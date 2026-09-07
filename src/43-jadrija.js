@@ -30869,41 +30869,149 @@ async function buildJadrija(scene) {
   // the shoulder" is a phone at reading distance on the man and a dislocated
   // shoulder on the six-year-old. Reach is |shoulder→elbow| + |elbow→wrist|,
   // measured off the figure every frame, and it is the only length in here.
+  //
+  // AND THE SECOND REPORT WAS NOT THE FIRST ONE AGAIN. Misha, 7 Sep 2026: *"the
+  // way the bathers hold their cellphones is awkward/unnatural"*. The hand is
+  // on the phone — `gap` is 14 mm on the woman at t 360 and the solve below is
+  // exact on the frame it is asked for — so nothing here is floating any more.
+  // What was wrong is where the solve was told to put things, and photographed
+  // at 2.3 m from eight bearings it was wrong in two different ways for the two
+  // poses. Both are written up on the numbers they moved.
   const GRIP = {
     /** The wrist, from the right shoulder: forward, up, inboard. The first
      *  number is the pose — it is the fraction of the reach the hand is held
      *  at, so it *is* the elbow (1.0 is a straight arm, 0.3 is a hand at your
-     *  own ear), and 0.58 comes out at about 70° at the elbow. */
-    read: [0.58, -0.12, -0.15],
+     *  own ear), and 0.58 comes out at about 70° at the elbow.
+     *
+     *  THE SECOND NUMBER IS THE ONE THAT READ AS AWKWARD. It was −0.12, which
+     *  on the 0.50 m arm of the woman at t 360 s 0.6 put the phone 0.05 m
+     *  ABOVE the shoulder joint and only 0.12 m below her eyes: a screen held
+     *  up beside her own cheek on a line 25° under the eye line, which is what
+     *  somebody showing you a photograph does, not what somebody reading does.
+     *  From every one of the eight bearings the phone was level with her nose.
+     *  The arm followed it — carrying the wrist that high swung the whole upper
+     *  arm 36° off vertical, so the elbow hung unsupported out in front of the
+     *  ribs, which is the tiring, held-up look the report is about.
+     *
+     *  −0.24 drops the wrist by an eighth of the reach, 0.06 m on that figure.
+     *  The phone lands at the top of the sternum; the eye-to-screen line goes
+     *  from 25° below horizontal to 33°, which is where a person actually reads
+     *  one (30–45°); the distance from the eye stays at 0.30 m, because what
+     *  moved is the ANGLE and not the reach; and the shoulder unflexes from 36°
+     *  to 26° before the spread below is added, which is the elbow coming back
+     *  down beside the ribs — 30° on the woman photographed, 22° on the man at
+     *  t 470.9, because they draw different halves of it. The third
+     *  number goes −0.15 → −0.17 with it, 0.01 m further inboard, because a
+     *  screen read one-handed sits nearer the middle of you than that. */
+    read: [0.58, -0.24, -0.17],
     /** The phone, from the wrist: up about a hand's length and a little
      *  further out, because the wrist is a joint and the phone is in the
-     *  fingers. */
+     *  fingers. Unchanged — measured against the forearm the wrist is bent 41°
+     *  at the new height, which is a hand holding a phone and not a broken
+     *  wrist. */
     lift: [0.06, 0.22, 0.00],
     /** The phone at the ear, from the head bone — which is the base of the
      *  skull, so this is up to the ear and out past the cheek. In the FIGURE's
      *  frame, and that is the other half of the same bug: the old offset was
      *  0.115 m along the BILLBOARD bearing, so the handset slid round the head
      *  to whichever side you happened to be standing on and was at neither ear.
-     */
-    ear: [-0.02, -0.09, 0.20],
-    /** And the wrist under it, holding it there. */
-    hand: [0.02, -0.17, 0.04],
+     *
+     *  0.20 OUT WAS INSIDE THE SKULL. On the man at t 470.9 that is 0.089 m
+     *  from the centre line of a head whose own half-width is 0.073 m, so the
+     *  inner face of a 0.071 m case sat 0.019 m INSIDE his cheek — photographed
+     *  at 2.3 m the handset is a black patch printed on his ear and hair.
+     *  0.28 carries the centre out to 0.125 m and the inner face to 0.089 m,
+     *  which is 0.016 m of air off that skull and about half of it off the ear
+     *  itself; and −0.13 rather than −0.09 drops the earpiece end from over the
+     *  top of his ear to level with it.
+     *
+     *  AND THE FIRST NUMBER ONLY MATTERED ONCE THE THIRD WAS FIXED. −0.02 put
+     *  the case 0.009 m BEHIND the head bone, which is the base of the skull
+     *  and already behind the ear; buried in the head that was invisible, and
+     *  standing clear of it, photographed from behind at 2.2 m, it was a
+     *  handset held against the back of his skull — the billboard sweeps the
+     *  0.071 m width fore-and-aft from that bearing, so its trailing edge was
+     *  0.044 m behind the skull base. 0.06 is 0.027 m forward, which puts the
+     *  middle of the case under the ear canal with the earpiece end 0.01 m
+     *  above it. Circled at eight bearings it is at the ear from seven, and
+     *  behind his own head from the eighth, which is the one that should hide
+     *  it. */
+    ear: [0.06, -0.13, 0.28],
+    /** And the wrist under it, holding it there.
+     *
+     *  0.04 out was the third face of the same bug. It put the wrist 0.09 m
+     *  INBOARD of the shoulder, so the forearm ran diagonally up across the
+     *  throat and the hand came at the ear from in front of the chin — and the
+     *  wrist had to break 79° to do it, which is past what one bends. Out at
+     *  0.07 and forward at 0.10 the forearm runs up the SIDE of the head, in
+     *  the shoulder's own plane, and the wrist comes back to 11°: a nearly
+     *  straight line from elbow to handset, which is what holding a phone to
+     *  your ear is. */
+    hand: [0.10, -0.16, 0.07],
     /** Which way the elbow falls. Every point on a circle perpendicular to the
      *  line from the shoulder to the hand is a legal elbow and the solve has to
      *  be told which one to take: down, back and a little out from the ribs for
-     *  a reader; down and further out for a handset at an ear. */
-    poleRead: [-0.30, -1, 0.45],
-    poleEar: [0.15, -1, 0.55],
+     *  a reader; forward and a little out for a handset at an ear.
+     *
+     *  THE POLE IS PROJECTED, so what it asks for is not what it gets. The
+     *  elbow can only be chosen on that circle, and a pole is squashed onto it
+     *  perpendicular to the shoulder→wrist line — so the more that line points
+     *  the way the pole does, the less of the pole survives. `poleEar` asked
+     *  for "down" with a −1, and the hand at the ear puts the wrist up and
+     *  inboard of the shoulder, which is most of the way to straight down: what
+     *  was left after the projection was mostly +x with the sign of the
+     *  leftovers, and it threw the elbow 0.105 m ACROSS the chest. Asking for
+     *  the forward elbow directly is both what a caller's elbow does and the
+     *  one direction the projection cannot eat, since the wrist is never out in
+     *  front on this pose. It lands 0.224 m forward, 0.078 m below the shoulder
+     *  and 0.031 m outboard of it — the arm no longer crosses the body at all.
+     *
+     *  `poleRead`'s z comes 0.45 → 0.30 for the same reason read the other way:
+     *  with the wrist dropped, 0.45 put the elbow 0.025 m outboard of the
+     *  shoulder, an arm winged off the ribs. 0.30 lands it within a millimetre
+     *  of the shoulder's own z, which is where an upper arm hangs. Not further
+     *  in — the elbow has a ribcage to clear, and an elbow tucked inboard of
+     *  the shoulder is an arm inside the chest. */
+    poleRead: [-0.30, -1, 0.30],
+    poleEar: [1.00, -0.80, 0.35],
     /** And the head over it, because a person reading a phone looks at it.
      *  On the NECK and not on `head`: the crowd turns the head to watch you go
      *  past (42-crowd.js) and `aims` holds one rotation per bone, so two
      *  writers on that bone is whichever ran last. The neck carries the head
-     *  with it and nobody can tell the difference. */
-    chin: 0.30,
-    /** A handset is not read, so that head tips toward the shoulder instead. */
-    tilt: 0.13,
+     *  with it and nobody can tell the difference.
+     *
+     *  0.30 rad is 17°, and against a phone that was up at nose height there
+     *  was nothing for it to do: the face read as looking straight past the
+     *  screen it was supposed to be reading. With the phone down at the
+     *  sternum the eye line to it is 36° and 0.42 rad — 24° — is the half of
+     *  that a neck contributes, which leaves the eyes the rest. It is also the
+     *  posture everybody on a beach is actually in. */
+    chin: 0.42,
+    /** A handset is not read, so that head tips toward the shoulder instead.
+     *  0.20 rather than 0.13 now the handset stands clear of the cheek: 11°,
+     *  which is the head leaning the last centimetre on to the phone rather
+     *  than the phone being pressed on to a head held straight. */
+    tilt: 0.20,
     /** How far the four fingers come round it. See the curl in `holdPhone`. */
     curl: 0.85,
+    /**
+     * And not all twelve of them the same.
+     *
+     * Everything above is ONE pose, and twelve people on this shore are holding
+     * a phone: three in a row on the terrace at t 317–325 held theirs at the
+     * same height, at the same angle, with their heads tipped the same amount,
+     * which reads as a window display and not as a café. The spread is per
+     * PERSON, off `jit` and the casting index — Rule 4, never `rng()`, which
+     * taken here would walk every parasol, bather and hut on the beach one draw
+     * down the shared stream — so it is a fact about that bather and the same
+     * arm every time you walk back to them.
+     *
+     * In fractions of the reach, like the rest of the table, and small: ±0.045
+     * of reach is ±22 mm of phone on an adult, which is the difference between
+     * two people reading and nowhere near enough to put a hand through a knee.
+     * `chin` and `tilt` are radians, so ±0.09 is ±5°.
+     */
+    vary: { read: 0.045, high: 0.055, pole: 0.12, chin: 0.09, tilt: 0.05 },
   };
 
   /**
@@ -30975,7 +31083,7 @@ async function buildJadrija(scene) {
         rec = arms[k] = {
           on: false, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(),
           qc: new THREE.Quaternion(),
-          ex: 0, ey: 0, ez: 0, wx: 0, wy: 0, wz: 0,
+          ex: 0, ey: 0, ez: 0, wx: 0, wy: 0, wz: 0, id: -1,
         };
       }
       // A PHONE AT THE EAR IS A DIFFERENT POSE, not a different offset. Both
@@ -30984,7 +31092,15 @@ async function buildJadrija(scene) {
       // and how tightly that folds the arm, which the solve works out for
       // itself from the distance.
       const ear = fg.phone === 2 && phoneHead >= 0;
-      holdPhone(f, rec, ear, tmpP);
+      // WHO, and not which mesh. `GRIP.vary` spreads the pose per person and
+      // `fg.idx` is the casting order — the only stable name anybody in this
+      // crowd has (see the note where it is handed out). The mesh index `k`
+      // would have done the arithmetic just as well and been the wrong number:
+      // a roving slot changes hands as you walk down the shore, so a spread
+      // hung off `k` is a spread that belongs to the SLOT, and the bather you
+      // walked away from would be holding their phone at somebody else's angle
+      // when you came back.
+      holdPhone(f, rec, ear, tmpP, fg.idx | 0);
       // IN THE FIGURE'S OWN SPACE, and it has to be put back into the world's.
       // `boneAt` reads the skinning palette, which is built in the mesh's local
       // frame — the same frame `cat()` reports paw heights in. Left as it came
@@ -31051,6 +31167,15 @@ async function buildJadrija(scene) {
     f.aim('neck', 0, 1, 0, 0);
   }
 
+  /**
+   * This bather's own share of `GRIP.vary`, signed, on the axis `key`.
+   *
+   * `jit` answers 0…1 for a pair of integers and takes nothing off the shared
+   * stream — Rule 4 — so this is a fact about bather `id` and not about the
+   * frame, the slot or the draw order.
+   */
+  const spread = (id, key) => jit(id, key) * 2 - 1;
+
   /** `aim` is told an axis and an angle; a solve hands back a quaternion. */
   function aimQ(f, name, q) {
     const s = Math.hypot(q.x, q.y, q.z);
@@ -31077,7 +31202,7 @@ async function buildJadrija(scene) {
    *
    * @returns the phone's place, in FIGURE space, in `out`.
    */
-  function holdPhone(f, rec, ear, out) {
+  function holdPhone(f, rec, ear, out, id) {
     const S = _hS, E = _hE, W = _hW, T = _hT;
     f.boneAt(phoneArmU, S);
     f.boneAt(phoneArmL, E);
@@ -31090,12 +31215,18 @@ async function buildJadrija(scene) {
     // there puts the hand, and that is what the solve is for.
     if (ear) {
       f.boneAt(phoneHead, out);
+      // NOT SPREAD, and that is the whole of the reason: these three are what
+      // hold a 0.071 m case off a 0.146 m head, and the clearance they buy is
+      // 0.016 m. Any spread worth seeing is a handset through somebody's jaw on
+      // one draw in four. The caller's variation is all in `tilt`, which is a
+      // head leaning on to a phone that has not moved.
       out.set(out.x + GRIP.ear[0] * L, out.y + GRIP.ear[1] * L,
         out.z + GRIP.ear[2] * L);
       T.set(out.x + GRIP.hand[0] * L, out.y + GRIP.hand[1] * L,
         out.z + GRIP.hand[2] * L);
     } else {
-      T.set(S.x + GRIP.read[0] * L, S.y + GRIP.read[1] * L,
+      T.set(S.x + (GRIP.read[0] + spread(id, 9143) * GRIP.vary.read) * L,
+        S.y + (GRIP.read[1] + spread(id, 9147) * GRIP.vary.high) * L,
         S.z + GRIP.read[2] * L);
       out.set(T.x + GRIP.lift[0] * L, T.y + GRIP.lift[1] * L,
         T.z + GRIP.lift[2] * L);
@@ -31104,7 +31235,12 @@ async function buildJadrija(scene) {
     // either. This is every frame the pose ladder skips — 42-crowd.js re-poses
     // a figure past POSE_NEAR every third frame and past POSE_MID every eighth
     // — and it is what keeps this to one solve per pose.
-    if (rec.on && E.x === rec.ex && E.y === rec.ey && E.z === rec.ez
+    //
+    // `id` is in the test because the spread above is hung off it: a slot that
+    // changed hands between two people the clip happens to hold identically
+    // would otherwise keep the first one's arm on the second one's body.
+    if (rec.on && rec.id === id
+      && E.x === rec.ex && E.y === rec.ey && E.z === rec.ez
       && W.x === rec.wx && W.y === rec.wy && W.z === rec.wz) return out;
     // What the clip is doing under the last solve. A bone's delta is laid on
     // OUTSIDE its parent's — `measured = qb · qa · clip` for the forearm — so
@@ -31127,7 +31263,12 @@ async function buildJadrija(scene) {
     const a = (d * d + Lu * Lu - Lf * Lf) / (2 * d);
     const h = Math.sqrt(Math.max(0, Lu * Lu - a * a));
     const pole = ear ? GRIP.poleEar : GRIP.poleRead;
-    const p = _hP.set(pole[0], pole[1], pole[2]);
+    // The reader's elbow swings a little in or out with the person, on the one
+    // axis where that is a posture and not a mistake — an elbow further forward
+    // or back on that circle changes how folded the arm is, which the wrist
+    // target has already decided.
+    const p = _hP.set(pole[0], pole[1],
+      pole[2] + (ear ? 0 : spread(id, 9149) * GRIP.vary.pole));
     p.addScaledVector(v, -p.dot(v));
     if (p.lengthSq() < 1e-6) p.set(v.y, -v.x, 0);   // any perpendicular will do
     p.normalize();
@@ -31140,13 +31281,14 @@ async function buildJadrija(scene) {
       _hN.copy(T).sub(el).normalize());
     aimQ(f, 'armUR', rec.qa);
     aimQ(f, 'armLR', rec.qb);
-    if (ear) f.aim('neck', 1, 0, 0, GRIP.tilt);
-    else f.aim('neck', 0, 0, -1, GRIP.chin);
+    if (ear) f.aim('neck', 1, 0, 0, GRIP.tilt + spread(id, 9151) * GRIP.vary.tilt);
+    else f.aim('neck', 0, 0, -1, GRIP.chin + spread(id, 9153) * GRIP.vary.chin);
     // Stamped HERE and not at the bottom, because the guard above is what makes
     // undoing the deltas legal and the two have to be set together — an early
     // return past this would leave the next frame taking deltas off a pose that
     // was never measured with them on.
     rec.on = true;
+    rec.id = id;
     rec.ex = E.x; rec.ey = E.y; rec.ez = E.z;
     rec.wx = W.x; rec.wy = W.y; rec.wz = W.z;
     if (phoneFing < 0) return out;
