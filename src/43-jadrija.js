@@ -36020,7 +36020,33 @@ async function buildJadrija(scene) {
     // Drawn even where it is overridden, for the reason above it: the roll is
     // the beach, and a `b.sex` that skipped it would move everybody after it.
     const roll = rng() < 0.5 ? 'f' : 'm';
-    const sex = b.sex || roll;
+    // AND THEN THROWN AWAY FOR ANYBODY WHO IS SOMEBODY.
+    //
+    // The roll above picks the instanced rig -- `crowds.f` carries a fall of
+    // hair down the neck -- and the bark voice. `castBlob` picks which of the
+    // eight baked bodies you become when you walk up, and it is dealt on
+    // HEIGHT alone, in two bands, because it runs before this loop and there
+    // is no sex to consult yet. Two decisions about one person, made in two
+    // places, never compared: 41 of 79 promotable bathers disagreed, which is
+    // exactly what a fair coin against a fixed deal should give.
+    //
+    // Misha, 7 Sep, on the swimwear that came of it. The moustache in the same
+    // report was a different bug and is fixed; this is the one that puts a man
+    // in a two-piece, because the blob's suit is painted into its vertices and
+    // there is nothing to overrule it with.
+    //
+    // THE BLOB IS THE PERSON. Whoever can be promoted takes their sex from the
+    // body they will turn into, and the coin is only kept for those who never
+    // can -- the shop staff, who are pinned by `b.sex` above anyway, and the
+    // chair sitters `castBlob` skips outright. A slot they can never fill
+    // cannot contradict them.
+    //
+    // The draw still happens for everybody, unconditionally, for the reason
+    // the comment above gives: the `rng` stream IS the beach, and a number
+    // taken here and not there moves every parasol downstream of it (rule 4).
+    const cb = castBlob ? castBlob[bi] : -1;
+    const kin = cb >= 0 && CAST_KIND ? CAST_KIND[cb] : null;
+    const sex = b.sex || (kin ? BATHER_SEX[kin] : null) || roll;
     // The instanced tier is now everybody's home except the terrace's. A
     // roving candidate lives here and is *lent* to a slot; `fg.hidden` is what
     // says which of the two is drawing them this frame.
@@ -37080,6 +37106,11 @@ async function buildJadrija(scene) {
         who: crowds.skin ? crowds.skin.slots.filter(Boolean)
           .map((fg) => ({
             idx: fg.idx, blob: BATHER_CAST[fg.blob], mode: fg.mode,
+            // The third column that has to agree, and did not until 1.353.0:
+            // `sex` picks the instanced rig and the bark voice, `blob` picks
+            // the body you become. A row where these disagree is a woman at
+            // twenty metres who is a man at two.
+            sex: fg.sex, blobSex: BATHER_SEX[BATHER_CAST[fg.blob]],
             d: +Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z).toFixed(1),
             skinM: +(castNatH[fg.blob] * fg.hscale).toFixed(3),
             instM: +(((crowds.m || crowds.f || {}).height || 0)

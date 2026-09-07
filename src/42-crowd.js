@@ -298,6 +298,32 @@ const BATHER_CAST = [
 ];
 
 /**
+ * And which of them is a woman.
+ *
+ * Stated rather than parsed off the name, because a table that can be read is
+ * worth eight lines and a regex over `^woman|^girl` is a rule somebody has to
+ * remember when the ninth person is baked.
+ *
+ * It exists because the beach was deciding this TWICE. `castBlob` deals these
+ * eight along the shore on height alone -- child or adult, and nothing else,
+ * because sex has not been drawn yet when it runs -- and the casting loop then
+ * flipped its own coin for the instanced rig and the bark voice. Two answers
+ * about one person, never compared: 41 of 79 promotable bathers disagreed.
+ * What that looks like is a figure with a fall of hair down her neck who yelps
+ * in a woman's voice and becomes a heavy old man in trunks as you walk up.
+ *
+ * Four of each, and both of `castBlob`'s bands are balanced too -- one girl
+ * and one boy, three women and three men -- so reading sex off the deal
+ * instead of off a coin leaves the shore's own balance where it was.
+ */
+const BATHER_SEX = {
+  woman_young_slim: 'f', man_old_heavy: 'm',
+  girl_child: 'f', man_young_fit: 'm',
+  woman_young_full: 'f', boy_child: 'm',
+  woman_old: 'f', man_young_lean: 'm',
+};
+
+/**
  * What each of the eight has on, and what colour they are.
  *
  * Read off `SUITS` in tools/blender/bathers_mh.py, which is where they are
