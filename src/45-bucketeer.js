@@ -71,15 +71,12 @@ const BUCK = {
   // inside a house, and from 150 m the house is what you can see of her.
   poseM: 150,
   faceM: 34,
-  // Seconds between one hummed phrase and the next, plus up to as much again.
-  // A hum with no gaps in it is a kettle.
-  // Opened up, because the level was only half of why she was masking the
-  // birds. A 4.45 s phrase against a 1.4-4.0 s gap is a 53-76% duty cycle —
-  // she was humming through two-thirds of every minute, which is not somebody
-  // humming to herself, it is a radio. 3.2 + 0-5.0 puts her at 35-58%, so
-  // there is more silence than tune and the gulls have somewhere to land.
-  // OFF until there is a real song to put in it — see the call site.
-  hum: false,
+  // ON, and with a recording of her own voice in it rather than a tune — see
+  // `humBurst` at the foot of this file, which is where the whole of the
+  // phrasing lives, and the block in 80-audio.js that used to be a
+  // synthesiser. The flag stays because it is the one switch that turns her
+  // voice off without unpicking anything.
+  hum: true,
   // How close you get before she stops rather than walks through you, and how
   // far round in front of her that has to be. 0.95 m is her own reach plus a
   // shoulder; 0.30 is about 70 degrees either side, so somebody beside her or
@@ -93,8 +90,75 @@ const BUCK = {
   noticeDot: 0.82,
   noticeHold: 3.4,     // s she stays turned toward you
   noticeGap: 11.0,     // s before she will do it again, so she does not nag
-  humGap: 3.2,
-  humJit: 5.0,
+
+  // ── how somebody actually hums ─────────────────────────────────────────────
+  //
+  // THE CLIP IS ONE PHRASE, 1.93 s of it, and every number here is an answer to
+  // that. Two seconds on a seamless repeat is a worse artefact than silence:
+  // noise has no join, but a tune has a period, and the second time round the
+  // same eight notes at the same interval the ear has it and cannot put it
+  // down again. The same verdict the beds got — *"it was heard as a loop inside
+  // a minute"* — and a phrase with words behind it gives itself away far faster
+  // than a hillside of insects does.
+  //
+  // So she does not hum on a metronome. She hums in BURSTS: one to three
+  // phrases nearly back to back with a breath between them, then eight to
+  // eighteen seconds of nothing, and the last phrase of a burst is usually one
+  // she does not finish. That is what somebody carrying water does — they get
+  // going, do a couple of bars, trail off and forget about it — and it is also
+  // the only structure that makes twelve repetitions of one clip in five
+  // minutes not sound like twelve repetitions of one clip.
+  //
+  // The arithmetic, which is the part that has to be defended, because it is
+  // the third time a sound of hers has been raised against the bird calls:
+  // a mean burst is two phrases, one of them cut to 0.71 of its length, which
+  // is 3.31 s of voice inside a 3.83 s burst; the mean gap after it is 12.5 s.
+  // That is a 20.3 % DUTY CYCLE. The synthesiser that was here ran at 35-58 %
+  // after it had already been opened up once from 53-76 %, and 35-58 % was
+  // still judged a radio. A fifth is somebody humming to herself.
+  humRun: [1, 3],       // phrases in a burst
+  humBreath: 0.30,      // s between two phrases inside one, plus up to
+  humBreathJit: 0.45,   // this much again — a breath, not a rest
+  humGap: 8.0,          // s from the end of a burst to the start of the next,
+  humJit: 9.0,          // plus up to this much again
+  // Where a phrase she does not finish stops, as a fraction of the clip.
+  // MEASURED off the recording rather than picked: the 10 ms envelope has its
+  // two deepest interior dips at 0.775 s and 1.42 s, at −23.4 dB and −22.8 dB
+  // under the peak, which are the two places she takes a breath. 0.40 and 0.74
+  // are those two, so a truncated phrase stops where she was going to pause
+  // anyway and not in the middle of a note. 1.0 is the whole of it, which is
+  // what she does about a third of the time.
+  humPart: [0.40, 0.74, 1.00],
+  // Nobody hums the same phrase in the same key twice. Playback rate is her key
+  // and her tempo in one number, which is exactly right on a voice — start a
+  // phrase higher than the last and you start it faster too. A burst holds one
+  // key (0.035 is ±0.6 of a semitone, a shade either side of where she was) and
+  // each phrase inside it wobbles a further ±1 %, which is a person and not a
+  // varispeed.
+  humDrift: 0.035,
+  humWobble: 0.010,
+  // What each beat of the loop is worth, and everything missing from this table
+  // is a beat she does not hum through at all.
+  //
+  // "AS SHE MOVES AROUND" IS THE BRIEF, and the rest of it is what a person
+  // with ten kilos on one arm actually does: you cannot hum while you are
+  // lifting. So `lift`, `take`, `set`, `tip` and `right` are absent — the four
+  // moments the weight is moving between the ground and her hand, and the one
+  // where she is rolling ten litres over a rail — and a phrase that is running
+  // when she reaches one of them is cut off where it stands rather than allowed
+  // to finish. Which is audible, and is the best thing in here: she stops
+  // mid-tune to heave the bucket up, and picks it up again on the stairs.
+  //
+  // The two standing beats that ARE in it are the two where she is waiting
+  // rather than working — the tap running into the pail, and straightening her
+  // back on the porch looking at the channel — which is precisely when anybody
+  // hums.
+  humBeat: {
+    up: 1.00,           // empty pail, four flights into the morning
+    down: 0.88,         // ten kilos down an open flight, minding her feet
+    rest: 0.85,         // straightening her back, looking at the water
+    fill: 0.72,         // under her breath, listening to the tap
+  },
 
   // ── ten kilos on one arm ───────────────────────────────────────────────────
   //
@@ -680,7 +744,12 @@ async function buildBucketeer(scene, vik, walkY) {
     tip: 0,             // radians the pail has rolled about its bail
     poolAt: null,       // where the last one landed, and how long ago
     poolT: 0,
-    humAt: 0.8,
+    // The humming. `humAt` is seconds until the next phrase, `humLeft` is how
+    // many are left in the burst she is in the middle of, `humRem` is seconds
+    // of phrase still sounding, `humI` is the phrase counter the sine hash is
+    // indexed on and `humKey` is the rate this burst is being hummed at.
+    // `wall` is how much building is between her and your ear, eased.
+    humAt: 3.0, humLeft: 0, humRem: 0, humI: 0, humKey: 1, wall: 0,
     // You, and whether she has seen you. `yield` is her legs stopped because
     // you are in the doorway; `notice`/`noticeAmt` is the seconds left of her
     // having looked up and the eased shape of it; `offered` is whether there
@@ -1095,6 +1164,176 @@ async function buildBucketeer(scene, vik, walkY) {
     }
   }
 
+  // ── the humming ─────────────────────────────────────────────────────────────
+  /**
+   * The sine hash, and RULE 4: `rng()` is never called in the Jadrija build.
+   *
+   * The reason is the one written over `jit` in 43-jadrija.js — the shared
+   * stream is drawn on in the middle of the shore build, and taking draws off
+   * it moves every parasol, bather and hut on the beach. This one runs once a
+   * phrase, twelve times a minute at the very most, and it would be an
+   * especially silly way to redecorate a beach. `i` is the phrase counter and
+   * `k` names which question is being asked of it, so the six decisions taken
+   * about one phrase are six independent numbers and not six draws in a row.
+   */
+  const jit = (i, k) => {
+    const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+    return v - Math.floor(v);
+  };
+
+  /**
+   * The way back from world metres into the plan's own axes, taken ONCE off the
+   * house rather than assumed.
+   *
+   * `vik.at` goes the other way through `field.toWorld`, which is the shore's
+   * arc-length frame — and that frame is neither rigid nor uniform. MEASURED at
+   * this house: one unit along the plan's x lands 0.976 m of world away and one
+   * unit along its z lands 0.996 m, so it carries a scale, the two axes carry
+   * different ones, and there is a little shear between them. The fly next door
+   * inverts it as a plain rotation by `vik.yaw`, which round-trips the middle of
+   * the big room to within 3 cm and the foot of the stairs to within 10 — fine
+   * for a fly, and a fifth of the fade this door is given, in the wrong
+   * direction, for a wall.
+   *
+   * So take the two basis vectors and invert the 2x2 they make. Over the ±4 m
+   * the plan covers the frame is linear to well inside a millimetre, and this is
+   * eleven lines and one multiply a frame.
+   */
+  const vikInv = (() => {
+    const o = vik.at([0, 0, 0]);
+    const ex = vik.at([1, 0, 0]), ez = vik.at([0, 0, 1]);
+    const a = ex[0] - o[0], b = ez[0] - o[0];
+    const c = ex[2] - o[2], d = ez[2] - o[2];
+    const det = (a * d - b * c) || 1;
+    return { x: o[0], z: o[2], m: [d / det, -b / det, -c / det, a / det] };
+  })();
+
+  /**
+   * How far inside one storey of the house a point is, 0…1.
+   *
+   * The same question the fly asks in 44-vikendica.js — is this inside the flat
+   * — asked about two people instead of one and about both storeys instead of
+   * one, because what the humming needs is not "am I indoors" but "is there a
+   * wall between us".
+   *
+   * TWO STOREYS AND NOT ONE, and the second was found by listening. The porch
+   * she tips the water on is `terrasa 8`, which is under the upper terrace and
+   * hard against the prizemlje's own front wall — so a listener standing in the
+   * prizemlje is three metres from her with a dwelling wall in between, and a
+   * test that only knew about the flat called that no wall at all. `floorAt`
+   * has said all along what the fix is: the two storeys "are separate dwellings
+   * and there is no internal stair between them", so being in the lower one is
+   * exactly as much building as being in the upper one.
+   *
+   * `fy` is which floor slab to sit the band on. The two bands must not
+   * overlap, so they are split at 0.35 m under the upper floor rather than at
+   * each storey's own clear height, which would have left half a metre where a
+   * point was in both. Feet are what is handed in — `who.y` is the walker's own
+   * y, not the camera's, and the eye is 1.66 m over it — so 2.55 m of slab is
+   * nowhere near either answer and the split is never close.
+   *
+   * Ramped over the last 0.55 m rather than switched, so that the front door is
+   * a doorway and not a plane. She walks through it at 0.76 m/s carrying ten
+   * litres, which is 0.7 s of fade — about how long it takes to get a bucket
+   * through a door.
+   */
+  function inStorey(x, y, z, fy, lo, hi) {
+    if (!vik || !vik.plan) return 0;
+    const ly = y - vik.base;
+    if (ly < fy - lo || ly > fy + hi) return 0;
+    const dx = x - vikInv.x, dz = z - vikInv.z;
+    const lx = vikInv.m[0] * dx + vikInv.m[1] * dz;
+    const lz = vikInv.m[2] * dx + vikInv.m[3] * dz;
+    const O = vik.plan.outer;
+    const off = Math.hypot(Math.max(O.x0 - lx, lx - O.x1, 0),
+      Math.max(O.z0 - lz, lz - O.z1, 0));
+    return clamp(1 - off / 0.55, 0, 1);
+  }
+  /** In the flat, the gornji kat, which is the one she works in. */
+  const inFlat = (x, y, z) =>
+    inStorey(x, y, z, vik.plan.floor, 0.35, 2.90);
+  /** In the prizemlje under it, which is somebody else's front door. */
+  const inPriz = (x, y, z) =>
+    inStorey(x, y, z, vik.plan.floorP, 0.60, vik.plan.floor - 0.35 - vik.plan.floorP);
+
+  /**
+   * What she is worth on this beat of the loop, 0…1. See `BUCK.humBeat`.
+   */
+  function humLevel() {
+    // Stopped in a doorway waiting for you to move out of it. Whatever else
+    // that is, it is not somebody humming to herself: she is looking at you and
+    // waiting, and carrying on with the tune would be pointed rather than
+    // absent-minded.
+    if (st.yield) return 0;
+    let lvl = BUCK.humBeat[st.phase] || 0;
+    // `rest` is two beats in one name — nine tenths of a second putting ten
+    // kilos down, then a couple standing over it — and only the second half of
+    // it is a beat anybody hums through. `held` falls 1 to 0 across the first,
+    // so this is the pail reaching the porch and her getting her breath back.
+    if (st.phase === 'rest') lvl *= 1 - st.held;
+    return lvl;
+  }
+
+  /**
+   * One frame of the humming.
+   *
+   * The per-frame call into `audio.hum` happens whether or not anything is
+   * sounding, and that is the design and not a wasted call: a phrase runs for
+   * nearly two seconds and she walks 2.3 m in that, through a doorway that is
+   * a wall. See the note over `hum` in 80-audio.js — the level, the distance
+   * and the wall are written every frame on to the one live voice.
+   */
+  function humTick(dt, d, who) {
+    if (!BUCK.hum || !audio) return;
+    // How much house is between the two of you: one wall is exactly one of you
+    // being inside a storey and the other not. The prizemlje term has no `her`
+    // half because she has no way into it — her route is the flat, the outside
+    // stair and the porch, and `floorAt` is why: there is no internal stair, so
+    // the downstairs dwelling is not on her round. It counts for the listener
+    // alone, and it counts whether she is in the flat over your head or on the
+    // porch outside your door.
+    st.wall = damp(st.wall, Math.max(
+      Math.abs(inFlat(who.x, who.y, who.z) - inFlat(st.x, st.y, st.z)),
+      inPriz(who.x, who.y, who.z)), 7, dt);
+    const lvl = state.phase === 'intro' ? 0 : humLevel();
+
+    if (st.humRem > 0) st.humRem -= dt;
+    if (lvl <= 0.02) {
+      // She has reached a beat nobody hums through. Cut the phrase where it
+      // stands — and DO NOT touch `humAt`, because the burst she was in the
+      // middle of should pick up again on the stairs rather than restart from
+      // the top the moment she is upright.
+      if (st.humRem > 0) { audio.hum(d, { stop: true }); st.humRem = 0; }
+      return;
+    }
+    audio.hum(d, { wall: st.wall, level: lvl });
+    st.humAt -= dt;
+    if (st.humAt > 0) return;
+
+    if (st.humLeft <= 0) {
+      // A new burst: how many phrases, and what key she is in for all of them.
+      // The key is per burst and not per phrase because somebody who has just
+      // started humming stays in the key they started in until they stop.
+      st.humLeft = BUCK.humRun[0]
+        + Math.floor(jit(st.humI, 3) * (BUCK.humRun[1] - BUCK.humRun[0] + 1));
+      st.humKey = 1 + (jit(st.humI, 7) * 2 - 1) * BUCK.humDrift;
+    }
+    // Only the LAST phrase of a burst is one she might not finish, which is
+    // what trailing off means. Cut one in the middle and the next one starting
+    // straight after it is a skip, not a person.
+    const part = st.humLeft <= 1
+      ? BUCK.humPart[Math.floor(jit(st.humI, 11) * BUCK.humPart.length)] : 1;
+    const rate = st.humKey * (1 + (jit(st.humI, 13) * 2 - 1) * BUCK.humWobble);
+    const len = audio.hum(d,
+      { start: true, part, rate, wall: st.wall, level: lvl });
+    st.humRem = len;
+    st.humLeft -= 1;
+    st.humI += 1;
+    st.humAt = len + (st.humLeft > 0
+      ? BUCK.humBreath + jit(st.humI, 17) * BUCK.humBreathJit
+      : BUCK.humGap + jit(st.humI, 19) * BUCK.humJit);
+  }
+
   /**
    * Poked once a frame from `updateCrowd`, with the camera.
    *
@@ -1200,23 +1439,19 @@ async function buildBucketeer(scene, vik, walkY) {
     placePail();
     placeWater(dt);
 
-    // And the humming, WHICH IS OFF.
+    // And the humming, WHICH IS ON AGAIN AND IS HER OWN VOICE.
     //
-    // It read as chords rather than as a person. One oscillator stepping its
-    // pitch inside one breath is the right shape for a hum and it is what the
-    // synthesiser does; what it is not is a tune somebody could be humming,
-    // and a written four-bar phrase with a call and an answer sounds composed
-    // — because it was. `BUCK.hum` is the switch and everything under it is
-    // left standing, including "Buckasteers of America" in `HUM_A`/`HUM_B`,
-    // because the intent is to replace the melody with a real one rather than
-    // to take her voice away.
-    st.humAt -= dt;
-    if (BUCK.hum && st.humAt <= 0 && audio && state.phase !== 'intro') {
-      // A little under her breath while she is tipping ten kilos out, which is
-      // the one moment in the loop nobody hums through.
-      const len = audio.hum(Math.sqrt(d2), st.phase === 'tip' ? 0.45 : 1);
-      st.humAt = (len || 4.4) + BUCK.humGap + Math.random() * BUCK.humJit;
-    }
+    // The synthesiser that used to be here read as chords rather than as a
+    // person — *"instead of humming, i think u are playing some musical
+    // chords... for now remove it, i will give u later the bucketeers of
+    // america song"* — and it has been deleted, tune and all. What is in its
+    // place is 1.93 s of Baye humming one phrase of that song, in the
+    // ElevenLabs voice she speaks in, and everything about WHEN is above in
+    // `humTick`: bursts rather than a loop, nothing while she is lifting.
+    //
+    // After the pose and not before it, because `st.held` is what says whether
+    // the weight is moving and `stepLoop` is what writes it.
+    humTick(dt, Math.sqrt(d2), who);
   }
 
   return {
@@ -1241,6 +1476,25 @@ async function buildBucketeer(scene, vik, walkY) {
             + 'has stopped and looked back at you'
           : null);
     },
+    /**
+     * Debug: her voice off and on.
+     *
+     * Here and not on `__fr.buck` in 90-app.js because it exists for ONE job —
+     * recording the same thirty seconds twice and differencing them, which is
+     * the only way to say what she does to the bird calls rather than what she
+     * sounds like next to them. `perchStats` and the sea's uniforms are on the
+     * app object for the same reason and this one is on hers because everything
+     * else the humming owns is in this file.
+     *
+     * A/B is the whole point, so it also cuts a phrase already in the air:
+     * a control run with the tail of her last breath in the first second of it
+     * is a control run with her in it.
+     */
+    hum: (on) => {
+      BUCK.hum = on == null ? !BUCK.hum : !!on;
+      if (!BUCK.hum && audio) { audio.hum(0, { stop: true }); st.humRem = 0; }
+      return BUCK.hum;
+    },
     /** Where she is from you, for whoever has to decide who you are near. */
     gapTo: (x, z) => Math.hypot(x - st.x, z - st.z),
     /** Where she is now, and what she is doing. */
@@ -1257,8 +1511,19 @@ async function buildBucketeer(scene, vik, walkY) {
       yaw: +st.yaw.toFixed(3), clip: fig.playing(),
       bucket: kanta.position.toArray().map((n) => +n.toFixed(2)),
       pool: +st.poolT.toFixed(2),
-      /** Seconds until she starts the next phrase. A hum is easy to lose. */
+      // The humming. `humIn` is seconds to the next phrase, `humRem` seconds of
+      // one still sounding, `humLeft` how many are left of this burst, `humLvl`
+      // what this beat of the loop is worth and `wall` how much house is
+      // between her and your ear. `hums` is what the mixer says it has actually
+      // STARTED, which is the one number that separates "she never asks" from
+      // "she asks and the clip has not decoded" — the failure that sounds
+      // identical from outside.
       humIn: +st.humAt.toFixed(2),
+      humRem: +Math.max(0, st.humRem).toFixed(2),
+      humLeft: st.humLeft,
+      humLvl: +humLevel().toFixed(2),
+      wall: +st.wall.toFixed(3),
+      hums: audio ? audio.hum(0, { probe: true }) : -1,
       jetOn: jet.visible, jetH: +jet.scale.y.toFixed(2),
       jetAt: jet.position.toArray().map((n) => +n.toFixed(2)),
       poolOn: pool.visible,

@@ -4579,155 +4579,280 @@ function buildAudio() {
 
   // ── the Bucketeer's hum ─────────────────────────────────────────────────────
   /**
-   * A woman humming to herself with a bucket in her hand.
+   * Baye humming to herself, in her own recorded voice.
    *
-   * ONE OSCILLATOR FOR THE WHOLE PHRASE, and that is the whole of what makes
-   * this a hum and not a xylophone. Every other voice in this file is an event
-   * — a step, a call, a bark — and gets a note each. A hum is not a sequence of
-   * notes; it is one breath with the pitch stepping inside it, and the moment
-   * each note is given its own oscillator and its own attack you have somebody
-   * whistling in semiquavers. So the frequency is stepped with
-   * `setValueAtTime` at each note boundary and the gain only dips a little on
-   * the way past, which is the tongue, and rests to nothing at a `.`, which is
-   * where she takes a breath.
+   * WHAT WAS HERE BEFORE AND WHY IT IS GONE. Until 1.349.0 this was a
+   * synthesiser: one triangle oscillator stepping its pitch inside one breath
+   * through a written four-bar tune — "Buckasteers of America" — held in two
+   * pattern strings called `HUM_A` and `HUM_B`. The shape of it was right and
+   * the verdict on it was not: *"instead of humming, i think u are playing some
+   * musical chords, which is interesting but it's not what i had in mind... for
+   * now remove it, i will give u later the bucketeers of america song"*. It was
+   * switched off at `BUCK.hum` and left standing against the day the song
+   * arrived. The song has arrived — 7 Sep 2026, *"i have a variant of the song,
+   * basically it's the Bucketeer Baye, literally humming the tune to this song,
+   * she needs to be humming it as she moves around"* — so the oscillator, the
+   * two note tables and the note-boundary envelope that drove them are DELETED
+   * rather than left switched off. A written tune under a real one is a second
+   * answer to a question that now has a first, and the failure mode of leaving
+   * it is somebody flipping a flag in a year and getting the chords back.
    *
-   * And the mouth is SHUT, which is the other half of it. A cat is a sawtooth
-   * through two sweeping formants because a cat opens its mouth; a hum
-   * radiates through the nose and has almost nothing above the third harmonic.
-   * A triangle under a gentle low-pass is that, and any band-pass at all made
-   * it a kazoo.
+   * What replaces it is nine seconds of nothing and two seconds of her, off a
+   * clip of the same ElevenLabs voice she speaks in. `hum_bucketeer.mp3` is one
+   * PHRASE of the tune — 1.93 s of it, not a chorus and not a loop — and every
+   * design decision below follows from that one fact.
    *
-   * The tune is written rather than borrowed. Four bars, call and answer, up to
-   * the octave and back down to the root — which is about as much as anybody
-   * hums while carrying something, and is nobody's song.
+   * ── one voice, written every frame ──
+   *
+   * This is not a fire-and-forget event like the meow or the bark. Those are
+   * over in half a second and the listener has not moved; she walks at up to
+   * 1.16 m/s and a phrase is nearly two seconds, so she covers 2.3 m while it
+   * sounds — and one of the twelve legs she covers is the front door, which is
+   * a wall arriving in the middle of a note. A gain fixed at trigger time is a
+   * woman whose voice stays in the room she has just left.
+   *
+   * So there is exactly ONE live voice, held in `humNodes`, and every call to
+   * this function rewrites its distance, its wall and its level whether or not
+   * it is starting anything. `o.start` begins a phrase; `o.stop` ends one; a
+   * bare call is the per-frame update. A person hums one phrase at a time, so
+   * starting a second fades the first — which is also what makes "she stops
+   * dead when she picks the bucket up" a single call from the caller.
+   *
+   * ── the wall is between the two of you, not around one of you ──
+   *
+   * `outBus` carries the beach and takes the room's 500 Hz lid off `roomV`,
+   * which is how far indoors THE LISTENER is. That is the right question for a
+   * hillside of cicadas, which is always outside, and the wrong one for her,
+   * who is inside the flat for a third of her loop and out on the stairs for
+   * the rest. Four cases and `roomV` alone gets two of them: it muffles her
+   * correctly when you are in the flat and she is on the steps, and it muffles
+   * her wrongly when you are in the flat WITH her — and leaves her at full
+   * level out on the promenade while she is two rooms away behind a wall.
+   *
+   * So the caller hands in `o.wall`, which is how much building stands between
+   * the two of you — 45-bucketeer.js computes it as the difference of her
+   * in-the-flat and yours, because one wall is exactly one of you being inside
+   * it. The law applied to it is `outLp`'s own, 20 kHz down to 500 at the
+   * corner, so that when she does go behind a wall she goes behind the same
+   * wall the cicadas are behind and not a second one invented here.
+   *
+   * The gain is 0.86 and not the beach's 0.94, and the difference is a door.
+   * `outBus` is the whole envelope of the house against a hillside ninety
+   * metres off; she is one room away through a doorway she is carrying a
+   * bucket through all morning, so it is standing open. −17 dB is what an open
+   * interior door leaves of somebody in the next room; −24 is a shut one.
+   *
+   * ── which bus ──
+   *
+   * `bed`, and none of the three stages under it. Not `outBus`, whose lid is
+   * the wrong question — see above, and the wall here is the right one. Not
+   * `master` like the fly, which is on YOUR side of the wall by definition and
+   * has no wall term at all. `bed` puts her under `bedDuck` and `voiceDuck`,
+   * which is right twice: she hums under the transistor set, and she goes down
+   * when anybody speaks.
+   *
+   * ── and she stops when she talks ──
+   *
+   * ONE THROAT. `bayeGap` in 43-jadrija.js says it in as many words — the
+   * figure on the shore and the one carrying water "share a face, a rig and a
+   * voice", one person doing one errand or the other — so a hummed phrase
+   * running under a spoken line is not a mix problem, it is a woman humming
+   * and talking at the same time. The check is on `voiceEl` directly rather
+   * than through the voice service, because the per-frame update is already
+   * here and the collision has to be caught mid-phrase, not only at the start.
+   * She is now down to one line every five minutes (`VOICE.gapBucket`) and the
+   * humming is what fills that silence, so the two meet often.
    */
   const HUM = {
-    root: 220.0,        // A3, which is where a woman hums without trying
-    beat: 0.556,        // s — 108 to the minute, a walking pace and no faster
-    range: 26,          // m — audible on the forecourt, gone from the water
-    // MEASURED, not guessed, and it started at twice this. Recorded off
-    // `audio.tap()` with tools/sfx.mjs the first version peaked at 0.410
-    // against the meow's 0.430 — a woman humming to herself as loud as a cat
-    // being hosed, and humming for four and a half seconds at a time rather
-    // than for half of one. Halved, she peaks around 0.21 and sits near 0.13
-    // RMS at arm's length, which is under the beach bed's own 0.12 by the time
-    // you are ten metres off her.
-    // Then measured AGAINST THE BIRDS and cut again, because being under the
-    // beach bed is not the test — the test is what she does to everything else
-    // you are listening for. Recorded at arm's length with a gull firing in the
-    // same take: the hum band, 180-460 Hz, stood +9.7 dB over the gull band at
-    // 600-1300 and +35 dB over the swifts at 3500-5600, and the take peaked at
-    // -2.99 dBFS. A woman humming to herself was the loudest thing on this
-    // shore and she was masking the sky. 0.065 puts her peak just under the
-    // gull's own 0.070 amp, which is where somebody humming under their breath
-    // belongs: plainly there when you walk up to her, gone as a nuisance.
-    gain: 0.065,
-    lp: 840,            // the closed mouth
+    key: 'hum_bucketeer',
+    // The sounding length of the clip, in seconds, and it is a CONSTANT and not
+    // `buf.duration` on purpose. The caller schedules the next phrase off the
+    // return of this function and the buffer may not have decoded yet on the
+    // first one; a clock that only starts once a decode lands is a clock that
+    // stutters at the top of the session. Measured off the source: the phrase
+    // runs 0.000 to 1.940 and everything after that is digital silence, which
+    // is why the clip was trimmed to 1.955 before it was encoded.
+    len: 1.93,
+    // TWICE THE PEAK THE SYNTHESISER WAS CUT TO, AND QUIETER AGAINST THE BIRDS
+    // THAN IT WAS. That is not a sleight of hand, it is the measurement, and it
+    // is the answer to a complaint that has now come back three times.
+    //
+    // What was here before finished at a peak of 0.065 after two rounds of
+    // being turned down, and the reason it had to be turned down is written in
+    // its own note: recorded at arm's length its band stood +9.7 dB over the
+    // gull band. Which it would. It was a TRIANGLE, and the tune it played
+    // climbed to the octave — `HUM_A` reached 12 semitones over a 220 Hz root,
+    // so on its top note the fundamental was at 440 and the second harmonic sat
+    // at 880 Hz, in the middle of the gulls, 6 dB down. The thing masking the
+    // birds was not the loudness. It was that half the tune was living in their
+    // band.
+    //
+    // A closed mouth does not do that, and this recording is measured proof of
+    // it. Its own fundamental never leaves 190-350 Hz across the whole phrase,
+    // and its power divides:
+    //
+    //     120-250 Hz  11.30 %        800-1300 Hz   0.14 %
+    //     250-500 Hz  85.19 %       1300-2500 Hz   1.89 %
+    //     500-800 Hz   1.23 %       above 2500 Hz  0.14 %
+    //
+    // 96.5 % of her under 500 Hz, and 0.96 % of her in the gull's own
+    // 600-1300 — 20 dB under her own total before anything else has happened
+    // to her. So whatever she is scaled to, she arrives in the gull band 20 dB
+    // quieter than she arrives in her own, and the gull band is already 2.9 dB
+    // louder than the hum band is in the bed she is standing in.
+    //
+    // The clip peaks at 0.700, so 0.185 is a peak of 0.130 — double the
+    // retired synthesiser, which is where she is plainly a person humming
+    // rather than a rumour of one at three metres over an August beach. What
+    // that costs the birds is measured downstream and is nothing: see the
+    // recordings this release was signed off on.
+    gain: 0.185,
+    // Linear in distance and not squared, for the reason written over Baye's
+    // own carry and repeated over the fly: squared, she is inaudible at fifteen
+    // metres, which is well inside the range at which you can see what she is
+    // doing. 26 m reaches the whole forecourt and the top of the steps and is
+    // gone by the waterline.
+    range: 26,
+    // A closed mouth has almost no top on it and this clip already knows that
+    // — it was low-passed at 3.4 kHz before it was encoded, because that is
+    // where its own content ends. This is the little more that a hum loses at
+    // any distance at all through air, and it is deliberately gentle: taking
+    // more turned the clip into a drone and threw away the articulation that
+    // is the whole reason this take was chosen over a flat one.
+    lp: 3200,
+    // The wall, as a gain and a corner. See the note above for both numbers.
+    wallGain: 0.86,
+    wallHz: 500,
+    // Q in DECIBELS for a lowpass, which this file has been caught by three
+    // times: 0.7 is not Butterworth damping, it is +0.7 dB of resonance at the
+    // corner. Butterworth is −3.01, and a resonant peak sitting at 500 Hz on a
+    // voice whose second harmonic lives there is a formant nobody asked for.
+    wallQ: -3.01,
   };
-  // An eighth per character. A digit is semitones off the root, `-` holds the
-  // note before it, `.` is where she stops for breath. `a` and `c` are the ten
-  // and the twelve that will not fit in a column.
-  //                1  &  2  &  3  &  4  &
-  //
-  // THE TUNE IS "BUCKASTEERS OF AMERICA", by request, and it is written to the
-  // words rather than to the bar: eight syllables, stresses on BUCK and MER,
-  // scanned 2-1-2-1-1-2-1-2 eighths, which is what those words do when you say
-  // them out loud. Call and answer, and the two phrases carry the same rhythm
-  // so it is one tune and not two — A climbs to the octave on "mer" and leaves
-  // "ca" hanging on the fifth, B answers it down to the root.
-  //
-  //             Buck  a  steers  of  A  mer  i   ca
-  //   A:          5   5    9      7  9   c   9   7   (unresolved)
-  //   B:          5   5    7      5  4   7   4   0   (home)
-  //
-  // No words are sung and none are drawn — her mouth is shut, which is the
-  // whole of why this is a triangle under a low-pass. Rule 12 is about text on
-  // signs and there is no text here.
-  const HUM_A = '5-59-79c' + '-97-....';
-  const HUM_B = '5-57-547' + '-40-....';
-  const HUM_N = { 0: 0, 2: 2, 4: 4, 5: 5, 7: 7, 9: 9, a: 10, c: 12 };
-  let humAlt = 0;
+  let humBuf = null;
+  // The one live voice. A person hums one phrase at a time, so there is one of
+  // these or there is none — see the note above.
+  let humNodes = null;
+  let humFired = 0;
 
   /**
-   * @param d     metres between her and the listener
-   * @param gain  0…1, for the beat she is doing something else
-   * @returns     how long the phrase runs, so a caller can time the next one
+   * One phrase of it, and the per-frame update of whatever is already running.
+   *
+   * @param d  metres between her and the listener
+   * @param o  what the caller knows this frame:
+   *             wall   0…1, how much building stands between the two of you
+   *             level  0…1, a blanket scale — the caller's own dynamics
+   *             start  truthy to begin a phrase this frame
+   *             part   0…1 of the clip to play, for a phrase she does not
+   *                    finish. The two natural places to stop are 0.40 and
+   *                    0.74 — see the caller, which measured them.
+   *             rate   playback rate, which is her key and her tempo at once
+   *             stop   truthy to end the phrase that is running
+   *             probe  for a test only: answer with how many phrases have
+   *                    actually been started instead of with a duration. It is
+   *                    a branch of this function and not a key on the module's
+   *                    `stats()` deliberately — the export list and the debug
+   *                    object are shared surfaces and everything this feature
+   *                    owns is inside this one block, so a merge has one place
+   *                    to look. "Started" is the number that matters, because
+   *                    the failure this catches is the silent one: a caller
+   *                    asking for a phrase every four seconds while the clip
+   *                    has not decoded reads exactly like a caller that never
+   *                    asks at all.
+   * @returns    how long the phrase asked for will sound, in seconds, EVEN IF
+   *             nothing is played. The caller's clock is what keeps her
+   *             phrasing regular; walk out of earshot and back and she should
+   *             be part-way through a phrase rather than starting one.
    */
-  function hum(d = 0, gain = 1) {
-    const pat = (humAlt++ & 1) ? HUM_B : HUM_A;
-    const step = HUM.beat * 0.5;
-    const dur = pat.length * step;
-    // The length is returned even when nothing is played, because the caller's
-    // clock is what keeps her phrasing regular — walk out of earshot and back
-    // and she should be part-way through a phrase, not starting one.
+  function hum(d = 0, o = {}) {
+    if (o.probe) return humFired;
+    const rate = o.rate || 1;
+    const dur = HUM.len * (o.part == null ? 1 : Math.max(0.05, o.part)) / rate;
     if (!ctx || ctx.state === 'suspended') return dur;
-    // Linear in distance and not squared, for the reason written over Baye's
-    // own carry: squared, she is inaudible at fifteen metres, which is inside
-    // the range at which you can see what she is doing.
-    const far = 1 - Math.max(0, d) / HUM.range;
-    if (far <= 0.04 || gain <= 0.03) return dur;
-    const amp = HUM.gain * far * clamp(gain, 0, 1);
+    // Lazily, and once. Fly the sortie over the far side of the channel and
+    // the vikendica is never within earshot — `sampleLoad` carries the `tried`
+    // set that stops a failed decode being retried sixty times a second.
+    if (!humBuf) sampleLoad(HUM.key, (b) => { humBuf = b; });
 
-    const t0 = ctx.currentTime + 0.02;
-    const osc = ctx.createOscillator();
-    osc.type = 'triangle';
-    // Nobody hums the same phrase in the same key twice, and a hum that is
-    // always at A is a doorbell. A whole tone of drift either way.
-    const v = Math.pow(2, (Math.random() - 0.5) * 0.17);
+    const t = ctx.currentTime;
+    const wall = clamp(o.wall || 0, 0, 1);
+    const far = Math.max(0, 1 - Math.max(0, d) / HUM.range);
+    const amp = HUM.gain * far * clamp(o.level == null ? 1 : o.level, 0, 1)
+      * (1 - HUM.wallGain * wall);
+    // One throat — see the note above. Sticky through the whole line and not
+    // only at its start, because a phrase already in the air has to be got out
+    // of the way of a sentence that has begun under it.
+    const speaking = !!(voiceEl && !voiceEl.paused && !voiceEl.ended);
 
-    // The waver. Slow and shallow — 17 Hz and a tenth of a semitone is a cat's
-    // rasp — and faded in over the first note, because vibrato that is there
-    // on the attack is a singer warming up rather than somebody not thinking
-    // about it.
-    const lfo = ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 4.7 + Math.random() * 1.1;
-    const lg = ctx.createGain();
-    lg.gain.setValueAtTime(0.0001, t0);
-    lg.gain.exponentialRampToValueAtTime(HUM.root * 0.011, t0 + 0.9);
-    lfo.connect(lg).connect(osc.frequency);
+    // Retire a voice that has run itself out, so the next `start` is not
+    // fighting a node that stopped a second ago.
+    if (humNodes && t > humNodes.until) humNodes = null;
 
+    if (humNodes) {
+      const n = humNodes;
+      if (o.stop || speaking) {
+        // A fall and not a cut. 0.16 s is a breath being let go; anything
+        // shorter is a tape stopping, which is the one artefact a two-second
+        // clip cannot afford.
+        n.g.gain.cancelScheduledValues(t);
+        n.g.gain.setValueAtTime(Math.max(0.00002, n.g.gain.value), t);
+        n.g.gain.exponentialRampToValueAtTime(0.00002, t + 0.16);
+        try { n.src.stop(t + 0.20); } catch (e) { /* already stopped */ }
+        n.until = t;
+        humNodes = null;
+      } else if (!o.start) {
+        // The per-frame follow. `setTargetAtTime` and not a set, so that
+        // walking through the front door is a door closing rather than a
+        // sample-accurate step in the middle of a vowel.
+        n.g.gain.setTargetAtTime(Math.max(0.00002, amp), t, 0.09);
+        n.lp.frequency.setTargetAtTime(
+          HUM.lp * Math.pow(HUM.wallHz / HUM.lp, wall), t, 0.09);
+        if (n.w) n.w.gain.setTargetAtTime(0.13 * far * (1 - wall), t, 0.12);
+        return dur;
+      }
+    }
+    if (!o.start || !humBuf || speaking || amp <= 0.00003) return dur;
+
+    const t0 = t + 0.02;
+    const src = ctx.createBufferSource();
+    src.buffer = humBuf;
+    // Her key and her tempo in one number, which is what a rate is on a voice
+    // and is exactly right here: somebody who starts a phrase a little higher
+    // than the last one starts it a little faster too. The caller picks it.
+    src.playbackRate.value = rate;
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = HUM.lp;
-    lp.Q.value = 0.9;
-
+    lp.Q.value = HUM.wallQ;
+    lp.frequency.value = HUM.lp * Math.pow(HUM.wallHz / HUM.lp, wall);
     const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t0);
+    // In over 60 ms rather than from nothing. The clip's own first note is
+    // already an attack — she is 2.8 dB under her peak 50 ms in — so anything
+    // longer is a fade-in laid over an onset and reads as a fader being pushed.
+    g.gain.setValueAtTime(0.00002, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp), t0 + 0.06);
+    // And out. A phrase she finishes gets the clip's own ending, which already
+    // falls away; a phrase she abandons part-way gets 0.30 s of trailing off,
+    // which is longer than the ending because stopping in the middle of a tune
+    // is a slower thing than getting to the end of it.
+    const cut = o.part != null && o.part < 0.995;
+    const fade = cut ? 0.30 : 0.12;
+    g.gain.setValueAtTime(Math.max(0.00003, amp), t0 + Math.max(0.08, dur - fade));
+    g.gain.exponentialRampToValueAtTime(0.00002, t0 + dur + 0.02);
 
-    let i = 0, first = true;
-    while (i < pat.length) {
-      const ch = pat[i];
-      let n = 1;
-      while (i + n < pat.length && pat[i + n] === '-') n++;
-      const a = t0 + i * step, b = a + n * step;
-      if (ch === '.') {
-        g.gain.exponentialRampToValueAtTime(0.0001, a + 0.12);
-      } else {
-        osc.frequency.setValueAtTime(HUM.root * v * Math.pow(2, HUM_N[ch] / 12), a);
-        // Breathed into rather than snapped on: the first note of a phrase
-        // takes a fifth of a second to arrive, and every one after it dips to
-        // a third and comes back, which is the tongue between two notes on one
-        // breath. Without the dip a run of held notes is one long tone with
-        // the pitch jumping about inside it, which sounds like a fault.
-        if (!first) g.gain.exponentialRampToValueAtTime(amp * 0.34, a + 0.014);
-        g.gain.exponentialRampToValueAtTime(amp,
-          a + (first ? 0.21 : Math.min(0.13, n * step * 0.34)));
-        g.gain.setValueAtTime(amp, b - 0.035);
-        first = false;
-      }
-      i += n;
-    }
-    // And the end of the breath, which is a fall and not a cut.
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.26);
-
-    osc.connect(lp).connect(g).connect(bed || master);
+    src.connect(lp).connect(g).connect(bed || master);
+    let w = null;
     if (verbSend) {
-      const w = ctx.createGain(); w.gain.value = 0.15 * far;
+      // The valley, and only while she is out in it. Indoors on the far side
+      // of a wall there is no 2.9 s limestone tail on her — the same objection
+      // the fly's note makes about a 4 m room.
+      w = ctx.createGain();
+      w.gain.value = 0.13 * far * (1 - wall);
       g.connect(w).connect(verbSend);
     }
-    osc.start(t0); osc.stop(t0 + dur + 0.34);
-    lfo.start(t0); lfo.stop(t0 + dur + 0.34);
+    src.start(t0);
+    src.stop(t0 + dur + 0.06);
+    humFired += 1;
+    humNodes = { src, g, lp, w, until: t0 + dur + 0.06 };
     return dur;
   }
 
