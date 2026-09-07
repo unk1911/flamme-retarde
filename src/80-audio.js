@@ -4878,6 +4878,36 @@ function buildAudio() {
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
     beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, fly,
     /**
+     * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
+     *
+     * A hook and not an implementation, and the split is on purpose. What lives
+     * out there is the LANGUAGE — five Croatian vowels as formant pairs, three
+     * classes of consonant, and twenty-six phrase shapes — which is a table
+     * about people rather than a table about the audio graph, and it belongs
+     * beside the code that decides who says one. What lives in here is the
+     * three things this file owns and nothing outside it can see: the context,
+     * the shared noise buffer, and WHICH BUS.
+     *
+     * `outBus` and not `bed`, which is where `bark` goes. A bark is somebody
+     * you have walked into and is at your ear whatever is between you; a
+     * conversation on the concrete is part of the resort, so it goes through
+     * the stage a shut door takes away — with the promenade, the cicadas and
+     * the sea against the edge. Standing in the vikendica you hear the birds
+     * and not the beach, which is the whole point of that stage, and chatter on
+     * `bed` would be the one thing in the game that walked through a wall.
+     *
+     * `YELP` is the voice, handed over rather than duplicated. Those eight rows
+     * are already the pitch and the vowel of each of the eight bathers — the
+     * girl at 440 Hz, the heavy old man at 108 — and a second copy out there is
+     * a copy that can disagree with the noise the same person makes when she is
+     * hosed. `chatSay` divides them by its own reference vowel to get the tract
+     * scale, so adding a ninth bather is still one row, here.
+     */
+    chat: (kind, key, d, seed) => (ctx ? chatSay(ctx, {
+      out: outBus, verb: verbSend, noise: noiseBuf,
+      V: YELP[kind] || YELP.woman_young_slim,
+    }, key, d, seed) : false),
+    /**
      * The last node before the speakers, and the context it lives in.
      *
      * For `tools/record.mjs`, and for nothing in the game. A cut is filmed

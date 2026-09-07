@@ -6540,6 +6540,30 @@ window.__fr = {
      */
     greetNow: (mode) => (jadrija && jadrija.crowd.greetNow
       ? jadrija.crowd.greetNow(mode) : null),
+    /**
+     * And who is standing about TALKING to whom, which is the longer thing.
+     *
+     * `greets` is a hello — three seconds, a head and a hand. `chats` is a
+     * conversation: two or three people angled at each other for up to
+     * forty-six seconds, taking turns, nodding at whoever has the floor. See
+     * 43-chatter.js. Same argument for counting it rather than photographing
+     * it, and the same shape of answer.
+     *
+     * `chatNow(mode)` opens one between the nearest people who pass the tests,
+     * so a cluster can be shot instead of waited for; `chatSay(kind, line, d)`
+     * fires a single utterance on demand, which is how the synth gets levelled
+     * against the bed; `chatSurvey()` is the pair geometry of this stretch,
+     * which is where every threshold in `CHAT` came from.
+     */
+    chats: () => (jadrija && jadrija.crowd.chats ? jadrija.crowd.chats() : null),
+    chatNow: (mode) => (jadrija && jadrija.crowd.chatNow
+      ? jadrija.crowd.chatNow(mode) : null),
+    chatSay: (kind, line, d) => (jadrija && jadrija.crowd.chatSay
+      ? jadrija.crowd.chatSay(kind, line, d) : null),
+    chatLines: () => (jadrija && jadrija.crowd.chatLines
+      ? jadrija.crowd.chatLines() : null),
+    chatSurvey: () => (jadrija && jadrija.crowd.chatSurvey
+      ? jadrija.crowd.chatSurvey() : null),
     /** Debug: who is standing close enough to be resolved against right now. */
     bodies: (pad = 1.2) => {
       if (!jadrija || !jadrija.bodies) return null;
