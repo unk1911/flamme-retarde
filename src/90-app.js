@@ -5947,8 +5947,15 @@ function frame() {
       const sx = songW[0] - camera.position.x, sy = songW[1] - camera.position.y,
         sz = songW[2] - camera.position.z;
       const sd = Math.hypot(sx, sy, sz);
+      // AND THE FOURTH NUMBER, WHICH IS THE ONE HOLE IN THE SLAB: how far into
+      // the upper bathroom the eye is, over the soil stack. Asked of the eye
+      // for exactly the reason the storey above it is — a product with a
+      // person in one half and a camera in the other is the shimmer bug — and
+      // asked of the house rather than answered here, because the house owns
+      // which room you are in. See `vik.ductAt` and `stack` in src/80-audio.js.
       audio.song(sd, sd > 1 ? (sx * e[0] + sz * e[2]) / sd : 0,
-        clamp((at.y - songW[3]) / 0.9, 0, 1));
+        clamp((at.y - songW[3]) / 0.9, 0, 1),
+        jadrija.ductAt ? jadrija.ductAt(at.x, at.y, at.z) : 0);
     }
   }
 

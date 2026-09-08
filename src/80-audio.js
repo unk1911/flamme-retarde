@@ -3138,6 +3138,14 @@ function buildAudio() {
    * the set is very nearly directly under you up there. None of it is
    * distance. All of it is the slab, and that is the answer to the request.
    *
+   * AND THERE IS EXACTLY ONE HOLE IN THAT SLAB — the bathroom, which sits over
+   * the soil stack and is the one room upstairs with a service penetration
+   * through the floor. `stack` in the table below is that path and the note on
+   * it is the whole argument; it is a 3.89 m² exception and everything above
+   * this paragraph is still true of the other 48 m². Read the two together:
+   * the slab is the rule, the stack is the one place a rule about MASS does
+   * not apply because what is there is an OPENING.
+   *
    * And what it does to the mix in that room, which is the number the request
    * actually turns on. -77.6 on this bus is -79.0 at the tap once the master
    * has taken its 1.4 dB, against a control run of the whole room at -46.8:
@@ -3266,6 +3274,34 @@ function buildAudio() {
     // on it is 0.0104 dB in that room, against the 0.07 dB standard. There is
     // room to go louder still if he wants it — 0.9 would be 0.022 dB — and the
     // ceiling on this number is the yard's taste, not the birds.
+    //
+    // AND THE BATHROOM COSTS THEM NOTHING EITHER, which is the whole test the
+    // exception below had to pass. Re-measured after `stack` went in, standing
+    // at the `living` anchor in the room NEXT DOOR to it — two thirty-second
+    // pairs, playing against `songMute(true)`:
+    //
+    //     -48.27 vs -47.10   the run WITH the radio 1.17 dB QUIETER
+    //     -46.77 vs -47.73   and then 0.95 dB louder
+    //
+    // Which is a 2.1 dB swing between two measurements of the same thing, a
+    // mean of -0.11, and no measurement of this voice at all — it is the
+    // aperiodic bed, the same 0.86 dB the first pass at this got and the same
+    // 2.5 dB ten-second thirds of the control alone spread. Differenced by
+    // octave the deltas run -2.5 to +2.1 with no pattern and no consistent
+    // sign. The tap in that room says why, and it is the instrument that does
+    // not move: -74.04 and -74.01 dBFS on the two runs, with `duct` at 0 and
+    // the highpass parked at 20 Hz. That is 28.3 dB under the room, which is
+    // +0.006 dB on it, against the 0.07 standard the bathers set.
+    //
+    // It cannot be otherwise and that is worth saying plainly: with `duct` at
+    // 0 every coefficient in `songTick` is the one that shipped, and the only
+    // new node in the graph is a highpass parked at 20 Hz — which, behind a
+    // 260 Hz lid, is 0.06 dB at 60 Hz and 0.01 at 100. Checked against a
+    // build of HEAD~1 rather than argued: in the yard the level term comes
+    // back 0.384724 on both builds, the same digits, and in the living room
+    // both agree with 0.62 * dist * (1 - 0.98 * thru) to the third place, the
+    // 0.011795 / 0.012808 between them being `indoors` still settling. The
+    // exception is a rectangle 3.89 m² in area and it does not leave it.
     gain: 0.62,
     // How far off it carries. Inverse-square and not the pines' 1.5: past the
     // opening this is a point source in open air over a hard paved yard, which
@@ -3280,6 +3316,85 @@ function buildAudio() {
     lpNear: 5200, lpFar: 900,
     // The slab, and the lid the slab is. See the long note above.
     storey: 0.020, lpStorey: 260,
+    // AND THE ONE HOLE IN IT, WHICH IS THE BATHROOM.
+    //
+    // Misha, 8 Sep: the radio *"should also be audible inside the 2nd floor
+    // bathroom of the vikendica"*. Everything above says it should not be, and
+    // everything above is right — so this is an exception and it needs a path,
+    // not a number. Turning `storey` up would make the whole upper flat leak,
+    // which is the thing the slab was measured to stop.
+    //
+    // THE PATH IS THE SOIL STACK, and it is not invented for this: the flat
+    // below has one drawn in it. tools/blender/vikendica.py, `prizemlje_bath`
+    // — *"The soil stack, boxed in and tiled like the walls, in the corner
+    // behind the door. Every flat in this row has one and it is always in a
+    // corner."* It is boxed at 1.19 m west and 0.33 m south of the upper
+    // bathroom's south-west corner, which is to say it stands in the wall line
+    // directly under it, because a stack serves both bathrooms or it serves
+    // neither. A stack, its vent and the boxing round it are ONE COLUMN OF AIR
+    // from the flat below to the flat above, and the slab does not close it —
+    // it is the hole the slab is cast around. That is the whole reason a
+    // bathroom is the room where you hear the neighbours and the landing two
+    // metres away is silent, and it is why this exception is local by
+    // construction rather than by a rule somebody wrote.
+    //
+    // WHICH INVERTS THE SPECTRUM, and that is the part worth getting right. A
+    // slab is a MASS: it obeys the mass law, passes what is under 260 Hz and
+    // stops the rest, which is what `lpStorey` is. A duct is an OPENING: the
+    // mass law says nothing about it at all. What limits it is the aperture at
+    // one end and the losses down a two-and-a-half-metre lossy shaft at the
+    // other, so it passes the middle and rolls off both ends — nothing much
+    // under a couple of hundred hertz, because 100 mm of pipe in a stiff
+    // plasterboard box is a bad radiator down there, and nothing much over a
+    // couple of kilohertz, because that is a long folded path with a bend in
+    // it. 300 Hz to 1.6 kHz. It is not a louder slab and must not sound like
+    // one: what comes up a pipe is the tune with no bottom on it.
+    //
+    // 0.11 IS 15 dB BETTER THAN THE SLAB and that is the published figure for
+    // this failure, not a taste. A boxed service duct is the standard flanking
+    // path between stacked wet rooms and it costs a floor 10 to 15 dB of the
+    // D it would otherwise have; 15 is the generous end of that, chosen
+    // because he asked to hear it and the room is 3.89 m² of hard tile with
+    // nothing in it to absorb anything.
+    //
+    // WHAT IT COMES OUT AS, and it is measured at the tap and not off a
+    // thirty-second window — see the note on `gain`, and the duty cycle, which
+    // reports about the same +1.4 dB whatever this number is.
+    //
+    // Standing in the middle of the room, `songEye` reads -49.0 dBFS while a
+    // pass is playing — three runs at -49.02, -49.41 and -49.68, which is how
+    // steady that instrument is — and that is -50.4 once the master has taken
+    // its 20 log10(0.85). Thirty seconds of the same room with `songMute(true)`
+    // is -49.1 and -48.8. So the song sits about 1.3 dB UNDER the bathroom's
+    // own bed while it plays, where in the yard it sits 1.7 dB over; and a
+    // bird phrase, which peaks at -47 in that room, is still three and a half
+    // decibels clear of it and in a band the pipe cannot reach at all.
+    //
+    // The same station on the build before this one reads -74.06, gain
+    // 0.010174, lidded at 282 Hz. So the exception is worth 25.1 dB in that
+    // one room, and it is two halves of about the same size: 12.9 dB of level,
+    // which is `stack` against `storey` with the residual direct term at
+    // `thru` 0.993 taken off the nominal 15, and another 12 from the lid
+    // moving 282 Hz -> 1617, because that is where the song keeps its energy.
+    // Neither half alone would have done it and neither half alone would have
+    // been honest.
+    //
+    // AND THE BAND SPLIT IS THE MEASUREMENT THAT MATTERS, because it is the
+    // one the duty cycle cannot move. Two independent thirty-second pairs,
+    // playing minus muted, differenced by octave:
+    //
+    //     20-150  +0.4 -0.1 | 150-300 +2.1 +1.1 | 300-600 +1.4 -0.7
+    //     600-1.2k +9.3 +9.7 | 1.2-2.4k +7.4 +6.2
+    //     2.4-4.8k -0.6 -1.7 | 4.8k+ +0.1 +0.0
+    //
+    // The two bands from 600 Hz to 2.4 kHz move by 6 to 10 dB and repeat to
+    // within 1.2; everything outside them scatters ±1.7 with no sign to it,
+    // which is the aperiodic bed and not this voice — the control pair in the
+    // note on `gain` swings 2.1 dB on its own. That is a tune with no bottom
+    // and no top on it: the flat downstairs, heard up a pipe. If this ever
+    // reads as a radio in the room, the number that is wrong is `hpStack`,
+    // not `stack`.
+    stack: 0.11, lpStack: 1600, hpStack: 300,
     // One bar, up and down. Combed off the onset envelopes of the two mixes at
     // one, two and four beats, they run at 108.85 and 107.55 bpm — 2.205 and
     // 2.232 s to the bar — so 2.20 is a bar of either to within 1.5%, which is
@@ -3314,7 +3429,7 @@ function buildAudio() {
   // own seconds and not the context's, so `songRun` can fast-forward the whole
   // thing and read back the intervals it designed. `ix` is which mix goes next.
   const songNow = { at: SONG.arm, left: 0, ix: 0, plays: 0, mixSecs: 0,
-    d: 1e9, pan: 0, up: 0, gain: 0, hz: 0, clock: 0, log: [] };
+    d: 1e9, pan: 0, up: 0, duct: 0, gain: 0, hz: 0, hp: 20, clock: 0, log: [] };
 
   /**
    * The set's own front end, built once and left up.
@@ -3325,17 +3440,33 @@ function buildAudio() {
    * ramped by hand at pass time cannot be walked on by the distance term,
    * which is a `setTargetAtTime` on a different node. `g` is where you are
    * standing, and the panner is last so the pan is of the finished sound.
+   *
+   * `hp` is the soil stack and nothing else, and it is parked at 20 Hz — flat
+   * to within 0.11 dB at 50 and 0.01 at 100 — everywhere except the one room
+   * in the house that has a hole through the slab in it. See `stack` in SONG.
+   * A duct is the only path here that takes the BOTTOM off a sound, so it is
+   * the only one that needs a filter the other way up; every other wall in
+   * this file is a lid.
+   *
+   * Q IS IN DECIBELS on a lowpass and a highpass — this has bitten this
+   * codebase three times, see `webaudio-q-is-decibels`. -3.01 dB is 10^(-3.01
+   * /20) = 0.7071, which is Butterworth: maximally flat, no corner peak. `lp`
+   * above asks for 0.5, which is half a decibel of resonance and is harmless
+   * in a band this wide; a highpass corner sitting inside the tune is not the
+   * place to leave one.
    */
   function songRig() {
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass'; lp.frequency.value = SONG.lpFar; lp.Q.value = 0.5;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 20; hp.Q.value = -3.01;
     const env = ctx.createGain();
     env.gain.value = 0.0001;
     const g = ctx.createGain();
     g.gain.value = 0.0001;
     const pn = ctx.createStereoPanner();
     pn.pan.value = 0;
-    lp.connect(env).connect(g).connect(pn).connect(bed);
+    lp.connect(hp).connect(env).connect(g).connect(pn).connect(bed);
     // An eye on it, and it is here for the reason `perchEye` is: what a test
     // needs is not the gain somebody wrote, it is the dBFS of samples the
     // graph actually computed. This is the number the whole bird question is
@@ -3349,7 +3480,7 @@ function buildAudio() {
       const w = ctx.createGain(); w.gain.value = 0.22;
       g.connect(w).connect(verbSend);
     }
-    return { lp, env, g, pn };
+    return { lp, hp, env, g, pn };
   }
 
   /**
@@ -3361,11 +3492,20 @@ function buildAudio() {
    * above it. It is NOT "which storey am I on": that question is answered here
    * by multiplying it with `roomV`, because the terrace and the landing are
    * both above the slab and neither has one between you and the set.
+   *
+   * `duct` is how much of the upper bathroom you are standing in, 0 outside it
+   * and 1 a third of a metre inside — `vik.ductAt`, which owns the rectangle,
+   * because the house owns which room you are in and this file must not carry
+   * a second opinion about it. It is the soil stack; see `stack` in SONG. It
+   * arrives raw and is multiplied by `up * roomV` here, so it can only ever
+   * open a path that the slab was closing: on the ground floor, on the landing
+   * and on the terrace `thru` is 0 and this argument does nothing at all.
    */
-  function song(d, pan, up) {
+  function song(d, pan, up, duct) {
     songNow.d = d;
     songNow.pan = pan;
     songNow.up = sat(up);
+    songNow.duct = sat(duct || 0);
   }
 
   /**
@@ -3425,14 +3565,34 @@ function buildAudio() {
     // the upper terrace is above it and outdoors, and from out there the yard
     // is simply below you with its door open.
     const thru = songNow.up * roomV;
+    // And the one room upstairs where the slab has a hole through it — the
+    // bathroom, over the stack. See `stack` in SONG for the path and the
+    // numbers. It replaces the slab's two terms rather than adding a third
+    // voice: `thr` is what fraction of the level gets up, `lid` is what is
+    // left on top of it, and both are interpolated so that walking in through
+    // the door is a crossfade from one path to the other and not two radios.
+    //
+    // `duct` alone changes nothing anywhere: every term below still runs
+    // through `thru`, which is 0 on the ground floor, on the landing and on
+    // the terrace. The exception cannot escape the storey it is written for.
+    const duct = songNow.duct;
+    const thr = SONG.storey + (SONG.stack - SONG.storey) * duct;
     const amp = (songMuted ? 0 : SONG.gain)
-      * dist * (1 - (1 - SONG.storey) * thru);
+      * dist * (1 - (1 - thr) * thru);
     const cut = SONG.lpFar + (SONG.lpNear - SONG.lpFar) * dist;
-    const hz = cut + (SONG.lpStorey - cut) * thru;
+    const lid = SONG.lpStorey + (SONG.lpStack - SONG.lpStorey) * duct;
+    const hz = cut + (lid - cut) * thru;
+    // The bottom the pipe takes off, and it is the product of the two: a duct
+    // is only a duct when there is a slab for it to go through. 20 Hz is the
+    // parked value and is flat, not off — a biquad has no bypass, and 20 is
+    // far enough under the mix that it is one.
+    const hpHz = 20 + (SONG.hpStack - 20) * thru * duct;
     songNow.gain = amp;
     songNow.hz = hz;
+    songNow.hp = hpHz;
     songNodes.g.gain.setTargetAtTime(Math.max(amp, 0.000001), t0, 0.12);
     songNodes.lp.frequency.setTargetAtTime(hz, t0, 0.20);
+    songNodes.hp.frequency.setTargetAtTime(hpHz, t0, 0.20);
     // 0.7 rather than 1: a room heard through its own door is off to one side,
     // not in one ear — and less than the birds' 0.8, because a radio in a room
     // is a wall's worth of reflections and not a point in a tree.
@@ -5464,8 +5624,10 @@ function buildAudio() {
      * birds and for the same reason: the mixer owns what it sounds like and
      * when it plays, and the only thing it cannot know is where it is, because
      * a station in the resort's frame means nothing over the channel. `song`
-     * is 90-app.js's answer — the distance, the bearing, and how far the eye
-     * is above the ground floor's ceiling.
+     * is 90-app.js's answer — the distance, the bearing, how far the eye is
+     * above the ground floor's ceiling, and how far into the upper bathroom it
+     * is, which is the one room the slab has a hole through. All four are
+     * geometry and none of them is a mix decision; see `stack` in SONG.
      */
     songAt: () => ({ t: SONG.t, s: SONG.s, up: SONG.up, slab: SONG.slab }),
     song,
@@ -5646,7 +5808,12 @@ function buildAudio() {
         // plus the room comes out as — `thru` is the slab, and `thru` at 1 is
         // the whole of why the birds upstairs are untouched.
         up: +songNow.up.toFixed(2), thru: +(songNow.up * roomV).toFixed(3),
+        // And how much of the bathroom you are in, which is the only thing
+        // that can make `thru` at 1 audible. `hp` next to `hz` because the two
+        // together are the band: a reading with `hp` at 20 is the slab.
+        duct: +songNow.duct.toFixed(3),
         gain: +songNow.gain.toFixed(6), hz: Math.round(songNow.hz),
+        hp: Math.round(songNow.hp),
         playing: songNow.left > 0, left: +songNow.left.toFixed(2),
         at: +songNow.at.toFixed(2),
         next: SONG.mix[songNow.ix], plays: songNow.plays,

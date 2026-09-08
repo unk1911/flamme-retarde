@@ -1519,6 +1519,58 @@ async function buildVikendica(scene, field) {
   }
 
   /**
+   * How much of the upper bathroom you are standing in, 0…1.
+   *
+   * There is one thing in this house that goes through the slab, and it is not
+   * a stair — there is no stair, the two flats are let separately and always
+   * have been. It is the soil stack. The prizemlje has one drawn in the corner
+   * of `kupN` behind the door, boxed in and tiled, and it is drawn there
+   * because every flat in the row has one; the upper bathroom is the room
+   * directly over it and shares it, because a stack serves both wet rooms or
+   * it serves neither. Stack, vent and boxing are one continuous column of air
+   * between the two storeys and the slab is cast around it rather than across
+   * it — which is exactly why, in a building like this, the flat below is
+   * audible in the bathroom and nowhere else at all.
+   *
+   * So this is a room query and not an audio one, and it lives here for the
+   * same reason `indoorsAt` does: the house owns which room you are in, and a
+   * second opinion about it in 80-audio.js would be a second set of
+   * coordinates to keep in step with the drawings. `plan.rooms.bath` IS the
+   * rectangle the walls were built from — 2.35 by 1.655, the 3.89 m² on the
+   * schedule — so it cannot drift.
+   *
+   * Ramped 0.30 m in from the walls rather than switched at them. Two reasons
+   * and both are measured: a body inside this house is held 0.26 m off a face
+   * by `GROUND.tight`, so 0.30 is the smallest ramp that still reaches 1
+   * everywhere you can actually stand; and the door is a 1.0 m opening in the
+   * east wall, so a hard edge would put the whole change on the threshold, in
+   * one step, which is the one place in a room a level change is audible AS a
+   * level change. Walking in, it comes up over about a third of a metre.
+   *
+   * The height band is the flat's own storey and not "above the slab". Above
+   * matters because the room below is a different bathroom; below matters
+   * because the mezzanine deck, when the loft roof is on, spreads right across
+   * this footprint at +2.55 and a person standing on it is over the bathroom's
+   * ceiling and not in it.
+   *
+   * Swept at 5 cm over the whole plot to check it is what it says it is: at
+   * eye height on the upper storey it answers non-zero over 3.88 m² bounded by
+   * x -3.15..-0.85 and z -0.60..1.00, which is `rooms.bath` to the grid step
+   * and the schedule's 3.89 m² to a centimetre. At eye height on the ground
+   * floor: nothing. On the mezzanine deck: nothing. Walking in through the
+   * door on z = 0 it reads 0, 0.20, 0.53, 0.87, 1 at 10 cm steps.
+   */
+  const DUCT_RAMP = 0.30;
+  function ductAt(t, s, y) {
+    if (y != null && (y < base + VIK.floor - 0.6
+      || y > base + VIK.floor + plan.clear)) return 0;
+    const B = plan.rooms.bath;
+    const [x, z] = toHouse(t, s);
+    const into = Math.min(x - B.x0, B.x1 - x, z - B.z0, B.z1 - z);
+    return clamp(into / DUCT_RAMP, 0, 1);
+  }
+
+  /**
    * The walls, as boxes in the locale's own axes.
    *
    * Everything inside the house is already axis-aligned to the locale by the
@@ -2502,7 +2554,8 @@ async function buildVikendica(scene, field) {
 
   return {
     root, parts, plan, base, yaw,
-    floorAt, blockers, tight, indoorsAt, hull, headroom, tick: tickHouse,
+    floorAt, blockers, tight, indoorsAt, ductAt, hull, headroom,
+    tick: tickHouse,
     /** The television: where it is in world metres, and the knock. */
     tv: {
       at: () => { const [wx, wz] = world(tv.at[0], tv.at[2]);
