@@ -6705,14 +6705,21 @@ window.__fr = {
      * `chatNow(mode)` opens one between the nearest people who pass the tests,
      * so a cluster can be shot instead of waited for; `chatSay(kind, line, d)`
      * fires a single utterance on demand, which is how the synth gets levelled
-     * against the bed; `chatSurvey()` is the pair geometry of this stretch,
-     * which is where every threshold in `CHAT` came from.
+     * against the bed; `chatWords(c, l, d)` does the same for one baked line of
+     * one of the fifteen conversations, which is how the two halves get
+     * levelled against EACH OTHER; `chatSurvey()` is the pair geometry of this
+     * stretch, which is where every threshold in `CHAT` came from.
      */
     chats: () => (jadrija && jadrija.crowd.chats ? jadrija.crowd.chats() : null),
     chatNow: (mode) => (jadrija && jadrija.crowd.chatNow
       ? jadrija.crowd.chatNow(mode) : null),
     chatSay: (kind, line, d) => (jadrija && jadrija.crowd.chatSay
       ? jadrija.crowd.chatSay(kind, line, d) : null),
+    chatWords: (c, l, d) => (jadrija && jadrija.crowd.chatWords
+      ? jadrija.crowd.chatWords(c, l, d) : null),
+    /** Both bather voices off, for the control half of a level measurement. */
+    chatMute: (v) => (jadrija && jadrija.crowd.chatMute
+      ? jadrija.crowd.chatMute(v) : null),
     chatLines: () => (jadrija && jadrija.crowd.chatLines
       ? jadrija.crowd.chatLines() : null),
     chatSurvey: () => (jadrija && jadrija.crowd.chatSurvey

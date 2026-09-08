@@ -126,6 +126,106 @@
 // and NINETEEN utterances — one every 4.9 s somewhere in earshot, at 6.8 to 32
 // m. Most of those are past fifteen metres and are inside the promenade rather
 // than on top of it.
+//
+// ══ AND THEN THE REQUIREMENT MOVED ═══════════════════════════════════════════
+//
+// Everything above stands and none of it was wrong. One of its premises is no
+// longer true, which is a different thing, and it is worth being exact about
+// which one.
+//
+// Misha, 8 Sep 2026: *"when the bathers are chatting amongst themselves, ok it
+// doesn't have to be within 12 words, but i am thinking, maybe you can
+// pre-render some of their conversations, pre-cache some of it, and when i
+// sorta approach within an 'ears-shot' of them, that's when their convo becomes
+// audible, perhaps not SUPER LOUD, but yeah audible, and this way, it sounds
+// the most natural... there's no pause betwixt their chatter and it feels super
+// organic."*
+//
+// The case against recorded speech, three tables up, rests on one sentence:
+// ambient chatter is "many speakers, constantly, saying nothing in particular".
+// He has just asked for them to be saying something IN PARTICULAR and to be
+// able to make it out. Every clause of the old argument still holds for what it
+// was written about — a murmur across four hundred metres of shore does want a
+// synthesiser, and the voice service still cannot be used, for the reason it
+// could never be used: three to six seconds of model call and speech synthesis
+// is fatal for a conversation that is supposed to be ALREADY HAPPENING when you
+// walk up. You would arrive, stand there, and hear it start.
+//
+// So the argument is not overturned, it is BOUNDED, and there are now two of
+// them with a distance between them:
+//
+//   FAR   the synth below, unchanged. No payload, never the same twice, and it
+//         carries every conversation on the shore that you are not close to.
+//   NEAR  fifteen conversations baked by `tools/cut_chat.py` in the eight
+//         bathers' own ElevenLabs voices, played from the mouth of whoever is
+//         holding the floor. See `WORDS`.
+//
+// WHY THE SPLIT IS THE DESIGN AND NOT A COMPROMISE. The bark clips' lesson is
+// still the governing one — "sixteen clips is sixteen clips, and the ear finds
+// the period inside a minute" — and the library is fifteen. What saves it is
+// that the library is only ever spent on a conversation you can actually make
+// out. Measured, walking at 1.35 m/s for 900 s and logging every group's
+// closest approach and how long it stayed inside it:
+//
+//     within        conversations   of those, a pass      one every
+//                   that came in    lasting over 3 s
+//      6 m               4                3               5.0 min
+//      8 m               4                4               3.8
+//     10 m               7                6               2.5
+//     12 m              10                9               1.7
+//     14 m              20               17               0.9
+//     16 m              25               20               0.8
+//     20 m              34               28               0.5
+//
+// The whole shore produces a conversation every 15 s. Eleven metres produces
+// one every two minutes, and THAT is the rate the library is spent at. So
+// eleven is a number tuned for recurrence, and the sound was checked against it
+// afterwards rather than the other way round — see `WORDS.on`.
+//
+// ── AND THE HONEST ANSWER ABOUT FIFTEEN ──────────────────────────────────────
+//
+// That table is the promenade EDGE, at s 2, and it is the kindest lane on the
+// beach. Four half-hour walks, one at each of s 2, 6, 10 and 14, every line
+// played logged as it was played:
+//
+//                  conversations   of the   lines    of those  the same LINE
+//     lane          heard   /min      15    played     unheard   heard again
+//     s  2            17    0.57       9        55        82 %      12.9 min
+//     s  6            30    1.00      12        78        85 %      12.3
+//     s 10            46    1.53      14       117        74 %       6.2
+//     s 14            47    1.57      15       118        74 %       6.4
+//
+// Out on the sand a player passes THREE TIMES as many conversations as at the
+// water's edge, and all fifteen come round inside half an hour. So the plain
+// answer to "is fifteen enough" is: fifteen conversations are not, and fifteen
+// conversations are not what a player hears. What they hear is 135 lines, of
+// which three or four go past in the ten seconds a pass lasts, and the number
+// that decides whether a repeat registers is how long before the same SENTENCE
+// comes round — six minutes at worst, thirteen at best, with 74 to 85 per cent
+// of everything heard in half an hour being something not heard before.
+//
+// That is what `nextK` buys and it is the whole reason it exists. Without it a
+// second hearing overlapped the first by 44 to 62 per cent and the repeat was
+// the same words.
+//
+// If the library is ever allowed to grow, it goes in a straight line: thirty
+// conversations would put the first repeated sentence at twelve to twenty-six
+// minutes. And it should grow where the misses are rather than evenly — see
+// `CHAT_CLASS`.
+//
+// ── ONE MEASUREMENT DECIDED THE SHAPE OF EVERY SCRIPT ────────────────────────
+//
+// 234 conversations over four lanes: 230 pairs and FOUR threes, and all four of
+// the threes were out on the sand rather than on the promenade, where 106 of
+// 106 were pairs. `findGroup` will build a three — it looks for somebody
+// standing with BOTH of the first two — and on the concrete nobody ever is,
+// because separate groups sit 3 to 6 m apart and the third person is always
+// somebody else's.
+//
+// So every baked script is two-handed and strictly alternating, which is
+// exactly what `nextTurn` already does to a pair: following the script changes
+// nothing at all about who speaks. The 1.7 per cent that are threes are cast by
+// nobody and stay on the synth, which is what they sounded like yesterday.
 // -----------------------------------------------------------------------------
 
 /**
@@ -367,7 +467,7 @@ const CHAT_LEVEL = {
  * of beeps. Re-triggering the oscillator every syllable throws it away.
  */
 function chatSay(ctx, io, key, d, seed) {
-  if (!ctx || !io || !io.out) return false;
+  if (!ctx || !io || !io.out || chatMuted) return false;
   const P = CHAT_LINES[key];
   if (!P || d > CHAT_LEVEL.gone) return false;
   const V = io.V || { f0: 250, f1: 760, f2: 1320, rasp: 0.15 };
@@ -556,6 +656,324 @@ function chatSay(ctx, io, key, d, seed) {
   }
   osc.start(t0);
   osc.stop(end + 0.14);
+  return true;
+}
+
+// ── and the other half: fifteen conversations, already going on ──────────────
+/**
+ * The library, off the payload, or nothing at all.
+ *
+ * `chatidx.json` is written by `tools/cut_chat.py` and inlined verbatim by
+ * build.py, so this is a plain object and not a string to parse. A build whose
+ * payload has been stripped leaves `CHAT_LIB` null and every conversation on
+ * the beach on the synth, which is what shipped before this and is a game that
+ * is quieter rather than a game that is broken — the same rule `sampleLoad`
+ * states for every other baked clip.
+ */
+const CHAT_LIB = (typeof PAYLOAD !== 'undefined' && PAYLOAD.chatidx)
+  ? PAYLOAD.chatidx : null;
+
+/**
+ * Which voices may stand in for which.
+ *
+ * Every line is baked in ONE bather's voice, so a script can only be played by
+ * a group whose people match its cast — and fifteen scripts cannot cover the
+ * thirty-six pairs eight kinds can make. This is where the slack is, and where
+ * it is NOT.
+ *
+ * Two kinds are interchangeable if they are the same sex and the same age. The
+ * young men are Harry and Liam and the young women are Jessica and Niamh: a
+ * young man in the other young man's voice is a young man, and nobody who has
+ * heard one of them yelp can tell you which of the two hosed figures it was. A
+ * nine-year-old in a seventy-year-old's voice is a defect, and that is exactly
+ * where the line is drawn — the two children, the old woman and the old man are
+ * each alone in their class and can only ever be themselves.
+ *
+ * The runtime still prefers an EXACT kind match and only falls back to the
+ * class — see `pickConv`. What the class buys is coverage: counted over four
+ * half-hour walks, the seven class pairs the fifteen scripts are written for
+ * account for 75, 87, 89 and 90 per cent of the groups that came inside
+ * `WORDS.on`. The rest never get words and stay on the synth, which is what
+ * that group sounded like yesterday.
+ *
+ * WHAT IS MISSED, in order of how often, because this is the list to work down
+ * if the library ever grows: an old man with an old woman, two young women, two
+ * old women, a child with an adult, two old men, and the 1.7 per cent that are
+ * threes. None of them is worth a script before the crowded pairings have more
+ * than four between them — see the recurrence table in the header, which says
+ * the shortage is depth on the common pairs and not breadth across the rare
+ * ones.
+ */
+const CHAT_CLASS = {
+  girl_child: 'girl',
+  boy_child: 'boy',
+  woman_young_slim: 'womanY',
+  woman_young_full: 'womanY',
+  woman_old: 'womanO',
+  man_young_fit: 'manY',
+  man_young_lean: 'manY',
+  man_old_heavy: 'manO',
+};
+
+/**
+ * How near you have to be for a murmur to turn into words, and how loud it is
+ * when it does.
+ *
+ * ── the two radii, and why `on` is a recurrence number and not a level ──
+ *
+ * `on` is the one number that decides whether fifteen conversations is enough.
+ * The rate at which the library is spent is the rate at which a player comes
+ * inside this radius, and the table in the header is that rate against the
+ * radius: eleven metres is one conversation every two minutes, and sixteen is
+ * one every fifty seconds. Between those two the bag of fifteen empties in
+ * thirty minutes or in twelve.
+ *
+ * Eleven, then, and it was chosen against the recurrence and then CHECKED
+ * against the sound rather than the other way round: at 11 m this is 12.1 dB
+ * down and behind a 3.9 kHz lid, which is a voice you can tell is a voice and
+ * are only catching about half the words of — so the boundary is not a moment
+ * where a murmur becomes a transcript, it is a moment where a murmur starts to
+ * have words in it. Which is what walking towards two people actually does.
+ *
+ * `off` at fifteen is hysteresis and nothing more. Without a gap a player
+ * standing at the boundary flips between a recorded voice and a synthesised one
+ * every turn, and those two do not sound like the same person.
+ *
+ * `warm` is neither. It is where the conversation is CHOSEN and its clip asked
+ * for, twenty-four metres out, and it is here because of `beadWarm`'s lesson in
+ * 80-audio.js: "a decode that starts when the sound is wanted is a sound that
+ * is missing the first time it is asked for". At 1.35 m/s, twenty-four metres
+ * is ten seconds of walking, and a decode takes forty milliseconds. Choosing
+ * early costs nothing — a conversation is not marked as heard until somebody
+ * has actually heard two lines of it, so a group you never reach spends
+ * nothing.
+ *
+ * ── the level, which is the thing he asked for ──
+ *
+ * `gain` and `half` are set TOGETHER and not independently, and the pair of
+ * them is one decision: they are the two numbers that make this louder than the
+ * synth up close and EXACTLY EQUAL TO IT at the boundary. Solve
+ * `gain·far(11) = CHAT_LEVEL.gain·farSynth(11)` and the crossing is silent —
+ * the only thing that changes as you step over eleven metres is which of the
+ * two is talking, and at eleven metres both are behind the same 3.9 kHz lid.
+ * Get this wrong and the boundary is a step in loudness, which is the one thing
+ * in a crossfade the ear cannot be talked out of hearing.
+ *
+ * That leaves one free number, which is how much louder than the synth this is
+ * when you are standing in it, and that is the whole of his *"perhaps not SUPER
+ * LOUD, but yeah audible"*. 0.62 and 3.8 make it +3.84 dB on the synth at 3 m,
+ * +0.31 at eleven, and −0.83 by twenty-two — so it is louder exactly where it
+ * has to be understood and QUIETER than what it replaced everywhere else. The
+ * vikendica's own bird question is answered by that last column before any
+ * measurement: the living room is 22 m from the nearest conversation and this
+ * is never scheduled past `off` at fifteen, so the indoor path is the synth it
+ * always was, unchanged, and the 0.07 dB in the header still stands verbatim.
+ *
+ * MEASURED, and not by two recordings — the bed drifts 4.35 dB between
+ * ten-second windows, so the phases are INTERLEAVED, five cycles of eight
+ * ten-second blocks with 3.5 s of guard at the head of each so a reverb tail
+ * cannot be counted as the block after it. About 980 windows a phase, on an
+ * AnalyserNode on `audio.tap()`, at t 280 s 2 against a bed of −33.82 dBFS:
+ *
+ *     one voice every 2.9 s at  3 m, recorded     +2.62 dB on the bed
+ *     one voice every 2.9 s at  3 m, synthesised  +0.75
+ *     one voice every 2.9 s at 11 m, recorded     +0.82
+ *     one voice every 2.9 s at 11 m, synthesised  −0.42
+ *     the four control blocks                     −0.48 … +0.37
+ *
+ * The last row is the method's own floor, 0.85 dB, and it is the number the
+ * other four have to be read against. Two things follow. The recorded voice at
+ * three metres is 2.6 dB over a beach that has a crowd already recorded into
+ * it, which is audible and is not shouting. And ACROSS THE BOUNDARY the two
+ * voices land 1.2 dB apart — inside a decibel and a half of the control's own
+ * spread — so stepping over eleven metres is not a step in loudness.
+ *
+ * ── AND IT DOES NOT TOUCH THE BIRDS ──────────────────────────────────────────
+ *
+ * The same run, per band, for the loudest case there is — standing three metres
+ * from two people and never letting the voice stop:
+ *
+ *      60   120   250   500   900  1600  2800 | 4600  7000  11000
+ *    +0.28 +4.80 +4.73 +2.91 +1.26 +2.74 +4.53| −0.04  0.00  −2.10
+ *
+ * Everything the voice adds is between 120 Hz and 4.6 kHz, which is where a
+ * voice is. THE TWO BANDS THE BIRDS LIVE IN DO NOT MOVE: 4.6-7 kHz by −0.04 dB
+ * and 7-11 kHz by nothing at all, against a control that cannot resolve better
+ * than 0.85. That is structural rather than lucky — `cut_chat.py` lids every
+ * clip at 6 kHz before the encoder sees it, because `lpNear` throws that band
+ * away anyway, so there is nothing up there for it to add. The swallow's
+ * twitter runs to 11 kHz and the wagtail's call is nothing but top, and neither
+ * of them is being competed with by a sound that stops at six.
+ *
+ * Confirmed a second way, three separate thirty-second recordings through
+ * `tools/sfx.mjs` off the same tap, against a control taken with `chatMute`:
+ * the far murmur reads +0.96 dB overall and −0.06/−0.12 in those two bands; the
+ * close words read +3.54 dB overall and +0.22/+0.05.
+ *
+ * The one band that DOES move and has a bird in it is 500-900 Hz, up 2.9 dB,
+ * where the collared dove sits. Said out loud rather than left to be found: it
+ * is only that loud with your ear three metres from two people on the promenade
+ * at t 280, which is fifty metres from the dove's pine at t 243 s 46, where its
+ * own distance term is 0.202 and it coos once every twenty-two to seventy-four
+ * seconds. The place that bird is the loudest thing is the living room, and
+ * this voice does not go in there at all.
+ *
+ * ── the pace ──
+ *
+ * `gap` is what goes between one line and the next answering it, and it is
+ * short on purpose: *"there's no pause betwixt their chatter"*. Two hundred
+ * milliseconds is the median gap between turns in a real conversation in every
+ * language anybody has measured, and the spread up to half a second is what
+ * stops it being a metronome. It is scheduled here rather than baked into the
+ * file for exactly that reason — a pause inside an mp3 cannot be shortened when
+ * somebody answers quickly.
+ *
+ * `floor` is this voice's own version of `CHAT.floor`, and it is a twelfth of
+ * it. That number exists so three murmurs at once are a promenade and not a
+ * party; a conversation you are standing next to must never have a line
+ * swallowed because somebody twenty metres away said something first. So a
+ * scripted line is barred by almost nothing, and a murmur is still barred by
+ * `CHAT.floor` from landing on top of one.
+ *
+ * `entry` is how many lines in a player may join, and it is the cheapest
+ * variety in the whole design. Nine lines with seven possible entry points, and
+ * a dwell of about ten seconds meaning three or four lines are actually heard,
+ * is a conversation whose second hearing usually overlaps its first by nothing
+ * at all. It is also the honest answer to his own words: you are not meant to
+ * hear it start.
+ *
+ * `keep` is how many lines have to have been HEARD before a conversation counts
+ * as used up. Two. A player who caught one line and walked on has not heard
+ * that conversation in any sense a repeat could spoil, and spending a fifteenth
+ * of the library on it is the difference between a bag that lasts half an hour
+ * and one that lasts twenty minutes.
+ */
+const WORDS = {
+  on: 11,
+  off: 15,
+  warm: 24,
+  // 0.62 with `half` 3.8 — see above; the pair is one decision. 0.62 is also,
+  // by coincidence worth noting rather than relying on, the radio's own gain.
+  gain: 0.62,
+  half: 3.8,
+  roll: 1.5,
+  // The same two numbers the synth uses, because it is the same promenade and
+  // the same air. A voice at thirty metres over open concrete has no sibilance
+  // left; at arm's length it has all of it.
+  lpNear: 6000,
+  lpFar: 1450,
+  verb: 0.12,
+  gap: [0.18, 0.55],
+  floor: 0.07,
+  entry: 6,
+  keep: 2,
+};
+
+/** One conversation's decoded buffer, and the alignment it came back with. */
+const wordBuf = {};
+
+/**
+ * The control run's switch, and it earns its place in shipping code for the
+ * same reason `songMuted` in 80-audio.js does.
+ *
+ * The question this whole voice has to answer — does it bury the birds — cannot
+ * be answered from one recording, because the place it is asked about is never
+ * silent: there is a field recording of this promenade underneath it, a
+ * hillside of cicadas, four birds on their own clocks and other people talking
+ * further down the shore. What settles it is the SAME thirty seconds with one
+ * voice taken out, and every other way of getting that control — a second
+ * build, a git stash, a hand-edited gain — is a different page, and a different
+ * page is a different answer.
+ *
+ * It stops BOTH halves, the synth and the recordings, because half a control is
+ * not one. It is off, the game never writes it, and `__fr.jad.chatMute` is the
+ * only thing that touches it.
+ */
+let chatMuted = false;
+
+/**
+ * Ask for a conversation's clip, and work out where its lines really are.
+ *
+ * THE OFFSETS IN THE INDEX ARE NOT TRUSTED, and the note over `cut_chat.py`'s
+ * `find_gaps` has the measurement: whether an mp3 decoder honours the gapless
+ * tag and eats the encoder's 1 105-sample delay is not a property of the
+ * decoder. Sweeping sixteen settings through one build of ffmpeg, the delay
+ * appeared and vanished with the BITRATE — 92 ms at 12 kHz 24k and nothing at
+ * all at 12 kHz 32k. There is no constant to hard-code and no reason to believe
+ * Chrome does whatever ffmpeg did, and a table that is 92 ms out clips the
+ * first consonant off every line in the library.
+ *
+ * So the tool writes down where the first line began in ITS decode, and this
+ * finds the first line again in the browser's, and everything else moves by the
+ * difference. One scan of a few thousand samples, once per conversation, and it
+ * is correct for any decoder whatever it does with the tag.
+ */
+function wordsWarm(ci) {
+  if (!CHAT_LIB || wordBuf[ci] !== undefined) return;
+  const C = CHAT_LIB.conv[ci];
+  if (!C || !audio || !audio.chatLoad) return;
+  // Marked as asked-for before the call, so a decode in flight is not asked for
+  // again sixty times a second — `sampleTried`'s reason, one level up.
+  wordBuf[ci] = null;
+  audio.chatLoad(C.key, (buf) => {
+    const d = buf.getChannelData(0);
+    // Only as far as the delay could possibly have pushed it. A quarter of a
+    // second past where the tool found it is four times the largest delay in
+    // that sweep, and stopping there means a clip that somehow decoded to
+    // silence falls back to the baked table instead of scanning 24 s of it.
+    const n = Math.min(d.length,
+      Math.ceil((C.at0 + 0.25) * buf.sampleRate));
+    const thr = CHAT_LIB.onset;
+    let i = 0;
+    while (i < n && Math.abs(d[i]) <= thr) i++;
+    wordBuf[ci] = { buf, shift: i < n ? i / buf.sampleRate - C.at0 : 0 };
+  });
+}
+
+/**
+ * One recorded line, out of one conversation, from one person's mouth.
+ *
+ * The counterpart of `chatSay` and deliberately the same shape: the same
+ * distance law, the same lid, the same reverb send, the same bus. What is
+ * different is only that the mouth is a recording instead of three bandpasses,
+ * and that is the point — the two have to be interchangeable at eleven metres
+ * or the crossover is audible.
+ *
+ * `rate` is a fifteenth of a semitone either side of one, keyed on the
+ * speaker's own seed so a given figure always sounds like themselves. It is not
+ * for variety across hearings — the entry point does that — it is so that two
+ * different pairs playing the same script are two different pairs. Narrow, for
+ * `bark`'s reason: past a few per cent this stops being a person and starts
+ * being a tape speed.
+ */
+function chatWords(ctx, io, buf, off, dur, d, seed) {
+  if (!ctx || !io || !io.out || !buf || chatMuted) return false;
+  const far = 1 / (1 + Math.pow(Math.max(d, 0.1) / WORDS.half, WORDS.roll));
+  const t0 = ctx.currentTime + 0.015;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = 0.985 + seed * 0.030;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  // 0.4, and it is DECIBELS. A lowpass biquad's Q is read in dB by the Web
+  // Audio spec where a bandpass's is not, so 0.7 here would be a resonance and
+  // not a Butterworth — the same trap `chatSay` and half of 80-audio.js are
+  // written against.
+  lp.Q.value = 0.4;
+  lp.frequency.value = WORDS.lpFar
+    + (WORDS.lpNear - WORDS.lpFar) * Math.pow(far, 0.55);
+  const g = ctx.createGain();
+  g.gain.value = WORDS.gain * far;
+  src.connect(lp).connect(g).connect(io.out);
+  if (io.verb) {
+    const w = ctx.createGain();
+    w.gain.value = WORDS.verb * far;
+    g.connect(w).connect(io.verb);
+  }
+  // A slice of the buffer and not the whole of it: `start(when, offset,
+  // duration)` is one node and no seek, which is the entire reason the fifteen
+  // ship as fifteen files rather than as a hundred and thirty-five.
+  src.start(t0, Math.max(0, off), dur);
   return true;
 }
 
@@ -780,6 +1198,52 @@ function makeChatter(dep) {
   const sayLog = [];
 
   /**
+   * THE BAG, which is the whole of the answer to "fifteen clips is fifteen
+   * clips".
+   *
+   * A conversation index against the clock at which somebody last actually
+   * heard it. Not a boolean, because the number is what makes the ordering work
+   * once they have all been heard: `pickConv` prefers unheard, then an exact
+   * voice match, and among equals the one that has been unheard LONGEST. So the
+   * fifteen come out in a shuffled order with nothing repeating until the pool
+   * a group can draw from is exhausted, and then in order of age — which is the
+   * longest possible interval between two hearings of the same one, by
+   * construction rather than by luck.
+   *
+   * Written only when `WORDS.keep` lines of it have been played to somebody.
+   * Choosing a conversation costs nothing; being overheard is what spends it.
+   */
+  const spent = {};
+  /**
+   * WHERE THE LAST PERSON TO OVERHEAR THIS CONVERSATION GOT TO IN IT.
+   *
+   * The bag decides how long before a conversation comes round again; this
+   * decides whether you can TELL when it does, and it turned out to matter
+   * more. Measured over three half-hour walks along the beach itself rather
+   * than the promenade edge, a player passes 1.2 to 1.5 conversations a minute
+   * — three times the rate at the water's edge — so fifteen come round in
+   * minutes however they are shuffled, and the interval alone cannot save it.
+   *
+   * But a pass only lasts about ten seconds, which is three or four lines of
+   * nine. So the second hearing does not have to be the same three or four.
+   * Starting it where the last one stopped means the first three passes at a
+   * conversation play lines 0-3, 4-6 and 7-8 and share NOTHING; what comes
+   * round is the conversation, and what a player hears is more of it. Without
+   * this, entry points chosen by hash overlapped by 40 to 80 per cent and the
+   * repeat was the same words.
+   *
+   * It is per CONVERSATION and not per group on purpose: the point is that the
+   * next pair to be overheard saying this carries on from where the last pair
+   * was interrupted, which nobody can hear as anything at all.
+   */
+  const nextK = {};
+  let nWords = 0, nCast = 0;
+  // Which conversations were actually heard and when, so the recurrence
+  // interval can be MEASURED over half an hour of walking rather than argued
+  // about from the size of the library. Nothing in the game reads it.
+  const heard = [];
+
+  /**
    * Whether this person can be put in a conversation.
    *
    * `dep.free` is the greeting's own test and carries the four that are
@@ -890,6 +1354,13 @@ function makeChatter(dep) {
       turn: 0,
       next: 0,
       walk,
+      // The pre-rendered half, and all five are set here rather than left to
+      // arrive undefined: `conv` is which of the fifteen, `role` which way
+      // round the cast sits on these two, `k` the line, `on` whether it is
+      // words rather than a murmur at this instant, and `heard` how many lines
+      // somebody has actually been close enough to hear. `d` is the group's
+      // distance, written every frame by `step`.
+      conv: null, role: 0, k: -1, on: false, heard: 0, d: 1e9,
     };
     for (const fg of g) {
       fg.chat = G;
@@ -913,28 +1384,153 @@ function makeChatter(dep) {
   }
 
   /**
+   * Which of the fifteen these two are having, if any of them is theirs.
+   *
+   * Returns true if this group now has a script. Called at `WORDS.warm`, which
+   * is twenty-four metres and ten seconds of walking before anything is heard,
+   * so that the decode has landed by the time it is wanted.
+   *
+   * THE ORDER OF PREFERENCE IS THE WHOLE FUNCTION and every step of it is
+   * about the fifteen going as far as they can:
+   *
+   *   1. the cast must match by CLASS, either way round. A script is strictly
+   *      alternating, so which of the two speaks its first line is free, and
+   *      allowing both orders doubles what fifteen scripts can be cast onto.
+   *   2. unheard beats heard, which is the bag.
+   *   3. an exact kind match beats a class match, so a Harry script goes to
+   *      Harry while there is one going.
+   *   4. and among equals, whichever has gone unheard longest.
+   *
+   * A conversation another live group already holds is skipped outright. Two
+   * groups within earshot at once is rare — the survey saw at most one — but
+   * two people on one bench and two on the next having word for word the same
+   * conversation is the single most damning thing this could do, and it is one
+   * comparison to make it impossible.
+   */
+  function pickConv(G, not) {
+    if (!CHAT_LIB || G.who.length !== 2) return false;
+    const ka = dep.voice(G.who[0]), kb = dep.voice(G.who[1]);
+    const ca = CHAT_CLASS[ka], cb = CHAT_CLASS[kb];
+    if (!ca || !cb) return false;
+    const n = CHAT_LIB.conv.length;
+    // Scanned from an offset that depends on who these two are, so that ties —
+    // and at the start of a session everything is a tie — do not always fall to
+    // conversation zero. `findGroup` scans from an offset for the same reason.
+    const o = (chatJit(G.who[0].idx * 31 + G.who[1].idx, 3313) * n) | 0;
+    let best = -1, bestScore = -1, bestAt = 0, bestRole = 0;
+    for (let i = 0; i < n; i++) {
+      const ci = (o + i) % n;
+      if (ci === not) continue;
+      const C = CHAT_LIB.conv[ci];
+      const c0 = CHAT_CLASS[C.cast[0]], c1 = CHAT_CLASS[C.cast[1]];
+      let role = 0;
+      if (c0 === ca && c1 === cb) role = 1;
+      else if (c0 === cb && c1 === ca) role = 2;
+      if (!role) continue;
+      let taken = false;
+      for (const H of groups) if (H !== G && H.conv === ci) taken = true;
+      if (taken) continue;
+      const exact = role === 1 ? (C.cast[0] === ka && C.cast[1] === kb)
+        : (C.cast[0] === kb && C.cast[1] === ka);
+      const at = spent[ci];
+      const score = (at == null ? 4 : 0) + (exact ? 2 : 0);
+      if (score > bestScore
+        || (score === bestScore && at != null && at < bestAt)) {
+        best = ci; bestScore = score; bestAt = at == null ? 0 : at;
+        bestRole = role;
+      }
+    }
+    if (best < 0) return false;
+    G.conv = best;
+    G.role = bestRole;
+    G.heard = 0;
+    // WHERE THEY ARE UP TO WHEN YOU ARRIVE.
+    //
+    // Where the last person to overhear this one stopped, if anybody has — see
+    // `nextK`, which is what actually keeps fifteen from sounding like fifteen.
+    // Otherwise a hash, so that the first hearing of the day is not line zero
+    // either: you are never meant to hear one start.
+    //
+    // The hash is keyed on `nGroup` and not only on who these two are, because
+    // the same pair meets on the same stretch of promenade five times in a
+    // quarter of an hour and keyed on their indices alone they would join at
+    // the same line every time. `nGroup` moves every time anybody anywhere on
+    // the beach starts talking, which makes it the shore's own clock.
+    const lines = CHAT_LIB.conv[best].lines.length;
+    const span = Math.min(WORDS.entry, Math.max(1, lines - 2));
+    G.k = nextK[best] != null ? nextK[best]
+      : (chatJit(G.who[0].idx + nGroup * 13, 9127) * span) | 0;
+    G.k -= 1;                       // `nextTurn` steps on to it
+    nCast++;
+    wordsWarm(best);
+    return true;
+  }
+
+  /** Whose mouth line `k` of the script comes out of. */
+  function spkOf(G, k) {
+    return (k % 2 === 0) === (G.role === 1) ? 0 : 1;
+  }
+
+  /**
    * Hand the floor to somebody else.
    *
    * Never to the same person twice running in a group of two, which would be a
    * monologue; in a group of three it is allowed once in five, because somebody
    * carrying on after a pause is a real thing and a strict round robin is the
    * most machine-like pattern there is.
+   *
+   * A GROUP WITH A SCRIPT IS DRIVEN BY THE SCRIPT INSTEAD, and for a pair that
+   * is not a change: a script alternates and so does `1 - G.spk`. It is written
+   * as a branch rather than left to coincide because a three would need it, and
+   * because a turn's LENGTH does change — it becomes the length of the line
+   * that is about to be said plus a beat, which is the only honest way to have
+   * somebody finish a sentence before the next person starts one.
    */
   function nextTurn(G) {
     const n = G.who.length;
-    const r = chatJit(G.who[0].idx * 17 + G.turn, 1213);
-    let s = G.spk;
-    if (n === 2) s = 1 - G.spk;
-    else if (r < 0.20) s = G.spk;
-    else s = (G.spk + 1 + ((r * 100) | 0) % (n - 1)) % n;
-    G.spk = s;
-    G.turn++;
-    nTurn++;
-    G.next = G.t + CHAT.turn[0]
-      + chatJit(G.who[s].idx + G.turn * 7, 331) * (CHAT.turn[1] - CHAT.turn[0]);
+    let s;
+    if (G.conv != null) {
+      const L = CHAT_LIB.conv[G.conv].lines;
+      G.k = (G.k + 1) % L.length;
+      // Round the end of the script and still standing there. Nine lines is
+      // twenty-three seconds and the longest a walking player ever spent inside
+      // eleven metres was twenty-one, so this is the standing-still case — and
+      // hearing line one again is the worst thing in the design. So they change
+      // the subject: another conversation off the bag with a cast that fits,
+      // which is what two people who have finished one actually do. If there is
+      // no other, it wraps, which is the least bad of the two.
+      if (G.k === 0 && G.heard > 0 && pickConv(G, G.conv)) {
+        G.k = (G.k + 1) % CHAT_LIB.conv[G.conv].lines.length;
+      }
+      s = spkOf(G, G.k);
+      G.spk = s;
+      G.turn++;
+      nTurn++;
+      G.next = G.t + CHAT_LIB.conv[G.conv].lines[G.k].d + WORDS.gap[0]
+        + chatJit(G.who[s].idx + G.turn * 7, 331)
+          * (WORDS.gap[1] - WORDS.gap[0]);
+    } else {
+      const r = chatJit(G.who[0].idx * 17 + G.turn, 1213);
+      s = G.spk;
+      if (n === 2) s = 1 - G.spk;
+      else if (r < 0.20) s = G.spk;
+      else s = (G.spk + 1 + ((r * 100) | 0) % (n - 1)) % n;
+      G.spk = s;
+      G.turn++;
+      nTurn++;
+      G.next = G.t + CHAT.turn[0]
+        + chatJit(G.who[s].idx + G.turn * 7, 331) * (CHAT.turn[1] - CHAT.turn[0]);
+    }
     // Whether this turn is spoken out loud, and which hand goes up if one does.
+    //
+    // EVERY turn is spoken once the words are on, and that is not a level
+    // decision, it is what a conversation is. Under half of them are voiced at
+    // a distance because a group that makes a noise every two seconds across
+    // the shore is an argument; standing next to two people and hearing one
+    // sentence in two is not a conversation with pauses in it, it is a
+    // conversation with holes in it.
     const sp = G.who[s];
-    G.say = chatJit(sp.idx + G.turn * 13, 2711) < CHAT.voiced;
+    G.say = G.on ? true : chatJit(sp.idx + G.turn * 13, 2711) < CHAT.voiced;
     G.gest = chatJit(sp.idx + G.turn * 19, 5501) < GEST.odds;
     G.gAt = G.t + 0.25 + chatJit(sp.idx + G.turn, 907) * 0.5;
     G.spoke = false;
@@ -976,6 +1572,46 @@ function makeChatter(dep) {
   }
 
   /**
+   * The line this group is up to, out of the mouth of whoever is holding the
+   * floor.
+   *
+   * Returns false if it could not be played, and the caller RETRIES on the next
+   * frame rather than marking the turn spoken — which is the difference between
+   * a conversation and a conversation with a line missing out of it. The only
+   * things that stop it are a clip that has not finished decoding and the
+   * global floor, and both are gone within a frame or two.
+   */
+  function sayLine(G, who) {
+    const W = wordBuf[G.conv];
+    if (!W || !audio || !audio.chatWords) return false;
+    if (clock - saidAt < WORDS.floor) return false;
+    const L = CHAT_LIB.conv[G.conv].lines[G.k];
+    if (!L) return false;
+    const fg = G.who[G.spk];
+    const d = Math.hypot(fg.x - who.x, fg.z - who.z);
+    if (!audio.chatWords(W.buf, L.at + W.shift, L.d, d, fg.seed)) return false;
+    saidAt = clock;
+    nSaid++;
+    nWords++;
+    G.heard++;
+    // Spent only once somebody has actually heard `keep` lines of it. Catching
+    // one line on the way past is not hearing a conversation, and charging the
+    // library a fifteenth for it is the difference between a bag that lasts
+    // half an hour and one that lasts twenty minutes.
+    if (G.heard === WORDS.keep) spent[G.conv] = clock;
+    // And the next pair to be overheard having this conversation carry on from
+    // here. See `nextK`.
+    nextK[G.conv] = (G.k + 1) % CHAT_LIB.conv[G.conv].lines.length;
+    if (heard.length >= 200) heard.shift();
+    heard.push({ c: G.conv, k: G.k, t: +clock.toFixed(1), d: +d.toFixed(1),
+      idx: fg.idx });
+    if (sayLog.length >= 24) sayLog.shift();
+    sayLog.push({ idx: fg.idx, key: CHAT_LIB.conv[G.conv].key + ':' + G.k,
+      d: +d.toFixed(1) });
+    return true;
+  }
+
+  /**
    * A hello, out loud, for `stepGreet` to call.
    *
    * The greeting is the other half of what was asked for and it already exists;
@@ -1012,6 +1648,67 @@ function makeChatter(dep) {
         groups.splice(i, 1);
         continue;
       }
+      // ── how far off you are, and therefore whether this has words in it ──
+      //
+      // The GROUP's distance and not the speaker's, and taken over the nearest
+      // of them. Two people talking are up to 5.5 m apart, so measured off
+      // whoever happens to hold the floor this would cross the boundary and
+      // come back every time the floor changed — which is a conversation
+      // switching between a recording and a synthesiser on alternate lines, and
+      // those two do not sound like the same person. The LEVEL is still the
+      // speaker's own distance; only the decision is the group's.
+      let dd = 1e9;
+      for (const fg of G.who) {
+        const ax = fg.x - who.x, az = fg.z - who.z;
+        const q = ax * ax + az * az;
+        if (q < dd) dd = q;
+      }
+      G.d = Math.sqrt(dd);
+      if (CHAT_LIB) {
+        // Chosen and asked for well out, so the decode has landed. See
+        // `WORDS.warm`, and `beadWarm` in 80-audio.js for why this is separate
+        // from wanting it.
+        if (G.conv == null && G.d <= WORDS.warm) pickConv(G);
+        else if (G.conv != null && !wordBuf[G.conv]) wordsWarm(G.conv);
+        if (!G.on && G.conv != null && G.d <= WORDS.on && wordBuf[G.conv]) {
+          // Straight into it, on this frame, and not at the next turn. The
+          // whole request is that there is no pause: you come inside earshot
+          // and they are already talking. Waiting for the current turn to run
+          // out would put up to four seconds of nothing between arriving and
+          // hearing anything, which is the very gap pre-rendering exists to
+          // remove.
+          G.on = true;
+          // AND THE CURSOR IS SET HERE AND NOT AT CASTING, which is worth the
+          // paragraph because casting it there and letting it run was the first
+          // version and it measurably leaked.
+          //
+          // The script starts running when the group is CHOSEN, twenty-four
+          // metres out, so that the conversation is genuinely in progress
+          // rather than waiting for you. Ten seconds of walking is three or
+          // four lines, and those are lines nobody heard — so a pass that was
+          // meant to begin where the last listener left off began four lines
+          // past it, and the four in between were never played to anybody. Over
+          // three half-hour walks that put 44 to 62 per cent of a second
+          // hearing on words already heard.
+          //
+          // Snapping to `nextK` on the frame the words come on costs nothing —
+          // nobody has heard a syllable of it yet, so there is nothing for the
+          // jump to be audible in — and it is what makes the guarantee a
+          // guarantee: three passes at a nine-line conversation play 0-3, 4-6
+          // and 7-8 and share nothing at all.
+          const nL = CHAT_LIB.conv[G.conv].lines.length;
+          if (nextK[G.conv] != null) G.k = (nextK[G.conv] + nL - 1) % nL;
+          G.spoke = false;
+          nextTurn(G);
+        } else if (G.on && (G.d > WORDS.off || !wordBuf[G.conv])) {
+          // The second half of that is the safety net and not the common case:
+          // a clip whose decode never landed would otherwise leave a group
+          // marked as speaking words and saying nothing at all, which is the
+          // one failure here that is silent in both senses. Dropping back to
+          // the murmur is what a build with no payload does anyway.
+          G.on = false;
+        }
+      }
       if (G.t >= G.next) nextTurn(G);
       // A WALKER STOPS FOR IT, which the first cut did not do and which the
       // tally said mattered: of the first fifteen groups logged at t 318, ten
@@ -1033,8 +1730,13 @@ function makeChatter(dep) {
       // Spoken at the START of the turn, because that is what a turn IS: the
       // rest of it is the pause after, which is where the listeners nod.
       if (G.say && !G.spoke) {
-        G.spoke = true;
-        speak(G.who[G.spk], who, CHAT_TALK);
+        if (G.on) {
+          // Not marked spoken until it actually was — see `sayLine`.
+          if (sayLine(G, who)) G.spoke = true;
+        } else {
+          G.spoke = true;
+          speak(G.who[G.spk], who, CHAT_TALK);
+        }
       }
       // In and out. The same eased shape the greeting and the bump both use,
       // for their reason: linear in and linear out is a servo.
@@ -1203,13 +1905,26 @@ function makeChatter(dep) {
       // written to by the thing it was meant to be the "before" of — which is
       // exactly what happened, and it looked like a group being counted twice.
       clock: +clock.toFixed(1), by: { ...byMode }, say: sayLog.slice(),
+      // The pre-rendered half. `words` is how many recorded lines have been
+      // played, `cast` how many groups were given a script at all, and `spent`
+      // how much of the bag is gone. `heard` is the log the recurrence interval
+      // is MEASURED off — every line, which conversation it came out of and
+      // when — because "does fifteen repeat" is a claim about half an hour of
+      // walking and cannot be settled by counting the library.
+      lib: CHAT_LIB ? CHAT_LIB.conv.length : 0,
+      words: nWords, cast: nCast,
+      spent: Object.keys(spent).length,
+      buf: Object.keys(wordBuf).filter((k) => wordBuf[k]).length,
+      heard: heard.slice(),
       groups: groups.map((G) => ({
         t: +G.t.toFixed(2), dur: +G.dur.toFixed(1), turn: G.turn,
         spk: G.who[G.spk].idx, walk: G.walk,
+        conv: G.conv, on: !!G.on, k: G.k, heard: G.heard,
+        d: +G.d.toFixed(1),
         apart: +Math.hypot(G.who[0].x - G.who[1].x,
           G.who[0].z - G.who[1].z).toFixed(2),
         who: G.who.map((fg) => ({
-          idx: fg.idx, mode: fg.mode,
+          idx: fg.idx, mode: fg.mode, kind: dep.voice(fg),
           look: +(fg.look || 0).toFixed(3),
           lookY: +(fg.lookY || 0).toFixed(3),
           nod: +(fg.nod || 0).toFixed(3),
@@ -1335,9 +2050,57 @@ function makeChatter(dep) {
       return { pool: pool.length, modes, grid,
         seps: seps.sort((a, b) => a[1] - b[1]).slice(0, 14) };
     },
+    /**
+     * Both voices off, for the control half of a measurement. See `chatMuted`.
+     *
+     * `__fr.jad.chatMute(1)` and then thirty seconds of the same beach is the
+     * only honest "without" this thing has.
+     */
+    mute: (v) => { chatMuted = !!v; return chatMuted; },
     /** Say one line on demand, so the synth can be recorded on its own. */
     sayNow: (kind, key, d) => (audio && audio.chat
       ? audio.chat(kind, key, d, 0.5) : false),
-    lines: () => Object.keys(CHAT_LINES),
+    /**
+     * Play one baked line on demand, at a stated distance.
+     *
+     * The pair to `sayNow`, and it exists for the same reason: a level cannot
+     * be measured off a thing that fires when it feels like it. `wordsNow(0, 3,
+     * 3)` puts line three of the first conversation three metres away, so the
+     * recorded voice and the synthesised one can be recorded against the same
+     * bed at the same range and differenced.
+     *
+     * It warms the clip and returns false until the decode lands, so a probe
+     * calls it twice: once to ask, and once a moment later to hear it.
+     */
+    wordsNow: (c, l, d) => {
+      if (!CHAT_LIB) return null;
+      const C = CHAT_LIB.conv[c];
+      if (!C || !C.lines[l]) return null;
+      wordsWarm(c);
+      const W = wordBuf[c];
+      if (!W || !audio || !audio.chatWords) return false;
+      const L = C.lines[l];
+      return audio.chatWords(W.buf, L.at + W.shift, L.d, d == null ? 3 : d,
+        0.5);
+    },
+    /**
+     * The synth's phrase list, and the whole baked library beside it.
+     *
+     * `lines()` used to be twenty-six keys. It is now the two halves of this
+     * file in one call, because the question a probe actually asks is which of
+     * the two a given noise came out of, and `shift` is the answer to whether
+     * the browser's decoder ate the encoder's delay — the one number in here
+     * that could silently be wrong. See `wordsWarm`.
+     */
+    lines: () => ({
+      synth: Object.keys(CHAT_LINES),
+      words: CHAT_LIB ? CHAT_LIB.conv.map((C, i) => ({
+        i, key: C.key, cast: C.cast, topic: C.topic, n: C.lines.length,
+        at0: C.at0,
+        shift: wordBuf[i] ? +wordBuf[i].shift.toFixed(4) : null,
+        spent: spent[i] == null ? null : +spent[i].toFixed(1),
+        say: C.lines.map((L) => L.t),
+      })) : null,
+    }),
   };
 }

@@ -5597,6 +5597,28 @@ function buildAudio() {
       V: YELP[kind] || YELP.woman_young_slim,
     }, key, d, seed) : false),
     /**
+     * And the same two people once you are close enough to make them out.
+     *
+     * Two hooks and no more, for the reason the note above gives: what lives
+     * out there is which conversation these two are having and where they are
+     * up to in it, which is a table about people; what lives in here is the
+     * context, the decoder and WHICH BUS. `outBus` again, and it has to be the
+     * same one — a recorded line and a synthesised murmur that went through
+     * different stages of the wall would step in level as you crossed the
+     * eleven metres between them, and the whole design of `WORDS` in
+     * 43-chatter.js is that they do not.
+     *
+     * `chatLoad` is `sampleLoad` under another name, so the fifteen clips are
+     * decoded once, lazily, by the same code and with the same silent failures
+     * as every other baked clip in this file. It is exposed rather than
+     * duplicated because a second decoder is a second set of `tried` keys and a
+     * second way to retry a failed decode sixty times a second.
+     */
+    chatLoad: (key, keep) => sampleLoad(key, keep),
+    chatWords: (buf, off, dur, d, seed) => (ctx ? chatWords(ctx, {
+      out: outBus, verb: verbSend,
+    }, buf, off, dur, d, seed) : false),
+    /**
      * The last node before the speakers, and the context it lives in.
      *
      * For `tools/record.mjs`, and for nothing in the game. A cut is filmed
