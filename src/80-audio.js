@@ -5472,14 +5472,48 @@ function buildAudio() {
     // a fly is not loud, it is *the thing in the room*.
     gain: 0.055,
     lp: 4200,         // no fizz above the fourth formant; a fly has no top end
+
+    // And what a fly sounds like when it has been hit with four hundred litres
+    // a minute.
+    //
+    // Misha's word for this was "loudly", and it is licensed: a fly in a death
+    // spiral is not the fly that was crossing the room. It is beating flat out
+    // against an airframe that no longer answers, a hand's width from your
+    // face, and the one thing it must not sound like is the thing you have been
+    // half-hearing for the last ten minutes.
+    //
+    // Five times the idle gain, and measured off `audio.tap()` the way the idle
+    // one was: at the level a fly two metres away hands in, the wingbeat
+    // partial goes from −57.4 dB at 194 Hz to −44.5 dB at 307 Hz — 12.9 dB up
+    // and a fifth higher — and the whole mix's RMS goes up 5.9 dB with it. At
+    // point blank the limiter takes some of that back (7.1 dB of RMS instead of
+    // 14), which is the limiter doing its job: what it takes off the fly it
+    // takes off everything else too, so the fly still owns the room.
+    //
+    // None of this touches the IDLE buzz, which sits 10.8 dB under the room
+    // floor and is a separate open question — see the note on `gain` above.
+    death: 0.28,
+    // And half of why it reads as dying rather than as near: the pitch waver
+    // goes from two per cent to seven, which is a wingbeat being fought rather
+    // than flown.
+    deathWob: 3.4,
   };
   let flyNodes = null;
   /**
    * @param level  0…1 — how loud, and 0 means the wings have stopped
    * @param hz     multiplier on the wingbeat, ~0.9 to 1.35
    * @param pan    −1 left, +1 right, which ear it is in
+   * @param dying  the death spiral, which is loud. It is a flag and not a
+   *               gain because the level the caller hands in is a 0…1 it has
+   *               already worked out against distance and doorways — there is
+   *               no headroom left in it to be fourteen decibels louder with —
+   *               and because how loud a dying fly is, is a question about the
+   *               mix and belongs in this file with the rest of them. See
+   *               FLYBUZZ.death.
    */
-  function fly(level, hz = 1, pan = 0) {
+  function fly(level, hz = 1, pan = 0, dying = false) {
+    const gain = dying ? FLYBUZZ.death : FLYBUZZ.gain;
+    const wob = dying ? FLYBUZZ.deathWob : 1;
     if (!ctx || dead) return;
     const t = ctx.currentTime;
     const want = Math.max(0, Math.min(1, level));
@@ -5550,17 +5584,24 @@ function buildAudio() {
         air.start(); chop.start();
       }
       osc.start(); wob.start();
-      flyNodes = { osc, chop, out, pan: pn, lfo, wob };
+      flyNodes = { osc, chop, out, pan: pn, lfo, wob, wobG };
     }
     const n = flyNodes;
     // 20 ms, which is a ramp only so that it does not click. A fly's buzz has
     // no release: it is on while the wings beat and off the instant six feet
     // are on the plaster, and anything slower than this reads as the fly
     // gliding in, which no fly has ever done.
-    n.out.gain.setTargetAtTime(Math.max(0.00005, want * FLYBUZZ.gain), t, 0.020);
+    n.out.gain.setTargetAtTime(Math.max(0.00005, want * gain), t, 0.020);
     const f = FLYBUZZ.hz * Math.max(0.6, Math.min(1.8, hz));
-    n.osc.frequency.setTargetAtTime(f, t, 0.05);
-    if (n.chop) n.chop.frequency.setTargetAtTime(f, t, 0.05);
+    // 50 ms on the pitch, which is right for a fly changing its mind and too
+    // slow for the moment one is hit: the wingbeat jumps most of a fourth on
+    // that frame — 1.05 to 1.38 — and a 50 ms constant takes about 150 ms to
+    // arrive, which is long enough to hear as a swoop rather than as a hit.
+    // 15 ms whenever the waver is up, which is only ever the spiral. The climb
+    // AFTER that first frame is slow enough that either would do.
+    n.osc.frequency.setTargetAtTime(f, t, wob > 1.2 ? 0.015 : 0.05);
+    if (n.chop) n.chop.frequency.setTargetAtTime(f, t, wob > 1.2 ? 0.015 : 0.05);
+    if (n.wobG) n.wobG.gain.setTargetAtTime(FLYBUZZ.hz * 0.022 * wob, t, 0.03);
     n.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.06);
   }
 

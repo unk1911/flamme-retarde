@@ -1792,6 +1792,68 @@ async function buildVikendica(scene, field) {
   };
 
   /**
+   * And what happens when you hit it with the hose.
+   *
+   * A branch throws 9.2 litres a second at 23 m/s. Whatever that does to a 12
+   * mg animal it does not do gently, and the honest thing to model is not a
+   * fly being knocked out of the sky — it is a fly that has been WETTED. A
+   * housefly with water on its wings does not stop flying; it goes into a
+   * flat, accelerating spiral it cannot get out of, beating harder and harder
+   * against an airframe that has stopped answering, and it comes down. That is
+   * the beat Misha asked for — "loudly, in a spiralling orbit" — and it is
+   * also what actually happens, which is the sort of agreement worth having.
+   *
+   * The numbers:
+   *
+   *   fall     1.55 s from the hit to the floor. Free fall from the middle of
+   *            this room is 0.59 s and looks like a dropped ball bearing; a
+   *            wet fly is still making lift, badly, and takes two or three
+   *            times that. It is also how long the shot needs.
+   *   turns    Four and a bit revolutions on the way down, speeding up as the
+   *            orbit closes — which is the same skater's arm that makes every
+   *            spiral in nature tighten as it goes.
+   *   r0, r1   The orbit opens at 16 cm and closes to 2. Wider and it flies
+   *            through the furniture; tighter and it is a fly falling straight
+   *            down with a wobble on it.
+   *   tumble   How fast the animal turns about its OWN axes, which is not the
+   *            orbit and is what makes it read as out of control rather than
+   *            as being on a wire. It rises through the fall, because it is
+   *            losing rather than fighting.
+   *   again    And then, in two and a half to four and a half minutes,
+   *            ANOTHER ONE. See the note over `hatch`.
+   *   floors   The clear patches of tile it is allowed to die on, in the
+   *            house's own metres, read off a downward raycast over the whole
+   *            room rather than guessed: everything else in here is under an
+   *            armchair, the shelves, the desk or the low table, and a corpse
+   *            you cannot walk over and look at is a corpse that did not
+   *            happen. The fly's own position is clamped into the nearest of
+   *            them, so it still dies roughly where it was hit.
+   *
+   *            EVERY ONE OF THESE IS VERIFIED AT 5 cm, not at the 20 cm the
+   *            first sweep used: 684 samples, none of them anything but floor.
+   *            The 20 cm version put the west edge of the second rectangle at
+   *            1.25, which is one sample away from an armchair whose true edge
+   *            is somewhere between 1.2 and 1.4 — and the first fly to die at
+   *            that end of the room landed inside it, with the cut framing a
+   *            close-up of upholstery.
+   */
+  const DEATH = {
+    fall: 1.55,
+    turns: 4.3,
+    r0: 0.16,
+    r1: 0.02,
+    tumble: [7.0, 30.0],       // rad/s, start and end
+    hz: [1.38, 1.74],          // the wingbeat climbs a fifth as it fights
+    again: [150, 270],
+    keep: 4,                   // corpses the floor remembers
+    floors: [
+      { x0: 1.80, x1: 2.30, z0: -0.15, z1: 1.00 },
+      { x0: 1.45, x1: 1.75, z0: -0.15, z1: 1.55 },
+      { x0: 0.22, x1: 0.45, z0: -0.20, z1: 1.50 },
+    ],
+  };
+
+  /**
    * The few places it goes back to, which is what a fly's day in a room is.
    *
    * Each is a patch of a real surface in the house's own metres with the
@@ -1894,6 +1956,13 @@ async function buildVikendica(scene, field) {
   const flyRig = new THREE.Group();
   const flyWing = [new THREE.Group(), new THREE.Group()];
   const flyLeg = [];
+  // The dead ones. `corpseProto` is built beside the live rig out of the same
+  // parts and cloned into `corpses` as they are needed — see the note on it
+  // below, and `DEATH.keep` for why there is more than one.
+  let corpseProto = null;
+  const corpses = [];
+  // The close-up's own scene, and it is null until somebody kills something.
+  let corpseShot = null;
   // The wings, and they are nearly not there. Emissive was 0.34 and specular
   // 0.30 — a white sheet lit from inside — and against the beech of the table
   // they came out as two solid cream wedges, which is a paper aeroplane and
@@ -2000,6 +2069,57 @@ async function buildVikendica(scene, field) {
       flyLeg.push(g);
     }
     root.add(flyRig);
+
+    /**
+     * The same animal, dead, on the tile.
+     *
+     * Built out of the same four lumps, two vanes and six shanks as the live
+     * one, because it IS the live one and a corpse modelled separately is a
+     * second fly that has to be kept in agreement with the first. What changes
+     * is the pose, and only the pose: on its back, wings splayed instead of
+     * folded, and the six legs drawn in over the belly.
+     *
+     * It is 3.7 px at the distance you can get to it and every bit of that is
+     * the silhouette, which is why the legs are worth posing at all: a speck
+     * with a fringe round it reads as a dead insect and a bare speck reads as
+     * a crumb. The close-up in src/44-corpse.js is what the detail is for.
+     */
+    corpseProto = new THREE.Group();
+    {
+      // The body, and the pose is the whole of it.
+      for (const m of flyRig.children) {
+        if (!(m instanceof THREE.Mesh)) continue;
+        const c = m.clone();
+        corpseProto.add(c);
+      }
+      for (let i = 0; i < 2; i++) {
+        const w = new THREE.Group();
+        w.position.copy(flyWing[i].position);
+        // Out and flat, which is where a dead fly's wings are. The living one
+        // folds them down the abdomen the instant six feet are down; nothing
+        // folds them again after that.
+        w.rotation.set(0, (i ? 1 : -1) * 0.95, 0.06);
+        const m = new THREE.Mesh(vane, flyWingMat);
+        m.renderOrder = 2;
+        w.add(m);
+        corpseProto.add(w);
+      }
+      // And the curl. Same three rows as LEG_STAND, swept hard inboard and
+      // dropped on to the body — see LEG_DEAD in src/44-corpse.js, which is
+      // the same pose written out joint by joint for the shot that can see it.
+      const CURL = [[-0.30, 1.15], [-1.55, 1.30], [-2.70, 1.20]];
+      for (let i = 0; i < 6; i++) {
+        const s = i & 1 ? 1 : -1;
+        const row = i >> 1;
+        const g = new THREE.Group();
+        g.position.set([0.00115, -0.00015, -0.00145][row], -0.00080, s * 0.00085);
+        g.rotation.set(0, s * CURL[row][0], CURL[row][1]);
+        const m = new THREE.Mesh(shank, dark);
+        g.add(m);
+        corpseProto.add(g);
+      }
+      corpseProto.visible = false;
+    }
   }
 
   /**
@@ -2030,6 +2150,10 @@ async function buildVikendica(scene, field) {
     doing: 'still', act: 0, rock: 0, wig: 0,
     buzz: 0, hz: 1,
     held: false, far: true,
+    // The spiral, while there is one: where it is winding down to, how far
+    // round it has got, and how far over it has gone. Null unless `mode` is
+    // 'spin'. `again` is the clock on the next fly — see `hatch`.
+    die: null, again: 0,
   };
   const fwd = new THREE.Vector3(1, 0, 0);
   const side = new THREE.Vector3();
@@ -2037,6 +2161,8 @@ async function buildVikendica(scene, field) {
   const aimV = new THREE.Vector3();
   const basis = new THREE.Matrix4();
   const camRight = new THREE.Vector3();
+  const _tq = new THREE.Quaternion();
+  const _ax = new THREE.Vector3();
 
   /**
    * Where the fly is in world metres.
@@ -2270,6 +2396,189 @@ async function buildVikendica(scene, field) {
     }
   }
 
+  // ── being hit with the hose ─────────────────────────────────────────────────
+  /**
+   * Where a fly at (x, z) is allowed to end up: the nearest clear patch of
+   * tile, with the point clamped into it.
+   *
+   * Nearest and not random, because the one thing the player has to be able to
+   * do afterwards is find it — a fly swatted over the low table that lands
+   * behind the bookshelf is a fly that did not land at all as far as anybody
+   * watching is concerned. See DEATH.floors for where the rectangles come from.
+   */
+  function deathBed(x, z) {
+    let best = null, bd = Infinity;
+    for (const R of DEATH.floors) {
+      const cx = clamp(x, R.x0, R.x1), cz = clamp(z, R.z0, R.z1);
+      const d = (cx - x) * (cx - x) + (cz - z) * (cz - z);
+      if (d < bd) { bd = d; best = [cx, cz]; }
+    }
+    return best || [1.9, 0.5];
+  }
+
+  /**
+   * Hit. Everything after this is the fly dying.
+   *
+   * Returns false if there was nothing to hit, which is the caller's cue that
+   * it did not happen — the app puts a whole camera sequence on the back of
+   * this and must not start one for a fly that is already on the floor.
+   *
+   * A SITTING FLY CAN BE HIT, and that is deliberate. The obvious reading is
+   * that a swat is a thing you do to something in the air, but nobody has ever
+   * swatted a fly in the air: you hit it on the wall, on the window, on the
+   * table, in the fraction of a second before it goes. It is also the only
+   * version that is fair — the animal spends the larger half of its life
+   * sitting still (see the note at the top of this block), and a hit test that
+   * excluded that would be a hit test that was off more than it was on.
+   */
+  function swat() {
+    if (F.mode === 'spin' || F.mode === 'dead') return false;
+    const bed = deathBed(F.p.x, F.p.z);
+    F.mode = 'spin';
+    F.held = false;
+    F.buzz = 1;
+    // Which way it goes round: whichever way it was already turning, because
+    // it is the fly's own momentum and not a coin.
+    const dir = F.loop.dir;
+    // The orbit it opens on is the one it is already flying. The angle is set
+    // so that the tangent at u = 0 is the heading it has this instant, and the
+    // circle's centre is put wherever that requires — which means the first
+    // frame of the spiral is exactly where the last frame of the flight was,
+    // going the same way, and there is no cut in the middle of a shot that is
+    // about to zoom in on it.
+    //
+    // The centre then DRIFTS to the patch of floor it is going to die on. That
+    // is the part the first pass got wrong: it centred the orbit on the
+    // landing point from the first frame, so a fly hit at the terrace window,
+    // 2.2 m from the nearest clear tile, teleported the whole 2.2 m on frame
+    // one and then spiralled tidily down from the wrong place. A spiral that
+    // translates while it turns is what falling out of control looks like
+    // anyway; a spiral around a fixed axis is a fairground ride.
+    const a0 = F.yaw - dir * Math.PI / 2;
+    F.die = {
+      t: 0,
+      bx: bed[0], bz: bed[1],
+      cx: F.p.x - Math.cos(a0) * DEATH.r0,
+      cz: F.p.z - Math.sin(a0) * DEATH.r0,
+      a0,
+      y0: F.p.y,
+      spun: 0, tumble: 0,
+      dir,
+    };
+    return true;
+  }
+
+  /**
+   * One frame of the spiral.
+   *
+   * The orbit is analytic — angle and radius as functions of how far through
+   * the fall it is — rather than integrated, and that is on purpose: this is
+   * two seconds of a shot that has to arrive at one exact point on the floor
+   * with the camera already pointed at it, and an integrator that is 3 cm out
+   * at the end is a cut to a fly that is not in frame.
+   */
+  function stepDie(d) {
+    const D = F.die;
+    D.t += d;
+    const u = clamp(D.t / DEATH.fall, 0, 1);
+    // Accelerating down, because it is falling as much as flying by the end.
+    const drop = u * u * (3 - u) / 2;
+    // And tightening. The orbit angle goes as u², so the last quarter of the
+    // fall is half of the turning — which is what a spiral that is closing
+    // does, and is the part everybody actually sees.
+    const spun = TAU * DEATH.turns * u * u;
+    D.spun = spun;
+    const r = lerp(DEATH.r0, DEATH.r1, u * u);
+    const a = D.a0 + D.dir * spun;
+    // The axis, on its way from where it was hit to where it is going to lie.
+    const cx = lerp(D.cx, D.bx, drop);
+    const cz = lerp(D.cz, D.bz, drop);
+    F.p.x = clamp(cx + Math.cos(a) * r, HARD.x0, HARD.x1);
+    F.p.z = clamp(cz + Math.sin(a) * r, HARD.z0, HARD.z1);
+    const floor = plan.floor + FLY.stand;
+    F.p.y = lerp(D.y0, floor, drop);
+    // Its own tumble, which is not the orbit: the body is turning end over end
+    // inside a circle it is being carried round, and both are needed or it
+    // reads as a model aeroplane on a string.
+    D.tumble += d * lerp(DEATH.tumble[0], DEATH.tumble[1], u);
+    // Heading is the tangent of the orbit, so it is at least pointing the way
+    // it is travelling — which a fly with one wet wing very nearly is.
+    F.yaw = a + D.dir * Math.PI / 2;
+    F.pitch = -0.5 * u;
+    F.speed = TAU * r * DEATH.turns / DEATH.fall;
+    F.hz = lerp(DEATH.hz[0], DEATH.hz[1], u);
+    if (u >= 1) settle(D.bx, D.bz);
+  }
+
+  /**
+   * Down. Put a corpse where it landed and take the live one away.
+   *
+   * The corpse is a separate object and not the fly frozen: the fly has to be
+   * able to be alive again — see `hatch` — and a room with one mesh in it
+   * cannot have both a dead fly on the tile and a live one at the window,
+   * which is exactly the state this room is in two minutes later.
+   */
+  function settle(x, z) {
+    F.mode = 'dead';
+    F.buzz = 0;
+    F.die = null;
+    F.p.set(x, plan.floor + 0.0004, z);
+    flyRig.visible = false;
+    if (audio) audio.fly(0);
+    if (corpseProto) {
+      let c;
+      if (corpses.length < DEATH.keep) {
+        c = corpseProto.clone();
+        c.visible = true;
+        root.add(c);
+        corpses.push(c);
+      } else {
+        // Four dead flies on the floor of a four-metre room is already a
+        // story; a fifth is a bug report. The oldest gets swept up.
+        c = corpses.shift();
+        corpses.push(c);
+      }
+      c.position.copy(F.p);
+      // On its back, and rolled a third of a right angle off it, which is
+      // where a domed thing with a wing folded under each side of it actually
+      // comes to rest. CORPSE_ROLL, so the speck on the tile and the close-up
+      // that cuts to it are lying at the same angle.
+      c.rotation.set(Math.PI - CORPSE_ROLL, Math.random() * TAU, 0);
+    }
+    // And the next one, in a few minutes.
+    F.again = rnd(DEATH.again[0], DEATH.again[1]);
+  }
+
+  /**
+   * Another fly.
+   *
+   * The choice here was: is the flat silent for the rest of the session, or
+   * does another one find its way in? It is another one, and the argument is
+   * the terrace door. This is a ground-floor-plus-one flat on the Dalmatian
+   * coast in August with a 2.2 m opening on to a beach standing open all day;
+   * the room does not become fly-proof because you got the one that was in it.
+   * A room that went permanently quiet would also make the swat a thing you
+   * can do exactly once per session, and it is far too good to be a one-shot.
+   *
+   * It comes in at the terrace door, high, and goes about its business, and
+   * the one you killed is still on the tile behind it.
+   */
+  function hatch() {
+    F.mode = 'cruise';
+    F.p.set(rnd(1.10, 2.30), rnd(4.55, 4.95), 3.40);
+    F.up.set(0, 1, 0);
+    F.upFrom.set(0, 1, 0);
+    F.yaw = rnd(-Math.PI, Math.PI); F.pitch = 0; F.turnT = 0;
+    F.speed = 0.8; F.speed0 = 0.8; F.speedD = 0;
+    F.perch = null;
+    F.hold = rnd(FLY.air[0], FLY.air[1]);
+    F.seg = 0;
+    F.buzz = 0;
+    F.again = 0;
+    flyRig.visible = true;
+    saccade(0.5);
+  }
+
   /** Wings out or wings folded, and the legs doing whatever they are doing. */
   function poseFly(dt) {
     const air = F.mode !== 'sit';
@@ -2320,6 +2629,16 @@ async function buildVikendica(scene, field) {
     const near = dx * dx + dz * dz < 30 * 30;
     if (!near) {
       if (!F.far) { F.far = true; flyRig.visible = false; if (audio) audio.fly(0); }
+      // The one thing that keeps running with nobody in the flat: the clock on
+      // the next fly. Gate it on being watched and the room stays empty until
+      // you have STOOD in it for four minutes, which nobody does — you kill
+      // the fly, go down to the beach, come back, and the flat is a museum.
+      // A fly comes in through the terrace door whether or not you are there
+      // to see it, so this is two subtractions and a branch, out here.
+      if (F.mode === 'dead') {
+        F.again -= Math.min(dt, 0.05);
+        if (F.again <= 0) { hatch(); flyRig.visible = false; F.far = true; }
+      }
       return;
     }
     if (F.far) { F.far = false; flyRig.visible = true; }
@@ -2411,6 +2730,21 @@ async function buildVikendica(scene, field) {
         }
         break;
       }
+      case 'spin':
+        // Hit. The spiral owns the position outright — it is not a heading and
+        // a speed any more — so this returns rather than falling through to
+        // the integrator and the perch logic below, both of which would be
+        // arguing with it.
+        stepDie(d);
+        poseRig(d, who);
+        return;
+      case 'dead':
+        // Nothing to step but the clock on the next one. The corpse is a
+        // separate object standing where it fell and does not need a frame.
+        F.again -= d;
+        if (F.again <= 0) hatch();
+        poseRig(d, who);
+        return;
       default:
         stepSit(d);
         break;
@@ -2500,18 +2834,33 @@ async function buildVikendica(scene, field) {
     }
     basis.makeBasis(fwd, upN, side);
     flyRig.quaternion.setFromRotationMatrix(basis);
+    // And the tumble, on top of whatever heading it has: about the body's own
+    // long axis and about its side at once, so it is going over and round at
+    // the same time. Multiplied on to the basis rather than replacing it, so
+    // the orbit is still legible under the spinning.
+    if (F.mode === 'spin' && F.die) {
+      _tq.setFromAxisAngle(_ax.set(1, 0, 0), F.die.tumble);
+      flyRig.quaternion.multiply(_tq);
+      _tq.setFromAxisAngle(_ax.set(0, 0, 1), F.die.tumble * 0.42);
+      flyRig.quaternion.multiply(_tq);
+    }
     flyRig.position.copy(F.p);
     poseFly(d);
 
     // ── and what it sounds like ──────────────────────────────────────────────
     // Airborne or not, first, because that is the whole of it: the buzz is the
     // wings and the wings are either going or they are not.
-    const airborne = F.mode !== 'sit';
+    const airborne = F.mode !== 'sit' && F.mode !== 'dead';
     F.buzz += ((airborne ? 1 : 0) - F.buzz) * Math.min(1, d * 40);
     // Faster wings when it is working, which is audible: a fly coming out of a
-    // turn or off a ceiling is a semitone up on one crossing the room.
-    F.hz = 0.94 + 0.34 * clamp((F.speed - FLY.speed[0])
-      / (FLY.speed[1] - FLY.speed[0]), 0, 1) + (F.mode === 'off' ? 0.22 : 0);
+    // turn or off a ceiling is a semitone up on one crossing the room. In the
+    // spiral `stepDie` has already set it — a fly fighting a wet wing is not
+    // beating at the speed it is travelling at, which is the whole tell — so
+    // this leaves it alone.
+    if (F.mode !== 'spin') {
+      F.hz = 0.94 + 0.34 * clamp((F.speed - FLY.speed[0])
+        / (FLY.speed[1] - FLY.speed[0]), 0, 1) + (F.mode === 'off' ? 0.22 : 0);
+    }
     if (!audio) return;
     const c = Math.cos(yaw), s = Math.sin(yaw);
     const [wx, wy, wz] = flyWorld();
@@ -2543,7 +2892,15 @@ async function buildVikendica(scene, field) {
       pan = clamp((camRight.x * -ex + camRight.z * -ez)
         / Math.max(0.30, dist), -1, 1) * 0.85;
     }
-    audio.fly(F.buzz * far * inFlat, F.hz, pan);
+    // The spiral is louder, and it is louder in the one place there is room to
+    // be: the gain the level is measured against, which 80-audio.js takes as an
+    // argument for exactly this. Not by raising the idle buzz, which is a
+    // separate question and is still open. See FLYBUZZ.death.
+    //
+    // The distance and doorway terms stay on. They are the reason the whole
+    // thing is not simply audible from the promenade, and a fly dying loudly in
+    // a room you are not in is still a fly in a room you are not in.
+    audio.fly(F.buzz * far * inFlat, F.hz, pan, F.mode === 'spin');
   }
 
   /** The clock, the fan, the set, and the fly. */
@@ -2645,6 +3002,52 @@ async function buildVikendica(scene, field) {
       step: (secs = 1, who = null, dtStep = 1 / 60) => {
         for (let t = 0; t < secs; t += dtStep) stepFly(dtStep, who);
         return F.mode;
+      },
+      /**
+       * Hit it with the hose. See `swat` above for what that starts, and
+       * src/90-app.js for who decides that the water arrived.
+       *
+       * Comes back false if there is nothing to hit — already spiralling, or
+       * already on the tile — which is what stops a second jet of water
+       * starting a second camera sequence over the first.
+       */
+      swat: () => swat(),
+      /**
+       * Kill it where it is, without the water. The whole sequence is two
+       * seconds long and needs a hose, a room and a hit, and none of those is
+       * available to a headless page that wants a picture of the corpse.
+       */
+      kill: () => {
+        if (!swat()) return F.mode;
+        // Straight to the floor rather than through the spiral, because the
+        // spiral is what `step()` is for and this is the shortcut past it.
+        stepDie(DEATH.fall + 0.001);
+        return F.mode;
+      },
+      /**
+       * How long the spiral lasts. The camera sequence in src/90-app.js is cut
+       * to it and the two must not be able to disagree — a shot that cuts to
+       * the close-up a quarter of a second before the animal lands is a shot
+       * of a fly that is still in the air.
+       */
+      fallSecs: () => DEATH.fall,
+      /** Alive again, at the terrace door, and the corpses stay where they are. */
+      revive: () => { hatch(); return F.mode; },
+      /** Is there a live one in the room? */
+      alive: () => F.mode !== 'dead' && F.mode !== 'spin',
+      /** Where the dead ones are lying, in the house's own metres. */
+      dead: () => corpses.map((c) => [+c.position.x.toFixed(3),
+        +c.position.y.toFixed(3), +c.position.z.toFixed(3)]),
+      /**
+       * The close-up, built on demand and kept.
+       *
+       * Twenty thousand triangles and eleven materials that most sessions will
+       * never ask for — see the head of src/44-corpse.js — so nothing exists
+       * until the first fly dies, and after that it is the same shot.
+       */
+      shot: () => {
+        if (!corpseShot) corpseShot = buildFlyCorpse();
+        return corpseShot;
       },
       /** Every perch it knows, for a test that wants to visit all of them. */
       perches: () => PERCH.map((s) => s.k),

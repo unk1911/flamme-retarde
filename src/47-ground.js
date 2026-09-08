@@ -2374,6 +2374,18 @@ async function buildGround(scene, field) {
     get active() { return active; },
     get armed() { return armed; },
     update, enter, leave, bail, canEnter, canBoard, look, pose, you,
+    /**
+     * Where the water leaves the branch and which way it is thrown.
+     *
+     * The direction is the walker's own yaw and pitch, which is the vector the
+     * jet is fired down and the one thing outside this file that has to agree
+     * with it — `checkFlySwat` in src/90-app.js walks that vector to decide
+     * whether the water reached a seven-millimetre animal. The POSITION is a
+     * branch held 55 cm in front of the eye, 22 cm to the right of it and 22 cm
+     * below, and the note over that function explains why the fly test
+     * deliberately does not use it.
+     */
+    nozzle,
     /** How far the third person got behind her last frame; 0 is first. */
     thirdD: () => thirdD,
     retarget, dropIn, stepTo, addGuest,
