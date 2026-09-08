@@ -55,7 +55,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -317,7 +317,7 @@ class World:
 
     def _crypto(self):
         r = requests.get("https://api.coingecko.com/api/v3/simple/price",
-                         params={"ids": "bitcoin,ethereum,litecoin",
+                         params={"ids": "bitcoin,ethereum,litecoin,dogecoin",
                                  "vs_currencies": "usd,eur",
                                  "include_24hr_change": "true"},
                          timeout=12)
@@ -328,15 +328,33 @@ class World:
         # beach show three coins and she only ever mentioned one. It is the
         # same request — CoinGecko takes a comma-separated list — so a third
         # coin costs nothing.
+        #
+        # AND DOGE MAKES FOUR, asked for by name on 8 Sep 2026 in the same
+        # breath as the bathers: *"market news, crypto news, bitcoin,
+        # litecoin, ethereium, doge coin"*. Checked against the live endpoint
+        # before it was written down rather than assumed — `dogecoin` is a
+        # valid id and comes back in the same object as the other three
+        # (`{"usd": 0.090387, "usd_24h_change": 0.55}`, measured 8 Sep) — so
+        # again it is the same one request and costs nothing.
         for name, key in (("btc", "bitcoin"), ("eth", "ethereum"),
-                          ("ltc", "litecoin")):
+                          ("ltc", "litecoin"), ("doge", "dogecoin")):
             if key in d:
                 usd = d[key].get("usd", 0)
-                # Whole dollars over a thousand and cents under it. Bitcoin at
+                # Whole dollars over a thousand, cents between a dollar and a
+                # thousand, and FOUR PLACES UNDER A DOLLAR. Bitcoin at
                 # $79,679.41 does not want the cents and litecoin at $51 badly
                 # does — rounded to the dollar it lost 43 cents on a $51 coin,
                 # which on the beach phones is a price that is visibly wrong.
-                out[name] = {"usd": round(usd) if usd >= 1000 else round(usd, 2),
+                # Doge is that same argument one decade further down: it trades
+                # at nine cents, so two places round it to "$0.09" and throw
+                # away the digits the coin is actually quoted in. 43-jadrija.js
+                # made the same call for the dog's balloon and said why — "the
+                # honest thing is to print what the exchange sent". Four is the
+                # prompt's version of that: enough to be true, and the persona
+                # is what stops anybody reading it out.
+                out[name] = {"usd": (round(usd) if usd >= 1000
+                                     else round(usd, 2) if usd >= 1
+                                     else round(usd, 4)),
                              "eur": round(d[key].get("eur", 0)),
                              "chg24": round(d[key].get("usd_24h_change", 0), 2)}
         return out
@@ -347,15 +365,44 @@ class World:
             return None
         head = {"X-Subscription-Token": key, "Accept": "application/json"}
         out = {}
-        for slot, params in (
+        # THE LOCAL SLOT HAD NEVER RETURNED A SINGLE HEADLINE, and it failed
+        # twice over. Both were measured against the live API on 8 Sep 2026
+        # rather than reasoned about, because "the news feed is empty" is the
+        # kind of thing that gets written off as "Brave was down".
+        #
+        # 1. ONE REQUEST PER SECOND. The Brave Free plan's limit is literally
+        #    `rate_limit: 1` and these two went out back to back, so the FIRST
+        #    always answered 200 and the SECOND always answered 429 —
+        #    deterministically, every twenty minutes, since the day the slot
+        #    was added. `world` is first in the tuple, which is why the world
+        #    headlines were the only ones anybody ever saw. Hence the sleep:
+        #    it costs a second on a background thread that runs every twenty
+        #    minutes and nothing ever waits on.
+        # 2. AND CROATIA IS NOT IN BRAVE'S COUNTRY ENUM. With the rate limit
+        #    respected the local slot answered 422 instead: `country` accepts
+        #    AR AU AT BE BR CA CL DK FI FR DE GR HK IN ID IT JP KR MY MX NL NZ
+        #    NO CN PL PT PH RU SA ZA … and no HR. So the parameter that was
+        #    there to make the results local was the one thing making them
+        #    impossible, and the 422 fallback below could not rescue it either
+        #    — it re-sent the SAME bad `country` to /web/search and got the
+        #    same 422 back.
+        #
+        # `search_lang: "hr"` alone does the whole job: it answers 200 with
+        # Slobodna Dalmacija, Dalmacija Danas and a Šibenik street story. The
+        # language was always the part that mattered — nobody publishes
+        # Croatian local news in English anyway.
+        for nth, (slot, params) in enumerate((
             ("world", {"q": "world news today", "count": 4}),
             ("local", {"q": "Šibenik Dalmacija vijesti", "count": 4,
-                       "country": "HR", "search_lang": "hr"}),
-        ):
+                       "search_lang": "hr"}),
+        )):
+            if nth:
+                time.sleep(1.2)
             try:
                 r = requests.get("https://api.search.brave.com/res/v1/news/search",
                                  headers=head, params=params, timeout=12)
                 if r.status_code == 422:      # some plans have no news index
+                    time.sleep(1.2)           # …and the retry is a request too
                     r = requests.get("https://api.search.brave.com/res/v1/web/search",
                                      headers=head, params=params, timeout=12)
                     items = (r.json().get("web", {}) or {}).get("results", [])
@@ -632,32 +679,64 @@ PERSONA_BATHER = """You are one of the people on the beach at Jadrija, near
 Sibenik, on the Dalmatian coast, in the summer of 2026. It is hot, the cicadas
 are deafening, and there is a fire somewhere inland.
 
-A moment ago a stranger turned a fire hose on you. You are soaked. You are
-saying ONE thing to them, out loud, right now.
+A moment ago a stranger turned a fire hose on you. You are soaked. That is WHY
+you are speaking. It is not necessarily what you are speaking ABOUT.
 
 TEN WORDS AT THE ABSOLUTE MOST. Nobody makes a speech with water running off
 their chin. Ten is the CEILING and not the target — four or five is a better
 line than nine. However many sentences that is, and often two or three very
 short ones, because that is what surprise sounds like.
 
+THE WATER IS THE DOORBELL. It is what made you turn round and open your mouth.
+It is not automatically the subject, and a beach where eight strangers in a row
+all say some version of "you got me wet" is a beach with one line on it. Every
+time you speak you are given a line marked TALK ABOUT, and THAT is the subject:
+sometimes the water, more often whatever you were already chewing over out here
+in the heat — what things cost, what the news said this morning, what a coin is
+doing, the smoke over the hill. When the subject is not the water, you may
+glance at it in a word or ignore it completely. Never answer both at length.
+There is no room, and the pivot is the joke: soaked, and still going on about
+the ferry.
+
 THIS IS THE LENGTH AND THE REGISTER. Say things this size:
   Joj! Again, again!
   Ma daj, my book!
-  That's freezing, you maniac.
   I was dry a second ago.
   Sixty years I've come here. Never that.
-  Hey. That's a hose, not a joke.
+  Six euro for a sunbed. Robbery, in daylight.
+  Bitcoin's down again. So is my mood.
+  My brother-in-law bought ethereum. He's very quiet lately.
+  They rename a country. My ferry's still late.
+  Smoke again. Same hill, same silence from the council.
+  You and the news. Both relentless today.
+  Doge. My nephew won't shut up about doge.
   Well. I'm awake now.
 Those show you the size and the tone. They are not a script: never say one of
-them back word for word.
+them back word for word. If one of them happens to be about the same thing you
+have been asked to talk about, that is a coincidence and not permission — it
+makes copying it worse, not better. Say your own.
 
 WHO YOU ARE arrives in the context and it decides everything about how you
-sound. A small child is delighted or wailing, never witty. A young woman is
-withering. A young man is up for it. An old woman is scandalised. A heavy old
-man is unimpressed and slow about it. Play the person you are given.
+sound. A small child is delighted or wailing, never witty, and has no view of
+their own about money or politics — a child talking about ethereum is wrong,
+and a child repeating what their father said about ethereum, slightly wrong, is
+right. A young woman is withering. A young man is up for it. An old woman is
+scandalised. A heavy old man is unimpressed and slow about it. Play the person
+you are given.
 
 HOW YOU SAY IT:
-- React to the WATER first. That is what just happened.
+- Say the thing marked TALK ABOUT. If it is the water, react to the water,
+  because that is what just happened.
+- YOU ARE NOT A NEWSREADER. Nobody on a beach recites a headline. You have an
+  opinion about it, or a complaint that runs off the back of it, or you are
+  entirely unimpressed by it. If the only way you can fit a subject into ten
+  words is to announce it, you have picked the wrong half: say the part that is
+  about YOU.
+- Never read a number out like a screen. A price or a temperature you may
+  mention once and in words — "bitcoin's down", "four euro for a coffee", "the
+  sea's like soup". No figures to the cent, no percentages, no decimals.
+- Names are the joke and are allowed: bitcoin, doge, the ferry, the council,
+  the price of everything. One of them, never a list.
 - Croatian coast, so a word of Croatian is natural if the player's language is
   English — "joj", "ma daj", "hvala lijepa". At most one, and NOT every time:
   roughly one line in three has one and the rest have none. Two people in a row
@@ -670,6 +749,120 @@ HOW YOU SAY IT:
   person you are. You simply are one.
 - English unless the context says the player's language is Croatian or French.
 """
+
+# WHAT A BATHER TALKS ABOUT, AND WHY IT IS DRAWN HERE RATHER THAN ASKED FOR.
+#
+# Misha, 7 Sep 2026: *"they mention getting soaked... it would be cool if they
+# would say, concisely, something semi-interesting, like perhaps some latest
+# news, or perhaps some latest crypto news, or mention crypto prices... right
+# now it's kinda boring tbh"*. And again on 8 Sep, which is what makes it a
+# design problem rather than a wording one: *"various bathers having short but
+# semi-intelligent and news-relevant short quips"*.
+#
+# THE FEEDS WERE ALWAYS THERE AND THE PROMPT WAS THROWING THEM AWAY. `World`
+# has fetched weather, crypto and news since the service shipped and
+# `/baye/health` lists all three, but `build_messages` put exactly ONE of the
+# three coins into the prompt — `if c.get("btc")` — so ethereum and litecoin
+# were fetched every three minutes, stored, served to the phone screens, and
+# never once shown to the model. The local headlines were worse: see `_news`,
+# where two separate live bugs meant that slot had never returned a row in its
+# life. So "they are boring" was not a persona failure to begin with. Half the
+# world was being collected and binned one function short of the prompt.
+#
+# BUT FIXING THAT ALONE WOULD HAVE MADE EIGHT PEOPLE WHO ALL TALK ABOUT
+# BITCOIN, which is exactly as boring as eight people who all say "you soaked
+# me" and is the failure the third constraint names. A model handed a context
+# with a fire, a heatwave, six headlines and four coins in it does not spread
+# itself across them; it picks the shiniest thing, and the shiniest thing is
+# always the money. Telling it in prose to "vary the subject" does not work
+# either — that is the same class of instruction as "be brief", which 7 Sep
+# established a model obeys far less reliably than it imitates an example.
+#
+# So the subject is DRAWN, once per line, out here, and named in the user turn.
+# That buys three things a paragraph of prose cannot: the spread is a fact
+# rather than a hope, it is tunable by moving a number, and it is MEASURABLE —
+# the distribution below is what was actually sampled, not what was asked for.
+#
+# THE WEIGHTS. The soak is a third, which is the whole of the brief: it is the
+# doorbell, so it should steer the line about as often as a doorbell decides
+# what you say when you open the door. The rest is a spread across the things
+# somebody on that concrete in August has actually got on their mind, and it is
+# deliberately NOT crypto-heavy — the coins are twelve percent, one notch above
+# the heat, because four coins in a context is already four chances to be the
+# same line twice.
+#
+# A topic whose feed is empty is dropped from the draw rather than asked for
+# anyway: `random.choices` normalises whatever weights it is handed, so a
+# service with no Brave key simply redistributes the twenty-one points of
+# headlines over the other seven subjects and nobody has to notice.
+BATHER_TOPIC = (
+    # key, weight, the world slot it needs, and what is on your mind
+    ("soak", 34, None,
+     "the water. They have just soaked you and that is the whole line."),
+    ("crypto", 12, "crypto",
+     "one of the coins above, and only one of them. Somebody on this beach is "
+     "in it, and it is going well or it is going badly. In words, never as a "
+     "figure."),
+    ("world", 12, "news.world",
+     "one of the world headlines above. Not the headline — what you make of "
+     "it, or what it means for you, here, with wet hair. Never read it out."),
+    ("heat", 10, "weather",
+     "the heat, or the sea, or the wind. You have been out in it since "
+     "morning and you have a view about it."),
+    ("local", 9, "news.local",
+     "one of the local Dalmatian headlines above. This is your coast, so it "
+     "is personal and slightly aggrieved."),
+    ("money", 7, None,
+     "what things cost here now. The coffee, the parking, what they ask for "
+     "an umbrella in August."),
+    ("politics", 7, None,
+     "politics. Not a party and not a name you would have to explain — just "
+     "how sick of the lot of them you are, or how much better you would do "
+     "it."),
+    ("fire", 5, None,
+     "the fire inland. It has been burning over that hill for days and you "
+     "have your own theory about whose fault it is."),
+    ("ferry", 4, None,
+     "getting home. The ferry, the bus, the crowd, the road out of here."),
+)
+
+# The five that a small child has no opinion of their own about. Constraint
+# four, and it is the one that keeps the eight sounding like eight people: a
+# nine-year-old holding forth on ethereum is a bug, and a nine-year-old
+# repeating his father on ethereum and getting it slightly wrong is the single
+# funniest thing this whole feature can do. So the subject is not withheld from
+# the children — it is handed to them second-hand.
+ADULT_TOPIC = {"crypto", "world", "local", "money", "politics"}
+BATHER_CHILD = {"girl_child", "boy_child"}
+
+
+def bather_topic(world: dict):
+    """Draw one subject, out of the ones this beach can actually supply."""
+    news = world.get("news") or {}
+    have = {"weather": bool(world.get("weather")),
+            "crypto": bool(world.get("crypto")),
+            "news.world": bool(news.get("world")),
+            "news.local": bool(news.get("local"))}
+    pool = [t for t in BATHER_TOPIC if t[2] is None or have.get(t[2])]
+    return random.choices(pool, weights=[t[1] for t in pool])[0]
+
+
+# A day's move in WORDS, because every one of the three personas forbids saying
+# a percentage out loud and none of them can do the conversion in the same
+# breath as a joke. Handed "-1.37%" the model either says "down one point three
+# seven percent", which is the readout the brief bans, or it burns three of its
+# ten words getting out of it. Handed "down a little" it says "bitcoin's
+# sulking again" and gets on with the line.
+def chg_words(p: float) -> str:
+    a = abs(p)
+    if a < 0.5:
+        return "flat"
+    d = "up" if p > 0 else "down"
+    return f"{d} a little" if a < 2 else d if a < 6 else f"{d} hard"
+
+
+COIN_NAME = {"btc": "bitcoin", "eth": "ethereum", "ltc": "litecoin",
+             "doge": "doge"}
 
 # WHICH VOICE EACH OF THE EIGHT GETS.
 #
@@ -737,6 +930,39 @@ SPEAKERS = {
     "cat": PERSONA_CAT,
     "bather": PERSONA_BATHER,
 }
+
+# WHO IS SWITCHED OFF, AND WHY IT IS A SET HERE AND NOT A DELETION ABOVE.
+#
+# Misha, 8 Sep 2026: *"the talking cat speaking in irish voice paddy, is
+# actually annoying. for now, turn that off"*. "For now" is the operative half:
+# nothing of his is removed. `PERSONA_CAT` still holds Behemoth, `CAT_VOICE`
+# still holds Paddy, `CAT_VOICE`/`catGap` in 49-voice.js and `catNews` in
+# 43-jadrija.js are all untouched, and he is still under the table getting wet.
+# He simply cannot be issued a line.
+#
+# DELETING HIM FROM `SPEAKERS` WOULD HAVE BEEN THE OBVIOUS MOVE AND IT IS A
+# TRAP. Two places resolve the speaker with `who if who in SPEAKERS else
+# "baye"` — `clean_context` and `do_POST` — which is a deliberate rule about
+# untrusted input ("an unknown speaker is Baye, because the alternative is a
+# client that can pick which system prompt runs"). Take "cat" out of the map
+# and that rule fires on our own client: the cat does not fall silent, he
+# becomes BAYE. Every time you walked onto the terrace, on his 95-second
+# cadence, a sultry woman would flirt with you from underneath a café table in
+# Jessica's voice. That is strictly worse than the thing being complained
+# about, and it would have shipped looking like a one-line fix.
+#
+# THIS IS THE SERVER'S SWITCH AND NOT THE CLIENT'S, for the one reason that
+# decides it: the browser runs a built `flamme-retarde.html` that players have
+# in cache. A mute in `CAST` silences him in tabs opened after the next deploy
+# and in no others. This is one process, restarted once, after which no client
+# — cached, modified, or a probe calling `voice.now('cat')` — can obtain a cat
+# line by any route, because every line in this service is issued by exactly
+# one function and it is `do_POST`.
+#
+# TO GIVE HIM HIS VOICE BACK, make this an empty set. That is the whole revert;
+# 49-voice.js needs nothing, because it mutes him only when told to by the
+# refusal below and forgets on reload.
+MUTED = {"cat"}
 
 # HOW MANY WORDS EACH OF THEM GETS, in one table rather than only inside three
 # paragraphs of prose. Each persona states its own ceiling — that is the copy
@@ -826,7 +1052,21 @@ def clean_context(raw: dict) -> dict:
         # anyway.
         "kind": clamp_str(g("kind"), 24),
         "doing": clamp_str(g("doing"), 12),
-        "phase": clamp_str(g("phase"), 16),
+        # 48 AND NOT 16, AND THIS HAS BEEN WRONG SINCE THE SERVICE SHIPPED.
+        # `context` in 49-voice.js sends one of exactly three phases and all
+        # three are longer than sixteen characters, so the clamp cut every one
+        # of them mid-word and the model has never once been told what the
+        # player is doing. Printed out of a real user turn on 8 Sep:
+        #
+        #   - they are on foot on the b
+        #
+        # "on foot on the beach beside you" (31), "in the water with you" (21)
+        # and "flying the Canadair" (19) become "on foot on the b", "in the
+        # water wit" and "flying the Canad". A truncation is worse than an
+        # absent field: the model cannot tell a cut string from a strange one
+        # and will try to make sense of it. Every other clamp here was sized
+        # against the strings the client actually sends; this one was not.
+        "phase": clamp_str(g("phase"), 48),
         "place": clamp_str(g("place"), 48),
         "hour": clamp_num(g("hour"), 0, 24),
         "lat": clamp_num(g("lat"), -90, 90),
@@ -905,9 +1145,17 @@ def build_messages(ctx: dict, world: dict) -> list:
             bits.append(f"wind {w['wind_kmh']} km/h")
         if bits:
             lines.append("- real weather at Jadrija: " + ", ".join(bits))
+    # ALL OF THEM, and this one line is the root cause of "the bathers are
+    # boring". It read `if c.get("btc")` and printed bitcoin alone, so the
+    # ethereum and litecoin that `_crypto` has been fetching every three
+    # minutes since 4 Sep reached the phone screens and the `/world` route and
+    # never reached the model at all. Doge joins them on the same trip.
     c = world.get("crypto") or {}
-    if c.get("btc"):
-        lines.append(f"- bitcoin ${c['btc']['usd']:,} ({c['btc']['chg24']:+}% today)")
+    coins = [f"{COIN_NAME[k]} ${c[k]['usd']:,} ({chg_words(c[k]['chg24'])})"
+             for k in ("btc", "eth", "ltc", "doge") if c.get(k)]
+    if coins:
+        lines.append("- the coins, and how each has moved today: "
+                     + ", ".join(coins))
     n = world.get("news") or {}
     for slot, label in (("local", "local headlines"), ("world", "world headlines")):
         if n.get(slot):
@@ -932,6 +1180,19 @@ def build_messages(ctx: dict, world: dict) -> list:
     # six, which is the same failure that turned "under 25 words" into a
     # measured mean of 19.3. A model handed a number writes to the number, so
     # the number has to be followed by somewhere better to go.
+    # AND WHAT IT IS ABOUT, for a bather, one line above the word cap and for
+    # the same reason the word cap is down here: this is the position that
+    # binds. Put up with the rest of the context it was one bullet among
+    # fifteen and the model went back to the water every time.
+    if who == "bather":
+        key, _, _, steer = bather_topic(world)
+        lines.append(f"TALK ABOUT: {steer}")
+        if key in ADULT_TOPIC and ctx.get("kind") in BATHER_CHILD:
+            lines.append("But you are a small child and you do not really "
+                         "understand it. You are repeating what a grown-up "
+                         "said about it, and getting it a bit wrong.")
+        lines.append("")
+
     lines.append(f"Say one thing to them now. At most {WORD_CAP[who]} words, "
                  "and fewer is better.")
     return [{"role": "system", "content": SPEAKERS[who]},
@@ -1163,6 +1424,21 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
         who = body.get("who") if isinstance(body, dict) else None
         who = who if who in SPEAKERS else "baye"
+        # Before the limiter, because a speaker who is switched off should not
+        # be spending anybody's hourly allowance to be told so.
+        #
+        # 429 AND NOT 403, which is a deliberate lie about the reason and an
+        # honest one about the behaviour. `ask` in 49-voice.js treats exactly
+        # one status as "be quiet, this is not worth a console line" and it is
+        # 429; everything else it warns about. A muted speaker is precisely
+        # that case — nothing is broken, he is just not talking — and a stale
+        # tab that has not learned yet would otherwise print a warning every
+        # thirty seconds for as long as it stayed open. The body says what is
+        # actually going on, which is what anybody reading a log or curling
+        # this route needs, and `muted` is the flag the client latches on.
+        if who in MUTED:
+            return self._send(429, {"ok": False, "muted": True,
+                                    "error": f"{who} is not speaking"})
         refused = LIMIT.check(f"{user}/{who}")
         if refused:
             return self._send(refused[0], {"ok": False, "error": refused[1]})

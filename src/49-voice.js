@@ -370,6 +370,18 @@ const voice = (() => {
         // above, not something the player did. Anything else is worth a line in
         // the console and nothing on screen.
         if (r.status !== 429) console.warn(sp.key + ':', d && d.error);
+        // AND A SPEAKER CAN BE SWITCHED OFF FROM THE SERVER, which is where
+        // the switch belongs and why there is no `mute: true` in `CAST`
+        // above. `MUTED` in baye.py is the single authority — one process,
+        // restarted once, and no client can obtain that speaker's line by any
+        // route — so this is not a second switch to keep in step with it. It
+        // is the client learning the answer it was just given, once per
+        // session, and forgetting it on reload. Turned back on server-side,
+        // the next page load has the speaker back with nothing edited here.
+        //
+        // Misha, 8 Sep 2026: *"the talking cat speaking in irish voice paddy,
+        // is actually annoying. for now, turn that off"*.
+        if (d && d.muted) sp.mute = true;
         sp.nextAt = clock + 30;
         return;
       }
@@ -458,6 +470,16 @@ const voice = (() => {
   }
 
   function poll(sp) {
+    // A MUTED SPEAKER IS NOT A SPEAKER WITH A LONG GAP, and this line is why
+    // the latch above is not enough on its own. The refusal goes down the
+    // ordinary failure path, which sets `nextAt` to `clock + 30` — so on the
+    // latch alone he would ask again in thirty seconds, be refused again, and
+    // go round for as long as the page stayed open. That is a wasted round
+    // trip every half minute, and worse than wasted: `step` returns at the
+    // first speaker that is ready, so every one of those frames is a frame
+    // BAYE does not get. Silencing the cat by starving her is not what was
+    // asked for. With this, he asks exactly once per page load.
+    if (sp.mute) { sp.inRange = false; return null; }
     const gap = takeNews(sp, sp.gap());
     // A speaker with `onlyNews` has no clock and no range: it is silent until
     // somebody does something to it, and then it answers once. `nextAt` is the
