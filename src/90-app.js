@@ -426,9 +426,43 @@ addEventListener('keydown', (e) => {
   // the two jumps it calls rather than here — the ladder is the interesting
   // part of this key and it was written out in a keydown handler, where the
   // only way to reach it was a keydown.
-  if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+  //
+  // AND SPACE, because Enter is not reachable on every keyboard while you are
+  // already running.
+  //
+  // Misha, 7 Sep, holding Q and the up arrow: *"it's just when i hold q + up +
+  // <enter> is when it DOES NOT ARRIVE"*. It does not, and no branch in here
+  // could cause that — by the time `keydown` runs the game cannot know what
+  // else is held. It is the keyboard: three simultaneous keys have to be three
+  // separate lines in its matrix, and on his `ArrowUp` and `Enter` share one.
+  // Measured from the other side, at the listener: Enter alone arrives, Shift
+  // plus Enter arrives, Q plus W plus Enter arrives, and Q plus ArrowUp plus
+  // Enter never reaches the page at all. That is rollover, not a binding.
+  //
+  // Space is the answer for the reason every other game already uses it: it is
+  // wired on its own line on essentially any keyboard, so it survives whatever
+  // else is held. Confirmed on his — with Q and ArrowUp both down, Space
+  // arrives.
+  //
+  // Enter and NumpadEnter stay. They work for everybody they ever worked for,
+  // and taking a key away to add one is how you break somebody else's hands.
+  // SPACE IS STILL THE BRANCH. It only becomes a jump on the one gesture that
+  // cannot reach Enter — already running, already going forward — which is
+  // Misha's own rule: *"i want space to be the hose for everything else...
+  // except for when pressing q+up+space"*. Generalised to whichever run and
+  // forward keys are down, because Shift runs as well as Q and W goes forward
+  // as well as the up arrow, and a rule that only knew two of the four would
+  // be a rule somebody trips over on their own keyboard.
+  //
+  // `spaceLeapt` is what stops the same press doing both. The branch is read
+  // from `keys` every frame, so without it a running jump would also open the
+  // hose for as long as the bar stayed down. Cleared on the way up.
+  if (e.code === 'Enter' || e.code === 'NumpadEnter'
+    || (e.code === 'Space' && runHeld() && fwdHeld())) {
     if (state.phase === 'ground' && ground && ground.ok && !state.paused) {
-      e.preventDefault(); jumpOut(); return;
+      e.preventDefault();
+      if (e.code === 'Space') spaceLeapt = true;
+      jumpOut(); return;
     }
   }
   // J for e[J]ect. Deliberately not next to anything: it is the one key in the
@@ -488,7 +522,10 @@ addEventListener('keydown', (e) => {
   if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyZ',
        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
-addEventListener('keyup', (e) => keys.delete(e.code));
+addEventListener('keyup', (e) => {
+  keys.delete(e.code);
+  if (e.code === 'Space') spaceLeapt = false;
+});
 addEventListener('blur', () => { keys.clear(); if (flight) flight.p.kb.set(0, 0); });
 
 canvas.addEventListener('click', () => {
@@ -574,6 +611,15 @@ addEventListener('mousemove', (e) => {
   flight.p.stick.y = clamp(flight.p.stick.y - e.movementY * s, -1, 1);
 });
 let mouseDrop = false;
+// True from the moment a running Space becomes a jump until that bar comes back
+// up, so one press cannot both leap and hose. See the jump block in `keydown`.
+let spaceLeapt = false;
+/** Whichever key is running you, and whichever is sending you forward. The run
+ *  list is `walk`'s own in 47-ground.js and the forward list is its `iz`, so a
+ *  key added there is a key this already knows about. */
+const runHeld = () => keys.has('KeyQ') || keys.has('ShiftLeft')
+  || keys.has('ShiftRight') || !!TOUCH.grun;
+const fwdHeld = () => keys.has('KeyW') || keys.has('ArrowUp') || (TOUCH.gy || 0) > 0.2;
 addEventListener('mousedown', (e) => { if (pointerLocked && e.button === 0) mouseDrop = true; });
 addEventListener('mouseup', (e) => { if (e.button === 0) mouseDrop = false; });
 
@@ -5127,7 +5173,8 @@ function frame() {
   if (state.phase === 'ground') {
     // The branch, on mouse or space. The aeroplane's own input is deliberately
     // not read: it is parked, and nothing on foot should be moving its controls.
-    ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
+    ground.setSpray(mouseDrop || (keys.has('Space') && !spaceLeapt)
+      || TOUCH.gjet || debugJet);
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
     // integrated was the chute branch, so the moment the canopy touched down she
@@ -7523,7 +7570,8 @@ window.__fr = {
       for (let i = 0; i < Math.floor(secs / dt); i++) {
         state.t += dt;
         fire.update(dt);
-        ground.setSpray(mouseDrop || keys.has('Space') || TOUCH.gjet || debugJet);
+        ground.setSpray(mouseDrop || (keys.has('Space') && !spaceLeapt)
+      || TOUCH.gjet || debugJet);
         ground.update(dt);
         // The shoreline handover, which the real frame loop does too. Without
         // it a headless walk into the sea grinds along the barrier for ever.

@@ -8,6 +8,51 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.356.0] — 2026-09-08
+
+### the running jump goes on the space bar, because his keyboard cannot reach Enter
+
+Misha, 7 Sep: *"holding Q + Up Arrow + 'Space' to jump stopped working"*, then
+*"'Q' + 'Up' + 'ENTER' -> does not work... but it used to work"*, then the one
+that settled it: *"what DOES indeed work is 'Q' + 'W' + 'ENTER'"*.
+
+THAT IS A HARDWARE SIGNATURE AND NOT A SOFTWARE ONE, and it took six rounds to
+read it. Three simultaneous keys need three separate lines in a keyboard's
+matrix; on his, `ArrowUp` and `Enter` share one. Measured from the listener
+itself rather than from the game: Enter alone arrives, Shift plus Enter
+arrives, Q plus W plus Enter arrives, and Q plus ArrowUp plus Enter never
+reaches the page at all. No branch in this file could cause that — by the time
+`keydown` runs the game cannot know what else is held down.
+
+Everything measured inside the game said the jump was fine, and it was: at his
+own spawn the ladder answers `jump` with `hopV` 7 at every speed to 5 m/s, and
+a jump taken at a run carries about ten metres. Three separate harnesses were
+built to chase it and each reported something false — synthetic
+`KeyboardEvent`s that never moved the walker, and a sample window that read
+before it had spun up, which produced a "0.59 m/s against 9.38" difference
+between the arrow and W that does not exist. What actually found it was two
+lines pasted into his own console.
+
+SPACE IS THE FIX because it is wired on its own line on essentially any
+keyboard, which is why every other game already uses it. Confirmed on his: with
+Q and ArrowUp both down, Space arrives.
+
+AND IT IS STILL THE BRANCH. His rule, and a better one than mine: *"i want
+space to be the hose for everything else... except for when pressing
+q+up+space"*. So Space jumps only when a run key AND a forward key are already
+held, and hoses in every other case. Generalised past the two keys he named —
+Shift runs as well as Q, W goes forward as well as the up arrow — because a
+rule that knew only half the pairs is one somebody trips over on their own
+keyboard. `spaceLeapt` stops the same press doing both, since the branch is
+read out of `keys` every frame and would otherwise stay open for as long as the
+bar was down.
+
+  Space alone      speed 0.00   hopV 0   spraying true
+  Q + Up + Space   speed 9.38   hopV 7   spraying false, airborne 1.89 m
+
+Enter and NumpadEnter still jump. They work for everybody they ever worked for,
+and taking a key away to add one is how you break somebody else's hands.
+
 ## [1.355.0] — 2026-09-07
 
 ### the radio goes up 6 dB, and the jump was never on the space bar
