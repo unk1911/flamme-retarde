@@ -37511,12 +37511,17 @@ async function buildJadrija(scene) {
        * between the nearest people who pass the same tests, so a conversation
        * can be photographed instead of waited for; `chatSay(kind, line, d)`
        * fires one utterance on demand, which is how the synth gets levelled
-       * against the bed it has to sit inside; `chatSurvey()` is every pair on
-       * this stretch and the geometry that decides which of them can talk.
+       * against the bed it has to sit inside; `chatWords(c, l, d)` is its pair
+       * for the baked half, which fires line `l` of conversation `c` at `d`
+       * metres so the two voices can be levelled against each other and the
+       * crossover checked; `chatSurvey()` is every pair on this stretch and the
+       * geometry that decides which of them can talk.
        */
       chats: () => chatter.stats(lastCam),
       chatNow: (mode) => chatter.now(crowds, lastCam, mode),
       chatSay: (kind, line, d) => chatter.sayNow(kind, line, d || 3),
+      chatWords: (c, l, d) => chatter.wordsNow(c || 0, l || 0, d || 3),
+      chatMute: (v) => chatter.mute(v),
       chatLines: () => chatter.lines(),
       chatSurvey: () => chatter.survey(crowds, lastCam),
       /** The instanced layers, so the near shadow cascade can occlude with them. */
