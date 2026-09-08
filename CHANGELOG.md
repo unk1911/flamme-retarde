@@ -8,6 +8,162 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.357.0] — 2026-09-08
+
+### the beach resolves into words as you walk up to it
+
+Misha: *"maybe you can pre-render some of their conversations... when i sorta
+approach within an ears-shot of them, that's when their convo becomes audible
+... there's no pause betwixt their chatter and it feels super organic"*. He had
+diagnosed the blocker exactly: every spoken line is a model call and a speech
+synthesis back to back, three to six seconds, so a conversation triggered on
+approach STARTS when you arrive. Pre-rendering is the only way to have one
+already going.
+
+`43-chatter.js` had argued itself out of real speech and the argument was good,
+but it rested on ambient talk being "many speakers, constantly, saying nothing
+in particular". He asked for something in particular, audibly. The requirement
+moved; the reasoning did not become wrong, it became inapplicable.
+
+The synth keeps the distance and words take over inside earshot — but as a
+SWITCH WITH HYSTERESIS and not a crossfade, because a crossfade plays a
+synthesised murmur and a recorded sentence out of one mouth at partial gain,
+which is two utterances from one person. The group's nearest member crossing
+11 m swaps the source and 15 m swaps it back, and the two are made
+level-continuous at that boundary by solving `gain * far(11)` for both: +3.84 dB
+at 3 m, +0.31 at 11, and −0.83 by 22. Louder exactly where it must be
+understood and QUIETER than what it replaced everywhere else.
+
+FIFTEEN CONVERSATIONS, capped by him, and the honest number is that fifteen is
+short. Four thirty-minute walks with every line logged: the same SENTENCE comes
+round after 6 to 13 minutes and 74-85 per cent of everything heard in half an
+hour is new. What saves it is that fifteen conversations are not what a player
+hears — 135 lines are, three or four per pass — and `nextK` resumes each script
+where the last hearing stopped, so three passes at a nine-line script play 0-3,
+4-6, 7-8 and share nothing. Without it, second hearings overlapped 44-62 per
+cent. Thirty would put the first repeat at 12-26 minutes, and the spend should
+go on DEPTH in the crowded pairings rather than breadth: a young man with an
+old woman is 26 per cent of near groups against four scripts.
+
+ALL 106 GROUPS MEASURED ON THE PROMENADE WERE PAIRS — 230 of 234 across four
+lanes — so every script is two-handed and strictly alternating, which is what
+`nextTurn` already did for a pair. The four threes stay on the synth.
+
+One mp3 per conversation, played as `start(when, offset, duration)`, and the
+offsets are re-measured in the browser rather than trusted: over sixteen encoder
+settings, whether ffmpeg strips LAME's 1105-sample delay changed WITH THE
+BITRATE — +92.1 ms at 12 kHz 24k, 0.0 at 12 kHz 32k. There is no constant to
+hard-code. Chrome and ffmpeg agreed within 0.5 ms on all fifteen, which is
+known rather than hoped.
+
+THE BIRDS DO NOT MOVE, and it is structural rather than lucky: `cut_chat.py`
+lids every clip at 6 kHz before the encoder because `lpNear` throws that band
+away regardless, so there is nothing up there to add. Interleaved measurement,
+five cycles of eight ten-second blocks with 3.5 s guards at each head — the
+first attempt without guards had reverb tails contaminating the controls by
+2.6 dB — about 980 windows a phase:
+
+  4.6-7 kHz  −0.04 dB      7-11 kHz  0.00 dB      control spread 0.85
+
+Words carry +2.62 dB on the bed at 3 m where the synth sat 2.1 dB under it.
+Indoors nothing changed: words are never scheduled past 15 m and the living
+room is 22 m from the nearest conversation. One caveat on the record — 500-900
+Hz moves +2.91 dB, which is the collared dove's band, but only with your ear
+3 m from two people at t 280, fifty metres from its pine.
+
+937 KB shipped at 12 kHz / 24 kbps — 12 kHz beat 16 at every bitrate even in
+the 3.5 kHz band, which is the reverse of what was expected. Generation cost
+about $1.60. Bundle 28.74 -> 30.00 MB.
+
+### the cat is off, and the bathers were being shown one price out of three
+
+*"the talking cat speaking in irish voice paddy, is actually annoying. for now,
+turn that off"*. A `MUTED` set on the server, checked before the rate limiter;
+`MUTED = set()` brings him back. Both of the obvious places to do it are traps
+and neither was used: removing `"cat"` from `SPEAKERS` does not silence him, it
+turns him INTO BAYE — two call sites resolve `who if who in SPEAKERS else
+"baye"` — so he would have gone on talking from under the table in Jessica's
+voice on his ninety-five-second clock. Taking him out of `CAST` passes
+`undefined` to `poll` every frame. The server is also the only side that cannot
+be half-applied in the field, since players hold the built html in cache.
+
+AND THREE FEEDS WERE BEING COLLECTED AND BINNED ONE FUNCTION SHORT OF THE
+PROMPT. `build_messages` said `if c.get("btc")` and printed bitcoin alone:
+ethereum and litecoin have been fetched every three minutes since 4 Sep, served
+to the phone screens and to `/baye/world`, and never once shown to the model.
+The Croatian news slot had never returned a single row and failed twice over —
+Brave Free is one request a second and both slots went out back to back, so
+`local` was deterministically 429; spaced properly it returned 422, because
+CROATIA IS NOT IN BRAVE'S COUNTRY ENUM. The `country` parameter that existed to
+make the results local was the one thing making them impossible. And
+`clamp_str(g("phase"), 16)` had truncated all three client phases mid-word
+since the service shipped: the model was reading "they are on foot on the b".
+
+Doge added, with a rounding branch — at nine cents the existing cents-under-a-
+thousand rule renders $0.09, the precision mistake 43-jadrija.js already argued
+about for the dog — and the change rendered in words, since every persona bans
+quoting a percentage.
+
+Variety is DRAWN and not requested. Telling a model to vary its subject is the
+same class of instruction as telling it to be brief, which 7 Sep showed does not
+work, so `BATHER_TOPIC` picks server-side over nine weighted subjects: soak
+34.3 per cent, crypto 12.1, world 11.9, heat 10.0, local 8.9, money 6.9,
+politics 6.9, fire 4.9, ferry 4.1. A dead feed drops out and the rest
+renormalise. Brevity untouched at 8.6 words mean either side of the change.
+
+### the splashback ran 150 mm past the end of its own wall
+
+*"the kitchen backsplash tile seems to pierce through that sliding door"*. It
+did, and the door was never the defect. The run's east end had been set out off
+the CABINETS (`run1 + 0.30`) and the cabinets stop 130 mm before the wall does:
+28 mm past the corner into thin air, 35 mm buried in the leaf, and the last
+83 mm standing proud of its face, which is the column of four tiles in his
+screenshot. The leaf's own setting-out checks out against its opening.
+
+Now terminated on the reveal line: 16 courses of 0.1556 instead of 17 of
+0.1553, the module moving a third of a millimetre, the last course butting the
+return on the same 4 mm joint as every other, and no bare wall. 28.0 mm of
+clearance in every door position — the leaf travels along z only — proved by
+baking it shut, shooting it, and confirming the payload rebuilds byte-identical.
+
+AND THE TILE WAS COVERING A HOLE. Both bathroom walls ran to the other one's
+centreline, leaving the outer quadrant of the south-east corner — 5 by 5 cm on
+plan, 2.40 m tall — as nothing at all: two stubs with a slot straight through
+from the kitchen to the living room, invisible only because the overshooting
+tile covered it over the metre of height anyone looks at.
+
+No siblings, swept colour-blind over every axis-planar face in the house against
+the plane of every sliding leaf — as a PLANE-CROSSING test and not an AABB
+overlap, because a planar face's bounding box is flat on its own normal and
+never overlaps there, which is how a naive sweep reports clean.
+
+### a slab is a mass and a soil stack is an opening
+
+*"the radio... should also be audible inside the 2nd floor bathroom"*. The 41 dB
+the slab gives is correct and stayed. What was added is the one thing that
+genuinely crosses it, and it was already drawn in `prizemlje_bath`: *"The soil
+stack, boxed in and tiled like the walls, in the corner behind the door. Every
+flat in this row has one and it is always in a corner."* It stands in the wall
+line directly under the upper bathroom, because a stack serves both wet rooms or
+neither.
+
+That INVERTS THE SPECTRUM, which is what makes it more than a leakier slab. A
+slab is a mass and passes what is under 260 Hz; a duct is an aperture, obeys no
+mass law, and is limited by the opening and the shaft — so it passes the middle
+and rolls off both ends. `stack: 0.11`, `hpStack: 300`, `lpStack: 1600`, the
+highpass parked at 20 Hz everywhere else, Q −3.01 dB because Q is decibels here.
+
+  bathroom tap    −74.06 dBFS before  ->  −49.0 now, worth 25.1 dB
+                  (12.9 of level, 12 of the lid moving 282 -> 1617 Hz)
+  upstairs living room tap   −74.04 and −74.01, +0.006 dB on the room
+
+The song sits 1.3 dB UNDER the bathroom's own bed where in the yard it sits 1.7
+over. The living room's two measured pairs swing 2.1 dB in opposite directions
+and mean −0.11: that is the aperiodic bed, and the tap is the instrument that
+does not move. Gated by `ductAt` off the bathroom's own rect, swept at 5 cm:
+non-zero over 3.88 m² bounded exactly by that rectangle, zero on the ground
+floor, on the mezzanine and 2 cm above the flat's ceiling.
+
 ## [1.356.0] — 2026-09-08
 
 ### the running jump goes on the space bar, because his keyboard cannot reach Enter
