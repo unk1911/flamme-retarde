@@ -37868,6 +37868,17 @@ async function buildJadrija(scene) {
       const [t, s] = local(x, z);
       return vik.indoorsAt(t, s, y);
     },
+    /**
+     * And how far into the upper bathroom, which is the one room in the house
+     * with a hole through the slab in it — see `vik.ductAt`. World metres, the
+     * same as `indoorsAt` above and for the same reason: the only caller is
+     * the mixer coupling in 90-app.js, which has an eye and not a station.
+     */
+    ductAt: (x, y, z) => {
+      if (!vik) return 0;
+      const [t, s] = local(x, z);
+      return vik.ductAt(t, s, y);
+    },
     /** What is over your head here, if anything is low enough to duck under. */
     headroom: (x, z, y) => {
       if (!vik) return null;
