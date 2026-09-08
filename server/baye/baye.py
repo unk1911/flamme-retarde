@@ -878,19 +878,65 @@ COIN_NAME = {"btc": "bitcoin", "eth": "ethereum", "ltc": "litecoin",
 # a nine-year-old and is how this has always been done. A `rate` of 1 is
 # everybody else.
 #
-# `woman_old` is the one compromise and it is worth naming: the library has no
-# `old` female at all, so she takes Matilda, who is middle-aged and reads older
-# than the young voices by a decade. The alternative was to give a
-# seventy-year-old a twenty-year-old's voice.
+# `woman_old` used to be the one compromise: the library has no `old` female at
+# all, so she took Matilda, who is middle-aged and reads older than the young
+# voices by a decade — the alternative being to give a seventy-year-old a
+# twenty-year-old's voice. She is now Balkanika, and the compromise has changed
+# shape rather than gone away. See below.
+#
+# ── THE TWO OLDEST PEOPLE ON THIS BEACH ARE CROATIAN ─────────────────────────
+#
+# Misha, 8 Sep 2026: *"i think it would be cool if some of the bathers would
+# speak croatian, make it more authentic"*. Enumerated off `/v1/voices` rather
+# than remembered: of the 44 voices on this account exactly two are labelled
+# `language: hr` — Fran (`accent: zagreb`) and Balkanika (`accent: standard`),
+# five verified Croatian entries each. One man and one woman, and that number
+# decides everything.
+#
+# WHICH TWO OF THE EIGHT GET THEM IS DECIDED BY `CHAT_CLASS` IN 43-chatter.js,
+# not by who seems most local, and the argument lives in full in the header of
+# `tools/cut_chat.py`. The short form: six of the eight kinds share a voice
+# class with another kind and the runtime will cast a baked script across that
+# class, which is inaudible between two young women and is NOT inaudible when
+# one of them is speaking Croatian. `woman_old` and `man_old_heavy` are the
+# only two kinds alone in their class, so they are the only two whose language
+# cannot leak onto somebody else's figure. They are also, by `BATHER_WHO`
+# below, the two locals.
+#
+# THIS TABLE IS WHY THAT REACHES THIS FILE AT ALL. The whole point of copying
+# the ids into `cut_chat.py` is that the woman who talks and the woman who
+# yelps when you hose her are one person. Change the bake and not this and they
+# stop being one person, in the most audible way available: she converses in
+# Croatian and then shouts at you in American English.
+#
+# ON THE LABELS, WHICH DISAGREE WITH THE PITCH. Fran is labelled `middle_aged`
+# and Balkanika `young`, so on labels alone this is a step backwards for two
+# characters of about seventy. Median f0 over the voiced frames says otherwise
+# for him and is equivocal for her: Fran 105 Hz against Bill's 135-165, a full
+# four semitones lower and the better heavy old man; Balkanika 194 Hz against
+# Matilda's 201-294, the darkest female voice on the account, which is the
+# direction age moves a voice but is not the same as sounding seventy. The swap
+# was made on the pitch. Her label is the dissent and it is recorded here so
+# that reverting this one line is an informed decision and not a discovery.
+#
+# WHAT DOES NOT CHANGE IS THE LANGUAGE OF THIS SERVICE. `PERSONA_BATHER` still
+# writes English for all eight. A bather line is a reply TO the player, at ten
+# words, from a stranger who has just been hosed by them; answering in a
+# language the player cannot read, with no subtitle path that would translate
+# it, is a line spent on nothing. Croatian belongs where the bathers are
+# talking to EACH OTHER and the player is walking past, which is the baked
+# library and specifically `chat15`. Fran and Balkanika speaking English here
+# will carry whatever accent they have, and that is the authenticity this
+# change actually buys on the live path.
 BATHER_VOICE = {
     "girl_child":       ("6nGWYkWm4p3WN2Es5h1E", 1.20),  # Tiara, young female
     "boy_child":        ("bIHbv24MWmeRgasZH58o", 1.20),  # Will, young male
     "woman_young_slim": ("cgSgspJ2msm6clMCkdW9", 1.00),  # Jessica, playful
     "woman_young_full": ("1e9Gn3OQenGu4rjQ3Du1", 1.00),  # Niamh
-    "woman_old":        ("XrExE9yKIg1WjnnlVkGX", 1.00),  # Matilda — see above
+    "woman_old":        ("VB7D8zswiztJjyl8LI3a", 1.00),  # Balkanika, hr
     "man_young_fit":    ("SOYHLrjzK2X1ezoPC6cr", 1.00),  # Harry
     "man_young_lean":   ("TX3LPaxmHKxFdv7VOQHJ", 1.00),  # Liam
-    "man_old_heavy":    ("pqHfZKP75CvOlQylNhV4", 1.00),  # Bill, old male
+    "man_old_heavy":    ("TRnNlYQWHAJwo9K75wNE", 1.00),  # Fran, hr, Zagreb
 }
 
 # And who each of them is, in the words the model gets. The mesh names are

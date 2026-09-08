@@ -67,14 +67,15 @@ WHERE THE MISSES ARE, in order, because this is the list to work down if the
 library is ever allowed to grow: an old man with an old woman, two young women,
 two old women, a child with an adult, and two old men. Each is a few per cent
 and none of them is worth a script of its own before the crowded pairings have
-more than four between them.
+more than four between them. THE FIRST OF THEM IS NOW WRITTEN — `chat15`, and
+the reason it jumped the queue is the language and not the coverage; see below.
 
 WITHIN a class there are two kinds and two voices — `man_young_fit` is Harry and
 `man_young_lean` is Liam, `woman_young_slim` is Jessica and `woman_young_full`
 is Niamh — so the four young-man/old-woman scripts are split two and two between
 Harry and Liam, and the runtime prefers an exact-kind match before it will
 accept a class match. A young man in Liam's voice when he was cast as Harry is a
-young man; a nine-year-old in Bill's voice is a defect, and the class rule is
+young man; a nine-year-old in Fran's voice is a defect, and the class rule is
 drawn exactly where that line is.
 
 ── WHAT THEY TALK ABOUT ──────────────────────────────────────────────────────
@@ -88,19 +89,107 @@ conversation that quotes four significant figures is a price ticker with a
 person in front of it, and because a clip that names a number is stale the
 following afternoon where "it's down again" is not.
 
-IN ENGLISH, WITH A WORD OF CROATIAN, and that is this game's own convention
-rather than a shortcut. The thirty-two bark clips are English in every language
-and say so; Baye, the cat and the hosed bathers are all English; the balloon
-over a bather's head is translated and the recording under it is not. Two
-Croatians talking to each other in English is a stretch — and the alternative is
-a library he cannot understand, when the entire request was to be able to make
-out that they are discussing bitcoin. So: the register of `PERSONA_BATHER`,
-which is where the topical direction for these people is being written.
+MOSTLY IN ENGLISH, AND ONE OF THEM IN CROATIAN, which is a correction to what
+this file used to say and the argument is worth keeping in full because half of
+it still holds.
 
-RULE 12 reaches this file. Nothing invents a Croatian institution, party,
-politician, newspaper or place: the model is given Jadrija and Šibenik, which
-the game already names, and forbidden the rest. A synthesised vowel is not a
-claim to be a word; a named ministry is a claim to be a ministry.
+The old paragraph said: English, with a word of Croatian, because that is this
+game's own convention rather than a shortcut — the thirty-two bark clips are
+English in every language and say so; Baye, the cat and the hosed bathers are
+all English; the balloon over a bather's head is translated and the recording
+under it is not. Two Croatians talking to each other in English is a stretch,
+and the alternative is a library he cannot understand when the entire request
+was to be able to make out that they are discussing bitcoin.
+
+Misha, 8 Sep 2026: *"in our eleven labs voice actor list (36 i think it is), we
+have a few croatian ones, isn't it? i think it would be cool if some of the
+bathers would speak croatian, make it more authentic"*.
+
+HE IS RIGHT ABOUT THE ROSTER, AND THE ANSWER TURNED OUT TO BE TWO. Enumerated
+off `/v1/voices` rather than remembered: the account holds 44 voices, of which
+exactly two are labelled `language: hr` — Fran (`accent: zagreb`, male) and
+Balkanika (`accent: standard`, female), both with five verified Croatian
+entries and neither with a verified English one. Three more are English or
+French voices that merely carry `hr` somewhere in `verified_languages`, which
+is not the same claim and is not used here. So there is one Croatian man and
+one Croatian woman available, and that number — one of each — decides the whole
+shape of what follows.
+
+WHICH TWO BATHERS GET THEM IS NOT A TASTE QUESTION, and it is settled by
+`CHAT_CLASS` in 43-chatter.js rather than by who seems most local. Six of the
+eight kinds share a class with another kind, and the runtime will cast a script
+across that class when it has no exact match: a `woman_young_slim` figure can
+be given a script baked in `woman_young_full`'s voice, and the file's own note
+says nobody can tell, because both are young women. THAT STOPS BEING TRUE THE
+MOMENT ONE OF THEM IS SPEAKING A DIFFERENT LANGUAGE. A figure who converses in
+Croatian and then yelps in American English when you hose her is not a near
+miss, it is two people in one body.
+
+`woman_old` and `man_old_heavy` are the only two kinds ALONE in their class —
+`womanO` and `manO` have one member each — so a script cast for them can never
+be played by anybody else. They are also, by the game's own description of
+them, the two locals: *"a woman of about seventy, who has been coming to this
+beach her whole life"*. The structural reason and the fictional one land on the
+same pair, which is the only reason this is a one-line change and not a
+rewrite of the class table.
+
+AND THE VOICES SURVIVE THE SWAP ON THE MEASUREMENT, which mattered because both
+of them are labelled younger than the person they now play. Median f0 over the
+voiced frames, 40 ms windows, autocorrelation, on takes generated for the
+comparison:
+
+    Fran         105 Hz  (p10-p90  79-137)      Bill      135-165 Hz
+    Balkanika    194 Hz  (p10-p90 151-241)      Matilda   201-294 Hz, p90 to 344
+
+Fran is a full four semitones under Bill and is if anything the better heavy man
+of seventy; the `middle_aged` label understates him. Balkanika is the darkest
+and least bright female voice on the account, which is the direction age moves a
+voice — but she is labelled `young` where Matilda is labelled `middle_aged`, and
+that label is the dissent. It is written down here rather than smoothed over:
+the swap was made on the pitch and Matilda is one line away if the ear disagrees
+with the number.
+
+AND THEY CAN STILL CARRY THE ENGLISH, which is the risk that had to be retired
+before eight existing conversations could be re-rendered in them. Neither hr
+voice has a verified English entry, so it was measured instead of assumed:
+takes were sent through `/v1/speech-to-text` and scored against the text that
+went in. Fran and Balkanika reading English both came back at 0.0 per cent word
+error, which is the same score the shipped Bill and Matilda takes get. That
+retires intelligibility and NOT accent — a transcriber cannot hear an accent,
+and how Croatian their English sounds is unverified by anything but an ear.
+
+SO: seven scripts are unchanged English, eight are English re-rendered because
+one of their two speakers is now a different person, and `chat15` is entirely in
+Croatian because both of its speakers are. That is "some of the bathers", and
+the share is deliberate — the English ones are still the ones a player follows,
+and the Croatian one is the two oldest people on the beach talking to each other
+with nobody else in it, which is the one case where English was always the lie.
+
+WHAT THE PLAYER LOSES BY THAT IS NOTHING, and it is worth saying why rather
+than hoping. These recordings are never subtitled: the caption path in
+49-voice.js belongs to the live voice service, and a baked conversation goes
+straight to `audio.chat` with no text on screen. So a Croatian conversation is
+not an untranslated string in front of anybody. It is two old people you walk
+past, which is what it would be in Jadrija.
+
+AND HOW OFTEN IT IS HEARD IS SMALL AND KNOWN. `manO + womanO` is inside the
+11.3 per cent "everything else" bucket of the survey, so `chat15` will come up
+a few times in a hundred. The authenticity that arrives every session is the
+other half: `woman_old` is in six of the sixteen scripts and `man_old_heavy` in
+three, and by the survey's class shares roughly half of all promenade
+conversations now have a genuinely Croatian voice somewhere in them, speaking
+English with whatever accent Fran and Balkanika have.
+
+RULE 12 REACHES THIS FILE, AND IT REACHES THE LANGUAGE TOO. Nothing invents a
+Croatian institution, party, politician, newspaper or place: the model is given
+Jadrija and Šibenik, which the game already names, and forbidden the rest. A
+synthesised vowel is not a claim to be a word; a named ministry is a claim to be
+a ministry. The same rule is why `chat15` IS NOT MODEL-WRITTEN. Invented text is
+forbidden here and invented Croatian is the same offence one layer down — a
+model asked for beach Croatian will hand back something that scans and cannot be
+vouched for, and nobody in the loop would catch it. So the Croatian is written
+out by hand in `lines=` and every word of it is a word somebody would say. See
+the note on `chat15` itself, which carries the gloss line by line.
 
 ── AND WHAT COMES OUT ────────────────────────────────────────────────────────
 
@@ -142,12 +231,21 @@ with the tag.
 Run it:
 
     python3 tools/cut_chat.py --pilot        # one conversation, end to end
-    python3 tools/cut_chat.py                # all fifteen
+    python3 tools/cut_chat.py                # all sixteen
     python3 tools/cut_chat.py chat00 chat07  # named ones
     python3 tools/cut_chat.py --rates        # the encoder sweep, no API calls
 
 Text and raw speech are cached under CACHE so a re-run of the encoder costs
 nothing; `--fresh` throws the cache away and pays for the library again.
+
+THE SPEECH CACHE IS KEYED ON THE VOICE, which it was not until the Croatian
+swap and which is the difference between a thirty-cent re-bake and a two-dollar
+one. A take is `chatNN_LL_<voice id>.mp3`, so changing one kind's voice misses
+exactly the lines that kind speaks and hits on every line it does not: the swap
+above re-rendered 36 lines and reused 99. Keying on `chatNN_LL` alone cannot
+express that — the file for a line is either there or not, and the only way to
+replace one speaker was `--fresh`, which also re-generates the TEXT and so pays
+the model for fifteen scripts nobody asked to change.
 """
 
 import json
@@ -246,15 +344,20 @@ ONSET = 10 ** (-46.0 / 20)
 # adult voice sped up, which raises pitch and speed together. In the game that
 # is `playbackRate` with `preservesPitch` off; here it is a resample, applied
 # before the level is read so it cannot move it.
+#
+# THE TWO OLDEST PEOPLE ARE THE TWO CROATIAN VOICES and the header carries the
+# argument. In one line: they are the only two kinds alone in `CHAT_CLASS`, so
+# they are the only two whose language cannot leak onto somebody else's figure
+# through a class substitution.
 VOICE = {
     'girl_child':       ('6nGWYkWm4p3WN2Es5h1E', 1.20),  # Tiara
     'boy_child':        ('bIHbv24MWmeRgasZH58o', 1.20),  # Will
     'woman_young_slim': ('cgSgspJ2msm6clMCkdW9', 1.00),  # Jessica
     'woman_young_full': ('1e9Gn3OQenGu4rjQ3Du1', 1.00),  # Niamh
-    'woman_old':        ('XrExE9yKIg1WjnnlVkGX', 1.00),  # Matilda
+    'woman_old':        ('VB7D8zswiztJjyl8LI3a', 1.00),  # Balkanika, hr
     'man_young_fit':    ('SOYHLrjzK2X1ezoPC6cr', 1.00),  # Harry
     'man_young_lean':   ('TX3LPaxmHKxFdv7VOQHJ', 1.00),  # Liam
-    'man_old_heavy':    ('pqHfZKP75CvOlQylNhV4', 1.00),  # Bill
+    'man_old_heavy':    ('TRnNlYQWHAJwo9K75wNE', 1.00),  # Fran, hr, Zagreb
 }
 
 # And who they are, in the words the model gets — BATHER_WHO, same file, same
@@ -352,6 +455,100 @@ CONV = [
          topic='the news, the government and the ferry timetable',
          brief='He complains, at length and comfortably. She agrees just '
                'enough to keep it going.'),
+
+    # ── the sixteenth, which is the Croatian one ──────────────────────────────
+    #
+    # THE CAST IS THE POINT AND IT IS ALSO THE COVERAGE MISS. `woman_old` and
+    # `man_old_heavy` are the two hr voices — see `VOICE` — and they are the
+    # only pair on this beach both of whose members are Croatian, so this is
+    # the only conversation that can be in Croatian without one half of it
+    # being an American voice pronouncing a language it has no verified entry
+    # for. It also happens to be the top line of the misses list in the header,
+    # which is a coincidence and a welcome one: the pair that had no script is
+    # the pair that had to have this one.
+    #
+    # `lines` IS WRITTEN OUT HERE AND NOT ASKED FOR. Every other script in this
+    # file is a model call against `RULES`; this one is not, and the reason is
+    # RULE 12 rather than distrust of the model. Invented text is forbidden in
+    # this project, and Croatian invented by a model that scans is the same
+    # offence with the check removed — nobody in the loop reads it closely
+    # enough to catch a phrase no Croatian would say. So it is hand-written,
+    # every line is a thing somebody would actually say on that concrete, and
+    # the gloss is here so it can be checked by somebody who does speak it.
+    #
+    #   0  It has been burning three days and nobody cares.
+    #   1  Oh, leave it. It always burns, always the same story.
+    #   2  My mother remembered one worse summer.
+    #   3  With you it was always worse before.
+    #   4  It was worse. And a lot cheaper.
+    #   5  Coffee now is like a whole dinner.
+    #   6  And my grandson keeps buying those new coins.
+    #   7  Let him buy. I do not trust the bank either.
+    #   8  He is clever. But he is still young.
+    #
+    # THE REGISTER IS ŠIBENIK AND NOT ZAGREB, in the words even though it cannot
+    # be in the accent — Fran is labelled `zagreb` and Balkanika `standard`, and
+    # no amount of spelling changes what an ElevenLabs voice sounds like. What
+    # spelling DOES change is which word is said, because the model reads the
+    # graphemes: `uvik`, `lito`, `cila`, `virujem` are the ikavian forms of
+    # `uvijek`, `ljeto`, `cijela`, `vjerujem` and they come out ikavian. `ka`
+    # for `kao` and `nek` for `neka` are the ordinary coastal contractions.
+    # `Ma pusti` and `Ma daj` are already in this game because they are what
+    # people say there. Nothing heavier than that: `nisan` for `nisam` is real
+    # Šibenik and is left out, because a Zagreb voice reading a hard Dalmatian
+    # ending is a worse lie than a soft one.
+    #
+    # AND THE IKAVIAN WAS CHECKED, because "the model reads the graphemes" is an
+    # assumption and this file does not ship those. The nine takes went through
+    # `/v1/speech-to-text` and came back at 5 word errors in 63. Four of those
+    # are the transcriber's own language model and not the voice: it returned
+    # `lito`, `cila` and `mater` verbatim but rewrote `uvik` and `virujem` into
+    # `uvijek` and `vjerujem`, which are the two highest-frequency words in the
+    # set and the two where a language model's prior is strongest.
+    #
+    # A transcript cannot settle that, so the audio was asked instead — the same
+    # phrase rendered both ways in the same voice, and the length of the speech
+    # in it measured:
+    #
+    #     virujem  2.376 s     vjerujem  2.503 s     127 ms apart
+    #     ka       1.540 s     kao       1.643 s     102 ms apart
+    #     uvik     2.811 s     uvijek    2.827 s      16 ms apart
+    #
+    # So `virujem` and `ka` ARE being said ikavian and the transcriber was
+    # standardising; the fifth error, `ka` read back as `kad`, is the same
+    # effect making a sentence ungrammatical to do it. `uvik` and `uvijek` are
+    # both two syllables and duration cannot separate them, so that one is
+    # genuinely unresolved — and it is left in, because the worst case is that
+    # the line is heard in standard Croatian, which is still a thing a person
+    # says. It is a lost flavour and not a wrong word.
+    #
+    # AND IT OBEYS `RULES` EVEN THOUGH IT NEVER SEES IT. Nine lines, strictly
+    # alternating, no greeting and no goodbye, any three consecutive making
+    # sense alone, nobody named, no institution named, no price named at all
+    # (the ceiling is one) and no dash or semicolon anywhere. Word counts are
+    # 8, 7, 7, 7, 6, 6, 8, 7, 7 — mean 7.0, which is the English scripts' mean
+    # exactly, and a Croatian line of seven words carries what an English line
+    # of eight or nine does, since none of those seven is an article.
+    #
+    # The one rule it inverts is the Croatian-word rule, which says at most two
+    # lines in a script may carry one. That rule exists to stop three people
+    # saying "ajme" in twenty seconds inside an English conversation. Here the
+    # conversation is the Croatian, and the rule has nothing to do.
+    dict(key='chat15', cast=['woman_old', 'man_old_heavy'],
+         topic='whether it was worse before, which neither of them can settle',
+         brief='Two people of about seventy who have watched this beach for '
+               'fifty years, disagreeing about the past. Entirely in Croatian.',
+         lines=[
+             'Gori već treći dan, a nikoga nije briga.',
+             'Ma pusti. Uvik gori, uvik ista priča.',
+             'Moja mater je pamtila jedno gore lito.',
+             'Kod tebe je uvik prije bilo gore.',
+             'Bilo je gore. I puno jeftinije.',
+             'Kava je sad ka cila večera.',
+             'A unuk mi stalno kupuje one nove kovanice.',
+             'Nek kupuje. Ja ne virujem ni banci.',
+             'Pametan je on. Ali još je mlad.',
+         ]),
 ]
 
 # What each conversation must obey, and every clause of it is here because of
@@ -546,11 +743,38 @@ def band(y):
     """The filters, at 48 kHz and before the resample, so the resampler's own
     anti-alias is the only thing shaping the top — `cut_field.py`'s rule.
 
-    80 Hz because `man_old_heavy` is Bill and Bill's f0 lives at 100-150 Hz;
-    anything under 80 in a studio voice is a microphone stand. 6 000 Hz because
-    `CHAT_WORDS.lpNear` is 6 000 and the encoder must not spend bits on a band
-    a biquad throws away a moment later."""
-    sos = sig.butter(2, 80, 'hp', fs=SR, output='sos')
+    65 Hz AND NOT 80, WHICH THE CROATIAN SWAP MOVED. It used to be 80, on the
+    argument that `man_old_heavy` was Bill, Bill's f0 lives at 100-150 Hz, and
+    anything under 80 in a studio voice is a microphone stand. Fran is four
+    semitones under Bill and the argument does not survive him: measured over
+    his voiced frames, 11 per cent (Croatian take) and 17 per cent (English
+    take) have their FUNDAMENTAL below 80 Hz, first percentile 72 Hz. That is
+    not a stand, it is the man.
+
+    What it was actually costing is small and is why this is a footnote and not
+    a defect: the 80 Hz filter takes 0.60-0.75 dB off a Fran take against
+    0.17-0.20 dB off a Bill take and 0.04-0.05 off the two women, because the
+    energy down there is under one per cent of the total either way — a low male
+    fundamental is weaker than its own second harmonic. But `band` runs AFTER
+    `level`, so that difference lands straight on the shipped RMS: half a
+    decibel of step between Fran and whoever he is talking to, put there by the
+    filter and by nothing else, which is a mastering difference this file's own
+    rule says not to make the game's gain fix.
+
+    It is not the whole step — the measured per-speaker gap in `chat14` is
+    0.55 dB and in `chat15` 0.43, and the rest of that is the ordinary
+    difference in how much of a take is voiced, which `level` measures over and
+    cannot remove. It is only the part of the step this file was creating.
+
+    65 gives half of it back (0.32-0.43 dB) and admits nothing: after the
+    filter the 20-60 Hz band holds 0.008 per cent of the energy, against 0.002
+    at 80 Hz and 0.81 unfiltered. Both numbers are inaudible; the point is that
+    the corner is now set by the lowest voice in the cast rather than by a voice
+    that has left it.
+
+    6 000 Hz because `CHAT_WORDS.lpNear` is 6 000 and the encoder must not spend
+    bits on a band a biquad throws away a moment later."""
+    sos = sig.butter(2, 65, 'hp', fs=SR, output='sos')
     y = sig.sosfiltfilt(sos, y)
     sos = sig.butter(2, 6000, 'lp', fs=SR, output='sos')
     return sig.sosfiltfilt(sos, y)
@@ -566,15 +790,71 @@ def encode(y, dst, rate=RATE, kbps=KBPS):
     return os.path.getsize(dst) / 1024.0
 
 
-def find_gaps(y, want):
+# How far a cut is allowed to sit from where the source timeline says it should
+# be, once the decoder's constant delay has been taken out. Generous on purpose:
+# the whole measured range of that delay is 0 to +92 ms (see the header's rate
+# sweep) and the encoder's resampler adds tens of milliseconds of length change
+# over a 24-second file, so 0.30 s is many times either and still far under the
+# 1.5 s that separates one line from the next. Past it the file is wrong.
+GAP_TOL = 0.30
+# Where the shift is looked for. Wider than the sweep's 0 to +92 ms in both
+# directions so that a decoder nobody has measured yet fails loudly on the
+# tolerance rather than silently on the search bound.
+GAP_SHIFT = (-0.25, 0.35)
+
+
+def find_gaps(y, want, expect):
     """Where the silences we put in actually landed, in the decoded file.
 
     The alignment guarantee, and it is measured rather than assumed — see the
     header. Everything under `peak - HUSH_DB` for at least `HUSH` seconds is a
     run of silence; we wrote `want` of them between the lines, plus whatever is
-    at the two ends. Take the `want` longest interior runs and use their
-    midpoints as the cuts. If there are not that many, the file is wrong and the
-    caller must not ship it."""
+    at the two ends.
+
+    ── WHICH SILENCE IS WHICH, WHICH IS WHERE THIS WAS WRONG ─────────────────
+
+    This used to take the `want` LONGEST interior runs and call them the cuts,
+    on the reasoning that the gaps we inserted are the biggest silences in the
+    file. THEY ARE NOT, and the version that assumed it had been shipping a
+    broken table for the whole life of this feature. Scanned over the fifteen
+    conversations as they stood before the Croatian swap, by asking whether a
+    segment's words-per-second is physically possible and whether its RMS is
+    near the -20 dBFS every line was levelled to:
+
+        TWELVE OF THE FIFTEEN had at least one segment boundary in the wrong
+        place. Worst was chat05 line 3, which was given 6.65 seconds for a
+        seven-word line, and chat07 line 6 at 6.19.
+
+    `GAP` is 0.16 s of digital silence. A pause after a full stop INSIDE a
+    take — and every one of these lines is two or three short sentences,
+    because that is what the brief asks for — is routinely 0.3 to 0.5 s of room
+    tone, which is under `peak - 34 dB` and therefore a run, and is LONGER than
+    the thing we inserted. So "longest" picks an intra-line breath and drops a
+    real boundary, and the two errors then walk down the file together: one
+    segment swallows its neighbour and another gets what is left.
+
+    It was invisible because of what a wrong boundary does. `43-chatter.js`
+    plays a line as `start(when, at, d)`, so a segment that is too long simply
+    keeps playing into the next line's audio and a conversation still sounds
+    like a conversation — it is the SCHEDULING that goes wrong, silently, and
+    the only place it becomes obvious is a segment that gets almost nothing.
+    `chat15` produced one of those: 0.198 s and -46.7 dBFS for its last line,
+    which is a line that does not play at all. Nine lines of Croatian is what
+    finally made it loud enough to see.
+
+    THE FIX IS TO STOP GUESSING WHICH SILENCE IS WHICH. `expect` is where the
+    cuts are in the SOURCE timeline, which the caller knows exactly because it
+    did the concatenating. That is not a retreat from the header's rule — the
+    rule is that the offsets we WRITE are measured in the decoded file, and
+    they still are. The source timeline is used only to say which of the
+    candidate silences is the one we put there, and the thing it cannot know,
+    the decoder's own delay, is solved for rather than assumed: try every shift
+    on a 5 ms grid, assign each expected cut to the nearest unused run in
+    order, and keep the shift with the smallest total error. If any cut then
+    sits more than `GAP_TOL` from where it belongs, the file is wrong and the
+    caller must not ship it.
+
+    Returns the cut positions in samples, or None."""
     a = np.abs(y)
     thr = np.max(a) * (10 ** (-HUSH_DB / 20))
     # A short moving maximum, so one zero crossing inside a vowel is not a gap.
@@ -594,11 +874,51 @@ def find_gaps(y, want):
             i += 1
     inner = [r for r in runs
              if r[0] > 0 and r[1] < len(a) - w and (r[1] - r[0]) / SR >= HUSH]
-    if len(inner) < want:
+    if len(inner) < want or len(expect) != want:
         return None
-    inner.sort(key=lambda r: r[0] - r[1])          # longest first
-    cuts = sorted((r[0] + r[1]) // 2 for r in inner[:want])
-    return cuts
+    mid = sorted((r[0] + r[1]) // 2 for r in inner)
+
+    def assign(shift):
+        """Each expected cut to the nearest run at or after the last one used.
+        Monotonic by construction, so two expected cuts can never collapse onto
+        one silence and quietly agree with each other."""
+        out, k, err = [], 0, 0.0
+        for e in expect:
+            want_at = e + shift
+            best, bi = None, k
+            for j in range(k, len(mid)):
+                d = abs(mid[j] - want_at)
+                if best is None or d < best:
+                    best, bi = d, j
+                elif mid[j] > want_at:
+                    break                    # sorted, so it only gets worse
+            if best is None:
+                return None, 1e18
+            out.append(mid[bi])
+            err += best * best
+            k = bi + 1
+            if k > len(mid) - (want - len(out)):
+                # Not enough silences left for the cuts still to be placed.
+                return None, 1e18
+        return out, err
+
+    best, bestErr = None, None
+    step = int(0.005 * SR)
+    for s in range(int(GAP_SHIFT[0] * SR), int(GAP_SHIFT[1] * SR) + 1, step):
+        cuts, err = assign(s)
+        if cuts is not None and (bestErr is None or err < bestErr):
+            best, bestErr = cuts, err
+    if best is None:
+        return None
+    # And the residual is CHECKED and not merely minimised, because the best of
+    # a bad set of candidates is still a bad set. The decoder's delay is a
+    # constant, so take it out as the median of the residuals and require what
+    # is left — the part that cannot be explained by a delay — to be inside the
+    # tolerance for every cut.
+    shift = float(np.median([c - e for c, e in zip(best, expect)]))
+    if max(abs((c - e) - shift) for c, e in zip(best, expect)) > GAP_TOL * SR:
+        return None
+    return best
 
 
 def first_onset(y):
@@ -625,20 +945,32 @@ def cut(c, n, px, fresh=False):
     """One conversation, from a topic to a row of `chatidx.json`."""
     os.makedirs(CACHE, exist_ok=True)
     tpath = os.path.join(CACHE, c['key'] + '.json')
-    if fresh or not os.path.exists(tpath):
-        lines, usage = write_lines(c, n, px)
-        json.dump({'lines': lines, 'usage': usage, 'at': time.time(),
-                   'topic': c['topic'], 'cast': c['cast']},
-                  open(tpath, 'w'), indent=1)
-        print(f"  {c['key']}  wrote {len(lines)} lines  "
-              f"({usage.get('total_tokens', '?')} tokens)")
-    lines = json.load(open(tpath))['lines']
+    # A HAND-WRITTEN SCRIPT NEVER TOUCHES THE MODEL, AND NEVER TOUCHES THE TEXT
+    # CACHE EITHER. `chat15` carries its own `lines` — see the note on it — and
+    # the source of truth for those words has to be this file, where they can be
+    # read next to their gloss, and not a JSON blob under /mnt/c that a `--fresh`
+    # would silently regenerate into something nobody vouched for.
+    if c.get('lines'):
+        lines = list(c['lines'])
+    else:
+        if fresh or not os.path.exists(tpath):
+            lines, usage = write_lines(c, n, px)
+            json.dump({'lines': lines, 'usage': usage, 'at': time.time(),
+                       'topic': c['topic'], 'cast': c['cast']},
+                      open(tpath, 'w'), indent=1)
+            print(f"  {c['key']}  wrote {len(lines)} lines  "
+                  f"({usage.get('total_tokens', '?')} tokens)")
+        lines = json.load(open(tpath))['lines']
 
     pieces, index, chars = [], [], 0
     for i, text in enumerate(lines):
         kind = c['cast'][i % 2]
         vid, rate = VOICE[kind]
-        mp = os.path.join(CACHE, f"{c['key']}_{i:02d}.mp3")
+        # KEYED ON THE VOICE, so changing one kind's voice invalidates exactly
+        # the lines that kind speaks. See the header: this is what made the
+        # Croatian swap cost 36 takes instead of 135 plus a re-write of every
+        # script.
+        mp = os.path.join(CACHE, f"{c['key']}_{i:02d}_{vid[:8]}.mp3")
         if fresh or not os.path.exists(mp):
             open(mp, 'wb').write(say(text, vid))
             chars += len(text)
@@ -648,7 +980,14 @@ def cut(c, n, px, fresh=False):
 
     gap = np.zeros(int(GAP * SR))
     whole = pieces[0]
+    # WHERE WE PUT THE GAPS, in the source timeline, kept as we build it. This
+    # is not the table that ships — that one is measured in the decoded file,
+    # below, exactly as before — it is only how `find_gaps` tells one silence
+    # from another. See the long note there: it used to tell them apart by
+    # length and that was wrong in twelve conversations out of fifteen.
+    expect = []
     for y in pieces[1:]:
+        expect.append(len(whole) + len(gap) // 2)
         whole = np.concatenate([whole, gap, y])
     whole = band(whole)
     peak = 20 * np.log10(np.max(np.abs(whole)))
@@ -661,15 +1000,36 @@ def cut(c, n, px, fresh=False):
     # Read back what the decoder actually hands the game, and find the gaps in
     # THAT rather than trusting the timeline that went in.
     back = decode(dst)
-    cuts = find_gaps(back, len(pieces) - 1)
+    cuts = find_gaps(back, len(pieces) - 1, expect)
     if cuts is None:
-        sys.exit(f"error: {c['key']} — could not find {len(pieces) - 1} gaps in "
+        sys.exit(f"error: {c['key']} — could not place {len(pieces) - 1} gaps in "
                  f"the decoded file. Do not ship it.")
     edges = [0] + list(cuts) + [len(back)]
     for i in range(len(pieces)):
         a, b = edges[i], edges[i + 1]
         index[i]['at'] = round(a / SR, 3)
         index[i]['d'] = round((b - a) / SR, 3)
+
+    # AND THE TABLE IS CHECKED AGAINST THE ONLY GROUND TRUTH THERE IS: how long
+    # each piece was before it was concatenated. Every segment but the last is
+    # its line plus the gap, so it must come back at `len(piece) + GAP` and the
+    # last at `len(piece) + GAP/2` (it runs to the end of the file, which is the
+    # tail the trim left).
+    #
+    # THIS IS HERE BECAUSE THE ABSENCE OF IT IS WHAT LET THE OLD `find_gaps`
+    # SHIP FOR THE WHOLE LIFE OF THE FEATURE. A boundary in the wrong place did
+    # not fail anything: the old finder cut at a REAL silence, just somebody
+    # else's, so every obvious test still passed — the right number of cuts, no
+    # cut through a word, every segment ending in quiet. The only thing that was
+    # wrong was which line each stretch belonged to, and nothing was asking.
+    worst = 0.0
+    for i, p in enumerate(pieces):
+        want_d = len(p) / SR + (GAP if i < len(pieces) - 1 else GAP / 2)
+        worst = max(worst, abs(index[i]['d'] - want_d))
+    if worst > GAP_TOL:
+        sys.exit(f"error: {c['key']} — a segment is {worst:.2f} s from the "
+                 f"length its own take was. The gaps are mis-assigned. Do not "
+                 f"ship it.")
     # Where the first line actually begins, which is the anchor the game
     # re-measures against. See the header: whether the decoder ate the
     # encoder's delay is not a thing this tool gets to know about Chrome.
@@ -679,19 +1039,20 @@ def cut(c, n, px, fresh=False):
     print(f"  {c['key']:<8s} {c['cast'][0][:16]:<16s} + {c['cast'][1][:16]:<16s}"
           f" {len(lines):2d} lines  {secs:5.1f} s  {kb:6.1f} KB  "
           f"{chars:4d} new chars  decodes at {got:+.2f} dBFS, peak {peak:+.1f}, "
-          f"onset {at0 * 1000:.0f} ms")
+          f"onset {at0 * 1000:.0f} ms, segments within {worst * 1000:.0f} ms")
     return dict(key=c['key'], cast=c['cast'], topic=c['topic'], at0=round(at0, 3),
                 lines=index, kb=kb, secs=secs, chars=chars)
 
 
 def rates():
     """The encoder sweep, off whatever is already cached. No API calls."""
-    key = CONV[0]['key']
-    src = [os.path.join(CACHE, f'{key}_{i:02d}.mp3') for i in range(20)]
+    c = CONV[0]
+    key = c['key']
+    src = [os.path.join(CACHE, f"{key}_{i:02d}_{VOICE[c['cast'][i % 2]][0][:8]}"
+                               f".mp3") for i in range(20)]
     src = [p for p in src if os.path.exists(p)]
     if not src:
         sys.exit('error: nothing cached — run --pilot first')
-    c = CONV[0]
     pieces = [level(speed(trim(decode(p)), VOICE[c['cast'][i % 2]][1]))
               for i, p in enumerate(src)]
     gap = np.zeros(int(GAP * SR))
