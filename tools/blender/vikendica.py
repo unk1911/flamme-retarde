@@ -903,9 +903,26 @@ def shell(kit):
     wall(kit, WALL, "y", W_MID, BY1, IY1, INT * 2, F2, CEILZ)
     # And the two sides of the bathroom, which is a box in the north-west
     # corner of the big room.
-    wall(kit, WALL, "y", BATH_E, BATH_S, BY0, INT, F2, CEILZ,
+    #
+    # The south-east corner is mitred and not half-lapped, and that is the fix
+    # to a hole. Both walls used to run to the *other one's centreline* — south
+    # to BATH_E, east to BATH_S — so between them they left the outer quadrant
+    # of the corner, 5 x 5 cm on plan and 2.40 m tall, as nothing at all: the
+    # south face stopped 5 cm short of the east face and the east face stopped
+    # 5 cm short of the south face, and you could see through the gap between
+    # the two stubs from the kitchen into the living room. Nobody had noticed
+    # because the kitchen splashback overshot the corner by 15 cm and covered
+    # it over the one metre of height anybody looks at. Cutting the tile back
+    # to the corner (see `kitchen`) is what uncovered it.
+    #
+    # So the south wall now runs out to the east wall's east face and the east
+    # wall stops on the south wall's north face. One solid corner, one flat
+    # east face from the spine right down to the kitchen, and no two coplanar
+    # faces fighting over the 5 cm both walls would otherwise claim. It is the
+    # same joint the north end of this wall already makes against the spine.
+    wall(kit, WALL, "y", BATH_E, BATH_S + INT / 2, BY0, INT, F2, CEILZ,
          holes=[(D_BATH[0], D_BATH[1], F2 + D_BATH[2], F2 + D_BATH[3])])
-    wall(kit, WALL, "x", BATH_S, IX0, BATH_E, INT, F2, CEILZ)
+    wall(kit, WALL, "x", BATH_S, IX0, BATH_E + INT / 2, INT, F2, CEILZ)
 
     # ── floors ──────────────────────────────────────────────────────────────
     # Ceramic through the big room and the kitchen — the schedule says
@@ -2278,7 +2295,31 @@ def kitchen(kit):
                  y1 - 0.605, y1 - 0.03, F2 + 0.12, top - 0.06, bev=0.001)
         kit.span(CHROME, d + 0.14, d + 0.30, y1 - 0.615, y1 - 0.60,
                  top - 0.16, top - 0.14, bev=0.002)
-    tiled_face(kit, "x", y1 - 0.005, run0 - 0.06, run1 + 0.30, top, top + 0.62,
+    # The splashback, and its east end is set out off the wall and not off the
+    # cabinets, which is the whole of the fix.
+    #
+    # It used to end at run1 + 0.30 = −0.59. The wall it is tiling is the south
+    # face of the bathroom box, which ends at its own east face, −0.74 — so the
+    # run stood 150 mm out past the corner on nothing, and the bathroom's
+    # sliding leaf, parked open, hangs across exactly that ground at x −0.712 to
+    # −0.677. The tile went straight through it: 35 mm buried in the leaf and
+    # 83 mm standing proud of its face, which read from the sofa as a column of
+    # four tiles glued to the door. Reported 8 Sep 2026, and it had been there
+    # since the run was drawn.
+    #
+    # BATH_E + INT / 2 is the reveal line — the outside corner of the bathroom
+    # box — and tile dies into a corner, so this is where it stops. The run is
+    # 2.49 m instead of 2.64 and `tiled_face` divides it into 16 courses of
+    # 0.1556 instead of 17 of 0.1553, so the module is unchanged to a third of
+    # a millimetre and the field simply loses its last column. There is no bare
+    # wall left at the end: the last course butts the return.
+    #
+    # Clearance to the leaf is then 28 mm, and it is 28 mm wherever the door is
+    # standing: the leaf only ever travels along z, so its x never changes. Shut
+    # it and the leaf is at z −0.645 to 0.445, 675 mm clear of the tile plane
+    # altogether.
+    tiled_face(kit, "x", y1 - 0.005, run0 - 0.06, BATH_E + INT / 2,
+               top, top + 0.62,
                face=-1, size=0.155, colour=TILE_WALL, accent=None, accent_p=0)
     cab0, cab1 = run0 + 0.62, run1 + 0.02
     kit.span(KITCH_UP, cab0, cab1, y1 - 0.34, y1 - 0.02,
@@ -4525,8 +4566,11 @@ def plan_json():
     band(blockers, "x", SPINE, INT * 2, NIX0, IX1, [D_S4, D_S3])
     band(blockers, "x", SPINE, INT * 2, IX0, NIX0, [])
     band(blockers, "y", W_MID, INT * 2, BY1, IY1, [])
-    band(blockers, "y", BATH_E, INT, BATH_S, BY0, [D_BATH])
-    band(blockers, "x", BATH_S, INT, IX0, BATH_E, [])
+    # Mitred at the south-east corner, exactly as the walls above are — these
+    # two lines are the walk volume for those two walls and they have to say
+    # the same thing about where the corner is.
+    band(blockers, "y", BATH_E, INT, BATH_S + INT / 2, BY0, [D_BATH])
+    band(blockers, "x", BATH_S, INT, IX0, BATH_E + INT / 2, [])
 
     band(blockersP, "x", Y0 + EXT / 2, EXT, X0, X1, [PD_TERR])
     band(blockersP, "x", Y1 - EXT / 2, EXT, NX0, X1, [PT7_OPEN])
