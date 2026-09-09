@@ -8,6 +8,160 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.358.0] — 2026-09-08
+
+### the two oldest people on the beach are Croatian
+
+Misha: *"in our eleven labs voice actor list (36 i think it is), we have a few
+croatian ones, isn't it? i think it would be cool if some of the bathers would
+speak croatian, make it more authentic"*.
+
+He remembered right, and better than he thought. The account holds **44**
+voices and exactly two are labelled `language: hr` — Fran (male, Zagreb accent,
+middle-aged) and Balkanika (female, "standard" Slavic). Three others carry
+Croatian somewhere in `verified_languages` while being labelled English or
+French; that is the weaker claim and it was not used.
+
+THEY WENT TO `man_old_heavy` AND `woman_old`, and the reason is structural
+rather than taste. Six of the eight bather kinds share a voice class, and the
+runtime casts a script across a class: two young women swapping is inaudible,
+but a young woman who speaks Croatian to her friend and then yelps at you in
+American English is not. Those two kinds are the only ones alone in their
+class, so a Croatian script cannot leak onto anybody else. They are also the
+game's own two locals — the woman of seventy has been coming to this beach her
+whole life.
+
+The pitch agrees where the labels do not: Fran is 105 Hz against Bill's 135-165,
+four semitones lower and the better heavy man of seventy. THE DISSENT IS
+RECORDED IN BOTH TABLES: Balkanika is labelled `young` where Matilda was
+`middle_aged`, and whether she reads seventy is a thing only an ear can settle.
+
+Neither voice has a verified English entry, so before eight English
+conversations were re-rendered in them they were measured: **0.0 % WER** through
+speech-to-text, the same as the shipped Bill and Matilda takes. That retires
+intelligibility and not accent — no transcriber hears an accent.
+
+`chat15` is new and entirely in Croatian, hand-written rather than generated
+because RULE 12 applies to language too, with the gloss beside each line in
+`cut_chat.py`. Ikavian throughout — `uvik`, `lito`, `cila`, `virujem`, with `ka`
+and `nek` for the coastal contractions — and the ikavian was checked rather than
+assumed: same phrase both ways in the same voice, `virujem` came back 127 ms
+shorter than `vjerujem` and `ka` 102 ms shorter than `kao`. `uvik` against
+`uvijek` is two syllables either way and duration cannot separate them; that one
+is unresolved and worst case it reads standard, which is still a thing a person
+says. `nisan` for `nisam` was left out: a Zagreb voice reading a hard Dalmatian
+ending is a worse lie than a soft one.
+
+It is also the pairing at the top of the library's own list of misses — an old
+man with an old woman — so the sixteenth script went where the coverage was
+thinnest rather than where it was easiest.
+
+### twelve of the fifteen conversations had a line boundary in the wrong place
+
+Found while baking the sixteenth, and much the more important half of this
+release. `find_gaps` took the LONGEST interior silences as the line boundaries.
+`GAP` is 0.16 s and a pause after a full stop inside a take is routinely 0.3 to
+0.5 s, so "longest" reliably picks an intra-line breath and drops a real
+boundary.
+
+IT WAS INVISIBLE BECAUSE A TOO-LONG SEGMENT STILL SOUNDS LIKE A CONVERSATION —
+it simply plays on into the next line. What made it loud was `chat15`, whose
+last line was handed 0.198 s at −46.7 dBFS: a line that does not play at all.
+
+The checksum is speaking rate. Across all shipped lines, words per second:
+
+    before   mean 3.80   sd 1.77   range 0.99 - 11.44
+    after    mean 3.18   sd 0.70   range 1.88 -  6.04
+
+11.44 words a second is not speech. Afterwards the only lines above 4.2 are
+`chat09` and `chat10`, which are the two children, played at 1.20x on purpose;
+every adult conversation sits between 2.5 and 3.4 with a spread of at most 0.71.
+Cuts are now assigned to where the source timeline says they are, and the table
+is asserted against the length each take actually was — all sixteen land within
+14 to 120 ms. This is why the seven otherwise untouched conversations changed
+bytes.
+
+The highpass moved 80 -> 65 Hz in the same pass. It was set for Bill, but 11 to
+17 per cent of Fran's voiced frames have their fundamental under 80 Hz, and at
+80 the filter took 0.60-0.75 dB off him against 0.17-0.20 off Bill and 0.04 off
+the women — half a decibel of level step manufactured by the tool itself, landing
+on the shipped RMS because `band` runs after `level`. The speech cache is now
+keyed on the voice id, which is what made this a 36-take re-bake instead of 135
+plus a paid rewrite of fifteen scripts. $0.52 and no model calls at all.
+
+### swat the fly with the hose
+
+Misha: *"i wanna be able to 'swat it' with my 'water hose'... it goes into this
+sequence where the housefly loudly goes into a spiraling orbit, the camera kinda
+starts to zoom in on it, and it lands on the ground and there's a cinematic cut
+to it, shown at very high resolution, on its back all dead"*.
+
+THE CLOSE-UP IS A SECOND SCENE AND NOT A CAMERA MOVE, and that is the whole
+design. The world's near plane is 1.2 m and load-bearing — moving it has pumped
+the exposure and shimmered the scene before — and a 7 mm animal is 3.7 px at
+1.35 m, so there was never anything there to zoom into. `44-corpse.js` draws a
+private scene with its own camera: a 2 mm near plane, a 12° lens, 4.6 cm from a
+corpse modelled at its true 6.5 mm, composited over the finished frame with
+colour and depth cleared under it. That is `60-arms.js`'s trick used as a cut
+rather than an overlay.
+
+SCALING THE FLY UP LOSES ON PHYSICS, NOT TASTE. Every distance in this game's
+shading is in world metres, so a 70 cm fly at 1.4 m collects a specular lobe, a
+haze term, a `waterPath` and a shadow-map lookup computed for an animal the size
+of a dog — and it needs 1.4 m of clear air inside a 3.9 m room. At its own size
+in its own rig none of that arises, and the geometry is real rather than a
+blow-up: 26 408 triangles, built lazily on the first swat and never before it.
+
+The animal: grey scutum with four dark stripes 0.2 mm wide (the first pass made
+them 85 µm — the arithmetic was right and the reference had not been read, and
+they never appeared in a frame); compound eyes 34 facets across, each facet a
+domed normal, so the highlight is a field of sparks; one pair of veined wings
+with the muscid M1+2 bend and the two club halteres behind them; legs curled
+inward over the belly, which is what a dead fly's flexors do last. It lies 36°
+off square, because a domed back with a wing folded under each side does not
+balance — and that is why the shot arcs: no one angle holds both the stripes, on
+the low side, and the curl, on the high side.
+
+THE HIT IS 0.30 m PERPENDICULAR TO THE LINE YOU SIGHT DOWN — 8.5° off-axis at
+2 m, 4.1° at the 4.2 m reach — held for 0.10 s in seconds and not frames, with
+time off-target draining at twice the fill rate. A sitting fly can be hit;
+nobody has ever swatted one in the air. The measurement that set it: with the
+reticle exactly on a fly 2.6 m away the branch's OWN axis passes 0.365 m from
+it, a constant offset at every range with nothing on screen to explain it, while
+the visible cone is genuinely on the animal. So the parabola is walked from the
+eye, gravity kept — 5 cm of drop at 2 m, 16 cm at 4.2.
+
+The spiral, measured by probe rather than described: cruise to `spin` at 0.05 s
+and `dead` at 1.60 s, **4.17 full revolutions with all 29 heading steps the same
+sign**, a 0.11 m mean radius, a monotonic fall 4.855 -> 2.902 m onto the tile,
+speed 0.31 -> 1.99 m/s peaking at 2.82. It flutters down at about 1.26 m/s where
+free fall would cover 11.8 m in the same time, which is what a swatted fly does.
+
+"Loudly" is +12.9 dB on the fly's own partial and the wingbeat up a fifth, 194 ->
+307 Hz. THE IDLE BUZZ IS UNTOUCHED — whether it should carry through the room
+floor is a separate open question and it stays open.
+
+TWO REAL BUGS FELL OUT ON THE WAY. `personAt()` returns the CAMERA whenever an
+override holds it, and the frame loop writes `camera.position` — so a scrub
+handed the fly a listener two kilometres away, past the 30 m gate, and it froze
+while `stats()` reported a healthy spiral. And `ground.setSpray` is rewritten
+from the input every frame, so shutting the branch off at the hit lasted exactly
+one frame: 46 litres poured through a cut.
+
+Honest about what it is not. The spiral beat is 6-8 px of fly at the bottom of
+the zoom and the lens stops at 26° rather than 16°, because 16° at 2 m is 56 cm
+of blank white tile; the buzz carries that beat. The corpse on the floor is 3-4
+px from standing height — correct for a 7 mm animal, and it does mean the cut is
+the only place you ever really see it. The touch path is written and never
+exercised. The audio A/B is a synth-level measurement, not an in-room pair.
+RULE 5 does not apply at this scale: the eyes interpenetrate the head capsule
+and the abdomen the thorax, deliberately, because that is how the animal is
+built.
+
+Afterwards the corpses stay where they fell, four at most, and another fly comes
+in through the terrace door in 2.5 to 4.5 minutes on a clock that runs whether
+or not you are in the flat.
+
 ## [1.357.0] — 2026-09-08
 
 ### the beach resolves into words as you walk up to it
