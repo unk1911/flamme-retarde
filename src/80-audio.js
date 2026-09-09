@@ -4781,8 +4781,19 @@ function buildAudio() {
     });
   }
 
-  /** Stop her mid-sentence — leaving the beach, or the switch going off. */
+  /**
+   * Stop her mid-sentence — leaving the beach, or the switch going off.
+   *
+   * BOTH OF HER MOUTHS, since the Croatian was baked. `voice.step` calls this
+   * on the frame you leave the ground, and it used to stop the live element
+   * only — so getting into the aeroplane while she was half way through "ubi me
+   * vrućina" left a woman muttering on a staircase four hundred metres below
+   * you until the clip ran out. The early return had to go with it: on a page
+   * where the live service was never reached `voiceEl` is null, and that is
+   * exactly the page where the baked line is the only thing she has said.
+   */
   function hush() {
+    mutter(0, { stop: true });
     if (!voiceEl) return;
     try { voiceEl.pause(); voiceEl.currentTime = 0; } catch (e) { /* never started */ }
     if (voiceDuck && ctx) voiceDuck.gain.setTargetAtTime(1, ctx.currentTime, 0.25);
@@ -5346,7 +5357,17 @@ function buildAudio() {
     // One throat — see the note above. Sticky through the whole line and not
     // only at its start, because a phrase already in the air has to be got out
     // of the way of a sentence that has begun under it.
-    const speaking = !!(voiceEl && !voiceEl.paused && !voiceEl.ended);
+    //
+    // TWO SOURCES OF HER TALKING NOW, AND THE SECOND ONE IS NOT AN ELEMENT.
+    // `voiceEl` is the live service's `<audio>` and was the whole of it while
+    // the only way she could speak was a round trip to mpcn0. Her Croatian is
+    // baked and plays off an `AudioBufferSourceNode`, which `voiceEl` knows
+    // nothing about — so on this test alone she would have hummed straight
+    // through "ajme meni", four seconds after heaving the bucket, on the same
+    // staircase. `mutterUntil` is when the baked line now sounding will be
+    // over; see `mutter` below, which honours this test in the other direction.
+    const speaking = !!(voiceEl && !voiceEl.paused && !voiceEl.ended)
+      || t < mutterUntil;
 
     // Retire a voice that has run itself out, so the next `start` is not
     // fighting a node that stopped a second ago.
@@ -5417,6 +5438,288 @@ function buildAudio() {
     src.stop(t0 + dur + 0.06);
     humFired += 1;
     humNodes = { src, g, lp, w, until: t0 + dur + 0.06 };
+    return dur;
+  }
+
+  // ── and the same woman, in her own language ─────────────────────────────────
+  /**
+   * The Bucketeer says something short, in Croatian, once every five minutes.
+   *
+   * Misha, 8 Sep 2026: *"the bucketeer baye, don't make her talk with that
+   * saltry/jessica voice.. instead, she should occasionally say some short
+   * things, in croatian voice"*.
+   *
+   * WHAT THIS IS INSTEAD OF. There has never been a Bucketeer persona — see the
+   * note over `SPEAKERS` in server/baye/baye.py, which checked it in the code
+   * rather than assuming. Every line he has heard from a woman by the vikendica
+   * came out of `PERSONA`, Baye's own, because `bayeGap` in 43-jadrija.js
+   * answers about whichever of her two errands you are nearer to. So the
+   * complaint is not a miscast table, it is the shore Baye being audible on a
+   * staircase, and the fix is this channel plus the one line in 49-voice.js
+   * that takes the live one off the bucket branch. She is unchanged on the
+   * sand: walk down to the water and she is still Jessica, still in English,
+   * still saying what the sea temperature is.
+   *
+   * BAKED AND NOT LIVE, and the latency is only half the reason. `tools/
+   * cut_mutter.py` carries the whole argument; the short form is that a mutter
+   * belongs to a BEAT. "Ajme meni" is what you say as ten kilos comes off the
+   * floor and nowhere else, and a live line is asked for at one moment and
+   * arrives three to six seconds later, by which time she is two legs further
+   * round a forty-second loop. A recording fires on the frame the beat starts.
+   * It also means she talks without a session, which the hum has always done
+   * and the live path never could.
+   *
+   * ── one throat, still ──
+   *
+   * `hum` above says it: the figure on the shore and the one carrying water
+   * "share a face, a rig and a voice", so a hummed phrase under a spoken one is
+   * not a mix problem, it is a woman humming and talking at once. That check
+   * was on `voiceEl`, which is the live service's element and knows nothing
+   * about a buffer source, so `mutterUntil` was added beside it — a wall-clock
+   * time the hum also honours. Both directions are covered: a mutter starting
+   * fades a phrase already in the air, and a hum will not start under one.
+   *
+   * CHECKED HEADLESS RATHER THAN READ, because "one of these two counters did
+   * not go up" is exactly the kind of claim that is true in the source and
+   * false in the build. Asking for a line and a hummed phrase in the same frame
+   * takes `says` from 0 to 1 and leaves `hums` at 0; asking for the phrase
+   * again once the line is over takes `hums` to 1. Both probes are on
+   * `buck.stats()` and both are the mixer's own count of what it STARTED, not
+   * the caller's count of what it asked for — which is the only version of this
+   * test that can fail.
+   *
+   * ── the level, and what it is allowed to mask ──
+   *
+   * The gain is set against the HUM and not against the beach, because the hum
+   * is the same woman at the same distance and its own note already fought the
+   * bird question twice. Measured: `hum_bucketeer.mp3` ships at -16.3 dBFS RMS
+   * and is played at 0.185, so it leaves this file at -31.0 dBFS. These clips
+   * ship at -20.0 dBFS RMS — `cut_mutter.py` levels them there, which is
+   * `bump_*.mp3`'s level and `cut_chat.py`'s — so 0.44 puts them at -27.1, four
+   * decibels over the hum. Which is the right direction and about the right
+   * size: you open your mouth to speak and close it to hum.
+   *
+   * AND SHE IS IN THE BIRD BAND, WHICH THE HUM IS NOT, AND THE DEFENCE IS TIME
+   * RATHER THAN SPECTRUM. This is a different argument from the hum's and it is
+   * put first because the measurement went against the guess.
+   *
+   * The hum won its case on where its energy sits: 96.5 % of it under 500 Hz,
+   * out of the gulls' 600-1300. Speech cannot make that claim — a consonant
+   * lives exactly there — and `tools/sfx.mjs` says so plainly. Three recordings
+   * of 26.7 s off `audio.tap()`, standing on the shore at Jadrija with the
+   * beach bed and 72 birds running, each fired seven times at three metres and
+   * differenced against a control of the same beach with her switched off:
+   *
+   *                    120-250   250-500   500-800   600-1300   1300-2500
+   *     hum   x7         -0.54     +2.12     -1.24      -0.69       -0.64
+   *     mutter x7        +3.80     +4.04     +4.27      +5.24       +0.71
+   *
+   * The hum adds nothing to the gull band at 51 % duty. She adds 5.2 dB to it.
+   * That is what a mouth being open costs and no gain that leaves the Croatian
+   * intelligible can avoid it — and it HAS to stay intelligible, because these
+   * lines are not subtitled and an unintelligible one is a bundle of a hundred
+   * kilobytes spent on a mumble.
+   *
+   * SO IT IS BOUGHT WITH TIME, AND THE RATE IS THE WHOLE OF IT. `BUCK.humRun`
+   * and its gaps put the hum at a 20.3 % duty cycle. She says one line of 0.85 s
+   * every 245 to 355 seconds, which is 0.28 % — seventy times less mouth, and
+   * about a sixth of a second of covered bird in an average minute. The
+   * recordings above are deliberately not that: firing her seven times in
+   * twenty-six seconds is a 29 % duty cycle, a hundredfold overstatement, and
+   * it is what the table measures. It is there to say what one line costs while
+   * it is sounding, which is the number a level is chosen on. What it costs
+   * over a walk is that number divided by a hundred.
+   *
+   * The 4 dB over the hum came out as designed, incidentally, and the table is
+   * how it was checked: in the hum's OWN band, 250-500, the two rows are +2.12
+   * and +4.04 at 51 % and 29 % duty, which is about four and a half decibels a
+   * clip.
+   *
+   * ── the rate, which is the casting ──
+   *
+   * `MUTTER.rate` is where this feature's one real compromise lives and it is
+   * not a tuning knob. The clips are Balkanika, the only female voice on the
+   * account labelled `language: hr` — the three that merely carry `hr` in
+   * `verified_languages` were tested and read Croatian AS ENGLISH, coming back
+   * from the transcriber as "I'm a many" for `Ajme meni` — and Balkanika is
+   * ALREADY CAST, as `woman_old`, the seventy-year-old bather, in
+   * `BATHER_VOICE` in baye.py and in `chat15`. The vikendica stands on the open
+   * frontage with the promenade in front of it, so the two of them are within a
+   * minute's walk and, unshifted, within one voice.
+   *
+   * 1.2030 is three point two semitones, and it was chosen on two measurements
+   * that agree. Median f0 over voiced frames, everything through the same
+   * pipeline: Jessica 210.1 Hz, Balkanika as shipped 174.5, the hum 272.7.
+   * At +3.2 st the clips read 209.6.
+   *
+   *   SHE LANDS WHERE THE BUCKETEER ALREADY IS. 209.6 against 210.1 is four
+   *   hundredths of a semitone, so a player who has heard this woman on that
+   *   staircase for a fortnight hears the same register and a different person.
+   *
+   *   AND THE HUM STAYS RIGHT, which is the thing this change could most easily
+   *   have broken. She hums and speaks four seconds apart on one flight of
+   *   stairs. The hum sits +4.52 st over Jessica and +4.56 st over Balkanika at
+   *   this rate — the interval preserved to four hundredths — so
+   *   `hum_bucketeer.mp3` is untouched and byte-identical, and it did not need
+   *   re-cutting from the new voice. Which is as well: `eleven_v3` is on this
+   *   account and CAN hold a note (measured, 52 % of voiced frames held inside
+   *   a quarter-tone against 20 % for speech), but the melody it holds is its
+   *   own invention, and the tune she hums is Misha's own song.
+   *
+   * A plain resample and not a formant-preserving shift, deliberately: it moves
+   * the formants with the pitch, which is a fifth off the vocal tract and is
+   * most of what makes her not `woman_old`. It is the same mechanism `voice_for`
+   * uses to make two children out of two adults and the same one `BUCK.humDrift`
+   * uses to put her hum in a new key every burst.
+   *
+   * WHAT IS UNVERIFIED, plainly: whether 3.2 semitones is enough for an EAR to
+   * hear two women rather than one. The measurement says yes and nobody in the
+   * loop that wrote this has heard either voice. This is the one line to change
+   * if it is wrong, and `cut_mutter.py`'s sweep says the language survives
+   * anything from +2.5 to +4.0 and falls apart at +5.
+   */
+  const MUTTER = {
+    rate: 1.2030,
+    gain: 0.44,
+    // The hum's, unchanged and for its reasons: linear in distance and not
+    // squared, so she is still audible at fifteen metres where you can plainly
+    // see what she is doing; 26 m reaches the whole forecourt and the top of
+    // the steps and is gone by the waterline. Two sounds out of one mouth that
+    // faded at different rates would be two people walking apart.
+    range: 26,
+    // Higher than the hum's 3 200, and the difference is a mouth being open. A
+    // closed mouth has no top on it and that clip was lidded at 3.4 kHz because
+    // that is where its own content ended; a consonant is not. The clips carry
+    // content to 5 800 Hz before the rate lifts them to 7.0, so this is only
+    // the little a voice loses through air, and taking more turns a mutter into
+    // a mumble.
+    lp: 5000,
+    // The wall, as a gain and a corner, and they are the hum's numbers because
+    // it is the same wall between the same two people. −17 dB is what an open
+    // interior door leaves of somebody in the next room; the door she carries a
+    // bucket through all morning is standing open.
+    wallGain: 0.86,
+    wallHz: 500,
+    // DECIBELS, for a lowpass. −3.01 is Butterworth; 0.7 would be +0.7 dB of
+    // resonance sitting on a female voice's second harmonic. Four times in this
+    // file now.
+    wallQ: -3.01,
+  };
+  /** One AudioBuffer per line, decoded on first use and kept. Twenty-three
+   *  clips of under a second are 106 KB of payload and about 1.1 MB decoded,
+   *  and only the ones she has actually said are ever paid for. */
+  const mutterBuf = {};
+  let mutterNodes = null;
+  /** When the line now sounding will be over, on `ctx.currentTime`. Read by
+   *  `hum` as well as here — see "one throat" above. */
+  let mutterUntil = 0;
+  let mutterFired = 0;
+
+  /**
+   * One line, and the per-frame update of whatever is already running.
+   *
+   * The same shape as `hum` and for the same reason — she moves while she is
+   * sounding and one of the twelve legs is a doorway — but called only while a
+   * line is actually in the air, because at a 0.28 % duty cycle a per-frame
+   * call that does nothing 99.7 % of the time is a per-frame call that does
+   * nothing.
+   *
+   * @param d  metres between her and the listener
+   * @param o    key    which line, off `mutteridx.json`
+   *             wall   0…1, how much building stands between the two of you
+   *             level  0…1, the caller's own scale
+   *             start  truthy to begin a line this frame
+   *             stop   truthy to end the one that is running
+   *             probe  for a test only: how many lines have actually been
+   *                    STARTED. Same branch, same reason as `hum`'s — a caller
+   *                    asking for a line every five minutes while the clip has
+   *                    not decoded reads exactly like a caller that never asks.
+   * @returns  how long the line will sound, in seconds, EVEN IF nothing plays,
+   *           so the caller's clock does not depend on a decode having landed.
+   */
+  function mutter(d = 0, o = {}) {
+    if (o.probe) return mutterFired;
+    const key = o.key ? 'mutter_' + o.key : null;
+    const buf = key ? mutterBuf[key] : null;
+    // The length off the index and not off the buffer, for `hum`'s reason: the
+    // caller schedules against this and the buffer may not have decoded yet.
+    const dur = (o.len || 1.0) / MUTTER.rate;
+    if (!ctx || ctx.state === 'suspended') return dur;
+    if (key && !buf) sampleLoad(key, (b) => { mutterBuf[key] = b; });
+
+    const t = ctx.currentTime;
+    const wall = clamp(o.wall || 0, 0, 1);
+    const far = Math.max(0, 1 - Math.max(0, d) / MUTTER.range);
+    const amp = MUTTER.gain * far * clamp(o.level == null ? 1 : o.level, 0, 1)
+      * (1 - MUTTER.wallGain * wall);
+    // The live service wins, and it is not a preference: if she is being made
+    // to speak by 49-voice.js then she is on the shore, this is the other
+    // errand, and two of her is the fault this whole feature exists to remove.
+    const speaking = !!(voiceEl && !voiceEl.paused && !voiceEl.ended);
+
+    if (mutterNodes && t > mutterNodes.until) mutterNodes = null;
+
+    if (mutterNodes) {
+      const n = mutterNodes;
+      if (o.stop || speaking) {
+        n.g.gain.cancelScheduledValues(t);
+        n.g.gain.setValueAtTime(Math.max(0.00002, n.g.gain.value), t);
+        n.g.gain.exponentialRampToValueAtTime(0.00002, t + 0.12);
+        try { n.src.stop(t + 0.16); } catch (e) { /* already stopped */ }
+        n.until = t;
+        mutterNodes = null;
+        mutterUntil = t;
+      } else if (!o.start) {
+        n.g.gain.setTargetAtTime(Math.max(0.00002, amp), t, 0.09);
+        n.lp.frequency.setTargetAtTime(
+          MUTTER.lp * Math.pow(MUTTER.wallHz / MUTTER.lp, wall), t, 0.09);
+        if (n.w) n.w.gain.setTargetAtTime(0.13 * far * (1 - wall), t, 0.12);
+        return dur;
+      }
+    }
+    if (!o.start || !buf || speaking || amp <= 0.00003) return dur;
+
+    const t0 = t + 0.02;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    // Her whole casting, in one number. See MUTTER.rate.
+    src.playbackRate.value = MUTTER.rate;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = MUTTER.wallQ;
+    lp.frequency.value = MUTTER.lp * Math.pow(MUTTER.wallHz / MUTTER.lp, wall);
+    const g = ctx.createGain();
+    // 30 ms and not the hum's 60. `cut_mutter.py` trims each clip to 30 ms
+    // before the first thing above the noise, so a longer ramp is a fade laid
+    // over a plosive — and half these lines open on one. `Pardon.` peaks on its
+    // own P.
+    g.gain.setValueAtTime(0.00002, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp), t0 + 0.03);
+    // And out on the clip's own ending. A mutter is not cut short the way a
+    // hummed phrase is: she stops humming to heave the bucket up because you
+    // cannot hum while you are lifting, and she does not stop half way through
+    // "ajme meni", because that is the noise the lifting makes.
+    g.gain.setValueAtTime(Math.max(0.00003, amp), t0 + Math.max(0.06, dur - 0.06));
+    g.gain.exponentialRampToValueAtTime(0.00002, t0 + dur + 0.02);
+
+    // `bed`, like the hum and for the same two reasons: it puts her under
+    // `bedDuck` so she goes down when the fire is roaring, and under
+    // `voiceDuck` so she goes down when anybody actually speaks. Not `outBus`,
+    // whose lid is how far indoors YOU are, when the question here is how much
+    // house is between the two of you — which is `o.wall`, computed by the
+    // caller and applied above.
+    src.connect(lp).connect(g).connect(bed || master);
+    let w = null;
+    if (verbSend) {
+      w = ctx.createGain();
+      w.gain.value = 0.13 * far * (1 - wall);
+      g.connect(w).connect(verbSend);
+    }
+    src.start(t0);
+    src.stop(t0 + dur + 0.06);
+    mutterFired += 1;
+    mutterUntil = t0 + dur;
+    mutterNodes = { src, g, lp, w, until: t0 + dur + 0.06 };
     return dur;
   }
 
@@ -5606,7 +5909,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, fly,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, mutter, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

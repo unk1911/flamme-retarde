@@ -7832,6 +7832,19 @@ window.__fr = {
     hold: (on) => (jadrija && jadrija.bucketeer
       ? jadrija.bucketeer.hold(on) : null),
     /**
+     * Her voice, both of them.
+     *
+     * `hum(false)` and `say(false)` are the controls for an A/B recording, which
+     * is the only honest way to say what she does to the bird calls — see the
+     * note on each in 45-bucketeer.js. `say('ajme')` plays one Croatian line
+     * where she stands without waiting out a five-minute clock, and takes a
+     * suffix as well as a whole key so a plan on disk can ask for `'pomalo'`.
+     */
+    hum: (on) => (jadrija && jadrija.bucketeer
+      ? jadrija.bucketeer.hum(on) : null),
+    say: (v) => (jadrija && jadrija.bucketeer
+      ? jadrija.bucketeer.say(v) : null),
+    /**
      * Stand off her and look at her, on whichever floor she is on.
      *
      * `back` is metres in front of her, so the default is her face; negative is

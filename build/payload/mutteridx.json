@@ -1,0 +1,166 @@
+{
+ "voice": "VB7D8zswiztJjyl8LI3a",
+ "lines": [
+  {
+   "key": "fill_ajde",
+   "beat": "fill",
+   "hr": "Ajde, brže malo.",
+   "en": "Come on, a bit faster.",
+   "len": 1.435
+  },
+  {
+   "key": "fill_sporo",
+   "beat": "fill",
+   "hr": "Sporo teče.",
+   "en": "It runs slow.",
+   "len": 0.933
+  },
+  {
+   "key": "lift_ajme",
+   "beat": "lift",
+   "hr": "Ajme meni.",
+   "en": "Oh dear me.",
+   "len": 0.946
+  },
+  {
+   "key": "lift_ledja",
+   "beat": "lift",
+   "hr": "Joj, leđa moja.",
+   "en": "Oh, my back.",
+   "len": 1.236
+  },
+  {
+   "key": "down_pomalo",
+   "beat": "down",
+   "hr": "Pomalo, pomalo.",
+   "en": "Easy does it.",
+   "len": 1.321
+  },
+  {
+   "key": "down_polako",
+   "beat": "down",
+   "hr": "Polako, polako.",
+   "en": "Slowly, slowly.",
+   "len": 1.127
+  },
+  {
+   "key": "down_prolij",
+   "beat": "down",
+   "hr": "Samo da ne prolijem.",
+   "en": "Just don't let me spill it.",
+   "len": 1.245
+  },
+  {
+   "key": "tip_evo",
+   "beat": "tip",
+   "hr": "Evo vam vode.",
+   "en": "Here is your water.",
+   "len": 0.997
+  },
+  {
+   "key": "tip_eto",
+   "beat": "tip",
+   "hr": "Eto ti.",
+   "en": "There you go.",
+   "len": 0.614
+  },
+  {
+   "key": "tip_na",
+   "beat": "tip",
+   "hr": "Na, i tebi.",
+   "en": "Here, you too.",
+   "len": 0.906
+  },
+  {
+   "key": "tip_zalij",
+   "beat": "tip",
+   "hr": "Sad si zalivena.",
+   "en": "Now you are watered.",
+   "len": 1.092
+  },
+  {
+   "key": "rest_uf",
+   "beat": "rest",
+   "hr": "Uf, vrućina.",
+   "en": "Oof, the heat.",
+   "len": 1.17
+  },
+  {
+   "key": "rest_ubime",
+   "beat": "rest",
+   "hr": "Ubi me vrućina.",
+   "en": "This heat is killing me.",
+   "len": 1.144
+  },
+  {
+   "key": "rest_fala",
+   "beat": "rest",
+   "hr": "Fala Bogu.",
+   "en": "Thank God.",
+   "len": 0.678
+  },
+  {
+   "key": "rest_lipo",
+   "beat": "rest",
+   "hr": "Lipo je danas.",
+   "en": "It is lovely today.",
+   "len": 1.159
+  },
+  {
+   "key": "rest_dosta",
+   "beat": "rest",
+   "hr": "Dosta mi je.",
+   "en": "I have had enough.",
+   "len": 0.756
+  },
+  {
+   "key": "up_jos",
+   "beat": "up",
+   "hr": "Još jedanput.",
+   "en": "One more time.",
+   "len": 1.049
+  },
+  {
+   "key": "up_zadnji",
+   "beat": "up",
+   "hr": "Zadnji put, kunem se.",
+   "en": "Last time, I swear.",
+   "len": 1.441
+  },
+  {
+   "key": "up_di",
+   "beat": "up",
+   "hr": "Di sam stala?",
+   "en": "Where did I leave off?",
+   "len": 1.122
+  },
+  {
+   "key": "up_opet",
+   "beat": "up",
+   "hr": "Opet ja.",
+   "en": "Me again.",
+   "len": 0.943
+  },
+  {
+   "key": "see_pardon",
+   "beat": "see",
+   "hr": "Pardon.",
+   "en": "Excuse me.",
+   "len": 0.494
+  },
+  {
+   "key": "see_malo",
+   "beat": "see",
+   "hr": "Samo malo.",
+   "en": "Just a moment.",
+   "len": 0.761
+  },
+  {
+   "key": "see_evo",
+   "beat": "see",
+   "hr": "Evo, evo.",
+   "en": "Coming, coming.",
+   "len": 0.946
+  }
+ ]
+}
