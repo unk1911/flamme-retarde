@@ -8,6 +8,84 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.359.0] — 2026-09-08
+
+### the poster moves left, grows by half, and stays up under the loft
+
+Misha: *"can u move the 'Bucketeers of america' poster a bit to the left, and
+make it larger. and also when i press 'V' to see the 3rd floor, it seems to
+disappear! lol. make it not disappear with the appearance of 3rd floor."*
+
+TWO REQUESTS, ONE FIX, and it took reading the constraint properly to see it.
+The poster was registered `nowOnly` on purpose and the note above it argued the
+case: the loft's ladder-stair runs up this wall and there is no clear run left,
+0.17 m at the door end and 0.48 m at the corner, so it comes down with the old
+roof.
+
+THE FLIGHT RUNS THE OTHER WAY. `floorAt` interpolates it as
+`f = (z1 - z) / (z1 - z0)` over `loftStair {z0: 0.90, z1: 3.14}`, so it stands
+at floor level at z 3.14 and reaches the deck at z 0.90: the FOOT is at the
+terrace corner and the HEAD is at the door. The clear wall under it is a
+triangle that is deepest at the DOOR end — which is where he pointed. Moving
+left is the thing that buys the clearance, so the poster stays up and `nowOnly`
+is deleted rather than worked around. It was the map's only member.
+
+The old note also said the flight ran back to the render at 3.15. Cast upward at
+x 3.118 in loft mode, string and treads both stop between 3.119 and 3.121 — out
+by 31 mm, and not in the poster's favour: its own frame front stood at 3.118, so
+it was GRAZING the treads by about 2 mm where RULE 5 asks for three.
+
+Now 0.600 x 0.900 m of paper against 0.500 x 0.750 — a fifth larger on each
+edge, 44 per cent more area, still the file's exact 1024:1536 — with its centre
+1.015 m left and 0.34 m down. Clearances: 0.102 to the door lining, 0.084 to the
+string underside, 0.008 frame-back to the render, all by raycast over the whole
+frame footprint in loft mode.
+
+THE DROP WAS NOT ASKED FOR AND IT IS THE PRICE OF THE WIDTH. The string falls
+1.18 in 1, so every extra 100 mm of sheet drives the top edge 118 mm down. Held
+at its old height the widest sheet that fits is 0.424 m — narrower than the one
+he asked to have enlarged. Hanging it above the flight instead was rejected: the
+same triangle mirrored lives at the terrace end, which is the direction the
+arrow did not point.
+
+### the camera stops on the dead fly
+
+Misha: *"i also LOVE what u did with the dying FLY! haha, when u do the cut-scene
+to show the dead fly, pause on it for a few seconds longer so we can marvel at
+it"*.
+
+RAISING `macro` WOULD HAVE BEEN THE WRONG NUMBER. It is the window the camera's
+arc is interpolated across, not a dwell: the arc covers 1.75 rad of azimuth at
+33 deg/s mean and 50 through the middle, and stretching 3.00 to 5.00 to buy two
+seconds puts those at 20 and 30. That is the same marvelling in slow motion, and
+a macro push that slow reads as sluggish rather than reverent.
+
+So the rate is untouched and the time is a dead stop: `SWAT.still`, 2.00 s, with
+`sat()` already pinning the parameter at 1 past `macro` so `look()` gets the same
+three numbers every frame — no second branch and no second state. Measured two
+frames nearly a second apart inside it: max channel difference 0.0, the same
+file length to the byte.
+
+AND THE SHOT'S BEST FRAME HAD NEVER BEEN SEEN. The fade was measured off the end
+of the ARC, so the belly with six legs curled over it — the composition the whole
+move exists to arrive at — went dark as it arrived. The fade now sits inside the
+still, and that frame is lit and motionless for 1.68 s before it starts to go.
+
+Hit to standing is 7.00 s: 1.55 spiral, 0.45 on the tile, 3.00 of arc, 2.00
+stopped. The block claimed 4.65 and never could have been right — 1.55 + 0.45 +
+3.00 is five, and it has been five since the shot was written. Escape, Enter,
+Space and pointerdown were tested at six points including inside the still and
+inside the fade; all twenty-four end the cut, close the letterbox and put the
+walker back where she stood.
+
+A TRAP CAUGHT BEFORE IT SHIPPED, worth writing down because it would have been
+invisible. The constant was first called `hold` — and `SWAT.hold` already exists
+eleven lines above as the 0.10 s of water it takes to kill the fly. A duplicate
+key in an object literal is not a syntax error; the second silently wins. The
+swat would have quietly required two full seconds of water on the animal, and no
+close-up test could have caught it, because every one of them starts the shot by
+hand.
+
 ## [1.358.0] — 2026-09-08
 
 ### the two oldest people on the beach are Croatian
