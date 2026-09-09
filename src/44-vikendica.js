@@ -637,13 +637,6 @@ async function buildVikendica(scene, field) {
     tv.at = [0.17, plan.floor + 0.955, 3.40];
   }
 
-  // Things that are on the wall under the roof that is THERE and come off it
-  // under the one the renovation would build. `loftOnly` down in the blockers
-  // is the same idea the other way round, and for the same reason: `roof()` is
-  // a switch a player presses, so anything that differs between the two states
-  // has to be switchable in place rather than decided once at build time.
-  const nowOnly = [];
-
   // ── the two drawings on the spine, and the poster on the east wall ─────────
   /**
    * A floor plan, drawn.
@@ -1079,31 +1072,78 @@ async function buildVikendica(scene, field) {
       return tex;
     })();
 
-    // 0.500 × 0.750, which is the file's own 1024:1536 exactly. Between A2
-    // (0.420 × 0.594) and B1 (0.700 × 1.000) and a shade taller than B2
-    // (0.500 × 0.707) — a printed public-service sheet, not a postcard and not
-    // a hoarding.
+    // 0.600 × 0.900, which is the file's own 1024:1536 exactly. Bigger than
+    // the 0.500 × 0.750 it was: between A1 (0.594 × 0.841) and B1 (0.700 ×
+    // 1.000) now rather than between A2 and B2 — a printed public-service
+    // sheet at the size a hallway actually gets one, and still not a hoarding.
     //
-    // Centred on the blank run and at 1.55 m, which are both measured. The run
-    // is 2.89 m of wall — the door lining stops at z 0.73 and the corner into
-    // the terrace wall is at 3.62 — so the centre is 2.175 and there is 1.19 m
-    // of clear wall either side of the paper. 1.55 m of centre height puts the
-    // headline at eye level for a standing adult (this game's own eye is
-    // 1.66 m), the top edge 0.475 m under a 2.40 m ceiling and the bottom edge
-    // 1.175 m off the floor, clear of anything that could ever stand there.
+    // MOVED LEFT AND ENLARGED, on the asking, and those two turn out to be the
+    // same move. Left on this wall is −z, and that is established against
+    // something that is not the photograph, because a photograph read on its
+    // own has put a parasol on the wrong end of a building twice: the wall
+    // faces −x, so a camera that can see this poster looks along +x, and with
+    // up = +y the screen's right hand is f × u = +z. Then checked in the
+    // engine — stood at the `living` anchor with the yaw computed off
+    // `root.rotation.y` rather than off the frame, the doorway that is at
+    // frame left in his shot comes out as the FRONT DOOR at z 0.2…0.73, with
+    // the outside flight's landing and railing beyond it, and the terrace at
+    // z 3.865 and up comes out past the right edge. Left is towards the door.
     //
-    // AND IT COMES DOWN WHEN THE LOFT GOES IN, which is not a dodge. The
-    // renovation runs its ladder-stair UP THIS WALL — twelve treads from z 3.14
-    // to z 0.90, hard against the render, `VIK.loftStair` — and there is no
-    // 0.556 m of clear wall left anywhere on the run: 0.17 m between the door
-    // lining and the foot of the flight and 0.48 m between its head and the
-    // corner. Raycast in loft mode: at z 2.10 and 1.20 m off the floor a tread's
-    // outer face is at x 2.22 and it runs back to the render at 3.15, straight
-    // through a frame whose own front stands at 3.118. So the
-    // poster is registered `nowOnly` and `roof()` takes it off the wall with
-    // the old roof, which is what anybody would do with a picture on the wall
-    // they were about to build a staircase up.
-    nowOnly.push(hang(boaTex, 1.925, 2.425, 4.075, 4.825, {
+    // AND THAT IS WHY IT CAN NOW STAY UP UNDER THE LOFT, which the note this
+    // replaces said it could not. That note was right that the ladder-stair
+    // runs up this wall and wrong about which way round it runs. It climbs
+    // TOWARDS the door: `floorAt` interpolates f from z1 down to z0 and the
+    // blocker band is banded the same way, so the FOOT of the flight is at
+    // z 3.14 by the terrace corner and the HEAD is at z 0.90 by the door — not
+    // the other way about, and the 0.17 m and 0.48 m in the old note are the
+    // right gaps against the wrong ends. Every tread agrees: measured in loft
+    // mode the tread tops step 2.34, 2.13, 1.91 … 0.43, 0.21 as z goes 1.2 to
+    // 3.1, which is a flight descending as z grows.
+    //
+    // So the wall under it is not a 2.24 m write-off. It is a triangle, and the
+    // triangle is deepest at the door end — which is exactly the end he asked
+    // for. Cast upwards at x 3.118, the plane the frame's own front stands in:
+    //
+    //     z 0.70 … 0.99   the mezzanine deck, soffit at 2.39 off the floor
+    //     z 1.00 … 3.14   the flight's wall string, underside 3.528 − 1.180 z
+    //
+    // straight, to the millimetre, over every sample; the deck binds to the
+    // left of z 0.964 and the string to the right of it. And the old note's
+    // "runs back to the render at 3.15" is out by 31 mm — string and treads
+    // both stop between x 3.119 and 3.121. Which does NOT make the old poster
+    // innocent: its frame front stands at 3.118, so the two overlapped by
+    // something like 2 mm. It was never a picture buried in a staircase, it
+    // was a picture grazing one, and rule 5 asks for 3.
+    //
+    // Paper at z 0.860…1.460 and 0.760…1.660 off the floor; the frame's outer
+    // 0.656 × 0.956 of it at z 0.832…1.488 and 0.732…1.688. Clearances:
+    //
+    //     frame left to the door lining at z 0.730             0.102
+    //     frame top to the string underside (1.772 at z 1.488) 0.084
+    //     frame top to the deck soffit over its left-hand end  0.70
+    //     frame back at x 3.142 to the render at 3.150         0.008
+    //
+    // the last of which is the old rule-5 number and is untouched.
+    //
+    // WHAT IT COST is 0.34 m of height, and that is the whole three-way trade.
+    // The centre was at 1.55, which put the headline at a standing eye (this
+    // game's own is 1.66); it is at 1.21 now, with the top edge at the eye
+    // instead and the bottom 0.76 off the floor — still clear of anything that
+    // could ever stand there, since nothing does on this wall. There is no way
+    // round it: the string falls 1.18 in 1, so with the left-hand end pinned
+    // 0.102 off the door lining every extra 100 mm of paper width drives the
+    // top edge 118 mm further down. Holding 1.55 m of centre instead would have
+    // allowed a sheet 0.424 wide — SMALLER than the one he asked to have made
+    // bigger. Rejected with it: hanging it above the flight rather than under,
+    // which is the same triangle mirrored and sits at the terrace end, the one
+    // direction the arrow did not point.
+    //
+    // It is no longer registered `nowOnly`, and it was the only thing that ever
+    // was, so that list and the loop `roof()` ran over it have gone with it. A
+    // mechanism with no members is a paragraph of comment describing something
+    // that does not happen; `loftOnly` down in the blockers still carries the
+    // same idea the other way round if anything ever needs this one back.
+    hang(boaTex, 0.860, 1.460, 3.660, 4.560, {
       wall: EAST,
       open: true,
       mat: solidMaterial(0xffffff, {
@@ -1112,7 +1152,7 @@ async function buildVikendica(scene, field) {
         body: 'base = texture2D(uBoaMap, vUv).rgb;',
         uniforms: { uBoaMap: { value: boaTex } },
       }),
-    }));
+    });
   }
 
   // ── the fan ────────────────────────────────────────────────────────────────
@@ -2930,8 +2970,6 @@ async function buildVikendica(scene, field) {
         if (parts[k]) parts[k].visible = which === 'loft';
       }
       for (const b of loftOnly) b.off = which !== 'loft';
-      // And what the loft's own ladder-stair would be built straight through.
-      for (const m of nowOnly) m.visible = which !== 'loft';
       return which;
     },
     get roofNow() { return parts.loft && parts.loft.visible ? 'loft' : 'now'; },
