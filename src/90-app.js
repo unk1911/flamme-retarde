@@ -269,6 +269,14 @@ addEventListener('keydown', (e) => {
     || e.code === 'NumpadEnter' || e.code === 'Space')) {
     e.preventDefault(); endFlyCut(); return;
   }
+  // The swat, and the same three keys for the same reason. It is a quarter the
+  // length of the trampoline shot and it is still interruptible: the second
+  // time you kill a fly you have seen it, and there is nothing worse in a game
+  // than a reward you have to sit through.
+  if (swatCut && (e.code === 'Escape' || e.code === 'Enter'
+    || e.code === 'NumpadEnter' || e.code === 'Space')) {
+    e.preventDefault(); endSwat(); return;
+  }
   // N — Baye's voice. H was taken by the HUD and V by the doors, and this sits
   // above the pause guard with ? and ESC because switching her off is something
   // you want to be able to do while she is in the middle of a sentence.
@@ -1948,6 +1956,15 @@ let vikHold = false;
 // Any touch, anywhere, ends it and leaves you standing where it was going.
 addEventListener('pointerdown', () => { if (vikWalk) endVikWalk(); });
 
+// And out of the swat, for the same reason: the ground HUD and the touch layer
+// are both away while it runs, so on a phone there is no button to press.
+//
+// Not for the first half second. The gesture that STARTS this is a finger held
+// on the spray button, and a finger that is lifted and put back down inside the
+// first frames of the shot — which is what holding a button through a hit looks
+// like — would skip the thing it just earned.
+addEventListener('pointerdown', () => { if (swatCut && swatCut.t > 0.5) endSwat(); });
+
 /** Start the sequence. Returns false if the locale is not up yet. */
 function startVikWalk() {
   if (!jadrija || !jadrija.vik || !ground || !ground.ok) return false;
@@ -2168,6 +2185,295 @@ function checkTvSpray() {
     vz - sprayDir.z * along);
   tvHeld = off < 0.55 ? tvHeld + 1 : 0;
   if (tvHeld > 10) { tvHeld = 0; vik.tv.knock(); if (audio) audio.radioClick(true); }
+}
+
+// ── swatting the fly ─────────────────────────────────────────────────────────
+/**
+ * And the fly, which is the one thing in the flat you can hit with the hose
+ * that is trying not to be hit.
+ *
+ * ── WHAT COUNTS AS A HIT ──
+ *
+ * The water's own PARABOLA, from the eye, and both halves of that are a
+ * decision that was measured rather than assumed.
+ *
+ * The parabola, because the laptop and the television are tested against a
+ * straight line and they are half a metre across. The fly is seven
+ * millimetres, and the jet leaves the branch at 23 m/s and falls: 5 cm at two
+ * metres and 16 cm at four, which against a 30 cm cone is nothing at one end
+ * of the room and half of it at the other. Twelve steps of the same walk
+ * `traceJet` makes in src/47-ground.js, and it is 12 steps of arithmetic and
+ * no allocation, once a frame, and only while the branch is open.
+ *
+ * From the EYE, though, and not from the nozzle — and that is the correction
+ * that made this work at all. Measured: with the reticle held exactly on a fly
+ * 2.6 m away, the water's own axis passes 0.365 m from it. The branch is held
+ * 22 cm to your right and 22 cm below your eye, so the jet runs down a line
+ * parallel to the one you are sighting along and permanently a third of a
+ * metre off it, at every range. Test against that line and pointing straight
+ * at the animal is a guaranteed miss for ever, with no way to see why: the
+ * offset does not shrink with distance and there is nothing on the screen to
+ * measure it against. And the visible spray is a cone half a metre wide at
+ * that range, so the water genuinely IS on the fly in the picture while the
+ * axis is nowhere near it. The player's line is the honest one to test.
+ *
+ *   SWAT.radius is 0.30 m off that line, which at two metres is 8.5 DEGREES.
+ *
+ * That is a number worth defending in both directions. A branch is not a
+ * laser: 47-ground.js catches a person within 0.62 m of the axis at the nozzle
+ * and 1.4 m of it at twenty metres, because a jet is a cone and being made to
+ * be accurate with one is not the game. Half of that, and pointing a hose at a
+ * housefly is a thing a person can actually do — find it, hold the water on
+ * it, and it dies. But it is still only a quarter of the room's width at the
+ * range you fight it at, so it is not free: at four metres, which is across
+ * the room, the same cone is a target 60 cm across and the fly is one part in
+ * eighty-five of it.
+ *
+ * And it is HELD, not touched: 0.10 s of water on it, in seconds and not in
+ * frames, because a frame count is a difficulty setting that reads differently
+ * on every machine — six frames at 60 fps is two at 24, and the frame-count
+ * version of this would have been three times harder on the laptop it was
+ * written on than on the desktop it was tested on. Time outside the cone
+ * drains at twice the rate it fills, so a jet sweeping across the animal on
+ * its way to somewhere else does not bank a kill.
+ */
+const SWAT = {
+  reach: 4.2,        // m of jet a fly can be hit in — the room is 3.9 across
+  radius: 0.30,      // m off the line you are sighting down
+  hold: 0.10,        // s of it, and see above for why this is not a frame count
+  steps: 12,         // of the parabola, which at 23 m/s is 35 cm apiece
+  // The shot. Four beats, and it is seconds and not a cutscene: 4.65 s from
+  // the hit to standing in the room again, of which the close-up is the
+  // longest single beat because it is the only one that is new. Escape, Enter
+  // or Space ends it wherever it has got to — the same three keys the
+  // trampoline cut takes, and for the reason written over that one.
+  floor: 0.45,       // s held on the tile after it lands
+  macro: 3.00,       // s of the close-up
+  fade: 0.32,        // of which the last third of a second goes to black
+  // The zoom, and it is a zoom and not a fly-in: see below.
+  //
+  // 58° down to 26°, and the bottom of that ramp is a compromise that was
+  // measured rather than chosen. The animal is about four pixels across at the
+  // two metres this is fought at, and every degree off the lens is another
+  // pixel on it — at 16° it is eight or nine. But 16° at two metres is a frame
+  // 56 cm wide, and 56 cm of this room is white floor tile and nothing else:
+  // the fly gets bigger and the shot gets emptier, and a speck spiralling
+  // against a blank white field reads as a dead pixel rather than as a fly
+  // coming down in a room. 26° keeps a metre of the room in frame — the tile
+  // grid, the leg of the low table, the skirting — which is what the spiral is
+  // legible AGAINST.
+  fov: [26, 58],
+  creep: 0.40,       // m of push on top of it, and no more
+  keepOff: 1.75,     // m the eye stays off the fly, because the near plane is
+                     // 1.2 and a fly inside it is a fly that is not drawn
+  // The close-up's own move: metres out, radians above the tile, radians round
+  // from the animal's nose. A slow push and a slow arc, which is what a macro
+  // shot of something that is not going to move again is.
+  //
+  // It ARCS, and the arc is the whole reason the shot is two and a half
+  // seconds rather than one. A fly on its back rolled a quarter over shows you
+  // two different animals from its two sides: from the low side the striped
+  // grey scutum and a flank, and from the high side the belly with the six
+  // legs curled up over it. There is no single angle that has both, so the
+  // camera starts on the one and finishes on the other — which is also the
+  // only thing in this shot that gives the frame any parallax to read the
+  // shape off.
+  from: [0.046, 0.42, 1.30],
+  to: [0.028, 0.25, -0.45],
+};
+
+/** The swat, or null. */
+let swatCut = null;
+let swatHeld = 0;
+/**
+ * Wall time held off the shot, for `__fr.fly.cutAt` — the same switch, and the
+ * same reason, as `vikHold` over the walk up to the house: a page rendering at
+ * one frame a second cannot film a sequence that is driven by the clock,
+ * because the clock is the thing that is wrong.
+ */
+let swatHold = false;
+const _jetP = new THREE.Vector3();
+const _jetV = new THREE.Vector3();
+const _flyP = new THREE.Vector3();
+
+/**
+ * Is the water on it? One walk of the jet's parabola per frame, which is
+ * twelve steps of arithmetic and no allocation.
+ */
+function checkFlySwat(dt) {
+  const vik = jadrija && jadrija.vik;
+  if (state.phase !== 'ground' || !ground || !ground.you || !vik || !vik.fly) {
+    swatHeld = 0; return;
+  }
+  const you = ground.you;
+  if (!you.spraying || you.jet < 0.4 || !vik.fly.alive()) { swatHeld = 0; return; }
+  // In the room with it. Hosing the terrace through a shut door is not a hit,
+  // and the same test the buzz is gated on is the one to ask.
+  if (!jadrija.indoorsAt(camera.position.x, camera.position.y, camera.position.z)) {
+    swatHeld = 0; return;
+  }
+  const at = vik.fly.at();
+  _flyP.set(at[0], at[1], at[2]);
+  // The branch's own direction, which is the walker's yaw and pitch and is
+  // where the water actually goes — and the eye as the origin, for the reason
+  // written above.
+  const { dir } = ground.nozzle();
+  _jetP.copy(camera.position);
+  _jetV.set(dir[0], dir[1], dir[2]).multiplyScalar(GROUND.jetV);
+  // Straight-line range first, because most frames are a miss and this is the
+  // cheap half of the test.
+  if (_flyP.distanceTo(_jetP) > SWAT.reach) { swatHeld = 0; return; }
+  const step = SWAT.reach / GROUND.jetV / SWAT.steps;
+  let near = Infinity;
+  for (let i = 0; i < SWAT.steps; i++) {
+    const x0 = _jetP.x, y0 = _jetP.y, z0 = _jetP.z;
+    _jetV.y -= 9.81 * step;
+    _jetP.addScaledVector(_jetV, step);
+    // Closest approach along the step and not at the end of it: a step is a
+    // third of a metre and the target is seven millimetres, so sampling only
+    // the ends walks straight through it — the same mistake, and the same fix,
+    // that `sweep` in 47-ground.js carries a paragraph about.
+    const dx = _jetP.x - x0, dy = _jetP.y - y0, dz = _jetP.z - z0;
+    const L2 = dx * dx + dy * dy + dz * dz;
+    const t = L2 > 1e-9 ? clamp(((_flyP.x - x0) * dx + (_flyP.y - y0) * dy
+      + (_flyP.z - z0) * dz) / L2, 0, 1) : 0;
+    near = Math.min(near, Math.hypot(x0 + dx * t - _flyP.x,
+      y0 + dy * t - _flyP.y, z0 + dz * t - _flyP.z));
+  }
+  swatHeld = clamp(swatHeld + (near < SWAT.radius ? dt : -dt * 2), 0, SWAT.hold);
+  if (swatHeld >= SWAT.hold) { swatHeld = 0; startSwat(); }
+}
+
+/**
+ * Hit: take the camera, and let the animal get on with dying.
+ *
+ * The branch is shut off at the same moment, and that is not tidiness — a hose
+ * left running through five seconds of cut is 46 litres of a 400 litre pack
+ * spent on a shot. The same thing `checkLaptopSpray` does when it sits you
+ * down at the desk, and for the same reason.
+ */
+function startSwat() {
+  const vik = jadrija && jadrija.vik;
+  if (!vik || swatCut || !vik.fly.swat()) return false;
+  ground.setSpray(false);
+  const at = vik.fly.at();
+  swatCut = {
+    t: 0,
+    // Where the eye was standing when it happened. The push is measured off
+    // this rather than followed off the camera, so nothing the player does
+    // with the mouse during the shot can drag the frame around.
+    //
+    // Off the WALKER and not off `camera.position`, for two reasons. The
+    // camera is a derived quantity — `ground.pose` writes it from the walker
+    // later in the same frame — so anything that starts a shot before that has
+    // run reads a camera still standing wherever it was last frame, which for
+    // `__fr.fly.swat()` called straight after `__fr.vik.stand()` is two
+    // kilometres away over the channel. And the walker's eye has no head bob
+    // on it, which is right for a locked-off shot and wrong for a walk.
+    eye: new THREE.Vector3(ground.you.x,
+      ground.you.y + ground.you.eye, ground.you.z),
+    aim: new THREE.Vector3(at[0], at[1], at[2]),
+    // And where the walker was, put back every frame. A cut is a cut: coming
+    // out of one three metres from where you went into it, because a key was
+    // held down through a shot you could not see yourself in, reads as the
+    // game having lost track of you.
+    stood: [ground.you.x, ground.you.z, ground.you.yaw, ground.you.pitch],
+  };
+  // The room's own letterbox, which is the intro's. The skip button goes away
+  // with it: it belongs to the film and it calls `beginFlight`, which pressed
+  // in the middle of a walk around the vikendica would put you in an aeroplane.
+  $('cine-skip').hidden = true;
+  $('cine').hidden = false;
+  $('ground-hud').hidden = true;
+  if (IS_TOUCH) $('gtouch').hidden = true;
+  requestAnimationFrame(() => { if (swatCut) $('cine').classList.remove('open'); });
+  return true;
+}
+
+/** Give it all back, whether it ran out or was skipped. */
+function endSwat() {
+  if (!swatCut) return;
+  // The fade is not put back here, and that is deliberate: `vik.fly.shot()`
+  // BUILDS the close-up on first call, and a shot skipped in its first second
+  // has no close-up yet. Every frame of the macro beat writes the fade from its
+  // own clock anyway, so the next one opens at full whatever this one ended on.
+  swatCut = null;
+  swatHold = false;
+  camOverride = null;
+  camera.fov = baseFov;
+  camera.updateProjectionMatrix();
+  $('cine').classList.add('open');
+  setTimeout(() => { if (!swatCut) $('cine').hidden = true; }, 800);
+  $('cine-skip').hidden = false;
+  $('ground-hud').hidden = false;
+  if (IS_TOUCH) $('gtouch').hidden = false;
+  if (!IS_TOUCH) grabPointer();
+}
+
+/**
+ * One frame of it, on wall time — the same clock the walk up to the house and
+ * the race's cut use, and for the reason written over `stepVikWalk`: a lens
+ * that slows the world has nothing to say about how long a shot is.
+ */
+function stepSwat(dt) {
+  if (!swatCut) return;
+  const vik = jadrija && jadrija.vik;
+  if (!vik || state.phase !== 'ground') { endSwat(); return; }
+  const S = swatCut;
+  S.t += dt;
+  // Standing still through it. See `stood`.
+  ground.put(S.stood[0], S.stood[1], S.stood[2], S.stood[3]);
+
+  const fall = vik.fly.fallSecs();
+  if (S.t < fall + SWAT.floor) {
+    // ── the spiral, and the camera going in on it ──────────────────────────
+    // A ZOOM, and not a fly-in, and that is the whole of why this beat is
+    // possible at all. The world's near plane is 1.2 m and moving it has cost
+    // this project a shimmer across the entire scene once already; a camera
+    // that pushes in on something in the middle of a four-metre room ends up
+    // through the furniture and inside its own clip. A long lens takes the
+    // same picture from where you are already standing and touches nothing.
+    // There is 40 cm of creep on top of it because a lens alone is a flat
+    // move, and a frame that closes AND advances reads as somebody leaning in.
+    const at = vik.fly.at();
+    _flyP.set(at[0], at[1], at[2]);
+    const u = sat(S.t / fall);
+    const e = u * u * (3 - 2 * u);
+    const f = lerp(SWAT.fov[1], SWAT.fov[0], e);
+    if (Math.abs(camera.fov - f) > 1e-3) {
+      camera.fov = f;
+      camera.updateProjectionMatrix();
+    }
+    _jetV.subVectors(_flyP, S.eye);
+    const gap = _jetV.length();
+    _jetV.y = 0;
+    if (_jetV.lengthSq() > 1e-6) _jetV.normalize();
+    const creep = Math.min(SWAT.creep * e, Math.max(0, gap - SWAT.keepOff));
+    // The aim lags the animal a little, so the spiral moves inside the frame
+    // instead of being nailed to the middle of it. An operator swinging a long
+    // lens on to something falling is always slightly behind it, and that lag
+    // is the single thing that makes a tracked shot read as handled rather
+    // than as parented.
+    S.aim.lerp(_flyP, Math.min(1, dt * 9));
+    camOverride = [
+      S.eye.x + _jetV.x * creep, S.eye.y, S.eye.z + _jetV.z * creep,
+      S.aim.x, S.aim.y, S.aim.z,
+    ];
+    return;
+  }
+
+  // ── and the cut to the close-up ─────────────────────────────────────────
+  const shot = vik.fly.shot();
+  const v = sat((S.t - fall - SWAT.floor) / SWAT.macro);
+  const e = v * v * (3 - 2 * v);
+  shot.look(lerp(SWAT.from[0], SWAT.to[0], e), lerp(SWAT.from[1], SWAT.to[1], e),
+    lerp(SWAT.from[2], SWAT.to[2], e));
+  // Out through black rather than back to the room on a hard cut, because what
+  // is behind this is a wide shot of a floor from two metres and the join
+  // between the two is a jump of a hundredfold in scale.
+  shot.setFade(1 - sat((S.t - fall - SWAT.floor - SWAT.macro + SWAT.fade)
+    / SWAT.fade));
+  if (v >= 1) endSwat();
 }
 
 /**
@@ -5173,8 +5479,16 @@ function frame() {
   if (state.phase === 'ground') {
     // The branch, on mouse or space. The aeroplane's own input is deliberately
     // not read: it is parked, and nothing on foot should be moving its controls.
-    ground.setSpray(mouseDrop || (keys.has('Space') && !spaceLeapt)
-      || TOUCH.gjet || debugJet);
+    //
+    // And not at all while the swat's cut is running. `startSwat` shuts the
+    // branch off, and without this line that lasted exactly one frame: this
+    // one, which writes the button straight back on top of it every frame a
+    // finger is on it. Five seconds of cut is 46 litres of a 400 litre pack
+    // poured at a wall nobody can see, and a trace and a cone of droplets
+    // computed for a camera that is somewhere else. It comes straight back the
+    // frame the shot ends, because the finger is still down.
+    ground.setSpray(!swatCut && (mouseDrop || (keys.has('Space') && !spaceLeapt)
+      || TOUCH.gjet || debugJet));
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
     // integrated was the chute branch, so the moment the canopy touched down she
@@ -5426,8 +5740,12 @@ function frame() {
   if (vikWalk && !vikHold) stepVikWalk(real);
   if (chaseCut) stepChaseCut(real);
   if (flyCut) stepFlyCut(real);
+  if (swatCut && !swatHold) stepSwat(real);
   if (comp) stepComputer(real);
-  else { checkLaptopSpray(); checkTvSpray(); }
+  // Not while the swat is running: the branch is already shut off, and a
+  // second hit on the animal that is currently falling out of the sky would
+  // start a second camera sequence over the top of the first.
+  else if (!swatCut) { checkLaptopSpray(); checkTvSpray(); checkFlySwat(real); }
   if (!camOverride) stepLens(real);
   // And the mix goes with it, water included — the duck and the long tail are
   // most of what makes the lens read as a scope rather than as a zoom, and
@@ -6080,6 +6398,14 @@ function frame() {
   // frame behind the phase, and one frame of a dive mask over the first frame
   // of a walk up to the vikendica is the whole of the complaint.
   if (mask && state.phase === 'swim' && !chaseCut && !bodyCam) mask.render(renderer);
+  // And the close-up of the dead fly, which is not an overlay but a CUT: it
+  // clears the colour and the depth under itself and what was drawn above is
+  // gone. Last, for the same reason the mask is last — it is the whole frame
+  // while it is on — and gated on the beat rather than on the sequence, so the
+  // first two seconds of the shot are still the room. See src/44-corpse.js.
+  if (swatCut && swatCut.t >= jadrija.vik.fly.fallSecs() + SWAT.floor) {
+    jadrija.vik.fly.shot().render(renderer);
+  }
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
@@ -7331,6 +7657,94 @@ window.__fr = {
         p[0], p[1], p[2]];
       return { at: p.map((n) => +n.toFixed(2)), d, fov };
     },
+
+    /**
+     * ── the swat ──
+     *
+     * `swat()` is the hit itself, exactly as the water would deliver it: the
+     * spiral, the camera, the cut, everything. `kill()` skips the whole
+     * sequence and puts a corpse on the floor, which is what a test that wants
+     * to photograph the tile rather than the shot wants.
+     *
+     *   __fr.vik.stand('living'); __fr.fly.swat(); __fr.fly.cutAt(2.4);
+     *
+     * `cutAt` is the scrub, and it exists for the reason `vik.cutAt` does: the
+     * sequence is driven by wall time and a headless page runs about one frame
+     * a second, so a screenshot of the close-up taken by waiting for it is a
+     * screenshot of the first tenth of the spiral. It sets the time outright,
+     * runs the fly's own clock up to the same point, and holds there.
+     */
+    swat: () => (startSwat() ? 'hit' : 'no'),
+    kill: () => {
+      const v = jadrija && jadrija.vik;
+      return v ? v.fly.kill() : null;
+    },
+    revive: () => {
+      const v = jadrija && jadrija.vik;
+      return v ? v.fly.revive() : null;
+    },
+    corpses: () => {
+      const v = jadrija && jadrija.vik;
+      return v ? v.fly.dead() : null;
+    },
+    cutAt: (t) => {
+      const v = jadrija && jadrija.vik;
+      if (!v) return null;
+      if (t == null) {
+        swatHold = false; v.fly.hold(false); return 'released';
+      }
+      if (!swatCut && !startSwat()) return 'no fly';
+      // Both clocks, together, and BOTH of them have to be taken off the frame
+      // loop. The camera is pointed at wherever the animal has actually got
+      // to, so a scrub that advanced the shot and let the room advance the fly
+      // — which on a card is most of a second between two captures — frames an
+      // empty room and photographs it.
+      swatHold = true;
+      v.fly.hold(true);
+      const want = Math.max(0, t);
+      const step = 1 / 60;
+      // The WALKER, and not `personAt()`, and this cost an hour.
+      //
+      // `personAt` returns the camera whenever an override has the camera —
+      // which a cut always does — and `camera.position` is written by the
+      // frame loop. Scrubbing runs a hundred steps between two frames, so
+      // every one of them after the first was handed a camera still standing
+      // wherever it was before the shot started: two kilometres away, past the
+      // 30 m gate `stepFly` uses to decide the flat is worth simulating. The
+      // fly stopped dead on the first step and the shot arced round an empty
+      // patch of ceiling, with `stats()` reporting a perfectly healthy spiral
+      // because the frame loop had re-posed it in between.
+      const who = ground && ground.ok
+        ? { x: ground.you.x, y: ground.you.y + ground.you.eye, z: ground.you.z }
+        : personAt();
+      while (swatCut && swatCut.t < want) {
+        v.fly.hold(false);
+        v.fly.step(step, who);
+        v.fly.hold(true);
+        stepSwat(step);
+      }
+      return swatCut ? { t: +swatCut.t.toFixed(2), fly: v.fly.stats().mode }
+        : 'over';
+    },
+    /**
+     * Point the close-up's own camera by hand: metres out, radians above the
+     * tile, radians round from the animal's nose. For looking at the corpse
+     * from somewhere the shot itself never goes, which is how the anatomy gets
+     * checked at all — the shot is one 3 cm arc and half the animal is behind
+     * it.
+     */
+    frame: (d = 0.05, el = 0.4, az = 1.0) => {
+      const v = jadrija && jadrija.vik;
+      if (!v) return null;
+      v.fly.shot().look(d, el, az);
+      return { d, el, az };
+    },
+    /** How long the whole thing runs, so a recorder can size itself off it. */
+    cutLen: () => {
+      const v = jadrija && jadrija.vik;
+      return v ? +(v.fly.fallSecs() + SWAT.floor + SWAT.macro).toFixed(2) : null;
+    },
+    cut: () => (swatCut ? { t: +swatCut.t.toFixed(2) } : null),
   },
 
   /**
