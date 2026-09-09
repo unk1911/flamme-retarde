@@ -2242,13 +2242,58 @@ const SWAT = {
   radius: 0.30,      // m off the line you are sighting down
   hold: 0.10,        // s of it, and see above for why this is not a frame count
   steps: 12,         // of the parabola, which at 23 m/s is 35 cm apiece
-  // The shot. Four beats, and it is seconds and not a cutscene: 4.65 s from
-  // the hit to standing in the room again, of which the close-up is the
-  // longest single beat because it is the only one that is new. Escape, Enter
-  // or Space ends it wherever it has got to — the same three keys the
-  // trampoline cut takes, and for the reason written over that one.
+  // The shot. Five beats, and it is seconds and not a cutscene: 7.00 s from
+  // the hit to standing in the room again, of which the close-up is 5.00 s
+  // because it is the only part of this that is new. Escape, Enter or Space
+  // ends it wherever it has got to, the static beat included — the same three
+  // keys the trampoline cut takes, and for the reason written over that one.
+  //
+  //   1.55  the spiral, zoomed into from where you stand   (vik.fly.fallSecs)
+  //   0.45  held on the tile after it lands                (floor)
+  //   3.00  the close-up's arc, one side of it to the other (macro)
+  //   2.00  and then STOPPED on it                         (still)
+  //         of which the last 0.32 goes to black           (fade)
+  //
+  // THIS COMMENT USED TO SAY 4.65 s and it was never true: 1.55 + 0.45 + 3.00
+  // is five, and it has been five since the shot was written. The arithmetic
+  // is spelt out above so the next person does not have to redo it.
+  //
+  // `still` is the answer to "pause on it for a few seconds longer so we can
+  // marvel at it", and it is called that because `hold` is already taken,
+  // eleven lines up, by the tenth of a second of water. A duplicate key in
+  // this object is not a syntax error in any mode — the second one silently
+  // wins — so a second `hold` here would have quietly made killing a fly need
+  // TWO SECONDS of water on it, and nothing in the close-up's own tests would
+  // ever have noticed, because they all start the shot by hand.
+  //
+  // It is a held beat rather than a bigger `macro` on
+  // purpose. The arc covers 1.75 rad of azimuth on a smoothstep, which is
+  // 33 deg/s mean and 50 deg/s through the middle of the move; stretching
+  // `macro` to 5.00 s to buy the same two seconds would put those at 20 and
+  // 30, and that is not more marvelling, it is the same marvelling in slow
+  // motion — past some speed a macro push stops reading as reverent and starts
+  // reading as sluggish. So the rate is untouched and the time is bought at
+  // the END, where the camera arrives, stops, and sits on the composition the
+  // whole move existed to reach. Which is also how a real macro insert is cut.
+  // Rejected with it: a residual drift through the still, 28 mm creeping to
+  // 25 mm, to keep the frame "alive". Smoothstep already arrives at zero
+  // velocity, so the stop is soft without help, and a camera that never quite
+  // settles is the opposite of the thing that was asked for.
+  //
+  // And it fixes something that was wrong before anyone asked. The fade used
+  // to eat the last 0.32 s of the ARC, so the frame the whole move exists to
+  // arrive at — the belly side, the six legs curled up over it — was never once
+  // seen at full brightness. At the smoothstep's tail 0.32 s is only the last
+  // 3% of the move, so it was not much travel that was lost; it was the
+  // destination itself, playing entirely under a wipe to black. Now the arc
+  // finishes in the clear and the fade is measured off the end of the still,
+  // so that frame is lit and motionless for 1.68 s before it starts to go
+  // dark. Measured, on the two frames either side of it: t = 5.70 s and
+  // t = 6.62 s of the shot come back pixel for pixel identical, at the same
+  // mean luminance as the last frame of the arc.
   floor: 0.45,       // s held on the tile after it lands
-  macro: 3.00,       // s of the close-up
+  macro: 3.00,       // s of the close-up's arc — a rate, not a duration
+  still: 2.00,       // s stopped on the end of it, and the fade is inside this
   fade: 0.32,        // of which the last third of a second goes to black
   // The zoom, and it is a zoom and not a fly-in: see below.
   //
@@ -2270,8 +2315,9 @@ const SWAT = {
   // from the animal's nose. A slow push and a slow arc, which is what a macro
   // shot of something that is not going to move again is.
   //
-  // It ARCS, and the arc is the whole reason the shot is two and a half
-  // seconds rather than one. A fly on its back rolled a quarter over shows you
+  // It ARCS, and the arc is the whole reason this beat is three seconds rather
+  // than one — and the whole reason the two seconds after it are a STILL and
+  // not more arc. A fly on its back rolled a quarter over shows you
   // two different animals from its two sides: from the low side the striped
   // grey scutum and a flank, and from the high side the belly with the six
   // legs curled up over it. There is no single angle that has both, so the
@@ -2464,16 +2510,21 @@ function stepSwat(dt) {
 
   // ── and the cut to the close-up ─────────────────────────────────────────
   const shot = vik.fly.shot();
-  const v = sat((S.t - fall - SWAT.floor) / SWAT.macro);
+  const m = S.t - fall - SWAT.floor;   // s into the close-up
+  const v = sat(m / SWAT.macro);
   const e = v * v * (3 - 2 * v);
+  // `sat` is what makes the still a still: past `macro` the parameter is
+  // pinned at 1, `look` is handed the same three numbers every frame, and the
+  // camera is simply not moving. No second branch, no second state — the arc
+  // runs off the end of its own clock and stops there.
   shot.look(lerp(SWAT.from[0], SWAT.to[0], e), lerp(SWAT.from[1], SWAT.to[1], e),
     lerp(SWAT.from[2], SWAT.to[2], e));
   // Out through black rather than back to the room on a hard cut, because what
   // is behind this is a wide shot of a floor from two metres and the join
-  // between the two is a jump of a hundredfold in scale.
-  shot.setFade(1 - sat((S.t - fall - SWAT.floor - SWAT.macro + SWAT.fade)
-    / SWAT.fade));
-  if (v >= 1) endSwat();
+  // between the two is a jump of a hundredfold in scale. Measured off the end
+  // of the STILL and not the end of the arc: see the note over `still`.
+  shot.setFade(1 - sat((m - SWAT.macro - SWAT.still + SWAT.fade) / SWAT.fade));
+  if (m >= SWAT.macro + SWAT.still) endSwat();
 }
 
 /**
@@ -7742,7 +7793,8 @@ window.__fr = {
     /** How long the whole thing runs, so a recorder can size itself off it. */
     cutLen: () => {
       const v = jadrija && jadrija.vik;
-      return v ? +(v.fly.fallSecs() + SWAT.floor + SWAT.macro).toFixed(2) : null;
+      return v ? +(v.fly.fallSecs() + SWAT.floor + SWAT.macro + SWAT.still)
+        .toFixed(2) : null;
     },
     cut: () => (swatCut ? { t: +swatCut.t.toFixed(2) } : null),
   },
