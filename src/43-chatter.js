@@ -660,6 +660,18 @@ function chatSay(ctx, io, key, d, seed) {
 }
 
 // ── and the other half: fifteen conversations, already going on ──────────────
+//
+// SIXTEEN NOW, AND EVERY PARAGRAPH BELOW STILL SAYS FIFTEEN ON PURPOSE. The
+// sixteenth is `chat15`, added with the Croatian voices — see the header of
+// `tools/cut_chat.py` — and it is the `manO + womanO` pair, which the survey
+// put inside the 11.3 per cent "everything else" bucket. So it moves the
+// recurrence arithmetic below by less than the measurement's own noise, and
+// every number in these notes (one conversation every two minutes at eleven
+// metres, the bag emptying in thirty, the 75/87/89/90 per cent coverage) was
+// counted on four half-hour walks against fifteen scripts. Rewriting the word
+// would make them read as though they had been counted again. They have not.
+// Nothing in the code counts either: `CHAT_LIB.conv.length` is read from the
+// payload everywhere it matters.
 /**
  * The library, off the payload, or nothing at all.
  *
@@ -688,6 +700,17 @@ const CHAT_LIB = (typeof PAYLOAD !== 'undefined' && PAYLOAD.chatidx)
  * nine-year-old in a seventy-year-old's voice is a defect, and that is exactly
  * where the line is drawn — the two children, the old woman and the old man are
  * each alone in their class and can only ever be themselves.
+ *
+ * THAT LAST CLAUSE IS NOW LOAD-BEARING FOR A SECOND REASON, and it was written
+ * before there was one. The old woman and the old man are the two Croatian
+ * voices — Balkanika and Fran, the only two on the account labelled
+ * `language: hr` — and `chat15` is baked entirely in Croatian. Because their
+ * classes have one member each, the fallback below can never hand a Croatian
+ * script to anybody else. If it could, the defect would not be an accent, it
+ * would be a figure who converses in one language and yelps in another when
+ * you hose her. Any future voice added to `womanO` or `manO` inherits that
+ * constraint: it has to be Croatian too, or `chat15` has to lose its class
+ * fallback. This is the comment that says so.
  *
  * The runtime still prefers an EXACT kind match and only falls back to the
  * class — see `pickConv`. What the class buys is coverage: counted over four
