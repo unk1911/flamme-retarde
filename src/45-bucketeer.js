@@ -293,6 +293,28 @@ const BUCK = {
   // She still stops, turns and holds the bucket out every single time.
   sayYield: 90.0,
   sayYieldFor: 0.8,     // s of being blocked before it is worth a word
+  // WHERE THE EAR IS, when that is not where the walker is. Null everywhere
+  // else, and null is the game's own convention: `personAt` in 90-app.js says
+  // in as many words that on foot the listener is the walker and not the
+  // camera, because in the third person they are three metres apart and the
+  // body is the honest answer.
+  //
+  // A cut is the case that convention does not cover. The pour cut takes the
+  // camera to 2.8 m of her while the body it left behind is anywhere from five
+  // to eighteen metres away, and `MUTTER.range` is 26 m of linear roll-off — so
+  // a line fired on to a close-up would play at between a quarter and three
+  // quarters of its level depending on where the player happened to be
+  // standing when the shot started, which is a line landing badly rather than a
+  // line landing. Written by `startPour` in 90-app.js as a live reference to
+  // `camera.position` — no copy, so it is never a frame stale — and cleared by
+  // `endPour`.
+  //
+  // The DISTANCE only. `wallTick` still measures the wall off the walker, and
+  // deliberately: it asks whether one of you is inside a storey and the other
+  // is not, and during this cut both the camera and the body are outdoors on
+  // the same side of the same house, so the two answers are the same number
+  // and the one that is already there is the one with the reasoning on it.
+  ear: null,
   // What each beat of the loop is allowed to say, and everything missing is a
   // beat she says nothing on. The pools come off `mutteridx.json` by this name,
   // so a line added to the tool with `beat: 'down'` needs nothing here.
@@ -590,6 +612,10 @@ const levelFill = (y) =>
 
 // Scratch for the one below, because it is called twice a frame.
 const wDisc = { y: 0, r: 0 };
+
+// And for `beat()` below, for the same reason: it is read every frame by the
+// pour cut and a fresh object a frame is a fresh object a frame.
+const bckBeat = { phase: '', t: 0 };
 
 /**
  * The surface of what is in it: where it stands, and how wide it is.
@@ -2145,7 +2171,14 @@ async function buildBucketeer(scene, vik, walkY) {
     // is one wall — see `wallTick`. The humming first of the two only because
     // it was here first; they cannot collide, `sayTick` returns early while a
     // line is sounding and `hum` refuses to start under one.
-    const dNow = Math.sqrt(d2);
+    // The ear, which is the walker unless something has taken the camera off
+    // him — see `BUCK.ear`. `d2` above is still the walker's, and has to be:
+    // it is what decides whether she is posed at all, whether you are in her
+    // way and whether she has noticed you, and none of those three is a
+    // question about where the picture is being taken from.
+    const dNow = BUCK.ear
+      ? Math.hypot(BUCK.ear.x - st.x, BUCK.ear.z - st.z)
+      : Math.sqrt(d2);
     wallTick(dt, who);
     humTick(dt, dNow, who);
     // And the Croatian, once every five minutes, on the beat it belongs to.
@@ -2227,6 +2260,18 @@ async function buildBucketeer(scene, vik, walkY) {
     },
     /** Where she is from you, for whoever has to decide who you are near. */
     gapTo: (x, z) => Math.hypot(x - st.x, z - st.z),
+    /**
+     * Which beat she is on and how far into it, and nothing else.
+     *
+     * `stats()` answers the same question and forty others, and builds an
+     * object with thirty-odd keys to do it. This one is read EVERY FRAME by the
+     * pour cut in 90-app.js — the cut's clock is her clock, so that a shot cut
+     * on `tipIn + tipHold` is cut on the frame the pail actually starts back up
+     * and not on a wall clock that started a fifth of a second late — and a
+     * per-frame `stats()` for two numbers is a per-frame allocation for two
+     * numbers. One scratch object, refilled.
+     */
+    beat: () => { bckBeat.phase = st.phase; bckBeat.t = st.clock; return bckBeat; },
     /** Where she is now, and what she is doing. */
     stats: () => ({
       phase: st.phase, leg: st.leg, u: +st.u.toFixed(2), dir: st.dir,
@@ -2302,6 +2347,22 @@ async function buildBucketeer(scene, vik, walkY) {
         k = st.leg + 1;
       } else if (phase === 'tip' || phase === 'right' || phase === 'rest'
         || phase === 'take') {
+        // WALKING DOWN, which has to be said and was not. These four beats all
+        // happen standing still at the last waypoint, so the direction looks
+        // like it cannot matter — and it decides which way she FACES, ten lines
+        // below: `dir` picks the waypoint the heading is measured against, and
+        // left unset it is whatever the loop was doing when the jump came.
+        // `go('tip')` called after anything that reached the walk back up —
+        // another `go`, a `tick` or a `trace` long enough to get past the
+        // pick-up — therefore read −1, took the waypoint AHEAD of her instead
+        // of the one behind, and stood her on the porch facing exactly
+        // backwards, 180 degrees out, with no other symptom at all.
+        //
+        // Found by filming the pour cut, whose second camera is placed in HER
+        // frame: every scrub past 7.75 s came back photographing the beach from
+        // the wrong side of her, and the frames before it were perfect. See
+        // `__fr.pour.frame`.
+        st.dir = 1;
         st.fill = phase === 'tip' ? 1 : 0;
         st.held = 1;
         k = BUCK_WAY.length - 1;
