@@ -2694,12 +2694,33 @@ function stepSwat(dt) {
  * She is on a 52 second loop and pours every lap. `checkPour` is the whole of
  * the decision and every clause in it is a way of being wrong:
  *
- *   ONCE, and per SESSION rather than per machine. There is no save in this
- *   game and the file is opened off a filesystem at least as often as off the
- *   site; `localStorage` on a `file:` origin is opaque in Chrome and throws or
- *   silently forgets in half the browsers that matter. But the argument that
- *   settles it is not the API — it is that a cut you get once ever, on one
- *   machine, is a cut you cannot show anybody. Reload and you can see it again.
+ *   ONCE, THEN A COOLDOWN — and per SESSION rather than per machine. There is
+ *   no save in this game and the file is opened off a filesystem at least as
+ *   often as off the site; `localStorage` on a `file:` origin is opaque in
+ *   Chrome and throws or silently forgets in half the browsers that matter.
+ *   But the argument that settles it is not the API — it is that a cut you get
+ *   once ever, on one machine, is a cut you cannot show anybody.
+ *
+ *   IT WAS A HARD LATCH AND IT IS NOT ANY MORE. Misha asked for *"just the
+ *   first time around she does it"* before the cut existed and could be
+ *   judged, and what that spec turned out to mean in play is: *"i often stand
+ *   next to her pouring water, but the cut-scene doesn't trigger.. i only saw
+ *   it trigger 1 time"*. He was right and the flag was right; the two together
+ *   were wrong. `checkPour` returned on its FIRST line for the whole rest of
+ *   the session, so every approach after the first was answered before a
+ *   single geometric clause was read, and the honest report of that from
+ *   inside the game is silence.
+ *
+ *   So the latch became a clock. `POUR.again` is ten minutes of REAL time —
+ *   `checkPour` is handed `real` and not the slowed step, deliberately, the
+ *   way `SWAT`'s five beats are wall time — which is about eleven and a half
+ *   of her 52.37 s laps. Rare enough that it stays a thing that happens to you
+ *   rather than a thing that plays; often enough that it is still in the game
+ *   an hour in, and that you can show somebody.
+ *
+ *   THE COOLDOWN STARTS WHEN THE CUT DOES, not when it ends, and that is the
+ *   same argument the flag was set on: a cut skipped in its second second is a
+ *   cut that was seen and turned down.
  *
  *   AT LEAST 5 m. Not a compromise: it is the answer. `BUCK.noticeM` is 4.6 m,
  *   and inside that she stops, turns to you and holds the bucket out — a beat
@@ -2768,6 +2789,10 @@ const POUR = {
   rise: 2.2,
   dot: BUCK.noticeDot,
   watch: 0.45,
+  // Ten minutes of real play before it may offer itself again. See the block
+  // above: this replaced a hard latch that made the cut a thing you saw once
+  // and then could never show anybody.
+  again: 600,
   // HOW LATE YOU MAY BE, and the number is the water's and not a preference.
   //
   // Misha, 10 Sep 2026: *"i don't see the cut-scene of bucketeer baye for some
@@ -2823,6 +2848,11 @@ const POUR = {
 let pourCut = null;
 /** Seen once, per session — see the note above on why not `localStorage`. */
 let pourSeen = false;
+// Seconds of real time before it may run again. `pourSeen` stays what it
+// always was — whether it has EVER played — because that is what the debug
+// surface and `seen(false)` are about, and the two answer different
+// questions now that one of them is a clock.
+let pourAgain = 0;
 /** Seconds you have had her in the middle of the screen. */
 let pourEyes = 0;
 /** Seconds of coming back up out of the black, after the cut has ended. */
@@ -2963,7 +2993,12 @@ function pourPlace(R, t) {
 
 /** Is this the one? One pass of the argument at the top of this block. */
 function checkPour(dt) {
-  if (pourSeen || pourCut) return;
+  if (pourCut) return;
+  // The cooldown, run before anything else and NOT free: `pourEyes` is zeroed
+  // with it so the 0.45 s of watching has to be fresh when it lifts. Banked
+  // across ten minutes it would fire on the first frame of the first lap after,
+  // which is the one arrival nobody had to earn.
+  if (pourAgain > 0) { pourAgain -= dt; pourEyes = 0; return; }
   const b = jadrija && jadrija.bucketeer;
   // Nothing else may already own the camera, and `camOverride` is most of that
   // list in one test — the walk-up, the computer, the race and the trampoline
@@ -3027,6 +3062,7 @@ function startPour() {
   // cut that was seen and turned down, and offering it again in fifty seconds
   // is offering it to somebody who has just said no.
   pourSeen = true;
+  pourAgain = POUR.again;
   pourEyes = 0;
   ground.setSpray(false);
   // AND THE LENS PUT BACK, which the swat does not have to do and this does.
@@ -8570,6 +8606,7 @@ window.__fr = {
       const t = pourClock();
       return {
         seen: pourSeen, rolling: !!pourCut,
+        again: +pourAgain.toFixed(1),
         owned: !!(camOverride || swatCut || vikWalk || comp || dipPhase),
         gap: +gap.toFixed(2), want: [POUR.near, POUR.far],
         rise: +(w[1] - ground.you.y).toFixed(2), riseMax: POUR.rise,
@@ -8596,9 +8633,20 @@ window.__fr = {
       camOverride = null;
       return 'free';
     },
-    /** Has it played, and is anybody watching her? `seen(false)` re-arms it. */
-    seen: (v) => { if (v != null) pourSeen = !!v; return pourSeen; },
+    /**
+     * Has it ever played, and is anybody watching her?
+     *
+     * `seen(false)` re-arms it NOW, cooldown and all — which is the whole use
+     * of it, so it clears both. `seen(true)` is the other half of the same
+     * tool: it puts the cut back out of reach without waiting ten minutes for
+     * a control run that is supposed to be without it.
+     */
+    seen: (v) => {
+      if (v != null) { pourSeen = !!v; pourAgain = v ? POUR.again : 0; }
+      return pourSeen;
+    },
     stats: () => ({ live: !!pourCut, seen: pourSeen,
+      again: +pourAgain.toFixed(1), againFor: POUR.again,
       eyes: +pourEyes.toFixed(2), clock: +pourClock().toFixed(2),
       len: +POUR.len.toFixed(2), cut: +POUR.cut.toFixed(2),
       ear: !!BUCK.ear }),

@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.369.0] — 2026-09-10
+
+### the pour cut stops being a thing you saw once
+
+Misha: *"i often stand next to her pouring water, but the cut-scene doesn't
+trigger.. i only saw it trigger 1 time... why is that?"* — and then, on the
+answer: *"i like your cooldown idea"*.
+
+He was right and the flag was right; the two together were wrong. `checkPour`
+opened with `if (pourSeen || pourCut) return;`, and `pourSeen` was set the
+moment the cut started and cleared by nothing for the rest of the page's life.
+So every approach after the first was answered on the function's FIRST LINE,
+before a single geometric clause was read — and the honest report of that from
+inside the game is silence. Nothing was broken. It had simply already happened.
+
+THE SPEC WAS WRITTEN BEFORE THE THING EXISTED. *"this should just be the first
+time around she does it"* was asked for when there was no cut to judge, and
+what it turned out to mean in play is a cut you cannot show anybody and will
+essentially never see again yourself.
+
+So the latch is a clock. `POUR.again` is **600 s of REAL time** — `checkPour`
+is handed `real` and not the slowed step, deliberately, the way `SWAT`'s five
+beats are wall time — which is about eleven and a half of her 52.37 s laps.
+Rare enough that it stays a thing that happens to you rather than a thing that
+plays; often enough that it is still in the game an hour in.
+
+THE COOLDOWN STARTS WHEN THE CUT DOES and not when it ends, which is the same
+argument the flag was set on: a cut skipped in its second second is a cut that
+was seen and turned down. It does not tick during the cut itself, because
+`checkPour` is not called while one is rolling.
+
+AND `pourEyes` IS ZEROED WITH IT, so the 0.45 s of watching has to be fresh
+when the cooldown lifts. Banked across ten minutes it would have fired on the
+first frame of the first lap after — the one arrival nobody had to earn.
+
+`pourSeen` survives as what it always was, whether it has EVER played, because
+that is what the debug surface is about and the two now answer different
+questions. `__fr.pour.seen(false)` clears both and re-arms it on the spot;
+`seen(true)` puts it back out of reach for a control run. `stats()` and
+`why()` both report `again`, so "why is nothing happening" has a number.
+
+Measured: a player 8 m out on the open side fires it (`live: true`), `again`
+lands at 600 on the frame the cut starts, reads 591 fifteen seconds later —
+which is the settle minus the rest of the 9.5 s cut, exactly — and
+`seen(false)` returns both to zero.
+
+AND THE OTHER HALF OF HIS REPORT, unchanged and worth writing down: *"i often
+stand NEXT TO her"* is inside `POUR.near`, so even on a fresh session it cannot
+arm from there. That floor stays. `BUCK.noticeM` is 4.6 m and inside it she
+stops, turns and holds the bucket out to you, which is a beat of her own that a
+cut would talk over.
+
 ## [1.368.0] — 2026-09-10
 
 ### how late you may be to the pour, and the number is the water's
