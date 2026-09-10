@@ -8,6 +8,72 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.360.0] — 2026-09-10
+
+### the bucket she puts down stays put down, and eight other things she was doing wrong
+
+Misha: *"the bucket situation on the first floor after she pours it out seems to
+move oddly around her, there are small glitches like that. see if you can
+perfect that whole bucketeering routine."*
+
+HE WAS RIGHT ABOUT THE BUCKET AND RIGHT THAT IT WAS NOT THE ONLY ONE. Ten
+discontinuities, all of them measured rather than spotted. `tick` advances the
+state machine and places the pail ONCE, at the end, so every frame in between
+was a frame nobody had ever looked at. `drawFrame` is now split out of `step`
+and `trace(secs, dt)` walks a full lap one row a frame — pail world pose, her
+yaw, the roll, `held`/`fill`/`load`, the world palm, the bail, and the three
+sizes that pop — differenced against its own previous row. 62 seconds at 60 fps
+is 3721 rows and it named all ten in one pass.
+
+THE ONE HE SAW. A set-down pail slid 0.369 m at 0.816 m/s and spun at
+2.400 rad/s with `held` at zero on both frames — the bucket turning with her
+because its yaw was read off her. `restAt` now latches position and bearing the
+instant weight is on the floor and the pail is drawn off the latch. Measured
+again over the same lap: **0.000 m/s, 0.000 rad/s, 0.0 mm**, and independently
+re-measured over 3721 frames and all nine phases with the same answer.
+
+THE POUR WAS LYING ABOUT WHERE THE WATER WENT. The level began falling at t=0
+of `tip` and the stream did not appear until t=0.450 — 57 per cent of the water
+left the bucket and arrived nowhere. The level is pinned to the lip, the
+stream's width is the level's fall rate times the surface radius, and
+`tipIn/Hold/Out` moved 1.5/1.1/0.8 to 2.4/0.45/0.9. Level falls 0.783 s, stream
+runs 0.767 s, **gap 0.000 s**. The disc inside the bucket was also cut on a hard
+`tip < 0.98` with `fill` still at 0.111 — a 222 mm disc blinking out inside a
+bucket rolled 57 degrees — and is now counter-rolled to level and tapered on
+`fill`.
+
+THE REST, EACH WITH ITS NUMBER. `right` was linear where the roll was eased:
+153.8 rad/s² at each end against the roll's 5.4, now 14.7. `held` was a bare
+ramp on all four weight transfers, the pail going 0 to 0.73 m/s in one frame at
+95.2 m/s²; eased, now 5.5. The bail lay flat at 1.42 rad with the bucket half a
+metre off the ground; it comes up over the first 12 per cent of the grip. She
+walked 169.2 degrees off her own heading at 0.76 m/s leaving the bathroom —
+2.58 m a lap sideways — and the pace is now gated on facing error, which leaves
+0.67 m at a shuffle. Four one-frame `walkY` seams of up to 84 mm are rate-
+limited. The wet patch slammed from nothing to 0.96 m in a single frame and now
+grows by the water that actually lands.
+
+AND STANDING NEXT TO HER FROZE HER COMPLETELY. Within 0.95 m the whole loop
+stopped: `fill` 0.00, `yielding` true, indefinitely. The yield is now gated on
+the two walking beats, so the doorway block she was written for still works and
+watching her work no longer stops her working.
+
+TWO OF THE TEN WERE NOT HERS. `play()` in `41-skin.js` threw away an in-flight
+crossfade — re-playing the clip already in `prev` rebuilt the pose as
+`lerp(cur, prev, 0)` — which is every figure in the game that stops and starts
+inside 0.28 s, and it took a pace gate to expose it: 132 mm of pail sideways and
+back in one frame, 933 m/s². The fade now turns round instead. And
+`__fr.buck.watch` computed its eye from `dropIn`, which asks `walkY` cold and
+answers with the storey above, so four camera angles came back as four
+photographs of paving.
+
+WHAT IS STILL WRONG, WRITTEN DOWN. She cannot bend to the bucket: the pail
+travels to her hand rather than the other way about, and no spine hinge closes
+it — her palm hangs 0.72 m up, a standing pail's bail is at 0.40 m, and the
+hinge required is 85 degrees, which lifts her feet off the floor. That needs a
+baked clip. The `walkY` seams remain for everyone else who walks that route.
+`dropIn` still asks `walkY` cold for every other caller.
+
 ## [1.359.0] — 2026-09-08
 
 ### the poster moves left, grows by half, and stays up under the loft
