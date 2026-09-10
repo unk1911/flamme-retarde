@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.362.0] — 2026-09-10
+
+### every rope on the mole was inside out
+
+`seg3` in `43-jadrija.js` builds a four-sided tube round a run between two
+points, and it wound every quad the wrong way about.
+
+`b.quad(a, b, c, d)` is `tri(a, b, c)` plus `tri(a, c, d)`, so the vertex order
+IS the facing. The order this shipped with — the first angle at A, the first
+angle at B, the second at B, the second at A — was checked rather than argued
+about: build the basis exactly as the code does, take the first triangle's
+normal, dot it with the outward radial at the quad's own centre. **−1.000**, for
+a run along z, a run along x and a run along nothing in particular. Not
+−0.9-something. Exactly anti-parallel, every time.
+
+So every tube it made was inside out. A back-face cull showed the inside of the
+far wall where the near wall should have been, and the lighting was handed a
+normal pointing into the rope. Four call sites: the mooring ropes down the
+mole, the pulpit rails on the moored boats, and the fender lanyards.
+
+THE ANSWER WAS ALREADY IN THE REPOSITORY. `59-brod.js` has a copy of this same
+helper written later, and its quad goes `P0, P3, P2, P1` — the reverse. One of
+the two was right and it was not this one.
+
+It stays single-sided. The Brod hands a 36 mm lanyard both faces deliberately;
+the heaviest member here is a 32 mm rail and the rest are 20 to 24 mm rope, and
+doubling every one of them buys a back wall nobody can see through 24 mm of
+foreground at the range the mole is looked at from.
+
+AND THE PIXEL A/B WAS WORTHLESS, WHICH IS WORTH WRITING DOWN. Shot from the
+same camera on both builds, 38.07 per cent of the frame differed — far too much
+for four ropes. The control says why: the SAME build shot twice differs by
+37.15 per cent. The sea moves, the boats move, the crowd walks, and none of it
+is frozen by `tgps`. This fix rests on the arithmetic above and on the triangle
+count, which is unchanged at 642 533 because reversing a vertex order moves no
+geometry. Census `{446,333,86,27}`, blockers 818, 60 fps.
+
 ## [1.361.0] — 2026-09-10
 
 ### doge reaches the glass, and no phone shows the same three coins

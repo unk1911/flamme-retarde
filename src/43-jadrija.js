@@ -18934,9 +18934,24 @@ async function buildJadrija(scene) {
         const o = (a, Q) => [Q[0] + (Math.cos(a) * ex + Math.sin(a) * fx) * r,
           Q[1] + (Math.cos(a) * ey + Math.sin(a) * fy) * r,
           Q[2] + (Math.cos(a) * ez + Math.sin(a) * fz) * r];
+        // WOUND OUTWARD, and it was not. `quad(a,b,c,d)` is `tri(a,b,c)` plus
+        // `tri(a,c,d)`, so the vertex order IS the facing, and the order this
+        // shipped with — a0 at A, a0 at B, a1 at B, a1 at A — puts the normal
+        // exactly anti-parallel to the outward radial: the dot is −1.000 for
+        // every run direction, not −0.9-something. Every tube this made was
+        // inside out, so a back-face cull showed the far wall's inside where
+        // the near wall should have been, and the lighting read a normal
+        // pointing into the rope. `59-brod.js`'s copy of this helper already
+        // had it right (`P0, P3, P2, P1`) — this is the one that did not.
+        //
+        // The tube stays single-sided. The Brod hands a 36 mm lanyard both
+        // faces on purpose; the heaviest thing here is a 32 mm rail and the
+        // rest are 20 to 24 mm rope, and doubling every one of them buys a
+        // back wall nobody can see through 24 mm of foreground at the range
+        // the mole is looked at from.
         for (let i = 0; i < 4; i++) {
           const a0 = (i / 4) * TAU, a1 = ((i + 1) / 4) * TAU;
-          b.quad(o(a0, A), o(a0, B), o(a1, B), o(a1, A), col);
+          b.quad(o(a0, A), o(a1, A), o(a1, B), o(a0, B), col);
         }
       };
       // A rope between two points in the mole's own frame, as a chain of short
