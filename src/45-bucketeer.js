@@ -59,12 +59,27 @@ const BUCK = {
   //
   // Not a smoothing — a rate limit, and the difference is the whole reason it
   // is safe. `walkY` is exact and mostly continuous, but her route crosses four
-  // places where it is not, and all four were found by differencing her y on
-  // consecutive frames over a lap: −44 mm at the head of the flight, +40 and
-  // +50 mm coming off the made ground on to the porch slab, and −84 mm at the
-  // tip point, each of them inside ONE frame, with the pail, the figure and
-  // both shadows going with her. They are seams between the house's slabs and
-  // the ground mesh and they are not hers to move.
+  // places where it is not, each of them inside ONE frame, with the pail, the
+  // figure and both shadows going with her.
+  //
+  // RE-MEASURED 10 Sep, 400 samples a leg along `BUCK_WAY` with the hint she
+  // walks it with, and the earlier reading had the worst one in the wrong
+  // place: 37.6 mm at the head of the flight (leg 6-7, house 3.97, 0.80),
+  // 6.2 mm near the foot (7-8), 50.0 mm off the bottom step on to the made
+  // ground (8-9, house 4.00, 4.30), and 84.1 mm on the leg on to the porch
+  // (9-10, house 3.39, 4.63). The TIP POINT LEG (10-11) IS PERFECTLY SMOOTH —
+  // a fix aimed where the old note pointed would have missed the big one.
+  //
+  // AND THE 84 mm IS NOT A MESH ERROR. Either side of house (3.39, 4.63):
+  // `floorAt` answers null and the terrain gives 3.0862; a centimetre further
+  // on it answers 3.0020 and that is the ground-storey terrace. The gap is the
+  // drawing's own: `P_TER = P_FL - 0.20`, "terrace 8, one step down, as the
+  // drawing says", and the made ground outside happens to sit 84 mm above it.
+  // So there is really a step down on to that porch, exactly as there would be
+  // in life, and flattening it would contradict the source. What is wrong is
+  // only that a walker crosses it in one frame instead of stepping down it,
+  // which is what the rate limit below is for. It is not hers to move; it is
+  // everybody's to take at a human speed. See plan/jadrija-TODO.md.
   //
   // A first-order damp would hide them and cost her height on the flight, which
   // she goes down at 0.41 m/s of vertical: the lag of such a filter is v/k, and

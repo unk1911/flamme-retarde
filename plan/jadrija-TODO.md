@@ -713,6 +713,27 @@ bed. See the commit.
   standing position, or build it unlettered where the pan actually puts it.
   The freezer already referenced in `tisakFront`'s comment — lid 0.91 m at
   530 px/m — is this same object and is the scale check for it.
+  **The porch step is real, and the seam list was wrong about where — 10 Sep.**
+  The queue carried "the four walkY seams for every other walker on that
+  route" as a terrain defect. Re-measured at 400 samples a leg along
+  `BUCK_WAY`, hinted the way she walks it: 37.6 mm at the head of the flight
+  (leg 6-7, house 3.97, 0.80), 6.2 mm near the foot (7-8), 50.0 mm off the
+  bottom step on to the made ground (8-9, house 4.00, 4.30), 84.1 mm on the
+  leg on to the porch (9-10, house 3.39, 4.63). The tip-point leg (10-11) is
+  perfectly smooth — the note in `45-bucketeer.js` had the 84 mm there, and a
+  fix aimed at it would have missed the real one entirely.
+  Either side of the 84 mm: `floorAt` returns null and the terrain answers
+  3.0862; a centimetre on it returns 3.0020, the ground-storey terrace. That
+  gap is the drawing's: `P_TER = P_FL - 0.20`, "terrace 8, one step down, as
+  the drawing says", and the made ground outside sits 84 mm above it. **So it
+  is a real step and flattening it would contradict the source.** The fix is
+  not terrain, it is that every walker should take a step down at a human
+  speed instead of teleporting: promote the bucketeer's `settleY` rate limit
+  (0.85 m/s, a limit and not a damp, so it costs nothing below its ceiling)
+  into whatever owns `you.y` in `47-ground.js` and the crowd walkers. That
+  touches the player's vertical feel, so it wants doing deliberately and
+  verified, not squeezed into a spare twenty minutes.
+
   **`gt = t1 − 2.05` is not a one-line change — 10 Sep.** The note over
   `tisakFront` says so and it is right: moving where the glazed corner starts
   re-cuts the bay loop, the streaks, the ghost, the `cuts` the wordmark hangs
