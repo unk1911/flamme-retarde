@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.368.0] — 2026-09-10
+
+### how late you may be to the pour, and the number is the water's
+
+Misha: *"widen the arm window, fold it in"*.
+
+`POUR.arm` was 0.25 s and is now **0.50**. The reason 0.25 was not as brutal as
+it reads is `pourEyes`, which BANKS — it accumulates for every frame the seven
+spatial clauses hold and is never reset by the clock test, so a player who is
+simply watching her walk down and tip has satisfied `watch` long before she
+gets there. The quarter second was never "arrive inside this window", it was
+"be looking at her at the instant she starts", and the case it fails is the
+honest one: you hear the pour, turn to it, and the moment has gone.
+
+0.50 AND NOT MORE, because the cut's clock IS her clock — `pourPlace` is a pure
+function of it — so joining late does not restart the shot, it starts it
+already running. Traced at 1/60 s, `st.pour` is zero until **0.52 s**, crosses
+0.55 at 0.62, peaks at 1.02 and is dry again by **1.23**: the whole pour this
+cut exists to show is a 0.71 s event. 0.50 is therefore the last frame at which
+the camera still arrives BEFORE the water does. 1.25, which `pushFor` would
+have made a tidy-looking number, is a cut that opens on a woman standing over a
+channel holding an empty bucket.
+
+Confirmed on rendered frames at both ends: at 0.50 the first thread of water is
+leaving the lip, at 0.90 the stream is at full width, and shot A holds both.
+
+AND THE TRIGGER WAS RE-MEASURED PROPERLY, which corrected a reading in the
+1.367.0 notes. `dropIn`'s yaw does not reach the camera until the next frame,
+so a probe that aims and reads `camera.getWorldDirection` in the same tick gets
+the previous aim: every `dot` in that sweep was one iteration stale. The
+position clauses — gap, rise, indoors, house — were computed from the two
+positions directly and stand. Re-measured with a settle between the aim and the
+read, the convention is `atan2(x - hx, z - hz)` and a player 8 m out on the open
+side reads **0.994** against a 0.82 floor, then fires the cut inside two
+seconds. That is the end-to-end proof the 1.367.0 note could not claim.
+
 ## [1.367.0] — 2026-09-10
 
 ### she waits for a room, and the hose finally reaches her

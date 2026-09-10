@@ -2768,7 +2768,29 @@ const POUR = {
   rise: 2.2,
   dot: BUCK.noticeDot,
   watch: 0.45,
-  arm: 0.25,
+  // HOW LATE YOU MAY BE, and the number is the water's and not a preference.
+  //
+  // Misha, 10 Sep 2026: *"i don't see the cut-scene of bucketeer baye for some
+  // reason"*, and then *"widen the arm window"*.
+  //
+  // It was 0.25 s. The reason that is not as brutal as it reads is `pourEyes`,
+  // which BANKS: it accumulates for every frame the seven spatial clauses hold
+  // and is never reset by this test, so a player who is simply watching her
+  // walk down and tip has satisfied `watch` long before she gets there. The
+  // quarter second is not "arrive inside this window", it is "be looking at
+  // her at the instant she starts", and the case it fails is the honest one —
+  // you hear the pour, turn to it, and by the time she is on your screen the
+  // moment has gone.
+  //
+  // 0.50 AND NOT MORE, because the cut's clock IS her clock — `pourPlace` is a
+  // pure function of it — so joining late does not restart the shot, it starts
+  // it already running. Traced at 1/60 s, `st.pour` is zero until **0.52 s**,
+  // crosses 0.55 at 0.62, peaks at 1.02 and is dry again by **1.23**: the whole
+  // pour this cut exists to show is a 0.71 s event. So 0.50 is the last frame
+  // at which the camera still arrives BEFORE the water does, and 1.25 — which
+  // `pushFor` would have made a tidy-looking number — is a cut that opens on a
+  // woman standing over a channel holding an empty bucket.
+  arm: 0.50,
   // ── the two shots, in HER frame at the tip point: metres in front of her,
   // metres to her right, metres above her feet. Both the eye and the point it
   // is pointed at, because a shot is a line and not a position.
