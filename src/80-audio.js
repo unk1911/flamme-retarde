@@ -5736,6 +5736,135 @@ function buildAudio() {
     return dur;
   }
 
+  // ── ten litres going over the lip ──────────────────────────────────────────
+  //
+  // Misha, 10 Sep 2026: *"can u enhance the water pouring with very loud sound
+  // of water bein gpoured as .mp3.. make it more immersive"*.
+  //
+  // `tools/cut_pour.py` synthesises the clip on his own machine and its note
+  // says what is in it and why none of it was fetched. Everything here is WHEN
+  // and HOW LOUD.
+  const POURSFX = {
+    // LOUD, and this is the number he asked for. 1.30 against the mutters'
+    // 0.44 — and the clip under it is already 7 dB hotter at -13.0 dBFS RMS
+    // against their -20, so at the lip this is about 16 dB over her voice.
+    // That is not a mix error: a bucket of water hitting stone two metres away
+    // IS much louder than a woman muttering at it, and the reason the game did
+    // not sound that way is that it made no sound at all.
+    //
+    // MEASURED THROUGH THE GAME'S OWN MIXER, off `audio.tap()`, against a
+    // control recording of the same scene with nothing fired — because the
+    // first attempt at this measurement was taken at the default URL, where
+    // the player is in the aircraft and the engine bed swamped both the thing
+    // being measured and its control, and reported the pour and a mutter as
+    // identical to a tenth of a dB. On foot at Jadrija:
+    //
+    //   control, nothing fired    -35.3 dBFS   (loudest 300 ms window)
+    //   pour at  3 m               -9.7        +25.6 dB over the empty scene
+    //   pour at 20 m              -13.8        +21.5
+    //   her voice at 3 m          -26.3         +9.0
+    //
+    // So it stands 16.6 dB over her at the same distance, and the true peak at
+    // 3 m is -1.50 dBFS with zero samples at full scale. 1.5 dB of headroom is
+    // thin and it is deliberate; the loudest thing that can co-occur is the
+    // beach bed at -23 dBFS, which sums to about a tenth of a dB.
+    gain: 1.30,
+    // AND IT CARRIES FURTHER THAN SHE DOES. `MUTTER.range` is 26 m because a
+    // mutter is confidential; water on stone is not, and 44 m is roughly where
+    // this stops being audible over the forecourt rather than where it stops
+    // being computed. Linear, like the hum and the mutter, so that three
+    // things attached to one woman do not walk apart as you back away.
+    range: 44,
+    // The wall, and it is the mutter's pair for the mutter's reason: it is the
+    // same wall between the same two people. She only pours on the porch, so
+    // this is only ever the prizemlje under her — but it is the difference
+    // between standing in that flat and standing on the terrace outside it.
+    wallGain: 0.82,
+    wallHz: 620,
+    wallQ: -3.01,
+    // Nothing over 11 kHz survives a 22 050 Hz clip anyway; this is the lid
+    // for the OPEN case, so that the filter has somewhere to travel from.
+    lp: 11000,
+    // One at a time. She pours once a lap and the clip is 1.90 s, so this can
+    // only ever fire twice at once through a debug handle — but `catWet`'s
+    // finding is that the guard is what stops a per-frame caller stacking a
+    // hundred of them, and a trigger read off a stream width is exactly that
+    // kind of caller.
+    hold: 1.90,
+  };
+  let pourBuf = null;
+  let pourUntil = 0;
+  let pourFired = 0;
+
+  /**
+   * The bucket going over, once.
+   *
+   * @param d  metres between the pail and the listener
+   * @param o    wall   0…1, how much building stands between the two of you
+   *             level  0…1, the caller's own scale
+   *             probe  for a test only: how many have actually been STARTED,
+   *                    which is the only number that separates "she never
+   *                    pours" from "she pours and the clip has not decoded" —
+   *                    the same failure, and the same fix, as `hum` and
+   *                    `mutter` both carry notes about.
+   * @returns  how long it will sound, in seconds, EVEN IF nothing plays.
+   */
+  function pourSfx(d = 0, o = {}) {
+    if (o.probe) return pourFired;
+    if (!ctx || ctx.state === 'suspended') return POURSFX.hold;
+    if (!pourBuf) { sampleLoad('pour', (b) => { pourBuf = b; }); return POURSFX.hold; }
+
+    const t = ctx.currentTime;
+    if (t < pourUntil) return POURSFX.hold;
+
+    const wall = clamp(o.wall || 0, 0, 1);
+    const far = Math.max(0, 1 - Math.max(0, d) / POURSFX.range);
+    const amp = POURSFX.gain * far * clamp(o.level == null ? 1 : o.level, 0, 1)
+      * (1 - POURSFX.wallGain * wall);
+    if (amp <= 0.00003) return POURSFX.hold;
+
+    const t0 = t + 0.02;
+    const src = ctx.createBufferSource();
+    src.buffer = pourBuf;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = POURSFX.wallQ;
+    lp.frequency.value = POURSFX.lp * Math.pow(POURSFX.wallHz / POURSFX.lp, wall);
+    const g = ctx.createGain();
+    // 8 ms, and short on purpose where the mutter's is 30. `cut_pour.py` opens
+    // on the sheet breaking off the rim — a 60 ms transient that IS the attack
+    // — and a 30 ms ramp laid over it is a fade across the one event that says
+    // this came out of a vessel.
+    g.gain.setValueAtTime(0.00002, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp), t0 + 0.008);
+
+    // `bed`, for the mutter's reasons: under `bedDuck` so it goes down when
+    // the fire is roaring, and under `voiceDuck` so it goes down when anybody
+    // speaks. It does NOT duck for her own line — `POUR.line` fires at 0.90
+    // and by then this clip is past its plateau, which is the two of them
+    // landing together rather than fighting.
+    src.connect(lp).connect(g).connect(bed || master);
+    // AND MORE SEND THAN SHE GETS. 0.13 is a voice in the open; water on stone
+    // between a house wall and a terrace slab is the one thing on this porch
+    // with a real early reflection, and it is what makes it sound like it
+    // happened somewhere rather than in the mix.
+    if (verbSend) {
+      const w = ctx.createGain();
+      w.gain.value = 0.26 * far * (1 - wall);
+      g.connect(w).connect(verbSend);
+    }
+    src.start(t0);
+    src.stop(t0 + POURSFX.hold + 0.10);
+    pourFired += 1;
+    pourUntil = t0 + POURSFX.hold * 0.92;
+    return POURSFX.hold;
+  }
+
+  /** Decode it before she needs it, for `sayTick`'s warm-up reason: a clip
+   *  loaded lazily on the frame it is first wanted is silent that first time,
+   *  and she only pours once every 52 seconds. */
+  function pourWarm() { sampleLoad('pour', (b) => { pourBuf = b; }); }
+
   // ── the fly in the vikendica ────────────────────────────────────────────────
   /**
    * One housefly, which you hear before you see.
@@ -5922,7 +6051,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, mutter, fly,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

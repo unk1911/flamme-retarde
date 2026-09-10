@@ -8,6 +8,75 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.370.0] — 2026-09-10
+
+### ten litres going over the lip, and you can hear it
+
+Misha: *"can u enhance the water pouring with very loud sound of water bein
+gpoured as .mp3.. make it more immersive"*.
+
+She has poured a bucket into that channel every 52.37 seconds since she was
+built and it has never made a sound.
+
+**SYNTHESISED HERE, NOT FETCHED.** `tools/cut_pour.py`, numpy on his own
+machine and ffmpeg to encode; nothing leaves the box. Two standing rules meet
+on it and point the same way — his, *"i wanna run my stuff on my own
+infra/computers/hardware"*, where the ElevenLabs exception he granted is for a
+VOICE and a bucket is not one; and the house's, that everything in 80-audio.js
+is made rather than recorded. He asked for an .mp3, which is about the asset
+and not about where it comes from.
+
+**WHAT WATER POURING ACTUALLY IS**, in the order you hear it: the lip, 60 ms of
+rising hiss as the sheet breaks off the rim, which is what says *vessel* rather
+than *tap*. The stream, two bands of noise. The bubbles, which are the whole
+thing — a bubble entrained in water rings at its Minnaert frequency,
+f0 = 3.26/r, and it rings UP, sweeping as it decays, and that upward chirp is
+the single feature that separates water from noise to a listener. Radii from
+0.15 mm to 8 mm, drawn on a log scale, a few hundred a second. Four glugs at
+90–190 Hz, which are the bucket taking air back and are why it does not sound
+like a hose — without them it was a shower. The impact, 0.12 s late and
+outlasting the stream, because the bucket is empty before the water on the
+ground has stopped moving. Then run-off into the channel.
+
+22 050 Hz at 96 kbps, which is what `shore.mp3` and `lapping.mp3` are; the
+mutters' 12 kHz is not available to this, because every bubble under 8 mm rings
+above their lid. 23 KB. Deterministic, one seed, because build.py commits its
+output.
+
+**FIRED ON THE RISING EDGE OF THE STREAM** and not on the phase, and the two
+are not the same instant: `tip` begins when she starts to ROLL the pail and
+nothing leaves it for half a second. Traced at 1/60 s, `st.pour` is zero until
+0.52, peaks at 1.02 and is dry by 1.23. On the phase it would have opened half
+a second early, which is the one error here a player would hear as a bug.
+
+**AND IT IS LOUD, WHICH IS MEASURED.** Through the game's own mixer off
+`audio.tap()`, against a control recording of the same scene with nothing
+fired:
+
+| | loudest 300 ms | over the empty scene |
+|---|---|---|
+| control, nothing fired | −35.3 dBFS | — |
+| pour at 3 m | **−9.7** | **+25.6 dB** |
+| pour at 20 m | −13.8 | +21.5 dB |
+| her voice at 3 m | −26.3 | +9.0 dB |
+
+16.6 dB over her at the same distance, true peak −1.50 dBFS, zero samples at
+full scale.
+
+THE FIRST ATTEMPT AT THAT MEASUREMENT WAS WORTHLESS and is worth recording as
+such: taken at the default URL, where the player is in the aircraft, the engine
+bed swamped both the sound and its control and reported the pour and a mutter
+as identical to a tenth of a dB. The control is what caught it. It is the third
+time this project's notes have had to say that.
+
+Range 44 m rather than the mutter's 26 — water on stone is not confidential —
+and twice her reverb send, because water between a house wall and a terrace
+slab is the one thing on that porch with a real early reflection. Warmed at
+60 m for `sayTick`'s reason: a clip decoded lazily is silent the first time,
+and she only pours once a lap. `stats().pours` counts what the mixer actually
+STARTED, which is the only number that separates "she never pours" from "she
+pours and it never decoded".
+
 ## [1.369.0] — 2026-09-10
 
 ### the pour cut stops being a thing you saw once

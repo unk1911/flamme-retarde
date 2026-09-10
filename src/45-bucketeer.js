@@ -1150,6 +1150,15 @@ async function buildBucketeer(scene, vik, walkY) {
     // And the hose. `wetPend` is a line owed, `wetSoak` the memory that stops
     // one continuous jet asking for sixty of them a second. See `buckWet`.
     wetPend: false, wetSoak: 0,
+    // The stream's own width last frame, which is all a rising edge needs.
+    // See where the sound is fired.
+    pourWas: 0,
+    // And how far off the listener was on the last frame anybody measured one.
+    // `stepLoop` has no `who` — it is also run by `tick` and `trace`, which
+    // have no listener at all — so `step` leaves it here for the pour to read.
+    // Starts out of range, so a loop stepped by a probe before anybody has
+    // stood near her is silent rather than deafening.
+    ear: 1e6, pourWarm: false,
     // You, and whether she has seen you. `yield` is her legs stopped because
     // you are in the doorway; `notice`/`noticeAmt` is the seconds left of her
     // having looked up and the eased shape of it; `offered` is whether there
@@ -1395,6 +1404,36 @@ async function buildBucketeer(scene, vik, walkY) {
     }
     if (st.phase !== 'down' && st.phase !== 'up') st.vel = 0;
     if (st.phase !== 'tip') st.pour = 0;
+    // ── and the sound of it ───────────────────────────────────────────────
+    //
+    // Misha: *"can u enhance the water pouring with very loud sound of water
+    // bein gpoured as .mp3.. make it more immersive"*.
+    //
+    // ON THE RISING EDGE OF THE STREAM and not on the phase, and the two are
+    // not the same instant. `tip` begins when she starts to ROLL the pail and
+    // the water does not go anywhere for half a second: traced at 1/60 s,
+    // `st.pour` is zero until 0.52 s, crosses 0.55 at 0.62, peaks at 1.02 and
+    // is dry by 1.23. Fired on the phase, the clip would open half a second
+    // before anything left the lip — which is the one error in this that a
+    // player would hear as a bug rather than as a mix.
+    //
+    // HERE AND NOT IN `drawFrame`, deliberately, so it survives `tick` and
+    // `trace`: those run the loop forward without drawing, and a sound that
+    // only exists on drawn frames is a sound no probe can count.
+    //
+    // HER POSITION AND NOT THE PAIL'S, and that is a measurement rather than a
+    // shortcut: the pail hangs about 0.6 m off her centre on a straight arm,
+    // which against a 44 m range is 1.4% of the roll-off — inaudible — and the
+    // one case where it would not be inaudible is a cut that puts the camera
+    // 2.79 m away, where `BUCK.ear` is already the thing being measured from
+    // and the pail is what the shot is pointed at anyway.
+    if (st.pour > 0 && st.pourWas <= 0 && audio) {
+      const dp = BUCK.ear
+        ? Math.hypot(BUCK.ear.x - st.x, BUCK.ear.z - st.z)
+        : st.ear;
+      audio.pourSfx(dp, { wall: st.wall });
+    }
+    st.pourWas = st.pour;
     // And how loaded the BODY is, chasing what is in her hand. Here rather
     // than in the pose, so `tick` — which runs the loop forward without ever
     // drawing a frame — settles the lean along with everything else.
@@ -2315,6 +2354,14 @@ async function buildBucketeer(scene, vik, walkY) {
     const dNow = BUCK.ear
       ? Math.hypot(BUCK.ear.x - st.x, BUCK.ear.z - st.z)
       : Math.sqrt(d2);
+    // Left where `stepLoop` can find it — see `st.ear`.
+    st.ear = dNow;
+    // And the pour decoded before she needs it, for `sayTick`'s warm-up
+    // reason: a clip loaded lazily on the frame it is first wanted is silent
+    // that first time, and she pours once every 52.37 s. 60 m rather than the
+    // sound's own 44 so the decode has a walk's worth of warning, and it is
+    // 23 KB — nothing beside the 4.5 MB the twenty-eight mutters cost.
+    if (!st.pourWarm && dNow < 60 && audio) { st.pourWarm = true; audio.pourWarm(); }
     wallTick(dt, who);
     // The hose's memory, run here rather than in `sayTick` because that one
     // returns at its first line whenever `BUCK.say` is off — which is exactly
@@ -2470,6 +2517,12 @@ async function buildBucketeer(scene, vik, walkY) {
       sayHold: +st.sayHold.toFixed(1),
       // And the hose: seconds left of her remembering it, and a line owed.
       wetSoak: +st.wetSoak.toFixed(1), wetPend: st.wetPend,
+      // And the water going over the lip: what the mixer says it has actually
+      // STARTED, which is the one number separating "she never pours" from
+      // "she pours and the clip has not decoded". Same branch, same reason as
+      // `hums` and `says` above.
+      pours: audio ? audio.pourSfx(0, { probe: true }) : -1,
+      pourWarm: !!st.pourWarm,
       says: audio ? audio.mutter(0, { probe: true }) : -1,
       said: st.said.slice(),
       jetOn: jet.visible, jetH: +jet.scale.y.toFixed(2),
