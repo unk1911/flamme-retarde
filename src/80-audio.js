@@ -5778,7 +5778,22 @@ function buildAudio() {
     //
     // Point blank is the case that decides it and not an academic one: Misha
     // *"often stand[s] next to her pouring water"*.
-    gain: 0.85,
+    //
+    // AND THEN HE HEARD IT: *"POUR_shipped_1.371.0.wav is good: but it's a bit
+    // TOO loud... make it a bit not as loud"*. 0.85 to 0.50 is -4.6 dB, which
+    // is the size of the word "a bit" — 3 dB is the smallest change anybody
+    // reliably hears and 10 dB is the one everybody calls half. It leaves the
+    // pour 12 dB over her own voice at the same distance and 16 dB over the
+    // empty scene, so it is still far and away the loudest thing that happens
+    // on that porch; what it is no longer is the loudest thing in the game.
+    //
+    // THE HEADROOM ARGUMENT ABOVE IS NOW SLACK RATHER THAN SPENT, and that is
+    // worth saying because it is the number a future change will reach for
+    // first: measured at 0.50 the master peaks at -5.16 dBFS point blank against
+    // -1.21 at 0.85, so there are five decibels between this and the clipping
+    // that 1.30 produced. The drop he actually hears is 4.2 dB, not the 4.6 the
+    // gains alone predict, because the reverb send scales with it too.
+    gain: 0.50,
     // AND IT CARRIES FURTHER THAN SHE DOES. `MUTTER.range` is 26 m because a
     // mutter is confidential; water on stone is not, and 44 m is roughly where
     // this stops being audible over the forecourt rather than where it stops

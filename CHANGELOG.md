@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.372.0] — 2026-09-10
+
+### the pour, quieter
+
+Misha: *"POUR_shipped_1.371.0.wav is good: but it's a bit TOO loud... make it a
+bit not as loud"*.
+
+`POURSFX.gain` 0.85 → **0.50**, which is −4.6 dB asked for and **−4.2 dB
+delivered** — the two differ because the reverb send scales with the gain, so
+the wet path comes down with the dry one. Measured through the game's own mixer
+against a control recording of the same scene with nothing fired:
+
+| | loudest 300 ms | true peak | over control |
+|---|---|---|---|
+| 0.85, what 1.371.0 shipped | −10.1 dBFS | −1.21 | +21.2 dB |
+| **0.50, this** | **−14.3** | **−5.16** | **+17.0** |
+
+It stays **12 dB over her own voice** at the same distance and 17 dB over the
+empty scene, so it is still far and away the loudest thing that happens on that
+porch. What it is no longer is the loudest thing in the game.
+
+−4.6 dB is the size of the words "a bit": 3 dB is the smallest change anybody
+reliably hears, 10 dB is the one everybody calls half.
+
+AND THE HEADROOM ARGUMENT IS NOW SLACK RATHER THAN SPENT. That is worth writing
+down because it is the number the next change to this will reach for first:
+1.30 clipped the master at +0.47 dBFS with ten samples at full scale, 0.85 left
+1.21 dB, and 0.50 leaves 5.16.
+
+The clip itself is untouched — same recording, same conditioning, same
+`assets/audio/` source and credit. This is one number.
+
 ## [1.371.0] — 2026-09-10
 
 ### the pour is a recording of a real one, and she turns on the spot
