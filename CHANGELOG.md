@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.361.0] — 2026-09-10
+
+### doge reaches the glass, and no phone shows the same three coins
+
+On the queue since 8 September, when Misha asked for it by name — *"bitcoin,
+litecoin, ethereium, doge coin"* — and the service has fetched `dogecoin` from
+CoinGecko ever since. The screens never showed it because `phoneQuotes` reads
+`btc`, `ltc` and `eth` and nothing else, and `phoneScreen`'s row list was
+written before doge existed.
+
+A FOURTH BAND IS THE OBVIOUS FIX AND IT IS THE WRONG ONE. The note over that
+function is a measurement, not a preference: the glass is 64 by 131 mm, which
+is 31 px wide at two metres on the 58 degree lens, and an earlier nine-element
+draft came out as one grey smudge at that size. Four bands in the same 408 px
+shrink each from 132 px to 97 to buy a coin nobody can read.
+
+So the screens show THREE OF THE FOUR and differ from one another. Four
+textures, bitcoin on three of them — about right for what people actually
+watch — and which one a phone shows is keyed on its pool slot through `jit`
+rather than `n % 4`, because four people in a row along the promenade cycling
+their screens in lockstep is a thing no row of strangers does, and a wrong
+regular pattern is worse than none. RULE 4 holds: `jit`, never `rng`. Four
+256x512 canvases is 2 MB on the card, once, for the life of the page.
+
+DOGE THROUGH THE OLD FORMATTER READ '$0.09'. `toFixed(2)` on $0.085707 is not
+a price, it is a rounding error with a currency sign on it — the four coins
+span six orders of magnitude and two decimals only ever suited the middle of
+that. Under a dollar now takes four.
+
+AND THE BAKED FLOOR WAS RE-TAKEN RATHER THAN EXTENDED. That block is the
+fallback for a page opened off a filesystem with no network, and the file keeps
+itself honest by dating it; inventing a doge price to sit beside three real
+ones would have been the exact offence rule 12 exists to prevent. All four were
+pulled live and the date moved with them: BTC 78,346 (−1.09%), ETH 2,477.22
+(−1.11%), LTC 52.73 (−2.79%), DOGE 0.085707 (−5.26%), CoinGecko, 10 Sep 2026.
+
+Census `{446,333,86,27}`, blockers 818, tris 642533, 60 fps — all unmoved.
+
 ## [1.360.0] — 2026-09-10
 
 ### the bucket she puts down stays put down, and eight other things she was doing wrong

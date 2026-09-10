@@ -30679,6 +30679,13 @@ async function buildJadrija(scene) {
   // this.
   let phones = null;                    // the pool, built on first use
   const tmpP = new THREE.Vector3();     // scratch for the hand bone read
+  // FOUR SCREENS, NOT ONE. Each is three of the four coins, so a row of
+  // phones is not four copies of one photograph — and doge, which the service
+  // has fetched since 8 Sep 2026, finally reaches the glass. Bitcoin is on
+  // three of the four, which is about right for what people actually watch.
+  // Four 256x512 canvases is 2 MB on the card, once, for the life of the page.
+  const SCREENS = [['btc', 'ltc', 'eth'], ['btc', 'eth', 'doge'],
+    ['btc', 'ltc', 'doge'], ['ltc', 'eth', 'doge']];
   let phoneTex = null;
   let phoneHand = -1;                   // bone indices, resolved once
   let phoneHead = -1;
@@ -30726,7 +30733,7 @@ async function buildJadrija(scene) {
    * the same offence in a different costume, which is why the fallback is a
    * real quote with the date it was taken beside it.
    */
-  function phoneScreen(q) {
+  function phoneScreen(q, coins) {
     // 256 BY 512, AND LAID OUT FOR THE THIRTY PIXELS IT IS ACTUALLY SEEN AT.
     //
     // Measured, not guessed. The glass is 64 by 131 mm, so in a 1920-wide
@@ -30763,7 +30770,17 @@ async function buildJadrija(scene) {
     g.fillStyle = '#8b95a8';
     g.font = '500 14px system-ui, sans-serif';
     g.fillText(q.at, 15, 78);
-    const rows = [['BTC', q.btc], ['LTC', q.ltc], ['ETH', q.eth]];
+    // WHICH THREE, AND WHY IT IS STILL THREE. Misha asked for doge on 8 Sep
+    // 2026 in the same breath as the bathers' chatter, and the service has
+    // fetched it ever since; the screens never showed it because this list was
+    // written before it existed. The obvious fix is a fourth band, and it is
+    // the wrong one: the note above is a measurement, not a preference — nine
+    // elements across the 31 px this glass is actually seen at was one grey
+    // smudge, and four bands in the same 408 px shrinks each by a quarter to
+    // buy a coin nobody can read. So the screens show THREE OF THE FOUR and
+    // differ from each other, which is also what a row of real phones does.
+    const trio = coins || ['btc', 'ltc', 'eth'];
+    const rows = trio.map((k) => [k.toUpperCase(), q[k]]);
     rows.forEach(([sym, v], i) => {
       // 132 px bands 6 px apart, ending at 496 — the last 16 px of the glass
       // are left blank on purpose, because that is the strip the fingers close
@@ -30793,8 +30810,11 @@ async function buildJadrija(scene) {
       // largest size that fits the longest of the three without wrapping.
       g.fillStyle = '#f2f5fb';
       g.font = '700 40px system-ui, sans-serif';
+      // Three formats, because the four coins span six orders of magnitude.
+      // Doge at $0.0857 through the old `toFixed(2)` reads '$0.09', which is
+      // not a price, it is a rounding error with a currency sign on it.
       const px = v.usd >= 1000 ? Math.round(v.usd).toLocaleString('en-US')
-        : v.usd.toFixed(2);
+        : v.usd >= 1 ? v.usd.toFixed(2) : v.usd.toFixed(4);
       g.fillText('$' + px, 16, y + 80);
       // The sparkline, now across the full band rather than tucked beside the
       // price. Shape from a hash of the symbol so the three are not the same
@@ -30831,8 +30851,9 @@ async function buildJadrija(scene) {
    * the first phone is drawn and never again.
    */
   const phoneQuotes = {
-    q: { btc: { usd: 79679, chg: -1.37 }, ltc: { usd: 51.43, chg: 0.81 },
-      eth: { usd: 2454.3, chg: -1.80 }, at: 'CoinGecko · 4 Sep 2026' },
+    q: { btc: { usd: 78346, chg: -1.09 }, ltc: { usd: 52.73, chg: -2.79 },
+      eth: { usd: 2477.22, chg: -1.11 }, doge: { usd: 0.085707, chg: -5.26 },
+      at: 'CoinGecko · 10 Sep 2026' },
     asked: false,
     async refresh() {
       if (this.asked || typeof AUTH === 'undefined' || !AUTH.baye) return;
@@ -30844,8 +30865,9 @@ async function buildJadrija(scene) {
         if (!c || !c.btc) return;
         const put = (k, v) => { if (v) this.q[k] = { usd: v.usd, chg: v.chg24 }; };
         put('btc', c.btc); put('ltc', c.ltc); put('eth', c.eth);
+        put('doge', c.doge);
         this.q.at = 'CoinGecko · live';
-        if (phoneTex) { phoneTex.dispose(); phoneTex = null; }
+        if (phoneTex) { phoneTex.forEach((t) => t.dispose()); phoneTex = null; }
       } catch { /* the baked quote stands */ }
     },
   };
@@ -31083,7 +31105,7 @@ async function buildJadrija(scene) {
       scene.add(grp);
       phones.grp = grp;
     }
-    if (!phoneTex) phoneTex = phoneScreen(phoneQuotes.q);
+    if (!phoneTex) phoneTex = SCREENS.map((c) => phoneScreen(phoneQuotes.q, c));
     phoneQuotes.refresh();
     let n = 0;
     holdGap = 0;
@@ -31120,14 +31142,21 @@ async function buildJadrija(scene) {
           new THREE.MeshBasicMaterial({ color: 0x14161c }));
         const face = new THREE.Mesh(
           new THREE.PlaneGeometry(PHONE.w * 0.90, PHONE.h * 0.90),
-          new THREE.MeshBasicMaterial({ map: phoneTex }));
+          new THREE.MeshBasicMaterial({ map: phoneTex[0] }));
         face.position.z = PHONE.d * 0.5 + PHONE.glass;
         g.add(body); g.add(face);
         phones.grp.add(g);
         phones[n] = m = { g, body, face };
       }
-      if (m.face.material.map !== phoneTex) {
-        m.face.material.map = phoneTex;
+      // WHICH OF THE FOUR THIS SLOT SHOWS. Keyed on the pool slot through
+      // `jit` rather than `n % 4` for the reason a regular pattern is always
+      // worse than none: four people in a row along the promenade would
+      // otherwise cycle their screens in lockstep, which is a thing no row of
+      // strangers does. RULE 4 — no draw from the world's own stream — so this
+      // is `jit`, not `rng`, and the same slot answers the same way all page.
+      const tx = phoneTex[Math.floor(jit(n, 41) * SCREENS.length) % SCREENS.length];
+      if (m.face.material.map !== tx) {
+        m.face.material.map = tx;
         m.face.material.needsUpdate = true;
       }
       let rec = arms[k];
