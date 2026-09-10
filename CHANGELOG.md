@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.365.0] — 2026-09-10
+
+### the bathers stop wading through the paving
+
+Misha: *"there are some parts of the game, where the bathers do not respect the
+ground elevation ... it looks like they are wading through objects, ankle-deep,
+they should raise higher when they detect elevation raises."* His shot is a man
+on the konoba's flagstone terrace, sunk to the shin.
+
+ONE LINE, AND IT WAS ASKING THE WRONG FUNCTION. The walker update had:
+
+    const p = toWorld(w.t, s);
+    w.x = p[0]; w.z = p[2];
+    w.y = surfaceY(w.t, s);
+
+`toWorld` answers this a line above — `p[1]` IS `standY` — and the walker threw
+it away for a second, worse call. `surfaceY` is the graded surface and nothing
+else. `standY` is that plus everything laid over it: the konoba's terrace pad
+and its ramp, the changing station's pad, the kabina's floor, and the 0.05 m
+the paving's stone sits over its own mortar. All of it was invisible to a
+walker, so they waded through the lot.
+
+The note over `standY` had already worked this out — *"the stone is then the
+surface you STAND on, and `surfaceY` still answers with the mortar"* — and said
+it about `toWorld`'s placements. This was the caller still asking the wrong one.
+
+MEASURED, ON ALL HUNDRED. Before: 24 sat more than 50 mm off their ground, and
+the walkers among them were **0.12 to 0.27 m under it** around t 240-251, which
+is the konoba's terrace and is the shot he sent. After: no walker is off at all.
+
+AND TWO OF THE TWENTY-FOUR WERE RIGHT ALL ALONG, which is why this was measured
+rather than blanket-corrected: the `lie` figures reading +0.52 to +0.59 are on
+sunbeds, and the waders at s < 0 reading −0.95 to −1.41 are standing in the
+sea. Neither moved.
+
+Also fixed: the two children queueing at the gelato counter, placed with
+`surfaceY` at build time and standing 0.12 m into the flags.
+
+Still off and recorded rather than chased: one `stand` at t 251.4 (−0.124) and
+one `serve` at t 274.6 (−0.089), both from other counter placements.
+
+Census `{446,333,86,27}`, blockers 818, tris 642533, 100 people — all unmoved.
+
 ## [1.364.0] — 2026-09-10
 
 ### the Bucketeer speaks Croatian, in a voice of her own

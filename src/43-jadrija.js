@@ -23654,7 +23654,11 @@ async function buildJadrija(scene) {
       // one cannot, which is what a queue at a gelato counter looks like.
       for (const [dt, k, dang] of [[-3.85, 0.80, 0.26], [-3.05, 0.66, -0.20]]) {
         const cs = S.s0 - 1.15;
-        bathers.push({ t: cm + dt, s: cs, y: surfaceY(cm + dt, cs),
+        // `standY` and not `surfaceY`, for the reason the walker's height now
+        // carries: `surfaceY` is the graded surface and a person stands on
+        // what is laid over it. Two children queueing at a gelato counter on a
+        // terrace pad were 0.12 m into the flags.
+        bathers.push({ t: cm + dt, s: cs, y: standY(cm + dt, cs),
           ang: Math.PI / 2 + dang, pose: 'stand', k, beat: null });
       }
     }
@@ -37309,7 +37313,28 @@ async function buildJadrija(scene) {
       w.off = s - w.lane;
       const p = toWorld(w.t, s);
       w.x = p[0]; w.z = p[2];
-      w.y = surfaceY(w.t, s);
+      // `p[1]`, WHICH IS `standY`, AND NOT `surfaceY` AGAIN.
+      //
+      // `toWorld` has already answered this question one line up and the
+      // answer was being thrown away for a second, worse one. `surfaceY` is
+      // the graded surface and nothing else; `standY` is what you stand ON,
+      // which is that plus everything laid over it — the konoba's terrace pad
+      // and its ramp, the changing station's pad, the kabina's floor, and the
+      // 0.05 m the paving's stone sits over its own mortar. Every one of those
+      // was invisible to a walker, so they waded through the lot.
+      //
+      // MEASURED before it was changed: of the hundred, 24 sat more than
+      // 50 mm off their ground, and the walkers among them were 0.12 to
+      // 0.27 m UNDER it around t 240-251 — which is the konoba's terrace, and
+      // is the shot Misha sent: a man on the flagstones, sunk to the shin.
+      // The lying figures reading +0.52 to +0.59 are on sunbeds and are right;
+      // the waders at s < 0 reading -0.95 to -1.41 are in the sea and are also
+      // right. Neither moved.
+      //
+      // The note over `standY` had already worked out that `surfaceY` answers
+      // with the mortar rather than the stone, and said so about `toWorld`'s
+      // placements. This is the caller that was still asking the wrong one.
+      w.y = p[1];
       w.yaw = rigYaw(w.t, w.dir > 0 ? 0 : Math.PI);
     }
 

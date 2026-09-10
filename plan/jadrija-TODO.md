@@ -734,6 +734,24 @@ bed. See the commit.
   on the account, or accepting that she and the old bather share one and never
   speak within earshot of each other.
 
+  **A canopy landing seaward of the promenade stands you 1.15 m low — 10 Sep.**
+  Measured, not guessed, and NARROW, which is why most landings are fine.
+  `localeAt` pads `inField` by 5 m so the resort answers for a canopy that
+  comes down just outside it — there is a comment there about exactly that
+  failure. But only `localeAt` was padded: Jadrija's own `walkY` still cuts off
+  at `s < -3`. So from about s -12 to s -4, `inField(x, z, 5)` is TRUE, the
+  locale hands you Jadrija, and Jadrija's `walkY` answers **0** for a strip
+  where `standY` — and therefore what is DRAWN — answers **1.15**. Land there
+  and you stand a metre and a sixth under the surface you can see, on a flat
+  plane, with the buildings' feet cut off. The `t` axis was reconciled when the
+  pad went in (-5 … LEN+5 against a 5 m pad); the `s` axis was not.
+  `dropIn` itself is innocent — checked at 16 points across the resort, it
+  agrees with `walkY` to the millimetre. **The fix is one of two and wants a
+  decision**: widen `walkY`'s seaward guard to match what `standY` already
+  answers for (almost certainly right — `standY` gives a sensible 1.15 all the
+  way out to s -12), or pull `inField`'s pad back so open country owns that
+  strip and the DEM is at least consistent with itself.
+
   **The porch step is real, and the seam list was wrong about where — 10 Sep.**
   The queue carried "the four walkY seams for every other walker on that
   route" as a terrain defect. Re-measured at 400 samples a leg along
