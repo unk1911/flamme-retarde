@@ -4345,9 +4345,17 @@ function buildAudio() {
     // Every envelope below is an exponential ramp, and an exponential ramp to
     // zero throws. A bird right on the edge of earshot arrives here with a gain
     // of nothing at all, so it is floored once, here, rather than at nine nodes.
-    const g0 = clamp(gain, 0.02, 1);
+    // AND `clamp` DOES NOT STOP A NaN. It is `x < a ? a : x > b ? b : x`, and
+    // both of those comparisons are false for NaN, so it hands the NaN back
+    // unchanged — which is fine everywhere it is used on arithmetic and fatal
+    // here, because the next thing that happens is an AudioParam assignment and
+    // a non-finite AudioParam throws. This is the boundary where a bad number
+    // stops being a wrong sound and starts being a dead audio graph, so it is
+    // the place that checks. The caller in 44-birds.js was fixed as well; both
+    // ends, because this one is reached by six other callers too.
+    const g0 = Number.isFinite(gain) ? clamp(gain, 0.02, 1) : 0.02;
     const pn = ctx.createStereoPanner();
-    pn.pan.value = clamp(pan, -1, 1);
+    pn.pan.value = Number.isFinite(pan) ? clamp(pan, -1, 1) : 0;
     pn.connect(master);
     // Every one of these happens over water or bare limestone. Dry, they sound
     // like a bird in the room with you.

@@ -347,7 +347,16 @@ function buildBirds(scene, fire) {
     if (!audio || state.phase === 'intro' || callBudget < 1 || b.mute > 0) return;
     const dx = b.x - camPos.x, dy = b.y - camPos.y, dz = b.z - camPos.z;
     const d = Math.hypot(dx, dy, dz);
-    if (d > BIRDS.callDist) return;
+    // WRITTEN AS `NOT WITHIN` RATHER THAN `BEYOND`, and the difference is the
+    // whole of a NaN that reached `birdCall` once and could not be reproduced.
+    // `camPos` is copied off `camera.position` every frame, and the camera is
+    // written by half a dozen cuts and overrides; one non-finite frame from any
+    // of them makes `d` NaN for every bird at once. `d > callDist` is FALSE for
+    // NaN, so the range gate that exists to stop distant birds calling waved it
+    // straight through, and `near` and `pan` went with it. `!(d <= callDist)`
+    // is the same test for every real distance and closes it, because every
+    // comparison against NaN is false and this one is negated.
+    if (!(d <= BIRDS.callDist)) return;
     callBudget -= 1;
     b.mute = 2.5 + rnd() * 2.5;
     calls++;

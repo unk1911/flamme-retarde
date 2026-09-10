@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.363.0] — 2026-09-10
+
+### the NaN that reached birdCall, found and closed at both ends
+
+Seen once, never reproduced, and on the queue ever since. It is two false
+comparisons in a row.
+
+FIRST, `clamp` DOES NOT STOP A NaN. It is `x < a ? a : x > b ? b : x`, and both
+of those are false for NaN, so it returns the NaN unchanged. That is harmless
+in every arithmetic use in this codebase and fatal in exactly one place: the
+next statement in `birdCall` is an AudioParam assignment, and a non-finite
+AudioParam **throws** — reproduced directly on the shipped build, `TypeError:
+Failed to set the 'value' property on 'AudioParam'`.
+
+SECOND, THE RANGE GATE WAVED IT THROUGH. `cry` in `44-birds.js` computes the
+distance to the listener and returns if it is beyond earshot, and `d > callDist`
+is FALSE for NaN — so the one test standing between a bad number and the audio
+graph passed it. `camPos` is copied off `camera.position` every frame and the
+camera is written by half a dozen cuts and overrides; one non-finite frame from
+any of them makes `d` NaN for EVERY BIRD AT ONCE, which is also why it was seen
+once and never again: it needs a transient bad camera frame and it fires for the
+whole flock in the same tick.
+
+The gate is now `!(d <= BIRDS.callDist)`, the identical test for every real
+distance and closed for NaN, because the way to catch a value that fails every
+comparison is to negate one. And `birdCall` checks `Number.isFinite` on both pan
+and gain itself, because that is the boundary where a bad number stops being a
+wrong sound and starts being a dead audio graph, and six other callers reach it.
+
+PROVED BY INJECTION AND BY ITS CONTROL. `birdCall('gull', NaN, NaN)` on the
+previous build throws; on this one it returns cleanly. The control matters — a
+probe that never reaches the function also reports no exception — and the same
+run confirmed the handle it called was real. Census `{446,333,86,27}`, blockers
+818, tris 642533, 69 birds live.
+
 ## [1.362.0] — 2026-09-10
 
 ### every rope on the mole was inside out
