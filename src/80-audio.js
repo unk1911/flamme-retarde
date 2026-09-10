@@ -5741,9 +5741,9 @@ function buildAudio() {
   // Misha, 10 Sep 2026: *"can u enhance the water pouring with very loud sound
   // of water bein gpoured as .mp3.. make it more immersive"*.
   //
-  // `tools/cut_pour.py` synthesises the clip on his own machine and its note
-  // says what is in it and why none of it was fetched. Everything here is WHEN
-  // and HOW LOUD.
+  // `tools/cut_pour.py` conditions the clip and its note says where it comes
+  // from, what was changed and why the version this file shipped first — a
+  // synthesised one — was replaced. Everything here is WHEN and HOW LOUD.
   const POURSFX = {
     // LOUD, and this is the number he asked for. 1.30 against the mutters'
     // 0.44 — and the clip under it is already 7 dB hotter at -13.0 dBFS RMS
@@ -5759,16 +5759,26 @@ function buildAudio() {
     // being measured and its control, and reported the pour and a mutter as
     // identical to a tenth of a dB. On foot at Jadrija:
     //
-    //   control, nothing fired    -35.3 dBFS   (loudest 300 ms window)
-    //   pour at  3 m               -9.7        +25.6 dB over the empty scene
-    //   pour at 20 m              -13.8        +21.5
-    //   her voice at 3 m          -26.3         +9.0
+    //   control, nothing fired   -31.3 dBFS   (loudest 300 ms window)
+    //   pour at point blank      -10.1        +21.2 dB over the empty scene
+    //   pour at 3 m               -9.8        +21.5
+    //   her voice at 3 m         -26.6         +4.7
     //
-    // So it stands 16.6 dB over her at the same distance, and the true peak at
-    // 3 m is -1.50 dBFS with zero samples at full scale. 1.5 dB of headroom is
-    // thin and it is deliberate; the loudest thing that can co-occur is the
-    // beach bed at -23 dBFS, which sums to about a tenth of a dB.
-    gain: 1.30,
+    // So it stands about 17 dB over her at the same distance.
+    //
+    // AND 0.85 IS A HEADROOM NUMBER, arrived at by measuring rather than by
+    // taste. It was 1.30 under the synthesised clip that shipped first. The
+    // recording that replaced it carries real transients where the synthesis
+    // carried modelled ones, and at 1.30 the master came back at +0.47 dBFS
+    // true peak with TEN SAMPLES at full scale — clipping, which is not a
+    // loudness, and which no amount of asking for "very loud" makes into one.
+    // 0.95 cleared it at 3 m and left 0.24 dB at point blank, which is not
+    // enough to also carry the beach bed; 0.85 lands at -1.21 dBFS with the
+    // listener standing on top of her and nothing at full scale.
+    //
+    // Point blank is the case that decides it and not an academic one: Misha
+    // *"often stand[s] next to her pouring water"*.
+    gain: 0.85,
     // AND IT CARRIES FURTHER THAN SHE DOES. `MUTTER.range` is 26 m because a
     // mutter is confidential; water on stone is not, and 44 m is roughly where
     // this stops being audible over the forecourt rather than where it stops
@@ -5785,12 +5795,12 @@ function buildAudio() {
     // Nothing over 11 kHz survives a 22 050 Hz clip anyway; this is the lid
     // for the OPEN case, so that the filter has somewhere to travel from.
     lp: 11000,
-    // One at a time. She pours once a lap and the clip is 1.90 s, so this can
+    // One at a time. She pours once a lap and the clip is 2.40 s, so this can
     // only ever fire twice at once through a debug handle — but `catWet`'s
     // finding is that the guard is what stops a per-frame caller stacking a
     // hundred of them, and a trigger read off a stream width is exactly that
     // kind of caller.
-    hold: 1.90,
+    hold: 2.40,
   };
   let pourBuf = null;
   let pourUntil = 0;
