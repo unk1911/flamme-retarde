@@ -20647,7 +20647,29 @@ async function buildJadrija(scene) {
     // `beachTo` the promenade level is fitted to the waterline and the ground
     // at s 16 is most of a metre above it. Everybody put on `st.deck` out here
     // was walking through the sand up to the hip. See `deckOf`.
-    const y = surfaceY(t, lane);
+    //
+    // `standY` and not `surfaceY`, which is the same correction the walker's
+    // height and the gelato queue already carry: `surfaceY` is the GRADED
+    // surface and a person stands on whatever is laid over it. This lane runs
+    // JAD.mid+1.6 to JAD.mid+7.6 — s 10.0 to 16.0 — and the whole of that band
+    // is over something: the promenade's flags (PAVE_LIFT, 0.05 m) for most of
+    // it, and the konoba's terrace apron where the shore passes t 244.
+    //
+    // Measured, over the five of these that the cast keeps: a `stand` at
+    // t 251.390, s 15.620 sat at 3.2466 against a `standY` of 3.3705 — 0.124 m
+    // into the konoba's apron, and a standing figure never gets a second
+    // chance at its height because `updateCrowd` reads `b.y` once and only the
+    // walkers re-solve. The other four are the walkers at t 103.453/s 16.012
+    // and t 363.978/s 16.646 (0.050 each, the flags), and the pair at
+    // t 239.292/s 11.389 and t 239.992/s 12.489 (0.188 and 0.277, the apron's
+    // ramp) — who spawn low and then step up to `walkY` on their first frame,
+    // which is a figure that pops rather than one that is buried.
+    //
+    // NOT `deckOf` and not the konoba's own floor datum: this loop places
+    // along a lane that crosses on and off the terrace, so the height has to
+    // be the one that answers "what is under your feet HERE" at each `t`.
+    // `standY` is that function; `surfaceY` is what the paving is drawn from.
+    const y = standY(t, lane);
     let lead;
     if (rng() < 0.84) {
       // A beat of 30–90 m, clamped inside the resort. Short beats read as
@@ -20669,7 +20691,10 @@ async function buildJadrija(scene) {
     // walking a beat neither of them is on is a bug you would have to watch for
     // a minute to see.
     if (lead && rng() < 0.5) {
-      B(t + 0.7, lane + 1.1, surfaceY(t + 0.7, lane + 1.1), lead.ang, lead.pose,
+      // The companion's own floor, at the companion's own (t, s) and by the
+      // same `standY` as the lead's — a metre apart across a 0.05 m flag
+      // edge is exactly where two people at two different heights show.
+      B(t + 0.7, lane + 1.1, standY(t + 0.7, lane + 1.1), lead.ang, lead.pose,
         rng() < 0.28 ? 0.68 : 1, lead.beat && { ...lead.beat });
     }
   }
