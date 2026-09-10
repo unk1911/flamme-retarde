@@ -980,6 +980,34 @@ BATHER_WHO = {
 # errands, one persona — so tightening this one covers both. Checked in the
 # code rather than assumed, because the assumption that goes the other way ends
 # with a fourth persona nobody can find the caller for.
+#
+# ── AND ON 8 SEP SHE STOPPED ASKING FOR ONE OF THE TWO ERRANDS ───────────────
+#
+# Misha: *"the bucketeer baye, don't make her talk with that saltry/jessica
+# voice.. instead, she should occasionally say some short things, in croatian
+# voice"*.
+#
+# THE PARAGRAPH ABOVE IS WHY THAT WAS A ONE-FILE CHANGE AND NOT A FOURTH ENTRY
+# HERE, and it is the reason it is still worth reading. He describes a
+# Bucketeer persona talking in the wrong voice; there is no such persona, and
+# what he heard was `PERSONA` — this one — answering about the other errand
+# because `bayeGap` hands whichever of the two of her you are nearer to. So the
+# fix could not have been a new speaker in the map: the wrong voice was not
+# miscast, it was the RIGHT voice on the wrong errand.
+#
+# `poll` in 49-voice.js now refuses the bucket branch outright, and
+# `45-bucketeer.js` says twenty-three baked Croatian lines instead — Balkanika,
+# played up 3.2 semitones, `tools/cut_mutter.py` — on the same 245-to-355-second
+# clock the live branch used. NOTHING IN THIS FILE CHANGED FOR IT and nothing
+# needed to. `PERSONA` is untouched, `TTS_VOICE` is untouched, and the shore
+# Baye is exactly what she was: live, English, Jessica, the sea temperature off
+# Open-Meteo. This service simply stops being asked while you are on the steps.
+#
+# WHICH MEANS THIS FILE CANNOT BE REDEPLOYED TO FIX IT AND CANNOT BREAK IT
+# EITHER. If the Croatian ever has to come off, it comes off in the client; if
+# a Bucketeer persona is ever genuinely wanted here, it is a new key in
+# `SPEAKERS` and a new id in `voice_for`, and the trap two paragraphs down
+# applies to adding one exactly as it applies to removing one.
 SPEAKERS = {
     "baye": PERSONA,
     "cat": PERSONA_CAT,

@@ -8,6 +8,55 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.364.0] — 2026-09-10
+
+### the Bucketeer speaks Croatian, in a voice of her own
+
+Built once already and dropped the same day. Misha, on hearing it: *"they all
+sound horrible, like a chipmunk on speed speaking 100mph."*
+
+WHY IT WAS A CHIPMUNK. The account had exactly two voices labelled
+`language: hr`, and Balkanika — the only female of the two — was already cast
+as `woman_old`, the seventy-year-old on the promenade. The two women walk
+within earshot of each other, so the Bucketeer was given the SAME voice played
+3.2 semitones up. A plain resample moves the formants with the pitch, which is
+genuinely what makes two people out of one, and at that shift it also makes a
+chipmunk.
+
+AND EVERY INSTRUMENT SAID IT WAS FINE. Median f0 209.6 Hz against Jessica's
+210.1 — four hundredths of a semitone. 0.0 per cent word error through
+speech-to-text, the same as the shipped Bill and Matilda takes. Levels inside
+0.4 dB. The hum's interval over her own speech preserved to four hundredths, so
+`hum_bucketeer.mp3` did not even need re-cutting. Not one of those can hear a
+chipmunk: a pitch meter reports the fundamental and a transcriber reports the
+words, and a resample dragging the formants along is obvious to a person and
+invisible to both. **A measurement can only refute what it is able to notice.**
+
+THE FIX WAS NOT A SMALLER SHIFT, IT WAS A SECOND WOMAN — and the account's own
+library was the wrong shelf to have been looking at. The tier allows 30 voices
+and one slot was in use; the SHARED library carries three hundred tagged `hr`,
+and adding one is a POST. Three were auditioned on six of her own lines at
+native pitch: Nina 181.8 Hz (described as Croatian), Zlata 195.2 (Balkan, and
+by a distance the most adopted female on that shelf — 6 108 clones, 9.8 M
+characters), Mila 210.6 (Croatian, and near enough Jessica to be a problem of
+its own). Misha picked **Zlata**.
+
+So `MUTTER.rate` is **1.0** and should stay there. If she ever needs separating
+from somebody again, separate her by CASTING and not by pitch — this whole
+detour is what the other way costs. `voice_for`'s two children are still an
+adult sped up and that stays, because a child IS a shorter vocal tract: moving
+the formants with the pitch is the right answer there and was the wrong one
+here.
+
+Re-baked: 23 takes, 98 KB, 21.3 s of speech, RMS −20.014 dBFS with a spread of
+**0.147 dB** against the pitched version's 0.383, and no clip nearer than
+2.96 dB to full scale — the resampled set had one at 0.17. Everything else
+about the feature is as it was: the hand-written Šibenik ikavian, the nine
+beats, the five-minute cadence, the hum untouched and byte-identical because
+the tune is Misha's own.
+
+Census `{446,333,86,27}`, blockers 818, tris 642533, 60 fps — all unmoved.
+
 ## [1.363.0] — 2026-09-10
 
 ### the NaN that reached birdCall, found and closed at both ends

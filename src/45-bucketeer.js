@@ -248,6 +248,66 @@ const BUCK = {
     fill: 0.72,         // under her breath, listening to the tap
   },
 
+  // ── and once in a while she says something ─────────────────────────────────
+  //
+  // Misha, 8 Sep 2026: *"the bucketeer baye, don't make her talk with that
+  // saltry/jessica voice.. instead, she should occasionally say some short
+  // things, in croatian voice"*. Twenty-three baked lines, `tools/cut_mutter.py`
+  // and the note over `MUTTER` in 80-audio.js; everything here is WHEN.
+  //
+  // ON, and the flag is the switch the recordings need for the same reason
+  // `hum` is: `mutter()` below is the A/B, and a control run with the tail of
+  // "ubi me vrućina" in the first second of it is not a control run.
+  say: true,
+  // 245 to 355 seconds, mean 300, WHICH ARE THE VOICE'S OWN NUMBERS AND NOT A
+  // NEW OPINION. `VOICE.gapBucket` and `VOICE.jitterBucket` in 49-voice.js are
+  // 245 and 110 and were set on 7 Sep after he measured her talking every
+  // 45-60 s: *"her role is to carry buckets not chat chat... maybe once every 5
+  // minutes"*. The live path on this branch is now off — see the note over
+  // `poll` in that file — so this is the same cadence carried across to the
+  // channel that replaced it, deliberately to the second. If it is still too
+  // much it is too much in one place.
+  sayGap: 245,
+  sayJit: 110,
+  // AND THE CLOCK ONLY RUNS WHEN SOMEBODY IS THERE TO HEAR IT, which is the
+  // difference between a library of twenty-three and a library of twenty-three
+  // you have heard. `MUTTER.range` is 26 m and she is on her loop from the
+  // moment the beach is built, so a clock that ran regardless would spend four
+  // lines into an empty forecourt before you had walked up the steps. 30 m is
+  // that range with a little over, so that arming happens just outside earshot
+  // and she is not silent for five minutes after you arrive.
+  sayNear: 30.0,
+  // The one thing that gets a shorter clock, and it is not her noticing you.
+  //
+  // `yield` is her legs stopped because you are standing in a one-metre doorway
+  // she is carrying ten litres through. Somebody actually says something there
+  // — it is why the game already uses "Pardon!" — and on the five-minute clock
+  // alone she would stand in front of you in silence, which is the one moment
+  // silence is wrong. 90 s is short enough that a player who blocks her twice
+  // gets an answer the second time and long enough that standing in her way for
+  // a minute is not a conversation.
+  //
+  // NOT `notice`, deliberately. `noticeGap` is 11 s and being looked at is the
+  // exact thing `gapBucket` was raised to stop her narrating; a `see` line on
+  // that trigger would hand back the minute's cadence in a different language.
+  // She still stops, turns and holds the bucket out every single time.
+  sayYield: 90.0,
+  sayYieldFor: 0.8,     // s of being blocked before it is worth a word
+  // What each beat of the loop is allowed to say, and everything missing is a
+  // beat she says nothing on. The pools come off `mutteridx.json` by this name,
+  // so a line added to the tool with `beat: 'down'` needs nothing here.
+  //
+  // `set` is absent: she is putting an empty bucket down beside a tap she is
+  // about to turn on, and `fill` is one tenth of a second later with two lines
+  // of its own. Two in a row out of one pair of beats is a woman talking to
+  // herself, which is a different character. `take` and `right` are folded onto
+  // the beats they are half of — `take` is the same heave as `lift` and `right`
+  // is the end of the same tip.
+  sayBeat: {
+    fill: 'fill', lift: 'lift', take: 'lift',
+    down: 'down', tip: 'tip', right: 'tip', rest: 'rest', up: 'up',
+  },
+
   // ── ten kilos on one arm ───────────────────────────────────────────────────
   //
   // Everything below is laid over the baked `walk` clip with `aim`, because the
@@ -383,6 +443,38 @@ const BUCK = {
   // be a woman being yanked sideways.
   loadEase: 3.4,
 };
+
+/**
+ * What she can say, off the payload, or nothing at all.
+ *
+ * `mutteridx.json` is written by `tools/cut_mutter.py` and inlined verbatim by
+ * build.py, so this is a plain object and not a string to parse — the same
+ * arrangement `CHAT_LIB` in 43-chatter.js has with `chatidx.json`, and the same
+ * failure: a build whose payload has been stripped leaves this null, `BUCK_SAY`
+ * empty and a Bucketeer who hums and says nothing, which is the game that
+ * shipped in 1.357.0 rather than a game that is broken.
+ *
+ * `hr` and `en` travel in the index and nothing draws them. They are there so a
+ * probe can read what she said — see `stats().said` — because these lines are
+ * deliberately not subtitled: the caption path in 49-voice.js belongs to the
+ * live service, and `cut_mutter.py` argues at length that a thing muttered at a
+ * bucket is not a thing to put a caption under. `put(kind, text)` in that file
+ * uses `textContent` and would render the Croatian safely; it is simply never
+ * asked to.
+ */
+const MUTTER_LIB = (typeof PAYLOAD !== 'undefined' && PAYLOAD.mutteridx)
+  ? PAYLOAD.mutteridx : null;
+
+/** Beat name to the lines that belong to it, built once. `len` is carried
+ *  through because `audio.mutter` schedules against it and must not wait for a
+ *  decode to know how long a line is. */
+const BUCK_SAY = (() => {
+  const o = {};
+  for (const r of (MUTTER_LIB && MUTTER_LIB.lines) || []) {
+    (o[r.beat] || (o[r.beat] = [])).push(r);
+  }
+  return o;
+})();
 
 // Her route, in the house's own metres: +x along the shore past the front door,
 // +z out towards the sea. Every one of these was checked against the sidecar's
@@ -966,11 +1058,31 @@ async function buildBucketeer(scene, vik, walkY) {
     // indexed on and `humKey` is the rate this burst is being hummed at.
     // `wall` is how much building is between her and your ear, eased.
     humAt: 3.0, humLeft: 0, humRem: 0, humI: 0, humKey: 1, wall: 0,
+    // The Croatian. `sayAt` is seconds until she may next say anything and runs
+    // down only while somebody is inside `BUCK.sayNear`; `saySince` is how long
+    // since the last line, which is what the doorway's shorter floor is
+    // measured against; `sayRem` is seconds of a line still sounding and
+    // `sayNow` which one; `sayI` is the counter the sine hash is indexed on and
+    // `sayLast` the last line said on each beat, so no beat repeats itself
+    // twice running. `sayBeat` is what she was doing last frame, because a line
+    // is fired by the CHANGE into a beat and not by being in one.
+    //
+    // Started at 40 and not at `sayGap`, which is the one place this disagrees
+    // with the live path it replaces. `poll` in 49-voice.js pulls `nextAt` to
+    // `clock + 1.5` when you first come into range, so the shore Baye greets
+    // you — and that rule is switched off for the Bucketeer because her route
+    // carries her past you and re-armed it every lap. This is the half of it
+    // worth keeping: the FIRST line of a session comes inside a minute, and
+    // every one after it is on the five-minute clock. Five minutes of silence
+    // before the feature exists is a feature nobody finds.
+    sayAt: 40.0, saySince: 0, sayRem: 0, sayNow: null, sayI: 0,
+    sayLast: {}, sayBeat: null, said: [], warmed: false,
     // You, and whether she has seen you. `yield` is her legs stopped because
     // you are in the doorway; `notice`/`noticeAmt` is the seconds left of her
     // having looked up and the eased shape of it; `offered` is whether there
-    // was anything in her hand worth holding out when she did.
-    yield: false, notice: 0, noticeCool: 0, noticeAmt: 0, offered: false,
+    // was anything in her hand worth holding out when she did. `yieldT` is how
+    // long she has been stood there waiting, which is what earns a "pardon".
+    yield: false, yieldT: 0, notice: 0, noticeCool: 0, noticeAmt: 0, offered: false,
     newsPend: null, newsAt: 0,
     hold: false,        // debug: the loop stopped where it stands
     x: 0, y: 0, z: 0,
@@ -1663,18 +1775,31 @@ async function buildBucketeer(scene, vik, walkY) {
    * a wall. See the note over `hum` in 80-audio.js — the level, the distance
    * and the wall are written every frame on to the one live voice.
    */
-  function humTick(dt, d, who) {
-    if (!BUCK.hum || !audio) return;
-    // How much house is between the two of you: one wall is exactly one of you
-    // being inside a storey and the other not. The prizemlje term has no `her`
-    // half because she has no way into it — her route is the flat, the outside
-    // stair and the porch, and `floorAt` is why: there is no internal stair, so
-    // the downstairs dwelling is not on her round. It counts for the listener
-    // alone, and it counts whether she is in the flat over your head or on the
-    // porch outside your door.
+  /**
+   * How much house is between the two of you: one wall is exactly one of you
+   * being inside a storey and the other not. The prizemlje term has no `her`
+   * half because she has no way into it — her route is the flat, the outside
+   * stair and the porch, and `floorAt` is why: there is no internal stair, so
+   * the downstairs dwelling is not on her round. It counts for the listener
+   * alone, and it counts whether she is in the flat over your head or on the
+   * porch outside your door.
+   *
+   * ITS OWN FUNCTION SINCE SHE GOT A SECOND VOICE. This was the first eleven
+   * lines of `humTick`, which was fine while the humming was the only thing
+   * that needed it and is a bug now that `sayTick` does too: `humTick` returns
+   * at its first line when `BUCK.hum` is off, and `BUCK.hum` is off during
+   * exactly the A/B recording the humming's own note asks for. A stale `wall`
+   * on a control run is a Croatian line coming through a wall that was measured
+   * somewhere else.
+   */
+  function wallTick(dt, who) {
     st.wall = damp(st.wall, Math.max(
       Math.abs(inFlat(who.x, who.y, who.z) - inFlat(st.x, st.y, st.z)),
       inPriz(who.x, who.y, who.z)), 7, dt);
+  }
+
+  function humTick(dt, d, who) {
+    if (!BUCK.hum || !audio) return;
     const lvl = state.phase === 'intro' ? 0 : humLevel();
 
     if (st.humRem > 0) st.humRem -= dt;
@@ -1762,6 +1887,143 @@ async function buildBucketeer(scene, vik, walkY) {
     mesh.updateMatrixWorld();
     placePail();
     placeWater(dt);
+  }
+
+  /**
+   * One frame of the Croatian.
+   *
+   * WHAT THIS IS AND WHERE THE REST OF IT LIVES. The lines and the voice are
+   * `tools/cut_mutter.py`; the level, the wall and the casting are `MUTTER` in
+   * 80-audio.js; the cadence is `BUCK.sayGap` above. This is only the choice of
+   * WHEN and WHICH, and it is the whole reason the feature is baked rather than
+   * live.
+   *
+   * ── a line belongs to a beat, and that is the argument ──
+   *
+   * Her loop is nine beats and about forty seconds, and the things a person
+   * says while carrying water are each tied to one of them: "ajme meni" as ten
+   * kilos comes off the floor, "pomalo" going down an open flight, "evo vam
+   * vode" while it is going over the plants. A live line is ASKED FOR at one
+   * moment and lands three to six seconds later — measured, in the note at the
+   * top of 49-voice.js — by which time she is two beats further round. So the
+   * live path could only ever have produced a remark about the loop in general,
+   * said at a moment chosen by somebody else's queue.
+   *
+   * Which is why the clock does not fire a line. It ARMS her, and the line goes
+   * on the next transition INTO a beat that has something to say — so what you
+   * hear is a woman grunting as she lifts, not a woman narrating that she lifts.
+   * `sayBeat` is what she was doing last frame and the whole mechanism.
+   *
+   * ── and it does not run when nobody is there ──
+   *
+   * `sayNear`. She is on her loop from the moment the beach is built and the
+   * clip only carries 26 m, so a clock that ran regardless would spend four
+   * lines into an empty forecourt before you had climbed the steps. See the
+   * note on the constant.
+   *
+   * RULE 4: no `rng()` in the Jadrija build. `jit` is the sine hash `humTick`
+   * uses, indexed on `sayI` — twelve draws an hour at the very most, and taking
+   * them off the shared stream would move every parasol on the beach.
+   */
+  function sayTick(dt, d, who) {
+    if (!BUCK.say || !audio || !MUTTER_LIB) return;
+
+    // A line in the air: follow it, and nothing else happens until it is done.
+    // Two of her talking over each other is the fault this feature was written
+    // to remove, so it is not possible here either.
+    if (st.sayRem > 0) {
+      st.sayRem -= dt;
+      audio.mutter(d, { wall: st.wall, len: st.sayNow ? st.sayNow.len : 1 });
+      st.saySince += dt;
+      return;
+    }
+    st.saySince += dt;
+    st.yieldT = st.yield ? st.yieldT + dt : 0;
+    if (state.phase === 'intro') return;
+
+    // ── warm every decoder before she needs one, and it is not an optimisation ──
+    //
+    // FOUND BY THE `says` PROBE AND NOT BY READING. `audio.mutter` loads a clip
+    // lazily on the frame it is first asked for, which is `sampleLoad`'s rule
+    // for every baked sound in the game and is right for all of them but this.
+    // A decode is asynchronous: the buffer lands a frame or two after the call
+    // that asked for it, and the call that asked for it has already declined to
+    // play anything. The hum survives that because it has ONE clip and fires
+    // every twelve seconds — it is silent once, at the top of the session, and
+    // correct for ever after. This has twenty-three clips and fires once every
+    // five minutes, so lazily loaded, EVERY LINE IS SILENT THE FIRST TIME SHE
+    // SAYS IT: about half of what a player hears in an hour, and silent in the
+    // one way that leaves no trace, because a woman who says nothing on the
+    // stairs is what she did last week.
+    //
+    // Headless it read as `said: ["Ajde, brže malo."]` with `says: 0` — the
+    // line chosen, the clock reset, the mixer never asked to start anything —
+    // which is exactly the failure `says` was put on `stats()` to separate from
+    // "she never asks". It is the second time this session's notes have had to
+    // say that a counter of what was STARTED is the only version of the test
+    // that can fail.
+    //
+    // A bare call with a key and no `start` is already the load and nothing
+    // else, so this needs no new parameter. It costs about 4.5 MB of decoded
+    // buffer and it is spent only if you actually walk up to the vikendica —
+    // fly the sortie over the far side of the channel and none of it is ever
+    // touched, which is the whole point of `sampleLoad` being lazy in the first
+    // place. This does not make it eager; it moves "lazy" from the first line
+    // to the first time anybody is near enough to hear one, forty seconds
+    // earlier.
+    if (!st.warmed && d < BUCK.sayNear) {
+      st.warmed = true;
+      for (const r of (MUTTER_LIB.lines || [])) audio.mutter(d, { key: r.key });
+    }
+    // Only while somebody could hear it. `sayAt` is the five-minute clock and
+    // `saySince` is not — the doorway floor below has to keep running or a
+    // player who walks up and immediately blocks her gets nothing.
+    if (d < BUCK.sayNear) st.sayAt -= dt;
+
+    // Which beat she is on, in the pools' own names, and whether she has just
+    // arrived at it.
+    const beat = BUCK.sayBeat[st.phase] || null;
+    const entered = beat && beat !== st.sayBeat;
+    st.sayBeat = beat;
+
+    // The doorway. She is stopped, you are in front of her, her hands are full
+    // and she has been stood there long enough that saying nothing has become
+    // the odd thing to do. Its own floor and not the five-minute clock — see
+    // `BUCK.sayYield`, which also says why being LOOKED at does not qualify.
+    let pool = null;
+    if (st.yieldT > BUCK.sayYieldFor && st.saySince > BUCK.sayYield) {
+      pool = 'see';
+    } else if (st.sayAt <= 0 && d < BUCK.sayNear) {
+      // Armed. She takes the next beat that has anything to say, or answers you
+      // if she has just looked up — `newsPend` is set by `step` below and is the
+      // one thing she does that is ABOUT you rather than about the bucket.
+      pool = (st.notice > 0 && st.newsPend) ? 'see' : (entered ? beat : null);
+    }
+    if (!pool) return;
+
+    const lines = BUCK_SAY[pool];
+    if (!lines || !lines.length) return;
+    // Not the one this beat said last time. With the smallest pool at two that
+    // is enough to guarantee she never repeats herself inside a beat, and the
+    // hashed start is what stops the bigger pools cycling in order.
+    const n = lines.length;
+    const s = Math.floor(jit(st.sayI, 23) * n) % n;
+    let line = lines[s];
+    for (let i = 0; i < n; i++) {
+      const c = lines[(s + i) % n];
+      if (c.key !== st.sayLast[pool]) { line = c; break; }
+    }
+    st.sayLast[pool] = line.key;
+    st.sayI += 1;
+    st.sayNow = line;
+    st.sayRem = audio.mutter(d, { start: true, key: line.key, len: line.len,
+      wall: st.wall });
+    st.sayAt = BUCK.sayGap + jit(st.sayI, 29) * BUCK.sayJit;
+    st.saySince = 0;
+    // For a probe, because nothing puts these on screen. Six, which is
+    // `VOICE.memory`, and for the same purpose it serves there.
+    st.said.push(line.hr);
+    if (st.said.length > 6) st.said.shift();
   }
 
   /**
@@ -1878,7 +2140,18 @@ async function buildBucketeer(scene, vik, walkY) {
     //
     // After the pose and not before it, because `st.held` is what says whether
     // the weight is moving and `stepLoop` is what writes it.
-    humTick(dt, Math.sqrt(d2), who);
+    //
+    // And the wall before both of them, because both of them are her and there
+    // is one wall — see `wallTick`. The humming first of the two only because
+    // it was here first; they cannot collide, `sayTick` returns early while a
+    // line is sounding and `hum` refuses to start under one.
+    const dNow = Math.sqrt(d2);
+    wallTick(dt, who);
+    humTick(dt, dNow, who);
+    // And the Croatian, once every five minutes, on the beat it belongs to.
+    // Misha, 8 Sep 2026: *"instead, she should occasionally say some short
+    // things, in croatian voice"*. See `sayTick`.
+    sayTick(dt, dNow, who);
   }
 
   return {
@@ -1922,6 +2195,36 @@ async function buildBucketeer(scene, vik, walkY) {
       if (!BUCK.hum && audio) { audio.hum(0, { stop: true }); st.humRem = 0; }
       return BUCK.hum;
     },
+    /**
+     * Debug: the Croatian off and on, and one line NOW.
+     *
+     * The same job as `hum` above and for the same reason — the only way to say
+     * what she does to the bird calls is to record the same thirty seconds
+     * twice and difference them — plus the thing a five-minute clock makes
+     * impossible from a probe. `say(false)` is the control; `say('lift_ajme')`
+     * or `say(true)` plays one where she stands, without moving her clock past
+     * where it was, so a screenshot plan does not have to wait four minutes to
+     * find out whether the payload decoded.
+     */
+    say: (v) => {
+      if (typeof v === 'string' || v === true) {
+        const all = (MUTTER_LIB && MUTTER_LIB.lines) || [];
+        const line = typeof v === 'string'
+          ? all.find((r) => r.key === v || r.key.endsWith('_' + v))
+          : all[st.sayI % Math.max(1, all.length)];
+        if (!line || !audio) return null;
+        st.sayI += 1;
+        st.sayNow = line;
+        st.sayRem = audio.mutter(0, { start: true, key: line.key,
+          len: line.len, wall: st.wall });
+        st.said.push(line.hr);
+        if (st.said.length > 6) st.said.shift();
+        return line.key;
+      }
+      BUCK.say = v == null ? !BUCK.say : !!v;
+      if (!BUCK.say && audio) { audio.mutter(0, { stop: true }); st.sayRem = 0; }
+      return BUCK.say;
+    },
     /** Where she is from you, for whoever has to decide who you are near. */
     gapTo: (x, z) => Math.hypot(x - st.x, z - st.z),
     /** Where she is now, and what she is doing. */
@@ -1954,6 +2257,20 @@ async function buildBucketeer(scene, vik, walkY) {
       humLvl: +humLevel().toFixed(2),
       wall: +st.wall.toFixed(3),
       hums: audio ? audio.hum(0, { probe: true }) : -1,
+      // And the Croatian, in the same shape and for the same reason. `sayIn` is
+      // seconds to the next line and only runs down while somebody is inside
+      // `BUCK.sayNear`; `sayRem` is one still sounding; `sayPool` is how many
+      // lines came out of the payload, which is 0 on a build with the payload
+      // stripped and 23 otherwise; `says` is what the mixer says it has
+      // actually STARTED. `said` is the last six she has said, in Croatian,
+      // because nothing puts them on screen — see `MUTTER_LIB`.
+      sayIn: +Math.max(0, st.sayAt).toFixed(1),
+      sayRem: +Math.max(0, st.sayRem).toFixed(2),
+      sayBeat: st.sayBeat,
+      sayPool: ((MUTTER_LIB && MUTTER_LIB.lines) || []).length,
+      sayWarm: !!st.warmed,
+      says: audio ? audio.mutter(0, { probe: true }) : -1,
+      said: st.said.slice(),
       jetOn: jet.visible, jetH: +jet.scale.y.toFixed(2),
       jetAt: jet.position.toArray().map((n) => +n.toFixed(2)),
       poolOn: pool.visible,

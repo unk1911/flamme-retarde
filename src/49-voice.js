@@ -65,6 +65,34 @@ const VOICE = {
    * holds the bucket out whenever you look at her, because that costs nothing
    * and is the part that reads as her noticing you. What is rare now is her
    * narrating it.
+   *
+   * ── AND ON 8 SEP THE ANSWER STOPPED BEING A NUMBER ──
+   *
+   * *"the bucketeer baye, don't make her talk with that saltry/jessica voice..
+   * instead, she should occasionally say some short things, in croatian voice"*.
+   *
+   * The premise is right and the diagnosis is not, and the difference decides
+   * where the fix goes. There is no Bucketeer persona and there never was --
+   * checked in the code and written down over `SPEAKERS` in baye.py -- so what
+   * he heard on that staircase was THIS speaker, Baye, in `PERSONA`, because
+   * `bayeGap` answers about whichever of her two errands you are nearer to. One
+   * woman, two errands, one voice, and the voice was wrong for one of the two
+   * errands.
+   *
+   * So the whole bucket branch is off the live path. `poll` refuses it below
+   * and these two numbers are what it refuses it WITH -- they are still read,
+   * and they still hold, because 45-bucketeer.js now runs the same clock in
+   * `BUCK.sayGap` and `BUCK.sayJit`, 245 and 110 to the second, over
+   * twenty-three baked Croatian lines. What was tuned here on 7 Sep was not
+   * thrown away; it was carried across, and the two numbers are kept in step
+   * on purpose so that "once every five minutes" is one decision in two files
+   * rather than two decisions.
+   *
+   * WHAT IS UNCHANGED IS EVERYTHING ELSE ABOUT HER. Walk down to the water and
+   * the shore Baye is exactly what she was: live, in English, in Jessica, on
+   * `gap` and `jitter` below, saying what the sea temperature is because a
+   * service asked Open-Meteo ninety seconds ago. That half is the whole feature
+   * this file was written for and nothing here touches it.
    */
   gapBucket: 245,
   jitterBucket: 110,
@@ -480,7 +508,30 @@ const voice = (() => {
     // BAYE does not get. Silencing the cat by starving her is not what was
     // asked for. With this, he asks exactly once per page load.
     if (sp.mute) { sp.inRange = false; return null; }
-    const gap = takeNews(sp, sp.gap());
+    const raw = sp.gap();
+    // AND THE BUCKET ERRAND IS NOT ON THIS PATH AT ALL, WHICH IS THE 8 SEP
+    // CHANGE. See the long note over `gapBucket`: there is no Bucketeer
+    // persona, so every line he heard from a woman by the vikendica was Baye's,
+    // in Baye's voice, which is the shore's voice. She now says twenty-three
+    // baked Croatian lines up there instead, off `sayTick` in 45-bucketeer.js,
+    // on the same 245-to-355-second clock this branch used to run.
+    //
+    // BEFORE `takeNews` AND NOT AFTER IT, and that ordering is the whole
+    // correctness of this line. `takeNews` latches an event on to the speaker
+    // for twenty-five seconds; let the bucket's own event -- you looked at her
+    // while she was carrying -- through it and then refuse the line, and the
+    // event survives the walk down to the water and gets attached to the next
+    // SHORE line. She would have flirted about a bucket she was no longer
+    // holding, a hundred metres from it. The event is dropped here instead,
+    // which costs nothing: `bucketeer.news()` is one-shot and `bayeGap` has
+    // already taken it, and the offer was the thing `gapBucket` existed to stop
+    // her narrating in the first place.
+    //
+    // `inRange` false rather than left alone, so that walking from the
+    // staircase down to the sand is a fresh arrival at the shore Baye and not a
+    // speaker that thinks it has been in range for four minutes.
+    if (raw && raw.bucket) { sp.inRange = false; return null; }
+    const gap = takeNews(sp, raw);
     // A speaker with `onlyNews` has no clock and no range: it is silent until
     // somebody does something to it, and then it answers once. `nextAt` is the
     // only brake, and it is there so that hosing a whole terrace is a
@@ -596,7 +647,18 @@ const voice = (() => {
       // clearing `nextAt` is enough to let `step` have another go if this one
       // finds the line busy.
       sp.nextAt = 0;
-      return ask(sp, takeNews(sp, sp.gap()));
+      const raw = sp.gap();
+      // AND THE BUTTON HAS TO OBEY THE SAME RULE AS THE CLOCK. `poll` above
+      // takes the bucket errand off this path; a "say something" button that
+      // did not would be the one remaining way for a player standing on those
+      // steps to get exactly the line that was complained about — and it is a
+      // button in the settings panel, not a debug hook, so somebody will press
+      // it there. It plays one of her baked Croatian lines instead, which is
+      // what "say something" means at that end of the beach now.
+      if (who === 'baye' && raw && raw.bucket) {
+        return at(() => jadrija.bucketeer.say(true));
+      }
+      return ask(sp, takeNews(sp, raw));
     },
     context: (who = 'baye') => {
       const sp = CAST[who] || CAST.baye;
