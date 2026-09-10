@@ -31,6 +31,14 @@ SRC = ROOT / "src"
 PAYLOAD = ROOT / "build" / "payload"
 OUT = ROOT / "flamme-retarde.html"
 DEPLOY = Path("/mnt/c/tmp/flamme-retarde")
+# And the Synology, because he is remoted into this laptop and the copy on its
+# own C: drive is served across that link twice — once to reach the browser and
+# once to reach him. Asked for on 10 Sep 2026: *"so also put shit into
+# /mnt/synology/shared/micko/flamme-retarde so i can look at shit before u make
+# a release that should load faster for me too"*. Same two filenames as DEPLOY,
+# so whatever opens one opens the other, and skipped silently when the share is
+# not mounted — a build must never fail because a NAS is asleep.
+SHARE = Path("/mnt/synology/shared/micko/flamme-retarde")
 
 # The build stamp shown on the title screen, so a page can be identified at a
 # glance without diffing ten megabytes. Both are constants rather than
@@ -299,6 +307,22 @@ def main() -> None:
         print(f"deployed to {DEPLOY}")
     else:
         print(f"note: {DEPLOY.parent} not mounted — skipped deploy")
+
+    # The share, on the same terms and after the same worktree guard.
+    if inWorktree:
+        pass
+    elif SHARE.parent.exists():
+        SHARE.mkdir(parents=True, exist_ok=True)
+        # copyfile and not copy2, which is the whole difference between this
+        # working and not: copy2 also copies the mtime, and setting a time on
+        # this mount raises PermissionError even though the write itself is
+        # fine. The file lands, the build then dies on the metadata. Nothing
+        # here needs the timestamp preserved.
+        shutil.copyfile(OUT, SHARE / "flamme-retarde.html")
+        shutil.copyfile(OUT, SHARE / "index.html")
+        print(f"deployed to {SHARE}")
+    else:
+        print(f"note: {SHARE.parent} not mounted — skipped share")
 
 
 if __name__ == "__main__":
