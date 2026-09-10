@@ -8,6 +8,105 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.371.0] — 2026-09-10
+
+### the pour is a recording of a real one, and she turns on the spot
+
+**THE WATER.** Misha: *"omg your water poured out sounds like shit!"*
+
+He was right, and the measurement that says why is not the one the synthesis
+was reasoning about. That version modelled the physics carefully — Minnaert
+bubbles with the upward chirp, glugs for the bucket taking air back, a separate
+impact layer — and got the **envelope** wrong, which turned out to be the only
+thing that mattered. Stepped in 50 ms windows it reached −10.4 dBFS within
+0.2 s and then sat between −9.8 and −10.8 for eight hundred milliseconds: a
+trapezoid. A real vessel being tipped is a **ramp** — −41, −47, −41, −34, −28,
+−26, −17, −15.7 across nine hundred milliseconds — because the flow rate climbs
+as the angle does. No amount of bubble modelling fixes a plateau, and the
+bubbles were never what was wrong.
+
+THE CLIP HE LINKED CANNOT SHIP. It is Epidemic Sound, not open source: a
+subscription library whose terms cover use *in* a production, not
+redistribution of the file. This build base64s every asset into one HTML file,
+in a public repository, served publicly.
+
+WHAT SHIPPED INSTEAD is freesound.org 421184, **"Water, Pouring, A.wav" by
+InspectorJ** — a tub of icy water poured onto snow-laden concrete, microphone
+half a metre from the splash — under **CC BY 4.0**, which permits
+redistribution and modification with credit and a statement of changes. Both
+are in `assets/audio/CREDITS.md` and the README, and the source is committed.
+
+A CC0 CANDIDATE WAS REJECTED ON THE SAME MEASUREMENT. Freesound 174637 by
+altfuture would have cost no attribution at all, but stepped the same way it
+peaks at 0.25 s and is gone by 0.70: a splat. Water hitting the ground thrown,
+not water leaving a vessel. The cheaper licence, the wrong event.
+
+Trimmed 0.438 s off the head so the recording's peak lands 0.50 s from its own
+start, which is where her stream peaks — the two now land within 50 ms.
+
+AND THE GAIN IS A HEADROOM NUMBER NOW, not a taste. Under a recording with real
+transients, 1.30 put the master at **+0.47 dBFS with ten samples at full
+scale** — clipping, which is not a loudness. 0.85 lands at −1.21 dBFS with the
+listener standing on top of her, nothing at full scale, still **+21.2 dB** over
+the same scene with nothing fired and about **17 dB over her own voice**. Point
+blank is the deciding case and not an academic one: he *"often stand[s] next to
+her pouring water"*.
+
+**THE CARRYING ARM — and it was never the arm.** Misha: *"when she carries her
+bucket, her arm is extended kinda weirdly... she later kinda corrects it"*.
+
+Both halves of that sentence were load-bearing. Traced with the player 3 m off
+her and looking at her, the pail's lateral stand-off went from the 0.324–0.360
+it holds all the way down the stairs to a peak of **0.491 m**, while `st.vel`
+never left 0.44–0.76 — she was *walking*. It is not the carry at all: it is
+`poseCarry`'s **offer**, which takes the upper arm from 27.0° of abduction to
+**74.1°**, nearly horizontal, holds it, and damps back over 0.9 s. That decay
+is "she later kinda corrects it" exactly, and it fires every 11 s for as long
+as you stand within 4.6 m and look at her. The plain carry measures clean and
+was not touched.
+
+TWO FAULTS, NOT ONE. **When**: the gesture's own note calls it "somebody who
+has just stopped and turned to look at you", and the *turn* is gated on
+`st.vel < 0.05` — the arm never was. Now gated on `offerStill`, 0.20 m/s, and
+held to `down`/`up` only, because `held` is 1 through `tip` whose `vel` is
+zero, so a notice during the pour would have lifted the arm mid-pour. **What**:
+only the *upper* arm's target moved, so the forearm solve dragged the elbow out
+and backwards — a winged elbow. Both bones move now, and forward. Walking and
+noticed: lateral 0.435–0.491 → **0.321–0.359**, against an un-noticed control
+of 0.324–0.360. Stopped and noticed, the gesture survives and improves:
+fore-aft 0.052 → 0.305, +253 mm forward.
+
+**AND A PIROUETTE.** Misha: *"maybe she can do a little ballet move... i'm
+curious how easy it is to borrow from our existing ballet moves"*.
+
+Easy, as it turns out, and for one reason worth writing down: both women are
+`loadSkin('human_skin_fr3d')` and `loadSkin` does not cache, so each gets an
+independent decode of **one skeleton with one clip dictionary**. Nothing was
+borrowed, exported or re-baked. The pirouette is not its own clip — it is
+7.45–10.70 s of `ballet`: BAL_STAND → BAL_PIQUE → BAL_PIROU → three `_spin`
+copies at 120/240/360 → BAL_STAND, with the revolution baked into the root
+bone's quaternion, so there is no yaw to drive or undo.
+
+SHE DOES IT IN `breathe` — the 2.20 s of `rest` after the pail is down, which
+is the only window where both hands are empty, her feet are still and she is
+not behind a wall. At 1.55 the step is 2.03 s, a real single pirouette against
+the barre routine's 3.25 s of demonstration, and **the 52.37 s lap does not
+move**: `take` still begins at 3.10. The turn out to sea runs underneath and is
+untouched.
+
+RARE, and RULE 4: `jit(st.laps, 31) < 0.17`, drawn once on the way into `rest`
+— 20 turns in 120 laps, mean gap six laps, about five and a quarter minutes,
+which is `sayGap`'s own argument. Verified live: ticked 12 laps and she turned
+on laps 6 and 8, the first two the hash predicts.
+
+DELIBERATELY NOT DURING THE POUR CUT. That cut is a composed shot — 26° lens
+from 3.4 m aimed at 1.42 m — and an arm going overhead at 2.0 m is a limb
+leaving the picture. Allowing it is deleting one clause, and that should be a
+call made after looking at the shot rather than before.
+
+`__fr.buck.raw().pirou()` forces the next `rest` to be a turn; `stats()` now
+carries `pirouLap`, `laps` and `clipT`.
+
 ## [1.370.0] — 2026-09-10
 
 ### ten litres going over the lip, and you can hear it

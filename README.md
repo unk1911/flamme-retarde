@@ -158,6 +158,19 @@ are applied live and none of it is baked in.
 | `swallow.mp3` | *Hirundo rustica* | [Barn Swallow XC468712.mp3](https://commons.wikimedia.org/wiki/File:Hirundo_rustica_-_Barn_Swallow_XC468712.mp3) | Marie-Lan Taÿ Pamart | CC BY-SA 4.0 |
 | `wagtail.mp3` | *Motacilla flava* | [Western Yellow Wagtail XC436362.mp3](https://commons.wikimedia.org/wiki/File:Motacilla_flava_-_Western_Yellow_Wagtail_XC436362.mp3) | Joost van Bruggen | CC BY-SA 4.0 |
 
+**The water** — one clip, and the only sound effect in this game that is not
+either synthesised at runtime in `src/80-audio.js` or baked from the owner's
+own recordings:
+
+| clip | what | source | recordist | licence |
+|---|---|---|---|---|
+| `pour.mp3` | Baye emptying her pail on the porch | [Water, Pouring, A.wav](https://freesound.org/people/InspectorJ/sounds/421184/) | InspectorJ (Jonathan Shaw) | CC BY 4.0 |
+
+Trimmed 0.438 s off the head so its peak lands on hers, downmixed to mono,
+resampled to 22 050 Hz and re-levelled to −13.0 dBFS RMS. `tools/cut_pour.py`
+does the conditioning and `assets/audio/CREDITS.md` records it in full, which
+is what that licence asks for.
+
 **The cat**: [*cat*](https://www.meshy.ai/3d-models/cat-01979f8f-28e0-785a-bb0d-1828950e2725)
 by **hsunq2007**, generated with [Meshy](https://www.meshy.ai) and published
 there under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). A
