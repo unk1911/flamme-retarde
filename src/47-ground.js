@@ -1990,6 +1990,18 @@ async function buildGround(scene, field) {
   function dropIn(x, z, yaw, lost = true) {
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
+    // ASKED COLD, AND MEASURED RATHER THAN ASSUMED. `walkY` takes a third
+    // argument — where the asker is standing now — and without it `floorAt`
+    // skips its own guard and returns the HIGHEST surface at that point, which
+    // is why the bucketeer's camera came back with four photographs of paving.
+    // The obvious conclusion is that this line has the same fault, and it does
+    // not: all three callers were checked at the seat of the laptop, the one
+    // place a caller lands inside the vikendica's footprint. Cold answers
+    // 5.802 with the mezzanine off AND on — the deck is not offered at that
+    // (x, z) — and 5.802 is the floor the desk stands on. A hint of the storey
+    // below answers 3.202, so the argument works; nobody is passing one because
+    // nobody needs one. It stays cold until a caller lands on the lower floor,
+    // and this note is here so the next person measures instead of patching.
     you.y = field.walkY(px, pz);
     you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
