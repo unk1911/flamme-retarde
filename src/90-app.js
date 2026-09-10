@@ -2578,7 +2578,7 @@ function stepSwat(dt) {
  * and all three are at ankle height and all three are about the bucket:
  *
  *   1. SHE CANNOT BEND. There is no crouch clip. Her palm hangs 0.87 m above
- *      her feet and a pail standing on the floor has its bail at 0.29 m, so
+ *      her feet and a pail standing on the floor has its bail at 0.40 m, so
  *      `set`, `take`, `lift` and the first 0.9 s of `rest` are a bucket
  *      travelling to meet a hand rather than a hand going down to the bucket.
  *      Photographed from anywhere that has both in frame it is unmistakable: a
@@ -2593,7 +2593,7 @@ function stepSwat(dt) {
  * plain about which is which.
  *
  *   SOLVED — the disc. A circle standing in for an ellipse is only a lie when
- *   you can see the plane of it. Shot A's eye is at 0.62 m and the pail's rim
+ *   you can see the plane of it. Shot A's eye is at 0.60 m and the pail's rim
  *   starts at 0.755 m and goes DOWN from there as she rolls it; shot B stops at
  *   her waist. There is not one frame in this cut that looks into the bucket,
  *   and that is not a dodge — it is where a bucket being emptied is watched
@@ -2606,14 +2606,20 @@ function stepSwat(dt) {
  *
  *   COVERED — the bend. The hand and the bucket are never in frame together
  *   while they are apart. Shot A ends on the frame the pail comes back upright,
- *   which is the frame before the set-down starts. Shot B's bottom edge crosses
- *   her at 0.69 m and crosses the pail — which stands 0.23 m nearer the lens —
- *   at 0.74 m, and the pail's rim travels from 0.2875 m on the paving to
- *   0.755 m in her fist, so the WHOLE of both transfers happens under the
- *   picture. It comes back into frame when she turns and walks off with it, by
- *   which time it is hanging off her fist exactly as a bucket does. Nothing
- *   false is shown. What is not shown is her bending down — and she does not
- *   bend down, so there was never anything there to show.
+ *   which is the frame before the set-down starts. And shot B's bottom edge
+ *   crosses her at 0.85 m, and crosses the pail — which stands 0.23 m nearer
+ *   the lens — at 0.90 m, against a rim that travels from 0.2875 m on the
+ *   paving to 0.755 m in her fist. So the WHOLE of both transfers happens under
+ *   the picture, with 14 cm to spare at the worst of it. Those two numbers
+ *   include the letterbox, which eats 11 per cent off the top and the bottom
+ *   and is part of the shot: the geometric figures are 0.69 and 0.74. Measured
+ *   on the frames, not computed — `__fr.pour.frame(4.40)` and `(7.40)` are the
+ *   two worst instants and there is no blue in either of them.
+ *
+ *   The pail comes back into the picture when she turns and walks off with it,
+ *   hanging off her fist exactly as a bucket does. Nothing false is shown. What
+ *   is not shown is her bending down — and she does not bend down, so there was
+ *   never anything there to show.
  *
  * ── THE SHOTS ──
  *
@@ -2641,31 +2647,34 @@ function stepSwat(dt) {
  *      own rule — arrive, and then stop — applied to a thing that lasts three
  *      quarters of a second.
  *
- *   B  3.75 → 9.30 s   SHE PUTS IT DOWN, LOOKS AT THE CHANNEL, AND GOES.
+ *   B  3.75 → 9.50 s   SHE PUTS IT DOWN, LOOKS AT THE CHANNEL, AND GOES.
  *      3.17 m out on a 26 degree lens, eye at 1.50 m, from behind her right
  *      shoulder as she ends up — which is 1.58 m in front of her and 2.75 m to
  *      her right as she STARTS, because she turns 64 degrees to her left across
- *      this shot. Locked off: the move in it is hers. She straightens up, the
- *      bucket goes down out of the bottom of the frame, she turns and looks out
- *      at the channel with the konoba's pergola and the far shore behind her,
- *      she gets her breath back, she picks the bucket up (under the frame), and
- *      then she turns and walks away out of the left of it — and because the
- *      camera is level and she is receding, her own walk drops the bottom edge
- *      down her body and hands the bucket back to the picture, swinging off her
- *      fist, which is the whole of the pick-up delivered in one gesture and no
- *      cheating.
+ *      this shot. Locked off for five of its five and three quarter seconds:
+ *      the move in it is hers. She straightens up, the bucket goes down out of
+ *      the bottom of the frame, she turns and looks out at the channel with the
+ *      konoba's pergola, its barman and the far shore behind her, she gets her
+ *      breath back, she picks the bucket up (under the frame), and then she
+ *      turns and walks away out of the left of it.
  *
- *      36 degrees of azimuth between the two shots and 16 of elevation, on
- *      purpose: under about 30 and a cut reads as a jump rather than as a cut.
- *      Both cameras are on the same side of her line, so she does not swap ends
- *      of the screen.
+ *      And in the last second the camera tilts 35 cm down after her, which is
+ *      the only move in this cut that is not a camera arriving somewhere. It is
+ *      also what hands the bucket back: the frame line is set where it is to
+ *      keep the transfers out, and it does that so well that her own walk alone
+ *      left 5 cm of blue at the bottom edge. See `pourPlace`.
+ *
+ *      30 degrees of azimuth between the two shots and 13 of elevation, on
+ *      purpose: under about 30 all told and a cut reads as a jump rather than
+ *      as a cut. Both cameras are on the same side of her line, so she does not
+ *      swap ends of the screen.
  *
  * ── HOW LONG, AND WHY IT IS NOT SEVEN SECONDS ──
  *
- * 9.30 s, against the fly's 7.00, and the length is not a taste: THE CUT DOES
+ * 9.50 s, against the fly's 7.00, and the length is not a taste: THE CUT DOES
  * NOT STOP HER CLOCK. It is exactly `tipIn + tipHold + tipOut + setDown +
  * breathe + lift` — 7.75 s, every one of those a number in BUCK that was argued
- * somewhere else — plus 1.55 s of her walking away with the bucket. Shortening
+ * somewhere else — plus 1.75 s of her walking away with the bucket. Shortening
  * it would mean either shortening her beats, which changes every other lap, or
  * cutting away from an action half done. So the clock below is HERS: `beat()`
  * hands back the phase and how far into it she is, and `pourClock` lays those
