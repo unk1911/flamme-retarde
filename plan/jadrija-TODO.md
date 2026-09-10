@@ -699,6 +699,28 @@ bed. See the commit.
   Still not built and wanting a source: the air-conditioning unit on the stone
   wall behind, and the furled dark parasol standing beyond the kiosk — both are
   in _343 and neither is the shop's.
+  **The chest freezer is INSIDE, not on the apron — 10 Sep.** The queue has
+  carried "the Ledo chest freezer on TISAK's apron" for a while and the frame
+  does not support it. Read at 4:24-4:30 of `1000150414` (the clean one is
+  262+5 s, the next second is behind the photographer's thumb): a pale blue
+  glass-topped chest freezer stands at the EAST end of the serving line,
+  behind the counter and inboard of it, its lid roughly level with the counter
+  top, with what looks like a lilo or inflatable lying across it. It is not on
+  the paving in front, and NO lettering on it is legible at this scale — so
+  "Ledo" is an assumption about a Croatian ice-cream chest and not something
+  this source says. Rule 12: it does not get a wordmark from a frame that
+  cannot show one. Either find a frame that reads the branding and the
+  standing position, or build it unlettered where the pan actually puts it.
+  The freezer already referenced in `tisakFront`'s comment — lid 0.91 m at
+  530 px/m — is this same object and is the scale check for it.
+  **`gt = t1 − 2.05` is not a one-line change — 10 Sep.** The note over
+  `tisakFront` says so and it is right: moving where the glazed corner starts
+  re-cuts the bay loop, the streaks, the ghost, the `cuts` the wordmark hangs
+  off and the end return at `S.t0`, and it wants doing in the same pass as
+  un-mirroring the elevation, which is a second re-cut of all the same things.
+  It is a session, not a spare twenty minutes, and half of it landed would be
+  worse than none. Left where it is (`S.t1 − 1.30`) until it can be done whole
+  against the frame rather than around it.
   **The stretch at 4:48-6:10** was listed here as "beach bar MINI and the
   grill" and it is NOT MINI. **CORRECTED 31 Aug** — read frame by frame, the
   last eighty seconds of the pan are the KONOBA's terrace from the seaward
