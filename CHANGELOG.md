@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.366.0] — 2026-09-10
+
+### the first pour gets a cut-scene
+
+Misha: *"since u are struggling with 3d-rendering that part anyway, i had asked
+about it 3 times and it's still not really 100% working ... i am thinking maybe
+in a cut-scene u can really do a much better job ... but this should just be the
+first time around she does it."*
+
+Which is the right instinct and is not a camera move. Three of her faults are
+geometry that cannot be fixed from where she is standing, and a cut is allowed
+to answer them by choosing what is seen.
+
+TWO SHOTS, 9.50 s, ON HER OWN CLOCK. `beat()` hands back her phase and how far
+into it she is, so the cut between them lands on the frame the pail actually
+comes upright rather than on a stopwatch.
+
+**A, the pour, 0.00 to 3.75.** 2.79 m out, 30 degree lens, eye at 0.60 m, from
+her front quarter on the bucket side. Three measurements put it there: from
+dead in front the pail crosses her own thigh; from square on her right at 2.2 m
+the camera is inside the prizemlje wall; above a metre you are looking down
+into the bucket. It leans 30 cm over 1.25 s and stops — and 1.25 is not a round
+number, it is when the water stops. Cut off at her waist deliberately:
+`leanHead` keeps her eyes level, so during the pour she is watching the horizon,
+and a pour shot with her face in it is a shot of somebody not paying attention.
+
+**B, she puts it down, looks at the channel and goes, 3.75 to 9.50.** Over her
+right shoulder AS SHE ENDS UP — she turns 64 degrees across the shot — locked
+off for five seconds, then 35 cm of tilt down after her.
+
+WHAT IT SOLVES AND WHAT IT ONLY COVERS, plainly. Solved: the water disc is a
+circle where a tilted cylinder cuts an ellipse, and both eyes sit at or below
+the rim, so no frame looks into the bucket — which is where a person actually
+watches a pail being emptied. Solved: `placePail`'s 17.7 mm and 83 mm off
+plumb, a fifth of a degree and one degree at this range, on an axis pointing
+away from both cameras. COVERED AND NOT SOLVED: she still cannot bend to the
+bucket, and hand and pail are never in frame together while they are apart —
+14 cm of margin at the worst instant, checked on the rendered frames rather
+than computed. Nothing false is shown; what is not shown is her bending down,
+and she does not bend down.
+
+ONCE A SESSION, and not `localStorage`: this file is opened off a filesystem as
+often as off the site, `file:` origins get an opaque store, and a cut you get
+once ever on one machine is a cut you cannot show anybody.
+
+"PRESENT TO SEE IT" IS SEVEN CLAUSES, all exercised. Between 5 and 18 m — 5 is
+above `BUCK.noticeM` so she cannot be mid-notice; on her level within 2.2 m
+floor-to-floor; outdoors; **not with the house in the way**, a real segment
+against `vik.plan.outer` in the plan's own axes, because her `wall` number only
+asks whether one of you is inside a storey; inside 35 degrees of straight
+ahead; held 0.45 s; her roll no more than 0.25 s old. Miss it and nothing is
+spent — she comes round again in fifty seconds with the flag still down.
+
+Escape, Enter, Space and a delayed pointerdown all end it, and a stuck clock
+ends it by itself. TWO BUGS FELL OUT OF FILMING IT: `__fr.buck.go('tip')` faced
+her backwards after any beat that had reached the walk back up, because the
+four standing beats never set `st.dir`; and the Z lens was not cleared on
+entry, so a zoom left half in would have stretched nine seconds into half a
+minute.
+
+And it changed nothing it should not have: a 720-frame trace of her whole loop
+across twelve state-machine columns hashes identical before and after.
+
+Census `{446,333,86,27}`, blockers 818, tris 642533, 59 fps.
+
 ## [1.365.0] — 2026-09-10
 
 ### the bathers stop wading through the paving
