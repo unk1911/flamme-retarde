@@ -161,6 +161,41 @@
    "hr": "Evo, evo.",
    "en": "Coming, coming.",
    "len": 0.929
+  },
+  {
+   "key": "wet_ej",
+   "beat": "wet",
+   "hr": "Ej! Šta to radiš?",
+   "en": "Hey! What are you doing?",
+   "len": 1.815
+  },
+  {
+   "key": "wet_ajme",
+   "beat": "wet",
+   "hr": "Ajme, ledena je!",
+   "en": "Oh, it is freezing!",
+   "len": 1.125
+  },
+  {
+   "key": "wet_imam",
+   "beat": "wet",
+   "hr": "Imam ja svoje vode!",
+   "en": "I have my own water!",
+   "len": 1.256
+  },
+  {
+   "key": "wet_dosta",
+   "beat": "wet",
+   "hr": "Ma dosta!",
+   "en": "Oh, enough!",
+   "len": 0.695
+  },
+  {
+   "key": "wet_fala",
+   "beat": "wet",
+   "hr": "Fala, tribalo mi je.",
+   "en": "Thanks, I needed that.",
+   "len": 1.368
   }
  ]
 }

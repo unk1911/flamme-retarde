@@ -349,6 +349,29 @@ LINES = [
     ('see_pardon',  'see',  'Pardon.',               'Excuse me.'),
     ('see_malo',    'see',  'Samo malo.',            'Just a moment.'),
     ('see_evo',     'see',  'Evo, evo.',             'Coming, coming.'),
+    # and four hundred litres a minute in the back of the neck.
+    #
+    # Misha, 9 Sep 2026: *"maybe if i spray her with water to activate her"*.
+    # The only pool here that is not muttered. Every other line on this loop is
+    # said to a bucket, a tap or her own back and the `see` three are the
+    # exception that proves it — these five are the second exception and a
+    # louder one, because being hosed is the one thing that happens to her on
+    # this shore that is unarguably addressed to her.
+    #
+    # SHE IS CARRYING WATER, which is the joke the scene is already making and
+    # the reason `wet_imam` is in here at all: a woman fetching ten litres at a
+    # time up an outside stair, in the heat, being handed four hundred litres a
+    # minute by a man with a fire hose. Nobody has to point at it.
+    #
+    # Two annoyed, one flat statement of fact, one about the cold and one
+    # grateful, because a pool where every line is cross is a character and
+    # this is a woman having a hot afternoon interrupted. Ikavian throughout,
+    # like the rest: `tribalo` and not `trebalo`, the way `up_di` has `di`.
+    ('wet_ej',      'wet',  'Ej! Šta to radiš?',     'Hey! What are you doing?'),
+    ('wet_ajme',    'wet',  'Ajme, ledena je!',      'Oh, it is freezing!'),
+    ('wet_imam',    'wet',  'Imam ja svoje vode!',   'I have my own water!'),
+    ('wet_dosta',   'wet',  'Ma dosta!',             'Oh, enough!'),
+    ('wet_fala',    'wet',  'Fala, tribalo mi je.',  'Thanks, I needed that.'),
 ]
 
 

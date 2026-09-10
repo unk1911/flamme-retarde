@@ -1129,6 +1129,13 @@ async function boot() {
     // reason: each hit knocks the knob round one channel, and the last position
     // on the dial is the end of the band.
     ground.addGuest(jadrija.tvProbe, jadrija.tvWet);
+    // And the Bucketeer, who was the one person on this shore the jet went
+    // straight through. Her own two ends and not `figureProbe`'s: she is built
+    // by 45-bucketeer.js, she is only a target for the half of her loop she is
+    // outdoors for, and `buckProbe` is what knows which half that is.
+    if (jadrija.bucketeer && jadrija.bucketeer.probe) {
+      ground.addGuest(jadrija.bucketeer.probe, jadrija.bucketeer.onWet);
+    }
   }
 
   await step(85, 'load.maquis');
@@ -8515,6 +8522,43 @@ window.__fr = {
         fov: camera.fov };
     },
     go: () => (startPour() ? 'rolling' : 'no'),
+    /**
+     * Why it is not firing, clause by clause.
+     *
+     * Misha, 10 Sep 2026: *"i don't see the cut-scene of bucketeer baye for
+     * some reason"*. Seven conditions have to hold at the instant she tips and
+     * `checkPour` returns at the first one that does not, so from the outside
+     * a cut that never comes is indistinguishable from a cut that is not
+     * there. Every number it tests, read where you are standing — and `eyes`
+     * is the one that says whether the watching is banking, because that one
+     * accumulates across her whole lap and is the half of the mechanism a
+     * player cannot feel.
+     */
+    why: () => {
+      const b = jadrija && jadrija.bucketeer;
+      if (!b) return 'no bucketeer';
+      const eye = personAt();
+      const w = b.where();
+      const dx = w[0] - eye.x, dz = w[2] - eye.z;
+      const gap = Math.hypot(dx, dz);
+      camera.getWorldDirection(_pourLook);
+      const dy = w[1] + 0.90 - eye.y;
+      const L = Math.hypot(dx, dy, dz) || 1;
+      const dot = (_pourLook.x * dx + _pourLook.y * dy + _pourLook.z * dz) / L;
+      const t = pourClock();
+      return {
+        seen: pourSeen, rolling: !!pourCut,
+        owned: !!(camOverride || swatCut || vikWalk || comp || dipPhase),
+        gap: +gap.toFixed(2), want: [POUR.near, POUR.far],
+        rise: +(w[1] - ground.you.y).toFixed(2), riseMax: POUR.rise,
+        indoors: jadrija.indoorsAt
+          ? +jadrija.indoorsAt(eye.x, eye.y, eye.z).toFixed(2) : null,
+        house: pourHouseBetween(eye.x, eye.z, w[0], w[2]),
+        dot: +dot.toFixed(3), dotMin: +POUR.dot.toFixed(3),
+        eyes: +pourEyes.toFixed(2), watch: POUR.watch,
+        clock: +t.toFixed(2), arm: POUR.arm, phase: b.beat().phase,
+      };
+    },
     end: () => { endPour(false); return 'out'; },
     /** The camera, the letterbox and her loop, all three. */
     free: () => {

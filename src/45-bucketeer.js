@@ -329,6 +329,46 @@ const BUCK = {
     fill: 'fill', lift: 'lift', take: 'lift',
     down: 'down', tip: 'tip', right: 'tip', rest: 'rest', up: 'up',
   },
+  // ── and she waits for a room she can be heard in ───────────────────────────
+  //
+  // Misha, 10 Sep 2026: *"outside vikendica it's pretty loud w/ all the sounds
+  // so i don't hear her mumbles. maybe she should say some stuff, while being
+  // up on the 2nd floor"*.
+  //
+  // He is describing masking and the fix is not a gain. `MUTTER.gain` is 0.44
+  // against a forecourt carrying the sea, the cicadas, the birds and whatever
+  // the beach is doing four hundred metres away, and the honest way to lose an
+  // argument with all of that is to turn her up until she is a woman shouting
+  // in a garden. The room is the fix: she is at the basin for 5.2 s of every
+  // lap and the flat has none of that bed in it.
+  //
+  // WHICH BEATS ARE THE FLAT. `fill` and `lift` and no others. Traced at
+  // 1/30 s over fifteen minutes, her lap is **52.37 s** and metronomic to the
+  // frame, and it divides as: fill 5.20, lift 0.93, down 23.13, tip 2.87,
+  // right 0.93, rest 3.13, take 0.93, up 14.27, set 0.93. Only the first two
+  // are spent standing in the bathroom — `down` starts there but is 23 s of
+  // stair and made ground, and `up` ends there but is the same going the other
+  // way, so neither can be promised a room.
+  //
+  // AND NOT THE BEAT ALONE, WHICH IS THE HALF THAT WOULD HAVE MADE IT WORSE.
+  // `MUTTER.wallGain` is 0.86 and `MUTTER.wallHz` 500: one wall between the
+  // two of you is −17 dB and a 500 Hz lid, which is less of her than the
+  // forecourt was leaving. Firing indoors while the player is in the garden
+  // would have swapped a line he could nearly hear for one he could not hear
+  // at all. So the gate is the beat AND `st.wall` — she is at the basin and
+  // there is no storey between you, which is the two of you in the flat.
+  sayIn: { fill: 1, lift: 1 },
+  sayInWall: 0.35,
+  // AND IT EXPIRES, because a gate with no way out is a woman who has stopped
+  // talking. 60 s off the measured lap: an arming beat comes round every
+  // 52.37 s, so a player who is in the flat with her waits at most one lap and
+  // usually far less, and a player who never goes up the stairs loses one
+  // minute off a clock that is already 245 to 355 seconds long — 20% at the
+  // very worst, and then she says it in the garden exactly as she does today.
+  sayInHold: 60.0,
+  // And how long she remembers having been hosed, which is the guard and not
+  // a mood. See `buckWet` for why it is ten seconds and not the cat's two.
+  wetSoak: 10.0,
 
   // ── ten kilos on one arm ───────────────────────────────────────────────────
   //
@@ -1103,6 +1143,13 @@ async function buildBucketeer(scene, vik, walkY) {
     // before the feature exists is a feature nobody finds.
     sayAt: 40.0, saySince: 0, sayRem: 0, sayNow: null, sayI: 0,
     sayLast: {}, sayBeat: null, said: [], warmed: false,
+    // How long she has been armed and holding out for the flat. Its own
+    // counter and not `saySince`, which is the doorway's floor and has to keep
+    // running through a hold — see `BUCK.sayInHold`.
+    sayHold: 0,
+    // And the hose. `wetPend` is a line owed, `wetSoak` the memory that stops
+    // one continuous jet asking for sixty of them a second. See `buckWet`.
+    wetPend: false, wetSoak: 0,
     // You, and whether she has seen you. `yield` is her legs stopped because
     // you are in the doorway; `notice`/`noticeAmt` is the seconds left of her
     // having looked up and the eased shape of it; `offered` is whether there
@@ -2017,13 +2064,37 @@ async function buildBucketeer(scene, vik, walkY) {
     // the odd thing to do. Its own floor and not the five-minute clock — see
     // `BUCK.sayYield`, which also says why being LOOKED at does not qualify.
     let pool = null;
-    if (st.yieldT > BUCK.sayYieldFor && st.saySince > BUCK.sayYield) {
+    if (st.wetPend) {
+      // THE HOSE, and it outranks the clock, the beat and the doorway both.
+      //
+      // Misha, 9 Sep 2026: *"maybe if i spray her with water to activate
+      // her"*. Everything else in this function is her talking to a bucket on
+      // a five-minute clock and the whole point of it is that she is not
+      // performing for you. Four hundred litres a minute in the back of the
+      // neck is the one event on this loop that is unambiguously addressed to
+      // her, and a woman who answered it on the next scheduled beat, four
+      // minutes later, would be a woman who had not noticed. So it jumps the
+      // queue outright: no `sayAt`, no `sayNear` — if she is close enough for
+      // you to have HIT her she is close enough to hear — and no room gate,
+      // because `buckWet` only fires when she is outdoors anyway.
+      st.wetPend = false;
+      pool = 'wet';
+    } else if (st.yieldT > BUCK.sayYieldFor && st.saySince > BUCK.sayYield) {
       pool = 'see';
     } else if (st.sayAt <= 0 && d < BUCK.sayNear) {
       // Armed. She takes the next beat that has anything to say, or answers you
       // if she has just looked up — `newsPend` is set by `step` below and is the
       // one thing she does that is ABOUT you rather than about the bucket.
       pool = (st.notice > 0 && st.newsPend) ? 'see' : (entered ? beat : null);
+      // And then holds it, if this is not a beat she can be heard on and she
+      // has not been waiting too long already. See `BUCK.sayIn` for the lap
+      // this is measured against and the wall it is really about. `see` is
+      // never held: that one is her answering you at arm's length.
+      st.sayHold += dt;
+      if (pool && pool !== 'see' && st.sayHold < BUCK.sayInHold
+        && !(BUCK.sayIn[pool] && st.wall < BUCK.sayInWall)) pool = null;
+    } else {
+      st.sayHold = 0;
     }
     if (!pool) return;
 
@@ -2046,10 +2117,75 @@ async function buildBucketeer(scene, vik, walkY) {
       wall: st.wall });
     st.sayAt = BUCK.sayGap + jit(st.sayI, 29) * BUCK.sayJit;
     st.saySince = 0;
+    st.sayHold = 0;
     // For a probe, because nothing puts these on screen. Six, which is
     // `VOICE.memory`, and for the same purpose it serves there.
     st.said.push(line.hr);
     if (st.said.length > 6) st.said.shift();
+  }
+
+  // ── and the branch can be pointed at her ───────────────────────────────────
+  //
+  // Misha, 9 Sep 2026: *"maybe if i spray her with water to activate her"*.
+  //
+  // She was not a target at all. Every other person, animal and set on this
+  // shore is registered with `addGuest` in 47-ground.js — Chloe, the dog, the
+  // cat, six bathers, the transistor and the television — and the one woman on
+  // it who is actually carrying water was the single thing the jet passed
+  // straight through. That is not a tuning fault, it is a missing wire.
+
+  /**
+   * Where she is to the jet, or nothing at all.
+   *
+   * `r` and `h` are Chloe's numbers off `SHOW.hitR`/`hitH` written out rather
+   * than imported, because 43-jadrija.js is not in scope here and because they
+   * are not really hers: they are "an adult standing up", and this is one.
+   * 0.62 m is a shade wider than a person because `traceJet` grows its own fan
+   * down the trace and a hairline ray that has to intersect a walking woman
+   * exactly is the difference between water that works and water that "didn't
+   * seem to do much" — that argument is in `traceJet` and this only has to not
+   * contradict it.
+   *
+   * NULL FOR THE HALF OF HER LOOP THAT IS INDOORS, and this is the whole of
+   * why the function exists rather than a two-line lambda at the registration.
+   * `traceJet` steps a parabola against crew, objects, guests and the ground —
+   * and against no walls at all, because nothing it was written for was ever
+   * behind one. She spends 30 of her 52.37 s in the flat: registered flat, a
+   * jet lobbed at the gable would soak a woman standing in a bathroom on the
+   * other side of a stone wall, and she would answer it out loud. `inFlat` is
+   * the same predicate `wallTick` measures the muffling with, so the two
+   * always agree about which side of the house she is on.
+   */
+  function buckProbe() {
+    if (!mesh.visible || inFlat(st.x, st.y, st.z) > 0.2) return null;
+    return { x: st.x, y: st.y, z: st.z, r: 0.62, h: 1.85 };
+  }
+
+  /**
+   * The jet is on her.
+   *
+   * Litres ignored, for `figureWet`'s reason: there is no quantity of water
+   * that finishes this job and a soak meter on a woman watering her plants
+   * would be the game being a game about the one thing here that is not one.
+   *
+   * `wetSoak` is what stops it being sixty reactions a second. The jet is
+   * traced every frame the branch is on her, so without a memory a two-second
+   * burst is a hundred and twenty lines queued behind each other — which is
+   * `catWet`'s finding, and its `soak` is the same guard for the same reason.
+   * Ten seconds, which is longer than the cat's because his answer is a meow
+   * and hers is a sentence: `sayTick` will not start a line while one is still
+   * sounding, so a shorter memory would only bank a second reaction to play
+   * the instant the first one stopped, and a woman who says two different
+   * things about one soaking is a woman talking to herself.
+   */
+  function buckWet(_litres) {
+    if (st.wetSoak > 0) return;
+    st.wetSoak = BUCK.wetSoak;
+    st.wetPend = true;
+    // For the voice service, in `news`'s own form: what happened, not what to
+    // say. The live path is off on this branch — see the note over `poll` in
+    // 49-voice.js — and this costs one string either way.
+    st.newsPend = 'wet';
   }
 
   /**
@@ -2180,6 +2316,11 @@ async function buildBucketeer(scene, vik, walkY) {
       ? Math.hypot(BUCK.ear.x - st.x, BUCK.ear.z - st.z)
       : Math.sqrt(d2);
     wallTick(dt, who);
+    // The hose's memory, run here rather than in `sayTick` because that one
+    // returns at its first line whenever `BUCK.say` is off — which is exactly
+    // the A/B recording its own note asks for, and a soak that never expired
+    // through a control run would still be blocking on the run after it.
+    if (st.wetSoak > 0) st.wetSoak = Math.max(0, st.wetSoak - dt);
     humTick(dt, dNow, who);
     // And the Croatian, once every five minutes, on the beat it belongs to.
     // Misha, 8 Sep 2026: *"instead, she should occasionally say some short
@@ -2207,8 +2348,16 @@ async function buildBucketeer(scene, vik, walkY) {
         : (n === 'seen'
           ? 'you have just looked at her while she was carrying water, and she '
             + 'has stopped and looked back at you'
-          : null);
+          : (n === 'wet'
+            ? 'they have just turned a fire hose on you, out on the porch, '
+              + 'while you were carrying water up from the tap by the bucket'
+            : null));
     },
+    /**
+     * The two ends of the hose hook — 90-app.js wires them to 47-ground.js,
+     * which is the only file that has both her and a branch.
+     */
+    probe: buckProbe, onWet: buckWet,
     /**
      * Debug: her voice off and on.
      *
@@ -2314,6 +2463,13 @@ async function buildBucketeer(scene, vik, walkY) {
       sayBeat: st.sayBeat,
       sayPool: ((MUTTER_LIB && MUTTER_LIB.lines) || []).length,
       sayWarm: !!st.warmed,
+      // How long she has been armed and holding out for a room she can be
+      // heard in, against the 60 s she will hold for. The one number that
+      // separates "she is waiting for the flat" from "she is not armed at
+      // all", which from outside are the same silence — see `BUCK.sayIn`.
+      sayHold: +st.sayHold.toFixed(1),
+      // And the hose: seconds left of her remembering it, and a line owed.
+      wetSoak: +st.wetSoak.toFixed(1), wetPend: st.wetPend,
       says: audio ? audio.mutter(0, { probe: true }) : -1,
       said: st.said.slice(),
       jetOn: jet.visible, jetH: +jet.scale.y.toFixed(2),

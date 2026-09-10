@@ -8,6 +8,106 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.367.0] — 2026-09-10
+
+### she waits for a room, and the hose finally reaches her
+
+Two asks about the Bucketeer, and a third fault that fell out of the first.
+
+**SHE WAITS FOR A ROOM SHE CAN BE HEARD IN.** Misha: *"outside vikendica it's
+pretty loud w/ all the sounds so i don't hear her mumbles. maybe she should say
+some stuff, while being up on the 2nd floor"*.
+
+He is describing masking, and the wrong fix is a gain: `MUTTER.gain` is 0.44
+against a forecourt carrying the sea, the cicadas, the birds and the beach, and
+the way to lose that argument is to turn her up until she is a woman shouting in
+a garden. The room is the fix.
+
+WHICH BEATS ARE THE FLAT — `fill` and `lift`, and no others. Her lap was traced
+at 1/30 s over fifteen minutes: **52.37 s**, metronomic to the frame, dividing
+as fill 5.20, lift 0.93, down 23.13, tip 2.87, right 0.93, rest 3.13, take 0.93,
+up 14.27, set 0.93. Only the first two are spent standing at the basin. `down`
+starts there but is 23 s of stair and made ground; `up` ends there but is the
+same going the other way.
+
+AND NOT THE BEAT ALONE, which is the half that would have made it worse.
+`MUTTER.wallGain` is 0.86 and `MUTTER.wallHz` 500 — one wall between the two of
+you is **−17 dB and a 500 Hz lid**, which is less of her than the forecourt was
+leaving. Firing indoors while the player is in the garden would have swapped a
+line he could nearly hear for one he could not hear at all. So the gate is the
+beat AND `st.wall`: she is at the basin and there is no storey between you.
+
+AND IT EXPIRES AFTER 60 s, off the measured lap. An arming beat comes round
+every 52.37 s, so a player in the flat waits at most one lap; a player who never
+goes up the stairs loses one minute off a clock that is already 245–355 s — 20%
+at the very worst — and then she says it in the garden exactly as before.
+
+**AND THE BRANCH CAN BE POINTED AT HER.** Misha: *"maybe if i spray her with
+water to activate her"*.
+
+She was not a target at all — not a tuning fault, a missing wire. Every other
+person, animal and set on this shore is registered with `addGuest`: Chloe, the
+dog, the cat, six bathers, the transistor, the television. The one woman on it
+actually carrying water was the single thing the jet passed straight through.
+
+`buckProbe` and `buckWet`, wired in 90-app.js because that is the only file
+holding both her and a hose. FIVE NEW LINES in Zlata's voice, one pool, and the
+one that is the joke the scene was already making — *"Imam ja svoje vode!"*, I
+have my own water — said by a woman fetching ten litres at a time up an outside
+stair while a man hands her four hundred litres a minute. Ikavian throughout,
+like the other twenty-three.
+
+NULL FOR THE HALF OF HER LOOP SHE IS INDOORS FOR, and this is why the probe is a
+function and not a lambda. `traceJet` steps its parabola against crew, objects,
+guests and the ground — and against **no walls at all**, because nothing it was
+written for was ever behind one. She spends 30 of her 52.37 s in the flat;
+registered flat, a jet lobbed at the gable would soak a woman standing in a
+bathroom on the far side of a stone wall, and she would answer it out loud.
+
+The hose outranks the clock, the beat and the doorway both: four hundred litres
+a minute in the back of the neck is the one event on this loop unambiguously
+addressed to her, and a woman who answered it four minutes later on the next
+scheduled beat would be a woman who had not noticed.
+
+**AND THE PEOPLE WHO WERE STANDING IN THE GROUND.** 1.365.0 left two measured
+residuals and both are closed, along with three nobody had counted.
+
+The promenade walker loop was floored on `surfaceY` — the graded surface — where
+a person stands on what is laid over it. Five figures: 0.124 at the konoba
+apron (a `stand`, which never re-solves and so stayed buried all session),
+0.277 and 0.188 on the apron ramp, and two of exactly 0.050, which is
+`PAVE_LIFT`. All five now measure **0.000** against `standY`.
+
+The counter staff had the same fault by a different route. `SHOP_STAFF` plants
+each figure on the shop's own datum, `at((t0+t1)/2).deck`, and the long note
+above it explains why: counter clearance is measured from where the counter was
+drawn. Sound as far as it goes — but at MINI, s 17.85 is inside `paveBand`, so
+the flags are 50 mm over the mortar that datum answers with, and the shore
+rises another 39 mm across the shop. The datum now takes a **floor** rather than
+a replacement, the same idiom as `knGround`: nobody can be placed below the
+height his counter was drawn for. MINI 0.089 → 0.000, H2O 0.015 → 0.000,
+Trampulin 0.066 → 0.000. The konoba keeps its own branch and its own 0.047,
+which is that shop's set-out datum and a different question.
+
+Twenty-seven low figures remain, measured and deliberately **not** patched: nine
+terrace chair sitters low by exactly `PAVE_LIFT` (needs one chair-seat
+measurement to say whether their chairs are drawn the same way), two quay
+figures ~0.95 low that are meant to be under the lip, and the waders and
+sunbathers, whose offsets are the pose.
+
+**AND WHY THE CUT-SCENE IS NOT FIRING.** Misha: *"i don't see the cut-scene of
+bucketeer baye for some reason"*. `checkPour` returns at the first of seven
+clauses that fails, so from outside a cut that never comes is indistinguishable
+from a cut that is not there. `__fr.pour.why()` now reads every number it tests
+where you are standing — including `eyes`, which banks across her whole lap and
+is the half of the mechanism a player cannot feel.
+
+Nothing was relaxed. All nine viewpoints measured on the open side at 6–12 m
+pass every clause; the two that fail are 3 m (inside `near`) and under the
+porch (indoors, house between, 2.8 m of rise). The 5 m floor stays: inside
+`BUCK.noticeM` = 4.6 m she stops, turns and holds the bucket out to you, which
+is a beat of her own that a cut would talk over.
+
 ## [1.366.0] — 2026-09-10
 
 ### the first pour gets a cut-scene
