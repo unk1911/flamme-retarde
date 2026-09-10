@@ -713,6 +713,27 @@ bed. See the commit.
   standing position, or build it unlettered where the pan actually puts it.
   The freezer already referenced in `tisakFront`'s comment — lid 0.91 m at
   530 px/m — is this same object and is the scale check for it.
+  **The Bucketeer's Croatian mutters are DROPPED — 10 Sep.** Built, baked and
+  levelled; Misha heard them and the verdict was "they all sound horrible,
+  like a chipmunk on speed speaking 100mph". The cause is the one compromise
+  the whole thing stood on: the account has exactly two Croatian voices, and
+  Balkanika was already cast as `woman_old` on the beach, so the Bucketeer was
+  the SAME voice resampled 3.2 semitones up to tell them apart. A plain
+  resample moves the formants with the pitch, which is what separates two
+  women — and at that shift it also does the chipmunk. The pitch numbers said
+  it was fine (median f0 209.6 against Jessica's 210.1) and the transcriber
+  said it was fine (0.0% WER); neither of them can hear a chipmunk. Only an
+  ear could, and it took one.
+  The BATHERS' Croatian is unaffected and stayed: Fran and Balkanika at their
+  own pitch shipped in 1.358.0, `chat15` included, and Misha's word on that one
+  was "sounds good".
+  Kept at the tag `dropped/bucketeer-mutters` (was c19b231), not deleted: the
+  hand-written Sibenik lines, the beat hooks, `tools/cut_mutter.py` and the 23
+  takes are all there. **If it is ever redone, it wants a voice of its own
+  rather than a pitched one** — which today means either a third Croatian voice
+  on the account, or accepting that she and the old bather share one and never
+  speak within earshot of each other.
+
   **The porch step is real, and the seam list was wrong about where — 10 Sep.**
   The queue carried "the four walkY seams for every other walker on that
   route" as a terrain defect. Re-measured at 400 samples a leg along
