@@ -55,16 +55,89 @@ const BUCK = {
   // stair legs only — everywhere else she is over the floor anyway.
   clipMin: 0.30,
   clipMax: 1.75,
+  // How fast her feet will take a STEP in the floor, in metres a second.
+  //
+  // Not a smoothing — a rate limit, and the difference is the whole reason it
+  // is safe. `walkY` is exact and mostly continuous, but her route crosses four
+  // places where it is not, and all four were found by differencing her y on
+  // consecutive frames over a lap: −44 mm at the head of the flight, +40 and
+  // +50 mm coming off the made ground on to the porch slab, and −84 mm at the
+  // tip point, each of them inside ONE frame, with the pail, the figure and
+  // both shadows going with her. They are seams between the house's slabs and
+  // the ground mesh and they are not hers to move.
+  //
+  // A first-order damp would hide them and cost her height on the flight, which
+  // she goes down at 0.41 m/s of vertical: the lag of such a filter is v/k, and
+  // any k fast enough to swallow 84 mm in a couple of frames leaves her 16 mm
+  // sunk into every stair. A rate limit costs exactly nothing below its own
+  // ceiling. 0.85 m/s tracks the ramp to the millimetre and spreads the 84 mm
+  // seam over 0.10 s, which reads as a step down rather than as a teleport.
+  stepRate: 0.85,
   // Radians a second she turns at. A person carrying something turns slowly.
   turn: 2.4,
+  // And how much of her pace survives being pointed the wrong way.
+  //
+  // MEASURED, AND IT WAS THE SECOND WORST THING IN THE LOOP. `faceTo` is a
+  // RATE and `walkOn` was not: she left a waypoint at the full pace whatever
+  // she was facing, and turned on to the leg while already travelling down it.
+  // Differenced against her own heading over a lap that is 169 degrees off on
+  // the first frame out of the bathroom, 113 off stepping away from the porch,
+  // and 3.25 seconds of every lap spent more than 45 degrees off — which is a
+  // woman walking backwards out of her own front door with ten litres in one
+  // hand.
+  //
+  // So the pace is gated on the error and nothing else changes. Full walk
+  // inside 31 degrees, which covers every corner the route actually has bar
+  // four — the sharpest of the ordinary ones is 35 degrees, between the
+  // bathroom door and the end of the sofa — and stopped by 83, so the two
+  // doubles-back and the two 80-degree corners at the head and the foot of the
+  // flight become a pivot and then a walk. Standing still to turn on to an open
+  // flight of stairs is not a cost; it is what anybody does with a full bucket.
+  veerLo: 0.55, veerHi: 1.45,
+  // And how far out she starts pulling up, in metres, at the two ends of the
+  // route that are a stop rather than a turn. 0.40 m is about half a stride: at
+  // 0.76 m/s that is 0.7 s of slowing down, and the floor of 12 per cent under
+  // it is what stops the last two centimetres taking a second and a half.
+  pullUp: 0.40,
   // The beats she is not walking through, in seconds.
   fill: 5.2,          // the tap running into it
   lift: 0.9,          // straightening up with it
-  tipIn: 1.5,         // rolling it over
-  tipHold: 1.1,       // and letting the last of it go
-  tipOut: 0.8,        // and back upright
+  tipIn: 2.4,         // rolling it over
+  tipHold: 0.45,      // and letting the last of it go
+  tipOut: 0.9,        // and back upright
   setDown: 0.9,       // putting it down on the porch to straighten her back
   breathe: 2.2,       // standing on the porch looking at the water
+  // ── and why the roll is now 2.4 s and the hold 0.45 ────────────────────────
+  //
+  // THESE THREE USED TO BE 1.5, 1.1 AND 0.8, AND THEY WERE THE WRONG THREE
+  // NUMBERS BECAUSE THEY WERE ANSWERING THE WRONG QUESTION. The old `tip` case
+  // drained the level on a clock of its own — `fill` fell over `tipIn * 0.55`
+  // — and the stream was switched on at a fixed angle. Traced frame by frame,
+  // those two do not meet: the level started falling at t = 0 of the beat and
+  // the stream did not appear until t = 0.450, by which time 57 per cent of ten
+  // litres had left a bucket with nothing coming out of it. Then the stream ran
+  // for 0.33 s, and the pail was held over for another 1.1 s after it was
+  // already empty.
+  //
+  // The level is now decided by the LIP, which is where it always was: see
+  // `spillLevel`. Water leaves when the rim on the low side goes under the
+  // surface and not one frame before, and the whole of this table's job is to
+  // make the angle at which that happens take a believable length of time.
+  //
+  // The arithmetic, and it is all in `spillLevel`'s two constants. The pail
+  // holds 30 mm of freeboard, so the surface reaches the lip at
+  // atan(0.030 / 0.133) = 0.222 rad, 12.7 degrees; the plane reaches the inside
+  // of the base at atan(0.257 / 0.133) = 1.093 rad, 62.6 degrees. On the roll's
+  // own smoothstep to 2.05 rad those two land at 0.198 and 0.522 of `tipIn`, so
+  // the pour is 0.324 of it however long it is. 2.4 s puts 0.78 s of water over
+  // the rim, which is what ten litres over a 290 mm lip takes; 1.5 s put 0.49 s
+  // and read as a bucket with a hole in it.
+  //
+  // `tipHold` came down because the roll now does its work: she is empty at
+  // 1.25 s of a 2.4 s roll, so the last 1.15 s of it IS the shake-out this beat
+  // used to stand still for. 0.45 is the beat at the top of the swing before
+  // she brings it back. The whole beat is 2.85 s against 2.60, which is 0.25 s
+  // on a fifty-second lap and lands nowhere near anything else.
   // Pose her inside this, blink inside that. Both are on the camera and not on
   // you, for the reason `updateCrowd` gives: "is this worth posing" is the
   // viewer's question. 150 and not Baye's 250 — she spends most of the loop
@@ -276,6 +349,19 @@ const BUCK = {
   // `holdPhone` does it, and that is an arm with no life left in it at all.
   armUp: [-0.05, -0.890, 0.45],
   armFore: [0.17, -0.875, 0.45],
+  // What a full stream is worth, as (level fall, in bucketfuls a second) times
+  // (the radius of what is still in it, in metres).
+  //
+  // The stream used to be a switch — a fixed sheet that appeared at 0.685 m
+  // tall on one frame and vanished on another — and both ends of that are the
+  // pop this whole pass exists to remove. What comes over a lip is as fat as
+  // the water going over it, so the cross-section is the product of how fast
+  // the level is falling and how wide the surface still is, and that product is
+  // zero at BOTH ends for free: at the start because the lip has only just gone
+  // under the surface, at the end because there is no surface left. Measured
+  // over the roll it peaks at 0.145 about two thirds of the way through, which
+  // is where a bucket does throw its widest sheet.
+  jetRef: 0.145,
   // How fast the whole thing comes on and off, as a rate — 1/e in 0.29 s.
   // `held * fill` is a step at the top of `lift` and a ramp on the way out of
   // `tip`, and a lean that snapped on with the first frame of a pick-up would
@@ -358,6 +444,99 @@ const PAIL = {
   water: [0.105, 0.180, 0.215],
 };
 
+// The inside of it, in the pail's own axis coordinates, because three separate
+// things now ask the same question and used to answer it three times: how full
+// is it, where is the surface, and has the lip gone under that surface.
+//
+// `full` keeps the 30 mm of freeboard the old inline arithmetic had — a bucket
+// filled to the brim is a bucket you cannot carry — and that 30 mm is now
+// load-bearing rather than cosmetic: it is what decides the angle she has to
+// roll to before anything comes out.
+const PAIL_IN = {
+  base: -PAIL.ear + PAIL.wall * 1.9,        // the inside of the base
+  full: PAIL.h - PAIL.ear - 0.030,          // and as high as it is ever filled
+  lip: PAIL.h - PAIL.ear,                   // the rim it goes over
+  rLip: PAIL.rRim - PAIL.wall,              // measured inside the wall
+};
+
+/**
+ * The highest the surface can stand on the pail's axis at this roll.
+ *
+ * THIS ONE FUNCTION IS THE WHOLE OF THE POUR. Roll a bucket by `tip` and the
+ * lowest point of its rim drops `rLip * tan(tip)` below where the rim's own
+ * plane crosses the axis; a surface above that is a surface running over the
+ * edge. So the level is not a number anybody chooses — it is pinned to the lip
+ * from the moment the lip goes under it, and everything else (when the stream
+ * starts, how fast it runs, when the last of it is gone) falls out of that
+ * rather than being timed against it. See the note over `tipIn`.
+ *
+ * The argument is clamped at 1.40 rad for one reason: `tan` changes sign
+ * through a right angle and she rolls it to 2.05. By 1.09 the plane is already
+ * through the inside of the base and there is nothing left to be wrong about,
+ * so anything past 1.40 is arithmetic nobody can see.
+ */
+const spillLevel = (tip) =>
+  PAIL_IN.lip - PAIL_IN.rLip * Math.tan(Math.min(tip, 1.40));
+/** That level back as a fraction of a bucketful. */
+const levelFill = (y) =>
+  clamp((y - PAIL_IN.base) / (PAIL_IN.full - PAIL_IN.base), 0, 1);
+
+// Scratch for the one below, because it is called twice a frame.
+const wDisc = { y: 0, r: 0 };
+
+/**
+ * The surface of what is in it: where it stands, and how wide it is.
+ *
+ * WATER IS LEVEL WHATEVER IS HOLDING IT, and the note over the disc's mesh used
+ * to admit that it was not — it was a child of the pail, so it tipped with it,
+ * and the only defence offered was that the level was drained fast enough that
+ * it was "wrong for about a third of a second". It was worse than that: traced,
+ * the disc was switched off at a hard `tip < 0.98` while `fill` was still 0.111
+ * and its radius still 111 mm, so ten litres of water ended by a 222 mm disc
+ * blinking out inside a bucket rolled 57 degrees with the mouth toward you.
+ *
+ * So the disc is counter-rolled to level in `placePail` and this is where it
+ * stands and how big it is. Three bounds, and the SMALLEST of the three is the
+ * answer, because what is wanted is the largest level disc centred on the axis
+ * that is still inside the bucket:
+ *
+ *   the wall   — the cone's own inner radius at that height, which is the only
+ *                one that ever bites while the pail is upright;
+ *   the base   — (y − base) / tan, or the disc goes out through the bottom on
+ *                the down-slope side, which it does past 44 degrees;
+ *   the lip    — (lip − y) / tan, the same thing on the up-slope side.
+ *
+ * It is a CIRCLE and not the ellipse the true intersection is. A horizontal
+ * plane through a cylinder tilted by t cuts an ellipse of R by R/cos t, so by
+ * 60 degrees the honest figure is twice as long as it is wide — and it is also
+ * a wedge in the low corner by then rather than anything centred, so drawing
+ * the ellipse and leaving it on the axis would trade one wrong shape for
+ * another and cost a rotated scale to do it. What is worth having is that it is
+ * level, that it is inside the bucket, and that it goes to nothing rather than
+ * blinking out; a 220 mm disc under a lip for a little under a second at ankle
+ * height does not repay a conic section.
+ *
+ * The last line is the same taper at the other end of the loop. `fill` crossing
+ * a threshold used to put a 108 mm disc into an empty bucket in one frame,
+ * which is the tap's own version of the pop above; a base that wets over the
+ * first twentieth of a bucketful — 0.17 s of a 4.2 s fill — is what actually
+ * happens under a tap.
+ */
+function waterDisc(fill, tip) {
+  const s = Math.tan(Math.min(tip, 1.40));
+  const y = Math.min(PAIL_IN.base + (PAIL_IN.full - PAIL_IN.base) * fill,
+    spillLevel(tip));
+  const f = (y + PAIL.ear) / PAIL.h;
+  let r = PAIL.rBase + (PAIL.rRim - PAIL.rBase) * f - PAIL.wall - 0.002;
+  if (s > 1e-4) {
+    r = Math.min(r, (y - PAIL_IN.base) / s, (PAIL_IN.lip - y) / s);
+  }
+  const g = clamp(fill / 0.05, 0, 1);
+  wDisc.y = y;
+  wDisc.r = Math.max(0, r) * g * g * (3 - 2 * g);
+  return wDisc;
+}
+
 // Her hair is Baye's, to the number — he asked for the same woman in a swimsuit
 // and this is what "the same woman" costs. Copied rather than imported because
 // `BAYE_HAIR` lives inside `buildJadrija`'s closure; if one of the two is ever
@@ -386,6 +565,22 @@ const CARRY_BONES = ['spine01', 'spine02', 'spine03', 'neck',
   'clavicleL', 'clavicleR', 'armUL', 'armUR', 'armLR'];
 
 const bckGl = (a) => a.map((n) => n.toFixed(3)).join(', ');
+
+/**
+ * 0…1 with the ends flat. Ten kilos does not start or stop moving in a frame.
+ *
+ * Every one of the four beats where the weight crosses between the floor and
+ * her hand — `lift`, `take`, `set` and the first 0.9 s of `rest`, which are the
+ * same four the humming table names as the ones she cannot hum through — drove
+ * `held` off a bare `clock / duration`. Differenced, the pail therefore went
+ * from stationary to 0.73 m/s inside one frame at the top of a set-down and
+ * back to nothing at the bottom of it: 95 m/s squared at the start of `set`,
+ * 60 at the start of `rest`, 42 and 40 on the two pick-ups, against the 27 the
+ * roll itself never exceeds. Not one of those is a bucket being handled by a
+ * person. It is the same fault the roll's own note rejects linear motion for,
+ * left in the four places nobody had differenced.
+ */
+const bckEase = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 
 
 /**
@@ -742,6 +937,12 @@ async function buildBucketeer(scene, vik, walkY) {
     // in her hand to lean away from.
     load: 0,
     tip: 0,             // radians the pail has rolled about its bail
+    pour: 0,            // 0…1, how fat the stream over the lip is
+    // Where a set-down pail is STANDING, as [x, y, z, yaw], latched — see
+    // `restAt`, which is where the whole of the argument for it is. `standFor`
+    // is which of the two places that is, so that walking away from one and
+    // arriving at the other is a fresh answer rather than a stale one.
+    stand: null, standFor: -1,
     poolAt: null,       // where the last one landed, and how long ago
     poolT: 0,
     // The humming. `humAt` is seconds until the next phrase, `humLeft` is how
@@ -796,19 +997,67 @@ async function buildBucketeer(scene, vik, walkY) {
     st.yaw += Math.abs(d) < m ? d : Math.sign(d) * m;
   }
 
-  /** Move along the route. Returns true when she has run out of it. */
+  /**
+   * Move along the route. Returns true when she has run out of it.
+   *
+   * THE TURN COMES FIRST AND THE PACE IS GATED ON IT, which is the fix for
+   * three and a quarter seconds a lap of walking sideways — see `veerLo` in
+   * BUCK for the measurement. The turn is taken before the step and not after
+   * it so that the gate is answering this frame's heading rather than last
+   * frame's, which at 2.4 rad/s is nine degrees of difference at every corner.
+   */
   function walkOn(dt) {
     const from = st.dir > 0 ? st.leg : st.leg + 1;
     const to = st.dir > 0 ? st.leg + 1 : st.leg;
     const a = at(from), b = at(to);
     const len = Math.hypot(b[0] - a[0], b[2] - a[2]) || 0.001;
-    const v = pace(Math.min(from, to), st.dir);
+    const want = Math.atan2(-(b[2] - a[2]), b[0] - a[0]);
+    faceTo(want, dt);
+    let off = want - st.yaw;
+    while (off > Math.PI) off -= Math.PI * 2;
+    while (off < -Math.PI) off += Math.PI * 2;
+    const e = clamp((Math.abs(off) - BUCK.veerLo)
+      / (BUCK.veerHi - BUCK.veerLo), 0, 1);
+    // AND NEVER QUITE TO ZERO, which is a decision and not a rounding.
+    //
+    // The first cut of this gate stopped her dead below a tenth of a pace, on
+    // the grounds that `clipMin` floors the walk clip at 0.30 and a woman
+    // creeping at 0.05 m/s has feet covering 0.41. That is true and it bought
+    // something worse: `st.vel` under 0.02 is what `drawFrame` calls standing,
+    // so a pivot became walk, idle and walk again inside three quarters of a
+    // second — a statue on a turntable in the middle of it, and, because those
+    // three land inside one 0.28 s crossfade, a 132 mm one-frame flick of the
+    // pail every time she rounded the head of the flight. (That flick was a
+    // fault in `play` and is fixed there; see the note over it in 41-skin.js.
+    // It is still not a thing to go looking for twice.)
+    //
+    // A floor of 6 per cent keeps her over that line at every pace she has —
+    // 0.026 m/s on the stair legs, 0.070 on the flat back up — so a pivot is
+    // one continuous walk clip and she shuffles round on it, which is what
+    // somebody turning with a full bucket does. The foot slide is the same
+    // trade the stair legs already take and the note over `clipMin` already
+    // argues; here it is 33 mm of ground over a 170-degree turn, and it is
+    // hidden under a rotation, which is the one place a slide does not read.
+    let v = pace(Math.min(from, to), st.dir)
+      * (0.06 + 0.94 * (1 - e * e * (3 - 2 * e)));
+    // And she arrives rather than stopping dead. The gate above takes care of
+    // both ends of the route that are a TURN — out of the bathroom and off the
+    // porch, where she is 170 and 113 degrees off and so starts from nothing
+    // anyway — but the two ends that are a stop had her going from the full
+    // pace to zero inside one frame, which differenced as 110 m/s squared on
+    // the pail at the top of `set`, four times what the roll ever does. Only
+    // the LAST leg: an intermediate waypoint is a corner she walks through, and
+    // slowing for each of the eleven would be a woman picking her way.
+    const last = st.dir > 0 ? to >= BUCK_WAY.length - 1 : to <= 0;
+    if (last) {
+      const g = clamp(((1 - st.u) * len) / BUCK.pullUp, 0, 1);
+      v *= 0.12 + 0.88 * g * g * (3 - 2 * g);
+    }
     st.vel = v;
     st.u += (v / len) * dt;
     const k = Math.min(1, st.u);
     st.x = a[0] + (b[0] - a[0]) * k;
     st.z = a[2] + (b[2] - a[2]) * k;
-    faceTo(Math.atan2(-(b[2] - a[2]), b[0] - a[0]), dt);
     if (st.u < 1) return false;
     st.u = 0;
     st.leg += st.dir;
@@ -837,7 +1086,9 @@ async function buildBucketeer(scene, vik, walkY) {
         if (st.clock >= BUCK.fill) { st.phase = 'lift'; st.clock = 0; }
         break;
       case 'lift':
-        st.held = Math.min(1, st.clock / BUCK.lift);
+        // `bckEase` and not a bare ramp, on all four of the transfers — the
+        // long note over it says what a bare ramp measured as.
+        st.held = bckEase(st.clock / BUCK.lift);
         st.vel = 0;
         faceTo(tapYaw(), dt);
         if (st.clock >= BUCK.lift) {
@@ -854,30 +1105,63 @@ async function buildBucketeer(scene, vik, walkY) {
         // is held at the end while the last of it runs out. Linear is a lever
         // being cranked.
         //
-        // The level is on its own curve and empties well before the roll
-        // finishes. Ten litres is out of a pail in about a second, and that is
-        // also what keeps the disc honest — it is gone by 55 degrees, which is
-        // about as far as a horizontal surface can lean before you can see it
-        // lean.
+        // THE LEVEL IS NO LONGER ON A CURVE OF ITS OWN. It used to be — it fell
+        // over `tipIn * 0.55` of the beat while the stream was switched on at a
+        // fixed angle — and the two did not meet: traced frame by frame, the
+        // water started leaving at t = 0 and nothing came out of the bucket
+        // until t = 0.450, so 57 per cent of it went nowhere at all. The lip
+        // decides now. `spillLevel` is where the surface can stand at this
+        // roll, and anything above that has gone over the edge; the level, the
+        // start of the stream, its width and the moment the last of it is out
+        // are then one fact instead of four numbers hoping to agree.
         const k = Math.min(1, st.clock / BUCK.tipIn);
         st.tip = k * k * (3 - 2 * k) * 2.05;
-        st.fill = Math.max(0, 1 - st.clock / (BUCK.tipIn * 0.55));
+        const was = st.fill;
+        st.fill = Math.min(st.fill, levelFill(spillLevel(st.tip)));
+        // And the stream is as fat as what is going over: how fast the level is
+        // falling, times how much surface is left to fall. Zero at both ends
+        // for nothing — see `jetRef`.
+        // The last term is the weir getting going. The other two are already
+        // zero at the far end of the pour — no surface left to fall — but at
+        // the near end the level starts down with a rate of its own the moment
+        // the lip crosses it, which put the sheet at 26 per cent of full width
+        // on its first frame. The first twentieth of a bucketful going over an
+        // edge is a dribble finding the low point of a rim, and it takes about
+        // a tenth of a second.
+        st.pour = dt > 1e-6
+          ? clamp((was - st.fill) / dt * waterDisc(st.fill, st.tip).r
+            / BUCK.jetRef, 0, 1) * bckEase(clamp((1 - st.fill) / 0.05, 0, 1))
+          : 0;
+        // The patch on the concrete grows by exactly what has landed on it,
+        // which is the other half of the same fact. It used to be slammed to 1
+        // on the first pouring frame, so a 0.96 m lens appeared out of dry
+        // paving in a sixtieth of a second.
+        if (was > st.fill) st.poolT = Math.min(1, st.poolT + (was - st.fill));
         st.held = 1;
         if (st.clock >= BUCK.tipIn + BUCK.tipHold) {
           st.phase = 'right'; st.clock = 0;
         }
         break;
       }
-      case 'right':
-        st.tip = 2.05 * (1 - Math.min(1, st.clock / BUCK.tipOut));
+      case 'right': {
+        // And back up on the same smoothstep it went over on. It was linear,
+        // and linear here is the crank the roll's own note rejects: measured,
+        // the righting started and stopped with a step of 2.56 rad/s in the
+        // rate — 154 rad/s squared at each end, against the 5.4 the roll never
+        // exceeds. The pail is on the end of a swung arm through all of it (see
+        // `sw` in `placePail`), so that step was also 0.22 m of hand travel
+        // starting from nothing and stopping dead.
+        const k = Math.min(1, st.clock / BUCK.tipOut);
+        st.tip = 2.05 * (1 - k * k * (3 - 2 * k));
         if (st.clock >= BUCK.tipOut) { st.phase = 'rest'; st.clock = 0; }
         break;
+      }
       case 'rest':
         // She puts it down, straightens her back and looks at the water. It is
         // the one beat in the loop that is not work, and it is the reason she
         // reads as somebody rather than as a mechanism.
         st.tip = 0;
-        st.held = 1 - Math.min(1, st.clock / BUCK.setDown);
+        st.held = 1 - bckEase(st.clock / BUCK.setDown);
         if (st.clock > BUCK.setDown) {
           // Turned out to sea while she stands there.
           const a = at(11), b = vik.at([0.95, 0, 8.2]);
@@ -888,7 +1172,7 @@ async function buildBucketeer(scene, vik, walkY) {
         }
         break;
       case 'take':
-        st.held = Math.min(1, st.clock / BUCK.lift);
+        st.held = bckEase(st.clock / BUCK.lift);
         if (st.clock >= BUCK.lift) {
           st.phase = 'up'; st.clock = 0; st.dir = -1;
           st.leg = BUCK_WAY.length - 2; st.u = 0;
@@ -900,7 +1184,7 @@ async function buildBucketeer(scene, vik, walkY) {
         break;
       case 'set':
         // Back at the tap: down it goes, and round again.
-        st.held = 1 - Math.min(1, st.clock / BUCK.setDown);
+        st.held = 1 - bckEase(st.clock / BUCK.setDown);
         faceTo(tapYaw(), dt);
         if (st.clock >= BUCK.setDown) {
           st.phase = 'fill'; st.clock = 0; st.fill = 0;
@@ -910,6 +1194,7 @@ async function buildBucketeer(scene, vik, walkY) {
         st.phase = 'fill'; st.clock = 0;
     }
     if (st.phase !== 'down' && st.phase !== 'up') st.vel = 0;
+    if (st.phase !== 'tip') st.pour = 0;
     // And how loaded the BODY is, chasing what is in her hand. Here rather
     // than in the pose, so `tick` — which runs the loop forward without ever
     // drawing a frame — settles the lean along with everything else.
@@ -1022,19 +1307,60 @@ async function buildBucketeer(scene, vik, walkY) {
     carryQ('armLR', carry.qb);
   }
 
-  /** Where the bucket is when it is not in her hand, in world metres. */
+  /**
+   * Where the bucket is when it is not in her hand, and which way it is facing.
+   *
+   * LATCHED, AND THAT IS THE WHOLE OF THE FAULT THIS FUNCTION HAD.
+   *
+   * Misha, 10 Sep 2026: *"the bucket situation on the first floor after she
+   * pours it out seems to move oddly around her"* — and it did, literally
+   * around her. Both halves of a set-down pail's pose were recomputed from
+   * `st.yaw` every frame: the porch spot is "a stride in front of her", so it
+   * is a point on a 0.34 m circle centred on her feet, and `placePail` took the
+   * group's bearing straight off her as well. She turns out to sea 0.9 s after
+   * she puts it down, at `turn` — and so the bucket, standing on concrete with
+   * nobody within arm's reach of it, orbited her.
+   *
+   * MEASURED, and this is what it looked like in the numbers, which is where it
+   * was found: between t 31.52 and 31.97 of the lap, with `held` at 0 on both
+   * frames of every difference, the pail slid 0.369 m across the porch at up to
+   * 0.816 m/s and turned at 2.400 rad/s — 137 degrees a second, her exact turn
+   * rate, because it was her turn.
+   *
+   * So the answer is not a smoothing or a smaller radius. A bucket that has
+   * been put down has been put down, and where it was put is a fact about the
+   * past. The spot is recomputed only while the pail is ENTIRELY in her hand;
+   * the instant any of the weight is on the floor it is frozen, and it stays
+   * frozen through `rest`, `take`, `fill` and `lift` until she has hold of all
+   * of it again. `standFor` is the one thing a plain latch would get wrong:
+   * `up` ends with the porch branch live and `set` begins with the tap branch,
+   * so the two resting places have to be told apart or she would put the empty
+   * bucket down on a spot she left at the bottom of the stairs.
+   *
+   * The yaw comes back rather than being read off `st.yaw` in `placePail`, for
+   * the same reason and with the same latch. See there for how the two are
+   * blended while the pail is between the floor and her fist.
+   */
   function restAt(out) {
-    if (st.phase === 'fill' || st.phase === 'lift' || st.phase === 'set') {
-      const w = wx(BUCK_TAP);
-      out.set(w[0], walkY(w[0], w[2], st.y) + PAIL.ear, w[2]);
-    } else {
-      // On the porch, a stride in front of her rather than under her: a bucket
-      // set down between somebody's feet is a bucket she is standing in.
-      const fx = Math.cos(st.yaw), fz = -Math.sin(st.yaw);
-      const x = st.x + fx * 0.34, z = st.z + fz * 0.34;
-      out.set(x, walkY(x, z, st.y) + PAIL.ear, z);
+    const tap = st.phase === 'fill' || st.phase === 'lift' || st.phase === 'set';
+    const spot = tap ? 1 : 0;
+    if (!st.stand || st.standFor !== spot || st.held > 0.999) {
+      st.standFor = spot;
+      let x, z;
+      if (tap) {
+        const w = wx(BUCK_TAP);
+        x = w[0]; z = w[2];
+      } else {
+        // On the porch, a stride in front of her rather than under her: a
+        // bucket set down between somebody's feet is a bucket she is standing
+        // in.
+        x = st.x + Math.cos(st.yaw) * 0.34;
+        z = st.z - Math.sin(st.yaw) * 0.34;
+      }
+      st.stand = [x, walkY(x, z, st.y) + PAIL.ear, z, st.yaw];
     }
-    return out;
+    out.set(st.stand[0], st.stand[1], st.stand[2]);
+    return st.stand[3];
   }
 
   /**
@@ -1047,7 +1373,7 @@ async function buildBucketeer(scene, vik, walkY) {
    */
   function placePail() {
     if (handB === null) handB = fig.boneIndex('handR');
-    restAt(vRest);
+    const standYaw = restAt(vRest);
     if (st.held > 0 && handB >= 0) {
       fig.boneAt(handB, vHand);
       // IN THE FIGURE'S OWN SPACE, and it has to be put back into the world's.
@@ -1098,30 +1424,56 @@ async function buildBucketeer(scene, vik, walkY) {
     // rear lip down and round to the front, and the water comes over it towards
     // whoever is watching. The other sign is the same movement with the bucket
     // emptying behind her heel, which is the sign this had first.
-    kanta.quaternion.setFromAxisAngle(qUp, st.yaw - Math.PI * 0.5);
+    //
+    // OFF THE LATCH AND NOT OFF HER, blended on `held` — see `restAt`, which is
+    // where the bearing a set-down pail keeps is decided and why. In her hand
+    // it turns with her, because the pin is across her fist; on the floor it
+    // keeps the bearing it was put down at, because it is a bucket. In between
+    // the two are the same number anyway — the latch is refreshed every frame
+    // while `held` is 1 — so the blend is exact at both ends and there is no
+    // frame where the answer changes hands.
+    let dy = st.yaw - standYaw;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    kanta.quaternion.setFromAxisAngle(qUp,
+      standYaw + dy * st.held - Math.PI * 0.5);
     pail.rotation.x = st.tip;
     // And the handle laid over on its side once it is standing on something,
     // because a bail left bolt upright over an idle bucket is a bucket
     // somebody is still holding.
-    bail.rotation.x = (1 - st.held) * 1.42;
+    //
+    // ON THE FIRST TENTH OF THE GRIP AND NOT ON THE WHOLE OF IT. Straight off
+    // `1 − held` this ran the full 81 degrees over the whole 0.9 s of a lift,
+    // which traced as the bail lying at up to 1.42 rad while `held` was already
+    // 0.98 — a bucket half a metre off the floor and climbing, with its handle
+    // still flat on its side and nothing holding it. A fist closes on a bail
+    // and the bail comes up; the rest of the beat is the bucket following it.
+    bail.rotation.x = 1.42 * (1 - bckEase(st.held / 0.12));
 
-    // What is in it. The cone is 25 mm wider at the mouth than at the base, so
-    // the surface radius is read off the profile at its own height.
-    const on = st.fill > 0.015 && st.tip < 0.98;
-    water.visible = on;
-    if (on) {
-      const y0 = -PAIL.ear + PAIL.wall * 1.9;
-      const y = y0 + (PAIL.h - PAIL.ear - 0.030 - y0) * st.fill;
-      const f = (y + PAIL.ear) / PAIL.h;
-      const r = PAIL.rBase + (PAIL.rRim - PAIL.rBase) * f - PAIL.wall - 0.002;
-      water.position.y = y;
-      water.scale.set(r, 1, r);
+    // What is in it, and IT STANDS LEVEL. `waterDisc` is where it is and how
+    // wide, and the long note over it is the argument; here is only the one
+    // line that makes it level. The disc is a child of the pail and the pail is
+    // rolled by `tip` about its own local x, and the group over both carries
+    // nothing but a yaw about world up — so an equal and opposite roll on the
+    // disc puts its plane horizontal in the world, exactly, at any angle, for
+    // one assignment.
+    const w = waterDisc(st.fill, st.tip);
+    water.visible = w.r > 0.002;
+    if (water.visible) {
+      water.position.y = w.y;
+      water.rotation.x = -st.tip;
+      water.scale.set(w.r, 1, w.r);
     }
   }
 
   /** The stream out of it, and the puddle it makes on the concrete. */
   function placeWater(dt) {
-    const pouring = st.phase === 'tip' && st.tip > 0.45 && st.fill > 0.015;
+    // On exactly while something is going over the lip, and no wider than what
+    // is going over it — `st.pour` is written in `stepLoop` and its note over
+    // `jetRef` is the argument. It replaces `tip > 0.45 && fill > 0.015`, which
+    // was a switch: the sheet appeared 0.685 m tall on one frame and vanished
+    // on another, 0.33 s later, having missed most of the water.
+    const pouring = st.pour > 0.004;
     jet.visible = pouring;
     if (pouring) {
       // Off the lip that has actually gone down, which is the pail's own +z rim
@@ -1143,10 +1495,15 @@ async function buildBucketeer(scene, vik, walkY) {
       // Flattened across the lip and turned to it: the sheet is as wide as the
       // rim it is coming over and a few centimetres thick, which is the axis
       // the 0.34 is on. Round, it is a downpipe.
-      jet.scale.set(1, Math.max(0.02, kanta.position.y + ly - ground), 0.34);
+      jet.scale.set(st.pour, Math.max(0.02, kanta.position.y + ly - ground),
+        0.34 * st.pour);
       jet.rotation.y = st.yaw + Math.PI * 0.5;
+      // WHERE it landed, and only where. How MUCH is `st.poolT`, and that is
+      // written in the `tip` case by the water actually leaving the bucket —
+      // this line used to say `st.poolT = 1` as well, which is why a 0.96 m
+      // lens appeared on dry paving in one frame however gently the stream
+      // started.
       st.poolAt = [lx, ground, lzw];
-      st.poolT = 1;
     }
     // And the wet patch, which spreads while she is pouring and dries while
     // she is walking back up. Fifty seconds of concrete in August is about
@@ -1154,12 +1511,20 @@ async function buildBucketeer(scene, vik, walkY) {
     // somebody doing this all day.
     if (st.poolAt) {
       if (!pouring) st.poolT = Math.max(0, st.poolT - dt / 50);
-      pool.visible = st.poolT > 0.02;
+      // And it goes out the way it came in. `poolT > 0.02` cut it off at a
+      // 0.36 m lens still at 21 per cent, which on dry limestone is a dark
+      // circle the size of a dinner plate blinking out of existence; the last
+      // tenth of the dry-out now takes the radius and the opacity down together
+      // and nothing at all changes above it. `poolT` itself grows with what has
+      // actually landed — see the `tip` case — so the near end of its life is
+      // continuous for the same reason the far end now is.
+      pool.visible = st.poolT > 0.002;
       if (pool.visible) {
         pool.position.set(st.poolAt[0], st.poolAt[1] + 0.004, st.poolAt[2]);
-        const r = 0.34 + 0.62 * Math.min(1, st.poolT * 1.6);
+        const gone = bckEase(st.poolT / 0.10);
+        const r = (0.34 + 0.62 * Math.min(1, st.poolT * 1.6)) * gone;
         pool.scale.set(r, 0.55 + 0.45 * st.poolT, r * 0.86);
-        pool.material.uniforms.uOpacity.value = 0.20 + 0.52 * st.poolT;
+        pool.material.uniforms.uOpacity.value = (0.20 + 0.52 * st.poolT) * gone;
       }
     }
   }
@@ -1335,6 +1700,56 @@ async function buildBucketeer(scene, vik, walkY) {
   }
 
   /**
+   * Her feet on the floor, and NOT a straight read of it.
+   *
+   * `walkY` is exact and it is right; what it is not is continuous, and her
+   * route crosses four seams where it steps. See `stepRate` in BUCK, which is
+   * where the four are measured and where the choice of a rate limit over a
+   * damp is argued. This costs nothing anywhere the floor is smooth: below the
+   * ceiling it is `st.y = walkY(...)` and nothing else.
+   */
+  function settleY(dt) {
+    const g = walkY(st.x, st.z, st.y);
+    const m = BUCK.stepRate * dt;
+    const d = g - st.y;
+    st.y += Math.abs(d) < m ? d : Math.sign(d) * m;
+  }
+
+  /**
+   * Everything a frame of her needs once `stepLoop` has decided what she is
+   * doing: the clip, the weight, the palette, the pail and the water.
+   *
+   * ITS OWN FUNCTION SO THAT A PROBE CAN RUN IT. `tick` below advances the
+   * state machine without drawing, which is right for skipping forward and
+   * useless for looking at a curve: the pail is placed once, at the end, so
+   * every frame in between is a frame nobody measured. `trace` runs this, and
+   * finding the four discontinuities that were in this loop needed the pail's
+   * world position on consecutive frames and nothing else would do.
+   *
+   * The order is load-bearing and is `poseCarry`'s note: pose, update, matrix,
+   * THEN the pail — `boneAt` means nothing until the palette has been folded
+   * and the mesh's own matrix is current.
+   */
+  function drawFrame(dt, face) {
+    // Walking or standing, and how fast the clip runs. `play` is a no-op when
+    // the clip is already current, so this is safe every frame.
+    const moving = st.vel > 0.02;
+    fig.play(moving ? 'walk' : 'idle', { fade: 0.28 });
+    fig.state.speed = moving
+      ? clamp(st.vel / BUCK.clipSpeed, BUCK.clipMin, BUCK.clipMax) : 1;
+    // The weight, immediately before the update and nowhere else — see the
+    // note over `poseCarry`. She already walks the loaded legs slower than the
+    // empty ones (0.44 m/s down the flight against 0.78 back up); this is the
+    // half of carrying ten litres that is above the waist.
+    poseCarry();
+    fig.update(dt);
+    if (face) fig.faceTick(dt);
+    mesh.updateMatrixWorld();
+    placePail();
+    placeWater(dt);
+  }
+
+  /**
    * Poked once a frame from `updateCrowd`, with the camera.
    *
    * Gated on the camera the way Baye is, and for the same reason: twenty-eight
@@ -1360,10 +1775,22 @@ async function buildBucketeer(scene, vik, walkY) {
     // person who tries to squeeze past you in a doorway with ten litres in one
     // hand is a person clipping through a jamb. Standing still and waiting is
     // what somebody actually does, and it costs nothing to be right about.
+    // AND ONLY WHILE SHE IS ON HER WAY SOMEWHERE, which is the one line this
+    // wanted from the day it was written and did not have. `ahead` falls back
+    // to 1 when she is not moving — deliberately, so that a woman already
+    // stopped by you stays stopped — but nothing said she had to be walking in
+    // the first place, so standing anywhere within 0.95 m of her set `yield`
+    // whatever she was doing, and `yield` takes `stepLoop` out of the frame.
+    // Probed: stand 0.45 m from her at the basin and `fill` sits at 0.00 with
+    // `yielding` true for as long as you care to stand there. Not a slow beat —
+    // a stopped one. She never turns the tap off, never picks the bucket up,
+    // and `humLevel` returns 0 the whole time, so the flat goes quiet as well.
+    // The two walking beats are the only ones with a leg to be in the way of.
     const near = Math.sqrt(d2);
+    const walking = st.phase === 'down' || st.phase === 'up';
     const ahead = st.vel > 0.02
       ? (dx * Math.sin(st.yaw) + dz * Math.cos(st.yaw)) / (near || 1) : 1;
-    st.yield = near < BUCK.yieldM && ahead > BUCK.yieldDot;
+    st.yield = walking && near < BUCK.yieldM && ahead > BUCK.yieldDot;
 
     // ── and she knows you are there ─────────────────────────────────────────
     //
@@ -1418,26 +1845,11 @@ async function buildBucketeer(scene, vik, walkY) {
     if (st.notice > 0 && st.vel < 0.05 && near > 0.35) {
       faceTo(Math.atan2(dx, dz), dt);
     }
-    st.y = walkY(st.x, st.z, st.y);
+    settleY(dt);
     mesh.position.set(st.x, st.y, st.z);
     mesh.rotation.y = st.yaw;
 
-    // Walking or standing, and how fast the clip runs. `play` is a no-op when
-    // the clip is already current, so this is safe every frame.
-    const moving = st.vel > 0.02;
-    fig.play(moving ? 'walk' : 'idle', { fade: 0.28 });
-    fig.state.speed = moving
-      ? clamp(st.vel / BUCK.clipSpeed, BUCK.clipMin, BUCK.clipMax) : 1;
-    // The weight, immediately before the update and nowhere else — see the
-    // note over `poseCarry`. She already walks the loaded legs slower than the
-    // empty ones (0.44 m/s down the flight against 0.78 back up); this is the
-    // half of carrying ten litres that is above the waist.
-    poseCarry();
-    fig.update(dt);
-    if (d2 < BUCK.faceM * BUCK.faceM) fig.faceTick(dt);
-    mesh.updateMatrixWorld();
-    placePail();
-    placeWater(dt);
+    drawFrame(dt, d2 < BUCK.faceM * BUCK.faceM);
 
     // And the humming, WHICH IS ON AGAIN AND IS HER OWN VOICE.
     //
@@ -1510,6 +1922,9 @@ async function buildBucketeer(scene, vik, walkY) {
       noticeAmt: +st.noticeAmt.toFixed(3), offered: !!st.offered,
       yaw: +st.yaw.toFixed(3), clip: fig.playing(),
       bucket: kanta.position.toArray().map((n) => +n.toFixed(2)),
+      /** How fat the stream is, 0…1, and where a set-down pail is standing. */
+      pour: +st.pour.toFixed(3),
+      stand: st.stand ? st.stand.map((n) => +n.toFixed(2)) : null,
       pool: +st.poolT.toFixed(2),
       // The humming. `humIn` is seconds to the next phrase, `humRem` seconds of
       // one still sounding, `humLeft` how many are left of this burst, `humLvl`
@@ -1537,7 +1952,10 @@ async function buildBucketeer(scene, vik, walkY) {
      * it. Same reason `vik.cut` and `pc.step` exist.
      */
     go(phase, leg = null) {
-      st.phase = phase; st.clock = 0; st.u = 0; st.tip = 0;
+      st.phase = phase; st.clock = 0; st.u = 0; st.tip = 0; st.pour = 0;
+      // And the set-down latch cleared, so the beat photographs itself rather
+      // than a bucket left standing wherever the loop was before the jump.
+      st.stand = null; st.standFor = -1;
       let k = 0;                    // the waypoint she is standing on
       if (phase === 'down') {
         st.dir = 1; st.fill = 1; st.held = 1;
@@ -1600,7 +2018,7 @@ async function buildBucketeer(scene, vik, walkY) {
     tick(secs, dtStep = 1 / 30) {
       for (let t = 0; t < secs; t += dtStep) {
         stepLoop(dtStep);
-        st.y = walkY(st.x, st.z, st.y);
+        settleY(dtStep);
       }
       mesh.position.set(st.x, st.y, st.z);
       mesh.rotation.y = st.yaw;
@@ -1610,6 +2028,64 @@ async function buildBucketeer(scene, vik, walkY) {
       placePail();
       placeWater(0);
       return this.stats();
+    },
+    /**
+     * Every frame of a stretch of the loop, sampled, as rows of numbers.
+     *
+     * WHY THIS IS IN THE SHIPPED FILE AND NOT IN A SCRATCH BUILD. Every fault
+     * this loop has ever had was a STEP in a curve that should have been
+     * smooth, and not one of them was findable by looking: a bucket that jumps
+     * 90 mm on one frame, an ankle-height prop that rotates through 70 degrees
+     * over half a second, a puddle that appears at full size. On a headless
+     * page running a frame a second none of that is even on screen at the same
+     * time as itself. Differencing consecutive frames finds all of them in one
+     * pass and says where in the cycle each one is, which is what `tick` cannot
+     * do — it advances the state machine and places the pail once, at the end,
+     * so every frame in between is a frame nobody measured.
+     *
+     *   const r = __fr.buck.raw().trace(6, 1 / 60, 'down', 9);
+     *
+     * One row a frame: t, phase, the pail group's world position, her yaw, the
+     * roll, `held`, `fill`, `load`, her speed, the world palm the pail hangs
+     * from, the bail's lie, and the three sizes that pop — the disc in the
+     * bucket, the height of the stream and the radius of the wet patch — then
+     * her own feet, the PAIL'S OWN bearing and how fat the stream is.
+     *
+     * The pail's bearing is its own and not hers, which is not a nicety: the
+     * fault this was written to find was a set-down bucket turning with her,
+     * and a trace carrying only `st.yaw` cannot tell a latched bucket from an
+     * unlatched one. It is read off the group's quaternion, which by
+     * construction carries nothing but a yaw about world up.
+     *
+     * It is deliberately an array of arrays: a full pour at 60 fps is four
+     * hundred rows and named fields triple the bytes over the wire for
+     * nothing.
+     */
+    trace(secs, dtStep = 1 / 60, phase = null, leg = null) {
+      if (phase) this.go(phase, leg);
+      const rows = [];
+      for (let t = 0; t < secs; t += dtStep) {
+        stepLoop(dtStep);
+        settleY(dtStep);
+        mesh.position.set(st.x, st.y, st.z);
+        mesh.rotation.y = st.yaw;
+        drawFrame(dtStep, false);
+        rows.push([+(t + dtStep).toFixed(4), st.phase,
+          +kanta.position.x.toFixed(5), +kanta.position.y.toFixed(5),
+          +kanta.position.z.toFixed(5),
+          +st.yaw.toFixed(5), +st.tip.toFixed(5),
+          +st.held.toFixed(5), +st.fill.toFixed(5), +st.load.toFixed(5),
+          +st.vel.toFixed(4),
+          +vPalm.x.toFixed(5), +vPalm.y.toFixed(5), +vPalm.z.toFixed(5),
+          +bail.rotation.x.toFixed(4),
+          water.visible ? +water.scale.x.toFixed(4) : 0,
+          jet.visible ? +jet.scale.y.toFixed(4) : 0,
+          pool.visible ? +pool.scale.x.toFixed(4) : 0,
+          +st.x.toFixed(5), +st.y.toFixed(5), +st.z.toFixed(5),
+          +(2 * Math.atan2(kanta.quaternion.y, kanta.quaternion.w)).toFixed(5),
+          +st.pour.toFixed(4)]);
+      }
+      return rows;
     },
     /** Stop the loop where it stands, or let it run again. */
     hold: (on) => { st.hold = on == null ? !st.hold : !!on; return st.hold; },

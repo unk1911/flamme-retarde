@@ -1673,6 +1673,41 @@ function skinnedFigure(data, opts = {}) {
   function play(name, { fade = 0.30, next = null, from = 0 } = {}) {
     const clip = data.clips[name];
     if (!clip || clip === st.cur) return false;
+    // ── asked back for the clip we are still fading OUT of ────────────────
+    //
+    // TURN THE FADE ROUND; DO NOT START A NEW ONE. The line below makes the
+    // current clip the new `prev` and the new clip the new `cur` at weight
+    // zero, and that is right when the two are strangers and catastrophic when
+    // the new one is the clip already sitting in `prev` at weight 1 − u: the
+    // pose is lerp(prev, cur, u), and re-playing `prev` rebuilt it as
+    // lerp(cur, prev, 0) — the same two poses with the weight thrown away — so
+    // an interrupted crossfade snapped the whole distance between the clips in
+    // one frame and then faded back over the next 0.28 s.
+    //
+    // MEASURED on the Bucketeer, whose pace gate now stops her at a corner and
+    // starts her again inside the fade: her walk went idle at 14.050 and asked
+    // for walk again at 14.167, 0.117 s into a 0.28 s fade, and on that one
+    // frame the pail hanging off her fist jumped 132 mm forward and came
+    // straight back — 933 m/s squared, thirty times anything else in her loop,
+    // and a single-frame flick that no amount of looking would ever have found.
+    // It is not hers, though: this is every figure in the game that stops and
+    // starts inside a third of a second, and the reason it has never been seen
+    // is that until now nothing did.
+    //
+    // The two clocks swap with the two clips and the fade is complemented, so
+    // the pose on the frame after is exactly the pose on the frame before and
+    // the walk picks up from where its own feet were rather than from zero. A
+    // `fade` of 0 still means "snap", which is what the branch below does.
+    if (clip === st.prev && fade > 0 && st.fadeLen > 0) {
+      const u = Math.min(1, st.fade / st.fadeLen);
+      const t = st.curT;
+      st.prev = st.cur; st.cur = clip;
+      st.curT = st.prevT; st.prevT = t;
+      st.fadeLen = fade;
+      st.fade = (1 - u) * fade;
+      st.next = next;
+      return true;
+    }
     if (st.cur && fade > 0) {
       st.prev = st.cur; st.prevT = st.curT; st.fade = 0; st.fadeLen = fade;
     } else {

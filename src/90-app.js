@@ -7855,6 +7855,19 @@ window.__fr = {
       ground.retarget(jadrija);
       ground.dropIn(x, z, 0);
       const a = Math.atan2(-(hx - x), -(hz - z));
+      // THE FLOOR SHE IS ON, AND NOT THE ONE OVER HER HEAD. `put` has taken a
+      // `yHint` since the prizemlje arrived and the note over it says exactly
+      // why; `dropIn` has not, and asks `walkY` cold. Cold on the porch that
+      // answers with the TERRACE — the porch is `terrasa 8` and there is a slab
+      // 2.80 m over it — so `ground.you.y` here was the balcony, the eye was
+      // computed 2.80 m too high, and every pitch taken off it looked down
+      // through the underside of the terrace at her feet. Photographing the
+      // pour from four sides in a row produced four pictures of paving.
+      //
+      // So the hint is applied first and the eye read back off it. Two `put`s
+      // and not one, because the pitch needs the eye and the eye needs the
+      // floor: the first lands her on the right storey, the second aims.
+      ground.put(x, z, a, 0, hy);
       const eye = ground.you.y + 1.66;
       const p = Math.atan2(hy + aim - eye, Math.hypot(hx - x, hz - z));
       ground.put(x, z, a, p, hy);
