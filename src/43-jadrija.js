@@ -23732,8 +23732,40 @@ async function buildJadrija(scene) {
       // been the only man on this shore up to his ankles in his own terrace,
       // and 177 mm is most of a head of counter clearance. One flag under the
       // floor, like everything else in that shop; see `knSet`.
+      //
+      // And a floor under the datum, because a datum is not the ground and at
+      // MINI the two were 89 mm apart. Measured at t 274.60, s 17.85 with
+      // `raw().staff()` against `raw().heights()`: the shop datum
+      // `at(278).deck` is 2.846 and the flag he is standing on is 2.935, and
+      // that gap is two things and not one. 0.050 of it is `PAVE_LIFT` — the
+      // promenade's stone is laid that far over the mortar bed `surfaceY`
+      // answers with, and s 17.85 is inside `paveBand`, so the datum is not
+      // even the right ground at the middle of the shop either; see the note
+      // in `standY`. The other 0.039 is shore, the deck going 2.8465 to 2.8853
+      // between t 278 and t 274.60, and THAT is exactly the drift the
+      // paragraph above is about and is not a fault.
+      //
+      // `Math.max` and not `standY` outright, so that the argument above
+      // survives intact: the shop's own datum stays the floor of the
+      // placement and nobody can be put below the height his counter was
+      // drawn for, which is what plain ground would do to a barman on a
+      // stretch where the shore FALLS across a shop. Same idiom and same
+      // reason as `knGround` in the canopy block. Today the ground wins at
+      // all three of the shops that reach this branch.
+      //
+      // What it costs is counter clearance, and it is worth writing the
+      // number down: `shopKit` puts the counter top at `y0 + 1.06`, so at
+      // MINI 1.060 m becomes 0.971 m. That is still a bar counter, and the
+      // error was in the direction that shows MORE of him over it rather than
+      // less — which is the only direction this trade is allowed to go, since
+      // the whole reason the datum was picked was that a man who sinks
+      // vanishes behind his own bar. Four figures, `sunk` before and after:
+      // mini 274.60 0.089 -> 0.000, h2o 317.20 0.015 -> 0.000, tramp2 471.60
+      // 0.066 -> 0.000, konoba 244.00 0.047 -> 0.047, untouched because that
+      // one is the set-out datum of one flag under its own floor and not this
+      // question at all.
       const y0 = S.key === 'konoba' ? konobaFloor(S) - 0.047
-        : at((S.t0 + S.t1) * 0.5).deck;
+        : Math.max(at((S.t0 + S.t1) * 0.5).deck, standY(t, ss));
       bathers.push({ t, s: ss, y: y0, ang: -Math.PI / 2,
         pose, k, beat: null, sex: 'm', shirt: TEE, hair: CROP, staff: true });
     }
@@ -38491,11 +38523,22 @@ async function buildJadrija(scene) {
      * the bottom of" — which is a thing you cannot get to the bottom of by
      * reading, because what is missing is a figure and figures are chosen at
      * runtime.
+     *
+     * `y` and `sunk` came later and are the other half of it: `y` is the
+     * height the figure was placed at, and `sunk` is `standY` at his own
+     * (t, s) minus it — how far into the ground he is standing, positive
+     * down. It is read here rather than off the drawing pass because the
+     * placement is one line of arithmetic run once at build time and nothing
+     * downstream corrects it, so a man 89 mm under the flags looks exactly
+     * like a man on them from every angle a screenshot can be taken from.
+     * MINI's server stood 89 mm into the flags from the day he was placed
+     * until this printed the number, and every look at him agreed with him.
      */
     staff: () => bathers.map((b, i) => [i, b])
       .filter(([, b]) => b.staff)
       .map(([i, b]) => ({ i, t: +b.t.toFixed(1), s: +b.s.toFixed(2),
         pose: b.pose, k: b.k, beat: b.beat, hid: !!b.hidden,
+        y: +b.y.toFixed(3), sunk: +(standY(b.t, b.s) - b.y).toFixed(3),
         blob: b.blob == null ? null : b.blob })),
     /** How many people are on a phone, how many are drawn, and what the
      *  screens are showing — which is the only way to tell a live quote from
