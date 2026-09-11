@@ -5593,7 +5593,83 @@ function buildAudio() {
    */
   const MUTTER = {
     rate: 1.0,
-    gain: 0.44,
+    // ── 0.44 WAS FOUR DECIBELS OVER AN EMPTY BEACH, WHICH IS NOT A VOICE ─────
+    //
+    // Misha, 10 Sep 2026: *"if i spray her, i *think* she mutters something
+    // under her breath but it's kinda like blah.... why can't she talk more, in
+    // croatian... maybe the volume is too soft or something? she certainly hums
+    // nicely"*.
+    //
+    // "I think" is the report. Measured through the game's own mixer off
+    // `audio.tap()`, on foot at Jadrija (`?tgps=233,21`) against silent control
+    // recordings of the same scene — never at the default URL, where the player
+    // is in the aircraft and the engine bed once reported the pour and a mutter
+    // as identical to a tenth of a decibel. Loudest 300 ms window, and the same
+    // window taken again inside 300-3400 Hz, which is the band the words are
+    // actually in:
+    //
+    //                              full band        speech band
+    //   control, nothing fired     -31.81            -33.16
+    //   her hum at 3 m             -31.48  (+0.3)    -33.55  (-0.4)
+    //   her voice at 3 m, was      -26.22  (+5.6)    -29.92  (+3.2)
+    //   her voice at 3 m, now      -17.95 (+13.9)    -21.64 (+11.5)
+    //   a `wet` line at 3 m, now   -17.39 (+14.4)    -19.93 (+13.2)
+    //   the pour at 3 m            -14.84 (+17.0)    -16.34 (+16.8)
+    //
+    // THREE DECIBELS OF SPEECH OVER THE BED, BEFORE. Nothing is intelligible at
+    // three decibels; effortless listening starts around ten and does not
+    // really arrive until fourteen. That row IS the word "blah", and it is the
+    // row that matters, because the full-band number flatters her: the bed at
+    // Jadrija is sea and cicadas and gulls spread across the spectrum, and a
+    // voice only has to beat the part of it that is sitting on the consonants.
+    //
+    // THE CONTROL IS NOT ONE NUMBER, and that is worth writing down because the
+    // note over `POURSFX.gain` quotes a single one (-31.3) as though it were.
+    // Four silent runs of the same scene at the same spot came back at -31.80,
+    // -28.86, -34.23 and -35.24 full band: a 6.4 dB spread, because the beach
+    // is not the same beach twice — the bathers, the gulls and the boats are
+    // wherever this run put them. The -31.81 above is the POWER MEAN of the
+    // four, which is the only honest way to difference against it, and every
+    // margin in this table carries that ±3 dB with it. What does NOT vary is
+    // the thing being measured: two runs of the same line came back at -18.02
+    // and -17.95, two hundredths apart.
+    //
+    // AND THE HUM IS WHY THE COMPLAINT IS SHAPED THE WAY IT IS. He likes the
+    // hum, and the hum measures a third of a decibel over an empty beach, which
+    // is to say nothing at all — because it is a closed mouth on one sustained
+    // note living in 190-350 Hz, a narrow band with nothing else in it.
+    // Broadband metrics cannot see that and neither can this table; what the
+    // table can see is that a hum can be quiet and still be heard and a sentence
+    // cannot. *"She certainly hums nicely"* and *"it's kinda like blah"* are the
+    // same person describing two sounds at the same level.
+    //
+    // 1.15 is +8.34 dB, and the measurement landed on it rather than the taste.
+    // The voice scales exactly with this number — `g` carries it and the reverb
+    // send hangs off `g`, so the wet scales with the dry and there is no second
+    // term — and the recordings confirm it to the hundredth: +8.27 dB full
+    // band, +8.28 speech band, +8.57 on the peak, against +8.34 predicted.
+    //
+    // What that buys is 11.5 dB of speech-band margin, which is inside
+    // "effortless", and it still leaves the pour on top: 3.1 dB over her full
+    // band and 5.3 in the speech band. That last is a constraint and not an
+    // accident — `POURSFX`'s note says a bucket of water hitting stone IS louder
+    // than a woman muttering at it and must stay the loudest thing on that
+    // porch, and at 1.15 it does, by about the smallest margin anybody can hear.
+    //
+    // HEADROOM, checked the way `POURSFX.gain` had to be after real transients
+    // clipped the master at +0.47 dBFS with ten samples at full scale. Point
+    // blank is the case that decides it, because he *"often stand[s] next to
+    // her"*: 4x-oversampled true peak goes from -15.01 dBFS to -6.44, which is
+    // six and a half decibels of margin, more than the pour's -5.16. And the
+    // case that is not hypothetical — a `tip` line and the pour landing on the
+    // same instant, at zero distance, which is exactly what the `tip` pool is
+    // for — measures -3.93 dBFS true peak. Nothing near full scale.
+    //
+    // 1.15 IS OVER 1.0 AND THAT IS NOT A BUG. This is a `GainNode` value, not a
+    // sample; the clips are levelled to -20.0 dBFS RMS by `cut_mutter.py`, so
+    // 1.15 of one of them is nowhere near full scale and the numbers above are
+    // the proof.
+    gain: 1.15,
     // The hum's, unchanged and for its reasons: linear in distance and not
     // squared, so she is still audible at fifteen metres where you can plainly
     // see what she is doing; 26 m reaches the whole forecourt and the top of
