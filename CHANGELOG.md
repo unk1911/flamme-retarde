@@ -8,6 +8,100 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.375.0] — 2026-09-11
+
+### she dances on the way, and there was never a travelling step
+
+Misha: *"i love how she does the peruette! she does it at the bottom of the
+vikendica... but can she be doing the peruette and random ballet moves, as she
+moves around through space...? she is a ballerina after all"*.
+
+**WHAT THE `ballet` CLIP ACTUALLY HOLDS**, surveyed and then measured in the
+shipped payload rather than read off the source, because `ballet_floor` rewrites
+every root key at bake time. Five stretches, each entered and left through
+`BAL_STAND`:
+
+| range | step | usable |
+|---|---|---|
+| 0.00–2.40 | first position, demi-plié **at the barre** | no — the rail is 700 m away |
+| 2.55–4.60 | **relevé**, bras bas → first → fifth, both demi-pointe | yes |
+| 4.55–7.45 | **retiré → développé**, right leg to 92°, right arm at her side | yes |
+| 7.45–10.60 | **piqué → pirouette** + three 120° spins | already shipped |
+| 10.70–14.35 | **attitude → arabesque** on a baked 70° turn | yes |
+
+**AND THE MEASUREMENT THAT KILLED THE TRAVELLING STEP.** Over all 451 frames the
+root's x is **0.0152 m to four decimals on every frame** and z is **0.0000 on
+every frame between 0.70 and 14.35**. The "six millimetres" the pirouette note
+quotes is the `IDLE_A` key at each *end* of the clip, outside every segment.
+**There is no travelling step in the library at all** — so the option of handing
+her position to the clip does not exist to be taken. She walks the flat at
+1.16 m/s, so a step played over an advancing route is 19 mm of foot slide per
+frame for two seconds.
+
+So three honest things shipped instead of one dishonest one:
+
+**1. THE PORCH GETS VARIETY.** The gate is untouched — 0.40 inside 12 m, 0.17
+beyond, first one free — but the step is now a draw: pirouette 49.9%, relevé
+26%, développé 24%. The arabesque is excluded **by measurement**: it needs rate
+1.80 to fit the 2.03 s window, at which the leg unfolds at 410 °/s, and the
+`BAL_ARM1` note already calls 393 *"a throw"*.
+
+**2. THE ARM OVER THE WALK.** A new `over()` in `src/41-skin.js` runs a second
+clip on six named bones, `clavicleL` through `fingersL`, on its own clock with
+root translation discarded — the same idea as the carry solve already laid over
+the baked walk. The développé's left arm plays over her walking on the porch and
+the made ground: a ballerina walking rather than a ballerina dancing. Proven
+inert on the body: two 361-frame traces, overlay on and off, **0.000000 m of
+position difference and 0.000000 m/s of velocity difference**.
+
+**3. A HALT AT 0.55 OF LEG 9** — outdoors, flat, in the open, and **never the
+stair**. She stops, dances, and walks on with the pail still in her right fist.
+Développé two laps in three, arabesque one in three; the pirouette and the
+relevé are excluded because both take *both* arms overhead and the carry solve
+owns the right one.
+
+**FOOT SLIDE, on the toe and not the ankle** — the ankle legitimately travels
+40 mm/frame rising to demi-pointe, and measuring there gave a false 42 mm:
+
+| | worst mm/frame | mean |
+|---|---|---|
+| développé, 102 planted frames | **5.89** | 1.49 |
+| arabesque, 145 frames | **8.12** | 1.58 |
+| her ordinary walk up the flat | 60.71 | 15.61 |
+
+The dancing is an order of magnitude *steadier* than her walk. Her drift during
+a halt is **0.000 mm**.
+
+**TWO FAULTS FOUND BY MEASURING.** Cutting straight from `walk` into the window
+dragged the supporting toe **45.7 mm on one frame**. And the pail jumped
+**155.5 mm on one frame** — 1246 m/s², twelve times the 110 that `walkOn`'s own
+note calls a bug — because three clips met inside one fade: the step ends at
+vel 0 into `idle`, and one frame later `walkOn` runs and switches to `walk`. It
+is the 132 mm flick `play`'s note documents, but A→B→C, which that fix cannot
+see. `pathSettle` puts 0.35 s of standing at each end: worst pail acceleration
+is now **81.2 / 93.4 against 83.2 while walking** — the halt puts *less* into
+the bucket than her own walking does.
+
+Also fixed: `hold` now holds the clip, because a one-shot window is
+unphotographable on a headless page running at 1 fps; and `yield` no longer
+fires mid-step, since it bypasses `stepLoop` where the halt's clock lives and
+she would have run off the end of a 15 s clip.
+
+**CADENCE**, over 5000 laps of hash plus 26 live laps at 9.5 m: inside 12 m she
+does something on **0.605 of laps** against 0.40 before, in two places, plus the
+arm on about 0.49. Between 12 and 26 m it is **0.167, mean gap 5.99, worst 43** —
+the shipped numbers to the decimal. The rarity is unchanged; the occasions are
+added. Draws are `jit(laps, 37/41/43/47)`; RULE 4 holds.
+
+**`portDown: false`** — the loaded walk was rendered straight on, where the lean
+is visible, and it is not absurd; but the raised arm deletes `freeArm`, which is
+the counterweight to ten kilos, and the plain frame is the better picture.
+`port('down')` toggles it for anybody who disagrees.
+
+The lap is **52.10 s** with all nine beats identical to the pre-change trace. A
+halt lap runs 4.00 s longer (développé) or 4.70 s (arabesque) — a pause, not a
+retiming, and nothing in the game is derived from the lap length.
+
 ## [1.374.0] — 2026-09-11
 
 ### the nape paint is gone, and so is the door that hid three fixes
