@@ -1203,7 +1203,7 @@ def ring(c, ra, rb, wire, seg=18, ring_seg=6):
     return vs, fs
 
 
-def cutters(J, k=(1.0, 1.0, 1.0), torso=True, tail=True):
+def cutters(J, k=(1.0, 1.0, 1.0), torso=True):
     """The paint volumes, each one closed, positioned off the joint markers.
 
     Two rules govern every entry, and both were learned the hard way.
@@ -1230,9 +1230,12 @@ def cutters(J, k=(1.0, 1.0, 1.0), torso=True, tail=True):
     figure and there is no honest way to map a chest the way a skull maps. On a
     1.24 m girl the wedge lands on her sternum.
 
-    `tail` says this figure is wearing the modelled ponytail — see `extras`. It
-    is what the nape is for, and only she has it; see that cutter for why
-    nobody without a tail should be given one.
+    There used to be a `tail` flag here — "this figure is wearing the modelled
+    ponytail, so give it the nape" — and it is gone with the nape cutter it
+    selected. It is not kept as a hook: a parameter with no consumer reads as a
+    feature that can be switched back on, and the note on `hair` records why
+    this one should not be. `NO_TAIL` is a different switch and still live; it
+    drops the ponytail *geometry* in `extras`.
     """
     out = []
 
@@ -1618,10 +1621,80 @@ def cutters(J, k=(1.0, 1.0, 1.0), torso=True, tail=True):
     # there is no bare ring between them — checked vertex by vertex down the
     # midline strip, and the painted band is continuous from the crown to 1.538
     # on both the old numbers and these.
-    if tail:
-        add("nape", HAIR_M, HAIR_P, 2,
-            (fx(-0.073), 0.0, J["neck"].z + 0.100 * kz),
-            (0.105 * kx, 0.070 * ky, 0.052 * kz), rows=14, seg=22)
+    #
+    # ── and then it was reported a third time, and it is gone ────────────────
+    #
+    # 11 Sep 2026: *"the buckateer baye still has that hair on her nape/back of
+    # her head. can u remove that"*. Third report of one noun, so it is a
+    # decision and not an opening position: there is no nape cutter any more.
+    #
+    # TWO THINGS WERE WRONG AND ONLY ONE OF THEM WAS THE PAINT.
+    #
+    # *The shortening above never reached the game.* It shipped in the source on
+    # 24 Aug and the blob in build/payload was last written on 4 Sep, and the
+    # blob still carried the old long ellipsoid: measured off the two, the
+    # committed `human_skin.fr3d.gz` has 207 dark vertices on the body shell in
+    # the band y 1.42–1.65 reaching down to y = 1.4632 and out to |z| = 0.0798,
+    # and the same blend repainted from these cutters has 114 reaching 1.5381
+    # and 0.0486. 1.4632 is the *old* floor. The saved blend says why: its live
+    # `prev` attribute holds 1821 dark vertices between y 1.455 and 1.545 on the
+    # back, down to 1.4568, so the export that produced the shipped blob was a
+    # `--reskin` — pose and write, no paint pass — and a `--reskin` ships
+    # whatever colour the blend happens to be holding. Every paint fix between
+    # 24 Aug and now was invisible to the game for the same reason. **A change
+    # to `cutters` is not shipped until the blob is re-exported through a door
+    # that repaints: `--repaint`, `--rebase` or a full run. `--reskin` and
+    # `--reexport` will quietly ship the last paint the blend was saved with.**
+    #
+    # *And the paint was wrong at any length.* Rendered at 1.4 m from behind her
+    # head at fov 24 — his framing, on the porch and in the bathroom — all three
+    # candidates were looked at side by side: the shipped long one, the
+    # shortened one above, and a version tightened to hug the tail's root
+    # (half-width in y taken from 0.069 to 0.032, which is the only number that
+    # decides how far it stands proud). The long one is an olive wedge running
+    # from the hairline to the top of her dress either side of the tail, with a
+    # stair-stepped boundary. The shortened one is the same wedge from the ear
+    # to mid-neck — smaller, and still a stepped edge crossing bare skin, so it
+    # would have been reported a fourth time. The tightened one is better again
+    # and still steps.
+    #
+    # The steps are not fixable on the paint side, and the note on the retired
+    # scarf lining twenty lines down already said why: a cutter has a sharp
+    # boundary and painted colour does not, because the decimator averages the
+    # colours of the vertices it collapses, so what ships is a ramp several
+    # centimetres wide and a *quantised* one — the ramp lands on whichever
+    # triangles happened to survive, which is the staircase. That is survivable
+    # where the ramp reads as hair and fatal where it crosses skin, which is the
+    # whole of the nape's problem and none of the cap's.
+    #
+    # And the thing it was holding up turns out not to need it. "Without it the
+    # modelled tail hangs off a shaved neck" was the reason this existed, and it
+    # is wrong: with the cutter gone, the cap still ends in a hairline behind the
+    # ears and the tail leaves the *knot* at the crown, which is geometry
+    # (`HAIR_KNOT`, joined in `extras`) and not paint. Read off the renders at
+    # full size, her neck is clean skin and the tail is attached at the top of
+    # her head where it is modelled to be attached. Nothing hangs off anything.
+    #
+    # `easeNape` in src/41-skin.js is unaffected: it hands hair-coloured
+    # vertices below the head joint over to the neck bone, and its constituency
+    # was always the tail and the knot — the fall reaches y = 1.313, which is
+    # what `FACE.nape`'s 17 cm is measured off. It loses the painted shell and
+    # keeps the 25 cm of geometry that is the reason it exists.
+    #
+    # WHAT IS FIXED AND WHAT IS NOT. `human_skin.fr3d.gz` is re-exported here,
+    # and that is Baye, the Bucketeer (src/45-bucketeer.js — the same blob, not
+    # a copy of it) and the chase figure (src/61-chase.js): 132 dark vertices on
+    # the back of her neck clear of the tail, down to 30, and the 30 that are
+    # left are the knot and the fall themselves and not paint. The eight bathers
+    # never had it. **Chloe still does.** `chloe_skin.fr3d.gz` is a separate
+    # bake off a separate blend and it was never gated on the tail she does not
+    # have, so she has been carrying this paint dyed to her hair colour all
+    # along; the cutter is gone from the source, so her next bake picks it up,
+    # but her blob is not re-exported here. Doing that is a bigger job than it
+    # looks — `--body`, `--out`, `--blend`, `--notail`, `--noanklets`,
+    # `--noscarf`, `--boots`, and a 48 MB blend whose stored paint is as stale
+    # as this one's was — and it would land every unshipped paint change on her
+    # at once rather than this one.
 
     # There is no painted garment on this figure any more, and that is the whole
     # of the entry. She wears geometry (see `hip_scarf`) and nothing else.
@@ -7230,6 +7303,24 @@ def main():
             clipcheck(rig, name)
         return
 
+    # THIS DOOR SHIPS THE BLEND'S PAINT AND NOT THE FILE'S.
+    #
+    # It opens, poses, renders and exports; there is no `paint` call in it, so
+    # the colours that reach build/payload are whatever the blend was last saved
+    # holding. That is correct for arguing about a pose and it is a trap when a
+    # cutter has been edited in between, because the export succeeds and the
+    # paint change simply is not in it.
+    #
+    # It has cost one release already. The nape was shortened in `cutters` on
+    # 24 Aug; the blob was re-exported on 4 Sep through here; and the blob that
+    # shipped had the pre-24-Aug ellipsoid in it — 207 dark vertices on the neck
+    # reaching y = 1.4632 where the file's own numbers give 114 reaching 1.5381.
+    # The blend was still holding 1821 dark vertices between y 1.455 and 1.545
+    # from before the fix, and this door wrote them out faithfully. Seventeen
+    # days later the same paint was reported for the third time.
+    #
+    # So: after editing `cutters`, export through `--repaint`, `--rebase` or a
+    # full run. Never through `--reskin` or `--reexport`.
     if "--reskin" in argv:
         bpy.ops.wm.open_mainfile(filepath=str(BLEND))
         body, rig = bpy.data.objects["human"], bpy.data.objects["rig"]
