@@ -810,6 +810,402 @@ const BUCK = {
   // become a thing that happens every time you walk away and come back, which
   // is the failure mode the pour cut's once-per-session latch actually had.
   pirouFirst: true,
+
+  // ── the whole routine, and not only the turn ───────────────────────────────
+  //
+  // Misha, 11 Sep 2026: *"i love how she does the peruette! she does it at the
+  // bottom of the vikendica... but can she be doing the peruette and random
+  // ballet moves, as she moves around through space...? she is a ballerina
+  // after all"*.
+  //
+  // ── WHAT IS ACTUALLY IN `ballet`, AND WHAT IS NOT ──
+  //
+  // Read off BALLET_KEYS in tools/blender/human_mh.py and then MEASURED in the
+  // shipped payload rather than believed off the source, because `ballet_floor`
+  // rewrites every root key on the way out of the bake. Five stretches, and
+  // every one of them is entered and left through BAL_STAND, which is what
+  // makes a 0.28 s crossfade at either end a woman settling rather than a woman
+  // snapping:
+  //
+  //   0.00 – 2.40   first position, demi-plie, AT THE BARRE. One hand is on the
+  //                 swim ladder's handrail, 0.90 m off a deck that is 700 m from
+  //                 here. Unusable anywhere but the ladder, and not used.
+  //   2.55 – 4.60   RELEVE. Bras bas through first to fifth, up on to both
+  //                 demi-pointe, sustained, and down. Both arms overhead —
+  //                 armUL and armUR both at −144 degrees.
+  //   4.55 – 7.45   RETIRE into DEVELOPPE. The right leg unfolds to 92 degrees
+  //                 while the LEFT arm goes to fifth and the RIGHT stays down
+  //                 at her side (armUR 4, 12, 17 — eight degrees off hanging).
+  //   7.45 – 10.60  PIQUE, PIROUETTE, three 120-degree spins. Both arms
+  //                 overhead through BAL_PIQUE. This is the one that already
+  //                 ships and the one he is talking about; see `pirouFrom`.
+  //   10.70 – 14.35 ATTITUDE into ARABESQUE, presented on a 70-degree turn out
+  //                 and back — `_spin(…, 430)` — so it starts and finishes on
+  //                 the same bearing. Left arm forward at −81, right arm BEHIND
+  //                 her at +62.
+  //
+  // AND NOT ONE OF THEM TRAVELS. Measured over all 451 frames of the baked
+  // clip: the root's x is 0.0152 m on every single frame to four decimals, and
+  // its z is 0.0000 on every frame between 0.70 and 14.35 — the −0.0060 the
+  // pirouette's own note quotes as "six millimetres" is the IDLE_A key at each
+  // END of the clip and is not inside any segment at all. So the honest figure
+  // for how far this routine can carry her is ZERO MILLIMETRES.
+  //
+  // WHICH KILLS THE OBVIOUS ANSWER. "Hand her position over to the clip for a
+  // travelling step and put her back on the route afterwards" cannot be done,
+  // not because it is hard but because there is no travelling step in the
+  // library to hand it to. Every pose in the routine is danced over one spot.
+  // And the other way round is worse: she walks the flat at 1.16 m/s, so a
+  // step played while `walkOn` keeps advancing her is a supporting foot sliding
+  // 19 mm EVERY FRAME at 60 fps for two whole seconds — 39 mm a frame down the
+  // flight of stairs, where the foot is also on a 156 mm riser.
+  //
+  // Which leaves two honest answers, and both of them ship.
+  //
+  //   ONE. WHERE SHE IS ALREADY STILL, GIVE HER MORE THAN ONE STEP. `breathe`
+  //   is unchanged and so is its 0.40 / 0.17 / first-one-free gate — the
+  //   feature he says he loves is not being touched — but the step danced in it
+  //   is now a draw from `restSteps` instead of always the turn.
+  //
+  //   TWO. WHERE SHE IS WALKING, DANCE THE ARM. Her free arm never touches the
+  //   ground, so it cannot slide: `over` in 41-skin.js lays the routine's own
+  //   port de bras on six bones down her left side while the walk keeps the
+  //   root, the pelvis, the spine and both legs. Nothing is typed — the arm is
+  //   the developpe's arm, off the same authored clip — and the foot slide is
+  //   not small, it is ZERO BY CONSTRUCTION. See `portFrom`.
+  //
+  // And then a third, which is a compromise and is labelled one: on the way
+  // back up she STOPS, dances one step on the made ground, and walks on. A
+  // stop cannot slide either, and it is the only way a whole step happens
+  // anywhere but the porch. It costs her lap about three seconds on the laps it
+  // fires; see `pathOdds` for why that is a pause and not a retiming.
+  //
+  // Each step is `from`, `to` and the rate it is played at, and the rates are
+  // not a taste: `breathe` is 2.20 s, the pirouette's note spends 2.03 of it
+  // and keeps 0.17 for the fade home, and every step that has to live on the
+  // porch is cut to fit that same window. What each one costs to get there is
+  // the rate.
+  //
+  //   releve     2.05 s of clip at 1.15 → 1.78 s
+  //   developpe  2.90 s of clip at 1.45 → 2.00 s
+  //   pirouette  3.15 s of clip at 1.55 → 2.03 s   (unchanged, to the decimal)
+  //   arabesque  3.65 s of clip at 1.35 → 2.70 s
+  steps: {
+    releve: { from: 2.55, to: 4.60, rate: 1.15 },
+    developpe: { from: 4.55, to: 7.45, rate: 1.45 },
+    pirouette: { from: 7.45, to: 10.60, rate: 1.55 },
+    arabesque: { from: 10.70, to: 14.35, rate: 1.35 },
+  },
+  // What she may dance on the porch, and the list is a list rather than a set
+  // because a repeat is how a weight is spelled: the pirouette is half of the
+  // draws. He asked for variety, not for the thing he likes to become one
+  // outcome in four — and it is also the only one of the four that ends facing
+  // exactly where it started without relying on a baked 70-degree turn coming
+  // back, which on the beat immediately before `take` matters.
+  //
+  // THE ARABESQUE IS NOT ON THIS LIST AND THAT IS A MEASUREMENT. 3.65 s of clip
+  // into a 2.03 s window is rate 1.80, and the fastest joint in it is the
+  // working leg unfolding from attitude to arabesque — 41 degrees of legUR x
+  // and 128 of its z over 0.75 s of clip, which at 1.80 is 410 deg/s. The
+  // note over BAL_ARM1 measured 393 deg/s on an arm and called it a throw. A
+  // leg whipping out of an attitude at 410 is the same fault, so the arabesque
+  // is danced where there is room for it and nowhere else.
+  //
+  // Counted over 5000 laps of the hash rather than assumed off the list
+  // length, because `jit(i, 43) * 4 | 0` is only uniform if the hash is:
+  // pirouette 49.9 per cent, releve 26.0, developpe 24.2.
+  restSteps: ['pirouette', 'pirouette', 'developpe', 'releve'],
+  // ── and one step on the way up, with the bucket still in her hand ──────────
+  //
+  // WHICH STEP IS NOT A CHOICE, IT IS AN ARM. The set-down note above already
+  // rejected dancing with the pail in her fist, and it was right about the
+  // pirouette: BAL_PIQUE takes BOTH arms overhead and the carry solve owns the
+  // right one, so what comes out is either a bucket swinging through her head
+  // or an arm that stops half way and reads as broken. The relevé has exactly
+  // the same fault — armUR −144, both arms up.
+  //
+  // The developpe does not. Its right arm is at (4, 12, 17) degrees, which is
+  // eight degrees off hanging, which is within a couple of degrees of where the
+  // carry solve was going to put it anyway. So the clip and the solve agree
+  // instead of fighting, and what you get is a woman standing on the path
+  // unfolding her left arm to fifth and her right leg to ninety with a bucket
+  // hanging off her other fist. That is a dancer holding something, which is
+  // what a dancer holding something looks like.
+  //
+  // AND THE ARABESQUE EARNS ITS PLACE, but only just, and the two thirds to one
+  // third is that. Its right arm wants to go BACK to +62 and the carry solve
+  // holds it down at the pail, so what ships is an arabesque with one arm
+  // hanging — and the segment is really attitude THEN arabesque, of which the
+  // attitude half is the strong one: shot-att-a.png is a clean attitude
+  // derrière with the working leg folded up behind her, the left arm in fifth
+  // and a bucket on the end of the other. The arabesque half reads as a proper
+  // line from three quarters front (shot-arab-front.png — supporting leg
+  // straight, working leg horizontal behind, left arm forward) and reads as
+  // "woman with a leg up" from anywhere near the front. The developpe reads
+  // from every side (shot-dev-front.png, shot-dev-b.png), so it gets two draws
+  // in three and the adage gets one.
+  //
+  // Nothing of hers goes through the pail doing either. Measured over the whole
+  // of both steps, the closest the pail centre ever comes to her right toe is
+  // 0.488 m on the developpe and 0.625 m on the arabesque, against 0.670 m on
+  // the plain walk up — and the pail is 0.13 m in the radius. It was worth
+  // checking: the developpe's working leg is the RIGHT one and the pail hangs
+  // off the RIGHT hand, so the line it unfolds along is the line the bucket is
+  // on.
+  pathSteps: ['developpe', 'developpe', 'arabesque'],
+  // Which leg of the route, and how far along it she stops.
+  //
+  // Leg 9 is waypoint 10 to waypoint 9 — the porch out to the made ground at
+  // the foot of the flight — and she walks it SECOND on the way up, so by 0.55
+  // of its 1.53 m she is 0.84 m clear of waypoint 10 and out from under the
+  // terrace slab that hangs 2.80 m over the porch. It is the one place in her
+  // whole lap that is outdoors, flat, level to within 3.4 degrees, in the open
+  // where the beach and the promenade can both see it, and NOT the stair.
+  //
+  // Legs 6, 7 and 8 are the landing, the 17-riser flight and the bottom step,
+  // and there is no handrail on the room side. Nothing below ever stops her,
+  // turns her or moves a leg of hers on any of the three. A pail dropped down
+  // an open flight is a worse outcome than no dancing at all.
+  pathLeg: 9,
+  pathAt: 0.55,
+  // How often, and it is the one number here that is a judgement.
+  //
+  // She is watched or she is not, exactly as the turn is, and for the argued
+  // reason: at 12 m a 2 s step is a step, and past it you can see that she
+  // moved and not what she did. Beyond `pirouWatch` this is ZERO and not a
+  // smaller number, which is different from the turn — the turn costs nothing,
+  // and this costs her four seconds of a 52.10 s lap. Spending that on somebody
+  // who cannot make out what she did is spending it for nothing.
+  //
+  // FOUR SECONDS, MEASURED, and it is worth writing down where they go because
+  // the step itself is only half of them. Traced at 1/60 from waypoint 11, the
+  // walk back up takes 13.833 s plain, 17.833 s with a developpe and 18.533 s
+  // with an arabesque — so +4.00 s and +4.70 s. Of the four: 2.00 s is the step,
+  // 0.70 s is `pathSettle` at each end of it, and the remaining 1.30 s is
+  // `pathPull` — braking into the spot and picking the pace back up over 0.40 m
+  // either side, at a 12 per cent floor. Nothing in her lap is DERIVED from
+  // 52.10 s (the hum's cadence, `sayGap` and `sayInHold` are wall clocks that
+  // were calibrated against it, and the pour cut is hung off `tip`), so what
+  // this is is a pause and not a retiming. The beats are to the millisecond
+  // what they were: fill 5.20, lift 0.90, down 23.08, tip 2.87, right 0.90,
+  // rest 3.12, take 0.90, up 14.23, set 0.90 — re-traced after this pass and
+  // identical to the frame.
+  //
+  // 0.33 inside 12 m, and it never doubles up with a turn: a lap that already
+  // drew a pirouette on the porch does not also stop on the path, because a
+  // woman who sets a bucket down, turns on the spot, picks it back up, walks
+  // two metres and then does a developpe is giving a recital. So the per-lap
+  // chance of a step SOMEWHERE, with somebody standing close, is 0.40 + 0.60 ×
+  // 0.33 = 0.60 — three laps in five, against the 0.40 that ships today —
+  // and it lands in two different places in the lap instead of one. That is
+  // "commoner" bought by adding occasions rather than by raising the odds on
+  // the one he already sees, which is the same argument `pirou` makes about a
+  // woman who pirouettes every lap being a mechanism.
+  //
+  // RULE 4: `jit(st.laps, 37)`, and 37 is a fresh index so this draw is
+  // independent of the turn's 31 rather than correlated with it.
+  //
+  // COUNTED OVER THE HASH, 5000 laps of each, which is the check the existing
+  // odds note ran and is how a distance gate wired the wrong way round gets
+  // caught before anybody stands on the porch for ten minutes:
+  //
+  //   inside 12 m   turn 0.400 · halt 0.205 · A STEP 0.605 · arm drawn 0.614
+  //                 mean gap between steps 1.65 laps (86 s), worst gap 9
+  //   12 to 26 m    turn 0.167 · halt 0.000 · A STEP 0.167 · arm drawn 0.614
+  //                 mean gap 5.99 laps, worst 43
+  //
+  // The arm is DRAWN at 0.614 and DELIVERED at about 0.49 inside 12 m, because
+  // `posePort` will not run it on a lap that already has a halt — 0.614 times
+  // (1 − 0.205). Counted in the shipped page rather than off the hash, 26
+  // consecutive laps with somebody standing 9.5 m away came back with 9 porch
+  // steps (pirouette 4, releve 3, developpe 2), 7 halts (developpe 6,
+  // arabesque 1) and 11 laps carrying the arm — 0.35, 0.27 and 0.42, which for
+  // 26 samples of three binomials is the table above.
+  //
+  // The second row is the thing to read: 0.167, a mean of 5.99 and a worst of
+  // 43 are the numbers the note above `pirouWatch` records for the SHIPPED
+  // build, to the decimal. Nothing about the rarity he argued for has moved.
+  // What moved is the first row, from 0.40 steps a watched lap to 0.605, in two
+  // places instead of one, with an arm on top.
+  pathOdds: 0.33,
+  // How hard she brakes for it and how hard she picks the pace back up, in
+  // metres of route either side of the spot.
+  //
+  // NOT OPTIONAL. `walkOn`'s own note measured what a stop from full pace in
+  // one frame does to the pail hanging off her fist: 110 m/s squared, four
+  // times anything the pour ever does. The same smoothstep as the `pullUp`
+  // gate at the end of the route, over the same 0.40 m, because it is the same
+  // event — a woman arriving somewhere rather than a woman being switched off.
+  pathPull: 0.40,
+  // ── AND SHE STANDS STILL FOR A THIRD OF A SECOND AT EACH END OF IT ────────
+  //
+  // This is the whole of what the first cut of the halt got wrong, it was
+  // found by measuring and not by looking, and both faults are the same fault.
+  //
+  // The first cut went straight from `walk` into the ballet window and straight
+  // back out. Traced at 1/60 over the halt:
+  //
+  //   the BALL OF HER SUPPORTING FOOT moved 45.7 mm on one frame — 2.7 m/s of
+  //   drag across the made ground, on a woman whose root had not moved a
+  //   micron. Nothing was sliding on the route; what was sliding was the 0.28 s
+  //   crossfade, because her feet were wherever a walk cycle left them and the
+  //   ballet window wants them in first position, and the fade drags them
+  //   there through the concrete. The shipped pirouette's own worst frame is
+  //   10.7 mm, and the difference is that IT fades in from `idle`.
+  //
+  //   the PAIL jumped 155.5 mm on the single frame the step ended — 9.3 m/s,
+  //   1246 m/s squared, twelve times the 110 the note in `walkOn` calls a bug.
+  //   And it is not this file's arithmetic, it is three clips inside one fade:
+  //   the step ends with `st.vel` at zero, so `drawFrame` asks for `idle`, and
+  //   ONE FRAME LATER `walkOn` runs and it asks for `walk`. The second request
+  //   throws away a crossfade that is 12 per cent done and starts a new one
+  //   from the clip it was fading INTO, so the pose snapped 88 per cent of the
+  //   way from the ballet pose to `idle` in one frame and then faded back. It
+  //   is the 132 mm flick the note over `play` in 41-skin.js documents, with
+  //   three clips instead of two — and that fix cannot help here, because it
+  //   recognises A → B → A and this is A → B → C.
+  //
+  // So she STOPS, stands for 0.35 s, dances, stands for 0.35 s, and walks on —
+  // and 0.35 is not a taste either, it is 0.28 plus margin, so that each of
+  // the three crossfades has finished before the next one is asked for. Every
+  // transition in the halt is now one the game already ships: `walk` to `idle`
+  // happens at every corner of her route and at both ends of it, and `idle` to
+  // the ballet window is the pirouette's own entry, argued over `pirouFrom` as
+  // "close enough to `idle` that a 0.28 s crossfade is a woman settling".
+  //
+  // It costs 0.70 s on top of the step. It reads better than it measures: a
+  // woman who stops walking, pauses, does a developpe and pauses again before
+  // she picks the pace back up is a woman deciding to dance. The first cut,
+  // which cut straight from the walk, was a woman being switched between two
+  // animations.
+  //
+  // ── AND WHAT IT MEASURES AFTERWARDS, WHICH IS THE POINT OF THE NUMBER ──
+  //
+  // Re-traced at 1/60, worst and mean per-frame travel of the BALL of her
+  // supporting foot in world metres, inside the step only:
+  //
+  //   developpe, 102 planted frames    5.89 mm worst   1.49 mm mean
+  //   arabesque, 145 planted frames    8.12 mm worst   1.58 mm mean
+  //   her ordinary walk up the flat     60.71 mm worst  15.61 mm mean
+  //   her ordinary walk down the flat   39.78 mm worst  12.17 mm mean
+  //
+  // So the step's supporting foot is TEN TIMES stiller than the baked walk's,
+  // which is the honest way to say "it does not slide": the walk clip has its
+  // own foot-plant slide, it always has, it is the number every slide in this
+  // file is judged against, and the dance is an order of magnitude inside it.
+  // The settle windows peak at 33.6 mm, which is the walk-to-idle crossfade —
+  // still half the walk's own worst frame, and a transition that already
+  // happens at every corner of her route.
+  //
+  // And the pail, on the same traces: worst acceleration 81.2 m/s squared with
+  // a developpe and 93.4 with an arabesque, against 83.2 on a plain walk up.
+  // The halt now puts LESS into the bucket than her walking does.
+  pathSettle: 0.35,
+
+  // ── the port de bras, over the walk ────────────────────────────────────────
+  //
+  // 4.55 to 7.45 of `ballet` is the developpe, and its LEFT arm alone is a
+  // complete port de bras: BAL_STAND's bras bas at armUL −3, through first
+  // position at −34 (BAL_ARM1, which every transition in the routine passes
+  // through and which exists precisely so an arm travels on an arc instead of
+  // through her own chin), out to fifth overhead at −144, sustained, and back
+  // down the same way. 2.90 s of authored ballet arm, and it never goes near
+  // the barre.
+  //
+  // WHY THE LEFT AND NOT BOTH. The pail is in her RIGHT hand — `poseCarry`
+  // solves armUR, armLR and handR to absolute directions so that ten litres
+  // hangs under gravity whatever her trunk is doing — so the right arm is not
+  // hers to lend. The left is: on `up` the pail is EMPTY, `st.load` is zero,
+  // and every one of the lean aims (`leanA`, `shrugL`, `freeArm`) is therefore
+  // an `aim` of angle zero, which `aim` deletes rather than storing. Her left
+  // side is doing nothing at all on the way up and has been all along.
+  //
+  // ZERO FOOT SLIDE, BY CONSTRUCTION AND NOT BY MEASUREMENT. `over` takes six
+  // bones — the left clavicle, upper arm, forearm, hand, thumb and fingers —
+  // and throws the second clip's root translation away. The walk keeps the
+  // root, the pelvis, the spine, the chest, the head and both legs, so her feet
+  // are doing in every frame exactly what they did before this existed. There
+  // is nothing for a slide to be measured on.
+  //
+  // It was measured anyway, because "by construction" is what everybody says
+  // about the thing that turns out to be wrong. Two traces of the walk back up
+  // from waypoint 11, 361 frames each at 1/60, one with the overlay at full
+  // weight and one without: the largest difference in her world position on
+  // any frame is 0.000000 m and the largest difference in `st.vel` is
+  // 0.000000 m/s. It is the same walk with a different arm on it, and the two
+  // renders — shot-portup-a.png and shot-portup-plain.png, the same frame of
+  // the same stride from the same camera — show exactly that and nothing else.
+  portFrom: 4.55,
+  portTo: 7.45,
+  // Played at 1.05 rather than at the pirouette's 1.55, and the difference is
+  // the point. A pirouette is a fast thing done in a moment; carrying an arm is
+  // slow, and the arm is the only thing moving, so there is no revolution to
+  // keep up with. 2.90 s at 1.05 is 2.76 s of phrase, and the outdoor flat
+  // stretch of `up` — waypoint 11 to waypoint 9, 3.23 m at 1.16 m/s — is 2.79 s
+  // of walking. It fits the window it was cut for with 30 ms to spare.
+  portRate: 1.05,
+  // The weight, ramped over this many seconds at each end with a raised
+  // cosine. A weight that snapped on is an arm teleporting from a walk's swing
+  // into fifth position in one frame; 0.42 s is a little longer than the 0.28 s
+  // clip crossfade she uses everywhere else, because this fade is between two
+  // things happening AT ONCE and there is no reason for it to be quick.
+  portIn: 0.42,
+  // Six bones down one side, named rather than indexed. `over` drops any name
+  // this rig does not carry, so this list is safe against a re-bake.
+  //
+  // The chain is named all the way down and not just at the shoulder because
+  // `over` composes locals: naming `armUL` alone would turn the whole arm and
+  // leave the ELBOW and the WRIST doing whatever the walk was doing relative to
+  // it, which for a port de bras is the entire difference between a ballet arm
+  // and a walking arm pointed somewhere new.
+  //
+  // The head and the neck are deliberately NOT on it. The developpe's head is
+  // at (−2, −10, 0) — a ten-degree épaulement toward the working side — and on
+  // a woman walking a path that is ten degrees of looking away from where she
+  // is going. An épaulement is a thing you do facing front.
+  portArm: ['clavicleL', 'armUL', 'armLL', 'handL', 'thumbL', 'fingersL'],
+  // The two legs of the route it runs on: 9 and 10, the made ground and the
+  // porch, which she walks in one order going down and the other coming up.
+  // Everything else is either the stair or indoors on the first floor, and a
+  // port de bras behind a wall is the dance-nobody-sees that `pirouNear`
+  // already argues about.
+  portLegs: [9, 10],
+  // And how often. More than half of laps, which is far commoner than any step
+  // — because this is a CARRIAGE and not an event. It costs her nothing, it
+  // takes no time out of her lap, and a dancer carrying an arm while she walks
+  // somewhere is not a performance that needs an audience the way a pirouette
+  // does. 26 m and not 12: an arm going overhead changes her whole silhouette
+  // for nearly three seconds, which reads at a distance a 2 s turn does not.
+  //
+  // Not 1.00, though. Every lap is a mechanism, and the laps she just walks are
+  // what make the laps she does not walk worth seeing. RULE 4: `jit(laps, 41)`.
+  portOdds: 0.62,
+  portNear: 26.0,
+  // WHETHER IT RUNS ON THE WAY DOWN AS WELL, and it does not.
+  //
+  // Rendered before it was decided, because a flourish with a full bucket is
+  // either charming or absurd and only a frame can say which. The two frames
+  // are the same stride of the loaded walk from the same camera, straight on
+  // where the lean is actually visible: shot-down-front-port.png and
+  // shot-down-front-plain.png.
+  //
+  // AND IT IS NOT ABSURD, which is not the same as being right. The lean
+  // survives — the loaded shoulder is still down, the spine still tilts away
+  // from the pail, the head still corrects — so nothing about the frame is
+  // broken. What it loses is the reading. Going down she has ten kilos in her
+  // right fist and the carry solve is at full strength (`leanA` 0.055,
+  // `shrugR` 0.34 down against `shrugL` 0.20 up), and the last piece of it is
+  // `freeArm`: the LEFT arm goes out 0.06 rad, because the arm that is not
+  // carrying anything is the counterweight to the arm that is. Put that arm
+  // overhead in fifth and the counterweight is gone — the trunk says "this is
+  // heavy" and the arm says "this is nothing", and the frame stops being a
+  // woman carrying water and becomes a woman who has forgotten she is. Side by
+  // side, the plain one is the better picture, and the loaded walk's lean is
+  // the best thing in her whole lap.
+  //
+  // It is one boolean, the code is general, and `port('down')` toggles it from
+  // the console — so this is a decision and not a limitation. Look again.
+  portDown: false,
 };
 
 /**
@@ -1400,6 +1796,12 @@ async function buildBucketeer(scene, vik, walkY) {
   // what put the elbow behind her.
   const cTO = new THREE.Vector3(), cTP = new THREE.Vector3();
   const cIA = new THREE.Quaternion(), cIB = new THREE.Quaternion();
+  // `trace`'s two feet, found once. Debug-only, and it is still one scratch
+  // vector rather than a `new` a frame: a foot slide is looked for over eight
+  // hundred frames at a time and eight hundred allocations inside the loop
+  // being measured is a measurement of the allocator.
+  let trFL = -1, trFR = -1;
+  const trV = new THREE.Vector3();
   const cA = new THREE.Quaternion(), cB = new THREE.Quaternion();
   const cID = new THREE.Quaternion();
 
@@ -1492,6 +1894,31 @@ async function buildBucketeer(scene, vik, walkY) {
     // pail goes down on THIS lap, which is the same question — see the long
     // note where both are written, and `BUCK.setDown`.
     laps: 0, pirouLap: false, pirouEver: false, setLap: false,
+    // WHICH step the porch turn is, this lap. `pirouLap` stays the flag for
+    // "there is a step in `breathe` at all" — the pour cut, `setLap` and the
+    // whole of the note over `BUCK.pirou` are written in terms of it and it is
+    // what `stats()` has always reported — and this is the row of `BUCK.steps`
+    // drawn alongside it. Null whenever `pirouLap` is false, so the two can
+    // never disagree about whether anything is going to happen.
+    move: null,
+    // ── the step on the way up ────────────────────────────────────────────
+    //
+    // `pathLap` is whether this lap has one owed and `pathStep` which it is,
+    // both drawn on the way into `rest` with everything else so the lap's
+    // decisions are taken in one place. `dance` is the halt actually running —
+    // null or seconds into it — and `danced` is the latch that stops her
+    // stopping twice on the same leg, because `st.u` goes past `pathAt` and
+    // stays past it for the rest of the leg.
+    pathLap: false, pathStep: null, dance: 0, danced: false,
+    // ── and the arm, while she walks ──────────────────────────────────────
+    //
+    // `portLap` is the draw; `port` is the weight the overlay is being played
+    // at this frame, 0 to 1, ramped by `posePort`; `portT` is seconds into the
+    // phrase, which is kept here rather than read back off the figure so that
+    // the ramp-out can start before the clip has run out. `portSet` is whether
+    // `fig.over` currently holds the clip, so it is configured once a phrase
+    // rather than sixty times a second.
+    portLap: false, port: 0, portT: 0, portSet: false,
     hold: false,        // debug: the loop stopped where it stands
     x: 0, y: 0, z: 0,
   };
@@ -1522,6 +1949,23 @@ async function buildBucketeer(scene, vik, walkY) {
     if (dir > 0) return stair ? BUCK.downStair : BUCK.downFlat;
     return stair ? BUCK.upStair : BUCK.upFlat;
   }
+
+  /**
+   * One row of `BUCK.steps`, and how many seconds of wall clock it runs for.
+   *
+   * The fallback is not defensive tidiness: `st.move` and `st.pathStep` can be
+   * set from the console by `pirou()` and `dance()`, and a typo that reached
+   * `undefined.from` would take the whole figure down rather than photograph
+   * the wrong step. `danceLen` is the halt's total, settle included, and it is
+   * ONE function because the length is needed in two places — `stepLoop` ends
+   * the halt on it and `drawFrame` decides on it which third of the halt she is
+   * in — and two copies of `(to − from) / rate + 2 × settle` is two copies of
+   * the arithmetic that ends the step on the wrong pose.
+   */
+  const stepRow = (k, dflt) => BUCK.steps[k] || BUCK.steps[dflt];
+  const stepSecs = (s) => (s.to - s.from) / s.rate;
+  const danceLen = () =>
+    2 * BUCK.pathSettle + stepSecs(stepRow(st.pathStep, 'developpe'));
 
   /** Turn towards a bearing at a person's rate rather than snapping to it. */
   function faceTo(want, dt) {
@@ -1586,6 +2030,18 @@ async function buildBucketeer(scene, vik, walkY) {
     const last = st.dir > 0 ? to >= BUCK_WAY.length - 1 : to <= 0;
     if (last) {
       const g = clamp(((1 - st.u) * len) / BUCK.pullUp, 0, 1);
+      v *= 0.12 + 0.88 * g * g * (3 - 2 * g);
+    }
+    // AND SHE ARRIVES AT THE STEP THE SAME WAY, which is the whole reason
+    // `BUCK.pathPull` exists rather than the halt simply zeroing `st.vel`.
+    // The measurement three paragraphs up is the one that applies: a stop from
+    // full pace inside one frame put 110 m/s squared into the pail hanging off
+    // her fist, and this stop is 0.84 m into open ground with nothing to hide
+    // it under. So the same smoothstep over the same 0.40 m, once on the way in
+    // and once on the way out, and `danced` is which side of the spot she is on.
+    if (st.pathLap && st.dir < 0 && st.leg === BUCK.pathLeg) {
+      const d = (st.danced ? st.u - BUCK.pathAt : BUCK.pathAt - st.u) * len;
+      const g = clamp(d / BUCK.pathPull, 0, 1);
       v *= 0.12 + 0.88 * g * g * (3 - 2 * g);
     }
     st.vel = v;
@@ -1720,6 +2176,46 @@ async function buildBucketeer(scene, vik, walkY) {
             && ((BUCK.pirouFirst && watched && !st.pirouEver)
               || jit(st.laps, 31) < odds);
           if (st.pirouLap) st.pirouEver = true;
+          // WHICH step, on a lap that has one. A second `jit` on the same lap
+          // index and a different question — index 43 — because the step is not
+          // the same decision as whether there is one, and a draw taken off the
+          // first would tie "she turns" to "it is the turn she does" for ever.
+          // `restSteps` spells the weights by repeating an entry; see the note
+          // on it for why the pirouette is half of them.
+          st.move = st.pirouLap
+            ? BUCK.restSteps[Math.floor(jit(st.laps, 43) * BUCK.restSteps.length)
+              % BUCK.restSteps.length]
+            : null;
+          // ── and whether she stops for one on the way back up ──────────────
+          //
+          // Drawn here with the rest of the lap's decisions rather than in `up`
+          // where it happens, for the reason the paragraph above gives: `up` is
+          // run sixty times a second and a test inside it would need a flag to
+          // stop being re-taken, which is this flag.
+          //
+          // `!st.pirouLap` is the no-recital clause and `pathOdds` argues it.
+          // Inside `pirouWatch` only — beyond 12 m this is zero and not a
+          // smaller number, because unlike the turn it costs her three seconds
+          // of lap and there is no one to see what it bought. And not under the
+          // pour cut either: the cut runs to 1.75 s into `up`, which is most of
+          // the way across the porch, and a woman braking to a halt inside a
+          // composed dolly is the same objection the turn's clause makes.
+          st.pathLap = !BUCK.ear && !st.pirouLap && st.ear < BUCK.pirouWatch
+            && jit(st.laps, 37) < BUCK.pathOdds;
+          st.pathStep = st.pathLap
+            ? BUCK.pathSteps[Math.floor(jit(st.laps, 47) * BUCK.pathSteps.length)
+              % BUCK.pathSteps.length]
+            : null;
+          st.danced = false;
+          // ── and whether she carries her arm on the way up ─────────────────
+          //
+          // 26 m, not 12, and 0.62 of laps: `BUCK.portOdds` has the whole of
+          // why a carriage is commoner and reads further than a step. It is
+          // NOT excluded by either of the two above — the arm is the walk and
+          // the step is the halt, they are never running at the same frame, and
+          // `posePort` will not start a phrase on a leg she is about to stop on
+          // because `st.dance` gates it there.
+          st.portLap = st.ear < BUCK.portNear && jit(st.laps, 41) < BUCK.portOdds;
           // ── and whether the pail goes down at all ─────────────────────────
           //
           // Misha, 10 Sep 2026: *"after she pours the water out the bucket, the
@@ -1789,6 +2285,7 @@ async function buildBucketeer(scene, vik, walkY) {
           // gone past. It costs nothing on the laps that finish cleanly — the
           // clip clears it itself the frame it reaches `pirouTo`.
           st.pirouLap = false;
+          st.move = null;
         }
         break;
       case 'take':
@@ -1806,6 +2303,40 @@ async function buildBucketeer(scene, vik, walkY) {
         break;
       case 'up':
         st.held = 1;
+        // ── the step on the made ground ──────────────────────────────────────
+        //
+        // She stops, dances one, and walks on. `BUCK.pathLeg` is where and
+        // `BUCK.pathOdds` is how often; both are argued at length there.
+        //
+        // ON ITS OWN CLOCK AND NOT ON THE CLIP'S, which is the opposite of what
+        // `drawFrame` does for the porch turn and is not an inconsistency. The
+        // turn lives inside `rest`, and `rest` ends on `setDown + breathe`
+        // whatever the clip is doing, so ending the turn on the clip's own time
+        // is free: there is an outer timer underneath it that cannot hang. This
+        // has none. A halt that waited for `fig.state.curT` to reach `to` would
+        // wait for ever under `tick`, which advances the state machine sixty
+        // times without ever drawing a frame — and `tick` is how every probe in
+        // this file gets her to a beat. So the length is computed from the same
+        // three numbers the clip is played with, `(to − from) / rate`, and the
+        // two clocks are therefore the same clock with the same dt in it.
+        if (st.dance > 0) {
+          st.dance += dt;
+          st.vel = 0;
+          if (st.dance - 1 >= danceLen()) { st.dance = 0; }
+          break;
+        }
+        if (st.pathLap && !st.danced && st.leg === BUCK.pathLeg
+          && st.u >= BUCK.pathAt) {
+          // Starts at 1 rather than at 0 so that "is she dancing" is a truth
+          // test on one number and the first frame of the halt is inside it —
+          // `st.dance` is seconds-into-the-step plus one, and the one is
+          // subtracted nowhere because nothing needs the absolute time, only
+          // the length.
+          st.dance = 1;
+          st.danced = true;
+          st.vel = 0;
+          break;
+        }
         if (walkOn(dt)) { st.phase = 'set'; st.clock = 0; st.vel = 0; }
         break;
       case 'set':
@@ -2412,6 +2943,84 @@ async function buildBucketeer(scene, vik, walkY) {
   }
 
   /**
+   * The port de bras: the routine's own arm, laid over her walk.
+   *
+   * This is the half of "ballet while she moves through space" that costs
+   * nothing and cannot go wrong, and the reason it cannot is geometric rather
+   * than careful — `BUCK.portFrom` has the whole argument. Her free arm never
+   * touches the ground, so there is no contact for a slide to happen at: the
+   * walk clip keeps the root, the pelvis, the spine, the chest, the head and
+   * both legs, and six bones down her left side come off `ballet` instead.
+   *
+   * ── the weight is a ramp and the ramp is the whole function ──
+   *
+   * `over` in 41-skin.js deliberately does not take a weight, because a weight
+   * that arrives with the clip is a weight that snaps, and an arm snapping from
+   * a walk's 397 mm swing into fifth position in one frame is the single-frame
+   * flick the note over `play` spent a release finding once already.
+   *
+   * So `st.port` is a plain linear ramp toward a target of 1 or 0 at
+   * 1/`portIn` a second, and what the figure is handed is a raised cosine of
+   * it — zero slope at both ends, so the arm starts moving from rest and
+   * arrives at rest. One ramp covers both reasons it ever has to come down: the
+   * phrase running out, and her stopping being somewhere it belongs (she has
+   * reached the stair, or you have stepped into her way and she has stopped).
+   * There is no second path and therefore no second bug.
+   *
+   * ── and the four gates on it, each of which is a place it must not run ──
+   *
+   *   `portLap`       the draw, once a lap. `BUCK.portOdds`.
+   *   `!pathLap`      the arm and the halt are exclusive. They never overlap in
+   *                   TIME — the halt is at 0.55 of leg 9 and the arm is ramped
+   *                   out by then — but they would overlap in the CLIP, and an
+   *                   overlay playing `ballet` at 4.55 on the left arm of a
+   *                   figure whose whole body is playing `ballet` at 11.20 is a
+   *                   woman arguing with herself. Cheaper to not have the
+   *                   question: a lap has the arm or it has the step.
+   *   `portLegs`      waypoints 9 to 11 only, which is the outdoors part. The
+   *                   stair and the first floor are both excluded, the stair
+   *                   because a woman going up seventeen open risers with a
+   *                   bucket minds her feet, the first floor because nobody is
+   *                   in it. `pirouNear`'s note makes the second argument.
+   *   `vel > 0.02`    the same threshold `drawFrame` calls standing. An arm
+   *                   carried by a woman who has stopped dead is not a carriage
+   *                   any more, it is a pose she is holding at you.
+   */
+  function posePort(dt) {
+    const walkBeat = st.phase === 'up' || (BUCK.portDown && st.phase === 'down');
+    const ok = st.portLap && !st.pathLap && st.dance === 0 && walkBeat
+      && BUCK.portLegs.includes(st.leg) && st.vel > 0.02;
+    // The phrase runs out on its own length and not on the clip's clock, for
+    // the reason the halt gives: `st.portT` is advanced by this function, so it
+    // is the same dt the figure got, and it is readable before the fade-out
+    // needs to start rather than only when the clip has already stopped.
+    const want = (ok && (!st.portSet
+      || st.portT < (BUCK.portTo - BUCK.portFrom) / BUCK.portRate)) ? 1 : 0;
+    if (want > 0 && !st.portSet) {
+      st.portSet = fig.over('ballet',
+        { bones: BUCK.portArm, from: BUCK.portFrom, rate: BUCK.portRate });
+      st.portT = 0;
+      // A rig without a left arm would answer false, and then this runs once a
+      // frame for ever asking the same question. `portLap` off is the latch.
+      if (!st.portSet) { st.portLap = false; return; }
+    }
+    if (!st.portSet) return;
+    st.portT += dt;
+    const k = BUCK.portIn > 0 ? dt / BUCK.portIn : 1;
+    st.port = want > st.port
+      ? Math.min(want, st.port + k) : Math.max(want, st.port - k);
+    fig.state.overW = 0.5 - 0.5 * Math.cos(Math.PI * st.port);
+    // All the way down and not coming back: the clip is let go of and the lap's
+    // draw is spent, so she carries the arm ONCE on the way up and not again
+    // when she crosses the second of the two legs. `portLap` is redrawn on the
+    // way into the next `rest` with everything else.
+    if (st.port <= 0 && want <= 0) {
+      fig.over(null);
+      st.portSet = false; st.portT = 0; st.portLap = false;
+    }
+  }
+
+  /**
    * Everything a frame of her needs once `stepLoop` has decided what she is
    * doing: the clip, the weight, the palette, the pail and the water.
    *
@@ -2427,6 +3036,23 @@ async function buildBucketeer(scene, vik, walkY) {
    * and the mesh's own matrix is current.
    */
   function drawFrame(dt, face) {
+    // ── `hold` now holds the CLIP as well, and that is a debug fix ───────────
+    //
+    // It used to freeze `stepLoop` and nothing else, so a probe that put her on
+    // a beat and froze her got a stopped state machine with a clip still
+    // running underneath it. For eight of the nine beats that is invisible —
+    // `idle` and `walk` loop, so a held frame is a frame of them either way —
+    // and for the one beat that matters it made the pose unphotographable: a
+    // ballet window is a ONE-SHOT played from a chosen time, the headless page
+    // runs about a frame a second, and between arming a step and the shutter
+    // the clip ran two full seconds past the pose somebody wanted a picture of.
+    // The pirouette's own note records that it "works and never arrived"; half
+    // of that was the odds and half was this.
+    //
+    // Zero and not a scale, so `placeWater`, `faceTick` and the port de bras'
+    // ramp all stop with it. Held means held. `trace` and `tick` never set the
+    // flag, so neither is affected.
+    if (st.hold) dt = 0;
     // Walking or standing, and how fast the clip runs. `play` is a no-op when
     // the clip is already current, so this is safe every frame.
     const moving = st.vel > 0.02;
@@ -2441,10 +3067,28 @@ async function buildBucketeer(scene, vik, walkY) {
     // clock `showSettle` reads for Baye at the barre.
     const spin = st.pirouLap && st.phase === 'rest'
       && st.clock >= BUCK.setDown;
-    if (spin) {
-      fig.play('ballet', { fade: 0.28, from: BUCK.pirouFrom });
-      fig.state.speed = BUCK.pirouRate;
-      if (fig.playing() === 'ballet' && fig.state.curT >= BUCK.pirouTo) {
+    // WHICH window of it, and there are now four of them — see `BUCK.steps`.
+    // Two places in the lap ask for one: `breathe` on the porch, with the pail
+    // on the ground and both hands empty, and the halt on the made ground on
+    // the way up, with the empty pail still in her right fist. The row is
+    // drawn once a lap and held in `st.move` / `st.pathStep`; the fallbacks are
+    // there so a hand-set flag from the console cannot land on `undefined.from`
+    // and take the whole figure with it.
+    //
+    // AND THE HALT IS ONLY DANCING FOR THE MIDDLE OF ITSELF. `BUCK.pathSettle`
+    // is 0.35 s of standing at each end of it, which is where the 45 mm of foot
+    // drag and the 155 mm pail flick went; that note has the measurements. So
+    // the first third and the last third of `st.dance` fall through to `idle`
+    // below, which is what "she stops, then dances" is made of.
+    const row = st.dance > 0 ? stepRow(st.pathStep, 'developpe') : null;
+    const el = st.dance - 1;
+    const move = spin ? stepRow(st.move, 'pirouette')
+      : (row && el >= BUCK.pathSettle
+        && el < BUCK.pathSettle + stepSecs(row) ? row : null);
+    if (move) {
+      fig.play('ballet', { fade: 0.28, from: move.from });
+      fig.state.speed = move.rate;
+      if (spin && fig.playing() === 'ballet' && fig.state.curT >= move.to) {
         st.pirouLap = false;
       }
     } else {
@@ -2452,6 +3096,10 @@ async function buildBucketeer(scene, vik, walkY) {
       fig.state.speed = moving
         ? clamp(st.vel / BUCK.clipSpeed, BUCK.clipMin, BUCK.clipMax) : 1;
     }
+    // And her free arm, over whichever of those it is walking. Before
+    // `poseCarry` only because both have to be before `fig.update`; they touch
+    // different bones and cannot disagree.
+    posePort(dt);
     // The weight, immediately before the update and nowhere else — see the
     // note over `poseCarry`. She already walks the loaded legs slower than the
     // empty ones (0.44 m/s down the flight against 0.78 back up); this is the
@@ -2755,7 +3403,18 @@ async function buildBucketeer(scene, vik, walkY) {
     const walking = st.phase === 'down' || st.phase === 'up';
     const fwd = dx * Math.cos(st.yaw) - dz * Math.sin(st.yaw);
     const side = dx * Math.sin(st.yaw) + dz * Math.cos(st.yaw);
-    st.yield = walking && fwd > 0 && fwd < BUCK.yieldM
+    // AND NOT WHILE SHE IS MID-STEP, which is one clause and prevents a real
+    // hang rather than an awkward frame. `yield` is implemented by not calling
+    // `stepLoop` at all (see `step`), and `st.dance` — the halt's own clock —
+    // is advanced inside `stepLoop`. So standing in front of a woman who was
+    // half way through a developpe froze her dance timer while `drawFrame` went
+    // on advancing the CLIP, which is a one-shot: she would have run out of the
+    // developpe, through the pirouette, through the arabesque and off the end
+    // of a fifteen-second clip, holding the last frame of it, and stayed there
+    // until you moved. She is standing still with her feet in one place
+    // already, which is the whole content of yielding, so there is nothing for
+    // this clause to cost.
+    st.yield = walking && st.dance === 0 && fwd > 0 && fwd < BUCK.yieldM
       && Math.abs(side) < BUCK.yieldSide;
 
     // ── and she knows you are there ─────────────────────────────────────────
@@ -2979,6 +3638,16 @@ async function buildBucketeer(scene, vik, walkY) {
       // lap" from "the draw has not happened yet", and `setLap` false looks
       // exactly like a bug in the set-down until you can read it.
       pirouEver: st.pirouEver, setLap: st.setLap,
+      // The rest of the routine — see `BUCK.steps`. `move` is which step this
+      // lap's porch turn is and `pathStep` which one the halt on the way up is;
+      // `dance` is seconds into that halt plus one, so zero means she is
+      // walking. `port` is the weight her free arm's port de bras is being
+      // played at, which is the one number that separates "the overlay is not
+      // running" from "it is running and the bones are wrong" — from outside
+      // those are the same still frame, which is the whole lesson of `clipT`.
+      move: st.move, pathLap: st.pathLap, pathStep: st.pathStep,
+      dance: +st.dance.toFixed(2), portLap: st.portLap,
+      port: +st.port.toFixed(3), overW: +(fig.state.overW || 0).toFixed(3),
       // How far the listener is, which is what both of those were decided on.
       ear: +Math.min(st.ear, 9999).toFixed(1),
       clipT: +fig.state.curT.toFixed(2),
@@ -3056,6 +3725,16 @@ async function buildBucketeer(scene, vik, walkY) {
       // moment rather than a woman turning round a bucket she is still holding.
       st.pirouLap = false;
       st.setLap = false;
+      st.move = null;
+      // The rest of the routine with them, and for the third time the same
+      // reason: `go` lands on an ORDINARY lap. `dance()` and `port()` are how
+      // a probe asks for the other kind, and they are called AFTER this — note
+      // that `trace(secs, dt, phase)` runs `go` itself, so arming a step for a
+      // trace means `go('up', 9)` first and then `trace(secs, dt)` with no
+      // phase, or the arming is thrown away by the jump it was meant for.
+      st.pathLap = false; st.pathStep = null; st.dance = 0; st.danced = false;
+      st.portLap = false; st.port = 0; st.portT = 0;
+      if (st.portSet) { fig.over(null); st.portSet = false; }
       let k = 0;                    // the waypoint she is standing on
       if (phase === 'down') {
         st.dir = 1; st.fill = 1; st.held = 1;
@@ -3199,7 +3878,39 @@ async function buildBucketeer(scene, vik, walkY) {
           pool.visible ? +pool.scale.x.toFixed(4) : 0,
           +st.x.toFixed(5), +st.y.toFixed(5), +st.z.toFixed(5),
           +(2 * Math.atan2(kanta.quaternion.y, kanta.quaternion.w)).toFixed(5),
-          +st.pour.toFixed(4)]);
+          +st.pour.toFixed(4),
+          // ── 23 onward: the ballet, and both BALLS OF HER FEET in world ────
+          //
+          // Added for the routine — `BUCK.steps`. The whole question about
+          // dancing on a route is whether a foot covers ground the clip does
+          // not, and it cannot be answered from her ROOT: the root is what
+          // `walkOn` writes and it is correct by definition. It has to be a
+          // contact point, it has to be in world space, and it has to be on
+          // consecutive frames, which is exactly the shape this function
+          // already exists for.
+          //
+          // AND IT IS THE TOE BONE AND NOT THE FOOT BONE, which cost a wrong
+          // answer before it cost a right one. `footL`'s head is the ANKLE, and
+          // an ankle is supposed to move: every ballet pose in this routine
+          // stands on demi-pointe, which is the heel coming up and the foot
+          // rotating about the ball, so the ankle travels 40 mm on a frame with
+          // the foot nailed to the deck. Measured on the ankle, an in-place
+          // developpe reads as 42 mm a frame of "slide" and there is none.
+          // `toeL`'s head is the ball of the foot, which is the thing actually
+          // touching Croatia.
+          //
+          // `boneAt` is figure space; `localToWorld` puts it where the ground
+          // is. `drawFrame` two lines up has already folded the palette and
+          // updated the matrix, so both are current.
+          +st.port.toFixed(4), +st.dance.toFixed(3),
+          ...(() => {
+            if (trFL < 0) { trFL = fig.boneIndex('toeL'); trFR = fig.boneIndex('toeR'); }
+            fig.boneAt(trFL, trV); mesh.localToWorld(trV);
+            const lx = +trV.x.toFixed(5), ly = +trV.y.toFixed(5), lz = +trV.z.toFixed(5);
+            fig.boneAt(trFR, trV); mesh.localToWorld(trV);
+            return [lx, ly, lz,
+              +trV.x.toFixed(5), +trV.y.toFixed(5), +trV.z.toFixed(5)];
+          })()]);
       }
       return rows;
     },
@@ -3216,7 +3927,7 @@ async function buildBucketeer(scene, vik, walkY) {
      * It sets the same flag the draw sets and nothing else, so what a probe
      * photographs is the shipped path and not a second one.
      */
-    pirou: (on = true) => {
+    pirou: (on = true, step = null) => {
       st.pirouLap = !!on;
       // The set-down travels with it. They are one decision in the loop — the
       // pail comes out of her hand BECAUSE she is about to turn, see the note
@@ -3224,7 +3935,69 @@ async function buildBucketeer(scene, vik, walkY) {
       // photograph a pirouette danced round a bucket still hanging off her
       // fist, which is not a frame that occurs in the game.
       st.setLap = !!on;
-      return st.pirouLap;
+      // WHICH step, so that the four in `BUCK.steps` can be looked at one at a
+      // time instead of waited for. `pirou(true)` with no name keeps whatever
+      // the lap's own draw said, which is the shipped path; a name overrides
+      // the draw and nothing else, so the frame is still the frame the game
+      // produces. An unknown name is refused rather than stored, because a
+      // typo that silently became `undefined` would photograph the fallback
+      // and look like the draw ignoring the argument.
+      if (on && step && BUCK.steps[step]) st.move = step;
+      else if (on && !st.move) st.move = 'pirouette';
+      else if (!on) st.move = null;
+      return { pirouLap: st.pirouLap, move: st.move };
+    },
+    /**
+     * Arm the halt on the way up, and pick the step it dances.
+     *
+     * `__fr.buck.go('up', 9); __fr.buck.raw().dance('arabesque');` and then
+     * `__fr.buck.tick(2)` puts her on the made ground in the middle of it.
+     * THAT ORDER: `go` clears the arming, so a `dance()` before it is a
+     * `dance()` thrown away — see the note inside `go`.
+     *
+     * It clears `pirouLap` as well, which is not tidiness: the draw excludes
+     * the two from the same lap on purpose — see `BUCK.pathOdds` — and a probe
+     * that armed both would photograph a lap the game never deals.
+     */
+    dance: (step = null, on = true) => {
+      st.pathLap = !!on;
+      st.pathStep = on ? (step && BUCK.steps[step] ? step : 'developpe') : null;
+      st.danced = false;
+      if (on) { st.pirouLap = false; st.setLap = false; st.move = null; }
+      return { pathLap: st.pathLap, pathStep: st.pathStep };
+    },
+    /**
+     * Arm the port de bras, or force it on this instant.
+     *
+     * `port(true)` is the draw, so she carries the arm the next time she walks
+     * one of `BUCK.portLegs`. `port('now')` skips the ramp and the gates and
+     * hands the figure a fully weighted overlay where she stands, which is the
+     * only way to photograph the arm at fifth on a frame a probe chose rather
+     * than on whichever frame of the phrase the settle happened to land on.
+     *
+     * `port('down')` toggles `BUCK.portDown`, which is the one thing the note
+     * over that constant asks anybody to do: it says the arm is off on the
+     * loaded walk because the lean and the ballet arm fight, and that this is a
+     * decision rather than a limitation. A decision has to be re-lookable, and
+     * `BUCK` is not reachable from the console, so without this line the note
+     * was asking for something the page could not do.
+     */
+    port: (v = true) => {
+      if (v === 'down') {
+        BUCK.portDown = !BUCK.portDown;
+        return { portDown: BUCK.portDown };
+      }
+      if (v === 'now') {
+        st.portLap = true;
+        st.portSet = fig.over('ballet',
+          { bones: BUCK.portArm, from: BUCK.portTo - 1.05, rate: BUCK.portRate });
+        st.port = 1; st.portT = 0;
+        fig.state.overW = 1;
+        return { portSet: st.portSet, overW: fig.state.overW };
+      }
+      st.portLap = !!v;
+      if (!v) { fig.over(null); st.portSet = false; st.port = 0; st.portT = 0; }
+      return { portLap: st.portLap };
     },
     /** Where she is standing, in world metres, for a camera to be aimed at. */
     where: () => [st.x, st.y, st.z],
