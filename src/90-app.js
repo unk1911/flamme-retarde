@@ -2611,7 +2611,28 @@ function stepSwat(dt) {
  *   degree. Both are on the axis running away from both of these cameras. They
  *   were never visible and they are certainly not visible here.
  *
- *   COVERED — the bend. The hand and the bucket are never in frame together
+ *   NO LONGER PRESENT — the bend. This used to say COVERED, and everything
+ *   under it is still true and is left standing because it is what makes the
+ *   framing defensible if the beat ever comes back. What changed on 10 Sep is
+ *   that there is no bend in this cut at all: `st.setLap` in 45-bucketeer.js
+ *   now puts the pail down on the porch only on the laps she is about to
+ *   pirouette on, and `BUCK.ear` is non-null for the whole of this cut, so the
+ *   cut's lap is by construction one of the laps she keeps hold of it. She
+ *   straightens up with ten litres' worth of empty bucket still in her fist,
+ *   stands there, and walks off with it.
+ *
+ *   RE-PHOTOGRAPHED RATHER THAN ARGUED, at 3.80, 4.40, 5.50, 7.00, 7.40 and
+ *   9.00 s through `__fr.pour.frame`. Shot B is unchanged to the eye at every
+ *   one of them: a held pail's rim sits at 0.755 m and this frame's bottom edge
+ *   crosses it at 0.90, so it is 14.5 cm under the picture exactly as the
+ *   set-down pail's 0.2875 m was, and there is no blue in any of the six. The
+ *   only difference is her right arm, which now holds the light carry pose
+ *   through `rest` instead of relaxing to her side — which is what somebody
+ *   holding a bucket does, and is the point.
+ *
+ *   The rest of the original argument:
+ *
+ *   The hand and the bucket are never in frame together
  *   while they are apart. Shot A ends on the frame the pail comes back upright,
  *   which is the frame before the set-down starts. And shot B's bottom edge
  *   crosses her at 0.85 m, and crosses the pail — which stands 0.23 m nearer
@@ -2659,11 +2680,17 @@ function stepSwat(dt) {
  *      shoulder as she ends up — which is 1.58 m in front of her and 2.75 m to
  *      her right as she STARTS, because she turns 64 degrees to her left across
  *      this shot. Locked off for five of its five and three quarter seconds:
- *      the move in it is hers. She straightens up, the bucket goes down out of
- *      the bottom of the frame, she turns and looks out at the channel with the
- *      konoba's pergola, its barman and the far shore behind her, she gets her
- *      breath back, she picks the bucket up (under the frame), and then she
- *      turns and walks away out of the left of it.
+ *      the move in it is hers. She straightens up, she turns and looks out at
+ *      the channel with the konoba's pergola, its barman and the far shore
+ *      behind her, she gets her breath back, and then she turns and walks away
+ *      out of the left of it, the pail swinging off her fist.
+ *
+ *      (This used to read "the bucket goes down out of the bottom of the frame
+ *      ... she picks the bucket up (under the frame)", and both of those
+ *      happened under the picture. Since 10 Sep neither happens at all on this
+ *      lap — see NO LONGER PRESENT above — and the pail is simply in her hand
+ *      for the whole shot, 14.5 cm below the frame line, until the tilt finds
+ *      it at the end.)
  *
  *      And in the last second the camera tilts 35 cm down after her, which is
  *      the only move in this cut that is not a camera arriving somewhere. It is
@@ -2681,7 +2708,14 @@ function stepSwat(dt) {
  * 9.50 s, against the fly's 7.00, and the length is not a taste: THE CUT DOES
  * NOT STOP HER CLOCK. It is exactly `tipIn + tipHold + tipOut + setDown +
  * breathe + lift` — 7.75 s, every one of those a number in BUCK that was argued
- * somewhere else — plus 1.75 s of her walking away with the bucket. Shortening
+ * somewhere else — plus 1.75 s of her walking away with the bucket.
+ *
+ * `setDown` and `lift` are still in that sum even on the laps the pail never
+ * leaves her hand, and that is not an oversight: they are the LENGTHS of `rest`
+ * and `take`, which are unchanged. Measured after the 10 Sep pass, one whole
+ * lap traced at 1/30 s from `fill`: fill 5.20, lift 0.94, down 23.13, tip 2.87,
+ * right 0.93, rest 3.13, take 0.94, up 14.26, set 0.94 — 52.37 s, the same lap
+ * to the frame it has always been. Shortening
  * it would mean either shortening her beats, which changes every other lap, or
  * cutting away from an action half done. So the clock below is HERS: `beat()`
  * hands back the phase and how far into it she is, and `pourClock` lays those

@@ -120,7 +120,15 @@ const BUCK = {
   tipIn: 2.4,         // rolling it over
   tipHold: 0.45,      // and letting the last of it go
   tipOut: 0.9,        // and back upright
-  setDown: 0.9,       // putting it down on the porch to straighten her back
+  // Putting it down, and it is TWO beats of the loop and not one. At the tap it
+  // happens every lap and has to: the pail fills standing on the bathroom floor
+  // under the spout. On the porch it now happens only on the laps she is about
+  // to pirouette on — Misha, 10 Sep 2026, *"the bucket should remain in her arm
+  // after water is poured out"* — and the whole of that argument, including
+  // what it costs the ballet and why `rest` is still 3.10 s long either way, is
+  // where the flag is set, at the top of `rest`. The duration is unchanged and
+  // is the same 0.9 s both ends.
+  setDown: 0.9,
   breathe: 2.2,       // standing on the porch looking at the water
   // ── and why the roll is now 2.4 s and the hold 0.45 ────────────────────────
   //
@@ -165,12 +173,53 @@ const BUCK = {
   // synthesiser. The flag stays because it is the one switch that turns her
   // voice off without unpicking anything.
   hum: true,
-  // How close you get before she stops rather than walks through you, and how
-  // far round in front of her that has to be. 0.95 m is her own reach plus a
-  // shoulder; 0.30 is about 70 degrees either side, so somebody beside her or
-  // behind her is not in her way and she carries on.
-  yieldM: 0.95,
-  yieldDot: 0.30,
+  // ── how close you get before she stops rather than walks through you ───────
+  //
+  // Misha, 10 Sep 2026: *"if i stand in her way, she walks right through me"*.
+  // He is right, and the reason was NOT either of these numbers. It was the
+  // vector the test was taken against, and the whole of it is written out over
+  // the test itself in `step` — `(sin yaw, cos yaw)` is HER RIGHT and not her
+  // nose, which this very file says in as many words three hundred lines below
+  // ("her right", in `placePail`). So the old `ahead` was how far to the side
+  // of her you were standing, it read 0.000 for somebody dead in front, and
+  // `0.000 > 0.30` is false on every frame of every lap. She could not yield
+  // to somebody in her way; she could only yield to somebody standing off her
+  // right shoulder, which is the one place nobody stands on purpose.
+  //
+  // MEASURED BEFORE THE FIX, dropped on foot at the mid-point of leg 10 — the
+  // porch, where she tips it — and sampled every 0.7 s as she came down it:
+  //
+  //   d 2.38 m  yielding false     d 0.35 m  yielding false
+  //   d 1.66 m  yielding false     d 0.25 m  yielding false   <- inside her
+  //   d 0.95 m  yielding false     d 0.75 m  yielding false   <- out the far side
+  //
+  // Twenty-five centimetres between centres, at a steady 0.76 m/s, with the
+  // flag never once set. That is the report, exactly.
+  //
+  // AND THE TEST IS NOW A CORRIDOR AND NOT A CONE, which is a second change and
+  // needs its own defence. A cone is the wrong shape for "in my way": at the
+  // old 0.30 (72 degrees either side) somebody 1.24 m off to one side at 1.30 m
+  // range is inside it and is plainly not blocking anything, while somebody
+  // 0.55 m to the side at 0.60 m range is outside it and is standing on her
+  // feet. What actually blocks a walker is LATERAL OFFSET, which does not
+  // depend on range at all, so that is what is measured: how far ahead of her
+  // nose you are, and how far off her line.
+  //
+  // 1.30 m ahead. The two bodies are 0.54 m between centres — `GROUND.body` is
+  // 0.30 and `BODY.r` in 43-jadrija.js is 0.24 — so anything under that can
+  // never fire before you are already inside her, and 0.95 left only 0.41 m of
+  // approach at 0.76 m/s, half a second. 1.30 leaves 0.76 m of clear air, a
+  // full second, and `yield` damps her at 9 so she is stopped inside 0.09 m of
+  // it. It is still short enough to be a room: the 1.65 m bathroom is the
+  // tightest leg she has and stopping 1.30 m short of somebody standing in it
+  // is stopping at the door, which is what a person does.
+  //
+  // 0.62 m to the side. The two shoulders again — 0.54 — plus 8 cm, so she
+  // stops for somebody who would actually be brushed and walks past somebody
+  // who has stepped aside. In the 1.00 m doorway that is the whole opening,
+  // which is right: there is no room in it to stand aside.
+  yieldM: 1.30,
+  yieldSide: 0.62,
   // Noticing you. 4.6 m is close enough that a look is aimed rather than
   // swept, and 0.82 is about 35 degrees off her — you have to be looking AT
   // her, not past her at the water.
@@ -259,16 +308,45 @@ const BUCK = {
   // `hum` is: `mutter()` below is the A/B, and a control run with the tail of
   // "ubi me vrućina" in the first second of it is not a control run.
   say: true,
-  // 245 to 355 seconds, mean 300, WHICH ARE THE VOICE'S OWN NUMBERS AND NOT A
-  // NEW OPINION. `VOICE.gapBucket` and `VOICE.jitterBucket` in 49-voice.js are
-  // 245 and 110 and were set on 7 Sep after he measured her talking every
-  // 45-60 s: *"her role is to carry buckets not chat chat... maybe once every 5
-  // minutes"*. The live path on this branch is now off — see the note over
-  // `poll` in that file — so this is the same cadence carried across to the
-  // channel that replaced it, deliberately to the second. If it is still too
-  // much it is too much in one place.
-  sayGap: 245,
-  sayJit: 110,
+  // ── 105 to 157 s, AND THIS SUPERSEDES THE INSTRUCTION IT USED TO CARRY ─────
+  //
+  // These were 245 and 110 — 245 to 355 s, mean 300 — and the note here said,
+  // correctly, that they were `VOICE.gapBucket` and `VOICE.jitterBucket` in
+  // 49-voice.js carried across to the second, set on 7 Sep after he measured
+  // her talking every 45-60 s:
+  //
+  //   7 Sep 2026: *"her role is to carry buckets not chat chat... maybe once
+  //   every 5 minutes"*
+  //
+  // Three days later, having actually lived with five minutes:
+  //
+  //   10 Sep 2026: *"why can't she talk more, in croatian... maybe the volume
+  //   is too soft or something?"*
+  //
+  // THE SECOND ONE WINS, and it is worth being plain about why that is not just
+  // deference to whoever spoke last. The 7 Sep instruction was a reaction to
+  // 45-60 s, which is one line every lap: a woman narrating a bucket. It said
+  // nothing about five minutes being right — five minutes was the number
+  // somebody else picked to be safely on the other side of it. And the
+  // complaint it was answering has had a second cause removed in the meantime:
+  // at `MUTTER.gain` 0.44 her voice cleared the beach by 3.9 dB in the speech
+  // band, so half of "she doesn't talk" was "I can't hear her", which is fixed
+  // in 80-audio.js and measured there.
+  //
+  // 105 and 52 are read off her own lap and not off a stopwatch. 52.37 s is one
+  // lap, so this is TWO TO THREE LAPS between lines, mean 131 s — she says
+  // something about every two and a half times round. That is the honest middle
+  // of the two instructions: two and a half times more talking than five
+  // minutes, and two and a half times less than the every-lap narration he
+  // stopped in the first place. Standing on the porch for ten minutes you now
+  // hear four or five lines out of twenty-eight instead of two.
+  //
+  // (The live path in 49-voice.js is off on this branch — see the note over
+  // `poll` there — so there is no second copy of this cadence to keep in step
+  // with. If it is ever turned back on, `gapBucket` is 245 and is now the stale
+  // one.)
+  sayGap: 105,
+  sayJit: 52,
   // AND THE CLOCK ONLY RUNS WHEN SOMEBODY IS THERE TO HEAR IT, which is the
   // difference between a library of twenty-three and a library of twenty-three
   // you have heard. `MUTTER.range` is 26 m and she is on her loop from the
@@ -281,17 +359,32 @@ const BUCK = {
   //
   // `yield` is her legs stopped because you are standing in a one-metre doorway
   // she is carrying ten litres through. Somebody actually says something there
-  // — it is why the game already uses "Pardon!" — and on the five-minute clock
-  // alone she would stand in front of you in silence, which is the one moment
-  // silence is wrong. 90 s is short enough that a player who blocks her twice
-  // gets an answer the second time and long enough that standing in her way for
-  // a minute is not a conversation.
+  // — it is why the game already uses "Pardon!" — and on the main clock alone
+  // she would stand in front of you in silence, which is the one moment silence
+  // is wrong. It has to be short enough that a player who blocks her twice gets
+  // an answer the second time and long enough that standing in her way for a
+  // minute is not a conversation.
+  //
+  // 90 s WAS THAT NUMBER AGAINST A 300 s CLOCK, which is a ratio of 0.30, and
+  // it is the ratio and not the ninety that was the judgement. `sayGap` is now
+  // 105-157 s with a mean of 131 — see the note over it and the two instructions
+  // it reconciles — so 90 would have been two thirds of the main clock and the
+  // doorway would have stopped being a floor at all.
+  //
+  // AND THIS PATH HAS NEVER ONCE FIRED IN THE SHIPPED GAME, which is the other
+  // half of why it is being touched today. It hangs off `st.yieldT`, and `yield`
+  // could not be set by anybody standing in her way: the test was taken against
+  // her right shoulder instead of her nose, and the whole account is over
+  // `BUCK.yieldM`. So these three `see` lines — "Pardon.", "Samo malo.", "Evo,
+  // evo." — have been in the payload since 1.357.0, decoded, warmed, and
+  // unreachable. 40 s is the same 0.30 of the new clock, and it is now a number
+  // that can actually be observed rather than one that was only ever arithmetic.
   //
   // NOT `notice`, deliberately. `noticeGap` is 11 s and being looked at is the
-  // exact thing `gapBucket` was raised to stop her narrating; a `see` line on
+  // exact thing the cadence was raised to stop her narrating; a `see` line on
   // that trigger would hand back the minute's cadence in a different language.
   // She still stops, turns and holds the bucket out every single time.
-  sayYield: 90.0,
+  sayYield: 40.0,
   sayYieldFor: 0.8,     // s of being blocked before it is worth a word
   // WHERE THE EAR IS, when that is not where the walker is. Null everywhere
   // else, and null is the game's own convention: `personAt` in 90-app.js says
@@ -360,12 +453,31 @@ const BUCK = {
   sayIn: { fill: 1, lift: 1 },
   sayInWall: 0.35,
   // AND IT EXPIRES, because a gate with no way out is a woman who has stopped
-  // talking. 60 s off the measured lap: an arming beat comes round every
-  // 52.37 s, so a player who is in the flat with her waits at most one lap and
-  // usually far less, and a player who never goes up the stairs loses one
-  // minute off a clock that is already 245 to 355 seconds long — 20% at the
-  // very worst, and then she says it in the garden exactly as she does today.
-  sayInHold: 60.0,
+  // talking.
+  //
+  // IT WAS 60 s, AND IT WAS BOTH TOO LONG AND WIDER THAN ITS OWN NOTE CLAIMED.
+  // Read the test in `sayTick`: the hold is not applied to the `fill`/`lift`
+  // pools alone, it is applied to EVERY pool but `see` — so a `down`, `tip`,
+  // `rest` or `up` line, which has no room argument at all, was also sat on for
+  // a minute in the hope that a basin beat would come round first. Against a
+  // 245-355 s clock that was the 20 per cent the note admits to. Against the
+  // 105-157 s clock above it would have been up to 57 per cent, and half of the
+  // extra talking he asked for would have been eaten by a gate written to solve
+  // a problem that no longer exists.
+  //
+  // It no longer exists because the fix for it was the wrong fix. The room gate
+  // was reasoned out on 10 Sep as the alternative to "turn her up until she is
+  // a woman shouting in a garden" — and the measurement since (see `MUTTER.gain`
+  // in 80-audio.js) is that she was not loud enough to be shouting in a cupboard:
+  // 3.9 dB of speech-band margin over an empty beach. She is +8.3 dB now, so
+  // the forecourt is a room she can be heard in, and waiting for a better one
+  // is a preference rather than a rescue.
+  //
+  // 20 s keeps the preference and stops it being a tax. A basin beat comes round
+  // every 52.37 s, so 20 s catches it about two times in five when the player is
+  // up there with her — most of the value — and costs at worst 19 per cent of
+  // the shortest gap when nobody ever goes up the stairs.
+  sayInHold: 20.0,
   // And how long she remembers having been hosed, which is the guard and not
   // a mood. See `buckWet` for why it is ten seconds and not the cat's two.
   wetSoak: 10.0,
@@ -629,9 +741,7 @@ const BUCK = {
   // been a change to her loop; this is not.
   pirou: 0.17,
   // About one lap in six, which is once every five minutes and change. Her lap
-  // is 52.37 s and runs all day: `sayGap` is 245 s for exactly this reason and
-  // the note over it carries Misha's own words about it — *"her role is to
-  // carry buckets not chat chat"*. A pirouette every lap would be a tic inside
+  // is 52.37 s and runs all day: a pirouette every lap would be a tic inside
   // four minutes. RULE 4: the draw is `jit(st.laps, 31)` and not `rng()`.
   //
   // AND ONLY IF SOMEBODY IS THERE. `sayNear` is 30 m and makes the same
@@ -639,6 +749,67 @@ const BUCK = {
   // built, and a dance nobody is near is a dance spent. 26 m is `MUTTER.range`
   // — the distance at which she is a person rather than a shape.
   pirouNear: 26.0,
+
+  // ── and the rarity above was invisible, which is not the same thing ────────
+  //
+  // Misha, 10 Sep 2026: *"the bucketeer baye, i thought u could make her do a
+  // ballet move, borrowed from NPC baye? but i don't see her doing any ballet
+  // moves... what is up with that?"*
+  //
+  // It works — `__fr.buck.raw().pirou()` forces one and it plays. What it never
+  // did was arrive. Counted rather than argued: `jit(i, 31) < 0.17` over two
+  // thousand laps comes back at exactly 0.170, a mean gap of 5.88 laps and a
+  // WORST gap of 30 — so the honest description of the old odds is "every five
+  // minutes and eight seconds on average, and once every twenty-six minutes if
+  // you are unlucky", and that is only the draw. On top of it you had to be
+  // inside 26 m at the instant of the transition AND still there through
+  // `breathe`, which is 2.20 s of a 52.37 s lap. He never caught one, and the
+  // note above was written as though the only cost of rarity is waiting.
+  //
+  // THE RARITY IS NOT THE BUG AND IS NOT BEING REPEALED. The argument over
+  // `pirou` is his own — *"her role is to carry buckets not chat chat"* — and a
+  // woman who pirouettes every lap is a mechanism, not a person. What the
+  // argument actually says is that a dance NOBODY SEES is a dance spent, and
+  // that inverts the moment somebody is standing on the porch watching her:
+  // then the rare thing is the person, not the dance, and spending one is the
+  // cheapest thing she can do. So the odds are no longer one number.
+  //
+  //   beyond `pirouWatch`, out to `pirouNear`   0.17, exactly as before
+  //   inside `pirouWatch`                       0.40 — one lap in 2.5, which
+  //                                             at 52.37 s is a turn about
+  //                                             every two minutes and ten
+  //                                             seconds of standing there
+  //
+  // Counted over the hash rather than assumed, 5000 laps of each: 0.17 gives a
+  // mean gap of 6.00 laps, a median of 4 and a worst of 43; 0.40 gives 2.50,
+  // 2 and 16. And counted again in the shipped page, which is the test that
+  // catches a distance gate wired the wrong way round — 25 consecutive laps
+  // with the player standing 6.8 m away came back with 9 turns, and 25 with
+  // him 20.0 m away came back with 4.
+  //
+  // 12 m is not a taste either. It is `noticeM` (4.6) times about two and a
+  // half, which is the range at which a 2.03 s step is a step and not a
+  // silhouette shifting: the figure is 1.78 m tall, so at 12 m she is 8.5
+  // degrees of a 60 degree field, a tenth of the screen height. Past that you
+  // can see that she moved and not what she did, which is the old number's
+  // whole point and is why 26 m keeps the old odds rather than losing them.
+  pirouWatch: 12.0,
+  pirouNearOdds: 0.40,
+  // AND THE FIRST ONE IS A GIFT, which is the half that actually answers the
+  // report. Odds cannot promise anything: at 0.40 there is still a one-in-five
+  // chance of four laps — three and a half minutes — before the first turn, and
+  // the first thing anybody does with a new toy is stand there for a minute and
+  // conclude it is not in the game. This is the same device as the Croatian's
+  // first line, which is armed at 40 s rather than at the full `sayGap` for the
+  // same reason and says so over `sayAt`.
+  //
+  // So: the FIRST lap that ends with somebody inside `pirouWatch` is a turn,
+  // guaranteed, and then the dice take over for the rest of the session. Walk
+  // up to the vikendica and you see one inside one lap of arriving. It is a
+  // latch and not a cooldown — once spent it never comes back, so this cannot
+  // become a thing that happens every time you walk away and come back, which
+  // is the failure mode the pour cut's once-per-session latch actually had.
+  pirouFirst: true,
 };
 
 /**
@@ -1279,8 +1450,11 @@ async function buildBucketeer(scene, vik, walkY) {
     // you — and that rule is switched off for the Bucketeer because her route
     // carries her past you and re-armed it every lap. This is the half of it
     // worth keeping: the FIRST line of a session comes inside a minute, and
-    // every one after it is on the five-minute clock. Five minutes of silence
-    // before the feature exists is a feature nobody finds.
+    // every one after it is on the main clock. Five minutes of silence before
+    // the feature exists is a feature nobody finds. (And the same device is now
+    // used for the pirouette, which had exactly that fault — see
+    // `BUCK.pirouFirst`.) 40 stays as it is: `sayGap` has come down to 105 and
+    // the arming is still the shorter of the two, so it still does its job.
     sayAt: 40.0, saySince: 0, sayRem: 0, sayNow: null, sayI: 0,
     sayLast: {}, sayBeat: null, said: [], warmed: false,
     // How long she has been armed and holding out for the flat. Its own
@@ -1311,7 +1485,13 @@ async function buildBucketeer(scene, vik, walkY) {
     // is one number and not a stream — and `pirouLap` is whether THIS one is a
     // lap she turns on. It is decided once, on the way into `rest`, and read
     // by `drawFrame`; see `BUCK.pirouFrom`.
-    laps: 0, pirouLap: false,
+    //
+    // `pirouEver` is the session latch behind `BUCK.pirouFirst`: the first lap
+    // that ends with somebody inside `pirouWatch` is taken outright, and after
+    // that this is true for ever and the dice decide. `setLap` is whether the
+    // pail goes down on THIS lap, which is the same question — see the long
+    // note where both are written, and `BUCK.setDown`.
+    laps: 0, pirouLap: false, pirouEver: false, setLap: false,
     hold: false,        // debug: the loop stopped where it stands
     x: 0, y: 0, z: 0,
   };
@@ -1529,17 +1709,72 @@ async function buildBucketeer(scene, vik, walkY) {
           // is deleting this clause; it should be a decision somebody makes
           // after looking at the shot, not a side effect of this one.
           st.laps += 1;
+          // Two odds and a gift, all three argued over `BUCK.pirouWatch`: the
+          // old 0.17 out at the edge of earshot, 0.40 when somebody is close
+          // enough to see what she is doing, and the first lap with somebody
+          // that close taken outright so that the feature introduces itself
+          // instead of waiting to be believed in.
+          const watched = st.ear < BUCK.pirouWatch;
+          const odds = watched ? BUCK.pirouNearOdds : BUCK.pirou;
           st.pirouLap = !BUCK.ear && st.ear < BUCK.pirouNear
-            && jit(st.laps, 31) < BUCK.pirou;
+            && ((BUCK.pirouFirst && watched && !st.pirouEver)
+              || jit(st.laps, 31) < odds);
+          if (st.pirouLap) st.pirouEver = true;
+          // ── and whether the pail goes down at all ─────────────────────────
+          //
+          // Misha, 10 Sep 2026: *"after she pours the water out the bucket, the
+          // bucket goes down on the floor and goes back into her arm.. that is
+          // unnecessary... the bucket should remain in her arm after water is
+          // poured out... this will look smoother"*.
+          //
+          // He is right about every lap but one kind, and the exception is not
+          // a hedge — it is a hard constraint that the pirouette's own note
+          // states in as many words. `breathe` is THE ONLY WINDOW IN HER LAP
+          // where both hands are empty, her feet are still and she is somewhere
+          // anybody can see her; `fill` is longer but is inside a 1.65 m
+          // bathroom behind a wall, and everything else is walking or ten kilos
+          // moving between the floor and her hand. Take the set-down away
+          // unconditionally and the ballet has nowhere left to live, so defect
+          // 4 would have quietly deleted defect 1's fix on the same afternoon
+          // it landed.
+          //
+          // So the pail goes down on the laps she is about to turn on and stays
+          // in her hand on every other one — which is not a compromise between
+          // the two reports, it is better than either. A bucket put down for no
+          // reason and picked straight back up is the fidget he is objecting
+          // to; a bucket put down BECAUSE she is about to turn round on the
+          // spot is a woman putting a bucket down. The set-down stopped being
+          // punctuation and became a preparation.
+          //
+          // WHAT WAS REJECTED. (1) Dancing with the pail in her fist: the clip
+          // takes both arms overhead through BAL_PIQUE and the carry solve owns
+          // the right one, so it is either a bucket swinging through her own
+          // head or an arm that stops half way and reads as broken. (2) Moving
+          // the pirouette to `fill`: she is alone in a bathroom on the first
+          // floor and a dance behind a wall is the dance-nobody-sees the odds
+          // note already rejects. (3) Shortening `rest` on the laps that keep
+          // hold of it: that shortens the LAP, and the lap is 52.37 s
+          // metronomic — `sayInHold`, the hum's cadence and the pour cut's own
+          // 9.50 s are all measured against it, and the cut's length is
+          // literally `tipIn + tipHold + tipOut + setDown + breathe + lift`. So
+          // `rest` is 3.10 s either way and only the PAIL's behaviour inside it
+          // changes. She still straightens her back and still turns out to sea
+          // on the same frame she always did.
+          st.setLap = st.pirouLap;
         }
         break;
       }
       case 'rest':
-        // She puts it down, straightens her back and looks at the water. It is
-        // the one beat in the loop that is not work, and it is the reason she
-        // reads as somebody rather than as a mechanism.
+        // She straightens her back and looks at the water. It is the one beat
+        // in the loop that is not work, and it is the reason she reads as
+        // somebody rather than as a mechanism.
+        //
+        // And she puts the pail down only if this is a lap she is about to turn
+        // on — `st.setLap`, decided at the top of the beat and argued there at
+        // length. On every other lap it stays in her fist and `restAt`'s latch
+        // is simply never reached, because `held` never leaves 1.
         st.tip = 0;
-        st.held = 1 - bckEase(st.clock / BUCK.setDown);
+        st.held = st.setLap ? 1 - bckEase(st.clock / BUCK.setDown) : 1;
         if (st.clock > BUCK.setDown) {
           // Turned out to sea while she stands there.
           const a = at(11), b = vik.at([0.95, 0, 8.2]);
@@ -1557,7 +1792,13 @@ async function buildBucketeer(scene, vik, walkY) {
         }
         break;
       case 'take':
-        st.held = bckEase(st.clock / BUCK.lift);
+        // And she only picks it up if she put it down. Left unconditional this
+        // would be the one line that turned "keep hold of the bucket" into a
+        // worse fault than the one it fixed: `held` is already 1 on a lap she
+        // kept it on, and `bckEase(0)` is 0, so the first frame of `take` would
+        // drop ten litres to the floor and haul it back up over 0.93 s — a pail
+        // teleporting downwards, which is not even the old behaviour.
+        st.held = st.setLap ? bckEase(st.clock / BUCK.lift) : 1;
         if (st.clock >= BUCK.lift) {
           st.phase = 'up'; st.clock = 0; st.dir = -1;
           st.leg = BUCK_WAY.length - 2; st.u = 0;
@@ -2063,11 +2304,21 @@ async function buildBucketeer(scene, vik, walkY) {
     // absent-minded.
     if (st.yield) return 0;
     let lvl = BUCK.humBeat[st.phase] || 0;
-    // `rest` is two beats in one name — nine tenths of a second putting ten
-    // kilos down, then a couple standing over it — and only the second half of
-    // it is a beat anybody hums through. `held` falls 1 to 0 across the first,
-    // so this is the pail reaching the porch and her getting her breath back.
-    if (st.phase === 'rest') lvl *= 1 - st.held;
+    // `rest` is two beats in one name — nine tenths of a second of straightening
+    // up out of a pour, then a couple standing there — and only the second half
+    // of it is a beat anybody hums through.
+    //
+    // ON THE CLOCK AND NOT ON `held`, which is a change and not a tidy-up. This
+    // used to read `lvl *= 1 - st.held`, because `held` fell 1 to 0 across the
+    // set-down and so WAS the first half of the beat expressed as a number.
+    // Since the pail now stays in her hand on every lap she does not turn on —
+    // see the note at the top of `rest` — `held` sits at 1 through the whole
+    // beat on most laps, and that line would have returned a flat zero: she
+    // would have stopped humming on the porch entirely, which is one of the two
+    // beats `humBeat` exists to cover and the one Misha singled out
+    // (*"she certainly hums nicely"*). Same curve, same 0.9 s, taken off the
+    // thing that was actually being asked about all along.
+    if (st.phase === 'rest') lvl *= bckEase(st.clock / BUCK.setDown);
     return lvl;
   }
 
@@ -2466,21 +2717,46 @@ async function buildBucketeer(scene, vik, walkY) {
     // hand is a person clipping through a jamb. Standing still and waiting is
     // what somebody actually does, and it costs nothing to be right about.
     // AND ONLY WHILE SHE IS ON HER WAY SOMEWHERE, which is the one line this
-    // wanted from the day it was written and did not have. `ahead` falls back
-    // to 1 when she is not moving — deliberately, so that a woman already
-    // stopped by you stays stopped — but nothing said she had to be walking in
-    // the first place, so standing anywhere within 0.95 m of her set `yield`
-    // whatever she was doing, and `yield` takes `stepLoop` out of the frame.
-    // Probed: stand 0.45 m from her at the basin and `fill` sits at 0.00 with
-    // `yielding` true for as long as you care to stand there. Not a slow beat —
-    // a stopped one. She never turns the tap off, never picks the bucket up,
-    // and `humLevel` returns 0 the whole time, so the flat goes quiet as well.
-    // The two walking beats are the only ones with a leg to be in the way of.
+    // wanted from the day it was written and did not have. Standing anywhere
+    // within the radius used to set `yield` whatever she was doing, and `yield`
+    // takes `stepLoop` out of the frame. Probed: stand 0.45 m from her at the
+    // basin and `fill` sits at 0.00 with `yielding` true for as long as you
+    // care to stand there. Not a slow beat — a stopped one. She never turns the
+    // tap off, never picks the bucket up, and `humLevel` returns 0 the whole
+    // time, so the flat goes quiet as well. The two walking beats are the only
+    // ones with a leg to be in the way of.
+    //
+    // ── HER NOSE, AND IT WAS HER RIGHT SHOULDER ────────────────────────────
+    //
+    // The whole account of the bug, the measurement that found it and why this
+    // is a corridor rather than a cone is over `BUCK.yieldM`. The two lines
+    // here are only the arithmetic, and the arithmetic is the thing that was
+    // wrong, so it is worth writing the convention down where it is used:
+    //
+    //   st.yaw = atan2(-(bz - az), bx - ax)    — `walkOn`, and `go`, and `tapYaw`
+    //   so she travels along  ( cos yaw, -sin yaw)
+    //   and her right is      ( sin yaw,  cos yaw)    — `placePail` says so too
+    //
+    // Those two are perpendicular, which is why the old test could not fire:
+    // it dotted the vector to you against the second one and compared it to
+    // 0.30. Somebody straight in front of her scores exactly 0.
+    //
+    // AND NO `st.vel` FALLBACK, which the old line had and does not need. It
+    // set `ahead` to 1 whenever she was under 0.02 m/s, so that a woman already
+    // stopped by you stayed stopped — a sound aim with an unsound mechanism,
+    // because 1 also passes for somebody who has since walked round BEHIND her,
+    // leaving her stuck facing an empty doorway until they wander back out of
+    // the radius. Both of these are read off `st.yaw`, which does not move
+    // while she is yielding (`walkOn` is the only thing that turns her and
+    // `yield` is what stops it being called), so the stopped case answers
+    // itself: step aside and `side` clears, step behind her and `fwd` goes
+    // negative, and either way she picks the bucket up and goes.
     const near = Math.sqrt(d2);
     const walking = st.phase === 'down' || st.phase === 'up';
-    const ahead = st.vel > 0.02
-      ? (dx * Math.sin(st.yaw) + dz * Math.cos(st.yaw)) / (near || 1) : 1;
-    st.yield = walking && near < BUCK.yieldM && ahead > BUCK.yieldDot;
+    const fwd = dx * Math.cos(st.yaw) - dz * Math.sin(st.yaw);
+    const side = dx * Math.sin(st.yaw) + dz * Math.cos(st.yaw);
+    st.yield = walking && fwd > 0 && fwd < BUCK.yieldM
+      && Math.abs(side) < BUCK.yieldSide;
 
     // ── and she knows you are there ─────────────────────────────────────────
     //
@@ -2697,6 +2973,14 @@ async function buildBucketeer(scene, vik, walkY) {
       // separates "she never turns" from "she turns and the window is wrong",
       // which from outside are the same still frame.
       pirouLap: st.pirouLap, laps: st.laps,
+      // The two flags the 10 Sep pass added, both on `stats()` because both are
+      // decisions taken once a lap that nothing else can be inferred from: a
+      // probe standing on the porch cannot tell "she is not going to turn this
+      // lap" from "the draw has not happened yet", and `setLap` false looks
+      // exactly like a bug in the set-down until you can read it.
+      pirouEver: st.pirouEver, setLap: st.setLap,
+      // How far the listener is, which is what both of those were decided on.
+      ear: +Math.min(st.ear, 9999).toFixed(1),
       clipT: +fig.state.curT.toFixed(2),
       bucket: kanta.position.toArray().map((n) => +n.toFixed(2)),
       /** How fat the stream is, 0…1, and where a set-down pail is standing. */
@@ -2764,7 +3048,14 @@ async function buildBucketeer(scene, vik, walkY) {
       // the way into `rest` and a jump does not go that way, so a `go` taken
       // out of a lap that was going to turn would leave her spinning on a beat
       // nobody asked about. `pirou()` below is how a probe asks for one.
+      //
+      // `setLap` with it and for exactly the same reason — the two are decided
+      // on the same frame and mean the same thing about the lap — so a `go`
+      // lands on an ORDINARY lap, the one where the pail stays in her hand.
+      // `pirou()` sets both back, which is what makes it photograph the whole
+      // moment rather than a woman turning round a bucket she is still holding.
       st.pirouLap = false;
+      st.setLap = false;
       let k = 0;                    // the waypoint she is standing on
       if (phase === 'down') {
         st.dir = 1; st.fill = 1; st.held = 1;
@@ -2925,7 +3216,16 @@ async function buildBucketeer(scene, vik, walkY) {
      * It sets the same flag the draw sets and nothing else, so what a probe
      * photographs is the shipped path and not a second one.
      */
-    pirou: (on = true) => { st.pirouLap = !!on; return st.pirouLap; },
+    pirou: (on = true) => {
+      st.pirouLap = !!on;
+      // The set-down travels with it. They are one decision in the loop — the
+      // pail comes out of her hand BECAUSE she is about to turn, see the note
+      // at the top of `rest` — and a probe that set only the flag would
+      // photograph a pirouette danced round a bucket still hanging off her
+      // fist, which is not a frame that occurs in the game.
+      st.setLap = !!on;
+      return st.pirouLap;
+    },
     /** Where she is standing, in world metres, for a camera to be aimed at. */
     where: () => [st.x, st.y, st.z],
     /** The route, as the house sees it, as the locale sees it and as a floor. */
