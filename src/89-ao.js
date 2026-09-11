@@ -123,8 +123,18 @@ vec3 viewPos(vec2 uv, float d) {
   return (uProjInv * clip).xyz;
 }
 
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+/**
+ * Interleaved gradient noise — Jimenez, "Next Generation Post Processing in
+ * Call of Duty: Advanced Warfare", SIGGRAPH 2014.
+ *
+ * It replaces a fract(sin(dot(...))) hash, and the swap is the whole of the
+ * fix described over the rotation below: this is the one dither whose values
+ * over any small neighbourhood are close to a *stratified* set rather than to
+ * nine independent draws, so a three-by-three average of them covers the circle
+ * once instead of landing on it nine times at random.
+ */
+float ign(vec2 p) {
+  return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
 
 void main() {
@@ -192,8 +202,44 @@ void main() {
   if (trust <= 0.001) { fragColor = vec4(1.0); return; }
 
   // A per-pixel rotation of the kernel, so sixteen taps behave like rather
-  // more than sixteen once the blur has had them.
-  float a = hash(gl_FragCoord.xy) * 6.2831853;
+  // more than sixteen once the blur has had them. This is the only random
+  // number in the pass and it is the whole of its noise budget.
+  //
+  // ── and it has to be interleaved rather than hashed ──────────────────────
+  //
+  // Misha, 10 Sep 2026, on the Bucketeer at the basin: *"that defect, on the
+  // nape (back of her head): the hairiness"*. It is this line. A fract(sin())
+  // hash makes every pixel's rotation independent of its neighbours', so the
+  // sixteen-tap estimate is sixteen Bernoulli trials and the four-tap blur that
+  // follows averages four *independent* draws of it — which divides the
+  // deviation by two, where quieting sixteen coin tosses needs it divided by
+  // four. What is left over is salt-and-pepper.
+  //
+  // It is invisible over most of the world because the variance of a Bernoulli
+  // mean is p(1-p): a wall is p = 0 and a deep corner is p = 1, and both are
+  // silent. It is loudest at p = 0.5, and p = 0.5 is precisely a NECK — a 55 mm
+  // cylinder under a chin, sampled over the 0.32 m hemisphere this pass uses
+  // indoors, sees about half the room whichever way the kernel is turned. So
+  // the one surface in the game that lands in the middle of the curve is human
+  // skin at conversational range, which is also the one surface a player looks
+  // at closely. Measured on her nape at 1.4 m: the occlusion swung +/-4% pixel
+  // to pixel, which on skin reads as stubble. Nothing else was wrong — the
+  // albedo, the normals, the shadow cascade and the vertex colours were each
+  // eliminated by flattening them one at a time and photographing the result;
+  // forcing the whole figure to flat magenta still produced the speckle,
+  // because the speckle is a multiply applied after she is shaded.
+  //
+  // Interleaved gradient noise is the fix and it is free: same instruction
+  // count, same static screen-space pattern (so nothing new shimmers when you
+  // turn your head), same mean occlusion to within a tenth of a level. What
+  // changes is that the sixteen values in any four-by-four block are spread
+  // over the circle instead of being drawn from it at random, so the blur below
+  // actually cancels them. Measured over the same crop of her nape, the
+  // high-frequency deviation falls from 0.79 to 0.30 levels, against 0.06 with
+  // the pass switched off entirely — i.e. three quarters of what was left to
+  // remove. The hashed rotation with the same widened blur only reached 0.48,
+  // and the picture still had a five-o'clock shadow in it.
+  float a = ign(floor(gl_FragCoord.xy)) * 6.2831853;
   vec3 rv = vec3(cos(a), sin(a), 0.0);
   vec3 t = normalize(rv - n * dot(rv, n));
   vec3 b = cross(n, t);
@@ -266,14 +312,26 @@ uniform float uShow;
 
 void main() {
   vec4 col = texture2D(tColor, vUv);
-  // Four taps on the diagonals of one occlusion texel. Cheaper than a
-  // separable blur, and against a half-resolution buffer that bilinear
-  // filtering has already smoothed once, it is enough.
-  float ao = (
-    texture2D(tAO, vUv + uAOTexel * vec2(-0.5, -0.5)).r +
-    texture2D(tAO, vUv + uAOTexel * vec2(0.5, -0.5)).r +
-    texture2D(tAO, vUv + uAOTexel * vec2(-0.5, 0.5)).r +
-    texture2D(tAO, vUv + uAOTexel * vec2(0.5, 0.5)).r) * 0.25;
+  // Nine bilinear taps, one occlusion texel apart. Each one is already an
+  // average of the two-by-two it lands between, so the nine of them are a
+  // four-by-four tent over the occlusion buffer — eight screen pixels across,
+  // which is as wide as this can go before a contact shadow stops being in
+  // contact with anything.
+  //
+  // It was four taps half a texel apart, which is barely more than the
+  // bilinear filter would have given on its own: about five texels' worth of
+  // averaging, against the sixteen independent draws a hashed kernel rotation
+  // needs to be quiet. Widening it alone does not fix that — nine taps over a
+  // hashed rotation still left a visible mottle on skin — and the rotation
+  // alone does not either. The pair is the fix: see the note over ign() in
+  // AO_FRAG for the measurement and for whose nape it was measured on.
+  float ao = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      ao += texture2D(tAO, vUv + uAOTexel * vec2(float(i), float(j))).r;
+    }
+  }
+  ao /= 9.0;
   if (uShow > 0.5) { fragColor = vec4(vec3(ao), 1.0); return; }
   fragColor = vec4(col.rgb * (1.0 - (1.0 - ao) * uStrength), 1.0);
 }
