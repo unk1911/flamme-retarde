@@ -295,6 +295,13 @@ const BUCK = {
     down: 0.88,         // ten kilos down an open flight, minding her feet
     rest: 0.85,         // straightening her back, looking at the water
     fill: 0.72,         // under her breath, listening to the tap
+    // And the two new ones, which are the loudest she gets and should be: both
+    // hands are empty, nothing is being lifted, and she is alone in her own
+    // flat. `dwell` is under `roam` for the same reason `fill` is under `up` —
+    // somebody standing at a window hums more quietly than somebody walking
+    // through a room.
+    roam: 0.94,
+    dwell: 0.80,
   },
 
   // ── and once in a while she says something ─────────────────────────────────
@@ -333,13 +340,23 @@ const BUCK = {
   // band, so half of "she doesn't talk" was "I can't hear her", which is fixed
   // in 80-audio.js and measured there.
   //
-  // 105 and 52 are read off her own lap and not off a stopwatch. 52.37 s is one
-  // lap, so this is TWO TO THREE LAPS between lines, mean 131 s — she says
-  // something about every two and a half times round. That is the honest middle
-  // of the two instructions: two and a half times more talking than five
-  // minutes, and two and a half times less than the every-lap narration he
-  // stopped in the first place. Standing on the porch for ten minutes you now
-  // hear four or five lines out of twenty-eight instead of two.
+  // 105 and 52 were read off her own lap and not off a stopwatch: 52.37 s was
+  // one lap, so this was TWO TO THREE LAPS between lines, mean 131 s — about
+  // every two and a half times round. That was the honest middle of the two
+  // instructions above, and it is the cadence that ships.
+  //
+  // ── AND IT IS UNCHANGED BY THE FIVE-MINUTE CYCLE, WHICH IS WORTH SAYING ───
+  //
+  // These two are a WALL CLOCK and not a lap count — `st.sayAt` runs down in
+  // seconds inside `sayTick` — so the re-derivation that moved `pirou`,
+  // `pirouNearOdds`, `pathOdds` and `portOdds` does not touch them. Standing
+  // within 30 m of her you still hear a line every 105 to 157 s, mean 131 s,
+  // exactly as before. What HAS changed is the description: one line every
+  // 2.5 laps has become about two and a half lines every cycle, because the
+  // cycle is 316 s. The seconds are the thing that was ever measured.
+  //
+  // What has changed for the better is WHERE they land — see `sayIn`, which
+  // was 11.7 per cent of her lap and is now 84 per cent of her cycle.
   //
   // (The live path in 49-voice.js is off on this branch — see the note over
   // `poll` there — so there is no second copy of this cadence to keep in step
@@ -418,9 +435,17 @@ const BUCK = {
   // herself, which is a different character. `take` and `right` are folded onto
   // the beats they are half of — `take` is the same heave as `lift` and `right`
   // is the end of the same tip.
+  // The two roam beats are pointed at pools that already exist and NOT at new
+  // lines — RULE 12, and there is nothing to invent anyway. Read what is in
+  // them: `up` is "Di sam stala?", "Opet ja.", "Još jedanput." — a woman losing
+  // her thread and picking it up again, which is precisely a wander; and `rest`
+  // is "Uf, vrućina.", "Lipo je danas.", "Fala Bogu.", which is what somebody
+  // says standing at a window. Both were written for beats she is not carrying
+  // anything on, and neither mentions the bucket.
   sayBeat: {
     fill: 'fill', lift: 'lift', take: 'lift',
     down: 'down', tip: 'tip', right: 'tip', rest: 'rest', up: 'up',
+    roam: 'up', dwell: 'rest',
   },
   // ── and she waits for a room she can be heard in ───────────────────────────
   //
@@ -450,7 +475,16 @@ const BUCK = {
   // would have swapped a line he could nearly hear for one he could not hear
   // at all. So the gate is the beat AND `st.wall` — she is at the basin and
   // there is no storey between you, which is the two of you in the flat.
-  sayIn: { fill: 1, lift: 1 },
+  // AND THE WANDER IS THE FLAT, WHICH IS MOST OF WHAT THIS GATE EVER WANTED.
+  // The note above is an argument about how little of her lap is spent indoors
+  // with nothing between the two of you — 6.13 s of 52.37, `fill` and `lift`
+  // and nothing else. On a five-minute cycle the roam is four minutes of it and
+  // ALL of it is the flat, so the room she can be heard in is now the ordinary
+  // case rather than the one worth waiting for. The wall clause below still
+  // does the deciding: `st.wall` is what says whether there is a storey between
+  // her and your ear, and a line said in the bathroom while you are in the
+  // garden is still a line you cannot hear.
+  sayIn: { fill: 1, lift: 1, roam: 1, dwell: 1 },
   sayInWall: 0.35,
   // AND IT EXPIRES, because a gate with no way out is a woman who has stopped
   // talking.
@@ -473,10 +507,18 @@ const BUCK = {
   // the forecourt is a room she can be heard in, and waiting for a better one
   // is a preference rather than a rescue.
   //
-  // 20 s keeps the preference and stops it being a tax. A basin beat comes round
-  // every 52.37 s, so 20 s catches it about two times in five when the player is
-  // up there with her — most of the value — and costs at worst 19 per cent of
-  // the shortest gap when nobody ever goes up the stairs.
+  // 20 s keeps the preference and stops it being a tax. A basin beat came round
+  // every 52.37 s, so 20 s caught it about two times in five when the player was
+  // up there with her — most of the value — and cost at worst 19 per cent of
+  // the shortest gap when nobody ever went up the stairs.
+  //
+  // AND IT IS VERY NEARLY A DEAD CLAUSE NOW, which is the right outcome rather
+  // than a reason to delete it. `sayIn` used to name 6.13 s of a 52.37 s lap;
+  // it now names `roam` and `dwell` as well, which are 84 per cent of a 316 s
+  // cycle. So the pool she has just armed is one she can be heard on almost
+  // whatever she is doing, the hold expires almost never, and the 20 s is what
+  // covers the sixteen per cent — the stair, the porch, the pour — where it
+  // still is not. Left exactly as it is: it costs nothing when it never fires.
   sayInHold: 20.0,
   // And how long she remembers having been hosed, which is the guard and not
   // a mood. See `buckWet` for why it is ten seconds and not the cat's two.
@@ -739,10 +781,28 @@ const BUCK = {
   // before the revolution starts — and what it reads as is a woman turning to
   // face the water and then turning once on the spot. Gating it off would have
   // been a change to her loop; this is not.
-  pirou: 0.17,
-  // About one lap in six, which is once every five minutes and change. Her lap
-  // is 52.37 s and runs all day: a pirouette every lap would be a tic inside
-  // four minutes. RULE 4: the draw is `jit(st.laps, 31)` and not `rng()`.
+  // ── RE-DERIVED 11 SEP, BECAUSE A LAP IS NOT 52 SECONDS ANY MORE ───────────
+  //
+  // THIS WAS 0.17 AND THAT NUMBER MEANT SOMETHING IN SECONDS. Everything below
+  // about rarity is an argument about REAL TIME — "once every five minutes and
+  // change", "a tic inside four minutes" — expressed as a per-lap probability
+  // because the lap was 52.10 s and the two were interchangeable. They are not
+  // any more. `st.laps` counts POURS, and she pours once every 316 s now
+  // instead of every 52.10, so every draw taken on that index got six times
+  // rarer on the clock the moment the wander landed, silently, without a line
+  // of it being touched. Each of the four is re-derived where it stands.
+  //
+  // 0.17 a lap at 52.10 s was a step every 5.2 minutes out at the edge of
+  // earshot. 0.17 a cycle at 316 s is one every 31 minutes. 0.30 is what puts
+  // it back nearest to where it was without pretending the pour itself is any
+  // commoner than it now is: counted over the hash, 5000 cycles, 0.30 comes
+  // back at 0.3008 with a mean gap of 3.32 cycles — **17.5 minutes** — and a
+  // worst of 24. Slower than the 5.2 it replaces, and that is not something a
+  // number can fix: the porch happens once a cycle and the cycle is the thing
+  // he asked to be six times longer. What is not slower is the BALLET, which
+  // now mostly happens upstairs; see `BUCK.roamOdds`.
+  pirou: 0.30,
+  // RULE 4: the draw is `jit(st.laps, 31)` and not `rng()`.
   //
   // AND ONLY IF SOMEBODY IS THERE. `sayNear` is 30 m and makes the same
   // argument for the talking: she is on her loop from the moment the beach is
@@ -794,7 +854,25 @@ const BUCK = {
   // can see that she moved and not what she did, which is the old number's
   // whole point and is why 26 m keeps the old odds rather than losing them.
   pirouWatch: 12.0,
-  pirouNearOdds: 0.40,
+  // ── AND 0.40 BECAME 0.55, FOR THE REASON `pirou` GIVES ABOVE ──────────────
+  //
+  // 0.40 a lap at 52.10 s was a step on the porch every 130 s of standing there
+  // watching. 0.40 a cycle at 316 s is one every 13.2 minutes. There is no
+  // number on this line that puts 130 s back — a probability cannot exceed 1
+  // and the porch only comes round once every five minutes — so the question
+  // is not "how do I restore the rate" but "how much of the pour should carry
+  // a step", and the honest answer to that is MOST of it: the pour is now the
+  // showpiece of the whole cycle, it has a cut built round it, and it happens
+  // five times an hour instead of seventy.
+  //
+  // 0.55, counted over 5000 cycles of the hash: 0.5508, mean gap 1.81 cycles,
+  // median 1, worst 10. At 316 s that is a porch step every **9.5 minutes** of
+  // standing there. Taken together with the halt on the way up, which is drawn
+  // only on the cycles this one misses, the chance that a watched pour carries
+  // a ballet step somewhere is 0.55 + 0.45 × 0.617 = **0.83** — against the
+  // 0.605 the shipped build managed per lap. Per trip to the water she dances
+  // MORE than she did; per minute the flat carries it.
+  pirouNearOdds: 0.55,
   // AND THE FIRST ONE IS A GIFT, which is the half that actually answers the
   // report. Odds cannot promise anything: at 0.40 there is still a one-in-five
   // chance of four laps — three and a half minutes — before the first turn, and
@@ -862,10 +940,11 @@ const BUCK = {
   //
   // Which leaves two honest answers, and both of them ship.
   //
-  //   ONE. WHERE SHE IS ALREADY STILL, GIVE HER MORE THAN ONE STEP. `breathe`
-  //   is unchanged and so is its 0.40 / 0.17 / first-one-free gate — the
-  //   feature he says he loves is not being touched — but the step danced in it
-  //   is now a draw from `restSteps` instead of always the turn.
+  //   ONE. WHERE SHE IS ALREADY STILL, GIVE HER MORE THAN ONE STEP. The step
+  //   danced on the porch is a draw and not always the turn. (11 Sep: the draw
+  //   is now from `pathSteps`, because the pail stays in her fist — see the top
+  //   of `rest` — and the hands-free half of the routine moved upstairs to the
+  //   wander. `BUCK.roamSteps`.)
   //
   //   TWO. WHERE SHE IS WALKING, DANCE THE ARM. Her free arm never touches the
   //   ground, so it cannot slide: `over` in 41-skin.js lays the routine's own
@@ -896,25 +975,32 @@ const BUCK = {
     pirouette: { from: 7.45, to: 10.60, rate: 1.55 },
     arabesque: { from: 10.70, to: 14.35, rate: 1.35 },
   },
-  // What she may dance on the porch, and the list is a list rather than a set
-  // because a repeat is how a weight is spelled: the pirouette is half of the
-  // draws. He asked for variety, not for the thing he likes to become one
-  // outcome in four — and it is also the only one of the four that ends facing
-  // exactly where it started without relying on a baked 70-degree turn coming
-  // back, which on the beat immediately before `take` matters.
+  // ── `restSteps` USED TO BE HERE AND HAS BEEN SPLIT IN TWO ─────────────────
   //
-  // THE ARABESQUE IS NOT ON THIS LIST AND THAT IS A MEASUREMENT. 3.65 s of clip
-  // into a 2.03 s window is rate 1.80, and the fastest joint in it is the
-  // working leg unfolding from attitude to arabesque — 41 degrees of legUR x
-  // and 128 of its z over 0.75 s of clip, which at 1.80 is 410 deg/s. The
-  // note over BAL_ARM1 measured 393 deg/s on an arm and called it a throw. A
-  // leg whipping out of an attitude at 410 is the same fault, so the arabesque
-  // is danced where there is room for it and nowhere else.
+  // It was "what she may dance on the porch" — pirouette, pirouette, developpé,
+  // relevé — and it existed because the porch was the only place in her lap
+  // where both her hands were empty. That stopped being true twice on 11 Sep,
+  // in opposite directions:
   //
-  // Counted over 5000 laps of the hash rather than assumed off the list
-  // length, because `jit(i, 43) * 4 | 0` is only uniform if the hash is:
-  // pirouette 49.9 per cent, releve 26.0, developpe 24.2.
-  restSteps: ['pirouette', 'pirouette', 'developpe', 'releve'],
+  //   the porch stopped being hands-free. The pail never goes down there now —
+  //   see the top of `rest` — so the two steps that take both arms overhead
+  //   through BAL_PIQUE, the pirouette and the relevé, cannot be danced on it.
+  //   What is left is `pathSteps`, which is exactly the list of steps whose
+  //   right arm agrees with a carried bucket, and `rest` draws from that.
+  //
+  //   and the flat became hands-free, twenty-odd stops of it a cycle. That is
+  //   where the pirouette went; `BUCK.roamSteps` is the list and carries the
+  //   measurement that decides it.
+  //
+  // The one measurement worth carrying forward out of the old note, because it
+  // is about the clip and not about the porch: THE ARABESQUE CANNOT BE PLAYED
+  // FAST. 3.65 s of it into a 2.03 s window is rate 1.80, and the fastest joint
+  // is the working leg unfolding from attitude — 41 degrees of legUR x and 128
+  // of its z over 0.75 s of clip, which at 1.80 is 410 deg/s. The note over
+  // BAL_ARM1 measured 393 deg/s on an arm and called it a throw. So the
+  // arabesque is danced at 1.35 in a beat with room for 2.70 s of it, which is
+  // `rest` at its full 3.10 s and the halt on the made ground, and nowhere
+  // faster.
   // ── and one step on the way up, with the bucket still in her hand ──────────
   //
   // WHICH STEP IS NOT A CHOICE, IT IS AN ARM. The set-down note above already
@@ -1027,7 +1113,23 @@ const BUCK = {
   // build, to the decimal. Nothing about the rarity he argued for has moved.
   // What moved is the first row, from 0.40 steps a watched lap to 0.605, in two
   // places instead of one, with an arm on top.
-  pathOdds: 0.33,
+  // ── AND IT IS 0.60 NOW, RE-DERIVED WITH THE OTHER THREE ───────────────────
+  //
+  // Same arithmetic as `pirou` and `pirouNearOdds`, and this one was nearly
+  // killed outright rather than merely slowed. It is drawn on `!st.pirouLap`,
+  // so at the old 0.33 behind the new 0.55 it would have fired on 0.45 × 0.33 =
+  // 0.15 of cycles — one halt every **35 minutes** of standing there, against
+  // one every 2.5 minutes before. That is not rarity, that is a feature that
+  // has been turned off by a change somewhere else, which is exactly what the
+  // brief for this pass warned would happen to every gate expressed in laps.
+  //
+  // 0.60 over the hash, 5000 cycles: 0.6168, mean gap 1.62, worst 9. Behind the
+  // porch's 0.55 that is 0.45 × 0.617 = 0.28 of cycles — one halt on the made
+  // ground every **19.0 minutes** — and it is the other half of the 0.83 in the
+  // note over `pirouNearOdds`. The four seconds it costs are four seconds of a
+  // 316 s cycle now instead of a 52.10 s lap, which is a quarter of the price
+  // it was.
+  pathOdds: 0.60,
   // How hard she brakes for it and how hard she picks the pace back up, in
   // metres of route either side of the spot.
   //
@@ -1179,7 +1281,24 @@ const BUCK = {
   //
   // Not 1.00, though. Every lap is a mechanism, and the laps she just walks are
   // what make the laps she does not walk worth seeing. RULE 4: `jit(laps, 41)`.
-  portOdds: 0.62,
+  // 0.62 BECAME 0.85 ON THE SAME RE-DERIVATION, and this is the one of the four
+  // where the answer is simply "more", because the note above is right that it
+  // costs nothing.
+  //
+  // DELIVERED and not drawn, because `posePort` will not run it on a cycle that
+  // already owes a halt and the halt's own odds went up too:
+  //
+  //   before  0.6144 drawn × (1 − 0.205 halting) = 0.489 a lap at 52.10 s
+  //           — an arm carried up the made ground every 1.8 minutes
+  //   at 0.62 0.6144 × (1 − 0.277) = 0.444 a cycle at 316 s — every 11.9
+  //   at 0.85 0.8476 × (1 − 0.277) = 0.613 a cycle at 316 s — every 8.6
+  //
+  // 0.85 over the hash, 5000 cycles: 0.8476, mean gap 1.18, worst 6. It does
+  // not put 1.8 minutes back and nothing on this line could: the walk it is
+  // carried on happens once a cycle. What it does is stop the change to the
+  // cycle quietly halving it as well. Still the commonest thing in her
+  // routine, still not every time.
+  portOdds: 0.85,
   portNear: 26.0,
   // WHETHER IT RUNS ON THE WAY DOWN AS WELL, and it does not.
   //
@@ -1206,6 +1325,161 @@ const BUCK = {
   // It is one boolean, the code is general, and `port('down')` toggles it from
   // the console — so this is a decision and not a limitation. Look again.
   portDown: false,
+
+  // ── and then she does not go straight back for another bucket ──────────────
+  //
+  // Misha, 11 Sep 2026: *"she should have a more elaborate walk path, which
+  // will permit her to exercise her amazing ballet moves.. she should sometimes
+  // walk into the rooms, walk around the kitchen on the second floor, like she
+  // should have some amount of brownian motion and walk various paths not just
+  // her usual path... each of her journeys' trips should be much longer than
+  // 52s... her bucketeering journey should take, i dunno, once every 5 minutes
+  // or so, b/c now she will be going other places"*.
+  //
+  // ── WHAT IS NOT DONE, AND WHY IT IS THE WHOLE OF THE DESIGN ──
+  //
+  // The wrong way to make a 52 s loop into a 5 minute one is to slow it down.
+  // Every pace in this file is measured and human — 0.76 m/s with ten litres,
+  // 0.44 down seventeen open risers, 1.16 back up empty — and six times any of
+  // those is a woman wading. The second wrong way is to make the CARRY longer:
+  // the route down is the survey's own stair and there is no more of it, the
+  // pour cut's clock is her clock beat for beat, and `sayInHold`, the hum's
+  // cadence and `POUR_INTO` in 90-app.js are all cut against the beats as they
+  // stand.
+  //
+  // So the bucketeering trip is untouched, to the millisecond, and what is new
+  // is what she does BETWEEN two of them: `set` no longer runs into `fill`. She
+  // leaves the pail standing under the spout — which is where it has to fill
+  // anyway — and goes for a wander round the flat, and comes back to it. The
+  // trip is 52.10 s of a cycle that is now about five minutes, which is exactly
+  // what he asked for: the same bucket, five times less often, and four minutes
+  // of a woman living in a house instead of four more laps of a shuttle.
+  //
+  // ── A GRAPH OVER THE REAL PLAN, AND NOT AN OFFSET ON THE OLD LINE ──
+  //
+  // "Brownian motion" is the ask and a random offset is the obvious reading of
+  // it, and it is the wrong one: this flat is 42 m² with a sofa, a bookshelf,
+  // two wardrobes, a bed in each bedroom, a kitchen run and a desk in it, and a
+  // figure jittering off a straight line walks through all of them. What is
+  // random here is WHICH WAY SHE GOES at each node of a graph whose every edge
+  // was measured clear; the edges themselves are as fixed as `BUCK_WAY` is, and
+  // for the same reason. See `BUCK_ROAM` for the survey.
+  //
+  // Her pace on it, and it is a third pace rather than one of the two she has.
+  // 1.16 m/s is `upFlat` and its note says what it is — "a woman with an empty
+  // bucket who has done this four times already this morning and would like to
+  // get it over with". None of that is true here: she has nowhere to be. 0.92
+  // is between her loaded walk and her hurried one, which is where an unhurried
+  // indoor walk sits.
+  roamFlat: 0.92,
+  // How many moves before she goes back for the bucket, and then the way home
+  // is the shortest path and not more dice — a woman who has decided to fetch
+  // water does not wander on the way to the tap.
+  //
+  // MEASURED AND NOT PICKED, AND THE FIRST NUMBER WAS WRONG. The thirteen edges
+  // average 0.877 m, which at 0.92 with the same `pullUp` brake she uses at the
+  // ends of her route is about 1.3 s of walking a move, and the dwell table
+  // below averages some seconds more — but the visit frequencies of a random
+  // walk are not uniform and neither is the table, so this was ticked rather
+  // than arithmetic. [18, 34] came back at a mean cycle of 249.4 s over
+  // thirteen whole cycles run through `tick` at 1/30, which is 4.2 minutes and
+  // not five. [22, 42] is that scaled by the wander's own share of it.
+  //
+  // RE-TICKED at [24, 44] with the destination stops lengthened, eighteen whole
+  // cycles: **mean 316.1 s**, spread 225 to 425. Against 52.10 s before, and
+  // against "once every 5 minutes or so", which it is to within sixteen
+  // seconds of the middle. The spread is not noise to be tuned out — a woman
+  // who potters for four minutes one time and seven the next is the thing being
+  // asked for, and the metronome is what he called repetitive.
+  //
+  // Where the time goes, off the same run, as a percentage of the whole:
+  // standing somewhere 60.6, walking the flat 23.4, and the bucket 16.0 —
+  // which is `fill` 1.6, `lift` 0.3, `down` 6.9, `tip` 0.9, `right` 0.3,
+  // `rest` 0.9, `take` 0.3, `up` 4.7, `set` 0.3. The trip inside it is 52.10 s
+  // to the millisecond, unchanged: the beats are what they were and only how
+  // often they come round has moved.
+  roamRun: [24, 44],
+  // ── and the ballet, which is the reason the wander is worth having ─────────
+  //
+  // THIS IS WHERE THE ROUTINE BELONGS AND IT ALWAYS WAS. The whole of the note
+  // `restSteps` left behind is an argument about the ONE window in her lap where
+  // both hands are empty and her feet are still, and how little of it there is.
+  // On the roam there is no pail at all: it is standing under the tap. Every
+  // stop is that window, and there are twenty-odd of them a cycle.
+  //
+  // Gated on being watched exactly as the porch step is, and by the same
+  // number: `pirouWatch`, 12 m, past which you can see that she moved and not
+  // what she did. From the porch every corner of this flat is inside it — the
+  // longest is the basin at 6.9 m — so standing in the garden watching her is
+  // enough, which is the case that matters.
+  //
+  // ── AND THIS IS THE NUMBER THE WHOLE RE-DERIVATION LANDS ON ───────────────
+  //
+  // Every one of the four lap-indexed gates got six times rarer on the clock
+  // when the cycle went from 52.10 s to 316 s, and three of them (`pirou`,
+  // `pirouNearOdds`, `pathOdds`) could only be partly put back, because the
+  // thing they hang off — the pour — is the thing he asked to be six times
+  // rarer. This one is not hung off the pour. It is hung off a stop, and there
+  // are twenty-four stops with room to dance in a cycle, so it is where the
+  // real-time rate actually comes from now.
+  //
+  // COUNTED, from the same eighteen-cycle tick that timed the cycle: the seven
+  // nodes with `room` above zero are visited 24.6 times a cycle between them
+  // (node 4 six and a half times, node 10 four and a half, node 3 four, the
+  // rest one to three). At 0.24 that is **5.9 whole ballet steps a cycle**, one
+  // every 54 s of standing there watching her.
+  //
+  // Against the shipped build, whose own note counts 0.605 steps a lap inside
+  // 12 m at 52.10 s — one every 86 s. So the routine is 1.6 times commoner than
+  // it was in real time, in twelve places instead of two, and the pirouette is
+  // back in the draw: the porch cannot deal it any more (both arms go overhead
+  // and there is a bucket on one of them) and up here she is carrying nothing.
+  //
+  // NOT HIGHER, and 0.32 was tried first. `pirou`'s own argument is that a
+  // woman who dances every lap is a mechanism; at 0.32 this is 7.8 steps a
+  // cycle, one every 41 s, which from a chair on the porch is a woman who
+  // cannot cross her own front room without doing a relevé. RULE 4: the draw is
+  // `jit(st.roamI, 61)`, off the MOVE counter and not the lap counter, and 61
+  // is a fresh index — over 5000 draws it comes back at 0.2388 with a mean gap
+  // of 4.19 stops and a worst of 29.
+  roamOdds: 0.24,
+  // ── WHAT SHE MAY DANCE INDOORS, AND IT IS TWO OF THE FOUR ─────────────────
+  //
+  // THIS WAS THREE LISTS AND A `room` OF 0, 1 OR 2, AND THE MEASUREMENT KILLED
+  // THE THIRD ONE. The plan was to offer the developpé and the arabesque at the
+  // nodes with a lane in front of them, on a guess that the working foot
+  // reaches "about 0.84 m". Traced instead — `trace` at 1/60 through a whole
+  // halt, the toe bones in world, differenced against her own root:
+  //
+  //   pirouette   0.216 m of horizontal reach, toe up to 0.441 m
+  //   relevé      0.277 m,                     toe up to 0.152 m
+  //   developpé   1.078 m,                     toe up to 1.287 m
+  //   arabesque   0.907 m,                     toe up to 1.253 m
+  //
+  // And the flat's best standing spot, probed the same way every edge was, is
+  // `midRoom` at 0.79 m. So there is nowhere in this house where the developpé
+  // does not put a foot 0.29 m inside something at hip height, and nowhere the
+  // arabesque clears either. They are not being withheld for taste; they do not
+  // fit, and a leg through a bookshelf is worse than no leg.
+  //
+  // WHICH IS A TIDIER SPLIT THAN THE ONE THAT WAS PLANNED. The two steps that
+  // fit indoors are exactly the two the PORCH cannot deal — both arms go
+  // overhead through BAL_PIQUE and there is a bucket on one of them down there
+  // — and the two that need floor are exactly the two `pathSteps` already
+  // deals outdoors, with the bucket, on the porch and the made ground. Each
+  // half of the routine now has one place it belongs and neither is anywhere
+  // else.
+  //
+  // `room` on a node is therefore a boolean in all but name: 0.28 m of toe
+  // clears every node in the table, so the zeroes are a judgement and not a
+  // clearance — the bathroom, the two doorways and the stride into soba 3 are
+  // places nobody turns on the spot, whatever fits.
+  //
+  // Counted over 5000 draws of the hash rather than off the list length, which
+  // is the check the old `restSteps` ran and for the same reason — `jit(i, 67)
+  // * 3 | 0` is only uniform if the hash is: pirouette 67.6 per cent, relevé
+  // 32.4. The repeat is how the weight is spelled, as it always was here.
+  roamSteps: ['pirouette', 'pirouette', 'releve'],
 };
 
 /**
@@ -1278,6 +1552,138 @@ const BUCK_WAY = [
 // ground; all three are taken at the stair pace, because the landing is where
 // you slow down for a flight and not where you arrive already slowed.
 const BUCK_STAIR = [6, 7, 8];
+
+// ── where else she goes, between one bucket and the next ─────────────────────
+//
+// The nodes of the wander, in the same house metres as `BUCK_WAY`, and the
+// whole of this table is a SURVEY rather than a layout. See `BUCK.roamFlat` for
+// what it is for; this note is what was measured and what was found closed.
+//
+// ── HOW IT WAS MEASURED ──
+//
+// Not off the drawings, because the drawings do not carry the furniture: the
+// sidecar knows the walls and nothing else, and this flat's difficulty is
+// entirely the furniture. Every candidate point was probed IN THE SHIPPED PAGE
+// by casting twenty-four horizontal rays at 0.30 m, 1.00 m and 1.60 m off the
+// floor and taking the nearest hit — knees, torso and head — against the drawn
+// mesh with the hidden mezzanine filtered out, which matters: three.js r180's
+// raycaster does not skip invisible objects, and the first pass had the whole
+// east side of the big room condemned by a ladder-stair that is not there.
+//
+// The bar is HER OWN ROUTE. Probed the same way, the tightest thing she has
+// walked since 1.357.0 is 0.31 m, twice — the dog-leg out of the bathroom, at
+// both ends of it. So 0.31 is what an edge here has to clear, and the one that
+// came in at 0.29 (the big room to the soba 4 door, across the east jamb) was
+// deleted rather than shaved: soba 4 is reached from the bathroom door, which
+// is the doorway opposite it anyway.
+//
+// Worst torso clearance, metres, on every edge below, at 0.15 m sampling:
+//
+//   tap-bathMid 0.31 · bathMid-bathDoor 0.31 · bathDoor-sofaEnd 0.45
+//   sofaEnd-midRoom 0.63 · midRoom-shelf 0.73 · shelf-frontDoor 0.65
+//   bathDoor-s4door 0.31 · midRoom-s3door 0.33 · s3door-s3in 0.35
+//   midRoom-eastLane 0.64 · frontDoor-eastLane 0.59 · eastLane-eastMid 0.64
+//   eastMid-glass 0.50
+//
+// ── AND THE THREE PLACES HE ASKED FOR THAT ARE NOT IN IT ──
+//
+// THE KITCHEN IS NOT REACHABLE AND IT IS THE FURNITURE, NOT THE PLAN. There is
+// no wall at all between it and the big room — the sidecar's blockers stop at
+// z 1.12 — so on the drawings it is one space. On the mesh it is not. The
+// cabinet run ends at x −0.89 (`run1` in `kitchen()`, x0 + 2.30) and the sofa's
+// back is at x −0.63, which is a 0.26 m gap at worktop height; the only other
+// way round the sofa is its east end at x 0.03 against the round table at
+// x 0.23, which is 0.20 m. Both are torso, not ankle. A 0.54 m body does not
+// go through either, and a figure that took the 0.26 would be standing in the
+// worktop for half a second every time — which is worse than not going. Moving
+// the sofa is a change to tools/blender/vikendica.py and a re-bake, and it is
+// not this file's to make.
+//
+// SOBA 4 IS A DOORWAY AND NOT A ROOM, for the same kind of reason and it is
+// worth writing down because it is a fault in the house rather than in the
+// route. Its 0.85 m opening runs x −0.74…0.11 and the 1.90 m wardrobe stands
+// at x −0.37…0.19 from z −1.055 — so it takes up more than half the doorway it
+// is beside, and the clear gap between the west jamb (−0.74, −0.835) and the
+// wardrobe's near corner (−0.37, −1.055) is 0.43 m. Best possible clearance
+// through it is 0.215 m, which is under `GROUND.tight`'s own 0.26. She goes to
+// the door, stands in it, and looks in — which is honest, and is what you do
+// with a room you were not going into.
+//
+// THE TERRACE IS BEHIND GLASS. The opening is real and 2.20 m wide, and
+// `terrace_doors` draws the sliders SHUT across it: rays at 0.30 m and 1.00 m
+// find a pane at z 3.76 from x 0.4 to x 3.0 with 0.01-0.02 m of air in front
+// of it. She is not going to walk through a closed door. What she does instead
+// is stand at it, at `glass`, and look at the channel through it, which is the
+// single best thing to be looking at in this house and is 0.50 m clear.
+//
+// `hold` is how long she stands here, seconds, as a base and a span; `room` is
+// whether she may dance here at all, and `BUCK.roamSteps` is the measurement
+// that decides what "at all" means; `look` is a point in house metres she turns
+// to face while she stands, or absent to keep the bearing she arrived on.
+const BUCK_ROAM = [
+  // 0  the basin. Where every wander starts and ends, and where the pail is
+  //    standing the whole time she is away from it.
+  { at: [-1.60, 0.24], hold: [2.5, 3.5], room: 0 },
+  // 1  clear of the basin's east end — `BUCK_WAY` 1, and the dog-leg is here
+  //    for the reason it is there: straight across, the bathroom door jamb is
+  //    0.277 m away and that is a coincidence rather than a clearance.
+  { at: [-1.15, 0.16], hold: [0.8, 1.6], room: 0 },
+  // 2  the bathroom door, the middle of a 1.00 m opening.
+  { at: [-0.79, -0.05], hold: [0.8, 2.0], room: 0 },
+  // 3  past the north end of the sofa.
+  { at: [0.15, 0.02], hold: [1.0, 3.0], room: 1 },
+  // 4  the middle of the big room, and the junction of the whole graph.
+  { at: [1.45, 0.16], hold: [1.5, 4.0], room: 1 },
+  // 5  in front of the bookshelf, which stands x 1.73…2.47 on the north wall,
+  //    0.45 m off it. She stands and looks at it.
+  { at: [2.10, 0.10], hold: [6.0, 16.0], room: 1, look: [2.10, -1.20] },
+  // 6  inside the front door, looking out of it down the channel.
+  { at: [2.70, 0.20], hold: [8.0, 22.0], room: 1, look: [7.00, 0.20] },
+  // 7  the soba 4 door. She stands in it and looks in; see the note above.
+  { at: [-0.30, -0.74], hold: [5.0, 13.0], room: 0, look: [-0.30, -4.00] },
+  // 8  the soba 3 door — the other 0.85 m opening in the same wall.
+  { at: [0.93, -0.74], hold: [2.0, 5.0], room: 0 },
+  // 9  and a stride inside it, between the west wall and the foot of the bed.
+  { at: [0.78, -1.22], hold: [7.0, 18.0], room: 0, look: [1.80, -2.60] },
+  // 10 the head of the clear lane down the east side of the big room, which is
+  //    1.34 m wide between the desk and the east wall and is the only run of
+  //    open floor in this flat. She has never once walked it.
+  { at: [2.55, 1.30], hold: [1.2, 3.0], room: 1 },
+  // 11 half way down it.
+  { at: [2.55, 2.40], hold: [1.5, 4.0], room: 1 },
+  // 12 at the terrace doors, looking through them at the water.
+  { at: [2.55, 3.25], hold: [10.0, 30.0], room: 1, look: [2.55, 12.00] },
+];
+
+// Who is next to whom. Symmetric by construction — `roamLinks` below asserts it
+// — because an edge that is walkable one way is walkable the other, and a table
+// that disagreed with itself would strand her.
+const BUCK_ROAM_LINK = [
+  [1], [0, 2], [1, 3, 7], [2, 4], [3, 5, 8, 10], [4, 6], [5, 10],
+  [2], [4, 9], [8], [4, 6, 11], [10, 12], [11],
+];
+
+// And the first step of the shortest way back to the basin from each node,
+// breadth-first, computed rather than typed: a hand-written column would be one
+// more thing to keep in step with the edges above, and the failure mode is a
+// woman who never goes back for the bucket.
+const BUCK_ROAM_HOME = (() => {
+  const home = BUCK_ROAM.map(() => -1);
+  const seen = BUCK_ROAM.map(() => false);
+  seen[0] = true;
+  let front = [0];
+  while (front.length) {
+    const next = [];
+    for (const a of front) {
+      for (const b of BUCK_ROAM_LINK[a]) {
+        if (seen[b]) continue;
+        seen[b] = true; home[b] = a; next.push(b);
+      }
+    }
+    front = next;
+  }
+  return home;
+})();
 
 // Where the bucket stands while it fills: on the bathroom floor at her feet,
 // west of the basin and clear of the shower tray by 6 cm.
@@ -2039,10 +2445,10 @@ async function buildBucketeer(scene, vik, walkY) {
     //
     // `pirouEver` is the session latch behind `BUCK.pirouFirst`: the first lap
     // that ends with somebody inside `pirouWatch` is taken outright, and after
-    // that this is true for ever and the dice decide. `setLap` is whether the
-    // pail goes down on THIS lap, which is the same question — see the long
-    // note where both are written, and `BUCK.setDown`.
-    laps: 0, pirouLap: false, pirouEver: false, setLap: false,
+    // that this is true for ever and the dice decide.
+    //
+    // `setLap` USED TO BE HERE and is gone; see the top of `rest`.
+    laps: 0, pirouLap: false, pirouEver: false,
     // WHICH step the porch turn is, this lap. `pirouLap` stays the flag for
     // "there is a step in `breathe` at all" — the pour cut, `setLap` and the
     // whole of the note over `BUCK.pirou` are written in terms of it and it is
@@ -2068,6 +2474,15 @@ async function buildBucketeer(scene, vik, walkY) {
     // `fig.over` currently holds the clip, so it is configured once a phrase
     // rather than sixty times a second.
     portLap: false, port: 0, portT: 0, portSet: false,
+    // ── the wander round the flat ─────────────────────────────────────────
+    //
+    // `node` is which of `BUCK_ROAM` she is standing on or walking to, `was`
+    // the one before it — which is the whole of the no-doubling-back rule —
+    // and `left` how many moves she has before she goes back for the bucket.
+    // `dwellT` is how long this stop lasts and `roamI` is the draw index, which
+    // is a counter of MOVES and not of laps: the lap index is taken once a
+    // cycle and there are twenty-odd of these inside one. RULE 4 either way.
+    node: 0, was: -1, roamLeft: 0, dwellT: 0, roamI: 0,
     hold: false,        // debug: the loop stopped where it stands
     x: 0, y: 0, z: 0,
   };
@@ -2085,7 +2500,18 @@ async function buildBucketeer(scene, vik, walkY) {
     st.yaw = Math.atan2(-(n[2] - st.z), n[0] - st.x);
   }
 
-  const at = (k) => wx(BUCK_WAY[k]);
+  // ── WHICH ROUTE SHE IS ON, and it is a variable now rather than a constant ──
+  //
+  // `BUCK_WAY` while she is fetching water, and a two-point array — the node
+  // she left and the node she is walking to — while she is wandering the flat.
+  // One variable and not a second copy of `walkOn`: everything that function
+  // does is about a polyline and an index into it, and the wander is a polyline
+  // with two points in it. The stair, the porch halt and the port de bras all
+  // name legs of `BUCK_WAY` by number, so each of them is gated on this being
+  // that array and not on a flag that could disagree with it.
+  let way = BUCK_WAY;
+  const roamWay = [[0, 0], [0, 0]];
+  const at = (k) => wx(way[k]);
   /** Facing the bucket at her feet, which is what you look at while it fills. */
   function tapYaw() {
     const n = wx(BUCK_TAP);
@@ -2094,6 +2520,9 @@ async function buildBucketeer(scene, vik, walkY) {
 
   /** How fast this leg is walked, in metres a second. */
   function pace(leg, dir) {
+    // The wander has no stair in it and nothing in her hand: one pace, and the
+    // argument for it is over `BUCK.roamFlat`.
+    if (way !== BUCK_WAY) return BUCK.roamFlat;
     const stair = BUCK_STAIR.includes(leg);
     if (dir > 0) return stair ? BUCK.downStair : BUCK.downFlat;
     return stair ? BUCK.upStair : BUCK.upFlat;
@@ -2176,7 +2605,7 @@ async function buildBucketeer(scene, vik, walkY) {
     // the pail at the top of `set`, four times what the roll ever does. Only
     // the LAST leg: an intermediate waypoint is a corner she walks through, and
     // slowing for each of the eleven would be a woman picking her way.
-    const last = st.dir > 0 ? to >= BUCK_WAY.length - 1 : to <= 0;
+    const last = st.dir > 0 ? to >= way.length - 1 : to <= 0;
     if (last) {
       const g = clamp(((1 - st.u) * len) / BUCK.pullUp, 0, 1);
       v *= 0.12 + 0.88 * g * g * (3 - 2 * g);
@@ -2188,7 +2617,8 @@ async function buildBucketeer(scene, vik, walkY) {
     // her fist, and this stop is 0.84 m into open ground with nothing to hide
     // it under. So the same smoothstep over the same 0.40 m, once on the way in
     // and once on the way out, and `danced` is which side of the spot she is on.
-    if (st.pathLap && st.dir < 0 && st.leg === BUCK.pathLeg) {
+    if (way === BUCK_WAY && st.pathLap && st.dir < 0
+      && st.leg === BUCK.pathLeg) {
       const d = (st.danced ? st.u - BUCK.pathAt : BUCK.pathAt - st.u) * len;
       const g = clamp(d / BUCK.pathPull, 0, 1);
       v *= 0.12 + 0.88 * g * g * (3 - 2 * g);
@@ -2201,7 +2631,97 @@ async function buildBucketeer(scene, vik, walkY) {
     if (st.u < 1) return false;
     st.u = 0;
     st.leg += st.dir;
-    return st.dir > 0 ? st.leg >= BUCK_WAY.length - 1 : st.leg < 0;
+    return st.dir > 0 ? st.leg >= way.length - 1 : st.leg < 0;
+  }
+
+  // ── the wander, in four small functions ────────────────────────────────────
+  //
+  // All four are RULE 4 draws off `st.roamI` — the sine hash, a fresh index for
+  // each question, no `rng()` — and the index is a counter of MOVES rather than
+  // of laps. That is the one thing to keep straight about them: `jit(st.laps,
+  // 31)` and the four draws beside it are taken once a cycle and there are
+  // eighteen to thirty-four of these inside one cycle, so they cannot share a
+  // stream without one of them becoming a function of the other.
+
+  /** Leave the pail under the tap and go for a wander. */
+  function roamStart() {
+    st.phase = 'dwell'; st.clock = 0; st.vel = 0;
+    st.node = 0; st.was = -1;
+    st.roamI += 1;
+    st.roamLeft = BUCK.roamRun[0]
+      + Math.floor(jit(st.roamI, 53) * (BUCK.roamRun[1] - BUCK.roamRun[0] + 1));
+    dwellStart();
+  }
+
+  /**
+   * How long she stands where she has just arrived, and whether she dances.
+   *
+   * The step is armed HERE and not in `dwell`, which runs sixty times a second:
+   * the same argument the lap's own draws make at the top of `rest`, and the
+   * same shape — one decision, taken once, on the way in.
+   */
+  function dwellStart() {
+    const spot = BUCK_ROAM[st.node];
+    st.dwellT = spot.hold[0] + jit(st.roamI, 59) * (spot.hold[1] - spot.hold[0]);
+    st.dance = 0;
+    // Watched, and not under the pour cut — which cannot overlap this anyway,
+    // but `BUCK.ear` is the one test for "somebody else owns the camera" and
+    // leaving it out would be leaving out the reason rather than the clause.
+    if (spot.room > 0 && !BUCK.ear && st.ear < BUCK.pirouWatch
+      && jit(st.roamI, 61) < BUCK.roamOdds) {
+      const list = BUCK.roamSteps;
+      st.pathStep = list[Math.floor(jit(st.roamI, 67) * list.length)
+        % list.length];
+      st.dance = 1;
+      // And she does not walk off the instant the last frame of it lands. The
+      // halt's own note measured what that costs — 155 mm of pail on one frame
+      // — and the shape of the fix is the same here: `danceLen` already carries
+      // 0.35 s of standing at each end of the step, and this keeps at least
+      // another 0.4 s of the stop on the far side of it.
+      st.dwellT = Math.max(st.dwellT, danceLen() + 0.40);
+    }
+  }
+
+  /** Walk one edge of the graph. The route IS that edge. */
+  function roamGo(to) {
+    roamWay[0] = BUCK_ROAM[st.node].at;
+    roamWay[1] = BUCK_ROAM[to].at;
+    way = roamWay;
+    st.was = st.node;
+    st.node = to;
+    st.dir = 1; st.leg = 0; st.u = 0;
+    st.phase = 'roam'; st.clock = 0;
+  }
+
+  /** Back at the basin, with the pail where she left it: turn the tap on. */
+  function fillStart() {
+    way = BUCK_WAY;
+    st.dir = 1; st.leg = 0; st.u = 0;
+    st.phase = 'fill'; st.clock = 0; st.fill = 0;
+  }
+
+  /** Where she goes next: the dice, or the shortest way back to the tap. */
+  function roamNext() {
+    st.roamI += 1;
+    if (st.roamLeft <= 0) {
+      // Done wandering. The way home is breadth-first and not more dice: a
+      // woman who has decided to fetch water does not take the scenic route to
+      // her own tap.
+      if (st.node === 0) { fillStart(); return; }
+      roamGo(BUCK_ROAM_HOME[st.node]);
+      return;
+    }
+    st.roamLeft -= 1;
+    const ns = BUCK_ROAM_LINK[st.node];
+    // NOT STRAIGHT BACK THE WAY SHE CAME, unless that is the only way out — at
+    // the four leaves of this graph it is. Counted over 5000 moves of the hash,
+    // a walk without this clause spends 47 per cent of its moves undoing the
+    // one before, which is a woman pacing a doorway rather than a woman
+    // wandering a flat; with it that is 0 per cent and the average distance
+    // from the basin after ten moves goes from 1.9 m to 3.4 m.
+    const open = ns.filter((n) => n !== st.was);
+    const list = open.length ? open : ns;
+    roamGo(list[Math.floor(jit(st.roamI, 71) * list.length) % list.length]);
   }
 
   /**
@@ -2329,11 +2849,21 @@ async function buildBucketeer(scene, vik, walkY) {
           // index and a different question — index 43 — because the step is not
           // the same decision as whether there is one, and a draw taken off the
           // first would tie "she turns" to "it is the turn she does" for ever.
-          // `restSteps` spells the weights by repeating an entry; see the note
-          // on it for why the pirouette is half of them.
+          //
+          // AND IT IS DRAWN FROM `pathSteps` NOW AND NOT FROM `restSteps`,
+          // which is the whole consequence of the pail staying in her fist. The
+          // two lists were always split on exactly that: `restSteps` is what
+          // she may dance with both hands empty and `pathSteps` is what she may
+          // dance with a bucket on one of them, and the note over `pathSteps`
+          // has the measurement — the developpé's right arm sits eight degrees
+          // off hanging, which is where the carry solve was going to put it
+          // anyway, and the attitude-into-arabesque reads with one arm down.
+          // BAL_PIQUE takes BOTH arms overhead, so the pirouette is not
+          // available on the porch any more. It has not been lost; it has moved
+          // upstairs, where she carries nothing — see `BUCK.roamOdds`.
           st.move = st.pirouLap
-            ? BUCK.restSteps[Math.floor(jit(st.laps, 43) * BUCK.restSteps.length)
-              % BUCK.restSteps.length]
+            ? BUCK.pathSteps[Math.floor(jit(st.laps, 43) * BUCK.pathSteps.length)
+              % BUCK.pathSteps.length]
             : null;
           // ── and whether she stops for one on the way back up ──────────────
           //
@@ -2365,47 +2895,6 @@ async function buildBucketeer(scene, vik, walkY) {
           // `posePort` will not start a phrase on a leg she is about to stop on
           // because `st.dance` gates it there.
           st.portLap = st.ear < BUCK.portNear && jit(st.laps, 41) < BUCK.portOdds;
-          // ── and whether the pail goes down at all ─────────────────────────
-          //
-          // Misha, 10 Sep 2026: *"after she pours the water out the bucket, the
-          // bucket goes down on the floor and goes back into her arm.. that is
-          // unnecessary... the bucket should remain in her arm after water is
-          // poured out... this will look smoother"*.
-          //
-          // He is right about every lap but one kind, and the exception is not
-          // a hedge — it is a hard constraint that the pirouette's own note
-          // states in as many words. `breathe` is THE ONLY WINDOW IN HER LAP
-          // where both hands are empty, her feet are still and she is somewhere
-          // anybody can see her; `fill` is longer but is inside a 1.65 m
-          // bathroom behind a wall, and everything else is walking or ten kilos
-          // moving between the floor and her hand. Take the set-down away
-          // unconditionally and the ballet has nowhere left to live, so defect
-          // 4 would have quietly deleted defect 1's fix on the same afternoon
-          // it landed.
-          //
-          // So the pail goes down on the laps she is about to turn on and stays
-          // in her hand on every other one — which is not a compromise between
-          // the two reports, it is better than either. A bucket put down for no
-          // reason and picked straight back up is the fidget he is objecting
-          // to; a bucket put down BECAUSE she is about to turn round on the
-          // spot is a woman putting a bucket down. The set-down stopped being
-          // punctuation and became a preparation.
-          //
-          // WHAT WAS REJECTED. (1) Dancing with the pail in her fist: the clip
-          // takes both arms overhead through BAL_PIQUE and the carry solve owns
-          // the right one, so it is either a bucket swinging through her own
-          // head or an arm that stops half way and reads as broken. (2) Moving
-          // the pirouette to `fill`: she is alone in a bathroom on the first
-          // floor and a dance behind a wall is the dance-nobody-sees the odds
-          // note already rejects. (3) Shortening `rest` on the laps that keep
-          // hold of it: that shortens the LAP, and the lap is 52.37 s
-          // metronomic — `sayInHold`, the hum's cadence and the pour cut's own
-          // 9.50 s are all measured against it, and the cut's length is
-          // literally `tipIn + tipHold + tipOut + setDown + breathe + lift`. So
-          // `rest` is 3.10 s either way and only the PAIL's behaviour inside it
-          // changes. She still straightens her back and still turns out to sea
-          // on the same frame she always did.
-          st.setLap = st.pirouLap;
         }
         break;
       }
@@ -2414,12 +2903,41 @@ async function buildBucketeer(scene, vik, walkY) {
         // in the loop that is not work, and it is the reason she reads as
         // somebody rather than as a mechanism.
         //
-        // And she puts the pail down only if this is a lap she is about to turn
-        // on — `st.setLap`, decided at the top of the beat and argued there at
-        // length. On every other lap it stays in her fist and `restAt`'s latch
-        // is simply never reached, because `held` never leaves 1.
+        // ── AND THE PAIL NEVER LEAVES HER FIST HERE ANY MORE ───────────────
+        //
+        // Misha, 10 Sep 2026: *"after she pours the water out the bucket, the
+        // bucket goes down on the floor and goes back into her arm.. that is
+        // unnecessary... the bucket should remain in her arm after water is
+        // poured out"*. And again, 11 Sep, having watched the half-measure that
+        // answered it: *"she continues to set down her bucket downstairs. she
+        // shouldn't set it down, just pour water out and don't set it down lift
+        // it back up again"*.
+        //
+        // THE HALF-MEASURE WAS `st.setLap` AND IT IS DELETED. It put the pail
+        // down only on the laps she was about to pirouette on, which was a real
+        // answer to a real constraint — `breathe` was the only window in the
+        // whole lap where both her hands were empty, so taking the set-down away
+        // unconditionally took the ballet with it. That constraint is gone. The
+        // wander added between one bucket and the next (see `BUCK.roamFlat`) is
+        // four minutes an hour of her walking round her own flat with NOTHING in
+        // either hand, with twenty-odd places to stop in it, so the routine now
+        // has somewhere far better to live than a 2.20 s gap on a porch. Both
+        // reports are honoured outright instead of being split.
+        //
+        // WHAT SHE STILL DOES HERE. She can still dance — `pathSteps`, the two
+        // steps whose right arm agrees with a carried bucket, drawn at the top
+        // of the beat and argued there — and she still turns out to sea and
+        // straightens her back. What she does not do is put ten litres' worth of
+        // empty bucket on the paving for two seconds and pick it up again.
+        //
+        // AND `rest` IS THE SAME 3.10 s IT ALWAYS WAS. `setDown + breathe` is
+        // kept as the length because the POUR CUT is cut on it: `POUR_INTO` in
+        // 90-app.js lays her beats end to end and its `take` and `up` both carry
+        // `BUCK.setDown` in the sum. Shortening the beat would slide the cut's
+        // last two shots off the frames they were composed on. So the 0.9 s is
+        // now simply the beat before she looks up, which is what it reads as.
         st.tip = 0;
-        st.held = st.setLap ? 1 - bckEase(st.clock / BUCK.setDown) : 1;
+        st.held = 1;
         if (st.clock > BUCK.setDown) {
           // Turned out to sea while she stands there.
           const a = at(11), b = vik.at([0.95, 0, 8.2]);
@@ -2438,13 +2956,13 @@ async function buildBucketeer(scene, vik, walkY) {
         }
         break;
       case 'take':
-        // And she only picks it up if she put it down. Left unconditional this
-        // would be the one line that turned "keep hold of the bucket" into a
-        // worse fault than the one it fixed: `held` is already 1 on a lap she
-        // kept it on, and `bckEase(0)` is 0, so the first frame of `take` would
-        // drop ten litres to the floor and haul it back up over 0.93 s — a pail
-        // teleporting downwards, which is not even the old behaviour.
-        st.held = st.setLap ? bckEase(st.clock / BUCK.lift) : 1;
+        // There is nothing left to pick up — she never put it down — so this is
+        // 0.90 s of a woman standing on a porch with an empty bucket deciding to
+        // go back up the stairs. It is kept at exactly `BUCK.lift` and not
+        // deleted for the reason `rest` gives: `POUR_INTO.up` in 90-app.js is
+        // the sum of her beats and the cut's last shot is framed on the frame
+        // this one ends. Whatever else changes, this beat is 0.90 s long.
+        st.held = 1;
         if (st.clock >= BUCK.lift) {
           st.phase = 'up'; st.clock = 0; st.dir = -1;
           st.leg = BUCK_WAY.length - 2; st.u = 0;
@@ -2489,17 +3007,66 @@ async function buildBucketeer(scene, vik, walkY) {
         if (walkOn(dt)) { st.phase = 'set'; st.clock = 0; st.vel = 0; }
         break;
       case 'set':
-        // Back at the tap: down it goes, and round again.
+        // Back at the tap: down it goes — and this set-down is the one that was
+        // never in question. The pail FILLS standing on the bathroom floor under
+        // the spout; there is no other way for it to fill, and `BUCK.setDown`'s
+        // own note has said so since the beat was written.
         st.held = 1 - bckEase(st.clock / BUCK.setDown);
         faceTo(tapYaw(), dt);
         if (st.clock >= BUCK.setDown) {
-          st.phase = 'fill'; st.clock = 0; st.fill = 0;
+          // AND NOT STRAIGHT BACK TO `fill`, which is the whole of the 11 Sep
+          // change. She leaves it standing there and goes for a wander round the
+          // flat; `BUCK.roamFlat` is the argument and `BUCK_ROAM` is the survey.
+          roamStart();
         }
         break;
+      // ── the wander ────────────────────────────────────────────────────────
+      //
+      // Two beats and not one, and the split is the same one `up` and `rest`
+      // make: `roam` is her legs carrying her somewhere, `dwell` is her standing
+      // when she gets there. Everything that reads the phase — the clip, the
+      // hum's level, which pool she may say a line out of, whether you can be in
+      // her way — wants to know which of those two it is.
+      case 'roam':
+        st.held = 0;
+        if (walkOn(dt)) {
+          st.phase = 'dwell'; st.clock = 0; st.vel = 0;
+          dwellStart();
+        }
+        break;
+      case 'dwell': {
+        st.vel = 0;
+        // Said here as well as in `roam`, so that the two beats of the wander
+        // agree about her hands whichever of them a probe jumped into.
+        st.held = 0;
+        // The step, on its own clock and not the clip's, for the reason the
+        // halt on the made ground gives at length: `tick` advances this machine
+        // sixty times without ever drawing, so a beat that waited for
+        // `fig.state.curT` would hang under every probe in this file.
+        if (st.dance > 0) {
+          st.dance += dt;
+          if (st.dance - 1 >= danceLen()) st.dance = 0;
+          break;
+        }
+        // What she is looking at while she stands, if this node has anything
+        // worth looking at. `look` is in house metres and the bearing is taken
+        // the same way every other one in this file is.
+        const spot = BUCK_ROAM[st.node];
+        if (spot.look) {
+          const b = wx(spot.look);
+          faceTo(Math.atan2(-(b[2] - st.z), b[0] - st.x), dt);
+        } else if (st.node === 0) {
+          faceTo(tapYaw(), dt);
+        }
+        if (st.clock >= st.dwellT) roamNext();
+        break;
+      }
       default:
         st.phase = 'fill'; st.clock = 0;
     }
-    if (st.phase !== 'down' && st.phase !== 'up') st.vel = 0;
+    if (st.phase !== 'down' && st.phase !== 'up' && st.phase !== 'roam') {
+      st.vel = 0;
+    }
     if (st.phase !== 'tip') st.pour = 0;
     // ── and the sound of it ───────────────────────────────────────────────
     //
@@ -2889,7 +3456,14 @@ async function buildBucketeer(scene, vik, walkY) {
    * blended while the pail is between the floor and her fist.
    */
   function restAt(out) {
-    const tap = st.phase === 'fill' || st.phase === 'lift' || st.phase === 'set';
+    // `roam` and `dwell` are the tap's, and it is not a detail: she is away
+    // from the bucket for four minutes of every cycle and it is standing under
+    // the spout the whole time. Left out of this list the porch branch would
+    // take them, and a pail that is not in her hand would be re-placed at her
+    // feet on every frame of the wander — a bucket following her round the
+    // flat a stride in front of her.
+    const tap = st.phase === 'fill' || st.phase === 'lift' || st.phase === 'set'
+      || st.phase === 'roam' || st.phase === 'dwell';
     const spot = tap ? 1 : 0;
     if (!st.stand || st.standFor !== spot || st.held > 0.999) {
       st.standFor = spot;
@@ -3185,9 +3759,9 @@ async function buildBucketeer(scene, vik, walkY) {
     // ON THE CLOCK AND NOT ON `held`, which is a change and not a tidy-up. This
     // used to read `lvl *= 1 - st.held`, because `held` fell 1 to 0 across the
     // set-down and so WAS the first half of the beat expressed as a number.
-    // Since the pail now stays in her hand on every lap she does not turn on —
+    // Since the pail now stays in her hand on every lap without exception —
     // see the note at the top of `rest` — `held` sits at 1 through the whole
-    // beat on most laps, and that line would have returned a flat zero: she
+    // beat on EVERY lap, and that line would have returned a flat zero: she
     // would have stopped humming on the porch entirely, which is one of the two
     // beats `humBeat` exists to cover and the one Misha singled out
     // (*"she certainly hums nicely"*). Same curve, same 0.9 s, taken off the
@@ -3328,6 +3902,18 @@ async function buildBucketeer(scene, vik, walkY) {
    *   `vel > 0.02`    the same threshold `drawFrame` calls standing. An arm
    *                   carried by a woman who has stopped dead is not a carriage
    *                   any more, it is a pose she is holding at you.
+   *
+   * ── and NOT on the wander, which is a measurement and not an oversight ──
+   *
+   * The obvious place for a port de bras is the four minutes she spends walking
+   * round her own flat with both hands empty, and it does not fit. The phrase is
+   * 2.90 s of clip at 1.05, which is 2.76 s of walking; the longest edge in
+   * `BUCK_ROAM` is 1.58 m and at `roamFlat` that is 1.72 s, and the mean edge is
+   * 0.877 m — 0.95 s. So every phrase would be ramped out before it reached
+   * fifth position, and what you would see is an arm that starts to go up and
+   * changes its mind, twenty times a cycle. The wander pays for the routine in
+   * WHOLE STEPS instead, at the stops, where there is time for one; see
+   * `dwellStart`.
    */
   function posePort(dt) {
     const walkBeat = st.phase === 'up' || (BUCK.portDown && st.phase === 'down');
@@ -3408,8 +3994,14 @@ async function buildBucketeer(scene, vik, walkY) {
     // POSE either way; counted in seconds of `rest` it would land on a
     // different one every time the frame rate moved. `state.curT` is the same
     // clock `showSettle` reads for Baye at the barre.
-    const spin = st.pirouLap && st.phase === 'rest'
-      && st.clock >= BUCK.setDown;
+    //
+    // FROM THE TOP OF `rest` AND NOT 0.9 s INTO IT, which is a consequence of
+    // the set-down going. It used to wait for `BUCK.setDown` because that was
+    // how long the pail took to reach the paving and there was nothing to dance
+    // around until it had. Nothing moves now, so the whole 3.10 s of the beat is
+    // the window — and it has to be: the arabesque is 2.70 s of wall clock and
+    // 2.20 s of `breathe` would have cut half a second off the end of it.
+    const spin = st.pirouLap && st.phase === 'rest';
     // WHICH window of it, and there are now four of them — see `BUCK.steps`.
     // Two places in the lap ask for one: `breathe` on the porch, with the pail
     // on the ground and both hands empty, and the halt on the made ground on
@@ -3744,7 +4336,10 @@ async function buildBucketeer(scene, vik, walkY) {
     // itself: step aside and `side` clears, step behind her and `fwd` goes
     // negative, and either way she picks the bucket up and goes.
     const near = Math.sqrt(d2);
-    const walking = st.phase === 'down' || st.phase === 'up';
+    // `roam` with them: standing in a 1.00 m doorway she is walking through is
+    // being in her way whether or not she is carrying anything.
+    const walking = st.phase === 'down' || st.phase === 'up'
+      || st.phase === 'roam';
     const fwd = dx * Math.cos(st.yaw) - dz * Math.sin(st.yaw);
     const side = dx * Math.sin(st.yaw) + dz * Math.cos(st.yaw);
     // AND NOT WHILE SHE IS MID-STEP, which is one clause and prevents a real
@@ -3981,7 +4576,17 @@ async function buildBucketeer(scene, vik, walkY) {
       // probe standing on the porch cannot tell "she is not going to turn this
       // lap" from "the draw has not happened yet", and `setLap` false looks
       // exactly like a bug in the set-down until you can read it.
-      pirouEver: st.pirouEver, setLap: st.setLap,
+      pirouEver: st.pirouEver,
+      // ── the wander, which is most of her cycle now ─────────────────────────
+      //
+      // `node` is which of `BUCK_ROAM` she is at or heading for, `roamLeft` how
+      // many moves are left before she goes back for the bucket, and `roamI`
+      // the draw index. All three are on `stats()` for the reason `setLap` was:
+      // from outside, "she is wandering and has eleven moves to go" and "the
+      // wander is broken and she is walking the same edge for ever" are the
+      // same figure crossing the same room.
+      node: st.node, roamLeft: st.roamLeft, roamI: st.roamI,
+      dwellT: +st.dwellT.toFixed(2),
       // The rest of the routine — see `BUCK.steps`. `move` is which step this
       // lap's porch turn is and `pathStep` which one the halt on the way up is;
       // `dance` is seconds into that halt plus one, so zero means she is
@@ -4053,22 +4658,23 @@ async function buildBucketeer(scene, vik, walkY) {
      * it. Same reason `vik.cut` and `pc.step` exist.
      */
     go(phase, leg = null) {
+      // The wander is a different route with a different index, so it gets its
+      // own door — and `leg` is the NODE for those two. See `roam` below.
+      if (phase === 'roam' || phase === 'dwell') return this.roam(leg);
       st.phase = phase; st.clock = 0; st.u = 0; st.tip = 0; st.pour = 0;
       // And the set-down latch cleared, so the beat photographs itself rather
       // than a bucket left standing wherever the loop was before the jump.
       st.stand = null; st.standFor = -1;
+      // BACK ON THE BUCKET'S OWN ROUTE, whatever the wander left behind. `way`
+      // is what `walkOn` and `at` read, and a `go('down', 7)` taken while she
+      // was half way along an edge of `BUCK_ROAM` would have indexed leg 7 of a
+      // two-point array. `roam` and `dwell` below put it back the other way.
+      way = BUCK_WAY;
       // The pirouette with it, and for the same reason: the flag is decided on
       // the way into `rest` and a jump does not go that way, so a `go` taken
       // out of a lap that was going to turn would leave her spinning on a beat
       // nobody asked about. `pirou()` below is how a probe asks for one.
-      //
-      // `setLap` with it and for exactly the same reason — the two are decided
-      // on the same frame and mean the same thing about the lap — so a `go`
-      // lands on an ORDINARY lap, the one where the pail stays in her hand.
-      // `pirou()` sets both back, which is what makes it photograph the whole
-      // moment rather than a woman turning round a bucket she is still holding.
       st.pirouLap = false;
-      st.setLap = false;
       st.move = null;
       // The rest of the routine with them, and for the third time the same
       // reason: `go` lands on an ORDINARY lap. `dance()` and `port()` are how
@@ -4275,12 +4881,14 @@ async function buildBucketeer(scene, vik, walkY) {
      */
     pirou: (on = true, step = null) => {
       st.pirouLap = !!on;
-      // The set-down travels with it. They are one decision in the loop — the
-      // pail comes out of her hand BECAUSE she is about to turn, see the note
-      // at the top of `rest` — and a probe that set only the flag would
-      // photograph a pirouette danced round a bucket still hanging off her
-      // fist, which is not a frame that occurs in the game.
-      st.setLap = !!on;
+      // THE SET-DOWN USED TO TRAVEL WITH IT and there is nothing left to set
+      // down: the pail stays in her fist through the whole of `rest` now, on
+      // every lap. See the note at the top of that beat. What that means for a
+      // probe is that `pirou()` with no name no longer photographs a pirouette
+      // — the porch draws from `pathSteps`, so the default below is the step
+      // the game would actually deal there, and a real pirouette is
+      // photographed upstairs with `go('dwell', 6); dance('pirouette')`.
+      //
       // WHICH step, so that the four in `BUCK.steps` can be looked at one at a
       // time instead of waited for. `pirou(true)` with no name keeps whatever
       // the lap's own draw said, which is the shipped path; a name overrides
@@ -4289,7 +4897,7 @@ async function buildBucketeer(scene, vik, walkY) {
       // typo that silently became `undefined` would photograph the fallback
       // and look like the draw ignoring the argument.
       if (on && step && BUCK.steps[step]) st.move = step;
-      else if (on && !st.move) st.move = 'pirouette';
+      else if (on && !st.move) st.move = 'developpe';
       else if (!on) st.move = null;
       return { pirouLap: st.pirouLap, move: st.move };
     },
@@ -4309,8 +4917,19 @@ async function buildBucketeer(scene, vik, walkY) {
       st.pathLap = !!on;
       st.pathStep = on ? (step && BUCK.steps[step] ? step : 'developpe') : null;
       st.danced = false;
-      if (on) { st.pirouLap = false; st.setLap = false; st.move = null; }
-      return { pathLap: st.pathLap, pathStep: st.pathStep };
+      if (on) { st.pirouLap = false; st.move = null; }
+      // AND IF SHE IS ALREADY STANDING AT A STOP ON THE WANDER, START IT HERE.
+      // The halt on the made ground is ARMED for a leg she has not reached yet,
+      // which is what the two lines above do; a stop on the wander is a beat she
+      // is already inside, and `dwellStart` — which is the only thing that ever
+      // sets `st.dance` there — ran on the way in. So arming alone would do
+      // nothing at all, and the step that is now most of her ballet would be the
+      // one step in this file a probe could not photograph.
+      if (on && st.phase === 'dwell') {
+        st.dance = 1;
+        st.dwellT = Math.max(st.dwellT, danceLen() + 0.40);
+      }
+      return { pathLap: st.pathLap, pathStep: st.pathStep, dance: st.dance };
     },
     /**
      * Arm the port de bras, or force it on this instant.
@@ -4434,8 +5053,69 @@ async function buildBucketeer(scene, vik, walkY) {
           + Math.cos(st.yaw) * (kanta.position.z - st.z)).toFixed(4),
         knuckle: knuck.toArray().map((n) => +n.toFixed(4)) };
     },
+    /**
+     * Stand her at a node of the wander, and start one from there.
+     *
+     * The cycle is five minutes and four of them are this, so waiting for her
+     * to arrive at the bookshelf is not a way to photograph her at the
+     * bookshelf. `roam(6)` puts her inside the front door looking out of it;
+     * `roam(6, 0)` puts her there with no moves left, so the next thing she
+     * does is walk back to the tap.
+     *
+     * `dance('pirouette')` AFTER this and then `tick(1.2)` is how the turn gets
+     * photographed now that the porch no longer has one — same order rule as
+     * `go`, and for the same reason: this clears the arming.
+     */
+    roam(node = null, moves = null) {
+      way = BUCK_WAY;
+      st.pirouLap = false; st.move = null;
+      st.pathLap = false; st.pathStep = null; st.dance = 0; st.danced = false;
+      st.portLap = false; st.port = 0; st.portT = 0;
+      if (st.portSet) { fig.over(null); st.portSet = false; }
+      st.stand = null; st.standFor = -1;
+      st.held = 0; st.fill = 0; st.load = 0; st.tip = 0; st.pour = 0;
+      st.node = node == null ? 0 : clamp(node | 0, 0, BUCK_ROAM.length - 1);
+      st.was = -1;
+      st.roamLeft = moves == null ? BUCK.roamRun[0] : Math.max(0, moves | 0);
+      const spot = BUCK_ROAM[st.node];
+      const w = wx(spot.at);
+      st.x = w[0]; st.z = w[2];
+      // The flat and not the storey under it — `floorAt` offers both at this
+      // (x, z) and `yHint` is the whole of what tells them apart. Same hint the
+      // seeding at the top of this file uses and for the same reason.
+      st.y = walkY(st.x, st.z, vik.base + VIK.floor);
+      if (spot.look) {
+        const b = wx(spot.look);
+        st.yaw = Math.atan2(-(b[2] - st.z), b[0] - st.x);
+      } else if (st.node === 0) {
+        st.yaw = tapYaw();
+      }
+      st.phase = 'dwell'; st.clock = 0; st.vel = 0;
+      st.dwellT = spot.hold[1];
+      poseCarry();
+      fig.update(0);
+      mesh.position.set(st.x, st.y, st.z);
+      mesh.rotation.y = st.yaw;
+      mesh.updateMatrixWorld();
+      placePail();
+      placeWater(0);
+      return this.stats();
+    },
     /** Where she is standing, in world metres, for a camera to be aimed at. */
     where: () => [st.x, st.y, st.z],
+    /**
+     * The wander's graph, as the house sees it and as the world does, with the
+     * floor under each node and who each one is next to. Same job `ways` does
+     * for the bucket's route: a probe that wants to aim a camera at the
+     * bookshelf should not have to read the table out of the source.
+     */
+    roamWays: () => BUCK_ROAM.map((n, i) => {
+      const w = wx(n.at);
+      return { i, house: n.at, room: n.room, hold: n.hold,
+        to: BUCK_ROAM_LINK[i], home: BUCK_ROAM_HOME[i],
+        at: [+w[0].toFixed(1), +w[2].toFixed(1)],
+        y: +walkY(w[0], w[2], vik.base + VIK.floor).toFixed(2) };
+    }),
     /** The route, as the house sees it, as the locale sees it and as a floor. */
     ways: () => BUCK_WAY.map((p, i) => {
       const w = at(i);
