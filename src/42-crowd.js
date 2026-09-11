@@ -652,7 +652,7 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   // now, and the biggest single-pose group on this shore drops from eleven
   // people to six.
   const SEATED = ['sit', 'sitback', 'sittable',
-    'sitclasp', 'sittalk', 'sitfwd'];
+    'sitlap', 'sittalk', 'sitfwd'];
   // The quay's own two. There is no `fg.seat` out here — nobody on the lip of
   // the promenade is in a numbered chair — so the choice rides on `fg.seed`,
   // the draw the figure was already given when the beach was built. Reading a
