@@ -8,6 +8,229 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.376.0] — 2026-09-11
+
+### she clasps the bail, she wanders the flat, and the cut-scene had a five-metre floor
+
+Four requests in one release, each measured before it was patched, and three of
+the four turned out to be a different fault from the one reported.
+
+**THE GRIP — THE WIRE WAS POINTING THROUGH HER PALM.** Misha: *"the way she
+holds the bucket is horrible. she seems to have no ability to CLASP the handle
+... it is visually very jarring"*, with a screenshot. The reported fault is a
+hand that will not close; the actual fault is that closing it could never have
+helped. The angle between the bail wire and her knuckle line was **81.5
+degrees** — the wire ran the way the PALM NORMAL points, in at the palm and out
+at the back of the hand. A one-segment finger slab can only ever wrap a wire
+lying ACROSS it, so at 81.5 degrees the fold produces a fist with a wire through
+the middle of it. It is 24.9 degrees now, wire to the crook of the fingers 25.0
+mm to 13.5 mm.
+
+Why she had never clasped anything: `walk` leaves `fingersR` and `thumbR` at the
+rest rotation **to 0.0 degrees**, and so do `idle`, `tread`, `swim`, `crawl` and
+every other loop, both hands. The rest hand of this rig is an open splayed slab
+and nothing had ever asked it to close. It was never a limit of the bake — the
+`wine` clip already flexes those two bones by 110 and 45 degrees, and the fold
+now goes to the bake numbers rather than to an angle anybody typed.
+
+Two wrong answers found and backed out on the way, both worth keeping:
+
+  * Solving the wrist as a **roll about the forearm** looked right and was
+    unstable. A wire has no direction, so the answer folds into plus-or-minus
+    ninety, and at the eighty degrees this needs the branch flips on noise:
+    traced over one stride the roll jumped **+86.7 to −79.9 degrees** and the
+    pail swung **0.500 m to 0.004 m**, through her shin. Replaced with an
+    absolute frame, which has no branch to flip.
+  * The bail was hanging off the **wine bottle's** grip point. A bottle fills a
+    fist and sits mid-palm, 41 mm proximal of the knuckles; a bail is 8 mm of
+    wire lying ON the knuckles. 29 mm apart, and that gap was the whole reason
+    the fold had nothing to close on. `GRIP_B` is its own point now.
+
+Stable through standing, mid-stride, the lift, the flight down and the walk back
+up: crook 13.4–13.5 mm, cross 24.7–26.7 degrees. Her position over 361 frames
+moves **0.000000 m**, and `port()`'s ballet arm does not become a fist — `over`
+writes a pose and `aim` writes a delta, so they compose rather than compete.
+
+The bucket was NOT turned, which is the physically honest fix — a pail at your
+side hangs with its pin fore-and-aft. The pour jet, the puddle and both cut
+cameras are built on the current sign, and the pail stands 60 mm outboard for
+thigh clearance only because the bail's plane lies the way it does. Turn the pin
+and the hand is 60 mm off the wire entirely.
+
+**HER FEET ON THE FLIGHT — THE FAULT WAS IN THE HOUSE, NOT IN HER.** Misha:
+*"when she walks down the steps, her feet are slightly below the ground ... u
+got other bathers feet normal, so hers should be normal too"*. He was right that
+it was not her rig: toe against root on the flat is **+1.3 mm mean**, range −4.7
+to +10.2. `floorAt`'s stair ramp in 44-vikendica.js lerped from `base` to `base +
+floor` along the line through the **inside corners** of the steps — one riser
+under the tread anybody actually stands on. Measured analytically against
+`outside_stair` in vikendica.py, that is a sawtooth of **−5 to +165 mm, mean +78
+mm**, and positive — her inside the concrete — for **97 per cent of the flight**.
+Confirmed independently by rays dropped on to the drawn treads, 504 frames at
+1/60 down legs 6-8: the tread top stood **74.0 mm** above her feet on average and
+**174 mm** at worst.
+
+The ramp is raised half a riser (`VIK.riser`), clamped to `base + riser` at the
+foot for the real 70 mm step up on to tread 0 and to `base + floor` at the head.
+**After: mean +4.4 mm, range −73.6 to +89.4 mm** — the plus-or-minus 85 mm of a
+ramp against a stair, which is about zero. The old floor at the foot was a 40 mm
+DIP inside the stair rect, which is the unexplained "50 mm" that `BUCK.stepRate`'s
+note had been carrying. It fixes the flight for the player too.
+
+The 84.1 mm porch step at leg 9-10 is untouched: it is the survey's own
+`P_TER = P_FL − 0.20` and flattening it would contradict the drawing.
+
+**SHE STOPS PUTTING THE PAIL DOWN.** Misha: *"she shouldn't set it down, just
+pour water out and don't set it down lift it back up again"*. `st.setLap` is
+deleted rather than flagged off; `held` is 1 through `tip`, `right`, `rest` and
+`take`. The one set-down left is the one that has to be there — the pail stands
+on the bathroom floor under the spout while it fills. `rest` keeps its
+`setDown + breathe` length because `POUR_INTO` in 90-app.js sums her beats.
+
+**THE WANDER.** Misha: *"she should have a more elaborate walk path ... she
+should sometimes walk into the rooms, walk around the kitchen on the second
+floor ... some amount of brownian motion"*. Thirteen nodes and thirteen edges
+over the measured plan, a hash-driven random walk with no backtracking and a BFS
+home. Every node and every edge probed with 24 horizontal rays at 0.30, 1.00 and
+1.60 m: **worst torso clearance on any edge is 0.31 m**, which is exactly the
+tightest thing her shipped route already walks twice a lap (the bathroom
+dog-leg). A candidate edge that came in at 0.29 was deleted, not shaved.
+
+Two of the places he asked for are not in it, and the notes say why rather than
+quietly leaving them out. The **kitchen is unreachable**: the cabinet run ends at
+x −0.89 against the sofa back at −0.63, and the sofa's east end at 0.03 against
+the round table at 0.23 — 0.26 m and 0.20 m, both at torso height. The **terrace
+sliders are drawn shut**, a pane at z 3.76 with one to two centimetres of air
+across the whole 2.20 m opening. So she stands at the glass and looks out at the
+channel instead, which reads from the garden.
+
+Which steps she can dance indoors was measured off the clip rather than guessed
+— pirouette 0.216 m of reach, relevé 0.277, développé 1.078, arabesque 0.907,
+against a best standing spot in the flat of 0.79 m. So the flat gets the two
+compact steps and the two leg-out steps stay outdoors, where `pathSteps` already
+had them.
+
+**AND EVERY LAP-INDEXED GATE RE-DERIVED, BECAUSE THE LAP IS NOW SIX TIMES
+LONGER.** The cycle is **316.1 s mean** over 18 whole cycles, spread 225–425 s;
+the bucketeering trip inside it is still 52.10 s to the millisecond. Time splits
+60.6 per cent standing, 23.4 per cent walking the flat, 16.0 per cent on the
+bucket. Every odds in this file is expressed per lap and was tuned against 52
+seconds, so a six-times longer lap silently makes all of them six times rarer —
+which would have shipped a woman who wanders beautifully and never dances. All
+counted over 5000 draws of `jit` with fresh indices, never `rng()`:
+
+| gate | was | is | before | after |
+|---|---|---|---|---|
+| `pirou` (12–26 m) | 0.17 | 0.30 | one every 5.2 min | one every 17.5 min |
+| `pirouNearOdds` (under 12 m) | 0.40 | 0.55 | 2.2 min | 9.5 min |
+| `pathOdds` (halt on the way up) | 0.33 | 0.60 | 2.5 min | 19.0 min |
+| `portOdds` (the ballet arm) | 0.62 | 0.85 | 1.8 min | 8.6 min |
+| `roamOdds` (new) | — | 0.24 | — | one every 54 s |
+
+Per trip to the water the ballet is COMMONER than it was (0.83 against 0.605);
+per minute it is the flat that carries it, one step every 54 s against 86 s, in
+twelve places instead of two. `sayIn` goes from 11.7 per cent of a lap to 84 per
+cent of a cycle.
+
+**THE POUR CUT-SCENE HAD A FIVE-METRE FLOOR.** Misha: *"the cut-sequence
+downstairs still doesn't fire every time ... make it fire EVERY FUCKING TIME"*,
+after an earlier *"i often stand next to her pouring water, but the cut-scene
+doesn't trigger"*. Standing next to her was the one thing that could not work.
+`__fr.pour.why()` sampled every frame, with the failing clause counted at the
+instant she tips:
+
+| where the player stood | laps | blocked by |
+|---|---|---|
+| 3 m in front, looking at her | 5 / 5 | `POUR.near` — gap 3.00 against a 5.0 floor |
+| the terrace | 32 / 32 | `near` + `rise` + the aim dot, all at once |
+| 25 m out | 5 / 5 | `POUR.far` |
+| 8 m out, back turned | 6 / 6 | the aim dot |
+| 8 m out, looking at her | 1 fired, then 4 / 4 | `POUR.again`, the 600 s cooldown |
+
+The only geometry that could ever fire it was a narrow annulus, facing her — and
+having fired once it then sat out about eleven laps. That is "i only saw it
+trigger 1 time" exactly.
+
+A correction to the 1.372.0 note, which claimed `pourEyes` BANKS across her lap.
+It does not. From the one legal spot it is zeroed for **61 per cent of every
+lap** — 48 per cent because she is upstairs and 13 per cent on the house test —
+and stood at **0.13 s** on the frame she tipped. It only ever reached 0.45
+against a 0.50 threshold. Even the legal spot was a coin flip.
+
+Waived: `near`, `far`, `rise`, indoors, the house test, the aim dot and the eyes.
+`pourEyes`, `pourHouseBetween` and `pourPlanInv` are deleted, not left dead.
+Kept, each naming itself on the way out: `rolling`, `cooldown`, `noBucketeer`,
+**`notAfoot`** — which is the Canadair guard, and gets crashing, water, boat and
+ride for free — `noGround`, `paused`, `owned`, `notPouring` and `sameTip`.
+
+`POUR.again` is **0**: her cycle is the cooldown now, and a five-minute trip pays
+for its own 9.4 s cut. A skipped cut is handled structurally rather than by a
+timer — the trigger is a rising edge on her clock, so skipping at 0.26 s reports
+`sameTip` for every frame to 0.50 and never re-fires. Both cameras are placed in
+HER frame, so the shot is frame-for-frame identical at 3 m, 140 m and from
+inside the house; no distance gate was re-added and no camera fly-in was needed.
+The real bound is `BUCK.poseM` at 150 m, past which her loop does not advance and
+there is no pour to catch. **30 trips, 30 cuts**, 1:1 from all four
+previously-blocked positions; airborne, `notAfoot` for 959 of 959 frames and
+zero cuts.
+
+**A SIMPLE PAUSE, AND A SILENT ONE FOR SCREENSHOTS.** Misha: *"simplify this
+text remove the shit about fire still burning, just have it show a simple Pause
+button ... would be cool if i press Escape-Escape very rapidly for it to
+halt/pause, without blurring the background, b/c often i need to pause, take a
+screenshot of some defect"*. The card is **Paused, Resume, and the key hint**;
+the eyebrow and the hectares-and-city-health line are gone, `paintPauseState()`
+is deleted along with both callers and the dead rule in styles.css, and
+`pause.eyebrow` and `pause.alight` are out of all three languages.
+
+A second Escape within **400 ms** converts that pause to silent: the panel is
+hidden outright, so there is no blur, no dim, and the frame stands exactly as it
+was. 400 ms is GTK's and Qt's default double-click interval, with Windows at
+500; a deliberate double tap lands nearer 200. Chrome's own threshold cannot be
+measured over CDP — `Input.dispatchMouseEvent` takes `clickCount` as an argument
+and will manufacture the event at any gap — so the platform defaults are the
+measurement.
+
+Two shapes rejected: delaying the first Escape by 400 ms, which would make the
+pause everybody actually uses feel broken; and letting a lone Escape restore the
+card while silent, which repaints the very frame you are mid-screenshot on. A
+lone Escape while silent is swallowed on purpose and `P` is the way out.
+`setPaused` clears the flag unconditionally, so every other door — Resume, `M`,
+the race, and every `if (state.paused) setPaused(false)` back door — restores the
+card and the next ordinary pause looks normal. A consumed Escape returns above
+the pause line and never touches the timestamp, which is why the help sheet, the
+sign-in and the three cut-scene branches are structurally safe: `?` then Escape
+then a second Escape 70 ms later gives a normal card, not a silent pause.
+
+### known, and not fixed here
+
+Through the pour the pail is **207 mm from her fist**, and always has been —
+measured identical before and after the grip work. `placePail` swings the bucket
+220 mm forward over the roll so the water clears her feet, a cheat its own note
+admits to, and the hand does not go with it. The fix is to carry the ARM forward
+on `tip` the way `offer` already does, which is the pour's geometry and not the
+grip's.
+
+Pour cut shot A is framed low and close behind her and cuts her head off. It was
+survivable at one firing a session; at one a trip it wants re-framing.
+
+### added
+
+* `__fr.buck.raw().grip('R'|'L')` — the clasp in millimetres: `cross` (wire
+  against the knuckle line, which is the number that says whether the fix is a
+  pose or a re-plumbed bail), `crook`, `tip`, `palm`, the flex and opposition
+  laid on, and the pail's lateral stand-off against the 0.350 the thigh needs.
+* `__fr.buck.raw().clasp(false)` — the grip off and on, for an A and a B on one
+  frame.
+* `__fr.buck.raw().roam(node, moves)` — stand her at a node of the wander and
+  start one there, because four fifths of a five-minute cycle is the wander and
+  waiting for her to reach the bookshelf is not a way to photograph her at it.
+* `__fr.buck.raw().roamWays()` — the graph, with the floor under each node.
+* `__fr.pause()` now reports `silent` instead of the deleted `sub`.
+* `__fr.pour.why()` no longer re-implements the gate: it reports the string
+  `checkPour` wrote on the frame it decided, so the handle cannot list a clause
+  the game no longer has.
+
 ## [1.375.0] — 2026-09-11
 
 ### she dances on the way, and there was never a travelling step
