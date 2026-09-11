@@ -310,7 +310,18 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
-  if (e.code === 'KeyP' || e.code === 'Escape') { e.preventDefault(); togglePause(); return; }
+  // P and Escape stop the world, and Escape can be pressed twice for the
+  // silent version of it — see `escPause`, which owns that decision. Every
+  // Escape above this line was consumed by whatever it was closing and never
+  // reaches here, so the back doors out of a sheet, a sign-in or a cut-scene
+  // are unchanged and cannot be read as half of a double-tap. A held Escape
+  // cannot be either: this handler drops `e.repeat` on its first line, so the
+  // thirty presses a second an autorepeat would deliver never arrive.
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    e.preventDefault();
+    if (e.code === 'Escape') escPause(); else togglePause();
+    return;
+  }
   // Ahead of the pause guard on purpose: pausing to read the hint and then
   // pressing the key it told you about should work.
   if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); skipToGround(); return; }
@@ -928,7 +939,6 @@ function paintDeviceText() {
     ? TK('set.footGround', 'set.footTouch')
     : TK('set.foot', 'set.footTouch')) + ' · v' + BUILD.v;
   $('pause').querySelector('.hint').innerHTML = TK('pause.hint', 'pause.hintTouch');
-  if (state.paused) paintPauseState();
 }
 onLangChange(paintDeviceText);
 
@@ -1441,6 +1451,7 @@ const HELP = [
   ]],
   ['help.g.any', [
     ['P · ESC', 'help.k.pause'],
+    ['ESC ESC', 'help.k.silent'],
     ['N', 'help.k.voice'],
     ['M', 'help.k.settings'],
     ['H', 'help.k.hud'],
@@ -1492,12 +1503,58 @@ function togglePanel() {
 
 // ── pause ────────────────────────────────────────────────────────────────────
 
-/** The line under the word: what, exactly, you walked away from. */
-function paintPauseState() {
-  if (!fire) return;
-  const ha = fire.burningCount() * (fire.cell * fire.cell) / 1e4;
-  $('pause-sub').textContent = (ha < 10 ? ha.toFixed(1) : Math.round(ha))
-    + ' ha ' + T('pause.alight') + ' · Šibenik ' + Math.round(state.cityHealth * 100) + '%';
+// The pause card used to carry a line of arithmetic under the word — hectares
+// alight, the city's health — and Misha, 11 Sep: "remove the shit about 'fire
+// still burning', just have it show a simple Pause button". He is right: a
+// number you cannot act on while the world is stopped is a number read once
+// and then sat behind. The HUD says it while you are playing, which is when it
+// means something.
+
+/**
+ * The silent pause: stopped, with nothing painted over the frame.
+ *
+ * Misha again, same message: "often i need to pause, take a screenshot of some
+ * defect or what not". The ordinary pause is no good for that — it throws a
+ * dark card and a nine-pixel backdrop blur over the exact frame he wanted to
+ * keep, so the defect goes out of focus at the moment he photographs it. This
+ * is the same stop with the card taken off.
+ */
+let silentPause = false;
+
+// 400 ms is the double-tap window, and it is not a taste: it is GTK's and Qt's
+// default double-click interval, with Windows' GetDoubleClickTime at 500 and
+// macOS in the same place. A deliberate double-tap lands nearer 200 ms, so 400
+// clears a real one with room to spare, and it is still far shorter than the
+// gap between two Escapes that meant two different things — nobody pauses,
+// looks at the frozen frame, and decides to carry on inside half a second.
+const ESC_DOUBLE_MS = 400;
+let escLast = -1e9;
+
+/**
+ * Escape's half of the pause, which is the half that can be pressed twice.
+ *
+ * The first press is exactly what it always was — pause, or unpause — and it
+ * fires immediately. Holding the decision for 400 ms to find out whether a
+ * second one is coming would buy the double-tap at the price of making the
+ * ordinary pause feel broken, and the ordinary pause is the one pressed a
+ * hundred times more often. What makes that affordable is that the *second*
+ * press has somewhere new to go: the world is already stopped by the time it
+ * arrives, so instead of starting it again it can take the card off.
+ */
+function escPause() {
+  const now = performance.now();
+  const quick = now - escLast <= ESC_DOUBLE_MS;
+  escLast = now;
+  // Already silent: a pair gets you out. The lone Escape in between is
+  // swallowed on purpose, and that is the whole point of the mode rather than
+  // an oversight — resuming for 200 ms and stopping again would move the frame
+  // he is in the middle of photographing. P is the instant way out, and it
+  // still is.
+  if (silentPause) { if (quick) setPaused(false); return; }
+  // The second of a quick pair, with the first one's card still up: drop the
+  // card and the blur with it, and leave the world stopped.
+  if (quick && state.paused) { silentPause = true; $('pause').hidden = true; return; }
+  togglePause();
 }
 
 function setPaused(on) {
@@ -1522,11 +1579,15 @@ function setPaused(on) {
     && state.phase !== 'swim' && state.phase !== 'brod') return;
   if (state.paused === on) return;
   state.paused = on;
+  // Every other door in and out of a pause — P, the Resume button, the touch
+  // buttons, the back doors that unpause on their way somewhere — puts the
+  // card back where it belongs. Only `escPause` takes it off, and only for as
+  // long as that one stop lasts, so the next ordinary pause looks ordinary.
+  silentPause = false;
   $('pause').hidden = !on;
   audio.setPaused(on);
 
   if (on) {
-    paintPauseState();
     // Nothing survives the pause held down. Coming back to full right rudder
     // because that is what your hand was doing thirty seconds ago is the
     // classic way a pause button loses an aeroplane.
@@ -8952,8 +9013,11 @@ window.__fr = {
   /** Read the pause with no argument, set it with one. */
   pause: (on) => {
     if (on !== undefined) setPaused(on);
+    // `shown` and `silent` are the two halves of the same question from
+    // opposite sides: a silent pause is stopped with nothing on the screen, so
+    // a probe that only asked `paused` could not tell it from an ordinary one.
     return { paused: state.paused, shown: !$('pause').hidden,
-      sub: $('pause-sub').textContent, t: +state.t.toFixed(2) };
+      silent: silentPause, t: +state.t.toFixed(2) };
   },
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
