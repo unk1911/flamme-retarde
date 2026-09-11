@@ -8,6 +8,72 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.374.0] — 2026-09-11
+
+### the nape paint is gone, and so is the door that hid three fixes
+
+Misha, for the third time: *"the buckateer baye still has that hair on her
+nape/back of her head. can u remove that and release a new version"*.
+
+**THE REASON HE HAD TO ASK THREE TIMES IS THE REAL FINDING.** The 24 Aug
+shortening never reached the game. The shipped `human_skin.fr3d.gz` carried
+**207** dark body-shell vertices in the band y 1.42–1.65, reaching down to
+y = 1.4632 and out to |z| = 0.0798 — the *pre-24-Aug* ellipsoid. Repainting the
+same blend from the file's own cutters gives **114**, reaching 1.5381. The saved
+blend still holds 1821 dark vertices between y 1.455 and 1.545 on the back of
+her neck.
+
+So the 4 Sep re-export was a `--reskin`: pose, render, write, and **no paint
+pass**. That door ships whatever colour the blend was last saved with, which
+means every paint change since August has been invisible to the game — the nape
+shortening, and 7 Sep's mouth-and-lash fix, which finally arrives in this build
+by the same mechanism. There is now a note over `--reskin` saying so, ending in
+the rule: after editing `cutters`, export through `--repaint`, `--rebase` or a
+full run.
+
+**THE CUTTER IS DELETED**, not shortened a third time, and the `tail` flag that
+selected it went with it. Three candidates were built and rendered at 1.4 m
+behind her head in both the tiled bathroom and porch daylight:
+
+- **shipped** — an olive wedge from the hairline to the top of her dress, with a
+  stair-stepped boundary.
+- **the source's own shortened version** — the same wedge, ear to mid-neck,
+  still stepped. It would have been reported a fourth time.
+- **tightened**, half-width 0.069 → 0.032 — still steps, and buys nothing,
+  because the root it would cover is behind the tail anyway (36 dark vertices
+  against 30 for none).
+- **none** — the cap ends in a hairline behind the ears and the tail leaves the
+  **knot** at the crown, which is geometry rather than paint.
+
+On the neck clear of the tail's 36 mm: **132 dark vertices before, 30 after**,
+and those 30 are the knot and the fall themselves. **The tail does not regress**
+— there is nothing hanging off a bare neck, because what holds it up was never
+the paint.
+
+Why it could never have been a clean edge, which is worth writing down: a cutter
+has a sharp boundary and painted colour does not. The export decimator collapses
+edges and *averages* the colours of the vertices it merges, so a line that is
+crisp on the 218 000-vertex mesh arrives as a gradient centimetres wide. The
+choice was only ever "soft enough to read as hair" or "gone".
+
+`easeNape` and `FACE.nape` are unaffected: their constituency was always the
+tail geometry, which reaches y = 1.313 and is what the 17 cm is measured off.
+The pubic-hair exclusion is the head-weight test and is untouched.
+
+BLAST RADIUS, measured: `human_skin.fr3d.gz` is Baye, the Bucketeer and the
+chase figure, one blob. 14 916 verts / 28 085 tris, unchanged. 201 vertices
+change colour — 179 nape, 22 brow and hairline. The bathers are untouched.
+
+AND THE EXPORT IS NOT BYTE-REPRODUCIBLE, which nobody had noticed: three
+`--repaint` runs on one blend gave 14 916 / 14 917 / 14 915 vertices, because
+the re-solved bind's quantised weights are in the dedupe key. A paint-only door
+holds the mesh steady, which is how the comparisons above were measured at all.
+
+**Chloe still has it.** `chloe_skin.fr3d.gz` is a separate bake, was never gated
+on a tail she does not have, and carries the same paint dyed to her own hair.
+The source fix lands on her next bake; re-exporting her now would land every
+unshipped paint change on her at once, so it is flagged rather than done.
+
 ## [1.373.0] — 2026-09-11
 
 ### the nape was never hair, the yield never fired, and she can be heard
