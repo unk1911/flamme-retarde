@@ -1693,7 +1693,7 @@ def one(name, height, obj, check=False):
     MH.smooth(body, 1, above=J["neck"].z)
     rig = MH.armature(J)
     MH.skin(body, rig)
-    coats = MH.cutters(J, k=k, torso=False, tail=False)
+    coats = MH.cutters(J, k=k, torso=False)
     MH.paint(body, coats)
     out = OUT / ("bather_%s.fr3d.gz" % name)
     # `post=False`, and that is the difference between eight bathers and eight
@@ -2116,7 +2116,7 @@ def preview(name, height, obj, views):
     MH.smooth(body, 1, above=J["neck"].z)
     rig = MH.armature(J)
     MH.skin(body, rig)
-    MH.paint(body, MH.cutters(J, k=k, torso=False, tail=False))
+    MH.paint(body, MH.cutters(J, k=k, torso=False))
 
     out = ([], [], [], [])
     n = swimsuit(J, body, kind, suit, height, out)
