@@ -74,6 +74,11 @@ const VIK = {
   // dropped 2.9 m through the doorstep. Surfaces that meet must overlap.
   stair: { x0: 3.30, x1: 4.62, z0: 0.76, z1: 3.865 },
   landing: { x0: 3.30, x1: 4.62, z0: -0.42, z1: 0.80 },
+  // And the riser, which `floorAt` needs and did not have. `ST_RISE` in
+  // tools/blender/vikendica.py, where the flight is drawn: seventeen of them,
+  // 0.17 each, 2.89 of the storey's 2.90. See the note in `floorAt` about what
+  // the ramp between the two ends of them has to run THROUGH.
+  riser: 0.17,
 
   // And the ladder-stair inside, up the east wall of the big room: twelve
   // treads, 2.55 m of rise in 1.98 of run. It was fourteen over 2.60, and
@@ -1422,11 +1427,51 @@ async function buildVikendica(scene, field) {
 
     if (inRect(x, z, VIK.stair)) {
       const R = VIK.stair;
-      // Never below the ground it stands on: the plinth is buried, so a ramp
-      // run all the way down to `base` puts a step *down* at the foot of the
-      // flight and you walk off the promenade into a dip before you climb.
-      offer(Math.max(base + VIK.sink,
-        base + VIK.floor * clamp((R.z1 - z) / (R.z1 - R.z0), 0, 1)));
+      // ── AND HALF A RISER UP, WHICH IS NOT A FUDGE — IT IS WHERE THE TREADS
+      //    ARE ───────────────────────────────────────────────────────────────
+      //
+      // Misha, 11 Sep 2026, of the Bucketeer: *"when she walks down the steps,
+      // her feet are slightly below the ground"*. They were, and so were
+      // yours, and so is anybody else's who ever uses this flight: it is this
+      // line and it has nothing to do with her.
+      //
+      // The lerp alone runs from `base` at `z1` to `base + floor` at `z0`,
+      // which is the line through the INSIDE CORNERS of the steps — where each
+      // riser meets the tread behind it. The surface you actually stand on is
+      // the tread TOP, one riser above that corner, so over the body of every
+      // tread the old ramp fell away underneath the concrete.
+      //
+      // MEASURED, not argued. `outside_stair` in tools/blender/vikendica.py
+      // draws tread i with its top at `GRADE + ST_RISE * (i + 1)` over a going
+      // of 3.10 / 17 = 0.18235, so in this frame the drawn top at house z is
+      // 0.17 * (floor((3.86 - z) / 0.18235) + 1) and the old ramp was
+      // 0.93398 * (3.865 - z). Differenced over the flight that is a SAWTOOTH
+      // from −5 mm to +165 mm with a mean of +78 mm, and it is positive — her
+      // inside the step — for 97 per cent of the run. Rays straight down on to
+      // the drawn treads agree with the arithmetic to the millimetre: traced at
+      // 1/60 s down legs 6-8 of `BUCK_WAY`, 504 frames, the drawn tread top
+      // stood a mean of 74.0 mm above her feet and 174 mm above them at worst.
+      //
+      // Half a riser is where a ramp fitted to a stair belongs: it puts the
+      // line through the middle of each tread, so the residual is ±85 mm about
+      // zero instead of −5 to +165 mm about −78. Clamped at BOTH ends, and the
+      // two clamps are different facts:
+      //
+      //   the FLOOR of the clamp is `base + riser`, the top of the bottom
+      //   tread, and NOT `base + sink` as it was. There is a real step up off
+      //   the made ground on to that tread — 70 mm of it, riser minus sink —
+      //   and the ramp must not dive below the tread to find it. The old
+      //   `Math.max(base + sink, …)` put a 40 mm DIP inside the stair rectangle
+      //   instead, which is the "50.0 mm off the bottom step" the note over
+      //   `BUCK.stepRate` measured and could not explain.
+      //
+      //   the CEILING is `base + floor`, which the lerp used to reach exactly
+      //   and now reaches 90 mm early, at z 0.851. Tread 16's top is 2.89 and
+      //   the landing is 2.90, so that last 90 mm is the flight meeting the
+      //   landing 10 mm high rather than a step: continuous, and on the right
+      //   side of continuous.
+      offer(clamp(base + VIK.floor * clamp((R.z1 - z) / (R.z1 - R.z0), 0, 1)
+        + VIK.riser * 0.5, base + VIK.riser, base + VIK.floor));
     }
     if (inRect(x, z, VIK.landing)) offer(base + VIK.floor);
     if (inRect(x, z, plan.outer)) offer(base + VIK.floor);
