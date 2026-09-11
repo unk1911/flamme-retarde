@@ -8,6 +8,141 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.373.0] — 2026-09-11
+
+### the nape was never hair, the yield never fired, and she can be heard
+
+Six reports from Misha in one evening, five of them defects nobody had found by
+reading.
+
+**THE NAPE.** *"the bucketeer baye has that defect, on the nape (back of her
+head): the hairiness"*.
+
+It was **ambient-occlusion noise**, and nothing about the figure was wrong.
+`src/89-ao.js` rotates a 16-tap hemisphere by a per-pixel hash and blurs the
+half-res result over about five texels. The variance of that estimate is
+`p(1-p)`, so a wall and a deep corner are both silent and it is loudest where a
+surface is HALF occluded — which a 55 mm neck under a chin is exactly. ±4% per
+pixel, which on smooth light skin reads as stubble. She is the only figure the
+camera is ever 1.4 m from, which is why only she ever showed it.
+
+Proved by elimination and then by one decisive test: forcing her `gl_FragColor`
+to flat magenta left the speckle intact at 234–253 on a constant 255, with
+green pinned at 0 — a greyscale multiply applied AFTER she is shaded, and only
+one of those exists. Wet streaks, vertex colours, normals, the shadow cascade
+and z-fighting were each flattened and re-shot first; the near plane was forced
+from 0.06 to 1.0, four decades of depth precision, and nothing changed.
+
+Fixed with interleaved gradient noise in place of the hash and a 9-tap tent in
+place of 4 taps at half a texel. Neither alone is enough — high-frequency σ on
+the same crop: **0.79 before, 0.67 rotation only, 0.48 wider blur only, 0.30
+both**, against a floor of 0.06 with AO off. Mean occlusion is unchanged
+(whole-frame brightness moves a quarter of a level on 255) and it is FASTER:
+42–61 fps over the shot list becomes **57–61**.
+
+What remains on that nape is the painted hairline, which is the cutter that
+stops the modelled tail hanging off a shaved neck. Documented, deliberate,
+identical before and after, and left alone.
+
+**THE YIELD HAS NEVER FIRED.** *"if i stand in her way, she walks right through
+me"*.
+
+Not the radius — the vector. `ahead` was dotted against `(sin yaw, cos yaw)`,
+which this same file calls *"her right"* three hundred lines further down. Her
+nose is `(cos yaw, -sin yaw)`. The two are perpendicular, so somebody standing
+dead in front of her scored exactly **0.000** against a 0.30 threshold: the
+yield could only ever fire for a person off her right shoulder, and never for
+anybody actually in the way. Traced with the player on her path: d = 2.38,
+1.66, 0.95, 0.35, 0.25 m and `yielding` false at every sample.
+
+Now a corridor rather than a cone, because a cone is the wrong shape — at 0.30
+somebody 1.24 m to the side at 1.30 m range is "in the way" and somebody 0.55 m
+to the side at 0.60 m is not. `fwd > 0 && fwd < 1.30 && |side| < 0.62`: the
+0.54 m sum of two bodies plus 0.76 m of air, which is a full second of
+approach. She pulls up at **1.26 m**; step 0.95 m aside and she goes; walk in
+behind her and she goes.
+
+AND HER THREE DOORWAY LINES HAVE BEEN UNREACHABLE SINCE 1.357.0, because
+"Pardon.", "Samo malo." and "Evo, evo." all hang off the yield timer. First run
+after the fix: `said: ["Samo malo."]`.
+
+**SHE COULD NOT BE HEARD.** *"why can't she talk more, in croatian... maybe the
+volume is too soft or something? she certainly hums nicely"*.
+
+Measured through the game's own mixer against a control of the same scene with
+nothing fired, in the speech band 300–3400 Hz:
+
+| | full band | speech band |
+|---|---|---|
+| control | −31.81 | −33.16 |
+| her hum | +0.3 | −0.4 |
+| her voice, was | +5.6 | **+3.2** |
+| her voice, now | **+13.9** | **+11.5** |
+| the pour | +17.0 | +16.8 |
+
+`MUTTER.gain` 0.44 → **1.15**, +8.34 dB predicted and +8.27 measured. The pour
+keeps its 3 dB on top, which its own note requires. Point-blank true peak
+−15.01 → −6.44 dBFS; a line landing on the same instant as the pour at zero
+distance measures −3.93, nothing near full scale.
+
+And the hum measures **+0.3 dB over the bed** — effectively zero margin,
+because a closed mouth is a narrow band at 190–350 Hz. That is why "hums
+nicely" and "kinda like blah" were one person describing two sounds at the same
+level.
+
+Cadence 245–355 s → **105–157 s**, and the note quotes both his instructions
+and says why 10 Sep supersedes 7 Sep. Also found: the room gate added that
+afternoon was being applied to EVERY pool rather than just the two indoor
+beats, which against the new clock would have eaten more than half the extra
+talking. 60 → 20 s.
+
+**THE PIROUETTE NOBODY COULD SEE.** *"i thought u could make her do a ballet
+move... but i don't see her doing any ballet moves"*.
+
+It worked. Counted over the hash across 5000 laps, `jit(i,31) < 0.17` gives a
+mean gap of **6.00 laps, median 4, worst 43** — twenty-six minutes of standing
+on the porch if unlucky, on top of a 2.20 s window and a 26 m gate. The rarity
+was his own instruction and it stays; the invisibility was the bug, exactly as
+the pour cut's once-per-session latch was in 1.369.0.
+
+Two odds and a gift: 0.17 out at the edge of earshot, **0.40** inside a new
+`pirouWatch` of 12 m, and the **first** lap that ends with somebody inside 12 m
+is a turn outright, so the feature introduces itself. Live and unprompted, she
+pirouetted **34.5 s into the session**.
+
+**AND THE PAIL STAYS IN HER HAND** — *"after she pours the water out the bucket,
+the bucket goes down on the floor and goes back into her arm.. that is
+unnecessary"* — except on the laps she is about to turn on, which is better
+than either request alone: a bucket put down for no reason is a fidget, one put
+down because she is about to dance is motivated. The lap is unchanged at
+52.37 s and the pour cut was re-photographed at six timestamps rather than
+argued about.
+
+**AND THE SEATED BATHERS**, which are the least of it and are recorded honestly
+as such. Four Mixamo captures, used as MEASUREMENTS and never as angles: each
+wrist's offset from its own shoulder as a fraction of the actor's arm, then the
+game's own per-figure solver puts the hand there.
+
+Two rejected attempts got there. The first froze Euler tables and shipped an
+**83.1°** shoulder twist — caused not by a missing rest-pose delta but by the
+retarget's minimal-arc alignment between bone directions, which for clavicles
+81.8° apart lands on an axis within 6° of world up, so the whole correction
+yawed the girdle and did not even mirror. The second fixed the twist and left
+the hands floating: anchoring a wrist to its own shoulder is right for a
+gesture and wrong for a hand resting on a leg. Palm-to-body, against the
+existing `sit` benchmark's 0.000–0.045 m: `sitclasp` 0.013–0.124 and `sitfwd`
+0.003–0.152 before, **0.000–0.052 and 0.001–0.038** after.
+
+`sitclasp` is renamed `sitlap`, because the name was part of the fault — the
+actor's wrists are 0.34 of an arm apart and it was never a clasp.
+
+THE LESSON IS IN THE FILE TWICE, because it bit twice in one afternoon: a
+96-tile contact sheet answers *"is anyone sunk, twisted or floating"* and
+cannot answer *"is this a pose a person would hold"*. Both get asked, and the
+second at 2x. Misha on the shipped result: *"i cannot tell the difference"* —
+which is true, and is why this is the last paragraph of this entry rather than
+the first.
+
 ## [1.372.0] — 2026-09-10
 
 ### the pour, quieter
