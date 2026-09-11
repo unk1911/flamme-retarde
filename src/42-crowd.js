@@ -637,14 +637,35 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   //
   // `sit` is the one that does not, and it used to: it landed on `idle`, which
   // is a person standing up where a person should be sitting down, and that is
-  // why the terraces were drawn by the instanced tier instead. There are three
+  // why the terraces were drawn by the instanced tier instead. There are six
   // seated clips in the bake now — see `sit_clips` in tools/blender/bathers_mh.py
-  // — and which of the three a figure is in is `fg.seat`, set once where the
+  // — and which of the six a figure is in is `fg.seat`, set once where the
   // crowd is placed and never afterwards, because a person who changes how
   // they are sitting every time you look away is worse than a mannequin.
   const CLIP = { stand: 'idle', wade: 'idle', walk: 'walk', sit: 'idle',
     lie: 'idle', wait: 'idle' };
-  const SEATED = ['sit', 'sitback', 'sittable'];
+  // Three authored against the furniture and three solved on to hand positions
+  // measured off motion capture. Counted on the sand at t 300 s 6 on 10 Sep,
+  // before this: of a hundred people twenty-six were sitting and they had FOUR
+  // poses between them — eleven quay sitters on the one `sitquay`, and fifteen
+  // terrace sitters six / five / four across the three authored ones. Eight
+  // now, and the biggest single-pose group on this shore drops from eleven
+  // people to six.
+  const SEATED = ['sit', 'sitback', 'sittable',
+    'sitlap', 'sittalk', 'sitfwd'];
+  // The quay's own two. There is no `fg.seat` out here — nobody on the lip of
+  // the promenade is in a numbered chair — so the choice rides on `fg.seed`,
+  // the draw the figure was already given when the beach was built. Reading a
+  // number that has already been drawn is free; DRAWING one here would move
+  // every parasol on the beach (rule 4).
+  //
+  // `fg.idx` was the first cut and it is the obvious one — the casting order
+  // is stable, ordinal and costs nothing. Measured, it split the eleven quay
+  // sitters EIGHT / three, because the casting walks the deck laying people
+  // down in a repeating pattern and the quay sitters in it are very nearly
+  // every third person: an index modulo a small list against a stride of three
+  // is not a spread, it is a comb. The seed has no such structure.
+  const QUAYED = ['sitquay', 'quaytalk'];
   // What somebody standing about does that `idle` does not: a look off to one
   // side. It is a one-shot in the bake and it is keyed from `IDLE_A` at either
   // end — see BATHER_CLIPS in tools/blender/bathers_mh.py — so it drops into a
@@ -678,12 +699,8 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   const POSE_NEAR = 45, POSE_MID = 110;
 
   /**
-   * Which clip this person should be playing.
-   *
-   * The `f.clips` test is not defensive coding for its own sake. The payload
-   * and the source are versioned separately — `build/payload/bather_*.fr3d.gz`
-   * is committed, not built — so a blob baked before the seated clips existed
-   * has to come out as a person standing rather than as a thrown exception.
+   * Which clip this person should be playing. See `firstClip` below for why
+   * every return here goes through a test that the blob carries the name.
    */
   /**
    * The phase a figure's clip starts at when it has no clock of its own yet.
@@ -706,17 +723,39 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     }
     if (fg.mode !== 'sit') return CLIP[fg.mode] || 'idle';
     // Two different kinds of sitting, and the difference is the furniture.
-    // A terrace sitter is on a 0.46 m chair and plays one of three clips
-    // solved against it; a quay sitter is on the slab itself with their legs
-    // over the water, half a metre lower, and plays `sitquay`. Handing a chair
-    // clip to somebody on the quay is what the old code could not do — it did
-    // not have to, because the quay sitters were all mannequins.
-    if (fg.seat == null) {
-      return f.clips && f.clips.includes('sitquay') ? 'sitquay' : 'idle';
-    }
-    const nm = SEATED[((fg.seat | 0) % SEATED.length + SEATED.length)
-      % SEATED.length];
-    return f.clips && f.clips.includes(nm) ? nm : 'idle';
+    // A terrace sitter is on a 0.46 m chair and plays one of six clips solved
+    // against it; a quay sitter is on the slab itself with their legs over the
+    // water, half a metre lower, and plays one of two solved against that.
+    // Handing a chair clip to somebody on the quay is what the old code could
+    // not do — it did not have to, because the quay sitters were all
+    // mannequins — and it is still what this must not do: the two families are
+    // separate lists and a figure never crosses between them, because the
+    // whole of the difference between them is a hip half a metre lower and
+    // shins hanging over water.
+    const quay = fg.seat == null;
+    const list = quay ? QUAYED : SEATED;
+    const k = quay ? Math.floor((fg.seed || 0) * list.length) : (fg.seat | 0);
+    return firstClip(f, list[(k % list.length + list.length) % list.length],
+      list[0], 'idle');
+  }
+
+  /**
+   * The first of these clip names this blob actually carries.
+   *
+   * The `f.clips` test was never defensive coding for its own sake and it
+   * matters more with eight seated clips than it did with four:
+   * build/payload/bather_*.fr3d.gz is COMMITTED rather than built, so a blob
+   * baked before a clip existed has to come out as somebody rather than as a
+   * thrown exception. What changed is the fallback. One step to `idle` was
+   * fine when the only thing that could be missing was the whole seated set;
+   * now a blob can easily have `sit` and not `sitfwd`, and falling all the way
+   * to `idle` for that is a person standing up in a café chair — the exact bug
+   * the seated clips were added to fix. So it falls to the first name in its
+   * own family first, and only then to standing.
+   */
+  function firstClip(f, ...names) {
+    for (const n of names) if (f.clips && f.clips.includes(n)) return n;
+    return names[names.length - 1];
   }
 
   for (const f of figs) {

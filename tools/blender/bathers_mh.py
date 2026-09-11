@@ -1142,19 +1142,310 @@ def _hang(side, out, swing, elbow):
             "armL" + side: (elbow, 0, sign * STAND_FORE_IN)}
 
 
+def _rel_target(rig, base, side, want, drop):
+    """One wrist target in room metres, from one measured off a BODY.
+
+    `want` is (forward, up[, out]): the first two are the wrist's offset from
+    that shoulder as a FRACTION of this figure's own shoulder-to-wrist length,
+    measured with the torso already in the attitude `base` leaves it in. `out`
+    passes straight through to `_arm_solve` — it is the tuck, and the note over
+    the tables below has the numbers it was swept against.
+
+    This is the other half of the line `_arm_solve` draws. A hand on a café
+    table is a fact about the table and is given in metres; a hand resting in
+    its owner's own lap is a fact about the owner, and giving THAT in metres is
+    the same mistake in the other direction — 0.32 m in front of the shoulder
+    is a hand in the lap of the 1.84 m man and a hand held out in front of the
+    1.24 m girl, whose whole arm is 0.353 m. Measured across the eight, the
+    captured seated hand positions scale at 0.158 to 0.168 m of wrist-to-thigh
+    per metre of stature, a six per cent band around proportional, which is the
+    evidence that a fraction is the right unit and a metre is not.
+
+    The shoulder is read from `base` rather than from the rest pose for the
+    same reason the note over `arms` gives: a shoulder that has leaned back
+    twelve degrees is twelve degrees of hand, and the capture measured the
+    wrist from the shoulder where the capture's own lean had put it.
+    """
+    MH.pose(rig, base)
+    B = rig.pose.bones
+    sh = B["armU" + side].head
+    reach = ((B["armL" + side].head - sh).length
+             + (B["hand" + side].head - B["armL" + side].head).length)
+    return ((sh.x + want[0] * reach, sh.z - drop + want[1] * reach)
+            + tuple(want[2:]))
+
+
+# ── three more seated attitudes, measured off motion capture ──────────────── #
+#
+# Misha, 10 Sep 2026: *"so u sayin' u can generate a cooler bather? someone
+# with more moving parts?"*. Counted on the sand at t 300 s 6 the same
+# afternoon: of a hundred people twenty-six are sitting, and they were sharing
+# FOUR poses — eleven quay sitters on `sitquay`, and fifteen terrace sitters
+# six / five / four across the three above.
+#
+# So three Mixamo seated captures were retargeted on to this rig to get more.
+# That is not what is below. What is below is what SURVIVED the retarget, and
+# the difference is the whole of this note, because the first attempt shipped
+# and was rejected on sight: *"the bathers are all twisted and retarded-looking
+# ... their arms / torsoes are all contorted out of shape."* He was right, and
+# two separate things were wrong.
+#
+# FAULT ONE — THE RETARGET YAWED THE SHOULDER GIRDLE NINETY DEGREES. Measured
+# on Sitting_7 at frame 144, woman_young_slim, with the angle between the hip
+# line and the shoulder line projected on to the ground:
+#
+#     the rig at rest                         0.0 deg
+#     the +-6 clavicles the poses above use   0.0 deg
+#     the retarget                           83.1 deg
+#
+# Eighty-three degrees of shoulders-against-hips is not a stylistic difference,
+# it is the complaint. It came out as `clavicleL` Z -111.5 and `clavicleR` Z
+# -79.0 — both NEGATIVE, where this rig mirrors the two sides in sign, so what
+# looks like two shoulder angles is one girdle turned bodily to her right.
+#
+# The cause is exact and it is worth writing down because it will bite the next
+# person who retargets anything on to this rig. The retarget aligns the two
+# rest poses — theirs is a T, ours is an A — with the MINIMAL-ARC rotation
+# between the two bone direction vectors. For a clavicle those directions
+# disagree by a lot and in a very particular way:
+#
+#     clavicleL  ours (-0.06 +0.99 -0.11)  theirs (+0.98 +0.20 -0.02)  81.8 deg
+#     clavicleR  ours (-0.06 -0.99 -0.11)  theirs (-0.98 +0.20 -0.02)  97.9 deg
+#
+# — ours run ACROSS the chest and theirs run along it, and the minimal arc
+# between those two comes out about an axis of (0.00, -0.11, -0.99): world up,
+# to within six degrees. The clavicles are in `human_mh.FLAT`, so `align_roll`
+# gives them a local Z that IS world up. The alignment therefore lands entirely
+# on the one axis that yaws the shoulder girdle. And it lands the same way
+# round on both sides — +Y to +X and -Y to -X are both a negative turn about up
+# — so it does not mirror, it twists. Without the alignment the same frame
+# gives -29.6 and +19.6, which do mirror; but without the alignment the arms
+# are 88 degrees out, because the arms are what the alignment is for.
+#
+# FAULT TWO — THE TORSO NUMBERS WERE THE ARTEFACT, NOT THE CAPTURE. Asked how
+# far each source bone had moved from its own rest at that frame:
+#
+#     spine01 3.1   spine02 2.9   spine03 3.4   chest 3.4   neck 8.5   head 6.6
+#
+# The actor's spine moves THREE DEGREES. The first bake froze 16.1 of pitch and
+# 10.6 of twist on `spine01`, and at the frame above the same recipe writes
+# 49.3. The poses this file already had live between -6 and +5 a segment and
+# were right all along. There was never anything in these captures' torsos.
+#
+# WHAT IS ACTUALLY IN THEM IS ARM PLACEMENT, and arm placement is the one thing
+# this file already knows how to carry across eight bodies. So the captures are
+# used the way the chair and the table are used — as MEASUREMENTS — and every
+# pose below is solved per figure by `_arm_solve` through `_rel_target`, in the
+# same idiom as `up_a`, `back_a` and `tab_a`. Nothing is a frozen Euler angle.
+# Measured in the source's own body frame, retarget-free, as fractions of the
+# actor's own shoulder-to-wrist length (f = in front of the shoulder, u = above
+# it, l = to the actor's left of it), these are what the three carry that the
+# three above do not:
+#
+#   Sitting_7        L(f+0.36 l-0.03 u-0.63)  R(f+0.45 l+0.30 u-0.65)  lean -7
+#                    and, the unit it is actually USED in, 0.27 and 0.42 of
+#                    the way down its own thigh — see `MIX_LAP`
+#       the right hand crossed to the midline while the left rests out on its
+#       own thigh. `sitback` is the only other asymmetric seat here and its
+#       asymmetry is an arm hanging OUTSIDE the chair; nothing had a hand
+#       come across the lap.
+#   Having_A_Meeting_Female
+#       k0  L(f+0.43 l-0.19 u-0.69)  R(f+0.49 l+0.19 u-0.60)  lean -16
+#       k1  L(f+0.01 l-0.17 u-0.68)  R(f+0.10 l+0.21 u-0.63)  lean  +6
+#       k2  L(f+0.80 l-0.25 u-0.37)  R(f+0.44 l-0.43 u-0.28)  lean +12, hd +28
+#       hands together in the lap, drawn back under the shoulders, and then up
+#       and out on a sentence. The wrist travels 0.16 m between k0 and k2
+#       against one to four MILLIMETRES over the whole of any sitting idle,
+#       which are holds with a tremor on them. This is the only one of the nine
+#       captures with motion worth the name and it is the one the terrace was
+#       missing: everybody here was still.
+#   Sitting_Idle_3   L(f+0.56 l+0.04 u-0.67)  R(f+0.65 l-0.02 u-0.69)  lean +8
+#                    and 0.86 and 0.94 along its own thigh, which is the knee
+#       forward over the knees, elbows in front of the shoulders, hands 0.74 of
+#       an arm apart. A silhouette, which is what tells two bathers apart at
+#       thirty metres; the head yaw the other captures carry does not.
+#
+# AND THE LEGS ARE NOT HERE AT ALL, which was right in the first attempt and is
+# kept. Measured across all eight bodies with the hip pinned where a chair
+# sitter's hip has to be, the lowest sole of a captured leg lands between 0.59
+# and -0.04 m: three of the nine captures are people sitting on the FLOOR, and
+# the six chair captures still span 0.24 m across this cast, because a clip
+# carries leg proportions as fixed joint ANGLES and the same angles put the man
+# through the slab and leave the girl hanging. `_sit_solve` exists because a
+# centimetre is a foot through the paving.
+#
+# NO SOURCE FILE IS IN THIS REPOSITORY AND NONE MAY BE. Mixamo is free to use
+# inside a game and its character and animation files are not redistributable.
+# What is below is a table of ratios and a handful of spine angles.
+#
+# Each entry is (torso, {side: (forward, up, out)}). `out` is the third thing
+# an arm has and is CHOSEN rather than solved, for the reason `_arm_solve`
+# gives: the solve owns the swing and the elbow, and which side of the body the
+# hand ends up on is nobody's consequence.
+#
+# EVERY `out` BELOW WAS SWEPT, not guessed, and the first guesses were all
+# BACKWARDS. `STAND_ARM_IN` is a TUCK — the name says so and it was still read
+# as an abduction — so raising it brings a hand TOWARD the midline. Swept from
+# 0 to 75 degrees on the 1.24 m girl, the 1.72 m woman and the 1.71 m heavy man
+# against the lateral each target actually lands at, it is very nearly a
+# straight line at 0.0072 of an arm's length per degree, and the three bodies
+# agree to within 0.03 of an arm across the whole range. So `out` is readable
+# straight off the measured `l`, and the achieved lateral is printed by
+# `_sit_report` so that it stays that way. One target could not be had: the
+# gesture's right hand is measured 0.43 of an arm OUTBOARD, and up there the
+# lateral lever is so short that the whole 0..75 sweep only spans -0.20 to
+# +0.32. It is at 0 degrees, which is as far out as this rig goes, and the hand
+# reads as open rather than as flung wide.
+#
+# TWO PROPERTIES OF THE BLEND, both checked rather than assumed.
+#
+# Every `out` is a constant and every solved arm has Y = 0, so nothing here
+# puts a number near +-90 on the MIDDLE axis of an XYZ Euler. `_lerp_pose`
+# blends the authored degrees, so a bone that did would swing a limb the long
+# way round between two keys — the specific failure that killed two frames of
+# the first attempt. Solving the arms does not merely make them look better, it
+# takes that whole class of bug off the table.
+#
+# What blending degrees DOES still do is bow the hand's path: between two
+# solved keys the wrist does not travel the straight line between the two
+# solved positions. Measured halfway between every pair of keys of every seated
+# clip on all eight bodies, the worst departure from that chord is 73 mm, on
+# `sittalk` and `quaytalk` — where the hands come up on the gesture — and
+# 11 mm or less everywhere else. Seventy-three millimetres of sag on a hand
+# rising 0.3 m is what a real hand does, and the midpoints were rendered and
+# looked at to be sure of it rather than argued about.
+
+# Sitting_7: sitting back, a hand on each thigh, the right one come across.
+#
+# THIS ONE IS ANCHORED TO THE THIGH AND NOT TO THE SHOULDER, and it is the only
+# one of the three that is. That is the whole of what was wrong with it the
+# first time. Shipped shoulder-anchored like the other two it was rejected on
+# sight: the hands came out together at navel height, held in front of the
+# belly with the elbows winged out and the forearms near horizontal, resting on
+# nothing — somebody wringing their hands in mid-air. Measured as the distance
+# from the middle of the palm to the nearest point on the body with the arms
+# taken out of the mesh, it read 0.013 to 0.124 m across the eight, against the
+# 0.000 to 0.045 m that `sit` reads with its hands solved on to the thigh.
+#
+# Two things added up, and both were measured rather than guessed. The actor is
+# not resting their hands either: their wrist sits 0.102 to 0.115 m above their
+# own femur axis, which with the flesh on a thigh is about five centimetres of
+# daylight. And our seat is not their seat — `_sit_solve` rakes the thigh DOWN
+# to put the soles on the paving, by as much as fifteen degrees on the shorter
+# figures, where the capture's stool left the knees up. So a target that holds
+# the wrist a fixed fraction of an arm below the SHOULDER preserves the one
+# thing that does not matter here and throws away the one that does, and the
+# steeper the thigh the further into the air the hand goes. The solve then
+# wings the elbows out, because that is the only way it can reach a point that
+# high and that far forward.
+#
+# A HAND RESTING ON SOMETHING IS A FACT ABOUT THE SOMETHING. That is the line
+# this file already draws for the table and the chair, and a lap is on the same
+# side of it. The fractions below run along the figure's OWN thigh, hip to
+# knee, at the same flat `thighZ` the two authored thigh poses use — see
+# `laparms` for the two measurements that ruled out following the thigh's own
+# rake, which was the obvious thing to do and is wrong twice over. 0.27 and
+# 0.42 are where the actor's own wrists sit along their own thighs, so the pose
+# is still the capture's; only the unit changed.
+#
+# And the name changed with it. It was `sitclasp`, and it was never a clasp:
+# the actor's wrists are 0.34 of an arm apart, which is 17 cm on the 1.72 m
+# woman. Calling it a clasp is what talked the first attempt into a pair of
+# hands wrung together in front of a stomach. It is a lap.
+#
+# Each target is (along the thigh, metres above `thighZ`, out).
+MIX_LAP = [
+    ({"spine01": (3, 0, 0), "spine02": (3, 0, 0), "spine03": (3, 0, 0),
+      "chest": (2, 0, 0), "neck": (-2, 0, 0), "head": (-4, -3, 1),
+      "handL": (-10, 0, 0), "handR": (-16, 0, 0)},
+     {"L": (0.27, 0.010, 33.0), "R": (0.42, 0.004, 48.0)}),
+    ({"spine01": (4, 0, 0), "spine02": (4, 0, 0), "spine03": (3, 0, 0),
+      "chest": (2, 0, 0), "neck": (-1, 0, 0), "head": (-3, -6, 1),
+      "handL": (-10, 0, 0), "handR": (-16, 0, 0)},
+     {"L": (0.31, 0.012, 33.0), "R": (0.46, 0.006, 48.0)}),
+]
+
+# Having_A_Meeting_Female: talking with the hands.
+MIX_TALK = [
+    ({"spine01": (5, 0, 0), "spine02": (5, 0, 0), "spine03": (4, 0, 0),
+      "chest": (3, 0, 0), "neck": (-3, 0, 0), "head": (-4, 6, 1),
+      "handL": (-12, 0, 0), "handR": (-12, 0, 0)},
+     {"L": (0.43, -0.69, 48.0), "R": (0.49, -0.60, 50.0)}),
+    ({"spine01": (-2, 0, 0), "spine02": (-2, 0, 0), "spine03": (-1, 0, 0),
+      "chest": (-1, 0, 0), "neck": (1, 0, 0), "head": (-2, -8, 1),
+      "handL": (-14, 0, 0), "handR": (-14, 0, 0)},
+     {"L": (0.06, -0.68, 48.0), "R": (0.13, -0.63, 53.0)}),
+    ({"spine01": (-4, 0, 0), "spine02": (-4, 0, 0), "spine03": (-3, 0, 0),
+      "chest": (-2, 0, 0), "neck": (2, 0, 0), "head": (-3, 26, 2),
+      "handL": (-6, 0, 0), "handR": (-4, 0, 0)},
+     {"L": (0.80, -0.44, 64.0), "R": (0.55, -0.38, 0.0)}),
+]
+
+# Sitting_Idle_3: forward over the knees, a hand on each one.
+#
+# ALSO ANCHORED TO THE LEG, and for the same reason `MIX_LAP` is, found the
+# same way: the row cropped out of the contact sheet and read at twice the
+# size. Shoulder-anchored it measured 0.124 to 0.152 m of palm-to-body on the
+# three heaviest of the eight, and what that is, at 2x, is a right hand hanging
+# in the air beside a knee with the fingers spread. It passed at thumbnail size
+# and it passed the girdle-yaw test and it was wrong, which is the same lesson
+# twice in one afternoon: a sheet of ninety-six answers whether anybody is
+# sunk, twisted or floating, and cannot answer whether a pose is one a person
+# would hold. Both have to be asked, and the second one is asked at 2x.
+#
+# The fractions are where the actor's own wrists sit along their own thighs —
+# 0.86 and 0.94, which is the knee — and the height follows the thigh down
+# (`rake=True`) because by the knee `_sit_solve` has raked the leg 10 to 20 cm
+# below the flat `thighZ` that `MIX_LAP` can safely use up by the hip.
+#
+# Each target is (along the thigh, metres above the thigh line, out).
+MIX_FWD = [
+    ({"spine01": (-3, 0, 0), "spine02": (-3, 0, 0), "spine03": (-2, 0, 0),
+      "chest": (-2, 0, 0), "neck": (2, 0, 0), "head": (-2, -10, 1),
+      "handL": (-14, 0, 0), "handR": (-14, 0, 0)},
+     {"L": (0.86, 0.038, 38.0), "R": (0.94, 0.038, 40.0)}),
+    ({"spine01": (-5, 0, 0), "spine02": (-5, 0, 0), "spine03": (-3, 0, 0),
+      "chest": (-3, 0, 0), "neck": (3, 0, 0), "head": (-1, -6, 1),
+      "handL": (-14, 0, 0), "handR": (-14, 0, 0)},
+     {"L": (0.81, 0.042, 38.0), "R": (0.89, 0.042, 40.0)}),
+]
+
+
 def sit_clips(rig, J):
-    """The three seated clips, for this figure's own skeleton.
+    """The six seated clips, for this figure's own skeleton.
 
-    Three and not one because the complaint was as much about sameness as about
-    geometry, and three is what fits on a terrace: somebody sitting up with
-    their hands on their knees, somebody sprawled back with an arm over the
-    chair, and somebody with their elbows on the table talking to whoever is
-    opposite. They share the solved legs — the same feet on the same paving —
-    and differ from the ribs up.
+    Three are authored here against the furniture and three come off the
+    captures above, and every one of the six is solved the same way: somebody
+    sitting up with their hands on their knees, somebody sprawled back with an
+    arm over the chair, somebody with their elbows on the table talking to
+    whoever is opposite, somebody settled back with a hand on each thigh and
+    the right one come across, somebody talking with their hands, and somebody
+    forward over their own knees. They share the solved legs — the same feet on
+    the same paving — and differ from the ribs up.
 
-    Each one breathes between two keys on a four-second loop. That is short
-    enough that eight of them do not fall into step and long enough that
-    nothing on the terrace looks like it is being wound.
+    Six and not three because three was still fifteen terrace sitters sharing
+    three attitudes, six of them on the same one. Six and not twelve because
+    only three of the nine captures had anything to give. Three of the nine
+    are people sitting on the FLOOR. The other three — Sitting_5 and the
+    fourth and fifth sitting idles — rest their hands at f+0.36..0.42,
+    u-0.70..-0.78, against the f+0.32 u-0.83 that `sit` already puts on
+    the same figure and the f+0.52 u-0.82 of `sitquay`: 0.11 to 0.13 of an
+    arm away, which on the 1.72 m woman is five centimetres. That buys a
+    fourth statue, not a fourth person.
+
+    `sitlap` is the closest call of the three. It was shipped once, rejected,
+    and rebuilt on the thigh rather than dropped, for the reason under
+    `MIX_LAP` — the pose was sound and the ANCHOR was wrong. What keeps it
+    beside `sit`, which also rests both hands on the legs, is that it leans
+    seven degrees BACK where `sit` leans six forward, its left hand sits at
+    0.27 along the thigh against `sit`'s 0.42, and its right hand comes across
+    to the far side of the lap. `sit` is somebody sitting up; this is somebody
+    settled.
+
+    Each one breathes between its keys on a loop of three to six seconds, and
+    no two of the six periods are a multiple of one another. That matters more
+    at six than it did at three: eight people on one deck become a chorus line
+    the moment two of their loops share a period.
     """
     hipx, hipy, kneex, kneey, drop = _sit_solve(rig, J["l-ankle"].z)
 
@@ -1184,6 +1475,72 @@ def sit_clips(rig, J):
                                 out=want[2] if len(want) > 2 else None)
             out["armU" + side], out["armL" + side] = up, lo
         return out
+
+    def relarms(entry):
+        """One captured key whose hands are in FREE SPACE, off the shoulder.
+
+        The whole of the difference between this and `arms` is the unit of the
+        target, and that is the whole of what the first attempt got wrong: it
+        froze the capture's joint ANGLES, which are facts about the actor, and
+        this takes the capture's hand POSITION relative to its own shoulder,
+        which is a fact about anybody.
+
+        `sittalk` is the only terrace pose that uses it, and that is not an
+        accident. A hand held out on a sentence hangs off a shoulder and off
+        nothing else, so the shoulder is the right anchor; a hand resting on a
+        leg is a fact about the leg, and anchoring THAT to the shoulder is what
+        `laparms` exists to undo. Both were shipped the wrong way round once.
+        """
+        torso, targets = entry
+        p = _sit_base(hipx, hipy, kneex, kneey, torso)
+        return arms(torso, {s: _rel_target(rig, p, s, w, drop)
+                            for s, w in targets.items()})
+
+    def laparms(entry, rake=False):
+        """One captured key whose hands rest ON THE LEGS, not in free space.
+
+        The targets are (along the thigh, metres above `thighZ`, out) rather
+        than fractions of an arm. The fraction is read off this figure's own
+        posed leg; the HEIGHT is the same flat `thighZ` the two authored
+        thigh poses use, and following the thigh's own rake instead was tried
+        and thrown away. Two measurements killed it.
+
+        The thigh's real top is 0.061 to 0.115 m above the femur axis across
+        the eight, not the 0.045 this file writes — so `thighZ` is already two
+        to six centimetres INSIDE the leg, and that is not a bug, it is what
+        makes a hand look like it is resting: a wrist joint sits about four
+        centimetres above the underside of its own palm, so a wrist aimed at
+        the true surface floats the hand off it. `sit`'s 0.000 to 0.045 m of
+        palm-to-body is the proof that the number is calibrated.
+
+        And on the UPPER thigh the rake runs the wrong way for reach.
+        Following it drops the target 3.7 cm on `woman_young_full`, whose arm
+        is 0.446 m against a shoulder-to-thigh distance of 0.42 — and 3.7 cm
+        past a limb already at 95 per cent of extension is a limb that cannot
+        get there. `_arm_solve` said so, 35 mm short, which is a floating hand
+        again by a different road. So `rake=False`, the default, is the flat
+        height `sit` has already proved all eight can reach.
+
+        `rake=True` is for hands at the KNEE, where the flat height is not
+        merely imprecise but absurd: `_sit_solve` rakes the thigh down by up
+        to fifteen degrees to put the soles on the paving, so by the knee the
+        leg has fallen 10 to 20 cm below `thighZ` and a hand aimed at `thighZ`
+        is a hand a hand's-breadth over the kneecap. That is what `sitfwd`
+        shipped as, shoulder-anchored: 0.124 to 0.152 m of palm-to-body on the
+        three heaviest figures, with the right hand hanging in the air beside
+        the knee. Leaning forward is what makes it safe to follow the leg down
+        there — the shoulder comes with it, and nothing is near extension.
+        """
+        torso, targets = entry
+        p = _sit_base(hipx, hipy, kneex, kneey, torso)
+        MH.pose(rig, p)
+        B = rig.pose.bones
+        out = {}
+        for s, (u, dz, ab) in targets.items():
+            hip, knee = B["legU" + s].head, B["legL" + s].head
+            q = hip.lerp(knee, u)
+            out[s] = (q.x, (q.z - drop + dz) if rake else (thighZ + dz), ab)
+        return arms(torso, out)
 
     # Upright: hands resting on the thighs, head come round a little. Note the
     # arms are solved against the torso of THIS key and not of the rest pose —
@@ -1237,6 +1594,15 @@ def sit_clips(rig, J):
     tab_b = arms(tab_t2, {"L": (reach - 0.03, TABLE_TOP + 0.04, 24.0),
                           "R": (reach - 0.01, TABLE_TOP + 0.03, 24.0)})
 
+    # And the three off the captures. Each closes on its own first key, which
+    # is the one thing a captured frame does not do for itself: a clip that
+    # ends where it started is the difference between a person breathing and a
+    # person snapping back. `sittalk` is the long one because a gesture is
+    # slower than a breath and six seconds is about the length of a sentence.
+    lap = [laparms(e) for e in MIX_LAP]
+    talk = [relarms(e) for e in MIX_TALK]
+    fwd = [laparms(e, rake=True) for e in MIX_FWD]
+
     return [
         {"name": "sit", "loop": True,
          "keys": [(0.0, P(up_a)), (2.0, P(up_b, 0.004)), (4.0, P(up_a))]},
@@ -1244,6 +1610,15 @@ def sit_clips(rig, J):
          "keys": [(0.0, P(back_a)), (2.2, P(back_b, 0.005)), (4.4, P(back_a))]},
         {"name": "sittable", "loop": True,
          "keys": [(0.0, P(tab_a)), (1.9, P(tab_b, 0.003)), (3.8, P(tab_a))]},
+        {"name": "sitlap", "loop": True,
+         "keys": [(0.0, P(lap[0])), (2.3, P(lap[1], 0.004)),
+                  (4.6, P(lap[0]))]},
+        {"name": "sittalk", "loop": True,
+         "keys": [(0.0, P(talk[0])), (2.1, P(talk[1], 0.003)),
+                  (4.1, P(talk[2], 0.006)), (6.2, P(talk[0]))]},
+        {"name": "sitfwd", "loop": True,
+         "keys": [(0.0, P(fwd[0])), (1.7, P(fwd[1], 0.004)),
+                  (3.4, P(fwd[0]))]},
     ]
 
 
@@ -1525,9 +1900,47 @@ def quay_clips(rig, J):
                        "legLL": (kneex + 2, 0, 0), "legLR": (kneex + 6, 0, 0)})
     c = arms(c_t, {"L": HAND, "R": (HAND[0] - 0.02,) + HAND[1:]})
 
+    # And a second one, on the same hanging legs.
+    #
+    # THE QUAY WAS THE WORST OF THE FOUR AND IT LOOKED LIKE THE BEST. Counted
+    # on 10 Sep: of the twenty-six people sitting on this shore eleven are quay
+    # sitters and all eleven were on the one clip above — a bigger single-pose
+    # crowd than any of the three on the terrace, and standing in the middle of
+    # the deck you can see six of them at once.
+    #
+    # `MIX_TALK`'s torso and not `MIX_LAP`'s or `MIX_FWD`'s, and one and not
+    # three, because the only thing that separates two people on a wall at
+    # thirty metres is what their hands and head are doing, and of the three
+    # only this one MOVES: hands together in the lap, drawn back under the
+    # shoulders, and then up on a sentence. `MIX_FWD` leans forward over knees
+    # that are not in front of a quay sitter, and `MIX_LAP` puts a hand on each
+    # thigh — which is what `sitquay` already does, and for the reason its own
+    # note gives: on a wall the thigh is the only thing an arm can reach. Next
+    # to a hold that is already there, it would be a second statue.
+    #
+    # The legs keep the swing `sitquay` gives them, at a period of their own.
+    # Their own captured legs are useless here for a second reason on top of
+    # the one the note over the tables gives: a quay sitter's legs touch
+    # nothing at all, which is a pose no seated capture contains.
+    def relarms(entry, swing):
+        torso, targets = entry
+        t = dict(torso, **swing)
+        p = _quay_base(hipx, kneex, t)
+        return arms(t, {s: _rel_target(rig, p, s, w, drop)
+                        for s, w in targets.items()})
+
+    def swing(d1, d2):
+        return {"legLL": (kneex + d1, 0, 0), "legLR": (kneex + d2, 0, 0)}
+
+    q = [relarms(e, s) for e, s in zip(MIX_TALK, (swing(-4, 3), swing(5, -3),
+                                                 swing(1, 6)))]
+
     return [{"name": "sitquay", "loop": True,
              "keys": [(0.0, P(a)), (2.4, P(b, 0.004)), (4.6, P(c)),
-                      (7.0, P(a))]}]
+                      (7.0, P(a))]},
+            {"name": "quaytalk", "loop": True,
+             "keys": [(0.0, P(q[0])), (2.0, P(q[1], 0.003)),
+                      (3.9, P(q[2], 0.006)), (5.9, P(q[0]))]}]
 
 
 def lie_clips(rig, J):
@@ -1622,20 +2035,47 @@ def _sit_report(rig, clips):
     hand's height and its reach in front of the shoulder, per key.
 
     Nothing here fails the bake. It prints, and the pass is done by looking.
+
+    TWO COLUMNS ARE HERE BECAUSE OF THE CAPTURES and are worth naming.
+
+    `yaw` is the angle between the hip line and the shoulder line, projected on
+    to the ground. It is the number that caught the rejected bake: this rig at
+    rest reads 0.0, the +-6 clavicles the authored poses use read 0.0, and the
+    retarget read 83.1. Anything here above about 12 is a person whose
+    shoulders have come off their hips, which is what "contorted" looks like
+    from behind a number.
+
+    `f/l/u` is each wrist's offset from its own shoulder as a fraction of that
+    figure's own shoulder-to-wrist length — the unit `_rel_target` is given its
+    targets in. It is printed because `out` is chosen and not solved: the solve
+    lands `f` and `u` to two millimetres and says nothing at all about `l`, so
+    `l` is how the abduction was tuned against what the captures measured.
     """
     for c in clips:
-        if not (c["name"].startswith("sit") or c["name"] == "sunbathe"):
+        if not (c["name"].startswith(("sit", "quay"))
+                or c["name"] == "sunbathe"):
             continue
         for i, (t, p) in enumerate(c["keys"][:-1]):
             MH.pose(rig, p)
             B = rig.pose.bones
             root = p.get("@root", (0, 0, 0))[2]
-            print("[bathers]   %-9s k%d  hip %.3f  hand %.3f/%.3f  "
-                  "reach %.3f  head %.3f"
+            hips = B["legUR"].head - B["legUL"].head
+            shl = B["armUR"].head - B["armUL"].head
+            hips.z = shl.z = 0.0
+            rel = []
+            for s in ("L", "R"):
+                sh = B["armU" + s].head
+                n = ((B["armL" + s].head - sh).length
+                     + (B["hand" + s].head - B["armL" + s].head).length)
+                d = B["hand" + s].head - sh
+                rel.append("%s%+.2f/%+.2f/%+.2f"
+                           % (s, d.x / n, d.y / n, d.z / n))
+            print("[bathers]   %-9s k%d  hip %.3f  hand %.3f/%.3f  head %.3f  "
+                  "yaw %4.1f  %s %s"
                   % (c["name"], i, B["legUL"].head.z + root,
                      B["handL"].head.z + root, B["handR"].head.z + root,
-                     B["handL"].head.x - B["armUL"].head.x,
-                     B["head"].tail.z + root))
+                     B["head"].tail.z + root,
+                     math.degrees(hips.angle(shl)), rel[0], rel[1]))
 
 
 # Azimuth, elevation, the height to aim at as a FRACTION OF STATURE, and how

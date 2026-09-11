@@ -30968,7 +30968,8 @@ async function buildJadrija(scene) {
   // whole of it: measure where the shoulder, elbow and wrist have got to,
   // decide where the wrist has to be, turn the two bones to put it there. It
   // reads the pose it is correcting instead of assuming one, which is why one
-  // set of numbers covers four seated clips and eight bodies.
+  // set of numbers covers all eight seated clips and eight bodies — the three
+  // added on 10 Sep cost it nothing, because nothing in here names a clip.
   //
   // IN FRACTIONS OF THE ARM'S OWN REACH, never in metres. The eight blobs stand
   // 1.24 m to 1.84 m and their arms are 0.35 m to 0.50 m: "0.30 m in front of
