@@ -189,6 +189,19 @@ project's `LICENSE.ASSETS.md`. Nothing of MakeHuman's is committed here —
 `tools/blender/mh_morph.py` fetches what it needs on first run. The rigs, the
 weights, the clips, the faces, the paint and the clothes are this project's.
 
+**Four seated poses were measured off motion capture**: `sitclasp`, `sittalk`,
+`sitfwd` and `quaytalk` place their hands where three
+**[Mixamo](https://www.mixamo.com)** (Adobe) seated captures place theirs. What
+was taken is a table of *ratios* — each wrist's offset from its own shoulder as
+a fraction of that figure's shoulder-to-wrist length — and the arms are then
+solved per figure by this project's own solver, exactly as the poses beside
+them are. Not one joint angle was copied: the first attempt did copy them, and
+the note over `MIX_CLASP` in
+[`tools/blender/bathers_mh.py`](tools/blender/bathers_mh.py) records what that
+cost and why it was thrown away. No Mixamo file is in this repository and none
+may be — the licence is free and royalty-free for use *inside* a work and does
+not permit redistributing the character or animation files themselves.
+
 **The sea, partly**: the whitecap and capillary work was done after reading
 **[ABYSSAL](https://github.com/Token-Gremlin/natural-disasters)** by **Davi
 (Token-Gremlin)**, MIT. No code was copied — what was taken is the *reasoning*,
