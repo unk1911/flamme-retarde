@@ -1638,7 +1638,30 @@ function skinnedFigure(data, opts = {}) {
   const st = {
     cur: null, curT: 0, prev: null, prevT: 0, fade: 0, fadeLen: 0,
     next: null, speed: 1,
+    // ── the overlay: a second clip, on a few bones only ──────────────────────
+    //
+    // Everything above is one pose at a time, with a crossfade between two of
+    // them, and that is right for what a figure DOES — she is walking or she is
+    // dancing, not both. This is for the case where she is doing one thing with
+    // her legs and a different one with an arm, which is not a blend of two
+    // states but two states at once, and the only honest way to express it.
+    //
+    // Written for the Bucketeer, whose whole ask was "ballet while she walks"
+    // (see BUCK.portFrom in 45-bucketeer.js): the `ballet` clip does not move
+    // her a single millimetre — measured, 451 frames, root x constant to four
+    // decimals — so a ballet clip played on a walking woman is a woman
+    // skating. What CAN travel is her free arm, because an arm does not touch
+    // the ground. So the walk keeps the root, the pelvis, the spine and both
+    // legs, and six bones down one arm come off a second clip.
+    //
+    // `over` is null for every figure that has never asked, the buffers are
+    // not allocated until the first call, and the loop below is skipped
+    // entirely — so this costs nothing to the four other skinned figures in
+    // the game and to the crowd, which is not skinned at all.
+    over: null, overT: 0, overRate: 1, overW: 0, overIdx: null,
   };
+  // Allocated on the first `over()` and never freed. See `st.over`.
+  let overQ = null, overT3 = null;
 
   /**
    * One extra rotation on one bone, laid over whatever the clip is doing.
@@ -1717,6 +1740,48 @@ function skinnedFigure(data, opts = {}) {
     return true;
   }
 
+  /**
+   * Lay a second clip over the first, on a named handful of bones.
+   *
+   *   fig.over('ballet', { bones: ARM_L, from: 4.55, rate: 1.05 });
+   *   fig.state.overW = w;            // 0 … 1, every frame, ramped by the caller
+   *   fig.over(null);                 // and off again
+   *
+   * The weight is deliberately NOT a parameter of this call. A weight that
+   * snapped on would be an arm teleporting from a walk swing into fifth
+   * position in one frame, so every caller has to ramp it, and a ramp is a
+   * per-frame number rather than a property of the clip — the same shape
+   * `st.speed` already has, and for the same reason.
+   *
+   * `bones` is a list of NAMES and not indices, because a caller that knew
+   * indices would be a caller that had hard-coded a fact about the bake. A
+   * name that is not in this rig is dropped silently: the arm chain differs
+   * between the human and the bathers, and an overlay that threw on a figure
+   * without a thumb bone would be an overlay nobody dared call.
+   *
+   * IT DOES NOT INCLUDE THE CHILDREN OF WHAT IT IS GIVEN. Everything here is a
+   * local rotation composed on to its parent's, so naming `armUL` alone turns
+   * the whole arm — the forearm and the hand come with it, carrying whatever
+   * the first clip said they were doing relative to it. Naming the chain
+   * explicitly is how you get the second clip's ELBOW as well as its shoulder,
+   * which for a port de bras is the whole difference between a ballet arm and
+   * a walk's arm pointed in a new direction.
+   */
+  function over(name, { bones = null, from = 0, rate = 1 } = {}) {
+    if (!name) { st.over = null; st.overIdx = null; st.overW = 0; return false; }
+    const clip = data.clips[name];
+    if (!clip || !bones || !bones.length) return false;
+    const idx = [];
+    for (const b of bones) {
+      const i = data.bones.findIndex((x) => x.name === b);
+      if (i >= 0) idx.push(i);
+    }
+    if (!idx.length) return false;
+    if (!overQ) { overQ = new Float32Array(nb * 4); overT3 = new Float32Array(3); }
+    st.over = clip; st.overIdx = idx; st.overT = from; st.overRate = rate;
+    return true;
+  }
+
   function update(dt) {
     if (!st.cur) return;
     const step = dt * st.speed;
@@ -1737,6 +1802,36 @@ function skinnedFigure(data, opts = {}) {
       for (let i = 0; i < nb; i++) qnlerp(localQ, i * 4, mixQ, i * 4, localQ, i * 4, u);
       for (let k = 0; k < 3; k++) localT[k] = mixT[k] + (localT[k] - mixT[k]) * u;
       if (u >= 1) st.prev = null;
+    }
+
+    // ── and then the overlay, on its own clock ──────────────────────────────
+    //
+    // AFTER the crossfade, so a figure that starts walking in the middle of a
+    // port de bras gets the overlay on the blended pose rather than on one of
+    // the two clips being blended — the arm should not flicker back to the
+    // walk's swing for a third of a second because her legs changed their mind.
+    //
+    // ON `dt` AND NOT ON `step`, which is the one line here worth arguing.
+    // `st.speed` is the WALK's rate and the Bucketeer drives it off how fast
+    // she is actually moving — 0.30 at a pivot, 1.75 downhill — so an overlay
+    // clocked off `step` would run her arm at a third speed while she turned a
+    // corner and at double while she hurried. An arm phrase has its own tempo
+    // and it is not her footfall's.
+    //
+    // The overlay's ROOT TRANSLATION IS THROWN AWAY, deliberately, and that is
+    // what makes this safe: `overT3` is written by `sample` and read by
+    // nothing. Whatever the second clip thinks about where the figure stands is
+    // not an opinion it is allowed to have, so an overlay can never move her,
+    // can never lift her off the ground and can never slide a foot.
+    if (st.over && st.overW > 0) {
+      st.overT += dt * st.overRate;
+      sample(st.over, st.overT, overQ, overT3);
+      const w = Math.min(1, st.overW);
+      const idx = st.overIdx;
+      for (let n = 0; n < idx.length; n++) {
+        const o = idx[n] * 4;
+        qnlerp(localQ, o, localQ, o, overQ, o, w);
+      }
     }
 
     const P = palette;
@@ -2041,7 +2136,7 @@ function skinnedFigure(data, opts = {}) {
   return {
     mesh, material: mat, bones: data.bones, uBones, cast, wear, tattoo,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
-    play, update, state: st, face, faceTick, uFace, aim,
+    play, over, update, state: st, face, faceTick, uFace, aim,
     playing: () => (st.cur ? st.cur.name : null),
     /**
      * Where a bone's head has got to this frame, in figure space.
