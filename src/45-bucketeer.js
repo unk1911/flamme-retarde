@@ -1764,15 +1764,164 @@ async function buildBucketeer(scene, vik, walkY) {
   // once, on the frame the bucket first asks. `null` and not −1, because −1 is
   // what a miss returns.
   let handB = null;
-  // Where a closed fist holds something, in figure space, measured off the
-  // idle arm in 43-jadrija.js — the same three numbers the wine bottle's grip
-  // point uses, because they are a property of this rig's hand and not of what
-  // it happens to be holding.
+  // Where the bail's apex hangs, in figure space, as an offset from `handR`'s
+  // own head in the bind pose.
+  //
+  // THIS USED TO BE THE WINE BOTTLE'S GRIP POINT — (0.0443, −0.0748, 0.0096),
+  // still in 43-jadrija.js — on the argument that it is "a property of this
+  // rig's hand and not of what it is holding". That argument is wrong, and it
+  // is wrong by 29 mm. A bottle is held in the MIDDLE of a fist: its neck
+  // fills the hand, so its grip point is the middle of the palm, 41 mm
+  // proximal of the knuckles. A bail is 8 mm of wire and it lies in the CROOK
+  // — on the skin over the knuckles, in the fold the fingers make. Hung from
+  // the bottle's point the wire sat in the middle of her palm with the fold
+  // 41 mm in front of it, so there was nothing for a finger to close on.
+  //
+  // `fingersR`'s own head, 20 mm out along the measured palm normal, both off
+  // the bind mesh. See `GRIP.crook`.
+  const GRIP_B = new THREE.Vector3(0.0723, -0.0692, 0.0140);
+  // The bottle's, kept only so that `clasp(false)` is the whole of the old
+  // behaviour and not most of it. See `gOn`.
   const PALM_B = new THREE.Vector3(0.0443, -0.0748, 0.0096);
   const vHand = new THREE.Vector3(), vPalm = new THREE.Vector3();
   const qTurn = new THREE.Quaternion(), qHand = new THREE.Quaternion();
   const qUp = new THREE.Vector3(0, 1, 0);
   const vRest = new THREE.Vector3(), vHold = new THREE.Vector3();
+
+  // ── the hand that is supposed to be holding it ─────────────────────────────
+  //
+  // Misha, 11 Sep 2026: *"the way she holds the bucket is horrible. she seems
+  // to have no ability to CLASP the handle"* — and she had none, because
+  // nothing in this file had ever asked her to. The `walk` clip leaves
+  // `fingersR` and `thumbR` at the REST rotation to a thousandth of a degree
+  // (measured over all thirty frames of it, and the same for `idle`, `tread`,
+  // `swim` and every other loop in the bake), and the rest hand of this rig is
+  // an open slab with the four fingers straight and slightly splayed. So the
+  // bail wire ran through it.
+  //
+  // THE FINGERS ARE ONE BONE AND SO IS THE THUMB. Thirty bones, two of them a
+  // hand each side: `fingersR` carries 742 vertices at weight over 100/255 and
+  // `thumbR` 206, so they are heavily enough skinned that turning them turns
+  // real geometry — and the `wine` clip already flexes `fingersR` by 110
+  // degrees, which is the existence proof that a closed fist renders on this
+  // figure. There are no phalanges, so a grip is a slab folding at the
+  // knuckles and not a curl, and the one thing that has to be right is WHERE
+  // the wire crosses that fold.
+  //
+  // THE AXES WERE MEASURED AND NOT TYPED. Each of the four numbers below is
+  // the principal-axis decomposition of the bone's own dominant vertices about
+  // its own head, in the bind pose, in figure space — see the note on `aim` in
+  // 41-skin.js for why figure space and not the bone's own frame. The sign of
+  // the palm normal is settled by which side of the finger slab the thumb's
+  // head sits on, which is a fact about the mesh and not a guess: `pose-solvers
+  // -not-typed-angles` is the memory about this rig's sign traps and this is
+  // what not falling into one costs.
+  //
+  //   fingers    knuckle to tip, 84 mm of it
+  //   palm       out of the palm, the way a held thing lies
+  //   curl       fingers x palm, so a POSITIVE `aim` folds the tips in
+  //   thumb      the thumb's own length, 90 mm, and its own opposing axis
+  //
+  // The left is the right mirrored in z and was measured separately rather
+  // than mirrored, because a cross product does not survive a reflection with
+  // its sign intact and assuming it does is the fifth sign trap in this rig.
+  const GRIP = {
+    R: {
+      fing: new THREE.Vector3(0.582, -0.754, 0.306).normalize(),
+      palm: new THREE.Vector3(-0.179, -0.485, -0.856).normalize(),
+      curl: new THREE.Vector3(0.7938, 0.4434, -0.4173).normalize(),
+      thumbAx: new THREE.Vector3(0.149, 0.847, -0.511).normalize(),
+      fingers: 'fingersR', thumb: 'thumbR', hand: 'handR',
+    },
+    L: {
+      fing: new THREE.Vector3(0.577, -0.756, -0.310).normalize(),
+      palm: new THREE.Vector3(-0.180, -0.487, 0.854).normalize(),
+      curl: new THREE.Vector3(-0.7966, -0.4370, -0.4171).normalize(),
+      thumbAx: new THREE.Vector3(-0.149, -0.846, -0.514).normalize(),
+      fingers: 'fingersL', thumb: 'thumbL', hand: 'handL',
+    },
+    // Knuckle to fingertip: the extent of `fingersR`'s dominant vertices along
+    // its own long axis, off the bind mesh. The thumb's is 90 mm the same way,
+    // and is only ever used to work out which way it opposes.
+    fingLen: 0.084,
+    // How far out of the palm the fold at the base of the fingers is. A wire
+    // held in a fist does not touch the knuckle bone: it lies on the skin over
+    // it, and the skin over it is 20 mm out. Measured as the finger slab's own
+    // half-thickness off the bind mesh — `fingersR`'s dominant vertices run
+    // −20.2 to +14.6 mm along the palm normal — so a wire on the palm side of
+    // the fold sits at about the 20.
+    crook: 0.020,
+    // A hand doing nothing, and a hand shut as far as this bake has ever shut
+    // one.
+    //
+    // 26 degrees is what every clip in the blob that shapes a hand at all uses
+    // for `fingersL` and `fingersR` — idle, notice, note, wave, ballet, all of
+    // them the same constant — so it is this figure's own resting hand rather
+    // than a guess. TWICE it, because of the joint this rig has not got: a
+    // relaxed hand carries about 35 degrees at the knuckle and another 45 at
+    // the middle joint, and with the four fingers on one bone the knuckle is
+    // the only place either can be paid. At 26 the hand is still a flat plate
+    // with a slight bend in it, which is what Misha was looking at on the free
+    // side; at 52 it is a hand.
+    //
+    // 110 is `wine` — `fingersR` at its most closed anywhere in the bake, and
+    // therefore the most closed hand this figure is known to render.
+    soft: 0.91,
+    shut: 1.92,
+    // Thumb against fingers. `wine` folds `fingersR` 110 degrees and `thumbR`
+    // 45, so this is the bake's own ratio for a closed hand.
+    oppose: 0.41,
+  };
+  const gV = new THREE.Vector3(), gW = new THREE.Vector3();
+  const gAx = new THREE.Vector3(), gP = new THREE.Vector3();
+  const gT = new THREE.Vector3(), gQ = new THREE.Quaternion();
+  const gF = new THREE.Vector3(), gN = new THREE.Vector3();
+  const gX = new THREE.Vector3(1, 0, 0);
+  // The wrist's own turn, and it is kept for the same reason `carry.qa` is:
+  // `aim` writes a delta and `boneTurn` reports the result, so the only way
+  // back to what the clip and the arm solve alone would have said is to take
+  // the last one off the measurement. See `gripTurn`.
+  const gHandQ = new THREE.Quaternion(), gTmpQ = new THREE.Quaternion();
+  const gTgt = new THREE.Quaternion();
+  let gTurned = false;
+  // The three measured axes as a basis, inverted once. Orthonormal to four
+  // decimals off the bind mesh — `fing` dotted with `palm` is −0.0004 — so the
+  // inverse is the transpose and this is exact enough to be called one.
+  const gMt = new THREE.Matrix4();
+  const gMbInv = new THREE.Matrix4()
+    .makeBasis(GRIP.R.fing, GRIP.R.palm, GRIP.R.curl).transpose();
+  // The whole clasp, off. `__fr.buck.raw().clasp(false)` is the A/B: the same
+  // frame, from the same camera, with and without — which is the only way to
+  // photograph a before and an after of something 80 mm across, because the
+  // before is a build nobody has any more the moment the after exists. It is
+  // one flag read in two places and it defaults on, so it is not a second code
+  // path in the shipped game.
+  let gOn = true;
+  // Which bone indices those names are, found once. See `handB`.
+  const gB = { R: null, L: null };
+  // What the last solve laid on each hand, in radians, so a probe can tell a
+  // frame that looks wrong from a frame the solve declined to touch — and so
+  // the fold can be eased rather than switched. See `poseGrip`.
+  const gFlex = { R: 0, L: 0 }, gOpp = { R: 0, L: 0 };
+
+  /**
+   * A point on the bail wire, in world, by arc parameter.
+   *
+   * `u` runs 0 to 1 from one lug over the apex to the other, which is exactly
+   * the parameter the eleven prisms of the bail are built on — see `pt` in the
+   * bail's own block, and the two numbers here are its R and H. The arc is
+   * rolled by whatever `bail.rotation.x` is doing (a set-down bucket lies its
+   * handle over) and then carried by the group, which is a child of the scene
+   * and not of her, so its local matrix IS its world one and this needs no
+   * `updateMatrixWorld` to be current.
+   */
+  function bailPoint(u, out) {
+    const a = Math.PI * u;
+    out.set(Math.cos(a) * (PAIL.rRim - 0.004), Math.sin(a) * PAIL.bail, 0);
+    out.applyAxisAngle(gX, bail.rotation.x);
+    out.applyQuaternion(kanta.quaternion).add(kanta.position);
+    return out;
+  }
 
   // Scratch for the carry pose, allocated once. `carry` is what the last solve
   // laid on each of the two arm bones, and it is not an optimisation: `aim`
@@ -2425,6 +2574,12 @@ async function buildBucketeer(scene, vik, walkY) {
       carry.off = true;
       carry.qa.identity();
       carry.qb.identity();
+      // The wrist's turn with them. It is not one of `CARRY_BONES` — the
+      // hand is the grip's and not the carry's — so the line below does not
+      // reach it, and a turn left on an empty hand would be subtracted from a
+      // hand that no longer had one the next time she picked the pail up.
+      gTurned = false; gHandQ.identity();
+      fig.aim(GRIP.R.hand, 0, 1, 0, 0);
       for (const n of CARRY_BONES) fig.aim(n, 0, 1, 0, 0);
       return;
     }
@@ -2509,6 +2664,194 @@ async function buildBucketeer(scene, vik, walkY) {
     carry.qb.copy(cID).slerp(cB, h * BUCK.armDamp);
     carryQ('armUR', carry.qa);
     carryQ('armLR', carry.qb);
+    gripTurn();
+  }
+
+  /**
+   * Turn the carrying hand until the bail lies ACROSS the fingers.
+   *
+   * THIS IS THE HALF OF THE FAULT THAT NO AMOUNT OF CURLING WOULD HAVE FIXED,
+   * and it was not visible until it was measured. `grip()` reports `cross`, the
+   * angle between the bail wire and the knuckle line, and before this it read
+   * 81.5 degrees on every frame of the loaded walk. Eighty-one degrees means
+   * the wire runs very nearly the way the PALM NORMAL points — it goes in at
+   * the palm and out at the back of the hand — which is exactly what Misha saw
+   * and called "the bail wire passes straight through the open hand". A finger
+   * that folds at one knuckle can close on a wire lying across it and can never
+   * close on a wire pointing through it, so closing the fingers first would
+   * have produced a fist with a wire through the middle of it and looked worse.
+   *
+   * WHY THE HAND AND NOT THE BUCKET. The honest fix is the other one: a bucket
+   * carried at somebody's side hangs with its pin fore-and-aft, because that is
+   * the way the fist holding it is turned, and this pail's pin is laid ACROSS
+   * her so a roll about it pours forward — see the group's own note. Two things
+   * stop that. The pour, the jet, the puddle and both cameras of the pour cut
+   * are built on that sign; and the pail's axis stands 60 mm OUTBOARD of the
+   * fist for thigh clearance (see `BUCK.armUp`, which is four paragraphs of why
+   * it has to), which only works at all because the bail's plane is laid the
+   * same way the offset is. Turn the pin fore-and-aft and the hand is 60 mm to
+   * the side of the plane the wire lives in — off the wire entirely. So the
+   * bucket stays where it is and the hand turns to meet it.
+   *
+   * AN ORIENTATION AND NOT AN ANGLE, WHICH IS THE SECOND THING THIS GOT WRONG.
+   * Written first as a roll of the forearm about its own length — anatomically
+   * pronation, and it leaves the wrist exactly where it is — it needed about
+   * 80 degrees, and a wire has no direction, so the answer was folded into a
+   * quarter turn either way. Eighty degrees is close enough to the fold at 90
+   * that a degree of measurement noise flipped the branch: traced over one
+   * stride the roll jumped between +86.7 and −79.9, and the pail's lateral
+   * stand-off, which holds 0.329 m for the whole flight of stairs, swung from
+   * 0.500 m to 0.004 — the bucket through her own shin and out the other side.
+   * A target that is a full FRAME has no branch to flip: the knuckle line goes
+   * on the pin, the fingers keep the direction the arm solve gave them, and the
+   * palm is what is left over. There is one answer and it is continuous.
+   *
+   * SOLVED TO THE PIN AND NOT TYPED. The target for the knuckle line is her own
+   * right in figure space — `+z`, the sign the whole of `BUCK`'s carry block
+   * was measured on — because that is where the pin lies while the pail is in
+   * her hand, and the wire at the apex runs along the pin.
+   *
+   * The measurement has this solve's own delta taken back off it before it is
+   * read: `aim` writes a delta and `boneTurn` reports the result, so without
+   * that this would be reading back what it last wrote. Same three lines and
+   * the same trap as the arm above.
+   */
+  function gripTurn() {
+    if (!gB.R) gripBones();
+    const b = gB.R;
+    if (b.h < 0 || b.f < 0) return;
+    // Nothing in her hand, no wire to line up with, and the wrist goes back to
+    // the clip. The fingers still soften — that is `poseGrip`, below.
+    const h = gOn ? st.held : 0;
+    if (h < 0.002) {
+      if (gTurned) {
+        gTurned = false;
+        gHandQ.identity();
+        fig.aim(GRIP.R.hand, 0, 1, 0, 0);
+      }
+      return;
+    }
+    gTurned = true;
+    // What the clip and the arm solve alone make of the hand, with the last
+    // turn taken back off.
+    fig.boneTurn(b.h, gQ);
+    gQ.premultiply(gTmpQ.copy(gHandQ).invert());
+    gF.copy(GRIP.R.fing).applyQuaternion(gQ);
+    // The target frame. The knuckle line goes on the pin; the fingers keep as
+    // much of the direction they had as is perpendicular to it, so the hand
+    // still hangs the way the arm put it and only turns about its own length;
+    // and the palm is the third axis, which is forced once the other two are
+    // chosen — `curl` is `fing` cross `palm` by construction, so `palm` is
+    // `curl` cross `fing` and there is nothing left to decide.
+    gT.set(0, 0, 1);
+    gF.addScaledVector(gT, -gF.dot(gT));
+    if (gF.lengthSq() < 1e-6) return;
+    gF.normalize();
+    gN.crossVectors(gT, gF);
+    // Bind frame to target frame, as two bases and a transpose. `mB` is the
+    // three measured axes as columns and never changes; `mT` is this frame's.
+    gMt.makeBasis(gF, gN, gT).multiply(gMbInv);
+    gTgt.setFromRotationMatrix(gMt);
+    // `aim` writes a DELTA on whatever the clip and the arm are already doing,
+    // and what has just been solved is an ABSOLUTE orientation — so the delta
+    // is the target with the clip's own turn divided back out of it.
+    gHandQ.copy(gTgt).multiply(gTmpQ.copy(gQ).invert());
+    // Eased on `held`, so a hand letting go of the bail unwinds as it opens
+    // rather than staying turned over an empty fist.
+    gTmpQ.identity().slerp(gHandQ, bckEase(h));
+    gHandQ.copy(gTmpQ);
+    carryQ(GRIP.R.hand, gHandQ);
+  }
+
+  /** The six bone indices the grip works on, found once. See `handB`. */
+  function gripBones() {
+    for (const s of ['R', 'L']) {
+      const g = GRIP[s];
+      gB[s] = { h: fig.boneIndex(g.hand), f: fig.boneIndex(g.fingers),
+        t: fig.boneIndex(g.thumb) };
+    }
+  }
+
+  /**
+   * Close the digits — the other half of the clasp.
+   *
+   * AFTER `fig.update`, AND THAT IS WHY IT COSTS A SECOND ONE. `aim` turns a
+   * bone about a FIGURE-space axis, and the axes here were measured in the bind
+   * pose, so each has to be carried into this frame by whatever the hand has
+   * done since — which is `boneTurn`, and `boneTurn` means nothing until the
+   * palette has been folded. `gripTurn` above has just turned the wrist by a
+   * hundred degrees, so reading it before the fold would read the wrist as it
+   * stood LAST frame and put the fold a hundred degrees out on the one frame
+   * `go()` draws; a probe would photograph a hand the game never shows.
+   *
+   * The second fold is thirty bones of quaternion. It is not a second UPLOAD:
+   * `boneTex.needsUpdate` is a flag, both passes set it, and the renderer reads
+   * the texture once. For one figure who is only stepped when somebody is
+   * inside 250 m of her that is not a cost worth writing a cleverer order for.
+   *
+   * SHUT IS A FACT ABOUT THE HAND AND NOT ABOUT THE WIRE. The instinct is to
+   * solve the fold — how far round does the fingertip have to come to be past
+   * 8 mm of rod — and that answer is 68 degrees, which photographs as four
+   * straight fingers held at an angle over a handle. It is the wrong question.
+   * A fist closing on a wire is not stopped by the wire; 8 mm is nothing, the
+   * fingers go as far as they go, and where they stop is a property of the
+   * hand. With four fingers on one bone there is exactly one such angle and the
+   * bake has already measured it: `wine`, 110 degrees, the most closed hand in
+   * the blob. What the wire decides is not how far the fingers fold but where
+   * it has to be for folding them to close ON it — and that is `GRIP_B` and
+   * `gripTurn`, both of which are solves.
+   *
+   * THE THUMB OPPOSES AT THE BAKE'S OWN RATIO. 45 degrees of `thumbR` against
+   * 110 of `fingersR` is what `wine` uses, so 0.41 is a measurement of what a
+   * closed hand on this figure looks like rather than a number somebody liked.
+   *
+   * AND THE FREE HAND SOFTENS. Misha's note is about the pail, but the same
+   * rest slab swings on the other side of her the whole way down: the `walk`
+   * clip leaves `fingersL` and `thumbL` at the rest rotation to a thousandth of
+   * a degree, so the hand that is carrying nothing is as flat as the one that
+   * was. A hand hanging at somebody's side is neither flat nor a fist, so it
+   * gets `GRIP.soft` — the bake's own resting hand, doubled for the middle
+   * joint this rig has not got. See the note there.
+   */
+  function poseGrip() {
+    if (!gB.R) gripBones();
+    if (gB.R.f < 0) return;
+    // How much of a grip each hand is making. The right closes on the first
+    // tenth of the lift and opens again on the last — the same window the bail
+    // rights itself over in `placePail`, and for the same reason: a fist closes
+    // on a bail and then the bail comes up.
+    const close = gOn ? bckEase(st.held / 0.12) : 0;
+    for (const s of ['R', 'L']) {
+      const g = GRIP[s], b = gB[s];
+      if (b.f < 0) continue;
+      let flex = gOn ? GRIP.soft : 0;
+      // Shut, on the loaded side. See the note above for why this is the
+      // bake's number and not a solve.
+      if (s === 'R' && close > 0.001) {
+        flex = GRIP.soft + (GRIP.shut - GRIP.soft) * close;
+      }
+      // THE BALLET ARM OWNS THE LEFT HAND WHILE IT IS UP. `BUCK.portArm` names
+      // `handL`, `thumbL` and `fingersL`, so the port de bras and this are
+      // shaping the same three bones — and they do not fight over them, because
+      // `over` writes a POSE into the sampled clip and `aim` writes a DELTA on
+      // to the result, which compose. What they do instead is ADD, and a
+      // resting curl on top of a ballet hand is a woman dancing with her fist
+      // closed. Backed off by half at full weight: what is left is the
+      // overlay's own shape with a little of this in it. Nothing here ever
+      // touches the right arm, so the two have no bone in common at all.
+      if (s === 'L') flex *= 1 - 0.5 * clamp(fig.state.overW, 0, 1);
+      const opp = flex * GRIP.oppose;
+      gFlex[s] = flex; gOpp[s] = opp;
+      // The bind axes carried into this frame, per the note above. The
+      // constants themselves are never written back to: they are the
+      // measurement, and a measurement that gets updated is not one.
+      fig.boneTurn(b.h, gQ);
+      gV.copy(g.curl).applyQuaternion(gQ);
+      fig.aim(g.fingers, gV.x, gV.y, gV.z, flex);
+      gV.copy(g.thumbAx).applyQuaternion(gQ);
+      fig.aim(g.thumb, gV.x, gV.y, gV.z, opp);
+    }
+    fig.update(0);
   }
 
   /**
@@ -2587,7 +2930,7 @@ async function buildBucketeer(scene, vik, walkY) {
       vHand.applyMatrix4(mesh.matrixWorld);
       fig.boneTurn(handB, qTurn);
       qHand.copy(mesh.quaternion).multiply(qTurn);
-      vPalm.copy(PALM_B).applyQuaternion(qHand).add(vHand);
+      vPalm.copy(gOn ? GRIP_B : PALM_B).applyQuaternion(qHand).add(vHand);
       // The pin hangs `bail` below her fist, and it hangs there in WORLD Y
       // whatever her wrist is doing. That is not a simplification: a bucket on
       // a bail is a pendulum, and the one thing it does not do is follow the
@@ -3109,6 +3452,7 @@ async function buildBucketeer(scene, vik, walkY) {
     if (face) fig.faceTick(dt);
     mesh.updateMatrixWorld();
     placePail();
+    poseGrip();
     placeWater(dt);
   }
 
@@ -3800,6 +4144,7 @@ async function buildBucketeer(scene, vik, walkY) {
       mesh.rotation.y = st.yaw;
       mesh.updateMatrixWorld();
       placePail();
+      poseGrip();
       placeWater(0);
       return this.stats();
     },
@@ -3821,6 +4166,7 @@ async function buildBucketeer(scene, vik, walkY) {
       fig.update(0);
       mesh.updateMatrixWorld();
       placePail();
+      poseGrip();
       placeWater(0);
       return this.stats();
     },
@@ -3998,6 +4344,95 @@ async function buildBucketeer(scene, vik, walkY) {
       st.portLap = !!v;
       if (!v) { fig.over(null); st.portSet = false; st.port = 0; st.portT = 0; }
       return { portLap: st.portLap };
+    },
+    /**
+     * The grip, in millimetres: where the bail wire is against the hand.
+     *
+     * "It looks wrong" is not a measurement, and a hand on a wire is the one
+     * thing in this loop that cannot be judged from a wide shot — the whole
+     * event is 80 mm across. This reports the four numbers a clasp is made of,
+     * for either hand, and the ones that decided the solve are:
+     *
+     *   cross     degrees between the wire and the KNUCKLE LINE. Zero is a
+     *             wire lying across the fingers, which is the only thing a
+     *             one-segment finger slab can ever wrap; ninety is a wire
+     *             running the same way the fingers point, which no amount of
+     *             folding will ever close on. This is the number that says
+     *             whether the fix is a pose or a re-plumbed bail.
+     *   crook     wire to the fold at the base of the fingers, which is where
+     *             a bail actually lies. It was 25 mm with the fingers straight
+     *             and the wire passing lengthwise through the open hand.
+     *   tip       wire to the fingertip, which says whether the far end of the
+     *             slab has come round past the wire or stopped short of it.
+     *   palm      wire to `GRIP_B`, the point the pail is actually hung from,
+     *             kept because it is the number `placePail` is solving.
+     *
+     * `flex`, `opp` and `turn` are what the solve laid on, in degrees, so a
+     * frame that looks wrong can be told apart from a frame the solve declined
+     * to touch; `stand` is how far the pail's axis is outboard of her own
+     * centre line, which is the number the thigh clearance lives on — see
+     * `BUCK.armUp`, where 0.350 is what it has to reach to clear.
+     */
+    /** The clasp off and on, for photographing a before and an after. */
+    clasp: (on = true) => { gOn = !!on; return { clasp: gOn }; },
+    grip(side = 'R') {
+      const g = GRIP[side] || GRIP.R;
+      if (!gB[side]) {
+        gB[side] = { h: fig.boneIndex(g.hand), f: fig.boneIndex(g.fingers),
+          t: fig.boneIndex(g.thumb) };
+      }
+      const b = gB[side];
+      if (b.f < 0) return { side, bones: 'missing' };
+      // The hand's own turn since the bind pose, which is what carries every
+      // one of the measured axes from the bind frame into this frame — and
+      // then the mesh's, because everything else here is in world.
+      fig.boneTurn(b.h, gQ);
+      gQ.premultiply(mesh.quaternion);
+      const knuck = fig.boneAt(b.f, new THREE.Vector3())
+        .applyMatrix4(mesh.matrixWorld);
+      const fdir = gV.copy(g.fing).applyQuaternion(gQ).clone();
+      const curl = gAx.copy(g.curl).applyQuaternion(gQ).clone();
+      const palmN = gP.copy(g.palm).applyQuaternion(gQ).clone();
+      const tip = knuck.clone().addScaledVector(fdir, GRIP.fingLen);
+      const crook = knuck.clone().addScaledVector(palmN, GRIP.crook);
+      // The wire, walked at a millimetre and a half a step. A closed form for
+      // the nearest point on an ellipse is a quartic; two hundred samples is
+      // four hundred multiplies and is exact enough for a number reported to
+      // the millimetre.
+      const near = (p) => {
+        let bu = 0, bd = 1e9;
+        for (let i = 0; i <= 200; i++) {
+          const d = bailPoint(i / 200, gW).distanceTo(p);
+          if (d < bd) { bd = d; bu = i / 200; }
+        }
+        return [bu, bd];
+      };
+      const [uk, dk] = near(crook);
+      const [, dt2] = near(tip);
+      const [, dp] = near(vPalm);
+      // The wire's own direction where it passes the crook, as a chord across
+      // one sample either side, and unsigned against the knuckle line: a wire
+      // lying across the fingers is the same wire whichever end is which.
+      const a = bailPoint(Math.max(0, uk - 0.005), new THREE.Vector3());
+      const c = bailPoint(Math.min(1, uk + 0.005), gW).sub(a).normalize();
+      const cross = Math.acos(Math.min(1, Math.abs(c.dot(curl)))) * 180 / Math.PI;
+      return { side, phase: st.phase, held: +st.held.toFixed(3),
+        cross: +cross.toFixed(1),
+        crook: +(dk * 1000).toFixed(1),
+        tip: +(dt2 * 1000).toFixed(1),
+        palm: +(dp * 1000).toFixed(1),
+        atU: +uk.toFixed(3),
+        flex: +(gFlex[side] * 180 / Math.PI).toFixed(1),
+        opp: +(gOpp[side] * 180 / Math.PI).toFixed(1),
+        // How far the wrist has been turned off what the clip and the arm
+        // solve alone would have said, in degrees — see `gripTurn`.
+        turn: +(2 * Math.acos(Math.min(1, Math.abs(gHandQ.w)))
+          * 180 / Math.PI).toFixed(1),
+        // The pail's axis in HER frame, so the lateral one is the thigh's
+        // number rather than a world coordinate nobody can read.
+        stand: +(Math.sin(st.yaw) * (kanta.position.x - st.x)
+          + Math.cos(st.yaw) * (kanta.position.z - st.z)).toFixed(4),
+        knuckle: knuck.toArray().map((n) => +n.toFixed(4)) };
     },
     /** Where she is standing, in world metres, for a camera to be aimed at. */
     where: () => [st.x, st.y, st.z],
