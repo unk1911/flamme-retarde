@@ -2784,72 +2784,81 @@ function stepSwat(dt) {
  * late would end shot A a fifth of a second into the set-down, with the bucket
  * sinking through the bottom of a frame that was supposed to be over.
  *
- * ── WHO IS THERE TO SEE IT ──
+ * ── WHO IS THERE TO SEE IT: NOBODY HAS TO BE ──
  *
- * She is on a 52 second loop and pours every lap. `checkPour` is the whole of
- * the decision and every clause in it is a way of being wrong:
+ * She pours every lap, and now every pour is this cut. That is the third answer
+ * this question has had and it is the one that was asked for:
  *
- *   ONCE, THEN A COOLDOWN — and per SESSION rather than per machine. There is
- *   no save in this game and the file is opened off a filesystem at least as
- *   often as off the site; `localStorage` on a `file:` origin is opaque in
- *   Chrome and throws or silently forgets in half the browsers that matter.
- *   But the argument that settles it is not the API — it is that a cut you get
- *   once ever, on one machine, is a cut you cannot show anybody.
+ *   Misha, 11 Sep 2026: *"the cut-sequence downstairs still doesn't fire every
+ *   time... so how about this: make it fire EVERY FUCKING TIME.... so every
+ *   time she is down there, doesn't matter if we are near/not near, the cut
+ *   scene gets triggered"*.
  *
- *   IT WAS A HARD LATCH AND IT IS NOT ANY MORE. Misha asked for *"just the
- *   first time around she does it"* before the cut existed and could be
- *   judged, and what that spec turned out to mean in play is: *"i often stand
- *   next to her pouring water, but the cut-scene doesn't trigger.. i only saw
- *   it trigger 1 time"*. He was right and the flag was right; the two together
- *   were wrong. `checkPour` returned on its FIRST line for the whole rest of
- *   the session, so every approach after the first was answered before a
- *   single geometric clause was read, and the honest report of that from
- *   inside the game is silence.
+ * WHAT IT USED TO BE, AND WHAT THE MEASUREMENT SAID. The gate was seven
+ * clauses about the player: at least 5 m from her, at most 18, within 2.2 m of
+ * her floor, not indoors, not with the vikendica between you, within 35 degrees
+ * of straight at her, and 0.45 s of that banked before she tipped. Each one was
+ * arguable on its own and together they were a sieve. Measured rather than
+ * argued — `__fr.pour.why()` sampled every frame for whole laps at a time, and
+ * the clause that was false at the instant she tipped counted:
  *
- *   So the latch became a clock. `POUR.again` is ten minutes of REAL time —
- *   `checkPour` is handed `real` and not the slowed step, deliberately, the
- *   way `SWAT`'s five beats are wall time — which is about eleven and a half
- *   of her 52.37 s laps. Rare enough that it stays a thing that happens to you
- *   rather than a thing that plays; often enough that it is still in the game
- *   an hour in, and that you can show somebody.
+ *   standing 3 m in front of her, looking straight at her   5 of 5 laps blocked
+ *      on the 5 m floor alone. Which is where he stands. *"i often stand next
+ *      to her pouring water, but the cut-scene doesn't trigger"* was not a
+ *      timing complaint; it was this number, every single lap.
+ *   on the terrace over the porch, the spot `?tgps=233,21` lands on
+ *                                                          32 of 32 blocked
+ *      on four clauses at once — 1.22 m out, 2.80 m up, looking down at 0.28.
+ *   25 m away                                              5 of 5 blocked, far
+ *   8 m away, back turned                                  6 of 6 blocked, dot
+ *   8 m away, looking at her — the one legal spot          1 fired, then 4 of 4
+ *      blocked by the ten minute cooldown. That is the *"i only saw it trigger
+ *      1 time"*, exactly: one lap in eleven and a half, and only from a five
+ *      metre annulus he had no reason to stand in.
  *
- *   THE COOLDOWN STARTS WHEN THE CUT DOES, not when it ends, and that is the
- *   same argument the flag was set on: a cut skipped in its second second is a
- *   cut that was seen and turned down.
+ * And the banking was a fiction. From that one legal spot, 48% of a lap fails
+ * the level test because she is upstairs and 13% fails the house test, so
+ * `pourEyes` was zeroed for 61% of every lap and stood at 0.13 s — one frame —
+ * on the frame she tipped. It only ever reached 0.45 inside the 0.50 s arm
+ * window, with 0.05 s to spare. One dropped frame and the lap was gone.
  *
- *   AT LEAST 5 m. Not a compromise: it is the answer. `BUCK.noticeM` is 4.6 m,
- *   and inside that she stops, turns to you and holds the bucket out — a beat
- *   of her own that a cut would talk over — and `yieldM` is 0.95, inside which
- *   she does not reach the pour at all. And a player standing three metres in
- *   front of her can already see the whole thing perfectly well; taking the
- *   camera off them there would be taking away a view they had.
+ * WHAT IS LEFT. Everything that was about the player has gone. What remains is
+ * not proximity, it is the four ways a cut can be a bug rather than a scene:
  *
- *   AT MOST 18 m, which is inside `MUTTER.range`: near enough that you could
- *   hear her, which is a fair definition of being at the same place as her.
+ *   SHE IS ACTUALLY POURING. `pourClock()` inside `POUR.arm` of the top of the
+ *   tip, and it has to be a RISING edge — see `pourEdge`. This is the whole of
+ *   the trigger now.
  *
- *   ON HER LEVEL, within 2.2 m of vertical. The flat and its terrace are both
- *   2.90 m over the porch, so this is what says you are not standing on the
- *   balcony over her head looking down through a slab.
+ *   YOU ARE ON FOOT. `state.phase === 'ground'` and nothing else, which is one
+ *   clause covering every way of not being: a cut that takes the camera off a
+ *   Canadair on a drop run is not a scene, it is a crash. `lost`, `crashing`,
+ *   `swim`, `ride`, `foil` and `brod` go with it for the same reason.
  *
- *   NOT INDOORS, and NOT WITH THE HOUSE IN THE WAY. The second is a real
- *   segment-against-rectangle test against `vik.plan.outer`, in the plan's own
- *   axes, because the vikendica is the only thing near that porch you cannot
- *   see past — everything else out there is oleander and parasols. Her own
- *   `wall` number was the obvious candidate and it is the wrong one: it asks
- *   whether one of you is inside a storey, which cannot see a wall standing
- *   between two people who are both outside.
+ *   NOBODY ELSE OWNS THE CAMERA. `camOverride` is most of that list in one
+ *   test — the walk-up, the computer, the race, the trampoline — with the fly
+ *   swat, `vikWalk`, `comp` and `dipPhase` named beside it.
  *
- *   LOOKING AT HER, within `BUCK.noticeDot` of straight ahead — 35 degrees,
- *   the same number and for the same reason it has where it lives: you have to
- *   be looking AT her and not past her.
+ *   AND THE GAME IS RUNNING. `state.paused`, and `ground.ok`.
  *
- *   AND HAVING LOOKED FOR 0.45 s. One frame of a mouse sweeping across her is
- *   not somebody watching. It also means the last thing seen before the cut is
- *   her, which is what makes the cut a cut and not a teleport.
+ * THE COOLDOWN IS ZERO, AND THAT IS A DECISION ABOUT HER LAP. `POUR.again` was
+ * ten minutes because her lap was 52 seconds and 9.4 s of cut every 52 would
+ * have been a tic. Her journey is minutes long now — she wanders the flat
+ * between trips — so the lap IS the cooldown, and one 9.4 s cut per trip is a
+ * couple of percent of play. The number is still there, in one place, if it
+ * ever needs to be a number again. `POUR.hold` is what a probe parks it at.
  *
- *   AND HER ROLL NO MORE THAN 0.25 s OLD, so the shot starts at the top of the
- *   pour or not at all. Miss it and nothing is spent: she comes round again in
- *   fifty seconds and the flag is still down.
+ * A SKIP IS NOT A RE-OFFER. With no cooldown, `endPour` can land back inside
+ * the arm window — Escape at 0.3 s of a 0.50 s window — and the next frame
+ * would start the same pour over. `pourEdge` is why it does not: the trigger is
+ * the frame her clock ENTERS the window, and a clock already inside it never
+ * enters it again.
+ *
+ * AND THE SHOT DOES NOT CARE WHERE YOU WERE. Both cameras are placed in HER
+ * frame off `b.where()` — see `pourRig` — so the cut looks the same from 3 m,
+ * from 120 m and from inside the bathroom; all three were shot and compared
+ * frame for frame. The one real bound is `BUCK.poseM`, 150 m, beyond which her
+ * loop does not advance at all and there is no pour to catch. That is honest
+ * and it is not a gate: she is not being simulated out there.
  *
  * ── AND SHE SAYS ONE THING ──
  *
@@ -2878,29 +2887,41 @@ const POUR_INTO = {
 };
 
 const POUR = {
-  // ── who counts as being there to see it. Every one of these is argued above.
-  near: 5.0,
-  far: 18.0,
-  rise: 2.2,
-  dot: BUCK.noticeDot,
-  watch: 0.45,
-  // Ten minutes of real play before it may offer itself again. See the block
-  // above: this replaced a hard latch that made the cut a thing you saw once
-  // and then could never show anybody.
-  again: 600,
-  // HOW LATE YOU MAY BE, and the number is the water's and not a preference.
+  // ── HOW LONG BEFORE IT MAY RUN AGAIN, AND THE ANSWER IS NOT AT ALL.
+  //
+  // This is the one knob left of the seven that used to decide whether the cut
+  // played, so it is worth being plain about why it is a zero. It was 600 —
+  // ten minutes of REAL play, `checkPour` being handed `real` and not the
+  // slowed step the way `SWAT`'s five beats are wall time — and 600 was right
+  // when her lap was 52.37 s, because the alternative was 9.4 seconds of cut
+  // every fifty and that is a tic rather than a scene. Her journey is minutes
+  // long now. The lap has become the cooldown, and a second one on top of it is
+  // what was turning every other trip into nothing. Misha's own reasoning, and
+  // it is the right one: *"this might mean each of her journeys' trips should
+  // be much longer than 52s"* — a longer trip is what makes an every-time
+  // cut-scene bearable, so the trip pays for it and this does not have to.
+  //
+  // Turn it up and it is a rate limit again, in seconds of real play. Nothing
+  // else reads it.
+  again: 0,
+  // And what a probe means by "not now". `__fr.pour.seen(true)` and the scrub
+  // in `__fr.pour.frame` both park the cooldown here: long enough to be out of
+  // the way of any run that is supposed to be without the cut, and a number
+  // rather than a second latch of the kind this whole block is a history of.
+  hold: 3600,
+  // HOW LATE THE CAMERA MAY BE, and the number is the water's and not a
+  // preference.
   //
   // Misha, 10 Sep 2026: *"i don't see the cut-scene of bucketeer baye for some
   // reason"*, and then *"widen the arm window"*.
   //
-  // It was 0.25 s. The reason that is not as brutal as it reads is `pourEyes`,
-  // which BANKS: it accumulates for every frame the seven spatial clauses hold
-  // and is never reset by this test, so a player who is simply watching her
-  // walk down and tip has satisfied `watch` long before she gets there. The
-  // quarter second is not "arrive inside this window", it is "be looking at
-  // her at the instant she starts", and the case it fails is the honest one —
-  // you hear the pour, turn to it, and by the time she is on your screen the
-  // moment has gone.
+  // It was 0.25 s, and it was widened to 0.50 to buy a player who was watching
+  // her the extra quarter second `pourEyes` needed to bank. There is no
+  // `pourEyes` any more and nothing is late: `checkPour` runs every frame and
+  // the first frame of `tip` is inside this window, so what the window means
+  // now is only "she is at the TOP of the pour and not half way down it" — the
+  // definition of the beat the shot exists for, and the guard on a cut being
+  // started by anything that jumps her clock.
   //
   // 0.50 AND NOT MORE, because the cut's clock IS her clock — `pourPlace` is a
   // pure function of it — so joining late does not restart the shot, it starts
@@ -2941,22 +2962,38 @@ const POUR = {
 
 /** The cut, or null. */
 let pourCut = null;
-/** Seen once, per session — see the note above on why not `localStorage`. */
+/** Has it ever played this session. Reported, and nothing gates on it. */
 let pourSeen = false;
-// Seconds of real time before it may run again. `pourSeen` stays what it
-// always was — whether it has EVER played — because that is what the debug
-// surface and `seen(false)` are about, and the two answer different
-// questions now that one of them is a clock.
+// Seconds of real time before it may run again, and zero all the way down
+// unless somebody has turned `POUR.again` up or a probe has parked it at
+// `POUR.hold`. `pourSeen` is the other question — whether it has EVER played —
+// and the two have answered different questions since the latch became a
+// clock.
 let pourAgain = 0;
-/** Seconds you have had her in the middle of the screen. */
-let pourEyes = 0;
+/**
+ * Her clock as of last frame, so that the top of a pour is a RISING edge.
+ *
+ * The trigger is one window on `pourClock()` and a window is not an event: a
+ * cut skipped at 0.3 s of a 0.50 s window would leave her clock still inside
+ * it, and with no cooldown to hide behind the next frame would start the same
+ * pour again. Read and rewritten at the top of `checkPour`, before every guard,
+ * so it is never stale by a frame nobody sampled.
+ */
+let pourEdge = -1;
+/**
+ * What the last pass of `checkPour` decided, as one of its own clause names.
+ *
+ * `__fr.pour.why()` used to be a second implementation of the gate, reading
+ * every number back from outside the frame and re-deriving the answer. Two
+ * copies of a seven-clause conjunction is two copies to keep in step, and the
+ * one that goes stale is the one nobody runs. So the decision is written where
+ * it is made and the handle only reports it.
+ */
+let pourWhy = 'boot';
 /** Seconds of coming back up out of the black, after the cut has ended. */
 let pourBack = 0;
-/** The plan frame's inverse, built once off the house. */
-let pourInv = null;
 const _pourEye = new THREE.Vector3();
 const _pourAt = new THREE.Vector3();
-const _pourLook = new THREE.Vector3();
 
 /**
  * Where she is in the run, in seconds, or −1 if she is not in it at all.
@@ -2971,61 +3008,6 @@ function pourClock() {
   const k = b.beat();
   const base = POUR_INTO[k.phase];
   return typeof base === 'number' ? base + k.t : -1;
-}
-
-/**
- * The way back from world metres into the vikendica's own plan axes.
- *
- * The same eleven lines and the same argument as `vikInv` in 45-bucketeer.js —
- * the shore's arc-length frame carries a scale, a different one on each axis,
- * and a little shear, so the honest inverse is the 2x2 the two basis vectors
- * make. Built once, on the first frame anybody stands near the house.
- */
-function pourPlanInv() {
-  if (pourInv) return pourInv;
-  const v = jadrija && jadrija.vik;
-  if (!v || !v.plan || !v.plan.outer) return null;
-  const o = v.at([0, 0, 0]), ex = v.at([1, 0, 0]), ez = v.at([0, 0, 1]);
-  const a = ex[0] - o[0], b = ez[0] - o[0];
-  const c = ex[2] - o[2], d = ez[2] - o[2];
-  const det = (a * d - b * c) || 1;
-  pourInv = { x: o[0], z: o[2], m: [d / det, -b / det, -c / det, a / det] };
-  return pourInv;
-}
-
-/**
- * Is the vikendica standing between the two of you?
- *
- * A slab test of the segment against `plan.outer`, in the plan's own axes. She
- * tips it at plan z 5.62 and the footprint ends at 3.865, so she is 1.75 m
- * clear of the building and the question is well posed: any crossing of that
- * rectangle is a wall, a floor and a wall.
- */
-function pourHouseBetween(ex, ez, hx, hz) {
-  const inv = pourPlanInv();
-  if (!inv) return false;
-  const O = jadrija.vik.plan.outer;
-  const ax = inv.m[0] * (ex - inv.x) + inv.m[1] * (ez - inv.z);
-  const az = inv.m[2] * (ex - inv.x) + inv.m[3] * (ez - inv.z);
-  const bx = inv.m[0] * (hx - inv.x) + inv.m[1] * (hz - inv.z);
-  const bz = inv.m[2] * (hx - inv.x) + inv.m[3] * (hz - inv.z);
-  const dx = bx - ax, dz = bz - az;
-  let t0 = 0, t1 = 1;
-  if (Math.abs(dx) < 1e-6) {
-    if (ax < O.x0 || ax > O.x1) return false;
-  } else {
-    const u = (O.x0 - ax) / dx, w = (O.x1 - ax) / dx;
-    t0 = Math.max(t0, Math.min(u, w));
-    t1 = Math.min(t1, Math.max(u, w));
-  }
-  if (Math.abs(dz) < 1e-6) {
-    if (az < O.z0 || az > O.z1) return false;
-  } else {
-    const u = (O.z0 - az) / dz, w = (O.z1 - az) / dz;
-    t0 = Math.max(t0, Math.min(u, w));
-    t1 = Math.min(t1, Math.max(u, w));
-  }
-  return t0 <= t1;
 }
 
 /**
@@ -3086,48 +3068,52 @@ function pourPlace(R, t) {
   return shot;
 }
 
-/** Is this the one? One pass of the argument at the top of this block. */
+/**
+ * Is this the one? It is, every time, and the whole argument is at the top of
+ * this block.
+ *
+ * There is nothing about the player in here any more — not where he is
+ * standing, not which way he is looking, not what is between the two of them.
+ * What is left is her clock, and the ways a cut would be a bug rather than a
+ * scene.
+ */
 function checkPour(dt) {
-  if (pourCut) return;
-  // The cooldown, run before anything else and NOT free: `pourEyes` is zeroed
-  // with it so the 0.45 s of watching has to be fresh when it lifts. Banked
-  // across ten minutes it would fire on the first frame of the first lap after,
-  // which is the one arrival nobody had to earn.
-  if (pourAgain > 0) { pourAgain -= dt; pourEyes = 0; return; }
-  const b = jadrija && jadrija.bucketeer;
-  // Nothing else may already own the camera, and `camOverride` is most of that
-  // list in one test — the walk-up, the computer, the race and the trampoline
-  // all go through it.
-  if (!b || state.phase !== 'ground' || !ground || !ground.ok || state.paused
-    || camOverride || swatCut || vikWalk || comp || dipPhase) {
-    pourEyes = 0; return;
-  }
-  const eye = personAt();
-  const w = b.where();
-  const dx = w[0] - eye.x, dz = w[2] - eye.z;
-  const gap = Math.hypot(dx, dz);
-  // FLOOR AGAINST FLOOR, and not her feet against your eye. Written the second
-  // way — which is what `personAt` hands you — the test carries a permanent
-  // 1.66 m bias, so a symmetric 2.2 m window is really −0.54 to +3.86 and a
-  // player standing on the terrace 2.90 m over her head passes it.
-  if (gap < POUR.near || gap > POUR.far
-    || Math.abs(w[1] - ground.you.y) > POUR.rise
-    || (jadrija.indoorsAt && jadrija.indoorsAt(eye.x, eye.y, eye.z) > 0.2)
-    || pourHouseBetween(eye.x, eye.z, w[0], w[2])) {
-    pourEyes = 0; return;
-  }
-  // Aimed at her HEAD and in three dimensions, because from five metres with
-  // her feet on a porch below you the answer to "is she on the screen" and the
-  // answer to "is her ground position ahead of you" are different questions.
-  camera.getWorldDirection(_pourLook);
-  const dy = w[1] + 0.90 - eye.y;
-  const L = Math.hypot(dx, dy, dz) || 1;
-  if ((_pourLook.x * dx + _pourLook.y * dy + _pourLook.z * dz) / L < POUR.dot) {
-    pourEyes = 0; return;
-  }
-  pourEyes += dt;
+  // HER CLOCK FIRST, above every guard and every return, because this is the
+  // one line in the function that has to run on a frame that fires nothing:
+  // `pourEdge` is only a rising edge if it was sampled on the frame before.
   const t = pourClock();
-  if (pourEyes >= POUR.watch && t >= 0 && t <= POUR.arm) startPour();
+  const was = pourEdge;
+  pourEdge = t;
+  // ONE CLAUSE TO A LINE, AND EACH ONE NAMES ITSELF ON THE WAY OUT. The old
+  // version was a conjunction and `__fr.pour.why()` was a second copy of it
+  // that recomputed every number from outside the frame — which is how you get
+  // a debug handle reporting clauses the game no longer has. `pourWhy` is the
+  // decision itself, written where it is made, so the two cannot drift.
+  if (pourCut) { pourWhy = 'rolling'; return; }
+  // The cooldown, which is zero unless somebody has set it — `POUR.again`.
+  if (pourAgain > 0) { pourAgain -= dt; pourWhy = 'cooldown'; return; }
+  const b = jadrija && jadrija.bucketeer;
+  if (!b) { pourWhy = 'noBucketeer'; return; }
+  // ON FOOT, and this one clause is the Canadair guard and every other one at
+  // once: `fly`, `crashing`, `lost`, `swim`, `ride`, `foil` and `brod` are all
+  // not-ground. A cut that hijacks the camera off a drop run over a fire is not
+  // a scene, it is a crash.
+  if (state.phase !== 'ground') { pourWhy = 'notAfoot'; return; }
+  if (!ground || !ground.ok) { pourWhy = 'noGround'; return; }
+  if (state.paused) { pourWhy = 'paused'; return; }
+  // NOBODY ELSE HOLDING THE CAMERA. `camOverride` is most of that list in one
+  // test — the walk-up, the computer, the race and the trampoline all go
+  // through it — and the other four are named because they do not.
+  if (camOverride || swatCut || vikWalk || comp || dipPhase) {
+    pourWhy = 'owned'; return;
+  }
+  // SHE IS ACTUALLY POURING, at the top of it and not half way down.
+  if (!(t >= 0 && t <= POUR.arm)) { pourWhy = 'notPouring'; return; }
+  // AND THIS IS A NEW TIP. The frame her clock ENTERS the window, not every
+  // frame it spends inside one — see `pourEdge`, and the skip it exists for.
+  if (was >= 0 && was <= POUR.arm) { pourWhy = 'sameTip'; return; }
+  pourWhy = 'fired';
+  startPour();
 }
 
 /**
@@ -3153,12 +3139,13 @@ function startPour() {
   pourCut.was = -1;
   pourCut.stuck = 0;
   pourCut.said = false;
-  // Set here and not when it finishes: a cut skipped in its second second is a
-  // cut that was seen and turned down, and offering it again in fifty seconds
-  // is offering it to somebody who has just said no.
+  // Armed here and not when it finishes, which mattered when the cooldown was
+  // ten minutes and still says the right thing at zero: a cut skipped in its
+  // second second is a cut that was seen and turned down, so what it costs is
+  // counted from where it started. What actually stops a skip re-offering
+  // itself on the next frame is `pourEdge`, not this.
   pourSeen = true;
   pourAgain = POUR.again;
-  pourEyes = 0;
   ground.setSpray(false);
   // AND THE LENS PUT BACK, which the swat does not have to do and this does.
   // `stepLens` is not called under an override — see the note where it is
@@ -6520,9 +6507,10 @@ function frame() {
   // second hit on the animal that is currently falling out of the sky would
   // start a second camera sequence over the top of the first.
   else if (!swatCut) { checkLaptopSpray(); checkTvSpray(); checkFlySwat(real); }
-  // The Bucketeer's first pour. It arms itself off her own clock and off
-  // whether anybody is standing there — see `checkPour` — so unlike every other
-  // cut in this file there is no key that starts it.
+  // The Bucketeer's pour, every one of them. It arms itself off her own clock
+  // and off nothing else at all — not where you are, not which way you are
+  // looking, see `checkPour` — so unlike every other cut in this file there is
+  // no key that starts it.
   if (pourCut) stepPour(real);
   else { stepPourBack(real); checkPour(real); }
   if (!camOverride) stepLens(real);
@@ -8618,11 +8606,13 @@ window.__fr = {
   },
 
   /**
-   * The Bucketeer's first pour, as a scene — the block over `POUR` above.
+   * The Bucketeer's pour, as a scene — the block over `POUR` above.
    *
    *   __fr.pour.frame(0.95)      the shot at 0.95 s, held for a screenshot
    *   __fr.pour.frame(6.60)      and at 6.60, which is the second one
    *   __fr.pour.go()             fire it for real, wherever you are standing
+   *   __fr.pour.why()            which clause the live gate is sitting on
+   *   __fr.pour.seen(false)      clear the cooldown; seen(true) parks it
    *   __fr.pour.free()           her loop and the camera back
    *
    * `frame` is the `__fr.fly.cutAt` of this cut and it exists for exactly the
@@ -8638,14 +8628,20 @@ window.__fr = {
     frame: (t = 0) => {
       const b = jadrija && jadrija.bucketeer;
       if (!b || !ground || !ground.ok) return null;
-      // A scrub is not a performance. If the real cut has already armed itself
-      // — and it will have, because a probe stands the camera in front of her
-      // and then puts her on the first frame of the roll, which is every clause
-      // of `checkPour` at once — take it down and disarm it, or the two of them
-      // write the camera on alternate frames and the one that wins is whichever
-      // ran last. `seen(false)` arms it again.
+      // A scrub is not a performance. `go('tip')` below puts her on the first
+      // frame of the roll, which is now the WHOLE of `checkPour` — so without
+      // this the real cut starts a frame later and the two of them write the
+      // camera on alternate frames, the one that wins being whichever ran last.
+      // Take it down, and park the cooldown where the live path cannot reach
+      // it; `seen(false)` hands it back.
+      //
+      // `pourSeen` used to be what this line set, and it was already a lie when
+      // the latch became a clock — nothing has gated on `pourSeen` since. It is
+      // still set, because the scrub HAS shown the cut and that is what the flag
+      // means, but `pourAgain` is the half that does the work.
       if (pourCut) endPour(false);
       pourSeen = true;
+      pourAgain = POUR.hold;
       b.hold(true);
       b.go('tip');
       // THE RIG BEFORE THE TICK, and it is the whole of what makes this a
@@ -8678,39 +8674,45 @@ window.__fr = {
     /**
      * Why it is not firing, clause by clause.
      *
-     * Misha, 10 Sep 2026: *"i don't see the cut-scene of bucketeer baye for
-     * some reason"*. Seven conditions have to hold at the instant she tips and
-     * `checkPour` returns at the first one that does not, so from the outside
-     * a cut that never comes is indistinguishable from a cut that is not
-     * there. Every number it tests, read where you are standing — and `eyes`
-     * is the one that says whether the watching is banking, because that one
-     * accumulates across her whole lap and is the half of the mechanism a
-     * player cannot feel.
+     * `why` is the answer and the rest are the inputs it was read off, in the
+     * order `checkPour` reads them. It is not recomputed here: it is the string
+     * that function wrote on the last frame it ran, so this cannot list a
+     * clause the game no longer has. The seven it USED to list — gap, rise,
+     * indoors, house, dot, eyes and the arm window — are gone with the gate
+     * they belonged to; only the arm window survives, as `clock` against `arm`.
+     *
+     *   fired         it started one, on that frame
+     *   rolling       one is already running
+     *   cooldown      `POUR.again`, or a probe's `seen(true)`
+     *   noBucketeer   she has not been built
+     *   notAfoot      you are flying, swimming, riding, dead or in the intro
+     *   noGround      the walker has not been built
+     *   paused        the menu is up
+     *   owned         another cut or overlay has the camera
+     *   notPouring    her clock is outside `arm` of the top of a tip
+     *   sameTip       this tip has already been offered — see `pourEdge`
+     *
+     * `gap` is here to orient a probe and is NOT a clause: nothing about where
+     * you are standing gates this cut any more. It is measured off `ground.you`
+     * and not off `personAt()`, which during a cut is the cut's own camera two
+     * and a half metres from her face — a probe reading that one mid-roll gets
+     * a number about the shot and thinks it is about the player.
      */
     why: () => {
       const b = jadrija && jadrija.bucketeer;
       if (!b) return 'no bucketeer';
-      const eye = personAt();
       const w = b.where();
-      const dx = w[0] - eye.x, dz = w[2] - eye.z;
-      const gap = Math.hypot(dx, dz);
-      camera.getWorldDirection(_pourLook);
-      const dy = w[1] + 0.90 - eye.y;
-      const L = Math.hypot(dx, dy, dz) || 1;
-      const dot = (_pourLook.x * dx + _pourLook.y * dy + _pourLook.z * dz) / L;
-      const t = pourClock();
       return {
-        seen: pourSeen, rolling: !!pourCut,
-        again: +pourAgain.toFixed(1),
+        why: pourWhy, rolling: !!pourCut, seen: pourSeen,
+        again: +pourAgain.toFixed(1), againFor: POUR.again,
+        afoot: state.phase === 'ground', state: state.phase,
+        ok: !!(ground && ground.ok), paused: !!state.paused,
         owned: !!(camOverride || swatCut || vikWalk || comp || dipPhase),
-        gap: +gap.toFixed(2), want: [POUR.near, POUR.far],
-        rise: +(w[1] - ground.you.y).toFixed(2), riseMax: POUR.rise,
-        indoors: jadrija.indoorsAt
-          ? +jadrija.indoorsAt(eye.x, eye.y, eye.z).toFixed(2) : null,
-        house: pourHouseBetween(eye.x, eye.z, w[0], w[2]),
-        dot: +dot.toFixed(3), dotMin: +POUR.dot.toFixed(3),
-        eyes: +pourEyes.toFixed(2), watch: POUR.watch,
-        clock: +t.toFixed(2), arm: POUR.arm, phase: b.beat().phase,
+        clock: +pourClock().toFixed(2), arm: POUR.arm,
+        edge: +pourEdge.toFixed(2), phase: b.beat().phase,
+        gap: ground && ground.ok
+          ? +Math.hypot(w[0] - ground.you.x, w[2] - ground.you.z).toFixed(2)
+          : null,
       };
     },
     end: () => { endPour(false); return 'out'; },
@@ -8729,20 +8731,24 @@ window.__fr = {
       return 'free';
     },
     /**
-     * Has it ever played, and is anybody watching her?
+     * Has it ever played, and may it play now?
      *
-     * `seen(false)` re-arms it NOW, cooldown and all — which is the whole use
-     * of it, so it clears both. `seen(true)` is the other half of the same
-     * tool: it puts the cut back out of reach without waiting ten minutes for
-     * a control run that is supposed to be without it.
+     * `seen(false)` re-arms it NOW and clears the cooldown with it, which is
+     * the whole use of it. `seen(true)` is the other half of the same tool: it
+     * parks the cooldown at `POUR.hold` so that a control run which is supposed
+     * to be without the cut is without it. That used to be a no-op in
+     * everything but name — `POUR.again` was ten minutes and `seen(true)` set
+     * the cooldown to it — and at `again: 0` it would have been a no-op in
+     * name as well, so it names its own number.
      */
     seen: (v) => {
-      if (v != null) { pourSeen = !!v; pourAgain = v ? POUR.again : 0; }
+      if (v != null) { pourSeen = !!v; pourAgain = v ? POUR.hold : 0; }
       return pourSeen;
     },
-    stats: () => ({ live: !!pourCut, seen: pourSeen,
+    stats: () => ({ live: !!pourCut, seen: pourSeen, why: pourWhy,
       again: +pourAgain.toFixed(1), againFor: POUR.again,
-      eyes: +pourEyes.toFixed(2), clock: +pourClock().toFixed(2),
+      clock: +pourClock().toFixed(2), edge: +pourEdge.toFixed(2),
+      arm: POUR.arm,
       len: +POUR.len.toFixed(2), cut: +POUR.cut.toFixed(2),
       ear: !!BUCK.ear }),
   },
