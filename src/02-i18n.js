@@ -414,6 +414,7 @@ const STRINGS = {
     'help.k.vikendica': 'the vikendica, and its other roof',
     'help.k.race': 'the race',
     'help.k.pause': 'pause',
+    'help.k.silent': 'silent pause',
     'help.k.settings': 'settings',
     'help.k.hud': 'hide the HUD',
     'help.k.clip': 'record the last ten seconds',
@@ -423,9 +424,7 @@ const STRINGS = {
     'set.footTouch': 'tap SET to close',
 
     // pause
-    'pause.eyebrow': 'the fire is waiting',
     'pause.title': 'Paused',
-    'pause.alight': 'alight',
     'pause.resume': 'Resume',
     'pause.hint': '<kbd>P</kbd> or <kbd>Esc</kbd> to go back',
     'pause.hintTouch': 'tap anywhere to go back',
@@ -846,6 +845,7 @@ const STRINGS = {
     'help.k.vikendica': 'vikendica, i njezin drugi krov',
     'help.k.race': 'utrka',
     'help.k.pause': 'pauza',
+    'help.k.silent': 'tiha pauza',
     'help.k.settings': 'postavke',
     'help.k.hud': 'sakrij HUD',
     'help.k.clip': 'snimi zadnjih deset sekundi',
@@ -854,9 +854,7 @@ const STRINGS = {
     'set.footGround': 'M zatvara · WASD hod · strelice okret · SHIFT trk · Z dalekozor · RAZMAK mlaz · ENTER skok s balkona · U te izbaci uvis · K uzmi zmaja · F uzmi foil · E natrag u avion',
     'set.footTouch': 'dodirni POST za zatvaranje',
 
-    'pause.eyebrow': 'vatra čeka',
     'pause.title': 'Pauza',
-    'pause.alight': 'gori',
     'pause.resume': 'Nastavi',
     'pause.hint': '<kbd>P</kbd> ili <kbd>Esc</kbd> za povratak',
     'pause.hintTouch': 'dodirni bilo gdje za povratak',
@@ -1268,6 +1266,7 @@ const STRINGS = {
     'help.k.vikendica': 'la vikendica, et son autre toit',
     'help.k.race': 'la course',
     'help.k.pause': 'pause',
+    'help.k.silent': 'pause silencieuse',
     'help.k.settings': 'réglages',
     'help.k.hud': 'masquer le HUD',
     'help.k.clip': 'enregistrer les dix dernières secondes',
@@ -1276,9 +1275,7 @@ const STRINGS = {
     'set.footGround': 'M ferme · WASD marche · flèches tournent · MAJ course · Z téléobjectif · ESPACE ouvre la lance · ENTRÉE saute du balcon · U te propulse en l’air · K sort une aile · F sort un foil · E remonte à bord',
     'set.footTouch': 'touchez RÉGL pour fermer',
 
-    'pause.eyebrow': 'le feu attend',
     'pause.title': 'En pause',
-    'pause.alight': 'en feu',
     'pause.resume': 'Reprendre',
     'pause.hint': '<kbd>P</kbd> ou <kbd>Échap</kbd> pour revenir',
     'pause.hintTouch': 'touchez n’importe où pour revenir',

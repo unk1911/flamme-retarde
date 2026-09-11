@@ -607,10 +607,6 @@ html.touch #swim-hud { bottom: 7.4rem; }
   margin: 0; font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 200;
   letter-spacing: .06em; color: var(--salt);
 }
-#pause-sub {
-  margin: 1rem 0 0; color: #92a4ab; line-height: 1.7; font-weight: 300;
-  font-size: .92rem; min-height: 1.7em;
-}
 #pause .hint kbd {
   font-family: var(--mono); color: var(--stone);
   border: 1px solid var(--edge); border-radius: 2px;
