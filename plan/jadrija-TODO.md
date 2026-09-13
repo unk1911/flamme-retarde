@@ -588,7 +588,20 @@ as of this writing; the state of each is in the git log, not here.
   thing `b_016` was: v595 carries no GPS, so there is no `t` the footage
   supports. Either geotag a frame from it or accept a placement and say so.
 
-- **A figure behind H2O's counter and Trampulin's does not render.** Tried
+- ~~**A figure behind H2O's counter and Trampulin's does not render.**~~
+  **FIXED, AND THE ENTRY WAS NEVER STRUCK — checked 13 Sep.** Both render:
+  photographed from six metres off each counter, head, face, both arms and
+  torso above the top, which is what a barman behind a counter looks like.
+  `staff()` lists six figures, none hidden, H2O's at t 317.2 s 21.85 with
+  `k` 0.99 and `sunk` 0.000.
+  What fixed it is in the file and dated: the staff datum became
+  `Math.max(at((t0 + t1) / 2).deck, standY(t, ss))`, and the note over that line
+  records the very numbers — *"mini 274.60 0.089 -> 0.000, h2o 317.20 0.015 ->
+  0.000, tramp2 471.60 0.066 -> 0.000"*. The entry below was written on 31 Aug
+  against the old datum and describes a figure that was sinking, not one that
+  was failing to draw. Its advice to "start in the crowd layer and not in the
+  shopfront" was right, and somebody did.
+  Kept for the reasoning. Original entry: Tried
   31 Aug at the same standoff that works at MINI, the konoba and the gelato
   case (`s0 - 0.15`), with `k` set, on the shop's own deck datum, unhidden,
   at five camera stations. What shows is a shoulder and two hands. A raycast
