@@ -1301,8 +1301,19 @@ concrete. 89 people at 60 fps.
   toe slides 8.6 and 9.3 mm every frame, at 0.75 and 0.66 of her travel
   speed.** On the stairs it is 4.9 mm at 0.61-0.75. Lateral slide, which no
   rate change can touch, is 2.5-4.5 mm.
-  **So foot locking is the third option** the `clipMin` note did not have: keep
-  the slow cadence that looks right AND stop the feet skating.
+  **~~So foot locking is the third option the `clipMin` note did not have.~~
+  IT IS NOT, AND THE NUMBER THAT SETTLES IT IS 430 mm — 13 Sep.** Measured the
+  travel of the CLIP's own toe across each stance run: **245, 428, 441, 464 mm
+  on the left and 50, 432, 432, 307 on the right**, typically 430 over a
+  63-frame stance. Her leg is about 850 mm. Holding the toe still for a stance
+  therefore asks for a correction of **half a leg length**, which no solver can
+  absorb — the soft clamp refuses it, `maxPull` refuses it, and any threshold
+  loose enough to admit it would straighten the knee into a stilt.
+  Foot locking assumes the clip is broadly right and the runtime has introduced
+  centimetres. Ours is out by half a leg a step, on purpose, because `clipMin`
+  floors the rate so she does not skip downstairs. **The choice really is the
+  two the `clipMin` note names.** A third option would have to be a clip: a
+  baked stair descent, or a walk baked at her actual pace.
   **The rig already is the article's rig** — `legUL -> legLL -> footL -> toeL`,
   hip/knee/heel/toe, and 45-bucketeer.js already says "`footL`'s head is the
   ANKLE" and "`toeL`'s head is the ball of the foot, which is the thing
@@ -1342,10 +1353,18 @@ concrete. 89 people at 60 fps.
      reaches the foot through the chain and the knee's is laid on top, so the
      foot gains `fQK * fQR` — swing first, then bend. The other way round is
      19 mm out.
-  3. **After both, a 5.6 mm static residual remains** on a frozen figure. A
-     single-pass two-bone solve under-shoots; the standard answer is to iterate
-     it, which `aim()` makes awkward because it replaces rather than
-     accumulates. That is where this stopped, and it is where to start.
+  3. **The residual was not under-shoot, it was a third rotation that should
+     never have been there.** Rebuilt 13 Sep: the tempting form takes the
+     interior angle at the hip and at the knee and turns both by the
+     difference, and it is wrong here because `aim` rotates the bone AND
+     EVERYTHING UNDER IT rigidly — turning the hip does not change the angle at
+     the hip, it just points the whole leg somewhere else, and the swing that
+     follows corrects from the wrong place. The knee is the only joint that can
+     change the reach. Bend the knee by its own angle difference, work out
+     where that puts the ankle, then turn the hip ONCE to aim at the target:
+     two `aim`s, not three. **Static residual went 55 mm -> 19 -> 5.6 -> 0.000
+     over eight frames.** The solver is exact. It is the approach that does not
+     fit, for the reason above.
   The measurement harness is the other thing worth keeping: stance as runs of
   five or more frames with the toe inside 30 mm of `walkY`, edges trimmed, and
   ALWAYS a second lock-off run as a control — the spread between two identical
