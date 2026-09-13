@@ -1228,6 +1228,33 @@ concrete. 89 people at 60 fps.
   heard of.
   Cost is not the objection: ~30 walking figures x 2 legs is 60 two-bone solves
   a frame against 642 533 tris.
+  **BUILT ONCE AND REVERTED — 13 Sep.** Roughly 250 lines: a `foot` constant
+  block, a two-bone solver with the soft clamp, a two-threshold state machine
+  and a smoothstepped hold, called between `poseCarry()` and `fig.update(dt)`,
+  with a `lock(false)` handle for the A/B. It ended up a NO-OP on the mean and
+  WORSE on the tail — 10.35/9.82 mm a frame against 10.16/10.36 with it off,
+  inside the 9.5-10.5 run-to-run spread, but the worst frame went 39.8 -> 70.6.
+  Not shipped. Three real bugs were found on the way and they are the value
+  here, because the next attempt will hit all three:
+  1. **`boneAt` answers with the aims already in it.** Solving from that is a
+     loop closed on its own output — it settles, but wherever it likes. Held
+     still, the first cut was stable to five decimals and **19 mm** from where
+     the foot belonged; moving, it made slide WORSE than doing nothing
+     (27.8 mm a frame against 10.2, worst frame 164 mm against 39.8). Fix:
+     clear the six leg aims, `fig.update(0)` to refold the clip's own pose, and
+     read THAT. One extra fold of thirty bones, which is nothing.
+  2. **The foot's rotation order is not the obvious one.** The hip's aim
+     reaches the foot through the chain and the knee's is laid on top, so the
+     foot gains `fQK * fQR` — swing first, then bend. The other way round is
+     19 mm out.
+  3. **After both, a 5.6 mm static residual remains** on a frozen figure. A
+     single-pass two-bone solve under-shoots; the standard answer is to iterate
+     it, which `aim()` makes awkward because it replaces rather than
+     accumulates. That is where this stopped, and it is where to start.
+  The measurement harness is the other thing worth keeping: stance as runs of
+  five or more frames with the toe inside 30 mm of `walkY`, edges trimmed, and
+  ALWAYS a second lock-off run as a control — the spread between two identical
+  runs is 1 mm, which is most of the effect being looked for.
 - **Probe harness: `gpuLaunch()` returns an `env` as well as `args`, and both
   have to reach `spawn`.** Passing only the args leaves `GALLIUM_DRIVER` and
   the WSL library path unset, `--use-angle=gl` falls through to software GL,
