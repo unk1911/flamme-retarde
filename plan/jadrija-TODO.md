@@ -734,6 +734,44 @@ bed. See the commit.
   on the account, or accepting that she and the old bather share one and never
   speak within earshot of each other.
 
+  **~~A canopy landing seaward of the promenade stands you 1.15 m low.~~
+  MEASURED AND CLOSED WITHOUT A CHANGE — 13 Sep.** The entry below is kept
+  because the reasoning in it is where the trap is. Its key step does not hold:
+  *"Jadrija's `walkY` answers 0 for a strip where `standY` — and therefore what
+  is DRAWN — answers 1.15"*. `standY` extrapolates the promenade's surface
+  seaward whether or not anything is built out there; it is not evidence of
+  geometry, and the "therefore" is the whole error.
+
+  Raycast down on to the actual scene across the whole padded strip, t 0…700
+  at s -9…-3, visibility-filtered: **exactly one cell in the sweep has anything
+  drawn above `walkY` at all** — t 425, s -7, drawn 1.15 against `walkY` 0,
+  which is the 1.15 the note was written from. Everywhere else in that strip
+  nothing is drawn, because it is open water, and `walkY` answering 0 (the
+  waterline) is right.
+
+  **AND THE PREFERRED FIX WOULD HAVE BEEN WORSE THAN THE FAULT.** Built it to
+  find out: widen the guard to `s < -9`, and `walkY` then answers 0.96 at
+  t 100, 1.43 at 200, 1.48 at 300, 2.12 at 425 and 0.55 at 550 — across cells
+  where the raycast finds **nothing drawn at all**. At t 425, s -6 it answers
+  2.19 where the drawn surface is **-1.51**, so it would stand you 3.7 m over
+  the rock on an invisible flat shelf six metres out to sea. Today's behaviour
+  — the waterline — is better than that everywhere.
+
+  The pad is also benign where it does apply: under Jadrija the strip clamps to
+  `max(groundAt, 0)` and stands you at sea level, where open country's own
+  `walkY` is the raw DEM and would put you under it. So the inconsistency
+  between `inField`'s `s > -4 - pad` and `walkY`'s `s < -3` costs nothing, and
+  closing it in the other direction would cost something.
+
+  What survives is much smaller than the entry claims: **one patch of about a
+  square metre of rip-rap on the eastern mole's flank** — t 425, drawn 1.15 at
+  s -7, 0.26 at s -8, -1.51 at s -6, an irregular boulder profile beside a mole
+  whose deck `onMole` already answers for correctly at 2.19. Nothing in this
+  game models standing on rubble, and a canopy has to come down inside that
+  square metre to find it. Not worth a branch in `walkY`.
+
+  ─── the original entry, kept for the reasoning ───
+
   **A canopy landing seaward of the promenade stands you 1.15 m low — 10 Sep.**
   Measured, not guessed, and NARROW, which is why most landings are fine.
   `localeAt` pads `inField` by 5 m so the resort answers for a canopy that
@@ -772,6 +810,20 @@ bed. See the commit.
   into whatever owns `you.y` in `47-ground.js` and the crowd walkers. That
   touches the player's vertical feel, so it wants doing deliberately and
   verified, not squeezed into a spare twenty minutes.
+  **DONE in 1.379.0 — 13 Sep, and her number did not promote.** She walks the
+  flight at 0.41 m/s of vertical; you can run down it at 2.3, so a flat
+  0.85 m/s ceiling would have left the player hovering above the ramp all the
+  way to the bottom. The ceiling is a SLOPE instead: the flight's real gradient
+  is 0.934 at the median and the 95th alike, the seams register as 22.0 and
+  22.4, and 1.30 sits between them with enormous margin — lag on the ramp is
+  0.000 mm at creep, walk and sprint. The 84.2 mm porch step goes to 44.5 mm at
+  a walk and 22.8 at a creep. The seam/drop cutoff is 0.12 m, chosen off 94 284
+  samples along four promenade lines: 68 seams over 6 mm, median 11.7, worst
+  855, and the tail is kerbs and the mole, which must stay instant.
+  Also re-measured: the four seams now read 21.5, 21.4, **50.0** and 84.2 mm.
+  The 1.376.0 stair fix redistributed the sawtooth across the two stair legs
+  but did NOT explain the 50 mm off the bottom step, which the 1.376.0 entry
+  claimed it did. That one was always a separate seam.
 
   **`gt = t1 − 2.05` is not a one-line change — 10 Sep.** The note over
   `tisakFront` says so and it is right: moving where the glazed corner starts
