@@ -8,6 +8,115 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.377.0] — 2026-09-13
+
+### the fist goes to the pail, and one NaN was latching the whole audio bed
+
+Three things off the open list, and the first was found by accident while
+probing for the second.
+
+**A SINGLE NaN WAS KILLING THE SOUND FOR THE REST OF THE SESSION.** A probe
+called `dropIn(x, z)` with the yaw left off, and every frame after it threw
+`Failed to execute setTargetAtTime on AudioParam: The provided float value is
+non-finite`. The chain, measured end to end: `you.yaw` becomes undefined, the
+next integration step carries that into `you.x`, `canopyAt` answers NaN, and
+`cicadas(on, gain, wood)` writes it straight into module state.
+
+Two things made that a latch rather than a glitch.
+
+  * **`Math.max(v, 0.0001)` READS LIKE A GUARD AND IS NOT ONE.** `Math.max`
+    returns NaN if either argument is NaN, so all NINE of the gain writes in
+    80-audio.js that were "guarded" that way passed a NaN straight through.
+    `shore` has a note describing exactly this failure — *"a non-finite value
+    handed to setTargetAtTime throws, inside the frame callback, which stops
+    the render loop dead"* — and guards its own entry against it with
+    `!(d <= fade)`. The neighbour one function down had nothing.
+  * **`chorusLevel` runs off the frame loop's own tick**, not off `cicadas`. So
+    the NaN did not have to arrive again to keep throwing; it only had to arrive
+    once. And it could only arrive once, because the change test upstream is
+    `Math.abs(cicW - cicadaWood) > 0.02`, which is FALSE for a NaN — the single
+    call that gets through is the one on the afoot transition.
+
+Of the three position-derived globals in that file, two were already guarded in
+the idiom this codebase uses for "and not a NaN" — `placeD = d == null ||
+!(d >= 0) ? null : d` and the same for `placeRow`. `placeCan`, written by
+`cicadas`, was the one that was not. That is the whole of the fault.
+
+Closed at both ends. `lvl(v, floor)` replaces the nine `Math.max` guards and is
+written as `v >= floor ? v : floor`, which is false for NaN and therefore
+actually floors it; `cicadas` guards its two inputs the way its neighbours do;
+and `dropIn` now defaults its yaw and REFUSES a non-finite argument rather than
+clamping it, because a caller asking to be put at NaN has a bug of their own and
+landing them at the origin would hide it. Verified: `cicadas(true, NaN, NaN)`
+fed directly to the shipped build throws nothing, and `dropIn(NaN, 10, 0)`
+returns false with the walker untouched.
+
+**THE PAIL WAS 226 mm FROM HER FIST THROUGH THE POUR.** Flagged in 1.376.0 and
+measured here at peak roll. `placePail` swung the BUCKET 220 mm forward and 80
+up over the roll and left the hand where it was — the one cheat that file admits
+to, and its own note claimed *"it is small enough that her fist is still on the
+bail"*, which was never measured and is false. Since 1.376.0 closed the fingers
+round the bail, what it produced was a pail flying along beside an open reaching
+hand.
+
+The reason for the swing is still right and is kept: a bucket emptied from a
+hand hanging at a hip empties on to the foot under it, behind her own leg, and
+is unwatchable. What was wrong was which thing moved. `offerUp` is already a
+solved forward reach on these exact two bones and its own note ends *"the pail —
+which hangs from the palm — goes with it"*, so the mechanism existed; it wanted
+the pour's numbers instead of the offer's.
+
+**SOLVED AGAINST THE CHEAT, NOT TYPED.** The bucket's world position at full
+tip is load-bearing three ways over — the jet, the puddle and both cut cameras
+are aimed at it — so the hand had to come to the pail and the pail had to stay
+put. Swept on a two-parameter blend between the carry targets and the offer's,
+at peak roll: `up` came out almost entirely off the forearm target, `forward`
+off both, and the lateral needed the upper arm's z opened back up by 0.073 on
+its own. Final error at the fist against the three numbers the old swing
+produced: **−2.1 mm forward, +2.1 mm up, −1.6 mm outboard**, inside RULE 5 on
+every axis.
+
+Wire to the crook of her fingers, traced over the whole 2.5 s roll: **13.5 mm on
+every frame**, against 226.1 at peak before. The fist does not leave the bail.
+
+**AND SHOT A WAS REFRAMED — AFTER THE FIRST FIX MADE IT WORSE.** The old shot
+sat at 0.60 m, knee height, aimed at the bail: 1.29 m of frame centred on the
+bucket, her head a third of a metre outside it, and the crop landing on her
+hips. Survivable when the cut fired once a session; at once a trip it reads as a
+camera that missed, and it crops in the worst available place.
+
+The obvious fix — raise the eye and the aim — puts her head in and **throws the
+water out**, which is the event the cut exists for. A/B'd against the previous
+build at one deterministic instant (`frame(0.75)`, pour 0.692, roll 0.48, all
+four captures identical to three decimals): the old shot has a bright column of
+water down the left of frame and the raised one has none at all, the pail's own
+body occluding it from the steeper angle with the ground under it below the
+bottom edge. Written up here because the trap is not obvious from the numbers —
+this shot has to hold about 1.8 m of subject, her crown at 1.62 down to the wet
+paving at 0, and there is no way to buy that from 2.4 m without a wide-angle
+lens on a person.
+
+So it stands further back: **3.28 m at 34 degrees**, 1.96 m of frame from −0.08
+to 1.88, and the 0.30 m push still leaves 16 cm of air over her head at the end
+of it. Checked at 0.02, 0.30, 0.75, 1.50 and 2.20 s — head in, feet in, jet in,
+at every one.
+
+**Proof numbers unchanged:** census `{seen:446, thin:333, plain:86, rich:27}`,
+blockers 818, tris 642533, people 100, 60 fps.
+
+### added
+
+* `__fr.buck.raw().grip()` now also reports `hand` and `pail` — the fist and the
+  bucket in HER frame, forward/up/outboard off her feet. These are the numbers
+  the tip reach was solved against.
+
+### still open
+
+Chloe's painted nape, the Bucketeer having no collider in `bodies()`, the
+parachute landing gap, the baked crouch and sunbathe clips, the 43-jadrija.js
+ground calibration, the TISAK window re-cut, and 27 measured-but-unpatched low
+figures.
+
 ## [1.376.0] — 2026-09-11
 
 ### she clasps the bail, she wanders the flat, and the cut-scene had a five-metre floor

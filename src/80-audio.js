@@ -37,6 +37,21 @@ function buildAudio() {
   let dead = false;
   let masterVol = 0.85;
 
+  /**
+   * A value an AudioParam will actually accept, with a floor under it.
+   *
+   * `Math.max(v, 0.0001)` READS LIKE THIS AND IS NOT THIS. `Math.max` returns
+   * NaN if either argument is NaN, so every one of the nine gain writes in this
+   * file that was "guarded" that way passed a NaN straight through to
+   * `setTargetAtTime`, which throws — inside the frame callback, which is the
+   * failure `shore` describes in its own note and guards its entry against.
+   *
+   * `v >= floor` is false for NaN, so this returns the floor instead. It is the
+   * same shape as the two guards further down (`!(d >= 0)`, `!(k >= 0)`), which
+   * is deliberate: that idiom is how this file already says "and not a NaN".
+   */
+  const lvl = (v, floor = 0.0001) => (v >= floor ? v : floor);
+
   /** One second of pink-ish noise, reused by every noise source in the scene. */
   function makeNoise(ac) {
     const n = ac.sampleRate * 2;
@@ -1304,7 +1319,7 @@ function buildAudio() {
     const t0 = ctx.currentTime;
     for (const v of droneVoices) {
       v.bus.gain.cancelScheduledValues(t0);
-      v.bus.gain.setValueAtTime(Math.max(0.0001, v.bus.gain.value), t0);
+      v.bus.gain.setValueAtTime(lvl(v.bus.gain.value), t0);
       v.bus.gain.exponentialRampToValueAtTime(0.0001, t0 + fade);
       for (const p of v.parts) { try { p.stop(t0 + fade + 0.1); } catch (e) { /* already */ } }
     }
@@ -1721,7 +1736,7 @@ function buildAudio() {
     const t = ctx.currentTime;
     if (fireBus) {
       fireBus.gain.cancelScheduledValues(t);
-      fireBus.gain.setValueAtTime(Math.max(0.0001, fireBus.gain.value), t);
+      fireBus.gain.setValueAtTime(lvl(fireBus.gain.value), t);
       fireBus.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
     }
     // Stopped after the fade rather than on it, and dropped either way. A
@@ -2119,7 +2134,7 @@ function buildAudio() {
       + MORPH.rows * m.rows;
     const amp = (inside ? SHORE.inside : SHORE.gain) * t * t * Math.sqrt(1 - cede);
     const n = shoreNodes;
-    n.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.45);
+    n.g.gain.setTargetAtTime(lvl(amp), t0, 0.45);
     n.lp.frequency.setTargetAtTime(
       SHORE.lpFar + (SHORE.lpNear - SHORE.lpFar) * Math.pow(t, 1.6), t0, 0.5);
     if (n.w) n.w.gain.setTargetAtTime(0.12 + 0.55 * (1 - t), t0, 0.5);
@@ -2391,7 +2406,7 @@ function buildAudio() {
     // knew about the kabine then walking into the alley would take the crowd
     // behind the water and leave the water at the level it had on the edge.
     lapNodes.g.gain.setTargetAtTime(
-      Math.max(LAP.gain * t * (1 - MORPH.duck * sat(placeRow)), 0.0001), t0, 0.35);
+      lvl(LAP.gain * t * (1 - MORPH.duck * sat(placeRow))), t0, 0.35);
   }
 
   // ── among the kabine ────────────────────────────────────────────────────────
@@ -2463,7 +2478,7 @@ function buildAudio() {
     // Squared, like the promenade's: the alley is a place you are in or are
     // not, and a linear ramp puts half a beach in your ear from the promenade.
     const amp = ROWS.gain * placeRow * placeRow;
-    rowNodes.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.40);
+    rowNodes.g.gain.setTargetAtTime(lvl(amp), t0, 0.40);
   }
 
   // ── something going past ────────────────────────────────────────────────────
@@ -3033,7 +3048,7 @@ function buildAudio() {
     const amp = on && d != null
       ? RADIO.gain * sat((RADIO.fade - d) / (RADIO.fade - RADIO.near))
       : 0.0001;
-    radioNodes.g.gain.setTargetAtTime(Math.max(amp, 0.0001), t0, 0.10);
+    radioNodes.g.gain.setTargetAtTime(lvl(amp), t0, 0.10);
     // Through a doorway and down a row of huts it loses its top before it loses
     // its level, which is why you hear that there is a radio on before you hear
     // what it is playing. Off the station it loses its top as well, and for a
@@ -3590,7 +3605,7 @@ function buildAudio() {
     songNow.gain = amp;
     songNow.hz = hz;
     songNow.hp = hpHz;
-    songNodes.g.gain.setTargetAtTime(Math.max(amp, 0.000001), t0, 0.12);
+    songNodes.g.gain.setTargetAtTime(lvl(amp, 0.000001), t0, 0.12);
     songNodes.lp.frequency.setTargetAtTime(hz, t0, 0.20);
     songNodes.hp.frequency.setTargetAtTime(hpHz, t0, 0.20);
     // 0.7 rather than 1: a room heard through its own door is off to one side,
@@ -3941,8 +3956,8 @@ function buildAudio() {
     const n = cicadaNodes;
     if (!n) return;
     const k = placeWeights().wood;
-    n.g.gain.setTargetAtTime(Math.max(
-      n.real ? cicAsk * CICADA.level * (1 + MORPH.lift * k) : cicAsk, 0.0001), t0, 1.2);
+    n.g.gain.setTargetAtTime(lvl(
+      n.real ? cicAsk * CICADA.level * (1 + MORPH.lift * k) : cicAsk), t0, 1.2);
     if (!n.real) return;
     // And the crossfade between the two hillsides, on the same weight and on
     // the same clock. In square root and not in proportion, because these are
@@ -3955,8 +3970,8 @@ function buildAudio() {
     // end — which come down to within a few metres of the concrete and read
     // 0.36 overhead where you are looking at the sea — do not put the deep-wood
     // recording half up at the water's edge.
-    n.openG.gain.setTargetAtTime(Math.max(Math.sqrt(1 - k), 0.0001), t0, CICADA.fade);
-    n.woodG.gain.setTargetAtTime(Math.max(Math.sqrt(k), 0.0001), t0, CICADA.fade);
+    n.openG.gain.setTargetAtTime(lvl(Math.sqrt(1 - k)), t0, CICADA.fade);
+    n.woodG.gain.setTargetAtTime(lvl(Math.sqrt(k)), t0, CICADA.fade);
   }
 
   /**
@@ -3968,8 +3983,22 @@ function buildAudio() {
     if (!ctx) return;
     const t0 = ctx.currentTime;
     if (!on) { cicadaStop(t0, 0.9); return; }
-    placeCan = wood;
-    cicAsk = gain;
+    // GUARDED THE WAY `lap` GUARDS ITS DISTANCE AND `rows` ITS COUNT, AND FOR
+    // THE SAME REASON — this was the one of the three that was not, and it is
+    // the whole of the fault below. Both of these are module state that a
+    // DIFFERENT caller reads every frame: `chorusLevel` runs off the frame
+    // loop's own tick whether or not anybody called `cicadas` that frame. So a
+    // single bad frame does not glitch, it LATCHES — one NaN through here and
+    // every subsequent frame throws out of `setTargetAtTime` for the rest of
+    // the session.
+    //
+    // Measured: `dropIn(x, z)` with the yaw left off makes `you.yaw` undefined,
+    // the next integration step carries that into `you.x`, `canopyAt` answers
+    // NaN, and the frame-change test upstream — `Math.abs(cicW - cicadaWood)
+    // > 0.02` — is FALSE for a NaN, so the only call that gets through is the
+    // one on the afoot transition. One call, and the bed is poisoned for good.
+    placeCan = !(wood >= 0) ? 0 : sat(wood);
+    cicAsk = !(gain >= 0) ? 0 : gain;
     sampleLoad('cicadas', (b) => { cicadaBuf = b; });
     sampleLoad('wood', (b) => { woodBuf = b; });
     const have = !!(cicadaBuf && woodBuf);

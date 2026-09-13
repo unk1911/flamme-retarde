@@ -2935,7 +2935,32 @@ const POUR = {
   // ── the two shots, in HER frame at the tip point: metres in front of her,
   // metres to her right, metres above her feet. Both the eye and the point it
   // is pointed at, because a shot is a line and not a position.
-  a: { eye: [2.40, 1.40, 0.60], at: [0.10, 0.30, 0.66], fov: 30 },
+  // RAISED, AND THE REASON IS THAT THIS SHOT NOW PLAYS EVERY TRIP.
+  //
+  // It used to sit at 0.60 m — knee height — and aim at 0.66, which is the
+  // bail. At 30 degrees and 2.4 m that is 1.29 m of frame centred on the
+  // bucket, so her head was out of it by a third of a metre and the crop
+  // landed on her hips. As an insert on a shot nobody saw twice that was
+  // arguable; at one firing every five minutes it reads as a camera that
+  // missed, and the place it crops is the worst available.
+  //
+  // THE FIRST TRY AT THE FIX WAS WORSE THAN THE FAULT, and it is worth saying
+  // why, because it is the trap this shot sets. Raising the eye to 1.15 and the
+  // aim to 1.05 does put her head in frame — and it puts the WATER out of it.
+  // The jet runs from the lip to the paving, so a frame that starts at her
+  // knees has thrown away the event the cut exists for; A/B'd against the old
+  // build at one deterministic instant (`frame(0.75)`, pour 0.692, roll 0.48),
+  // the old shot had a bright column of water down the left of frame and the
+  // raised one had none at all — the pail's own body occluding it from the
+  // steeper angle, with the ground under it below the bottom edge.
+  //
+  // So the shot has to hold about 1.8 m of subject — her crown at 1.62 down to
+  // the wet paving at 0 — and the only way to buy that without a wide-angle
+  // lens on a person is to stand further back. 3.28 m at 34 degrees is 1.96 m
+  // of frame from -0.08 to 1.88, and the 0.30 m push still leaves 16 cm of air
+  // over her head at the end of it. Checked at 0.02, 0.30, 0.75, 1.50 and 2.20
+  // s: head in, feet in, jet in, at every one.
+  a: { eye: [3.28, 1.76, 1.10], at: [0.15, 0.30, 0.90], fov: 34 },
   b: { eye: [1.577, 2.751, 1.50], at: [0.00, 0.00, 1.42], fov: 26 },
   push: 0.30,        // m of lean-in on shot A, and then it stops
   pushFor: 1.25,     // s, which is when the last of the water is over the lip

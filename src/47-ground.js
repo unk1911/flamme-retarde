@@ -1987,7 +1987,21 @@ async function buildGround(scene, field) {
     return true;
   }
 
-  function dropIn(x, z, yaw, lost = true) {
+  function dropIn(x, z, yaw = 0, lost = true) {
+    // A DEFAULT AND A REFUSAL, BECAUSE THIS IS A HANDLE PROBES CALL BY HAND.
+    // `dropIn(x, z)` reads like a legal call — `lost` has a default and `yaw`
+    // did not — and it used to set `you.yaw` to undefined. The next integration
+    // step carries that into `you.x`, `canopyAt` then answers NaN, and the
+    // cicada bed latches it and throws out of the frame callback on every
+    // frame for the rest of the session. That cost an afternoon once; nothing
+    // in the error names this function.
+    //
+    // Non-finite arguments are refused rather than clamped: a caller who asks
+    // to be put at NaN has a bug of their own, and quietly landing them at the
+    // origin would hide it.
+    if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(yaw)) {
+      return false;
+    }
     const [px, pz] = confine(x, z);
     you.x = px; you.z = pz;
     // ASKED COLD, AND MEASURED RATHER THAN ASSUMED. `walkY` takes a third

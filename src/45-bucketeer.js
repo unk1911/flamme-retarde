@@ -689,6 +689,36 @@ const BUCK = {
   // reason forward is the honest direction for this and sideways never was.
   offerUp: [0.15, -0.92, 0.36],
   offerFore: [0.86, -0.30, 0.42],
+  // WHERE THE SAME TWO BONES GO WHEN SHE TIPS IT, which is the third errand
+  // for this pair and the one that was being faked.
+  //
+  // `placePail` used to swing the BUCKET 220 mm forward and 80 mm up over the
+  // roll and leave the hand where it was — the one cheat that file admits to,
+  // and at full tip it put 207 mm of daylight between her fist and the bail.
+  // The note over it is right about why the swing has to happen (a pail emptied
+  // from a hand at the hip empties on to the foot under it, behind her own leg,
+  // and is unwatchable) and wrong about there being no way to do it: `offerUp`
+  // is a solved forward reach on these exact two bones and its own note ends
+  // "the pail — which hangs from the palm — goes with it".
+  //
+  // So this is the offer's mechanism with the pour's numbers. SOLVED AGAINST
+  // THE CHEAT rather than typed, because the bucket's world position at full
+  // tip is load-bearing three ways over — the jet, the puddle and both cut
+  // cameras are built on it — so the hand had to come to the pail and the pail
+  // had to stay put. See `tipFull` for what the sweep landed on.
+  // SOLVED, not typed — swept on a two-parameter blend between the carry
+  // targets and the offer's, at peak roll, against the position the cheat used
+  // to put the bucket in. `up` came out almost entirely off the forearm target
+  // and `forward` off both, and the lateral needed the upper arm's z opened
+  // back up by 0.073 on its own. Final error at the fist, against the three
+  // numbers the old swing produced: **-2.1 mm forward, +2.1 mm up, -1.6 mm
+  // outboard**. Inside RULE 5 on every axis, which is the whole point: the jet,
+  // the puddle and both cut cameras are aimed at where that bucket is.
+  tipUp: [0.213, -0.930, 0.405],
+  tipFore: [0.848, -0.310, 0.4205],
+  // How far into the roll the reach is complete, in the same units `placePail`
+  // ramped its swing over, so the timing is unchanged.
+  tipFull: 2.05,
   // And how stopped she has to be before any of it shows, in metres a second,
   // as a ramp that is squared so the bottom of it is properly dead.
   //
@@ -2346,6 +2376,8 @@ async function buildBucketeer(scene, vik, walkY) {
   const cTF = new THREE.Vector3(...BUCK.armFore).normalize();
   const cOU = new THREE.Vector3(...BUCK.offerUp).normalize();
   const cOF = new THREE.Vector3(...BUCK.offerFore).normalize();
+  const cRU = new THREE.Vector3(...BUCK.tipUp).normalize();
+  const cRF = new THREE.Vector3(...BUCK.tipFore).normalize();
   // The two above blended towards the two below, when she offers. Both bones
   // and not just the upper one — see `offerUp`: moving the shoulder alone is
   // what put the elbow behind her.
@@ -3216,7 +3248,19 @@ async function buildBucketeer(scene, vik, walkY) {
     const onWalk = st.phase === 'down' || st.phase === 'up';
     const still = clamp(1 - st.vel / BUCK.offerStill, 0, 1);
     const offer = (st.offered && onWalk) ? st.noticeAmt * still * still : 0;
-    if (offer > 0.002) {
+    // THE TIP, and it takes precedence, though the two can never both be up:
+    // `offer` is gated on `down` or `up` and the roll only happens in `tip`.
+    // The `else if` is there so that the day somebody widens either gate, the
+    // arm holding ten litres over a rail wins over the arm being polite.
+    //
+    // Same ramp `placePail` swung the bucket on, so nothing about the timing of
+    // the pour moved — see `tipUp`.
+    const reach = st.tip > 0
+      ? Math.sin(clamp(st.tip / BUCK.tipFull, 0, 1) * Math.PI * 0.5) : 0;
+    if (reach > 0.002) {
+      cTO.copy(cTU).lerp(cRU, reach).normalize();
+      cTP.copy(cTF).lerp(cRF, reach).normalize();
+    } else if (offer > 0.002) {
       cTO.copy(cTU).lerp(cOU, offer).normalize();
       cTP.copy(cTF).lerp(cOF, offer).normalize();
     } else {
@@ -3511,14 +3555,22 @@ async function buildBucketeer(scene, vik, walkY) {
       // rotation of the hand holding it. Everything the bottle needed
       // `GRIP_UP` for, gravity does here for free.
       //
-      // Plus the swing out, which is the one cheat in this file and is here
-      // because there is no clip for it. A bucket emptied from a hand hanging
-      // at a hip empties on to the foot under it — correct, and unwatchable,
-      // because the whole event happens behind her own leg. Twenty-two
-      // centimetres forward and eight up over the roll is an arm being swung
-      // out to tip something, it puts the water clear of her feet, and it is
-      // small enough that her fist is still on the bail.
-      const sw = Math.sin(clamp(st.tip / 2.05, 0, 1) * Math.PI * 0.5);
+      // THE SWING OUT USED TO BE HERE, AND IT WAS THE ONE CHEAT IN THIS FILE.
+      //
+      // The reason for it is still right and is worth keeping: a bucket emptied
+      // from a hand hanging at a hip empties on to the foot under it, which is
+      // correct and unwatchable, because the whole event happens behind her own
+      // leg. What was wrong was the thing being moved. Twenty-two centimetres
+      // forward and eight up were added to the BUCKET and not to the hand, and
+      // "it is small enough that her fist is still on the bail" was measured
+      // and is false: at peak roll it put **226 mm** between the two, which
+      // once the fingers actually closed round the bail (see `gripTurn`) is a
+      // pail flying along beside an open reaching hand.
+      //
+      // It is an arm reach now — `tipUp` and `tipFore`, solved against the
+      // three numbers this line used to produce so that the bucket ends up in
+      // the same place to within 2 mm. The hand goes to the pail; the pail does
+      // not go anywhere, because three other things are aimed at it.
       // And six centimetres outboard, which was not a cheat but a measurement,
       // and the measurement was wrong. It said "the palm is about 90 mm off
       // the outside of a thigh"; the bind mesh's right thigh reaches z 0.205
@@ -3534,9 +3586,9 @@ async function buildBucketeer(scene, vik, walkY) {
       // the pail stops hanging plumb under the hand holding it, which is the
       // one thing a bucket on a bail always does.
       const rx = Math.sin(st.yaw), rz = Math.cos(st.yaw);   // her right
-      vHold.set(vPalm.x + Math.cos(st.yaw) * 0.22 * sw + rx * 0.06,
-        vPalm.y - PAIL.bail + 0.08 * sw,
-        vPalm.z - Math.sin(st.yaw) * 0.22 * sw + rz * 0.06);
+      vHold.set(vPalm.x + rx * 0.06,
+        vPalm.y - PAIL.bail,
+        vPalm.z + rz * 0.06);
       vRest.lerp(vHold, st.held);
     }
     kanta.position.copy(vRest);
@@ -5051,6 +5103,19 @@ async function buildBucketeer(scene, vik, walkY) {
         // number rather than a world coordinate nobody can read.
         stand: +(Math.sin(st.yaw) * (kanta.position.x - st.x)
           + Math.cos(st.yaw) * (kanta.position.z - st.z)).toFixed(4),
+        // The fist in HER frame — forward, up, outboard, off her feet. This is
+        // the number `tipUp` was solved against: the reach has to put the hand
+        // where the old cheat put the bucket, or the pour moves.
+        hand: [
+          +(Math.cos(st.yaw) * (vPalm.x - st.x)
+            - Math.sin(st.yaw) * (vPalm.z - st.z)).toFixed(4),
+          +(vPalm.y - st.y).toFixed(4),
+          +(Math.sin(st.yaw) * (vPalm.x - st.x)
+            + Math.cos(st.yaw) * (vPalm.z - st.z)).toFixed(4)],
+        pail: [
+          +(Math.cos(st.yaw) * (kanta.position.x - st.x)
+            - Math.sin(st.yaw) * (kanta.position.z - st.z)).toFixed(4),
+          +(kanta.position.y - st.y).toFixed(4)],
         knuckle: knuck.toArray().map((n) => +n.toFixed(4)) };
     },
     /**
