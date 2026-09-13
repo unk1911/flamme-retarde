@@ -1190,6 +1190,44 @@ concrete. 89 people at 60 fps.
   is to open the frame and then go and look at the same spot in the build.
   What the sweep is good for: it is how the fish-head tap, Brod, Pizzeria Kod
   Koze, the JadriJa wall and the wood ground were confirmed built above.
+- **FOOT LOCKING: measured, and the case for it is the `clipMin` floor —
+  13 Sep.** Misha sent theorangeduck.com/page/inverse-kinematics-foot-locking.
+  Its diagnosis is right and half of it is already here; what is missing is
+  worth having, and here are the numbers.
+  **What we already do.** `fig.state.speed = clamp(st.vel / BUCK.clipSpeed,
+  clipMin, clipMax)` — the clip rate is already driven by her travel speed,
+  which is the article's own "match foot velocity to root motion". The player's
+  gait does the same off distance (`you.gait += (moved / GROUND.stride) * PI`).
+  **What it cannot do.** `clipMin` is 0.30 and the note over it is right that
+  the alternative is "a woman skipping down" the flight. So at her slow paces
+  the rate saturates and stops tracking. Measured on the flat (leg 3, stance
+  isolated as runs of 5+ frames within 12 mm of `walkY`, touchdown and lift-off
+  trimmed, 33 % / 42 % stance which is a believable duty cycle): **the planted
+  toe slides 8.6 and 9.3 mm every frame, at 0.75 and 0.66 of her travel
+  speed.** On the stairs it is 4.9 mm at 0.61-0.75. Lateral slide, which no
+  rate change can touch, is 2.5-4.5 mm.
+  **So foot locking is the third option** the `clipMin` note did not have: keep
+  the slow cadence that looks right AND stop the feet skating.
+  **The rig already is the article's rig** — `legUL -> legLL -> footL -> toeL`,
+  hip/knee/heel/toe, and 45-bucketeer.js already says "`footL`'s head is the
+  ANKLE" and "`toeL`'s head is the ball of the foot, which is the thing
+  actually touching Croatia", which is his toe-centric premise word for word.
+  `fig.aim()` writes per-bone deltas already and `port()` proves the overlay
+  composes.
+  **One thing must NOT be lifted: his contact detection.** He thresholds toe
+  VELOCITY at 0.1-0.5 m/s. Measured here, the toe's 10th-percentile world speed
+  is 0.278 m/s — there is no low band to threshold, because the slide is the
+  thing that would have to be detected. His signal assumes the clip is right
+  and only the runtime breaks it; ours is compromised at the source on purpose.
+  **Height above `walkY` works** and is what the numbers above use.
+  Take: the two-bone solve with his soft clamp (stops a locked foot
+  straightening the leg), the lock/unlock hysteresis, and cubic inertialization
+  for the transitions — all given in closed form in the article. Skip: the
+  25 000-iteration offline solver, which corrects a clip against its OWN root
+  motion and so cannot fix a clip driven along a route at a speed it has never
+  heard of.
+  Cost is not the objection: ~30 walking figures x 2 legs is 60 two-bone solves
+  a frame against 642 533 tris.
 - **Probe harness: `gpuLaunch()` returns an `env` as well as `args`, and both
   have to reach `spawn`.** Passing only the args leaves `GALLIUM_DRIVER` and
   the WSL library path unset, `--use-angle=gl` falls through to software GL,
