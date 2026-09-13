@@ -1096,6 +1096,30 @@ concrete. 89 people at 60 fps.
   riser line), and t 470-489 far inland at s 30-40, which is `toWorld`
   extrapolating past the resort's own back edge. Everything past t 572 is
   outside the promenade and not drawn at all.
+- **The Bucketeer's kitchen: one of the two blocking gaps is a CHOICE, not the
+  survey — 13 Sep.** 1.376.0 shipped her thirteen-node wander with the note
+  that the upper flat's kitchen is unreachable, measured: the cabinet run ends
+  at x -0.89 against the sofa's back at -0.63 (**0.26 m**) and the sofa's east
+  end at 0.03 against the round table's west edge at 0.23 (**0.20 m**). Both
+  are under the 0.31 m worst clearance her shipped route already walks, so she
+  was kept out. Misha had explicitly asked for the kitchen.
+  Read back to source, the two gaps are not the same kind of thing. The **sofa
+  is surveyed** — `living()` in vikendica.py says *"the plan puts a 390 sofa
+  across the middle of it"*, and `sofa(kit, -0.30, -1.05, yaw=-pi/2,
+  length=1.28, depth=0.66)` carries its own note that its back is on the
+  bathroom *"which is what the photograph shows"*. That one does not move. The
+  **round table does not come from the survey**: the comment over
+  `round_table(kit, 0.55, -2.00, ...)` records it being moved there by
+  judgement when the armchair was turned round — *"The low table moves south
+  with it: two seats side by side want the table in front of them and not
+  between them."*
+  So the east slot is closed by furniture somebody placed by eye, and nudging
+  that table south or east would widen 0.20 m toward 0.45. **It still would not
+  be enough on its own** — her body is 0.48 m across before clearance — so this
+  is not a fix, it is the one degree of freedom that exists. The real options
+  are Misha's: move the table AND accept ~0.26 m (5 cm tighter than she already
+  walks, which is a person turning sideways), or leave the kitchen out. Not
+  something to decide alone on a flat built from his photographs.
 - **The crowd's feet are FINE, and the sweep that says otherwise is the wrong
   instrument — MEASURED 13 Sep.** Comparing every visible figure's `y` against
   `walkY` at its own (x, z) reports 24 of 76 more than 30 mm out, with a worst
