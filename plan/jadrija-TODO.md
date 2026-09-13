@@ -1285,90 +1285,49 @@ concrete. 89 people at 60 fps.
   is to open the frame and then go and look at the same spot in the build.
   What the sweep is good for: it is how the fish-head tap, Brod, Pizzeria Kod
   Koze, the JadriJa wall and the wood ground were confirmed built above.
-- **FOOT LOCKING: measured, and the case for it is the `clipMin` floor —
-  13 Sep.** Misha sent theorangeduck.com/page/inverse-kinematics-foot-locking.
-  Its diagnosis is right and half of it is already here; what is missing is
-  worth having, and here are the numbers.
-  **What we already do.** `fig.state.speed = clamp(st.vel / BUCK.clipSpeed,
-  clipMin, clipMax)` — the clip rate is already driven by her travel speed,
-  which is the article's own "match foot velocity to root motion". The player's
-  gait does the same off distance (`you.gait += (moved / GROUND.stride) * PI`).
-  **What it cannot do.** `clipMin` is 0.30 and the note over it is right that
-  the alternative is "a woman skipping down" the flight. So at her slow paces
-  the rate saturates and stops tracking. Measured on the flat (leg 3, stance
-  isolated as runs of 5+ frames within 12 mm of `walkY`, touchdown and lift-off
-  trimmed, 33 % / 42 % stance which is a believable duty cycle): **the planted
-  toe slides 8.6 and 9.3 mm every frame, at 0.75 and 0.66 of her travel
-  speed.** On the stairs it is 4.9 mm at 0.61-0.75. Lateral slide, which no
-  rate change can touch, is 2.5-4.5 mm.
-  **~~So foot locking is the third option the `clipMin` note did not have.~~
-  IT IS NOT, AND THE NUMBER THAT SETTLES IT IS 430 mm — 13 Sep.** Measured the
-  travel of the CLIP's own toe across each stance run: **245, 428, 441, 464 mm
-  on the left and 50, 432, 432, 307 on the right**, typically 430 over a
-  63-frame stance. Her leg is about 850 mm. Holding the toe still for a stance
-  therefore asks for a correction of **half a leg length**, which no solver can
-  absorb — the soft clamp refuses it, `maxPull` refuses it, and any threshold
-  loose enough to admit it would straighten the knee into a stilt.
-  Foot locking assumes the clip is broadly right and the runtime has introduced
-  centimetres. Ours is out by half a leg a step, on purpose, because `clipMin`
-  floors the rate so she does not skip downstairs. **The choice really is the
-  two the `clipMin` note names.** A third option would have to be a clip: a
-  baked stair descent, or a walk baked at her actual pace.
-  **The rig already is the article's rig** — `legUL -> legLL -> footL -> toeL`,
-  hip/knee/heel/toe, and 45-bucketeer.js already says "`footL`'s head is the
-  ANKLE" and "`toeL`'s head is the ball of the foot, which is the thing
-  actually touching Croatia", which is his toe-centric premise word for word.
-  `fig.aim()` writes per-bone deltas already and `port()` proves the overlay
-  composes.
-  **One thing must NOT be lifted: his contact detection.** He thresholds toe
-  VELOCITY at 0.1-0.5 m/s. Measured here, the toe's 10th-percentile world speed
-  is 0.278 m/s — there is no low band to threshold, because the slide is the
-  thing that would have to be detected. His signal assumes the clip is right
-  and only the runtime breaks it; ours is compromised at the source on purpose.
-  **Height above `walkY` works** and is what the numbers above use.
-  Take: the two-bone solve with his soft clamp (stops a locked foot
-  straightening the leg), the lock/unlock hysteresis, and cubic inertialization
-  for the transitions — all given in closed form in the article. Skip: the
-  25 000-iteration offline solver, which corrects a clip against its OWN root
-  motion and so cannot fix a clip driven along a route at a speed it has never
-  heard of.
-  Cost is not the objection: ~30 walking figures x 2 legs is 60 two-bone solves
-  a frame against 642 533 tris.
-  **BUILT ONCE AND REVERTED — 13 Sep.** Roughly 250 lines: a `foot` constant
-  block, a two-bone solver with the soft clamp, a two-threshold state machine
-  and a smoothstepped hold, called between `poseCarry()` and `fig.update(dt)`,
-  with a `lock(false)` handle for the A/B. It ended up a NO-OP on the mean and
-  WORSE on the tail — 10.35/9.82 mm a frame against 10.16/10.36 with it off,
-  inside the 9.5-10.5 run-to-run spread, but the worst frame went 39.8 -> 70.6.
-  Not shipped. Three real bugs were found on the way and they are the value
-  here, because the next attempt will hit all three:
-  1. **`boneAt` answers with the aims already in it.** Solving from that is a
-     loop closed on its own output — it settles, but wherever it likes. Held
-     still, the first cut was stable to five decimals and **19 mm** from where
-     the foot belonged; moving, it made slide WORSE than doing nothing
-     (27.8 mm a frame against 10.2, worst frame 164 mm against 39.8). Fix:
-     clear the six leg aims, `fig.update(0)` to refold the clip's own pose, and
-     read THAT. One extra fold of thirty bones, which is nothing.
-  2. **The foot's rotation order is not the obvious one.** The hip's aim
-     reaches the foot through the chain and the knee's is laid on top, so the
-     foot gains `fQK * fQR` — swing first, then bend. The other way round is
-     19 mm out.
-  3. **The residual was not under-shoot, it was a third rotation that should
-     never have been there.** Rebuilt 13 Sep: the tempting form takes the
-     interior angle at the hip and at the knee and turns both by the
-     difference, and it is wrong here because `aim` rotates the bone AND
-     EVERYTHING UNDER IT rigidly — turning the hip does not change the angle at
-     the hip, it just points the whole leg somewhere else, and the swing that
-     follows corrects from the wrong place. The knee is the only joint that can
-     change the reach. Bend the knee by its own angle difference, work out
-     where that puts the ankle, then turn the hip ONCE to aim at the target:
-     two `aim`s, not three. **Static residual went 55 mm -> 19 -> 5.6 -> 0.000
-     over eight frames.** The solver is exact. It is the approach that does not
-     fit, for the reason above.
-  The measurement harness is the other thing worth keeping: stance as runs of
-  five or more frames with the toe inside 30 mm of `walkY`, edges trimmed, and
-  ALWAYS a second lock-off run as a control — the spread between two identical
-  runs is 1 mm, which is most of the effect being looked for.
+- **FOOT LOCKING: NOT NEEDED. The foot is 80-90 per cent planted, and every
+  number that said otherwise was my own instrument — 13 Sep.** Misha sent
+  theorangeduck.com/page/inverse-kinematics-foot-locking. It was built twice
+  and thrown away twice, and the useful part is why.
+  **THE MEASUREMENT THAT SETTLES IT, and it uses no contact test at all.** Take
+  the toe's world speed every frame and look at the bottom of the
+  distribution — the slowest frames ARE the planted foot, by definition, and
+  nothing has to be decided about when contact starts:
+
+  | leg | her body | toe 5th pct | toe 15th pct |
+  |---|---|---|---|
+  | 3, flat indoors | 11.36 mm/frame | 2.18 / 1.66 | 3.82 / 3.36 |
+  | 4, flat indoors | 9.87 | 1.32 / 2.05 | 2.55 / 3.53 |
+  | 7, the flight | 7.33 | 0.96 / 0.96 | 2.42 / 2.44 |
+
+  **One to two millimetres a frame.** Confirmed from the other side: tracked in
+  HER frame, the toe sweeps backward at 0.377 m/s while she walks forward at
+  0.440, so the residual is 0.063 m/s — 1.05 mm a frame — and the swing range
+  is 0.683 m, which is a proper stride. The clip plants its feet.
+  **WHERE 8.6 mm CAME FROM, because it was in this file for a morning.** A
+  contact test of "toe within 30 mm of `walkY`" catches the swing foot as it
+  passes low, and on a slope `walkY` moves under it. That inflated the stance
+  slide to 8.6-9.3 mm and turned a whole swing into a "430 mm stance travel",
+  off which I argued that the correction was half a leg length and IK could
+  never absorb it. Both numbers were artefacts. **On sloping ground, do not
+  detect contact by height — read the bottom of the speed distribution.**
+  So the `clipMin` trade the note over that constant describes is real and
+  SMALL, and the two options it names are the whole of it. Nothing to fix.
+  **The solver, if it is ever wanted for something else, works.** Static
+  residual 0.00000 m over eight frames on a frozen figure, after three bugs:
+  1. `boneAt` answers with the aims already folded in, so solving from it is a
+     loop closed on its own output — stable, and wherever it likes. Clear the
+     aims and `fig.update(0)` first.
+  2. The foot gains `fQK * fQH`, swing then bend, not the other way round.
+  3. **Two rotations, not three.** The tempting form turns the hip by its
+     interior-angle difference, and `aim` rotates the bone AND EVERYTHING UNDER
+     IT rigidly, so that does not change the angle at the hip at all — it
+     points the whole leg somewhere else and the swing then corrects from the
+     wrong place. The knee is the only joint that can change the reach: bend
+     the knee, find where the ankle lands, turn the hip ONCE to aim.
+  And the harness rule that came out of it: always run a second lock-off pass
+  as a control. Two identical runs differ by 1 mm, which is the size of the
+  entire effect.
 - **Probe harness: `gpuLaunch()` returns an `env` as well as `args`, and both
   have to reach `spawn`.** Passing only the args leaves `GALLIUM_DRIVER` and
   the WSL library path unset, `--use-angle=gl` falls through to software GL,
