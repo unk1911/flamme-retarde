@@ -104,6 +104,18 @@ done is worse than no list.
 
 - **The per-shop detail pass.** One shop per iteration, against its own
   photographs.
+  **READ THE FUNCTION BEFORE BELIEVING THE PHOTOGRAPH — 13 Sep, and this is the
+  fifth time in one session.** The pass on the pizzeria produced a list of
+  three things the frame had and the game did not: a wall rack of pots, a
+  candle lantern, a mosaic table top. **All three were already drawn**, further
+  down the same `pizzeriaFront` that had already been half read — along with
+  the Ledo freezer and its oval. Only the ground it stands on was actually
+  missing.
+  The same shape had already caught the fish-head tap, the shore playground,
+  the boat mural and KOD-KOSE that same morning. The rule that comes out of it:
+  a shop-pass finding is not a finding until the shop's own draw function has
+  been read END TO END. These functions are three hundred lines and the detail
+  is at the bottom.
   **PIZZERIA, first pass — 13 Sep.** Shot the shop in game and put it beside
   `1000150335`. Most of it is right and better than the grep suggests: the
   red-on-white plate, the two green louvred leaves with nine slats each, the

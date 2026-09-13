@@ -66,11 +66,20 @@ an optional `tJit`, off by default so the band is laid to the millimetre it
 always was, and both quads either side of a station take the same jittered line
 so the flags still tile without a gap.
 
-### also
+### also — and this paragraph was wrong, corrected in place
 
-Still missing from `1000150335` and not built here: the wall rack of small pots
-under the painted name, the black candle lantern on the ledge, and the mosaic
-top on the round table.
+It said: *"Still missing from `1000150335` and not built here: the wall rack of
+small pots under the painted name, the black candle lantern on the ledge, and
+the mosaic top on the round table."* **All three were already built** and the
+list was made from the photograph without reading to the end of the function
+that draws the shop. `pizzeriaFront` has "the wall planter, three pockets of
+herbs on a grey batten", "the lantern on its stone plinth at the corner", and
+"the terrace: one mosaic table and four yellow chairs" — the last with its own
+note about ten big chips scattered over a white top. The Ledo chest freezer at
+the foot of the steps is there too, oval mark and all.
+
+So the pizzeria was **already fully detailed apart from the ground it stands
+on**, and the apron is the whole of what this release adds to it.
 
 **Proof numbers:** census `{seen:446, thin:333, plain:86, rich:27}`, blockers
 818, people 100, all unchanged; tris **642533 → 642821**, which is the apron.
