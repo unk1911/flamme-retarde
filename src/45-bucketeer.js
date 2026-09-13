@@ -2026,6 +2026,38 @@ async function buildBucketeer(scene, vik, walkY) {
   // shader: `wear` is the whole mechanism and the shadow pass gets it for free,
   // because a draw range belongs to the geometry and both materials share one.
   fig.wear(false);
+
+  // And the septum ring goes, from her decode alone. Misha, 13 Sep 2026:
+  // *"remove the nosering for the bucketeering baye"*. Baye at the ladder keeps
+  // hers — she is the same payload but her own decode (`loadSkin` does not
+  // cache), so an edit to this index buffer reaches nobody else.
+  //
+  // Found by reading the blob, not by guessing a box: of the 374 vertices in
+  // the gold (219, 184, 102) of the jewellery, exactly 38 stand above 1.4 m —
+  // the rest are at the anklets and the waist — and they are one connected
+  // shell of 76 triangles on the midline at the tip of the nose, which is the
+  // hoop `extras` builds in tools/blender/human_mh.py. No other triangle
+  // touches any of them.
+  //
+  // Collapsed to a point rather than cut out, because the index count is
+  // load-bearing: `wear` sets the draw range to `ni - shed`, and the wrap is
+  // the last `shed` indices, so a shorter buffer would put 228 indices of hip
+  // wrap back on her. A zero-area triangle rasterises nothing in either the
+  // colour pass or the shadow pass, and both of them share this geometry.
+  {
+    const g = fig.mesh.geometry;
+    const col = g.getAttribute('aVCol').array;
+    const py = g.getAttribute('position').array;
+    const ix = g.index.array;
+    const ring = (v) => col[v * 3] === 219 && col[v * 3 + 1] === 184 &&
+      col[v * 3 + 2] === 102 && py[v * 3 + 1] > 1.4;
+    for (let i = 0; i + 2 < ix.length; i += 3) {
+      if (ring(ix[i]) && ring(ix[i + 1]) && ring(ix[i + 2])) {
+        ix[i + 1] = ix[i]; ix[i + 2] = ix[i];
+      }
+    }
+    g.index.needsUpdate = true;
+  }
   fig.play('idle', { fade: 0 });
   const mesh = fig.mesh;
   // She spends the loop inside a 4 m room and on a landing, both of which are

@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.381.0] — 2026-09-13
+
+### the Bucketeer loses the nose ring
+
+**"remove the nosering for the bucketeering baye."** Off her, and only
+her: Baye at the ladder keeps hers. They share one baked mesh, but
+`loadSkin` does not cache, so each has her own decode and an edit to the
+Bucketeer's index buffer reaches nobody else.
+
+The ring was found by reading the blob, not by drawing a box round her
+nose: of the 374 vertices in the jewellery's gold (219, 184, 102), exactly
+38 stand above 1.4 m. They form one connected shell of 76 triangles on the
+midline at the tip of her nose, and no other triangle touches them.
+
+Those triangles are collapsed to a point rather than cut out, because the
+index count matters: `wear` draws `ni - shed`, and the hip wrap is the
+last `shed` indices, so a shorter buffer would have put 228 indices of
+wrap back on her. A zero-area triangle draws nothing in the colour pass
+or the shadow pass.
+
+Checked in the build: her mesh has 76 collapsed and 0 visible, both of
+Baye's meshes still have 76 visible, and an eye-height close-up shows no
+ring.
+
 ## [1.380.0] — 2026-09-13
 
 ### the pizzeria gets its paving, and `paveBand` learns about rectangles
