@@ -1174,6 +1174,22 @@ concrete. 89 people at 60 fps.
   the first downward hit is not the ground under a canopy.** Anybody who runs
   this sweep again and "fixes" the outliers will lift four people off their
   sunbeds and stand a swimmer on the sea.
+- **"Which frames has the code never cited" is NOT a list of unbuilt things —
+  13 Sep.** Swept `survey/4`: of 47 stills, **21 are never named anywhere in
+  `src/`**, which looks like a backlog and is not one. Chased three of them:
+  `_350`/`_351` (a playground and a boat mural on the shore block), and the
+  contact sheet of the other nine. **Every subject was already built** — the
+  playground from `a_160`, the boat mural as `brodMural` from
+  `murals/brod-mural.jpg`, eleven metres of it with the water arris to arris.
+  `_350`/`_351` are the same wall as `brod-mural.jpg` from its two ends in
+  evening sun instead of frontally in overcast.
+  **The heuristic fails because the code cites ONE frame per subject and the
+  survey carries several of each.** An uncited frame usually means a second
+  angle on something already standing in the game. Anybody minded to run this
+  sweep should compare SUBJECTS, not filenames, and the cheapest way to do that
+  is to open the frame and then go and look at the same spot in the build.
+  What the sweep is good for: it is how the fish-head tap, Brod, Pizzeria Kod
+  Koze, the JadriJa wall and the wood ground were confirmed built above.
 - **Probe harness: `gpuLaunch()` returns an `env` as well as `args`, and both
   have to reach `spawn`.** Passing only the args leaves `GALLIUM_DRIVER` and
   the WSL library path unset, `--use-angle=gl` falls through to software GL,
