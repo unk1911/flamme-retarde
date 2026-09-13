@@ -8,6 +8,101 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.379.0] — 2026-09-13
+
+### every walker takes the porch step at a human speed, and the ceiling is a slope
+
+The oldest item on the list: promote the Bucketeer's `settleY` rate limit into
+whatever owns `you.y`, so the player stops crossing an 84 mm step in one frame.
+It has sat there because it touches the player's vertical feel. Three
+measurements changed the shape of the answer, and the first of them says the
+obvious version of this change is wrong.
+
+**HER NUMBER DOES NOT PROMOTE.** She walks the flight at a measured stair pace —
+0.41 m/s of vertical, comfortably under her 0.85 m/s ceiling. You can run down
+it. The flight's real gradient is 0.934, so at a 3 m/s sprint the ground under
+you drops at 2.3 m/s, and a flat 0.85 would leave you **hovering above the ramp
+all the way to the bottom**. Moving the constant across would have shipped a
+worse artefact than the one it fixed.
+
+**SO THE CEILING IS A SLOPE, NOT A SPEED**, and what makes that safe is how far
+apart the two cases turn out to be. Sampled at 400 points a leg, the flight's
+gradient is **0.934 at the median and 0.934 at the 95th** — a clean constant
+ramp — while the seams register as gradients of **22.0 and 22.4**, which is to
+say vertical. Any threshold in that gap separates a hill you are walking down
+from a hole in the floor. 1.30 sits 39 per cent over the steepest real ground
+and seventeen times under the gentlest seam.
+
+Allowance per frame is `moved * 1.30 + 0.85 * dt`: the first term is what a real
+ramp could honestly have risen by, the second a floor so a seam still resolves
+while you stand on it.
+
+**Proven to cost nothing on real ground.** Simulated against the shipped
+`walkY` down the flight itself, leg 7-8:
+
+| speed | worst per-frame step | lag behind the true ground |
+|---|---|---|
+| creep 0.4 m/s | 6.2 mm | **0.000 mm** |
+| walk 1.4 m/s | 21.8 mm | **0.000 mm** |
+| sprint 3.0 m/s | 46.6 mm | **0.000 mm** |
+
+Not "small" — zero, at every speed, because on a ramp the allowance always
+exceeds what the ramp asks. And on the 84.2 mm porch seam:
+
+| speed | before | after | transient lag |
+|---|---|---|---|
+| creep | 84.1 mm | **22.8 mm** | 61 mm |
+| walk | 84.3 mm | **44.5 mm** | 40 mm |
+| sprint | 84.4 mm | **79.2 mm** | 5 mm |
+
+The slower you cross it the more it is spread, which is the right shape: at a
+sprint you are covering 50 mm of ground a frame anyway and an 84 mm step is
+proportionally a smaller event. It does little at full pace and that is by
+design, not by omission.
+
+**THE CUTOFF WAS CHOSEN OFF A DISTRIBUTION, AFTER THE FIRST ONE WAS WRONG.**
+What this limiter costs is transient lag — your feet briefly off the true ground
+by up to the size of the thing being eased — so the cap on what counts as a seam
+rather than a drop is the whole of its safety. The first value here was 0.45 m,
+a tall step, and easing a 44 cm one would put you 40 cm under the paving for a
+quarter of a second: a far worse artefact than the pop it replaced.
+
+Swept along four lines of the promenade at s = 8, 14, 20 and 26, **94 284
+samples** at one frame's spacing: **68 places where the ground steps by more
+than 6 mm**, median 11.7 mm, p90 167 mm, worst 855 mm, with 8 over 120 mm and 2
+over 450. The tail is kerbs and the edge of the mole — things you step off,
+which must stay instant. **0.12 m** takes 60 of the 68 including all four of the
+vikendica's, and bounds the worst lag it can ever produce at about a tenth of a
+metre. Anything bigger is handed over whole, exactly as before.
+
+Also gated off while you are airborne: in the air the floor under you is
+whatever you happen to be over, and easing that would land you on a height you
+were above two frames ago. A landing is allowed to be a discontinuity — it is
+the one place in here that already was.
+
+### a correction to 1.376.0
+
+That entry said the stair-ramp fix explained the unexplained 50 mm in
+`BUCK.stepRate`'s note. **It does not.** Re-measured on the shipped build, the
+four seams now read 21.5, 21.4, **50.0** and 84.2 mm against the 37.6, 6.2, 50.0
+and 84.1 they read before. The fix redistributed the sawtooth across the two
+stair legs — which is what it was for, and the feet are right — but the 50 mm
+step off the bottom on to the made ground is untouched and always was a
+different seam. It is one of the four this release eases.
+
+**Proof numbers unchanged:** census `{seen:446, thin:333, plain:86, rich:27}`,
+blockers 818, tris 642533, people 100, 61 fps. Walked and hopped twice on the
+sand to check landings: `hop` back to 0, `gy` equal to `y`, nothing stuck.
+
+### still open, and now measured
+
+The limiter is a constant slope. An allowance that tracked the gradient the
+ground has ACTUALLY been showing would spread the porch step over the full
+0.10 s at any pace, because both sides of it are flat — but it needs a fast
+attack and a slow release to avoid lagging the entry to the flight, and that is
+a second design on the player's core feel rather than a constant. The 68 seams
+above are the measurement that would justify it.
+
 ## [1.378.0] — 2026-09-13
 
 ### you can no longer walk through the woman carrying the water

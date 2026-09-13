@@ -54,6 +54,63 @@ const GROUND = {
   // this walker is a physics simulation; what it has to be is controllable.
   hopV: 7.0,
   hopG: 12.0,
+  // ── the seams, and taking them at a human speed ────────────────────────────
+  //
+  // `walkY` is exact and it is right; what it is not is CONTINUOUS. Measured
+  // along the vikendica's route at the spacing a walker covers in one frame,
+  // the ground under you steps 21.5 mm at the head of the flight, 21.4 mm on
+  // it, 50.0 mm off the bottom step on to the made ground, and **84.2 mm** on
+  // to the porch — each of them inside a single frame, which is the whole view
+  // jumping. The 84 mm is not a mesh error: it is the drawing's own
+  // `P_TER = P_FL - 0.20`, there really is a step down there, and flattening it
+  // would contradict the survey. What is wrong is only that you cross it in one
+  // frame instead of stepping down it.
+  //
+  // The Bucketeer has had a rate limit for this since 1.360.0 and the note over
+  // her `stepRate` argues the choice of a limit over a damp. **Her number does
+  // not promote.** She walks the flight at a measured stair pace, 0.41 m/s of
+  // vertical, comfortably under her 0.85 ceiling; you can run down it, and a
+  // flat 0.85 would leave you hovering above the ramp all the way to the
+  // bottom. That is the trap in "just move the constant".
+  //
+  // SO THE CEILING IS A SLOPE, NOT A SPEED, and the measurement that makes it
+  // safe is how far apart the two cases are. Sampled at 400 points a leg, the
+  // flight's real gradient is **0.934 at the median and 0.934 at the 95th** —
+  // it is a clean constant ramp — while the two seams register as gradients of
+  // **22.0 and 22.4**, which is to say vertical. Anything between those two
+  // separates a hill you are walking down from a hole in the floor, and 1.30
+  // sits 39 per cent over the steepest real ground and seventeen times under
+  // the gentlest seam. On a ramp the allowance always exceeds what the ramp
+  // asks, so this costs exactly nothing there: no lag, no float, not a
+  // millimetre.
+  stepSlope: 1.30,
+  // And a floor under the allowance, so a seam still resolves while you stand
+  // on it. Her number, because the job is the same one and 84 mm over 0.10 s
+  // reads as a step down rather than as a teleport.
+  stepRate: 0.85,
+  // Past this it is not a seam, it is a DROP, and a drop is not this function's
+  // business: above it the ground is handed over whole exactly as it always
+  // was, which keeps every existing behaviour on ledges, kerbs, the mole and
+  // the terrace bit for bit.
+  //
+  // CHOSEN OFF THE DISTRIBUTION AND NOT OFF A GUESS, because the first number
+  // here was 0.45 — a tall step — and that was wrong for a reason worth
+  // writing down: what this limiter costs is TRANSIENT LAG, your feet briefly
+  // off the true ground by up to the size of the thing it is easing. Easing a
+  // 44 cm step would put you 40 cm under the paving for a quarter of a second,
+  // which is a far worse artefact than the pop it replaced.
+  //
+  // Swept along four lines of the promenade at s = 8, 14, 20 and 26, 94 284
+  // samples at the spacing a walker covers in one frame: **68 places where the
+  // ground steps by more than 6 mm**, median 11.7 mm, and a long tail — p90 at
+  // 167 mm and a worst of 855 mm, with 8 over 120 mm and 2 over 450. The tail
+  // is kerbs and the edge of the mole, which are things you step off and which
+  // must stay instant.
+  //
+  // 0.12 takes 60 of the 68, including all four of the vikendica's and the
+  // 84.2 mm porch step this was written for, and bounds the worst lag it can
+  // ever produce at about a tenth of a metre.
+  stepMax: 0.12,
   walk: 3.4,               // m/s — a fast walk in kit
   // Shift. 6.1 m/s was a real sprint in real kit and it was the wrong number:
   // the places you are asked to cross on foot are four hundred metres of
@@ -1645,8 +1702,24 @@ async function buildGround(scene, field) {
     // The ground, then the hop on top of it. `gy` is what `walkY` says and is
     // what gets handed back to `walkY` next tick; `you.y` is where your feet
     // actually are, which during a hop is above it.
-    you.gy = field.walkY(you.x, you.z, you.gy != null ? you.gy : you.y);
     const air = you.hop > 0 || you.hopV !== 0;
+    const gWant = field.walkY(you.x, you.z, you.gy != null ? you.gy : you.y);
+    if (you.gy == null || air) {
+      // Nothing to ease from on the first frame, and nothing to ease at all
+      // while you are off the ground: in the air the floor under you is
+      // whatever you happen to be over, and easing that would have you land on
+      // a height you were above two frames ago. A landing is allowed to be a
+      // discontinuity; it is the one place in here that already is.
+      you.gy = gWant;
+    } else {
+      const d = gWant - you.gy;
+      const ad = Math.abs(d);
+      // What the ground you just crossed could honestly have risen by, plus the
+      // floor for standing still. See `stepSlope`.
+      const lim = moved * GROUND.stepSlope + GROUND.stepRate * dt;
+      you.gy = (ad <= lim || ad > GROUND.stepMax) ? gWant
+        : you.gy + Math.sign(d) * lim;
+    }
     // And how hard you arrive, which is `hopV` on the frame the arc runs out.
     // Worth carrying rather than assuming: stepping off a kerb and coming down
     // off the vikendica's rail are the same event to everything else in here,
