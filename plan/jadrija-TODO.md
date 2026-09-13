@@ -1096,6 +1096,22 @@ concrete. 89 people at 60 fps.
   riser line), and t 470-489 far inland at s 30-40, which is `toWorld`
   extrapolating past the resort's own back edge. Everything past t 572 is
   outside the promenade and not drawn at all.
+- **The crowd's feet are FINE, and the sweep that says otherwise is the wrong
+  instrument — MEASURED 13 Sep.** Comparing every visible figure's `y` against
+  `walkY` at its own (x, z) reports 24 of 76 more than 30 mm out, with a worst
+  of -962.8 mm and a best of +589.8. Every one of them checked is legitimate:
+  the big positives are people **lying on sun loungers** (idx 16 at +590 and
+  20 at +581 are on the loungers' beds; idx 98 and 99, flat on towels on the
+  sand, are +48, which is the towel), and the big negatives are people
+  **standing in the sea** at lane -0.3 (idx 65 at y -0.402 is in to the waist,
+  which is what a wader looks like). A raycast does not settle it either — take
+  the first hit downward at a seated figure under an awning and you "find the
+  ground" 1.7 m over their head, which is how idx 42, 62 and 72 came back at
+  -1.6 to -1.8 m. Photographed both classes before believing either.
+  **So: `walkY` is not the datum for anybody on furniture or in the water, and
+  the first downward hit is not the ground under a canopy.** Anybody who runs
+  this sweep again and "fixes" the outliers will lift four people off their
+  sunbeds and stand a swimmer on the sea.
 - **Probe harness: `gpuLaunch()` returns an `env` as well as `args`, and both
   have to reach `spawn`.** Passing only the args leaves `GALLIUM_DRIVER` and
   the WSL library path unset, `--use-angle=gl` falls through to software GL,
