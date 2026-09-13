@@ -562,6 +562,23 @@ as of this writing; the state of each is in the git log, not here.
 
 ## SURVEY — found, not yet built — PAUSED 26 Aug 2026
 
+> **RECONCILED 13 Sep 2026, and most of this section was already done.** The
+> heading has been wrong for a fortnight: the pause was 26 Aug, the work
+> carried on, and nobody came back to strike the entries. Checked item by item
+> against the source — Brod, the fish-head tap, Pizzeria Kod Koze, the
+> "JadriJa" wall and the ground in the wood are all BUILT, each with the frame
+> it was built from cited in the code. What is genuinely still open under this
+> heading is `a_030`, `b_046` and `b_076`, and all three are blocked on the
+> same thing: **nobody has said where they go**, and unlike the tap and the
+> library they are buildings and a lane rather than objects that can be placed
+> by eye on a verge.
+>
+> The lesson is the one this file keeps learning about itself: an entry that is
+> never struck through is worse than no entry, because the next person reads it
+> as work and spends an hour finding out it is done. Strike them on the way
+> past.
+
+
 Everything under this heading is a thing the survey shows that the game does
 not have. None of it is a bug and none of it is decided against; it is the
 backlog of what was seen and not built, and Misha paused the project on
@@ -640,12 +657,23 @@ bed. See the commit.
   — the east end carries the map board. A small enamelled sign, purple
   lettering on white, on the end
   wall at 0:24. Not set — one word, legible, and it is the name of the thing.
-- **Brod.** Stills _377/_378: the pier the Šibenik boat comes to. A rusted
+- ~~**Brod.**~~ **BUILT — reconciled 13 Sep.** It is `src/59-brod.js`, 3 923
+  lines of it, with `plan/brod-location.md` beside it and `__fr.brod` on the
+  console. Stills _377/_378: the pier the Šibenik boat comes to. A rusted
   cast-iron mushroom bollard and a newer brass one on a concrete quay with
   mooring rings let into the slab, and **St Nicholas Fortress** square across
   the water behind it. _357/_370/_376: the moorings, thirty-odd small white
   pasare with ŠB registrations.
-- **The fish-head tap.** _358/_359: a bronze spout cast as a fish, bolted to a
+- ~~**The fish-head tap.**~~ **BUILT — reconciled 13 Sep**, and it was built
+  properly: `BACK.rock` at t 418.6, s `rowB + 8.2`, with the casting sized by
+  SOLVING THE CAMERA out of the EXIF rather than guessing the object — 13 mm
+  in `_359` is 1444 px of focal length on a 4000 px axis, which turns the frame
+  into a ruler, and the escutcheon rosette at 0.10 m sets everything else.
+  Photographed in game 13 Sep: honey boulder, bronze dolphin on its face, white
+  limestone chips round the foot. One correction the entry never got — the
+  catalogue calls it *"a two-metre block"* and `_359` shows a rough NATURAL
+  boulder, wide at the base and tapering, not a dressed block. The code has it
+  right. _358/_359: a bronze spout cast as a fish, bolted to a
   two-metre block of orange-ochre limestone with a stone trough under it, on a
   pebble bed. It is the only piece of sculpture at Jadrija.
 - ~~**The little free library.**~~ BUILT 31 Aug at t 303.5, s 40.2 — a
@@ -653,7 +681,8 @@ bed. See the commit.
   with a lift-up lid full of books, and beside it a white panel painted with a
   row of coloured book spines. Green cast-iron and timber benches, gravel with
   a white limestone-block edging.
-- **Pizzeria Kod Koze** (_335): grey render, terracotta pantiles, yellow
+- ~~**Pizzeria Kod Koze**~~ **BUILT — reconciled 13 Sep**: `pizzeriaFront` in
+  43-jadrija.js, off `1000150335`, *"which reads all four"*. (_335): grey render, terracotta pantiles, yellow
   monobloc chairs on crazy paving. **The timber shelter at _336/_337**: green-grey
   fibre-cement sheet on a heavy timber frame over a whitewashed rubble base,
   sage-green rendered piers, a sage-green tubular rail with X-braces standing
@@ -862,7 +891,13 @@ bed. See the commit.
   screen to two metres, a named awning over it, a corrugated upper storey with
   a stepped parapet and a roof vent. See `slastBack`, which sits on top of the
   shared `shopBack` rather than replacing it.
-- **The "JadriJa" wall — FOUND 31 Aug, NOT BUILT, and it is the signature
+- ~~**The "JadriJa" wall.**~~ **BUILT — reconciled 13 Sep**: the hand-cut word
+  across the end of a block, off `1000150398`, with the letter colour sampled
+  off the frame rather than taken as black (27/25/23 against the limewash). See
+  43-jadrija.js, *"JadriJa, hand-cut, across the end of a block"*, and the note
+  that both J's are capitals with the tail turning up. The entry below — which
+  says it is blocked on somebody saying where — is what was true on 31 Aug.
+  **FOUND 31 Aug, NOT BUILT, and it is the signature
   image of the place.** `_397` and `_398`, and it is recorded nowhere in this
   file. A whitewashed flat-roofed block standing on the concrete apron at the
   water's edge at the head of the seaward kabine row, with **JadriJa** across
@@ -879,7 +914,10 @@ bed. See the commit.
   GPS. Somebody should say where, and then it is an afternoon's work: the
   block, the coping, the lettering (`paintedWord` at weight 800, on a plane
   turned a quarter to face along the shore), the ladder and the apron.
-- **The ground in the wood** (_344/_345/_347): pale compacted dirt with white
+- ~~**The ground in the wood.**~~ **BUILT — reconciled 13 Sep**, and not in
+  43-jadrija.js: the chippings band is in `src/10-world.js`, keyed off
+  `1000150345` and `_346` for the ratios, with the grove floor argued again at
+  43-jadrija.js against `_345` and `_349`. (_344/_345/_347): pale compacted dirt with white
   limestone chips through it and brown pine litter, not sand. ~~And pine bark:
   grey-brown plates with **orange-red** inner bark showing at the seams.~~
   **BUILT 31 Aug** in the trees' own fragment hook — see `PINEBARK`/`DRYBARK`
