@@ -103,7 +103,32 @@ done is worse than no list.
 ## STANDING — not items, and never finished
 
 - **The per-shop detail pass.** One shop per iteration, against its own
-  photographs. This used to sit in OPEN with a checkbox, which was the wrong
+  photographs.
+  **PIZZERIA, first pass — 13 Sep.** Shot the shop in game and put it beside
+  `1000150335`. Most of it is right and better than the grep suggests: the
+  red-on-white plate, the two green louvred leaves with nine slats each, the
+  hand-painted PIZZERIA, the red F2, and KOD-KOSE — which is NOT missing, it is
+  on the corner return at `S.t1 - 0.16, S.s0 + 1.30` and simply invisible from
+  square on. Worth knowing before somebody "adds" it twice.
+  What the frame has and the game does not: **the shop stands on crazy paving
+  and in the game it stands on duff.** The bands are `mid -> PAVE` poured slab,
+  `PAVE -> walkTo` flags, `walkTo -> back` duff, and `walkTo` is
+  `rowA + cabD + 1.0` = **21.1**. The pizzeria's frontage is at **s 30**, nine
+  metres inland of the flags. Also missing: the wall rack of small pots under
+  the painted name, the black candle lantern on the ledge, and the table's
+  mosaic top.
+  **AND THERE IS A TRAP IN THE OBVIOUS FIX.** Do not extend the band — the note
+  over `paving` records it once running the full 572 m and being pulled back
+  because it laid a 5 m strip of limestone across a beach. A LOCAL apron is the
+  right shape, and `paving` only wants an optional t-range to do it. But flags
+  are laid as mortar plus stone inset by `JOINT` and lifted by `PAVE_LIFT`
+  (0.05) to keep the two off the z-buffer at two kilometres from the origin,
+  and the thing that lifts `standY` to match is `paveBand` — **a single global
+  `[s0, s1]`, not a per-shop rect**. So a local apron laid with the lift sinks
+  every figure on it 50 mm, and one laid flush fights the duff underneath it.
+  Either `paveBand` becomes a list of rects, or the apron is laid as its own
+  surface that `standY` knows about. That is the decision this wants, and it is
+  a bigger one than a shop pass. This used to sit in OPEN with a checkbox, which was the wrong
   shape for it — Misha, 23 Aug: "isn't that just a continuous thing we do, we
   keep refining its shoppe." It is. Slasticarnica and Caffe TRAMPULIN have had
   theirs; the other eight have not, and there is no state at which the parade
