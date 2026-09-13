@@ -411,6 +411,39 @@ async function buildJadrija(scene) {
     const a = ST[i], c = ST[i + 1];
     const k = (t - a.t) / ((c.t - a.t) || 1);
     const lerp = (p, q) => p + (q - p) * k;
+    // THE TANGENT AND THE NORMAL ARE LERPED AND NOT RENORMALISED, AND THAT IS
+    // A KNOWN DEFECT LEFT ALONE ON PURPOSE — 13 Sep 2026.
+    //
+    // A straight lerp between two unit vectors is short by the cosine of half
+    // the angle between them, so at a bend this frame's normal is under unit
+    // length. Measured off the shipped build as |toWorld(t,1) - toWorld(t,0)|:
+    // 1.00000 at t 150, 250, 350 and 450, **0.99367 at t 392**, 0.99986 at 50.
+    // Where it is short, `toWorld(t, s)` places a point 0.9937*s off the shore
+    // instead of s, and `local` reading it back projects on to the same short
+    // normal again and answers s * 0.9874 — which is the whole of the 1.05 m
+    // that `plan/jadrija-TODO.md` records at (392, 8.5): `local` turns an asked
+    // 8.4 into 8.2921, that lands on the far side of a terrace riser, and
+    // `standY` answers the deck below instead of the one above.
+    //
+    // FIXED IT TO SEE, then reverted. Renormalising both vectors is four lines
+    // and it is CENSUS-SAFE, which is the test this file sets for changes to
+    // the frame: seen/thin/plain/rich stay 446/333/86/27, blockers 818, tris
+    // 642533, houses 27, people 100, all bit-identical. It also does not fix
+    // the reported symptom — (392, 8.4) still answers 1.606 against a drawn
+    // 2.660 — because the residual there is `local`'s three fixed Newton steps
+    // leaving t at 392.02, not the normal's length.
+    //
+    // What it does do is move the resort. A/B'd from a FIXED WORLD camera at
+    // the bend (the first attempt placed the camera with `toWorld` and was
+    // confounded by its own fix), the frame differs on **22.7 per cent** of
+    // pixels against a same-build control of 3.1 — no gaps and nothing
+    // misaligned, everything shifts together by a few centimetres, because
+    // every flag, kabina and bench near the bend is built through this
+    // function. And the resort was eyeballed into place against the frame AS
+    // IT IS, from photographs. Correcting the arithmetic moves it away from
+    // where somebody matched it by eye. That is the same argument `local` makes
+    // twenty lines down about the census, and it is Misha's call, not a
+    // tidy-up.
     return {
       x: lerp(a.x, c.x), z: lerp(a.z, c.z),
       ux: lerp(a.ux, c.ux), uz: lerp(a.uz, c.uz),

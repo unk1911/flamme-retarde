@@ -1069,6 +1069,33 @@ concrete. 89 people at 60 fps.
   lane on the terrace. She stands on `toWorld`, which is where the deck is
   drawn, so it does not show on her; something that stands on `walkY` there
   would float or sink.
+  **CAUSE FOUND, FIX BUILT AND REVERTED, AND IT IS MISHA'S CALL — 13 Sep.**
+  Both functions call the same `standY`, so the only thing between them is the
+  round trip, and `local` is not the inverse of `toWorld`. `at()` lerps the
+  tangent and the normal between stations and never renormalises them, and a
+  lerp of two unit vectors is short by the cosine of half the angle: measured
+  as `|toWorld(t,1) - toWorld(t,0)|`, the normal is 1.00000 at t 150, 250, 350
+  and 450 and **0.99367 at t 392**. So `toWorld` puts the point 0.9937*s out,
+  `local` projects on to the same short normal and answers `s * 0.9874`, an
+  asked 8.4 comes back as **8.2921**, and that is on the far side of a riser
+  the deck steps up at — hence 1.606 where the drawn deck is 2.660.
+  Renormalising is four lines and is **census-safe**, which is the test this
+  file sets: 446/333/86/27, blockers 818, tris 642533, houses 27, people 100,
+  all identical. But it does NOT fix the reported spot — the residual there is
+  `local`'s three fixed Newton steps leaving t at 392.02 — and it **moves the
+  resort**: A/B'd from a fixed world camera at the bend, 22.7 per cent of the
+  frame changes against a 3.1 per cent same-build control. Nothing breaks and
+  nothing misaligns; everything near the bend shifts together by a few
+  centimetres, because it is all built through `at()`. The resort was eyeballed
+  into place against the frame as it is, from photographs, so correcting the
+  arithmetic moves it away from where somebody matched it by eye. Same argument
+  `local`'s own note makes about the census.
+  Scope, measured: inside the built resort (t 0…572, s -2…40) only three
+  clusters exceed 0.2 m at all — the vikendica's two storeys (expected), **four
+  cells at t 392-395, s 8.5 exactly** (this one, a 0.25 m wide sliver on the
+  riser line), and t 470-489 far inland at s 30-40, which is `toWorld`
+  extrapolating past the resort's own back edge. Everything past t 572 is
+  outside the promenade and not drawn at all.
 - **Probe harness: `gpuLaunch()` returns an `env` as well as `args`, and both
   have to reach `spawn`.** Passing only the args leaves `GALLIUM_DRIVER` and
   the WSL library path unset, `--use-angle=gl` falls through to software GL,
