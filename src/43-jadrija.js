@@ -787,8 +787,33 @@ async function buildJadrija(scene) {
    * laid there is nothing standing proud of anything.
    */
   let paveBand = null;
+  /**
+   * Flags that are not the shore-long band: a shop's own apron.
+   *
+   * `paveBand` is one `[s0, s1]` and applies at every station, which is right
+   * for the band — it runs the length of the promenade by definition. A shop
+   * standing nine metres inland of it with its own square of flags is a rect,
+   * and a rect is what this is. Empty by default, so with nothing in it every
+   * answer `standY` gives is the one it gave before, to the bit.
+   *
+   * It has to exist at all because of the way a flag is drawn: mortar at the
+   * deck, stone inset by `JOINT` and lifted by `PAVE_LIFT` over it, because two
+   * co-planar surfaces two kilometres from the origin fight. The stone is then
+   * what you stand on, and if `standY` does not know that, everything `toWorld`
+   * places on the apron — every chair, every figure — is bedded 50 mm into it.
+   */
+  const paveRects = [];
+  const onPave = (t, s) => {
+    if (paveBand && s > paveBand[0] && s < paveBand[1]) return true;
+    for (let i = 0; i < paveRects.length; i++) {
+      const r = paveRects[i];
+      if (t > r.t0 && t < r.t1 && s > r.s0 && s < r.s1) return true;
+    }
+    return false;
+  };
 
-  function paving(s0, s1, yOf, cols, nS = 9, step = 1.1) {
+  function paving(s0, s1, yOf, cols, nS = 9, step = 1.1, tA = 0, tB = null,
+    tJit = 0) {
     // Subdivided along the shore as well as across it. The stations are six
     // metres apart, so cutting only in `s` gives six-metre flags — which reads
     // as decking, not as paving. `at()` interpolates a station anywhere, so the
@@ -819,13 +844,35 @@ async function buildJadrija(scene) {
     // the cells. Found by walking the shore and looking at it, which is the
     // only way that one was ever going to turn up.
     const JOINT = 0.055, LIFT = PAVE_LIFT;
-    const n = Math.floor(LEN / step);
-    for (let i = 0; i < n; i++) {
-      const a = at(i * step), c = at((i + 1) * step);
+    // Stations, and the range of them. `tA`/`tB` default to the whole shore,
+    // which is what the band wants; a shop's apron passes its own two metres
+    // of it. The index `i` stays the ABSOLUTE station number either way, so the
+    // jitter a cell gets is a property of where it is on the shore and not of
+    // which call laid it — lay the same rect twice from different ranges and
+    // you get the same stones.
+    const nAll = Math.floor(LEN / step);
+    const i0 = Math.max(0, Math.floor(tA / step));
+    const n = tB == null ? nAll : Math.min(nAll, Math.ceil(tB / step));
+    // ── and the cut ALONG the shore, which the band does not need ──────────
+    //
+    // The `s` cuts are jittered per station and the `t` cuts are not: every
+    // station lands on an exact multiple of `step`. On the band that is
+    // invisible, because you only ever see the promenade obliquely — you walk
+    // along it. Square on to a shop's apron the whole 1.1 m grid is there in
+    // one line and it reads as slabs, which was the second thing wrong with
+    // the pizzeria's first cut after the courses were square.
+    //
+    // Both quads either side of a station take the SAME jittered line, exactly
+    // as the `s` cuts do, so the flags still tile without a gap. Off by default
+    // so the band is laid to the millimetre it always was.
+    const stn = (i) => i * step
+      + (tJit ? (jit(i, 71) - 0.5) * step * tJit : 0);
+    for (let i = i0; i < n; i++) {
+      const a = at(stn(i)), c = at(stn(i + 1));
       // The inset stations, so the joint runs across the shore as well as along
       // it. Two extra `at` calls a cell; a flag cut only in `s` gets a joint on
       // two sides out of four and reads as planking.
-      const ai = at(i * step + JOINT), ci = at((i + 1) * step - JOINT);
+      const ai = at(stn(i) + JOINT), ci = at(stn(i + 1) - JOINT);
       for (let k = 0; k < nS; k++) {
         const a0 = cut(i, k), a1 = cut(i, k + 1);
         const c0 = cut(i + 1, k), c1 = cut(i + 1, k + 1);
@@ -1094,6 +1141,37 @@ async function buildJadrija(scene) {
   // bedded in. Set here rather than declared with the numbers, so that the one
   // thing that can turn it on is the pass that actually lays the flags.
   paveBand = [PAVE, walkTo];
+  // ── and the pizzeria's own apron, which is not part of the band ───────────
+  //
+  // `1000150335` is square on to the shop and it stands on crazy paving: big
+  // irregular limestone flags with wide joints, running out in front of the
+  // grey block and past the steps to the kitchen. The band cannot reach it and
+  // must not be made to. `walkTo` is 21.1 and the shop's frontage is at s 30 —
+  // nine metres inland — and the note over `paving` records what happened the
+  // last time this band was stretched: it ran the full 572 m and laid a five
+  // metre strip of limestone across a beach.
+  //
+  // So it is a rect, laid on the same deck the duff is on, with its own entry
+  // in `paveRects` so that `standY` lifts to the stone here as it does in the
+  // band. Without that entry the chairs and anybody standing on it are bedded
+  // 50 mm in, which is `PAVE_LIFT` and is exactly the fault the lift exists to
+  // avoid on the promenade.
+  //
+  // No beach blend in the colours: `shore`/`beachOf` are there so the band can
+  // go to shingle over the sand at the west end, and this is inland of the
+  // huts with pines behind it.
+  // COURSES SIZED OFF THE BAND'S, not chosen. The band runs `PAVE` to `walkTo`
+  // — 5.2 m — in nine courses, so a course is 0.58 m across against a 1.1 m
+  // station along it: a flag half again as long as it is wide, which with the
+  // per-station jitter is what stops it reading as a grid. The first cut here
+  // took four courses over 4.45 m, which is 1.11 by 1.10 — square — and it
+  // photographed as a tiled floor laid at the foot of the wall, which is the
+  // one thing the note over `paving` says crazy paving is the opposite of.
+  // Eight courses over 5.45 m is 0.68, near enough the band's proportion.
+  const F2_APRON = { t0: 199.6, t1: 208.4, s0: 24.6, s1: 30.05 };
+  paving(F2_APRON.s0, F2_APRON.s1, deckOf, (i) => FLAG[i % FLAG.length],
+    8, 1.1, F2_APRON.t0, F2_APRON.t1, 0.55);
+  paveRects.push(F2_APRON);
   ribbon(walkTo, JAD.back, deckOf, duff, 3);
   /**
    * The quay wall, which from the water was a flat black band 572 m long.
@@ -28421,12 +28499,11 @@ async function buildJadrija(scene) {
     if (KN) {
       const d = Math.min(t - KN.t0, KN.t1 - t, s - KN.s0, KN.s1 - s);
       if (d > -KN.ramp) {
-        const base = paveBand && s > paveBand[0] && s < paveBand[1]
-          ? y + PAVE_LIFT : y;
+        const base = onPave(t, s) ? y + PAVE_LIFT : y;
         return base + (KN.y - base) * sat((d + KN.ramp) / KN.ramp);
       }
     }
-    if (paveBand && s > paveBand[0] && s < paveBand[1]) return y + PAVE_LIFT;
+    if (onPave(t, s)) return y + PAVE_LIFT;
     // The changing station's pad. Same problem as the kabina's and the same
     // answer, except that a pad is approached from all four sides rather than
     // through one face — so the ramp hangs off the distance to the nearest

@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.380.0] — 2026-09-13
+
+### the pizzeria gets its paving, and `paveBand` learns about rectangles
+
+The first shop of the per-shop pass — Misha's *"isn't that just a continuous
+thing we do, we keep refining its shoppe"* — taken against `1000150335`.
+
+**Most of the shop was already right**, and better than a grep suggests: the
+red-on-white plate under the eaves, two green louvred leaves at nine slats
+each, the hand-painted PIZZERIA, the red F2, and KOD-KOSE — which is NOT
+missing. It is on the corner return at `S.t1 − 0.16, S.s0 + 1.30` and simply
+invisible square on. Written into the TODO so nobody adds it twice.
+
+**What the frame has and the game did not: the shop stands on crazy paving.**
+The promenade's surface is banded — poured slab to `PAVE`, flags to `walkTo`,
+duff inland of that — and `walkTo` is `rowA + cabD + 1.0` = **21.1**. The
+pizzeria's frontage is at **s 30**, nine metres inland, so it stood on bare
+duff.
+
+**The band was not stretched to reach it**, and `paving`'s own note is why: it
+once ran the full 572 m and was pulled back because that laid a five-metre
+strip of limestone across a beach. This is a rect instead — 199.6 to 208.4
+along, 24.6 to 30.05 across — on the same deck the duff is on.
+
+**AND `paveBand` HAD TO LEARN ABOUT RECTANGLES FIRST.** A flag is drawn twice:
+mortar at the deck, then stone inset by `JOINT` and lifted by `PAVE_LIFT`
+(0.05) over it, because two co-planar surfaces two kilometres from the origin
+fight. The stone is then the thing you stand on, and what tells `standY` so is
+`paveBand` — which was **one `[s0, s1]` applied at every station**. Correct for
+a band that runs the length of the shore by definition; useless for a square of
+flags outside it. Laid without that, every chair and every figure on the apron
+would have been bedded 50 mm into it, which is precisely the fault the lift
+exists to avoid on the promenade.
+
+So `paveRects` is a list and `onPave(t, s)` answers for both. Empty by default,
+so with nothing in it every answer `standY` gives is the one it gave before.
+Verified: on the apron `walkY` is 3.2173 against 3.1673 a metre outside it —
+0.0500, the lift exactly — and a point in the band proper is 3.2173 against
+3.1673 outside, unchanged.
+
+### two things the first cut got wrong, both visible and both measured
+
+**The courses were square.** Four courses over 4.45 m is 1.11 by 1.10, and it
+photographed as a tiled floor laid at the foot of the wall — the one thing the
+note over `paving` says crazy paving is the opposite of. The band runs 5.2 m in
+nine courses, so a course is 0.58 m across against a 1.1 m station along it: a
+flag half again as long as it is wide. Eight courses over 5.45 m is 0.68, near
+enough the same proportion.
+
+**And the cut ALONG the shore was not jittered at all.** The `s` cuts have been
+jittered per station since the band was laid; the `t` cuts sit on exact
+multiples of `step`. On the band that is invisible, because the promenade is
+only ever seen obliquely — you walk along it. Square on to a shop's apron the
+whole 1.1 m grid is there in one line and it reads as slabs. `paving` now takes
+an optional `tJit`, off by default so the band is laid to the millimetre it
+always was, and both quads either side of a station take the same jittered line
+so the flags still tile without a gap.
+
+### also
+
+Still missing from `1000150335` and not built here: the wall rack of small pots
+under the painted name, the black candle lantern on the ledge, and the mosaic
+top on the round table.
+
+**Proof numbers:** census `{seen:446, thin:333, plain:86, rich:27}`, blockers
+818, people 100, all unchanged; tris **642533 → 642821**, which is the apron.
+
+**On fps, which read 35-40 and did not before:** it is the machine, not the
+change. Stashed the diff, rebuilt and measured the baseline on the same box
+minutes apart — 37, 39, 35 without the apron against 39, 40, 35 with it. Two
+hundred and eighty-eight triangles were never going to cost twenty frames, and
+fps wants a same-session baseline like everything else here.
+
 ## [1.379.0] — 2026-09-13
 
 ### every walker takes the porch step at a human speed, and the ceiling is a slope
