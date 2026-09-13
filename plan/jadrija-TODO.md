@@ -147,6 +147,36 @@ done is worse than no list.
   is done. Rule 12 governs every pass: invent no name, no price and no number
   the photographs do not carry.
 
+## STATE OF THE QUEUE — audited 13 Sep 2026
+
+Written after a night of picking items off this file and finding most of them
+already done. **Seven entries were stale**: the fish-head tap, the shore
+playground, the boat mural, KOD-KOSE, the pizzeria's three wall props, the
+H2O/Trampulin counter figures, and the v59x summary above, which was thirteen
+items out of date. Anybody working from this file should verify before
+building; verifying costs about as much as the work.
+
+What is actually left, in four kinds:
+
+**Needs Misha, not more work.** The shore frame's un-renormalised normal (four
+lines, census-safe, moves the resort a few centimetres at every bend); the
+Bucketeer's kitchen (the sofa is surveyed, the round table is not); Chloe's
+painted nape (wants a re-bake that would land every unshipped paint change at
+once); `JAD.cabW` at 2.15 m against 0.95-1.05 measured.
+
+**Blocked on somebody saying WHERE.** `a_030`, `b_046`, `b_076`, the white
+flat-roofed block with the shade canopy, the doorway through the concrete
+wall. None carries a geotag.
+
+**Blocked on rule 12.** Four shops ship unnamed. No photograph reads them.
+
+**Wants one deliberate session, not a spare hour.** The TISAK window re-cut
+with the un-mirroring (`gt = t1 - 2.05`), which the note says is worse
+half-landed than not at all; the foot lock, which was built and reverted
+13 Sep with its three bugs written down; the H2O and slastičarnica frontages,
+which sit 0.9 m inland of the flag band and may want the apron treatment the
+pizzeria got in 1.380.0 — but that wants their own frames read first.
+
 ## OPEN — nothing open, PAUSED 26 Aug 2026
 
 Every checkbox below is done. The four prose items that were genuinely still
@@ -489,11 +519,26 @@ as of this writing; the state of each is in the git log, not here.
 - [x] v595 and v597, all 409 frames, 23 Aug. The catalogue is
       `plan/survey-v59x.md`: seventeen objects that are in the footage and not
       in the game, ranked, each against the frame that shows it best, plus the
-      ones checked and found already built. Four of them are built — see
-      SURVEY below. The other thirteen are ordered in that file and the top of
-      the unbuilt list is the green steel picket fence on a rubble wall
-      (`b_026`, `b_050`, `a_154`), which is a fourth boundary treatment and
-      the loudest colour in the lane.
+      ones checked and found already built.
+      **THE CATALOGUE IS FINISHED — audited item by item, 13 Sep.** This line
+      used to end "four of them are built ... the other thirteen are ordered in
+      that file and the top of the unbuilt list is the green steel picket
+      fence", and it was thirteen items out of date within a week. **Fifteen of
+      the seventeen are built**, each marked in place with its date: the kerb
+      blocks, the ZABRANJENO sign, the camp in the wood, the catering trailer,
+      the picket fence (`palisadeWall`, 16.5 m at t 241.0-257.5), the lavender
+      bank, the agave rockeries, the covered car, the folding bollards, the
+      drinks board, the tavern parasol and sets, the terrace nosings, the park
+      bench and the monobloc chair. Item 8 was a mis-identification folded into
+      9.
+      **The two that are left are excluded by rule 1 and always were** — the
+      turquoise barrel planters and the ivy-clad block, both `a_206`-`a_220`,
+      which the file's own contents list calls "the shopping parade inland,
+      which is out of the game's band". They are not a backlog, they are out of
+      scope.
+      One heading in that file still reads "Worth building, not built this
+      pass" over three entries that all say BUILT. Left as it is: the entries
+      carry the truth and the heading is only a heading.
 
 **Tidy**
 - [x] `menuWall()` is dead code, not a render bug — nothing in `SHOPS` sets
