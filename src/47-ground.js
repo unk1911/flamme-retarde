@@ -1987,7 +1987,7 @@ async function buildGround(scene, field) {
     return true;
   }
 
-  function dropIn(x, z, yaw = 0, lost = true) {
+  function dropIn(x, z, yaw = 0, lost = true, yHint) {
     // A DEFAULT AND A REFUSAL, BECAUSE THIS IS A HANDLE PROBES CALL BY HAND.
     // `dropIn(x, z)` reads like a legal call — `lost` has a default and `yaw`
     // did not — and it used to set `you.yaw` to undefined. The next integration
@@ -2016,7 +2016,22 @@ async function buildGround(scene, field) {
     // below answers 3.202, so the argument works; nobody is passing one because
     // nobody needs one. It stays cold until a caller lands on the lower floor,
     // and this note is here so the next person measures instead of patching.
-    you.y = field.walkY(px, pz);
+    //
+    // MEASURED, 13 Sep 2026, and a caller has now landed on the lower floor.
+    // Putting a probe in the vikendica's GARDEN — at the Bucketeer's tip point,
+    // which has the terrace over it — cold `walkY` answers **5.802 against the
+    // 3.002 that was wanted**, one whole storey up. The test that found it was
+    // a walk into her new collider, and it read "she does not block" for two
+    // runs before the storey showed up in the numbers: from up there the
+    // vertical gate in `hit` is doing exactly its job, because a person one
+    // floor below you is not in your way.
+    //
+    // So `yHint` is now a parameter, defaulted to nothing, which leaves every
+    // shipped caller on the same cold answer they have always had — none of
+    // them lands anywhere with two storeys over it. It is here for the callers
+    // that DO know, which today is every probe that wants to stand next to
+    // somebody at the vikendica.
+    you.y = field.walkY(px, pz, yHint);
     you.gy = you.y; you.hop = 0; you.hopV = 0;
     you.vx = you.vz = 0;
     you.yaw = yaw;

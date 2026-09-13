@@ -8,6 +8,78 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.378.0] — 2026-09-13
+
+### you can no longer walk through the woman carrying the water
+
+**SHE HAD NEVER BEEN A COLLIDER.** 1.350.0 gave her you — she yields, and since
+1.373.0 the corridor deciding it points where her nose does — but nothing ever
+gave you her. Asked of the shipped 1.377.0 build at her own feet with a 1.5 m
+pad, `bodies()` came back with exactly one entry and it was a bather **9.87 m
+away**: there was nothing where she was standing at all.
+
+She is in the sweep now, with the crowd's own `BODY.r` of 0.24 and `BODY.top` of
+1.78 rather than anything new, because she is the same rig.
+
+**NOT `probe`'s 0.62, and the difference is the point.** `buckProbe` is a HOSE
+TARGET — deliberately generous, because a jet of water that has to be aimed to
+the centimetre from twenty metres is a jet nobody lands. A collider at 0.62
+would hold you a metre and a quarter off her, which is not a person, it is a
+bollard. `buckSolid` is a second accessor with the same two gates (drawn, and
+not inside the flat) and no radius at all; the radius is decided in
+43-jadrija.js next to everybody else's.
+
+**Broadphased on world distance and not on `t`**, which is the one row in that
+function that differs. The band test is on the shore coordinate because the
+crowd carries `t` already and never has to be projected out of world space — the
+function's own note says so. She does not carry one: she lives on her twelve
+point route round the vikendica, off the promenade entirely. Getting a `t` for
+her would mean calling `local` on every sweep to feed a test looser than the one
+it replaced; one squared distance against a single circle is cheaper and exact.
+
+Measured end to end, walking straight into her with the loop frozen so she
+cannot step aside, sampling the gap every frame:
+
+| | closest approach |
+|---|---|
+| 1.377.0 | **0.006 m** — through her centre |
+| this | **0.540 m** — held |
+
+0.540 is `GROUND.body` 0.30 plus `BODY.r` 0.24 exactly, which is the same
+separation the crowd holds you at. She is not a collider indoors: asked in
+`fill`, standing at the basin, the sweep returns none.
+
+### the trap that made that test read false twice
+
+**`dropIn` near the vikendica puts you on the FIRST FLOOR.** The walk-in test
+reported "she does not block" for two runs before the storey turned up in the
+numbers, and both times the collider was working perfectly — from up on the
+terrace, a person one floor below you is genuinely not in your way, and the
+vertical gate in `hit` was doing its job.
+
+`dropIn`'s own note has said for a while that `walkY` is asked cold there, that
+all three shipped callers were checked at the seat of the laptop where cold and
+hinted agree, and — in its last line — *"it stays cold until a caller lands on
+the lower floor, and this note is here so the next person measures instead of
+patching."* A caller has now landed on the lower floor. **Measured: in the
+garden at her tip point, which has the terrace over it, cold `walkY` answers
+5.802 against the 3.002 that was wanted — one whole storey.**
+
+So `yHint` is a parameter now, defaulted to nothing. Every shipped caller keeps
+the identical cold answer it has always had; it exists for callers that DO know
+which floor they meant, which today is every probe that wants to stand next to
+somebody at the vikendica.
+
+**Proof numbers unchanged:** census `{seen:446, thin:333, plain:86, rich:27}`,
+blockers 818, tris 642533, people 100.
+
+### known, and deliberately not done here
+
+She does not react to being walked into. `bumpReact` answers `'bather'` only and
+lets every other kind fall through, which is why adding a new one is safe — but
+a bump line from her would want new Croatian clips through `tools/cut_mutter.py`
+and a payload rebuild, and that is a different job from being solid.
+
 ## [1.377.0] — 2026-09-13
 
 ### the fist goes to the pail, and one NaN was latching the whole audio bed

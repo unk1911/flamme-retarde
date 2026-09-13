@@ -4300,6 +4300,33 @@ async function buildBucketeer(scene, vik, walkY) {
   }
 
   /**
+   * Where she is standing, for something that wants to not walk into her.
+   *
+   * NOT `buckProbe`, and the difference is the radius. That one is a HOSE
+   * TARGET — 0.62 m is a figure you can hit with a jet of water from twenty
+   * metres, generous on purpose because a spray that has to be aimed to the
+   * centimetre is a spray nobody lands. A collider at 0.62 is a woman you are
+   * held a metre and a quarter away from, which is not a person, it is a
+   * bollard. The crowd's own `BODY.r` is 0.24 and has four paragraphs behind
+   * it; she is the same rig and gets the same number, decided at the other end
+   * in 43-jadrija.js rather than here.
+   *
+   * The same two gates as the probe, and for the same reasons: nothing to walk
+   * into while she is not drawn, and nothing to walk into while she is inside
+   * the flat, where you are not.
+   *
+   * ONE OBJECT, MUTATED. This is read inside the walker's own collision sweep,
+   * which runs several times a frame; the same convention `bodyList` states —
+   * read it, do not keep it.
+   */
+  const solidAt = { on: false, x: 0, y: 0, z: 0 };
+  function buckSolid() {
+    solidAt.on = mesh.visible && inFlat(st.x, st.y, st.z) <= 0.2;
+    solidAt.x = st.x; solidAt.y = st.y; solidAt.z = st.z;
+    return solidAt;
+  }
+
+  /**
    * The jet is on her.
    *
    * Litres ignored, for `figureWet`'s reason: there is no quantity of water
@@ -4542,7 +4569,7 @@ async function buildBucketeer(scene, vik, walkY) {
      * The two ends of the hose hook — 90-app.js wires them to 47-ground.js,
      * which is the only file that has both her and a branch.
      */
-    probe: buckProbe, onWet: buckWet,
+    probe: buckProbe, onWet: buckWet, solid: buckSolid,
     /**
      * Debug: her voice off and on.
      *

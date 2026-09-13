@@ -36774,6 +36774,35 @@ async function buildJadrija(scene) {
       pushBody(p[0], p[2], BODY.r, p[1] + show.air,
         p[1] + show.air + BODY.top, 'baye', -1);
     }
+    // AND THE BUCKETEER, who went three releases without one.
+    //
+    // 1.350.0 gave her you — she yields, and since 1.373.0 the corridor that
+    // decides it points where her nose does — but nothing ever gave you her,
+    // so you walked through a woman carrying ten litres of water. Asked of the
+    // shipped 1.377.0 build at her own feet with a 1.5 m pad, `bodies` came
+    // back with one entry and it was a bather 9.87 m away: there was nothing
+    // there at all.
+    //
+    // BROADPHASED ON WORLD DISTANCE AND NOT ON `t`, which is the one thing here
+    // that differs from every other row. The band test above is on the shore
+    // coordinate because the crowd carries `t` already and never has to be
+    // projected out of world space — the note on this function says so. She
+    // does not carry one: she lives on her own twelve-point route round the
+    // vikendica, which is off the promenade entirely, so getting a `t` for her
+    // means calling `local` on every sweep to feed a test that is looser than
+    // the one it replaces. One squared distance against a single circle is
+    // both cheaper and exact.
+    //
+    // Her radius is the crowd's, not `probe`'s 0.62 — see `buckSolid`, which
+    // is where that distinction is argued.
+    if (bucketeer) {
+      const b = bucketeer.solid();
+      const rr = pad + BODY.r;
+      const bx = b.x - x, bz = b.z - z;
+      if (b.on && bx * bx + bz * bz < rr * rr) {
+        pushBody(b.x, b.z, BODY.r, b.y, b.y + BODY.top, 'buck', -1);
+      }
+    }
     return bodyN;
   }
   /** The shared buffer `bodies` fills. Read it, do not keep it. */
