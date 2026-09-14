@@ -5520,7 +5520,12 @@ function buildAudio() {
   function zombieHum(d = 0, o = {}) {
     if (o.probe) return zhumFired;
     const rate = o.rate || 0.66;
-    const dur = HUM.len / rate + 0.12;
+    // `yelp` is the other thing it says: "drop your buckets!" — a scrap of
+    // her tune thrown from 1.8 times her rate down to a third of it in nine
+    // tenths of a second, through the same wings and the same rot. A siren
+    // falling down a well, which is the sound a startled undead fly makes.
+    const yelp = !!o.yelp;
+    const dur = yelp ? 0.90 : HUM.len / rate + 0.12;
     if (!ctx || ctx.state === 'suspended') return dur;
     if (!humBuf) sampleLoad(HUM.key, (b) => { humBuf = b; });
     const t = ctx.currentTime;
@@ -5548,10 +5553,15 @@ function buildAudio() {
     src.buffer = humBuf;
     // The drawl and the sag, on the rate itself — and the vibrato summed on to
     // the same param, which Web Audio adds to whatever is scheduled.
-    src.playbackRate.setValueAtTime(rate * ZHUM.drawl, t0);
-    src.playbackRate.linearRampToValueAtTime(rate, t0 + 0.25);
-    src.playbackRate.setValueAtTime(rate, t0 + dur * 0.72);
-    src.playbackRate.linearRampToValueAtTime(rate * ZHUM.sag, t0 + dur);
+    if (yelp) {
+      src.playbackRate.setValueAtTime(1.8, t0);
+      src.playbackRate.exponentialRampToValueAtTime(0.32, t0 + dur);
+    } else {
+      src.playbackRate.setValueAtTime(rate * ZHUM.drawl, t0);
+      src.playbackRate.linearRampToValueAtTime(rate, t0 + 0.25);
+      src.playbackRate.setValueAtTime(rate, t0 + dur * 0.72);
+      src.playbackRate.linearRampToValueAtTime(rate * ZHUM.sag, t0 + dur);
+    }
     const lfo = ctx.createOscillator();
     lfo.frequency.value = ZHUM.vib[0];
     const lfoG = ctx.createGain();
@@ -5579,8 +5589,10 @@ function buildAudio() {
     lp.Q.value = -3.01;         // decibels on a lowpass — see `wallQ`
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.00002, t0);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp), t0 + 0.12);
-    g.gain.setValueAtTime(Math.max(0.00003, amp), t0 + Math.max(0.2, dur - 0.35));
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp * (yelp ? 1.5 : 1)),
+      t0 + (yelp ? 0.03 : 0.12));
+    g.gain.setValueAtTime(Math.max(0.00003, amp * (yelp ? 1.5 : 1)),
+      t0 + Math.max(yelp ? 0.5 : 0.2, dur - 0.35));
     g.gain.exponentialRampToValueAtTime(0.00002, t0 + dur);
     const pn = ctx.createStereoPanner();
     pn.pan.value = clamp(o.pan || 0, -1, 1);
@@ -5591,7 +5603,7 @@ function buildAudio() {
       w.gain.value = 0.10 * far;
       g.connect(w).connect(verbSend);
     }
-    src.start(t0); lfo.start(t0); buzz.start(t0);
+    src.start(t0, yelp ? 0.25 : 0); lfo.start(t0); buzz.start(t0);
     const end = t0 + dur + 0.06;
     src.stop(end); lfo.stop(end); buzz.stop(end);
     zhumFired += 1;

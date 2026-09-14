@@ -192,6 +192,10 @@ const PLACES = {
   open: 'the scrub and pine above the bay',
 };
 
+/** How far away a spoken question still reaches her, metres. Shouting across
+ *  a beach carries; shouting across a beach from the city does not. */
+const EARS_REACH = 45;
+
 const voice = (() => {
   /** The player's switch. On by default — but nothing happens without a
    *  session, so "on" is only a statement of intent until you sign in. */
@@ -607,9 +611,66 @@ const voice = (() => {
     return on;
   }
 
+  /**
+   * Somebody asked her something out loud — see src/49-ears.js.
+   *
+   * `ask` is a name off `ASKS` in server/baye/baye.py, never the words: the
+   * transcript is matched to an intent on the server and only the intent comes
+   * back here, so what reaches her prompt is "they asked you the time" and not
+   * whatever was said into the microphone.
+   *
+   * WHICH OF HER ANSWERS is `bayeGap`'s own question — whichever errand you are
+   * nearer. On the shore it is Baye in her own voice. On the vikendica's steps
+   * it is the Bucketeer, who is `who: 'bucketeer'` on the server, answers in
+   * Croatian in Balkanika, and has no other way to open her mouth there — see
+   * `PERSONA_BUCKETEER` for why that stays true.
+   *
+   * Resolves to what happened, as one word, for the ears panel: `said`, `far`,
+   * `off`, `busy`, `nobody`, or the server's refusal.
+   */
+  async function answer(askName) {
+    if (!on) return 'off';
+    if (!AUTH.user || !AUTH.baye) return 'signed out';
+    const gap = at(() => jadrija.bayeGap());
+    if (!gap) return 'nobody';
+    if (gap.m > EARS_REACH) return 'far';
+    const who = gap.bucket ? 'bucketeer' : 'baye';
+    const sp = gap.bucket
+      ? (CAST.bucketeer || (CAST.bucketeer = { key: 'bucketeer', cfg: { memory: 4, hold: 4.0 },
+        said: [], nextAt: 0, inRange: false, gap: () => null, lead: null }))
+      : CAST.baye;
+    // Wait out a line already in the air rather than talk over it — a few
+    // seconds at most, because a question answered after the next one has
+    // been asked is not an answer.
+    for (let i = 0; i < 16 && busy; i++) await new Promise((r) => setTimeout(r, 500));
+    if (busy) return 'busy';
+    busy = true;
+    try {
+      const r = await fetch(AUTH.baye + '/line', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign(context(sp, gap), { who, ask: askName })),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d || !d.ok) return (d && d.error) || ('http ' + r.status);
+      sp.said.push(d.text);
+      if (sp.said.length > sp.cfg.memory) sp.said.shift();
+      caption(d.text, null);
+      await audio.voice(d.audio, 2.1, d.rate || 1);
+      capT = sp.cfg.hold;
+      return 'said: ' + d.text;
+    } catch (e) {
+      return e.message;
+    } finally {
+      busy = false;
+    }
+  }
+
   return {
     step,
     toggle,
+    answer,
     get on() { return on; },
     get near() { return CAST.baye.inRange || CAST.cat.inRange; },
     /** For a probe: what each of them has said this session, and where they

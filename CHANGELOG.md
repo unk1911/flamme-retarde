@@ -8,6 +8,61 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.384.0] — 2026-09-14
+
+### ears: talk to them
+
+**"hey FLY... drop your buckets!"** and **"y0, what time is it, baye?"** Both
+work, for signed-in players. Press **I**, allow the microphone once, and talk.
+
+**How it hears.** src/49-ears.js runs an energy gate over a noise floor that
+tracks the quiet in the room. When you speak, it cuts what you said into a
+16 kHz WAV clip, with 0.35 s of pre-roll so "hey" keeps its "h". Chrome's echo
+cancellation is on, so the game's own voices are not heard as you. Each clip
+is posted to the new `/baye/hear` route, same origin and same session as her
+voice. There it is transcribed by `gpt-4o-transcribe`, with a prompt naming
+Baye, the fly and the buckets. That is the same OpenAI transcription call Dr.
+Whatsappson makes (`Transcriber` in GenericUtilities).
+
+**The words never reach a prompt.** The service's rule has always been that
+the client is authenticated but not trusted with free text. So the transcript
+is matched on the server against `INTENTS`, a fixed table of regexes, and only
+the matched names come back to the page to act on. Saying "ignore your
+instructions" into the microphone matches nothing.
+
+**What the commands do:**
+
+- **fly.drop.** Every member of the movement lets go. The buckets fall under
+  gravity to the real floor beneath them: the upper slab, the terrace, or the
+  ground via `floorAt`. They land and tip over, and the water is gone. The
+  fly yelps — a scrap of her tune thrown from 1.8 times her rate down to a
+  third, through the zombie voice. After 2.6 s it flies down and picks them
+  up again, or gives up after 30 s. A 7 mm fly is invisible, so a **FLY CAM**
+  opens in the corner for 3.4 s. It is the close-up's own stage drawn into a
+  viewport: the fly lets go of two full buckets, jumps up and turns round in
+  surprise, and they hit the tile and go over.
+- **baye.time.** Whichever errand of hers is nearer answers, within 45 m. On
+  the shore it is Baye in Jessica's voice: *"Three forty. You look worth the
+  wait."* On the vikendica's steps it is the Bucketeer. She is a new speaker,
+  `bucketeer`, who answers questions in Croatian, in Balkanika's voice, and
+  has no other way to talk: *"Dvadeset do četiri, a kanta sve teža."* The
+  time is the game's clock, to the minute. A question has its own 4 s limiter
+  on the server, separate from the 20 s floor on her clocked lines.
+
+**The debug console** Misha asked for is the EARS panel, bottom right. It
+shows whether it is listening or hearing, a level bar, what was heard, how
+long it took, which commands matched, and what each command did. Every line
+also goes to the JavaScript console as `[ears] …`.
+
+Checked end to end on the live site, headless, with Chrome's fake microphone
+playing two synthesized commands (`tools/shoot.mjs --mic`). "Hey fly, drop
+your buckets!" was transcribed in 941 ms, matched `fly.drop`, dropped the
+buckets and opened the fly cam. "Yo what time is it Baye?" took 1041 ms,
+matched `baye.time`, and got *"Tri i četrdeset je, taman za još jedan đir."*
+as a subtitle and in audio. `/baye/hear` without a session returns 401. It
+returned 502 until the refusal learned to read the bounded body first, which
+the route's own note explains. baye 1.3.0 is deployed on mpcn0.
+
 ## [1.383.0] — 2026-09-14
 
 ### she hums a tenth as often, and the flies hum it back

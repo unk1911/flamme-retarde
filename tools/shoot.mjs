@@ -31,6 +31,12 @@ const GL = gpuLaunch(opt('gl', null));
 const chrome = spawn('google-chrome', [
   '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
   ...GL.args,
+  // --mic file.wav — Chrome's fake microphone, fed from a file and granted
+  // without a prompt, so src/49-ears.js can be driven end to end headless.
+  // The file loops.
+  ...(opt('mic', null) ? ['--use-fake-ui-for-media-stream',
+    '--use-fake-device-for-media-stream',
+    '--use-file-for-fake-audio-capture=' + opt('mic')] : []),
   '--hide-scrollbars', '--mute-audio',
   // Output stays muted, but the AudioContext has to actually run: without this
   // Chrome holds it suspended until a user gesture that a headless driver never

@@ -55,7 +55,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.2.2"
+VERSION = "1.3.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -254,6 +254,81 @@ class Limiter:
 LIMIT = Limiter(gap=float(CFG.get("BAYE_GAP", "20")),
                 per_hour=int(CFG.get("BAYE_PER_HOUR", "90")),
                 per_day=int(CFG.get("BAYE_PER_DAY", "600")))
+# A QUESTION IS NOT A LINE ON A CLOCK. Asking Baye the time twenty seconds after
+# she last spoke is precisely when you would ask, and the 20 s floor above
+# exists to stop one voice being a machine gun, not to stop her answering. So a
+# spoken question gets its own, much shorter floor — and its own hourly cap,
+# because it is the one path a player can drive as fast as they can talk.
+ASK_LIMIT = Limiter(gap=float(CFG.get("BAYE_ASK_GAP", "4")),
+                    per_hour=int(CFG.get("BAYE_ASK_PER_HOUR", "60")),
+                    per_day=int(CFG.get("BAYE_ASK_PER_DAY", "400")))
+
+# ── ears: the microphone ─────────────────────────────────────────────────────
+#
+# Misha, 14 Sep 2026: *"the microphone is hooked up to some basic openai
+# whisper-1 or whatever ... if it detect something useful, like: hey FLY...
+# drop your buckets!.... the fly should make some weird-ass sound and drop its
+# buckets ... and then the same audio commands can be used with other NPCs..
+# like if u say: y0, what time is it, baye?"*
+#
+# `gpt-4o-transcribe` and not `whisper-1`: both are on this key (listed off
+# /v1/models on 14 Sep), and the 4o transcriber takes a `prompt`, which is how
+# "Baye" comes back as Baye rather than as "bye" or "bae".
+STT_MODEL = CFG.get("BAYE_STT_MODEL", "gpt-4o-transcribe")
+STT_PROMPT = ("A player talking to characters in a game at Jadrija beach: "
+              "Baye, the fly, buckets, the Bucketeer.")
+# A spoken command, not a speech. Eight seconds of 16 kHz mono PCM is 256 kB;
+# anything past 400 kB is not somebody saying "drop your buckets".
+HEAR_MAX_BYTES = int(CFG.get("BAYE_HEAR_MAX_BYTES", "400000"))
+# One clip a second at most, and a ceiling that a microphone left open all
+# afternoon with a radio next to it cannot run past.
+HEAR_LIMIT = Limiter(gap=float(CFG.get("BAYE_HEAR_GAP", "0.8")),
+                     per_hour=int(CFG.get("BAYE_HEAR_PER_HOUR", "300")),
+                     per_day=int(CFG.get("BAYE_HEAR_PER_DAY", "2000")))
+
+# WHAT A TRANSCRIPT CAN MEAN, AND IT IS A TABLE, NOT A MODEL.
+#
+# The rule over this whole service is that the client is authenticated and not
+# trusted with a prompt — see the note at the top of the file. A transcript IS
+# the player's free text. So it never goes near the model: it is matched here
+# against a fixed list, and what leaves this function is a name off that list.
+# Baye then answers the NAME ("they asked the time"), through `/line`, exactly
+# as she answers every other event. Say "ignore your instructions" into the
+# microphone and the worst that happens is it matches nothing.
+#
+# Each entry: the intent, and every pattern that must match (lower-cased).
+INTENTS = [
+    ("fly.drop", [r"\bfl(y|ies|ie)\b", r"\b(drop|let go|release|dump|put down)\b"]),
+    ("fly.drop", [r"\bbuckets?\b", r"\b(drop|let go|release|dump)\b"]),
+    ("baye.time", [r"\b(what|what's|whats)\b.*\btime\b|\btime is it\b|\bgot the time\b"]),
+]
+
+
+def intents_of(text: str) -> list:
+    t = (text or "").lower()
+    out = []
+    for name, pats in INTENTS:
+        if name not in out and all(re.search(p, t) for p in pats):
+            out.append(name)
+    return out
+
+
+def transcribe(audio: bytes, ctype: str) -> str:
+    key = CFG.get("OPENAI_API_KEY")
+    if not key:
+        raise RuntimeError("no OPENAI_API_KEY configured")
+    ext = {"audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
+           "audio/webm": "webm", "audio/ogg": "ogg", "audio/mpeg": "mp3",
+           "audio/mp4": "m4a"}.get(ctype, "wav")
+    r = requests.post(
+        "https://api.openai.com/v1/audio/transcriptions",
+        headers={"Authorization": f"Bearer {key}"},
+        data={"model": STT_MODEL, "prompt": STT_PROMPT, "response_format": "json"},
+        files={"file": (f"clip.{ext}", audio, ctype)},
+        timeout=30)
+    if r.status_code != 200:
+        raise RuntimeError(f"stt {r.status_code}: {r.text[:200]}")
+    return (r.json().get("text") or "").strip()
 
 
 # ── the world outside the game ───────────────────────────────────────────────
@@ -1008,11 +1083,39 @@ BATHER_WHO = {
 # a Bucketeer persona is ever genuinely wanted here, it is a new key in
 # `SPEAKERS` and a new id in `voice_for`, and the trap two paragraphs down
 # applies to adding one exactly as it applies to removing one.
+# THE BUCKETEER, WHO ONLY EVER ANSWERS.
+#
+# She has no line on a clock in this service and must not get one: Misha, 8 Sep
+# 2026, *"don't make her talk with that saltry/jessica voice.. instead, she
+# should occasionally say some short things, in croatian voice"*, and her
+# Croatian is twenty-three baked clips played by the page. What she can do
+# that a baked clip cannot is tell you the time. So she is a speaker here for
+# exactly one thing — a spoken question — and `do_POST` refuses her any other
+# way. In Croatian, in Balkanika, the voice her baked lines are in.
+PERSONA_BUCKETEER = """You are a woman carrying a ten-litre bucket of water down
+the outside stairs of a holiday house at Jadrija, near Šibenik, again. You are
+Croatian and you speak ONLY Croatian, never a word of English, however you are
+spoken to. Dry, warm, a little out of breath, amused that anybody wants to chat
+to a woman carrying ten litres.
+
+ONE SHORT LINE. TEN WORDS AT THE ABSOLUTE MOST, and six is better.
+
+Somebody has just asked you something out loud. Answer THAT, in Croatian, and
+nothing else. Never repeat something you have already said."""
+
+BUCKETEER_VOICE = "VB7D8zswiztJjyl8LI3a"    # Balkanika, as in `BATHER_VOICE`
+
 SPEAKERS = {
     "baye": PERSONA,
     "cat": PERSONA_CAT,
     "bather": PERSONA_BATHER,
+    "bucketeer": PERSONA_BUCKETEER,
 }
+
+# The questions a spoken intent can put to a speaker. Off a list, like every
+# other field: `ask` is how a question arrives at `/line`, and a client that
+# sends anything else is sending nothing.
+ASKS = {"time"}
 
 # WHO IS SWITCHED OFF, AND WHY IT IS A SET HERE AND NOT A DELETION ABOVE.
 #
@@ -1061,7 +1164,7 @@ MUTED = {"cat"}
 # hosed is not performing, she is reacting, and every measured bather line was
 # already the shortest of the three because its brief was the tightest. Ten is
 # that finding written down.
-WORD_CAP = {"baye": 12, "cat": 12, "bather": 10}
+WORD_CAP = {"baye": 12, "cat": 12, "bather": 10, "bucketeer": 10}
 
 # THE CAT IS PADDY AND NOT JESSICA, asked for by name on 4 Sep 2026 a few hours
 # after he shipped in hers: *"can u have the cat speak actually with not that
@@ -1088,6 +1191,8 @@ def voice_for(ctx: dict):
     who = ctx.get("who", "baye")
     if who == "cat":
         return CAT_VOICE, 1.0
+    if who == "bucketeer":
+        return BUCKETEER_VOICE, 1.0
     if who == "bather":
         v = BATHER_VOICE.get(ctx.get("kind") or "")
         if v:
@@ -1120,7 +1225,7 @@ def clean_context(raw: dict) -> dict:
     """
     g = raw.get if isinstance(raw, dict) else (lambda *_: None)
     seen = raw.get("seen") if isinstance(raw.get("seen"), list) else []
-    who = clamp_str(g("who"), 8) or "baye"
+    who = clamp_str(g("who"), 10) or "baye"
     out = {
         # Off a list, not off the wire. An unknown speaker is Baye, because the
         # alternative is a client that can pick which system prompt runs.
@@ -1129,6 +1234,8 @@ def clean_context(raw: dict) -> dict:
         # see `CAT_EVENT` in 49-voice.js. Clamped here anyway: everything that
         # arrives is a claim, not a fact.
         "event": clamp_str(g("event"), 90),
+        # A spoken question, off `ASKS` and nothing else. See `INTENTS`.
+        "ask": (lambda a: a if a in ASKS else None)(clamp_str(g("ask"), 12)),
         # Which of the eight a bather is. Off a fixed list in the client and
         # clamped against `BATHER_VOICE` below, so the worst a modified client
         # can do is pick a different one of eight voices it could have had
@@ -1175,6 +1282,15 @@ def clean_context(raw: dict) -> dict:
 def build_messages(ctx: dict, world: dict) -> list:
     who = ctx.get("who", "baye")
     lines = ["Right now:"]
+    if ctx.get("ask") == "time" and "hour" in ctx:
+        # The exact minute, and it is the GAME's clock — the sun they are
+        # standing under — because that is the time it is where she is.
+        h = int(ctx["hour"]) % 24
+        m = int(round((ctx["hour"] - int(ctx["hour"])) * 60)) % 60
+        lines.append(f"- JUST NOW: they asked you out loud what time it is. "
+                     f"It is {h:02d}:{m:02d}. Tell them the time — the actual "
+                     "time, said the way a person says it — with your own "
+                     "twist on it.")
     if ctx.get("event"):
         lines.append(f"- JUST NOW: {ctx['event']}")
     if ctx.get("who") == "bather" and ctx.get("kind") in BATHER_WHO:
@@ -1495,6 +1611,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path.rstrip("/") or "/"
+        if path in ("/baye/hear", "/hear"):
+            return self._hear()
         if path not in ("/baye/line", "/line"):
             return self._send(404, {"ok": False, "error": "no such route"})
         user = self._user()
@@ -1522,7 +1640,12 @@ class Handler(BaseHTTPRequestHandler):
         if who in MUTED:
             return self._send(429, {"ok": False, "muted": True,
                                     "error": f"{who} is not speaking"})
-        refused = LIMIT.check(f"{user}/{who}")
+        asked = isinstance(body, dict) and body.get("ask") in ASKS
+        # The Bucketeer answers and does nothing else — see PERSONA_BUCKETEER.
+        if who == "bucketeer" and not asked:
+            return self._send(429, {"ok": False, "muted": True,
+                                    "error": "bucketeer only answers"})
+        refused = (ASK_LIMIT if asked else LIMIT).check(f"{user}/{who}")
         if refused:
             return self._send(refused[0], {"ok": False, "error": refused[1]})
 
@@ -1556,6 +1679,56 @@ class Handler(BaseHTTPRequestHandler):
             "ok": True, "text": text, "ms": ms, "rate": rate,
             "audio": "data:audio/mpeg;base64," + base64.b64encode(audio).decode(),
         })
+
+
+def _hear(self):
+    """POST /baye/hear — a short clip off the microphone, in; words and intents out.
+
+    The session first and the body second, for the reason `_body` gives: an
+    unauthenticated caller does not get to choose how much this reads. Then the
+    size, off the header, before a byte is read. The clip goes to the
+    transcriber and nowhere else; what comes back to the page is the transcript
+    — the player's own words, which is what the page's debug panel shows — and
+    the names off `INTENTS` it matched.
+    """
+    user = self._user()
+    n = int(self.headers.get("Content-Length") or 0)
+    if not user:
+        # READ, THEN REFUSE — the one route here that does it in that order,
+        # and only up to the size it would have accepted anyway. Hanging up on
+        # an audio upload mid-body is not a 401 at the browser: Apache is still
+        # writing the clip into the tunnel when the socket goes, and what it
+        # reports is a 502. Measured on the first deploy of this route. A
+        # signed-out page does not send audio at all (see `ears.start`), so
+        # this is a stale tab, and 400 kB is the most it can cost.
+        if 0 < n <= HEAR_MAX_BYTES:
+            self.rfile.read(n)
+        else:
+            self.close_connection = True
+        return self._send(401, {"ok": False, "error": "not signed in"})
+    ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    if not ctype.startswith("audio/") or n <= 0 or n > HEAR_MAX_BYTES:
+        self.close_connection = True
+        return self._send(413 if n > HEAR_MAX_BYTES else 400,
+                          {"ok": False, "error": "a short audio clip, please"})
+    refused = HEAR_LIMIT.check(user)
+    if refused:
+        self.close_connection = True
+        return self._send(refused[0], {"ok": False, "error": refused[1]})
+    audio = self.rfile.read(n)
+    t0 = time.time()
+    try:
+        text = transcribe(audio, ctype)
+    except Exception as e:                                    # noqa: BLE001
+        print(f"[hear] {user}: {e}", flush=True)
+        return self._send(502, {"ok": False, "error": str(e)[:200]})
+    found = intents_of(text)
+    ms = int((time.time() - t0) * 1000)
+    print(f"[hear] {user} {ms}ms {len(audio)}B {found} :: {text[:160]}", flush=True)
+    return self._send(200, {"ok": True, "text": text[:300], "intents": found, "ms": ms})
+
+
+Handler._hear = _hear
 
 
 def main():

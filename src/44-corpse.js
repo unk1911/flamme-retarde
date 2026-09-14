@@ -255,6 +255,12 @@ function corpseMaterial(color, opts = {}) {
       // Shared, so one write fades the whole shot to black at the end of it.
       uFade: opts.fade,
       uRes: opts.res,
+      // Where the frame starts, in the drawing buffer's pixels. Zero for every
+      // shot but the fly cam, which is a viewport in the corner — and
+      // `gl_FragCoord` is measured from the window, not from the viewport, so
+      // without this the vignette put the whole corner at the edge of a
+      // full-screen frame and drew it black.
+      uVp: CORPSE_VP,
       // Where the body is, for the tile's own contact shadow — see the floor
       // case below.
       uBlob: opts.blob || { value: [new THREE.Vector3(), new THREE.Vector3(),
@@ -292,6 +298,7 @@ uniform float uPow;
 uniform float uAlpha;
 uniform float uFade;
 uniform vec2 uRes;
+uniform vec2 uVp;
 uniform vec3 uRadii;
 uniform vec2 uSpan;
 uniform float uFacets;
@@ -484,7 +491,7 @@ void main(){
   float far = length(vP - cameraPosition);
   col *= 1.0 - 0.45 * smoothstep(0.050, 0.200, far);
   // And the frame: a soft vignette, and the fade the cut ends on.
-  vec2 uv = gl_FragCoord.xy / max(uRes, vec2(1.0));
+  vec2 uv = (gl_FragCoord.xy - uVp) / max(uRes, vec2(1.0));
   float vig = 1.0 - 0.55 * pow(length((uv - 0.5) * vec2(1.15, 1.0)) * 1.42, 2.4);
   col *= max(vig, 0.0) * uFade;
   gl_FragColor = vec4(col, alpha);
@@ -605,6 +612,32 @@ const INSERT = {
 };
 
 /**
+ * The fly cam — see `dropShot`. `rect` is where it sits on the screen, in CSS
+ * pixels with the origin bottom left the way WebGL wants it; `#flycam` in
+ * styles.css is the same box measured from the other corner, and the two
+ * formulas have to stay one formula.
+ */
+const DROPCAM = {
+  len: 3.4,
+  release: 0.55,
+  lift: 2.2,                 // mm the feet hold the bails over the tile
+  jolt: 3.0,                 // mm it jumps with the weight gone
+  spin: 0.85,                // s of turning round to see where they went
+  g: 0.055,                  // m/s² — a fly's own gravity, for watching
+  yaw: 0.35,
+  // Framed on the whole drop: 21 mm of picture from 4 mm under the tile to
+  // the fly's jump at 12 over it. At 7.5 cm and 4.2 mm, the first try, the
+  // body was off the top of the frame and only its legs were in it.
+  aimY: 6.0,
+  cam: [0.105, 0.26, -0.35],
+  rect: (W, H) => {
+    const w = Math.round(Math.min(W * 0.30, 460));
+    const h = Math.round(w * 9 / 16);
+    return { x: Math.round(W - w - 24), y: 96, w, h };
+  },
+};
+
+/**
  * The movement's bucket, at a fly's scale: the same cobalt ten-litre pail she
  * carries — `PAIL` in src/45-bucketeer.js, whose colours these are — made 2.6
  * mm tall. Too big for the animal by a factor nobody will argue with.
@@ -615,6 +648,9 @@ const MINIB = {
   bail: 1.45,                // and the bail's apex above the lugs
   wire: 0.075,
 };
+
+/** The viewport offset every corpse material reads — see `uVp`. Shared. */
+const CORPSE_VP = { value: new THREE.Vector2(0, 0) };
 
 const smooth01 = (x) => { const u = sat(x); return u * u * (3 - 2 * u); };
 const hash1 = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
@@ -1252,7 +1288,9 @@ function buildFlyCorpse() {
   // grain and its dust are written in the mesh's own local coordinates: a plane
   // left standing in XY has nothing in its local z to vary along, and the whole
   // floor comes out as one flat colour. Which is exactly what it did.
-  const tile = new THREE.PlaneGeometry(0.30, 0.30);
+  // 0.8 m and not 0.3: the fly cam stands back far enough to see the edge of
+  // a 30 cm tile. The grain is in metres, so a bigger plane is the same floor.
+  const tile = new THREE.PlaneGeometry(0.80, 0.80);
   tile.rotateX(-Math.PI / 2);
   const floorMesh = new THREE.Mesh(tile, M.floor);
   stage.add(floorMesh);
@@ -1712,6 +1750,88 @@ function buildFlyCorpse() {
     }
   }
 
+  /**
+   * The fly cam: "drop your buckets!", `t` seconds after it was said.
+   *
+   * A corner picture and not a cut — see `render(renderer, 'pip')` — because
+   * it is an answer to something the player said while playing, and taking
+   * the camera off them for it would be the game answering a question by
+   * pausing. The fly is hovering over the tile with a full pair; at 0.55 s it
+   * lets go, jolts up with the weight gone and turns right round in surprise,
+   * and the two buckets fall, land and go over on their sides.
+   */
+  function dropShot(t) {
+    measure();
+    floorMesh.visible = true;
+    for (const x of extras) x.A.body.visible = false;
+    for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
+    const P = pairs[0];
+    P.hide(false);
+    const D = DROPCAM;
+    const apex = mm(MINIB.ear + MINIB.bail);
+    const rel = t - D.release;
+    // Where the feet were at the instant it let go: pose the animal AT the
+    // release, read the two feet, then pose it at `t`. Worked out every frame
+    // rather than remembered, so a scrub straight to 2 s is the same picture
+    // as getting there frame by frame.
+    const from = [new THREE.Vector3(), new THREE.Vector3()];
+    if (rel > 0) {
+      poseDrop(D.release);
+      footAt(A0, 2, from[0]);
+      footAt(A0, 3, from[1]);
+    }
+    const y = poseDrop(t);
+    for (let k = 0; k < 2; k++) {
+      const s = k ? 1 : -1;
+      const B = P.b[k];
+      if (rel <= 0) {
+        footAt(A0, k ? 3 : 2, _w);
+        B.hang.position.copy(_w);
+        B.hang.rotation.set(0, D.yaw, 0.12 * Math.sin(t * 6 + s));
+        B.pin.rotation.set(0, 0, 0);
+        B.setFill(1);
+      } else {
+        // Falling at a fly's own gravity — which is to say slowly enough to
+        // watch: 9.81 would be on the tile in 38 ms, one and a bit frames.
+        const f = from[k];
+        const h = Math.max(0, f.y - apex);
+        const fall = Math.min(h, 0.5 * D.g * rel * rel);
+        const tLand = Math.sqrt(2 * h / D.g);
+        const over = rel > tLand ? smooth01((rel - tLand) / 0.22) : 0;
+        B.hang.position.set(f.x, f.y - fall
+          - over * mm(MINIB.ear + MINIB.bail - MINIB.rRim), f.z);
+        B.hang.rotation.set(0, D.yaw, 0);
+        B.pin.rotation.set(s * 1.45 * over, 0, 0);
+        B.setFill(over > 0.2 ? 0 : 1);
+      }
+      B.stream.visible = false;
+    }
+    P.shadow(blob, 4);
+    bodyShadow(A0, y);
+    _v.set(0, mm(D.aimY), 0);
+    look(D.cam[0], D.cam[1], D.cam[2], _v);
+    fade.value = 1;
+  }
+
+  /** The animal alone, at `t` into the fly cam. Returns its height. */
+  function poseDrop(t) {
+    const D = DROPCAM;
+    const apex = mm(MINIB.ear + MINIB.bail);
+    const yHold = apex + carryDrop + mm(D.lift);
+    const rel = t - D.release;
+    const jolt = rel > 0 ? mm(D.jolt) * (1 - Math.exp(-rel * 6)) : 0;
+    const spin = rel > 0 ? TAU * smooth01(rel / D.spin) : 0;
+    const y = yHold + jolt + mm(0.35) * Math.sin(t * 13);
+    rig.position.set(0, y, 0);
+    rig.rotation.set(0.08 * Math.sin(t * 7.3), D.yaw + spin, 0.06 * Math.sin(t * 5.1));
+    setLegs(A0, (L) => (L.row === 1 ? liveRaw(L, 'carry') : liveRaw(L, 'tuck')));
+    const beat = (Math.floor(t * 60) & 1) ? 1 : -1;
+    for (const W of A0.wings) W.g.rotation.set(0, -W.s * 1.70, 0.55 * beat);
+    rig.updateMatrixWorld(true);
+    eyeRot(A0);
+    return y;
+  }
+
   // A second and a third animal for the insert, built only if the movement
   // has grown that big. Clones share every geometry and every material except
   // the two eyes, whose `uRot` is per animal.
@@ -1722,6 +1842,7 @@ function buildFlyCorpse() {
       const m = M.eye[e].clone();
       m.uniforms.uFade = fade;
       m.uniforms.uRes = res;
+      m.uniforms.uVp = CORPSE_VP;
       return m;
     });
     for (let e = 0; e < 2; e++) b.getObjectByName('eye' + e).material = eyeM[e];
@@ -1742,7 +1863,9 @@ function buildFlyCorpse() {
   return {
     stage, cam, rig, body,
     look,
-    revive, reset, insert,
+    revive, reset, insert, dropShot,
+    /** How long the fly cam stays up, seconds. */
+    dropLen: () => DROPCAM.len,
     /** How long the resurrection runs, seconds. */
     riseLen: () => RISE.len,
     /** 1 is the shot, 0 is black. The last third of a second of the cut. */
@@ -1761,11 +1884,33 @@ function buildFlyCorpse() {
      */
     render(renderer, overlay = false) {
       renderer.getSize(_size);
+      const auto = renderer.autoClear;
+      renderer.autoClear = false;
+      if (overlay === 'pip') {
+        // The fly cam, in the corner `DROPCAM.box` describes — the same box
+        // the `#flycam` frame in styles.css draws round it, in CSS pixels,
+        // which is also what `setViewport` takes.
+        const r = DROPCAM.rect(_size.x, _size.y);
+        const pr = renderer.getPixelRatio();
+        res.value.set(r.w * pr, r.h * pr);
+        CORPSE_VP.value.set(r.x * pr, r.y * pr);
+        cam.aspect = r.w / Math.max(1, r.h);
+        cam.updateProjectionMatrix();
+        renderer.setScissorTest(true);
+        renderer.setViewport(r.x, r.y, r.w, r.h);
+        renderer.setScissor(r.x, r.y, r.w, r.h);
+        renderer.clear(true, true, false);
+        renderer.render(stage, cam);
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, _size.x, _size.y);
+        CORPSE_VP.value.set(0, 0);
+        renderer.autoClear = auto;
+        return;
+      }
+      CORPSE_VP.value.set(0, 0);
       res.value.copy(_size);
       cam.aspect = _size.x / Math.max(1, _size.y);
       cam.updateProjectionMatrix();
-      const auto = renderer.autoClear;
-      renderer.autoClear = false;
       renderer.clear(!overlay, true, false);
       renderer.render(stage, cam);
       renderer.autoClear = auto;

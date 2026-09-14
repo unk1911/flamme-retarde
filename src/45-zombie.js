@@ -112,6 +112,19 @@ const ZOMBIE = {
   // is what three flies humming one tune sounds like.
   hum: { answer: [2.6, 3.4], answerEvery: 25, own: [120, 240],
     rates: [0.66, 0.56, 0.76], stagger: 0.22, pourAt: 1.35 },
+  // ── "hey FLY... drop your buckets!" ──────────────────────────────────────
+  //
+  // Said into the microphone — see src/49-ears.js. Every member lets go: the
+  // two buckets fall under gravity to whatever floor is under them, land, and
+  // go over on their sides with the water out of them. The fly yelps, and
+  // after `fetchIn` seconds it goes down and picks them back up, because it
+  // is a member of a movement and not a quitter. If it cannot get to them in
+  // `fetchFor` it gives up and they are simply in its feet again — a fly that
+  // never found its buckets would be a fly with no job for the rest of the
+  // session.
+  fetchIn: 2.6,
+  fetchFor: 30,
+  grab: 0.035,               // m — this close over them and they are picked up
 };
 
 /**
@@ -209,6 +222,9 @@ function buildZombies(vik, buck) {
       seg: 0, wake: 0.9, home: -1, fill: 0, tilt: 0, want: 'wake',
       swing: rnd(0, TAU),
       humStart: -1,
+      // Dropped: where each bucket is and how fast it is falling, and when
+      // the fly goes back for them. Null while they are in its feet.
+      drop: null,
     };
     flock.push(z);
     return z;
@@ -226,6 +242,13 @@ function buildZombies(vik, buck) {
    */
   function aim(z, ph, t) {
     const T = z.target || (z.target = new THREE.Vector3());
+    if (z.drop && clockS >= z.drop.fetchAt) {
+      // Back for them: to a point just over where the pair landed.
+      const a = z.drop.b[0].p, b = z.drop.b[1].p;
+      T.set((a.x + b.x) / 2, Math.max(a.y, b.y) + 0.012, (a.z + b.z) / 2);
+      z.want = 'fetch';
+      return T;
+    }
     if (z.home >= 0) {
       T.set(...ZOMBIE.home[z.home]);
       z.want = 'home';
@@ -321,6 +344,7 @@ function buildZombies(vik, buck) {
     r.rotation.set(0, -z.head, 0.30);
     r.updateMatrix();
     z.swing += dt * 6.5;
+    if (z.drop) { stepDrop(z, dt); return; }
     for (let k = 0; k < 2; k++) {
       const s = k ? 1 : -1;
       const b = z.buckets[k];
@@ -331,6 +355,66 @@ function buildZombies(vik, buck) {
       b.hang.rotation.set(sw * 0.5, -z.head, sw);
       b.pin.rotation.set(s * z.tilt, 0, 0);
       b.water.visible = z.fill > 0.05;
+    }
+  }
+
+  /**
+   * What is under a point, in house metres: the upper floor and the terrace
+   * are both the slab at `plan.floor`, and anywhere else it is the ground —
+   * which `floorAt` answers, in the locale's own frame.
+   */
+  function floorUnder(x, y, zz) {
+    const P = vik.plan;
+    const O = P.outer;
+    const T = P.rooms.terrace;
+    const overSlab = (x > O.x0 && x < O.x1 && zz > O.z0 && zz < O.z1)
+      || (T && x > T.x0 && x < T.x1 && zz > T.z0 && zz < T.z1);
+    if (overSlab && y >= P.floor - 0.02) return P.floor;
+    const g = vik.floorAt(VIK.t + x, VIK.s - zz, y);
+    return typeof g === 'number' && isFinite(g) ? g - vik.base : 0.1;
+  }
+
+  /** Let go. The buckets fall; the fly carries on, lighter, and yelps. */
+  function dropOne(z) {
+    if (z.drop) return false;
+    z.drop = { fetchAt: clockS + ZOMBIE.fetchIn, giveUp: clockS + ZOMBIE.fetchFor, b: [] };
+    for (let k = 0; k < 2; k++) {
+      const b = z.buckets[k];
+      const p = b.hang.position.clone();
+      const floor = floorUnder(p.x, p.y, p.z);
+      z.drop.b.push({ p, vy: 0, floor, landed: false, over: 0,
+        side: k ? 1 : -1, yaw: -z.head });
+    }
+    z.fill = 0;
+    z.yelp = true;
+    return true;
+  }
+
+  function stepDrop(z, dt) {
+    const D = z.drop;
+    const apex = mm(MINIB.ear + MINIB.bail);
+    for (let k = 0; k < 2; k++) {
+      const q = D.b[k];
+      const b = z.buckets[k];
+      if (!q.landed) {
+        q.vy -= 9.81 * dt;
+        q.p.y += q.vy * dt;
+        if (q.p.y <= q.floor + apex) { q.p.y = q.floor + apex; q.landed = true; }
+      } else if (q.over < 1) {
+        q.over = Math.min(1, q.over + dt * 5);
+      }
+      // Over on its side as it lands, and down by the height that loses.
+      const e = smooth01(q.over);
+      b.hang.position.set(q.p.x, q.p.y - e * mm(MINIB.ear + MINIB.bail - MINIB.rRim), q.p.z);
+      b.hang.rotation.set(0, q.yaw, 0);
+      b.pin.rotation.set(q.side * 1.45 * e, 0, 0);
+      b.water.visible = false;
+    }
+    // Picked up: the fly is over the pair and low enough, or it has had long
+    // enough trying.
+    if (clockS >= D.fetchAt) {
+      const T = z.target;
+      if ((T && z.p.distanceTo(T) < ZOMBIE.grab) || clockS >= D.giveUp) z.drop = null;
     }
   }
 
@@ -373,7 +457,10 @@ function buildZombies(vik, buck) {
       const ex = _w.x - ear.x, ey = _w.y - ear.y, ez = _w.z - ear.z;
       const dist = Math.hypot(ex, ey, ez);
       const pan = clamp((_r.x * ex + _r.z * ez) / Math.max(0.3, dist), -1, 1) * 0.8;
-      if (z.humStart >= 0 && clockS >= z.humStart) {
+      if (z.yelp) {
+        z.yelp = false;
+        audio.zombieHum(dist, { start: true, id: z.i, pan, yelp: true });
+      } else if (z.humStart >= 0 && clockS >= z.humStart) {
         z.humStart = -1;
         audio.zombieHum(dist, { start: true, id: z.i, pan,
           rate: H.rates[z.i % H.rates.length] });
@@ -384,6 +471,18 @@ function buildZombies(vik, buck) {
   }
 
   return {
+    /**
+     * "Drop your buckets!" Every member that is holding a pair lets go.
+     * Answers how many did, which is what the ears panel prints — zero is a
+     * sentence the fly heard and could do nothing about.
+     */
+    drop: () => {
+      let n = 0;
+      for (const z of flock) if (dropOne(z)) n += 1;
+      return n;
+    },
+    /** Which members have no buckets in their feet right now, by index. */
+    bare: () => flock.map((z) => !!z.drop),
     /** Everybody hum, now. Debug, and what a probe of the voice wants. */
     hum: () => { choir(); return flock.length; },
     /** Can another one join? The swat asks before it plays the resurrection. */

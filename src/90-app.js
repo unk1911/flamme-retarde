@@ -290,6 +290,9 @@ addEventListener('keydown', (e) => {
   // above the pause guard with ? and ESC because switching her off is something
   // you want to be able to do while she is in the middle of a sentence.
   if (e.code === 'KeyN') { e.preventDefault(); voice.toggle(); return; }
+  // I — ears: the microphone, for talking to them. See src/49-ears.js. Up here
+  // with N for the same reason: it is a switch you want mid-sentence.
+  if (e.code === 'KeyI') { e.preventDefault(); ears.toggle(); return; }
 
   // ? and F1 — the help sheet. Above the pause guard because a paused game is
   // exactly when somebody goes looking for it, and ESC closes it rather than
@@ -1453,6 +1456,7 @@ const HELP = [
     ['P · ESC', 'help.k.pause'],
     ['ESC ESC', 'help.k.silent'],
     ['N', 'help.k.voice'],
+    ['I', 'help.k.ears'],
     ['M', 'help.k.settings'],
     ['H', 'help.k.hud'],
     ['L', 'help.k.clip'],
@@ -3062,6 +3066,22 @@ let pourEdge = -1;
 let pourWhy = 'boot';
 /** Seconds of coming back up out of the black, after the cut has ended. */
 let pourBack = 0;
+/**
+ * The fly cam's clock, or −1 when it is down. Started by `startFlyCam` when a
+ * spoken "drop your buckets" lands (src/49-ears.js); run on wall time in the
+ * frame loop and drawn in the corner by the render above.
+ */
+let flyCamT = -1;
+/** Held by `__fr.ears.flyCam(t)`, for a scrub — the same switch as `swatHold`. */
+let flyCamHold = false;
+function startFlyCam() {
+  if (!jadrija || !jadrija.vik) return false;
+  flyCamT = 0;
+  flyCamHold = false;
+  const el = $('flycam');
+  if (el) el.hidden = false;
+  return true;
+}
 /**
  * The clock `__fr.pour.frame` scrubbed to, so the flies' insert is in the
  * scrubbed picture too — the real cut is `pourCut` and has its own clock. −1
@@ -6589,6 +6609,14 @@ function frame() {
   // looking, see `checkPour` — so unlike every other cut in this file there is
   // no key that starts it.
   if (pourCut) stepPour(real);
+  if (flyCamT >= 0) {
+    if (!flyCamHold) flyCamT += real;
+    if (flyCamT >= jadrija.vik.fly.shot().dropLen() || swatCut || pourCut) {
+      flyCamT = -1;
+      const el = $('flycam');
+      if (el) el.hidden = true;
+    }
+  }
   else { stepPourBack(real); checkPour(real); }
   if (!camOverride) stepLens(real);
   // And the mix goes with it, water included — the duck and the long tail are
@@ -7249,6 +7277,11 @@ function frame() {
   // first two seconds of the shot are still the room. See src/44-corpse.js.
   if (swatCut && swatCut.t >= jadrija.vik.fly.fallSecs() + SWAT.floor) {
     jadrija.vik.fly.shot().render(renderer);
+  } else if (flyCamT >= 0 && !camOverride && jadrija && jadrija.vik) {
+    // The fly cam, in the corner: "drop your buckets!" — see `dropShot`.
+    const shot = jadrija.vik.fly.shot();
+    shot.dropShot(flyCamT);
+    shot.render(renderer, 'pip');
   } else if (camOverride && jadrija && jadrija.zombies && jadrija.zombies.count() > 0
     && (pourCut || pourInsertT >= 0)) {
     // And the movement, in front of the lens, pouring with her. An OVERLAY and
@@ -8717,7 +8750,22 @@ window.__fr = {
    * and what it is doing; `spawn(x, y, z)` enrols one at a house-metre point
    * without a swat, which is what a probe of the pour insert needs.
    */
+  /**
+   * Ears — src/49-ears.js. `act('fly.drop')` does a command without a
+   * microphone, which is how a probe checks the half of this that is not the
+   * transcriber; `flyCam(t)` holds the corner shot at `t` for a screenshot.
+   */
+  ears: {
+    stats: () => ears.stats(),
+    toggle: () => ears.toggle(),
+    act: (name) => ears.act(name),
+    flyCam: (t) => {
+      if (t == null) { flyCamHold = false; return flyCamT; }
+      startFlyCam(); flyCamT = t; flyCamHold = true; return flyCamT;
+    },
+  },
   zombie: {
+    drop: () => (jadrija && jadrija.zombies ? jadrija.zombies.drop() : null),
     stats: () => (jadrija && jadrija.zombies ? jadrija.zombies.stats() : null),
     spawn: (x, y, z) => (jadrija && jadrija.zombies ? jadrija.zombies.spawn(x, y, z) : null),
     /** Everybody hum now; the answer is how many phrases the voice has started. */

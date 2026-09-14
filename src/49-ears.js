@@ -1,0 +1,277 @@
+// -----------------------------------------------------------------------------
+// Ears: talking to them.
+//
+// Misha, 14 Sep 2026: *"just for those who are signed-in/authenticated... the
+// microphone is hooked up to some basic openai whisper-1 or whatever ... so it
+// listen and if it detect something useful, like: hey FLY... drop your
+// buckets!.... the fly should make some weird-ass sound and drop its buckets...
+// [and prolly we need a tiny debug console thingie either on javascript console
+// or side of the screen just so we see what is being heard]... and then the
+// same audio commands can be used with other NPCs.. like if u say: y0, what
+// time is it, baye?"*
+//
+// I turns it on. Chrome asks once for the microphone; after that this listens
+// for speech, cuts each thing you say into a clip, and posts the clip to
+// `/baye/hear` — same origin, same session cookie as her voice. The service on
+// mpcn0 transcribes it (the same OpenAI transcription call Dr. Whatsappson
+// makes — `Transcriber` in GenericUtilities) and matches the words against a
+// fixed table of commands, `INTENTS` in server/baye/baye.py. What comes back is
+// the transcript and the command names; this file does the commands.
+//
+// WHAT NEVER HAPPENS: the words going into anybody's prompt. See `INTENTS` —
+// the transcript is matched on the server and only a name off the list is
+// acted on, so a player cannot talk the service into anything.
+//
+// HOW IT HEARS A SENTENCE, which is the one part the transcription service
+// cannot do for us: a WhatsApp voice note arrives already cut, and a microphone
+// does not. An energy gate over a noise floor that follows the room:
+//
+//   the floor     tracks the quiet between words — down fast, up slowly — so a
+//                 fan or the game's own sea does not read as talking
+//   onset         louder than 3.2 times that floor, and than an absolute 0.018,
+//                 for 80 ms: a word, not a click
+//   pre-roll      0.35 s of what came before the onset goes on the front, so the
+//                 "h" of "hey" is not cut off
+//   the end       0.75 s back under the gate, or 7 s in all, whichever is first
+//   too short     under 0.30 s of voice is a cough, and is not sent
+//
+// Chrome's own echo cancellation is on, which takes this tab's output back out
+// of the input — so Baye talking out of the speakers is not heard as you.
+// The clip is 16 kHz mono 16-bit WAV, made here, because it needs no codec and
+// the transcriber takes it as it is: seven seconds is 224 kB.
+// -----------------------------------------------------------------------------
+
+const EARS = {
+  rate: 16000,
+  pre: 0.35,
+  onRms: 0.018,
+  over: 3.2,
+  attack: 0.08,
+  release: 0.75,
+  minVoiced: 0.30,
+  maxLen: 7.0,
+  /** Lines the panel keeps. */
+  keep: 6,
+};
+
+const ears = (() => {
+  let on = false;
+  let actx = null, stream = null, proc = null, srcNode = null, sink = null;
+  let floor = 0.006;
+  let level = 0;
+  let inflight = 0;
+  let sent = 0;
+  const lines = [];
+  // The last `pre` seconds, round and round, and the clip being recorded.
+  const preBuf = new Float32Array(Math.round(EARS.rate * EARS.pre));
+  let preI = 0;
+  let above = 0;
+  let rec = null;
+  // Resampling from whatever the device runs at down to 16 kHz: a box average
+  // over each output sample's span of input, carried across chunk boundaries.
+  let acc = 0, accN = 0, phase = 0;
+
+  let panelEl = null;
+  function panel() {
+    if (panelEl) return panelEl;
+    panelEl = document.createElement('div');
+    panelEl.id = 'ears';
+    panelEl.hidden = true;
+    const head = document.createElement('div');
+    head.className = 'ears-head';
+    const bar = document.createElement('div');
+    bar.className = 'ears-bar';
+    const fill = document.createElement('i');
+    bar.appendChild(fill);
+    const list = document.createElement('div');
+    list.className = 'ears-lines';
+    panelEl.append(head, bar, list);
+    document.body.appendChild(panelEl);
+    return panelEl;
+  }
+
+  /** Put the panel's contents back from state. textContent, never HTML: a
+   *  transcript is whatever somebody said. */
+  function draw() {
+    const el = panel();
+    el.hidden = !on && !lines.length;
+    el.querySelector('.ears-head').textContent = on
+      ? (rec ? 'EARS · hearing you' : inflight ? 'EARS · thinking' : 'EARS · listening')
+        + (sent ? ' · ' + sent + ' sent' : '')
+      : 'EARS · off (I)';
+    const list = el.querySelector('.ears-lines');
+    list.textContent = '';
+    for (const l of lines) {
+      const d = document.createElement('div');
+      d.className = 'ears-line ' + (l.kind || '');
+      d.textContent = l.text;
+      list.appendChild(d);
+    }
+  }
+
+  function note(text, kind) {
+    lines.push({ text, kind });
+    while (lines.length > EARS.keep) lines.shift();
+    console.info('[ears] ' + text);
+    draw();
+  }
+
+  function onChunk(e) {
+    const input = e.inputBuffer.getChannelData(0);
+    const sr = actx.sampleRate;
+    const step = sr / EARS.rate;
+    let sum = 0;
+    for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
+    const rms = Math.sqrt(sum / input.length);
+    level = rms;
+    if (panelEl && !panelEl.hidden) {
+      const f = panelEl.querySelector('.ears-bar i');
+      if (f) f.style.width = Math.min(100, Math.sqrt(rms / 0.12) * 100).toFixed(0) + '%';
+    }
+    const dt = input.length / sr;
+    const gate = Math.max(EARS.onRms, floor * EARS.over);
+    // Down to 16 kHz.
+    const out = [];
+    for (let i = 0; i < input.length; i++) {
+      acc += input[i]; accN += 1; phase += 1;
+      if (phase >= step) { phase -= step; out.push(acc / accN); acc = 0; accN = 0; }
+    }
+    if (!rec) {
+      // The floor follows the quiet, and only the quiet.
+      floor = rms < floor ? lerp(floor, rms, 0.25) : lerp(floor, rms, 0.004);
+      for (const v of out) { preBuf[preI] = v; preI = (preI + 1) % preBuf.length; }
+      above = rms > gate ? above + dt : 0;
+      if (above >= EARS.attack) {
+        rec = { buf: new Float32Array(Math.round(EARS.rate * (EARS.maxLen + EARS.pre))),
+          n: 0, voiced: above, quiet: 0 };
+        for (let k = 0; k < preBuf.length; k++) rec.buf[rec.n++] = preBuf[(preI + k) % preBuf.length];
+        draw();
+      }
+      return;
+    }
+    for (const v of out) if (rec.n < rec.buf.length) rec.buf[rec.n++] = v;
+    if (rms > gate) { rec.voiced += dt; rec.quiet = 0; } else rec.quiet += dt;
+    if (rec.quiet >= EARS.release || rec.n >= rec.buf.length) {
+      const r = rec;
+      rec = null;
+      above = 0;
+      if (r.voiced < EARS.minVoiced) { draw(); return; }
+      send(wav(r.buf.subarray(0, r.n)), r.n / EARS.rate);
+    }
+  }
+
+  function wav(samples) {
+    const n = samples.length;
+    const b = new ArrayBuffer(44 + n * 2);
+    const v = new DataView(b);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+    str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true); v.setUint32(24, EARS.rate, true);
+    v.setUint32(28, EARS.rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, 'data'); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    return new Blob([b], { type: 'audio/wav' });
+  }
+
+  async function send(blob, secs) {
+    if (!AUTH.user || !AUTH.baye) return;
+    // One at a time. A second sentence while the first is still being heard is
+    // a sentence the player can say again; two in flight is two answers out of
+    // order.
+    if (inflight) { note('(still thinking about the last one)', 'meta'); return; }
+    inflight += 1;
+    sent += 1;
+    draw();
+    try {
+      const r = await fetch(AUTH.baye + '/hear', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'audio/wav' }, body: blob,
+      });
+      const d = await r.json().catch(() => null);
+      if (!d || !d.ok) { note('× ' + ((d && d.error) || 'http ' + r.status), 'err'); return; }
+      const said = d.text || '';
+      note('“' + (said || '…') + '”  ' + secs.toFixed(1) + ' s · ' + d.ms + ' ms'
+        + (d.intents && d.intents.length ? '  → ' + d.intents.join(', ') : ''), 'heard');
+      for (const it of d.intents || []) act(it);
+    } catch (e) {
+      note('× ' + e.message, 'err');
+    } finally {
+      inflight -= 1;
+      draw();
+    }
+  }
+
+  /** Do a command. Every one reports back to the panel, including "nobody". */
+  async function act(name) {
+    if (name === 'fly.drop') {
+      const Z = typeof jadrija !== 'undefined' && jadrija && jadrija.zombies;
+      if (!Z || !Z.count()) { note('fly: there is no fly in the movement to hear you', 'meta'); return; }
+      const n = Z.drop();
+      if (!n) { note('fly: nothing to drop', 'meta'); return; }
+      note('fly: ' + (n > 1 ? n + ' flies let go' : 'let go of its buckets'), 'did');
+      if (typeof startFlyCam === 'function') startFlyCam();
+      return;
+    }
+    if (name === 'baye.time') {
+      note('baye: asking…', 'meta');
+      const res = await voice.answer('time');
+      note('baye: ' + res, res.startsWith('said') ? 'did' : 'meta');
+    }
+  }
+
+  async function start() {
+    if (!AUTH.user || !AUTH.baye) {
+      toast(T('ears.signin'));
+      return false;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true,
+          autoGainControl: true, channelCount: 1 } });
+    } catch (e) {
+      note('× microphone: ' + e.message, 'err');
+      toast(T('ears.denied'));
+      return false;
+    }
+    actx = new AudioContext();
+    if (actx.state === 'suspended') await actx.resume().catch(() => {});
+    srcNode = actx.createMediaStreamSource(stream);
+    // A ScriptProcessor, not a worklet: a worklet is a module fetched from a
+    // URL, and this game is one file with nothing to fetch.
+    proc = actx.createScriptProcessor(2048, 1, 1);
+    proc.onaudioprocess = onChunk;
+    // It only runs if it is connected through to an output, so through a
+    // gain of zero — the microphone is never played back.
+    sink = actx.createGain();
+    sink.gain.value = 0;
+    srcNode.connect(proc);
+    proc.connect(sink).connect(actx.destination);
+    on = true;
+    note('listening — say “hey fly, drop your buckets” or “what time is it, Baye?”', 'meta');
+    toast(T('ears.on'));
+    return true;
+  }
+
+  function stop() {
+    on = false;
+    rec = null;
+    try { proc && proc.disconnect(); srcNode && srcNode.disconnect(); } catch (e) { /* gone */ }
+    if (stream) for (const t of stream.getTracks()) t.stop();
+    if (actx) actx.close().catch(() => {});
+    actx = stream = proc = srcNode = sink = null;
+    toast(T('ears.off'));
+    draw();
+  }
+
+  return {
+    toggle: () => (on ? (stop(), false) : start()),
+    get on() { return on; },
+    act,
+    stats: () => ({ on, level: +level.toFixed(4), floor: +floor.toFixed(4),
+      hearing: !!rec, inflight, sent, lines: lines.map((l) => l.text) }),
+  };
+})();

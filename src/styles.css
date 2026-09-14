@@ -753,6 +753,43 @@ html.touch #swim-hud { bottom: 7.4rem; }
   text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 14px rgba(0, 0, 0, .8);
 }
 #saying[hidden] { display: none; }
+
+/* Ears — src/49-ears.js. What the microphone heard and what was done about it,
+   bottom right over the fly cam's corner, in the subtitle's own type. Small and
+   dim on purpose: it is a debug console Misha asked for, not a feature panel. */
+#ears {
+  position: fixed; right: 24px; bottom: calc(96px + min(30vw, 460px) * 9 / 16 + 12px);
+  z-index: 41; pointer-events: none;
+  width: min(30vw, 460px); max-width: 84vw;
+  font-family: var(--mono); font-size: .54rem; line-height: 1.6;
+  letter-spacing: .03em; color: #cfe0e6;
+  background: rgba(8, 14, 18, .62); border: 1px solid rgba(160, 200, 214, .22);
+  padding: .45rem .6rem;
+}
+#ears[hidden] { display: none; }
+#ears .ears-head { text-transform: uppercase; letter-spacing: .16em; color: #8fb3c0; }
+#ears .ears-bar { height: 3px; margin: .3rem 0 .35rem; background: rgba(160, 200, 214, .15); }
+#ears .ears-bar i { display: block; height: 100%; width: 0; background: #7fd1e6; }
+#ears .ears-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+#ears .ears-line.heard { color: #f2e7d8; }
+#ears .ears-line.did { color: #9be39b; }
+#ears .ears-line.err { color: #ef8f7f; }
+#ears .ears-line.meta { color: #7f96a0; }
+
+/* The fly cam's frame. The picture itself is WebGL, drawn by `render(renderer,
+   'pip')` in src/44-corpse.js into exactly this box: `DROPCAM.rect` is the same
+   formula from the bottom left. */
+#flycam {
+  position: fixed; right: 24px; bottom: 96px; z-index: 41; pointer-events: none;
+  width: min(30vw, 460px); aspect-ratio: 16 / 9;
+  border: 1px solid rgba(242, 231, 216, .55); box-sizing: border-box;
+}
+#flycam[hidden] { display: none; }
+#flycam span {
+  position: absolute; left: .45rem; top: .3rem;
+  font-family: var(--mono); font-size: .5rem; letter-spacing: .2em; color: #f2e7d8;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
 html.touch #saying { bottom: 24vh; font-size: .62rem; }
 
 /* Who you are, bottom left, out of the way of everything. Under the veil's
