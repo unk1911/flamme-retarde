@@ -253,11 +253,19 @@ const BUCK = {
   // That is a 20.3 % DUTY CYCLE. The synthesiser that was here ran at 35-58 %
   // after it had already been opened up once from 53-76 %, and 35-58 % was
   // still judged a radio. A fifth is somebody humming to herself.
+  //
+  // AND THEN A TENTH OF THAT. Misha, 14 Sep 2026: *"i love how bucketeer baye
+  // hums her song.. but it's a bit repetitive. maybe she can hum it at 1/10th
+  // the frequency"*. A burst still starts about three seconds in, so the first
+  // time you are near her you hear it — and after that one burst every 163 s
+  // instead of every 16.3: the mean burst is still 3.83 s and the mean gap is
+  // now 159 s, 125 plus half of 68. A 2.3 % duty cycle. The bursts themselves
+  // are untouched, because what was repetitive was how often, not how.
   humRun: [1, 3],       // phrases in a burst
   humBreath: 0.30,      // s between two phrases inside one, plus up to
   humBreathJit: 0.45,   // this much again — a breath, not a rest
-  humGap: 8.0,          // s from the end of a burst to the start of the next,
-  humJit: 9.0,          // plus up to this much again
+  humGap: 125.0,        // s from the end of a burst to the start of the next,
+  humJit: 68.0,         // plus up to this much again
   // Where a phrase she does not finish stops, as a fraction of the clip.
   // MEASURED off the recording rather than picked: the 10 ms envelope has its
   // two deepest interior dips at 0.775 s and 1.42 s, at −23.4 dB and −22.8 dB

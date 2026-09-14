@@ -2629,6 +2629,15 @@ function stepSwat(dt) {
     const r = m - riseAt;
     const wings = shot.revive(r, SWAT.to);
     vik.fly.buzz(wings * 0.8);
+    // And as it climbs away with the buckets, it hums her tune — the undead
+    // version, see `zombieHum` in src/80-audio.js. Once, on the frame the climb
+    // starts, and only when the shot is running live rather than scrubbed.
+    if (!S.hummed && r >= RISE.climb[0]) {
+      S.hummed = true;
+      if (audio && audio.zombieHum && !swatHold) {
+        audio.zombieHum(0.5, { start: true, id: 0, rate: 0.66 });
+      }
+    }
     if (r >= shot.riseLen()) endSwat();
     return;
   }
@@ -8711,6 +8720,13 @@ window.__fr = {
   zombie: {
     stats: () => (jadrija && jadrija.zombies ? jadrija.zombies.stats() : null),
     spawn: (x, y, z) => (jadrija && jadrija.zombies ? jadrija.zombies.spawn(x, y, z) : null),
+    /** Everybody hum now; the answer is how many phrases the voice has started. */
+    hum: () => {
+      if (!jadrija || !jadrija.zombies) return null;
+      jadrija.zombies.hum();
+      return audio && audio.zombieHum ? audio.zombieHum(0, { probe: true }) : null;
+    },
+    heard: () => (audio && audio.zombieHum ? audio.zombieHum(0, { probe: true }) : null),
   },
   pour: {
     frame: (t = 0) => {

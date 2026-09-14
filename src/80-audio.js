@@ -5478,6 +5478,127 @@ function buildAudio() {
     return dur;
   }
 
+  // ── and the flies that joined her, humming it back ──────────────────────────
+  /**
+   * Her tune, as sung by a housefly that has been dead.
+   *
+   * Misha, 14 Sep 2026: *"maybe the zombie-fly with the buckets can also hum
+   * some zombiefied-version of the same melody HAHAH"*.
+   *
+   * It is HER CLIP — `hum_bucketeer`, the same buffer `hum` decodes — so the
+   * tune is recognisably hers, and everything done to it is what makes it
+   * undead:
+   *
+   *   down and slow   played at 0.56-0.76, which is a fourth to most of an
+   *                   octave under her and half as fast again as she sings it
+   *   a drawl         it starts 22 per cent flat and slides up into the note
+   *                   over a quarter of a second, and sags 18 per cent at the
+   *                   end — a groan in, a groan out
+   *   a wobble        5.3 Hz of pitch vibrato at ±4 per cent, which on a
+   *                   voice is a warble and on this is a fly that cannot hold
+   *                   a note
+   *   through wings   amplitude-modulated by a 118 Hz sawtooth, so every
+   *                   sample of the tune is chopped by a wingbeat — the buzz
+   *                   IS the voice
+   *   and rotten      a tanh fuzz and a nasal +9 dB bump at 950 Hz, with the
+   *                   top rolled off at 2.6 kHz so it stays in a throat
+   *
+   * Up to three at once, one per member of the movement, because three flies
+   * humming one tune at three different rates a fifth of a second apart is a
+   * choir and a choir of zombie flies is the whole point.
+   *
+   * @param d  metres between this fly and the listener
+   * @param o  id (which member, 0-2), start, rate, level 0…1, pan −1…1, probe
+   * @returns  how long the phrase lasts, seconds — or with `probe`, how many
+   *           have been started
+   */
+  const ZHUM = { gain: 0.16, range: 16, buzzHz: 118, vib: [5.3, 0.04],
+    drawl: 0.78, sag: 0.82, peakHz: 950, peakDb: 9, lp: 2600, fuzz: 3.2 };
+  const zhumVoices = [null, null, null];
+  let zhumFired = 0;
+  let zhumCurve = null;
+  function zombieHum(d = 0, o = {}) {
+    if (o.probe) return zhumFired;
+    const rate = o.rate || 0.66;
+    const dur = HUM.len / rate + 0.12;
+    if (!ctx || ctx.state === 'suspended') return dur;
+    if (!humBuf) sampleLoad(HUM.key, (b) => { humBuf = b; });
+    const t = ctx.currentTime;
+    const id = clamp(o.id | 0, 0, 2);
+    const far = Math.max(0, 1 - Math.max(0, d) / ZHUM.range);
+    const amp = ZHUM.gain * far * clamp(o.level == null ? 1 : o.level, 0, 1);
+    let v = zhumVoices[id];
+    if (v && t > v.until) { zhumVoices[id] = v = null; }
+    if (v && !o.start) {
+      v.g.gain.setTargetAtTime(Math.max(0.00002, amp), t, 0.08);
+      if (o.pan != null) v.pn.pan.setTargetAtTime(clamp(o.pan, -1, 1), t, 0.08);
+      return dur;
+    }
+    if (!o.start || !humBuf || amp <= 0.00003) return dur;
+    if (v) { try { v.src.stop(t + 0.05); v.buzz.stop(t + 0.05); v.lfo.stop(t + 0.05); } catch (e) { /* gone */ } }
+    if (!zhumCurve) {
+      zhumCurve = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) {
+        const x = (i / 1023) * 2 - 1;
+        zhumCurve[i] = Math.tanh(ZHUM.fuzz * x) / Math.tanh(ZHUM.fuzz);
+      }
+    }
+    const t0 = t + 0.02;
+    const src = ctx.createBufferSource();
+    src.buffer = humBuf;
+    // The drawl and the sag, on the rate itself — and the vibrato summed on to
+    // the same param, which Web Audio adds to whatever is scheduled.
+    src.playbackRate.setValueAtTime(rate * ZHUM.drawl, t0);
+    src.playbackRate.linearRampToValueAtTime(rate, t0 + 0.25);
+    src.playbackRate.setValueAtTime(rate, t0 + dur * 0.72);
+    src.playbackRate.linearRampToValueAtTime(rate * ZHUM.sag, t0 + dur);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = ZHUM.vib[0];
+    const lfoG = ctx.createGain();
+    lfoG.gain.value = rate * ZHUM.vib[1];
+    lfo.connect(lfoG).connect(src.playbackRate);
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = zhumCurve;
+    // The wingbeat: a gain whose gain is 0.5 ± 0.5 of a sawtooth.
+    const wing = ctx.createGain();
+    wing.gain.value = 0.5;
+    const buzz = ctx.createOscillator();
+    buzz.type = 'sawtooth';
+    buzz.frequency.value = ZHUM.buzzHz * (1 + id * 0.07);
+    const buzzG = ctx.createGain();
+    buzzG.gain.value = 0.5;
+    buzz.connect(buzzG).connect(wing.gain);
+    const peak = ctx.createBiquadFilter();
+    peak.type = 'peaking';
+    peak.frequency.value = ZHUM.peakHz;
+    peak.gain.value = ZHUM.peakDb;
+    peak.Q.value = 1.1;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = ZHUM.lp;
+    lp.Q.value = -3.01;         // decibels on a lowpass — see `wallQ`
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.00002, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp), t0 + 0.12);
+    g.gain.setValueAtTime(Math.max(0.00003, amp), t0 + Math.max(0.2, dur - 0.35));
+    g.gain.exponentialRampToValueAtTime(0.00002, t0 + dur);
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(o.pan || 0, -1, 1);
+    src.connect(shaper).connect(wing).connect(peak).connect(lp).connect(g)
+      .connect(pn).connect(bed || master);
+    if (verbSend) {
+      const w = ctx.createGain();
+      w.gain.value = 0.10 * far;
+      g.connect(w).connect(verbSend);
+    }
+    src.start(t0); lfo.start(t0); buzz.start(t0);
+    const end = t0 + dur + 0.06;
+    src.stop(end); lfo.stop(end); buzz.stop(end);
+    zhumFired += 1;
+    zhumVoices[id] = { src, lfo, buzz, g, pn, until: end };
+    return dur;
+  }
+
   // ── and the same woman, in her own language ─────────────────────────────────
   /**
    * The Bucketeer says something short, in Croatian, once every five minutes.
@@ -6181,7 +6302,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

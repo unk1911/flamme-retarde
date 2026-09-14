@@ -95,6 +95,23 @@ const ZOMBIE = {
   // the middle pair, reaching down.
   hangAt: [-0.0002, -0.0031, 0.0021],
   hear: 60,                 // m — past this nobody is watching and it holds
+  // ── and it hums. `zombieHum` in src/80-audio.js is the voice; this is when.
+  //
+  // Misha, 14 Sep 2026: *"maybe the zombie-fly with the buckets can also hum
+  // some zombiefied-version of the same melody HAHAH"*. Three occasions, all
+  // rare, because the same request cut HER humming to a tenth:
+  //
+  //   ANSWERING HER. When she starts a phrase you can hear, the movement hums
+  //   it back once she has finished — 1.93 s of hers and then a beat. Once per
+  //   burst of hers, not once per phrase.
+  //   WHEN SHE POURS, 1.35 s into the tip, so inside the pour cut and over the
+  //   insert, which is the one place the joke is on screen as well.
+  //   AND ON ITS OWN, every two to four minutes.
+  //
+  // Each member at its own rate and a fifth of a second behind the last, which
+  // is what three flies humming one tune sounds like.
+  hum: { answer: [2.6, 3.4], answerEvery: 25, own: [120, 240],
+    rates: [0.66, 0.56, 0.76], stagger: 0.22, pourAt: 1.35 },
 };
 
 /**
@@ -146,6 +163,15 @@ function buildZombies(vik, buck) {
   // cut skipped in the spiral ends before the fly does.
   let pending = 0;
   let lastPhase = null;
+  // The humming's clocks — see ZOMBIE.hum.
+  let clockS = 0;
+  let humAt = 60;
+  let answerAt = -1;
+  let lastAnswer = -1e9;
+  let herFired = -1;
+  let lastBeatT = 0;
+  const _w = new THREE.Vector3();
+  const _r = new THREE.Vector3();
   const rnd = (a, b) => a + Math.random() * (b - a);
   const _p = new THREE.Vector3();
   const _m = new THREE.Matrix4();
@@ -182,6 +208,7 @@ function buildZombies(vik, buck) {
       speed: 0.2, speed0: 0.2, speedD: 0,
       seg: 0, wake: 0.9, home: -1, fill: 0, tilt: 0, want: 'wake',
       swing: rnd(0, TAU),
+      humStart: -1,
     };
     flock.push(z);
     return z;
@@ -307,7 +334,58 @@ function buildZombies(vik, buck) {
     }
   }
 
+  /** Everybody in, a fifth of a second apart. */
+  function choir() {
+    for (const z of flock) {
+      if (z.humStart < 0) z.humStart = clockS + z.i * ZOMBIE.hum.stagger;
+    }
+  }
+
+  function humTick(dt, who, ph, t) {
+    if (!audio || !audio.zombieHum) return;
+    const H = ZOMBIE.hum;
+    clockS += dt;
+    // Answering: a phrase of hers that actually sounded — `probe` counts only
+    // the ones that were played, so a burst out of earshot is not answered.
+    const her = audio.hum(0, { probe: true });
+    if (herFired < 0) herFired = her;
+    if (her > herFired) {
+      herFired = her;
+      if (answerAt < 0 && clockS - lastAnswer > H.answerEvery) {
+        answerAt = clockS + rnd(H.answer[0], H.answer[1]);
+      }
+    }
+    if (answerAt >= 0 && clockS >= answerAt) { answerAt = -1; lastAnswer = clockS; choir(); }
+    humAt -= dt;
+    if (humAt <= 0) { humAt = rnd(H.own[0], H.own[1]); choir(); }
+    if (ph === 'tip' && lastBeatT < H.pourAt && t >= H.pourAt) choir();
+    lastBeatT = ph === 'tip' ? t : 0;
+
+    // Where each one is heard from: the cut's camera while there is a cut —
+    // `BUCK.ear`, the same live reference her own voice uses — and you
+    // otherwise.
+    const ear = BUCK.ear || who;
+    if (!ear) return;
+    if (camera && camera.matrixWorld) _r.setFromMatrixColumn(camera.matrixWorld, 0);
+    for (const z of flock) {
+      _w.copy(z.p);
+      root.localToWorld(_w);
+      const ex = _w.x - ear.x, ey = _w.y - ear.y, ez = _w.z - ear.z;
+      const dist = Math.hypot(ex, ey, ez);
+      const pan = clamp((_r.x * ex + _r.z * ez) / Math.max(0.3, dist), -1, 1) * 0.8;
+      if (z.humStart >= 0 && clockS >= z.humStart) {
+        z.humStart = -1;
+        audio.zombieHum(dist, { start: true, id: z.i, pan,
+          rate: H.rates[z.i % H.rates.length] });
+      } else {
+        audio.zombieHum(dist, { id: z.i, pan });
+      }
+    }
+  }
+
   return {
+    /** Everybody hum, now. Debug, and what a probe of the voice wants. */
+    hum: () => { choir(); return flock.length; },
     /** Can another one join? The swat asks before it plays the resurrection. */
     room: () => flock.length + pending < ZOMBIE.max,
     /** One is coming: the corpse on the floor gets up as soon as it is there. */
@@ -340,6 +418,7 @@ function buildZombies(vik, buck) {
       lastPhase = ph;
       const d = Math.min(dt, 0.05);
       for (const z of flock) stepOne(z, d, ph, k.t);
+      humTick(dt, who, ph, k.t);
     },
     stats: () => ({
       count: flock.length, pending,

@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.383.0] — 2026-09-14
+
+### she hums a tenth as often, and the flies hum it back
+
+**"maybe she can hum it at 1/10th the frequency"**. The bursts themselves are
+unchanged: still one to three phrases, and the last one often trails off.
+What changes is the gap after a burst, which goes from 8–17 s to 125–193 s.
+The mean cycle goes from 16.3 s to 163 s, and the duty cycle from 20.3 % to
+2.3 %. The first burst still comes three seconds in, so you hear her the
+first time you're near.
+
+**"maybe the zombie-fly with the buckets can also hum some zombiefied-version
+of the same melody"**. `audio.zombieHum` plays her own clip, so it is
+recognisably her tune, and undead:
+- at 0.56–0.76 of her rate, so lower and slower
+- starting 22 % flat and sliding up into the note, then sagging 18 % at the end
+- with a 5.3 Hz warble
+- chopped by a 118 Hz sawtooth wingbeat, through a tanh fuzz, with a nasal
+  bump at 950 Hz
+
+There is one voice per member, so three flies are a choir, each at its own
+rate and a fifth of a second behind the last.
+
+It hums on four occasions:
+- It answers her, a beat after she finishes a phrase you could hear, once
+  per burst.
+- It hums 1.35 s into her pour, so inside the pour cut and over the insert.
+- It hums on its own every two to four minutes.
+- It hums once as it climbs out of the swat close-up with its buckets.
+
+The listener is the cut's camera during a cut and you otherwise, panned off
+the camera's right vector.
+
+Checked against a control recording of the same page with nothing fired:
+the solo phrase adds +10.6 dB in the 150–500 Hz band for 2.9 s, and the
+three-voice choir adds +15.1 dB. In the spectrogram her melody sits around
+200 Hz, with the wingbeat's broadband striations over it.
+
 ## [1.382.0] — 2026-09-14
 
 ### the fly gets up and joins the Bucketeers of America
