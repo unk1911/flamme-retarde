@@ -143,6 +143,35 @@
 // is that or better; it has not been re-measured, because the number that
 // mattered was the ceiling and the ceiling has come down.
 //
+// ── and the conversation, which is the second exception ──
+//
+// Misha, 14 Sep 2026: *"how come when i press 'L', it doesn't record my voice
+// or the pop screen that translates it and stuff? would be cool to include all
+// of that shit"*. The same argument as the terminal's, one level up: once you
+// are talking to them, what you said, what the game heard, what she said back
+// and the fly cam in the corner ARE the scene. A take of the fly dropping its
+// buckets with no voice saying "drop your buckets" is a take of a fly having a
+// seizure.
+//
+// So two things join the recording while they are on screen, and nothing
+// else does:
+//
+//   YOUR VOICE. The microphone src/49-ears.js opened, mixed into the same
+//   MediaStreamDestination the game's own sound goes to — one audio track,
+//   because a MediaRecorder given two records the first and ignores the
+//   second. It is Chrome's echo-cancelled stream, so the game is not in it
+//   twice. Wired whichever of the two is switched on second: see
+//   `clipMicSync`, which both L and I call.
+//
+//   THE WORDS ON SCREEN. The subtitle, the EARS panel and the fly cam's frame
+//   and label, painted over the composite by `clipDom` off their own boxes and
+//   computed styles — the same method as `crtMirror`, for the same reason: one
+//   layout, the browser's, and a painter that reads it. The fly cam's PICTURE
+//   was always in the take; it is WebGL, and so it is the canvas.
+//
+// Everything else that is DOM stays out, exactly as before — the HUD, the
+// toasts, the pause card, and this recorder's own red dot.
+//
 // ── the sound comes free ──
 //
 // captureStream gives a video track only, but `audio.tap()` — the last node
@@ -251,6 +280,7 @@ function clipFrame() {
   // a DOM box in the right place on it.
   const k = c.width / Math.max(1, canvas.clientWidth || c.width);
   const drew = crtMirror(clipCtx, k);
+  clipDom(clipCtx, k);
   if (clipShot) {
     const tell = clipShot;
     clipShot = null;
@@ -452,8 +482,137 @@ function clipArm() {
   // rather than off `frame()`, so a page with nobody recording never branches
   // on this file at all.
   rig.paint = setInterval(clipTick, 500);
+  clipMicSync();
   clipHud();
   return true;
+}
+
+// The microphone's connection into the take, while there is one.
+let clipMic = null;
+
+/**
+ * Your voice into the recording — or out of it — to match whether both the
+ * recorder and the microphone are on right now. Called by L and by I, so the
+ * order they are pressed in does not matter.
+ */
+function clipMicSync() {
+  const stream = typeof ears !== 'undefined' && ears.stream ? ears.stream() : null;
+  const want = !!(clipTapOut && stream);
+  if (clipMic && (!want || clipMic.stream !== stream)) {
+    try { clipMic.src.disconnect(); clipMic.g.disconnect(); } catch (e) { /* gone */ }
+    clipMic = null;
+  }
+  if (!want || clipMic) return !!clipMic;
+  try {
+    const ctx = clipTapOut.dest.context;
+    const src = ctx.createMediaStreamSource(stream);
+    const g = ctx.createGain();
+    g.gain.value = 1.0;
+    src.connect(g).connect(clipTapOut.dest);
+    clipMic = { src, g, stream };
+  } catch (e) { clipMic = null; }
+  return !!clipMic;
+}
+
+/**
+ * The words on screen, onto the composite: the subtitle, the EARS panel and
+ * the fly cam's frame. See the header.
+ *
+ * A small painter and not a general one: backgrounds, borders, and the text
+ * directly inside an element, wrapped at the element's own content width in
+ * its own font, colour, spacing and case. That is everything these three are
+ * made of. Nothing is drawn for an element that is hidden, so a take with
+ * nobody talking pays one `hidden` check per element per captured frame.
+ */
+const CLIP_DOM = ['saying', 'ears', 'flycam'];
+function clipDom(ctx, k) {
+  for (const id of CLIP_DOM) {
+    const el = document.getElementById(id);
+    if (!el || el.hidden) continue;
+    clipDomPaint(ctx, el, k);
+  }
+}
+
+function clipDomPaint(ctx, el, k) {
+  const cs = getComputedStyle(el);
+  if (cs.display === 'none' || cs.visibility === 'hidden') return;
+  const r = el.getBoundingClientRect();
+  if (r.width < 1 || r.height < 1) return;
+  const x = r.left * k, y = r.top * k, w = r.width * k, h = r.height * k;
+  ctx.save();
+  ctx.shadowColor = 'transparent';
+  const bg = cs.backgroundColor;
+  if (bg && bg !== 'transparent' && !/,\s*0\)$/.test(bg)) {
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, y, w, h);
+  }
+  const bw = parseFloat(cs.borderTopWidth) || 0;
+  if (bw > 0 && cs.borderTopStyle !== 'none') {
+    ctx.strokeStyle = cs.borderTopColor;
+    ctx.lineWidth = bw * k;
+    ctx.strokeRect(x + bw * k / 2, y + bw * k / 2, w - bw * k, h - bw * k);
+  }
+  // The text that belongs to this element and not to a child of it.
+  let text = '';
+  for (const n of el.childNodes) if (n.nodeType === 3) text += n.nodeValue;
+  text = text.trim();
+  if (text) {
+    if (cs.textTransform === 'uppercase') text = text.toUpperCase();
+    ctx.font = crtFont(cs, k);
+    if ('letterSpacing' in ctx) {
+      ctx.letterSpacing = (cs.letterSpacing === 'normal' ? 0
+        : parseFloat(cs.letterSpacing) * k) + 'px';
+    }
+    ctx.fillStyle = cs.color;
+    ctx.textBaseline = 'top';
+    const padL = (parseFloat(cs.paddingLeft) || 0) * k;
+    const padR = (parseFloat(cs.paddingRight) || 0) * k;
+    const padT = (parseFloat(cs.paddingTop) || 0) * k;
+    const inner = Math.max(1, w - padL - padR - 2 * bw * k);
+    const lh = (parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.3) * k;
+    const lines = clipWrapPx(ctx, text, inner);
+    // The subtitle's shadow, which is most of why it is readable over sky.
+    if (cs.textShadow && cs.textShadow !== 'none') {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+      ctx.shadowBlur = 3 * k;
+      ctx.shadowOffsetY = 1 * k;
+    }
+    const center = cs.textAlign === 'center';
+    ctx.textAlign = center ? 'center' : 'left';
+    const tx = center ? x + w / 2 : x + padL + bw * k;
+    const fs = parseFloat(cs.fontSize) * k;
+    let ty = y + padT + bw * k + Math.max(0, (lh - fs) / 2);
+    for (const line of lines) { ctx.fillText(line, tx, ty); ty += lh; }
+  }
+  ctx.restore();
+  for (const c of el.children) {
+    // A bar's fill is an empty element with a width and a background.
+    clipDomPaint(ctx, c, k);
+  }
+}
+
+/** Greedy word wrap at a width in canvas pixels, breaking a long word if it
+ *  has to — the stylesheet's `overflow-wrap: anywhere`. */
+function clipWrapPx(ctx, text, width) {
+  const out = [];
+  let line = '';
+  for (const word of text.split(/\s+/)) {
+    const next = line ? line + ' ' + word : word;
+    if (ctx.measureText(next).width <= width || !line) {
+      line = next;
+      while (ctx.measureText(line).width > width && line.length > 1) {
+        let cut = line.length - 1;
+        while (cut > 1 && ctx.measureText(line.slice(0, cut)).width > width) cut -= 1;
+        out.push(line.slice(0, cut));
+        line = line.slice(cut);
+      }
+    } else {
+      out.push(line);
+      line = word;
+    }
+  }
+  if (line) out.push(line);
+  return out;
 }
 
 function clipDisarm() {
@@ -475,6 +634,10 @@ function clipDisarm() {
   // it is dead weight the moment the last track is stopped; the next arm makes
   // another one, which costs a canvas allocation once per press of L.
   clipCanvas = null; clipCtx = null; clipDrewAt = 0;
+  if (clipMic) {
+    try { clipMic.src.disconnect(); clipMic.g.disconnect(); } catch (e) { /* gone */ }
+    clipMic = null;
+  }
   if (clipTapOut) {
     try { clipTapOut.out.disconnect(clipTapOut.dest); } catch (e) { /* gone */ }
     clipTapOut = null;

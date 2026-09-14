@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.385.0] — 2026-09-14
+
+### L records the conversation too
+
+**"how come when i press 'L', it doesn't record my voice or the pop screen
+that translates it and stuff?"** Because the recorder films the canvas plus
+the game's own mix. Everything drawn as DOM was deliberately left out, with
+one exception, the ottakyo terminal. Your microphone was never in the game's
+mix at all. The conversation is now the second exception, for the same reason
+as the terminal: while you are talking to them, it is the scene.
+
+- **Your voice.** The microphone src/49-ears.js opened is mixed into the same
+  MediaStreamDestination as the game's sound. It has to be the same one,
+  because a MediaRecorder given two audio tracks records only the first. It
+  is Chrome's echo-cancelled stream, so the game is not in the take twice.
+  `clipMicSync` wires it up, and L and I both call it, so the order you press
+  them in doesn't matter.
+- **The words on screen.** The subtitle, the EARS panel, and the fly cam's
+  frame and label are painted over the composite by `clipDom`, from their own
+  boxes and computed styles — the method `crtMirror` uses for the terminal.
+  The fly cam's picture was always in the take, because it is WebGL.
+
+Everything else that is DOM stays out as before: the HUD, the toasts, the
+pause card, and the recorder's own red dot.
+
+Checked on the site, headless, with a fake microphone and the recorder armed.
+The take's audio track has the spoken command 3.75–5.0 s in, at −12 dB
+against about −35 dB of game around it. That is exactly when the mic file
+played it, counting from when I was pressed. The recorder's own frame shows
+the EARS panel with the transcript, the FLY CAM with its label and picture,
+and the subtitle.
+
 ## [1.384.0] — 2026-09-14
 
 ### ears: talk to them

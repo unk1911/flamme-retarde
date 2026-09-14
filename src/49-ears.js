@@ -251,6 +251,7 @@ const ears = (() => {
     srcNode.connect(proc);
     proc.connect(sink).connect(actx.destination);
     on = true;
+    if (typeof clipMicSync === 'function') clipMicSync();
     note('listening — say “hey fly, drop your buckets” or “what time is it, Baye?”', 'meta');
     toast(T('ears.on'));
     return true;
@@ -263,6 +264,7 @@ const ears = (() => {
     if (stream) for (const t of stream.getTracks()) t.stop();
     if (actx) actx.close().catch(() => {});
     actx = stream = proc = srcNode = sink = null;
+    if (typeof clipMicSync === 'function') clipMicSync();
     toast(T('ears.off'));
     draw();
   }
@@ -270,6 +272,8 @@ const ears = (() => {
   return {
     toggle: () => (on ? (stop(), false) : start()),
     get on() { return on; },
+    /** The live microphone, for the recorder to mix into a take. */
+    stream: () => (on ? stream : null),
     act,
     stats: () => ({ on, level: +level.toFixed(4), floor: +floor.toFixed(4),
       hearing: !!rec, inflight, sent, lines: lines.map((l) => l.text) }),
