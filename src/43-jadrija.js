@@ -28607,6 +28607,8 @@ async function buildJadrija(scene) {
   // And the woman who carries water out of it — see src/45-bucketeer.js. She
   // takes no `rng()` draw, so the shore behind her is the same shore (rule 4).
   const bucketeer = vik ? await buildBucketeer(scene, vik, walkY) : null;
+  // And the flies that got up again and joined her. See src/45-zombie.js.
+  const zombies = vik && bucketeer ? buildZombies(vik, bucketeer) : null;
 
   // ── the cars in the wood ───────────────────────────────────────────────────
   // Placed by the loop far above, which is where the shore rules live; drawn
@@ -37580,6 +37582,7 @@ async function buildJadrija(scene) {
     // and the fly upstairs, which carries its own: `who` is the ear it is
     // heard at, and past thirty metres it stops being stepped at all.
     if (vik) vik.tick(dt, who);
+    if (zombies) zombies.tick(dt, who);
   }
 
   const mid = at(gapAt);
@@ -38420,6 +38423,8 @@ async function buildJadrija(scene) {
     figure: skinFig,
     /** The second one, on the vikendica's stairs with a bucket. */
     bucketeer,
+    /** The Bucketeers of America, fly division — src/45-zombie.js. */
+    zombies,
     /**
      * The two horns, for the shadow pass and nothing else.
      *

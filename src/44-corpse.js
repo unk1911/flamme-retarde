@@ -519,6 +519,285 @@ function corpseSeg(len, r0, r1, seg = 12, bulge = 0) {
 }
 
 /**
+ * Where the corpse's contact shadow goes: four blobs down the body's own axis
+ * and two under the wings, each [x, y, z, radius] in the body's millimetres.
+ *
+ * The wing pair is worth a sentence. A wing over a white tile is very nearly
+ * invisible — it is a membrane a fifth of a micron thick and the tile is the
+ * brightest thing in the shot — so what actually says WING in a photograph of a
+ * dead fly is not the wing, it is the shadow of it. Once the animal is up, those
+ * two slots go to the buckets.
+ */
+const CORPSE_SHADE = [[1.7, 0, 0, 0.85], [0.2, 0, 0, 1.05], [-1.5, 0, 0, 0.90],
+  [-3.2, 0, 0, 0.60], [-1.5, 0.5, 2.4, 1.50], [-1.5, 0.5, -2.4, 1.50]];
+
+// ── the resurrection ─────────────────────────────────────────────────────────
+//
+// The swat used to end on the corpse. It ends on the corpse getting up now, and
+// then on the corpse flying off with two buckets, because Misha asked for it in
+// terms that do not leave much room for interpretation: the fly has joined the
+// Bucketeers of America. See src/45-zombie.js for what it does afterwards.
+//
+// THE BEATS, in seconds into the resurrection, which starts where the corpse's
+// two-second still used to fade out:
+//
+//   0.00  dead, and for long enough that you believe it
+//   0.90  a hind leg kicks — one tibia snapping straight and falling back
+//   1.45  two more, a front and a middle, on the other side
+//   2.00  the spasm: every leg at once, and the wings, dying away
+//   2.85  dead again. The pause is the joke, and it is most of a second
+//   3.45  it kicks itself over and comes down on its feet
+//   4.10  shakes itself off, and rubs its front feet together
+//   5.05  the wings come out and start
+//   5.40  up, and over to the two buckets it has apparently had all along
+//   6.45  down on to the bails
+//   7.25  and away with them, up and out of the top of the frame
+//   9.30  black
+//
+// The camera holds the swat's last framing until the kick and then pulls back
+// to a frame 26 mm wide, which is what a fly and a pair of buckets need. The
+// buckets were never in the tight frame — they are 9 mm to its right — so they
+// are there from the first frame the wide one could show them.
+const RISE = {
+  // [start, length, which legs, how hard]
+  twitch: [[0.90, 0.16, [4], 0.9], [1.45, 0.14, [1, 2], 0.8], [1.62, 0.15, [5], 0.7]],
+  spasm: [2.00, 0.85],
+  flip: [3.45, 0.60],
+  hop: 2.6,                  // mm the kick throws it up
+  shake: [4.10, 0.85],
+  rub: [4.30, 0.70],
+  wings: [5.05, 0.35],
+  lift: [5.40, 1.05],
+  drop: [6.45, 0.45],
+  grab: [6.90, 0.25],
+  climb: [7.25, 1.65],
+  follow: [7.35, 1.55],
+  pull: [3.45, 1.15],
+  cam: [0.078, 0.34, -0.72], // where the pull-back ends: [d, el, az]
+  // Where the pair stands on the tile, [x, z] mm off the corpse, and the yaw
+  // the fly picks them up at — which is the one that has it facing the lens
+  // with a bucket either side of it rather than one behind the other.
+  pair: [-4.1, -8.6],
+  yaw: 0.67,
+  away: [-2.5, 15.0, 5.5],   // mm it climbs out of the frame by, from the grab
+  len: 9.30,
+  fade: 0.40,
+};
+
+// The pour insert: where on the screen each member of the movement hovers while
+// she pours (NDC x, NDC y, metres off the lens), and how they leave in shot B.
+// Placed against the frame `__fr.pour.frame(0.75)` makes — up and to the left
+// of her pail, over the paving and the pines, where nothing she does happens.
+const INSERT = {
+  // Five centimetres off the glass: 6.5 mm of fly is a fifth of the frame's
+  // height there, and its buckets hang to the height of hers. At 7.5 cm, the
+  // first try, it was a dark speck against the pines that read as dirt.
+  a: [[-0.30, 0.30, 0.050], [-0.62, 0.46, 0.062], [-0.02, 0.54, 0.070]],
+  yawA: -1.10,
+  yawB: 2.20,
+  jit: { every: 0.23, amp: 0.035 },
+  stagger: 0.09,
+  tilt: 1.95,
+  // Over at 0.42 s for 0.38 — her water reaches the lip at 0.52 — and back at
+  // 1.40 for 0.45, a little after hers is dry at 1.23.
+  pour: [0.42, 0.38, 1.40, 0.45],
+  b: { delay: 0.25, dur: 1.5, from: [0.85, -0.75, 0.085], to: [-0.35, 1.35, 0.11] },
+};
+
+/**
+ * The movement's bucket, at a fly's scale: the same cobalt ten-litre pail she
+ * carries — `PAIL` in src/45-bucketeer.js, whose colours these are — made 2.6
+ * mm tall. Too big for the animal by a factor nobody will argue with.
+ */
+const MINIB = {
+  h: 2.6, rBase: 0.95, rRim: 1.25, wall: 0.09,
+  ear: 2.25,                 // the lugs, above the base
+  bail: 1.45,                // and the bail's apex above the lugs
+  wire: 0.075,
+};
+
+const smooth01 = (x) => { const u = sat(x); return u * u * (3 - 2 * u); };
+const hash1 = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
+
+/**
+ * Every joint on one animal, found by name — so it works on the corpse and on
+ * any clone of it — plus the pose it was built in, which is the dead one.
+ *
+ * A leg's pose is ten numbers: the hip's three Euler angles, the knee, the
+ * shin, and the five tarsal joints.
+ */
+function animalRefs(body, eyeM, like) {
+  const legs = [];
+  for (let i = 0; i < 6; i++) {
+    const hip = body.getObjectByName('hip' + i);
+    const tars = [];
+    for (let j = 0; j < CORPSE.leg.tarsi; j++) tars.push(body.getObjectByName('tar' + i + '_' + j));
+    const L = {
+      i, hip, tars, s: i & 1 ? 1 : -1, row: i >> 1, foot: hip.userData.foot,
+      knee: body.getObjectByName('knee' + i), shin: body.getObjectByName('shin' + i),
+      v: new Array(10).fill(0),
+    };
+    L.dead = like ? like.legs[i].dead
+      : [hip.rotation.x, hip.rotation.y, hip.rotation.z, L.knee.rotation.z,
+        L.shin.rotation.z, ...tars.map((t) => t.rotation.z)];
+    legs.push(L);
+  }
+  const wings = [0, 1].map((k) => {
+    const g = body.getObjectByName('wing' + k);
+    const W = { g, s: k ? 1 : -1 };
+    W.dead = like ? like.wings[k].dead : [g.rotation.y, g.rotation.z];
+    return W;
+  });
+  const eyes = [0, 1].map((k) => body.getObjectByName('eye' + k));
+  return { body, legs, wings, eyes, eyeM };
+}
+
+/**
+ * A living leg, per pair: [azimuth, droop, femur, tibia, first tarsus, curl].
+ *
+ * The same joint conventions as LEG_DEAD in `buildFlyCorpse`, and the droop is
+ * negative for the same reason — ventral is −Y — which on a fly the right way up
+ * is simply down. `stand` has the femur up and the tibia down to the tile, which
+ * is the knees-out crouch a fly stands in; `tuck` is the legs drawn up in the
+ * air; `carry` is the middle pair hanging straight down, reaching for a bail;
+ * `rub` is the front pair up under the head.
+ */
+const LEG_LIVE = {
+  stand: [[0.70, -0.30, 0.55, -1.75, 0.95, 0.10], [1.60, -0.36, 0.62, -1.82, 1.00, 0.10],
+    [2.40, -0.30, 0.55, -1.75, 0.95, 0.10]],
+  tuck: [[0.60, -1.05, 0.40, -1.45, 0.40, 0.22], [1.60, -1.10, 0.30, -1.40, 0.40, 0.22],
+    [2.50, -1.00, 0.35, -1.30, 0.40, 0.22]],
+  carry: [[1.60, -1.22, 0.05, -0.18, 0.10, 0.04]],
+  rub: [[0.30, -0.60, 0.95, -2.25, 0.60, 0.15]],
+};
+const _live = new Array(10).fill(0);
+function liveRaw(L, kind) {
+  const T = LEG_LIVE[kind];
+  const P = T[Math.min(T.length - 1, L.row)];
+  _live[0] = 0; _live[1] = -L.s * P[0]; _live[2] = P[1];
+  _live[3] = P[2]; _live[4] = P[3]; _live[5] = P[4];
+  for (let j = 1; j < 5; j++) _live[5 + j] = P[5] * (1 + j * 0.4);
+  return _live.slice();
+}
+const copyRaw = (out, a) => { for (let k = 0; k < 10; k++) out[k] = a[k]; return out; };
+const mixRaw = (out, a, b, t) => {
+  for (let k = 0; k < 10; k++) out[k] = a[k] + (b[k] - a[k]) * t;
+  return out;
+};
+/** Pose every leg: `fn(leg, scratch)` hands back the ten numbers. */
+function setLegs(A, fn) {
+  for (const L of A.legs) {
+    const v = fn(L, L.v);
+    L.hip.rotation.set(v[0], v[1], v[2]);
+    L.knee.rotation.z = v[3];
+    L.shin.rotation.z = v[4];
+    for (let j = 0; j < L.tars.length; j++) L.tars[j].rotation.z = v[5 + j];
+  }
+}
+
+function miniBucketMats(fade, res) {
+  // PAIL.out, PAIL.in and PAIL.wire, and a water lighter than PAIL.water,
+  // because a 2 mm pool of dark water photographed from above is a black dot.
+  return {
+    out: corpseMaterial([0.140, 0.300, 0.650], { spec: 0.55, power: 60, fade, res }),
+    in: corpseMaterial([0.095, 0.215, 0.500], { spec: 0.30, power: 40, fade, res,
+      side: THREE.BackSide }),
+    base: corpseMaterial([0.095, 0.215, 0.500], { spec: 0.30, power: 40, fade, res,
+      side: THREE.DoubleSide }),
+    wire: corpseMaterial([0.560, 0.575, 0.590], { spec: 0.9, power: 90, fade, res }),
+    water: corpseMaterial([0.300, 0.470, 0.580], { spec: 1.0, power: 120, fade, res }),
+    stream: corpseMaterial([0.620, 0.760, 0.860], { spec: 0.8, power: 60, fade, res,
+      alpha: 0.62, transparent: true, depthWrite: false }),
+  };
+}
+
+/**
+ * One tiny bucket, hung from the apex of its bail.
+ *
+ * `hang` is the apex — what a foot holds — and `pin` is the ear line below it,
+ * which the body turns about when it pours, exactly as the real one does (see
+ * `PAIL` in src/45-bucketeer.js: "a bucket rolls over about the bail it is
+ * hanging from"). The stream is a separate object in the stage, because water
+ * falls straight down whatever the bucket is doing.
+ */
+function miniBucket(stage, MB) {
+  const B = MINIB;
+  const hang = new THREE.Group();
+  const r = B.rRim + 0.05;
+  const bailG = new THREE.TorusGeometry(mm(r), mm(B.wire), 5, 18, Math.PI);
+  bailG.scale(1, B.bail / r, 1);
+  bailG.translate(0, -mm(B.bail), 0);
+  hang.add(new THREE.Mesh(bailG, MB.wire));
+  const pin = new THREE.Group();
+  pin.position.y = -mm(B.bail);
+  hang.add(pin);
+  const yb = -B.ear, yr = B.h - B.ear;
+  const lathe = (r0, r1, y0, y1, mat) => {
+    const g = new THREE.LatheGeometry([new THREE.Vector2(mm(r0), mm(y0)),
+      new THREE.Vector2(mm(r1), mm(y1))], 22);
+    pin.add(new THREE.Mesh(g, mat));
+  };
+  lathe(B.rBase, B.rRim, yb, yr, MB.out);
+  lathe(B.rBase - B.wall, B.rRim - B.wall, yb + B.wall, yr, MB.in);
+  const baseG = new THREE.CircleGeometry(mm(B.rBase), 22);
+  baseG.rotateX(-Math.PI / 2);
+  const base = new THREE.Mesh(baseG, MB.base);
+  base.position.y = mm(yb);
+  pin.add(base);
+  const rimG = new THREE.TorusGeometry(mm(B.rRim - B.wall / 2), mm(0.07), 5, 22);
+  rimG.rotateX(Math.PI / 2);
+  const rim = new THREE.Mesh(rimG, MB.out);
+  rim.position.y = mm(yr);
+  pin.add(rim);
+  for (const s of [-1, 1]) {
+    const lug = new THREE.Mesh(new THREE.SphereGeometry(mm(0.14), 8, 6), MB.out);
+    lug.position.set(s * mm(B.rRim), 0, 0);
+    pin.add(lug);
+  }
+  const waterG = new THREE.CircleGeometry(1, 22);
+  waterG.rotateX(-Math.PI / 2);
+  const water = new THREE.Mesh(waterG, MB.water);
+  pin.add(water);
+  const streamG = new THREE.CylinderGeometry(mm(0.15), mm(0.09), 1, 7, 1, true);
+  streamG.translate(0, -0.5, 0);
+  const stream = new THREE.Mesh(streamG, MB.stream);
+  stream.renderOrder = 4;
+  stream.visible = false;
+  stage.add(stream);
+  stage.add(hang);
+  return {
+    hang, pin, water, stream,
+    setFill(f) {
+      water.visible = f > 0.02;
+      const k = sat(f);
+      const y = yb + B.wall + 0.05 + k * (B.h - B.wall - 0.45);
+      const rr = lerp(B.rBase, B.rRim, (y - yb) / B.h) - B.wall;
+      water.position.y = mm(y);
+      water.scale.set(mm(rr), 1, mm(rr));
+    },
+  };
+}
+
+function makePair(stage, MB) {
+  const b = [miniBucket(stage, MB), miniBucket(stage, MB)];
+  return {
+    b,
+    hide(off) {
+      for (const B of b) { B.hang.visible = !off; if (off) B.stream.visible = false; }
+    },
+    /** Their two contact shadows, into slots `at` and `at + 1` of the tile's six. */
+    shadow(blob, at) {
+      for (let k = 0; k < 2; k++) {
+        const h = b[k].hang;
+        const lift = Math.max(0, h.position.y - mm(MINIB.ear + MINIB.bail));
+        const kk = h.visible ? sat(1 - lift / mm(8)) : 0;
+        blob.value[at + k].set(h.position.x, h.position.z, mm(MINIB.rRim + 0.2) * kk);
+      }
+    },
+  };
+}
+
+/**
  * The corpse, its stage, its camera and its lights.
  *
  * Returns the handful of things the app needs: `render` draws the shot over
@@ -707,6 +986,7 @@ function buildFlyCorpse() {
       const m = add(eg, M.eye[s > 0 ? 1 : 0],
         [mm(E.at[0]), mm(E.at[1]), s * mm(E.at[2])]);
       m.rotation.set(s * 0.30, 0, 0.12);
+      m.name = 'eye' + (s > 0 ? 1 : 0);
       eyes.push(m);
     }
 
@@ -823,6 +1103,7 @@ function buildFlyCorpse() {
       const m = new THREE.Mesh(makeVane(s), M.wing);
       m.renderOrder = 3;
       g.add(m);
+      g.name = 'wing' + (s > 0 ? 1 : 0);
       body.add(g);
     }
 
@@ -894,6 +1175,9 @@ function buildFlyCorpse() {
     // right-hand legs are the ones that need the negative.
     hip.rotation.order = 'YZX';
     hip.rotation.set(s * P[2], -s * P[0], P[1]);
+    // Named, so the resurrection can find every joint on this animal and on
+    // any clone of it — see `animalRefs`.
+    hip.name = 'hip' + i;
     body.add(hip);
 
     const coxa = new THREE.Mesh(
@@ -903,6 +1187,7 @@ function buildFlyCorpse() {
     const knee = new THREE.Group();
     knee.position.set(mm(CORPSE.leg.coxa * k), 0, 0);
     knee.rotation.set(0, 0, P[3]);
+    knee.name = 'knee' + i;
     hip.add(knee);
     // The femur is the thick one — it is the muscle that jumps — and it tapers
     // hard into the joint.
@@ -912,6 +1197,7 @@ function buildFlyCorpse() {
     const shin = new THREE.Group();
     shin.position.set(mm(CORPSE.leg.femur * k), 0, 0);
     shin.rotation.set(0, 0, P[4]);
+    shin.name = 'shin' + i;
     knee.add(shin);
     shin.add(new THREE.Mesh(
       corpseSeg(mm(CORPSE.leg.tibia * k), mm(0.080), mm(0.058), 8), M.leg));
@@ -940,6 +1226,7 @@ function buildFlyCorpse() {
       const t = new THREE.Group();
       t.position.set(mm(at2), 0, 0);
       t.rotation.set(0, 0, j === 0 ? P[5] : 0.30 + j * 0.10);
+      t.name = 'tar' + i + '_' + j;
       node.add(t);
       const len = CORPSE.leg.tarsus * k * (j === 0 ? 1.5 : 1 - j * 0.10);
       t.add(new THREE.Mesh(
@@ -956,6 +1243,8 @@ function buildFlyCorpse() {
       claw.rotation.set(c * 0.5, 0, 0.9);
       node.add(claw);
     }
+    // How far past the last joint the claws are, which is where the foot is.
+    hip.userData.foot = mm(at2);
   }
 
   // ── the tile, and how the animal is lying on it ─────────────────────────────
@@ -965,7 +1254,8 @@ function buildFlyCorpse() {
   // floor comes out as one flat colour. Which is exactly what it did.
   const tile = new THREE.PlaneGeometry(0.30, 0.30);
   tile.rotateX(-Math.PI / 2);
-  stage.add(new THREE.Mesh(tile, M.floor));
+  const floorMesh = new THREE.Mesh(tile, M.floor);
+  stage.add(floorMesh);
 
   const rig = new THREE.Group();
   rig.add(body);
@@ -995,13 +1285,7 @@ function buildFlyCorpse() {
   // Where the shadow goes. Four blobs down the body's own axis, in the stage's
   // world metres, which is where the tile's shader wants them.
   // Each is [x, y, z, radius] in the body's own millimetres.
-  const shade = [[1.7, 0, 0, 0.85], [0.2, 0, 0, 1.05], [-1.5, 0, 0, 0.90],
-    [-3.2, 0, 0, 0.60],
-    // And two under the wings. A wing over a white tile is very nearly
-    // invisible — it is a membrane a fifth of a micron thick and the tile is
-    // the brightest thing in the shot — so what actually says WING in a
-    // photograph of a dead fly is not the wing, it is the shadow of it.
-    [-1.5, 0.5, 2.4, 1.50], [-1.5, 0.5, -2.4, 1.50]];
+  const shade = CORPSE_SHADE;
   for (let i = 0; i < shade.length; i++) {
     const p = body.localToWorld(new THREE.Vector3(
       mm(shade[i][0]), mm(shade[i][1]), mm(shade[i][2])));
@@ -1010,10 +1294,14 @@ function buildFlyCorpse() {
 
   // And each eye's own rotation into the stage, now that it has one. See the
   // note on `uRot`: this is the substitute for the `modelMatrix` a fragment
-  // shader does not get, and it is read once because nothing here moves again.
+  // shader does not get. It was read once, when nothing here moved again; the
+  // fly gets up now, so `poseFrame` reads it again on every frame it moves.
   for (let i = 0; i < eyes.length; i++) {
     M.eye[i].uniforms.uRot.value.setFromMatrix4(eyes[i].matrixWorld);
   }
+  // The dead blobs, kept, because the wing pair of them is a decision about a
+  // corpse and has no meaning for anything standing up.
+  const blobDead = blob.value.map((v) => v.clone());
 
   // What the lens is pointed at, and it is not the middle of the body: the
   // legs stand two millimetres over the belly and the belly is the subject, so
@@ -1025,19 +1313,438 @@ function buildFlyCorpse() {
    * Point the camera at it.
    *
    * `d` metres out, `el` radians above the tile, `az` radians round from the
-   * fly's own nose. Everything the shot does is these three numbers on a curve.
+   * fly's own nose. Everything the shot does is these three numbers on a curve
+   * — plus, since the fly got up, where on the stage it is pointed, which is
+   * `_aim` unless something says otherwise.
    */
-  function look(d, el, az) {
+  function look(d, el, az, aim) {
     cam.position.set(
       Math.cos(el) * Math.cos(az) * d, Math.sin(el) * d,
       Math.cos(el) * Math.sin(az) * d);
     cam.up.set(0, 1, 0);
-    cam.lookAt(_aim);
+    cam.lookAt(aim || _aim);
   }
+
+  // ── and then it gets up ─────────────────────────────────────────────────────
+  //
+  // Misha, 14 Sep 2026: *"it would be hilarious if after a few seconds the fly
+  // started twitching a bit, then came back to life ... started flying around
+  // again, this time carrying two tiny blue buckets of water. the zombie fly
+  // has essentially joined the "Bucketeers of America" movement"*.
+  //
+  // Everything below drives the SAME animal the corpse is built out of — the
+  // named joints on it are the whole interface — and every pose is a pure
+  // function of the time into the beat, for the reason `stepDie` gives in
+  // src/44-vikendica.js: the swat's cut is scrubbed by `__fr.fly.cutAt`, and a
+  // shot that has to arrive somewhere exact cannot be an integrator.
+  const A0 = animalRefs(body, M.eye);
+  const MB = miniBucketMats(fade, res);
+  // The pair of buckets on the tile, and a second pair for every extra member
+  // of the movement the pour insert has to show. Built here, once, because the
+  // stage is.
+  const pairs = [makePair(stage, MB)];
+  const extras = [];
+  const _v = new THREE.Vector3();
+  const _w = new THREE.Vector3();
+  const _q = new THREE.Vector3();
+
+  /** Where each foot is, in the stage, for the pose the animal is in now. */
+  function footAt(A, i, out) {
+    const L = A.legs[i];
+    return L.tars[L.tars.length - 1].localToWorld(out.set(L.foot, 0, 0));
+  }
+
+  // How high the body rides when it is standing, and where the middle pair of
+  // feet end up when they are reaching down for a bail — MEASURED off the pose
+  // rather than worked out from the table, because six joints of arithmetic
+  // written twice is two answers. Taken once, on the first frame that needs
+  // them, with the rig parked at the origin and put back afterwards.
+  let standLift = null;
+  let carryDrop = null;
+  let carrySpan = null;
+  function measure() {
+    if (standLift != null) return;
+    const px = rig.position.clone(), rx = rig.rotation.clone();
+    rig.position.set(0, 0, 0);
+    rig.rotation.set(0, 0, 0);
+    setLegs(A0, (L) => liveRaw(L, 'stand'));
+    rig.updateMatrixWorld(true);
+    let lo = Infinity;
+    for (let i = 0; i < 6; i++) lo = Math.min(lo, footAt(A0, i, _v).y);
+    standLift = -lo;
+    setLegs(A0, (L) => (L.row === 1 ? liveRaw(L, 'carry') : liveRaw(L, 'tuck')));
+    rig.updateMatrixWorld(true);
+    const a = footAt(A0, 2, new THREE.Vector3());
+    const b = footAt(A0, 3, new THREE.Vector3());
+    carryDrop = -(a.y + b.y) / 2;
+    carrySpan = Math.abs(a.z - b.z);
+    rig.position.copy(px);
+    rig.rotation.copy(rx);
+    setLegs(A0, (L) => L.dead);
+    rig.updateMatrixWorld(true);
+  }
+
+  /**
+   * The resurrection, `r` seconds in. See RISE for the beats.
+   *
+   * `from` is where the swat's own arc left the camera — [d, el, az] — so the
+   * first frame of this is the last frame of that and nothing jumps.
+   * Returns how hard the wings are going, 0 to 1, which is what the app turns
+   * into a buzz.
+   */
+  function revive(r, from) {
+    measure();
+    floorMesh.visible = true;
+    for (const x of extras) x.A.body.visible = false;
+    for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
+    const P = pairs[0];
+    P.hide(false);
+    const R = RISE;
+    const dead = r < R.flip[0];
+    const flipU = sat((r - R.flip[0]) / R.flip[1]);
+    const flipE = flipU * flipU * (3 - 2 * flipU);
+
+    // ── the legs ──────────────────────────────────────────────────────────
+    const liftU = sat((r - R.lift[0]) / R.lift[1]);
+    const grabU = sat((r - R.grab[0]) / R.grab[1]);
+    setLegs(A0, (L, v) => {
+      if (dead) {
+        // Dead, with the twitches on top of it. Each kick is one joint on one
+        // leg snapping straight and falling back — the tibia, because that is
+        // the fold that is holding the whole curl — and the spasm is all six
+        // at once, a nerve firing into a body that has not caught up yet.
+        copyRaw(v, L.dead);
+        for (const k of R.twitch) {
+          const u = (r - k[0]) / k[1];
+          if (u <= 0 || u >= 1 || k[2].indexOf(L.i) < 0) continue;
+          const kick = Math.sin(u * Math.PI) * k[3];
+          v[4] -= kick * 1.4;
+          v[5] -= kick * 0.6;
+          v[2] += kick * 0.25;
+        }
+        const sp = (r - R.spasm[0]) / R.spasm[1];
+        if (sp > 0 && sp < 1) {
+          const amp = (1 - sp) * (1 - sp);
+          const w = r * 41 + L.i * 1.9;
+          v[4] += amp * 0.55 * Math.sin(w);
+          v[3] += amp * 0.30 * Math.sin(w * 1.37 + 1.1);
+          v[2] += amp * 0.20 * Math.sin(w * 0.83 + 2.3);
+        }
+        return v;
+      }
+      // Over, and on to its feet. The legs go from the curl to the stance
+      // across the roll, so the feet are out and reaching by the time the
+      // floor comes round to meet them.
+      const stand = liveRaw(L, 'stand');
+      if (flipU < 1) return mixRaw(v, L.dead, stand, Math.min(1, flipE * 1.3));
+      // The rub. Front pair, up under the head, going like a pair of hands
+      // that have just had a thought — which is what a fly grooming looks like
+      // to everybody who has ever watched one, and this one has earned it.
+      const rubU = (r - R.rub[0]) / R.rub[1];
+      if (L.row === 0 && rubU > 0 && rubU < 1) {
+        const rub = liveRaw(L, 'rub');
+        const inU = Math.min(1, Math.min(rubU, 1 - rubU) * 5);
+        mixRaw(v, stand, rub, inU);
+        v[1] += L.s * 0.22 * Math.sin(r * 38) * inU;
+        v[3] += 0.18 * Math.sin(r * 38 + 1.2) * inU;
+        return v;
+      }
+      if (r < R.lift[0]) return copyRaw(v, stand);
+      // Up: every leg tucks, except the middle pair, which reach down for the
+      // bails and stay reaching.
+      const air = L.row === 1 ? liveRaw(L, 'carry') : liveRaw(L, 'tuck');
+      return mixRaw(v, stand, air, Math.min(1, liftU * 3));
+    });
+
+    // ── the wings ─────────────────────────────────────────────────────────
+    const wingOn = sat((r - R.wings[0]) / R.wings[1]);
+    const beat = (Math.floor(r * 60) & 1) ? 1 : -1;
+    for (const W of A0.wings) {
+      if (dead) {
+        let y = W.dead[0], z = W.dead[1];
+        const sp = (r - R.spasm[0]) / R.spasm[1];
+        if (sp > 0 && sp < 1) z += (1 - sp) * 0.25 * Math.sin(r * 53 + W.s);
+        W.g.rotation.set(0, y, z);
+        continue;
+      }
+      // Folded down the abdomen once it is over, and out and beating once it
+      // means to go. The beat is one frame up, one frame down: 190 strokes a
+      // second against 60 frames is a strobe, and a strobe is what a camera
+      // actually records of a fly's wings.
+      const fold = [-W.s * 2.80, 0.16];
+      const fly = [-W.s * 1.70, 0.55 * beat];
+      const y0 = lerp(W.dead[0], fold[0], flipE), z0 = lerp(W.dead[1], fold[1], flipE);
+      W.g.rotation.set(0, lerp(y0, fly[0], wingOn), lerp(z0, fly[1], wingOn));
+    }
+
+    // ── where the body is ─────────────────────────────────────────────────
+    const hop = Math.sin(flipU * Math.PI) * mm(RISE.hop);
+    const yDead = deadY;
+    const C = RISE.pair;
+    const yaw = RISE.yaw;
+    const latX = Math.sin(yaw), latZ = Math.cos(yaw);
+    const cx = mm(C[0]), cz = mm(C[1]);
+    const apex = mm(MINIB.ear + MINIB.bail);
+    const yGrab = apex + carryDrop;
+    let x = 0, y, z = 0, rot = Math.PI - CORPSE_ROLL, yw = 0, jig = 0;
+    if (dead) {
+      y = yDead;
+      const sp = (r - R.spasm[0]) / R.spasm[1];
+      if (sp > 0 && sp < 1) jig = (1 - sp) * 0.06 * Math.sin(r * 47);
+      for (const k of R.twitch) {
+        const u = (r - k[0]) / k[1];
+        if (u > 0 && u < 1) jig += Math.sin(u * Math.PI) * 0.035 * k[3];
+      }
+    } else if (flipU < 1) {
+      // Over the long axis, the way it rolled on to its back, with a hop in
+      // it: a fly righting itself does not roll, it kicks, and comes down.
+      rot = lerp(Math.PI - CORPSE_ROLL, 0, flipE);
+      y = lerp(yDead, standLift, flipE) + hop;
+    } else if (r < R.lift[0]) {
+      rot = 0;
+      y = standLift;
+      // The shake: a dog out of the sea, which is a joke and is also what a
+      // fly that has just got its wings back does before it trusts them.
+      const sh = (r - R.shake[0]) / R.shake[1];
+      if (sh > 0 && sh < 1) yw = 0.28 * Math.sin(sh * Math.PI * 7) * (1 - sh);
+    } else {
+      rot = 0;
+      const lu = liftU * liftU * (3 - 2 * liftU);
+      const du = sat((r - R.drop[0]) / R.drop[1]);
+      const de = du * du * (3 - 2 * du);
+      const cu = sat((r - R.climb[0]) / R.climb[1]);
+      const ce = cu * cu;
+      // Up, over, down on to the bails, and up and away with them.
+      const hx = cx - latX * 0, hz = cz;
+      const bob = mm(0.35) * Math.sin(r * 13);
+      if (r < R.drop[0]) {
+        x = lerp(0, hx, lu); z = lerp(0, hz, lu);
+        y = lerp(standLift, yGrab + mm(1.8), lu) + mm(1.0) * Math.sin(lu * Math.PI) + bob * lu;
+      } else if (r < R.climb[0]) {
+        x = hx; z = hz;
+        y = lerp(yGrab + mm(1.8), yGrab, de) + bob * (1 - grabU);
+      } else {
+        x = hx + mm(RISE.away[0]) * ce;
+        z = hz + mm(RISE.away[2]) * ce;
+        y = yGrab + mm(RISE.away[1]) * ce + bob;
+      }
+      yw = lerp(0, yaw, lu);
+    }
+    rig.position.set(x, y, z);
+    rig.rotation.set(rot + jig, yw, jig * 0.5);
+    rig.updateMatrixWorld(true);
+
+    // ── the buckets ───────────────────────────────────────────────────────
+    // On the tile until the feet reach them, then off the feet. Placed so the
+    // two bails are exactly under the two feet at the grab — `carrySpan` is
+    // measured — so the hand-over is a position that does not change rather
+    // than a blend that hides a jump.
+    for (let k = 0; k < 2; k++) {
+      const s = k ? 1 : -1;
+      const B = P.b[k];
+      const rest = _q.set(cx + latX * s * carrySpan / 2, apex, cz + latZ * s * carrySpan / 2);
+      if (r < R.grab[0]) {
+        B.hang.position.copy(rest);
+        B.hang.rotation.set(0, yaw, 0);
+      } else {
+        footAt(A0, k ? 3 : 2, _w);
+        B.hang.position.lerpVectors(rest, _w, grabU);
+        // The swing starts when they leave the tile and not when they are
+        // picked up: a bucket still standing on the floor does not sway.
+        const g0 = r - R.climb[0];
+        const sw = g0 > 0
+          ? 0.30 * sat(g0 / 0.25) * Math.exp(-g0 * 1.1) * Math.sin(g0 * 7.5 + s * 0.6) : 0;
+        B.hang.rotation.set(sw * 0.6, yaw, sw);
+      }
+      B.pin.rotation.set(0, 0, 0);
+      B.setFill(0);
+      B.stream.visible = false;
+    }
+    // The wings' two shadow slots while it is a corpse, the buckets' after.
+    if (dead) { blob.value[4].copy(blobDead[4]); blob.value[5].copy(blobDead[5]); }
+    else P.shadow(blob, 4);
+
+    // ── the rest of the frame ────────────────────────────────────────────
+    bodyShadow(A0, y);
+    eyeRot(A0);
+
+    // The camera. Held on the arc's last frame while it is dead, then out to a
+    // frame wide enough for a fly and two buckets, and up after it at the end.
+    const pu = sat((r - R.pull[0]) / R.pull[1]);
+    const pe = pu * pu * (3 - 2 * pu);
+    const up = sat((r - R.follow[0]) / R.follow[1]);
+    // And up by 2.4 mm across the lift, because a fly holding a pair of
+    // buckets is 7 mm of subject standing on the tile rather than 2.
+    const hi = smooth01((r - R.lift[0]) / R.lift[1]);
+    _v.set(lerp(0, cx / 2, pe), lerp(_aim.y, mm(2.6), pe) + mm(2.4) * hi + mm(8.0) * up * up,
+      lerp(0, cz / 2, pe));
+    look(lerp(from[0], R.cam[0], pe), lerp(from[1], R.cam[1], pe),
+      lerp(from[2], R.cam[2], pe), _v);
+    fade.value = 1 - sat((r - (R.len - R.fade)) / R.fade);
+    return dead ? 0 : wingOn;
+  }
+
+  /**
+   * The body's own shadow on the tile: four blobs down its axis, fading and
+   * spreading as it leaves the floor. The last two of the six are the dead
+   * wings' on a corpse and are handed to the buckets by `pair.shadow`.
+   */
+  function bodyShadow(A, y) {
+    const lift = Math.max(0, y - (standLift || 0));
+    const k = sat(1 - lift / mm(9));
+    for (let i = 0; i < 4; i++) {
+      const sh = CORPSE_SHADE[i];
+      const p = A.body.localToWorld(_v.set(mm(sh[0]), mm(sh[1]), mm(sh[2])));
+      blob.value[i].set(p.x, p.z, mm(sh[3]) * k);
+    }
+  }
+
+  function eyeRot(A) {
+    for (let i = 0; i < A.eyes.length; i++) {
+      A.eyeM[i].uniforms.uRot.value.setFromMatrix4(A.eyes[i].matrixWorld);
+    }
+  }
+
+  /** Back to the corpse exactly as it was built, for the next swat. */
+  function reset() {
+    rig.position.set(0, deadY, 0);
+    rig.rotation.set(Math.PI - CORPSE_ROLL, 0, 0);
+    setLegs(A0, (L) => L.dead);
+    for (const W of A0.wings) W.g.rotation.set(0, W.dead[0], W.dead[1]);
+    for (let i = 0; i < 6; i++) blob.value[i].copy(blobDead[i]);
+    for (const P of pairs) P.hide(true);
+    for (const x of extras) x.A.body.visible = false;
+    floorMesh.visible = true;
+    rig.updateMatrixWorld(true);
+    eyeRot(A0);
+  }
+
+  /**
+   * The pour insert: the movement's members, in front of the lens, pouring
+   * their buckets with her. `t` is HER clock — the pour cut's own — `cut` the
+   * frame the cut goes to shot B, `fov` the world lens and `n` how many of
+   * them there are. Returns nothing; `render(renderer, true)` draws it.
+   *
+   * Everything is placed in the camera's own frame, which is the stage's
+   * origin looking down −Z: the insert is not IN the porch, it is between
+   * the porch and the lens, which is where a fly that fills a fifth of the
+   * frame at a 34 degree lens actually is — seven centimetres off the glass.
+   */
+  function insert(t, cut, fov, n) {
+    measure();
+    floorMesh.visible = false;
+    fade.value = 1;
+    cam.fov = fov;
+    cam.position.set(0, 0, 0);
+    cam.up.set(0, 1, 0);
+    cam.lookAt(0, 0, -1);
+    const aspect = res.value.x / Math.max(1, res.value.y);
+    const th = Math.tan((fov * Math.PI / 180) / 2);
+    for (let k = 0; k < 3; k++) {
+      if (k >= n) {
+        if (k > 0 && extras[k - 1]) extras[k - 1].A.body.visible = false;
+        if (pairs[k]) pairs[k].hide(true);
+        continue;
+      }
+      const A = k === 0 ? A0 : extraAnimal(k);
+      A.body.visible = true;
+      const P = pairOf(k);
+      P.hide(false);
+      const tk = t - k * INSERT.stagger;
+      const holder = k === 0 ? rig : A.body;
+      // Where on the screen, and how far off the glass.
+      let nx, ny, D, yaw, vis = true;
+      const j = INSERT.jit;
+      const seg = Math.floor((tk + 7) / j.every);
+      const jx = (hash1(seg * 1.7 + k) - 0.5) * j.amp;
+      const jy = (hash1(seg * 3.1 + k * 2.3) - 0.5) * j.amp;
+      if (t < cut) {
+        const at = INSERT.a[k];
+        nx = at[0] + jx; ny = at[1] + jy + 0.018 * Math.sin(tk * 8.2);
+        D = at[2];
+        yaw = INSERT.yawA + 0.12 * Math.sin(tk * 1.7 + k);
+      } else {
+        const u = (t - cut - INSERT.b.delay - k * INSERT.stagger) / INSERT.b.dur;
+        vis = u > 0 && u < 1;
+        const e = sat(u);
+        const p0 = INSERT.b.from, p1 = INSERT.b.to;
+        nx = lerp(p0[0], p1[0], e) + k * 0.10;
+        ny = lerp(p0[1], p1[1], e * e) - k * 0.08;
+        D = lerp(p0[2], p1[2], e) + k * 0.012;
+        yaw = INSERT.yawB;
+      }
+      if (!vis) { A.body.visible = false; P.hide(true); continue; }
+      const px = nx * th * aspect * D, py = ny * th * D, pz = -D;
+      holder.position.set(px, py, pz);
+      holder.rotation.set(0.10 * Math.sin(tk * 5.1), yaw, 0.08 * Math.sin(tk * 4.3 + 1));
+      // Hovering: every leg tucked but the carrying pair.
+      setLegs(A, (L) => (L.row === 1 ? liveRaw(L, 'carry') : liveRaw(L, 'tuck')));
+      const beat = (Math.floor(t * 60 + k) & 1) ? 1 : -1;
+      for (const W of A.wings) W.g.rotation.set(0, -W.s * 1.70, 0.55 * beat);
+      holder.updateMatrixWorld(true);
+      eyeRot(A);
+      // The pour, on her beat: over, held while it runs out, and back.
+      const tilt = t < cut
+        ? INSERT.tilt * (smooth01((tk - INSERT.pour[0]) / INSERT.pour[1])
+          - smooth01((tk - INSERT.pour[2]) / INSERT.pour[3]))
+        : 0;
+      const fill = t < cut ? 1 - smooth01((tk - INSERT.pour[0] - 0.15) / 0.75) : 0;
+      for (let q = 0; q < 2; q++) {
+        const s = q ? 1 : -1;
+        const B = P.b[q];
+        footAt(A, q ? 3 : 2, _w);
+        B.hang.position.copy(_w);
+        const sw = 0.16 * Math.sin(tk * 6.3 + s + k);
+        B.hang.rotation.set(sw * 0.5, yaw, sw);
+        B.pin.rotation.set(s * tilt, 0, 0);
+        B.setFill(fill);
+        B.hang.updateMatrixWorld(true);
+        // The water, while there is any to fall and the lip is under it: a
+        // thread from the lip straight down and out of the bottom of frame.
+        const running = tilt > 1.05 && fill > 0.02 && fill < 0.995;
+        B.stream.visible = running;
+        if (running) {
+          const lip = B.pin.localToWorld(_v.set(0, mm(MINIB.h - MINIB.ear), mm(MINIB.rRim) * s));
+          B.stream.position.copy(lip);
+          B.stream.scale.set(1, D * 1.1, 1);
+        }
+      }
+    }
+  }
+
+  // A second and a third animal for the insert, built only if the movement
+  // has grown that big. Clones share every geometry and every material except
+  // the two eyes, whose `uRot` is per animal.
+  function extraAnimal(k) {
+    if (extras[k - 1]) return extras[k - 1].A;
+    const b = body.clone(true);
+    const eyeM = [0, 1].map((e) => {
+      const m = M.eye[e].clone();
+      m.uniforms.uFade = fade;
+      m.uniforms.uRes = res;
+      return m;
+    });
+    for (let e = 0; e < 2; e++) b.getObjectByName('eye' + e).material = eyeM[e];
+    stage.add(b);
+    const A = animalRefs(b, eyeM, A0);
+    extras[k - 1] = { A };
+    return A;
+  }
+  function pairOf(k) {
+    while (pairs.length <= k) pairs.push(makePair(stage, MB));
+    return pairs[k];
+  }
+
+  // The corpse's own resting height, which `reset` puts back.
+  const deadY = rig.position.y;
+  reset();
 
   return {
     stage, cam, rig, body,
     look,
+    revive, reset, insert,
+    /** How long the resurrection runs, seconds. */
+    riseLen: () => RISE.len,
     /** 1 is the shot, 0 is black. The last third of a second of the cut. */
     setFade: (v) => { fade.value = v; },
     /**
@@ -1048,15 +1755,18 @@ function buildFlyCorpse() {
      * reason src/60-arms.js gives — a renderer left with it off would fail to
      * clear the NEXT frame as well, and the symptom of that is a smear that
      * outlives the shot by a whole session.
+     *
+     * `overlay` is the one exception, and it is the pour insert: depth only,
+     * so the porch stays in the frame and the flies are drawn in front of it.
      */
-    render(renderer) {
+    render(renderer, overlay = false) {
       renderer.getSize(_size);
       res.value.copy(_size);
       cam.aspect = _size.x / Math.max(1, _size.y);
       cam.updateProjectionMatrix();
       const auto = renderer.autoClear;
       renderer.autoClear = false;
-      renderer.clear(true, true, false);
+      renderer.clear(!overlay, true, false);
       renderer.render(stage, cam);
       renderer.autoClear = auto;
     },

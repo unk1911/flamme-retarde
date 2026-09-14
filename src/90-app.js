@@ -2412,6 +2412,14 @@ const SWAT = {
   // shape off.
   from: [0.046, 0.42, 1.30],
   to: [0.028, 0.25, -0.45],
+  // AND THEN IT GETS UP. Misha, 14 Sep 2026: the fly twitches, comes back to
+  // life and flies off with two tiny blue buckets to join the Bucketeers of
+  // America. When there is room in the movement — `jadrija.zombies.room()`,
+  // three members — the still does not fade: 1.2 s into it the resurrection in
+  // src/44-corpse.js takes over the close-up and runs to its own black, and the
+  // corpse in the room gets up behind the cut. When there is no room it is the
+  // old ending, still and fade, and the fly stays dead.
+  stillRise: 1.20,
 };
 
 /** The swat, or null. */
@@ -2525,6 +2533,16 @@ function startSwat() {
 /** Give it all back, whether it ran out or was skipped. */
 function endSwat() {
   if (!swatCut) return;
+  const zv = jadrija && jadrija.vik;
+  if (zv) zv.fly.buzz(null);
+  // The corpse gets up whether or not you sat through the shot of it getting
+  // up: a cut skipped is a cut you did not watch, not a fly that did not rise.
+  // Decided here if the close-up never started, which is a skip in the spiral.
+  const Z = jadrija && jadrija.zombies;
+  if (Z) {
+    if (swatCut.rise == null) swatCut.rise = Z.room();
+    if (swatCut.rise) Z.expect();
+  }
   // The fade is not put back here, and that is deliberate: `vik.fly.shot()`
   // BUILDS the close-up on first call, and a shot skipped in its first second
   // has no close-up yet. Every frame of the macro beat writes the fade from its
@@ -2597,6 +2615,23 @@ function stepSwat(dt) {
   // ── and the cut to the close-up ─────────────────────────────────────────
   const shot = vik.fly.shot();
   const m = S.t - fall - SWAT.floor;   // s into the close-up
+  // The first frame of it: the corpse put back exactly as it was built — the
+  // last one may have got up and flown off — and the one decision about how
+  // this shot ends, taken once so that a movement that fills up half way
+  // through a shot cannot change its ending under it.
+  if (S.rise == null) {
+    shot.reset();
+    const Z = jadrija && jadrija.zombies;
+    S.rise = !!(Z && Z.room());
+  }
+  const riseAt = SWAT.macro + SWAT.stillRise;
+  if (S.rise && m >= riseAt) {
+    const r = m - riseAt;
+    const wings = shot.revive(r, SWAT.to);
+    vik.fly.buzz(wings * 0.8);
+    if (r >= shot.riseLen()) endSwat();
+    return;
+  }
   const v = sat(m / SWAT.macro);
   const e = v * v * (3 - 2 * v);
   // `sat` is what makes the still a still: past `macro` the parameter is
@@ -2609,8 +2644,9 @@ function stepSwat(dt) {
   // is behind this is a wide shot of a floor from two metres and the join
   // between the two is a jump of a hundredfold in scale. Measured off the end
   // of the STILL and not the end of the arc: see the note over `still`.
-  shot.setFade(1 - sat((m - SWAT.macro - SWAT.still + SWAT.fade) / SWAT.fade));
-  if (m >= SWAT.macro + SWAT.still) endSwat();
+  shot.setFade(S.rise ? 1
+    : 1 - sat((m - SWAT.macro - SWAT.still + SWAT.fade) / SWAT.fade));
+  if (!S.rise && m >= SWAT.macro + SWAT.still) endSwat();
 }
 
 // ── the Bucketeer's first pour ───────────────────────────────────────────────
@@ -3017,6 +3053,12 @@ let pourEdge = -1;
 let pourWhy = 'boot';
 /** Seconds of coming back up out of the black, after the cut has ended. */
 let pourBack = 0;
+/**
+ * The clock `__fr.pour.frame` scrubbed to, so the flies' insert is in the
+ * scrubbed picture too — the real cut is `pourCut` and has its own clock. −1
+ * is none; `startPour` clears it.
+ */
+let pourInsertT = -1;
 const _pourEye = new THREE.Vector3();
 const _pourAt = new THREE.Vector3();
 
@@ -3152,6 +3194,7 @@ function startPour() {
   const b = jadrija && jadrija.bucketeer;
   if (!b || pourCut) return false;
   pourCut = pourRig(b);
+  pourInsertT = -1;
   // Where the walker was, put back every frame. A cut is a cut: coming out of
   // one three metres from where you went into it, because a key was held down
   // through a shot you could not see yourself in, reads as the game having lost
@@ -7197,6 +7240,15 @@ function frame() {
   // first two seconds of the shot are still the room. See src/44-corpse.js.
   if (swatCut && swatCut.t >= jadrija.vik.fly.fallSecs() + SWAT.floor) {
     jadrija.vik.fly.shot().render(renderer);
+  } else if (camOverride && jadrija && jadrija.zombies && jadrija.zombies.count() > 0
+    && (pourCut || pourInsertT >= 0)) {
+    // And the movement, in front of the lens, pouring with her. An OVERLAY and
+    // not a cut: depth only, so the porch stays in the picture. See `insert` in
+    // src/44-corpse.js.
+    const shot = jadrija.vik.fly.shot();
+    shot.insert(pourCut ? pourClock() : pourInsertT, POUR.cut, camera.fov,
+      jadrija.zombies.count());
+    shot.render(renderer, true);
   }
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
@@ -8534,8 +8586,10 @@ window.__fr = {
     /** How long the whole thing runs, so a recorder can size itself off it. */
     cutLen: () => {
       const v = jadrija && jadrija.vik;
-      return v ? +(v.fly.fallSecs() + SWAT.floor + SWAT.macro + SWAT.still)
-        .toFixed(2) : null;
+      if (!v) return null;
+      const Z = jadrija.zombies;
+      const tail = Z && Z.room() ? SWAT.stillRise + v.fly.shot().riseLen() : SWAT.still;
+      return +(v.fly.fallSecs() + SWAT.floor + SWAT.macro + tail).toFixed(2);
     },
     cut: () => (swatCut ? { t: +swatCut.t.toFixed(2) } : null),
   },
@@ -8649,6 +8703,15 @@ window.__fr = {
    * the HUD go with it, so what comes back is the frame and not the frame with
    * a litre counter on it.
    */
+  /**
+   * The flies that got up — src/45-zombie.js. `stats()` is where each one is
+   * and what it is doing; `spawn(x, y, z)` enrols one at a house-metre point
+   * without a swat, which is what a probe of the pour insert needs.
+   */
+  zombie: {
+    stats: () => (jadrija && jadrija.zombies ? jadrija.zombies.stats() : null),
+    spawn: (x, y, z) => (jadrija && jadrija.zombies ? jadrija.zombies.spawn(x, y, z) : null),
+  },
   pour: {
     frame: (t = 0) => {
       const b = jadrija && jadrija.bucketeer;
@@ -8685,6 +8748,7 @@ window.__fr = {
       // price and they are thrown away here.
       if (t > 0) b.trace(t, 1 / 60);
       const shot = pourPlace(R, t);
+      pourInsertT = t;
       $('cine').hidden = false;
       $('cine').classList.remove('open');
       $('cine-skip').hidden = true;

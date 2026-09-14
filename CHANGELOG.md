@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.382.0] — 2026-09-14
+
+### the fly gets up and joins the Bucketeers of America
+
+**"it would be hilarious if after a few seconds the fly started twitching a
+bit, then came back to life ... carrying two tiny blue buckets of water."**
+Now it does.
+
+**The swat's close-up doesn't end on the corpse any more.** 1.2 s into the
+still, the corpse kicks a hind leg. Then two more legs twitch, and all six
+spasm together. Then it lies dead again for most of a second, which is the
+joke. After that it kicks itself over onto its feet, shakes, and rubs its
+front feet together. It gets its wings going, flies over to two tiny cobalt
+buckets, lowers its middle legs onto the bails, and climbs out of the top of
+the frame with them swinging. The whole beat is 9.3 s and lives in
+src/44-corpse.js with the corpse. Every pose is a function of time, so
+`__fr.fly.cutAt` still scrubs it. The camera pulls back from the macro frame
+to one 26 mm wide, and the buckets stand 9 mm to the right of the tight
+frame, so they are in shot from the first moment they could be seen.
+
+**Then it helps her.** src/45-zombie.js flies the real 7 mm housefly, cloned
+from the room's fly, with two 2.6 mm buckets, and it follows Baye's beat.
+While she fills, it hovers over her pail. On the way down the flight it flies
+beside her pail, and it tips its buckets when she tips hers. From there it
+flies home on its own: out from under the terrace, up its face and over the
+rail, across the terrace, over the east rail, north above the flight, in at
+the front door and across the big room, and it waits for her over the basin.
+While she wanders the flat, it stays at her shoulder.
+
+*Through* the terrace and not through the terrace doors, because those are
+glass and shut; she stands at them for the same reason. It goes round to the
+front door, which is open because she walks through it every trip. Every
+height on the way home was checked against the rail or head it clears, and
+the whole route was sampled end to end: carry, pour, home waypoints 0 to 12,
+then waiting at the basin 0.01–0.03 m off its mark.
+
+**And you can see it, because every pour cut now has an insert.** At 7 mm
+the fly in the world is as invisible as it always was. So while she pours,
+the pour cut draws the movement's members over the frame from the close-up's
+own stage, depth only, 5 cm off the lens. Each one hovers beside her pail
+and tips its buckets on her beat, with two threads of water running out of
+the bottom of the frame. In shot B they fly up past her head.
+
+Up to three members. A fourth swatted fly stays dead and gets the old ending.
+A cut skipped part-way still raises the corpse, just off camera. The new
+debug handles are `__fr.zombie.stats()` and `__fr.zombie.spawn(x, y, z)`.
+
+Checked in the build: a live swat runs to its own end at 60 fps, the corpse
+leaves the floor and `count` goes to 1. A live pour cut fires with the fly
+beside her. The Bucketeer's walk up is identical with and without two
+members in the flat. The Jadrija proof numbers are unchanged: census
+446/333/86/27, blockers 818, tris 642821, people 100.
+
 ## [1.381.0] — 2026-09-13
 
 ### the Bucketeer loses the nose ring

@@ -2240,6 +2240,8 @@ async function buildVikendica(scene, field) {
     // 'spin'. `again` is the clock on the next fly — see `hatch`.
     die: null, again: 0,
   };
+  // The close-up's own buzz, 0 to 1, or −1 for the room's. See `fly.buzz`.
+  let buzzOver = -1;
   const fwd = new THREE.Vector3(1, 0, 0);
   const side = new THREE.Vector3();
   const upN = new THREE.Vector3();
@@ -2985,6 +2987,10 @@ async function buildVikendica(scene, field) {
     // The distance and doorway terms stay on. They are the reason the whole
     // thing is not simply audible from the promenade, and a fly dying loudly in
     // a room you are not in is still a fly in a room you are not in.
+    // Unless the swat's close-up has the buzz — see `fly.buzz` below. A fly
+    // getting up off the tile in a shot is not the corpse in the room, which is
+    // silent, and the two would otherwise take turns at the one voice.
+    if (buzzOver >= 0) { audio.fly(buzzOver, 1.14, 0, false); return; }
     audio.fly(F.buzz * far * inFlat, F.hz, pan, F.mode === 'spin');
   }
 
@@ -3116,6 +3122,42 @@ async function buildVikendica(scene, field) {
       fallSecs: () => DEATH.fall,
       /** Alive again, at the terrace door, and the corpses stay where they are. */
       revive: () => { hatch(); return F.mode; },
+      /** What it is doing, as one word, without building `stats()` for it. */
+      mode: () => F.mode,
+      /**
+       * Hand the buzz to somebody else: a level, or null to give it back. The
+       * swat's resurrection is the only caller — the corpse getting up in the
+       * close-up is loud, and the corpse on the tile it is a picture of is not.
+       */
+      buzz: (v) => { buzzOver = v == null ? -1 : clamp(v, 0, 1); return buzzOver; },
+      /**
+       * The newest corpse gets up: it comes off the tile and its house-metre
+       * position is handed back, for src/45-zombie.js to put a live one at.
+       * Null if the floor is clean.
+       *
+       * The newest and not the nearest, because the only caller is the swat's
+       * own resurrection and the fly in that shot is the one that just died.
+       */
+      raise: () => {
+        const c = corpses.pop();
+        if (!c) return null;
+        root.remove(c);
+        return [c.position.x, c.position.y, c.position.z];
+      },
+      /**
+       * A copy of the live animal for something else to fly, in the house's
+       * own metres — it goes under `root` exactly as this one does. The
+       * children are in the order they were built: four lumps, the two wing
+       * pivots, the six leg pivots.
+       */
+      kit: () => {
+        const rig = flyRig.clone(true);
+        rig.visible = true;
+        rig.position.set(0, 0, 0);
+        rig.quaternion.identity();
+        return { rig, wings: rig.children.slice(4, 6), legs: rig.children.slice(6, 12),
+          wingMat: flyWingMat };
+      },
       /** Is there a live one in the room? */
       alive: () => F.mode !== 'dead' && F.mode !== 'spin',
       /** Where the dead ones are lying, in the house's own metres. */

@@ -4651,6 +4651,11 @@ async function buildBucketeer(scene, vik, walkY) {
       if (!BUCK.say && audio) { audio.mutter(0, { stop: true }); st.sayRem = 0; }
       return BUCK.say;
     },
+    /**
+     * Her bearing, and nothing else — read every frame by src/45-zombie.js,
+     * which is the reason it is not `stats().yaw`. See `beat` below.
+     */
+    yawNow: () => st.yaw,
     /** Where she is from you, for whoever has to decide who you are near. */
     gapTo: (x, z) => Math.hypot(x - st.x, z - st.z),
     /**
