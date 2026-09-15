@@ -681,7 +681,7 @@ const voice = (() => {
    * Resolves to what happened, as one word, for the ears panel: `said`, `far`,
    * `off`, `busy`, `nobody`, or the server's refusal.
    */
-  async function answer(askName) {
+  async function answer(askName, spoken = null) {
     if (!on) return 'off';
     if (!AUTH.user || !AUTH.baye) return 'signed out';
     const gap = at(() => jadrija.bayeGap());
@@ -703,7 +703,11 @@ const voice = (() => {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.assign(context(sp, gap), { who, ask: askName })),
+        // `spoken` is the language the question was asked in, off `/hear` — so
+        // "Wie spät ist es?" gets the time in German. See `spoken` in
+        // `clean_context`.
+        body: JSON.stringify(Object.assign(context(sp, gap), { who, ask: askName },
+          spoken ? { spoken } : null)),
       });
       const d = await r.json().catch(() => null);
       if (!d || !d.ok) return (d && d.error) || ('http ' + r.status);

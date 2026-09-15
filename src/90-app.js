@@ -8767,7 +8767,7 @@ window.__fr = {
   ears: {
     stats: () => ears.stats(),
     toggle: () => ears.toggle(),
-    act: (name) => ears.act(name),
+    act: (name, lang) => ears.act(name, lang),
     flyCam: (t, mode = 'drop') => {
       if (t == null) { flyCamHold = false; return flyCamT; }
       startFlyCam(mode); flyCamT = t; flyCamHold = true; return flyCamT;

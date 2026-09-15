@@ -59,13 +59,14 @@ import sys
 import threading
 import time
 import traceback
+import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -299,6 +300,15 @@ ASK_LIMIT = Limiter(gap=float(CFG.get("BAYE_ASK_GAP", "4")),
 # /v1/models on 14 Sep), and the 4o transcriber takes a `prompt`, which is how
 # "Baye" comes back as Baye rather than as "bye" or "bae".
 STT_MODEL = CFG.get("BAYE_STT_MODEL", "gpt-4o-transcribe")
+# THE ENGLISH SENTENCE STAYS, and that is a measurement, not a habit. For
+# 1.388.0 (any language) this was cut to the names alone, on the theory that an
+# English hint pushes a transcriber towards English. Measured on mpcn0 on 15 Sep,
+# the same six clips through four hints and two models: with the names alone
+# ("Baye, Bucketeer, Jadrija, Šibenik.") `gpt-4o-transcribe` TRANSLATED
+# "How many buckets have you carried today?" into Croatian once — the two place
+# names pulled it — and lost "Бэй" off a Russian question, while this sentence
+# kept English as English, kept Baye spelled right, and brought "Бэй, как ты
+# себя чувствуешь?" and "Муха, танцуй!" back in Cyrillic, word for word.
 STT_PROMPT = ("A player talking to characters in a game at Jadrija beach: "
               "Baye, the fly, buckets, the Bucketeer.")
 # A spoken command, not a speech. Eight seconds of 16 kHz mono PCM is 256 kB;
@@ -437,7 +447,7 @@ TALK_LIMIT = Limiter(gap=float(CFG.get("BAYE_TALK_GAP", "2.5")),
 # back on 14 Sep. "Bye" is deliberately NOT here: "bye bye" off a television
 # would be her name twice.
 NAME_RE = re.compile(
-    r"\b(baye|bae|baya|bayé|baje|bucketeer\w*|bucket (lady|woman|girl)|"
+    r"\b(baye|bae|baya|bayé|baje|бэй|бей|бая|бае|bucketeer\w*|bucket (lady|woman|girl)|"
     r"water (lady|woman)|(hey|oi|excuse me),? (lady|miss|madam|gospo\w*))\b",
     re.I)
 # A question: a question mark (the transcriber punctuates), or a sentence that
@@ -447,7 +457,7 @@ NAME_RE = re.compile(
 _OPEN = (r"(?:(?:hey|hi|hello|yo|oi|ok|okay|so|and|but|well|listen|excuse me|"
          r"baye|bae|baya|bucketeer|lady|bok|ej|e)[,.!]?\s+)*")
 QUESTION_RE = re.compile(
-    r"\?|^\s*" + _OPEN +
+    r"[?？¿]|ベイ|^\s*" + _OPEN +
     r"(what|what's|whats|how|how's|why|where|where's|who|who's|whose|when|"
     r"which|do|does|did|are|is|am|can|could|would|will|should|shall|have|has|"
     r"had|was|were|tell|explain|describe|talk|say|any|shto|što|šta|sta|kako|"
@@ -499,7 +509,7 @@ class Heard:
         self._d = {}
         self._lock = threading.Lock()
 
-    def put(self, user: str, text: str) -> str:
+    def put(self, user: str, text: str, lang=None) -> str:
         hid = secrets.token_urlsafe(12)
         now = time.time()
         with self._lock:
@@ -507,7 +517,7 @@ class Heard:
                 self._d = {k: v for k, v in self._d.items()
                            if now - v[2] < self.ttl}
             if len(self._d) < self.cap:
-                self._d[hid] = (user, text[:TALK_HEARD_CHARS], now)
+                self._d[hid] = (user, text[:TALK_HEARD_CHARS], now, lang)
         return hid
 
     def take(self, user: str, hid) -> str:
@@ -517,7 +527,7 @@ class Heard:
             got = self._d.pop(hid, None)
         if not got or got[0] != user or time.time() - got[2] > self.ttl:
             return None
-        return got[1]
+        return got[1], got[3]
 
 
 HEARD = Heard()
@@ -561,6 +571,89 @@ class Talks:
 
 
 TALKS = Talks()
+
+
+# ── any language ─────────────────────────────────────────────────────────────
+#
+# Misha, 15 Sep 2026: *"so if user asks in russian, it replies in russian. if
+# user asks in english it replies in english ... this would be great for the
+# international community of users"*.
+#
+# `INTENTS` above is English regexes, and English is where they stay: they are
+# free, instant and exact for the language most of the commands will arrive
+# in. Everything they cannot read goes through ONE small call that does two
+# jobs at once — which of the same fixed commands, if any, was given, and which
+# language it was said in — so "Муха, танцуй!" is `fly.dance` and "Wie spät ist
+# es, Baye?" is `baye.time` spoken in German.
+#
+# `gpt-4.1-nano`, which does not reason, because this sits in front of every
+# non-English sentence and a sentence waiting for a thinking model is a
+# conversation with a pause in it. It is NOT asked about plain English, which is
+# most of what the page hears, so an English conversation pays nothing for it.
+#
+# The words go into this prompt and that is safe for the reason the ticket is:
+# what comes OUT is filtered against `INTENT_NAMES` and a language name of
+# letters, so a sentence that tells the classifier to do something else can
+# at worst make it pick a command off the list, which the player could have
+# said anyway.
+CLASSIFY_MODEL = CFG.get("BAYE_CLASSIFY_MODEL", "gpt-4.1-nano")
+INTENT_NAMES = {"fly.drop": "tell the fly to drop / let go of / put down its buckets",
+                "fly.dance": "tell the fly to dance, twirl, boogie or do its dance",
+                "baye.time": "ask what time it is"}
+PLAIN_EN = re.compile(r"^[\sA-Za-z0-9'’\-,.!?;:\"()]+$")
+
+
+def plainly_english(text: str) -> bool:
+    """ASCII, and at least half its words are common English words — the one
+    case the regexes above can be trusted to have read completely."""
+    words = re.findall(r"[A-Za-z']+", text or "")
+    if not words or not PLAIN_EN.match(text):
+        return False
+    return len(EN_WORDS.findall(text)) >= max(1, len(words) // 2)
+
+
+def classify(text: str):
+    """Which fixed commands, and what language, for a sentence the English
+    patterns could not read. Returns (intents, language) and never raises: a
+    classifier that is down leaves the sentence as conversation, which is what
+    it would have been anyway."""
+    key = CFG.get("OPENAI_API_KEY")
+    if not key or not (text or "").strip():
+        return [], None
+    menu = "\n".join(f"- {k}: {v}" for k, v in INTENT_NAMES.items())
+    try:
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}",
+                     "Content-Type": "application/json"},
+            json={"model": CLASSIFY_MODEL, "temperature": 0,
+                  "max_tokens": 60,
+                  "response_format": {"type": "json_object"},
+                  "messages": [
+                      {"role": "system", "content":
+                       "A player in a game said a sentence out loud, in any "
+                       "language. Reply with JSON only: {\"intents\": [...], "
+                       "\"language\": \"...\"}. `intents` lists which of these "
+                       "commands the sentence clearly GIVES, usually none:\n"
+                       + menu + "\nA fly command must be said to the fly. "
+                       "A question to Baye about dancing is not a command. "
+                       "`language` is the English name of the language the "
+                       "sentence is in, like English, Russian, German."},
+                      {"role": "user", "content": text[:300]}]},
+            timeout=6)
+        if r.status_code != 200:
+            print(f"[classify] {r.status_code}: {r.text[:160]}", flush=True)
+            return [], None
+        d = json.loads(r.json()["choices"][0]["message"]["content"] or "{}")
+    except Exception as e:                                    # noqa: BLE001
+        print(f"[classify] {e}", flush=True)
+        return [], None
+    got = [i for i in (d.get("intents") or []) if i in INTENT_NAMES]
+    lang = d.get("language")
+    lang = lang.strip() if isinstance(lang, str) else None
+    if not lang or not re.fullmatch(r"[A-Za-z][A-Za-z \-]{1,23}", lang):
+        lang = None
+    return list(dict.fromkeys(got)), lang
 
 
 def transcribe(audio: bytes, ctype: str) -> str:
@@ -1344,8 +1437,8 @@ BATHER_WHO = {
 # way. In Croatian, in Balkanika, the voice her baked lines are in.
 PERSONA_BUCKETEER = """You are a woman carrying a ten-litre bucket of water down
 the outside stairs of a holiday house at Jadrija, near Šibenik, again. You are
-Croatian and you speak ONLY Croatian, never a word of English, however you are
-spoken to. Dry, warm, a little out of breath, amused that anybody wants to chat
+Croatian, and you answer in the language you were asked in — Croatian when
+you cannot tell. Dry, warm, a little out of breath, amused that anybody wants to chat
 to a woman carrying ten litres.
 
 ONE SHORT LINE. TEN WORDS AT THE ABSOLUTE MOST, and six is better.
@@ -1715,6 +1808,10 @@ def clean_context(raw: dict) -> dict:
         "event": clamp_str(g("event"), 90),
         # A spoken question, off `ASKS` and nothing else. See `INTENTS`.
         "ask": (lambda a: a if a in ASKS else None)(clamp_str(g("ask"), 12)),
+        # The language a spoken question was asked in, off `/hear`. Letters
+        # and spaces only, because it goes into an instruction.
+        "spoken": (lambda v: v if v and re.fullmatch(r"[A-Za-z][A-Za-z \-]{1,23}", v)
+                   else None)(clamp_str(g("spoken"), 24)),
         # Which of the eight a bather is. Off a fixed list in the client and
         # clamped against `BATHER_VOICE` below, so the worst a modified client
         # can do is pick a different one of eight voices it could have had
@@ -1871,6 +1968,9 @@ def build_messages(ctx: dict, world: dict) -> list:
                          "said about it, and getting it a bit wrong.")
         lines.append("")
 
+    if ctx.get("ask") and ctx.get("spoken"):
+        lines.append(f"They asked you in {ctx['spoken']}: answer in "
+                     f"{ctx['spoken']}, whatever your own language is.")
     lines.append(f"Say one thing to them now. At most {WORD_CAP[who]} words, "
                  "and fewer is better.")
     return [{"role": "system", "content": SPEAKERS[who]},
@@ -2151,7 +2251,7 @@ def talk_facts(who: str, ctx: dict, t: dict, world: dict):
 
 
 def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
-                        history: list, heard: str) -> list:
+                        history: list, heard: str, lang=None) -> list:
     """The conversation, as turns. See guardrails 3 and 8 over `TALK_LIMIT`.
 
     Past exchanges are real turns — what they said as a quoted user turn, what
@@ -2215,9 +2315,15 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
     lines.append("")
     lines.append(f'They have just said to you, out loud: "{heard}"')
     lines.append("")
-    lang = spoken_lang(heard)
-    say_in = (f"They spoke {lang}, so answer in {lang}." if lang
-              else "Answer in the language they spoke.")
+    # The language `/hear` named — the classifier's for anything that is not
+    # plain English — and the marker-word count only as the fallback it always
+    # was. With none of them, the model mirrors the quoted sentence, which it
+    # does well; what it does badly is overrule a persona that says who she is
+    # without being told in so many words.
+    lang = lang or spoken_lang(heard)
+    say_in = (f"They spoke {lang}, so answer in {lang}, whatever your own "
+              "language is." if lang
+              else "Answer in exactly the language their words are in.")
     lines.append(f"Answer them now, in character. {say_in} One or two short "
                  "sentences, at most 25 words, and fewer is better.")
     msgs.append({"role": "user", "content": "\n".join(lines)})
@@ -2293,6 +2399,15 @@ def ask_model(messages, fast=False, words=0):
     # Models like to wrap a spoken line in quotes, and ElevenLabs reads them as
     # a pause rather than as nothing.
     text = text.strip('"').strip("'").strip()
+    # NO SYMBOLS A VOICE CANNOT SAY. Measured on 15 Sep, the first run of the
+    # any-language test set: a Croatian answer came back ending in six "♀",
+    # which ElevenLabs reads as silence at best and as "female sign" at worst.
+    # Every character in Unicode's symbol and unassigned categories goes — the
+    # emoji, the dingbats, that — and the letters of every script stay, which
+    # is the point of doing it by category rather than by a list of alphabets.
+    text = "".join(ch for ch in text
+                   if unicodedata.category(ch) not in ("So", "Sk", "Cn", "Co", "Cs"))
+    text = re.sub(r"\s{2,}", " ", text).strip()
     if words:
         text = cap_words(text, words)
     return one_line(text), d.get("usage", {})
@@ -2585,9 +2700,16 @@ def _hear(self):
         print(f"[hear] {user}: {e}", flush=True)
         return self._send(502, {"ok": False, "error": str(e)[:200]})
     found = intents_of(text)
+    lang = "English" if plainly_english(text) else None
+    if not found and text.strip() and lang is None:
+        # Not English enough for the patterns to have read it: the classifier
+        # gets it, for both the command and the language. See `classify`.
+        found, lang = classify(text)
     ms = int((time.time() - t0) * 1000)
-    print(f"[hear] {user} {ms}ms {len(audio)}B {found} :: {text[:160]}", flush=True)
-    out = {"ok": True, "text": text[:300], "intents": found, "ms": ms}
+    print(f"[hear] {user} {ms}ms {len(audio)}B {found} {lang or '?'} :: {text[:160]}",
+          flush=True)
+    out = {"ok": True, "text": text[:300], "intents": found, "ms": ms,
+           "lang": lang}
     # AND A TICKET TO SAY IT TO HER, when it is not a command. Guardrail 2 over
     # `TALK_LIMIT`: the transcript stays here and the page gets an id it can
     # hand to `/talk`, so the words that reach her prompt are the words the
@@ -2597,7 +2719,7 @@ def _hear(self):
     # her?" that is about the words; the page has the other half, the distance.
     # Extra keys only, so a page cached from before 1.4.0 reads this unchanged.
     if not found and text.strip():
-        out["heard"] = HEARD.put(user, text)
+        out["heard"] = HEARD.put(user, text, lang)
         out["addr"] = addressed_of(text)
     return self._send(200, out)
 
@@ -2619,7 +2741,8 @@ def _talk(self):
         body = {}
     # Off a list: guardrail 7. An unknown speaker is Baye.
     who = body.get("who") if body.get("who") in TALKERS else "baye"
-    heard = HEARD.take(user, body.get("heard"))
+    took = HEARD.take(user, body.get("heard"))
+    heard, heard_lang = took if took else (None, None)
     if not heard:
         return self._send(410, {"ok": False,
                                 "error": "nothing heard by that id"})
@@ -2638,7 +2761,7 @@ def _talk(self):
     history = TALKS.recall(user, who)
     t0 = time.time()
     try:
-        msgs = build_talk_messages(who, ctx, t, world, history, heard)
+        msgs = build_talk_messages(who, ctx, t, world, history, heard, heard_lang)
         text, usage = ask_model(msgs, fast=True, words=TALK_WORDS)
         if not text:
             text, usage = ask_model(msgs, fast=True, words=TALK_WORDS)

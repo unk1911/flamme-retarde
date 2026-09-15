@@ -222,11 +222,15 @@ const ears = (() => {
       const d = await r.json().catch(() => null);
       if (!d || !d.ok) { note('× ' + ((d && d.error) || 'http ' + r.status), 'err'); return; }
       const said = d.text || '';
+      // The language it was heard in, when it is not English — the service
+      // names it (see `classify` in server/baye/baye.py) and she answers in it.
+      const lang = d.lang && d.lang !== 'English' ? d.lang : null;
       note('“' + (said || '…') + '”  ' + secs.toFixed(1) + ' s · ' + d.ms + ' ms'
+        + (lang ? ' · ' + lang : '')
         + (d.intents && d.intents.length ? '  → ' + d.intents.join(', ') : ''), 'heard');
       // A command, and that is the whole of it — commands outrank conversation.
       if (d.intents && d.intents.length) {
-        for (const it of d.intents) act(it);
+        for (const it of d.intents) act(it, d.lang);
         return;
       }
       // Nothing heard, or a service from before 1.4.0 that hands out no id:
@@ -254,7 +258,7 @@ const ears = (() => {
   }
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
-  async function act(name) {
+  async function act(name, lang = null) {
     if (name === 'fly.drop') {
       const Z = typeof jadrija !== 'undefined' && jadrija && jadrija.zombies;
       if (!Z || !Z.count()) { note('fly: there is no fly in the movement to hear you', 'meta'); return; }
@@ -275,7 +279,7 @@ const ears = (() => {
     }
     if (name === 'baye.time') {
       note('baye: asking…', 'meta');
-      const res = await voice.answer('time');
+      const res = await voice.answer('time', lang);
       note('baye: ' + res, res.startsWith('said') ? 'did' : 'meta');
     }
   }

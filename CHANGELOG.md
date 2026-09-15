@@ -8,6 +8,69 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.388.0] — 2026-09-15
+
+### any language (baye 1.5.0)
+
+**"it would be cool if it would answer in the same language as what the user
+asked... so if user asks in russian, it replies in russian ... this would be
+great for the international community of users"**. It does now, for talking
+to either Baye, for asking the time, and for the fly's commands.
+
+**Commands and language in one small call.** `INTENTS` is still English
+regexes, which are free and instant for English. Anything they cannot read,
+and that is not plainly English, goes to `classify` in server/baye/baye.py.
+That is one `gpt-4.1-nano` call, which does not reason, returning both the
+fixed commands given, if any, and the language name. The output is filtered
+against the command list and a letters-only language name. Plain English
+never pays for it: 0.6 s to hear, against 1.4–1.6 s for the rest.
+
+Measured on text through the classifier:
+
+| sentence | commands | language |
+|---|---|---|
+| Муха, танцуй! | fly.dance | Russian |
+| Муха, брось вёдра! | fly.drop | Russian |
+| Mouche, lâche tes seaux ! | fly.drop | French |
+| Fliege, lass die Eimer fallen! | fly.drop | German |
+| ハエ、踊って！ | fly.dance | Japanese |
+| Mucha, tańcz! | fly.dance | Polish |
+| Koliko je sati? | baye.time | Croatian |
+| Baye, ¿te gusta bailar? | none (a question about dancing is not a command) | Spanish |
+| Бэй, ты любишь танцевать? | none (a question about dancing is not a command) | Russian |
+
+**The language reaches her.** `/hear` names it and stores it with the
+single-use ticket. `/talk` then tells her: "They spoke Russian, so answer in
+Russian, whatever your own language is." The old marker-word count is now
+only a fallback. It had labelled any French or Italian containing "a" as
+English. A spoken time question carries a new `spoken` field, also clamped to
+letters. `PERSONA_BUCKETEER` no longer says "ONLY Croatian": she answers in the
+language she was asked in, and in Croatian when she cannot tell. The voices
+stay the same women in every language, Jessica and Balkanika. The addressing
+rule now also counts ？ and ¿ as question marks, and Бэй, Бей and ベイ as her
+name.
+
+**The transcription hint stayed English, and that is measured.** The hint was
+cut to the names alone, on the theory that English words push a transcriber
+towards English. Six clips through four hints and two models said otherwise.
+With "Baye, Bucketeer, Jadrija, Šibenik." `gpt-4o-transcribe` once
+*translated* an English question into Croatian and dropped Бэй off a Russian
+one. The original sentence kept English as English and brought "Бэй, как ты
+себя чувствуешь?" and "Муха, танцуй!" back in Cyrillic, word for word.
+
+**No symbols a voice cannot say.** A Croatian test answer ended in six "♀".
+Replies now lose every character in Unicode's symbol and unassigned
+categories, and keep the letters of every script.
+
+Checked end to end on the site, headless, with a fake microphone saying four
+things in a row. "Бэй, как ты себя чувствуешь?" got the Bucketeer, in
+Russian: *"Пока свежа, тепло и приятно, но десять литров тянут руку, а от
+пожара дымно."* "Муха, танцуй." made the fly dance. "Wie spät ist es, Baye?"
+got *"Zwanzig nach zwei – der Eimer kennt keine Pause."* An English control
+stayed English and never touched the classifier. The subtitle and the
+recorder's frame both draw Cyrillic, Japanese and č. The "missing č" noted
+under 1.385.0 was a misreading of a small screenshot: the caron is there.
+
 ## [1.387.0] — 2026-09-15
 
 ### talk to her (baye 1.4.0)
