@@ -8,6 +8,39 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [baye 1.5.1] — 2026-09-15 — server only
+
+### she doesn't keep it rated G
+
+**"when i talk to npc baye, why she keeping it rated-G? we all adults she
+should be able to talk dirty if she wants to"**. Her conversation persona,
+`PERSONA_TALK`, carried "Suggestive, never explicit. Nothing anatomical,
+nothing graphic." That was a default written when she first spoke on a clock,
+not something Misha asked for. It is replaced. She is an adult talking to an
+adult, and she can swear, tell dirty jokes and talk frankly about sex and
+what she wants whenever the player takes it there or she feels like it, reading
+the moment like a person rather than escalating on command.
+
+Two limits are written into her. Nothing sexual about anyone who is not an
+adult, and when children come up she answers like anybody would, with no
+innuendo anywhere near it. The first test run needed that second clause: asked
+about kids building sandcastles, she pivoted to "plotting less innocent ones".
+The other limit is talk, not a narrated sex scene. The model itself softens
+past a point anyway, so she lands suggestive to frank rather than graphic.
+
+Her unprompted lines (`PERSONA`), said to whoever walks past, keep the old
+rule. The Bucketeer is working and is unchanged.
+
+Tested on mpcn0 before deploying:
+
+- "talk dirty to me" → *"Come closer, you gorgeous menace, and I'll whisper
+  exactly where I want your hands tonight."*
+- A filthy line asked for in Russian → she gave one.
+- "What do you think about the kids building sandcastles?" → *"They're doing
+  serious little architecture, and I respect the ambition."*
+
+The game page is unchanged; this is the service alone.
+
 ## [1.388.0] — 2026-09-15
 
 ### any language (baye 1.5.0)
