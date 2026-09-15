@@ -18,9 +18,27 @@
 // fixed table of commands, `INTENTS` in server/baye/baye.py. What comes back is
 // the transcript and the command names; this file does the commands.
 //
-// WHAT NEVER HAPPENS: the words going into anybody's prompt. See `INTENTS` —
-// the transcript is matched on the server and only a name off the list is
-// acted on, so a player cannot talk the service into anything.
+// WHAT USED TO NEVER HAPPEN: the words going into anybody's prompt. See
+// `INTENTS` — the transcript is matched on the server and only a name off the
+// list is acted on, so a player cannot talk the service into anything.
+//
+// ── AND SINCE 15 SEP, ONE WAY IT DOES, BECAUSE HE ASKED FOR IT ──
+//
+// Misha: *"i wanna be able to talk to bucketeering baye about anything really.
+// about how many buckets she carried, about Immanual Kant's categorial
+// imparative... i also wanna be able to talk to the NPC baye, ask her
+// anything"*. A table of commands cannot hold Kant, so a sentence that is NOT a
+// command now goes on to her: `voice.converse` in 49-voice.js, `/talk` in
+// server/baye/baye.py. The list of guardrails that makes that safe is over
+// `TALK_LIMIT` there, and the one this file can see is that the words never
+// leave the page again — `/hear` answers with an id for what it heard, and the
+// id is what goes to `/talk`.
+//
+// THE ORDER IS THE RULE. A command wins: "hey fly, drop your buckets" is done
+// and never discussed. Only a sentence that matched nothing is offered to her,
+// and she takes it only if it was plausibly said TO her — near enough, and a
+// question or her name, or said from right beside her. Everything that gets
+// nothing says why, on its own line in the panel. See `TALK` in 49-voice.js.
 //
 // HOW IT HEARS A SENTENCE, which is the one part the transcription service
 // cannot do for us: a WhatsApp voice note arrives already cut, and a microphone
@@ -50,8 +68,9 @@ const EARS = {
   release: 0.75,
   minVoiced: 0.30,
   maxLen: 7.0,
-  /** Lines the panel keeps. */
-  keep: 6,
+  /** Lines the panel keeps. Eight since it holds conversations: an exchange
+   *  is two lines, what you said and what she answered, and six was three. */
+  keep: 8,
 };
 
 const ears = (() => {
@@ -61,6 +80,10 @@ const ears = (() => {
   let level = 0;
   let inflight = 0;
   let sent = 0;
+  /** She is answering: set from the moment a sentence goes to `/talk` until she
+   *  stops speaking, so the header can say so rather than "thinking". */
+  let talking = false;
+  let talked = 0;
   const lines = [];
   // The last `pre` seconds, round and round, and the clip being recorded.
   const preBuf = new Float32Array(Math.round(EARS.rate * EARS.pre));
@@ -96,7 +119,8 @@ const ears = (() => {
     const el = panel();
     el.hidden = !on && !lines.length;
     el.querySelector('.ears-head').textContent = on
-      ? (rec ? 'EARS · hearing you' : inflight ? 'EARS · thinking' : 'EARS · listening')
+      ? (rec ? 'EARS · hearing you' : talking ? 'EARS · she is answering'
+        : inflight ? 'EARS · thinking' : 'EARS · listening')
         + (sent ? ' · ' + sent + ' sent' : '')
       : 'EARS · off (I)';
     const list = el.querySelector('.ears-lines');
@@ -182,7 +206,11 @@ const ears = (() => {
     // One at a time. A second sentence while the first is still being heard is
     // a sentence the player can say again; two in flight is two answers out of
     // order.
-    if (inflight) { note('(still thinking about the last one)', 'meta'); return; }
+    if (inflight) {
+      note(talking ? '(she is still answering — say it again after)'
+        : '(still thinking about the last one)', 'meta');
+      return;
+    }
     inflight += 1;
     sent += 1;
     draw();
@@ -196,11 +224,31 @@ const ears = (() => {
       const said = d.text || '';
       note('“' + (said || '…') + '”  ' + secs.toFixed(1) + ' s · ' + d.ms + ' ms'
         + (d.intents && d.intents.length ? '  → ' + d.intents.join(', ') : ''), 'heard');
-      for (const it of d.intents || []) act(it);
+      // A command, and that is the whole of it — commands outrank conversation.
+      if (d.intents && d.intents.length) {
+        for (const it of d.intents) act(it);
+        return;
+      }
+      // Nothing heard, or a service from before 1.4.0 that hands out no id:
+      // there is nothing to say to her, and the old behaviour is exactly this.
+      if (!said.trim() || !d.heard) return;
+      // HELD INSIDE `inflight`, and through her whole answer rather than only
+      // until it arrives. A sentence said over her is refused with the note
+      // above rather than sent, and that is deliberate: echo cancellation takes
+      // most of her voice back out of the microphone and not all of it, and the
+      // failure it would leave is her hearing the tail of her own answer and
+      // replying to it, which is a loop that spends money until the hour runs
+      // out.
+      talking = true;
+      draw();
+      const res = await voice.converse({ id: d.heard, text: said, addr: d.addr || {} },
+        (r) => { talked += 1; note(r.line, r.kind); });
+      if (!res.told) note(res.line, res.kind);
     } catch (e) {
       note('× ' + e.message, 'err');
     } finally {
       inflight -= 1;
+      talking = false;
       draw();
     }
   }
@@ -261,7 +309,7 @@ const ears = (() => {
     proc.connect(sink).connect(actx.destination);
     on = true;
     if (typeof clipMicSync === 'function') clipMicSync();
-    note('listening — try “hey fly, drop your buckets”, “do your zombie fly dance” or “what time is it, Baye?”', 'meta');
+    note('listening — ask Baye or the Bucketeer anything, or try “hey fly, drop your buckets”', 'meta');
     toast(T('ears.on'));
     return true;
   }
@@ -285,6 +333,7 @@ const ears = (() => {
     stream: () => (on ? stream : null),
     act,
     stats: () => ({ on, level: +level.toFixed(4), floor: +floor.toFixed(4),
-      hearing: !!rec, inflight, sent, lines: lines.map((l) => l.text) }),
+      hearing: !!rec, inflight, sent, talking, talked,
+      lines: lines.map((l) => l.text) }),
   };
 })();

@@ -775,6 +775,9 @@ html.touch #swim-hud { bottom: 7.4rem; }
 #ears .ears-line.did { color: #9be39b; }
 #ears .ears-line.err { color: #ef8f7f; }
 #ears .ears-line.meta { color: #7f96a0; }
+/* Her answer, in the subtitle's warm rather than the command's green: a reply
+   is somebody talking, not a thing that was done. */
+#ears .ears-line.reply { color: #f3c98f; }
 
 /* The fly cam's frame. The picture itself is WebGL, drawn by `render(renderer,
    'pip')` in src/44-corpse.js into exactly this box: `DROPCAM.rect` is the same

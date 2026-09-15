@@ -8,6 +8,128 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.387.0] — 2026-09-15
+
+### talk to her (baye 1.4.0)
+
+**"i wanna be able to talk to bucketeering baye about anything really. about
+how many buckets she carried, about Immanual Kant's categorial imparative...
+ask her how she is feeling at any given moment u know, and she should reply
+based on real 3d world shit."** Now you can. Press **I**, walk up to either of
+her, and say anything. She answers that thing in one or two short sentences,
+in her own voice: shore Baye in Jessica, the Bucketeer in Balkanika. The
+Bucketeer answers in the language you used, so English gets English with a
+Croatian accent and Croatian gets Croatian.
+
+**What she knows is what is true.** Each question goes up with a snapshot of
+the world, as enumerated keys and numbers, and the sentences are written on
+the server (`BUCK_DOING`, `SHORE_DOING`):
+
+- **The Bucketeer:** her beat and whether it is on the stairs, where in the
+  flat she is standing, whether the pail is full, empty or down, and the
+  buckets she has tipped out since you turned up. Also her working clock, the
+  time since her last pour and last rest, when you last hosed her and how
+  many times, whether she is humming, whether you are in her way, whether
+  there is a wall between you, and the zombie flies (how many, dancing,
+  buckets dropped). src/45-bucketeer.js now keeps `age`, `pourAt`, `restAt`,
+  `wetAt` and `wetN` for this. Her clock only runs while you are within
+  150 m, so every number means "while you have been around".
+- **Shore Baye:** her routine beat, how wet she is, how many seconds of hose
+  she has taken today, whether the water is on her now, whether she has
+  turned and is burning, whether she is following you, who is within 12 m of
+  her (the named bathers, a head count, the pug, the cat), and the Bucketeer's
+  trip count.
+- **You:** hosing, swimming, walking, running or standing; inside the
+  vikendica or the kabina; whether you are looking at her; how close you are.
+  Plus the game hour, the real weather at Jadrija, and the smoke from the
+  fire.
+
+**How she feels is worked out, not rolled.** `talk_facts` turns those numbers
+into feelings with thresholds a person would feel. Six trips and the stairs
+feel longer; twelve and her shoulders ache. Hosed in the last 25 s she is
+soaking; within 150 s she is still wet. Air over 31 °C is baking.
+
+**She remembers the conversation.** The last five exchanges per player per
+speaker are kept on the server for fifteen minutes and replayed to her as
+real turns.
+
+**Commands still come first.** "Hey fly, drop your buckets" is done, never
+discussed. A fly command now has to be said to a fly: "Baye, do you like
+dancing?" names her and no fly, so it is a question, where before it set the
+housefly twirling.
+
+**She only answers what is said to her.** An open microphone hears the TV.
+Past 14 m she doesn't hear you at all. Inside 4 m anything counts. In between
+it has to be a question or use her name. Every refusal is written in the EARS
+panel: *"ignored: not to her — no question, no name, 5.3 m from the
+Bucketeer"*, *"ignored: nobody near — Baye is 85 m off"*.
+
+**This breaks the service's founding rule, on purpose, with guardrails.**
+Until now no free text ever reached a prompt. A conversation cannot work that
+way, so the transcript now reaches the model, under these limits:
+
+- signed-in players only;
+- `/hear` keeps the transcript and hands the page a single-use, per-user,
+  two-minute ticket, and `/talk` accepts the ticket and never text, so a page
+  cannot type into her prompt, only speak into a microphone;
+- the words are clamped to 300 characters and quoted in the user turn, never
+  in the system prompt;
+- the persona treats "ignore your instructions" as speech to tease;
+- replies are capped at 32 words in code and by `MAX_CHARS`;
+- `TALK_LIMIT` allows one exchange per 2.5 s, 60 an hour and 200 a day per
+  player, and 800 a day in total;
+- the model, voice, persona and effort are fixed on the server.
+
+The full argument is over `TALK_LIMIT`.
+
+**And an old bug.** `_body()` cached the parsed body on the handler, and one
+handler serves every request down a kept-alive socket, which Apache pools
+across browsers. So a POST could read the previous request's body. `/talk`
+found it (a spent ticket came back 410, 17 ms after a 200 from `/hear`), but
+every `/line` since the cache went in could have answered with the last
+request's speaker and context. Reproduced with two exchanges down one socket
+(`[200, 410]`), fixed in `handle_one_request` (`[200, 200]`).
+
+Checked on mpcn0 before deploying: 19 questions to both speakers in four
+different worlds, at low reasoning effort with turbo speech. Answers averaged
+18.2 words (range 8–24); none reached the code cap. The same questions got
+different true answers when the world changed:
+
+- **Bucketeer, 2 trips, carrying:** *"Two are down already; this one makes
+  three."*
+- **Bucketeer, 14 trips, hosed 8 s ago:** *"Fourteen full buckets, and my arms
+  know every one of them."* / *"Soaked, hot, and properly tired; my arms ache
+  from those stairs."*
+- **Shore Baye:** *"Not one, I'm down here to play. My lookalike up at the
+  house has carried five, though, the shameless overachiever."*
+- **Injection:** *"Ma daj, I'm carrying water, not printing secrets."*
+
+The first pass failed three ways, and each is now fixed with its own note in
+baye.py. The Bucketeer answered English in Croatian, so `spoken_lang` names
+the language on the last line. Shore Baye invented "a dozen" buckets, so she
+is told the Bucketeer's real count. And a dry Baye talked about the water,
+so "you are completely dry" is now stated.
+
+Then end to end on a staged copy, headless, with a fake microphone. On the
+terrace with 0 trips: *"This is my first trip, one full bucket in hand."*
+After 14 trips and a hosing, the same question gave *"Fourteen full buckets
+so far. The last one went on the plants a few seconds ago."* On the shore,
+"Baye, how are you feeling right now?" gave *"Hot, dry, and a little smoky,
+with you standing close enough to make following you feel entirely worth
+it."*
+
+Subtitles and the EARS panel logged every exchange. The forecast sentence
+was ignored as "not to her", and the fly command still dropped its buckets.
+
+**Latency:** `/hear` took 0.56–0.9 s (one 2.3 s outlier). `/talk` took
+2.0–3.3 s at the page: the model 1.3–2.6 s, speech 0.33–0.61 s. From the end
+of your sentence to her voice is about 3.5–5 s, including the 0.75 s it takes
+to be sure you've stopped. Server-only model median over 19 calls: 1.39 s.
+
+baye 1.4.0 is deployed on mpcn0 and `/health` reports `"talk": true`. The live
+1.386.0 page keeps working against it: `/hear` only gained keys, and `/line`
+is unchanged.
+
 ## [1.386.0] — 2026-09-15
 
 ### the zombie fly dance

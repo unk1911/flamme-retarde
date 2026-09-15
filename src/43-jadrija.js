@@ -38799,6 +38799,53 @@ async function buildJadrija(scene) {
         spot: voiceSpot() };
     },
     /**
+     * What is true about shore Baye this second, for when somebody asks her —
+     * the `baye` half of `/talk` in server/baye/baye.py, read by `converse` in
+     * 49-voice.js. The Bucketeer's own is `bucketeer.talk()`.
+     *
+     * Misha, 15 Sep 2026: *"ask her how she is feeling at any given moment u
+     * know, and she should reply based on real 3d world shit"*. So: which beat
+     * of the routine she is on (`her`, a key the server has the words for in
+     * `SHORE_DOING`), how wet she is and how much jet she has taken all
+     * session, whether the water is on her NOW, whether she has turned and
+     * whether she is burning, and who is standing round her.
+     *
+     * WHO IS ROUND HER is off `bathers` within twelve metres of HER, not of
+     * you — "who is near you?" is asked of her. `company` names only the ones
+     * the cast gave a kind to, because a kind is what the server can turn into
+     * "an old woman"; `crowd` counts everybody, so "about fifteen people" can
+     * still be true on a terrace of unnamed figures.
+     *
+     * `buck_laps` is the Bucketeer's count, sent with hers because she was
+     * asked about buckets in the first test and, with none in her facts, said
+     * "a dozen, give or take". See `talk_facts`.
+     */
+    bayeTalk: () => {
+      if (!show) return null;
+      let crowd = 0;
+      const company = [];
+      for (let i = 0; i < bathers.length; i++) {
+        const b = bathers[i];
+        if (b.hidden) continue;
+        const dt = b.t - show.t, ds = b.s - show.s;
+        if (dt * dt + ds * ds > 144) continue;
+        crowd += 1;
+        const k = castBlob && CAST_KIND && castBlob[i] >= 0
+          ? CAST_KIND[castBlob[i]] : null;
+        if (k && company.length < 6) company.push(k);
+      }
+      const w = toWorld(show.t, show.s);
+      return {
+        her: show.phase, soak_s: +show.soak.toFixed(1), wet: +show.wet.toFixed(2),
+        hosed_now: show.hit > 0, burning: show.burn > 0, turned: !!show.turned,
+        with_you: !!show.withYou, crowd, company,
+        dog: !!(dog && Math.hypot(dog.at[0] - show.t, dog.at[1] - show.s) < 12),
+        cat: !!(cat && Math.hypot(cat.at[0] - show.t, cat.at[1] - show.s) < 12),
+        buck_laps: bucketeer ? bucketeer.talk().laps : null,
+        at: [w[0], w[1] + show.air, w[2]],
+      };
+    },
+    /**
      * Fill the soak meter by hand, so the turn can be seen without standing
      * there with the branch on her for sixteen seconds — which is exactly as
      * long headless as it is in a real window, and is sixteen seconds every

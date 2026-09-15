@@ -529,6 +529,10 @@ function buildZombies(vik, buck) {
     },
     /** Which members have no buckets in their feet right now, by index. */
     bare: () => flock.map((z) => !!z.drop),
+    /** How many are dancing this second — what the Bucketeer is told when
+     *  somebody asks her what those flies are doing. See `talk` in
+     *  45-bucketeer.js. */
+    dancing: () => flock.filter((z) => z.dance).length,
     /** Everybody hum, now. Debug, and what a probe of the voice wants. */
     hum: () => { choir(); return flock.length; },
     /** Can another one join? The swat asks before it plays the resurrection. */

@@ -2493,6 +2493,25 @@ async function buildBucketeer(scene, vik, walkY) {
     // And the hose. `wetPend` is a line owed, `wetSoak` the memory that stops
     // one continuous jet asking for sixty of them a second. See `buckWet`.
     wetPend: false, wetSoak: 0,
+    // ── what she can say about her own day, when she is asked ──────────────
+    //
+    // Misha, 15 Sep 2026: *"about how many buckets she carried ... ask her how
+    // she is feeling at any given moment u know, and she should reply based on
+    // real 3d world shit"*. `laps` already counted the buckets; nothing counted
+    // the TIME, and "how long since you last stopped" is a question about time.
+    //
+    // `age` is her own clock: seconds she has actually been working, which is
+    // not the page's clock, because `step` does not run her at all while you
+    // are further off than `BUCK.poseM` — she stops where she is and picks up
+    // again when you come back. So every number below is "while you have been
+    // around", which is exactly what she can honestly claim to know about you.
+    // `pourAt`, `restAt` and `wetAt` are `age` at the last pour, the last beat
+    // she stood about without the bucket (`rest` or `dwell`) and the last frame
+    // your jet was on her; `wetN` is how many separate soakings, one per
+    // `BUCK.wetSoak` memory, which is the same unit her baked "ajme" answers.
+    // `looked` is whether you were looking at her last frame, off the same
+    // ray `notice` uses. See `talk()`.
+    age: 0, pourAt: -1, restAt: 0, wetAt: -1, wetN: 0, looked: false,
     // The stream's own width last frame, which is all a rising edge needs.
     // See where the sound is fired.
     pourWas: 0,
@@ -2906,6 +2925,7 @@ async function buildBucketeer(scene, vik, walkY) {
           // is deleting this clause; it should be a decision somebody makes
           // after looking at the shot, not a side effect of this one.
           st.laps += 1;
+          st.pourAt = st.age;
           // Two odds and a gift, all three argued over `BUCK.pirouWatch`: the
           // old 0.17 out at the edge of earshot, 0.40 when somebody is close
           // enough to see what she is doing, and the first lap with somebody
@@ -3139,6 +3159,8 @@ async function buildBucketeer(scene, vik, walkY) {
     if (st.phase !== 'down' && st.phase !== 'up' && st.phase !== 'roam') {
       st.vel = 0;
     }
+    // The last time she stood about with her hands empty — see `st.age`.
+    if (st.phase === 'rest' || st.phase === 'dwell') st.restAt = st.age;
     if (st.phase !== 'tip') st.pour = 0;
     // ── and the sound of it ───────────────────────────────────────────────
     //
@@ -4384,7 +4406,12 @@ async function buildBucketeer(scene, vik, walkY) {
    * things about one soaking is a woman talking to herself.
    */
   function buckWet(_litres) {
+    // Every frame the water is on her, before the memory below throws the
+    // frame away: "how long ago were you hosed" is measured from the LAST drop,
+    // not the first. See `st.age`.
+    st.wetAt = st.age;
     if (st.wetSoak > 0) return;
+    st.wetN += 1;
     st.wetSoak = BUCK.wetSoak;
     st.wetPend = true;
     // For the voice service, in `news`'s own form: what happened, not what to
@@ -4405,6 +4432,9 @@ async function buildBucketeer(scene, vik, walkY) {
     const dx = who.x - st.x, dz = who.z - st.z;
     const d2 = dx * dx + dz * dz;
     if (d2 > BUCK.poseM * BUCK.poseM) return;
+    // Her working clock, on the far side of the same gate that stops her
+    // working. See `st.age`.
+    st.age += dt;
 
     // ── you are in the way, and she is not a ghost ──────────────────────────
     //
@@ -4490,6 +4520,7 @@ async function buildBucketeer(scene, vik, walkY) {
       const el = Math.hypot(ex, ez) || 1;
       lookAt = (dir.x * ex + dir.z * ez) / el > BUCK.noticeDot;
     }
+    st.looked = lookAt;
     const wants = near < BUCK.noticeM && lookAt;
     if (wants && st.noticeCool <= 0) {
       st.notice = BUCK.noticeHold;
@@ -4658,6 +4689,61 @@ async function buildBucketeer(scene, vik, walkY) {
       BUCK.say = v == null ? !BUCK.say : !!v;
       if (!BUCK.say && audio) { audio.mutter(0, { stop: true }); st.sayRem = 0; }
       return BUCK.say;
+    },
+    /**
+     * What is true about her this second, for when somebody asks — the
+     * `bucketeer` half of `/talk` in server/baye/baye.py, read by
+     * `converse` in 49-voice.js.
+     *
+     * KEYS AND NUMBERS, NOT WORDS. `her` is the beat's own name and the server
+     * has the sentence for it (`BUCK_DOING`), so the prose lives next to the
+     * persona that reads it and a modified page can only choose between beats
+     * that exist. Everything is rounded to the second: she does not know to the
+     * millisecond when she last put a bucket down and nor does anybody else.
+     *
+     * `stair` is the flight itself — `BUCK_STAIR`'s three legs — because "down
+     * the stairs with ten litres" and "across the porch with ten litres" are
+     * different answers to "are you tired?". `carry` is off `held` and `fill`
+     * together: `held` alone is still 1 all the way back up with an empty pail.
+     * `step` is only the halts that are actually running (`st.dance`), never a
+     * turn that has been drawn for later in the lap.
+     */
+    talk: () => ({
+      her: st.phase,
+      stair: way === BUCK_WAY && (st.phase === 'down' || st.phase === 'up')
+        && BUCK_STAIR.includes(st.leg),
+      node: st.phase === 'roam' || st.phase === 'dwell' ? st.node : null,
+      step: st.dance > 0 ? st.pathStep : null,
+      carry: st.held > 0.5 ? (st.fill > 0.5 ? 'full' : 'empty') : 'none',
+      laps: st.laps,
+      working_s: Math.round(st.age),
+      since_pour_s: st.pourAt >= 0 ? Math.round(st.age - st.pourAt) : null,
+      since_rest_s: Math.round(st.age - st.restAt),
+      hosed_ago_s: st.wetN > 0 ? Math.round(st.age - st.wetAt) : null,
+      hosed_n: st.wetN,
+      humming: st.humRem > 0,
+      in_way: !!st.yield,
+      looked: !!st.looked,
+      wall: st.wall > 0.5,
+      at: [st.x, st.y, st.z],
+    }),
+    /**
+     * Somebody is talking to her: no fresh hum and no baked line on top of it.
+     *
+     * A woman does not start humming over her own answer, and the reply is a
+     * live voice out of the same corner as `sayTick`'s Croatian — two of her at
+     * once is the fault that function's whole first note is about. So both
+     * clocks are pushed to at least `secs` away, and neither is stopped: a
+     * phrase already in the air finishes, and both come back on their own
+     * cadence afterwards. `saySince` is honest as well as useful — she HAS
+     * just spoken — and it is what keeps the doorway line from following the
+     * answer straight out of her mouth.
+     */
+    listen: (secs = 14) => {
+      st.humAt = Math.max(st.humAt, secs);
+      st.sayAt = Math.max(st.sayAt, secs);
+      st.saySince = 0;
+      return { humAt: +st.humAt.toFixed(1), sayAt: +st.sayAt.toFixed(1) };
     },
     /**
      * Her bearing, and nothing else — read every frame by src/45-zombie.js,

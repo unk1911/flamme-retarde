@@ -26,10 +26,23 @@
 // caption below is a subtitle rather than a bubble: it is what she said, in the
 // corner, for a player with the sound off or a headless probe reading the DOM.
 //
-// It is deliberately not a conversation. There is no microphone and no reply.
+// It was deliberately not a conversation. There was no microphone and no reply.
 // She is a woman on a beach who says things near you, and the moment she starts
 // answering questions she becomes the laptop, which is thirty metres away and
 // already does that better.
+//
+// ── AND ON 15 SEP IT BECAME ONE, ON HIS SAY-SO ──
+//
+// Misha: *"i wanna be able to talk to bucketeering baye about anything really
+// ... i also wanna be able to talk to the NPC baye, ask her anything, ask her
+// how she is feeling at any given moment u know, and she should reply based on
+// real 3d world shit. i mean this is the level of immersion we striving for"*.
+//
+// The paragraph above is kept because its worry is the right one and the answer
+// to it is `converse` below: she does not become the laptop because she answers
+// as HERSELF, from what is actually true of her this second — the trip she is
+// on, the hose, the heat — in two short sentences and her own voice. The laptop
+// knows everything and nothing about the beach; she knows the beach.
 // -----------------------------------------------------------------------------
 
 const VOICE = {
@@ -195,6 +208,46 @@ const PLACES = {
 /** How far away a spoken question still reaches her, metres. Shouting across
  *  a beach carries; shouting across a beach from the city does not. */
 const EARS_REACH = 45;
+
+/**
+ * Talking TO her — `converse` below, and `/talk` in server/baye/baye.py.
+ *
+ * THE NOISE RULE, and it is two numbers and a test on the words. A microphone
+ * left on hears the television, the radio and whoever else is in the room, and
+ * a woman who answered all of it would be a woman answering a radio. So she
+ * answers a sentence only when it is plausibly said to her:
+ *
+ *   `earshot`   past this she does not hear you at all, whatever you said.
+ *               Fourteen and not `EARS_REACH`'s forty-five, because that one is
+ *               a command — "what time is it, Baye?" shouted down a promenade
+ *               — and this is somebody talking to you. Sixteen is where the
+ *               shore Baye starts talking to YOU (`VOICE.near`), and a little
+ *               inside that is where a normal voice stops carrying on a beach
+ *               with cicadas in it.
+ *   `close`     inside this, anything you say is to her. Four metres is an arm
+ *               and a pace; nobody stands that close to somebody and talks to
+ *               the radio.
+ *   between     it has to be a question, or have her name in it. The server
+ *               decides that off the words (`addressed_of`) and says so in
+ *               `/hear`'s `addr`; the page decides the distance, because the
+ *               page has it. The server checks both again before it spends.
+ *
+ * Every refusal says why in the EARS panel — "nobody near", "not to her" — so
+ * a sentence that got nothing is a sentence with a reason on screen.
+ *
+ * Measured from your FEET to hers, in three dimensions. `bayeGap` answers in
+ * plan for the Bucketeer, which is right for "which of her is nearer" and
+ * wrong for "can she hear you": on the vikendica's terrace she can be under
+ * your feet on the porch, 2.8 m down and 1.2 m out.
+ */
+const TALK = {
+  earshot: 14,
+  close: 4,
+  /** How long her answer stays on screen after she stops. */
+  hold: 5.0,
+  /** Seconds to wait for a line already in the air before giving up. */
+  wait: 8,
+};
 
 const voice = (() => {
   /** The player's switch. On by default — but nothing happens without a
@@ -667,10 +720,173 @@ const voice = (() => {
     }
   }
 
+  /** What you are doing, as one of `YOU_DOING`'s keys in baye.py. */
+  function youDoing() {
+    if (state.phase === 'fly') return 'fly';
+    if (state.phase === 'swim') return 'swim';
+    const y = at(() => (ground && ground.active ? ground.you : null));
+    if (!y) return null;
+    // `jet` and not `spraying` alone: `spraying` is the trigger and `jet` is
+    // the water, which keeps coming for the fraction of a second it takes to
+    // damp out — and "you are pointing a hose at me" is about the water.
+    if (y.spraying || y.jet > 0.05) return 'hose';
+    if (y.hop > 0.05) return 'jump';
+    const sp = Math.hypot(y.vx, y.vz);
+    return sp > 3.0 ? 'run' : sp > 0.35 ? 'walk' : 'stand';
+  }
+
+  /** Your feet, in three dimensions — see `TALK`. The camera when there is no
+   *  walker (swimming), dropped by an eye height. */
+  function feet() {
+    const y = at(() => (ground && ground.active ? ground.you : null));
+    if (y) return { x: y.x, y: y.y, z: y.z };
+    const c = at(() => camera.position);
+    return c ? { x: c.x, y: c.y - 1.6, z: c.z } : null;
+  }
+
+  /** Whether the camera is pointed at a point: inside about twenty degrees. */
+  function looking(p) {
+    const c = at(() => camera.position);
+    if (!c || !p) return false;
+    const f = at(() => camera.getWorldDirection(new THREE.Vector3()));
+    if (!f) return false;
+    const dx = p[0] - c.x, dy = p[1] + 1.4 - c.y, dz = p[2] - c.z;
+    const l = Math.hypot(dx, dy, dz) || 1;
+    return (f.x * dx + f.y * dy + f.z * dz) / l > 0.94;
+  }
+
+  /**
+   * Everything true about her and you, as the keys `clean_talk` accepts. The
+   * sentences are the server's — see `BUCK_DOING` and `SHORE_DOING` — and the
+   * feelings are worked out there too, off these numbers, in `talk_facts`.
+   */
+  function talkState(buck) {
+    const o = {};
+    const you = youDoing();
+    if (you) o.you = you;
+    const p = here();
+    if (p && at(() => jadrija.kabina.inside(p.x, p.z), 0) > 0.5) o.you_in = 'kabina';
+    else if (at(() => jadrija.indoorsAt(camera.position.x, camera.position.y,
+      camera.position.z), 0) > 0.5) o.you_in = 'vikendica';
+    o.session_min = Math.round(performance.now() / 60000);
+    const h = buck ? at(() => jadrija.bucketeer.talk()) : at(() => jadrija.bayeTalk());
+    if (h) {
+      Object.assign(o, h);
+      delete o.at;
+      delete o.looked;
+      o.you_looking = buck ? !!h.looked : looking(h.at);
+      // The water on her this second, from you: her own frame counter for
+      // the Bucketeer, the jet's grace window for shore Baye.
+      o.you_at_her = you === 'hose'
+        && (buck ? h.hosed_ago_s != null && h.hosed_ago_s < 2 : !!h.hosed_now);
+    }
+    if (buck) {
+      const Z = at(() => jadrija.zombies);
+      if (Z && Z.count()) {
+        o.flies = Z.count();
+        o.flies_bare = Z.bare().filter(Boolean).length;
+        o.flies_dancing = Z.dancing();
+      }
+    }
+    return o;
+  }
+
+  /**
+   * Somebody SAID something to her — a whole sentence off src/49-ears.js
+   * that was not a command — and she answers it.
+   *
+   * `heard` is `{ id, text, addr }` off `/hear`. The id is the only part of it
+   * that goes back up: the server kept the words when it transcribed them, and
+   * `/talk` answers what IT heard, not what a page says was heard. See
+   * guardrail 2 over `TALK_LIMIT` in server/baye/baye.py.
+   *
+   * Resolves to `{ kind, line }` for the ears panel, and the line always says
+   * what happened — including every reason she did not answer. `tell`, when
+   * given, gets the answer the moment it arrives rather than after she has
+   * finished saying it; the result then carries `told`.
+   */
+  async function converse(heard, tell) {
+    const out = (kind, line, extra) => Object.assign({ kind, line }, extra || null);
+    if (!on) return out('meta', 'ignored: her voice is switched off');
+    if (!AUTH.user || !AUTH.baye) return out('meta', 'ignored: signed out');
+    if (state.phase !== 'ground' && state.phase !== 'swim') {
+      return out('meta', 'ignored: nobody near — you are in the aeroplane');
+    }
+    const gap = at(() => jadrija.bayeGap());
+    if (!gap) return out('meta', 'ignored: nobody near');
+    const buck = !!gap.bucket;
+    const who = buck ? 'bucketeer' : 'baye';
+    const name = buck ? 'the Bucketeer' : 'Baye';
+    const f = feet();
+    const her = buck ? at(() => jadrija.bucketeer.where())
+      : at(() => jadrija.bayeTalk().at);
+    const m = f && her ? Math.hypot(her[0] - f.x, her[1] - f.y, her[2] - f.z) : gap.m;
+    if (m > TALK.earshot) {
+      return out('meta', 'ignored: nobody near — ' + name + ' is ' + Math.round(m) + ' m off');
+    }
+    const addr = heard.addr || {};
+    if (m > TALK.close && !addr.q && !addr.name) {
+      return out('meta', 'ignored: not to her — no question, no name, '
+        + m.toFixed(1) + ' m from ' + name);
+    }
+    for (let i = 0; i < TALK.wait * 2 && busy; i++) await new Promise((r) => setTimeout(r, 500));
+    if (busy) return out('meta', 'ignored: ' + name + ' is still talking');
+    busy = true;
+    const sp = buck
+      ? (CAST.bucketeer || (CAST.bucketeer = { key: 'bucketeer', cfg: { memory: 4, hold: 4.0 },
+        said: [], nextAt: 0, inRange: false, gap: () => null, lead: null }))
+      : CAST.baye;
+    // No hum and no baked line over her own answer — see `listen`.
+    if (buck) at(() => jadrija.bucketeer.listen(14));
+    const t0 = performance.now();
+    try {
+      const body = Object.assign(context(sp, gap), talkState(buck),
+        { who, heard: heard.id, near: +m.toFixed(1) });
+      const r = await fetch(AUTH.baye + '/talk', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d || !d.ok) {
+        if (d && d.ignored) return out('meta', 'ignored: not to her (the service agrees)');
+        return out('err', 'talk × ' + ((d && d.error) || 'http ' + r.status));
+      }
+      const wait = Math.round(performance.now() - t0);
+      sp.said.push(d.text);
+      if (sp.said.length > sp.cfg.memory) sp.said.shift();
+      // And she does not follow her own answer with an unprompted line a
+      // second later: the shore clock is pushed a whole gap out, as if the
+      // answer had been one of her own lines — which, to anybody listening,
+      // it was.
+      if (!buck) sp.nextAt = Math.max(sp.nextAt, clock + sp.cfg.gap);
+      caption(d.text, null);
+      const played = audio.voice(d.audio, 2.1, d.rate || 1);
+      const res = out('reply', name + ' · ' + m.toFixed(1) + ' m: “' + d.text + '”  '
+        + wait + ' ms (model ' + d.model_ms + ', voice ' + d.tts_ms + ')',
+      { text: d.text, ms: wait, who });
+      // Told NOW, while she is saying it, and not when she has finished: the
+      // panel is where a player with the sound off reads the conversation.
+      if (tell) { tell(res); res.told = true; }
+      await played;
+      capT = TALK.hold;
+      return res;
+    } catch (e) {
+      return out('err', 'talk × ' + e.message);
+    } finally {
+      busy = false;
+    }
+  }
+
   return {
     step,
     toggle,
     answer,
+    converse,
+    /** For a probe: exactly the state `/talk` would be sent right now, for
+     *  the Bucketeer (`true`) or shore Baye. */
+    talkState: (buck) => talkState(!!buck),
     get on() { return on; },
     get near() { return CAST.baye.inRange || CAST.cat.inRange; },
     /** For a probe: what each of them has said this session, and where they

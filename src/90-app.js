@@ -7502,6 +7502,9 @@ window.__fr = {
     say: (who) => voice.now(who),
     on: (v) => voice.toggle(v),
     context: (who) => voice.context(who),
+    /** What she would be told about herself and you if you spoke to her now —
+     *  `talk(true)` for the Bucketeer. See `converse` in 49-voice.js. */
+    talk: (buck) => voice.talkState(buck),
   }),
   /** Who the page thinks you are, asked fresh rather than remembered. */
   who: () => authWhoami(),
