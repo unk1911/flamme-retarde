@@ -216,6 +216,15 @@ const ears = (() => {
       if (typeof startFlyCam === 'function') startFlyCam();
       return;
     }
+    if (name === 'fly.dance') {
+      const Z = typeof jadrija !== 'undefined' && jadrija && jadrija.zombies;
+      if (!Z || !Z.count()) { note('fly: there is no fly in the movement to hear you', 'meta'); return; }
+      const n = Z.dance();
+      if (!n) { note('fly: no buckets to twirl — it is sitting this one out', 'meta'); return; }
+      note('fly: ' + (n > 1 ? n + ' flies are dancing' : 'dancing'), 'did');
+      if (typeof startFlyCam === 'function') startFlyCam('dance');
+      return;
+    }
     if (name === 'baye.time') {
       note('baye: asking…', 'meta');
       const res = await voice.answer('time');
@@ -252,7 +261,7 @@ const ears = (() => {
     proc.connect(sink).connect(actx.destination);
     on = true;
     if (typeof clipMicSync === 'function') clipMicSync();
-    note('listening — say “hey fly, drop your buckets” or “what time is it, Baye?”', 'meta');
+    note('listening — try “hey fly, drop your buckets”, “do your zombie fly dance” or “what time is it, Baye?”', 'meta');
     toast(T('ears.on'));
     return true;
   }

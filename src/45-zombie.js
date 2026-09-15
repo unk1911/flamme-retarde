@@ -125,6 +125,15 @@ const ZOMBIE = {
   fetchIn: 2.6,
   fetchFor: 30,
   grab: 0.035,               // m — this close over them and they are picked up
+  // ── "do your zombie fly dance thing" ─────────────────────────────────────
+  //
+  // Misha, 15 Sep 2026. Out here, at 7 mm, it stops where it is, spins, and
+  // swings both buckets right round its feet for as long as the routine in the
+  // fly cam lasts (DANCE in src/44-corpse.js, which is the one you can see),
+  // and the movement sings the groove: her tune at dance tempo, chopped on the
+  // eighth notes, twice through. A fly with its buckets on the floor has
+  // nothing to twirl and sits this one out.
+  dance: { len: 6.9, spin: 1.6, loops: 5, rates: [0.90, 0.675, 1.20], again: 2.9 },
 };
 
 /**
@@ -135,6 +144,7 @@ const ZOMBIE = {
 function zombieBucket(mats) {
   const B = MINIB;
   const hang = new THREE.Group();
+  hang.rotation.order = 'YXZ';   // yaw, then round the nose — see the close-up's
   const bailG = new THREE.TorusGeometry(mm(B.rRim + 0.05), mm(0.12), 3, 8, Math.PI);
   bailG.scale(1, B.bail / (B.rRim + 0.05), 1);
   bailG.translate(0, -mm(B.bail), 0);
@@ -225,6 +235,9 @@ function buildZombies(vik, buck) {
       // Dropped: where each bucket is and how fast it is falling, and when
       // the fly goes back for them. Null while they are in its feet.
       drop: null,
+      // Dancing: how far into the routine, or null.
+      dance: null,
+      humDance: false, humAgain: -1,
     };
     flock.push(z);
     return z;
@@ -291,8 +304,14 @@ function buildZombies(vik, buck) {
       z.home += 1;
       if (z.home >= ZOMBIE.home.length) z.home = -1;
     }
+    if (z.dance) {
+      // On the spot, and it bobs.
+      z.dance.t += dt;
+      z.p.y += 0.02 * Math.cos(z.dance.t * 12.6) * dt;
+      z.speed = 0.4;
+      if (z.dance.t >= ZOMBIE.dance.len) z.dance = null;
+    } else if (z.wake > 0) {
     // Getting up off the tile: straight up, slowly, for most of a second.
-    if (z.wake > 0) {
       z.wake -= dt;
       z.p.y += 0.12 * dt;
       z.speed = 0;
@@ -340,8 +359,11 @@ function buildZombies(vik, buck) {
     // ── the pose ───────────────────────────────────────────────────────────
     // Facing the way it is going, nose up in the air as the live one is.
     const r = z.rig;
+    const dz = z.dance;
+    const du = dz ? sat(dz.t / ZOMBIE.dance.len) : 0;
+    const spin = dz ? TAU * ZOMBIE.dance.spin * dz.t : 0;
     r.position.copy(z.p);
-    r.rotation.set(0, -z.head, 0.30);
+    r.rotation.set(0, -z.head + spin, 0.30);
     r.updateMatrix();
     z.swing += dt * 6.5;
     if (z.drop) { stepDrop(z, dt); return; }
@@ -352,7 +374,9 @@ function buildZombies(vik, buck) {
       _p.applyMatrix4(r.matrix);
       b.hang.position.copy(_p);
       const sw = (0.10 + 0.12 * sat(z.speed / 1.5)) * Math.sin(z.swing + s);
-      b.hang.rotation.set(sw * 0.5, -z.head, sw);
+      // Right round its feet while it dances — `loops` times over the routine.
+      const twirl = dz ? TAU * ZOMBIE.dance.loops * smooth01(du) : 0;
+      b.hang.rotation.set(sw * 0.5 - s * twirl, -z.head + spin, sw);
       b.pin.rotation.set(s * z.tilt, 0, 0);
       b.water.visible = z.fill > 0.05;
     }
@@ -462,8 +486,14 @@ function buildZombies(vik, buck) {
         audio.zombieHum(dist, { start: true, id: z.i, pan, yelp: true });
       } else if (z.humStart >= 0 && clockS >= z.humStart) {
         z.humStart = -1;
-        audio.zombieHum(dist, { start: true, id: z.i, pan,
-          rate: H.rates[z.i % H.rates.length] });
+        const D = ZOMBIE.dance;
+        audio.zombieHum(dist, { start: true, id: z.i, pan, dance: z.humDance,
+          rate: (z.humDance ? D.rates : H.rates)[z.i % H.rates.length] });
+        if (z.humDance && z.humAgain < 0) z.humAgain = clockS + D.again;
+        else if (z.humDance) z.humDance = false;
+      } else if (z.humDance && z.humAgain > 0 && clockS >= z.humAgain) {
+        z.humAgain = 0;
+        z.humStart = clockS;
       } else {
         audio.zombieHum(dist, { id: z.i, pan });
       }
@@ -479,6 +509,22 @@ function buildZombies(vik, buck) {
     drop: () => {
       let n = 0;
       for (const z of flock) if (dropOne(z)) n += 1;
+      return n;
+    },
+    /**
+     * "Do your zombie fly dance thing." Every member holding its buckets
+     * dances; answers how many did.
+     */
+    dance: () => {
+      let n = 0;
+      for (const z of flock) {
+        if (z.drop || z.dance) continue;
+        z.dance = { t: 0 };
+        z.humDance = true;
+        z.humAgain = -1;
+        z.humStart = clockS + z.i * 0.06;
+        n += 1;
+      }
       return n;
     },
     /** Which members have no buckets in their feet right now, by index. */

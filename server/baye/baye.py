@@ -55,7 +55,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -301,6 +301,8 @@ INTENTS = [
     ("fly.drop", [r"\bfl(y|ies|ie)\b", r"\b(drop|let go|release|dump|put down)\b"]),
     ("fly.drop", [r"\bbuckets?\b", r"\b(drop|let go|release|dump)\b"]),
     ("baye.time", [r"\b(what|what's|whats)\b.*\btime\b|\btime is it\b|\bgot the time\b"]),
+    # Misha, 15 Sep 2026: *"do your zombie fly dance thing"*.
+    ("fly.dance", [r"\b(danc\w*|boogie|groove|twirl\w*|bust a move|shake it)\b"]),
 ]
 
 

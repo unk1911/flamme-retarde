@@ -652,6 +652,42 @@ const MINIB = {
 /** The viewport offset every corpse material reads — see `uVp`. Shared. */
 const CORPSE_VP = { value: new THREE.Vector2(0, 0) };
 
+/**
+ * The zombie fly dance. Misha, 15 Sep 2026: *"i wanna be able to tell the fly
+ * to u know, "do your zombie fly dance thing", and for the fly to execute it's
+ * funky zombie fly dance, twirling them buckets and shit"*.
+ *
+ * Six moves in 6.6 s at 120 bpm, each [start, length]:
+ *
+ *   shimmy     rolling on the beat, legs kicking in turn, buckets swinging
+ *   pirouette  three turns, the buckets flying out on the spin
+ *   loop       head over heels round a 2.2 mm circle
+ *   twirl      both buckets swung right over the top, twice
+ *   shuffle    front legs out like a zombie's arms, stepping side to side
+ *   finale     one fast turn and a freeze with the buckets overhead
+ */
+const DANCE = {
+  len: 6.9,
+  bpm: 120,
+  shimmy: [0.00, 1.00],
+  pirouette: [1.00, 1.40],
+  loop: [2.40, 1.20],
+  twirl: [3.60, 1.30],
+  shuffle: [4.90, 0.90],
+  finale: [5.80, 1.10],
+  hover: 2.4,                // mm the bails ride over the tile
+  loopR: 2.2,
+  overhead: 2.75,            // rad round the foot: nearly straight up
+  yaw: 0.35,
+  // Framed on the top of the loop, which is the highest the fly gets: 13 mm
+  // over the tile. At 13 cm and 8 mm, the first cut, the loop left the top of
+  // the frame and the fly was a speck for the rest of it.
+  // And 0.30 rad over the tile and not 0.22: from lower down the top of the
+  // frame looked a metre across the floor, past the edge of the tile.
+  aimY: 10.0,
+  cam: [0.10, 0.30, -0.35],
+};
+
 const smooth01 = (x) => { const u = sat(x); return u * u * (3 - 2 * u); };
 const hash1 = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
 
@@ -705,6 +741,8 @@ const LEG_LIVE = {
     [2.50, -1.00, 0.35, -1.30, 0.40, 0.22]],
   carry: [[1.60, -1.22, 0.05, -0.18, 0.10, 0.04]],
   rub: [[0.30, -0.60, 0.95, -2.25, 0.60, 0.15]],
+  // The zombie's arms: the front pair straight out ahead and a little up.
+  arms: [[0.12, 0.18, 0.05, -0.15, 0.05, 0.02]],
 };
 const _live = new Array(10).fill(0);
 function liveRaw(L, kind) {
@@ -759,6 +797,9 @@ function miniBucketMats(fade, res) {
 function miniBucket(stage, MB) {
   const B = MINIB;
   const hang = new THREE.Group();
+  // Yaw, then a swing about the animal's own nose, then fore and aft — so a
+  // twirl is one number, the angle round the foot, whatever way it is facing.
+  hang.rotation.order = 'YXZ';
   const r = B.rRim + 0.05;
   const bailG = new THREE.TorusGeometry(mm(r), mm(B.wire), 5, 18, Math.PI);
   bailG.scale(1, B.bail / r, 1);
@@ -1569,6 +1610,7 @@ function buildFlyCorpse() {
       yw = lerp(0, yaw, lu);
     }
     rig.position.set(x, y, z);
+    rig.rotation.order = 'XYZ';
     rig.rotation.set(rot + jig, yw, jig * 0.5);
     rig.updateMatrixWorld(true);
 
@@ -1646,6 +1688,7 @@ function buildFlyCorpse() {
   /** Back to the corpse exactly as it was built, for the next swat. */
   function reset() {
     rig.position.set(0, deadY, 0);
+    rig.rotation.order = 'XYZ';
     rig.rotation.set(Math.PI - CORPSE_ROLL, 0, 0);
     setLegs(A0, (L) => L.dead);
     for (const W of A0.wings) W.g.rotation.set(0, W.dead[0], W.dead[1]);
@@ -1823,6 +1866,7 @@ function buildFlyCorpse() {
     const spin = rel > 0 ? TAU * smooth01(rel / D.spin) : 0;
     const y = yHold + jolt + mm(0.35) * Math.sin(t * 13);
     rig.position.set(0, y, 0);
+    rig.rotation.order = 'XYZ';
     rig.rotation.set(0.08 * Math.sin(t * 7.3), D.yaw + spin, 0.06 * Math.sin(t * 5.1));
     setLegs(A0, (L) => (L.row === 1 ? liveRaw(L, 'carry') : liveRaw(L, 'tuck')));
     const beat = (Math.floor(t * 60) & 1) ? 1 : -1;
@@ -1830,6 +1874,125 @@ function buildFlyCorpse() {
     rig.updateMatrixWorld(true);
     eyeRot(A0);
     return y;
+  }
+
+  /**
+   * "Do your zombie fly dance thing." The fly cam again, and this time it
+   * dances — see DANCE for the routine, beat by beat.
+   *
+   * The whole routine is a pure function of `t` like every other shot here,
+   * and the buckets are part of the choreography rather than dragged along by
+   * it: every bucket's angle round its foot is written for each move, so a
+   * twirl is a twirl and not a physics accident.
+   */
+  function danceShot(t) {
+    measure();
+    floorMesh.visible = true;
+    for (const x of extras) x.A.body.visible = false;
+    for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
+    const P = pairs[0];
+    P.hide(false);
+    const D = DANCE;
+    const apex = mm(MINIB.ear + MINIB.bail);
+    const base = apex + carryDrop + mm(D.hover);
+    const at = (w) => (t - w[0]) / w[1];
+    const inW = (w) => t >= w[0] && t < w[0] + w[1];
+    const latX = Math.sin(D.yaw), latZ = Math.cos(D.yaw);
+    const noseX = Math.cos(D.yaw), noseZ = -Math.sin(D.yaw);
+    let side = 0, fore = 0, up = 0, yaw = D.yaw, roll = 0, pitch = 0;
+    const tw = [0, 0];     // each bucket's swing round the nose axis, outward +
+    const fw = [0, 0];     // and fore and aft
+    let kick = 0, arms = 0;
+    const beat = Math.sin(TAU * D.bpm / 60 * t);
+
+    if (inW(D.shimmy)) {
+      // The shimmy: rolling side to side on the beat, legs kicking in turn,
+      // and the buckets swinging the other way like a pair of hips.
+      const u = at(D.shimmy);
+      const env = Math.min(1, u * 6, (1 - u) * 6);
+      roll = 0.45 * Math.sin(TAU * 3 * t) * env;
+      up = mm(0.6) * Math.abs(beat);
+      kick = env;
+      tw[0] = tw[1] = -roll * 1.3;
+    } else if (inW(D.pirouette)) {
+      // Three turns, and the buckets fly out on the spin.
+      const u = smooth01(at(D.pirouette));
+      yaw += TAU * 3 * u;
+      const out = 1.30 * Math.sqrt(Math.sin(Math.PI * at(D.pirouette)));
+      tw[0] = out; tw[1] = out;
+      up = mm(2.0) * Math.sin(Math.PI * at(D.pirouette));
+    } else if (inW(D.loop)) {
+      // The loop-the-loop: once round a vertical circle in the plane of its
+      // nose, head over heels, and the buckets trailing through it.
+      const u = smooth01(at(D.loop));
+      const a = TAU * u;
+      pitch = a;
+      fore = mm(D.loopR) * Math.sin(a);
+      up = mm(D.loopR) * (1 - Math.cos(a));
+      fw[0] = fw[1] = -0.9 * Math.sin(a);
+    } else if (inW(D.twirl)) {
+      // The twirl: bobbing on the beat and swinging BOTH buckets right over
+      // the top, twice each, outward — which is the move the whole routine is
+      // named for.
+      const u = smooth01(at(D.twirl));
+      up = mm(0.8) * beat;
+      yaw += 0.22 * Math.sin(TAU * 2 * t);
+      tw[0] = tw[1] = TAU * 2 * u;
+    } else if (inW(D.shuffle)) {
+      // The zombie shuffle: front legs straight out in front, leaning in,
+      // stepping side to side on the beat.
+      const u = at(D.shuffle);
+      arms = Math.min(1, u * 5, (1 - u) * 5);
+      pitch = -0.28 * arms;
+      const step = Math.tanh(4 * Math.sin(TAU * (D.bpm / 120) * (t - D.shuffle[0])));
+      side = mm(2.4) * step * arms;
+      tw[0] = tw[1] = -0.5 * Math.cos(TAU * (D.bpm / 120) * (t - D.shuffle[0])) * arms;
+    } else if (t >= D.finale[0]) {
+      // And the finale: one fast turn, then a freeze with the pair swung up
+      // over its head.
+      const u = at(D.finale);
+      yaw += TAU * smooth01(u / 0.45);
+      const e = smooth01((u - 0.35) / 0.3);
+      tw[0] = tw[1] = D.overhead * e;
+      up = mm(1.5) * e;
+    }
+
+    rig.position.set(side * latX + fore * noseX, base + up, side * latZ + fore * noseZ);
+    rig.rotation.order = 'YXZ';
+    rig.rotation.set(roll, yaw, pitch);
+    setLegs(A0, (L) => {
+      if (L.row === 1) return liveRaw(L, 'carry');
+      if (L.row === 0 && arms > 0) return mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'arms'), arms);
+      if (kick > 0) {
+        // Can-can: each leg on its own half of the beat.
+        const k = Math.max(0, Math.sin(TAU * 3 * t + (L.row * 2 + (L.s > 0 ? 1 : 0)) * 1.6));
+        return mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'stand'), k * kick);
+      }
+      return liveRaw(L, 'tuck');
+    });
+    const wb = (Math.floor(t * 60) & 1) ? 1 : -1;
+    for (const W of A0.wings) W.g.rotation.set(0, -W.s * 1.70, 0.55 * wb);
+    rig.updateMatrixWorld(true);
+    eyeRot(A0);
+
+    const yawNow = yaw;
+    for (let k = 0; k < 2; k++) {
+      const s = k ? 1 : -1;
+      const B = P.b[k];
+      footAt(A0, k ? 3 : 2, _w);
+      B.hang.position.copy(_w);
+      // Outward is away from the body: for the +Z bucket a negative turn
+      // about the nose. See `hang.rotation.order`.
+      B.hang.rotation.set(-s * tw[k], yawNow, fw[k]);
+      B.pin.rotation.set(0, 0, 0);
+      B.setFill(1);
+      B.stream.visible = false;
+    }
+    P.shadow(blob, 4);
+    bodyShadow(A0, base + up);
+    _v.set(0, mm(D.aimY), 0);
+    look(D.cam[0], D.cam[1], D.cam[2], _v);
+    fade.value = 1;
   }
 
   // A second and a third animal for the insert, built only if the movement
@@ -1863,7 +2026,9 @@ function buildFlyCorpse() {
   return {
     stage, cam, rig, body,
     look,
-    revive, reset, insert, dropShot,
+    revive, reset, insert, dropShot, danceShot,
+    /** How long the dance runs, seconds. */
+    danceLen: () => DANCE.len,
     /** How long the fly cam stays up, seconds. */
     dropLen: () => DROPCAM.len,
     /** How long the resurrection runs, seconds. */

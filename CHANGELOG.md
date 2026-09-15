@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.386.0] — 2026-09-15
+
+### the zombie fly dance
+
+**"do your zombie fly dance thing ... twirling them buckets and shit"**. Say
+it with the ears on (I), or say "dance", "boogie", "groove" or "twirl" —
+`fly.dance` in `INTENTS`, baye 1.3.1. The fly cam opens in the corner and
+the fly dances, 6.9 s at 120 bpm (`DANCE` in src/44-corpse.js):
+
+- **shimmy.** Rolling on the beat, legs kicking can-can in turn, and the
+  buckets swinging the other way like hips.
+- **pirouette.** Three turns, with the buckets flying out on the spin.
+- **loop-the-loop.** Head over heels round a 2.2 mm circle, with the buckets
+  trailing through it.
+- **twirl.** Both buckets swung right over the top of its feet, twice,
+  outward.
+- **zombie shuffle.** The front legs straight out ahead like a zombie's arms,
+  leaning in and stepping side to side.
+- **finale.** One fast turn, then a freeze with the pair swung up over its
+  head.
+
+The buckets are choreographed rather than simulated. Each one's angle round
+its foot is written per move, which is why the hang pivot's rotation order is
+now yaw, then round the nose, then fore and aft: a twirl is a single number.
+
+Meanwhile the real 7 mm fly in the world stops, spins and swings both buckets
+round its feet five times. The movement sings the groove, her tune at dance
+tempo with no drawl, chopped on the eighth notes by a 4 Hz square wave, twice
+through. A fly whose buckets are on the floor sits it out.
+
+Checked: the routine scrubbed at ten instants and re-framed twice. The first
+cut lost the loop off the top of the frame, the second looked a metre past
+the tile. The spoken-command path via `__fr.ears.act('fly.dance')` logs
+"fly: dancing", shows the fly cam and closes it at 6.9 s, and starts the
+groove twice. The deployed service matches "Do your zombie fly dance thing."
+to `fly.dance` without disturbing the other two commands.
+
 ## [1.385.0] — 2026-09-14
 
 ### L records the conversation too

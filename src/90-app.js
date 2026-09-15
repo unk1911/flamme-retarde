@@ -3072,10 +3072,13 @@ let pourBack = 0;
  * frame loop and drawn in the corner by the render above.
  */
 let flyCamT = -1;
+/** Which shot the fly cam is showing: `drop` or `dance`. */
+let flyCamMode = 'drop';
 /** Held by `__fr.ears.flyCam(t)`, for a scrub — the same switch as `swatHold`. */
 let flyCamHold = false;
-function startFlyCam() {
+function startFlyCam(mode = 'drop') {
   if (!jadrija || !jadrija.vik) return false;
+  flyCamMode = mode === 'dance' ? 'dance' : 'drop';
   flyCamT = 0;
   flyCamHold = false;
   const el = $('flycam');
@@ -6611,7 +6614,9 @@ function frame() {
   if (pourCut) stepPour(real);
   if (flyCamT >= 0) {
     if (!flyCamHold) flyCamT += real;
-    if (flyCamT >= jadrija.vik.fly.shot().dropLen() || swatCut || pourCut) {
+    const camLen = flyCamMode === 'dance' ? jadrija.vik.fly.shot().danceLen()
+      : jadrija.vik.fly.shot().dropLen();
+    if (flyCamT >= camLen || swatCut || pourCut) {
       flyCamT = -1;
       const el = $('flycam');
       if (el) el.hidden = true;
@@ -7280,7 +7285,8 @@ function frame() {
   } else if (flyCamT >= 0 && !camOverride && jadrija && jadrija.vik) {
     // The fly cam, in the corner: "drop your buckets!" — see `dropShot`.
     const shot = jadrija.vik.fly.shot();
-    shot.dropShot(flyCamT);
+    if (flyCamMode === 'dance') shot.danceShot(flyCamT);
+    else shot.dropShot(flyCamT);
     shot.render(renderer, 'pip');
   } else if (camOverride && jadrija && jadrija.zombies && jadrija.zombies.count() > 0
     && (pourCut || pourInsertT >= 0)) {
@@ -8759,13 +8765,14 @@ window.__fr = {
     stats: () => ears.stats(),
     toggle: () => ears.toggle(),
     act: (name) => ears.act(name),
-    flyCam: (t) => {
+    flyCam: (t, mode = 'drop') => {
       if (t == null) { flyCamHold = false; return flyCamT; }
-      startFlyCam(); flyCamT = t; flyCamHold = true; return flyCamT;
+      startFlyCam(mode); flyCamT = t; flyCamHold = true; return flyCamT;
     },
   },
   zombie: {
     drop: () => (jadrija && jadrija.zombies ? jadrija.zombies.drop() : null),
+    dance: () => (jadrija && jadrija.zombies ? jadrija.zombies.dance() : null),
     stats: () => (jadrija && jadrija.zombies ? jadrija.zombies.stats() : null),
     spawn: (x, y, z) => (jadrija && jadrija.zombies ? jadrija.zombies.spawn(x, y, z) : null),
     /** Everybody hum now; the answer is how many phrases the voice has started. */

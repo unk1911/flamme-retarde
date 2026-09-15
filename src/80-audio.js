@@ -5525,6 +5525,10 @@ function buildAudio() {
     // tenths of a second, through the same wings and the same rot. A siren
     // falling down a well, which is the sound a startled undead fly makes.
     const yelp = !!o.yelp;
+    // And `dance`: the tune straight, no drawl and no sag, at dance tempo,
+    // chopped on the eighth notes by a square wave — the groove the fly
+    // dances to. See ZOMBIE.dance in src/45-zombie.js.
+    const dance = !yelp && !!o.dance;
     const dur = yelp ? 0.90 : HUM.len / rate + 0.12;
     if (!ctx || ctx.state === 'suspended') return dur;
     if (!humBuf) sampleLoad(HUM.key, (b) => { humBuf = b; });
@@ -5556,6 +5560,8 @@ function buildAudio() {
     if (yelp) {
       src.playbackRate.setValueAtTime(1.8, t0);
       src.playbackRate.exponentialRampToValueAtTime(0.32, t0 + dur);
+    } else if (dance) {
+      src.playbackRate.setValueAtTime(rate, t0);
     } else {
       src.playbackRate.setValueAtTime(rate * ZHUM.drawl, t0);
       src.playbackRate.linearRampToValueAtTime(rate, t0 + 0.25);
@@ -5596,8 +5602,23 @@ function buildAudio() {
     g.gain.exponentialRampToValueAtTime(0.00002, t0 + dur);
     const pn = ctx.createStereoPanner();
     pn.pan.value = clamp(o.pan || 0, -1, 1);
-    src.connect(shaper).connect(wing).connect(peak).connect(lp).connect(g)
-      .connect(pn).connect(bed || master);
+    let chop = null;
+    if (dance) {
+      // 4 Hz is eighth notes at 120 bpm, which is DANCE.bpm.
+      const groove = ctx.createGain();
+      groove.gain.value = 0.62;
+      chop = ctx.createOscillator();
+      chop.type = 'square';
+      chop.frequency.value = 4;
+      const depth = ctx.createGain();
+      depth.gain.value = 0.38;
+      chop.connect(depth).connect(groove.gain);
+      src.connect(shaper).connect(wing).connect(groove).connect(peak);
+      peak.connect(lp).connect(g).connect(pn).connect(bed || master);
+    } else {
+      src.connect(shaper).connect(wing).connect(peak).connect(lp).connect(g)
+        .connect(pn).connect(bed || master);
+    }
     if (verbSend) {
       const w = ctx.createGain();
       w.gain.value = 0.10 * far;
@@ -5606,6 +5627,7 @@ function buildAudio() {
     src.start(t0, yelp ? 0.25 : 0); lfo.start(t0); buzz.start(t0);
     const end = t0 + dur + 0.06;
     src.stop(end); lfo.stop(end); buzz.stop(end);
+    if (chop) { chop.start(t0); chop.stop(end); }
     zhumFired += 1;
     zhumVoices[id] = { src, lfo, buzz, g, pn, until: end };
     return dur;
