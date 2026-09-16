@@ -8001,6 +8001,12 @@ window.__fr = {
      */
     put: (...a) => jadrija.putShow(...a),
     /**
+     * Ask her for one of her own numbers — 'wine', 'ballet', 'twerk',
+     * 'shimmy', 'heart', 'note', 'wheel', 'joy'. See `askShow`.
+     */
+    ask: (name) => (jadrija ? jadrija.askShow(name) : null),
+    did: () => (jadrija ? jadrija.didShow() : null),
+    /**
      * Walk into her, without walking. This is the collider's own hook — see
      * `bumpReact` — so it is the same call the ground makes on the first
      * frame of contact, and the only way a probe can test being shoved.

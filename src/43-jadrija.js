@@ -33581,6 +33581,32 @@ async function buildJadrija(scene) {
     notice: 1, rest: 1, flip: 1, up: 1, wheel: 1, down: 1, crawl: 1,
     bask: 1, hop: 1, out: 1, shimmy: 1, twerk: 1, heart: 1, note: 1 };
 
+  /**
+   * WHERE SHE CAN BE ASKED FOR SOMETHING, and it is `BUMPABLE` plus the three
+   * indoor phases where she is standing about rather than doing a thing.
+   *
+   * Misha, 16 Sep 2026: *"if it's a skill or routine she knows how to do, that
+   * she doesn't say something dismissive like 'do it y0self', but instead,
+   * actually does it. that would be next level shit"*. The kabina phases have
+   * to be in here and are exactly the ones `BUMPABLE` leaves out, because the
+   * wine is IN there: "pour me a glass" is asked of a woman who is already
+   * standing in the hut with you, which is `dwell`.
+   */
+  const ASKABLE = { dwell: 1, meet: 1, leave: 1, idle: 1, play: 1, home: 1,
+    orbit: 1, aim: 1, joy: 1, notice: 1, rest: 1, flip: 1, up: 1, wheel: 1,
+    down: 1, crawl: 1, bask: 1, hop: 1, out: 1, shimmy: 1, twerk: 1, heart: 1,
+    note: 1 };
+
+  /**
+   * WHAT SHE CAN BE ASKED FOR. Every one of these is a number she already has
+   * — the clip, the walk-up and the exit all existed before anybody could ask
+   * — so this table adds no animation, only a way in. The names are her own
+   * phase names, which is what keeps this honest: there is nothing here she
+   * cannot do.
+   */
+  const SHE_CAN = { wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
+    note: 1, wheel: 1, joy: 1 };
+
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
     dwell: 1, leave: 1 };
@@ -34207,6 +34233,51 @@ async function buildJadrija(scene) {
       if (WETDOWN[show.phase]) show.wetHeld = 1;
       else if (show.wetHeld) { audio.noiseStop(0.40); show.wetHeld = 0; }
     } else if (show.wetHeld) show.wetHeld = 0;
+    // ── AND WHAT SHE HAS BEEN ASKED FOR, OUT LOUD ────────────────────────
+    //
+    // Misha, 16 Sep 2026: *"since the game knows we are in the kabine and
+    // there's wine bottle and glass, and we have the routine where baye knows
+    // to pour the wine, if she would actually go and pour the wine. and if i
+    // say 'can you do a piruette?' ... if it's a skill or routine she knows how
+    // to do ... she actually does it"*.
+    //
+    // ARMED BY `askShow` AND ENTERED HERE, which is the pattern the note over
+    // `bumpReact` sets out and for the same reason: what arms it is a fetch
+    // handler in another file and must not start a clip from underneath the
+    // state machine. Nothing is forced — every branch below is the same call
+    // the dice make — so she enters each number from a state it is legal to
+    // enter it from, and a request made while she is held, burning or already
+    // pouring WAITS rather than being thrown away. That is what a person does
+    // when you ask them for something mid-sentence.
+    if (show.ask && ASKABLE[show.phase]) {
+      const name = show.ask;
+      show.ask = null;
+      show.did = name;
+      if (name === 'wine') {
+        // The whole walk to the bottle, not the pour on its own: the mark is
+        // in the kabina and the legs of `come` are what get her to it without
+        // going through the stool. Asked from out on the promenade she walks
+        // in, which is more of an answer than the clip is.
+        show.leg = 0;
+        go('come', 'walk', 0.36);
+      } else if (name === 'ballet') {
+        const bar = barreAt(show.t, show.s);
+        if (bar) {
+          show.bar = bar;
+          show.leg = show.s < SHOW.lane[0] ? 1 : 0;
+          showSay('trill', d);
+          go('toBar', 'walk', 0.32);
+        } else show.did = null;      // no ladder to hold: she cannot, honestly
+      } else if (name === 'joy') {
+        showSay('hup', d);
+        go('joy', 'flip', 0.18);
+      } else if (name === 'wheel') enterWheels();
+      else if (name === 'shimmy') enterShimmy();
+      else if (name === 'twerk') enterTwerk();
+      else if (name === 'heart') enterHeart();
+      else if (name === 'note') enterNote();
+      else show.did = null;
+    }
     show.bumpAgain = Math.max(0, (show.bumpAgain || 0) - dt);
     if (show.bumped) {
       show.bumped = 0;
@@ -39005,6 +39076,27 @@ async function buildJadrija(scene) {
      * that would be a teleport out of.
      */
     cue: (...names) => { if (show) show.queue.unshift(...names); return show && show.queue.slice(); },
+    /**
+     * Ask her for one of her own numbers, by name — see the note over
+     * `ASKABLE`. Answers whether the name is one she knows; WHEN she starts it
+     * is up to her, because it is entered from `stepShow` on a frame where the
+     * phase she is in can legally be left.
+     */
+    askShow: (name) => {
+      if (!show || !SHE_CAN[name]) return false;
+      show.ask = name;
+      return true;
+    },
+    /** What she was last asked for and took, or null. */
+    didShow: () => (show ? (show.did || null) : null),
+    /**
+     * Walk into her without walking into her — the collider's own hook, so a
+     * probe can test being shoved. `crowd.bump` is the same call and is NOT
+     * the same object: it hangs off `crowd`, which is not what `jadrija.bump`
+     * resolves to, and a probe calling the wrong one of the two gets a thrown
+     * `undefined` inside a timer, which is silent. That cost a false pass.
+     */
+    bump: (kind = 'baye', idx = 0, t = 0, s = 0) => bumpReact(kind, idx, t, s),
     /**
      * Where she thinks the two of you are, and what she would hold up here.
      *

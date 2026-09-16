@@ -233,6 +233,24 @@ const ears = (() => {
         for (const it of d.intents) act(it, d.lang);
         return;
       }
+      // AND A THING SHE CAN DO, which is NOT a command and does not return.
+      //
+      // Misha, 16 Sep 2026: *"if it's a skill or routine she knows how to do,
+      // that she doesn't say something dismissive like 'do it y0self', but
+      // instead, actually does it"*. Both halves happen: the routine is armed
+      // here and the sentence goes on to `converse` underneath it, so she
+      // says yes in her own voice while her own legs take her to the bottle.
+      // The service knows she is doing it — the name rides the ticket, see
+      // `SKILLS` in server/baye/baye.py — which is what stops the answer
+      // being the refusal he was getting.
+      if (d.does && d.does.length) {
+        for (const name of d.does) {
+          const J = typeof jadrija !== 'undefined' && jadrija;
+          const ok = !!(J && J.askShow && J.askShow(name));
+          note('baye: ' + (ok ? (DOES[name] || name) : 'cannot do that here'),
+            ok ? 'did' : 'meta');
+        }
+      }
       // Nothing heard, or a service from before 1.4.0 that hands out no id:
       // there is nothing to say to her, and the old behaviour is exactly this.
       if (!said.trim() || !d.heard) return;
@@ -256,6 +274,13 @@ const ears = (() => {
       draw();
     }
   }
+
+  /** What to print when she takes a request. Her phase names are not words. */
+  const DOES = {
+    wine: 'pouring the wine', ballet: 'to the barre', twerk: 'the bend',
+    shimmy: 'her shimmy', heart: 'a heart', note: 'holding up her card',
+    wheel: 'cartwheels', joy: 'a somersault',
+  };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
   async function act(name, lang = null) {

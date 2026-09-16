@@ -8,6 +8,89 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.395.0] — 2026-09-16
+
+### ask her and she does it
+
+**"if, since the game knows we are in the kabine and there's wine bottle and
+glass, and we have the routine where baye knows to pour the wine, if she would
+actually go and pour the wine. and if i say 'can you do a piruette?' ... if
+it's a skill or routine she knows how to do, that she doesn't say something
+dismissive like 'do it y0self', but instead, actually does it. that would be
+next level shit"**.
+
+Eight of her numbers can be asked for out loud now: the wine, the barre, the
+bend, the shimmy, the heart, her card, cartwheels and a somersault. NO
+ANIMATION WAS ADDED — every one of those already had its clip, its walk-up and
+its exit, and all this is a way in. `SHE_CAN` in src/43-jadrija.js is the list
+and the names in it are her own phase names, which is what keeps it honest:
+there is nothing on it she cannot already do.
+
+Armed by the voice, entered by her. `askShow` sets a flag and `stepShow` acts
+on it on a frame where the phase she is in can legally be left — the pattern
+the note over `bumpReact` sets out, and for its reason: a fetch handler must
+not start a clip from underneath the state machine. So nothing is forced, every
+branch is the same call the dice make, and a request arriving while she is held
+or burning or already pouring WAITS instead of being thrown away. `ASKABLE` is
+where it is safe, and it is `BUMPABLE` plus the three indoor phases, because
+the wine is in the kabina and "pour me a glass" is asked of a woman already
+standing in the hut with you.
+
+**A SKILL IS NOT A COMMAND**, and that is the design. A command (`INTENTS`) is
+answered INSTEAD of a conversation — "drop your buckets" gets no ticket and she
+is never asked anything. A skill is answered as WELL as one: the routine starts
+and the sentence goes on to `/talk` underneath it, so she says yes in her own
+voice while her legs take her to the bottle. The name rides the HEARD ticket
+into her prompt, which is the half that fixes what he actually complained
+about — told she is already doing it, she stops refusing:
+
+- "can you pour me some wine?" → *"Yeah, sure, gimme the glass."*
+- "now do a pirouette for me" → *"Yeah, I'm on it, babe."*
+- "show me a cartwheel" → *"Yeah, yeah, watch me."*
+- and asked what she THINKS of ballet, she just answers — no routine, because
+  `ASK_RE` separates a request from talk about the subject. The first cut of
+  that read "what DO you think of ballet?" as a request for one.
+
+Fifteen sentences checked against the table, no mismatches, and "dance for me"
+goes to the shimmy while "dance some ballet" goes to the barre. In any other
+language the classifier does it, off the same menu.
+
+Driven, all of it: asked for the bend she is in `twerk` on the next frame; the
+heart, the cartwheels and the somersault the same. Asked for the WINE she walks
+in — `come`, then nine seconds later `wine` at t 424.6, s 18.3, which is inside
+the hut at the bottle. Asked for the barre she walks to the ladder and is in
+`ballet` nine seconds later. Asked for a somersault mid-pirouette she finishes
+the pirouette first, which is the waiting working.
+
+- `__fr.jad.ask('wine')` and `__fr.jad.did()` drive and read it.
+- Proof numbers unchanged: census {446,333,86,27}, blockers 818, tris 642821,
+  59 fps.
+- AND A FALSE PASS FOUND AND KILLED. `crowd.bump` and `jadrija.bump` are not
+  the same object, and the probe handle was reaching the wrong one: calling
+  `undefined` inside a `setTimeout` throws where nothing is watching, so
+  1.394.0's "six bumps, one clip" measured a real collision that happened
+  anyway. The handle is on the right object now and the test was re-run for
+  real — six bumps inside 720 ms, one clip, still playing eighteen seconds
+  later.
+
+## [baye 1.7.0] — 2026-09-16 — server only
+
+### she can be asked for things
+
+`SKILLS` is the other half of 1.395.0 above: a table of the eight numbers she
+can be asked for, matched by English patterns like `INTENTS` and by the
+classifier in any other language, returned on its own `does` key so the page
+knows a skill is not a command. The name rides the HEARD ticket, so
+`build_talk_messages` can tell her she is already doing it — without that she
+says "pour it yourself, babe" while walking to the bottle, which is what
+started this.
+
+`ASK_RE` is the part worth keeping an eye on: it separates "can you pour me
+one" from "I love a cold white in this heat". A bare "do" was in the first cut
+and it read "what do you think of ballet?" as a request, so the modals now have
+to be aimed at her ("can you", not just "can"), and an imperative only counts
+at the start of a sentence and never as "do you…".
+
 ## [1.394.0] — 2026-09-16
 
 ### being walked into gets the whole take too

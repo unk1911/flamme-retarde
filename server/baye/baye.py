@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.6.3"
+VERSION = "1.7.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -353,6 +353,83 @@ INTENTS = [
 ]
 
 
+# ── AND WHAT SHE CAN BE ASKED TO DO ─────────────────────────────────────────
+#
+# Misha, 16 Sep 2026: *"since the game knows we are in the kabine and there's
+# wine bottle and glass, and we have the routine where baye knows to pour the
+# wine, if she would actually go and pour the wine. and if i say 'can you do a
+# piruette?' ... if it's a skill or routine she knows how to do, that she
+# doesn't say something dismissive like 'do it y0self', but instead, actually
+# does it. that would be next level shit"*.
+#
+# THESE ARE NOT COMMANDS, and that distinction is the whole design. A command —
+# `INTENTS` above — is answered INSTEAD of a conversation: the page acts on the
+# name and never asks her anything, which is why "drop your buckets" gets no
+# ticket. A skill is answered as WELL as one. She says yes, in her own voice,
+# in the register she is in, and the routine starts underneath the sentence. So
+# these come back on their own key, the ticket is issued as usual, and the name
+# rides the ticket into the prompt so the model knows she is already doing it.
+# Without that last part she says "pour it yourself, babe", which is what he
+# heard and what started this.
+#
+# Every name is one of HER OWN phase names, checked against `SHE_CAN` in
+# src/43-jadrija.js, which is what keeps it honest: there is nothing on this
+# list she cannot already do, and nothing was animated for it.
+SKILLS = {
+    "wine": ("pour a glass of wine, fetch a drink, open the bottle",
+             [r"\b(wine|drink|bottle|glass|rakija|pour)\b"]),
+    "ballet": ("dance ballet at the barre: a pirouette, a relevé, an "
+               "arabesque, going up on her toes",
+               [r"\b(ballet|pirouette|piruette|pirouet\w*|releve|relevé|"
+                r"arabesque|barre|en pointe|on your toes)\b"]),
+    "twerk": ("twerk, do the bend, shake her hips",
+              [r"\b(twerk\w*|the bend|shake (your|them) (ass|hips|butt))\b"]),
+    # "dance for me" is the most natural way anybody asks, and it belongs to
+    # the shimmy: she has three dances and this is the one that is not a
+    # specialist request. `ballet` is above it in this dict and `out[:1]` takes
+    # the first match, so "dance some ballet" still goes to the barre.
+    "shimmy": ("do her shimmy, dance for you",
+               [r"\b(shimm\w+|danc\w+)\b"]),
+    "heart": ("make a heart with her hands",
+              [r"\bheart\b"]),
+    "note": ("hold up her card, show you her sign",
+             [r"\b(card|sign|note)\b"]),
+    "wheel": ("do a cartwheel, some cartwheels",
+              [r"\bcart-?wheel\w*\b"]),
+    "joy": ("do a somersault, a flip, tumble",
+            [r"\b(somersault\w*|summersault\w*|flip|tumbl\w+|backflip)\b"]),
+}
+# The ask itself, so that TALKING about wine is not a request for it. "I love
+# a cold white in this heat" names the noun and asks for nothing; "can you pour
+# me one" is the request. One of these has to be in the sentence as well.
+# Not a bare "do", which was the first cut and which reads "what DO you think
+# of ballet?" as a request for one. A request is a modal aimed at her, a please,
+# a give-me, or an imperative verb opening the sentence — and "do you like…" is
+# a question however it starts, so that one is excluded by name.
+ASK_RE = re.compile(
+    r"\b(can|could|would|will|wanna|want to)\s+(you|u)\b"
+    r"|\b(please|pls|plz)\b"
+    r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
+    r"do the|do your|do a|do some)\b"
+    r"|\b(let'?s see|i want|i'?d like|how about|go on|for me)\b"
+    r"|^\s*(pour|show|make|give|dance|perform|try|do)(?!\s+(you|u|i|we)\b)\b",
+    re.I | re.M)
+
+
+def skills_of(text: str) -> list:
+    """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
+    t = (text or "").lower()
+    if not ASK_RE.search(t):
+        return []
+    out = []
+    for name, (_desc, pats) in SKILLS.items():
+        if all(re.search(p, t) for p in pats):
+            out.append(name)
+    # One thing at a time. Asked for two she does the first, because she has one
+    # body and the second would cut the first off half a clip in.
+    return out[:1]
+
+
 def intents_of(text: str) -> list:
     t = (text or "").lower()
     out = []
@@ -541,7 +618,7 @@ class Heard:
         self._d = {}
         self._lock = threading.Lock()
 
-    def put(self, user: str, text: str, lang=None) -> str:
+    def put(self, user: str, text: str, lang=None, does=None) -> str:
         hid = secrets.token_urlsafe(12)
         now = time.time()
         with self._lock:
@@ -549,7 +626,7 @@ class Heard:
                 self._d = {k: v for k, v in self._d.items()
                            if now - v[2] < self.ttl}
             if len(self._d) < self.cap:
-                self._d[hid] = (user, text[:TALK_HEARD_CHARS], now, lang)
+                self._d[hid] = (user, text[:TALK_HEARD_CHARS], now, lang, does)
         return hid
 
     def take(self, user: str, hid) -> str:
@@ -559,7 +636,10 @@ class Heard:
             got = self._d.pop(hid, None)
         if not got or got[0] != user or time.time() - got[2] > self.ttl:
             return None
-        return got[1], got[3]
+        # `does` is the name of the number she has been asked for and is
+        # already doing — see SKILLS. It rides the ticket rather than coming
+        # up from the page for the same reason the words do: guardrail 2.
+        return got[1], got[3], (got[4] if len(got) > 4 else None)
 
 
 HEARD = Heard()
@@ -634,6 +714,12 @@ INTENT_NAMES = {"fly.drop": "tell the fly to drop / let go of / put down its buc
                 "fly.birthday": "ask the fly for its birthday performance, or for a "
                                 "dance or a song in honour of somebody's birthday",
                 }
+# And the same menu for her own numbers, so that asking in Russian for a
+# pirouette works as well as asking in English. `do.` prefixed, filtered
+# against `SKILLS` on the way out, and never mixed in with the commands: the
+# page does one of them INSTEAD of talking to her and the other one WHILE
+# talking to her.
+SKILL_NAMES = {"do." + k: v[0] for k, v in SKILLS.items()}
 PLAIN_EN = re.compile(r"^[\sA-Za-z0-9'’\-,.!?;:\"()]+$")
 
 
@@ -647,14 +733,16 @@ def plainly_english(text: str) -> bool:
 
 
 def classify(text: str):
-    """Which fixed commands, and what language, for a sentence the English
-    patterns could not read. Returns (intents, language) and never raises: a
-    classifier that is down leaves the sentence as conversation, which is what
-    it would have been anyway."""
+    """Which fixed commands, what she has been asked to do, and what language,
+    for a sentence the English patterns could not read. Returns
+    (intents, does, language) and never raises: a classifier that is down
+    leaves the sentence as conversation, which is what it would have been
+    anyway."""
     key = CFG.get("OPENAI_API_KEY")
     if not key or not (text or "").strip():
-        return [], None
+        return [], [], None
     menu = "\n".join(f"- {k}: {v}" for k, v in INTENT_NAMES.items())
+    doable = "\n".join(f"- {k}: {v}" for k, v in SKILL_NAMES.items())
     try:
         r = requests.post(
             "https://api.openai.com/v1/chat/completions",
@@ -671,18 +759,24 @@ def classify(text: str):
                        "commands the sentence clearly GIVES, usually none:\n"
                        + menu + "\nA fly command must be said to the fly. "
                        "A question to Baye about dancing is not a command. "
+                       "Also list in `intents` which ONE of these things the "
+                       "sentence ASKS THE WOMAN BAYE TO DO, if any, and only "
+                       "when it is a request rather than talk about the "
+                       "subject:\n" + doable + "\n"
                        "`language` is the English name of the language the "
                        "sentence is in, like English, Russian, German."},
                       {"role": "user", "content": text[:300]}]},
             timeout=6)
         if r.status_code != 200:
             print(f"[classify] {r.status_code}: {r.text[:160]}", flush=True)
-            return [], None
+            return [], [], None
         d = json.loads(r.json()["choices"][0]["message"]["content"] or "{}")
     except Exception as e:                                    # noqa: BLE001
         print(f"[classify] {e}", flush=True)
-        return [], None
-    got = [i for i in (d.get("intents") or []) if i in INTENT_NAMES]
+        return [], [], None
+    raw = d.get("intents") or []
+    got = [i for i in raw if i in INTENT_NAMES]
+    does = [i[3:] for i in raw if i in SKILL_NAMES][:1]
     # The same one rule `intents_of` has: a birthday IS the dance, in a
     # language where asking for one names the other.
     if "fly.birthday" in got and "fly.dance" in got:
@@ -691,7 +785,7 @@ def classify(text: str):
     lang = lang.strip() if isinstance(lang, str) else None
     if not lang or not re.fullmatch(r"[A-Za-z][A-Za-z \-]{1,23}", lang):
         lang = None
-    return list(dict.fromkeys(got)), lang
+    return list(dict.fromkeys(got)), does, lang
 
 
 def transcribe(audio: bytes, ctype: str) -> str:
@@ -2385,7 +2479,7 @@ def talk_facts(who: str, ctx: dict, t: dict, world: dict):
 
 
 def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
-                        history: list, heard: str, lang=None) -> list:
+                        history: list, heard: str, lang=None, does=None) -> list:
     """The conversation, as turns. See guardrails 3 and 8 over `TALK_LIMIT`.
 
     Past exchanges are real turns — what they said as a quoted user turn, what
@@ -2453,6 +2547,19 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
         lines += [f'- "{s}"' for s in ctx["said"][-3:]]
     lines.append("")
     lines.append(f'They have just said to you, out loud: "{heard}"')
+    # AND SHE IS ALREADY DOING IT. See the note over `SKILLS`: without this she
+    # answers "pour it yourself, babe", which is a woman refusing while her own
+    # legs walk her to the bottle. The routine has already been armed in the
+    # page by the time this prompt is built, so the only honest thing she can
+    # say is yes.
+    if does and does in SKILLS:
+        lines.append("")
+        lines.append("THEY HAVE ASKED YOU TO " + SKILLS[does][0].upper()
+                     + ", AND YOU ARE DOING IT RIGHT NOW — you are already on "
+                     "your way. So say yes, in one short line, the way you "
+                     "would say it. Do not refuse, do not tell them to do it "
+                     "themselves, do not ask whether they are sure, and do "
+                     "not describe it.")
     lines.append("")
     # The language `/hear` named — the classifier's for anything that is not
     # plain English — and the marker-word count only as the fallback it always
@@ -2839,16 +2946,17 @@ def _hear(self):
         print(f"[hear] {user}: {e}", flush=True)
         return self._send(502, {"ok": False, "error": str(e)[:200]})
     found = intents_of(text)
+    does = skills_of(text) if not found else []
     lang = "English" if plainly_english(text) else None
-    if not found and text.strip() and lang is None:
+    if not found and not does and text.strip() and lang is None:
         # Not English enough for the patterns to have read it: the classifier
-        # gets it, for both the command and the language. See `classify`.
-        found, lang = classify(text)
+        # gets it, for the command, the request and the language. See `classify`.
+        found, does, lang = classify(text)
     ms = int((time.time() - t0) * 1000)
-    print(f"[hear] {user} {ms}ms {len(audio)}B {found} {lang or '?'} :: {text[:160]}",
-          flush=True)
+    print(f"[hear] {user} {ms}ms {len(audio)}B {found} {does} {lang or '?'} "
+          f":: {text[:160]}", flush=True)
     out = {"ok": True, "text": text[:300], "intents": found, "ms": ms,
-           "lang": lang}
+           "lang": lang, "does": does}
     # AND A TICKET TO SAY IT TO HER, when it is not a command. Guardrail 2 over
     # `TALK_LIMIT`: the transcript stays here and the page gets an id it can
     # hand to `/talk`, so the words that reach her prompt are the words the
@@ -2857,8 +2965,12 @@ def _hear(self):
     # rule and it is this one too. `addr` is the half of "was that said to
     # her?" that is about the words; the page has the other half, the distance.
     # Extra keys only, so a page cached from before 1.4.0 reads this unchanged.
+    # A SKILL IS NOT A COMMAND and still gets its ticket — see the note over
+    # `SKILLS`. She does the thing AND says yes to it, and the second half of
+    # that only works if the name reaches her prompt, which it does by riding
+    # the ticket rather than coming back up from the page.
     if not found and text.strip():
-        out["heard"] = HEARD.put(user, text, lang)
+        out["heard"] = HEARD.put(user, text, lang, does[0] if does else None)
         out["addr"] = addressed_of(text)
     return self._send(200, out)
 
@@ -2881,7 +2993,7 @@ def _talk(self):
     # Off a list: guardrail 7. An unknown speaker is Baye.
     who = body.get("who") if body.get("who") in TALKERS else "baye"
     took = HEARD.take(user, body.get("heard"))
-    heard, heard_lang = took if took else (None, None)
+    heard, heard_lang, heard_does = took if took else (None, None, None)
     if not heard:
         return self._send(410, {"ok": False,
                                 "error": "nothing heard by that id"})
@@ -2900,7 +3012,8 @@ def _talk(self):
     history = TALKS.recall(user, who)
     t0 = time.time()
     try:
-        msgs = build_talk_messages(who, ctx, t, world, history, heard, heard_lang)
+        msgs = build_talk_messages(who, ctx, t, world, history, heard, heard_lang,
+                                   heard_does)
         text, usage = ask_model(msgs, fast=True, words=TALK_WORDS)
         if not text:
             text, usage = ask_model(msgs, fast=True, words=TALK_WORDS)
