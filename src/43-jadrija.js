@@ -34136,8 +34136,20 @@ async function buildJadrija(scene) {
     // eighteen seconds of it outliving the pose it belongs to is the recording
     // playing over a woman who is walking away. Only the long one — the shove's
     // second is over before anything could want to cut it.
-    if (audio && audio.noiseNow && audio.noiseNow() === 'wetlong'
-        && !WETDOWN[show.phase]) audio.noiseStop(0.40);
+    //
+    // ARMED ON THE WAY IN. Misha: *"after first hose, doesn't work properly
+    // it's still too short ... the one that works is the long hose when she's
+    // laying on the back"*. Both of those are the same clip and the difference
+    // was this test: the water can land a frame before she is in any of these
+    // phases — she may be mid-stride on the indoor track — and a stop that
+    // only asks "is she down right now" cut the recording four tenths of a
+    // second after it started, which is the one second he heard. So it only
+    // stops one it has actually seen her DOWN in, and the `wetHeld` flag is
+    // that memory.
+    if (audio && audio.noiseNow && audio.noiseNow() === 'wetlong') {
+      if (WETDOWN[show.phase]) show.wetHeld = 1;
+      else if (show.wetHeld) { audio.noiseStop(0.40); show.wetHeld = 0; }
+    } else if (show.wetHeld) show.wetHeld = 0;
     show.bumpAgain = Math.max(0, (show.bumpAgain || 0) - dt);
     if (show.bumped) {
       show.bumped = 0;
@@ -34156,7 +34168,6 @@ async function buildJadrija(scene) {
         // apart, and because the shimmy would need it if it ever came back.
         show.bumpBack = 1;
         showSay('whee', Math.hypot(pt - show.t, ps - show.s));
-        showNoise('bump', Math.hypot(pt - show.t, ps - show.s));
         // A longer fade than the shimmy's 0.30 for `enterTwerk`'s reason: this
         // one starts from a deep squat, and a third of a second from standing
         // to that is a collapse rather than a move.
@@ -35729,6 +35740,18 @@ async function buildJadrija(scene) {
     // a clip from underneath it. `show.bumped` is a flag the next step reads.
     if (kind === 'baye') {
       if (show) show.bumped = 1;
+      // AND THE NOISE HERE, not in the reaction `stepShow` runs off the flag.
+      //
+      // Misha, 16 Sep 2026: *"when i bump into her right now it makes that
+      // digital clicking audio, so there is a hook it knows when i bump into
+      // her, so instead of (or in addition to that digital click, it should
+      // play these audio clips"*. This IS that hook. The reaction it arms is
+      // gated on her phase — no twerk indoors, none during the music, none
+      // while she is already in the middle of one — and a noise hung off the
+      // far side of those gates is a noise that does not happen in the room
+      // where he was testing it. Walking into her is walking into her, and
+      // `noises` has its own cooldown for the case of leaning on her.
+      showNoise('bump', 0);
       return true;
     }
     if (kind !== 'bather') return false;

@@ -278,6 +278,8 @@ const voice = (() => {
    */
   const CAST = {
     baye: { key: 'baye', cfg: VOICE, said: [], nextAt: 0, inRange: false,
+      // Silent until you speak to her — see `quiet` in `poll`.
+      quiet: true,
       gap: () => at(() => jadrija.bayeGap()), lead: null },
     cat: { key: 'cat', cfg: CAT_VOICE, said: [], nextAt: 0, inRange: false,
       gap: () => at(() => jadrija.catGap()), lead: 'The cat: ' },
@@ -565,6 +567,17 @@ const voice = (() => {
     // BAYE does not get. Silencing the cat by starving her is not what was
     // asked for. With this, he asks exactly once per page load.
     if (sp.mute) { sp.inRange = false; return null; }
+    // AND SHE DOES NOT START ANYTHING. Misha, 16 Sep 2026: *"let's change it
+    // so that the shore baye doesn't talk sweet nothings, those are annoying.
+    // let's do it so that, if i engage the 'I' talk that she replies"*.
+    //
+    // This kills the CLOCK and nothing else. `answer` and `converse` never
+    // came through here — they are called from the ears panel when you have
+    // actually said something to her, and they check the range themselves — so
+    // she still replies to everything you say into the microphone, and the
+    // only thing that stops is her opening her mouth because a timer went off.
+    // One flag on one speaker in CAST, which is where to put the lines back.
+    if (sp.quiet) { sp.inRange = false; return null; }
     const raw = sp.gap();
     // AND THE BUCKET ERRAND IS NOT ON THIS PATH AT ALL, WHICH IS THE 8 SEP
     // CHANGE. See the long note over `gapBucket`: there is no Bucketeer

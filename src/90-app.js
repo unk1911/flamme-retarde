@@ -8000,6 +8000,8 @@ window.__fr = {
      * frames a second cannot finish at all.
      */
     put: (...a) => jadrija.putShow(...a),
+    /** Hold the jet on her without a jet — see `douse` in 43-jadrija.js. */
+    douse: (v) => jadrija.douse(v),
     /** The special kabina, in the resort's own frame — where `put` has to put
      *  her for anything that only happens in there. */
     kabina: () => (jadrija ? jadrija.kabina : null),
