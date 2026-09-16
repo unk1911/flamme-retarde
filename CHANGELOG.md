@@ -8,6 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [baye 1.6.1] — 2026-09-16 — server only
+
+### brooklyn mouth
+
+**"make her responses be even more dirty and raw, brooklyn style if u know
+what imean"**. What 1.6.0 produced was uninhibited but LITERARY — *"then watch
+how quickly this perfectly dry woman forgets her manners"*, *"your clothes
+scattered like careless little confessions"*. Every one of those is a simile,
+and a woman reaching for a simile is a woman taking the long way round.
+
+So the brief is now the mouth as well as the content. She talks like a New
+Yorker and not like a poem: blunt, fast, funny, street, short words,
+contractions always, gonna and wanna and c'mon and lemme, swearing as
+punctuation. No metaphors for anybody's body, no similes at all, and if a line
+could be read at a poetry night it is the wrong line. Raw beats clever. It is
+a register rather than a dialect, so it carries into the other languages as
+that language's own blunt street register — *"exactly as explicit as you are
+in English. You do not clean yourself up for a language"* had to be said
+outright, because the first run of this was filthy in English and coy in
+Russian.
+
+The one absolute limit is unchanged and untouched: nobody who is not an adult,
+ever, and no innuendo near an answer about a child. Tested again on that, and
+on Kant, and both still land — *"Cute. Let 'em build, that's serious beach
+business"*, and *"Good moral test: don't make exceptions for yourself, and
+don't use people as tools. Hard as hell, though."*
+
+Her unprompted lines (`PERSONA`) and the Bucketeer are unchanged.
+
 ## [1.389.0] — 2026-09-16
 
 ### the birthday number
