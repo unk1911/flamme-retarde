@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.6.2"
+VERSION = "1.6.3"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -432,9 +432,23 @@ TALK_HEARD_CHARS = int(CFG.get("BAYE_TALK_HEARD_CHARS", "300"))
 # is the runaway guard behind it, cut at a sentence end by `cap_words`.
 TALK_WORDS = int(CFG.get("BAYE_TALK_WORDS", "32"))
 # How many past exchanges she is reminded of, and how long a conversation is a
-# conversation. Fifteen minutes of silence and you are somebody new again.
-TALK_KEEP = int(CFG.get("BAYE_TALK_KEEP", "5"))
-TALK_TTL = float(CFG.get("BAYE_TALK_TTL", "900"))
+# conversation.
+#
+# Was 5 and fifteen minutes. Misha, 16 Sep 2026: *"make the window longer.. 5
+# exchanges is too small"*, and he is right — five turns is about ninety seconds
+# of talking, so anything you told her at the start of a conversation was gone
+# by the middle of it. Twenty-four pairs and three quarters of an hour.
+#
+# WHAT IT COSTS, because it is the prompt and the prompt is the bill. Each pair
+# is BOUNDED — what they said by `TALK_HEARD_CHARS`, what she answered by
+# `cap_words` and `MAX_CHARS` — so the worst case here is twenty-four pairs of
+# 300 and 200 characters, about three thousand tokens, against a system prompt
+# and world block of nine hundred. A real conversation is a fraction of that: a
+# spoken sentence is fifteen words and her answers are capped at thirty-two. The
+# guardrail over `TALK_LIMIT` is unchanged by this and still true — the page
+# cannot put anything in here, because what goes in came out of `HEARD`.
+TALK_KEEP = int(CFG.get("BAYE_TALK_KEEP", "24"))
+TALK_TTL = float(CFG.get("BAYE_TALK_TTL", "2700"))
 # Metres: inside this, anything said is to her, question or not. The page
 # decides this first (it has the distance) and says why in the ears panel;
 # this is the same rule enforced where the money is.

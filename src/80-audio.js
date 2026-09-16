@@ -22,6 +22,8 @@ function buildAudio() {
   // that node is overwritten a sixtieth of a second later — and the bed is only
   // a third of the mix anyway. It hangs off the master instead; see `start`.
   let voiceEl = null, voiceGain = null, voiceDuck = null;
+  // A tap on her voice, for her lips. See `voiceLevel`.
+  let voiceAnl = null, voiceWave = null;
   let outBus = null, outLp = null;
   // The birds sitting still in the trees behind the resort. Their own stage of
   // the wall, because a wall is not one number — see PERCH.
@@ -4915,6 +4917,13 @@ function buildAudio() {
       // lowpass, which is on the master, and a muffled voice is not the thing
       // anybody was asking for when they put their head under.
       ctx.createMediaElementSource(voiceEl).connect(voiceGain).connect(subG);
+      // A BRANCH off her, not a link in the chain: an analyser passes its
+      // input through untouched, but hanging it off to one side and leaving
+      // its output unconnected means nothing about the sound can change if
+      // this ever stops being read.
+      voiceAnl = ctx.createAnalyser();
+      voiceAnl.fftSize = 1024;
+      voiceGain.connect(voiceAnl);
     }
     voiceGain.gain.value = vol;
     // Both spellings: `preservesPitch` is the standard and `mozPreservesPitch`
@@ -4944,6 +4953,35 @@ function buildAudio() {
       voiceEl.onerror = () => end(false);
       voiceEl.play().catch(() => end(false));
     });
+  }
+
+  // ── how open her mouth is, right now ────────────────────────────────────────
+  /**
+   * Misha, 16 Sep 2026: *"when she talks, is it possible to have her lips move
+   * a little bit so it's obvious that she is talking/saying something?"*
+   *
+   * Off the SOUND rather than off a timer, which is the whole of why this is
+   * here and not a sine wave in 43-jadrija.js. Her lines are an mp3 that came
+   * back from a voice service ninety milliseconds ago; nothing in the page
+   * knows where the syllables are in it, and a mouth flapping on a clock next
+   * to a voice that is between words is worse than a mouth that does not move.
+   * The envelope of the thing actually coming out of the speaker IS where the
+   * syllables are.
+   *
+   * Answers 0 to 1, and it is already the number a jaw wants: the floor takes
+   * out the room tone between words, and `drive` is what turns a speaking RMS
+   * into an open mouth. Zero whenever nothing is playing, so a caller can read
+   * it every frame and not ask first.
+   */
+  const MOUTH = { floor: 0.010, drive: 6.5 };
+  function voiceLevel() {
+    if (!voiceAnl || !voiceEl || voiceEl.paused || voiceEl.ended) return 0;
+    const n = voiceAnl.fftSize;
+    if (!voiceWave || voiceWave.length !== n) voiceWave = new Float32Array(n);
+    voiceAnl.getFloatTimeDomainData(voiceWave);
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += voiceWave[i] * voiceWave[i];
+    return clamp((Math.sqrt(sum / n) - MOUTH.floor) * MOUTH.drive, 0, 1);
   }
 
   /**
@@ -6612,7 +6650,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

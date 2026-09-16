@@ -32411,6 +32411,10 @@ async function buildJadrija(scene) {
     // the ones who did had no water left to fight the fire with afterwards.
     // Fifty litres is an eighth of the pack, which is a price worth paying
     // twice.
+    // How far her jaw comes down on the loudest part of a spoken line — a
+    // quarter of the drop the hose gets. See `voiceLevel` and the note where
+    // this is used: the ask was "a little bit".
+    talkOpen: 0.26,
     soakFor: 5.5,
     // And a second and a half of it inside the kabina. See the note on the
     // meter itself: in there the water is not buying a set piece, it is asking
@@ -34031,7 +34035,52 @@ async function buildJadrija(scene) {
       show.fill = clamp(show.fill
         + (into ? dt / SHOW.gulp : -dt / SHOW.spit), 0, 1);
       if (f.face) {
-        f.face.gape = show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill);
+        // AND HER LIPS, WHEN SHE IS TALKING. Misha, 16 Sep 2026: *"when she
+        // talks, is it possible to have her lips move a little bit so it's
+        // obvious that she is talking/saying something?"*
+        //
+        // The jaw is already here — it is what she opens her mouth with for
+        // the water, four lines down — so this is not a new mechanism, it is
+        // a second thing driving the same one. It rides the ENVELOPE of the
+        // line actually coming out of the speaker (`voiceLevel` in
+        // 80-audio.js) rather than a timer, because nothing in the page knows
+        // where the syllables are in an mp3 that arrived a moment ago, and
+        // lips flapping on a clock through a pause between words read worse
+        // than lips that never moved. `saying` is whose line it is: the voice
+        // channel is shared with the cat and the bathers, and she should not
+        // mouth their words from across the beach.
+        //
+        // A QUARTER, and not a full jaw drop. The water gape is a mouth held
+        // open to drink out of a hose; talking is millimetres, and the whole
+        // ask was "a little bit". Whichever of the two is bigger wins, so a
+        // woman being hosed while she talks does the hose.
+        const mine = typeof voice !== 'undefined' && voice.saying
+          && voice.saying() === 'baye';
+        let talk = 0;
+        if (mine) {
+          const lvl = audio && audio.voiceLevel ? audio.voiceLevel() : 0;
+          show.lipT = (show.lipT || 0) + dt;
+          show.lipPeak = Math.max(show.lipPeak || 0, lvl);
+          // AND A MOUTH THAT MOVES EVEN WHERE THE METER READS NOTHING. The
+          // envelope comes off an `<audio>` element through a media-element
+          // source, and that is the one part of this chain that a browser is
+          // allowed to refuse: headless Chrome resolves her whole line as a
+          // playback error, and a page with no output device would do the
+          // same. So the meter gets a third of a second to show anything at
+          // all, and if it does not, the rest of the line is carried by a
+          // syllable envelope instead — two beats crossed, which is a jaw
+          // moving at speech rate rather than a flap on one sine.
+          //
+          // It is a FALLBACK and not the plan: whenever the meter works, it
+          // wins, because only it knows where the pauses are.
+          const dumb = show.lipPeak < 0.02 && show.lipT > 0.35
+            ? Math.max(0, 0.55 + 0.45 * Math.sin(show.lipT * 17.0)
+              * Math.sin(show.lipT * 6.3))
+            : 0;
+          talk = Math.max(lvl, dumb) * SHOW.talkOpen;
+        } else if (show.lipT) { show.lipT = 0; show.lipPeak = 0; }
+        f.face.gape = Math.max(talk,
+          show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
         // Both gated on `gape` rather than on `fill` alone, so everything in
         // her mouth leaves with her mouth. A closed mouth with foam painted on
         // the inside of it is a closed mouth with a white line across it.

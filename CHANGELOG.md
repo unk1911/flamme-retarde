@@ -8,6 +8,60 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.393.0] — 2026-09-16
+
+### her lips move when she talks
+
+**"when she talks, is it possible to have her lips move a little bit so it's
+obvious that she is talking/saying something?"**. Yes, and it cost almost
+nothing, because the jaw was already there: `uGape` in src/41-skin.js is what
+she opens her mouth with for the hose, displaced in the bind pose like the
+smile — see the note over `faceAnchors`, which found the hinge of it at load
+time and called it `lipC` on the way past. This is a second thing driving the
+same one.
+
+It rides the ENVELOPE of the line actually coming out of the speaker. A new
+analyser branches off her voice gain and `voiceLevel` answers how loud she is
+this instant, 0 to 1, floored so the gaps between words are gaps. A timer would
+have been wrong: nothing in the page knows where the syllables are in an mp3
+that came back from a voice service ninety milliseconds ago, and lips flapping
+through a pause read worse than lips that never moved.
+
+`voice.saying()` says whose line is in the air, because that channel is shared
+with the cat, the bathers and the Bucketeer and she should not mouth their words
+from across the beach. A quarter of the hose's jaw drop, because the ask was "a
+little bit", and the larger of the two wins so a woman hosed mid-sentence does
+the hose.
+
+AND A FALLBACK, which the headless test is what found. The envelope comes off an
+`<audio>` element through a media-element source, and that is the one part of
+the chain a browser may refuse: headless Chrome resolves her whole line as a
+playback error, so the meter reads zero there and would have read zero on any
+page with no output device. The meter gets a third of a second to show
+something; if it does not, a syllable envelope carries the rest of the line.
+Whenever the meter works it wins, because only it knows where the pauses are.
+
+Not driven end to end: her speaking needs the voice service and a session, and
+the element will not play headless at all. The jaw, the level meter and the
+speaker test are each verified on their own, and the last link is four lines.
+
+## [baye 1.6.3] — 2026-09-16 — server only
+
+### a longer memory
+
+**"make the window longer.. 5 exchanges is too small"**. Five turns is about
+ninety seconds of talking, so anything told her at the start of a conversation
+was gone by the middle of it. `TALK_KEEP` is 24 and `TALK_TTL` is three
+quarters of an hour.
+
+What it costs is the prompt, and every pair in it is bounded — what they said by
+`TALK_HEARD_CHARS`, what she answered by `cap_words` — so the ceiling is about
+three thousand tokens against a system prompt and world block of nine hundred.
+Measured on a ten-turn conversation: 1980 prompt tokens, and she was asked at
+the end what the dog was called and what he drinks, nine turns after being told
+— *"Your dog's Doge, and you drink rakija. Don't get so toasted you forget your
+own damn name."*
+
 ## [1.392.0] — 2026-09-16
 
 ### four things he found by playing it

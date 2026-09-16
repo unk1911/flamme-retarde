@@ -300,6 +300,22 @@ const voice = (() => {
    */
   const at = (fn, dflt = null) => { try { const v = fn(); return v == null ? dflt : v; } catch { return dflt; } };
 
+  /**
+   * Play a line, and remember WHOSE it is while it is in the air.
+   *
+   * `audio.voice` is one channel shared by her, the cat, the bathers and the
+   * Bucketeer, so a level meter on it says only that somebody is talking. Her
+   * lips — `voiceLevel` in 80-audio.js, read by `stepShow` in 43-jadrija.js —
+   * have to know it is her, or the shore Baye mouths the cat's lines from
+   * thirty metres away.
+   */
+  let sayingKey = null;
+  async function play(key, d) {
+    sayingKey = key;
+    try { return await audio.voice(d.audio, 2.1, d.rate || 1); }
+    finally { if (sayingKey === key) sayingKey = null; }
+  }
+
   /** Where you actually are, in the world's metres — feet first, eye second. */
   function here() {
     const p = at(() => (ground && ground.active && ground.you) ? ground.you : null);
@@ -490,7 +506,7 @@ const voice = (() => {
       // `d.rate` is the server's, and it is 1 for everybody but the two
       // children — see `voice_for` in server/baye/baye.py and the note over
       // `voice` in 80-audio.js.
-      await audio.voice(d.audio, 2.1, d.rate || 1);
+      await play(sp.key, d);
       // They have stopped. NOW the subtitle gets its few seconds and goes.
       capT = sp.cfg.hold;
     } catch (e) {
@@ -727,7 +743,7 @@ const voice = (() => {
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
       caption(d.text, null);
-      await audio.voice(d.audio, 2.1, d.rate || 1);
+      await play(sp.key, d);
       capT = sp.cfg.hold;
       return 'said: ' + d.text;
     } catch (e) {
@@ -880,7 +896,7 @@ const voice = (() => {
       // it was.
       if (!buck) sp.nextAt = Math.max(sp.nextAt, clock + sp.cfg.gap);
       caption(d.text, null);
-      const played = audio.voice(d.audio, 2.1, d.rate || 1);
+      const played = play(sp.key, d);
       const res = out('reply', name + ' · ' + m.toFixed(1) + ' m: “' + d.text + '”  '
         + wait + ' ms (model ' + d.model_ms + ', voice ' + d.tts_ms + ')',
       { text: d.text, ms: wait, who });
@@ -902,6 +918,8 @@ const voice = (() => {
     toggle,
     answer,
     converse,
+    /** Whose line is in the air right now, or null — see `play`. */
+    saying: () => sayingKey,
     /** For a probe: exactly the state `/talk` would be sent right now, for
      *  the Bucketeer (`true`) or shore Baye. */
     talkState: (buck) => talkState(!!buck),
