@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.394.0] — 2026-09-16
+
+### being walked into gets the whole take too
+
+**"so when i bump into her, the audio clip plays, but again for just 1.5s or
+so... can we focus on fixing this"**. That one was my own design and the
+reasoning behind it was mine rather than his: 1.391.0 gave the kabina the full
+recording and left being walked into on the one-second cuts, on the argument
+that a shove is over in a second. He recorded twenty-two seconds and wants
+twenty-two seconds. It is the long take now.
+
+And the second half of it, which would have bitten as soon as the clip got
+long: `showNoise` waits before it plays — the noise comes after the thing that
+caused it, not on the same frame — so the "do not interrupt one already
+running" test was made BEFORE that wait and not again after it. Two contacts a
+tenth of a second apart both passed it, and the second cut the first off a
+tenth of a second in. The collider only fires on the first frame of a touch,
+but walking into somebody breaks and remakes contact constantly. It is tested
+on both sides of the wait now, and the wait itself is 70 ms for a shove rather
+than the water's 190: she is answering a push, not a jet landing on her.
+
+Driven: six bumps inside 720 ms start exactly ONE clip, and it is still
+playing eighteen seconds later.
+
 ## [1.393.0] — 2026-09-16
 
 ### her lips move when she talks

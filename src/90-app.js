@@ -8000,6 +8000,12 @@ window.__fr = {
      * frames a second cannot finish at all.
      */
     put: (...a) => jadrija.putShow(...a),
+    /**
+     * Walk into her, without walking. This is the collider's own hook — see
+     * `bumpReact` — so it is the same call the ground makes on the first
+     * frame of contact, and the only way a probe can test being shoved.
+     */
+    bump: (kind = 'baye', idx = 0, t = 0, s = 0) => jadrija.bump(kind, idx, t, s),
     /** Hold the jet on her without a jet — see `douse` in 43-jadrija.js. */
     douse: (v) => jadrija.douse(v),
     /** The special kabina, in the resort's own frame — where `put` has to put

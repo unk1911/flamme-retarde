@@ -33116,15 +33116,23 @@ async function buildJadrija(scene) {
    * inside that shape, and it comes in a fifth of a second later, because a
    * person does not vocalise on the same sample as the thing that made them.
    */
-  function showNoise(set, d, keep) {
+  function showNoise(set, d, keep, delay = 190) {
     if (!audio || !audio.noises || state.phase === 'intro') return;
     const g = clamp(1.15 - d / 30, 0, 1);
     if (g <= 0.05) return;
-    // `keep` means do not interrupt one already running, which is what the
-    // recline wants: she is already making the noise the kneel started and
-    // going onto her back is the same reaction continuing, not a new one.
+    // `keep` means do not interrupt one already running, which is what both
+    // callers want and for the same reason: the recline is the reaction the
+    // kneel started, carrying on, and walking into her twice is not two
+    // separate things to say. TESTED TWICE, because the delay below makes it a
+    // race — two contacts a tenth of a second apart would both pass a check
+    // made here, and the second would cut the first off at a tenth of a
+    // second. That is what "it plays for 1.5s" is when it is not the clip
+    // length: it is the take being started again over itself.
     if (keep && audio.noiseNow && audio.noiseNow()) return;
-    setTimeout(() => audio.noises(set, g), 190);
+    setTimeout(() => {
+      if (keep && audio.noiseNow && audio.noiseNow()) return;
+      audio.noises(set, g);
+    }, delay);
   }
 
   /** Which of her phases the long take belongs to: she is down and wet. */
@@ -35800,7 +35808,15 @@ async function buildJadrija(scene) {
       // far side of those gates is a noise that does not happen in the room
       // where he was testing it. Walking into her is walking into her, and
       // `noises` has its own cooldown for the case of leaning on her.
-      showNoise('bump', 0);
+      // THE WHOLE TAKE, and not one of the cuts. Misha, 16 Sep 2026: *"when i
+      // bump into her, the audio clip plays, but again for just 1.5s or so"*.
+      // That one was by my own design — being walked into got the one-second
+      // cuts on the reasoning that a shove is over in a second — and the
+      // reasoning was mine and not his. He recorded twenty-two seconds and
+      // wants twenty-two seconds. `keep` is what stops the next contact
+      // cutting it off, and the delay comes down from 190 ms to 70: she is
+      // answering a shove, not water landing on her.
+      showNoise('bumplong', 0, true, 70);
       return true;
     }
     if (kind !== 'bather') return false;
