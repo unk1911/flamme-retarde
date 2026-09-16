@@ -790,6 +790,7 @@ const voice = (() => {
         o.flies = Z.count();
         o.flies_bare = Z.bare().filter(Boolean).length;
         o.flies_dancing = Z.dancing();
+        o.flies_bday = Z.partying();
       }
     }
     return o;

@@ -3072,13 +3072,15 @@ let pourBack = 0;
  * frame loop and drawn in the corner by the render above.
  */
 let flyCamT = -1;
-/** Which shot the fly cam is showing: `drop` or `dance`. */
+/** Which shot the fly cam is showing: `drop`, `dance` or `birthday`. */
 let flyCamMode = 'drop';
 /** Held by `__fr.ears.flyCam(t)`, for a scrub — the same switch as `swatHold`. */
 let flyCamHold = false;
+/** Debug only: draw the fly cam over the whole frame. See `__fr.ears.flyCam`. */
+let flyCamBig = false;
 function startFlyCam(mode = 'drop') {
   if (!jadrija || !jadrija.vik) return false;
-  flyCamMode = mode === 'dance' ? 'dance' : 'drop';
+  flyCamMode = mode === 'dance' || mode === 'birthday' ? mode : 'drop';
   flyCamT = 0;
   flyCamHold = false;
   const el = $('flycam');
@@ -6614,8 +6616,9 @@ function frame() {
   if (pourCut) stepPour(real);
   if (flyCamT >= 0) {
     if (!flyCamHold) flyCamT += real;
-    const camLen = flyCamMode === 'dance' ? jadrija.vik.fly.shot().danceLen()
-      : jadrija.vik.fly.shot().dropLen();
+    const S = jadrija.vik.fly.shot();
+    const camLen = flyCamMode === 'dance' ? S.danceLen()
+      : flyCamMode === 'birthday' ? S.birthdayLen() : S.dropLen();
     if (flyCamT >= camLen || swatCut || pourCut) {
       flyCamT = -1;
       const el = $('flycam');
@@ -7286,8 +7289,9 @@ function frame() {
     // The fly cam, in the corner: "drop your buckets!" — see `dropShot`.
     const shot = jadrija.vik.fly.shot();
     if (flyCamMode === 'dance') shot.danceShot(flyCamT);
+    else if (flyCamMode === 'birthday') shot.birthdayShot(flyCamT);
     else shot.dropShot(flyCamT);
-    shot.render(renderer, 'pip');
+    shot.render(renderer, flyCamBig ? false : 'pip');
   } else if (camOverride && jadrija && jadrija.zombies && jadrija.zombies.count() > 0
     && (pourCut || pourInsertT >= 0)) {
     // And the movement, in front of the lens, pouring with her. An OVERLAY and
@@ -8768,7 +8772,15 @@ window.__fr = {
     stats: () => ears.stats(),
     toggle: () => ears.toggle(),
     act: (name, lang) => ears.act(name, lang),
-    flyCam: (t, mode = 'drop') => {
+    /**
+     * `flyCam(t, mode)` holds the corner shot at `t` for a screenshot, and
+     * `big` draws it over the whole frame instead of in its corner — which is
+     * a debug switch and nothing else. A 460 pixel picture is the right size
+     * to answer a question in while you play and the wrong size to check a
+     * twelve second routine in, and the birthday number was framed in it.
+     */
+    flyCam: (t, mode = 'drop', big = false) => {
+      flyCamBig = !!big;
       if (t == null) { flyCamHold = false; return flyCamT; }
       startFlyCam(mode); flyCamT = t; flyCamHold = true; return flyCamT;
     },
@@ -8776,6 +8788,35 @@ window.__fr = {
   zombie: {
     drop: () => (jadrija && jadrija.zombies ? jadrija.zombies.drop() : null),
     dance: () => (jadrija && jadrija.zombies ? jadrija.zombies.dance() : null),
+    birthday: () => (jadrija && jadrija.zombies ? jadrija.zombies.birthday() : null),
+    /** What the close-up measured off the animal, in mm — see `metrics`. */
+    metrics: () => (jadrija && jadrija.vik ? jadrija.vik.fly.shot().metrics() : null),
+    /**
+     * Run the birthday number past the lens without drawing it and report
+     * the worst thing it does: how far a pail goes through the tile, and
+     * where. A twelve second routine with two buckets swinging off a moving
+     * animal cannot be checked by looking at eight frames of it.
+     */
+    bdaySweep: (step = 0.02) => {
+      if (!jadrija || !jadrija.vik) return null;
+      const S = jadrija.vik.fly.shot();
+      let worst = 99, at = 0, near = 99, nearAt = 0;
+      for (let t = 0; t < S.birthdayLen(); t += step) {
+        S.birthdayShot(t);
+        for (const p of S.pailAt()) {
+          if (p[1] < worst) { worst = p[1]; at = t; }
+          // And into the cake, which stands at the origin: 1.29 mm of radius
+          // and 2.7 mm of it including the candle.
+          if (p[1] < 2.7) {
+            const d = Math.hypot(p[0], p[2]) - 1.29;
+            if (d < near) { near = d; nearAt = t; }
+          }
+        }
+      }
+      S.reset();
+      return { lowestPail: +worst.toFixed(3), at: +at.toFixed(2),
+        pailToCake: +near.toFixed(3), cakeAt: +nearAt.toFixed(2) };
+    },
     stats: () => (jadrija && jadrija.zombies ? jadrija.zombies.stats() : null),
     spawn: (x, y, z) => (jadrija && jadrija.zombies ? jadrija.zombies.spawn(x, y, z) : null),
     /** Everybody hum now; the answer is how many phrases the voice has started. */
@@ -8785,6 +8826,8 @@ window.__fr = {
       return audio && audio.zombieHum ? audio.zombieHum(0, { probe: true }) : null;
     },
     heard: () => (audio && audio.zombieHum ? audio.zombieHum(0, { probe: true }) : null),
+    /** How many birthday tunes the voice has started. See `zombieSong`. */
+    sang: () => (audio && audio.zombieSong ? audio.zombieSong(0, { probe: true }) : null),
   },
   pour: {
     frame: (t = 0) => {

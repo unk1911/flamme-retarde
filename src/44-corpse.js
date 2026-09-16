@@ -262,10 +262,11 @@ function corpseMaterial(color, opts = {}) {
       // full-screen frame and drew it black.
       uVp: CORPSE_VP,
       // Where the body is, for the tile's own contact shadow — see the floor
-      // case below.
+      // case below. Four down the animal, two for its buckets, and the seventh
+      // is whatever else is standing on the tile: the cake, on a birthday.
       uBlob: opts.blob || { value: [new THREE.Vector3(), new THREE.Vector3(),
         new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(),
-        new THREE.Vector3()] },
+        new THREE.Vector3(), new THREE.Vector3()] },
     },
     transparent: !!opts.transparent,
     depthWrite: opts.depthWrite !== false,
@@ -303,7 +304,7 @@ uniform vec3 uRadii;
 uniform vec2 uSpan;
 uniform float uFacets;
 uniform mat3 uRot;
-uniform vec3 uBlob[6];
+uniform vec3 uBlob[7];
 
 ${CORPSE_LIGHT}
 ${CORPSE_HEX}
@@ -334,6 +335,9 @@ void main(){
   float spec = uSpec;
   float power = uPow;
   float alpha = uAlpha;
+  // 1 for a surface that makes its own light and is not to be lit by the rig —
+  // the candle flame, and nothing else in this scene.
+  float emis = 0.0;
 
   if (uPat > 0.5 && uPat < 1.5) {
     // ── the compound eye ────────────────────────────────────────────────────
@@ -453,7 +457,7 @@ void main(){
     // the difference between a membrane and a piece of cellophane.
     float fringe = smoothstep(0.86, 1.0, -w) * step(0.05, u);
     alpha = mix(alpha, alpha * (0.35 + 0.65 * step(0.5, grain(vec2(u * 260.0, 0.5)))), fringe);
-  } else if (uPat > 4.5) {
+  } else if (uPat > 4.5 && uPat < 5.5) {
     // ── the tile it is lying on ─────────────────────────────────────────────
     // A glazed ceramic floor tile at four hundred pixels a millimetre, which is
     // a slightly cloudy white with a fine sparkle in the glaze and whatever has
@@ -474,22 +478,41 @@ void main(){
     // wing. Without it the fly hovers, which is the one thing a corpse must not
     // do.
     float sh = 0.0;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
       float r = uBlob[i].z;
       if (r <= 0.0) continue;
       float d = length(vP.xz - uBlob[i].xy) / r;
       sh = max(sh, 1.0 - smoothstep(0.35, 1.0, d));
     }
     base *= 1.0 - 0.62 * sh;
+  } else if (uPat > 5.5) {
+    // ── the candle flame ────────────────────────────────────────────────────
+    // A flame is not a lit surface, it is the light: no shading rig touches it
+    // (uEmis below), and everything that makes it read as fire is written
+    // here. uSpan.x is its height in metres, so the gradient is in fractions
+    // of whatever size the flame has been scaled to this frame.
+    float u = clamp(vL.y / uSpan.x, 0.0, 1.0);
+    // Up the flame: a near-white yellow at the wick going orange, then deep
+    // orange at the tip. uBase is the hot end and uAlt the cold one.
+    base = mix(uBase, uAlt, smoothstep(0.08, 0.92, u));
+    // A flame is brightest at its middle and thins to nothing at its edge, so
+    // it goes both darker and more transparent toward the silhouette — which
+    // is where the normal turns away from the lens.
+    float f = abs(dot(n, v));
+    base *= (1.30 - 0.50 * u) * (0.55 + 0.45 * f);
+    // And out at the top, where a candle flame is smoke more than fire.
+    alpha = uAlpha * (0.26 + 0.74 * f) * (1.0 - smoothstep(0.62, 1.0, u));
+    emis = 1.0;
   }
 
-  vec3 col = base * lightAt(n, v, spec, power) + glossAt(n, v, spec, power);
+  vec3 col = mix(base * lightAt(n, v, spec, power) + glossAt(n, v, spec, power),
+    base, emis);
   // Depth, by the only means a 3 cm scene has: everything past the animal goes
   // down. A real macro lens would do this with a millimetre of depth of field
   // and this shot has none, so the tile is darkened with distance instead —
   // which is what the eye reads off a shallow frame anyway.
   float far = length(vP - cameraPosition);
-  col *= 1.0 - 0.45 * smoothstep(0.050, 0.200, far);
+  col *= 1.0 - 0.45 * (1.0 - emis) * smoothstep(0.050, 0.200, far);
   // And the frame: a soft vignette, and the fade the cut ends on.
   vec2 uv = (gl_FragCoord.xy - uVp) / max(uRes, vec2(1.0));
   float vig = 1.0 - 0.55 * pow(length((uv - 0.5) * vec2(1.15, 1.0)) * 1.42, 2.4);
@@ -688,8 +711,116 @@ const DANCE = {
   cam: [0.10, 0.30, -0.35],
 };
 
+/**
+ * The birthday number. Misha, 16 Sep 2026: *"today is my Liege's birthday. i
+ * wanna be able to ask the zombie fly to do a special dance/performance in
+ * honour of My Liege"*.
+ *
+ * It is a PERFORMANCE and not a dance: the fly flies in carrying a cake with a
+ * lit candle on it, sets it down, dances round it for the length of the tune
+ * the movement hums (`zombieSong` in src/80-audio.js — the birthday one, and
+ * the only time any of them sings anything but hers), blows the candle out on
+ * the last phrase, and bows to camera in the smoke.
+ *
+ * Twelve and a half seconds, and every beat of it is a pure function of `t`
+ * like every other shot in this file, so it can be scrubbed a frame at a time
+ * by `__fr.ears.flyCam(t, 'birthday')`.
+ *
+ *   carry    in from stage left with the cake in its front legs
+ *   set      down on the tile, and it backs off and presents it
+ *   lap      once round the cake, banking, buckets flung out
+ *   line     facing camera behind the cake, legs kicking on the beat
+ *   twirl    both buckets right over the top, twice
+ *   rise     spiralling up over the flame, turning
+ *   blow     nose down, wings hard, and the flame leans, gutters and goes
+ *   bow      down in front of the cake, arms out, a bow held in the smoke
+ */
+const BDAY = {
+  len: 12.9,
+  carry: [0.00, 1.55],
+  set: [1.55, 0.85],
+  lap: [2.40, 2.40],
+  line: [4.80, 1.50],
+  twirl: [6.30, 1.50],
+  rise: [7.80, 2.15],
+  blow: [9.95, 1.15],
+  smoke: [11.05, 1.85],
+  bow: [11.10, 1.80],
+  // The tune starts on `lap` and the last note lands on the bow — see
+  // ZSONG.beat in src/80-audio.js, which is the same 0.36 s.
+  bpm: 167,
+  orbit: 3.6,                // mm — how wide it goes round the cake
+  close: 2.9,                // mm — and how close it gets, over the candle
+  // HEIGHTS, millimetres over the tile, and the whole shape of this routine
+  // comes out of two MEASURED numbers rather than a guess — `metrics` on this
+  // shot prints them. The middle pair reaches carryDrop = 4.52 mm down for
+  // the bails, and a pail hangs 3.70 mm under the bail it hangs from. So a
+  // bucket swung `a` radians off straight down has its base at
+  //
+  //     body − 4.52 − 3.70 cos a
+  //
+  // and a fly with them simply hanging cannot come below 8.2 mm. The cake is
+  // 2.7 mm tall. The first cut of this danced a body's length over the cake
+  // and made no sense; the fix is the swing — every height below is paired
+  // with an `…Out` angle that keeps the pair off the tile at it, and the fly
+  // works right down beside the thing with its hands visibly full.
+  into: 9.5,                 // it comes in at the hanging height
+  down: 3.0,                 // and gets this low to put the cake down
+  ring: 4.4,                 // the dance, round the cake
+  leap: 9.8,                 // the twirl, which needs the hanging height
+  top: 11.0,                 // the top of the spiral
+  puff: 3.6,                 // where it blows from, just over the flame
+  bowY: 3.2,                 // and the bow, down on the tile
+  hold: 3.6,                 // how far off its nose the cake rides
+  // Where the pair is swung, per beat: hands full, dancing, up at the top of
+  // the spiral where it can afford to let them hang, blowing, and the bow.
+  // And which way it comes at the candle: a shade over a radian round from
+  // upstage, because blowing it out from directly behind put the fly's own
+  // head between the lens and the flame for the whole of the wish.
+  blowAt: -1.15,
+  swingOut: 2.10,
+  danceOut: 1.95,
+  highOut: 1.30,
+  blowOut: 2.20,
+  salute: 2.75,
+  // THE CAMERA, as keys: [t, metres out, radians up, radians round, what it
+  // is aimed at in mm]. Every other shot in this file is one move on a curve,
+  // and this one cannot be: it has to be tight on a 2 mm cake for the dance
+  // and wide enough for an 11 mm spiral four seconds later, and a single lerp
+  // between those two is loose for the first half and short for the second.
+  // It also arcs half a radian round over the whole number, which is the one
+  // thing in this file that moves for no reason but showmanship.
+  key: [
+    [0.00, 0.086, 0.30, 0.62, 4.4],
+    [2.40, 0.076, 0.26, 0.52, 3.6],
+    [6.30, 0.082, 0.28, 0.42, 4.2],
+    [8.60, 0.102, 0.34, 0.28, 6.6],
+    [11.10, 0.090, 0.26, 0.16, 4.6],
+    [12.90, 0.082, 0.24, 0.10, 3.4],
+  ],
+};
+
+/**
+ * And the cake, which is 1.8 mm across. A fly is 6.5 mm long, so this is the
+ * cake a fly would need two of its legs to carry — which is what it does.
+ */
+const CAKE = {
+  r: 1.15, h: 0.80,
+  icing: 0.14,               // mm proud of the sponge, all round
+  wax: [0.085, 1.20],        // the candle: radius, height
+  flame: [0.160, 0.54],
+  smoke: 0.24,               // and the puffs it leaves
+};
+
 const smooth01 = (x) => { const u = sat(x); return u * u * (3 - 2 * u); };
 const hash1 = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
+/** Between two bearings the short way round, which a lerp of two angles is not. */
+const mixAng = (a, b, k) => {
+  let d = b - a;
+  while (d > Math.PI) d -= TAU;
+  while (d < -Math.PI) d += TAU;
+  return a + d * k;
+};
 
 /**
  * Every joint on one animal, found by name — so it works on the corpse and on
@@ -855,6 +986,113 @@ function miniBucket(stage, MB) {
   };
 }
 
+/**
+ * The cake, the candle on it and the smoke off the candle — everything the
+ * birthday number needs that is not the animal or its buckets. Built once with
+ * the stage and hidden until somebody has a birthday.
+ *
+ * The flame is the only thing in this scene that is not lit by the scene: see
+ * `uPat > 5.5` in `corpseMaterial`. Its flicker is here rather than in the
+ * shader because it has to be a pure function of the shot's own `t` — a
+ * shader that flickered on wall time would flicker while the shot was held
+ * still for a frame grab.
+ */
+function birthdayCake(stage, fade, res) {
+  const C = CAKE;
+  const M = {
+    sponge: corpseMaterial([0.420, 0.268, 0.148], { spec: 0.16, power: 18, fade, res }),
+    icing: corpseMaterial([0.935, 0.880, 0.855], { spec: 0.55, power: 55, fade, res }),
+    wax: corpseMaterial([0.950, 0.925, 0.870], { spec: 0.35, power: 34, fade, res }),
+    wick: corpseMaterial([0.115, 0.100, 0.090], { spec: 0.15, power: 14, fade, res }),
+    flame: corpseMaterial([1.000, 0.870, 0.440], { pat: 6, alt: [1.000, 0.330, 0.060],
+      span: [mm(C.flame[1]), 1], transparent: true, depthWrite: false,
+      side: THREE.DoubleSide, fade, res }),
+    smoke: corpseMaterial([0.560, 0.545, 0.530], { spec: 0.04, power: 8, alpha: 0,
+      transparent: true, depthWrite: false, fade, res }),
+  };
+  const g = new THREE.Group();
+  const add = (geo, mat, y) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = mm(y);
+    g.add(m);
+    return m;
+  };
+  add(new THREE.CylinderGeometry(mm(C.r), mm(C.r * 0.94), mm(C.h), 22), M.sponge, C.h / 2);
+  const icingH = 0.20;
+  const top = C.h + icingH / 2;
+  add(new THREE.CylinderGeometry(mm(C.r + C.icing), mm(C.r + C.icing), mm(icingH), 22),
+    M.icing, C.h);
+  const waxY = top + C.wax[1] / 2;
+  add(new THREE.CylinderGeometry(mm(C.wax[0]), mm(C.wax[0]), mm(C.wax[1]), 12),
+    M.wax, waxY);
+  const wickY = top + C.wax[1] + 0.06;
+  add(new THREE.CylinderGeometry(mm(0.022), mm(0.016), mm(0.16), 5), M.wick, wickY);
+  // The flame, in its own group so the shot can lean it, shrink it and put it
+  // out without touching where the candle is.
+  const flameG = new THREE.Group();
+  flameG.position.y = mm(wickY + 0.02);
+  const cone = new THREE.ConeGeometry(mm(C.flame[0]), mm(C.flame[1]), 12, 1, true);
+  cone.translate(0, mm(C.flame[1] / 2), 0);
+  flameG.add(new THREE.Mesh(cone, M.flame));
+  g.add(flameG);
+  // And the wisp it leaves. Three puffs, rising and spreading.
+  const puffs = [];
+  for (let i = 0; i < 3; i++) {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(mm(C.smoke), 8, 6), M.smoke);
+    p.visible = false;
+    g.add(p);
+    puffs.push(p);
+  }
+  g.visible = false;
+  stage.add(g);
+  return {
+    group: g,
+    /** mm from the cake's foot to the top of the wick — where the flame sits. */
+    wick: wickY,
+    /**
+     * The flame: `k` is how much of it is left, 1 to 0, `lean` radians it is
+     * pushed over by whatever is beating its wings at it, and `t` the shot's
+     * clock, which is all the flicker is a function of.
+     */
+    setFlame(k, lean, t, dir = 0) {
+      const on = k > 0.01;
+      flameG.visible = on;
+      if (!on) return;
+      // WHICH WAY IT LEANS, and it has to be said rather than left to the z
+      // axis: a flame pushed straight at the lens or straight away from it is
+      // a flame that does not visibly move, and the first cut of this blew
+      // one over by fifty degrees without a frame of it reading. `dir` is the
+      // bearing it leans toward, and the yaw under the lean puts it there —
+      // see the rotation order, which makes this Ry(φ)·Rz(lean).
+      flameG.rotation.order = 'YXZ';
+      // A candle flame is never still: it breathes at a few hertz and stutters
+      // faster than that, and both are bigger the harder it is being blown.
+      const gust = 1 + 3.2 * Math.abs(lean);
+      const f = 1 + gust * (0.055 * Math.sin(t * 8.3) + 0.035 * Math.sin(t * 21.7 + 1.3));
+      // Blown, a flame does not just tip over: it stretches out along the
+      // way it is going and thins across it.
+      flameG.scale.set(k * (1 - 0.14 * Math.abs(lean)) * f,
+        k * (1 + 0.38 * Math.abs(lean)) * f, k * f);
+      flameG.rotation.set(0, Math.PI - dir, lean + 0.06 * Math.sin(t * 6.1) * gust);
+      M.flame.uniforms.uAlpha.value = Math.min(1, 0.55 + 0.45 * k);
+    },
+    /** The smoke: `u` is 0 at the moment it goes out and 1 when it is gone. */
+    setSmoke(u) {
+      const on = u > 0 && u < 1;
+      M.smoke.uniforms.uAlpha.value = on ? 0.42 * Math.min(1, u * 6) * (1 - u) : 0;
+      for (let i = 0; i < puffs.length; i++) {
+        const e = sat((u - i * 0.13) / 0.87);
+        puffs[i].visible = on && e > 0;
+        puffs[i].position.set(mm(0.10 * Math.sin(e * 5.4 + i)),
+          mm(wickY + 0.30 + e * (2.6 + i * 0.7)), mm(0.07 * Math.sin(e * 3.9 + i * 2)));
+        const s = 0.45 + 1.7 * e;
+        puffs[i].scale.set(s, s * 1.15, s);
+      }
+    },
+    hide(off) { g.visible = !off; },
+  };
+}
+
 function makePair(stage, MB) {
   const b = [miniBucket(stage, MB), miniBucket(stage, MB)];
   return {
@@ -894,7 +1132,7 @@ function buildFlyCorpse() {
   const res = { value: new THREE.Vector2(1280, 720) };
   const blob = { value: [new THREE.Vector3(), new THREE.Vector3(),
     new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(),
-    new THREE.Vector3()] };
+    new THREE.Vector3(), new THREE.Vector3()] };
 
   const M = {
     chitin: corpseMaterial(CORPSE_COL.thorax, { pat: 2, spec: 0.42, power: 40,
@@ -1423,6 +1661,8 @@ function buildFlyCorpse() {
   // stage is.
   const pairs = [makePair(stage, MB)];
   const extras = [];
+  // The cake and its candle, for `birthdayShot` and nothing else.
+  const cake = birthdayCake(stage, fade, res);
   const _v = new THREE.Vector3();
   const _w = new THREE.Vector3();
   const _q = new THREE.Vector3();
@@ -1474,6 +1714,7 @@ function buildFlyCorpse() {
   function revive(r, from) {
     measure();
     floorMesh.visible = true;
+    cake.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -1692,8 +1933,9 @@ function buildFlyCorpse() {
     rig.rotation.set(Math.PI - CORPSE_ROLL, 0, 0);
     setLegs(A0, (L) => L.dead);
     for (const W of A0.wings) W.g.rotation.set(0, W.dead[0], W.dead[1]);
-    for (let i = 0; i < 6; i++) blob.value[i].copy(blobDead[i]);
+    for (let i = 0; i < blob.value.length; i++) blob.value[i].copy(blobDead[i]);
     for (const P of pairs) P.hide(true);
+    cake.hide(true);
     for (const x of extras) x.A.body.visible = false;
     floorMesh.visible = true;
     rig.updateMatrixWorld(true);
@@ -1714,6 +1956,7 @@ function buildFlyCorpse() {
   function insert(t, cut, fov, n) {
     measure();
     floorMesh.visible = false;
+    cake.hide(true);
     fade.value = 1;
     cam.fov = fov;
     cam.position.set(0, 0, 0);
@@ -1806,6 +2049,7 @@ function buildFlyCorpse() {
   function dropShot(t) {
     measure();
     floorMesh.visible = true;
+    cake.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -1888,6 +2132,7 @@ function buildFlyCorpse() {
   function danceShot(t) {
     measure();
     floorMesh.visible = true;
+    cake.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -1995,6 +2240,226 @@ function buildFlyCorpse() {
     fade.value = 1;
   }
 
+  /**
+   * The birthday number, `t` seconds in. See BDAY for the beats.
+   *
+   * Everything is staged about the CAKE, which stands at the stage's origin
+   * from the moment it is set down, and about where the lens is — the fly
+   * dances on the far side of it and faces the audience, and the flame leans
+   * away from whatever is beating its wings at it.
+   */
+  function birthdayShot(t) {
+    measure();
+    floorMesh.visible = true;
+    cake.hide(false);
+    for (const x of extras) x.A.body.visible = false;
+    for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
+    const P = pairs[0];
+    P.hide(false);
+    const D = BDAY;
+    const at = (w) => (t - w[0]) / w[1];
+    const inW = (w) => t >= w[0] && t < w[0] + w[1];
+    const beat = Math.sin(TAU * D.bpm / 60 * t);
+    // Millimetres, everywhere below, because that is the unit this animal and
+    // its cake are written in; `mm` puts them back into the stage at the end.
+    // The lens. It arcs a third of a radian over the whole number, and every
+    // bearing below is taken off where it has got to — so the fly is always
+    // the right way round to the audience and the cake is never behind it.
+    let k0 = D.key[0], k1 = D.key[D.key.length - 1];
+    for (let i = 0; i < D.key.length - 1; i++) {
+      if (t >= D.key[i][0] && t < D.key[i + 1][0]) { k0 = D.key[i]; k1 = D.key[i + 1]; }
+    }
+    if (t >= k1[0]) k0 = k1;
+    const ce = k1[0] > k0[0] ? smooth01((t - k0[0]) / (k1[0] - k0[0])) : 0;
+    const cd = lerp(k0[1], k1[1], ce);
+    const cel = lerp(k0[2], k1[2], ce);
+    const caz = lerp(k0[3], k1[3], ce);
+    const aimY = lerp(k0[4], k1[4], ce);
+    const back = caz + Math.PI;             // upstage: the far side of the cake
+    const faceCam = -caz;
+    // Facing the cake from a bearing `a` round it — which upstage IS facing
+    // the audience, and that is what makes the joins work.
+    const faceIn = (a) => Math.atan2(Math.sin(a), -Math.cos(a));
+
+    let bx = 0, bz = 0, by = D.ring, yaw = faceCam, roll = 0, pitch = 0;
+    const tw = [0, 0], fw = [0, 0];
+    let kick = 0, arms = 0, held = false, shake = 0;
+    let flame = 1, lean = 0, blowDir = back;
+    const rad = (r, a) => { bx = r * Math.cos(a); bz = r * Math.sin(a); };
+
+    if (t < D.carry[0] + D.carry[1]) {
+      // IN FROM STAGE LEFT with the cake, losing height all the way and
+      // turning to face the audience as it arrives. The cake rides a fixed
+      // offset off its nose, so where the cake has to end up says where the
+      // fly has to end up: the offset, backwards, from the origin.
+      const u = sat(at(D.carry));
+      const e = smooth01(u);
+      held = true;
+      arms = 1;
+      bx = lerp(-13.0, -Math.cos(faceCam) * D.hold, e);
+      bz = lerp(7.5, Math.sin(faceCam) * D.hold, e);
+      by = lerp(D.into, D.down, smooth01(Math.min(1, u * 1.12)))
+        + 0.25 * Math.sin(t * 9.1) * (1 - e);
+      yaw = mixAng(0.30, faceCam, e);
+      roll = 0.20 * Math.sin(t * 5.3) * (1 - e);
+      // Hands full. The pair is swung up and out of the way, which is also
+      // the only thing that lets it come down far enough to put the cake on
+      // the floor: a bucket hanging straight off its feet is on the tile a
+      // full three millimetres before the cake is.
+      // The swing LEADS the descent: it is fully out of the way by the time
+      // the body is half way down, because a pail still hanging at the height
+      // this ends at is a pail three tenths of a millimetre into the tile.
+      tw[0] = tw[1] = lerp(0.40, D.swingOut, smooth01(Math.min(1, u * 2.2)));
+    } else if (inW(D.set)) {
+      // CAKE DOWN. It backs off the cake, presenting it, and folds its arms.
+      const u = at(D.set);
+      const e = smooth01(u);
+      arms = 1 - smooth01((u - 0.45) / 0.55);
+      rad(lerp(D.hold, D.orbit, e), back);
+      by = lerp(D.down, D.ring, e);
+      yaw = faceCam;
+      tw[0] = tw[1] = lerp(D.swingOut, D.danceOut, e);
+    } else if (inW(D.lap)) {
+      // THE LAP: once round the cake, looking at it the whole way — which
+      // upstage is looking at the audience — and banked over into the turn.
+      const u = at(D.lap);
+      const e = smooth01(u);
+      const a = back + TAU * e;
+      rad(D.orbit, a);
+      by = D.ring + 0.9 * Math.sin(TAU * e);
+      yaw = faceIn(a);
+      roll = -0.42 * Math.min(1, u * 5, (1 - u) * 5);
+      tw[0] = tw[1] = D.danceOut + 0.30 * Math.sin(Math.PI * u);
+    } else if (inW(D.line)) {
+      // THE KICK LINE: upstage of the cake, square to the audience, legs
+      // going on the beat.
+      const u = at(D.line);
+      const env = Math.min(1, u * 5, (1 - u) * 5);
+      rad(D.orbit, back);
+      by = D.ring + 0.7 * Math.abs(beat);
+      yaw = faceCam;
+      roll = 0.42 * Math.sin(TAU * 3 * t) * env;
+      kick = env;
+      tw[0] = tw[1] = D.danceOut - 0.30 * roll;
+    } else if (inW(D.twirl)) {
+      // THE TWIRL: both buckets right over the top, twice — the move the
+      // ordinary dance is named for, and it is in this one too. It goes UP for
+      // it, because twice over the top is twice through hanging straight down,
+      // and a hanging bucket needs the whole 9.5 mm under it. It drops back on
+      // the last tenth, by which time they are out of the way again.
+      const u = at(D.twirl);
+      rad(D.orbit, back);
+      by = lerp(D.ring, D.leap, smooth01(Math.min(1, u * 3)))
+        - (D.leap - D.ring) * smooth01((u - 0.88) / 0.12) + 0.5 * beat;
+      yaw = faceCam + 0.20 * Math.sin(TAU * 2 * t);
+      tw[0] = tw[1] = D.danceOut + TAU * 2 * smooth01(u);
+    } else if (inW(D.rise)) {
+      // THE SPIRAL: twice round and up, closing on the flame, and it ends
+      // upstage again with its nose coming down toward the candle.
+      const u = at(D.rise);
+      const e = smooth01(u);
+      const a = back + TAU * 2 * e;
+      rad(lerp(D.orbit, D.close, e), a);
+      by = lerp(D.ring, D.top, e);
+      yaw = faceIn(a);
+      pitch = -0.45 * smooth01((u - 0.45) / 0.55);
+      roll = 0.22 * Math.sin(TAU * e);
+      tw[0] = tw[1] = lerp(D.danceOut, D.highOut, e);
+    } else if (inW(D.blow)) {
+      // THE WISH: nose down over the candle, wings hammering, and the flame
+      // leans away, gutters, and goes.
+      const u = at(D.blow);
+      const a = back + D.blowAt * smooth01(Math.min(1, u * 2.8));
+      rad(D.close + 0.2, a);
+      blowDir = a + Math.PI;
+      by = lerp(D.top, D.puff, smooth01(Math.min(1, u * 2.2)));
+      yaw = faceIn(a);
+      pitch = lerp(-0.45, -0.66, smooth01(Math.min(1, u * 3)));
+      shake = Math.sin(Math.PI * sat(u * 1.12));
+      roll = 0.09 * Math.sin(t * 31) * shake;
+      tw[0] = tw[1] = lerp(D.highOut, D.blowOut, smooth01(Math.min(1, u * 2.2)));
+      // It fights: the flame is beaten down in stutters and twice looks like
+      // coming back, which is what blowing a candle out actually looks like.
+      // It holds, fighting, and then goes in the last third — a candle that
+      // shrinks steadily from the first breath is a candle turned down with a
+      // dial. The stutter is the fight.
+      flame = (1 - smooth01(sat((u - 0.58) / 0.42)))
+        * (0.80 + 0.20 * Math.sin(t * 17.3));
+      lean = 1.20 * Math.sin(Math.PI * sat(u));
+    } else {
+      // THE BOW, held in the smoke to the end of the shot.
+      const u = sat(at(D.bow));
+      const e = smooth01(u);
+      // Round and out as it comes down, so the bow is taken BESIDE the cake
+      // and not in front of it: bowing from upstage put its head straight
+      // into the candle it had just blown out.
+      const a = back + D.blowAt + 1.85 * e;
+      rad(lerp(D.close + 0.2, D.orbit + 0.7, e), a);
+      by = lerp(D.puff, D.bowY, e);
+      yaw = mixAng(faceIn(back + D.blowAt), faceCam, smooth01((u - 0.25) / 0.5));
+      arms = smooth01((u - 0.20) / 0.35);
+      pitch = lerp(-0.66, 0, smooth01(Math.min(1, u * 2.4)))
+        - 0.58 * smooth01((u - 0.42) / 0.38);
+      tw[0] = tw[1] = lerp(D.blowOut, D.salute, smooth01((u - 0.30) / 0.45));
+      flame = 0;
+    }
+
+    rig.position.set(mm(bx), mm(by), mm(bz));
+    rig.rotation.order = 'YXZ';
+    rig.rotation.set(roll, yaw, pitch);
+    setLegs(A0, (L) => {
+      if (L.row === 1) return liveRaw(L, 'carry');
+      if (L.row === 0 && arms > 0) return mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'arms'), arms);
+      if (kick > 0) {
+        const k = Math.max(0, Math.sin(TAU * 3 * t + (L.row * 2 + (L.s > 0 ? 1 : 0)) * 1.6));
+        return mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'stand'), k * kick);
+      }
+      return liveRaw(L, 'tuck');
+    });
+    const wb = (Math.floor(t * 60) & 1) ? 1 : -1;
+    for (const W of A0.wings) {
+      W.g.rotation.set(0, -W.s * (1.70 - 0.22 * shake), 0.55 * wb * (1 + 0.30 * shake));
+    }
+    rig.updateMatrixWorld(true);
+    eyeRot(A0);
+
+    for (let k = 0; k < 2; k++) {
+      const s = k ? 1 : -1;
+      const B = P.b[k];
+      footAt(A0, k ? 3 : 2, _w);
+      B.hang.position.copy(_w);
+      B.hang.rotation.set(-s * tw[k], yaw, fw[k]);
+      B.pin.rotation.set(0, 0, 0);
+      B.setFill(1);
+      B.stream.visible = false;
+    }
+
+    // And the cake: off its nose while it is carrying it, and standing at the
+    // origin from the moment it lets go.
+    let cx = 0, cy = 0, cz = 0;
+    if (held) {
+      cx = bx + Math.cos(yaw) * D.hold;
+      cz = bz - Math.sin(yaw) * D.hold;
+      cy = by - D.down;
+      cake.group.rotation.set(0, yaw, 0);
+    } else {
+      cake.group.rotation.set(0, 0, 0);
+    }
+    cake.group.position.set(mm(cx), mm(cy), mm(cz));
+    // Away from whoever is blowing at it, which is `blowDir` — and because
+    // the fly comes at it from the side (see `blowAt`) that is across the
+    // frame, where a lean can be seen.
+    cake.setFlame(flame, lean, t, blowDir);
+    cake.setSmoke((t - D.smoke[0]) / D.smoke[1]);
+    blob.value[6].set(mm(cx), mm(cz),
+      mm(CAKE.r + CAKE.icing + 0.30) * sat(1 - cy / 6));
+    P.shadow(blob, 4);
+    bodyShadow(A0, mm(by));
+    _v.set(0, mm(aimY), 0);
+    look(cd, cel, caz, _v);
+    fade.value = 1;
+  }
+
   // A second and a third animal for the insert, built only if the movement
   // has grown that big. Clones share every geometry and every material except
   // the two eyes, whose `uRot` is per animal.
@@ -2026,9 +2491,32 @@ function buildFlyCorpse() {
   return {
     stage, cam, rig, body,
     look,
-    revive, reset, insert, dropShot, danceShot,
+    revive, reset, insert, dropShot, danceShot, birthdayShot,
     /** How long the dance runs, seconds. */
     danceLen: () => DANCE.len,
+    /** How long the birthday number runs, seconds. */
+    birthdayLen: () => BDAY.len,
+    /**
+     * What `measure` measured, in millimetres — the three numbers every shot
+     * in here is staged against, and the ones a routine gets wrong by
+     * guessing. Debug.
+     */
+    metrics: () => {
+      measure();
+      return { standLift: standLift / mm(1), carryDrop: carryDrop / mm(1),
+        carrySpan: carrySpan / mm(1), pail: MINIB.ear + MINIB.bail };
+    },
+    /**
+     * Where the bottom of each pail is right now, in mm, for the pose the
+     * last shot left. A negative y is a bucket through the floor,
+     * which is the one thing a routine with two of them swinging can do
+     * wrong and the one thing a single frame will not always show you.
+     */
+    pailAt: () => pairs[0].b.map((B) => {
+      B.hang.updateMatrixWorld(true);
+      B.pin.localToWorld(_q.set(0, -mm(MINIB.ear), 0));
+      return [_q.x / mm(1), _q.y / mm(1), _q.z / mm(1)];
+    }),
     /** How long the fly cam stays up, seconds. */
     dropLen: () => DROPCAM.len,
     /** How long the resurrection runs, seconds. */

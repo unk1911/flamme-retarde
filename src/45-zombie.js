@@ -134,6 +134,19 @@ const ZOMBIE = {
   // eighth notes, twice through. A fly with its buckets on the floor has
   // nothing to twirl and sits this one out.
   dance: { len: 6.9, spin: 1.6, loops: 5, rates: [0.90, 0.675, 1.20], again: 2.9 },
+  // ── the birthday number ──────────────────────────────────────────────────
+  //
+  // Misha, 16 Sep 2026: *"today is my Liege's birthday. i wanna be able to ask
+  // the zombie fly to do a special dance/performance in honour of My Liege"*.
+  //
+  // The performance you can SEE is the fly cam's — BDAY in src/44-corpse.js,
+  // the cake and the candle and the bow. Out here at 7 mm it is the same
+  // twelve and a half seconds: it holds its ground, turns slowly on the spot,
+  // lifts the pair right overhead for the bow at the end, and the whole
+  // movement sings the birthday tune once through, together, in three
+  // registers a tenth of a second apart. Nobody hums anything else all shot.
+  bday: { len: 12.9, spin: 0.55, loops: 3, stagger: 0.10, salute: 10.9,
+    overhead: 2.75 },
 };
 
 /**
@@ -238,6 +251,8 @@ function buildZombies(vik, buck) {
       // Dancing: how far into the routine, or null.
       dance: null,
       humDance: false, humAgain: -1,
+      // When this one comes in on the birthday tune, or −1. See `birthday`.
+      humSong: -1,
     };
     flock.push(z);
     return z;
@@ -309,7 +324,7 @@ function buildZombies(vik, buck) {
       z.dance.t += dt;
       z.p.y += 0.02 * Math.cos(z.dance.t * 12.6) * dt;
       z.speed = 0.4;
-      if (z.dance.t >= ZOMBIE.dance.len) z.dance = null;
+      if (z.dance.t >= (z.dance.bday ? ZOMBIE.bday : ZOMBIE.dance).len) z.dance = null;
     } else if (z.wake > 0) {
     // Getting up off the tile: straight up, slowly, for most of a second.
       z.wake -= dt;
@@ -360,8 +375,9 @@ function buildZombies(vik, buck) {
     // Facing the way it is going, nose up in the air as the live one is.
     const r = z.rig;
     const dz = z.dance;
-    const du = dz ? sat(dz.t / ZOMBIE.dance.len) : 0;
-    const spin = dz ? TAU * ZOMBIE.dance.spin * dz.t : 0;
+    const DZ = dz && dz.bday ? ZOMBIE.bday : ZOMBIE.dance;
+    const du = dz ? sat(dz.t / DZ.len) : 0;
+    const spin = dz ? TAU * DZ.spin * dz.t : 0;
     r.position.copy(z.p);
     r.rotation.set(0, -z.head + spin, 0.30);
     r.updateMatrix();
@@ -374,8 +390,13 @@ function buildZombies(vik, buck) {
       _p.applyMatrix4(r.matrix);
       b.hang.position.copy(_p);
       const sw = (0.10 + 0.12 * sat(z.speed / 1.5)) * Math.sin(z.swing + s);
-      // Right round its feet while it dances — `loops` times over the routine.
-      const twirl = dz ? TAU * ZOMBIE.dance.loops * smooth01(du) : 0;
+      // Right round its feet while it dances — `loops` times over the routine,
+      // and on a birthday they finish overhead and stay there for the bow.
+      const twirl = !dz ? 0
+        : dz.bday
+          ? TAU * DZ.loops * smooth01(sat(dz.t / DZ.salute))
+            + ZOMBIE.bday.overhead * smooth01((dz.t - DZ.salute) / 1.2)
+          : TAU * DZ.loops * smooth01(du);
       b.hang.rotation.set(sw * 0.5 - s * twirl, -z.head + spin, sw);
       b.pin.rotation.set(s * z.tilt, 0, 0);
       b.water.visible = z.fill > 0.05;
@@ -445,6 +466,10 @@ function buildZombies(vik, buck) {
   /** Everybody in, a fifth of a second apart. */
   function choir() {
     for (const z of flock) {
+      // Not one that is in the middle of the birthday tune. Her melody laid
+      // over that is two tunes at once out of one fly, and the birthday one
+      // is the only thing anybody is listening for while it is on.
+      if (z.dance && z.dance.bday) continue;
       if (z.humStart < 0) z.humStart = clockS + z.i * ZOMBIE.hum.stagger;
     }
   }
@@ -497,6 +522,14 @@ function buildZombies(vik, buck) {
       } else {
         audio.zombieHum(dist, { id: z.i, pan });
       }
+      // And the birthday tune, which is a different voice in `80-audio.js` —
+      // not her melody at all — so it has its own start and its own follow.
+      if (z.humSong >= 0 && clockS >= z.humSong && audio.zombieSong) {
+        z.humSong = -1;
+        audio.zombieSong(dist, { start: true, id: z.i, pan });
+      } else if (audio.zombieSong) {
+        audio.zombieSong(dist, { id: z.i, pan });
+      }
     }
   }
 
@@ -527,12 +560,32 @@ function buildZombies(vik, buck) {
       }
       return n;
     },
+    /**
+     * "In honour of My Liege." The birthday number: every member that still
+     * has its buckets performs, and they sing the tune together. Answers how
+     * many are in it.
+     */
+    birthday: () => {
+      let n = 0;
+      for (const z of flock) {
+        if (z.drop || z.dance) continue;
+        z.dance = { t: 0, bday: true };
+        z.humDance = false;
+        z.humAgain = -1;
+        z.humStart = -1;
+        z.humSong = clockS + z.i * ZOMBIE.bday.stagger;
+        n += 1;
+      }
+      return n;
+    },
     /** Which members have no buckets in their feet right now, by index. */
     bare: () => flock.map((z) => !!z.drop),
     /** How many are dancing this second — what the Bucketeer is told when
      *  somebody asks her what those flies are doing. See `talk` in
      *  45-bucketeer.js. */
-    dancing: () => flock.filter((z) => z.dance).length,
+    dancing: () => flock.filter((z) => z.dance && !z.dance.bday).length,
+    /** And how many are doing the birthday number, which she can see too. */
+    partying: () => flock.filter((z) => z.dance && z.dance.bday).length,
     /** Everybody hum, now. Debug, and what a probe of the voice wants. */
     hum: () => { choir(); return flock.length; },
     /** Can another one join? The swat asks before it plays the resurrection. */

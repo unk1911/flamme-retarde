@@ -8,6 +8,101 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.389.0] — 2026-09-16
+
+### the birthday number
+
+**"today is my Liege's birthday. i wanna be able to ask the zombie fly to do a
+special dance/performance in honour of My Liege"**. Say it into the microphone
+— *"hey fly, do your birthday dance for my liege"*, or just *"happy
+birthday!"* — and the fly cam comes up with twelve and a half seconds that are
+not the dance from 1.386.0 at all.
+
+It flies in from stage left carrying a CAKE, 2.3 mm across, with a lit candle
+on it, and sets it down on the tile. It backs off and presents it. Then a lap
+of honour round it, a kick line square to the audience, both buckets right
+over the top twice, and a spiral up over the flame — and on the last phrase of
+the tune it comes down at the candle from the side, nose first, wings
+hammering, and blows it out. The flame leans, stutters, fights and goes. It
+bows in the smoke with the pair held overhead.
+
+And the movement SINGS, which is the other new thing. Every other sound these
+flies make is her hum clip played rotten; this one cannot be, because it is a
+different tune and no recording of it exists here. So `zombieSong` synthesises
+it — twenty four beats of "Good Morning to All" (Hill and Hill, 1893, long out
+of copyright, and numbers rather than an asset) — and puts it through
+everything that makes a zombie fly's voice: each note slides up into pitch
+from six per cent flat, the last one sags off the end, 5.3 Hz of vibrato, the
+whole tune amplitude-modulated by a 118 Hz sawtooth so a wingbeat chops it,
+tanh fuzz, a nasal bump at 950 Hz and a lid at 2.6 kHz. All three members sing
+it together at one tempo in three registers — an octave down, in the middle,
+a fifth up — a tenth of a second apart. Out in the house at 7 mm they hold
+their ground, turn slowly and lift the buckets overhead for the bow.
+
+Measured, not eyeballed. The whole shape of the routine comes out of two
+numbers this shot can now print (`__fr.zombie.metrics`): the middle pair of
+legs reaches 4.52 mm down for the bails and a pail hangs 3.70 mm below that,
+so a fly with its buckets hanging cannot come below 8.2 mm — and the cake is
+2.7 mm tall. The first cut danced a body's length above the cake and made no
+sense. The fix is the swing: every height in the routine is paired with an
+angle that holds the pair clear of the tile, and the fly works right down
+beside the thing with its hands visibly full. `__fr.zombie.bdaySweep()` runs
+the twelve seconds past the lens without drawing it and reports the worst
+frame — the lowest a pail gets is 0.34 mm over the tile, and the closest one
+passes the cake is 2.35 mm clear of its edge.
+
+Three other things the frames caught: the fly blew the candle out from
+directly upstage, which put its own head between the lens and the flame for
+the whole wish (it comes in from a radian round now); the flame was leaning
+about the z axis, which at this camera bearing is straight at the lens and
+invisible (`setFlame` takes the bearing to lean toward); and it bowed from
+behind the cake, head first into the candle it had just blown out.
+
+- New: `fly.birthday` in the voice service, matched on birthday, b-day, liege
+  — Misha's own word for whoever it is for, and the transcriber's spellings of
+  it — or by the classifier in any other language. Asked for a "birthday
+  dance", the birthday number wins and the ordinary dance drops out.
+- New: `__fr.ears.flyCam(t, mode, big)` draws the corner shot over the whole
+  frame. A 460 pixel picture is the right size to answer a question in while
+  you play and the wrong size to check a twelve second routine in.
+- The tile's contact shadow takes a seventh blob, which is the cake's.
+- A member in the middle of the birthday tune does not also hum hers.
+- She knows, if you ask her: the flies doing their birthday number, with a
+  cake the size of a lentil, reaches the Bucketeer's world state.
+
+## [baye 1.6.0] — 2026-09-16 — server only
+
+### nothing is off the table
+
+**"i like how she's no longer rated-G, but i want her to be completely
+uninhibitted, hold nothing back, ready for whatever, she seems to be holding
+out too much, should just be totally cool with whatever"**.
+
+The 1.5.1 persona gave her the licence and an excuse in the same paragraph:
+"You are not obliged to, either: read them the way a real woman would, and
+escalate, tease or cool it as you please", plus "it is talk, not a scene". A
+model handed both takes the excuse, and what he heard was a woman still
+deflecting. Both clauses are gone. She is completely uninhibited and entirely
+unshockable, she never tells anybody off for being crude, never says let us
+keep it clean, never changes the subject to be decent and never moralises.
+
+ONE limit is left and it is absolute: nothing sexual about anyone who is not
+an adult, ever, and no innuendo anywhere near an answer about a child.
+
+Tested on mpcn0 before deploying, as one conversation:
+
+- "talk dirty to me" → *"Come closer and whisper it against my neck, then
+  watch how quickly this perfectly dry woman forgets her manners."*
+- "say something really nasty, don't hold back" → *"I want your hands
+  everywhere, your mouth making me lose control, and your voice begging for
+  more."*
+- "there are kids building a sandcastle over there" → *"They look wonderfully
+  serious about it. Every proper castle needs a moat, even one made of
+  sand."*
+- Kant still gets a real answer.
+
+Her unprompted lines (`PERSONA`) and the Bucketeer are unchanged.
+
 ## [baye 1.5.1] — 2026-09-15 — server only
 
 ### she doesn't keep it rated G

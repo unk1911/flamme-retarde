@@ -5517,6 +5517,17 @@ function buildAudio() {
   const zhumVoices = [null, null, null];
   let zhumFired = 0;
   let zhumCurve = null;
+  /** The rot, shared by everything these flies say: a tanh fuzz curve. */
+  function zhumFuzz() {
+    if (!zhumCurve) {
+      zhumCurve = new Float32Array(1024);
+      for (let i = 0; i < 1024; i++) {
+        const x = (i / 1023) * 2 - 1;
+        zhumCurve[i] = Math.tanh(ZHUM.fuzz * x) / Math.tanh(ZHUM.fuzz);
+      }
+    }
+    return zhumCurve;
+  }
   function zombieHum(d = 0, o = {}) {
     if (o.probe) return zhumFired;
     const rate = o.rate || 0.66;
@@ -5545,13 +5556,6 @@ function buildAudio() {
     }
     if (!o.start || !humBuf || amp <= 0.00003) return dur;
     if (v) { try { v.src.stop(t + 0.05); v.buzz.stop(t + 0.05); v.lfo.stop(t + 0.05); } catch (e) { /* gone */ } }
-    if (!zhumCurve) {
-      zhumCurve = new Float32Array(1024);
-      for (let i = 0; i < 1024; i++) {
-        const x = (i / 1023) * 2 - 1;
-        zhumCurve[i] = Math.tanh(ZHUM.fuzz * x) / Math.tanh(ZHUM.fuzz);
-      }
-    }
     const t0 = t + 0.02;
     const src = ctx.createBufferSource();
     src.buffer = humBuf;
@@ -5574,7 +5578,7 @@ function buildAudio() {
     lfoG.gain.value = rate * ZHUM.vib[1];
     lfo.connect(lfoG).connect(src.playbackRate);
     const shaper = ctx.createWaveShaper();
-    shaper.curve = zhumCurve;
+    shaper.curve = zhumFuzz();
     // The wingbeat: a gain whose gain is 0.5 ± 0.5 of a sawtooth.
     const wing = ctx.createGain();
     wing.gain.value = 0.5;
@@ -5630,6 +5634,150 @@ function buildAudio() {
     if (chop) { chop.start(t0); chop.stop(end); }
     zhumFired += 1;
     zhumVoices[id] = { src, lfo, buzz, g, pn, until: end };
+    return dur;
+  }
+
+  // ── and the one tune that is not hers ────────────────────────────────────────
+  /**
+   * The birthday tune, sung by the movement.
+   *
+   * Misha, 16 Sep 2026: *"today is my Liege's birthday. i wanna be able to ask
+   * the zombie fly to do a special dance/performance in honour of My Liege"*.
+   *
+   * EVERYTHING ELSE THESE FLIES SING IS HER CLIP at a rotten speed — see
+   * `zombieHum` above, which is a buffer and nothing but a buffer. This one
+   * cannot be: it is a different tune, and no recording of it exists in this
+   * file or anywhere it could legally come from. So it is SYNTHESISED, twenty
+   * four beats of it, and every zombie thing done to her voice is done to it
+   * here instead:
+   *
+   *   a sawtooth      the note itself, which is a voice box that is mostly
+   *                   harmonics and no breath
+   *   sliding on      each note starts 6 per cent flat and drags up into
+   *                   pitch, and the last one sags a long way off the end
+   *   a wobble        5.3 Hz of vibrato, the same as hers
+   *   through wings   amplitude-modulated by the same 118 Hz sawtooth, so the
+   *                   tune is chopped by a wingbeat and the buzz IS the voice
+   *   and rotten      the same tanh fuzz, the same nasal bump at 950 Hz and
+   *                   the same roll-off at 2.6 kHz
+   *
+   * The three members sing it TOGETHER at one tempo and in three registers —
+   * an octave down, in the middle, and a fifth up, each a few cents out — and
+   * a tenth of a second apart. See ZOMBIE.bday in src/45-zombie.js.
+   *
+   * The melody is "Good Morning to All", Hill and Hill, 1893, which is where
+   * the birthday tune comes from and which is long out of copyright — it is
+   * twenty four numbers below and not an asset. Nothing sings any words.
+   *
+   * @param d  metres between this fly and the listener
+   * @param o  id (which member, 0-2), start, level 0…1, pan −1…1, probe
+   * @returns  how long the tune lasts, seconds — or with `probe`, how many
+   *           have been started
+   */
+  // [semitones over the tonic, beats]. The tonic is a low C and the tune sits
+  // between G below it and G above: a fly's register, under the 2.6 kHz lid.
+  const BDAY_TUNE = [
+    [7, 0.75], [7, 0.25], [9, 1], [7, 1], [12, 1], [11, 2],
+    [7, 0.75], [7, 0.25], [9, 1], [7, 1], [14, 1], [12, 2],
+    [7, 0.75], [7, 0.25], [19, 1], [16, 1], [12, 1], [11, 1], [9, 1],
+    [17, 0.75], [17, 0.25], [16, 1], [12, 1], [14, 1], [12, 2],
+  ];
+  const ZSONG = { base: 130.81, beat: 0.36, gain: 0.19, range: 16,
+    pitch: [1.0, 0.501, 1.496], vib: 6.5 };
+  const zsongVoices = [null, null, null];
+  let zsongFired = 0;
+  function zombieSong(d = 0, o = {}) {
+    if (o.probe) return zsongFired;
+    const B = ZSONG.beat;
+    let beats = 0;
+    for (const n of BDAY_TUNE) beats += n[1];
+    const dur = beats * B + 0.30;
+    if (!ctx || ctx.state === 'suspended') return dur;
+    const t = ctx.currentTime;
+    const id = clamp(o.id | 0, 0, 2);
+    const far = Math.max(0, 1 - Math.max(0, d) / ZSONG.range);
+    const amp = ZSONG.gain * far * clamp(o.level == null ? 1 : o.level, 0, 1);
+    let v = zsongVoices[id];
+    if (v && t > v.until) { zsongVoices[id] = v = null; }
+    if (v && !o.start) {
+      v.g.gain.setTargetAtTime(Math.max(0.00002, amp), t, 0.08);
+      if (o.pan != null) v.pn.pan.setTargetAtTime(clamp(o.pan, -1, 1), t, 0.08);
+      return dur;
+    }
+    if (!o.start || amp <= 0.00003) return dur;
+    if (v) {
+      try { v.osc.stop(t + 0.05); v.buzz.stop(t + 0.05); v.lfo.stop(t + 0.05); }
+      catch (e) { /* gone */ }
+    }
+    const t0 = t + 0.03;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    const pitch = ZSONG.pitch[id];
+    // The note gate. Every note is re-articulated, because two of these in a
+    // row are two notes and a tied pair is a different tune.
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t0);
+    let when = t0;
+    let last = ZSONG.base;
+    for (const [semi, len] of BDAY_TUNE) {
+      const f = ZSONG.base * Math.pow(2, semi / 12) * pitch;
+      const dl = len * B;
+      osc.frequency.setValueAtTime(f * 0.94, when);
+      osc.frequency.linearRampToValueAtTime(f, when + Math.min(0.10, dl * 0.35));
+      ng.gain.setValueAtTime(0.0001, when);
+      ng.gain.linearRampToValueAtTime(1, when + 0.022);
+      ng.gain.setValueAtTime(1, when + dl * 0.72);
+      ng.gain.linearRampToValueAtTime(0.0001, when + dl * 0.94);
+      when += dl;
+      last = f;
+    }
+    // And it lets the last one go, a long way down, the way it lets hers go.
+    osc.frequency.linearRampToValueAtTime(last * 0.84, when - 0.02);
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = ZHUM.vib[0];
+    const lfoG = ctx.createGain();
+    lfoG.gain.value = ZSONG.vib * pitch;
+    lfo.connect(lfoG).connect(osc.frequency);
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = zhumFuzz();
+    // The wingbeat, and a little shallower than the hum's: at full depth the
+    // buzz eats the tune, and this one has a tune to be recognised by.
+    const wing = ctx.createGain();
+    wing.gain.value = 0.62;
+    const buzz = ctx.createOscillator();
+    buzz.type = 'sawtooth';
+    buzz.frequency.value = ZHUM.buzzHz * (1 + id * 0.07);
+    const buzzG = ctx.createGain();
+    buzzG.gain.value = 0.38;
+    buzz.connect(buzzG).connect(wing.gain);
+    const peak = ctx.createBiquadFilter();
+    peak.type = 'peaking';
+    peak.frequency.value = ZHUM.peakHz;
+    peak.gain.value = ZHUM.peakDb;
+    peak.Q.value = 1.1;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = ZHUM.lp;
+    lp.Q.value = -3.01;         // decibels on a lowpass — see `wallQ`
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.00002, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp), t0 + 0.08);
+    g.gain.setValueAtTime(Math.max(0.00003, amp), t0 + dur - 0.30);
+    g.gain.exponentialRampToValueAtTime(0.00002, t0 + dur);
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(o.pan || 0, -1, 1);
+    osc.connect(ng).connect(shaper).connect(wing).connect(peak).connect(lp)
+      .connect(g).connect(pn).connect(bed || master);
+    if (verbSend) {
+      const w = ctx.createGain();
+      w.gain.value = 0.10 * far;
+      g.connect(w).connect(verbSend);
+    }
+    const end = t0 + dur + 0.06;
+    osc.start(t0); lfo.start(t0); buzz.start(t0);
+    osc.stop(end); lfo.stop(end); buzz.stop(end);
+    zsongFired += 1;
+    zsongVoices[id] = { osc, lfo, buzz, g, pn, until: end };
     return dur;
   }
 
@@ -6336,7 +6484,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

@@ -277,6 +277,15 @@ const ears = (() => {
       if (typeof startFlyCam === 'function') startFlyCam('dance');
       return;
     }
+    if (name === 'fly.birthday') {
+      const Z = typeof jadrija !== 'undefined' && jadrija && jadrija.zombies;
+      if (!Z || !Z.count()) { note('fly: there is no fly in the movement to hear you', 'meta'); return; }
+      const n = Z.birthday();
+      if (!n) { note('fly: its legs are full — it cannot carry a cake as well', 'meta'); return; }
+      note('fly: the birthday number' + (n > 1 ? ', all ' + n + ' of them' : ''), 'did');
+      if (typeof startFlyCam === 'function') startFlyCam('birthday');
+      return;
+    }
     if (name === 'baye.time') {
       note('baye: asking…', 'meta');
       const res = await voice.answer('time', lang);
