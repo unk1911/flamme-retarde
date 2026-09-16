@@ -8000,6 +8000,9 @@ window.__fr = {
      * frames a second cannot finish at all.
      */
     put: (...a) => jadrija.putShow(...a),
+    /** The special kabina, in the resort's own frame — where `put` has to put
+     *  her for anything that only happens in there. */
+    kabina: () => (jadrija ? jadrija.kabina : null),
     bones: (...a) => jadrija.bones(...a),
     /**
      * How far into the special kabina the game thinks you are, 0 to 1 — the
@@ -8784,6 +8787,17 @@ window.__fr = {
       if (t == null) { flyCamHold = false; return flyCamT; }
       startFlyCam(mode); flyCamT = t; flyCamHold = true; return flyCamT;
     },
+  },
+  /**
+   * Her own recorded noises — `noises` in src/80-audio.js. `noise('wet')`
+   * plays one; `noise()` answers how many have been played, which is the only
+   * way a probe can tell a clip that sounded from a clip that never decoded.
+   */
+  noise: (set, gain = 1) => {
+    if (!audio || !audio.noises) return null;
+    if (!set) return audio.noises(null, 0, 0, true);
+    audio.noiseWarm(set);
+    return audio.noises(set, gain);
   },
   zombie: {
     drop: () => (jadrija && jadrija.zombies ? jadrija.zombies.drop() : null),

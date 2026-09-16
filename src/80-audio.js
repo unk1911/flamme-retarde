@@ -661,6 +661,92 @@ function buildAudio() {
     return true;
   }
 
+  // ── and the noises she makes herself ────────────────────────────────────────
+  /**
+   * Her own recorded noises, for the two things that happen TO her.
+   *
+   * Misha, 16 Sep 2026: *"when she gets hosed inside the kabine, or bumped
+   * into, she should emit a few of the pre-recorded noises"*, off two takes he
+   * recorded and dropped in a folder.
+   *
+   * WHAT SHE HAD BEFORE IS STILL THERE. Every other sound out of this woman is
+   * `squeak`, which is synthesised — see the note over SQUEAKS — and the three
+   * places this is called from call `showSay` as well, on the same frame. The
+   * synth is the shape of the reaction and this is the voice in it; a build
+   * whose payload has been stripped still has the whole reaction, which is the
+   * same argument `beadShove` makes two functions down.
+   *
+   * WHICH TAKE IS WHICH is the one thing in here decided by ear and not by
+   * measurement, and it is this table and nothing else — the two sets can be
+   * swapped by swapping these two lines. `f-Recording` is the closer, more
+   * rhythmic take and went to the water; `o-Recording` is the quieter one and
+   * went to being walked into. Both were cut out of continuous takes at their
+   * loudest seconds, high-passed at 75 Hz, denoised, levelled to −17 LUFS and
+   * encoded mono at 22.05 kHz — about seven kilobytes each, which is why there
+   * are eight of them.
+   */
+  const NOISE = {
+    wet: ['show_wet1', 'show_wet2', 'show_wet3', 'show_wet4', 'show_wet5'],
+    bump: ['show_bump1', 'show_bump2', 'show_bump3'],
+  };
+  // How loud, and how close together two of them may be. The cooldown is not
+  // politeness: the kneel and the recline are 3.2 s apart at the closest, and
+  // being walked into twice is two frames apart when you are pushing past her.
+  const NOISE_CFG = { gain: 0.80, range: 26, cool: 0.70 };
+  const voxBuf = {};
+  const voxLast = {};
+  let voxAt = -1e9;
+  let voxFired = 0;
+
+  /** Ask for a set before it is needed, the way `barkWarm` does. */
+  function noiseWarm(set) {
+    for (const k of NOISE[set] || []) {
+      if (!voxBuf[k]) sampleLoad(k, (b) => { voxBuf[k] = b; });
+    }
+  }
+
+  /**
+   * @param set   'wet' | 'bump'
+   * @param gain  0…1 from the caller, which is already distance-weighted
+   * @param pan   −1…1
+   * @param probe read the counter instead of making a sound
+   */
+  function noises(set, gain = 1, pan = 0, probe = false) {
+    if (probe) return voxFired;
+    const keys = NOISE[set];
+    if (!ctx || !bed || !keys || !keys.length) return false;
+    const t0 = ctx.currentTime;
+    if (t0 - voxAt < NOISE_CFG.cool) return false;
+    // Never the same one twice running, which with three in a set is the
+    // difference between a person and a tape.
+    const pool = keys.length > 1 ? keys.filter((k) => k !== voxLast[set]) : keys;
+    const key = pool[(Math.random() * pool.length) | 0];
+    const buf = voxBuf[key];
+    if (!buf) { noiseWarm(set); return false; }
+    const amp = NOISE_CFG.gain * clamp(gain, 0, 1);
+    if (amp <= 0.004) return false;
+    voxLast[set] = key;
+    voxAt = t0;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    // The same narrow spread `bark` uses: enough that two in a row are not one
+    // tape twice, short of the width where it reads as a speed change.
+    src.playbackRate.value = 0.97 + Math.random() * 0.07;
+    const g = ctx.createGain();
+    g.gain.value = amp;
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(pan, -1, 1);
+    src.connect(g).connect(pn).connect(bed);
+    if (verbSend) {
+      const w = ctx.createGain();
+      w.gain.value = 0.16;
+      g.connect(w).connect(verbSend);
+    }
+    src.start(t0);
+    voxFired += 1;
+    return true;
+  }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
@@ -6484,7 +6570,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

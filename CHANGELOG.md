@@ -8,6 +8,53 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.390.0] — 2026-09-16
+
+### she makes her own noises now
+
+**"when she gets hosed inside the kabine, or bumped into, she should emit a few
+of the pre-recorded noises"**, off two takes Misha recorded and dropped in a
+folder. Eight clips out of them are in `build/payload/` and there is a channel
+in the mix that plays them: `noises` in src/80-audio.js, called by `showNoise`
+in src/43-jadrija.js from the three moments that happen TO her — the kabina
+kneel, the kabina recline, and being walked into.
+
+WHAT SHE HAD BEFORE IS STILL THERE, and that is the design call. Every other
+sound out of this woman is `squeak`, which is synthesised, and all three of
+those moments already called `showSay` on the frame they fire. The synth is the
+SHAPE of the reaction: it lands on the exact frame, it carries the distance and
+the wet, and it is there in a build whose payload has been stripped. The
+recording is her voice inside that shape, and it comes 190 ms later, because a
+person does not vocalise on the same sample as the thing that made them.
+
+The takes needed work. Both were continuous phone recordings — one 18.3 s at a
+−23 dB noise bed, the other 22.8 s recorded so quietly it reads as silence
+until you normalise it. Neither has a single clean event in it. So the clips
+are cut at the loudest seconds of each, high-passed at 75 Hz, denoised,
+levelled to −17 LUFS, faded and encoded mono at 22.05 kHz — about seven
+kilobytes each, 64 KB for all eight, which is two thousandths of the build.
+Three more were cut and thrown away: after the denoise they came back at −44 to
+−48 dB RMS, which means the picks were noise and not voice.
+
+One thing in here was decided by ear and I do not have ears: WHICH take goes to
+WHICH event. `f-Recording` is the closer, more rhythmic one and went to the
+water; `o-Recording` is the quieter one and went to the shove. It is one table
+at the top of `noises` and the two sets swap by swapping two lines.
+
+Verified by driving the real trigger, not the handle: put her in the kabina,
+fill the soak meter, and the phase goes to `submit` with the noise counter
+going from 0 to 1 on the same beat. The bump path is a single line at the site
+that already says `showSay('whee', ...)`, and it is NOT driven here — a
+synthetic `confine` from a probe does not arm her collider, so that one is
+verified by reading and wants a walk into her to confirm.
+
+- `__fr.noise('wet')` plays one and `__fr.noise()` answers how many have
+  played, which is the only way a probe can tell a clip that sounded from a
+  clip that never decoded.
+- `__fr.jad.kabina()` gives the room in her own frame, so a test can put her
+  in it without walking the half minute the indoor track takes.
+- Proof numbers unchanged: census {446,333,86,27}, blockers 818, tris 642821.
+
 ## [baye 1.6.1] — 2026-09-16 — server only
 
 ### brooklyn mouth

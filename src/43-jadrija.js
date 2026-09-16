@@ -33099,6 +33099,27 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * And the recorded noise on top of it, for the two things that happen TO her.
+   *
+   * Misha, 16 Sep 2026: *"when she gets hosed inside the kabine, or bumped
+   * into, she should emit a few of the pre-recorded noises"*. See `noises` in
+   * src/80-audio.js, which holds the two sets and everything about them.
+   *
+   * ALONGSIDE `showSay` AND NOT INSTEAD OF IT. Every one of these three moments
+   * already made a noise, and the synthesised one is the shape of the reaction
+   * — it arrives on the exact frame, it carries the distance and the wet, and
+   * it is there in a build whose payload has been stripped. This is her voice
+   * inside that shape, and it comes in a fifth of a second later, because a
+   * person does not vocalise on the same sample as the thing that made them.
+   */
+  function showNoise(set, d) {
+    if (!audio || !audio.noises || state.phase === 'intro') return;
+    const g = clamp(1.15 - d / 30, 0, 1);
+    if (g <= 0.05) return;
+    setTimeout(() => audio.noises(set, g), 190);
+  }
+
+  /**
    * Where the two of you have got to, as a key into `PLACE_NOTES`, or null.
    *
    * Off her own position and not off yours, because it is her card and she is
@@ -33917,7 +33938,7 @@ async function buildJadrija(scene) {
       // here: the same test decides how long the meter is, so a woman standing
       // in the doorway is on the short one and answers the water the way the
       // room answers it.
-      if (her) go('submit', 'submit', 0.30);
+      if (her) { showNoise('wet', d); go('submit', 'submit', 0.30); }
       else go('flare', 'flare', 0.30);
       return;
     }
@@ -34122,6 +34143,7 @@ async function buildJadrija(scene) {
         // apart, and because the shimmy would need it if it ever came back.
         show.bumpBack = 1;
         showSay('whee', Math.hypot(pt - show.t, ps - show.s));
+        showNoise('bump', Math.hypot(pt - show.t, ps - show.s));
         // A longer fade than the shimmy's 0.30 for `enterTwerk`'s reason: this
         // one starts from a deep squat, and a third of a second from standing
         // to that is a collapse rather than a move.
@@ -34295,6 +34317,7 @@ async function buildJadrija(scene) {
           // body off the walls of a room 4 m across.
           show.lie = reclineSpot(pt, ps);
           showSay('squee', d);
+          showNoise('wet', d);
           go('recline', 'recline', 0.34);
           break;
         }
@@ -35860,6 +35883,10 @@ async function buildJadrija(scene) {
     // `beadWarm`: a decode that starts when the sound is wanted is a sound that
     // is missing the first time, and the first time is the one you remember.
     if (audio && audio.barkWarm) audio.barkWarm();
+    // And her own eight, for the same reason — `showNoise` is called from a
+    // frame that has already happened, and a decode started there is a noise
+    // that arrives after the moment it belongs to.
+    if (audio && audio.noiseWarm) { audio.noiseWarm('wet'); audio.noiseWarm('bump'); }
     bumpClock += dt;
     if (bumpCool > 0) bumpCool -= dt;
     // Kept outside the early-out below, which is the mistake this clock would
