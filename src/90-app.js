@@ -8796,6 +8796,11 @@ window.__fr = {
   noise: (set, gain = 1) => {
     if (!audio || !audio.noises) return null;
     if (!set) return audio.noises(null, 0, 0, true);
+    // `now` is which set is sounding and `stop` lets it go — the pair that
+    // says whether the long take is still running, which is the whole
+    // question about a recording that outlives the pose it belongs to.
+    if (set === 'now') return audio.noiseNow();
+    if (set === 'stop') return audio.noiseStop();
     audio.noiseWarm(set);
     return audio.noises(set, gain);
   },

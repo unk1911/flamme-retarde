@@ -33112,12 +33112,19 @@ async function buildJadrija(scene) {
    * inside that shape, and it comes in a fifth of a second later, because a
    * person does not vocalise on the same sample as the thing that made them.
    */
-  function showNoise(set, d) {
+  function showNoise(set, d, keep) {
     if (!audio || !audio.noises || state.phase === 'intro') return;
     const g = clamp(1.15 - d / 30, 0, 1);
     if (g <= 0.05) return;
+    // `keep` means do not interrupt one already running, which is what the
+    // recline wants: she is already making the noise the kneel started and
+    // going onto her back is the same reaction continuing, not a new one.
+    if (keep && audio.noiseNow && audio.noiseNow()) return;
     setTimeout(() => audio.noises(set, g), 190);
   }
+
+  /** Which of her phases the long take belongs to: she is down and wet. */
+  const WETDOWN = { submit: 1, kept: 1, recline: 1, cradle: 1, situp: 1 };
 
   /**
    * Where the two of you have got to, as a key into `PLACE_NOTES`, or null.
@@ -33938,7 +33945,7 @@ async function buildJadrija(scene) {
       // here: the same test decides how long the meter is, so a woman standing
       // in the doorway is on the short one and answers the water the way the
       // room answers it.
-      if (her) { showNoise('wet', d); go('submit', 'submit', 0.30); }
+      if (her) { showNoise('wetlong', d); go('submit', 'submit', 0.30); }
       else go('flare', 'flare', 0.30);
       return;
     }
@@ -34125,6 +34132,12 @@ async function buildJadrija(scene) {
     // the beat instead of being held rigid through one. So the overlay goes
     // with it — `stance` is gated on the shimmy and stays gated on it — and
     // what she does when you walk into her is now one clip doing one thing.
+    // The long take runs while she is down there and stops when she gets up:
+    // eighteen seconds of it outliving the pose it belongs to is the recording
+    // playing over a woman who is walking away. Only the long one — the shove's
+    // second is over before anything could want to cut it.
+    if (audio && audio.noiseNow && audio.noiseNow() === 'wetlong'
+        && !WETDOWN[show.phase]) audio.noiseStop(0.40);
     show.bumpAgain = Math.max(0, (show.bumpAgain || 0) - dt);
     if (show.bumped) {
       show.bumped = 0;
@@ -34317,7 +34330,7 @@ async function buildJadrija(scene) {
           // body off the walls of a room 4 m across.
           show.lie = reclineSpot(pt, ps);
           showSay('squee', d);
-          showNoise('wet', d);
+          showNoise('wetlong', d, true);
           go('recline', 'recline', 0.34);
           break;
         }
@@ -35886,7 +35899,10 @@ async function buildJadrija(scene) {
     // And her own eight, for the same reason — `showNoise` is called from a
     // frame that has already happened, and a decode started there is a noise
     // that arrives after the moment it belongs to.
-    if (audio && audio.noiseWarm) { audio.noiseWarm('wet'); audio.noiseWarm('bump'); }
+    if (audio && audio.noiseWarm) {
+      audio.noiseWarm('wet'); audio.noiseWarm('bump');
+      audio.noiseWarm('wetlong'); audio.noiseWarm('bumplong');
+    }
     bumpClock += dt;
     if (bumpCool > 0) bumpCool -= dt;
     // Kept outside the early-out below, which is the mistake this clock would

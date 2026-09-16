@@ -688,6 +688,17 @@ function buildAudio() {
   const NOISE = {
     wet: ['show_wet1', 'show_wet2', 'show_wet3', 'show_wet4', 'show_wet5'],
     bump: ['show_bump1', 'show_bump2', 'show_bump3'],
+    // AND THE WHOLE TAKE. Misha, having heard the one-second cuts: *"each
+    // sound plays for a few seconds. but my recording were much longer"*. He
+    // is right that a second of it is a snippet — the takes are 18.2 s and
+    // 22.7 s and they are continuous, so what is in them is a reaction that
+    // goes on, not a noise. These two are the entire recording, cleaned the
+    // same way, and they are what the kabina uses: it starts when she goes
+    // down and it stops when she gets up, which is what `noiseStop` is for.
+    // The short cuts stay for being walked into, because a shove is over in a
+    // second and twenty seconds of answer to one is a different joke.
+    wetlong: ['show_wetlong'],
+    bumplong: ['show_bumplong'],
   };
   // How loud, and how close together two of them may be. The cooldown is not
   // politeness: the kneel and the recline are 3.2 s apart at the closest, and
@@ -697,6 +708,9 @@ function buildAudio() {
   const voxLast = {};
   let voxAt = -1e9;
   let voxFired = 0;
+  // The one that is sounding, if any. ONE VOICE: she has one throat, and two
+  // of these over each other is two of her.
+  let voxNow = null;
 
   /** Ask for a set before it is needed, the way `barkWarm` does. */
   function noiseWarm(set) {
@@ -705,8 +719,33 @@ function buildAudio() {
     }
   }
 
+  /** Which set is sounding out of her right now, or null. */
+  function noiseNow() {
+    if (!voxNow || !ctx) return null;
+    if (ctx.currentTime >= voxNow.until) { voxNow = null; return null; }
+    return voxNow.set;
+  }
+
   /**
-   * @param set   'wet' | 'bump'
+   * Let it go, over `fade` seconds. A fall and not a cut, for the reason `hum`
+   * gives about its own stop: anything shorter than a tenth of a second is a
+   * tape stopping, and on a voice that is the one artefact you cannot afford.
+   */
+  function noiseStop(fade = 0.25) {
+    if (!ctx || !voxNow) return false;
+    const t = ctx.currentTime;
+    try {
+      voxNow.g.gain.cancelScheduledValues(t);
+      voxNow.g.gain.setValueAtTime(Math.max(0.00002, voxNow.g.gain.value), t);
+      voxNow.g.gain.exponentialRampToValueAtTime(0.00002, t + fade);
+      voxNow.src.stop(t + fade + 0.03);
+    } catch (e) { /* already stopped */ }
+    voxNow = null;
+    return true;
+  }
+
+  /**
+   * @param set   'wet' | 'bump' | 'wetlong' | 'bumplong'
    * @param gain  0…1 from the caller, which is already distance-weighted
    * @param pan   −1…1
    * @param probe read the counter instead of making a sound
@@ -727,6 +766,8 @@ function buildAudio() {
     if (amp <= 0.004) return false;
     voxLast[set] = key;
     voxAt = t0;
+    // One throat. Whatever she was saying, she stops saying it to say this.
+    if (voxNow) noiseStop(0.12);
     const src = ctx.createBufferSource();
     src.buffer = buf;
     // The same narrow spread `bark` uses: enough that two in a row are not one
@@ -743,6 +784,7 @@ function buildAudio() {
       g.connect(w).connect(verbSend);
     }
     src.start(t0);
+    voxNow = { set, src, g, until: t0 + buf.duration / src.playbackRate.value };
     voxFired += 1;
     return true;
   }
@@ -6570,7 +6612,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

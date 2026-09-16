@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.391.0] — 2026-09-16
+
+### the whole take, not a second of it
+
+**"each sound plays for a few seconds. but my recording were much longer, like
+i think 30s each"**. 1.390.0 cut one-second clips out of the two takes, and a
+second of a continuous eighteen-second recording is a snippet of a reaction
+rather than the reaction. The takes are 18.2 s and 22.7 s — both are now in
+whole, cleaned the same way (high-passed at 75 Hz, denoised, −17 LUFS, mono at
+22.05 kHz), 107 KB and 134 KB.
+
+The kabina uses the long one: it starts when she goes down and it STOPS when
+she gets up, which is the new part. Eighteen seconds of recording outliving the
+pose it belongs to is a tape playing over a woman who has walked away, so
+`noiseStop` lets it go over four tenths of a second whenever her phase leaves
+the set she is down and wet in, and the recline does not restart what the kneel
+already started. This channel is one voice now: she has one throat, and two of
+these over each other is two of her.
+
+Being walked into keeps the short cuts. A shove is over in a second and twenty
+seconds of answer to one is a different joke.
+
+Driven, not assumed: she goes down and `noiseNow()` reads `wetlong`, it still
+reads `wetlong` five seconds later, and moving her out of the room to a walking
+phase takes it to null. `__fr.noise('now')` and `__fr.noise('stop')` are the
+pair that says so.
+
 ## [1.390.0] — 2026-09-16
 
 ### she makes her own noises now
