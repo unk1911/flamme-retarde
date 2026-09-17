@@ -7409,6 +7409,44 @@ async function buildJadrija(scene) {
   };
 
   /**
+   * Is that flavour in the case, and what is it called on the plaque?
+   *
+   * `GELATO` is the counter as photographed — sixteen trays, eleven of them
+   * with a name on the slate — so this is the honest answer to "get me a
+   * stracciatella": the list is the shop's, not a list of words the parser
+   * happens to know. Matched without diacritics and without case, because a
+   * player saying "cokolada" into a microphone is asking for Čokolada and the
+   * transcriber will not have typed the caron.
+   *
+   * Answers the name as the plaque spells it, so what comes back out of this
+   * is the shop's own spelling and rule 12 is kept: nothing here is invented,
+   * it is only looked up.
+   */
+  function creamOnBoard(flavour) {
+    if (!flavour) return null;
+    const flat = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/gi, '').toLowerCase();
+    const want = flat(flavour);
+    if (!want) return null;
+    for (const row of [GELATO.back, GELATO.front || [], GELATO.mid || []]) {
+      for (const tray of row) {
+        if (!tray || !tray.name) continue;
+        const have = flat(tray.name);
+        if (have === want || have.includes(want) || want.includes(have)) return tray.name;
+      }
+    }
+    return null;
+  }
+
+  /** The first named tray in the case, for an ask that names no flavour. */
+  function creamDefault() {
+    for (const row of [GELATO.back, GELATO.front || [], GELATO.mid || []]) {
+      for (const tray of row) if (tray && tray.name) return tray.name;
+    }
+    return null;
+  }
+
+  /**
    * One flavour plaque, on a canvas.
    *
    * Opaque, and deliberately so. Rule 11: `depthWrite: false` on the
@@ -30434,6 +30472,28 @@ async function buildJadrija(scene) {
   /** The four indoor modes, as a set, so the trigger can tell it is on one. */
   const DOG_IN = { come: 1, hop: 1, rest: 1 };
 
+  /**
+   * Out, and not back in.
+   *
+   * Misha, 17 Sep 2026: *"if she goes for the bed, the pug should just run off
+   * and not come back"*.
+   *
+   * The room test below is derived from where you are standing every frame
+   * rather than fired on a threshold, which is the right shape for a dog that
+   * follows you about and the wrong shape for one that has been sent away: the
+   * frame after he trots out, the same test sees you still in the hut and
+   * sends him straight back in. So being sent away is a LATCH, and it is the
+   * only piece of state the dog has that is not a position. It is lifted when
+   * the room is empty — he does not stay banished from an empty hut all
+   * afternoon, he is just not getting back on that cot while she is on it.
+   */
+  function dogShoo() {
+    if (!dog) return false;
+    dog.shooed = 1;
+    if (DOG_IN[dog.mode]) { dog.mode = 'out'; dog.leg = 0; }
+    return true;
+  }
+
   function moveDog(dt, pt, ps) {
     const s = dog;
     s.soak = Math.max(0, s.soak - dt);
@@ -30455,9 +30515,14 @@ async function buildJadrija(scene) {
     const inRoom = !!K && !!kit && !!kit.cot
       && pt > K.t0 - 0.25 && pt < K.t1 + 0.25
       && ps > K.face + 0.15 && ps < K.s1 + 0.2;
-    if (inRoom && !DOG_IN[s.mode] && s.mode !== 'shake') {
+    // The latch, and where it is lifted: see `dogShoo`. An empty hut is not
+    // something to be banished from, and `inRoom` is you rather than her — so
+    // walk out and he is an ordinary dog again, which is also the one way back
+    // that does not need him to know what she is doing.
+    if (!inRoom) s.shooed = 0;
+    if (inRoom && !s.shooed && !DOG_IN[s.mode] && s.mode !== 'shake') {
       s.mode = 'come'; s.leg = 0;
-    } else if (!inRoom && DOG_IN[s.mode]) {
+    } else if ((!inRoom || s.shooed) && DOG_IN[s.mode]) {
       // Out, from wherever he had got to. Off the cot first if he is on it —
       // `out` walks, and a dog walking out of a hut two feet above the floor is
       // the funniest bug this could have and still a bug.
@@ -32512,6 +32577,26 @@ async function buildJadrija(scene) {
     // branch on her keeps her there — and eleven seconds after you stop is long
     // enough to walk round her and short enough that she is not furniture.
     keptFor: 11,
+    /**
+     * AND THE SAME POSE, ASKED FOR.
+     *
+     * Misha, 17 Sep 2026: *"once she gets on the knees or lies down it should
+     * take her much much longer to revert to another position"*.
+     *
+     * Eleven seconds is right for the hose and wrong for a request, and the
+     * difference is not a preference — it is what the two things are. The jet
+     * is a reaction: you stop pointing it at her, the reason it happened is
+     * over, and the clock that brings her up is measuring how long ago the
+     * water stopped. A request has no jet to stop. She went down because you
+     * asked her to, so what would bring her up is you asking for something
+     * else — and until then a pose she holds for eleven seconds is a pose that
+     * undoes itself while you are still looking at it.
+     *
+     * So the asked numbers are minutes rather than seconds, and they are still
+     * numbers: something has to get her up if you wander off down the beach
+     * and forget, or the hut has a woman in it for the rest of the session.
+     */
+    keptAsked: 95,
     // And the knee shuffle, for when you back off across the room while she is
     // down there. All three numbers are about a room four metres across: a pace
     // that reads as knees and not as a walk, a gap that is far enough to be a
@@ -32543,6 +32628,17 @@ async function buildJadrija(scene) {
     // kneel's eleven, because getting up off your back is a bigger decision
     // than getting up off your heels — and because `situp` is 2.2 s of it.
     cradleFor: 14,
+    /** Asked for rather than hosed into — see `keptAsked`. */
+    cradleAsked: 150,
+    /**
+     * And on the cot, which is longer again.
+     *
+     * Misha: *"sometimes she should 'lie down on the back on the floor' and
+     * sometimes 'lie down on your back on the bed'"*. The floor is a place you
+     * have been put; a bed is a place you have settled on, and seven minutes
+     * is the number that says the difference without being forever.
+     */
+    bedFor: 420,
     // How far off the walls she is pulled before she goes down. A kneeling
     // woman is a 0.6 m footprint and a reclining one is 1.6 m of body laid out
     // BEHIND her, so a spot that was fine to kneel on can put her head through
@@ -32770,6 +32866,11 @@ async function buildJadrija(scene) {
   function errandMark(name) {
     if (!show) return null;
     if (name === 'swim') return [show.t, SHOW.lane[0] - ERRAND.out];
+    // A FETCH GOES WHERE THE LOOK GOES. `fetch.cream` is the slastičarnica's
+    // counter, found the same way the recon finds it — by walking inland from
+    // her lane until the terrace is in the way — because it is the same
+    // counter and a second copy of that search would be a second answer.
+    if (name.startsWith('fetch.cream')) return errandMark('see.slast');
     if (name.startsWith('see.')) {
       const k = name.slice(4);
       if (k === 'vik') {
@@ -32983,6 +33084,56 @@ async function buildJadrija(scene) {
       clamp(show.t + dt0 / L * back, K.t0 + SHOW.reclineOff, K.t1 - SHOW.reclineOff),
       clamp(show.s + ds0 / L * back, K.face + SHOW.reclineOff, K.s1 - SHOW.reclineOff),
     ];
+  }
+
+  /**
+   * And the other place to lie down: the cot.
+   *
+   * Measured off the furniture rather than typed — see `── the cot ──`, which
+   * builds it from `dc` and moved outward on its own when the hut went to two
+   * bays. It is 1.90 m along `s` and 0.70 m across `t`, the pillow is at the
+   * inland end and the folded blanket at the foot, so a body on it lies ALONG
+   * `s` with its head inland. `kit.cot` already carries the middle of it and
+   * the height of the mattress, because the dog needed all three first.
+   *
+   * She is put a shade toward the foot of it: `recline` lays 1.6 m of body out
+   * behind her, so starting on the middle of the mattress puts her head off
+   * the inland end and through the back wall.
+   */
+  function cotSpot() {
+    if (!kit || !kit.cot) return null;
+    return [kit.cot[0], kit.cot[1] - 0.25];
+  }
+
+  /**
+   * Take her down onto her back, in the place that was asked for.
+   *
+   * One copy, three callers: the ask itself when she is already on her knees,
+   * `kept` on the frame the kneel has arrived, and `situp` → `kept` again when
+   * the ask was to move from the floor to the cot or back. The water's own
+   * route into `recline` is left exactly as it was — it has a meter to satisfy
+   * and this has a request, and the only thing they share is the clip.
+   */
+  function lieDown(pt, ps, d, go) {
+    const bed = show.lieWant === 'bed';
+    show.lieWant = null;
+    show.recl = 0;
+    const spot = bed ? cotSpot() : null;
+    show.onBed = spot ? 1 : 0;
+    show.lie = spot || reclineSpot(pt, ps);
+    // ON THE COT SHE IS NOT AIMED AT YOU. Every other way into this pose
+    // starts from a kneel facing whoever asked, and where she is pointed is
+    // what decides where her head ends up — which is fine on an open floor and
+    // wrong on a bed, where the only direction a body can lie is the bed's.
+    // Facing the door lays her out toward the pillow.
+    if (show.onBed) show.want = -Math.PI / 2;
+    showSay('squee', d);
+    // AND THE DOG IS OUT. Misha, 17 Sep 2026: *"if she goes for the bed, the
+    // pug should just run off and not come back"*. He sleeps on that cot — see
+    // `DOG_IN` and the `rest` mode — so this is not a joke about the dog, it
+    // is the bed only having room for one of them.
+    if (show.onBed) dogShoo();
+    go('recline', 'recline', 0.34);
   }
 
   function showCreep(tt, ss, dt) {
@@ -33708,6 +33859,9 @@ async function buildJadrija(scene) {
    * on her while she goes, and a chin that waits for the clip to finish before
    * coming up is a chin that comes up after the moment it was answering.
    */
+  /** The two she is on her back for — the way down and the hold. */
+  const LYING = { recline: 1, cradle: 1 };
+
   const KNEES = { submit: 1, kept: 1, creep: 1,
     // On her back she still drinks it — the mouth, the foam and what runs down
     // her are all the same gesture wherever she is lying.
@@ -33780,7 +33934,16 @@ async function buildJadrija(scene) {
   const ASKABLE = { dwell: 1, meet: 1, leave: 1, idle: 1, play: 1, home: 1,
     orbit: 1, aim: 1, joy: 1, notice: 1, rest: 1, flip: 1, up: 1, wheel: 1,
     down: 1, crawl: 1, bask: 1, hop: 1, out: 1, shimmy: 1, twerk: 1, heart: 1,
-    note: 1 };
+    note: 1,
+    // AND FROM A POSE SHE IS HOLDING, which the first cut of this could not
+    // do. `kept` and `cradle` are ninety-five seconds and two and a half
+    // minutes of held pose now that they can be asked for rather than only
+    // hosed into — so a list that cannot hear a request from either is a list
+    // that stops answering the moment she does what you asked. Asked from the
+    // kneel, "lie down" is the next step; asked from the floor, "on the bed"
+    // is a move; asked from either, the dances and the errands are her getting
+    // up and going, which is what a person does when you change your mind.
+    kept: 1, cradle: 1 };
 
   /**
    * WHAT SHE CAN BE ASKED FOR. Every one of these is a number she already has
@@ -33805,10 +33968,37 @@ async function buildJadrija(scene) {
     // Asking is the other way in, and it adds no animation, which is the rule
     // this whole table is here to keep.
     submit: 1,
+    /**
+     * AND THE FAR END OF THE SAME STAIRCASE.
+     *
+     * Misha, 17 Sep 2026: *"in the kabina, she does kneel, gets on her knees.
+     * but if i say 'lie down on your back' or something equivalent, she says
+     * 'yeah', but doesn't actually do it"*.
+     *
+     * `recline` → `cradle` is the second stage of the hose and it is reached
+     * by holding the branch on her for `reclineIn` once she is already down —
+     * so like the kneel before it, the pose was authored and unaskable. The
+     * three names are one pose and two places: `recline` lets her pick (see
+     * `show.bedTurn`), and the other two are the player naming the place,
+     * because "on the bed" and "on the floor" are different requests and a
+     * game that hears the difference and ignores it is worse than one that
+     * cannot hear it.
+     */
+    recline: 1, 'recline.bed': 1, 'recline.floor': 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
-    'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1 };
+    'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1,
+    /**
+     * AND THE ERRAND THAT COMES BACK WITH SOMETHING IN ITS HAND.
+     *
+     * A recon walks to a place and reports; this walks to the same counter,
+     * buys, walks back and puts it in your hand. The flavour rides on the
+     * name — `fetch.cream:stracciatella` — because `askShow` takes one string
+     * and a second argument would be a new shape for every caller of it,
+     * including the microphone. `askShow` splits it; nothing else has to know.
+     */
+    'fetch.cream': 1 };
 
   /**
    * ── WHAT HAS TO BE TRUE FIRST, AND WHAT IS ALREADY TRUE ────────────────
@@ -33863,6 +34053,39 @@ async function buildJadrija(scene) {
       if (KNEES[show.phase]) return 'already';
       return null;
     }
+    if (name === 'recline' || name === 'recline.bed' || name === 'recline.floor') {
+      // Indoors for `submit`'s reason, and more so: this is 1.6 m of body laid
+      // out on the ground, and the ground out there is a public promenade.
+      if (!sheIsIn()) return 'outside';
+      // Already on her back. `recline` is the way down and `cradle` is the
+      // hold, and asking for it again from either is asking for what is
+      // happening — except for the one case where it is not: she is on the
+      // floor and the ask names the bed, or the other way round, and then
+      // there is somewhere to go.
+      if (LYING[show.phase]) {
+        const wantBed = name === 'recline.bed';
+        const wantFloor = name === 'recline.floor';
+        if ((wantBed && !show.onBed) || (wantFloor && show.onBed)) return null;
+        return 'already';
+      }
+      if (name === 'recline.bed' && (!kit || !kit.cot)) return 'nobed';
+      return null;
+    }
+    if (name.startsWith('fetch.cream')) {
+      // One at a time. She is carrying one or has one on the way, and a second
+      // errand for the same thing is her walking off with the first still in
+      // her hand.
+      if (show.carry) return 'carrying';
+      if (show.job && show.job.buy) return 'onit';
+      if (!SHOPS.find((x) => x.key === SEE.slast)) return 'noshop';
+      // AND IS IT IN THE CASE. `creamOnBoard` reads the counter as
+      // photographed, so "get me a pistachio" is a yes and "get me a
+      // bubblegum" is a no — and saying no is the point: she used to say yes
+      // to anything and come back with nothing, which is the whole complaint.
+      const want = name.slice('fetch.cream'.length).replace(/^:/, '');
+      if (want && !creamOnBoard(want)) return 'noflavour';
+      return null;
+    }
     return null;
   }
 
@@ -33887,7 +34110,24 @@ async function buildJadrija(scene) {
    * water is her own lane's seaward edge and out.
    */
   const ERRAND = {
-    pace: 1.30,        // how much faster than a stroll, on the way there
+    /**
+     * How much faster than a stroll, on the way there.
+     *
+     * Misha, 17 Sep 2026, on being sent for an ice cream: *"can she like run
+     * to it faster?"*. She can, up to a hard ceiling that is worth writing
+     * down because it is not a taste: there is no run in her bank. The walk
+     * clip covers 0.687 m a step and is authored for 1.37 m/s, and the only
+     * thing that keeps her feet on the ground at any other speed is
+     * `showPace`, which scales the clip's clock by the same factor as the
+     * distance — and clamps that factor at 1.75. Past 1.75 the feet slide,
+     * and a figure skating up the promenade is worse than a slow one.
+     *
+     * So: 1.72, a hair under the ceiling. 2.36 m/s, which is a person walking
+     * as fast as they can rather than a person running, and it takes a third
+     * off every round trip. A real run needs a run clip, which is a Blender
+     * job and not a number.
+     */
+    pace: 1.72,
     near: 1.10,        // m — arrived
     out: 7.0,          // m past the edge of her lane that "swimming" is
     swimFor: 16,       // s in the water
@@ -33906,6 +34146,19 @@ async function buildJadrija(scene) {
     at: { tramp: 4.5, swim: 1.10 },
     /** And a recon stands where a customer stands, which is not a point. */
     atSee: 2.5,
+    /**
+     * Seconds at the counter, buying the thing she was sent for.
+     *
+     * Misha, 17 Sep 2026: *"then i ask her to get me the stratchetella, and
+     * she says sure i will get u that, and i think she went, bu tthen didn't
+     * bring me the actual damn ice-cream... i mean i want her to bring back
+     * tha tyummy ice-cream"*.
+     *
+     * A recon is `look` — 3.2 s of standing there reading a board. A purchase
+     * is longer than reading and shorter than a queue: four seconds is asking
+     * for one, watching it be made, and taking it.
+     */
+    buyFor: 4.2,
     /** Her body at the surface, metres under the sea, while she swims. */
     floatY: -0.30,
     /** Seconds of getting in, and of climbing back out. */
@@ -34724,7 +34977,34 @@ async function buildJadrija(scene) {
         showSay('squee', d);
         show.queue.length = 0;
         show.side = 0;
+        show.byAsk = 1;
         go('submit', 'submit', 0.30);
+      } else if (name === 'recline' || name === 'recline.bed'
+          || name === 'recline.floor') {
+        // WHERE, decided once and here. Two of the three names are the player
+        // saying it; the bare one alternates, because *"sometimes she should
+        // 'lie down on the back on the floor' and sometimes 'lie down on your
+        // back on the bed'"* is what was asked for and there is no `rng` in
+        // this build to toss a coin with — the resort is the same resort every
+        // time you load it and that is load-bearing. A latch that flips on
+        // every bare ask is both: deterministic, and not the same answer twice
+        // running.
+        const named = name === 'recline.bed' ? 1 : name === 'recline.floor' ? 0 : -1;
+        const bed = named >= 0 ? named
+          : (show.bedTurn = show.bedTurn ? 0 : 1);
+        show.lieWant = bed && kit && kit.cot ? 'bed' : 'floor';
+        show.byAsk = 1;
+        show.queue.length = 0;
+        show.side = 0;
+        // Three ways in, and all three end in `lieDown` reading `lieWant`.
+        // From her knees it is immediate; from standing the kneel is the route
+        // — `recline` starts from a kneel that is already pointed the right
+        // way and there is nothing in the bank between standing and her back.
+        // From her back it is a MOVE, floor to cot or the other way, and the
+        // only honest way to cross a room is to get up first.
+        if (LYING[show.phase]) go('situp', 'situp', 0.30);
+        else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
+        else go('submit', 'submit', 0.30);
       } else if (name === 'ballet') {
         const bar = barreAt(show.t, show.s);
         if (bar) {
@@ -34733,12 +35013,22 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toBar', 'walk', 0.32);
         } else show.did = null;      // no ladder to hold: she cannot, honestly
-      } else if (ERRANDS[name] || name.startsWith('see.')) {
+      } else if (ERRANDS[name] || name.startsWith('see.')
+          || name.startsWith('fetch.cream')) {
         const mk = errandMark(name);
         const legs = mk ? errandLegs(mk[0], mk[1]) : null;
         if (mk && legs) {
+          // WHAT SHE IS GOING TO BUY, resolved here and once, to the shop's
+          // own spelling — see `creamOnBoard`. An ask with no flavour on it
+          // gets the first named tray in the case rather than a guess at his
+          // taste, and `askWhy` has already turned away anything the counter
+          // does not have.
+          const buy = name.startsWith('fetch.cream')
+            ? (creamOnBoard(name.slice('fetch.cream'.length).replace(/^:/, ''))
+              || creamDefault())
+            : null;
           show.job = { name, t: mk[0], s: mk[1], since: 0, leg: 0, legs,
-            best: null, stall: 0 };
+            best: null, stall: 0, buy };
           show.stuck = null;
           showSay('trill', d);
           go('errand', 'walk', 0.32);
@@ -34922,6 +35212,12 @@ async function buildJadrija(scene) {
 
       case 'kept':
         show.want = Math.atan2(ps - show.s, pt - show.t);
+        // ASKED TO GO FURTHER, and the kneel is the way there rather than the
+        // destination. `lieWant` is set by the ask and read here on the first
+        // frame the kneel has actually arrived, which is why asking from
+        // standing gets a kneel and then a recline and not a body folding
+        // through itself out of a stand.
+        if (show.lieWant) { lieDown(pt, ps, d, go); break; }
         // Up again when the water has been off her a while. `hit` is the grace
         // window the jet refreshes, so holding the branch on her holds the
         // pose — which is the version anybody who finds this will want, and
@@ -34955,7 +35251,9 @@ async function buildJadrija(scene) {
         // than the one this room is.
         if (inside && Math.hypot(pt - show.t, ps - show.s) > SHOW.creepFrom) {
           go('creep', 'knees', 0.35);
-        } else if (show.hit <= 0 && show.tmr > SHOW.keptFor) {
+        } else if (show.hit <= 0
+            && show.tmr > (show.byAsk ? SHOW.keptAsked : SHOW.keptFor)) {
+          show.byAsk = 0;
           go('rise', 'getup', 0.35);
         }
         break;
@@ -34969,10 +35267,21 @@ async function buildJadrija(scene) {
       // start from a kneel that is already facing the right way. It is the
       // *hold* below that stops aiming.
       case 'recline':
-        show.want = Math.atan2(ps - show.s, pt - show.t);
+        // On the cot `want` was set by `lieDown` to the length of the bed and
+        // is left alone; everywhere else she is still aimed at you on the way
+        // down, for `submit`'s reason.
+        if (!show.onBed) show.want = Math.atan2(ps - show.s, pt - show.t);
         if (show.lie) {
           show.t = damp(show.t, show.lie[0], 2.6, dt);
           show.s = damp(show.s, show.lie[1], 2.6, dt);
+        }
+        // And up onto the mattress, over the clip rather than in one frame.
+        // `show.mat` is the trampoline's own term — what she is standing on
+        // that is not the ground — and a cot is the same question with a
+        // smaller answer: 0.44 m of bed against 0.90 m of trampoline.
+        if (show.onBed && kit && kit.cot) {
+          show.mat = damp(show.mat || 0,
+            Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
         }
         if (done) go('cradle', 'cradle', 0.34);
         break;
@@ -34990,7 +35299,17 @@ async function buildJadrija(scene) {
         // No `creep` out of this one. She is on her back — backing off across
         // the room gets you looked at, not followed, and a figure shuffling
         // after somebody from a supine pose is not a thing a body does.
-        if (show.hit <= 0 && show.tmr > SHOW.cradleFor) {
+        // Held on the mattress while she is on it, because the lift is eased
+        // and `cradle` is where the easing finishes.
+        if (show.onBed && kit && kit.cot) {
+          show.mat = damp(show.mat || 0,
+            Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
+        }
+        // Three numbers for one clock: the water's fourteen seconds, a request
+        // measured in minutes — see `keptAsked` — and the cot, which is longer
+        // again because a bed is a place somebody settles.
+        if (show.hit <= 0 && show.tmr > (show.onBed ? SHOW.bedFor
+          : show.byAsk ? SHOW.cradleAsked : SHOW.cradleFor)) {
           go('situp', 'situp', 0.30);
         }
         break;
@@ -35003,6 +35322,11 @@ async function buildJadrija(scene) {
         // And back to facing you on the way up, because everything she does
         // from her knees is done at somebody.
         show.want = Math.atan2(ps - show.s, pt - show.t);
+        // Off the cot on the way up, which is the same easing run backwards —
+        // and unconditional, because `onBed` is cleared below and a lift left
+        // behind is a woman kneeling in mid-air over a bed.
+        if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
+        if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
         // Hosed again halfway up and she goes straight back down, which is the
         // answer anybody would expect and costs one line.
         if (show.hit > 0) { go('recline', 'recline', 0.34); break; }
@@ -35419,10 +35743,10 @@ async function buildJadrija(scene) {
         const CG = j.name === 'tramp' ? SHOPS.find((x) => x.key === 'tramp') : null;
         const inZone = !!CG && show.t > CG.t0 - 1.5 && show.t < CG.t1 + 1.5
           && show.s > CG.s0 - 1.5 && show.s < CG.s1 + 1.5;
-        if (inZone || dist < (j.name.startsWith('see.') ? ERRAND.atSee
+        if (inZone || dist < (j.name.startsWith('see.') || j.buy ? ERRAND.atSee
           : (ERRAND.at[j.name] || ERRAND.near))) {
           j.since = 0;
-          if (j.name.startsWith('see.')) { go('peek', 'idle', 0.35); break; }
+          if (j.name.startsWith('see.') || j.buy) { go('peek', 'idle', 0.35); break; }
           if (j.name === 'swim') go('swim', 'swim', 0.50);
           else {
             // ON TO THE MAT, and the last two metres of it are a snap.
@@ -35511,7 +35835,25 @@ async function buildJadrija(scene) {
         j.gone = (j.gone || 0) + dt;
         show.vel = 0;
         show.want = Math.atan2(1, 0);
-        if (j.since > ERRAND.look) {
+        // BUYING TAKES LONGER THAN READING. A recon is `look` — long enough to
+        // take in a board. A purchase is asking for it, watching it be made
+        // and taking it; see `buyFor`.
+        if (j.buy && j.since > ERRAND.buyFor) {
+          // She has it. What she is carrying is the flavour she was sent for,
+          // and it is on `show` rather than on the job because the job ends
+          // when she gets back and the ice cream does not — it ends when it is
+          // in your hand.
+          show.carry = j.buy;
+          j.since = 0;
+          j.leg = 0;
+          j.best = null;
+          j.stall = 0;
+          j.legs = (j.legs || []).slice(0, -1).reverse().concat([[pt, ps]]);
+          showSay('trill', d);
+          go('backTo', 'walk', 0.34);
+          break;
+        }
+        if (!j.buy && j.since > ERRAND.look) {
           // Counted HERE, on the last frame of looking, and not on the way
           // back — a report is what was there when she was there.
           show.seen = reconLook(j.name, [j.t, j.s]);
@@ -35546,6 +35888,18 @@ async function buildJadrija(scene) {
           const seen = show.seen;
           // How long the whole errand took, which she is entitled to mention.
           if (seen) seen.away = Math.min(900, Math.round(j.gone || 0));
+          // AND SHE HANDS IT OVER. The errand that went for something arrives
+          // holding it, and this is the one frame where that becomes a thing
+          // in YOUR hand: `giveCream` is the whole of the other half — see
+          // src/61-cream.js — and it is asked for by name through `typeof`,
+          // because this file must not care whether that file was built in.
+          if (show.carry) {
+            const flavour = show.carry;
+            show.carry = null;
+            const got = typeof giveCream === 'function' ? giveCream(flavour) : null;
+            show.gave = { flavour, got: got || 'nowhere' };
+            showSay('trill', d);
+          }
           show.job = null;
           show.told = seen || null;
           if (seen && typeof voice !== 'undefined' && voice.report) voice.report(seen);
@@ -40695,6 +41049,9 @@ async function buildJadrija(scene) {
         bones: f.bones.length, clips: f.clips.join('+'), playing: f.playing(),
         pose: +pose.toFixed(5),
         mode: dog.mode, tgt: +dog.tgt.toFixed(2),
+        // And whether he has been sent out of the hut for good — see
+        // `dogShoo`, which is what she taking the cot does to him.
+        shooed: dog.shooed ? 1 : 0,
         timer: +dog.timer.toFixed(2), yaw: +dog.yaw.toFixed(3),
         soak: +dog.soak.toFixed(2),
         // Indoors: how far off the floor he is and how far through the sit.
@@ -40775,6 +41132,13 @@ async function buildJadrija(scene) {
       // whether a woman who is swimming is in the water or over it.
       y: skinFig ? +skinFig.mesh.position.y.toFixed(2) : null,
       dip: +(show.dip || 0).toFixed(2), job: show.job ? show.job.name : null,
+      // What she is lying on and what she was asked for: `mat` is the lift off
+      // the floor (a cot is 0.44 m of it), `onBed` is which of the two places
+      // she went, and `byAsk` is why the hold is minutes rather than seconds.
+      mat: +(show.mat || 0).toFixed(3), onBed: show.onBed ? 1 : 0,
+      byAsk: show.byAsk ? 1 : 0, lieWant: show.lieWant || null,
+      // What she is bringing back, and what happened when she handed it over.
+      carry: show.carry || null, gave: show.gave || null,
       ahead: (() => {
         const o = showAhead(SHOW.look, toWorld(show.t, show.s)[1]);
         return o ? { gap: +o.gap.toFixed(2), out: +o.out.toFixed(2),
@@ -41034,7 +41398,11 @@ async function buildJadrija(scene) {
      * phase she is in can legally be left.
      */
     askShow: (name) => {
-      if (!show || !SHE_CAN[name]) return false;
+      // THE FLAVOUR RIDES ON THE NAME — see `fetch.cream` in SHE_CAN. The
+      // table is checked against the base, so one entry covers every tray in
+      // the case and nothing downstream has to learn a second argument.
+      const base = name && name.startsWith('fetch.cream') ? 'fetch.cream' : name;
+      if (!show || !SHE_CAN[base]) return false;
       // AND WHY NOT, WHEN THERE IS A WHY. Three answers and not two: `false`
       // is a name she does not know, `true` is armed, and a STRING is a name
       // she knows and a reason there is nothing to do with it — "the glass is

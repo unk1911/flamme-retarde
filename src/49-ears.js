@@ -267,7 +267,15 @@ const ears = (() => {
           // this is for, and "cannot do that here" was the wrong answer to it.
           const got = J && J.askShow ? J.askShow(name) : false;
           const ok = got === true;
-          note('baye: ' + (ok ? (DOES[name] || name)
+          // The label is looked up on the BASE of the name, because a fetch
+          // carries what she is fetching on the end of it —
+          // `fetch.cream:stracciatella` — and the panel should say the
+          // flavour rather than have a table entry per tray in the case.
+          const cut = name.indexOf(':');
+          const base = cut > 0 ? name.slice(0, cut) : name;
+          const what = cut > 0 ? name.slice(cut + 1) : '';
+          const label = (DOES[base] || base) + (what ? ' — ' + what : '');
+          note('baye: ' + (ok ? label
             : (WHY[got] || 'cannot do that here')), ok ? 'did' : 'meta');
         }
       }
@@ -301,6 +309,15 @@ const ears = (() => {
     // The kneel, which is `submit` in the phase machine — the same eleven
     // seconds the hose gets you in the kabina. See `SHE_CAN`.
     submit: 'down on her knees',
+    // And the far end of it, which says WHERE, because the ask can name the
+    // place and the bare one picks — see `show.bedTurn` in 43-jadrija.js.
+    recline: 'down on her back',
+    'recline.bed': 'onto the cot',
+    'recline.floor': 'down on her back on the floor',
+    // The errand that comes back holding something. The panel says where she
+    // has gone, the same as the recons; the flavour rides on the name, so the
+    // label is looked up on the base — see `DOES_BASE`.
+    'fetch.cream': 'off to the ice cream place to get you one',
     shimmy: 'her shimmy', heart: 'a heart', note: 'holding up her card',
     wheel: 'cartwheels', joy: 'a somersault',
     // The two she has to go somewhere for, which is why these say where.
@@ -330,6 +347,11 @@ const ears = (() => {
     nokit: 'there is no bottle out here',
     outside: 'not out here on the deck — in the kabina',
     already: 'she is already down there',
+    nobed: 'there is no bed in here',
+    carrying: 'she is already carrying one',
+    onit: 'she has already gone for one',
+    noflavour: 'that one is not in the case',
+    noshop: 'the ice cream place is not open to her',
     gone: 'she is not on the beach',
   };
 

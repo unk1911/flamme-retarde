@@ -424,6 +424,22 @@ SKILLS = {
     # my knees" is a sentence somebody could say and it is not this request.
     "submit": ("get down on her knees in the kabina and stay there",
                [r"\b(kneel\w*|on your knees|onto your knees|to your knees)\b"]),
+    # AND THE FAR END OF THE SAME STAIRCASE. Misha, 17 Sep 2026: *"if i say
+    # 'lie down on your back' or something equivalent, she says 'yeah', but
+    # doesn't actually do it"*, and *"sometimes she should 'lie down on the
+    # back on the floor' and sometimes 'lie down on your back on the bed'"*.
+    #
+    # Three names, because the place is part of the request: the page picks
+    # when nobody says, and does what it is told when somebody does. The two
+    # placed ones are checked FIRST — this dict is ordered and `out[:1]` takes
+    # the first match — so "lie down on the bed" is the cot and not a toss-up.
+    "recline.bed": ("lie down on her back on the cot in the kabina",
+                    [r"\b(lie|lay|lye|get|go)\w*\b.{0,30}\b(bed|cot|bunk|mattress)\b"]),
+    "recline.floor": ("lie down on her back on the floor of the kabina",
+                      [r"\b(lie|lay|lye|get|go)\w*\b.{0,30}\bfloor\b"]),
+    "recline": ("lie down on her back in the kabina, knees up",
+                [r"\b(lie|lay|lye)\s*(down|back)\b|\bon your back\b"
+                 r"|\blie down\b|\blay down\b"]),
     "ballet": ("dance ballet at the barre: a pirouette, a relevé, an "
                "arabesque, going up on her toes",
                [r"\b(ballet|pirouette|piruette|pirouet\w*|releve|relevé|"
@@ -466,6 +482,7 @@ SKILLS = {
 ASK_RE = re.compile(
     r"\b(can|could|would|will|wanna|want to)\s+(you|u)\b"
     r"|\b(please|pls|plz)\b"
+    r"|\b(lie|lay|kneel)\s+(down|back|on)\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
@@ -544,11 +561,74 @@ def buys_of(text: str):
     return None
 
 
+def _flat(x: str) -> str:
+    """A flavour name with the diacritics and the spaces taken out.
+
+    A player says "cokolada" into a microphone and the transcriber does not
+    type the caron, so the match has to survive losing it. NFD splits the
+    letter from its mark and the class below drops the marks.
+    """
+    return re.sub(r"[^a-z0-9]+", "", unicodedata.normalize("NFD", (x or "").lower())
+                  .encode("ascii", "ignore").decode("ascii"))
+
+
+# Asked to BRING one rather than to go and look: "get me a stracciatella",
+# "bring me an ice cream", "can you buy me a cone".
+FETCH_RE = re.compile(r"\b(get|bring|fetch|buy|grab|pick up)\b")
+CREAM_RE = re.compile(r"\b(ice ?cream|gelato|sladoled|cone|scoop)\b")
+
+
+def cream_of(text: str):
+    """The flavour in a sentence, spelled as the counter spells it, or None.
+
+    `GELATO_NAMES` is the case as photographed — see the recon report — so this
+    never invents a flavour: it either finds one of the eleven on the plaques
+    or answers nothing, and the page refuses anything the case does not have.
+    """
+    t = _flat(text)
+    if not t:
+        return None
+    for name in GELATO_NAMES:
+        # The first word of the plaque as well as the whole of it: the board
+        # says "Jogurt Šumsko voće" and nobody asks for all three words.
+        for form in (name, name.split()[0]):
+            f = _flat(form)
+            if len(f) >= 4 and f in t:
+                return name
+    return None
+
+
+def fetch_of(text: str):
+    """`fetch.cream[:flavour]` if the sentence asks her to bring one back.
+
+    Misha, 17 Sep 2026: *"then i ask her to get me the stratchetella, and she
+    says sure i will get u that ... but then didn't bring me the actual damn
+    ice-cream"*. The flavour rides on the name because `askShow` in
+    src/43-jadrija.js takes one string — see `SHE_CAN['fetch.cream']`.
+    """
+    t = (text or "").lower()
+    if not FETCH_RE.search(t):
+        return None
+    flavour = cream_of(t)
+    # A named flavour is a request for an ice cream whether or not the words
+    # "ice cream" are in the sentence — "get me a stracciatella" is not
+    # ambiguous. Without a flavour the sentence has to name the thing.
+    if not flavour and not CREAM_RE.search(t):
+        return None
+    return "fetch.cream:" + flavour if flavour else "fetch.cream"
+
+
 def skills_of(text: str) -> list:
     """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
     t = (text or "").lower()
     if not ASK_RE.search(t):
         return []
+    # THE FETCH GOES FIRST, because it shares its nouns with the recon: "go see
+    # what ice creams they have" is `see.slast` and "get me an ice cream" is
+    # this, and the difference is the verb rather than the noun.
+    fetch = fetch_of(t)
+    if fetch:
+        return [fetch]
     out = []
     for name, (_desc, pats) in SKILLS.items():
         if all(re.search(p, t) for p in pats):
