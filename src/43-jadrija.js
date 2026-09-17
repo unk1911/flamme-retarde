@@ -28690,6 +28690,11 @@ async function buildJadrija(scene) {
   };
   let castNatH = null;                  // blob -> how tall it stands, in metres
   let castSlot = null;                  // roving slot -> which blob it is
+  // The same eight parses, kept for the people on bicycles and scooters, who
+  // are built three thousand lines down and are not part of the crowd. Hoisted
+  // for the reason `PHONE` is: `parsed` is a block-scoped const in there and a
+  // name declared beside the riders would be unreachable from this block.
+  let wheelBlobs = null;
   {
     // Eight blobs, thirty-two people.
     //
@@ -28739,6 +28744,7 @@ async function buildJadrija(scene) {
       parsed.push(skin);
       CAST_KIND.push(BATHER_CAST[i]);
     });
+    wheelBlobs = { parsed, kinds: CAST_KIND, opt: SKINOPT };
     // WHO IS ON THEIR PHONE. Seated people, two in five, and split three to
     // one between looking at it and talking into it — which is roughly what a
     // café terrace looks like and is the only part of this anybody would
@@ -37690,6 +37696,26 @@ async function buildJadrija(scene) {
         pushBody(b.x, b.z, BODY.r, b.y, b.y + BODY.top, 'buck', -1);
       }
     }
+    // AND THE BICYCLES AND SCOOTERS, which are not in `soft` because they are
+    // not in `crowds` — see `wheelers`. The rider does all the avoiding and
+    // gives you 1.2 m, so a moving one never arrives; this is for the one
+    // stopped at an angle to let somebody by, which measured, walking down
+    // its lane at it, you could otherwise walk straight through the front
+    // wheel of. Discs along the machine and not one round its middle, the
+    // sunbather's answer for the same shape — three for a bicycle, because
+    // with two, 1.1 m apart, you could stand between them 0.40 m off the top
+    // tube, which is inside the rider's knee. Only while drawn, like her. The
+    // kind is its own: `bumpReact` ignores it, and the thud still sounds.
+    //
+    // Read at run time only: `wheelers` is declared further down this file,
+    // and nothing calls this until the collider does, after the build.
+    for (const r of wheelers) {
+      if (!r.fig.mesh.visible || r.t < t - band - 1.5 || r.t > t + band + 1.5) continue;
+      const hx = Math.cos(r.yaw), hz = -Math.sin(r.yaw), hl = r.bike ? 0.55 : 0.30;
+      pushBody(r.x + hx * hl, r.z + hz * hl, 0.34, r.y, r.y + 1.85, 'rider', r.i);
+      pushBody(r.x - hx * hl, r.z - hz * hl, 0.34, r.y, r.y + 1.85, 'rider', r.i);
+      if (r.bike) pushBody(r.x, r.z, 0.34, r.y, r.y + 1.85, 'rider', r.i);
+    }
     return bodyN;
   }
   /** The shared buffer `bodies` fills. Read it, do not keep it. */
@@ -38123,6 +38149,1175 @@ async function buildJadrija(scene) {
   const allFolk = () => (folkFlat
     || (folkFlat = Object.values(crowds).flatMap((c) => c.figures)));
 
+  // ── on two wheels ──────────────────────────────────────────────────────────
+  //
+  // Misha, 17 Sep: "many folks in jadrija use e-scooters and bicycles, maybe u
+  // can put a few folks on them things just to make it more authentic."
+  //
+  // Five of them: three bicycles and two e-scooters, which is a few and not a
+  // parade. What they are built from follows from where they have to be seen.
+  //
+  // SKINNED, AND NEVER THE MARIONETTES. The instanced crowd could have carried
+  // five more people for no draw calls at all, and it would have been the
+  // wrong tier: every person within fifteen metres of you on this promenade is
+  // a blob now — `tierCount(15)` read eleven skinned and none instanced at
+  // t 290 before this went in — and a rider is the one figure GUARANTEED to
+  // come inside fifteen metres, fast, and pass you. So each is one of the eight
+  // baked bathers on a skinned figure of their own, sharing the crowd's parse
+  // (`wheelBlobs`), and posed not by a clip but by solving the limbs on to the
+  // machine: hips on the saddle, hands on the grips, feet on the pedals.
+  //
+  // AND NOT IN `crowds`. Everything that machinery does — the greeting, the
+  // chatter, the bump, the roving slots, the walkers stepping round each other
+  // — is written for somebody at a stroll who can stop, turn and wave, and a
+  // cyclist at 4.6 m/s is none of that. A rider handed to `stepGreet` is a
+  // rider who brakes to say hello. So they live beside the crowd, and the
+  // avoiding is theirs to do: pedestrians on a promenade do not get out of the
+  // way of a bicycle, the bicycle goes round them.
+  //
+  // NOTHING HERE DRAWS OFF `rng` (rule 4). Which stretch, which lane, which
+  // way round and how far along is `jit` off the rider's index, and everything
+  // after that is a clock.
+  const WHEELS = {
+    // Who, on what, at what cruising speed, over which stretch, in which paint.
+    //
+    // Adults only, off `BATHER_CAST`. The stretches are the open promenade
+    // from beach bar MINI to the far end of the kabine, and nothing else.
+    //
+    // Not west of the konoba: its terrace is a pad laid right across the
+    // promenade from t 239.5 to 253 — measured, `standY` steps 0.26 m up at
+    // one end and 0.11 m down at the other over the full width from s 9.2 to
+    // 15 — and a walker takes that in a stride where a wheel does not. West of
+    // it is 17 m of deck and then shingle over the sand of Strand Jadrija.
+    //
+    // And not through MINI's own tables either, t 264 to 284, which leave one
+    // gap a machine wide on the sea side. The first run turned three riders
+    // round in it at the same spot and they waited for each other for ninety
+    // seconds. East of about t 524 a structure crosses the deck to within two
+    // metres of the kabine. A bicycle on a beach, or through a café, is the
+    // wrong thing to be authentic about.
+    //
+    // Speeds are what an e-scooter and a bicycle actually do on a promenade
+    // with people on it — 5 to 5.6 and 4.6 — and two much slower, because an
+    // older couple pedalling to the water at a walking pace and a half is the
+    // commonest bicycle at a Dalmatian bathing station.
+    cast: [
+      // The ends are staggered by seven or eight metres, so that no two of
+      // them are ever swinging round in the same patch of concrete.
+      { who: 'man_young_fit', on: 'scoot', v: 5.6, t0: 289, t1: 521, paint: 0 },
+      { who: 'woman_young_slim', on: 'bike', v: 4.6, t0: 296, t1: 472, paint: 0 },
+      { who: 'man_old_heavy', on: 'bike', v: 3.3, t0: 304, t1: 513, paint: 1 },
+      { who: 'man_young_lean', on: 'scoot', v: 5.0, t0: 312, t1: 498, paint: 1 },
+      { who: 'woman_old', on: 'bike', v: 2.9, t0: 334, t1: 506, paint: 2,
+        low: true, basket: true },
+    ],
+    // KEEP RIGHT. Facing +t the shore normal points to your LEFT — `n` is
+    // `(uz, -ux)` and a Three.js right vector is `(-fz, 0, fx)` — so the sea is
+    // on the right going east and the east-bound lane is the seaward one.
+    // `jit` spreads each rider's pair by up to 0.4 m so that five of them are
+    // not wearing the same two ruts.
+    east: 11.0, west: 14.2, spread: 0.8, apart: 1.9,
+    // The strip they may use at all. 9.2 is 0.8 m off the step down to the
+    // middle terrace; 15.8 stops short of the seam where the slab gives way to
+    // the flags, which stand `PAVE_LIFT` proud and are a lip under a wheel.
+    band: [9.2, 15.8],
+    // The planning grid, in metres along and across.
+    dT: 0.5, dS: 0.2,
+    // What a planned lane keeps clear of a blocker: half a machine and a
+    // margin, across and along. Anything under `kerb` over the deck is ridden
+    // over; a 0.19 m plinth is not.
+    padS: 0.72, padT: 0.45, kerb: 0.06,
+    // A step in the deck a wheel will not take, per grid cell. 0.06 over half
+    // a metre is a 12 per cent ramp — the konoba's apron is ridden, its edge
+    // is not.
+    stepT: 0.06, stepS: 0.035,
+    // The turn at either end: how far past the end it bulges, how fast it is
+    // taken, and the narrowest pair of lanes it may join.
+    turnT: 2.2, turnV: 2.0, turnGap: 2.2,
+    // How far ahead a rider looks for people: a fixed stretch plus this many
+    // seconds at the current speed.
+    look: [3.0, 1.5],
+    // Centre-to-centre clearances. A bather is 0.24 m of radius and a machine
+    // is 0.33 m of half-width, so 0.95 leaves a shoulder's width of air; Baye
+    // gets a wide berth because she cartwheels, and you get a bit more than a
+    // stranger because you are the one who notices.
+    clear: 0.95, clearBaye: 1.7, clearYou: 1.2, clearWheel: 1.25,
+    // m/s sideways while dodging, and while drifting back to the lane, and
+    // m/s² for how fast that sideways speed may change.
+    steer: 1.1, drift: 0.40, swerve: 9.0,
+    // m/s² — a bicycle speeds up gently and brakes hard.
+    accel: 1.1, brake: 3.2,
+    // How far off its lane the steering may take a rider, before the grid
+    // has its own say.
+    wide: 1.4,
+    // Drawn inside this many metres, and re-posed every frame, every third and
+    // every eighth inside the other two. The crowd's own numbers.
+    far: 240, poseNear: 45, poseMid: 110,
+    // The drivetrain: crank radius, gear, wheel circumference in metres. 4.6 m
+    // per second is 2.1 turns of a 0.34 m wheel and about 66 rpm at the
+    // pedals, which is a relaxed cadence and not a spin.
+    crank: 0.17, gear: 1.9, circ: 2.14,
+  };
+
+  // The paint. Plain colours and not a letter anywhere — rule 12, and the
+  // shared-scooter liveries are the one thing on this list that would have
+  // been easy to get wrong by being specific.
+  const WHEEL_PAINT = {
+    bike: [[0.150, 0.300, 0.228], [0.735, 0.715, 0.655], [0.520, 0.128, 0.108]],
+    scoot: [[0.092, 0.092, 0.100], [0.540, 0.556, 0.560]],
+  };
+
+  /** A four-sided tube between two points, in a vehicle's own frame. */
+  function wheelTube(b, A, B, r, col) {
+    const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
+    const L = Math.hypot(dx, dy, dz) || 1;
+    const d = [dx / L, dy / L, dz / L];
+    // Across the machine, unless the tube already runs across it.
+    const w = Math.abs(d[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
+    let u = [d[1] * w[2] - d[2] * w[1], d[2] * w[0] - d[0] * w[2],
+      d[0] * w[1] - d[1] * w[0]];
+    const lu = Math.hypot(u[0], u[1], u[2]) || 1;
+    u = [u[0] / lu * r, u[1] / lu * r, u[2] / lu * r];
+    const v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2],
+      d[0] * u[1] - d[1] * u[0]];
+    const P = (Q, a, c) => [Q[0] + u[0] * a + v[0] * c, Q[1] + u[1] * a + v[1] * c,
+      Q[2] + u[2] * a + v[2] * c];
+    const ring = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+    for (let k = 0; k < 4; k++) {
+      const [a0, c0] = ring[k], [a1, c1] = ring[(k + 1) % 4];
+      b.quad(P(A, a0, c0), P(B, a0, c0), P(B, a1, c1), P(A, a1, c1),
+        k % 2 ? col : shade(col, 1.14));
+    }
+  }
+
+  /**
+   * A wheel standing in the machine's own plane: tread, two sidewalls, a flat
+   * rim and a hub. `spokes` draws three diameters across it, which is what
+   * makes a 0.68 m ring read as a bicycle wheel rather than as a hoop; a
+   * scooter's small wheel is solid, so it gets a disc instead.
+   */
+  function wheelRim(b, cx, cy, R, w, tyre, rim, spokes) {
+    const N = 14, Ri = R - 0.042, Rr = R - 0.070;
+    const p = (a, r, z) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r, z];
+    for (let j = 0; j < N; j++) {
+      const a0 = j / N * TAU, a1 = (j + 1) / N * TAU;
+      b.quad(p(a0, R, -w), p(a1, R, -w), p(a1, R, w), p(a0, R, w), tyre);
+      b.quad(p(a0, Ri, -w), p(a1, Ri, -w), p(a1, R, -w), p(a0, R, -w), tyre);
+      b.quad(p(a0, R, w), p(a1, R, w), p(a1, Ri, w), p(a0, Ri, w), tyre);
+      if (spokes) {
+        b.quad(p(a0, Rr, 0), p(a1, Rr, 0), p(a1, Ri, 0), p(a0, Ri, 0), rim);
+      } else {
+        b.tri(p(a0, Ri, 0), p(a1, Ri, 0), [cx, cy, 0], rim);
+      }
+    }
+    if (spokes) {
+      for (let k = 0; k < 3; k++) {
+        const a = k / 3 * Math.PI + 0.3, e = 0.004;
+        const c = Math.cos(a), s = Math.sin(a);
+        b.quad([cx + c * Rr - s * e, cy + s * Rr + c * e, 0],
+          [cx - c * Rr - s * e, cy - s * Rr + c * e, 0],
+          [cx - c * Rr + s * e, cy - s * Rr - c * e, 0],
+          [cx + c * Rr + s * e, cy + s * Rr - c * e, 0], rim);
+      }
+    }
+    b.box(cx, cy, 0, 0.05, 0.05, w * 2 + 0.03, rim);
+  }
+
+  // The grips are swept back from the stem to 0.18 m ahead of the bottom
+  // bracket and stand at 1.08, which is a Dutch bar and not a racing one. They
+  // were at 0.29 and 1.00 first, and every rider came out leaning 33 to 36
+  // degrees into them — a road-bike crouch on a promenade.
+  const WHEEL_BIKE = { axle: 0.54, R: 0.34, bb: [-0.06, 0.29], bar: [0.18, 1.08],
+    stem: [0.36, 1.04], grip: 0.27, seatK: 0.325, clamp: 0.84 };
+
+  /**
+   * A city bicycle, in its own frame: +x forward, +y up, +z to the rider's
+   * right, the origin on the ground halfway between the axles. The same frame
+   * the rig uses, so a point on the machine is a point on the rider less the
+   * figure's offset and nothing has to be turned.
+   *
+   * The saddle is set for whoever rides it — see THE SADDLE IS SET FOR THE
+   * RIDER where they are built — and the rest is a 1.08 m wheelbase on 0.34 m
+   * wheels, an upright bar, a rear rack, and for one of them a step-through
+   * frame and a basket. The cranks are their own mesh, because they go round.
+   */
+  function wheelBike(seatY, col, low, basket) {
+    const b = propBuilder(), c = propBuilder();
+    const K = WHEEL_BIKE;
+    const TYRE = [0.058, 0.058, 0.062], RIM = [0.600, 0.610, 0.620];
+    const DARK = [0.095, 0.092, 0.090], STEEL = [0.520, 0.530, 0.540];
+    for (const x of [-K.axle, K.axle]) wheelRim(b, x, K.R, K.R, 0.019, TYRE, RIM, true);
+    const BB = [K.bb[0], K.bb[1], 0];
+    const at2 = (y) => [K.bb[0] - (y - K.bb[1]) * K.seatK, y, 0];
+    const clY = Math.min(seatY - 0.10, K.clamp);
+    const CL = at2(clY), SEAT = at2(seatY);
+    const HT = [0.40, 0.86, 0], HB = [0.45, 0.66, 0];
+    wheelTube(b, BB, CL, 0.020, col);
+    wheelTube(b, CL, SEAT, 0.012, STEEL);
+    if (low) {
+      // The step-through: the top tube comes down to meet the down tube low,
+      // which is the frame a woman of seventy rides to the beach on.
+      wheelTube(b, [BB[0] + 0.10, BB[1] + 0.10, 0], [HB[0] - 0.02, HB[1] + 0.05, 0], 0.020, col);
+    } else {
+      wheelTube(b, CL, HT, 0.018, col);
+    }
+    wheelTube(b, BB, HB, 0.022, col);
+    for (const z of [-0.055, 0.055]) {
+      wheelTube(b, [BB[0], BB[1], z * 0.5], [-K.axle, K.R, z], 0.011, col);
+      wheelTube(b, [CL[0], CL[1], z * 0.3], [-K.axle, K.R, z], 0.010, col);
+      wheelTube(b, [HB[0], HB[1], z * 0.6], [K.axle, K.R, z * 0.8], 0.012, col);
+    }
+    wheelTube(b, HT, HB, 0.024, col);
+    wheelTube(b, HT, [K.stem[0], K.stem[1], 0], 0.014, STEEL);
+    // The bar, swept back to the grips, and the grips.
+    wheelTube(b, [K.stem[0], K.stem[1], -0.14], [K.stem[0], K.stem[1], 0.14], 0.011, STEEL);
+    for (const s of [-1, 1]) {
+      wheelTube(b, [K.stem[0], K.stem[1], s * 0.14], [K.bar[0] + 0.06, K.bar[1], s * (K.grip - 0.04)], 0.011, STEEL);
+      wheelTube(b, [K.bar[0] + 0.07, K.bar[1], s * (K.grip - 0.05)], [K.bar[0] - 0.03, K.bar[1], s * (K.grip + 0.03)], 0.017, DARK);
+    }
+    // Saddle and rack.
+    b.box(SEAT[0] + 0.03, seatY + 0.025, 0, 0.26, 0.05, 0.14, DARK, [0.180, 0.130, 0.090]);
+    b.box(-0.40, 0.735, 0, 0.34, 0.02, 0.13, STEEL);
+    wheelTube(b, [-0.24, 0.735, 0], [CL[0] - 0.02, CL[1] - 0.04, 0], 0.008, STEEL);
+    for (const z of [-0.06, 0.06]) wheelTube(b, [-0.55, 0.735, z], [-K.axle, K.R, z], 0.008, STEEL);
+    if (basket) {
+      // Wicker, on the front, with a towel in it.
+      b.box(K.axle + 0.08, 0.93, 0, 0.26, 0.20, 0.33, [0.520, 0.380, 0.220], [0.300, 0.500, 0.620]);
+    }
+    // The cranks, in their own frame at the bottom bracket, pointing straight
+    // up and down so that `rotation.z = -phase` puts the right pedal at the
+    // top at phase nought and carries it forward.
+    for (const s of [-1, 1]) {
+      wheelTube(c, [0, 0, s * 0.09], [0, s * WHEELS.crank, s * 0.09], 0.012, STEEL);
+      c.box(0, s * WHEELS.crank, s * 0.150, 0.10, 0.025, 0.09, DARK);
+    }
+    wheelRim(c, 0, 0, 0.10, 0.004, DARK, [0.300, 0.300, 0.310], false);
+    return { geo: b.geo(), crank: c.geo(), tris: (b.count() + c.count()) / 3 };
+  }
+
+  /**
+   * An e-scooter, in the same frame: a low deck, two small solid wheels, a
+   * stem raked back to a bar at about a metre. Dark, with nothing written on
+   * it.
+   */
+  const WHEEL_SCOOT = { deck: 0.155, bar: [0.36, 1.10], grip: 0.21 };
+  function wheelScoot(col) {
+    const b = propBuilder();
+    const K = WHEEL_SCOOT;
+    const TYRE = [0.055, 0.055, 0.058], HUB = [0.300, 0.305, 0.310];
+    const DARK = [0.080, 0.080, 0.085];
+    wheelRim(b, -0.44, 0.10, 0.10, 0.026, TYRE, HUB, false);
+    wheelRim(b, 0.45, 0.11, 0.11, 0.026, TYRE, HUB, false);
+    b.box(-0.03, K.deck - 0.035, 0, 0.74, 0.07, 0.17, col, [0.120, 0.120, 0.125]);
+    b.box(-0.45, 0.215, 0, 0.22, 0.015, 0.075, col);
+    wheelTube(b, [0.30, 0.12, 0], [0.42, 0.21, 0], 0.030, col);
+    wheelTube(b, [0.42, 0.21, 0], [K.bar[0], K.bar[1], 0], 0.021, col);
+    for (const z of [-0.03, 0.03]) wheelTube(b, [0.42, 0.21, z], [0.45, 0.11, z], 0.010, col);
+    wheelTube(b, [K.bar[0], K.bar[1], -K.grip - 0.04], [K.bar[0], K.bar[1], K.grip + 0.04], 0.012, col);
+    for (const s of [-1, 1]) {
+      wheelTube(b, [K.bar[0], K.bar[1], s * (K.grip - 0.05)], [K.bar[0], K.bar[1], s * (K.grip + 0.05)], 0.017, DARK);
+    }
+    b.box(K.bar[0] + 0.01, K.bar[1] + 0.025, 0, 0.06, 0.02, 0.07, DARK);
+    b.box(0.385, 0.90, 0, 0.03, 0.045, 0.055, [0.820, 0.820, 0.780]);
+    return { geo: b.geo(), crank: null, tris: b.count() / 3 };
+  }
+
+  // Scratch, because a solve runs a few times a frame per rider.
+  const _wkA = new THREE.Vector3(), _wkB = new THREE.Vector3();
+  const _wkC = new THREE.Vector3(), _wkD = new THREE.Vector3();
+  const _wkE = new THREE.Vector3(), _wkP = new THREE.Vector3();
+  const _wkQ = new THREE.Quaternion(), _wkR = new THREE.Quaternion();
+  const _wkS = new THREE.Quaternion(), _wkZ = new THREE.Vector3(0, 0, 1);
+  const _wkY = new THREE.Vector3(0, 1, 0), _wkPole = new THREE.Vector3();
+
+  /**
+   * Two bones from `root` to `goal`, the middle joint bending towards `pole`,
+   * written on to the figure as `aim`s. Returns the rotation the chain has
+   * put on everything below it, for the foot or the hand.
+   *
+   * The rest points come in already carried by whatever the ancestors did —
+   * the arms are handed their shoulders leaned by the spine — so the solve
+   * itself never needs to know there were ancestors. `aim` composes in figure
+   * space, outside the parent's rotation, which is why the lower bone's rest
+   * direction is turned by the upper bone's answer before it is asked where it
+   * has to go: the same order `greetArm` in 42-crowd.js takes a wave in.
+   */
+  function wheelLimb(fig, nU, nL, root, mid, end, goal, pole) {
+    const l1 = mid.distanceTo(root), l2 = end.distanceTo(mid);
+    const D = _wkA.copy(goal).sub(root);
+    const dl = D.length() || 1e-3;
+    const u = D.multiplyScalar(1 / dl);
+    const d = clamp(dl, Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
+    const ca = clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
+    const sa = Math.sqrt(1 - ca * ca);
+    const v = _wkB.copy(pole).addScaledVector(u, -pole.dot(u));
+    if (v.lengthSq() < 1e-8) v.set(1, 0, 0).addScaledVector(u, -u.x);
+    v.normalize();
+    // Where the knee or the elbow goes, and the two directions that follow.
+    const dirU = _wkC.copy(u).multiplyScalar(ca).addScaledVector(v, sa);
+    const knee = _wkD.copy(root).addScaledVector(dirU, l1);
+    const dirL = _wkE.copy(root).addScaledVector(u, d).sub(knee).normalize();
+    const restU = _wkP.copy(mid).sub(root).normalize();
+    _wkQ.setFromUnitVectors(restU, dirU);
+    const restL = _wkP.copy(end).sub(mid).normalize().applyQuaternion(_wkQ);
+    _wkR.setFromUnitVectors(restL, dirL);
+    armAimQ(fig, nU, _wkQ);
+    armAimQ(fig, nL, _wkR);
+    return _wkS.multiplyQuaternions(_wkR, _wkQ);
+  }
+
+  /** Every bone this needs, where the frozen `idle` put it. Null if any is missing. */
+  function wheelRest(fig) {
+    const out = {};
+    for (const n of ['pelvis', 'spine01', 'neck', 'legUL', 'legLL', 'footL', 'toeL',
+      'legUR', 'legLR', 'footR', 'toeR', 'armUL', 'armLL', 'handL',
+      'armUR', 'armLR', 'handR']) {
+      const i = fig.boneIndex(n);
+      if (i < 0) return null;
+      out[n] = fig.boneAt(i, new THREE.Vector3());
+    }
+    return out;
+  }
+
+  const wheelers = [];
+  let wheelTris = 0, wheelMachineTris = 0;
+  // The grid the lanes are planned on, and the length of `blockers` it was
+  // planned against. See `wheelPlan`.
+  const WG = { t0: 0, rows: 0, cols: 0, busy: null, forced: 0, turnsBad: 0 };
+  let wheelPlanAt = -1;
+  let wheelFrame = 0;
+  // Set by `wheels.hold` and by nothing in the game: stops the riders where
+  // they are and keeps posing them, so a screenshot can be aimed at somebody
+  // doing five metres a second.
+  let wheelHold = false;
+
+  if (wheelBlobs && wheelBlobs.parsed.length) {
+    const mat = solidMaterial(0xffffff, {
+      spec: 0.16, specPower: 36, side: THREE.DoubleSide, body: FACE,
+    });
+    WHEELS.cast.forEach((c, i) => {
+      const k = wheelBlobs.kinds.indexOf(c.who);
+      if (k < 0) return;
+      const fig = skinnedFigure(wheelBlobs.parsed[k], wheelBlobs.opt);
+      // `idle` held at a frame and never advanced. The clip is only the rest
+      // the solve starts from; everything a rider does with their body is an
+      // `aim`, and a standing idle breathing under a solve would move the
+      // hands off the grips by however far the chest rose.
+      if (!fig.play('idle', { fade: 0, from: 1.1 + jit(i, 9311) * 2 })) return;
+      fig.state.speed = 0;
+      fig.update(0);
+      const R = wheelRest(fig);
+      if (!R) return;
+      fig.mesh.frustumCulled = false;
+      const bike = c.on === 'bike';
+      const sdL = Math.sign(R.legUL.z) || -1, sdR = -sdL;
+      const hip = _wkA.copy(R.legUL).add(R.legUR).multiplyScalar(0.5);
+      const leg = (R.legLL.distanceTo(R.legUL) + R.footL.distanceTo(R.legLL)
+        + R.legLR.distanceTo(R.legUR) + R.footR.distanceTo(R.legLR)) * 0.5;
+      const arm = (R.armLL.distanceTo(R.armUL) + R.handL.distanceTo(R.armLL)
+        + R.armLR.distanceTo(R.armUR) + R.handR.distanceTo(R.armLR)) * 0.5;
+      // Where the figure's own origin sits in the machine's frame.
+      const F = new THREE.Vector3();
+      let seatY = 0;
+      let grip, gripW, deck = 0;
+      if (bike) {
+        // THE SADDLE IS SET FOR THE RIDER, the way anybody sets one: at the
+        // bottom of the stroke the leg is nearly straight. Found by bisection
+        // along a 72 degree seat tube, with the hip joint 0.09 m over the
+        // saddle top and a touch forward of the seat post, and the ankle
+        // 0.085 m over a pedal at bottom dead centre.
+        const K = WHEEL_BIKE;
+        const ankX = K.bb[0] - 0.075, ankY = K.bb[1] - WHEELS.crank + 0.085;
+        let lo = 0.60, hi = 1.20;
+        for (let n = 0; n < 24; n++) {
+          const y = (lo + hi) * 0.5;
+          const hx = K.bb[0] - (y - K.bb[1]) * K.seatK + 0.05, hy = y + 0.09;
+          if (Math.hypot(hx - ankX, hy - ankY) < leg * 0.95) lo = y; else hi = y;
+        }
+        seatY = lo;
+        F.set(K.bb[0] - (seatY - K.bb[1]) * K.seatK + 0.05 - hip.x,
+          seatY + 0.09 - hip.y, -hip.z);
+        grip = K.bar; gripW = K.grip;
+      } else {
+        // Standing on the deck, a little down into the knees, hips over the
+        // gap between the feet.
+        const K = WHEEL_SCOOT;
+        deck = K.deck;
+        F.set(-hip.x, deck - 0.035, -hip.z);
+        grip = K.bar; gripW = K.grip;
+      }
+      // The lean: the least that brings both wrists within 0.93 of an arm's
+      // length of their grips. A city bicycle is ridden nearly upright and a
+      // scooter completely, so this comes out small, and it is solved rather
+      // than typed because the eight bodies are 1.24 to 1.84 m.
+      const P0 = R.spine01;
+      const wrist = (sd) => _wkB.set(grip[0] - 0.045 - F.x, grip[1] + 0.03 - F.y,
+        sd * gripW - F.z);
+      const reach = (th) => {
+        _wkQ.setFromAxisAngle(_wkZ, -th);
+        let worst = 0;
+        for (const [S, sd] of [[R.armUL, sdL], [R.armUR, sdR]]) {
+          const sh = _wkC.copy(S).sub(P0).applyQuaternion(_wkQ).add(P0);
+          worst = Math.max(worst, sh.distanceTo(wrist(sd)));
+        }
+        return worst;
+      };
+      let lean = bike ? 0.10 : 0.0;
+      for (let n = 0; n < 30 && lean < 0.6 && reach(lean) > arm * 0.93; n++) lean += 0.02;
+      // The arms, leaned once and kept: the lean does not change.
+      _wkQ.setFromAxisAngle(_wkZ, -lean);
+      const leaned = (p) => p.clone().sub(P0).applyQuaternion(_wkQ).add(P0);
+      const arms = [
+        { sd: sdL, u: 'armUL', l: 'armLL', S: leaned(R.armUL), E: leaned(R.armLL), W: leaned(R.handL) },
+        { sd: sdR, u: 'armUR', l: 'armLR', S: leaned(R.armUR), E: leaned(R.armLR), W: leaned(R.handR) },
+      ];
+      for (const A of arms) A.goal = wrist(A.sd).clone();
+      const legs = [
+        { sd: sdL, u: 'legUL', l: 'legLL', f: 'footL', H: R.legUL, K: R.legLL, A: R.footL, T: R.toeL },
+        { sd: sdR, u: 'legUR', l: 'legLR', f: 'footR', H: R.legUR, K: R.legLR, A: R.footR, T: R.toeR },
+      ];
+      // A scooter is ridden one foot ahead of the other, and which foot is
+      // the rider's own.
+      const front = jit(i, 9312) < 0.5 ? 0 : 1;
+      for (let n = 0; n < 2; n++) {
+        const L = legs[n];
+        L.ankleY = L.A.y;
+        L.toe = L.T.clone().sub(L.A);
+        if (!bike) {
+          const fx = n === front ? 0.15 : -0.17;
+          L.goal = new THREE.Vector3(fx - 0.06 - F.x, deck + L.ankleY - F.y,
+            L.sd * 0.062 - F.z);
+          // The back foot turns out across the deck, the front one points
+          // down it.
+          L.dir = n === front ? new THREE.Vector3(1, -0.03, 0).normalize()
+            : new THREE.Vector3(0.80, -0.03, L.sd * 0.60).normalize();
+        } else {
+          L.goal = new THREE.Vector3();
+          L.dir = new THREE.Vector3(1, -0.22, 0).normalize();
+        }
+      }
+      const paint = WHEEL_PAINT[c.on][c.paint % WHEEL_PAINT[c.on].length];
+      const g = bike ? wheelBike(seatY, paint, !!c.low, !!c.basket) : wheelScoot(paint);
+      const veh = new THREE.Mesh(g.geo, mat);
+      veh.name = 'wheels:' + c.who;
+      scene.add(veh);
+      let crank = null;
+      if (g.crank) {
+        crank = new THREE.Mesh(g.crank, mat);
+        crank.position.set(WHEEL_BIKE.bb[0], WHEEL_BIKE.bb[1], 0);
+        veh.add(crank);
+      }
+      scene.add(fig.mesh);
+      wheelTris += g.tris + fig.tris;
+      wheelMachineTris += g.tris;
+      // Six per cent either way on the cruise, so two on the same machine at
+      // the same nominal speed are not riding in formation.
+      const cruise = c.v * (0.94 + jit(i, 9313) * 0.12);
+      wheelers.push({
+        i, c, fig, veh, crank, F, arms, legs, lean, bike, seatY,
+        v: cruise, vCruise: cruise,
+        dir: jit(i, 9314) < 0.5 ? 1 : -1,
+        // Where along its stretch it starts. Planned lanes are filled in on
+        // the first step; until then this is just a number.
+        u0: jit(i, 9315),
+        t: 0, s: 12, off: 0, offV: 0, seg: 'lane', arc: 0, arcFrom: 0, arcTo: 0, turnAt: 0,
+        x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, yawRate: 0, placed: false,
+        fT: 0, fS: 0, bT: 0, bS: 0,
+        phase: jit(i, 9316) * TAU, clock: jit(i, 9317) * 40,
+        look: 0, posed: false, gap: Infinity, whyJ: 0, whyT: 0, whyS: 0, whyBox: false,
+        lanes: null,
+      });
+    });
+  }
+
+  /**
+   * Plan every rider's two lanes against the static world.
+   *
+   * On a grid half a metre along by twenty centimetres across, over the whole
+   * stretch the five of them use: a cell is busy if a blocker taller than a
+   * kerb stands within half a machine and a margin of it, or if the deck
+   * steps under it by more than a wheel takes. Then a lane is the cheapest
+   * path through the free cells — near its preferred offset, away from
+   * anything it passes, and never more than 0.4 m across per half metre along
+   * — and it is relaxed afterwards wherever relaxing it keeps it free.
+   *
+   * RE-RUN WHEN `blockers` GROWS, which it does after this file has returned:
+   * 37-props.js pushes eight parasol poles on to the list at s 8.9 to 12.0,
+   * which is squarely in the east-bound lane, and 46-backlane.js pushes its
+   * walls. The walkers learned that the hard way — see `walkBinsAt` — and this
+   * asks the same one integer question for the same reason.
+   */
+  function wheelPlan() {
+    wheelPlanAt = blockers.length;
+    if (!wheelers.length) return;
+    const { dT, dS, padS, padT, kerb } = WHEELS;
+    const [s0, s1] = WHEELS.band;
+    let lo = Infinity, hi = -Infinity;
+    for (const r of wheelers) { lo = Math.min(lo, r.c.t0); hi = Math.max(hi, r.c.t1); }
+    lo = Math.max(1, lo - 8); hi = Math.min(LEN - 1, hi + 8);
+    const rows = Math.floor((hi - lo) / dT) + 1;
+    const cols = Math.round((s1 - s0) / dS) + 1;
+    const busy = new Uint8Array(rows * cols);
+    const Y = new Float32Array(rows * cols);
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) Y[i * cols + j] = standY(lo + i * dT, s0 + j * dS);
+    }
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        const q = i * cols + j;
+        if (i + 1 < rows && Math.abs(Y[q + cols] - Y[q]) > WHEELS.stepT) {
+          busy[q] = busy[q + cols] = 1;
+        }
+        if (j + 1 < cols && Math.abs(Y[q + 1] - Y[q]) > WHEELS.stepS) {
+          busy[q] = busy[q + 1] = 1;
+        }
+      }
+    }
+    for (const b of blockers) {
+      if (b.off || b.y0 != null || !(b.a >= 0) || !(b.c >= 0) || !(b.h >= 0)) continue;
+      const rad = b.rot ? Math.hypot(b.a, b.c) : 0;
+      const ea = (b.rot ? rad : b.a) + padT, ec = (b.rot ? rad : b.c) + padS;
+      if (b.s + ec < s0 || b.s - ec > s1 || b.t + ea < lo || b.t - ea > hi) continue;
+      // `y` is a world height where it is positive and the shore frame's zero
+      // where it is not — the same two readings `bans` has to make of it.
+      if (!(b.y > 0) && b.h < kerb) continue;
+      const i0 = Math.max(0, Math.ceil((b.t - ea - lo) / dT));
+      const i1 = Math.min(rows - 1, Math.floor((b.t + ea - lo) / dT));
+      const j0 = Math.max(0, Math.ceil((b.s - ec - s0) / dS));
+      const j1 = Math.min(cols - 1, Math.floor((b.s + ec - s0) / dS));
+      for (let ii = i0; ii <= i1; ii++) {
+        for (let jj = j0; jj <= j1; jj++) {
+          const q = ii * cols + jj;
+          if (b.y > 0 && b.y + b.h < Y[q] + kerb) continue;
+          busy[q] = 1;
+        }
+      }
+    }
+    WG.t0 = lo; WG.rows = rows; WG.cols = cols; WG.busy = busy; WG.forced = 0;
+    WG.turnsBad = 0;
+
+    const rowOf = (t) => clamp(Math.round((t - lo) / dT), 0, rows - 1);
+    const busyAt = (i, s) => busy[i * cols + clamp(Math.round((s - s0) / dS), 0, cols - 1)];
+    // Daylight: what a cell costs for having something solid this many cells
+    // to either side. The pad already keeps the machine clear, so this is not
+    // safety, it is manners — a lane that can pass a bench with a metre to
+    // spare should, and a lane threading a single free cell between two
+    // things should be the last resort it looks like. It was a flat 0.5 a
+    // cell first, against 1.5 a cell squared to move sideways, and every lane
+    // on the shore threaded the needle rather than pay to go round.
+    const DAY = [0, 2.5, 1.5, 0.8, 0.3];
+    // `other` is the rider's lane the other way, where there is one yet: the
+    // two are kept `apart` where the deck allows it, so that a squeeze past a
+    // bench is not where the east-bound and the west-bound lanes both go.
+    // Measured before: at t 416-422, a bench at s 11 and a kiosk front at
+    // s 14.2 pulled them to within a metre of each other, and that is where
+    // two riders met head on and stopped with 0.2 m between them.
+    const cost = (i, j, pref, other) => {
+      let c = busy[i * cols + j] ? 1e6 : 0;
+      const s = s0 + j * dS;
+      c += (s - pref) * (s - pref) * 0.35;
+      if (other) {
+        const g = Math.abs(s - other[i]);
+        if (g < WHEELS.apart) c += (WHEELS.apart - g) * 6;
+      }
+      for (let dj = -4; dj <= 4; dj++) {
+        if (!dj) continue;
+        const jj = j + dj;
+        if (jj < 0 || jj >= cols || busy[i * cols + jj]) c += DAY[Math.abs(dj)];
+      }
+      return c;
+    };
+    const lane = (iA, iB, pref, other = null) => {
+      const n = iB - iA + 1;
+      let prev = new Float64Array(cols), cur = new Float64Array(cols);
+      const back = new Int8Array(n * cols);
+      for (let j = 0; j < cols; j++) prev[j] = cost(iA, j, pref, other);
+      for (let m = 1; m < n; m++) {
+        const i = iA + m;
+        for (let j = 0; j < cols; j++) {
+          let best = Infinity, bj = 0;
+          for (let dj = -2; dj <= 2; dj++) {
+            const jj = j + dj;
+            if (jj < 0 || jj >= cols) continue;
+            const v = prev[jj] + dj * dj * 0.5;
+            if (v < best) { best = v; bj = dj; }
+          }
+          cur[j] = best + cost(i, j, pref, other);
+          back[m * cols + j] = bj;
+        }
+        const sw = prev; prev = cur; cur = sw;
+      }
+      let j = 0;
+      for (let jj = 1; jj < cols; jj++) if (prev[jj] < prev[j]) j = jj;
+      const s = new Float32Array(rows);
+      for (let m = n - 1; m >= 0; m--) {
+        s[iA + m] = s0 + j * dS;
+        if (busy[(iA + m) * cols + j] && other) WG.forced++;
+        j += back[m * cols + j];
+      }
+      for (let it = 0; it < 40; it++) {
+        for (let i = iA + 1; i < iB; i++) {
+          const want = s[i] + 0.5 * ((s[i - 1] + s[i + 1]) * 0.5 - s[i]);
+          if (!busyAt(i, want)) s[i] = want;
+        }
+      }
+      for (let i = 0; i < iA; i++) s[i] = s[iA];
+      for (let i = iB + 1; i < rows; i++) s[i] = s[iB];
+      return s;
+    };
+    // How far off its lane the machine may go at each row before the grid
+    // says no, and how many world metres a metre of `t` is at that offset —
+    // which is not one: rule 9b, and at s 12 on the bend past t 360 it is
+    // three quarters.
+    const bounds = (s) => {
+      const loA = new Float32Array(rows), hiA = new Float32Array(rows);
+      const kA = new Float32Array(rows);
+      for (let i = 0; i < rows; i++) {
+        let j = clamp(Math.round((s[i] - s0) / dS), 0, cols - 1);
+        if (busy[i * cols + j]) { loA[i] = hiA[i] = 0; } else {
+          let a = j, z = j;
+          while (a > 0 && !busy[i * cols + a - 1]) a--;
+          while (z < cols - 1 && !busy[i * cols + z + 1]) z++;
+          loA[i] = Math.max(-WHEELS.wide, s0 + a * dS - s[i]);
+          hiA[i] = Math.min(WHEELS.wide, s0 + z * dS - s[i]);
+        }
+        const t = lo + i * dT;
+        const p = toWorld(t - dT * 0.5, s[i]), q = toWorld(t + dT * 0.5, s[i]);
+        kA[i] = Math.max(0.3, Math.hypot(q[0] - p[0], q[2] - p[2]) / dT);
+      }
+      return { lo: loA, hi: hiA, k: kA };
+    };
+    for (const r of wheelers) {
+      const iA = rowOf(r.c.t0 - 4), iB = rowOf(r.c.t1 + 4);
+      // East alone, west against it, and east again against that.
+      const pE = WHEELS.east + (jit(r.i, 9318) - 0.5) * WHEELS.spread;
+      const pW = WHEELS.west + (jit(r.i, 9319) - 0.5) * WHEELS.spread;
+      const Wl = lane(iA, iB, pW, lane(iA, iB, pE));
+      const E = lane(iA, iB, pE, Wl);
+      const bE = bounds(E), bW = bounds(Wl);
+      // The turns. Walked in from each end until the two lanes are far enough
+      // apart to swing between and the swing itself is clear.
+      const arcFree = (i, sgn) => {
+        const rt = WHEELS.turnT / (sgn > 0 ? bE : bW).k[i];
+        const sm = (E[i] + Wl[i]) * 0.5, rs = (Wl[i] - E[i]) * 0.5;
+        for (let n = 0; n <= 12; n++) {
+          const th = n / 12 * Math.PI;
+          const t = lo + i * dT + sgn * rt * Math.sin(th);
+          const ii = rowOf(t);
+          if (Math.abs((lo + ii * dT) - t) > dT) return false;
+          if (busyAt(ii, sm - rs * Math.cos(th))) return false;
+        }
+        return true;
+      };
+      // Thirty metres at most, and if nothing in that will do, the end as
+      // written: a turn that clips a planter is a better failure than a
+      // rider pacing a sixteen-metre stretch because the lanes met.
+      const turnOk = (i, sgn) => Wl[i] - E[i] >= WHEELS.turnGap && arcFree(i, sgn);
+      const i1 = rowOf(r.c.t1), i0 = rowOf(r.c.t0);
+      let iEnd = i1;
+      while (iEnd > i1 - 60 && !turnOk(iEnd, 1)) iEnd--;
+      if (!turnOk(iEnd, 1)) iEnd = i1;
+      let iBeg = i0;
+      while (iBeg < i0 + 60 && !turnOk(iBeg, -1)) iBeg++;
+      if (!turnOk(iBeg, -1)) iBeg = i0;
+      WG.turnsBad += (turnOk(iEnd, 1) ? 0 : 1) + (turnOk(iBeg, -1) ? 0 : 1);
+      const was = r.lanes;
+      r.lanes = {
+        E, W: Wl, bE, bW,
+        tA: lo + iBeg * dT, tB: lo + iEnd * dT,
+      };
+      // Placed once, off the seed. A re-plan after that leaves the rider where
+      // it is and simply hands it better lanes.
+      if (!was) {
+        r.t = lerp(r.lanes.tA + 6, r.lanes.tB - 6, r.u0);
+        r.seg = 'lane'; r.off = 0;
+      } else if (r.seg === 'lane') {
+        r.t = clamp(r.t, r.lanes.tA, r.lanes.tB);
+      }
+    }
+  }
+
+  const wheelRow = (t) => clamp((t - WG.t0) / WHEELS.dT, 0, WG.rows - 1.001);
+  const wheelAt = (arr, t) => {
+    const x = wheelRow(t), i = Math.floor(x), f = x - i;
+    return arr[i] + (arr[i + 1] - arr[i]) * f;
+  };
+
+  // Who is near a rider this frame, as flat arrays: shore position and the
+  // clearance to keep from them. Filled once per rider per frame.
+  // Flat arrays and a count, and not a list of objects, for the reason
+  // `bodyBuf` gives: this runs five times a frame.
+  // `wObV` is how much further ahead to look for it, in metres: nought for
+  // anybody on foot, and for another rider the ground it covers towards you
+  // in the time you are looking ahead for.
+  const wObT = [], wObS = [], wObR = [], wObK = [], wObV = [];
+  let wObN = 0;
+  function wheelPush(t, s, c, k = 0, v = 0) {
+    wObT[wObN] = t; wObS[wObN] = s; wObR[wObN] = c; wObK[wObN] = k; wObV[wObN] = v;
+    wObN++;
+  }
+  function wheelSee(r, tLo, tHi, who, pt, ps, turning) {
+    wObN = 0;
+    const push = wheelPush;
+    const [b0, b1] = WHEELS.band;
+    for (const f of allFolk()) {
+      if (f.t < tLo || f.t > tHi) continue;
+      const fs = f.lane + (f.off || 0);
+      if (fs < b0 - 2.2 || fs > b1 + 2.2) continue;
+      push(f.t, fs, WHEELS.clear * Math.max(1, f.scale || 1));
+    }
+    if (show && skinFig && skinFig.mesh.visible && show.t > tLo && show.t < tHi) {
+      push(show.t, show.s, WHEELS.clearBaye);
+    }
+    // You, but only if you are down here: `who` is the camera when there is
+    // nobody on foot, and a Canadair over the promenade is not in the lane.
+    if (pt > tLo && pt < tHi && who && who.y < standY(pt, ps) + 2.4) {
+      push(pt, ps, WHEELS.clearYou);
+    }
+    // Each other — except that whoever is already turning has the right of
+    // way and does not look. Two riders who each wait for the other to clear
+    // a turn wait for ever, and the first cut of this had three of them doing
+    // it. So the one on the lane gives the turn a wider berth and brakes for
+    // it, and the one in the turn gets on with it.
+    //
+    // Two in turns at once is the one case that is not settled that way, and
+    // the one that started turning first goes first.
+    //
+    // And further off than people. A walker closes at a stroll; a scooter
+    // coming the other way closes at ten metres a second, and a rider who
+    // dodged a walker into the lane of one it had not yet looked far enough
+    // to see met it head on — measured, twice, in one two-minute run.
+    for (const o of wheelers) {
+      if (o === r || !o.lanes) continue;
+      const toward = o.dir !== r.dir ? o.v * WHEELS.look[1] : 0;
+      if (o.t < tLo - 2 - toward || o.t > tHi + 2 + toward) continue;
+      if (turning && !(o.seg === 'turn' && o.turnAt < r.turnAt)) continue;
+      push(o.t, o.s, o.seg === 'turn' ? WHEELS.clearWheel + 0.5 : WHEELS.clearWheel,
+        1, toward);
+    }
+  }
+
+  // The offset intervals the people near a rider ban, and the middle of each
+  // one that is near enough to have already decided which side it is passed
+  // on (NaN where it is not). Reused, like `wObT`.
+  const wBanLo = [], wBanHi = [], wBanMid = [];
+  let wBanN = 0;
+  // How far ahead the nearest thing the rider's CURRENT line runs into is, off
+  // the last `wheelPick`.
+  let wGap = Infinity, wGapJ = -1, wGapK = 0;
+
+  /** Whether `o` is a lateral offset `r` may take. See `wheelPick`. */
+  function wheelInBan(r, o) {
+    for (let j = 0; j < wBanN; j++) if (o > wBanLo[j] && o < wBanHi[j]) return true;
+    // NOT ACROSS ANYTHING CLOSE. A free offset on the far side of somebody a
+    // metre ahead is free and unreachable, and choosing it steers the machine
+    // straight through them to get there — which is exactly what one bicycle
+    // did to another, overtaking, on the run this was measured on. Near things
+    // are passed on the side the rider is already on; to the right if dead
+    // ahead.
+    for (let j = 0; j < wBanN; j++) {
+      const c = wBanMid[j];
+      if (c !== c) continue;
+      const now = Math.abs(r.off - c) > 0.03 ? r.off - c : -r.dir;
+      if (now * (o - c) <= 0) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The lateral offset a rider on its lane should make for, or null.
+   *
+   * Everything `wheelSee` gathered bans an interval of offset, measured
+   * against the lane at THAT person's `t` — the lane bends, and a bather
+   * beside a bend is beside the bend and not beside where the lane was.
+   * `squeeze` scales every clearance, for the second look `wheelMove` takes.
+   * The candidates are where the rider is, the lane itself, the grid's two
+   * bounds and either edge of every ban; the cheapest free one wins, and to
+   * the right costs a little less than to the left — right is seaward going
+   * east. Sets `wGap`.
+   */
+  function wheelPick(r, k, lane, lookM, lo, hi, squeeze) {
+    wBanN = 0;
+    wGap = Infinity; wGapJ = -1; wGapK = 0;
+    for (let j = 0; j < wObN; j++) {
+      const along = (wObT[j] - r.t) * r.dir * k;
+      // Another machine is kept in view while it is ALONGSIDE as well as
+      // ahead: an overtake is not over when the other one's front wheel has
+      // gone past your eye, and a person has no such length.
+      if (along < (wObK[j] ? -2.2 : -1.0) || along > lookM + wObV[j]) continue;
+      const sl = wheelAt(lane, wObT[j]);
+      const a = wObS[j] - wObR[j] * squeeze - sl, b = wObS[j] + wObR[j] * squeeze - sl;
+      wBanLo[wBanN] = a; wBanHi[wBanN] = b;
+      wBanMid[wBanN] = along < 3.0 + r.v * 0.5 ? (a + b) * 0.5 : NaN;
+      wBanN++;
+      if (r.off > a && r.off < b && along > -0.4 && along < wGap) {
+        wGap = along; wGapJ = j; wGapK = wObK[j];
+      }
+    }
+    let got = null, best = Infinity;
+    const take = (o) => {
+      if (o < lo - 1e-6 || o > hi + 1e-6 || wheelInBan(r, o)) return;
+      const c = Math.abs(o - r.off) + 0.35 * Math.abs(o) + 0.12 * r.dir * (o - r.off);
+      if (c < best) { best = c; got = o; }
+    };
+    take(r.off); take(0); take(lo); take(hi);
+    for (let j = 0; j < wBanN; j++) { take(wBanLo[j] - 0.02); take(wBanHi[j] + 0.02); }
+    return got;
+  }
+
+  /**
+   * One rider, one frame, in the shore's own frame.
+   *
+   * A lane is followed with a lateral `off` on it, the way the walkers carry
+   * one. What is in the way is gathered over the stretch the rider is about
+   * to cover — `WHEELS.look` — and each thing in it bans an interval of `off`;
+   * the grid's own bounds over the same stretch bound it. The rider takes the
+   * free offset nearest where it already is, leaning to its own right, and if
+   * that cannot be reached before it arrives, it brakes, and if there is no
+   * free offset at all it stops short and waits. Nobody on this promenade is
+   * ever asked to step aside for a bicycle.
+   *
+   * The ends are a turn: slow to a walking pace and swing across to the other
+   * lane on half an ellipse bulging `turnT` past the end, and come back.
+   */
+  function wheelMove(r, dt, who, pt, ps) {
+    const L = r.lanes;
+    let s;
+    let vWant = r.vCruise;
+    if (r.seg === 'lane') {
+      const east = r.dir > 0;
+      const lane = east ? L.E : L.W, B = east ? L.bE : L.bW;
+      const k = wheelAt(B.k, r.t);
+      const lookM = WHEELS.look[0] + r.v * WHEELS.look[1];
+      const tLo = r.dir > 0 ? r.t - 1.2 : r.t - lookM / k - 1;
+      const tHi = r.dir > 0 ? r.t + lookM / k + 1 : r.t + 1.2;
+      wheelSee(r, tLo, tHi, who, pt, ps);
+      // The grid over the stretch ahead.
+      let lo = B.lo[Math.round(wheelRow(r.t))], hi = B.hi[Math.round(wheelRow(r.t))];
+      const ahead = Math.ceil(lookM / k / WHEELS.dT);
+      for (let n = 1; n <= ahead; n++) {
+        const q = Math.round(wheelRow(r.t + r.dir * n * WHEELS.dT));
+        lo = Math.max(lo, B.lo[q]); hi = Math.min(hi, B.hi[q]);
+      }
+      if (lo > hi) { const m = (lo + hi) * 0.5; lo = hi = m; }
+      let want = wheelPick(r, k, lane, lookM, lo, hi, 1);
+      let gap = wGap;
+      // NO LINE WITH A SHOULDER'S AIR, AND A LINE WITH A HAND'S. Where the lane
+      // is hemmed in — a kiosk on one side, somebody walking up the middle —
+      // a rider does not stop dead in front of them: they slow right down and
+      // squeeze by. Measured before this: the two contacts left in two minutes
+      // on the shore were both a scooter at three metres a second trying to
+      // stop for a walker it could have passed at a walk with 0.2 m to spare.
+      let tight = false;
+      if (want === null && gap < Infinity) {
+        want = wheelPick(r, k, lane, lookM, lo, hi, 0.84);
+        tight = want !== null;
+        if (tight) gap = wGap;
+      }
+      // Dodging speed whenever the line it is on is inside somebody's berth,
+      // and not only when that somebody is ahead: a walker ALONGSIDE is not a
+      // gap to brake for, and moving away from them at the drift back to the
+      // lane is how the last grazes on the shore happened.
+      const rate = gap < Infinity || wheelInBan(r, r.off) ? WHEELS.steer : WHEELS.drift;
+      // Braking is kinematic, to a stop a machine's length short of them: the
+      // speed from which `brake`-and-a-bit brings it to rest in the distance
+      // there is. Proportional to the gap was the first cut and it braked too
+      // late against somebody walking towards it.
+      //
+      // Further back from another machine than from a person, because a
+      // machine is 1.7 m long and the distance is between middles: at 1.9 m
+      // two bicycles queueing at the same red light are 0.2 m nose to tail,
+      // which is nobody's idea of stopping behind somebody.
+      const hold = wGapK ? 2.7 : 1.9;
+      const stopIn = (g) => Math.sqrt(Math.max(0, 2 * 2.4 * (g - hold)));
+      if (want === null) {
+        want = r.off;
+        if (gap < Infinity) vWant = Math.min(vWant, stopIn(gap));
+      } else if (gap < Infinity) {
+        // Whether the sidestep fits in the room there is. A machine that can
+        // go sideways at most seven tenths as fast as it goes forwards covers
+        // 1.43 m of promenade for every metre it moves across, whatever its
+        // speed — so the question is one of distance and not of time, and a
+        // front wheel's length on top.
+        if (Math.abs(want - r.off) * 1.43 + 0.9 > gap - (hold - 1.9)) {
+          vWant = Math.min(vWant, stopIn(gap));
+        }
+        vWant = Math.min(vWant, tight ? 1.4 : r.vCruise * 0.85);
+      }
+      r.gap = gap;
+      // What it is braking for, if anything: for `wheels.list`, and nothing
+      // else. Numbers and not a string, because this is every frame.
+      r.whyJ = gap < Infinity && wGapJ >= 0 ? (wObK[wGapJ] ? 2 : 1) : 0;
+      r.whyT = r.whyJ ? wObT[wGapJ] : 0; r.whyS = r.whyJ ? wObS[wGapJ] : 0;
+      r.whyBox = want === null;
+      // Slow for the turn — and WAIT FOR IT at the end of the lane, still
+      // pointing along the promenade, if anybody is standing on the half
+      // ellipse it is about to swing through. Stopping halfway round instead
+      // was the first cut, and a bicycle stopped halfway round is 1.8 m of
+      // machine parked across the promenade with people walking into its
+      // wheels: measured, the last contact left on the shore was exactly that.
+      const tEnd = east ? L.tB : L.tA;
+      const toEnd = Math.max(0, (tEnd - r.t) * r.dir * k);
+      vWant = Math.min(vWant, Math.sqrt(WHEELS.turnV * WHEELS.turnV + 2 * 1.2 * toEnd));
+      let arcBusy = false;
+      if (toEnd < 6) {
+        const kE = wheelAt(B.k, tEnd), rt = WHEELS.turnT / kE;
+        const a0 = wheelAt(lane, tEnd) + r.off, a1 = wheelAt(east ? L.W : L.E, tEnd);
+        const sm = (a0 + a1) * 0.5, rs = (a1 - a0) * 0.5;
+        for (let n = 0; n <= 10 && !arcBusy; n++) {
+          const th = n / 10 * Math.PI;
+          const at2 = tEnd + r.dir * rt * Math.sin(th), as2 = sm - rs * Math.cos(th);
+          for (let j = 0; j < wObN; j++) {
+            if (wObK[j]) continue;
+            const dts = (wObT[j] - at2) * kE, dss = wObS[j] - as2;
+            if (dts * dts + dss * dss < wObR[j] * wObR[j]) { arcBusy = true; break; }
+          }
+          // And the other riders, where they WILL be. A person on the arc is
+          // there now and walks at a stroll; a scooter coming the other way
+          // up the far lane is ten metres off and two seconds from the middle
+          // of it, and a turn takes three. Measured: a bicycle swung across a
+          // scooter that was braking for it from 3.6 m/s and still arrived.
+          // Only riders that are moving — one waiting to turn itself is not
+          // going anywhere, and two riders each waiting for the other to
+          // clear would wait for ever.
+          //
+          // Nor one coming up behind on the same lane: that one is braking for
+          // this one, and waiting for it is waiting for somebody who is
+          // waiting for you.
+          for (const o of wheelers) {
+            if (arcBusy) break;
+            if (o === r || !o.lanes || (o.v < 0.5 && o.seg !== 'turn')) continue;
+            if (o.seg === 'lane' && o.dir === r.dir && (o.t - r.t) * r.dir < 0) continue;
+            for (let tau = 0; tau <= 2.4; tau += 0.6) {
+              const ot = o.seg === 'turn' ? o.t : o.t + o.dir * o.v * tau / kE;
+              const dts = (ot - at2) * kE, dss = o.s - as2;
+              if (dts * dts + dss * dss < WHEELS.clearWheel * WHEELS.clearWheel) { arcBusy = true; break; }
+            }
+          }
+        }
+        if (arcBusy) {
+          vWant = Math.min(vWant, Math.sqrt(2 * 2.4 * Math.max(0, toEnd - 0.1)));
+          r.whyJ = 3;
+        }
+      }
+      r.v += clamp(vWant - r.v, -WHEELS.brake * dt, WHEELS.accel * dt);
+      // Sideways as a velocity with a limit on how fast it can change, so a
+      // sidestep starts rather than snaps. A snap at five metres a second is
+      // a twelve-degree change of heading in one frame. It is a quick limit
+      // and deliberately so: 3.5 m/s² was tried, and a rider that takes 0.3 s
+      // to get going sideways is a rider that brakes instead, measured at
+      // three to ten times as many stops.
+      //
+      // AND NEVER FASTER THAN THE MACHINE IS GOING FORWARDS. A bicycle cannot
+      // move sideways; it can only point sideways and roll, and at 35 degrees
+      // of steer the most it gets is about seven tenths of its speed. Without
+      // this a rider stopped at the end of its lane still slid across it on
+      // the dodge it had been making, the heading — read off the motion —
+      // swung round to follow the slide, and the machine ended up parked at
+      // seventy degrees across the promenade with people and another bicycle
+      // walking into its front wheel.
+      //
+      // Stopped, it is walked: a person standing astride a bicycle shuffles it
+      // sideways at a third of a metre a second without it turning. Without
+      // THAT, the first version of this sentence left three riders queued for
+      // two minutes behind somebody standing still in the lane, each with a
+      // free line beside them and no way of getting on to it.
+      const side = r.v < 0.3 ? Math.min(rate, 0.35) : Math.min(rate, 0.7 * r.v + 0.1);
+      const vs = clamp((want - r.off) * 2.4, -side, side);
+      r.offV += clamp(vs - r.offV, -WHEELS.swerve * dt, WHEELS.swerve * dt);
+      r.off += r.offV * dt;
+      // Held inside the grid over the whole wheelbase and not just under the
+      // middle of it, or the front wheel noses into a planter the centre has
+      // not reached yet.
+      {
+        let lo0 = 0, hi0 = 0, first = true;
+        const qa = Math.round(wheelRow(r.t - 0.95 / k)), qb = Math.round(wheelRow(r.t + 0.95 / k));
+        for (let q = qa; q <= qb; q++) {
+          lo0 = first ? B.lo[q] : Math.max(lo0, B.lo[q]);
+          hi0 = first ? B.hi[q] : Math.min(hi0, B.hi[q]);
+          first = false;
+        }
+        const held = clamp(r.off, Math.min(lo0, 0), Math.max(hi0, 0));
+        if (held !== r.off) { r.off = held; r.offV = 0; }
+      }
+      r.t += r.dir * r.v * dt / k;
+      s = wheelAt(lane, r.t) + r.off;
+      if ((r.t - tEnd) * r.dir >= 0 && arcBusy) {
+        r.t = tEnd; r.v = 0;
+        s = wheelAt(lane, r.t) + r.off;
+      } else if ((r.t - tEnd) * r.dir >= 0) {
+        r.t = tEnd;
+        r.seg = 'turn'; r.arc = 0; r.turnAt = crowdT;
+        r.arcFrom = wheelAt(lane, tEnd) + r.off;
+        r.arcTo = wheelAt(east ? L.W : L.E, tEnd);
+        s = r.arcFrom;
+      }
+    } else {
+      const east = r.dir > 0;
+      const tEnd = east ? L.tB : L.tA;
+      const B = east ? L.bE : L.bW;
+      const k = wheelAt(B.k, tEnd);
+      const rt = WHEELS.turnT / k;
+      const sm = (r.arcFrom + r.arcTo) * 0.5, rs = (r.arcTo - r.arcFrom) * 0.5;
+      const len = Math.PI * Math.sqrt((WHEELS.turnT * WHEELS.turnT + rs * rs) * 0.5);
+      // Anybody on the rest of the arc, and the rider waits for them.
+      wheelSee(r, tEnd - rt - 2, tEnd + rt + 2, who, pt, ps, true);
+      // Once round, only something about to be run into stops it: whoever
+      // was on the arc was waited for at the end of the lane.
+      vWant = WHEELS.turnV;
+      for (let n = 1; n <= 3; n++) {
+        const th = Math.min(Math.PI, (r.arc + n * 0.35 / len) * Math.PI);
+        const at2 = tEnd + r.dir * rt * Math.sin(th), as2 = sm - rs * Math.cos(th);
+        for (let j = 0; j < wObN; j++) {
+          const dts = (wObT[j] - at2) * k, dss = wObS[j] - as2;
+          const cl = wObR[j] * 0.75;
+          if (dts * dts + dss * dss < cl * cl) vWant = 0;
+        }
+      }
+      r.v += clamp(vWant - r.v, -WHEELS.brake * dt, WHEELS.accel * dt);
+      r.arc += r.v * dt / len;
+      const th = Math.min(1, r.arc) * Math.PI;
+      r.t = tEnd + r.dir * rt * Math.sin(th);
+      s = sm - rs * Math.cos(th);
+      if (r.arc >= 1) {
+        r.seg = 'lane'; r.dir = -r.dir; r.t = tEnd; r.off = 0; r.offV = 0;
+        s = r.arcTo;
+      }
+    }
+    r.s = s;
+    // The crank goes round with the back wheel, except when it does not: every
+    // rider freewheels now and then, and always through a turn.
+    const coast = r.seg === 'turn' || r.v < 0.3
+      || Math.sin(r.clock * 0.29 + r.i * 2.3) > 0.62;
+    r.clock += dt;
+    if (!coast) r.phase += r.v * dt / WHEELS.circ * WHEELS.gear * TAU;
+  }
+
+  /** Where it is in the world, and which way it faces. */
+  function wheelPlace(r, dt) {
+    const p = toWorld(r.t, r.s);
+    const px = r.x, pz = r.z;
+    r.x = p[0]; r.z = p[2];
+    // Pitched to the deck along its own wheelbase, so it rides a slope nose-up
+    // rather than through it.
+    const half = r.bike ? WHEEL_BIKE.axle : 0.45;
+    const k = r.lanes ? wheelAt((r.dir > 0 ? r.lanes.bE : r.lanes.bW).k, r.t) : 1;
+    const yF = standY(r.t + r.dir * half / k, r.s), yB = standY(r.t - r.dir * half / k, r.s);
+    r.y = Math.max(p[1], (yF + yB) * 0.5);
+    const pitch = r.seg === 'turn' ? 0 : clamp(Math.atan2(yF - yB, half * 2), -0.14, 0.14);
+    r.pitch += (pitch - r.pitch) * Math.min(1, dt * 8);
+    // Where the two wheels are in the shore frame, for the walkers: a machine
+    // stopped at an angle is not a circle round its middle. See the walker loop.
+    {
+      const hx = Math.cos(r.yaw), hz = -Math.sin(r.yaw), hl = r.bike ? 0.55 : 0.40;
+      const f = local(r.x + hx * hl, r.z + hz * hl), b = local(r.x - hx * hl, r.z - hz * hl);
+      r.fT = f[0]; r.fS = f[1]; r.bT = b[0]; r.bS = b[1];
+    }
+    // The heading off the motion, smoothed — a turn is a turn and not a snap.
+    const dx = r.x - px, dz = r.z - pz;
+    // Only rolling motion turns the machine. A shuffle sideways while stopped
+    // is not a heading — see `side` in `wheelMove`.
+    const rolling = r.seg === 'turn' ? r.v > 0.02 : r.v > 0.3;
+    if (!r.placed) {
+      const q = toWorld(r.t + r.dir * 0.5, r.s);
+      r.yaw = Math.atan2(-(q[2] - p[2]), q[0] - p[0]);
+      r.placed = true;
+    } else if (!rolling) {
+      r.yawRate = 0;
+      r.roll -= r.roll * Math.min(1, dt * 4);
+    } else if (dx * dx + dz * dz > 1e-8) {
+      const want = Math.atan2(-dz, dx);
+      let d = want - r.yaw;
+      d -= Math.round(d / TAU) * TAU;
+      const turn = d * Math.min(1, dt * 10);
+      r.yaw += turn;
+      // AND LEANED INTO IT. Anything on two wheels going round a corner leans
+      // by atan(v times the rate of turn over g) or falls over, and a bicycle
+      // taking the end of its lane bolt upright at two metres a second on a
+      // two-metre radius reads as a toy on a rail. That is about eleven
+      // degrees; a sidestep round somebody is two or three. Positive yaw is a
+      // turn to the rider's left, and a lean to the left is a negative roll
+      // about the machine's own forward axis.
+      //
+      // Off a smoothed rate of turn, so a sidestep round somebody is a lean
+      // and not a flick: read raw, a dodge at speed put the machine over to
+      // its limit for two frames and back.
+      if (dt > 0) {
+        r.yawRate += (turn / dt - r.yawRate) * Math.min(1, dt * 3);
+        const want2 = clamp(-Math.atan(r.v * r.yawRate / 9.81), -0.22, 0.22);
+        r.roll += (want2 - r.roll) * Math.min(1, dt * 4);
+      }
+    }
+  }
+
+  /** Put the body on the machine. See `wheelLimb`. */
+  function wheelPose(r) {
+    const fig = r.fig, F = r.F;
+    fig.aim('spine01', 0, 0, 1, -r.lean);
+    // Eyes on the promenade, and now and then a look along it at something.
+    const glance = Math.sin(r.clock * 0.21 + r.i * 1.7);
+    r.look = glance > 0.7 ? (glance - 0.7) / 0.3 * 0.55 * (r.i % 2 ? 1 : -1) : 0;
+    _wkQ.setFromAxisAngle(_wkZ, r.lean * 0.8);
+    _wkR.setFromAxisAngle(_wkY, r.look);
+    armAimQ(fig, 'neck', _wkS.multiplyQuaternions(_wkR, _wkQ));
+    for (let n = 0; n < 2; n++) {
+      const Lg = r.legs[n];
+      if (r.bike) {
+        // Left pedal half a turn behind the right.
+        const ph = r.phase + (Lg.sd > 0 ? 0 : Math.PI);
+        const px = WHEEL_BIKE.bb[0] + Math.sin(ph) * WHEELS.crank;
+        const py = WHEEL_BIKE.bb[1] + Math.cos(ph) * WHEELS.crank;
+        Lg.goal.set(px - 0.075 - F.x, py + 0.085 - F.y, Lg.sd * 0.125 - F.z);
+      }
+      _wkPole.set(1, 0.25, Lg.sd * 0.12);
+      const Q = wheelLimb(fig, Lg.u, Lg.l, Lg.H, Lg.K, Lg.A, Lg.goal, _wkPole);
+      const toe = _wkP.copy(Lg.toe).normalize().applyQuaternion(Q);
+      _wkQ.setFromUnitVectors(toe, Lg.dir);
+      armAimQ(fig, Lg.f, _wkQ);
+    }
+    for (const A of r.arms) {
+      _wkPole.set(-0.45, -0.55, A.sd * 0.75);
+      wheelLimb(fig, A.u, A.l, A.S, A.E, A.W, A.goal, _wkPole);
+    }
+  }
+
+  function wheelDraw(r, dt, cam) {
+    const dx = r.x - cam.x, dz = r.z - cam.z, d2 = dx * dx + dz * dz;
+    const on = d2 < WHEELS.far * WHEELS.far;
+    r.veh.visible = on;
+    if (r.crank) r.crank.visible = on;
+    r.fig.mesh.visible = on;
+    if (!on) return;
+    r.veh.position.set(r.x, r.y, r.z);
+    // `YZX`: yaw, then pitch along the deck, then the lean about the machine's
+    // own length — which is the only order in which a lean stays a lean on a
+    // slope.
+    r.veh.rotation.set(r.roll, r.yaw, r.pitch, 'YZX');
+    if (r.crank) r.crank.rotation.z = -r.phase;
+    r.veh.updateMatrixWorld(true);
+    r.fig.mesh.position.copy(r.F).applyMatrix4(r.veh.matrixWorld);
+    r.fig.mesh.rotation.set(r.roll, r.yaw, r.pitch, 'YZX');
+    r.fig.mesh.updateMatrixWorld();
+    const every = d2 < WHEELS.poseNear * WHEELS.poseNear ? 1
+      : d2 < WHEELS.poseMid * WHEELS.poseMid ? 3 : 8;
+    if (r.posed && every > 1 && (wheelFrame + r.i) % every) return;
+    wheelPose(r);
+    r.fig.update(0);
+    r.posed = true;
+  }
+
+  // What a step costs, in milliseconds, smoothed. For the stats and nothing else.
+  let wheelMs = 0;
+  function stepWheelers(dt, cam, who, pt, ps) {
+    if (!wheelers.length) return;
+    const t0 = performance.now();
+    if (wheelPlanAt !== blockers.length) wheelPlan();
+    wheelFrame++;
+    for (const r of wheelers) wheelMove(r, wheelHold ? 0 : dt, who, pt, ps);
+    for (const r of wheelers) { wheelPlace(r, dt); wheelDraw(r, dt, cam); }
+    wheelMs += (performance.now() - t0 - wheelMs) * 0.02;
+  }
+
   /**
    * Walk the walkers, then pose everybody.
    *
@@ -38256,6 +39451,33 @@ async function buildJadrija(scene) {
         const gap = here - fs;
         if (dts * dts + gap * gap < touch * touch) pardon(w, f);
       }
+      // A bicycle that has stopped — to let somebody by, or to wait for its
+      // turn to clear — is a bystander for as long as it is stopped, and goes
+      // in the same ban list a bystander does, as long as the machine. The
+      // lean below is not enough on its own and was measured not to be: a
+      // walker strolling up behind a scooter waiting at the end of its lane
+      // leaned 0.32 m and walked through it anyway, because a lean is
+      // proportional to how close you are and the machine was 1.2 m long.
+      //
+      // Two discs at the wheels and not one at the middle, because a machine
+      // waiting at the end of its lane is waiting at an angle to it.
+      //
+      // Not for a walker who is standing still at the end of their beat. The
+      // ban steers, and steering answers "which side is nearer" — which for
+      // somebody standing beside a machine can be the far side of it, and a
+      // walker slid straight through a waiting scooter at 2 m/s answering it.
+      // The lean below still pushes them away, and a lean cannot cross.
+      for (const r of wheelers) {
+        if (w.wait > 0) break;
+        if (r.v > 1.2 || r.t < w.t - CROWD.see - 1.2 || r.t > w.t + CROWD.see + 1.2) continue;
+        const rr = BODY.r * (w.scale || 1) + 0.42;
+        folkT[folkN] = r.fT; folkS[folkN] = r.fS; folkR[folkN] = rr; folkN++;
+        folkT[folkN] = r.bT; folkS[folkN] = r.bS; folkR[folkN] = rr; folkN++;
+        // And one in the middle of a bicycle, whose wheels are 1.1 m apart:
+        // between two discs of that size a walker could pass 0.36 m off the
+        // top tube, which is through the rider's knee.
+        if (r.bike) { folkT[folkN] = r.t; folkS[folkN] = r.s; folkR[folkN] = rr; folkN++; }
+      }
       // And her, who is not one of the crowd and is the one you are looking at.
       // `allFolk` is `crowds`, and `show` has never been in `crowds` — so the
       // walkers stepped round each other and through Baye, which is the same
@@ -38265,6 +39487,12 @@ async function buildJadrija(scene) {
       if (show && skinFig && skinFig.mesh.visible) {
         push += yieldTo(w, here, show.t, show.s, 0.5);
       }
+      // And the bicycles, which are not in `crowds` either. The rider does the
+      // avoiding — see `wheelMove` — and this is only the half-step aside that
+      // anybody takes when a bicycle comes by close, and the one thing that
+      // stops a walker strolling straight into a rider who has stopped to let
+      // somebody else past.
+      for (const r of wheelers) push += yieldTo(w, here, r.t, r.s, 0.13 + r.i * 0.17);
       // And the world. See `walkSolid`.
       push += walkSolid(w, here);
       if (push !== 0) {
@@ -38311,6 +39539,12 @@ async function buildJadrija(scene) {
       w.y = p[1];
       w.yaw = rigYaw(w.t, w.dir > 0 ? 0 : Math.PI);
     }
+
+    // The bicycles and the scooters, after the walkers and not before: a rider
+    // steers round where people ARE, and the walkers have just moved. `who`
+    // for you, and the camera for the range gate, for the reason the note at
+    // the top of this function gives.
+    stepWheelers(dt, cam, who, pt, ps);
 
     // Who is standing about talking to whom, and it goes first of the THREE
     // for the reason the two below give between themselves: all of them write
@@ -38570,8 +39804,22 @@ async function buildJadrija(scene) {
       chatSurvey: () => chatter.survey(crowds, lastCam),
       /** The instanced layers, so the near shadow cascade can occlude with them. */
       meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
-      /** And the skinned ones, which each need a palette of their own. */
-      shadows: (shadow) => (crowds.skin ? crowds.skin.shadows(shadow) : []),
+      /**
+       * And the skinned ones, which each need a palette of their own.
+       *
+       * The riders come along on the same call rather than a new one in
+       * 90-app.js: they are people on the promenade and a figure, and the
+       * machine under each is a plain mesh with a crank hung off it. Near
+       * cascade and dynamic, like everybody else under two metres.
+       */
+      shadows: (shadow) => {
+        const out = crowds.skin ? crowds.skin.shadows(shadow) : [];
+        for (const r of wheelers) {
+          out.push(r.fig.cast(shadow, { near: true }));
+          out.push(...shadow.castTree(r.veh, { dynamic: true, near: true }));
+        }
+        return out;
+      },
     },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     /**
@@ -39888,6 +41136,69 @@ async function buildJadrija(scene) {
      * often none of them.
      */
     cars: { n: cars.count, tris: cars.tris, models: cars.counts },
+    /**
+     * The people on bicycles and scooters.
+     *
+     * `tris` is not part of `tris` above either, for the reason the car park's
+     * is not: none of it is baked. It is the five machines plus the five
+     * skinned bodies riding them, which share their geometry with the bathers
+     * they are copies of. `forced` is how many planned lane cells had to go
+     * through something solid because nothing else was free, and it should
+     * read nought. `list` is where each of them is, for a probe.
+     */
+    wheels: {
+      stats: () => ({
+        n: wheelers.length,
+        bikes: wheelers.filter((r) => r.bike).length,
+        scooters: wheelers.filter((r) => !r.bike).length,
+        tris: wheelTris, machineTris: wheelMachineTris,
+        forced: WG.forced, turnsBad: WG.turnsBad,
+        planAt: wheelPlanAt, ms: +wheelMs.toFixed(3),
+      }),
+      list: () => wheelers.map((r) => ({
+        who: r.c.who, on: r.c.on, seg: r.seg, dir: r.dir,
+        t: +r.t.toFixed(2), s: +r.s.toFixed(2), off: +r.off.toFixed(2),
+        v: +r.v.toFixed(2), gap: r.gap === Infinity ? null : +r.gap.toFixed(2),
+        x: +r.x.toFixed(2), y: +r.y.toFixed(2), z: +r.z.toFixed(2),
+        yaw: +r.yaw.toFixed(3), roll: +r.roll.toFixed(3),
+        lean: +r.lean.toFixed(2), seat: +r.seatY.toFixed(3),
+        ends: r.lanes ? [+r.lanes.tA.toFixed(1), +r.lanes.tB.toFixed(1)] : null,
+        drawn: r.fig.mesh.visible,
+        why: [null, 'person', 'rider', 'turn'][r.whyJ]
+          && [[null, 'person', 'rider', 'turn'][r.whyJ], +r.whyT.toFixed(1),
+            +r.whyS.toFixed(1), r.whyBox],
+      })),
+      /** Both lanes of one rider, every metre, for drawing a plan. */
+      lanes: (i) => {
+        const r = wheelers[i];
+        if (!r || !r.lanes) return null;
+        const out = [];
+        for (let t = r.lanes.tA; t <= r.lanes.tB; t += 1) {
+          out.push([t, +wheelAt(r.lanes.E, t).toFixed(2), +wheelAt(r.lanes.W, t).toFixed(2)]);
+        }
+        return out;
+      },
+      raw: () => wheelers,
+      hold: (v = true) => { wheelHold = !!v; return wheelHold; },
+      /** The planning grid as text, one row a metre, with rider `i`'s lanes on it. */
+      grid: (i = 0, t0 = WG.t0, t1 = WG.t0 + WG.rows * WHEELS.dT) => {
+        const r = wheelers[i];
+        const out = [];
+        for (let t = t0; t < t1; t += 1) {
+          const row = Math.round((t - WG.t0) / WHEELS.dT);
+          if (row < 0 || row >= WG.rows) continue;
+          let line = '';
+          for (let j = 0; j < WG.cols; j++) line += WG.busy[row * WG.cols + j] ? '#' : '.';
+          const put = (s, ch) => {
+            const j = Math.round((s - WHEELS.band[0]) / WHEELS.dS);
+            if (j >= 0 && j < line.length) line = line.slice(0, j) + ch + line.slice(j + 1);
+          };
+          if (r && r.lanes) { put(r.lanes.E[row], 'E'); put(r.lanes.W[row], 'W'); }
+          out.push(String(t.toFixed(0)).padStart(4) + ' ' + line);
+        }
+        return out;
+      },
+    },
     /** For the shadow pass in src/90-app.js. */
     carMeshes: cars.meshes(),
   };
