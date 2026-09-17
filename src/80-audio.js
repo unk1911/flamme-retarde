@@ -791,6 +791,32 @@ function buildAudio() {
     return true;
   }
 
+  /**
+   * A swig out of a bottle. Misha, 16 Sep 2026: *"yeah let's make the beer
+   * drinkable"*, and what a swig sounds like is not one noise but three: the
+   * glass coming off your teeth, two swallows, and the air going back up the
+   * neck after it. Synthesised, because nothing in the payload is close and a
+   * gulp is three filtered bursts and a slide.
+   */
+  function swig() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    // The lip on the glass: a tiny hard click, high and gone.
+    burst({ freq: 2600, q: 6, dur: 0.020, gain: 0.030, at: t0 });
+    // Two swallows, the second a little lower — a throat does not repeat.
+    for (let i = 0; i < 2; i++) {
+      const at = t0 + 0.10 + i * 0.27;
+      burst({ freq: 210 - i * 24, q: 1.1, dur: 0.085, gain: 0.085,
+        sweep: 0.55, at });
+      burst({ freq: 620 - i * 60, q: 3.2, dur: 0.055, gain: 0.038,
+        sweep: 0.70, at: at + 0.012 });
+    }
+    // And the air going back up the neck, which is the part that says bottle
+    // rather than glass: a short rising whistle down at the bottom.
+    burst({ freq: 300, q: 7, dur: 0.16, gain: 0.026, sweep: 1.9,
+      at: t0 + 0.66 });
+  }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
@@ -6650,7 +6676,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

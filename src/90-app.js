@@ -437,6 +437,15 @@ addEventListener('keydown', (e) => {
     if (boardBrod()) return;
     toggleGround();
   }
+  // Y — a swig. Free everywhere and it does nothing unless there is a beer
+  // in your pocket or a bottle already in your hand, so it costs no other
+  // control anything.
+  if (e.code === 'KeyY') {
+    e.preventDefault();
+    const got = drinkBeer();
+    if (got === 'no beer') toast(T('beer.none'));
+    return;
+  }
   // And the menu at a counter. Two keys rather than one, so that E means buy
   // and only buy: a key that cycled AND bought is a key that buys the wrong
   // thing the moment you press it once too often.
@@ -1449,6 +1458,7 @@ const HELP = [
     ['F', 'help.k.foil'],
     ['E', 'help.k.in'],
     ['E', 'help.k.buy'],
+    ['Y', 'help.k.drink'],
     [', .', 'help.k.menu'],
     ['O', 'help.k.pc'],
   ]],
@@ -6714,6 +6724,8 @@ function frame() {
   // The counter you are standing at, repainted every frame: you walk into it
   // and out of it, and nothing else tells the DOM when that happened.
   paintCounter();
+  // And the bottle in your hand, if there is one.
+  beerTick(real);
   if (flyCamT >= 0) {
     if (!flyCamHold) flyCamT += real;
     const S = jadrija.vik.fly.shot();
@@ -7373,6 +7385,9 @@ function frame() {
   // And your own arms over the top of it, on a near plane the world cannot
   // afford. See src/60-arms.js.
   if (arms) arms.render(renderer);
+  // And the bottle, if there is one in your hand — same reason, same pass, and
+  // after the arms because you do not drink while you are swimming a crawl.
+  beerRender(renderer);
   // The mask goes on last of all, because it is the closest thing to your eye
   // that exists — and only in the water. The alpha it fades on its own is a
   // frame behind the phase, and one frame of a dive mask over the first frame
@@ -9210,6 +9225,14 @@ window.__fr = {
   pocket: () => ({ eur: +POCKET.eur.toFixed(2), bought: POCKET.bought }),
   /** Buy by name, which is what the microphone does — see `buyAt`. */
   buy: (key) => buyAt(key || null),
+  /** A swig, and what the bottle is doing — see 61-beer.js. */
+  drink: () => drinkBeer(),
+  bottle: () => ({ out: beer.out, left: beer.left, swigging: beer.t >= 0,
+    at: beer.kit && beer.kit.group.visible
+      ? [+beer.kit.group.position.x.toFixed(3),
+        +beer.kit.group.position.y.toFixed(3),
+        +beer.kit.group.position.z.toFixed(3)] : null,
+    stow: null }),
   ground: {
     arm: () => ground.force(),
     raw: () => ground,

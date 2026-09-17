@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.402.0] — 2026-09-16
+
+### the beer is drinkable
+
+**"yeah let's make the beer drinkable"**. Buy one at MINI or H2O, press Y, and
+a bottle comes up into the bottom right of your view, tips back, and goes down
+again. Four swigs to a bottle. It leaves your pocket on the first swig and not
+on the last, because what you bought was a beer and not a mouthful of one.
+
+A BOTTLE AND NO ARM, and that is the design rather than the shortcut. The only
+first-person limb this game has is `60-arms.js` — three rigid pieces a side
+authored for a front crawl, driven by angles because the shape of a crawl is a
+cycle and not a target. Nothing in it holds anything, and a forearm and a hand
+modelled to wrap round a bottle is a second rig that will be wrong at exactly
+the distance you look at it. What you see when you drink from a bottle is the
+BOTTLE; the hand is behind it, out of shot, in every photograph of anybody
+drinking.
+
+TWO THINGS HAD TO BE MEASURED AND BOTH WERE WRONG FIRST.
+
+The near plane. The world's is 1.2 m and it is not negotiable — it is what
+keeps a depth buffer honest over a hundred and sixty-nine square kilometres —
+and a bottle you are drinking from is half a metre from your eye, which is
+inside it. The first cut parented one to the main camera and it was clipped
+away entirely: invisible in every frame, with the state machine underneath it
+working perfectly. It has its own scene and camera now with a 2 cm near,
+copying the world camera's lens, composited on top with the depth cleared —
+which is exactly how the arms are drawn in the water, for exactly this reason.
+
+And where it STANDS. Every material here runs `applyWater` and `applyHaze` on
+the fragment's WORLD position, so a bottle sitting at its own scene's origin is
+a bottle at y −0.25, which is under the sea: the second cut drew a turquoise
+bottle in full underwater fog on a bar stool in the sun. Its root rides the
+camera's own world position now and the offsets are applied inside that.
+
+The height was measured off the picture too. At 0.52 m with this lens the frame
+is 0.58 m tall, so a 0.24 m bottle standing at y −0.255 puts its neck in the
+middle of your view — a bottle held up in front of your face. Your hand is at
+your hip and what you see is the top third of it.
+
+No brand on it: brown glass and a plain gold band. Every wordmark at Jadrija
+came off a photograph or out of Misha's mouth, and the one thing rule 12 will
+not have is one that came from me.
+
+The swig is three sounds, because that is what a swig is: the glass off your
+teeth, two swallows a beat apart, and the air going back up the neck after it.
+
+Driven: 4 swigs to 3 to 2 to 1 and gone, the pocket charged once on the first,
+60 fps, census {446,333,86,27} and tris 642821 unchanged. It is on foot only —
+swimming is where the arms are drawn in the same pass — and a bottle you carry
+into the aeroplane is put down at the door.
+
 ## [1.401.0] — 2026-09-16
 
 ### a beer at MINI
