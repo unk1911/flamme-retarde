@@ -8,6 +8,37 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.398.0] — 2026-09-16
+
+### the kiosk she goes to is the one with the name on it
+
+**"can i buy pack of cigarettes at the Tisak?"** — which found a bug before it
+found an answer. There are two kiosks on this shore: `tisak` at t 305, red
+steel with the wordmark on it, and an unnamed green drinks store at t 290 that
+nobody would ask for by name. "The kiosk" was mapped to the green one, so
+every recon sent to the Tisak walked to the wrong building. It is the red one
+now.
+
+## [baye 1.9.1] — 2026-09-16 — server only
+
+### what is actually in that window
+
+You cannot buy anything anywhere in this game — there is no money and no
+inventory — but the kiosk is BUILT, and what is built can be reported. Raked
+magazine covers at the back of the counter shelf, flat stacks of newspapers in
+front of them, the chest freezer at the east end with a towel over its lid, and
+three shelves of cartons, bottles and cans behind the hatch.
+
+Those goods are deliberately unlabelled — rule 12, no brand that was not read
+off a photograph — so there are no cigarettes in the data and she is not told
+there are. Asked, she says what is there and stops:
+
+- "can i buy a pack of cigarettes at the tisak?" → *"I went and looked. Three
+  people were there, but I didn't see cigarettes, just papers, magazines,
+  drinks, and a freezer. So I can't tell you."*
+- "do they sell newspapers at the kiosk?" → *"Yeah, they do. I saw flat stacks
+  of newspapers in front of the magazines, right there behind the hatch."*
+
 ## [baye 1.9.0] — 2026-09-16 — server only
 
 ### she answers what she was sent for, and she can read the board

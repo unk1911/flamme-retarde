@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.9.0"
+VERSION = "1.9.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -1723,6 +1723,21 @@ SLAST_BOARD = (("sladoled", "2.50 €"), ("kupovi", "8.00 €"), ("kokice", None
                ("espresso", "2.00 €"), ("macchiato", "2.50 €"),
                ("cappuccino", "3.00 €"), ("nes caffe", "3.00 €"))
 
+# AND WHAT IS IN THE TISAK'S WINDOW, which is modelled and can be described.
+#
+# Misha asked whether you can buy a pack of cigarettes there. In the game you
+# cannot buy anything anywhere — there is no money and no inventory — but the
+# kiosk itself is built: raked magazine covers at the back of the counter
+# shelf, flat stacks of newspapers in front of them, the chest freezer at the
+# east end with a towel over its lid, and three shelves of cartons, bottles and
+# cans behind the hatch. Those goods are deliberately UNLABELLED — rule 12, no
+# brand that was not read off a photograph — so there are no cigarettes in the
+# data and she is not told there are. What she is told is what is there.
+TISAK_WINDOW = ("magazines raked up at the back of the counter shelf",
+                "flat stacks of newspapers in front of them",
+                "a chest freezer at the east end with a towel over the lid",
+                "three shelves of cartons, bottles and cans behind the hatch")
+
 # The plaques in the case, as read. Fifteen names and one pan whose card is
 # turned away — she can say that too, because it is what is there.
 GELATO_NAMES = ("Čokolada", "Vanilija", "Stracciatella", "Jogurt Šumsko voće",
@@ -2381,6 +2396,9 @@ def build_messages(ctx: dict, world: dict) -> list:
                          + ", and "
                          + ", ".join(n for n, p in SLAST_BOARD if not p)
                          + " with no price beside it at all")
+        if r["place"] == "kiosk":
+            lines.append("- in the window and behind the hatch: "
+                         + ", ".join(TISAK_WINDOW))
         if r.get("buck"):
             lines.append("- the other Baye is " + BUCK_WHERE[r["buck"]])
         if r.get("laps") is not None:

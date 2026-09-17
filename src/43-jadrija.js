@@ -33852,8 +33852,13 @@ async function buildJadrija(scene) {
    * to have seen it.
    */
   const SEE = {
-    slast: 'slast', kiosk: 'kiosk', mini: 'mini', h2o: 'h2o', f2: 'f2',
-    konoba: 'konoba', tramp: 'tramp',
+    slast: 'slast',
+    // THE RED ONE. There are two kiosks on this shore and only one of them has
+    // a name on it: `tisak` at t 305, and the unnamed green drinks store at t
+    // 290 that nobody would ask for. "The kiosk" is the Tisak — it was mapped
+    // to the green one and would have sent her to the wrong building.
+    kiosk: 'tisak',
+    mini: 'mini', h2o: 'h2o', f2: 'f2', konoba: 'konoba', tramp: 'tramp',
   };
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
