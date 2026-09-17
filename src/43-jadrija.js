@@ -29930,6 +29930,18 @@ async function buildJadrija(scene) {
         // — it is read every frame by the line that draws the wrap, and a
         // value read off state cannot be stranded by an event that never fires.
         leg: 0, shed: 0, held: 0, pour: 0,
+        // How full the glass is, −1 for empty. It used to be written by the
+        // `wine` phase and by the debug scrubber and by nothing else, which
+        // meant that before the first pour it was `undefined` — and
+        // `undefined >= 0` is false, so it happened to read as empty. It is a
+        // precondition now (see `askWhy`), and a precondition that works by
+        // accident is one that stops working the first time somebody
+        // reorders a test.
+        level: -1,
+        // And why she did not take the last thing she was asked for, or null.
+        // A key off `askWhy`, not a sentence: 49-ears.js turns it into words,
+        // the same way `DOES` turns a phase name into words.
+        why: null,
       };
     } catch (e) {
       console.warn('test figure failed:', e.message);
@@ -33779,10 +33791,80 @@ async function buildJadrija(scene) {
    */
   const SHE_CAN = { wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
     note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
+    // AND THE POSE SHE ALREADY HAD AND NOTHING COULD ASK FOR.
+    //
+    // Misha, 17 Sep 2026: *"i tell her to get down on her knees, and eventho
+    // she knows how to do it if i spray her, she says something but doesn't
+    // actually get down on her knees.... she should"*.
+    //
+    // He is right and the gap was one table entry wide. `submit` is the
+    // indoor answer to the hose — two clips and eleven seconds of held kneel,
+    // all of it authored in tools/blender/human_mh.py and all of it reachable
+    // only by holding a branch on her in the kabina for a second and a half.
+    // The water was never what the pose was ABOUT; it was only the one way in.
+    // Asking is the other way in, and it adds no animation, which is the rule
+    // this whole table is here to keep.
+    submit: 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
     'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1 };
+
+  /**
+   * ── WHAT HAS TO BE TRUE FIRST, AND WHAT IS ALREADY TRUE ────────────────
+   *
+   * Misha, 17 Sep 2026: *"if i ask to pour some wine, she executes her entire
+   * routine: she leaves the hut, re-enters, and pours, that's like a
+   * pre-recorded sequence.. she has no concept that she is already in the hut
+   * and the wine is already poured in the glass"*.
+   *
+   * MEASURED, on 1.403.0, asked for the wine from `dwell` — standing on the
+   * pour mark, in the room, with the glass full: `come` from leg 0 walked her
+   * to (dc, face − 1.55), which is 1.58 m OUT ON THE CONCRETE, 3.2 s of her
+   * outside the room she was already in, and then 7.6 s of the pour clip
+   * emptying a bottle into a glass that `fillTo` had already filled. 16.2 s
+   * of it, and the state at the end was the state at the start.
+   *
+   * So a skill is not one sequence any more. It is a precondition and an
+   * entry, and this function is the precondition half: null when there is
+   * nothing in the way, or a KEY for what is. The keys are answers to the
+   * player and not errors — "the glass is already full" is a fact about the
+   * room, which is why `askShow` can hand it straight back.
+   *
+   * ONE COPY, TWO CALLERS. `askShow` calls it so the panel can say why on the
+   * frame the words arrive, and the dispatch in `stepShow` calls it again on
+   * the frame she is actually free to start — because between those two the
+   * player may have walked out of the room, and the answer is allowed to have
+   * changed. A second copy of either test is what the notes over `wineAt` and
+   * `HOLD_FOR` are both about.
+   */
+  function askWhy(name) {
+    if (!show) return 'gone';
+    if (name === 'wine') {
+      // The glass is full and nobody drinks it — that is the room's own rule,
+      // written over `fillTo`. There is nothing left of this request to do.
+      if (show.level >= 0) return 'poured';
+      // And the bottle is in there. Asked from the promenade she walks in,
+      // which is more of an answer than the clip is — so this is not a
+      // refusal, it is only the case where there is no kabina at all.
+      if (!kit || !kit.wine || !special) return 'nokit';
+      return null;
+    }
+    if (name === 'submit') {
+      // INDOORS ONLY, and the argument is the one written over the soak meter:
+      // out on the promenade being hosed in front of forty people is a dare
+      // and she answers it by catching fire. The kneel is what the same water
+      // gets you in a four-metre hut with one other person in it. Asking for
+      // it on the open deck is asking for the wrong one of the two.
+      if (!sheIsIn()) return 'outside';
+      // And she is already down there. `kept` holds for `keptFor` and the
+      // water refreshes it; asking again from `dwell` is the request, asking
+      // again from the pose is not.
+      if (KNEES[show.phase]) return 'already';
+      return null;
+    }
+    return null;
+  }
 
   /**
    * AND THE ONES THAT ARE SOMEWHERE ELSE.
@@ -34596,13 +34678,53 @@ async function buildJadrija(scene) {
       const name = show.ask;
       show.ask = null;
       show.did = name;
-      if (name === 'wine') {
-        // The whole walk to the bottle, not the pour on its own: the mark is
-        // in the kabina and the legs of `come` are what get her to it without
-        // going through the stool. Asked from out on the promenade she walks
-        // in, which is more of an answer than the clip is.
-        show.leg = 0;
-        go('come', 'walk', 0.36);
+      // AND WHETHER THERE IS ANYTHING LEFT TO DO. See `askWhy`: the same
+      // function `askShow` answered the panel with, asked again here because
+      // the player has had a frame or more to walk out of the room since.
+      show.why = askWhy(name);
+      if (show.why) {
+        show.did = null;
+      } else if (name === 'wine') {
+        // ── THE LEGS THAT ARE ALREADY WALKED ──
+        //
+        // `come` has four waypoints and the first two are OUTSIDE: leg 0 is
+        // (dc, face − 1.55), a stride and a half out on the concrete. That is
+        // right for a woman on the promenade who has been asked to pour a
+        // drink and it is the whole of what he saw — asked from `dwell` she
+        // walked out of the hut she was standing in, came back in through the
+        // door and started again.
+        //
+        // So the entry is picked off where she actually is, which is two
+        // tests and no new state:
+        //
+        //   on the mark      the pour, from here. Nothing to walk.
+        //   under the roof   the last two legs — round the stool and on to
+        //                    the mark — so she never crosses the sill.
+        //   outside          all four, exactly as before.
+        //
+        // `0.35` is the tolerance the last leg of `come` already arrives on
+        // (0.20) plus the settle's own reach, so "on the mark" here means the
+        // same thing it means down there. The pour then plants her with
+        // `showSettle` over its first 0.58 s, as it always did — so the
+        // millimetres the solve is measured in are still the solve's.
+        const onMark = Math.hypot(show.t - kit.wine[0],
+          show.s - kit.wine[1]) < 0.35;
+        if (onMark) {
+          show.leg = 0;
+          go('wine', 'wine', 0.42);
+        } else {
+          show.leg = sheIsIn() ? 2 : 0;
+          go('come', 'walk', 0.36);
+        }
+      } else if (name === 'submit') {
+        // The kneel, asked for rather than hosed for. Same call the water
+        // makes — see the soak meter above, where `her` picks this over the
+        // flare — and deliberately without `showNoise('wetlong')`, which is
+        // the sound of water and there is none.
+        showSay('squee', d);
+        show.queue.length = 0;
+        show.side = 0;
+        go('submit', 'submit', 0.30);
       } else if (name === 'ballet') {
         const bar = barreAt(show.t, show.s);
         if (bar) {
@@ -40664,6 +40786,10 @@ async function buildJadrija(scene) {
       // look identical from outside, and only one of them is a bug.
       curT: skinFig && skinFig.state.cur ? +skinFig.state.curT.toFixed(2) : null,
       held: +show.held.toFixed(2), leg: show.leg, shed: show.shed,
+      // The glass, and the last request she turned down. Both are
+      // preconditions now — see `askWhy` — and a precondition that cannot be
+      // read from outside is one no test can measure.
+      level: +(show.level ?? -1).toFixed(2), why: show.why || null,
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
       // Whether the water on her is drawn as water. See sheIsIn().
       indoors: sheIsIn(), streak: skinFig && skinFig.face
@@ -40909,11 +41035,22 @@ async function buildJadrija(scene) {
      */
     askShow: (name) => {
       if (!show || !SHE_CAN[name]) return false;
+      // AND WHY NOT, WHEN THERE IS A WHY. Three answers and not two: `false`
+      // is a name she does not know, `true` is armed, and a STRING is a name
+      // she knows and a reason there is nothing to do with it — "the glass is
+      // already full" is not a failure, it is the room. 49-ears.js turns the
+      // key into words; see `askWhy`, which is asked again on the frame she
+      // is free to start, because by then it may answer differently.
+      const why = askWhy(name);
+      if (why) { show.why = why; show.did = null; return why; }
       show.ask = name;
+      show.why = null;
       return true;
     },
     /** What she was last asked for and took, or null. */
     didShow: () => (show ? (show.did || null) : null),
+    /** And why she did not take it, as a key off `askWhy`, or null. */
+    whyShow: () => (show ? (show.why || null) : null),
     /** The shop counter you are standing at, or null — see `counterAt`. */
     counter: (x, z) => counterAt(x, z),
     /** What she saw on the last recon, and what she came back and reported. */

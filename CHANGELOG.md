@@ -8,6 +8,68 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.404.0] — 2026-09-17 (baye 1.11.0)
+
+### a skill is a precondition and an entry, not a pre-recorded sequence
+
+**"if i ask to pour some wine, she executes her entire routine: she leaves the
+hut, re-enters, and pours, that's like a pre-recorded sequence.. she has no
+concept that she is already in the hut and the wine is already poured"**.
+
+She did exactly that. `come` has four waypoints and the first two are outside
+the kabina, and nothing in it ever asked where she was standing — so asked to
+pour while she was already in the room, on the pour mark, with the glass
+already full, she walked 1.58 m out onto the concrete, came back in through the
+door, and poured 7.6 s of wine into a full glass. Sixteen seconds, and the
+state of the room at the end was the state at the start.
+
+Now every ask is checked against what is already true and entered from the legs
+that are left. On the mark she pours from where she stands: 9.2 s against 16.2.
+Inside but off the mark she crosses the floor without ever crossing the sill —
+0 s outside, arriving on the same 5 mm. Out on the promenade she walks all four
+legs exactly as she did before, measured identical. Asked with the glass
+already full she does not move, and says so: "the glass is already full" is a
+fact about the room, and "cannot do that here" was the wrong answer to it.
+
+No world model was added for this. Everything a precondition reads —
+whether she is in the room, what is in the glass, whether the kit is there —
+was already state the game kept for another reason, and that is the rule the
+design states: a precondition reads state that exists anyway or it is not a
+precondition.
+
+`askShow` therefore has three answers instead of two — it does not know the
+name, it is armed, or here is the reason it is not — and 49-ears.js turns that
+reason into words the way `DOES` already turns a phase into words.
+
+### and you can ask her to get down on her knees
+
+**"i tell her to get down on her knees, and eventho she knows how to do it if i
+spray her, she says something but doesn't actually get down on her knees"**.
+
+`submit` → `kept` is eleven seconds of pose authored for that room, and the
+only thing that could ever reach it was a second and a half of jet. The water
+was never what it was about; it was the one way in. Asking is the other way in,
+and it adds no animation: 12.5 s down, her head half a metre lower, hands
+behind her back. Indoors only, for the same reason the soak meter is — out on
+the promenade the same water gets you the turn.
+
+Server side (baye 1.11.0): the skill, and `get` and `kneel` as bare-imperative
+openers. "Get down on your knees" carries no modal and no please, so it was
+never reaching the skill matcher at all.
+
+### the plan for the rest of it
+
+`plan/real-time-commands.md`: what the atomic actions actually are, the state
+that can serve as preconditions, why the planner needs no search (the longest
+honest plan is three steps), what a whitelisted three-step program from the
+classifier should look like and why it must be refused whole, and the stages in
+cheapest-first order.
+
+The pug is in there too, because he is real and it turns out "chase him out" is
+nearly possible rather than science fiction: his beat straddles the kabina door
+on purpose, he follows you in, and today the only thing that makes him leave a
+room is you leaving it first.
+
 ## [1.403.1] — 2026-09-17
 
 ### the pause stops the microphone
