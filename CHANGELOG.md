@@ -8,6 +8,92 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.397.0] — 2026-09-16
+
+### autonomous recon missions
+
+**"it would be cool if she could execute tasks, almost like an autonomous robot
+... can u run up to the ice-cream shop and see what flavors are available and
+let me know? ... or: run up to the vikendica and see if the bucketeering baye is
+upstairs or downstairs ... and she like literally knows where Kiosk is, goes to
+it, executes tasks, comes back, and reports on it.. does Recon missions"**.
+
+Eight places: the ice cream counter, the TISAK kiosk, MINI, H2O, the pizzeria,
+the konoba, the trampolines and the holiday house. Say *"run up to the vikendica
+and see if the bucketeering baye is upstairs or downstairs"* and she goes. She
+walks the length of the promenade, stands at the place and looks at it for three
+seconds, counts what is there, walks back to wherever you are STANDING NOW
+rather than where you were when she left, and tells you.
+
+**Everything she says she saw, she saw.** That is the part worth defending, and
+it is a split:
+
+- SHE counts the people, because people move and only the page knows where they
+  are this second. Nine at the ice cream shop, two of them children, one sitting
+  down at the kiosk — counted at the place, on the last frame of looking, not on
+  the way back.
+- THE SERVICE holds the words. The sixteen flavours in her answer come from
+  `GELATO_NAMES` in server/baye/baye.py, which is the same list as `GELATO` in
+  43-jadrija.js — read off photographs of that counter, plaque by plaque. Ice
+  cream does not move, so there is nothing for the page to observe and nothing
+  it needs to say. `clean_recon` takes a place key off a table and four clamped
+  numbers and REFUSES TEXT, so a modified client cannot put a word in her mouth
+  by claiming to have seen it. That is guardrail 2 from the other side.
+- The other Baye's floor is her own phase: `tap`, `up`, `stairs`, `plants`.
+
+Measured, all three:
+
+- the ice cream shop → *"I'm back. Nine people were there, two kids, and the
+  case had Čokolada, Vanilija, Stracciatella, Mango, Raffaello, plus one
+  turned-away plaque."*
+- the house → *"Nobody's there. The other Baye's on the outside stairs carrying
+  one bucket, and she's hauled eleven down already. Four minutes of sweaty
+  bullshit."*
+- the kiosk → *"Three people at Tisak, one sitting down. That's the whole damn
+  scene, babe."*
+
+**The walking is where the work went, and it took two more measurements on top
+of 1.396.0's three.** A recon mark cannot be typed: `s0 − 1.8` in front of the
+ice cream shop is 20.2 and that is inside its terrace, so she stalled six metres
+short of it every time. Every one of these shops has a terrace of a different
+depth, so the mark is found by walking inland from her lane until `blockedAt`
+says stop — as close to the counter as she can get, whatever is in front of it.
+And the travelling leg ran along `lane[1]`, the INLAND edge, which is where
+those terraces are: she walked to t 342 and stopped dead against the end of one.
+It runs down the middle of her own performance strip now, which is clear by
+construction.
+
+Even that is not clear for two hundred metres. Sent to the vikendica she
+stopped at t 417.5 against something on the deck and gave the errand up 180 m
+from the address. A travel leg is a LANE rather than a line now: a stall steps
+her sideways within it, seaward first, and she carries on. Six offsets, then she
+gives up honestly.
+
+- `__fr.jad.ask('see.slast')`, and `seen()` / `told()` read what she found and
+  what she brought back.
+- The panel says where she has gone, because there is nothing else to see until
+  she is back.
+- A LOOKING VERB is what separates the recon from the doing: "go and see who is
+  on the trampolines" is a mission and "let's go jump on the trampolines" is
+  her getting on one. Twelve phrasings checked, including his own three, no
+  mismatches.
+- No regression: census {446,333,86,27}, blockers 818, tris 642821, 59 fps.
+
+## [baye 1.8.0] — 2026-09-16 — server only
+
+### she reports back
+
+`RECON_PLACES`, `GELATO_NAMES`, `BUCK_WHERE` and `clean_recon` — see above for
+why the words live here and the numbers come up from the page. The report goes
+through `/line` with `ask: "recon"`, which is the one line she says that no
+sentence preceded: she was asked a minute and a half ago and walked up the beach
+for it. It gets the conversation's persona rather than the twelve-word one, and
+a forty-word ceiling, because a list of flavours is not one line.
+
+Eight `see.*` skills, matched on a place noun AND a looking verb, and `ASK_RE`
+learned the openers he actually uses: run, check, head, walk, nip, pop, find,
+look, see.
+
 ## [1.396.0] — 2026-09-16
 
 ### she goes places now: swimming, and the trampolines

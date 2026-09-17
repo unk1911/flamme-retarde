@@ -8006,6 +8006,9 @@ window.__fr = {
      */
     ask: (name) => (jadrija ? jadrija.askShow(name) : null),
     did: () => (jadrija ? jadrija.didShow() : null),
+    /** What she saw on the last recon, and what she brought back. */
+    seen: () => (jadrija ? jadrija.seen() : null),
+    told: () => (jadrija ? jadrija.told() : null),
     /**
      * Walk into her, without walking. This is the collider's own hook — see
      * `bumpReact` — so it is the same call the ground makes on the first

@@ -710,6 +710,58 @@ const voice = (() => {
    * Resolves to what happened, as one word, for the ears panel: `said`, `far`,
    * `off`, `busy`, `nobody`, or the server's refusal.
    */
+  /**
+   * SHE IS BACK, WITH SOMETHING TO SAY.
+   *
+   * Misha, 16 Sep 2026: *"she like literally knows where Kiosk is, goes to it,
+   * executes tasks, comes back, and reports on it.. does Recon missions"*.
+   * `stepShow` in 43-jadrija.js walks her there, counts what is at the place
+   * while she is standing in it, walks her back to you and calls this.
+   *
+   * WHAT GOES UP IS NUMBERS. `recon` is a place key off a table the service
+   * has its own copy of, and counts — people, children, how long she was gone.
+   * Not one word of it is text from the page, which is what keeps this on the
+   * right side of the rule the whole service is built on: the flavours in her
+   * answer come from the list in server/baye/baye.py, because ice cream does
+   * not move and a modified client must not be able to put a word in her mouth
+   * by claiming to have seen it. See `RECON_PLACES` there.
+   *
+   * Unprompted in the sense that nothing was said to her a second ago — but
+   * she was ASKED, a minute and a half back, and walked up the beach for it.
+   * So it goes through `/line` like her other answers rather than through
+   * `/talk`, and it is the one line she now says that no sentence preceded.
+   */
+  async function report(recon) {
+    if (!on || !recon) return 'off';
+    if (!AUTH.user || !AUTH.baye) return 'signed out';
+    const sp = CAST.baye;
+    const gap = at(() => jadrija.bayeGap());
+    for (let i = 0; i < 16 && busy; i++) await new Promise((r) => setTimeout(r, 500));
+    if (busy) return 'busy';
+    busy = true;
+    try {
+      const r = await fetch(AUTH.baye + '/line', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign(context(sp, gap),
+          { who: 'baye', ask: 'recon', recon })),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d || !d.ok) return (d && d.error) || ('http ' + r.status);
+      sp.said.push(d.text);
+      if (sp.said.length > sp.cfg.memory) sp.said.shift();
+      caption(d.text, null);
+      await play(sp.key, d);
+      capT = sp.cfg.hold;
+      return 'said: ' + d.text;
+    } catch (e) {
+      return e.message;
+    } finally {
+      busy = false;
+    }
+  }
+
   async function answer(askName, spoken = null) {
     if (!on) return 'off';
     if (!AUTH.user || !AUTH.baye) return 'signed out';
@@ -918,6 +970,7 @@ const voice = (() => {
     toggle,
     answer,
     converse,
+    report,
     /** Whose line is in the air right now, or null — see `play`. */
     saying: () => sayingKey,
     /** For a probe: exactly the state `/talk` would be sent right now, for

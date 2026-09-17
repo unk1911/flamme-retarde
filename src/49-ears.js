@@ -282,6 +282,16 @@ const ears = (() => {
     wheel: 'cartwheels', joy: 'a somersault',
     // The two she has to go somewhere for, which is why these say where.
     swim: 'off for a swim', tramp: 'off to the trampolines',
+    // And the recon missions. She walks off and there is nothing else to see
+    // until she is back, so the panel says where she has gone.
+    'see.slast': 'off to the ice cream place, back in a minute',
+    'see.kiosk': 'off to the kiosk, back in a minute',
+    'see.vik': 'off up to the house, back in a minute',
+    'see.mini': 'off to MINI, back in a minute',
+    'see.h2o': 'off to H2O, back in a minute',
+    'see.f2': 'off to the pizzeria, back in a minute',
+    'see.konoba': 'off to the konoba, back in a minute',
+    'see.tramp': 'off to the trampolines, back in a minute',
   };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */

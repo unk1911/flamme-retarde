@@ -32752,6 +32752,39 @@ async function buildJadrija(scene) {
   function errandMark(name) {
     if (!show) return null;
     if (name === 'swim') return [show.t, SHOW.lane[0] - ERRAND.out];
+    if (name.startsWith('see.')) {
+      const k = name.slice(4);
+      if (k === 'vik') {
+        // The house is up its own steps off the far end of the promenade, and
+        // she is not going up them: the mark is the foot of them, from where
+        // the terrace and the flight are both in front of her. Which is all
+        // "is she upstairs or downstairs" needs — and it is found the same way
+        // a shop's is, by walking inland until something is in the way, because
+        // a typed `lane[1]` lands in the terrace at the bottom of the steps.
+        const tv = VIK.t + 2.0;
+        let sv = LANE_S();
+        for (let y = LANE_S(); y < SHOW.lane[1] + 5; y += 0.5) {
+          if (blockedAt(tv, y)) break;
+          sv = y;
+        }
+        return [tv, sv];
+      }
+      const S = SHOPS.find((x) => x.key === SEE[k]);
+      if (!S) return null;
+      // AS CLOSE TO THE FRONTAGE AS SHE CAN ACTUALLY GET, found by walking
+      // inland from her lane until something is in the way. MEASURED: a mark
+      // typed as `s0 − 1.8` is 20.2 for the ice cream shop and that is inside
+      // its terrace — tables, chairs, awning posts — so she stalled six metres
+      // short of it and gave up. Every one of these shops has a terrace
+      // between the deck and the counter and none of them has the same depth.
+      const tc = (S.t0 + S.t1) / 2;
+      let ss = SHOW.lane[1];
+      for (let y = SHOW.lane[1]; y < S.s0 - 0.6; y += 0.5) {
+        if (blockedAt(tc, y)) break;
+        ss = y;
+      }
+      return [tc, ss];
+    }
     if (name === 'tramp') {
       // THE GRAVEL INSIDE THE CAGE, and not a mat, which is the second thing
       // this needed measuring to learn. `trampBeds` has four beds and every
@@ -32800,10 +32833,32 @@ async function buildJadrija(scene) {
    * what the first cut did: sent to the trampolines she stopped dead at s 31
    * against the back of a building, twenty metres short.
    */
+  const LANE_S = () => SHOW.lane[0] + 2.0;
+  /**
+   * And when the road itself is blocked, the offsets she tries, in order.
+   *
+   * MEASURED: sent to the vikendica she walked west along `LANE_S` and stopped
+   * dead at t 417.5 against something on the deck, sat there for the stall and
+   * gave the errand up — 180 metres from where she was going. The strip is
+   * clear by construction for her own wander, which never has to be anywhere
+   * in particular; a woman walking two hundred metres to an address crosses
+   * whatever is standing in it. So a travel leg is a lane rather than a line,
+   * and a stall steps her sideways within it and carries on instead of ending
+   * the errand. The seaward side first: it is the open deck.
+   */
+  const LANE_TRY = [0, -1.8, 1.8, -3.4, 3.4, -5.0];
   function errandLegs(t, s) {
-    if (s <= SHOW.lane[1]) return [[t, s]];
+    // THE TRAVELLING LEG RUNS DOWN THE MIDDLE OF HER OWN STRIP, and this is
+    // the third measurement this routing needed. It ran along `lane[1]`, the
+    // INLAND edge, which is where the shop terraces are: sent to the ice cream
+    // counter she walked the promenade to t 342 and stopped dead against the
+    // terrace at the end of it, six metres short, every time. The seaward half
+    // of her lane is the strip she performs on and is clear by construction —
+    // see the note over SHOW — so that is the road.
+    const lane = LANE_S();
+    if (s <= lane + 0.5) return [[t, s]];
     const clearColumn = (tc) => {
-      for (let ss = SHOW.lane[1]; ss <= s; ss += 1.0) {
+      for (let ss = lane; ss <= s; ss += 1.0) {
         if (blockedAt(tc, ss)) return false;
       }
       return !blockedAt(tc, s);
@@ -32812,12 +32867,46 @@ async function buildJadrija(scene) {
       for (const tc of (off === 0 ? [t] : [t - off, t + off])) {
         if (clearColumn(tc)) {
           return tc === t
-            ? [[t, SHOW.lane[1]], [t, s]]
-            : [[tc, SHOW.lane[1]], [tc, s], [t, s]];
+            ? [[t, lane], [t, s]]
+            : [[tc, lane], [tc, s], [t, s]];
         }
       }
     }
     return null;
+  }
+
+  /**
+   * What is true at the place she has walked to, counted now.
+   *
+   * Numbers and enums only — see the note over SEE. The people are whoever is
+   * within `SEE_R` of the mark this second, split the one way the crowd knows
+   * how to be split, and the Bucketeer's floor is her own phase read off the
+   * errand she is actually on.
+   */
+  const SEE_R = 9.0;
+  const BUCK_WHERE = { fill: 'tap', set: 'up', take: 'up', rest: 'up',
+    roam: 'up', dwell: 'up', up: 'stairs', lift: 'stairs', down: 'stairs',
+    right: 'stairs', tip: 'plants', pirouette: 'up', arabesque: 'up' };
+  function reconLook(name, at) {
+    const o = { place: name.slice(4), people: 0, kids: 0, sitting: 0 };
+    for (let i = 0; i < bathers.length; i++) {
+      const b = bathers[i];
+      if (b.hidden) continue;
+      const dt0 = b.t - at[0], ds0 = b.s - at[1];
+      if (dt0 * dt0 + ds0 * ds0 > SEE_R * SEE_R) continue;
+      o.people += 1;
+      if (b.mode === 'sit' || b.mode === 'lie') o.sitting += 1;
+      const k = castBlob && CAST_KIND && castBlob[i] >= 0
+        ? CAST_KIND[castBlob[i]] : null;
+      if (k && /child|boy|girl/.test(k)) o.kids += 1;
+    }
+    if (o.place === 'vik' && bucketeer) {
+      const k = bucketeer.beat ? bucketeer.beat() : null;
+      o.buck = (k && BUCK_WHERE[k.phase]) || 'up';
+      const tk = bucketeer.talk ? bucketeer.talk() : null;
+      if (tk && tk.laps != null) o.laps = Math.max(0, Math.min(99, tk.laps | 0));
+    }
+    return o;
   }
 
   function showTo(tt, ss, dt, mul = 1) {
@@ -33683,7 +33772,11 @@ async function buildJadrija(scene) {
    * cannot do.
    */
   const SHE_CAN = { wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
-    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1 };
+    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
+    // And the recon missions, which are errands with a report on the end —
+    // see SEE. `see.vik` is the holiday house and the other Baye in it.
+    'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
+    'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1 };
 
   /**
    * AND THE ONES THAT ARE SOMEWHERE ELSE.
@@ -33715,6 +33808,7 @@ async function buildJadrija(scene) {
     back: 4.0,         // m — close enough to you again
     giveUp: 200,       // s before an errand is given up on
     stall: 7.0,        // s of getting no closer before she gives it up
+    look: 3.2,         // s spent looking at the thing she was sent to see
     /**
      * And how close is close enough, per errand. A mat is 3.4 m across and has
      * its own collider, so `near` on a trampoline is the edge of the thing and
@@ -33722,12 +33816,45 @@ async function buildJadrija(scene) {
      * which was the bed itself refusing to be stood in.
      */
     at: { tramp: 4.5, swim: 1.10 },
+    /** And a recon stands where a customer stands, which is not a point. */
+    atSee: 2.5,
     /** Her body at the surface, metres under the sea, while she swims. */
     floatY: -0.30,
     /** Seconds of getting in, and of climbing back out. */
     wetIn: 0.9,
   };
   const ERRANDS = { swim: 1, tramp: 1 };
+
+  /**
+   * ── THE RECON MISSIONS ──
+   *
+   * Misha, 16 Sep 2026: *"it would be cool if she could execute tasks, almost
+   * like an autonomous robot ... can u run up to the ice-cream shop and see
+   * what flavors are available and let me know? ... or: run up to the
+   * vikendica and see if the bucketeering baye is upstairs or downstairs ...
+   * and she like literally knows where Kiosk is, goes to it, executes tasks,
+   * comes back, and reports on it"*.
+   *
+   * The errand engine above is the half that walks. This is the half that
+   * LOOKS, and the whole question about it is whether what she comes back with
+   * is true. It is: every place here is a real entry in SHOPS with real
+   * coordinates, and every fact gathered at one is counted off the world at
+   * the moment she is standing in it. Nothing is invented and nothing is
+   * remembered from before she set off.
+   *
+   * WHAT SHE SEES HERSELF and what the service knows are deliberately split.
+   * She counts PEOPLE, because people move and only the page knows where they
+   * are this second. The ice cream flavours are not counted, because they do
+   * not move: the sixteen names in GELATO were read off photographs of that
+   * counter and the same list is held in server/baye/baye.py, so the page
+   * sends a place and a number and never a word. That is guardrail 2 from the
+   * other side — a modified client cannot put text in her mouth by claiming
+   * to have seen it.
+   */
+  const SEE = {
+    slast: 'slast', kiosk: 'kiosk', mini: 'mini', h2o: 'h2o', f2: 'f2',
+    konoba: 'konoba', tramp: 'tramp',
+  };
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
@@ -34390,7 +34517,7 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toBar', 'walk', 0.32);
         } else show.did = null;      // no ladder to hold: she cannot, honestly
-      } else if (ERRANDS[name]) {
+      } else if (ERRANDS[name] || name.startsWith('see.')) {
         const mk = errandMark(name);
         const legs = mk ? errandLegs(mk[0], mk[1]) : null;
         if (mk && legs) {
@@ -35026,8 +35153,15 @@ async function buildJadrija(scene) {
         j.since += dt;
         // ALONG THE LEGS `errandLegs` found — see the note over it, which is
         // also where the measurement that made it necessary is written down.
+        j.gone = (j.gone || 0) + dt;
         const legs = j.legs || [[j.t, j.s]];
-        const g = legs[Math.min(j.leg || 0, legs.length - 1)];
+        const gi = Math.min(j.leg || 0, legs.length - 1);
+        const g0 = legs[gi];
+        // A travel leg is a LANE — see LANE_TRY. The last leg is the address
+        // itself and is never shifted.
+        const g = gi < legs.length - 1
+          ? [g0[0], clamp(g0[1] + LANE_TRY[j.lane || 0], SHOW.lane[0], SHOW.lane[1])]
+          : g0;
         const dist = showTo(g[0], g[1], dt, ERRAND.pace);
         // Stalled: against something, with the leg not getting any closer.
         // Every errand gets this, not just the ones inland, because the thing
@@ -35036,6 +35170,13 @@ async function buildJadrija(scene) {
           j.best = dist; j.stall = 0;
         } else j.stall = (j.stall || 0) + dt;
         if (j.stall > ERRAND.stall) {
+          // Sideways within the lane, and only then give up.
+          if (gi < legs.length - 1 && (j.lane || 0) < LANE_TRY.length - 1) {
+            j.lane = (j.lane || 0) + 1;
+            j.stall = 0;
+            j.best = null;
+            break;
+          }
           show.job = null;
           show.stuck = j.name;
           go('play', 'walk', 0.36);
@@ -35048,7 +35189,7 @@ async function buildJadrija(scene) {
         // only, on the last leg.
         if ((j.leg || 0) < legs.length - 1) {
           if (dist < ERRAND.near * 2.2) {
-            j.leg = (j.leg || 0) + 1; j.best = null; j.stall = 0;
+            j.leg = (j.leg || 0) + 1; j.best = null; j.stall = 0; j.lane = 0;
           }
           break;
         }
@@ -35062,8 +35203,10 @@ async function buildJadrija(scene) {
         const CG = j.name === 'tramp' ? SHOPS.find((x) => x.key === 'tramp') : null;
         const inZone = !!CG && show.t > CG.t0 - 1.5 && show.t < CG.t1 + 1.5
           && show.s > CG.s0 - 1.5 && show.s < CG.s1 + 1.5;
-        if (inZone || dist < (ERRAND.at[j.name] || ERRAND.near)) {
+        if (inZone || dist < (j.name.startsWith('see.') ? ERRAND.atSee
+          : (ERRAND.at[j.name] || ERRAND.near))) {
           j.since = 0;
+          if (j.name.startsWith('see.')) { go('peek', 'idle', 0.35); break; }
           if (j.name === 'swim') go('swim', 'swim', 0.50);
           else {
             // ON TO THE MAT, and the last two metres of it are a snap.
@@ -35136,6 +35279,68 @@ async function buildJadrija(scene) {
             show.hopV = ERRAND.hopV * (0.88 + Math.random() * 0.18);
             show.apex = show.hopV * show.hopV / (2 * SHOW.hopG);
             showSay('hup', d);
+          }
+        }
+        break;
+      }
+
+      case 'peek': {
+        // Standing at the place, looking at it. She faces INLAND — at the
+        // counter, the door, the flight of steps — because a woman sent to see
+        // what is there and standing with her back to it is a woman who has
+        // not looked.
+        const j = show.job;
+        if (!j) { showNext(); break; }
+        j.since += dt;
+        j.gone = (j.gone || 0) + dt;
+        show.vel = 0;
+        show.want = Math.atan2(1, 0);
+        if (j.since > ERRAND.look) {
+          // Counted HERE, on the last frame of looking, and not on the way
+          // back — a report is what was there when she was there.
+          show.seen = reconLook(j.name, [j.t, j.s]);
+          j.since = 0;
+          j.leg = 0;
+          j.best = null;
+          j.stall = 0;
+          // Home the way she came: the legs backwards, then you.
+          j.legs = (j.legs || []).slice(0, -1).reverse().concat([[pt, ps]]);
+          go('backTo', 'walk', 0.34);
+        }
+        break;
+      }
+
+      case 'backTo': {
+        const j = show.job;
+        if (!j) { showNext(); break; }
+        j.since += dt;
+        j.gone = (j.gone || 0) + dt;
+        const legs = j.legs && j.legs.length ? j.legs : [[pt, ps]];
+        // The last leg is YOU, and you move: it is re-read every frame rather
+        // than remembered from when she set off, or she walks back to where
+        // you were standing two minutes ago.
+        const last = (j.leg || 0) >= legs.length - 1;
+        const g2 = last ? [pt, ps] : legs[j.leg || 0];
+        const dist = showTo(g2[0], g2[1], dt, ERRAND.pace);
+        if (dist < (last ? ERRAND.back : ERRAND.near * 2.2)) {
+          if (!last) { j.leg = (j.leg || 0) + 1; j.stall = 0; j.best = null; break; }
+          // Back, with something to say. `voice.report` is the only thing in
+          // this file that talks to the service, and it sends the counted
+          // numbers and the name of the place — never a word she has made up.
+          const seen = show.seen;
+          // How long the whole errand took, which she is entitled to mention.
+          if (seen) seen.away = Math.min(900, Math.round(j.gone || 0));
+          show.job = null;
+          show.told = seen || null;
+          if (seen && typeof voice !== 'undefined' && voice.report) voice.report(seen);
+          go('play', 'walk', 0.36);
+        }
+        if (dist > 0.2) {
+          if (dist < (j.best == null ? 1e9 : j.best) - 0.25) { j.best = dist; j.stall = 0; }
+          else j.stall = (j.stall || 0) + dt;
+          if (j.stall > ERRAND.stall && !last) {
+            j.leg = Math.min((j.leg || 0) + 1, legs.length - 1);
+            j.stall = 0; j.best = null;
           }
         }
         break;
@@ -39373,6 +39578,9 @@ async function buildJadrija(scene) {
     },
     /** What she was last asked for and took, or null. */
     didShow: () => (show ? (show.did || null) : null),
+    /** What she saw on the last recon, and what she came back and reported. */
+    seen: () => (show ? (show.seen || null) : null),
+    told: () => (show ? (show.told || null) : null),
     /**
      * Walk into her without walking into her — the collider's own hook, so a
      * probe can test being shoved. `crowd.bump` is the same call and is NOT

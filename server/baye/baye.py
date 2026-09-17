@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.7.1"
+VERSION = "1.8.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -375,7 +375,34 @@ INTENTS = [
 # Every name is one of HER OWN phase names, checked against `SHE_CAN` in
 # src/43-jadrija.js, which is what keeps it honest: there is nothing on this
 # list she cannot already do, and nothing was animated for it.
+# A LOOKING VERB, which is what separates "go and see who is on the
+# trampolines" from "let's go jump on the trampolines". Both name the same
+# noun and they are not the same request, and the `see.` entries are FIRST in
+# the table below because `skills_of` takes the first match: a sentence with a
+# place AND a looking verb in it is a recon, and only a sentence without one
+# is her doing the thing herself.
+SEE_RE = (r"\b(see|check|look|find out|report|scout|peek|spy|recon|"
+          r"what'?s|whats|who'?s|whos|how many|available|got)\b")
+
 SKILLS = {
+    "see.slast": ("walk up to the ice cream place and see what flavours are in "
+                  "the case", [r"\b(ice ?cream|gelato|flavou?rs?|slast\w*)\b", SEE_RE]),
+    "see.vik": ("walk up to the holiday house and see what the other Baye, the "
+                "one carrying the buckets, is doing",
+                [r"\b(vikendica|holiday house|other baye|bucketeer\w*|"
+                 r"bucket baye|up the steps)\b", SEE_RE]),
+    "see.kiosk": ("walk over to the TISAK kiosk and see what is going on there",
+                  [r"\b(kiosk|tisak|newsagent)\b", SEE_RE]),
+    "see.mini": ("walk over to the beach bar MINI and see what is going on there",
+                 [r"\bmini\b", SEE_RE]),
+    "see.h2o": ("walk over to the Caffe bar H2O and see what is going on there",
+                [r"\bh ?2 ?o\b", SEE_RE]),
+    "see.f2": ("walk over to the pizzeria and see what is going on there",
+               [r"\b(pizzeri\w*|pizza|f2)\b", SEE_RE]),
+    "see.konoba": ("walk over to the konoba and see what is going on there",
+                   [r"\bkonoba\b", SEE_RE]),
+    "see.tramp": ("walk up to the trampolines and see who is on them",
+                  [r"\btrampolin\w*\b", SEE_RE]),
     "wine": ("pour a glass of wine, fetch a drink, open the bottle",
              [r"\b(wine|drink|bottle|glass|rakija|pour)\b"]),
     "ballet": ("dance ballet at the barre: a pirouette, a relevé, an "
@@ -423,7 +450,8 @@ ASK_RE = re.compile(
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
-    r"|^\s*(pour|show|make|give|dance|perform|try|go|do)(?!\s+(you|u|i|we)\b)\b",
+    r"|^\s*(pour|show|make|give|dance|perform|try|go|run|check|head|walk|nip|"
+    r"pop|find|look|see|do)(?!\s+(you|u|i|we)\b)\b",
     re.I | re.M)
 
 
@@ -1601,7 +1629,74 @@ SPEAKERS = {
 # The questions a spoken intent can put to a speaker. Off a list, like every
 # other field: `ask` is how a question arrives at `/line`, and a client that
 # sends anything else is sending nothing.
-ASKS = {"time"}
+ASKS = {"time", "recon"}
+
+# ── THE RECON MISSIONS ──────────────────────────────────────────────────────
+#
+# Misha, 16 Sep 2026: *"it would be cool if she could execute tasks, almost like
+# an autonomous robot ... can u run up to the ice-cream shop and see what flavors
+# are available and let me know? ... or: run up to the vikendica and see if the
+# bucketeering baye is upstairs or downstairs ... she like literally knows where
+# Kiosk is, goes to it, executes tasks, comes back, and reports on it"*.
+#
+# The walking and the counting are in src/43-jadrija.js — she goes, she stands
+# there, she counts what is there, she comes back. This is the half that turns
+# what she counted into a sentence, and the split between the two is a guardrail
+# rather than a convenience:
+#
+#   THE PAGE SENDS NUMBERS. A place off the table below, how many people were
+#   there, how many were children, how long she was gone. All clamped.
+#   THE WORDS ARE HERE. The flavours in her answer come from this file, not
+#   from the page — the sixteen names in `GELATO` in 43-jadrija.js were read off
+#   photographs of that counter and this is the same list. Ice cream does not
+#   move, so there is nothing for the page to observe and nothing it needs to
+#   say: a modified client cannot put a word in her mouth by claiming to have
+#   seen it.
+RECON_PLACES = {
+    "slast": "the ice cream place, the slastičarnica",
+    "kiosk": "the TISAK kiosk",
+    "mini": "the beach bar MINI",
+    "h2o": "the Caffe bar H2O",
+    "f2": "the pizzeria, F2",
+    "konoba": "the konoba",
+    "tramp": "the trampolines",
+    "vik": "the holiday house up the steps, where the other Baye is carrying "
+           "her buckets up and down all day",
+}
+# The plaques in the case, as read. Fifteen names and one pan whose card is
+# turned away — she can say that too, because it is what is there.
+GELATO_NAMES = ("Čokolada", "Vanilija", "Stracciatella", "Jogurt Šumsko voće",
+                "Pistaccio", "Kinder Bueno", "Lješnjak", "Lubenica", "Mango",
+                "Zelena Jabuka", "Raffaello")
+# Where the other Baye was, as her own errand reports it.
+BUCK_WHERE = {
+    "tap": "upstairs in the bathroom, filling her bucket at the tap",
+    "up": "upstairs in the flat",
+    "stairs": "on the outside stairs, carrying one",
+    "plants": "down at the porch, tipping one on the plants",
+}
+
+
+def clean_recon(raw):
+    """What she came back with, clamped. Numbers and table keys, never text."""
+    if not isinstance(raw, dict):
+        return None
+    g = raw.get
+    place = clamp_str(g("place"), 12)
+    if place not in RECON_PLACES:
+        return None
+    o = {"place": place,
+         "people": clamp_num(g("people"), 0, 60) or 0,
+         "kids": clamp_num(g("kids"), 0, 30) or 0,
+         "sitting": clamp_num(g("sitting"), 0, 60) or 0,
+         "away": clamp_num(g("away"), 0, 900) or 0}
+    w = clamp_str(g("buck"), 10)
+    if w in BUCK_WHERE:
+        o["buck"] = w
+    laps = clamp_num(g("laps"), 0, 99)
+    if laps is not None:
+        o["laps"] = laps
+    return o
 
 # WHO IS SWITCHED OFF, AND WHY IT IS A SET HERE AND NOT A DELETION ABOVE.
 #
@@ -2041,6 +2136,8 @@ def clean_context(raw: dict) -> dict:
         "event": clamp_str(g("event"), 90),
         # A spoken question, off `ASKS` and nothing else. See `INTENTS`.
         "ask": (lambda a: a if a in ASKS else None)(clamp_str(g("ask"), 12)),
+        # What she saw on a recon, clamped by `clean_recon` — numbers only.
+        "recon": clean_recon(g("recon")),
         # The language a spoken question was asked in, off `/hear`. Letters
         # and spaces only, because it goes into an instruction.
         "spoken": (lambda v: v if v and re.fullmatch(r"[A-Za-z][A-Za-z \-]{1,23}", v)
@@ -2200,6 +2297,39 @@ def build_messages(ctx: dict, world: dict) -> list:
                          "understand it. You are repeating what a grown-up "
                          "said about it, and getting it a bit wrong.")
         lines.append("")
+
+    # ── AND WHAT SHE FOUND, if she has just walked back from somewhere ──
+    r = ctx.get("recon")
+    if ctx.get("ask") == "recon" and r:
+        lines = ["YOU HAVE JUST WALKED BACK FROM " + RECON_PLACES[r["place"]].upper()
+                 + ", where they asked you to go and look. You were gone "
+                 + (f"{r['away']} seconds" if r["away"] < 90
+                    else f"{int(round(r['away'] / 60))} minutes")
+                 + ". WHAT YOU SAW, all of it true:"]
+        n = r["people"]
+        lines.append(f"- {n} people there" if n != 1 else "- one person there")
+        if r["kids"]:
+            lines.append(f"- {r['kids']} of them children")
+        if r["sitting"]:
+            lines.append(f"- {r['sitting']} of them sitting down")
+        if r["place"] == "slast":
+            lines.append("- the flavours in the case, on their plaques: "
+                         + ", ".join(GELATO_NAMES)
+                         + " — and one pan whose card is turned away")
+        if r.get("buck"):
+            lines.append("- the other Baye is " + BUCK_WHERE[r["buck"]])
+        if r.get("laps") is not None:
+            lines.append(f"- she has carried {r['laps']} buckets down so far")
+        lines.append("")
+        lines.append("Tell them what you found, as somebody who has just got "
+                     "back from doing it. THIRTY WORDS AT THE MOST. Nothing "
+                     "you were not told above, no guessing at what else might "
+                     "be there, and if they asked for the flavours then name "
+                     "some of them rather than counting them. Do not offer to "
+                     "go again.")
+        lines.append("")
+        return [{"role": "system", "content": TALK_PERSONA["baye"]},
+                {"role": "user", "content": "\n".join(lines)}]
 
     if ctx.get("ask") and ctx.get("spoken"):
         lines.append(f"They asked you in {ctx['spoken']}: answer in "
@@ -2889,12 +3019,17 @@ class Handler(BaseHTTPRequestHandler):
         fast = who in FAST_WHO
         try:
             msgs = build_messages(ctx, world)
-            text, usage = ask_model(msgs, fast)
+            # A recon report is the one line on this route that is not one
+            # line: she has walked up the beach and back and has a list to
+            # hand over, so it gets the conversation's own ceiling instead of
+            # `WORD_CAP`. See the recon branch in `build_messages`.
+            cap = 40 if ctx.get("ask") == "recon" else 0
+            text, usage = ask_model(msgs, fast, words=cap)
             if not text:
                 # One retry, because an empty reply here is a budget accident
                 # rather than a decision — see MAX_TOKENS. Retrying a refusal
                 # would be rude; retrying a truncation is just finishing.
-                text, usage = ask_model(msgs, fast)
+                text, usage = ask_model(msgs, fast, words=cap)
             if not text:
                 return self._send(502, {"ok": False, "error": "empty line"})
             vid, rate = voice_for(ctx)
