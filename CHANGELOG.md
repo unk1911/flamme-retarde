@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.403.0] — 2026-09-17
+
+### five riders on the promenade
+
+**"many folks in jadrija use e-scooters and bicycles, maybe u can put a few
+folks on them things just to make it more authentic"**. Three bicycles and two
+e-scooters, between t 287 and t 523, going both ways at 2.9 to 5.6 m/s.
+
+NOT A CLIP. Each rider is one of the eight baked bathers with its limbs solved
+on to the machine: two-bone IK puts the hips on the saddle, the hands on the
+grips and the feet on the pedals, the saddle height is bisected per rider so
+the leg comes nearly straight at the bottom of the stroke, and the torso lean
+is whatever it takes to reach the bars. The cranks turn with the back wheel at
+about 66 rpm and freewheel now and then. One step-through frame, with a basket.
+The machines carry no lettering, because rule 12 does not care that a bicycle
+is small.
+
+Lanes are planned per rider on a half-metre grid against the blocker list and
+the standing-height steps, keep-right, with the ends turned in half-ellipses —
+and replanned when the blocker list grows, because 37-props drops the parasol
+poles into the east lane after the resort has already been built. The avoiding
+is the rider's job: nobody on this promenade steps aside for a bicycle. No
+wheel goes west of beach bar MINI, because the konoba's terrace is a 0.26 m
+pad across the whole deck.
+
+Deterministic, like everything else in the resort: no `rng` anywhere in it.
+Lane jitter, start point, direction, crank phase and which foot leads all come
+out of `jit(i, k)`, so the promenade is the same promenade every time you load
+it.
+
+Measured over two minutes at 10 Hz: no contact with anybody on foot (closest
+0.62 m), none between machines (1.23 m), none with the concrete, Baye never
+closer than 1.68 m, census and blocker count unchanged, 0.08 ms a frame.
+
+### filming
+
+`tools/soundtake.mjs` and `__fr.hold` — see the tooling commit. A stepped film
+cannot hold a key down, which is why the first takes of the Canadair scooping
+in Šibenik harbour were filmed with the probes up.
+
 ## [1.402.0] — 2026-09-16
 
 ### the beer is drinkable

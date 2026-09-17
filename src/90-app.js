@@ -7669,6 +7669,8 @@ window.__fr = {
       // car park costs to draw. Not part of `tris` above, which counts only
       // what is baked into the shore's own buffers — these are instanced.
       cars: jadrija.cars,
+      // The bicycles and scooters on the promenade. Not in `tris` either.
+      riders: jadrija.wheels ? jadrija.wheels.stats() : null,
       testFigure: jadrija.testFigure || 'none',
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,

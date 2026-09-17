@@ -1177,7 +1177,12 @@ pines in gravel squares; pine cones and limestone chips on the needle floor.
 
 **People** — two-tier crowd (skinned blobs + instanced), `turnoutAt()`
 weighting, shared terrace seating so nobody sits off a chair, towels on bare
-concrete. 89 people at 60 fps.
+concrete. 89 people at 60 fps. Five riders (3 bicycles, 2 e-scooters) on the
+promenade t 287-523 only — the konoba's terrace pad crosses the whole deck at
+t 239.5-253 (0.26 m step) and MINI's tables leave one machine-wide gap at
+t 264-284, so no wheel goes west of MINI. Skinned bathers limb-solved on to
+the machine, lanes planned on a grid against `blockers`, kept right, and
+not in `crowds` (see `WHEELS`).
 
 165k → 323k triangles.
 
