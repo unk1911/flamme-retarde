@@ -259,9 +259,16 @@ const ears = (() => {
       if (d.does && d.does.length) {
         for (const name of d.does) {
           const J = typeof jadrija !== 'undefined' && jadrija;
-          const ok = !!(J && J.askShow && J.askShow(name));
-          note('baye: ' + (ok ? (DOES[name] || name) : 'cannot do that here'),
-            ok ? 'did' : 'meta');
+          // THREE ANSWERS AND NOT TWO — see `askShow` in 43-jadrija.js.
+          // `false` is a name she does not know; `true` is armed; a STRING is
+          // a name she knows and a reason there is nothing left of the
+          // request, which is a different thing from being unable. Asking for
+          // the wine in a room where the glass is already full is the case
+          // this is for, and "cannot do that here" was the wrong answer to it.
+          const got = J && J.askShow ? J.askShow(name) : false;
+          const ok = got === true;
+          note('baye: ' + (ok ? (DOES[name] || name)
+            : (WHY[got] || 'cannot do that here')), ok ? 'did' : 'meta');
         }
       }
       // Nothing heard, or a service from before 1.4.0 that hands out no id:
@@ -291,6 +298,9 @@ const ears = (() => {
   /** What to print when she takes a request. Her phase names are not words. */
   const DOES = {
     wine: 'pouring the wine', ballet: 'to the barre', twerk: 'the bend',
+    // The kneel, which is `submit` in the phase machine — the same eleven
+    // seconds the hose gets you in the kabina. See `SHE_CAN`.
+    submit: 'down on her knees',
     shimmy: 'her shimmy', heart: 'a heart', note: 'holding up her card',
     wheel: 'cartwheels', joy: 'a somersault',
     // The two she has to go somewhere for, which is why these say where.
@@ -305,6 +315,22 @@ const ears = (() => {
     'see.f2': 'off to the pizzeria, back in a minute',
     'see.konoba': 'off to the konoba, back in a minute',
     'see.tramp': 'off to the trampolines, back in a minute',
+  };
+
+  /**
+   * AND WHAT TO PRINT WHEN THERE IS NOTHING LEFT TO DO.
+   *
+   * A key off `askWhy` in 43-jadrija.js, one line each, in the same register
+   * `DOES` is in and for the same reason: her state names are not words. Every
+   * one of these is a fact about the room and not an error — the glass is
+   * either full or it is not, and she is either under that roof or she is not.
+   */
+  const WHY = {
+    poured: 'the glass is already full',
+    nokit: 'there is no bottle out here',
+    outside: 'not out here on the deck — in the kabina',
+    already: 'she is already down there',
+    gone: 'she is not on the beach',
   };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */

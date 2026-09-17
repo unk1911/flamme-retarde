@@ -406,6 +406,24 @@ SKILLS = {
                   [r"\btrampolin\w*\b", SEE_RE]),
     "wine": ("pour a glass of wine, fetch a drink, open the bottle",
              [r"\b(wine|drink|bottle|glass|rakija|pour)\b"]),
+    # AND THE POSE SHE ALREADY HAD. Misha, 17 Sep 2026: *"i tell her to get
+    # down on her knees, and eventho she knows how to do it if i spray her, she
+    # says something but doesn't actually get down on her knees.... she
+    # should"*.
+    #
+    # `submit` is her own phase name for it — see `SHE_CAN` in
+    # src/43-jadrija.js, which is the list this dict is checked against. The
+    # page refuses it out on the promenade and answers 'outside', because out
+    # there the same water gets you the turn and not the kneel; in the kabina
+    # it is eleven seconds of a pose that was already authored.
+    #
+    # THE NOUN AND NOT THE VERB "get down", which on its own is a request to
+    # get off something. "Get down on your knees" carries "on your knees" and
+    # is matched by it, and so is "kneel", "kneel down" and "onto your knees".
+    # The bare word "knees" is deliberately NOT on this list: "can you look at
+    # my knees" is a sentence somebody could say and it is not this request.
+    "submit": ("get down on her knees in the kabina and stay there",
+               [r"\b(kneel\w*|on your knees|onto your knees|to your knees)\b"]),
     "ballet": ("dance ballet at the barre: a pirouette, a relevé, an "
                "arabesque, going up on her toes",
                [r"\b(ballet|pirouette|piruette|pirouet\w*|releve|relevé|"
@@ -456,8 +474,14 @@ ASK_RE = re.compile(
     # looking word still have to be in the sentence, so "do they like me" is
     # not an errand.
     r"|\b(do they|what do they|have they|are they)\b"
+    # AND A BARE IMPERATIVE THAT OPENS WITH "get" OR "kneel". "Get down on
+    # your knees" and "kneel down" are both requests and neither carried a
+    # modal, a please or any of the openers above — so the whole sentence read
+    # as talk and never reached `skills_of` at all. `get` needs the same
+    # lookahead as the rest: "get you" and "get i" are not imperatives, and
+    # "do you like…" is the case that lookahead was written for.
     r"|^\s*(pour|show|make|give|dance|perform|try|go|run|check|head|walk|nip|"
-    r"pop|find|look|see|do)(?!\s+(you|u|i|we)\b)\b",
+    r"pop|find|look|see|do|get|kneel)(?!\s+(you|u|i|we)\b)\b",
     re.I | re.M)
 
 

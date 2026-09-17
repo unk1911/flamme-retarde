@@ -8119,10 +8119,15 @@ window.__fr = {
     put: (...a) => jadrija.putShow(...a),
     /**
      * Ask her for one of her own numbers — 'wine', 'ballet', 'twerk',
-     * 'shimmy', 'heart', 'note', 'wheel', 'joy'. See `askShow`.
+     * 'shimmy', 'heart', 'note', 'wheel', 'joy', 'submit'. See `askShow`.
+     *
+     * Three answers, not two: `false` is a name she does not know, `true` is
+     * armed, and a string is a reason there is nothing to do — 'poured' for a
+     * glass that is already full, 'outside' for the kneel out on the deck.
      */
     ask: (name) => (jadrija ? jadrija.askShow(name) : null),
     did: () => (jadrija ? jadrija.didShow() : null),
+    why: () => (jadrija ? jadrija.whyShow() : null),
     /** The counter at a world point, for a test that cannot walk. */
     counter: (x, z) => (jadrija ? jadrija.counter(x, z) : null),
     /** What she saw on the last recon, and what she brought back. */
