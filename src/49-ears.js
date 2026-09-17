@@ -95,6 +95,8 @@ const ears = (() => {
   let acc = 0, accN = 0, phase = 0;
 
   let panelEl = null;
+  /** The line you type into — see the note where it is built. */
+  let sayEl = null;
   function panel() {
     if (panelEl) return panelEl;
     panelEl = document.createElement('div');
@@ -108,7 +110,40 @@ const ears = (() => {
     bar.appendChild(fill);
     const list = document.createElement('div');
     list.className = 'ears-lines';
-    panelEl.append(head, bar, list);
+    // ── AND A LINE TO TYPE INTO ──────────────────────────────────────────
+    //
+    // Misha, 17 Sep 2026: *"maybe when u press 'I', it should be possible to
+    // 'type in' commands into it, not just use the voice.... for higher
+    // precision"*.
+    //
+    // The same route and the same tables — see the typed branch in `_hear` —
+    // so a typed sentence is read exactly as a spoken one, minus the part that
+    // can mishear it. `pointer-events` come back on for this one element,
+    // because the panel is a read-out and this is a control.
+    sayEl = document.createElement('input');
+    sayEl.id = 'ears-say';
+    sayEl.type = 'text';
+    sayEl.maxLength = 200;
+    sayEl.autocomplete = 'off';
+    sayEl.spellcheck = false;
+    sayEl.placeholder = T('ears.type');
+    sayEl.hidden = true;
+    // Its own handler, and it stops the game hearing any of it: the window
+    // keydown listener in 90-app.js would otherwise take a W typed into this
+    // box as a throttle. See the guard there, which is the other half.
+    sayEl.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+        e.preventDefault();
+        const text = sayEl.value.trim();
+        sayEl.value = '';
+        if (text) send(text, 0, true);
+        return;
+      }
+      if (e.code === 'Escape') { e.preventDefault(); sayEl.blur(); }
+    });
+    sayEl.addEventListener('keyup', (e) => e.stopPropagation());
+    panelEl.append(head, bar, list, sayEl);
     document.body.appendChild(panelEl);
     return panelEl;
   }
@@ -123,6 +158,10 @@ const ears = (() => {
         : inflight ? 'EARS · thinking' : 'EARS · listening')
         + (sent ? ' · ' + sent + ' sent' : '')
       : 'EARS · off (I)';
+    // The line to type into, up whenever the ears are. It is not gated on the
+    // microphone working: typing is the way in when the microphone is not, and
+    // a box that vanishes with the device is a box you cannot reach.
+    if (sayEl) sayEl.hidden = !on;
     const list = el.querySelector('.ears-lines');
     list.textContent = '';
     for (const l of lines) {
@@ -201,7 +240,15 @@ const ears = (() => {
     return new Blob([b], { type: 'audio/wav' });
   }
 
-  async function send(blob, secs) {
+  /**
+   * One sentence to the service: a clip off the microphone, or a typed line.
+   *
+   * ONE FUNCTION AND NOT TWO, because everything after the answer arrives is
+   * the same — the command, the order at a counter, the skill and the sentence
+   * that goes on to her are the same four things whichever way the words got
+   * here. What differs is two headers and what the panel calls it.
+   */
+  async function send(blob, secs, typed = false) {
     if (!AUTH.user || !AUTH.baye) return;
     // One at a time. A second sentence while the first is still being heard is
     // a sentence the player can say again; two in flight is two answers out of
@@ -217,7 +264,8 @@ const ears = (() => {
     try {
       const r = await fetch(AUTH.baye + '/hear', {
         method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'audio/wav' }, body: blob,
+        headers: { 'Content-Type': typed ? 'application/json' : 'audio/wav' },
+        body: typed ? JSON.stringify({ text: blob }) : blob,
       });
       const d = await r.json().catch(() => null);
       if (!d || !d.ok) { note('× ' + ((d && d.error) || 'http ' + r.status), 'err'); return; }
@@ -225,7 +273,8 @@ const ears = (() => {
       // The language it was heard in, when it is not English — the service
       // names it (see `classify` in server/baye/baye.py) and she answers in it.
       const lang = d.lang && d.lang !== 'English' ? d.lang : null;
-      note('“' + (said || '…') + '”  ' + secs.toFixed(1) + ' s · ' + d.ms + ' ms'
+      note('“' + (said || '…') + '”  ' + (typed ? 'typed' : secs.toFixed(1) + ' s')
+        + ' · ' + d.ms + ' ms'
         + (lang ? ' · ' + lang : '')
         + (d.intents && d.intents.length ? '  → ' + d.intents.join(', ') : ''), 'heard');
       // A command, and that is the whole of it — commands outrank conversation.
@@ -442,6 +491,26 @@ const ears = (() => {
 
   return {
     toggle: () => (on ? (stop(), false) : start()),
+    /**
+     * Whether the caret is in the typing line — the question the game's own
+     * keydown handler has to ask before it reads a key as a control. A W typed
+     * into this box is a letter and not the throttle.
+     */
+    typing: () => !!sayEl && !sayEl.hidden && document.activeElement === sayEl,
+    /**
+     * Put the caret in it, which needs the pointer let go of: this is a
+     * pointer-locked game and a locked pointer cannot click an input. Answers
+     * false when the ears are off, because there is nothing to type into.
+     */
+    focusTyping: () => {
+      if (!on || !sayEl || sayEl.hidden) return false;
+      document.exitPointerLock?.();
+      sayEl.focus();
+      return true;
+    },
+    /** And a typed line straight in, for a probe — the same path as the box. */
+    say: (text) => (text && String(text).trim()
+      ? (send(String(text).trim(), 0, true), true) : false),
     get on() { return on; },
     /** The live microphone, for the recorder to mix into a take. */
     stream: () => (on ? stream : null),

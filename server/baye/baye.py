@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.12.1"
+VERSION = "1.13.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -314,11 +314,20 @@ STT_PROMPT = ("A player talking to characters in a game at Jadrija beach: "
 # A spoken command, not a speech. Eight seconds of 16 kHz mono PCM is 256 kB;
 # anything past 400 kB is not somebody saying "drop your buckets".
 HEAR_MAX_BYTES = int(CFG.get("BAYE_HEAR_MAX_BYTES", "400000"))
+# A typed sentence, in characters. Two hundred is longer than anybody types at
+# a game and shorter than a paste of something else.
+TYPED_MAX_CHARS = 200
 # One clip a second at most, and a ceiling that a microphone left open all
 # afternoon with a radio next to it cannot run past.
 HEAR_LIMIT = Limiter(gap=float(CFG.get("BAYE_HEAR_GAP", "0.8")),
                      per_hour=int(CFG.get("BAYE_HEAR_PER_HOUR", "300")),
                      per_day=int(CFG.get("BAYE_HEAR_PER_DAY", "2000")))
+# And typing, which costs no transcription and is therefore limited only
+# against a stuck key: no gap worth having between two sentences somebody typed
+# on purpose, and an hourly ceiling well above a conversation.
+TYPE_LIMIT = Limiter(gap=float(CFG.get("BAYE_TYPE_GAP", "0.15")),
+                     per_hour=int(CFG.get("BAYE_TYPE_PER_HOUR", "600")),
+                     per_day=int(CFG.get("BAYE_TYPE_PER_DAY", "4000")))
 
 # WHAT A TRANSCRIPT CAN MEAN, AND IT IS A TABLE, NOT A MODEL.
 #
@@ -3369,21 +3378,52 @@ def _hear(self):
             self.close_connection = True
         return self._send(401, {"ok": False, "error": "not signed in"})
     ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-    if not ctype.startswith("audio/") or n <= 0 or n > HEAR_MAX_BYTES:
+    # ── TYPED, AND NOT SPOKEN ────────────────────────────────────────────
+    #
+    # Misha, 17 Sep 2026: *"maybe when u press 'I', it should be possible to
+    # 'type in' commands into it, not just use the voice.... for higher
+    # precision"*.
+    #
+    # The same route, because everything below the transcriber is the same
+    # question: what did that sentence ask for. A typed sentence skips the one
+    # part that can be wrong about what was said and costs nothing to run —
+    # which is why it is the precise way in as well as the cheap one.
+    #
+    # It is still the SERVER's text that rides the ticket. The page sends words
+    # somebody typed and gets back an id, exactly as it does for audio, and
+    # what reaches her prompt is what arrived here. Guardrail 2 over
+    # `TALK_LIMIT` is untouched: a page still cannot compose her input.
+    typed = None
+    if ctype == "application/json":
+        body = self._body()
+        typed = (body.get("text") if isinstance(body, dict) else None) or ""
+        typed = typed.strip()[:TYPED_MAX_CHARS]
+        if not typed:
+            return self._send(400, {"ok": False, "error": "say something"})
+    elif not ctype.startswith("audio/") or n <= 0 or n > HEAR_MAX_BYTES:
         self.close_connection = True
         return self._send(413 if n > HEAR_MAX_BYTES else 400,
                           {"ok": False, "error": "a short audio clip, please"})
-    refused = HEAR_LIMIT.check(user)
+    # The typed path has its own allowance. Ten seconds between clips is the
+    # gap a microphone needs to not be a machine gun; a keyboard is not a
+    # machine gun and waiting ten seconds to correct a typo is the whole
+    # reason somebody reached for the keyboard.
+    refused = (TYPE_LIMIT if typed else HEAR_LIMIT).check(user)
     if refused:
-        self.close_connection = True
+        if not typed:
+            self.close_connection = True
         return self._send(refused[0], {"ok": False, "error": refused[1]})
-    audio = self.rfile.read(n)
     t0 = time.time()
-    try:
-        text = transcribe(audio, ctype)
-    except Exception as e:                                    # noqa: BLE001
-        print(f"[hear] {user}: {e}", flush=True)
-        return self._send(502, {"ok": False, "error": str(e)[:200]})
+    if typed:
+        audio = b""
+        text = typed
+    else:
+        audio = self.rfile.read(n)
+        try:
+            text = transcribe(audio, ctype)
+        except Exception as e:                                # noqa: BLE001
+            print(f"[hear] {user}: {e}", flush=True)
+            return self._send(502, {"ok": False, "error": str(e)[:200]})
     found = intents_of(text)
     does = skills_of(text) if not found else []
     # An order at a counter, which is neither a command nor an errand: the page
@@ -3396,8 +3436,8 @@ def _hear(self):
         # gets it, for the command, the request and the language. See `classify`.
         found, does, lang = classify(text)
     ms = int((time.time() - t0) * 1000)
-    print(f"[hear] {user} {ms}ms {len(audio)}B {found} {does} {lang or '?'} "
-          f":: {text[:160]}", flush=True)
+    print(f"[hear] {user} {ms}ms {len(audio)}B{' typed' if typed else ''} "
+          f"{found} {does} {lang or '?'} :: {text[:160]}", flush=True)
     out = {"ok": True, "text": text[:300], "intents": found, "ms": ms,
            "lang": lang, "does": does, "buy": buy}
     # AND A TICKET TO SAY IT TO HER, when it is not a command. Guardrail 2 over

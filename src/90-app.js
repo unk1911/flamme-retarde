@@ -259,6 +259,18 @@ addEventListener('keydown', (e) => {
     skipToComputer();
     return;
   }
+  // ── THE TYPING LINE COMES FIRST ──────────────────────────────────────
+  //
+  // Misha, 17 Sep 2026: *"maybe when u press 'I', it should be possible to
+  // 'type in' commands into it, not just use the voice.... for higher
+  // precision"*.
+  //
+  // Above every other branch in this handler, including the cut-scene skips
+  // and the pause: while the caret is in that box a key is a LETTER. The box
+  // stops the event itself as well (see the handler where it is built), so
+  // this is the belt to that braces — a stray listener that saw a W as the
+  // throttle while somebody typed "swim" would be a bug nobody could explain.
+  if (ears && ears.typing && ears.typing()) return;
   // The trampoline cut, and its skip. Ahead of the pause guard AND ahead of
   // Escape, which would otherwise stop the world in the middle of a shot and
   // leave a paused camera two hundred metres over the beach with no way back
@@ -285,6 +297,16 @@ addEventListener('keydown', (e) => {
   if (pourCut && (e.code === 'Escape' || e.code === 'Enter'
     || e.code === 'NumpadEnter' || e.code === 'Space')) {
     e.preventDefault(); endPour(false); return;
+  }
+  // ENTER — the caret into the typing line, because a pointer-locked game
+  // cannot click an input. Below the three cut skips, which own Enter while
+  // they are running: a nine-second cinematic you cannot wave away because the
+  // microphone happens to be on would be a worse bug than the one this fixes.
+  // Only while the ears are up; otherwise Enter belongs to whatever wants it.
+  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && $('signin').hidden
+      && ears && ears.on && ears.focusTyping && ears.focusTyping()) {
+    e.preventDefault();
+    return;
   }
   // N — Baye's voice. H was taken by the HUD and V by the doors, and this sits
   // above the pause guard with ? and ESC because switching her off is something
@@ -8975,6 +8997,16 @@ window.__fr = {
     stats: () => ears.stats(),
     toggle: () => ears.toggle(),
     act: (name, lang) => ears.act(name, lang),
+    /**
+     * The typing line — see the note where it is built in 49-ears.js.
+     * `typing()` is whether the caret is in it, which is the question the
+     * keydown handler asks before it reads a key as a control; `focus()` puts
+     * it there the way ENTER does; `say(text)` sends a line without the box,
+     * which is how a probe drives the typed path.
+     */
+    typing: () => (ears.typing ? ears.typing() : null),
+    focus: () => (ears.focusTyping ? ears.focusTyping() : null),
+    say: (text) => (ears.say ? ears.say(text) : null),
     /**
      * `flyCam(t, mode)` holds the corner shot at `t` for a screenshot, and
      * `big` draws it over the whole frame instead of in its corner — which is

@@ -790,6 +790,21 @@ html.touch #swim-hud { bottom: 7.4rem; }
 /* Her answer, in the subtitle's warm rather than the command's green: a reply
    is somebody talking, not a thing that was done. */
 #ears .ears-line.reply { color: #f3c98f; }
+/* The line you type commands into. `pointer-events` come back on for this one
+   element: the panel above it is a read-out and this is a control. Monospace
+   and the panel's own palette, because it is part of the panel and not a form
+   somebody dropped on the page. */
+#ears #ears-say {
+  display: block; width: 100%; margin: .35rem 0 0; box-sizing: border-box;
+  pointer-events: auto;
+  font-family: var(--mono); font-size: .54rem; letter-spacing: .03em;
+  color: #f2e7d8; background: rgba(160, 200, 214, .10);
+  border: 1px solid rgba(160, 200, 214, .28); border-radius: 0;
+  padding: .22rem .34rem; outline: none;
+}
+#ears #ears-say:focus { border-color: #7fd1e6; background: rgba(127, 209, 230, .12); }
+#ears #ears-say::placeholder { color: #6d838c; }
+#ears #ears-say[hidden] { display: none; }
 
 /* The fly cam's frame. The picture itself is WebGL, drawn by `render(renderer,
    'pip')` in src/44-corpse.js into exactly this box: `DROPCAM.rect` is the same

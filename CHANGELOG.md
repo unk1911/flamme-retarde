@@ -8,6 +8,39 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.406.0] — 2026-09-17 (baye 1.13.0)
+
+### you can type it instead of saying it
+
+**"maybe when u press 'I', it should be possible to 'type in' commands into it,
+not just use the voice.... for higher precision"**.
+
+A line at the bottom of the ears panel, up whenever the ears are. ENTER puts
+the caret in it — a pointer-locked game cannot click an input, which is the
+whole reason it is a key and not a click — ENTER again sends, ESCAPE gives the
+keyboard back to the game.
+
+THE SAME ROUTE AND THE SAME TABLES. `/hear` takes `application/json` with a
+`text` field now and skips only the transcriber; everything below that is the
+one path it always was, so a typed sentence is read exactly as a spoken one is,
+including the ticket that carries it to her. It is still the service's text
+that reaches her prompt and never words the page composed — guardrail 2 over
+`TALK_LIMIT` is untouched.
+
+Which makes typing the cheap way in as well as the precise one: no clip, no
+transcription, nothing to mishear. Its own allowance, because the ten-second
+gap between clips exists to stop a microphone being a machine gun and a
+keyboard is not one — 0.15 s between lines and 600 an hour.
+
+And a key typed into that box is a LETTER. The guard is the first branch in
+the keydown handler, above the cut-scene skips and above the pause, and the box
+stops the event itself as well: somebody typing "swim" was otherwise opening
+the throttle on the W. Measured: with the caret in the box, P does not pause;
+with it blurred, P pauses.
+
+`__fr.ears.typing()`, `__fr.ears.focus()` and `__fr.ears.say(text)`, which is
+the typed path without the box.
+
 ## [1.405.1] — 2026-09-17 (baye 1.12.1)
 
 ### and a way back out of it
