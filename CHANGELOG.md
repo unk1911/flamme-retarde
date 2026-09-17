@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.406.1] — 2026-09-17
+
+### and she steps off the bed as she gets up
+
+**"after she lies down on bed, then i say get up, she gets up, but i think her
+feet somehow get stuck inside the bed so she cannot walk, she should be able to
+kinda get untangled from that situation"**.
+
+Not a walk bug — where she was standing. The cot is a blocker like every other
+piece of furniture in that hut, lying on it puts her at its middle, which is
+inside its own footprint, and getting up left her there. From inside a blocker
+every direction is refused, so she stood in the mattress with nowhere to go:
+MEASURED at (428.07, 19.15) with `made` and `vel` both nought and `stall`
+climbing past sixty seconds. She was not tangled, she was walled in on all four
+sides.
+
+`untangle` is a ring search outward for a patch of floor her own mover accepts
+— the door side tried first, because that is the way she wants to go anyway —
+eased over the clip that stands her up, at the same rate as the mattress lift
+drops, because getting off a bed and stepping clear of it are one movement.
+Measured after: (428.07, 18.30), a shade past the foot of the cot, and
+photographed standing on the tiles.
+
+It runs from both phases that end a pose rather than only from the cot's,
+because a kneel can be taken inside the furniture as easily as on top of it.
+
 ## [1.406.0] — 2026-09-17 (baye 1.13.0)
 
 ### you can type it instead of saying it

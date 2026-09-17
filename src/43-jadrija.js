@@ -33140,6 +33140,68 @@ async function buildJadrija(scene) {
     go('recline', 'recline', 0.34);
   }
 
+  /**
+   * The nearest patch of floor she can actually stand on.
+   *
+   * Misha, 17 Sep 2026: *"after she lies down on bed, then i say get up, she
+   * gets up, but i think her feet somehow get stuck inside the bed so she
+   * cannot walk, she should be able to kinda get untangled from that
+   * situation"*.
+   *
+   * He is right and it is not a walk bug, it is where she is standing. The cot
+   * is a blocker like any other furniture — `furniture.push` where it is built
+   * — and lying on it puts her at its middle, which is 0.35 m inside its own
+   * footprint. Getting up leaves her there, and from inside a blocker every
+   * direction is refused: MEASURED at (428.07, 19.15) with `stall` climbing
+   * past sixty seconds, `made` and `vel` both nought. She was not tangled, she
+   * was walled in on all four sides.
+   *
+   * So: a ring search outward for somewhere clear, the door side first,
+   * because that is the way she wants to go anyway. `pad` is the walk's own
+   * clearance, so what comes back is a spot her own mover accepts rather than
+   * one merely outside the box.
+   */
+  function freeSpotNear(t0, s0) {
+    if (!blockedAt(t0, s0)) return null;
+    const K = special;
+    // Toward the door first, then across the bed, then the two ends of it.
+    const dirs = [-Math.PI / 2, Math.PI / 2, Math.PI, 0,
+      -Math.PI * 0.75, -Math.PI * 0.25, Math.PI * 0.75, Math.PI * 0.25];
+    for (const r of [0.55, 0.85, 1.15, 1.45, 1.8]) {
+      for (const a of dirs) {
+        const t = t0 + Math.cos(a) * r, sN = s0 + Math.sin(a) * r;
+        if (K && (t < K.t0 + 0.40 || t > K.t1 - 0.40
+          || sN < K.face + 0.40 || sN > K.s1 - 0.40)) continue;
+        if (!blockedAt(t, sN)) return [t, sN];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Ease her out of whatever she is standing in, over the clip that stands her
+   * up. Called from both phases that end a pose, because both can end it
+   * inside the furniture: `situp` off her back and `rise` off her knees.
+   *
+   * Eased and not snapped, and the rate is the mattress lift's: standing up
+   * off a bed and stepping clear of it are one movement, so they finish
+   * together.
+   */
+  function untangle(dt) {
+    if (show.offBed === undefined) show.offBed = null;
+    if (!show.offBed) {
+      show.offBed = freeSpotNear(show.t, show.s);
+      if (!show.offBed) return;
+    }
+    show.t = damp(show.t, show.offBed[0], 3.4, dt);
+    show.s = damp(show.s, show.offBed[1], 3.4, dt);
+    if (Math.hypot(show.t - show.offBed[0], show.s - show.offBed[1]) < 0.05) {
+      show.t = show.offBed[0];
+      show.s = show.offBed[1];
+      show.offBed = null;
+    }
+  }
+
   function showCreep(tt, ss, dt) {
     const d0 = tt - show.t, d1 = ss - show.s;
     const dist = Math.hypot(d0, d1);
@@ -35369,6 +35431,11 @@ async function buildJadrija(scene) {
         // behind is a woman kneeling in mid-air over a bed.
         if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
         if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
+        // AND OFF THE BED ITSELF, which is the other half of getting up from
+        // one — see `untangle`. Lying on the cot puts her inside its blocker,
+        // and a woman standing inside a blocker cannot take a step in any
+        // direction.
+        untangle(dt);
         // Hosed again halfway up and she goes straight back down, which is the
         // answer anybody would expect and costs one line.
         if (show.hit > 0) { go('recline', 'recline', 0.34); break; }
@@ -35397,6 +35464,9 @@ async function buildJadrija(scene) {
       // metres across is a person going through a wall.
       case 'rise':
         show.want = Math.atan2(ps - show.s, pt - show.t);
+        // The same step clear, because this phase ends a pose too and a kneel
+        // can be taken inside the furniture as easily as on top of it.
+        untangle(dt);
         if (done) go(inside ? 'dwell' : 'leave', inside ? 'idle' : 'walk', 0.40);
         break;
 
