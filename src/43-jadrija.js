@@ -29895,6 +29895,8 @@ async function buildJadrija(scene) {
         // `fill` is the slow one under it — not whether the water is on her
         // mouth but how long it has been.
         gape: 0, fill: 0,
+        // How far into the water she is, 0 to 1 — see the errands.
+        dip: 0, mat: 0, apex: 0, job: null,
         // Where she is easing to while she lies down, or null. See
         // `reclineSpot`.
         lie: null,
@@ -32742,6 +32744,82 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * Where an errand takes her, in her own frame — or null for one she cannot
+   * go on. Read off the world: the trampolines are where SHOPS says they are,
+   * and the water is her lane's seaward edge and `out` metres past it.
+   */
+  function errandMark(name) {
+    if (!show) return null;
+    if (name === 'swim') return [show.t, SHOW.lane[0] - ERRAND.out];
+    if (name === 'tramp') {
+      // THE GRAVEL INSIDE THE CAGE, and not a mat, which is the second thing
+      // this needed measuring to learn. `trampBeds` has four beds and every
+      // one of them is a collider she cannot walk into, so aimed at a mat she
+      // stalls two to eight metres off it depending on which mat and which way
+      // in. The five metres of gravel between the seaward fence and the beds
+      // is the one part of the cage she can stand in — see `onBed`, which says
+      // so — so that is where she is sent, and the mat is a snap from there.
+      if (!trampBeds || !trampBeds.length) return null;
+      const S = SHOPS.find((x) => x.key === 'tramp');
+      let best = null, bd = 1e9;
+      for (const b2 of trampBeds) {
+        const d2 = (b2.t - show.t) ** 2 + (b2.s - show.s) ** 2;
+        if (d2 < bd) { bd = d2; best = b2; }
+      }
+      if (!best) return null;
+      return [best.t, S ? S.s0 + 1.6 : best.s - 3.5];
+    }
+    return null;
+  }
+
+  /** Is (t, s) inside anything solid? The same test `showClear` pushes out of. */
+  function blockedAt(t, s, pad = 0.55) {
+    for (const b of blockers) {
+      if (b.off) continue;
+      if (!(b.a >= 0) || !(b.c >= 0)) continue;
+      const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+      const dt0 = t - b.t, ds0 = s - b.s;
+      const dt1 = dt0 * co + ds0 * sn, ds1 = -dt0 * sn + ds0 * co;
+      if (Math.abs(dt1) < b.a + pad && Math.abs(ds1) < b.c + pad) return true;
+    }
+    return false;
+  }
+
+  /**
+   * A way inland to (t, s), as legs — or null if there is not one.
+   *
+   * SHE HAS NO PATHFINDING and this is not pathfinding either. It is the one
+   * thing the shape of this place allows instead: everything inland of the
+   * promenade is a row of buildings with gaps between them, so a way to
+   * anywhere behind them is a gap to walk through and then a straight line.
+   * The fan below looks for that gap — the target's own `t` first, then out to
+   * either side — by stepping inland from her lane and asking `blockedAt` at
+   * every metre. If no column is clear she cannot get there, and the errand
+   * says so rather than walking her into a wall for three minutes, which is
+   * what the first cut did: sent to the trampolines she stopped dead at s 31
+   * against the back of a building, twenty metres short.
+   */
+  function errandLegs(t, s) {
+    if (s <= SHOW.lane[1]) return [[t, s]];
+    const clearColumn = (tc) => {
+      for (let ss = SHOW.lane[1]; ss <= s; ss += 1.0) {
+        if (blockedAt(tc, ss)) return false;
+      }
+      return !blockedAt(tc, s);
+    };
+    for (let off = 0; off <= 34; off += 2) {
+      for (const tc of (off === 0 ? [t] : [t - off, t + off])) {
+        if (clearColumn(tc)) {
+          return tc === t
+            ? [[t, SHOW.lane[1]], [t, s]]
+            : [[tc, SHOW.lane[1]], [tc, s], [t, s]];
+        }
+      }
+    }
+    return null;
+  }
+
   function showTo(tt, ss, dt, mul = 1) {
     const d0 = tt - show.t, d1 = ss - show.s;
     const dist = Math.hypot(d0, d1);
@@ -33605,7 +33683,51 @@ async function buildJadrija(scene) {
    * cannot do.
    */
   const SHE_CAN = { wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
-    note: 1, wheel: 1, joy: 1 };
+    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1 };
+
+  /**
+   * AND THE ONES THAT ARE SOMEWHERE ELSE.
+   *
+   * Misha, 16 Sep 2026: *"i'll say to her: 'let's go swimming', and she's like
+   * yeah let's go.. but then like nothing happens... but i think she knows how
+   * to swim"*, and *"or like, let's go jumping up and down on the trampolin...
+   * jump real high"*.
+   *
+   * He is right on both counts and the gap is the same one: the clip exists —
+   * `swim` is in the bank the figure was baked with, and the hop is a real
+   * ballistic arc she already takes over benches — and nothing could ever ASK
+   * for either, because every number she had was performed on the spot in
+   * front of you. These two are the first things she does that need her to GO
+   * somewhere first, so what is added here is not a dance, it is an errand:
+   * walk to a mark, do the thing there, come back to you.
+   *
+   * Everything about the mark is read off the world rather than typed. The
+   * trampolines are `tramp` in SHOPS, which is where they actually are; the
+   * water is her own lane's seaward edge and out.
+   */
+  const ERRAND = {
+    pace: 1.30,        // how much faster than a stroll, on the way there
+    near: 1.10,        // m — arrived
+    out: 7.0,          // m past the edge of her lane that "swimming" is
+    swimFor: 16,       // s in the water
+    bounceFor: 14,     // s on the trampoline
+    hopV: 6.6,         // m/s off the mat — 2.1 m of apex against a bench's 0.76
+    back: 4.0,         // m — close enough to you again
+    giveUp: 200,       // s before an errand is given up on
+    stall: 7.0,        // s of getting no closer before she gives it up
+    /**
+     * And how close is close enough, per errand. A mat is 3.4 m across and has
+     * its own collider, so `near` on a trampoline is the edge of the thing and
+     * not its middle: MEASURED, she stopped 2.2 m short and stalled there,
+     * which was the bed itself refusing to be stood in.
+     */
+    at: { tramp: 4.5, swim: 1.10 },
+    /** Her body at the surface, metres under the sea, while she swims. */
+    floatY: -0.30,
+    /** Seconds of getting in, and of climbing back out. */
+    wetIn: 0.9,
+  };
+  const ERRANDS = { swim: 1, tramp: 1 };
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
@@ -34268,6 +34390,16 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toBar', 'walk', 0.32);
         } else show.did = null;      // no ladder to hold: she cannot, honestly
+      } else if (ERRANDS[name]) {
+        const mk = errandMark(name);
+        const legs = mk ? errandLegs(mk[0], mk[1]) : null;
+        if (mk && legs) {
+          show.job = { name, t: mk[0], s: mk[1], since: 0, leg: 0, legs,
+            best: null, stall: 0 };
+          show.stuck = null;
+          showSay('trill', d);
+          go('errand', 'walk', 0.32);
+        } else show.did = null;
       } else if (name === 'joy') {
         showSay('hup', d);
         go('joy', 'flip', 0.18);
@@ -34882,6 +35014,133 @@ async function buildJadrija(scene) {
         break;
       }
 
+      // ── the errands ──
+      //
+      // Three states and they are the same three for every errand there will
+      // ever be: get there, do it, come back. The job itself is four numbers
+      // on `show.job` and the phase reads them, so adding an errand is a mark
+      // and a case rather than a state machine of its own.
+      case 'errand': {
+        const j = show.job;
+        if (!j) { showNext(); break; }
+        j.since += dt;
+        // ALONG THE LEGS `errandLegs` found — see the note over it, which is
+        // also where the measurement that made it necessary is written down.
+        const legs = j.legs || [[j.t, j.s]];
+        const g = legs[Math.min(j.leg || 0, legs.length - 1)];
+        const dist = showTo(g[0], g[1], dt, ERRAND.pace);
+        // Stalled: against something, with the leg not getting any closer.
+        // Every errand gets this, not just the ones inland, because the thing
+        // it protects against is the same one — a woman standing in a wall.
+        if (dist < (j.best == null ? 1e9 : j.best) - 0.25) {
+          j.best = dist; j.stall = 0;
+        } else j.stall = (j.stall || 0) + dt;
+        if (j.stall > ERRAND.stall) {
+          show.job = null;
+          show.stuck = j.name;
+          go('play', 'walk', 0.36);
+          break;
+        }
+        // Two radii and they are not the same number, which the first cut of
+        // this got wrong: a waypoint is passed when she is NEAR it, and 2.8 m
+        // of slack on a waypoint turned her inland six metres before the gap
+        // and put her into the building beside it. The wide one is arrival
+        // only, on the last leg.
+        if ((j.leg || 0) < legs.length - 1) {
+          if (dist < ERRAND.near * 2.2) {
+            j.leg = (j.leg || 0) + 1; j.best = null; j.stall = 0;
+          }
+          break;
+        }
+        // ARRIVAL IS A ZONE for the trampolines and a point for everything
+        // else, and that is the third thing this needed measuring to get
+        // right. Inside the cage she cannot travel along the gravel freely
+        // either — four beds and a fence leave her wedged wherever she came in
+        // — so being IN it is arriving at it, whichever of the four mats the
+        // mark happened to name. The snap on arrival takes her to whichever
+        // one she ended up nearest.
+        const CG = j.name === 'tramp' ? SHOPS.find((x) => x.key === 'tramp') : null;
+        const inZone = !!CG && show.t > CG.t0 - 1.5 && show.t < CG.t1 + 1.5
+          && show.s > CG.s0 - 1.5 && show.s < CG.s1 + 1.5;
+        if (inZone || dist < (ERRAND.at[j.name] || ERRAND.near)) {
+          j.since = 0;
+          if (j.name === 'swim') go('swim', 'swim', 0.50);
+          else {
+            // ON TO THE MAT, and the last two metres of it are a snap.
+            // MEASURED: walking, she gets inside the cage and stops two to
+            // three metres short of a bed, because every bed is a collider of
+            // its own and `showClear` will not let her stand in one. Arrival
+            // is therefore the cage rather than the mat, and she is put on the
+            // mat on the frame she arrives. It is a metre or two, she is
+            // standing still for it, and the cage mesh is opaque black from
+            // outside — see `onBed` — so there is nothing to see.
+            const bed2 = trampBeds.reduce((x, y3) =>
+              (((y3.t - show.t) ** 2 + (y3.s - show.s) ** 2)
+                < ((x.t - show.t) ** 2 + (x.s - show.s) ** 2) ? y3 : x));
+            show.t = bed2.t; show.s = bed2.s;
+            // `toWorld` gives the gravel and `matY` is the bed,
+            // so the difference is what she stands on for as long as she is
+            // bouncing. Cleared again when she steps off.
+            show.mat = Math.max(0, bed2.matY - toWorld(show.t, show.s)[1]);
+            show.hopV = ERRAND.hopV;
+            show.apex = ERRAND.hopV * ERRAND.hopV / (2 * SHOW.hopG);
+            go('bounce', 'flip', 0.30);
+          }
+        } else if (j.since > ERRAND.giveUp) {
+          // She could not get there. Rather than stand in the sea forever.
+          show.job = null;
+          go('play', 'walk', 0.36);
+        }
+        break;
+      }
+
+      case 'swim': {
+        const j = show.job;
+        if (!j) { showNext(); break; }
+        j.since += dt;
+        // In over `wetIn`, and out again over the same at the end.
+        show.dip = clamp(show.dip
+          + (j.since < ERRAND.swimFor - ERRAND.wetIn ? dt : -dt) / ERRAND.wetIn,
+          0, 1);
+        // Out and back along the same line she came in on, which is what
+        // somebody swimming off a beach does: nobody swims in a straight line
+        // away from the shore.
+        const u = sat(j.since / ERRAND.swimFor);
+        showTo(j.t, j.s - 3.0 * Math.sin(Math.PI * u), dt, 0.36);
+        if (j.since > ERRAND.swimFor && show.dip <= 0.001) {
+          j.since = 0;
+          show.dip = 0;
+          show.job = null;
+          go('play', 'walk', 0.50);
+        }
+        break;
+      }
+
+      case 'bounce': {
+        const j = show.job;
+        if (!j) { showNext(); break; }
+        j.since += dt;
+        // She stays on the mat and the arc is the bench hop's own integrator
+        // — see `airborne` in the pose step, which is already running. All
+        // this does is put her back up every time she lands, and higher: 2.1 m
+        // of apex against the 0.76 a bench gets, which is "jump real high".
+        show.vel = 0;
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (show.air <= 0 && show.hopV <= 0) {
+          if (j.since > ERRAND.bounceFor) {
+            show.job = null;
+            show.apex = 0;
+            show.mat = 0;
+            go('play', 'walk', 0.36);
+          } else {
+            show.hopV = ERRAND.hopV * (0.88 + Math.random() * 0.18);
+            show.apex = show.hopV * show.hopV / (2 * SHOW.hopG);
+            showSay('hup', d);
+          }
+        }
+        break;
+      }
+
       case 'bask':
         // Standing in it.
         //
@@ -35343,7 +35602,12 @@ async function buildJadrija(scene) {
       // at both ends and one at the apex on its own, with no second clock to
       // get out of step with the first — the knees come up as she rises and
       // the legs are down again by the time there is anything to land on.
-      show.tuck = damp(show.tuck, sat(show.air / hopApex()), 16, dt);
+      // Against the apex of the arc she is ACTUALLY on, which for a bench is
+      // `hopApex()` and on a trampoline is nearly three times it — the note
+      // above is right that the knees must be down before there is anything to
+      // land on, and a bench's apex used on a 2.1 m bounce folds her for the
+      // whole of it.
+      show.tuck = damp(show.tuck, sat(show.air / (show.apex || hopApex())), 16, dt);
       const k = show.tuck < 0.01 ? 0 : show.tuck;
       // Feet apart while she shimmies, and only then — which since the bump
       // was pointed at the twerk is never. See the note over `SHOW.stance`:
@@ -35439,7 +35703,23 @@ async function buildJadrija(scene) {
     // `air` is the hop, and it is added here rather than inside `toWorld`
     // because `toWorld` answers where the deck is and the deck has not moved.
     // The card is a child of this mesh and goes up with her for free.
-    f.mesh.position.set(p[0], p[1] + show.air, p[2]);
+    // AND SHE FLOATS, which is the one thing swimming needs that walking does
+    // not — and it is NOT a clamp against the ground, which is what the first
+    // cut made it. MEASURED: `toWorld` hands back the promenade's own surface
+    // and holds it flat seaward of the quay, so out over the water it reads
+    // 2.12 m at t 424 and 1.05 at t 380 — it is not a seabed and there is no
+    // depth in it. A woman clamped to the greater of that and the waterline
+    // swims two metres above the sea.
+    //
+    // The water IS the level, so while she is in it she is at the level, full
+    // stop, eased over `wetIn` seconds at each end so the quay edge is a woman
+    // getting in and out rather than a step of two metres in one frame.
+    const yNow = p[1] + show.air + (show.mat || 0);
+    f.mesh.position.set(p[0],
+      show.dip > 0
+        ? lerp(yNow, CONFIG.seaLevel + ERRAND.floatY, show.dip * show.dip * (3 - 2 * show.dip))
+        : yNow,
+      p[2]);
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
 
@@ -38828,6 +39108,10 @@ async function buildJadrija(scene) {
       base: [+SHOW.t0.toFixed(1), +SHOW.t1.toFixed(1)],
       // The hop, and what she is over. `air` is height off the deck.
       air: +show.air.toFixed(3), tuck: +show.tuck.toFixed(2),
+      // Where she is actually DRAWN, which is the only number that settles
+      // whether a woman who is swimming is in the water or over it.
+      y: skinFig ? +skinFig.mesh.position.y.toFixed(2) : null,
+      dip: +(show.dip || 0).toFixed(2), job: show.job ? show.job.name : null,
       ahead: (() => {
         const o = showAhead(SHOW.look, toWorld(show.t, show.s)[1]);
         return o ? { gap: +o.gap.toFixed(2), out: +o.out.toFixed(2),

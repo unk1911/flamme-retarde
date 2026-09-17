@@ -8,6 +8,76 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.396.0] — 2026-09-16
+
+### she goes places now: swimming, and the trampolines
+
+**"i'll say to her: 'let's go swimming', and she's like yeah let's go.. but then
+like nothing happens... but i think she knows how to swim"**, and **"or like,
+let's go jumping up and down on the trampolin... jump real high"**.
+
+He is right on both counts and the gap is the same one. The `swim` clip is in
+the bank the figure was baked with; the hop is a real ballistic arc she already
+takes over benches. Nothing could ever ask for either, because every number she
+had until 1.395.0 was performed on the spot in front of you. These two are the
+first things she does that need her to GO somewhere, so what is new is not a
+dance, it is an ERRAND: walk to a mark, do the thing, come back. Three states,
+and they are the same three for every errand there will ever be.
+
+**The routing is what this cost**, and it took three measurements.
+
+1. She has collision, and a straight line to a mark forty metres inland goes
+   through the back row of kabine and then through a building. Sent to the
+   trampolines she made SEVEN METRES IN TWENTY-TWO SECONDS, which is a woman
+   walking into a wall. So an errand is legs: along her own lane, where the
+   deck is clear by construction, and only then inland.
+2. Inland still needed a gap. `errandLegs` is not pathfinding and does not
+   pretend to be — it is the one thing the shape of this place allows instead.
+   Everything behind the promenade is a row of buildings with gaps between
+   them, so it fans out from the target's own `t`, steps inland a metre at a
+   time asking `blockedAt`, and takes the first clear column. It finds the way
+   into the trampoline park at 34 m of fan.
+3. Arrival is a ZONE for the cage and a point for everything else. Four beds
+   and a fence leave her wedged wherever she came in — aimed at a mat she
+   stalled two to eight metres off it, because every bed is a collider she
+   cannot stand in. So being IN the cage is arriving at it, and the last two
+   metres on to the mat are a snap, taken standing still, inside a mesh that is
+   opaque black from outside.
+
+And every errand now has a stall test: seven seconds of getting no closer and
+she gives it up and goes back rather than standing in a wall for three minutes.
+
+**Swimming needed the water to be the water.** `toWorld` hands back the
+promenade's own surface and holds it FLAT seaward of the quay — measured at
+2.12 m out over the sea at t 424 and 1.05 at t 380 — so there is no seabed in
+it and no depth. The first cut clamped her to the greater of that and the
+waterline, which swims her two metres above the sea. While she is in it she is
+AT the waterline, eased over nine tenths of a second at each end so the quay
+edge is a woman getting in and out rather than a step of two metres in one
+frame. Measured: y 2.87 standing, 2.08 walking down, −0.30 in the water at s
+−1.2 and −3.5 as she swims out, 2.88 back on the quay.
+
+The trampoline is her own bench hop with a bigger number in it: 6.6 m/s off the
+mat against the bench's arc, which is 2.1 m of apex against 0.76 — and the
+tuck now reads against the apex she is ACTUALLY on, because a bench's apex used
+on a 2.1 m bounce folds her knees for the whole of it. Measured on the mat at
+Jadrija's own bed height: she snaps to y 3.33, which is `beds()[0].y`, and
+peaks at 5.20.
+
+- Both are spoken: "let's go swimming", "go jump on the trampolines". The
+  trampoline wants the NOUN — a bare "jump" is `joy`, which she can do where
+  she is standing rather than eighty metres up the beach.
+- `__fr.jad.ask('swim')`, `ask('tramp')`, and `show()` now prints `y`, `dip`
+  and `job` — where she is DRAWN, which is the only number that settles whether
+  a woman who is swimming is in the water or over it.
+- No regression: census {446,333,86,27}, blockers 818, tris 642821, 60 fps, and
+  the 1.395.0 skills still enter on the next frame.
+
+## [baye 1.7.1] — 2026-09-16 — server only
+
+Two more skills — `swim` and `tramp` — and "let's go" added to `ASK_RE`, which
+is how he actually says both of them.
+
 ## [1.395.0] — 2026-09-16
 
 ### ask her and she does it

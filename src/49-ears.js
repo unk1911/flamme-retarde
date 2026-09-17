@@ -280,6 +280,8 @@ const ears = (() => {
     wine: 'pouring the wine', ballet: 'to the barre', twerk: 'the bend',
     shimmy: 'her shimmy', heart: 'a heart', note: 'holding up her card',
     wheel: 'cartwheels', joy: 'a somersault',
+    // The two she has to go somewhere for, which is why these say where.
+    swim: 'off for a swim', tramp: 'off to the trampolines',
   };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */

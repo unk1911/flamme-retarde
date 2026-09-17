@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -398,6 +398,17 @@ SKILLS = {
               [r"\bcart-?wheel\w*\b"]),
     "joy": ("do a somersault, a flip, tumble",
             [r"\b(somersault\w*|summersault\w*|flip|tumbl\w+|backflip)\b"]),
+    # AND THE TWO THAT ARE SOMEWHERE ELSE. Misha, 16 Sep 2026: *"i'll say to
+    # her: 'let's go swimming', and she's like yeah let's go.. but then like
+    # nothing happens"*, and the trampolines. These two are errands rather than
+    # numbers — she walks off, does it, and comes back — see ERRAND in
+    # src/43-jadrija.js. The trampoline wants its own NOUN and not a bare
+    # "jump", because a bare jump is `joy` above and she can do that where she
+    # is standing rather than eighty metres up the beach.
+    "swim": ("go for a swim, get in the water",
+             [r"\b(swim\w*|bathe|paddle|go in the (water|sea))\b"]),
+    "tramp": ("walk up to the trampolines and jump on them",
+              [r"\b(trampolin\w*|trampol\w*|tramp)\b"]),
 }
 # The ask itself, so that TALKING about wine is not a request for it. "I love
 # a cold white in this heat" names the noun and asks for nothing; "can you pour
@@ -411,8 +422,8 @@ ASK_RE = re.compile(
     r"|\b(please|pls|plz)\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
-    r"|\b(let'?s see|i want|i'?d like|how about|go on|for me)\b"
-    r"|^\s*(pour|show|make|give|dance|perform|try|do)(?!\s+(you|u|i|we)\b)\b",
+    r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
+    r"|^\s*(pour|show|make|give|dance|perform|try|go|do)(?!\s+(you|u|i|we)\b)\b",
     re.I | re.M)
 
 
