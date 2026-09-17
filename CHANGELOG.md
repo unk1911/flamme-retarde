@@ -8,6 +8,22 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.403.1] — 2026-09-17
+
+### the pause stops the microphone
+
+**"if i press Pause: the 'I' audio still listening for stuff.. it should also
+pause"**. It was, and the listening was the smaller half of it: a paused game
+is when somebody talks to the room instead of to the game, and every sentence
+in it was going up to the transcriber and coming back as something for Baye to
+answer.
+
+So the pause closes the device, the same way it drops every held key — not a
+gate on what comes off the microphone, because the tally light is the promise.
+Resuming gives it back, and only a pause that closed one does: otherwise P
+becomes a way to switch the microphone *on*, and you would come back from a
+pause listening when you never were.
+
 ## [1.403.0] — 2026-09-17
 
 ### five riders on the promenade

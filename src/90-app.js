@@ -1551,6 +1551,24 @@ function togglePanel() {
  */
 let silentPause = false;
 
+/**
+ * Whether the microphone was open when the world stopped, so that resuming
+ * gives it back.
+ *
+ * Misha, 17 Sep 2026: *"if i press Pause: the 'I' audio still listening for
+ * stuff.. it should also pause"*. It was listening, and worse than merely
+ * listening: a paused game is exactly when somebody talks to the room rather
+ * than to the game, and every sentence in it was going up to the transcriber
+ * and coming back as something for Baye to answer. A stopped world that is
+ * still spending your microphone on the conversation you stopped it for is not
+ * stopped.
+ *
+ * The latch is the whole of it: pausing closes the microphone, and only a pause
+ * that closed one opens it again. Anything else and P becomes a way to switch
+ * the mic ON — press it once with the ears off and you would come back listening.
+ */
+let earsHeld = false;
+
 // 400 ms is the double-tap window, and it is not a taste: it is GTK's and Qt's
 // default double-click interval, with Windows' GetDoubleClickTime at 500 and
 // macOS in the same place. A deliberate double-tap lands nearer 200 ms, so 400
@@ -1627,8 +1645,20 @@ function setPaused(on) {
     flight.p.kb.set(0, 0);
     flight.p.stick.set(0, 0);
     document.exitPointerLock?.();
+    // And the microphone, which is a key held down by any other name — see
+    // `earsHeld`. It closes the device rather than gating what comes off it,
+    // because the tally light is the promise: nothing in the room is being
+    // listened to while the world is stopped.
+    if (ears && ears.on) { earsHeld = true; ears.toggle(); }
   } else if (!IS_TOUCH && $('panel').hidden) {
     grabPointer();
+  }
+  // Coming back: the microphone as you left it. The permission is already
+  // given and the resume is itself a keypress or a click, so opening it again
+  // needs nothing from the player.
+  if (!on && earsHeld) {
+    earsHeld = false;
+    if (ears && !ears.on) ears.toggle();
   }
 }
 
