@@ -33851,6 +33851,62 @@ async function buildJadrija(scene) {
    * other side — a modified client cannot put text in her mouth by claiming
    * to have seen it.
    */
+  /**
+   * ── THE COUNTERS ──
+   *
+   * Misha, 16 Sep 2026: *"ok so how do i buy a pack of cigarettes at the
+   * Tisak?"* — asked after being told you could not, which is how a feature
+   * request arrives. Real euros in a pocket and the transaction itself; what
+   * you do with what you bought is not built yet and he said so.
+   *
+   * WHERE THE PRICES COME FROM, because this is the one table on this shore
+   * with a number in it that was not read off a photograph:
+   *
+   *   THE SLASTIČARNICA'S NINE ARE REAL. They are the board on its wall, row
+   *   for row — see the note over the price column, where four of the nine
+   *   were white labels until Misha supplied them. KOKICE is not sold here
+   *   because KOKICE has no price on that board, and blank means blank.
+   *   THE TISAK'S FOUR ARE NOT. Nothing legible was ever photographed in that
+   *   window. They are ordinary Croatian kiosk prices and they are flagged
+   *   here as the guesses they are, for the same reason Raffaello's name was
+   *   flagged before he corrected it: he was there and I was not.
+   *
+   * And no brand on any of it. "A pack of cigarettes" is a thing; a name on
+   * the pack would be invented branding, which is rule 12.
+   */
+  const STOCK = {
+    tisak: { at: 'tisak', name: 'TISAK', items: [
+      ['a pack of cigarettes', 4.50], ['a newspaper', 2.00],
+      ['a bottle of water', 1.50], ['an ice cream out of the freezer', 2.00],
+    ] },
+    slast: { at: 'slast', name: 'slastičarnica', items: [
+      ['sladoled', 2.50], ['kupovi', 8.00], ['frappe', 7.00], ['krafne', 2.50],
+      ['espresso', 2.00], ['macchiato', 2.50], ['cappuccino', 3.00],
+      ['nes caffe', 3.00],
+    ] },
+  };
+  /** How close to the front of a shop you have to be to be served, in metres. */
+  const COUNTER_R = 3.2;
+
+  /**
+   * The counter you are standing at, or null. `x, z` are world metres.
+   *
+   * The serving side is the deck side — `s0` — because that is where the hatch
+   * and the vitrine are on every shop here, and it is the side the promenade
+   * runs along.
+   */
+  function counterAt(x, z) {
+    const [t, s] = local(x, z);
+    for (const key in STOCK) {
+      const S = SHOPS.find((q) => q.key === STOCK[key].at);
+      if (!S) continue;
+      if (t < S.t0 - 1.5 || t > S.t1 + 1.5) continue;
+      if (s < S.s0 - COUNTER_R || s > S.s0 + 0.8) continue;
+      return { key, name: STOCK[key].name, items: STOCK[key].items };
+    }
+    return null;
+  }
+
   const SEE = {
     slast: 'slast',
     // THE RED ONE. There are two kiosks on this shore and only one of them has
@@ -39583,6 +39639,8 @@ async function buildJadrija(scene) {
     },
     /** What she was last asked for and took, or null. */
     didShow: () => (show ? (show.did || null) : null),
+    /** The shop counter you are standing at, or null — see `counterAt`. */
+    counter: (x, z) => counterAt(x, z),
     /** What she saw on the last recon, and what she came back and reported. */
     seen: () => (show ? (show.seen || null) : null),
     told: () => (show ? (show.told || null) : null),

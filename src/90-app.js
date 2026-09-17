@@ -429,8 +429,22 @@ addEventListener('keydown', (e) => {
     // On this side of it there are two doors left: the boat, if you are stood
     // at the head of the mole with her alongside, and the aeroplane.
     if (inWater()) return;
+    // AND A THIRD, which is a hatch. E is the interact key and a counter is
+    // the one place on this shore where standing in front of something means
+    // being served at it: you cannot be at the Tisak's window and at the
+    // aeroplane at the same time, so there is nothing for it to take away.
+    if (buyHere()) return;
     if (boardBrod()) return;
     toggleGround();
+  }
+  // And the menu at a counter. Two keys rather than one, so that E means buy
+  // and only buy: a key that cycled AND bought is a key that buys the wrong
+  // thing the moment you press it once too often.
+  if ((e.code === 'Comma' || e.code === 'Period') && counterNow()) {
+    e.preventDefault();
+    const n = counterNow().items.length;
+    POCKET.pick = ((POCKET.pick + (e.code === 'Period' ? 1 : n - 1)) % n + n) % n;
+    paintCounter();
   }
   // ENTER — jump.
   //
@@ -1434,6 +1448,8 @@ const HELP = [
     ['K', 'help.k.kite'],
     ['F', 'help.k.foil'],
     ['E', 'help.k.in'],
+    ['E', 'help.k.buy'],
+    [', .', 'help.k.menu'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -3072,6 +3088,20 @@ let pourBack = 0;
  * frame loop and drawn in the corner by the render above.
  */
 let flyCamT = -1;
+/**
+ * ── THE POCKET ──
+ *
+ * Misha, 16 Sep 2026: *"ok so how do i buy a pack of cigarettes at the
+ * Tisak?"*, and asked how he wanted it: real euros, and the transaction on its
+ * own for now.
+ *
+ * Twenty euros, because a note out of a machine is twenty and because it is
+ * enough to stand at a counter half a dozen times before the answer is no. It
+ * is a session and not a save: nothing here is written down anywhere, so a
+ * reload is a fresh twenty, and that is the same trade every other bit of
+ * state in this game makes.
+ */
+const POCKET = { eur: 20.00, bought: {}, pick: 0 };
 /** Which shot the fly cam is showing: `drop`, `dance` or `birthday`. */
 let flyCamMode = 'drop';
 /** Held by `__fr.ears.flyCam(t)`, for a scrub — the same switch as `swatHold`. */
@@ -5999,6 +6029,60 @@ let lastFrameMs = 0;
 // is walking. Under `camOverride` there is no walker to speak of — the cuts
 // fly the camera through the house on their own — so the camera stands in.
 const personPt = new THREE.Vector3();
+/**
+ * ── BEING SERVED ──
+ *
+ * `counterNow` is the shop you are standing at, `paintCounter` is the line on
+ * the screen that says so, and `buyHere` is E. All three answer nothing at all
+ * unless you are on foot at Jadrija in front of a serving hatch, which is what
+ * lets E keep its own meaning everywhere else.
+ */
+let counterKey = null;
+function counterNow() {
+  if (state.phase !== 'ground' || !jadrija || !jadrija.counter) return null;
+  const p = personAt();
+  return jadrija.counter(p.x, p.z);
+}
+
+function paintCounter() {
+  const el = $('counter');
+  if (!el) return;
+  const c = counterNow();
+  if (!c) {
+    counterKey = null;
+    POCKET.pick = 0;
+    el.hidden = true;
+    return;
+  }
+  // The highlighted row goes back to the top when you walk to a different
+  // shop, and stays where it was while you are standing at this one.
+  if (c.key !== counterKey) { counterKey = c.key; POCKET.pick = 0; }
+  const [what, price] = c.items[POCKET.pick % c.items.length];
+  const line = c.name + ' — ' + what + ', ' + price.toFixed(2) + ' €'
+    + '   [E] buy   [, .] menu   ·   ' + POCKET.eur.toFixed(2) + ' € on you';
+  el.hidden = false;
+  // Only when it has actually changed. This runs every frame — it is how the
+  // line knows you have walked away — and a `textContent` write a frame is a
+  // layout a frame for a string that changes about once a minute.
+  if (el.textContent !== line) el.textContent = line;
+}
+
+/** E at a counter. Answers whether it was a counter, so E can carry on if not. */
+function buyHere() {
+  const c = counterNow();
+  if (!c) return false;
+  const [what, price] = c.items[POCKET.pick % c.items.length];
+  if (POCKET.eur + 1e-9 < price) {
+    toast(T('shop.short'));
+    return true;
+  }
+  POCKET.eur = Math.round((POCKET.eur - price) * 100) / 100;
+  POCKET.bought[what] = (POCKET.bought[what] || 0) + 1;
+  toast(what + ' · ' + POCKET.eur.toFixed(2) + ' €');
+  paintCounter();
+  return true;
+}
+
 function personAt() {
   if (!camOverride && state.phase === 'ground' && ground && ground.ok) {
     const y = ground.you;
@@ -6614,6 +6698,9 @@ function frame() {
   // looking, see `checkPour` — so unlike every other cut in this file there is
   // no key that starts it.
   if (pourCut) stepPour(real);
+  // The counter you are standing at, repainted every frame: you walk into it
+  // and out of it, and nothing else tells the DOM when that happened.
+  paintCounter();
   if (flyCamT >= 0) {
     if (!flyCamHold) flyCamT += real;
     const S = jadrija.vik.fly.shot();
@@ -8006,6 +8093,8 @@ window.__fr = {
      */
     ask: (name) => (jadrija ? jadrija.askShow(name) : null),
     did: () => (jadrija ? jadrija.didShow() : null),
+    /** The counter at a world point, for a test that cannot walk. */
+    counter: (x, z) => (jadrija ? jadrija.counter(x, z) : null),
     /** What she saw on the last recon, and what she brought back. */
     seen: () => (jadrija ? jadrija.seen() : null),
     told: () => (jadrija ? jadrija.told() : null),
@@ -9104,6 +9193,8 @@ window.__fr = {
       x == null ? camera.position.x : x, z == null ? camera.position.z : z),
     nearest: (sp, x, z) => trees.nearest(sp, x, z),
   },
+  /** What is on you and what you have bought — see POCKET. */
+  pocket: () => ({ eur: +POCKET.eur.toFixed(2), bought: POCKET.bought }),
   ground: {
     arm: () => ground.force(),
     raw: () => ground,

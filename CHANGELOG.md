@@ -8,6 +8,55 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.399.0] — 2026-09-16
+
+### you can buy things
+
+**"ok so how do i buy a pack of cigarettes at the Tisak?"** — asked straight
+after being told you could not, which is how a feature request arrives. Asked
+what he wanted of it he picked the transaction on its own, with real money in a
+pocket.
+
+Stand in front of a serving hatch and a line comes up:
+
+    TISAK — a pack of cigarettes, 4.50 €   [E] buy   [, .] menu   ·   20.00 € on you
+
+E buys it, `,` and `.` walk the menu, and the money comes off. Two shops to
+start: the Tisak and the slastičarnica. Twenty euros in your pocket, session
+only — nothing here is written down, so a reload is a fresh twenty, the same
+trade every other bit of state in this game makes.
+
+**WHERE THE PRICES COME FROM**, because this is the one table on this shore
+with a number in it that was not read off a photograph:
+
+- THE SLASTIČARNICA'S ARE REAL. They are the board on its wall, row for row:
+  sladoled 2.50, kupovi 8.00, frappe 7.00, krafne 2.50, espresso 2.00,
+  macchiato 2.50, cappuccino 3.00, nes caffe 3.00. Four of the nine rows were
+  white labels until Misha supplied the numbers — see the note over the price
+  column. KOKICE is NOT sold, because KOKICE has no price on that board and
+  blank means blank.
+- THE TISAK'S FOUR ARE NOT. Nothing legible was ever photographed in that
+  window, so they are ordinary Croatian kiosk prices and they are flagged in
+  the table as the guesses they are. Same standing as Raffaello's name before
+  he corrected it: he was there and I was not.
+
+And no brand on any of it. "A pack of cigarettes" is a thing; a name on the
+pack would be invented branding, which is rule 12.
+
+E stays E. It is the interact key and a counter is the one place on this shore
+where standing in front of something means being served at it — you cannot be
+at the Tisak's window and at the aeroplane at the same time, so the hatch takes
+nothing away from the door. Two keys and not one, so that E means buy and only
+buy: a key that cycled AND bought would buy the wrong thing the moment you
+pressed it once too often.
+
+Driven: at the Tisak the line reads 20.00 € and one press of E leaves 15.50;
+at the slastičarnica three presses of `.` reach krafne and E leaves 17.50 with
+one in the pocket; seven more empty it, and the eighth is refused. No
+regression: census {446,333,86,27}, blockers 818, tris 642821, 60 fps.
+
+Not built, and he said so when asked: anything to DO with what you bought.
+
 ## [1.398.0] — 2026-09-16
 
 ### the kiosk she goes to is the one with the name on it

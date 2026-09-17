@@ -754,6 +754,18 @@ html.touch #swim-hud { bottom: 7.4rem; }
 }
 #saying[hidden] { display: none; }
 
+/* The shop counter you are standing at — see `paintCounter` in 90-app.js.
+   Above the subtitle rather than below it: she can be talking to you while you
+   are buying a coffee, and the two lines must not land on each other. */
+#counter {
+  position: fixed; left: 50%; bottom: 26vh; transform: translateX(-50%);
+  z-index: 40; pointer-events: none; white-space: nowrap;
+  font-family: var(--mono); font-size: .66rem; letter-spacing: .04em;
+  color: #f5ead9;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 14px rgba(0, 0, 0, .8);
+}
+#counter[hidden] { display: none; }
+
 /* Ears — src/49-ears.js. What the microphone heard and what was done about it,
    bottom right over the fly cam's corner, in the subtitle's own type. Small and
    dim on purpose: it is a debug console Misha asked for, not a feature panel. */
