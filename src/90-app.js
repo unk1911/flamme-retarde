@@ -9396,6 +9396,16 @@ window.__fr = {
     return { paused: state.paused, shown: !$('pause').hidden,
       silent: silentPause, t: +state.t.toFixed(2) };
   },
+  /**
+   * Hold a key down, or let it go, past the pause. For filming: `film.mjs`
+   * steps a paused world, pausing clears `keys` and the keydown handler drops
+   * everything while paused, so a scoop run could not be filmed with Space
+   * held — the aeroplane flew the whole take over the water with the probes up.
+   * Call it in the shot's `per`, not once in `setup`: every screenshot the
+   * filmer takes costs the page its focus, and the blur handler lets go of
+   * every key, so a key held once is held for exactly one frame.
+   */
+  hold: (code, on = true) => { if (on) keys.add(code); else keys.delete(code); return [...keys]; },
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },
