@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -382,7 +382,8 @@ INTENTS = [
 # place AND a looking verb in it is a recon, and only a sentence without one
 # is her doing the thing herself.
 SEE_RE = (r"\b(see|check|look|find out|report|scout|peek|spy|recon|"
-          r"what'?s|whats|who'?s|whos|how many|available|got)\b")
+          r"what'?s|whats|who'?s|whos|how many|how much|price\w*|cost\w*|"
+          r"charge|menu|available|got|have they|do they)\b")
 
 SKILLS = {
     "see.slast": ("walk up to the ice cream place and see what flavours are in "
@@ -450,6 +451,11 @@ ASK_RE = re.compile(
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
+    # "what do they charge at the ice cream place" is a question, and walking
+    # up there to find out is the right answer to it. A place name and a
+    # looking word still have to be in the sentence, so "do they like me" is
+    # not an errand.
+    r"|\b(do they|what do they|have they|are they)\b"
     r"|^\s*(pour|show|make|give|dance|perform|try|go|run|check|head|walk|nip|"
     r"pop|find|look|see|do)(?!\s+(you|u|i|we)\b)\b",
     re.I | re.M)
@@ -682,6 +688,46 @@ class Heard:
 
 
 HEARD = Heard()
+
+
+class Asked:
+    """What the errand was, in their own words, until she gets back.
+
+    THE SECOND HALF OF A RECON IS ANSWERING THE QUESTION, and until this
+    existed there was not one: she walked to the place, counted what was there
+    and recited it, so "how much for a krafnica" and "what flavours have they
+    got" came back with the same sentence. She has to be told what she was sent
+    for.
+
+    The words are the ones `/hear` transcribed and they never leave this
+    machine — `/line` sends a place key and this is looked up against the user
+    who spoke, exactly as `Heard` works. Keyed by place and not by ticket
+    because the report is a separate call a minute and a half later, by which
+    time the ticket is long spent.
+    """
+
+    def __init__(self, ttl=900.0, cap=600):
+        self.ttl, self.cap = ttl, cap
+        self._d = {}
+        self._lock = threading.Lock()
+
+    def put(self, user: str, place: str, text: str, lang=None):
+        now = time.time()
+        with self._lock:
+            if len(self._d) >= self.cap:
+                self._d = {k: v for k, v in self._d.items()
+                           if now - v[1] < self.ttl}
+            self._d[(user, place)] = (text[:TALK_HEARD_CHARS], now, lang)
+
+    def take(self, user: str, place: str):
+        with self._lock:
+            got = self._d.pop((user, place), None)
+        if not got or time.time() - got[1] > self.ttl:
+            return None
+        return got[0], (got[2] if len(got) > 2 else None)
+
+
+ASKED = Asked()
 
 
 class Talks:
@@ -1663,6 +1709,20 @@ RECON_PLACES = {
     "vik": "the holiday house up the steps, where the other Baye is carrying "
            "her buckets up and down all day",
 }
+# AND THE BOARD ON THE WALL, row by row, as it is painted.
+#
+# Nine rows, and not one of them is invented: the note over the price column in
+# src/43-jadrija.js has the whole provenance — four of these were white labels
+# until Misha supplied the numbers, and KOKICE carries no price at all, which
+# is drawn as nothing rather than as an empty label. She can say that too,
+# because it is what is on the wall. Kept here for the same reason the flavours
+# are: a board does not move, so the page has nothing to observe and nothing it
+# needs to send.
+SLAST_BOARD = (("sladoled", "2.50 €"), ("kupovi", "8.00 €"), ("kokice", None),
+               ("frappe", "7.00 €"), ("krafne", "2.50 €"),
+               ("espresso", "2.00 €"), ("macchiato", "2.50 €"),
+               ("cappuccino", "3.00 €"), ("nes caffe", "3.00 €"))
+
 # The plaques in the case, as read. Fifteen names and one pan whose card is
 # turned away — she can say that too, because it is what is there.
 GELATO_NAMES = ("Čokolada", "Vanilija", "Stracciatella", "Jogurt Šumsko voće",
@@ -2316,17 +2376,46 @@ def build_messages(ctx: dict, world: dict) -> list:
             lines.append("- the flavours in the case, on their plaques: "
                          + ", ".join(GELATO_NAMES)
                          + " — and one pan whose card is turned away")
+            lines.append("- the price board on the wall, exactly as painted: "
+                         + ", ".join(f"{n} {p}" for n, p in SLAST_BOARD if p)
+                         + ", and "
+                         + ", ".join(n for n, p in SLAST_BOARD if not p)
+                         + " with no price beside it at all")
         if r.get("buck"):
             lines.append("- the other Baye is " + BUCK_WHERE[r["buck"]])
         if r.get("laps") is not None:
             lines.append(f"- she has carried {r['laps']} buckets down so far")
         lines.append("")
+        if ctx.get("asked"):
+            lines.append('WHAT THEY SENT YOU FOR, in their own words: "'
+                         + ctx["asked"] + '"')
+            lines.append("ANSWER THAT, out of what is written above and "
+                         "nothing else. If what you saw does not answer it, "
+                         "say so plainly — you went and looked and it was not "
+                         "there, or it is not a thing that place has. Never "
+                         "make up a price, a name or a number.")
+            # WHOSE LANGUAGE, and it is theirs, said in as few words as
+            # possible. The first cut of this line explained WHY — that a board
+            # at Jadrija is written in Croatian whoever reads it out — and
+            # naming the language in the instruction was enough to make her
+            # answer an English question about a cappuccino entirely in
+            # Croatian, and then to do it to every other question too. The rule
+            # works; the reasoning behind it does not belong in the prompt.
+            # THE LANGUAGE IS THE ONE `/hear` NAMED, and not one read off the
+            # sentence here. "How much for a krafnica" is an English sentence
+            # with a Croatian noun in it, and asked to judge for itself the
+            # model answered the whole thing in Croatian. `/hear` already
+            # settles this for every other path — `plainly_english`, then the
+            # classifier — so the answer travels with the question.
+            lines.append("Answer in "
+                         + (ctx.get("asked_lang") or "the language of that "
+                            "sentence")
+                         + ". A name off the board or the case keeps its own "
+                           "spelling.")
         lines.append("Tell them what you found, as somebody who has just got "
                      "back from doing it. THIRTY WORDS AT THE MOST. Nothing "
                      "you were not told above, no guessing at what else might "
-                     "be there, and if they asked for the flavours then name "
-                     "some of them rather than counting them. Do not offer to "
-                     "go again.")
+                     "be there. Do not offer to go again.")
         lines.append("")
         return [{"role": "system", "content": TALK_PERSONA["baye"]},
                 {"role": "user", "content": "\n".join(lines)}]
@@ -3015,6 +3104,14 @@ class Handler(BaseHTTPRequestHandler):
 
         t0 = time.time()
         ctx = clean_context(body)
+        # WHAT SHE WAS SENT FOR, looked up here rather than sent up by the
+        # page — see `Asked`. The words are the ones this service transcribed
+        # when the errand was given, so guardrail 2 holds on a path where the
+        # page cannot supply text at all.
+        if ctx.get("ask") == "recon" and ctx.get("recon"):
+            got = ASKED.take(user, ctx["recon"]["place"])
+            if got:
+                ctx["asked"], ctx["asked_lang"] = got
         world = WORLD.snapshot()
         fast = who in FAST_WHO
         try:
@@ -3118,6 +3215,11 @@ def _hear(self):
     if not found and text.strip():
         out["heard"] = HEARD.put(user, text, lang, does[0] if does else None)
         out["addr"] = addressed_of(text)
+    # AND WHAT THE ERRAND WAS, kept until she is back — see `Asked`. Only for
+    # the recon skills, because they are the only ones that come back with
+    # something to say.
+    if does and does[0].startswith("see.") and text.strip():
+        ASKED.put(user, does[0][4:], text, lang)
     return self._send(200, out)
 
 

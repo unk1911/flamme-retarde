@@ -8,6 +8,60 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [baye 1.9.0] — 2026-09-16 — server only
+
+### she answers what she was sent for, and she can read the board
+
+**"and if i ask her: go to ice cream place, how much for a krafnica? will she
+know?"**
+
+She does now, and the answer is 2.50 €, because that board is real: nine rows
+painted on the wall of the slastičarnica, read off photographs and corrected by
+Misha himself — see the note over the price column in src/43-jadrija.js, where
+four of the nine were white labels until he supplied the numbers. `SLAST_BOARD`
+is that list, on the server with the flavours and for the same reason: a board
+does not move, so the page has nothing to observe and nothing it needs to send.
+
+KOKICE carries no price on the wall and carries none here either. Asked about
+popcorn she says they have it and there is no price beside it, which is what is
+painted.
+
+**The other half was the real gap, and it was mine.** Until this, a recon
+report was built from what she counted and NOTHING ELSE — she was never told
+what she had been sent for, so "how much for a krafnica" and "what flavours
+have they got" came back with the same sentence. `Asked` keeps the question, in
+their own words, from the moment the errand is given until she is back: keyed
+by user and place, because the report is a separate call a minute and a half
+later by which time the `HEARD` ticket is long spent. The words are the ones
+this service transcribed and they never leave the machine — `/line` sends a
+place key and the question is looked up against the user who spoke. Guardrail 2
+holds on a path where the page cannot supply text at all.
+
+And she is told to answer THAT, out of what is written in front of her, and to
+say so plainly when it does not answer it:
+
+- "how much for a krafnica?" → *"I checked, and krafne are 2.50 euros."*
+- "do they have popcorn?" → *"Yeah, they've got kokice, popcorn, but there's no
+  price beside it."*
+- "is there a pizza slice at the ice cream place?" → *"No pizza slice, I went
+  and looked. The board lists ice cream, drinks, doughnuts and popcorn, but no
+  pizza."*
+- and in Russian, with the name off the board kept as it is spelt.
+
+TWO THINGS THE TESTS CAUGHT, both about language. The report had no language
+line at all, so an English question about a cappuccino came back in Croatian —
+the price list is Croatian and nothing said otherwise. The fix for THAT was
+worse: a line explaining why a board at Jadrija is Croatian made her answer
+every question in Croatian, including ones that had been fine. The rule works
+and the reasoning behind it does not belong in a prompt. What settles it is the
+language `/hear` already named — `plainly_english`, then the classifier —
+carried with the question, because "how much for a krafnica" is an English
+sentence with a Croatian noun in it and no model should be asked to judge that
+twice.
+
+`SEE_RE` learned prices: how much, price, cost, charge, menu, have they, do
+they. A question about a place is an errand to it.
+
 ## [1.397.0] — 2026-09-16
 
 ### autonomous recon missions
