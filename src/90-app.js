@@ -446,6 +446,26 @@ addEventListener('keydown', (e) => {
     if (got === 'no beer') toast(T('beer.none'));
     return;
   }
+  // ; — a lick of the ice cream, and see src/61-cream.js.
+  //
+  // SEMICOLON BECAUSE THERE IS NOT A LETTER LEFT. The note over L and N a
+  // hundred lines up said the board was nearly full and listed what was on it;
+  // it is full now. Every one of the twenty-six letters is bound in this
+  // handler — A through Z, checked one at a time and not from memory — so a
+  // lick either shares a key with something or takes a punctuation mark, and
+  // sharing is how you end up dropping the gear at a gelato counter. The comma
+  // and the full stop are the counter menu, the slash is the help sheet with
+  // shift on it, and the digits are the two back doors; the semicolon is next
+  // to nothing and means nothing, which is the most that is left to want.
+  //
+  // Free everywhere and it does nothing unless there is an ice cream in your
+  // hand, so it costs no other control anything.
+  if (e.code === 'Semicolon') {
+    e.preventDefault();
+    const got = lickCream();
+    if (got === 'no cream') toast(T('cream.none'));
+    return;
+  }
   // And the menu at a counter. Two keys rather than one, so that E means buy
   // and only buy: a key that cycled AND bought is a key that buys the wrong
   // thing the moment you press it once too often.
@@ -1459,6 +1479,7 @@ const HELP = [
     ['E', 'help.k.in'],
     ['E', 'help.k.buy'],
     ['Y', 'help.k.drink'],
+    [';', 'help.k.lick'],
     [', .', 'help.k.menu'],
     ['O', 'help.k.pc'],
   ]],
@@ -6756,6 +6777,9 @@ function frame() {
   paintCounter();
   // And the bottle in your hand, if there is one.
   beerTick(real);
+  // And the ice cream, which unlike the bottle is on a clock whether you are
+  // eating it or not — see MELT in src/61-cream.js.
+  creamTick(real);
   if (flyCamT >= 0) {
     if (!flyCamHold) flyCamT += real;
     const S = jadrija.vik.fly.shot();
@@ -7418,6 +7442,11 @@ function frame() {
   // And the bottle, if there is one in your hand — same reason, same pass, and
   // after the arms because you do not drink while you are swimming a crawl.
   beerRender(renderer);
+  // And the ice cream, same pass and same reason, after the bottle because you
+  // are never holding both — she hands one over and the other is in the other
+  // hand, and if the two ever did overlap the cone is the thing you are
+  // looking at. See src/61-cream.js.
+  creamRender(renderer);
   // The mask goes on last of all, because it is the closest thing to your eye
   // that exists — and only in the water. The alpha it fades on its own is a
   // frame behind the phase, and one frame of a dive mask over the first frame
@@ -9270,6 +9299,39 @@ window.__fr = {
         +beer.kit.group.position.y.toFixed(3),
         +beer.kit.group.position.z.toFixed(3)] : null,
     stow: null }),
+  /**
+   * The ice cream — see 61-cream.js.
+   *
+   * `cream(flavour)` is exactly what shore Baye calls when she hands you one,
+   * so a probe can be handed one without her: it answers 'taken', 'have one'
+   * or 'not now'. `lick()` is the ; key.
+   *
+   * `cone(secs)` is the read, and with a number it AGES the cone by that many
+   * seconds of melting first and then reads it — because the melt is four
+   * minutes long on purpose and no probe is going to sit through that. With no
+   * argument it ages nothing and only reports, so it is safe to call twice.
+   */
+  cream: (flavour) => giveCream(flavour == null ? 'stracciatella' : flavour),
+  lick: () => lickCream(),
+  /** Bin it — which is also what she would do if she took it back off you. */
+  dropCream: () => creamStow(),
+  cone: (secs) => {
+    if (cream.out && typeof secs === 'number' && secs > 0) {
+      const sun = MELT.shade + (1 - MELT.shade) * sat(state.sunElev / MELT.peakElev);
+      cream.melt = Math.min(1, cream.melt + secs * sun / MELT.full);
+      cream.held += secs;
+    }
+    return { out: cream.out, flavour: cream.flavour, licks: cream.licks,
+      licking: cream.t >= 0, melt: +cream.melt.toFixed(3),
+      held: +cream.held.toFixed(2),
+      at: cream.kit && cream.kit.group.visible
+        ? [+cream.kit.group.position.x.toFixed(3),
+          +cream.kit.group.position.y.toFixed(3),
+          +cream.kit.group.position.z.toFixed(3)] : null,
+      scoops: cream.kit
+        ? [cream.kit.scoopA.visible, cream.kit.scoopB.visible] : null,
+      drip: cream.kit ? +cream.kit.drips[0].scale.y.toFixed(4) : null };
+  },
   ground: {
     arm: () => ground.force(),
     raw: () => ground,

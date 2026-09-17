@@ -817,6 +817,35 @@ function buildAudio() {
       at: t0 + 0.66 });
   }
 
+  /**
+   * A lick off an ice cream. Misha, 17 Sep 2026: *"let's enjoy slupring it"*.
+   *
+   * Quiet and short, which is most of the brief: a lick is one of the smallest
+   * noises a person makes, and anything you can hear across a room is a wrong
+   * one. Two layers and nothing else — a soft wet brush of wide-band noise
+   * sliding DOWN in pitch, which is a tongue leaving a surface, and a very
+   * short high tick under it at the end, which is the lips parting after. The
+   * downward sweep is the part that matters: the same burst swept upward reads
+   * as a suck rather than a lick, which was the first version of this.
+   *
+   * A third of the gain of `swig`, and a fifth of its length. See CREAM.up,
+   * which fires this on the way up rather than at the top of the arc, because
+   * that is where the tongue actually meets it.
+   */
+  function lick() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    // The wet brush. Low Q so it is a wash rather than a note, and swept down
+    // a fifth over 130 ms.
+    burst({ freq: 1150, q: 0.8, dur: 0.130, gain: 0.030, sweep: 0.62, at: t0 });
+    // A little more of it lower down, which is the width of a tongue against
+    // something soft rather than something hard.
+    burst({ freq: 420, q: 1.4, dur: 0.105, gain: 0.022, sweep: 0.70,
+      at: t0 + 0.012 });
+    // And the lips at the end of it: 12 ms, high, gone.
+    burst({ freq: 3100, q: 5, dur: 0.012, gain: 0.014, at: t0 + 0.122 });
+  }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
@@ -6676,7 +6705,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.405.0] — 2026-09-17 (baye 1.12.0)
+
+### she brings back the ice cream, and you eat it
+
+**"i want her to bring back tha tyummy ice-cream and let's enjoy slupring it ya
+know"**. She went, she reported what was in the case, and she came back
+empty-handed — and asked for a named flavour she said yes and still came back
+empty-handed. Both halves of that are fixed, and they are two files.
+
+HER HALF is an errand that buys. The walk is the recon's own — the counter of
+the slastičarnica, found by walking inland from her lane until the terrace is
+in the way — with four seconds at it, which is asking for one, watching it be
+made and taking it. And she checks the case before she promises: `creamOnBoard`
+reads `GELATO`, the counter as photographed, so "get me a stracciatella" is a
+yes because it is really in there, and "get me a bubblegum" is "that one is not
+in the case" rather than a walk to nowhere. What she carries back is spelled
+the way the plaque spells it.
+
+YOUR HALF is `src/61-cream.js`: a wafer cone and two scoops in your hand, its
+own render pass with a 2 cm near camera and a root that rides the camera, both
+for the reasons `61-beer.js` gives at length. The colours are the sixteen pans
+in that case, lifted row for row out of the survey that read them off the
+glass; an unknown flavour gets the pale pan whose plaque is turned away in
+every frame, because that is an ice cream the shop actually has. Stracciatella
+is angular shards on a fixed uv, so they stay where they are while the scoop
+shrinks under them.
+
+`;` takes a lick. Eight of them, four a scoop, the top one first, each a
+0.96 s arc with the bite landing while the scoop is at your mouth and out of
+shot — a lick is a plane and every vertex past it is pushed onto it, which is
+the flat facet a licked scoop carries.
+
+AND IT MELTS, which the beer does not. Gelato is served at −12 °C and this is
+32 °C on white concrete: four minutes to a wet cone at the top of the day, the
+first run down the flank at forty-three seconds, scaled by the sun with a
+floor under it because 32 °C air melts it in the shade too. It slumps, the
+folds soften, and what is left is a pool in the bottom of the cone.
+
+She hands it over on one frame through one call, and that call is the only
+thing either file knows about the other.
+
+### she runs, she lies down, and the pug leaves
+
+**"can she like run to it faster?"** — 2.36 m/s against 1.78, a third off
+every round trip. That is the ceiling and not a taste: there is no run in her
+bank, and the only thing keeping her feet on the ground at any other speed is
+the walk's clock being scaled by the same factor as the distance, which clamps
+at 1.75. A real run is a Blender job.
+
+**"if i say 'lie down on your back' ... she says 'yeah', but doesn't actually
+do it"** — `recline` → `cradle` is the second stage of the hose, reached by
+holding the branch on her once she is already down, so like the kneel before it
+the pose was authored and unaskable. Three names now, because the place is part
+of the request: `recline.bed`, `recline.floor`, and a bare `recline` that
+alternates on a latch — **"sometimes ... on the floor and sometimes ... on the
+bed"** — because there is no `rng` in this build and the resort being the same
+resort every load is load-bearing.
+
+On the cot she is laid along the bed rather than at you, which is the one thing
+every other way into this pose does not have to think about: where she is
+pointed decides where her head ends up, and a bed has one direction. 0.44 m of
+mattress under her, eased over the clip.
+
+**"once she gets on the knees or lies down it should take her much much longer
+to revert"** — 95 seconds on her knees against the hose's 11, 150 on her back
+against 14, and 420 on the cot. The water keeps its own numbers: a jet stopping
+is a reason to get up and a request is not. `kept` and `cradle` can be asked
+from now, or the long holds would be a trap.
+
+**"if she goes for the bed, the pug should just run off and not come back"** —
+he sleeps on that cot, and the room test that brings him in is derived from
+where you are standing every frame, so without a latch he trots out and comes
+straight back. The latch lifts when the hut is empty: he is not banished from
+an empty room all afternoon, he is just not getting back on the bed while she
+is on it.
+
+Server (baye 1.12.0): the three reclines, `lie`/`lay`/`kneel` as bare
+imperative openers, and the fetch — `get me the cokolada` resolves to Čokolada
+without the caron the transcriber never types. The verb is what separates it
+from the recon: "go see what flavours they have" is still a look.
+
 ## [1.404.0] — 2026-09-17 (baye 1.11.0)
 
 ### a skill is a precondition and an entry, not a pre-recorded sequence
