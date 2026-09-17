@@ -33884,6 +33884,27 @@ async function buildJadrija(scene) {
       ['water', 'a bottle of water', 1.50],
       ['freezer ice cream', 'an ice cream out of the freezer', 2.00],
     ] },
+    // The two caffe bars. Both have a serving opening and a glass-door drinks
+    // fridge standing in it — see `cooler` in SHOPS, which is why they can
+    // serve you and the pizzeria cannot: F2's frontage has no opening at all
+    // and the konoba is tables under a canopy. A counter exists where the
+    // building has a hatch.
+    //
+    // NONE OF THESE PRICES WAS READ OFF ANYTHING. The boards on both bars are
+    // five or six ruled rows that do not resolve at any distance the survey
+    // had — they ship as rows on purpose — so these are ordinary Dalmatian
+    // beach-bar prices and they are guesses, flagged here exactly as the
+    // Tisak's are. And no brand on any of it: a beer is a beer.
+    mini: { at: 'mini', name: 'beach bar MINI', items: [
+      ['beer', 'a beer', 4.00], ['espresso', 'espresso', 2.00],
+      ['water', 'a bottle of water', 2.00], ['juice', 'a juice', 3.00],
+      ['rakija', 'a rakija', 3.00],
+    ] },
+    h2o: { at: 'h2o', name: 'Caffe bar H2O', items: [
+      ['beer', 'a beer', 4.00], ['espresso', 'espresso', 2.00],
+      ['cappuccino', 'cappuccino', 3.00], ['water', 'a bottle of water', 2.00],
+      ['juice', 'a juice', 3.00],
+    ] },
     slast: { at: 'slast', name: 'slastičarnica', items: [
       ['sladoled', 'sladoled', 2.50], ['kupovi', 'kupovi', 8.00],
       ['frappe', 'frappe', 7.00], ['krafne', 'krafne', 2.50],

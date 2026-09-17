@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.401.0] — 2026-09-16
+
+### a beer at MINI
+
+**"can i buy a beer at beach bar MINI?"** — not until now. Both caffe bars
+serve: MINI and H2O, a beer, an espresso, a water, a juice, and a rakija at
+MINI because a Dalmatian beach bar has one.
+
+A COUNTER EXISTS WHERE THE BUILDING HAS A HATCH, and that is the rule rather
+than a list I felt like writing. Both bars have a serving opening with a
+glass-door drinks fridge standing in it — `cooler` in SHOPS — which is why they
+can serve you and the pizzeria cannot: F2's frontage has no opening at all, and
+the konoba is tables under a canopy. Stand at F2's window and the prompt does
+not come up.
+
+NONE OF THESE PRICES WAS READ OFF ANYTHING. The boards on both bars are five or
+six ruled rows that do not resolve at any distance the survey had, and they
+ship as rows on purpose — so a beer at 4.00 € is an ordinary Dalmatian
+beach-bar price and a guess, flagged in the table exactly as the Tisak's four
+are. The slastičarnica's nine remain the only real ones. And no brand on any of
+it: a beer is a beer.
+
+Say it out loud too: *"one beer please"*, *"daj mi jedno pivo"*, *"jedan
+rakija"*.
+
+Driven: MINI shows "a beer, 4.00 €" and leaves 16.00, a rakija leaves 13.00,
+the same words at H2O leave 9.00, and at the pizzeria the answer is "no
+counter". Census {446,333,86,27}, blockers 818, tris 642821, 60 fps — a table
+and a regex move none of them.
+
 ## [1.400.0] — 2026-09-16
 
 ### "edin krafne"

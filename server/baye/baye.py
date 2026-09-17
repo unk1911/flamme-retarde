@@ -488,6 +488,10 @@ BUY = {
     "macchiato": [r"\b(macchiato|makijato|machiato)\b"],
     "cappuccino": [r"\b(cappucc?ino|kapu[čc]ino|capuccino)\b"],
     "nes caffe": [r"\b(nes ?caff?e|nescafe|nes)\b"],
+    # The bars — see STOCK in src/43-jadrija.js. No brand on any of them.
+    "beer": [r"\b(beer|beers|pivo|pivu|pive|lager|cold one)\b"],
+    "juice": [r"\b(juice|sok|soka|sokic|soki[ćc])\b"],
+    "rakija": [r"\b(rakij\w*|grappa|brandy)\b"],
 }
 # A WORD THAT MEANS YOU WANT ONE, or a sentence short enough to be an order.
 # Without this, standing at the counter saying "I love a cappuccino in the
