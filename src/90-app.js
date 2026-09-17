@@ -6057,7 +6057,7 @@ function paintCounter() {
   // The highlighted row goes back to the top when you walk to a different
   // shop, and stays where it was while you are standing at this one.
   if (c.key !== counterKey) { counterKey = c.key; POCKET.pick = 0; }
-  const [what, price] = c.items[POCKET.pick % c.items.length];
+  const [, what, price] = c.items[POCKET.pick % c.items.length];
   const line = c.name + ' — ' + what + ', ' + price.toFixed(2) + ' €'
     + '   [E] buy   [, .] menu   ·   ' + POCKET.eur.toFixed(2) + ' € on you';
   el.hidden = false;
@@ -6067,19 +6067,32 @@ function paintCounter() {
   if (el.textContent !== line) el.textContent = line;
 }
 
-/** E at a counter. Answers whether it was a counter, so E can carry on if not. */
-function buyHere() {
+/**
+ * Buy something. With no `key` it is the highlighted row, which is E; with one
+ * it is that item by name, which is the microphone — see `BUY` in
+ * server/baye/baye.py. Answers a word for what happened, because the ears
+ * panel prints it and "nothing happened" is not an answer a player can use.
+ */
+function buyAt(key) {
   const c = counterNow();
-  if (!c) return false;
-  const [what, price] = c.items[POCKET.pick % c.items.length];
-  if (POCKET.eur + 1e-9 < price) {
-    toast(T('shop.short'));
-    return true;
-  }
+  if (!c) return 'no counter';
+  const row = key
+    ? c.items.find((it) => it[0] === key)
+    : c.items[POCKET.pick % c.items.length];
+  if (!row) return 'not sold here';
+  const [, what, price] = row;
+  if (POCKET.eur + 1e-9 < price) { toast(T('shop.short')); return 'short'; }
   POCKET.eur = Math.round((POCKET.eur - price) * 100) / 100;
   POCKET.bought[what] = (POCKET.bought[what] || 0) + 1;
   toast(what + ' · ' + POCKET.eur.toFixed(2) + ' €');
   paintCounter();
+  return 'bought ' + what + ', ' + POCKET.eur.toFixed(2) + ' € left';
+}
+
+/** E at a counter. Answers whether it was a counter, so E can carry on if not. */
+function buyHere() {
+  if (!counterNow()) return false;
+  buyAt(null);
   return true;
 }
 
@@ -9195,6 +9208,8 @@ window.__fr = {
   },
   /** What is on you and what you have bought — see POCKET. */
   pocket: () => ({ eur: +POCKET.eur.toFixed(2), bought: POCKET.bought }),
+  /** Buy by name, which is what the microphone does — see `buyAt`. */
+  buy: (key) => buyAt(key || null),
   ground: {
     arm: () => ground.force(),
     raw: () => ground,

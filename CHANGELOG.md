@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.400.0] — 2026-09-16
+
+### "edin krafne"
+
+**"so i just come up and use voice to say: edin krafne"**. Yes, and it is a
+better way to buy a doughnut than a key is. Stand at a counter, press I, and
+order it out loud in either language:
+
+- *"edin krafne"* / *"jedan krafne"* / just *"krafne"*
+- *"daj mi jednu kavu"*, *"molim jedan espresso"*
+- *"one cappuccino please"*, *"gimme a water"*, *"a pack of cigarettes"*
+
+THE ITEM IS A KEY OFF A TABLE and nothing else leaves the service, exactly as
+`INTENTS` works. The page is told "krafne" and decides the rest for itself:
+whether you are standing at a counter that sells them, and whether you have the
+money. So the microphone can no more spend your euros at the wrong shop than it
+can make her say something. The two tables — `BUY` in server/baye/baye.py and
+`STOCK` in src/43-jadrija.js — are one table in two files and the keys have to
+stay in step.
+
+AN ORDER IS NOT A COMMAND. It does not swallow the sentence: "jedan espresso,
+molim" buys a coffee AND is a thing somebody said out loud, so it still reaches
+her if it was worth saying.
+
+The one thing that needed a second pass is what counts as ordering. "A" was in
+the list of words that mean you want one, and *"I love a cappuccino in the
+morning"* bought a cappuccino — an article is not an order. It is out; "pack
+of" is in, because nobody says it about a pack they are not asking for; and a
+sentence of two words or fewer needs no verb at all, which is what "edin
+krafne" is.
+
+Driven at both counters: "krafne" at the slastičarnica leaves 17.50 €, asking
+there for cigarettes answers "not sold here", the same words at the Tisak leave
+13.00 €, and anywhere else answers "no counter". Twelve orders checked against
+the table in both languages, no mismatches.
+
 ## [1.399.0] — 2026-09-16
 
 ### you can buy things

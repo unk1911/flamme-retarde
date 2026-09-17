@@ -33874,15 +33874,21 @@ async function buildJadrija(scene) {
    * And no brand on any of it. "A pack of cigarettes" is a thing; a name on
    * the pack would be invented branding, which is rule 12.
    */
+  // [key, what it is called on screen, price]. The key is what the voice
+  // service answers with — see `BUY` in server/baye/baye.py — so the two
+  // tables are one table in two files and the keys have to stay in step.
   const STOCK = {
     tisak: { at: 'tisak', name: 'TISAK', items: [
-      ['a pack of cigarettes', 4.50], ['a newspaper', 2.00],
-      ['a bottle of water', 1.50], ['an ice cream out of the freezer', 2.00],
+      ['cigarettes', 'a pack of cigarettes', 4.50],
+      ['newspaper', 'a newspaper', 2.00],
+      ['water', 'a bottle of water', 1.50],
+      ['freezer ice cream', 'an ice cream out of the freezer', 2.00],
     ] },
     slast: { at: 'slast', name: 'slastičarnica', items: [
-      ['sladoled', 2.50], ['kupovi', 8.00], ['frappe', 7.00], ['krafne', 2.50],
-      ['espresso', 2.00], ['macchiato', 2.50], ['cappuccino', 3.00],
-      ['nes caffe', 3.00],
+      ['sladoled', 'sladoled', 2.50], ['kupovi', 'kupovi', 8.00],
+      ['frappe', 'frappe', 7.00], ['krafne', 'krafne', 2.50],
+      ['espresso', 'espresso', 2.00], ['macchiato', 'macchiato', 2.50],
+      ['cappuccino', 'cappuccino', 3.00], ['nes caffe', 'nes caffe', 3.00],
     ] },
   };
   /** How close to the front of a shop you have to be to be served, in metres. */

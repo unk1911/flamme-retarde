@@ -233,6 +233,19 @@ const ears = (() => {
         for (const it of d.intents) act(it, d.lang);
         return;
       }
+      // AN ORDER AT A COUNTER. Misha, 16 Sep 2026: *"so i just come up and use
+      // voice to say: edin krafne"*. The service answers with an item key off
+      // its own table and this decides the rest: whether you are standing at a
+      // hatch that sells it and whether you have the money. Like a skill and
+      // unlike a command, it does not swallow the sentence — "jedan espresso,
+      // molim" is an order AND a thing somebody said out loud.
+      if (d.buy) {
+        const got = typeof buyAt === 'function' ? buyAt(d.buy) : 'no counter';
+        note('shop: ' + (got === 'no counter' ? 'not at a counter'
+          : got === 'not sold here' ? 'they do not sell ' + d.buy + ' here'
+            : got === 'short' ? 'not enough on you' : got),
+        got.startsWith('bought') ? 'did' : 'meta');
+      }
       // AND A THING SHE CAN DO, which is NOT a command and does not return.
       //
       // Misha, 16 Sep 2026: *"if it's a skill or routine she knows how to do,

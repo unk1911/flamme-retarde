@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.9.1"
+VERSION = "1.10.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -459,6 +459,61 @@ ASK_RE = re.compile(
     r"|^\s*(pour|show|make|give|dance|perform|try|go|run|check|head|walk|nip|"
     r"pop|find|look|see|do)(?!\s+(you|u|i|we)\b)\b",
     re.I | re.M)
+
+
+# ── BUYING OUT LOUD ─────────────────────────────────────────────────────────
+#
+# Misha, 16 Sep 2026: *"so i just come up and use voice to say: edin krafne"*.
+# Yes — and it is a better way to buy a doughnut than a key is.
+#
+# The item is a KEY OFF THIS TABLE and nothing else leaves here, exactly as
+# `INTENTS` works: the page is told "krafne" and decides for itself whether you
+# are standing at a counter that sells them and whether you can afford one. So
+# the microphone can no more spend your money at the wrong shop than it can
+# make her say something.
+#
+# The names are the ones on the board, plus what somebody would actually say
+# for them in either language. `kupovi` is what that row is called; a scoop in
+# a tub or a cone is `sladoled`.
+BUY = {
+    "cigarettes": [r"\b(cigarett?es?|cigaret\w*|smokes|fajn\w*|pack of|kutij\w*)\b"],
+    "newspaper": [r"\b(newspaper|paper|novine|novina)\b"],
+    "water": [r"\b(water|voda|vode|vodu)\b"],
+    "freezer ice cream": [r"\b(ice ?lolly|lolly|sladoled iz|eskim\w*)\b"],
+    "sladoled": [r"\b(sladoled\w*|ice ?cream|gelato)\b"],
+    "kupovi": [r"\b(kupovi|kup|cup|tub)\b"],
+    "frappe": [r"\b(frapp?e\w*)\b"],
+    "krafne": [r"\b(krafn\w*|doughnut\w*|donut\w*)\b"],
+    "espresso": [r"\b(espress?o|espres\w*|kava|kavu)\b"],
+    "macchiato": [r"\b(macchiato|makijato|machiato)\b"],
+    "cappuccino": [r"\b(cappucc?ino|kapu[čc]ino|capuccino)\b"],
+    "nes caffe": [r"\b(nes ?caff?e|nescafe|nes)\b"],
+}
+# A WORD THAT MEANS YOU WANT ONE, or a sentence short enough to be an order.
+# Without this, standing at the counter saying "I love a cappuccino in the
+# morning" buys a cappuccino. "Edin krafne" is two words and needs no verb;
+# anything longer has to ask for it.
+# NOT the bare article. "A" was in this list for one run and "I love a
+# cappuccino in the morning" bought a cappuccino; an article is not an order.
+# "Pack of" earns its place because it is one — nobody says it about a pack
+# they are not asking for.
+BUY_RE = re.compile(
+    r"\b(one|two|another|gimme|give me|get me|i'?ll have|i want|i'?d like|"
+    r"buy|take|please|pack of|jedan|jednu|jedno|dva|dvije|daj|dajte|molim|"
+    r"mo[žz]e|kupiti|kupi[mt]?)\b", re.I)
+
+
+def buys_of(text: str):
+    """Which one thing off a counter a sentence orders, or None."""
+    t = (text or "").lower().strip()
+    if not t:
+        return None
+    if not BUY_RE.search(t) and len(t.split()) > 2:
+        return None
+    for name, pats in BUY.items():
+        if all(re.search(p, t) for p in pats):
+            return name
+    return None
 
 
 def skills_of(text: str) -> list:
@@ -3208,6 +3263,10 @@ def _hear(self):
         return self._send(502, {"ok": False, "error": str(e)[:200]})
     found = intents_of(text)
     does = skills_of(text) if not found else []
+    # An order at a counter, which is neither a command nor an errand: the page
+    # buys it if you are standing at the right hatch, and the sentence still
+    # goes on to her if it was also worth saying. See `BUY`.
+    buy = buys_of(text) if not found and not does else None
     lang = "English" if plainly_english(text) else None
     if not found and not does and text.strip() and lang is None:
         # Not English enough for the patterns to have read it: the classifier
@@ -3217,7 +3276,7 @@ def _hear(self):
     print(f"[hear] {user} {ms}ms {len(audio)}B {found} {does} {lang or '?'} "
           f":: {text[:160]}", flush=True)
     out = {"ok": True, "text": text[:300], "intents": found, "ms": ms,
-           "lang": lang, "does": does}
+           "lang": lang, "does": does, "buy": buy}
     # AND A TICKET TO SAY IT TO HER, when it is not a command. Guardrail 2 over
     # `TALK_LIMIT`: the transcript stays here and the page gets an id it can
     # hand to `/talk`, so the words that reach her prompt are the words the
