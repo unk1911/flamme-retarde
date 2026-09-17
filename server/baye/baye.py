@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.12.0"
+VERSION = "1.12.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -424,6 +424,20 @@ SKILLS = {
     # my knees" is a sentence somebody could say and it is not this request.
     "submit": ("get down on her knees in the kabina and stay there",
                [r"\b(kneel\w*|on your knees|onto your knees|to your knees)\b"]),
+    # AND THE WAY BACK UP. Misha, 17 Sep 2026: *"now that she lays down on the
+    # bed. i say, stand up, or get up, she doesn't want to now"*.
+    #
+    # FIRST IN THIS DICT, ahead of the reclines below it, because the two share
+    # their verbs: "get up" and "get down on the bed" both open with `get`, and
+    # `out[:1]` takes the first match. The direction is the word after it.
+    #
+    # "Get off the bed" and "off your knees" are the same request said the
+    # other way round and are matched too. A bare "up" is NOT: "up at the
+    # ice cream place" and "up the steps" are not requests to stand.
+    "rise": ("get up off her knees or off her back and stand up",
+             [r"\b(stand|get|sit)\s*(up|upright)\b|\bon your feet\b"
+              r"|\bget off (the|that) (bed|cot|floor)\b|\boff your knees\b"
+              r"|\bstand\b(?!\s*(there|still|by))"]),
     # AND THE FAR END OF THE SAME STAIRCASE. Misha, 17 Sep 2026: *"if i say
     # 'lie down on your back' or something equivalent, she says 'yeah', but
     # doesn't actually do it"*, and *"sometimes she should 'lie down on the
@@ -483,6 +497,7 @@ ASK_RE = re.compile(
     r"\b(can|could|would|will|wanna|want to)\s+(you|u)\b"
     r"|\b(please|pls|plz)\b"
     r"|\b(lie|lay|kneel)\s+(down|back|on)\b"
+    r"|\b(stand|get)\s+(up|upright)\b|\bon your feet\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"

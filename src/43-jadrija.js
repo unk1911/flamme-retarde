@@ -33117,6 +33117,10 @@ async function buildJadrija(scene) {
   function lieDown(pt, ps, d, go) {
     const bed = show.lieWant === 'bed';
     show.lieWant = null;
+    // Whichever was asked for last is what she does. Both latches are read in
+    // `kept`, so leaving a stale one set is a woman who lies down and stands
+    // straight back up.
+    show.getUp = 0;
     show.recl = 0;
     const spot = bed ? cotSpot() : null;
     show.onBed = spot ? 1 : 0;
@@ -33985,6 +33989,20 @@ async function buildJadrija(scene) {
      * cannot hear it.
      */
     recline: 1, 'recline.bed': 1, 'recline.floor': 1,
+    /**
+     * AND THE WAY BACK UP, which the long holds made necessary.
+     *
+     * Misha, 17 Sep 2026: *"now that she lays down on the bed. i say, stand
+     * up, or get up, she doesn't want to now"*.
+     *
+     * Straight out of the change before it: the hose's eleven seconds became
+     * ninety-five when she was asked, and seven minutes on the cot, and the
+     * only thing that could end any of it was the clock. A pose you can ask
+     * for and cannot ask out of is not a pose, it is a trap — and `rise` and
+     * `situp` are both already there, authored, because the water's own route
+     * out has always used them.
+     */
+    rise: 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
@@ -34069,6 +34087,12 @@ async function buildJadrija(scene) {
         return 'already';
       }
       if (name === 'recline.bed' && (!kit || !kit.cot)) return 'nobed';
+      return null;
+    }
+    if (name === 'rise') {
+      // Only from a pose. Asked of a woman who is standing up it is not a
+      // refusal and not a thing to do either — she is already on her feet.
+      if (!KNEES[show.phase] && !LYING[show.phase]) return 'standing';
       return null;
     }
     if (name.startsWith('fetch.cream')) {
@@ -35005,6 +35029,20 @@ async function buildJadrija(scene) {
         if (LYING[show.phase]) go('situp', 'situp', 0.30);
         else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
         else go('submit', 'submit', 0.30);
+      } else if (name === 'rise') {
+        // The way out of every pose in the room, and it takes the same two
+        // routes the water does: off her knees is `rise`, off her back is
+        // `situp` and then `rise` — `getup` begins on all fours and crossfading
+        // to that from her back is a body passing through itself, which is the
+        // note over `situp`. `getUp` is the latch that carries the request
+        // across the kneel in the middle.
+        show.lieWant = null;
+        show.byAsk = 0;
+        show.getUp = 1;
+        show.queue.length = 0;
+        showSay('trill', d);
+        if (LYING[show.phase]) go('situp', 'situp', 0.30);
+        else go('rise', 'getup', 0.35);
       } else if (name === 'ballet') {
         const bar = barreAt(show.t, show.s);
         if (bar) {
@@ -35212,6 +35250,10 @@ async function buildJadrija(scene) {
 
       case 'kept':
         show.want = Math.atan2(ps - show.s, pt - show.t);
+        // ASKED TO GET UP, and the kneel is the landing between her back and
+        // her feet — `situp` ends here, so a request made while she was lying
+        // down is finished here and not forgotten.
+        if (show.getUp) { show.getUp = 0; go('rise', 'getup', 0.35); break; }
         // ASKED TO GO FURTHER, and the kneel is the way there rather than the
         // destination. `lieWant` is set by the ask and read here on the first
         // frame the kneel has actually arrived, which is why asking from

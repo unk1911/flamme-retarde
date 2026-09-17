@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.405.1] — 2026-09-17 (baye 1.12.1)
+
+### and a way back out of it
+
+**"now that she lays down on the bed. i say, stand up, or get up, she doesn't
+want to now"**. Straight out of the release before it: the hose's eleven
+seconds became ninety-five when she was asked, and seven minutes on the cot,
+and the only thing that could end any of it was the clock. A pose you can ask
+for and cannot ask out of is not a pose, it is a trap.
+
+`rise` is askable. Nothing new was animated for it — the water's own route out
+has always been `rise` off her knees and `situp` then `rise` off her back, and
+the request rides across the kneel in the middle on a latch, because `getup`
+begins on all fours and crossfading to that from her back is a body passing
+through itself. Off the cot it takes the mattress with it: the lift eases back
+to nothing on the way up, or she kneels in mid-air over a bed.
+
+Asked of a woman already standing it answers "she is already on her feet",
+which is neither a refusal nor a thing to do.
+
+Server (baye 1.12.1): "stand up", "get up", "on your feet", "get off the bed",
+"off your knees". Ahead of the reclines in the table, because the two share
+their verbs — "get up" and "get down on the bed" both open with *get*, and the
+direction is the word after it. A bare "up" is not a request to stand: "up at
+the ice cream place" is a place. "Stand still" is not one either.
+
 ## [1.405.0] — 2026-09-17 (baye 1.12.0)
 
 ### she brings back the ice cream, and you eat it

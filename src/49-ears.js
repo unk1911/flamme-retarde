@@ -314,6 +314,8 @@ const ears = (() => {
     recline: 'down on her back',
     'recline.bed': 'onto the cot',
     'recline.floor': 'down on her back on the floor',
+    // And the way out of all of them, which the long holds made necessary.
+    rise: 'back up on her feet',
     // The errand that comes back holding something. The panel says where she
     // has gone, the same as the recons; the flavour rides on the name, so the
     // label is looked up on the base — see `DOES_BASE`.
@@ -348,6 +350,7 @@ const ears = (() => {
     outside: 'not out here on the deck — in the kabina',
     already: 'she is already down there',
     nobed: 'there is no bed in here',
+    standing: 'she is already on her feet',
     carrying: 'she is already carrying one',
     onit: 'she has already gone for one',
     noflavour: 'that one is not in the case',
