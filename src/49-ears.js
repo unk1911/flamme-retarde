@@ -455,9 +455,6 @@ const ears = (() => {
     'hair.down': 'taking her hair out of the tail',
     'hair.up': 'putting her hair back up',
     give: 'coming to take it from you',
-    flat: 'flat on her front',
-    'flat.edge': 'flat on the edge of the cot, legs over the side',
-    coke: 'cutting lines on the plate',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she

@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.420.0] — 2026-09-18 (baye 1.22.0)
+
+### she takes her own hair down
+
+**"undo ponytail"**, and **"persists"**. The visual half shipped behind a
+handle; this is the gesture and the words.
+
+Both arms through the two-bone solver to the back of her head, then the swap,
+then the arms down. Measured, because a render cannot tell you this: her hands
+finish **0.168 m and 0.161 m** from the head bone, against a geometric target of
+0.138 and a skull whose scalp is 0.155 above that bone — palms on the back of
+her head, left and right agreeing to 7 mm.
+
+Two defects found by measuring rather than looking, both in the merged work:
+
+**The rest chain was sampled mid-crossfade.** Asked while she was walking, the
+first frame of the phase is still the walk, so the solve worked from a shoulder
+that then swung out from under it: 0.098 m on the left against 0.292 on the
+right, one hand at her ear and the other nowhere near it. There is a settle now
+that holds the arms untouched until the fade lands, and the cache is its own
+rather than the shared one.
+
+**`NOW` defeated the get-up.** With the hair asks in the interrupt set, a woman
+on the cot went `cradle → situp → tieHair` on three consecutive frames — `situp`
+is in neither `ASKABLE` nor `LYING`, so the licence re-dispatched immediately
+and a standing idle crossfaded in under a woman still lying down. Off `NOW` it
+is `cradle → situp → rise → tieHair → dwell`, which is a woman getting up
+first.
+
+**Also fixed, and it was mine:** `DOES` in 49-ears.js had `flat`, `flat.edge`
+and `coke` twice each. I had grepped for `flat:`, found two hits, and added my
+labels after both — but both hits were in the SAME table, so the later copies
+silently won and three commands were announcing themselves in the wrong
+register. One table, no duplicates.
+
 ## [1.419.3] — 2026-09-18
 
 ### one straw

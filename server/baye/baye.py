@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.21.0"
+VERSION = "1.22.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
