@@ -8244,6 +8244,7 @@ window.__fr = {
     props: () => (jadrija && jadrija.props ? jadrija.props() : null),
     hair: (on) => (jadrija && jadrija.hair ? jadrija.hair(on) : null),
     coke: (u) => (jadrija && jadrija.coke ? jadrija.coke(u) : null),
+    pose: (n, at, settle) => (jadrija && jadrija.pose ? jadrija.pose(n, at, settle) : null),
     plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
     /** Blade, hand, and the gap between them — see `cokeReach`. */
     cokeHand: () => (jadrija && jadrija.cokeHand ? jadrija.cokeHand() : null),
