@@ -79,6 +79,12 @@ const ears = (() => {
   let floor = 0.006;
   let level = 0;
   let inflight = 0;
+  /**
+   * Which sentence is the current one. Bumped on every send, so an answer
+   * that lands after you have said something else is dropped rather than
+   * spoken over the new one — see the note in `send`.
+   */
+  let gen = 0;
   let sent = 0;
   /** She is answering: set from the moment a sentence goes to `/talk` until she
    *  stops speaking, so the header can say so rather than "thinking". */
@@ -97,6 +103,25 @@ const ears = (() => {
   let panelEl = null;
   /** The line you type into — see the note where it is built. */
   let sayEl = null;
+  /**
+   * The panel is open for TYPING, with no microphone.
+   *
+   * Misha, 17 Sep 2026: *"when u press 'I', disable the voice recorder. maybe
+   * enable later, but i just wanna type stuff so no extra shit comes in.
+   * problem is too much noise"*.
+   *
+   * He is describing the microphone's real failure mode rather than a bug in
+   * it: an open mic in a room transcribes the room. A television, a sentence
+   * said to somebody else, a cough — each one arrives here as words, gets
+   * matched against her skills, and comes back as her answering something
+   * nobody asked. Every unprompted thing she said in the kabina came in
+   * through the device.
+   *
+   * So `I` opens the line and nothing else. The microphone is still all here
+   * and is one call away — `__fr.ears.mic()`, and see `start` — but it is off
+   * until somebody asks for it.
+   */
+  let typedOn = false;
   function panel() {
     if (panelEl) return panelEl;
     panelEl = document.createElement('div');
@@ -152,16 +177,20 @@ const ears = (() => {
    *  transcript is whatever somebody said. */
   function draw() {
     const el = panel();
-    el.hidden = !on && !lines.length;
+    el.hidden = !on && !typedOn && !lines.length;
     el.querySelector('.ears-head').textContent = on
       ? (rec ? 'EARS · hearing you' : talking ? 'EARS · she is answering'
         : inflight ? 'EARS · thinking' : 'EARS · listening')
         + (sent ? ' · ' + sent + ' sent' : '')
-      : 'EARS · off (I)';
+      : typedOn
+        ? (talking ? 'EARS · she is answering'
+          : inflight ? 'EARS · thinking' : 'EARS · type it (ENTER)')
+          + (sent ? ' · ' + sent + ' sent' : '')
+        : 'EARS · off (I)';
     // The line to type into, up whenever the ears are. It is not gated on the
     // microphone working: typing is the way in when the microphone is not, and
     // a box that vanishes with the device is a box you cannot reach.
-    if (sayEl) sayEl.hidden = !on;
+    if (sayEl) sayEl.hidden = !on && !typedOn;
     const list = el.querySelector('.ears-lines');
     list.textContent = '';
     for (const l of lines) {
@@ -253,11 +282,34 @@ const ears = (() => {
     // One at a time. A second sentence while the first is still being heard is
     // a sentence the player can say again; two in flight is two answers out of
     // order.
+    // ── THE LATEST THING YOU SAID WINS ──────────────────────────────────
+    //
+    // Misha, 17 Sep 2026: *"the (she is still answering, say it again
+    // later...) NO! bitch, if i say something, and she doing, my shit should
+    // interrupt whatever crazy ass shit she be doing and she quickly switches
+    // over to the last thing i told her to do. i'm the player here"*.
+    //
+    // He is right, and the old refusal had a real reason that has since gone
+    // away: with an open microphone, a sentence sent while she was still
+    // talking was USUALLY her own voice coming back through the mic, and
+    // answering it is a loop that spends money until the hour runs out. The
+    // microphone is off by default now — see `typedOn` — so a second sentence
+    // is a person typing a second sentence, and the only sensible thing to do
+    // with it is the new one.
+    //
+    // Interrupting is three things: hush the audio so she stops mid-word,
+    // bump the generation so the answer already in the air is dropped when it
+    // lands, and let the fetch itself go — an abort is tidier but the token is
+    // what makes it CORRECT, because a reply can already be decoding.
     if (inflight) {
-      note(talking ? '(she is still answering — say it again after)'
-        : '(still thinking about the last one)', 'meta');
-      return;
+      gen += 1;
+      if (audio && audio.hush) audio.hush();
+      inflight = 0;
+      talking = false;
+      note('(cutting her off)', 'meta');
     }
+    const mine = ++gen;
+    const stale = () => mine !== gen;
     inflight += 1;
     sent += 1;
     draw();
@@ -268,6 +320,7 @@ const ears = (() => {
         body: typed ? JSON.stringify({ text: blob }) : blob,
       });
       const d = await r.json().catch(() => null);
+      if (stale()) return;
       if (!d || !d.ok) { note('× ' + ((d && d.error) || 'http ' + r.status), 'err'); return; }
       const said = d.text || '';
       // The language it was heard in, when it is not English — the service
@@ -341,13 +394,19 @@ const ears = (() => {
       talking = true;
       draw();
       const res = await voice.converse({ id: d.heard, text: said, addr: d.addr || {} },
-        (r) => { talked += 1; note(r.line, r.kind); });
+        (r) => { if (!stale()) { talked += 1; note(r.line, r.kind); } });
+      if (stale()) return;
       if (!res.told) note(res.line, res.kind);
     } catch (e) {
       note('× ' + e.message, 'err');
     } finally {
-      inflight -= 1;
-      talking = false;
+      // Only if nothing newer has started: a stale send clearing these would
+      // switch the panel back to idle while the sentence you actually care
+      // about is still in the air.
+      if (!stale()) {
+        inflight = Math.max(0, inflight - 1);
+        talking = false;
+      }
       draw();
     }
   }
@@ -365,6 +424,7 @@ const ears = (() => {
     'recline.floor': 'down on her back on the floor',
     // And the way out of all of them, which the long holds made necessary.
     rise: 'back up on her feet',
+    fours: 'down on all fours',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she
@@ -402,6 +462,7 @@ const ears = (() => {
     already: 'she is already down there',
     nobed: 'there is no bed in here',
     standing: 'she is already on her feet',
+    lying: 'she is on her back — get her up first',
     carrying: 'she is already carrying one',
     onit: 'she has already gone for one',
     noflavour: 'that one is not in the case',
@@ -492,20 +553,37 @@ const ears = (() => {
   }
 
   return {
-    toggle: () => (on ? (stop(), false) : start()),
+    /**
+     * `I` — the typing line on and off, and the microphone left alone.
+     *
+     * It also closes the microphone if one is open, because one key that
+     * means "stop listening to me" is worth more than a tidy separation.
+     */
+    toggle: () => {
+      if (on) stop();
+      typedOn = !typedOn;
+      if (typedOn && !AUTH.user) toast(T('ears.signin'));
+      draw();
+      if (typedOn) setTimeout(() => { if (sayEl) sayEl.focus(); }, 0);
+      return typedOn;
+    },
+    /** And the device, for whoever wants it back. Off by default — see `typedOn`. */
+    mic: () => (on ? (stop(), false) : start()),
     /**
      * Whether the caret is in the typing line — the question the game's own
      * keydown handler has to ask before it reads a key as a control. A W typed
      * into this box is a letter and not the throttle.
      */
     typing: () => !!sayEl && !sayEl.hidden && document.activeElement === sayEl,
+    /** Whether the line is open at all, mic or no mic. */
+    open: () => !!typedOn || !!on,
     /**
      * Put the caret in it, which needs the pointer let go of: this is a
      * pointer-locked game and a locked pointer cannot click an input. Answers
      * false when the ears are off, because there is nothing to type into.
      */
     focusTyping: () => {
-      if (!on || !sayEl || sayEl.hidden) return false;
+      if ((!on && !typedOn) || !sayEl || sayEl.hidden) return false;
       document.exitPointerLock?.();
       sayEl.focus();
       return true;

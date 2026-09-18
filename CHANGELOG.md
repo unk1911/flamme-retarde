@@ -8,6 +8,80 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.409.0] — 2026-09-17 (baye 1.15.0)
+
+### the microphone is off, and you type
+
+**"when u press 'I', disable the voice recorder. maybe enable later, but i
+just wanna type stuff so no extra shit comes in. problem is too much noise,
+too much broken shit"**.
+
+He is describing the device's real failure mode rather than a bug in it: an
+open microphone in a room transcribes the room. A television, a sentence said
+to somebody else, a cough — each arrives as words, gets matched against her
+skills, and comes back as her answering something nobody asked. Every
+unprompted thing she said was coming in through it.
+
+`I` opens the typing line and nothing else now. The microphone is all still
+here and one call away (`__fr.ears.mic()`), and `I` closes it if it is open,
+because one key meaning "stop listening to me" is worth more than a tidy
+separation.
+
+### and the newest thing you say wins
+
+**"NO! bitch, if i say something, and she doing, my shit should interrupt
+whatever crazy ass shit she be doing and she quickly switches over to the last
+thing i told her to do. i'm the player here"**.
+
+The old refusal — *she is still answering, say it again after* — had a real
+reason that has just gone away with the microphone: a sentence sent while she
+was talking was usually her own voice coming back through the mic, and
+answering that is a loop that spends money until the hour runs out. Typed,
+a second sentence is a person typing a second sentence.
+
+So it interrupts: her audio is hushed mid-word, and a generation counter drops
+the answer already in the air when it lands rather than letting it talk over
+the new one.
+
+### "kiss me" now means kiss me
+
+**"right now when i say 'kiss me', she does her routine, goes out the kabine,
+comes in pours wine... wtf? if i say 'kiss me', then bitch kiss me"**.
+
+Two separate faults, both mine. The kabina has a rule that walks her in to
+pour you a drink whenever you are in it and she is not already doing something
+the room does not own — and `toYou`, `kiss` and `hug` were not on that list,
+so the kiss armed and the hut overrode it on the very next frame. That is
+exactly the wine he saw.
+
+And `ASKABLE` made her finish what she was doing first, which is right for a
+cartwheel and wrong for this: a kiss, a hug, "get up" and "all fours" are
+requests about the next moment, not performances to queue. They interrupt now,
+except in the three states where interrupting is a bug — in the air, on fire,
+or turned.
+
+### down on all fours
+
+**"if i tell her bitch get on all fours, she should look like that doggie"**.
+
+Another pose that was already in the bank: `kneel` runs IDLE_A → LUNGE →
+KNEEL → FOURS, so the way down ends exactly there, and `getup` begins on all
+fours, which is why the note over `situp` warns against crossfading into it
+from her back. An authored entrance and an authored exit; it needed a name.
+
+Held like the other asked poses, and it steps clear of the furniture on the
+way down as well as on the way up — photographed first with a stool through
+her shoulder, because she goes down where she was standing and where she was
+standing was the pour mark.
+
+Server (baye 1.15.0): all fours, on all four, hands and knees, doggy.
+
+### known, and tabled
+
+The hug in the third-person view (**B**) is still wrong, and it is structural:
+only one of the two bodies can be posed, because the other one is the player.
+A scene with both of them posed is the cinematic's job.
+
 ## [1.408.2] — 2026-09-17
 
 ### the hug keeps the chests apart

@@ -34213,7 +34213,7 @@ async function buildJadrija(scene) {
     // kneel, "lie down" is the next step; asked from the floor, "on the bed"
     // is a move; asked from either, the dances and the errands are her getting
     // up and going, which is what a person does when you change your mind.
-    kept: 1, cradle: 1 };
+    kept: 1, cradle: 1, fours: 1 };
 
   /**
    * WHAT SHE CAN BE ASKED FOR. Every one of these is a number she already has
@@ -34279,6 +34279,17 @@ async function buildJadrija(scene) {
      * of it.
      */
     kiss: 1, hug: 1,
+    /**
+     * AND DOWN ON ALL FOURS, which is another pose that was already in the
+     * bank and unaskable.
+     *
+     * `kneel` in tools/blender/human_mh.py runs IDLE_A → LUNGE → KNEEL →
+     * FOURS, so the way down exists and ends exactly there, and `getup`
+     * begins on all fours — which is why the note over `situp` warns against
+     * crossfading to it from her back. So this pose has an authored entrance
+     * AND an authored exit and needed neither: it needed a name.
+     */
+    fours: 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
@@ -34365,10 +34376,23 @@ async function buildJadrija(scene) {
       if (name === 'recline.bed' && (!kit || !kit.cot)) return 'nobed';
       return null;
     }
+    if (name === 'fours') {
+      // Already down there. Asking again from the pose is not the request.
+      if (show.phase === 'fours') return 'already';
+      // And not off her back: `getup` is the way up from all fours and the
+      // way down is `kneel` from standing, so the honest order from a recline
+      // is to sit up first — which is what `rise` is for.
+      if (LYING[show.phase]) return 'lying';
+      return null;
+    }
     if (name === 'rise') {
       // Only from a pose. Asked of a woman who is standing up it is not a
       // refusal and not a thing to do either — she is already on her feet.
-      if (!KNEES[show.phase] && !LYING[show.phase]) return 'standing';
+      // `fours` counts: it is a pose on the floor with `getup` as its exit,
+      // and a get-up that refuses it leaves her down there for the whole
+      // ninety-five seconds with no way out but the clock.
+      if (!KNEES[show.phase] && !LYING[show.phase]
+        && show.phase !== 'fours') return 'standing';
       return null;
     }
     if (name.startsWith('fetch.cream')) {
@@ -34599,7 +34623,15 @@ async function buildJadrija(scene) {
    * page that never finishes loading rather than a wrong answer.
    */
   const OWN = { flare: 1, submit: 1, kept: 1, rise: 1, creep: 1,
-    recline: 1, cradle: 1, situp: 1 };
+    recline: 1, cradle: 1, situp: 1,
+    // AND THE TWO THAT ARE WITH YOU, which is the bug Misha hit head on:
+    // *"right now when i say 'kiss me', she does her routine, goes out the
+    // kabine, comes in pours wine... wtf?"*. Exactly that — the room rule
+    // above walks her in to pour you a drink whenever you are in the kabina
+    // and she is not already doing something the room does not own, and it
+    // fires on the frame AFTER the kiss is armed. So the kiss was starting and
+    // being overridden by the hut, every time, and what you saw was the wine.
+    toYou: 1, kiss: 1, hug: 1, fours: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -35236,7 +35268,25 @@ async function buildJadrija(scene) {
     // enter it from, and a request made while she is held, burning or already
     // pouring WAITS rather than being thrown away. That is what a person does
     // when you ask them for something mid-sentence.
-    if (show.ask && ASKABLE[show.phase]) {
+    // ── AND THREE THAT DO NOT WAIT THEIR TURN ────────────────────────────
+    //
+    // Misha, 17 Sep 2026: *"if i say 'kiss me', then bitch kiss me"*.
+    //
+    // `ASKABLE` is the list of phases a request may be *entered from*, and it
+    // is right for a dance: asked mid-cartwheel she finishes the cartwheel,
+    // because a number cut off half way is a glitch and the wait is a second
+    // and a half. It is wrong for these three. "Kiss me" and "get up" are not
+    // requests for a performance, they are requests about the next moment, and
+    // a woman who pours out the rest of a glass of wine first is not answering
+    // them.
+    //
+    // The three exceptions to the exception are the states where interrupting
+    // is a bug rather than a choice: in the air (the hop integrator owns her
+    // vertical), on fire, and turned — the last one being the promenade's
+    // answer to the hose, which owns her whole body until it lets go.
+    const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1 };
+    const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
+    if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
       show.ask = null;
       show.did = name;
@@ -35335,6 +35385,15 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toYou', 'walk', 0.34);
         }
+      } else if (name === 'fours') {
+        show.queue.length = 0;
+        show.side = 0;
+        show.byAsk = 1;
+        showSay('squee', d);
+        // The clip holds its last frame, which IS the pose — a one-shot with
+        // no `next` stays where it ended (see `play` in 41-skin.js). So there
+        // is nothing to freeze and nothing to loop.
+        go('fours', 'kneel', 0.32);
       } else if (name === 'rise') {
         // The way out of every pose in the room, and it takes the same two
         // routes the water does: off her knees is `rise`, off her back is
@@ -36134,6 +36193,28 @@ async function buildJadrija(scene) {
         }
         break;
       }
+
+      // ── ON ALL FOURS ─────────────────────────────────────────────────
+      //
+      // Aimed at you the whole time, like everything else she does from the
+      // floor of that room, and held for as long as an asked pose is held —
+      // see `keptAsked`, and the argument there about a request having no jet
+      // to stop. `rise` is the way out, and `getup` begins exactly here.
+      case 'fours':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        // Out of the furniture, on the way DOWN as well as up: she goes down
+        // where she was standing, and where she was standing was the pour
+        // mark, which is a hand's width from the tabouret. Photographed with
+        // a stool through her shoulder. `untangle` only acts when she is
+        // actually inside something, so this costs nothing when she is not.
+        untangle(dt);
+        if (show.getUp) { show.getUp = 0; go('rise', 'getup', 0.35); break; }
+        if (show.hit > 0) show.tmr = 0;
+        if (show.tmr > (show.byAsk ? SHOW.keptAsked : SHOW.keptFor)) {
+          show.byAsk = 0;
+          go('rise', 'getup', 0.35);
+        }
+        break;
 
       // AND THE CLOSING CONTINUES THROUGH THE HOLD, which is the difference
       // between two people standing near each other and a kiss. `toYou` hands

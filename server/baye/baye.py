@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.14.0"
+VERSION = "1.15.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -444,6 +444,10 @@ SKILLS = {
              [r"\b(kiss\w*|smooch\w*|snog\w*|poljub\w*)\b"]),
     "hug": ("come over and hug you",
             [r"\b(hug\w*|cuddl\w*|embrace\w*|hold me|come here|zagrljaj\w*)\b"]),
+    # ON ALL FOURS, which the `kneel` clip has always ended on.
+    "fours": ("get down on all fours in the kabina and stay there",
+              [r"\ball fours\b|\bon all four\b|\bhands and knees\b"
+               r"|\bdogg?y(?: ?style)?\b|\bdoggie\b"]),
     # AND THE WAY BACK UP. Misha, 17 Sep 2026: *"now that she lays down on the
     # bed. i say, stand up, or get up, she doesn't want to now"*.
     #
@@ -519,6 +523,7 @@ ASK_RE = re.compile(
     r"|\b(lie|lay|kneel)\s+(down|back|on)\b"
     r"|\b(stand|get)\s+(up|upright)\b|\bon your feet\b"
     r"|\b(kiss|hug|cuddle|hold)\s+me\b|\bcome here\b"
+    r"|\ball fours\b|\bhands and knees\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"

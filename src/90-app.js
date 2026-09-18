@@ -304,7 +304,8 @@ addEventListener('keydown', (e) => {
   // microphone happens to be on would be a worse bug than the one this fixes.
   // Only while the ears are up; otherwise Enter belongs to whatever wants it.
   if ((e.code === 'Enter' || e.code === 'NumpadEnter') && $('signin').hidden
-      && ears && ears.on && ears.focusTyping && ears.focusTyping()) {
+      && ears && ears.open && ears.open() && ears.focusTyping
+      && ears.focusTyping()) {
     e.preventDefault();
     return;
   }
@@ -9005,6 +9006,9 @@ window.__fr = {
      * which is how a probe drives the typed path.
      */
     typing: () => (ears.typing ? ears.typing() : null),
+    /** The microphone, which `I` no longer opens — see `typedOn` in 49-ears.js. */
+    mic: () => (ears.mic ? ears.mic() : null),
+    open: () => (ears.open ? ears.open() : null),
     focus: () => (ears.focusTyping ? ears.focusTyping() : null),
     say: (text) => (ears.say ? ears.say(text) : null),
     /**
