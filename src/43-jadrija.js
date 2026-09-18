@@ -29836,11 +29836,11 @@ async function buildJadrija(scene) {
         // How far through the haircut she is. One uniform for all three parts
         // of it — see `CROP` — and it is only ever driven by `show.shorn`,
         // which is only ever driven by the latch.
-        uniforms: { uShorn: { value: 0 },
+        uniforms: { uShorn: { value: 0 }, uTailOff: { value: 0 },
           // Which wrap she has on. See `SCARVES` and `showScarf`.
           uScarfA: { value: new THREE.Vector3(...SCARVES[0][0]) },
           uScarfB: { value: new THREE.Vector3(...SCARVES[0][1]) } },
-        decl: 'uniform float uShorn;\n'
+        decl: 'uniform float uShorn;\nuniform float uTailOff;\n'
           + 'uniform vec3 uScarfA;\nuniform vec3 uScarfB;',
         // And the same discard on the shadow, which it did not have. The
         // ponytail comes off in her own fragment and her silhouette on the
@@ -29848,9 +29848,10 @@ async function buildJadrija(scene) {
         // casting a shadow with a tail in it. Same test, same numbers, over
         // the caster's own copies of uv and the bind position. See `cast` in
         // 41-skin.js for why this is a fragment discard and not a cull.
-        casterDecl: 'uniform float uShorn;',
-        casterDrop: 'vDropUv.x > 0.5 '
-          + '&& vDropLocal.y < mix(1.29, 1.80, uShorn)',
+        casterDecl: 'uniform float uShorn;\nuniform float uTailOff;',
+        casterDrop: '(vDropUv.x > 0.5 '
+          + '&& vDropLocal.y < mix(1.29, 1.80, uShorn)) '
+          + '|| (vDropUv.x > 0.5 && uTailOff > 0.5)',
         // Literal colours, as the landmarks do. The marker palette in
         // 42-crowd.js is for figures the runtime recolours per instance, and
         // there is exactly one of these — so the dye below is written straight
@@ -29869,6 +29870,17 @@ async function buildJadrija(scene) {
           // over the knot's highest at 1.726, so at uShorn 0 this discards
           // nothing at all and by 0.86 it has discarded all of it.
           if (vUv.x > 0.5 && vLocal.y < mix(1.29, 1.80, uShorn)) discard;
+          // AND THE SAME FLAG, TAKEN OFF ON PURPOSE. Misha, 18 Sep 2026:
+          // "undo ponytail makes her take her hair out of the ponytail", and
+          // it persists. The flag flagTail wrote covers the knot and the tail
+          // and nothing else, so the whole of undoing it is not drawing them
+          // — and then hanging loose hair off the head bone, which is a worn
+          // part like the headphones. Its own uniform and not uShorn: that one
+          // is the turn, and it takes the sides down to stubble.
+          //
+          // (NO BACKTICKS IN HERE. This is inside a template literal and a
+          // backtick in a comment ends it. Fourth time.)
+          if (vUv.x > 0.5 && uTailOff > 0.5) discard;
           vec3 vcol = vVCol;
           {
             // Not a window round HAIR_P but a *line* from the skin to it, and
@@ -38332,6 +38344,102 @@ async function buildJadrija(scene) {
   const worn = {};
 
   /**
+   * Her hair, out of the ponytail and down.
+   *
+   * A shell hung off the head bone, like the headphones and for the same
+   * reason: `wearTick` already pins a group to a bone every frame, and a
+   * second skinned mesh to keep in step with the first is a bug waiting to
+   * happen. The tail and its knot stop being drawn at the same moment — see
+   * `uTailOff` in her fragment.
+   *
+   * Rings down the back of the skull, hugging it at the crown and flaring as
+   * it falls, and OPEN AT THE FRONT over a hundred degrees so it is hair and
+   * not a helmet. The frame is the head bone's own: the bone sits at
+   * (0.0169, 1.5907, 0) with the scalp 0.155 above it, +x forward and +z out
+   * to the side, which is the frame `PUTON.ear` is written in.
+   *
+   * Two colours down its length rather than one, because `BAYE_HAIR` already
+   * says the crown is where the sun is on it (0.640, 0.500, 0.290) and the
+   * nape is the roots (0.300, 0.208, 0.112) — a single mid tone throws away
+   * the one thing her head already knows about itself.
+   */
+  function looseHairGroup() {
+    //  y       back-shift   half-depth   half-width
+    const R = [
+      [0.150, -0.004, 0.052, 0.050],
+      [0.116, -0.010, 0.072, 0.068],
+      [0.060, -0.015, 0.084, 0.081],
+      [0.000, -0.019, 0.090, 0.088],
+      [-0.070, -0.023, 0.094, 0.094],
+      [-0.150, -0.027, 0.097, 0.101],
+      [-0.230, -0.031, 0.099, 0.105],
+      [-0.300, -0.035, 0.093, 0.099],
+      [-0.348, -0.040, 0.070, 0.076],
+    ];
+    const SIDES = 22, A0 = Math.PI * 0.28, A1 = Math.PI * 1.72;
+    const pos = [], nrm = [], col = [];
+    const lo = BAYE_HAIR.lo, hi = BAYE_HAIR.hi;
+    const at = (i, j) => {
+      const [y, bx, dx, dz] = R[i];
+      const a = A0 + (A1 - A0) * (j / SIDES);
+      return [bx + Math.cos(a) * dx, y, Math.sin(a) * dz];
+    };
+    const shade = (i) => {
+      const k = i / (R.length - 1);
+      return [hi[0] + (lo[0] - hi[0]) * k, hi[1] + (lo[1] - hi[1]) * k,
+        hi[2] + (lo[2] - hi[2]) * k];
+    };
+    const push = (v, n, c) => {
+      pos.push(v[0], v[1], v[2]); nrm.push(n[0], n[1], n[2]);
+      col.push(c[0], c[1], c[2]);
+    };
+    const nOf = (v) => {
+      const L = Math.hypot(v[0], v[2]) || 1;
+      return [v[0] / L, 0.18, v[2] / L];
+    };
+    for (let i = 0; i < R.length - 1; i++) {
+      const ca = shade(i), cb = shade(i + 1);
+      for (let j = 0; j < SIDES; j++) {
+        const a = at(i, j), b = at(i, j + 1), c = at(i + 1, j + 1), d = at(i + 1, j);
+        push(a, nOf(a), ca); push(b, nOf(b), ca); push(c, nOf(c), cb);
+        push(a, nOf(a), ca); push(c, nOf(c), cb); push(d, nOf(d), cb);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(geo, solidMaterial(0xffffff,
+      { spec: 0.16, specPower: 22, side: THREE.DoubleSide,
+        body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;' })));
+    return g;
+  }
+
+  /**
+   * Down, or back up in a tail. It STAYS: *"persists"*.
+   */
+  function hairDown(on = true) {
+    const want = !!on;
+    if (!!worn.hair === want) return want ? 'already' : 'already';
+    if (want) {
+      worn.hair = [{ group: looseHairGroup(), bone: 'head' }];
+      wearTick();
+    } else {
+      for (const part of worn.hair || []) {
+        if (part.group.parent) part.group.parent.remove(part.group);
+      }
+      delete worn.hair;
+    }
+    if (skinFig && skinFig.mesh && skinFig.mesh.material
+      && skinFig.mesh.material.uniforms
+      && skinFig.mesh.material.uniforms.uTailOff) {
+      skinFig.mesh.material.uniforms.uTailOff.value = want ? 1 : 0;
+    }
+    return want ? 'down' : 'up';
+  }
+
+  /**
    * A pair of over-the-head headphones: two cups, and a band over the crown.
    *
    * Dark like the real ones and with nothing written on them — the NAME came
@@ -43591,6 +43699,8 @@ async function buildJadrija(scene) {
     },
     /** What is buzzing right now. */
     signals: () => Object.keys(signals),
+    /** Hair out of the tail, or back into it. It stays either way. */
+    hair: (on = true) => hairDown(on !== false),
     /**
      * Everything she has been handed and set down, in world metres. Written
      * for a camera: three shots at a guessed stool missed it, and a

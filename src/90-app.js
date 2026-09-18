@@ -8242,6 +8242,7 @@ window.__fr = {
     signal: (key, on = true) => (jadrija && jadrija.signal ? jadrija.signal(key, on) : null),
     signals: () => (jadrija && jadrija.signals ? jadrija.signals() : null),
     props: () => (jadrija && jadrija.props ? jadrija.props() : null),
+    hair: (on) => (jadrija && jadrija.hair ? jadrija.hair(on) : null),
     /** What she saw on the last recon, and what she brought back. */
     seen: () => (jadrija ? jadrija.seen() : null),
     told: () => (jadrija ? jadrija.told() : null),
