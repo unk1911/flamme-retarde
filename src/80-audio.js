@@ -868,17 +868,24 @@ function buildAudio() {
   function kiss() {
     if (!ctx) return;
     const t0 = ctx.currentTime;
+    // LOUDER THAN THE FIRST CUT, which Misha could not hear at all: *"i don't
+    // hear no kiss sound"*. It was pitched off `lick`, which is deliberately
+    // one of the smallest noises in the file and is heard while you are
+    // holding the thing that makes it. This happens at somebody else's mouth
+    // a hand's breadth from your ear, so it lives nearer `swig` — whose
+    // swallow peaks at 0.085 and is comfortable.
+    //
     // Contact: low, soft, short. Two lips are not a slap.
-    burst({ freq: 380, q: 1.0, dur: 0.055, gain: 0.030, sweep: 0.80, at: t0 });
+    burst({ freq: 380, q: 1.0, dur: 0.060, gain: 0.070, sweep: 0.80, at: t0 });
     // The seal parting, which is the sound everybody actually recognises:
-    // high, 14 ms, swept upward.
-    burst({ freq: 2100, q: 4.5, dur: 0.014, gain: 0.042, sweep: 1.45,
+    // high, 16 ms, swept upward.
+    burst({ freq: 2100, q: 4.5, dur: 0.016, gain: 0.105, sweep: 1.45,
       at: t0 + 0.045 });
-    burst({ freq: 3400, q: 6, dur: 0.010, gain: 0.020, sweep: 1.30,
-      at: t0 + 0.052 });
+    burst({ freq: 3400, q: 6, dur: 0.012, gain: 0.055, sweep: 1.30,
+      at: t0 + 0.054 });
     // And the breath after it, wide and quiet, away from the mouth.
-    burst({ freq: 700, q: 0.7, dur: 0.190, gain: 0.016, sweep: 0.55,
-      at: t0 + 0.075 });
+    burst({ freq: 700, q: 0.7, dur: 0.200, gain: 0.038, sweep: 0.55,
+      at: t0 + 0.078 });
   }
 
   function beadShove(amp = 1, d = 0) {

@@ -32628,8 +32628,24 @@ async function buildJadrija(scene) {
      * her mouth about 0.14 m forward of where her feet are — so the feet
      * stand where a body can stand and the mouth still arrives.
      */
-    kissGap: 0.17,
-    hugGap: 0.21,
+    /**
+     * THE BODY STANDS WHERE A BODY FITS, AND THE MOUTH IS THE LEAN.
+     *
+     * Three numbers in one afternoon, and the middle one was the lesson.
+     * 0.30 m put 0.42 m of air between two faces — *"lips are so far away"* —
+     * because the push added her core to your own half-width. Fixing the push
+     * let 0.17 m happen, and 0.17 is INSIDE you: `GROUND.body` is 0.30, so her
+     * centre was a third of a metre inside your own cylinder. *"now u really
+     * walking inaide me. chill"*.
+     *
+     * So: 0.32, a shade outside your half-width, and the reach is the lean.
+     * Her chest tips in and her chin comes up, which carries her mouth about
+     * 0.15 m forward of her feet — so the feet stand where a body can stand
+     * and the mouth still arrives. Both are what a person does: nobody kisses
+     * by standing closer, they kiss by leaning.
+     */
+    kissGap: 0.32,
+    hugGap: 0.34,
     /** Seconds in, held, and out. The long hold is what "French" buys. */
     kissIn: 0.75,
     kissHold: 3.4,
@@ -32638,8 +32654,8 @@ async function buildJadrija(scene) {
     hugHold: 4.6,
     hugOut: 0.75,
     /** The lean: her chest tips toward you and her chin comes up to meet you. */
-    kissLean: 0.28,
-    kissChin: 0.34,
+    kissLean: 0.38,
+    kissChin: 0.40,
     /**
      * And the hug: shoulders round you, elbows CLOSED, cheek past your ear.
      *
@@ -41757,6 +41773,7 @@ async function buildJadrija(scene) {
       carry: show.carry || null, gave: show.gave || null,
       // The two that are with you: which one was asked for, and the clock.
       near: show.near || null, kiss: +(show.kiss || 0).toFixed(2),
+      said: show.kissSaid ? 1 : 0,
       mark: show.markT == null ? null
         : [+show.markT.toFixed(2), +show.markS.toFixed(2), show.hasDir || 0],
       ang: +show.ang.toFixed(2), want: +show.want.toFixed(2),

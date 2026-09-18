@@ -8,6 +8,27 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.408.1] — 2026-09-17
+
+### out of you, and loud enough to hear
+
+**"before kiss wasn't comin near enough. now u really walking inaide me.
+chill... also i don't hear no kiss sound"**.
+
+Three gaps in one afternoon and the middle one taught the rule. 0.30 m left
+0.42 m of air between two faces, because the push added her core to your own
+half-width. Fixing the push let 0.17 happen — and `GROUND.body` is 0.30, so
+0.17 is her centre a third of a metre inside your own cylinder. 0.32 now, a
+shade outside it, with a deeper lean: the body stands where a body fits and the
+mouth is carried by the lean, which is how people kiss anyway. Nobody steps
+closer; they lean.
+
+The sound was firing all along — verified, the call happens and the function
+runs — it was pitched off `lick`, which is deliberately one of the smallest
+noises in the file and is heard while you hold the thing making it. This one
+happens at somebody else's mouth a hand's breadth from your ear, so it now
+sits nearer `swig`, whose swallow is comfortable at 0.085.
+
 ## [1.408.0] — 2026-09-17
 
 ### the kiss lands, and you hear it
