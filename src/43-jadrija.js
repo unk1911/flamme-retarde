@@ -38497,22 +38497,31 @@ async function buildJadrija(scene) {
     // Open-ended cylinders and double-sided, because the bore is the one thing
     // that says straw rather than dowel at this size.
     //
-    // ON THE WOOD, AND COLOURED. The first go laid them in the well parallel
-    // to the lines in the powder's own near-white, and they read as two more
-    // lines — which is the failure the whole plate is about not having. Out on
-    // the wood beside the wrap, across the lines' direction, in plastic
-    // colours nothing else in this room is wearing.
+    // IN THE WELL, DIAGONAL TO THE LINES. Misha, 18 Sep 2026: *"put straws on
+    // the plate, perpendicular or diagonal to the lines"*.
+    //
+    // Twice wrong before this. The first go laid them in the well PARALLEL to
+    // the lines in the powder's own near-white, and they read as two more
+    // lines; the second put them out on the wood, which fixed the reading and
+    // was not what was asked for. Diagonal is what does both: 40 degrees off
+    // the lines and in plastic colours nothing else in this room is wearing,
+    // so nothing about them says powder.
+    //
+    // CUT SHORT, 42 mm, because the well is 100 mm across and already holds
+    // four lines, a heap and a blade. At that length, 40 degrees, and the two
+    // centres below, every end sits inside r = 0.048 — the flat floor stops at
+    // 0.050 — and the near end of the lower one clears the heap by 4 mm.
     const tube = (c) => solidMaterial(new THREE.Color(c[0], c[1], c[2]),
       { spec: 0.52, specPower: 60, vcol: false, emissive: 0.22,
         side: THREE.DoubleSide, body: 'n = gl_FrontFacing ? n : -n;' });
     const straws = [];
     for (const [cx, cz, col] of [
-      [-0.132, -0.014, [0.720, 0.255, 0.230]],
-      [-0.132, 0.008, [0.280, 0.390, 0.640]]]) {
+      [0.006, -0.028, [0.720, 0.255, 0.230]],
+      [-0.010, -0.036, [0.280, 0.390, 0.640]]]) {
       const m = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.0034, 0.0034, 0.058, 10, 1, true), tube(col));
-      m.rotation.set(0, Math.PI / 2, Math.PI / 2);
-      m.position.set(cx, -0.0052, cz);
+        new THREE.CylinderGeometry(0.0034, 0.0034, 0.042, 10, 1, true), tube(col));
+      m.rotation.set(0, 0.70, Math.PI / 2);
+      m.position.set(cx, 0.0034, cz);
       g.add(m);
       straws.push(m);
     }

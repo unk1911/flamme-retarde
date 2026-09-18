@@ -8,6 +8,23 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.419.2] — 2026-09-18
+
+### the straws, on the plate
+
+**"put straws on the plate, perpendicular or diagonal to the lines"**.
+
+Twice wrong before this, and the two failures are opposite. The first go laid
+them in the well PARALLEL to the lines in the powder's own near-white, and they
+read as two more lines. The second put them out on the wood, which fixed the
+reading and was not what was asked for. Diagonal does both: 40 degrees off the
+lines, in the well, in plastic colours nothing else in this room is wearing.
+
+Cut to 42 mm, because the well is 100 mm across and already holds four lines, a
+heap and a blade. At that length and that angle every end sits inside r =
+0.048, against a flat floor that stops at 0.050, and the near end of the lower
+one clears the heap by 4 mm.
+
 ## [1.419.1] — 2026-09-18
 
 ### two straws
