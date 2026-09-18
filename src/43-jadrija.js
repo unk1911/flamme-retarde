@@ -27512,6 +27512,10 @@ async function buildJadrija(scene) {
       // out from a half-width at the call site, because the cot has moved
       // once already when the hut went to two bays.
       cotEdge: [c0 + 0.07, cms],
+      // The ornamental plate: the middle of its well, and the height of the
+      // flat floor inside it. The well is flat out to r = 0.050 and then
+      // rises, so anything laid in it stays inside that.
+      plate: [plT, plS, plY + 0.0095],
       cotFoot: [cm - 0.62, cms - 0.10],
       // Where the neck of the bottle has to end up. Not the rim: a lip resting
       // on the rim is a bottle being emptied by somebody who has never poured
@@ -34700,6 +34704,13 @@ async function buildJadrija(scene) {
      * her hip on the edge so that there is nothing under them.
      */
     'flat.edge': 1,
+    /**
+     * And what goes on the ornamental plate. Misha, 18 Sep 2026: *"coke
+     * command to have her pour white powder onto the ornamental plate and
+     * make neat straight lines with a razor blade"*. See COKE: four objects
+     * and one clock, all of it placed off `kit.plate`.
+     */
+    coke: 1,
     /** And over on to one side or the other, which are two baked clips. */
     'side.left': 1, 'side.right': 1,
     /** And her arms out, which is a latch on the pose like her legs. */
@@ -34824,6 +34835,11 @@ async function buildJadrija(scene) {
       if (!LYING[show.phase]) return 'notlying';
       const want = name === 'arms.wide' ? 1 : 0;
       if ((show.armsWide || 0) === want) return want ? 'armsalready' : 'armsdown';
+      return null;
+    }
+    if (name === 'coke') {
+      if (!kit || !kit.plate) return 'nokit';
+      if (show.phase === 'coke') return 'onit';
       return null;
     }
     if (name === 'flat.edge') {
@@ -35095,7 +35111,7 @@ async function buildJadrija(scene) {
     // fires on the frame AFTER the kiss is armed. So the kiss was starting and
     // being overridden by the hut, every time, and what you saw was the wine.
     toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1,
-    flatEdge: 1, edgeHeld: 1,
+    flatEdge: 1, edgeHeld: 1, coke: 1,
     sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
@@ -35750,7 +35766,7 @@ async function buildJadrija(scene) {
     // vertical), on fire, and turned — the last one being the promenade's
     // answer to the hose, which owns her whole body until it lets go.
     const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1,
-      'flat.edge': 1,
+      'flat.edge': 1, coke: 1,
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
       give: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
@@ -35889,6 +35905,20 @@ async function buildJadrija(scene) {
         show.armsWide = name === 'arms.wide' ? 1 : 0;
         show.did = name;
         showSay('squee', d);
+      } else if (name === 'coke') {
+        // Same road as the wine: she has to be on the mark at the tabouret,
+        // and that mark is the one the whole room is solved around.
+        show.byAsk = 1;
+        show.queue.length = 0;
+        show.side = 0;
+        showSay('trill', d);
+        cokeSet(0);
+        if (LYING[show.phase] || KNEES[show.phase] || show.phase === 'fours') {
+          show.getUp = 1;
+          show.ask = name;
+          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          else go('rise', 'getup', 0.35);
+        } else go('coke', 'idle', 0.40);
       } else if (name === 'flat.edge') {
         // The same road as `flat` with two things set: she has to end up on
         // the bed whatever she was on, and she has to be laid down ACROSS it.
@@ -36108,6 +36138,20 @@ async function buildJadrija(scene) {
       // is a ramp rather than a switch: the hand and the tabouret are 40 cm
       // apart at the moment of the grasp and a bottle that teleports between
       // them is a bottle nobody believes was ever picked up.
+      case 'coke': {
+        // On to the mark first, at the rate the pour uses, and then the plate
+        // does the rest — `cokeSet` is one 0-to-1 scrub so that a phase and a
+        // probe drive it through the same call.
+        show.want = kit && kit.wine ? kit.wine[2] : show.want;
+        showHold(dt);
+        if (show.tmr < 0.62 && kit && kit.wine) showSettle(kit.wine, dt, 10.0);
+        const DUR = COKE.pour + COKE.lines * COKE.cut;
+        const u = Math.max(0, show.tmr - 0.70) / DUR;
+        cokeSet(u);
+        if (u >= 1) go('dwell', 'idle', 0.42);
+        break;
+      }
+
       case 'wine': {
         show.want = kit.wine[2];
         showHold(dt);
@@ -38363,6 +38407,143 @@ async function buildJadrija(scene) {
    * nape is the roots (0.300, 0.208, 0.112) — a single mid tone throws away
    * the one thing her head already knows about itself.
    */
+  /**
+   * ── WHAT GOES ON THE PLATE ─────────────────────────────────────────────
+   *
+   * Misha, 18 Sep 2026: *"coke command to have her pour white powder onto the
+   * ornamental plate and make neat straight lines with a razor blade"*.
+   *
+   * Four objects and one clock. The wrap is a folded paper square that tips;
+   * the heap is a cone that grows while it tips and shrinks as the lines take
+   * it; each line is a long low prism that grows from one end; the blade rides
+   * alongside whichever line is being drawn.
+   *
+   * Everything is placed off `kit.plate`, which is the middle of the plate's
+   * well and the height of the flat floor inside it — flat out to r = 0.050,
+   * so four lines 0.055 long on an 0.011 pitch sit inside it with the heap
+   * beside them and nothing runs up the cavetto.
+   *
+   * Their own meshes and not the room's buffer, because the room's buffer is
+   * baked once and every one of these changes shape while you watch.
+   */
+  const COKE = {
+    lines: 4,
+    len: 0.055,
+    wide: 0.0042,
+    tall: 0.0026,
+    pitch: 0.0115,
+    /** Seconds: the pour, and then each line. */
+    pour: 1.6,
+    cut: 1.15,
+  };
+  let cokeKit = null;
+
+  function cokeBuild() {
+    if (cokeKit || !kit || !kit.plate) return cokeKit;
+    const w = toWorld(kit.plate[0], kit.plate[1]);
+    const y = kit.plate[2];
+    const g = new THREE.Group();
+    g.position.set(w[0], y, w[2]);
+    // Squared to the plate rather than to the room: the lines read as neat
+    // because they are parallel to each other, and what they are parallel to
+    // beyond that is nobody's business.
+    g.rotation.y = faceYaw(kit.plate[0], 0);
+    scene.add(g);
+
+    // Emissive, like the bottle and the glass on this table and for the same
+    // reason: this room has one bulb and a print on the wall, and white powder
+    // lit only by that is grey powder. 0.34 is under the wine's 0.40.
+    const powder = solidMaterial(new THREE.Color(0.960, 0.958, 0.950),
+      { spec: 0.10, specPower: 12, vcol: false, emissive: 0.34 });
+    const steel = solidMaterial(new THREE.Color(0.520, 0.545, 0.575),
+      { spec: 0.90, specPower: 110, vcol: false, emissive: 0.12 });
+    const paper = solidMaterial(new THREE.Color(0.880, 0.870, 0.845),
+      { spec: 0.14, specPower: 16, vcol: false });
+
+    // The heap, off to one side of where the lines go.
+    const heap = new THREE.Mesh(new THREE.ConeGeometry(0.016, 0.011, 12), powder);
+    heap.position.set(-0.030, 0.0055, 0.0);
+    g.add(heap);
+
+    // The lines. Each is built full length about its own centre and scaled
+    // from one end, so growing one is a scale and a shift rather than new
+    // geometry every frame.
+    const lines = [];
+    for (let i = 0; i < COKE.lines; i++) {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(COKE.len, COKE.tall, COKE.wide), powder);
+      const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
+      m.position.set(0.012, COKE.tall / 2, z);
+      m.scale.x = 0.0001;
+      m.visible = false;
+      g.add(m);
+      lines.push(m);
+    }
+
+    // The blade: a rectangle with a thicker spine down one long edge, which is
+    // the whole silhouette of a razor blade seen from above.
+    const blade = new THREE.Group();
+    const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.043, 0.0004, 0.019), steel);
+    const b2 = new THREE.Mesh(new THREE.BoxGeometry(0.043, 0.0016, 0.004), steel);
+    b2.position.set(0, 0.0006, -0.0095);
+    blade.add(b1); blade.add(b2);
+    blade.position.set(0.012, 0.0012, 0.042);
+    g.add(blade);
+
+    // And the wrap it came out of, on the wood beside the plate.
+    const wrap = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.0022, 0.028), paper);
+    // On the WOOD and not in the well. The plate is 0.105 of radius and the
+    // first go put this at 0.060 from its middle, which is a paper wrap lying
+    // in the dish with the lines.
+    wrap.position.set(-0.150, -0.0086, -0.040);
+    g.add(wrap);
+
+    cokeKit = { g, heap, lines, blade, wrap };
+    return cokeKit;
+  }
+
+  /**
+   * Scrub the whole thing, 0 to 1, so it can be driven by a phase and shot by
+   * a probe with the same call.
+   */
+  function cokeSet(u) {
+    const k = cokeBuild();
+    if (!k) return null;
+    const t = Math.max(0, Math.min(1, u));
+    // The pour takes the first quarter, the four lines the rest.
+    const P = 0.25;
+    const pour = Math.min(1, t / P);
+    const cut = Math.max(0, (t - P) / (1 - P));
+    k.wrap.rotation.z = -0.9 * Math.sin(Math.PI * pour);
+    k.wrap.position.y = 0.0011 + 0.010 * Math.sin(Math.PI * pour);
+    // The heap grows in, and then goes down as the lines take it.
+    const taken = cut;
+    k.heap.scale.setScalar(Math.max(0.001, pour * (1 - 0.82 * taken)));
+    k.heap.visible = pour > 0.02;
+    const each = 1 / COKE.lines;
+    for (let i = 0; i < COKE.lines; i++) {
+      const f = Math.max(0, Math.min(1, (cut - i * each) / each));
+      const m = k.lines[i];
+      m.visible = f > 0.001;
+      m.scale.x = Math.max(0.0001, f);
+      // Grown from the far end rather than from the middle, which is what the
+      // blade is doing to it.
+      m.position.x = 0.012 - (COKE.len / 2) * (1 - f);
+    }
+    // The blade rides beside whichever line is being drawn, and sits off at
+    // the near edge before and after.
+    const at = Math.min(COKE.lines - 1, Math.floor(cut * COKE.lines));
+    const f = Math.max(0, Math.min(1, (cut - at * each) / each));
+    const zOf = (i) => (i - (COKE.lines - 1) / 2) * COKE.pitch;
+    const zNow = cut <= 0 ? 0.042 : zOf(at) + COKE.wide * 1.9;
+    k.blade.position.z = cut <= 0 ? 0.042
+      : (cut >= 1 ? 0.042 : zNow);
+    k.blade.position.x = cut <= 0 || cut >= 1 ? 0.012
+      : 0.012 + (COKE.len / 2) * (1 - f) - COKE.len / 2 + COKE.len * f;
+    k.blade.rotation.y = 0;
+    return { pour: +pour.toFixed(3), cut: +cut.toFixed(3), line: at };
+  }
+
   function looseHairGroup() {
     //  y       back-shift   half-depth   half-width
     const R = [
@@ -43699,6 +43880,9 @@ async function buildJadrija(scene) {
     },
     /** What is buzzing right now. */
     signals: () => Object.keys(signals),
+    /** Scrub what is on the plate, 0 to 1 — see COKE. */
+    coke: (u = 1) => cokeSet(u),
+    plate: () => (kit && kit.plate ? kit.plate.slice() : null),
     /** Hair out of the tail, or back into it. It stays either way. */
     hair: (on = true) => hairDown(on !== false),
     /**

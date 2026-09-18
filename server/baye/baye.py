@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.20.0"
+VERSION = "1.21.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -456,6 +456,15 @@ SKILLS = {
     # that asks for it contains every word they own: "lay flat ... legs
     # hanging off" would otherwise be answered by a roll in the middle of the
     # mattress, which is the pose he already had.
+    # WHAT GOES ON THE PLATE. Misha, 18 Sep 2026: *"coke command to have
+    # her pour white powder onto the ornamental plate and make neat
+    # straight lines with a razor blade"*. Its own noun and nothing
+    # else's, so it needs no ordering against the poses.
+    "coke": ("pour out a line of powder on the plate",
+             # NOT \bblow\b, which it had for about a minute: "blow me a
+             # kiss" is a sentence somebody says in this room.
+             [r"\bcoke\b|\bcocaine\b|\bcut (me )?(a |some )?lines?\b"
+              r"|\brack ('?em|them|up)\b|\bchop (some|a) lines?\b"]),
     "flat.edge": ("lie on her front on the edge of the cot, legs over the side",
                   [r"\blegs?\b.{0,24}\b(off|over)\b.{0,16}\b(bed|cot|edge|side)\b"
                    r"|\blegs?\s+(hanging|dangling|hang|dangle)\b"
@@ -566,6 +575,7 @@ ASK_RE = re.compile(
     r"|\blegs? (up|down)\b|\bflat on your\b|\bface down\b|\broll over\b"
     r"|\b(lay|lie|roll)\s*(down\s*)?flat\b"
     r"|\blegs? (hang\w*|dangl\w*|off|over)\b"
+    r"|\b(coke|cocaine)\b|\bcut (me )?(a |some )?lines?\b|\brack '?em\b"
     r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"

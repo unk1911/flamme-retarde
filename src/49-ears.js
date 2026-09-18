@@ -446,11 +446,13 @@ const ears = (() => {
     'legs.down': 'legs down', 'legs.up': 'legs back up',
     flat: 'over on to her front',
     'flat.edge': 'on to her front on the edge of the cot',
+    coke: 'to the plate',
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
     give: 'coming to take it from you',
     flat: 'flat on her front',
     'flat.edge': 'flat on the edge of the cot, legs over the side',
+    coke: 'cutting lines on the plate',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she

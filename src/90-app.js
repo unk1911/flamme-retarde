@@ -8243,6 +8243,8 @@ window.__fr = {
     signals: () => (jadrija && jadrija.signals ? jadrija.signals() : null),
     props: () => (jadrija && jadrija.props ? jadrija.props() : null),
     hair: (on) => (jadrija && jadrija.hair ? jadrija.hair(on) : null),
+    coke: (u) => (jadrija && jadrija.coke ? jadrija.coke(u) : null),
+    plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
     /** What she saw on the last recon, and what she brought back. */
     seen: () => (jadrija ? jadrija.seen() : null),
     told: () => (jadrija ? jadrija.told() : null),

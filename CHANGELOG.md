@@ -8,6 +8,39 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.419.0] — 2026-09-18 (baye 1.21.0)
+
+### what goes on the plate
+
+**"coke command to have her pour white powder onto the ornamental plate and
+make neat straight lines with a razor blade"**.
+
+Four objects and one clock. The wrap tips; the heap grows while it tips and
+goes down as the lines take it; each line is a long low prism grown from its
+far end, which is the end the blade is working from; the blade rides alongside
+whichever line is being drawn. `cokeSet` is a single 0-to-1 scrub, so the phase
+and a probe drive the whole thing through the same call — the reason the wine
+pour is scrubbable is the reason this is.
+
+Everything is placed off `kit.plate`, the middle of the plate's well, which is
+flat out to r = 0.050: four lines 0.055 long on an 0.0115 pitch sit inside that
+with the heap beside them and nothing running up the cavetto. Their own meshes
+and not the room's buffer, because the room's buffer is baked once and every
+one of these changes shape while you watch.
+
+Two things the first photograph caught. The wrap was lying IN the dish with the
+lines, 0.060 from the middle of a plate with 0.105 of radius — it is on the
+wood now. And white powder in a room with one bulb is grey powder, so it is
+emissive at 0.34, just under the wine's 0.40, the same trick the bottle and the
+glass on that table already use.
+
+**baye 1.21.0** gets `coke`. Its pattern had `\bblow\b` in it for about a
+minute: "blow me a kiss" is a sentence somebody says in this room.
+
+**Not done yet:** her arm does not follow the blade. She walks to the mark and
+the plate does the rest, which reads as her doing it from anywhere but close
+up. The two-bone solver the hug and the gift use is the way in.
+
 ## [1.418.1] — 2026-09-18
 
 ### rolling over, which was wrong twice
