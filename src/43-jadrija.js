@@ -32645,7 +32645,16 @@ async function buildJadrija(scene) {
      * by standing closer, they kiss by leaning.
      */
     kissGap: 0.32,
-    hugGap: 0.34,
+    /**
+     * The hug stands FURTHER OFF than the kiss, which is the opposite of what
+     * you would guess and is what the third-person shot shows: two torsos
+     * 0.34 m apart with 0.30 m half-widths each do not embrace, they MERGE —
+     * Misha's camera behind Chloe had the pair of them occupying the same
+     * space. A kiss is two faces meeting over a gap; a hug in a game where
+     * the other body cannot yield has to keep the chests apart and let the
+     * ARMS do the closing. 0.44, with the wrists reaching 0.50.
+     */
+    hugGap: 0.44,
     /** Seconds in, held, and out. The long hold is what "French" buys. */
     kissIn: 0.75,
     kissHold: 3.4,
@@ -33316,11 +33325,24 @@ async function buildJadrija(scene) {
      * is what the third photograph showed. 0.42 puts them round the far side
      * of you, which is where hands go in a hug.
      */
-    reach: 0.42,
-    /** How far below the shoulder they close: the middle of somebody's back. */
-    drop: 0.18,
+    reach: 0.54,
+    /**
+     * How far below the shoulder they close.
+     *
+     * 0.18 put them round the middle of your back, and MEASURED that works —
+     * the wrists travel 0.4 m — but it does not READ: *"what's going on with
+     * the hug? seems to be just standin' there"*. Hands at the middle of
+     * somebody's back are hidden inside their outline from every angle
+     * outside the pair of you, and with the elbows hanging down the silhouette
+     * is a woman standing still. So: high on the back, level with the
+     * shoulder blades, where the forearms are visible ABOVE your shoulder
+     * line, and the elbows go out rather than down (see the pole below).
+     */
+    drop: 0.06,
     /** And how far in, from the shoulder's own offset. */
-    inward: 0.12,
+    inward: 0.16,
+    /** The torso goes with the arms, or the arms are a reach and not a hug. */
+    lean: 0.15,
   };
   let hugRest = null;
   function hugArms(f, e) {
@@ -33350,10 +33372,16 @@ async function buildJadrija(scene) {
         S.y - HUG_ARM.drop,
         S.z - Math.sign(S.z || 1) * HUG_ARM.inward);
       goal.lerpVectors(W, goal, e);
-      // The elbow goes DOWN and out, which is what an arm round somebody does
-      // — the pole is what decides that and it is the only hint the solver
-      // takes about which of the two valid bends to pick.
-      _hugPole.set(0, -1, Math.sign(S.z || 1) * 0.55).normalize();
+      if (side === 'L') {
+        show.hugGoal = [+goal.x.toFixed(3), +goal.y.toFixed(3), +goal.z.toFixed(3)];
+        show.hugRest = [+W.x.toFixed(3), +W.y.toFixed(3), +W.z.toFixed(3)];
+      }
+      // THE ELBOWS GO OUT, which is the half of this that shows. The pole is
+      // the only hint the solver takes about which of the two valid bends to
+      // pick, and down-and-slightly-out gave a silhouette you could not tell
+      // from standing still. Out-and-slightly-down is an embrace from across
+      // the promenade.
+      _hugPole.set(-0.1, -0.22, Math.sign(S.z || 1) * 1).normalize();
       wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, goal, _hugPole);
     }
   }
@@ -36167,11 +36195,15 @@ async function buildJadrija(scene) {
             : 1 - (show.kiss - SHOW.hugIn - SHOW.hugHold) / SHOW.hugOut;
         const e = sat(u) * sat(u) * (3 - 2 * sat(u));
         hugArms(f, e);
+        // And she presses in, the kiss's own lean at half of it: arms round
+        // somebody while standing bolt upright is a reach, not a hug.
+        f.aim('spine03', 0, 0, -1, HUG_ARM.lean * e);
         // Cheek past your ear, and always the same side, because a head that
         // picks a side per hug is a head that cannot decide.
         f.aim('neck', 0, 1, 0, SHOW.hugHead * e);
         if (show.kiss > T) {
           hugArms(f, 0);
+          f.aim('spine03', 0, 0, -1, 0);
           f.aim('neck', 0, 1, 0, 0);
           show.near = null;
           showNext();
@@ -41774,6 +41806,7 @@ async function buildJadrija(scene) {
       // The two that are with you: which one was asked for, and the clock.
       near: show.near || null, kiss: +(show.kiss || 0).toFixed(2),
       said: show.kissSaid ? 1 : 0,
+      hugGoal: show.hugGoal || null, hugRest: show.hugRest || null,
       mark: show.markT == null ? null
         : [+show.markT.toFixed(2), +show.markS.toFixed(2), show.hasDir || 0],
       ang: +show.ang.toFixed(2), want: +show.want.toFixed(2),

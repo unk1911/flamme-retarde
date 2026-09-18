@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.408.2] — 2026-09-17
+
+### the hug keeps the chests apart
+
+**"what's going on with the hug? seems to be just standin' there...?"**
+
+Measured first: her wrists travel 0.4 m, so the arms were moving. What they
+were doing was reaching into the middle of Chloe's back with the elbows
+hanging down, which is invisible from outside the pair of you — and the third
+person camera showed the rest of it, which is that two torsos 0.34 m apart with
+0.30 m half-widths each do not embrace, they MERGE. The two of them were
+standing in the same space.
+
+So the hug now stands FURTHER off than the kiss, which is the opposite of what
+you would guess: 0.44 m, with the wrists reaching 0.54 and the elbows pushed
+out rather than down, so the arms do the closing and the bodies stay bodies. A
+kiss is two faces over a gap; a hug against somebody who cannot yield has to
+be arms.
+
+It is still approximate, and the reason is structural rather than a number:
+Chloe does not move. She is the player, her body is what the camera is
+attached to, and nothing about her answers a hug. A scene where both of them
+are posed is a different job — see the cinematic.
+
 ## [1.408.1] — 2026-09-17
 
 ### out of you, and loud enough to hear
