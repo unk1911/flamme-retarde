@@ -27506,6 +27506,12 @@ async function buildJadrija(scene) {
       // typed, because the furniture moved outward on its own when the hut went
       // to two bays and this would have stayed where the hut used to be.
       cot: [cm, cms - 0.10, f + 0.44],
+      // The INNER long edge of it, the one facing the walkway, and the
+      // middle of the bed down its length. Where she lies when her legs
+      // go over the side — see `flatEdge`. Published rather than worked
+      // out from a half-width at the call site, because the cot has moved
+      // once already when the hut went to two bays.
+      cotEdge: [c0 + 0.07, cms],
       cotFoot: [cm - 0.62, cms - 0.10],
       // Where the neck of the bottle has to end up. Not the rim: a lip resting
       // on the rim is a bottle being emptied by somebody who has never poured
@@ -33460,7 +33466,11 @@ async function buildJadrija(scene) {
     // straight back up.
     show.getUp = 0;
     show.recl = 0;
-    const spot = bed ? cotSpot() : null;
+    // ACROSS THE BED AND NOT ALONG IT when her legs are going over the side,
+    // and on the inner long edge rather than the middle — see `flat.edge`.
+    const spot = bed
+      ? (show.edgeWant && kit && kit.cotEdge ? kit.cotEdge.slice() : cotSpot())
+      : null;
     show.onBed = spot ? 1 : 0;
     show.lie = spot || reclineSpot(pt, ps);
     // ON THE COT SHE IS NOT AIMED AT YOU. Every other way into this pose
@@ -33468,7 +33478,11 @@ async function buildJadrija(scene) {
     // what decides where her head ends up — which is fine on an open floor and
     // wrong on a bed, where the only direction a body can lie is the bed's.
     // Facing the door lays her out toward the pillow.
-    if (show.onBed) show.want = -Math.PI / 2;
+    // PI and not 0, measured rather than reasoned: at 0 she lay across the bed
+    // the right way and the wrong way round, with her HEAD over the edge and
+    // her legs up the mattress. The prone phases already carry a half turn in
+    // `wantSide`, so this is the one that decides which end goes over.
+    if (show.onBed) show.want = show.edgeWant ? Math.PI : -Math.PI / 2;
     showSay('squee', d);
     // AND THE DOG IS OUT. Misha, 17 Sep 2026: *"if she goes for the bed, the
     // pug should just run off and not come back"*. He sleeps on that cot — see
@@ -34478,7 +34492,7 @@ async function buildJadrija(scene) {
    * same again on her front.
    */
   const LYING = { recline: 1, cradle: 1, flat: 1, flatheld: 1,
-    sideL: 1, sideR: 1 };
+    flatEdge: 1, edgeHeld: 1, sideL: 1, sideR: 1 };
 
   const KNEES = { submit: 1, kept: 1, creep: 1,
     // On her back she still drinks it — the mouth, the foam and what runs down
@@ -34651,6 +34665,19 @@ async function buildJadrija(scene) {
      * body a clip has already laid down put her face 0.16 m inside the bed.
      */
     flat: 1,
+    /**
+     * And the same on the edge of the cot with her legs over the side.
+     *
+     * Misha, 18 Sep 2026: *"can she lay belly flat on the bed with her legs
+     * hanging off the bed?"* — she could not: probed, `flat` put her head at
+     * z 456.37 and her feet at 457.85 with every joint within 4 cm of one
+     * height, which is a body entirely on the mattress.
+     *
+     * It is a baked clip AND a placement, and neither is any use alone. The
+     * clip drops the legs; the placement turns her across the bed and puts
+     * her hip on the edge so that there is nothing under them.
+     */
+    'flat.edge': 1,
     /** And over on to one side or the other, which are two baked clips. */
     'side.left': 1, 'side.right': 1,
     /** And her arms out, which is a latch on the pose like her legs. */
@@ -34775,6 +34802,13 @@ async function buildJadrija(scene) {
       if (!LYING[show.phase]) return 'notlying';
       const want = name === 'arms.wide' ? 1 : 0;
       if ((show.armsWide || 0) === want) return want ? 'armsalready' : 'armsdown';
+      return null;
+    }
+    if (name === 'flat.edge') {
+      if (show.phase === 'edgeHeld' || show.phase === 'flatEdge') return 'already';
+      // The edge of a cot is the only edge in this room. On the floor there is
+      // nothing for her legs to hang off.
+      if (!kit || !kit.cotEdge) return 'nobed';
       return null;
     }
     if (name === 'flat') {
@@ -35039,6 +35073,7 @@ async function buildJadrija(scene) {
     // fires on the frame AFTER the kiss is armed. So the kiss was starting and
     // being overridden by the hut, every time, and what you saw was the wine.
     toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1,
+    flatEdge: 1, edgeHeld: 1,
     sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
@@ -35693,6 +35728,7 @@ async function buildJadrija(scene) {
     // vertical), on fire, and turned — the last one being the promenade's
     // answer to the hose, which owns her whole body until it lets go.
     const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1,
+      'flat.edge': 1,
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
       give: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
@@ -35831,8 +35867,26 @@ async function buildJadrija(scene) {
         show.armsWide = name === 'arms.wide' ? 1 : 0;
         show.did = name;
         showSay('squee', d);
+      } else if (name === 'flat.edge') {
+        // The same road as `flat` with two things set: she has to end up on
+        // the bed whatever she was on, and she has to be laid down ACROSS it.
+        show.byAsk = 1;
+        show.edgeWant = 1;
+        show.queue.length = 0;
+        showSay('squee', d);
+        if (show.phase === 'cradle' && show.onBed) {
+          show.legsDown = 0;
+          go('flatEdge', 'flatEdge', 0.34);
+        } else {
+          show.flatWant = 2;
+          show.lieWant = 'bed';
+          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
+          else go('submit', 'submit', 0.30);
+        }
       } else if (name === 'flat') {
         show.byAsk = 1;
+        show.edgeWant = 0;
         show.queue.length = 0;
         showSay('squee', d);
         // The roll starts from the cradle, so from anywhere else she gets
@@ -36326,6 +36380,31 @@ async function buildJadrija(scene) {
       // you: a body lying on its front cannot turn to face somebody without
       // rolling over, which is the same argument the note over `cradle` makes
       // about not being a compass needle.
+      case 'flatEdge':
+        if (show.onBed && kit && kit.cot) {
+          show.mat = damp(show.mat || 0,
+            Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
+        }
+        if (done) go('edgeHeld', 'edgeHeld', 0.30);
+        break;
+
+      case 'edgeHeld':
+        if (show.onBed && kit && kit.cot) {
+          show.mat = damp(show.mat || 0,
+            Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
+        }
+        if (show.getUp) {
+          show.getUp = 0;
+          show.edgeWant = 0;
+          go('cradle', 'cradle', 0.40);
+          break;
+        }
+        if (show.tmr > SHOW.bedFor) {
+          show.edgeWant = 0;
+          go('cradle', 'cradle', 0.40);
+        }
+        break;
+
       case 'flat':
         if (show.onBed && kit && kit.cot) {
           show.mat = damp(show.mat || 0,
@@ -36384,9 +36463,13 @@ async function buildJadrija(scene) {
         // Asked for her front while she was somewhere else: the cradle is the
         // landing on the way, so it sends her straight on.
         if (show.flatWant) {
+          // 2 is the edge of the bed and 1 is the middle of whatever she is
+          // on — see `flat.edge`.
+          const edge = show.flatWant === 2;
           show.flatWant = 0;
           show.legsDown = 0;
-          go('flat', 'flat', 0.34);
+          if (edge) go('flatEdge', 'flatEdge', 0.34);
+          else go('flat', 'flat', 0.34);
           break;
         }
         // Same hold as `kept` and for the same reason: `hit` is the grace
@@ -37801,6 +37884,7 @@ async function buildJadrija(scene) {
       const wantSide = show.phase === 'aim' || show.phase === 'wheel'
         ? -Math.PI / 2
         : (show.phase === 'flat' || show.phase === 'flatheld'
+          || show.phase === 'flatEdge' || show.phase === 'edgeHeld'
           || show.phase === 'sideL' || show.phase === 'sideR') ? Math.PI : 0;
       show.sideRate = turnRate(wantSide - show.side, show.sideRate,
         SHOW.sideMax, dt);

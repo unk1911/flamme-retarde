@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.418.0] — 2026-09-18 (baye 1.20.0)
+
+### legs over the side of the cot
+
+**"can she lay belly flat on the bed with her legs hanging off the bed?"** —
+she could not. Probed, `flat` put her head at z 456.37 and her feet at 457.85
+with every joint inside 4 cm of one height: a body entirely on the mattress.
+
+It is a baked clip AND a placement, and neither is any use alone. The clip
+(`PRONE_EDGE`, off PRONE) flexes the hips; the placement turns her ACROSS the
+bed instead of along it and puts her hip on the inner long edge, so there is
+nothing under the legs the clip has just dropped. Either one on its own folds
+her legs into the mattress.
+
+The hip angle came off the cot and not out of the air. The mattress is 0.44 m
+over the floor, her hip sits 0.571 m over the floor lying on her front, and hip
+to toe is 0.84 m — so a leg that reaches the floor from there hangs 43 degrees
+below horizontal, not vertically, which is what a low camp bed does to this
+pose. Three probes: at −34 the foot hung 0.234 m clear of the floor, at −55 it
+was 12.5 mm THROUGH it — 11.7 mm of ankle per degree of hip — and −46 puts the
+ankle just over the floor with the pointed toe reaching it.
+
+And the yaw was measured too, because at 0 she lay across the bed the right way
+and the wrong way round, with her HEAD over the edge.
+
+**baye 1.20.0** gets `flat.edge`, listed BEFORE `flat` and before the two leg
+adjustments, because the sentence that asks for this contains every word they
+own: "lay flat … legs hanging off" would otherwise have been answered by a roll
+in the middle of the mattress, which is the pose he already had.
+
 ## [1.417.1] — 2026-09-18
 
 ### it is already out

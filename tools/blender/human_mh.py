@@ -4342,6 +4342,47 @@ PRONE_B["chest"] = (-6, 0, 0)
 PRONE_B["head"] = (7, 50, 0)
 
 
+# ── ON HER FRONT, WITH HER LEGS OFF THE EDGE ─────────────────────────────────
+#
+# Misha, 18 Sep 2026: *"can she lay belly flat on the bed with her legs hanging
+# off the bed?"*
+#
+# PRONE with the hips flexed, and it is only a pose because the placement puts
+# her pelvis ON the edge — the clip drops the legs and the room decides there
+# is nothing under them. Both halves ship together or she folds her legs into
+# the mattress.
+#
+# The numbers come off the cot rather than out of the air. Probed, the mattress
+# is 0.44 m over the floor, her hip joint sits 0.571 m over it lying on her
+# front, and hip to toe is 0.84 m. A leg that reaches the floor from there is
+# therefore 43 degrees below horizontal, not vertical — which is what a low
+# camp bed does to this pose and why the first guess of a right angle at the
+# hip was wrong. Split between the hip and a little knee, because a body draped
+# over an edge does not hold a straight leg.
+#
+# THREE PROBES, and the hip is the only number that moved. At -34 the foot hung
+# 0.234 m clear of the floor; at -55 it was 0.0125 m THROUGH it, which is 11.7
+# mm of ankle per degree of hip. -46 puts the ankle just over the floor with the
+# pointed toe reaching it, which is a leg hanging rather than a leg standing.
+PRONE_EDGE = dict(PRONE)
+PRONE_EDGE["legUL"] = (-46, 0, 7)
+PRONE_EDGE["legUR"] = (-46, 0, -7)
+PRONE_EDGE["legLL"] = (18, 0, 0)
+PRONE_EDGE["legLR"] = (18, 0, 0)
+# Toes down, which is what a foot with nothing under it does.
+PRONE_EDGE["footL"] = (-26, 0, 0)
+PRONE_EDGE["footR"] = (-26, 0, 0)
+
+PRONE_EDGE_B = dict(PRONE_EDGE)
+PRONE_EDGE_B["@root"] = (0.16, 0.0, RECLINE_ROOT + 0.005)
+PRONE_EDGE_B["spine01"] = (-7, 0, 0)
+PRONE_EDGE_B["chest"] = (-6, 0, 0)
+PRONE_EDGE_B["head"] = (7, 50, 0)
+# The legs swing a little, because they are the part with nothing holding them.
+PRONE_EDGE_B["legUL"] = (-43, 0, 7)
+PRONE_EDGE_B["legUR"] = (-49, 0, -7)
+
+
 # ── the somersault ──────────────────────────────────────────────────────────
 #
 # One tucked front somersault, and the entire revolution is carried on `pelvis`
@@ -6959,6 +7000,13 @@ CLIPS = [
      "keys": [(0.0, CRADLE), (0.9, RECLINE_B), (1.9, PRONE)]},
     {"name": "flatheld", "loop": True,
      "keys": [(0.0, PRONE), (2.4, PRONE_B), (4.8, PRONE)]},
+    # And the same thing at the edge of the cot, legs over the side. Reached
+    # through PRONE, because she gets on to her front first and only then do
+    # the legs go over — see PRONE_EDGE.
+    {"name": "flatEdge", "loop": False,
+     "keys": [(0.0, CRADLE), (0.9, RECLINE_B), (1.9, PRONE), (2.7, PRONE_EDGE)]},
+    {"name": "edgeHeld", "loop": True,
+     "keys": [(0.0, PRONE_EDGE), (2.6, PRONE_EDGE_B), (5.2, PRONE_EDGE)]},
     # And over on to one side or the other, from her back. Held at the end
     # rather than looping: a `once` clip with nothing after it stays on its
     # last frame, which IS the pose.

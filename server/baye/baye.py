@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.19.0"
+VERSION = "1.20.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -449,6 +449,18 @@ SKILLS = {
     # 'legs up', she raises legs up again... if i say 'lay flat' she should lay
     # flat on her tummy"*. The first two are adjustments to a pose she is
     # already holding; the third is a baked roll — see PRONE.
+    # ON THE EDGE OF THE COT, LEGS OVER THE SIDE. Misha, 18 Sep 2026: *"can
+    # she lay belly flat on the bed with her legs hanging off the bed?"*
+    #
+    # BEFORE `flat`, and before the two leg adjustments, because the sentence
+    # that asks for it contains every word they own: "lay flat ... legs
+    # hanging off" would otherwise be answered by a roll in the middle of the
+    # mattress, which is the pose he already had.
+    "flat.edge": ("lie on her front on the edge of the cot, legs over the side",
+                  [r"\blegs?\b.{0,24}\b(off|over)\b.{0,16}\b(bed|cot|edge|side)\b"
+                   r"|\blegs?\s+(hanging|dangling|hang|dangle)\b"
+                   r"|\b(hang|dangle)\w*\b.{0,16}\blegs?\b"
+                   r"|\b(off|over)\s*(the\s*)?(edge|side)\s*(of\s*)?(the\s*)?(bed|cot)\b"]),
     "legs.down": ("lower her legs while she lies on her back",
                   [r"\blegs?\s*(down|flat|out|straight)\b|\bstraighten your legs\b"]),
     "legs.up": ("raise her legs again while she lies on her back",
@@ -553,6 +565,7 @@ ASK_RE = re.compile(
     r"|\ball fours\b|\bhands and knees\b"
     r"|\blegs? (up|down)\b|\bflat on your\b|\bface down\b|\broll over\b"
     r"|\b(lay|lie|roll)\s*(down\s*)?flat\b"
+    r"|\blegs? (hang\w*|dangl\w*|off|over)\b"
     r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
