@@ -121,8 +121,11 @@ const CARRY = [
   // apart, because a thing you brought with you and a thing you bought at a
   // kiosk answer different questions. None of them is `consumed`: you do not
   // use these up.
-  { key: 'handcuffs', label: 'a pair of handcuffs', give: true, worn: true,
-    box: [0.10, 0.03, 0.06], col: [0.72, 0.74, 0.77] },
+  // Ornament and not restraint — Misha, 18 Sep 2026: *"they can be ornamental
+  // cuffs"*. Two bangles, one per wrist, with nothing between them: `wear`
+  // takes a PAIR of bones here, which is the one thing the head did not need.
+  { key: 'cuffs', label: 'a pair of ornamental cuffs', give: true, worn: true,
+    box: [0.075, 0.025, 0.075], col: [0.78, 0.76, 0.70], wear: 'wrists' },
   // `wear` is the bone it goes on when she is handed it — see WEAR in
   // 43-jadrija.js. Anything without one is set down instead.
   { key: 'headphones', label: 'Bose noise-cancelling headphones',
@@ -157,7 +160,7 @@ const SATCHEL = {
   // Three things, and they are in the bag from the first frame rather than
   // put there by a shop — see `worn` in CARRY. Everything else in here is
   // something you bought.
-  have: { handcuffs: 1, headphones: 1, lovense: 1 },
+  have: { cuffs: 1, headphones: 1, lovense: 1 },
 };
 
 /**

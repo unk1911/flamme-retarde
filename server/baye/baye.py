@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.18.0"
+VERSION = "1.18.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -702,7 +702,7 @@ def fetch_of(text: str):
 # carrying, so this only has to recognise the noun.
 GIVE_RE = re.compile(r"\b(give|hand|pass|take)\b")
 GIVE_WORDS = (
-    ("handcuffs", r"handcuffs?|cuffs\b"),
+    ("cuffs", r"cuffs?\b|bangles?|bracelets?"),
     ("headphones", r"headphones?|bose\b|cans\b"),
     ("lovense", r"lovense|toy\b"),
     ("cigarettes", r"cigarettes?|smokes?|fags?\b|pack of"),

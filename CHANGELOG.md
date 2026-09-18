@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.414.1] — 2026-09-18 (baye 1.18.1)
+
+### ornamental cuffs
+
+**"they can be ornamental cuffs"**. So they are: two bangles, one per wrist,
+with nothing between them — a wide band round the wrist, open across 40° at the
+back, which is what makes it something somebody slid on rather than a ring
+welded shut. Eleven segments of an arc for the headphone band's reason, that a
+torus is four hundred triangles for a shape read at two metres.
+
+The item in the satchel is `a pair of ornamental cuffs` now, and it is what you
+arrive carrying in place of the old row.
+
+WHAT THIS ACTUALLY BUYS is the shape of the wearable table: `wear: 'wrists'`
+answers TWO bones, so `wearableParts` hands back a list rather than a group and
+`wearTick` walks it, resolving whatever bone each part names. The head needed
+one; a pair of anything needs two; finding that out later would have meant
+changing every caller. Adding an attachable is still a row in the satchel and a
+case in one function.
+
+Measured: the bag lists `cuffs, headphones, lovense`, `give:cuffs` takes it to
+two, and both bangles are on her wrists afterwards — photographed on the wrist
+mid-routine, with the other one up by her shoulder because that arm was raised.
+
+Server (baye 1.18.1): cuffs, bangles, bracelets.
+
 ## [1.414.0] — 2026-09-17
 
 ### she puts them on

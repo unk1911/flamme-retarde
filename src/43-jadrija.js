@@ -36042,10 +36042,10 @@ async function buildJadrija(scene) {
           if (show.tmr > PUTON.on) {
             const row = typeof satchelRow === 'function'
               ? satchelRow(giftHeld.key) : null;
-            const g = wearableGroup(giftHeld.key);
-            if (g && row) {
-              worn[giftHeld.key] = { group: g, bone: row.wear };
-              skinFig.mesh.add(g);
+            const parts = row ? wearableParts(giftHeld.key, row.wear) : null;
+            if (parts) {
+              worn[giftHeld.key] = parts;
+              for (const part of parts) skinFig.mesh.add(part.group);
             }
             scene.remove(giftHeld.mesh);
             if (giftHeld.mesh.geometry) giftHeld.mesh.geometry.dispose();
@@ -37989,9 +37989,44 @@ async function buildJadrija(scene) {
     return g;
   }
 
-  /** One mesh per wearable key. Add a row to the table and a case here. */
-  function wearableGroup(key) {
-    if (key === 'headphones') return headphonesGroup();
+  /**
+   * A cuff bracelet: a wide band round the wrist, open at the back.
+   *
+   * Eleven segments of an arc rather than a torus, for the headphone band's
+   * reason — a torus is four hundred triangles for a shape read at two
+   * metres. Open across 40° at the back of the wrist, which is what makes it
+   * a bangle somebody slid on rather than a ring welded shut.
+   */
+  function bangleGroup() {
+    const g = new THREE.Group();
+    const metal = solidMaterial(new THREE.Color(0.780, 0.755, 0.700),
+      { spec: 0.85, specPower: 90, vcol: false });
+    const r = 0.0335, wide = 0.024, thick = 0.0045;
+    for (let i = 0; i < 11; i++) {
+      const a = (i / 10) * (Math.PI * 2 - 0.70) + 0.35;
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(thick, 0.021, wide), metal);
+      seg.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
+      seg.rotation.z = a;
+      g.add(seg);
+    }
+    for (const m of g.children) { m.castShadow = false; m.receiveShadow = false; }
+    return g;
+  }
+
+  /**
+   * One or more meshes per wearable key, and which bone each goes on.
+   *
+   * Adding an attachable is a row in the satchel and a case here. `wrists`
+   * answers two, which is why this hands back a list rather than a group:
+   * the head needed one and a pair of anything needs two, and finding that
+   * out later would have meant changing every caller.
+   */
+  function wearableParts(key, where) {
+    if (key === 'headphones') return [{ group: headphonesGroup(), bone: 'head' }];
+    if (where === 'wrists') {
+      return [{ group: bangleGroup(), bone: 'handL' },
+        { group: bangleGroup(), bone: 'handR' }];
+    }
     return null;
   }
 
@@ -38003,19 +38038,23 @@ async function buildJadrija(scene) {
    * it has come since the bind pose, so the thing follows her head through a
    * cartwheel without knowing what a cartwheel is.
    */
+  const wearBone = {};
   function wearTick() {
     const keys = Object.keys(worn);
     if (!keys.length || !skinFig) return;
-    if (headB === null) headB = skinFig.boneIndex('head');
     for (const k of keys) {
-      const w = worn[k];
-      if (!w.group.parent) skinFig.mesh.add(w.group);
-      if (w.bone === 'head' && headB >= 0) {
-        skinFig.boneAt(headB, vHorn);
-        w.group.position.copy(vHorn);
-        w.group.quaternion.copy(skinFig.boneTurn(headB, qHorn));
+      for (const part of worn[k]) {
+        if (wearBone[part.bone] === undefined) {
+          wearBone[part.bone] = skinFig.boneIndex(part.bone);
+        }
+        const b = wearBone[part.bone];
+        if (b < 0) { part.group.visible = false; continue; }
+        if (!part.group.parent) skinFig.mesh.add(part.group);
+        skinFig.boneAt(b, vHorn);
+        part.group.position.copy(vHorn);
+        part.group.quaternion.copy(skinFig.boneTurn(b, qHorn));
+        part.group.visible = true;
       }
-      w.group.visible = true;
     }
   }
 
