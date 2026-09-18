@@ -8,6 +8,39 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.414.0] — 2026-09-17
+
+### she puts them on
+
+**"let's start with headphones first, and then add other attachables"**.
+
+The handover already had the two hard parts — she comes to you, and she takes
+it — so a wearable is that with a different ending: instead of setting the
+thing down she puts it ON, and from then on it rides a bone.
+
+WHICH BONE IS THE SATCHEL'S BUSINESS. A row with `wear: 'head'` goes on her
+head, so the next attachable is a row and a mesh rather than a state machine.
+Anything without a `wear` is set down exactly as before.
+
+The rig is the horns' — a group parented to her mesh, put at the bone in
+FIGURE space and turned by `boneTurn` — which is the one attachment in this
+file that has always worked, through the cartwheel, the hose and the flip. So
+the headphones stay on her head while she tumbles.
+
+The headphones themselves are two cups, two cushions and a band of six
+segments over the crown, placed off the numbers `CROP` already states: the head
+bone at (0.0169, 1.5907, 0) with the scalp over it at y 1.746, which is where
+the horns are rooted from. Dark, and with nothing written on them — the NAME
+came from Misha, but a wordmark painted on a 40 mm cup would be mine, and rule
+12 is about the ones I invent.
+
+Measured: `give:headphones` takes the bag from three to two, the beats run
+`toYou → studyIt → wearIt`, and she goes back to her own routine wearing them.
+Photographed at her ear afterwards, mid-twerk.
+
+The cup sits a shade behind the ear and the band a shade back on the crown —
+`PUTON.ear` is the one line to nudge if it wants centring.
+
 ## [1.413.0] — 2026-09-17 (baye 1.18.0)
 
 ### hand her anything

@@ -34262,7 +34262,7 @@ async function buildJadrija(scene) {
   const NEARBY = { toYou: 1, kiss: 1, hug: 1,
     // The handover stands as close as a kiss and for the same reason: you
     // cannot hand somebody something across arm's length plus a collider.
-    takeIt: 1, studyIt: 1, placeIt: 1 };
+    takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1 };
 
   /**
    * The four she is lying down for: on her back, the way down to it, and the
@@ -34830,7 +34830,7 @@ async function buildJadrija(scene) {
     // fires on the frame AFTER the kiss is armed. So the kiss was starting and
     // being overridden by the hut, every time, and what you saw was the wine.
     toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1,
-    sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1 };
+    sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -36022,7 +36022,39 @@ async function buildJadrija(scene) {
           giftHeld.up = damp(giftHeld.up, 1, 3.2, dt);
           giftHeld.spin = (giftHeld.spin || 0) + dt * 1.1;
         }
-        if (show.tmr > GIFT.study) go('placeIt', 'idle', 0.26);
+        if (show.tmr > GIFT.study) {
+          // ON, IF IT IS SOMETHING TO WEAR, and down if it is not. The
+          // satchel's row decides — `wear: 'head'` — so the next attachable is
+          // a row and a mesh.
+          const row = giftHeld && typeof satchelRow === 'function'
+            ? satchelRow(giftHeld.key) : null;
+          go(row && row.wear ? 'wearIt' : 'placeIt', 'idle', 0.26);
+        }
+        break;
+
+      // And on it goes. The prop in her hand is dropped at the end of the
+      // lift and the worn group takes over, so there is never two of it.
+      case 'wearIt':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        if (giftHeld) {
+          giftHeld.up = damp(giftHeld.up, 1, 3.6, dt);
+          if (show.tmr > PUTON.on) {
+            const row = typeof satchelRow === 'function'
+              ? satchelRow(giftHeld.key) : null;
+            const g = wearableGroup(giftHeld.key);
+            if (g && row) {
+              worn[giftHeld.key] = { group: g, bone: row.wear };
+              skinFig.mesh.add(g);
+            }
+            scene.remove(giftHeld.mesh);
+            if (giftHeld.mesh.geometry) giftHeld.mesh.geometry.dispose();
+            giftHeld = null;
+            show.near = null;
+            showSay('trill', d);
+            showNext();
+          }
+        } else { show.near = null; showNext(); }
         break;
 
       case 'placeIt':
@@ -37576,6 +37608,8 @@ async function buildJadrija(scene) {
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
 
+    wearTick();
+
     // ── AND WHATEVER SHE HAS BEEN HANDED ─────────────────────────────────
     //
     // The cone's own rig — the hand's whole frame, the measured palm point —
@@ -37879,6 +37913,111 @@ async function buildJadrija(scene) {
   };
   const giftProps = [];
   let giftHeld = null;
+
+  /**
+   * ── THINGS SHE IS WEARING ──────────────────────────────────────────────
+   *
+   * Misha, 17 Sep 2026: *"let's start with headphones first, and then add
+   * other attachables"*.
+   *
+   * The handover already had the two hard parts — she comes to you and she
+   * takes it — so a wearable is that with a different ending: instead of
+   * setting the thing down she puts it ON, and from then on it rides a bone.
+   *
+   * WHICH BONE IS THE SATCHEL'S BUSINESS, not this file's: a row with
+   * `wear: 'head'` goes on her head, and adding another attachable is a row
+   * and a mesh rather than a state machine. The rig is the horns' — a group
+   * parented to her mesh, put at the bone in FIGURE space and turned by
+   * `boneTurn` — which is the one attachment in this file that has always
+   * worked, through cartwheels, the hose and the flip.
+   */
+  const PUTON = {
+    /** Seconds to lift it and settle it on. */
+    on: 0.9,
+    /**
+     * The head bone sits at (0.0169, 1.5907, 0) and the scalp over it is at
+     * y 1.746 — see CROP, where the horns are rooted off the same numbers. So
+     * in the bone's own frame the ears are a little below and 78 mm out, and
+     * the band clears the crown by 30 mm.
+     */
+    ear: [0.004, 0.030, 0.078],
+    band: 0.112,
+    cup: [0.044, 0.030],
+  };
+  const worn = {};
+
+  /**
+   * A pair of over-the-head headphones: two cups, and a band over the crown.
+   *
+   * Dark like the real ones and with nothing written on them — the NAME came
+   * from Misha (see the satchel's table, and rule 12, which is about names I
+   * invent), but a wordmark painted on a 40 mm cup would be mine.
+   */
+  function headphonesGroup() {
+    const g = new THREE.Group();
+    const shell = solidMaterial(new THREE.Color(0.105, 0.105, 0.115),
+      { spec: 0.55, specPower: 60, vcol: false });
+    const pad = solidMaterial(new THREE.Color(0.055, 0.055, 0.060),
+      { spec: 0.20, specPower: 20, vcol: false });
+    for (const sd of [1, -1]) {
+      const cup = new THREE.Mesh(
+        new THREE.CylinderGeometry(PUTON.cup[0], PUTON.cup[0] * 0.92,
+          PUTON.cup[1], 14), shell);
+      cup.rotation.x = Math.PI / 2;
+      cup.position.set(PUTON.ear[0], PUTON.ear[1], sd * PUTON.ear[2]);
+      const cush = new THREE.Mesh(
+        new THREE.CylinderGeometry(PUTON.cup[0] * 0.86, PUTON.cup[0] * 0.86,
+          PUTON.cup[1] * 0.45, 14), pad);
+      cush.rotation.x = Math.PI / 2;
+      cush.position.set(PUTON.ear[0], PUTON.ear[1],
+        sd * (PUTON.ear[2] - PUTON.cup[1] * 0.62));
+      g.add(cup, cush);
+    }
+    // The band, as six segments of an arc over the crown rather than a torus:
+    // a torus here is 400 triangles for a shape read at two metres.
+    for (let i = 0; i < 7; i++) {
+      const u = (i / 6) * Math.PI - Math.PI / 2;
+      const seg = new THREE.Mesh(
+        new THREE.BoxGeometry(0.022, 0.016, 0.030), shell);
+      seg.position.set(PUTON.ear[0],
+        PUTON.ear[1] + Math.cos(u) * PUTON.band,
+        Math.sin(u) * PUTON.ear[2] * 1.04);
+      seg.rotation.x = -u;
+      g.add(seg);
+    }
+    for (const m of g.children) { m.castShadow = false; m.receiveShadow = false; }
+    return g;
+  }
+
+  /** One mesh per wearable key. Add a row to the table and a case here. */
+  function wearableGroup(key) {
+    if (key === 'headphones') return headphonesGroup();
+    return null;
+  }
+
+  /**
+   * Put on whatever she is wearing, every frame, off the bone it belongs to.
+   *
+   * Parented to her mesh and posed in figure space, which is the horns' own
+   * rig: `boneAt` gives the bone's place in that space and `boneTurn` how far
+   * it has come since the bind pose, so the thing follows her head through a
+   * cartwheel without knowing what a cartwheel is.
+   */
+  function wearTick() {
+    const keys = Object.keys(worn);
+    if (!keys.length || !skinFig) return;
+    if (headB === null) headB = skinFig.boneIndex('head');
+    for (const k of keys) {
+      const w = worn[k];
+      if (!w.group.parent) skinFig.mesh.add(w.group);
+      if (w.bone === 'head' && headB >= 0) {
+        skinFig.boneAt(headB, vHorn);
+        w.group.position.copy(vHorn);
+        w.group.quaternion.copy(skinFig.boneTurn(headB, qHorn));
+      }
+      w.group.visible = true;
+    }
+  }
 
   /**
    * One handed-over thing, as geometry: a box of the size the satchel gives.

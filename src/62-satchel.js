@@ -123,8 +123,11 @@ const CARRY = [
   // use these up.
   { key: 'handcuffs', label: 'a pair of handcuffs', give: true, worn: true,
     box: [0.10, 0.03, 0.06], col: [0.72, 0.74, 0.77] },
+  // `wear` is the bone it goes on when she is handed it — see WEAR in
+  // 43-jadrija.js. Anything without one is set down instead.
   { key: 'headphones', label: 'Bose noise-cancelling headphones',
-    give: true, worn: true, box: [0.17, 0.18, 0.08], col: [0.11, 0.11, 0.12] },
+    give: true, worn: true, box: [0.17, 0.18, 0.08], col: [0.11, 0.11, 0.12],
+    wear: 'head' },
   { key: 'lovense', label: 'a Lovense remote-control toy',
     give: true, worn: true, box: [0.04, 0.12, 0.04], col: [0.62, 0.12, 0.18] },
 ];
