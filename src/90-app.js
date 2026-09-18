@@ -8239,6 +8239,8 @@ window.__fr = {
     why: () => (jadrija ? jadrija.whyShow() : null),
     /** The counter at a world point, for a test that cannot walk. */
     counter: (x, z) => (jadrija ? jadrija.counter(x, z) : null),
+    signal: (key, on = true) => (jadrija && jadrija.signal ? jadrija.signal(key, on) : null),
+    signals: () => (jadrija && jadrija.signals ? jadrija.signals() : null),
     /** What she saw on the last recon, and what she brought back. */
     seen: () => (jadrija ? jadrija.seen() : null),
     told: () => (jadrija ? jadrija.told() : null),

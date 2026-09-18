@@ -36083,6 +36083,8 @@ async function buildJadrija(scene) {
               m.position.set(w[0], w[1] + 0.02, w[2]);
             }
             m.rotation.set(0, faceYaw(show.t, show.ang), 0);
+            // Which thing it is, so a signal can find it later — see SIGNAL.
+            m.userData.key = giftHeld.key;
             giftProps.push(m);
             while (giftProps.length > GIFT.keep) {
               const old = giftProps.shift();
@@ -38021,6 +38023,80 @@ async function buildJadrija(scene) {
    * the head needed one and a pair of anything needs two, and finding that
    * out later would have meant changing every caller.
    */
+  /**
+   * ── A SIGNAL, SENT FROM SOMEWHERE ELSE ─────────────────────────────────
+   *
+   * Misha, 18 Sep 2026: *"have the lovense sit on the table next to the wine
+   * glass and wire in the logic to remotely trigger it from the laptop or a
+   * cellphone"*, and *"that's another thing Chloe needs, a cellphone"*.
+   *
+   * The thing on the table is an OBJECT with a motor in it: it buzzes, and it
+   * walks a millimetre at a time across the wood. That is the whole of what it
+   * does. What is worth building is the PATH — a sender, a receiver, and a
+   * rule about when a signal gets through — because once that exists, every
+   * other receiver is a row in the satchel with `radio: true`.
+   *
+   * TWO SENDERS, AND THE REASON THEY DIFFER. The phone has to be ON you,
+   * which is what makes it a phone rather than a keyboard shortcut; the
+   * laptop needs you in front of it, which is what makes the walk up to the
+   * vikendica mean something. Neither has a range: a radio crossing two
+   * hundred metres of promenade is the one thing here not worth modelling.
+   *
+   * The shake is deterministic, like everything else in this resort — a sine
+   * against the clock rather than a random walk — so a thing left buzzing is
+   * in the same place on a reload.
+   */
+  const SIGNAL = { walk: 0.0026, hz: 47, hear: 7 };
+  const signals = {};
+
+  /** Turn a receiver on or off, and say in words what happened. */
+  function signalSet(key, on) {
+    if (!key) return 'nothing';
+    const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
+    if (!row || !row.radio) return 'no receiver';
+    // It has to be out. In the bag it is switched off and in a bag.
+    const prop = giftProps.find((m) => m.userData && m.userData.key === key);
+    if (!prop) return 'not out';
+    if (!on) {
+      delete signals[key];
+      if (audio && audio.buzz) audio.buzz(false);
+      return 'off';
+    }
+    signals[key] = { prop, t: 0, at: prop.position.clone() };
+    return 'on';
+  }
+
+  /** Whether a signal can be sent at all: your phone on you, or the laptop. */
+  function signalCan() {
+    const hasPhone = typeof satchelHas === 'function' && satchelHas('phone');
+    const atPc = typeof comp !== 'undefined' && !!comp;
+    return hasPhone || atPc;
+  }
+
+  /** The rattle, the creep, and how loud it is from where you are standing. */
+  function signalTick(dt, cam) {
+    const keys = Object.keys(signals);
+    if (!keys.length) return;
+    let near = 1e9;
+    for (const k of keys) {
+      const sg = signals[k];
+      sg.t += dt;
+      const a = sg.t * SIGNAL.hz;
+      sg.prop.position.set(
+        sg.at.x + Math.sin(a) * SIGNAL.walk,
+        sg.at.y + Math.abs(Math.sin(a * 2)) * SIGNAL.walk * 0.4,
+        sg.at.z + Math.cos(a * 0.9) * SIGNAL.walk);
+      // And it creeps: a thing vibrating on a hard surface does not stay put.
+      sg.at.x += Math.sin(sg.t * 0.7) * dt * 0.004;
+      sg.at.z += Math.cos(sg.t * 0.53) * dt * 0.004;
+      if (cam) {
+        near = Math.min(near, Math.hypot(cam.x - sg.prop.position.x,
+          cam.z - sg.prop.position.z));
+      }
+    }
+    if (audio && audio.buzz) audio.buzz(true, Math.min(near, SIGNAL.hear));
+  }
+
   function wearableParts(key, where) {
     if (key === 'headphones') return [{ group: headphonesGroup(), bone: 'head' }];
     if (where === 'wrists') {
@@ -41308,6 +41384,10 @@ async function buildJadrija(scene) {
     const who = at || cam;
     const [pt, ps] = local(who.x, who.z);
     stepPhones(cam);
+    // The thing on the table with a motor in it — see SIGNAL. Here rather
+    // than in her step, because it is scenery and carries on whether she is
+    // being posed this frame or not.
+    signalTick(dt, cam);
 
     // Unconditional, and carries its own gate inside instead. The balloon work
     // is two subtractions and a hypot and wants no gate at all; the pose is
@@ -42912,6 +42992,17 @@ async function buildJadrija(scene) {
     whyShow: () => (show ? (show.why || null) : null),
     /** The shop counter you are standing at, or null — see `counterAt`. */
     counter: (x, z) => counterAt(x, z),
+    /**
+     * Send a signal to something you have put down — see SIGNAL. Answers in
+     * words: 'on', 'off', 'not out', 'no receiver', or 'no sender' when you
+     * have neither your phone on you nor the laptop in front of you.
+     */
+    signal: (key, on = true) => {
+      if (!signalCan()) return 'no sender';
+      return signalSet(key, on !== false);
+    },
+    /** What is buzzing right now. */
+    signals: () => Object.keys(signals),
     /** What she saw on the last recon, and what she came back and reported. */
     seen: () => (show ? (show.seen || null) : null),
     told: () => (show ? (show.told || null) : null),

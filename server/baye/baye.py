@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.18.1"
+VERSION = "1.19.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -555,6 +555,8 @@ ASK_RE = re.compile(
     r"|\b(lay|lie|roll)\s*(down\s*)?flat\b"
     r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
+    r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
+    r"|\b(stop|silence)\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
@@ -720,6 +722,29 @@ GIVE_WORDS = (
 )
 
 
+# ── AND A SIGNAL FROM YOUR PHONE ──────────────────────────────────────────────
+#
+# Not a skill: she has no part in it. The page turns `buzz:<key>` into a signal
+# to a thing you have put down — see SIGNAL in src/43-jadrija.js — and the rule
+# about whether it gets through (your phone on you, or the laptop in front of
+# you) is the page's, because only the page knows where you are standing.
+BUZZ_RE = re.compile(r"\b(buzz|vibrate|switch on|turn on|start)\b")
+HUSH_RE = re.compile(r"\b(stop|switch off|turn off|silence|quiet)\b")
+
+
+def buzz_of(text: str):
+    """`buzz:<key>` or `hush:<key>` if the sentence works a remote."""
+    t = (text or "").lower()
+    on = BUZZ_RE.search(t)
+    off = HUSH_RE.search(t)
+    if not on and not off:
+        return None
+    for key, pat in GIVE_WORDS:
+        if re.search(r"\b(" + pat + r")", t):
+            return ("hush:" if off else "buzz:") + key
+    return None
+
+
 def give_of(text: str):
     """`give:<key>` if the sentence hands her something out of the bag."""
     t = (text or "").lower()
@@ -747,6 +772,11 @@ def skills_of(text: str) -> list:
     gift = give_of(t)
     if gift:
         return [gift]
+    # The remote, before the table: "buzz the lovense" names a thing in the
+    # bag and a verb no skill of hers uses.
+    rem = buzz_of(t)
+    if rem:
+        return [rem]
     out = []
     for name, (_desc, pats) in SKILLS.items():
         if all(re.search(p, t) for p in pats):

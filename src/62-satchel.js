@@ -131,8 +131,20 @@ const CARRY = [
   { key: 'headphones', label: 'Bose noise-cancelling headphones',
     give: true, worn: true, box: [0.17, 0.18, 0.08], col: [0.11, 0.11, 0.12],
     wear: 'head' },
+  // `radio` marks a thing with a motor and a receiver in it: put it down
+  // somewhere and a signal from your phone or the laptop reaches it. See
+  // SIGNAL in 43-jadrija.js.
   { key: 'lovense', label: 'a Lovense remote-control toy',
-    give: true, worn: true, box: [0.04, 0.12, 0.04], col: [0.62, 0.12, 0.18] },
+    give: true, worn: true, box: [0.04, 0.12, 0.04], col: [0.62, 0.12, 0.18],
+    radio: true },
+  // ── AND A PHONE ───────────────────────────────────────────────────────
+  //
+  // Misha, 18 Sep 2026: *"that's another thing Chloe needs, a cellphone"*.
+  // It is the sender — the thing that has to be ON you for a signal to go
+  // anywhere, which is what makes the laptop in the vikendica a second way to
+  // do it rather than the only way. 147 x 71 x 8 mm, which is a phone.
+  { key: 'phone', label: 'your phone', worn: true,
+    box: [0.071, 0.147, 0.008], col: [0.10, 0.10, 0.12] },
 ];
 
 const CARRY_BY_KEY = {};
@@ -160,7 +172,7 @@ const SATCHEL = {
   // Three things, and they are in the bag from the first frame rather than
   // put there by a shop — see `worn` in CARRY. Everything else in here is
   // something you bought.
-  have: { cuffs: 1, headphones: 1, lovense: 1 },
+  have: { cuffs: 1, headphones: 1, lovense: 1, phone: 1 },
 };
 
 /**

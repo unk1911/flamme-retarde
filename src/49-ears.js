@@ -360,6 +360,24 @@ const ears = (() => {
       // being the refusal he was getting.
       if (d.does && d.does.length) {
         for (const name of d.does) {
+          // ── A SIGNAL, WHICH IS NOT SOMETHING SHE DOES ──────────────────
+          //
+          // `buzz:<key>` and `hush:<key>` are the player's own phone talking
+          // to a thing on a table, so they never reach `askShow` — she has no
+          // part in it. See SIGNAL in 43-jadrija.js.
+          if (name.startsWith('buzz:') || name.startsWith('hush:')) {
+            const on = name.startsWith('buzz:');
+            const key = name.slice(5);
+            const J2 = typeof jadrija !== 'undefined' && jadrija;
+            const got = J2 && J2.signal ? J2.signal(key, on) : 'nothing';
+            note('phone: ' + (got === 'on' ? 'sent — it is going'
+              : got === 'off' ? 'sent — off'
+                : got === 'not out' ? 'it is still in your satchel'
+                  : got === 'no sender' ? 'you have no phone on you'
+                    : got === 'no receiver' ? 'that one has no receiver in it'
+                      : got), got === 'on' || got === 'off' ? 'did' : 'meta');
+            continue;
+          }
           const J = typeof jadrija !== 'undefined' && jadrija;
           // THREE ANSWERS AND NOT TWO — see `askShow` in 43-jadrija.js.
           // `false` is a name she does not know; `true` is armed; a STRING is

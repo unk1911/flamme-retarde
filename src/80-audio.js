@@ -888,6 +888,58 @@ function buildAudio() {
       at: t0 + 0.078 });
   }
 
+  /**
+   * A small motor in a thing on a table, heard across a room.
+   *
+   * Misha, 18 Sep 2026: *"have the lovense sit on the table next to the wine
+   * glass and wire in the logic to remotely trigger it from the laptop or a
+   * cellphone"*.
+   *
+   * What a little motor in a hard object on a hard surface actually sounds
+   * like is the SURFACE rather than the motor: a low buzz somewhere near 90 Hz
+   * with its second harmonic, plus the rattle of the thing walking a
+   * millimetre at a time across wood. It is a loop rather than a one-shot, so
+   * `buzz(on)` starts and stops it and the caller does not have to keep time.
+   *
+   * `d` is metres away, and it dies fast: this is a quiet noise in a small
+   * room and there is nothing to hear from the next hut.
+   */
+  let buzzOsc = null, buzzGain = null, buzzHarm = null, buzzLfo = null;
+  function buzz(on, d = 0) {
+    if (!ctx) return false;
+    if (!on) {
+      if (buzzGain) buzzGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      return false;
+    }
+    const far = Math.max(0, 1 - d / 7);
+    if (!buzzOsc) {
+      buzzOsc = ctx.createOscillator();
+      buzzOsc.type = 'triangle';
+      buzzOsc.frequency.value = 88;
+      buzzHarm = ctx.createOscillator();
+      buzzHarm.type = 'square';
+      buzzHarm.frequency.value = 176;
+      const hg = ctx.createGain();
+      hg.gain.value = 0.22;
+      buzzGain = ctx.createGain();
+      buzzGain.gain.value = 0;
+      // The wobble: a motor in a loose object is never one pitch for long.
+      buzzLfo = ctx.createOscillator();
+      buzzLfo.frequency.value = 5.5;
+      const lg = ctx.createGain();
+      lg.gain.value = 6;
+      buzzLfo.connect(lg).connect(buzzOsc.frequency);
+      buzzOsc.connect(buzzGain);
+      buzzHarm.connect(hg).connect(buzzGain);
+      buzzGain.connect(master);
+      buzzOsc.start();
+      buzzHarm.start();
+      buzzLfo.start();
+    }
+    buzzGain.gain.setTargetAtTime(0.055 * far, ctx.currentTime, 0.08);
+    return true;
+  }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
@@ -6747,7 +6799,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

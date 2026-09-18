@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.415.0] — 2026-09-18 (baye 1.19.0)
+
+### a phone, and something that answers it
+
+**"have the lovense sit on the table next to the wine glass and wire in the
+logic to remotely trigger it from the laptop or a cellphone"**, and **"that's
+another thing Chloe needs, a cellphone"**.
+
+You now carry a phone. It is the SENDER, and it has to be on you — which is
+what makes it a phone rather than a keyboard shortcut. The laptop in the
+vikendica is the second way, and it needs you in front of it, which is what
+makes the walk up there mean something. Neither has a range: a radio crossing
+two hundred metres of promenade is the one thing here not worth modelling.
+
+A receiver is a satchel row with `radio: true` and a thing you have put down —
+hand it to her, she sets it on the tabouret, and from then on it answers. It
+buzzes and it walks a millimetre at a time across the wood, which is what a
+small motor on a hard surface does; the rattle is a sine against the clock
+rather than a random walk, so a thing left going is in the same place on a
+reload, like everything else in this resort. It dies away over seven metres.
+
+The sound is three parts and the surface is most of it: 88 Hz with its second
+harmonic, a 5.5 Hz wobble on the pitch because a motor in a loose object is
+never one note for long, and it runs as a loop so the caller does not keep
+time.
+
+Typed: "buzz the lovense", "turn it on", "stop the lovense", "switch off the
+toy". Answers plainly — *it is still in your satchel*, *you have no phone on
+you*, *that one has no receiver in it*.
+
+Measured: the bag lists cuffs, headphones, lovense and phone; handing the toy
+over takes it to three and puts it on the table; the signal answers `on` and
+`signals()` lists it; with the phone taken out of the bag the same call
+answers `no sender`; put back, it answers `off` and the list empties.
+
+TWO THINGS THAT BIT, both mine and both the same shape: an edit script that
+asserts its way out writes NOTHING, so twice today a block of code went missing
+while the lines that CALL it landed — once leaving `signalTick is not defined`
+in the boot, which the probe caught before it ever reached the site.
+
 ## [1.414.1] — 2026-09-18 (baye 1.18.1)
 
 ### ornamental cuffs
