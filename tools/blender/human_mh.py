@@ -4228,6 +4228,68 @@ CRADLE_B["@root"] = (0.16, 0.0, RECLINE_ROOT + 0.006)
 CRADLE_B["head"] = (-23, 4, 0)
 
 
+# ── FACE DOWN ─────────────────────────────────────────────────────────────────
+#
+# Misha, 17 Sep 2026: *"if i say 'lay flat' she should lay flat on her tummy"*.
+#
+# A POSE AND NOT A RUNTIME ROTATION, and the failed attempt is the argument.
+# 43-jadrija.js tried it as one `aim`: CRADLE lays her out by turning the pelvis
+# 90°, so a half turn about her long axis ought to be the difference between her
+# back and her front. It is not — `aim` works in FIGURE space, where the axes are
+# fixed and her long axis after the clip's own 90° is not one of them. Measured:
+# her head went to 3.39 m with the mattress at 3.55, so her face was a sixth of
+# a metre inside the bed, and the same stacked rotation flipped the frame her leg
+# aims work in, turning "legs down" into legs up.
+#
+# Here the axis is the rig's. `pelvis` is the bone the lay-down lives on, so the
+# roll goes on the same triple that already holds the 90°, and everything below
+# it — spine, legs, arms — is authored in the frame it lands in.
+#
+# Her weight is on her front, so: the chest lifts a little rather than being
+# driven into the mattress, the head turns to lie on a cheek (nobody sleeps with
+# their nose in a pillow), the arms come up beside her head with the elbows out,
+# and the feet relax so the toes point back down the bed rather than at the
+# ceiling.
+PRONE = {
+    "@root": (0.16, 0.0, RECLINE_ROOT),
+    "pelvis": (-90, 0, 0),
+    # A shallow arch through the back, which is what a body on its front does:
+    # the shoulders come up off the surface and the belly stays on it.
+    "spine01": (-5, 0, 0), "spine02": (-5, 0, 0), "spine03": (-4, 0, 0),
+    "chest": (-4, 0, 0),
+    # HER HEAD ON A CHEEK, and the pitch is the one number here that was found
+    # rather than reasoned. Nobody sleeps with their nose in a pillow, so the
+    # head has to come up to the surface and turn — and the sign is the
+    # opposite of the obvious one: probed, the head sat at z 0.804 with the
+    # neck at +10 and went DOWN to 0.734 as that went to −34. +64 puts it at
+    # 0.905, level with the chest's 0.894 and just under the pelvis's 0.934,
+    # which is a head resting on the bed rather than pressed into it.
+    "neck": (64, 0, 0), "head": (34, 52, 0),
+    "clavicleL": (0, 0, 5), "clavicleR": (0, 0, -5),
+    # ARMS AT HER SIDES, and these are IDLE_A's own numbers rather than new
+    # ones: zero in this rig is the rest pose with the arms held out, so the
+    # first pass — which set the abduction to 3° and thought that meant "down"
+    # — probed her hands 0.91 m apart on a cot 0.70 m across.
+    "armUL": (-6, 0, STAND_ARM_IN),
+    "armLL": (-14 + STAND_ELBOW_UNDO, 0, STAND_FORE_IN), "handL": (-4, 0, 0),
+    "armUR": (-4, 0, -STAND_ARM_IN),
+    "armLR": (-11 + STAND_ELBOW_UNDO, 0, -STAND_FORE_IN), "handR": (-4, 0, 0),
+    # And the legs flat, which is a degree of EXTENSION and not zero: probed
+    # at zero the ankles sat 0.11 m above the pelvis, because in this frame a
+    # positive hip lifts the leg off the bed behind her.
+    "legUL": (-1, 0, 6), "legLL": (-1, 0, 0), "footL": (-14, 0, 0),
+    "legUR": (-1, 0, -6), "legLR": (-1, 0, 0), "footR": (-14, 0, 0),
+}
+
+# The breath, for CRADLE_B's reason: a held pose that does not move is a
+# mannequin. Everything small.
+PRONE_B = dict(PRONE)
+PRONE_B["@root"] = (0.16, 0.0, RECLINE_ROOT + 0.005)
+PRONE_B["spine01"] = (-7, 0, 0)
+PRONE_B["chest"] = (-6, 0, 0)
+PRONE_B["head"] = (7, 50, 0)
+
+
 # ── the somersault ──────────────────────────────────────────────────────────
 #
 # One tucked front somersault, and the entire revolution is carried on `pelvis`
@@ -6838,6 +6900,13 @@ CLIPS = [
               (2.30, CRADLE)]},
     {"name": "cradle", "loop": True,
      "keys": [(0.0, CRADLE), (2.6, CRADLE_B), (5.2, CRADLE)]},
+    # Over on to her front, from the pose she is already holding — so the clip
+    # IS the roll and there is nothing to crossfade through. Once, because it
+    # ends somewhere she stays; `flatheld` is the breathing loop after it.
+    {"name": "flat", "loop": False,
+     "keys": [(0.0, CRADLE), (0.9, RECLINE_B), (1.9, PRONE)]},
+    {"name": "flatheld", "loop": True,
+     "keys": [(0.0, PRONE), (2.4, PRONE_B), (4.8, PRONE)]},
     # And back up, which is the same three keys in reverse and is a clip rather
     # than a crossfade for a reason worth writing down: `getup` starts from
     # FOURS, and blending from a woman on her back with her knees up to a woman

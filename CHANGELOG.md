@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.410.0] — 2026-09-17 (baye 1.16.0)
+
+### legs down, legs up, and flat on her front
+
+**"when she's laying on the cot, her legs go up. and she stays in that
+position. from here if i say 'legs down', she lowers her legs down. if i say
+'legs up', she raises legs up again. if i say 'lay flat' she should lay flat on
+her tummy"**.
+
+THE LEGS ARE A LATCH, not a phase: she stays in `cradle`, which is the same
+pose with her legs somewhere else, so the hold and the mattress carry on
+untouched. And the amount is not invented — `_cradle(hip, knee, …)` in
+tools/blender/human_mh.py flexes the hips 118° and the knees 78°, so lowering
+them is undoing 0.92 of a known number. Measured: her ankle goes from 0.62 m
+above her hip to 0.14 m below it, which is the mattress, and comes back.
+
+It took two goes for a reason worth writing down. The first put the aims in
+the `cradle` case, and the HOP a few lines below it aims the same four bones
+every frame — with an angle of zero, which deletes an aim. So the rotation
+lived exactly one frame and her ankle moved 2 cm instead of 76. The legs are
+applied after the tuck now.
+
+FACE DOWN IS A BAKED POSE, and the attempt that was not is in the source as a
+comment, because it is the more useful half of the story. The idea was one
+`aim`: the cradle lays her out by turning the pelvis 90°, so a half turn about
+her long axis ought to be the difference between her back and her front. It is
+not — `aim` works in FIGURE space, where the axes are fixed, and her long axis
+after the clip's own 90° is not one of them. Her head went to 3.39 m with the
+mattress at 3.55, so her face was a sixth of a metre inside the bed, and the
+same stacked rotation flipped the frame the leg aims work in, turning "legs
+down" into legs up.
+
+So `PRONE` is a pose in the exporter, next to `CRADLE`, and `flat`/`flatheld`
+are baked clips: the roll, and the breath after it. Thirty clips now.
+
+Every number in that pose was probed rather than reasoned, and two of them
+were the opposite of the obvious. The neck: her head sat 0.13 m BELOW her
+pelvis at +10° and went further down as that went negative, so the lift is
++64°, which puts it at 0.905 against the chest's 0.894 — a head resting on a
+cheek rather than pressed into the bed. The arms: zero in this rig is the rest
+pose with the arms held out, so "at her sides" is IDLE_A's own constants, and
+the first pass had her hands 0.91 m apart on a cot 0.70 m across.
+
+And the roll swapped her ends, because `PRONE` lays the head along +x from the
+pelvis and the recline family lays it the other way — photographed with her
+head at the foot of the cot. The fix is the cartwheel's own mechanism: a held
+offset between where a body is pointed and how it is laid out, half a turn
+about the pelvis, so only the ends move.
+
+Server (baye 1.16.0): legs down / legs up / knees up, lay flat, lie flat, flat
+on your tummy, face down, roll over.
+
 ## [1.409.1] — 2026-09-17
 
 ### she stops walking out of the door she is already through

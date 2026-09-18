@@ -32715,6 +32715,51 @@ async function buildJadrija(scene) {
     /** Asked for rather than hosed into — see `keptAsked`. */
     cradleAsked: 150,
     /**
+     * ── HER LEGS, WHILE SHE IS ON HER BACK ────────────────────────────
+     *
+     * Misha, 17 Sep 2026: *"when she's laying on the cot, her legs go up. and
+     * she stays in that position. from here if i say 'legs down', she lowers
+     * her legs down. if i say 'legs up', she raises legs up again"*.
+     *
+     * The pose is `CRADLE` in tools/blender/human_mh.py and it is built by
+     * `_cradle(hip, knee, ...)` with hip −118° and knee 78° — so "legs down"
+     * is undoing a KNOWN amount rather than inventing one, which is what the
+     * hug taught me to stop doing. These are those two angles in radians,
+     * applied negatively through `aim` about the figure's own sagittal axis
+     * (+z, the axis the hop tuck uses to bring her knees up).
+     *
+     * Not quite all of it: a leg laid flat on a mattress is not a leg in
+     * anatomical zero, and the last few degrees of hip extension would drive
+     * her heels through the bed. 0.92 of the flexion, measured off the ankle
+     * height — see `legsFlat`.
+     */
+    legsHip: 2.060,
+    legsKnee: 1.361,
+    legsAll: 0.92,
+    /** Seconds for the legs to go down or come up. A leg is not a switch. */
+    legsIn: 0.9,
+    /**
+     * ── FACE DOWN NEEDS A CLIP, AND HERE IS WHY ───────────────────────
+     *
+     * Misha asked for *"lay flat on her tummy"* and this is where the attempt
+     * went and why it is not here. The idea was one `aim`: `CRADLE` lays her
+     * out by rotating the pelvis 90°, so a half turn about her long axis
+     * should be the difference between her back and her front.
+     *
+     * It is not, and the measurement says so plainly: rolling the pelvis π
+     * about the FIGURE's x put her head at 3.39 m with the mattress at 3.55 —
+     * her face a sixth of a metre inside the bed — because the figure's axes
+     * are fixed and her long axis after the clip's own 90° is not one of them.
+     * Worse, it flips the frame the leg aims work in, so "legs down" became
+     * legs up: her ankle stayed at 4.28 when it should have gone to 3.54.
+     *
+     * Stacking figure-space rotations on a body a clip has already laid down
+     * is the wrong tool. Prone is a POSE — `_cradle`'s sibling in
+     * tools/blender/human_mh.py, with the pelvis rolled in the rig where the
+     * axis is hers rather than the figure's — and it wants Blender and a
+     * re-bake, not another aim.
+     */
+    /**
      * And on the cot, which is longer again.
      *
      * Misha: *"sometimes she should 'lie down on the back on the floor' and
@@ -33386,6 +33431,35 @@ async function buildJadrija(scene) {
     }
   }
   const _hugGoal = new THREE.Vector3(), _hugPole = new THREE.Vector3();
+
+  /**
+   * Her legs down, or back up, over `legsIn` seconds.
+   *
+   * `aim` lays one rotation over whatever the clip is doing, in figure space
+   * — see 41-skin.js — so this is the clip's own flexion undone rather than a
+   * second pose fighting it. Both legs and both joints, and the FEET go with
+   * the knees: a shin that straightens while the ankle keeps the pose's
+   * −16° points the toes at the ceiling.
+   */
+  function legsFlat(f, dt) {
+    const want = show.legsDown ? 1 : 0;
+    show.legsAt = damp(show.legsAt || 0, want, 1 / SHOW.legsIn, dt);
+    const k = show.legsAt * SHOW.legsAll;
+    if (k < 0.002 && !show.legsDown) {
+      if (show.legsWasOn) {
+        for (const n of ['legUL', 'legLL', 'legUR', 'legLR', 'footL', 'footR']) {
+          f.aim(n, 0, 0, 1, 0);
+        }
+        show.legsWasOn = 0;
+      }
+      return;
+    }
+    show.legsWasOn = 1;
+    for (const side of ['L', 'R']) {
+      f.aim('legU' + side, 0, 0, 1, -SHOW.legsHip * k);
+      f.aim('legL' + side, 0, 0, 1, -SHOW.legsKnee * k);
+    }
+  }
 
   function nearClose(pt, ps, dir, want, dt) {
     let fx = 0, fz = 0;
@@ -34117,6 +34191,10 @@ async function buildJadrija(scene) {
     // which is the same number the heart gets, and it is on her the whole way
     // down rather than arriving at the bottom.
     recline: 0.95, cradle: 1.00, situp: 0.85,
+    // Face down: the roll, and the breath after it. Baked 17 Sep — see PRONE
+    // in tools/blender/human_mh.py, which is where the argument for it being
+    // a clip rather than a runtime rotation is written down.
+    flat: 0.95, flatheld: 1.00,
   };
 
   /**
@@ -34129,8 +34207,11 @@ async function buildJadrija(scene) {
   /** The three where she is close enough to touch you on purpose. */
   const NEARBY = { toYou: 1, kiss: 1, hug: 1 };
 
-  /** The two she is on her back for — the way down and the hold. */
-  const LYING = { recline: 1, cradle: 1 };
+  /**
+   * The four she is lying down for: on her back, the way down to it, and the
+   * same again on her front.
+   */
+  const LYING = { recline: 1, cradle: 1, flat: 1, flatheld: 1 };
 
   const KNEES = { submit: 1, kept: 1, creep: 1,
     // On her back she still drinks it — the mouth, the foam and what runs down
@@ -34213,7 +34294,7 @@ async function buildJadrija(scene) {
     // kneel, "lie down" is the next step; asked from the floor, "on the bed"
     // is a move; asked from either, the dances and the errands are her getting
     // up and going, which is what a person does when you change your mind.
-    kept: 1, cradle: 1, fours: 1 };
+    kept: 1, cradle: 1, fours: 1, flatheld: 1 };
 
   /**
    * WHAT SHE CAN BE ASKED FOR. Every one of these is a number she already has
@@ -34290,6 +34371,19 @@ async function buildJadrija(scene) {
      * AND an authored exit and needed neither: it needed a name.
      */
     fours: 1,
+    /**
+     * And the two adjustments to the pose she is already in. These are the
+     * first things in this table that are not a number or an errand: they
+     * change a pose she is holding without changing the pose.
+     */
+    'legs.down': 1, 'legs.up': 1,
+    /**
+     * And over on to her front. Misha: *"if i say 'lay flat' she should lay
+     * flat on her tummy"*. A baked pose and a baked roll — PRONE in
+     * tools/blender/human_mh.py — because stacking figure-space rotations on a
+     * body a clip has already laid down put her face 0.16 m inside the bed.
+     */
+    flat: 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
@@ -34374,6 +34468,20 @@ async function buildJadrija(scene) {
         return 'already';
       }
       if (name === 'recline.bed' && (!kit || !kit.cot)) return 'nobed';
+      return null;
+    }
+    if (name === 'legs.down' || name === 'legs.up') {
+      // Only from the pose they are about. Everywhere else her legs are
+      // whatever the clip says and there is nothing to raise or lower.
+      if (!LYING[show.phase]) return 'notlying';
+      const want = name === 'legs.up' ? 0 : 1;
+      if ((show.legsDown || 0) === want) return want ? 'legsalready' : 'legsup';
+      return null;
+    }
+    if (name === 'flat') {
+      if (show.phase === 'flatheld' || show.phase === 'flat') return 'already';
+      // From her back, which is where the roll starts. Asked standing she is
+      // taken down first — see the entry.
       return null;
     }
     if (name === 'fours') {
@@ -34631,7 +34739,7 @@ async function buildJadrija(scene) {
     // and she is not already doing something the room does not own, and it
     // fires on the frame AFTER the kiss is armed. So the kiss was starting and
     // being overridden by the hut, every time, and what you saw was the wine.
-    toYou: 1, kiss: 1, hug: 1, fours: 1 };
+    toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -35284,7 +35392,7 @@ async function buildJadrija(scene) {
     // is a bug rather than a choice: in the air (the hop integrator owns her
     // vertical), on fire, and turned — the last one being the promenade's
     // answer to the hose, which owns her whole body until it lets go.
-    const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1 };
+    const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
@@ -35385,6 +35493,29 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toYou', 'walk', 0.34);
         }
+      } else if (name === 'flat') {
+        show.byAsk = 1;
+        show.queue.length = 0;
+        showSay('squee', d);
+        // The roll starts from the cradle, so from anywhere else she gets
+        // there first and `cradle` sends her on — see `show.flatWant`.
+        if (show.phase === 'cradle') {
+          show.legsDown = 0;
+          go('flat', 'flat', 0.34);
+        } else {
+          show.flatWant = 1;
+          show.lieWant = show.onBed || (kit && kit.cot) ? 'bed' : 'floor';
+          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
+          else go('submit', 'submit', 0.30);
+        }
+      } else if (name === 'legs.down' || name === 'legs.up') {
+        // A LATCH AND NOT A PHASE. She stays in `cradle` — it is the same
+        // pose with her legs somewhere else — so the hold, the aim at you and
+        // the mattress all carry on untouched.
+        show.legsDown = name === 'legs.down' ? 1 : 0;
+        show.did = name;
+        showSay('squee', d);
       } else if (name === 'fours') {
         show.queue.length = 0;
         show.side = 0;
@@ -35709,7 +35840,47 @@ async function buildJadrija(scene) {
       // walking past it is a compass needle, not a person. `want` keeps
       // whatever `recline` left it at. Every other indoor phase re-aims every
       // frame and every one of them is upright.
+      // ── ON HER FRONT ──────────────────────────────────────────────────
+      //
+      // `flat` is the roll and `flatheld` is where she stays. Neither aims at
+      // you: a body lying on its front cannot turn to face somebody without
+      // rolling over, which is the same argument the note over `cradle` makes
+      // about not being a compass needle.
+      case 'flat':
+        if (show.onBed && kit && kit.cot) {
+          show.mat = damp(show.mat || 0,
+            Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
+        }
+        if (done) go('flatheld', 'flatheld', 0.30);
+        break;
+
+      case 'flatheld':
+        if (show.onBed && kit && kit.cot) {
+          show.mat = damp(show.mat || 0,
+            Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
+        }
+        if (show.getUp) {
+          show.getUp = 0;
+          // Over on to her back first: `situp` starts from the cradle and
+          // there is nothing in the bank that gets off a front directly.
+          go('cradle', 'cradle', 0.40);
+          break;
+        }
+        if (show.tmr > (show.onBed ? SHOW.bedFor
+          : show.byAsk ? SHOW.cradleAsked : SHOW.cradleFor)) {
+          go('cradle', 'cradle', 0.40);
+        }
+        break;
+
       case 'cradle':
+        // Asked for her front while she was somewhere else: the cradle is the
+        // landing on the way, so it sends her straight on.
+        if (show.flatWant) {
+          show.flatWant = 0;
+          show.legsDown = 0;
+          go('flat', 'flat', 0.34);
+          break;
+        }
         // Same hold as `kept` and for the same reason: `hit` is the grace
         // window the jet refreshes, so keeping the branch on her keeps her
         // there.
@@ -35745,6 +35916,9 @@ async function buildJadrija(scene) {
         // behind is a woman kneeling in mid-air over a bed.
         if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
         if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
+        // And her legs back to the pose's own, or the next time she lies down
+        // she arrives already flat.
+        show.legsDown = 0;
         // AND OFF THE BED ITSELF, which is the other half of getting up from
         // one — see `untangle`. Lying on the cot puts her inside its blocker,
         // and a woman standing inside a blocker cannot take a step in any
@@ -37048,6 +37222,17 @@ async function buildJadrija(scene) {
       f.aim('legLR', 0, 0, 1, -k * SHOW.tuckKnee);
     }
 
+    // ── AND HER LEGS, WHILE SHE IS LYING DOWN ────────────────────────────
+    //
+    // AFTER THE HOP AND NOT INSIDE THE PHASE, which is the whole of why the
+    // first cut did nothing. The tuck above aims the same four bones EVERY
+    // frame, and `aim` with an angle of zero deletes the aim — so a rotation
+    // set in the `cradle` case was wiped a few lines later, every frame, by a
+    // hop that was not happening. MEASURED: her ankle moved 2 cm when it
+    // should have moved half a metre, which is one frame of the aim surviving.
+    if (LYING[show.phase]) legsFlat(f, dt);
+    else if (show.legsWasOn) legsFlat(f, dt);
+
     // Turn towards `want` at a rate a person turns at, and never the long way
     // round — the shore's frame wraps and a heading that crosses the wrap would
     // otherwise spin her through a whole circle to move by a degree. The wrap
@@ -37083,8 +37268,19 @@ async function buildJadrija(scene) {
       // line the body goes over and that line is ninety degrees off the way she
       // is facing. A fixed offset held for the length of the move and given
       // back afterwards, which is what this branch is for.
+      // A HALF TURN FOR HER FRONT, which is the same mechanism and the same
+      // argument as the cartwheel's quarter: where a body is POINTED and
+      // which way it is laid out are two different things, and this is the
+      // offset between them.
+      //
+      // `PRONE` lays her head along +x from the pelvis and the recline family
+      // lays it the other way, so without this the roll swaps her ends —
+      // photographed with her head at the foot of the cot and her feet on the
+      // pillow. Half a turn about her own pelvis puts them back, and nothing
+      // else has to know: the pelvis is the pivot, so only the ends move.
       const wantSide = show.phase === 'aim' || show.phase === 'wheel'
-        ? -Math.PI / 2 : 0;
+        ? -Math.PI / 2
+        : (show.phase === 'flat' || show.phase === 'flatheld') ? Math.PI : 0;
       show.sideRate = turnRate(wantSide - show.side, show.sideRate,
         SHOW.sideMax, dt);
       show.side += show.sideRate * dt;

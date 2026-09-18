@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.15.0"
+VERSION = "1.16.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -444,6 +444,18 @@ SKILLS = {
              [r"\b(kiss\w*|smooch\w*|snog\w*|poljub\w*)\b"]),
     "hug": ("come over and hug you",
             [r"\b(hug\w*|cuddl\w*|embrace\w*|hold me|come here|zagrljaj\w*)\b"]),
+    # HER LEGS, WHILE SHE IS ON HER BACK, and over on to her front. Misha,
+    # 17 Sep 2026: *"if i say 'legs down', she lowers her legs down. if i say
+    # 'legs up', she raises legs up again... if i say 'lay flat' she should lay
+    # flat on her tummy"*. The first two are adjustments to a pose she is
+    # already holding; the third is a baked roll — see PRONE.
+    "legs.down": ("lower her legs while she lies on her back",
+                  [r"\blegs?\s*(down|flat|out|straight)\b|\bstraighten your legs\b"]),
+    "legs.up": ("raise her legs again while she lies on her back",
+                [r"\blegs?\s*(up|back up)\b|\bknees up\b"]),
+    "flat": ("roll over and lie flat on her front",
+             [r"\b(lay|lie|roll)\s*(down\s*)?flat\b|\bflat on your (tummy|stomach|front|belly)\b"
+              r"|\bon your (tummy|stomach|belly|front)\b|\bface down\b|\broll over\b"]),
     # ON ALL FOURS, which the `kneel` clip has always ended on.
     "fours": ("get down on all fours in the kabina and stay there",
               [r"\ball fours\b|\bon all four\b|\bhands and knees\b"
@@ -524,6 +536,8 @@ ASK_RE = re.compile(
     r"|\b(stand|get)\s+(up|upright)\b|\bon your feet\b"
     r"|\b(kiss|hug|cuddle|hold)\s+me\b|\bcome here\b"
     r"|\ball fours\b|\bhands and knees\b"
+    r"|\blegs? (up|down)\b|\bflat on your\b|\bface down\b|\broll over\b"
+    r"|\b(lay|lie|roll)\s*(down\s*)?flat\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"

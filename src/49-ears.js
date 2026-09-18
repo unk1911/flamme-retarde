@@ -425,6 +425,9 @@ const ears = (() => {
     // And the way out of all of them, which the long holds made necessary.
     rise: 'back up on her feet',
     fours: 'down on all fours',
+    'legs.down': 'legs down', 'legs.up': 'legs back up',
+    flat: 'over on to her front',
+    flat: 'flat on her front',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she
@@ -463,6 +466,9 @@ const ears = (() => {
     nobed: 'there is no bed in here',
     standing: 'she is already on her feet',
     lying: 'she is on her back — get her up first',
+    notlying: 'she is not lying down',
+    legsalready: 'her legs are already down',
+    legsup: 'her legs are already up',
     carrying: 'she is already carrying one',
     onit: 'she has already gone for one',
     noflavour: 'that one is not in the case',
