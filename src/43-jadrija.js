@@ -35878,7 +35878,33 @@ async function buildJadrija(scene) {
       // every other errand in this file stops at four metres, which is
       // "close enough to talk", and these two are not that.
       case 'toYou': {
-        show.dbg = (show.dbg || 0) + 1;
+        // ── THE ROUTE, WHEN YOU ARE NOT STANDING NEXT TO HER ──────────────
+        //
+        // A straight line at you is right for the last few metres and wrong
+        // for the length of a promenade: MEASURED from 43 m away she walked
+        // 40 of them and stopped dead 14 m short, against whatever bench or
+        // kiosk was on the line. `showTo` steers round nothing — that is what
+        // `errandLegs` is for, and the recons have used it since they existed:
+        // down the seaward half of her own lane, which is clear by
+        // construction, and inland at the end.
+        //
+        // The last leg is YOU and is re-read every frame, exactly as `backTo`
+        // does it, because you move while she walks.
+        if (show.nearLegs === undefined) show.nearLegs = null;
+        if (!show.nearLegs && Math.hypot(pt - show.t, ps - show.s) > 7) {
+          show.nearLegs = errandLegs(pt, ps) || null;
+          show.nearLeg = 0;
+        }
+        if (show.nearLegs && show.nearLeg < show.nearLegs.length - 1) {
+          const g = show.nearLegs[show.nearLeg];
+          const left = showTo(g[0], g[1], dt, ERRAND.pace);
+          if (left < ERRAND.near * 2.2) show.nearLeg += 1;
+          if (show.gap0 == null) show.gap0 = Math.hypot(pt - show.t, ps - show.s);
+          if (show.tmr > 12 + show.gap0 / (SHOW.walk * 0.5)) {
+            show.near = null; show.nearLegs = null; show.gap0 = null; showNext();
+          }
+          break;
+        }
         const dT = pt - show.t, dS = ps - show.s;
         const gap = Math.hypot(dT, dS);
         const want = show.near === 'hug' ? SHOW.hugGap : SHOW.kissGap;
@@ -35918,15 +35944,25 @@ async function buildJadrija(scene) {
           // reach", and 0.2 m of slack on the near side is that.
           if (gap < want + 0.20 && face < 0.5) {
             show.kiss = 0;
+            show.gap0 = null;
+            show.nearLegs = null;
             go(show.near === 'hug' ? 'hug' : 'kiss', 'idle', 0.30);
           }
         }
         // And she gives up rather than chasing you down the promenade — but
-        // not before she has had time to cross one. `stall * 2.5` was
-        // seventeen seconds, which is twenty metres of walking, and abandoning
-        // a request because you were standing at the far end of the deck is
-        // the behaviour this whole day has been about.
-        if (show.tmr > ERRAND.stall * 6) { show.near = null; showNext(); }
+        // the allowance is the WALK and not a constant. Seventeen seconds was
+        // twenty metres; forty-two is fifty-five, and standing at the far end
+        // of a five-hundred-metre promenade would still have got you nothing
+        // at all, which is indistinguishable from the feature being broken.
+        // So: eight seconds of turning and settling, plus the distance at
+        // half her pace, measured when she set off.
+        if (show.gap0 == null) show.gap0 = gap;
+        if (show.tmr > 12 + show.gap0 / (SHOW.walk * 0.5)) {
+          show.near = null;
+          show.gap0 = null;
+          show.nearLegs = null;
+          showNext();
+        }
         break;
       }
 
@@ -41579,7 +41615,6 @@ async function buildJadrija(scene) {
       // The two that are with you: which one was asked for, and the clock.
       near: show.near || null, kiss: +(show.kiss || 0).toFixed(2),
       ang: +show.ang.toFixed(2), want: +show.want.toFixed(2),
-      dbg: show.dbg || 0,
       ahead: (() => {
         const o = showAhead(SHOW.look, toWorld(show.t, show.s)[1]);
         return o ? { gap: +o.gap.toFixed(2), out: +o.out.toFixed(2),

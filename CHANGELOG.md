@@ -8,6 +8,27 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.407.1] — 2026-09-17
+
+### and she can get to you from the far end of the promenade
+
+**"how to test/ trigger the kiss/hug? nothing is happening"**. Two reasons it
+could look like nothing, and both were mine.
+
+She walked at you in a straight line, and `showTo` steers round nothing —
+MEASURED from 43 m away she covered 40 of them and stopped dead 14 m short
+against whatever bench was on the line, then stood there. She uses
+`errandLegs` now, the router the recons have always used: down the seaward
+half of her own lane, which is clear by construction, and inland at the end,
+with the last leg being you and re-read every frame because you move.
+
+And her patience was a constant — 42 seconds, which is 55 m of walking, so
+standing at the far end of a five-hundred-metre promenade got you nothing at
+all and looked exactly like a broken feature. It is the distance now, measured
+when she sets off, plus twelve seconds for turning and settling.
+
+Measured after: asked from 43 m she arrived at 0.5 m and the kiss ran.
+
 ## [1.407.0] — 2026-09-17 (baye 1.14.0)
 
 ### she kisses you, and she hugs you
