@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.17.0"
+VERSION = "1.18.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -554,6 +554,7 @@ ASK_RE = re.compile(
     r"|\blegs? (up|down)\b|\bflat on your\b|\bface down\b|\broll over\b"
     r"|\b(lay|lie|roll)\s*(down\s*)?flat\b"
     r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
+    r"|\b(give|hand|pass)\b|\btake the\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
@@ -689,6 +690,47 @@ def fetch_of(text: str):
     return "fetch.cream:" + flavour if flavour else "fetch.cream"
 
 
+# ── HANDING HER SOMETHING ─────────────────────────────────────────────────────
+#
+# Misha, 17 Sep 2026: *"build machinery to take anything out of the satchel and
+# give to her/ handover, regardless of the object"*.
+#
+# The key rides on the skill name — `give:handcuffs` — exactly as the ice
+# cream's flavour does, because `askShow` in src/43-jadrija.js takes one
+# string. The vocabulary is the satchel's own fifteen keys plus the words a
+# person would actually say for them; the page refuses anything you are not
+# carrying, so this only has to recognise the noun.
+GIVE_RE = re.compile(r"\b(give|hand|pass|take)\b")
+GIVE_WORDS = (
+    ("handcuffs", r"handcuffs?|cuffs\b"),
+    ("headphones", r"headphones?|bose\b|cans\b"),
+    ("lovense", r"lovense|toy\b"),
+    ("cigarettes", r"cigarettes?|smokes?|fags?\b|pack of"),
+    ("newspaper", r"newspaper|paper\b"),
+    ("water", r"water|bottle of water"),
+    ("beer", r"beer\b"),
+    ("freezer ice cream", r"ice ?cream from the freezer"),
+    ("sladoled", r"sladoled"),
+    ("kupovi", r"kupovi"),
+    ("krafne", r"krafne|doughnuts?|donuts?"),
+    ("frappe", r"frappe"),
+    ("juice", r"juice"),
+    ("rakija", r"rakija"),
+    ("espresso", r"espresso"),
+)
+
+
+def give_of(text: str):
+    """`give:<key>` if the sentence hands her something out of the bag."""
+    t = (text or "").lower()
+    if not GIVE_RE.search(t):
+        return None
+    for key, pat in GIVE_WORDS:
+        if re.search(r"\b(" + pat + r")", t):
+            return "give:" + key
+    return None
+
+
 def skills_of(text: str) -> list:
     """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
     t = (text or "").lower()
@@ -700,6 +742,11 @@ def skills_of(text: str) -> list:
     fetch = fetch_of(t)
     if fetch:
         return [fetch]
+    # And handing her something, before the table below: "give her the beer"
+    # shares its noun with `BUY` and its verb with nothing else.
+    gift = give_of(t)
+    if gift:
+        return [gift]
     out = []
     for name, (_desc, pats) in SKILLS.items():
         if all(re.search(p, t) for p in pats):

@@ -76,13 +76,25 @@
  */
 const CARRY = [
   // The kiosk. See `STOCK.tisak`.
-  { key: 'cigarettes', label: 'a pack of cigarettes', give: true },
-  { key: 'newspaper', label: 'a newspaper', give: true },
-  { key: 'water', label: 'a bottle of water', give: true, consumed: true },
+  // ── A SIZE AND A COLOUR ───────────────────────────────────────────────
+  //
+  // `box` and `col` are what 43-jadrija.js draws when one of these is handed
+  // over — see GIFT there. A box of the right size in the right colour, and
+  // nothing written on it: rule 12 does not care that a pack of cigarettes is
+  // small. Sizes are the real things: a cigarette pack is 85 × 55 × 22 mm, a
+  // half-litre bottle is 0.24 m tall, a folded newspaper is a tabloid folded
+  // once. Anything with no `box` gets the default in GIFT.
+  { key: 'cigarettes', label: 'a pack of cigarettes', give: true,
+    box: [0.055, 0.085, 0.022], col: [0.78, 0.74, 0.66] },
+  { key: 'newspaper', label: 'a newspaper', give: true,
+    box: [0.20, 0.28, 0.012], col: [0.86, 0.85, 0.80] },
+  { key: 'water', label: 'a bottle of water', give: true, consumed: true,
+    box: [0.066, 0.24, 0.066], col: [0.72, 0.82, 0.86] },
   { key: 'freezer ice cream', label: 'an ice cream out of the freezer',
     give: true, consumed: true },
   // The two caffe bars. `STOCK.mini` and `STOCK.h2o`.
-  { key: 'beer', label: 'a beer', give: true, consumed: true },
+  { key: 'beer', label: 'a beer', give: true, consumed: true,
+    box: [0.066, 0.24, 0.066], col: [0.255, 0.115, 0.045] },
   { key: 'espresso', label: 'espresso', consumed: true },
   { key: 'macchiato', label: 'macchiato', consumed: true },
   { key: 'cappuccino', label: 'cappuccino', consumed: true },
@@ -109,11 +121,12 @@ const CARRY = [
   // apart, because a thing you brought with you and a thing you bought at a
   // kiosk answer different questions. None of them is `consumed`: you do not
   // use these up.
-  { key: 'handcuffs', label: 'a pair of handcuffs', give: true, worn: true },
+  { key: 'handcuffs', label: 'a pair of handcuffs', give: true, worn: true,
+    box: [0.10, 0.03, 0.06], col: [0.72, 0.74, 0.77] },
   { key: 'headphones', label: 'Bose noise-cancelling headphones',
-    give: true, worn: true },
+    give: true, worn: true, box: [0.17, 0.18, 0.08], col: [0.11, 0.11, 0.12] },
   { key: 'lovense', label: 'a Lovense remote-control toy',
-    give: true, worn: true },
+    give: true, worn: true, box: [0.04, 0.12, 0.04], col: [0.62, 0.12, 0.18] },
 ];
 
 const CARRY_BY_KEY = {};
@@ -254,6 +267,19 @@ function satchelList() {
     rows.push(row(key, SATCHEL.have[key]));
   }
   return rows;
+}
+
+/**
+ * The table row for a thing, or null: its size, its colour and its flags.
+ *
+ * 43-jadrija.js asks this when she is handed something, so that the box in
+ * her hand is the size of the thing rather than one size for everything. Read
+ * only — the row is the table's, not a copy, and nothing outside here writes
+ * to it.
+ */
+function satchelRow(what) {
+  const k = satchelKey(what);
+  return (k && CARRY_BY_KEY[k]) || null;
 }
 
 /** How many things in all, counting three beers as three. */

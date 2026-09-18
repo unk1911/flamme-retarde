@@ -429,6 +429,7 @@ const ears = (() => {
     flat: 'over on to her front',
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
+    give: 'coming to take it from you',
     flat: 'flat on her front',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
@@ -473,6 +474,9 @@ const ears = (() => {
     legsup: 'her legs are already up',
     armsalready: 'her arms are already out',
     armsdown: 'her arms are already down',
+    nothaveit: 'you are not carrying that',
+    holding: 'she is already holding something',
+    nothing: 'name the thing',
     carrying: 'she is already carrying one',
     onit: 'she has already gone for one',
     noflavour: 'that one is not in the case',

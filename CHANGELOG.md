@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.413.0] — 2026-09-17 (baye 1.18.0)
+
+### hand her anything
+
+**"build machinery to take anything out of the satchel and give to her/
+handover, regardless of the object. she holds it, examines it, sets it
+aside"**.
+
+`give:<key>` — the key rides on the name the way the ice cream's flavour does,
+so one entry in `SHE_CAN` covers the whole bag. She walks over on the kiss's
+own approach, because you cannot hand somebody something across arm's length
+plus a collider, and then three beats and nothing else: she takes it, she holds
+it up and turns it, and she puts it down.
+
+REGARDLESS OF THE OBJECT is the brief, so it draws a BOX: a thing the size the
+satchel says it is, in the colour the satchel says it is. The ice cream has its
+own cone and the wine its own bottle because those are things you look at
+closely; a pack of cigarettes at arm's length in a dim hut is a small box, and
+pretending otherwise would be fifteen models nobody asked for. The sizes are
+the real ones — 85 × 55 × 22 mm for the cigarettes, 0.24 m for the bottle — and
+nothing is written on any of them.
+
+It leaves your bag on the frame she takes it, through `satchelTake`, so until
+that answers there is nothing in her hand and after it there is nothing in
+yours. And it STAYS where she puts it: on the tabouret indoors, which is the
+only surface in that room, and on the deck at her feet outdoors. A thing set
+aside that vanishes was not set aside. Six of them are kept and the oldest goes.
+
+The lift to her eye is the two-bone solver rather than an `aim`, for the reason
+the hug gives: nobody measured where "up to her face" is in a bone's own frame,
+and a goal can simply be stated.
+
+Measured: three things in the bag, `give:handcuffs` → `takeIt` with the count
+at 2, the sequence `takeIt → studyIt → placeIt → dwell`, and the same ask again
+refused with "you are not carrying that".
+
+Server (baye 1.18.0): give her the X, hand her the X, pass her the X, take the
+X — fifteen nouns plus the words a person would say for them.
+
 ## [1.412.1] — 2026-09-17
 
 ### three things you arrive with

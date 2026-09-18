@@ -34259,7 +34259,10 @@ async function buildJadrija(scene) {
    * coming up is a chin that comes up after the moment it was answering.
    */
   /** The three where she is close enough to touch you on purpose. */
-  const NEARBY = { toYou: 1, kiss: 1, hug: 1 };
+  const NEARBY = { toYou: 1, kiss: 1, hug: 1,
+    // The handover stands as close as a kiss and for the same reason: you
+    // cannot hand somebody something across arm's length plus a collider.
+    takeIt: 1, studyIt: 1, placeIt: 1 };
 
   /**
    * The four she is lying down for: on her back, the way down to it, and the
@@ -34443,6 +34446,12 @@ async function buildJadrija(scene) {
     'side.left': 1, 'side.right': 1,
     /** And her arms out, which is a latch on the pose like her legs. */
     'arms.wide': 1, 'arms.down': 1,
+    /**
+     * AND ANYTHING OUT OF YOUR SATCHEL. The key rides on the name the way the
+     * ice cream's flavour does — `give:handcuffs` — so one entry covers the
+     * whole bag and nothing downstream learns a second argument.
+     */
+    give: 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
@@ -34535,6 +34544,17 @@ async function buildJadrija(scene) {
       if (!LYING[show.phase]) return 'notlying';
       const want = name === 'legs.up' ? 0 : 1;
       if ((show.legsDown || 0) === want) return want ? 'legsalready' : 'legsup';
+      return null;
+    }
+    if (name.startsWith('give:')) {
+      const key = name.slice(5);
+      if (!key) return 'nothing';
+      // It has to be in the bag: `satchelHas` answers a count, which is the
+      // honest refusal for "give her the beer" with no beer on you.
+      if (typeof satchelHas !== 'function' || !satchelHas(key)) return 'nothaveit';
+      // One at a time. She has one pair of hands and the beat ends with her
+      // putting the thing down.
+      if (giftHeld) return 'holding';
       return null;
     }
     if (name === 'side.left' || name === 'side.right') {
@@ -34810,7 +34830,7 @@ async function buildJadrija(scene) {
     // fires on the frame AFTER the kiss is armed. So the kiss was starting and
     // being overridden by the hut, every time, and what you saw was the wine.
     toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1,
-    sideL: 1, sideR: 1 };
+    sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -35464,7 +35484,8 @@ async function buildJadrija(scene) {
     // vertical), on fire, and turned — the last one being the promenade's
     // answer to the hose, which owns her whole body until it lets go.
     const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1,
-      'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1 };
+      'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
+      give: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
@@ -35565,6 +35586,20 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toYou', 'walk', 0.34);
         }
+      } else if (name.startsWith('give:')) {
+        // The same walk the kiss uses, because she has to be within reach to
+        // be handed anything; the item is remembered until it is in her hand.
+        show.gift = name.slice(5);
+        show.near = 'give';
+        show.queue.length = 0;
+        show.side = 0;
+        showSay('trill', d);
+        if (LYING[show.phase] || KNEES[show.phase] || show.phase === 'fours') {
+          show.getUp = 1;
+          show.ask = name;
+          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          else go('rise', 'getup', 0.35);
+        } else go('toYou', 'walk', 0.34);
       } else if (name === 'side.left' || name === 'side.right') {
         const clip = name === 'side.left' ? 'sideL' : 'sideR';
         show.byAsk = 1;
@@ -35957,6 +35992,79 @@ async function buildJadrija(scene) {
       // walking past it is a compass needle, not a person. `want` keeps
       // whatever `recline` left it at. Every other indoor phase re-aims every
       // frame and every one of them is upright.
+      // ── SOMETHING HANDED OVER ────────────────────────────────────────
+      //
+      // Three beats and nothing else, which is the brief: she takes it, she
+      // holds it up and turns it, and she puts it down. See GIFT.
+      case 'takeIt':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        // OUT OF YOUR BAG ON THIS FRAME, and only once: `satchelTake` is what
+        // moves it, so until it answers there is nothing in her hand and
+        // after it there is nothing in yours.
+        if (!giftHeld && show.gift) {
+          const got = typeof satchelTake === 'function' ? satchelTake(show.gift, 1) : 0;
+          if (!got) { show.gift = null; show.near = null; showNext(); break; }
+          giftHeld = { key: show.gift, mesh: giftMesh(show.gift), up: 0 };
+          show.gift = null;
+          showSay('squee', d);
+        }
+        if (show.tmr > GIFT.take) go('studyIt', 'idle', 0.26);
+        break;
+
+      case 'studyIt':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        // Up to her eye and turning. The lift is the IK solver rather than an
+        // aim, for the reason the hug gives: nobody measured where "up to her
+        // face" is in a bone's own frame, and a goal can be stated.
+        if (giftHeld) {
+          giftHeld.up = damp(giftHeld.up, 1, 3.2, dt);
+          giftHeld.spin = (giftHeld.spin || 0) + dt * 1.1;
+        }
+        if (show.tmr > GIFT.study) go('placeIt', 'idle', 0.26);
+        break;
+
+      case 'placeIt':
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        if (giftHeld) {
+          giftHeld.up = damp(giftHeld.up, 0, 3.4, dt);
+          if (show.tmr > GIFT.place) {
+            // AND IT STAYS WHERE SHE PUT IT. Indoors that is the tabouret,
+            // which is the only surface in the room; outdoors it is the deck
+            // at her feet. A thing set aside that vanishes was not set aside.
+            const K = special;
+            const inHut = sheIsIn() && kit && kit.rest;
+            const spot = inHut
+              ? [kit.rest[0] + 0.14, kit.rest[1] - 0.10, kit.rest[2]]
+              : (() => {
+                const w = toWorld(show.t + 0.34, show.s + 0.10);
+                return [null, null, w];
+              })();
+            const m = giftHeld.mesh;
+            if (inHut) {
+              const w = toWorld(spot[0], spot[1]);
+              m.position.set(w[0], spot[2], w[2]);
+            } else {
+              const w = spot[2];
+              m.position.set(w[0], w[1] + 0.02, w[2]);
+            }
+            m.rotation.set(0, faceYaw(show.t, show.ang), 0);
+            giftProps.push(m);
+            while (giftProps.length > GIFT.keep) {
+              const old = giftProps.shift();
+              scene.remove(old);
+              if (old.geometry) old.geometry.dispose();
+            }
+            giftHeld = null;
+            show.near = null;
+            showSay('trill', d);
+            showNext();
+          }
+        } else { show.near = null; showNext(); }
+        break;
+
       // ── ON HER FRONT ──────────────────────────────────────────────────
       //
       // `flat` is the roll and `flatheld` is where she stays. Neither aims at
@@ -36519,7 +36627,8 @@ async function buildJadrija(scene) {
             show.kissSaid = 0;
             show.gap0 = null;
             show.nearLegs = null;
-            go(show.near === 'hug' ? 'hug' : 'kiss', 'idle', 0.30);
+            go(show.near === 'give' ? 'takeIt'
+              : show.near === 'hug' ? 'hug' : 'kiss', 'idle', 0.30);
           }
         }
         break;
@@ -37467,6 +37576,39 @@ async function buildJadrija(scene) {
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
 
+    // ── AND WHATEVER SHE HAS BEEN HANDED ─────────────────────────────────
+    //
+    // The cone's own rig — the hand's whole frame, the measured palm point —
+    // with the wrist solved up to her eye while she looks at it. See GIFT.
+    if (giftHeld) {
+      if (handR === null) handR = f.boneIndex('handR');
+      if (handR >= 0) {
+        if (giftHeld.up > 0.01 && armsRest !== undefined) {
+          // Her wrist up in front of her face, eased, through the two-bone
+          // solver the riders and the hug use.
+          if (!armsRest) armsWide(f, 0);
+          if (armsRest) {
+            const S = armsRest.armUR, E = armsRest.armLR, W = armsRest.handR;
+            _hugGoal.set(GIFT.eye[0], GIFT.eye[1], GIFT.eye[2]);
+            _hugGoal.lerpVectors(W, _hugGoal, giftHeld.up);
+            _hugPole.set(0.2, -1, -0.5).normalize();
+            wheelLimb(f, 'armUR', 'armLR', S, E, W, _hugGoal, _hugPole);
+          }
+        } else if (armsRest) {
+          f.aim('armUR', 0, 1, 0, 0);
+          f.aim('armLR', 0, 1, 0, 0);
+        }
+        f.mesh.updateMatrixWorld();
+        f.boneAt(handR, vHand).applyMatrix4(f.mesh.matrixWorld);
+        f.boneTurn(handR, qTurn);
+        qHand.copy(f.mesh.quaternion).multiply(qTurn);
+        vPalm.copy(PALM).applyQuaternion(qHand).add(vHand);
+        giftHeld.mesh.position.copy(vPalm);
+        giftHeld.mesh.quaternion.copy(qHand);
+        if (giftHeld.spin) giftHeld.mesh.rotateY(giftHeld.spin);
+      }
+    }
+
     // ── AND THE ICE CREAM SHE IS CARRYING ────────────────────────────────
     //
     // Her left hand, the bottle's own rig, and nothing of the bottle's state —
@@ -37702,6 +37844,60 @@ async function buildJadrija(scene) {
     grip: 0.040,
   };
   let coneMesh = null;
+
+  /**
+   * ── SOMETHING HANDED OVER ──────────────────────────────────────────────
+   *
+   * Misha, 17 Sep 2026: *"build machinery to take anything out of the satchel
+   * and give to her/ handover, regardless of the object. she holds it,
+   * examines it, sets it aside"*.
+   *
+   * REGARDLESS OF THE OBJECT is the whole brief, so this draws a BOX rather
+   * than a model of anything: a thing the size the satchel says it is, in the
+   * colour the satchel says it is, held in her hand and then set down. The
+   * ice cream has its own cone and the wine its own bottle because those two
+   * are things you look at closely; a pack of cigarettes at arm's length in a
+   * dim hut is a small box, and pretending otherwise would be fifteen models
+   * nobody asked for.
+   *
+   * The three beats are what he asked for and nothing else: she takes it, she
+   * holds it up and turns it, and she puts it down. WHERE she puts it down is
+   * the one thing worth arguing about — indoors it goes on the tabouret next
+   * to the wine, because that is the only surface in the room, and outdoors it
+   * goes on the deck at her feet. It STAYS there: a thing set aside that
+   * vanishes was not set aside.
+   */
+  const GIFT = {
+    /** Seconds: taking it, looking at it, putting it down. */
+    take: 0.7,
+    study: 2.6,
+    place: 0.9,
+    /** Where her wrist goes while she looks at it, in figure metres. */
+    eye: [0.20, 1.36, -0.10],
+    /** And how many set-down things the room keeps before the oldest goes. */
+    keep: 6,
+  };
+  const giftProps = [];
+  let giftHeld = null;
+
+  /**
+   * One handed-over thing, as geometry: a box of the size the satchel gives.
+   *
+   * `solidMaterial` rather than anything clever, and no texture and no
+   * lettering — rule 12 does not care that a pack of cigarettes is small.
+   */
+  function giftMesh(key) {
+    const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
+    const d = (row && row.box) || [0.09, 0.05, 0.04];
+    const c = (row && row.col) || [0.62, 0.60, 0.56];
+    const g = new THREE.Mesh(new THREE.BoxGeometry(d[0], d[1], d[2]),
+      solidMaterial(new THREE.Color(c[0], c[1], c[2]),
+        { spec: 0.35, specPower: 40, vcol: false }));
+    g.castShadow = false;
+    g.receiveShadow = false;
+    scene.add(g);
+    return g;
+  }
 
   /** The cone in her hand, made once and kept — see the note over `CONE`. */
   function coneKit() {
@@ -42517,7 +42713,8 @@ async function buildJadrija(scene) {
       // THE FLAVOUR RIDES ON THE NAME — see `fetch.cream` in SHE_CAN. The
       // table is checked against the base, so one entry covers every tray in
       // the case and nothing downstream has to learn a second argument.
-      const base = name && name.startsWith('fetch.cream') ? 'fetch.cream' : name;
+      const base = name && name.startsWith('fetch.cream') ? 'fetch.cream'
+        : name && name.startsWith('give:') ? 'give' : name;
       if (!show || !SHE_CAN[base]) return false;
       // AND WHY NOT, WHEN THERE IS A WHY. Three answers and not two: `false`
       // is a name she does not know, `true` is armed, and a STRING is a name
