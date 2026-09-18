@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.418.1] — 2026-09-18
+
+### rolling over, which was wrong twice
+
+**"also fix her rolling around in bed it looks awkward now"** — and the comment
+in this file was part of the reason. It said the rolled poses "lie along the
+bed already and are simply head-to-foot reversed, exactly like the front", so
+the code gave them the same flat half turn the front gets.
+
+Probed, that is not what they are. CRADLE lies along x with her head at −x;
+PRONE lies along x with her head at +x, so a half turn IS right for the front;
+but SIDE_L and SIDE_R lie along **y**, head at (+0.286, +0.581), which is 63.8
+degrees off the axis the other two share. A half turn cannot correct a 64
+degree error, and what it left was a woman lying across her own bed.
+
+**And the turn ran at the wrong rate**, which is the more visible half. The
+offset was rate-limited like a person turning on their feet — it reached its
+target in about 0.85 s while the roll clip underneath took 1.7 — so for the
+first half of every roll her body slewed round the bed while the pose barely
+changed. Caught mid-roll at 104 degrees off, legs out over the floor. It is
+driven off the clip's own progress now, smoothstepped, so the clip turns her
+one way in figure space and this turns her back the other and the two cancel
+exactly. Her head stays on the pillow the whole way over.
+
+**And she was lying 0.45 m too far down the bed**, which the slew had been
+hiding. She is 1.52 m crown to heel and the cot is 1.90, so she fits with room
+to spare, and her feet were hanging 0.30 m past the foot rail with the pillow
+empty behind her. Two measurements to land it: `+0.20` puts the head BONE on
+the pillow's middle but the crown is another 0.12 m past that and ends up over
+the far edge, so `+0.12`, which is head on the pillow and heels 0.09 m inboard
+of the rail.
+
 ## [1.418.0] — 2026-09-18 (baye 1.20.0)
 
 ### legs over the side of the cot

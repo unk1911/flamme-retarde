@@ -33446,7 +33446,17 @@ async function buildJadrija(scene) {
    */
   function cotSpot() {
     if (!kit || !kit.cot) return null;
-    return [kit.cot[0], kit.cot[1] - 0.25];
+    // +0.20 AND IT WAS -0.25, which is 0.45 m up the bed, and it came out of
+    // the same probe that straightened the roll. She is 1.52 m from crown to
+    // heel in these poses and the cot is 1.90 m, so she fits with room to
+    // spare — and she was lying so far down it that her feet hung 0.30 m past
+    // the foot rail while the pillow sat empty behind her head. Her pelvis at
+    // `cot[1] + 0.12` puts her head bone within a centimetre of the pillow's
+    // own middle and her heels 0.09 m inboard of the rail. +0.20 was measured
+    // first and is 0.08 too far: it lands the head bone right, but the CROWN
+    // is 0.12 m past the head bone and ends up over the far edge of the
+    // pillow, which reads as a woman sleeping off the end of her own bed.
+    return [kit.cot[0], kit.cot[1] + 0.12];
   }
 
   /**
@@ -37881,14 +37891,56 @@ async function buildJadrija(scene) {
       // own layout as well as its roll. Measured, not reasoned: they lie
       // along the bed already and are simply head-to-foot reversed, exactly
       // like the front.
+      //
+      // AND THE SIDES ARE NOT THE FRONT. The comment that used to sit here
+      // said the rolled poses "lie along the bed already and are simply
+      // head-to-foot reversed, exactly like the front", and it was wrong.
+      // Probed in the rig: CRADLE lies along x with her head at -x, PRONE
+      // lies along x with her head at +x — reversed, so a half turn is right
+      // for the front — but SIDE_L and SIDE_R lie along Y, with the head at
+      // (+0.286, +0.581), which is 63.8 degrees off the axis the other two
+      // share. A flat half turn cannot correct a 64-degree error, and what it
+      // left was a woman lying ACROSS her own bed.
+      const SIDE_OFF = 1.114;
       const wantSide = show.phase === 'aim' || show.phase === 'wheel'
         ? -Math.PI / 2
-        : (show.phase === 'flat' || show.phase === 'flatheld'
-          || show.phase === 'flatEdge' || show.phase === 'edgeHeld'
-          || show.phase === 'sideL' || show.phase === 'sideR') ? Math.PI : 0;
-      show.sideRate = turnRate(wantSide - show.side, show.sideRate,
-        SHOW.sideMax, dt);
-      show.side += show.sideRate * dt;
+        : show.phase === 'sideL' ? Math.PI - SIDE_OFF
+          : show.phase === 'sideR' ? Math.PI + SIDE_OFF
+            : (show.phase === 'flat' || show.phase === 'flatheld'
+              || show.phase === 'flatEdge' || show.phase === 'edgeHeld')
+                ? Math.PI : 0;
+      // AND IT TURNS AT THE CLIP'S RATE, not at its own.
+      //
+      // This is the other half of why rolling over looked wrong, and it is the
+      // more visible half. The offset was rate-limited like a person turning
+      // on their feet: it ran to its target in about 0.85 s while the roll
+      // clip underneath took 1.7, so for the first half of the roll her body
+      // slewed round the bed while the pose barely changed. Measured mid-roll
+      // at 104 degrees off, legs out over the floor.
+      //
+      // Tying it to the clip's own progress makes the two cancel exactly,
+      // which is the point: the clip turns her one way in figure space and
+      // this turns her back the other, and her head stays on the pillow the
+      // whole way over.
+      const ROLL_T = { sideL: 1.7, sideR: 1.7, flat: 1.9, flatEdge: 2.7 };
+      const rollT = ROLL_T[show.phase];
+      if (rollT) {
+        if (show.sidePhase !== show.phase) {
+          show.sidePhase = show.phase;
+          show.sideFrom = show.side;
+        }
+        const u = Math.min(1, Math.max(0, (show.tmr || 0) / rollT));
+        // Smoothstepped, because a roll that starts and stops at full rate is
+        // a body being turned rather than a body turning.
+        show.side = show.sideFrom
+          + (wantSide - show.sideFrom) * (u * u * (3 - 2 * u));
+        show.sideRate = 0;
+      } else {
+        show.sidePhase = show.phase;
+        show.sideRate = turnRate(wantSide - show.side, show.sideRate,
+          SHOW.sideMax, dt);
+        show.side += show.sideRate * dt;
+      }
     }
 
     const p = toWorld(show.t, show.s);
