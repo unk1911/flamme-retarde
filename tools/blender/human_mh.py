@@ -4383,6 +4383,107 @@ PRONE_EDGE_B["legUL"] = (-43, 0, 7)
 PRONE_EDGE_B["legUR"] = (-49, 0, -7)
 
 
+# ── SITTING, AND THE POSES MADE OF IT — WORK IN PROGRESS ─────────────────────
+#
+# NOT WIRED INTO THE GAME YET. Nothing in src/ names these and the baked blob
+# does not carry them: two probe passes in and only SIT is close. What follows
+# is what the probe said, so the next pass starts from measurements instead of
+# from my assumptions, all of which were wrong:
+#
+#   SIT         torso vertical over the pelvis, good. Heels 0.049 m UNDER the
+#               mattress at hip -88/knee 4, and -0.196 at hip -82/knee 14 —
+#               so bending the knee LOWERS the foot from a seated hip, which
+#               is obvious afterwards and was not before. The pelvis's own -6
+#               of backward tilt is rotating the whole leg down with it; try
+#               pelvis 0, hip -90, knee 0.
+#   LOTUS       knees 0.159 m and feet 0.307 m under the surface. The opening
+#               is NOT the hip's third number (z) once the hip is deeply
+#               flexed — z=52 barely moved the knees off the midline — and it
+#               is not the second either: y=46 only made the sinking worse.
+#   WALL_PERCH  elbows up and wide, which is right, but the hands finish 0.12 m
+#               BELOW the crown and level with it in x rather than behind it,
+#               and the elbows are forward of the head instead of flared. Feet
+#               0.235 m under the surface, same fault as LOTUS.
+#   FETAL       curling the wrong way. SIDE_L's body axis runs toward
+#               (+0.286, +0.581), so the knees have to come up along THAT, and
+#               both hip signs tried sent them off it: -96 put them at y
+#               -0.222 against a head at +0.646, and +96 put them at x -0.412.
+#
+# ── SITTING, AND THE THREE POSES THAT ARE MADE OF IT ─────────────────────────
+#
+# Misha, 18 Sep 2026, in one run: fetal position, lotus position, sit up on the
+# bed on her knees, upside down, "wall perch", head stand.
+#
+# Sitting is the one this file did not have. KNEEL puts her pelvis at 0.484
+# (0.934 standing, `@root` −0.45) which is knee height; sitting puts it on the
+# surface, so the root goes lower and the hips do the work: hip flexion is
+# NEGATIVE x on `legU`, the same sign PRONE_EDGE uses to drop her legs over the
+# edge of the cot, and a right angle at the hip with a straight knee is a woman
+# sitting up with her legs out in front of her.
+SIT = {
+    "@root": (0.0, 0.0, -0.80),
+    "pelvis": (-6, 0, 0),
+    "spine01": (3, 0, 0), "spine02": (3, 0, 0), "spine03": (2, 0, 0),
+    "chest": (0, 0, 0), "neck": (4, 0, 0), "head": (-2, 0, 0),
+    "armUL": (-14, 0, 30), "armLL": (-30, 0, 10), "handL": (-6, 0, 0),
+    "armUR": (-14, 0, -30), "armLR": (-30, 0, -10), "handR": (-6, 0, 0),
+    "legUL": (-82, 0, 8), "legLL": (14, 0, 0), "footL": (-4, 0, 0),
+    "legUR": (-82, 0, -8), "legLR": (14, 0, 0), "footR": (-4, 0, 0),
+}
+
+# Cross-legged. Not a true padmasana — that has each foot up on the opposite
+# thigh and this rig has no way to put one there without the shins passing
+# through each other — but the shape everybody means by it: hips open, knees
+# down and out, shins folded in front.
+#
+# The opening is the THIRD number on the hip and the bend is the first on the
+# knee, which is the same pair KNEEL uses (82 of knee) taken further.
+LOTUS = dict(SIT, **{
+    "legUL": (-46, 46, 18), "legLL": (112, 0, 0), "footL": (-4, 0, 14),
+    "legUR": (-46, -46, -18), "legLR": (112, 0, 0), "footR": (-4, 0, -14),
+    "armUL": (-8, 0, 40), "armLL": (-16, 0, 8), "handL": (-10, 0, 0),
+    "armUR": (-8, 0, -40), "armLR": (-16, 0, -8), "handR": (-10, 0, 0),
+    "spine01": (4, 0, 0), "spine02": (4, 0, 0), "neck": (2, 0, 0),
+})
+
+# Back against the wall, legs apart, hands locked behind her head.
+#
+# *"makes her sit on the bed with her back perched against the wall, legs
+# spread apart, arms behind her head hands locked behind her head"*.
+#
+# The arms are the part with a sign in it. WAVE_UP raises the RIGHT arm with
+# z = +96 against the −33 it rests at, so up is +z on the right and −z on the
+# left; the elbow then folds with negative x on `armL`, the way HEART_A folds
+# them at −86. Hands behind the head rather than beside it is the second
+# number, the yaw, bringing the forearms back past her ears.
+WALL_PERCH = dict(SIT, **{
+    "spine01": (-2, 0, 0), "spine02": (-2, 0, 0), "spine03": (-2, 0, 0),
+    "chest": (-4, 0, 0), "neck": (6, 0, 0), "head": (-4, 0, 0),
+    "legUL": (-78, 26, 12), "legLL": (18, 0, 0), "footL": (-4, 0, 10),
+    "legUR": (-78, -26, -12), "legLR": (18, 0, 0), "footR": (-4, 0, -10),
+    "clavicleL": (0, 0, -6), "clavicleR": (0, 0, 6),
+    "armUL": (-62, 0, -96), "armLL": (-124, -40, 0), "handL": (0, 0, -8),
+    "armUR": (-62, 0, 96), "armLR": (-124, 40, 0), "handR": (0, 0, 8),
+})
+
+# Curled up on her side. Off SIDE_L, so it inherits that pose's own axis and
+# takes the same `SIDE_OFF` correction in the page — see the note on the roll
+# in src/43-jadrija.js.
+FETAL = dict(SIDE_L, **{
+    "spine01": (8, 0, 0), "spine02": (8, 0, 0), "spine03": (6, 0, 0),
+    "chest": (6, 0, 0), "neck": (-8, 0, 0), "head": (-6, 0, 0),
+    "legUL": (96, 0, 10), "legLL": (104, 0, 0), "footL": (-16, 0, 0),
+    "legUR": (88, 0, -10), "legLR": (112, 0, 0), "footR": (-16, 0, 0),
+    "armUL": (-70, 0, 20), "armLL": (-96, 0, 10), "handL": (-10, 0, 0),
+    "armUR": (-30, 0, -24), "armLR": (-104, 0, -8), "handR": (-10, 0, 0),
+})
+
+FETAL_B = dict(FETAL, **{
+    "spine01": (10, 0, 0), "chest": (8, 0, 0),
+})
+
+
+
 # ── the somersault ──────────────────────────────────────────────────────────
 #
 # One tucked front somersault, and the entire revolution is carried on `pelvis`
