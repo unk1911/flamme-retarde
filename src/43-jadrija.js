@@ -26705,7 +26705,14 @@ async function buildJadrija(scene) {
     // The legs go out with it — a top this size on the old 22 cm square reads
     // as a mushroom — and the seat gets 24 sides rather than 16, because a
     // 16-gon at this radius has 9 cm facets and you look straight down at it.
-    const SR = 0.232, BL = 0.152;
+    //
+    // 60 cm now and not 46 — *"make the table even bigger"* — because a
+    // decorative plate went on it and a 21 cm plate, a 31 cm bottle, a glass
+    // and the thing she sets down do not share 46 cm. The legs do NOT scale
+    // with it this time: a round top overhanging a narrower base is what a
+    // café table looks like, and legs out at the rim of this one would be in
+    // the walkway.
+    const SR = 0.300, BL = 0.172;
     const LEG = [[0.000, 0.0140], [0.030, 0.0170], [0.072, 0.0146],
       [0.250, 0.0184], [0.430, 0.0150], [0.610, 0.0134], [0.680, 0.0126]];
     for (const o of [[-BL, -BL], [BL, -BL], [-BL, BL], [BL, BL]]) {
@@ -26733,6 +26740,123 @@ async function buildJadrija(scene) {
       [f + 0.721, SR - 0.018], [f + 0.7225, (SR - 0.018) * 0.720],
       [f + 0.7215, (SR - 0.018) * 0.367], [f + 0.7200, 0.000],
     ], KIT.woodT, 24);
+    // ── the plate ──────────────────────────────────────────────────────
+    //
+    // Misha, 18 Sep 2026: *"add an ornate decorative black plate with Kanji
+    // characters on it"*.
+    //
+    // A black-glazed display plate, 21 cm across, gold-banded, with one
+    // character in the well. The character is 炎 — *honō*, FLAME, which is
+    // two fire radicals stacked and is the one word this whole game is about.
+    // It is a real character drawn as real strokes; rule 12 forbids inventing
+    // text, and a plate covered in marks that only look like writing is
+    // exactly the thing rule 12 is for.
+    //
+    // DRAWN AND NOT TYPED. A font would be the obvious way and it is not
+    // available: the glyph would come off a canvas, which costs the extra
+    // gamma every canvas texture in this game costs, and it would come out of
+    // whatever CJK font the player's machine happens to have — which on a
+    // machine with none is a row of empty boxes on a decorative plate. So the
+    // strokes are geometry, like everything else in this room.
+    const PL_PROF = [
+      [0.0040, 0.0000], [0.0040, 0.0380], [0.0000, 0.0420], [0.0000, 0.0500],
+      [0.0055, 0.0575], [0.0110, 0.0730], [0.0180, 0.0885], [0.0250, 0.1010],
+      [0.0288, 0.1050], [0.0302, 0.1042], [0.0265, 0.1020], [0.0205, 0.0800],
+      [0.0140, 0.0620], [0.0100, 0.0555], [0.0095, 0.0500], [0.0095, 0.0000],
+    ];
+    // Where it stands: past the bottle from the glass, so that the three
+    // things on this table are not in a row.
+    const plT = bt - 0.150, plS = bs + 0.030, plY = f + 0.7215;
+    const PL_BLACK = [0.070, 0.065, 0.076];
+    const PL_GOLD = [0.820, 0.655, 0.300];
+    lathe(W, plT, plS, PL_PROF.map(([y, r]) => [plY + y, r]), PL_BLACK, 32);
+
+    /** A flat annulus lying on the plate, for the gold work. */
+    const plBand = (r0, r1, y0, y1, col, sides = 32) => {
+      for (let i = 0; i < sides; i++) {
+        const a0 = (i / sides) * TAU, a1 = ((i + 1) / sides) * TAU;
+        b.quad(W(plT + Math.cos(a0) * r0, plS + Math.sin(a0) * r0, plY + y0),
+          W(plT + Math.cos(a0) * r1, plS + Math.sin(a0) * r1, plY + y1),
+          W(plT + Math.cos(a1) * r1, plS + Math.sin(a1) * r1, plY + y1),
+          W(plT + Math.cos(a1) * r0, plS + Math.sin(a1) * r0, plY + y0), col);
+      }
+    };
+    // The rim band, gilded, and the line round the well. Both a fraction of a
+    // millimetre proud, which is gold leaf on glaze and is also what keeps
+    // them off the depth buffer's coin toss.
+    const plRimY = (r) => 0.0205 + (r - 0.0800) * 0.2727 + 0.0004;
+    plBand(0.0820, 0.1005, plRimY(0.0820), plRimY(0.1005), PL_GOLD);
+    plBand(0.0505, 0.0550, 0.0102, 0.0102, PL_GOLD);
+    // And the chain on the band: twenty black lozenges, which is the ornament.
+    // A repeat is right HERE, unlike on a wall or a sea — a rim pattern that
+    // does not repeat is not a rim pattern.
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * TAU, da = 0.052;
+      // EACH CORNER AT ITS OWN HEIGHT, because the rim is a cone and not a
+      // disc. Laid flat at one height these came out as triangles: the outer
+      // half of every diamond was a millimetre and a half UNDER the gold it
+      // was supposed to sit on, and what showed was the piece left over where
+      // the flat patch cut up through the slope. (It was also, before that,
+      // drawn at world y = 0.024 — `plRimY` is a height above the plate's
+      // base and every other call here adds `plY` to it.)
+      const rm = 0.0912, dr = 0.0072;
+      const P4 = [[rm - dr, a], [rm, a - da], [rm + dr, a], [rm, a + da]]
+        .map(([r, th]) => W(plT + Math.cos(th) * r, plS + Math.sin(th) * r,
+          plY + plRimY(r) + 0.0004));
+      b.quad(P4[0], P4[1], P4[2], P4[3], PL_BLACK);
+    }
+
+    /**
+     * One brush stroke, flat, as a ribbon whose width changes along it.
+     *
+     * A kanji is not a set of rectangles. Every stroke has a thick end and a
+     * thin end and which end is which is most of what makes a character read
+     * as written rather than as assembled, so the caller hands over a polyline
+     * with a width at every point and this lays a ribbon down it.
+     */
+    const plStroke = (pts, y, col) => {
+      const n = pts.length, L = [], R = [];
+      for (let i = 0; i < n; i++) {
+        const a = pts[Math.max(0, i - 1)], c = pts[Math.min(n - 1, i + 1)];
+        let dx = c[0] - a[0], dy = c[1] - a[1];
+        const d = Math.hypot(dx, dy) || 1;
+        dx /= d; dy /= d;
+        const h = pts[i][2] / 2;
+        L.push([pts[i][0] - dy * h, pts[i][1] + dx * h]);
+        R.push([pts[i][0] + dy * h, pts[i][1] - dx * h]);
+      }
+      for (let i = 0; i < n - 1; i++) {
+        b.quad(W(plT + L[i][0], plS + L[i][1], plY + y),
+          W(plT + R[i][0], plS + R[i][1], plY + y),
+          W(plT + R[i + 1][0], plS + R[i + 1][1], plY + y),
+          W(plT + L[i + 1][0], plS + L[i + 1][1], plY + y), col);
+      }
+    };
+    // 火, in a unit box, origin at its bottom left. Four strokes: the long
+    // left-falling one from the top centre, the right-falling one that swells
+    // and then tapers, and the two marks that splay off the top like sparks —
+    // the left one thick to thin going down-left, the right one thin to thick
+    // going down-right.
+    const PL_HI = [
+      [[0.52, 0.94, 0.082], [0.46, 0.70, 0.095], [0.38, 0.46, 0.090],
+        [0.26, 0.22, 0.068], [0.12, 0.05, 0.020]],
+      [[0.45, 0.62, 0.040], [0.56, 0.46, 0.068], [0.68, 0.28, 0.092],
+        [0.80, 0.12, 0.095], [0.92, 0.04, 0.028]],
+      [[0.24, 0.88, 0.074], [0.16, 0.74, 0.060], [0.07, 0.60, 0.020]],
+      [[0.70, 0.86, 0.034], [0.79, 0.76, 0.064], [0.90, 0.64, 0.084]],
+    ];
+    // 炎 is 火 over 火, the upper one narrower and the lower one wider, which
+    // is how the character sits square rather than as two of the same thing.
+    // 0.072 m tall over both, inside the 0.050 m of flat well floor.
+    const PL_W = 0.062, PL_H = 0.072;
+    for (const [sx, sy, ox, oy] of [[0.72, 0.44, 0.14, 0.56], [1.00, 0.56, 0.00, 0.00]]) {
+      for (const st of PL_HI) {
+        plStroke(st.map(([x, y, w]) => [
+          (ox + x * sx - 0.5) * PL_W, (oy + y * sy - 0.5) * PL_H, w * sx * PL_W]),
+        0.0101, PL_GOLD);
+      }
+    }
+
     // ── the glass, on the near edge of the same stool ──
     // On her side of the bottle and a hand's width off it: she stands at
     // `wine`, which is out past +t and +s, so this is the thing between her and

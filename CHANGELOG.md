@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.417.0] — 2026-09-18
+
+### a bigger table, and a plate on it
+
+**"make the table even bigger, and add an ornate decorative black plate with
+Kanji characters on it"**.
+
+The top is 60 cm across now and it was 46. The legs do NOT go out with it this
+time — a round top overhanging a narrower base is what a café table looks
+like, and legs at the rim of this one would be in the walkway.
+
+The plate is 21 cm of black glaze with a gilded rim, a chain of twenty black
+lozenges round the band, a gold line about the well, and one character in the
+middle: **炎**, *honō*, FLAME. It is two fire radicals stacked, and it is the
+one word this whole game is about.
+
+**Drawn, not typed.** A font was the obvious way and it is not available
+twice over: the glyph would have to come off a canvas, which costs the extra
+gamma every canvas texture in this game costs, and it would render in whatever
+CJK font the player's machine happens to carry — which on a machine carrying
+none is a row of empty boxes on a decorative plate. So the strokes are
+geometry, like everything else in this room: a polyline with a width at every
+point, laid as a ribbon, because every stroke has a thick end and a thin end
+and which end is which is most of what makes a character read as written
+rather than as assembled. It is a real character with its real strokes; rule
+12 forbids invented text, and a plate covered in marks that merely look like
+writing is exactly the thing rule 12 is for.
+
+Two faults on the way, both worth keeping. The lozenges were first drawn at
+world y = 0.024 — two hundred metres away and underground — because `plRimY`
+returns a height ABOVE the plate's base and every other call here adds the
+base to it. Then, once they were in the right place, they came out as
+TRIANGLES: laid flat at one height on a rim that is a cone, the outer half of
+every diamond sat a millimetre and a half under the gold it was meant to
+decorate, and what showed was the sliver left over where a flat patch cuts up
+through a slope. Each corner carries its own height now.
+
 ## [1.416.1] — 2026-09-18
 
 ### the shape, off the drawing this time
