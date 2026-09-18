@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.421.0] — 2026-09-18
+
+### her hand on the blade, and the reason she has to crouch
+
+The `coke` phase animated its own props while she stood at the mark with her
+arms down. This is her doing it — and the interesting part is not the solver,
+it is that **she cannot reach the plate standing up**.
+
+Measured: her right shoulder is 1.407 m over the hut floor, the blade is at
+0.732, and shoulder to wrist is 0.239 + 0.238 = 0.477 m. Straight down is the
+longest an arm ever gets, so she was 0.12 m short and a solve on its own would
+have spent the whole phase clamped at full stretch. Leaning makes it worse
+rather than better: the plate is only 0.046 m from a vertical through that
+shoulder, so a bow carries the shoulder PAST it at 0.36 m per radian while
+buying 0.02 m of height.
+
+So the hips drop 0.205 m — hip +a, knee −2a, mesh lowered to match, feet
+planted — and the wrist target then sits at 0.349 m from the shoulder, 73 per
+cent of the arm, which is where a solver has room to work. Both ankles finish
+within 4 mm of where the standing clip puts them.
+
+Two things that had to be measured rather than derived. The drop is NOT
+`(1 − cos a) × bone length`: neither bone hangs plumb, and rotating them swings
+lean into the vertical — the formula gave 0.146 against a true 0.202, which is
+her ankles 56 mm above the tiles. And **her two legs are not the same**: the
+idle stands her with one foot forward, so folding both by equal angles put 25 mm
+between her ankles and one of them through the floor. Each leg now folds by
+whatever it takes to lose the height the other lost.
+
+The grip point tracks the blade to about 20 mm down a line and 60–75 mm at the
+worst changeover, decaying over a quarter second, which is her carrying it back
+rather than teleporting it. `__fr.jad.cokeHand()` reports blade, wrist, grip
+and both distances, because a bad frame conversion still solves and still
+reports success.
+
+**Still animating itself:** the paper wrap tips and pours with her hands at her
+sides. Same complaint, one prop over.
+
 ## [1.420.0] — 2026-09-18 (baye 1.22.0)
 
 ### she takes her own hair down
