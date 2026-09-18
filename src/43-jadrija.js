@@ -38490,6 +38490,33 @@ async function buildJadrija(scene) {
     blade.position.set(0.012, 0.0012, 0.042);
     g.add(blade);
 
+    // TWO STRAWS. Misha, 18 Sep 2026: *"should have 2 straws too"* — two,
+    // which is the whole of what makes the plate a scene with somebody else
+    // in it rather than a still life.
+    //
+    // Open-ended cylinders and double-sided, because the bore is the one thing
+    // that says straw rather than dowel at this size.
+    //
+    // ON THE WOOD, AND COLOURED. The first go laid them in the well parallel
+    // to the lines in the powder's own near-white, and they read as two more
+    // lines — which is the failure the whole plate is about not having. Out on
+    // the wood beside the wrap, across the lines' direction, in plastic
+    // colours nothing else in this room is wearing.
+    const tube = (c) => solidMaterial(new THREE.Color(c[0], c[1], c[2]),
+      { spec: 0.52, specPower: 60, vcol: false, emissive: 0.22,
+        side: THREE.DoubleSide, body: 'n = gl_FrontFacing ? n : -n;' });
+    const straws = [];
+    for (const [cx, cz, col] of [
+      [-0.132, -0.014, [0.720, 0.255, 0.230]],
+      [-0.132, 0.008, [0.280, 0.390, 0.640]]]) {
+      const m = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.0034, 0.0034, 0.058, 10, 1, true), tube(col));
+      m.rotation.set(0, Math.PI / 2, Math.PI / 2);
+      m.position.set(cx, -0.0052, cz);
+      g.add(m);
+      straws.push(m);
+    }
+
     // And the wrap it came out of, on the wood beside the plate.
     const wrap = new THREE.Mesh(new THREE.BoxGeometry(0.034, 0.0022, 0.028), paper);
     // On the WOOD and not in the well. The plate is 0.105 of radius and the
@@ -38498,7 +38525,7 @@ async function buildJadrija(scene) {
     wrap.position.set(-0.150, -0.0086, -0.040);
     g.add(wrap);
 
-    cokeKit = { g, heap, lines, blade, wrap };
+    cokeKit = { g, heap, lines, blade, wrap, straws };
     return cokeKit;
   }
 

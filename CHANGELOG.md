@@ -8,6 +8,22 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.419.1] — 2026-09-18
+
+### two straws
+
+**"should have 2 straws too"** — two, which is the whole of what makes the
+plate a scene with somebody else in it rather than a still life.
+
+Open-ended cylinders, double-sided, because the bore is the one thing that says
+straw rather than dowel at this size.
+
+The first go laid them in the well parallel to the lines in the powder's own
+near-white, and they came out reading as two more lines — which is exactly the
+failure the plate is about not having. They are out on the wood beside the
+wrap now, across the lines' direction, in plastic colours nothing else in this
+room is wearing.
+
 ## [1.419.0] — 2026-09-18 (baye 1.21.0)
 
 ### what goes on the plate
