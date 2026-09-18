@@ -8,6 +8,86 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.416.0] — 2026-09-18
+
+### it is one piece of silicone, and the table it lies on
+
+**"but that doesn't look like lovense. this is lovens"**, with a photograph.
+Fair: what was on the tabouret was the generic satchel box, a red brick with
+rounded nothing, and the picture is a single piece of moulded silicone — a fat
+ovoid at one end, a long tail curving back underneath it, the two nearly
+meeting.
+
+The shape is about being ONE piece. The egg does not sit on a stalk, it swells
+out of it, so it is a single loft along a single curve with the radius doing
+all the work: fat over the first third, pinched at the waist, tapering to
+nothing at the tail. `TubeGeometry` was the obvious tool and it has one radius
+from end to end, which is the one thing this needed not to have, so there is a
+new `loftAlong(curve, rings, sides, radiusAt)` — rings of points stepped along
+a `CatmullRomCurve3`, each at whatever radius the caller asks for. It is
+general; the next thing with a waist gets it for free. Ends open where the
+radius goes to nothing, because a cap on a point shades like a dent.
+
+Magenta, two pale buttons on the tail, and no lettering — the wordmark is on
+the real one and would be mine here.
+
+It also lies down. The curve is drawn standing in the x-y plane, and the first
+photograph had it on its edge on the stool like a hook; a thing may now carry
+a `lay` angle that the set-down applies, so it rests on its side the way it
+would on a real table.
+
+### the table got bigger
+
+**"you can make the table bigger"**, **"it should be lying flat if table is big
+enough"**. The tabouret's top is 46 cm across now and it was 34, which is the
+difference between a stool with a bottle on it and the one surface in the
+room. The rim keeps its 20 mm roll — an edge does not get thicker when a table
+gets wider — the underside dish scales with the top, the legs go out with it,
+and the seat has 24 sides rather than 16 because at this radius a 16-gon shows
+its corners from directly above.
+
+Two other things were wrong with setting a thing down and neither had anything
+to do with the size. The spot she puts it on was 0.172 m off the middle of a
+top with 0.168 m of radius, so it hung over the edge no matter what it was;
+and every one of these meshes is built about its own middle, so a thing placed
+at the height of the wood was buried to its waist in it. Both fixed: 0.147 off
+centre, and a `sit` height each object declares for itself.
+
+### the wine trembles, and the light comes on
+
+**"when I buzz it does make that buzzing sound and cause the wine to vibrate in
+the glass?"** and **"do the lights light up when lovense vibrates?"** — it made
+the sound, quietly; the wine did nothing; there was no light.
+
+The glass cannot move, because the stool and the stem and the bowl are all in
+the room's one merged buffer. The wine can, and the wine is the part you would
+watch anyway: a small motor on a hard top does not visibly shake a full glass,
+it puts ripples on the surface. So the wine carries a vertex ripple over its
+top 6 mm, pinned at the rim so it cannot climb the inside of the glass, driven
+by how close the buzzing object is to the glass — the same tabletop, or
+nothing.
+
+**The first cut of it did nothing at all**, and the reason is worth keeping:
+the wine's surface was a rim and a centre point, seventeen vertices, and a
+vertex shader cannot put a wave on seventeen vertices. It is fourteen rings
+now. Two standing modes beating at 5.4 and 3.3 Hz rather than one travelling
+wave — a travelling ripple at the real capillary frequency for this wavelength
+is 32 Hz, which at 60 fps crawls backwards, and a single ring pattern is a
+bullseye.
+
+The light is the fourth emitter in the game after the television, the radio
+dial and the bulb in the lampshade: one of the two buttons on the tail, dark
+at rest and pulsing about once a second while the motor runs. An indicator
+that is lit when the motor is off is a decal.
+
+And the buzz itself went from 0.055 to 0.14, because at the old gain you had to
+be told it was on — the same fault the kiss had, and the same fix.
+
+**Also:** `__fr.jad.props()` — every object she has been handed and set down,
+by key, in world metres. Three camera shots at a guessed stool position missed
+it entirely before this existed. A coordinate settles where a thing actually
+is, which is the argument the Blender `--probe` flag already makes.
+
 ## [1.415.0] — 2026-09-18 (baye 1.19.0)
 
 ### a phone, and something that answers it

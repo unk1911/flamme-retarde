@@ -920,7 +920,7 @@ function buildAudio() {
       buzzHarm.type = 'square';
       buzzHarm.frequency.value = 176;
       const hg = ctx.createGain();
-      hg.gain.value = 0.22;
+      hg.gain.value = 0.34;
       buzzGain = ctx.createGain();
       buzzGain.gain.value = 0;
       // The wobble: a motor in a loose object is never one pitch for long.
@@ -936,7 +936,10 @@ function buildAudio() {
       buzzHarm.start();
       buzzLfo.start();
     }
-    buzzGain.gain.setTargetAtTime(0.055 * far, ctx.currentTime, 0.08);
+    // 0.14 and it was 0.055. A small motor against a wooden top is one of the
+    // louder things in a quiet room, and at the old gain you had to be told it
+    // was on — the same fault the kiss had, and the same fix.
+    buzzGain.gain.setTargetAtTime(0.14 * far, ctx.currentTime, 0.08);
     return true;
   }
 

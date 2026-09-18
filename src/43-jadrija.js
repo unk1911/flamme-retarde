@@ -26691,9 +26691,24 @@ async function buildJadrija(scene) {
     // above it. Eight sides is enough at this size; the seat gets sixteen
     // because its rim is the one circle in the room at eye level.
     const bt = dc - 1.58, bs = 18.20;
+    // 46 cm across, and it was 34. Misha, 18 Sep 2026: *"you can make the
+    // table bigger"*, *"it should be lying flat if table is big enough"* — the
+    // thing she sets down beside the wine is 110 mm end to end and the old top
+    // could not take it and the bottle and the glass without something hanging
+    // over the edge, which is what the first photograph showed. It is also
+    // just the right object: this is the ONLY surface in the room, and a 34 cm
+    // disc under a 31 cm bottle was a stool pretending to be a table.
+    //
+    // ONE NUMBER DOES IT, and two things scale differently off it. The rim
+    // roll keeps its 20 mm, because an edge does not get thicker when a table
+    // gets wider; the underside dish is a proportion of the top and scales.
+    // The legs go out with it — a top this size on the old 22 cm square reads
+    // as a mushroom — and the seat gets 24 sides rather than 16, because a
+    // 16-gon at this radius has 9 cm facets and you look straight down at it.
+    const SR = 0.232, BL = 0.152;
     const LEG = [[0.000, 0.0140], [0.030, 0.0170], [0.072, 0.0146],
       [0.250, 0.0184], [0.430, 0.0150], [0.610, 0.0134], [0.680, 0.0126]];
-    for (const o of [[-0.11, -0.11], [0.11, -0.11], [-0.11, 0.11], [0.11, 0.11]]) {
+    for (const o of [[-BL, -BL], [BL, -BL], [-BL, BL], [BL, BL]]) {
       lathe(W, bt + o[0] * 1.34, bs + o[1] * 1.34,
         LEG.map(([h, r]) => [f + h, r, -0.34 * o[0] * (h / 0.68),
           -0.34 * o[1] * (h / 0.68)]), KIT.dark, 8);
@@ -26701,7 +26716,7 @@ async function buildJadrija(scene) {
     // Stretchers. Four bars in a square a third of the way up, which is what
     // stops a stool this light from racking — and, more to the point here, what
     // the eye reads as a stool rather than as four sticks under a disc.
-    const q = 0.11 * (1.34 - 0.34 * (0.221 / 0.68));
+    const q = BL * (1.34 - 0.34 * (0.221 / 0.68));
     for (const sg of [-1, 1]) {
       frustum(W, f + 0.212, [bt, bs + sg * q, q, 0.009],
         f + 0.230, [bt, bs + sg * q, q, 0.009], KIT.dark);
@@ -26711,13 +26726,13 @@ async function buildJadrija(scene) {
     // The seat: an underside, a rounded edge, and a top dished the two
     // millimetres that thirty summers of people put into one.
     lathe(W, bt, bs, [
-      [f + 0.658, 0.000], [f + 0.658, 0.148], [f + 0.664, 0.162],
-      [f + 0.702, 0.168], [f + 0.716, 0.162], [f + 0.721, 0.150],
-    ], KIT.wood, 16);
+      [f + 0.658, 0.000], [f + 0.658, SR - 0.020], [f + 0.664, SR - 0.006],
+      [f + 0.702, SR], [f + 0.716, SR - 0.006], [f + 0.721, SR - 0.018],
+    ], KIT.wood, 24);
     lathe(W, bt, bs, [
-      [f + 0.721, 0.150], [f + 0.7225, 0.108], [f + 0.7215, 0.055],
-      [f + 0.7200, 0.000],
-    ], KIT.woodT, 16);
+      [f + 0.721, SR - 0.018], [f + 0.7225, (SR - 0.018) * 0.720],
+      [f + 0.7215, (SR - 0.018) * 0.367], [f + 0.7200, 0.000],
+    ], KIT.woodT, 24);
     // ── the glass, on the near edge of the same stool ──
     // On her side of the bottle and a hand's width off it: she stands at
     // `wine`, which is out past +t and +s, so this is the thing between her and
@@ -26868,10 +26883,18 @@ async function buildJadrija(scene) {
       for (const [y, r] of WINE_R) {
         if (y < top) prof.push([y, r]);
       }
-      prof.push([top, wineR(top)]);
       // And the surface, which is the one horizontal face in the glass and the
       // thing the eye actually reads the level off.
-      prof.push([top, 0.0000]);
+      //
+      // FOURTEEN RINGS ACROSS IT AND NOT ONE. It was a rim and a centre point
+      // — seventeen vertices — and the first cut of the buzz ripple below put
+      // a wave on it and nothing whatever happened, because there was nothing
+      // between the rim and the middle to displace. Fourteen rings is a 3 mm
+      // step against a 13 mm wavelength, four and a half samples a wave,
+      // which is enough to carry it. It costs 224 triangles on the ONE shell
+      // that is visible at a time.
+      const R0 = wineR(top);
+      for (let k = 0; k <= 14; k++) prof.push([top, R0 * (1 - k / 14)]);
       lathe(O, 0, 0, prof, KIT.wine, 16);
       wbufs.push(buf);
     }
@@ -26943,8 +26966,68 @@ async function buildJadrija(scene) {
     scarf.visible = false;
     scene.add(scarf);
     const gp = W(gt, gs, by);
-    const fills = wbufs.map((buf) => {
-      const m = new THREE.Mesh(buf.geo(), solidMaterial(0xffffff, inner));
+    // ── AND THE WINE TREMBLES WHEN THE TABLE DOES ────────────────────────
+    //
+    // Misha, 18 Sep 2026: *"when I buzz it does make that buzzing sound and
+    // cause the wine to vibrate in the glass?"*
+    //
+    // It did not, and the glass cannot move: the stool, the stem and the bowl
+    // are all in the room's one merged buffer, and only the wine, the bottle
+    // and the splash are meshes of their own. Which is fine, because the wine
+    // is the part you would actually watch — a motor on a hard top does not
+    // visibly shake a full glass, it puts ripples on the surface.
+    //
+    // So: a vertex hook on the wine, and it only touches the top 6 mm, which
+    // on these shells is the flat disc and the meniscus and nothing else. The
+    // sides are left alone, so nothing can push through the crystal.
+    //
+    // TWO STANDING MODES AND NOT ONE TRAVELLING WAVE. A travelling ripple at
+    // the real capillary frequency for this wavelength is about 32 Hz, which
+    // at 60 fps aliases into a crawl going the wrong way; and one ring
+    // pattern is a bullseye, which is the failure mode where a regular
+    // pattern reads worse than no pattern at all. Two ring spacings, beating
+    // at 5.4 and 3.3 Hz — incommensurate, so the surface never repeats — is
+    // what a driven surface actually looks like from half a metre.
+    //
+    // The normal is tilted by the slope, which is where ALL of the effect is:
+    // a millimetre of displacement on a 42 mm disc is invisible, and the 30
+    // degrees of normal it puts under the lamp is not. The wine material is
+    // 40 per cent emissive, which flattens shading by that much, so the tilt
+    // has to be generous to survive it.
+    //
+    // And the rim is pinned — `edge` tapers the whole thing to nothing over
+    // the outer half — because the rim ring is shared with the wall of the
+    // wine, and a surface whose edge moves is a surface that climbs the
+    // inside of the glass.
+    const wineBuzz = { value: 0 }, wineT = { value: 0 };
+    const RIPPLE = [
+      '{',
+      '  float rr = length(p.xz);',
+      '  float lip = smoothstep(0.006, 0.0, uWTop - p.y);',
+      '  float edge = 1.0 - smoothstep(0.55, 1.00, rr / max(uWR, 1e-4));',
+      '  float amp = uBuzz * 0.0009 * lip * edge;',
+      '  float w  = sin(rr * 470.0) * sin(uBuzzT * 34.0)',
+      '           + 0.58 * sin(rr * 306.0 + 1.7) * sin(uBuzzT * 21.0 + 0.9);',
+      '  float dw = 470.0 * cos(rr * 470.0) * sin(uBuzzT * 34.0)',
+      '           + 177.5 * cos(rr * 306.0 + 1.7) * sin(uBuzzT * 21.0 + 0.9);',
+      '  p.y += amp * w;',
+      '  vec2 rad = rr > 1e-5 ? p.xz / rr : vec2(0.0);',
+      '  n = normalize(n - vec3(rad.x, 0.0, rad.y) * (amp * dw));',
+      '}',
+    ].join('\n');
+    const fills = wbufs.map((buf, i) => {
+      const top = 0.0870 + (0.1220 - 0.0870) * (i / (FILLS - 1));
+      const m = new THREE.Mesh(buf.geo(), solidMaterial(0xffffff, {
+        ...inner,
+        vert: RIPPLE,
+        decl: 'uniform float uBuzz; uniform float uBuzzT;'
+          + ' uniform float uWTop; uniform float uWR;',
+        // `wineBuzz` and `wineT` are the SAME two objects in all twenty
+        // materials, which is how one write drives whichever shell is
+        // showing; `uWTop` is this shell's own surface.
+        uniforms: { uBuzz: wineBuzz, uBuzzT: wineT,
+          uWTop: { value: top }, uWR: { value: wineR(top) } },
+      }));
       m.position.set(gp[0], gp[1], gp[2]);
       m.visible = false;
       scene.add(m);
@@ -27220,6 +27303,8 @@ async function buildJadrija(scene) {
     tv.draw(null, 0x2545);
     return {
       tv, radio, bottle, scarf, poured, fills, stream, splash,
+      // The two the ripple reads — see the wine's vertex hook above.
+      wineBuzz, wineT, glass: gp,
       // Where the set is, for the jet to knock the knob on. The table top plus
       // a hand's width: aiming at a radio means aiming at the thing on the
       // table, not at the table.
@@ -36068,21 +36153,33 @@ async function buildJadrija(scene) {
             // at her feet. A thing set aside that vanishes was not set aside.
             const K = special;
             const inHut = sheIsIn() && kit && kit.rest;
+            // Pulled in from 0.14/-0.10, which is 0.172 m off the middle of
+            // a top that used to have 0.168 m of radius: it hung over the
+            // edge, which is exactly what Misha photographed. 0.147 off the
+            // centre of a 0.232 top leaves 30 mm of wood outboard of the end
+            // of the longest thing in the bag.
             const spot = inHut
-              ? [kit.rest[0] + 0.14, kit.rest[1] - 0.10, kit.rest[2]]
+              ? [kit.rest[0] + 0.120, kit.rest[1] - 0.085, kit.rest[2]]
               : (() => {
                 const w = toWorld(show.t + 0.34, show.s + 0.10);
                 return [null, null, w];
               })();
             const m = giftHeld.mesh;
+            // AND IT SITS ON THE SURFACE RATHER THAN HALF THROUGH IT. These
+            // meshes are built about their own middles, so a thing put down
+            // at the height of the wood is a thing buried to its waist in it.
+            // `sit` is the half-height it needs, after whatever `lay` does.
+            const sit = m.userData.sit || 0;
             if (inHut) {
               const w = toWorld(spot[0], spot[1]);
-              m.position.set(w[0], spot[2], w[2]);
+              m.position.set(w[0], spot[2] + sit, w[2]);
             } else {
               const w = spot[2];
               m.position.set(w[0], w[1] + 0.02, w[2]);
             }
-            m.rotation.set(0, faceYaw(show.t, show.ang), 0);
+            // Lying down if the thing has an opinion about it — see
+            // `lovenseMesh`, whose curve is drawn standing up.
+            m.rotation.set(m.userData.lay || 0, faceYaw(show.t, show.ang), 0);
             // Which thing it is, so a signal can find it later — see SIGNAL.
             m.userData.key = giftHeld.key;
             giftProps.push(m);
@@ -38059,6 +38156,10 @@ async function buildJadrija(scene) {
     if (!prop) return 'not out';
     if (!on) {
       delete signals[key];
+      // And the light goes out with it.
+      if (prop.userData && prop.userData.led) {
+        prop.userData.led.uniforms.uEmissive.value = 0;
+      }
       if (audio && audio.buzz) audio.buzz(false);
       return 'off';
     }
@@ -38076,8 +38177,11 @@ async function buildJadrija(scene) {
   /** The rattle, the creep, and how loud it is from where you are standing. */
   function signalTick(dt, cam) {
     const keys = Object.keys(signals);
-    if (!keys.length) return;
-    let near = 1e9;
+    if (!keys.length) {
+      if (kit && kit.wineBuzz) kit.wineBuzz.value = 0;
+      return;
+    }
+    let near = 1e9, shake = 0;
     for (const k of keys) {
       const sg = signals[k];
       sg.t += dt;
@@ -38093,6 +38197,27 @@ async function buildJadrija(scene) {
         near = Math.min(near, Math.hypot(cam.x - sg.prop.position.x,
           cam.z - sg.prop.position.z));
       }
+      // The light on the tail, while it runs. A slow breath rather than the
+      // motor's own rate: 47 Hz is invisible at any frame rate anybody plays
+      // this at, and what a small indicator actually does is pulse about once
+      // a second. Full to a quarter and back.
+      if (sg.prop.userData && sg.prop.userData.led) {
+        const u = sg.prop.userData.led.uniforms.uEmissive;
+        u.value = 0.72 + 0.28 * Math.sin(sg.t * 5.7);
+      }
+      // How much of it reaches the glass. Through the tabletop, not through
+      // the air: a thing on the same 46 cm top shakes the wine, the same
+      // thing on the cot two metres off does not, and there is no case in
+      // between worth modelling. Full out to a quarter metre, gone by a half.
+      if (kit && kit.glass) {
+        const d = Math.hypot(kit.glass[0] - sg.prop.position.x,
+          kit.glass[2] - sg.prop.position.z);
+        shake = Math.max(shake, Math.max(0, Math.min(1, (0.50 - d) / 0.25)));
+      }
+    }
+    if (kit && kit.wineBuzz) {
+      kit.wineBuzz.value = shake;
+      kit.wineT.value += dt;
     }
     if (audio && audio.buzz) audio.buzz(true, Math.min(near, SIGNAL.hear));
   }
@@ -38140,15 +38265,144 @@ async function buildJadrija(scene) {
    * `solidMaterial` rather than anything clever, and no texture and no
    * lettering — rule 12 does not care that a pack of cigarettes is small.
    */
+  /**
+   * A body of revolution lofted along a curve, with a radius that changes.
+   *
+   * `TubeGeometry` is the obvious tool and it has one radius from end to end,
+   * which is the one thing this needs not to have. So: rings of `sides`
+   * points stepped along the curve, each at whatever radius the caller's
+   * function gives, and quads between consecutive rings. Ends left open where
+   * the radius goes to nothing, because a cap on a point is three triangles
+   * that meet at a vertex and shade like a dent.
+   */
+  function loftAlong(curve, rings, sides, radiusAt) {
+    const pos = [], idx = [], nrm = [];
+    const up = new THREE.Vector3(0, 0, 1);
+    const tan = new THREE.Vector3(), nx = new THREE.Vector3(), ny = new THREE.Vector3();
+    const pt = new THREE.Vector3();
+    for (let i = 0; i <= rings; i++) {
+      const u = i / rings;
+      curve.getPoint(u, pt);
+      curve.getTangent(u, tan).normalize();
+      nx.crossVectors(tan, up);
+      if (nx.lengthSq() < 1e-6) nx.set(1, 0, 0);
+      nx.normalize();
+      ny.crossVectors(tan, nx).normalize();
+      const r = radiusAt(u);
+      for (let j = 0; j < sides; j++) {
+        const a = (j / sides) * Math.PI * 2;
+        const cx = Math.cos(a), cy = Math.sin(a);
+        pos.push(pt.x + (nx.x * cx + ny.x * cy) * r,
+          pt.y + (nx.y * cx + ny.y * cy) * r,
+          pt.z + (nx.z * cx + ny.z * cy) * r);
+        nrm.push(nx.x * cx + ny.x * cy, nx.y * cx + ny.y * cy, nx.z * cx + ny.z * cy);
+      }
+    }
+    for (let i = 0; i < rings; i++) {
+      for (let j = 0; j < sides; j++) {
+        const a = i * sides + j, b = i * sides + (j + 1) % sides;
+        idx.push(a, b, a + sides, b, b + sides, a + sides);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    geo.setIndex(idx);
+    return geo;
+  }
+
+  /**
+   * The toy, as the photograph Misha sent rather than as a box.
+   *
+   * *"but that doesn't look like lovense. this is lovens"*, with a picture of
+   * a Lush 3: one piece of silicone in a hot magenta, a fat ovoid at one end
+   * and a long tail curving back under it, the two nearly touching. It is 45
+   * mm across the egg and about 110 mm end to end with the curve in it.
+   *
+   * ONE PIECE AND NOT TWO, which is what the shape is about: the egg does not
+   * sit on a stalk, it swells out of it. So it is one loft along one curve
+   * with the radius doing all the work — fat at the head, pinched at the
+   * waist, and tapering to nothing at the tail.
+   *
+   * No lettering: the wordmark is on the real one and would be mine here.
+   */
+  function lovenseMesh() {
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.030, 0.021, 0),
+      new THREE.Vector3(0.004, 0.026, 0),
+      new THREE.Vector3(0.030, 0.019, 0),
+      new THREE.Vector3(0.043, 0.004, 0),
+      new THREE.Vector3(0.036, -0.012, 0),
+      new THREE.Vector3(0.008, -0.019, 0),
+      new THREE.Vector3(-0.028, -0.020, 0),
+      new THREE.Vector3(-0.055, -0.016, 0),
+    ]);
+    const geo = loftAlong(curve, 44, 10, (u) => {
+      // The egg: a fat teardrop over the first third, widest a third of the
+      // way in, then the waist and the tail.
+      if (u < 0.34) {
+        const k = u / 0.34;
+        return 0.0075 + 0.0145 * Math.sin(Math.PI * (0.12 + 0.88 * k));
+      }
+      const k = (u - 0.34) / 0.66;
+      return 0.0072 * (1 - k) + 0.0016;
+    });
+    const skin = solidMaterial(new THREE.Color(0.855, 0.075, 0.420),
+      { spec: 0.75, specPower: 70, vcol: false });
+    const m = new THREE.Mesh(geo, skin);
+    // Two buttons on the tail, pale against the magenta.
+    const btn = solidMaterial(new THREE.Color(0.960, 0.700, 0.820),
+      { spec: 0.50, specPower: 50, vcol: false });
+    // AND ONE OF THEM IS A LIGHT. Misha, 18 Sep 2026: *"do the lights light up
+    // when lovense vibrates?"* — they do on the real one, and they did not
+    // here. It is the fourth emitter in this game after the television, the
+    // radio dial and the bulb in the lampshade, and like those it is its own
+    // material so that being lit and being under a lamp are different things.
+    //
+    // Dark at rest, which is the whole point: an LED that is on when the motor
+    // is off is a decal. `signalTick` writes `uEmissive` while it buzzes.
+    const led = solidMaterial(new THREE.Color(1.000, 0.620, 0.880),
+      { spec: 0.60, specPower: 60, vcol: false, emissive: 0 });
+    // AND IT LIES DOWN. The curve is drawn in the x-y plane, so on a table it
+    // has to be tipped a quarter turn about x or it stands on its edge like a
+    // hook — which is what the first photograph showed.
+    m.userData.lay = -Math.PI / 2;
+    // And on its side it is 22 mm through the fattest part of the egg, so it
+    // rests 22 mm above whatever it was put down on — see `sit` in `placeIt`.
+    m.userData.sit = 0.022;
+    for (const dx of [-0.030, -0.018]) {
+      const lit = dx === -0.030;
+      const b = new THREE.Mesh(new THREE.CylinderGeometry(
+        lit ? 0.0044 : 0.0034, lit ? 0.0044 : 0.0034, 0.002, lit ? 10 : 8),
+      lit ? led : btn);
+      b.rotation.x = Math.PI / 2;
+      b.position.set(dx, -0.0205, 0.0055);
+      m.add(b);
+    }
+    m.userData.led = led;
+    return m;
+  }
+
   function giftMesh(key) {
+    // One thing in the bag has a shape worth having — see `lovenseMesh`.
+    if (key === 'lovense') {
+      const m = lovenseMesh();
+      m.castShadow = false;
+      m.receiveShadow = false;
+      scene.add(m);
+      return m;
+    }
     const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
     const d = (row && row.box) || [0.09, 0.05, 0.04];
+    // Half its own height, so `placeIt` can stand it ON the wood rather than
+    // halfway through it.
     const c = (row && row.col) || [0.62, 0.60, 0.56];
     const g = new THREE.Mesh(new THREE.BoxGeometry(d[0], d[1], d[2]),
       solidMaterial(new THREE.Color(c[0], c[1], c[2]),
         { spec: 0.35, specPower: 40, vcol: false }));
     g.castShadow = false;
     g.receiveShadow = false;
+    g.userData.sit = d[1] / 2;
     scene.add(g);
     return g;
   }
@@ -43003,6 +43257,15 @@ async function buildJadrija(scene) {
     },
     /** What is buzzing right now. */
     signals: () => Object.keys(signals),
+    /**
+     * Everything she has been handed and set down, in world metres. Written
+     * for a camera: three shots at a guessed stool missed it, and a
+     * coordinate settles where a thing actually ended up — which is the same
+     * argument `--probe` makes in the Blender exporter.
+     */
+    props: () => giftProps.map((m) => ({ key: m.userData && m.userData.key,
+      at: [+m.position.x.toFixed(3), +m.position.y.toFixed(3),
+        +m.position.z.toFixed(3)] })),
     /** What she saw on the last recon, and what she came back and reported. */
     seen: () => (show ? (show.seen || null) : null),
     told: () => (show ? (show.told || null) : null),
