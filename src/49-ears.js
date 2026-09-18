@@ -365,6 +365,8 @@ const ears = (() => {
     'recline.floor': 'down on her back on the floor',
     // And the way out of all of them, which the long holds made necessary.
     rise: 'back up on her feet',
+    // The two that are with you rather than at you.
+    kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she
     // has gone, the same as the recons; the flavour rides on the name, so the
     // label is looked up on the base — see `DOES_BASE`.

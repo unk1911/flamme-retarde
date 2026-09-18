@@ -32597,6 +32597,44 @@ async function buildJadrija(scene) {
      * and forget, or the hut has a woman in it for the rest of the session.
      */
     keptAsked: 95,
+    /**
+     * ── A KISS AND A HUG ──────────────────────────────────────────────
+     *
+     * Misha, 17 Sep 2026: *"why can't main character (Chloe) and shore bay
+     * have romantic kissing and shit"*, then *"yes they must kiss (French
+     * kiss) and hug"*.
+     *
+     * Every number here is in FIGURE SPACE through `aim` in 41-skin.js — +x
+     * is the way she faces, +y is up — which is the one thing on this rig
+     * that needs no measuring, and the reason these are angles rather than
+     * a new clip. The cone in her hand was a lesson in the other direction
+     * the same afternoon: a plausible vector invented in a bone's own frame
+     * put a wafer inside her hip.
+     *
+     * The gaps are the body's. A kiss is heads at 0.30 m and closing, which
+     * with the lean below puts her mouth about 0.14 m off the lens; a hug is
+     * chests touching, which is 0.26 m between two standing people. The
+     * near plane is not touched for either: the game already ramps it down
+     * when a face comes close, which is what makes this possible at all.
+     */
+    kissGap: 0.30,
+    hugGap: 0.26,
+    /** Seconds in, held, and out. The long hold is what "French" buys. */
+    kissIn: 0.75,
+    kissHold: 3.4,
+    kissOut: 0.65,
+    hugIn: 0.85,
+    hugHold: 4.6,
+    hugOut: 0.75,
+    /** The lean: her chest tips toward you and her chin comes up to meet you. */
+    kissLean: 0.17,
+    kissChin: 0.26,
+    /** And the hug: shoulders round you, elbows closed, cheek to your ear. */
+    hugClav: 0.30,
+    hugArm: 1.28,
+    hugElbow: 1.05,
+    hugIn2: 0.34,
+    hugHead: 0.30,
     // And the knee shuffle, for when you back off across the room while she is
     // down there. All three numbers are about a room four metres across: a pace
     // that reads as knees and not as a walk, a gap that is far enough to be a
@@ -33925,6 +33963,9 @@ async function buildJadrija(scene) {
    * on her while she goes, and a chin that waits for the clip to finish before
    * coming up is a chin that comes up after the moment it was answering.
    */
+  /** The three where she is close enough to touch you on purpose. */
+  const NEARBY = { toYou: 1, kiss: 1, hug: 1 };
+
   /** The two she is on her back for — the way down and the hold. */
   const LYING = { recline: 1, cradle: 1 };
 
@@ -34065,6 +34106,16 @@ async function buildJadrija(scene) {
      * out has always used them.
      */
     rise: 1,
+    /**
+     * AND THE TWO THAT ARE NOT A PERFORMANCE.
+     *
+     * Everything else in this table is a number she does at you — a dance, a
+     * pose, an errand. These two are with you, which is why they are the only
+     * entries that need to know where you are standing to the centimetre: she
+     * walks in, closes the last half metre herself, and the hold is the whole
+     * of it.
+     */
+    kiss: 1, hug: 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
@@ -35091,6 +35142,27 @@ async function buildJadrija(scene) {
         if (LYING[show.phase]) go('situp', 'situp', 0.30);
         else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
         else go('submit', 'submit', 0.30);
+      } else if (name === 'kiss' || name === 'hug') {
+        // IN A POSE FIRST, UP SECOND. `kept` and `cradle` are askable so that
+        // the long holds are not a trap, which means these two can be asked of
+        // a woman on her knees — and a kiss from there is a different thing
+        // than the one that was asked for. So the request stands her up and
+        // re-arms itself: `show.ask` is read again on a later frame, and by
+        // then she is in `dwell` with her feet under her.
+        if (KNEES[show.phase] || LYING[show.phase]) {
+          show.lieWant = null;
+          show.byAsk = 0;
+          show.getUp = 1;
+          show.ask = name;
+          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          else go('rise', 'getup', 0.35);
+        } else {
+          show.near = name;
+          show.queue.length = 0;
+          show.side = 0;
+          showSay('trill', d);
+          go('toYou', 'walk', 0.34);
+        }
       } else if (name === 'rise') {
         // The way out of every pose in the room, and it takes the same two
         // routes the water does: off her knees is `rise`, off her back is
@@ -35799,6 +35871,130 @@ async function buildJadrija(scene) {
       // ever be: get there, do it, come back. The job itself is four numbers
       // on `show.job` and the phase reads them, so adding an errand is a mark
       // and a case rather than a state machine of its own.
+      // ── coming to you, and the two things she does when she gets there ──
+      //
+      // The walk is `showTo` against YOU, re-read every frame, for the reason
+      // `backTo` gives: you move. What is different is the last half metre —
+      // every other errand in this file stops at four metres, which is
+      // "close enough to talk", and these two are not that.
+      case 'toYou': {
+        show.dbg = (show.dbg || 0) + 1;
+        const dT = pt - show.t, dS = ps - show.s;
+        const gap = Math.hypot(dT, dS);
+        const want = show.near === 'hug' ? SHOW.hugGap : SHOW.kissGap;
+        show.want = Math.atan2(dS, dT);
+        // ROUND ON THE SPOT FIRST, which is what `dogTo` does and for the same
+        // reason: `showTo` moves her along the heading she HAS while turning it
+        // toward the one she wants, and over twenty metres of promenade the arc
+        // is invisible. Over two metres it is the whole walk — MEASURED, asked
+        // from 2 m away while facing the other way she set off up the deck and
+        // was seven metres away before she had finished turning round.
+        const face = Math.abs(((show.want - show.ang + Math.PI * 3)
+          % (Math.PI * 2)) - Math.PI);
+        if (face > 0.70 && gap < 6) { showHold(dt); break; }
+        // WALK, OR EASE, AND NEVER BOTH. The first cut did both on the same
+        // frame: `showTo` pulls her to within its own 0.14 m tolerance and the
+        // easing below pushes her back out to `want`, so she settled at
+        // whatever distance the two agreed on and the arrival test never
+        // fired. Measured — she stood 0.4 m off and gave up after seventeen
+        // seconds. So the walk brings her to arm's length and hands over.
+        if (gap > want + 0.40) {
+          showTo(pt, ps, dt, ERRAND.pace * 0.75);
+        } else {
+          // The last few centimetres, eased on to the line between you, which
+          // is the same argument `showSettle` makes about the pour mark: a
+          // stride cannot measure 0.3 m and a damp can.
+          const k = want / Math.max(gap, 1e-3);
+          show.t = damp(show.t, pt - dT * k, 3.2, dt);
+          show.s = damp(show.s, ps - dS * k, 3.2, dt);
+          showHold(dt);
+          // And facing you before she leans in, or the lean is sideways.
+          // CLOSE ENOUGH, and one-sided on purpose. `|gap - want| < 0.12` was
+          // the first cut and it is a window, which means something has to
+          // hold her inside it: her own clearance keeps her about 0.41 m off
+          // whoever she is walking at, so the kiss passed this by a centimetre
+          // and the hug — 4 cm tighter — hovered at the gap for ever without
+          // ever arriving. What either of these needs is "near enough to
+          // reach", and 0.2 m of slack on the near side is that.
+          if (gap < want + 0.20 && face < 0.5) {
+            show.kiss = 0;
+            go(show.near === 'hug' ? 'hug' : 'kiss', 'idle', 0.30);
+          }
+        }
+        // And she gives up rather than chasing you down the promenade — but
+        // not before she has had time to cross one. `stall * 2.5` was
+        // seventeen seconds, which is twenty metres of walking, and abandoning
+        // a request because you were standing at the far end of the deck is
+        // the behaviour this whole day has been about.
+        if (show.tmr > ERRAND.stall * 6) { show.near = null; showNext(); }
+        break;
+      }
+
+      // THE KISS. No clip and no new geometry: her chest tips toward you and
+      // her chin comes up, both through `aim` in figure space where +x is the
+      // way she faces — so "lean in" is an angle about the sagittal axis and
+      // there is nothing about the rig to get wrong. The hold is what makes it
+      // a kiss rather than a peck.
+      case 'kiss': {
+        showHold(dt);
+        show.kiss = (show.kiss || 0) + dt;
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        const T = SHOW.kissIn + SHOW.kissHold + SHOW.kissOut;
+        const u = show.kiss < SHOW.kissIn ? show.kiss / SHOW.kissIn
+          : show.kiss < SHOW.kissIn + SHOW.kissHold ? 1
+            : 1 - (show.kiss - SHOW.kissIn - SHOW.kissHold) / SHOW.kissOut;
+        const e = sat(u) * sat(u) * (3 - 2 * sat(u));
+        // Chest forward about −z, chin up about +z — the two halves of
+        // meeting somebody who is taller than the pose she is standing in.
+        f.aim('spine03', 0, 0, -1, SHOW.kissLean * e);
+        f.aim('neck', 0, 0, 1, SHOW.kissChin * e);
+        if (show.kiss > T) {
+          f.aim('spine03', 0, 0, -1, 0);
+          f.aim('neck', 0, 0, 1, 0);
+          show.near = null;
+          showNext();
+        }
+        break;
+      }
+
+      // AND THE HUG, which is the same shape with four more bones in it: the
+      // collarbones come round, the upper arms swing forward and in, the
+      // elbows close behind you, and her head goes past yours rather than into
+      // it. Mirrored on the adduction axis, because the two arms close on the
+      // same point from opposite sides.
+      case 'hug': {
+        showHold(dt);
+        show.kiss = (show.kiss || 0) + dt;
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        const T = SHOW.hugIn + SHOW.hugHold + SHOW.hugOut;
+        const u = show.kiss < SHOW.hugIn ? show.kiss / SHOW.hugIn
+          : show.kiss < SHOW.hugIn + SHOW.hugHold ? 1
+            : 1 - (show.kiss - SHOW.hugIn - SHOW.hugHold) / SHOW.hugOut;
+        const e = sat(u) * sat(u) * (3 - 2 * sat(u));
+        for (const side of ['L', 'R']) {
+          const sgn = side === 'L' ? 1 : -1;
+          f.aim('clavicle' + side, 0, 0, -1, SHOW.hugClav * e);
+          f.aim('armU' + side, 0, 0, -1, SHOW.hugArm * e);
+          f.aim('armL' + side, 0, 0, -1, SHOW.hugElbow * e);
+          f.aim('hand' + side, sgn, 0, 0, SHOW.hugIn2 * e);
+        }
+        // Cheek past your ear, and always the same side, because a head that
+        // picks a side per hug is a head that cannot decide.
+        f.aim('neck', 0, 1, 0, SHOW.hugHead * e);
+        if (show.kiss > T) {
+          for (const side of ['L', 'R']) {
+            f.aim('clavicle' + side, 0, 0, -1, 0);
+            f.aim('armU' + side, 0, 0, -1, 0);
+            f.aim('armL' + side, 0, 0, -1, 0);
+            f.aim('hand' + side, 1, 0, 0, 0);
+          }
+          f.aim('neck', 0, 1, 0, 0);
+          show.near = null;
+          showNext();
+        }
+        break;
+      }
+
       case 'errand': {
         const j = show.job;
         if (!j) { showNext(); break; }
@@ -36610,6 +36806,40 @@ async function buildJadrija(scene) {
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
 
+    // ── AND THE ICE CREAM SHE IS CARRYING ────────────────────────────────
+    //
+    // Her left hand, the bottle's own rig, and nothing of the bottle's state —
+    // see the note over `CONE`. `show.carry` is the flavour she bought and it
+    // is set the moment she takes it at the counter and cleared on the frame
+    // she hands it over, so the prop is up for exactly the walk back.
+    if (show.carry) {
+      const K = coneKit();
+      if (handR === null) handR = f.boneIndex('handR');
+      if (handR >= 0) {
+        // Painted when the flavour changes hands, not every frame: it is the
+        // same table 61-cream.js paints the one in your hand out of, so what
+        // she carries and what you are given are the same ice cream.
+        if (show.carryPaint !== show.carry) {
+          show.carryPaint = show.carry;
+          const row = typeof creamFlavour === 'function'
+            ? creamFlavour(show.carry).row : null;
+          if (row) K.ice.color.setRGB(row.col[0], row.col[1], row.col[2]);
+        }
+        f.boneAt(handR, vHand).applyMatrix4(f.mesh.matrixWorld);
+        f.boneTurn(handR, qTurn);
+        qHand.copy(f.mesh.quaternion).multiply(qTurn);
+        // Measured, not mirrored — see the note over `CONE`.
+        vPalm.copy(PALM).applyQuaternion(qHand).add(vHand);
+        vAx.copy(GRIP_UP).applyQuaternion(qHand);
+        K.g.position.copy(vPalm).addScaledVector(vAx, -CONE.grip);
+        K.g.quaternion.setFromUnitVectors(UPV, vAx);
+        K.g.visible = true;
+      }
+    } else if (coneMesh) {
+      coneMesh.g.visible = false;
+      show.carryPaint = null;
+    }
+
     // And the bottle, which is where her hand is or where she left it.
     //
     // After the matrix update, because that is what makes `boneAt` mean
@@ -36769,6 +36999,74 @@ async function buildJadrija(scene) {
   // +y is up, +z is her right.
   const PALM = new THREE.Vector3(0.0443, -0.0748, 0.0096);
   const GRIP_UP = new THREE.Vector3(-0.5014, 0.6297, -0.5934);
+
+  /**
+   * ── THE ICE CREAM SHE IS CARRYING ──────────────────────────────────────
+   *
+   * Misha, 17 Sep 2026, on the fetch: the cone used to appear in YOUR hand out
+   * of nothing on the frame she reached you, which is the whole errand's one
+   * remaining lie — she walked two hundred metres back from the counter with
+   * empty hands and produced it like a card trick.
+   *
+   * So she carries it, and on the bottle's rig rather than a second one: the
+   * hand's whole frame off `boneTurn`, the same `PALM` measured off the arm
+   * hanging at her side, and `GRIP_UP` — the same measured direction, because
+   * a cone carried in a fist and a bottle carried in a fist point the same
+   * way. The first cut had its own vector for this, near enough to the
+   * measured one to look deliberate and arrived at by nothing: it put the
+   * wafer inside her hip with the scoop poking out at her wrist, which is
+   * what the photographs showed.
+   *
+   * HER RIGHT HAND, which is the bottle's hand, and that is the point: `PALM`
+   * and the grip direction below are MEASURED in that hand's frame off
+   * `IDLE_A`. The first cut put the cone in her left and mirrored the offset
+   * on z, reasoning that the right hand pours the wine — and a mirrored offset
+   * is a guess about how the rig was built, not a measurement. It put the cone
+   * inside her hip, photographed twice from opposite sides with nothing in
+   * either frame. The two props never co-occur anyway: the bottle is in the
+   * kabina and `show.held` is nought everywhere else.
+   *
+   * It is a prop and not the first-person ice cream: 61-cream.js is the one in
+   * YOUR hand, 40 cm from the lens with a shader for the shards and a melt.
+   * This is the same object seen from two metres while she walks, so it is
+   * eleven triangles of wafer and a ball, painted out of the same table
+   * (`creamFlavour`) so the flavour in her hand is the flavour in yours.
+   */
+  const CONE = {
+    /** Metres. A gelateria cone is 0.12 m of wafer and a scoop across it. */
+    h: 0.118,
+    r: 0.026,
+    scoop: 0.034,
+    /** How far up the cone her fingers close — a third, which is the waist. */
+    grip: 0.040,
+  };
+  let coneMesh = null;
+
+  /** The cone in her hand, made once and kept — see the note over `CONE`. */
+  function coneKit() {
+    if (coneMesh) return coneMesh;
+    const g = new THREE.Group();
+    const waf = solidMaterial(new THREE.Color(0.735, 0.610, 0.395),
+      { spec: 0.20, specPower: 20, vcol: false });
+    const ice = solidMaterial(new THREE.Color(0.845, 0.830, 0.795),
+      { spec: 0.35, specPower: 30, vcol: false });
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(CONE.r, CONE.h, 11, 1, true), waf);
+    cone.position.y = CONE.h * 0.5;
+    cone.rotation.x = Math.PI;              // point down, mouth up
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(CONE.scoop, 10, 7), ice);
+    ball.position.y = CONE.h + CONE.scoop * 0.45;
+    ball.scale.set(1, 0.88, 1);
+    g.add(cone, ball);
+    for (const m of g.children) { m.castShadow = false; m.receiveShadow = false; }
+    g.visible = false;
+    // Straight into the scene, like the bottle two hundred lines down and for
+    // the same reason: it is in her hand some of the time and its own object
+    // the rest, so it cannot be a child of her mesh.
+    scene.add(g);
+    coneMesh = { g, ice };
+    return coneMesh;
+  }
 
 
   /**
@@ -38129,6 +38427,15 @@ async function buildJadrija(scene) {
   }
 
   const BODY = {
+    /**
+     * Her core while she is kissing or hugging you — see the note in `bodies`.
+     *
+     * 0.12 m against the 0.24 everybody else gets: under half the gap those
+     * two phases stand at, so nothing is pushed, and still a circle, so the
+     * face ramp has a body to find and you cannot walk through the middle of
+     * her while she is holding on to you.
+     */
+    kissR: 0.12,
     // The plan radius of one of them at the shoulders.
     //
     // Measured off the rig rather than guessed. The trunk part's own bounding
@@ -38250,9 +38557,27 @@ async function buildJadrija(scene) {
     if (show && skinFig && skinFig.mesh.visible
       && show.t > t - band && show.t < t + band) {
       const p = toWorld(show.t, show.s);
-      // Her hop takes her off the deck, and something 0.76 m over your head is
-      // not in your way. `show.air` is how far up she is.
-      pushBody(p[0], p[2], BODY.r, p[1] + show.air,
+      // A SMALLER CIRCLE WHILE SHE IS KISSING YOU, and not no circle at all.
+      //
+      // This is the list the ground pushes you out of, and at `kissGap` she is
+      // well inside `BODY.r` — so the push moved me, she closed the gap again,
+      // and the pair of us walked up the deck at 0.77 m/s for nine seconds
+      // with her holding station perfectly. Her approach was never the
+      // problem.
+      //
+      // Taking her out of this list fixed that and broke something quieter:
+      // it is also the list the FACE RAMP reads (`ground.nearBody` → the near
+      // plane, which is 1.2 m and comes down to 0.04 when somebody is at the
+      // lens). With no body in it the plane stayed at 1.05 and she was clipped
+      // away at the one moment you are looking straight at her — MEASURED,
+      // near 1.054 through the whole kiss and 0.04 the second it ended.
+      //
+      // So she stays in the list with 0.12 m of core: close enough that
+      // nothing is pushed at the gaps these two phases stand at, present
+      // enough that the ramp opens, and still solid enough that you cannot
+      // walk clean through the middle of her.
+      const near = show.near && NEARBY[show.phase];
+      pushBody(p[0], p[2], near ? BODY.kissR : BODY.r, p[1] + show.air,
         p[1] + show.air + BODY.top, 'baye', -1);
     }
     // AND THE BUCKETEER, who went three releases without one.
@@ -41251,6 +41576,10 @@ async function buildJadrija(scene) {
       byAsk: show.byAsk ? 1 : 0, lieWant: show.lieWant || null,
       // What she is bringing back, and what happened when she handed it over.
       carry: show.carry || null, gave: show.gave || null,
+      // The two that are with you: which one was asked for, and the clock.
+      near: show.near || null, kiss: +(show.kiss || 0).toFixed(2),
+      ang: +show.ang.toFixed(2), want: +show.want.toFixed(2),
+      dbg: show.dbg || 0,
       ahead: (() => {
         const o = showAhead(SHOW.look, toWorld(show.t, show.s)[1]);
         return o ? { gap: +o.gap.toFixed(2), out: +o.out.toFixed(2),

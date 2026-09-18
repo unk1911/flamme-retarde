@@ -8,6 +8,67 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.407.0] — 2026-09-17 (baye 1.14.0)
+
+### she kisses you, and she hugs you
+
+**"why can't main character (Chloe) and shore bay have romantic kissing and
+shit"**, then **"yes they must kiss (French kiss) and hug"**.
+
+Ask her — out loud or typed — and she comes over, closes the last half metre
+herself, faces you and holds it. No clip and no new geometry: her chest tips
+toward you and her chin comes up through `aim` in 41-skin.js, which works in
+FIGURE space where +x is the way she faces, so "lean in" is an angle about the
+sagittal axis and there is nothing about the rig to get wrong. The hug is the
+same shape with four more bones in it — collarbones round, upper arms forward,
+elbows closed, her head past yours rather than into it.
+
+THREE THINGS HAD TO BE MEASURED, and every one of them was a surprise.
+
+She walked away with me. Asked from two metres she set off up the deck and was
+seven metres away before she had finished turning round: `showTo` moves her
+along the heading she HAS while turning it toward the one she wants, which is
+invisible over twenty metres of promenade and is the whole walk over two. She
+rounds on the spot first now, which is what the dog has always done.
+
+Then the pair of us walked up the deck at 0.77 m/s for nine seconds with her
+holding station 0.5 m off my shoulder. Her approach was perfect. The COLLIDER
+was moving us: at the gap a kiss stands at she is inside `BODY.r`, so the
+ground pushed me out, she closed the gap again, and neither of us ever stopped.
+
+Taking her out of the body list fixed that and broke something quieter — it is
+also the list the face ramp reads, and the near plane stayed at 1.05 m through
+the whole kiss and dropped to 0.04 the second it ended. So she is *clipped away
+at the one moment you are looking straight at her*. She keeps a 0.12 m core
+instead: nothing is pushed at these gaps, the ramp still finds her, and you
+still cannot walk through the middle of her.
+
+And the arrival test was a window rather than a threshold, which the kiss
+passed by a centimetre and the hug failed by four: her own clearance holds her
+about 0.41 m off whoever she is walking at, so "near enough to reach" is what
+it asks now.
+
+Both are askable from a held pose as well: asked on her knees or on her back
+the request stands her up first and re-arms itself, because a kiss from there
+is not the one that was asked for.
+
+### and the ice cream is in her hand on the way back
+
+The fetch used to produce the cone in YOUR hand out of nothing on the frame she
+reached you — she walked two hundred metres from the counter with empty hands
+and produced it like a card trick. Now she carries it, on the wine bottle's own
+rig: the hand's whole frame off `boneTurn`, the measured palm point, and the
+same measured grip direction.
+
+The first cut of that had its own vector for "the way a hand points a cone",
+near enough to the measured one to look deliberate and arrived at by nothing.
+It put the wafer inside her hip with the scoop poking out at her wrist, in two
+photographs from opposite sides. A cone in a fist and a bottle in a fist point
+the same way; there was nothing there to have an opinion about.
+
+Server (baye 1.14.0): kiss, smooch, snog; hug, cuddle, embrace, hold me, and
+"come here", which in this game has no other meaning.
+
 ## [1.406.1] — 2026-09-17
 
 ### and she steps off the bed as she gets up

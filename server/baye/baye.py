@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.13.0"
+VERSION = "1.14.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -433,6 +433,17 @@ SKILLS = {
     # my knees" is a sentence somebody could say and it is not this request.
     "submit": ("get down on her knees in the kabina and stay there",
                [r"\b(kneel\w*|on your knees|onto your knees|to your knees)\b"]),
+    # AND THE TWO THAT ARE WITH YOU RATHER THAN AT YOU. Misha, 17 Sep 2026:
+    # *"why can't main character (Chloe) and shore bay have romantic kissing
+    # and shit"*, then *"yes they must kiss (French kiss) and hug"*.
+    #
+    # "Come here" belongs to the hug: it is the thing somebody says when they
+    # want you closer and it has no other meaning in this game, where every
+    # other way of calling her over is an errand with a destination.
+    "kiss": ("come over and kiss you",
+             [r"\b(kiss\w*|smooch\w*|snog\w*|poljub\w*)\b"]),
+    "hug": ("come over and hug you",
+            [r"\b(hug\w*|cuddl\w*|embrace\w*|hold me|come here|zagrljaj\w*)\b"]),
     # AND THE WAY BACK UP. Misha, 17 Sep 2026: *"now that she lays down on the
     # bed. i say, stand up, or get up, she doesn't want to now"*.
     #
@@ -507,6 +518,7 @@ ASK_RE = re.compile(
     r"|\b(please|pls|plz)\b"
     r"|\b(lie|lay|kneel)\s+(down|back|on)\b"
     r"|\b(stand|get)\s+(up|upright)\b|\bon your feet\b"
+    r"|\b(kiss|hug|cuddle|hold)\s+me\b|\bcome here\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
