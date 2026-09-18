@@ -33760,6 +33760,101 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * ── BOTH HANDS TO THE BACK OF HER HEAD ─────────────────────────────────
+   *
+   * The gesture the hair swap was missing. `hairDown` has always been able to
+   * take the tail out and hang the loose shell off the head bone, and driven
+   * from the console that is a haircut that happens between two frames — the
+   * one thing nobody would believe they had watched somebody do.
+   *
+   * SOLVED AND NOT AIMED, for the reason written over `armsWide` and paid for
+   * once over `hugArms`: nothing in this file knows where "behind her own
+   * head" is in the frame of a bone whose rest direction was never measured,
+   * and the last two times somebody guessed at one the answer was a hands-up.
+   * `wheelLimb` only needs a point, and a point can be stated: the head bone's
+   * own position, a little behind it, a little above it, and out to each side
+   * by less than the width of her shoulders — which is where the hands of
+   * somebody pulling a band out of their hair are.
+   *
+   * The head is sampled with the arms rather than written down, because the
+   * whole point of a goal is that it is not a number I made up: the bone is
+   * wherever the clip has put it this frame, and a reach measured off it
+   * survives her looking at you.
+   *
+   * Its own cache and not `armsRest`, which it could have shared: that one is
+   * filled once and kept forever, and it is filled from whatever pose she was
+   * in at the time. `armsWide` fills it lying down and this fills it standing
+   * up, and a chain ROOT taken from the wrong one of those is a shoulder half
+   * a metre from where the solve thinks it is. So this samples at the top of
+   * each gesture and throws it away at the bottom.
+   */
+  const HAIRDO = {
+    /**
+     * A BEAT BEFORE THE REACH, and it is not padding.
+     *
+     * The rest positions below are a chain ROOT and two bone lengths, and the
+     * solve is only as good as the pose they were taken in. Asked while she
+     * was walking — `tieHair` is entered from `leave` and from `play` as
+     * readily as from `dwell` — the first frame of the phase is still the
+     * walk, half way through a 0.30 s fade to the idle she will actually hold.
+     * MEASURED on exactly that: her left hand finished 0.098 m from her head
+     * and her right 0.292 m, against 0.138 for both from standing. One arm
+     * reached and the other stopped short of her ear, because the shoulder the
+     * solve was working from had swung on and left it.
+     *
+     * So the sample waits for the fade to land: the arms are untouched for
+     * this long and the cache is thrown away every frame of it.
+     */
+    settle: 0.34,
+    /** The clock: up, the swap at the top of it, and back down. */
+    up: 1.2, hold: 0.30, down: 0.8,
+    /** Behind the head bone, above it, and out to the side — figure metres. */
+    back: 0.100, rise: 0.055, out: 0.080,
+    /** Elbows out and forward, which is the shape of hands-behind-the-head. */
+    pole: [0.45, -0.25, 1],
+  };
+  let hairRest = null;
+  function hairHands(f, e) {
+    if (e <= 0.001) {
+      if (hairRest) {
+        for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+        hairRest = null;
+      }
+      return;
+    }
+    if (!hairRest) {
+      const v = new THREE.Vector3(), out = {};
+      for (const n of ['armUL', 'armLL', 'handL', 'armUR', 'armLR', 'handR',
+        'head']) {
+        const i = f.boneIndex(n);
+        if (i < 0) return;
+        f.boneAt(i, v);
+        out[n] = v.clone();
+      }
+      hairRest = out;
+    }
+    const H = hairRest.head;
+    for (const side of ['L', 'R']) {
+      const S = hairRest['armU' + side];
+      const E = hairRest['armL' + side];
+      const W = hairRest['hand' + side];
+      const sgn = Math.sign(S.z || 1);
+      _hugGoal.set(H.x - HAIRDO.back, H.y + HAIRDO.rise,
+        H.z + sgn * HAIRDO.out);
+      _hugGoal.lerpVectors(W, _hugGoal, e);
+      _hugPole.set(HAIRDO.pole[0], HAIRDO.pole[1], sgn * HAIRDO.pole[2])
+        .normalize();
+      wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _hugGoal, _hugPole);
+      // Readable from a probe, because "her hands went to her head" is a
+      // sentence a render cannot settle and a distance can.
+      if (side === 'L') {
+        show.hairGoal = [+_hugGoal.x.toFixed(3), +_hugGoal.y.toFixed(3),
+          +_hugGoal.z.toFixed(3)];
+      }
+    }
+  }
+
   function nearClose(pt, ps, dir, want, dt) {
     let fx = 0, fz = 0;
     if (dir) {
@@ -34716,6 +34811,24 @@ async function buildJadrija(scene) {
     /** And her arms out, which is a latch on the pose like her legs. */
     'arms.wide': 1, 'arms.down': 1,
     /**
+     * AND HER HAIR, OUT OF THE TAIL OR BACK INTO IT.
+     *
+     * `hairDown` and `looseHairGroup` have been able to do this since the
+     * shell was built — it hangs off the head bone through `worn`, and the
+     * tail and its knot stop being drawn at the same moment via `uTailOff`.
+     * What it has never had is a way in and a gesture: driven from the console
+     * the hair changed between two frames with her arms at her sides, which is
+     * a thing nobody would believe they had watched.
+     *
+     * So `tieHair` is the entry and `hairHands` is the gesture, and NEITHER
+     * changes what the swap is: it is still a latch, because *"persists"* is
+     * what was asked for. Two names and not one, for `legs.down`'s reason —
+     * "let your hair down" and "put your hair up" are different requests, and
+     * a game that hears the difference and ignores it is worse than one that
+     * cannot hear it.
+     */
+    'hair.down': 1, 'hair.up': 1,
+    /**
      * AND ANYTHING OUT OF YOUR SATCHEL. The key rides on the name the way the
      * ice cream's flavour does — `give:handcuffs` — so one entry covers the
      * whole bag and nothing downstream learns a second argument.
@@ -34835,6 +34948,17 @@ async function buildJadrija(scene) {
       if (!LYING[show.phase]) return 'notlying';
       const want = name === 'arms.wide' ? 1 : 0;
       if ((show.armsWide || 0) === want) return want ? 'armsalready' : 'armsdown';
+      return null;
+    }
+    if (name === 'hair.down' || name === 'hair.up') {
+      // The hair itself and not a flag, which is the point of asking `worn`:
+      // it is the same thing `hairDown` toggles and the same thing that is on
+      // her head, so there is one answer to "is it down" and nowhere for a
+      // second copy of it to drift. Anywhere and in any pose — there is
+      // nothing in this room a woman needs in order to take a band out of her
+      // own hair, so the only reason to say no is that it is already that way.
+      const want = name === 'hair.down' ? 1 : 0;
+      if ((worn.hair ? 1 : 0) === want) return want ? 'hairalready' : 'hairup';
       return null;
     }
     if (name === 'coke') {
@@ -35112,6 +35236,11 @@ async function buildJadrija(scene) {
     // being overridden by the hut, every time, and what you saw was the wine.
     toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1,
     flatEdge: 1, edgeHeld: 1, coke: 1,
+    // AND THE TWO SECONDS SHE HAS HER HANDS IN HER OWN HAIR. Out of this list
+    // the room rule below fires on the frame after it starts — she is standing
+    // in the kabina, `tieHair` is not one of the phases the hut owns, and she
+    // is walked back to the bottle in the middle of the reach.
+    tieHair: 1,
     sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
@@ -35768,6 +35897,24 @@ async function buildJadrija(scene) {
     const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1,
       'flat.edge': 1, coke: 1,
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
+      // AND THE HAIR IS NOT ON THIS LIST, which it was for an afternoon.
+      //
+      // It reads as one of the adjustments — two seconds of her own hands,
+      // about the next moment rather than about a performance — and being on
+      // here breaks the one thing its entry needs. This list is a licence to
+      // dispatch from a phase `ASKABLE` does not cover, and the get-up road
+      // the entry takes from a recline goes `situp` → `rise` → `dwell` with
+      // the request re-armed across it. `situp` is not in `ASKABLE` and it is
+      // not in `LYING` either — so on the very next frame the licence fired
+      // again, the test for "is she lying down" said no, and she was put into
+      // the reach on the first frame of a sit-up. MEASURED, frame by frame:
+      // cradle, situp, tieHair, and the standing idle crossfaded in under a
+      // woman still on the cot.
+      //
+      // Off the list the request simply waits for a phase it may be entered
+      // from, which is what every dance in this file already does, and the
+      // whole of `ASKABLE` — the idles, the dances, the held poses — can still
+      // start one on the frame the words arrive.
       give: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
@@ -35905,6 +36052,28 @@ async function buildJadrija(scene) {
         show.armsWide = name === 'arms.wide' ? 1 : 0;
         show.did = name;
         showSay('squee', d);
+      } else if (name === 'hair.down' || name === 'hair.up') {
+        // A PHASE AND NOT A LATCH, which is the one place this differs from
+        // the legs and the arms above it. Those two are a pose she is already
+        // holding with one thing moved, and the move IS the answer. This one
+        // is a swap — the tail stops being drawn and a shell appears — and a
+        // swap with nothing in front of it happens between two frames, which
+        // is why it wanted a gesture and therefore a phase to hang it on.
+        //
+        // ON HER FEET FOR IT, the same road `coke` takes: reaching behind her
+        // own head is authored off a standing chain, and the way there from
+        // the floor is to get up. `getUp` carries the request across the
+        // situp, and `show.ask` is read again on a later frame.
+        show.hairWant = name === 'hair.down' ? 1 : 0;
+        show.hairDid = 0;
+        show.queue.length = 0;
+        showSay('squee', d);
+        if (LYING[show.phase] || KNEES[show.phase] || show.phase === 'fours') {
+          show.getUp = 1;
+          show.ask = name;
+          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          else go('rise', 'getup', 0.35);
+        } else go('tieHair', 'idle', 0.30);
       } else if (name === 'coke') {
         // Same road as the wine: she has to be on the mark at the tabouret,
         // and that mark is the one the whole room is solved around.
@@ -36439,6 +36608,47 @@ async function buildJadrija(scene) {
           }
         } else { show.near = null; showNext(); }
         break;
+
+      // ── OUT OF THE PONYTAIL, AND BACK INTO IT ─────────────────────────
+      //
+      // Two and a third seconds and the same shape as `wearIt`: her hands go
+      // up, the thing happens at the top, her hands come down, and the phase
+      // hands her back. The reach is `hairHands` and the swap is `hairDown`,
+      // which is the call the console has always made — so this phase adds a
+      // gesture and changes nothing about what the hair does afterwards. It
+      // STAYS: *"persists"*.
+      //
+      // The swap on a LATCH and not on a window, because `hairDown` toggles
+      // and a toggle called twice is a toggle that did nothing. `hairDid` is
+      // set on the frame it fires and cleared on the way out.
+      case 'tieHair': {
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        showHold(dt);
+        // The beat the fade needs, and the cache thrown away through all of
+        // it — see `HAIRDO.settle`, which is where the measurement is.
+        const tm = show.tmr - HAIRDO.settle;
+        if (tm <= 0) { hairRest = null; break; }
+        const T = HAIRDO.up + HAIRDO.hold + HAIRDO.down;
+        const u = tm < HAIRDO.up ? tm / HAIRDO.up
+          : tm < HAIRDO.up + HAIRDO.hold ? 1
+            : 1 - (tm - HAIRDO.up - HAIRDO.hold) / HAIRDO.down;
+        const e = sat(u) * sat(u) * (3 - 2 * sat(u));
+        hairHands(f, e);
+        if (!show.hairDid && tm >= HAIRDO.up) {
+          show.hairDid = 1;
+          hairDown(!!show.hairWant);
+          showSay('trill', d);
+        }
+        if (tm > T) {
+          hairHands(f, 0);
+          show.hairDid = 0;
+          // Indoors she goes back to standing with you, the way the plate
+          // does; out on the deck there is a running order to get back to.
+          if (sheIsIn()) go('dwell', 'idle', 0.40);
+          else showNext();
+        }
+        break;
+      }
 
       // ── ON HER FRONT ──────────────────────────────────────────────────
       //
@@ -37893,6 +38103,12 @@ async function buildJadrija(scene) {
     else if (show.armsWasOn) armsWide(f, dt);
     if (LYING[show.phase]) legsFlat(f, dt);
     else if (show.legsWasOn) legsFlat(f, dt);
+    // And the reach, IF SOMETHING TOOK HER OUT OF IT. `tieHair` clears its own
+    // aims on the way out and that covers the only exit it controls; the hose,
+    // the turn and the room can all take her mid-gesture, and `aim` holds a
+    // rotation until somebody hands it a zero — so without this she walks away
+    // with both hands welded behind her head. Same latch the two above use.
+    if (show.phase !== 'tieHair' && hairRest) hairHands(f, 0);
 
     // Turn towards `want` at a rate a person turns at, and never the long way
     // round — the shore's frame wraps and a heading that crosses the wrap would
@@ -43644,6 +43860,10 @@ async function buildJadrija(scene) {
       hit: +show.hit.toFixed(2), spin: show.spin,
       soak: +show.soak.toFixed(1), burn: +show.burn.toFixed(2),
       turned: show.turned, shorn: +show.shorn.toFixed(2),
+      // Her hair, and where the reach is asking her left wrist to go while
+      // `tieHair` runs — in figure metres, so it can be checked against the
+      // head bone `bones(['head'])` reports without a render in between.
+      hair: worn.hair ? 'down' : 'up', hairGoal: show.hairGoal || null,
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
     /**

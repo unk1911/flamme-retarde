@@ -492,6 +492,35 @@ SKILLS = {
                    r"|\bspread\b.{0,10}\barms?\b"]),
     "arms.down": ("put her arms back down at her sides",
                   [r"\barms?\b.{0,14}\b(down|in|back)\b"]),
+    # HER HAIR, OUT OF THE PONYTAIL AND BACK INTO IT. Misha: *"undo
+    # ponytail"*. The shell and the swap have been in the page since the hair
+    # was built — `hairDown` in src/43-jadrija.js — and what it had no way of
+    # being was asked for. It is a LATCH: it stays down until somebody asks
+    # for it back up, which is what was wanted.
+    #
+    # DOWN BEFORE UP, and this dict is ordered for exactly this: "undo
+    # ponytail" and the bare word "ponytail" both name the same noun and they
+    # are opposite requests. Down owns the sentence that carries an undoing
+    # word; up owns everything else that says ponytail, which is why its last
+    # alternative is the bare noun and why it cannot be reached first.
+    #
+    # Neither of these can steal from anything above: every pattern in both
+    # requires the word "hair" or "ponytail", and no other skill in this table
+    # has either noun anywhere in it. Going the other way, "let your hair
+    # down" carries "down", "tie your hair back" carries "back" and "take your
+    # hair out" carries "out" — the three words `legs.down`, `arms.down` and
+    # `arms.wide` are matched on — and all three of those need a limb named in
+    # the same sentence, so none of them takes one of these.
+    "hair.down": ("let her hair down, out of the ponytail",
+                  [r"\b(undo|undoes|undone|untie|untied|unravel\w*|"
+                   r"out of|take out|let down|loose|loosen)\b"
+                   r".{0,24}\b(hair|pony ?tail)\b"
+                   r"|\b(hair|pony ?tail)\b.{0,24}"
+                   r"\b(down|out|loose)\b"]),
+    "hair.up": ("put her hair back up in a ponytail",
+                [r"\b(hair|pony ?tail)\b.{0,24}\b(up|back)\b"
+                 r"|\b(tie|tied|put|back)\b.{0,24}\bhair\b"
+                 r"|\bpony ?tail\b"]),
     # ON ALL FOURS, which the `kneel` clip has always ended on.
     "fours": ("get down on all fours in the kabina and stay there",
               [r"\ball fours\b|\bon all four\b|\bhands and knees\b"
@@ -577,6 +606,26 @@ ASK_RE = re.compile(
     r"|\blegs? (hang\w*|dangl\w*|off|over)\b"
     r"|\b(coke|cocaine)\b|\bcut (me )?(a |some )?lines?\b|\brack '?em\b"
     r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
+    # AND HER HAIR. Every phrasing of it — "undo ponytail", "take your hair
+    # out", "let your hair down", "hair down", "put your hair up", "tie your
+    # hair back", the bare "ponytail" — carries no modal, no please and none
+    # of the openers below, so without these lines all seven read as talk and
+    # never reached `skills_of` at all.
+    #
+    # THE NOUN AND A DIRECTION, not the noun on its own, which is what this
+    # said first. `\bhair\b` alone is a gate wide enough to walk anything
+    # through: "your hair smells of wine" would have reached the table and
+    # come back as a request to pour one, and "i love your hair and your
+    # dancing" as a request for the shimmy — because once ASK_RE lets a
+    # sentence past, every pattern in `SKILLS` gets a look at it. So this
+    # repeats the skill's own shape, the way the `coke` and `legs hanging`
+    # clauses above it do. The bare "ponytail" stays a gate on its own,
+    # because it has to be — it is the whole of one of the seven, and it is
+    # not a word anybody uses in passing.
+    r"|\b(hair|pony ?tails?)\b.{0,20}\b(up|down|out|back|loose)\b"
+    r"|\b(undo\w*|untie\w*|unravel\w*|loosen?|tie|tied|put|take|let)\b"
+    r".{0,20}\b(hair|pony ?tails?)\b"
+    r"|\bpony ?tails?\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"

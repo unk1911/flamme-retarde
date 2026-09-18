@@ -449,6 +449,11 @@ const ears = (() => {
     coke: 'to the plate',
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
+    // Her hands up to the back of her head, and then the swap. See `tieHair`
+    // in 43-jadrija.js: it is the same latch the console has always driven,
+    // with the two seconds of gesture in front of it that it never had.
+    'hair.down': 'taking her hair out of the tail',
+    'hair.up': 'putting her hair back up',
     give: 'coming to take it from you',
     flat: 'flat on her front',
     'flat.edge': 'flat on the edge of the cot, legs over the side',
@@ -496,6 +501,8 @@ const ears = (() => {
     legsup: 'her legs are already up',
     armsalready: 'her arms are already out',
     armsdown: 'her arms are already down',
+    hairalready: 'her hair is already down',
+    hairup: 'her hair is already up',
     nothaveit: 'you are not carrying that',
     holding: 'she is already holding something',
     nothing: 'name the thing',
