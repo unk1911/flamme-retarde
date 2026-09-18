@@ -33726,6 +33726,35 @@ async function buildJadrija(scene) {
    */
   const ARMS = { out: 0.52, drop: 0.02, secs: 1.0 };
   let armsRest = null;
+  /**
+   * The arm chain as the clip has it, sampled once into a caller's own cache.
+   *
+   * ITS OWN FUNCTION BECAUSE THE GIFT COULD NOT GET AT IT. `armsWide` samples
+   * the rest chain AFTER its own early return, so the gift's
+   * `if (!armsRest) armsWide(f, 0);` called a function that returned without
+   * sampling anything and left the cache null — and the eye-level lift the
+   * whole `studyIt` beat is built on has therefore never run in any session
+   * where `arms.wide` was not asked for first. It fails silently: the solve
+   * is simply skipped and she holds the thing at her side.
+   *
+   * A cache per caller rather than one shared one, which is what the hair and
+   * the blade already do. The shared `armsRest` is filled once and kept
+   * forever, from whatever pose happened to be current the first time
+   * anything wanted it, and two callers reaching for two different things
+   * from two different clips cannot both be right about that.
+   */
+  function armChain(f) {
+    const v = new THREE.Vector3();
+    const out = {};
+    for (const n of ['armUL', 'armLL', 'handL', 'armUR', 'armLR', 'handR']) {
+      const i = f.boneIndex(n);
+      if (i < 0) return null;
+      f.boneAt(i, v);
+      out[n] = v.clone();
+    }
+    return out;
+  }
+
   function armsWide(f, dt) {
     const want = show.armsWide ? 1 : 0;
     show.armsAt = damp(show.armsAt || 0, want, 1 / ARMS.secs, dt);
@@ -33737,14 +33766,8 @@ async function buildJadrija(scene) {
       return;
     }
     if (!armsRest) {
-      const v = new THREE.Vector3();
-      armsRest = {};
-      for (const n of ['armUL', 'armLL', 'handL', 'armUR', 'armLR', 'handR']) {
-        const i = f.boneIndex(n);
-        if (i < 0) { armsRest = null; return; }
-        f.boneAt(i, v);
-        armsRest[n] = v.clone();
-      }
+      armsRest = armChain(f);
+      if (!armsRest) return;
     }
     show.armsWasOn = 1;
     for (const side of ['L', 'R']) {
@@ -38264,18 +38287,31 @@ async function buildJadrija(scene) {
     if (giftHeld) {
       if (handR === null) handR = f.boneIndex('handR');
       if (handR >= 0) {
-        if (giftHeld.up > 0.01 && armsRest !== undefined) {
+        if (giftHeld.up > 0.01) {
           // Her wrist up in front of her face, eased, through the two-bone
           // solver the riders and the hug use.
-          if (!armsRest) armsWide(f, 0);
-          if (armsRest) {
-            const S = armsRest.armUR, E = armsRest.armLR, W = armsRest.handR;
+          //
+          // ITS OWN CAPTURE, TAKEN ON THE FRAME THE LIFT STARTS. This used to
+          // read `if (!armsRest) armsWide(f, 0);` against the shared cache,
+          // and that call samples nothing — see `armChain`. The lift was dead
+          // code in every session that had not asked for `arms.wide` first.
+          // Re-taken whenever the lift begins, because the rest chain has to
+          // be the pose she is actually holding the thing in.
+          if (!giftHeld.rest) giftHeld.rest = armChain(f);
+          const R = giftHeld.rest;
+          if (R) {
+            const S = R.armUR, E = R.armLR, W = R.handR;
             _hugGoal.set(GIFT.eye[0], GIFT.eye[1], GIFT.eye[2]);
             _hugGoal.lerpVectors(W, _hugGoal, giftHeld.up);
             _hugPole.set(0.2, -1, -0.5).normalize();
             wheelLimb(f, 'armUR', 'armLR', S, E, W, _hugGoal, _hugPole);
+            giftHeld.armOn = 1;
           }
-        } else if (armsRest) {
+        } else if (giftHeld.armOn) {
+          // And handed back, once, or the aim survives the beat — an `aim`
+          // holds its rotation until it is given a zero.
+          giftHeld.armOn = 0;
+          giftHeld.rest = null;
           f.aim('armUR', 0, 1, 0, 0);
           f.aim('armLR', 0, 1, 0, 0);
         }
@@ -38780,7 +38816,11 @@ async function buildJadrija(scene) {
     // On the WOOD and not in the well. The plate is 0.105 of radius and the
     // first go put this at 0.060 from its middle, which is a paper wrap lying
     // in the dish with the lines.
-    wrap.position.set(-0.150, -0.0086, -0.040);
+    // 0.118 and it was 0.150. The plate has 0.105 of radius, so this is the
+    // nearest the wood gets while still being wood — and the 32 mm matters
+    // because the wrap was the furthest thing she has to reach and she is
+    // already crouching 0.205 m to get at the blade. See `cokeHoldAt`.
+    wrap.position.set(-0.118, -0.0086, -0.040);
     g.add(wrap);
 
     cokeKit = { g, heap, lines, blade, wrap, straws };
@@ -38843,6 +38883,28 @@ async function buildJadrija(scene) {
     if (!k) return null;
     k.blade.updateWorldMatrix(true, false);
     return out.setFromMatrixPosition(k.blade.matrixWorld);
+  }
+
+  /**
+   * WHAT HER HAND IS ON THIS INSTANT: the wrap while it pours, then the blade.
+   *
+   * The wrap used to tip itself out over the plate with her hands at her
+   * sides, which is the same complaint the blade had one prop over. It needs
+   * no motion of its own to fix — `cokeSet` already tips it 0.9 rad and lifts
+   * it 10 mm, so a hand tracking its WORLD position rides that for free and
+   * the two cannot disagree.
+   *
+   * The handover is left to the follow damping rather than cut: the wrap and
+   * the blade are 0.15 m apart, which at `COKE_HAND.follow` takes about a
+   * third of a second, and a hand gliding from one to the other is what
+   * putting one down and picking the other up looks like from across a room.
+   */
+  function cokeHoldAt(out, u) {
+    const k = cokeKit;
+    if (!k) return null;
+    const o = u < 0.25 ? k.wrap : k.blade;
+    o.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(o.matrixWorld);
   }
 
   /**
@@ -39029,6 +39091,22 @@ async function buildJadrija(scene) {
     // for the bottle), so with the wrist turned to point that grip at the
     // steel this leaves it 21 mm clear — a hand on a blade and not through it.
     lift: 0.105,
+    /**
+     * And over the paper wrap, which she pinches — see `cokeHoldAt`.
+     *
+     * Solved off the blade's own arithmetic rather than guessed. Her grip
+     * point rides 0.088 m from the wrist bone, and the wrist rotation lays
+     * that offset along the line from wrist to target — so the grip lands at
+     * `|wrist offset| − 0.088` from the thing, and the sign does not help you:
+     * too SHORT an offset overshoots the target by as much as too long a one
+     * falls short. The blade's (0.105 up, 0.028 back) is 0.108, which leaves
+     * 0.020 of daylight and measures 0.029. The first two tries here were
+     * 0.062 and 0.050, i.e. offsets of 0.068 and 0.057 against a 0.088 hand,
+     * and both measured about 0.051 — the hand reaching straight through the
+     * paper and out the other side. 0.085 up makes the offset 0.0895, a hair
+     * over the hand itself.
+     */
+    liftWrap: 0.050,
     // And a shade back towards her, so the forearm is not a plumb line.
     back: 0.028,
     follow: 9.0,
@@ -39042,9 +39120,15 @@ async function buildJadrija(scene) {
   function cokeReach(f, dt, free) {
     const on = free && show.phase === 'coke';
     const u = on ? (show.cokeU || 0) : 0;
-    // The first line starts at 0.25 of the scrub — `cokeSet` gives the pour
-    // the first quarter — and the fourth ends at 1.
-    const want = on ? sat((u - 0.25) / 0.05) * sat((0.99 - u) / 0.05) : 0;
+    // FROM THE POUR AND NOT FROM THE FIRST LINE. This used to start at 0.25,
+    // which is where `cokeSet` hands the scrub from the pour to the cutting —
+    // so the whole pour happened with her arms at her sides while the paper
+    // tipped itself out. It comes in over the first twelfth now, which is her
+    // reaching for the wrap, and leaves at the end as it always did.
+    // AND IT HAS TO BE THERE BEFORE THE PAPER TIPS. At (u-0.03)/0.08 the arm
+    // was only arriving as the wrap went over at u 0.125, so her grip was
+    // still 53 mm off it when the pour handed on. Full by u 0.055.
+    const want = on ? sat((u - 0.004) / 0.05) * sat((0.99 - u) / 0.05) : 0;
     show.cutAt = damp(show.cutAt || 0, want, 4.5, dt);
     if (show.cutAt < 0.004) {
       // Nothing else in this file clears an arm aim every frame, so this is
@@ -39058,7 +39142,7 @@ async function buildJadrija(scene) {
       show.cutAt = 0;
       return;
     }
-    if (!cokeBladeAt(_ckBlade)) return;
+    if (!cokeHoldAt(_ckBlade, u)) return;
     if (!cokeArm) {
       const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'),
         iW = f.boneIndex('handR');
@@ -39082,7 +39166,10 @@ async function buildJadrija(scene) {
     // to know what this mesh is scaled by.
     _ckFwd.set(1, 0, 0).transformDirection(f.mesh.matrixWorld);
     _ckGoal.copy(_ckAt);
-    _ckGoal.y += COKE_HAND.lift;
+    // Lower over the wrap than over the blade: the blade number leaves the
+    // grip 21 mm clear of steel lying flat, and the wrap is 2 mm of folded
+    // paper she is pinching rather than a tool she is holding.
+    _ckGoal.y += u < 0.25 ? COKE_HAND.liftWrap : COKE_HAND.lift;
     _ckGoal.addScaledVector(_ckFwd, -COKE_HAND.back);
     f.mesh.worldToLocal(_ckGoal);
     _ckGoal.lerpVectors(cokeArm.W, _ckGoal, show.cutAt);
@@ -44490,10 +44577,20 @@ async function buildJadrija(scene) {
       q.premultiply(skinFig.mesh.quaternion);
       p.copy(PALM).applyQuaternion(q).add(w);
       const r3 = (v) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
-      return { u: +(show.cokeU || 0).toFixed(3), at: +(show.cutAt || 0).toFixed(3),
+      // AND THE THING SHE IS ACTUALLY ON, which for the first quarter is the
+      // wrap and not the blade. This reported the blade throughout, so during
+      // the pour it answered a question nobody asked: 0.21 m, which is the
+      // distance from a hand correctly on the wrap to the blade it is not
+      // holding yet. A probe that measures the wrong target is worse than no
+      // probe, because it comes back looking like a failure.
+      const u = +(show.cokeU || 0).toFixed(3);
+      const h = new THREE.Vector3();
+      const held = cokeHoldAt(h, u) ? (u < 0.25 ? 'wrap' : 'blade') : null;
+      return { u, at: +(show.cutAt || 0).toFixed(3),
         crouch: +(show.crouch || 0).toFixed(3), duck: +(show.duck || 0).toFixed(3),
-        blade: r3(b), wrist: r3(w), palm: r3(p),
-        dWrist: +w.distanceTo(b).toFixed(3), dPalm: +p.distanceTo(b).toFixed(3) };
+        held, blade: r3(b), wrist: r3(w), palm: r3(p),
+        dWrist: +w.distanceTo(b).toFixed(3), dPalm: +p.distanceTo(b).toFixed(3),
+        dHeldWrist: +w.distanceTo(h).toFixed(3), dHeld: +p.distanceTo(h).toFixed(3) };
     },
     /** Hair out of the tail, or back into it. It stays either way. */
     hair: (on = true) => hairDown(on !== false),

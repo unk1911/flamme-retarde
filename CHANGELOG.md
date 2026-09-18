@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.421.1] — 2026-09-18
+
+### two things that were animating themselves
+
+**The gift lift had never run.** `studyIt` is built on her bringing the thing
+you handed her up in front of her face, and the solve behind it was dead code:
+it guarded on a shared rest-chain cache and then tried to fill it by calling
+`armsWide(f, 0)` — which samples that cache AFTER its own early return, so the
+call did nothing and the cache stayed null. She raised the thing only in a
+session where `arms.wide` had been asked for at some earlier point, by
+accident. Measured now: her hand rises **0.386 m** through the beat, 4.069 to
+4.455, finishing 0.303 m from her head bone. It has its own capture, taken on
+the frame the lift starts, because the shared one is filled once and kept
+forever from whatever pose happened to be current the first time anything
+wanted it — which two callers reaching for two different things cannot both be
+right about.
+
+**And the wrap poured itself** with her hands at her sides, which is the
+complaint the blade had one prop over. It needed no motion of its own: the
+scrub already tips the paper 0.9 rad and lifts it 10 mm, so a hand tracking
+its world position rides that for free and the two cannot disagree. The reach
+now starts at the pour instead of at the first line, and the handover from
+wrap to blade is left to the follow damping — 0.15 m at 9 per second is about a
+third of a second, which is what putting one down and picking the other up
+looks like.
+
+Her grip closes from 0.23 m to **0.045–0.055 m** of the wrap across the pour,
+against **0.034 m** on the blade. I could not close that last centimetre and I
+tried three things that did not work, each ruled out by measurement: a faster
+ramp (it is not convergence), a wrist offset solved off the blade's own
+arithmetic (0.085 made it WORSE, 0.064, so the relation is not
+`|offset| − hand`), and moving the wrap 32 mm nearer (unchanged, so it is not
+reach either). Left at the measured minimum with the reason written down rather
+than tuned blind.
+
 ## [1.421.0] — 2026-09-18
 
 ### her hand on the blade, and the reason she has to crouch
