@@ -415,6 +415,57 @@ SKILLS = {
                   [r"\btrampolin\w*\b", SEE_RE]),
     "wine": ("pour a glass of wine, fetch a drink, open the bottle",
              [r"\b(wine|drink|bottle|glass|rakija|pour)\b"]),
+    # ── THE SITTING FAMILY, AND WHY IT IS ALL THE WAY UP HERE ───────────────
+    #
+    # Misha, 18 Sep 2026, in one run: *"fetal position"*, *"make her sit in
+    # lotus pose on the bed"*, *"sit up on the bed"* — *"makes her sit on the
+    # bed on her knees"* — *"upside down"*, *"wall perch"*, *"head stand"*, and
+    # a *"yawn"*. All eight are baked; see `SHE_CAN` in src/43-jadrija.js.
+    #
+    # THIS DICT IS ORDERED AND `out[:1]` TAKES THE FIRST MATCH, and every one
+    # of these eight loses a word-fight with something already below it:
+    #
+    #   "head stand"          `rise` owns the bare word "stand"
+    #   "sit up on the bed"   `rise` owns "sit up", and `recline.bed` owns a
+    #                         verb plus a bed noun
+    #   "...on her knees"     `submit` owns "on your knees"
+    #   "upside down"         nothing yet, but `legs.down` owns "down" as soon
+    #                         as somebody says "legs" in the same breath
+    #   "legs spread apart"   `arms.wide` owns "spread"
+    #
+    # So they go in front of all of it, and they are ordered against each
+    # other for the same reason: the handstand first, because *"stand on her
+    # hands upside down"* carries the `upside` noun as well as its own.
+    "handstand": ("stand on her hands upside down on the floor, against the "
+                  "wall, legs spread apart",
+                  [r"\bhand ?stands?\b|\bhead ?stands?\b"
+                   r"|\bstand on (your|her|the) hands\b"]),
+    # The wall perch before `upside`, because *"perched on her arms"* is how he
+    # described the OTHER one and "perch" is this one's whole name.
+    "perch": ("sit on the cot with her back against the wall, legs spread "
+              "apart and her hands locked behind her head",
+              [r"\bwall ?perch\b|\bperch\w*\b.{0,24}\bwall\b"
+               r"|\bback\b.{0,24}\bagainst\b.{0,16}\bwall\b"
+               r"|\bhands?\b.{0,24}\bbehind (your|her) head\b"]),
+    "upside": ("go upside down on the cot, torso on the bed and her legs in "
+               "the air",
+               [r"\bupside ?down\b|\bshoulder ?stand\b"]),
+    "fetal": ("curl up on her side on the cot in the fetal position",
+              [r"\bfo?etal\b|\bcurl(ed)?\s+(up|in|into)\b"]),
+    "lotus": ("sit cross-legged on the cot in the lotus position",
+              [r"\blotus\b|\bcross-? ?legged\b|\bpadmasana\b"]),
+    # THE KNEEL BEFORE THE PLAIN SIT, and both of them need a bed noun in the
+    # sentence: without one, "sit up" is `rise` and has been since 1.404.0, and
+    # that is the right answer to it.
+    "sit.knees": ("sit up on the cot on her knees",
+                  [r"\b(sit|sits|sitting|kneel\w*|up)\b",
+                   r"\b(knees|kneel\w*)\b",
+                   r"\b(bed|cot|bunk|mattress)\b"]),
+    "sit.bed": ("sit up on the cot with her legs out in front of her",
+                [r"\bsit\w*\b", r"\b(bed|cot|bunk|mattress)\b"]),
+    # And the yawn, which owns its own word and nothing else's.
+    "yawn": ("take her hand to her mouth and yawn",
+             [r"\byawn\w*\b"]),
     # AND THE POSE SHE ALREADY HAD. Misha, 17 Sep 2026: *"i tell her to get
     # down on her knees, and eventho she knows how to do it if i spray her, she
     # says something but doesn't actually get down on her knees.... she
@@ -626,6 +677,33 @@ ASK_RE = re.compile(
     r"|\b(undo\w*|untie\w*|unravel\w*|loosen?|tie|tied|put|take|let)\b"
     r".{0,20}\b(hair|pony ?tails?)\b"
     r"|\bpony ?tails?\b"
+    # AND THE SITTING FAMILY, all eight of them, for the hair's reason: not one
+    # of "fetal position", "lotus pose", "upside down", "wall perch", "head
+    # stand", "sit up on the bed" or "yawn" carries a modal, a please or any of
+    # the openers below, so without these lines all eight read as talk and
+    # never reached `skills_of` at all. `stand` is not in the imperative list
+    # down there either, which is why the handstand needs its own clause and
+    # not just the word.
+    #
+    # EACH ONE REPEATS ITS OWN SKILL'S SHAPE rather than gating on the bare
+    # noun, which is the lesson written over the hair: once ASK_RE lets a
+    # sentence past, EVERY pattern in `SKILLS` gets a look at it. So the two
+    # sitting clauses want a bed noun in the sentence and the curl wants a
+    # direction — `\bcurl\w*\b` on its own would let "your hair is curly"
+    # through, and what came back would be a request to pour a glass of wine.
+    r"|\bfo?etal\b|\bcurl(ed)?\s+(up|in|into)\b"
+    r"|\blotus\b|\bcross-? ?legged\b|\bpadmasana\b"
+    r"|\bupside ?down\b|\bshoulder ?stand\b"
+    r"|\bwall ?perch\b|\bperch\w*\b|\bbehind (your|her) head\b"
+    # "Sit with your back against the wall" is the perch said without either of
+    # its own two nouns, and it was the one phrasing of the eight that still
+    # read as talk after the clauses above. Measured offline against HEAD: it
+    # matched the skill's own pattern and never got a look at it.
+    r"|\bagainst the wall\b"
+    r"|\bhand ?stands?\b|\bhead ?stands?\b|\bstand on (your|her|the) hands\b"
+    r"|\byawn\w*\b"
+    r"|\bsit\w*\b.{0,24}\b(bed|cot|bunk|mattress)\b"
+    r"|\b(kneel\w*|knees)\b.{0,24}\b(bed|cot|bunk|mattress)\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"

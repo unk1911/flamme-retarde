@@ -8264,6 +8264,18 @@ window.__fr = {
     kabina: () => (jadrija ? jadrija.kabina : null),
     bones: (...a) => jadrija.bones(...a),
     /**
+     * The resort's own frame, both ways, so a probe can check a PLACEMENT.
+     *
+     * `bones` answers in world metres and every mark in that room — the cot,
+     * its two long edges, the plate, the wine — is published in (t, s). With
+     * no way across, a test of where she is lying can only assert heights, and
+     * a pose can be a foot off the side of a bed with every height perfect.
+     * Both directions, because the two questions are "where in the room is
+     * this bone" and "where in the world is that mark".
+     */
+    local: (x, z) => (jadrija && jadrija.local ? jadrija.local(x, z) : null),
+    toWorld: (t, s) => (jadrija && jadrija.toWorld ? jadrija.toWorld(t, s) : null),
+    /**
      * How far into the special kabina the game thinks you are, 0 to 1 — the
      * number the light and the shore bed both hang off, which is the only way to
      * tell a door that is not working from a room that is not dark enough.

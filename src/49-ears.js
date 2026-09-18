@@ -446,6 +446,18 @@ const ears = (() => {
     'legs.down': 'legs down', 'legs.up': 'legs back up',
     flat: 'over on to her front',
     'flat.edge': 'on to her front on the edge of the cot',
+    // And the sitting family, baked 18 Sep — see `BED_POSE` in 43-jadrija.js.
+    // Two names for sitting up because they are two poses: the baked SIT has
+    // her legs out in front, and the kneel is `situp` holding on `kept`.
+    'sit.bed': 'up on the cot with her legs out in front',
+    'sit.knees': 'up on the cot on her knees',
+    lotus: 'cross-legged on the cot',
+    perch: 'back to the wall on the cot, legs apart',
+    fetal: 'curled up on her side on the cot',
+    upside: 'upside down on the cot with her legs in the air',
+    handstand: 'up on her hands against the wall',
+    // And the one that is not a place she goes — see `yawnTick`.
+    yawn: 'a yawn',
     coke: 'to the plate',
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
@@ -508,6 +520,11 @@ const ears = (() => {
     noflavour: 'that one is not in the case',
     noshop: 'the ice cream place is not open to her',
     gone: 'she is not on the beach',
+    // The sitting family's three. `already`, `outside`, `nobed`, `standing`
+    // and `lying` are above and are the same facts about the same room.
+    nowall: 'there is no wall in here she can get her heels to',
+    yawning: 'she is in the middle of one',
+    hands: 'her hands are holding her up',
   };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
