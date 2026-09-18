@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.417.1] — 2026-09-18
+
+### it is already out
+
+**"hmm plate is there on the table, but where is lovesens"**, and then **"yeah
+skip handover"**.
+
+It was in the satchel, and everything in the satchel is invisible until she has
+been handed it and has set it down. That is the handover machinery working
+exactly as asked for and it is one step too many for the one object the remote
+is about: a receiver you have to stage before you can send it anything is a
+receiver nobody ever sends anything to.
+
+So it is on the tabouret from the start — the same spot `placeIt` uses, the
+same lie and the same sit, and registered in `giftProps` under its own key,
+because that list is what the signal searches. It is out of the starting bag as
+well: one object and not two, and the handover still has the cuffs and the
+headphones to carry.
+
+Nothing else to do now but send it. Press I, type **buzz the lovense**, and the
+light comes on, the motor runs, it walks a millimetre at a time across the
+wood and the wine shivers in the glass beside it.
+
 ## [1.417.0] — 2026-09-18
 
 ### a bigger table, and a plate on it

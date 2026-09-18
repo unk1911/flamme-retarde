@@ -38138,6 +38138,32 @@ async function buildJadrija(scene) {
   let giftHeld = null;
 
   /**
+   * AND ONE THING IS ALREADY OUT.
+   *
+   * Misha, 18 Sep 2026: *"hmm plate is there on the table, but where is
+   * lovesens"*, and then *"yeah skip handover"*. It was in the satchel, and
+   * everything in the satchel is invisible until she has been handed it and
+   * has set it down — which is the machinery working exactly as asked for and
+   * one step too many for the one object the remote is about. A receiver you
+   * have to stage before you can send it anything is a receiver nobody sends
+   * anything to.
+   *
+   * So it is on the tabouret from the start: the same spot `placeIt` uses, the
+   * same `lay` and `sit`, and in `giftProps` under its own key, because that
+   * list is what `signalSet` searches. It is out of the starting bag as well —
+   * one object, not two, and the handover still has the cuffs and the
+   * headphones to carry.
+   */
+  if (kit && kit.rest) {
+    const m = giftMesh('lovense');
+    const w = toWorld(kit.rest[0] + 0.120, kit.rest[1] - 0.085);
+    m.position.set(w[0], kit.rest[2] + (m.userData.sit || 0), w[2]);
+    m.rotation.set(m.userData.lay || 0, faceYaw(kit.rest[0], -0.55), 0);
+    m.userData.key = 'lovense';
+    giftProps.push(m);
+  }
+
+  /**
    * ── THINGS SHE IS WEARING ──────────────────────────────────────────────
    *
    * Misha, 17 Sep 2026: *"let's start with headphones first, and then add

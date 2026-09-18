@@ -172,7 +172,10 @@ const SATCHEL = {
   // Three things, and they are in the bag from the first frame rather than
   // put there by a shop — see `worn` in CARRY. Everything else in here is
   // something you bought.
-  have: { cuffs: 1, headphones: 1, lovense: 1, phone: 1 },
+  // No lovense: it is on the tabouret in the kabina from the start — see the
+  // note over `giftProps` in src/43-jadrija.js. Carrying a second one would
+  // put two of the same object in the room the moment you handed it over.
+  have: { cuffs: 1, headphones: 1, phone: 1 },
 };
 
 /**
