@@ -4383,67 +4383,178 @@ PRONE_EDGE_B["legUL"] = (-43, 0, 7)
 PRONE_EDGE_B["legUR"] = (-49, 0, -7)
 
 
-# ── SITTING, AND THE POSES MADE OF IT — WORK IN PROGRESS ─────────────────────
-#
-# NOT WIRED INTO THE GAME YET. Nothing in src/ names these and the baked blob
-# does not carry them: two probe passes in and only SIT is close. What follows
-# is what the probe said, so the next pass starts from measurements instead of
-# from my assumptions, all of which were wrong:
-#
-#   SIT         torso vertical over the pelvis, good. Heels 0.049 m UNDER the
-#               mattress at hip -88/knee 4, and -0.196 at hip -82/knee 14 —
-#               so bending the knee LOWERS the foot from a seated hip, which
-#               is obvious afterwards and was not before. The pelvis's own -6
-#               of backward tilt is rotating the whole leg down with it; try
-#               pelvis 0, hip -90, knee 0.
-#   LOTUS       knees 0.159 m and feet 0.307 m under the surface. The opening
-#               is NOT the hip's third number (z) once the hip is deeply
-#               flexed — z=52 barely moved the knees off the midline — and it
-#               is not the second either: y=46 only made the sinking worse.
-#   WALL_PERCH  elbows up and wide, which is right, but the hands finish 0.12 m
-#               BELOW the crown and level with it in x rather than behind it,
-#               and the elbows are forward of the head instead of flared. Feet
-#               0.235 m under the surface, same fault as LOTUS.
-#   FETAL       curling the wrong way. SIDE_L's body axis runs toward
-#               (+0.286, +0.581), so the knees have to come up along THAT, and
-#               both hip signs tried sent them off it: -96 put them at y
-#               -0.222 against a head at +0.646, and +96 put them at x -0.412.
-#
-# ── SITTING, AND THE THREE POSES THAT ARE MADE OF IT ─────────────────────────
+# ── SITTING, AND THE POSES MADE OF IT ────────────────────────────────────────
 #
 # Misha, 18 Sep 2026, in one run: fetal position, lotus position, sit up on the
-# bed on her knees, upside down, "wall perch", head stand.
+# bed on her knees, upside down, "wall perch", head stand. And a yawn.
 #
-# Sitting is the one this file did not have. KNEEL puts her pelvis at 0.484
-# (0.934 standing, `@root` −0.45) which is knee height; sitting puts it on the
-# surface, so the root goes lower and the hips do the work: hip flexion is
-# NEGATIVE x on `legU`, the same sign PRONE_EDGE uses to drop her legs over the
-# edge of the cot, and a right angle at the hip with a straight knee is a woman
-# sitting up with her legs out in front of her.
+# ── WHAT OPENS A FLEXED HIP ──────────────────────────────────────────────────
+#
+# This is the number two passes of this file failed to find, and it unlocks the
+# lotus, the wall perch and the straddle handstand together. Written down once.
+#
+# `pose` hands Blender an XYZ Euler, which composes as Rz·Ry·Rx: X first, and
+# all three about the REST bone's own axes, not about the axes the bone has
+# after the earlier terms. Probed, `legUL`'s rest axes are
+#
+#     X = (−0.000 +0.994 +0.113)   her LEFT      — this is the flexion
+#     Y = (+0.047 +0.113 −0.992)   down the thigh
+#     Z = (−0.999 +0.005 −0.047)   straight back
+#
+# so which of Y and Z opens the leg depends on where X has already put it:
+#
+#     hip at rest, thigh DOWN      the thigh lies along Y. Z is across it, so
+#                                  Z abducts and Y is a pure twist.
+#     hip flexed 90, thigh OUT     the thigh now lies along Z. Z is the twist
+#                                  and does NOTHING, and Y abducts.
+#
+# Measured, left leg at hip x = −90, sweeping the third number from −40 to +60:
+# the knee does not move by one millimetre. `legLL` sits at
+# (+0.455 +0.114 +0.930) for every value of it. That is last pass's "z = 52
+# barely moved the knees" — it is not a weak lever, it is the wrong axis.
+# Sweeping the SECOND number at the same flexion, knee y runs
+#
+#     y    0     −20     −40     −60
+#     y  +0.114 +0.264 +0.397 +0.496      knee z 0.930 → 0.963 throughout
+#
+# **NEGATIVE y abducts the LEFT leg**, and it does it without dropping the knee
+# at all. `_mirror_pose` negates y, so the right takes positive. The old +46
+# was this axis with the sign inverted, which is exactly why it "only made the
+# sinking worse": it was pulling both legs across the midline and down.
+#
+# AND THE KNEE INHERITS THE PROPERTY, which is the other half of the lotus.
+# After a deep hip flexion the KNEE's rest Z is pointing nearly straight DOWN
+# (world −X rotated 78° about her left axis), so `legL`'s third number folds
+# the shin in the plane of the mattress and not down through it. Cross-legged
+# is `legL` z and not `legL` x — at hip −77 the shin swings from an ankle at
+# (+0.519 +0.038 +0.857) at kz 108 round to (+0.254 +0.018 +0.925) at kz 148,
+# staying inside 7 cm of level the whole way. The same fold on kx puts the
+# ankle at 0.46, a third of a metre under the bed.
+#
+# ── WHERE THE SURFACE IS ─────────────────────────────────────────────────────
+#
+# `--probe` reports before `@root`, so for a pose with `@root` z = −R the
+# surface it sits on is at probe-z = +R. Every number quoted below is a probe
+# number and every clearance is measured against that. The reference points,
+# probed on the bind pose: pelvis 0.934, hip joint 0.909, knee 0.470, ankle
+# 0.076, shoulder 1.409, head joint 1.591, crown 1.741. Thigh 0.4425, shin
+# 0.4010, upper arm 0.2391, forearm 0.2377.
+#
+# ── AND "SIT UP ON THE BED ON HER KNEES" IS KNEEL, WHICH ALREADY EXISTS ──────
+#
+# Nothing new was written for it, deliberately. KNEEL is exactly that pose —
+# thighs vertical, shins folded back, hands off the floor — and it works on a
+# mattress unchanged: `@root` −0.45 puts her pelvis 0.484 over the surface,
+# which is her own knee height, and probes the knee 0.018 over it.
+#
+# ONE MEASUREMENT AGAINST IT, and it is a defect in KNEEL and not in the
+# request. Its shin lies flat — knee 0.468 to ankle 0.447 over 0.40 m — and
+# then the FOOT carries on down: ankle 0.447, ball of the foot 0.329, toe tip
+# 0.242, so with the root applied the toes are 0.121 and 0.208 m under the
+# floor. The cause is the foot's own number. With the shin horizontal the
+# ankle's neutral points the foot straight DOWN, so laying it flat takes about
+# +38 there, and KNEEL carries −16 — it is 54° the wrong way. `floor_poses`
+# does not rescue it either: nothing calls it on this clip.
+#
+# NOT CHANGED HERE. `footL`/`footR` +38 is the fix, but KNEEL is the base of
+# KNEEL_BACK, KNEEL_BACK_B, RECLINE_A and _knee, and through them of the
+# `kneel`, `getup`, `submit`, `kept`, `recline`, `situp` and `knees` clips —
+# seven shipped clips for a pair of feet that are behind her and under her in
+# every camera this game points at her. It wants its own pass and its own
+# render, not a quiet edit inside somebody else's.
+#
+# Sitting, on the other hand, is the one this file did not have. KNEEL puts her
+# pelvis at knee height; sitting puts it on the surface, so the root goes lower
+# and the hips do the work: hip flexion is NEGATIVE x on `legU`, the same sign
+# PRONE_EDGE uses to drop her legs over the edge of the cot.
+#
+# THREE NUMBERS AND ALL THREE ARE MEASURED.
+#
+# PELVIS 0, not the old −6. The tilt rotates both whole legs with it at 7.8 mm
+# of knee per degree, so −6 was 4.7 cm of heel through the mattress before any
+# hip angle had even been chosen. (Checked both ways: pelvis +4 with hip −88
+# probes identically to pelvis 0 with hip −92 — the pair only acts as a sum.)
+#
+# HIP −81, not the −90 that looks right on paper. Her hip joint sits 0.109 m
+# over the surface and a knee resting on it wants to be 0.06 over, so the thigh
+# slopes DOWN about 7° — a horizontal thigh leaves the leg floating.
+#
+# KNEE −14, and it is not hyperextension: the rest leg already carries about 8°
+# of bend (rest thigh 2.7° forward of vertical, rest shin 5.1° back), and this
+# takes it out. It is also the only lever that lifts the heel — from a seated
+# hip, BENDING the knee lowers the foot, 7 mm of ankle per degree.
+#
+# Probed: knee (+0.450 +0.167 +0.866), ankle (+0.847 +0.227 +0.873). Knee
+# 0.066 and ankle 0.073 over the surface; the heel hangs 0.076 under the ankle
+# joint, so it is a heel resting on the bed and not a heel inside it.
+#
+# THE ARMS ARE STRAIGHT AND ANGLED BACK, hands planted behind her hips, and
+# that is arithmetic and not taste: her shoulder is 0.607 m over the seat and
+# shoulder-to-wrist is 0.477, so a hanging arm cannot get its wrist below
+# 0.932 — and with the hand's own 0.18 m of fixed mesh hanging off it, that
+# puts the FINGERTIPS 0.011 m inside the mattress. Forty degrees of shoulder
+# extension carries the wrist back and UP to 0.993 and swings the hand with it,
+# which lands the tips at 0.813 — 0.013 over the bed, touching it, which is
+# what a planted hand should do. Probed both sides, because the two hands are
+# not mirror images: the finger bones take their roll from each hand's own
+# knuckle line (see `armature`), so the left tip sits 0.04 lower than the right
+# at identical angles and it is the LEFT one that has to clear.
 SIT = {
     "@root": (0.0, 0.0, -0.80),
-    "pelvis": (-6, 0, 0),
+    "pelvis": (0, 0, 0),
     "spine01": (3, 0, 0), "spine02": (3, 0, 0), "spine03": (2, 0, 0),
     "chest": (0, 0, 0), "neck": (4, 0, 0), "head": (-2, 0, 0),
-    "armUL": (-14, 0, 30), "armLL": (-30, 0, 10), "handL": (-6, 0, 0),
-    "armUR": (-14, 0, -30), "armLR": (-30, 0, -10), "handR": (-6, 0, 0),
-    "legUL": (-82, 0, 8), "legLL": (14, 0, 0), "footL": (-4, 0, 0),
-    "legUR": (-82, 0, -8), "legLR": (14, 0, 0), "footR": (-4, 0, 0),
+    "armUL": (40, 15, 30), "armLL": (0, -40, 0), "handL": (32, 0, 0),
+    "armUR": (40, -15, -30), "armLR": (0, 40, 0), "handR": (32, 0, 0),
+    "fingersL": (-34, 0, 0), "fingersR": (-34, 0, 0),
+    "legUL": (-81, -6, 0), "legLL": (-14, 0, 0), "footL": (-26, 0, -6),
+    "legUR": (-81, 6, 0), "legLR": (-14, 0, 0), "footR": (-26, 0, 6),
 }
 
+# The breath, for CRADLE_B's reason: a held pose that does not move is a
+# mannequin. Everything small, and the hands stay planted.
+SIT_B = dict(SIT, **{
+    "spine01": (4, 0, 0), "spine02": (4, 0, 0), "chest": (-2, 0, 0),
+    "neck": (5, 0, 0), "head": (-3, 6, 0),
+    "armUL": (38, 15, 30), "armUR": (38, -15, -30),
+})
+
 # Cross-legged. Not a true padmasana — that has each foot up on the opposite
-# thigh and this rig has no way to put one there without the shins passing
+# thigh, and this rig has no way to put one there without the shins passing
 # through each other — but the shape everybody means by it: hips open, knees
-# down and out, shins folded in front.
+# down and out, shins folded in front, feet crossed near the midline.
 #
-# The opening is the THIRD number on the hip and the bend is the first on the
-# knee, which is the same pair KNEEL uses (82 of knee) taken further.
+# Hip −77 rather than SIT's −81, because the knee has to come DOWN to the bed
+# and not just forward: 7.8 mm a degree, and −77 puts the knee at 0.857, which
+# is 0.057 over the surface and is a knee resting on it. Hip y −40 opens it —
+# see the note above — and probes the knees 0.80 m apart, which on a woman with
+# 0.23 m between her hip joints is a wide, settled cross-legged sit.
+#
+# THE TWO SHINS ARE NOT THE SAME NUMBER, and that is the whole reason this does
+# not read as a diagram. Folded symmetrically both ankles arrive within a
+# centimetre of each other on the midline and the two shins occupy the same
+# space. Left 132 and right 112 puts the left ankle at (+0.362 +0.003 +0.904)
+# and the right at (+0.494 −0.028 +0.870) — 0.13 m apart in x, the left one
+# nearer her body and 0.034 higher, which is a left shin crossed OVER a right
+# one. The ball of the left foot then lies at (+0.305 −0.127 +0.937), on top of
+# the right shin rather than inside it.
+#
+# Hands on her thighs, not on her knees: shoulder to knee probes 0.69 m and she
+# has 0.477 of arm, so hands on the knees is a woman leaning forward to reach
+# them. Mid-thigh is 0.51 and lands the wrist at (+0.176 +0.286 +0.988), a
+# centimetre or two over the top of the thigh with the palm down on it.
 LOTUS = dict(SIT, **{
-    "legUL": (-46, 46, 18), "legLL": (112, 0, 0), "footL": (-4, 0, 14),
-    "legUR": (-46, -46, -18), "legLR": (112, 0, 0), "footR": (-4, 0, -14),
-    "armUL": (-8, 0, 40), "armLL": (-16, 0, 8), "handL": (-10, 0, 0),
-    "armUR": (-8, 0, -40), "armLR": (-16, 0, -8), "handR": (-10, 0, 0),
-    "spine01": (4, 0, 0), "spine02": (4, 0, 0), "neck": (2, 0, 0),
+    "legUL": (-77, -40, 0), "legLL": (0, 0, 132), "footL": (-60, 0, -35),
+    "legUR": (-77, 40, 0), "legLR": (0, 0, -112), "footR": (-60, 0, 35),
+    "armUL": (-20, -40, 40), "armLL": (40, -20, 0), "handL": (-16, 0, 0),
+    "armUR": (-20, 40, -40), "armLR": (40, 20, 0), "handR": (-16, 0, 0),
+    "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (1, 0, 0),
+    "neck": (2, 0, 0),
+})
+
+LOTUS_B = dict(LOTUS, **{
+    "spine01": (3, 0, 0), "chest": (-2, 0, 0), "neck": (3, 0, 0),
+    "head": (-3, -5, 0), "armUL": (-19, -40, 40), "armUR": (-19, 40, -40),
 })
 
 # Back against the wall, legs apart, hands locked behind her head.
@@ -4451,35 +4562,260 @@ LOTUS = dict(SIT, **{
 # *"makes her sit on the bed with her back perched against the wall, legs
 # spread apart, arms behind her head hands locked behind her head"*.
 #
-# The arms are the part with a sign in it. WAVE_UP raises the RIGHT arm with
-# z = +96 against the −33 it rests at, so up is +z on the right and −z on the
-# left; the elbow then folds with negative x on `armL`, the way HEART_A folds
-# them at −86. Hands behind the head rather than beside it is the second
-# number, the yaw, bringing the forearms back past her ears.
+# THE PELVIS ROLLS BACK AND THE SPINE TAKES IT BACK OUT. Sitting against a wall
+# is not sitting upright: the pelvis tips back about 12°, the lumbar flattens
+# to bring the ribs to the wall, which is why the spine here carries −2 −2 −2
+# and the chest −4 — ten degrees of forward flexion cancelling the pelvis's
+# twelve and leaving her back vertical against the wall behind her.
+#
+# The legs are then SIT's legs with the pelvis's twelve degrees given back at
+# the hip — the two only act as a sum, so −68 here is −80 there — and opened on
+# the second number. Probed: knee (+0.399 +0.337 +0.863), ankle
+# (+0.735 +0.555 +0.871), which is 0.063 and 0.071 over the surface with the
+# ankles 1.11 m apart: a 63-degree V, legs flat on the bed.
+#
+# THE ARMS, WHICH ARE THE POSE AND WERE SOLVED ON A GRID. The last pass put the
+# hands 0.12 m BELOW the crown and level with it in x, which is a woman holding
+# her own ears. Three joints had to move together, so 228 upper-arm candidates
+# were scored on the elbow and each of those on the forearm and wrist, against
+# a target that is the FINGERTIPS meeting behind the skull rather than the
+# wrists. What that picks:
+#
+#     elbow   (+0.031 +0.364 +1.547)   0.14 m ABOVE the shoulder and 0.36 out
+#                                      to the side — flared, not forward
+#     wrist   (−0.117 +0.212 +1.654)   0.041 BEHIND the crown, 0.069 above the
+#                                      head joint, out at the side of the skull
+#     tip     (−0.167 +0.034 +1.671)   0.091 behind the crown, on the midline,
+#                                      which is where the two hands interlock
+#
+# The lever that gets the hands behind rather than beside is the SECOND number
+# on both arm bones — the yaw, −60 at the shoulder and −60 at the elbow. The
+# first number barely matters over its whole useful range, which is why three
+# passes of tuning the shoulder's x got nowhere.
 WALL_PERCH = dict(SIT, **{
+    "pelvis": (12, 0, 0),
     "spine01": (-2, 0, 0), "spine02": (-2, 0, 0), "spine03": (-2, 0, 0),
     "chest": (-4, 0, 0), "neck": (6, 0, 0), "head": (-4, 0, 0),
-    "legUL": (-78, 26, 12), "legLL": (18, 0, 0), "footL": (-4, 0, 10),
-    "legUR": (-78, -26, -12), "legLR": (18, 0, 0), "footR": (-4, 0, -10),
+    "legUL": (-68, -30, 0), "legLL": (-15, 0, 0), "footL": (-22, 0, -8),
+    "legUR": (-68, 30, 0), "legLR": (-15, 0, 0), "footR": (-22, 0, 8),
     "clavicleL": (0, 0, -6), "clavicleR": (0, 0, 6),
-    "armUL": (-62, 0, -96), "armLL": (-124, -40, 0), "handL": (0, 0, -8),
-    "armUR": (-62, 0, 96), "armLR": (-124, 40, 0), "handR": (0, 0, 8),
+    "armUL": (-20, -60, -70), "armLL": (-80, -60, 0), "handL": (0, 0, 30),
+    "armUR": (-20, 60, 70), "armLR": (-80, 60, 0), "handR": (0, 0, -30),
+    "fingersL": (-20, 0, 0), "fingersR": (-20, 0, 0),
 })
 
-# Curled up on her side. Off SIDE_L, so it inherits that pose's own axis and
-# takes the same `SIDE_OFF` correction in the page — see the note on the roll
-# in src/43-jadrija.js.
+WALL_PERCH_B = dict(WALL_PERCH, **{
+    "spine01": (-3, 0, 0), "chest": (-5, 0, 0), "neck": (7, 0, 0),
+    "head": (-5, 6, 0), "armUL": (-22, -60, -70), "armUR": (-22, 60, 70),
+})
+
+# ── CURLED UP ON HER SIDE ────────────────────────────────────────────────────
+#
+# WHY THE CURL KEPT GOING THE WRONG WAY, and it is a fact about SIDE_L rather
+# than about the hip. Probed, SIDE_L's two hip joints are at (+0.057 −0.021
+# +0.825) and (−0.051 −0.021 +1.031), so the vector from her left hip to her
+# right — which is straight UP on somebody lying squarely on her side — comes
+# out at (−0.464 0 +0.886). That is **27.6° short of a side**: her front faces
+# (+0.785 −0.464 +0.411), a quarter of a turn up out of the mattress. The
+# pelvis's own bone is the reason — it runs up and 27.6° BACK from vertical, so
+# its local Z is not world −X and a 90 on it is not a 90 of roll.
+#
+# Hip flexion therefore swings the knees along THAT front: up into the air in
+# front of her chest, not up the bed toward her head. At −96 the knee lands at
+# y −0.155 with her head at +0.581, which is the "curling the wrong way" of the
+# last pass, and no amount of flexion fixes it — the knee's height peaks at
+# −118° and is still 0.43 m over the mattress.
+#
+# SO ROLL HER THE REST OF THE WAY, ABOUT HER OWN LONG AXIS. A rotation about
+# the body axis cannot move the head, because the head lies ON that axis — so
+# `SIDE_OFF` in src/43-jadrija.js, which corrects the YAW of this pose and is
+# tuned to a head at (+0.286 +0.581), stays exactly right. Verified over a
+# −40..+40 sweep: the head probes (+0.286 +0.581 +1.076) at every one of them
+# and only the roll changes. +25 is as square as the axis allows (the body axis
+# itself tilts 12.5° up, so the best available "up" is (−0.089 −0.197 +0.976)),
+# and it takes her front to (+0.906 −0.422 −0.003) — HORIZONTAL. From there the
+# knees curl up the bed instead of up into the air.
+#
+# The triple is not typed, it is `M⁻¹ · Rot(axis, 25°) · R_side · M` converted
+# back to a local Euler. It looks like a typo and is not.
+FETAL_ROLL = (-2.4, 22.0, 77.7)
+
+# And then the curl, which is both ends and not just the legs: the spine flexes
+# −6 through every bone (NEGATIVE is forward flexion here, the sign `_tuck`
+# uses), the hips flex −120 and −112, and the knees fold 105.
+#
+# The two hips are deliberately different. She is lying on her left, so the two
+# legs are STACKED and not mirrored — the under knee belongs on the bed and the
+# over knee on top of it — and the second number is what stacks them: left +6
+# and right −14 probe the knees at 0.909 and 0.980, 0.10 and 0.17 over the
+# surface, which is one leg resting and the other lying across it.
+#
+# Probed: head (+0.449 +0.457 +1.066) and knees at y +0.05 and −0.03, come up
+# from SIDE_L's −0.426 — 0.47 m along the axis toward her head, 0.43 m from the
+# head itself, which is knees drawn up to the chest. Nothing under the bed.
 FETAL = dict(SIDE_L, **{
-    "spine01": (8, 0, 0), "spine02": (8, 0, 0), "spine03": (6, 0, 0),
-    "chest": (6, 0, 0), "neck": (-8, 0, 0), "head": (-6, 0, 0),
-    "legUL": (96, 0, 10), "legLL": (104, 0, 0), "footL": (-16, 0, 0),
-    "legUR": (88, 0, -10), "legLR": (112, 0, 0), "footR": (-16, 0, 0),
-    "armUL": (-70, 0, 20), "armLL": (-96, 0, 10), "handL": (-10, 0, 0),
-    "armUR": (-30, 0, -24), "armLR": (-104, 0, -8), "handR": (-10, 0, 0),
+    "pelvis": FETAL_ROLL,
+    "spine01": (-6, 0, 0), "spine02": (-6, 0, 0), "spine03": (-6, 0, 0),
+    "chest": (-6, 0, 0), "neck": (-6, 0, 0), "head": (-6, 0, 0),
+    "legUL": (-120, 6, 6), "legLL": (105, 0, 0), "footL": (18, 0, 0),
+    "legUR": (-112, -14, -6), "legLR": (109, 0, 0), "footR": (18, 0, 0),
+    # The under arm, which SIDE_L already had to solve once — it probed 0.14 m
+    # INSIDE the mattress there — and which the extra roll drops another
+    # 0.19 m. −150 is the number that brings it back out — wrist (+0.579 +0.182
+    # +0.918), 0.112 over the mattress — and lays it up the bed past her head,
+    # where somebody lying on their side puts the arm they are not lying on.
+    "armUL": (-150, 30, 0), "armLL": (120, 40, 0), "handL": (-14, 0, 0),
+    # And the over arm folded in, hand up by her own chin.
+    "armUR": (-120, 0, -20), "armLR": (-100, -20, 0), "handR": (-14, 0, 0),
+    "fingersL": (-30, 0, 0), "fingersR": (-30, 0, 0),
 })
 
 FETAL_B = dict(FETAL, **{
-    "spine01": (10, 0, 0), "chest": (8, 0, 0),
+    "spine01": (-8, 0, 0), "chest": (-8, 0, 0), "neck": (-4, 0, 0),
+    "legUR": (-114, -14, -6),
+})
+
+# ── UPSIDE DOWN, ON THE BED ──────────────────────────────────────────────────
+#
+# *"sit perched on her arms with torso on the bed and legs raised"* — a
+# shoulderstand: the back of her skull, her shoulders and both upper arms on
+# the mattress, the elbows bent with her hands propping her own back, and
+# everything above that going up.
+#
+# The whole pose is one number, `pelvis` 160, and then three corrections.
+# 180 would stand her torso vertically on her shoulders; 160 leaves it at about
+# 70° from the bed, which is what "torso on the bed" means and is also what a
+# person without a wall to lean on can actually hold.
+#
+# NECK FLEXION AND NOT EXTENSION, which is the opposite of the reflex and was
+# probed both ways. Upside down, flexing the neck is what brings the skull UP
+# to the mattress and lays it there: at −40 the head joint sits at 0.322 and
+# the crown at 0.253, a face driven into the bed; at −64 they are 0.466 and
+# 0.495, within 3 cm of each other, which is the back of a head resting flat
+# with the chin tucked into the chest. Past that it starts lifting the crown
+# again — −76 puts it 0.068 over the joint.
+#
+# THE ARMS ARE SHOULDER EXTENSION, +90, which is the sign KNEEL_BACK uses to
+# put her hands behind her: lying on her back, behind her IS down. That lands
+# the elbow at (+0.024 +0.143 +0.385) — the lowest thing in the pose, and
+# therefore what `@root` is solved off — with the forearm standing up off it
+# and the wrist at (−0.046 +0.047 +0.591), 0.056 m from her own back, which on
+# a hand is contact.
+#
+# THE HANDS CANNOT REACH HER LOWER BACK AND SHOULD NOT. Elbow on the mattress
+# plus a forearm of 0.238 reaches 0.62, and her lumbar is at 0.85 — so the
+# support lands on the MID-back, which is where a real shoulderstand's hands
+# actually go. Two passes were spent solving toward a target at 0.87 that no
+# arm on this body can touch with its elbow down.
+#
+# `@root` −0.365 puts that elbow 0.020 over the bed. Everything else falls out
+# of it: skull 0.102, neck 0.084, shoulder 0.139, hands 0.226, hips 0.570,
+# toes 1.556.
+SHOULDER_UP = {
+    "@root": (0.0, 0.0, -0.365),
+    "pelvis": (160, 0, 0),
+    "spine01": (-3, 0, 0), "spine02": (-3, 0, 0), "spine03": (-2, 0, 0),
+    "chest": (-2, 0, 0), "neck": (-64, 0, 0), "head": (-10, 0, 0),
+    "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+    "armUL": (90, 0, 35), "armLL": (-95, 25, 0), "handL": (-20, 0, 0),
+    "armUR": (90, 0, -35), "armLR": (-95, -25, 0), "handR": (-20, 0, 0),
+    "fingersL": (-24, 0, 0), "fingersR": (-24, 0, 0),
+    "legUL": (-22, 0, 8), "legLL": (-6, 0, 0), "footL": (-26, 0, 0),
+    "legUR": (-22, 0, -8), "legLR": (-6, 0, 0), "footR": (-26, 0, 0),
+}
+
+SHOULDER_UP_B = dict(SHOULDER_UP, **{
+    "legUL": (-20, 0, 8), "legUR": (-24, 0, -8),
+    "legLL": (-4, 0, 0), "legLR": (-8, 0, 0),
+    "spine01": (-4, 0, 0),
+})
+
+# ── AND THE SAME THING ON HER HANDS ──────────────────────────────────────────
+#
+# *"stand on her hands upside down, on the floor, against a wall, legs spread
+# apart"*. `pelvis` 180 — the full inversion, which probes her shoulder at
+# 0.460 and her crown at 0.128 — and then the arms go overhead, which inverted
+# means down to the floor.
+#
+# −180 on the shoulder, which is 40° past LAUNCH's arms-up-and-over −150 and is
+# a straight overhead reach. With 45 at the elbow undoing the A-pose's own bend
+# the arm comes out straight: shoulder 0.464, wrist (−0.097 +0.216 −0.005),
+# which is 0.469 m below it against an arm of 0.477, and 0.43 m between the
+# two hands.
+#
+# THE WRIST IS +82 AND THAT IS THE POSE. A hand left in line with the arm goes
+# into the floor fingers-first — the tips probe 0.14 m below the wrist. +82
+# lays the palm flat: wrist −0.005, heel of the hand +0.016, fingertips −0.002,
+# three points within 0.02 m of one plane, with the fingers 0.17 m out in front
+# spread on the ground. Forward, here, is −x — the inversion turns her round,
+# so −x is her face, and that is the way a handstand's fingers point.
+#
+# The straddle is the hip's THIRD number and not the second, because this hip
+# is NOT flexed — see the note at the top — and 32 a side probes the ankles at
+# ±0.656, 37.7° off vertical each, 75° of straddle.
+#
+# `@root` +0.020 puts the floor under the lowest of the six hand points, and
+# it is solved off HAND_STAND_B and not off this one: the wobble rolls the
+# hands a couple of degrees and takes 8 mm off the low point. Her hips then
+# stand at 0.954 m and her toes at 1.740, with 0.229 of daylight under her
+# crown.
+HAND_STAND = {
+    "@root": (0.0, 0.0, 0.020),
+    "pelvis": (180, 0, 0),
+    "spine01": (-2, 0, 0), "spine02": (-2, 0, 0), "spine03": (-2, 0, 0),
+    "chest": (-3, 0, 0),
+    # Neck EXTENSION, +45: upside down, that is her looking at the floor
+    # between her own hands, and it lifts the crown to 0.209 — 0.23 m of air
+    # under her head instead of the 0.10 a neutral neck leaves.
+    "neck": (45, 0, 0), "head": (15, 0, 0),
+    "armUL": (-180, 0, 40), "armLL": (45, 0, 0), "handL": (82, 0, 0),
+    "armUR": (-180, 0, -40), "armLR": (45, 0, 0), "handR": (82, 0, 0),
+    "fingersL": (6, 0, 0), "fingersR": (6, 0, 0),
+    "legUL": (0, 0, -32), "legLL": (-4, 0, 0), "footL": (-25, 0, 0),
+    "legUR": (0, 0, 32), "legLR": (-4, 0, 0), "footR": (-25, 0, 0),
+}
+
+# The wobble, which on a handstand is not decoration: a held handstand is a
+# constant correction and a still one is a shop dummy standing on its hands.
+# Small at the shoulder, larger at the feet, which is where the lever is.
+HAND_STAND_B = dict(HAND_STAND, **{
+    "armUL": (-178, 0, 40), "armUR": (-182, 0, -40),
+    "spine01": (-4, 0, 0), "chest": (-1, 0, 0),
+    "legUL": (-3, 0, -35), "legUR": (3, 0, 29),
+    "neck": (42, 0, 0),
+})
+
+# ── THE YAWN ─────────────────────────────────────────────────────────────────
+#
+# An UPPER-BODY pose, authored as a variant of IDLE_A so a two-second clip can
+# blend it over whatever she is already doing. It keeps the idle's legs, its
+# left arm, its root and its hand shape; what it adds is the head going back,
+# the jaw dropping and the right hand coming up to cover it.
+#
+# `jaw` is NEGATIVE to open, which the two poses that already key it agree on
+# (−9 and −13 elsewhere in this file) and which the probe confirms: the jaw's
+# tail runs 1.508 → 1.477 → 1.453 as it goes 0 → −15 → −30. −26 is a yawn
+# rather than a word.
+#
+# The hand is scored on the KNUCKLES and not the wrist, which is the difference
+# between covering her mouth and putting her wrist in it — the hand is 0.13 m
+# of fixed mesh past the wrist joint. Probed: knuckles (+0.130 −0.017 +1.608)
+# against a mouth at (+0.139 −0.020 +1.619), 1.4 cm out, with the wrist below
+# it at 1.527 and the elbow out at (+0.250 −0.113 +1.309).
+YAWN = dict(IDLE_A, **{
+    "spine03": (-3, 0, 0), "chest": (-5, 0, 0),
+    "neck": (10, 0, 0), "head": (12, -4, 1), "jaw": (-26, 0, 0),
+    "clavicleR": (0, 0, -8),
+    "armUR": (-80, -20, -20), "armLR": (-80, 0, 0), "handR": (0, 0, 0),
+    "fingersR": (-30, 0, 0),
+})
+
+# The top of it — chest fuller, jaw wider, chin further back — and then the
+# clip runs YAWN → YAWN_B → IDLE_A, so the whole thing is one breath.
+YAWN_B = dict(YAWN, **{
+    "spine03": (-5, 0, 0), "chest": (-8, 0, 0),
+    "neck": (14, 0, 0), "head": (16, -6, 1), "jaw": (-34, 0, 0),
+    "armUR": (-84, -20, -18), "armLR": (-82, 0, 0),
 })
 
 
@@ -7124,6 +7460,62 @@ CLIPS = [
     {"name": "situp", "loop": False,
      "keys": [(0.00, CRADLE), (0.70, RECLINE_B), (1.45, RECLINE_A),
               (2.20, KNEEL_BACK)]},
+    # ── the sitting poses, paired the way `flat`/`flatheld` are ─────────────
+    #
+    # Every one of these is two clips for the reason written over `submit`: the
+    # way into a pose happens once and takes a second or two, and what she is
+    # at the end of it she stays. The once-clip arrives and holds its last
+    # frame; the loop breathes there until something else happens.
+    #
+    # They all come UP through RECLINE_B, which is her flat on her back — the
+    # same hinge `flat`, `flatEdge`, `sideL` and `sideR` use, so whichever of
+    # them she is in, the crossfade into one of these has a pose in common with
+    # it and nothing passes through her own body.
+    {"name": "sit", "loop": False,
+     "keys": [(0.0, CRADLE), (0.8, RECLINE_B), (1.5, RECLINE_A), (2.3, SIT)]},
+    {"name": "sitHeld", "loop": True,
+     "keys": [(0.0, SIT), (2.6, SIT_B), (5.2, SIT)]},
+    # Cross-legged, and it goes through SIT because that is how a person gets
+    # there: you sit up first and then the legs come in.
+    {"name": "lotus", "loop": False,
+     "keys": [(0.0, CRADLE), (0.8, RECLINE_B), (1.5, RECLINE_A), (2.3, SIT),
+              (3.3, LOTUS)]},
+    {"name": "lotusHeld", "loop": True,
+     "keys": [(0.0, LOTUS), (2.8, LOTUS_B), (5.6, LOTUS)]},
+    # Back to the wall. Same route, and the last leg of it is the hands going
+    # up behind her head, which is the slowest key in the clip because it is
+    # the one anybody watching is actually looking at.
+    {"name": "perch", "loop": False,
+     "keys": [(0.0, CRADLE), (0.8, RECLINE_B), (1.5, RECLINE_A), (2.3, SIT),
+              (3.4, WALL_PERCH)]},
+    {"name": "perchHeld", "loop": True,
+     "keys": [(0.0, WALL_PERCH), (2.7, WALL_PERCH_B), (5.4, WALL_PERCH)]},
+    # Curled up. Through SIDE_L, because the roll and the curl are two things
+    # and doing them at once is a body folding as it falls.
+    {"name": "fetal", "loop": False,
+     "keys": [(0.0, CRADLE), (0.8, RECLINE_B), (1.8, SIDE_L), (2.9, FETAL)]},
+    {"name": "fetalHeld", "loop": True,
+     "keys": [(0.0, FETAL), (3.0, FETAL_B), (6.0, FETAL)]},
+    # Upside down on the bed. Straight from her back, which is where a
+    # shoulderstand starts, and 1.6 s for the hips because that is a whole body
+    # going over its own shoulders and not a limb moving.
+    {"name": "upside", "loop": False,
+     "keys": [(0.0, CRADLE), (0.7, RECLINE_B), (2.3, SHOULDER_UP)]},
+    {"name": "upsideHeld", "loop": True,
+     "keys": [(0.0, SHOULDER_UP), (2.4, SHOULDER_UP_B), (4.8, SHOULDER_UP)]},
+    # And on the floor, on her hands, against a wall. From standing through the
+    # half-kneel LUNGE, which is the pose that already has one hand going down
+    # and is what she would pass through on the way to planting them.
+    {"name": "handstand", "loop": False,
+     "keys": [(0.00, IDLE_A), (0.45, CROUCH), (0.85, LUNGE),
+              (1.55, HAND_STAND)]},
+    {"name": "handHeld", "loop": True,
+     "keys": [(0.0, HAND_STAND), (1.3, HAND_STAND_B), (2.6, HAND_STAND)]},
+    # And the yawn, which is the only one here that is not a place she goes.
+    # Upper body over the idle, one breath, back to where it started.
+    {"name": "yawn", "loop": False,
+     "keys": [(0.00, IDLE_A), (0.55, YAWN), (1.25, YAWN_B), (1.75, YAWN),
+              (2.40, IDLE_A)]},
     # And going somewhere on them, at 0.40 m/s — 1.2 s a cycle, two half
     # strides, which is a knee and about 24 cm each. `SHOW.creep` in
     # 43-jadrija.js is that number and the two have to move together or she
