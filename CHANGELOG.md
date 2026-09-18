@@ -8,6 +8,14 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.419.3] — 2026-09-18
+
+### one straw
+
+**"actually just one straw"**. Two put a second object into a 100 mm well that
+already holds four lines, a heap and a blade, and the plate reads better with
+some room around what is in it.
+
 ## [1.419.2] — 2026-09-18
 
 ### the straws, on the plate

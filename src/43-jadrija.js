@@ -38507,21 +38507,23 @@ async function buildJadrija(scene) {
     // the lines and in plastic colours nothing else in this room is wearing,
     // so nothing about them says powder.
     //
-    // CUT SHORT, 42 mm, because the well is 100 mm across and already holds
-    // four lines, a heap and a blade. At that length, 40 degrees, and the two
-    // centres below, every end sits inside r = 0.048 — the flat floor stops at
-    // 0.050 — and the near end of the lower one clears the heap by 4 mm.
+    // ONE, and it was two for a version: *"actually just one straw"*. Two put
+    // a second object in a 100 mm well that already holds four lines, a heap
+    // and a blade, and the plate reads better with the room around it.
+    //
+    // CUT SHORT, 42 mm, for the same reason. At that length, 40 degrees off
+    // the lines and centred where it is, both ends sit inside r = 0.046 —
+    // the flat floor stops at 0.050 — and the near end clears the heap.
     const tube = (c) => solidMaterial(new THREE.Color(c[0], c[1], c[2]),
       { spec: 0.52, specPower: 60, vcol: false, emissive: 0.22,
         side: THREE.DoubleSide, body: 'n = gl_FrontFacing ? n : -n;' });
     const straws = [];
-    for (const [cx, cz, col] of [
-      [0.006, -0.028, [0.720, 0.255, 0.230]],
-      [-0.010, -0.036, [0.280, 0.390, 0.640]]]) {
+    {
       const m = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.0034, 0.0034, 0.042, 10, 1, true), tube(col));
+        new THREE.CylinderGeometry(0.0034, 0.0034, 0.042, 10, 1, true),
+        tube([0.720, 0.255, 0.230]));
       m.rotation.set(0, 0.70, Math.PI / 2);
-      m.position.set(cx, 0.0034, cz);
+      m.position.set(0.002, 0.0034, -0.031);
       g.add(m);
       straws.push(m);
     }
