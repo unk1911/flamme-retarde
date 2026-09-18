@@ -33461,6 +33461,56 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * Her arms out wide, while she is lying down.
+   *
+   * Misha: *"if i say 'arms spread wide', spread arms"*.
+   *
+   * SOLVED AND NOT AIMED, which is the hug's lesson rather than the legs'.
+   * The legs could be an `aim` because the amount was already written down —
+   * `_cradle` states its own hip and knee flexion, so lowering them is
+   * undoing a known number. Nothing states where "wide" is, and a figure
+   * space rotation on a bone I have not measured is how the hug ended up a
+   * hands-up. So this hands `wheelLimb` a target and lets it work the
+   * rotations out: the wrists go out to either side at shoulder height, on
+   * the surface she is lying on.
+   */
+  const ARMS = { out: 0.52, drop: 0.02, secs: 1.0 };
+  let armsRest = null;
+  function armsWide(f, dt) {
+    const want = show.armsWide ? 1 : 0;
+    show.armsAt = damp(show.armsAt || 0, want, 1 / ARMS.secs, dt);
+    if (show.armsAt < 0.002) {
+      if (show.armsWasOn) {
+        for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+        show.armsWasOn = 0;
+      }
+      return;
+    }
+    if (!armsRest) {
+      const v = new THREE.Vector3();
+      armsRest = {};
+      for (const n of ['armUL', 'armLL', 'handL', 'armUR', 'armLR', 'handR']) {
+        const i = f.boneIndex(n);
+        if (i < 0) { armsRest = null; return; }
+        f.boneAt(i, v);
+        armsRest[n] = v.clone();
+      }
+    }
+    show.armsWasOn = 1;
+    for (const side of ['L', 'R']) {
+      const S = armsRest['armU' + side];
+      const E = armsRest['armL' + side];
+      const W = armsRest['hand' + side];
+      const sgn = Math.sign(S.z || 1);
+      _hugGoal.set(S.x, S.y - ARMS.drop, S.z + sgn * ARMS.out);
+      _hugGoal.lerpVectors(W, _hugGoal, show.armsAt);
+      // Elbow away from her body, which is the only bend an arm held out has.
+      _hugPole.set(0, -0.3, sgn).normalize();
+      wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _hugGoal, _hugPole);
+    }
+  }
+
   function nearClose(pt, ps, dir, want, dt) {
     let fx = 0, fz = 0;
     if (dir) {
@@ -34195,6 +34245,10 @@ async function buildJadrija(scene) {
     // in tools/blender/human_mh.py, which is where the argument for it being
     // a clip rather than a runtime rotation is written down.
     flat: 0.95, flatheld: 1.00,
+    // And on to one side or the other, baked 17 Sep — see SIDE_L in
+    // tools/blender/human_mh.py, and the note there about which number of the
+    // pelvis triple is the roll. It is not the one you would pick.
+    sideL: 0.95, sideR: 0.95,
   };
 
   /**
@@ -34211,7 +34265,8 @@ async function buildJadrija(scene) {
    * The four she is lying down for: on her back, the way down to it, and the
    * same again on her front.
    */
-  const LYING = { recline: 1, cradle: 1, flat: 1, flatheld: 1 };
+  const LYING = { recline: 1, cradle: 1, flat: 1, flatheld: 1,
+    sideL: 1, sideR: 1 };
 
   const KNEES = { submit: 1, kept: 1, creep: 1,
     // On her back she still drinks it — the mouth, the foam and what runs down
@@ -34294,7 +34349,7 @@ async function buildJadrija(scene) {
     // kneel, "lie down" is the next step; asked from the floor, "on the bed"
     // is a move; asked from either, the dances and the errands are her getting
     // up and going, which is what a person does when you change your mind.
-    kept: 1, cradle: 1, fours: 1, flatheld: 1 };
+    kept: 1, cradle: 1, fours: 1, flatheld: 1, sideL: 1, sideR: 1 };
 
   /**
    * WHAT SHE CAN BE ASKED FOR. Every one of these is a number she already has
@@ -34384,6 +34439,10 @@ async function buildJadrija(scene) {
      * body a clip has already laid down put her face 0.16 m inside the bed.
      */
     flat: 1,
+    /** And over on to one side or the other, which are two baked clips. */
+    'side.left': 1, 'side.right': 1,
+    /** And her arms out, which is a latch on the pose like her legs. */
+    'arms.wide': 1, 'arms.down': 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
@@ -34476,6 +34535,17 @@ async function buildJadrija(scene) {
       if (!LYING[show.phase]) return 'notlying';
       const want = name === 'legs.up' ? 0 : 1;
       if ((show.legsDown || 0) === want) return want ? 'legsalready' : 'legsup';
+      return null;
+    }
+    if (name === 'side.left' || name === 'side.right') {
+      const at = name === 'side.left' ? 'sideL' : 'sideR';
+      if (show.phase === at) return 'already';
+      return null;
+    }
+    if (name === 'arms.wide' || name === 'arms.down') {
+      if (!LYING[show.phase]) return 'notlying';
+      const want = name === 'arms.wide' ? 1 : 0;
+      if ((show.armsWide || 0) === want) return want ? 'armsalready' : 'armsdown';
       return null;
     }
     if (name === 'flat') {
@@ -34739,7 +34809,8 @@ async function buildJadrija(scene) {
     // and she is not already doing something the room does not own, and it
     // fires on the frame AFTER the kiss is armed. So the kiss was starting and
     // being overridden by the hut, every time, and what you saw was the wine.
-    toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1 };
+    toYou: 1, kiss: 1, hug: 1, fours: 1, flat: 1, flatheld: 1,
+    sideL: 1, sideR: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -35392,7 +35463,8 @@ async function buildJadrija(scene) {
     // is a bug rather than a choice: in the air (the hop integrator owns her
     // vertical), on fire, and turned — the last one being the promenade's
     // answer to the hose, which owns her whole body until it lets go.
-    const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1 };
+    const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1,
+      'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
@@ -35493,6 +35565,28 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toYou', 'walk', 0.34);
         }
+      } else if (name === 'side.left' || name === 'side.right') {
+        const clip = name === 'side.left' ? 'sideL' : 'sideR';
+        show.byAsk = 1;
+        show.queue.length = 0;
+        showSay('squee', d);
+        // The roll starts from the cradle, like the one on to her front.
+        if (LYING[show.phase] && show.phase !== 'cradle') {
+          show.sideWant = clip;
+          go('cradle', 'cradle', 0.40);
+        } else if (show.phase === 'cradle') {
+          show.legsDown = 0;
+          go(clip, clip, 0.34);
+        } else {
+          show.sideWant = clip;
+          show.lieWant = show.onBed || (kit && kit.cot) ? 'bed' : 'floor';
+          if (KNEES[show.phase]) lieDown(pt, ps, d, go);
+          else go('submit', 'submit', 0.30);
+        }
+      } else if (name === 'arms.wide' || name === 'arms.down') {
+        show.armsWide = name === 'arms.wide' ? 1 : 0;
+        show.did = name;
+        showSay('squee', d);
       } else if (name === 'flat') {
         show.byAsk = 1;
         show.queue.length = 0;
@@ -35624,8 +35718,15 @@ async function buildJadrija(scene) {
       // took her back — after a kiss, a hug, a pose, anything it does not own
       // — she walked out of the door she was already through and came back in
       // through it.
-      show.leg = sheIsIn() ? 2 : 0;
-      go('come', 'walk', 0.34);
+      // Already in here with the glass full: there is nothing to come in for,
+      // so she stays where she is standing rather than walking the last two
+      // waypoints to a bottle she has already poured.
+      if (sheIsIn() && show.level >= 0) {
+        go('dwell', 'idle', 0.40);
+      } else {
+        show.leg = sheIsIn() ? 2 : 0;
+        go('come', 'walk', 0.34);
+      }
     }
 
     switch (show.phase) {
@@ -35661,7 +35762,23 @@ async function buildJadrija(scene) {
         const last = legs.length - 1;
         const dist = showTo(g[0], g[1], dt, show.leg === last ? 0.72 : 1.05);
         if (dist < (show.leg === last ? 0.20 : 0.40)) {
-          if (show.leg >= last) { show.leg = 0; go('wine', 'wine', 0.42); }
+          if (show.leg >= last) {
+            show.leg = 0;
+            // AND IF THERE IS ALREADY A GLASS POURED, SHE JUST STAYS.
+            //
+            // Misha, 17 Sep 2026: *"after i say kiss, she kisses, but then
+            // again goes to pour another wine glass. same with hug. she
+            // shouldn't keep going back to the wine glass"*.
+            //
+            // The room brings her in whenever you are in it and she is not
+            // doing something it does not own, and the end of coming in was
+            // always the pour — so every kiss, hug or pose was followed by
+            // another glass. `level` is the room's own record of what is in
+            // the glass and nobody drinks it (see `fillTo`), which is exactly
+            // the test `askWhy('wine')` already makes when you ask her.
+            if (show.level >= 0) go('dwell', 'idle', 0.40);
+            else go('wine', 'wine', 0.42);
+          }
           else show.leg++;
         }
         break;
@@ -35872,7 +35989,35 @@ async function buildJadrija(scene) {
         }
         break;
 
+      // On one side or the other. The clip holds its own last frame, so this
+      // is a hold with a mattress under it and nothing else.
+      case 'sideL':
+      case 'sideR':
+        if (show.onBed && kit && kit.cot) {
+          show.mat = damp(show.mat || 0,
+            Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
+        }
+        if (show.getUp) {
+          show.getUp = 0;
+          go('cradle', 'cradle', 0.40);
+          break;
+        }
+        if (show.tmr > (show.onBed ? SHOW.bedFor
+          : show.byAsk ? SHOW.cradleAsked : SHOW.cradleFor)) {
+          go('cradle', 'cradle', 0.40);
+        }
+        break;
+
       case 'cradle':
+        // Asked for a side while she was somewhere else: the cradle is the
+        // landing on the way there too.
+        if (show.sideWant) {
+          const w = show.sideWant;
+          show.sideWant = null;
+          show.legsDown = 0;
+          go(w, w, 0.34);
+          break;
+        }
         // Asked for her front while she was somewhere else: the cradle is the
         // landing on the way, so it sends her straight on.
         if (show.flatWant) {
@@ -35916,9 +36061,10 @@ async function buildJadrija(scene) {
         // behind is a woman kneeling in mid-air over a bed.
         if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
         if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
-        // And her legs back to the pose's own, or the next time she lies down
-        // she arrives already flat.
+        // And her legs and arms back to the pose's own, or the next time she
+        // lies down she arrives already arranged.
         show.legsDown = 0;
+        show.armsWide = 0;
         // AND OFF THE BED ITSELF, which is the other half of getting up from
         // one — see `untangle`. Lying on the cot puts her inside its blocker,
         // and a woman standing inside a blocker cannot take a step in any
@@ -37230,6 +37376,8 @@ async function buildJadrija(scene) {
     // set in the `cradle` case was wiped a few lines later, every frame, by a
     // hop that was not happening. MEASURED: her ankle moved 2 cm when it
     // should have moved half a metre, which is one frame of the aim surviving.
+    if (LYING[show.phase]) armsWide(f, dt);
+    else if (show.armsWasOn) armsWide(f, dt);
     if (LYING[show.phase]) legsFlat(f, dt);
     else if (show.legsWasOn) legsFlat(f, dt);
 
@@ -37278,9 +37426,18 @@ async function buildJadrija(scene) {
       // photographed with her head at the foot of the cot and her feet on the
       // pillow. Half a turn about her own pelvis puts them back, and nothing
       // else has to know: the pelvis is the pivot, so only the ends move.
+      // A HALF TURN FOR ALL THREE OF THE ROLLED POSES, and the sides earned
+      // that the hard way: reasoning from their figure-space layout said a
+      // quarter each and the measurement said otherwise — a quarter turned
+      // her ACROSS the cot (her head moved a metre in x and stayed at the
+      // same end), because the mirror that makes `SIDE_R` flips the pose's
+      // own layout as well as its roll. Measured, not reasoned: they lie
+      // along the bed already and are simply head-to-foot reversed, exactly
+      // like the front.
       const wantSide = show.phase === 'aim' || show.phase === 'wheel'
         ? -Math.PI / 2
-        : (show.phase === 'flat' || show.phase === 'flatheld') ? Math.PI : 0;
+        : (show.phase === 'flat' || show.phase === 'flatheld'
+          || show.phase === 'sideL' || show.phase === 'sideR') ? Math.PI : 0;
       show.sideRate = turnRate(wantSide - show.side, show.sideRate,
         SHOW.sideMax, dt);
       show.side += show.sideRate * dt;

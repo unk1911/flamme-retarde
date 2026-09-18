@@ -4283,6 +4283,58 @@ PRONE = {
 
 # The breath, for CRADLE_B's reason: a held pose that does not move is a
 # mannequin. Everything small.
+# ── ON HER SIDE ───────────────────────────────────────────────────────────────
+#
+# Misha: *"when laying on the cot, if i say 'roll onto your right side', should
+# roll. same for 'roll onto your left side'"*.
+#
+# WHICH NUMBER IS THE ROLL took six probes and one render, and the answer is
+# worth writing down because it is not the obvious one. CRADLE lays her on her
+# back with `pelvis` (90, 0, 0) and PRONE on her front with (−90, 0, 0), so the
+# first number is WHICH WAY SHE FALLS and its sign is the half roll between
+# those two. A fall on to her side is therefore not a roll applied after a
+# lay-down at all: it is the third number on its own, from standing —
+# (0, 0, ±90). Everything tried in between put her torso up at an angle, her
+# head 0.3 m off the surface, or her body across the cot instead of along it.
+#
+# The arms are then one measurement each. The under arm probed 0.14 m INSIDE
+# the mattress and the number that lifts it is the shoulder's first component,
+# which moves it slowly: −20 gave 0.694 against a surface at 0.93, and −96
+# gave 0.942. That puts the hand up past her head, which the render says is
+# exactly what somebody lying on their side does with the arm they are not
+# lying on.
+SIDE_L = dict(PRONE)
+SIDE_L["pelvis"] = (0, 0, 90)
+SIDE_L["spine01"] = (0, 0, 0)
+SIDE_L["spine02"] = (0, 0, 0)
+SIDE_L["spine03"] = (0, 0, 0)
+SIDE_L["chest"] = (0, 0, 0)
+SIDE_L["neck"] = (0, 0, 0)
+SIDE_L["head"] = (0, 0, 0)
+SIDE_L["armUL"] = (-96, 0, 36)
+SIDE_L["armLL"] = (92, 0, 22)
+
+
+def _mirror_pose(d):
+    """The same pose on the other side: L and R swapped, y and z negated.
+
+    Rule read off IDLE_A, which is the one pose in this file that states the
+    convention outright — `armUL` (−6, 0, +33) against `armUR` (−4, 0, −33).
+    The third component is the side and flips; the second is a yaw and flips
+    with it; the first is the sagittal angle and is shared.
+    """
+    out = {}
+    for k, v in d.items():
+        if k == "@root":
+            out[k] = (v[0], -v[1], v[2])
+            continue
+        n = k[:-1] + ("R" if k.endswith("L") else "L") if k[-1] in "LR" else k
+        out[n] = (v[0], -v[1], -v[2]) if isinstance(v, tuple) and len(v) == 3 else v
+    return out
+
+
+SIDE_R = _mirror_pose(SIDE_L)
+
 PRONE_B = dict(PRONE)
 PRONE_B["@root"] = (0.16, 0.0, RECLINE_ROOT + 0.005)
 PRONE_B["spine01"] = (-7, 0, 0)
@@ -6907,6 +6959,13 @@ CLIPS = [
      "keys": [(0.0, CRADLE), (0.9, RECLINE_B), (1.9, PRONE)]},
     {"name": "flatheld", "loop": True,
      "keys": [(0.0, PRONE), (2.4, PRONE_B), (4.8, PRONE)]},
+    # And over on to one side or the other, from her back. Held at the end
+    # rather than looping: a `once` clip with nothing after it stays on its
+    # last frame, which IS the pose.
+    {"name": "sideL", "loop": False,
+     "keys": [(0.0, CRADLE), (0.8, RECLINE_B), (1.7, SIDE_L)]},
+    {"name": "sideR", "loop": False,
+     "keys": [(0.0, CRADLE), (0.8, RECLINE_B), (1.7, SIDE_R)]},
     # And back up, which is the same three keys in reverse and is a clip rather
     # than a crossfade for a reason worth writing down: `getup` starts from
     # FOURS, and blending from a woman on her back with her knees up to a woman

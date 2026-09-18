@@ -8,6 +8,62 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.412.0] — 2026-09-17 (baye 1.17.0)
+
+### she stops pouring a second glass
+
+**"after i say kiss, she kisses, but then again goes to pour another wine
+glass. same with hug. she shouldn't keep going back to the wine glass"**.
+
+The room brings her in whenever you are in it and she is not doing something
+it does not own, and the end of coming in was always the pour — so every kiss,
+every hug and every pose was followed by another glass. `level` is the room's
+own record of what is in the glass and nobody drinks it, which is exactly the
+test `askWhy('wine')` has made since 1.404.0 when you ask her for one; the
+room now makes it too. Glass full and she stays where she is.
+
+Measured: kiss, then hug, then watched for half a minute — `dwell`, `dwell`,
+`dwell`, and the level never moved off 1.
+
+### arms out, and on to either side
+
+**"if i say 'arms spread wide', spread arms... if i say 'roll onto your right
+side', should roll. same for 'roll onto your left side'"**.
+
+The arms are SOLVED and not aimed, which is the hug's lesson rather than the
+legs'. The legs could be an `aim` because the amount was already written down
+— `_cradle` states its own hip and knee flexion — but nothing states where
+"wide" is, and a rotation about an axis I have not measured is how the hug
+became a hands-up. So `wheelLimb` gets a target: wrists out to either side at
+shoulder height, on the surface she is lying on. Measured 1.29 m apart, which
+on a cot 0.70 m wide means her hands hang off it, as they would.
+
+The sides are two more baked poses, and finding them took six probes and a
+render. CRADLE lays her on her back at `pelvis` (90, 0, 0) and PRONE on her
+front at (−90, 0, 0), so that first number is which way she falls and its sign
+is the half roll between them — which means a fall on to her side is the THIRD
+number on its own, from standing. Everything in between put her torso up at an
+angle, her head a third of a metre off the surface, or her body across the cot.
+The under arm then probed 0.14 m inside the mattress, and the number that
+lifts it is the shoulder's first component: −96° puts the hand up past her
+head, which the render says is what somebody on their side does with the arm
+they are not lying on.
+
+And all three rolled poses need a half turn of the held yaw offset — the
+cartwheel's own mechanism — because they lay her out head-to-foot reversed
+against the recline family. Reasoning said a quarter turn for the sides; the
+measurement said otherwise, since the mirror that makes the right-side pose
+flips its layout as well as its roll. A quarter put her across the bed.
+
+Server (baye 1.17.0): arms spread wide / arms out / arms down, roll onto your
+left side, roll onto your right side.
+
+### known
+
+The right-side pose sits about 0.3 m off the centre line of the cot — half over
+the edge — where the left-side one is square on it. Same pose mirrored, so it
+is one offset, not a second pose.
+
 ## [1.411.0] — 2026-09-17
 
 ### the satchel

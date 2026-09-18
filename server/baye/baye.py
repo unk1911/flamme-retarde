@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.16.0"
+VERSION = "1.17.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -456,6 +456,21 @@ SKILLS = {
     "flat": ("roll over and lie flat on her front",
              [r"\b(lay|lie|roll)\s*(down\s*)?flat\b|\bflat on your (tummy|stomach|front|belly)\b"
               r"|\bon your (tummy|stomach|belly|front)\b|\bface down\b|\broll over\b"]),
+    # ON TO ONE SIDE OR THE OTHER, and her arms out. Misha, 17 Sep 2026:
+    # *"if i say 'arms spread wide', spread arms... if i say 'roll onto your
+    # right side', should roll. same for 'roll onto your left side'"*.
+    #
+    # The sides are checked before `flat` below, because "roll onto your right
+    # side" contains "roll" and `flat` owns the bare "roll over".
+    "side.left": ("roll on to her left side",
+                  [r"\b(left)\b.{0,12}\bside\b|\bside\b.{0,12}\b(left)\b"]),
+    "side.right": ("roll on to her right side",
+                   [r"\b(right)\b.{0,12}\bside\b|\bside\b.{0,12}\b(right)\b"]),
+    "arms.wide": ("spread her arms out wide while she lies down",
+                  [r"\barms?\b.{0,14}\b(wide|out|spread|apart)\b"
+                   r"|\bspread\b.{0,10}\barms?\b"]),
+    "arms.down": ("put her arms back down at her sides",
+                  [r"\barms?\b.{0,14}\b(down|in|back)\b"]),
     # ON ALL FOURS, which the `kneel` clip has always ended on.
     "fours": ("get down on all fours in the kabina and stay there",
               [r"\ball fours\b|\bon all four\b|\bhands and knees\b"
@@ -538,6 +553,7 @@ ASK_RE = re.compile(
     r"|\ball fours\b|\bhands and knees\b"
     r"|\blegs? (up|down)\b|\bflat on your\b|\bface down\b|\broll over\b"
     r"|\b(lay|lie|roll)\s*(down\s*)?flat\b"
+    r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
