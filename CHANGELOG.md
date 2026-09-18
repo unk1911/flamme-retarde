@@ -8,6 +8,75 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.422.0] — 2026-09-18 (baye 1.23.0)
+
+### eight poses, and the thing that unlocked them
+
+**"fetal position"**, **"lotus position"**, **"sit up on the bed on her knees"**,
+**"upside down"**, **"wall perch"**, **"head stand"**, **"yawn"** — asked for in
+two runs and all reachable now, plus `sit.bed` as an alternative to the kneel.
+
+**THE BLOCKER, AND IT BEAT ME TWICE FIRST.** Every one of these wanted the legs
+spread, and two attempts failed because the hip's abduction is not where it
+looks. `pose()` hands Blender an XYZ Euler applied about the bone's REST axes:
+for the hip, X is flexion, Y runs down the thigh, Z points straight back. So
+with the thigh DOWN, Z abducts — which is what everybody's intuition is built
+on. With the thigh OUT at 90 degrees the thigh lies along its own Z, so **Z is
+a pure twist and moves the knee by exactly zero**: probed identical at
+`(+0.455 +0.114 +0.930)` for every z from −40 to +60. **Y is what abducts**,
+negative on the left. My earlier `+46` was that axis with the sign inverted —
+adducting across the midline, which is why it "only made the sinking worse".
+The knee inherits the same trap: after deep hip flexion its own rest Z is
+nearly vertical, so cross-legged is the KNEE's third number, not its first.
+
+47 clips now, the payload 697 KB to 788 KB. All seven were photographed before
+anything was wired, because the bake reported joint geometry and nobody had
+looked at a picture — limb interpenetration is not a number.
+
+### three bugs that were already there
+
+**`rise` never cleared `show.getUp`.** Say "get up", then "lie down on the bed",
+and `kept` reads the stale latch one line before `lieWant` and stands her
+straight back up. `cradle` now passes the latch on rather than spending it,
+which also cut getting up out of a pose from **13.6 s to 6.0 s**.
+
+**`coke` was in `NOW`** while its road re-arms the ask across a `situp` — the
+same trap the hair command was kept out of. Measured from `fetalHeld`: the
+sit-up ran for ONE frame and she slid to the tabouret standing 0.42 m in the
+air.
+
+**Twelve `LYING[show.phase]` tests** in the ask dispatch could not see the
+sitting family, so "take your hair down" from `lotusHeld` skipped the get-up
+and left her in `dwell` 0.44 m above the cot. They test the cot now, not the
+clip list.
+
+### what does not fit, stated rather than hidden
+
+The cot is **0.66 m** of mattress standing **0.15 m off the wall** it is against,
+and three of these poses are wider than that:
+
+- **`lotus`** — her knees pass 75 mm beyond each long edge. A cross-legged
+  person on a camp bed does that, so it stays.
+- **`perch`** — WALL_PERCH is 0.87 m glutes-to-ankle. Her back finishes 242 mm
+  off the plaster and her shins 304 mm past the edge. Not fixable from the
+  runtime; the cot would have to move.
+- **`upside`** — 28 mm of bone clearance to the joist undersides. It
+  photographs well and there is no margin in it.
+- **`sit.knees`** — **her toes are 149 mm inside the mattress.** This is the
+  KNEEL foot defect the rig file already documents: the shin is flat and the
+  foot then continues 54 degrees down. `footL/footR` +38 fixes it and re-bakes
+  seven shipped clips, so it is its own job with its own regression pass, not a
+  quiet edit. Her shins vanish at the ankle until then.
+
+Also: no shipped clip HOLDS a kneel — `kneel` ends on FOURS, `submit` ends on
+KNEEL_BACK, and nothing reaches a kneel from the cradle, which is the only way
+onto that mattress. `sit.knees` is `situp` + `kept`, i.e. hands behind her back.
+
+**baye 1.23.0**: 58 sentences unit-tested offline against the shipped file, zero
+wrong. Four deliberate reassignments — "head stand" used to reach `rise`,
+"kneel up on the bed" reached `submit`, "sit up on the cot" reached `rise`, and
+"go upside down on the bed" reached `recline.bed`.
+
 ## [1.421.1] — 2026-09-18
 
 ### two things that were animating themselves
