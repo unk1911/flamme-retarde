@@ -94,6 +94,26 @@ const CARRY = [
   { key: 'kupovi', label: 'kupovi', give: true, consumed: true },
   { key: 'frappe', label: 'frappe', consumed: true },
   { key: 'krafne', label: 'krafne', give: true, consumed: true },
+  // ── AND THE THREE YOU START WITH ──────────────────────────────────────
+  //
+  // Misha, 17 Sep 2026: *"make sure in my satchel/inventory, i initially wear
+  // a pair of handcuffs, a pair of bose over-the-head noise canceling
+  // headphones, one of those lovense remote control toys"*.
+  //
+  // Named rather than described, and that is rule 12 being kept rather than
+  // broken: the rule is that no name in this game came from ME. Bose and
+  // Lovense came from him, the way OŽUJSKO and TISAK came off his own
+  // photographs of those shops, and the handcuffs are a plain noun.
+  //
+  // `worn: true` marks the three that are not shopping — the bag lists them
+  // apart, because a thing you brought with you and a thing you bought at a
+  // kiosk answer different questions. None of them is `consumed`: you do not
+  // use these up.
+  { key: 'handcuffs', label: 'a pair of handcuffs', give: true, worn: true },
+  { key: 'headphones', label: 'Bose noise-cancelling headphones',
+    give: true, worn: true },
+  { key: 'lovense', label: 'a Lovense remote-control toy',
+    give: true, worn: true },
 ];
 
 const CARRY_BY_KEY = {};
@@ -115,7 +135,14 @@ for (const c of CARRY) {
  * euros and an empty bag, and that is the trade every other bit of state in
  * this game makes.
  */
-const SATCHEL = { have: {} };
+const SATCHEL = {
+  // ── WHAT YOU ARRIVE WITH ───────────────────────────────────────────────
+  //
+  // Three things, and they are in the bag from the first frame rather than
+  // put there by a shop — see `worn` in CARRY. Everything else in here is
+  // something you bought.
+  have: { handcuffs: 1, headphones: 1, lovense: 1 },
+};
 
 /**
  * The key for a thing, given either a key or the label a shop writes.
@@ -210,7 +237,9 @@ function satchelList() {
   const row = (key, n) => {
     const c = CARRY_BY_KEY[key];
     return { key, label: satchelLabel(key), name: c && c.name ? c.name : satchelLabel(key),
-      n, give: !!(c && c.give), consumed: !!(c && c.consumed) };
+      n, give: !!(c && c.give), consumed: !!(c && c.consumed),
+      // What you brought with you rather than bought — see `worn` in CARRY.
+      worn: !!(c && c.worn) };
   };
   for (const c of CARRY) {
     const n = SATCHEL.have[c.key] || 0;

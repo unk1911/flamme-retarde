@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.412.1] — 2026-09-17
+
+### three things you arrive with
+
+**"make sure in my satchel/inventory, i initially wear a pair of handcuffs, a
+pair of bose over-the-head noise canceling headphones, one of those lovense
+remote control toys"**.
+
+In the bag from the first frame, and marked `worn` — the flag says brought
+rather than bought, because a thing you came with and a thing you got at a
+kiosk answer different questions, and the gift will want to know.
+
+Named rather than described, which is rule 12 being kept and not broken: the
+rule is that no name in this game came from ME. Bose and Lovense came from him,
+the way OŽUJSKO and TISAK came off his own photographs of those shops, and
+handcuffs are a plain noun. None of the three is `consumed`.
+
+Measured: three items and twenty euros on the first frame, the panel reading
+`satchel · 20.00 € / a pair of handcuffs / Bose noise-cancelling headphones /
+a Lovense remote-control toy`, a pack of cigarettes bought around them for
+15.50 € left and four rows, and `take('handcuffs')` answering 1.
+
+One consequence worth knowing: `POCKET.bought` is a view of the same bag, so
+it now lists the three as well. Nothing reads it but the beer, which asks for
+one label by name.
+
 ## [1.412.0] — 2026-09-17 (baye 1.17.0)
 
 ### she stops pouring a second glass
