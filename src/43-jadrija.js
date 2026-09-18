@@ -36317,6 +36317,10 @@ async function buildJadrija(scene) {
         const DUR = COKE.pour + COKE.lines * COKE.cut;
         const u = Math.max(0, show.tmr - 0.70) / DUR;
         cokeSet(u);
+        // Published for the crouch and the arm, which are written a long way
+        // below this — everything that poses her runs AFTER the switch, and
+        // the tuck down there deletes any leg aim set up here. See `cokeStoop`.
+        show.cokeU = u;
         if (u >= 1) go('dwell', 'idle', 0.42);
         break;
       }
@@ -38110,6 +38114,14 @@ async function buildJadrija(scene) {
     // with both hands welded behind her head. Same latch the two above use.
     if (show.phase !== 'tieHair' && hairRest) hairHands(f, 0);
 
+    // ── AND DOWN TO THE PLATE ─────────────────────────────────────────────
+    //
+    // Here for the same reason the two above are here: it aims the same four
+    // leg bones the tuck does, and the tuck runs every frame with an angle of
+    // zero. Unconditional, so that it eases back out of the crouch on the
+    // frames after she has left the phase. See `cokeStoop`.
+    cokeStoop(f, dt);
+
     // Turn towards `want` at a rate a person turns at, and never the long way
     // round — the shore's frame wraps and a heading that crosses the wrap would
     // otherwise spin her through a whole circle to move by a degree. The wrap
@@ -38230,7 +38242,11 @@ async function buildJadrija(scene) {
     // The water IS the level, so while she is in it she is at the level, full
     // stop, eased over `wetIn` seconds at each end so the quay edge is a woman
     // getting in and out rather than a step of two metres in one frame.
-    const yNow = p[1] + show.air + (show.mat || 0);
+    // `duck` is the crouch at the plate, and it is a SUBTRACTION for the same
+    // reason `air` is an addition: the deck has not moved and she has. Her
+    // knees fold by the same amount in figure space, so her feet stay on the
+    // floor while her hips come down — see `cokeStoop`.
+    const yNow = p[1] + show.air + (show.mat || 0) - (show.duck || 0);
     f.mesh.position.set(p[0],
       show.dip > 0
         ? lerp(yNow, CONFIG.seaLevel + ERRAND.floatY, show.dip * show.dip * (3 - 2 * show.dip))
@@ -38273,6 +38289,21 @@ async function buildJadrija(scene) {
         if (giftHeld.spin) giftHeld.mesh.rotateY(giftHeld.spin);
       }
     }
+
+    // ── AND THE HAND THAT IS DOING THE CUTTING ───────────────────────────
+    //
+    // AFTER the matrix update, because the goal is a blade standing in world
+    // metres on a table and the solver wants it in figure space — see
+    // `cokeReach`, which is where that conversion lives and is the one thing
+    // in this that is easy to get silently wrong.
+    //
+    // Not while she is holding something: the block above owns that arm for as
+    // long as there is a cone in it, and two solves on one chain is the last
+    // writer winning at random. Passed IN rather than gating the call, because
+    // the only code that ever hands this arm back to the clip is inside it —
+    // skip the call and a cone put in her hand mid-cut leaves the aim on her
+    // for the rest of the afternoon.
+    cokeReach(f, dt, !giftHeld);
 
     // ── AND THE ICE CREAM SHE IS CARRYING ────────────────────────────────
     //
@@ -38796,6 +38827,301 @@ async function buildJadrija(scene) {
       : 0.012 + (COKE.len / 2) * (1 - f) - COKE.len / 2 + COKE.len * f;
     k.blade.rotation.y = 0;
     return { pour: +pour.toFixed(3), cut: +cut.toFixed(3), line: at };
+  }
+
+  /**
+   * Where the blade is standing, in world metres.
+   *
+   * Its own matrix and not the group's position plus an offset, because the
+   * group carries a yaw of its own — the lines are squared to the plate and
+   * not to the room — and a hand sent to `g.position + blade.position` would
+   * be sent to a point rotated off the table by that yaw.
+   */
+  const _ckBlade = new THREE.Vector3();
+  function cokeBladeAt(out) {
+    const k = cokeKit;
+    if (!k) return null;
+    k.blade.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(k.blade.matrixWorld);
+  }
+
+  /**
+   * GETTING HER DOWN TO THE PLATE, WHICH SHE CANNOT REACH STANDING UP.
+   *
+   * Measured on the rig before a line of this was written, and the numbers are
+   * the whole design. Over the hut floor: her right shoulder 1.407 m, the
+   * blade 0.732 m. Shoulder to wrist is 0.239 + 0.238 = 0.477 m, and straight
+   * down is the longest an arm ever gets — so from her own mark she is 0.12 m
+   * short of ever having a wrist over that plate, and the solver would have
+   * spent the whole phase clamped at full stretch with her hand in the air.
+   *
+   * AND LEANING MAKES IT WORSE. The plate is 0.046 m from a vertical line
+   * through that shoulder — she stands square beside the table with the thing
+   * almost directly under her — so a bow at the waist carries the shoulder
+   * PAST it at 0.36 m a radian while buying 0.02 m of height. Same for a side
+   * bend. Every rotation of the torso pivots about a point 0.43 m below the
+   * shoulder: it is nearly all sideways travel and nearly no drop.
+   *
+   * So she drops. Fold the thigh forward by `a` and the shin back by the same
+   * about the rig's sagittal axis — +z at the hip swings the knee forward,
+   * which is the tuck's own sign, and -z at the knee takes the foot back under
+   * her — and the hip comes down while the foot stays where the clip put it.
+   * The mesh is then lowered by exactly that drop, so her feet are on the
+   * floor and only her hips have moved. At 0.60 rad it is 0.205 m, and the
+   * wrist target then sits 0.349 m from her shoulder — 73% of the arm, an
+   * elbow with a bend in it rather than a woman pointing. MEASURED at the
+   * bottom of the crouch with the arm still at rest: her hanging wrist is
+   * 49 mm off the blade, so the crouch is what does the reaching and the arm
+   * is only placing the hand. That is the right way round for a squat this
+   * deep; a shallower one and the elbow starts to lock.
+   *
+   * THE KNEE TAKES TWICE THE ANGLE, and it is not a fudge. `aim` composes in
+   * FIGURE space and is written on to each bone after its parents, so a hip at
+   * +a and a knee at -a about the same axis cancel exactly: the shin comes out
+   * pointing the way it started. The first cut of this did that and it read as
+   * a woman perching rather than squatting — MEASURED: her ankle sat 48 mm
+   * under the floor, because the hip had gone down by the drop this file takes
+   * off the mesh and the leg had only folded by half of it. At -2a the shin
+   * ends up at -a in figure space, which is what the drop below assumes.
+   *
+   * AND THE DROP IS MEASURED OFF HER OWN LEG, not written down here, because
+   * (1 - cos a) on a bone length is only right for a bone that hangs plumb and
+   * neither of these does. Her thigh leans 0.044 m forward of vertical over
+   * its 0.438 and her shin leans 0.056 m back over its 0.395, and rotating
+   * those two by ±a swings part of that lean into the vertical: the true drop
+   * is (Ty + Sy)(1 - cos a) + (Tx - Sx)·sin a, which at 0.60 rad is 0.202 m
+   * against the 0.146 the plain formula gives. That 56 mm was her standing
+   * with her ankles above the tiles, which is exactly the fault the paragraph
+   * above describes with the sign turned round. Taken in WORLD metres off the
+   * bones themselves, so that neither the figure's scale nor a re-baked blob
+   * can put it out.
+   *
+   * The bow and the chin are not for the reach and would not buy it: they are
+   * so that the top of her is over what her hand is doing.
+   */
+  const CROUCH = { knee: 0.60, bow: 0.22, chin: 0.42 };
+  const _crA = new THREE.Vector3(), _crB = new THREE.Vector3();
+  const _crC = new THREE.Vector3(), _crF = new THREE.Vector3();
+  let crouchLeg = null;
+
+  /**
+   * One leg as the clip has it: how much height it stands, and how much lean
+   * there is in it. World metres, off the bones, along her own forward axis.
+   */
+  function crouchLegAt(f, nH, nK, nF) {
+    const iH = f.boneIndex(nH), iK = f.boneIndex(nK), iF = f.boneIndex(nF);
+    if (iH < 0 || iK < 0 || iF < 0) return null;
+    f.boneAt(iH, _crA).applyMatrix4(f.mesh.matrixWorld);
+    f.boneAt(iK, _crB).applyMatrix4(f.mesh.matrixWorld);
+    f.boneAt(iF, _crC).applyMatrix4(f.mesh.matrixWorld);
+    _crF.set(1, 0, 0).transformDirection(f.mesh.matrixWorld);
+    _crB.sub(_crA);                      // thigh
+    _crC.sub(_crA).sub(_crB);            // shin
+    return { y: -(_crB.y + _crC.y), x: _crB.dot(_crF) - _crC.dot(_crF) };
+  }
+
+  /**
+   * The angle that leg has to fold through to lose `drop` of height.
+   *
+   * The inverse of `y(1 - cos a) + x·sin a`, which is `R·sin(a - φ) = drop - y`
+   * with R the hypotenuse of the two and φ their angle. Here because HER TWO
+   * LEGS ARE NOT THE SAME: the idle has one foot forward of the other, so the
+   * same angle on both folds them by different amounts — measured, 25 mm of
+   * difference at 0.60 rad, which is one ankle in the tiles. Each leg is
+   * folded by whatever it takes to lose the height the other one lost, and
+   * both ankles then land within 4 mm of where the clip had them.
+   */
+  function crouchFold(L, drop) {
+    const R = Math.hypot(L.x, L.y);
+    if (R < 1e-4) return 0;
+    return Math.atan2(L.y, L.x) + Math.asin(clamp((drop - L.y) / R, -1, 1));
+  }
+  function cokeStoop(f, dt) {
+    const on = show.phase === 'coke';
+    // In over the pour, out over the last of the fourth line, and driven off
+    // the same 0-to-1 the props are driven off so the two cannot drift apart.
+    // The tail runs past 1: the phase is left on that frame and the ease-out
+    // has to go on happening with `on` false, which is why the damp below is
+    // what actually holds the value and this only says where it is heading.
+    const u = on ? (show.cokeU || 0) : 0;
+    const want = on ? sat((u - 0.02) / 0.13) * sat((1.0 - u) / 0.05) : 0;
+    show.crouch = damp(show.crouch || 0, want, 3.0, dt);
+    if (show.crouch < 0.004) {
+      if (show.crouchOn) {
+        // The legs and the spine are cleared for us by the tuck every frame;
+        // the neck is not, and a neck left aimed is a woman who never looks up
+        // again. Cleared once rather than every frame for the same reason the
+        // arms below are.
+        f.aim('neck', 0, 0, -1, 0);
+        show.crouchOn = 0;
+        crouchLeg = null;
+      }
+      show.crouch = 0;
+      show.duck = 0;
+      return;
+    }
+    // Her leg as the clip has it, taken once — on this frame there are no leg
+    // aims on her, because the tuck above deletes all four of them every frame
+    // and the crouch has not written any yet.
+    if (!crouchLeg) {
+      const R = crouchLegAt(f, 'legUR', 'legLR', 'footR');
+      const L = crouchLegAt(f, 'legUL', 'legLL', 'footL');
+      if (!R || !L) { show.duck = 0; return; }
+      crouchLeg = { R, L };
+    }
+    show.crouchOn = 1;
+    // The right leg sets the angle and the drop; the left follows the drop.
+    const a = CROUCH.knee * show.crouch;
+    const drop = crouchLeg.R.y * (1 - Math.cos(a)) + crouchLeg.R.x * Math.sin(a);
+    const b = crouchFold(crouchLeg.L, drop);
+    f.aim('legUR', 0, 0, 1, a);
+    f.aim('legLR', 0, 0, 1, -2 * a);
+    f.aim('legUL', 0, 0, 1, b);
+    f.aim('legLL', 0, 0, 1, -2 * b);
+    // Three joints and not one, weighted up the spine, which is the shape the
+    // shimmy's bend already uses — see the note over `bow` in the hop.
+    const bow = CROUCH.bow * show.crouch;
+    f.aim('spine01', 0, 0, -1, bow * 0.45);
+    f.aim('spine02', 0, 0, -1, bow * 0.33);
+    f.aim('spine03', 0, 0, -1, bow * 0.22);
+    f.aim('neck', 0, 0, -1, CROUCH.chin * show.crouch);
+    show.duck = drop;
+  }
+
+  /**
+   * HER RIGHT HAND ON THE BLADE, FOR AS LONG AS IT IS CUTTING.
+   *
+   * Misha, 18 Sep 2026: the props were animating themselves on the table while
+   * she stood at the mark and watched, which reads from the doorway and is
+   * nothing at all close up.
+   *
+   * The same two-bone solver the riders, the hug and the cone use, and the one
+   * thing that is different about this call site is the frame: every other
+   * goal in this file is a point on her own body and this one is an object
+   * standing on a table thirty centimetres away in WORLD metres. `worldToLocal`
+   * is the whole of the conversion and getting it wrong is silent — the arm
+   * still solves, to a point two kilometres away, and the elbow simply locks.
+   *
+   * The rest pose is taken ONCE, on the frame the reach starts, and held —
+   * which is what the hug and the cone do, and for a reason that matters more
+   * here. `aim` composes in FIGURE space, so the rotation that takes the upper
+   * arm from its rest direction to the goal is only right if that rest
+   * direction is the one the bone is actually starting from, and the bow above
+   * turns it. Hence the gap in the two ramps: the crouch is asked for from
+   * u = 0.02 and this one does not start until u = 0.25, 0.62 s of clock
+   * later, by which point the crouch is 90% of the way in. The 10% that is
+   * left is a shoulder still creeping down after the rest was taken, and it
+   * costs at most 6 mm at the hand — measured across the whole cut, the wrist
+   * holds 0.103 to 0.109 m off the blade against a target of 0.109.
+   *
+   * The goal is damped in WORLD space rather than in hers, so that it is
+   * immune to her own settling onto the mark, and slowly enough to show:
+   * `cokeSet` snaps the blade 27 mm back along the plate and 11 mm across it
+   * to start the next line, and a hand that snapped with it would be a hand
+   * that teleports. At 9 a second the sweep itself lags 3 mm, which is
+   * nothing, and the jump between lines becomes a quarter of a second of her
+   * carrying the blade back — measured at the grip point, 21 mm off the steel
+   * down a line and 62 mm at the worst of the four changeovers.
+   */
+  const COKE_HAND = {
+    // How far over the blade the wrist bone rides. The hand is rigid and its
+    // grip point sits 0.088 m off the wrist on this rig (see PALM, measured
+    // for the bottle), so with the wrist turned to point that grip at the
+    // steel this leaves it 21 mm clear — a hand on a blade and not through it.
+    lift: 0.105,
+    // And a shade back towards her, so the forearm is not a plumb line.
+    back: 0.028,
+    follow: 9.0,
+  };
+  const _ckGoal = new THREE.Vector3(), _ckPole = new THREE.Vector3();
+  const _ckFwd = new THREE.Vector3(), _ckAt = new THREE.Vector3();
+  const _ckTo = new THREE.Vector3(), _ckPalm = new THREE.Vector3();
+  const _ckQa = new THREE.Quaternion(), _ckQb = new THREE.Quaternion();
+  const _ckID = new THREE.Quaternion();
+  let cokeArm = null;
+  function cokeReach(f, dt, free) {
+    const on = free && show.phase === 'coke';
+    const u = on ? (show.cokeU || 0) : 0;
+    // The first line starts at 0.25 of the scrub — `cokeSet` gives the pour
+    // the first quarter — and the fourth ends at 1.
+    const want = on ? sat((u - 0.25) / 0.05) * sat((0.99 - u) / 0.05) : 0;
+    show.cutAt = damp(show.cutAt || 0, want, 4.5, dt);
+    if (show.cutAt < 0.004) {
+      // Nothing else in this file clears an arm aim every frame, so this is
+      // the only thing that ever hands the chain back to the clip.
+      if (cokeArm) {
+        f.aim('armUR', 0, 1, 0, 0);
+        f.aim('armLR', 0, 1, 0, 0);
+        f.aim('handR', 0, 1, 0, 0);
+        cokeArm = null;
+      }
+      show.cutAt = 0;
+      return;
+    }
+    if (!cokeBladeAt(_ckBlade)) return;
+    if (!cokeArm) {
+      const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'),
+        iW = f.boneIndex('handR');
+      if (iS < 0 || iE < 0 || iW < 0) return;
+      cokeArm = {
+        S: f.boneAt(iS, new THREE.Vector3()),
+        E: f.boneAt(iE, new THREE.Vector3()),
+        W: f.boneAt(iW, new THREE.Vector3()),
+        // Where her grip point sits relative to the wrist bone, in figure
+        // space, before anything has been done to the arm. `PALM` is measured
+        // in the BIND pose — it is the bottle's own number — so it has to come
+        // through `boneTurn`, which is how far the clip has turned the wrist
+        // since then. Everything the solve does to the chain afterwards then
+        // turns this vector with it.
+        P: PALM.clone().applyQuaternion(f.boneTurn(iW, new THREE.Quaternion())),
+      };
+      _ckAt.copy(_ckBlade);
+    }
+    _ckAt.lerp(_ckBlade, 1 - Math.exp(-COKE_HAND.follow * Math.max(dt, 0)));
+    // World metres all the way to the conversion, so that neither offset has
+    // to know what this mesh is scaled by.
+    _ckFwd.set(1, 0, 0).transformDirection(f.mesh.matrixWorld);
+    _ckGoal.copy(_ckAt);
+    _ckGoal.y += COKE_HAND.lift;
+    _ckGoal.addScaledVector(_ckFwd, -COKE_HAND.back);
+    f.mesh.worldToLocal(_ckGoal);
+    _ckGoal.lerpVectors(cokeArm.W, _ckGoal, show.cutAt);
+    // The blade itself in her frame as well, for the wrist below. Converted
+    // rather than offset, because the two conversions must be the same one.
+    _ckTo.copy(_ckAt);
+    f.mesh.worldToLocal(_ckTo);
+    // The elbow out to her own side and a little behind her, which is the only
+    // place it can go on an arm reaching down at something in front of it.
+    // +z is her right on this rig — measured: `armUR` sits at z +0.179.
+    _ckPole.set(-0.45, 0.10, 1).normalize();
+    _ckQa.copy(wheelLimb(f, 'armUR', 'armLR', cokeArm.S, cokeArm.E, cokeArm.W,
+      _ckGoal, _ckPole));
+    // ── AND THE WRIST, WHICH IS THE DIFFERENCE BETWEEN HOLDING IT AND
+    //    HAVING A HAND NEAR IT ──────────────────────────────────────────
+    //
+    // The solve puts the wrist BONE where it was asked to and says nothing
+    // about which way the hand is pointing, and the hand is rigid. Measured
+    // with only the arm solved: the wrist landed 106 mm from the blade, which
+    // is the target, and her grip point landed 109 mm from it — the palm
+    // facing off across the table, a hand resting at the rim of the plate.
+    //
+    // So the hand is turned as well: take the grip offset the chain has just
+    // carried, and rotate it on to the line from the wrist to the blade. The
+    // shortest rotation between two directions is the one `setFromUnitVectors`
+    // gives, which is also the one with the least twist in the wrist — nobody
+    // is asking for a correct forearm here, only for a hand that is holding
+    // something.
+    _ckPalm.copy(cokeArm.P).applyQuaternion(_ckQa);
+    _ckTo.sub(_ckGoal);
+    if (_ckPalm.lengthSq() > 1e-8 && _ckTo.lengthSq() > 1e-8) {
+      _ckQb.setFromUnitVectors(_ckPalm.normalize(), _ckTo.normalize());
+      // Eased with everything else, or the wrist snaps round on the frame the
+      // reach starts while the arm is still on its way. Into `_ckQa`, which is
+      // spent by now, and NOT back into `_ckQb`: `slerpQuaternions` copies the
+      // first argument into `this` before it reads the second, so a quaternion
+      // slerped into itself is a quaternion thrown away.
+      armAimQ(f, 'handR', _ckQa.slerpQuaternions(_ckID, _ckQb, show.cutAt));
+    }
   }
 
   function looseHairGroup() {
@@ -44141,6 +44467,34 @@ async function buildJadrija(scene) {
     /** Scrub what is on the plate, 0 to 1 — see COKE. */
     coke: (u = 1) => cokeSet(u),
     plate: () => (kit && kit.plate ? kit.plate.slice() : null),
+    /**
+     * Where the blade is, where her hand got to, and the gap — world metres.
+     *
+     * The arm is solved to a goal that is converted out of world space into
+     * hers, and a conversion that is wrong still solves: the elbow locks, the
+     * hand goes somewhere confident, and every probe reports a success. So the
+     * number is published. `palm` is the grip point of the hand — the same
+     * `PALM` the bottle is held by — which is the thing that is supposed to be
+     * on the steel; `wrist` is the bone the solver actually aims.
+     */
+    cokeHand: () => {
+      const b = new THREE.Vector3();
+      if (!skinFig || !cokeBladeAt(b)) return null;
+      const i = skinFig.boneIndex('handR');
+      if (i < 0) return null;
+      const w = new THREE.Vector3(), q = new THREE.Quaternion(),
+        p = new THREE.Vector3();
+      skinFig.mesh.updateMatrixWorld();
+      skinFig.boneAt(i, w).applyMatrix4(skinFig.mesh.matrixWorld);
+      skinFig.boneTurn(i, q);
+      q.premultiply(skinFig.mesh.quaternion);
+      p.copy(PALM).applyQuaternion(q).add(w);
+      const r3 = (v) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+      return { u: +(show.cokeU || 0).toFixed(3), at: +(show.cutAt || 0).toFixed(3),
+        crouch: +(show.crouch || 0).toFixed(3), duck: +(show.duck || 0).toFixed(3),
+        blade: r3(b), wrist: r3(w), palm: r3(p),
+        dWrist: +w.distanceTo(b).toFixed(3), dPalm: +p.distanceTo(b).toFixed(3) };
+    },
     /** Hair out of the tail, or back into it. It stays either way. */
     hair: (on = true) => hairDown(on !== false),
     /**

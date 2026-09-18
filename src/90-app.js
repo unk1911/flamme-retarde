@@ -8245,6 +8245,8 @@ window.__fr = {
     hair: (on) => (jadrija && jadrija.hair ? jadrija.hair(on) : null),
     coke: (u) => (jadrija && jadrija.coke ? jadrija.coke(u) : null),
     plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
+    /** Blade, hand, and the gap between them — see `cokeReach`. */
+    cokeHand: () => (jadrija && jadrija.cokeHand ? jadrija.cokeHand() : null),
     /** What she saw on the last recon, and what she brought back. */
     seen: () => (jadrija ? jadrija.seen() : null),
     told: () => (jadrija ? jadrija.told() : null),
