@@ -38280,22 +38280,39 @@ async function buildJadrija(scene) {
     const up = new THREE.Vector3(0, 0, 1);
     const tan = new THREE.Vector3(), nx = new THREE.Vector3(), ny = new THREE.Vector3();
     const pt = new THREE.Vector3();
+    // `getPointAt` and not `getPoint`: the arc-length ones, so that `u` is a
+    // fraction of the LENGTH of the curve and not of its parameter. A
+    // Catmull-Rom's parameter runs fast through a tight bend and slow through
+    // a straight, and a radius table written against it is a radius table
+    // written against nothing.
+    const L = Math.max(1e-6, curve.getLength());
+    const h = 0.5 / rings;
     for (let i = 0; i <= rings; i++) {
       const u = i / rings;
-      curve.getPoint(u, pt);
-      curve.getTangent(u, tan).normalize();
+      curve.getPointAt(u, pt);
+      curve.getTangentAt(u, tan).normalize();
       nx.crossVectors(tan, up);
       if (nx.lengthSq() < 1e-6) nx.set(1, 0, 0);
       nx.normalize();
       ny.crossVectors(tan, nx).normalize();
       const r = radiusAt(u);
+      // How fast the radius is changing ALONG THE SURFACE, which is what
+      // decides where the surface faces. A purely radial normal is right for
+      // a tube and wrong for anything with a waist: the blunt end of an egg
+      // turns over completely, and lit as though it still faced sideways it
+      // reads as a dark rim rather than as a round end.
+      const ua = Math.max(0, u - h), ub = Math.min(1, u + h);
+      const dr = (radiusAt(ub) - radiusAt(ua)) / (L * Math.max(1e-6, ub - ua));
+      const k = 1 / Math.sqrt(1 + dr * dr);
       for (let j = 0; j < sides; j++) {
         const a = (j / sides) * Math.PI * 2;
         const cx = Math.cos(a), cy = Math.sin(a);
         pos.push(pt.x + (nx.x * cx + ny.x * cy) * r,
           pt.y + (nx.y * cx + ny.y * cy) * r,
           pt.z + (nx.z * cx + ny.z * cy) * r);
-        nrm.push(nx.x * cx + ny.x * cy, nx.y * cx + ny.y * cy, nx.z * cx + ny.z * cy);
+        nrm.push(((nx.x * cx + ny.x * cy) - tan.x * dr) * k,
+          ((nx.y * cx + ny.y * cy) - tan.y * dr) * k,
+          ((nx.z * cx + ny.z * cy) - tan.z * dr) * k);
       }
     }
     for (let i = 0; i < rings; i++) {
@@ -38312,45 +38329,73 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * The toy, as the photograph Misha sent rather than as a box.
+   * The toy, as the DIMENSIONED photograph rather than as a box.
    *
-   * *"but that doesn't look like lovense. this is lovens"*, with a picture of
-   * a Lush 3: one piece of silicone in a hot magenta, a fat ovoid at one end
-   * and a long tail curving back under it, the two nearly touching. It is 45
-   * mm across the egg and about 110 mm end to end with the curve in it.
+   * Misha, 18 Sep 2026: *"but that doesn't look like lovense. this is
+   * lovens"*, and then, of the first attempt, *"the shape of it not exactly
+   * right"* — with the spec drawing. So this is off numbers and not off an
+   * impression:
    *
-   * ONE PIECE AND NOT TWO, which is what the shape is about: the egg does not
-   * sit on a stalk, it swells out of it. So it is one loft along one curve
-   * with the radius doing all the work — fat at the head, pinched at the
-   * waist, and tapering to nothing at the tail.
+   *     96 mm  overall width          76 mm  the egg, end to end
+   *     75 mm  overall height         37 mm  the egg, through the fat part
+   *
+   * WHAT THE FIRST CUT GOT WRONG was the topology, not the profile. I built a
+   * short hook — an egg with a tail curling back under it. The real thing is
+   * a big OPEN LOOP: the arm leaves the slim end of the egg, swings down and
+   * round the far side in a U, comes back along the top and ends above the
+   * egg's fat end, the two nearly touching. The egg is the lower right of the
+   * loop and the arm is all the rest of it, and it is one piece throughout —
+   * the egg does not sit on a stalk, it swells out of it.
+   *
+   * So: sixteen control points traced off the drawing, in metres, in the x-y
+   * plane, about the middle of its own bounding box; and a radius table
+   * against ARC LENGTH from the arm's tip (u = 0) to the egg's blunt end
+   * (u = 1). The two ends are round rather than pointed, which the table does
+   * by turning the radius over rather than running it into the axis.
    *
    * No lettering: the wordmark is on the real one and would be mine here.
    */
   function lovenseMesh() {
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.030, 0.021, 0),
-      new THREE.Vector3(0.004, 0.026, 0),
-      new THREE.Vector3(0.030, 0.019, 0),
-      new THREE.Vector3(0.043, 0.004, 0),
-      new THREE.Vector3(0.036, -0.012, 0),
-      new THREE.Vector3(0.008, -0.019, 0),
-      new THREE.Vector3(-0.028, -0.020, 0),
-      new THREE.Vector3(-0.055, -0.016, 0),
-    ]);
-    const geo = loftAlong(curve, 44, 10, (u) => {
-      // The egg: a fat teardrop over the first third, widest a third of the
-      // way in, then the waist and the tail.
-      if (u < 0.34) {
-        const k = u / 0.34;
-        return 0.0075 + 0.0145 * Math.sin(Math.PI * (0.12 + 0.88 * k));
+    const P = [
+      [0.0473, 0.0211], [0.0316, 0.0283], [0.0172, 0.0337], [0.0012, 0.0363],
+      [-0.0147, 0.0356], [-0.0285, 0.0304], [-0.0397, 0.0207], [-0.0449, 0.0069],
+      [-0.0443, -0.0062], [-0.0387, -0.0170], [-0.0256, -0.0276], [-0.0118, -0.0250],
+      [0.0027, -0.0221], [0.0172, -0.0189], [0.0316, -0.0170], [0.0461, -0.0160],
+    ];
+    const curve = new THREE.CatmullRomCurve3(
+      P.map(([x, y]) => new THREE.Vector3(x, y, 0)));
+    // Radius against arc length. The arm is 9 mm through at the button end,
+    // pinches to 6.8 in the middle of the long run and thickens a little into
+    // the bend; the egg starts to swell at 0.64, is 37 mm through at 0.92 and
+    // turns over into a blunt end. The last four rows are that end: a radius
+    // that walks down to nothing over the last 3 per cent is a cone, and the
+    // one thing the fat end of an egg is not is a cone.
+    const R = [
+      [0.000, 0.0000], [0.010, 0.0026], [0.022, 0.0040], [0.035, 0.0047],
+      [0.090, 0.0046], [0.180, 0.0039], [0.300, 0.0034], [0.440, 0.0036],
+      [0.560, 0.0041], [0.640, 0.0054], [0.690, 0.0076], [0.740, 0.0102],
+      [0.790, 0.0131], [0.840, 0.0163], [0.880, 0.0181], [0.915, 0.0185],
+      [0.945, 0.0172], [0.968, 0.0143], [0.986, 0.0093], [1.000, 0.0000],
+    ];
+    const radiusAt = (u) => {
+      for (let i = 1; i < R.length; i++) {
+        if (u <= R[i][0]) {
+          const k = (u - R[i - 1][0]) / (R[i][0] - R[i - 1][0]);
+          return R[i - 1][1] + (R[i][1] - R[i - 1][1]) * k;
+        }
       }
-      const k = (u - 0.34) / 0.66;
-      return 0.0072 * (1 - k) + 0.0016;
-    });
-    const skin = solidMaterial(new THREE.Color(0.855, 0.075, 0.420),
+      return 0;
+    };
+    // 96 rings because the two ends turn over inside three per cent of the
+    // length, and 16 sides because the egg is 37 mm through and a 12-gon on
+    // that is a 9 mm facet at arm's length. 3072 triangles, once, for the one
+    // object in the bag with a shape.
+    const geo = loftAlong(curve, 96, 16, radiusAt);
+    const skin = solidMaterial(new THREE.Color(0.910, 0.105, 0.450),
       { spec: 0.75, specPower: 70, vcol: false });
     const m = new THREE.Mesh(geo, skin);
-    // Two buttons on the tail, pale against the magenta.
+    // Two buttons and a light on the flat of the arm, near the tip, where the
+    // drawing has them.
     const btn = solidMaterial(new THREE.Color(0.960, 0.700, 0.820),
       { spec: 0.50, specPower: 50, vcol: false });
     // AND ONE OF THEM IS A LIGHT. Misha, 18 Sep 2026: *"do the lights light up
@@ -38363,23 +38408,26 @@ async function buildJadrija(scene) {
     // is off is a decal. `signalTick` writes `uEmissive` while it buzzes.
     const led = solidMaterial(new THREE.Color(1.000, 0.620, 0.880),
       { spec: 0.60, specPower: 60, vcol: false, emissive: 0 });
+    const at = new THREE.Vector3();
+    for (const [u, rad, lit] of [[0.058, 0.0036, true], [0.092, 0.0024, false],
+      [0.124, 0.0024, false]]) {
+      curve.getPointAt(u, at);
+      const b = new THREE.Mesh(
+        new THREE.CylinderGeometry(rad, rad, 0.0016, lit ? 12 : 8),
+        lit ? led : btn);
+      b.rotation.x = Math.PI / 2;
+      b.position.set(at.x, at.y, radiusAt(u) * 0.86);
+      m.add(b);
+    }
+    m.userData.led = led;
     // AND IT LIES DOWN. The curve is drawn in the x-y plane, so on a table it
     // has to be tipped a quarter turn about x or it stands on its edge like a
     // hook — which is what the first photograph showed.
     m.userData.lay = -Math.PI / 2;
-    // And on its side it is 22 mm through the fattest part of the egg, so it
-    // rests 22 mm above whatever it was put down on — see `sit` in `placeIt`.
-    m.userData.sit = 0.022;
-    for (const dx of [-0.030, -0.018]) {
-      const lit = dx === -0.030;
-      const b = new THREE.Mesh(new THREE.CylinderGeometry(
-        lit ? 0.0044 : 0.0034, lit ? 0.0044 : 0.0034, 0.002, lit ? 10 : 8),
-      lit ? led : btn);
-      b.rotation.x = Math.PI / 2;
-      b.position.set(dx, -0.0205, 0.0055);
-      m.add(b);
-    }
-    m.userData.led = led;
+    // On its side it is 18.5 mm through the fattest part of the egg, so it
+    // rests that far above whatever it was put down on — see `sit` in
+    // `placeIt`.
+    m.userData.sit = 0.0185;
     return m;
   }
 

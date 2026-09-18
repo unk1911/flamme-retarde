@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.416.1] — 2026-09-18
+
+### the shape, off the drawing this time
+
+**"the shape of it not exactly right"**, with the dimensioned page: 96 mm
+across, 75 mm tall, the egg 76 long and 37 through.
+
+What the first cut got wrong was the TOPOLOGY, not the profile — and no amount
+of adjusting the profile was going to find it. I had built a short hook: an egg
+with a tail curling back under it. The real thing is a big open loop. The arm
+leaves the slim end of the egg, swings down and round the far side in a U,
+comes back along the top and ends above the egg's fat end with the two nearly
+touching; the egg is the lower right of the loop and the arm is all the rest of
+it. Sixteen control points traced off the drawing and a radius table against
+arc length, and the mesh now measures **96.5 x 76.5 x 36.9 mm** against the
+drawing's 96 x 75 x 37.
+
+Two things in `loftAlong` had to be right for a table like that to mean
+anything. It reads the curve with `getPointAt` rather than `getPoint`, so `u`
+is a fraction of LENGTH and not of parameter — a Catmull-Rom's parameter runs
+fast through a tight bend and slow through a straight, and a radius table
+written against it is written against nothing. And the normal now leans by the
+rate the radius is changing along the surface, because a purely radial normal
+is right for a tube and wrong for anything with a waist: the blunt end of an
+egg turns over completely, and lit as though it still faced sideways it reads
+as a dark rim instead of a round end.
+
+The light moved off the very tip to where the drawing has it, with the two
+plain buttons behind it.
+
 ## [1.416.0] — 2026-09-18
 
 ### it is one piece of silicone, and the table it lies on
