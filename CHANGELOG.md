@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.411.0] — 2026-09-17
+
+### the satchel
+
+**"implement an inventory of stuff that i'm carrying, so like when i buy
+cigarettes, beer, whatever, i have a small satchel, and i store it in there.
+for now just implement it with ability to add ting sto it and remove them"**.
+
+`'` opens it: what you are carrying, and what is left of your twenty euros.
+The storage and the two operations only — `satchelPut`, `satchelTake`,
+`satchelHas`, `satchelList`, and `__fr.satchel` for a probe. Taking the
+ballerina out and giving it to her is the next piece, and this is the bag it
+comes out of.
+
+THERE IS ONE BAG. `POCKET.bought` has been it since the counters opened — the
+shops write into it and the beer takes itself back out of it — so the satchel
+did not become a second one: `SATCHEL.have` is the store and `POCKET.bought` is
+a view of it, keyed by the labels the shops already use. `buyAt` and
+61-beer.js did not change a line, and 33 assertions replay both of them
+against the view. Fifteen items in one table, every name already in the game
+and no brand on any of it.
+
+`'` because the board is full: the physical key beside the semicolon that took
+the ice cream, and not Tab, which is how a keyboard reaches the sign-in field.
+The list sits one layer above the pause card, because it opens while the world
+is stopped and the pause blur had turned every word in it to a smudge.
+
+Measured on the merged build: empty, then two things bought at the TISAK
+(20.00 € → 13.50 €) and both in the bag, `'` up, `take('newspaper')` → 1 and
+the view down to one item, `put('a bottle of water', 2)` → 2 under the right
+key. Three languages.
+
 ## [1.410.0] — 2026-09-17 (baye 1.16.0)
 
 ### legs down, legs up, and flat on her front

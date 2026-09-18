@@ -335,6 +335,27 @@ addEventListener('keydown', (e) => {
     if (e.code === 'Escape') { e.preventDefault(); toggleSignIn(false); }
     return;
   }
+  // ' — the satchel: what you are carrying. See src/62-satchel.js.
+  //
+  // THE APOSTROPHE BECAUSE THERE IS NOTHING ELSE LEFT, and the note over the
+  // lick further down this handler is where that was established: all twenty-six
+  // letters are bound in this handler, the comma and the full stop are the
+  // counter menu, the slash with shift on it is the help sheet, the digits are
+  // the two back doors, and the semicolon went to the ice cream. The
+  // apostrophe is the physical key next to that semicolon — `e.code`, so it is
+  // the same key under the thumb whatever the layout prints on it — and it is
+  // the last mark in reach of a hand that is on WASD with the other one.
+  // Verified by grep before taking it: 'Quote' appeared nowhere in src/.
+  //
+  // NOT TAB, which is what a game would normally use. Tab is how somebody
+  // reaches the sign-in field and the settings sliders with a keyboard, and
+  // swallowing it here would take that away to save a keystroke.
+  //
+  // Above the pause guard, with the help sheet and the four back doors: a
+  // player who has stopped the world is exactly the player who wants to know
+  // what is in the bag, and it is a read-out — there is nothing in it that
+  // could act on a frozen simulation.
+  if (e.code === 'Quote') { e.preventDefault(); satchelToggle(); return; }
   if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
   // P and Escape stop the world, and Escape can be pressed twice for the
   // silent version of it — see `escPause`, which owns that decision. Every
@@ -1527,6 +1548,7 @@ const HELP = [
     ['ESC ESC', 'help.k.silent'],
     ['N', 'help.k.voice'],
     ['I', 'help.k.ears'],
+    ["'", 'help.k.satchel'],
     ['M', 'help.k.settings'],
     ['H', 'help.k.hud'],
     ['L', 'help.k.clip'],
@@ -3184,8 +3206,13 @@ let flyCamT = -1;
  * is a session and not a save: nothing here is written down anywhere, so a
  * reload is a fresh twenty, and that is the same trade every other bit of
  * state in this game makes.
+ *
+ * AND `bought` IS THE SATCHEL, seen from out here. It was a plain object and
+ * it is now a view onto the one bag in src/62-satchel.js — same reads, same
+ * writes, same names, and `buyAt` below and `drinkBeer` in 61-beer.js did not
+ * change a line for it. The whole argument is written over `satchelBought`.
  */
-const POCKET = { eur: 20.00, bought: {}, pick: 0 };
+const POCKET = { eur: 20.00, bought: satchelBought(), pick: 0 };
 /** Which shot the fly cam is showing: `drop`, `dance` or `birthday`. */
 let flyCamMode = 'drop';
 /** Held by `__fr.ears.flyCam(t)`, for a scrub — the same switch as `swatHold`. */
@@ -9323,10 +9350,39 @@ window.__fr = {
       x == null ? camera.position.x : x, z == null ? camera.position.z : z),
     nearest: (sp, x, z) => trees.nearest(sp, x, z),
   },
-  /** What is on you and what you have bought — see POCKET. */
-  pocket: () => ({ eur: +POCKET.eur.toFixed(2), bought: POCKET.bought }),
+  /**
+   * What is on you and what you have bought — see POCKET.
+   *
+   * `bought` is a SNAPSHOT and not the live view: it is keyed by label, the
+   * way the shops write it, and spreading it here means a probe that reads
+   * this twice can compare the two. The live bag is `__fr.satchel`.
+   */
+  pocket: () => ({ eur: +POCKET.eur.toFixed(2), bought: { ...POCKET.bought } }),
   /** Buy by name, which is what the microphone does — see `buyAt`. */
   buy: (key) => buyAt(key || null),
+  /**
+   * The satchel — see src/62-satchel.js. Keyed by the shops' own keys
+   * (`beer`, `cigarettes`) and a label works just as well: both
+   * `__fr.satchel.put('beer')` and `__fr.satchel.put('a beer')` put a beer in.
+   *
+   *   put(key, n)    how many of it you now have
+   *   take(key, n)   how many actually came out — 0 if you had none
+   *   has(key)       how many you are carrying
+   *   list()         every row, in the order the panel shows them
+   *   show(v)        open or close the list; answers whether it is up
+   *
+   * No `clear()` on purpose: a handle that empties the bag is one mistyped
+   * line away from resetting the state a test is measuring.
+   */
+  satchel: {
+    put: (key, n) => satchelPut(key, n == null ? 1 : n),
+    take: (key, n) => satchelTake(key, n == null ? 1 : n),
+    has: (key) => satchelHas(key),
+    list: () => satchelList(),
+    count: () => satchelCount(),
+    show: (v) => satchelToggle(v),
+    open: () => satchelOpen(),
+  },
   /** A swig, and what the bottle is doing — see 61-beer.js. */
   drink: () => drinkBeer(),
   bottle: () => ({ out: beer.out, left: beer.left, swigging: beer.t >= 0,
