@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.409.1] — 2026-09-17
+
+### she stops walking out of the door she is already through
+
+**"in kabine when i say 'kiss me', she kisses, which is great, but then goes
+OUTSIDE the kabine, and comes back INSIDE kabine?"**
+
+Exactly what the code said to do. The hut takes her back whenever you are in
+it and she is not doing something the room owns, and that line set `leg = 0`
+whatever room she was standing in — and `come`'s first two waypoints are
+outside on the concrete, a stride and a half past the sill. So after anything
+the room does not own (a kiss, a hug, a pose) she walked out of the door she
+was already through and came back in through it.
+
+It is the same rule 1.404.0 put on the wine ask — enter from the leg she is
+actually on — and this line never learned it. `leg = sheIsIn() ? 2 : 0`.
+
+Measured: her `s` sampled every 60 ms from the kiss until she settled, lowest
+value 18.34 against a sill at 17.20. She does not cross it.
+
 ## [1.409.0] — 2026-09-17 (baye 1.15.0)
 
 ### the microphone is off, and you type

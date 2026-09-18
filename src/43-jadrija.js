@@ -35482,7 +35482,18 @@ async function buildJadrija(scene) {
     // three feet away from you.
     if (inside && !KABIN[show.phase] && !MUSIC[show.phase]
         && !OWN[show.phase] && !show.turned) {
-      show.leg = 0;
+      // AND FROM THE LEG SHE IS ACTUALLY ON, which is the same rule 1.404.0
+      // put on the wine ask and this line never learned.
+      //
+      // Misha, 17 Sep 2026: *"in kabine when i say 'kiss me', she kisses,
+      // which is great, but then goes OUTSIDE the kabine, and comes back
+      // INSIDE kabine?"*. Exactly what the code said to do: `come` has four
+      // waypoints, the first two are outside on the concrete, and this set
+      // `leg = 0` whatever room she was standing in. So every time the hut
+      // took her back — after a kiss, a hug, a pose, anything it does not own
+      // — she walked out of the door she was already through and came back in
+      // through it.
+      show.leg = sheIsIn() ? 2 : 0;
       go('come', 'walk', 0.34);
     }
 
