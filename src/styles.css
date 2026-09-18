@@ -766,6 +766,50 @@ html.touch #swim-hud { bottom: 7.4rem; }
 }
 #counter[hidden] { display: none; }
 
+/* What you are carrying — src/62-satchel.js. The ears panel's own type,
+   palette and box, because it is the same kind of thing: a small read-out in
+   the corner of the screen and not a feature panel with controls in it.
+
+   Left and vertically centred, which is the one strip of this screen nothing
+   owns — the reasoning is written out over the panel in 62-satchel.js. */
+#satchel {
+  position: fixed; left: 24px; top: 50%; transform: translateY(-50%);
+  /* 69, which is one above the pause card and one below the settings panel,
+     and the number is the whole of why: ' works while the world is stopped —
+     see the key in 90-app.js — and #pause (68) lays a 9 px backdrop blur over
+     everything under it. At the ears panel's 41 the box was still there while
+     paused and every word in it was a smudge. #panel already sits at 70 for
+     exactly this reason: the things you are meant to be able to read with the
+     game stopped have to be above the thing that stopped it.
+
+     Which also puts it over the threshold dip (62), and that is the right side
+     of the line #dip draws: it covers the world and the numbers over it, "and
+     not the menu you may have opened on top of both". This is a thing you
+     opened with a key and not a gauge, so it stays. */
+  z-index: 69; pointer-events: none;
+  width: min(22vw, 300px); max-width: 84vw;
+  font-family: var(--mono); font-size: .56rem; line-height: 1.7;
+  letter-spacing: .03em; color: #cfe0e6;
+  background: rgba(8, 14, 18, .62); border: 1px solid rgba(160, 200, 214, .22);
+  padding: .45rem .6rem;
+}
+#satchel[hidden] { display: none; }
+#satchel .sat-head { text-transform: uppercase; letter-spacing: .16em; color: #8fb3c0; }
+#satchel .sat-rule {
+  height: 1px; margin: .3rem 0 .35rem; background: rgba(160, 200, 214, .18);
+}
+#satchel .sat-row { display: flex; justify-content: space-between; gap: .8rem; }
+/* The count keeps its width and the name gives way, because the count is the
+   half you cannot guess. `min-width: 0` is what lets a flex child shrink at
+   all — without it the ellipsis never happens and a long name pushes the ×3
+   out of the box. */
+#satchel .sat-row span {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#satchel .sat-row b { flex: none; color: #f2e7d8; font-weight: 400; }
+#satchel .sat-empty { color: #7f96a0; }
+html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
+
 /* Ears — src/49-ears.js. What the microphone heard and what was done about it,
    bottom right over the fly cam's corner, in the subtitle's own type. Small and
    dim on purpose: it is a debug console Misha asked for, not a feature panel. */
