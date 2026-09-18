@@ -27512,6 +27512,55 @@ async function buildJadrija(scene) {
       // out from a half-width at the call site, because the cot has moved
       // once already when the hut went to two bays.
       cotEdge: [c0 + 0.07, cms],
+      /**
+       * AND THE OTHER LONG EDGE, WHICH IS THE ONE WITH A WALL BEHIND IT.
+       *
+       * Where she sits for `perch` — *"her back perched against the wall"* —
+       * and it cannot be flush, which is worth writing down because it looks
+       * like a bug and is the furniture: `c1` is dc + 1.90 and the boards of
+       * the side wall are at `K.t1` = dc + 2.05, so the cot stands 0.15 m off
+       * the wall it is against. A body sitting at the very edge of this
+       * mattress has its shoulders about 0.13 m from the plaster and there is
+       * nothing to be done about that from here.
+       *
+       * −0.15 rather than −0.05, and the 0.10 m is her own backside: the pose
+       * is solved about the pelvis and her glutes stand about 0.15 m behind
+       * it, so a pelvis on the edge is a woman sitting half off the bed.
+       */
+      cotWall: [c1 - 0.15, cms],
+      /**
+       * AND WHERE THE CURL GOES, WHICH IS NOT THE MIDDLE OF THE BED.
+       *
+       * `fetal` is built on SIDE_L and SIDE_L does not lie on its own root:
+       * probed in the game with her at `cotSpot`, the curl put her toes at
+       * t 428.820 and her under-hand at 428.664 against a mattress that ends
+       * at 428.412 and a wall whose boards are at 428.582 — her feet were
+       * 0.24 m INSIDE the plaster. The whole pose sits 0.45 m to one side of
+       * the mark, because the curl draws her knees up along the axis the roll
+       * left them on.
+       *
+       * Its footprint is only 0.584 m across a 0.660 m mattress, so it fits
+       * with 38 mm either side once it is centred, and −0.45 is what centres
+       * it. `case 'fetal'` eases her across during the roll rather than her
+       * being laid down here: on her back at this mark she would be a third
+       * of a metre off the inner edge of the bed.
+       */
+      cotCurl: [cm - 0.45, cms + 0.02],
+      /**
+       * And the patch of floor the handstand goes on — *"on the floor, against
+       * a wall"*.
+       *
+       * THE NEAR WALL AND NOT THE COT'S, and in the one gap along it: the
+       * tabouret with the plate on it is at s 18.20, the radio table at 19.90
+       * and the television at 22.10, which leaves the run from about 20.5 to
+       * 21.6 and nothing else. 21.05 is the middle of that.
+       *
+       * 0.38 m off the boards. `HOLD` in `special.shell` lets her stand 0.22 m
+       * from them, so this is inside what the walk will accept, and 0.38 is
+       * what "against a wall" is for a handstand: you kick up and your heels
+       * arrive at the plaster rather than a stride short of it.
+       */
+      handSpot: [K.t0 + 0.38, 21.05],
       // The ornamental plate: the middle of its well, and the height of the
       // flat floor inside it. The well is flat out to r = 0.050 and then
       // rises, so anything laid in it stays inside that.
@@ -32999,6 +33048,16 @@ async function buildJadrija(scene) {
      * is the number that says the difference without being forever.
      */
     bedFor: 420,
+    /**
+     * AND THE HANDSTAND, WHICH IS NOT A PLACE ANYBODY SETTLES.
+     *
+     * Every other held pose in this room is measured in minutes because the
+     * thing holding it is a mattress. This one is held by her shoulders: the
+     * wobble in HAND_STAND_B is a real correction, not decoration, and a
+     * woman who stays on her hands for seven minutes is not holding a
+     * handstand, she is furniture. Twenty-four seconds is a long one.
+     */
+    handFor: 24,
     // How far off the walls she is pulled before she goes down. A kneeling
     // woman is a 0.6 m footprint and a reclining one is 1.6 m of body laid out
     // BEHIND her, so a spot that was fine to kneel on can put her head through
@@ -33473,6 +33532,85 @@ async function buildJadrija(scene) {
     // is 0.12 m past the head bone and ends up over the far edge of the
     // pillow, which reads as a woman sleeping off the end of her own bed.
     return [kit.cot[0], kit.cot[1] + 0.12];
+  }
+
+  /**
+   * Up on the mattress, or back down off it, over a few tenths.
+   *
+   * `show.mat` is the trampoline's own term — what she is standing on that is
+   * not the ground — and a cot is the same question with a smaller answer.
+   * Held every frame rather than set once, because the lift is eased and any
+   * of these phases can be the one the easing finishes in.
+   *
+   * A function and not four lines copied again: it was six phases before the
+   * sitting family and it is eighteen after, and eighteen copies of a term
+   * read off `kit.cot` is eighteen places for the next bed to be missed.
+   */
+  function matTick(dt) {
+    if (!show.onBed || !kit || !kit.cot) return;
+    show.mat = damp(show.mat || 0,
+      Math.max(0, kit.cot[2] - toWorld(show.t, show.s)[1]), 3.4, dt);
+  }
+
+  /**
+   * The way out of a held pose on the cot: the get-up latch, and the clock.
+   *
+   * Both roads end in `cradle` and that is the whole of why this is one
+   * function. The sitting clips all open on CRADLE — see the block over them
+   * in tools/blender/human_mh.py — so the cradle is the one pose every one of
+   * them has in common with her, and crossfading back to it is the way in run
+   * backwards through a pose rather than through her own body.
+   *
+   * `bedFor` is seven minutes and `cradleAsked` is two and a half, which is
+   * the same pair `flatheld` and the sides already use: a bed is a place
+   * somebody settles and a floor is not.
+   */
+  /**
+   * The yawn, laid over whatever she is doing, and then taken off again.
+   *
+   * *"makes her take her hand to her mouth to yawn"*, and it *"should play
+   * over whatever she is doing and return her to it, not replace her state"* —
+   * so this is `fig.over` and not a phase. Her legs, her place, her clock and
+   * her pose are untouched; ten bones of her upper body come off the `yawn`
+   * clip for two and a half seconds and then stop.
+   *
+   * RAMPED AT BOTH ENDS, because a jaw that opens between two frames is a
+   * glitch rather than a breath — and the ramp is doubly safe here, since the
+   * clip's own first and last keys are IDLE_A, so at the moments the weight is
+   * nought the overlay is asking for nothing much anyway.
+   *
+   * ON ITS OWN CLOCK. `update` in 41-skin.js only advances `overT` while the
+   * weight is above zero, which is right for the Bucketeer's port de bras —
+   * she holds it at weight 1 for a whole walk — and wrong for a one-shot armed
+   * at nought: it would sit on its first frame forever. So the clock is
+   * written here from `show.yawn`, and `overT` is the overlay's copy of it.
+   */
+  function yawnTick(f, dt) {
+    if (show.yawn == null) return;
+    show.yawn += dt;
+    const t = show.yawn;
+    const T = YAWN_AT.up + YAWN_AT.hold + YAWN_AT.down;
+    const u = t < YAWN_AT.up ? t / YAWN_AT.up
+      : t < YAWN_AT.up + YAWN_AT.hold ? 1
+        : 1 - (t - YAWN_AT.up - YAWN_AT.hold) / YAWN_AT.down;
+    const e = sat(u);
+    f.state.overW = e * e * (3 - 2 * e);
+    f.state.overT = t;
+    if (t > T) {
+      show.yawn = null;
+      f.over(null);
+    }
+  }
+
+  function poseOut(dt, go) {
+    // `getUp` is NOT cleared on the way through, so that `cradle` passes it on
+    // to `situp` and `kept` finishes the request — see the note in `cradle`.
+    if (show.getUp) { go('cradle', 'cradle', 0.44); return true; }
+    if (show.tmr > (show.onBed ? SHOW.bedFor : SHOW.cradleAsked)) {
+      go('cradle', 'cradle', 0.44);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -34608,6 +34746,17 @@ async function buildJadrija(scene) {
     // which is the same number the heart gets, and it is on her the whole way
     // down rather than arriving at the bottom.
     recline: 0.95, cradle: 1.00, situp: 0.85,
+    // The sitting family, baked 18 Sep — see SIT in tools/blender/human_mh.py.
+    // Sitting up on the bed is the one where she is looking straight at you,
+    // so it gets the wide one; the two she holds with her eyes shut get less.
+    sit: 0.90, sitHeld: 0.95, bedSit: 0.85, bedKneel: 0.90,
+    lotus: 0.70, lotusHeld: 0.75, perch: 0.85, perchHeld: 0.90,
+    // Curled up is the one pose in the room that is not done AT somebody.
+    fetal: 0.45, fetalHeld: 0.40,
+    // And the two that are hard work. A handstand held with the widest smile
+    // in the building is a woman who is not holding a handstand.
+    upside: 0.60, upsideHeld: 0.55,
+    handGo: 0.70, handstand: 0.65, handHeld: 0.55,
     // Face down: the roll, and the breath after it. Baked 17 Sep — see PRONE
     // in tools/blender/human_mh.py, which is where the argument for it being
     // a clip rather than a runtime rotation is written down.
@@ -34636,7 +34785,65 @@ async function buildJadrija(scene) {
    * same again on her front.
    */
   const LYING = { recline: 1, cradle: 1, flat: 1, flatheld: 1,
-    flatEdge: 1, edgeHeld: 1, sideL: 1, sideR: 1 };
+    flatEdge: 1, edgeHeld: 1, sideL: 1, sideR: 1,
+    // AND CURLED UP, which is SIDE_L with the knees drawn in — see FETAL in
+    // tools/blender/human_mh.py. It belongs on this list and the rest of the
+    // sitting family does not: she is lying on her side in it, so "arms out"
+    // and "legs down" mean the same thing they mean in the sides it is built
+    // from, and "roll onto your back" is the same move.
+    fetal: 1, fetalHeld: 1 };
+
+  /**
+   * AND THE ONES WHERE SHE IS ON THE COT AND NOT LYING ON IT.
+   *
+   * Baked 18 Sep — see SIT in tools/blender/human_mh.py and the note over the
+   * sitting clips, which is where the argument for each pose being two clips
+   * is written down. Every one of them comes UP through RECLINE_B, which is
+   * her flat on her back, so the way in is the way in to everything else on
+   * this mattress: `cradle` is the hinge and `show.poseWant` is the latch that
+   * carries the request across it.
+   *
+   * A SECOND LIST AND NOT MORE ENTRIES IN `LYING`, because the two lists gate
+   * different things. `LYING` is about being horizontal: "legs down" and "arms
+   * out wide" are adjustments to a supine pose and there is nothing in a
+   * cross-legged sit for either of them to mean, and `legsFlat` and `armsWide`
+   * hang off that list directly. This one is about the ROAD OUT — she is on
+   * that cot in some arrangement, and anything asked of her that needs her on
+   * her feet starts by undoing it.
+   *
+   * `fetal` and `fetalHeld` are on BOTH, which is not a mistake: she is lying
+   * on her side in them, so the supine latches mean what they mean in the
+   * `sideL` they are built from, and the road out is still this one.
+   */
+  const POSED = { sit: 1, sitHeld: 1, bedSit: 1, bedKneel: 1,
+    lotus: 1, lotusHeld: 1, perch: 1, perchHeld: 1,
+    upside: 1, upsideHeld: 1, fetal: 1, fetalHeld: 1 };
+
+  /**
+   * Down on that cot in any of them, which is the road-out test.
+   *
+   * EVERY `LYING[show.phase]` IN THE ASK DISPATCH IS THIS, and it has to be:
+   * a dozen branches down there ask "is she lying down" purely to decide
+   * whether to put a `situp` in front of what was asked for, and every one of
+   * them would have answered NO for a woman sitting cross-legged on the bed.
+   * MEASURED, before the change: asked to take her hair down out of
+   * `lotusHeld`, she went straight into the reach — no get-up, `show.mat`
+   * never cleared — and ended up standing in `dwell` 0.44 m in the air over
+   * the cot. The `notlying`-style tests in `askWhy` are a different question
+   * and stay on `LYING`.
+   */
+  const onCot = (p) => !!(LYING[p] || POSED[p]);
+
+  /**
+   * And on her hands on the floor, which is neither.
+   *
+   * Its own pair because the way out of it is neither a sit-up nor a get-up:
+   * `handstand` runs IDLE_A → CROUCH → LUNGE → HAND_STAND, so it is a
+   * one-shot from STANDING that holds its last frame, and the honest way back
+   * down is the same clip in reverse — which does not exist. `getup` from
+   * LUNGE is the nearest thing in the bank and that is what `rise` plays.
+   */
+  const HANDS = { handGo: 1, handstand: 1, handHeld: 1 };
 
   const KNEES = { submit: 1, kept: 1, creep: 1,
     // On her back she still drinks it — the mouth, the foam and what runs down
@@ -34719,7 +34926,14 @@ async function buildJadrija(scene) {
     // kneel, "lie down" is the next step; asked from the floor, "on the bed"
     // is a move; asked from either, the dances and the errands are her getting
     // up and going, which is what a person does when you change your mind.
-    kept: 1, cradle: 1, fours: 1, flatheld: 1, sideL: 1, sideR: 1 };
+    kept: 1, cradle: 1, fours: 1, flatheld: 1, sideL: 1, sideR: 1,
+    // AND THE SITTING FAMILY, for the same reason and more so: `bedFor` is
+    // seven minutes, so a held pose that cannot hear a request is seven
+    // minutes of her ignoring you. Only the HELD half of each pair — the
+    // once-clips are one to three seconds of her arriving somewhere and
+    // interrupting those is the glitch `ASKABLE` exists to avoid.
+    sitHeld: 1, bedKneel: 1, lotusHeld: 1, perchHeld: 1, fetalHeld: 1,
+    upsideHeld: 1, handHeld: 1 };
 
   /**
    * WHAT SHE CAN BE ASKED FOR. Every one of these is a number she already has
@@ -34823,6 +35037,47 @@ async function buildJadrija(scene) {
      */
     'flat.edge': 1,
     /**
+     * ── AND THE SITTING FAMILY, SIX MORE POSES ON THE SAME MATTRESS ────────
+     *
+     * Misha, 18 Sep 2026, in one run: *"fetal position"*, *"make her sit in
+     * lotus pose on the bed"*, *"sit up on the bed"* — *"makes her sit on the
+     * bed on her knees"* — *"upside down"*, *"wall perch"*, *"head stand"*,
+     * and a *"yawn"*.
+     *
+     * All seven are baked — see SIT and the clips under it in
+     * tools/blender/human_mh.py — and every one of them comes up through
+     * RECLINE_B, which is `flat.edge`'s road with one more key on the end of
+     * it: she is taken to the cot, laid on her back, and `cradle` sends her
+     * on. `show.poseWant` is the latch that carries the request across the
+     * sit-up, which is the mechanism `show.flatWant` already is.
+     *
+     * TWO NAMES FOR SITTING UP, and they are two requests. `sit.bed` is the
+     * baked SIT — legs out in front, hands planted behind her hips — and
+     * `sit.knees` is the pose he actually described, which needed no bake at
+     * all: `situp` already ends on KNEEL_BACK and `kept` already holds it, so
+     * "on her knees" is those two clips with the mattress left under her.
+     */
+    'sit.bed': 1, 'sit.knees': 1, lotus: 1, perch: 1, fetal: 1, upside: 1,
+    /**
+     * AND THE ONE THAT IS NOT ON THE BED. *"stand on her hands upside down,
+     * on the floor, against a wall, legs spread apart"* — so a mark on the
+     * floor by the near wall (see `kit.handSpot`) and a walk to it, because
+     * HAND_STAND is entered from a stand and there is no way into it from the
+     * cot that is not a woman getting off a bed backwards.
+     */
+    handstand: 1,
+    /**
+     * AND THE ONE THAT IS NOT A PLACE SHE GOES.
+     *
+     * *"makes her take her hand to her mouth to yawn"*, and *"should play over
+     * whatever she is doing and return her to it"* — which is a description of
+     * `fig.over`, the overlay written for the Bucketeer's port de bras, and
+     * not of a phase. So this is a LATCH like `legs.down` is: her phase does
+     * not change, her legs and her place are untouched, and ten bones of her
+     * upper body come off a second clip for two and a half seconds.
+     */
+    yawn: 1,
+    /**
      * And what goes on the ornamental plate. Misha, 18 Sep 2026: *"coke
      * command to have her pour white powder onto the ornamental plate and
      * make neat straight lines with a razor blade"*. See COKE: four objects
@@ -34871,6 +35126,62 @@ async function buildJadrija(scene) {
      * including the microphone. `askShow` splits it; nothing else has to know.
      */
     'fetch.cream': 1 };
+
+  /**
+   * THE SIX ON THE MATTRESS: the name you ask by, the clip that arrives and
+   * the clip that stays.
+   *
+   * A table and not six branches, because every one of them is the same three
+   * things — a precondition, `cradle`, and a pair of clips — and six copies of
+   * that is six places for the next one to be added wrong. The phase names ARE
+   * the clip names, which is the convention `flatEdge`/`edgeHeld` already
+   * keeps; the only pair where they differ is the kneel, whose two clips are
+   * `situp` and `kept` and already belong to somebody else.
+   */
+  const BED_POSE = {
+    'sit.bed': ['sit', 'sit', 'sitHeld', 'sitHeld'],
+    'sit.knees': ['bedSit', 'situp', 'bedKneel', 'kept'],
+    lotus: ['lotus', 'lotus', 'lotusHeld', 'lotusHeld'],
+    perch: ['perch', 'perch', 'perchHeld', 'perchHeld'],
+    fetal: ['fetal', 'fetal', 'fetalHeld', 'fetalHeld'],
+    upside: ['upside', 'upside', 'upsideHeld', 'upsideHeld'],
+  };
+  /**
+   * And the same table read from the other end: arriving phase → the pose it
+   * hands over to, and the clip that holds it.
+   *
+   * Built rather than typed, because a second copy of six pairs is a second
+   * place for the seventh to be added to only one of them.
+   */
+  const BED_NEXT = {};
+  for (const k of Object.keys(BED_POSE)) {
+    BED_NEXT[BED_POSE[k][0]] = [BED_POSE[k][2], BED_POSE[k][3]];
+  }
+
+  /**
+   * And the bones the yawn is laid over.
+   *
+   * THE CHAIN AND NOT THE SHOULDER, which is what `fig.over` is emphatic
+   * about: it does not include the children of what it is given, so naming
+   * `armUR` alone would turn her whole right arm to the yawn's shoulder angle
+   * while the elbow and the wrist kept whatever the pose she is in says. The
+   * yawn's hand is 0.13 m of fixed mesh past a wrist that is scored to
+   * 1.4 cm of her own mouth — see YAWN in tools/blender/human_mh.py — so
+   * every joint between the collarbone and the fingers has to come off the
+   * same clip.
+   *
+   * NO PELVIS AND NO SPINE BELOW `spine03`, deliberately, and that is what
+   * makes this safe in every pose rather than only standing: the yawn is
+   * authored off IDLE_A, so its lower spine is a standing woman's, and laying
+   * that over a body lying on a cot would lift her off it. What is here is her
+   * head going back, her jaw opening and her right hand coming up to cover it,
+   * which is the whole of what was asked for.
+   */
+  const YAWN_OVER = ['spine03', 'chest', 'neck', 'head', 'jaw',
+    'clavicleR', 'armUR', 'armLR', 'handR', 'thumbR'];
+
+  /** How the yawn is shaped: in, held, out — 2.40 s of clip, and it fits. */
+  const YAWN_AT = { up: 0.55, hold: 1.20, down: 0.65 };
 
   /**
    * ── WHAT HAS TO BE TRUE FIRST, AND WHAT IS ALREADY TRUE ────────────────
@@ -34996,6 +35307,43 @@ async function buildJadrija(scene) {
       if (!kit || !kit.cotEdge) return 'nobed';
       return null;
     }
+    if (BED_POSE[name]) {
+      // She is already in it — the arriving clip counts, because asking again
+      // while she is on her way there is asking for what is happening.
+      const p = BED_POSE[name];
+      if (show.phase === p[0] || show.phase === p[2]) return 'already';
+      // INDOORS, for `recline`'s reason and then some: every one of these is
+      // reached by laying her on her back first, and the only back she lies on
+      // out there is a public promenade.
+      if (!sheIsIn()) return 'outside';
+      // And there has to be a bed. All six are solved against the mattress —
+      // `SIT`'s hands are 13 mm off the surface they are planted on — and
+      // there is no second surface in this room at that height.
+      if (!kit || !kit.cot) return 'nobed';
+      return null;
+    }
+    if (name === 'handstand') {
+      if (HANDS[show.phase]) return 'already';
+      // Indoors, and for the wall rather than for modesty: *"against a
+      // wall"* is half the request, and the only walls she can get her heels
+      // to are in here.
+      if (!sheIsIn()) return 'outside';
+      if (!kit || !kit.handSpot) return 'nowall';
+      return null;
+    }
+    if (name === 'yawn') {
+      // ONE AT A TIME, because it is a latch on a clock and re-arming it
+      // half way through restarts a yawn she is in the middle of.
+      if (show.yawn != null) return 'yawning';
+      // AND NOT WHILE HER HANDS ARE HOLDING HER UP. The overlay takes her
+      // right arm off whatever it is doing, and in these four that arm is
+      // load-bearing: a woman on her hands who lifts one to her mouth and
+      // does not fall over is the one case where "over whatever she is
+      // doing" is the wrong answer.
+      if (HANDS[show.phase] || show.phase === 'fours' || show.phase === 'crawl'
+        || show.phase === 'upside' || show.phase === 'upsideHeld') return 'hands';
+      return null;
+    }
     if (name === 'flat') {
       if (show.phase === 'flatheld' || show.phase === 'flat') return 'already';
       // From her back, which is where the roll starts. Asked standing she is
@@ -35008,7 +35356,7 @@ async function buildJadrija(scene) {
       // And not off her back: `getup` is the way up from all fours and the
       // way down is `kneel` from standing, so the honest order from a recline
       // is to sit up first — which is what `rise` is for.
-      if (LYING[show.phase]) return 'lying';
+      if (onCot(show.phase)) return 'lying';
       return null;
     }
     if (name === 'rise') {
@@ -35017,8 +35365,12 @@ async function buildJadrija(scene) {
       // `fours` counts: it is a pose on the floor with `getup` as its exit,
       // and a get-up that refuses it leaves her down there for the whole
       // ninety-five seconds with no way out but the clock.
-      if (!KNEES[show.phase] && !LYING[show.phase]
-        && show.phase !== 'fours') return 'standing';
+      // `POSED` and `HANDS` count for the same reason `fours` does: the
+      // sitting family holds for `bedFor`, which is seven minutes, and the
+      // handstand holds until something stops it. A pose you can ask for and
+      // cannot ask out of is not a pose, it is a trap.
+      if (!KNEES[show.phase] && !LYING[show.phase] && !POSED[show.phase]
+        && !HANDS[show.phase] && show.phase !== 'fours') return 'standing';
       return null;
     }
     if (name.startsWith('fetch.cream')) {
@@ -35237,7 +35589,19 @@ async function buildJadrija(scene) {
 
   /** The indoor track, as a set, so the trigger can tell it is already on it. */
   const KABIN = { come: 1, enter: 1, wine: 1, meet: 1, untie: 1,
-    dwell: 1, leave: 1 };
+    dwell: 1, leave: 1,
+    // AND THE WALK TO THE HANDSTAND'S MARK, which is the second indoor walk
+    // this room has ever had and had to learn the first one's lesson from
+    // scratch. See `showClear`: the room's own walls are blockers, and the
+    // note there says outright that every phase inside this room is on this
+    // list because four metres of hand-placed hut does not want a physics
+    // system. MEASURED with `handGo` left off it: asked from `dwell` she
+    // walked 0.37 m in fourteen seconds and finished at (426.59, 19.87),
+    // 1.7 m short of a mark at (424.86, 21.05) and drifting the wrong way
+    // down the room — the push was cancelling her stride every frame,
+    // because `kit.handSpot` is 0.38 m off the boards and `HOLD` plus
+    // `SHOW.solid` is further than that.
+    handGo: 1 };
 
   /**
    * Everything that outranks the room, hoisted.
@@ -35264,7 +35628,17 @@ async function buildJadrija(scene) {
     // in the kabina, `tieHair` is not one of the phases the hut owns, and she
     // is walked back to the bottle in the middle of the reach.
     tieHair: 1,
-    sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1 };
+    sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1,
+    // AND THE SITTING FAMILY AND THE HANDSTAND, all twelve of them, for the
+    // reason the note above gives about `submit`: every one is entered from
+    // inside this room, so a phase the hut does not own is a woman walked
+    // back to the doorway on the frame after she got there. The walk to the
+    // handstand's mark is on the list too — it is 2 m across the same floor
+    // and the room would override it at the second step.
+    sit: 1, sitHeld: 1, bedSit: 1, bedKneel: 1,
+    lotus: 1, lotusHeld: 1, perch: 1, perchHeld: 1,
+    fetal: 1, fetalHeld: 1, upside: 1, upsideHeld: 1,
+    handGo: 1, handstand: 1, handHeld: 1 };
 
   // Scratch for the horns, hoisted out of the frame loop.
   const vHorn = new THREE.Vector3(), qHorn = new THREE.Quaternion();
@@ -35918,7 +36292,17 @@ async function buildJadrija(scene) {
     // vertical), on fire, and turned — the last one being the promenade's
     // answer to the hose, which owns her whole body until it lets go.
     const NOW = { kiss: 1, hug: 1, rise: 1, fours: 1, flat: 1,
-      'flat.edge': 1, coke: 1,
+      'flat.edge': 1,
+      // AND `coke` IS OFF THIS LIST, which is the hair's own paragraph below
+      // applied to the one name that was left on it. Its road from a pose
+      // re-arms `show.ask` across a `situp` — `show.getUp` carries it — and
+      // this licence then fires again on the very next frame, from `situp`,
+      // which is in neither `ASKABLE` nor the get-up tests. MEASURED: asked
+      // from `fetalHeld`, the sit-up ran for ONE frame (`show.mat` damped from
+      // 0.440 to 0.416 and stopped there) and she went straight to the plate,
+      // standing at the tabouret 0.42 m in the air. Off the list it waits for
+      // a phase it may be entered from, which every held pose in that room
+      // already is.
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
       // AND THE HAIR IS NOT ON THIS LIST, which it was for an afternoon.
       //
@@ -35938,7 +36322,20 @@ async function buildJadrija(scene) {
       // from, which is what every dance in this file already does, and the
       // whole of `ASKABLE` — the idles, the dances, the held poses — can still
       // start one on the frame the words arrive.
-      give: 1 };
+      give: 1,
+      // AND THE SIX ON THE MATTRESS, WHICH ARE SAFE HERE AND THE HANDSTAND IS
+      // NOT. The hazard the paragraph above describes is a branch that
+      // RE-ARMS `show.ask` and lets this licence fire again on the next frame,
+      // and none of these six does: they set `show.poseWant` and let `cradle`
+      // read it, which is `show.flatWant`'s mechanism and is why `flat.edge`
+      // has always been on this list. `handstand` needs her on her feet on
+      // the floor, so its route from a pose re-arms the request across a
+      // `situp` and a `rise` — exactly `hair.down`'s shape — and it is
+      // deliberately left off.
+      'sit.bed': 1, 'sit.knees': 1, lotus: 1, perch: 1, fetal: 1, upside: 1,
+      // And the yawn, which changes no phase at all: it is a latch on an
+      // overlay, so there is nothing here for the licence to fire twice.
+      yawn: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
@@ -36015,7 +36412,7 @@ async function buildJadrija(scene) {
         // way and there is nothing in the bank between standing and her back.
         // From her back it is a MOVE, floor to cot or the other way, and the
         // only honest way to cross a room is to get up first.
-        if (LYING[show.phase]) go('situp', 'situp', 0.30);
+        if (onCot(show.phase)) go('situp', 'situp', 0.30);
         else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
         else go('submit', 'submit', 0.30);
       } else if (name === 'kiss' || name === 'hug') {
@@ -36025,12 +36422,12 @@ async function buildJadrija(scene) {
         // than the one that was asked for. So the request stands her up and
         // re-arms itself: `show.ask` is read again on a later frame, and by
         // then she is in `dwell` with her feet under her.
-        if (KNEES[show.phase] || LYING[show.phase]) {
+        if (KNEES[show.phase] || onCot(show.phase)) {
           show.lieWant = null;
           show.byAsk = 0;
           show.getUp = 1;
           show.ask = name;
-          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else go('rise', 'getup', 0.35);
         } else {
           show.near = name;
@@ -36047,10 +36444,10 @@ async function buildJadrija(scene) {
         show.queue.length = 0;
         show.side = 0;
         showSay('trill', d);
-        if (LYING[show.phase] || KNEES[show.phase] || show.phase === 'fours') {
+        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
           show.getUp = 1;
           show.ask = name;
-          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else go('rise', 'getup', 0.35);
         } else go('toYou', 'walk', 0.34);
       } else if (name === 'side.left' || name === 'side.right') {
@@ -36059,7 +36456,7 @@ async function buildJadrija(scene) {
         show.queue.length = 0;
         showSay('squee', d);
         // The roll starts from the cradle, like the one on to her front.
-        if (LYING[show.phase] && show.phase !== 'cradle') {
+        if (onCot(show.phase) && show.phase !== 'cradle') {
           show.sideWant = clip;
           go('cradle', 'cradle', 0.40);
         } else if (show.phase === 'cradle') {
@@ -36091,10 +36488,10 @@ async function buildJadrija(scene) {
         show.hairDid = 0;
         show.queue.length = 0;
         showSay('squee', d);
-        if (LYING[show.phase] || KNEES[show.phase] || show.phase === 'fours') {
+        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
           show.getUp = 1;
           show.ask = name;
-          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else go('rise', 'getup', 0.35);
         } else go('tieHair', 'idle', 0.30);
       } else if (name === 'coke') {
@@ -36105,10 +36502,10 @@ async function buildJadrija(scene) {
         show.side = 0;
         showSay('trill', d);
         cokeSet(0);
-        if (LYING[show.phase] || KNEES[show.phase] || show.phase === 'fours') {
+        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
           show.getUp = 1;
           show.ask = name;
-          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else go('rise', 'getup', 0.35);
         } else go('coke', 'idle', 0.40);
       } else if (name === 'flat.edge') {
@@ -36124,10 +36521,60 @@ async function buildJadrija(scene) {
         } else {
           show.flatWant = 2;
           show.lieWant = 'bed';
-          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
           else go('submit', 'submit', 0.30);
         }
+      } else if (BED_POSE[name]) {
+        // ── THE SITTING FAMILY, AND IT IS `flat`'S ROAD WITH A TABLE ON IT ──
+        //
+        // Every one of the six comes up through RECLINE_B, so the entry is the
+        // one `flat` already uses: from the cradle on the cot the clip IS the
+        // move and there is nothing to walk; from anywhere else she is taken
+        // to the cot, laid on her back, and `cradle` reads `poseWant` on the
+        // frame she arrives. `edgeWant` is cleared because all six are solved
+        // against the middle of the mattress and not its long edge.
+        const p = BED_POSE[name];
+        show.byAsk = 1;
+        show.edgeWant = 0;
+        show.queue.length = 0;
+        showSay('squee', d);
+        if (show.phase === 'cradle' && show.onBed) {
+          show.legsDown = 0;
+          go(p[0], p[1], 0.34);
+        } else {
+          show.poseWant = name;
+          show.lieWant = 'bed';
+          if (onCot(show.phase)) go('situp', 'situp', 0.34);
+          else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
+          else go('submit', 'submit', 0.30);
+        }
+      } else if (name === 'handstand') {
+        // ON HER FEET AND ON THE FLOOR, which is the road `coke` and
+        // `hair.down` take and for the same reason: HAND_STAND is entered from
+        // IDLE_A through CROUCH and LUNGE, so the way into it from the cot is
+        // to get off the cot. `getUp` carries the request across the sit-up
+        // and `show.ask` is read again on a later frame — which is also why
+        // this name is NOT in `NOW`, see the note there.
+        show.byAsk = 1;
+        show.queue.length = 0;
+        showSay('hup', d);
+        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
+          show.getUp = 1;
+          show.ask = name;
+          if (onCot(show.phase)) go('situp', 'situp', 0.34);
+          else go('rise', 'getup', 0.35);
+        } else go('handGo', 'walk', 0.32);
+      } else if (name === 'yawn') {
+        // A LATCH AND NOT A PHASE, exactly like `legs.down` below: she stays
+        // in whatever she was doing, her place and her legs are untouched, and
+        // ten bones come off a second clip until the clock runs out. See
+        // `YAWN_OVER`, and `yawnTick` where the weight is ramped.
+        show.yawn = 0;
+        f.over('yawn', { bones: YAWN_OVER, from: 0 });
+        f.state.overW = 0;
+        show.did = name;
+        showSay('squee', d);
       } else if (name === 'flat') {
         show.byAsk = 1;
         show.edgeWant = 0;
@@ -36141,7 +36588,7 @@ async function buildJadrija(scene) {
         } else {
           show.flatWant = 1;
           show.lieWant = show.onBed || (kit && kit.cot) ? 'bed' : 'floor';
-          if (LYING[show.phase]) go('situp', 'situp', 0.30);
+          if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
           else go('submit', 'submit', 0.30);
         }
@@ -36173,7 +36620,16 @@ async function buildJadrija(scene) {
         show.getUp = 1;
         show.queue.length = 0;
         showSay('trill', d);
-        if (LYING[show.phase]) go('situp', 'situp', 0.30);
+        // AND THE SITTING FAMILY GOES ROUND BY THE CRADLE. `situp` opens on
+        // CRADLE and will take a handover from any of those poses, but not in
+        // 0.30 s: what that renders is a woman uncrossing her legs and lying
+        // back in the same third of a second. Every one of those clips opens
+        // on CRADLE as well, so the cradle is the pose they have in common
+        // with her and going through it is the way in run backwards. `getUp`
+        // is read there — see `case 'cradle'`.
+        if (POSED[show.phase]) { show.getUp = 1; go('cradle', 'cradle', 0.44); }
+        else if (HANDS[show.phase]) go('rise', 'getup', 0.35);
+        else if (LYING[show.phase]) go('situp', 'situp', 0.30);
         else go('rise', 'getup', 0.35);
       } else if (name === 'ballet') {
         const bar = barreAt(show.t, show.s);
@@ -36753,7 +37209,157 @@ async function buildJadrija(scene) {
         }
         break;
 
+      // ── THE SITTING FAMILY ────────────────────────────────────────────
+      //
+      // Five of the six arrive and hand over, which is `flat` → `flatheld`'s
+      // shape exactly: the once-clip ends where she stays and the loop
+      // breathes there. `BED_NEXT` says which loop, so the six pairs live in
+      // one table rather than in twelve cases.
+      //
+      // NONE OF THEM RE-AIMS AT YOU, for `cradle`'s reason: a woman who has
+      // arranged herself on a mattress and then swings round to keep facing
+      // whoever walks past the door is a compass needle, not a person. The
+      // yaw is whatever put her along the bed and it stays there.
+      case 'sit':
+      case 'bedSit':
+      case 'lotus':
+      case 'upside': {
+        matTick(dt);
+        if (done) { const n = BED_NEXT[show.phase]; go(n[0], n[1], 0.30); }
+        break;
+      }
+
+      // The curl is the second one that has somewhere to be — see
+      // `kit.cotCurl`, which is where the 0.45 m is measured. Eased over the
+      // roll rather than set at the recline, for the reason written there.
+      case 'fetal':
+        if (kit && kit.cotCurl) showSettle(kit.cotCurl, dt, 1.4);
+        matTick(dt);
+        if (done) go('fetalHeld', 'fetalHeld', 0.30);
+        break;
+
+      // ── AND THE ONE WITH SOMEWHERE TO BE ──────────────────────────────
+      //
+      // *"her back perched against the wall"*, and the wall is the side wall,
+      // which is the only one this cot touches. So the perch is the one pose
+      // in the family that is not where `cradle` left her: she is laid down
+      // along the bed like everything else, and then over the 3.4 s of the
+      // clip — while she is sitting up out of it anyway — she eases 0.20 m
+      // across to `kit.cotWall` and turns the quarter turn that puts her back
+      // to the boards.
+      //
+      // MOVED HERE AND NOT IN `lieDown`, which was the first cut and cannot
+      // work: laid down already turned, CRADLE puts her head 0.57 m along the
+      // way she is facing, which with her back to that wall is 0.57 m INSIDE
+      // it. The turn has to happen while she is upright, and the only frames
+      // where she is upright are the last ones of this clip.
+      case 'perch':
+        if (kit && kit.cotWall) {
+          show.want = Math.PI;
+          showSettle(kit.cotWall, dt, 1.6);
+        }
+        matTick(dt);
+        if (done) go('perchHeld', 'perchHeld', 0.30);
+        break;
+
+      case 'sitHeld':
+      case 'bedKneel':
+      case 'lotusHeld':
+      case 'upsideHeld':
+        matTick(dt);
+        poseOut(dt, go);
+        break;
+
+      case 'fetalHeld':
+        // Held on the curl's own mark for `perchHeld`'s reason: she was eased
+        // on to it rather than walked to it, and the hold is seven minutes.
+        if (kit && kit.cotCurl) showSettle(kit.cotCurl, dt, 0.8);
+        matTick(dt);
+        poseOut(dt, go);
+        break;
+
+      case 'perchHeld':
+        // Still held against the wall: the clip's own breathing does not move
+        // her, but the hold is seven minutes long and `showSettle` is the only
+        // thing keeping her on a mark she was eased on to rather than walked
+        // to. A tenth of the rate the arrival used, which at this distance is
+        // a term that does nothing and cannot drift.
+        if (kit && kit.cotWall) {
+          show.want = Math.PI;
+          showSettle(kit.cotWall, dt, 0.8);
+        }
+        matTick(dt);
+        poseOut(dt, go);
+        break;
+
+      // ── AND ON HER HANDS, ON THE FLOOR, AGAINST THE WALL ──────────────
+      //
+      // Three phases because getting there is a walk. HAND_STAND is entered
+      // from IDLE_A through CROUCH and LUNGE — a standing entry — and the
+      // mark is 2 m across the room at `kit.handSpot`, so she goes there on
+      // her feet first. `showSettle` in the clip's own first half second does
+      // the last few centimetres, which is `wine`'s arrangement and for the
+      // same reason: the walk arrives loosely and the pose is solved to
+      // millimetres against the wall behind her.
+      case 'handGo': {
+        const mk = kit && kit.handSpot;
+        if (!mk) { go('dwell', 'idle', 0.40); break; }
+        // AND OFF THE COT FIRST, which is `situp`'s own two lines and is not
+        // paranoia: MEASURED, driven straight from `lotusHeld` into this with
+        // the lift left behind, she walked to the wall 0.44 m off the floor
+        // and put her hands down in mid-air. Every route that gets her here
+        // from the bed goes through `situp`, which clears it — but this is the
+        // only phase in the room that WALKS with the lift still readable, so
+        // it clears it itself rather than trusting where she came from.
+        if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
+        if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
+        const dist = showTo(mk[0], mk[1], dt, 0.62);
+        if (dist < 0.22) go('handstand', 'handstand', 0.36);
+        break;
+      }
+
+      case 'handstand':
+        // HER BACK TO THE BOARDS, which is a fact about the pose and not a
+        // taste: `pelvis` 180 turns her round, so her face points the way her
+        // back points standing up — probed, the fingers reach out on the side
+        // away from `show.ang`. Pointing her AT the wall is therefore what
+        // puts her heels near it.
+        show.want = Math.PI;
+        showHold(dt);
+        if (show.tmr < 0.50 && kit && kit.handSpot) {
+          showSettle(kit.handSpot, dt, 9.0);
+        }
+        if (done) go('handHeld', 'handHeld', 0.28);
+        break;
+
+      case 'handHeld':
+        showHold(dt);
+        // `getup` begins on FOURS and the nearest thing to it in this clip is
+        // LUNGE, which `handstand` passes through on the way up — so the way
+        // down is the way up, crossfaded, and there is nothing in the bank
+        // that does it properly. 0.46 s rather than the usual third, because
+        // what is being blended is a whole body coming off its hands.
+        if (show.getUp || show.tmr > SHOW.handFor) {
+          show.getUp = 0;
+          show.byAsk = 0;
+          go('rise', 'getup', 0.46);
+        }
+        break;
+
       case 'cradle':
+        // ASKED TO GET UP OUT OF ONE OF THE SITTING POSES. The cradle is the
+        // landing on the way back as well as on the way there — see the
+        // `rise` branch, which sends `POSED` round by here rather than
+        // crossfading a cross-legged sit straight into a sit-up.
+        //
+        // AND THE LATCH IS PASSED ON RATHER THAN SPENT, which is worth eleven
+        // seconds. `situp` ends on the kneel and `kept` is where the road out
+        // finishes — it reads `getUp` on the frame the kneel arrives and goes
+        // straight to `rise`. Cleared here, the request was over by the time
+        // she was kneeling and `kept` simply held: MEASURED, "get up" from
+        // `lotusHeld` took 13.6 s, of which 11 was her waiting out `keptFor`
+        // on her knees with nothing left asking her to move.
+        if (show.getUp) { go('situp', 'situp', 0.34); break; }
         // Asked for a side while she was somewhere else: the cradle is the
         // landing on the way there too.
         if (show.sideWant) {
@@ -36774,6 +37380,16 @@ async function buildJadrija(scene) {
           if (edge) go('flatEdge', 'flatEdge', 0.34);
           else go('flat', 'flat', 0.34);
           break;
+        }
+        // And asked for one of the sitting family, which is the same latch
+        // with a name in it instead of a number — see `BED_POSE`. Every one of
+        // those clips opens on CRADLE, so this is the frame where there is
+        // nothing to crossfade through.
+        if (show.poseWant) {
+          const p = BED_POSE[show.poseWant];
+          show.poseWant = null;
+          show.legsDown = 0;
+          if (p) { go(p[0], p[1], 0.34); break; }
         }
         // Same hold as `kept` and for the same reason: `hit` is the grace
         // window the jet refreshes, so keeping the branch on her keeps her
@@ -36850,7 +37466,28 @@ async function buildJadrija(scene) {
         // The same step clear, because this phase ends a pose too and a kneel
         // can be taken inside the furniture as easily as on top of it.
         untangle(dt);
-        if (done) go(inside ? 'dwell' : 'leave', inside ? 'idle' : 'walk', 0.40);
+        // AND OFF THE MATTRESS, which `situp` already does and which this
+        // does again because not every road out of that room goes through
+        // one: `fours` and `handHeld` both come up this way, and a lift left
+        // behind is a woman standing in mid-air. Same two lines, same rate.
+        if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
+        if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
+        if (done) {
+          // AND THE LATCH IS SPENT, which nothing was saying and which cost a
+          // whole verification pass to find. `getUp` is what carries "get her
+          // up" across the kneel in the middle of the road out, and no phase
+          // cleared it once she was actually standing — so it stayed set, and
+          // `kept` reads it BEFORE it reads `lieWant`, one line higher up.
+          //
+          // MEASURED: "get up", and then "sit up on the bed". She knelt, the
+          // stale latch fired on the frame the kneel arrived, and she stood
+          // straight back up — the bed request still sitting in `poseWant`
+          // with nothing left to read it. Every request that goes down
+          // through `kept` had the same hole in it, `recline.bed` included,
+          // for as long as `rise` has existed.
+          show.getUp = 0;
+          go(inside ? 'dwell' : 'leave', inside ? 'idle' : 'walk', 0.40);
+        }
         break;
 
       // Out through the door before she is allowed to head for her spot, or
@@ -38136,6 +38773,11 @@ async function buildJadrija(scene) {
     // rotation until somebody hands it a zero — so without this she walks away
     // with both hands welded behind her head. Same latch the two above use.
     if (show.phase !== 'tieHair' && hairRest) hairHands(f, 0);
+    // And the yawn, which is not an aim at all — see `yawnTick`. Here with the
+    // three above it because it belongs to the same pass and for the same
+    // reason: it is a thing laid over a pose, so it runs once the pose is
+    // decided and whatever phase she is in.
+    yawnTick(f, dt);
 
     // ── AND DOWN TO THE PLATE ─────────────────────────────────────────────
     //
@@ -38211,7 +38853,18 @@ async function buildJadrija(scene) {
       const SIDE_OFF = 1.114;
       const wantSide = show.phase === 'aim' || show.phase === 'wheel'
         ? -Math.PI / 2
-        : show.phase === 'sideL' ? Math.PI - SIDE_OFF
+        // AND CURLED UP TAKES `SIDE_L`'S OFFSET UNCHANGED, which is the one
+        // thing about FETAL that had to be measured rather than argued. The
+        // extra roll in it is about her own LONG axis — see FETAL_ROLL in
+        // tools/blender/human_mh.py — and a rotation about the body axis
+        // cannot move a head that lies on that axis. Probed in the game:
+        // SIDE_L puts her head at 65.1° off the way she is pointed and FETAL
+        // at 46.5°, which looks like a 19° disagreement and is not the axis
+        // moving — it is the six bones of spine flexion that curl her chin
+        // toward her own knees. The axis is what this corrects, so the number
+        // is `sideL`'s.
+        : (show.phase === 'sideL' || show.phase === 'fetal'
+          || show.phase === 'fetalHeld') ? Math.PI - SIDE_OFF
           : show.phase === 'sideR' ? Math.PI + SIDE_OFF
             : (show.phase === 'flat' || show.phase === 'flatheld'
               || show.phase === 'flatEdge' || show.phase === 'edgeHeld')
@@ -38229,7 +38882,14 @@ async function buildJadrija(scene) {
       // which is the point: the clip turns her one way in figure space and
       // this turns her back the other, and her head stays on the pillow the
       // whole way over.
-      const ROLL_T = { sideL: 1.7, sideR: 1.7, flat: 1.9, flatEdge: 2.7 };
+      // 1.8 FOR THE CURL AND NOT ITS 2.9, which is the one place this table
+      // does not use the clip's own length. `fetal` runs CRADLE → RECLINE_B →
+      // SIDE_L at 1.8 and then FETAL at 2.9: the ROLL is finished at 1.8 and
+      // the last second is her knees coming up. Timed to 2.9 the yaw would
+      // still be 38% short on the frame she is fully on her side, which is a
+      // body lying across its own bed while it curls up.
+      const ROLL_T = { sideL: 1.7, sideR: 1.7, flat: 1.9, flatEdge: 2.7,
+        fetal: 1.8 };
       const rollT = ROLL_T[show.phase];
       if (rollT) {
         if (show.sidePhase !== show.phase) {
@@ -43868,6 +44528,18 @@ async function buildJadrija(scene) {
           // without holding a branch on her for five seconds at one frame a
           // second — which a headless page cannot do at all.
           recline: 'recline', cradle: 'cradle', situp: 'situp',
+          // And the sitting family, for the same reason: `bedFor` is seven
+          // minutes and the way in is a kneel, a recline and a clip, which is
+          // nine seconds a headless page cannot sit through.
+          flat: 'flat', flatheld: 'flatheld',
+          flatEdge: 'flatEdge', edgeHeld: 'edgeHeld',
+          sideL: 'sideL', sideR: 'sideR',
+          sit: 'sit', sitHeld: 'sitHeld', bedSit: 'situp', bedKneel: 'kept',
+          lotus: 'lotus', lotusHeld: 'lotusHeld',
+          perch: 'perch', perchHeld: 'perchHeld',
+          fetal: 'fetal', fetalHeld: 'fetalHeld',
+          upside: 'upside', upsideHeld: 'upsideHeld',
+          handGo: 'walk', handstand: 'handstand', handHeld: 'handHeld',
           // The turn, and the two airborne moves she goes on doing after it.
           // `flare` is the throw; the rest of the turn is played over the
           // stamp, which is what `go` does with them in the routine.
