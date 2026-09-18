@@ -717,6 +717,16 @@ async function buildGround(scene, field) {
         // never a stranger at 1.78.
         if (y != null && b.top != null
           && (y > b.top + 0.05 || y + GROUND.eye < b.y0)) continue;
+        // AND THE ONE KIND OF BODY YOU ARE NOT PUSHED OUT OF: somebody with
+        // their arms round you. `soft` is set by whoever publishes the entry —
+        // today only 43-jadrija.js, and only while she is kissing or hugging
+        // you — and it is a flag rather than a small radius because this list
+        // has two readers. `nearBody` below it drives the near plane, so a
+        // body shrunk to nothing to stop the push takes the face ramp with it
+        // and she gets clipped away at the one moment you are looking at her.
+        // Measured: her core plus your own half-width is 0.42 m, which was the
+        // gap between two faces that were meant to be touching.
+        if (b.soft) continue;
         const rr = GROUND.body + b.r;
         const dx = x - b.x, dz = z - b.z;
         const d = Math.hypot(dx, dz);

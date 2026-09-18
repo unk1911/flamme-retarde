@@ -846,6 +846,41 @@ function buildAudio() {
     burst({ freq: 3100, q: 5, dur: 0.012, gain: 0.014, at: t0 + 0.122 });
   }
 
+  /**
+   * A kiss. Misha, 17 Sep 2026: *"we need to hear the kiss sound jesus"*.
+   *
+   * THE SHAPE OF ONE IS A RELEASE AND NOT AN IMPACT, which is the whole
+   * difference between this and every other short noise in this file. Lips
+   * meeting make almost nothing; what you hear is them parting — a small
+   * pressure drop that reads as a rising click rather than a falling one. So
+   * `lick` above is swept DOWN because a tongue leaving a surface is a wash
+   * going away, and this is swept UP, because a seal breaking is a pop coming
+   * towards you.
+   *
+   * Three layers: the soft contact, which is barely there and mostly low; the
+   * pop, 14 ms and high, which is the whole recognisable part; and a breath
+   * after it, because nobody kisses and then holds still.
+   *
+   * Louder than `lick` and quieter than `swig`: this is a hand's breadth from
+   * your ear, so it needs to be small. Anything you could hear from the other
+   * end of the promenade would be a comedy sound effect.
+   */
+  function kiss() {
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    // Contact: low, soft, short. Two lips are not a slap.
+    burst({ freq: 380, q: 1.0, dur: 0.055, gain: 0.030, sweep: 0.80, at: t0 });
+    // The seal parting, which is the sound everybody actually recognises:
+    // high, 14 ms, swept upward.
+    burst({ freq: 2100, q: 4.5, dur: 0.014, gain: 0.042, sweep: 1.45,
+      at: t0 + 0.045 });
+    burst({ freq: 3400, q: 6, dur: 0.010, gain: 0.020, sweep: 1.30,
+      at: t0 + 0.052 });
+    // And the breath after it, wide and quiet, away from the mouth.
+    burst({ freq: 700, q: 0.7, dur: 0.190, gain: 0.016, sweep: 0.55,
+      at: t0 + 0.075 });
+  }
+
   function beadShove(amp = 1, d = 0) {
     if (!ctx) return;
     const t0 = ctx.currentTime;
@@ -6705,7 +6740,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

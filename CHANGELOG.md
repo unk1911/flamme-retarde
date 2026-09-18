@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.408.0] — 2026-09-17
+
+### the kiss lands, and you hear it
+
+**"what kinda backwards-ass hug is this"**, and **"she approaches Chloe (me)
+just slightly), but lips are so far away. the lips are supposed to be TOUCHING.
+and we need to hear the kiss sound jesus"**. Both fair, and the second one had
+a cause nobody would guess from the outside.
+
+SHE STOOD 0.42 m OFF YOU AND COULD NOT GET CLOSER, because that is her core
+plus your own half-width: the ground pushes you out of anybody in the body
+list, so every centimetre she closed, it moved you. Shrinking her to nothing
+was the obvious answer and it is wrong — the same list drives the near plane,
+and a body the push cannot feel is a body the face ramp cannot find either, so
+she was clipped away at the one moment you are looking straight at her
+(measured: 1.054 m through the whole kiss, 0.04 the instant it ended).
+
+So a body can now be published SOFT: measured by the ramp, ignored by the
+push. One flag, one reader each, and the gap is the gap she was asked to stand
+at — 0.17 m, closed through the lean rather than at the end of the walk,
+because the feet should arrive as the mouth does.
+
+And there is a sound: three layers, and the shape of a kiss is a RELEASE
+rather than an impact — the recognisable part is the seal parting, so it is
+swept upward, where the ice cream's lick is swept down. Small, because it
+happens a hand's breadth from your ear.
+
+### and the hug is solved rather than typed
+
+Two wrong pictures in a row taught this one. The arms swung BACKWARD first: in
+figure space a rotation about +z takes an arm bone hanging at −y toward +x,
+which is forward, and I had written −z on all four bones. Sign fixed, they went
+straight up beside her ears with the palms out, which is a hands-up and not a
+hug — and that was not a sign, it was me deciding what a rotation would look
+like on a bone whose rest direction I had never measured.
+
+The angles are gone. `wheelLimb`, the two-bone solver the riders use to put
+hands on handlebars, takes the rest positions of shoulder, elbow and wrist and
+a goal for the wrist, and works the rotations out of what the rig actually is.
+The goals are where hands go in a hug: forward past you, level with the middle
+of your back, inside the width of her own shoulders.
+
 ## [1.407.1] — 2026-09-17
 
 ### and she can get to you from the far end of the promenade

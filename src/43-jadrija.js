@@ -32617,8 +32617,19 @@ async function buildJadrija(scene) {
      * near plane is not touched for either: the game already ramps it down
      * when a face comes close, which is what makes this possible at all.
      */
-    kissGap: 0.30,
-    hugGap: 0.26,
+    /**
+     * MOUTHS, NOT BODIES. Misha, 17 Sep 2026: *"she approaches Chloe (me) just
+     * slightly), but lips are so far away. the lips are supposed to be
+     * TOUCHING"*.
+     *
+     * 0.30 m was two people standing close, and 0.30 m of air between two
+     * faces is not a kiss. Both halves are smaller now and the lean is what
+     * does the rest: her chest tips in and her chin comes up, which carries
+     * her mouth about 0.14 m forward of where her feet are — so the feet
+     * stand where a body can stand and the mouth still arrives.
+     */
+    kissGap: 0.17,
+    hugGap: 0.21,
     /** Seconds in, held, and out. The long hold is what "French" buys. */
     kissIn: 0.75,
     kissHold: 3.4,
@@ -32627,14 +32638,24 @@ async function buildJadrija(scene) {
     hugHold: 4.6,
     hugOut: 0.75,
     /** The lean: her chest tips toward you and her chin comes up to meet you. */
-    kissLean: 0.17,
-    kissChin: 0.26,
-    /** And the hug: shoulders round you, elbows closed, cheek to your ear. */
-    hugClav: 0.30,
-    hugArm: 1.28,
-    hugElbow: 1.05,
-    hugIn2: 0.34,
-    hugHead: 0.30,
+    kissLean: 0.28,
+    kissChin: 0.34,
+    /**
+     * And the hug: shoulders round you, elbows CLOSED, cheek past your ear.
+     *
+     * Misha's second screenshot: *"what kinda backwards-ass hug is this"* —
+     * the arms were swinging backward (wrong sign, see the note in the phase)
+     * and then, sign fixed, straight up at head height with the palms out,
+     * which is a hands-up and not a hug. An arm hanging at her side is −y, so
+     * 1.05 rad forward puts the upper arm at sixty degrees — forward and
+     * slightly down, elbow at chest height — and 1.45 at the elbow brings the
+     * forearm round rather than out past you.
+     */
+    hugClav: 0.18,
+    hugArm: 1.05,
+    hugElbow: 1.45,
+    hugIn2: 0.30,
+    hugHead: 0.26,
     // And the knee shuffle, for when you back off across the room while she is
     // down there. All three numbers are about a room four metres across: a pace
     // that reads as knees and not as a walk, a gap that is far enough to be a
@@ -33238,6 +33259,104 @@ async function buildJadrija(scene) {
       show.s = show.offBed[1];
       show.offBed = null;
     }
+  }
+
+  /**
+   * Ease her on to the mark in front of you, and keep doing it.
+   *
+   * Called from the two poses rather than only from the walk, because the walk
+   * hands over as soon as she is within reach and "within reach" is not
+   * "touching". Same mark as `toYou` computes: your position plus your own
+   * view direction times the gap, in the shore's frame.
+   */
+  /**
+   * Her arms round you, SOLVED and not typed.
+   *
+   * Two screenshots from Misha taught this. The first had the arms swinging
+   * backward, which was a sign error I could do on paper. Fixing the sign gave
+   * the second: both hands up beside her ears, palms out, which is a
+   * hands-up. That was not a sign — it was me deciding what a rotation about
+   * an axis would look like on a bone whose rest direction I had not measured.
+   * Three numbers, three guesses, two wrong pictures.
+   *
+   * So the angles are gone. `wheelLimb` is the two-bone solver the riders use
+   * to put hands on handlebars: hand it the rest positions of the shoulder,
+   * the elbow and the wrist, and a GOAL for the wrist, and it works out both
+   * rotations from what the rig actually is. The goals here are where a
+   * person's hands go in a hug — forward, level with the middle of their back,
+   * and inside the width of their own shoulders — expressed in figure space,
+   * where +x is the way she faces and +y is up.
+   *
+   * The rest positions are sampled once, off the idle pose she holds while
+   * this runs, because bone LENGTHS are what the solver needs from them and
+   * those do not change.
+   */
+  const HUG_ARM = {
+    /**
+     * Forward of her shoulder, in metres: PAST you, not up to you.
+     *
+     * She stands 0.21 m off your centre and a person is about 0.2 m deep, so
+     * hands that stop at 0.30 have closed in front of her own belly — which
+     * is what the third photograph showed. 0.42 puts them round the far side
+     * of you, which is where hands go in a hug.
+     */
+    reach: 0.42,
+    /** How far below the shoulder they close: the middle of somebody's back. */
+    drop: 0.18,
+    /** And how far in, from the shoulder's own offset. */
+    inward: 0.12,
+  };
+  let hugRest = null;
+  function hugArms(f, e) {
+    if (!hugRest) {
+      const names = ['armUL', 'armLL', 'handL', 'armUR', 'armLR', 'handR'];
+      const v = new THREE.Vector3();
+      hugRest = {};
+      for (const n of names) {
+        const i = f.boneIndex(n);
+        if (i < 0) { hugRest = null; return; }
+        f.boneAt(i, v);
+        hugRest[n] = v.clone();
+      }
+    }
+    if (e <= 0.001) {
+      for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+      return;
+    }
+    for (const side of ['L', 'R']) {
+      const S = hugRest['armU' + side];
+      const E = hugRest['armL' + side];
+      const W = hugRest['hand' + side];
+      // Where the wrist is asked to go, eased from where it rests so the arms
+      // come up over the length of the clip rather than snapping.
+      const goal = _hugGoal.set(
+        S.x + HUG_ARM.reach,
+        S.y - HUG_ARM.drop,
+        S.z - Math.sign(S.z || 1) * HUG_ARM.inward);
+      goal.lerpVectors(W, goal, e);
+      // The elbow goes DOWN and out, which is what an arm round somebody does
+      // — the pole is what decides that and it is the only hint the solver
+      // takes about which of the two valid bends to pick.
+      _hugPole.set(0, -1, Math.sign(S.z || 1) * 0.55).normalize();
+      wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, goal, _hugPole);
+    }
+  }
+  const _hugGoal = new THREE.Vector3(), _hugPole = new THREE.Vector3();
+
+  function nearClose(pt, ps, dir, want, dt) {
+    let fx = 0, fz = 0;
+    if (dir) {
+      const w0 = toWorld(pt, ps);
+      const a = local(w0[0] + dir.x, w0[2] + dir.z);
+      fx = a[0] - pt; fz = a[1] - ps;
+      const l = Math.hypot(fx, fz) || 1;
+      fx /= l; fz /= l;
+    }
+    show.markT = pt + fx * want;
+    show.markS = ps + fz * want;
+    show.hasDir = dir ? 1 : 0;
+    show.t = damp(show.t, show.markT, 2.6, dt);
+    show.s = damp(show.s, show.markS, 2.6, dt);
   }
 
   function showCreep(tt, ss, dt) {
@@ -34556,7 +34675,16 @@ async function buildJadrija(scene) {
     return [best + 0.60, 0.30, Math.PI / 2];
   }
 
-  function stepShow(dt, pt, ps) {
+  /**
+   * @param dir  which way YOU are looking, in world space, or null.
+   *
+   * Only two things in here want it and they are the two that stand in front
+   * of you rather than near you — see `toYou`. Misha's screenshot of the first
+   * cut is the argument for it: a gap measured off your centre is a CIRCLE,
+   * and she stopped wherever on that circle her walk happened to reach, which
+   * was shoulder to shoulder with Chloe, both of them facing the sea.
+   */
+  function stepShow(dt, pt, ps, dir = null) {
     // Kept only so a probe can ask what she is steering by. The camera and the
     // person were the same point until B, and telling them apart from outside
     // is otherwise guesswork — see `updateCrowd`.
@@ -35882,90 +36010,95 @@ async function buildJadrija(scene) {
         //
         // A straight line at you is right for the last few metres and wrong
         // for the length of a promenade: MEASURED from 43 m away she walked
-        // 40 of them and stopped dead 14 m short, against whatever bench or
-        // kiosk was on the line. `showTo` steers round nothing — that is what
+        // 40 of them and stopped dead 14 m short, against whatever bench was
+        // on the line. `showTo` steers round nothing — that is what
         // `errandLegs` is for, and the recons have used it since they existed:
         // down the seaward half of her own lane, which is clear by
         // construction, and inland at the end.
         //
-        // The last leg is YOU and is re-read every frame, exactly as `backTo`
-        // does it, because you move while she walks.
+        // WHERE IN FRONT OF YOU, which is the other half of Misha's
+        // screenshot. A gap measured off your centre is a CIRCLE, and the
+        // first cut let her stop anywhere on it — she ended up shoulder to
+        // shoulder with Chloe, both of them facing the sea, which is not a
+        // hug. `dir` is your view direction in world space; this is the same
+        // vector in the shore's frame, so the mark is in front of your face.
+        let fx = 0, fz = 0;
+        if (dir) {
+          const w0 = toWorld(pt, ps);
+          const a = local(w0[0] + dir.x, w0[2] + dir.z);
+          fx = a[0] - pt; fz = a[1] - ps;
+          const l = Math.hypot(fx, fz) || 1;
+          fx /= l; fz /= l;
+        }
+        const want = show.near === 'hug' ? SHOW.hugGap : SHOW.kissGap;
+        const mt = pt + fx * want, ms = ps + fz * want;
+        const dT = mt - show.t, dS = ms - show.s;
+        const gap = Math.hypot(dT, dS);
+        // Facing YOU rather than the mark: the mark is under her feet by the
+        // time she reaches it, and a body aimed at its own feet looks at the
+        // floor.
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        const face = Math.abs(((show.want - show.ang + Math.PI * 3)
+          % (Math.PI * 2)) - Math.PI);
+        // The long way round, if there is furniture between you.
         if (show.nearLegs === undefined) show.nearLegs = null;
-        if (!show.nearLegs && Math.hypot(pt - show.t, ps - show.s) > 7) {
-          show.nearLegs = errandLegs(pt, ps) || null;
+        if (!show.nearLegs && gap > 7) {
+          show.nearLegs = errandLegs(mt, ms) || null;
           show.nearLeg = 0;
+        }
+        if (show.gap0 == null) show.gap0 = gap;
+        // Her patience is the WALK and not a constant: eight seconds to turn
+        // and settle plus the distance at half her pace. Forty-two seconds
+        // flat was 55 m, so from the far end of a five-hundred-metre deck you
+        // got nothing at all, which looks exactly like a broken feature.
+        if (show.tmr > 12 + show.gap0 / (SHOW.walk * 0.5)) {
+          show.near = null;
+          show.nearLegs = null;
+          show.gap0 = null;
+          showNext();
+          break;
         }
         if (show.nearLegs && show.nearLeg < show.nearLegs.length - 1) {
           const g = show.nearLegs[show.nearLeg];
-          const left = showTo(g[0], g[1], dt, ERRAND.pace);
-          if (left < ERRAND.near * 2.2) show.nearLeg += 1;
-          if (show.gap0 == null) show.gap0 = Math.hypot(pt - show.t, ps - show.s);
-          if (show.tmr > 12 + show.gap0 / (SHOW.walk * 0.5)) {
-            show.near = null; show.nearLegs = null; show.gap0 = null; showNext();
+          if (showTo(g[0], g[1], dt, ERRAND.pace) < ERRAND.near * 2.2) {
+            show.nearLeg += 1;
           }
           break;
         }
-        const dT = pt - show.t, dS = ps - show.s;
-        const gap = Math.hypot(dT, dS);
-        const want = show.near === 'hug' ? SHOW.hugGap : SHOW.kissGap;
-        show.want = Math.atan2(dS, dT);
         // ROUND ON THE SPOT FIRST, which is what `dogTo` does and for the same
-        // reason: `showTo` moves her along the heading she HAS while turning it
-        // toward the one she wants, and over twenty metres of promenade the arc
-        // is invisible. Over two metres it is the whole walk — MEASURED, asked
-        // from 2 m away while facing the other way she set off up the deck and
-        // was seven metres away before she had finished turning round.
-        const face = Math.abs(((show.want - show.ang + Math.PI * 3)
-          % (Math.PI * 2)) - Math.PI);
+        // reason: `showTo` moves her along the heading she HAS while turning
+        // it toward the one she wants, and over two metres that arc is the
+        // whole walk — she set off up the deck and was seven metres away
+        // before she had finished turning round.
         if (face > 0.70 && gap < 6) { showHold(dt); break; }
-        // WALK, OR EASE, AND NEVER BOTH. The first cut did both on the same
-        // frame: `showTo` pulls her to within its own 0.14 m tolerance and the
-        // easing below pushes her back out to `want`, so she settled at
-        // whatever distance the two agreed on and the arrival test never
-        // fired. Measured — she stood 0.4 m off and gave up after seventeen
-        // seconds. So the walk brings her to arm's length and hands over.
-        if (gap > want + 0.40) {
-          showTo(pt, ps, dt, ERRAND.pace * 0.75);
+        if (gap > 0.55) {
+          showTo(mt, ms, dt, ERRAND.pace * 0.75);
         } else {
-          // The last few centimetres, eased on to the line between you, which
-          // is the same argument `showSettle` makes about the pour mark: a
-          // stride cannot measure 0.3 m and a damp can.
-          const k = want / Math.max(gap, 1e-3);
-          show.t = damp(show.t, pt - dT * k, 3.2, dt);
-          show.s = damp(show.s, ps - dS * k, 3.2, dt);
+          // The last half metre, eased on to the mark rather than walked: a
+          // stride cannot measure 0.3 m and a damp can. Same argument
+          // `showSettle` makes about the pour mark.
+          show.t = damp(show.t, mt, 3.2, dt);
+          show.s = damp(show.s, ms, 3.2, dt);
           showHold(dt);
-          // And facing you before she leans in, or the lean is sideways.
-          // CLOSE ENOUGH, and one-sided on purpose. `|gap - want| < 0.12` was
-          // the first cut and it is a window, which means something has to
-          // hold her inside it: her own clearance keeps her about 0.41 m off
-          // whoever she is walking at, so the kiss passed this by a centimetre
-          // and the hug — 4 cm tighter — hovered at the gap for ever without
-          // ever arriving. What either of these needs is "near enough to
-          // reach", and 0.2 m of slack on the near side is that.
-          if (gap < want + 0.20 && face < 0.5) {
+          if (gap < 0.30 && face < 0.5) {
             show.kiss = 0;
+            show.kissSaid = 0;
             show.gap0 = null;
             show.nearLegs = null;
             go(show.near === 'hug' ? 'hug' : 'kiss', 'idle', 0.30);
           }
         }
-        // And she gives up rather than chasing you down the promenade — but
-        // the allowance is the WALK and not a constant. Seventeen seconds was
-        // twenty metres; forty-two is fifty-five, and standing at the far end
-        // of a five-hundred-metre promenade would still have got you nothing
-        // at all, which is indistinguishable from the feature being broken.
-        // So: eight seconds of turning and settling, plus the distance at
-        // half her pace, measured when she set off.
-        if (show.gap0 == null) show.gap0 = gap;
-        if (show.tmr > 12 + show.gap0 / (SHOW.walk * 0.5)) {
-          show.near = null;
-          show.gap0 = null;
-          show.nearLegs = null;
-          showNext();
-        }
         break;
       }
 
+      // AND THE CLOSING CONTINUES THROUGH THE HOLD, which is the difference
+      // between two people standing near each other and a kiss. `toYou` hands
+      // over as soon as she is within reach — measured, 0.42 m from your
+      // centre, because the arrival test fires 0.30 m short of a mark that is
+      // itself 0.17 in front of you — and 0.42 m of air between two faces is
+      // what Misha saw: *"lips are so far away. the lips are supposed to be
+      // TOUCHING"*. So the mark is recomputed inside the pose and she eases on
+      // to it while the lean goes in: the feet arrive as the mouth does.
       // THE KISS. No clip and no new geometry: her chest tips toward you and
       // her chin comes up, both through `aim` in figure space where +x is the
       // way she faces — so "lean in" is an angle about the sagittal axis and
@@ -35975,6 +36108,7 @@ async function buildJadrija(scene) {
         showHold(dt);
         show.kiss = (show.kiss || 0) + dt;
         show.want = Math.atan2(ps - show.s, pt - show.t);
+        nearClose(pt, ps, dir, SHOW.kissGap, dt);
         const T = SHOW.kissIn + SHOW.kissHold + SHOW.kissOut;
         const u = show.kiss < SHOW.kissIn ? show.kiss / SHOW.kissIn
           : show.kiss < SHOW.kissIn + SHOW.kissHold ? 1
@@ -35984,6 +36118,14 @@ async function buildJadrija(scene) {
         // meeting somebody who is taller than the pose she is standing in.
         f.aim('spine03', 0, 0, -1, SHOW.kissLean * e);
         f.aim('neck', 0, 0, 1, SHOW.kissChin * e);
+        // AND YOU HEAR IT. Misha: *"we need to hear the kiss sound jesus"*.
+        // On the frame the lean arrives rather than on the frame the phase
+        // starts, because what you are listening for is contact — and once,
+        // which is what the latch is.
+        if (!show.kissSaid && show.kiss >= SHOW.kissIn) {
+          show.kissSaid = 1;
+          if (audio && audio.kiss) audio.kiss();
+        }
         if (show.kiss > T) {
           f.aim('spine03', 0, 0, -1, 0);
           f.aim('neck', 0, 0, 1, 0);
@@ -36002,28 +36144,18 @@ async function buildJadrija(scene) {
         showHold(dt);
         show.kiss = (show.kiss || 0) + dt;
         show.want = Math.atan2(ps - show.s, pt - show.t);
+        nearClose(pt, ps, dir, SHOW.hugGap, dt);
         const T = SHOW.hugIn + SHOW.hugHold + SHOW.hugOut;
         const u = show.kiss < SHOW.hugIn ? show.kiss / SHOW.hugIn
           : show.kiss < SHOW.hugIn + SHOW.hugHold ? 1
             : 1 - (show.kiss - SHOW.hugIn - SHOW.hugHold) / SHOW.hugOut;
         const e = sat(u) * sat(u) * (3 - 2 * sat(u));
-        for (const side of ['L', 'R']) {
-          const sgn = side === 'L' ? 1 : -1;
-          f.aim('clavicle' + side, 0, 0, -1, SHOW.hugClav * e);
-          f.aim('armU' + side, 0, 0, -1, SHOW.hugArm * e);
-          f.aim('armL' + side, 0, 0, -1, SHOW.hugElbow * e);
-          f.aim('hand' + side, sgn, 0, 0, SHOW.hugIn2 * e);
-        }
+        hugArms(f, e);
         // Cheek past your ear, and always the same side, because a head that
         // picks a side per hug is a head that cannot decide.
         f.aim('neck', 0, 1, 0, SHOW.hugHead * e);
         if (show.kiss > T) {
-          for (const side of ['L', 'R']) {
-            f.aim('clavicle' + side, 0, 0, -1, 0);
-            f.aim('armU' + side, 0, 0, -1, 0);
-            f.aim('armL' + side, 0, 0, -1, 0);
-            f.aim('hand' + side, 1, 0, 0, 0);
-          }
+          hugArms(f, 0);
           f.aim('neck', 0, 1, 0, 0);
           show.near = null;
           showNext();
@@ -38534,9 +38666,20 @@ async function buildJadrija(scene) {
   // of garbage that shows up as a hitch and not as a frame time.
   const bodyBuf = [];
   let bodyN = 0;
-  function pushBody(x, z, r, y0, top, kind, idx) {
-    const e = bodyBuf[bodyN] || (bodyBuf[bodyN] = { x: 0, z: 0, r: 0, y0: 0, top: 0, kind: '', idx: 0 });
+  /**
+   * @param soft  present to be MEASURED and not to be pushed out of.
+   *
+   * The one entry that needs it is her while she is kissing or hugging you —
+   * see the note in `bodies`. The push and the face ramp read the same list,
+   * so a body that must be felt by one and not the other cannot be expressed
+   * by a radius: her core plus your own half-width is 0.42 m, which is exactly
+   * the gap Misha measured between two faces that were supposed to be
+   * touching, and shrinking her to nothing took the ramp out with it.
+   */
+  function pushBody(x, z, r, y0, top, kind, idx, soft = 0) {
+    const e = bodyBuf[bodyN] || (bodyBuf[bodyN] = { x: 0, z: 0, r: 0, y0: 0, top: 0, kind: '', idx: 0, soft: 0 });
     e.x = x; e.z = z; e.r = r; e.y0 = y0; e.top = top; e.kind = kind; e.idx = idx;
+    e.soft = soft;
     bodyN++;
   }
 
@@ -38614,7 +38757,7 @@ async function buildJadrija(scene) {
       // walk clean through the middle of her.
       const near = show.near && NEARBY[show.phase];
       pushBody(p[0], p[2], near ? BODY.kissR : BODY.r, p[1] + show.air,
-        p[1] + show.air + BODY.top, 'baye', -1);
+        p[1] + show.air + BODY.top, 'baye', -1, near ? 1 : 0);
     }
     // AND THE BUCKETEER, who went three releases without one.
     //
@@ -40326,7 +40469,7 @@ async function buildJadrija(scene) {
         // clip — the fringe's swing among it — and a pose held with a frozen
         // dt is a pose whose cloth never arrives.
         if (posed) skinFig.state.curT = posed.at;
-        else stepShow(dt, pt, ps);
+        else stepShow(dt, pt, ps, dir);
         // After both, because it reads the bones the step above has just
         // solved and it has to run on the held frame as well as the live one.
         placeHorns(dt);
@@ -41614,6 +41757,8 @@ async function buildJadrija(scene) {
       carry: show.carry || null, gave: show.gave || null,
       // The two that are with you: which one was asked for, and the clock.
       near: show.near || null, kiss: +(show.kiss || 0).toFixed(2),
+      mark: show.markT == null ? null
+        : [+show.markT.toFixed(2), +show.markS.toFixed(2), show.hasDir || 0],
       ang: +show.ang.toFixed(2), want: +show.want.toFixed(2),
       ahead: (() => {
         const o = showAhead(SHOW.look, toWorld(show.t, show.s)[1]);
