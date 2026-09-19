@@ -3225,7 +3225,7 @@ let flyCamT = -1;
  * change a line for it. The whole argument is written over `satchelBought`.
  */
 const POCKET = { eur: 20.00, bought: satchelBought(), pick: 0 };
-/** Which shot the fly cam is showing: `drop`, `dance` or `birthday`. */
+/** Which shot the fly cam is showing: `drop`, `dance`, `birthday` or `brush`. */
 let flyCamMode = 'drop';
 /** Held by `__fr.ears.flyCam(t)`, for a scrub — the same switch as `swatHold`. */
 let flyCamHold = false;
@@ -3233,7 +3233,8 @@ let flyCamHold = false;
 let flyCamBig = false;
 function startFlyCam(mode = 'drop') {
   if (!jadrija || !jadrija.vik) return false;
-  flyCamMode = mode === 'dance' || mode === 'birthday' ? mode : 'drop';
+  flyCamMode = (mode === 'dance' || mode === 'birthday' || mode === 'brush')
+    ? mode : 'drop';
   flyCamT = 0;
   flyCamHold = false;
   const el = $('flycam');
@@ -6861,7 +6862,8 @@ function frame() {
     if (!flyCamHold) flyCamT += real;
     const S = jadrija.vik.fly.shot();
     const camLen = flyCamMode === 'dance' ? S.danceLen()
-      : flyCamMode === 'birthday' ? S.birthdayLen() : S.dropLen();
+      : flyCamMode === 'birthday' ? S.birthdayLen()
+        : flyCamMode === 'brush' ? S.brushLen() : S.dropLen();
     if (flyCamT >= camLen || swatCut || pourCut) {
       flyCamT = -1;
       const el = $('flycam');
@@ -7541,6 +7543,7 @@ function frame() {
     const shot = jadrija.vik.fly.shot();
     if (flyCamMode === 'dance') shot.danceShot(flyCamT);
     else if (flyCamMode === 'birthday') shot.birthdayShot(flyCamT);
+    else if (flyCamMode === 'brush') shot.brushShot(flyCamT);
     else shot.dropShot(flyCamT);
     shot.render(renderer, flyCamBig ? false : 'pip');
   } else if (camOverride && jadrija && jadrija.zombies && jadrija.zombies.count() > 0
@@ -9147,6 +9150,7 @@ window.__fr = {
     drop: () => (jadrija && jadrija.zombies ? jadrija.zombies.drop() : null),
     dance: () => (jadrija && jadrija.zombies ? jadrija.zombies.dance() : null),
     birthday: () => (jadrija && jadrija.zombies ? jadrija.zombies.birthday() : null),
+    brush: () => (jadrija && jadrija.zombies ? jadrija.zombies.brush() : null),
     /** What the close-up measured off the animal, in mm — see `metrics`. */
     metrics: () => (jadrija && jadrija.vik ? jadrija.vik.fly.shot().metrics() : null),
     /**

@@ -6169,6 +6169,163 @@ function buildAudio() {
     return dur;
   }
 
+
+  // ── the toothbrush ─────────────────────────────────────────────────────────
+  /**
+   * A Sonicare, running, with its pacer.
+   *
+   * Misha, 19 Sep 2026: *"the zombie fly demonstrates the usage of an electric
+   * toothbrush, preferably the sonicare electric tooth brush"* — and half of
+   * what makes that brush that brush is the sound of it.
+   *
+   * WHAT IT ACTUALLY IS. 31,000 brush strokes a minute is 258 Hz, and what
+   * you hear is that fundamental plus a hard second harmonic and a thin band
+   * of hiss riding on top of them — the bristles, not the motor. A single
+   * sine at 258 is a doorbell; the pair with the hiss over it is a
+   * toothbrush. The whole thing is then wobbled a couple of hertz, because a
+   * motor loaded against a tooth is never quite steady.
+   *
+   * AND THE PACER, which is the other half of knowing what brush it is. A
+   * Sonicare chirps twice every thirty seconds to send you to the next
+   * quadrant and three times at the end of the two minutes, and those chirps
+   * are a high two-tone at about 2.6 kHz. `QUAD` is where they fall in the
+   * shot — the same boundaries `BRUSH` in src/44-corpse.js is written on,
+   * because this is scheduled on the audio clock and cannot read that file.
+   * Five numbers, two places, and they have to agree.
+   */
+  const BRUSH_SND = {
+    hz: 258, gain: 0.115, range: 14,
+    /** When the motor runs, in the shot's own seconds. */
+    on: 2.55, off: 11.70,
+    /** And where the pacer chirps: the three quadrant changes and the end. */
+    quad: [4.30, 5.80, 7.30], done: 11.60,
+    beep: 2620, beepGap: 0.085, beepLen: 0.055,
+  };
+  let brushVoice = null;
+  let brushFired = 0;
+  /**
+   * `d` metres off, `o.start` to run the whole cycle. Answers how long it
+   * lasts, so a caller with no audio context still knows.
+   */
+  function brushRun(d = 0, o = {}) {
+    if (o.probe) return brushFired;
+    const B = BRUSH_SND;
+    const dur = B.off + 0.6;
+    if (!ctx || ctx.state === 'suspended') return dur;
+    const t = ctx.currentTime;
+    const far = Math.max(0, 1 - Math.max(0, d) / B.range);
+    const amp = B.gain * far * clamp(o.level == null ? 1 : o.level, 0, 1);
+    let v = brushVoice;
+    if (v && t > v.until) { brushVoice = v = null; }
+    // Already running: this is the every-frame call, and all it does is move
+    // the level and the pan as you walk round it.
+    if (v && !o.start) {
+      v.g.gain.setTargetAtTime(Math.max(0.00002, amp), t, 0.10);
+      if (o.pan != null) v.pn.pan.setTargetAtTime(clamp(o.pan, -1, 1), t, 0.10);
+      return dur;
+    }
+    if (!o.start || amp <= 0.00003) return dur;
+    if (v) {
+      try { v.osc.stop(t + 0.05); v.oct.stop(t + 0.05); v.lfo.stop(t + 0.05); }
+      catch (e) { /* gone */ }
+    }
+    const t0 = t + 0.03;
+    const g = ctx.createGain();
+    g.gain.value = 0.00002;
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(o.pan || 0, -1, 1);
+    g.connect(pn).connect(bed || master);
+    // The motor: the fundamental and its octave, a little apart in level, and
+    // both of them wobbled by the same slow LFO.
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = B.hz;
+    const oct = ctx.createOscillator();
+    oct.type = 'triangle';
+    oct.frequency.value = B.hz * 2;
+    const octG = ctx.createGain();
+    octG.gain.value = 0.42;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 2.3;
+    const lfoG = ctx.createGain();
+    lfoG.gain.value = 4.5;
+    lfo.connect(lfoG);
+    lfoG.connect(osc.frequency);
+    lfoG.connect(oct.frequency);
+    // The motor's own gate: on when the fly presses the button and off when
+    // it presses it again, both a tenth of a second rather than a step,
+    // because a motor spins up.
+    const mg = ctx.createGain();
+    mg.gain.setValueAtTime(0.0001, t0);
+    mg.gain.setValueAtTime(0.0001, t0 + B.on - 0.02);
+    mg.gain.linearRampToValueAtTime(1, t0 + B.on + 0.12);
+    mg.gain.setValueAtTime(1, t0 + B.off - 0.02);
+    mg.gain.linearRampToValueAtTime(0.0001, t0 + B.off + 0.22);
+    // And a band of hiss over it, which is the bristles: a peaking filter
+    // parked where a brush against a tooth lives.
+    const pk = ctx.createBiquadFilter();
+    pk.type = 'peaking';
+    pk.frequency.value = 3200;
+    pk.gain.value = 7;
+    pk.Q.value = 0.9;
+    // The noise buffer this file makes once at start-up — see `makeNoise`.
+    let hiss = null;
+    if (noiseBuf) {
+      hiss = ctx.createBufferSource();
+      hiss.buffer = noiseBuf;
+      hiss.loop = true;
+    }
+    osc.connect(mg);
+    oct.connect(octG).connect(mg);
+    mg.connect(pk).connect(g);
+    if (hiss) {
+      const hg = ctx.createGain();
+      hg.gain.value = 0.055;
+      const hb = ctx.createBiquadFilter();
+      hb.type = 'bandpass';
+      hb.frequency.value = 3400;
+      hb.Q.value = 1.2;
+      hiss.connect(hb).connect(hg).connect(mg);
+      try { hiss.start(t0); hiss.stop(t0 + dur + 0.1); } catch (e) { /* once */ }
+    }
+    // The pacer. Two chirps at each quadrant change and three at the end,
+    // each its own little oscillator because that is cheaper than a sampler
+    // and exactly as accurate.
+    const chirp = (when, n) => {
+      for (let i = 0; i < n; i++) {
+        const cs = ctx.createOscillator();
+        cs.type = 'square';
+        cs.frequency.value = B.beep * (i & 1 ? 1.12 : 1);
+        const cg = ctx.createGain();
+        const w = t0 + when + i * B.beepGap;
+        cg.gain.setValueAtTime(0.0001, w);
+        cg.gain.linearRampToValueAtTime(0.35, w + 0.006);
+        cg.gain.setValueAtTime(0.35, w + B.beepLen * 0.7);
+        cg.gain.linearRampToValueAtTime(0.0001, w + B.beepLen);
+        cs.connect(cg).connect(g);
+        cs.start(w);
+        cs.stop(w + B.beepLen + 0.02);
+      }
+    };
+    for (const q of B.quad) chirp(q, 2);
+    chirp(B.done, 3);
+    g.gain.setValueAtTime(0.00002, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00003, amp), t0 + 0.06);
+    g.gain.setValueAtTime(Math.max(0.00003, amp), t0 + dur - 0.20);
+    g.gain.exponentialRampToValueAtTime(0.00002, t0 + dur);
+    if (verbSend) {
+      const w = ctx.createGain();
+      w.gain.value = 0.08 * far;
+      g.connect(w).connect(verbSend);
+    }
+    const end = t0 + dur + 0.08;
+    osc.start(t0); oct.start(t0); lfo.start(t0);
+    osc.stop(end); oct.stop(end); lfo.stop(end);
+    brushFired += 1;
+    brushVoice = { osc, oct, lfo, g, pn, until: end };
+    return dur;
+  }
+
   // ── and the same woman, in her own language ─────────────────────────────────
   /**
    * The Bucketeer says something short, in Croatian, once every five minutes.
@@ -6872,7 +7029,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

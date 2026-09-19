@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.430.0] — 2026-09-19 (baye 1.28.0)
+
+### the Sonicare demonstration
+
+**"can we add a new special crazy/weird dance for the zombie fly to perform:
+this time, the zombie fly demonstrates the usage of an electric toothbrush,
+preferably the sonicare electric tooth brush"**.
+
+Fourteen seconds, and it is a DEMONSTRATION rather than a dance, which is the
+joke: the fly works through the routine off the back of the box, straight to
+camera, with the seriousness of a man in a white coat — and then the brush
+gets away from it.
+
+    present   in from stage right, the brush held out flat to the lens and
+              turned once about its own axis, the way a hand shows a thing
+    press     a front leg over to the button, and it comes on
+    quads     the four quadrants, thirty seconds each in a real two-minute
+              cycle and a second and a half here, the pacer chirping between
+    wild      the buzz wins: the brush drags it round the tile twice with the
+              animal hanging off the handle
+    off       a leg back on the button, and the shaking dies with the motor
+    bow       the brush up overhead like a trophy, and a bow in the quiet
+
+**Fly-sized and not life-sized**, which was the one decision that had to be
+made before any of the rest of it. A real Sonicare is 24 cm and this animal
+is 7 mm: hand it the real thing and the shot is a fly standing next to a
+telegraph pole. So the brush is 5.8 mm — a shade shorter than the fly is long
+— and it is a Sonicare rather than a toothbrush: white body, the grey rubber
+grip panel down the front, the one round button, the chrome collar, the slim
+bent neck, the oval head with blue centre bristles. Four of those five are
+what makes a shape read as that brush and not as a stick.
+
+**Where the brush is gets said by WHICH PART OF IT is at the point**, and
+that is the whole of why the poses read. Every beat names a point in the
+animal's frame, the angles the brush lies at, and how far along the brush
+that point is: the quadrants put the BRISTLES on its cheek and let the handle
+fall where it falls, the wild beat holds the FOOT of the handle and lets the
+head lead, and those are different numbers for the same pair of legs. The
+first cut wrote them all as "where the handle is" and the animal spent six
+seconds brushing the air beside its own face. The angle has a sign trap in it
+too, and it cost a render: the tilt is the direction from the foot to the
+head, so a head on the NEAR cheek is reached from further out on that side —
+plus the side, and the handle lies back through its own thorax.
+
+**The sound is the brush and not a fly**, which is the one number in this
+movement's repertoire that nobody hums. 31,000 brush strokes a minute is
+258 Hz, and what a Sonicare sounds like is that fundamental, a hard second
+harmonic, and a thin band of hiss over the two of them — the bristles, not
+the motor. A single sine at 258 is a doorbell. And it has its pacer: two
+chirps at each quadrant change and three at the end, at 2.6 kHz, on the same
+boundaries the shot is cut on. One brush for the whole movement however many
+flies are demonstrating it, because five Sonicares out of five flies is a
+dentist's waiting room.
+
+Out on the terrace at 7 mm there is no brush to see at that size, and what a
+demonstration looks like from across a room is SHAKING: each of them holds
+its ground, buzzes on the spot at the brush's own rate, and is flung round
+its own axis for the two laps where the thing gets away from it.
+
+Ask for it by name — **show me how to use the toothbrush**, **do the sonicare
+dance**, **brush your teeth** — and, as with the birthday number, a sentence
+with both a dance and a toothbrush in it is the toothbrush. "Brush" on its
+own is not enough: that is a word somebody says about her hair, so either the
+thing is named or the sentence says teeth.
+
 ## [1.429.0] — 2026-09-19 (baye 1.27.0)
 
 ### she stops when you start

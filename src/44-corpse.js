@@ -801,6 +801,76 @@ const BDAY = {
 };
 
 /**
+ * ── THE SONICARE DEMONSTRATION ─────────────────────────────────────────────
+ *
+ * Misha, 19 Sep 2026: *"a new special crazy/weird dance... the zombie fly
+ * demonstrates the usage of an electric toothbrush, preferably the sonicare"*.
+ *
+ * It is a DEMONSTRATION and not a dance, which is the joke: the fly works
+ * through the routine off the back of the box, straight to camera, with the
+ * seriousness of a man in a white coat — and then the brush gets away from it
+ * and takes it round the room. Fourteen seconds:
+ *
+ *   present   in from stage right, the brush held out flat to the lens and
+ *             turned once about its own axis, the way a hand shows a thing
+ *   press     a front leg over to the button, and it comes on
+ *   quads     the four quadrants, thirty seconds each in a real two-minute
+ *             cycle and one and a half here, the pacer chirping between them
+ *   wild      the buzz wins: the brush drags it round the tile, twice, with
+ *             the animal hanging off the handle
+ *   off       it gets a leg back on the button and the shaking dies
+ *   bow       the brush up overhead like a trophy, and a bow in the quiet
+ *
+ * Every beat is a pure function of `t` like every other shot in this file, so
+ * `__fr.ears.flyCam(t, 'brush', true)` scrubs it a frame at a time.
+ *
+ * THE SOUND IS NOT HERE. The motor and the pacer chirps are `brushRun` in
+ * src/80-audio.js, which has its own copy of these times because it is
+ * scheduled on the audio clock and cannot read this file. The two are marked
+ * in both places; they are five numbers and they have to agree.
+ */
+const BRUSH = {
+  len: 14.0,
+  present: [0.00, 2.00],
+  press: [2.00, 0.80],
+  quads: [2.80, 6.00],       // four of them, 1.5 s each
+  wild: [8.80, 2.60],
+  off: [11.40, 0.90],
+  bow: [12.30, 1.70],
+  bpm: 118,
+  /** How the brush is held: mm off its nose, and how high over the tile. */
+  hold: 3.0,
+  ride: 7.6,
+  /** The four quadrants, as [which side of its head, which half]. */
+  quad: [[1, 1], [-1, 1], [-1, -1], [1, -1]],
+  /** How far out it works the head, and how hard the animal shakes with it. */
+  reach: 1.9,
+  shake: 0.40,
+  /** The wild beat: how wide the brush takes it round, and how many times. */
+  orbit: 5.2,
+  laps: 2,
+  /** And the bow: how far up the brush goes and how far over it goes. */
+  up: 3.4,
+  bowP: 0.62,
+  /**
+   * The lens, as keys: [t, metres out, radians up, radians round, aim mm].
+   *
+   * Further out than the birthday number's, and measured rather than
+   * guessed: this animal is holding a thing nearly as long as it is, so the
+   * frame has to take a 6 mm fly and a 6 mm brush at whatever angle it has
+   * the brush at. At the 0.082 the first cut opened on, the fly alone filled
+   * the frame and the head of the brush was outside it.
+   */
+  key: [
+    [0.00, 0.115, 0.26, 0.58, 7.8],
+    [2.80, 0.104, 0.24, 0.46, 7.6],
+    [8.80, 0.132, 0.30, 0.34, 7.2],
+    [11.40, 0.112, 0.26, 0.22, 6.8],
+    [14.00, 0.100, 0.24, 0.14, 6.2],
+  ],
+};
+
+/**
  * And the cake, which is 1.8 mm across. A fly is 6.5 mm long, so this is the
  * cake a fly would need two of its legs to carry — which is what it does.
  */
@@ -811,6 +881,140 @@ const CAKE = {
   flame: [0.160, 0.54],
   smoke: 0.24,               // and the puffs it leaves
 };
+
+/**
+ * ── THE TOOTHBRUSH ─────────────────────────────────────────────────────────
+ *
+ * Misha, 19 Sep 2026: *"can we add a new special crazy/weird dance for the
+ * zombie fly to perform: this time, the zombie fly demonstrates the usage of
+ * an electric toothbrush, preferably the sonicare electric tooth brush"*.
+ *
+ * FLY-SIZED AND NOT LIFE-SIZED, which is the one decision that had to be made
+ * before any of the rest of it. A real Sonicare is 24 cm and this animal is
+ * 7 mm: hand it the real thing and the shot is a fly standing next to a
+ * telegraph pole, and nobody can see either of them. So it is 5.4 mm — a
+ * shade shorter than the fly is long — which is a toothbrush a fly could
+ * plausibly be holding and reads as one at the only size anybody sees it.
+ *
+ * It is a Sonicare and not a toothbrush: white body, the grey rubber grip
+ * panel down the front of it, the one round button, the chrome collar, the
+ * slim neck with the bend in it, and the oval head with blue centre bristles.
+ * Four of those five are what makes a shape read as that brush rather than as
+ * a stick, and the button is the one you press.
+ */
+const SONIC = {
+  /** The handle: half-length, radius, and how much it tapers to the foot. */
+  body: [1.70, 0.62, 0.86],
+  /** The rubber grip panel on the front, and how proud of the body it sits. */
+  grip: [1.10, 0.40, 0.09],
+  /** The button: radius, and where up the handle it is. */
+  btn: [0.26, 0.70],
+  /** The chrome collar at the top of the handle. */
+  ring: [0.66, 0.22],
+  /** The neck: length, radius at the collar, radius at the head. */
+  neck: [1.55, 0.26, 0.20],
+  /** And the head: half-length, half-width, and the bristles on top of it. */
+  head: [0.52, 0.34, 0.34],
+  /**
+   * How fast the head shakes, and how far. A Sonicare runs at 31,000 strokes
+   * a minute, which is 258 Hz — and at 258 Hz on a 60 Hz screen a shaking
+   * head is a still head with a stroboscope on it. So it shakes at 26, which
+   * is the fastest thing the eye reads as shaking rather than as blur, and
+   * the sound carries the other 232.
+   */
+  hz: 26, throw: 0.40,
+};
+
+/**
+ * The brush, as geometry. Built once with the stage and hidden until somebody
+ * asks for the demonstration.
+ *
+ * Its own frame: the handle's foot at the origin, the head at +y, the button
+ * and the grip panel facing +x. Everything that poses it therefore only has
+ * to say where the foot of it is and which way is up, which is what a hand
+ * holding a toothbrush decides.
+ */
+function sonicare(stage, fade, res) {
+  const S = SONIC;
+  const M = {
+    shell: corpseMaterial([0.955, 0.960, 0.965], { spec: 0.62, power: 70, fade, res }),
+    grip: corpseMaterial([0.300, 0.325, 0.350], { spec: 0.30, power: 26, fade, res }),
+    chrome: corpseMaterial([0.760, 0.790, 0.820], { spec: 0.90, power: 120, fade, res }),
+    btn: corpseMaterial([0.180, 0.470, 0.760], { spec: 0.55, power: 60, fade, res }),
+    bristle: corpseMaterial([0.960, 0.965, 0.955], { spec: 0.35, power: 30, fade, res }),
+    blue: corpseMaterial([0.150, 0.430, 0.820], { spec: 0.35, power: 30, fade, res }),
+  };
+  const g = new THREE.Group();
+  const add = (geo, mat, p, parent) => {
+    const m = new THREE.Mesh(geo, mat);
+    if (p) m.position.set(mm(p[0]), mm(p[1]), mm(p[2]));
+    (parent || g).add(m);
+    return m;
+  };
+  // The handle, and the foot rounded off it.
+  const bodyH = S.body[0] * 2;
+  add(new THREE.CylinderGeometry(mm(S.body[1]), mm(S.body[1] * S.body[2]),
+    mm(bodyH), 14), M.shell, [0, S.body[0], 0]);
+  add(new THREE.SphereGeometry(mm(S.body[1] * S.body[2]), 12, 8), M.shell, [0, 0, 0]);
+  // The grip panel down the front of it: a slab with its own curve, sunk into
+  // the shell so only its face shows.
+  const gp = add(new THREE.CylinderGeometry(mm(S.body[1] + S.grip[2]),
+    mm(S.body[1] + S.grip[2]), mm(S.grip[0] * 2), 14, 1, true,
+    -S.grip[1], S.grip[1] * 2), M.grip, [0, S.body[0] * 0.92, 0]);
+  gp.rotation.y = Math.PI / 2 - S.grip[1];
+  // The button, proud of the panel.
+  const btn = add(new THREE.CylinderGeometry(mm(S.btn[0]), mm(S.btn[0]),
+    mm(0.16), 12), M.btn, [S.body[1] + S.grip[2] * 0.6, S.btn[1], 0]);
+  btn.rotation.z = Math.PI / 2;
+  // The collar, the neck and the bend in it.
+  add(new THREE.CylinderGeometry(mm(S.ring[0]), mm(S.ring[0]), mm(S.ring[1]), 14),
+    M.chrome, [0, bodyH + S.ring[1] * 0.5, 0]);
+  const neckY = bodyH + S.ring[1];
+  const shaft = new THREE.Group();
+  shaft.position.set(0, mm(neckY), 0);
+  g.add(shaft);
+  add(new THREE.CylinderGeometry(mm(S.neck[2]), mm(S.neck[1]), mm(S.neck[0]), 10),
+    M.shell, [0, S.neck[0] / 2, 0], shaft);
+  // The head: an oval pad on the end of the neck, angled forward the way a
+  // brush head is, with the bristles standing off its face.
+  const headG = new THREE.Group();
+  headG.position.set(0, mm(S.neck[0]), 0);
+  headG.rotation.z = -0.13;
+  shaft.add(headG);
+  const pad = add(new THREE.SphereGeometry(mm(S.head[0]), 12, 8),
+    M.shell, [0, S.head[0] * 0.5, 0], headG);
+  pad.scale.set(S.head[1] / S.head[0], 1, 0.62);
+  const br = add(new THREE.CylinderGeometry(mm(S.head[1] * 0.92), mm(S.head[1]),
+    mm(S.head[2]), 12), M.bristle, [S.head[1] * 0.55, S.head[0] * 0.55, 0], headG);
+  br.rotation.z = -Math.PI / 2;
+  br.scale.set(1, 1, 0.66);
+  const bl = add(new THREE.CylinderGeometry(mm(S.head[1] * 0.42), mm(S.head[1] * 0.46),
+    mm(S.head[2] * 1.12), 10), M.blue, [S.head[1] * 0.58, S.head[0] * 0.55, 0], headG);
+  bl.rotation.z = -Math.PI / 2;
+  bl.scale.set(1, 1, 0.66);
+  for (const m of g.children) { m.castShadow = false; m.receiveShadow = false; }
+  g.visible = false;
+  stage.add(g);
+  return {
+    group: g,
+    /** mm from the foot of the handle to the tip of the bristles. */
+    len: neckY + S.neck[0] + S.head[0] * 0.55 + S.head[1],
+    /** Where the button is, in the brush's own frame — a leg reaches for it. */
+    button: [S.body[1] + S.grip[2] * 0.6, S.btn[1], 0],
+    hide(on) { g.visible = !on; },
+    /**
+     * Running. `k` is how hard, 0 to 1, and `t` the shot's own clock — the
+     * head twists about the neck and the whole thing shivers with it, both
+     * pure functions of `t` so a held frame holds still. See SONIC.hz.
+     */
+    setRun(k, t) {
+      const a = TAU * SONIC.hz * t;
+      headG.rotation.y = SONIC.throw * k * Math.sin(a);
+      shaft.rotation.z = 0.035 * k * Math.sin(a * 0.5);
+      shaft.position.x = mm(0.06 * k * Math.sin(a + 1.1));
+    },
+  };
+}
 
 const smooth01 = (x) => { const u = sat(x); return u * u * (3 - 2 * u); };
 const hash1 = (x) => { const v = Math.sin(x * 12.9898) * 43758.5453; return v - Math.floor(v); };
@@ -1663,9 +1867,15 @@ function buildFlyCorpse() {
   const extras = [];
   // The cake and its candle, for `birthdayShot` and nothing else.
   const cake = birthdayCake(stage, fade, res);
+  // And the toothbrush, likewise, for `brushShot`.
+  const brush = sonicare(stage, fade, res);
   const _v = new THREE.Vector3();
   const _w = new THREE.Vector3();
   const _q = new THREE.Vector3();
+  const _be = new THREE.Euler();
+  const _bq = new THREE.Quaternion();
+  const _bd = new THREE.Vector3();
+  const _up = new THREE.Vector3(0, 1, 0);
 
   /** Where each foot is, in the stage, for the pose the animal is in now. */
   function footAt(A, i, out) {
@@ -1715,6 +1925,7 @@ function buildFlyCorpse() {
     measure();
     floorMesh.visible = true;
     cake.hide(true);
+    brush.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -1936,6 +2147,7 @@ function buildFlyCorpse() {
     for (let i = 0; i < blob.value.length; i++) blob.value[i].copy(blobDead[i]);
     for (const P of pairs) P.hide(true);
     cake.hide(true);
+    brush.hide(true);
     for (const x of extras) x.A.body.visible = false;
     floorMesh.visible = true;
     rig.updateMatrixWorld(true);
@@ -1957,6 +2169,7 @@ function buildFlyCorpse() {
     measure();
     floorMesh.visible = false;
     cake.hide(true);
+    brush.hide(true);
     fade.value = 1;
     cam.fov = fov;
     cam.position.set(0, 0, 0);
@@ -2050,6 +2263,7 @@ function buildFlyCorpse() {
     measure();
     floorMesh.visible = true;
     cake.hide(true);
+    brush.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2133,6 +2347,7 @@ function buildFlyCorpse() {
     measure();
     floorMesh.visible = true;
     cake.hide(true);
+    brush.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2252,6 +2467,7 @@ function buildFlyCorpse() {
     measure();
     floorMesh.visible = true;
     cake.hide(false);
+    brush.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2460,6 +2676,264 @@ function buildFlyCorpse() {
     fade.value = 1;
   }
 
+
+  /**
+   * The Sonicare demonstration, `t` seconds in. See BRUSH for the beats.
+   *
+   * WHERE THE BRUSH IS is said by where its HEAD has to be and not by where
+   * its handle is, and that is the whole of why this reads: the head is the
+   * end that has to arrive at a mouth, at a button or over its own shoulder,
+   * and the handle is four and a half millimetres of lever behind it. Poses
+   * written the other way round — foot on the hand, head wherever the
+   * arithmetic put it — have the animal brushing the air beside its face.
+   */
+  function brushShot(t) {
+    measure();
+    floorMesh.visible = true;
+    cake.hide(true);
+    brush.hide(false);
+    for (const x of extras) x.A.body.visible = false;
+    for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
+    const P = pairs[0];
+    P.hide(false);
+    const D = BRUSH;
+    const at = (w) => (t - w[0]) / w[1];
+    const inW = (w) => t >= w[0] && t < w[0] + w[1];
+    const beat = Math.sin(TAU * D.bpm / 60 * t);
+
+    // The lens, on its own keys — the same machinery as the birthday number,
+    // and for the same reason: this shot is tight on a 1 mm button at three
+    // seconds and wide enough for a 5 mm orbit at ten.
+    let k0 = D.key[0], k1 = D.key[D.key.length - 1];
+    for (let i = 0; i < D.key.length - 1; i++) {
+      if (t >= D.key[i][0] && t < D.key[i + 1][0]) { k0 = D.key[i]; k1 = D.key[i + 1]; }
+    }
+    if (t >= k1[0]) k0 = k1;
+    const ce = k1[0] > k0[0] ? smooth01((t - k0[0]) / (k1[0] - k0[0])) : 0;
+    const cd = lerp(k0[1], k1[1], ce);
+    const cel = lerp(k0[2], k1[2], ce);
+    const caz = lerp(k0[3], k1[3], ce);
+    const aimY = lerp(k0[4], k1[4], ce);
+    const faceCam = -caz;
+
+    let bx = 0, bz = 0, by = D.ride, yaw = faceCam, roll = 0, pitch = 0;
+    const tw = [0, 0], fw = [0, 0];
+    let arms = 1, kick = 0, run = 0, press = 0;
+    // The brush, in the animal's own frame: a point (fore, up, lateral), how
+    // the brush lies through it, and WHICH PART OF THE BRUSH that point is —
+    // `anch` 0 is the foot of the handle, 1 is the tip of the bristles. That
+    // last number is the one that makes the poses read: the quadrants are
+    // written by putting the HEAD on its cheek and letting the handle fall
+    // where it falls, and the wild beat by holding the FOOT and letting the
+    // head lead, and those are different numbers for the same pair of legs.
+    let hf = D.hold, hu = 0.3, hl = 0, bRoll = Math.PI / 2, bTilt = 0;
+    let anch = 0.50, spin = 0;
+
+    if (inW(D.present)) {
+      // IN FROM STAGE RIGHT, and the brush turned once about its own axis in
+      // front of the lens — the way a hand shows a thing to somebody.
+      const u = at(D.present);
+      const e = smooth01(u);
+      bx = lerp(9.0, 0, e);
+      bz = lerp(6.0, 0, e);
+      by = lerp(D.ride + 2.4, D.ride, e) + 0.22 * Math.sin(t * 8.7) * (1 - e);
+      yaw = mixAng(faceCam - 1.5, faceCam, e);
+      roll = 0.18 * Math.sin(t * 5.1) * (1 - e);
+      spin = TAU * smooth01(Math.max(0, (u - 0.45) / 0.55));
+      hf = D.hold + 0.6;
+      hu = 0.3 + 0.35 * Math.sin(Math.PI * u);
+      anch = 0.50;
+      tw[0] = tw[1] = lerp(1.2, 2.05, e);
+    } else if (inW(D.press)) {
+      // THE BUTTON. It brings the handle round upright, gets a front leg on
+      // the button, and the motor comes in under its leg.
+      const u = at(D.press);
+      press = Math.min(1, u * 3.2);
+      const e = smooth01(u);
+      bRoll = lerp(Math.PI / 2, 0.22, e);
+      bTilt = lerp(0, -0.14, e);
+      // Clear of its own body: a handle held at the animal's own radius is a
+      // handle lying across its back, and what the lens sees then is a fly
+      // under a log.
+      hf = lerp(D.hold + 0.6, 3.3, e);
+      hu = lerp(0.65, -0.25, e);
+      // Held down by the handle, so the button is where a leg can reach it
+      // and the head is up in the air where the lens can see it start.
+      anch = lerp(0.50, 0.16, e);
+      run = smooth01(Math.max(0, (u - 0.55) / 0.45));
+      by = D.ride + 0.4 * Math.sin(t * 7.0);
+      tw[0] = tw[1] = 2.05;
+    } else if (inW(D.quads)) {
+      // THE FOUR QUADRANTS, thirty seconds each in a real cycle and a second
+      // and a half here. It works the head into the corner of its own mouth,
+      // one side then the other, and the pacer chirps at each change — that
+      // is `brushRun` in src/80-audio.js, on these same boundaries.
+      const u = at(D.quads);
+      const q = Math.min(3, Math.floor(u * 4));
+      const qu = u * 4 - q;
+      const [side, half] = D.quad[q];
+      const sw = Math.sin(TAU * 2.2 * (t - D.quads[0]));
+      run = 1;
+      kick = 0.35;
+      // Its head is at the front of it, so the brush comes in across the
+      // nose: the head of the brush inside the reach, the handle out to the
+      // side of whichever cheek it is on.
+      hf = 2.50 + 0.12 * sw;
+      hu = half > 0 ? 0.50 : -0.40;
+      hl = side * (0.55 + 0.10 * sw);
+      // MINUS the side and not plus it, which is the difference between a
+      // handle sticking out past its cheek and a handle lying back through
+      // its own thorax: this angle is the direction from the FOOT to the
+      // head, so a head on the near cheek is reached from further out on
+      // that side, not from the other one.
+      bRoll = -side * (1.35 + 0.10 * sw);
+      bTilt = -0.35 - half * 0.25;
+      // The BRISTLES are the point that has to arrive, and the handle goes
+      // wherever that leaves it.
+      anch = 0.94;
+      // It leans into the side it is working on, and up or down with the half.
+      roll = side * 0.22 + 0.05 * sw;
+      pitch = -half * 0.18;
+      yaw = faceCam + side * 0.34;
+      by = D.ride + 0.35 * beat;
+      // And a little swing round the tile, so six seconds of this is not six
+      // seconds of a fly standing still.
+      bx = 1.1 * Math.sin(TAU * (u * 0.75 + 0.1));
+      bz = 0.8 * Math.cos(TAU * (u * 0.75 + 0.1));
+      tw[0] = tw[1] = 1.95 + 0.25 * Math.sin(TAU * 1.4 * t);
+      // The change itself: a beat of the head lifting clear between quadrants.
+      hf += 0.9 * Math.max(0, 1 - Math.abs(qu - 0.02) * 22);
+    } else if (inW(D.wild)) {
+      // AND THE BUZZ WINS. The brush takes it round the tile twice, held out
+      // at the full stretch of the handle, the animal trailing off the end of
+      // it and shaking so hard the wings blur.
+      const u = at(D.wild);
+      const e = smooth01(u);
+      const env = Math.min(1, u * 4, (1 - u) * 3.4);
+      const a = TAU * D.laps * e;
+      run = 1;
+      arms = 1;
+      bx = D.orbit * Math.cos(a) * env;
+      bz = D.orbit * Math.sin(a) * env;
+      by = D.ride + 1.6 * Math.sin(TAU * 2 * e) * env;
+      // Trailing: it faces the way it is being dragged, and banks into it.
+      yaw = Math.atan2(-Math.sin(a), Math.cos(a)) + Math.PI / 2;
+      roll = -0.55 * env;
+      pitch = 0.30 * env * Math.sin(TAU * 3 * e);
+      // The brush leads, out in front and level, with the animal hanging off
+      // the back of the handle.
+      hf = 3.4;
+      hu = 0.2 + 0.5 * Math.sin(TAU * 3 * e);
+      hl = 0;
+      bRoll = 0.25 * Math.sin(TAU * 4 * e);
+      bTilt = -1.45;
+      // Held by the foot of the handle with the head out in front, which is
+      // what being dragged by a thing looks like.
+      anch = 0.10;
+      tw[0] = 2.3; tw[1] = 2.3;
+      fw[0] = 0.5 * Math.sin(TAU * 2 * e);
+      fw[1] = -fw[0];
+    } else if (inW(D.off)) {
+      // OFF. A leg back on the button, and the shaking dies with the motor.
+      const u = at(D.off);
+      const e = smooth01(u);
+      press = Math.min(1, (1 - u) * 3.0, u * 4.0);
+      run = 1 - smooth01(Math.max(0, (u - 0.30) / 0.45));
+      bx = lerp(D.orbit * 0.35, 0, e);
+      bz = lerp(D.orbit * 0.20, 0, e);
+      by = lerp(D.ride + 0.8, D.ride, e);
+      yaw = mixAng(faceCam + 0.9, faceCam, e);
+      roll = lerp(-0.30, 0, e);
+      bRoll = lerp(0.9, 0.22, e);
+      bTilt = lerp(-1.0, -0.14, e);
+      hf = 3.3;
+      hu = -0.25;
+      anch = 0.12;
+      tw[0] = tw[1] = lerp(2.3, 2.05, e);
+    } else {
+      // AND THE BOW, with the thing held up like a trophy.
+      const u = sat(at(D.bow));
+      const e = smooth01(Math.min(1, u * 2.0));
+      yaw = faceCam;
+      by = D.ride + 0.5 * e;
+      pitch = -D.bowP * smooth01(Math.max(0, (u - 0.35) / 0.45));
+      bRoll = 0;
+      bTilt = lerp(-0.14, 0.06, e);
+      hf = lerp(3.3, 1.7, e);
+      hu = lerp(-0.25, D.up, e);
+      anch = lerp(0.12, 0.18, e);
+      arms = 1;
+      tw[0] = tw[1] = lerp(2.05, D.up > 0 ? 2.60 : 2.05, e);
+    }
+
+    // The shake. Everything the motor does to the animal is here and nowhere
+    // else, so a beat that wants more of it only has to raise `run`.
+    const shk = run * D.shake;
+    const sa = TAU * SONIC.hz * t;
+    bx += 0.10 * shk * Math.sin(sa);
+    by += 0.08 * shk * Math.sin(sa * 1.37 + 0.6);
+    roll += 0.09 * shk * Math.sin(sa + 1.1);
+    pitch += 0.06 * shk * Math.sin(sa * 0.81);
+
+    rig.position.set(mm(bx), mm(by), mm(bz));
+    rig.rotation.order = 'YXZ';
+    rig.rotation.set(roll, yaw, pitch);
+    setLegs(A0, (L) => {
+      if (L.row === 1) return liveRaw(L, 'carry');
+      // The front pair holds the brush; the near one of them goes to the
+      // button when there is a button to press.
+      if (L.row === 0) {
+        const k = press > 0 && L.s > 0 ? Math.max(arms, press) : arms;
+        return mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'arms'), k);
+      }
+      if (kick > 0) {
+        const k = Math.max(0, Math.sin(TAU * 3 * t + (L.row * 2 + (L.s > 0 ? 1 : 0)) * 1.6));
+        return mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'stand'), k * kick);
+      }
+      return liveRaw(L, 'tuck');
+    });
+    const wb = (Math.floor(t * 60) & 1) ? 1 : -1;
+    for (const W of A0.wings) {
+      W.g.rotation.set(0, -W.s * (1.70 - 0.26 * run), 0.55 * wb * (1 + 0.34 * run));
+    }
+    rig.updateMatrixWorld(true);
+    eyeRot(A0);
+
+    for (let k = 0; k < 2; k++) {
+      const s = k ? 1 : -1;
+      const B = P.b[k];
+      footAt(A0, k ? 3 : 2, _w);
+      B.hang.position.copy(_w);
+      B.hang.rotation.set(-s * tw[k], yaw, fw[k]);
+      B.pin.rotation.set(0, 0, 0);
+      B.setFill(1);
+      B.stream.visible = false;
+    }
+
+    // ── and the brush ──────────────────────────────────────────────────────
+    // Its own axis is +y. `bRoll` lays it over toward the side and `bTilt`
+    // toward the nose, both in the animal's frame, and the animal's yaw turns
+    // the pair of them into the stage. Then the foot is backed off the head
+    // by however much of the handle is behind the hand.
+    _be.set(bRoll, yaw, bTilt, 'YXZ');
+    brush.group.quaternion.setFromEuler(_be);
+    if (spin) brush.group.quaternion.multiply(_bq.setFromAxisAngle(_up, spin));
+    _bd.set(0, 1, 0).applyQuaternion(brush.group.quaternion);
+    const hx = bx + hf * Math.cos(yaw) + hl * Math.sin(yaw);
+    const hz = bz - hf * Math.sin(yaw) + hl * Math.cos(yaw);
+    brush.group.position.set(mm(hx), mm(by + hu), mm(hz));
+    brush.group.position.addScaledVector(_bd, -mm(brush.len * anch));
+    brush.setRun(run, t);
+
+    blob.value[6].set(brush.group.position.x, brush.group.position.z,
+      mm(1.1) * sat(1 - (by + hu) / 7));
+    P.shadow(blob, 4);
+    bodyShadow(A0, mm(by));
+    _v.set(0, mm(aimY), 0);
+    look(cd, cel, caz, _v);
+    fade.value = 1;
+  }
+
   // A second and a third animal for the insert, built only if the movement
   // has grown that big. Clones share every geometry and every material except
   // the two eyes, whose `uRot` is per animal.
@@ -2491,11 +2965,13 @@ function buildFlyCorpse() {
   return {
     stage, cam, rig, body,
     look,
-    revive, reset, insert, dropShot, danceShot, birthdayShot,
+    revive, reset, insert, dropShot, danceShot, birthdayShot, brushShot,
     /** How long the dance runs, seconds. */
     danceLen: () => DANCE.len,
     /** How long the birthday number runs, seconds. */
     birthdayLen: () => BDAY.len,
+    /** And the Sonicare demonstration. */
+    brushLen: () => BRUSH.len,
     /**
      * What `measure` measured, in millimetres — the three numbers every shot
      * in here is staged against, and the ones a routine gets wrong by

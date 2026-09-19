@@ -147,6 +147,23 @@ const ZOMBIE = {
   // registers a tenth of a second apart. Nobody hums anything else all shot.
   bday: { len: 12.9, spin: 0.55, loops: 3, stagger: 0.10, salute: 10.9,
     overhead: 2.75 },
+  // ── the toothbrush demonstration ─────────────────────────────────────────
+  //
+  // Misha, 19 Sep 2026: *"a new special crazy/weird dance... the zombie fly
+  // demonstrates the usage of an electric toothbrush, preferably the
+  // sonicare"*.
+  //
+  // The demonstration you can SEE is the fly cam's — BRUSH in
+  // src/44-corpse.js, the brush and the button and the four quadrants. Out
+  // here at 7 mm there is no brush to see at that size, and what a
+  // demonstration looks like from across a room is SHAKING: each of them
+  // holds its ground, turns slowly, buzzes on the spot at the brush's own
+  // rate, and is flung round its own axis for the two laps where the thing
+  // gets away from it. The sound is the brush itself — `brushRun` in
+  // src/80-audio.js — and not a fly at all, which is the point: it is the
+  // one number in this movement's repertoire that nobody hums.
+  brush: { len: 14.0, spin: 0.30, loops: 2, stagger: 0.08,
+    hz: 26, shake: 0.010, wild: [8.80, 2.60], wildSpin: 2.2 },
 };
 
 /**
@@ -253,6 +270,9 @@ function buildZombies(vik, buck) {
       humDance: false, humAgain: -1,
       // When this one comes in on the birthday tune, or −1. See `birthday`.
       humSong: -1,
+      // And when the toothbrush starts, which is one sound for the whole
+      // movement rather than one each — see `brush`.
+      humBrush: -1,
     };
     flock.push(z);
     return z;
@@ -324,7 +344,17 @@ function buildZombies(vik, buck) {
       z.dance.t += dt;
       z.p.y += 0.02 * Math.cos(z.dance.t * 12.6) * dt;
       z.speed = 0.4;
-      if (z.dance.t >= (z.dance.bday ? ZOMBIE.bday : ZOMBIE.dance).len) z.dance = null;
+      // The brush shakes it where it stands, at the brush's own rate.
+      if (z.dance.brush) {
+        const B = ZOMBIE.brush;
+        const on = z.dance.t > 2.55 && z.dance.t < 11.70;
+        if (on) {
+          const a = TAU * B.hz * z.dance.t;
+          z.p.y += B.shake * Math.sin(a) * dt;
+          z.p.x += B.shake * Math.sin(a * 1.31 + z.i) * dt;
+        }
+      }
+      if (z.dance.t >= routineOf(z.dance).len) z.dance = null;
     } else if (z.wake > 0) {
     // Getting up off the tile: straight up, slowly, for most of a second.
       z.wake -= dt;
@@ -375,9 +405,16 @@ function buildZombies(vik, buck) {
     // Facing the way it is going, nose up in the air as the live one is.
     const r = z.rig;
     const dz = z.dance;
-    const DZ = dz && dz.bday ? ZOMBIE.bday : ZOMBIE.dance;
+    const DZ = dz ? routineOf(dz) : ZOMBIE.dance;
     const du = dz ? sat(dz.t / DZ.len) : 0;
-    const spin = dz ? TAU * DZ.spin * dz.t : 0;
+    let spin = dz ? TAU * DZ.spin * dz.t : 0;
+    // And the two laps where the brush wins, which are a different rate
+    // entirely — see ZOMBIE.brush.
+    if (dz && dz.brush) {
+      const W = ZOMBIE.brush.wild;
+      const wu = sat((dz.t - W[0]) / W[1]);
+      spin += TAU * ZOMBIE.brush.wildSpin * smooth01(wu);
+    }
     r.position.copy(z.p);
     r.rotation.set(0, -z.head + spin, 0.30);
     r.updateMatrix();
@@ -393,6 +430,8 @@ function buildZombies(vik, buck) {
       // Right round its feet while it dances — `loops` times over the routine,
       // and on a birthday they finish overhead and stay there for the bow.
       const twirl = !dz ? 0
+        : dz.brush
+          ? TAU * ZOMBIE.brush.loops * smooth01(du)
         : dz.bday
           ? TAU * DZ.loops * smooth01(sat(dz.t / DZ.salute))
             + ZOMBIE.bday.overhead * smooth01((dz.t - DZ.salute) / 1.2)
@@ -463,13 +502,18 @@ function buildZombies(vik, buck) {
     }
   }
 
+  /** Which of the three numbers a dance record is running. */
+  function routineOf(dz) {
+    return dz.brush ? ZOMBIE.brush : dz.bday ? ZOMBIE.bday : ZOMBIE.dance;
+  }
+
   /** Everybody in, a fifth of a second apart. */
   function choir() {
     for (const z of flock) {
       // Not one that is in the middle of the birthday tune. Her melody laid
       // over that is two tunes at once out of one fly, and the birthday one
       // is the only thing anybody is listening for while it is on.
-      if (z.dance && z.dance.bday) continue;
+      if (z.dance && (z.dance.bday || z.dance.brush)) continue;
       if (z.humStart < 0) z.humStart = clockS + z.i * ZOMBIE.hum.stagger;
     }
   }
@@ -521,6 +565,18 @@ function buildZombies(vik, buck) {
         z.humStart = clockS;
       } else {
         audio.zombieHum(dist, { id: z.i, pan });
+      }
+      // And the toothbrush, which is not a voice at all: ONE brush for the
+      // movement, however many of them are demonstrating it, because five
+      // Sonicares out of five flies is a dentist's waiting room. Whoever
+      // starts it starts it; everybody else's call only moves the level.
+      if (audio.brushRun) {
+        if (z.humBrush >= 0 && clockS >= z.humBrush) {
+          z.humBrush = -1;
+          audio.brushRun(dist, { start: true, pan });
+        } else if (z.dance && z.dance.brush) {
+          audio.brushRun(dist, { pan });
+        }
       }
       // And the birthday tune, which is a different voice in `80-audio.js` —
       // not her melody at all — so it has its own start and its own follow.
@@ -578,14 +634,34 @@ function buildZombies(vik, buck) {
       }
       return n;
     },
+    /**
+     * "Show me how to use the toothbrush." The Sonicare demonstration: every
+     * member that still has its buckets performs it, and the brush itself is
+     * heard once for the lot of them. Answers how many are in it.
+     */
+    brush: () => {
+      let n = 0;
+      for (const z of flock) {
+        if (z.drop || z.dance) continue;
+        z.dance = { t: 0, brush: true };
+        z.humDance = false;
+        z.humAgain = -1;
+        z.humStart = -1;
+        z.humBrush = clockS + z.i * ZOMBIE.brush.stagger;
+        n += 1;
+      }
+      return n;
+    },
     /** Which members have no buckets in their feet right now, by index. */
     bare: () => flock.map((z) => !!z.drop),
     /** How many are dancing this second — what the Bucketeer is told when
      *  somebody asks her what those flies are doing. See `talk` in
      *  45-bucketeer.js. */
-    dancing: () => flock.filter((z) => z.dance && !z.dance.bday).length,
+    dancing: () => flock.filter((z) => z.dance && !z.dance.bday && !z.dance.brush).length,
     /** And how many are doing the birthday number, which she can see too. */
     partying: () => flock.filter((z) => z.dance && z.dance.bday).length,
+    /** And how many are brushing their teeth, which she can also see. */
+    brushing: () => flock.filter((z) => z.dance && z.dance.brush).length,
     /** Everybody hum, now. Debug, and what a probe of the voice wants. */
     hum: () => { choir(); return flock.length; },
     /** Can another one join? The swat asks before it plays the resurrection. */

@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.27.0"
+VERSION = "1.28.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -359,6 +359,16 @@ INTENTS = [
     # "Liege" is his own word for whoever it is for, so it is one of the ways of
     # asking — and the transcriber has spelt it "leige" and "liage" on a beach.
     ("fly.birthday", [r"\b(birthday|b-?day|liege|leige|liage|many happy returns)\b"]),
+    # Misha, 19 Sep 2026: *"a new special crazy/weird dance for the zombie fly
+    # to perform: this time, the zombie fly demonstrates the usage of an
+    # electric toothbrush, preferably the sonicare electric tooth brush"*.
+    #
+    # THE NOUN AND NOT THE VERB, which is the same lesson the hair's patterns
+    # are written under: "brush" on its own is a word somebody says about her
+    # hair, so either the thing is named — a toothbrush, a Sonicare, which the
+    # transcriber has also spelt "sonic care" — or the sentence says teeth.
+    ("fly.brush", [r"\b(tooth[\s-]?brush\w*|sonic[\s-]?care|sonicare)\b"]),
+    ("fly.brush", [r"\bbrush\w*\b", r"\b(teeth|tooth)\b"]),
 ]
 
 
@@ -1051,6 +1061,12 @@ def intents_of(text: str) -> list:
     # ordinary dance drops out; asked for both, a fly can only do one.
     if "fly.birthday" in out and "fly.dance" in out:
         out.remove("fly.dance")
+    # And the same for the toothbrush, which is asked for as a dance more
+    # often than not — *"a new special crazy/weird dance... the zombie fly
+    # demonstrates the usage of an electric toothbrush"*. A sentence with both
+    # in it wants the one with the toothbrush in it.
+    if "fly.brush" in out and "fly.dance" in out:
+        out.remove("fly.dance")
     return out
 
 
@@ -1357,6 +1373,8 @@ INTENT_NAMES = {"fly.drop": "tell the fly to drop / let go of / put down its buc
                 "fly.dance": "tell the fly to dance, twirl, boogie or do its dance",
                 "fly.birthday": "ask the fly for its birthday performance, or for a "
                                 "dance or a song in honour of somebody's birthday",
+                "fly.brush": "ask the fly to demonstrate the electric toothbrush, "
+                             "the Sonicare, or to show how to brush your teeth",
                 }
 # And the same menu for her own numbers, so that asking in Russian for a
 # pirouette works as well as asking in English. `do.` prefixed, filtered
@@ -1424,6 +1442,8 @@ def classify(text: str):
     # The same one rule `intents_of` has: a birthday IS the dance, in a
     # language where asking for one names the other.
     if "fly.birthday" in got and "fly.dance" in got:
+        got.remove("fly.dance")
+    if "fly.brush" in got and "fly.dance" in got:
         got.remove("fly.dance")
     lang = d.get("language")
     lang = lang.strip() if isinstance(lang, str) else None
@@ -3057,6 +3077,7 @@ def clean_talk(raw: dict, who: str = "baye") -> dict:
         "flies_bare": clamp_num(g("flies_bare"), 0, 20),
         "flies_dancing": clamp_num(g("flies_dancing"), 0, 20),
         "flies_bday": clamp_num(g("flies_bday"), 0, 20),
+        "flies_brush": clamp_num(g("flies_brush"), 0, 20),
         # Shore Baye.
         "soak_s": clamp_num(g("soak_s"), 0, 99999),
         "wet": clamp_num(g("wet"), 0, 1),
@@ -3160,6 +3181,10 @@ def talk_facts(who: str, ctx: dict, t: dict, world: dict):
                            "somebody, which involves a cake the size of a "
                            "lentil with a lit candle on it, and they are "
                            "singing")
+            if t.get("flies_brush"):
+                her.append("the flies are demonstrating an electric "
+                           "toothbrush, a Sonicare, one of them holding it "
+                           "while it shakes the lot of them about")
             if t.get("flies_bare"):
                 her.append("a fly has dropped its tiny buckets")
 

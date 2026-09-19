@@ -720,6 +720,15 @@ const ears = (() => {
       if (typeof startFlyCam === 'function') startFlyCam('birthday');
       return;
     }
+    if (name === 'fly.brush') {
+      const Z = typeof jadrija !== 'undefined' && jadrija && jadrija.zombies;
+      if (!Z || !Z.count()) { note('fly: there is no fly in the movement to hear you', 'meta'); return; }
+      const n = Z.brush();
+      if (!n) { note('fly: its legs are full — it cannot hold a toothbrush as well', 'meta'); return; }
+      note('fly: the toothbrush demonstration' + (n > 1 ? ', all ' + n + ' of them' : ''), 'did');
+      if (typeof startFlyCam === 'function') startFlyCam('brush');
+      return;
+    }
     if (name === 'baye.time') {
       note('baye: asking…', 'meta');
       const res = await voice.answer('time', lang);
