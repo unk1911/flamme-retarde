@@ -669,7 +669,19 @@ document.addEventListener('pointerlockchange', () => {
   // so the camera froze halfway into its move, the terminal never opened, and
   // the only key the computer state machine listens to is one the paused game
   // could not act on. O put you in a Paused screen you could not leave.
-  if (had && !pointerLocked && $('panel').hidden && !comp) setPaused(true);
+  //
+  // AND SO ARE THE EARS, which is the third thing in this game that drops the
+  // lock ON PURPOSE and the only one that was not on this line. Misha, 19 Sep
+  // 2026: *"how come pressing 'I' sometimes makes it go to Paused state?"* —
+  // because a locked pointer cannot put a caret in a text box, so opening the
+  // typed line releases it, and this handler read that as the player's
+  // attention going somewhere else. It had not: it had gone into the box this
+  // game just opened for them. "Sometimes" is whether the lock was held at
+  // the moment — after a settings panel or a sign-in sheet it is not, and
+  // then `I` behaved.
+  if (had && !pointerLocked && $('panel').hidden && !comp && !ears.open()) {
+    setPaused(true);
+  }
 });
 addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;

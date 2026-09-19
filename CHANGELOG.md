@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.426.2] — 2026-09-19
+
+### I is not the player walking away
+
+**"how come pressing 'I' sometimes makes it go to Paused state?"**
+
+Because a locked pointer cannot put a caret in a text box, so opening the typed
+line releases the lock — and `pointerlockchange` reads a lock you HELD being
+dropped as the player's attention going somewhere else, and stops the world for
+them. That is the right rule: Escape, alt-tab and the OS taking the cursor back
+all arrive here. It already had two exemptions for the two things that drop the
+lock on purpose, the settings sheet and sitting down at the laptop. The ears are
+the third and were never added.
+
+*"Sometimes"* is whether the lock was held at that moment. After a settings
+panel or a sign-in sheet it is not, and then `I` behaved perfectly — which is
+the worst kind of bug report to get and a very good one to be given.
+
+And the pointer comes back when the line closes, which is what the settings
+sheet already does: the lock was dropped to let a caret into a box, so the
+moment the box is gone the mouse is a head again. The key press is the gesture
+the browser wants, so it is a grab that gets granted.
+
 ## [1.426.1] — 2026-09-19
 
 ### the phone never buzzed once, and the motor is deeper

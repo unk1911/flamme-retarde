@@ -794,7 +794,19 @@ const ears = (() => {
         document.exitPointerLock?.();
         sayEl.focus();
       }
-      if (!typedOn && sayEl) sayEl.blur();
+      if (!typedOn && sayEl) {
+        sayEl.blur();
+        // AND THE POINTER COMES BACK WITH THE LINE CLOSING, which is what
+        // `togglePanel` does for the settings sheet and for the same reason:
+        // the lock was dropped to let a caret into a box, so the moment the
+        // box is gone the mouse is a head again. The key press is the gesture
+        // the browser wants, so this is a grab that will actually be granted.
+        if (typeof IS_TOUCH !== 'undefined' && !IS_TOUCH
+          && typeof grabPointer === 'function' && typeof state !== 'undefined'
+          && (state.phase === 'fly' || state.phase === 'ground'
+            || state.phase === 'chute' || state.phase === 'swim'
+            || state.phase === 'brod')) grabPointer();
+      }
       syncSay();
       return typedOn;
     },
