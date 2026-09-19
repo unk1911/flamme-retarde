@@ -151,7 +151,49 @@ void main(){
  *              never mentions, and the only symptom is a link failure and a
  *              black object.
  */
-function solidFragment(body = '', decl = '') {
+/**
+ * ── A HIGHLIGHT THAT IS NOT A LOBE ON A NORMAL ───────────────────────────────
+ *
+ * Every other surface in this game gets Blinn-Phong: a dot of light where the
+ * half vector lines up with the normal. That is right for a wall and wrong for
+ * hair, and it is most of why hair in a render reads as moulded plastic. A
+ * strand is a CYLINDER — its normal is not a direction, it is a whole disc of
+ * them — so what a light leaves on it is a BAND running across the strands,
+ * not a dot, and where that band sits depends on the strand direction and not
+ * on the surface at all.
+ *
+ * Kajiya-Kay, which is the cheap version of that and the one every game ships:
+ * the band is `sin` of the angle between the strand and the half vector, taken
+ * to a power. No extra geometry, no texture, one dot product.
+ *
+ * TWO BANDS, because hair has two and leaving one out is what makes the cheap
+ * version look cheap. The sharp one is light off the OUTSIDE of the strand and
+ * is the colour of the sun; the broad one has been through the hair, comes
+ * back the colour of the hair, and sits further down towards the tips. They
+ * are separated by shifting the strand direction along the normal, which is
+ * what `shift` does in every published version of this.
+ */
+const GLSL_HAIR = /* glsl */ `
+float hairBand(vec3 t, vec3 h, float e){
+  float d = dot(t, h);
+  float s = sqrt(max(0.0, 1.0 - d * d));
+  // A strand pointing away from the light carries no band at all, and without
+  // this it carries a bright one: sin is symmetric and dot is not.
+  return smoothstep(-1.0, 0.0, d) * pow(s, e);
+}
+vec3 hairLobes(vec3 tan, vec3 n, vec3 v, vec3 l, vec3 tint, float amt){
+  vec3 h = normalize(l + v);
+  vec3 t1 = normalize(tan + n * 0.08);
+  vec3 t2 = normalize(tan - n * 0.12);
+  // 0.7 and not 0.9: photographed in full August sun off the sea, the sharp
+  // band clipped to white along the top of the tail, and a highlight that has
+  // clipped is a highlight with no shape left in it.
+  return (vec3(hairBand(t1, h, 110.0)) * 0.7
+    + tint * hairBand(t2, h, 16.0) * 1.1) * amt;
+}
+`;
+
+function solidFragment(body = '', decl = '', lit = '') {
   return /* glsl */ `
 precision highp float;
 
@@ -182,6 +224,7 @@ ${GLSL_SKY}
 ${GLSL_HAZE}
 ${GLSL_WATER}
 ${GLSL_SHADOW}
+${GLSL_HAIR}
 
 void main(){
   vec3 n = normalize(vNormal);
@@ -224,6 +267,19 @@ void main(){
 
   col += base * uEmissive;
 
+  // ── AND ANYTHING WHOSE LIGHT IS NOT THIS LIGHT ───────────────────────────
+  //
+  // The body hook runs before the lighting and can change what is lit — the
+  // normal, the colour, how glossy it is. This one runs AFTER it and can add a
+  // term the model above does not have. There is exactly one caller so far and
+  // it is hair, whose highlight is a band across the strands rather than a
+  // lobe on the surface — see hairLobes. In scope: col, base, n, spec,
+  // viewDir, sh.
+  //
+  // (NO BACKTICKS IN HERE: this is inside a template literal and one in a
+  // comment ends it. Fifth time, and the first outside 43-jadrija.js.)
+  ${lit}
+
   float dist = length(vWorld - uCamPos);
   col = applyHaze(col, dist, vWorld, uSunDir, viewDir);
   // And the water, for whatever part of that distance was under it. Every
@@ -241,6 +297,7 @@ void main(){
  * @param color   base colour
  * @param opts    spec / specPower / emissive / body (extra GLSL) / instanced
  *                / uniforms + decl (extra uniforms, supplied *and* declared)
+ *                / lit (extra GLSL, after the lighting rather than before it)
  */
 function solidMaterial(color, opts = {}) {
   // Spread rather than set: three.js warns about a `defines` of undefined on
@@ -261,7 +318,8 @@ function solidMaterial(color, opts = {}) {
       ...(opts.uniforms || {}),
     },
     vertexShader: solidVertex(opts.vert || '', opts.decl || ''),
-    fragmentShader: solidFragment(opts.body || '', opts.decl || ''),
+    fragmentShader: solidFragment(opts.body || '', opts.decl || '',
+      opts.lit || ''),
     side: opts.side ?? THREE.FrontSide,
     transparent: !!opts.transparent,
     depthWrite: opts.depthWrite !== false,

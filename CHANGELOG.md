@@ -8,6 +8,219 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.424.0] — 2026-09-19
+
+### she was standing in the table, and the hair was a slab
+
+Three notes from Misha in one run, and two of them turned out to be the same
+bug seen from different sides.
+
+#### The tabouret, and the woman standing inside it
+
+**"when she does the coke, she ends up standing *inside* the tabourette and it
+looks weird, i think the tabourette/table should be not so close to the wall so
+she has more space to walk around and stuff"**.
+
+He is right, and MEASURED it is worse than it looks. The top went from 0.17 m
+to 0.23 m to 0.30 m in radius over two releases and **nothing that stood on it
+or beside it moved with it**:
+
+- the table was 0.34 m off an inner wall face, so a 0.30 m top left **40 mm**
+  of floor between its rim and the plaster;
+- the pour mark is solved backwards from the glass, and the glass was on the
+  far side of the top — so the mark it produced stood her **34 mm** from that
+  wall and **0.334 m** from the middle of the table, with the edge of the wood
+  running through her thighs;
+- the walk in was written against "a stool that needs 0.19" and has been
+  carrying her **through the tabletop** since the day it stopped being 0.19;
+- and the stoop drops her pelvis 0.20 m, which puts her hips at exactly the
+  height of the wood.
+
+So the table moved out to **0.47 m off the wall**, and the top was laid out as
+one table instead of four numbers that each moved at a different time — see
+`LAY`. Every spot was solved rather than nudged, against the constraints that
+matter: 25 mm of wood outboard of each object, 18 mm between them, her body
+clear of the rim, and both jobs inside an arm. It lands at plate 33 mm of wood
+outboard, glass 147, bottle 40, and the set-down spot 47.
+
+**TWO MARKS, because a 0.60 m top cannot be served from one.** A 0.21 m plate
+and the thing she sets down have to sit 63 degrees apart on that table, and a
+mark on the bisector is 0.37 m from both against an arm that measures 0.476 m
+from shoulder to wrist — so she now stands in one place to pour and steps the
+half metre round to work at the plate. The leg that carries her is `stepTo`,
+which is generic and is used by the fetch as well.
+
+**And the stoop is a lean now.** Taking the knee fold out was the obvious fix
+and it was wrong — measured, it clears her hips by 0.126 m and leaves her grip
+**0.129 m** off the blade, because the drop was what was doing the reaching.
+Her shoulder is 0.553 m above this table and her arm is 0.476 m long. So the
+fold stays and her HIPS GO BACK instead: 75 mm of it, with the bow from 0.22 to
+0.42, which is what a person over a table actually does. Her pelvis ends up
+0.485 m from the middle of the top with her chest over the plate.
+
+**One real bug fell out of that.** `reachRight` caches the arm's rest chain
+once, and the bow goes on moving the shoulder under it for a second afterwards
+— the old note measured that at 6 mm and called it nothing, and at 0.42 rad of
+bow it is 90 mm. Correcting the shoulder's TRANSLATION alone made it worse
+(228 mm), which is the tell: the rest DIRECTION had rotated too. It carries the
+cached chain by the clavicle's whole rigid movement now — position and turn —
+because the clavicle is the one joint above the arm that nothing in this file
+ever aims, so it can be read back without reading the solver's own aim in with
+it.
+
+Measured end to end afterwards: she walks in and never comes closer than
+**0.444 m** to the middle of the stool (the mark itself is 0.447), pours, and
+the glass fills; the cut holds **35 mm at best and 47 mm median** between her
+grip and the blade, with the only big gaps at the two places the hand travels
+between objects.
+
+#### The Lovense goes in
+
+**"when she puts on the lovesens, the bigger end of it should sorta disappear
+inside and should only be able to see the tip with the LED light sticking
+out"**. It was laid flat on the outside of the wrap, which is a thing taped to
+somebody.
+
+The geometry is rigid and that is the whole problem: the tip of the arm and the
+blunt end of the egg are 37 mm apart across the loop's opening and the egg is
+37 mm through, so how much tip can show with the egg buried is arithmetic
+rather than taste. The exit goes at the BOTTOM of the front of her pelvis,
+where the body's own surface falls away fastest — x 0.095 at y 0.818 against
+0.133 at y 0.880 — and the tip leaves at 66 degrees, running away from the skin
+instead of along it.
+
+Both numbers were **swept rather than chosen**: `__fr.jad.toy({tip, out})`
+re-places a worn one and hands back the measurement, 36 of them in one run.
+Which was necessary — the surface here is steep enough that 10 mm of exit
+height moves the tip by 25 mm. It lands at **tip 37 mm proud, lit button 7 mm
+proud, egg 13 mm under**, and `toyFit` publishes all three because a body is
+opaque and a render cannot answer the last one.
+
+#### The ponytail, and the hair under it
+
+**"kinda looks blah.. too flat. it needs to have more volume, more depth"** —
+of the tail, and true of the hair down as well, which is the same fault twice.
+
+The tail was 72 mm through at its thickest and tapered from the band down,
+which is a rat's tail. A hank that long is 110 to 120 mm through, it SWELLS
+below the band, and it carries that mass to about the shoulder: **118 mm at the
+widest now, the swell 6 cm below the band, and 12 mm further off her back the
+whole way down**. It also has a section: three soft lobes, 8 per cent deep,
+turning a fifth of a turn down its length, because a tube with one radius is a
+dowel however fat it is. It clears her the whole way — 9 mm at the back of the
+skull, 46 mm at the nape, 3 mm at the shoulder blade. Re-baked through
+`--extras`, which is the door that exists for exactly this.
+
+The hair down got the same three things: 25 to 30 mm more width and depth at
+every row, five locks turning down its length, and **normals computed off the
+surface** instead of the radial direction with a fixed 0.18 of up mixed into
+it — which shaded the whole shell like a cylinder and would have hidden every
+lock. The grooves between the locks are painted darker as well as modelled,
+because photographed out on the promenade with the sun behind her the shading
+term is nearly all ambient and a shape with no paint on it is a shape nobody
+sees. The hem is ragged for the same reason a level line is the one thing that
+says "geometry" at any distance.
+
+It is the same figure everywhere, so the Bucketeer and the swimmer get the
+tail too.
+
+#### And it is lit as hair now
+
+**"wow the nano banana version so nice. there is no way we can have the same
+level of detail in the game yeah? for the hair?"** — asked of a photoreal
+version of the same shot, made by handing the render to `gemini-2.5-flash-image`
+image-to-image. Not at strand level, no. But half of what that picture has over
+this one is not strands at all, it is the HIGHLIGHT, and that half is free.
+
+Every surface in this game gets Blinn-Phong: a dot of light where the half
+vector lines up with the normal. Hair does not work that way. A strand is a
+cylinder, its normal is a whole disc of directions, and what a light leaves on
+it is a BAND running across the strands whose position depends on which way
+they run and not on the surface at all. That is Kajiya-Kay, it is one dot
+product, and it is what every game ships.
+
+**Two bands and not one**, because leaving the second out is what makes the
+cheap version look cheap: a sharp one off the outside of the strand in the
+colour of the sun, and a broad one that has been through the hair, comes back
+the colour of the hair, and sits further towards the tips. They are separated
+by shifting the strand direction along the normal.
+
+**One direction for the whole head, and that is not a saving.** Every strand in
+a gathered tail runs the same way to within a few degrees, so `hairAim` writes
+one world-space vector a frame off the head bone — the tail's own axis comes
+off the bake, 30 mm back over 397 mm down — and both the tail and the loose
+shell read it. A tangent attribute would cost three floats a vertex to say the
+same thing.
+
+`solidMaterial` grew the hook this needed: `lit`, which is GLSL injected AFTER
+the lighting rather than before it. `body` can change what is lit; nothing
+could add a term the model does not have, and hair is the first surface in this
+game that wanted one.
+
+Set at 0.7 after a photograph: at 0.9 the sharp band clipped to white along the
+top of the tail in full August sun, and a highlight that has clipped has no
+shape left in it.
+
+#### And it falls now
+
+**"what about hair physics? say she does a hand stand, does her free flowing
+hair fall to the floor?"** It did not. Photographed upside down in the kabina,
+it stood straight up off her skull like a helmet put on backwards, because it
+was a worn part — a shell pinned to the head bone by `wearTick`, exactly like
+the horns and the headphones.
+
+It is simulated now: nine nodes, one a ring, integrated at a fixed 120 Hz and
+laid out with the surface rebuilt along whatever the chain did.
+
+**It lives in the scene and not on her mesh**, which is the decision everything
+else rests on. Inertia is the whole point — hair lags when a head turns and
+swings when a body does — and inside her own frame there is no such thing: her
+frame turns with her, so a fall simulated in it is a fall that never moves.
+Every number is world metres and the mesh is rebuilt in world metres each
+frame. The ice cream in her hand makes the same argument in its own note.
+
+**THREE THINGS WERE WRONG ON THE WAY, and all three were only findable because
+the chain publishes its own positions** — `__fr.jad.hairSim()`, which gives
+every node in HER frame. A hanging chain's failure mode is a picture nobody can
+read: hair in front of her face and hair behind her head are the same dark mass
+from most angles and the same number of pixels at the distance anybody looks at
+this.
+
+1. **A positional spring sags.** The first model pulled each ring towards where
+   the skull would hold it and let gravity fight that, which balances by
+   sagging exactly `g / k` — measured, 0.29 m of it, and the fall ended up
+   hanging in front of her face. It holds its shape by DIRECTION now: each ring
+   is pulled towards the point that continues its own rest direction out of the
+   ring above it, and then the segment length is made exact. Nothing sags
+   because nothing is stretched; gravity can only bend the chain, which is what
+   gravity does to hair.
+2. **A collision that fights the style wins.** The skull sphere shoved ring 2
+   out by 40 mm — the top rings of a cap are centred on the axis of her skull
+   by construction — and the whole fall inherited it, hanging 0.136 m off her
+   back against the 0.062 the table asks for. Each ring is now collided only
+   against the spheres its own rest position is already outside of.
+3. **Stiffness applied per iteration is not stiffness.** Folded in with the
+   length pass it ran `iter` times a step and `most` steps a frame — sixteen
+   pulls — and 0.06 compounded sixteen times is 0.63, which is a wire. Upside
+   down the fall sat within 1 mm of where it sits standing up, which is the
+   bug this pass exists to fix wearing a different hat. One pull a step, at a
+   fixed rate, and the numbers mean something: gravity moves a ring 0.68 mm a
+   step, so a stiffness `b` holds it `0.68 / b` mm off the styled shape. 0.45
+   at the crown is 1.5 mm and nobody will ever see it move; 0.0025 at the hem
+   is 0.27 m, which is hair.
+
+Measured at rest afterwards, against the table it is styled from: the crown at
+(−0.004, +0.150) and the hem at (−0.033, −0.341) against (−0.062, −0.348) — the
+styled shape survives being simulated, which is the thing that had to be true
+before any of the rest of it was worth having. In the handstand the tip travels
+0.13 m and the fall drapes past her inverted head towards the floor.
+
+The ponytail is NOT simulated: it is baked into the skinned mesh and rigid to
+the skull by design — see the note over `HAIR_TAIL`, where a hair bone is
+weighed against a bone out of the palette and a keyframe in every clip. Doing
+it would mean drawing the tail at runtime as well, which is the same chain and
+a burn-off flag and a shadow caster. Another day.
+
 ## [1.423.0] — 2026-09-18 (baye 1.24.0)
 
 ### she fetches it off the stool, and puts it on

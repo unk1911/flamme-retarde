@@ -518,17 +518,46 @@ def smooth(body, levels, above=1.46):
 # numbers are off the base mesh: the back of her skull runs to x = −0.041, the
 # nape tucks in to −0.012, and the deepest part of her upper back is −0.055. The
 # tail clears all three.
-HAIR_KNOT = (-0.052, 0.0, 1.688, 0.043, 0.040, 0.038)
+#
+# ── AND IT IS A ROPE OF HAIR AND NOT A DOWEL ─────────────────────────────────
+#
+# Misha, 19 Sep 2026, of the ponytail: *"kinda looks blah.. too flat. it needs
+# to have more volume, more depth"*. He is right and the numbers say why: the
+# first cut was 72 mm through at its thickest and tapered from the band down,
+# which is a rat's tail. A ponytail that thick a hank of hair makes is 110 to
+# 120 mm through, it SWELLS below the band rather than narrowing from it, and
+# it carries that mass to about the shoulder before it goes anywhere.
+#
+# So: 118 mm at the widest, the swell 6 cm below the band, the taper in the
+# last third, and 12 mm further off her back the whole way down — which is the
+# "depth" half of it, and is also what a hank of hair does when it is heavy
+# enough to hang rather than lie.
+#
+# It clears her the whole way, which is the one thing these numbers have to
+# do: the back of the skull runs to x = −0.041 and the deepest part of her
+# upper back to −0.055, and the front face of the tail is behind both of them
+# from the nape down — 9 mm clear at the skull, 46 mm at the nape, 3 mm at the
+# shoulder blade. Above the nape it is INSIDE the head on purpose, the way the
+# knot is: what is drawn there is the knot.
+HAIR_KNOT = (-0.056, 0.0, 1.690, 0.050, 0.046, 0.044)
 HAIR_TAIL = [
-    (-0.062, 0.0, 1.690, 0.032),   # inside the knot, so the two read as one
-    (-0.082, 0.0, 1.652, 0.036),
-    (-0.094, 0.0, 1.596, 0.035),
-    (-0.098, 0.0, 1.530, 0.033),
-    (-0.096, 0.0, 1.464, 0.030),
-    (-0.090, 0.0, 1.404, 0.025),
-    (-0.084, 0.0, 1.352, 0.016),
-    (-0.080, 0.0, 1.318, 0.005),
+    (-0.060, 0.0, 1.694, 0.038),   # inside the knot, so the two read as one
+    (-0.081, 0.0, 1.657, 0.054),
+    (-0.099, 0.0, 1.603, 0.059),
+    (-0.109, 0.0, 1.545, 0.059),
+    (-0.111, 0.0, 1.485, 0.056),
+    (-0.107, 0.0, 1.427, 0.049),
+    (-0.100, 0.0, 1.373, 0.039),
+    (-0.094, 0.0, 1.329, 0.025),
+    (-0.090, 0.0, 1.297, 0.007),
 ]
+# And it is not round. A tube with one radius is a dowel however fat it is —
+# the whole of what was "flat" about the old one is that there is nothing on
+# its surface for a light to do anything with. Three soft lobes, 8 per cent
+# deep, turning about a fifth of a turn down its length: that is the shape a
+# gathered hank actually has, and at 16 segments it is five vertices a lobe,
+# which reads as hair at two metres and costs nothing.
+HAIR_LOBE = (0.085, 3, 1.10)   # depth, count, twist in radians end to end
 
 # Anklets, one a side. Height and radii measured off the mesh rather than
 # authored: the ankle marker sits at z = 0.0756, and 35 mm above it the leg is a
@@ -613,7 +642,7 @@ def extras(body, J):
         tint.extend([(mark, prev)] * len(sv))
 
     if not NO_TAIL:
-        add_shell(*tube(HAIR_TAIL, seg=16), HAIR_M, HAIR_P)
+        add_shell(*tube(HAIR_TAIL, seg=16, lobe=HAIR_LOBE), HAIR_M, HAIR_P)
     if not NO_ANKLETS:
         for s in (1, -1):
             ank = J["%s-ankle" % ("l" if s > 0 else "r")]
@@ -1126,8 +1155,12 @@ def ball(cx, cy, cz, rx, ry, rz, rows=12, seg=20):
     return vs, fs
 
 
-def tube(path, seg=14):
+def tube(path, seg=14, lobe=None):
     """A tapered closed tube through `path` = [(x, y, z, radius), ...].
+
+    `lobe` is (depth, count, twist) and makes the section a soft polygon that
+    turns as it goes down — see HAIR_LOBE. Without it the section is a circle,
+    which is right for everything else that calls this.
 
     Unlike `ball` this one does get rendered, so the rings are laid in the plane
     normal to the local direction — a tube whose rings all sit in the same world
@@ -1151,7 +1184,12 @@ def tube(path, seg=14):
         v = d.cross(u).normalized()
         for k in range(seg):
             a = 2.0 * math.pi * k / seg
-            vs.append(c + (u * math.cos(a) + v * math.sin(a)) * rad[i])
+            r = rad[i]
+            if lobe:
+                depth, count, twist = lobe
+                t = i / max(1, len(pts) - 1)
+                r *= 1.0 + depth * math.cos(count * a + twist * t)
+            vs.append(c + (u * math.cos(a) + v * math.sin(a)) * r)
     for i in range(len(pts) - 1):
         for k in range(seg):
             j = (k + 1) % seg

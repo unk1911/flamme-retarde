@@ -26690,7 +26690,81 @@ async function buildJadrija(scene) {
     // across 0.68 m — with the swell a turner leaves at the knee and the taper
     // above it. Eight sides is enough at this size; the seat gets sixteen
     // because its rim is the one circle in the room at eye level.
-    const bt = dc - 1.58, bs = 18.20;
+    // ── AND IT STANDS OFF THE WALL, BECAUSE SHE HAS TO GET ROUND IT ──────
+    //
+    // Misha, 19 Sep 2026: *"when she does the coke, she ends up standing
+    // *inside* the tabourette and it looks weird, i think the tabourette/table
+    // should be not so close to the wall so she has more space to walk around
+    // and stuff"*.
+    //
+    // MEASURED, and he is right twice over. The top was at dc − 1.58, which is
+    // 0.34 m off an inner wall face at dc − 1.92 — so a 0.30 m top left 40 mm
+    // of floor between its rim and the plaster. The mark she pours from is
+    // solved backwards from the glass, which put her at t 424.646 against a
+    // wall at 424.612: **34 mm**. She stood in the render of the plaster, and
+    // the only reason it never showed is that the wall is behind her in every
+    // shot anybody has taken in this room.
+    //
+    // The table moves out to dc − 1.15. That is 0.47 m of floor between the
+    // rim and the wall, her pour mark lands 0.33 m off it, and nothing else in
+    // the room is anywhere near — the radio table is 1.7 m inland along the
+    // same wall and the cot is 2.4 m across the room.
+    const bt = dc - 1.15, bs = 18.20;
+
+    /**
+     * ── AND WHAT IS ON THE TOP, WHICH IS ALSO WHERE SHE CAN STAND ─────────
+     *
+     * One table for four objects and two marks, because they are one problem:
+     * a 0.60 m top with a 0.21 m plate on it, and a woman who has to reach
+     * two of the things on it without standing in the third.
+     *
+     * THE GLASS IS NOT AN ORNAMENT HERE. `wine` below is solved BACKWARDS
+     * from it — the pour is authored with the glass 0.315 m in front of her
+     * and 0.235 m to her right — so where the glass sits on the wood is where
+     * her body ends up, to the millimetre. It was at (+0.085, +0.090), which
+     * is the far side of the top from her, and the mark that fell out of that
+     * put her 0.334 m from the middle of a table whose rim is at 0.300: the
+     * edge of the wood ran through her thighs. That is the *"standing inside
+     * the tabourette"* half of Misha's note, and it is not the wall's fault.
+     * It is the glass's, and before that it is 1.416.0 and 1.417.0 growing the
+     * top from 0.17 m to 0.23 m to 0.30 m and moving nothing that stood on it.
+     *
+     * So the four spots and the two marks were SOLVED rather than nudged,
+     * against these constraints, and the numbers below are what came out:
+     *
+     *   every object on the wood      ≥ 25 mm of top outboard of its own edge
+     *   no two of them touching       ≥ 18 mm between their edges
+     *   her body clear of the rim     the pour mark ≥ 0.44 m from the middle
+     *   both jobs in arm's reach      the plate and the set-down ≤ 0.33 m
+     *   and the walk between marks    ≤ 0.22 m, which `showSettle` can ease
+     *
+     *   plate   (−0.067, +0.148)  0.162 out   33 mm of wood outboard
+     *   glass   (−0.054, −0.094)  0.108 out   147 mm
+     *   bottle  (−0.095, −0.204)  0.225 out   40 mm
+     *   spot    (−0.193, −0.041)  0.197 out   47 mm   what she sets down
+     *   pour    0.446 m from the middle, at yaw +30°  — from the glass
+     *   work    0.420 m,               at yaw −22°    — see `work` below
+     *
+     * TWO MARKS AND NOT ONE, which is the thing that could not be avoided: a
+     * mark far enough out for the crouch is a mark too far from the plate to
+     * reach, and the pour's is fixed by the glass. So she stands in one place
+     * to pour you a drink and steps round to the other to work at the plate,
+     * which is what a person at a table does anyway. Measured: plate 0.322 m,
+     * set-down 0.280 m, bottle 0.382 m, and 0.215 m between the marks.
+     */
+    const LAY = {
+      // Pulled 8 mm further out than the solve put it, and the mark pulled in
+      // with it, because the first cut of this was measured and came back
+      // short: at a 0.322 m reach her grip sat 42 to 70 mm off the blade
+      // against the 20 to 41 mm it holds today. An arm is 0.52 m and the
+      // plate is 0.63 m below her shoulder; there is not much slack in it.
+      plate: [-0.070, +0.155],
+      glass: [-0.054, -0.094],
+      bottle: [-0.095, -0.204],
+      spot: [-0.193, -0.041],
+      /** How far out the second mark stands, and where it looks. */
+      work: 0.400,
+    };
     // 46 cm across, and it was 34. Misha, 18 Sep 2026: *"you can make the
     // table bigger"*, *"it should be lying flat if table is big enough"* — the
     // thing she sets down beside the wine is 110 mm end to end and the old top
@@ -26766,7 +26840,10 @@ async function buildJadrija(scene) {
     ];
     // Where it stands: past the bottle from the glass, so that the three
     // things on this table are not in a row.
-    const plT = bt - 0.150, plS = bs + 0.030, plY = f + 0.7215;
+    // Where it lies on the top: see LAY over `bt`, which is the whole of the
+    // 0.60 m table laid out at once rather than four spots that each moved
+    // when the table last grew and one that did not.
+    const plT = bt + LAY.plate[0], plS = bs + LAY.plate[1], plY = f + 0.7215;
     const PL_BLACK = [0.070, 0.065, 0.076];
     const PL_GOLD = [0.820, 0.655, 0.300];
     lathe(W, plT, plS, PL_PROF.map(([y, r]) => [plY + y, r]), PL_BLACK, 32);
@@ -26883,7 +26960,11 @@ async function buildJadrija(scene) {
     // stands in the middle of the seat and `rest` below says so; the standing
     // mark is derived from the glass, and it is the mark that moved.
     const by = f + 0.722;
-    const gt = bt + 0.085, gs = bs + 0.090;
+    // On her side of the top and near the middle of it — see LAY. This is the
+    // one object on this table whose position decides where a PERSON stands:
+    // the pour mark is solved backwards from it, so moving the glass 0.22 m
+    // across the wood is what took her body out of the tabletop.
+    const gt = bt + LAY.glass[0], gs = bs + LAY.glass[1];
     lathe(W, gt, gs, [
       [by + 0.000, 0.0000], [by + 0.000, 0.0380], [by + 0.005, 0.0380],
       [by + 0.009, 0.0300], [by + 0.013, 0.0090],
@@ -27173,7 +27254,7 @@ async function buildJadrija(scene) {
       const gbuf = propBuilder();
       const keep2 = b;
       b = gbuf;
-      const lt = K.t0 + 0.30, ls = bs - 0.10, ly = f + 1.92;
+      const lt = K.t0 + 0.55, ls = bs - 0.10, ly = f + 1.92;
       // The inside of the cone, a hair inside the enamel, and the bulb.
       lathe(W, lt, ls, [[ly + 0.026, 0.023], [ly - 0.108, 0.130]],
         [1.000, 0.905, 0.720], 12);
@@ -27257,7 +27338,10 @@ async function buildJadrija(scene) {
     // where the bright things have somewhere to be bright from is a room and
     // not a set of exposure decisions.
     {
-      const lt = K.t0 + 0.30, ls = bs - 0.10, ly = f + 1.92;
+      // 0.55 and not 0.30: the table went out to dc − 1.15 and a work light
+      // over the floor beside a table is a work light over nothing. The arm is
+      // the length that puts the cone over the half of the top she works at.
+      const lt = K.t0 + 0.55, ls = bs - 0.10, ly = f + 1.92;
       const ENAM = [0.640, 0.628, 0.600];
       boxTS(K.t0 + 0.01, K.t0 + 0.06, ls - 0.075, ls + 0.075,
         ly - 0.10, ly + 0.09, [0.400, 0.392, 0.375], [0.440, 0.432, 0.415]);
@@ -27437,9 +27521,18 @@ async function buildJadrija(scene) {
       // cabinet, so that a jet clipping the corner of the wood does not count
       // as changing the channel.
       screen: [vt, vs - 0.10, gy + 0.31, 0.24, 0.40],
-      // Where the bottle lives when nobody is holding it. On the near half of
-      // the seat beside the glass — see the note up at `botT`.
-      rest: [bt, bs, by],
+      // Where the bottle lives when nobody is holding it — see LAY, which is
+      // where all five spots on this top are set out together. Not the middle
+      // of the seat any more: the middle is 0.45 m from where she stands now,
+      // and a bottle she has to lean across the table for is a bottle that
+      // jumps into her hand.
+      rest: [bt + LAY.bottle[0], bs + LAY.bottle[1], by],
+      // AND WHERE A THING SHE HAS BEEN HANDED IS SET DOWN, which used to be
+      // `rest` plus a guess and is its own spot now. It has to be on the wood,
+      // clear of the other three, and within reach of the mark she is standing
+      // on when she puts it there — the pre-placed Lovense starts here and
+      // `placeIt` puts everything else here too.
+      spot: [bt + LAY.spot[0], bs + LAY.spot[1], by],
       // WHERE SHE STANDS TO POUR. Computed from the glass and a yaw, because
       // typed it drifts: it and `WINE_POUR` in tools/blender/human_mh.py are
       // two ends of the same measurement and the wine goes on the floor if
@@ -27501,7 +27594,41 @@ async function buildJadrija(scene) {
         return [gt - 0.315 * u[0] - 0.235 * r[0],
           gs - 0.315 * u[1] - 0.235 * r[1], a];
       })(),
-      // The cot, for the dog: where he lies on it, how high the mattress is,
+      /**
+       * AND WHERE SHE STANDS TO WORK AT THE TABLE, which is not where she
+       * stands to pour, and is not one place either.
+       *
+       * Misha, 19 Sep 2026: *"when she does the coke, she ends up standing
+       * inside the tabourette"*. She did, and the mark was half of it: the
+       * pour's is solved from the glass and lands 0.45 m from the middle of
+       * the top, which is right for a pour — you lean over a table to pour
+       * into a glass on it — and wrong for a stoop, which puts her hips at
+       * the height of the wood.
+       *
+       * TWO OBJECTS ON A 0.60 m TOP CANNOT SHARE A MARK, and that is
+       * arithmetic rather than a preference: a 0.21 m plate and the thing she
+       * sets down have to be 0.18 m apart, which at the radius they sit on is
+       * 63 degrees of the table, and a mark 0.41 m out on the bisector is
+       * 0.37 m from each of them against an arm that measures 0.476 m from
+       * shoulder to wrist. So each job gets the spot it is actually done
+       * from, both off the same rule, and she walks the half metre between
+       * them — see `stepTo`, which is the leg that carries her round.
+       *
+       * `lead` is what stops her reaching across herself: her working shoulder
+       * is 0.18 m to the right of her spine, so facing a thing dead on costs
+       * that much of the reach sideways. Twenty degrees of turn puts the
+       * object off that shoulder instead of off her chest.
+       */
+      work: (() => {
+        const OUT = 0.410, LEAD = 0.35;
+        const at = (o) => {
+          const L = Math.hypot(o[0], o[1]) || 1;
+          const mt = bt + o[0] / L * OUT, ms = bs + o[1] / L * OUT;
+          return [mt, ms, Math.atan2(-o[1] / L, -o[0] / L) + LEAD];
+        };
+        return { coke: at(LAY.plate), lift: at(LAY.spot), out: OUT };
+      })(),
+      // The cot, for the dog: where he lies on it, how high the mattress is,      // The cot, for the dog: where he lies on it, how high the mattress is,
       // and where he stands on the floor to get up. Off `cm`/`cs0` rather than
       // typed, because the furniture moved outward on its own when the hut went
       // to two bays and this would have stayed where the hut used to be.
@@ -29892,9 +30019,32 @@ async function buildJadrija(scene) {
         uniforms: { uShorn: { value: 0 }, uTailOff: { value: 0 },
           // Which wrap she has on. See `SCARVES` and `showScarf`.
           uScarfA: { value: new THREE.Vector3(...SCARVES[0][0]) },
-          uScarfB: { value: new THREE.Vector3(...SCARVES[0][1]) } },
+          uScarfB: { value: new THREE.Vector3(...SCARVES[0][1]) },
+          // Which way the strands run, in world metres — see `hairAim`, which
+          // writes it every frame off the head bone.
+          uHairT: { value: new THREE.Vector3(0, -1, 0) } },
         decl: 'uniform float uShorn;\nuniform float uTailOff;\n'
-          + 'uniform vec3 uScarfA;\nuniform vec3 uScarfB;',
+          + 'uniform vec3 uScarfA;\nuniform vec3 uScarfB;\n'
+          + 'uniform vec3 uHairT;',
+        /**
+         * AND THE TAIL IS LIT AS HAIR RATHER THAN AS A PAINTED TUBE.
+         *
+         * Misha, 19 Sep 2026, of a photoreal version of the same shot: the
+         * thing the render had no answer to was the hair. Half of that is
+         * strands, which is geometry nobody is paying for here; the other half
+         * is the HIGHLIGHT, which is free — see `hairLobes` in 30-material.js.
+         *
+         * Only where `vUv.x` flags the knot and the tail. The scalp is painted
+         * hair on a skull and its strands run every which way under that
+         * paint, so a band across "the" strand direction there would be a band
+         * across nothing.
+         */
+        lit: 'if (vUv.x > 0.5) {\n'
+          + '  vec3 ht = uHairT - n * dot(uHairT, n);\n'
+          + '  float hl = length(ht);\n'
+          + '  if (hl > 0.001) col += hairLobes(ht / hl, n, -viewDir,\n'
+          + '    uSunDir, base, 1.0) * uSunColor * uSunI * sh;\n'
+          + '}',
         // And the same discard on the shadow, which it did not have. The
         // ponytail comes off in her own fragment and her silhouette on the
         // concrete kept it for three releases — a woman with a shaved head
@@ -35304,7 +35454,7 @@ async function buildJadrija(scene) {
       // deck there is no stool to fetch anything from — see `placeIt`, which
       // puts a thing down at her feet out there and is a different errand.
       if (!sheIsIn()) return 'outside';
-      if (!kit || !kit.wine) return 'nokit';
+      if (!kit || !kit.work) return 'nokit';
       return null;
     }
     if (name === 'side.left' || name === 'side.right') {
@@ -35326,7 +35476,7 @@ async function buildJadrija(scene) {
       // nothing in this room a woman needs in order to take a band out of her
       // own hair, so the only reason to say no is that it is already that way.
       const want = name === 'hair.down' ? 1 : 0;
-      if ((worn.hair ? 1 : 0) === want) return want ? 'hairalready' : 'hairup';
+      if ((hairFall ? 1 : 0) === want) return want ? 'hairalready' : 'hairup';
       return null;
     }
     if (name === 'coke') {
@@ -35666,7 +35816,7 @@ async function buildJadrija(scene) {
     // And the fetch off the tabouret, which is two more phases at the same
     // mark the plate and the pour use — out of this list the room walks her
     // back to the bottle on the frame after she gets there.
-    liftIt: 1, strapIt: 1,
+    liftIt: 1, strapIt: 1, stepTo: 1,
     // AND THE SITTING FAMILY AND THE HANDSTAND, all twelve of them, for the
     // reason the note above gives about `submit`: every one is entered from
     // inside this room, so a phase the hut does not own is a woman walked
@@ -36504,6 +36654,11 @@ async function buildJadrija(scene) {
           show.ask = name;
           if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else go('rise', 'getup', 0.35);
+        } else if (kit && kit.work
+            && Math.hypot(show.t - kit.work.lift[0], show.s - kit.work.lift[1]) > 0.26) {
+          show.goMark = kit.work.lift;
+          show.goNext = 'liftIt';
+          go('stepTo', 'walk', 0.34);
         } else go('liftIt', 'idle', 0.40);
       } else if (name === 'side.left' || name === 'side.right') {
         const clip = name === 'side.left' ? 'sideL' : 'sideR';
@@ -36550,8 +36705,9 @@ async function buildJadrija(scene) {
           else go('rise', 'getup', 0.35);
         } else go('tieHair', 'idle', 0.30);
       } else if (name === 'coke') {
-        // Same road as the wine: she has to be on the mark at the tabouret,
-        // and that mark is the one the whole room is solved around.
+        // Same road as the wine, with one leg in front of it: the plate is
+        // worked at from its own side of the table — see `work` — and that is
+        // half a metre from wherever she was standing.
         show.byAsk = 1;
         show.queue.length = 0;
         show.side = 0;
@@ -36562,6 +36718,11 @@ async function buildJadrija(scene) {
           show.ask = name;
           if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else go('rise', 'getup', 0.35);
+        } else if (kit && kit.work
+            && Math.hypot(show.t - kit.work.coke[0], show.s - kit.work.coke[1]) > 0.26) {
+          show.goMark = kit.work.coke;
+          show.goNext = 'coke';
+          go('stepTo', 'walk', 0.34);
         } else go('coke', 'idle', 0.40);
       } else if (name === 'flat.edge') {
         // The same road as `flat` with two things set: she has to end up on
@@ -36803,10 +36964,19 @@ async function buildJadrija(scene) {
         // The extra waypoint swings her round it on the inland side, and it is
         // derived from `kit.wine` rather than typed so that it follows if the
         // mark ever moves again — which is exactly what caught this out.
-        // Clearances now 0.95 m on the leg in and 0.27 m on the leg to the
-        // mark, against a stool that needs 0.19.
+        //
+        // AND IT MOVED AGAIN, TWICE, AND THIS NUMBER DID NOT. The note under
+        // it said 0.27 m of clearance "against a stool that needs 0.19", and
+        // the stool has been 0.30 since 1.417.0 — so the last leg has been
+        // walking her through the tabletop ever since, which is the other half
+        // of Misha's *"standing inside the tabourette"*. Re-derived against
+        // the top it actually has and the mark it actually ends on: she comes
+        // down the wall side parallel to it rather than cutting the corner,
+        // and the closest the leg gets to the middle of the top is 0.426 m —
+        // which is no closer than the mark she is walking to (0.446 m). The
+        // leg in from the door clears 0.498 m.
         const legs = [[K.dc, K.face - 1.55], [K.dc, K.face + 0.55],
-          [kit.wine[0] + 0.95, kit.wine[1] + 0.56],
+          [kit.wine[0] + 0.20, kit.wine[1] + 1.00],
           [kit.wine[0], kit.wine[1]]];
         const g = legs[Math.min(show.leg, legs.length - 1)];
         // Slower on the last leg. She is arriving somewhere small and dark, and
@@ -36841,13 +37011,44 @@ async function buildJadrija(scene) {
       // is a ramp rather than a switch: the hand and the tabouret are 40 cm
       // apart at the moment of the grasp and a bottle that teleports between
       // them is a bottle nobody believes was ever picked up.
+      // ── THE HALF METRE ROUND THE TABLE ───────────────────────────────
+      //
+      // Two jobs at this table are done from two different sides of it — see
+      // `work` in the kit — and the gap between the marks is 0.50 m, which is
+      // twice what `showSettle` was ever meant to absorb. An ease that long
+      // is a woman skating, so she walks it: the same `showTo` the way in
+      // uses, at a shade under a stroll because it is two strides in a room.
+      //
+      // GENERIC, because it is about to be used twice. `show.goNext` is the
+      // phase on the far end of it, and the leg itself knows nothing about
+      // what she is going to do when she gets there.
+      case 'stepTo': {
+        const mk = show.goMark;
+        if (!mk) { showNext(); break; }
+        const gone = showTo(mk[0], mk[1], dt, 0.74);
+        if (gone < 0.20 || show.tmr > 6) {
+          const nx = show.goNext;
+          show.goMark = null;
+          show.goNext = null;
+          if (nx === 'coke') { cokeSet(0); go('coke', 'idle', 0.40); }
+          else if (nx === 'liftIt') go('liftIt', 'idle', 0.34);
+          else showNext();
+        }
+        break;
+      }
+
       case 'coke': {
         // On to the mark first, at the rate the pour uses, and then the plate
         // does the rest — `cokeSet` is one 0-to-1 scrub so that a phase and a
         // probe drive it through the same call.
-        show.want = kit && kit.wine ? kit.wine[2] : show.want;
+        //
+        // `work` AND NOT `wine`, which is the whole of Misha's *"standing
+        // inside the tabourette"*: the pour mark is solved from the glass and
+        // is a leaning-over-the-table mark, and this phase crouches. See
+        // `work` in the kit.
+        show.want = kit && kit.work ? kit.work.coke[2] : show.want;
         showHold(dt);
-        if (show.tmr < 0.62 && kit && kit.wine) showSettle(kit.wine, dt, 10.0);
+        if (show.tmr < 0.62 && kit && kit.work) showSettle(kit.work.coke, dt, 10.0);
         const DUR = COKE.pour + COKE.lines * COKE.cut;
         const u = Math.max(0, show.tmr - 0.70) / DUR;
         cokeSet(u);
@@ -37100,12 +37301,13 @@ async function buildJadrija(scene) {
       // stool. She walks to the tabouret's own mark, reaches, closes her hand
       // on it, and carries it to her hip. See DON, and `donReach` for the arm.
       case 'liftIt': {
-        // The mark is the pour's and the plate's. It is the one place on this
-        // floor a hand can reach that stool from, and every millimetre of the
-        // reach below is measured from a woman standing on it.
-        show.want = kit && kit.wine ? kit.wine[2] : show.want;
+        // The plate's mark and not the pour's: she is picking something up off
+        // the wood, which is the same job the plate is and wants the same
+        // arm's length. From the pour mark the set-down spot is 0.56 m away,
+        // which is past her reach; from this one it is 0.280 m. See `work`.
+        show.want = kit && kit.work ? kit.work.lift[2] : show.want;
         showHold(dt);
-        if (show.tmr < DON.settle && kit && kit.wine) showSettle(kit.wine, dt, 10.0);
+        if (show.tmr < DON.settle && kit && kit.work) showSettle(kit.work.lift, dt, 10.0);
         // Published for the arm, which is solved a long way below this and
         // after the pose — the crouch and the cut have the same arrangement
         // and the note over `cokeStoop` says why.
@@ -37141,7 +37343,7 @@ async function buildJadrija(scene) {
       // away and the worn group takes over — the same swap `wearIt` makes, so
       // there is never two of it.
       case 'strapIt':
-        show.want = kit && kit.wine ? kit.wine[2] : show.want;
+        show.want = kit && kit.work ? kit.work.lift[2] : show.want;
         showHold(dt);
         show.donAt = 1;
         if (!giftHeld) { show.don = null; show.donAt = 0; showNext(); break; }
@@ -37178,14 +37380,14 @@ async function buildJadrija(scene) {
             // which is the only surface in the room; outdoors it is the deck
             // at her feet. A thing set aside that vanishes was not set aside.
             const K = special;
-            const inHut = sheIsIn() && kit && kit.rest;
+            const inHut = sheIsIn() && kit && kit.spot;
             // Pulled in from 0.14/-0.10, which is 0.172 m off the middle of
             // a top that used to have 0.168 m of radius: it hung over the
             // edge, which is exactly what Misha photographed. 0.147 off the
             // centre of a 0.232 top leaves 30 mm of wood outboard of the end
             // of the longest thing in the bag.
             const spot = inHut
-              ? [kit.rest[0] + 0.120, kit.rest[1] - 0.085, kit.rest[2]]
+              ? [kit.spot[0], kit.spot[1], kit.spot[2]]
               : (() => {
                 const w = toWorld(show.t + 0.34, show.s + 0.10);
                 return [null, null, w];
@@ -39060,6 +39262,15 @@ async function buildJadrija(scene) {
     // knees fold by the same amount in figure space, so her feet stay on the
     // floor while her hips come down — see `cokeStoop`.
     const yNow = p[1] + show.air + (show.mat || 0) - (show.duck || 0);
+    // AND HER HIPS GO BACK WITH THE STOOP, which is the same argument `duck`
+    // makes one line up: the deck has not moved and she has. In world metres
+    // and after `toWorld`, because what it is measured along is her own
+    // facing rather than either axis of the resort — see CROUCH.back.
+    if (show.duckBack) {
+      const yw = faceYaw(show.t, show.ang + show.side);
+      p[0] -= Math.cos(yw) * show.duckBack;
+      p[2] += Math.sin(yw) * show.duckBack;
+    }
     f.mesh.position.set(p[0],
       show.dip > 0
         ? lerp(yNow, CONFIG.seaLevel + ERRAND.floatY, show.dip * show.dip * (3 - 2 * show.dip))
@@ -39069,6 +39280,8 @@ async function buildJadrija(scene) {
     f.mesh.updateMatrixWorld();
 
     wearTick();
+    hairAim();
+    hairStep(dt);
 
     // ── AND THE ARM THAT IS FETCHING SOMETHING OFF THE STOOL ─────────────
     //
@@ -39438,11 +39651,11 @@ async function buildJadrija(scene) {
    * reuse the handover/placement phases for the visible gesture, but activation
    * must happen after placement rather than when the parser recognizes words.
    */
-  if (kit && kit.rest) {
+  if (kit && kit.spot) {
     const m = giftMesh('lovense');
-    const w = toWorld(kit.rest[0] + 0.120, kit.rest[1] - 0.085);
-    m.position.set(w[0], kit.rest[2] + (m.userData.sit || 0), w[2]);
-    m.rotation.set(m.userData.lay || 0, faceYaw(kit.rest[0], -0.55), 0);
+    const w = toWorld(kit.spot[0], kit.spot[1]);
+    m.position.set(w[0], kit.spot[2] + (m.userData.sit || 0), w[2]);
+    m.rotation.set(m.userData.lay || 0, faceYaw(kit.spot[0], -0.55), 0);
     m.userData.key = 'lovense';
     giftProps.push(m);
   }
@@ -39799,7 +40012,31 @@ async function buildJadrija(scene) {
    * The bow and the chin are not for the reach and would not buy it: they are
    * so that the top of her is over what her hand is doing.
    */
-  const CROUCH = { knee: 0.60, bow: 0.22, chin: 0.42 };
+  /**
+   * HOW SHE GETS DOWN TO THE PLATE, and it is a lean and not a squat.
+   *
+   * Misha, 19 Sep 2026: *"when she does the coke, she ends up standing
+   * *inside* the tabourette"*. Half of that was the mark she stood on (see
+   * `work` in the kit) and half of it was this. A 0.60 rad knee fold drops her
+   * pelvis 0.20 m, and her pelvis stands at 0.934 while the top of this table
+   * is at 0.722 — so the fold put her hip joint 12 mm above the wood and her
+   * hips, which are 0.10 m of flesh either side of that joint, straight
+   * through it. No mark she can reach the plate from would have fixed that.
+   *
+   * TAKING THE FOLD OUT WAS THE OBVIOUS FIX AND IT IS WRONG. Measured: at
+   * 0.34 rad her pelvis clears the wood by 0.126 m and her grip finishes
+   * 0.129 m off the blade, because the drop is what was doing the REACHING.
+   * Her shoulder is 0.553 m above this table and her arm is 0.476 m long, so
+   * without 0.20 m of knee she cannot touch it at all, wherever she stands.
+   *
+   * So the knee stays and her HIPS GO BACK instead, which is what a person
+   * actually does over a table: 75 mm of it, along her own facing, while the
+   * bow goes from 0.22 to 0.42 and takes her shoulders the other way. Her
+   * pelvis ends up 0.485 m from the middle of a 0.300 m top — clear of the
+   * rim by the width of her own hip — with her chest over the plate, and the
+   * mark she stands on can stay close enough to reach it.
+   */
+  const CROUCH = { knee: 0.60, bow: 0.42, chin: 0.38, back: 0.075 };
   const _crA = new THREE.Vector3(), _crB = new THREE.Vector3();
   const _crC = new THREE.Vector3(), _crF = new THREE.Vector3();
   let crouchLeg = null;
@@ -39858,6 +40095,7 @@ async function buildJadrija(scene) {
       }
       show.crouch = 0;
       show.duck = 0;
+      show.duckBack = 0;
       return;
     }
     // Her leg as the clip has it, taken once — on this frame there are no leg
@@ -39866,7 +40104,7 @@ async function buildJadrija(scene) {
     if (!crouchLeg) {
       const R = crouchLegAt(f, 'legUR', 'legLR', 'footR');
       const L = crouchLegAt(f, 'legUL', 'legLL', 'footL');
-      if (!R || !L) { show.duck = 0; return; }
+      if (!R || !L) { show.duck = 0; show.duckBack = 0; return; }
       crouchLeg = { R, L };
     }
     show.crouchOn = 1;
@@ -39886,6 +40124,7 @@ async function buildJadrija(scene) {
     f.aim('spine03', 0, 0, -1, bow * 0.22);
     f.aim('neck', 0, 0, -1, CROUCH.chin * show.crouch);
     show.duck = drop;
+    show.duckBack = CROUCH.back * show.crouch;
   }
 
   /**
@@ -39953,6 +40192,9 @@ async function buildJadrija(scene) {
   const _ckFwd = new THREE.Vector3();
   const _ckTo = new THREE.Vector3(), _ckPalm = new THREE.Vector3();
   const _ckQa = new THREE.Quaternion(), _ckQb = new THREE.Quaternion();
+  const _ckQc = new THREE.Quaternion(), _ckQd = new THREE.Quaternion();
+  const _ckShift = new THREE.Vector3(), _ckS = new THREE.Vector3();
+  const _ckE = new THREE.Vector3(), _ckW = new THREE.Vector3();
   const _ckID = new THREE.Quaternion();
 
   /**
@@ -39990,8 +40232,17 @@ async function buildJadrija(scene) {
       const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'),
         iW = f.boneIndex('handR');
       if (iS < 0 || iE < 0 || iW < 0) return;
+      const iC = f.boneIndex('clavicleR');
       reachArm = {
         who,
+        iC,
+        // WHERE HER SHOULDER HANGS FROM, and how it was turned when the chain
+        // below was sampled. See the correction under `A.at` — this is the one
+        // joint above the arm that nothing in this file ever aims, so it is
+        // the one place the torso's own movement can be read back out without
+        // reading this solver's own aim in with it.
+        C: iC >= 0 ? f.boneAt(iC, new THREE.Vector3()) : null,
+        Q: iC >= 0 ? f.boneTurn(iC, new THREE.Quaternion()) : null,
         S: f.boneAt(iS, new THREE.Vector3()),
         E: f.boneAt(iE, new THREE.Vector3()),
         W: f.boneAt(iW, new THREE.Vector3()),
@@ -40006,6 +40257,36 @@ async function buildJadrija(scene) {
       };
     }
     const A = reachArm;
+    // ── AND WHERE HER TORSO HAS GOT TO SINCE ─────────────────────────────
+    //
+    // The rest chain is taken once and the body it hangs off does not hold
+    // still: the stoop at the plate goes on bowing her spine for a second
+    // after this cache is made, and an arm solved from where the shoulder
+    // used to be misses by exactly as much as the shoulder moved. The note
+    // under `COKE_HAND` measured the old version of that at 6 mm and called
+    // it nothing; at 0.42 rad of bow it is 90 mm — a grip hovering over a
+    // blade rather than holding it. MEASURED, three ways: uncorrected, 129 mm
+    // median off the blade; the shoulder's TRANSLATION alone, 228 mm, which
+    // is worse than doing nothing because the rest direction is then right
+    // for a torso that has rotated and wrong for where it points; and the
+    // whole rigid movement, below, 30 mm.
+    //
+    // A RIGID MOVE AND NOT A RE-TAKE. Re-reading the chain each frame would
+    // read this solver's own aim back into its own rest pose, which is a
+    // loop. The CLAVICLE is the joint that solves it: the arm hangs off it,
+    // nothing in this file ever aims it, so the movement it has made since
+    // the cache — where it is now, and how far it has turned — is the torso's
+    // movement with none of the arm's in it. Carry the cached chain by that
+    // and every segment length and every rest direction is preserved exactly.
+    if (A.C) {
+      f.boneTurn(A.iC, _ckQc).multiply(_ckQd.copy(A.Q).invert());
+      f.boneAt(A.iC, _ckShift);
+      _ckS.copy(A.S).sub(A.C).applyQuaternion(_ckQc).add(_ckShift);
+      _ckE.copy(A.E).sub(A.C).applyQuaternion(_ckQc).add(_ckShift);
+      _ckW.copy(A.W).sub(A.C).applyQuaternion(_ckQc).add(_ckShift);
+    } else {
+      _ckS.copy(A.S); _ckE.copy(A.E); _ckW.copy(A.W);
+    }
     A.at.lerp(to, 1 - Math.exp(-o.follow * Math.max(dt, 0)));
     // World metres all the way to the conversion, so that neither offset has
     // to know what this mesh is scaled by.
@@ -40014,13 +40295,13 @@ async function buildJadrija(scene) {
     _ckGoal.y += o.up;
     _ckGoal.addScaledVector(_ckFwd, o.fwd);
     f.mesh.worldToLocal(_ckGoal);
-    _ckGoal.lerpVectors(A.W, _ckGoal, amt);
+    _ckGoal.lerpVectors(_ckW, _ckGoal, amt);
     // The target itself in her frame as well, for the wrist below. Converted
     // rather than offset, because the two conversions must be the same one.
     _ckTo.copy(A.at);
     f.mesh.worldToLocal(_ckTo);
     _ckPole.copy(o.pole);
-    _ckQa.copy(wheelLimb(f, 'armUR', 'armLR', A.S, A.E, A.W, _ckGoal, _ckPole));
+    _ckQa.copy(wheelLimb(f, 'armUR', 'armLR', _ckS, _ckE, _ckW, _ckGoal, _ckPole));
     // ── AND THE WRIST, WHICH IS THE DIFFERENCE BETWEEN HOLDING IT AND
     //    HAVING A HAND NEAR IT ──────────────────────────────────────────
     //
@@ -40140,73 +40421,425 @@ async function buildJadrija(scene) {
     reachRight(f, dt, 'don', _dnTo, show.donArm, DON_ARM);
   }
 
+  /**
+   * ── HER HAIR, DOWN, AND IT HANGS RATHER THAN BEING WORN ────────────────
+   *
+   * Misha, 19 Sep 2026: *"what about hair physics? say she does a hand stand,
+   * does her free flowing hair fall to the floor?"*. It did not — photographed
+   * upside down in the kabina, it stood straight up off her skull like a
+   * helmet put on backwards, because it was a worn part: a shell pinned to the
+   * head bone by `wearTick`, exactly like the horns and the headphones.
+   *
+   * So it is simulated now, and the three decisions that make that work are
+   * worth writing down.
+   *
+   * IT LIVES IN THE SCENE AND NOT ON HER MESH. Inertia is the whole point —
+   * hair lags when a head turns and swings when a body does — and inside her
+   * own frame there is no such thing: her frame turns with her, so a fall
+   * simulated in it would be a fall that never moves. The ice cream in her
+   * hand makes the same argument in its own note. Every number below is world
+   * metres, and the mesh is rebuilt in world metres every frame.
+   *
+   * IT IS A CHAIN OF THE RINGS IT ALREADY HAD. The shell is nine rings down
+   * the fall, so it is nine nodes with the gaps between them for segment
+   * lengths — no second representation to keep in step with the first, and
+   * the shape it holds at rest is the shape the rigid version held.
+   *
+   * AND IT IS PULLED BACK TOWARDS THE SKULL, harder at the crown than at the
+   * ends — `HAIRSIM.stiff`, which is the bending stiffness of hair and is the
+   * one term that stops this being a rope. At the crown it is stiff enough
+   * that the cap does not move at all; by the tips gravity wins by twenty to
+   * one, which is what puts her hair on the floor in a handstand and throws it
+   * through a cartwheel.
+   */
+  const HAIRSIM = {
+    /**
+     * HOW STIFF EACH RING IS, and it is a BEND and not a spring.
+     *
+     * The first cut of this pulled every ring towards where the skull would
+     * hold it and let gravity fight that. It is the obvious model and it is
+     * wrong, in a way worth writing down: a positional spring balances gravity
+     * by SAGGING, exactly `g / k` of it, so the only way to hold a shape is a
+     * stiffness that also refuses to move at all. Measured — published by
+     * `__fr.jad.hairSim()` — it hung 0.29 m below where it belonged and ended
+     * up in front of her face, because once the rings are that far off their
+     * rest the only thing deciding where they are is the constraint pass.
+     *
+     * So the shape is held by DIRECTION instead. Each ring is pulled towards
+     * the point that continues its own rest direction out of the ring above
+     * it, and the segment lengths are then made exact. Nothing sags, because
+     * nothing is being stretched: gravity can only BEND the chain, which is
+     * what gravity does to hair. At the crown the bend is refused outright
+     * and the cap sits on her skull; by the hem it is 0.06 and the last hand's
+     * width of it does what it likes.
+     */
+    bend: [1, 1, 0.45, 0.16, 0.060, 0.024, 0.010, 0.005, 0.0025],
+    /** How much of the velocity survives a step. */
+    damp: 0.994,
+    /** Fixed, because a chain integrated on a wall clock explodes. */
+    step: 1 / 120,
+    /** And at most this many of those a frame — a headless page runs at one. */
+    most: 8,
+    /** How many times the lengths and the collisions are enforced. */
+    iter: 2,
+    /**
+     * And what it cannot pass through: her head, as a sphere on the head bone.
+     * 0.112 is the skull plus the cap of hair over it, measured off the mesh —
+     * the same profile `toyFit` walks.
+     */
+    skull: 0.112,
+    chest: 0.150,
+    /** A jump bigger than this is a teleport, not a movement. See `hairStep`. */
+    jump: 0.60,
+  };
+
+  /**
+   * The shell: nine rings, the lock pattern, and the colours. Built once; its
+   * positions are written every frame by `hairStep`.
+   *
+   * The table is the ring's own radius before the chain bends it — half-depth
+   * and half-width about the strand, plus how far back of the head bone that
+   * ring's centre sits when nothing has moved it.
+   */
+  //  y       back-shift   half-depth   half-width
+  const HAIR_R = [
+    [0.150, -0.004, 0.060, 0.058],
+    [0.116, -0.012, 0.082, 0.078],
+    [0.060, -0.020, 0.098, 0.094],
+    [0.000, -0.028, 0.108, 0.104],
+    [-0.070, -0.036, 0.116, 0.114],
+    [-0.150, -0.044, 0.120, 0.116],
+    [-0.230, -0.052, 0.122, 0.118],
+    [-0.300, -0.058, 0.116, 0.112],
+    [-0.348, -0.062, 0.092, 0.092],
+  ];
+  const HAIR_SIDES = 26;
+  const HAIR_A0 = Math.PI * 0.28, HAIR_A1 = Math.PI * 1.72;
+  /** Locks: how deep, how many, and how far they turn end to end. */
+  const HAIR_LOCK = [0.110, 4, 0.95];
+
+  /**
+   * WHICH WAY THE STRANDS RUN ON THE TAIL, in world metres, every frame.
+   *
+   * One direction for the whole tail rather than one per vertex, and that is
+   * not a saving — it is what hair does. Every strand in a gathered tail runs
+   * the same way to within a few degrees, and the band a light leaves on them
+   * is decided by that shared direction. A tangent attribute would cost three
+   * floats a vertex to say the same thing.
+   *
+   * The tail's own axis comes off the bake: `HAIR_TAIL` in
+   * tools/blender/human_mh.py runs from (−0.060, 1.694) to (−0.090, 1.297),
+   * which is 30 mm back over 397 mm down. `boneTurn` carries it wherever her
+   * head has got to and her mesh's own rotation carries that into the world —
+   * the horns' rig, one vector wide.
+   *
+   * The loose fall does NOT come through here. It is simulated, so the
+   * direction its strands run is the direction the chain runs — see
+   * `hairSurface`, which writes its own.
+   */
+  const _hairQ = new THREE.Quaternion(), _hairV = new THREE.Vector3();
+  let hairBone = null;
+  function hairAim() {
+    if (!skinFig) return;
+    if (hairBone === null) hairBone = skinFig.boneIndex('head');
+    if (hairBone < 0) return;
+    _hairV.set(-0.0755, -0.9971, 0)
+      .applyQuaternion(skinFig.boneTurn(hairBone, _hairQ))
+      .applyQuaternion(skinFig.mesh.quaternion);
+    const u = skinFig.material && skinFig.material.uniforms;
+    if (u && u.uHairT) u.uHairT.value.copy(_hairV);
+  }
+
   function looseHairGroup() {
-    //  y       back-shift   half-depth   half-width
-    const R = [
-      [0.150, -0.004, 0.052, 0.050],
-      [0.116, -0.010, 0.072, 0.068],
-      [0.060, -0.015, 0.084, 0.081],
-      [0.000, -0.019, 0.090, 0.088],
-      [-0.070, -0.023, 0.094, 0.094],
-      [-0.150, -0.027, 0.097, 0.101],
-      [-0.230, -0.031, 0.099, 0.105],
-      [-0.300, -0.035, 0.093, 0.099],
-      [-0.348, -0.040, 0.070, 0.076],
-    ];
-    const SIDES = 22, A0 = Math.PI * 0.28, A1 = Math.PI * 1.72;
-    const pos = [], nrm = [], col = [];
+    const R = HAIR_R, SIDES = HAIR_SIDES;
+    const n = R.length * (SIDES + 1);
+    const pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    const idx = [];
     const lo = BAYE_HAIR.lo, hi = BAYE_HAIR.hi;
-    const at = (i, j) => {
-      const [y, bx, dx, dz] = R[i];
-      const a = A0 + (A1 - A0) * (j / SIDES);
-      return [bx + Math.cos(a) * dx, y, Math.sin(a) * dz];
-    };
-    const shade = (i) => {
+    /**
+     * Down its length, and round it.
+     *
+     * DOWN: sunlit at the crown to the root colour at the nape, and then back
+     * up by half — hair that has been in this sun all summer is lighter at the
+     * ends than it is underneath, and a single ramp to the darkest colour in
+     * the palette made the whole fall one flat brown mass.
+     *
+     * ROUND: the grooves between the locks are painted darker as well as being
+     * modelled. That is what makes them survive a flat sky — photographed on
+     * the promenade with the sun behind her the shading term is nearly all
+     * ambient, and a shape with no paint on it is a shape nobody sees.
+     */
+    for (let i = 0; i < R.length; i++) {
       const k = i / (R.length - 1);
-      return [hi[0] + (lo[0] - hi[0]) * k, hi[1] + (lo[1] - hi[1]) * k,
-        hi[2] + (lo[2] - hi[2]) * k];
-    };
-    const push = (v, n, c) => {
-      pos.push(v[0], v[1], v[2]); nrm.push(n[0], n[1], n[2]);
-      col.push(c[0], c[1], c[2]);
-    };
-    const nOf = (v) => {
-      const L = Math.hypot(v[0], v[2]) || 1;
-      return [v[0] / L, 0.18, v[2] / L];
-    };
+      const f = k < 0.58 ? k / 0.58 : 1 - (k - 0.58) / 0.42 * 0.5;
+      for (let j = 0; j <= SIDES; j++) {
+        const a = HAIR_A0 + (HAIR_A1 - HAIR_A0) * (j / SIDES);
+        const groove = 0.86 + 0.14
+          * (0.5 + 0.5 * Math.cos(HAIR_LOCK[1] * a + HAIR_LOCK[2] * k));
+        const o = (i * (SIDES + 1) + j) * 3;
+        col[o] = (hi[0] + (lo[0] - hi[0]) * f) * groove;
+        col[o + 1] = (hi[1] + (lo[1] - hi[1]) * f) * groove;
+        col[o + 2] = (hi[2] + (lo[2] - hi[2]) * f) * groove;
+      }
+    }
     for (let i = 0; i < R.length - 1; i++) {
-      const ca = shade(i), cb = shade(i + 1);
       for (let j = 0; j < SIDES; j++) {
-        const a = at(i, j), b = at(i, j + 1), c = at(i + 1, j + 1), d = at(i + 1, j);
-        push(a, nOf(a), ca); push(b, nOf(b), ca); push(c, nOf(c), cb);
-        push(a, nOf(a), ca); push(c, nOf(c), cb); push(d, nOf(d), cb);
+        const a = i * (SIDES + 1) + j, b = a + 1;
+        const c = a + SIDES + 1, d = c + 1;
+        idx.push(a, b, d, a, d, c);
       }
     }
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-    geo.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
-    const g = new THREE.Group();
-    g.add(new THREE.Mesh(geo, solidMaterial(0xffffff,
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    geo.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    // It is rebuilt in world metres every frame, so the bounding sphere it
+    // computes from an empty buffer would cull it on frame one and for ever.
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+    // Lit as hair and not as a shell — the same two bands the tail gets, off
+    // the same per-frame direction. See `hairLobes` in 30-material.js.
+    const mat = solidMaterial(0xffffff,
       { spec: 0.16, specPower: 22, side: THREE.DoubleSide,
-        body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;' })));
-    return g;
+        uniforms: { uHairT: { value: new THREE.Vector3(0, -1, 0) } },
+        decl: 'uniform vec3 uHairT;',
+        body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;',
+        lit: 'vec3 ht = uHairT - n * dot(uHairT, n);\n'
+          + 'float hl = length(ht);\n'
+          + 'if (hl > 0.001) col += hairLobes(ht / hl, n, -viewDir,\n'
+          + '  uSunDir, base, 1.0) * uSunColor * uSunI * sh;' });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    scene.add(mesh);
+    return { mesh, geo, mat,
+      // The chain: one node a ring, in world metres, with its previous
+      // position beside it. Verlet keeps velocity in the difference of the
+      // two, which is what makes a hard constraint safe to apply — move a
+      // node and you have changed its velocity to match, for free.
+      node: R.map(() => new THREE.Vector3()),
+      prev: R.map(() => new THREE.Vector3()),
+      rest: R.map(() => new THREE.Vector3()),
+      len: R.map((r, i) => (i ? Math.abs(R[i][0] - R[i - 1][0]) : 0)),
+      free: R.map(() => 3),
+      acc: 0, live: false };
+  }
+
+  /**
+   * One frame of it: where the skull would hold each ring, then physics on
+   * what is left, then the surface laid along the result.
+   */
+  const _hsA = new THREE.Vector3(), _hsB = new THREE.Vector3();
+  const _hsQ = new THREE.Quaternion(), _hsQ2 = new THREE.Quaternion();
+  const _hsT = new THREE.Vector3();
+  const _hsU = new THREE.Vector3(), _hsR = new THREE.Vector3();
+  const _hsC = new THREE.Vector3(), _hsD = new THREE.Vector3();
+  const _hsK = new THREE.Vector3();
+  let chestBone = null;
+  function hairStep(dt) {
+    const H = hairFall;
+    if (!H || !skinFig) return;
+    if (hairBone === null) hairBone = skinFig.boneIndex('head');
+    if (hairBone < 0) return;
+    const f = skinFig;
+    // Her head's frame in the world: where the bone is, and how it is turned.
+    // `boneTurn` is the change since the bind pose and her mesh carries the
+    // rest, which is the horns' rig and the one attachment in this file that
+    // has never been wrong.
+    _hsQ.copy(f.mesh.quaternion).multiply(f.boneTurn(hairBone, _hsQ2));
+    f.boneAt(hairBone, _hsA).applyMatrix4(f.mesh.matrixWorld);
+    // And where her chest is, for the same reason — a fall that hangs forward
+    // over a bowed head has to stop at her shoulder blades.
+    if (chestBone === null) chestBone = f.boneIndex('chest');
+    if (chestBone >= 0) f.boneAt(chestBone, _hsK).applyMatrix4(f.mesh.matrixWorld);
+    else _hsK.copy(_hsA).setY(_hsA.y - 0.4);
+    for (let i = 0; i < HAIR_R.length; i++) {
+      H.rest[i].set(HAIR_R[i][1], HAIR_R[i][0], 0)
+        .applyQuaternion(_hsQ).add(_hsA);
+      // Which of the two her own style already puts her hair inside. See the
+      // collision pass, which skips those.
+      H.free[i] = (H.rest[i].distanceTo(_hsA) > HAIRSIM.skull ? 1 : 0)
+        | (H.rest[i].distanceTo(_hsK) > HAIRSIM.chest ? 2 : 0);
+    }
+    // A TELEPORT IS NOT A MOVEMENT. `put`, `pose` and the crossings all set
+    // her somewhere else between two frames, and a chain that integrates that
+    // arrives as a whip. Anything past `jump` re-seats the whole fall.
+    if (!H.live || H.node[0].distanceTo(H.rest[0]) > HAIRSIM.jump) {
+      for (let i = 0; i < H.node.length; i++) {
+        H.node[i].copy(H.rest[i]);
+        H.prev[i].copy(H.rest[i]);
+      }
+      H.live = true;
+      H.acc = 0;
+    }
+    // Fixed steps, and a ceiling on how many: headless this runs at about a
+    // frame a second, and a spring rig handed a one-second dt is a rig that
+    // has already exploded.
+    H.acc = Math.min(H.acc + Math.max(0, dt), HAIRSIM.step * HAIRSIM.most * 2);
+    let guard = HAIRSIM.most;
+    const h = HAIRSIM.step, hh = h * h;
+    while (H.acc >= h && guard-- > 0) {
+      H.acc -= h;
+      // Free flight first: whatever it was doing, carried on, plus gravity.
+      for (let i = 2; i < H.node.length; i++) {
+        const p = H.node[i], q = H.prev[i];
+        _hsB.copy(p).sub(q).multiplyScalar(HAIRSIM.damp);
+        q.copy(p);
+        p.add(_hsB);
+        p.y -= 9.81 * hh;
+      }
+      // The cap over her skull is not simulated at all. Two rings of it,
+      // because one leaves the second free to swing about the first and the
+      // parting comes apart at the crown.
+      for (let i = 0; i < 2; i++) {
+        H.node[i].copy(H.rest[i]);
+        H.prev[i].copy(H.rest[i]);
+      }
+      // ── THE BEND, ONCE A STEP ────────────────────────────────────────
+      //
+      // ONCE, and that is the whole of why this is its own pass. Folded in
+      // with the length constraint it was applied `iter` times a step and
+      // `most` steps a frame — sixteen pulls a frame — and a stiffness of
+      // 0.06 compounded sixteen times is 0.63, which is not soft hair, it is
+      // a wire. MEASURED: upside down in the handstand the fall sat within
+      // 1 mm of where it sits standing up, which is the bug this whole pass
+      // exists to fix, wearing a different hat.
+      //
+      // With one pull at a fixed 120 Hz the numbers mean something: gravity
+      // moves a ring 0.68 mm a step, so a stiffness `b` holds it `0.68/b`
+      // millimetres off the styled shape. 0.45 at the crown is 1.5 mm and
+      // nobody will ever see it move; 0.0025 at the hem is 0.27 m, which is
+      // hair.
+      for (let i = 2; i < H.node.length; i++) {
+        const a = H.node[i - 1], p = H.node[i];
+        // Where this ring would be if the fall had not moved: out of the ring
+        // above it, along its own rest direction, at its own length.
+        _hsC.copy(H.rest[i]).sub(H.rest[i - 1]);
+        const rl = _hsC.length() || 1e-6;
+        _hsC.multiplyScalar(H.len[i] / rl).add(a);
+        p.lerp(_hsC, HAIRSIM.bend[i]);
+      }
+      for (let it = 0; it < HAIRSIM.iter; it++) {
+        for (let i = 2; i < H.node.length; i++) {
+          const a = H.node[i - 1], p = H.node[i];
+          // The length is made exact, which is the one thing that must be
+          // true however the pass above it argued.
+          _hsB.copy(p).sub(a);
+          const d = _hsB.length() || 1e-6;
+          p.copy(a).addScaledVector(_hsB, H.len[i] / d);
+          // And it cannot go through her — head, then chest. Only where the
+          // STYLE does not already put it inside them: the top rings of a cap
+          // are centred on the axis of her skull by construction, and a
+          // collision that fights the shape it is drawing wins every frame.
+          // Measured before this rule existed: ring 2 was shoved 40 mm out
+          // and the whole fall inherited it, hanging 0.136 m off her back
+          // against the 0.062 the table asks for.
+          if (H.free[i] & 1) hairPush(p, _hsA, HAIRSIM.skull);
+          if (H.free[i] & 2) hairPush(p, _hsK, HAIRSIM.chest);
+        }
+      }
+    }
+    hairSurface(H);
+  }
+
+  /** Shove a point out of a sphere, if it is inside one. */
+  function hairPush(p, c, r) {
+    _hsD.copy(p).sub(c);
+    const d = _hsD.length();
+    if (d > r || d < 1e-6) return;
+    p.copy(c).addScaledVector(_hsD, r / d);
+  }
+
+  /**
+   * The surface, laid along whatever the chain did.
+   *
+   * A frame is carried down the chain rather than taken fresh at each ring —
+   * parallel transport, which is the same argument `tube` in
+   * tools/blender/human_mh.py makes in its own docstring: rings taken off a
+   * fixed axis pinch to a ribbon wherever the path turns.
+   */
+  function hairSurface(H) {
+    const R = HAIR_R, S = HAIR_SIDES;
+    const pos = H.geo.attributes.position.array;
+    const nrm = H.geo.attributes.normal.array;
+    // The first frame comes off her head: forward is her own forward, so the
+    // opening in the shell stays over her face however the fall swings.
+    _hsU.set(1, 0, 0).applyQuaternion(_hsQ);     // her forward
+    _hsR.set(0, 0, 1).applyQuaternion(_hsQ);     // and her right
+    for (let i = 0; i < R.length; i++) {
+      // Down the chain, which is the strand direction at this ring.
+      _hsT.copy(H.node[Math.min(i + 1, R.length - 1)])
+        .sub(H.node[Math.max(i - 1, 0)]);
+      if (_hsT.lengthSq() < 1e-9) _hsT.set(0, -1, 0);
+      _hsT.normalize();
+      // Re-orthogonalise the carried frame against it rather than rebuilding:
+      // the twist stays where it was and the ring only tips.
+      _hsC.copy(_hsU).addScaledVector(_hsT, -_hsU.dot(_hsT));
+      if (_hsC.lengthSq() < 1e-8) _hsC.copy(_hsR);
+      _hsC.normalize();
+      _hsR.crossVectors(_hsT, _hsC).normalize();
+      _hsU.copy(_hsC);
+      const k = i / (R.length - 1);
+      const dx = R[i][2], dz = R[i][3];
+      for (let j = 0; j <= S; j++) {
+        const a = HAIR_A0 + (HAIR_A1 - HAIR_A0) * (j / S);
+        const lock = 1 + HAIR_LOCK[0]
+          * Math.cos(HAIR_LOCK[1] * a + HAIR_LOCK[2] * k);
+        // The hem is not a level line — hair does not end on one, and a level
+        // line is the one thing that says "geometry" at any distance.
+        const drop = i === R.length - 1
+          ? 0.024 * (0.5 + 0.5 * Math.cos(HAIR_LOCK[1] * a * 0.8 + 1.7)) : 0;
+        const o = (i * (S + 1) + j) * 3;
+        _hsB.copy(H.node[i])
+          .addScaledVector(_hsC, Math.cos(a) * dx * lock)
+          .addScaledVector(_hsR, Math.sin(a) * dz * lock)
+          .addScaledVector(_hsT, drop);
+        pos[o] = _hsB.x; pos[o + 1] = _hsB.y; pos[o + 2] = _hsB.z;
+      }
+    }
+    // Normals off the surface that is actually there, which is what makes the
+    // locks read at all — see the note over `hairLobes` in 30-material.js.
+    const at = (i, j) => (i * (S + 1) + j) * 3;
+    for (let i = 0; i < R.length; i++) {
+      for (let j = 0; j <= S; j++) {
+        const a = at(i, Math.min(j + 1, S)), b = at(i, Math.max(j - 1, 0));
+        const c = at(Math.min(i + 1, R.length - 1), j);
+        const d = at(Math.max(i - 1, 0), j);
+        _hsC.set(pos[a] - pos[b], pos[a + 1] - pos[b + 1], pos[a + 2] - pos[b + 2]);
+        _hsD.set(pos[c] - pos[d], pos[c + 1] - pos[d + 1], pos[c + 2] - pos[d + 2]);
+        _hsB.crossVectors(_hsC, _hsD);
+        const L = _hsB.length() || 1;
+        const o = at(i, j);
+        nrm[o] = _hsB.x / L; nrm[o + 1] = _hsB.y / L; nrm[o + 2] = _hsB.z / L;
+      }
+    }
+    H.geo.attributes.position.needsUpdate = true;
+    H.geo.attributes.normal.needsUpdate = true;
+    // And the highlight runs down the chain rather than down her skull, which
+    // is the one place this is better than a worn shell was: upside down, the
+    // band follows the hair to the floor.
+    _hsB.copy(H.node[H.node.length - 1]).sub(H.node[2]);
+    if (_hsB.lengthSq() > 1e-8) H.mat.uniforms.uHairT.value.copy(_hsB.normalize());
   }
 
   /**
    * Down, or back up in a tail. It STAYS: *"persists"*.
    */
+  let hairFall = null;
   function hairDown(on = true) {
     const want = !!on;
-    if (!!worn.hair === want) return want ? 'already' : 'already';
+    if (!!hairFall === want) return want ? 'already' : 'already';
     if (want) {
-      worn.hair = [{ group: looseHairGroup(), bone: 'head' }];
-      wearTick();
+      hairFall = looseHairGroup();
+      // Seated at the rest pose on the frame it appears rather than swinging
+      // in from the origin — which is what `live` is for in `hairStep`.
+      hairStep(0);
     } else {
-      for (const part of worn.hair || []) {
-        if (part.group.parent) part.group.parent.remove(part.group);
-      }
-      delete worn.hair;
+      scene.remove(hairFall.mesh);
+      hairFall.geo.dispose();
+      hairFall = null;
     }
     if (skinFig && skinFig.mesh && skinFig.mesh.material
       && skinFig.mesh.material.uniforms
@@ -40442,64 +41075,94 @@ async function buildJadrija(scene) {
   /**
    * ── AND THE SAME OBJECT, ON HER ────────────────────────────────────────
    *
-   * Over the wrap, on the outside of it, on the bone the wrap itself belongs
-   * to. `hip_scarf` in tools/blender/human_mh.py says why that is the right
-   * bone in one line — *"everything rigid to the pelvis: a hip scarf is tied
-   * to the hips and does not follow a knee"* — and anything lying on that
-   * cloth wants the same answer, or the two drift apart the first time she
-   * bends.
+   * On the bone the wrap itself belongs to. `hip_scarf` in
+   * tools/blender/human_mh.py says why that is the right one in a line —
+   * *"everything rigid to the pelvis: a hip scarf is tied to the hips and
+   * does not follow a knee"* — and anything this bone carries then stays put
+   * through a cartwheel without knowing what a cartwheel is.
    *
-   * EVERY NUMBER BELOW IS MEASURED off the bind pose rather than guessed,
-   * because the surface it lies on is not a cylinder and is not vertical:
+   * AND IT GOES IN, WHICH IS THE SECOND PASS AT IT. Misha, 19 Sep 2026:
+   * *"the bigger end of it should sorta disappear inside and should only be
+   * able to see the tip with the LED light sticking out"*. The first cut laid
+   * the whole loop flat on the outside of the wrap, which is a thing taped to
+   * somebody. So the egg is inside her now and the only part of it anybody
+   * can see is the last 25 mm of the arm with the lit button on it.
    *
-   *   pelvis bone     (0.0152, 0.9344, 0), which is the top edge of the wrap
-   *   the cloth       about an axis at x 0.015, its front face runs
-   *                   0.117 at y 0.835 · 0.142 at y 0.880 · 0.153 at y 0.940
+   * THE GEOMETRY IS RIGID AND THAT IS THE WHOLE PROBLEM. The tip of the arm
+   * and the blunt end of the egg are 37 mm apart across the loop's opening,
+   * and the egg is 37 mm through — so how much tip can show with the egg
+   * still buried is not a free choice, it is arithmetic, and it comes out at
+   * about 25 mm. Every number below is that arithmetic solved against the
+   * body's own surface rather than against a guess:
    *
-   * — so over the 96 mm this thing is long the front of her moves 34 mm
-   * forward, which is a lean of about 19 degrees at the hem easing to 11 at
-   * the waist. It is hung at the middle of that range: centred at y 0.885 with
-   * its mid-plane 18.5 mm proud of the cloth there (the egg's own
-   * half-thickness — the same `sit` it rests on a table by), and leaned 15
-   * degrees so that neither end stands off her.
+   *   pelvis bone     (0.0152, 0.9344, 0), and everything here hangs off it
+   *   the front of her, measured off the bind pose:
+   *                   x 0.095 at y 0.818 · 0.113 at 0.835 · 0.133 at 0.880
    *
-   * AND IT IS TURNED FLAT AGAINST HER, which is the only thing about the
-   * frame worth saying. The curve is drawn in its own x-y plane — see
-   * `lovenseMesh` — so left alone it stands out of her hip like a door
-   * handle. The basis lays its long axis DOWN her with the egg low, the loop
-   * opening across her, and its 37 mm of thickness along her forward axis.
+   * The surface falls away by 38 mm over that 62 mm of height, so the exit is
+   * put at the BOTTOM of that run and aimed down it: a tip leaving at 50
+   * degrees below the horizontal is running away from the skin instead of
+   * along it, and what it buys is the difference between an LED that is a
+   * millimetre under the surface and one that is clear of it.
+   *
+   * `toyFit` publishes the three numbers this is actually about — how far the
+   * tip is proud, how far the lit button is proud, and how deep the egg's
+   * outermost vertex is under — because a render cannot tell you the last one
+   * and an object 2 mm too far out is an object sticking through her.
    */
   const TOY = {
-    /** Figure metres, off the pelvis bone. */
-    at: [0.148, -0.049, 0],
-    /** How far it leans back with the front of her, radians. */
-    lean: 0.26,
+    /**
+     * Where the tip of it comes out of her, in figure metres, and which way
+     * it is pointing when it does — radians below her own horizon.
+     *
+     * The exit is low on the front of the pelvis, where the body's own
+     * surface falls away fastest: measured off the mesh in the bind pose, the
+     * front face runs x 0.095 at y 0.818, 0.113 at 0.835 and 0.133 at 0.880,
+     * so a tip leaving at 66 degrees below the horizontal is running AWAY
+     * from the skin rather than along it. That is what buys the protrusion:
+     * up at navel height the same object would have to stand 25 mm off her to
+     * show 25 mm of itself, and down here it shows that much with the egg
+     * buried.
+     *
+     * BOTH NUMBERS WERE SWEPT RATHER THAN CHOSEN, through `__fr.jad.toy({tip,
+     * out})`, which re-places a worn one and hands back `toyFit`'s three
+     * measurements — 36 of them in one run of the harness. The surface here
+     * is steep enough that 10 mm of exit height moves the tip by 25 mm, which
+     * is not a thing anybody was going to guess. What these two land on:
+     * **tip 37 mm proud, lit button 7 mm proud, egg 13 mm under.**
+     */
+    tip: [0.118, 0.818, 0],
+    out: 1.150,
     /**
      * And how far the motor moves it while it is ON her, in metres.
      *
      * Not `SIGNAL.walk`: that number is a thing on a hard tabletop, which is
-     * where it came from and where it skids about. Strapped to a body over a
-     * folded cloth there is nowhere for it to go, so it is a buzz in place at
-     * under half the amplitude and no creep at all.
+     * where it came from and where it skids about. Held by a body there is
+     * nowhere for it to go, so it is a buzz in place at under half the
+     * amplitude and no creep at all.
      */
     buzz: 0.0011,
   };
 
   /**
-   * The worn rig: a mount at the bone, and the thing itself inside it.
+   * Where the mount sits on the bone, off TOY and off the mesh's own tip.
    *
-   * TWO GROUPS AND NOT ONE, which is what lets the motor and the skeleton
-   * both write a position every frame without one of them winning. `wearTick`
-   * owns the outer group — it puts it at the bone and turns it by `boneTurn`,
-   * every frame, like the horns and the headphones. The inner one is the
-   * mount: where on that bone the thing sits, which is a constant, plus
-   * whatever `signalTick` is shaking it by, which is not.
-   *
-   * `m` is the mesh she is holding when there is one. A thing picked up off
-   * the tabouret is the SAME object worn — same geometry, same LED material,
-   * same `userData` — and building a second one here would leave the signal
-   * writing to the one that was thrown away.
+   * Its own function because the debug hook re-places a worn one to sweep
+   * these two numbers — see `__fr.jad.toy({tip, out})`. Nothing else should
+   * call it twice: `wearTick` owns the group above this one.
    */
+  function toyPlace(shake, mesh) {
+    const tip = (mesh.userData.tip || new THREE.Vector3(0.047, 0.021, 0));
+    const turn = -(TOY.out + Math.atan2(tip.y, tip.x));
+    shake.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), turn);
+    const bone = skinFig && skinFig.bones.find((b) => b.name === 'pelvis');
+    const root = bone ? bone.t : [0.0152, 0.9344, 0];
+    const arm = tip.clone().applyQuaternion(shake.quaternion);
+    shake.position.set(TOY.tip[0] - root[0] - arm.x,
+      TOY.tip[1] - root[1] - arm.y, TOY.tip[2] - root[2] - arm.z);
+    return shake;
+  }
+
   function toyWorn(m) {
     const mesh = m || giftMesh('lovense');
     if (mesh.parent) mesh.parent.remove(mesh);
@@ -40507,16 +41170,13 @@ async function buildJadrija(scene) {
     mesh.rotation.set(0, 0, 0);
     mesh.quaternion.identity();
     const shake = new THREE.Group();
-    shake.position.set(TOY.at[0], TOY.at[1], TOY.at[2]);
-    shake.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
-      new THREE.Vector3(0, -1, 0),        // its long axis, down her
-      new THREE.Vector3(0, 0, -1),        // the loop's opening, across her
-      new THREE.Vector3(1, 0, 0)));       // and 37 mm of it, out in front
-    // Leaned with the front of her, about her own left-right axis. Negative,
-    // because +z is her right and the top of this has to go BACK: her belly
-    // stands further forward than her hip bone does.
-    shake.quaternion.premultiply(new THREE.Quaternion()
-      .setFromAxisAngle(new THREE.Vector3(0, 0, 1), -TOY.lean));
+    // ITS OWN PLANE IS HER SAGITTAL PLANE, which is the frame with nothing
+    // clever in it: the curve is drawn in x-y, +x is in front of her and +y is
+    // up, so the loop is left alone and only turned about her left-right axis.
+    // Turned by however much puts the tip where `TOY.out` says, and PLACED by
+    // that tip rather than by its own middle — the middle of this one is
+    // inside her. See `toyPlace`.
+    toyPlace(shake, mesh);
     shake.add(mesh);
     const g = new THREE.Group();
     g.add(shake);
@@ -40534,45 +41194,55 @@ async function buildJadrija(scene) {
   function toyMount(f, out) {
     if (pelvisB === null) pelvisB = f.boneIndex('pelvis');
     if (pelvisB < 0) return null;
-    f.boneAt(pelvisB, out);
-    _mtV.set(TOY.at[0], TOY.at[1], TOY.at[2])
-      .applyQuaternion(f.boneTurn(pelvisB, _mtQ));
-    out.add(_mtV);
+    const bone = f.bones[pelvisB];
+    // The exit point and not the object's middle, because the middle of this
+    // one is inside her: what her hand has to arrive at is where the thing
+    // goes in, which is `TOY.tip` — a figure-space point, so it comes off the
+    // bone's REST position and is then carried by whatever the bone has done
+    // since. The same arithmetic `wearTick` does for the group itself.
+    _mtV.set(TOY.tip[0] - bone.t[0], TOY.tip[1] - bone.t[1],
+      TOY.tip[2] - bone.t[2]).applyQuaternion(f.boneTurn(pelvisB, _mtQ));
+    f.boneAt(pelvisB, out).add(_mtV);
     return out.applyMatrix4(f.mesh.matrixWorld);
   }
 
   /**
-   * HOW FAR OFF HER THE THING ACTUALLY IS, in millimetres. Debug only.
+   * WHAT IS OUT AND WHAT IS IN, in millimetres. Debug only.
    *
-   * The placement above is four numbers against a surface that is neither flat
-   * nor vertical, and the failure it can have is silent: a toy sunk into the
-   * cloth reads, from two metres, exactly like a toy lying on it. So this
-   * measures rather than asserts — every vertex of the worn mesh against the
-   * outermost thing the figure has at that height and bearing, which is the
-   * wrap where there is wrap and her own skin where there is not.
+   * Three numbers, because three things have to be true at once and a render
+   * can only show you one of them: the TIP is proud of her, the lit button is
+   * proud of her, and the EGG is not. The last one is the one a picture
+   * cannot answer — a body is opaque, so an egg 2 mm outside the skin and an
+   * egg 20 mm inside it photograph identically from every angle but one.
    *
-   * In the BIND pose and not this frame's, and that is the whole reason it can
-   * be one number: both the cloth and the mount are rigid to the pelvis, so
-   * what is true standing still is true through a cartwheel.
+   * Measured against the outermost surface the figure has at that height and
+   * bearing, which is the wrap where there is wrap and her own skin where
+   * there is not, and in the BIND pose: both the cloth and the mount are
+   * rigid to the pelvis, so what is true standing still is true upside down.
    */
   let toyProf = null;
-  function toyClear() {
+  function toyFit() {
     if (!skinFig || !skinFig.mesh.geometry) return null;
     const NA = 72, NY = 26, Y0 = 0.78, DY = 0.008;
     const CX = 0.015;                 // the wrap's axis — `SCARF_CX` in the rig
+    const bin = (v) => {
+      const dx = v.x - CX;
+      const iy = Math.round((v.y - Y0) / DY);
+      if (iy < 0 || iy >= NY) return -1;
+      let a = Math.atan2(v.z, dx);
+      if (a < 0) a += Math.PI * 2;
+      return iy * NA + (Math.floor(a / (Math.PI * 2) * NA) % NA);
+    };
     if (!toyProf) {
       const pos = skinFig.mesh.geometry.attributes.position;
+      const v = new THREE.Vector3();
       toyProf = new Float32Array(NA * NY);
       for (let i = 0; i < pos.count; i++) {
-        const dx = pos.getX(i) - CX, y = pos.getY(i), z = pos.getZ(i);
-        const iy = Math.round((y - Y0) / DY);
-        if (iy < 0 || iy >= NY) continue;
-        const r = Math.hypot(dx, z);
+        v.fromBufferAttribute(pos, i);
+        const r = Math.hypot(v.x - CX, v.z);
         if (r > 0.30) continue;        // the arms, which hang outside all this
-        let a = Math.atan2(z, dx);
-        if (a < 0) a += Math.PI * 2;
-        const k = iy * NA + (Math.floor(a / (Math.PI * 2) * NA) % NA);
-        if (r > toyProf[k]) toyProf[k] = r;
+        const k = bin(v);
+        if (k >= 0 && r > toyProf[k]) toyProf[k] = r;
       }
     }
     const part = worn.lovense && worn.lovense[0];
@@ -40582,36 +41252,36 @@ async function buildJadrija(scene) {
     // then the bone's own rest position. `boneAt` would be this frame's pose.
     const bone = skinFig.bones.find((b) => b.name === 'pelvis');
     if (!bone) return null;
-    const M = new THREE.Matrix4().compose(
-      new THREE.Vector3(TOY.at[0], TOY.at[1], TOY.at[2]), part.shake.quaternion,
-      new THREE.Vector3(1, 1, 1));
+    const M = new THREE.Matrix4().compose(part.shake.position,
+      part.shake.quaternion, new THREE.Vector3(1, 1, 1));
     M.premultiply(new THREE.Matrix4().makeTranslation(
       bone.t[0], bone.t[1], bone.t[2]));
     const v = new THREE.Vector3();
+    const clear = (p) => {
+      const k = bin(p);
+      if (k < 0 || !toyProf[k]) return null;
+      return Math.hypot(p.x - CX, p.z) - toyProf[k];
+    };
     const pos = mesh.geometry.attributes.position;
-    // THREE NUMBERS AND NOT ONE, because the mesh is 37 mm thick and a single
-    // maximum is that thickness rather than anything about where it sits. The
-    // whole mesh's MINIMUM says whether it is inside her; the same minimum
-    // taken over the bottom third and the top third says whether it is lying
-    // along her or standing off at one end, which is what the lean is for.
-    const gaps = [9, 9, 9];
-    const lowY = 0.9344 + TOY.at[1] - 0.026, hiY = 0.9344 + TOY.at[1] + 0.026;
+    let tip = -9, egg = -9;
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(M);
-      const dx = v.x - CX, r = Math.hypot(dx, v.z);
-      const iy = Math.round((v.y - Y0) / DY);
-      if (iy < 0 || iy >= NY) continue;
-      let a = Math.atan2(v.z, dx);
-      if (a < 0) a += Math.PI * 2;
-      const body = toyProf[iy * NA + (Math.floor(a / (Math.PI * 2) * NA) % NA)];
-      if (!body) continue;
-      const gap = r - body;
-      if (gap < gaps[0]) gaps[0] = gap;
-      const k = v.y < lowY ? 1 : v.y > hiY ? 2 : -1;
-      if (k > 0 && gap < gaps[k]) gaps[k] = gap;
+      const gap = clear(v);
+      if (gap == null) continue;
+      if (gap > tip) tip = gap;
+      // The egg is the only part of this with any thickness — the arm is
+      // 9 mm through at its fattest and the egg is 37 — so its own `z` says
+      // which is which without knowing anything about the vertex order.
+      v.fromBufferAttribute(pos, i);
+      if (Math.abs(v.z) > 0.012) {
+        v.applyMatrix4(M);
+        if (gap > egg) egg = gap;
+      }
     }
-    if (gaps[0] > 8) return null;
-    return gaps.map((g) => (g > 8 ? null : Math.round(g * 1000)));
+    const lit = mesh.userData.ledAt
+      ? clear(v.copy(mesh.userData.ledAt).applyMatrix4(M)) : null;
+    const mm = (x) => (x == null || x < -8 ? null : Math.round(x * 1000));
+    return { tip: mm(tip), led: mm(lit), egg: mm(egg) };
   }
 
   function wearableParts(key, where, mesh) {
@@ -40811,8 +41481,15 @@ async function buildJadrija(scene) {
       b.rotation.x = Math.PI / 2;
       b.position.set(at.x, at.y, radiusAt(u) * 0.86);
       m.add(b);
+      // Where the lit one sits on the arm, in the mesh's own frame. Worn, it
+      // is the one part of this that has to end up OUTSIDE her — see TOY —
+      // and a number measured off the object beats a number typed next to it.
+      if (lit) m.userData.ledAt = b.position.clone();
     }
     m.userData.led = led;
+    // The very end of the arm: `P[0]`, which is where the curve starts and
+    // where the radius is nought. Worn, this is the point that pokes out.
+    m.userData.tip = new THREE.Vector3(P[0][0], P[0][1], 0);
     // AND IT LIES DOWN. The curve is drawn in the x-y plane, so on a table it
     // has to be tipped a quarter turn about x or it stands on its edge like a
     // hook — which is what the first photograph showed.
@@ -45444,7 +46121,7 @@ async function buildJadrija(scene) {
       // Her hair, and where the reach is asking her left wrist to go while
       // `tieHair` runs — in figure metres, so it can be checked against the
       // head bone `bones(['head'])` reports without a render in between.
-      hair: worn.hair ? 'down' : 'up', hairGoal: show.hairGoal || null,
+      hair: hairFall ? 'down' : 'up', hairGoal: show.hairGoal || null,
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
     /**
@@ -45775,16 +46452,51 @@ async function buildJadrija(scene) {
     /** And what she has ON, which is the other half of the same question. */
     worn: () => Object.keys(worn),
     /**
-     * The one she can be wearing, measured — see TOY and `toyClear`.
+     * The fall, node by node, in HER frame: where each ring has got to
+     * relative to the head bone, with +x in front of her and +y up.
+     *
+     * A hanging chain is the one thing here whose failure mode is a picture
+     * nobody can read — hair in front of her face and hair behind her head
+     * are the same dark mass from most angles and the same number of pixels
+     * at the distance anybody looks at this. So the numbers are published: at
+     * rest the fall runs from about (0, +0.15) at the crown to (−0.06, −0.35)
+     * at the hem, and every x is NEGATIVE.
+     */
+    hairSim: () => {
+      if (!hairFall || !skinFig || hairBone < 0) return null;
+      const q = new THREE.Quaternion().copy(skinFig.mesh.quaternion)
+        .multiply(skinFig.boneTurn(hairBone, new THREE.Quaternion())).invert();
+      const at = new THREE.Vector3();
+      skinFig.mesh.updateMatrixWorld();
+      skinFig.boneAt(hairBone, at).applyMatrix4(skinFig.mesh.matrixWorld);
+      const v = new THREE.Vector3();
+      return hairFall.node.map((n, i) => {
+        v.copy(n).sub(at).applyQuaternion(q);
+        return [i, +v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+      });
+    },
+    /**
+     * The one she can be wearing, measured — see TOY and `toyFit`.
      *
      * `mount` is where the thing belongs on her in world metres, which exists
      * whether or not anything is there yet, and `at` is where the object
-     * actually is. `clear` is the pair of millimetres that says whether it is
-     * lying on the cloth or sunk into it: the closest vertex and the furthest.
-     * A probe that only photographs this cannot tell the difference.
+     * actually is. `fit` is the three millimetre numbers that say whether it
+     * is sitting the way it is meant to: how far the tip is proud of her, how
+     * far the lit button is, and how far the egg is under. A photograph can
+     * answer the first two and cannot answer the third.
      */
-    toy: () => {
+    toy: (o) => {
       if (!skinFig) return null;
+      // Sweep the two numbers the placement is made of without a rebuild —
+      // `__fr.jad.toy({ tip: [x, y, z], out: 0.95 })`. The answer comes back
+      // measured, so a dozen of these settle it in one run of the harness.
+      if (o && worn.lovense && worn.lovense[0]) {
+        if (o.tip) TOY.tip = o.tip.slice();
+        if (o.out != null) TOY.out = o.out;
+        const part = worn.lovense[0];
+        toyPlace(part.shake, part.shake.children[0]);
+        part.rest.copy(part.shake.position);
+      }
       const w = new THREE.Vector3(), a = new THREE.Vector3();
       skinFig.mesh.updateMatrixWorld();
       const mount = toyMount(skinFig, w);
@@ -45797,7 +46509,7 @@ async function buildJadrija(scene) {
       return { on: !!part, held: !!(giftHeld && giftHeld.key === 'lovense'),
         out: giftProps.some((m) => m.userData && m.userData.key === 'lovense'),
         mount: mount ? r3(w) : null, at: part ? r3(a) : null,
-        clear: toyClear(), buzzing: !!signals.lovense,
+        fit: toyFit(), buzzing: !!signals.lovense,
         lit: part && part.led
           ? +part.led.uniforms.uEmissive.value.toFixed(2) : null,
         phase: show ? show.phase : null,

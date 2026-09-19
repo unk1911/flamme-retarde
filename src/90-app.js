@@ -8244,7 +8244,8 @@ window.__fr = {
     props: () => (jadrija && jadrija.props ? jadrija.props() : null),
     /** What she has on, and the one of those that has a motor in it. */
     worn: () => (jadrija && jadrija.worn ? jadrija.worn() : null),
-    toy: () => (jadrija && jadrija.toy ? jadrija.toy() : null),
+    hairSim: () => (jadrija && jadrija.hairSim ? jadrija.hairSim() : null),
+    toy: (o) => (jadrija && jadrija.toy ? jadrija.toy(o) : null),
     hair: (on) => (jadrija && jadrija.hair ? jadrija.hair(on) : null),
     coke: (u) => (jadrija && jadrija.coke ? jadrija.coke(u) : null),
     pose: (n, at, settle) => (jadrija && jadrija.pose ? jadrija.pose(n, at, settle) : null),
