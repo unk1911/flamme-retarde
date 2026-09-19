@@ -355,6 +355,7 @@ button {
 }
 /* On a phone the bottom left corner belongs to the buttons, so the pack sits
    above them rather than underneath them. */
+#gh-pack[hidden] { display: none; }
 html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
 /* The button row in the water lives where the swim hint was, so the hint goes
    up above it. Same arrangement the ground HUD already makes for its pack
@@ -943,6 +944,12 @@ html.touch #whoami .lbl { display: none; }
   font-family: var(--mono);
 }
 #panel[hidden] { display: none; }
+#panel-close {
+  position: absolute; top: .4rem; right: .6rem;
+  font-size: 1.1rem; line-height: 1; color: #6f8189; padding: .35rem .55rem;
+  background: none; border: 0; cursor: pointer;
+}
+#panel-close:hover { color: var(--salt); }
 #panel h3 {
   margin: 0 0 1rem; font-size: .6rem; letter-spacing: .3em;
   text-transform: uppercase; color: var(--sea); font-weight: 400;
@@ -1315,7 +1322,10 @@ html.touch #tank-hint { font-size: .46rem; max-width: 5.6rem; letter-spacing: .1
 html.touch #wingmen { display: none; }
 html.touch #panel {
   right: 50%; transform: translate(50%, -50%);
-  width: min(20rem, 86vw); max-height: 84vh; overflow-y: auto;
+  /* Clear of the button row at the bottom, which this used to sit on top of —
+     including the one button that opens it. */
+  max-height: calc(100vh - 5.6rem);
+  width: min(20rem, 86vw); overflow-y: auto;
   touch-action: pan-y;                 /* the page is locked; this is not */
 }
 html.touch .row input[type=range] { height: 22px; }

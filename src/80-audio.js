@@ -905,7 +905,15 @@ function buildAudio() {
    * room and there is nothing to hear from the next hut.
    */
   let buzzOsc = null, buzzGain = null, buzzHarm = null, buzzLfo = null;
-  function buzz(on, d = 0) {
+  /**
+   * `amp` is the pattern — see `signalAmp` in 43-jadrija.js. It is a third
+   * argument and not a second call because the oscillators run as a loop: the
+   * gaps in a pulse pattern are a gain going to nothing and coming back, and
+   * stopping the loop for each one would cost a click at both ends of every
+   * pulse. The 0.08 s ramp below is what makes it a motor spinning up rather
+   * than a switch.
+   */
+  function buzz(on, d = 0, amp = 1) {
     if (!ctx) return false;
     if (!on) {
       if (buzzGain) buzzGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
@@ -939,7 +947,8 @@ function buildAudio() {
     // 0.14 and it was 0.055. A small motor against a wooden top is one of the
     // louder things in a quiet room, and at the old gain you had to be told it
     // was on — the same fault the kiss had, and the same fix.
-    buzzGain.gain.setTargetAtTime(0.14 * far, ctx.currentTime, 0.08);
+    buzzGain.gain.setTargetAtTime(0.14 * far * Math.max(0, amp),
+      ctx.currentTime, 0.08);
     return true;
   }
 

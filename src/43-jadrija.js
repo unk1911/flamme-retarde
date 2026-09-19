@@ -35068,6 +35068,35 @@ async function buildJadrija(scene) {
    * wine is IN there: "pour me a glass" is asked of a woman who is already
    * standing in the hut with you, which is `dwell`.
    */
+  /**
+   * ── WHAT IS DONE ON HER FEET ───────────────────────────────────────────
+   *
+   * Everything in this table needs her standing, and the gate in the dispatch
+   * stands her up before it runs — see there for the argument. What is NOT in
+   * it is the family whose clips are authored from a pose and go round by the
+   * cradle on their own: the reclines, the six on the mattress, the roll on to
+   * her front, the two sides, and the latches that change a pose without
+   * leaving it (her legs, her arms, a yawn).
+   *
+   * `rise` is not in it either, for the obvious reason, and neither is
+   * `submit` — it is the one pose she can enter from her knees as well as
+   * from her feet, and `askWhy` already refuses it when she is in it.
+   */
+  const askLog = [];
+  const ON_FEET = { wine: 1, coke: 1, give: 1, wear: 1, kiss: 1, hug: 1,
+    fours: 1, handstand: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
+    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
+    'hair.down': 1, 'hair.up': 1, 'fetch.cream': 1,
+    'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
+    'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1 };
+
+  /** And whether she is on them. */
+  function onHerFeet() {
+    const p = show.phase;
+    return !(KNEES[p] || LYING[p] || POSED[p] || HANDS[p] || onCot(p)
+      || p === 'fours' || p === 'crawl');
+  }
+
   const ASKABLE = { dwell: 1, meet: 1, leave: 1, idle: 1, play: 1, home: 1,
     orbit: 1, aim: 1, joy: 1, notice: 1, rest: 1, flip: 1, up: 1, wheel: 1,
     down: 1, crawl: 1, bask: 1, hop: 1, out: 1, shimmy: 1, twerk: 1, heart: 1,
@@ -35380,9 +35409,14 @@ async function buildJadrija(scene) {
   function askWhy(name) {
     if (!show) return 'gone';
     if (name === 'wine') {
-      // The glass is full and nobody drinks it — that is the room's own rule,
-      // written over `fillTo`. There is nothing left of this request to do.
-      if (show.level >= 0) return 'poured';
+      // AND A FULL GLASS IS NO LONGER A REFUSAL. "The glass is already full"
+      // is the room's own rule — written over `fillTo`, nobody drinks it —
+      // and as an answer to somebody who has just asked for a drink it reads
+      // as nothing happening at all. Misha, 19 Sep 2026, after a `coke`: *"I
+      // asked to 'pour wine' but nothing happened"*. The rule stands for the
+      // ROOM, which still will not walk her in to pour a second one; asked in
+      // so many words she pours it.
+
       // And the bottle is in there. Asked from the promenade she walks in,
       // which is more of an answer than the clip is — so this is not a
       // refusal, it is only the case where there is no kabina at all.
@@ -35537,10 +35571,10 @@ async function buildJadrija(scene) {
     if (name === 'fours') {
       // Already down there. Asking again from the pose is not the request.
       if (show.phase === 'fours') return 'already';
-      // And not off her back: `getup` is the way up from all fours and the
-      // way down is `kneel` from standing, so the honest order from a recline
-      // is to sit up first — which is what `rise` is for.
-      if (onCot(show.phase)) return 'lying';
+      // AND IT NO LONGER REFUSES FROM THE COT. "She is on her back — get her
+      // up first" was a true sentence and the wrong answer: getting her up
+      // first is a thing the game can do, and it does it now. See the gate in
+      // the dispatch and `ON_FEET`.
       return null;
     }
     if (name === 'rise') {
@@ -36125,6 +36159,11 @@ async function buildJadrija(scene) {
      * routine and the dice without knowing which one started them.
      */
     const showNext = () => {
+      // AND THE ASK IS OVER. `byAsk` says the phase she is leaving was asked
+      // for rather than rolled for — the room reads it and stands off while
+      // it is set, see the kabina rule — so the one place every number ends
+      // is the one place it can be cleared without a dozen copies.
+      show.byAsk = 0;
       const nxt = show.queue.shift();
       if (nxt === 'shimmy') return enterShimmy();
       if (nxt === 'twerk') return enterTwerk();
@@ -36533,8 +36572,68 @@ async function buildJadrija(scene) {
       // function `askShow` answered the panel with, asked again here because
       // the player has had a frame or more to walk out of the room since.
       show.why = askWhy(name);
+      // What was asked, where she was, and where it put her. A ring of the
+      // last dozen, because a request that is refused, a request that is
+      // eaten and a request that is answered by a branch nobody expected all
+      // look identical from outside — see `__fr.jad.asked()`.
+      // AND THE LATCH IS SPENT THE MOMENT SHE IS UP.
+      //
+      // `getUp` means "she is on her way to her feet for this request". Once
+      // the request is being handled WITH her feet under her it has done its
+      // job, and a latch left set is read by whatever phase she lands in:
+      // `fours` and `kept` both open with `if (show.getUp) go('rise')`, which
+      // is the stale-latch fault `rise` already documents one phase further
+      // on. MEASURED, from a kneel: the gate stood her up, the request fired
+      // on the next frame and put her on all fours, and the latch it had been
+      // carried on stood her straight back up again — one frame of the pose
+      // and then `dwell`, with every readout saying the request had been
+      // taken. Which it had.
+      if (onHerFeet()) show.getUp = 0;
+      const logAt = askLog.length;
+      askLog.push({ name, from: show.phase, why: show.why || null, to: null,
+        feet: onHerFeet(), getUp: !!show.getUp });
+      while (askLog.length > 12) askLog.shift();
       if (show.why) {
         show.did = null;
+      } else if (ON_FEET[name.split(':')[0]] && !onHerFeet()) {
+        // ── AND SHE GETS UP FIRST, WHATEVER IT WAS ─────────────────────────
+        //
+        // Misha, 19 Sep 2026: *"when I ask her to do stuff inside kabine,
+        // seems certain actions require her to be in certain position in the
+        // first place, like standing up first, but really, it should be
+        // possible to go from any position to any other position"*.
+        //
+        // He is right, and the reason it was patchy is that the get-up was
+        // written FIVE TIMES — once each inside `give`, `coke`, `wear`, the
+        // hair and the kiss — so the five that had it worked from the cot and
+        // everything else either refused (`fours` answered "she is on her
+        // back, get her up first") or started a standing clip on a woman who
+        // was lying down. One gate, in front of all of them, and the five
+        // copies are gone: if what was asked for happens on her feet and she
+        // is not on them, the request is RE-ARMED and she takes the road up.
+        // By the time it is read again she is in `dwell` and the branch that
+        // handles it runs exactly as it does from standing.
+        //
+        // The road is the one `rise` already knows: the sitting family goes
+        // round by the cradle, her back goes through `situp`, and everything
+        // else is `getup`. Nothing here is new except that it is one place.
+        show.ask = name;
+        // AND IT ONLY STARTS THE ROAD ONCE. `cradle` is a phase a request may
+        // be made from, so a gate that re-entered it every frame re-entered it
+        // EVERY FRAME: the clip restarted, the timer went back to nought, and
+        // she lay there being asked to get up for ever. Measured, from
+        // `lotusHeld`: the request never fired and she never left the cot.
+        // `getUp` is the latch that says she is already on her way, and the
+        // three phases that carry it clear it when they hand her on.
+        if (!show.getUp) {
+          show.getUp = 1;
+          show.lieWant = null;
+          show.byAsk = 0;
+          show.queue.length = 0;
+          if (POSED[show.phase]) go('cradle', 'cradle', 0.44);
+          else if (onCot(show.phase) || LYING[show.phase]) go('situp', 'situp', 0.30);
+          else go('rise', 'getup', 0.35);
+        }
       } else if (name === 'wine') {
         // ── THE LEGS THAT ARE ALREADY WALKED ──
         //
@@ -36558,6 +36657,9 @@ async function buildJadrija(scene) {
         // same thing it means down there. The pour then plants her with
         // `showSettle` over its first 0.58 s, as it always did — so the
         // millimetres the solve is measured in are still the solve's.
+        // WHOSE WALK THIS IS, for the end of it — see `come`, where a full
+        // glass turns the room around and must not turn the player around.
+        show.byAsk = 1;
         const onMark = Math.hypot(show.t - kit.wine[0],
           show.s - kit.wine[1]) < 0.35;
         if (onMark) {
@@ -36610,20 +36712,11 @@ async function buildJadrija(scene) {
         // than the one that was asked for. So the request stands her up and
         // re-arms itself: `show.ask` is read again on a later frame, and by
         // then she is in `dwell` with her feet under her.
-        if (KNEES[show.phase] || onCot(show.phase)) {
-          show.lieWant = null;
-          show.byAsk = 0;
-          show.getUp = 1;
-          show.ask = name;
-          if (onCot(show.phase)) go('situp', 'situp', 0.30);
-          else go('rise', 'getup', 0.35);
-        } else {
-          show.near = name;
-          show.queue.length = 0;
-          show.side = 0;
-          showSay('trill', d);
-          go('toYou', 'walk', 0.34);
-        }
+        show.near = name;
+        show.queue.length = 0;
+        show.side = 0;
+        showSay('trill', d);
+        go('toYou', 'walk', 0.34);
       } else if (name.startsWith('give:')) {
         // The same walk the kiss uses, because she has to be within reach to
         // be handed anything; the item is remembered until it is in her hand.
@@ -36632,12 +36725,7 @@ async function buildJadrija(scene) {
         show.queue.length = 0;
         show.side = 0;
         showSay('trill', d);
-        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
-          show.getUp = 1;
-          show.ask = name;
-          if (onCot(show.phase)) go('situp', 'situp', 0.30);
-          else go('rise', 'getup', 0.35);
-        } else go('toYou', 'walk', 0.34);
+        go('toYou', 'walk', 0.34);
       } else if (name.startsWith('wear:')) {
         // THE COKE'S ROAD AND NOT THE GIFT'S, and that is the whole difference
         // between the two: a handover happens at arm's length from YOU, and
@@ -36649,12 +36737,7 @@ async function buildJadrija(scene) {
         show.queue.length = 0;
         show.side = 0;
         showSay('trill', d);
-        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
-          show.getUp = 1;
-          show.ask = name;
-          if (onCot(show.phase)) go('situp', 'situp', 0.30);
-          else go('rise', 'getup', 0.35);
-        } else if (kit && kit.work
+        if (kit && kit.work
             && Math.hypot(show.t - kit.work.lift[0], show.s - kit.work.lift[1]) > 0.26) {
           show.goMark = kit.work.lift;
           show.goNext = 'liftIt';
@@ -36698,12 +36781,7 @@ async function buildJadrija(scene) {
         show.hairDid = 0;
         show.queue.length = 0;
         showSay('squee', d);
-        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
-          show.getUp = 1;
-          show.ask = name;
-          if (onCot(show.phase)) go('situp', 'situp', 0.30);
-          else go('rise', 'getup', 0.35);
-        } else go('tieHair', 'idle', 0.30);
+        go('tieHair', 'idle', 0.30);
       } else if (name === 'coke') {
         // Same road as the wine, with one leg in front of it: the plate is
         // worked at from its own side of the table — see `work` — and that is
@@ -36713,12 +36791,7 @@ async function buildJadrija(scene) {
         show.side = 0;
         showSay('trill', d);
         cokeSet(0);
-        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
-          show.getUp = 1;
-          show.ask = name;
-          if (onCot(show.phase)) go('situp', 'situp', 0.30);
-          else go('rise', 'getup', 0.35);
-        } else if (kit && kit.work
+        if (kit && kit.work
             && Math.hypot(show.t - kit.work.coke[0], show.s - kit.work.coke[1]) > 0.26) {
           show.goMark = kit.work.coke;
           show.goNext = 'coke';
@@ -36850,6 +36923,7 @@ async function buildJadrija(scene) {
       } else if (name === 'ballet') {
         const bar = barreAt(show.t, show.s);
         if (bar) {
+          show.byAsk = 1;
           show.bar = bar;
           show.leg = show.s < SHOW.lane[0] ? 1 : 0;
           showSay('trill', d);
@@ -36876,14 +36950,17 @@ async function buildJadrija(scene) {
           go('errand', 'walk', 0.32);
         } else show.did = null;
       } else if (name === 'joy') {
+        show.byAsk = 1;
         showSay('hup', d);
         go('joy', 'flip', 0.18);
-      } else if (name === 'wheel') enterWheels();
-      else if (name === 'shimmy') enterShimmy();
-      else if (name === 'twerk') enterTwerk();
-      else if (name === 'heart') enterHeart();
-      else if (name === 'note') enterNote();
+      } else if (name === 'wheel') { show.byAsk = 1; enterWheels(); }
+      else if (name === 'shimmy') { show.byAsk = 1; enterShimmy(); }
+      else if (name === 'twerk') { show.byAsk = 1; enterTwerk(); }
+      else if (name === 'heart') { show.byAsk = 1; enterHeart(); }
+      else if (name === 'note') { show.byAsk = 1; enterNote(); }
       else show.did = null;
+      const rec = askLog[Math.min(logAt, askLog.length - 1)];
+      if (rec && rec.name === name) rec.to = show.phase;
     }
     show.bumpAgain = Math.max(0, (show.bumpAgain || 0) - dt);
     if (show.bumped) {
@@ -36919,8 +36996,22 @@ async function buildJadrija(scene) {
     // this line fires on the very next frame and walks her back to the doorway
     // to start coming in again, out of a pose she has just gone down into
     // three feet away from you.
+    // AND NOT OVER SOMETHING SHE WAS ASKED FOR.
+    //
+    // Misha, 19 Sep 2026: *"it should be possible to go from any position to
+    // any other position"*. Half of that was the get-up gate; this is the
+    // other half, and it is the same fault from the other end. `OWN` is a
+    // list of phases, so every number she does that is NOT on it — the dances
+    // above all — was overridden by this line on the frame after it started,
+    // in the one room where most of them get asked for. MEASURED: asked for
+    // the bend from a handstand she got up, took the request, entered the
+    // clip, and was walked to the doorway before a single frame of it drew.
+    //
+    // `byAsk` is the bit that already says a phase was asked for rather than
+    // rolled for, and every ask that matters sets it. The room still brings
+    // her in when she is wandering, which is what it is for.
     if (inside && !KABIN[show.phase] && !MUSIC[show.phase]
-        && !OWN[show.phase] && !show.turned) {
+        && !OWN[show.phase] && !show.turned && !show.byAsk) {
       // AND FROM THE LEG SHE IS ACTUALLY ON, which is the same rule 1.404.0
       // put on the wine ask and this line never learned.
       //
@@ -36999,8 +37090,16 @@ async function buildJadrija(scene) {
             // another glass. `level` is the room's own record of what is in
             // the glass and nobody drinks it (see `fillTo`), which is exactly
             // the test `askWhy('wine')` already makes when you ask her.
-            if (show.level >= 0) go('dwell', 'idle', 0.40);
-            else go('wine', 'wine', 0.42);
+            // AND A GLASS THAT IS ALREADY FULL STOPS THE ROOM AND NOT THE
+            // PLAYER. Misha, 19 Sep 2026: *"after 'coke' I asked to 'pour
+            // wine' but nothing happened"*. This is where it went: the ask
+            // sends her on the walk in, and the end of that walk asked the
+            // room's question — is there wine in the glass — and answered it
+            // for both of them. `byAsk` is the one bit that says which of the
+            // two is walking. The room still will not pour a second glass;
+            // asked in so many words, she pours it.
+            if (show.level >= 0 && !show.byAsk) go('dwell', 'idle', 0.40);
+            else { show.byAsk = 0; go('wine', 'wine', 0.42); }
           }
           else show.leg++;
         }
@@ -37393,21 +37492,16 @@ async function buildJadrija(scene) {
                 return [null, null, w];
               })();
             const m = giftHeld.mesh;
-            // AND IT SITS ON THE SURFACE RATHER THAN HALF THROUGH IT. These
-            // meshes are built about their own middles, so a thing put down
-            // at the height of the wood is a thing buried to its waist in it.
-            // `sit` is the half-height it needs, after whatever `lay` does.
-            const sit = m.userData.sit || 0;
-            if (inHut) {
-              const w = toWorld(spot[0], spot[1]);
-              m.position.set(w[0], spot[2] + sit, w[2]);
-            } else {
-              const w = spot[2];
-              m.position.set(w[0], w[1] + 0.02, w[2]);
-            }
+            const surf = inHut ? spot[2] : spot[2][1] + 0.002;
+            const w = inHut ? toWorld(spot[0], spot[1]) : spot[2];
+            m.position.set(w[0], surf, w[2]);
             // Lying down if the thing has an opinion about it — see
             // `lovenseMesh`, whose curve is drawn standing up.
             m.rotation.set(m.userData.lay || 0, faceYaw(show.t, show.ang), 0);
+            // AND IT SITS ON THE SURFACE RATHER THAN HALF THROUGH IT, which is
+            // measured after the two angles above and not guessed before them.
+            // See `restOn`.
+            restOn(m, surf);
             // Which thing it is, so a signal can find it later — see SIGNAL.
             m.userData.key = giftHeld.key;
             giftProps.push(m);
@@ -39654,8 +39748,9 @@ async function buildJadrija(scene) {
   if (kit && kit.spot) {
     const m = giftMesh('lovense');
     const w = toWorld(kit.spot[0], kit.spot[1]);
-    m.position.set(w[0], kit.spot[2] + (m.userData.sit || 0), w[2]);
+    m.position.set(w[0], kit.spot[2], w[2]);
     m.rotation.set(m.userData.lay || 0, faceYaw(kit.spot[0], -0.55), 0);
+    restOn(m, kit.spot[2]);
     m.userData.key = 'lovense';
     giftProps.push(m);
   }
@@ -40947,7 +41042,58 @@ async function buildJadrija(scene) {
    * against the clock rather than a random walk — so a thing left buzzing is
    * in the same place on a reload.
    */
-  const SIGNAL = { walk: 0.0026, hz: 47, hear: 7 };
+  const SIGNAL = {
+    walk: 0.0026, hz: 47, hear: 7,
+    /**
+     * ── AND IT IS NOT ON THE WHOLE TIME ────────────────────────────────────
+     *
+     * Misha, 19 Sep 2026: *"once lovesens is on, it seems to be vibrating non
+     * stop. if nothing else, there should be pauses of no vibrations between
+     * the vibrations"*.
+     *
+     * Seconds, alternating, starting with the motor RUNNING: two short pulses
+     * with a breath between them, then a long one, then a proper rest. Five
+     * seconds round, which is slow enough that you hear it as a pattern
+     * rather than as a stutter, and the rest is long enough to be silence.
+     *
+     * A pattern and not a random walk, for the reason the creep gives: a
+     * thing left running is doing the same thing on a reload, like everything
+     * else in this resort.
+     */
+    beat: [0.85, 0.30, 0.85, 0.30, 1.90, 0.95],
+    /** And how long each pulse takes to spin up and die away. */
+    edge: 0.09,
+  };
+
+  /**
+   * Where in that pattern we are: 1 while the motor is running, 0 in a gap,
+   * and eased across both edges of every pulse — see `SIGNAL.edge`. One
+   * number, because everything the motor drives wants the same one: the
+   * shake, the wine, the light and the sound.
+   */
+  /** How much of the pulse we are inside is still to run, in seconds. */
+  function signalLeft(t) {
+    const B = SIGNAL.beat;
+    let cyc = 0;
+    for (const d of B) cyc += d;
+    let u = ((t % cyc) + cyc) % cyc;
+    let i = 0;
+    while (i < B.length - 1 && u >= B[i]) { u -= B[i]; i++; }
+    return Math.max(0.05, B[i] - u);
+  }
+
+  function signalAmp(t) {
+    const B = SIGNAL.beat;
+    let cyc = 0;
+    for (const d of B) cyc += d;
+    let u = ((t % cyc) + cyc) % cyc;
+    let i = 0;
+    while (i < B.length - 1 && u >= B[i]) { u -= B[i]; i++; }
+    if (i % 2) return 0;                       // odd segments are the gaps
+    const ramp = Math.min(SIGNAL.edge, B[i] * 0.45);
+    const k = sat(Math.min(u, B[i] - u) / ramp);
+    return k * k * (3 - 2 * k);
+  }
   const signals = {};
   const _sigW = new THREE.Vector3();
 
@@ -40986,6 +41132,8 @@ async function buildJadrija(scene) {
       // And the light goes out with it.
       if (rx.led) rx.led.uniforms.uEmissive.value = 0;
       if (audio && audio.buzz) audio.buzz(false);
+      // And the phone stops with it, mid-pulse if that is where it is.
+      if (IS_TOUCH && navigator.vibrate) navigator.vibrate(0);
       return 'off';
     }
     signals[key] = { t: 0, node: rx.node, at: rx.node.position.clone() };
@@ -41006,7 +41154,7 @@ async function buildJadrija(scene) {
       if (kit && kit.wineBuzz) kit.wineBuzz.value = 0;
       return;
     }
-    let near = 1e9, shake = 0;
+    let near = 1e9, shake = 0, loud = 0;
     for (const k of keys) {
       const sg = signals[k];
       // WHERE IT IS THIS FRAME, and not where it was when the signal was
@@ -41022,12 +41170,34 @@ async function buildJadrija(scene) {
       }
       sg.t += dt;
       const a = sg.t * SIGNAL.hz;
+      // WHERE IN THE PATTERN IT IS. Everything below is scaled by it, which
+      // is what makes the gaps gaps: the thing stops moving, the sound goes,
+      // the wine settles and the light drops back. See `signalAmp`.
+      const beat = signalAmp(sg.t);
       // A tabletop lets it skid; a hip does not — see `TOY.buzz`.
-      const amp = rx.table ? SIGNAL.walk : TOY.buzz;
+      const amp = (rx.table ? SIGNAL.walk : TOY.buzz) * beat;
       sg.node.position.set(
         sg.at.x + Math.sin(a) * amp,
         sg.at.y + Math.abs(Math.sin(a * 2)) * amp * 0.4,
         sg.at.z + Math.cos(a * 0.9) * amp);
+      // AND THE PHONE IN YOUR HAND, once a pulse.
+      //
+      // Misha, 19 Sep 2026: *"is it possible in phone mode when lovesens
+      // vibrates to vibrate the phone?"*. It is, on Android — `navigator
+      // .vibrate` takes a length in milliseconds and no amplitude, so the
+      // pattern is the only thing it can carry, and the pattern is exactly
+      // what it should carry. Fired on the leading edge of each pulse for the
+      // length that pulse has left, rather than every frame: a call while one
+      // is already running restarts it, and a buzz restarted sixty times a
+      // second is a buzz that never starts.
+      //
+      // iOS has no vibration API at all and silently has none — no feature
+      // test needed beyond the one below, and nothing to apologise for.
+      if (IS_TOUCH && navigator.vibrate && near < SIGNAL.hear) {
+        const run = beat > 0.5;
+        if (run && !sg.vib) navigator.vibrate(Math.round(signalLeft(sg.t) * 1000));
+        sg.vib = run;
+      }
       // And it creeps: a thing vibrating on a hard surface does not stay put.
       // Only on the wood. Strapped on, the millimetre a second this adds would
       // be the thing walking down her leg over a minute and a half.
@@ -41049,8 +41219,10 @@ async function buildJadrija(scene) {
       // this at, and what a small indicator actually does is pulse about once
       // a second. Full to a quarter and back.
       if (rx.led) {
-        rx.led.uniforms.uEmissive.value = 0.72 + 0.28 * Math.sin(sg.t * 5.7);
+        rx.led.uniforms.uEmissive.value =
+          (0.72 + 0.28 * Math.sin(sg.t * 5.7)) * (0.22 + 0.78 * beat);
       }
+      if (beat > loud) loud = beat;
       // How much of it reaches the glass. Through the tabletop, not through
       // the air: a thing on the same 46 cm top shakes the wine, the same
       // thing on the cot two metres off does not, and there is no case in
@@ -41062,14 +41234,17 @@ async function buildJadrija(scene) {
       // what the distance already said and is more honest than a second rule.
       if (kit && kit.glass) {
         const d = Math.hypot(kit.glass[0] - _sigW.x, kit.glass[2] - _sigW.z);
-        shake = Math.max(shake, Math.max(0, Math.min(1, (0.50 - d) / 0.25)));
+        shake = Math.max(shake,
+          Math.max(0, Math.min(1, (0.50 - d) / 0.25)) * beat);
       }
     }
     if (kit && kit.wineBuzz) {
       kit.wineBuzz.value = shake;
       kit.wineT.value += dt;
     }
-    if (audio && audio.buzz) audio.buzz(true, Math.min(near, SIGNAL.hear));
+    // The loudest of them, so two receivers do not cancel each other out in
+    // the one voice they share.
+    if (audio && audio.buzz) audio.buzz(true, Math.min(near, SIGNAL.hear), loud);
   }
 
   /**
@@ -41494,11 +41669,48 @@ async function buildJadrija(scene) {
     // has to be tipped a quarter turn about x or it stands on its edge like a
     // hook — which is what the first photograph showed.
     m.userData.lay = -Math.PI / 2;
-    // On its side it is 18.5 mm through the fattest part of the egg, so it
-    // rests that far above whatever it was put down on — see `sit` in
-    // `placeIt`.
-    m.userData.sit = 0.0185;
+    // How high it rests above whatever it is put down on is NOT a number this
+    // function knows: on its side it is 18.5 mm through the fattest part of
+    // the egg, and turned by a yaw as well it hangs 41. See `restOn`, which
+    // measures it after both angles instead.
     return m;
+  }
+
+  /**
+   * Stand a set-down thing ON a surface, by measuring it rather than by
+   * declaring how tall it is.
+   *
+   * Misha, 19 Sep 2026: *"lovesens on the table appears to be laying too low
+   * in the table, needs to be higher"*. MEASURED: its lowest vertex sat
+   * **22.9 mm under the wood**.
+   *
+   * The old way was a `sit` on each object — half its own height — and it was
+   * right for a box and wrong for anything turned. These meshes are placed
+   * with `rotation.set(lay, yaw, 0)`, which is an XYZ Euler: the yaw is
+   * applied about an axis the lie has already tipped, so the loop's plane
+   * ends up tilted and the thing hangs 41 mm below its own origin rather than
+   * the 18.5 its half-thickness promised. No number typed next to the model
+   * can know that, because it is not a property of the model — it is a
+   * property of the model AND the two angles it was put down at.
+   *
+   * So the box is taken after the rotation and the thing is lifted by
+   * whatever it is short. It is exact for every object at every angle, and
+   * the next thing she sets down gets it for free.
+   *
+   * ITS BOX IS ALLOCATED HERE and not hoisted out, which for anything called
+   * every frame would be wrong and here is the only thing that is right: the
+   * pre-placed Lovense is set down while this file is still being BUILT, and
+   * a `const` shared with it would be in its temporal dead zone at that
+   * moment. That is rule 3, and it is a page that never finishes loading
+   * rather than a wrong answer — measured, it stopped at 78 per cent with
+   * "Cannot access '_restBox' before initialization". A dozen calls a session
+   * do not need a scratch.
+   */
+  function restOn(m, surfaceY) {
+    m.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(m);
+    if (!Number.isFinite(box.min.y)) return;
+    m.position.y += surfaceY - box.min.y;
   }
 
   function giftMesh(key) {
@@ -41512,15 +41724,12 @@ async function buildJadrija(scene) {
     }
     const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
     const d = (row && row.box) || [0.09, 0.05, 0.04];
-    // Half its own height, so `placeIt` can stand it ON the wood rather than
-    // halfway through it.
     const c = (row && row.col) || [0.62, 0.60, 0.56];
     const g = new THREE.Mesh(new THREE.BoxGeometry(d[0], d[1], d[2]),
       solidMaterial(new THREE.Color(c[0], c[1], c[2]),
         { spec: 0.35, specPower: 40, vcol: false }));
     g.castShadow = false;
     g.receiveShadow = false;
-    g.userData.sit = d[1] / 2;
     scene.add(g);
     return g;
   }
@@ -46122,6 +46331,12 @@ async function buildJadrija(scene) {
       // `tieHair` runs — in figure metres, so it can be checked against the
       // head bone `bones(['head'])` reports without a render in between.
       hair: hairFall ? 'down' : 'up', hairGoal: show.hairGoal || null,
+      // What she has been asked for and not started yet, and whether she is
+      // on her way up to do it. Both were invisible from outside, and a
+      // request that is armed and a request that was eaten look identical in
+      // every other readout — which cost an hour of tracing phases that were
+      // all correct. See the gate in the dispatch.
+      ask: show.ask || null, getUp: !!show.getUp,
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
     /**
@@ -46380,6 +46595,9 @@ async function buildJadrija(scene) {
       show.why = null;
       return true;
     },
+    /** The last dozen requests: what, from where, why not, and where to. */
+    asked: () => askLog.map((r) => [r.name, r.from, r.to, r.why || '-',
+      r.feet ? 'feet' : 'down', r.getUp ? 'rising' : '-']),
     /** What she was last asked for and took, or null. */
     didShow: () => (show ? (show.did || null) : null),
     /** And why she did not take it, as a key off `askWhy`, or null. */

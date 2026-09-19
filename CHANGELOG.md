@@ -8,6 +8,110 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.426.0] — 2026-09-19
+
+### six from one run on a phone
+
+**The tank goes away on the beach.** *"dont need to see the LITRES indicator in
+jadrija mode"*. Nothing is alight on that concrete, so four hundred litres of
+nothing sat in the corner. It comes back the moment the branch is open, because
+then it is the one number that matters — the hose works down there and a tank
+that empties with no gauge on it is worse than a gauge nobody asked for.
+
+**The Lovense sat 22.9 mm INSIDE the tabouret.** *"appears to be laying too low
+in the table, needs to be higher"*. Measured, and he was being polite about it.
+The old way was a `sit` on each object — half its own height — which is right
+for a box and wrong for anything turned: these are placed with `rotation.set(
+lay, yaw, 0)`, an XYZ Euler, so the yaw is applied about an axis the lie has
+already tipped and the loop hangs 41 mm below its own origin rather than the
+18.5 its half-thickness promised. No number typed next to a model can know
+that, because it is not a property of the model — it is a property of the model
+AND the two angles it was put down at. `restOn` takes the box after the
+rotation and lifts the thing by whatever it is short. Exact for every object at
+every angle, and the next thing she sets down gets it free.
+
+**And it stops for breath.** *"once lovesens is on, it seems to be vibrating non
+stop. if nothing else, there should be pauses"*. A pattern now: two short
+pulses with a breath between them, a long one, then a proper rest — five
+seconds round, which reads as a pattern rather than a stutter. One number
+drives all of it, so the gaps are real gaps: the thing stops moving, the sound
+goes, the wine settles and the light drops back. Each pulse eases in and out
+over 90 ms, because a motor spins up and a switch does not.
+
+**And so does the phone.** *"is it possible in phone mode when lovesens vibrates
+to vibrate the phone?"* On Android, yes: `navigator.vibrate` takes a length and
+no amplitude, so the pattern is the only thing it can carry and the pattern is
+exactly what it should carry. Fired on the leading edge of each pulse for the
+length that pulse has left — a call while one is already running restarts it,
+and a buzz restarted sixty times a second is a buzz that never starts. Only
+within earshot, and it stops mid-pulse when you switch the thing off. iOS has
+no vibration API at all and silently has none.
+
+**The settings sheet can be shut on a phone.** *"if u open controls u cannot
+close it because controls button is occluded by the controls menu"*. On a
+keyboard M is both doors; on glass the only door was the SET button, and the
+sheet is centred over the row that button is in. It has a ✕ now, a tap anywhere
+outside it closes it, and it is short enough to clear the button row. The tap
+is taken in the capture phase and stopped there, or the same tap that closes
+the sheet plants a thumb on the walk stick underneath it.
+
+### and she can go from anything to anything
+
+**"when I ask her to do stuff inside kabine, seems certain actions require her
+to be in certain position in the first place, like standing up first, but
+really, it should be possible to go from any position to any other position"**
+— and, after a `coke`, **"I asked to 'pour wine' but nothing happened"**.
+
+Four faults, and they had to be found in this order because each one hid the
+next. All four were found with two new readouts — `__fr.jad.asked()`, the last
+dozen requests with where each one came from and where it put her, and `ask`
+and `getUp` on `show()`. A request that is refused, a request that is eaten and
+a request that is answered by a branch nobody expected look identical in every
+other readout, and an hour went into tracing phases that were all correct.
+
+1. **The get-up was written five times.** Once each inside `give`, `coke`,
+   `wear`, the hair and the kiss — so those five worked from the cot and
+   everything else either refused (`fours` answered *"she is on her back, get
+   her up first"*) or started a standing clip on a woman who was lying down.
+   One gate in front of the whole dispatch now: if what was asked for happens
+   on her feet and she is not on them, the request is re-armed and she takes
+   the road up — the cradle for the sitting family, a sit-up off her back,
+   `getup` for everything else. The five copies are gone.
+
+2. **A gate that re-entered its own road never left it.** `cradle` is a phase a
+   request may be made from, so the gate fired again every frame, restarted the
+   clip and set the timer back to nought. She lay there being asked to get up
+   for ever. `getUp` is the latch that says she is already on her way.
+
+3. **And the latch outlived its job.** Once she is up, a latch left set is read
+   by whatever phase she lands in — `fours` and `kept` both open with `if
+   (show.getUp) go('rise')`, which is the stale-latch fault `rise` already
+   documents one phase further on. Asked for all fours from a kneel she stood
+   up, went down onto her hands, and was stood straight back up by the latch
+   she had been carried on: one frame of the pose, and every readout saying the
+   request had been taken. Which it had. It is spent the moment the dispatch
+   runs with her feet under her.
+
+4. **And the room walked her off anything it did not own.** `OWN` is a list of
+   phases, so every number that is not on it — which is all the dances — was
+   overridden on the frame after it started, in the one room where most of them
+   get asked for. Asked for the bend from a handstand she got up, took the
+   request, entered the clip, and was walked to the doorway before a frame of
+   it drew. The room now stands off anything she was ASKED for; it still brings
+   her in when she is wandering, which is what it is for.
+
+**And the wine.** A full glass was a refusal — *"the glass is already full"* —
+which is the room's own rule and the wrong answer to somebody who has just
+asked for a drink. Worse, the end of the walk in asked the same question and
+answered it for both of them, so even with the refusal gone she walked over and
+stopped. `byAsk` is the bit that says which of the two is walking: the room
+still will not pour a second glass, and asked in so many words she pours it.
+
+Measured, each from the pose named to the thing asked for, and all of them
+arrive: lotus → all fours, fetal → put the toy on, the cradle → pour, a kneel →
+the plate, a handstand → the bend, all fours → hair down, face down → a kiss,
+upside down → sit up, and a second glass after the plate.
+
 ## [1.425.2] — 2026-09-19
 
 ### one sentence and out

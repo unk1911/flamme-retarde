@@ -5808,6 +5808,21 @@ function updateGroundHUD(dt) {
   $('gh-crew').textContent = g.crewLeft;
   $('gh-saved').textContent = g.rescued;
 
+  // ── AND THE TANK GOES AWAY ON THE BEACH ─────────────────────────────────
+  //
+  // Misha, 19 Sep 2026: *"dont need to see the LITRES indicator in jadrija
+  // mode"*. There is nothing alight on that concrete and nothing to put out,
+  // so a gauge reading 400 litres is four hundred litres of nothing.
+  //
+  // UNLESS THE BRANCH IS OPEN, and then it is the one number that matters:
+  // the hose works down there — it is half of what happens in the kabina —
+  // and a tank that empties with no gauge on it is worse than a gauge nobody
+  // asked for. `hose()` is the ramp the trigger drives, so this comes up with
+  // the water and goes when the water stops.
+  const onBeach = !!(jadrija && jadrija.inField
+    && jadrija.inField(ground.you.x, ground.you.z, 5));
+  $('gh-pack').hidden = onBeach && ground.hose() < 0.02 && !g.refilling;
+
   const pct = g.packMax > 0 ? g.pack / g.packMax : 0;
   $('gh-fill').style.width = (pct * 100) + '%';
   $('gh-litres').textContent = Math.round(g.pack);
@@ -7586,6 +7601,29 @@ $('help').addEventListener('click', (e) => {
 // The thumb's way in: a phone has no ? to press, and every touch HUD already
 // carries a SET button.
 $('panel-help').addEventListener('click', () => { togglePanel(); toggleHelp(true); });
+$('panel-close').addEventListener('click', () => togglePanel());
+/**
+ * And a tap anywhere else shuts it.
+ *
+ * Misha, 19 Sep 2026: *"on cellphone if u open controls u cannot close it
+ * because controls button is occluded by the controls menu"*. On a keyboard M
+ * is both doors; on glass the only door was the SET button, and this sheet is
+ * centred over the row that button is in.
+ *
+ * In the CAPTURE phase and stopped there, or the same tap that closes the
+ * sheet also plants a thumb on the walk stick underneath it. Buttons are
+ * excluded so that SET itself still toggles — closed here and reopened by its
+ * own handler is a sheet that will not shut.
+ */
+addEventListener('pointerdown', (e) => {
+  const p = $('panel');
+  if (p.hidden || e.pointerType === 'mouse') return;
+  if (p.contains(e.target)) return;
+  if (e.target.closest && e.target.closest('button, input, a, #signin, #ears')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  togglePanel();
+}, true);
 
 $('enter').addEventListener('click', () => {
   const seen = introSeen();
@@ -8235,6 +8273,7 @@ window.__fr = {
      * glass that is already full, 'outside' for the kneel out on the deck.
      */
     ask: (name) => (jadrija ? jadrija.askShow(name) : null),
+    asked: () => (jadrija && jadrija.asked ? jadrija.asked() : null),
     did: () => (jadrija ? jadrija.didShow() : null),
     why: () => (jadrija ? jadrija.whyShow() : null),
     /** The counter at a world point, for a test that cannot walk. */
