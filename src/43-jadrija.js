@@ -41071,6 +41071,34 @@ async function buildJadrija(scene) {
    * number, because everything the motor drives wants the same one: the
    * shake, the wine, the light and the sound.
    */
+  /**
+   * A pulse, as a pattern a phone can feel the RATE of.
+   *
+   * Misha, 19 Sep 2026: *"i still think the Hz frequency of vibration is
+   * still too high"*. A phone's motor has one frequency and a page cannot
+   * change it — the only thing `navigator.vibrate` takes is lengths. What it
+   * can change is how often the motor is STARTED, and a rotating mass started
+   * and stopped twelve times a second is the coarse low rumble a heavy toy
+   * makes rather than the fine continuous hum of a small one.
+   *
+   * 52 ms on and 30 ms off, which is 12 Hz and is as slow as this can go
+   * before it stops being a vibration and becomes a series of taps. The
+   * pattern is built to fill the pulse it is given and the last entry is
+   * always an ON, so a pulse never ends on a gap nobody asked for.
+   */
+  const VIBE = [0.052, 0.030];
+  function vibePattern(secs) {
+    const out = [];
+    let left = Math.max(0.05, secs);
+    while (left > 0.02 && out.length < 40) {
+      const on = Math.min(VIBE[0], left);
+      out.push(Math.round(on * 1000));
+      left -= on + VIBE[1];
+      if (left > 0.02) out.push(Math.round(VIBE[1] * 1000));
+    }
+    return out;
+  }
+
   /** How much of the pulse we are inside is still to run, in seconds. */
   function signalLeft(t) {
     const B = SIGNAL.beat;
@@ -41220,7 +41248,7 @@ async function buildJadrija(scene) {
         const run = beat > 0.5;
         if (run && !sg.vib) {
           sg.buzzed = (sg.buzzed || 0) + 1;
-          navigator.vibrate(Math.round(signalLeft(sg.t) * 1000));
+          navigator.vibrate(vibePattern(signalLeft(sg.t)));
         }
         sg.vib = run;
       }

@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.426.4] — 2026-09-19
+
+### lower, and then lower again
+
+**"i still think the Hz frequency of vibration is still too high. can it be
+lower?"** — after 88 Hz had already gone to 62. Two things answer to that
+description and both move.
+
+**The sound.** The pitch was never the whole of what he was hearing. A SQUARE
+carries every odd harmonic at 1/n, so the second voice at 124 Hz was putting
+real energy at 372, 620 and 868 — and those are the frequencies a phone speaker
+can actually reproduce, which makes them what the buzz sounds like. Winding the
+fundamental down without touching them moves the one part nobody can hear. So
+all three move: **48 Hz**, a motor idling rather than running; the second voice
+becomes a TRIANGLE, which has the same odd harmonics at 1/n² and is a sixth as
+bright at the third and a twentieth at the fifth; and a **low-pass at 240 Hz**
+takes off what is left. Q is decibels on these filters, so it is 0 — at 0.7 it
+would be a resonance sitting exactly where the brightness was.
+
+**And the phone.** A phone's motor has one frequency and a page cannot change
+it: the only thing `navigator.vibrate` takes is lengths. What it CAN change is
+how often the motor is started, and a rotating mass started and stopped twelve
+times a second is the coarse rumble of a heavy toy rather than the fine
+continuous hum of a small one. Each pulse is a pattern of **52 ms on, 30 ms
+off** now, built to fill whatever the pulse has left and always ending on an
+ON. Measured: seven pulses, the longest 1640 ms of stutter, at 12 Hz.
+
+Twelve is about as slow as this goes before it stops being a vibration and
+becomes a series of taps; it is one number if it wants to be slower.
+
 ## [1.426.3] — 2026-09-19 (baye 1.25.0)
 
 ### nobody can spell it

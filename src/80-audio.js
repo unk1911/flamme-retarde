@@ -921,36 +921,51 @@ function buildAudio() {
     }
     const far = Math.max(0, 1 - d / 7);
     if (!buzzOsc) {
-      // ── LOWER THAN IT WAS ──────────────────────────────────────────────
+      // ── LOWER, AND THEN LOWER AGAIN ────────────────────────────────────
       //
       // Misha, 19 Sep 2026: *"the frequency of the vibration should be
-      // slightly lower/deeper"*. 88 Hz was a small motor at full speed and
-      // read thin through a phone speaker, where everything under about
-      // 150 Hz is the first harmonic anyway. 62 is the same motor wound down:
-      // it is still above what a phone can reproduce at all, and what changes
-      // is the SECOND, which comes down to 124 with it and is the part you
-      // actually hear on a small speaker.
+      // slightly lower/deeper"*, and then of 62 Hz: *"i still think the Hz
+      // frequency of vibration is still too high. can it be lower?"*.
+      //
+      // 88 went to 62 and it was not enough, and the reason it was not is
+      // that the pitch was never the whole of what he was hearing. A SQUARE
+      // has every odd harmonic in it at 1/n — a square at 124 Hz puts real
+      // energy at 372, 620 and 868 — and those are the frequencies a phone
+      // speaker can actually reproduce, so they are what the buzz sounds
+      // like. Winding the fundamental down without touching them just moves
+      // the one part nobody can hear.
+      //
+      // So all three things move: 48 Hz, which is a motor idling rather than
+      // running; the second voice becomes a TRIANGLE, which has the same odd
+      // harmonics at 1/n² and is therefore a sixth as bright at the third and
+      // a twentieth at the fifth; and a low-pass at 240 Hz takes off what is
+      // left. Q is DECIBELS on these filters, so 0 is flat — 0.7 would be a
+      // resonance sitting exactly where the brightness was.
       buzzOsc = ctx.createOscillator();
       buzzOsc.type = 'triangle';
-      buzzOsc.frequency.value = 62;
+      buzzOsc.frequency.value = 48;
       buzzHarm = ctx.createOscillator();
-      buzzHarm.type = 'square';
-      buzzHarm.frequency.value = 124;
+      buzzHarm.type = 'triangle';
+      buzzHarm.frequency.value = 96;
       const hg = ctx.createGain();
-      hg.gain.value = 0.34;
+      hg.gain.value = 0.46;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 240;
+      lp.Q.value = 0;
       buzzGain = ctx.createGain();
       buzzGain.gain.value = 0;
       // The wobble: a motor in a loose object is never one pitch for long.
+      // Shallower again with the pitch — 4 Hz on 48 is eight per cent, and a
+      // warble is what this stops being.
       buzzLfo = ctx.createOscillator();
-      // Slower and shallower with the pitch: a wobble of 6 Hz on 88 is seven
-      // per cent and on 62 it is ten, which stops being a motor in a loose
-      // object and starts being a warble.
-      buzzLfo.frequency.value = 4.2;
+      buzzLfo.frequency.value = 3.6;
       const lg = ctx.createGain();
-      lg.gain.value = 4;
+      lg.gain.value = 2.6;
       buzzLfo.connect(lg).connect(buzzOsc.frequency);
-      buzzOsc.connect(buzzGain);
-      buzzHarm.connect(hg).connect(buzzGain);
+      buzzOsc.connect(lp);
+      buzzHarm.connect(hg).connect(lp);
+      lp.connect(buzzGain);
       buzzGain.connect(master);
       buzzOsc.start();
       buzzHarm.start();
