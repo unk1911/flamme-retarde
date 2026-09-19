@@ -41126,6 +41126,42 @@ async function buildJadrija(scene) {
   const _sigW = new THREE.Vector3();
 
   /**
+   * ── ONE WORD, WHICHEVER ROAD IT TAKES ──────────────────────────────────
+   *
+   * Misha, 19 Sep 2026: *"can u simplify the cuffs and headphones. should be
+   * able to say 'wear the cuffs' or 'wear the headphones' w/o having to worry
+   * about taking them out of the satchel and all that"*.
+   *
+   * He is right, and the distinction was never his to carry. There are two
+   * beats and they are about WHERE THE THING IS: something on the tabouret is
+   * fetched off it (`wear:` — walk to the stool, pick it up, put it on) and
+   * something in your bag is handed over (`give:` — she comes to you, takes
+   * it, puts it on). Both end with it on a bone, and which one is playable
+   * depends on a fact the game knows and the player has no reason to track.
+   *
+   * So the ask is normalised here, once, before anything reads it: a `wear:`
+   * for a thing in your bag becomes the handover, and a `give:` for a
+   * wearable thing that is already out becomes the fetch. The two words are
+   * synonyms now for everything that has a bone, and each still says the
+   * thing it always said for everything else — you cannot `wear` a beer and
+   * you cannot `give` her something you are not carrying.
+   */
+  function askRoad(name) {
+    if (!name) return name;
+    const cut = name.indexOf(':');
+    if (cut < 0) return name;
+    const verb = name.slice(0, cut), key = name.slice(cut + 1);
+    if (verb !== 'wear' && verb !== 'give') return name;
+    const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
+    if (!row || !row.wear) return name;              // no bone: leave it alone
+    const out = giftProps.some((m) => m.userData && m.userData.key === key);
+    const bag = typeof satchelHas === 'function' && satchelHas(key);
+    if (verb === 'wear' && !out && bag) return 'give:' + key;
+    if (verb === 'give' && !bag && out) return 'wear:' + key;
+    return name;
+  }
+
+  /**
    * WHERE A RECEIVER ACTUALLY IS, which is two places since she can put one on.
    *
    * On the tabouret it is a mesh in `giftProps` standing in world metres; worn
@@ -46618,7 +46654,11 @@ async function buildJadrija(scene) {
      * is up to her, because it is entered from `stepShow` on a frame where the
      * phase she is in can legally be left.
      */
-    askShow: (name) => {
+    askShow: (rawName) => {
+      // WHICH ROAD, decided here and once — see `askRoad`. Everything below
+      // and everything in the dispatch reads the normalised name, so neither
+      // has to know that the two words are the same request.
+      const name = askRoad(rawName);
       // THE FLAVOUR RIDES ON THE NAME — see `fetch.cream` in SHE_CAN. The
       // table is checked against the base, so one entry covers every tray in
       // the case and nothing downstream has to learn a second argument.

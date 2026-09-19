@@ -676,7 +676,7 @@ const ears = (() => {
     // same facts about the same room.
     notwearable: 'that is not something she can put on',
     wearing: 'she already has it on',
-    notout: 'that one is not out — hand it to her instead',
+    notout: 'that one is not out and not in your satchel',
     nothing: 'name the thing',
     carrying: 'she is already carrying one',
     onit: 'she has already gone for one',

@@ -8,6 +8,34 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.426.5] — 2026-09-19
+
+### wear it, wherever it happens to be
+
+**"can u simplify the cuffs and headphones. should be able to say 'wear the
+cuffs' or 'wear the headphones' w/o having to worry about taking them out of
+the satchel and all that"**.
+
+He is right, and the distinction was never his to carry. There are two beats
+and both end with the thing on a bone; which one is playable depends on WHERE
+IT IS. Something on the tabouret is fetched off it — walk to the stool, pick it
+up, put it on. Something in your bag is handed over — she comes to you, takes
+it, turns it over, puts it on. That is a fact the game knows and the player has
+no reason to track.
+
+So the ask is normalised in one place before anything reads it: a `wear:` for a
+thing in your bag becomes the handover, and a `give:` for a wearable thing that
+is already out becomes the fetch. The two words are synonyms now for everything
+that has a bone — **wear the cuffs**, **wear the headphones**, **give her the
+lovense** all do the right thing from wherever the object is — and each still
+means what it always meant for everything else: you cannot wear a beer, and you
+cannot give her something you are not carrying.
+
+Measured: `wear:cuffs` goes down the handover and ends with both bangles on,
+`wear:headphones` the same, `give:lovense` walks her to the stool and ends with
+it on her, and `wear:newspaper` still answers *that is not something she can
+put on*.
+
 ## [1.426.4] — 2026-09-19
 
 ### lower, and then lower again
