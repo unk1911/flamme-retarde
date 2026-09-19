@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.23.0"
+VERSION = "1.24.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -705,6 +705,13 @@ ASK_RE = re.compile(
     r"|\bsit\w*\b.{0,24}\b(bed|cot|bunk|mattress)\b"
     r"|\b(kneel\w*|knees)\b.{0,24}\b(bed|cot|bunk|mattress)\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
+    # AND PUTTING ON A THING THAT IS ALREADY OUT — see `wear_of`. The verb and
+    # the noun, within a clause of each other, which is the shape the hair's
+    # own note argues for: "put the lovense on her" carries no modal and no
+    # please, and on the bare verb alone "put your feet up" would reach the
+    # whole of `SKILLS` and come back a request to pour wine.
+    r"|\b(put|strap|wear|wearing|attach|fasten|fit|clip)\b.{0,24}"
+    r"\b(lovense|toy|headphones|bose|cuffs|bangles|bracelets)\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
@@ -844,14 +851,14 @@ def fetch_of(text: str):
 
 # ── HANDING HER SOMETHING ─────────────────────────────────────────────────────
 #
-# Misha, 17 Sep 2026: *"build machinery to take anything out of the satchel and
-# give to her/ handover, regardless of the object"*.
+# Handover vocabulary for carried objects. The Lovense is a special pre-placed
+# receiver in the kabina, so future table-placement vocabulary must not imply
+# insertion into a character or activate the receiver before placement ends.
 #
-# The key rides on the skill name — `give:handcuffs` — exactly as the ice
-# cream's flavour does, because `askShow` in src/43-jadrija.js takes one
-# string. The vocabulary is the satchel's own fifteen keys plus the words a
-# person would actually say for them; the page refuses anything you are not
-# carrying, so this only has to recognise the noun.
+# The key rides on the skill name — `give:handcuffs` — exactly as the ice cream's
+# flavour does, because `askShow` in src/43-jadrija.js takes one string. The
+# vocabulary is the satchel's own keys plus ordinary synonyms; the page refuses
+# anything that is not actually carried.
 GIVE_RE = re.compile(r"\b(give|hand|pass|take)\b")
 GIVE_WORDS = (
     ("cuffs", r"cuffs?\b|bangles?|bracelets?"),
@@ -870,6 +877,13 @@ GIVE_WORDS = (
     ("rakija", r"rakija"),
     ("espresso", r"espresso"),
 )
+
+
+# The three rows that name a thing with a bone on it — see the `wear` column in
+# src/62-satchel.js. Spelled off `GIVE_WORDS` rather than beside it, so a noun
+# only ever has one spelling in this file.
+WEAR_KEYS = ("lovense", "headphones", "cuffs")
+WEAR_WORDS = tuple((k, p) for k, p in GIVE_WORDS if k in WEAR_KEYS)
 
 
 # ── AND A SIGNAL FROM YOUR PHONE ──────────────────────────────────────────────
@@ -906,6 +920,41 @@ def give_of(text: str):
     return None
 
 
+# ── AND PUTTING ON A THING THAT IS ALREADY OUT ────────────────────────────────
+#
+# The other direction from `give_of`, and a separate verb list rather than a
+# flag on that one: "give her the toy" takes something out of your bag, and
+# "put the toy on her" takes it off the tabouret it has been lying on since the
+# room was built. The page decides which of the two is even possible — it is the
+# only thing that knows where the object is — and answers plainly when it is
+# neither. See `wear:` in `SHE_CAN`, src/43-jadrija.js.
+#
+# BEFORE `give_of` IN `skills_of`, because "take the toy off the table and put
+# it on" carries the word `take`, which is a handover verb, and the handover
+# would have answered it with a thing that is not in your bag.
+WEAR_RE = re.compile(
+    r"\bput\w*\b.{0,24}\bon\b|\b(wear|wears|wearing|strap|straps|"
+    r"attach|attaches|fit|fits|fasten|fastens|clip)\b")
+# AND "PUT IT ON THE TABLE" IS NOT THIS. The `put ... on` above is the only
+# loose pattern in here and it is loose on purpose — "put the lovense on her"
+# has a noun in the middle of it — so the one sentence it would otherwise
+# swallow is named here. Setting a thing down on that stool is not a request
+# this service can answer anyway: the object is already on it.
+WEAR_NOT = re.compile(r"\bon (the|that|a)\s+"
+                      r"(table|stool|tabouret|floor|deck|bed|cot|plate|side)\b")
+
+
+def wear_of(text: str):
+    """`wear:<key>` if the sentence puts something that is out on to her."""
+    t = (text or "").lower()
+    if not WEAR_RE.search(t) or WEAR_NOT.search(t):
+        return None
+    for key, pat in WEAR_WORDS:
+        if re.search(r"\b(" + pat + r")", t):
+            return "wear:" + key
+    return None
+
+
 def skills_of(text: str) -> list:
     """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
     t = (text or "").lower()
@@ -917,6 +966,11 @@ def skills_of(text: str) -> list:
     fetch = fetch_of(t)
     if fetch:
         return [fetch]
+    # Putting on a thing that is already out, before the handover: the sentence
+    # that asks for it can carry a handover verb — see `wear_of`.
+    don = wear_of(t)
+    if don:
+        return [don]
     # And handing her something, before the table below: "give her the beer"
     # shares its noun with `BUY` and its verb with nothing else.
     gift = give_of(t)

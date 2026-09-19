@@ -34757,6 +34757,10 @@ async function buildJadrija(scene) {
     // in the building is a woman who is not holding a handstand.
     upside: 0.60, upsideHeld: 0.55,
     handGo: 0.70, handstand: 0.65, handHeld: 0.55,
+    // Fetching the thing off the stool and putting it on. Lower than the
+    // handover's, which is a present: this is a woman doing something to
+    // herself in a room with the door shut, and her face is on the job.
+    liftIt: 0.50, strapIt: 0.80,
     // Face down: the roll, and the breath after it. Baked 17 Sep — see PRONE
     // in tools/blender/human_mh.py, which is where the argument for it being
     // a clip rather than a runtime rotation is written down.
@@ -35112,6 +35116,18 @@ async function buildJadrija(scene) {
      * whole bag and nothing downstream learns a second argument.
      */
     give: 1,
+    /**
+     * AND ANYTHING THAT IS ALREADY OUT, PUT ON.
+     *
+     * The key rides on the name for the same reason — `wear:lovense` — and
+     * the two families are the two directions the same object travels: `give`
+     * takes a thing out of YOUR bag and ends with her setting it down, and
+     * this one starts from a thing already lying on the tabouret and ends with
+     * it on a bone. What decides which bone is the satchel's `wear` column,
+     * which is the headphones' own mechanism; what is new is only the fetch —
+     * she walks to the stool, picks the thing up and straps it on.
+     */
+    wear: 1,
     // And the recon missions, which are errands with a report on the end —
     // see SEE. `see.vik` is the holiday house and the other Baye in it.
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
@@ -35271,6 +35287,24 @@ async function buildJadrija(scene) {
       // One at a time. She has one pair of hands and the beat ends with her
       // putting the thing down.
       if (giftHeld) return 'holding';
+      return null;
+    }
+    if (name.startsWith('wear:')) {
+      const key = name.slice(5);
+      if (!key) return 'nothing';
+      // A BONE, AND A THING THAT IS OUT. Those are the two halves of it and
+      // they answer differently: a newspaper has no bone and never will, and
+      // the toy has one and may be on her already or still in the bag.
+      const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
+      if (!row || !row.wear) return 'notwearable';
+      if (worn[key]) return 'wearing';
+      if (giftHeld) return 'holding';
+      if (!giftProps.find((m) => m.userData && m.userData.key === key)) return 'notout';
+      // And it is fetched off the tabouret, which is in the kabina. Out on the
+      // deck there is no stool to fetch anything from — see `placeIt`, which
+      // puts a thing down at her feet out there and is a different errand.
+      if (!sheIsIn()) return 'outside';
+      if (!kit || !kit.wine) return 'nokit';
       return null;
     }
     if (name === 'side.left' || name === 'side.right') {
@@ -35629,6 +35663,10 @@ async function buildJadrija(scene) {
     // is walked back to the bottle in the middle of the reach.
     tieHair: 1,
     sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1,
+    // And the fetch off the tabouret, which is two more phases at the same
+    // mark the plate and the pour use — out of this list the room walks her
+    // back to the bottle on the frame after she gets there.
+    liftIt: 1, strapIt: 1,
     // AND THE SITTING FAMILY AND THE HANDSTAND, all twelve of them, for the
     // reason the note above gives about `submit`: every one is entered from
     // inside this room, so a phase the hut does not own is a woman walked
@@ -36450,6 +36488,23 @@ async function buildJadrija(scene) {
           if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else go('rise', 'getup', 0.35);
         } else go('toYou', 'walk', 0.34);
+      } else if (name.startsWith('wear:')) {
+        // THE COKE'S ROAD AND NOT THE GIFT'S, and that is the whole difference
+        // between the two: a handover happens at arm's length from YOU, and
+        // this happens at the tabouret, because the thing she is putting on is
+        // lying on it. So it is the plate's entry — up first if she is on the
+        // cot or her knees, and then the mark at the stool.
+        show.don = name.slice(5);
+        show.byAsk = 1;
+        show.queue.length = 0;
+        show.side = 0;
+        showSay('trill', d);
+        if (onCot(show.phase) || KNEES[show.phase] || show.phase === 'fours') {
+          show.getUp = 1;
+          show.ask = name;
+          if (onCot(show.phase)) go('situp', 'situp', 0.30);
+          else go('rise', 'getup', 0.35);
+        } else go('liftIt', 'idle', 0.40);
       } else if (name === 'side.left' || name === 'side.right') {
         const clip = name === 'side.left' ? 'sideL' : 'sideR';
         show.byAsk = 1;
@@ -37036,6 +37091,81 @@ async function buildJadrija(scene) {
             showNext();
           }
         } else { show.near = null; showNext(); }
+        break;
+
+      // ── AND THE ONE SHE FETCHES OFF THE TABLE HERSELF ────────────────
+      //
+      // The handover's three beats with the first one turned round: nothing
+      // comes out of your bag, because the thing is already lying on the
+      // stool. She walks to the tabouret's own mark, reaches, closes her hand
+      // on it, and carries it to her hip. See DON, and `donReach` for the arm.
+      case 'liftIt': {
+        // The mark is the pour's and the plate's. It is the one place on this
+        // floor a hand can reach that stool from, and every millimetre of the
+        // reach below is measured from a woman standing on it.
+        show.want = kit && kit.wine ? kit.wine[2] : show.want;
+        showHold(dt);
+        if (show.tmr < DON.settle && kit && kit.wine) showSettle(kit.wine, dt, 10.0);
+        // Published for the arm, which is solved a long way below this and
+        // after the pose — the crouch and the cut have the same arrangement
+        // and the note over `cokeStoop` says why.
+        show.donAt = sat((show.tmr - 0.24) / (DON.grab - 0.34));
+        // AND IT LEAVES THE TABLE ON ONE FRAME, ONCE. `giftProps` is what the
+        // signal searches, so it comes out of that list here and goes into
+        // `worn` at the far end of `strapIt` — in between it is in her hand
+        // and `receiverOf` answers nothing, which is a motor running in a fist
+        // and is exactly right.
+        if (!giftHeld && show.tmr > DON.grab) {
+          const ix = giftProps.findIndex((m) => m.userData
+            && m.userData.key === show.don);
+          if (ix < 0) { show.don = null; show.donAt = 0; showNext(); break; }
+          const m = giftProps.splice(ix, 1)[0];
+          giftHeld = { key: show.don, mesh: m, up: 0, grip: 0,
+            from: m.position.clone(), fromQ: m.quaternion.clone(),
+            // How it sits in the fist: its long axis along the grip, which is
+            // the direction `GRIP_UP` was measured in for the bottle. Left at
+            // identity the loop lies across her palm like a plate.
+            hold: new THREE.Quaternion().setFromUnitVectors(
+              new THREE.Vector3(1, 0, 0), vAx.copy(GRIP_UP).normalize()) };
+          showSay('squee', d);
+        }
+        if (giftHeld) {
+          giftHeld.grip = Math.min(1, giftHeld.grip + dt / DON.carry);
+          if (giftHeld.grip >= 1) go('strapIt', 'idle', 0.26);
+        }
+        break;
+      }
+
+      // And on, and the hand is the only thing that moves: it carries the
+      // thing from the stool to her own hip, and at the end the prop is thrown
+      // away and the worn group takes over — the same swap `wearIt` makes, so
+      // there is never two of it.
+      case 'strapIt':
+        show.want = kit && kit.wine ? kit.wine[2] : show.want;
+        showHold(dt);
+        show.donAt = 1;
+        if (!giftHeld) { show.don = null; show.donAt = 0; showNext(); break; }
+        if (show.tmr > DON.on) {
+          const row = typeof satchelRow === 'function'
+            ? satchelRow(giftHeld.key) : null;
+          // THE SAME OBJECT AND NOT A SECOND ONE: the mesh in her hand is the
+          // mesh that was on the stool and is the mesh she is now wearing,
+          // which is what keeps its own LED material the thing `signalTick`
+          // has always written to.
+          const parts = wearableParts(giftHeld.key, row && row.wear, giftHeld.mesh);
+          if (parts) {
+            worn[giftHeld.key] = parts;
+            for (const part of parts) skinFig.mesh.add(part.group);
+          } else {
+            scene.remove(giftHeld.mesh);
+            if (giftHeld.mesh.geometry) giftHeld.mesh.geometry.dispose();
+          }
+          giftHeld = null;
+          show.don = null;
+          show.donAt = 0;
+          showSay('trill', d);
+          showNext();
+        }
         break;
 
       case 'placeIt':
@@ -38940,6 +39070,14 @@ async function buildJadrija(scene) {
 
     wearTick();
 
+    // ── AND THE ARM THAT IS FETCHING SOMETHING OFF THE STOOL ─────────────
+    //
+    // Before the block below rather than after it, because that one pins the
+    // prop to her palm and this is what decides where her palm is. Same
+    // conversion hazard as the cut — see `reachRight` — and the same cure:
+    // after the matrix update, never before it.
+    donReach(f, dt);
+
     // ── AND WHATEVER SHE HAS BEEN HANDED ─────────────────────────────────
     //
     // The cone's own rig — the hand's whole frame, the measured palm point —
@@ -38980,8 +39118,23 @@ async function buildJadrija(scene) {
         f.boneTurn(handR, qTurn);
         qHand.copy(f.mesh.quaternion).multiply(qTurn);
         vPalm.copy(PALM).applyQuaternion(qHand).add(vHand);
-        giftHeld.mesh.position.copy(vPalm);
-        giftHeld.mesh.quaternion.copy(qHand);
+        // AND A RAMP AND NOT A SWITCH WHEN IT CAME OFF A TABLE. The hand and
+        // the tabouret are 40 cm apart on the frame her fingers close, which
+        // is the bottle's own number and the bottle's own lesson: a thing that
+        // teleports between them is a thing nobody believes was picked up.
+        // `from` is where it was lying and `hold` is how it sits in a fist —
+        // both are set by `liftIt` and neither exists on the handover path,
+        // which is untouched.
+        qHold.copy(qHand);
+        if (giftHeld.hold) qHold.multiply(giftHeld.hold);
+        if (giftHeld.from && giftHeld.grip < 1) {
+          const k = giftHeld.grip * giftHeld.grip * (3 - 2 * giftHeld.grip);
+          giftHeld.mesh.position.lerpVectors(giftHeld.from, vPalm, k);
+          giftHeld.mesh.quaternion.slerpQuaternions(giftHeld.fromQ, qHold, k);
+        } else {
+          giftHeld.mesh.position.copy(vPalm);
+          giftHeld.mesh.quaternion.copy(qHold);
+        }
         if (giftHeld.spin) giftHeld.mesh.rotateY(giftHeld.spin);
       }
     }
@@ -39240,9 +39393,9 @@ async function buildJadrija(scene) {
   /**
    * ── SOMETHING HANDED OVER ──────────────────────────────────────────────
    *
-   * Misha, 17 Sep 2026: *"build machinery to take anything out of the satchel
-   * and give to her/ handover, regardless of the object. she holds it,
-   * examines it, sets it aside"*.
+   * The generic handover machinery takes a carried object, lets her examine it,
+   * and places it on the tabouret or deck. The pre-placed Lovense receiver is
+   * intentionally outside this path; its table state is established at boot.
    *
    * REGARDLESS OF THE OBJECT is the whole brief, so this draws a BOX rather
    * than a model of anything: a thing the size the satchel says it is, in the
@@ -39275,19 +39428,15 @@ async function buildJadrija(scene) {
   /**
    * AND ONE THING IS ALREADY OUT.
    *
-   * Misha, 18 Sep 2026: *"hmm plate is there on the table, but where is
-   * lovesens"*, and then *"yeah skip handover"*. It was in the satchel, and
-   * everything in the satchel is invisible until she has been handed it and
-   * has set it down — which is the machinery working exactly as asked for and
-   * one step too many for the one object the remote is about. A receiver you
-   * have to stage before you can send it anything is a receiver nobody sends
-   * anything to.
+   * The Lovense receiver is pre-placed on the tabouret from the start. It uses
+   * the same spot, `lay`, and `sit` values as `placeIt`, and it is registered
+   * in `giftProps` under its own key because that is what `signalSet` searches.
+   * It is deliberately absent from the starting bag: the room contains one
+   * receiver, while the satchel still carries the cuffs and headphones.
    *
-   * So it is on the tabouret from the start: the same spot `placeIt` uses, the
-   * same `lay` and `sit`, and in `giftProps` under its own key, because that
-   * list is what `signalSet` searches. It is out of the starting bag as well —
-   * one object, not two, and the handover still has the cuffs and the
-   * headphones to carry.
+   * Any future typed placement request is a table interaction only. It may
+   * reuse the handover/placement phases for the visible gesture, but activation
+   * must happen after placement rather than when the parser recognizes words.
    */
   if (kit && kit.rest) {
     const m = giftMesh('lovense');
@@ -39297,6 +39446,35 @@ async function buildJadrija(scene) {
     m.userData.key = 'lovense';
     giftProps.push(m);
   }
+
+  /**
+   * ── AND SHE CAN FETCH IT OFF THERE AND PUT IT ON ───────────────────────
+   *
+   * Misha, 18 Sep 2026: she takes the Lovense off the tabouret, it goes on
+   * OVER her wrap, and from then on it rides her pelvis.
+   *
+   * WHICH IS THE HANDOVER BACKWARDS, and that is why it is four numbers and
+   * not a machine. `give:` starts in your bag and ends with her setting the
+   * thing down; this starts with a thing already set down and ends with it on
+   * a bone. The middle — a prop in her hand, a solved arm, a swap to the worn
+   * group — is `wearIt`'s and `placeIt`'s and is not written twice.
+   *
+   * The one beat neither of those had is the FETCH: a hand closing on
+   * something lying on a table. It is the bottle's beat, and the bottle's own
+   * note says the whole of what makes it work — the hand and the tabouret are
+   * 40 cm apart on the frame she grasps, so the object crosses that gap over a
+   * ramp rather than in one frame. `carry` is that ramp.
+   */
+  const DON = {
+    /** Seconds on to the mark at the stool, at the pour's own rate. */
+    settle: 0.62,
+    /** And when her hand closes: after the reach is full, not during it. */
+    grab: 1.30,
+    /** How long the thing takes to come off the wood into her fist. */
+    carry: 0.40,
+    /** And from her fist to her hip, which is the whole of `strapIt`. */
+    on: 1.10,
+  };
 
   /**
    * ── THINGS SHE IS WEARING ──────────────────────────────────────────────
@@ -39772,11 +39950,111 @@ async function buildJadrija(scene) {
     follow: 9.0,
   };
   const _ckGoal = new THREE.Vector3(), _ckPole = new THREE.Vector3();
-  const _ckFwd = new THREE.Vector3(), _ckAt = new THREE.Vector3();
+  const _ckFwd = new THREE.Vector3();
   const _ckTo = new THREE.Vector3(), _ckPalm = new THREE.Vector3();
   const _ckQa = new THREE.Quaternion(), _ckQb = new THREE.Quaternion();
   const _ckID = new THREE.Quaternion();
-  let cokeArm = null;
+
+  /**
+   * THE SOLVE ITSELF, which is the whole of the note above with the coke's
+   * timings taken out of it.
+   *
+   * `who` is which job is holding the arm. It is not decoration: the rest pose
+   * is taken once, on the frame a job starts, and a second job that reached in
+   * on the same cached chain would be solving against a shoulder that is no
+   * longer where it was sampled. Change the name and the chain is re-taken;
+   * keep it across two phases — as the fetch does across `liftIt` and
+   * `strapIt` — and the hand carries on from where it is, which is what makes
+   * one continuous movement out of two beats.
+   *
+   * `o.up` and `o.fwd` are where the WRIST rides relative to the target, in
+   * world metres and in her own forward direction, and their length is the one
+   * number that decides where the grip lands — see `COKE_HAND.liftWrap`, which
+   * is where that arithmetic is written down and where it was got wrong twice.
+   */
+  let reachArm = null;
+  function reachRight(f, dt, who, to, amt, o) {
+    if (amt < 0.004) {
+      // Nothing else in this file clears an arm aim, so this is the only thing
+      // that ever hands the chain back to the clip — and only the job that
+      // took it may give it back.
+      if (reachArm && reachArm.who === who) {
+        f.aim('armUR', 0, 1, 0, 0);
+        f.aim('armLR', 0, 1, 0, 0);
+        f.aim('handR', 0, 1, 0, 0);
+        reachArm = null;
+      }
+      return;
+    }
+    if (!reachArm || reachArm.who !== who) {
+      const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'),
+        iW = f.boneIndex('handR');
+      if (iS < 0 || iE < 0 || iW < 0) return;
+      reachArm = {
+        who,
+        S: f.boneAt(iS, new THREE.Vector3()),
+        E: f.boneAt(iE, new THREE.Vector3()),
+        W: f.boneAt(iW, new THREE.Vector3()),
+        // Where her grip point sits relative to the wrist bone, in figure
+        // space, before anything has been done to the arm. `PALM` is measured
+        // in the BIND pose — it is the bottle's own number — so it has to come
+        // through `boneTurn`, which is how far the clip has turned the wrist
+        // since then. Everything the solve does to the chain afterwards then
+        // turns this vector with it.
+        P: PALM.clone().applyQuaternion(f.boneTurn(iW, new THREE.Quaternion())),
+        at: to.clone(),
+      };
+    }
+    const A = reachArm;
+    A.at.lerp(to, 1 - Math.exp(-o.follow * Math.max(dt, 0)));
+    // World metres all the way to the conversion, so that neither offset has
+    // to know what this mesh is scaled by.
+    _ckFwd.set(1, 0, 0).transformDirection(f.mesh.matrixWorld);
+    _ckGoal.copy(A.at);
+    _ckGoal.y += o.up;
+    _ckGoal.addScaledVector(_ckFwd, o.fwd);
+    f.mesh.worldToLocal(_ckGoal);
+    _ckGoal.lerpVectors(A.W, _ckGoal, amt);
+    // The target itself in her frame as well, for the wrist below. Converted
+    // rather than offset, because the two conversions must be the same one.
+    _ckTo.copy(A.at);
+    f.mesh.worldToLocal(_ckTo);
+    _ckPole.copy(o.pole);
+    _ckQa.copy(wheelLimb(f, 'armUR', 'armLR', A.S, A.E, A.W, _ckGoal, _ckPole));
+    // ── AND THE WRIST, WHICH IS THE DIFFERENCE BETWEEN HOLDING IT AND
+    //    HAVING A HAND NEAR IT ──────────────────────────────────────────
+    //
+    // The solve puts the wrist BONE where it was asked to and says nothing
+    // about which way the hand is pointing, and the hand is rigid. Measured
+    // with only the arm solved: the wrist landed 106 mm from the blade, which
+    // is the target, and her grip point landed 109 mm from it — the palm
+    // facing off across the table, a hand resting at the rim of the plate.
+    //
+    // So the hand is turned as well: take the grip offset the chain has just
+    // carried, and rotate it on to the line from the wrist to the target. The
+    // shortest rotation between two directions is the one `setFromUnitVectors`
+    // gives, which is also the one with the least twist in the wrist — nobody
+    // is asking for a correct forearm here, only for a hand that is holding
+    // something.
+    _ckPalm.copy(A.P).applyQuaternion(_ckQa);
+    _ckTo.sub(_ckGoal);
+    if (_ckPalm.lengthSq() > 1e-8 && _ckTo.lengthSq() > 1e-8) {
+      _ckQb.setFromUnitVectors(_ckPalm.normalize(), _ckTo.normalize());
+      // Eased with everything else, or the wrist snaps round on the frame the
+      // reach starts while the arm is still on its way. Into `_ckQa`, which is
+      // spent by now, and NOT back into `_ckQb`: `slerpQuaternions` copies the
+      // first argument into `this` before it reads the second, so a quaternion
+      // slerped into itself is a quaternion thrown away.
+      armAimQ(f, 'handR', _ckQa.slerpQuaternions(_ckID, _ckQb, amt));
+    }
+  }
+
+  // The elbow out to her own side and a little behind her, which is the only
+  // place it can go on an arm reaching down at something in front of it.
+  // +z is her right on this rig — measured: `armUR` sits at z +0.179.
+  const REACH_POLE = new THREE.Vector3(-0.45, 0.10, 1).normalize();
+  const COKE_ARM = { up: COKE_HAND.lift, fwd: -COKE_HAND.back,
+    follow: COKE_HAND.follow, pole: REACH_POLE };
   function cokeReach(f, dt, free) {
     const on = free && show.phase === 'coke';
     const u = on ? (show.cokeU || 0) : 0;
@@ -39791,84 +40069,75 @@ async function buildJadrija(scene) {
     const want = on ? sat((u - 0.004) / 0.05) * sat((0.99 - u) / 0.05) : 0;
     show.cutAt = damp(show.cutAt || 0, want, 4.5, dt);
     if (show.cutAt < 0.004) {
-      // Nothing else in this file clears an arm aim every frame, so this is
-      // the only thing that ever hands the chain back to the clip.
-      if (cokeArm) {
-        f.aim('armUR', 0, 1, 0, 0);
-        f.aim('armLR', 0, 1, 0, 0);
-        f.aim('handR', 0, 1, 0, 0);
-        cokeArm = null;
-      }
+      reachRight(f, dt, 'coke', _ckBlade, 0, COKE_ARM);
       show.cutAt = 0;
       return;
     }
     if (!cokeHoldAt(_ckBlade, u)) return;
-    if (!cokeArm) {
-      const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'),
-        iW = f.boneIndex('handR');
-      if (iS < 0 || iE < 0 || iW < 0) return;
-      cokeArm = {
-        S: f.boneAt(iS, new THREE.Vector3()),
-        E: f.boneAt(iE, new THREE.Vector3()),
-        W: f.boneAt(iW, new THREE.Vector3()),
-        // Where her grip point sits relative to the wrist bone, in figure
-        // space, before anything has been done to the arm. `PALM` is measured
-        // in the BIND pose — it is the bottle's own number — so it has to come
-        // through `boneTurn`, which is how far the clip has turned the wrist
-        // since then. Everything the solve does to the chain afterwards then
-        // turns this vector with it.
-        P: PALM.clone().applyQuaternion(f.boneTurn(iW, new THREE.Quaternion())),
-      };
-      _ckAt.copy(_ckBlade);
-    }
-    _ckAt.lerp(_ckBlade, 1 - Math.exp(-COKE_HAND.follow * Math.max(dt, 0)));
-    // World metres all the way to the conversion, so that neither offset has
-    // to know what this mesh is scaled by.
-    _ckFwd.set(1, 0, 0).transformDirection(f.mesh.matrixWorld);
-    _ckGoal.copy(_ckAt);
     // Lower over the wrap than over the blade: the blade number leaves the
     // grip 21 mm clear of steel lying flat, and the wrap is 2 mm of folded
     // paper she is pinching rather than a tool she is holding.
-    _ckGoal.y += u < 0.25 ? COKE_HAND.liftWrap : COKE_HAND.lift;
-    _ckGoal.addScaledVector(_ckFwd, -COKE_HAND.back);
-    f.mesh.worldToLocal(_ckGoal);
-    _ckGoal.lerpVectors(cokeArm.W, _ckGoal, show.cutAt);
-    // The blade itself in her frame as well, for the wrist below. Converted
-    // rather than offset, because the two conversions must be the same one.
-    _ckTo.copy(_ckAt);
-    f.mesh.worldToLocal(_ckTo);
-    // The elbow out to her own side and a little behind her, which is the only
-    // place it can go on an arm reaching down at something in front of it.
-    // +z is her right on this rig — measured: `armUR` sits at z +0.179.
-    _ckPole.set(-0.45, 0.10, 1).normalize();
-    _ckQa.copy(wheelLimb(f, 'armUR', 'armLR', cokeArm.S, cokeArm.E, cokeArm.W,
-      _ckGoal, _ckPole));
-    // ── AND THE WRIST, WHICH IS THE DIFFERENCE BETWEEN HOLDING IT AND
-    //    HAVING A HAND NEAR IT ──────────────────────────────────────────
-    //
-    // The solve puts the wrist BONE where it was asked to and says nothing
-    // about which way the hand is pointing, and the hand is rigid. Measured
-    // with only the arm solved: the wrist landed 106 mm from the blade, which
-    // is the target, and her grip point landed 109 mm from it — the palm
-    // facing off across the table, a hand resting at the rim of the plate.
-    //
-    // So the hand is turned as well: take the grip offset the chain has just
-    // carried, and rotate it on to the line from the wrist to the blade. The
-    // shortest rotation between two directions is the one `setFromUnitVectors`
-    // gives, which is also the one with the least twist in the wrist — nobody
-    // is asking for a correct forearm here, only for a hand that is holding
-    // something.
-    _ckPalm.copy(cokeArm.P).applyQuaternion(_ckQa);
-    _ckTo.sub(_ckGoal);
-    if (_ckPalm.lengthSq() > 1e-8 && _ckTo.lengthSq() > 1e-8) {
-      _ckQb.setFromUnitVectors(_ckPalm.normalize(), _ckTo.normalize());
-      // Eased with everything else, or the wrist snaps round on the frame the
-      // reach starts while the arm is still on its way. Into `_ckQa`, which is
-      // spent by now, and NOT back into `_ckQb`: `slerpQuaternions` copies the
-      // first argument into `this` before it reads the second, so a quaternion
-      // slerped into itself is a quaternion thrown away.
-      armAimQ(f, 'handR', _ckQa.slerpQuaternions(_ckID, _ckQb, show.cutAt));
+    COKE_ARM.up = u < 0.25 ? COKE_HAND.liftWrap : COKE_HAND.lift;
+    reachRight(f, dt, 'coke', _ckBlade, show.cutAt, COKE_ARM);
+  }
+
+  /**
+   * ── AND THE SAME ARM ON THE THING SHE IS PUTTING ON ────────────────────
+   *
+   * Two goals and one movement: the object where it lies on the tabouret, and
+   * then the mount on her own hip — see `liftIt` and `strapIt`, which are the
+   * two phases, and `toyMount`, which is where the second goal comes from.
+   *
+   * ONE `who` ACROSS BOTH, deliberately: the rest chain is taken on the frame
+   * she starts reaching and is held through the carry, so what the solver
+   * sees is a single hand travelling from the stool to her hip rather than two
+   * reaches with a re-take between them. The goal's own damping — `follow`,
+   * in world metres — is what makes the changeover a quarter of a second of
+   * her carrying it rather than a jump, exactly as it is between two lines of
+   * the plate.
+   *
+   * The two offsets are the arithmetic `COKE_HAND` sets out. Off the table the
+   * wrist rides 0.104 above the thing, which with a 0.088 hand puts her grip
+   * 18 mm above its middle — that is the top of the egg, which is where you
+   * take hold of it. At her hip the wrist is out in FRONT rather than above,
+   * 0.087 in all, so the grip lands on the mount point itself: a hand pressing
+   * something against her rather than one hovering over it.
+   */
+  const DON_ARM = { up: 0.104, fwd: -0.020, follow: 9.0, pole: REACH_POLE };
+  const DON_AT = { up: 0.104, fwd: -0.020 };
+  const DON_HIP = { up: 0.035, fwd: 0.080 };
+  const _dnTo = new THREE.Vector3();
+  function donReach(f, dt) {
+    const lift = show.phase === 'liftIt', strap = show.phase === 'strapIt';
+    const want = lift || strap ? (show.donAt || 0) : 0;
+    show.donArm = damp(show.donArm || 0, want, 4.5, dt);
+    if (show.donArm < 0.004) {
+      reachRight(f, dt, 'don', _dnTo, 0, DON_ARM);
+      show.donArm = 0;
+      return;
     }
+    // WHICH OF THE TWO, and the switch is the fist and not the phase: her
+    // hand stays on the wood until it has actually closed on the thing, which
+    // is `grip` reaching 1, and only then starts for her hip.
+    const home = strap || (giftHeld && giftHeld.grip >= 1);
+    if (home) {
+      if (!toyMount(f, _dnTo)) return;
+      DON_ARM.up = DON_HIP.up;
+      DON_ARM.fwd = DON_HIP.fwd;
+    } else {
+      // Where it is lying, which is where it was lying: the prop is being
+      // ramped into her palm by then and reading its live position would be
+      // the hand chasing the thing it is already holding.
+      if (giftHeld && giftHeld.from) _dnTo.copy(giftHeld.from);
+      else {
+        const m = giftProps.find((x) => x.userData && x.userData.key === show.don);
+        if (!m) return;
+        _dnTo.copy(m.position);
+      }
+      DON_ARM.up = DON_AT.up;
+      DON_ARM.fwd = DON_AT.fwd;
+    }
+    reachRight(f, dt, 'don', _dnTo, show.donArm, DON_ARM);
   }
 
   function looseHairGroup() {
@@ -40047,25 +40316,46 @@ async function buildJadrija(scene) {
    */
   const SIGNAL = { walk: 0.0026, hz: 47, hear: 7 };
   const signals = {};
+  const _sigW = new THREE.Vector3();
+
+  /**
+   * WHERE A RECEIVER ACTUALLY IS, which is two places since she can put one on.
+   *
+   * On the tabouret it is a mesh in `giftProps` standing in world metres; worn
+   * it is the mount inside the group `wearTick` pins to her pelvis, which is
+   * her own frame. `node` is the thing the motor moves either way and `table`
+   * is whether it is standing on wood — because the creep, and only the creep,
+   * is a fact about wood. Answered fresh every frame rather than held in the
+   * signal, so a thing that is picked up while it is running goes on running.
+   */
+  function receiverOf(key) {
+    const prop = giftProps.find((m) => m.userData && m.userData.key === key);
+    if (prop) {
+      return { node: prop, table: 1, led: prop.userData && prop.userData.led };
+    }
+    for (const part of worn[key] || []) {
+      if (part.shake) return { node: part.shake, table: 0, led: part.led };
+    }
+    return null;
+  }
 
   /** Turn a receiver on or off, and say in words what happened. */
   function signalSet(key, on) {
     if (!key) return 'nothing';
     const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
     if (!row || !row.radio) return 'no receiver';
-    // It has to be out. In the bag it is switched off and in a bag.
-    const prop = giftProps.find((m) => m.userData && m.userData.key === key);
-    if (!prop) return 'not out';
+    // It has to be out. In the bag it is switched off and in a bag — and on
+    // her counts as out, which is the one thing this test had to learn.
+    const rx = receiverOf(key);
+    if (!rx) return 'not out';
     if (!on) {
       delete signals[key];
       // And the light goes out with it.
-      if (prop.userData && prop.userData.led) {
-        prop.userData.led.uniforms.uEmissive.value = 0;
-      }
+      if (rx.led) rx.led.uniforms.uEmissive.value = 0;
       if (audio && audio.buzz) audio.buzz(false);
       return 'off';
     }
-    signals[key] = { prop, t: 0, at: prop.position.clone() };
+    signals[key] = { t: 0, node: rx.node, at: rx.node.position.clone() };
     return 'on';
   }
 
@@ -40086,34 +40376,59 @@ async function buildJadrija(scene) {
     let near = 1e9, shake = 0;
     for (const k of keys) {
       const sg = signals[k];
+      // WHERE IT IS THIS FRAME, and not where it was when the signal was
+      // sent: she can pick the thing up while it is running. For the two or
+      // three seconds it is in her fist there is no node at all — see
+      // `liftIt` — and the honest thing for a motor in a hand is to keep
+      // running and move nothing, which is what skipping this does.
+      const rx = receiverOf(k);
+      if (!rx) continue;
+      if (sg.node !== rx.node) {
+        sg.node = rx.node;
+        sg.at.copy(rx.node.position);
+      }
       sg.t += dt;
       const a = sg.t * SIGNAL.hz;
-      sg.prop.position.set(
-        sg.at.x + Math.sin(a) * SIGNAL.walk,
-        sg.at.y + Math.abs(Math.sin(a * 2)) * SIGNAL.walk * 0.4,
-        sg.at.z + Math.cos(a * 0.9) * SIGNAL.walk);
+      // A tabletop lets it skid; a hip does not — see `TOY.buzz`.
+      const amp = rx.table ? SIGNAL.walk : TOY.buzz;
+      sg.node.position.set(
+        sg.at.x + Math.sin(a) * amp,
+        sg.at.y + Math.abs(Math.sin(a * 2)) * amp * 0.4,
+        sg.at.z + Math.cos(a * 0.9) * amp);
       // And it creeps: a thing vibrating on a hard surface does not stay put.
-      sg.at.x += Math.sin(sg.t * 0.7) * dt * 0.004;
-      sg.at.z += Math.cos(sg.t * 0.53) * dt * 0.004;
+      // Only on the wood. Strapped on, the millimetre a second this adds would
+      // be the thing walking down her leg over a minute and a half.
+      if (rx.table) {
+        sg.at.x += Math.sin(sg.t * 0.7) * dt * 0.004;
+        sg.at.z += Math.cos(sg.t * 0.53) * dt * 0.004;
+      }
+      // World metres for both of the distances below, and worn it is four
+      // matrices deep in her — the mount, the bone group, her mesh and the
+      // scene. `updateWorldMatrix` is what makes that true on the frame she
+      // moved rather than on the one after it.
+      sg.node.updateWorldMatrix(true, false);
+      _sigW.setFromMatrixPosition(sg.node.matrixWorld);
       if (cam) {
-        near = Math.min(near, Math.hypot(cam.x - sg.prop.position.x,
-          cam.z - sg.prop.position.z));
+        near = Math.min(near, Math.hypot(cam.x - _sigW.x, cam.z - _sigW.z));
       }
       // The light on the tail, while it runs. A slow breath rather than the
       // motor's own rate: 47 Hz is invisible at any frame rate anybody plays
       // this at, and what a small indicator actually does is pulse about once
       // a second. Full to a quarter and back.
-      if (sg.prop.userData && sg.prop.userData.led) {
-        const u = sg.prop.userData.led.uniforms.uEmissive;
-        u.value = 0.72 + 0.28 * Math.sin(sg.t * 5.7);
+      if (rx.led) {
+        rx.led.uniforms.uEmissive.value = 0.72 + 0.28 * Math.sin(sg.t * 5.7);
       }
       // How much of it reaches the glass. Through the tabletop, not through
       // the air: a thing on the same 46 cm top shakes the wine, the same
       // thing on the cot two metres off does not, and there is no case in
       // between worth modelling. Full out to a quarter metre, gone by a half.
+      // The rule is the same one worn as on the wood, and deliberately: what
+      // it measures is how far the thing is from the glass, and a woman
+      // standing at the stool with it strapped to her is 0.3 m from it. It
+      // trembles while she is there and stops when she walks off, which is
+      // what the distance already said and is more honest than a second rule.
       if (kit && kit.glass) {
-        const d = Math.hypot(kit.glass[0] - sg.prop.position.x,
-          kit.glass[2] - sg.prop.position.z);
+        const d = Math.hypot(kit.glass[0] - _sigW.x, kit.glass[2] - _sigW.z);
         shake = Math.max(shake, Math.max(0, Math.min(1, (0.50 - d) / 0.25)));
       }
     }
@@ -40124,8 +40439,184 @@ async function buildJadrija(scene) {
     if (audio && audio.buzz) audio.buzz(true, Math.min(near, SIGNAL.hear));
   }
 
-  function wearableParts(key, where) {
+  /**
+   * ── AND THE SAME OBJECT, ON HER ────────────────────────────────────────
+   *
+   * Over the wrap, on the outside of it, on the bone the wrap itself belongs
+   * to. `hip_scarf` in tools/blender/human_mh.py says why that is the right
+   * bone in one line — *"everything rigid to the pelvis: a hip scarf is tied
+   * to the hips and does not follow a knee"* — and anything lying on that
+   * cloth wants the same answer, or the two drift apart the first time she
+   * bends.
+   *
+   * EVERY NUMBER BELOW IS MEASURED off the bind pose rather than guessed,
+   * because the surface it lies on is not a cylinder and is not vertical:
+   *
+   *   pelvis bone     (0.0152, 0.9344, 0), which is the top edge of the wrap
+   *   the cloth       about an axis at x 0.015, its front face runs
+   *                   0.117 at y 0.835 · 0.142 at y 0.880 · 0.153 at y 0.940
+   *
+   * — so over the 96 mm this thing is long the front of her moves 34 mm
+   * forward, which is a lean of about 19 degrees at the hem easing to 11 at
+   * the waist. It is hung at the middle of that range: centred at y 0.885 with
+   * its mid-plane 18.5 mm proud of the cloth there (the egg's own
+   * half-thickness — the same `sit` it rests on a table by), and leaned 15
+   * degrees so that neither end stands off her.
+   *
+   * AND IT IS TURNED FLAT AGAINST HER, which is the only thing about the
+   * frame worth saying. The curve is drawn in its own x-y plane — see
+   * `lovenseMesh` — so left alone it stands out of her hip like a door
+   * handle. The basis lays its long axis DOWN her with the egg low, the loop
+   * opening across her, and its 37 mm of thickness along her forward axis.
+   */
+  const TOY = {
+    /** Figure metres, off the pelvis bone. */
+    at: [0.148, -0.049, 0],
+    /** How far it leans back with the front of her, radians. */
+    lean: 0.26,
+    /**
+     * And how far the motor moves it while it is ON her, in metres.
+     *
+     * Not `SIGNAL.walk`: that number is a thing on a hard tabletop, which is
+     * where it came from and where it skids about. Strapped to a body over a
+     * folded cloth there is nowhere for it to go, so it is a buzz in place at
+     * under half the amplitude and no creep at all.
+     */
+    buzz: 0.0011,
+  };
+
+  /**
+   * The worn rig: a mount at the bone, and the thing itself inside it.
+   *
+   * TWO GROUPS AND NOT ONE, which is what lets the motor and the skeleton
+   * both write a position every frame without one of them winning. `wearTick`
+   * owns the outer group — it puts it at the bone and turns it by `boneTurn`,
+   * every frame, like the horns and the headphones. The inner one is the
+   * mount: where on that bone the thing sits, which is a constant, plus
+   * whatever `signalTick` is shaking it by, which is not.
+   *
+   * `m` is the mesh she is holding when there is one. A thing picked up off
+   * the tabouret is the SAME object worn — same geometry, same LED material,
+   * same `userData` — and building a second one here would leave the signal
+   * writing to the one that was thrown away.
+   */
+  function toyWorn(m) {
+    const mesh = m || giftMesh('lovense');
+    if (mesh.parent) mesh.parent.remove(mesh);
+    mesh.position.set(0, 0, 0);
+    mesh.rotation.set(0, 0, 0);
+    mesh.quaternion.identity();
+    const shake = new THREE.Group();
+    shake.position.set(TOY.at[0], TOY.at[1], TOY.at[2]);
+    shake.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, -1, 0),        // its long axis, down her
+      new THREE.Vector3(0, 0, -1),        // the loop's opening, across her
+      new THREE.Vector3(1, 0, 0)));       // and 37 mm of it, out in front
+    // Leaned with the front of her, about her own left-right axis. Negative,
+    // because +z is her right and the top of this has to go BACK: her belly
+    // stands further forward than her hip bone does.
+    shake.quaternion.premultiply(new THREE.Quaternion()
+      .setFromAxisAngle(new THREE.Vector3(0, 0, 1), -TOY.lean));
+    shake.add(mesh);
+    const g = new THREE.Group();
+    g.add(shake);
+    return { group: g, bone: 'pelvis', shake, rest: shake.position.clone(),
+      led: mesh.userData && mesh.userData.led };
+  }
+
+  /**
+   * Where that mount point is in WORLD metres, for the hand that is putting
+   * it there — see `donReach`. The same arithmetic `wearTick` does, one frame
+   * early and one object before there is anything to hang on it.
+   */
+  const _mtV = new THREE.Vector3(), _mtQ = new THREE.Quaternion();
+  let pelvisB = null;
+  function toyMount(f, out) {
+    if (pelvisB === null) pelvisB = f.boneIndex('pelvis');
+    if (pelvisB < 0) return null;
+    f.boneAt(pelvisB, out);
+    _mtV.set(TOY.at[0], TOY.at[1], TOY.at[2])
+      .applyQuaternion(f.boneTurn(pelvisB, _mtQ));
+    out.add(_mtV);
+    return out.applyMatrix4(f.mesh.matrixWorld);
+  }
+
+  /**
+   * HOW FAR OFF HER THE THING ACTUALLY IS, in millimetres. Debug only.
+   *
+   * The placement above is four numbers against a surface that is neither flat
+   * nor vertical, and the failure it can have is silent: a toy sunk into the
+   * cloth reads, from two metres, exactly like a toy lying on it. So this
+   * measures rather than asserts — every vertex of the worn mesh against the
+   * outermost thing the figure has at that height and bearing, which is the
+   * wrap where there is wrap and her own skin where there is not.
+   *
+   * In the BIND pose and not this frame's, and that is the whole reason it can
+   * be one number: both the cloth and the mount are rigid to the pelvis, so
+   * what is true standing still is true through a cartwheel.
+   */
+  let toyProf = null;
+  function toyClear() {
+    if (!skinFig || !skinFig.mesh.geometry) return null;
+    const NA = 72, NY = 26, Y0 = 0.78, DY = 0.008;
+    const CX = 0.015;                 // the wrap's axis — `SCARF_CX` in the rig
+    if (!toyProf) {
+      const pos = skinFig.mesh.geometry.attributes.position;
+      toyProf = new Float32Array(NA * NY);
+      for (let i = 0; i < pos.count; i++) {
+        const dx = pos.getX(i) - CX, y = pos.getY(i), z = pos.getZ(i);
+        const iy = Math.round((y - Y0) / DY);
+        if (iy < 0 || iy >= NY) continue;
+        const r = Math.hypot(dx, z);
+        if (r > 0.30) continue;        // the arms, which hang outside all this
+        let a = Math.atan2(z, dx);
+        if (a < 0) a += Math.PI * 2;
+        const k = iy * NA + (Math.floor(a / (Math.PI * 2) * NA) % NA);
+        if (r > toyProf[k]) toyProf[k] = r;
+      }
+    }
+    const part = worn.lovense && worn.lovense[0];
+    const mesh = part && part.shake && part.shake.children[0];
+    if (!mesh) return null;
+    // Its own vertices into the pelvis's bind frame: the mount's transform,
+    // then the bone's own rest position. `boneAt` would be this frame's pose.
+    const bone = skinFig.bones.find((b) => b.name === 'pelvis');
+    if (!bone) return null;
+    const M = new THREE.Matrix4().compose(
+      new THREE.Vector3(TOY.at[0], TOY.at[1], TOY.at[2]), part.shake.quaternion,
+      new THREE.Vector3(1, 1, 1));
+    M.premultiply(new THREE.Matrix4().makeTranslation(
+      bone.t[0], bone.t[1], bone.t[2]));
+    const v = new THREE.Vector3();
+    const pos = mesh.geometry.attributes.position;
+    // THREE NUMBERS AND NOT ONE, because the mesh is 37 mm thick and a single
+    // maximum is that thickness rather than anything about where it sits. The
+    // whole mesh's MINIMUM says whether it is inside her; the same minimum
+    // taken over the bottom third and the top third says whether it is lying
+    // along her or standing off at one end, which is what the lean is for.
+    const gaps = [9, 9, 9];
+    const lowY = 0.9344 + TOY.at[1] - 0.026, hiY = 0.9344 + TOY.at[1] + 0.026;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(M);
+      const dx = v.x - CX, r = Math.hypot(dx, v.z);
+      const iy = Math.round((v.y - Y0) / DY);
+      if (iy < 0 || iy >= NY) continue;
+      let a = Math.atan2(v.z, dx);
+      if (a < 0) a += Math.PI * 2;
+      const body = toyProf[iy * NA + (Math.floor(a / (Math.PI * 2) * NA) % NA)];
+      if (!body) continue;
+      const gap = r - body;
+      if (gap < gaps[0]) gaps[0] = gap;
+      const k = v.y < lowY ? 1 : v.y > hiY ? 2 : -1;
+      if (k > 0 && gap < gaps[k]) gaps[k] = gap;
+    }
+    if (gaps[0] > 8) return null;
+    return gaps.map((g) => (g > 8 ? null : Math.round(g * 1000)));
+  }
+
+  function wearableParts(key, where, mesh) {
     if (key === 'headphones') return [{ group: headphonesGroup(), bone: 'head' }];
+    if (key === 'lovense') return [toyWorn(mesh)];
     if (where === 'wrists') {
       return [{ group: bangleGroup(), bone: 'handL' },
         { group: bangleGroup(), bone: 'handR' }];
@@ -40477,6 +40968,9 @@ async function buildJadrija(scene) {
   const UPV = new THREE.Vector3(0, 1, 0);
   const qAim = new THREE.Quaternion(), qId = new THREE.Quaternion();
   const qTurn = new THREE.Quaternion(), qHand = new THREE.Quaternion();
+  // How a fetched thing sits in the fist: `qHand` with the object's own grip
+  // rotation on it — see `liftIt`, which is the only thing that sets one.
+  const qHold = new THREE.Quaternion();
   const qFix = new THREE.Quaternion();
 
   // ── "uhm... excuuuuse me!" ─────────────────────────────────────────────────
@@ -45191,8 +45685,11 @@ async function buildJadrija(scene) {
       // THE FLAVOUR RIDES ON THE NAME — see `fetch.cream` in SHE_CAN. The
       // table is checked against the base, so one entry covers every tray in
       // the case and nothing downstream has to learn a second argument.
-      const base = name && name.startsWith('fetch.cream') ? 'fetch.cream'
-        : name && name.startsWith('give:') ? 'give' : name;
+      // The colon is the join in every one of these — `give:beer`,
+      // `wear:lovense`, `fetch.cream:stracciatella` — so one split answers all
+      // three and the next family does not add a clause to a chain of
+      // ternaries. A name with no colon is its own base.
+      const base = name ? name.split(':')[0] : name;
       if (!show || !SHE_CAN[base]) return false;
       // AND WHY NOT, WHEN THERE IS A WHY. Three answers and not two: `false`
       // is a name she does not know, `true` is armed, and a STRING is a name
@@ -45275,6 +45772,38 @@ async function buildJadrija(scene) {
     props: () => giftProps.map((m) => ({ key: m.userData && m.userData.key,
       at: [+m.position.x.toFixed(3), +m.position.y.toFixed(3),
         +m.position.z.toFixed(3)] })),
+    /** And what she has ON, which is the other half of the same question. */
+    worn: () => Object.keys(worn),
+    /**
+     * The one she can be wearing, measured — see TOY and `toyClear`.
+     *
+     * `mount` is where the thing belongs on her in world metres, which exists
+     * whether or not anything is there yet, and `at` is where the object
+     * actually is. `clear` is the pair of millimetres that says whether it is
+     * lying on the cloth or sunk into it: the closest vertex and the furthest.
+     * A probe that only photographs this cannot tell the difference.
+     */
+    toy: () => {
+      if (!skinFig) return null;
+      const w = new THREE.Vector3(), a = new THREE.Vector3();
+      skinFig.mesh.updateMatrixWorld();
+      const mount = toyMount(skinFig, w);
+      const part = worn.lovense && worn.lovense[0];
+      if (part && part.shake) {
+        part.shake.updateWorldMatrix(true, false);
+        a.setFromMatrixPosition(part.shake.matrixWorld);
+      }
+      const r3 = (v) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+      return { on: !!part, held: !!(giftHeld && giftHeld.key === 'lovense'),
+        out: giftProps.some((m) => m.userData && m.userData.key === 'lovense'),
+        mount: mount ? r3(w) : null, at: part ? r3(a) : null,
+        clear: toyClear(), buzzing: !!signals.lovense,
+        lit: part && part.led
+          ? +part.led.uniforms.uEmissive.value.toFixed(2) : null,
+        phase: show ? show.phase : null,
+        donAt: show ? +(show.donAt || 0).toFixed(2) : null,
+        grip: giftHeld ? +(giftHeld.grip || 0).toFixed(2) : null };
+    },
     /** What she saw on the last recon, and what she came back and reported. */
     seen: () => (show ? (show.seen || null) : null),
     told: () => (show ? (show.told || null) : null),

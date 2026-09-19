@@ -363,8 +363,10 @@ const ears = (() => {
           // ── A SIGNAL, WHICH IS NOT SOMETHING SHE DOES ──────────────────
           //
           // `buzz:<key>` and `hush:<key>` are the player's own phone talking
-          // to a thing on a table, so they never reach `askShow` — she has no
-          // part in it. See SIGNAL in 43-jadrija.js.
+          // to a receiver already on a table, so they never reach `askShow`.
+          // A future table-placement action is separate: it must finish its
+          // visible placement before calling this signal path. See SIGNAL in
+          // 43-jadrija.js.
           if (name.startsWith('buzz:') || name.startsWith('hush:')) {
             const on = name.startsWith('buzz:');
             const key = name.slice(5);
@@ -467,6 +469,10 @@ const ears = (() => {
     'hair.down': 'taking her hair out of the tail',
     'hair.up': 'putting her hair back up',
     give: 'coming to take it from you',
+    // The other direction: a thing already on the tabouret, fetched and put
+    // on. The label says where she is going, like the recons, because the
+    // first two seconds of it are her walking to the stool.
+    wear: 'over to the stool for it',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she
@@ -514,6 +520,11 @@ const ears = (() => {
     hairup: 'her hair is already up',
     nothaveit: 'you are not carrying that',
     holding: 'she is already holding something',
+    // The three the fetch adds. `outside` and `nokit` are above and are the
+    // same facts about the same room.
+    notwearable: 'that is not something she can put on',
+    wearing: 'she already has it on',
+    notout: 'that one is not out — hand it to her instead',
     nothing: 'name the thing',
     carrying: 'she is already carrying one',
     onit: 'she has already gone for one',

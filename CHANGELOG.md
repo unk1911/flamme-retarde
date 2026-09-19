@@ -8,6 +8,86 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.423.0] — 2026-09-18 (baye 1.24.0)
+
+### she fetches it off the stool, and puts it on
+
+The Lovense has been lying on the tabouret since 1.416.0 and the only thing
+anybody could do with it was send it a signal. Now she can go and get it: **put
+the lovense on**, and she walks to the mark at the stool, reaches down, closes
+her hand on it, carries it to her hip and straps it on over the wrap. From then
+on it rides her pelvis — through the pour, the kneel and the cartwheel — and
+the phone still reaches it.
+
+**It is the handover backwards**, which is why it is four numbers and not a
+machine. `give:` starts in your bag and ends with her setting something down;
+`wear:` starts from a thing already set down and ends with it on a bone. The
+middle of it — a prop in her hand, a solved arm, the swap to the worn group —
+is `wearIt`'s and `placeIt`'s and is not written twice. Which bone comes off
+the satchel row, `wear: 'pelvis'`, the column the headphones' `head` and the
+cuffs' `wrists` are already in.
+
+**And it is the wrap's own bone.** `hip_scarf` in the rig says why in one line
+— everything rigid to the pelvis, because a hip scarf is tied to the hips and
+does not follow a knee — and a thing lying on that cloth wants the same answer,
+or the two come apart the first time she bends.
+
+**Where on it, measured rather than guessed.** The pelvis bone is at
+(0.0152, 0.9344, 0), which is the top edge of the wrap, and the front face of
+the cloth runs 0.117 at y 0.835, 0.142 at 0.880 and 0.153 at 0.940 — so over
+the 96 mm this thing is long, the front of her moves 34 mm forward. It hangs at
+the middle of that: centred at y 0.885, its mid-plane 18.5 mm proud of the
+cloth there — the egg's own half-thickness, the same `sit` it lies on a table
+by — and leaned 15 degrees so that neither end stands off her. It is also
+turned flat against her, which is the only thing about the frame worth saying:
+the curve is drawn in its own x-y plane, so left alone it stands out of her hip
+like a door handle.
+
+`__fr.jad.toy()` publishes the check rather than asserting it — the closest
+vertex of the mesh to her own surface, and the closest at each end, in
+millimetres: **4, 15, 19**. It lies on the cloth and is not in it. Three
+numbers and not one because the mesh is 37 mm thick and a single maximum
+measures that thickness rather than the placement.
+
+**And the signal follows it.** A receiver used to be a mesh in `giftProps` that
+the tick held on to; it is looked up fresh every frame now, so the same object
+answers whether it is on the wood or on her — and the two seconds it is in her
+fist between the two are a motor running in a hand, which is what you would
+hear. What changes with the surface is the creep: a thing buzzing on a hard top
+walks a millimetre at a time across it and a thing strapped over a folded cloth
+does not, so worn it shakes in place at 1.1 mm and the walk is switched off.
+The light still pulses and the wine still trembles — measured with it on her at
+the stool, her hip is 0.31 m from the glass and the ripple reads 0.77.
+
+**The arm is one solver now.** `cokeReach` was the only thing in the file that
+could put her hand on an object standing in the room, and it was welded to the
+plate: the phase name, the blade, the scrub. What is left of it is the plate's
+timings; the solve is `reachRight` — a goal in world metres, an amount, and a
+`who` that says which job is holding the arm, so that two jobs cannot solve
+against one another's cached rest pose. Measured after the split against the
+numbers its own note records: **27 mm** on the paper wrap against 29, and 20 to
+41 mm on the blade against 21 down a line and 62 at the worst changeover.
+
+**And it comes off the table over a ramp**, which is the bottle's lesson: her
+hand and the stool are 40 cm apart on the frame she grasps, and an object that
+teleports between them is an object nobody believes was picked up. It sits in
+the fist along `GRIP_UP` — the direction the bottle was measured in — because
+left at identity the loop lies across her palm like a plate.
+
+Typed: **put the lovense on her**, **strap the toy on**, **wear the lovense**.
+It answers plainly when there is nothing to do: *she already has it on*, *that
+one is not out — hand it to her instead*, *not out here on the deck — in the
+kabina*, *that is not something she can put on*.
+
+Measured end to end: from `dwell` at the stool it is `liftIt` → her fist at
+1.3 s → `strapIt` → worn at 2.8 s; `give:cuffs` still ends with the bangles on
+her wrists and the bag down to two; the signal answers `on` with the thing on
+her hip and the light pulses 0.47 to 0.96.
+
+Server (baye 1.24.0): the same sentence, heard before the handover gets a look
+at it — "take the lovense off the table and put it on" carries a handover verb,
+and handing her a thing that is not in your bag is not what it asks for.
+
 ## [1.422.0] — 2026-09-18 (baye 1.23.0)
 
 ### eight poses, and the thing that unlocked them

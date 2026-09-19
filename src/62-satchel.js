@@ -108,19 +108,14 @@ const CARRY = [
   { key: 'krafne', label: 'krafne', give: true, consumed: true },
   // ── AND THE THREE YOU START WITH ──────────────────────────────────────
   //
-  // Misha, 17 Sep 2026: *"make sure in my satchel/inventory, i initially wear
-  // a pair of handcuffs, a pair of bose over-the-head noise canceling
-  // headphones, one of those lovense remote control toys"*.
+  // The satchel vocabulary includes the Lovense row so the signal and object
+  // tables share one key, but the live receiver is pre-placed on the kabina
+  // tabouret rather than carried in this session's starting bag.
   //
-  // Named rather than described, and that is rule 12 being kept rather than
-  // broken: the rule is that no name in this game came from ME. Bose and
-  // Lovense came from him, the way OŽUJSKO and TISAK came off his own
-  // photographs of those shops, and the handcuffs are a plain noun.
+  // Named rather than described: Bose and Lovense are the supplied names, while
+  // the handcuffs are a plain noun.
   //
-  // `worn: true` marks the three that are not shopping — the bag lists them
-  // apart, because a thing you brought with you and a thing you bought at a
-  // kiosk answer different questions. None of them is `consumed`: you do not
-  // use these up.
+  // `worn: true` marks the things that are not shopping. None is consumed.
   // Ornament and not restraint — Misha, 18 Sep 2026: *"they can be ornamental
   // cuffs"*. Two bangles, one per wrist, with nothing between them: `wear`
   // takes a PAIR of bones here, which is the one thing the head did not need.
@@ -134,9 +129,15 @@ const CARRY = [
   // `radio` marks a thing with a motor and a receiver in it: put it down
   // somewhere and a signal from your phone or the laptop reaches it. See
   // SIGNAL in 43-jadrija.js.
+  //
+  // AND IT HAS A BONE, which is the row's other half. `wear: 'pelvis'` is what
+  // takes it off the tabouret and puts it on her, over the wrap — the same
+  // column the headphones' 'head' and the cuffs' 'wrists' are in, so this
+  // needed a bone and a mesh and no new machinery. See TOY in 43-jadrija.js
+  // for where on that bone it sits, and `wear:` in `SHE_CAN` for the ask.
   { key: 'lovense', label: 'a Lovense remote-control toy',
     give: true, worn: true, box: [0.04, 0.12, 0.04], col: [0.62, 0.12, 0.18],
-    radio: true },
+    radio: true, wear: 'pelvis' },
   // ── AND A PHONE ───────────────────────────────────────────────────────
   //
   // Misha, 18 Sep 2026: *"that's another thing Chloe needs, a cellphone"*.
@@ -172,9 +173,8 @@ const SATCHEL = {
   // Three things, and they are in the bag from the first frame rather than
   // put there by a shop — see `worn` in CARRY. Everything else in here is
   // something you bought.
-  // No lovense: it is on the tabouret in the kabina from the start — see the
-  // note over `giftProps` in src/43-jadrija.js. Carrying a second one would
-  // put two of the same object in the room the moment you handed it over.
+  // The Lovense is intentionally absent here: one receiver is already on the
+  // tabouret from boot. See the note over `giftProps` in src/43-jadrija.js.
   have: { cuffs: 1, headphones: 1, phone: 1 },
 };
 
