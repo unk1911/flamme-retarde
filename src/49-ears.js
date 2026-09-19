@@ -613,6 +613,7 @@ const ears = (() => {
     // And the one that is not a place she goes — see `yawnTick`.
     yawn: 'a yawn',
     coke: 'to the plate',
+    look: 'her eyes on you',
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
     // Her hands up to the back of her head, and then the swap. See `tieHair`

@@ -35272,6 +35272,15 @@ async function buildJadrija(scene) {
     /** And her arms out, which is a latch on the pose like her legs. */
     'arms.wide': 1, 'arms.down': 1,
     /**
+     * AND HER EYES ON YOU, which is not a pose at all.
+     *
+     * Misha, 19 Sep 2026: *"if you say 'look at me', she should look at me"*.
+     * A latch over whatever she is doing, like the yawn — so it is askable
+     * from her back, from a handstand and from the middle of a cartwheel, and
+     * it changes nothing about any of them. See GAZE.
+     */
+    look: 1,
+    /**
      * AND HER HAIR, OUT OF THE TAIL OR BACK INTO IT.
      *
      * `hairDown` and `looseHairGroup` have been able to do this since the
@@ -36562,7 +36571,11 @@ async function buildJadrija(scene) {
       'sit.bed': 1, 'sit.knees': 1, lotus: 1, perch: 1, fetal: 1, upside: 1,
       // And the yawn, which changes no phase at all: it is a latch on an
       // overlay, so there is nothing here for the licence to fire twice.
-      yawn: 1 };
+      yawn: 1,
+      // And her eyes, for the same reason and more so: "look at me" is a
+      // request about the next second, and one that waits for a cartwheel to
+      // finish has answered a different request.
+      look: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
@@ -36854,6 +36867,13 @@ async function buildJadrija(scene) {
           if (onCot(show.phase)) go('situp', 'situp', 0.34);
           else go('rise', 'getup', 0.35);
         } else go('handGo', 'walk', 0.32);
+      } else if (name === 'look') {
+        // A LATCH AND NOT A PHASE. Her feet, her hands and her clip are none
+        // of this function's business: all that happens is that a clock is
+        // set, and `gazeTick` turns her head while it runs.
+        show.gaze = GAZE.hold;
+        show.did = name;
+        showSay('trill', d);
       } else if (name === 'yawn') {
         // A LATCH AND NOT A PHASE, exactly like `legs.down` below: she stays
         // in whatever she was doing, her place and her legs are untouched, and
@@ -39376,6 +39396,9 @@ async function buildJadrija(scene) {
     wearTick();
     hairAim();
     hairStep(dt);
+    // Her head: at you if you asked for it, and on the motor's beat if she is
+    // wearing something with one in it. See GAZE.
+    gazeTick(f, dt, pt, ps);
 
     // ── AND THE ARM THAT IS FETCHING SOMETHING OFF THE STOOL ─────────────
     //
@@ -40614,6 +40637,130 @@ async function buildJadrija(scene) {
   const HAIR_LOCK = [0.110, 4, 0.95];
 
   /**
+   * ── LOOK AT ME ─────────────────────────────────────────────────────────
+   *
+   * Misha, 19 Sep 2026: *"if you say 'look at me', she should look at me"*,
+   * and *"when lovense is turned on, with each vibrations, her eyes should
+   * blink a little and head move a little, in sync with it"*.
+   *
+   * Two requests and one mechanism, because they are the same three bones. A
+   * gaze is not a clip and not a phase: it is a delta over whatever she is
+   * already doing, like the yawn — so it works lying down, mid-cartwheel, on
+   * her hands against the wall, and it changes nothing about what she was
+   * doing when you asked.
+   *
+   * THE DELTA IS SOLVED AND NOT TYPED. `aim` composes in FIGURE space over
+   * the clip's own pose, so aiming a head at an absolute direction is only
+   * right when the clip has her head straight — every other frame it
+   * overshoots by whatever the clip was already doing. What is wanted is the
+   * rotation that takes her head's CURRENT forward to the direction you are
+   * in, which is what `setFromUnitVectors` answers, and it needs no sign
+   * conventions to get wrong. The neck takes a little over half of it and the
+   * head the rest, which is what a neck does: a person looking 60 degrees to
+   * one side has not turned their skull 60 degrees on a still spine.
+   *
+   * AND IT UNDOES ITS OWN LAST ANSWER FIRST, which is the whole of why the
+   * first cut of this was 40 degrees off the target and stayed there. The
+   * head's current forward already has last frame's aim in it, but the aim
+   * REPLACES rather than adds — so solving current-to-target and storing
+   * that as the new aim feeds the answer back into its own input, and what
+   * it settles on is a fixed point of that loop rather than your eyes. So
+   * `_gzA` keeps what was applied, the forward is taken back through it to
+   * get the CLIP's own head direction, and the solve is against that. Then
+   * the next frame lands exactly on the target instead of chasing it.
+   */
+  const GAZE = {
+    /** Seconds she holds it, and how fast it arrives and leaves. */
+    hold: 7.0, rate: 3.6,
+    /** How the two bones share the turn. */
+    neck: 0.58, head: 0.42,
+    /** And as far round as the pair of them go, in radians. */
+    max: 1.30,
+    /**
+     * And what the motor does to her head, which is the second request: a
+     * small tip of the chin on every pulse, riding the same envelope the
+     * motor does — see `signalAmp`. 0.055 rad is three degrees, which is a
+     * head reacting rather than a head nodding.
+     */
+    nod: 0.055,
+  };
+  /** And the eyes, which are not a bone: a flutter on each pulse's onset. */
+  const BUZZFACE = { lid: 0.55, fade: 0.32 };
+  const _gzV = new THREE.Vector3(), _gzH = new THREE.Vector3();
+  const _gzF = new THREE.Vector3(), _gzQ = new THREE.Quaternion();
+  const _gzR = new THREE.Quaternion(), _gzS = new THREE.Quaternion();
+  const _gzI = new THREE.Quaternion(), _gzZ = new THREE.Vector3(0, 0, 1);
+  /** What was aimed last frame, so it can be taken back off — see above. */
+  const _gzA = new THREE.Quaternion();
+  let neckB = null, headGz = null, gazeOn = 0;
+  function gazeTick(f, dt, pt, ps) {
+    if (neckB === null) { neckB = f.boneIndex('neck'); headGz = f.boneIndex('head'); }
+    if (neckB < 0 || headGz < 0) return;
+    if (show.gaze > 0) show.gaze = Math.max(0, show.gaze - dt);
+    show.gazeAt = damp(show.gazeAt || 0, show.gaze > 0 ? 1 : 0, GAZE.rate, dt);
+    const nod = show.buzzNod || 0;
+    if (show.gazeAt < 0.004 && nod < 0.004) {
+      // Handed back once, or an aim outlives the thing that asked for it —
+      // every other aim in this file makes the same point.
+      if (gazeOn) {
+        f.aim('neck', 0, 1, 0, 0);
+        f.aim('head', 0, 1, 0, 0);
+        _gzA.identity();
+        gazeOn = 0;
+      }
+      return;
+    }
+    gazeOn = 1;
+    _gzR.identity();
+    if (show.gazeAt > 0.004) {
+      // Where your eyes are, and where hers are, and the direction between
+      // them in her own frame.
+      const w = toWorld(pt, ps);
+      _gzV.set(w[0], w[1] + 1.56, w[2]);
+      f.boneAt(headGz, _gzH).applyMatrix4(f.mesh.matrixWorld);
+      _gzV.sub(_gzH).applyQuaternion(_gzQ.copy(f.mesh.quaternion).invert());
+      if (_gzV.lengthSq() > 1e-6) {
+        _gzV.normalize();
+        // Her nose, as the CLIP is holding it this frame: what the bones say
+        // now, with last frame's own aim taken back off it. Neither the bind
+        // pose nor the aimed pose is the right input here — see the note.
+        _gzF.set(1, 0, 0).applyQuaternion(f.boneTurn(headGz, _gzQ))
+          .applyQuaternion(_gzQ.copy(_gzA).invert()).normalize();
+        _gzR.setFromUnitVectors(_gzF, _gzV);
+        // A neck has a limit, and past it she turns her whole body — which
+        // she is already doing, because `want` aims her at you in every phase
+        // that is about you. So this only ever has the last few degrees left.
+        const sp = Math.hypot(_gzR.x, _gzR.y, _gzR.z);
+        const ang = 2 * Math.atan2(sp, _gzR.w);
+        const k = Math.min(1, ang > 1e-4 ? GAZE.max / ang : 1) * show.gazeAt;
+        _gzR.copy(_gzS.slerpQuaternions(_gzI, _gzR, k));
+      }
+    }
+    // And the motor's own nod on top of it, about her left-right axis.
+    if (nod > 0.004) {
+      _gzR.multiply(_gzQ.setFromAxisAngle(_gzZ, -GAZE.nod * nod));
+    }
+    // The two shares compose back to the whole of it, which is why one
+    // quaternion is enough to remember: 0.58 and 0.42 of the same turn,
+    // stacked, is the turn.
+    _gzA.copy(_gzR);
+    aimQ(f, 'neck', _gzS.slerpQuaternions(_gzI, _gzR, GAZE.neck));
+    aimQ(f, 'head', _gzS.slerpQuaternions(_gzI, _gzR, GAZE.head));
+  }
+
+  /**
+   * The eyes, on the same beat. Called after `faceTick` and not before it:
+   * the blink ticker writes this uniform every frame, so anything that wants
+   * to add to a blink has to be the last writer or it is not there at all.
+   */
+  function buzzFace(dt) {
+    show.buzzBlink = Math.max(0, (show.buzzBlink || 0) - dt / BUZZFACE.fade);
+    if (!skinFig || !skinFig.uFace || show.buzzBlink < 0.004) return;
+    const u = skinFig.uFace.uBlink;
+    u.value = Math.max(u.value, show.buzzBlink * BUZZFACE.lid);
+  }
+
+  /**
    * WHICH WAY THE STRANDS RUN ON THE TAIL, in world metres, every frame.
    *
    * One direction for the whole tail rather than one per vertex, and that is
@@ -41195,6 +41342,7 @@ async function buildJadrija(scene) {
       delete signals[key];
       // And the light goes out with it.
       if (rx.led) rx.led.uniforms.uEmissive.value = 0;
+      if (show) { show.buzzNod = 0; show.buzzBlink = 0; }
       if (audio && audio.buzz) audio.buzz(false);
       // And the phone stops with it, mid-pulse if that is where it is.
       if (IS_TOUCH && navigator.vibrate) navigator.vibrate(0);
@@ -41216,6 +41364,7 @@ async function buildJadrija(scene) {
     const keys = Object.keys(signals);
     if (!keys.length) {
       if (kit && kit.wineBuzz) kit.wineBuzz.value = 0;
+      if (show) show.buzzNod = 0;
       return;
     }
     let near = 1e9, shake = 0, loud = 0;
@@ -41297,6 +41446,15 @@ async function buildJadrija(scene) {
           (0.72 + 0.28 * Math.sin(sg.t * 5.7)) * (0.22 + 0.78 * beat);
       }
       if (beat > loud) loud = beat;
+      // AND WHAT IT DOES TO HER, which is only a question when the thing is
+      // ON her: a toy buzzing on a tabouret is furniture. The nod follows the
+      // envelope and the blink is struck on each pulse's onset — see
+      // `gazeTick` and `buzzFace`, which are the two ends of it.
+      if (!rx.table && show) {
+        show.buzzNod = beat;
+        if (beat > 0.5 && !sg.lid) show.buzzBlink = 1;
+        sg.lid = beat > 0.5;
+      }
       // How much of it reaches the glass. Through the tabletop, not through
       // the air: a thing on the same 46 cm top shakes the wine, the same
       // thing on the cot two metres off does not, and there is no case in
@@ -45074,7 +45232,12 @@ async function buildJadrija(scene) {
         // A blink is two hundred milliseconds and a lash line is one pixel
         // wide, so this is gated a good deal harder than the pose is. Inside
         // 40 m is about where a face stops being a smudge.
-        if (dx * dx + dz * dz < 40 * 40) skinFig.faceTick(dt);
+        if (dx * dx + dz * dz < 40 * 40) {
+          skinFig.faceTick(dt);
+          // AFTER it, not before: the blink ticker writes that uniform every
+          // frame, so anything adding to a blink has to be the last writer.
+          buzzFace(dt);
+        }
         // `__fr.jad.pose` takes the routine out of the loop and holds one frame
         // of one clip. The clock is put back after the step rather than instead
         // of it, because the step is what drives everything that is *not* the
@@ -46418,6 +46581,12 @@ async function buildJadrija(scene) {
       // every other readout — which cost an hour of tracing phases that were
       // all correct. See the gate in the dispatch.
       ask: show.ask || null, getUp: !!show.getUp,
+      // Where her eyes are: seconds of hold left, how much of the turn is
+      // arrived, and the motor's own reaction on her face. Same reason as
+      // the two above — an aim that is running and an aim that expired look
+      // identical from a still frame.
+      gaze: +(show.gaze || 0).toFixed(2), gazeAt: +(show.gazeAt || 0).toFixed(3),
+      buzzNod: +(show.buzzNod || 0).toFixed(3),
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
     /**

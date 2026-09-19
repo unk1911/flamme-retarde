@@ -8,6 +8,57 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.427.0] — 2026-09-19 (baye 1.26.0)
+
+### look at me
+
+**"if you say 'look at me', she should look at me. also when lovense is turned
+on, with each vibrations, her eyes should blink a little and head move a
+little, in sync with it"**.
+
+Two requests and one mechanism, because they are the same three bones.
+
+**The gaze is a latch and not a phase.** Nothing about her feet, her hands or
+her clip is any of its business: `look` sets a seven-second clock and
+`gazeTick` turns her head while it runs. So it works lying on the cot,
+cross-legged, mid-cartwheel, upside down against the wall and while she is
+pouring — and when the clock runs out the bones go back to the clip without
+her having done anything. She can be asked for it in the middle of anything
+else and it interrupts nothing.
+
+**The delta is solved, not typed.** `aim` composes in figure space over the
+clip's own pose, so aiming a head at an absolute direction is only right on
+the frames where the clip has her head straight. What is wanted is the
+rotation that takes her head's CURRENT forward to where your eyes are, which
+`setFromUnitVectors` answers with no sign conventions to get wrong. The neck
+takes 0.58 of it and the head 0.42, because a person looking sixty degrees to
+one side has not turned their skull sixty degrees on a still spine, and the
+pair is clamped at 1.30 rad — past that a person turns their body, and out on
+the promenade she is walking and will not.
+
+**And it undoes its own last answer first**, which is the whole of why the
+first cut of this sat 40 degrees off and stayed there. Her current forward
+already has last frame's aim in it and the aim REPLACES rather than adds, so
+solving current-to-target and storing that as the new aim feeds the answer
+back into its own input: what it settles on is a fixed point of that loop and
+not your eyes. So the aim is remembered, taken back off the forward to recover
+what the CLIP is doing, and the solve is against that. Measured, standing off
+her shoulder while she sat in the lotus: **76.1 degrees off before the ask,
+0.4 after it** — and 40 degrees off with the loop in.
+
+**The motor rides the same two bones.** A pulse tips her chin about three
+degrees and strikes a half-blink at its onset, both on `signalAmp`'s own
+envelope — so they land with the sound, the light, the shake and the wine,
+and stop dead in the gaps between pulses. Only when the thing is ON her: one
+buzzing on a tabouret is furniture. Measured over three pulses: the nod tracks
+the beat 1-to-1 and the lid goes to 0.52 on each onset and fades in a third of
+a second, over whatever her own blink ticker was doing.
+
+Baye 1.26.0 knows the sentence — **look at me**, **watch me**, **keep your
+eyes on me**, **look this way**, *pogledaj me*, *regarde-moi* — and every
+pattern names a person on purpose: "look at the trampolines" is still an
+errand, and walking up there is still the right answer to it.
+
 ## [1.426.5] — 2026-09-19
 
 ### wear it, wherever it happens to be

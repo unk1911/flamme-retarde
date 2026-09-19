@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.25.0"
+VERSION = "1.26.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -466,6 +466,18 @@ SKILLS = {
     # And the yawn, which owns its own word and nothing else's.
     "yawn": ("take her hand to her mouth and yawn",
              [r"\byawn\w*\b"]),
+    # HER EYES ON YOU. Misha, 19 Sep 2026: *"if you say 'look at me', she
+    # should look at me"*. Above `see.*`, which owns the word "look" for
+    # errands — "go look at the kiosk" is a place and a verb, and this is a
+    # verb and a PERSON. The person is what tells them apart, so every
+    # pattern here names one: me, my eyes, this way, here. Without that,
+    # "look at the trampolines" would have her staring at you instead of
+    # walking up there.
+    "look": ("look at them, and hold their eye",
+             [r"\blook(ing)?\b.{0,12}\b(at|to)?\s*(me|my|us)\b"
+              r"|\beyes?\b.{0,10}\b(on|at)\s*me\b"
+              r"|\blook (here|this way|over here)\b"
+              r"|\bwatch me\b|\b(po)?gledaj me\b|\bregarde[- ]moi\b"]),
     # AND THE POSE SHE ALREADY HAD. Misha, 17 Sep 2026: *"i tell her to get
     # down on her knees, and eventho she knows how to do it if i spray her, she
     # says something but doesn't actually get down on her knees.... she
@@ -702,6 +714,10 @@ ASK_RE = re.compile(
     r"|\bagainst the wall\b"
     r"|\bhand ?stands?\b|\bhead ?stands?\b|\bstand on (your|her|the) hands\b"
     r"|\byawn\w*\b"
+    # "look at me" carries no modal and none of the openers below.
+    r"|\blook(ing)?\b.{0,12}\b(me|my|us|here|this way)\b|\bwatch me\b"
+    r"|\beyes?\b.{0,10}\b(on|at)\s*me\b"
+    r"|\b(po)?gledaj me\b|\bregarde[- ]moi\b"
     r"|\bsit\w*\b.{0,24}\b(bed|cot|bunk|mattress)\b"
     r"|\b(kneel\w*|knees)\b.{0,24}\b(bed|cot|bunk|mattress)\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
