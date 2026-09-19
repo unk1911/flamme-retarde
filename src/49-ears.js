@@ -151,6 +151,15 @@ const ears = (() => {
     sayEl.maxLength = 200;
     sayEl.autocomplete = 'off';
     sayEl.spellcheck = false;
+    // What a phone's keyboard should look like when it comes up for this.
+    // `enterkeyhint` is the return key's label — it says SEND rather than
+    // GO — and the two corrections are off because what goes in here is
+    // commands: an autocapitalised "Put" and a corrected "lovense" are both
+    // sentences the service has never seen.
+    sayEl.setAttribute('enterkeyhint', 'send');
+    sayEl.setAttribute('autocapitalize', 'off');
+    sayEl.setAttribute('autocorrect', 'off');
+    sayEl.setAttribute('inputmode', 'text');
     sayEl.placeholder = T('ears.type');
     sayEl.hidden = true;
     // Its own handler, and it stops the game hearing any of it: the window
@@ -170,6 +179,26 @@ const ears = (() => {
     sayEl.addEventListener('keyup', (e) => e.stopPropagation());
     panelEl.append(head, bar, list, sayEl);
     document.body.appendChild(panelEl);
+    // ── AND WHERE THE KEYBOARD IS ────────────────────────────────────────
+    //
+    // On a phone the software keyboard covers the bottom third of the screen
+    // and this panel lives at the bottom of it, so the moment the line is
+    // usable the line is also behind the thing you are using it with. The
+    // keyboard is not in the layout — it shrinks the VISUAL viewport and
+    // leaves the page alone — so what it costs is `innerHeight` minus what is
+    // left of the viewport, and `--kb` carries that number to the style
+    // sheet, which lifts the panel by it. Wired once, here, because the panel
+    // is built once; on a desktop it stays at nought for ever.
+    const vv = window.visualViewport;
+    if (vv) {
+      const lift = () => {
+        const gap = Math.max(0, innerHeight - (vv.height + vv.offsetTop));
+        document.documentElement.style.setProperty('--kb', gap.toFixed(0) + 'px');
+      };
+      vv.addEventListener('resize', lift);
+      vv.addEventListener('scroll', lift);
+      lift();
+    }
     return panelEl;
   }
 
@@ -278,7 +307,14 @@ const ears = (() => {
    * here. What differs is two headers and what the panel calls it.
    */
   async function send(blob, secs, typed = false) {
-    if (!AUTH.user || !AUTH.baye) return;
+    // AND IT SAYS WHY, rather than swallowing the line. On a keyboard this
+    // was invisible — you can see the badge and you know whether you signed
+    // in — and on a phone it is the whole feature failing silently: you tap
+    // SAY, you type a sentence, the box empties and nothing happens, twice,
+    // and then you put the phone down. Two lines, both facts about where you
+    // are rather than errors.
+    if (!AUTH.baye) { note(T('ears.nohost'), 'meta'); draw(); return; }
+    if (!AUTH.user) { note(T('ears.signin'), 'meta'); draw(); return; }
     // One at a time. A second sentence while the first is still being heard is
     // a sentence the player can say again; two in flight is two answers out of
     // order.
@@ -632,7 +668,16 @@ const ears = (() => {
       typedOn = !typedOn;
       if (typedOn && !AUTH.user) toast(T('ears.signin'));
       draw();
-      if (typedOn) setTimeout(() => { if (sayEl) sayEl.focus(); }, 0);
+      // SYNCHRONOUSLY, and that is not a tidy-up. A phone raises its keyboard
+      // for a focus() that happens inside the gesture that asked for it and
+      // for nothing else, so the setTimeout this used to have — harmless on a
+      // desktop, where the key itself is the input — was the whole reason the
+      // typed line could be opened on glass and not typed into. See `t-say`
+      // in 91-touch.js, which is the gesture.
+      if (typedOn && sayEl) {
+        document.exitPointerLock?.();
+        sayEl.focus();
+      }
       return typedOn;
     },
     /** And the device, for whoever wants it back. Off by default — see `typedOn`. */

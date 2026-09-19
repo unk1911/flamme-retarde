@@ -8,6 +8,51 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.425.0] — 2026-09-19
+
+### the typed line, on a phone
+
+**"can you make sure the 'I' mode is supported for mobile? I wanna test with my
+phone"**. It was not, in three separate ways, and only one of them is the
+missing button.
+
+**There is no I key on a phone.** `SAY` joins the on-foot row — the same place
+`BODY`, `UP` and `HOUSE` went when they stopped being keyboard-only. Ten
+buttons do not fit across a phone in portrait, so that row wraps now, and the
+button LIGHTS while the line is open: the panel it opens can be behind the
+keyboard it raised, and a control with no state is a control you tap twice and
+close again.
+
+**A focus deferred is a keyboard that never comes up.** `ears.toggle` put the
+caret in the box through a `setTimeout` — harmless with a keyboard, where the
+key that opened it is already the input — and a phone raises its keyboard for a
+`focus()` that happens inside the gesture that asked for it and for nothing
+else. It focuses synchronously now, and `tap` in 91-touch.js runs its handler
+inside the pointerup, which is the other half of the same trick.
+
+**And the keyboard eats the bottom of the screen**, which is where this panel
+lives. A software keyboard is not in the layout — it shrinks the visual
+viewport and leaves the page exactly where it was — so `--kb` is written off
+`visualViewport` and the panel is lifted by it, sitting above the button row.
+The input is **sixteen pixels and not a rem of it**: under 16 px a phone zooms
+the whole page in when the caret lands in the box, and what it does not do is
+zoom back out. `enterkeyhint="send"` labels the return key, and autocapitalise
+and autocorrect are off, because what goes in here is commands — an
+autocapitalised *Put* and a corrected *lovense* are both sentences the service
+has never seen.
+
+**And it says why when nothing happens.** `send` began `if (!AUTH.user ||
+!AUTH.baye) return`, which on a keyboard is invisible and on a phone is the
+whole feature failing silently: you tap SAY, type a sentence, the box empties,
+nothing happens, twice, and then you put the phone down. Two lines now, both
+facts about where you are rather than errors — *she only hears you on the site,
+not off a local file*, and *sign in to talk to them*.
+
+Measured in a touch-emulated Chrome at 932×430, which is a phone in landscape
+(portrait gets the rotate prompt, as it always has): the tap lands on the
+button, the panel opens, `document.activeElement` is the box, the computed font
+size is 16 px, the return key says send, and a second tap closes it.
+
 ## [1.424.0] — 2026-09-19
 
 ### she was standing in the table, and the hair was a slab

@@ -850,6 +850,31 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
 #ears #ears-say::placeholder { color: #6d838c; }
 #ears #ears-say[hidden] { display: none; }
 
+/* ── the ears on glass ──────────────────────────────────────────────────────
+   Three things are different on a phone and all three are the same problem:
+   there is no keyboard until you ask for one, and when you do it eats the
+   bottom of the screen.
+
+   `--kb` is how much of it the keyboard has: written by src/49-ears.js off
+   `visualViewport`, which is the only thing that knows — a software keyboard
+   is not in the layout, it shrinks what you can see and leaves the page
+   exactly where it was. The panel is lifted by that and sits above the button
+   row, which is at .8rem with buttons about 2.4rem tall.
+
+   And the input is SIXTEEN PIXELS, not a rem of it: under 16 px a phone zooms
+   the whole page in when the caret lands in the box, and what it does not do
+   is zoom back out. */
+:root { --kb: 0px; }
+html.touch #ears {
+  left: .8rem; right: .8rem; width: auto; max-width: none;
+  bottom: calc(3.9rem + var(--kb));
+  font-size: .62rem; line-height: 1.5;
+}
+html.touch #ears .ears-lines { max-height: 26vh; overflow: hidden; }
+html.touch #ears #ears-say {
+  font-size: 16px; padding: .45rem .5rem; margin-top: .45rem;
+}
+
 /* The fly cam's frame. The picture itself is WebGL, drawn by `render(renderer,
    'pip')` in src/44-corpse.js into exactly this box: `DROPCAM.rect` is the same
    formula from the bottom left. */
@@ -1156,6 +1181,15 @@ html.touch #whoami .lbl { display: none; }
 #tmini button.on, #gmini button.on, #cmini button.on, #smini button.on {
                    background: rgba(255, 208, 138, .26); border-color: var(--ember-hi);
                    color: var(--ember-hi); }
+/* `on` is a thumb that is down; `lit` is a thing that is open. The typed line
+   is the only control on this HUD with a state worth showing — its panel can
+   be behind the keyboard it raised, and a control with no state is a control
+   you tap twice and close again. */
+#gmini button.lit { background: rgba(127, 209, 230, .20);
+                    border-color: #7fd1e6; color: #cfe0e6; }
+/* Ten buttons do not fit across a phone in one line. They wrap upward, which
+   is why this row is anchored at the bottom rather than stretched. */
+#tmini, #gmini, #cmini, #smini { flex-wrap: wrap; max-width: calc(100vw - 1.6rem); }
 
 /* The one-way doors, on their own row above the controls and deliberately
    quieter than them: smaller, dimmer, further from where a thumb lives. The

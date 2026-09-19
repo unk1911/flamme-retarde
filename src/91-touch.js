@@ -352,6 +352,23 @@ function initTouch() {
   // says which — see `updateGroundHUD`.
   tap('t-roof', () => skipToVikendica());
   tap('t-pc', () => skipToComputer());
+  /**
+   * I, and the one control on this HUD whose whole job is to open a keyboard.
+   *
+   * `tap` runs its function inside the pointerup handler, which is what makes
+   * this work at all: a phone raises its keyboard for a focus() that happens
+   * inside a real gesture and for nothing else. `ears.toggle` focuses the box
+   * synchronously for the same reason — it used to defer it by a setTimeout,
+   * which is fine for a keyboard and invisible on glass.
+   *
+   * The button lights while the line is open, because on a phone the panel it
+   * opens can be behind the keyboard and a control with no state is a control
+   * you tap twice.
+   */
+  tap('t-say', (el) => {
+    const up = ears.toggle();
+    el.classList.toggle('lit', !!up);
+  });
   tap('t-gset', () => togglePanel());
   tap('t-gpause', () => togglePause());
   tap('t-run', (el) => {
