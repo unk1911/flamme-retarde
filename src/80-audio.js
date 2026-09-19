@@ -5093,6 +5093,7 @@ function buildAudio() {
    * this has always been done. Left at the default the browser holds the pitch
    * and speeds up the words, which is an adult in a hurry.
    */
+  let voiceEnd = null, voiceCap = 0;
   function voice(url, vol = 2.1, rate = 1) {
     if (!ctx || !url) return Promise.resolve(false);
     if (!voiceEl) {
@@ -5133,14 +5134,47 @@ function buildAudio() {
     duck(0.25, 0.15);
     return new Promise((done) => {
       const end = (ok) => {
-        voiceEl.onended = voiceEl.onerror = null;
+        if (voiceEnd !== end) return;
+        voiceEnd = null;
+        clearTimeout(voiceCap);
+        voiceEl.onended = voiceEl.onerror = voiceEl.onpause = null;
         duck(1, 0.45);
         done(ok);
       };
+      // WHOEVER WAS PLAYING IS FINISHED, whatever the element thinks. The
+      // promise this hands back is what the voice module waits on before it
+      // will start another line, so a line that never resolves is a mouth
+      // that never opens again — and there are three ways to get one: a
+      // phone that takes a call and pauses the tab's media, a stalled mp3
+      // that never fires `ended`, and `voiceStop` below. All three end here.
+      if (voiceEnd) voiceEnd(false);
+      voiceEnd = end;
+      // `pause` is not fired at the natural end of a clip — that is `ended` —
+      // so a pause is always something else stopping her.
       voiceEl.onended = () => end(true);
       voiceEl.onerror = () => end(false);
+      voiceEl.onpause = () => end(false);
+      // And a ceiling, because the two events above are the ones that are
+      // supposed to arrive. Forty-five seconds is ten times her longest line.
+      voiceCap = setTimeout(() => end(false), 45000);
       voiceEl.play().catch(() => end(false));
     });
+  }
+
+  /**
+   * Cut her off mid-word.
+   *
+   * Misha, 19 Sep 2026: *"whatever she is saying, at any point if i type
+   * something new, it should just immediately cut her off at mid-sentence and
+   * return to stable state"*. The pause fires `end(false)`, which resolves
+   * whatever was waiting on her, so the caller is free the same tick.
+   */
+  function voiceStop() {
+    if (!voiceEl) return false;
+    const was = !voiceEl.paused;
+    try { voiceEl.pause(); } catch (e) { /* nothing playing */ }
+    if (voiceEnd) voiceEnd(false);
+    return was;
   }
 
   // ── how open her mouth is, right now ────────────────────────────────────────
@@ -6904,7 +6938,7 @@ function buildAudio() {
     setVolume, getVolume, setMuffle, keyClick, printTick,
     setPaused, jingle, incoming, rumble, detonate, drone, droneOff, shelling, cicadas,
     shore, lapping, kabine, room, water,
-    firestarter, slowmo, radioTune, radioClick, voice, hush,
+    firestarter, slowmo, radioTune, radioClick, voice, voiceStop, hush,
     /**
      * The birds sitting still in the trees. `perches()` is the table — the
      * only place a species is described — and 90-app.js walks it every frame

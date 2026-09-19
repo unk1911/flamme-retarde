@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.26.0"
+VERSION = "1.27.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -1102,11 +1102,16 @@ TALKERS = {"baye", "bucketeer"}
 # How much of what they said she is handed. A spoken sentence is fifteen words
 # and ninety characters; three hundred is a paragraph somebody has read out.
 TALK_HEARD_CHARS = int(CFG.get("BAYE_TALK_HEARD_CHARS", "300"))
-# The reply's word ceiling in CODE. The persona asks for twenty-five at most,
-# and that is where the length actually comes from — see the long note over
+# The reply's word ceiling in CODE. The persona asks for fourteen at most, and
+# that is where the length actually comes from — see the long note over
 # `PERSONA` for why a number in a prompt is a ceiling a model writes up to. This
 # is the runaway guard behind it, cut at a sentence end by `cap_words`.
-TALK_WORDS = int(CFG.get("BAYE_TALK_WORDS", "32"))
+#
+# 32 was the guard behind a 25-word brief. The brief is 14 now (Misha, 19 Sep
+# 2026: *"no need for these long diatribes"*), so the guard comes down with
+# it — far enough above the brief that a good line is never cut, close enough
+# that a paragraph cannot get through.
+TALK_WORDS = int(CFG.get("BAYE_TALK_WORDS", "20"))
 # How many past exchanges she is reminded of, and how long a conversation is a
 # conversation.
 #
@@ -2454,8 +2459,16 @@ PERSONA_TALK = """You are Baye. You are on the beach at Jadrija, near Šibenik,
 on the Dalmatian coast, in the summer of 2026. Somebody near you has just said
 something to you out loud, and you are answering them, out loud.
 
-ONE OR TWO SHORT SPOKEN SENTENCES. TWENTY-FIVE WORDS AT THE ABSOLUTE MOST, and
-most answers are ten to eighteen. Spoken, not written.
+ONE SHORT SPOKEN SENTENCE. FOURTEEN WORDS AT THE ABSOLUTE MOST, and most
+answers are five to ten. Spoken, not written. Answer the thing and stop.
+
+STOPPING IS THE HARD PART, so it is here in the second rule. The answer is the
+whole line. Do not follow it with an instruction, an invitation, a plan or a
+flourish: "already wearing 'em, babe" is the answer, and "now stand still and
+let me decide what those hands are for" is a second line nobody asked for,
+tacked on to a question that was already finished. A second short sentence is
+allowed only when a REAL question needs it — a fact, a reason, something they
+actually asked to know. A remark gets one line and not a word more.
 
 WHO YOU ARE. Warm, teasing, filthy-mouthed and openly flirtatious, half-lidded
 from the heat, and clever under it: you have read things and you have opinions.
@@ -2549,9 +2562,10 @@ plants by the porch, and go back up for another. You are Croatian, from this
 coast. Somebody near you has just said something to you out loud, and you are
 answering them, out loud.
 
-ONE OR TWO SHORT SPOKEN SENTENCES. TWENTY-FIVE WORDS AT THE ABSOLUTE MOST, and
-most answers are ten to eighteen. You are carrying water; you do not make
-speeches.
+ONE SHORT SPOKEN SENTENCE. FOURTEEN WORDS AT THE ABSOLUTE MOST, and most
+answers are five to ten. You are carrying water; you do not make speeches.
+Answer the thing and stop, and do not tack a second line on to an answer that
+is already finished.
 
 WHO YOU ARE. Dry, warm, practical, a little out of breath, and amused that
 anybody wants to chat to a woman hauling buckets. Dalmatian common sense and
@@ -3372,8 +3386,18 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
     say_in = (f"They spoke {lang}, so answer in {lang}, whatever your own "
               "language is." if lang
               else "Answer in exactly the language their words are in.")
-    lines.append(f"Answer them now, in character. {say_in} One or two short "
-                 "sentences, at most 25 words, and fewer is better.")
+    # THE LAST LINE BEFORE THE REPLY, and the number in it is the one that
+    # binds — see the long note over the same trick in `line_prompt`. Misha,
+    # 19 Sep 2026: *"her replies should be in general shorter, keeping it
+    # dirty still, but no need for these long diatribes"*, about a line whose
+    # first four words were the whole answer and whose next eleven were a
+    # second thought nobody asked for. So the cap comes down to fourteen AND
+    # the instruction says where to stop, because a cap on its own only moves
+    # where the second sentence gets truncated.
+    lines.append(f"Answer them now, in character. {say_in} ONE short "
+                 "sentence, at most 14 words, and five to ten is better. "
+                 "Answer what they said and stop there — no second sentence "
+                 "tacked on to an answer that is already finished.")
     msgs.append({"role": "user", "content": "\n".join(lines)})
     return msgs
 

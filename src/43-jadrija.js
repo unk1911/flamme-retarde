@@ -95,6 +95,18 @@ const JAD = {
   cabRise: 0,
   cabEave: 0.10,
   plinth: 0.22,            // the concrete pad the rows stand on
+  /**
+   * And the tiles on top of the pad, in the one hut that is open.
+   *
+   * Misha, 19 Sep 2026: *"inside the kabine, her toes are just slightly below
+   * the floor, maybe by 1cm or so"*. They were: the tiles are laid at
+   * `floor + 0.016` (they had to be, to clear the room's own inner floor at
+   * `+0.010` — see the note where they are drawn) and `standY` answered with
+   * the slab underneath them. So everything that stands in that room, her and
+   * you both, stood 16 mm inside the floor. One number, read by the two
+   * places that have to agree about it.
+   */
+  tile: 0.016,
 
   // How far inland you may walk. This used to be 135 m, and 135 m of Srima is
   // not a place you walk through, it is a place you are lost in: the houses are
@@ -27289,7 +27301,7 @@ async function buildJadrija(scene) {
       // at `floor + 0.01` — the tiles went in UNDER it and rendered as nothing
       // at all, which looks exactly like a tone range that is too subtle and
       // cost a rebuild to tell apart from one.
-      const g = 0.011, sz = 0.33, fy = f + 0.016;
+      const g = 0.011, sz = 0.33, fy = f + JAD.tile;
       for (let t = K.t0; t < K.t1 - 0.05; t += sz) {
         for (let ss = K.s0; ss < K.s1 - 0.05; ss += sz) {
           const t1 = Math.min(t + sz, K.t1), s1t = Math.min(ss + sz, K.s1);
@@ -28890,7 +28902,9 @@ async function buildJadrija(scene) {
     const K = special;
     if (K && t > K.t0 - 0.30 && t < K.t1 + 0.30
         && s > K.face - 0.55 && s < K.s1 + 0.10) {
-      return y + (K.floor - y) * sat((s - (K.face - 0.55)) / 0.55);
+      // `K.floor + JAD.tile` and not `K.floor`: the slab is not the floor,
+      // the tiles on it are. See JAD.tile.
+      return y + (K.floor + JAD.tile - y) * sat((s - (K.face - 0.55)) / 0.55);
     }
     // The paving, which is 0.05 m thicker than the height it is drawn from.
     //

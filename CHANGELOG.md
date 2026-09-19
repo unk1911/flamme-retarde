@@ -8,6 +8,81 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.429.0] — 2026-09-19 (baye 1.27.0)
+
+### she stops when you start
+
+**"there seems to be a bug where whatever i say, it shows baye as still
+talking... but she wasn't talking no more, somehow i think some previous state
+got stuck"**, and **"at any point if i type something new, it should just
+immediately cut her off at mid-sentence and return to stable state"**.
+
+**One bug and one design mistake, and the bug is the interesting one.** `busy`
+was a boolean cleared in a `finally`, so it was exactly as reliable as the
+promise that block awaited — and the last thing it awaits is her mp3
+finishing. That promise resolved on `ended` and on `error` and on nothing
+else. But the ears ALREADY cut her off when you typed a second line: they
+call `audio.hush()`, which pauses the element — and a paused element fires
+neither. So the await never returned, `busy` was never cleared, and every
+sentence after that came back *ignored: Baye is still talking* for the rest
+of the session. The trigger was the interrupt feature itself, which is why it
+only ever happened to somebody typing fast.
+
+So `voice()` in 80-audio.js now always resolves: on `ended`, on `error`, on
+`pause` — which is never the natural end of a clip and is therefore always
+something else stopping her — and on a 45-second ceiling, which is ten times
+her longest line and exists for the stalled download that fires nothing at
+all. A phone taking a call unblocks her now too, and that would have hung it
+just the same.
+
+**And waiting was the wrong answer anyway.** A person who is talked over
+stops talking. A line the PLAYER starts no longer queues behind the one in
+the air: it aborts the request, stops the audio mid-word and takes the line,
+with a token so that the turn that got cut off cannot clear a flag it no
+longer owns or play a clip nobody is waiting for. Her own unprompted lines
+still wait their turn — what an ambient line would be talking over is an
+answer somebody asked for.
+
+### shorter, and still filthy
+
+**"her audio replies tend to still be a bit too wordy and long... like how she
+goes: 'Already wearing 'em, babe. Now stand still and let me decide what those
+hands are for.' there was no need for [the second half]"**.
+
+He is right, and the brief was the problem: twenty-five words with one or two
+sentences allowed is a licence to answer and then keep going. It is fourteen
+now, most answers five to ten, one sentence — and the rule that matters is
+not the number but the one under it: *the answer is the whole line*. No
+instruction, invitation, plan or flourish tacked on to a question that was
+already finished. A second short sentence only where a real question needs
+one. The code guard behind it comes down from 32 words to 20, and the last
+line of the prompt — the one sitting a token from the first token of the
+reply, which is the one that binds — says the same thing again.
+
+### the floor, and her mouth
+
+**"inside the kabine, her toes are just slightly below the floor, maybe by 1cm
+or so"**. 16 mm, and it is the same class of bug as the one in the note above
+`standY`: the tiles are laid at `floor + 0.016` — they have to be, to clear
+the room's own inner floor at `+0.010` — and `standY` answered with the slab
+underneath them. So everything that stands in that room, her and you both,
+stood 16 mm inside the floor. One number now, read by the two places that
+have to agree about it.
+
+**"her upper lip is missing lipstick. she should have bright red lipstick on
+her lips"**. It was missing, and widening the band would never have fixed it.
+`uLipC` is the MEAN of the vertices the mouth cutter paints in human_mh.py,
+and that band wraps over the crease and down the INSIDE of both lips — so its
+mean sits 13 mm behind her face, inside her head. The lip ellipsoid was
+centred there, and because her upper lip protrudes 4.5 mm further than her
+lower one, the two lips sat at different radii from that centre: measured off
+the shipped blob at the midline, the lower lip is at 0.57 of the band and the
+upper at 0.72, and the band ends at 0.75. Which is exactly what was on
+screen. The centre moves out on to the surface, the depth term goes to
+nearly nothing for both lips, and what is left bounds the band by height —
+which is what a band across a pair of lips should be bounded by. And the
+colour is the pillar-box red he asked for.
+
 ## [1.428.0] — 2026-09-19
 
 ### set with stones, and joined

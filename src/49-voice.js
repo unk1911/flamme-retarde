@@ -264,6 +264,48 @@ const voice = (() => {
    * next frame it is allowed to.
    */
   let busy = false;
+  /**
+   * ── AND WHO IS HOLDING IT ──────────────────────────────────────────────
+   *
+   * Misha, 19 Sep 2026: *"whatever i say, it shows baye as still talking...
+   * but she wasn't talking no more, somehow i think some previous state got
+   * stuck"*, and *"at any point if i type something new, it should just
+   * immediately cut her off at mid-sentence and return to stable state"*.
+   *
+   * TWO BUGS IN ONE SENTENCE. The first is that `busy` was a boolean cleared
+   * in a `finally`, so it was only ever as reliable as the promise the try
+   * block awaited — and the last thing it awaits is her mp3 finishing. A tab
+   * that goes to the background, a phone that takes a call, a stalled clip:
+   * any of those and `ended` never arrives, the await never returns and she
+   * is "still talking" for the rest of the session. That end is fixed in
+   * `voice()` in 80-audio.js, which now always resolves.
+   *
+   * The second is that waiting was the wrong answer anyway. A person who is
+   * talked over stops talking. So a line the PLAYER starts does not queue
+   * behind the one in the air: it cuts it off, here, and the token is how the
+   * one that got cut off knows not to clear a flag it no longer owns or to
+   * play a clip nobody is waiting for any more.
+   */
+  let busyTok = 0;
+  let live = null;            // the in-flight player-started request
+  /** Claim the line for an ambient turn: only if nobody else has it. */
+  function claim() {
+    if (busy) return 0;
+    busy = true;
+    return ++busyTok;
+  }
+  /** Take the line, whoever had it. See above. */
+  function cutIn() {
+    if (live) { try { live.abort(); } catch (e) { /* already done */ } live = null; }
+    at(() => audio.voiceStop());
+    sayingKey = null;
+    busy = true;
+    return ++busyTok;
+  }
+  /** Hand it back, unless somebody has taken it in the meantime. */
+  function release(tok) { if (tok === busyTok) busy = false; }
+  /** Whether this turn is still the one that matters. */
+  function mine(tok) { return tok === busyTok; }
   let clock = 0;
   const seen = [];            // locales you have actually stood in, in order
   let capT = 0;               // how long the subtitle has left
@@ -454,7 +496,11 @@ const voice = (() => {
    */
   async function ask(sp, gap) {
     if (busy || !AUTH.user || !AUTH.baye) return;
-    busy = true;
+    // An unprompted line waits its turn and never cuts anybody off: she is
+    // the one talking to herself here, and what she would be talking over is
+    // an answer somebody asked for.
+    const tok = claim();
+    if (!tok) return;
     try {
       const r = await fetch(AUTH.baye + '/line', {
         method: 'POST',
@@ -506,6 +552,10 @@ const voice = (() => {
       // `d.rate` is the server's, and it is 1 for everybody but the two
       // children — see `voice_for` in server/baye/baye.py and the note over
       // `voice` in 80-audio.js.
+      // Unless somebody has said something to her since this was asked for,
+      // in which case her own next thought is not what anybody is waiting to
+      // hear — see `cutIn`.
+      if (!mine(tok)) return;
       await play(sp.key, d);
       // They have stopped. NOW the subtitle gets its few seconds and goes.
       capT = sp.cfg.hold;
@@ -513,7 +563,7 @@ const voice = (() => {
       console.warn(sp.key + ':', e.message);
       sp.nextAt = clock + 45;
     } finally {
-      busy = false;
+      release(tok);
     }
   }
 
@@ -737,8 +787,8 @@ const voice = (() => {
     const sp = CAST.baye;
     const gap = at(() => jadrija.bayeGap());
     for (let i = 0; i < 16 && busy; i++) await new Promise((r) => setTimeout(r, 500));
-    if (busy) return 'busy';
-    busy = true;
+    const tok = claim();
+    if (!tok) return 'busy';
     try {
       const r = await fetch(AUTH.baye + '/line', {
         method: 'POST',
@@ -749,6 +799,7 @@ const voice = (() => {
       });
       const d = await r.json().catch(() => null);
       if (!d || !d.ok) return (d && d.error) || ('http ' + r.status);
+      if (!mine(tok)) return 'cut off';
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
       caption(d.text, null);
@@ -758,7 +809,7 @@ const voice = (() => {
     } catch (e) {
       return e.message;
     } finally {
-      busy = false;
+      release(tok);
     }
   }
 
@@ -773,16 +824,15 @@ const voice = (() => {
       ? (CAST.bucketeer || (CAST.bucketeer = { key: 'bucketeer', cfg: { memory: 4, hold: 4.0 },
         said: [], nextAt: 0, inRange: false, gap: () => null, lead: null }))
       : CAST.baye;
-    // Wait out a line already in the air rather than talk over it — a few
-    // seconds at most, because a question answered after the next one has
-    // been asked is not an answer.
-    for (let i = 0; i < 16 && busy; i++) await new Promise((r) => setTimeout(r, 500));
-    if (busy) return 'busy';
-    busy = true;
+    // She is talked over rather than waited out — see `cutIn`.
+    const ctl = new AbortController();
+    const tok = cutIn();
+    live = ctl;
     try {
       const r = await fetch(AUTH.baye + '/line', {
         method: 'POST',
         credentials: 'same-origin',
+        signal: ctl.signal,
         headers: { 'Content-Type': 'application/json' },
         // `spoken` is the language the question was asked in, off `/hear` — so
         // "Wie spät ist es?" gets the time in German. See `spoken` in
@@ -792,6 +842,9 @@ const voice = (() => {
       });
       const d = await r.json().catch(() => null);
       if (!d || !d.ok) return (d && d.error) || ('http ' + r.status);
+      // Something else was said while this was in the model. Her answer to
+      // the question before last is not an answer.
+      if (!mine(tok)) return 'cut off';
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
       caption(d.text, null);
@@ -799,9 +852,10 @@ const voice = (() => {
       capT = sp.cfg.hold;
       return 'said: ' + d.text;
     } catch (e) {
-      return e.message;
+      return e.name === 'AbortError' ? 'cut off' : e.message;
     } finally {
-      busy = false;
+      if (live === ctl) live = null;
+      release(tok);
     }
   }
 
@@ -915,9 +969,13 @@ const voice = (() => {
       return out('meta', 'ignored: not to her — no question, no name, '
         + m.toFixed(1) + ' m from ' + name);
     }
-    for (let i = 0; i < TALK.wait * 2 && busy; i++) await new Promise((r) => setTimeout(r, 500));
-    if (busy) return out('meta', 'ignored: ' + name + ' is still talking');
-    busy = true;
+    // SHE IS TALKED OVER AND NOT WAITED OUT. This used to sit in a loop
+    // waiting up to TALK.wait seconds for the line in the air to finish and
+    // then give up with "is still talking" — which is neither what a person
+    // does nor what anybody wants from a chat box. See `cutIn`.
+    const ctl = new AbortController();
+    const tok = cutIn();
+    live = ctl;
     const sp = buck
       ? (CAST.bucketeer || (CAST.bucketeer = { key: 'bucketeer', cfg: { memory: 4, hold: 4.0 },
         said: [], nextAt: 0, inRange: false, gap: () => null, lead: null }))
@@ -931,6 +989,7 @@ const voice = (() => {
       const r = await fetch(AUTH.baye + '/talk', {
         method: 'POST',
         credentials: 'same-origin',
+        signal: ctl.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -940,6 +999,9 @@ const voice = (() => {
         return out('err', 'talk × ' + ((d && d.error) || 'http ' + r.status));
       }
       const wait = Math.round(performance.now() - t0);
+      // And something else was said while this was in the model: an answer to
+      // the sentence before last is not an answer to anything.
+      if (!mine(tok)) return out('meta', 'cut off: you said something else');
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
       // And she does not follow her own answer with an unprompted line a
@@ -959,9 +1021,11 @@ const voice = (() => {
       capT = TALK.hold;
       return res;
     } catch (e) {
+      if (e.name === 'AbortError') return out('meta', 'cut off: you said something else');
       return out('err', 'talk × ' + e.message);
     } finally {
-      busy = false;
+      if (live === ctl) live = null;
+      release(tok);
     }
   }
 

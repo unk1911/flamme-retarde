@@ -678,12 +678,37 @@ const FACE = {
   // is what human_mh.py builds it as and what keeps her from reading as a
   // mannequin; a band centred on a flat line sits low at the corners and high
   // in the middle, which is a mouth drawn by somebody who has not looked at one.
-  lipsR: [0.026, 0.0098, 1.00],    // z is a fraction of the measured lip width
+  lipsR: [0.030, 0.0110, 1.10],    // z is a fraction of the measured lip width
   lipsLift: 0.0032,                // m the line rises, corner over centre
-  // Rose, not pillar-box. The old value was 0.40/0.05/0.07 — a crimson four
-  // times as saturated as any lip, which at a full gape spreads over half her
-  // chin because the band grows with the opening.
-  lipstick: [0.690, 0.330, 0.330],
+  /**
+   * ── AND FORWARD, ON TO THE LIPS THEMSELVES ────────────────────────────
+   *
+   * Misha, 19 Sep 2026: *"her upper lip is missing lipstick"*. It was, and
+   * for a reason no amount of widening this band would have fixed: `uLipC` is
+   * the MEAN of the vertices the mouth cutter painted in human_mh.py, and
+   * that band wraps over the crease and down the inside of both lips — so its
+   * mean sits 13 mm BEHIND her face, inside her head. The ellipsoid was
+   * therefore centred behind the mouth, and since her upper lip protrudes
+   * 4.5 mm further than her lower one, the two lips are at different radii
+   * from that centre. Measured off the shipped blob, at the midline:
+   *
+   *     lower lip   y 1.545   x 0.1635      r 0.57   painted
+   *     upper lip   y 1.558   x 0.1678      r 0.72   nothing
+   *     crease      y 1.5515  x 0.1632      (uLipC.x is 0.1512)
+   *
+   * 0.72 is past the outer edge of the band, which is exactly what was on
+   * screen: a red lower lip and a bare upper one. Moving the centre out on to
+   * the surface makes the depth term nearly zero for both of them, and then
+   * the band is bounded by height alone — which is what a band across a pair
+   * of lips should be bounded by.
+   */
+  lipsFwd: 0.013,
+  // Bright red, asked for by name — *"she should have bright red lipstick on
+  // her lips"*, same day. The note this replaces argued for rose on the
+  // grounds that 0.40/0.05/0.07 was four times as saturated as any lip; that
+  // was true of a band which at a full gape spread over half her chin, and it
+  // is a different band now.
+  lipstick: [0.720, 0.060, 0.090],
   // How far open a full gape is, as a multiple of that band: 1.05 puts a full
   // gape at 21 mm by 45 mm, which is a mouth held open under a branch. It was
   // 0.88 and the opening came out 12 by 27 — a mouth with a red ring round it
@@ -1133,7 +1158,9 @@ const FACE_FRAG = /* glsl */ `
       // in runs uphill with it. Squared, because a parabola is what the nine
       // shells of the mouth cutter in human_mh.py are laid along.
       float span = f.z / max(uLipsR.z, 1e-4);
-      vec3 lc = vec3(uLipC.x, uLipC.y + ${FACE.lipsLift} * span * span, uLipC.z);
+      // Out on to the lips and not in the middle of her head — see lipsFwd.
+      vec3 lc = vec3(uLipC.x + ${FACE.lipsFwd},
+        uLipC.y + ${FACE.lipsLift} * span * span, uLipC.z);
       vec3 q = (f - lc) / uLipsR;
       float r = length(q);
 
