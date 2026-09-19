@@ -361,14 +361,12 @@ function initTouch() {
    * synchronously for the same reason — it used to defer it by a setTimeout,
    * which is fine for a keyboard and invisible on glass.
    *
-   * The button lights while the line is open, because on a phone the panel it
-   * opens can be behind the keyboard and a control with no state is a control
-   * you tap twice.
+   * The button lights while the line is open, and the EARS set that class
+   * rather than this tap does: on glass a send closes the line by itself —
+   * one sentence and out, see `sendTyped` — so the only thing that knows
+   * whether the box is up is the box.
    */
-  tap('t-say', (el) => {
-    const up = ears.toggle();
-    el.classList.toggle('lit', !!up);
-  });
+  tap('t-say', () => ears.toggle());
   tap('t-gset', () => togglePanel());
   tap('t-gpause', () => togglePause());
   tap('t-run', (el) => {

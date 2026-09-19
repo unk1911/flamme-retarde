@@ -71,6 +71,23 @@ const EARS = {
   /** Lines the panel keeps. Eight since it holds conversations: an exchange
    *  is two lines, what you said and what she answered, and six was three. */
   keep: 8,
+  /**
+   * AND WHAT IT KEEPS ON GLASS, which is not the same question.
+   *
+   * Misha, 19 Sep 2026: *"after I type something, the dialog box is too big
+   * and I cant see anything else that is going on. maybe after typing
+   * something the dialog should go away"*. On a desktop this panel is a
+   * console in a corner of a big screen; on a phone in landscape it is a
+   * third of the window, and the thing it is covering is the thing you just
+   * asked for.
+   *
+   * Three lines, and then the whole panel goes after `fade` seconds of
+   * nothing happening. Not on a desktop: there it has always stayed, it costs
+   * nothing there, and a transcript that deletes itself while you are reading
+   * it is its own complaint.
+   */
+  keepTouch: 3,
+  fade: 7.0,
 };
 
 const ears = (() => {
@@ -123,6 +140,7 @@ const ears = (() => {
    */
   let typedOn = false;
   let sayForm = null;
+  let fadeT = 0;
   function panel() {
     if (panelEl) return panelEl;
     panelEl = document.createElement('div');
@@ -176,6 +194,20 @@ const ears = (() => {
       const text = sayEl.value.trim();
       sayEl.value = '';
       if (text) send(text, 0, true);
+      // ── ON GLASS, ONE SENTENCE AND OUT ──────────────────────────────────
+      //
+      // Misha, 19 Sep 2026: *"after I type something, the dialog box is too
+      // big and I cant see anything else that is going on"*. He is right, and
+      // it is worse than it sounds: the box is a third of a phone in
+      // landscape, the keyboard is another third, and what the two of them
+      // are covering is the thing he just asked her to do. So a send closes
+      // the line, which takes the keyboard with it — SAY is one tap away and
+      // the panel is three lines of what happened.
+      //
+      // The opposite on a desktop, where the caret stays put: there the panel
+      // costs a corner of a big screen, and losing the caret after every
+      // sentence is a click back into the box for the next one.
+      if (IS_TOUCH) { closeTyped(); return; }
       sayEl.focus();
     };
     sayEl.addEventListener('keydown', (e) => {
@@ -265,11 +297,50 @@ const ears = (() => {
     }
   }
 
+  /**
+   * Shut the typed line, and tell the button on the HUD that it is shut.
+   *
+   * The button is the ears' own control — see `t-say` in 91-touch.js — and
+   * the panel is the only thing that knows when it has closed itself, so the
+   * lit state is set from here rather than from the tap that opened it.
+   */
+  function closeTyped() {
+    typedOn = false;
+    if (sayEl) sayEl.blur();
+    draw();
+    syncSay();
+  }
+
+  function syncSay() {
+    const b = typeof document !== 'undefined' && document.getElementById('t-say');
+    if (b) b.classList.toggle('lit', !!typedOn || !!on);
+  }
+
   function note(text, kind) {
     lines.push({ text, kind });
-    while (lines.length > EARS.keep) lines.shift();
+    while (lines.length > (IS_TOUCH ? EARS.keepTouch : EARS.keep)) lines.shift();
     console.info('[ears] ' + text);
     draw();
+    // And start the clock on the panel clearing itself. See `EARS.fade`.
+    if (IS_TOUCH) fade();
+  }
+
+  /**
+   * Clear the panel once nothing has happened for a while. Touch only.
+   *
+   * It RE-ARMS rather than giving up when it finds something going on — a
+   * line open, a live microphone, an answer still in the air. Returning
+   * instead, which is what this did first, leaves the panel up until the next
+   * line arrives: her voice takes longer than the timer does, so the one case
+   * it was written for is the one case it would have missed.
+   */
+  function fade() {
+    clearTimeout(fadeT);
+    fadeT = setTimeout(() => {
+      if (typedOn || on || inflight || talking) { fade(); return; }
+      lines.length = 0;
+      draw();
+    }, EARS.fade * 1000);
   }
 
   function onChunk(e) {
@@ -723,6 +794,8 @@ const ears = (() => {
         document.exitPointerLock?.();
         sayEl.focus();
       }
+      if (!typedOn && sayEl) sayEl.blur();
+      syncSay();
       return typedOn;
     },
     /** And the device, for whoever wants it back. Off by default — see `typedOn`. */

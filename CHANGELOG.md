@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.425.2] — 2026-09-19
+
+### one sentence and out
+
+**"after I type something, the dialog box is too big and I cant see anything
+else that is going on. maybe after typing something the dialog should go away
+or something"**.
+
+He is right and it is worse than it sounds: on a phone in landscape the box is
+a third of the window, the keyboard is another third, and what those two are
+covering is the thing he just asked her to do.
+
+**A send closes the line on glass**, which takes the keyboard with it. SAY is
+one tap away and the button unlights itself — the EARS own that class now
+rather than the tap that opened it, because the only thing that knows the box
+has closed is the box.
+
+**The panel keeps three lines there and eight here**, and then it clears itself
+after seven seconds of nothing happening. Not on a desktop: there it is a
+console in the corner of a big screen, it costs nothing, and a transcript that
+deletes itself while you are reading it is its own complaint.
+
+The clock RE-ARMS rather than giving up when it finds something going on — a
+line open, a live microphone, an answer still in the air. Returning instead,
+which is what it did first, leaves the panel up until the next line arrives:
+her voice takes longer than seven seconds, so the one case it was written for
+is the one case it would have missed.
+
+Measured on a 932×430 phone: tap SAY and the panel is 87 px with the caret in
+it; send and it is 60 px with the keyboard gone; seven seconds later there is
+no panel at all.
+
 ## [1.425.1] — 2026-09-19
 
 ### three ways to say Enter, and a phone uses the third
