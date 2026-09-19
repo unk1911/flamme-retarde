@@ -921,21 +921,33 @@ function buildAudio() {
     }
     const far = Math.max(0, 1 - d / 7);
     if (!buzzOsc) {
+      // ── LOWER THAN IT WAS ──────────────────────────────────────────────
+      //
+      // Misha, 19 Sep 2026: *"the frequency of the vibration should be
+      // slightly lower/deeper"*. 88 Hz was a small motor at full speed and
+      // read thin through a phone speaker, where everything under about
+      // 150 Hz is the first harmonic anyway. 62 is the same motor wound down:
+      // it is still above what a phone can reproduce at all, and what changes
+      // is the SECOND, which comes down to 124 with it and is the part you
+      // actually hear on a small speaker.
       buzzOsc = ctx.createOscillator();
       buzzOsc.type = 'triangle';
-      buzzOsc.frequency.value = 88;
+      buzzOsc.frequency.value = 62;
       buzzHarm = ctx.createOscillator();
       buzzHarm.type = 'square';
-      buzzHarm.frequency.value = 176;
+      buzzHarm.frequency.value = 124;
       const hg = ctx.createGain();
       hg.gain.value = 0.34;
       buzzGain = ctx.createGain();
       buzzGain.gain.value = 0;
       // The wobble: a motor in a loose object is never one pitch for long.
       buzzLfo = ctx.createOscillator();
-      buzzLfo.frequency.value = 5.5;
+      // Slower and shallower with the pitch: a wobble of 6 Hz on 88 is seven
+      // per cent and on 62 it is ten, which stops being a motor in a loose
+      // object and starts being a warble.
+      buzzLfo.frequency.value = 4.2;
       const lg = ctx.createGain();
-      lg.gain.value = 6;
+      lg.gain.value = 4;
       buzzLfo.connect(lg).connect(buzzOsc.frequency);
       buzzOsc.connect(buzzGain);
       buzzHarm.connect(hg).connect(buzzGain);

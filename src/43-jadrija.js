@@ -41148,7 +41148,7 @@ async function buildJadrija(scene) {
   }
 
   /** The rattle, the creep, and how loud it is from where you are standing. */
-  function signalTick(dt, cam) {
+  function signalTick(dt, ear) {
     const keys = Object.keys(signals);
     if (!keys.length) {
       if (kit && kit.wineBuzz) kit.wineBuzz.value = 0;
@@ -41180,24 +41180,6 @@ async function buildJadrija(scene) {
         sg.at.x + Math.sin(a) * amp,
         sg.at.y + Math.abs(Math.sin(a * 2)) * amp * 0.4,
         sg.at.z + Math.cos(a * 0.9) * amp);
-      // AND THE PHONE IN YOUR HAND, once a pulse.
-      //
-      // Misha, 19 Sep 2026: *"is it possible in phone mode when lovesens
-      // vibrates to vibrate the phone?"*. It is, on Android — `navigator
-      // .vibrate` takes a length in milliseconds and no amplitude, so the
-      // pattern is the only thing it can carry, and the pattern is exactly
-      // what it should carry. Fired on the leading edge of each pulse for the
-      // length that pulse has left, rather than every frame: a call while one
-      // is already running restarts it, and a buzz restarted sixty times a
-      // second is a buzz that never starts.
-      //
-      // iOS has no vibration API at all and silently has none — no feature
-      // test needed beyond the one below, and nothing to apologise for.
-      if (IS_TOUCH && navigator.vibrate && near < SIGNAL.hear) {
-        const run = beat > 0.5;
-        if (run && !sg.vib) navigator.vibrate(Math.round(signalLeft(sg.t) * 1000));
-        sg.vib = run;
-      }
       // And it creeps: a thing vibrating on a hard surface does not stay put.
       // Only on the wood. Strapped on, the millimetre a second this adds would
       // be the thing walking down her leg over a minute and a half.
@@ -41211,8 +41193,36 @@ async function buildJadrija(scene) {
       // moved rather than on the one after it.
       sg.node.updateWorldMatrix(true, false);
       _sigW.setFromMatrixPosition(sg.node.matrixWorld);
-      if (cam) {
-        near = Math.min(near, Math.hypot(cam.x - _sigW.x, cam.z - _sigW.z));
+      if (ear) {
+        near = Math.min(near, Math.hypot(ear.x - _sigW.x, ear.z - _sigW.z));
+        sg.near = +near.toFixed(2);
+      }
+      // ── AND THE PHONE IN YOUR HAND, once a pulse ─────────────────────────
+      //
+      // Misha, 19 Sep 2026: *"is it possible in phone mode when lovesens
+      // vibrates to vibrate the phone?"* — and then, of the first attempt,
+      // *"i don't feel the phone vibrate tho"*. It never fired once: this
+      // block was written three lines HIGHER, above the two that work out how
+      // far away the thing is, and `near` is reset to 1e9 at the top of every
+      // tick. So the test was 1e9 < 7, every frame, on every phone.
+      //
+      // `navigator.vibrate` takes a length in milliseconds and no amplitude,
+      // so the pattern is the only thing it can carry and the pattern is
+      // exactly what it should carry. Fired on the LEADING EDGE of each pulse
+      // for the length that pulse has left: a call made while one is already
+      // running restarts it, and a buzz restarted sixty times a second is a
+      // buzz that never starts.
+      //
+      // iOS has no vibration API at all and silently has none. Android will
+      // also ignore it outright with the ringer in do-not-disturb, which is
+      // not something a page can see or say anything about.
+      if (IS_TOUCH && navigator.vibrate && near < SIGNAL.hear) {
+        const run = beat > 0.5;
+        if (run && !sg.vib) {
+          sg.buzzed = (sg.buzzed || 0) + 1;
+          navigator.vibrate(Math.round(signalLeft(sg.t) * 1000));
+        }
+        sg.vib = run;
       }
       // The light on the tail, while it runs. A slow breath rather than the
       // motor's own rate: 47 Hz is invisible at any frame rate anybody plays
@@ -44971,7 +44981,14 @@ async function buildJadrija(scene) {
     // The thing on the table with a motor in it — see SIGNAL. Here rather
     // than in her step, because it is scenery and carries on whether she is
     // being posed this frame or not.
-    signalTick(dt, cam);
+    //
+    // `who` AND NOT `cam`, which is this file's oldest lesson wearing a new
+    // hat: with the third person on, the camera is up to 3.1 m away and
+    // orbiting, so both of the things this distance decides — how loud the
+    // motor is and whether your phone buzzes with it — were being asked of a
+    // point that wanders round the room on its own. What they are about is
+    // where the PERSON is.
+    signalTick(dt, who);
 
     // Unconditional, and carries its own gate inside instead. The balloon work
     // is two subtractions and a hypot and wants no gate at all; the pose is
@@ -46613,8 +46630,17 @@ async function buildJadrija(scene) {
       if (!signalCan()) return 'no sender';
       return signalSet(key, on !== false);
     },
-    /** What is buzzing right now. */
-    signals: () => Object.keys(signals),
+    /**
+     * What is buzzing right now, and what the phone has been told about it.
+     *
+     * `buzzed` is how many pulses have been handed to `navigator.vibrate`,
+     * which is the one thing a probe can check about a device it does not
+     * have: the first version of this fired zero of them and looked exactly
+     * like a phone with vibration turned off.
+     */
+    signals: () => Object.keys(signals).map((k) => ({ key: k,
+      t: +signals[k].t.toFixed(2), beat: +signalAmp(signals[k].t).toFixed(2),
+      buzzed: signals[k].buzzed || 0, near: signals[k].near ?? null })),
     /** Scrub what is on the plate, 0 to 1 — see COKE. */
     coke: (u = 1) => cokeSet(u),
     plate: () => (kit && kit.plate ? kit.plate.slice() : null),

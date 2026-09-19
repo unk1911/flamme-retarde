@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.426.1] — 2026-09-19
+
+### the phone never buzzed once, and the motor is deeper
+
+**"i'm trying it now on the android, i don't feel the phone vibrate tho"**. It
+fired zero times, on every phone, and the reason is three lines of ordering:
+the block that calls `navigator.vibrate` was written ABOVE the two lines that
+work out how far away the thing is, and `near` is reset to 1e9 at the top of
+every tick. So the test it made was `1e9 < 7`, sixty times a second, for ever.
+Moved below them, and the count is published — `__fr.jad.signals()` now
+answers how many pulses have been handed to the device, because a phone that
+was never asked and a phone that ignored being asked look identical from the
+sofa. Measured in a touch-emulated Chrome with the call stubbed: **nine pulses
+in thirteen seconds**, the last of them 1850 ms, which is the long one in the
+pattern.
+
+**And the distance is measured from the PERSON now, not the camera.** This
+file's oldest lesson wearing a new hat: with the third person on, the camera is
+up to 3.1 m away and orbiting, so both of the things that distance decides —
+how loud the motor is and whether your phone buzzes with it — were being asked
+of a point that wanders round the room on its own.
+
+**The motor is lower.** *"the frequency of the vibration should be slightly
+lower/deeper"*. 88 Hz was a small motor at full speed and read thin through a
+phone speaker, where everything under about 150 Hz is the first harmonic
+anyway. It is 62 now, and what actually changes for a small speaker is the
+SECOND, which comes down to 124 with it. The wobble goes with them: 6 Hz on 88
+is seven per cent and on 62 it is ten, which stops being a motor in a loose
+object and starts being a warble, so it is 4 Hz at 4.2 a second.
+
 ## [1.426.0] — 2026-09-19
 
 ### six from one run on a phone
