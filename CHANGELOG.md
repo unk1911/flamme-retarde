@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.426.3] — 2026-09-19 (baye 1.25.0)
+
+### nobody can spell it
+
+**"for putting on lovense it should accept various spellings like 'lovesense',
+'lovense', etc... should be like 'put on lovesense' or 'wear lovense', many of
+these combination should work"**.
+
+He is right, and his own messages in this repository carry three spellings of
+it. It is a brand name said out loud to a transcriber that has never heard it,
+so the only sensible parse is a FAMILY rather than a spelling:
+
+    lov + e/i + n + s/c + a tail        lovense  lovens  lovence  lovinse
+    love + a gap + sen + s/c + a tail   lovesense  lovesens  love sense
+                                        lovesence
+
+Neither half can swallow an ordinary word: the first needs an s or a c after
+the n, so *loving* and *loven* fall out, and the second needs *sen* after the
+*love*, so *loves*, *lovely* and "I love sense of humour" do.
+
+ONE CONSTANT, THREE READERS. The handover, the remote and putting it on all
+take their nouns from `GIVE_WORDS`, so a spelling added once is added to all
+three: **buzz the lovesense** and **give her the lovesens** work for the same
+reason **wear the lovence** does. *vibrator* joins *toy* as a plain noun for
+it.
+
+And two more verbs: `insert`, which is what the thing now does, and `put … in`
+beside `put … on`. The guard that keeps *"put it on the table"* from being a
+request to wear the table grew the bag, a pocket and a hand.
+
+Measured against the installed file on mpcn0 after the restart, not against
+the tree: fourteen phrasings, all of them `wear:lovense`, with the near misses
+still falling through.
+
 ## [1.426.2] — 2026-09-19
 
 ### I is not the player walking away

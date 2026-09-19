@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.24.0"
+VERSION = "1.25.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -710,8 +710,9 @@ ASK_RE = re.compile(
     # own note argues for: "put the lovense on her" carries no modal and no
     # please, and on the bare verb alone "put your feet up" would reach the
     # whole of `SKILLS` and come back a request to pour wine.
-    r"|\b(put|strap|wear|wearing|attach|fasten|fit|clip)\b.{0,24}"
-    r"\b(lovense|toy|headphones|bose|cuffs|bangles|bracelets)\b"
+    r"|\b(put|strap|wear|wearing|attach|fasten|fit|clip|insert)\b.{0,24}"
+    r"\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy|"
+    r"headphones|bose|cuffs|bangles|bracelets)\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
@@ -860,10 +861,31 @@ def fetch_of(text: str):
 # vocabulary is the satchel's own keys plus ordinary synonyms; the page refuses
 # anything that is not actually carried.
 GIVE_RE = re.compile(r"\b(give|hand|pass|take)\b")
+
+# ── AND NOBODY CAN SPELL IT ───────────────────────────────────────────────────
+#
+# Misha, 19 Sep 2026: *"it should accept various spellings like 'lovesense',
+# 'lovense', etc"*. He is right, and his own messages in this repository carry
+# three of them — `lovense`, `lovesens`, `lovesense`. It is a brand name said
+# out loud to a transcriber that has never heard it, so the only sensible parse
+# is a FAMILY rather than a spelling:
+#
+#     lov + e/i + n + s/c + a tail    lovense lovens lovence lovinse
+#     love + optional gap + sen + s/c + a tail
+#                                     lovesense lovesens love sense lovesence
+#
+# Neither half can swallow an ordinary word: the first needs an s or a c after
+# the n, so "loving" and "loven" fall out; the second needs "sen" after the
+# "love", so "loves" and "lovely" do.
+#
+# One constant, three readers — the handover, the remote and putting it on all
+# take their nouns from `GIVE_WORDS`, so a spelling added here is added to all
+# three at once.
+LOVENSE = r"lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator"
 GIVE_WORDS = (
     ("cuffs", r"cuffs?\b|bangles?|bracelets?"),
     ("headphones", r"headphones?|bose\b|cans\b"),
-    ("lovense", r"lovense|toy\b"),
+    ("lovense", LOVENSE + r"|toy\b"),
     ("cigarettes", r"cigarettes?|smokes?|fags?\b|pack of"),
     ("newspaper", r"newspaper|paper\b"),
     ("water", r"water|bottle of water"),
@@ -933,15 +955,16 @@ def give_of(text: str):
 # it on" carries the word `take`, which is a handover verb, and the handover
 # would have answered it with a thing that is not in your bag.
 WEAR_RE = re.compile(
-    r"\bput\w*\b.{0,24}\bon\b|\b(wear|wears|wearing|strap|straps|"
-    r"attach|attaches|fit|fits|fasten|fastens|clip)\b")
+    r"\bput\w*\b.{0,24}\b(on|in)\b|\b(wear|wears|wearing|strap|straps|"
+    r"attach|attaches|fit|fits|fasten|fastens|clip|insert|inserts)\b")
 # AND "PUT IT ON THE TABLE" IS NOT THIS. The `put ... on` above is the only
 # loose pattern in here and it is loose on purpose — "put the lovense on her"
 # has a noun in the middle of it — so the one sentence it would otherwise
 # swallow is named here. Setting a thing down on that stool is not a request
 # this service can answer anyway: the object is already on it.
-WEAR_NOT = re.compile(r"\bon (the|that|a)\s+"
-                      r"(table|stool|tabouret|floor|deck|bed|cot|plate|side)\b")
+WEAR_NOT = re.compile(r"\b(on|in) (the|that|a|your|her|my)\s+"
+                      r"(table|stool|tabouret|floor|deck|bed|cot|plate|side|"
+                      r"bag|satchel|pocket|hand|hands)\b")
 
 
 def wear_of(text: str):
