@@ -39393,7 +39393,7 @@ async function buildJadrija(scene) {
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
 
-    wearTick();
+    wearTick(dt);
     hairAim();
     hairStep(dt);
     // Her head: at you if you asked for it, and on the motor's beat if she is
@@ -41135,27 +41135,336 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * A cuff bracelet: a wide band round the wrist, open at the back.
+   * ── THE CUFFS, AND WHAT IS SET INTO THEM ───────────────────────────────
    *
-   * Eleven segments of an arc rather than a torus, for the headphone band's
-   * reason — a torus is four hundred triangles for a shape read at two
-   * metres. Open across 40° at the back of the wrist, which is what makes it
-   * a bangle somebody slid on rather than a ring welded shut.
+   * Misha, 19 Sep 2026, with a photograph of a pair of pavé-set diamond
+   * handcuffs: *"can u enhance the cuffs to make them look more ornamental,
+   * with diamonds like on this pic"*, and *"they should have the connecting
+   * thingie too"*.
+   *
+   * THE STONES ARE GEOMETRY AND NOT A TEXTURE, which is the whole decision
+   * here. A pavé is a field of little domes, and what makes one read as
+   * diamond rather than as glitter is that each dome catches the sun at its
+   * own angle — so as she moves, one stone lights while its neighbour goes
+   * out. A texture cannot do that at any resolution: it has one normal per
+   * surface and the whole band flares and dies together. So the band is
+   * built as a surface whose radius is modulated by the stone grid, drawn
+   * with FLAT normals, and every facet of every stone is its own highlight.
+   *
+   * It costs 46 stones round by 3 across at four segments each way, which is
+   * 5,900 triangles for a cuff — and the pair shares one geometry, so it is
+   * two draw calls for both wrists. That is the same order as the headphones
+   * and a twentieth of her hair.
+   *
+   * THE LOCK PLATE IS THE BAND SWELLING and not a second object glued on:
+   * over half a radian the section grows half again as wide and half again
+   * as deep, on a raised cosine, so the stones run over the plate unbroken
+   * the way they do in the photograph. The keyhole is the one dark thing on
+   * the whole piece.
+   */
+  const CUFF = {
+    /** The wrist, how wide the band is along the arm, and how proud it sits. */
+    r: 0.0295, wide: 0.0235, deep: 0.0060,
+    /**
+     * The pavé: stones around the band, rows across it, how high each sits.
+     *
+     * SQUARE STONES, which is a measurement and not a preference. At 46 round
+     * by 3 across each stone was 4.6 mm one way and 7.8 the other, and what
+     * that renders as is not a pavé at all — it is a set of ribs running
+     * across the band, because a dome twice as long as it is wide reads as a
+     * ridge. 52 by 6 puts them at 4.0 by 3.9.
+     */
+    round: 52, rows: 6, dome: 0.00095,
+    /** Segments per stone, each way. Three is a faceted dome; eight is a ball. */
+    seg: 3,
+    /** The lock plate: where it sits, how far round it reaches, and its swell. */
+    plate: Math.PI, span: 0.46, wider: 1.55, taller: 1.5,
+    /** And the keyhole in the middle of it. */
+    hole: 0.0018,
+  };
+
+  /**
+   * ── AND THE CHAIN BETWEEN THEM ─────────────────────────────────────────
+   *
+   * MEASURED FIRST, because the length is the whole of whether this works.
+   * Her wrists sit 0.41–0.45 m apart standing, 0.33 on all fours, 0.16
+   * kneeling, and reach 0.61 at the widest frame of the dances. A real
+   * handcuff chain is nine centimetres and would be stretched to five times
+   * its length every time she stands up, so this is not that chain: it is a
+   * swag, long enough to hang in a deep curve at her usual 0.43 and short
+   * enough to come taut when she throws her arms out.
+   *
+   * ONE FREE POINT AND NOT A ROPE SOLVER. The middle of it is a particle
+   * with gravity and drag; the two ends are wherever her wrists went this
+   * frame; neither half is allowed to stretch past half the chain. The links
+   * are then laid along the curve through those three points. That is enough
+   * to swing when she turns and to snap taut when she reaches, and it is
+   * thirty transforms a frame rather than a solver.
+   *
+   * AND IT LIES AGAINST HER RATHER THAN THROUGH HER. A chain hanging between
+   * two wrists at her hips passes exactly through her pelvis, so the free
+   * point is kept in front of her belly whenever it is low and between her
+   * hips — the hair's own skull rule, one plane instead of one sphere.
+   */
+  const CHAIN = {
+    /**
+     * Links, and how long the whole thing is. They are OVAL and overlapping —
+     * a round link at this size reads as a sequin, and a chain of sequins
+     * reads as a necklace somebody dropped.
+     */
+    len: 0.62, links: 42, r: 0.0078, wire: 0.0022, long: 2.0,
+    /**
+     * They have to OVERLAP, and by a specific amount. A link is 37 mm long
+     * the way it is drawn here, and at 42 of them the run puts one every
+     * 15 mm — so each link's end sits inside the next one's, which is what
+     * makes a chain read as a chain. Spaced at their own length they read as
+     * a row of separate rings with daylight between them, and at this size
+     * every other one is edge-on and nearly invisible, so the gaps come out
+     * twice as wide as the arithmetic says.
+     */
+    /** Gravity on the free point, and how fast it gives it up. */
+    g: 7.5, damp: 0.86, step: 1 / 120,
+    /**
+     * How far in front of her the low point is held, how wide that rule is,
+     * and how high up it stops applying — above her shoulders there is no
+     * body in the way and a chain pushed forward up there is a chain being
+     * held out by nothing.
+     */
+    front: 0.115, wide: 0.17, high: 1.32,
+  };
+
+  /**
+   * The stones, as light: one hash per stone, so no two of them are quite
+   * the same white and no two of them flash together.
+   */
+  let paveMat = null;
+  function paveMaterial() {
+    if (paveMat) return paveMat;
+    paveMat = solidMaterial(new THREE.Color(0.855, 0.870, 0.900), {
+      spec: 0.9, specPower: 120, vcol: false,
+      uniforms: { uStoneU: { value: CUFF.round / (Math.PI * 2) },
+        uStoneV: { value: CUFF.rows / CUFF.wide } },
+      decl: 'uniform float uStoneU; uniform float uStoneV;',
+      body: [
+        '  // WHICH STONE THIS IS: the same grid the geometry was built on,',
+        '  // read back out of the object-space position.',
+        '  float su = floor(atan(vLocal.y, vLocal.x) * uStoneU);',
+        '  float sv = floor(vLocal.z * uStoneV);',
+        '  float st = fract(sin(su * 12.9898 + sv * 78.233) * 43758.5453);',
+        '  base *= 0.90 + 0.20 * st;',
+        '  spec = 0.55 + 0.70 * st;',
+        '  env = 0.30;',
+      ].join('\n'),
+      lit: [
+        '  // THE FIRE, which is the part of a diamond that is not a highlight:',
+        '  // a much tighter lobe than the metal underneath it, tinted a',
+        '  // different colour on every stone. It is what makes a pave twinkle',
+        '  // in colour rather than flash in white.',
+        '  {',
+        '    float sv2 = floor(vLocal.z * uStoneV);',
+        '    float s2 = fract(sin(floor(atan(vLocal.y, vLocal.x) * uStoneU)',
+        '      * 12.9898 + sv2 * 78.233) * 43758.5453);',
+        '    vec3 fire = 0.55 + 0.45 * cos(vec3(0.0, 2.1, 4.2) + s2 * 6.2831);',
+        '    vec3 hw = normalize(uSunDir - viewDir);',
+        '    col += fire * uSunColor * pow(max(dot(n, hw), 0.0), 300.0) * 1.6 * sh;',
+        '  }',
+      ].join('\n'),
+    });
+    return paveMat;
+  }
+
+  /**
+   * The band itself, as one lofted surface with the stones in its radius.
+   *
+   * Built once and shared by both wrists — nothing about it is handed.
+   */
+  let bandGeo = null;
+  function bandGeometry() {
+    if (bandGeo) return bandGeo;
+    const A = CUFF.round * CUFF.seg;          // rings around the wrist
+    const P = CUFF.rows * CUFF.seg;           // points across the outer face
+    const rings = [];
+    for (let i = 0; i <= A; i++) {
+      const a = ((i % A) / A) * Math.PI * 2;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      // The plate, as a raised cosine on the section rather than a box.
+      let dd = Math.abs(a - CUFF.plate);
+      if (dd > Math.PI) dd = Math.PI * 2 - dd;
+      const k = dd < CUFF.span ? 0.5 + 0.5 * Math.cos(Math.PI * dd / CUFF.span) : 0;
+      const w = CUFF.wide * (1 + (CUFF.wider - 1) * k) * 0.5;
+      const h = CUFF.deep * (1 + (CUFF.taller - 1) * k);
+      // Where in its own stone this ring is, around the band.
+      const u = ((i / CUFF.seg) % 1) - 0.5;
+      const ring = [];
+      for (let j = 0; j <= P; j++) {
+        const phi = (j / P - 0.5) * Math.PI;
+        const v = ((j / CUFF.seg) % 1) - 0.5;
+        // A dome, cut off at the edge of its own cell so the stones are set
+        // side by side rather than run together into a ripple.
+        const q = Math.max(0, 1 - 4 * (u * u + v * v));
+        const bump = CUFF.dome * Math.sqrt(q);
+        const rad = CUFF.r + (h + bump) * Math.cos(phi);
+        const z = (w + bump) * Math.sin(phi);
+        ring.push(new THREE.Vector3(ca * rad, sa * rad, z));
+      }
+      // And back along the inside, flat against the wrist.
+      for (let j = 1; j < 4; j++) {
+        const f = 1 - j / 4;
+        ring.push(new THREE.Vector3(ca * CUFF.r, sa * CUFF.r, w * (f * 2 - 1)));
+      }
+      rings.push(ring);
+    }
+    // FLAT normals and not smooth ones: see the note above — a smoothed pave
+    // is a bumpy tube, and every stone in it lights at the same moment.
+    bandGeo = loft(rings, { closed: true }).toNonIndexed();
+    bandGeo.computeVertexNormals();
+    return bandGeo;
+  }
+
+  /**
+   * One cuff: the band, and the one dark thing on it.
    */
   function bangleGroup() {
     const g = new THREE.Group();
-    const metal = solidMaterial(new THREE.Color(0.780, 0.755, 0.700),
-      { spec: 0.85, specPower: 90, vcol: false });
-    const r = 0.0335, wide = 0.024, thick = 0.0045;
-    for (let i = 0; i < 11; i++) {
-      const a = (i / 10) * (Math.PI * 2 - 0.70) + 0.35;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(thick, 0.021, wide), metal);
-      seg.position.set(Math.cos(a) * r, Math.sin(a) * r, 0);
-      seg.rotation.z = a;
-      g.add(seg);
-    }
+    const band = new THREE.Mesh(bandGeometry(), paveMaterial());
+    g.add(band);
+    // The keyhole, on the plate, facing out of the band.
+    const dark = solidMaterial(new THREE.Color(0.055, 0.050, 0.048),
+      { spec: 0.35, specPower: 60, vcol: false });
+    const hole = new THREE.Mesh(
+      new THREE.CircleGeometry(CUFF.hole, 12), dark);
+    const hr = CUFF.r + CUFF.deep * CUFF.taller + 0.0004;
+    hole.position.set(Math.cos(CUFF.plate) * hr, Math.sin(CUFF.plate) * hr, 0);
+    hole.lookAt(hole.position.clone().multiplyScalar(2));
+    g.add(hole);
     for (const m of g.children) { m.castShadow = false; m.receiveShadow = false; }
     return g;
+  }
+
+  /**
+   * The chain, as thirty links and one particle. See CHAIN.
+   */
+  function chainGroup(L, R) {
+    const g = new THREE.Group();
+    const geo = new THREE.TorusGeometry(CHAIN.r, CHAIN.wire, 5, 10);
+    const mat = solidMaterial(new THREE.Color(0.880, 0.890, 0.920),
+      { spec: 0.95, specPower: 140, vcol: false });
+    const links = [];
+    for (let i = 0; i < CHAIN.links; i++) {
+      const m = new THREE.Mesh(geo, mat);
+      // Drawn round and worn oval: the basis below puts local x along the run
+      // of the chain, so this is the one axis that stretches a link into the
+      // shape a link is.
+      m.scale.set(CHAIN.long, 1, 1);
+      m.castShadow = false; m.receiveShadow = false;
+      g.add(m);
+      links.push(m);
+    }
+    return { group: g, bone: null,
+      chain: { L, R, links, mid: new THREE.Vector3(),
+        vel: new THREE.Vector3(), on: 0 } };
+  }
+
+  const _chA = new THREE.Vector3(), _chB = new THREE.Vector3();
+  const _chM = new THREE.Vector3(), _chV = new THREE.Vector3();
+  const _chC = new THREE.Vector3(), _chP = new THREE.Vector3();
+  const _chQ = new THREE.Quaternion(), _chT = new THREE.Vector3();
+  const _chX = new THREE.Vector3(), _chY = new THREE.Vector3();
+  const _chZ = new THREE.Vector3(0, 0, 1), _chW = new THREE.Matrix4();
+
+  /**
+   * Where on a cuff the chain has got to.
+   *
+   * A jewellery chain is not welded to a point on the band: its ring slides
+   * round to wherever it is pulled, which is why this is solved rather than
+   * being a fixed lug. It also means nothing here has to know which way the
+   * wrist bone's axes point, which is the one fact about this rig that is
+   * different on the left hand and the right.
+   */
+  function chainEnd(group, to, out) {
+    out.copy(to).sub(group.position)
+      .applyQuaternion(_chQ.copy(group.quaternion).invert());
+    out.z = 0;
+    if (out.lengthSq() < 1e-9) out.set(1, 0, 0);
+    out.setLength(CUFF.r).applyQuaternion(group.quaternion).add(group.position);
+    return out;
+  }
+
+  /** One point on the curve through the three we have. */
+  function chainAt(a, c, b, t, out) {
+    const s = 1 - t;
+    return out.set(s * s * a.x + 2 * s * t * c.x + t * t * b.x,
+      s * s * a.y + 2 * s * t * c.y + t * t * b.y,
+      s * s * a.z + 2 * s * t * c.z + t * t * b.z);
+  }
+
+  function chainTick(c, dt) {
+    if (!c.L.group.visible || !c.R.group.visible) return;
+    // Where it is hanging from, which needs where it is hanging to — so the
+    // first frame guesses and every frame after it knows.
+    if (!c.on) {
+      _chM.copy(c.L.group.position).add(c.R.group.position).multiplyScalar(0.5);
+      c.mid.copy(_chM);
+      c.mid.y -= CHAIN.len * 0.35;
+      c.vel.set(0, 0, 0);
+      c.on = 1;
+    }
+    chainEnd(c.L.group, c.mid, _chA);
+    chainEnd(c.R.group, c.mid, _chB);
+    // GRAVITY IS STRAIGHT DOWN IN HER OWN FRAME and not the world's, which
+    // sounds wrong and is not: her mesh is only ever yawed. A handstand is
+    // her BONES upside down, and her wrists come with them, so a chain that
+    // hangs on -y in figure space hangs towards the sky in a handstand,
+    // which is what a chain does.
+    let t = Math.min(dt, 0.1);
+    while (t > 1e-5) {
+      const h = Math.min(CHAIN.step, t);
+      t -= h;
+      _chP.copy(c.mid);
+      c.vel.y -= CHAIN.g * h;
+      c.vel.multiplyScalar(Math.pow(CHAIN.damp, h * 60));
+      c.mid.addScaledVector(c.vel, h);
+      // Neither half stretches.
+      for (let k = 0; k < 2; k++) {
+        const e = k ? _chB : _chA;
+        _chV.copy(c.mid).sub(e);
+        const L = _chV.length();
+        if (L > CHAIN.len * 0.5) {
+          c.mid.copy(e).addScaledVector(_chV, (CHAIN.len * 0.5) / L);
+        }
+      }
+      // And it lies against her rather than through her.
+      if (c.mid.x < CHAIN.front && Math.abs(c.mid.z) < CHAIN.wide
+        && c.mid.y < CHAIN.high) {
+        c.mid.x = CHAIN.front;
+      }
+      // What the constraints did is part of how it is moving, or the sag
+      // pumps itself up against the ends it keeps being pulled back to.
+      c.vel.copy(c.mid).sub(_chP).divideScalar(h);
+    }
+    // The curve through the three points, and the links laid along it.
+    _chC.copy(c.mid).multiplyScalar(2)
+      .addScaledVector(_chA, -0.5).addScaledVector(_chB, -0.5);
+    const n = c.links.length;
+    for (let i = 0; i < n; i++) {
+      const m = c.links[i];
+      chainAt(_chA, _chC, _chB, i / n, _chP);
+      chainAt(_chA, _chC, _chB, (i + 1) / n, _chV);
+      m.position.copy(_chP).add(_chV).multiplyScalar(0.5);
+      _chT.copy(_chV).sub(_chP);
+      if (_chT.lengthSq() < 1e-10) _chT.set(1, 0, 0);
+      _chT.normalize();
+      // A chain is links at right angles to each other, so every other one
+      // turns a quarter turn about the run of it. The torus lies in its own
+      // xy plane, which is the plane a link's metal lies in, so the run of
+      // the chain has to be IN that plane and the axis across it.
+      _chX.set(0, 0, 1);
+      if (Math.abs(_chT.z) > 0.9) _chX.set(0, 1, 0);
+      _chY.copy(_chX).cross(_chT).normalize();
+      if (i & 1) _chY.copy(_chT).cross(_chY).normalize();
+      _chX.copy(_chT).cross(_chY);
+      m.quaternion.setFromRotationMatrix(_chW.makeBasis(_chT, _chX, _chY));
+    }
   }
 
   /**
@@ -41695,8 +42004,12 @@ async function buildJadrija(scene) {
     if (key === 'headphones') return [{ group: headphonesGroup(), bone: 'head' }];
     if (key === 'lovense') return [toyWorn(mesh)];
     if (where === 'wrists') {
-      return [{ group: bangleGroup(), bone: 'handL' },
-        { group: bangleGroup(), bone: 'handR' }];
+      // Three parts and not two: the pair, and the thing between them. The
+      // chain is not on a bone — it is on both of them — so it comes last
+      // and is placed after the two ends it hangs from. See CHAIN.
+      const L = { group: bangleGroup(), bone: 'handL' };
+      const R = { group: bangleGroup(), bone: 'handR' };
+      return [L, R, chainGroup(L, R)];
     }
     return null;
   }
@@ -41710,11 +42023,20 @@ async function buildJadrija(scene) {
    * cartwheel without knowing what a cartwheel is.
    */
   const wearBone = {};
-  function wearTick() {
+  function wearTick(dt) {
     const keys = Object.keys(worn);
     if (!keys.length || !skinFig) return;
     for (const k of keys) {
       for (const part of worn[k]) {
+        // Anything hanging between two bones rather than off one. It is
+        // stepped here and not in its own tick because it needs both ends
+        // where this loop has just put them.
+        if (part.chain) {
+          if (!part.group.parent) skinFig.mesh.add(part.group);
+          part.group.visible = true;
+          chainTick(part.chain, dt);
+          continue;
+        }
         if (wearBone[part.bone] === undefined) {
           wearBone[part.bone] = skinFig.boneIndex(part.bone);
         }

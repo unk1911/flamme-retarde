@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.428.0] — 2026-09-19
+
+### set with stones, and joined
+
+**"can u enhance the cuffs to make them look more ornamental, with diamonds
+like on this pic"**, with a photograph of a pair of pavé-set diamond
+handcuffs, and **"they should have the connecting thingie too"**.
+
+**The stones are geometry and not a texture**, which is the whole decision
+here. What makes a pavé read as diamond rather than as glitter is that every
+stone catches the sun at its own angle: one lights while its neighbour goes
+out, and the band never flares all at once. A texture cannot do that at any
+resolution, because it has one normal for the whole surface. So the band is
+lofted as a surface whose radius is modulated by the stone grid, drawn with
+FLAT normals, and every facet of every stone is its own highlight. On top of
+that each stone gets its own hash: a slightly different white, a different
+gloss, and a tightly-lobed tinted *fire* that is a diamond's and not a
+metal's.
+
+**Square stones**, which is a measurement and not a preference. The first cut
+was 46 around by 3 across, and at 33.5 mm radius that is a stone 4.6 mm one
+way and 7.8 the other — which does not render as a pavé at all. It renders as
+a set of ribs, because a dome twice as long as it is wide is a ridge. 52 by 6
+puts them at 4.0 by 3.9 and the field reads as stones. The lock plate is the
+band SWELLING over half a radian rather than a second object glued on, so the
+stones run over it unbroken the way they do in the photograph, and the
+keyhole is the one dark thing on the whole piece. 6,600 triangles, and the
+pair shares one geometry.
+
+**And the chain, which had to be measured before it could be built.** Her
+wrists sit 0.41–0.45 m apart standing, 0.33 on all fours, 0.16 kneeling, and
+reach 0.61 at the widest frame of the dances. A real handcuff chain is nine
+centimetres and would be stretched to five times its length every time she
+stood up, so this is not that chain: it is a 0.62 m swag, long enough to hang
+in a deep curve at her usual 0.43 and short enough to come taut when she
+throws her arms out.
+
+One free point and not a rope solver: the middle of it is a particle with
+gravity and drag, the two ends are wherever her wrists went this frame,
+neither half may stretch past half the chain, and forty-two oval links are
+laid along the curve through those three points. Links every 15 mm on a link
+37 mm long, so each one's end sits inside the next one's — spaced at their
+own length they read as separate rings with daylight between them. It swings
+when she turns and snaps taut when she reaches.
+
+Two details that are each one line and would be glaring without them: the
+chain slides round the band to wherever it is pulled, like a real one, which
+also means nothing has to know which way a wrist bone's axes point; and the
+low point is held in front of her belly while it is below her shoulders,
+because a chain hanging between two wrists at her hips otherwise passes
+exactly through her pelvis.
+
 ## [1.427.0] — 2026-09-19 (baye 1.26.0)
 
 ### look at me
