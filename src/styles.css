@@ -874,6 +874,12 @@ html.touch #ears .ears-lines { max-height: 26vh; overflow: hidden; }
 html.touch #ears #ears-say {
   font-size: 16px; padding: .45rem .5rem; margin-top: .45rem;
 }
+/* The sign-in sheet is the other place a phone opens a keyboard, and its two
+   fields had the same fault: 0.68rem is about 11 px, and under 16 the page
+   zooms in when the caret lands and does not zoom back out. */
+html.touch #signin-form input { font-size: 16px; }
+#ears form { margin: 0; display: block; }
+#ears form[hidden] { display: none; }
 
 /* The fly cam's frame. The picture itself is WebGL, drawn by `render(renderer,
    'pip')` in src/44-corpse.js into exactly this box: `DROPCAM.rect` is the same

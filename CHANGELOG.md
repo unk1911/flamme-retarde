@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.425.1] — 2026-09-19
+
+### three ways to say Enter, and a phone uses the third
+
+**"on mobile I type something into the I textfield, press enter but it never
+goes.. maybe I am not signed in? if so, it should show a clear message that I
+am not signed in"**. Both halves, and the first one is not the sign-in.
+
+**The box tested `e.code`, and an Android keyboard does not send one.** GBoard
+and most of the others report `keyCode` 229 and an EMPTY `code` for everything
+they insert, because what they are sending is composition text rather than
+keystrokes — so the one branch that mattered on the device most people play
+this on was the one branch that could not fire. It tests `e.key` as well now,
+which catches it there, and the input sits in a FORM, which catches the
+keyboards that send neither: a phone's return key is a GO or a SEND, and what
+it does reliably on every platform is submit the form the input is in. All
+three paths measured in a touch-emulated Chrome — code, key-only, and a bare
+submit — and all three send.
+
+The caret also stays in the box after a send. On a keyboard that is a
+convenience; on a phone, losing it costs a tap and a keyboard closing and
+opening between every sentence.
+
+**And when it cannot send, it says so where you are looking.** The two silent
+returns at the top of `send` are lines in the panel now, in the same red an
+error gets — *sign in to talk to them*, and *she only hears you on the site,
+not off a local file*.
+
+**Signing in is also reachable from inside the game**, which it was not. The
+sheet lives on the title screen and nothing in the game opened it, so a player
+who reached Jadrija signed out had one route back: a reload, which on a phone
+is thirty-two megabytes. Typing a sentence she cannot hear now opens it.
+
+And its two fields are 16 px like the typed line, for the reason that one is:
+under 16 a phone zooms the whole page in when the caret lands, and it does not
+zoom back out.
+
 ## [1.425.0] — 2026-09-19
 
 ### the typed line, on a phone

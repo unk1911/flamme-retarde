@@ -122,6 +122,7 @@ const ears = (() => {
    * until somebody asks for it.
    */
   let typedOn = false;
+  let sayForm = null;
   function panel() {
     if (panelEl) return panelEl;
     panelEl = document.createElement('div');
@@ -165,19 +166,52 @@ const ears = (() => {
     // Its own handler, and it stops the game hearing any of it: the window
     // keydown listener in 90-app.js would otherwise take a W typed into this
     // box as a throttle. See the guard there, which is the other half.
+    /**
+     * Send what is in the box, and keep the caret in it.
+     *
+     * The caret staying is a phone thing: lose it and every sentence costs a
+     * tap on the box and a keyboard closing and opening between them.
+     */
+    const sendTyped = () => {
+      const text = sayEl.value.trim();
+      sayEl.value = '';
+      if (text) send(text, 0, true);
+      sayEl.focus();
+    };
     sayEl.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.code === 'Enter' || e.code === 'NumpadEnter') {
+      // ── THREE WAYS TO SAY ENTER, AND A PHONE USES THE THIRD ─────────────
+      //
+      // Misha, 19 Sep 2026: *"on mobile I type something into the I
+      // textfield, press enter but it never goes"*. It never did: this tested
+      // `e.code`, and an Android virtual keyboard does not send one. GBoard
+      // and most of the others report `keyCode` 229 and an EMPTY `code` for
+      // everything they insert, because what they are sending is composition
+      // text rather than keystrokes — so the one branch that mattered on the
+      // device most people play this on was the one branch that could not
+      // fire. `e.key` catches it there, `e.code` still catches a real
+      // keyboard, and the form below catches the keyboards that send neither.
+      if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.key === 'Enter') {
         e.preventDefault();
-        const text = sayEl.value.trim();
-        sayEl.value = '';
-        if (text) send(text, 0, true);
+        sendTyped();
         return;
       }
-      if (e.code === 'Escape') { e.preventDefault(); sayEl.blur(); }
+      if (e.code === 'Escape' || e.key === 'Escape') {
+        e.preventDefault();
+        sayEl.blur();
+      }
     });
     sayEl.addEventListener('keyup', (e) => e.stopPropagation());
-    panelEl.append(head, bar, list, sayEl);
+    // AND A FORM ROUND IT, which is the belt to that pair of braces. A phone's
+    // return key is a GO or a SEND and what it does — reliably, on every
+    // platform, whatever it does with key events — is submit the form the
+    // input is in. One input and no button, so the submit is the key.
+    sayForm = document.createElement('form');
+    sayForm.id = 'ears-form';
+    sayForm.autocomplete = 'off';
+    sayForm.addEventListener('submit', (e) => { e.preventDefault(); sendTyped(); });
+    sayForm.appendChild(sayEl);
+    panelEl.append(head, bar, list, sayForm);
     document.body.appendChild(panelEl);
     // ── AND WHERE THE KEYBOARD IS ────────────────────────────────────────
     //
@@ -220,6 +254,7 @@ const ears = (() => {
     // microphone working: typing is the way in when the microphone is not, and
     // a box that vanishes with the device is a box you cannot reach.
     if (sayEl) sayEl.hidden = !on && !typedOn;
+    if (sayForm) sayForm.hidden = !on && !typedOn;
     const list = el.querySelector('.ears-lines');
     list.textContent = '';
     for (const l of lines) {
@@ -313,8 +348,18 @@ const ears = (() => {
     // SAY, you type a sentence, the box empties and nothing happens, twice,
     // and then you put the phone down. Two lines, both facts about where you
     // are rather than errors.
-    if (!AUTH.baye) { note(T('ears.nohost'), 'meta'); draw(); return; }
-    if (!AUTH.user) { note(T('ears.signin'), 'meta'); draw(); return; }
+    if (!AUTH.baye) { note(T('ears.nohost'), 'err'); draw(); return; }
+    if (!AUTH.user) {
+      note(T('ears.signin'), 'err');
+      draw();
+      // AND A WAY TO DO SOMETHING ABOUT IT, which there was not. The sheet
+      // lives on the title screen and nothing inside the game opened it, so a
+      // player who reached Jadrija signed out had one route back to it: a
+      // reload, which on a phone is thirty-two megabytes. Typing a sentence
+      // she cannot hear is the exact moment to offer the door.
+      if (typeof toggleSignIn === 'function') toggleSignIn(true);
+      return;
+    }
     // One at a time. A second sentence while the first is still being heard is
     // a sentence the player can say again; two in flight is two answers out of
     // order.
