@@ -18,7 +18,53 @@
   --edge:     rgba(180, 226, 236, 0.22);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   --face: "Helvetica Neue", Inter, system-ui, -apple-system, sans-serif;
+
+  /* ── THE SLAB'S FOOTPRINT, WRITTEN ONCE ──────────────────────────────────
+     The cellphone is the only thing in this game that appears on top of a
+     layout that was finished without it, and everything anchored to the right
+     edge has to get out of its way. Four elements used to do that by repeating
+     the slab's own min() inside a calc() of their own, and the rest of the
+     right-hand furniture did not do it at all — which on a 932 by 430 phone
+     meant the slab at [756, 39, 163, 353] sat on top of the throttle
+     ([878, 128, 46, 174], 41 of its 46 columns), the whole tank gauge
+     ([802, 118, 72, 125]) and the top 48 px of SCOOP and DROP. The throttle
+     was not merely hidden: #cell is `pointer-events: auto` at z-index 69 and
+     #touch is at 45, so the lever could not be moved while the phone was out.
+
+     So there is one number now. `--cell-w` is the slab's width — the same
+     three-term min() the phone is sized by, and the third term is load-bearing
+     for the reason written over #cell — and `--cell-gap` is how far left
+     everything else moves while the phone is out: nothing, or the slab plus
+     the fourteen pixels `DROPCAM.push` also adds. Add `var(--cell-gap)` to a
+     `right` and that element can never be under the phone again, at any
+     viewport, before or after a rotation, because both halves of it are
+     viewport units the browser re-evaluates by itself. */
+  --cell-w: min(15vw, 230px, calc(78vh * 9 / 19.5));
+  --cell-gap: 0px;
+
+  /* How much TALLER THAN ONE LINE the bottom-left button row has grown, in
+     CSS pixels — written by `shelf()` in src/91-touch.js and 0 until it says
+     otherwise. Ten or eleven buttons fit across 932 px in one line and do not
+     fit across 568, and every panel that sits above that row (#ears, the pack
+     gauge, all four water HUDs, the doors) had a hard-coded rem in its
+     `bottom` that assumed one line. Measured at 430 by 932 the wrapped ground
+     row was [13, 853, 404, 66] and #ears was [13, 782, 250, 87], which is the
+     panel lying on the top sixteen pixels of the buttons. */
+  --wrap: 0px;
+
+  /* And how far in from the RIGHT edge the bottom-right block reaches — SCOOP
+     and DROP, or WATER, or the throttle — written by the same `shelf()`, 0
+     where there is no touch HUD at all. One panel uses it, because one panel
+     runs the full width of the screen: on the ground at 932 by 430 the ears
+     measured [13, 280, 730, 87] with WATER at [624, 344, 74, 74] over the last
+     twenty-three rows of the line you type into. */
+  --big: 0px;
 }
+
+/* A phone's slab is bigger relative to the screen, and the margin it keeps is
+   smaller. Both halves of the footprint change with it. */
+html.touch { --cell-w: min(34vw, 210px, calc(82vh * 9 / 19.5)); }
+body.cell-out { --cell-gap: calc(var(--cell-w) + 14px); }
 
 * { box-sizing: border-box; }
 
@@ -245,7 +291,13 @@ button {
 /* instruments -------------------------------------------------------------- */
 
 #left  { position: absolute; left: 1.8rem;  top: 50%; transform: translateY(-50%); }
-#right { position: absolute; right: 1.8rem; top: 50%; transform: translateY(-50%);
+/* `--cell-gap` on the right-hand column and not on the left-hand one, because
+   the phone comes out on the right: with it out and nothing in this rule the
+   tank gauge measured [802, 118, 72, 125] behind a slab at [756, 39, 163, 353]
+   — all 72 columns of it, on a screen where the tank is the reason you are
+   flying low over the channel in the first place. */
+#right { position: absolute; right: calc(1.8rem + var(--cell-gap));
+         top: 50%; transform: translateY(-50%);
          display: flex; flex-direction: column; align-items: center; gap: .7rem; }
 
 .inst {
@@ -356,11 +408,11 @@ button {
 /* On a phone the bottom left corner belongs to the buttons, so the pack sits
    above them rather than underneath them. */
 #gh-pack[hidden] { display: none; }
-html.touch #gh-pack { bottom: 4.3rem; width: 10rem; }
+html.touch #gh-pack { bottom: calc(4.3rem + var(--wrap)); width: 10rem; }
 /* The button row in the water lives where the swim hint was, so the hint goes
    up above it. Same arrangement the ground HUD already makes for its pack
    gauge, one line higher because the breath bar is two lines and not one. */
-html.touch #swim-hud { bottom: 7.4rem; }
+html.touch #swim-hud { bottom: calc(7.4rem + var(--wrap)); }
 #gh-pack .gh-track {
   height: 8px; background: rgba(255, 255, 255, .10);
   border: 1px solid rgba(255, 255, 255, .16); border-radius: 2px; overflow: hidden;
@@ -830,8 +882,11 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
      screen: the status bar was off the top edge and the chin off the bottom,
      measured at [709, -12, 210, 455]. So the width is also capped by whatever
      width the available HEIGHT allows at that aspect — the height drives it on
-     anything short and the width on anything tall. */
-  width: min(15vw, 230px, calc(78vh * 9 / 19.5));
+     anything short and the width on anything tall. The three terms live on
+     `--cell-w` at the top of this file now, because seven other elements have
+     to stand clear of this slab and none of them should be carrying a second
+     copy of its arithmetic. */
+  width: var(--cell-w);
   font-family: var(--mono); letter-spacing: .03em; color: #e8f1f4;
   user-select: none;
 }
@@ -887,6 +942,17 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
   width: 34%; height: .3rem; padding: 0;
   background: rgba(190, 210, 220, .45); border: 0; border-radius: 3px;
   cursor: pointer;
+}
+/* THE CHIN IS THE BUTTON. Drawn it is 54 by 5 on a 932 by 430 screen, which is
+   a home bar and looks right and is five pixels of target — the smallest
+   anything in this game asks a thumb to hit by a factor of nine. The bar keeps
+   its size and the hit area takes the chin: .4rem above and below fills the
+   1.1rem the chin is, and 40 per cent of the bar's own width a side takes it
+   from 54 to 97 — a third of the slab, with nothing else in the chin to take
+   a tap from. 17.6 px tall is still short of 44 and cannot reach it without
+   the target climbing into the app above, where the icons are. */
+#cell .cell-home::after {
+  content: ''; position: absolute; inset: -.4rem -40%;
 }
 #cell .cell-home:hover { background: rgba(190, 210, 220, .75); }
 
@@ -950,7 +1016,7 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
   font-size: .40rem; color: #9fb4bd; text-align: center;
 }
 
-html.touch #cell { right: .8rem; width: min(34vw, 210px, calc(82vh * 9 / 19.5)); }
+html.touch #cell { right: .8rem; }
 
 /* AND WHAT THE PHONE STANDS ON. The ears panel is bottom right and the slab
    covers its right-hand end — measured with both up: ears [606, 278, 270, 63]
@@ -958,23 +1024,8 @@ html.touch #cell { right: .8rem; width: min(34vw, 210px, calc(82vh * 9 / 19.5));
    every line she says. `pointer-events: none` meant nothing was unclickable,
    so this was invisible until somebody put both on the screen at once. The
    body carries the class while the phone is out; the arithmetic is the slab's
-   own width plus its margin. */
-body.cell-out #ears {
-  right: calc(24px + min(15vw, 230px, calc(78vh * 9 / 19.5)) + 14px);
-}
-html.touch body.cell-out #ears {
-  right: calc(.8rem + min(34vw, 210px, calc(82vh * 9 / 19.5)) + .5rem);
-}
-/* The fly cam's FRAME. What is inside it is drawn by the renderer and moves
-   with `DROPCAM.push`, which the phone sets off this same slab's measured
-   width — the two have to agree to the pixel or the border sits beside the
-   picture instead of round it. */
-body.cell-out #flycam {
-  right: calc(24px + min(15vw, 230px, calc(78vh * 9 / 19.5)) + 14px);
-}
-html.touch body.cell-out #flycam {
-  right: calc(.8rem + min(34vw, 210px, calc(82vh * 9 / 19.5)) + 14px);
-}
+   own width plus its margin, and it lives on `--cell-gap`. */
+body.cell-out #ears { right: calc(24px + var(--cell-gap)); }
 
 /* Ears — src/49-ears.js. What the microphone heard and what was done about it,
    bottom right over the fly cam's corner, in the subtitle's own type. Small and
@@ -1027,13 +1078,27 @@ html.touch body.cell-out #flycam {
    exactly where it was. The panel is lifted by that and sits above the button
    row, which is at .8rem with buttons about 2.4rem tall.
 
+   `--wrap` is the other thing that can push it up, and it is there because
+   3.9rem was an arithmetic guess at a row that is not always one line. Eleven
+   ground buttons fit across 932 px and do not fit across 430: measured there
+   the row was [13, 853, 404, 66] and this panel was [13, 782, 250, 87], which
+   is the panel sitting on the top sixteen pixels of the buttons. `shelf()` in
+   src/91-touch.js measures the row and writes the difference.
+
    And the input is SIXTEEN PIXELS, not a rem of it: under 16 px a phone zooms
    the whole page in when the caret lands in the box, and what it does not do
    is zoom back out. */
 :root { --kb: 0px; }
 html.touch #ears {
-  left: .8rem; right: .8rem; width: auto; max-width: none;
-  bottom: calc(3.9rem + var(--kb));
+  left: .8rem; width: auto; max-width: none;
+  /* The two things this panel has to end short of, whichever is worse: the
+     phone, and the big button in the bottom right corner. `--big` is already
+     measured on the screen and so already has `--cell-gap` in it — the blocks
+     move over for the slab too — which is why this is a max and not a sum.
+     One rule for the phone and no phone, so the touch override of
+     `body.cell-out #ears` is gone: the gap is in the expression. */
+  right: max(calc(.8rem + var(--cell-gap)), var(--big));
+  bottom: calc(3.9rem + var(--wrap) + var(--kb));
   font-size: .62rem; line-height: 1.5;
 }
 html.touch #ears .ears-lines { max-height: 26vh; overflow: hidden; }
@@ -1051,7 +1116,17 @@ html.touch #signin-form input { font-size: 16px; }
    'pip')` in src/44-corpse.js into exactly this box: `DROPCAM.rect` is the same
    formula from the bottom left. */
 #flycam {
-  position: fixed; right: 24px; bottom: 96px; z-index: 41; pointer-events: none;
+  /* THE MARGIN IS 24 PIXELS ON EVERY DEVICE, and that is not a style choice:
+     `DROPCAM.rect` in src/44-corpse.js scissors the picture to
+     `W - w - 24 - push` and does not know what kind of screen it is on. The
+     touch override of this frame used to start from .8rem instead, so with the
+     phone out on a 932 by 430 screen the border came out at [463, 177, 280,
+     157] round a picture at [451, 176, 280, 158] — two 280-wide boxes sharing
+     268 of them, which reads as twelve pixels of empty frame down the right
+     and twelve pixels of fly hanging out of it on the left. One rule for both
+     now, and `--cell-gap` is the same slab-plus-fourteen that `push` is. */
+  position: fixed; right: calc(24px + var(--cell-gap));
+  bottom: 96px; z-index: 41; pointer-events: none;
   width: min(30vw, 460px); aspect-ratio: 16 / 9;
   border: 1px solid rgba(242, 231, 216, .55); box-sizing: border-box;
 }
@@ -1153,7 +1228,7 @@ html.touch #whoami .lbl { display: none; }
    it, which is the whole job — the failure this prevents is playing for twenty
    minutes with the buffer switched off. */
 #clip-rec {
-  position: fixed; right: 1.6rem; bottom: 1.6rem; z-index: 60;
+  position: fixed; right: calc(1.6rem + var(--cell-gap)); bottom: 1.6rem; z-index: 60;
   display: flex; align-items: center; gap: .5rem;
   font-family: var(--mono); font-size: .58rem; letter-spacing: .22em;
   text-transform: uppercase; color: var(--salt);
@@ -1310,9 +1385,17 @@ html.touch #whoami .lbl { display: none; }
 }
 
 /* The throttle is a lever, not a pair of buttons: an absolute position you can
-   set with one thumb and read without looking. */
+   set with one thumb and read without looking.
+
+   And it moves over for the phone, which is the one thing on this HUD where
+   being covered is worse than being hidden: #cell is `pointer-events: auto` at
+   z-index 69 and this whole overlay is at 45, so the slab at [756, 39, 163,
+   353] was not just drawn over the lever at [878, 128, 46, 174] — it was
+   swallowing every touch meant for it. Take the phone out over the channel and
+   the aeroplane could not be given any power at all. */
 #thr {
-  position: absolute; right: .45rem; top: 50%; transform: translateY(-50%);
+  position: absolute; right: calc(.45rem + var(--cell-gap));
+  top: 50%; transform: translateY(-50%);
   width: 2.9rem; text-align: center;
   pointer-events: auto; touch-action: none;
 }
@@ -1336,8 +1419,13 @@ html.touch #whoami .lbl { display: none; }
   text-transform: uppercase; color: #6f8189;
 }
 
+/* The two big ones, and they move over for the phone as well. The slab reaches
+   down to y 392 on a 932 by 430 screen and this row starts at 344, so DROP —
+   [801, 344, 74, 74] — lost the top 48 of its 74 pixels behind it, which is
+   the half a thumb aims at. Same `--cell-gap`, so the row keeps its distance
+   from the throttle either way. */
 #tbig, #gbig, #sbig {
-  position: absolute; right: 3.6rem; bottom: .8rem;
+  position: absolute; right: calc(3.6rem + var(--cell-gap)); bottom: .8rem;
   display: flex; gap: .6rem;
 }
 #tbig button, #gbig button, #sbig button {
@@ -1366,14 +1454,58 @@ html.touch #whoami .lbl { display: none; }
 #gmini button.lit { background: rgba(127, 209, 230, .20);
                     border-color: #7fd1e6; color: #cfe0e6; }
 /* Ten buttons do not fit across a phone in one line. They wrap upward, which
-   is why this row is anchored at the bottom rather than stretched. */
-#tmini, #gmini, #cmini, #smini { flex-wrap: wrap; max-width: calc(100vw - 1.6rem); }
+   is why this row is anchored at the bottom rather than stretched.
+
+   `row-gap` is bigger than the column gap, and only because of the rule below
+   it: a wrapped row is two lines of targets eight pixels apart, and the
+   invisible hit area each of them grows is seven pixels tall on each side. At
+   `gap: .45rem` for both axes those areas met in the middle and the upper
+   button was eating the top of the lower one. Nothing moves while the row fits
+   on one line, which at 932 px it does — the widest is #gmini at 562. */
+#tmini, #gmini, #cmini, #smini {
+  flex-wrap: wrap; row-gap: 1rem; max-width: calc(100vw - 1.6rem);
+}
+
+/* ── FORTY-FOUR PIXELS OF GLASS ─────────────────────────────────────────────
+   Measured at 932 by 430 these buttons come out between 37 by 30 (AP, II, UP,
+   IN, PC) and 68 by 30 (VIKENDICA): every one of them under the 44 px a thumb
+   wants, and the shortest of them by fourteen. Making them taller is not on —
+   the row would eat another fourteen pixels of a screen that has 430 — so the
+   TARGET grows and the button does not. An absolutely positioned pseudo-element
+   is part of its originating element for hit testing, so this is 44 by 44+ of
+   glass under a control that still draws at 30.
+
+   The insets are the gaps, halved, and nothing more: .45rem between buttons is
+   7.2 px, so 3.5 px a side leaves them a fifth of a pixel apart and the
+   narrowest button reaches 44. Seven pixels above puts the top edge at y 381
+   with the door row's last pixel at 380, which is the one pair on this HUD
+   that could have collided. The twelve below is the whole margin to the bottom
+   of the screen, and there is nothing under it to collide with.
+
+   What this is actually fixing is not a missed tap: #touch is
+   `pointer-events: none`, so a thumb that lands in the gap between AP and LVL
+   falls through to the window — and in `fly` anything left of 0.58 of the
+   width plants the flight stick. A near miss on the settings button was a
+   control input. */
+#tmini button, #gmini button, #cmini button, #smini button { position: relative; }
+#tmini button::after, #gmini button::after,
+#cmini button::after, #smini button::after {
+  content: ''; position: absolute; inset: -7px -3.5px -12px;
+}
 
 /* The one-way doors, on their own row above the controls and deliberately
    quieter than them: smaller, dimmer, further from where a thumb lives. The
-   first tap arms one and it says so in ember; the second commits. */
+   first tap arms one and it says so in ember; the second commits.
+
+   Which is why they are the one row on this HUD that does NOT get the hit area
+   above: they measure 41 to 68 by 23 and they are meant to. Being hard to
+   brush is the feature — see `arm()` in 91-touch.js — and a 44 px target round
+   a 23 px button would hand back exactly what the small button was buying.
+
+   `--wrap` because the row it sits on can become two rows: the bottom is
+   measured from the top of the button row, not from the screen. */
 #tdoor {
-  position: absolute; left: .8rem; bottom: 3.1rem;
+  position: absolute; left: .8rem; bottom: calc(3.1rem + var(--wrap));
   display: flex; gap: .4rem;
 }
 #tdoor button {
@@ -1479,7 +1611,7 @@ html.touch #whoami .lbl { display: none; }
 /* With the touch controls up, the tank has to get out of the throttle's way
    and the desktop stick readout is meaningless — you can see your own thumb. */
 html.touch #stick { display: none; }
-html.touch #right { right: 3.6rem; top: 42%; }
+html.touch #right { right: calc(3.6rem + var(--cell-gap)); top: 42%; }
 html.touch #tank { width: 2.5rem; height: 6.4rem; }
 html.touch #tank-label b { font-size: .74rem; }
 html.touch #tank-label span { font-size: .4rem; }
@@ -1760,7 +1892,7 @@ html.touch .row input[type=range] { height: 22px; }
   background: rgba(207, 238, 242, .12);
 }
 #rd-hint { min-height: 1.2em; opacity: .9; }
-html.touch #ride-hud { bottom: 7.4rem; }
+html.touch #ride-hud { bottom: calc(7.4rem + var(--wrap)); }
 
 /* ── the eFoil ───────────────────────────────────────────────────────────── */
 /* Laid out exactly like the kite's, because they are the same thing seen from
@@ -1817,7 +1949,7 @@ html.touch #ride-hud { bottom: 7.4rem; }
   background: rgba(224, 195, 138, .12);
 }
 #fo-hint { min-height: 1.2em; opacity: .9; }
-html.touch #foil-hud { bottom: 7.4rem; }
+html.touch #foil-hud { bottom: calc(7.4rem + var(--wrap)); }
 
 /* ── the boat to Šibenik ─────────────────────────────────────────────────── */
 /* The same stack as the kite and the foil, because it is the same place on the
@@ -1865,7 +1997,7 @@ html.touch #foil-hud { bottom: 7.4rem; }
   opacity: .95;
 }
 #br-hint { min-height: 1.2em; opacity: .85; }
-html.touch #brod-hud { bottom: 7.4rem; }
+html.touch #brod-hud { bottom: calc(7.4rem + var(--wrap)); }
 
 #swim-hud {
   position: fixed;

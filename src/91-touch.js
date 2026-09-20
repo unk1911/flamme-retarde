@@ -31,6 +31,86 @@
 /** How far from the pad centre counts as full deflection, in CSS pixels. */
 let padRadius = 78;
 
+/** The four bottom-left button rows, and the four bottom-right blocks. */
+const MINI_ROWS = ['tmini', 'gmini', 'cmini', 'smini'];
+const BIG_BLOCKS = ['tbig', 'gbig', 'sbig', 'thr'];
+/** What `shelf` last wrote, so it can decline to write it again. */
+const shelfWas = [-1, -1];
+
+/**
+ * What the touch HUD's own furniture is taking up, for the panels that have to
+ * stand clear of it: `--wrap` up the bottom-left, `--big` in from the right.
+ *
+ * BOTH ARE MEASUREMENTS AND NOT ARITHMETIC, and that is the whole point of
+ * them. Six things in styles.css sit above the button row — the ears panel,
+ * the pack gauge, the three water HUDs, the one-way doors — and every one of
+ * them carried a hard-coded rem in its `bottom` that was a guess at how tall
+ * that row would be. The guess is right at 932 px, where the widest row
+ * (#gmini, eleven buttons) comes out 562 wide and fits on one line. It is
+ * wrong the moment the row wraps: measured at 430 by 932 the row was
+ * [13, 853, 404, 66] and the ears panel was [13, 782, 250, 87], which is the
+ * panel lying on the top sixteen pixels of the buttons and on the input box a
+ * thumb was aiming at. A 568 by 320 phone held sideways wraps it too, and that
+ * one is not behind the turn-it-sideways screen.
+ *
+ * `--wrap` is the DIFFERENCE from one line rather than the height, so nothing
+ * moves in the common case and the rems above stay the numbers somebody chose.
+ *
+ * `--big` is the other corner. The ears panel is the one thing on this screen
+ * that runs the full width of it, and the bottom right of that width belongs
+ * to SCOOP and DROP, or to WATER, or to the throttle. Measured on the ground
+ * at 932 by 430 with the panel up: ears [13, 280, 730, 87] against WATER at
+ * [624, 344, 74, 74] — twenty-three rows of the typing line with a round
+ * button drawn on them. So the panel ends eight pixels short of whichever of
+ * those is furthest left, and `--big` is that distance measured in from the
+ * right edge. Zero when there is nothing down there, which is every desktop.
+ *
+ * Observers and not a resize handler, because this furniture changes for three
+ * reasons and only one of them is a resize: a mode change swaps which row and
+ * which block are on the screen, and the phone coming out of the bag slides
+ * every block left by `--cell-gap`. Neither arrives through a window event.
+ * A ResizeObserver catches the first — a hidden row reports a zero box, which
+ * is why both numbers are taken across the whole set rather than from whichever
+ * element was asked last — and the class watcher in `initTouch` catches the
+ * second, because a slide is not a resize and reports nothing at all.
+ */
+function shelf() {
+  let extra = 0;
+  for (const id of MINI_ROWS) {
+    const row = document.getElementById(id);
+    if (!row) continue;
+    const r = row.getBoundingClientRect();
+    if (r.height <= 0) continue;
+    // One line is one button, asked of the row itself rather than assumed: the
+    // four rows share a padding and a font size and could stop doing so.
+    const one = row.firstElementChild
+      ? row.firstElementChild.getBoundingClientRect().height : r.height;
+    extra = Math.max(extra, Math.round(r.height - one));
+  }
+  let big = 0;
+  for (const id of BIG_BLOCKS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    // Width, not `hidden`: on her deck `paintBrodTouch` hides both of #sbig's
+    // buttons and leaves the block itself in the layout, 0 px wide and still
+    // sitting 3.6rem in from the edge. A block with nothing in it is not
+    // something to keep clear of.
+    if (r.width <= 0) continue;
+    big = Math.max(big, Math.round(innerWidth - r.left) + 8);
+  }
+  // Only when it has actually moved. Writing a custom property on the root
+  // dirties the style of every element under it whether the value changed or
+  // not, and the observers below fire on a great many frames that changed
+  // nothing.
+  if (extra !== shelfWas[0] || big !== shelfWas[1]) {
+    shelfWas[0] = extra; shelfWas[1] = big;
+    const root = document.documentElement.style;
+    root.setProperty('--wrap', extra + 'px');
+    root.setProperty('--big', big + 'px');
+  }
+}
+
 function initTouch() {
   if (!IS_TOUCH) return;
 
@@ -46,8 +126,40 @@ function initTouch() {
     const r = pad.getBoundingClientRect();
     padRadius = Math.max(40, r.width * 0.5);
   };
-  addEventListener('resize', measure);
-  addEventListener('orientationchange', () => setTimeout(measure, 250));
+  // `shelf` is NOT in there. `measure` runs on every pointerdown that plants
+  // the flight stick, and the two are not the same kind of work: one reads a
+  // rectangle into a local, the other writes a custom property on the root and
+  // dirties the style of the whole tree. A stick press a second would be a
+  // style recalculation a second for nothing.
+  const relayout = () => { measure(); shelf(); };
+  addEventListener('resize', relayout);
+  addEventListener('orientationchange', () => setTimeout(relayout, 250));
+  // And on the furniture itself, for the mode changes no window event reports
+  // — see `shelf`.
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(shelf);
+    for (const id of [...MINI_ROWS, ...BIG_BLOCKS]) {
+      const el = document.getElementById(id);
+      if (el) ro.observe(el);
+    }
+  }
+  /**
+   * And the phone, which a ResizeObserver cannot see.
+   *
+   * The slab does not resize anything it moves: `body.cell-out` slides the
+   * whole right-hand side over by `--cell-gap` and every block keeps the size
+   * it had, so nothing in the set above reports a thing. Observing #cell
+   * itself does not work either — src/63-phone.js builds it the first time it
+   * is asked for, which is long after this runs, so there is nothing here to
+   * observe at boot. The class going on and off the body is the event, so that
+   * is what this watches. Measured without it: the ground HUD's ears panel
+   * came out [13, 280, 730, 87] against a WATER button that had just moved to
+   * 624, because `--big` was still the 139 it was worth before the phone.
+   */
+  if (typeof MutationObserver === 'function') {
+    new MutationObserver(shelf)
+      .observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  }
 
   // ── the floating stick ────────────────────────────────────────────────────
 
@@ -561,7 +673,7 @@ function initTouch() {
   tap('t-sset', () => togglePanel());
   tap('t-spause', () => togglePause());
 
-  measure();
+  relayout();
 }
 
 /**

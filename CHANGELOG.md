@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.445.0] — 2026-09-20
+
+### the phone was standing on the aeroplane
+
+Every piece of furniture that landed this week was measured on its own and
+none of them were measured together. Put the phone out at 932 by 430 — the
+size and shape this is actually played at — and the slab at
+`[756, 39, 163, 353]` covered **41 of the throttle's 46 columns, all 72 of
+the tank gauge and the top 48 pixels of DROP**.
+
+And it did not merely cover them. `#cell` is `pointer-events: auto` at
+z-index 69; the touch HUD is at 45. **The throttle was swallowing every touch
+meant for it** — you could see it, and nothing you did to it did anything.
+
+The slab's footprint is one custom property now, written once in `:root`, and
+every right-hand element adds it to its own `right`. Measured after:
+
+    #cell   [756,  39, 163, 353]
+    #thr    [702, 128,  46, 174]   overlap 0   (was 41 x 174)
+    #right  [625, 118,  72, 125]   overlap 0   (was 72 x 125)
+    #tank   [642, 118,  40, 102]   overlap 0
+    #tbig   [541, 344, 157,  74]   overlap 0   (was 119 x 48)
+
+That property also closes the fly cam's split frame. Its touch rule measured
+from `.8rem` where `DROPCAM.rect` measures from 24 px, so the border came out
+at `[463, 177, 280, 157]` round a picture at `[451, 176, 280, 158]` — two
+280-wide boxes sharing 268 of them. They are 279 of 280 now, and a rotation
+to 430x932 and back returns every rectangle to the pixel.
+
+**And the bottom-left buttons are 44 pixels of glass under 30 pixels of
+drawing.** They were 37 to 68 wide by 30 tall, which is a third under what a
+thumb on glass needs, and a near miss on one of them fell through to the
+window — where, in the air, anything left of 0.58 of the width plants the
+flight stick. The drawing has not changed; only the target has. The phone's
+home bar was the worst in the game by a factor of nine, 54 by **5**, and is
+now 98 by 19, which is the chin's full depth — 44 is not reachable without
+the target climbing into the app icons.
+
+**Left alone deliberately**: the one-way door row — BAIL, JADRIJA, VIKENDICA,
+ROKIĆI — stays at 23 pixels. Being hard to brush against is what that row is
+for; `arm()`'s own comment says so, and a 44-pixel target round a 23-pixel
+button hands back exactly what the small button buys.
+
+Five more collisions were found and are written down rather than bodged. Two
+of them belong to `DROPCAM.rect` and not to the stylesheet: the fly cam's
+280 by 157 picture at `y: 96` is across the tank column on a 430-pixel screen,
+and once the phone pushes it left it covers 220 by 93 of the boat's HUD —
+the countdown, the passage bar and the callout. The `w` cap wants a height
+term. The other three are portrait-only, masked by `#rotate`, and no
+landscape phone is narrow enough to reach them: 568 by 320 leaves 107 pixels
+of clearance.
+
 ## [1.444.0] — 2026-09-20 (baye 1.30.0)
 
 ### what she was never told
