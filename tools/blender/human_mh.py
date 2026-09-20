@@ -4892,6 +4892,85 @@ CROUCH = {
     "legUR": (-67, 0, -5), "legLR": (87, 0, 0), "footR": (-30, 0, 0),
 }
 
+# ── OVER THE TABLE ────────────────────────────────────────────────────────────
+#
+# Misha, 20 Sep 2026, of the line she takes off the plate: *"need a real
+# bend"*. The game had been doing it with a neck aim, which is the same
+# conclusion the prone attempt reached from the other side — a fold deep
+# enough to put a face near a table is a POSE and not a rotation laid over a
+# standing clip. Her face was getting about forty centimetres short.
+#
+# ── AND `pelvis` IS NOT A HIP ─────────────────────────────────────────────
+#
+# The first two cuts of this pose both hinged `pelvis`, on the reasonable
+# assumption that the bone between the legs and the spine is the hip. It is
+# not: on this rig `pelvis` is the root's own orientation and it turns the
+# WHOLE figure rigidly. Rendered as a ladder at -20, -35, -50 and -65 with
+# everything else at idle, she is a plank leaning further and further over,
+# feet and all — a diver off a block, not a woman over a table. Countering it
+# in the legs does not help, because they are being carried rather than bent.
+#
+# The fold lives in the SPINE, and the ladder that settled the weighting is
+# the second one: 0.55 of it in `spine01`, 0.25 in `spine02`, 0.12 in
+# `spine03` and 0.08 in the chest. Most of it low, because a fold that is
+# even along the back is a banana and a fold that is all in the lowest joint
+# is a hinge — real backs are somewhere between and nearer the hinge.
+#
+# 68 degrees is the depth. At 60 her face is around hip height and at 75 she
+# is nearly horizontal; 68 is what puts her eyes over a plate on a table with
+# her heels still down.
+#
+# The knees take twelve degrees. Stiff-legged at this depth is a hamstring
+# stretch and not a stoop, and the small bend is also what stops her reading
+# as falling forward.
+#
+# The head is the last of it. Folded 68 her face already points at the floor,
+# so the neck is asked for UP and not down: it brings her eyes on to the
+# plate rather than on to her own shins.
+#
+# The RIGHT arm is deliberately close to its idle. `reachRight` in
+# src/43-jadrija.js solves that chain on top of whatever clip is playing and
+# takes its rest chain from the frame the job starts — so a clip that threw
+# the arm somewhere first would hand the solver a shoulder it then has to
+# undo. The LEFT one braces out and forward, where the edge of a table is.
+def _stoop(a, neck, head, knee=12, root=-0.02):
+    return dict(IDLE_A, **{
+        "@root": (0.0, 0.020, -0.006 + root),
+        "spine01": (-a * 0.55, 0, 1.0), "spine02": (-a * 0.25, 0, 1.0),
+        "spine03": (-a * 0.12, 0, 0.5), "chest": (-a * 0.08, 0, 0),
+        "neck": (neck, 0, 0), "head": (head, -2, 0),
+        "armUL": (14, 0, 22), "armLL": (-30, 0, 6), "handL": (-10, 0, 0),
+        "legUL": (-knee * 0.5, 0, STAND_TRACK),
+        "legLL": (knee, 0, STAND_SHANK),
+        "footL": (-knee * 0.45, STAND_SOLE, 0),
+        "legUR": (-knee * 0.5, 3, -STAND_TRACK),
+        "legLR": (knee, 0, -STAND_SHANK),
+        "footR": (-knee * 0.45, -STAND_SOLE, 0),
+    })
+
+
+# THE NECK WAS WRONG BY TWENTY-FIVE DEGREES on the first bake, and the fold
+# was right — which is worth separating, because the picture showed a woman
+# leaning over a table looking straight at the camera. Folded 74 her face
+# already points at the floor and the neck only has to bring her gaze FORWARD
+# on to the plate, which is about 16. At 40 it carried her head all the way
+# back to level and she was stooping at the room.
+STOOP = _stoop(74, 16, 4, knee=16)
+
+# Halfway down, for the clip to pass through, so the fold arrives as a
+# movement rather than as a cut.
+STOOP_IN = _stoop(34, 14, 6, knee=8, root=-0.012)
+
+# A breath lower, the way every held pose in this file has one — a position
+# that does not move is a mannequin.
+STOOP_B = _stoop(77, 17, 5, knee=17, root=-0.030)
+
+# And the head off it, which is the only fast thing in the beat. Still folded
+# — she comes off the plate before she comes up — so this is the neck and
+# nothing else, thrown a long way back from where it was resting.
+STOOP_UP = _stoop(66, -20, -18, knee=13, root=-0.022)
+
+
 # The throw: arms up and over, legs driving straight, and the hips already
 # turning. Everything after this is ballistic.
 LAUNCH = {
@@ -7326,6 +7405,17 @@ CLIPS = [
     # as well as the way up and reusing it costs nothing.
     {"name": "kneel", "loop": False,
      "keys": [(0.0, IDLE_A), (0.45, LUNGE), (0.80, KNEEL), (1.15, FOURS)]},
+    # Over the plate and off it again. 3.40 s, which is the length of the
+    # `line` beat in src/43-jadrija.js — the clip and the phase are one
+    # number and the phase is what the powder is driven off, so a clip that
+    # ran short would have her standing up through the last of it.
+    #
+    # The keys are the beat: down by 1.05, along the line through the middle
+    # of it, the head off it at 2.55, and back up. The fold comes in slower
+    # than it goes out, because it does.
+    {"name": "snort", "loop": False,
+     "keys": [(0.00, IDLE_A), (0.55, STOOP_IN), (1.05, STOOP),
+              (2.15, STOOP_B), (2.55, STOOP_UP), (3.40, IDLE_A)]},
     {"name": "crawl", "loop": True,
      "keys": [(0.0, CRAWL_A), (0.55, CRAWL_B), (1.10, CRAWL_A)]},
     {"name": "getup", "loop": False,

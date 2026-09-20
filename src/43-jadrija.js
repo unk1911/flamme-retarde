@@ -37462,7 +37462,7 @@ async function buildJadrija(scene) {
           show.goMark = kit.work.coke;
           show.goNext = 'line';
           go('stepTo', 'walk', 0.34);
-        } else go('line', 'idle', 0.40);
+        } else go('line', 'snort', 0.30);
       } else if (name === 'reset') {
         // No `showSay` and no clip: a reset is not something she performs,
         // it is the room being put straight. See `resetWant`.
@@ -37866,7 +37866,7 @@ async function buildJadrija(scene) {
           show.goMark = null;
           show.goNext = null;
           if (nx === 'coke') { cokeSet(0); go('coke', 'idle', 0.40); }
-          else if (nx === 'line') go('line', 'idle', 0.40);
+          else if (nx === 'line') go('line', 'snort', 0.30);
           else if (nx === 'liftIt') go('liftIt', 'idle', 0.34);
           else showNext();
         }
@@ -37926,15 +37926,12 @@ async function buildJadrija(scene) {
           strawHold(skinFig, sat((lu - 0.14) / 0.10) * sat((0.94 - lu) / 0.08),
             Math.min(COKE.lines - 1, cokeGone), along);
         }
-        // And the head comes back at the top, which is the sniff. A short
-        // sharp one — 0.18 of the phase — against the slow way down.
-        if (skinFig) {
-          const back = sat((lu - 0.70) / 0.10) * sat((1.0 - lu) / 0.18);
-          skinFig.aim('neck', 1, 0, 0, -0.34 * back);
-        }
+        // The head off the plate at the top is IN THE CLIP and not an aim
+        // any more — see STOOP_UP. It was a neck rotation laid over `idle`,
+        // which is a woman standing up straight nodding at a table.
         if (lu >= 1) {
           cokeGone = Math.min(COKE.lines, cokeGone + 1);
-          if (skinFig) { skinFig.aim('neck', 1, 0, 0, 0); strawHold(skinFig, 0); }
+          if (skinFig) strawHold(skinFig, 0);
           go('dwell', 'idle', 0.42);
         }
         break;
@@ -41141,9 +41138,12 @@ async function buildJadrija(scene) {
     return Math.atan2(L.y, L.x) + Math.asin(clamp((drop - L.y) / R, -1, 1));
   }
   function cokeStoop(f, dt) {
-    // Both beats at this plate, because taking one is the cutting posture
-    // held — see `cokeTakeSet`.
-    const on = show.phase === 'coke' || show.phase === 'line';
+    // The CUTTING only. Taking a line had this too for a version, on the
+    // argument that it is the same posture held — and it is not, it is a
+    // deeper one. The `snort` clip does the whole fold now (see STOOP in
+    // tools/blender/human_mh.py) and a crouch laid over a clip that is
+    // already folded is two bends in one back.
+    const on = show.phase === 'coke';
     // In over the pour, out over the last of the fourth line, and driven off
     // the same 0-to-1 the props are driven off so the two cannot drift apart.
     // The tail runs past 1: the phase is left on that frame and the ease-out

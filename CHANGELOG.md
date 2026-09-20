@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.453.0] — 2026-09-20
+
+### a real bend
+
+*"Need a real bend."* So it is a baked pose and not a rotation: `snort`, the
+forty-eighth clip on her rig, 3.40 s and 103 frames — the same 3.40 the
+`line` beat runs for, because the clip and the phase are one number and a
+clip that ran short would have her standing up through the last of the
+powder.
+
+Measured on the built page as her head's height above the plate:
+
+    before, the neck aim     0.873 m  ->  0.557 m
+    the clip                 0.873 m  ->  0.465 m
+
+**`pelvis` is not a hip**, and two cuts of this pose were spent finding that
+out. The bone between the legs and the spine looks like the hip and is the
+root's own orientation: it turns the whole figure rigidly. Rendered as a
+ladder at −20, −35, −50 and −65 with everything else at idle, she is a plank
+leaning further and further over — a diver off a block, feet and all — and
+countering it in the legs does not help, because they are being carried
+rather than bent.
+
+The fold lives in the **spine**, weighted 0.55 / 0.25 / 0.12 / 0.08 from
+`spine01` up. Most of it low, because a fold that is even along the back is a
+banana and a fold that is all in the bottom joint is a hinge; real backs are
+between the two and nearer the hinge. 74 degrees, with sixteen of knee —
+stiff-legged at that depth is a hamstring stretch and not a stoop, and the
+bend is also what stops her reading as falling forward.
+
+**And the neck was wrong by twenty-five degrees on the first bake, while the
+fold was right.** Worth separating, because the picture showed a woman
+leaning over a table and looking straight at the camera. Folded 74 her face
+already points at the floor and the neck only has to bring her gaze forward
+on to the plate, which is 16; at 40 it carried her head all the way back to
+level and she was stooping at the room.
+
+The head off the plate at the top is in the clip too — `STOOP_UP`, still
+folded, because she comes off the plate before she comes up. It had been a
+neck rotation laid over `idle`, which is a woman standing up straight nodding
+at a table.
+
+The right arm is left near its idle on purpose: `reachRight` solves that
+chain on top of whatever clip is playing and takes its rest from the frame
+the job starts, so a clip that threw the arm somewhere first would hand the
+solver a shoulder it then has to undo. The left one braces out and forward,
+where the edge of a table is.
+
+`cokeStoop`'s crouch no longer covers this phase. It had it for a version, on
+the argument that taking a line is the cutting posture held — it is not, it
+is a deeper one, and a crouch laid over a clip that is already folded is two
+bends in one back.
+
 ## [1.452.3] — 2026-09-20
 
 ### she picks the straw up
