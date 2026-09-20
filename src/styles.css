@@ -1125,9 +1125,16 @@ html.touch #signin-form input { font-size: 16px; }
      268 of them, which reads as twelve pixels of empty frame down the right
      and twelve pixels of fly hanging out of it on the left. One rule for both
      now, and `--cell-gap` is the same slab-plus-fourteen that `push` is. */
+  /* `--fly-bottom` is 96 until `shelf()` finds the ears panel under the box on
+     a touch screen and lifts it clear — see the note there. The width carries
+     the same height cap `DROPCAM.rect` applies, because the frame and the
+     picture are one formula and 24px is the margin at the top as at the
+     side. */
   position: fixed; right: calc(24px + var(--cell-gap));
-  bottom: 96px; z-index: 41; pointer-events: none;
-  width: min(30vw, 460px); aspect-ratio: 16 / 9;
+  bottom: var(--fly-bottom, 96px); z-index: 41; pointer-events: none;
+  width: min(30vw, 460px,
+    max(120px, (100vh - var(--fly-bottom, 96px) - 24px) * 16 / 9));
+  aspect-ratio: 16 / 9;
   border: 1px solid rgba(242, 231, 216, .55); box-sizing: border-box;
 }
 #flycam[hidden] { display: none; }

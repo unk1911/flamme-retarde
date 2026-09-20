@@ -663,10 +663,32 @@ const DROPCAM = {
    * since one is DOM and the other is a scissored viewport neither knew.
    */
   push: 0,
+  /**
+   * How far the bottom of the box stands off the bottom of the screen.
+   *
+   * 96 everywhere except a touch screen with the ears panel up, where
+   * `shelf()` in src/91-touch.js measures the panel and writes both this and
+   * `--fly-bottom` — the frame and the picture are one formula. See the note
+   * there for the 279 by 54 that made it necessary.
+   */
+  lift: 96,
   rect: (W, H) => {
-    const w = Math.round(Math.min(W * 0.30, 460));
+    // `H` WAS IN THIS SIGNATURE AND UNUSED, which is most of what was wrong
+    // with this box on a phone. Sized off the width alone, a 932 by 430 screen
+    // gets a 280 by 157 picture — and with 96 px under it that is 253 of 430,
+    // nearly three fifths of the height, spent from the bottom edge.
+    //
+    // The cap is expressed from the top of the box rather than as a fraction
+    // of the picture, because what it has to stay out of is the top of the
+    // screen: 24 px of margin, matching the 24 down the side. On a laptop it
+    // never binds — 720 less 96 less 24 allows a 1 065-wide picture against
+    // the 384 the width already allows — so this changes nothing on a desktop
+    // and is only ever the rule on glass.
+    const y = DROPCAM.lift || 96;
+    const w = Math.round(Math.min(W * 0.30, 460,
+      Math.max(120, (H - y - 24) * 16 / 9)));
     const h = Math.round(w * 9 / 16);
-    return { x: Math.round(W - w - 24 - (DROPCAM.push || 0)), y: 96, w, h };
+    return { x: Math.round(W - w - 24 - (DROPCAM.push || 0)), y, w, h };
   },
 };
 

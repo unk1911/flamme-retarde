@@ -35,7 +35,7 @@ let padRadius = 78;
 const MINI_ROWS = ['tmini', 'gmini', 'cmini', 'smini'];
 const BIG_BLOCKS = ['tbig', 'gbig', 'sbig', 'thr'];
 /** What `shelf` last wrote, so it can decline to write it again. */
-const shelfWas = [-1, -1];
+const shelfWas = [-1, -1, -1];
 
 /**
  * What the touch HUD's own furniture is taking up, for the panels that have to
@@ -99,15 +99,46 @@ function shelf() {
     if (r.width <= 0) continue;
     big = Math.max(big, Math.round(innerWidth - r.left) + 8);
   }
+  // And how high the fly cam has to stand to clear the ears.
+  //
+  // On a desktop these two are already stacked, and by construction: `#ears`
+  // takes its `bottom` from `96px + min(30vw, 460px) * 9 / 16 + 12px`, which
+  // is the fly cam's own box plus a gap, so the panel sits on top of the
+  // picture and always has. The touch override threw that away — it anchors
+  // the panel at `3.9rem + --wrap` off the bottom edge, because on a phone it
+  // belongs down by the thumbs — and nothing then moved the fly cam, which is
+  // still at 96. Measured at 932 by 430 with both up: the picture runs from
+  // 177 to 334 down the screen and the panel from 280 to 368, so the bottom
+  // **279 by 54** of the fly cam is behind the ears. Both are things you have
+  // up at once — she talks while the fly performs — and neither knows about
+  // the other, because one is DOM and the other is a scissored viewport.
+  //
+  // So the panel keeps the bottom of the screen, which is right, and the
+  // picture is told where its top edge is. Ten pixels of gap, the same as the
+  // twelve the desktop rule uses less the border either side.
+  //
+  // Measured and not assumed, because the panel's height is its content: it
+  // is three lines when she answers and one when she does not.
+  let flyUp = 96;
+  const ears = document.getElementById('ears');
+  if (ears && !ears.hidden) {
+    const r = ears.getBoundingClientRect();
+    if (r.height > 0) flyUp = Math.max(96, Math.round(innerHeight - r.top) + 10);
+  }
   // Only when it has actually moved. Writing a custom property on the root
   // dirties the style of every element under it whether the value changed or
   // not, and the observers below fire on a great many frames that changed
   // nothing.
-  if (extra !== shelfWas[0] || big !== shelfWas[1]) {
-    shelfWas[0] = extra; shelfWas[1] = big;
+  if (extra !== shelfWas[0] || big !== shelfWas[1] || flyUp !== shelfWas[2]) {
+    shelfWas[0] = extra; shelfWas[1] = big; shelfWas[2] = flyUp;
     const root = document.documentElement.style;
     root.setProperty('--wrap', extra + 'px');
     root.setProperty('--big', big + 'px');
+    // The frame is CSS and the picture is a scissor rectangle in
+    // `DROPCAM.rect`, and the two have to be one formula — the same rule the
+    // 24 px margin is under. `lift` is what `rect` reads.
+    root.setProperty('--fly-bottom', flyUp + 'px');
+    DROPCAM.lift = flyUp;
   }
 }
 
@@ -138,9 +169,38 @@ function initTouch() {
   // — see `shelf`.
   if (typeof ResizeObserver === 'function') {
     const ro = new ResizeObserver(shelf);
-    for (const id of [...MINI_ROWS, ...BIG_BLOCKS]) {
+    for (const id of MINI_ROWS.concat(BIG_BLOCKS)) {
       const el = document.getElementById(id);
       if (el) ro.observe(el);
+    }
+    // And the ears panel, which is here for the fly cam's sake and not its
+    // own: the picture stands on top of it now, and the panel's height is its
+    // content — one line when she does not answer and three when she does.
+    //
+    // LAZILY, and that is the whole of this block. `#ears` is built by
+    // src/49-ears.js the first time she is asked for, exactly as `#cell` is
+    // built by the phone, so at this point in the boot there is nothing here
+    // to observe and `ro.observe` silently attaches to nothing. Measured with
+    // the straightforward version: the panel opened, the box did not move,
+    // and `--fly-bottom` stayed at 96 while the value it wanted was 160 — a
+    // dispatched `resize` put it right, which is what said the logic was
+    // sound and the wiring was not.
+    //
+    // So the arrival of the panel is the event, the same way the class going
+    // on the body is the phone's, and a childList watch on the parent it is
+    // appended to catches it once.
+    if (typeof MutationObserver === 'function') {
+      const grab = () => {
+        const el = document.getElementById('ears');
+        if (!el) return false;
+        ro.observe(el);
+        shelf();
+        return true;
+      };
+      if (!grab()) {
+        const mo = new MutationObserver(() => { if (grab()) mo.disconnect(); });
+        mo.observe(document.body, { childList: true });
+      }
     }
   }
   /**

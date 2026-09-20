@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.448.0] — 2026-09-20
+
+### the fly cam stands on the ears
+
+A sweep of every mode the game has, at both screen sizes, found this and
+photographed it: with her panel open and the fly performing, **the bottom
+279 by 54 of the fly cam is behind the ears.** Both are things you have up at
+once — she talks while the fly works — and neither knew about the other,
+because one is DOM and the other is a scissored viewport.
+
+On a desktop these two are stacked, and by construction: `#ears` takes its
+`bottom` from `96px + min(30vw, 460px) * 9 / 16 + 12px`, which is the fly
+cam's own box plus a gap. **The touch override threw that away** — it anchors
+the panel at `3.9rem + --wrap` off the bottom edge, because on a phone it
+belongs down by the thumbs — and nothing then moved the fly cam, which was
+still at 96.
+
+So the panel keeps the bottom of the screen, which is right, and the picture
+is told where its top edge is. Measured at 932 by 430:
+
+    before   fly [628, 177, 908, 334]   ears [13, 280, 710, 368]   82 x 54
+    after    fly [628, 113, 908, 270]   ears [13, 280, 710, 368]   0
+
+The height is measured and not assumed, because the panel's height is its
+content: one line when she does not answer and three when she does.
+
+**And `rect` was given `H` and never used it.** That is most of what was
+wrong with this box on a phone — sized off the width alone, a 932 by 430
+screen gets a 280 by 157 picture, and with 96 under it that is 253 of 430
+spent from the bottom edge. The cap is expressed from the *top* of the box,
+at the same 24 px margin the side uses. On a laptop it never binds: 720 less
+96 less 24 allows a 1 065-wide picture against the 384 the width already
+allows, so this is only ever the rule on glass.
+
+**The wiring was the hard half, and it is worth writing down.** The
+straightforward version — put `ears` in the set the `ResizeObserver` watches
+— does nothing at all, and does it silently: `#ears` is built by
+`src/49-ears.js` the first time she is asked for, exactly as `#cell` is built
+by the phone, so at boot there is nothing there and `ro.observe` attaches to
+nothing. The panel opened, the box did not move, and `--fly-bottom` stayed at
+96 while the value it wanted was 160 — a dispatched `resize` put it right,
+which is what said the logic was sound and the wiring was not. The arrival of
+the panel is the event, the same way the class going on the body is the
+phone's.
+
+**Still not fixed, and still written down**: the fly cam's picture crosses the
+tank column and the throttle at phone height — `#flycam` against `#right`
+72 by 66, `#radio` 62 by 25, `#reticle` 53 by 77. Both remain readable,
+because the instruments are drawn over the picture rather than under it. The
+fix is to give the right-hand column the same treatment the phone's slab
+gets, and that is a layout decision about where a tank gauge is allowed to
+live, not a collision to paper over at seven in the morning.
+
 ## [1.447.0] — 2026-09-20
 
 ### the Brod has gulls
