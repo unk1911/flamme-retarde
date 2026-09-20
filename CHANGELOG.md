@@ -8,6 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.448.1] — 2026-09-20
+
+### a race HUD rode the ferry
+
+`boardBrod` can only be reached from the promenade, so the five overlays it
+hides by hand are the five that can possibly be up. `__fr.brod.go()` can be
+called from anywhere, and a sweep of every mode the game has found what that
+costs — called mid-race it left the race HUD and the underwater tint up, so
+both rode the ferry across the channel and stepped ashore at Šibenik.
+
+    mid-race        up: swim-hud, chase-hud, under
+    after go()      up: chase-hud, under        <- and brod-hud over them
+    after go() now  up: brod-hud
+
+**No player can reach that, which is exactly why it was worth fixing.** This
+door is the handle every headless probe in the repository leans on, and a
+harness that lands you in a state the real door cannot produce is a harness
+that tests a game nobody plays. That has already cost a night once — the same
+door left the aeroplane's touch controls up, so the stick that walks her deck
+was not on the screen to be driven, and the deck walk could not be measured
+on glass until it was found.
+
+One list now, `MODE_HUDS`, so the next mode to grow a HUD shows up here as a
+missing entry rather than as a panel that will not go away. `__fr.jad.stand`
+and `__fr.vik.stand` have the same hole and can adopt it in a line each; they
+are left alone in this release because they also do not set `state.phase`,
+and what those two should do when called out of the aeroplane is a question
+rather than a bug.
+
 ## [1.448.0] — 2026-09-20
 
 ### the fly cam stands on the ears

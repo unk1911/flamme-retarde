@@ -5431,6 +5431,37 @@ function dropKite(hard = false) {
  * world for "the door" to mean that boat. `canBoard` is seven metres from a
  * mark on the mole and nothing else — see 59-brod.js.
  */
+/**
+ * Every overlay a mode owns, in one place, for the back doors.
+ *
+ * `boardBrod` can only be reached from the promenade, so the five it hides by
+ * hand are the five that can possibly be up. `__fr.brod.go()` can be called
+ * from anywhere — and a sweep of every mode found it: called mid-race it
+ * leaves `chase-hud` and the underwater tint up, so a race HUD rides the
+ * ferry across the channel and steps ashore at Šibenik with you.
+ *
+ * Nobody can reach that as a player, which is exactly why it is worth fixing
+ * rather than shrugging at. This door is the handle every headless probe
+ * leans on, and a harness that lands you in a state the real door cannot
+ * produce is a harness that tests a game nobody plays. That already cost a
+ * night once, when this same door left the aeroplane's touch controls up and
+ * the stick that walks her deck was not on the screen to be driven.
+ *
+ * One list, so the next mode to grow a HUD shows up here as a missing entry
+ * instead of as a panel that will not go away.
+ */
+const MODE_HUDS = ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'chase-hud',
+  'ride-hud', 'foil-hud', 'brod-hud', 'under'];
+
+/** Hide every one of them but `keep`, and stop whatever was driving them. */
+function clearModes(keep) {
+  for (const id of MODE_HUDS) {
+    const el = $(id);
+    if (el) el.hidden = id !== keep;
+  }
+  if (chase && chase.active) chase.stop();
+}
+
 function boardBrod() {
   if (state.phase !== 'ground' || !brod || !ground || !ground.ok) return false;
   const y = ground.you;
@@ -8672,9 +8703,7 @@ window.__fr = {
       if (ground && ground.ok && state.phase === 'ground') ground.bail();
       camOverride = null;
       state.phase = 'brod';
-      for (const id of ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'ride-hud',
-        'foil-hud']) $(id).hidden = true;
-      $('brod-hud').hidden = false;
+      clearModes('brod-hud');
       // The same three lines `boardBrod` runs, and they were missing here:
       // a probe that boards her through this door on a touch device got the
       // aeroplane's controls, and the stick that walks her deck was not on
