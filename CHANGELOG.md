@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.440.1] — 2026-09-20
+
+### framed for a phone screen
+
+The live view was shot on a 34-degree lens, and 34 is the VERTICAL angle on a
+frame that is 9:19.5 — all vertical. What the lens actually saw was
+2·d·tan(17°): **1.83 m at three metres**, which is a person with their head
+cut off, and **0.95 m at the 1.55 the indoor case backed off to**, which is a
+torso. Standing 360 m away and opening the Baye app on a woman sitting in the
+kabina, what came back was her midriff.
+
+**50 degrees**, which is also what the camera in a real phone is — they are
+wide because what people photograph is a person in a place — and the two
+distances go out with it: 3.2 m outdoors and 2.3 indoors, aimed at 1.05
+rather than 1.15 so she sits in the lower two thirds of a tall frame. The
+outdoor frame is 2.98 m tall and runs from under her feet to half a metre
+over her head; the indoor one is 2.14 and she just fits, which is what a
+four-metre room allows. Photographed both: the promenade with the pines
+behind her, and the kabina with the tabouret, the poster and the lamp.
+
 ## [1.440.0] — 2026-09-20
 
 ### the live view keeps her alive

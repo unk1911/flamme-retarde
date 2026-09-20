@@ -41,12 +41,27 @@ const PHONE = {
   home: 'home',
   /** Seconds of buzz one press of the Lovense button is worth. */
   buzz: 5.0,
-  /** The camera: metres in front of her, eye height, and what it looks at. */
-  camAt: 3.0, camY: 1.62, camAim: 1.15,
+  /**
+   * The camera: metres in front of her, eye height, and what it looks at.
+   *
+   * FRAMED FOR A PHONE SCREEN, which is where this goes and which is 9:19.5.
+   * `fov` is the VERTICAL angle, and at the 34 degrees this opened on the
+   * lens saw 2·d·tan(17°) — 1.83 m at three metres, which is a person with
+   * their head cut off, and 0.95 m at the 1.55 the indoor case used, which is
+   * a torso. 50 degrees is also what the camera in a real phone is: they are
+   * wide because what people photograph is a person in a place.
+   *
+   * At 3.2 m the frame is 2.98 m tall and the aim is 1.05, so it runs from
+   * under her feet to half a metre over her head. Indoors at 2.3 it is 2.14 m
+   * and she just fits — the kabina is four metres across and the lens can be
+   * in the wall behind it without anybody minding, but it cannot be outside
+   * the room looking at the back of one.
+   */
+  camAt: 3.2, camY: 1.62, camAim: 1.05,
   /** Indoors there is a wall three metres in front of her. */
-  camIn: 1.55,
-  /** And the lens, in degrees. */
-  fov: 34,
+  camIn: 2.3,
+  /** And the lens, in degrees — vertical, on a screen that is all vertical. */
+  fov: 50,
   /**
    * How often the live view is re-rendered, and how big it is drawn.
    *
