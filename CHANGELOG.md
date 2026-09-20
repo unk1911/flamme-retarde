@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.439.1] — 2026-09-20
+
+### the phone, on a phone
+
+Checked at 932 by 430 with a coarse pointer, which is the size and the shape
+this gets played at, and the slab did not fit on the screen: **[709, −12,
+210, 455]** — 455 pixels of phone in a 430 pixel viewport, with the status bar
+off the top edge and the chin off the bottom. A phone is 9:19.5 and a phone
+held sideways is 430 tall, so a width capped only at `min(34vw, 210px)` is a
+height nobody asked about.
+
+So the width is capped by the available HEIGHT as well: the third term of the
+`min()` is what that aspect allows in 78vh on a desktop and 82vh on glass.
+Height drives it on anything short, width on anything tall. Measured again
+after: [756, 39, 163, 353], entirely inside the screen, with the live view
+blitting into [763, 76, 149, 277].
+
+The PHONE button is in the bottom row next to SAY and is not covered by the
+slab, which is the other half of being able to put it away again.
+
 ## [1.439.0] — 2026-09-20
 
 ### the upper deck too

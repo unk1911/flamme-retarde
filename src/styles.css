@@ -824,7 +824,14 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
 #cell {
   position: fixed; right: 24px; top: 50%; transform: translateY(-50%);
   z-index: 69; pointer-events: auto;
-  width: min(15vw, 230px);
+  /* THE THIRD TERM IS THE ONE THAT MATTERS, and it is there because a phone
+     is 9:19.5 and a phone in landscape is 430 px tall. At `min(34vw, 210px)`
+     alone the slab came out 210 wide and therefore 455 tall on a 932 by 430
+     screen: the status bar was off the top edge and the chin off the bottom,
+     measured at [709, -12, 210, 455]. So the width is also capped by whatever
+     width the available HEIGHT allows at that aspect — the height drives it on
+     anything short and the width on anything tall. */
+  width: min(15vw, 230px, calc(78vh * 9 / 19.5));
   font-family: var(--mono); letter-spacing: .03em; color: #e8f1f4;
   user-select: none;
 }
@@ -939,7 +946,7 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
   font-size: .40rem; color: #9fb4bd; text-align: center;
 }
 
-html.touch #cell { right: .8rem; width: min(34vw, 210px); }
+html.touch #cell { right: .8rem; width: min(34vw, 210px, calc(82vh * 9 / 19.5)); }
 
 /* Ears — src/49-ears.js. What the microphone heard and what was done about it,
    bottom right over the fly cam's corner, in the subtitle's own type. Small and
