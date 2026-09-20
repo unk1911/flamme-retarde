@@ -8,6 +8,124 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.449.0] — 2026-09-20 (baye 1.31.0)
+
+### the words that were not there
+
+Seven things, six of them his, and the two worth reading first are the ones
+that were worse than missing.
+
+**Every one-word command failed.** `skills_of` opens on `ASK_RE`, which is
+the whole of what stops "your hair smells of wine" being read as a request
+for a glass — and one word carries no modal, no please and no imperative
+opener, so it read as talk. Measured against HEAD:
+
+    'twerk'   -> []          'do a twerk'   -> ['twerk']
+    'shimmy'  -> []          'dance for me' -> ['shimmy']
+
+That is the whole list of her numbers, not just the twerk. A sentence now
+gets in when, with its filler taken out, **one** word is left and that word is
+a skill's own name. One and not two, because two words of content is already
+a sentence about something — "nice card", "wine glass" — and those still need
+an asking verb, exactly as before. Checked: they still get nothing.
+
+**And "take the lovense out" handed it to her.** `take` is a handover verb, so
+the sentence reached `give_of` and came back `give:lovense` — the opposite
+instruction, answered by offering her a thing she is already wearing.
+
+    'take lovesens out'  ->  give:lovense   ->  doff:lovense
+    'pull it out'        ->  []             ->  doff:lovense
+
+`doff_of` runs before the handover, for the same reason `wear_of` does. "Take
+it out" with no noun is allowed, which the cream and the beer are not: there
+is one thing in this game you take *out* of somebody.
+
+### and the rest of the Lovense vocabulary
+
+**"Lovense off" did nothing, and neither did "turn the lovense off"** —
+`HUSH_RE` carries `turn off` as a contiguous phrase, so the noun sitting
+between its two words broke it. Only "stop the lovense" worked. The word
+`off` is not in `HUSH_RE` and must not be, because it is in half the
+sentences on this beach; it counts when the thing is named in the same
+breath, and never for `take ... off`, `take ... out`, or "buzz off".
+
+    'lovense off'   'lovesense off'   'lovesens off'
+    'turn the lovense off'   'switch the lovense off'   'lovense stop'
+      -> all hush:lovense
+
+**And how long.** The duration was being thrown away — "buzz for 30 seconds"
+and a bare "buzz" returned the same string. It rides on the end of the name
+now, `buzz:lovense:120`, on the same colon split the fetch already uses for
+its flavour.
+
+    'lovens vibrate for 2 minutes'  ->  buzz:lovense:120
+    'buzz for 30 seconds'           ->  buzz:lovense:30
+    'buzz her'                      ->  buzz:lovense     (the page's default)
+    'buzz for 9999 minutes'         ->  buzz:lovense:600 (capped)
+
+Ten minutes is the cap, and not out of prudishness: a number typed into a
+sentence is a number somebody can typo, and a motor that will not stop for
+half an hour because of a stray zero is a worse bug than a short buzz.
+
+### it stops on its own now
+
+**"When lovens goes in, it should only vibrate for about 15 seconds and then
+stop."** It ran until something stopped it, which on a beach is for ever —
+the phone's BUZZ button was the only thing in the game that ever turned it
+off by itself, and that is five seconds because a button press is a button
+press.
+
+The clock lives on the signal rather than on whatever started it, so it
+survives all three callers. Fifteen seconds is three of `SIGNAL.beat`'s
+five-second rounds, so it ends on a rest rather than mid-pulse. Measured on
+the built page, from the frame she puts it in:
+
+    worn      t 0.17   until 15   near 2.03 m
+    +8.6 s    t 8.59   running
+    +14.6 s   t 14.59  running
+    after     worn true, buzzing FALSE
+
+And the mechanism on its own, driven to the second: running at 14.5, stopped
+by 15.5, still stopped at 18.
+
+### she hears you from twenty metres
+
+**"The bay's hearing range should be greater than 5 meters. It should be more
+like 20 meters."** The number he was feeling is `close` and not `earshot`.
+Fourteen metres is where she stops hearing at all and was never the
+complaint; **four** is where a sentence stops counting as said *to* her
+unless it is a question or carries her name — so a bare "twerk" from six
+metres came back "not to her", which reads as a woman who has gone deaf at
+five paces. `close` is 20 now and `earshot` 26, so the band above it
+survives.
+
+### and she takes it back out
+
+`wear:` had no opposite — nothing in `SHE_CAN` had ever undone anything. The
+exact reverse of the pre-placement at the top of the file: the parts come off
+the rig, `giftMesh` builds the object again, and it goes back on the tabouret
+at `kit.spot` with the same lay and the same rest, so the room ends up as it
+started and `wear:` can pick it straight back up. Whatever it was doing stops
+on the way out, through `signalSet`, so the light and the nod and the
+handset's own motor stop with it. Measured: `on false, out true`.
+
+**No walk-up yet, and that is what it is missing.** `wear:` is an errand —
+she crosses to the stool, `liftIt` plays, the thing goes on at the end of it
+— and this is instant. The gesture belongs beside `liftIt` and is left out
+rather than half-built, because a reach that ends with the object teleporting
+is worse than no reach.
+
+### parked
+
+**"When we bump into baye... it actually doesn't work great, so can u
+temporarily park that?"** The whole 22.7-second take is off the shove. What
+is left is `NOISE.bump`, the three one-second cuts — which is a reaction
+rather than a performance, and a shove is over in a second.
+
+Parked and not deleted: the clip stays in the payload, the row stays in
+`NOISE`, `noiseWarm` still decodes it, and the kabina's `wetlong` uses the
+same path. One line comes back when the new recordings exist.
+
 ## [1.448.2] — 2026-09-20
 
 ### a handle that accepts a state the game cannot reach

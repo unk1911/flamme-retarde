@@ -241,8 +241,25 @@ const EARS_REACH = 45;
  * your feet on the porch, 2.8 m down and 1.2 m out.
  */
 const TALK = {
-  earshot: 14,
-  close: 4,
+  // ── AND SHE HEARS YOU FROM FURTHER OFF THAN SHE DID ──────────────────────
+  //
+  // Misha, 20 Sep 2026: *"the bay's hearing range should be greater than 5
+  // meters. 5 meters is not enough. it should be more like 20 meters"*.
+  //
+  // The number he was feeling is `close`, not `earshot`. Fourteen metres is
+  // where she stopped hearing you at all, and nothing about that was the
+  // complaint; four metres is where a sentence stops counting as being said
+  // TO her unless it is a question or carries her name — so a bare "twerk"
+  // said from six metres came back "not to her", which from the promenade
+  // reads as a woman who has gone deaf at about five paces.
+  //
+  // Twenty, as asked, and `earshot` goes to twenty-six so that the band above
+  // it survives: inside twenty anything you say is to her, from twenty to
+  // twenty-six it has to be a question or have her name in it, and past that
+  // she does not hear you. The noise rule is still there; it has just been
+  // moved out to a distance where a beach is a beach rather than a room.
+  earshot: 26,
+  close: 20,
   /** How long her answer stays on screen after she stops. */
   hold: 5.0,
   /** Seconds to wait for a line already in the air before giving up. */

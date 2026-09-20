@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.30.0"
+VERSION = "1.31.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -765,6 +765,19 @@ ASK_RE = re.compile(
     r"headphones|bose|(hand[\s-]?)?cuffs|bangles|bracelets|chain\w*)\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"
+    # AND THE THING'S OWN NAME WITH "OFF" AFTER IT. "Lovense off" is how
+    # somebody actually says it, and it carries no verb at all — so it never
+    # reached `buzz_of`, and neither did "turn the lovense off", because the
+    # `turn off` above is contiguous and the noun sits between the two words.
+    # The noun is what makes this safe: a bare `off` is in half the sentences
+    # on this beach.
+    r"|\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy)\b"
+    r".{0,16}\boff\b"
+    # And taking it back out, which carries `take` — a handover verb — and
+    # went to `give_of` as an offer of the thing she is already wearing. See
+    # `doff_of`, which is strict about what it will answer with.
+    r"|\b(take|takes|pull|pulls|slip|slips|remove|removes|yank|yanks|get|gets)"
+    r"\b.{0,24}\bout\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
@@ -1002,11 +1015,34 @@ def buzz_of(text: str):
     t = (text or "").lower()
     on = BUZZ_RE.search(t)
     off = HUSH_RE.search(t)
-    if not on and not off:
+    # AND A BARE "OFF" AFTER THE THING'S OWN NAME.
+    #
+    # Misha, 20 Sep 2026: *"currently there's no way it seems to say 'lovense
+    # off' or 'lovesense off'. there should be"*. There was not, and neither
+    # was there a way to say **"turn the lovense off"** — `HUSH_RE` carries
+    # `turn off` as a contiguous phrase, so the noun sitting between its two
+    # words broke it. Measured against HEAD, all three returned nothing and
+    # only "stop the lovense" worked.
+    #
+    # `off` on its own is not in `HUSH_RE` and must not be: it is in half the
+    # sentences on this beach. It counts here only when the thing is named in
+    # the same breath, and never when the sentence is `take ... off` (which is
+    # `TAKE_OFF_RE`'s), `take ... out` (which is `doff_of`'s), or "buzz off",
+    # which is a person being told to go away.
+    bare_off = bool(
+        not on and not off and OFF_RE.search(t)
+        and not DOFF_RE.search(t) and not TAKE_OFF_RE.search(t)
+        and not re.search(r"\bbuzz\s*off\b", t))
+    if not on and not off and not bare_off:
         return None
+    stop = bool(off or bare_off)
     for key, pat in GIVE_WORDS:
         if re.search(r"\b(" + pat + r")", t):
-            return ("hush:" if off else "buzz:") + key
+            return ("hush:" + key) if stop else ("buzz:" + key + secs_of(t))
+    # A bare `off` that named nothing is not this. "The mole is off to the
+    # left" reached here and must leave with nothing.
+    if bare_off:
+        return None
     # AND "BUZZ HER" NAMES IT WITHOUT NAMING IT. There is exactly one thing in
     # this game with a motor and a receiver in it — the `radio` row in
     # src/62-satchel.js — and the player now has a phone with a BUZZ button on
@@ -1016,8 +1052,58 @@ def buzz_of(text: str):
     # beach, and "turn it on" is a hose as often as it is a toy. "Buzz off" is
     # a person telling somebody to go away, and it is not this.
     if HUM_RE.search(t) and not re.search(r"\bbuzz\s*off\b", t):
-        return ("hush:" if off else "buzz:") + "lovense"
+        return ("hush:lovense") if stop else ("buzz:lovense" + secs_of(t))
     return None
+
+
+# ── AND FOR HOW LONG ──────────────────────────────────────────────────────────
+#
+# Misha, 20 Sep 2026: *"if we are in the room we should be able to say 'lovens
+# vibrate for 2 minutes' or something like that"*. The duration was being
+# thrown away — "buzz for 30 seconds" and a bare "buzz" returned the same
+# string — so the page had nothing to run a clock off.
+#
+# It rides on the end of the name, `buzz:lovense:120`, because the page
+# already splits these on the colon and a second field costs it one line. No
+# suffix at all is the default the phone's own button uses, which stays five
+# seconds.
+#
+# Capped at ten minutes. Not prudishness — a number typed into a sentence is
+# a number somebody can typo, and a motor that will not stop for half an hour
+# because of a stray zero is a worse bug than a short buzz.
+FOR_RE = re.compile(
+    r"\bfor\s+(a|an|one|two|three|four|five|ten|fifteen|twenty|thirty|"
+    r"half|\d{1,4})\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes)\b")
+WORD_NUM = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4,
+            "five": 5, "ten": 10, "fifteen": 15, "twenty": 20, "thirty": 30,
+            "half": 0.5}
+BUZZ_MAX = 600
+
+
+def secs_of(text: str) -> str:
+    """`:<seconds>` if the sentence says how long, else an empty string."""
+    m = FOR_RE.search((text or "").lower())
+    if not m:
+        return ""
+    n = WORD_NUM.get(m.group(1))
+    if n is None:
+        try:
+            n = float(m.group(1))
+        except ValueError:
+            return ""
+    if m.group(2).startswith("m"):
+        n *= 60
+    n = int(round(n))
+    if n < 1:
+        return ""
+    return ":" + str(min(n, BUZZ_MAX))
+
+
+# The word on its own, which `HUSH_RE` deliberately does not carry: `off` is
+# in half the sentences on this beach ("take your shoes off", "buzz off", "the
+# far end of the mole is off to the left") and it only means this one when the
+# thing is named in the same breath. See the guard in `buzz_of`.
+OFF_RE = re.compile(r"\boff\b")
 
 
 # AND "TAKE IT OFF" IS THE OPPOSITE OF A HANDOVER. `GIVE_RE` owns the verb
@@ -1028,6 +1114,42 @@ def buzz_of(text: str):
 # on" while she stood there wearing them.
 TAKE_OFF_RE = re.compile(r"\btake\b.{0,24}\boff\b|\btake off\b|\bunclip\b"
                          r"|\bundo\b.{0,20}\b(cuffs?|chain\w*)\b")
+
+
+# ── AND TAKING IT BACK OUT ────────────────────────────────────────────────────
+#
+# Misha, 20 Sep 2026: *"there's definitely no way to say something like 'take
+# lovesens out' or 'pull lovesens out', but there should be"*.
+#
+# He is right, and it was worse than missing. `take` is a handover verb, so
+# "take the lovense out" reached `give_of` and came back **`give:lovense`** —
+# which is the opposite instruction, and the page would have answered it by
+# offering her a thing she is already wearing.
+#
+# BEFORE `give_of` in `skills_of`, for exactly the reason `wear_of` is: the
+# sentence carries a handover verb and is not a handover. And a separate
+# action from `hush:`, because stopping the motor and taking the thing out are
+# two different requests and only one of them ends with her holding it.
+#
+# "Take it out" with no noun is allowed, which the cream and the beer are not.
+# There is one thing in this game you take *out* of somebody, and the sentence
+# has nowhere else to land.
+DOFF_RE = re.compile(r"\b(take|takes|pull|pulls|get|gets|slip|slips|remove|"
+                     r"removes|yank|yanks)\b.{0,24}\bout\b"
+                     r"|\btake it out\b|\bpull it out\b|\bout it comes\b")
+DOFF_IT = re.compile(r"\b(it|that|this)\b")
+
+
+def doff_of(text: str):
+    """`doff:<key>` if the sentence takes a worn thing back off her."""
+    t = (text or "").lower()
+    if not DOFF_RE.search(t):
+        return None
+    for key, pat in WEAR_WORDS:
+        if re.search(r"\b(" + pat + r")", t):
+            return "doff:" + key
+    # The bare pronoun, and only for the one thing that is *in* rather than on.
+    return "doff:lovense" if DOFF_IT.search(t) else None
 
 
 def give_of(text: str):
@@ -1077,11 +1199,52 @@ def wear_of(text: str):
     return None
 
 
+# ── AND THE NAME OF THE THING, SAID ON ITS OWN ────────────────────────────────
+#
+# Misha, 20 Sep 2026: *"she should understand the command 'twerk' in the
+# kabine, she already knows how to twerk"*. She does, and `SKILLS` has carried
+# the pattern for it since the move was built — the sentence never got that
+# far. `skills_of` opens on `ASK_RE`, which is the whole of what stops "your
+# hair smells of wine" being read as a request for a glass, and a single word
+# carries no modal, no please and no imperative opener. So it read as talk.
+#
+# Measured against HEAD, and it was never only the twerk:
+#
+#     'twerk'       -> []            'do a twerk'    -> ['twerk']
+#     'shimmy'      -> []            'dance for me'  -> ['shimmy']
+#
+# **Every one-word command failed**, which is the whole list of her numbers.
+#
+# The fix is narrow on purpose, because `ASK_RE` is load-bearing. A sentence
+# gets in here only if, with its filler words taken out, there is ONE word
+# left and that word is a skill's own name. Two words of content is already
+# enough to be a sentence about something — "nice card", "wine glass" — and
+# those still need an asking verb, exactly as before.
+BARE_FILLER = {"a", "an", "the", "some", "do", "does", "go", "now", "again",
+               "please", "pls", "plz", "baye", "ok", "okay", "yeah", "yes",
+               "and", "then", "just", "quick", "quickly", "more", "one"}
+BARE_WORD = re.compile(r"[a-zà-ž']+", re.I)
+
+
+def bare_skill(text: str):
+    """The one skill a sentence names when the sentence is nothing else."""
+    words = [w for w in BARE_WORD.findall((text or "").lower())
+             if w not in BARE_FILLER]
+    if len(words) != 1:
+        return None
+    t = words[0]
+    for name, (_desc, pats) in SKILLS.items():
+        if all(re.search(p, t) for p in pats):
+            return name
+    return None
+
+
 def skills_of(text: str) -> list:
     """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
     t = (text or "").lower()
     if not ASK_RE.search(t):
-        return []
+        bare = bare_skill(t)
+        return [bare] if bare else []
     # THE FETCH GOES FIRST, because it shares its nouns with the recon: "go see
     # what ice creams they have" is `see.slast` and "get me an ice cream" is
     # this, and the difference is the verb rather than the noun.
@@ -1093,6 +1256,12 @@ def skills_of(text: str) -> list:
     don = wear_of(t)
     if don:
         return [don]
+    # And taking it back out, before the handover for the same reason `wear_of`
+    # is: the sentence carries `take`, and the handover would have read it as
+    # an offer of a thing she is already wearing. See `doff_of`.
+    off = doff_of(t)
+    if off:
+        return [off]
     # And handing her something, before the table below: "give her the beer"
     # shares its noun with `BUY` and its verb with nothing else.
     gift = give_of(t)

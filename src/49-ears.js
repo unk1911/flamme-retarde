@@ -521,10 +521,23 @@ const ears = (() => {
           // 43-jadrija.js.
           if (name.startsWith('buzz:') || name.startsWith('hush:')) {
             const on = name.startsWith('buzz:');
-            const key = name.slice(5);
+            // AND HOW LONG, WHICH RIDES ON THE END OF THE NAME.
+            //
+            // `buzz:lovense:120` — the service puts the seconds there when
+            // the sentence said them, and nothing when it did not. See
+            // `secs_of` in server/baye/baye.py. Same split the fetch already
+            // uses for its flavour, so this is one line and not a format.
+            //
+            // No suffix means the page's own default rather than zero:
+            // "buzz her" with no length is not a request for a motor that
+            // never stops, it is a request for a buzz.
+            const bits = name.slice(5).split(':');
+            const key = bits[0];
+            const secs = bits[1] ? Math.max(0, +bits[1] || 0) : 0;
             const J2 = typeof jadrija !== 'undefined' && jadrija;
-            const got = J2 && J2.signal ? J2.signal(key, on) : 'nothing';
-            note('phone: ' + (got === 'on' ? 'sent — it is going'
+            const got = J2 && J2.signal ? J2.signal(key, on, secs) : 'nothing';
+            note('phone: ' + (got === 'on'
+              ? 'sent — it is going' + (secs ? ' for ' + secs + ' s' : '')
               : got === 'off' ? 'sent — off'
                 : got === 'not out' ? 'it is still in your satchel'
                   : got === 'no sender' ? 'you have no phone on you'

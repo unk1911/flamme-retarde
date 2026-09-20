@@ -35696,7 +35696,13 @@ async function buildJadrija(scene) {
    * phase names, which is what keeps this honest: there is nothing here she
    * cannot do.
    */
-  const SHE_CAN = { wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
+  // AND TAKING IT BACK OUT. Misha, 20 Sep 2026: *"there's definitely no way
+  // to say something like 'take lovesens out' or 'pull lovesens out', but
+  // there should be"*. `wear:` had no opposite — nothing in this table ever
+  // undid anything — and the sentence reached the handover instead and came
+  // back as an offer of the thing she is already wearing. See `doff_of` in
+  // server/baye/baye.py, which now answers `doff:<key>`.
+  const SHE_CAN = { doff: 1, wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
     note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
     // AND THE POSE SHE ALREADY HAD AND NOTHING COULD ASK FOR.
     //
@@ -36069,6 +36075,20 @@ async function buildJadrija(scene) {
       // puts a thing down at her feet out there and is a different errand.
       if (!sheIsIn()) return 'outside';
       if (!kit || !kit.work) return 'nokit';
+      return null;
+    }
+    if (name.startsWith('doff:')) {
+      const key = name.slice(5);
+      if (!key) return 'nothing';
+      // The mirror of `wear:` and it answers the same three ways: a thing
+      // with no bone was never on her, a thing she is not wearing cannot come
+      // off, and it goes back on the tabouret — which is indoors.
+      const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
+      if (!row || !row.wear) return 'notwearable';
+      if (!worn[key]) return 'notworn';
+      if (giftHeld) return 'holding';
+      if (!sheIsIn()) return 'outside';
+      if (!kit || !kit.spot) return 'nokit';
       return null;
     }
     if (name === 'side.left' || name === 'side.right') {
@@ -37363,6 +37383,11 @@ async function buildJadrija(scene) {
           show.goNext = 'liftIt';
           go('stepTo', 'walk', 0.34);
         } else go('liftIt', 'idle', 0.40);
+      } else if (name.startsWith('doff:')) {
+        show.byAsk = 1;
+        show.queue.length = 0;
+        showSay('trill', d);
+        doffNow(name.slice(5));
       } else if (name === 'side.left' || name === 'side.right') {
         const clip = name === 'side.left' ? 'sideL' : 'sideR';
         show.byAsk = 1;
@@ -38009,6 +38034,8 @@ async function buildJadrija(scene) {
             if (parts) {
               worn[giftHeld.key] = parts;
               for (const part of parts) skinFig.mesh.add(part.group);
+              // And it goes for fifteen seconds. See BUZZ_FOR.
+              wornBuzz(giftHeld.key);
             }
             scene.remove(giftHeld.mesh);
             if (giftHeld.mesh.geometry) giftHeld.mesh.geometry.dispose();
@@ -38084,6 +38111,7 @@ async function buildJadrija(scene) {
           if (parts) {
             worn[giftHeld.key] = parts;
             for (const part of parts) skinFig.mesh.add(part.group);
+            wornBuzz(giftHeld.key);
           } else {
             scene.remove(giftHeld.mesh);
             if (giftHeld.mesh.geometry) giftHeld.mesh.geometry.dispose();
@@ -42245,8 +42273,32 @@ async function buildJadrija(scene) {
     return null;
   }
 
-  /** Turn a receiver on or off, and say in words what happened. */
-  function signalSet(key, on) {
+  /**
+   * How long a signal runs when nobody says otherwise, and the one it gets
+   * when she has just put the thing in.
+   *
+   * Misha, 20 Sep 2026: *"when lovens goes in, it should only vibrate for
+   * about 15 seconds and then stop"*. It ran until something stopped it,
+   * which on a beach is for ever — the phone's own BUZZ button was the only
+   * thing in the game that ever turned it off on its own, and that is five
+   * seconds because a button press is a button press.
+   *
+   * Fifteen is three of `SIGNAL.beat`'s five-second rounds, so it ends on a
+   * rest rather than mid-pulse, which is the difference between a thing
+   * stopping and a thing being cut off.
+   */
+  const BUZZ_FOR = { wear: 15.0, spoken: 30.0 };
+
+  /**
+   * Turn a receiver on or off, and say in words what happened.
+   *
+   * `secs` is how long to run for, and 0 is "until told otherwise", which is
+   * what every caller meant before there was a clock in here. The clock lives
+   * on the signal and not on the caller so that it survives whatever starts
+   * it: the phone keeps its own countdown because it draws one on its screen,
+   * and a spoken "for two minutes" has nowhere else to put it.
+   */
+  function signalSet(key, on, secs = 0) {
     if (!key) return 'nothing';
     const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
     if (!row || !row.radio) return 'no receiver';
@@ -42264,8 +42316,66 @@ async function buildJadrija(scene) {
       if (IS_TOUCH && navigator.vibrate) navigator.vibrate(0);
       return 'off';
     }
-    signals[key] = { t: 0, node: rx.node, at: rx.node.position.clone() };
+    signals[key] = { t: 0, node: rx.node, at: rx.node.position.clone(),
+      until: secs > 0 ? secs : 0 };
     return 'on';
+  }
+
+  /**
+   * The fifteen seconds a thing gets the moment it goes in.
+   *
+   * Only for the one with a motor in it — putting the headphones on her is
+   * not this — and deliberately NOT through `signalCan`, which asks whether
+   * you have a phone on you. That test is the right one for a remote, and the
+   * wrong one here: this is the device announcing itself as it is switched
+   * on, the way every one of them does, and it does not need a handset in the
+   * room to do it.
+   */
+  function wornBuzz(key) {
+    if (key !== 'lovense') return;
+    signalSet(key, true, BUZZ_FOR.wear);
+  }
+
+  /**
+   * And she takes it back out.
+   *
+   * The exact reverse of the pre-placement at the top of this file: the parts
+   * come off the rig, `giftMesh` builds the object again and it goes back on
+   * the tabouret at `kit.spot`, with the same lay and the same rest — so the
+   * room ends up in the state it started in and `wear:` can pick it straight
+   * back up. Whatever it was doing stops on the way out, because a motor in
+   * a hand is a different object from a motor in a person.
+   *
+   * NO WALK-UP YET, and that is the one thing it is missing. `wear:` is an
+   * errand — she crosses to the stool, `liftIt` plays, and the thing goes on
+   * at the end of it — and this is instant. The gesture belongs in the same
+   * phase machine and the place for it is beside `liftIt`; it is left out
+   * here rather than half-built, because a reach that ends with the object
+   * teleporting is worse than no reach at all.
+   */
+  function doffNow(key) {
+    const parts = worn[key];
+    if (!parts) return false;
+    for (const part of parts) {
+      if (part.group && part.group.parent) part.group.parent.remove(part.group);
+      part.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    }
+    delete worn[key];
+    // Off, and through `signalSet` so the light, the nod and the handset's
+    // own motor all stop with it rather than being left lit on a thing that
+    // is no longer on anybody.
+    if (signals[key]) signalSet(key, false);
+    if (kit && kit.spot) {
+      const m = giftMesh(key);
+      const w = toWorld(kit.spot[0], kit.spot[1]);
+      m.position.set(w[0], kit.spot[2], w[2]);
+      m.rotation.set(m.userData.lay || 0, faceYaw(kit.spot[0], -0.55), 0);
+      restOn(m, kit.spot[2]);
+      m.userData.key = key;
+      giftProps.push(m);
+      scene.add(m);
+    }
+    return true;
   }
 
   /** Whether a signal can be sent at all: your phone on you, or the laptop. */
@@ -42298,6 +42408,12 @@ async function buildJadrija(scene) {
         sg.at.copy(rx.node.position);
       }
       sg.t += dt;
+      // AND IT STOPS ITSELF when it was given a length. `signalSet` does the
+      // whole of turning it off — the light, the nod, the audio and the
+      // handset's own motor — so this hands back to it rather than deleting
+      // the row, and leaves the loop at once because the row it was reading
+      // is gone.
+      if (sg.until && sg.t >= sg.until) { signalSet(k, false); continue; }
       const a = sg.t * SIGNAL.hz;
       // WHERE IN THE PATTERN IT IS. Everything below is scaled by it, which
       // is what makes the gaps gaps: the thing stops moving, the sound goes,
@@ -43208,7 +43324,26 @@ async function buildJadrija(scene) {
       // wants twenty-two seconds. `keep` is what stops the next contact
       // cutting it off, and the delay comes down from 190 ms to 70: she is
       // answering a shove, not water landing on her.
-      showNoise('bumplong', 0, true, 70);
+      // ── PARKED, ON HIS WORD, 20 Sep 2026 ───────────────────────────────
+      //
+      // *"when we bump into baye, i know i had asked you to play one of those
+      // 2 audio clips which are about 15-30s each, but it actually doesn't
+      // work great, so can u temporarily park that? i will later replace
+      // those audio clips with some other clips but haven't figured out yet
+      // with what."*
+      //
+      // So the whole take is off the shove. What is left is the short cuts —
+      // `NOISE.bump`, the three one-second pieces — which is what this was
+      // before 1.398.0 and is a reaction rather than a performance: a shove
+      // is over in a second, and twenty-two seconds of answer to one was the
+      // thing that did not work.
+      //
+      // PARKED AND NOT DELETED. `show_bumplong` stays in the payload, the
+      // `bumplong` row stays in `NOISE`, and `noiseWarm` still decodes it —
+      // the kabina's `wetlong` uses the same path and he is replacing the
+      // recordings rather than the idea. One line comes back when the new
+      // clips exist.
+      showNoise('bump', 0, false, 190);
       return true;
     }
     if (kind !== 'bather') return false;
@@ -47827,9 +47962,9 @@ async function buildJadrija(scene) {
      * words: 'on', 'off', 'not out', 'no receiver', or 'no sender' when you
      * have neither your phone on you nor the laptop in front of you.
      */
-    signal: (key, on = true) => {
+    signal: (key, on = true, secs = 0) => {
       if (!signalCan()) return 'no sender';
-      return signalSet(key, on !== false);
+      return signalSet(key, on !== false, secs);
     },
     /**
      * What is buzzing right now, and what the phone has been told about it.
@@ -47841,6 +47976,7 @@ async function buildJadrija(scene) {
      */
     signals: () => Object.keys(signals).map((k) => ({ key: k,
       t: +signals[k].t.toFixed(2), beat: +signalAmp(signals[k].t).toFixed(2),
+      until: signals[k].until || 0,
       buzzed: signals[k].buzzed || 0, near: signals[k].near ?? null })),
     /** Scrub what is on the plate, 0 to 1 — see COKE. */
     coke: (u = 1) => cokeSet(u),
