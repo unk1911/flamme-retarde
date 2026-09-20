@@ -312,13 +312,20 @@ const PAX_SKIN_N = 8;
  * clips below are what people on a ferry are doing: hands in the lap, sitting
  * up, talking to whoever is beside them, leaning forward on their knees.
  *
- * THE COCKPIT AND NOT THE UPPER DECK, which is a budget and not a principle.
- * These are 7 940 triangles apiece against the instanced tier's 3 036, and
- * the cockpit is where you board, where the gangway runs, and where the
- * benches are an arm's length from the walk to the stair. The six on the roof
- * are seen from the top of that stair and no nearer.
+ * BOTH BENCHES, which the first cut of this held back from on a budget: the
+ * cockpit's eight went on blobs and the upper deck's six stayed instanced,
+ * on the argument that the roof is seen from the top of the stair and no
+ * nearer. That is true of the stair and not of the upper deck, which is a
+ * place you go and sit — it is the whole reason it was built, see the note
+ * over `BROD.decks` — and a bench you are sitting ON is the closest anybody
+ * gets to any of these people. Measured at 2560 by 1440 with the whole
+ * channel in frame: 61 fps either way, which is the vsync cap, so the six
+ * cost nothing anybody can see.
+ *
+ * The one who stays an instance is the child. A blob is an adult and a
+ * 0.68-scale adult is not a child, it is a small adult.
  */
-const PAX_SKIN_SIT = 8;
+const PAX_SKIN_SIT = 14;
 const PAX_SIT_CLIPS = ['sitlap', 'sit', 'sittalk', 'sitfwd'];
 
 /**
@@ -510,7 +517,7 @@ async function buildBrodPax(scene, deckAt, boat) {
     let j = 0;
     for (const fg of cast) {
       if (j >= PAX_SKIN_SIT) break;
-      if (fg.mode !== 'sit' || fg.bench !== W || fg.scale < 0.85) continue;
+      if (fg.mode !== 'sit' || fg.scale < 0.85) continue;
       // The SOLE and not the plank — see PAX_SKIN_SIT. `B.y` is authored and
       // `B.top` is built, which is the one trap in this table.
       upgrade(fg, k + j, fg.bench.y * BROD_K,

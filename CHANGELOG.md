@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.439.0] — 2026-09-20
+
+### the upper deck too
+
+The six on the roof, which 1.436.0 held back on a budget: the cockpit's eight
+went on blobs and the upper deck's stayed instanced, on the argument that the
+roof is seen from the top of the stair and no nearer.
+
+That is true of the stair and not of the upper deck. It is a place you GO and
+SIT — the long note over `BROD.decks` says the deckhouse roof exists because
+it is the one thing that reads as capacity from the shore, and the benches up
+there are the only ones with the channel on both sides — and a bench you are
+sitting on is the closest anybody gets to any of these people.
+
+Measured at 2560 by 1440 with the whole channel in frame: 61 fps with the six
+instanced and 61 with them on blobs, which is the vsync cap either way. They
+cost nothing anybody can see.
+
+**Twenty-one of the twenty-two.** The one who stays an instance is the child,
+and that is the same rule as before: a blob is an adult, and a 0.68-scale
+adult is not a child, it is a small adult.
+
+161 323 triangles of passenger, plus the dog.
+
 ## [1.438.0] — 2026-09-20
 
 ### and somebody's dog
