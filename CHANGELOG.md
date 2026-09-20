@@ -8,6 +8,46 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.433.0] — 2026-09-19
+
+### a bed you stand in for ten minutes
+
+**"perhaps enhance the ambient audio sounds in certain locations so they are
+less repetitive"**.
+
+The note over the field beds has said since they were cut that the two SHORT
+clips are each played on two playheads at 2.3 % either side of one — so what
+comes round is the pair and not the clip — and that *a bed with a period
+longer than a minute does not need help having one*. That second half was
+wrong, and it is worth writing down why rather than just changing the number.
+
+A minute is not long for a bed you STAND IN. The alley between the kabine is
+55.5 seconds and it is where the entire indoor routine happens; the pier is
+69.5 and it is where you swim from. Both have EVENTS in them — a laugh, a
+door, a child — and one distinctive event is the whole of what the ear needs
+to learn an interval. The right test is not "longer than a minute", it is
+"longer than anybody stands there", and that is twenty minutes.
+
+So every bed gets the pair now, and the shortest gets three:
+
+    kabine    55.5 s   1 head  ->  2      period  55 s  ->  20.1 min
+    wood      68.0 s   1       ->  2              68 s  ->  24.6 min
+    lapping   69.5 s   1       ->  2              70 s  ->  25.2 min
+    hillside  10.0 s   2       ->  3             3.3 m  ->   7.3 min
+    promenade 24.5 s   2       ->  2 (unchanged)         8.5 min
+
+The arithmetic is one line: the pair comes round when the playheads have
+walked a whole loop apart, which at 4.6 % of relative rate takes 21.7 loops.
+Three heads is not 4.6 % but 2.3 between the closest pair, which is why the
+ten-second hillside doubles rather than trebles — and why it needed the third
+head most, being the shortest clip in the payload.
+
+It costs five buffer sources across the whole resort, and the level is
+unchanged: `voices` already divides by the square root of the count, which is
+what keeps N uncorrelated copies of a bed at the level one of them went in at.
+Measured standing in the alley: shore 2 heads, hillside and wood 5 between
+them, pier 2, alley 2 — eleven where there were seven.
+
 ## [1.432.0] — 2026-09-19 (baye 1.29.0)
 
 ### the konoba has a till

@@ -2169,15 +2169,35 @@ function buildAudio() {
    * never comes back — so that clip is ten seconds and there is no honest way
    * to make it more.
    *
-   * What makes up the shortfall is playheads rather than tape. The two short
-   * clips are each played twice at once, from spread starting points and at
-   * rates 2.3 % either side of one, so what returns is not the clip but the
-   * *pair*, and the pair returns when the two have walked a whole loop apart
-   * from each other. Ten seconds becomes three and a quarter minutes; the
-   * promenade's twenty-four and a half becomes eight and a half. It costs two
-   * buffer sources and it works because a detune of a fortieth is a fortieth of
-   * a semitone below anything anybody hears as pitch in a crowd, and because
-   * two copies of a hillside of insects is a hillside of insects.
+   * What makes up the shortfall is playheads rather than tape. Each clip is
+   * played twice at once, from spread starting points and at rates 2.3 %
+   * either side of one, so what returns is not the clip but the *pair*, and
+   * the pair returns when the two have walked a whole loop apart from each
+   * other. It costs one extra buffer source a bed and it works because a
+   * detune of a fortieth is a fortieth of a semitone below anything anybody
+   * hears as pitch in a crowd, and because two copies of a hillside of insects
+   * is a hillside of insects.
+   *
+   * ALL OF THEM, WHICH IS A CHANGE OF MIND. This note used to say the trick
+   * was for "the two short clips" and that a bed with a period over a minute
+   * does not need help having one. Misha, 19 Sep 2026: *"enhance the ambient
+   * audio sounds in certain locations so they are less repetitive"* — and he
+   * is right and the old reasoning was wrong in a way worth writing down. A
+   * minute is not long for a bed you STAND IN. The alley between the kabine
+   * is 55.5 s and it is where the whole indoor routine happens; the pier is
+   * 69.5 s and it is where you swim from. Both of them have events in them —
+   * a laugh, a door, a child — and one distinctive event is all the ear needs
+   * to learn an interval. What is long enough is not "longer than a minute",
+   * it is "longer than anybody stands there", and that is twenty minutes and
+   * not one:
+   *
+   *     kabine   55.5 s  ->  20.1 min      wood      68.0 s  ->  24.6 min
+   *     lapping  69.5 s  ->  25.2 min      promenade 24.5 s  ->   8.5 min
+   *     hillside 10.0 s  ->   7.3 min (three heads, see below)
+   *
+   * The arithmetic is the same one every time: the pair comes round when the
+   * playheads have walked a whole loop apart, which at 4.6 % of relative rate
+   * takes 1/0.046 = 21.7 loops.
    *
    * Each window was chosen by searching its source for the two ends that match
    * best in level and in spectrum, so that the loop seam is inaudible. That
@@ -2237,6 +2257,16 @@ function buildAudio() {
    * rate that makes the period long: two playheads at the same rate come round
    * together for ever, however far apart they start.
    */
+  /**
+   * What every bed that is not the promenade or the hillside is played with.
+   *
+   * Two playheads and 2.3 %, which are the promenade's own numbers — there is
+   * no reason for a second set and every reason for one: the moment two beds
+   * disagree about the detune, the pair of them beat against each other at the
+   * difference. See the note on length above.
+   */
+  const BED = { voices: 2, detune: 0.023 };
+
   function voices(buf, n, detune, dest, t0) {
     const out = [];
     const span = Math.max(0.001, buf.duration - 1.0);
@@ -2706,10 +2736,11 @@ function buildAudio() {
       const g = ctx.createGain();
       g.gain.value = 0.0001;
       g.connect(outBus);
-      // One playhead. The clip is 69.5 s — the whole of the pier recording bar
-      // its two ends — and a bed with a period longer than a minute does not
-      // need help having one.
-      const srcs = voices(lapBuf, 1, 0, g, t0);
+      // Two playheads, 69.5 s apiece: the whole of the pier recording bar its
+      // two ends, and its pair comes round every twenty-five minutes. It had
+      // one until 1.433.0 on the argument that a minute is long enough — see
+      // the note on length at the top, where that argument is retracted.
+      const srcs = voices(lapBuf, BED.voices, BED.detune, g, t0);
       // And the body under it, into the same gain, so it is the same bed and
       // not a second one to keep in step. See BODY.
       lapNodes = { srcs, g, body: seaBody(srcs[0], g) };
@@ -2784,7 +2815,9 @@ function buildAudio() {
       lp.type = 'lowpass'; lp.frequency.value = ROWS.lp; lp.Q.value = 0.4;
       const g = ctx.createGain();
       g.gain.value = 0.0001;
-      const srcs = voices(rowBuf, 1, 0, lp, t0);
+      // Two playheads. This is the 55.5 s bed and the one place on the shore
+      // you stand in for ten minutes at a time — see the note on length.
+      const srcs = voices(rowBuf, BED.voices, BED.detune, lp, t0);
       lp.connect(g).connect(outBus);
       // A little send, and less than the promenade's. Two parallel walls three
       // metres apart is a room, and it is a room with no ceiling and both ends
@@ -4154,11 +4187,10 @@ function buildAudio() {
     // used to sit. Measured, not judged; it wants an ear.
     level: 3.2,
     fade: 0.8,           // s — how fast the wood comes in as you walk into it
-    // The hillside clip is ten seconds and there is no more of it in the
-    // recording — see the note on length at the top. So it is played twice at
-    // once, which puts the pair's period at three and a half minutes. The wood
-    // clip is 68 s and needs one playhead and no help.
-    voices: 2,
+    // The hillside's own count, which is one more than everywhere else — see
+    // `realCicadas`, and the note on length at the top for why the wood's
+    // went from one to `BED.voices`.
+    voices: 3,
     detune: 0.023,
   };
   let cicadaBuf = null, woodBuf = null;
@@ -4190,12 +4222,15 @@ function buildAudio() {
       const cg = ctx.createGain();
       cg.gain.value = 0.0001;
       cg.connect(g);
-      // One playhead for anything over twenty seconds and two for anything
-      // under, which is the hillside clip and only the hillside clip. Started
-      // at a different place every session either way, so that the two clips
-      // do not come round together on the same beat for as long as the game is
-      // open.
-      const n = buf.duration < 20 ? CICADA.voices : 1;
+      // THREE playheads on the ten-second hillside and two on the 68 s walk
+      // through the pines, which had one until 1.433.0. Three because ten
+      // seconds is the shortest clip in the payload and a pair of them still
+      // comes round every three and a third minutes: a third head puts the
+      // closest pair 2.3 % apart instead of 4.6 and doubles that to seven and
+      // a quarter. Started at a different place every session either way, so
+      // that the two clips do not come round together on the same beat for as
+      // long as the game is open.
+      const n = buf.duration < 20 ? CICADA.voices : BED.voices;
       for (const src of voices(buf, n, CICADA.detune, cg, t0)) srcs.push(src);
       mix.push(cg);
     }
@@ -7393,7 +7428,14 @@ function buildAudio() {
       // How many playheads are up, which is what makes the periods long.
       heads: (shoreNodes ? shoreNodes.srcs.length : 0)
         + (cicadaNodes && cicadaNodes.real ? cicadaNodes.srcs.length : 0)
-        + (lapNodes ? lapNodes.srcs.length : 0),
+        + (lapNodes ? lapNodes.srcs.length : 0)
+        + (rowNodes ? rowNodes.srcs.length : 0),
+      // And per bed, which is the number this pass is about: one playhead is a
+      // bed with a period and two is a bed without one.
+      each: { shore: shoreNodes ? shoreNodes.srcs.length : 0,
+        hill: cicadaNodes && cicadaNodes.real ? cicadaNodes.srcs.length : 0,
+        lap: lapNodes ? lapNodes.srcs.length : 0,
+        rows: rowNodes ? rowNodes.srcs.length : 0 },
       playing: !!shoreNodes,
       gain: shoreNodes ? +shoreNodes.g.gain.value.toFixed(4) : 0,
       lp: shoreNodes ? Math.round(shoreNodes.lp.frequency.value) : 0,
