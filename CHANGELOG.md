@@ -8,6 +8,31 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.442.5] — 2026-09-20
+
+### her deck, by thumb
+
+The deck walk was measured with keys. This drives it the way it is actually
+driven on the device this gets played on: a real touch, held, on the floating
+stick in the left half of the screen.
+
+    start    you at [1.20, −2.45]   ×8 running
+    +1.6 s   you at [7.09, −2.45]   ×1 — 5.9 m of deck, and the compression off
+    +3.2 s   you at [11.51, −1.17]  still walking, finger still down
+
+Both halves land. She covers 5.9 m in 1.6 seconds, which is the shore's walk
+and not the old deck's wade, and **the time-lapse gives itself up to a
+thumb** — the rule that a walking input means somebody wants to be on the
+boat rather than on the crossing was written for the keys and turns out to
+have been written for the stick as well.
+
+One thing had to be fixed to test it at all: `__fr.brod.go()`, the back door
+a probe boards her through, hid the HUDs and did NOT do the three lines
+`boardBrod` does for a touch device — so on glass it left the aeroplane's
+controls up and the stick that walks her deck was not on the screen to be
+driven. A back door that lands you somewhere the front door does not is a
+back door that tests the wrong game.
+
 ## [1.442.4] — 2026-09-20
 
 ### tapped, for the first time

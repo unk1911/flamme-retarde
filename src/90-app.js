@@ -8653,6 +8653,15 @@ window.__fr = {
       for (const id of ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'ride-hud',
         'foil-hud']) $(id).hidden = true;
       $('brod-hud').hidden = false;
+      // The same three lines `boardBrod` runs, and they were missing here:
+      // a probe that boards her through this door on a touch device got the
+      // aeroplane's controls, and the stick that walks her deck was not on
+      // the screen to be driven. A back door that lands you somewhere the
+      // front door does not is a back door that tests the wrong game.
+      if (IS_TOUCH) {
+        $('touch').hidden = true; $('gtouch').hidden = true;
+        $('stouch').hidden = false;
+      }
       paintBrodHud();
       return brod.stats();
     },
