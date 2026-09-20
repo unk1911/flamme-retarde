@@ -322,6 +322,32 @@ const PAX_SKIN_SIT = 8;
 const PAX_SIT_CLIPS = ['sitlap', 'sit', 'sittalk', 'sitfwd'];
 
 /**
+ * ── AND SOMEBODY'S DOG ─────────────────────────────────────────────────────
+ *
+ * Misha, 19 Sep 2026: *"replace all those marionettes that are now on the boat
+ * with more realistic people and animals"* — and the animal is a dog, because
+ * on this coast it is always a dog. Every boat that runs between a beach and a
+ * town in August has one aboard, standing where it can see over the side, and
+ * it belongs to whoever is sitting nearest.
+ *
+ * THE PUG OFF THE PROMENADE, which is the same trick the passengers are: he is
+ * `dog.fr3d` out of the payload, the 24-bone quadruped `skinnedFigure` already
+ * takes, and the shore has been drawing him since the beach was built. A
+ * second copy is one inflate and 3 000-odd triangles.
+ *
+ * He has TWO CLIPS and that decided the pose: the bake has `idle`, `trot` and
+ * `shake` and nothing else, so a dog lying under a bench was never on the
+ * table. Standing is what the clip gives and it is also what a dog on a boat
+ * does — they do not settle while the engine is running.
+ *
+ * In the cockpit, off the port bench, looking out over the side at the water
+ * going past. Clear of the gangway — the walk from the boarding gate to the
+ * stair is 4 m across and he is 1.9 out of the middle of it — and he goes in
+ * `solid` with the people, so you walk round him rather than through him.
+ */
+const PAX_DOG = { x: -6.40, z: -1.90, yaw: Math.PI / 2, r: 0.30 };
+
+/**
  * Build the passengers and hand back something `59-brod.js` can flush.
  *
  * `deckAt` comes in as a callback rather than being re-derived here, because
@@ -426,6 +452,9 @@ async function buildBrodPax(scene, deckAt, boat) {
    * two thirds of the way out is the shin.
    */
   const solid = [];
+  // The dog first, so that a passenger's ring can never quietly replace him if
+  // somebody puts one on the same spot: both are in the list and both refuse.
+  solid.push({ x: PAX_DOG.x, z: PAX_DOG.z, r: PAX_DOG.r });
   for (const fg of cast) {
     if (fg.mode === 'sit') {
       const out = PAX_TOE * fg.scale * 0.62;
@@ -490,6 +519,30 @@ async function buildBrodPax(scene, deckAt, boat) {
     }
   }
 
+  // ── the dog ───────────────────────────────────────────────────────────
+  //
+  // Loaded here rather than borrowed off the shore for the two rigs' own
+  // reason at the top of this function: 25 KB of payload against an accessor
+  // reaching into somebody else's closure for an object that is being posed
+  // by a state machine on the promenade. This one is standing still.
+  let dog = null;
+  if (boat && typeof PAYLOAD !== 'undefined' && PAYLOAD.dog_fr3d) {
+    try {
+      dog = await loadSkin('dog_fr3d',
+        { spec: 0.05, specPower: 20, body: 'base *= vVCol;' });
+    } catch (e) { dog = null; }
+  }
+  if (dog) {
+    const dy = deckAt(PAX_DOG.x, PAX_DOG.z);
+    if (dy == null) { dog = null; } else {
+      dog.play('idle', { fade: 0 });
+      dog.mesh.position.set(PAX_DOG.x, dy, PAX_DOG.z);
+      dog.mesh.rotation.y = PAX_DOG.yaw;
+      dog.mesh.frustumCulled = false;
+      boat.add(dog.mesh);
+    }
+  }
+
   let drawn = 0;
   let lastT = -1;
   return {
@@ -506,11 +559,13 @@ async function buildBrodPax(scene, deckAt, boat) {
         r.f.update(dt);
       }
       drawn += real.length;
+      if (dog) { dog.mesh.visible = true; dog.update(dt); drawn += 1; }
     },
     /** Off the screen the instant she is: the layers live in the scene, not
      *  under `group`, so nothing else takes them down with her. */
     hide: () => {
       for (const r of real) r.f.mesh.visible = false;
+      if (dog) dog.mesh.visible = false;
       if (!drawn) return;
       for (const c of crowds) for (const L of c.layers) L.geo.instanceCount = 0;
       drawn = 0;
@@ -536,6 +591,7 @@ async function buildBrodPax(scene, deckAt, boat) {
       // what those cost. See PAX_SKIN_N.
       real: real.length,
       realTris: real.reduce((a, r) => a + r.f.tris, 0),
+      dog: dog ? dog.tris : 0,
       // What she costs, and both halves of it matter. `layers` is the draw
       // calls — one instanced mesh per rig part per rig — and it is the number
       // that does NOT go down when the crowd is small, which is why there are
@@ -560,5 +616,7 @@ async function buildBrodPax(scene, deckAt, boat) {
     crowds, cast,
     /** And the eight on blobs, for the same probe — see PAX_SKIN_N. */
     real,
+    /** And the dog, likewise — see PAX_DOG. */
+    get dog() { return dog; },
   };
 }

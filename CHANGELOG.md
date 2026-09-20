@@ -8,6 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.438.0] — 2026-09-20
+
+### and somebody's dog
+
+The second half of **"more realistic people and animals"**, and on this coast
+the animal is a dog. Every boat that runs between a beach and a town in
+August has one aboard, standing where it can see over the side, belonging to
+whoever is sitting nearest.
+
+He is the pug off the promenade — `dog.fr3d` out of the payload, the 24-bone
+quadruped `skinnedFigure` has taken since the beach was built — loaded again
+rather than borrowed for the two passenger rigs' own reason: 25 KB against an
+accessor reaching into somebody else's closure for an object a state machine
+is walking up and down a beach. This one is standing still.
+
+**Two clips decided the pose.** The bake has `idle`, `trot` and `shake` and
+nothing else, so a dog lying under a bench was never on the table — and
+standing is what a dog on a boat does anyway, because they do not settle
+while the engine is running. He is in the cockpit off the port bench, a metre
+and a half from the nearest sitter, looking out over the side at the water
+going past.
+
+And he is **something you walk round**: he goes into `solid` with the
+twenty-two people, first in the list so that a passenger ring can never
+quietly replace him. Clear of the gangway — the walk from the boarding gate
+to the stair is four metres across and he is 1.9 out of the middle of it.
+
+3 864 triangles, on the sole at 1.26 m, which is the cockpit's own floor.
+
 ## [1.437.0] — 2026-09-20
 
 ### the same legs you walk the promenade with
