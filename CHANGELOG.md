@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.440.0] — 2026-09-20
+
+### the live view keeps her alive
+
+**"we should be able to see a live view of the shore baye, so we can see her
+from a distance"** — and from a distance was exactly where it stopped working.
+
+Her pose is gated on range, and rightly: twenty-eight bones on the CPU are
+only worth solving when somebody is near enough to tell, so past 250 m she
+keeps whatever palette she was last left holding, and past 40 m her face
+stops blinking. Both gates ask the distance from **the camera**. The phone's
+lens is a second viewer and it stands three metres in front of her wherever
+you are, so the moment that feature existed both gates were asking the wrong
+question: at the vikendica you are four hundred metres off and the live feed
+was a photograph of a woman who had stopped moving.
+
+Measured, standing 360 m away with the phone shut: her clip clock reads 0.00
+and stays there. Open the Baye app: 2.02, then 4.29 two seconds later — she
+is walking the promenade again, on a phone screen, from the far end of the
+resort.
+
+It is a flag and not a point, because there is nothing to measure: the lens
+is always three metres from her by construction. It is set by the view while
+it draws and cleared by the phone's own tick the moment the lens is on
+another app or in the bag — `phoneCamStep` is not called at all then, so that
+is the only place that can say so.
+
 ## [1.439.1] — 2026-09-20
 
 ### the phone, on a phone

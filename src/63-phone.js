@@ -308,6 +308,13 @@ function phoneTick(dt) {
       phoneDraw();
     }
   }
+  // And she is let go of the moment the lens is not on her — on another app,
+  // in the bag, or gone. `phoneCamStep` is not called at all then, so this is
+  // the only place that can say so.
+  if ((!phoneOn || phoneApp !== 'cam') && typeof jadrija !== 'undefined'
+    && jadrija && jadrija.watch) {
+    jadrija.watch(false);
+  }
   if (!phoneOn || !phoneEl) return;
   phoneBat = Math.max(2, PHONE.bat0 - (performance.now() / 60000) * (PHONE.bat0 / PHONE.batFor));
   const d = new Date();
@@ -382,6 +389,11 @@ function phoneCamStep(renderer, scene, real) {
   if (!phoneOn || phoneApp !== 'cam') return false;
   const p = phoneCamPlace();
   if (!p) return false;
+  // Keep her alive while the lens is on her. Both of the shore's range gates
+  // are asked of the CAMERA, and at the vikendica that is four hundred metres
+  // away while this lens is at three — see the note at the gate in
+  // 43-jadrija.js. Without it the live feed is a still photograph.
+  if (jadrija.watch) jadrija.watch(true);
   phoneCamRig();
   phoneCamT += real;
   if (phoneCamT >= 1 / PHONE.camHz) {

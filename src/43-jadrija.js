@@ -29141,6 +29141,14 @@ async function buildJadrija(scene) {
   // are built three thousand lines down and are not part of the crowd. Hoisted
   // for the reason `PHONE` is: `parsed` is a block-scoped const in there and a
   // name declared beside the riders would be unreachable from this block.
+  /**
+   * Whether anybody is looking at her down a lens that is not the camera.
+   *
+   * Set by the phone's live view — see `watch` on the module and the note at
+   * the range gate in the step. One flag and no counter: there is exactly one
+   * lens and it is either open or it is not.
+   */
+  let watched = 0;
   let wheelBlobs = null;
   {
     // Eight blobs, thirty-two people.
@@ -45599,12 +45607,23 @@ async function buildJadrija(scene) {
       // of a kilometre she is a couple of pixels and the palette she was left
       // holding is as good as any other. The performance is gated with her: at
       // that range she is always idling anyway, because it only starts at 17 m.
-      if (dx * dx + dz * dz < 250 * 250) {
+      // AND SOMEBODY MAY BE WATCHING HER DOWN A LENS. Misha, 19 Sep 2026
+      // asked for a live view of her on the phone — see `phoneCamStep` in
+      // src/63-phone.js — and that camera stands three metres in front of her
+      // wherever you are. Both gates below are the same question asked of the
+      // wrong viewer the moment it exists: at the vikendica you are 400 m off
+      // and the phone's lens is at 3, so without this the live feed is a
+      // photograph of a woman who has stopped moving, and past 40 m a woman
+      // who has stopped blinking. `watched` is that lens, and it is a flag
+      // rather than a point because there is nothing to measure: the lens is
+      // always three metres from her by construction.
+      const gap = dx * dx + dz * dz;
+      if (watched || gap < 250 * 250) {
         skinFig.update(dt);
         // A blink is two hundred milliseconds and a lash line is one pixel
         // wide, so this is gated a good deal harder than the pose is. Inside
         // 40 m is about where a face stops being a smudge.
-        if (dx * dx + dz * dz < 40 * 40) {
+        if (watched || gap < 40 * 40) {
           skinFig.faceTick(dt);
           // AFTER it, not before: the blink ticker writes that uniform every
           // frame, so anything adding to a blink has to be the last writer.
@@ -47250,6 +47269,8 @@ async function buildJadrija(scene) {
      * build and this is the only door to it.
      */
     blobs: () => wheelBlobs,
+    /** The phone's live view, on or off — see `watched`. */
+    watch: (on) => { watched = on ? 1 : 0; return !!watched; },
     quotes: () => phoneQuotes.q,
     quotesRefresh: () => phoneQuotes.refresh(),
     /**
