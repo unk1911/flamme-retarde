@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.452.1] — 2026-09-20
+
+### just the tip
+
+*"When she puts on lovesens, can still see the larger piece. is there some
+way to hide that so that we just see the tip of it sticking out?"*
+
+**Moving it was tried first and neither direction works.** `out` is how far
+the TIP stands proud, so raising it shows more arm and lowering it brings the
+fat end forward — swept at 1.15, 1.25, 1.34 and 1.42, and then the other way
+at 1.06, 0.98 and 0.90, and the egg is visible in all seven. It is already
+13 mm under her by the numbers. What he can see is the swell of it through
+nothing, because this body has no volume for it to be inside of.
+
+So the worn copy simply does not draw it. **The threshold is a radius and it
+is the file's own**: `toyFit` separates the two parts with *"the arm is 9 mm
+through at its fattest and the egg is 37"*, and the mesh is a profile swept
+about a curve lying in its own x-y plane — so a vertex's `z` IS its radius.
+Everything thicker than 12.5 mm is the swell that starts at u 0.64, and it
+goes. What is left is the arm, its two buttons and the light.
+
+**The prop is untouched.** On the tabouret, in her hand and in your bag it is
+the whole object, which is what it should be — this is about what is visible
+when it is in somebody. The original material is kept on the mesh and
+`doffNow` hands it back, so taking it out puts the egg back on the stool with
+the rest of it. Measured: worn `on true`, then `on false, out true`.
+
 ## [1.452.0] — 2026-09-20 (baye 1.34.0)
 
 ### do a line

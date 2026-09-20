@@ -42642,6 +42642,14 @@ async function buildJadrija(scene) {
       if (typeof satchelPut === 'function') satchelPut(key, 1);
       return true;
     }
+    // And it is the whole object again the moment it is out of her.
+    for (const part of parts) {
+      const mh = part.shake && part.shake.children[0];
+      if (mh && mh.userData && mh.userData.skinWas) {
+        mh.material = mh.userData.skinWas;
+        mh.userData.skinWas = null;
+      }
+    }
     if (kit && kit.spot) {
       const m = giftMesh(key);
       const w = toWorld(kit.spot[0], kit.spot[1]);
@@ -42858,6 +42866,31 @@ async function buildJadrija(scene) {
      * amplitude and no creep at all.
      */
     buzz: 0.0011,
+    /**
+     * ── AND THE BODY OF IT IS NOT DRAWN WHILE SHE IS WEARING IT ──────────
+     *
+     * Misha, 20 Sep 2026: *"when she puts on lovesens, can still see the
+     * larger piece. is there some way to hide that so that we just see the
+     * tip of it sticking out?"*
+     *
+     * Moving it was tried first and neither direction works: `out` is how far
+     * the TIP stands proud, so raising it shows more arm and lowering it
+     * brings the fat end forward. The egg is already 13 mm under her by the
+     * numbers — what he can see is the swell of it through nothing, because
+     * this body has no volume for it to be inside of.
+     *
+     * So the worn copy simply does not draw it. The threshold is a RADIUS and
+     * it is the file's own: `toyFit` separates the two parts with *"the arm is
+     * 9 mm through at its fattest and the egg is 37"*, and the mesh is a
+     * profile swept about a curve lying in its own x-y plane — so a vertex's
+     * `z` IS its radius. Everything thicker than 12.5 mm is the swell that
+     * starts at u 0.64, and it goes.
+     *
+     * The PROP is untouched: on the tabouret, in your hand and in the bag it
+     * is the whole object, which is what it should be — this is about what is
+     * visible when it is in somebody. `doffNow` puts the material back.
+     */
+    hide: 0.0125,
   };
 
   /**
@@ -42879,8 +42912,28 @@ async function buildJadrija(scene) {
     return shake;
   }
 
+  /**
+   * The skin it is drawn in while it is worn: the same pink, with everything
+   * fatter than `TOY.hide` discarded. See the note there.
+   *
+   * Built once and shared — there is only ever one of these on one body — and
+   * the ORIGINAL is kept on the mesh so `doffNow` can hand it back.
+   */
+  let toySkinWorn = null;
+  function toyWornSkin() {
+    if (!toySkinWorn) {
+      toySkinWorn = solidMaterial(new THREE.Color(0.910, 0.105, 0.450),
+        { spec: 0.75, specPower: 70, vcol: false,
+          body: 'if (abs(vLocal.z) > ' + TOY.hide.toFixed(4) + ') discard;' });
+    }
+    return toySkinWorn;
+  }
+
   function toyWorn(m) {
     const mesh = m || giftMesh('lovense');
+    // What is drawn while it is in her — see `TOY.hide`.
+    if (!mesh.userData.skinWas) mesh.userData.skinWas = mesh.material;
+    mesh.material = toyWornSkin();
     if (mesh.parent) mesh.parent.remove(mesh);
     mesh.position.set(0, 0, 0);
     mesh.rotation.set(0, 0, 0);
