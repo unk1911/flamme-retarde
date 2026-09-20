@@ -8,6 +8,66 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.443.0] — 2026-09-20
+
+### eleven beds, two seconds
+
+The de-repetition pass reached the recordings and stopped at the door. Under
+them, **eleven synthesised beds were looping the same two seconds of pink
+noise** — the same buffer, all at playback rate exactly 1.000, all started
+inside the same call to `start()`. Sample-locked: one waveform through eleven
+filters, and not one of them had ever been asked how long it was.
+
+`loopStats()` is the accessor that found it, and it walks the live nodes
+rather than the source, which is why it could find it at all. The table off a
+running page, before:
+
+    loop       where you hear it                tape    heads  period
+    shore      the promenade                    23.5 s    2     511 s
+    hill       hillside, in the open             9.0 s    3     391 s
+    wood       in under the pines               67.0 s    2    1457 s
+    lap        the water's edge                 68.5 s    2    1489 s
+    rows       the alley between the kabine     54.5 s    2    1185 s
+    radio      the kabina, on the station       31.1 s    1      31 s
+    hiss       the kabina, off the station       2.0 s    1       2 s
+    rumble     cockpit, combustion               2.0 s    1       2 s
+    air        cockpit, slipstream               2.0 s    1       2 s
+    fire       anywhere a hillside is alight     2.0 s    1       2 s
+    brodRum    the Brod's deck, the block        2.0 s    1       2 s
+    brodWash   the Brod's deck, the water        2.0 s    1       2 s
+
+Judged against how long anybody actually stands there, the worst of those is
+the Brod: **the crossing is 570 seconds and the wash was playing the same two
+of them 285 times.**
+
+The shared buffer is twelve seconds now, every playhead starts at its own
+random offset on it, and the five beds you stand still in — both of the
+Brod's, the slipstream, the combustion rumble and the fire — run on two heads
+at 2.3 per cent, which is `BED.detune` and the same figure the recordings
+use. Measured on the built page, mid-channel: **2 s → 261 s.** The one-shot
+noise sources are cut from a different place in the buffer every time too,
+which they were not: every footstep, crackle, snare and hi-hat in the game
+used to start at sample zero.
+
+**The levels have not moved**, which is the thing a change like this gets
+wrong. Two heads at 1/√2 render offline at −22.36 dBFS against one head's
+−22.33 — 0.03 dB — and a single-head bed keeps a byte-identical graph, with
+no gain stage inserted at all. `brodWash` also gets a 37-second drift on its
+cutoff, ±48 Hz, because it was the one bed with nothing else moving it; the
+whole swing measures 0.04 dB, since the 1/f slope gives back what the
+widening bandwidth takes.
+
+One suspect was checked and **disproved** rather than fixed: the loop's seam
+is not a click. Successive samples out of the Voss generator correlate at
+0.82, so the step at the wrap is about 2.3 times an ordinary step — the 97th
+percentile of a jump the generator makes all the time, once in 576 000
+samples. No crossfade was added, because there was nothing to cross.
+
+**Left alone, deliberately.** The radio station is 31 seconds on one playhead,
+in the room you stand in longest. It is music, and two detuned heads would
+phase it — the only fix is a longer clip, which is the payload and
+`tools/cut_field.py`, not this file. It is written down rather than bodged.
+
 ## [1.442.5] — 2026-09-20
 
 ### her deck, by thumb

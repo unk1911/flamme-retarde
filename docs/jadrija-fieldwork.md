@@ -91,6 +91,18 @@ laid straight on it. A chromed two-rail ladder bolted to the coping, concrete
 steps down, and a grey floating diving pontoon a few metres offshore. The
 shallows are almost Caribbean; the far shore is a low grey-blue band.
 
+> **The pontoon is not floating and is not a few metres offshore.** That was a
+> first reading of a wide frame, and `20260821_175309.jpg` is the same object
+> at a long lens and settles it: what is out there is a lump of poured
+> concrete standing on the bed, its sides flaring outward as they rise, with a
+> cap slab a little proud of the flare, two pipes bent over at the top and a
+> ladder down the seaward face. It is fifty-five metres out, not five. The
+> engine has had it for a long time — `DIVE` in `src/43-jadrija.js`, at
+> t 396.8, s -54.8 — and the description in that file was written off this
+> same photograph. The one thing the photograph has that the model did not is
+> the *weathering*: the flare is black with weed from the waterline most of
+> the way up to the cap.
+
 Past the kabine the peninsula has a **new promenade** — a bright near-white
 slab plaza on a wide expansion grid, rows of cream parasols, timber picnic
 benches, young pines in square tree pits, a bar, and the kiosk.
@@ -135,10 +147,37 @@ over selected windows, envelope autocorrelation and L/R correlation.
 
 ## Still missing
 
-Things the footage shows that the engine does not yet have: the hedges and the
-gates along the lanes; the sawn-block benches; oleander in flower; lavender on
-the wall tops; the diving pontoon and the ladder as modelled objects; the new
-promenade plaza; and the shop.
+This list had gone stale, and a stale list of missing things is worse than no
+list: it sends somebody off to build what is already there. Checked line by
+line against the source, 20 Sep.
+
+Built since it was written, and struck off: **the hedges and the gates along
+the lanes** (`laneGate`, and the clipped laurel behind the wall); **oleander in
+flower** — "Oleander in August is more flower than leaf" is a comment in the
+file; **lavender on the wall tops** (`lavenderBank`, measured off the frames at
+126,141,122 in the mean); **the shop** (the slastičarnica, rebuilt off its own
+photographs, back bar and all).
+
+**The diving pontoon and its ladder** come off too, and for a different
+reason — they were never missing. See the note under *The kabine and the
+water*: the object is `DIVE`, it has stood at t 396.8 for a long time, and it
+has the two bent pipes and eight rungs of ladder that this line was asking
+for. What it was missing is the black weed up the flare, which is a surface
+and not an object.
+
+Still missing, and still wanted:
+
+- **The sawn limestone block benches** down the promenade — long blocks used as
+  seats, which is a different piece of furniture from the timber-slat benches
+  on iron frames that the promenade already has.
+- **The new promenade plaza** east of the kabine — the near-white slab on its
+  expansion grid, the cream parasols, the picnic benches, the young pines in
+  square pits, the bar and the kiosk. Note that an apron of new concrete WAS
+  built once, over the water between the businesses and the kabine, and was
+  taken out on the user's word because it is not there in the real Jadrija.
+  That was a different thing in a different place. If this one is ever built it
+  goes where the walk found it — see "the plaza that was here, and is not" in
+  `src/43-jadrija.js`.
 
 Parked cars are no longer among them. The nose-in row under the olives is
 built: five body types read off `1000149595.mp4` and `1000149597.mp4` —

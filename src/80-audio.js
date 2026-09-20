@@ -54,9 +54,42 @@ function buildAudio() {
    */
   const lvl = (v, floor = 0.0001) => (v >= floor ? v : floor);
 
-  /** One second of pink-ish noise, reused by every noise source in the scene. */
+  /**
+   * Twelve seconds of pink-ish noise, reused by every noise source in the
+   * scene.
+   *
+   * It was two, and the line over it said one, which is how long it had been
+   * since anybody looked. Eleven synthesised beds — both of the Brod's, the
+   * slipstream, the combustion rumble, the fire, the two halves of the branch,
+   * the sea, the scoop, the radio's hiss and the water under the surface —
+   * were all looping the same two seconds, all at a playback rate of exactly
+   * one, all started inside the same call to `start()`. Sample-locked, in other
+   * words: one waveform through eleven filters, with a period of two seconds
+   * each. `loopStats` prints that table, and it is the row this whole pass came
+   * out of.
+   *
+   * Six times as long, because the period of a single-headed bed IS its buffer
+   * and there is no other lever on it. Two seconds is inside the range where a
+   * looping noise is heard as looping and twelve is not — this file already
+   * knows that number and says so over `nodes.hoseLfo`, where a filter that
+   * never moves stops being heard as water "about two seconds into holding the
+   * trigger down". It costs 2.3 MB at 48 kHz and about ten milliseconds of a
+   * start-up that already builds a 2.9 s stereo impulse response.
+   *
+   * The seam is left alone, and that was measured rather than assumed, because
+   * a click once a loop would have been the obvious thing to blame and it is
+   * not there. Successive samples out of this generator correlate at 0.82
+   * (`loopStats().noise.lag1`), so the jump it makes on the sample it wraps is
+   * about 2.3 times the jump it makes on an average sample — the 97th
+   * percentile of a step it takes all the time, in a signal whose ordinary
+   * sample-to-sample step is already half its own RMS. That is one odd sample
+   * in 576 000, which is not a click and does not want a crossfade; a
+   * crossfade would only be a second, quieter thing happening every twelve
+   * seconds.
+   */
+  const PINK_SECS = 12;
   function makeNoise(ac) {
-    const n = ac.sampleRate * 2;
+    const n = Math.round(ac.sampleRate * PINK_SECS);
     const buf = ac.createBuffer(1, n, ac.sampleRate);
     const d = buf.getChannelData(0);
     // Voss-McCartney-ish: summing octaves of white gives a 1/f slope, which is
@@ -75,17 +108,95 @@ function buildAudio() {
     return buf;
   }
 
-  const loopNoise = (gainVal, type, freq, q) => {
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuf;
-    src.loop = true;
+  /**
+   * Where on the shared buffer a new playhead starts.
+   *
+   * Everything in this file that reaches for `noiseBuf` used to start at sample
+   * zero. For the beds that meant the lockstep described over `makeNoise`; for
+   * the one-shots it meant something sillier, which is that every footstep in
+   * the game is the same 140 ms of tape, every crackle the same 40 ms and every
+   * hi-hat the same 32, shaped by a different filter and a different envelope
+   * but cut from the same place. `footstep`'s own note says "no two are the
+   * same length", and that was true of the envelope over it and false of the
+   * noise under it.
+   *
+   * A source may be started anywhere inside its buffer, so this costs nothing
+   * whatever — no node, no sample, no arithmetic in the frame loop. It is the
+   * cheapest thing in this pass and probably the most often heard.
+   *
+   * It does hand a one-shot a little level variation, since 140 ms of 1/f noise
+   * is not the same loudness wherever you cut it: `loopStats().noise.spread` is
+   * the standard deviation of that, measured over the buffer this session is
+   * using, and it comes back at 0.6 to 0.8 dB. The mean is what "keep the
+   * levels" is about and the mean is untouched; on a footstep the variation is
+   * the point, because that is what the envelope was already being jittered to
+   * fake.
+   *
+   * In one respect it is not quite neutral, and in the direction nobody would
+   * have guessed: sample zero is the generator's cold start, so the 140 ms
+   * every one-shot in this file used to take is measured at 0.49 dB BELOW the
+   * buffer's own mean — inside one standard deviation of it, and all of that
+   * deficit under 50 Hz, where the two slowest of the six poles are still
+   * filling and where nothing here is listening anyway.
+   */
+  const noisePhase = () => (noiseBuf ? Math.random() * noiseBuf.duration : 0);
+
+  /**
+   * A synthesised bed: one filter, one gain, and as many playheads on the
+   * shared noise buffer as the place it plays in is worth.
+   *
+   * Every head now starts at its own point on the buffer and, where there is
+   * more than one, runs at its own rate — the two halves of what `voices` does
+   * for the recordings, applied to noise instead of to tape. The phase is what
+   * stops the eleven beds being one waveform in lockstep; the rate is what
+   * stops two heads on the same bed sitting at a fixed offset from each other
+   * for ever, which is the whole argument in `voices` and does not change for
+   * being made of noise.
+   *
+   * The rate is free here in a way it is not on a recording. Pink noise is
+   * scale-invariant — 1/f resampled is 1/f — so a head at 2.3 % fast is the
+   * same noise at the same level, where 2.3 % on a clip of a promenade is a
+   * promenade that has been pitched. `BED.detune` and not a number of its own,
+   * for BED's own reason: two spacings in one mix beat against each other at
+   * the difference.
+   *
+   * `heads` is 2 only where the player STANDS STILL for minutes — the Brod's
+   * nine-and-a-half-minute crossing, the cockpit, a hillside that is alight for
+   * as long as it takes to put out. Two heads at 1/sqrt(2) apiece is the same
+   * power out, uncorrelated sources adding as powers — rendered offline three
+   * times either way, one head is −22.33 dBFS through this bandpass and two are
+   * −22.36, which is a thirtieth of a decibel and is the only sense in which
+   * this touches the mix. What it buys is that each head's own twelve seconds
+   * sits 3 dB down under an uncorrelated copy of itself. Everywhere else one
+   * head is right: the scoop and the sea are a pass and not a place, and a bed
+   * nobody stands in does not need a node spent on it.
+   */
+  const loopNoise = (gainVal, type, freq, q, heads = 1, dest = null) => {
     const f = ctx.createBiquadFilter();
     f.type = type; f.frequency.value = freq; f.Q.value = q;
     const g = ctx.createGain();
     g.gain.value = gainVal;
-    src.connect(f).connect(g).connect(master);
-    src.start();
-    return { src, f, g };
+    const srcs = [];
+    const t0 = ctx.currentTime;
+    for (let i = 0; i < heads; i++) {
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuf;
+      src.loop = true;
+      if (heads > 1) {
+        src.playbackRate.value = 1 + BED.detune * (2 * i / (heads - 1) - 1);
+        const hg = ctx.createGain();
+        hg.gain.value = 1 / Math.sqrt(heads);
+        src.connect(hg).connect(f);
+      } else {
+        // No gain stage at all on a single head, so that the beds which keep
+        // one are the same graph they were and cannot have moved.
+        src.connect(f);
+      }
+      src.start(t0, noisePhase());
+      srcs.push(src);
+    }
+    f.connect(g).connect(dest || master);
+    return { srcs, f, g };
   };
 
   /**
@@ -315,8 +426,10 @@ function buildAudio() {
       osc.start();
       return { osc, bp, g };
     })();
-    // Combustion / exhaust rumble.
-    nodes.rumble = loopNoise(0, 'lowpass', 260, 1.0);
+    // Combustion / exhaust rumble. Two heads: this is the widest, lowest bed
+    // in the mix and it plays for the whole of a sortie, which is the longest
+    // anybody sits still anywhere in this game.
+    nodes.rumble = loopNoise(0, 'lowpass', 260, 1.0, 2);
 
     // ── the Brod's diesel, from her own deck ──────────────────────────────
     //
@@ -353,13 +466,48 @@ function buildAudio() {
       nodes.brodEng.push({ osc, lp, g });
     }
     // The block itself, through the hull and up through your feet.
-    nodes.brodRum = loopNoise(0, 'lowpass', 150, 1.0);
+    //
+    // Two heads on both of these, and they are the reason `loopNoise` learned
+    // to count. The crossing is 570 seconds and the passenger spends all of
+    // them standing at the rail: at one head and two seconds, the wash played
+    // the same two seconds 285 times while you watched Sibenik come up.
+    nodes.brodRum = loopNoise(0, 'lowpass', 150, 1.0, 2);
     // And the water going past her, which is the other half of being on a boat
     // and is the half the horn and the engine together still would not say.
-    nodes.brodWash = loopNoise(0, 'bandpass', 700, 0.75);
+    nodes.brodWash = loopNoise(0, 'bandpass', 700, 0.75, 2);
+    // And a drift on the wash, which is the one bed here with nothing else
+    // moving it. The others all have a hand on them every frame — the
+    // slipstream tracks airspeed, the rumble tracks throttle, the wash tracks
+    // her speed through the water and her speed at cruise does not change.
+    //
+    // 37 seconds and 48 Hz, on a cutoff that sits between 520 lying alongside
+    // and 1040 at cruise — an eighth of an octave at the low end and a
+    // sixteenth at the high one. Rendered offline and measured, the whole
+    // swing is worth 0.04 dB either way: a bandpass hands back the same power
+    // wherever it is parked in this band, because the 1/f slope gives back
+    // exactly what the widening bandwidth takes. So it is not a level, and it
+    // is not heard as one. It is heard the way the branch's 3.7 Hz wander is
+    // heard, which is as water rather than as noise.
+    //
+    // 37 is chosen for not being a multiple of anything else in the bed: not
+    // of the 12 s buffer under it, not of the 261 s the pair of heads comes
+    // round at, and not of the 570 s crossing. Nothing in here lines up twice
+    // the same way while you are aboard.
+    nodes.brodWashLfo = (() => {
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine'; lfo.frequency.value = 1 / 37;
+      const amt = ctx.createGain();
+      amt.gain.value = 48;
+      lfo.connect(amt).connect(nodes.brodWash.f.frequency);
+      lfo.start();
+      return lfo;
+    })();
 
     // ── airflow over the airframe ─────────────────────────────────────────
-    nodes.air = loopNoise(0, 'bandpass', 900, 0.7);
+    // Two heads, for the rumble's reason: it is up for the whole sortie. Its
+    // own cutoff is already walking about with the airspeed, so it gets no
+    // drift of its own.
+    nodes.air = loopNoise(0, 'bandpass', 900, 0.7, 2);
 
     // ── water ─────────────────────────────────────────────────────────────
     // Scooping is the hull ploughing: broadband, bright, and very loud.
@@ -397,7 +545,9 @@ function buildAudio() {
 
     // ── the fire ──────────────────────────────────────────────────────────
     // A big fire is felt more than heard: a low roar with a slow surge in it.
-    nodes.fire = loopNoise(0, 'lowpass', 520, 0.9);
+    // Two heads here as well: a hillside burns for as long as it takes to put
+    // out, and this is heard from a beach you are standing on.
+    nodes.fire = loopNoise(0, 'lowpass', 520, 0.9, 2);
     nodes.fireLfo = (() => {
       const lfo = ctx.createOscillator();
       lfo.type = 'sine'; lfo.frequency.value = 0.17;
@@ -439,7 +589,7 @@ function buildAudio() {
     g.gain.exponentialRampToValueAtTime(gain, t + Math.min(0.02, dur * 0.2));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f).connect(g).connect(dest || master);
-    src.start(t);
+    src.start(t, noisePhase());
     src.stop(t + dur + 0.02);
   }
 
@@ -1068,7 +1218,7 @@ function buildAudio() {
       wob.connect(g).connect(master);
       // Six tonnes hitting a hillside in a limestone valley comes back at you.
       if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.45; g.connect(w).connect(verbSend); }
-      src.start(t0);
+      src.start(t0, noisePhase());
       gushNodes = { src, g };
     }
     gushNodes.g.gain.setTargetAtTime(on ? GUSH : 0.0001, t0, on ? 0.06 : 0.22);
@@ -1111,7 +1261,7 @@ function buildAudio() {
     g.gain.exponentialRampToValueAtTime(0.075 * hard, t0 + 0.05);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5);
     src.connect(lp).connect(g).connect(master);
-    src.start(t0); src.stop(t0 + 1.6);
+    src.start(t0, noisePhase()); src.stop(t0 + 1.6);
     // The bubbles.
     let at = t0 + 0.06;
     for (let i = 0; i < 30 && at < t0 + 1.5; i++) {
@@ -1160,7 +1310,7 @@ function buildAudio() {
     g.gain.linearRampToValueAtTime(0.115 * hard, t0 + swell);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + swell + 0.16);
     src.connect(bp).connect(g).connect(master);
-    src.start(t0); src.stop(t0 + swell + 0.2);
+    src.start(t0, noisePhase()); src.stop(t0 + swell + 0.2);
     // The surface breaking over your head, and the water running off it.
     burst({ freq: 2800, q: 0.4, dur: 0.26, gain: 0.15 * hard, sweep: 0.20,
       at: t0 + swell });
@@ -1187,7 +1337,7 @@ function buildAudio() {
     wob.connect(wg).connect(ag.gain);
     wob.start(tb); wob.stop(tb + 0.62);
     air.connect(f1).connect(ag).connect(master);
-    air.start(tb); air.stop(tb + 0.65);
+    air.start(tb, noisePhase()); air.stop(tb + 0.65);
   }
 
   /**
@@ -1316,7 +1466,7 @@ function buildAudio() {
     dg.gain.exponentialRampToValueAtTime(0.09, t0 + 0.34);
     dg.gain.exponentialRampToValueAtTime(0.0001, t0 + 2.4);
     deb.connect(hp).connect(dg).connect(master);
-    deb.start(t0); deb.stop(t0 + 2.6);
+    deb.start(t0, noisePhase()); deb.stop(t0 + 2.6);
 
     // Everything goes to the valley, hard. This is the bit that sells it.
     if (verbSend) {
@@ -1665,7 +1815,7 @@ function buildAudio() {
       g.gain.exponentialRampToValueAtTime(0.0001, when + 1.4 + far);
       src.connect(lp).connect(g).connect(master);
       if (verbSend) { const w = ctx.createGain(); w.gain.value = 1.1; g.connect(w).connect(verbSend); }
-      src.start(when); src.stop(when + 2.6 + far);
+      src.start(when, noisePhase()); src.stop(when + 2.6 + far);
       // Irregular: guns do not keep time.
       at += 0.5 + Math.random() * 2.4;
     }
@@ -1948,7 +2098,7 @@ function buildAudio() {
     g.gain.exponentialRampToValueAtTime(0.40, at + dur * 0.94);
     g.gain.exponentialRampToValueAtTime(0.0001, at + dur + 0.09);
     src.connect(bp).connect(g).connect(fireBus);
-    src.start(at); src.stop(at + dur + 0.2);
+    src.start(at, noisePhase()); src.stop(at + dur + 0.2);
 
     const o = ctx.createOscillator();
     o.type = 'sawtooth';
@@ -2197,7 +2347,10 @@ function buildAudio() {
    *
    * The arithmetic is the same one every time: the pair comes round when the
    * playheads have walked a whole loop apart, which at 4.6 % of relative rate
-   * takes 1/0.046 = 21.7 loops.
+   * takes 1/0.046 = 21.7 loops. `loopStats` prints it off the running nodes
+   * rather than off this note, which is how the rest of it was found: every
+   * word above is about the six recordings, and the eleven SYNTHESISED beds
+   * had the same fault and a far worse number — see `makeNoise`.
    *
    * Each window was chosen by searching its source for the two ends that match
    * best in level and in spectrum, so that the loop seam is inaudible. That
@@ -2289,6 +2442,37 @@ function buildAudio() {
       out.push(src);
     }
     return out;
+  }
+
+  /**
+   * How long before a listener standing still hears the same thing twice.
+   *
+   * The arithmetic the note on length does by hand, done off the nodes that
+   * are actually running — because the interesting failure is not a wrong
+   * multiplication, it is a bed that was meant to get a second playhead and
+   * did not, and from outside those two look identical. See `loopStats`.
+   *
+   * The length is what the playhead traverses and not what the clip is, which
+   * is a second shorter: `voices` insets both ends by half a second, so the
+   * promenade's 24.5 s loop is 23.5 s of tape and comes round at 8.5 minutes
+   * rather than the 8.9 the raw duration would give.
+   *
+   * For more than two heads it is the CLOSEST pair, not the whole ensemble.
+   * Three heads at ±2.3 % line up completely once in 21.7 loops, but the ear
+   * is not waiting for all three — the first coincidence is between the two
+   * that are 2.3 % apart, at half that.
+   */
+  function loopPeriod(srcs) {
+    if (!srcs || !srcs.length || !srcs[0].buffer) return 0;
+    const s0 = srcs[0];
+    const len = s0.loopEnd > s0.loopStart
+      ? s0.loopEnd - s0.loopStart : s0.buffer.duration;
+    const r = srcs.map((s) => s.playbackRate.value);
+    let d = Infinity;
+    for (let i = 0; i < r.length; i++) {
+      for (let j = i + 1; j < r.length; j++) d = Math.min(d, Math.abs(r[i] - r[j]));
+    }
+    return d > 1e-6 && d < Infinity ? len / d : len / r[0];
   }
 
   // ── where you are, and what that does to the mix ────────────────────────────
@@ -2711,7 +2895,7 @@ function buildAudio() {
     vca.gain.value = 0;
     scale.connect(vca.gain);
     ns.connect(lp).connect(hp).connect(vca).connect(dest);
-    ns.start(ctx.currentTime);
+    ns.start(ctx.currentTime, noisePhase());
     return { ns, vca, scale };
   }
 
@@ -3358,14 +3542,13 @@ function buildAudio() {
     g.gain.value = 0.0001;
     lp.connect(stg).connect(g).connect(bed);
     if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.22; g.connect(w).connect(verbSend); }
-    const ns = ctx.createBufferSource();
-    ns.buffer = noiseBuf; ns.loop = true;
-    const nf = ctx.createBiquadFilter();
-    nf.type = 'bandpass'; nf.frequency.value = 2100; nf.Q.value = 0.8;
-    const ng = ctx.createGain();
-    ng.gain.value = RADIO.hiss;
-    ns.connect(nf).connect(ng).connect(g);
-    ns.start();
+    // The same band and the same level it always had, built by `loopNoise` now
+    // rather than by hand, which gets it the two playheads the rest of this
+    // pass is about. The kabina is where the whole indoor routine happens and
+    // the hiss is up the entire time you are in there — and it is the loudest
+    // thing in the room the moment the knob is one notch off the station.
+    const hiss = loopNoise(RADIO.hiss, 'bandpass', 2100, 0.8, 2, g);
+    const ng = hiss.g;
     // The station itself, running whether or not anybody is listening to it,
     // because that is what a station does: tune away for a minute and come back
     // and the song has moved on. Restarting the clip on every knock of the knob
@@ -3377,7 +3560,7 @@ function buildAudio() {
     src.loopEnd = Math.max(1, radioBuf.duration - 0.5);
     src.connect(lp);
     src.start(ctx.currentTime, Math.random() * radioBuf.duration);
-    return { lp, stg, g, ng, src };
+    return { lp, stg, g, ng, src, hiss };
   }
 
   /**
@@ -4075,7 +4258,7 @@ function buildAudio() {
       lfo.connect(lg).connect(g.gain);
       lfo.start(t);
       src.connect(lp).connect(hp).connect(g).connect(slowLp);
-      src.start(t);
+      src.start(t, noisePhase());
       underNodes = { src, g };
     }
     underNodes.g.gain.setTargetAtTime(0.075 * underV, t, 0.35);
@@ -4276,7 +4459,7 @@ function buildAudio() {
     src.connect(bp).connect(g);
     src.connect(bp2).connect(bp2g).connect(g);
     g.connect(outBus);
-    src.start(t0);
+    src.start(t0, noisePhase());
     return { real: false, g, srcs: [src] };
   }
 
@@ -5415,7 +5598,7 @@ function buildAudio() {
     ag.gain.exponentialRampToValueAtTime(0.34 * far, t0 + dur * 0.62);
     ag.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.09);
     air.connect(bp).connect(ag).connect(master);
-    air.start(t0); air.stop(t0 + dur + 0.14);
+    air.start(t0, noisePhase()); air.stop(t0 + dur + 0.14);
 
     // A second, higher band with almost nothing in it — the hiss across the
     // teeth. Without it the intake is a filter sweep and not a mouth.
@@ -5428,7 +5611,7 @@ function buildAudio() {
     hg.gain.exponentialRampToValueAtTime(0.085 * V.rasp * 4 * far, t0 + 0.04);
     hg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur * 0.72);
     hs.connect(hf).connect(hg).connect(master);
-    hs.start(t0); hs.stop(t0 + dur);
+    hs.start(t0, noisePhase()); hs.stop(t0 + dur);
 
     // And the voice catching up at the end, which is the half-syllable that
     // comes out after the air does. Quiet, short, and falling — it is not a
@@ -5501,7 +5684,7 @@ function buildAudio() {
       ng.gain.exponentialRampToValueAtTime(0.10 * V.rasp * far, t0 + 0.05);
       ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
       air.connect(nf).connect(ng).connect(out);
-      air.start(t0); air.stop(t0 + dur + 0.14);
+      air.start(t0, noisePhase()); air.stop(t0 + dur + 0.14);
     }
     out.connect(bed || master);
     if (verbSend) {
@@ -5601,7 +5784,7 @@ function buildAudio() {
       ng.gain.exponentialRampToValueAtTime(0.075 * far * (hard - 0.5) * 2, t0 + 0.06);
       ng.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
       air.connect(nf).connect(ng).connect(out);
-      air.start(t0); air.stop(t0 + dur + 0.12);
+      air.start(t0, noisePhase()); air.stop(t0 + dur + 0.12);
     }
     out.connect(bed || master);
     if (verbSend) {
@@ -6321,7 +6504,7 @@ function buildAudio() {
       hb.frequency.value = 3400;
       hb.Q.value = 1.2;
       hiss.connect(hb).connect(hg).connect(mg);
-      try { hiss.start(t0); hiss.stop(t0 + dur + 0.1); } catch (e) { /* once */ }
+      try { hiss.start(t0, noisePhase()); hiss.stop(t0 + dur + 0.1); } catch (e) { /* once */ }
     }
     // The pacer. Two chirps at each quadrant change and three at the end,
     // each its own little oscillator because that is cheaper than a sampler
@@ -7039,7 +7222,7 @@ function buildAudio() {
         chop.connect(chopG).connect(gate.gain);
         const ng = ctx.createGain(); ng.gain.value = 0.085;
         air.connect(nbp).connect(gate).connect(ng).connect(am);
-        air.start(); chop.start();
+        air.start(ctx.currentTime, noisePhase()); chop.start();
       }
       osc.start(); wob.start();
       flyNodes = { osc, chop, out, pan: pn, lfo, wob, wobG };
@@ -7398,6 +7581,110 @@ function buildAudio() {
       rate: cukBuf ? cukBuf.sampleRate : 0,
       hose: nodes.hose ? +nodes.hose.g.gain.value.toFixed(4) : -1,
     }),
+    /**
+     * For a test: every loop in the mix, and when it comes round.
+     *
+     * The question this exists to answer is the one nobody could answer by
+     * reading the file: WHICH of the twenty-odd looping sources in here are
+     * still short and single-headed. A bed on one playhead has a period equal
+     * to its own length; a bed on two has one 21.7 times longer; and from
+     * outside — from the gain, the level, the spectrum — those two are
+     * indistinguishable, which is exactly how eleven synthesised beds went on
+     * sharing one two-second loop for the whole of the project.
+     *
+     * `secs` is the tape a playhead traverses, which is a second less than the
+     * clip wherever `voices` has inset the ends. `period` is `loopPeriod` — how
+     * long a listener standing there has before he hears it again — and `-1`
+     * means nothing of that bed is running to be asked.
+     *
+     * `noise` is the buffer every synthesised bed shares. Its length is eleven
+     * of the rows below at once; its RMS is here because changing that length
+     * must not change the level of any of them, and it is a fresh random
+     * buffer every session, so it is worth three runs before believing a
+     * tenth of a decibel of it. `lag1`, `wrap` and `spread` are argued at
+     * `makeNoise` and `noisePhase`.
+     */
+    loopStats: () => {
+      const S = (n) => (!n ? []
+        : (n.srcs || (n.src ? [n.src] : (n.ns ? [n.ns] : []))));
+      const row = (key, where, srcs) => {
+        const s0 = srcs[0];
+        const len = s0 && s0.buffer
+          ? (s0.loopEnd > s0.loopStart ? s0.loopEnd - s0.loopStart
+            : s0.buffer.duration) : 0;
+        const p = loopPeriod(srcs);
+        return {
+          key, where, heads: srcs.length, secs: +len.toFixed(2),
+          rate: srcs.map((x) => +x.playbackRate.value.toFixed(4)),
+          period: srcs.length ? +p.toFixed(1) : -1,
+          mins: srcs.length ? +(p / 60).toFixed(2) : -1,
+        };
+      };
+      // The hillside and the wood are one node set with two clips in it, so
+      // they have to be told apart by which buffer a head is on — averaging
+      // the two would report a period neither of them has.
+      const cic = (buf) => (cicadaNodes && cicadaNodes.real && buf
+        ? cicadaNodes.srcs.filter((x) => x.buffer === buf) : []);
+      let nrms = -120, nlag = 0, nwrap = 0, nspread = 0;
+      if (noiseBuf) {
+        const d = noiseBuf.getChannelData(0);
+        let sum = 0, cor = 0;
+        for (let i = 0; i < d.length; i++) sum += d[i] * d[i];
+        for (let i = 1; i < d.length; i++) cor += d[i] * d[i - 1];
+        nrms = +(10 * Math.log10(Math.max(sum / d.length, 1e-12))).toFixed(2);
+        // What the loop's own seam is worth, and deterministically rather than
+        // as one draw of a random variable: the wrap joins two independent
+        // samples, an ordinary frame joins two that correlate at `lag1`, so
+        // the wrap's step is sqrt(1/(1-lag1)) times an average step IN THE
+        // MEAN. Reading the one step at the join instead gives anything
+        // between 0.8 and 3 depending on the session, which is how a real
+        // number gets mistaken for a result. See the note over `makeNoise`.
+        nlag = +(cor / Math.max(sum, 1e-12)).toFixed(3);
+        nwrap = +Math.sqrt(1 / Math.max(1 - nlag, 1e-6)).toFixed(2);
+        // How much a one-shot's level moves when `noisePhase` cuts it from
+        // somewhere else: the standard deviation, in dB, of the RMS of 140 ms
+        // blocks — a footstep's own length — across the whole buffer. This is
+        // the number that says the phase costs a level and not a mix.
+        const w = Math.round(0.14 * noiseBuf.sampleRate);
+        let m = 0, m2 = 0, nb = 0;
+        for (let a = 0; a + w <= d.length; a += w) {
+          let e = 0;
+          for (let i = a; i < a + w; i++) e += d[i] * d[i];
+          const db = 10 * Math.log10(Math.max(e / w, 1e-12));
+          m += db; m2 += db * db; nb++;
+        }
+        const mean = m / Math.max(nb, 1);
+        nspread = +Math.sqrt(Math.max(0, m2 / Math.max(nb, 1) - mean * mean)).toFixed(2);
+      }
+      const TABLE = [
+        ['shore', 'the promenade, everywhere at Jadrija', S(shoreNodes)],
+        ['hill', 'the hillside, out in the open', cic(cicadaBuf)],
+        ['wood', 'fifteen paces in under the pines', cic(woodBuf)],
+        ['cicSynth', 'the fallback chorus, until the decode lands',
+          cicadaNodes && !cicadaNodes.real ? cicadaNodes.srcs : []],
+        ['lap', "standing at the water's edge", S(lapNodes)],
+        ['body', 'the body under the slaps', lapNodes ? S(lapNodes.body) : []],
+        ['rows', 'the alley between the kabine', S(rowNodes)],
+        ['radio', 'the kabina, on the station', radioNodes ? [radioNodes.src] : []],
+        ['hiss', 'the kabina, one notch off it', S(radioNodes && radioNodes.hiss)],
+        ['rumble', 'the cockpit, combustion', S(nodes.rumble)],
+        ['air', 'the cockpit, slipstream', S(nodes.air)],
+        ['scoop', 'on the step, scooping', S(nodes.scoop)],
+        ['sea', 'in ground effect over water', S(nodes.sea)],
+        ['hose', 'the branch, in your hands', S(nodes.hose)],
+        ['hoseLo', 'the branch, the mass under it', S(nodes.hoseLo)],
+        ['fire', 'anywhere a hillside is alight', S(nodes.fire)],
+        ['brodRum', "the Brod's deck, the block", S(nodes.brodRum)],
+        ['brodWash', "the Brod's deck, the water going past", S(nodes.brodWash)],
+        ['under', 'three metres under', S(underNodes)],
+        ['gush', 'six tonnes going over the side', S(gushNodes)],
+      ];
+      return {
+        noise: { secs: noiseBuf ? +noiseBuf.duration.toFixed(2) : 0, rms: nrms,
+          lag1: nlag, wrap: nwrap, spread: nspread },
+        rows: TABLE.map(([k, w, x]) => row(k, w, x)),
+      };
+    },
     /**
      * For a test: which of the five field recordings decoded, and what are the
      * beds built out of them doing?
