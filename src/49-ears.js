@@ -742,6 +742,15 @@ const ears = (() => {
       if (typeof startFlyCam === 'function') startFlyCam('brush');
       return;
     }
+    if (name === 'fly.site') {
+      const Z = typeof jadrija !== 'undefined' && jadrija && jadrija.zombies;
+      if (!Z || !Z.count()) { note('fly: there is no fly in the movement to hear you', 'meta'); return; }
+      const n = Z.site();
+      if (!n) { note('fly: it is holding two buckets — it cannot type as well', 'meta'); return; }
+      note('fly: working on the website' + (n > 1 ? ', all ' + n + ' of them' : ''), 'did');
+      if (typeof startFlyCam === 'function') startFlyCam('site');
+      return;
+    }
     if (name === 'baye.time') {
       note('baye: asking…', 'meta');
       const res = await voice.answer('time', lang);

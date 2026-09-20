@@ -164,6 +164,25 @@ const ZOMBIE = {
   // one number in this movement's repertoire that nobody hums.
   brush: { len: 14.0, spin: 0.30, loops: 2, stagger: 0.08,
     hz: 26, shake: 0.010, wild: [8.80, 2.60], wildSpin: 2.2 },
+  // ── the website ──────────────────────────────────────────────────────────
+  //
+  // Misha, 20 Sep 2026: *"a demonstration of working on dad's website
+  // https://acupunctchi.com, applying some fixes/edits to it, looking super
+  // busy and all"*.
+  //
+  // What you can SEE is the fly cam's — SITE in src/44-corpse.js, the laptop
+  // and the word and the 404. Out here at 7 mm there is no laptop and there
+  // is certainly no screen, and what a person typing looks like from across a
+  // room is a SMALL FAST NOD, over and over, at nothing: `peck` is the
+  // flurry's own window and `hz` its own rate, both off SITE. Then at 11.56 —
+  // the frame the close-up's animal reads the 404 — the whole movement rears
+  // back together and stays back, which is the one moment out here that is
+  // readable as a thing having gone wrong.
+  //
+  // The sound is the keyboard itself — `siteRun` in src/80-audio.js — and it
+  // is one machine for the lot of them, for the toothbrush's reason.
+  site: { len: 15.8, spin: 0.14, loops: 1, stagger: 0.09,
+    peck: [4.00, 4.60], hz: 6.2, jab: 0.020, rear: [11.56, 0.85] },
 };
 
 /**
@@ -273,6 +292,8 @@ function buildZombies(vik, buck) {
       // And when the toothbrush starts, which is one sound for the whole
       // movement rather than one each — see `brush`.
       humBrush: -1,
+      // And the keyboard, on the same terms — see `site`.
+      humSite: -1,
     };
     flock.push(z);
     return z;
@@ -353,6 +374,16 @@ function buildZombies(vik, buck) {
           z.p.y += B.shake * Math.sin(a) * dt;
           z.p.x += B.shake * Math.sin(a * 1.31 + z.i) * dt;
         }
+      }
+      // The keyboard nods it forward and down, and the 404 throws it back.
+      if (z.dance.site) {
+        const S = ZOMBIE.site;
+        const u = z.dance.t - S.peck[0];
+        if (u > 0 && u < S.peck[1]) {
+          z.p.y -= S.jab * Math.abs(Math.sin(TAU * S.hz * 0.5 * z.dance.t)) * dt;
+        }
+        const r = sat((z.dance.t - S.rear[0]) / S.rear[1]);
+        z.p.y += S.jab * 1.6 * smooth01(r) * dt;
       }
       if (z.dance.t >= routineOf(z.dance).len) z.dance = null;
     } else if (z.wake > 0) {
@@ -504,7 +535,8 @@ function buildZombies(vik, buck) {
 
   /** Which of the three numbers a dance record is running. */
   function routineOf(dz) {
-    return dz.brush ? ZOMBIE.brush : dz.bday ? ZOMBIE.bday : ZOMBIE.dance;
+    return dz.site ? ZOMBIE.site : dz.brush ? ZOMBIE.brush
+      : dz.bday ? ZOMBIE.bday : ZOMBIE.dance;
   }
 
   /** Everybody in, a fifth of a second apart. */
@@ -513,7 +545,7 @@ function buildZombies(vik, buck) {
       // Not one that is in the middle of the birthday tune. Her melody laid
       // over that is two tunes at once out of one fly, and the birthday one
       // is the only thing anybody is listening for while it is on.
-      if (z.dance && (z.dance.bday || z.dance.brush)) continue;
+      if (z.dance && (z.dance.bday || z.dance.brush || z.dance.site)) continue;
       if (z.humStart < 0) z.humStart = clockS + z.i * ZOMBIE.hum.stagger;
     }
   }
@@ -577,6 +609,14 @@ function buildZombies(vik, buck) {
         } else if (z.dance && z.dance.brush) {
           audio.brushRun(dist, { pan });
         }
+      }
+      // And the keyboard, on exactly the toothbrush's terms: ONE machine for
+      // the movement. Unlike the brush it is fire-and-forget — `siteRun`
+      // schedules all nineteen of its events when it starts — so there is no
+      // every-frame call to follow it with.
+      if (audio.siteRun && z.humSite >= 0 && clockS >= z.humSite) {
+        z.humSite = -1;
+        audio.siteRun(dist, { start: true, pan });
       }
       // And the birthday tune, which is a different voice in `80-audio.js` —
       // not her melody at all — so it has its own start and its own follow.
@@ -652,16 +692,42 @@ function buildZombies(vik, buck) {
       }
       return n;
     },
+    /**
+     * "Show me how you work on dad's website." Every member that still has
+     * its buckets performs it, and the keyboard is heard once for the lot of
+     * them. Answers how many are in it.
+     *
+     * NOTE: the phrase that reaches this is `fly.site`, and the table that
+     * turns a sentence into that name is INTENTS in server/baye/baye.py.
+     * Until a row for it lands there, this is reachable from the console and
+     * from `__fr.ears.flyCam(t, 'site', true)` and from nowhere else.
+     */
+    site: () => {
+      let n = 0;
+      for (const z of flock) {
+        if (z.drop || z.dance) continue;
+        z.dance = { t: 0, site: true };
+        z.humDance = false;
+        z.humAgain = -1;
+        z.humStart = -1;
+        z.humSite = clockS + z.i * ZOMBIE.site.stagger;
+        n += 1;
+      }
+      return n;
+    },
     /** Which members have no buckets in their feet right now, by index. */
     bare: () => flock.map((z) => !!z.drop),
     /** How many are dancing this second — what the Bucketeer is told when
      *  somebody asks her what those flies are doing. See `talk` in
      *  45-bucketeer.js. */
-    dancing: () => flock.filter((z) => z.dance && !z.dance.bday && !z.dance.brush).length,
+    dancing: () => flock.filter((z) => z.dance && !z.dance.bday && !z.dance.brush
+      && !z.dance.site).length,
     /** And how many are doing the birthday number, which she can see too. */
     partying: () => flock.filter((z) => z.dance && z.dance.bday).length,
     /** And how many are brushing their teeth, which she can also see. */
     brushing: () => flock.filter((z) => z.dance && z.dance.brush).length,
+    /** And how many are at the computer, which she can see as well. */
+    working: () => flock.filter((z) => z.dance && z.dance.site).length,
     /** Everybody hum, now. Debug, and what a probe of the voice wants. */
     hum: () => { choir(); return flock.length; },
     /** Can another one join? The swat asks before it plays the resurrection. */

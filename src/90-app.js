@@ -3251,7 +3251,8 @@ let flyCamT = -1;
  * change a line for it. The whole argument is written over `satchelBought`.
  */
 const POCKET = { eur: 20.00, bought: satchelBought(), pick: 0 };
-/** Which shot the fly cam is showing: `drop`, `dance`, `birthday` or `brush`. */
+/** Which shot the fly cam is showing: `drop`, `dance`, `birthday`, `brush` or
+ *  `site`. */
 let flyCamMode = 'drop';
 /** Held by `__fr.ears.flyCam(t)`, for a scrub — the same switch as `swatHold`. */
 let flyCamHold = false;
@@ -3259,8 +3260,8 @@ let flyCamHold = false;
 let flyCamBig = false;
 function startFlyCam(mode = 'drop') {
   if (!jadrija || !jadrija.vik) return false;
-  flyCamMode = (mode === 'dance' || mode === 'birthday' || mode === 'brush')
-    ? mode : 'drop';
+  flyCamMode = (mode === 'dance' || mode === 'birthday' || mode === 'brush'
+    || mode === 'site') ? mode : 'drop';
   flyCamT = 0;
   flyCamHold = false;
   const el = $('flycam');
@@ -6997,7 +6998,8 @@ function frame() {
     const S = jadrija.vik.fly.shot();
     const camLen = flyCamMode === 'dance' ? S.danceLen()
       : flyCamMode === 'birthday' ? S.birthdayLen()
-        : flyCamMode === 'brush' ? S.brushLen() : S.dropLen();
+        : flyCamMode === 'brush' ? S.brushLen()
+          : flyCamMode === 'site' ? S.siteLen() : S.dropLen();
     if (flyCamT >= camLen || swatCut || pourCut) {
       flyCamT = -1;
       const el = $('flycam');
@@ -7702,6 +7704,7 @@ function frame() {
     if (flyCamMode === 'dance') shot.danceShot(flyCamT);
     else if (flyCamMode === 'birthday') shot.birthdayShot(flyCamT);
     else if (flyCamMode === 'brush') shot.brushShot(flyCamT);
+    else if (flyCamMode === 'site') shot.siteShot(flyCamT);
     else shot.dropShot(flyCamT);
     shot.render(renderer, flyCamBig ? false : 'pip');
   } else if (camOverride && jadrija && jadrija.zombies && jadrija.zombies.count() > 0

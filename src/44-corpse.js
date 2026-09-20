@@ -110,6 +110,20 @@ const CORPSE = {
 const mm = (v) => v / 1000;
 
 /**
+ * One white pixel, so `uMap` is never an unbound sampler. Made on the first
+ * material rather than at load, because this file is parsed before anything
+ * has decided there will ever be a corpse in this session.
+ */
+let _corpseBlank = null;
+function corpseBlank() {
+  if (!_corpseBlank) {
+    _corpseBlank = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    _corpseBlank.needsUpdate = true;
+  }
+  return _corpseBlank;
+}
+
+/**
  * How far off square it is lying, in radians.
  *
  * A quarter of a right angle, and it is the one number in this file that is a
@@ -237,6 +251,11 @@ function corpseMaterial(color, opts = {}) {
     uniforms: {
       uBase: { value: new THREE.Vector3(...color) },
       uAlt: { value: new THREE.Vector3(...(opts.alt || color)) },
+      // Only the screen in `workstation` ever supplies one, and every other
+      // material in this file gets the one white pixel below — an unbound
+      // sampler is legal in a branch nothing takes and is a driver argument
+      // waiting to happen, and one texel costs four bytes.
+      uMap: { value: opts.map || corpseBlank() },
       uPat: { value: opts.pat || 0 },
       uSpec: { value: opts.spec ?? 0.35 },
       uPow: { value: opts.power ?? 48 },
@@ -304,6 +323,7 @@ uniform vec3 uRadii;
 uniform vec2 uSpan;
 uniform float uFacets;
 uniform mat3 uRot;
+uniform sampler2D uMap;
 uniform vec3 uBlob[7];
 
 ${CORPSE_LIGHT}
@@ -485,7 +505,7 @@ void main(){
       sh = max(sh, 1.0 - smoothstep(0.35, 1.0, d));
     }
     base *= 1.0 - 0.62 * sh;
-  } else if (uPat > 5.5) {
+  } else if (uPat > 5.5 && uPat < 6.5) {
     // ── the candle flame ────────────────────────────────────────────────────
     // A flame is not a lit surface, it is the light: no shading rig touches it
     // (uEmis below), and everything that makes it read as fire is written
@@ -502,6 +522,22 @@ void main(){
     base *= (1.30 - 0.50 * u) * (0.55 + 0.45 * f);
     // And out at the top, where a candle flame is smoke more than fire.
     alpha = uAlpha * (0.26 + 0.74 * f) * (1.0 - smoothstep(0.62, 1.0, u));
+    emis = 1.0;
+  } else if (uPat > 6.5) {
+    // ── the screen ──────────────────────────────────────────────────────────
+    // A lit panel, and like the flame it is not a surface the rig shades: it
+    // makes its own light, so what the canvas painted is what the pixel is.
+    // See workstation() in this file for why the texture is left undecoded.
+    // (No backticks in here. A backtick ends the template and breaks the
+    // build, which this repo has now paid for four separate afternoons.)
+    base = texture2D(uMap, vUv).rgb;
+    // And the glass over it. Without this the panel is a decal — a rectangle
+    // of colour with no sign that there is anything in front of it — and at a
+    // stand-off of two centimetres the lens is close enough that the sheen
+    // across the top corner is the whole difference. Additive and small,
+    // because a screen you cannot read through a reflection is a mirror.
+    float sheen = pow(1.0 - abs(dot(n, v)), 3.5);
+    base += vec3(0.115, 0.120, 0.132) * sheen;
     emis = 1.0;
   }
 
@@ -1059,6 +1095,728 @@ const mixAng = (a, b, k) => {
 };
 
 /**
+ * ── THE WEBSITE ────────────────────────────────────────────────────────────
+ *
+ * Misha, 20 Sep 2026: *"have the zombie fly perform a new skill: do a
+ * demonstration of working on dad's website https://acupunctchi.com, applying
+ * some fixes/edits to it, looking super busy and all"*.
+ *
+ * THE SITE IS REAL AND IT BELONGS TO SOMEBODY, which decides nearly everything
+ * that is on the glass. Every string, every colour and the font stack were
+ * read off acupunctchi.com on 20 Sep 2026 and none of them was invented to be
+ * funny: the nine colours below are the `:root` block of
+ * /assets/css/style.css verbatim, the headings are set in the fallback its own
+ * stack names — Georgia, because the webfont is Cormorant Garamond and there
+ * is no webfont in a one-file game — and the three sentences on the preview
+ * are the hero line, the signature service and the button, as shipped.
+ *
+ * DELIBERATELY LEFT OUT: the telephone number, the email address, the street
+ * address and the founder's name. They are a working clinic's contact details
+ * and they would be on a novelty screen 3.3 mm wide for fourteen seconds,
+ * which gains the joke nothing. The eighteen therapies and the medical copy
+ * go for the same reason with one extra: nobody can read a list at this size.
+ *
+ * AND THE JOKE IS THAT THE FLY IS WRONG. `Acupnosis` is the clinic's own word
+ * — acupuncture and hypnosis delivered in one session, which is the thing the
+ * practice is known for — and to anything holding a dictionary it looks
+ * exactly like a misspelling of hypnosis. So the animal finds it, "corrects"
+ * it, ships the correction inside two seconds, takes the signature page down
+ * with it, and puts it back. Nothing about the site is broken when the routine
+ * starts or when it ends. The only thing that breaks is the fly's.
+ */
+const ACU = {
+  /** The site's own `:root`, off /assets/css/style.css. */
+  cream: '#FBF7F0', sand: '#F4ECE0', ink: '#2E2A24', soft: '#6E6457',
+  brand: '#F97D19', brandDark: '#DD6A0C', sage: '#7C8A6B', deep: '#586348',
+  line: '#E8DECE',
+  /**
+   * The editor's ground, and it is the one colour on this screen the site does
+   * not have: `--ink` with the lights turned down, because a code editor is
+   * dark and #2E2A24 type on a #2E2A24 ground is nothing at all. Every other
+   * colour in the left pane — tag, attribute, string, comment — is a swatch
+   * off the same stylesheet, which is why the two panes look like one machine.
+   */
+  slate: '#1C1915',
+  /** Its heading stack, minus the webfont; the fallbacks are the site's own. */
+  serif: 'Georgia, "Times New Roman", serif',
+  sans: '"Segoe UI", system-ui, -apple-system, sans-serif',
+  mono: '"DejaVu Sans Mono", "Courier New", monospace',
+  /** And the four strings, as shipped. */
+  word: 'Acupnosis',
+  wrong: 'Hypnosis',
+  hero: 'Health, healing & happiness — naturally',
+  brow: 'ACUPUNCTCHI CLINIC · HOLLYWOOD, FLORIDA',
+  cta: 'Book an Appointment',
+  file: 'index.html — acupunctchi.com',
+  /**
+   * The alarm colour, and the site has none: a wellness practice's palette is
+   * cream, sand, orange and sage from top to bottom, and there is no swatch in
+   * it for a thing having gone wrong. So the one red on this screen is
+   * imported, and that is the point of it — when it appears, it is the only
+   * pixel in the frame that does not belong to the site.
+   */
+  bad: '#B3402B',
+  ok: '#5E7A4E',
+};
+
+/**
+ * THE BEATS, and why they fall where they do.
+ *
+ *   arrive   in over the tile and down on to the front corner of the deck,
+ *            the machine already awake and showing the hero
+ *   spot     it puts its head on the glass and finds the word; the spell
+ *            checker underlines it and the status bar goes amber
+ *   type     THE FLURRY, and it is the longest beat by a factor of two
+ *            because it is the one the request actually asked for: nine
+ *            characters out, a breath, eight in, and a return
+ *   ship     it sits back and rubs its front legs together while the thing
+ *            deploys, which is the only calm second in the routine
+ *   oops     the preview comes back and the signature page is a 404. A beat
+ *            and a half of reading it, THEN the recoil — a fly that jumps on
+ *            the same frame the banner appears has not read anything
+ *   undo     straight back at the keyboard, both front legs on one chord,
+ *            held; the word snaps back in a single frame, because an undo is
+ *            not an animation
+ *   bow      up off the deck, round to the lens, and a bow in the quiet
+ *
+ * 15.8 s, which is 1.8 longer than the Sonicare demonstration and is spent
+ * entirely in `oops`: the toothbrush's joke is visible the instant it starts
+ * and this one has to be read off a screen 3.3 mm wide.
+ *
+ * Every beat is a pure function of `t` like every other shot in this file, so
+ * `__fr.ears.flyCam(t, 'site', true)` scrubs it a frame at a time.
+ *
+ * THE SOUND IS NOT HERE. The keystrokes, the return, the deploy chime and the
+ * error are `siteRun` in src/80-audio.js, which has its own copy of these
+ * times because it is scheduled on the audio clock and cannot read this file.
+ * The two are marked in both places; they are six numbers and they have to
+ * agree.
+ */
+const SITE = {
+  len: 15.8,
+  arrive: [0.00, 2.20],
+  spot: [2.20, 1.80],
+  type: [4.00, 4.60],
+  ship: [8.60, 1.60],
+  oops: [10.20, 2.20],
+  undo: [12.40, 1.60],
+  bow: [14.00, 1.80],
+  /**
+   * Inside `type`, in seconds from the top of that beat: when the nine
+   * characters of the word come out, when the eight of the replacement go in,
+   * and when the return is hit. `siteRun` has these same three.
+   */
+  cut: [0.35, 1.55],
+  put: [2.20, 1.70],
+  ret: 4.25,
+  /** How much of `oops` is spent reading it before the animal moves. */
+  read: 0.62,
+  /**
+   * Where it stands, in mm on the tile: off the FRONT RIGHT CORNER of the
+   * machine and not square in front of it, and that is the whole composition.
+   * A lens cannot see a screen and the thing facing the screen from the same
+   * place; put the animal at the corner instead and one camera at 26° off the
+   * panel's normal has the glass legible and the fly in three-quarter profile
+   * with its legs on the keys. Square-on, the first cut was a fly's back with
+   * a bright rectangle behind it.
+   */
+  stand: [1.15, 2.05],
+  /** What it is looking at while it works, which is the right-hand end of the
+   *  keyboard — the only part of the board a fly standing there can reach. */
+  look: [-0.55, 0.78],
+  /** How far it hovers over the tile while it works. A fly at a keyboard is
+   *  never quite standing on it. */
+  ride: 0.30,
+  /**
+   * Where the two pails stand while it works, in mm on the tile: [x, z, yaw].
+   *
+   * SEVEN MILLIMETRES UPSTAGE, and the number is not a taste — it is the only
+   * place on this tile they fit. A pail is 3.7 mm to the top of its bail and
+   * the whole laptop is 2.2, so wherever they stand they are the tallest
+   * things in the shot, and no distance fixes that: the lens is 40 to 60 mm
+   * out, so moving a pail ten millimetres further off makes it a fifth
+   * smaller and nothing more. What CAN be fixed is where they are in the
+   * frame. The camera lives between −0.12 and −0.95 of azimuth for the whole
+   * routine, which is one side of the machine, so a pair parked on the OTHER
+   * side falls off the left edge of every close shot and sits at the far edge
+   * of the two wide ones. Both earlier passes — beside it, and behind it —
+   * put a blue drum across a quarter of every frame.
+   */
+  park: [[1.60, 7.30, -0.35], [2.75, 8.15, 0.55]],
+  /** Keystrokes a second in the flurry, and how deep a key goes, in mm. */
+  rate: 6.2, sink: 0.055,
+  /**
+   * The lens, as keys: [t, metres out, radians up, radians round, and the
+   * three millimetres of the point it is aimed at].
+   *
+   * SEVEN numbers and not five, and the last three are why: every other shot
+   * in this file aims somewhere up the Y axis because its subject is standing
+   * at the origin, and the subject of eleven of these fifteen seconds is a
+   * pane of glass 1.5 mm off to one side of it.
+   *
+   * MUCH CLOSER THAN THE TOOTHBRUSH, and measured rather than carried over.
+   * At the 12° lens this shot has the frame is 0.374 × d across, so the
+   * 0.104 m the brush sits at gives 39 mm of picture — and the whole of this
+   * set piece, machine and animal together, is ten.
+   *
+   * The two pushes in, at 2.95 and 10.20, are the only frames anybody can
+   * READ, and they are the two the routine is about: the word, and the 404.
+   * Twenty-one millimetres of stand-off puts 3.3 mm of glass across half the
+   * frame, which at 1280 is 640 px for a 1024 px canvas — a shade under
+   * one-to-one, and the closest this gets to worth having. The rest of the
+   * routine lives at 0.04 and upward, where the screen is a fifth of the
+   * frame: you see a caret moving and two panes of a colour, which is all the
+   * flurry needs and all a 460 px corner box was ever going to carry.
+   */
+  key: [
+    [0.00, 0.060, 0.34, -0.95, 0.50, 1.30, 0.70],
+    [2.20, 0.050, 0.28, -0.72, 0.10, 1.25, 0.60],
+    [2.95, 0.023, 0.17, -0.18, -1.15, 1.25, 0.15],
+    [3.72, 0.023, 0.15, -0.14, -1.15, 1.22, 0.12],
+    [4.30, 0.050, 0.27, -0.62, -0.30, 1.10, 0.70],
+    [8.60, 0.048, 0.26, -0.55, -0.05, 1.20, 0.85],
+    [10.20, 0.024, 0.17, -0.14, -1.15, 1.10, 0.15],
+    [11.55, 0.024, 0.16, -0.12, -1.15, 1.10, 0.15],
+    [12.40, 0.050, 0.28, -0.58, -0.05, 1.35, 0.85],
+    [14.00, 0.056, 0.32, -0.80, 0.35, 1.40, 0.90],
+    [15.80, 0.062, 0.34, -0.90, 0.50, 1.50, 1.00],
+  ],
+};
+
+/**
+ * The machine, in millimetres.
+ *
+ * FLY-SIZED, the same decision the Sonicare made and for the same reason: a
+ * 13" laptop is 300 mm and this animal is 6.5, so the real thing is an
+ * aircraft carrier with a fly on the deck. It is 3.6 mm across the lid, which
+ * is a shade over half the length of the animal — a machine a fly could be
+ * working at, and the only size at which both of them fit in one frame.
+ *
+ * The lid is 16:9 because the routine is watched in a 16:9 box, and a screen
+ * whose shape fights the frame it is photographed in wastes the frame twice.
+ */
+const DESK = {
+  /** The deck: half-depth (x, toward the animal), thickness, half-width (z). */
+  deck: [1.30, 0.26, 1.80],
+  /** The lid panel: thickness, half-height, half-width. */
+  lid: [0.13, 1.02, 1.80],
+  /** The glass inside it, and it is 16:9 exactly. */
+  glass: [3.34, 1.88],
+  /** How far the lid leans back off upright, radians. */
+  lean: 0.30,
+  /**
+   * The keyboard: rows and columns, the pitch between key centres, how proud
+   * a cap stands off the deck, and where the block starts in x and z.
+   */
+  keys: [5, 12, 0.255, 0.075],
+  kb: [-1.06, -1.40],
+  /** The trackpad: centre in x, half-depth, half-width. */
+  pad: [0.86, 0.36, 0.60],
+};
+
+/**
+ * Several boxes, welded into one buffer.
+ *
+ * Sixty keycaps is sixty draw calls the honest way and one this way, and none
+ * of them ever move — the single cap that goes down under a foot is its own
+ * mesh, below. Non-indexed because a box is 36 vertices either way and the
+ * index buffer saves nothing worth the arithmetic of re-basing sixty of them.
+ */
+function weldBoxes(list) {
+  const parts = [];
+  let n = 0;
+  for (const [w, h, d, x, y, z] of list) {
+    const g = new THREE.BoxGeometry(w, h, d).toNonIndexed();
+    g.translate(x, y, z);
+    parts.push(g);
+    n += g.attributes.position.count;
+  }
+  const pos = new Float32Array(n * 3);
+  const nor = new Float32Array(n * 3);
+  let o = 0;
+  for (const g of parts) {
+    pos.set(g.attributes.position.array, o);
+    nor.set(g.attributes.normal.array, o);
+    o += g.attributes.position.count * 3;
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return out;
+}
+
+/**
+ * What the screen is showing, as a pure function of the shot's clock.
+ *
+ * Everything the glass does is decided here and painted by `paintSite` below,
+ * so a held frame paints the same pixels every time it is held and a scrub
+ * lands on exactly the picture that second of the routine has.
+ */
+function siteFrame(t) {
+  const S = SITE;
+  const at = (w) => (t - w[0]) / w[1];
+  const inW = (w) => t >= w[0] && t < w[0] + w[1];
+  const f = {
+    page: 'hero',          // which bit of the site the preview is scrolled to
+    word: ACU.word,        // what line 6 says right now
+    caret: -1,             // where the caret is in it, or −1 for none
+    squig: 0,              // the spell checker's underline, 0 to 1
+    tip: 0,                // and its little tooltip
+    sel: 0,                // the undo's selection flash
+    broke: 0,              // the 404 banner in the preview
+    ship: -1,              // the deploy bar, 0 to 1
+    tone: 'ok',            // what colour the status bar is
+    say: 'acupunctchi.com · connected',
+    blink: (Math.floor(t * 2.2) & 1) === 0,
+  };
+  if (inW(S.arrive)) {
+    // The machine is already awake when the animal arrives, because a fly
+    // that has to wait for a login is not a set piece.
+    return f;
+  }
+  if (inW(S.spot)) {
+    const u = at(S.spot);
+    f.page = 'card';
+    f.squig = smooth01((u - 0.18) / 0.26);
+    f.tip = smooth01((u - 0.40) / 0.22);
+    f.tone = 'warn';
+    f.say = '1 problem · "Acupnosis" is not in the dictionary';
+    return f;
+  }
+  if (inW(S.type)) {
+    const u = t - S.type[0];
+    // Nine characters out and eight in, both rounded to a whole letter: a
+    // caret that sits between two letters for a frame reads as a smear.
+    const gone = Math.round(9 * sat((u - S.cut[0]) / S.cut[1]));
+    const made = Math.round(8 * sat((u - S.put[0]) / S.put[1]));
+    f.page = 'card';
+    f.word = made > 0 ? ACU.wrong.slice(0, made) : ACU.word.slice(0, 9 - gone);
+    f.caret = f.word.length;
+    f.squig = gone === 0 ? 1 : 0;
+    f.tone = 'edit';
+    f.say = u >= S.ret ? '↵  saving index.html…' : 'editing index.html · line 6';
+    return f;
+  }
+  if (inW(S.ship)) {
+    const u = at(S.ship);
+    f.page = 'card';
+    f.word = ACU.wrong;
+    f.ship = sat(u * 1.15);
+    f.tone = 'ship';
+    f.say = 'deploying to acupunctchi.com · ' + Math.round(f.ship * 100) + '%';
+    return f;
+  }
+  if (inW(S.oops)) {
+    f.page = 'card';
+    f.word = ACU.wrong;
+    f.broke = smooth01(at(S.oops) / 0.22);
+    f.tone = 'bad';
+    f.say = 'deployed · 1 broken link · 404 /acupnosis/';
+    return f;
+  }
+  if (inW(S.undo)) {
+    const u = at(S.undo);
+    f.page = 'card';
+    // Before the chord lands the screen is still wrong, and after it the word
+    // is simply back. An undo has no in-between state and is not animated.
+    f.word = u < 0.34 ? ACU.wrong : ACU.word;
+    f.broke = u < 0.34 ? 1 : 0;
+    f.sel = u < 0.34 ? 0 : smooth01((0.72 - u) / 0.38);
+    f.tone = u < 0.34 ? 'bad' : 'ok';
+    f.say = u < 0.34 ? 'deployed · 1 broken link · 404 /acupnosis/'
+      : '⌘Z · restored · redeploying…';
+    return f;
+  }
+  f.page = 'card';
+  f.tone = 'ok';
+  f.say = 'acupunctchi.com · 0 problems';
+  return f;
+}
+
+/**
+ * The screen, painted.
+ *
+ * A code editor on the left and the page it is editing on the right, which is
+ * what working on a website has looked like since about 2011 and is therefore
+ * the one layout that reads as this activity from across a room — and from
+ * 34 mm away through a 12° lens, which is where the lens actually is. A
+ * full-width editor would have been a fly typing at a black rectangle.
+ *
+ * `g` is a 1024 × 576 context. Nothing here is measured in millimetres: this
+ * is a screen and its units are its own pixels.
+ */
+function paintSite(g, f) {
+  const W = 1024, H = 576;
+  // A pill, or a plain rectangle on a canvas too old to have `roundRect` —
+  // the same guard src/44-board.js keeps over the signs, and for the same
+  // reason: this is the only rounded thing on the screen and it is the site's
+  // button, which is fully rounded and is nothing else if it is not.
+  const pill = (x, y, w, h) => {
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, w, h, h / 2);
+    else g.rect(x, y, w, h);
+    g.fill();
+  };
+  const BAR = 46, FOOT = 42, PANE = 596;
+  const px = (n) => n + 'px ';
+  g.textBaseline = 'alphabetic';
+  g.clearRect(0, 0, W, H);
+
+  // ── the window's own chrome ──────────────────────────────────────────────
+  g.fillStyle = ACU.ink;
+  g.fillRect(0, 0, W, BAR);
+  for (let i = 0; i < 3; i++) {
+    g.fillStyle = [ACU.brand, ACU.sage, ACU.soft][i];
+    g.beginPath();
+    g.arc(30 + i * 30, BAR / 2, 8, 0, TAU);
+    g.fill();
+  }
+  g.fillStyle = ACU.line;
+  g.font = '500 ' + px(22) + ACU.sans;
+  g.textAlign = 'center';
+  g.fillText(ACU.file, W / 2, BAR / 2 + 8);
+
+  // ── the editor ───────────────────────────────────────────────────────────
+  g.fillStyle = ACU.slate;
+  g.fillRect(0, BAR, PANE, H - BAR - FOOT);
+  const COL = { t: ACU.sage, a: '#A89E8F', s: ACU.brand, x: ACU.cream, c: ACU.deep };
+  const LH = 39;
+  const y0 = BAR + 40;
+  const CODE = [
+    [['<section', 't'], [' class=', 'a'], ['"signature"', 's'], ['>', 't']],
+    [['  <p', 't'], [' class=', 'a'], ['"eyebrow"', 's'], ['>', 't'],
+      ['Our Signature Service', 'x'], ['</p>', 't']],
+    [['  <h2>', 't'], ['Exclusive to the Clinic', 'x'], ['</h2>', 't']],
+    [],
+    [['  <!-- the name is the trademark. -->', 'c']],
+    null,
+    [['  <p>', 't'], ['A powerful blend of ', 'x'], ['<em>', 't']],
+    [['    acupuncture and hypnosis', 'x'], ['</em>', 't'], [' —', 'x']],
+    [['    the first of its kind.', 'x'], ['</p>', 't']],
+    [['  <a', 't'], [' href=', 'a'], ['"/acupnosis/"', 's'], ['>', 't'],
+      ['Learn more', 'x'], ['</a>', 't']],
+    [['</section>', 't']],
+  ];
+  g.textAlign = 'left';
+  g.font = px(25) + ACU.mono;
+  // Where the tooltip goes, if there is one. It is drawn AFTER the loop and
+  // not inside it, which is the whole of what was wrong with the first pass:
+  // a card painted while line 6 is being drawn has line 7 painted straight
+  // over the top of it, and what that looks like is a transparent tooltip
+  // with somebody else's code showing through it.
+  let tipAt = null;
+  for (let i = 0; i < CODE.length; i++) {
+    const y = y0 + i * LH;
+    g.fillStyle = i === 5 ? ACU.sage : ACU.soft;
+    g.globalAlpha = i === 5 ? 1 : 0.65;
+    g.fillText(String(i + 1).padStart(2, ' '), 16, y);
+    g.globalAlpha = 1;
+    if (i === 5) {
+      // The line being worked on: its own faint wash, the way every editor
+      // marks the line the caret is in.
+      g.fillStyle = 'rgba(124,138,107,0.13)';
+      g.fillRect(56, y - 27, PANE - 56, LH);
+    }
+    let x = 66;
+    if (CODE[i]) {
+      for (const [s, k] of CODE[i]) {
+        g.fillStyle = COL[k];
+        g.fillText(s, x, y);
+        x += g.measureText(s).width;
+      }
+      continue;
+    }
+    // ── line 6, which is the whole routine ─────────────────────────────────
+    const open = '  <h3>';
+    g.fillStyle = COL.t;
+    g.fillText(open, x, y);
+    x += g.measureText(open).width;
+    if (f.sel > 0) {
+      g.fillStyle = 'rgba(249,125,25,' + (0.68 * f.sel).toFixed(3) + ')';
+      g.fillRect(x - 3, y - 26, g.measureText(f.word).width + 6, 34);
+    }
+    g.fillStyle = COL.x;
+    g.fillText(f.word, x, y);
+    const wEnd = x + g.measureText(f.word).width;
+    if (f.squig > 0) {
+      // The spell checker, drawn the way every one of them is: a two-pixel
+      // wave under the word, in a red this palette does not otherwise own.
+      g.strokeStyle = ACU.bad;
+      g.lineWidth = 4;
+      g.beginPath();
+      const w = (wEnd - x) * f.squig;
+      for (let q = 0; q <= w; q += 2) {
+        const yy = y + 10 + (Math.floor(q / 5) % 2 ? 6 : 0);
+        if (q === 0) g.moveTo(x, yy); else g.lineTo(x + q, yy);
+      }
+      g.stroke();
+    }
+    if (f.caret >= 0 && f.blink) {
+      g.fillStyle = ACU.cream;
+      g.fillRect(wEnd + 2, y - 26, 4, 34);
+    }
+    g.fillStyle = COL.t;
+    g.fillText('</h3>', wEnd + 10, y);
+    if (f.tip > 0) tipAt = [x, y];
+  }
+  if (tipAt) {
+    // And its tooltip, which is the beat where the fly decides.
+    g.globalAlpha = f.tip;
+    // Lighter than `--ink`, which was the first try and is within a couple of
+    // stops of the editor's own ground: a tooltip has to be a card sitting ON
+    // the code, and #2E2A24 on #1C1915 is a rectangle you find by looking for
+    // it.
+    g.fillStyle = '#423B31';
+    g.strokeStyle = ACU.bad;
+    g.lineWidth = 3;
+    g.fillRect(tipAt[0] - 6, tipAt[1] + 22, 348, 48);
+    g.strokeRect(tipAt[0] - 6, tipAt[1] + 22, 348, 48);
+    g.fillStyle = ACU.cream;
+    g.font = '600 ' + px(22) + ACU.sans;
+    g.fillText('not in dictionary — "Hypnosis"?', tipAt[0] + 10, tipAt[1] + 54);
+    g.globalAlpha = 1;
+  }
+
+  // ── and the page itself ──────────────────────────────────────────────────
+  const PW = W - PANE;
+  g.fillStyle = f.page === 'card' ? ACU.sand : ACU.cream;
+  g.fillRect(PANE, BAR, PW, H - BAR - FOOT);
+  // The preview's own address bar, so the right pane reads as a browser and
+  // not as a second editor pane.
+  g.fillStyle = ACU.line;
+  g.fillRect(PANE, BAR, PW, 34);
+  g.fillStyle = ACU.soft;
+  g.font = px(19) + ACU.sans;
+  g.textAlign = 'left';
+  g.fillText('acupunctchi.com' + (f.page === 'card' ? '/#acupnosis' : ''), PANE + 16, BAR + 24);
+  const cx = PANE + 28;
+  let y = BAR + 34;
+  g.textAlign = 'left';
+  if (f.page === 'hero') {
+    g.fillStyle = ACU.deep;
+    g.font = '700 ' + px(17) + ACU.sans;
+    g.fillText(ACU.brow, cx, y + 46);
+    g.fillStyle = ACU.ink;
+    g.font = '600 ' + px(44) + ACU.serif;
+    const lines = ['Health, healing &', 'happiness —', 'naturally'];
+    for (let i = 0; i < lines.length; i++) g.fillText(lines[i], cx, y + 110 + i * 52);
+    // The button, and it is the site's own pill: brand orange, fully rounded.
+    g.fillStyle = ACU.brand;
+    pill(cx, y + 300, 300, 62);
+    g.fillStyle = '#ffffff';
+    g.font = '700 ' + px(23) + ACU.sans;
+    g.textAlign = 'center';
+    g.fillText(ACU.cta, cx + 150, y + 340);
+    g.textAlign = 'left';
+  } else {
+    g.fillStyle = ACU.deep;
+    g.font = '700 ' + px(17) + ACU.sans;
+    g.fillText('OUR SIGNATURE SERVICE', cx, y + 42);
+    g.fillStyle = ACU.ink;
+    g.font = '600 ' + px(30) + ACU.serif;
+    g.fillText('Exclusive to the', cx, y + 90);
+    g.fillText('AcupunctChi Clinic', cx, y + 126);
+    // The word, big, in the site's own heading serif and its own dark orange.
+    g.fillStyle = ACU.brandDark;
+    g.font = '700 ' + px(62) + ACU.serif;
+    g.fillText(f.word || ' ', cx, y + 216);
+    g.fillStyle = ACU.sage;
+    pill(cx, y + 240, 130, 34);
+    g.fillStyle = '#ffffff';
+    g.font = '700 ' + px(17) + ACU.sans;
+    g.textAlign = 'center';
+    g.fillText('SIGNATURE', cx + 65, y + 264);
+    g.textAlign = 'left';
+    g.fillStyle = ACU.soft;
+    g.font = px(20) + ACU.sans;
+    g.fillText('A powerful blend of', cx, y + 312);
+    g.fillText('acupuncture and hypnosis.', cx, y + 340);
+    if (f.broke > 0) {
+      g.globalAlpha = f.broke;
+      g.fillStyle = ACU.bad;
+      g.fillRect(PANE, H - FOOT - 86, PW, 86);
+      g.fillStyle = '#ffffff';
+      g.font = '700 ' + px(30) + ACU.sans;
+      g.fillText('404', PANE + 20, H - FOOT - 50);
+      g.font = px(21) + ACU.sans;
+      g.fillText('/acupnosis/ — page not found', PANE + 20, H - FOOT - 20);
+      g.globalAlpha = 1;
+    }
+  }
+
+  // ── the status bar ───────────────────────────────────────────────────────
+  const TONE = { ok: ACU.ok, warn: ACU.brandDark, edit: ACU.deep,
+    ship: ACU.sage, bad: ACU.bad };
+  g.fillStyle = TONE[f.tone] || ACU.ok;
+  g.fillRect(0, H - FOOT, W, FOOT);
+  if (f.ship >= 0) {
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.fillRect(0, H - FOOT, W * f.ship, FOOT);
+  }
+  g.fillStyle = '#ffffff';
+  g.font = '600 ' + px(22) + ACU.sans;
+  g.textAlign = 'left';
+  g.fillText(f.say, 18, H - 13);
+}
+
+/**
+ * The machine, as geometry. Built once with the stage and hidden until
+ * somebody asks for the demonstration.
+ *
+ * Its own frame: the deck flat on the tile with the hinge at −x, the lid
+ * rising from it and leaning back over −x, and the glass facing +x. So the
+ * place a person would sit is +x, and everything that poses the animal only
+ * has to say where on the tile it is standing and which way it is looking —
+ * which is what somebody walking up to a laptop decides.
+ */
+function workstation(stage, fade, res) {
+  const D = DESK;
+  const cv = document.createElement('canvas');
+  cv.width = 1024;
+  cv.height = 576;
+  const g2 = cv.getContext('2d');
+  const tex = new THREE.CanvasTexture(cv);
+  /**
+   * NOT `SRGBColorSpace`, and this is the one line on the screen that has a
+   * measurement behind it rather than a taste.
+   *
+   * The shot's shader writes `gl_FragColor` straight out — no
+   * `colorspace_fragment`, no tone map, nothing — so what every other surface
+   * in this scene puts in that variable is already a display-referred number.
+   * The glass is emissive: it is not lit, it IS the light, so what the canvas
+   * painted is what the pixel should be. Tag the texture sRGB and it is
+   * decoded on the way in and never encoded on the way out, which squares it:
+   * the cream ground survives that (0.98 → 0.96) and the charcoal editor does
+   * not — #1C1915 comes back at a fifth of its value, and the whole left pane
+   * goes to pure black with some coloured dust in it.
+   */
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.anisotropy = 8;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+
+  const M = {
+    shell: corpseMaterial([0.740, 0.752, 0.772], { spec: 0.72, power: 95, fade, res }),
+    dark: corpseMaterial([0.115, 0.120, 0.130], { spec: 0.45, power: 55, fade, res }),
+    // The caps, and the gloss on them is deliberately low. A keyboard at this
+    // magnification is sixty little domes all catching the key light at once,
+    // and at 0.38 of specular the two pushes in had a white bar across the
+    // deck where the board should be — sixty highlights merging into one.
+    key: corpseMaterial([0.180, 0.186, 0.198], { spec: 0.20, power: 28, fade, res }),
+    // The cap under a foot, and it is nearly white against a near-black
+    // board: at this magnification one key is 0.21 mm across and a difference
+    // of a stop between it and its sixty neighbours is a difference nobody
+    // sees. Lit rather than moved is most of what makes a keystroke visible.
+    lit: corpseMaterial([0.820, 0.840, 0.880], { spec: 0.55, power: 70, fade, res }),
+    glass: corpseMaterial([1, 1, 1], { pat: 7, map: tex, fade, res }),
+  };
+  const g = new THREE.Group();
+  const add = (geo, mat, p, parent) => {
+    const m = new THREE.Mesh(geo, mat);
+    if (p) m.position.set(mm(p[0]), mm(p[1]), mm(p[2]));
+    (parent || g).add(m);
+    return m;
+  };
+  // The deck, and a dark strip along the hinge so the two halves are two
+  // pieces rather than one folded card.
+  add(new THREE.BoxGeometry(mm(D.deck[0] * 2), mm(D.deck[1]), mm(D.deck[2] * 2)),
+    M.shell, [0, D.deck[1] / 2, 0]);
+  add(new THREE.CylinderGeometry(mm(D.deck[1] * 0.55), mm(D.deck[1] * 0.55),
+    mm(D.deck[2] * 2 - 0.10), 10), M.dark, [-D.deck[0], D.deck[1] * 0.8, 0])
+    .rotation.x = Math.PI / 2;
+  // The lid, hinged at the back of the deck and leaning away from the animal.
+  const lid = new THREE.Group();
+  lid.position.set(mm(-D.deck[0]), mm(D.deck[1]), 0);
+  lid.rotation.z = D.lean;
+  g.add(lid);
+  add(new THREE.BoxGeometry(mm(D.lid[0]), mm(D.lid[1] * 2), mm(D.lid[2] * 2)),
+    M.shell, [0, D.lid[1], 0], lid);
+  // The bezel, then the glass a hair proud of it so there is no z-fight along
+  // an edge the lens spends eleven seconds looking straight at.
+  add(new THREE.BoxGeometry(mm(0.03), mm(D.lid[1] * 2 - 0.10), mm(D.lid[2] * 2 - 0.10)),
+    M.dark, [D.lid[0] * 0.5 + 0.005, D.lid[1], 0], lid);
+  const screen = add(new THREE.PlaneGeometry(mm(D.glass[0]), mm(D.glass[1])),
+    M.glass, [D.lid[0] * 0.5 + 0.022, D.lid[1], 0], lid);
+  screen.rotation.y = Math.PI / 2;
+  // The keyboard. Sixty caps in one buffer — see `weldBoxes` — with the front
+  // row's middle five welded into one bar, because a keyboard without a space
+  // bar is a calculator.
+  const [rows, cols, pitch, tall] = D.keys;
+  const kw = pitch * 0.84, kd = pitch * 0.84;
+  const caps = [];
+  const keyAt = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = D.kb[0] + r * pitch;
+      const z = D.kb[1] + c * pitch;
+      if (r === rows - 1 && c >= 4 && c <= 8) { if (c > 4) continue; }
+      const wide = (r === rows - 1 && c === 4) ? pitch * 4.84 : kd;
+      caps.push([mm(kw), mm(tall), mm(wide), mm(x), mm(D.deck[1] + tall / 2),
+        mm(z + (wide - kd) / 2)]);
+      keyAt.push([x, z + (wide - kd) / 2, wide]);
+    }
+  }
+  add(weldBoxes(caps), M.key);
+  // The one cap that goes down under a foot, which is the only moving part of
+  // this machine and the only way a keystroke is visible at all.
+  const hit = add(new THREE.BoxGeometry(mm(kw), mm(tall), mm(kd)), M.lit,
+    [0, D.deck[1] + tall / 2, 0]);
+  hit.visible = false;
+  // And the trackpad, which nothing uses and which the machine is not a
+  // laptop without.
+  add(new THREE.BoxGeometry(mm(D.pad[1] * 2), mm(0.02), mm(D.pad[2] * 2)),
+    M.dark, [D.pad[0], D.deck[1] + 0.012, 0]);
+
+  for (const m of g.children) { m.castShadow = false; m.receiveShadow = false; }
+  g.visible = false;
+  stage.add(g);
+
+  let key = '';
+  return {
+    group: g,
+    /** Where the glass's middle is, in the machine's own frame, mm — the lid's
+     *  hinge plus the panel, turned through the lean. Debug; the camera keys
+     *  were written against it. */
+    mid: [-D.deck[0] + (D.lid[0] * 0.5 + 0.022) * Math.cos(D.lean)
+      - D.lid[1] * Math.sin(D.lean),
+    D.deck[1] + (D.lid[0] * 0.5 + 0.022) * Math.sin(D.lean)
+      + D.lid[1] * Math.cos(D.lean), 0],
+    hide(on) { g.visible = !on; },
+    /**
+     * Paint the screen for this second of the routine.
+     *
+     * Repainted only when the picture has actually changed, which over
+     * fifteen seconds is about forty times rather than nine hundred: a
+     * 1024 × 576 canvas is 2.3 MB of upload and a caret that blinks twice a
+     * second does not need one every frame. `siteFrame` is a pure function of
+     * `t`, so the signature below is complete by construction.
+     */
+    screen(t) {
+      const f = siteFrame(t);
+      const k = [f.page, f.word, f.caret, f.tone, f.say, f.blink,
+        f.squig.toFixed(2), f.tip.toFixed(2), f.sel.toFixed(2),
+        f.broke.toFixed(2), f.ship.toFixed(2)].join('|');
+      if (k === key) return;
+      key = k;
+      paintSite(g2, f);
+      tex.needsUpdate = true;
+    },
+    /**
+     * A key going down. `i` picks one of the sixty and `k` is how far — and a
+     * negative `i` puts the cap away, which is every beat but the flurry.
+     */
+    press(i, k) {
+      if (i < 0 || k <= 0.06) { hit.visible = false; return null; }
+      const [x, z] = keyAt[((i % keyAt.length) + keyAt.length) % keyAt.length];
+      hit.visible = true;
+      hit.position.set(mm(x), mm(D.deck[1] + tall / 2 - SITE.sink * k), mm(z));
+      return [x, D.deck[1] + tall, z];
+    },
+  };
+}
+
+/**
  * Every joint on one animal, found by name — so it works on the corpse and on
  * any clone of it — plus the pose it was built in, which is the dead one.
  *
@@ -1110,6 +1868,11 @@ const LEG_LIVE = {
   rub: [[0.30, -0.60, 0.95, -2.25, 0.60, 0.15]],
   // The zombie's arms: the front pair straight out ahead and a little up.
   arms: [[0.12, 0.18, 0.05, -0.15, 0.05, 0.02]],
+  // And the front pair down on to a keyboard just in front of the head, which
+  // is neither of the two that existed: `arms` is straight out in front at
+  // head height and `stand` goes all the way down to the tile, and a key is
+  // a third of a millimetre off the floor and a millimetre and a half away.
+  type: [[0.34, -0.62, 0.66, -1.62, 0.78, 0.16]],
 };
 const _live = new Array(10).fill(0);
 function liveRaw(L, kind) {
@@ -1901,6 +2664,11 @@ function buildFlyCorpse() {
   const cake = birthdayCake(stage, fade, res);
   // And the toothbrush, likewise, for `brushShot`.
   const brush = sonicare(stage, fade, res);
+  // And the computer, for `siteShot`. It carries the only canvas in this
+  // scene — everything else here is procedural, see `corpseMaterial` — and
+  // that canvas is 2.3 MB, so it is painted for the first time on the first
+  // frame of the routine and never before it.
+  const desk = workstation(stage, fade, res);
   const _v = new THREE.Vector3();
   const _w = new THREE.Vector3();
   const _q = new THREE.Vector3();
@@ -1958,6 +2726,7 @@ function buildFlyCorpse() {
     floorMesh.visible = true;
     cake.hide(true);
     brush.hide(true);
+    desk.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2180,6 +2949,7 @@ function buildFlyCorpse() {
     for (const P of pairs) P.hide(true);
     cake.hide(true);
     brush.hide(true);
+    desk.hide(true);
     for (const x of extras) x.A.body.visible = false;
     floorMesh.visible = true;
     rig.updateMatrixWorld(true);
@@ -2202,6 +2972,7 @@ function buildFlyCorpse() {
     floorMesh.visible = false;
     cake.hide(true);
     brush.hide(true);
+    desk.hide(true);
     fade.value = 1;
     cam.fov = fov;
     cam.position.set(0, 0, 0);
@@ -2296,6 +3067,7 @@ function buildFlyCorpse() {
     floorMesh.visible = true;
     cake.hide(true);
     brush.hide(true);
+    desk.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2380,6 +3152,7 @@ function buildFlyCorpse() {
     floorMesh.visible = true;
     cake.hide(true);
     brush.hide(true);
+    desk.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2500,6 +3273,7 @@ function buildFlyCorpse() {
     floorMesh.visible = true;
     cake.hide(false);
     brush.hide(true);
+    desk.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2724,6 +3498,7 @@ function buildFlyCorpse() {
     floorMesh.visible = true;
     cake.hide(true);
     brush.hide(false);
+    desk.hide(true);
     for (const x of extras) x.A.body.visible = false;
     for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
     const P = pairs[0];
@@ -2966,6 +3741,288 @@ function buildFlyCorpse() {
     fade.value = 1;
   }
 
+
+  /**
+   * The website demonstration, `t` seconds in. See SITE for the beats.
+   *
+   * WHERE IT IS STANDING is the decision this shot is built on, and it is not
+   * where a person would stand. A screen and the thing looking at the screen
+   * face each other, so no single lens has both — put the animal square in
+   * front of the machine and every frame is a fly's back with a bright
+   * rectangle behind it. It stands at the FRONT RIGHT CORNER instead, a
+   * millimetre and a half off the deck, reaching in across it; one camera at
+   * a quarter-turn off the panel's normal then has the glass at two-thirds
+   * face-on and the animal in three-quarter profile with its legs on the
+   * keys, which is the picture the whole routine needs.
+   *
+   * AND ITS BUCKETS ARE ON THE FLOOR. Every other number in this movement's
+   * repertoire is performed holding them — the dance, the birthday, the
+   * toothbrush — and this one cannot be: a fly carrying two pails rides at
+   * 7.6 mm because the middle pair hangs 4.5 below it, and a keyboard is at
+   * 0.34. So they are parked on the tile beside the machine, already down
+   * when the shot opens, and that is the joke the composition tells before
+   * anything moves: a Bucketeer who put the buckets down to get some work
+   * done.
+   */
+  function siteShot(t) {
+    measure();
+    floorMesh.visible = true;
+    cake.hide(true);
+    brush.hide(true);
+    desk.hide(false);
+    for (const x of extras) x.A.body.visible = false;
+    for (let k = 1; k < pairs.length; k++) pairs[k].hide(true);
+    const P = pairs[0];
+    P.hide(false);
+    const D = SITE;
+    const at = (w) => (t - w[0]) / w[1];
+    const inW = (w) => t >= w[0] && t < w[0] + w[1];
+
+    desk.group.position.set(0, 0, 0);
+    desk.group.rotation.set(0, 0, 0);
+    desk.screen(t);
+
+    // The lens, on its own keys — the same machinery as the toothbrush, with
+    // an aim POINT rather than an aim height. See SITE.key.
+    let k0 = D.key[0], k1 = D.key[D.key.length - 1];
+    for (let i = 0; i < D.key.length - 1; i++) {
+      if (t >= D.key[i][0] && t < D.key[i + 1][0]) { k0 = D.key[i]; k1 = D.key[i + 1]; }
+    }
+    if (t >= k1[0]) k0 = k1;
+    const ce = k1[0] > k0[0] ? smooth01((t - k0[0]) / (k1[0] - k0[0])) : 0;
+    const cd = lerp(k0[1], k1[1], ce);
+    const cel = lerp(k0[2], k1[2], ce);
+    const caz = mixAng(k0[3], k1[3], ce);
+    const aimX = lerp(k0[4], k1[4], ce);
+    const aimY = lerp(k0[5], k1[5], ce);
+    const aimZ = lerp(k0[6], k1[6], ce);
+    const faceCam = -caz;
+
+    // Standing height is MEASURED and not chosen — see `measure` — because the
+    // one thing this routine must not do is put six feet through a tile it is
+    // photographed two centimetres above.
+    const ground = standLift / mm(1);
+    /** Which way it is looking, to face a point on the tile. */
+    const faceTo = (tx, tz, fx, fz) => Math.atan2(-(tz - fz), tx - fx);
+    const faceKeys = faceTo(D.look[0], D.look[1], D.stand[0], D.stand[1]);
+
+    let bx = D.stand[0], bz = D.stand[1], by = ground + D.ride;
+    let yaw = faceKeys, roll = 0, pitch = 0;
+    // `hands` is how much of the front pair is up on the keyboard, `ham` how
+    // hard it is hammering, `rub` the front-legs-together a fly does anyway
+    // and a person waiting on a deploy does too, and `foot` whether the back
+    // four are on the tile or drawn up in the air.
+    let hands = 0, ham = 0, rub = 0, foot = 1, wing = 0.25;
+    // Which key is down and how far. −1 is none.
+    let hitKey = -1, hitK = 0;
+
+    if (inW(D.arrive)) {
+      // IN FROM STAGE RIGHT AND ABOVE, and down on to the corner. It comes in
+      // past the lens rather than toward it, so the first thing in the frame
+      // is the machine and the second is the animal arriving at it.
+      const u = at(D.arrive);
+      const e = smooth01(u);
+      bx = lerp(8.2, D.stand[0], e);
+      bz = lerp(6.4, D.stand[1], e);
+      by = lerp(ground + 6.2, ground + D.ride, e) + 0.30 * Math.sin(t * 9.3) * (1 - e);
+      yaw = mixAng(faceKeys - 1.25, faceKeys, e);
+      roll = 0.22 * Math.sin(t * 5.4) * (1 - e) - 0.10 * e;
+      pitch = lerp(-0.18, 0.06, e);
+      hands = smooth01((u - 0.62) / 0.38);
+      foot = smooth01((u - 0.55) / 0.35);
+      wing = lerp(1, 0.05, e);
+    } else if (inW(D.spot)) {
+      // THE WORD. It leans in and puts its head on the glass — up, forward
+      // and nose-high, because the screen is above it and leaning away.
+      const u = at(D.spot);
+      const e = smooth01(u);
+      bx = lerp(D.stand[0], 1.05, e);
+      bz = lerp(D.stand[1], 1.50, e);
+      by = ground + D.ride + 0.88 * e + 0.10 * Math.sin(t * 6.1);
+      yaw = mixAng(faceKeys, faceTo(-1.45, 0.10, 1.05, 1.50), e);
+      pitch = 0.36 * e;
+      roll = -0.14 * e;
+      hands = 1 - 0.45 * e;
+      foot = 1 - 0.55 * e;
+      wing = 0.05 + 0.14 * e;
+    } else if (inW(D.type)) {
+      // THE FLURRY, and it is the beat the request asked for. Four and a half
+      // seconds of a housefly hammering a keyboard with its front pair while
+      // the other four hold it against its own recoil.
+      const u = t - D.type[0];
+      const e = smooth01(Math.min(1, u * 4));
+      bx = lerp(1.05, D.stand[0] - 0.24, e);
+      bz = lerp(1.50, D.stand[1] - 0.18, e);
+      by = ground + D.ride + lerp(0.88, 0.22, e);
+      yaw = mixAng(faceTo(-1.45, 0.10, 1.05, 1.50), faceKeys, e);
+      hands = 1;
+      foot = 0.85;
+      // A flick of the wings on every stroke and nothing between them, which
+      // is what a fly does when it is agitated and standing still.
+      wing = 0.12;
+      // The strike. Nine characters out and eight in at SITE.cut and SITE.put
+      // — the same two windows the screen reads — and nothing between them,
+      // which is the breath where it looks at what it has done.
+      let n = -1, fr = 0;
+      if (u >= D.cut[0] && u < D.cut[0] + D.cut[1]) {
+        const p = (u - D.cut[0]) / D.cut[1] * 9;
+        n = Math.floor(p); fr = p - n;
+      } else if (u >= D.put[0] && u < D.put[0] + D.put[1]) {
+        const p = (u - D.put[0]) / D.put[1] * 8;
+        n = 9 + Math.floor(p); fr = p - Math.floor(p);
+      } else if (u >= D.ret && u < D.ret + 0.30) {
+        n = 17; fr = (u - D.ret) / 0.30;
+      }
+      if (n >= 0) {
+        // Down fast and up slow, which is what a key does and what a finger
+        // does not: the cap is at the bottom of its travel a quarter of the
+        // way into the stroke and back up by the end of it.
+        hitK = Math.max(0, 1 - Math.abs(fr - 0.22) * 3.4);
+        // The right-hand end of the board, which is the only part of it
+        // anything standing at that corner can reach — columns 8 to 11 of
+        // the twelve. A fly whose foot is on the escape key is a fly whose
+        // body is somewhere else.
+        const r = Math.floor(hash1(n * 3.7 + 0.4) * 4);
+        const c = 8 + Math.floor(hash1(n * 5.1 + 1.9) * 4);
+        hitKey = n === 17 ? 3 * 12 + 11 : r * 12 + c;
+      }
+      // The body works with it: a rock forward on every stroke and a roll
+      // that does not divide into it, so a second of this never repeats.
+      ham = 1;
+      wing += 0.34 * hitK;
+      pitch = 0.10 - 0.16 * hitK;
+      roll = -0.06 + 0.07 * Math.sin(TAU * 1.7 * t);
+      bx -= 0.18 * hitK;
+      by += 0.05 * Math.sin(TAU * 2.3 * t);
+    } else if (inW(D.ship)) {
+      // AND A SECOND OF CALM, which the routine needs exactly once: it sits
+      // back off the keys and rubs its front legs together while the thing
+      // goes out. A fly does this anyway; so does everybody waiting on a
+      // deploy, and that is the whole joke of the beat.
+      const u = at(D.ship);
+      const e = smooth01(Math.min(1, u * 2.2));
+      bx = lerp(D.stand[0] - 0.30, D.stand[0] + 0.25, e);
+      bz = lerp(D.stand[1] - 0.22, D.stand[1] + 0.10, e);
+      by = ground + D.ride + 0.34 * e;
+      yaw = faceKeys;
+      pitch = 0.26 * e;
+      hands = 1;
+      rub = e;
+      foot = 1;
+      wing = 0.05;
+    } else if (inW(D.oops)) {
+      // THE 404. A beat and a half of reading it and THEN the recoil: an
+      // animal that jumps on the frame the banner appears has not read
+      // anything, and the whole gag is that it takes a moment to land.
+      const u = at(D.oops);
+      const r = smooth01((u - D.read) / 0.26);
+      bx = D.stand[0] + 0.25 + 1.05 * r;
+      bz = D.stand[1] + 0.10 + 0.62 * r;
+      by = ground + D.ride + 0.34 + 0.82 * r - 0.32 * smooth01((u - 0.94) / 0.06);
+      yaw = mixAng(faceKeys, faceKeys - 0.55, r);
+      pitch = lerp(0.26, -0.42, r);
+      roll = -0.34 * r * Math.sin(TAU * 1.4 * (u - D.read));
+      hands = 1 - r;
+      rub = (1 - r) * (1 - smooth01(u / D.read));
+      foot = 1 - 0.9 * r;
+      wing = 0.10 + 0.90 * r;
+    } else if (inW(D.undo)) {
+      // STRAIGHT BACK AT IT, both front legs on one chord, and HELD — an
+      // undo is one key held down and not a second flurry, which is the only
+      // thing that distinguishes this beat from the one four seconds ago.
+      const u = at(D.undo);
+      const e = smooth01(Math.min(1, u * 3.4));
+      bx = lerp(D.stand[0] + 1.25, D.stand[0] - 0.24, e);
+      bz = lerp(D.stand[1] + 0.70, D.stand[1] - 0.18, e);
+      by = lerp(ground + D.ride + 0.80, ground + D.ride + 0.14, e);
+      yaw = mixAng(faceKeys - 0.55, faceKeys, e);
+      pitch = lerp(-0.42, -0.10, e);
+      roll = lerp(-0.22, 0, e);
+      hands = 1;
+      foot = 0.9;
+      wing = lerp(1.0, 0.16, e);
+      // One cap, down at the moment the word comes back and down for the rest
+      // of the beat.
+      if (u >= 0.30) { hitKey = 4 * 12 + 2; hitK = Math.min(1, (u - 0.30) * 12); }
+    } else {
+      // AND THE BOW. Up off the deck, round to the lens, and over.
+      const u = sat(at(D.bow));
+      const e = smooth01(Math.min(1, u * 1.9));
+      bx = lerp(D.stand[0] - 0.30, D.stand[0] + 0.55, e);
+      bz = lerp(D.stand[1] - 0.22, D.stand[1] + 0.35, e);
+      by = ground + D.ride + 1.05 * e;
+      yaw = mixAng(faceKeys, faceCam, e);
+      pitch = 0.10 - 0.72 * smooth01(Math.max(0, (u - 0.38) / 0.42));
+      hands = 1 - e;
+      foot = 1 - 0.7 * e;
+      wing = 0.16 + 0.55 * e;
+    }
+
+    rig.position.set(mm(bx), mm(by), mm(bz));
+    rig.rotation.order = 'YXZ';
+    rig.rotation.set(roll, yaw, pitch);
+    setLegs(A0, (L) => {
+      if (L.row === 0) {
+        // The front pair: up on the keys, or rubbing, or hammering. `type`
+        // is its own entry in LEG_LIVE because neither of the two that
+        // existed is a leg on a keyboard — `arms` is straight out in front
+        // and `stand` is straight down on to the tile.
+        const base = mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'type'), hands);
+        if (rub > 0) return mixRaw(L.v, base, liveRaw(L, 'rub'), rub);
+        if (ham > 0) {
+          // The two legs alternate: 1.9 radians apart is not half a cycle, so
+          // they never quite take turns, which is what makes it read as fast
+          // rather than as a metronome.
+          const k = Math.max(0, Math.sin(TAU * D.rate * t + (L.s > 0 ? 0 : 1.9)));
+          return mixRaw(L.v, base, liveRaw(L, 'arms'), k * ham * 0.42);
+        }
+        return base;
+      }
+      return mixRaw(L.v, liveRaw(L, 'tuck'), liveRaw(L, 'stand'), foot);
+    });
+    // The wings, and for the first time in this file they are sometimes SHUT.
+    // Every other routine in the repertoire is performed in the air, so 1.70
+    // of azimuth and a beat on the elevation has been all any of them needed.
+    // This one is performed standing at a keyboard, and a housefly with its
+    // feet down folds its wings flat back along the abdomen — 2.62 of
+    // azimuth and no elevation at all, which is also the difference between
+    // a screen you can read and a screen with a membrane over it. Open they
+    // sweep the whole frame, because the lens is side-on to the animal for
+    // eleven of these fifteen seconds and a wing is 5.6 mm long.
+    const wb = (Math.floor(t * 60) & 1) ? 1 : -1;
+    for (const W of A0.wings) {
+      W.g.rotation.set(0, -W.s * lerp(2.62, 1.70, wing),
+        lerp(W.s * 0.06, 0.55 * wb, wing));
+    }
+    rig.updateMatrixWorld(true);
+    eyeRot(A0);
+
+    // The two pails, standing on the tile where it put them. `apex` is the
+    // height a bail hangs at when the bucket's foot is on the floor, which is
+    // the same number `dropShot` lands them on.
+    const apex = mm(MINIB.ear + MINIB.bail);
+    for (let k = 0; k < 2; k++) {
+      const B = P.b[k];
+      const A = SITE.park[k];
+      B.hang.position.set(mm(A[0]), apex, mm(A[1]));
+      B.hang.rotation.set(0, A[2], 0);
+      B.pin.rotation.set(0, 0, 0);
+      B.setFill(1);
+      B.stream.visible = false;
+    }
+
+    desk.press(hitKey, hitK);
+    // The machine's own contact shadow, in the seventh blob — the slot the
+    // tile keeps for whatever else is standing on it, which on a birthday is
+    // the cake and here is a laptop.
+    blob.value[6].set(0, 0, mm(2.05));
+    P.shadow(blob, 4);
+    bodyShadow(A0, mm(by));
+    _v.set(mm(aimX), mm(aimY), mm(aimZ));
+    look(cd, cel, caz, _v);
+    fade.value = 1;
+  }
+
   // A second and a third animal for the insert, built only if the movement
   // has grown that big. Clones share every geometry and every material except
   // the two eyes, whose `uRot` is per animal.
@@ -2997,13 +4054,15 @@ function buildFlyCorpse() {
   return {
     stage, cam, rig, body,
     look,
-    revive, reset, insert, dropShot, danceShot, birthdayShot, brushShot,
+    revive, reset, insert, dropShot, danceShot, birthdayShot, brushShot, siteShot,
     /** How long the dance runs, seconds. */
     danceLen: () => DANCE.len,
     /** How long the birthday number runs, seconds. */
     birthdayLen: () => BDAY.len,
     /** And the Sonicare demonstration. */
     brushLen: () => BRUSH.len,
+    /** And the website. */
+    siteLen: () => SITE.len,
     /**
      * What `measure` measured, in millimetres — the three numbers every shot
      * in here is staged against, and the ones a routine gets wrong by

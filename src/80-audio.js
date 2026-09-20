@@ -7246,8 +7246,155 @@ function buildAudio() {
     n.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.06);
   }
 
+
+  // ── the computer ───────────────────────────────────────────────────────────
+  /**
+   * The website demonstration, heard.
+   *
+   * Misha, 20 Sep 2026: *"a demonstration of working on dad's website ...
+   * looking super busy and all"*. BUSY IS A SOUND before it is a picture, and
+   * the whole of this is one: seventeen keystrokes, a return, a chime and a
+   * thing going wrong.
+   *
+   * A KEYSTROKE IS NOT A CLICK. A click — one short burst of noise — is a
+   * switch, and a keyboard is a switch under a moulding: the snap of the dome
+   * and then the cap bottoming out on the plate a couple of milliseconds
+   * later, which is the part that gives it a pitch. So each stroke is a band
+   * of noise around 2.1 kHz, 7 ms long, plus a short sine at 160 Hz for the
+   * plate, and the two together are the difference between a keyboard and a
+   * Geiger counter. The noise band is detuned a few per cent per stroke off
+   * the stroke number, because seventeen identical keystrokes is a machine
+   * gun — the same reason the fly's own wingbeat is wobbled, see FLYBUZZ.
+   *
+   * WHERE THEY FALL is SITE in src/44-corpse.js: nine characters out over
+   * 1.55 s, a breath, eight in over 1.70, and a return at 4.25 — all of them
+   * measured from the top of the `type` beat, which starts at 4.00. Those six
+   * numbers are here as well because this is scheduled on the audio clock and
+   * cannot read that file, and they have to agree.
+   *
+   * AND THE TWO TONES AT THE END, which are the whole shape of the joke in
+   * two seconds of sound: a rising pair when the thing deploys, at 10.20, and
+   * a falling pair when the preview comes back broken, at 10.55. Nothing in
+   * this game is more familiar than those two gestures in that order.
+   */
+  const SITE_SND = {
+    gain: 0.100, range: 12,
+    /**
+     * Where the `type` beat starts, and the three windows inside it — those
+     * three are measured FROM the beat and not from the top of the routine,
+     * which is how SITE writes them and the one place these two files can
+     * disagree without either of them looking wrong.
+     */
+    type: 4.00,
+    cut: [0.35, 1.55, 9],
+    put: [2.20, 1.70, 8],
+    ret: 4.25,
+    /**
+     * And three that are this file's own clock: the chime when the deploy
+     * finishes (the top of `oops`, not the top of `ship` — a deploy is heard
+     * when it lands), the error a third of a second later as the preview
+     * comes back, and the undo's single stroke, which is 60 ms ahead of the
+     * frame the word returns on, because a key is pressed and THEN the thing
+     * happens.
+     */
+    ship: 10.20, fail: 10.55, undo: 12.88,
+    /** The keystroke: where the cap lands, how long, and the plate under it. */
+    tap: 2100, tapLen: 0.007, plate: 160,
+    /** And the two gestures: [low, high] for the chime, reversed for the 404. */
+    chime: [784, 1175],
+  };
+  let siteFired = 0;
+  /**
+   * `d` metres off, `o.start` to run the whole thing. Answers how long it
+   * lasts, so a caller with no audio context still knows — the same contract
+   * `brushRun` keeps.
+   */
+  function siteRun(d = 0, o = {}) {
+    if (o.probe) return siteFired;
+    const B = SITE_SND;
+    const dur = B.undo + 1.4;
+    if (!ctx || ctx.state === 'suspended') return dur;
+    if (!o.start) return dur;
+    const far = Math.max(0, 1 - Math.max(0, d) / B.range);
+    const amp = B.gain * far * clamp(o.level == null ? 1 : o.level, 0, 1);
+    if (amp <= 0.00003) return dur;
+    const t0 = ctx.currentTime + 0.03;
+    const g = ctx.createGain();
+    g.gain.value = amp;
+    const pn = ctx.createStereoPanner();
+    pn.pan.value = clamp(o.pan || 0, -1, 1);
+    g.connect(pn).connect(bed || master);
+
+    /** One keystroke: the dome, then the cap on the plate. */
+    const tap = (when, n, hard = 1) => {
+      if (noiseBuf) {
+        const src = ctx.createBufferSource();
+        src.buffer = noiseBuf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        // Detuned off the stroke number and not off a random: a scrub back to
+        // the same second has to sound like the same second.
+        bp.frequency.value = B.tap * (0.86 + 0.28 * ((n * 0.6180339) % 1));
+        bp.Q.value = 2.6;
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.0001, when);
+        ng.gain.linearRampToValueAtTime(0.85 * hard, when + 0.0012);
+        ng.gain.exponentialRampToValueAtTime(0.0001, when + B.tapLen);
+        src.connect(bp).connect(ng).connect(g);
+        try { src.start(when, noisePhase()); src.stop(when + 0.05); } catch (e) { /* once */ }
+      }
+      const os = ctx.createOscillator();
+      os.type = 'sine';
+      os.frequency.setValueAtTime(B.plate * 1.4, when + 0.002);
+      os.frequency.exponentialRampToValueAtTime(B.plate, when + 0.020);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0.0001, when + 0.002);
+      og.gain.linearRampToValueAtTime(0.30 * hard, when + 0.004);
+      og.gain.exponentialRampToValueAtTime(0.0001, when + 0.045);
+      os.connect(og).connect(g);
+      os.start(when + 0.002);
+      os.stop(when + 0.06);
+    };
+    /** Two notes, up or down: the deploy and the thing that broke. */
+    const pair = (when, up, level) => {
+      for (let i = 0; i < 2; i++) {
+        const os = ctx.createOscillator();
+        os.type = 'triangle';
+        os.frequency.value = B.chime[up ? i : 1 - i];
+        const og = ctx.createGain();
+        const w = when + i * 0.115;
+        og.gain.setValueAtTime(0.0001, w);
+        og.gain.linearRampToValueAtTime(level, w + 0.010);
+        og.gain.exponentialRampToValueAtTime(0.0001, w + 0.26);
+        os.connect(og).connect(g);
+        os.start(w);
+        os.stop(w + 0.30);
+      }
+    };
+
+    let n = 0;
+    for (const [from, span, count] of [B.cut, B.put]) {
+      for (let i = 0; i < count; i++) {
+        tap(t0 + B.type + from + (i + 0.5) * span / count, n, 1);
+        n += 1;
+      }
+    }
+    // The return, which is a bigger key and lands harder.
+    tap(t0 + B.type + B.ret, n, 1.55);
+    // The deploy, and then the 404 a third of a second later: the second
+    // gesture has to be late enough to read as a consequence of the first and
+    // early enough that it is still the same sentence.
+    pair(t0 + B.ship, true, 0.22);
+    pair(t0 + B.fail, false, 0.30);
+    // And the undo, which is one chord held rather than a flurry — so one
+    // stroke, hard, and nothing after it.
+    tap(t0 + B.undo, n + 1, 1.7);
+    siteFired += 1;
+    return dur;
+  }
+
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

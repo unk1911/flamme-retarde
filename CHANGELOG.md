@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.450.0] — 2026-09-20 (baye 1.32.0)
+
+### the website
+
+The fly cam learns a fourth number, and this one is a job of work: a housefly
+at a 3.6 mm laptop, editing **acupunctchi.com** — asked for as *"do a
+demonstration of working on dad's website, applying some fixes/edits to it,
+looking super busy and all"*.
+
+**The joke is the clinic's own word.** Its signature service is *Acupnosis*,
+which is what the practice is known for and which looks to any spell checker
+exactly like a misspelling of hypnosis. So the fly finds it, squiggles it,
+corrects it, ships the correction inside two seconds — and takes the
+signature page down with it:
+
+    t 3.45    <h3>Acupnosis</h3>   1 problem · not in the dictionary
+    t 5.40    the flurry, the word down to "Acu"
+    t 9.40    deploying to acupunctchi.com · 58%
+    t 10.75   404 /acupnosis/ — page not found
+    t 12.10   reared up, wings open, having read it
+    t 13.10   back on the keys, the undo's orange flash
+    t 15.20   round to the lens, bowed, the site whole beside it
+
+Nothing about the site is broken at the start of the routine or at the end of
+it. **15.8 s, 774 triangles, 55–60 fps** — 60 welded keycaps in one buffer,
+one moving cap, the lid, the deck, the trackpad and the glass. The screen
+repaints about forty times over the take rather than nine hundred, because
+the painter only fires when its own signature changes.
+
+**Read off the real site**, on 20 Sep: the nine `:root` colours verbatim —
+cream `#FBF7F0`, sand `#F4ECE0`, ink `#2E2A24`, brand `#F97D19`, sage
+`#7C8A6B` — Georgia for the headings, which is the fallback the site's own
+stack names, and its real strings. Even the editor's syntax colours are site
+swatches. **The one colour that is not the site's is the error red**, and
+that is the point: a wellness palette has no swatch for a thing having gone
+wrong, so when red appears it is the only pixel in frame that does not
+belong.
+
+**Deliberately left out**: the phone number, the email, the street address
+and the founder's name. A working clinic's contact details on a 3.3 mm
+novelty screen gain the joke nothing.
+
+Two notes from the build worth keeping. The composition is why the animal
+works from the front right corner rather than square on — a lens cannot see a
+screen and the thing facing that screen from the same place — and its two
+pails are parked seven millimetres upstage, because a 3.7 mm bucket beside a
+2.2 mm laptop is an oil drum. And **it is the first routine in the repertoire
+performed with the wings shut**: every other one is danced in the air, and a
+fly with its feet down folds them flat.
+
+### and a way to ask for it
+
+    'fly work on acupunctchi'        -> fly.site
+    'show me acupunctchi.com'        -> fly.site
+    "work on dad's website"          -> fly.site
+    'zombie fly work on the website' -> fly.site
+    'i need to work on my website'   -> nothing
+    'the site is nice'               -> nothing
+
+Three rows, on the same shape as the brush's three. The domain first, because
+nothing else in this game is spelt like it; then the trade words, which need
+a fly named beside them, because "work on the website" is a thing a person
+says about their own afternoon and `site` and `code` are both words this
+beach already uses for other things; then the clinic by name.
+
 ## [1.449.0] — 2026-09-20 (baye 1.31.0)
 
 ### the words that were not there

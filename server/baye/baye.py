@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.31.0"
+VERSION = "1.32.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -373,6 +373,23 @@ INTENTS = [
     # your brushing thing". The noun rule above is about HER hair, so a
     # sentence that says a fly and says brush cannot be about it.
     ("fly.brush", [r"\bbrush\w*\b", r"\b(fl(y|ies|ie)|zombie\w*)\b"]),
+    # ── AND THE ONE WHERE IT DOES A DAY'S WORK ────────────────────────────
+    #
+    # The fly at a 3.6 mm laptop, editing acupunctchi.com — the clinic's own
+    # site. Three ways in, on the same shape as the brush's three.
+    #
+    # The DOMAIN first, because nothing else in this game is spelt like it and
+    # a sentence with it in can mean nothing else. Then the trade words, which
+    # need a fly named beside them: "work on the website" is a thing a person
+    # says about their own afternoon, and "code" and "site" are both words
+    # this beach already uses for other things. And the clinic by name, which
+    # like the domain is unambiguous.
+    ("fly.site", [r"\bacupunct[\s-]?chi\b|\bacupunctchi\.com\b"]),
+    ("fly.site", [r"\b(web ?site|web ?page|site|html|css|code|coding|"
+                  r"develop\w*|debug\w*|deploy\w*)\b",
+                  r"\b(fl(y|ies|ie)|zombie\w*)\b"]),
+    ("fly.site", [r"\b(dad'?s|father'?s|the clinic'?s)\b",
+                  r"\b(web ?site|web ?page|site|page)\b"]),
 ]
 
 
@@ -1626,7 +1643,9 @@ TALKS = Talks()
 # at worst make it pick a command off the list, which the player could have
 # said anyway.
 CLASSIFY_MODEL = CFG.get("BAYE_CLASSIFY_MODEL", "gpt-4.1-nano")
-INTENT_NAMES = {"fly.drop": "tell the fly to drop / let go of / put down its buckets",
+INTENT_NAMES = {
+    "fly.site": "work on the clinic's website",
+    "fly.drop": "tell the fly to drop / let go of / put down its buckets",
                 "fly.dance": "tell the fly to dance, twirl, boogie or do its dance",
                 "fly.birthday": "ask the fly for its birthday performance, or for a "
                                 "dance or a song in honour of somebody's birthday",
