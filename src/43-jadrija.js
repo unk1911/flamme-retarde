@@ -35702,7 +35702,7 @@ async function buildJadrija(scene) {
   // undid anything — and the sentence reached the handover instead and came
   // back as an offer of the thing she is already wearing. See `doff_of` in
   // server/baye/baye.py, which now answers `doff:<key>`.
-  const SHE_CAN = { doff: 1, wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
+  const SHE_CAN = { reset: 1, doff: 1, wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
     note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
     // AND THE POSE SHE ALREADY HAD AND NOTHING COULD ASK FOR.
     //
@@ -36625,6 +36625,32 @@ async function buildJadrija(scene) {
    * and she stopped wherever on that circle her walk happened to reach, which
    * was shoulder to shoulder with Chloe, both of them facing the sea.
    */
+  /**
+   * "Reset", and what it is for.
+   *
+   * Misha, 20 Sep 2026: *"would be nice to have a 'reset' command... b/c the
+   * finite-state machine sometimes ends up with weird stuff like her lying on
+   * top of the pug or something by accident, or some other inconsistency but
+   * i need to run through bunch of scenarios to identify them"*.
+   *
+   * So this is deliberately a BLUNT instrument and not a fix: the faults it
+   * is for have not been identified yet, and a reset written to undo a
+   * specific one would not catch the next. It empties the queue, forgets what
+   * she was asked for and why she could not, drops every walk-to it was
+   * holding, puts her arms back where the rig rests them, and sends her to
+   * `dwell` on a normal fade — which is the state a fresh room starts in.
+   *
+   * WHAT IT DOES NOT TOUCH: what she is wearing, what is on the tabouret,
+   * what is in the glass, where she is standing, or the room. Those are the
+   * world, and a command that tidied them would lose work rather than undo a
+   * tangle. If a scenario turns up where the tangle IS one of those, it gets
+   * added here with the scenario written beside it.
+   *
+   * Armed rather than run, because `go` lives inside `stepShow` and the
+   * request arrives from a typed line between frames.
+   */
+  let resetWant = 0;
+
   function stepShow(dt, pt, ps, dir = null) {
     // Kept only so a probe can ask what she is steering by. The camera and the
     // person were the same point until B, and telling them apart from outside
@@ -36747,6 +36773,18 @@ async function buildJadrija(scene) {
       // wrist through a cartwheel is the sort of thing that is funny once.
       if (phase !== 'wine') { show.held = 0; show.pour = 0; }
     };
+
+    // And the blunt instrument. See `resetWant`.
+    if (resetWant) {
+      resetWant = 0;
+      show.queue.length = 0;
+      show.ask = null; show.why = null; show.did = null; show.don = null;
+      show.byAsk = 0; show.side = 0; show.sideWant = null;
+      show.goMark = null; show.goNext = null;
+      show.bumped = 0; show.buzzNod = 0; show.buzzBlink = 0;
+      if (skinFig) hugArms(skinFig, 0);
+      go('dwell', 'idle', 0.35);
+    }
 
     // The two set pieces, each with the setting-up its entry needs, so that the
     // dice below and the routine above can both start one without either
@@ -37383,6 +37421,10 @@ async function buildJadrija(scene) {
           show.goNext = 'liftIt';
           go('stepTo', 'walk', 0.34);
         } else go('liftIt', 'idle', 0.40);
+      } else if (name === 'reset') {
+        // No `showSay` and no clip: a reset is not something she performs,
+        // it is the room being put straight. See `resetWant`.
+        resetWant = 1;
       } else if (name.startsWith('doff:')) {
         show.byAsk = 1;
         show.queue.length = 0;
@@ -42033,6 +42075,9 @@ async function buildJadrija(scene) {
       s * s * a.z + 2 * s * t * c.z + t * t * b.z);
   }
 
+  /** The carried normal — see the note in `chainTick`. */
+  const _chN = new THREE.Vector3();
+
   function chainTick(c, dt) {
     if (!c.L.group.visible || !c.R.group.visible) return;
     // Where it is hanging from, which needs where it is hanging to — so the
@@ -42081,6 +42126,9 @@ async function buildJadrija(scene) {
     _chC.copy(c.mid).multiplyScalar(2)
       .addScaledVector(_chA, -0.5).addScaledVector(_chB, -0.5);
     const n = c.links.length;
+    // The seed for the carried normal. Any vector not along the first run
+    // will do; it is orthogonalised before it is used.
+    _chN.set(0, 0, 1);
     for (let i = 0; i < n; i++) {
       const m = c.links[i];
       chainAt(_chA, _chC, _chB, i / n, _chP);
@@ -42093,9 +42141,42 @@ async function buildJadrija(scene) {
       // turns a quarter turn about the run of it. The torus lies in its own
       // xy plane, which is the plane a link's metal lies in, so the run of
       // the chain has to be IN that plane and the axis across it.
-      _chX.set(0, 0, 1);
-      if (Math.abs(_chT.z) > 0.9) _chX.set(0, 1, 0);
-      _chY.copy(_chX).cross(_chT).normalize();
+      //
+      // ── AND THE FRAME IS CARRIED, NOT REDERIVED ────────────────────────
+      //
+      // Misha, 20 Sep 2026, on a handstand with the cuffs on: *"one of the
+      // arms gets stuck in an unnatural shape"*. The arm is fine. What is
+      // down her forearm is this chain, drawn as a corkscrew — forty-two
+      // links each rotated a little further about the run than the last,
+      // which at a glance is a limb with a screw thread on it.
+      //
+      // The cause was a fixed reference axis. Each link built its own frame
+      // from world `+z`, swapping to `+y` when the run came within 26° of
+      // `z` — and both halves of that are wrong. A frame built from a
+      // CONSTANT against a tangent that TURNS rolls steadily about the run,
+      // which is the corkscrew; and the swap is a discontinuity, so the
+      // roll also jumps by a quarter turn somewhere in the middle of the
+      // chain. Standing, her wrists are 0.43 m apart and the swag barely
+      // turns, so it never showed. Upside down the chain hangs the length of
+      // her forearm in a tight curve and the run sweeps through most of a
+      // right angle, which is the pose that made it obvious.
+      //
+      // So the normal is PARALLEL-TRANSPORTED: seeded once at the top of the
+      // chain and then carried link to link, each time with the component
+      // along the new tangent taken out. That is the standard way to frame a
+      // curve without torsion, it costs one subtraction a link, and the
+      // alternating quarter turn is now a real alternation rather than a
+      // quarter turn added to a frame that was already spinning.
+      _chN.addScaledVector(_chT, -_chN.dot(_chT));
+      if (_chN.lengthSq() < 1e-8) {
+        // The carried normal has collapsed onto the run, which happens when
+        // the curve doubles back on itself. Any perpendicular will do and
+        // the next link carries on from it.
+        _chN.set(-_chT.y, _chT.x, 0);
+        if (_chN.lengthSq() < 1e-8) _chN.set(0, 1, 0);
+      }
+      _chN.normalize();
+      _chY.copy(_chN);
       if (i & 1) _chY.copy(_chT).cross(_chY).normalize();
       _chX.copy(_chT).cross(_chY);
       m.quaternion.setFromRotationMatrix(_chW.makeBasis(_chT, _chX, _chY));
@@ -43343,7 +43424,18 @@ async function buildJadrija(scene) {
       // the kabina's `wetlong` uses the same path and he is replacing the
       // recordings rather than the idea. One line comes back when the new
       // clips exist.
-      showNoise('bump', 0, false, 190);
+      // ── AND NOW NOTHING AT ALL ─────────────────────────────────────────
+      //
+      // The whole take came off the shove first, leaving the three
+      // one-second cuts. Misha, an hour later: *"when i bump into her, can
+      // still hear 1s of that audio clip. can u park that also, need to hear
+      // nothing when bump into her for now"*. So the shove is silent.
+      //
+      // `showSay` still runs where it always did — the synthesised squeak is
+      // the shape of the reaction and was never one of these recordings — so
+      // walking into her is still a thing that happens to somebody. What is
+      // gone is her recorded voice, both lengths of it, until the clips he
+      // is looking for exist.
       return true;
     }
     if (kind !== 'bather') return false;

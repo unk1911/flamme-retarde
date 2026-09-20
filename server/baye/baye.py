@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.32.0"
+VERSION = "1.33.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -688,6 +688,22 @@ SKILLS = {
     # src/43-jadrija.js. The trampoline wants its own NOUN and not a bare
     # "jump", because a bare jump is `joy` above and she can do that where she
     # is standing rather than eighty metres up the beach.
+    # ── AND THE ONE THAT IS NOT A NUMBER AT ALL ──────────────────────────
+    #
+    # Misha, 20 Sep 2026: *"would be nice to have a 'reset' command, if i say
+    # 'reset', it sort of resets the state of many of the variables, b/c the
+    # finite-state machine sometimes ends up with weird stuff"*.
+    #
+    # In `SKILLS` and not `INTENTS` because it is hers — it empties her queue
+    # and puts her arms back — and because a bare "reset" is a one-word
+    # command, which is a road that only opened this morning. See `bare_skill`.
+    #
+    # The nouns are the ones somebody actually types when a thing has gone
+    # wrong, and they are all words nobody says to her for any other reason:
+    # nothing on this beach is "reset" or "unstuck" except a tangle.
+    "reset": ("reset, start over, get unstuck, snap out of it",
+              [r"\b(reset|re-?set|unstick|unstuck|start over|snap out of it|"
+               r"sort yourself out|get up and reset)\b"]),
     "swim": ("go for a swim, get in the water",
              [r"\b(swim\w*|bathe|paddle|go in the (water|sea))\b"]),
     "tramp": ("walk up to the trampolines and jump on them",
@@ -782,6 +798,10 @@ ASK_RE = re.compile(
     r"headphones|bose|(hand[\s-]?)?cuffs|bangles|bracelets|chain\w*)\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"
+    # And the tangle. None of these words mean anything else on this beach,
+    # so they need no verb in front of them — "start over" and "snap out of
+    # it" carry none and are two of the three ways somebody actually types it.
+    r"|\b(reset|re-?set|unstick|unstuck|start over|snap out of it)\b"
     # AND THE THING'S OWN NAME WITH "OFF" AFTER IT. "Lovense off" is how
     # somebody actually says it, and it carries no verb at all — so it never
     # reached `buzz_of`, and neither did "turn the lovense off", because the

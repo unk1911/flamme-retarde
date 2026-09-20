@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.451.0] — 2026-09-20 (baye 1.33.0)
+
+### the arm was never the problem
+
+*"When she puts cuffs, one of the arms gets stuck in an unnatural shape"*,
+with a screenshot of a handstand. The arm is fine. What is down her forearm
+is **the chain, drawn as a corkscrew** — forty-two links each rotated a
+little further about the run than the last, which at a glance is a limb with
+a screw thread on it.
+
+The cause is a fixed reference axis. Each link built its own frame from world
+`+z`, swapping to `+y` when the run came within 26° of `z`, and both halves
+of that are wrong: a frame built from a CONSTANT against a tangent that TURNS
+rolls steadily about the run, which is the corkscrew, and the swap is a
+discontinuity, so the roll also jumps a quarter turn somewhere in the middle
+of the chain.
+
+Standing, her wrists are 0.43 m apart and the swag barely turns, which is why
+nobody saw it. Upside down the chain hangs the length of her forearm in a
+tight curve and the run sweeps through most of a right angle. **The pose is
+what was new, not the bug** — this has been in the chain since 1.428.0.
+
+The normal is parallel-transported now: seeded once at the top and carried
+link to link, each time with the component along the new tangent taken out.
+That is the standard way to frame a curve without torsion, it costs one
+subtraction a link, and the alternating quarter turn is a real alternation
+again rather than a quarter turn added to a frame that was already spinning.
+
+### she did it and then said she would not
+
+    [ears] baye: to the plate
+    [ears] Baye: "No, I'm not pouring cocaine, babe."
+
+Both halves work as built — the skill arms, and the sentence goes on to
+`converse` underneath it as every other skill's does. For this one noun the
+model will not play along however the ticket is worded, because it is a drug
+and refusing is what a model does about drugs. That is not a prompt to be
+tuned; it is a reply that cannot be trusted to agree with her own legs.
+
+So the sentence that arms this one is not sent on. He offered the choice
+himself — *"either fix the audio response part to be in sync with the
+execution action or keep audio response off in this case"* — and silence
+cannot contradict anything. The panel still says what she did, `showSay`
+still gives her the squeak, and every other skill still answers in her voice.
+
+### reset
+
+*"If i say 'reset', it sort of resets the state of many of the variables,
+b/c the finite-state machine sometimes ends up with weird stuff like her
+lying on top of the pug."*
+
+Deliberately a blunt instrument, because the faults it is for have not been
+identified yet and a reset written to undo a specific one would not catch the
+next. It empties the queue, forgets what she was asked for and why she could
+not, drops every walk-to it was holding, puts her arms back where the rig
+rests them, and sends her to `dwell`. Measured: `handGo` → reset → `dwell`.
+
+**What it does not touch**: what she is wearing, what is on the tabouret,
+what is in the glass, where she is standing, or the room. Those are the
+world, and a command that tidied them would lose work rather than undo a
+tangle.
+
+    'reset'  'please reset'  'get unstuck'  'start over'  'snap out of it'
+
+### and the shove is silent
+
+The whole take came off it an hour ago, leaving the three one-second cuts.
+*"Can still hear 1s of that audio clip. can u park that also, need to hear
+nothing when bump into her for now."* So: nothing. `showSay` still runs —
+the synthesised squeak is the shape of the reaction and was never one of
+these recordings — so walking into her is still a thing that happens to
+somebody. What is gone is her recorded voice, both lengths of it.
+
 ## [1.450.0] — 2026-09-20 (baye 1.32.0)
 
 ### the website

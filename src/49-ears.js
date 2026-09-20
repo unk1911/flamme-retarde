@@ -59,6 +59,16 @@
 // the transcriber takes it as it is: seven seconds is 224 kB.
 // -----------------------------------------------------------------------------
 
+/**
+ * Skills whose spoken answer is not sent, because it cannot be relied on to
+ * agree with what she is doing. See the note at the guard below.
+ *
+ * `reset` is here for a different reason and it is worth saying which: there
+ * is nothing to answer. It is not a thing she does, it is the room being put
+ * straight, and a line about it would be her narrating housekeeping.
+ */
+const MUTE_TALK = { coke: 1, reset: 1 };
+
 const EARS = {
   rate: 16000,
   pre: 0.35,
@@ -566,6 +576,29 @@ const ears = (() => {
             : (WHY[got] || 'cannot do that here')), ok ? 'did' : 'meta');
         }
       }
+      // ── AND THE ONE SHE MUST NOT BE ASKED ABOUT ───────────────────────
+      //
+      // Misha, 20 Sep 2026, having typed "coke":
+      //
+      //     [ears] baye: to the plate
+      //     [ears] Baye: "No, I'm not pouring cocaine, babe."
+      //
+      // She did it and then said she would not. Both halves work as built —
+      // the skill armed, and the sentence went on to `converse` underneath
+      // it as every other skill's does — and for this one noun the model
+      // will not play along however the ticket is worded, because it is a
+      // drug and refusing is what a model does about drugs.
+      //
+      // That is not a prompt to be tuned; it is a reply that cannot be
+      // trusted to agree with her own legs. So the sentence that arms this
+      // one is not sent on. He offered the choice himself — *"either fix the
+      // audio response part to be in sync with the execution action or keep
+      // audio response off in this case"* — and silence cannot contradict
+      // anything.
+      //
+      // The ears panel still says what she did, `showSay` still gives her
+      // the squeak, and every other skill still answers in her own voice.
+      if (d.does && d.does.some((n) => MUTE_TALK[n.split(':')[0]])) return;
       // Nothing heard, or a service from before 1.4.0 that hands out no id:
       // there is nothing to say to her, and the old behaviour is exactly this.
       if (!said.trim() || !d.heard) return;
