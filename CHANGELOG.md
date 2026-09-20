@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.452.2] — 2026-09-20
+
+### the egg, actually chopped off
+
+*"Maybe when she puts it in, the programme can quietly chop off the bigger
+piece as if it doesn't exist and so we just see the tail sticking out, kinda
+like a trick / an eye trick."* That is exactly it, and 1.452.1 did not do it.
+
+**The fragment discard was wrong and here is why**, because the reasoning
+looked sound: it dropped everything with `abs(z) > 12.5 mm`, on the argument
+that the tube is swept about a curve in the `z = 0` plane so a vertex's `z`
+is its radius. It is not. `z` is the radius only at the top and bottom of
+each ring — round the sides of it `z` goes to nought while the vertex is
+still a full radius out. What it actually cut was a slab through the middle
+of the egg, which from the one angle I checked looked like the egg had gone
+and from any other did not.
+
+So the worn copy is **its own geometry**: the same loft over a curve that
+stops at 0.62 of the arc, just before the radius table swells at 0.64, with
+the last twentieth turned over on a circle so the arm ends in a dome rather
+than a cut pipe. Checked from the front and from 45°, which is the check the
+last one did not get.
+
+**Two wrong turns on the way, both worth keeping.** Running the radius down
+to nought over the back third of the SAME curve hangs the page: thirty-eight
+per cent of the loft collapses onto the axis, the degenerate rings put NaN
+through the normals and the bounding sphere, and the world never finishes
+building. And reading the cut from `TOY.cut` throws `Cannot access 'TOY'
+before initialization` — `lovenseMesh` is CALLED during the build, long
+before that table is declared, and moving the number to its own `const`
+beside the function does not help because the call site is earlier than
+both. It is a literal in the one place that uses it.
+
+Both of those present identically from outside: no error on screen, no
+world, a probe that waits out its timeout. `--wait 25` is what turns either
+of them into a stack trace in four seconds.
+
+### and the pug is on the bed rather than in it
+
+*"For the cot, the pug sinks into it, he needs to stand up higher."*
+
+`hopH` is the mattress top less the floor, so the hop lands his **root** on
+the tick — and his root is not what touches it. Measured off `joints` with
+him settled:
+
+    before   back paw  −64 mm      front paw  −27 mm
+    after    back paw  −19 mm      front paw  +18 mm
+
+45 mm is the mean of the two, which is the best a single offset can do while
+his two ends are 37 mm apart. Levelling the pair is a pitch rather than an
+offset, and the pitch is `slump`, which belongs to the sit — a different
+pose, and the reason sweeping `DOG.settle` moved nothing here and sent me
+looking in the wrong place first.
+
+`__fr.jad.dogSit({ settle, slump, fold })` sweeps that pose without a
+rebuild, the way `toy` sweeps the placement.
+
 ## [1.452.1] — 2026-09-20
 
 ### just the tip

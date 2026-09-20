@@ -31217,6 +31217,25 @@ async function buildJadrija(scene) {
     slump: 0.34,        // rad of nose-up pitch — the sit itself
     fold: 0.55,         // rad the hind legs swing forward, under him
     curlIn: 1.9,        // 1/s, how fast the settle arrives
+    /**
+     * ── AND HE IS PUT ON THE BED BY HIS PAWS, NOT BY HIS ROOT ───────────
+     *
+     * Misha, 20 Sep 2026: *"for the cot, the pug sinks into it, he needs to
+     * stand up higher"*.
+     *
+     * `hopH` is the mattress top less the floor, so the hop lands his ROOT on
+     * the tick — and his root is not what touches it. Measured off `joints`
+     * with him settled, against a mattress at 3.5535: **back paw 64 mm under,
+     * front paw 27 mm under.** He was standing in the bed up to his elbows.
+     *
+     * 45 mm is the mean of the two, which is the best a single offset can do
+     * while his two ends are 37 mm apart: it leaves the back paw 19 mm in and
+     * the front 18 mm proud, and at this size both of those read as a dog on
+     * bedding. Levelling the pair is a pitch and not an offset, and the pitch
+     * is `slump`, which belongs to the sit — a different pose from this one,
+     * and the reason `dogSit` sweeps it and this does not move.
+     */
+    bed: 0.045,
   };
 
   /**
@@ -31542,7 +31561,9 @@ async function buildJadrija(scene) {
           if (last) {
             s.mode = 'hop'; s.timer = 0;
             s.from = [s.at[0], s.at[1]];
-            s.hopH = kit.cot[2] - standY(kit.cot[0], kit.cot[1]);
+            // Plus `DOG.bed`, which is what puts his paws on the tick
+            // rather than his root — see the note there.
+            s.hopH = kit.cot[2] - standY(kit.cot[0], kit.cot[1]) + DOG.bed;
           } else s.leg++;
         }
         return;
@@ -42645,9 +42666,9 @@ async function buildJadrija(scene) {
     // And it is the whole object again the moment it is out of her.
     for (const part of parts) {
       const mh = part.shake && part.shake.children[0];
-      if (mh && mh.userData && mh.userData.skinWas) {
-        mh.material = mh.userData.skinWas;
-        mh.userData.skinWas = null;
+      if (mh && mh.userData && mh.userData.geoWas) {
+        mh.geometry = mh.userData.geoWas;
+        mh.userData.geoWas = null;
       }
     }
     if (kit && kit.spot) {
@@ -42886,11 +42907,13 @@ async function buildJadrija(scene) {
      * `z` IS its radius. Everything thicker than 12.5 mm is the swell that
      * starts at u 0.64, and it goes.
      *
-     * The PROP is untouched: on the tabouret, in your hand and in the bag it
+     * The PROP is untouched: on the tabouret, in her hand and in your bag it
      * is the whole object, which is what it should be — this is about what is
-     * visible when it is in somebody. `doffNow` puts the material back.
+     * visible when it is in somebody. `doffNow` puts the geometry back.
+     *
+     * The cut itself is a number inside `lovenseMesh`, and the note there
+     * says why it cannot live in this table.
      */
-    hide: 0.0125,
   };
 
   /**
@@ -42912,28 +42935,14 @@ async function buildJadrija(scene) {
     return shake;
   }
 
-  /**
-   * The skin it is drawn in while it is worn: the same pink, with everything
-   * fatter than `TOY.hide` discarded. See the note there.
-   *
-   * Built once and shared — there is only ever one of these on one body — and
-   * the ORIGINAL is kept on the mesh so `doffNow` can hand it back.
-   */
-  let toySkinWorn = null;
-  function toyWornSkin() {
-    if (!toySkinWorn) {
-      toySkinWorn = solidMaterial(new THREE.Color(0.910, 0.105, 0.450),
-        { spec: 0.75, specPower: 70, vcol: false,
-          body: 'if (abs(vLocal.z) > ' + TOY.hide.toFixed(4) + ') discard;' });
-    }
-    return toySkinWorn;
-  }
-
   function toyWorn(m) {
     const mesh = m || giftMesh('lovense');
-    // What is drawn while it is in her — see `TOY.hide`.
-    if (!mesh.userData.skinWas) mesh.userData.skinWas = mesh.material;
-    mesh.material = toyWornSkin();
+    // The egg is not drawn while it is in her — see `TOY.cut`. The whole
+    // geometry is kept so that taking it out hands it straight back.
+    if (mesh.userData.armGeo && mesh.geometry !== mesh.userData.armGeo) {
+      mesh.userData.geoWas = mesh.geometry;
+      mesh.geometry = mesh.userData.armGeo;
+    }
     if (mesh.parent) mesh.parent.remove(mesh);
     mesh.position.set(0, 0, 0);
     mesh.rotation.set(0, 0, 0);
@@ -43239,6 +43248,65 @@ async function buildJadrija(scene) {
     const skin = solidMaterial(new THREE.Color(0.910, 0.105, 0.450),
       { spec: 0.75, specPower: 70, vcol: false });
     const m = new THREE.Mesh(geo, skin);
+    // ── AND THE SAME LOFT WITH THE EGG LEFT OFF ─────────────────────────
+    //
+    // Misha, 20 Sep 2026: *"maybe when she puts it in, the programme can
+    // quietly chop off the bigger piece as if it doesn't exist and so we just
+    // see the tail sticking out, kinda like a trick / an eye trick"*. That is
+    // exactly it, and it is a second geometry rather than a trick in the
+    // shader.
+    //
+    // THE FIRST GO WAS A FRAGMENT DISCARD and it was wrong for a reason worth
+    // keeping: it dropped everything with `abs(z) > 12.5 mm`, on the argument
+    // that a vertex's z is its radius. It is not. The tube is swept about a
+    // curve lying in the z = 0 plane, so `z` is the radius only at the top
+    // and bottom of each ring — round the sides of it, z goes to nought while
+    // the vertex is still a full radius out. What that discard actually cut
+    // was a slab through the middle of the egg, which from the one angle I
+    // checked looked like the egg had gone and from any other did not.
+    //
+    // So the radius table is asked to stop instead. `TOY.cut` is 0.62 of the
+    // arc, which is just before the swell starts at 0.64, and the last five
+    // per cent of it turns over on a circle so the arm ends in a dome rather
+    // than a cut pipe — the same trick the two real ends use.
+    //
+    // A SHORTER CURVE and not the same curve with the radius run down to
+    // nought. That was the second attempt and it hung the page: thirty-eight
+    // per cent of the loft collapsed onto the axis, every ring in it a
+    // zero-radius point, and the degenerate triangles that come out of that
+    // put NaN through the normals and the bounding sphere. The world never
+    // finished building. `loftAlong` walks whatever curve it is given, so the
+    // honest way to stop early is to give it a curve that stops.
+    {
+      // 0.62 OF THE ARC, WRITTEN HERE AS A NUMBER and not read off `TOY`.
+      //
+      // This function is CALLED during the build — the tabouret's copy is
+      // pre-placed — and `TOY` is a `const` declared two thousand lines
+      // further down. Reaching forward into it throws `Cannot access 'TOY'
+      // before initialization`, the build stops at 78 per cent, and from
+      // outside that is indistinguishable from a hang: no error on screen,
+      // no world, a probe that waits out its timeout. Moving the number to
+      // its own `const` beside this function did not help either, for the
+      // same reason — the call site is earlier than both.
+      //
+      // The radius table swells into the egg at 0.64 and this stops just
+      // before it.
+      const C = 0.62, F = 0.05, N = 48;
+      const pts = [];
+      for (let i = 0; i <= N; i++) pts.push(curve.getPointAt((i / N) * C));
+      const armCurve = new THREE.CatmullRomCurve3(pts);
+      // `v` is along the SHORT curve, so the radius table is asked about
+      // `v * C` — and the last twentieth turns over on a circle, so the arm
+      // ends in a dome rather than a cut pipe, which is the trick the two
+      // real ends already use.
+      m.userData.armGeo = loftAlong(armCurve, 64, 16, (v) => {
+        const u = v * C;
+        const r = radiusAt(u);
+        if (v <= 1 - F / C) return r;
+        const k = (v - (1 - F / C)) / (F / C);
+        return Math.max(0.0004, r * Math.sqrt(Math.max(0, 1 - k * k)));
+      });
+    }
     // Two buttons and a light on the flat of the arm, near the tip, where the
     // drawing has them.
     const btn = solidMaterial(new THREE.Color(0.960, 0.700, 0.820),
@@ -47897,6 +47965,22 @@ async function buildJadrija(scene) {
           return o;
         })(),
         says: dog.balloon.mesh.visible ? dog.balloon.said : null };
+    },
+    /**
+     * Sweep the sit without a rebuild, the way `toy` sweeps the placement.
+     *
+     * `__fr.jad.dogSit({ settle: 0.03, slump: 0.30 })` — and it hands back
+     * the joints so a dozen of these settle it in one run of the harness.
+     * The two numbers are not independent: `slump` is the nose-up pitch and
+     * lifts his front, `settle` is the drop that puts his front paws back
+     * down, so a change to either moves both ends of him.
+     */
+    dogSit: (o) => {
+      if (!dog) return null;
+      if (o && o.settle != null) DOG.settle = o.settle;
+      if (o && o.slump != null) DOG.slump = o.slump;
+      if (o && o.fold != null) DOG.fold = o.fold;
+      return { settle: DOG.settle, slump: DOG.slump, fold: DOG.fold };
     },
     /** Hose him, from the console, without having to fly the aeroplane. */
     wet: () => { dogWet(1); return dog && dog.mode; },
