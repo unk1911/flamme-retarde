@@ -30,6 +30,11 @@
 // instance and two wing instances, and the wings hinge because the per-instance
 // rotation is a full quaternion — so a wingbeat is a couple of quaternion
 // multiplies on the CPU and nothing whatever on the GPU.
+//
+// That last paragraph is now `birdRig`, and it is out here because the Brod
+// took it: the gulls on her rails and astern of her are the same bird, drawn
+// by the same three instances, and they live in 60-pax.js because what they
+// are about is a boat and not a sky. Nothing below changed shape for it.
 // -----------------------------------------------------------------------------
 
 const BIRDS = {
@@ -239,23 +244,41 @@ function birdWingProto() {
   return b.geo();
 }
 
-function buildBirds(scene, fire) {
-  const rnd = mulberry32(CONFIG.seed ^ 0x0b19d5);
-  const bodyL = propLayer(scene, birdBodyProto(),
-    FLOCK.reduce((a, s) => a + s.n, 0), { spec: 0.05, specPower: 14 });
-  const wingL = propLayer(scene, birdWingProto(),
-    FLOCK.reduce((a, s) => a + s.n, 0) * 2, { spec: 0.05, specPower: 14 });
+/**
+ * The two instanced layers a flock is drawn out of, and the one function that
+ * assembles a bird from them.
+ *
+ * Out here rather than inside `buildBirds` because the Brod wants gulls of her
+ * own — `buildBrodGulls` in 60-pax.js keeps a dozen of them astern of a hull
+ * that is moving, in the hull's own frame, and it has nothing whatever in
+ * common with the ring round the camera below except the bird itself. Written
+ * out a second time this would have been two wingbeats, and the second one
+ * would have been the paper aeroplane.
+ *
+ * `org` and `bas` are the frame the bird's coordinates are given in: null for
+ * the world, and for the boat her position together with the quaternion of
+ * whichever of her frames the caller wants — the full one for something
+ * standing on her rail, which then heels with her, and a levelled one for
+ * something flying beside her, which does not.
+ */
+function birdRig(scene, cap) {
+  const bodyL = propLayer(scene, birdBodyProto(), cap,
+    { spec: 0.05, specPower: 14 });
+  const wingL = propLayer(scene, birdWingProto(), cap * 2,
+    { spec: 0.05, specPower: 14 });
 
   const _e = new THREE.Euler();
   const _qb = new THREE.Quaternion();
   const _qw = new THREE.Quaternion();
   const _qh = new THREE.Quaternion();
   const _qt = new THREE.Quaternion();
+  const _qs = new THREE.Quaternion();
   const _v = new THREE.Vector3();
+  const _p = new THREE.Vector3();
   const _zA = new THREE.Vector3(0, 0, 1);
   const _xA = new THREE.Vector3(1, 0, 0);
-  const camPos = new THREE.Vector3();
-  const camRight = new THREE.Vector3(1, 0, 0);
+  const _yA = new THREE.Vector3(0, 1, 0);
+  let nb = 0, nw = 0;
 
   const put = (L, i, x, y, z, q, sx, sy, sz, col, tint) => {
     L.aPos.array[i * 3] = x; L.aPos.array[i * 3 + 1] = y; L.aPos.array[i * 3 + 2] = z;
@@ -268,6 +291,104 @@ function buildBirds(scene, fire) {
     L.aColor.array[i * 3 + 2] = col[2] * tint;
   };
 
+  return {
+    bodyL, wingL,
+    /** Triangles a bird costs, which is a body and two wings. */
+    tris: bodyL.geo.attributes.position.count / 3
+      + wingL.geo.attributes.position.count / 3 * 2,
+    open() { nb = 0; nw = 0; },
+    /**
+     * One bird: `b` carries the pose, `sp` the species' proportions.
+     *
+     * `b.fold` is how much wing is out — 1 spread and 0.32 folded, which is
+     * the one number that says perched. There is no second hinge and no
+     * folded geometry: the same hinge that beats the wing droops and shortens
+     * it, which is a cheat and reads perfectly at fifty metres.
+     *
+     * AND IT DOES NOT READ AT THREE, which is what `b.droop` and `b.sweep`
+     * are for and why they exist at all. A gull rafted on the channel is
+     * fifty metres off and a gull on the Brod's capping is a metre and a half
+     * from your face on the way to the stair, and the first shot of one at
+     * that range came back as a grey manta ray: at `fold` 0.32 and a hinge of
+     * −0.12 the two wings are flat plates sticking straight out sideways,
+     * which is the one thing a perched bird's wings never do. They fold along
+     * the flank and the tips cross back over the tail. `droop` is how far
+     * down the hinge takes them and `sweep` is a rotation about the bird's own
+     * Y that takes the tips aft — one more quaternion, and only for whoever
+     * asks: both default to what the rafting birds already had, so the flock
+     * in this file is untouched to the bit.
+     */
+    draw(sp, b, org, bas) {
+      const len = sp.len * b.s;
+      _e.set(b.pitch, b.yaw, b.roll, 'YXZ');
+      _qb.setFromEuler(_e);
+      _p.set(b.x, b.y, b.z);
+      if (bas) { _qb.premultiply(bas); _p.applyQuaternion(bas).add(org); }
+      put(bodyL, nb++, _p.x, _p.y, _p.z, _qb,
+        len * sp.girth, len * sp.girth, len, sp.body, b.tint);
+
+      const fold = b.fold == null ? 1 : b.fold;
+      const amp = sp.amp * b.flap * fold;
+      const shut = sat((fold - 0.32) / 0.68);
+      const hinge = lerp(b.droop == null ? -0.12 : b.droop,
+        sp.dihedral + amp * beatShape(b.ph), shut);
+      // Feathering: the wing twists against the stroke, which is what turns a
+      // flapping board into something that is actually holding the bird up.
+      const twist = -0.42 * amp * Math.cos(b.ph);
+      const semi = sp.span * 0.5 * b.s * fold;
+      // Swept only while it is folded, and gone by the time the wing is out:
+      // a gliding bird's tips are forward of its tail, not behind it.
+      const sweep = b.sweep ? b.sweep * (1 - shut) : 0;
+      _v.set(0, len * 0.10, -len * 0.05).applyQuaternion(_qb);
+      for (const side of [1, -1]) {
+        // The left wing is the right one turned through π about the fore-aft
+        // axis: Rz(π - hinge) takes the prototype's +X tip out to port with the
+        // same dihedral, for the cost of one quaternion and no second geometry.
+        _qh.setFromAxisAngle(_zA, side > 0 ? hinge : Math.PI - hinge);
+        _qt.setFromAxisAngle(_xA, side * twist);
+        _qw.copy(_qb);
+        // Before the hinge and in the bird's own frame, signed by the side for
+        // the reason the hinge is: the left wing has already been turned end
+        // for end, so the rotation that takes its tip aft is the opposite one.
+        if (sweep) {
+          _qs.setFromAxisAngle(_yA, -sweep * side);
+          _qw.multiply(_qs);
+        }
+        _qw.multiply(_qh).multiply(_qt);
+        put(wingL, nw++, _p.x + _v.x, _p.y + _v.y, _p.z + _v.z, _qw,
+          semi, 1, semi * sp.chord, sp.wing, b.tint);
+      }
+    },
+    /** Hand the frame over, and say how many birds went in it. */
+    close() {
+      bodyL.geo.instanceCount = nb;
+      wingL.geo.instanceCount = nw;
+      for (const L of [bodyL, wingL]) {
+        L.aPos.needsUpdate = true;
+        L.aRot.needsUpdate = true;
+        L.aScale.needsUpdate = true;
+        L.aColor.needsUpdate = true;
+      }
+      return nb;
+    },
+    hide() { bodyL.geo.instanceCount = 0; wingL.geo.instanceCount = 0; },
+  };
+}
+
+/**
+ * The gull's row, by name and not by index, because 60-pax.js takes it: the
+ * birds on the Brod are yellow-legged gulls and they are the same bird as the
+ * ones over the channel, at the same span, in the same white.
+ */
+const GULL = FLOCK.find((s) => s.key === 'gull');
+
+function buildBirds(scene, fire) {
+  const rnd = mulberry32(CONFIG.seed ^ 0x0b19d5);
+  const rig = birdRig(scene, FLOCK.reduce((a, s) => a + s.n, 0));
+
+  const camPos = new THREE.Vector3();
+  const camRight = new THREE.Vector3(1, 0, 0);
+
   const flock = [];
   for (let si = 0; si < FLOCK.length; si++) {
     for (let i = 0; i < FLOCK[si].n; i++) {
@@ -278,7 +399,7 @@ function buildBirds(scene, fire) {
         // Individual size and tint. Fourteen identical gulls in a row is a
         // texture; the same fourteen with a tenth either way is a flock.
         s: 0.86 + rnd() * 0.30, tint: 0.88 + rnd() * 0.22,
-        ph: rnd() * TAU, flap: 0, on: false, duty: rnd() * 2,
+        ph: rnd() * TAU, flap: 0, fold: 1, on: false, duty: rnd() * 2,
         base: rnd() * TAU, wp: rnd() * TAU, wr: 0.7 + rnd() * 0.6,
         alarm: 0, callT: rnd() * 20, mute: 0,
       });
@@ -491,8 +612,7 @@ function buildBirds(scene, fire) {
 
   function update(dt, camera, aircraft) {
     if (density <= 0.001) {
-      bodyL.geo.instanceCount = 0;
-      wingL.geo.instanceCount = 0;
+      rig.hide();
       live = 0;
       return;
     }
@@ -512,7 +632,8 @@ function buildBirds(scene, fire) {
       nFlush++;
     }
 
-    let nb = 0, nw = 0, moved = 0;
+    let moved = 0;
+    rig.open();
     for (const b of flock) {
       if (!b.live) continue;
       const R = BIRDS.radius * FLOCK[b.sp].ring;
@@ -524,45 +645,13 @@ function buildBirds(scene, fire) {
         if (!rehome(b)) continue;
       }
       step(b, dt, flushers, nFlush);
-
-      const sp = FLOCK[b.sp];
-      const len = sp.len * b.s;
-      _e.set(b.pitch, b.yaw, b.roll, 'YXZ');
-      _qb.setFromEuler(_e);
-      put(bodyL, nb++, b.x, b.y, b.z, _qb,
-        len * sp.girth, len * sp.girth, len, sp.body, b.tint);
-
-      // A sitting bird has its wings folded, which with one hinge means short
-      // and drooped. It is a cheat and it reads perfectly at fifty metres.
-      const amp = sp.amp * b.flap;
-      const fold = b.sit ? 0.32 : 1;
-      const hinge = b.sit ? -0.12 : sp.dihedral + amp * beatShape(b.ph);
-      // Feathering: the wing twists against the stroke, which is what turns a
-      // flapping board into something that is actually holding the bird up.
-      const twist = -0.42 * amp * Math.cos(b.ph);
-      const semi = sp.span * 0.5 * b.s * fold;
-      _v.set(0, len * 0.10, -len * 0.05).applyQuaternion(_qb);
-      for (const side of [1, -1]) {
-        // The left wing is the right one turned through π about the fore-aft
-        // axis: Rz(π - hinge) takes the prototype's +X tip out to port with the
-        // same dihedral, for the cost of one quaternion and no second geometry.
-        _qh.setFromAxisAngle(_zA, side > 0 ? hinge : Math.PI - hinge);
-        _qt.setFromAxisAngle(_xA, side * twist);
-        _qw.copy(_qb).multiply(_qh).multiply(_qt);
-        put(wingL, nw++, b.x + _v.x, b.y + _v.y, b.z + _v.z, _qw,
-          semi, 1, semi * sp.chord, sp.wing, b.tint);
-      }
+      // A sitting bird has its wings folded, and that is the whole of what
+      // `fold` says — see `draw`.
+      b.fold = b.sit ? 0.32 : 1;
+      rig.draw(FLOCK[b.sp], b, null, null);
     }
 
-    live = nb;
-    bodyL.geo.instanceCount = nb;
-    wingL.geo.instanceCount = nw;
-    for (const L of [bodyL, wingL]) {
-      L.aPos.needsUpdate = true;
-      L.aRot.needsUpdate = true;
-      L.aScale.needsUpdate = true;
-      L.aColor.needsUpdate = true;
-    }
+    live = rig.close();
   }
 
   return {
@@ -574,6 +663,9 @@ function buildBirds(scene, fire) {
     // makes and so the one thing a test has to be able to check.
     stats: () => ({
       live, calls, of: flock.length,
+      // What they cost, which is the number the boat's own gulls are measured
+      // against — see `buildBrodGulls`. A bird is a body and two wings.
+      tris: live * rig.tris,
       alarmed: flock.reduce((n, b) => n + (b.live && b.alarm > 0.05 ? 1 : 0), 0),
       sitting: flock.reduce((n, b) => n + (b.live && b.sit ? 1 : 0), 0),
     }),

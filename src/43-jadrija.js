@@ -19750,6 +19750,244 @@ async function buildJadrija(scene) {
     const PLANK = [0.744, 0.726, 0.668];
     const PIPE = [0.796, 0.800, 0.792];
 
+    // ── forty years of it, written down the face ─────────────────────────────
+    //
+    // Three flat colours got the masses right and the *age* wrong, and at the
+    // distance you normally see this thing from the age is most of what there
+    // is. In `survey/20260821_175309.jpg`, resized to 1100 px wide, the face
+    // runs from the underside of the cap at y 378 to the waterline at y 470
+    // and from x 212 to x 465 — **92 px tall, 253 px wide**, which is the
+    // 3.84 m long side at 66 px/m. That is the frame every number below came
+    // off, and the numbers were counted rather than eyeballed: for each of
+    // those 253 columns, how far up the face the concrete is darker than one
+    // third of the pale. Binned by height, the width that is dark reads
+    //
+    //     0.10 of the face   97 %        0.50   46 %
+    //     0.15               94 %        0.60   44 %
+    //     0.20               80 %        0.70   37 %
+    //     0.25               63 %        0.80   33 %
+    //     0.30               48 %        0.95   29 %
+    //
+    // and that table is the whole brief. Two things in it. The bottom fifth of
+    // the face is a **solid contiguous mass of weed** — 97 % at a tenth of the
+    // way up, still 80 % at a fifth, and only half gone by 0.30 — with a
+    // ragged but broadly level top; it is not a hem, it is a plateau. And
+    // above it the dark does NOT taper away: it sits at 44-46 % of the width
+    // from a third of the way up to two thirds, and is still **29 % at the
+    // cap**. What stands on the plateau is a set of near parallel-sided runs
+    // that stop at different heights and a good third of which do not stop at
+    // all.
+    //
+    // A first pass got neither. It had the band fading out at 0.30 m — which
+    // is the *wet edge*, where the sea is right now, and is a different and
+    // much shorter thing than the weed — and it grew the dark from a height
+    // field thresholded against `yy`, which makes every tongue a triangle that
+    // narrows to a spike. Measured, it ran 79 % dark at a quarter of the way
+    // up against 63 %, and **0 % above three quarters against 31 %**: a flame
+    // job. The plateau and the runs are now separate terms and the runs are
+    // gated on width rather than carved out of a height field.
+    //
+    // The runs' width is what sets the mesh. They run 30 to 80 px across on a
+    // face 253 px wide, which is **0.11 to 0.30 m** — hand to shoulder. A
+    // column has to be finer than the narrowest of them, so the grid is laid
+    // at a fixed **0.105 m of column** and not a fixed column count: 37
+    // columns on each long face, 26 on each short one, 126 round the big mass.
+    // An earlier pass used 0.145 and the narrowest drips landed at two
+    // columns, which is Nyquist and duly came back as a herringbone.
+    //
+    // The rows are sized the same way, and getting them right needed the
+    // height rather than a guess at it. `DIVE.top` is **2.626 m**, so the face
+    // above water is 2.366 m and the whole battered side, footing to cap, is
+    // 2.916 m; eighteen rows is 0.162 m each. The feathers below — 0.24 m at
+    // the top of a broad run, 0.20 m on a drip, 0.16 m on the plateau — are
+    // one to one and a half rows, because a feather shorter than a row is not
+    // a feather, it is a step. They were first written at 0.10-0.14 m against
+    // a face assumed to be 1.74 m tall, which is what happens when you size a
+    // blend against a number you have not asked the game for.
+    //
+    // No texture and no shader: the mesh this lands in is drawn `base *= vVCol`
+    // and `b.smooth` carries a colour per vertex, so the stain is geometry's
+    // own colour and costs one attribute that was already there.
+    //
+    // Not black. Wet weed on concrete photographs as a very dark GREEN-grey,
+    // and the green is what keeps it from reading as a hole cut in the mass —
+    // at the exposure this scene runs at, a neutral this dark goes to paper
+    // black and takes the flare's shading with it.
+    const WEED = [0.086, 0.104, 0.090];
+    const mix3 = (a, c, k) => [lerp(a[0], c[0], k), lerp(a[1], c[1], k),
+      lerp(a[2], c[2], k)];
+
+    /**
+     * The colour of the concrete at `u` metres round the mass and `yy` metres
+     * above mean sea level. Four terms, darkest wins.
+     *
+     * **The wet edge.** Solid at and under the water and gone by 0.30 m. Not
+     * weed and not weathering — it is where the sea is, it is the same on
+     * every face and on the newest pour as on the oldest, and it is the floor
+     * everything else stands on.
+     *
+     * **The plateau**, which is the term the first pass did not have. Its top
+     * is a sum of four sines of wavelength 1.22, 0.69, 0.44 and 0.25 m — so it
+     * is ragged rather than ruled — running from 0.120 to 0.343 of the face
+     * and averaging 0.244, which on this 2.366 m face is **0.28 to 0.81 m of
+     * solid weed, 0.58 m on average**, against 0.30 m for the wet edge it
+     * stands on. That one number is what turns a set of spikes standing in the
+     * water into a mass with things growing out of it.
+     *
+     * **The runs**, at two scales. Each is a steep gate on a field of three
+     * incommensurate sines — 2.77, 0.89 and 0.64 m for the broad ones, 0.56,
+     * 0.40 and 0.28 m for the thin drips — multiplied by a stop height that
+     * varies on a much longer wavelength than the gate does. That product is
+     * the point and it is why they are not triangles: the gate sets the WIDTH
+     * and the stop sets the HEIGHT, and because the gate is steep the sides
+     * come out near parallel and the run keeps its width all the way up. A
+     * height field thresholded against `yy` cannot do this — width and height
+     * are the same number in it, so every tongue is a triangle.
+     *
+     * The broad runs mostly do reach the cap, which is not laziness: the
+     * photograph says 29 % of the width is dark at 0.95 of the face and 44 %
+     * at 0.60, so only about a sixth of it stops in between. The thin drips
+     * carry that sixth — their stop runs 0.20 to 1.02 of the face against the
+     * broad ones' 0.90 to 1.04.
+     *
+     * Two last touches, both there because dead-straight edges read as paint.
+     * `wob` wanders the gate field with height, so an edge meanders instead of
+     * being ruled; and the gate threshold drifts up by 0.05 over the climb, so
+     * a run narrows a little as it goes — a little, not to a point.
+     *
+     * Over the 13.04 m perimeter this reproduces the photograph's table to an
+     * **rms of 1.4 %** of width. `wear` scales the plateau and the runs and
+     * leaves the wet edge alone: 1 on the old mass, a small number on the new.
+     */
+    const stainAt = (base, F, wear) => (u, yy) => {
+      const climb = yy / F;
+      const wet = 1 - smoothstep(0.0, 0.30, yy);
+      const rag = 0.55 * Math.sin(u * 5.13 + 1.7)
+        + 0.30 * Math.sin(u * 9.11 + 4.4)
+        + 0.15 * Math.sin(u * 14.30 + 0.6)
+        + 0.10 * Math.sin(u * 25.10 + 2.9);
+      const band = smoothstep(0, 0.16, F * wear * (0.245 + 0.118 * rag) - yy);
+      const wob = 0.110 * Math.sin(u * 3.31 + climb * 5.4 + 0.8)
+        + 0.060 * Math.sin(u * 8.17 - climb * 3.9 + 2.5)
+        + 0.035 * Math.sin(u * 6.23 + climb * 8.7 + 4.1);
+      const wide = 0.36 * Math.sin(u * 2.27 + 0.4)
+        + 0.40 * Math.sin(u * 7.03 + 0.9)
+        + 0.24 * Math.sin(u * 9.79 + 2.7) + wob;
+      const gA = smoothstep(0.051 + 0.05 * climb, 0.311 + 0.05 * climb, wide);
+      const stopA = clamp(1.245 + 0.305 * (0.62 * Math.sin(u * 1.87 + 2.1)
+        + 0.38 * Math.sin(u * 3.41 + 5.3))
+        + 0.05 * Math.sin(u * 13.70 + 3.1), 0.30, 1.04);
+      const runA = smoothstep(0, 0.24, F * wear * gA * stopA - yy);
+      const fine = 0.44 * Math.sin(u * 11.31 + 5.1)
+        + 0.34 * Math.sin(u * 15.70 + 1.3)
+        + 0.10 * Math.sin(u * 22.30 + 3.9) + 0.6 * wob;
+      const gB = smoothstep(0.061 + 0.03 * climb, 0.361 + 0.03 * climb, fine);
+      const stopB = clamp(0.545 + 0.603 * (0.60 * Math.sin(u * 2.63 + 0.9)
+        + 0.40 * Math.sin(u * 4.57 + 3.7)), 0.20, 1.02);
+      const runB = smoothstep(0, 0.20, F * wear * gB * stopB - yy);
+      // Weed thins where it is only just surviving, so the top of a run is a
+      // shade off full dark. Eighteen per cent and no more: the drips that
+      // reach the cap in the photograph read 10-30 of 255, which is still
+      // black, not grey.
+      const run = Math.max(runA, runB)
+        * (1 - 0.18 * smoothstep(0.10 * F, 0.98 * F, yy));
+      // And the combing on the pale: in the photograph the clean third is not
+      // clean, it is ruled with faint vertical lines where forty years of rain
+      // has come off the cap. Six per cent of the way to the weed, which is
+      // under one grey level at this exposure and is only ever read as
+      // texture; beaten twice so the lines are not evenly spaced.
+      const rule = 0.055 * (0.5 + 0.5 * Math.sin(u * 9.45 + 0.4))
+        * (0.55 + 0.45 * Math.sin(u * 3.70 + 2.2))
+        * smoothstep(0.0, 0.30, yy);
+      return mix3(base, WEED,
+        clamp(Math.max(wet, band, run, rule), 0, 1));
+    };
+
+    /**
+     * `frustumD`, with the four battered sides laid as a grid of quads whose
+     * vertices are coloured by `stain(u, y)` instead of one flat colour.
+     *
+     * The caps are left exactly as `frustum` lays them, because they are the
+     * two faces nobody can see: the top of this one is under the cap slab and
+     * the bottom is inside the footing.
+     *
+     * `u` is arc length round the top rectangle, and how a column's `u` is
+     * found as it descends took two tries. The obvious answer — keep the
+     * parametric position across the face, so the stain narrows with the mass
+     * — is what rain does and is wrong for weed. This mass is battered 21.5°
+     * (half-width 1.02 m at the footing, 1.92 m at the cap) against about 12°
+     * in the photograph, and taking `u` parametrically fans every run out from
+     * a point below the platform: the render came back looking like a
+     * starburst, with runs leaning 30° at the ends of each face. Weed is not
+     * runoff. It starts at the waterline and climbs, and it climbs PLUMB.
+     *
+     * So `u` is 85 % of the way from the parametric position to the plumb one
+     * — the metric offset from the centre of the face, divided by the half
+     * width at the cap — which leaves the residual lean at 3.2°. 55 % was
+     * tried first and was still wrong, and in a way worth writing down: a
+     * column that fans also NARROWS downward, so every run came to a point
+     * where it met the plateau, and in the photograph a tongue is widest at
+     * the water. The cost of going plumb is that the four faces' `u` ranges no
+     * longer meet exactly at the corners — the mismatch is zero at the cap,
+     * where the two mappings agree, and grows to about 0.8 m at the footing,
+     * which is down inside a plateau of solid weed and cannot be seen.
+     */
+    const weathered = (y0, r0, y1, r1, stain, rows, colM) => {
+      const corner = ([ct, cs, ht, hs], k) =>
+        [ct + (k === 1 || k === 2 ? ht : -ht),
+          cs + (k === 2 || k === 3 ? hs : -hs)];
+      const A = [0, 1, 2, 3].map((k) => {
+        const c = corner(r0, k); return P(c[0], c[1], y0);
+      });
+      const B = [0, 1, 2, 3].map((k) => {
+        const c = corner(r1, k); return P(c[0], c[1], y1);
+      });
+      b.quad(B[0], B[1], B[2], B[3], stain(0, y1));
+      b.quad(A[3], A[2], A[1], A[0], stain(0, y0));
+      let u0 = 0;
+      for (let j = 0; j < 4; j++) {
+        const p0 = corner(r0, j), p1 = corner(r0, (j + 1) % 4);
+        const q0 = corner(r1, j), q1 = corner(r1, (j + 1) % 4);
+        const len = Math.hypot(q1[0] - q0[0], q1[1] - q0[1]);
+        const cols = Math.max(2, Math.round(len / colM));
+        const at = (i, k) => {
+          const p = i / cols, v = k / rows;
+          const at0 = p0[0] + (q0[0] - p0[0]) * v;
+          const as0 = p0[1] + (q0[1] - p0[1]) * v;
+          const at1 = p1[0] + (q1[0] - p1[0]) * v;
+          const as1 = p1[1] + (q1[1] - p1[1]) * v;
+          const t = at0 + (at1 - at0) * p, s = as0 + (as1 - as0) * p;
+          const yy = y0 + (y1 - y0) * v;
+          // See above: 85 % plumb, 15 % parallel to the batter.
+          const pu = 0.5 + (p - 0.5)
+            * (0.15 + 0.85 * Math.hypot(at1 - at0, as1 - as0) / len);
+          return { w: P(t, s, yy), c: stain(u0 + pu * len, yy) };
+        };
+        // One normal for the whole side. It is a trapezoid between two level
+        // edges and therefore planar, so taking it per triangle — which is
+        // what `b.quad` would have done — is the same vector recomputed a
+        // thousand times a face with rounding noise on it.
+        const e = [at(0, 0), at(1, 0), at(0, 1)];
+        const ux = e[1].w[0] - e[0].w[0], uy = e[1].w[1] - e[0].w[1];
+        const uz = e[1].w[2] - e[0].w[2];
+        const vx = e[2].w[0] - e[0].w[0], vy = e[2].w[1] - e[0].w[1];
+        const vz = e[2].w[2] - e[0].w[2];
+        const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz;
+        const nz = ux * vy - uy * vx;
+        const L = Math.hypot(nx, ny, nz) || 1;
+        const N = [nx / L, ny / L, nz / L];
+        for (let i = 0; i < cols; i++) {
+          for (let k = 0; k < rows; k++) {
+            const a = at(i, k), q = at(i + 1, k);
+            const c = at(i + 1, k + 1), d = at(i, k + 1);
+            b.smooth(a.w, q.w, c.w, N, N, N, a.c, q.c, c.c);
+            b.smooth(a.w, c.w, d.w, N, N, N, a.c, c.c, d.c);
+          }
+        }
+        u0 += len;
+      }
+    };
+
     // ── the footing, which is one pour ───────────────────────────────────────
     //
     // "Nobody sees it" was the argument for giving each mass its own shaft down
@@ -19770,9 +20008,16 @@ async function buildJadrija(scene) {
       -0.55, [D.t + 0.56, D.s, 2.20, 0.98], WET);
 
     // ── the big mass ─────────────────────────────────────────────────────────
-    // The flare, which is the whole shape, standing on the footing above.
-    frustumD(-0.55, [D.t - 0.62, D.s, 1.02, 0.98],
-      y - 0.26, [D.t - 0.62, D.s, 1.92, 1.34], OLD);
+    // The flare, which is the whole shape, standing on the footing above. Not
+    // a `frustumD` any more: four flat quads cannot carry the staining and the
+    // staining is the object. 126 columns by 18 rows is 4 536 triangles where
+    // there were 8; with the newer block's 1 248 and the three boxes below
+    // given back, `__fr.stats().jadrija.tris` goes 644 045 → 649 777, which is
+    // **5 732 triangles, or 0.89 %**, and is the cheapest thing in this file
+    // per metre of silhouette it earns.
+    weathered(-0.55, [D.t - 0.62, D.s, 1.02, 0.98],
+      y - 0.26, [D.t - 0.62, D.s, 1.92, 1.34],
+      stainAt(OLD, y - 0.26, 1.0), 18, 0.105);
     // The cap: a slab a little proud of the flare all round, which is where
     // the shuttering stopped and is the one hard horizontal on the thing.
     frustumD(y - 0.26, [D.t - 0.62, D.s, 1.96, 1.38],
@@ -19784,21 +20029,28 @@ async function buildJadrija(scene) {
     // happens to every one of these on this coast.
     // It has no shaft of its own any more; it stands on the shared footing at
     // -0.55, five centimetres below where its own leg used to start.
-    frustumD(-0.55, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
-      y - 0.46, [D.t + 2.06, D.s - 0.16, 0.94, 0.92], NEW);
+    // It gets the tidal band and almost nothing else. In the photograph the
+    // newer block's face is still white to within a hand of the water while
+    // the old mass beside it is black to the cap, and that difference is the
+    // only thing that says one pour arrived after the other — so `wear` is
+    // 0.32. On its 2.166 m face that caps the plateau at 0.24 m and the tallest
+    // run at 0.69 m, so most of what it has is the wet edge the sea gives
+    // everything, with a scallop or two standing on it.
+    weathered(-0.55, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
+      y - 0.46, [D.t + 2.06, D.s - 0.16, 0.94, 0.92],
+      stainAt(NEW, y - 0.46, 0.32), 12, 0.14);
     frustumD(y - 0.46, [D.t + 2.06, D.s - 0.16, 0.96, 0.94],
       y - 0.26, [D.t + 2.06, D.s - 0.16, 0.98, 0.96], [0.808, 0.806, 0.778],
       [0.836, 0.834, 0.804]);
 
-    // A run of dark down the face of the big one, which is what forty years of
-    // wet feet coming up a ladder does to a wall and is most of why the thing
-    // does not read as a new casting.
-    for (const [ot, wt, sh] of [[-1.30, 0.30, 0.62], [-0.34, 0.19, 0.44],
-      [0.42, 0.24, 0.55]]) {
-      boxD(D.t - 0.62 + ot - wt, D.t - 0.62 + ot + wt,
-        D.s - 1.36, D.s - 1.30, y - 0.26 - sh * 1.5, y - 0.26,
-        [0.520, 0.552, 0.532]);
-    }
+    // Three boxes of dark used to hang on the ladder face here, 6 cm proud of
+    // the concrete, standing in for the drip off forty years of wet feet. They
+    // are gone, and it took one screenshot to see why: against real tongues
+    // they read as three rectangular *panels* bolted to the wall — hard-edged,
+    // flat, and lighter in the middle than the staining they sat on, so the
+    // nearest thing they resembled was a hatch. A stain that has an outline is
+    // a decal. The ladder's own run is in the weathering now, which is where
+    // it belongs, and the only thing standing off this face is the ladder.
 
     // ── the board ────────────────────────────────────────────────────────────
     // One plank, laid across both masses along the shore and running a long

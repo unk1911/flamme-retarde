@@ -7381,8 +7381,28 @@ function frame() {
   // is the thing that was measured — it is what makes a bump read as a bump —
   // and the front plane is free. Same ramp as a wall, so walking up to somebody
   // and walking up to a doorframe pull the plane in the same way.
+  // And a sixth, which is the Brod's side deck, and it was the worst of them.
+  //
+  // Walk her deck and by four metres along the boat has come apart: a row of
+  // bare white stanchions over open sea with the deck as a tan sliver BEHIND
+  // them, as if the eye had gone outboard of the rail. It had not. The side
+  // deck is about a metre wide with a bulwark down one edge and the deckhouse
+  // wall down the other, so at the standing clip of 1.2 m both of them are
+  // inside the front plane and neither is drawn — and what is left is the far
+  // half of the deck, the stanchions that are further along than 1.2 m, and
+  // the sea through the hole where the bulwark was. Every frame of it looks
+  // like a camera that has left the boat, which is why it was read as one.
+  //
+  // Same fault as the kite bar and the foil board and the same fix, and it is
+  // the fifth time this list has grown for the same reason: a mode that puts
+  // something solid within arm's reach has to say so, because the clip does
+  // not measure, it is told. 0.82 puts the plane at 0.26 m — enough to clear
+  // a bulwark at half a metre and a deckhouse wall at a third of one, and not
+  // so near that it spends the depth this view needs, because the far end of
+  // it is four kilometres of Šibenik coming up the channel.
+  const brodNear = state.phase === 'brod' ? 0.82 : 0;
   const faceD = state.phase === 'ground' && ground.nearBody ? ground.nearBody() : null;
-  clipNear = Math.max(indoors, hullNow, bedNow, rideNear);
+  clipNear = Math.max(indoors, hullNow, bedNow, rideNear, brodNear);
   let wantNear = 1.2 - 1.14 * clipNear;
   // Somebody else's face, and it is taken out of the ramp above rather than
   // fed into it.

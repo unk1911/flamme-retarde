@@ -8,6 +8,99 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.447.0] — 2026-09-20
+
+### the Brod has gulls
+
+Six of them stand on her — the capping either side right aft, the stemhead
+where the pulpit rails meet, the upper deck's rail and the funnel casing. They
+shuffle, stretch a wing, and go up when she gathers way or when your feet come
+within 3.2 m of one. **Two ride the whole crossing**, and all six are back on
+the rail by Šibenik.
+
+The other eight wheel round her at the mole and fall in astern once she is
+making way, holding station on a critically damped spring in a **levelled**
+copy of her frame — her position and heading, none of her roll — rather than
+flying a waypoint, which is what a gull behind a ferry actually does. Their
+heading is taken from velocity *through the air*, so they face the bow while
+she makes way and face where they are going when she is stopped, with no blend
+between the two.
+
+    alongside        6 perched, 8 wheeling
+    under way 1600 m 2 riding, 12 astern, mean 16.7 m abaft, furthest 26.8 m
+    at x8            astern held 15.0 -> 15.5 m — they come with her
+    at Šibenik       all six perches refilled
+    cost             14 birds, 2 draw calls, 1 470 triangles, 60-63 fps
+
+The model, the wingbeat and the colours are `44-birds.js`'s own, lifted into a
+shared `birdRig` both files now draw from — the flock over the channel is
+unchanged, 72 built and 46 live in the fly phase, exactly as before. What had
+to be added was **a folded wing that reads at a metre and a half** rather than
+at fifty. Six on a small screen instead of fourteen, because the boat's 21
+passenger blobs are already 161 323 triangles and 21 draw calls; 1 470
+triangles is worth having on a phone and a second set of blobs is not.
+
+### the deck was never outboard
+
+Walk her deck and by four metres along the boat came apart: a row of bare
+stanchions over open sea, the deck a tan sliver *behind* them, as if the eye
+had gone over the side. **It had not.** Measured against the hull rather than
+judged from the picture, the eye is 3.20 m from the centreline on a 3.675 m
+half-beam — **0.47 m inboard of her side**, which is where somebody standing
+on a side deck against the bulwark is.
+
+What was actually happening is the front plane. The side deck is about a metre
+wide with a bulwark down one edge and the deckhouse wall down the other, and
+the standing clip is **1.2 m** — so both of them were inside it and neither
+was drawn. What was left was the far half of the deck, the stanchions further
+off than 1.2 m, and the sea through the hole where the bulwark had been. Every
+frame of it looks like a camera that has left the boat.
+
+The clip already ramps for four things — being indoors, the aeroplane's hull,
+the trampoline bed, the kite bar and the foil board under your feet — and the
+Brod was not one of them. It is now, at **0.265 m**: enough to clear a bulwark
+at half a metre and a deckhouse wall at a third of one, and not so near that
+it spends the depth this view needs, because the far end of it is four
+kilometres of Šibenik coming up the channel.
+
+This is the fifth entry on that list and they all have the same shape. The
+clip does not measure; it is told. A mode that puts something solid within
+arm's reach has to say so.
+
+### forty years, counted
+
+1.442.x shipped the diving platform's weathering from a read of the
+photograph. This is the same thing measured off it: for each of 253 columns
+across the face in `20260821_175309.jpg`, how far up the concrete is darker
+than a third of the pale.
+
+    height up the face   0.10  0.15  0.20  0.25  0.30  0.40-0.60  0.70  0.80  1.00
+    width stained         97%   94%   80%   63%   48%     44-46%   37%   33%   29%
+
+That table says two things the first pass got wrong, and the second is the
+bigger one. **The bottom fifth is a solid plateau of weed** — 0.58 m of it on
+average, ragged-topped, standing on the 0.30 m wet edge — and **above it the
+dark does not taper**: a third of the width is still black at the cap, where
+the first pass had nothing at all above three quarters.
+
+So the plateau is its own term now, and the runs are no longer a height field
+thresholded against height — which is what made them triangles, because that
+makes width and height the same number. Each is a steep **gate** that sets the
+width times a slow **stop** that sets the height, so the sides stay near
+parallel. And they climb plumb rather than fanning: the mass is battered 21.5°
+against about 12° in the photograph, so a run laid out parametrically turned
+the whole face into a starburst.
+
+It reproduces the photograph's table to an **rms of 1.45 % of width**, for
+5 732 triangles — 0.89 % of Jadrija. `DIVE.top` had to be asked of the game
+rather than inferred: it is 2.626 m, so the face is 2.366 m and not the 1.74 m
+the first feathers were sized against.
+
+**Where it still falls short**: at three metres the runs read harder-edged
+than the photograph's, which have soft sides and a range of darkness rather
+than one black. At the distance the platform is actually seen from — the
+bathing terrace, fifty-five metres — it reads as the photograph does.
+
 ## [1.446.0] — 2026-09-20
 
 ### the third bench, and what the stills actually show

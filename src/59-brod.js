@@ -2633,6 +2633,7 @@ function buildBrod(scene) {
   let moorRun = null;            // [{ cleat, post, sag }], her end in HER frame
   let pax = null;                // the passengers, once their rigs have loaded
   let paxT = 0;                  // their clock — see `draw`
+  let gulls = null;              // the birds on her rails and astern of her
   let route = null;              // [[x, z], ...], berth first
   let arc = null;                // cumulative metres along it
   let total = 0;
@@ -2655,6 +2656,18 @@ function buildBrod(scene) {
   // 47-ground.js, which this is the boat's copy of and deliberately no more.
   const you = { x: -4.4, z: 0, yaw: 0, pitch: -0.02, deck: 0.38, gait: 0, bob: 0 };
   const att = { y: 0, roll: 0, pitch: 0, yaw: 0 };
+
+  /**
+   * The two things about her that 60-pax.js cannot see and the gulls need.
+   *
+   * A live view and not a snapshot: an object with getters costs nothing a
+   * frame and there is no copy to go stale. `sp` is how fast she is going,
+   * which is what empties her rails; `you` is where your feet are in her
+   * frame, which is what flushes one bird rather than all of them; and `on`
+   * says whether `you` means anything at all, because it holds wherever you
+   * last stood for as long as you are ashore.
+   */
+  const helm = { you, get sp() { return sp; }, get on() { return active; } };
 
   const tmpV = new THREE.Vector3();
   const tmpW = new THREE.Vector3();
@@ -3204,6 +3217,11 @@ function buildBrod(scene) {
       buildBrodPax(scene, deckAt, boat).then((p) => { pax = p; })
         .catch((e) => console.warn('brod passengers failed:', e.message));
     }
+    // And her gulls, which are not passengers and are not asynchronous: two
+    // instanced layers off a prototype 44-birds.js has already built, so they
+    // are here the moment she is and they are here whether or not the two
+    // passenger rigs ever inflate. See `buildBrodGulls`.
+    if (!gulls) gulls = buildBrodGulls(scene, boat, helm);
     return true;
   }
 
@@ -3890,6 +3908,11 @@ function buildBrod(scene) {
    * a kilometre off.
    */
   function drawPax(dt, cam, on) {
+    // The gulls first, and before the early return, because they are not
+    // passengers: they are on her rails and astern of her whether or not the
+    // two rigs above ever arrived. `place` has already run, so the matrix they
+    // are posed against is this frame's.
+    if (gulls) gulls.update(dt, cam, on);
     if (!pax) return;
     if (!on) { pax.hide(); return; }
     paxT += dt;
@@ -3974,8 +3997,11 @@ function buildBrod(scene) {
       tris: hull.geometry.attributes.position.count / 3
         + (fitting ? fitting.geometry.attributes.position.count / 3 : 0),
       pax: pax ? pax.stats() : null,
+      gulls: gulls ? gulls.stats() : null,
     }),
     /** The passengers, for a probe. Null until their rigs have inflated. */
     get pax() { return pax; },
+    /** And her gulls, likewise — see `buildBrodGulls` in 60-pax.js. */
+    get gulls() { return gulls; },
   };
 }

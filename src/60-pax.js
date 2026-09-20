@@ -635,3 +635,587 @@ async function buildBrodPax(scene, deckAt, boat) {
     get dog() { return dog; },
   };
 }
+
+// -----------------------------------------------------------------------------
+// ── AND THE GULLS ────────────────────────────────────────────────────────────
+//
+// Misha, 19 Sep 2026: *"replace all those marionettes that are now on the boat
+// with more realistic people and animals"*. The people are above, the first
+// animal was the dog, and *animals* is a plural. On this coast the second one
+// is not a choice: a boat that runs between a beach and a town in August has
+// gulls on it and gulls behind it, and a ferry crossing 3 850 m of channel
+// with an empty sky over her wake is the one thing in this game nobody who has
+// taken that boat would believe.
+//
+// There are gulls here already — 44-birds.js keeps a ring of four species
+// round the camera, and a probe counts 72 of them live off the channel — so
+// this is not a second bird. It is `GULL`, `birdRig` and `beatShape` out of
+// that file, which is the model, the colours and the wingbeat, with a
+// different question asked of them.
+//
+// ── the question, which is that they hold station on a moving hull ───────────
+//
+// Everything on the Brod is written in HER frame and the long note at the top
+// of this file explains why: she is 460 m from the origin, she heels, she
+// trims, and anything placed in world metres sails out from under itself at
+// eight knots. The gulls are that problem twice over, and the two halves want
+// DIFFERENT frames:
+//
+//   - the ones on her rails are furniture. They get her full matrix, heel and
+//     trim with it, exactly as a passenger does, so a bird on the capping
+//     leans with the rail it is standing on.
+//   - the ones astern are not on her at all. They fly in a LEVELLED copy of
+//     her frame — her position and her heading, and none of her roll. A gull
+//     hanging over the wake that banked 3° every time the hull took a wave
+//     would be a gull nailed to the transom.
+//
+// Both come off one `boat.matrixWorld.decompose` a frame, and that is the
+// whole of the machinery.
+//
+// ── what a gull behind a ferry actually does ─────────────────────────────────
+//
+// Almost nothing, and that is the observation the following flock is built on.
+// It does not fly along behind the boat; it hangs in the air she has already
+// pushed, holds a spot ten to thirty metres astern, and slides sideways across
+// the others without a wingbeat for half a minute at a time. So a follower is
+// NOT a flight integrator with a waypoint — it is a critically damped spring
+// on to a station that wanders, which is what holding station means and which
+// converges instead of circling. Measured at 1 600 m run, at cruise: twelve of
+// them in the air, the mean **16.7 m abaft the transom** and the furthest
+// 26.8, which is the shape of it.
+//
+// The heading falls out of that for free and it is the one piece of real
+// physics in here: a bird's velocity through the AIR is its velocity in her
+// frame plus her own speed, so `headingTo(vx + speed, vz)` points a
+// station-keeping bird at the bow while she is making way and points it where
+// it is going when she is stopped. One formula, no blend, and it is why they
+// face forward over the wake without being told to.
+//
+// ── and fast mode ────────────────────────────────────────────────────────────
+//
+// `brodFast` steps her integrator eight times on one frame, so the coast goes
+// by at ×8 and you still cross her deck at your own pace. The gulls come with
+// her and do not notice, because every one of them is a position in her frame
+// and her frame is what moved. That is the defensible answer and the other one
+// was thought through and thrown out: integrated in world metres they would
+// fall eight times too slowly and be a kilometre astern four seconds after the
+// button.
+//
+// ── cost ─────────────────────────────────────────────────────────────────────
+//
+// Two instanced draws for the lot, whatever the count — `birdRig` again — and
+// a bird is a measured 105 triangles: 85 for the spindle and the tail fan, 10
+// for each wing. `IS_SMALL` gets six of them rather than none, which is the
+// opposite call to the one the blobs above make and is made on the same
+// grounds: the twenty-one who are drawn as blobs cost 161 323 triangles and 21
+// draw calls, and fourteen gulls cost 1 470 and two. There is nothing on a
+// phone to save here, and what a phone would lose is the only thing moving in
+// the sky over her wake.
+// -----------------------------------------------------------------------------
+
+const BROD_GULL = {
+  n: 14,                     // on a laptop
+  small: 6,                  // and on a phone — see the note above
+  // How far a bird's middle stands over the thing it is standing on. There are
+  // no legs on this model and there is no need for any: 0.11 m puts a gull's
+  // body clear of the rail, and at that height the toes nobody drew are
+  // exactly where the eye puts them.
+  stand: 0.11,
+  // The stance of a standing gull, nose up. `pitch` is positive bill-up in the
+  // flight model — see the beat in 44-birds.js.
+  stance: 0.21,
+  // How close you get before it goes. 3.2 m is a stride and a half, which is
+  // about what a harbour gull that sees people all day will allow, and it is
+  // wide enough that the flush reads as a reaction to YOU rather than as a
+  // bird that happened to leave.
+  flush: 3.2,
+  // The speed she counts as under way at, for the birds' purposes. She works
+  // up to 8.0 m/s at 0.26 m/s², so 2.5 is about ten seconds after let-go —
+  // which is when the rail empties, and it empties as she gathers way rather
+  // than on the horn.
+  way: 2.5,
+  // The spring, in rad/s. 0.55 is a time constant of 1.8 s and a bird that
+  // takes about six seconds to slide 20 m across the wake; at 1.2 they dart
+  // between stations like flies and the whole flock reads as insects.
+  chase: 0.55,
+  turn: 1.1,                 // rad/s the heading may chase the airflow at
+  // Nothing may sit lower than this over the hull herself. Her masthead is
+  // 10.34 m over the waterline in her own frame and the ensign is under that,
+  // so a station that crosses her plan is lifted clear of both.
+  clear: 12.5,
+};
+
+/**
+ * Where a gull will stand on her, in HER frame and in built metres.
+ *
+ * Every one of these is resolved off the geometry the boat is drawn from
+ * rather than typed — `brodSheer` for the capping, `BROD_ROOF` for the upper
+ * deck's rail, the casing's own lip — for the reason `deckAt` is a callback
+ * further up this file: a perch written down is a perch that is in the air the
+ * next time the hull is scaled.
+ *
+ *   `cap`   the bulwark capping, which is 0.42 m of flat plank running her
+ *           whole length and is the best gull perch on the boat
+ *   `stem`  the stemhead post, where the two pulpit rails meet on the
+ *           centreline
+ *   `rail`  the upper deck's top rail, 0.90 m over the roof
+ *   `case`  the rolled lip round the top of the funnel casing
+ *
+ * ORDERED, because `IS_SMALL` takes the front of this list and not a sample of
+ * it: the first three are the one you walk up to in the cockpit, the one on
+ * the stem that is a silhouette from anywhere on the boat, and the one that
+ * rides across.
+ *
+ * Two of them are marked `stay`, and that is not a shortcut either. Most of a
+ * rail empties as a boat gathers way and one or two do not — they turn, face
+ * the wind and ride the whole crossing — and if every last one went up at
+ * let-go the deck would be conspicuously empty for nine and a half minutes.
+ */
+const BROD_PERCH = [
+  // The port quarter, right aft. The awning's canvas ends at x −12.51 so this
+  // is in the open, and at 2.91 m in her frame it stands at the eye height of
+  // somebody on the cockpit sole, which is 2.86. You meet it on the way to the
+  // stair.
+  { at: 'cap', x: -12.70, s: -1 },
+  // The stemhead. The rails converge on this post and there is nothing within
+  // 0.40 m of it, which is the only place on her a 0.66 m bird fits without
+  // arranging the geometry round it — every other gap in the pulpit is 0.64 m
+  // between stanchions and the tail fan would be inside one.
+  { at: 'stem', x: 13.545, s: 1 },
+  // The casing lip, to starboard of the exhaust, which stands out of the top
+  // of it at z −0.60 and goes on up another metre. It is one of the two that
+  // ride across, and it is the first of them because `IS_SMALL` gets three
+  // perches and a rail with nobody left on it is not the picture.
+  { at: 'case', x: 7.00, s: 1, stay: true },
+  { at: 'cap', x: -13.15, s: 1 },
+  // The second rider, and STARBOARD, which is not where it was. `enter` puts
+  // you on the PORT side deck at x 1.20 — the port rail perch is 2.09 m from
+  // your head the instant you board, inside the 3.2 m flush — so the bird
+  // meant to ride the whole crossing went up every single time in the moment
+  // you got on, and the stat that said so read `perched: 1` where it should
+  // have read 2. Over here it is 8 m from the boarding mark. The starboard
+  // bench has sitters at x −1.35, 2.40 and 3.02, so 5.20 is 2.18 m clear of
+  // the nearest head.
+  { at: 'rail', x: 5.20, s: 1, stay: true },
+  // And the port one, which stays where it was for exactly the reason the
+  // note above moved the other one: a gull clattering off the rail over your
+  // head as you step aboard is the best thing on this boat. The port bench
+  // has people at x −1.90, 0.75 and 3.95, so 2.40 is a clear 1.55 m from the
+  // nearest of them.
+  { at: 'rail', x: 2.40, s: -1 },
+];
+
+/**
+ * The gulls on and behind her.
+ *
+ * Separate from `buildBrodPax` and synchronous, which is deliberate: the
+ * passengers are two payload rigs and eight borrowed blobs, any of which can
+ * fail to arrive, and a boat with nobody on her should still have her gulls.
+ * `scene` for the two instanced layers, `boat` for the frame, and `helm` for
+ * the two things 59-brod.js knows and this file cannot see — how fast she is
+ * going, and where your feet are on her deck.
+ *
+ * RULE 4: `mulberry32` and not `rng`, for the reason `paxJit` gives at length.
+ * This is its own stream and it moves nothing on the beach.
+ */
+function buildBrodGulls(scene, boat, helm) {
+  if (!boat || typeof GULL === 'undefined' || !GULL) return null;
+  const small = typeof IS_SMALL !== 'undefined' && IS_SMALL;
+  const N = small ? BROD_GULL.small : BROD_GULL.n;
+  const rnd = mulberry32(CONFIG.seed ^ 0x6b17d1);
+  const rig = birdRig(scene, N);
+
+  // Her transom, off the loft's last station rather than typed: every distance
+  // astern in this file is measured from it.
+  const STERN = BROD_ST[BROD_ST.length - 1][0];
+
+  // ── the perches, resolved ──────────────────────────────────────────────────
+  // THREE PERCHES ON A PHONE AND NOT SIX, which is the one place `IS_SMALL`
+  // changes the shape of this and not just the count. Six birds with six
+  // perches is a boat with nothing in the air over it while she is alongside,
+  // and the wheeling is half of what says the gulls are hers.
+  const perches = [];
+  const nP = Math.min(BROD_PERCH.length, small ? 3 : N);
+  for (let i = 0; i < nP; i++) {
+    const p = BROD_PERCH[i];
+    const [sy, hw] = brodSheer(p.x);
+    const o = { x: p.x, stay: !!p.stay };
+    if (p.at === 'cap') {
+      // The middle of the capping: `deckAt` takes `BROD_BULK` off the sheer's
+      // half-beam to find its inboard face, so half of that back out again is
+      // the middle of the plank.
+      o.y = sy; o.z = p.s * (hw - BROD_BULK * 0.5);
+    } else if (p.at === 'stem') {
+      // The pulpit rail's own height over the sheer — see the guardrail in
+      // `brodProto`, where the top wire runs at BROD_P(0.72) and comes in to
+      // this post on the centreline.
+      o.y = sy + 0.72; o.z = 0;
+    } else if (p.at === 'rail') {
+      o.y = BROD_ROOF * BROD_K + 0.90; o.z = p.s * 1.19 * BROD_K;
+    } else {
+      o.y = (BROD_ROOF + 0.98) * BROD_K; o.z = p.s * 0.55;
+    }
+    o.y += BROD_GULL.stand;
+    // Facing out over the water, which is what a bird on a rail does — except
+    // on the stem, where out over the water is over the bow.
+    o.yaw = p.at === 'stem' ? headingTo(1, 0) : headingTo(0, p.s);
+    perches.push(o);
+  }
+
+  // ── the birds ──────────────────────────────────────────────────────────────
+  const flock = [];
+  for (let i = 0; i < N; i++) {
+    const p = i < perches.length ? perches[i] : null;
+    // The ones with nowhere to stand start ON their ring and not at the
+    // origin, which in her frame is the middle of the engine room. They are
+    // built at the berth and she is moored there, so the ring is where they
+    // would be — and a flock that starts inside the hull and springs out of it
+    // is the first thing on the screen the moment she is built.
+    const a = rnd() * TAU, R = 19 + rnd() * 24;
+    flock.push({
+      p, on: !!p, land: false,
+      x: p ? p.x : Math.cos(a) * R,
+      y: p ? p.y : 9 + rnd() * 10,
+      z: p ? p.z : Math.sin(a) * R,
+      yaw: p ? p.yaw : a, pitch: 0, roll: 0,
+      vx: 0, vy: 0, vz: 0,
+      // A tenth either way on the size and the tint, for the reason
+      // 44-birds.js gives: fourteen identical gulls is a texture.
+      s: 0.88 + rnd() * 0.26, tint: 0.90 + rnd() * 0.18,
+      ph: rnd() * TAU, flap: 0, fold: p ? 0.32 : 1,
+      // How a folded wing sits on THIS bird, which is the one thing about the
+      // model that had to change to put a gull a metre from your face — see
+      // `draw` in 44-birds.js. The rafting birds out in the channel keep the
+      // two flat plates sticking out sideways that they have always had, at
+      // fifty metres, where nobody can tell; these fold back over the tail,
+      // because at a metre and a half everybody can.
+      droop: -0.14, sweep: 0.62,
+      beat: false, duty: rnd() * 3,
+      // Its station astern: how far back it likes to sit, how far out on the
+      // quarter, and how high. Three slow sines on top of that, at three rates
+      // it shares with nobody, which is what makes the flock slide across
+      // itself instead of translating as a lump.
+      //
+      // 5 to 25 m and 3.5 to 12 m up, and both were wider on the first cut —
+      // 4 to 30 astern and up to 13.5 high. Photographed from off her quarter
+      // that put half the flock in the top corner of the frame with the boat
+      // in the bottom one, which is a sky with birds in it rather than a boat
+      // being followed. What settled it is that the mean came down from 19.5 m
+      // to 16.7 and every bird stayed inside the same frame as her wake.
+      d0: 5 + rnd() * 20, z0: (rnd() - 0.5) * 22, y0: 3.5 + rnd() * 8.5,
+      w1: 0.045 + rnd() * 0.050, q1: rnd() * TAU,
+      w2: 0.030 + rnd() * 0.045, q2: rnd() * TAU,
+      w3: 0.025 + rnd() * 0.035, q3: rnd() * TAU,
+      // And the ring it wheels in while she is not going anywhere.
+      orb: a, orbR: R, orbY: 9 + rnd() * 10,
+      orbW: (rnd() < 0.5 ? -1 : 1) * (0.030 + rnd() * 0.030),
+      // The fidget. `shuffle` is the next time it turns on the spot, `stretch`
+      // the next time it opens a wing, `st` the stretch itself running.
+      shuffle: rnd() * 4, want: p ? p.yaw : 0,
+      stretch: 5 + rnd() * 18, st: 0,
+      rest: 25 + rnd() * 70,
+      mute: 0, callT: 3 + rnd() * 18,
+    });
+  }
+
+  // ── scratch ────────────────────────────────────────────────────────────────
+  const org = new THREE.Vector3();
+  const qFull = new THREE.Quaternion();
+  const qLevel = new THREE.Quaternion();
+  const _s = new THREE.Vector3();
+  const _f = new THREE.Vector3();
+  const _t = new THREE.Vector3();
+  const _yA = new THREE.Vector3(0, 1, 0);
+  const camRight = new THREE.Vector3(1, 0, 0);
+  const tgt = { x: 0, y: 0, z: 0 };
+
+  let t = 0, spd = 0, way = 0, stopped = 99;
+  let drawn = 0, calls = 0, budget = 2;
+  let astern = 0, far = 0;
+
+  /** Where a bird is in the world, in whichever of her frames it lives in. */
+  function worldOf(b, out) {
+    out.set(b.x, b.y, b.z).applyQuaternion(b.on ? qFull : qLevel).add(org);
+    return out;
+  }
+
+  /**
+   * One call, if anybody is near enough to hear it.
+   *
+   * The same two rate limits 44-birds.js uses and for the same reason — a bird
+   * that has just shouted shuts up, and no more than a couple get out a second
+   * — with the budget deliberately meaner, because these fourteen are all
+   * inside fifty metres of you and that flock's twenty are spread over a ring
+   * 750 m across.
+   *
+   * The pan wants the camera's right vector and this file is handed the camera
+   * POSITION, so it reads the one off the global. Guarded, because the boat is
+   * built before 90-app.js has finished and a missing pan is a centred call
+   * rather than an exception.
+   */
+  function cry(b, alarm, cam) {
+    if (!audio || !cam || b.mute > 0 || budget < 1) return;
+    if (typeof state !== 'undefined' && state && state.phase === 'intro') return;
+    worldOf(b, _t);
+    const dx = _t.x - cam.x, dy = _t.y - cam.y, dz = _t.z - cam.z;
+    const d = Math.hypot(dx, dy, dz);
+    // `NOT WITHIN` and not `BEYOND`, which is 44-birds.js's NaN closed the same
+    // way: every comparison against NaN is false, and this one is negated.
+    if (!(d <= 260)) return;
+    budget -= 1;
+    b.mute = 3 + rnd() * 4;
+    calls++;
+    if (typeof camera !== 'undefined' && camera && camera.matrixWorld) {
+      camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+    }
+    const near = 1 - d / 260;
+    const pan = (dx * camRight.x + dy * camRight.y + dz * camRight.z)
+      / Math.max(d, 1);
+    audio.birdCall('gull', clamp(pan, -1, 1),
+      near * near * (alarm ? 1 : 0.7), alarm);
+  }
+
+  /**
+   * Where a bird wants to be, in the levelled frame.
+   *
+   * Two shapes and a lerp on `way`: a loose cloud astern when she is making
+   * way, and a wide slow ring round her when she is not. The migration between
+   * them takes as long as she takes to gather way, which is half a minute, and
+   * the spring flies the whole of it — which is the thing you actually watch
+   * from the mole, the gulls peeling off her rails and settling in behind her.
+   */
+  function station(b, out) {
+    if (b.land && b.p) {
+      // Coming in: a metre over the perch until it is nearly there, then the
+      // perch itself. Her heel is ignored here rather than corrected for — at
+      // the berth she lies inside 1.5°, which at the outermost perch is 0.08 m,
+      // and the bird is drawn on the rail in her full frame the moment it is
+      // down.
+      const d = Math.hypot(b.x - b.p.x, b.y - b.p.y, b.z - b.p.z);
+      out.x = b.p.x; out.z = b.p.z;
+      out.y = b.p.y + sat((d - 0.8) / 2.5) * 1.1;
+      return;
+    }
+    const ax = STERN - b.d0 - 4.5 * Math.sin(t * b.w1 * TAU + b.q1);
+    const az = b.z0 + 6.0 * Math.sin(t * b.w2 * TAU + b.q2);
+    const ay = b.y0 + 2.2 * Math.sin(t * b.w3 * TAU + b.q3);
+    const a = b.orb + t * b.orbW * TAU;
+    out.x = lerp(Math.cos(a) * b.orbR, ax, way);
+    out.z = lerp(Math.sin(a) * b.orbR, az, way);
+    out.y = lerp(b.orbY + 2.5 * Math.sin(t * b.w3 * TAU + b.q3), ay, way);
+    // And over the boat herself, high enough to clear the mast. Without this
+    // the ring alongside runs a bird through the ensign twice a minute.
+    if (out.x > STERN - 1.5 && out.x < 15 && Math.abs(out.z) < 5.5) {
+      out.y = Math.max(out.y, BROD_GULL.clear);
+    }
+  }
+
+  /** Off the rail. */
+  function up(b, cam) {
+    b.on = false;
+    b.land = false;
+    b.fold = 1;
+    b.flap = 1;
+    b.beat = true; b.duty = 2.4;
+    // It keeps her speed — it was standing on her — so in her frame it starts
+    // from rest and falls astern on its own. What it adds is the hop: up, and
+    // a shove outboard away from whatever moved.
+    b.vx = 0.6; b.vy = 2.6; b.vz = Math.sign(b.z || 1) * 1.4;
+    b.rest = 25 + rnd() * 70;
+    cry(b, true, cam);
+  }
+
+  /** On the rail, and doing something about it. */
+  function perched(b, dt, near, cam) {
+    const p = b.p;
+    b.x = p.x; b.y = p.y; b.z = p.z;
+    b.roll = 0;
+    b.pitch = damp(b.pitch, BROD_GULL.stance, 6, dt);
+
+    b.shuffle -= dt;
+    if (b.shuffle <= 0) {
+      b.shuffle = 2.5 + rnd() * 5.5;
+      b.want = p.yaw + (rnd() - 0.5) * 1.7;
+    }
+    // The two that ride across turn and face the wind, which is what they are
+    // riding it for. Everybody else looks wherever they were looking.
+    const want = way > 0.4 ? headingTo(1, 0) : b.want;
+    b.yaw += clamp(angleDelta(b.yaw, want), -1.7 * dt, 1.7 * dt);
+
+    // The wing-stretch, which is the whole difference between a perched bird
+    // and a bollard: one wing out and half up, held for a beat, folded again.
+    // `fold` does it — there is one hinge in this model and no second pose.
+    b.stretch -= dt;
+    if (b.stretch <= 0 && b.st <= 0) { b.st = 1.5; b.stretch = 8 + rnd() * 17; }
+    if (b.st > 0) {
+      b.st -= dt;
+      const u = Math.sin(sat(1 - b.st / 1.5) * Math.PI);
+      b.fold = 0.32 + 0.60 * u;
+      b.flap = 0.22 * u;
+      b.ph += GULL.beat * 0.30 * TAU * dt;
+    } else {
+      b.fold = damp(b.fold, 0.30, 8, dt);
+      b.flap = damp(b.flap, 0, 8, dt);
+    }
+
+    b.rest -= dt;
+    if (b.mute > 0) b.mute -= dt;
+    // Three ways off a rail: she gathers way, you walk up to it, or it simply
+    // decides to go — and the last of those only counts alongside, because a
+    // bird that lifts off mid-channel has nothing to come back to until
+    // Šibenik.
+    if ((way > 0.45 && !p.stay) || near < BROD_GULL.flush
+      || (way < 0.25 && b.rest <= 0)) up(b, cam);
+  }
+
+  /** In the air, holding a station. */
+  function flying(b, dt, cam) {
+    station(b, tgt);
+    const W = BROD_GULL.chase;
+    b.vx += (W * W * (tgt.x - b.x) - 2 * W * b.vx) * dt;
+    b.vy += (W * W * (tgt.y - b.y) - 2 * W * b.vy) * dt;
+    b.vz += (W * W * (tgt.z - b.z) - 2 * W * b.vz) * dt;
+    // A gull does 19 m/s fleeing and nothing on this boat is worth more than
+    // that. The clamp is here for the frame `seek` teleports her three
+    // kilometres, where the spring would otherwise hand the integrator a
+    // four-figure velocity.
+    const v = Math.hypot(b.vx, b.vy, b.vz);
+    if (v > GULL.flee) {
+      const k = GULL.flee / v;
+      b.vx *= k; b.vy *= k; b.vz *= k;
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+    // Never into the water. Her frame's y is the sea under her, so this is the
+    // surface plus a wave either way.
+    if (b.y < 1.2) { b.y = 1.2; b.vy = Math.max(b.vy, 0); }
+
+    // Through the AIR, which is her speed plus its own — see the header.
+    const wx = b.vx + spd, wz = b.vz;
+    const air = Math.hypot(wx, wz);
+    const dyaw = air > 0.8
+      ? clamp(angleDelta(b.yaw, headingTo(wx, wz)),
+        -BROD_GULL.turn * dt, BROD_GULL.turn * dt)
+      : 0;
+    b.yaw += dyaw;
+    // Banking into the turn, at the gull's own number. Increasing yaw swings
+    // the nose to port and positive roll lifts the starboard wing, so the two
+    // have the same sign.
+    b.roll = damp(b.roll,
+      clamp(dyaw / Math.max(dt, 1e-3) * GULL.bank, -1.2, 1.2), 5, dt);
+    b.pitch = damp(b.pitch, clamp(b.vy / Math.max(air, 3), -0.45, 0.45), 5, dt);
+
+    // It beats when it has lost its place and glides when it has it, which
+    // behind a ferry is most of the time: `glide` is 6.5 s against `burst` at
+    // 1.7 in the species' own row, and the work term is what takes it off that
+    // clock when the station has moved out from under it.
+    b.duty -= dt;
+    if (b.duty <= 0) {
+      b.beat = !b.beat;
+      b.duty = (b.beat ? GULL.burst : GULL.glide) * (0.55 + rnd() * 0.9);
+    }
+    const miss = Math.hypot(tgt.x - b.x, tgt.y - b.y, tgt.z - b.z);
+    const work = sat((miss - 3) / 9) + sat(b.vy * 0.6);
+    b.flap = damp(b.flap, (b.beat || work > 0.35) ? 1 : 0, 7, dt);
+    b.fold = damp(b.fold, 1, 6, dt);
+    b.ph += GULL.beat * TAU * dt;
+
+    // Down again, and only on its OWN perch: ownership is one to one, because
+    // two birds converging on the same rail is a queue and a queue is a
+    // machine. She has to have been stopped for a moment first — coming
+    // alongside at Šibenik takes her through 2.5 m/s a long way out, and
+    // without the hold they would start landing on a boat still doing four
+    // knots.
+    if (b.p) b.land = way < 0.15 && stopped > 2.5;
+    if (b.land) {
+      const d = Math.hypot(b.x - b.p.x, b.y - b.p.y, b.z - b.p.z);
+      if (d < 0.45 && Math.hypot(b.vx, b.vy, b.vz) < 2.2) {
+        b.on = true;
+        b.land = false;
+        b.vx = b.vy = b.vz = 0;
+        b.want = b.p.yaw;
+        b.shuffle = 1 + rnd() * 3;
+        b.rest = 25 + rnd() * 70;
+      }
+    }
+
+    if (b.mute > 0) b.mute -= dt;
+    b.callT -= dt;
+    if (b.callT <= 0) {
+      b.callT = GULL.call[0] + rnd() * GULL.call[1];
+      cry(b, false, cam);
+    }
+  }
+
+  /**
+   * One frame. `on` is `group.visible` — she is drawn out to a kilometre and
+   * her gulls stop with her, which is the gate `hide` is for the crowd.
+   */
+  function update(dt, cam, on) {
+    if (!on) { rig.hide(); drawn = 0; return; }
+    dt = clamp(dt, 0, 0.1);
+    t += dt;
+    budget = Math.min(2, budget + dt * 0.8);
+    spd = helm && Number.isFinite(helm.sp) ? helm.sp : 0;
+    way = sat(spd / BROD_GULL.way);
+    stopped = way < 0.15 ? stopped + dt : 0;
+
+    // Her two frames, off one decompose. `place` has already run this frame —
+    // see the call site in `drawPax` — so this is her attitude now and not
+    // last frame's.
+    boat.matrixWorld.decompose(org, qFull, _s);
+    _f.set(1, 0, 0).applyQuaternion(qFull);
+    qLevel.setFromAxisAngle(_yA, yawOfX(_f.x, _f.z));
+
+    // Where you are, in her frame. Your FEET and not the camera whenever you
+    // are aboard: in third person the camera is two metres behind you, and a
+    // gull that flushed off it would flush after you had walked past it.
+    // Ashore there is nothing else to use, and the camera on the mole is close
+    // enough to your feet for a 3.2 m radius.
+    let px = 1e6, py = 0, pz = 0;
+    if (helm && helm.on) {
+      px = helm.you.x; py = helm.you.deck + 1.55; pz = helm.you.z;
+    } else if (cam) {
+      _t.set(cam.x, cam.y, cam.z);
+      boat.worldToLocal(_t);
+      px = _t.x; py = _t.y; pz = _t.z;
+    }
+
+    rig.open();
+    let nAir = 0, sum = 0;
+    far = 0;
+    for (const b of flock) {
+      if (b.on) {
+        perched(b, dt, Math.hypot(b.x - px, b.y - py, b.z - pz), cam);
+      } else {
+        flying(b, dt, cam);
+        const d = STERN - b.x;
+        if (d > 0) { nAir++; sum += d; far = Math.max(far, d); }
+      }
+      rig.draw(GULL, b, org, b.on ? qFull : qLevel);
+    }
+    astern = nAir ? sum / nAir : 0;
+    drawn = rig.close();
+  }
+
+  return {
+    update,
+    hide: () => { rig.hide(); drawn = 0; },
+    stats: () => ({
+      n: flock.length,
+      perched: flock.reduce((a, b) => a + (b.on ? 1 : 0), 0),
+      air: flock.reduce((a, b) => a + (b.on ? 0 : 1), 0),
+      landing: flock.reduce((a, b) => a + (b.land ? 1 : 0), 0),
+      // How far abaft the transom the followers actually sit, which is the one
+      // claim in here a screenshot cannot check and is the number the station
+      // was tuned against.
+      astern: +astern.toFixed(1),
+      far: +far.toFixed(1),
+      way: +way.toFixed(2),
+      calls,
+      drawn,
+      tris: drawn * rig.tris,
+    }),
+    /** The flock and the stations, for a probe. */
+    flock, perches,
+  };
+}
