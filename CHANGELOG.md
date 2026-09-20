@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.434.0] — 2026-09-19
+
+### the crossing runs itself
+
+**"the trip to sibenik should be somehow accelerated maybe with time lapse or
+some trick right now it is too boring"**.
+
+The time-lapse has been on her deck since the passage was built — T steps her
+integrator eight times on the same frame, with the walking zeroed, so the
+coast goes by at eight times while you cross her deck at your own pace — and
+it was behind a key nobody presses. Worse than that: **T is named in the hint
+line on a keyboard and not in the touch one, and the FAST button was
+explicitly hidden on her deck**, on the reasonable grounds that a boat has no
+sprint. So on a phone, which is where this gets played, there was no way to
+reach it at all and the honest nine and a half minutes were the only thing on
+offer. A feature you cannot find is a feature you have not got.
+
+So the default turns over. She winds on to eight times **a hundred metres
+out** — far enough to watch her leave the mole, and about twelve seconds —
+and the ways out of it are the three anybody would actually try:
+
+- press T, or
+- press FAST, which is on her deck now and lit while it runs, or
+- **just walk**. A walking input while the coast is going by at eight times
+  is somebody who wants to be on the boat rather than on the crossing, so it
+  drops her to one and leaves her there.
+
+That choice is remembered for the voyage and cleared when you board again, so
+nothing puts it back on against you. The last three hundred metres still give
+it up by themselves, because coming alongside is the part nobody wants
+compressed.
+
+And the hint says what is happening while it happens — *×8 · T or walk her
+deck for the long way*, and its own wording on glass — instead of the old
+*making way*, which named neither the rate nor the way out.
+
+Measured: still at one at 69 m under way, on by 1 400 m, and the whole 3 813 m
+crossing comes in at about a minute and a half instead of nine and a half.
+
 ## [1.433.0] — 2026-09-19
 
 ### a bed you stand in for ten minutes

@@ -543,6 +543,13 @@ function initTouch() {
   // is a thing you *are* doing for twenty seconds, and a thumb that has to
   // stay on it is a thumb that is not on the stick.
   tap('t-fast', (el) => {
+    // On her deck the same button runs the passage instead — the boat has no
+    // sprint and the crossing has nine and a half minutes, so FAST means the
+    // one fast thing there is. See `toggleBrodFast`.
+    if (state.phase === 'brod') {
+      el.classList.toggle('on', toggleBrodFast());
+      return;
+    }
     TOUCH.sfast = !TOUCH.sfast;
     el.classList.toggle('on', TOUCH.sfast);
   });
@@ -603,9 +610,16 @@ function paintSwimTouch(wade, auto) {
  * do at any point on those four and a half kilometres.
  */
 function paintBrodTouch() {
-  for (const id of ['t-dive', 't-rise', 't-fast', 't-sauto']) {
+  for (const id of ['t-dive', 't-rise', 't-sauto']) {
     document.getElementById(id).hidden = true;
   }
+  // FAST STAYS, and it is the whole of this change. It was hidden here with
+  // the other three on the grounds that a boat has no sprint — true, and it
+  // left the touch player with no way at all to reach the time-lapse, which
+  // is the one control on her deck that matters. See `brodWant` in 90-app.js.
+  const f = document.getElementById('t-fast');
+  f.hidden = false;
+  f.classList.toggle('on', typeof brodFast !== 'undefined' && brodFast);
   document.getElementById('t-ashore').classList.add('armed');
 }
 

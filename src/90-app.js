@@ -4865,6 +4865,31 @@ function paintFoilHud() {
 const BROD_FAST = 8;
 const BROD_STILL = { fwd: 0, side: 0, sprint: false };
 let brodFast = false;
+/**
+ * ── AND IT RUNS ITSELF UNLESS YOU SAY OTHERWISE ──────────────────────────
+ *
+ * Misha, 19 Sep 2026: *"the trip to sibenik should be somehow accelerated
+ * maybe with time lapse or some trick right now it is too boring"*.
+ *
+ * The time-lapse has been here since the passage was built and it was behind
+ * a key nobody presses: T is named in the hint line on a keyboard and NOT in
+ * the touch one, and the FAST button was explicitly hidden on her deck — so
+ * on a phone, which is where this gets played, there was no way to reach it
+ * at all and the honest nine and a half minutes were the only option there
+ * was. A feature you cannot find is a feature you have not got.
+ *
+ * So the default turns over. She winds on to eight times a hundred metres
+ * out — far enough to watch her leave — and the ways OUT of it are the ways
+ * anybody would try: press the key, press the button, or simply walk. A
+ * walking input while the coast is going by at eight times is somebody who
+ * wants to be on the boat rather than on the crossing, and it drops her back
+ * to one and stays there.
+ *
+ * `brodWant` is that choice, and it is per voyage: null until you express
+ * one, true or false after.
+ */
+const BROD_AUTO_AT = 100;      // m under way before it winds on by itself
+let brodWant = null;
 
 /**
  * T on her deck: let the passage run itself.
@@ -4879,6 +4904,9 @@ function toggleBrodFast(on) {
   if (!brod || !brod.active) return false;
   if (brod.phase === 'slow' || brod.phase === 'alongside') return false;
   brodFast = on == null ? !brodFast : !!on;
+  // An explicit answer, which is what stops the auto-engage below putting it
+  // straight back on the next frame.
+  brodWant = brodFast;
   return brodFast;
 }
 
@@ -4892,7 +4920,8 @@ function paintBrodHud() {
   $('br-say').textContent = c ? T(c.key) : '';
   $('br-hint').innerHTML = brod.phase === 'alongside'
     ? TK('brod.ashoreHint', 'brod.ashoreHintTouch')
-    : (brodFast ? T('brod.fast') : TK('brod.hint', 'brod.hintTouch'));
+    : (brodFast ? TK('brod.fast', 'brod.fastTouch')
+      : TK('brod.hint', 'brod.hintTouch'));
   if (IS_TOUCH) paintBrodTouch();
 }
 
@@ -5380,6 +5409,9 @@ function boardBrod() {
   const y = ground.you;
   if (!brod.canBoard(y.x, y.z)) return false;
   if (!brod.enter()) return false;
+  // A fresh voyage has no opinion about the time-lapse yet — see `brodWant`.
+  brodFast = false;
+  brodWant = null;
   ground.bail();
   eject.reset();
   // Whatever was holding the camera lets go of it here. Nothing should be — but
@@ -6778,6 +6810,18 @@ function frame() {
         - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
       sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
     };
+    // Hands on the controls: whoever is walking her deck is not asking for the
+    // coast to go by at eight times. This is also the only cancel a thumb can
+    // find without being told where to look.
+    if (brodFast && (Math.abs(ctl.fwd) > 0.2 || Math.abs(ctl.side) > 0.2)) {
+      brodFast = false;
+      brodWant = false;
+    }
+    // And on by itself, once she is clear of the mole — see `brodWant`.
+    if (!brodFast && brodWant === null && brod.phase === 'run'
+      && brod.run > BROD_AUTO_AT) {
+      brodFast = true;
+    }
     let out = brod.update(dt, ctl);
     // And the clock, which is NOT her engine.
     //
@@ -8595,6 +8639,8 @@ window.__fr = {
      * something a probe can sit through.
      */
     fast: (v) => toggleBrodFast(v),
+    /** Whether it is running itself right now, and whether anybody said so. */
+    fastOn: () => ({ on: brodFast, want: brodWant }),
     /** Jump to a point on the passage, in metres run, and look at the world. */
     at: (m) => {
       if (!brod) return null;

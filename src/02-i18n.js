@@ -211,7 +211,8 @@ const STRINGS = {
     // each: the thing they are about is out of the window.
     'brod.left': 'min to Šibenik',
     'brod.hint': '<b>W A S D</b> walk her deck · <b>Z</b> look · <b>T</b> run the passage · <b>E</b> over the side',
-    'brod.fast': 'making way',
+    'brod.fast': '×8 · <b>T</b> or walk her deck for the long way',
+    'brod.fastTouch': '×8 · <b>FAST</b> or the stick for the long way',
     'brod.hintTouch': 'the stick walks her deck · <b>ASHORE</b> is over the side',
     'brod.ashoreHint': '<b>E</b> to step ashore at Šibenik',
     'brod.ashoreHintTouch': '<b>ASHORE</b> — she is alongside the riva',
@@ -685,7 +686,8 @@ const STRINGS = {
     // ── brod za Šibenik ──────────────────────────────────────────────────
     'brod.left': 'min do Šibenika',
     'brod.hint': '<b>W A S D</b> hodaj palubom · <b>Z</b> gledaj · <b>T</b> pusti plovidbu · <b>E</b> preko boka',
-    'brod.fast': 'plovi',
+    'brod.fast': '×8 · <b>T</b> ili hodaj palubom za sporiju vožnju',
+    'brod.fastTouch': '×8 · <b>FAST</b> ili palica za sporiju vožnju',
     'brod.hintTouch': 'palica hoda palubom · <b>NA OBALU</b> je preko boka',
     'brod.ashoreHint': '<b>E</b> za iskrcaj u Šibeniku',
     'brod.ashoreHintTouch': '<b>NA OBALU</b> — privezan je uz rivu',
@@ -1135,7 +1137,8 @@ const STRINGS = {
     // ── le bateau pour Šibenik ───────────────────────────────────────────
     'brod.left': 'min pour Šibenik',
     'brod.hint': '<b>W A S D</b> marcher sur le pont · <b>Z</b> regarder · <b>T</b> laisser filer · <b>E</b> par-dessus bord',
-    'brod.fast': 'en route',
+    'brod.fast': '×8 · <b>T</b> ou marchez sur le pont pour le trajet long',
+    'brod.fastTouch': '×8 · <b>FAST</b> ou le stick pour le trajet long',
     'brod.hintTouch': 'le stick marche sur le pont · <b>À TERRE</b> = par-dessus bord',
     'brod.ashoreHint': '<b>E</b> pour débarquer à Šibenik',
     'brod.ashoreHintTouch': '<b>À TERRE</b> — il est à quai sur la riva',
