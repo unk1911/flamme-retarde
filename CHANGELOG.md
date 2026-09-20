@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.432.0] — 2026-09-19 (baye 1.29.0)
+
+### the konoba has a till
+
+**"keep enhancing jadrija businesses from surveys"** — the standing item.
+
+The konoba was ruled out of the shop table when that table was written, on the
+grounds that *a counter exists where the building has a hatch* and this one is
+tables under a canopy. That was true of the SHOPS row and stopped being true
+of the building: it has had an L-shaped bar since the terrace was rebuilt — a
+counter at `s1−1.5`, five monobloc stools along it in scarlet and lime, a
+glass-door cooler behind it and a barman standing at `s1−0.35` with his hands
+on the top — and the survey frame all of that was modelled from has a CAFFE
+BAR sign screwed to the door frame. A bar with a barman and no way to buy a
+drink is the one business on this shore that was further from the photograph
+after it was modelled than before.
+
+**It serves from the back**, which is the one thing this needed that the other
+four did not. Every counter here faces the promenade and `counterAt` takes the
+deck side for granted; this shop is twelve metres of open terrace with the bar
+at the INLAND end, so the row carries a window of its own — t 239–253, s
+15.6–18.6 — and standing at the front of it is standing at somebody's table,
+which is what it should be. Measured: the counter answers at the bar and at
+the stools, and not at the tables, not behind the bar, and not past either
+end.
+
+What it pours is what a Dalmatian konoba pours at four in the afternoon: a
+beer, a **gemišt**, a glass of wine, a rakija and a coffee. The prices are
+guesses in exactly the way MINI's and H2O's are and are flagged as such in the
+same place. Baye can be asked for the two new ones by name — and *špricer* is
+the same drink said by somebody from further north, so it is in the pattern.
+
 ## [1.431.0] — 2026-09-19
 
 ### the phone comes out of the bag

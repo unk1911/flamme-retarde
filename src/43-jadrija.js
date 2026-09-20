@@ -35789,6 +35789,35 @@ async function buildJadrija(scene) {
       ['cappuccino', 'cappuccino', 3.00], ['water', 'a bottle of water', 2.00],
       ['juice', 'a juice', 3.00],
     ] },
+    // ── AND THE KONOBA, WHICH HAD A BAR AND NO TILL ──────────────────────
+    //
+    // Misha, 19 Sep 2026: *"keep enhancing jadrija businesses from surveys"*.
+    //
+    // The note above says a counter exists where the building has a hatch, and
+    // ruled this shop out as "tables under a canopy". That was true of the
+    // SHOPS row and stopped being true of the building: the konoba has had an
+    // L-shaped bar since the terrace was rebuilt — a counter at s1−1.5, five
+    // monobloc stools along it, a glass-door cooler behind, and a barman
+    // standing at s1−0.35 with his hands on it — and the survey frame it was
+    // built from has a CAFFE BAR sign screwed to the door frame. A bar with a
+    // barman and no way to buy a drink is the one business on this shore that
+    // is further from the photograph than it was before it was modelled.
+    //
+    // SO IT SERVES FROM THE BACK, which is why this row carries a window of
+    // its own. Every other counter here faces the promenade and `counterAt`
+    // can take the deck side for granted; this one is twelve metres of open
+    // terrace with the bar at the INLAND end of it, so standing at the front
+    // of the shop is standing at somebody's table. See `win` below.
+    //
+    // The prices are guesses in the same way MINI's and H2O's are, and the
+    // list is what a Dalmatian konoba pours at four in the afternoon: a beer,
+    // a gemišt, a glass of wine, a rakija and a coffee. No brands.
+    konoba: { at: 'konoba', name: 'konoba', win: [239, 253, 15.6, 18.6],
+      items: [
+        ['beer', 'a beer', 4.00], ['gemišt', 'a gemišt', 3.00],
+        ['wine', 'a glass of wine', 3.50], ['rakija', 'a rakija', 3.00],
+        ['espresso', 'espresso', 2.00],
+      ] },
     slast: { at: 'slast', name: 'slastičarnica', items: [
       ['sladoled', 'sladoled', 2.50], ['kupovi', 'kupovi', 8.00],
       ['frappe', 'frappe', 7.00], ['krafne', 'krafne', 2.50],
@@ -35809,6 +35838,13 @@ async function buildJadrija(scene) {
   function counterAt(x, z) {
     const [t, s] = local(x, z);
     for (const key in STOCK) {
+      // A window of its own, for the one shop whose bar is not on the
+      // promenade side — see `konoba` in STOCK.
+      const w = STOCK[key].win;
+      if (w) {
+        if (t < w[0] || t > w[1] || s < w[2] || s > w[3]) continue;
+        return { key, name: STOCK[key].name, items: STOCK[key].items };
+      }
       const S = SHOPS.find((q) => q.key === STOCK[key].at);
       if (!S) continue;
       if (t < S.t0 - 1.5 || t > S.t1 + 1.5) continue;

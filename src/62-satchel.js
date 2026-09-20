@@ -101,6 +101,13 @@ const CARRY = [
   { key: 'nes caffe', label: 'nes caffe', consumed: true },
   { key: 'juice', label: 'a juice', consumed: true },
   { key: 'rakija', label: 'a rakija', consumed: true },
+  // And the konoba's two. `STOCK.konoba` — a gemišt is white wine and
+  // mineral water and is what everybody on this coast is actually drinking
+  // at four in the afternoon; the wine is a glass of the same white without
+  // the water in it. Both are glasses and neither is carried anywhere, so
+  // neither has a box.
+  { key: 'gemišt', label: 'a gemišt', consumed: true },
+  { key: 'wine', label: 'a glass of wine', consumed: true },
   // The slastičarnica. `STOCK.slast`.
   { key: 'sladoled', label: 'sladoled', give: true, consumed: true },
   { key: 'kupovi', label: 'kupovi', give: true, consumed: true },

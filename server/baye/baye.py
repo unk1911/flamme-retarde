@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.28.0"
+VERSION = "1.29.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -791,6 +791,11 @@ BUY = {
     "beer": [r"\b(beer|beers|pivo|pivu|pive|lager|cold one)\b"],
     "juice": [r"\b(juice|sok|soka|sokic|soki[ćc])\b"],
     "rakija": [r"\b(rakij\w*|grappa|brandy)\b"],
+    # The konoba, which serves from 1.432.0 — see STOCK in src/43-jadrija.js.
+    # A gemišt is white wine and mineral water; "špricer" is the same drink
+    # said by somebody from further north and is what half the coast calls it.
+    "gemišt": [r"\b(gemi[šs]t\w*|gemist\w*|[šs]pricer\w*|spritzer\w*)\b"],
+    "wine": [r"\b(wine|vino|vina|glass of wine|bijelo vino)\b"],
 }
 # A WORD THAT MEANS YOU WANT ONE, or a sentence short enough to be an order.
 # Without this, standing at the counter saying "I love a cappuccino in the
