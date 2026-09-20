@@ -261,13 +261,49 @@ const PAX_SHIRT = [
 ];
 
 /**
+ * ── AND EIGHT OF THEM ARE REAL PEOPLE ──────────────────────────────────────
+ *
+ * Misha, 19 Sep 2026: *"replace all those marionettes that are now on the
+ * boat with more realistic people and animals"*.
+ *
+ * They are not marionettes, they are the INSTANCED tier — the same two rigs
+ * the beach draws a hundred and twenty people with, at 3 036 triangles a
+ * head. That tier is right for a promenade seen from forty metres and it is
+ * the wrong tier for a bench you are sitting next to: the shore has known
+ * this since the terraces were built, which is why the eight blobs in
+ * `wheelBlobs` exist and why the people you can walk up to at Jadrija are
+ * drawn with them.
+ *
+ * The boat never had that second tier. It has one now, and it is eight of
+ * them, and it is the EIGHT WHO ARE STANDING — the pair at the starboard
+ * rail, the two on the foredeck, the two up top, the ones at the side decks.
+ * Standing is where the tier change pays: they are at your eye height, on the
+ * side deck you squeeze past, and the walk from the boarding gate to the
+ * stair goes within a metre of three of them. The fourteen sitters stay
+ * instanced for now — a seated blob wants the thigh solve at the top of this
+ * file done a second time in bone deltas, and that is its own evening.
+ *
+ * PARENTED TO THE HULL, which is the whole reason this is eight lines and not
+ * a machine. The long note above explains that the instanced tier could not
+ * be a child of the boat — the scratch skeleton is shared by the whole crowd
+ * — and had to have her matrix composed on the outside of every figure's own
+ * instead. A skinned figure is an ordinary Object3D with its own mesh, so it
+ * simply goes in the group: `boat.add(mesh)`, place it in her frame once, and
+ * the heel, the trim, the pitch in a swell and the four and a half kilometres
+ * of channel all come free and exact.
+ */
+const PAX_SKIN_N = 8;
+
+/**
  * Build the passengers and hand back something `59-brod.js` can flush.
  *
  * `deckAt` comes in as a callback rather than being re-derived here, because
  * it is the walkable model and there is only supposed to be one of those. It
  * is the same function the player's own feet are on.
+ *
+ * `boat` is the group everything on her is a child of — see PAX_SKIN_N.
  */
-async function buildBrodPax(scene, deckAt) {
+async function buildBrodPax(scene, deckAt, boat) {
   const rigs = {};
   for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
     // Re-inflated rather than borrowed off the beach's crowds, which live in
@@ -372,16 +408,68 @@ async function buildBrodPax(scene, deckAt) {
     }
   }
 
+  // ── the eight who are real ────────────────────────────────────────────
+  //
+  // Taken off `wheelBlobs`, which is where the shore parks the eight parsed
+  // bather blobs and the material options they are built with. Borrowed and
+  // not re-inflated: unlike the two instanced rigs at the top of this
+  // function, these are 150 KB apiece and the shore has already paid for
+  // them. If the shore has not finished building yet there are none, and the
+  // boat is exactly what it was before this existed.
+  const real = [];
+  // `wheelBlobs` is block-scoped inside the shore's own build, so this comes
+  // through the one accessor on the module — see `blobs` in 43-jadrija.js.
+  const blobs = (typeof jadrija !== 'undefined' && jadrija && jadrija.blobs)
+    ? jadrija.blobs() : null;
+  if (boat && blobs && blobs.parsed && blobs.parsed.length) {
+    let k = 0;
+    for (const fg of cast) {
+      if (real.length >= PAX_SKIN_N) break;
+      // The standing ones, and not the children: the blobs are eight adults
+      // and a 0.68-scale adult is not a child, it is a small adult.
+      if (fg.mode !== 'stand' || fg.scale < 0.85) continue;
+      const f = skinnedFigure(blobs.parsed[k % blobs.parsed.length], blobs.opt);
+      // In HER frame, once. Nothing below moves them again — they are people
+      // standing at a rail — so the only per-frame cost is the clip.
+      f.mesh.position.set(fg.x, fg.y, fg.z);
+      f.mesh.rotation.y = fg.yaw;
+      // A hull that is 22 m long and 460 m from the origin puts a figure well
+      // outside anything three.js can cull it by from its own geometry, and a
+      // passenger that vanishes when the bow swings is worse than no
+      // passenger. Everything else on this boat is drawn unconditionally.
+      f.mesh.frustumCulled = false;
+      f.play('idle');
+      boat.add(f.mesh);
+      // And the instance they were standing in for stands down. `fg.hidden`
+      // is the flag `makeCrowd`'s own flush reads — see 42-crowd.js — so this
+      // is the whole of the swap and there is never a moment with both.
+      fg.hidden = true;
+      real.push({ f, fg });
+      k++;
+    }
+  }
+
   let drawn = 0;
+  let lastT = -1;
   return {
     /** Everybody, posed in her frame and composed with her world matrix. */
     flush: (t, cam, frame) => {
       drawn = 0;
       for (const c of crowds) { c.flush(t, cam, frame); drawn += c.drawn; }
+      // And the eight, which need nothing but their own clock: they are
+      // children of the hull and she has already been posed this frame.
+      const dt = lastT < 0 ? 0 : Math.max(0, Math.min(0.1, t - lastT));
+      lastT = t;
+      for (const r of real) {
+        r.f.mesh.visible = true;
+        r.f.update(dt);
+      }
+      drawn += real.length;
     },
     /** Off the screen the instant she is: the layers live in the scene, not
      *  under `group`, so nothing else takes them down with her. */
     hide: () => {
+      for (const r of real) r.f.mesh.visible = false;
       if (!drawn) return;
       for (const c of crowds) for (const L of c.layers) L.geo.instanceCount = 0;
       drawn = 0;
@@ -403,6 +491,10 @@ async function buildBrodPax(scene, deckAt) {
       kids: cast.filter((f) => f.scale < 0.85).length,
       shirts: cast.filter((f) => f.shirt).length,
       rigs: crowds.length,
+      // How many of them are drawn with a blob rather than an instance, and
+      // what those cost. See PAX_SKIN_N.
+      real: real.length,
+      realTris: real.reduce((a, r) => a + r.f.tris, 0),
       // What she costs, and both halves of it matter. `layers` is the draw
       // calls — one instanced mesh per rig part per rig — and it is the number
       // that does NOT go down when the crowd is small, which is why there are
@@ -425,5 +517,7 @@ async function buildBrodPax(scene, deckAt) {
      * on the same matrix. See the note over `frame` in 42-crowd.js.
      */
     crowds, cast,
+    /** And the eight on blobs, for the same probe — see PAX_SKIN_N. */
+    real,
   };
 }

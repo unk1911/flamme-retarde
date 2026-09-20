@@ -8,6 +8,50 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.435.0] — 2026-09-19
+
+### seven of them are real people
+
+**"replace all those marionettes that are now on the boat with more realistic
+people and animals"**.
+
+They were never marionettes — they are the INSTANCED tier, the same two rigs
+the beach draws a hundred and twenty people with at 3 036 triangles a head.
+That tier is right for a promenade seen from forty metres and wrong for a
+bench you are standing next to, which the shore has known since its terraces
+were built: that is why the eight parsed bather blobs exist and why the
+people you can walk up to at Jadrija are drawn with them. The boat never had
+the second tier. It has one now.
+
+**The ones who are STANDING**, which is where the tier change pays: they are
+at your eye height, on the side deck you squeeze past, and the walk from the
+boarding gate to the stair passes within a metre of three of them. Seven of
+the eight — the eighth is a child, and a 0.68-scale adult blob is not a
+child, it is a small adult, so that one stays an instance. The fourteen
+sitters stay instanced too: a seated blob wants this file's thigh solve done
+a second time in bone deltas, and that is its own evening.
+
+**Parented to the hull, which is why this is eight lines and not a machine.**
+The long note at the top of 60-pax.js explains that the instanced tier could
+not be a child of the boat — the scratch skeleton is shared by the whole
+crowd — and had to have her matrix composed on the outside of every figure's
+own instead. A skinned figure is an ordinary Object3D with its own mesh, so
+it simply goes in the group: `boat.add(mesh)`, place it in her frame once,
+and the heel, the trim, the pitch in a swell and the four and a half
+kilometres of channel all come free and exact. Nothing poses them per frame
+but their own clip.
+
+The blobs are borrowed and not re-inflated — 150 KB apiece parsed, and the
+shore has paid for all eight — through one accessor, `jadrija.blobs()`,
+because `wheelBlobs` is block-scoped inside the shore's own build. If the
+shore has not finished loading, the boat is exactly what it was before this
+existed.
+
+Measured: 7 real, 53 954 triangles, against 22 instances at 68 556 — and the
+instance each of them was standing in for stands down through `fg.hidden`,
+which is the flag `makeCrowd`'s own flush already reads, so there is never a
+frame with both.
+
 ## [1.434.0] — 2026-09-19
 
 ### the crossing runs itself

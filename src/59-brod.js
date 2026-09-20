@@ -3175,7 +3175,7 @@ function buildBrod(scene) {
     // supposed to be exactly one of those; a passenger standing on a deck the
     // player cannot reach is a passenger standing on a deck that is not there.
     if (!pax) {
-      buildBrodPax(scene, deckAt).then((p) => { pax = p; })
+      buildBrodPax(scene, deckAt, boat).then((p) => { pax = p; })
         .catch((e) => console.warn('brod passengers failed:', e.message));
     }
     return true;

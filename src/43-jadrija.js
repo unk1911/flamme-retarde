@@ -47239,6 +47239,17 @@ async function buildJadrija(scene) {
      * nothing extra. `quotesRefresh` is idempotent: after the first call it
      * returns without touching the network.
      */
+    /**
+     * The eight parsed bather blobs and the material options they are built
+     * with, or null while the shore is still loading.
+     *
+     * Reached for by the BOAT — see PAX_SKIN_N in src/60-pax.js, which puts
+     * eight real people on her deck instead of eight instances. Borrowing is
+     * the whole point: these are 150 KB apiece parsed and the shore has
+     * already paid for all eight. `wheelBlobs` is block-scoped inside the
+     * build and this is the only door to it.
+     */
+    blobs: () => wheelBlobs,
     quotes: () => phoneQuotes.q,
     quotesRefresh: () => phoneQuotes.refresh(),
     /**
