@@ -38081,6 +38081,7 @@ async function buildJadrija(scene) {
             }
             scene.remove(giftHeld.mesh);
             if (giftHeld.mesh.geometry) giftHeld.mesh.geometry.dispose();
+            dropGiftArm(giftHeld, skinFig);   // see dropGiftArm
             giftHeld = null;
             show.near = null;
             showSay('trill', d);
@@ -38158,6 +38159,7 @@ async function buildJadrija(scene) {
             scene.remove(giftHeld.mesh);
             if (giftHeld.mesh.geometry) giftHeld.mesh.geometry.dispose();
           }
+          dropGiftArm(giftHeld, skinFig);   // see dropGiftArm
           giftHeld = null;
           show.don = null;
           show.donAt = 0;
@@ -38207,6 +38209,7 @@ async function buildJadrija(scene) {
               scene.remove(old);
               if (old.geometry) old.geometry.dispose();
             }
+            dropGiftArm(giftHeld, skinFig);   // see dropGiftArm
             giftHeld = null;
             show.near = null;
             showSay('trill', d);
@@ -40115,10 +40118,7 @@ async function buildJadrija(scene) {
         } else if (giftHeld.armOn) {
           // And handed back, once, or the aim survives the beat — an `aim`
           // holds its rotation until it is given a zero.
-          giftHeld.armOn = 0;
-          giftHeld.rest = null;
-          f.aim('armUR', 0, 1, 0, 0);
-          f.aim('armLR', 0, 1, 0, 0);
+          dropGiftArm(giftHeld, f);
         }
         f.mesh.updateMatrixWorld();
         f.boneAt(handR, vHand).applyMatrix4(f.mesh.matrixWorld);
@@ -40431,6 +40431,45 @@ async function buildJadrija(scene) {
   };
   const giftProps = [];
   let giftHeld = null;
+
+  /**
+   * Give the right arm back to the clip.
+   *
+   * ── AND WHY THIS IS A FUNCTION ─────────────────────────────────────────
+   *
+   * Misha, 20 Sep 2026: *"the right arm-cuffs problem still there. if i now
+   * say 'reset', it fixes the problem... the problem is introduced when cuffs
+   * are put, one arm ends up being raised and never lowered/synced with the
+   * other"*. That is the whole diagnosis and it is right.
+   *
+   * The lift is solved with `wheelLimb` while `giftHeld.armOn` is set, and it
+   * was handed back in the `else` of the same test — which only ever runs
+   * while `giftHeld` still exists. On the frame the thing actually goes ON
+   * her, `giftHeld` is set to null three lines after the parts are parented,
+   * with `armOn` still 1. The `else` then never runs again, and **an `aim`
+   * holds its rotation until it is given a zero**, so her right arm stays
+   * where the reach left it — raised, for the rest of the session, through
+   * every clip after it. It shows worst in a handstand, which is where he
+   * found it, because that is the pose where the other arm is straight.
+   *
+   * `reset` cured it by accident: `hugArms(f, 0)` zeroes the same two bones.
+   * That is a mop, not a fix, and it only exists because he asked for a mop
+   * an hour earlier.
+   *
+   * So the release is one function, called from all three places the gift is
+   * let go of rather than from one of them. There are three because she can
+   * stop holding a thing in three ways — she puts it on, she puts it down,
+   * or the beat is cut out from under her — and each of those had its own
+   * line that nulled the record.
+   */
+  function dropGiftArm(g, f) {
+    if (!g || !g.armOn) return;
+    g.armOn = 0;
+    g.rest = null;
+    if (!f) return;
+    f.aim('armUR', 0, 1, 0, 0);
+    f.aim('armLR', 0, 1, 0, 0);
+  }
 
   /**
    * AND ONE THING IS ALREADY OUT.

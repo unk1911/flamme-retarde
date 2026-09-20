@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.451.1] — 2026-09-20
+
+### the arm, properly this time
+
+The chain's corkscrew was real and is fixed, and it was not what he was
+looking at. His own diagnosis is the whole of it:
+
+> *"if i now say 'reset', it fixes the problem... the problem is introduced
+> when cuffs are put, one arm ends up being raised and never lowered/synced
+> with the other"*
+
+The lift is solved with `wheelLimb` while `giftHeld.armOn` is set, and it was
+handed back in the `else` of that same test — which only ever runs while
+`giftHeld` still exists. **On the frame the thing actually goes on her,
+`giftHeld` is set to null three lines after the parts are parented, with
+`armOn` still 1.** The `else` never runs again, and an `aim` holds its
+rotation until it is given a zero, so her right arm stays where the reach
+left it — raised, for the rest of the session, through every clip after it.
+A handstand is where it shows worst, because that is the pose where the other
+arm is straight.
+
+`reset` cured it by accident: `hugArms(f, 0)` zeroes the same two bones. That
+is a mop and not a fix, and it only existed because he had asked for a mop an
+hour earlier.
+
+Measured, as the difference in height between her two wrists:
+
+    mid-errand, holding    handR − handL   +0.1524    (a raised arm)
+    after, at rest                         −0.0042    (level)
+    after a reset                          −0.0043    (identical)
+
+**The reset now changes nothing**, which is the proof: the state it used to
+produce is the state the errand leaves behind on its own.
+
+The release is one function called from all three places the gift is let go
+of, rather than from one of them. There are three because she can stop
+holding a thing in three ways — she puts it on, she puts it down, or the beat
+is cut out from under her — and each had its own line that nulled the record.
+
 ## [1.451.0] — 2026-09-20 (baye 1.33.0)
 
 ### the arm was never the problem
