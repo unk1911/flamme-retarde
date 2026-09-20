@@ -8,6 +8,23 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.441.2] — 2026-09-20
+
+### a paused phone
+
+Pausing with the Baye app open gave a blurred, dimmed smear of the promenade
+where her picture had been, which reads as a fault in the feed rather than as
+a game that has stopped. Two things cause it and neither can be argued with:
+the screen is a HOLE, and the pause card lays a nine-pixel backdrop blur over
+everything under it — which is the canvas the picture is drawn on. The phone's
+own frame is above the card; the hole is not, because a hole is nothing.
+
+So while the world is stopped the hole stops being one: the screen takes its
+background back and the picture's place says **paused**. The caption under it
+drops the word LIVE and keeps the distance, which is still true. Called from
+`setPaused`, because a paused frame loop does not run the phone's tick —
+which is the same reason the view cannot simply carry on.
+
 ## [1.441.1] — 2026-09-20
 
 ### how far away she is, and where

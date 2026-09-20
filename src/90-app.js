@@ -1724,6 +1724,9 @@ function setPaused(on) {
     && state.phase !== 'swim' && state.phase !== 'brod') return;
   if (state.paused === on) return;
   state.paused = on;
+  // And the phone's live view, which cannot be live and cannot even be a
+  // still while the pause card's blur is over the canvas. See `phonePaused`.
+  phonePaused(on);
   // Every other door in and out of a pause — P, the Resume button, the touch
   // buttons, the back doors that unpause on their way somewhere — puts the
   // card back where it belongs. Only `escPause` takes it off, and only for as

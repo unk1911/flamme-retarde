@@ -318,6 +318,36 @@ function phoneToggle(force) {
   return phoneOn;
 }
 
+/**
+ * The world has stopped, or started again.
+ *
+ * A LIVE VIEW OF A STOPPED WORLD IS NOT A LIVE VIEW, and while the game is
+ * paused it cannot even be a still: the screen is a HOLE — see the note in
+ * styles.css — the pause card lays a nine-pixel backdrop blur over
+ * everything under it, and the canvas is under it. So a paused phone showed a
+ * blurred, dimmed smear of the promenade where her picture had been, which
+ * looks like a bug in the feed rather than like a game that is stopped.
+ *
+ * So the hole stops being a hole: the screen takes its own background back
+ * and says what is true. Called from `setPaused` rather than from the tick,
+ * because a paused frame loop does not run the tick — which is the same
+ * reason the view cannot simply carry on.
+ */
+function phonePaused(on) {
+  if (!phoneEl) return;
+  const screen = phoneEl.querySelector('.cell-screen');
+  screen.classList.toggle('froze', !!on);
+  const hole = screen.querySelector('.cell-cam');
+  if (hole && phoneApp === 'cam') hole.textContent = on ? 'paused' : '';
+  // And the caption stops claiming to be live, since it is not. The distance
+  // under it is still true, so it stays — and the tick puts the word back a
+  // second after the world starts again.
+  const foot = screen.querySelector('.cell-foot');
+  if (foot && phoneApp === 'cam' && on) {
+    foot.textContent = foot.textContent.replace(/^LIVE · /, '');
+  }
+}
+
 /** Whether it is out, and which app is up — the render loop asks both. */
 function phoneIsOut() { return phoneOn; }
 function phoneAppNow() { return phoneOn ? phoneApp : null; }
