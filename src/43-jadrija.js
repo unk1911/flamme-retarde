@@ -20074,6 +20074,190 @@ async function buildJadrija(scene) {
     solid(t, (sF + sB + 0.10) / 2, half, (B.depth + 0.10) / 2, 0.9);
   }
 
+  // ── the sawn blocks ────────────────────────────────────────────────────────
+  /**
+   * The third bench on this shore, and the only one of the three that is a
+   * stone.
+   *
+   * `docs/jadrija-fieldwork.md`, on the olive end: "long sawn limestone blocks
+   * used as benches down the promenade". That is neither of the two this file
+   * already builds. The slat bench above is a chair — iron ends, a back to lean
+   * on, daylight through it. The six-metre plinth on the mid terrace at
+   * `JAD.mid + 2.6` is `20260821_175830`, and zoomed to the grain that thing is
+   * a casting: a form-board line runs straight across its face at half height
+   * and its end is a clean shutter cut. This is a third object. One piece of
+   * the quarry, sawn square, set flat on the flags, no back, no ironwork and
+   * nothing bolted to it. It is what a council on this coast buys when it has
+   * no money and no intention of maintaining anything, and it is the reason the
+   * survey's "still missing" list names it separately from the other two.
+   *
+   * NO FRAME IN THE SURVEY SHOWS ONE, which is worth saying out loud rather
+   * than implying with confident numbers. Ninety-six stills were contact-sheeted
+   * and every one carrying promenade furniture, a retaining wall or the olive
+   * end of the peninsula was then opened full size. What they hold is the
+   * precast plinth (`_175830` square on, `_175447` along the plaza's back edge),
+   * the aggregate parasol bases at Beach bar Mini (`20260823_111954`), and — in
+   * the car park under the olives, which is exactly where the survey sentence
+   * points — `1000150363`, `_366`, `_367` and `_369`, where the seats are
+   * green-painted cast-iron park benches with limestone kerb lumps edging the
+   * gravel round them. So the proportions here are the trade's and not a
+   * photograph's, and they are stated so the next person knows which is which:
+   * 0.45 m high, 0.46 m across, cut in two- and three-metre pieces, which is
+   * what a stone this heavy comes off the saw as and what a telehandler lays.
+   *
+   * THE COLOUR IS NOT A GUESS, because the sawn face of this quarry is already
+   * measured in this file. The kerb along the wood edge is capped with it, and
+   * that note settles the question at length: "the cap is sawn, grey and cold;
+   * the courses under it are the local limestone and much warmer ... this is
+   * one quarry's limestone sawn two ways, not two materials" — arrived at after
+   * two attempts that photographed as "a white plastic beam laid along the
+   * wood". A block bench is that cap cut ten times thicker, so it is that
+   * colour. Bare Dalmatian limestone weathers grey-buff and does not weather
+   * white; the 0.615 red in the kerb's courses is the split face, and a sawn
+   * one is a stop darker than it.
+   */
+  {
+    // The kerb cap's stone, warmer than it and a stop darker. The top face is
+    // six per cent over the sides and not more: the one surface of this that
+    // anybody touches is the top, and forty years of trousers polishes a stone
+    // rather than lichening it. `FOOT` is the other half of the same
+    // observation and is straight off `_175830`: the bottom
+    // hand's breadth of every block on this promenade is grey with splash, dust
+    // and shoe-black, and without that band a block floats over the flags
+    // instead of standing on them.
+    //
+    // AND IT CAME DOWN AND WARMED UP AFTER LOOKING AT IT, which is the third
+    // time this file has had to do that to a piece of sawn limestone. Built at
+    // the kerb cap's own numbers, the top face rendered **rgb(226, 236, 238)**
+    // against flags in the same frame at rgb(171, 163, 127) — a third brighter
+    // than the ground it stands on and BLUER than it, which is a painted plank
+    // and is the same reading that took the cap itself from 0.560 to 0.505.
+    // `20260821_175830` has the two within a few points: the block measures
+    // rgb(176, 173, 165) against paving at rgb(167, 170, 178) in the same
+    // frame, so a seat on this promenade is the value of the ground beside it
+    // and warmer, never a highlight on it.
+    //
+    // Which cannot be done by picking a pretty triple, because the top face
+    // takes a very blue sky over half its hemisphere and the renderer gives it
+    // back — the same fault `CONC` carries in its own note. Measured off a
+    // shipped frame: at albedo [0.500, 0.476, 0.432] the top came back
+    // (195, 198, 195), a flat neutral, so the channel gains here are about
+    // 390/416/451 and any warmth has to be put into the albedo three times
+    // over to survive them. These land the top at about rgb(196, 190, 178) —
+    // grey-buff, a shade over the flags, and R above B where it was under it.
+    const SAWN = [0.472, 0.430, 0.372];
+    const SAWNTOP = [0.502, 0.457, 0.395];
+    const FOOT = [0.361, 0.329, 0.284];
+    const H = 0.45;          // top of the seat above the flags
+    const HW = 0.23;         // half the width, across the shore
+    const FOOTH = 0.085;     // the grubby band at the bottom
+    const GAP = 0.026;       // the open joint between two butted pieces
+    // The BACK of the promenade, not the front of it. The slat bench looks at
+    // the water from `rowA - 2.42` and the plinth sits out on the mid terrace;
+    // this line is 1.8 m in from the kerb at `walkTo + 0.30`, on the strip of
+    // flags with the wood behind it, which is where `_175447` has the plaza's
+    // own blocks — along the back edge against the planting and not out in the
+    // middle of the slab. It leaves 1.36 m of clear flag between block and
+    // kerb: `GROUND.girth` inflates this collider to 0.78 m a side, the kerb
+    // registers none at all for the reason its own note gives, so the gap you
+    // actually walk is 0.81 m and nothing here seals the band.
+    const BS = walkTo - 1.5;
+    // WHERE, and it is the survey sentence that chooses it rather than taste.
+    // The blocks are named in the paragraph about the olive end and the neck —
+    // the same sentence as the car park under the olives, the agave on the
+    // rocky verges and the lavender along the wall tops. Those three are
+    // already placed in this file and between them they fix the band:
+    // `agaveBig` at 222.2, 258.4 and 292.6 and `lavenderBank(259.0, 291.0)`.
+    // 212 to 312 is that stretch — from the pizzeria's apron, past the
+    // vikendica and the mole, to the Tisak — and it stops a long way short of
+    // the kabine at 396, where the survey has "wooden slatted benches and a
+    // dark round planter" and no stone at all.
+    //
+    // FOUR OF THEM, and the exclusions are what decide that rather than the
+    // pitch. The precast plinth's own note works the same arithmetic and comes
+    // out at "2 to 3 and not 4 to 7 ... the binding constraint is the
+    // exclusions rather than the step", and this band is worse: `clearOfShops`
+    // opens 2.5 m either side of ten frontages and the vikendica takes another
+    // twelve, which leaves three clear windows in a hundred metres — 216 to
+    // 226, 254.5 to 269.5 and 295.5 to 303 — and only the middle one has room
+    // for two. Laying them greedily, first fit, is therefore not laziness: on
+    // a band this broken it is the only rule that finds the windows at all,
+    // and it is also how a council lays them, which is wherever there was room
+    // for the lorry to stop.
+    let need = 212;
+    for (let t = 212; t < 312; t += 1.0) {
+      // One stone, two or three. A single block is the commonest and is what
+      // the survey sentence literally says; two and three butted end to end is
+      // what happens where there is room for it.
+      const j = jit(t | 0, 831);
+      const n = j < 0.46 ? 1 : (j < 0.82 ? 2 : 3);
+      const L = 2.10 + jit(t | 0, 832) * 0.95;
+      const run = n * L + (n - 1) * GAP;
+      const t0 = t, t1 = t + run;
+      if (t0 < need || t1 > 312) continue;
+      // Both ends tested, not the centre: an eight-metre run whose middle is
+      // 2 m clear of a frontage still has a stone inside the shop. The kerb
+      // wall a thousand lines down tests the same way and for the same reason.
+      if (!clearOfShops(t0) || !clearOfShops(t1)) continue;
+      // And not across the vikendica's terrace. Its front lands at s 19.3 and
+      // this line is at 19.6, so a run here would be laid along the front of
+      // the house at the exact offset you step out on to. Six metres and not
+      // the twelve the plinth and the kerb use, and the difference is what is
+      // being missed: those two are a six-metre object and a continuous wall
+      // and have to clear the way in, where this has to clear the terrace
+      // itself, which is the house's own 7.7 m of frontage and a stride.
+      if (t1 > VIK.t - 6.0 && t0 < VIK.t + 6.0) continue;
+      for (let k = 0; k < n; k++) {
+        const a = t0 + k * (L + GAP), c = a + L;
+        // Each stone level over its own length, off the highest flag under it,
+        // so a run on a fall STEPS once per stone instead of following the
+        // ground. That is what a rigid block laid on wedges does, it is the
+        // single detail that separates this from a kerb extruded along the
+        // shore, and it is the kerb wall's own method — see the `y0` rounding
+        // there. Highest and not mean, so no stone is ever buried at one end.
+        //
+        // `standY` and not `surfaceY`: this stands ON the flags, and the flags
+        // are laid `PAVE_LIFT` over the mortar that `surfaceY` answers with. A
+        // block built off `surfaceY` in this band is 50 mm into the promenade,
+        // which is the exact fault the note in `standY` was written for.
+        let hi = -1e9;
+        for (let u = a; u <= c + 1e-6; u += 0.5) hi = Math.max(hi, standY(u, BS));
+        // Per-stone tone. The kerb's caps carry this and its note says why:
+        // a hundred identical horizontal surfaces taking the sun square on all
+        // come back at one value and read down the run as a dotted white line
+        // rather than as masonry. Six stones is a much smaller number and the
+        // same failure at the joints, where two faces meet edge to edge.
+        const g = 0.93 + jit((t * 7) | 0, 833 + k) * 0.14;
+        // No `cut`. The shore's tightest radius is the one measured at H2O —
+        // 0.345 m of sagitta over a 13 m face, so about 61 m — and over a 3 m
+        // stone that is 18 mm, which is inside the 26 mm joint beside it. The
+        // 13 m shopfront needed cutting; a bench does not, and the number is
+        // here so nobody has to re-derive it if these ever get longer.
+        boxTS(a, c, BS - HW, BS + HW, hi - 0.06, hi + FOOTH, shade(FOOT, g));
+        boxTS(a, c, BS - HW, BS + HW, hi + FOOTH - 0.004, hi + H,
+          shade(SAWN, g), shade(SAWNTOP, g));
+      }
+      // Solid, and deliberately NOT in `standY`, which is the question the
+      // trampoline beds already answered: "a bed is 0.39 m of step that exists
+      // for the walker and nothing else, and putting it in `standY` would stand
+      // every bather, chair and parasol `toWorld` ever places in this square on
+      // top of it." This is 0.45 m of the same argument on the worst possible
+      // band for it — `toWorld` works the promenade flags, so the cost would
+      // not be one bather on one bed but a file of people walking the length of
+      // the bench tops. The slat bench and the precast plinth are both plain
+      // colliders for the same reason, and a block you cannot walk through is
+      // the honest reading of a block anyway: it is 0.45 m of stone, you meet
+      // it at the shin, and the game has no way to climb one.
+      solid(t0 + run * 0.5, BS, run * 0.5, HW, H);
+      // And how far to the next one: four metres plus up to six, off its own
+      // slot of the same hash, so no two gaps are alike. An even pitch would be
+      // the shorter code and would also be the one thing here that reads as
+      // wrong from the promenade — the lamp columns are on 27 m because a
+      // lighting engineer set them out, and nobody sets out a stone bench.
+      need = t1 + 4.0 + jit(t | 0, 830) * 6.0;
+    }
+  }
+
   // ── the life in it ─────────────────────────────────────────────────────────
   /**
    * Everything up to here is the resort with nobody in it: correct concrete,

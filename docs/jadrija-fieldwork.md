@@ -167,9 +167,20 @@ and not an object.
 
 Still missing, and still wanted:
 
-- **The sawn limestone block benches** down the promenade — long blocks used as
-  seats, which is a different piece of furniture from the timber-slat benches
-  on iron frames that the promenade already has.
+- ~~**The sawn limestone block benches**~~ — built 20 Sep, four runs of six
+  stones over 85 m of the olive end. But read the finding first, because it
+  changes what this line meant: **no frame in the ninety-six stills shows a
+  sawn limestone block bench at all.** `20260821_175830` is the one frame of
+  long promenade seating and, zoomed to the grain, it is **precast concrete**
+  — a form-board line runs straight across its face at half height and the
+  end is a clean shutter cut. That object was already in the engine, as the
+  six-metre plinth with a slat pad at `JAD.mid + 2.6`. `_175447` is the same
+  thing along the plaza's back edge. And in the car park under the olives,
+  where the sentence above points, `1000150363/366/367/369` show
+  **green-painted cast-iron park benches** with limestone kerb lumps edging
+  the gravel. So the stone block was built from the sentence and from the
+  limestone this file had already measured, and not from a photograph of one.
+  If the sentence was a misread of the precast, say so and it comes out.
 - **The new promenade plaza** east of the kabine — the near-white slab on its
   expansion grid, the cream parasols, the picnic benches, the young pines in
   square pits, the bar and the kiosk. Note that an apron of new concrete WAS

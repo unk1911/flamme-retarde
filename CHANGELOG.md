@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.446.0] — 2026-09-20
+
+### the third bench, and what the stills actually show
+
+The promenade gets the bench the survey listed as missing: a sawn limestone
+block, no back and no ironwork, laid straight on the flags at the olive end.
+Four runs of six stones over 85 m, t 216 to 301.4 — the pizzeria's apron,
+past the mole, to the Tisak. Each stone 0.45 m high by 0.46 m across and 2.1
+to 3.05 m long, butted with a 26 mm open joint and each levelled off the
+highest flag under its own length, so a run on a fall steps at its joints.
+**144 triangles.**
+
+**And the count is set by the shop frontages, not by the spacing.**
+`clearOfShops` opens 2.5 m either side of ten of them and the vikendica's
+terrace takes six more, which leaves three clear windows in a hundred metres
+— 216–226, 254.5–269.5, 295.5–303 — and only the middle one has room for
+two. That is the same arithmetic the precast plinth's own note already works
+through. No `rng()` draws, so no bather, parasol or hut moves.
+
+**The finding is bigger than the bench.** All ninety-six survey stills were
+contact-sheeted and everything carrying promenade furniture opened full size,
+and **none of them shows a sawn limestone block bench.** `20260821_175830` is
+the one frame of long promenade seating, and zoomed to the grain it is
+precast concrete — a form-board line straight across the face at half height,
+a clean shutter cut at the end. That object has been in the engine for a
+while, as the six-metre plinth at `JAD.mid + 2.6`. In the car park under the
+olives, which is exactly where the survey sentence points, what is actually
+there is green-painted cast-iron park benches with limestone kerb lumps
+edging the gravel.
+
+So this was built from the survey's sentence plus the limestone this file had
+already measured, and `docs/jadrija-fieldwork.md` now says so, with the frame
+numbers, so that the next person can take it out if the sentence turns out to
+have been a misread of the precast.
+
+**The colour had to be taken down, for the third time in this file.** It came
+off the kerb wall's sawn cap — same quarry, same saw — and at the cap's own
+numbers the top rendered **rgb(226, 236, 238)** against flags at
+rgb(171, 163, 127): a third brighter than the ground and *bluer* than it,
+which is a white plastic beam and is the exact failure the cap's own note
+records twice. It sits at rgb(196, 190, 178) now — grey-buff, a shade over
+the flags, R above B.
+
+Not in `standY`, following the trampoline beds' precedent: it is 0.45 m of
+step on the one band `toWorld` works hardest, so putting it there would give
+a file of bathers walking along the bench tops. It is a plain collider, as
+`BENCH` and the plinth both are.
+
 ## [1.445.0] — 2026-09-20
 
 ### the phone was standing on the aeroplane
