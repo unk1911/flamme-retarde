@@ -933,6 +933,35 @@ const voice = (() => {
   }
 
   /**
+   * Where you are, for the one refusal that has to name it.
+   *
+   * This test was `phase !== 'ground' && phase !== 'swim'`, and everything it
+   * caught was answered with "you are in the aeroplane". That was true of two
+   * phases out of eleven and stopped being true the moment there was anything
+   * else to stand on: aboard the Brod it told you that you were flying, while
+   * you were leaning on her rail with the promenade still in sight.
+   *
+   * The three modes on the water are let through to the distance test rather
+   * than refused here, because the distance test already answers them and
+   * answers them with a number. At the pier she is fifteen metres away and
+   * there is no reason you cannot talk to her; at the far end of the crossing
+   * the honest line is "Baye is 2 440 m off", which is a fact about where she
+   * is, and not a claim about an aeroplane you are not in.
+   *
+   * A table rather than a pair of comparisons, so that the next mode somebody
+   * adds shows up here as a missing key instead of silently becoming the
+   * aeroplane.
+   */
+  const AFOOT = { ground: 1, swim: 1, brod: 1, ride: 1, foil: 1 };
+  const ELSEWHERE = {
+    fly: 'you are in the aeroplane',
+    crashing: 'you are going down',
+    chute: 'you are under the canopy',
+    intro: 'the briefing has not finished',
+    won: 'it is over', lost: 'it is over',
+  };
+
+  /**
    * Somebody SAID something to her — a whole sentence off src/49-ears.js
    * that was not a command — and she answers it.
    *
@@ -950,8 +979,9 @@ const voice = (() => {
     const out = (kind, line, extra) => Object.assign({ kind, line }, extra || null);
     if (!on) return out('meta', 'ignored: her voice is switched off');
     if (!AUTH.user || !AUTH.baye) return out('meta', 'ignored: signed out');
-    if (state.phase !== 'ground' && state.phase !== 'swim') {
-      return out('meta', 'ignored: nobody near — you are in the aeroplane');
+    if (!AFOOT[state.phase]) {
+      return out('meta', 'ignored: nobody near — '
+        + (ELSEWHERE[state.phase] || 'you are not on your feet'));
     }
     const gap = at(() => jadrija.bayeGap());
     if (!gap) return out('meta', 'ignored: nobody near');
@@ -1035,6 +1065,21 @@ const voice = (() => {
     toggle,
     answer,
     converse,
+    /**
+     * What the phase gate makes of where you are.
+     *
+     * `converse` refuses for three different reasons and only one of them is
+     * about distance; this is the other one, on its own, because the two in
+     * front of it — her switch and the sign-in — stop a headless probe before
+     * it can ever reach this one. Reading the decision is the only way to
+     * measure it off a local file.
+     */
+    where: () => ({
+      phase: state.phase,
+      afoot: !!AFOOT[state.phase],
+      says: AFOOT[state.phase] ? null
+        : (ELSEWHERE[state.phase] || 'you are not on your feet'),
+    }),
     report,
     /** Whose line is in the air right now, or null — see `play`. */
     saying: () => sayingKey,

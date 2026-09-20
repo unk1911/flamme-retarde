@@ -7898,6 +7898,8 @@ window.__fr = {
     /** What she would be told about herself and you if you spoke to her now —
      *  `talk(true)` for the Bucketeer. See `converse` in 49-voice.js. */
     talk: (buck) => voice.talkState(buck),
+    /** What the phase gate in `converse` makes of where you are. */
+    where: () => voice.where(),
   }),
   /** Who the page thinks you are, asked fresh rather than remembered. */
   who: () => authWhoami(),

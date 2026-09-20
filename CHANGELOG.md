@@ -8,6 +8,73 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.444.0] — 2026-09-20 (baye 1.30.0)
+
+### what she was never told
+
+The service had not moved since the konoba got its till, and ten client
+versions had gone past it. Audited against what the game actually has now,
+by running candidate sentences through the classifier offline rather than by
+reading the regexes:
+
+    'give me the handcuffs'       talk              ->  do=give:cuffs
+    'buzz her'                    talk              ->  do=buzz:lovense
+    'make it buzz'                talk              ->  do=buzz:lovense
+    'smile for the camera'        talk              ->  do=look
+    'can i get a beer'            talk              ->  buy=beer
+    'dvije kave'                  talk              ->  buy=espresso
+    'a glass of wine please'      do=wine           ->  do=wine buy=wine
+    'fly do your brushing thing'  talk              ->  intent=fly.brush
+    'dodji' / 'dođi ovamo'        talk              ->  do=hug
+    'dance for me'                intent=fly.dance  ->  do=shimmy
+
+**"dance for me" is the one that settles it.** `SKILLS['shimmy']` is written
+with that exact phrasing in its own note, and it never once got there:
+`fly.dance` matches a bare dance word, a command outranks conversation, and
+she was not even handed a ticket to say yes with. A fly's dance now has to be
+asked *of a fly* — which is how `do your zombie fly dance thing` already
+worked, and is the only fly pattern that was a bare word.
+
+**"handcuffs" matched nothing at all.** `\bcuffs?\b` has no word boundary
+inside that word, so the noun the reference photograph arrived under was dead
+on the floor for the whole of the life of the cuffs. The chain had no
+vocabulary of any kind. And a buzzing verb with no noun — "buzz her", "make
+it buzz" — reached no receiver, although the phone has had a button that does
+exactly that, for five seconds, from four kilometres away, since 1.431.0.
+
+She also gets five short lines of furniture she had no way to know: what is
+on her wrists, that the toy is radio and can go off without a word said, that
+one of that phone's apps is a live camera on her face, what the konoba pours,
+and that the boat takes them away up the channel. `PERSONA_TALK` and
+`TALK_WORDS` are untouched — fourteen words and a ceiling of twenty stand.
+
+### and she could not be spoken to on the boat at all
+
+Found by the same audit, in the client rather than the service. `converse`
+gated on `phase !== 'ground' && phase !== 'swim'` and answered everything
+else with **"nobody near — you are in the aeroplane"**. That was true of two
+phases out of eleven, and it stopped being true the moment there was anything
+else to stand on: aboard the Brod it told you that you were flying, while you
+were leaning on her rail with the promenade still in sight.
+
+It is a table now, so the next mode somebody adds shows up as a missing key
+instead of silently becoming the aeroplane, and the three modes on the water
+go through to the distance test — which already answers them, and answers
+them with a number. Measured:
+
+    phase fly     afoot false  says "you are in the aeroplane"
+    phase brod    afoot true   at the pier, and at 2 400 m out
+
+At the pier she is a few metres away and there is now no reason you cannot
+talk to her. At the far end of the crossing the honest line is *"Baye is
+2 440 m off"*, which is a fact about where she is rather than a claim about
+an aeroplane you are not in.
+
+`__fr.voice.where()` reports the decision, because the two refusals in front
+of it — her switch and the sign-in — stop a headless probe before it can
+reach this one, and reading the decision is the only way to measure it off a
+local file.
+
 ## [1.443.0] — 2026-09-20
 
 ### eleven beds, two seconds

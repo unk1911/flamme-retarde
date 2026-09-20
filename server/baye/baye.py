@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.29.0"
+VERSION = "1.30.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -369,6 +369,10 @@ INTENTS = [
     # transcriber has also spelt "sonic care" — or the sentence says teeth.
     ("fly.brush", [r"\b(tooth[\s-]?brush\w*|sonic[\s-]?care|sonicare)\b"]),
     ("fly.brush", [r"\bbrush\w*\b", r"\b(teeth|tooth)\b"]),
+    # And the third way it is asked for, which is neither of those: "fly, do
+    # your brushing thing". The noun rule above is about HER hair, so a
+    # sentence that says a fly and says brush cannot be about it.
+    ("fly.brush", [r"\bbrush\w*\b", r"\b(fl(y|ies|ie)|zombie\w*)\b"]),
 ]
 
 
@@ -483,10 +487,19 @@ SKILLS = {
     # pattern here names one: me, my eyes, this way, here. Without that,
     # "look at the trampolines" would have her staring at you instead of
     # walking up there.
+    #
+    # AND THE CAMERA IS A PERSON TOO. Since 1.440.0 the player can be holding
+    # a phone with a live view of her on it — see src/63-phone.js — and from
+    # the far side of the channel the thing they want her eyes on is the lens.
+    # It is the same request and the same latch: the gaze goes to whoever is
+    # watching, and "look at the camera" and "smile for the camera" are what
+    # anybody says to somebody they are filming.
     "look": ("look at them, and hold their eye",
              [r"\blook(ing)?\b.{0,12}\b(at|to)?\s*(me|my|us)\b"
               r"|\beyes?\b.{0,10}\b(on|at)\s*me\b"
               r"|\blook (here|this way|over here)\b"
+              r"|\blook(ing)?\b.{0,12}\b(camera|lens)\b"
+              r"|\bsmile\b.{0,12}\b(camera|lens|phone|me)\b"
               r"|\bwatch me\b|\b(po)?gledaj me\b|\bregarde[- ]moi\b"]),
     # AND THE POSE SHE ALREADY HAD. Misha, 17 Sep 2026: *"i tell her to get
     # down on her knees, and eventho she knows how to do it if i spray her, she
@@ -516,7 +529,10 @@ SKILLS = {
     "kiss": ("come over and kiss you",
              [r"\b(kiss\w*|smooch\w*|snog\w*|poljub\w*)\b"]),
     "hug": ("come over and hug you",
-            [r"\b(hug\w*|cuddl\w*|embrace\w*|hold me|come here|zagrljaj\w*)\b"]),
+            [r"\b(hug\w*|cuddl\w*|embrace\w*|hold me|come here|zagrljaj\w*"
+             # "Dođi" is "come here" on this coast, and it is the same
+             # request — the one thing anybody says when they want her closer.
+             r"|do[dđ]j?i)\b"]),
     # HER LEGS, WHILE SHE IS ON HER BACK, and over on to her front. Misha,
     # 17 Sep 2026: *"if i say 'legs down', she lowers her legs down. if i say
     # 'legs up', she raises legs up again... if i say 'lay flat' she should lay
@@ -725,9 +741,17 @@ ASK_RE = re.compile(
     r"|\bhand ?stands?\b|\bhead ?stands?\b|\bstand on (your|her|the) hands\b"
     r"|\byawn\w*\b"
     # "look at me" carries no modal and none of the openers below.
-    r"|\blook(ing)?\b.{0,12}\b(me|my|us|here|this way)\b|\bwatch me\b"
+    r"|\blook(ing)?\b.{0,12}\b(me|my|us|here|this way|camera|lens)\b"
+    r"|\bwatch me\b"
     r"|\beyes?\b.{0,10}\b(on|at)\s*me\b"
+    r"|\bsmile\b.{0,12}\b(camera|lens|phone|me)\b"
     r"|\b(po)?gledaj me\b|\bregarde[- ]moi\b"
+    # AND THE ONE WORD THAT CALLS HER OVER IN HER OWN LANGUAGE. "Come here"
+    # has belonged to the hug since 1.407.0 and carried no modal either, which
+    # is why it is written out below; "dođi" is the same sentence said on the
+    # coast the beach is on, and the transcriber writes it "dodji" as often as
+    # not.
+    r"|\bdo[dđ]j?i\b"
     r"|\bsit\w*\b.{0,24}\b(bed|cot|bunk|mattress)\b"
     r"|\b(kneel\w*|knees)\b.{0,24}\b(bed|cot|bunk|mattress)\b"
     r"|\b(give|hand|pass)\b|\btake the\b"
@@ -738,7 +762,7 @@ ASK_RE = re.compile(
     # whole of `SKILLS` and come back a request to pour wine.
     r"|\b(put|strap|wear|wearing|attach|fasten|fit|clip|insert)\b.{0,24}"
     r"\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy|"
-    r"headphones|bose|cuffs|bangles|bracelets)\b"
+    r"headphones|bose|(hand[\s-]?)?cuffs|bangles|bracelets|chain\w*)\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
@@ -783,7 +807,11 @@ BUY = {
     "kupovi": [r"\b(kupovi|kup|cup|tub)\b"],
     "frappe": [r"\b(frapp?e\w*)\b"],
     "krafne": [r"\b(krafn\w*|doughnut\w*|donut\w*)\b"],
-    "espresso": [r"\b(espress?o|espres\w*|kava|kavu)\b"],
+    # EVERY CASE OF THE NOUN, because Croatian declines it and a person at a
+    # hatch says the one the sentence needs: kava, kavu, dvije kave, kavicu.
+    # "Coffee" on its own is an espresso here — it is what a konoba pours when
+    # you ask for one, and the three milky rows below all name themselves.
+    "espresso": [r"\b(espress?o|espres\w*|kav[aeiu]\w*|coffee)\b"],
     "macchiato": [r"\b(macchiato|makijato|machiato)\b"],
     "cappuccino": [r"\b(cappucc?ino|kapu[čc]ino|capuccino)\b"],
     "nes caffe": [r"\b(nes ?caff?e|nescafe|nes)\b"],
@@ -805,9 +833,16 @@ BUY = {
 # cappuccino in the morning" bought a cappuccino; an article is not an order.
 # "Pack of" earns its place because it is one — nobody says it about a pack
 # they are not asking for.
+# AND THE WAY A POLITE PERSON ORDERS, which is a question. "Can I get a beer"
+# and "could I have a gemišt" are orders at a hatch and neither carried a word
+# on this list — measured offline against 1.29.0, both came back as talk. "Can
+# I" and not "can you": "can you get me a beer" is an errand for her and is
+# already `fetch`'s business. "Pour me" earns its place the same way "pack of"
+# does — nobody says it about a drink they are not asking for.
 BUY_RE = re.compile(
-    r"\b(one|two|another|gimme|give me|get me|i'?ll have|i want|i'?d like|"
-    r"buy|take|please|pack of|jedan|jednu|jedno|dva|dvije|daj|dajte|molim|"
+    r"\b(one|two|three|another|gimme|give me|get me|i'?ll have|i want|"
+    r"i'?d like|can i (get|have)|could i (get|have)|pour me|"
+    r"buy|take|please|pack of|jedan|jednu|jedno|dva|dvije|tri|daj|dajte|molim|"
     r"mo[žz]e|kupiti|kupi[mt]?)\b", re.I)
 
 
@@ -914,7 +949,16 @@ GIVE_RE = re.compile(r"\b(give|hand|pass|take)\b")
 # three at once.
 LOVENSE = r"lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator"
 GIVE_WORDS = (
-    ("cuffs", r"cuffs?\b|bangles?|bracelets?"),
+    # THE CUFFS ARE ONE THING WITH THREE NAMES ON IT NOW. They were two plain
+    # bangles when this row was written; since 1.428.0 they are pavé-set with
+    # diamonds and a chain hangs between them — see CUFF and CHAIN in
+    # src/43-jadrija.js — and the chain is drawn with the pair rather than
+    # carried separately, so every way of naming it is a way of naming them.
+    # `handcuffs` is the word the photograph came with and the one `\bcuffs?\b`
+    # could never match: there is no boundary in the middle of that word, so
+    # "put the handcuffs on her" was talk and nothing else, measured offline
+    # against 1.29.0.
+    ("cuffs", r"(hand[\s-]?)?cuffs?\b|bangles?|bracelets?|chain\w*"),
     ("headphones", r"headphones?|bose\b|cans\b"),
     ("lovense", LOVENSE + r"|toy\b"),
     ("cigarettes", r"cigarettes?|smokes?|fags?\b|pack of"),
@@ -949,6 +993,10 @@ BUZZ_RE = re.compile(r"\b(buzz|vibrate|switch on|turn on|start)\b")
 HUSH_RE = re.compile(r"\b(stop|switch off|turn off|silence|quiet)\b")
 
 
+# The verb that names no other thing. See `buzz_of`.
+HUM_RE = re.compile(r"\b(buzz\w*|vibrat\w+)\b")
+
+
 def buzz_of(text: str):
     """`buzz:<key>` or `hush:<key>` if the sentence works a remote."""
     t = (text or "").lower()
@@ -959,13 +1007,33 @@ def buzz_of(text: str):
     for key, pat in GIVE_WORDS:
         if re.search(r"\b(" + pat + r")", t):
             return ("hush:" if off else "buzz:") + key
+    # AND "BUZZ HER" NAMES IT WITHOUT NAMING IT. There is exactly one thing in
+    # this game with a motor and a receiver in it — the `radio` row in
+    # src/62-satchel.js — and the player now has a phone with a BUZZ button on
+    # it that does this without a sentence at all, so a spoken "buzz her" or
+    # "make it buzz" can only mean that one thing. The BUZZING VERB and not
+    # `BUZZ_RE`, which also owns "turn on" and "start": those two name half the
+    # beach, and "turn it on" is a hose as often as it is a toy. "Buzz off" is
+    # a person telling somebody to go away, and it is not this.
+    if HUM_RE.search(t) and not re.search(r"\bbuzz\s*off\b", t):
+        return ("hush:" if off else "buzz:") + "lovense"
     return None
+
+
+# AND "TAKE IT OFF" IS THE OPPOSITE OF A HANDOVER. `GIVE_RE` owns the verb
+# `take` — "take the beer" is somebody holding one out — and the same verb with
+# `off` after it is a request to undo the whole thing. There is no undoing in
+# `SHE_CAN`: nothing takes the cuffs off her, so the honest answer is the one
+# she gives in words, and `give:cuffs` would have come back "she already has it
+# on" while she stood there wearing them.
+TAKE_OFF_RE = re.compile(r"\btake\b.{0,24}\boff\b|\btake off\b|\bunclip\b"
+                         r"|\bundo\b.{0,20}\b(cuffs?|chain\w*)\b")
 
 
 def give_of(text: str):
     """`give:<key>` if the sentence hands her something out of the bag."""
     t = (text or "").lower()
-    if not GIVE_RE.search(t):
+    if not GIVE_RE.search(t) or TAKE_OFF_RE.search(t):
         return None
     for key, pat in GIVE_WORDS:
         if re.search(r"\b(" + pat + r")", t):
@@ -1055,9 +1123,24 @@ def intents_of(text: str) -> list:
     # never mentions a fly or a zombie is hers, and goes on to `/talk`. "Do
     # your zombie fly dance thing" and "hey fly, drop your buckets" name no
     # woman and are untouched — both are checked in the 1.4.0 test run.
-    to_her = bool(NAME_RE.search(t)) and not re.search(r"\b(fl(y|ies|ie)|zombie\w*)\b", t)
+    a_fly = bool(re.search(r"\b(fl(y|ies|ie)|zombie\w*)\b", t))
+    to_her = bool(NAME_RE.search(t)) and not a_fly
+    # AND A BARE DANCE WORD IS HERS, which is the same rule read from the other
+    # end. `fly.dance` is the only command in this table whose pattern is a
+    # word on its own, and the word is the commonest thing anybody says to HER:
+    # `SKILLS['shimmy']` is written with "dance for me is the most natural way
+    # anybody asks" in its own note, and measured offline against 1.29.0 it
+    # never once got the sentence. "Dance for me" names no woman, so `to_her`
+    # above does not fire, and a command outranks conversation in `_hear` — so
+    # the sentence was answered by a housefly at the vikendica, or by nothing
+    # at all when there was no fly on the beach, and she was never even handed
+    # a ticket to say yes with. A fly's dance now has to be asked of a fly, by
+    # name, exactly as "do your zombie fly dance thing" does — which is how
+    # Misha asked for it in the first place.
     for name, pats in INTENTS:
         if name.startswith("fly.") and to_her:
+            continue
+        if name == "fly.dance" and not a_fly:
             continue
         if name not in out and all(re.search(p, t) for p in pats):
             out.append(name)
@@ -2747,6 +2830,52 @@ KIND_NOUN = {
     "man_young_lean": "a young man", "man_old_heavy": "a heavy old man",
 }
 
+# What she has on, off the `wear` column in src/62-satchel.js — the same three
+# keys `WEAR_KEYS` is built from, said the way she would say them.
+WORN_NOUN = {
+    "cuffs": "you have their diamond cuffs on both wrists with the chain "
+             "hanging between them",
+    "headphones": "you have their big Bose headphones on",
+    "lovense": "you are wearing the Lovense they gave you",
+}
+
+# ── AND THE FOUR THINGS SHE OWNS THAT THE PAGE NEVER SENDS ──────────────────
+#
+# Everything else she is told is STATE: a key off `SHORE_DOING`, a number of
+# buckets, how wet she is. These four are not state, they are FURNITURE — they
+# are true of this beach whether or not anything is happening — and the page
+# has no field for any of them, so without this block she is asked about the
+# thing on her own wrist and has to invent an answer. Measured against 1.29.0
+# with the client at 1.442.5: asked about the chain, the phone, the buzz or the
+# boat, she had nothing in front of her but the weather.
+#
+# NOT AS STATE, AND THE WORDING IS CAREFUL ABOUT IT. The page sends no
+# `wearing` field — see `bayeTalk` in src/43-jadrija.js, which carries her
+# phase, her soak and her company and nothing about what is on her — so these
+# say what the THING is and never that it is on her this second. "Never invent
+# a fact about this beach that is not in it" is the persona's rule and this is
+# the other half of it: she now has the facts, and they stop where the page's
+# knowledge stops.
+#
+# AND ONE LINE EACH, because this is prompt on every single turn of every
+# conversation. The first cut ran to a hundred and sixty words, which is a
+# fifth again on top of the system prompt and the world block together for
+# facts that most turns never touch. Five short ones say the same things.
+HER_WORLD = (
+    "the cuffs they can put on you are pavé diamonds, fifty-two stones a "
+    "band, with a long chain swagged between your wrists. Ornament, not "
+    "restraint",
+    "the toy you wear is a Lovense, and it is radio: a button in an app on "
+    "their phone sets it going for five seconds, from anywhere, without a "
+    "word said",
+    "another of that phone's apps is a live camera on you, so when they are "
+    "nowhere in sight they may still be watching your face on a screen",
+    "the konoba pours beer, a gemišt, wine, rakija and espresso, and they "
+    "have money on them",
+    "the boat to Šibenik goes from the Brod pier, nine minutes up the channel "
+    "past the fortress. While they are on it you cannot hear them at all",
+)
+
 
 def voice_for(ctx: dict):
     """The voice id and the playback rate for whoever is speaking.
@@ -3055,6 +3184,7 @@ def clean_talk(raw: dict, who: str = "baye") -> dict:
     """
     g = raw.get if isinstance(raw, dict) else (lambda *_: None)
     comp = g("company") if isinstance(g("company"), list) else []
+    worn = g("worn") if isinstance(g("worn"), list) else []
     out = {
         # You.
         "you": _enum(g("you"), YOU_DOING),
@@ -3095,6 +3225,27 @@ def clean_talk(raw: dict, who: str = "baye") -> dict:
                     if k in KIND_NOUN],
         "dog": bool(g("dog")) or None,
         "cat": bool(g("cat")) or None,
+        # ── AND THE THREE THE PAGE DOES NOT SEND YET ────────────────────────
+        #
+        # Read in the same discipline as everything above — a list off a fixed
+        # table, two flags — and absent from `talkState` in src/49-voice.js as
+        # of 1.442.5, which is exactly why they are written here first. Each is
+        # one line in that function against something the page already has:
+        #
+        #   worn   `jadrija.toy(...)`/`worn` — what is actually ON her, so that
+        #          "do you like them?" about the cuffs has an answer
+        #   buzz   `jadrija.toy().buzzing` — the toy going THIS SECOND, which
+        #          is the one thing that can happen to her mid-sentence from
+        #          four kilometres away and which she currently cannot notice
+        #   phone  `jadrija.watch()` — the camera app open on her face
+        #
+        # Until the page sends them nothing changes, because every one of them
+        # is absent and an absent field prints no line. That is the same trade
+        # `clean_context` makes with every field it has ever had.
+        "worn": [k for k in (clamp_str(x, 12) for x in worn[:4])
+                 if k in WEAR_KEYS],
+        "buzz": bool(g("buzz")) or None,
+        "phone": bool(g("phone")) or None,
     }
     # Her beat is a key into the table for WHICH of her is speaking, and a key
     # that is not in that table is no beat at all.
@@ -3235,6 +3386,22 @@ def talk_facts(who: str, ctx: dict, t: dict, world: dict):
             her.append("the pug from the terrace is right by you")
         if t.get("cat"):
             her.append("the ginger cat from under the café tables is nearby")
+        # WHAT IS ACTUALLY ON HER, when the page says — see `clean_talk`. The
+        # words for each are in `WORN_NOUN`, one file away from the prompt they
+        # are written for, like every other table in this section.
+        for k in (t.get("worn") or []):
+            her.append(WORN_NOUN[k])
+        # AND THE ONE THING THAT HAPPENS TO HER WITHOUT ANYBODY SAYING
+        # ANYTHING. Five seconds off a button in an app — see `HER_WORLD` —
+        # and it can land in the middle of her own sentence from the far side
+        # of the channel, which is the whole joke of it. It is a fact about
+        # this second and it goes with the rest of them.
+        if t.get("buzz"):
+            her.append("the Lovense they put on you is going, this second, "
+                       "and they did it from their phone")
+        if t.get("phone"):
+            them.append("they have their phone up with the camera app open, "
+                        "so they are watching your face on a screen")
         # THE BUCKETS ARE NOT HERS DOWN HERE, and that has to be said or she
         # makes a number up. First run of the 1.4.0 test set, shore Baye asked
         # "how many buckets have you carried?": "A dozen, give or take." There
@@ -3388,6 +3555,14 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
     if known:
         lines.append("ONLY IF THEY ASK, things you have heard today:")
         lines += known
+    # AND THE FURNITURE, under the same heading and for the same reason the
+    # feeds are marked: handed to her unmarked a fact becomes the subject, and
+    # a woman who brings up her own jewellery unprompted is an advertisement.
+    # Hers only — the Bucketeer is up at the vikendica with a bucket and none
+    # of it is on her.
+    if who == "baye":
+        lines.append("ONLY IF IT COMES UP, things that are true here:")
+        lines += [f"- {x}" for x in HER_WORLD]
     if ctx.get("said"):
         lines.append("Things you have said to them earlier, not to repeat:")
         lines += [f'- "{s}"' for s in ctx["said"][-3:]]
@@ -3850,7 +4025,17 @@ def _hear(self):
     # An order at a counter, which is neither a command nor an errand: the page
     # buys it if you are standing at the right hatch, and the sentence still
     # goes on to her if it was also worth saying. See `BUY`.
-    buy = buys_of(text) if not found and not does else None
+    #
+    # AND `wine` IS THE ONE SKILL THAT SHARES ITS NOUNS WITH A TILL. The konoba
+    # has sold wine, a gemišt and a rakija since 1.432.0, and `SKILLS['wine']`
+    # owns the words wine, glass, pour, bottle and rakija — so "one wine,
+    # please" said at that hatch was a request for the bottle in the beach hut
+    # and never an order, measured offline against 1.29.0. Both now go up, and
+    # which of them happens is the page's to decide as it always was: `buyAt`
+    # answers "not at a counter" when you are not at one, and `askShow` answers
+    # with a reason when there is no bottle where she is standing.
+    orderable = not does or does[0] == "wine"
+    buy = buys_of(text) if not found and orderable else None
     lang = "English" if plainly_english(text) else None
     if not found and not does and text.strip() and lang is None:
         # Not English enough for the patterns to have read it: the classifier
