@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.441.1] — 2026-09-20
+
+### how far away she is, and where
+
+A live view of somebody is also a way of FINDING them, and the line under the
+picture said *LIVE · shore*, which is neither. It now says **LIVE · 13 m · the
+promenade**, or **LIVE · 70 m · in the kabina**.
+
+Both numbers were already computed: `bayeGap` carries the distance from you
+to her and whether she is inside, because her own voice needs both to decide
+what she is allowed to say. Rounded the way a person says a distance — to the
+metre up close and to five past fifty, because nobody stands at 87 m and
+thinks "87" — and refreshed once a second rather than every frame, since a
+caption that flickers between 23 and 24 is worse than one that is a second
+old.
+
+Also this pass: a sweep across load, the ground, all three phone apps with
+the Lovense fired, the boat with twenty-one blobs aboard and the fly cam's
+Sonicare routine. Zero exceptions, zero warnings, 60–61 fps throughout.
+
 ## [1.441.0] — 2026-09-20
 
 ### the krafne photograph

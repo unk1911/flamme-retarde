@@ -88,6 +88,8 @@ let phoneSaid = 'tap to buzz';
 /** The render target the live view is drawn into, and the quad that shows it. */
 let phoneRT = null, phoneQuad = null, phoneQuadCam = null, phoneCamObj = null;
 let phoneCamT = 0;
+/** Wall seconds since the page loaded, for the once-a-second jobs. */
+let phoneClock = 0;
 let phoneSteps = 0, phoneBlits = 0, phoneRect = null;
 
 /** The apps, in the order they sit on the home screen. */
@@ -162,6 +164,23 @@ function coinRow(k, q) {
   }
   row.append(name, px, chg);
   return row;
+}
+
+/**
+ * The line under the picture: how far away she is and where.
+ *
+ * A live view of somebody is also a way of FINDING them, and the two numbers
+ * that answers are already computed — `bayeGap` has the distance from you to
+ * her and whether she is inside, because her voice needs both. Rounded the
+ * way a person says a distance: to the metre up close and to five past fifty,
+ * because nobody stands at 87 m and thinks "87".
+ */
+function phoneWhere() {
+  const g = (typeof jadrija !== 'undefined' && jadrija && jadrija.bayeGap)
+    ? jadrija.bayeGap() : null;
+  if (!g) return 'LIVE';
+  const m = g.m < 50 ? Math.round(g.m) : Math.round(g.m / 5) * 5;
+  return 'LIVE · ' + m + ' m · ' + (g.indoors ? 'in the kabina' : 'the promenade');
 }
 
 /** What the live view has to say for itself when it cannot show her. */
@@ -248,7 +267,7 @@ function phoneDraw() {
     if (why) hole.textContent = why;
     const foot = document.createElement('div');
     foot.className = 'cell-foot';
-    foot.textContent = why ? '' : 'LIVE · shore';
+    foot.textContent = why ? '' : phoneWhere();
     screen.append(hole, foot);
   }
 }
@@ -337,6 +356,15 @@ function phoneTick(dt) {
   bar.querySelector('.cell-clock').textContent =
     String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   bar.querySelector('.cell-bat').textContent = Math.round(phoneBat) + '%';
+  // And the line under the live view, which is a distance and therefore moves
+  // while you do. Once a second and not every frame: it is rounded to the
+  // metre and a caption that flickers between 23 and 24 is worse than one
+  // that is a second old.
+  if (phoneApp === 'cam' && Math.floor(phoneClock) !== Math.floor(phoneClock + dt)) {
+    const f = phoneEl.querySelector('.cell-foot');
+    if (f && !phoneCamWhy()) f.textContent = phoneWhere();
+  }
+  phoneClock += dt;
   // The quotes, once, the first time anybody opens the app — the same single
   // GET the bathers' screens make, against the same cache.
   if (phoneApp === 'coin' && typeof jadrija !== 'undefined'
