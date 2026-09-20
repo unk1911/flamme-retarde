@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.441.0] — 2026-09-20
+
+### the krafne photograph
+
+**"keep enhancing jadrija businesses from surveys"** — and this one has been
+written down as unfinished since August. From MORNING.md, 26 Aug 2026: *"The
+centre bay's lower two thirds is empty — PAUSED, unbuilt. The real one has a
+photograph of krafne under the name, and now that both flanking bays are full
+the gap is conspicuous where it was not before."* It stayed conspicuous for
+three weeks.
+
+20260821_175713 at source resolution, the centre bay cropped: under JADRIJA
+there is a MONTAGE and not one photograph. A white-bordered print of pastries
+on a plate sits across the middle at a slight angle with a torn red brush
+banner across its foot carrying **Krafne** in white script and a small white
+price label beside it; below and behind it, a second print of a cup of coffee
+seen from directly above with the crema swirled. Both are the flat sunlit
+food photography every šank on this coast prints its board with.
+
+What is drawn is what is there, at the resolution it is there at: a pastry is
+twelve pixels across in the source and three in the game, so what goes in
+that space is a pastry-shaped, pastry-coloured thing on a plate — the same
+licence the gelato pans in the vitrine are drawn under. Nothing is lettered
+that was not read.
+
+**And the price label is blank**, which is the price column's own grammar
+arriving in the middle bay: a sticker is a price the shop has changed, a
+printed number one it has not, and an empty white label is a price that
+exists and cannot be read. This one is four pixels of stroke in the only
+frame that has it, and KRAFNE's 2.50 on the right-hand board is a different
+label on a different sign.
+
 ## [1.440.1] — 2026-09-20
 
 ### framed for a phone screen

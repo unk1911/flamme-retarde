@@ -8057,6 +8057,119 @@ async function buildJadrija(scene) {
       line('JADRIJA',
         column([['JADRIJA']], '800', H * 0.34, () => fw * 0.90, 0.68),
         cx, f.y0 + fh * 0.62, 'center');
+
+      // ── AND THE PHOTOGRAPHS UNDER IT ────────────────────────────────────
+      //
+      // MORNING.md, 26 Aug 2026: *"The centre bay's lower two thirds is empty
+      // — PAUSED, unbuilt. The real one has a photograph of krafne under the
+      // name, and now that both flanking bays are full the gap is conspicuous
+      // where it was not before."* It stayed conspicuous for three weeks.
+      //
+      // 20260821_175713 at source resolution, the centre bay cropped: under
+      // JADRIJA there is a MONTAGE, not one photograph. A white-bordered print
+      // of pastries on a plate sits across the middle of it at a slight angle,
+      // with a torn red brush banner across its foot carrying **Krafne** in
+      // white script and a small white price label beside it; below and behind
+      // it, a second print of a cup of coffee seen from directly above, with
+      // the crema swirled. Both are the flat sunlit food photography every
+      // šank on this coast prints its board with.
+      //
+      // WHAT IS DRAWN IS WHAT IS THERE, at the resolution it is there at. A
+      // pastry twelve pixels across in the source is three in the game, and
+      // the honest thing to put in that space is a pastry-shaped, pastry-
+      // coloured thing on a plate — the same licence the gelato pans in the
+      // vitrine are drawn under. Nothing is lettered that was not read.
+      //
+      // AND THE PRICE LABEL IS BLANK, which is the price column's own grammar
+      // arriving in the middle bay: a sticker is a price the shop has changed,
+      // a printed number one it has not, and an empty white label is a price
+      // that exists and cannot be read. This one is four pixels of stroke in
+      // the only frame that has it, and KRAFNE's 2.50 on the right-hand board
+      // is a different label on a different sign. So it is drawn as the white
+      // rectangle it is, with nothing on it.
+      {
+        const mx = f.x0 + fw * 0.06, mw = fw * 0.88;
+        const my = f.y0 + fh * 0.70, mh = fh * 0.28;
+        /** One print, white-bordered and pinned a degree or two off square. */
+        const print = (x, y, w, h, rot, inner) => {
+          g.save();
+          g.translate(x + w * 0.5, y + h * 0.5);
+          g.rotate(rot);
+          g.fillStyle = '#f6f5f2';
+          g.fillRect(-w * 0.5, -h * 0.5, w, h);
+          const b = Math.min(w, h) * 0.055;   // the white border round a print
+          g.save();
+          g.beginPath();
+          g.rect(-w * 0.5 + b, -h * 0.5 + b, w - b * 2, h - b * 2);
+          g.clip();
+          inner(w - b * 2, h - b * 2);
+          g.restore();
+          g.restore();
+        };
+        // The pastries: a warm ground, a white plate, three rounds dusted with
+        // sugar and one of them cut.
+        print(mx, my, mw * 0.56, mh * 0.72, -0.035, (w, h) => {
+          g.fillStyle = '#cbbda6';
+          g.fillRect(-w * 0.5, -h * 0.5, w, h);
+          g.fillStyle = '#efeeea';
+          g.beginPath();
+          g.ellipse(0, h * 0.10, w * 0.42, h * 0.30, 0, 0, Math.PI * 2);
+          g.fill();
+          for (const [dx, dy, r] of [[-0.20, -0.02, 0.17], [0.14, -0.06, 0.15],
+            [-0.02, 0.16, 0.16]]) {
+            const cxp = w * dx, cyp = h * dy + h * 0.06, rr = Math.min(w, h) * r * 1.6;
+            const gr = g.createRadialGradient(cxp - rr * 0.3, cyp - rr * 0.35,
+              rr * 0.1, cxp, cyp, rr);
+            gr.addColorStop(0, '#e3b579');
+            gr.addColorStop(0.7, '#c78c46');
+            gr.addColorStop(1, '#93601f');
+            g.fillStyle = gr;
+            g.beginPath();
+            g.ellipse(cxp, cyp, rr, rr * 0.82, 0, 0, Math.PI * 2);
+            g.fill();
+            g.fillStyle = 'rgba(255,255,255,0.55)';
+            g.beginPath();
+            g.ellipse(cxp - rr * 0.15, cyp - rr * 0.30, rr * 0.45, rr * 0.20,
+              -0.2, 0, Math.PI * 2);
+            g.fill();
+          }
+        });
+        // The coffee, from directly above: saucer, crema, and the swirl.
+        print(mx + mw * 0.58, my + mh * 0.22, mw * 0.42, mh * 0.74, 0.045, (w, h) => {
+          g.fillStyle = '#d8d3cb';
+          g.fillRect(-w * 0.5, -h * 0.5, w, h);
+          const r = Math.min(w, h) * 0.42;
+          g.fillStyle = '#f4f3f0';
+          g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#8d5a2c';
+          g.beginPath(); g.arc(0, 0, r * 0.74, 0, Math.PI * 2); g.fill();
+          g.strokeStyle = '#e7d7bf';
+          g.lineWidth = r * 0.16;
+          g.beginPath();
+          g.arc(0, 0, r * 0.40, -0.4, Math.PI * 1.4);
+          g.stroke();
+        });
+        // The banner across the foot of the pastries, and the blank label.
+        const by = my + mh * 0.60, bh = mh * 0.17;
+        g.save();
+        g.translate(mx + mw * 0.06, by);
+        g.rotate(-0.045);
+        g.fillStyle = '#c0241f';
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.lineTo(mw * 0.34, -bh * 0.12);
+        g.lineTo(mw * 0.335, bh * 0.92);
+        g.lineTo(-mw * 0.005, bh);
+        g.closePath();
+        g.fill();
+        g.fillStyle = '#fbf7f2';
+        g.textAlign = 'center';
+        g.font = `italic 600 ${bh * 0.74}px ${SANS}`;
+        g.fillText('Krafne', mw * 0.165, bh * 0.76);
+        g.restore();
+        g.fillStyle = '#fbfbf9';
+        g.fillRect(mx + mw * 0.42, by - bh * 0.06, mw * 0.14, bh * 0.92);
+      }
     }
     // Right bay: what it costs. Eight items and, since 23 August 2026, eight
     // prices — there are no blank white labels left on this board.
