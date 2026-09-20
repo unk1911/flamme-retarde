@@ -377,6 +377,21 @@ function phonePaused(on) {
   }
 }
 
+/**
+ * The slab changed size, so anything measured off it is stale.
+ *
+ * One caller: the window's own resize, which on a phone is a ROTATION — and
+ * the fly cam's push was measured off the slab's width when it came out of
+ * the bag. Turn the phone sideways with both up and the corner box is offset
+ * by the width it used to be. The class-driven halves of this (the ears, the
+ * frame) re-evaluate their `min()` by themselves and need nothing.
+ */
+function phoneSync() {
+  if (!phoneEl || typeof DROPCAM === 'undefined') return;
+  DROPCAM.push = phoneOn
+    ? Math.round(phoneEl.getBoundingClientRect().width) + 14 : 0;
+}
+
 /** Whether it is out, and which app is up — the render loop asks both. */
 function phoneIsOut() { return phoneOn; }
 function phoneAppNow() { return phoneOn ? phoneApp : null; }

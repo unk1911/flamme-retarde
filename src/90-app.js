@@ -165,6 +165,10 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  // The phone's slab is sized in vw and vh, so a rotation changes its width —
+  // and the fly cam's corner box was pushed left by the width it used to be.
+  // See `phoneSync`.
+  phoneSync();
   // A paused frame loop draws nothing, so the resized canvas would sit there
   // stretched until you resumed. One frame costs nothing and keeps it honest.
   if (state.paused && (!ao || !ao.render(scene, camera))) renderer.render(scene, camera);

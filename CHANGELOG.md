@@ -8,6 +8,27 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.442.4] — 2026-09-20
+
+### tapped, for the first time
+
+Everything the phone does had been driven from the console. This is the first
+time anybody has touched it: real CDP touch events at 932 by 430 with a
+coarse pointer, at the coordinates the DOM reports, in the order somebody
+would actually do it.
+
+**PHONE** in the bottom row opens it. **Lovense** on the home screen opens the
+app. **BUZZ** starts it, and BUZZ again says *stopped* — which is the second
+press cancelling it, exactly as written. One tap in between landed 30 pixels
+off the button and did nothing at all, which is the other half of the test:
+the glass is not one big button.
+
+And one thing that fell out of doing it: **the slab is sized in vw and vh, so
+a rotation changes its width** — and the fly cam's corner box had been pushed
+left by the width the slab used to be. The push is recomputed on resize now.
+The class-driven halves of that arrangement, the ears and the frame,
+re-evaluate their own `min()` and needed nothing.
+
 ## [1.442.3] — 2026-09-20
 
 ### a phone gets the seven who are standing
