@@ -293,6 +293,33 @@ const PAX_SHIRT = [
  * of channel all come free and exact.
  */
 const PAX_SKIN_N = 8;
+/**
+ * And the cockpit's eight, seated.
+ *
+ * THE SEAT HEIGHT IS THE CLIP'S PROBLEM AND NOT THIS FILE'S, which is the
+ * whole reason these can be done at all and the instanced ones needed the
+ * thigh solve at the top of this file. The instanced `sit` is a hand-posed
+ * scratch skeleton authored for the lip of the lowest platform at Jadrija —
+ * hip 0.14 m up, feet hanging over water — so on a 0.49 m plank its feet stop
+ * 0.17 m short of the deck and `PAX_THIGH` has to drop the knee to reach it.
+ * A blob's seated clips are BAKED, off the café chairs on the terrace at
+ * Jadrija, and they are placed by putting the figure's origin on the FLOOR
+ * and letting the clip put the backside on the seat — which is what the
+ * terrace does, and a café chair and a boat's bench are the same height to
+ * four centimetres.
+ *
+ * So the sole under the plank is the whole of the placement, and the four
+ * clips below are what people on a ferry are doing: hands in the lap, sitting
+ * up, talking to whoever is beside them, leaning forward on their knees.
+ *
+ * THE COCKPIT AND NOT THE UPPER DECK, which is a budget and not a principle.
+ * These are 7 940 triangles apiece against the instanced tier's 3 036, and
+ * the cockpit is where you board, where the gangway runs, and where the
+ * benches are an arm's length from the walk to the stair. The six on the roof
+ * are seen from the top of that stair and no nearer.
+ */
+const PAX_SKIN_SIT = 8;
+const PAX_SIT_CLIPS = ['sitlap', 'sit', 'sittalk', 'sitfwd'];
 
 /**
  * Build the passengers and hand back something `59-brod.js` can flush.
@@ -421,31 +448,45 @@ async function buildBrodPax(scene, deckAt, boat) {
   // through the one accessor on the module — see `blobs` in 43-jadrija.js.
   const blobs = (typeof jadrija !== 'undefined' && jadrija && jadrija.blobs)
     ? jadrija.blobs() : null;
+  /** One blob, placed in her frame once and told what it is doing. */
+  const upgrade = (fg, k, y, clip) => {
+    const f = skinnedFigure(blobs.parsed[k % blobs.parsed.length], blobs.opt);
+    f.mesh.position.set(fg.x, y, fg.z);
+    f.mesh.rotation.y = fg.yaw;
+    // A hull that is 22 m long and 460 m from the origin puts a figure well
+    // outside anything three.js can cull it by from its own geometry, and a
+    // passenger that vanishes when the bow swings is worse than no passenger.
+    // Everything else on this boat is drawn unconditionally.
+    f.mesh.frustumCulled = false;
+    f.play(clip);
+    boat.add(f.mesh);
+    // And the instance they were standing in for stands down. `fg.hidden` is
+    // the flag `makeCrowd`'s own flush reads — see 42-crowd.js — so this is
+    // the whole of the swap and there is never a moment with both.
+    fg.hidden = true;
+    real.push({ f, fg });
+  };
   if (boat && blobs && blobs.parsed && blobs.parsed.length) {
+    // Nothing moves them again — they are people standing at a rail and
+    // sitting on a bench — so the only per-frame cost is the clip. The
+    // standing ones first, then the cockpit's benches.
     let k = 0;
     for (const fg of cast) {
-      if (real.length >= PAX_SKIN_N) break;
-      // The standing ones, and not the children: the blobs are eight adults
-      // and a 0.68-scale adult is not a child, it is a small adult.
+      if (k >= PAX_SKIN_N) break;
+      // Not the children: the blobs are eight adults, and a 0.68-scale adult
+      // is not a child, it is a small adult.
       if (fg.mode !== 'stand' || fg.scale < 0.85) continue;
-      const f = skinnedFigure(blobs.parsed[k % blobs.parsed.length], blobs.opt);
-      // In HER frame, once. Nothing below moves them again — they are people
-      // standing at a rail — so the only per-frame cost is the clip.
-      f.mesh.position.set(fg.x, fg.y, fg.z);
-      f.mesh.rotation.y = fg.yaw;
-      // A hull that is 22 m long and 460 m from the origin puts a figure well
-      // outside anything three.js can cull it by from its own geometry, and a
-      // passenger that vanishes when the bow swings is worse than no
-      // passenger. Everything else on this boat is drawn unconditionally.
-      f.mesh.frustumCulled = false;
-      f.play('idle');
-      boat.add(f.mesh);
-      // And the instance they were standing in for stands down. `fg.hidden`
-      // is the flag `makeCrowd`'s own flush reads — see 42-crowd.js — so this
-      // is the whole of the swap and there is never a moment with both.
-      fg.hidden = true;
-      real.push({ f, fg });
-      k++;
+      upgrade(fg, k++, fg.y, 'idle');
+    }
+    let j = 0;
+    for (const fg of cast) {
+      if (j >= PAX_SKIN_SIT) break;
+      if (fg.mode !== 'sit' || fg.bench !== W || fg.scale < 0.85) continue;
+      // The SOLE and not the plank — see PAX_SKIN_SIT. `B.y` is authored and
+      // `B.top` is built, which is the one trap in this table.
+      upgrade(fg, k + j, fg.bench.y * BROD_K,
+        PAX_SIT_CLIPS[j % PAX_SIT_CLIPS.length]);
+      j++;
     }
   }
 

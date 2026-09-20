@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.436.0] — 2026-09-19
+
+### and eight of them are sitting down
+
+The other half of **"replace all those marionettes... with more realistic
+people"**: the cockpit's eight, on the bench you board next to.
+
+The note left with 1.435.0 said the sitters wanted this file's thigh solve
+doing a second time in bone deltas. They did not, and the reason is worth
+writing down because it is the whole difference between the two tiers.
+
+**The seat height is the clip's problem and not this file's.** The instanced
+`sit` is a hand-posed scratch skeleton authored for the lip of the lowest
+platform at Jadrija — hip 0.14 m up, feet hanging over water where there is
+nothing to stand on — so on a 0.49 m plank its feet stop 0.17 m short of the
+deck, and `PAX_THIGH` exists to drop the knee until they reach it. A blob's
+seated clips are BAKED, off the café chairs on the terrace, and the terrace
+places them by putting the figure's origin on the FLOOR and letting the clip
+put the backside on the seat. A café chair and a boat's bench are the same
+height to four centimetres. So the placement is the sole under the plank and
+nothing else — `B.y` authored, not `B.top` built, which is the one trap in
+that table — and it lands first time.
+
+Four clips rather than one, because fourteen people doing the same thing is
+the fault this pass is fixing at a different scale: **hands in the lap,
+sitting up, talking to whoever is beside them, leaning forward on their
+knees**.
+
+The cockpit and not the upper deck, and that is a budget rather than a
+principle: a blob is 7 940 triangles against the instanced tier's 3 036, the
+cockpit is where you board and where the gangway runs, and the six on the
+roof are seen from the top of the stair and no nearer.
+
+Measured: 15 of the 22 on blobs, 115 308 triangles, 60 fps on her deck.
+
 ## [1.435.0] — 2026-09-19
 
 ### seven of them are real people
