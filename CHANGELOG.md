@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.442.2] — 2026-09-20
+
+### and it stops for the sights
+
+A consequence of the time-lapse, found by watching one whole crossing at
+eight times rather than by reading the code.
+
+The skipper names seven things on the way over — the mole, Nikola's fort, the
+channel, the narrows, the cave, the town, the berth — and they are placed by
+DISTANCE, which at walking pace is one every eighty seconds and at eight
+times is one every five. Two of them land within four seconds of each other.
+And worse, at eight steps to the frame two calls can fire in the SAME frame,
+and `out` holds one value, so the second one is never said at all.
+
+Both are one fix: **a call drops her back to one for four seconds**, which is
+long enough to read it and to look at the thing being named, and the fast
+loop stops at the first call it fires so no call can be swallowed by another.
+The time-lapse picks itself up afterwards without being asked.
+
+Measured over a minute of crossing: 1 482 m covered where a clean eight times
+would be 1 920, which is 22 s at speed and 8 s at walking pace — the two
+holds, exactly where the two calls were.
+
 ## [1.442.1] — 2026-09-20
 
 ### the fly cam moves over too

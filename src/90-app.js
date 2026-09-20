@@ -4893,6 +4893,26 @@ let brodFast = false;
  */
 const BROD_AUTO_AT = 100;      // m under way before it winds on by itself
 let brodWant = null;
+/**
+ * ── AND IT STOPS FOR THE SIGHTS ───────────────────────────────────────────
+ *
+ * Seconds of ordinary time the passage drops back to after a call.
+ *
+ * The skipper names seven things on the way over and they are placed by
+ * DISTANCE — 40, 520, 800, 1860, 2860, 3470 and 3800 m — which at walking
+ * pace is one every eighty seconds and at eight times is one every five. Two
+ * of them land within four seconds of each other, and worse: at eight steps
+ * to the frame two calls can fire in the SAME frame, and `out` holds one
+ * value, so the second one is simply never said.
+ *
+ * Both are the same fix. A call drops her back to one for four seconds — long
+ * enough to read it and to look at the thing being named, which is the whole
+ * point of naming it — and the fast loop stops at the first call it fires, so
+ * no call can be swallowed by another. The time-lapse picks itself back up
+ * afterwards without being asked.
+ */
+const BROD_CALL_HOLD = 4.0;
+let brodHold = 0;
 
 /**
  * T on her deck: let the passage run itself.
@@ -5415,6 +5435,7 @@ function boardBrod() {
   // A fresh voyage has no opinion about the time-lapse yet — see `brodWant`.
   brodFast = false;
   brodWant = null;
+  brodHold = 0;
   ground.bail();
   eject.reset();
   // Whatever was holding the camera lets go of it here. Nothing should be — but
@@ -6841,12 +6862,20 @@ function frame() {
     // It gives itself up at `slow`, 300 m out, because coming alongside is the
     // part nobody wants compressed — and because a passage that ends at eight
     // times ends without you noticing it has.
-    if (brodFast) {
+    // The four seconds after a call — see BROD_CALL_HOLD. Real time and not
+    // world time: what it is holding open is a thing to read.
+    if (brodHold > 0) brodHold = Math.max(0, brodHold - real);
+    if (out === 'call') brodHold = BROD_CALL_HOLD;
+    if (brodFast && brodHold <= 0) {
       if (brod.phase === 'slow' || brod.phase === 'alongside') brodFast = false;
       else {
         for (let i = 1; i < BROD_FAST; i++) {
           const o = brod.update(dt, BROD_STILL);
           if (o) out = o;
+          // At the first call, stop stepping for this frame: `out` holds one
+          // value, so a second call in the same frame would replace the first
+          // one and never be said at all.
+          if (o === 'call') { brodHold = BROD_CALL_HOLD; break; }
           if (brod.phase === 'slow' || brod.phase === 'alongside') {
             brodFast = false; break;
           }
