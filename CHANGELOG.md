@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.448.2] — 2026-09-20
+
+### a handle that accepts a state the game cannot reach
+
+`__fr.phone.app(k)` took any string and assigned it. So `app('baye')` — the
+app's *name*, which is what it says on the icon under it — set `phoneApp` to
+something no branch matches, and **the phone's screen went black**.
+`phoneCamStep` tests `phoneApp !== 'cam'` and correctly did nothing;
+`phoneDraw` found no app and drew nothing. From outside, that is
+indistinguishable from a broken live feed.
+
+It was taken for one, twice, ten minutes each time — including once this
+morning in a sweep meant to confirm that nothing in the night's thirty-two
+releases had broken the feature this whole loop was started for. The
+screenshot showed a phone out on her deck, 2 715 m across the channel, with
+a black screen where she should be. The feature was fine. The probe was
+wrong, and nothing said so.
+
+    __fr.phone.app('baye')  ->  null, and a line in the console
+    __fr.phone.app('cam')   ->  opens it
+    console                 ->  [phone] no app "baye" — try coin, love, cam or home
+
+Same lesson as `MODE_HUDS` in the release before it, found the same morning
+and worth stating once for both: **a debug handle that accepts a state the
+game cannot reach will eventually be believed.** It fails where the mistake
+is now, rather than in a screenshot twenty minutes later.
+
+And the sweep it came out of, on the built page, for the record: fly 54 fps,
+the promenade 61 with the crowd up, swimming 60, her deck 60 with fourteen
+gulls and the passengers aboard, the vikendica 52, and the live view running
+at 101 steps and 314 blits from the middle of the channel — **LIVE · 2 715 m
+· the promenade**, full length, which is what 1.440.1 re-framed the lens for.
+No console errors in any of them.
+
 ## [1.448.1] — 2026-09-20
 
 ### a race HUD rode the ferry

@@ -9635,7 +9635,30 @@ window.__fr = {
    */
   phone: Object.assign(() => phoneStats(), {
     out: (v) => phoneToggle(v),
-    app: (k) => { phoneToggle(true); phoneApp = k; phoneDraw(); return phoneStats(); },
+    /**
+     * Open an app by key — `coin`, `love`, `cam`, or `home` for the icons.
+     *
+     * IT CHECKS THE KEY, and that is not tidiness. This took any string and
+     * assigned it, so `app('baye')` — the app's *name*, which is what it says
+     * on the icon — set `phoneApp` to something no branch matches, and the
+     * screen went black: `phoneCamStep` tests `phoneApp !== 'cam'` and
+     * correctly did nothing, `phoneDraw` found no app and drew nothing. From
+     * outside it is indistinguishable from a broken live feed, which is what
+     * it was taken for, twice, for ten minutes each time.
+     *
+     * Same lesson as `MODE_HUDS` next door and the same morning: a debug
+     * handle that accepts a state the game cannot reach will eventually be
+     * believed. Null and a console line, so the probe fails where the mistake
+     * is rather than in the screenshot.
+     */
+    app: (k) => {
+      if (k !== 'home' && !PHONE_APPS.some((a) => a.key === k)) {
+        console.warn('[phone] no app "' + k + '" — try '
+          + PHONE_APPS.map((a) => a.key).join(', ') + ' or home');
+        return null;
+      }
+      phoneToggle(true); phoneApp = k; phoneDraw(); return phoneStats();
+    },
     press: () => { phonePress(); return phoneStats(); },
   }),
   satchel: {
