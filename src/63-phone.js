@@ -336,6 +336,14 @@ function phoneToggle(force) {
   if (phoneOn && phoneApp !== 'home') phoneDraw();
   else if (phoneOn) { phoneApp = PHONE.home; phoneDraw(); }
   phoneEl.hidden = !phoneOn;
+  // And the fly cam, which is drawn by the RENDERER into the same corner and
+  // therefore cannot be moved by a class. Its box is pushed left by the slab's
+  // measured width — see `push` in DROPCAM — and the `#flycam` frame that is
+  // drawn round it follows through the class above.
+  if (typeof DROPCAM !== 'undefined') {
+    DROPCAM.push = phoneOn
+      ? Math.round(phoneEl.getBoundingClientRect().width) + 14 : 0;
+  }
   return phoneOn;
 }
 

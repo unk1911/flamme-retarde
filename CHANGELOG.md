@@ -8,6 +8,31 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.442.1] — 2026-09-20
+
+### the fly cam moves over too
+
+The other thing that owns the bottom right corner. Measured with both up:
+the slab at [741, 154 → 876, 446] against the fly cam at [606, 352 → 876,
+504] — 135 by 94 pixels of overlap, which is the top right quarter of the
+fly's picture.
+
+Neither could see the other, and that is the interesting half: the fly cam is
+a SCISSORED VIEWPORT the renderer draws into the canvas, the phone is DOM on
+top of it, and a class on the body moves one and does nothing to the other.
+So the box itself takes a push — `DROPCAM.push`, in CSS pixels, written by
+the phone off its own measured width — and the `#flycam` frame that is drawn
+round that box follows through the class. They have to agree to the pixel or
+the border sits beside the picture instead of round it. Measured after: fly
+cam [457, 352 → 727, 504], slab unmoved, fourteen pixels between them.
+
+**And the Lovense button was checked from the ferry and needed nothing.**
+Pressed 2 184 m out in the channel: the signal goes on, the pattern runs, the
+countdown runs on the button. `signalCan` asks whether the phone is on you
+and the receiver is out, and neither of those has an opinion about which mode
+you are in — which is the right answer, and worth writing down as checked
+rather than assumed.
+
 ## [1.442.0] — 2026-09-20
 
 ### three things the ferry found

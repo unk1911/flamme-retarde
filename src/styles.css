@@ -965,6 +965,16 @@ body.cell-out #ears {
 html.touch body.cell-out #ears {
   right: calc(.8rem + min(34vw, 210px, calc(82vh * 9 / 19.5)) + .5rem);
 }
+/* The fly cam's FRAME. What is inside it is drawn by the renderer and moves
+   with `DROPCAM.push`, which the phone sets off this same slab's measured
+   width — the two have to agree to the pixel or the border sits beside the
+   picture instead of round it. */
+body.cell-out #flycam {
+  right: calc(24px + min(15vw, 230px, calc(78vh * 9 / 19.5)) + 14px);
+}
+html.touch body.cell-out #flycam {
+  right: calc(.8rem + min(34vw, 210px, calc(82vh * 9 / 19.5)) + 14px);
+}
 
 /* Ears — src/49-ears.js. What the microphone heard and what was done about it,
    bottom right over the fly cam's corner, in the subtitle's own type. Small and

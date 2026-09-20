@@ -653,10 +653,20 @@ const DROPCAM = {
   // body was off the top of the frame and only its legs were in it.
   aimY: 6.0,
   cam: [0.105, 0.26, -0.35],
+  /**
+   * How far left of the right margin the corner box sits, in CSS pixels.
+   *
+   * Nothing but the phone writes it — see `phoneToggle` in src/63-phone.js.
+   * The two of them are the only things in this game that own the bottom
+   * right corner, and measured with both up they overlapped by 135 by 94
+   * pixels: the slab covered the top right quarter of the fly's picture, and
+   * since one is DOM and the other is a scissored viewport neither knew.
+   */
+  push: 0,
   rect: (W, H) => {
     const w = Math.round(Math.min(W * 0.30, 460));
     const h = Math.round(w * 9 / 16);
-    return { x: Math.round(W - w - 24), y: 96, w, h };
+    return { x: Math.round(W - w - 24 - (DROPCAM.push || 0)), y: 96, w, h };
   },
 };
 
