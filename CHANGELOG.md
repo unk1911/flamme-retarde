@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.452.3] — 2026-09-20
+
+### she picks the straw up
+
+*"When she does coke doesn't really do anything she should really be taking
+the straw and doing it u know."*
+
+The first cut of the beat moved her HAND to the straw and left the straw
+lying in the well — so the powder went and nothing was seen to take it, which
+is a line disappearing under a hovering palm. The object had to move.
+
+It does now. Measured as the straw's height above the plate through the beat:
+
+    at rest        +3.4 mm      lying in the well
+    mid-beat      +16.9 mm      off the plate, in her hand
+    after          +3.4 mm      back in the well
+
+The far end is aimed at the line and the near end is in her palm, which is
+what makes it read as a straw rather than as a stick she is holding — the
+cylinder's own axis is +y, so one `setFromUnitVectors` from that to the run
+between the two points is the whole of the orientation. The aim travels with
+the powder going. It eases in over her reach and out before she straightens,
+on the same ramp shape the crouch uses, so the pick-up and the put-down are
+the same code run in opposite directions.
+
+All of it in the PLATE'S frame, because that is the frame the straw is a
+child of; the palm arrives in world metres and `worldToLocal` is the one line
+that joins the two.
+
+### and the line command is silent too
+
+*"When i tell her 'do a line', the audio voice still says contradictory
+things. here the audio voice should just be silent."*
+
+`MUTE_TALK` had `coke` and it did not have `line` — the mute was written
+against the noun and the new command is a different one. A skill that arms
+the plate and a skill that empties it are both sentences the model will
+refuse, so both are on the list now.
+
 ## [1.452.2] — 2026-09-20
 
 ### the egg, actually chopped off

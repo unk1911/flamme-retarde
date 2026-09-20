@@ -63,11 +63,18 @@
  * Skills whose spoken answer is not sent, because it cannot be relied on to
  * agree with what she is doing. See the note at the guard below.
  *
+ * `line` is here for the same reason `coke` is, and was missed when it was
+ * added — the mute was written against the noun and the new command is a
+ * different one. Misha, 20 Sep 2026: *"when i tell her 'do a line', the audio
+ * voice still says contradictory things. here the audio voice should just be
+ * silent"*. A skill that arms the plate and a skill that empties it are both
+ * sentences the model will refuse, so both are on this list.
+ *
  * `reset` is here for a different reason and it is worth saying which: there
  * is nothing to answer. It is not a thing she does, it is the room being put
  * straight, and a line about it would be her narrating housekeeping.
  */
-const MUTE_TALK = { coke: 1, reset: 1 };
+const MUTE_TALK = { coke: 1, line: 1, reset: 1 };
 
 const EARS = {
   rate: 16000,

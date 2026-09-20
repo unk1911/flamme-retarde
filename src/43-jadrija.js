@@ -37917,6 +37917,15 @@ async function buildJadrija(scene) {
         // The powder only goes during the middle beat.
         const along = sat((lu - 0.26) / 0.41);
         cokeTakeSet(along);
+        // AND THE STRAW IS IN HER HAND FOR IT. In over the reach, held flat
+        // through the middle, and back down in the well by the end — the
+        // same ramp shape the crouch uses, so the object arrives in her fist
+        // on the frame she is low enough to use it and is lying in the plate
+        // again before she straightens up. See `strawHold`.
+        if (skinFig) {
+          strawHold(skinFig, sat((lu - 0.14) / 0.10) * sat((0.94 - lu) / 0.08),
+            Math.min(COKE.lines - 1, cokeGone), along);
+        }
         // And the head comes back at the top, which is the sniff. A short
         // sharp one — 0.18 of the phase — against the slow way down.
         if (skinFig) {
@@ -37925,7 +37934,7 @@ async function buildJadrija(scene) {
         }
         if (lu >= 1) {
           cokeGone = Math.min(COKE.lines, cokeGone + 1);
-          if (skinFig) skinFig.aim('neck', 1, 0, 0, 0);
+          if (skinFig) { skinFig.aim('neck', 1, 0, 0, 0); strawHold(skinFig, 0); }
           go('dwell', 'idle', 0.42);
         }
         break;
@@ -40770,6 +40779,11 @@ async function buildJadrija(scene) {
         tube([0.720, 0.255, 0.230]));
       m.rotation.set(0, 0.70, Math.PI / 2);
       m.position.set(0.002, 0.0034, -0.031);
+      // Where it lies when nobody has hold of it, kept so that `strawHold`
+      // has somewhere to put it back. Read off the mesh rather than repeated
+      // as two more literals, so moving it in the well moves both.
+      m.userData.restP = m.position.clone();
+      m.userData.restQ = m.quaternion.clone();
       g.add(m);
       straws.push(m);
     }
@@ -40834,14 +40848,72 @@ async function buildJadrija(scene) {
     m.visible = f < 0.999;
     m.scale.x = Math.max(0.0001, 1 - f);
     m.position.x = 0.012 + (COKE.len / 2) * f;
-    // The straw rides over the end that is going, a hair above the powder.
-    const st = k.straws && k.straws[0];
-    if (st) {
-      const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
-      st.position.set(0.012 - COKE.len / 2 + COKE.len * f, 0.0075, z);
-      st.rotation.set(0, 0.22, Math.PI / 2 - 0.30);
-    }
+    // The straw is NOT moved here: `strawHold` owns it for the whole beat,
+    // because where it is depends on her hand and not on the powder.
     return { line: i, left: COKE.lines - cokeGone - f, v: +f.toFixed(3) };
+  }
+
+  const _stU = new THREE.Vector3(0, 1, 0);
+  const _stP = new THREE.Vector3(), _stA = new THREE.Vector3();
+  const _stD = new THREE.Vector3(), _stH = new THREE.Vector3();
+  const _stQ = new THREE.Quaternion(), _stT = new THREE.Quaternion();
+
+  /**
+   * ── AND SHE PICKS THE STRAW UP ────────────────────────────────────────
+   *
+   * Misha, 20 Sep 2026: *"when she does coke doesn't really do anything she
+   * should really be taking the straw and doing it u know"*.
+   *
+   * The first cut of the beat moved her HAND to the straw and left the straw
+   * lying in the well — so the powder went and nothing was seen to take it,
+   * which is a line disappearing under a hovering palm. The object has to
+   * move.
+   *
+   * `amt` is how much of it she has: 0 is lying in the well, 1 is in her
+   * fist. Position eases between the two, and so does the turn, so the pick
+   * up and the put down are the same code run in opposite directions.
+   *
+   * THE FAR END IS AIMED AT THE LINE and the near end is in her palm, which
+   * is what makes it read as a straw rather than as a stick she is holding:
+   * the cylinder's own axis is +y, so one `setFromUnitVectors` from that to
+   * the run between the two points is the whole of the orientation. `aim` is
+   * where on the line it is working, which travels with the powder going.
+   *
+   * All of it in the PLATE'S frame, because that is the frame the straw is a
+   * child of — the palm comes back in world metres and `worldToLocal` is the
+   * one line that joins the two.
+   */
+  function strawHold(f, amt, i, along) {
+    const k = cokeKit;
+    const st = k && k.straws && k.straws[0];
+    if (!st || !st.userData.restP) return;
+    if (amt <= 0.001) {
+      st.position.copy(st.userData.restP);
+      st.quaternion.copy(st.userData.restQ);
+      return;
+    }
+    const hR = f.boneIndex('handR');
+    if (hR < 0) return;
+    f.mesh.updateMatrixWorld();
+    f.boneAt(hR, _stH).applyMatrix4(f.mesh.matrixWorld);
+    f.boneTurn(hR, _stT);
+    _stQ.copy(f.mesh.quaternion).multiply(_stT);
+    _stP.copy(PALM).applyQuaternion(_stQ).add(_stH);
+    k.g.updateMatrixWorld();
+    k.g.worldToLocal(_stP);
+    // Where on the line the working end is, in the plate's frame.
+    const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
+    _stA.set(0.012 - COKE.len / 2 + COKE.len * along, 0.0060, z);
+    // The straw is placed by its MIDDLE, so the fist end and the plate end
+    // are half a straw either side of where it sits.
+    st.position.copy(st.userData.restP).lerp(
+      _stH.copy(_stP).add(_stA).multiplyScalar(0.5), amt);
+    _stD.copy(_stP).sub(_stA);
+    if (_stD.lengthSq() > 1e-8) {
+      _stD.normalize();
+      _stQ.setFromUnitVectors(_stU, _stD);
+      st.quaternion.copy(st.userData.restQ).slerp(_stQ, amt);
+    }
   }
 
   /**
