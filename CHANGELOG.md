@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.442.0] — 2026-09-20
+
+### three things the ferry found
+
+Opening the phone on her deck, two and a half kilometres out across the
+channel, is the exact situation the live view was asked for. All three of
+these fell out of doing it once.
+
+**It said you were flying.** The gate was a whitelist — ground and swim show
+her and everything else is *no signal · you are flying* — so the ferry, which
+is a person standing on a deck with a phone in their hand, got the aeroplane's
+joke. It is a short blacklist now and it says what it means: you are flying
+when you are in the cockpit, under the canopy, or in a cutscene. Everywhere
+else is somewhere you can stand.
+
+**And the haze was yours, not the lens's.** `U.uCamPos` is one shared uniform,
+written once a frame with the main camera's position, and every haze and water
+term in the game measures its distance from it — so a view rendered from a
+lens three metres in front of her while you are 2 440 m away came back with
+two and a half kilometres of atmosphere laid over her: a pale grey outline in
+a white field. The phone borrows the uniform for its own pass and puts it
+back. Her picture has a face in it again.
+
+**And the ears were underneath it.** Measured with both up: ears at
+[606, 278, 270, 63] against the slab at [741, 154, 135, 293] — 135 px of
+overlap, which is the end of every line she says. `pointer-events: none` meant
+nothing was unclickable, so nobody had seen it. The panel moves over by the
+slab's own width while the phone is out, on both a keyboard and glass: ears
+at [457, 278, 270, 63] now, clear by fourteen pixels.
+
 ## [1.441.2] — 2026-09-20
 
 ### a paused phone

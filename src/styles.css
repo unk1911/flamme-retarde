@@ -952,6 +952,20 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
 
 html.touch #cell { right: .8rem; width: min(34vw, 210px, calc(82vh * 9 / 19.5)); }
 
+/* AND WHAT THE PHONE STANDS ON. The ears panel is bottom right and the slab
+   covers its right-hand end — measured with both up: ears [606, 278, 270, 63]
+   against cell [741, 154, 135, 293], which is 135 px of overlap and the end of
+   every line she says. `pointer-events: none` meant nothing was unclickable,
+   so this was invisible until somebody put both on the screen at once. The
+   body carries the class while the phone is out; the arithmetic is the slab's
+   own width plus its margin. */
+body.cell-out #ears {
+  right: calc(24px + min(15vw, 230px, calc(78vh * 9 / 19.5)) + 14px);
+}
+html.touch body.cell-out #ears {
+  right: calc(.8rem + min(34vw, 210px, calc(82vh * 9 / 19.5)) + .5rem);
+}
+
 /* Ears — src/49-ears.js. What the microphone heard and what was done about it,
    bottom right over the fly cam's corner, in the subtitle's own type. Small and
    dim on purpose: it is a debug console Misha asked for, not a feature panel. */

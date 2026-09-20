@@ -90,6 +90,8 @@ let phoneRT = null, phoneQuad = null, phoneQuadCam = null, phoneCamObj = null;
 let phoneCamT = 0;
 /** Wall seconds since the page loaded, for the once-a-second jobs. */
 let phoneClock = 0;
+/** Where the world thought the eye was, while the phone borrows that uniform. */
+const _phCam = new THREE.Vector3();
 let phoneSteps = 0, phoneBlits = 0, phoneRect = null;
 
 /** The apps, in the order they sit on the home screen. */
@@ -183,13 +185,28 @@ function phoneWhere() {
   return 'LIVE · ' + m + ' m · ' + (g.indoors ? 'in the kabina' : 'the promenade');
 }
 
+/**
+ * The phases with no signal in them, and it is a SHORT list on purpose.
+ *
+ * This used to be the other way round — ground and swim showed her and
+ * everything else said *no signal · you are flying* — and the first thing
+ * that broke was the ferry: you stand on her deck with a phone in your hand
+ * four kilometres from the beach, which is the exact situation this feature
+ * was asked for, and the app told you you were flying. The right rule is that
+ * you are flying when you are flying: in the cockpit with two turboprops, on
+ * the way down under a canopy, or in a cutscene. Everywhere else is a person
+ * standing somewhere with a phone.
+ */
+const PHONE_NOSIG = { fly: 1, crashing: 1, chute: 1, intro: 1 };
+
 /** What the live view has to say for itself when it cannot show her. */
 function phoneCamWhy() {
   if (typeof jadrija === 'undefined' || !jadrija) return 'no signal';
   const s = jadrija.show && jadrija.show();
   if (!s) return 'no signal';
-  if (typeof state !== 'undefined' && state.phase !== 'ground'
-    && state.phase !== 'swim') return 'no signal · you are flying';
+  if (typeof state !== 'undefined' && PHONE_NOSIG[state.phase]) {
+    return 'no signal · you are flying';
+  }
   return null;
 }
 
@@ -312,6 +329,10 @@ function phoneToggle(force) {
   }
   phoneOn = want;
   phonePanel();
+  // What else has to get out of its way. The ears panel is bottom right and
+  // the phone stands over its right-hand end — see `body.cell-out` in
+  // styles.css, which is the whole of this.
+  document.body.classList.toggle('cell-out', phoneOn);
   if (phoneOn && phoneApp !== 'home') phoneDraw();
   else if (phoneOn) { phoneApp = PHONE.home; phoneDraw(); }
   phoneEl.hidden = !phoneOn;
@@ -485,11 +506,22 @@ function phoneCamStep(renderer, scene, real) {
     }
     phoneCamObj.position.set(p.eye[0], p.eye[1], p.eye[2]);
     phoneCamObj.lookAt(p.at[0], p.at[1], p.at[2]);
+    // AND THE HAZE HAS TO BE HERS, which is the difference between a picture
+    // and a smear. `U.uCamPos` is one shared uniform, written once a frame
+    // with the main camera's position, and every haze and water term in the
+    // game measures its distance from it — so a view rendered from a lens
+    // three metres in front of her while YOU are two and a half kilometres
+    // out across the channel came back with two and a half kilometres of
+    // atmosphere laid over her. Photographed from the ferry before this line
+    // existed: she was a pale grey outline in a white field.
+    const wasCam = _phCam.copy(U.uCamPos.value);
+    U.uCamPos.value.copy(phoneCamObj.position);
     const old = renderer.getRenderTarget();
     renderer.setRenderTarget(phoneRT);
     renderer.clear(true, true, false);
     renderer.render(scene, phoneCamObj);
     renderer.setRenderTarget(old);
+    U.uCamPos.value.copy(wasCam);
     phoneSteps += 1;
   }
   return true;
