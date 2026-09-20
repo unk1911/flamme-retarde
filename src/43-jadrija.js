@@ -35702,7 +35702,7 @@ async function buildJadrija(scene) {
   // undid anything — and the sentence reached the handover instead and came
   // back as an offer of the thing she is already wearing. See `doff_of` in
   // server/baye/baye.py, which now answers `doff:<key>`.
-  const SHE_CAN = { reset: 1, doff: 1, wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
+  const SHE_CAN = { line: 1, reset: 1, doff: 1, wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
     note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
     // AND THE POSE SHE ALREADY HAD AND NOTHING COULD ASK FOR.
     //
@@ -36116,6 +36116,16 @@ async function buildJadrija(scene) {
     if (name === 'coke') {
       if (!kit || !kit.plate) return 'nokit';
       if (show.phase === 'coke') return 'onit';
+      return null;
+    }
+    if (name === 'line') {
+      if (!kit || !kit.plate) return 'nokit';
+      if (show.phase === 'line') return 'onit';
+      // Nothing to take. Either the plate was never dressed or she has had
+      // all four — "do a line" before "coke" is a request with no object,
+      // and answering it by pouring one would be answering a different
+      // sentence.
+      if (cokeLeft() < 1) return 'nolines';
       return null;
     }
     if (name === 'flat.edge') {
@@ -37421,6 +37431,17 @@ async function buildJadrija(scene) {
           show.goNext = 'liftIt';
           go('stepTo', 'walk', 0.34);
         } else go('liftIt', 'idle', 0.40);
+      } else if (name === 'line') {
+        show.byAsk = 1;
+        show.queue.length = 0;
+        showSay('trill', d);
+        // Same mark as the cutting, and on to it the same way.
+        if (kit && kit.work
+            && Math.hypot(show.t - kit.work.coke[0], show.s - kit.work.coke[1]) > 0.26) {
+          show.goMark = kit.work.coke;
+          show.goNext = 'line';
+          go('stepTo', 'walk', 0.34);
+        } else go('line', 'idle', 0.40);
       } else if (name === 'reset') {
         // No `showSay` and no clip: a reset is not something she performs,
         // it is the room being put straight. See `resetWant`.
@@ -37824,6 +37845,7 @@ async function buildJadrija(scene) {
           show.goMark = null;
           show.goNext = null;
           if (nx === 'coke') { cokeSet(0); go('coke', 'idle', 0.40); }
+          else if (nx === 'line') go('line', 'idle', 0.40);
           else if (nx === 'liftIt') go('liftIt', 'idle', 0.34);
           else showNext();
         }
@@ -37850,6 +37872,41 @@ async function buildJadrija(scene) {
         // the tuck down there deletes any leg aim set up here. See `cokeStoop`.
         show.cokeU = u;
         if (u >= 1) go('dwell', 'idle', 0.42);
+        break;
+      }
+
+      case 'line': {
+        // ── ONE OFF THE PLATE ──────────────────────────────────────────
+        //
+        // Three beats over 3.4 s and the middle one is the only one anybody
+        // watches: down (0.9), along the line (1.4), and up (1.1). The last
+        // is the longest on purpose — coming up off a line is slower than
+        // going down to it, and the sniff is at the top of it.
+        //
+        // `show.cokeU` is this phase's own progress and not the plate's,
+        // which is what lets `cokeStoop` and `cokeReach` carry over from the
+        // cutting without knowing there is a second beat: both of them read
+        // that one number and ramp on it.
+        show.want = kit && kit.work ? kit.work.coke[2] : show.want;
+        showHold(dt);
+        if (show.tmr < 0.62 && kit && kit.work) showSettle(kit.work.coke, dt, 10.0);
+        const LN = 3.4;
+        const lu = Math.max(0, show.tmr - 0.55) / LN;
+        show.cokeU = Math.min(1, lu);
+        // The powder only goes during the middle beat.
+        const along = sat((lu - 0.26) / 0.41);
+        cokeTakeSet(along);
+        // And the head comes back at the top, which is the sniff. A short
+        // sharp one — 0.18 of the phase — against the slow way down.
+        if (skinFig) {
+          const back = sat((lu - 0.70) / 0.10) * sat((1.0 - lu) / 0.18);
+          skinFig.aim('neck', 1, 0, 0, -0.34 * back);
+        }
+        if (lu >= 1) {
+          cokeGone = Math.min(COKE.lines, cokeGone + 1);
+          if (skinFig) skinFig.aim('neck', 1, 0, 0, 0);
+          go('dwell', 'idle', 0.42);
+        }
         break;
       }
 
@@ -40713,6 +40770,87 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * ── AND THEN SHE TAKES ONE ────────────────────────────────────────────
+   *
+   * Misha, 20 Sep 2026: *"add a new command 'do a line' and she does a
+   * line"*. `coke` pours the powder out and cuts four lines with the blade
+   * and has always stopped there, which is a still life: the plate was
+   * dressed and nothing was ever taken off it.
+   *
+   * `cokeGone` is how many are already up her nose, and it is what makes the
+   * command repeatable — ask four times and the plate empties, ask a fifth
+   * and she says there is nothing left. A fresh pour resets it, in `cokeSet`,
+   * because a fresh pour is a fresh plate.
+   *
+   * THE SAME STAGING AS THE CUTTING and not a new one. She is already stooped
+   * over this plate with her right arm solved on to it — `cokeStoop` and the
+   * `coke` job in `reachRight` — so the new beat is that posture held, the
+   * straw brought to it, and one line going away under it. What it is NOT is
+   * a bend: her face gets as near the plate as a neck aim allows and no
+   * nearer, for the same reason the prone pose is not an `aim` either. A
+   * fold at the waist deep enough to put her nose on the table is a POSE and
+   * wants Blender, and that is written down here rather than faked with a
+   * rotation that would take her legs with it.
+   */
+  let cokeGone = 0;
+
+  /**
+   * One line going away, `v` from 0 to 1.
+   *
+   * Eaten from the NEAR end — the end her straw starts at — so the remaining
+   * powder is the far half and the straw travels along it. `cokeSet` grows a
+   * line the other way, from the far end, because that is the direction the
+   * blade drags it; a line that is eaten the way it was drawn would look like
+   * the cutting run backwards.
+   */
+  function cokeTakeSet(v) {
+    const k = cokeBuild();
+    if (!k) return null;
+    const i = Math.min(COKE.lines - 1, cokeGone);
+    const m = k.lines[i];
+    if (!m) return null;
+    const f = Math.max(0, Math.min(1, v));
+    m.visible = f < 0.999;
+    m.scale.x = Math.max(0.0001, 1 - f);
+    m.position.x = 0.012 + (COKE.len / 2) * f;
+    // The straw rides over the end that is going, a hair above the powder.
+    const st = k.straws && k.straws[0];
+    if (st) {
+      const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
+      st.position.set(0.012 - COKE.len / 2 + COKE.len * f, 0.0075, z);
+      st.rotation.set(0, 0.22, Math.PI / 2 - 0.30);
+    }
+    return { line: i, left: COKE.lines - cokeGone - f, v: +f.toFixed(3) };
+  }
+
+  /**
+   * Where the straw is, in world metres.
+   *
+   * Its own matrix and not the group's position plus an offset, for the same
+   * reason `cokeHoldAt` takes the blade's: the plate's group is yawed to the
+   * plate and the offsets are in its frame.
+   */
+  function cokeStrawAt(out) {
+    const k = cokeKit;
+    const st = k && k.straws && k.straws[0];
+    if (!st) return false;
+    st.updateWorldMatrix(true, false);
+    out.setFromMatrixPosition(st.matrixWorld);
+    return true;
+  }
+
+  /** How many are still on the plate, for a guard and for a probe. */
+  function cokeLeft() {
+    const k = cokeKit;
+    if (!k) return 0;
+    let n = 0;
+    for (let i = cokeGone; i < COKE.lines; i++) {
+      if (k.lines[i] && k.lines[i].visible && k.lines[i].scale.x > 0.5) n++;
+    }
+    return n;
+  }
+
+  /**
    * Scrub the whole thing, 0 to 1, so it can be driven by a phase and shot by
    * a probe with the same call.
    */
@@ -40724,6 +40862,8 @@ async function buildJadrija(scene) {
     const P = 0.25;
     const pour = Math.min(1, t / P);
     const cut = Math.max(0, (t - P) / (1 - P));
+    // A fresh pour is a fresh plate — see `cokeGone`.
+    if (t <= 0.001) cokeGone = 0;
     k.wrap.rotation.z = -0.9 * Math.sin(Math.PI * pour);
     k.wrap.position.y = 0.0011 + 0.010 * Math.sin(Math.PI * pour);
     // The heap grows in, and then goes down as the lines take it.
@@ -40908,7 +41048,9 @@ async function buildJadrija(scene) {
     return Math.atan2(L.y, L.x) + Math.asin(clamp((drop - L.y) / R, -1, 1));
   }
   function cokeStoop(f, dt) {
-    const on = show.phase === 'coke';
+    // Both beats at this plate, because taking one is the cutting posture
+    // held — see `cokeTakeSet`.
+    const on = show.phase === 'coke' || show.phase === 'line';
     // In over the pour, out over the last of the fourth line, and driven off
     // the same 0-to-1 the props are driven off so the two cannot drift apart.
     // The tail runs past 1: the phase is left on that frame and the ease-out
@@ -41171,7 +41313,11 @@ async function buildJadrija(scene) {
   const COKE_ARM = { up: COKE_HAND.lift, fwd: -COKE_HAND.back,
     follow: COKE_HAND.follow, pole: REACH_POLE };
   function cokeReach(f, dt, free) {
-    const on = free && show.phase === 'coke';
+    // The taking is the same arm on the same plate — see `cokeTakeSet`. It
+    // shares `show.cokeU`, and the phase decides what the hand is over:
+    // `cokeHoldAt` follows the blade during the cutting and `cokeStrawAt`
+    // follows the straw while a line goes away.
+    const on = free && (show.phase === 'coke' || show.phase === 'line');
     const u = on ? (show.cokeU || 0) : 0;
     // FROM THE POUR AND NOT FROM THE FIRST LINE. This used to start at 0.25,
     // which is where `cokeSet` hands the scrub from the pour to the cutting —
@@ -41188,7 +41334,9 @@ async function buildJadrija(scene) {
       show.cutAt = 0;
       return;
     }
-    if (!cokeHoldAt(_ckBlade, u)) return;
+    if (show.phase === 'line') {
+      if (!cokeStrawAt(_ckBlade)) return;
+    } else if (!cokeHoldAt(_ckBlade, u)) return;
     // Lower over the wrap than over the blade: the blade number leaves the
     // grip 21 mm clear of steel lying flat, and the wrap is 2 mm of folded
     // paper she is pinching rather than a tool she is holding.
@@ -42485,6 +42633,15 @@ async function buildJadrija(scene) {
     // own motor all stop with it rather than being left lit on a thing that
     // is no longer on anybody.
     if (signals[key]) signalSet(key, false);
+    // WHERE IT GOES BACK TO IS WHERE IT CAME FROM, and the two things she
+    // can be wearing came from different places. The Lovense is pre-placed
+    // on the tabouret and belongs there; the cuffs and the headphones came
+    // out of your bag and belong in it. Putting the cuffs on the stool would
+    // be tidy and wrong — you could not carry them out of the room.
+    if (key !== 'lovense') {
+      if (typeof satchelPut === 'function') satchelPut(key, 1);
+      return true;
+    }
     if (kit && kit.spot) {
       const m = giftMesh(key);
       const w = toWorld(kit.spot[0], kit.spot[1]);
@@ -48105,6 +48262,19 @@ async function buildJadrija(scene) {
      * have: the first version of this fired zero of them and looked exactly
      * like a phone with vibration turned off.
      */
+    /** The plate: how many lines are cut, how many are gone, where she is. */
+    /**
+     * The plate, for the new beat — see `cokeTakeSet`.
+     *
+     * `powder` and not `plate` or `coke`: both of those names are already
+     * taken twice over in this object (the plate's world point, the scrub,
+     * the skill flag), and a duplicate key in an object literal is the last
+     * one silently winning. It cost two probe runs to notice.
+     */
+    powder: () => ({ gone: cokeGone, left: cokeLeft(),
+      u: +((show && show.cokeU) || 0).toFixed(3),
+      vis: cokeKit ? cokeKit.lines.map((m) => +m.scale.x.toFixed(2)) : null,
+      phase: show ? show.phase : null }),
     signals: () => Object.keys(signals).map((k) => ({ key: k,
       t: +signals[k].t.toFixed(2), beat: +signalAmp(signals[k].t).toFixed(2),
       until: signals[k].until || 0,

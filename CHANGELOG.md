@@ -8,6 +8,76 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.452.0] — 2026-09-20 (baye 1.34.0)
+
+### do a line
+
+`coke` pours the powder out and cuts four lines with the blade, and had
+always stopped there — which is a still life: the plate was dressed and
+nothing was ever taken off it. *"Add a new command 'do a line' and she does a
+line."*
+
+Measured through the whole sequence on the built page:
+
+    before the pour   ask 'line'  ->  "nolines"
+    after 'coke'      left 4,  vis [1, 1, 1, 1]
+    during 'line'     phase line, vis [0.32, 1, 1, 1]
+    after             gone 1,  left 3,  vis [0, 1, 1, 1]
+
+It is **repeatable and it runs out**: ask four times and the plate empties,
+ask a fifth and she says there is nothing left. A fresh pour is a fresh
+plate. Asking before the plate is dressed is refused rather than answered by
+pouring one, because "do a line" and "cut me a line" are different sentences
+and the table is ordered so the doing is asked first.
+
+**The same staging as the cutting and not a new one** — she is already
+stooped over this plate with her right arm solved on to it, so the new beat
+is that posture held, the straw brought to it, and one line going away
+underneath. Three beats over 3.4 s: down, along, and up, with the last the
+longest because coming up off a line is slower than going down to it, and
+the sniff is at the top of it.
+
+**Where it stops short**: her face gets as near the plate as a neck aim
+allows and no nearer. A fold at the waist deep enough to put her nose on the
+table is a POSE — the same conclusion the prone attempt reached — and wants
+Blender and a re-bake, not a rotation that would take her legs with it.
+
+The line is eaten from the near end, which is the opposite of the way the
+blade drags it out; a line eaten the way it was drawn looks like the cutting
+run backwards.
+
+### cuffs off
+
+`doff:` could already take the Lovense out. *"Add command 'cuffs off' to take
+them off."* Two words and no verb, so `DOFF_RE` had to loosen to a bare
+`off` — and the NOUN is what keeps that safe. Everything below still leaves
+with nothing:
+
+    'cuffs off'  'handcuffs off'  'bracelets off'  'headphones off'
+      -> doff
+
+    'buzz off'   'take your shoes off'   'i love your bracelets'
+    'turn the light off'   'the mole is off to the left'
+      -> nothing
+
+**And "lovense off" still means stop.** It is the only wearable with a motor
+in it, so a bare `off` after its name is `hush:` as it has always been;
+taking it out needs somebody to say `out`, or a take-or-pull verb. Both
+directions are tested and both hold.
+
+**Where it goes back to is where it came from.** The Lovense is pre-placed on
+the tabouret and returns there; the cuffs and the headphones came out of your
+bag and return to it. Putting the cuffs on the stool would be tidy and wrong
+— you could not carry them out of the room.
+
+### and a note for whoever adds the next accessor
+
+`powder()` is called that because `plate` and `coke` are each already taken
+twice over in the same object literal — the plate's world point, the scrub,
+the skill flag — and **a duplicate key in an object literal is the last one
+silently winning**. It cost two probe runs, both of which looked like the
+feature was broken when it was the reader that was.
+
 ## [1.451.1] — 2026-09-20
 
 ### the arm, properly this time

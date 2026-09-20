@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.33.0"
+VERSION = "1.34.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -566,6 +566,21 @@ SKILLS = {
     # her pour white powder onto the ornamental plate and make neat
     # straight lines with a razor blade"*. Its own noun and nothing
     # else's, so it needs no ordering against the poses.
+    # ── AND TAKING ONE, WHICH IS NOT POURING ONE ─────────────────────────
+    #
+    # Misha, 20 Sep 2026: *"add a new command 'do a line' and she does a
+    # line"*. `coke` dresses the plate — powder out, four lines cut with the
+    # blade — and stopped there. This is the other half.
+    #
+    # BEFORE `coke` IN THE TABLE, because `coke` owns `cut a line` and would
+    # otherwise take "do a line" for another dressing. The verb is the whole
+    # difference: you CUT a line and you DO one, and the table is ordered so
+    # the doing is asked first.
+    "line": ("do a line, take one off the plate, have a bump",
+             [r"\bdo (a|one|another|the) line\b|\bdo lines?\b"
+              r"|\b(take|have|hit|snort|hoover|do)\b.{0,12}\b(a |one |that )?"
+              r"(line|bump|rail)\b"
+              r"|\bsnort\w*\b|\bbump it\b"]),
     "coke": ("pour out a line of powder on the plate",
              # NOT \bblow\b, which it had for about a minute: "blow me a
              # kiss" is a sentence somebody says in this room.
@@ -810,6 +825,12 @@ ASK_RE = re.compile(
     # on this beach.
     r"|\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy)\b"
     r".{0,16}\boff\b"
+    # AND THE CUFFS, THE SAME WAY. Misha, 20 Sep 2026: *"add command 'cuffs
+    # off' to take them off"*. Two words, no verb, and `doff_of` is what
+    # answers it — see the note there about `take ... off` having been a
+    # spoken refusal because nothing could undo a `wear:`.
+    r"|\b((hand[\s-]?)?cuffs?|bangles?|bracelets?|chain\w*|headphones|bose)\b"
+    r".{0,16}\boff\b"
     # And taking it back out, which carries `take` — a handover verb — and
     # went to `give_of` as an offer of the thing she is already wearing. See
     # `doff_of`, which is strict about what it will answer with.
@@ -817,6 +838,11 @@ ASK_RE = re.compile(
     r"\b.{0,24}\bout\b"
     r"|\b(gimme|give me|get me|show me|bring me|fetch me|pour me|make me|"
     r"do the|do your|do a|do some)\b"
+    # And taking one off the plate, which carries none of the above: "take a
+    # line", "have a bump", "snort one". The nouns are the skill's own and
+    # mean nothing else in this room.
+    r"|\b(take|have|hit|snort|hoover)\b.{0,12}\b(line|bump|rail)s?\b"
+    r"|\bsnort\w*\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
     # "what do they charge at the ice cream place" is a question, and walking
     # up there to find out is the right answer to it. A place name and a
@@ -1066,9 +1092,15 @@ def buzz_of(text: str):
     # the same breath, and never when the sentence is `take ... off` (which is
     # `TAKE_OFF_RE`'s), `take ... out` (which is `doff_of`'s), or "buzz off",
     # which is a person being told to go away.
+    # `DOFF_RE` now matches a bare `off` — it has to, because "cuffs off"
+    # carries no verb — so testing it here would swallow "lovense off" as
+    # well. What must be excluded is a real take-out: somebody saying `out`,
+    # or a take-or-pull verb. "Lovense off" has neither and means stop.
+    taking = bool(re.search(r"\bout\b", t) or re.search(
+        r"\b(take|takes|pull|pulls|slip|slips|remove|removes|yank|yanks)\b", t))
     bare_off = bool(
         not on and not off and OFF_RE.search(t)
-        and not DOFF_RE.search(t) and not TAKE_OFF_RE.search(t)
+        and not taking and not TAKE_OFF_RE.search(t)
         and not re.search(r"\bbuzz\s*off\b", t))
     if not on and not off and not bare_off:
         return None
@@ -1172,21 +1204,47 @@ TAKE_OFF_RE = re.compile(r"\btake\b.{0,24}\boff\b|\btake off\b|\bunclip\b"
 # There is one thing in this game you take *out* of somebody, and the sentence
 # has nowhere else to land.
 DOFF_RE = re.compile(r"\b(take|takes|pull|pulls|get|gets|slip|slips|remove|"
-                     r"removes|yank|yanks)\b.{0,24}\bout\b"
-                     r"|\btake it out\b|\bpull it out\b|\bout it comes\b")
+                     r"removes|yank|yanks)\b.{0,24}\b(out|off)\b"
+                     r"|\btake it out\b|\bpull it out\b|\bout it comes\b"
+                     # AND THE BARE "<thing> off", which carries no verb at
+                     # all: "cuffs off". The noun is checked by `doff_of`.
+                     r"|\boff\b")
 DOFF_IT = re.compile(r"\b(it|that|this)\b")
 
 
 def doff_of(text: str):
-    """`doff:<key>` if the sentence takes a worn thing back off her."""
+    """`doff:<key>` if the sentence takes a worn thing back off her.
+
+    `DOFF_RE` is deliberately loose — it has to be, because "cuffs off" has
+    no verb in it — so the NOUN is what makes this safe. A sentence with no
+    wearable named in it leaves here with nothing, and "buzz off", "take your
+    shoes off" and "the mole is off to the left" all leave that way.
+    """
     t = (text or "").lower()
     if not DOFF_RE.search(t):
         return None
+    if re.search(r"\bbuzz\s*off\b", t):
+        return None
+    verb = re.search(r"\b(take|takes|pull|pulls|get|gets|slip|slips|remove|"
+                     r"removes|yank|yanks)\b", t)
     for key, pat in WEAR_WORDS:
-        if re.search(r"\b(" + pat + r")", t):
-            return "doff:" + key
-    # The bare pronoun, and only for the one thing that is *in* rather than on.
-    return "doff:lovense" if DOFF_IT.search(t) else None
+        if not re.search(r"\b(" + pat + r")", t):
+            continue
+        # AND "LOVENSE OFF" IS NOT THIS. It is the only wearable with a motor
+        # in it, so a bare `off` after its name means stop — which is what it
+        # meant before this function existed and what `buzz_of` still answers.
+        # Taking it out needs somebody to say so: a take-or-pull verb, or the
+        # word `out`. The cuffs and the headphones have no motor, so "cuffs
+        # off" has nowhere else to go and needs no verb.
+        if key == "lovense" and not verb and not re.search(r"\bout\b", t):
+            return None
+        return "doff:" + key
+    # The bare pronoun, and only with a verb that means taking it out of her:
+    # "take it out" is this and "take it off" is a jumper.
+    if DOFF_IT.search(t) and re.search(r"\b(out|off)\b", t) and re.search(
+            r"\b(take|takes|pull|pulls|slip|slips|remove|removes|yank|yanks)\b", t):
+        return "doff:lovense"
+    return None
 
 
 def give_of(text: str):
