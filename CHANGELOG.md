@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.437.0] — 2026-09-20
+
+### the same legs you walk the promenade with
+
+**"make walking around the boat the same as walking around land, very easy,
+dont need special wasd controls for the boat"**.
+
+Laid side by side, almost nothing about her deck WAS special. W has always
+gone where you are LOOKING, the same as ashore; Z is the lens and B is the
+third person in both; the deck is a walk model with a rise limit and a clamp,
+which is what the shore's is. Three things differed, and they were the three
+you feel:
+
+**The speed.** 1.55 m/s and 2.6 against the shore's 3.4 and 9.4 — the note
+said *it is a deck, not a runway*, and the result was a mode that felt like
+wading: 22 m of boat took fourteen seconds to cross and takes six and a half
+now. They are `GROUND.walk` and `GROUND.run` themselves rather than a copy,
+so they cannot drift apart again. What keeps that safe on a boat is not the
+speed but the two limits that were already there and are untouched — a stride
+that rises more than 0.45 m or drops more than 0.65 is refused, and the hull
+clamps you inboard of the bulwark. At the shore's run a 60 fps stride is
+0.16 m, which still takes this stair's 0.24 m treads one at a time.
+
+**The footfall.** There was none. The shore fires a step on every crossing of
+π in a gait phase advanced by the distance ACTUALLY covered — not by the keys,
+because a stride refused by the deckhouse is boots that did not walk through
+it — and the boat now has the same four lines. 0.42 hardness is a laid timber
+deck: softer than the promenade's concrete, harder than sand.
+
+**The bob.** Likewise none: your head was held perfectly still while you
+crossed her. `GROUND.bobY` drops it as each boot lands and `bobX` takes it
+side to side once a stride, applied in HER frame so it rides the heel rather
+than fighting it.
+
+Measured on her deck: two seconds of W covers 6.8 m, which is 3.4 m/s to the
+centimetre, and the gait advances 0.78 m a footfall — the shore's stride,
+which does not know it is aboard.
+
 ## [1.436.0] — 2026-09-19
 
 ### and eight of them are sitting down

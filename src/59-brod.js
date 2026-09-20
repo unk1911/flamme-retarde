@@ -390,8 +390,29 @@ const BROD = {
   // above the sole by a factor of four.
   stepUp: 0.66,
   stepDown: 0.85,
-  walk: 1.55,                // m/s about the deck — it is a deck, not a runway
-  run: 2.6,
+  /**
+   * ── THE SAME LEGS YOU WALK THE PROMENADE WITH ──────────────────────────
+   *
+   * Misha, 19 Sep 2026: *"make walking around the boat the same as walking
+   * around land, very easy, dont need special wasd controls for the boat"*.
+   *
+   * These were 1.55 and 2.6 — *it is a deck, not a runway* — against the
+   * shore's 3.4 and 9.4. The argument was sound and the result was a mode
+   * that felt like wading: her deck is 22 m end to end, which took fourteen
+   * seconds at the old walk and takes six and a half at the shore's. Nothing
+   * else about the walk was ever special — W has always gone where you are
+   * LOOKING, the same as ashore — so the speeds were the whole of the
+   * difference, and they are `GROUND`'s own numbers now rather than a copy,
+   * which is what stops them drifting apart again.
+   *
+   * What keeps this safe on a boat is not the speed, it is the two limits
+   * that were already here and are untouched: a stride that rises more than
+   * `stepUp` or falls more than `stepDown` is refused, and the hull clamps
+   * you inboard of the bulwark. At the shore's run a 60 fps stride is 0.16 m,
+   * which still clears this stair's 0.24 m treads one at a time.
+   */
+  walk: GROUND.walk,
+  run: GROUND.run,
 
   // How she sits. Sampled off the real Gerstner surface at four points, so the
   // heel and the trim are the sea's business and not a clock's: a hull that
@@ -2627,7 +2648,12 @@ function buildBrod(scene) {
   let bodyOn = false;            // is 49-you.js's figure ours this frame
   let wasX = 0, wasZ = 0;        // where you stood last step, for the walk clip
 
-  const you = { x: -4.4, z: 0, yaw: 0, pitch: -0.02, deck: 0.38 };
+  // `gait` and `bob` are the walk's own, and they are here for the reason the
+  // speeds above are `GROUND`'s: a deck you cross in silence, with your head
+  // held perfectly still, is not the same walk as the one ashore however fast
+  // it goes. Same phase, same stride, same footfall, same bob — see `gait` in
+  // 47-ground.js, which this is the boat's copy of and deliberately no more.
+  const you = { x: -4.4, z: 0, yaw: 0, pitch: -0.02, deck: 0.38, gait: 0, bob: 0 };
   const att = { y: 0, roll: 0, pitch: 0, yaw: 0 };
 
   const tmpV = new THREE.Vector3();
@@ -3491,6 +3517,30 @@ function buildBrod(scene) {
       }
     }
 
+    // ── the gait, which is what the walk sounded like and did not ──────────
+    //
+    // Off the distance ACTUALLY covered and not off the keys: a stride into
+    // the deckhouse is refused above, and boots that went on walking through
+    // it are the one thing this model can get audibly wrong. `wasX/wasZ` is
+    // where you stood before the block above and is already kept for the walk
+    // clip, so this costs a hypot.
+    //
+    // The phase advances π per footfall and the sound fires on the crossing
+    // rather than on a counter, so one enormous dt cannot swallow a step or
+    // play fifty. 47-ground.js's own words, and its own numbers: the stride
+    // is a person's and does not know it is aboard.
+    const moved = Math.hypot(you.x - wasX, you.z - wasZ);
+    if (moved > 1e-4) {
+      const before = you.gait;
+      you.gait += (moved / GROUND.stride) * Math.PI;
+      if (Math.floor(you.gait / Math.PI) !== Math.floor(before / Math.PI)) {
+        // 0.42 is a laid timber deck: softer than the concrete promenade and
+        // harder than sand, which is the whole of what `hard` says.
+        audio.footstep(0.42, 0.62 + sat(moved / (dt * BROD.run)) * 0.45);
+      }
+    }
+    you.bob = damp(you.bob, dt > 0 ? sat(moved / (dt * GROUND.walk)) : 0, 7, dt);
+
     for (let i = 0; i < BROD.calls.length; i++) {
       if (i > said && s >= BROD.calls[i].at) { said = i; out = out || 'call'; }
     }
@@ -3611,7 +3661,15 @@ function buildBrod(scene) {
    */
   function pose(camera, back = 0, dt = 0) {
     if (!active) return;
-    const ex = you.x, ey = you.deck + BROD.eye, ez = you.z;
+    // The head, which drops as each boot lands and goes side to side once a
+    // stride — `GROUND.bobY` and `bobX` and the same two lines that make them
+    // move ashore. It is applied in HER frame, so the bob rides the heel
+    // rather than fighting it.
+    const bdy = -GROUND.bobY * you.bob * (1 - Math.cos(you.gait * 2)) * 0.5;
+    const bsw = GROUND.bobX * you.bob * Math.sin(you.gait);
+    const ex = you.x - Math.sin(you.yaw) * bsw;
+    const ey = you.deck + BROD.eye + bdy;
+    const ez = you.z + Math.cos(you.yaw) * bsw;
     // Her view line, in her frame. The walk uses (cos yaw, sin yaw) for
     // forward, so this is that with the pitch on it.
     const cp = Math.cos(you.pitch);
