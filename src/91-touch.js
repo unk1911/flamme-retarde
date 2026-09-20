@@ -367,6 +367,7 @@ function initTouch() {
    * whether the box is up is the box.
    */
   tap('t-say', () => ears.toggle());
+  tap('t-cell', () => phoneToggle());
   tap('t-gset', () => togglePanel());
   tap('t-gpause', () => togglePause());
   tap('t-run', (el) => {

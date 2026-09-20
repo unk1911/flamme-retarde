@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.431.0] — 2026-09-19
+
+### the phone comes out of the bag
+
+**"now that we have a satchel with our cellphone in it, should be able to pull
+out the cellphone somehow and we do, should see cellphone controls"** — with
+a Coinbase app for BTC, LTC, ETH and DOGE; a Lovense app whose button sends
+five seconds of vibration to the device she is wearing; and a live view of
+shore Baye, **"so we can see her from a distance without having to go into the
+kabine per se"**.
+
+**The phone already existed and had no face.** It has been in the bag since
+the satchel was built — `phone` in CARRY — as the SENDER: the thing that has
+to be on you before `signalCan()` will let a signal go anywhere, which is what
+makes the laptop at the vikendica a second way to reach the Lovense rather
+than the only one. So nothing under these three apps is new plumbing. What is
+new is that you can look at it. **]** takes it out, one key up and one over
+from the **'** that opens the bag it lives in, and on glass there is a PHONE
+button in the mini row, because ] is a key a phone has not got and everything
+on that screen is a thing you reach for with a thumb.
+
+**Coinbase** is the same four quotes the bathers' own phones have shown since
+1.35x — `phoneQuotes`, one GET against `/baye/world` cached for the life of
+the page — so your screen and theirs cannot disagree, and it costs nothing
+extra. Prices the way a person writes them: no decimals on a coin worth eighty
+thousand and four on one worth eight cents.
+
+**Lovense** is one button and five seconds, down the same path the typed line
+and the laptop already use, so there is no second way for it to be wrong. It
+counts down on the button, a second press stops it early, and it says what
+happened when it cannot: *device not found*, *no phone on you*.
+
+**And her, live, which is the only part of this that is rendered.** A camera
+three metres in front of her at eye height, closer indoors because three
+metres in front of somebody standing in a two-and-a-half-metre hut is three
+metres of wall, into a render target at **20 Hz** — it is a second render of
+the whole world, and the saving has to come out of the frame rate of the view
+rather than its size, because at 240 by 380 the pixels are nothing and the
+draw calls are everything.
+
+**THE SCREEN IS A HOLE.** That is the one thing this cost a rebuild to learn.
+The live view is drawn by the renderer, into the canvas, at the rectangle the
+DOM reports — and the canvas is under the whole DOM. The first cut had a phone
+body with a background, so the picture was there (`readRenderTargetPixels`
+said so, a clean promenade grey) and every pixel of it was behind the phone's
+own paint. The dark is carried by the three things AROUND the picture now —
+the status bar, the screen's own background on the other two apps, and the
+chin — and the body is a border and a shadow and nothing else.
+
+Two smaller things fell out of it: the quad camera's near plane, which at 0
+put the only thing in that scene exactly on it and clipped it away, and the
+lens aspect, which is taken off the HOLE and not off the target, or she is
+stretched by the difference between the two.
+
+And the help sheet finally names both keys: **'** for the bag, which has never
+been on it, and **]** for the phone.
+
 ## [1.430.0] — 2026-09-19 (baye 1.28.0)
 
 ### the Sonicare demonstration

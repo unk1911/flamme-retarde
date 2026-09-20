@@ -811,6 +811,136 @@ html.touch #swim-hud { bottom: 7.4rem; }
 #satchel .sat-empty { color: #7f96a0; }
 html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
 
+/* The cellphone — src/63-phone.js. A slab on the right, mirroring the satchel
+   on the left, at the satchel's own z-index and for the satchel's own reason:
+   it is a thing you opened with a key, so it stays over the threshold dip and
+   over the pause card's blur.
+
+   POINTER EVENTS ON, which every other panel in this game turns off. This one
+   has buttons in it — three apps and a Lovense trigger — and it is the first
+   piece of the interface you are meant to TAP rather than read. The glass
+   swallows its own clicks (see `pointerdown` in the module) so a tap on an app
+   is not also a step forward in the world behind it. */
+#cell {
+  position: fixed; right: 24px; top: 50%; transform: translateY(-50%);
+  z-index: 69; pointer-events: auto;
+  width: min(15vw, 230px);
+  font-family: var(--mono); letter-spacing: .03em; color: #e8f1f4;
+  user-select: none;
+}
+#cell[hidden] { display: none; }
+/* THE SCREEN IS A HOLE AND NOT A PANEL, which is the whole of why the body
+   carries no background of its own. The live view is drawn by the RENDERER,
+   into the canvas, at the rectangle this element reports — and the canvas is
+   *under* the whole DOM. A phone with a solid body painted over that rectangle
+   is a phone with a black screen, which is exactly what the first cut of this
+   was: the target had the picture in it (readRenderTargetPixels said so) and
+   every pixel of it was behind #cell's own background.
+
+   So the dark is carried by the three things AROUND the picture — the status
+   bar, the screen's own background when it is not showing the world, and the
+   chin — and the body is a border and a shadow and nothing else. */
+#cell .cell-body {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  aspect-ratio: 9 / 19.5;
+  background: none; border: 2px solid rgba(190, 210, 220, .30);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .55);
+}
+#cell .cell-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .44rem; color: #8fb3c0; padding: .22rem .42rem .2rem;
+  background: #0a0e12;
+}
+#cell .cell-screen {
+  flex: 1; min-height: 0; overflow: hidden;
+  background: rgba(14, 20, 26, .96);
+  padding: .35rem .42rem;
+  display: flex; flex-direction: column; gap: .3rem;
+}
+/* And on the camera the background goes, so the world can come through. The
+   two lines of type stay — they are over the picture, which is where a LIVE
+   tag belongs. */
+#cell .cell-screen[data-app="cam"] { background: none; padding: .25rem .3rem; }
+#cell .cell-screen[data-app="cam"] .cell-head,
+#cell .cell-screen[data-app="cam"] .cell-foot {
+  background: rgba(8, 12, 16, .78); padding: .1rem .2rem; border: 0;
+}
+/* The chin, which is the dark under the home button. */
+#cell .cell-chin {
+  height: 1.1rem; background: #0a0e12; position: relative;
+}
+#cell .cell-home {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 34%; height: .3rem; padding: 0;
+  background: rgba(190, 210, 220, .45); border: 0; border-radius: 3px;
+  cursor: pointer;
+}
+#cell .cell-home:hover { background: rgba(190, 210, 220, .75); }
+
+#cell .cell-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .45rem .3rem;
+  padding: .35rem .15rem;
+}
+#cell .cell-app {
+  display: flex; flex-direction: column; align-items: center; gap: .18rem;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; color: #cfe0e6; font-size: .40rem;
+}
+#cell .cell-app i {
+  display: flex; align-items: center; justify-content: center;
+  width: 2.1rem; height: 2.1rem; border-radius: .52rem;
+  font-style: normal; font-size: 1.05rem; color: #fff;
+  box-shadow: inset 0 -6px 12px rgba(0, 0, 0, .25);
+}
+#cell .cell-app:hover i { filter: brightness(1.18); }
+#cell .cell-head {
+  text-transform: uppercase; letter-spacing: .14em; font-size: .42rem;
+  color: #8fb3c0; border-bottom: 1px solid rgba(160, 200, 214, .16);
+  padding-bottom: .18rem;
+}
+#cell .cell-foot { font-size: .36rem; color: #6f8792; margin-top: auto; }
+
+#cell .cell-coins { display: flex; flex-direction: column; gap: .28rem; }
+#cell .cell-coin {
+  display: grid; grid-template-columns: 2.1rem 1fr auto; align-items: baseline;
+  gap: .2rem; font-size: .44rem;
+}
+#cell .cell-coin .cc-k { color: #8fb3c0; letter-spacing: .1em; }
+#cell .cell-coin b { color: #f2e7d8; font-weight: 400; text-align: right; }
+#cell .cell-coin i { font-style: normal; font-size: .38rem; }
+#cell .cell-coin i.up { color: #7fd6a0; }
+#cell .cell-coin i.dn { color: #ef8f7f; }
+
+#cell .cell-love {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: .5rem;
+}
+#cell .cell-dot {
+  width: 1.4rem; height: 1.4rem; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff9ec4, #d6336c 70%);
+  opacity: .55;
+}
+#cell .cell-buzz {
+  width: 68%; padding: .42rem 0; cursor: pointer;
+  font-family: inherit; font-size: .52rem; letter-spacing: .12em; color: #fff;
+  background: #d6336c; border: 0; border-radius: .5rem;
+}
+#cell .cell-buzz.on { background: #7fd6a0; color: #10241a; }
+#cell .cell-buzz:hover { filter: brightness(1.12); }
+#cell .cell-note { font-size: .38rem; color: #8fb3c0; }
+
+/* The hole itself: nothing at all, on purpose. What shows through it is the
+   canvas, and what the renderer has just put there is her. */
+#cell .cell-cam {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .40rem; color: #9fb4bd; text-align: center;
+}
+
+html.touch #cell { right: .8rem; width: min(34vw, 210px); }
+
 /* Ears — src/49-ears.js. What the microphone heard and what was done about it,
    bottom right over the fly cam's corner, in the subtitle's own type. Small and
    dim on purpose: it is a debug console Misha asked for, not a feature panel. */

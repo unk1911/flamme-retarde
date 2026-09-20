@@ -356,6 +356,20 @@ addEventListener('keydown', (e) => {
   // what is in the bag, and it is a read-out — there is nothing in it that
   // could act on a frozen simulation.
   if (e.code === 'Quote') { e.preventDefault(); satchelToggle(); return; }
+  // ] — the phone, out of that same bag. See src/63-phone.js.
+  //
+  // THE BRACKET BECAUSE THE APOSTROPHE'S OWN NOTE IS STILL TRUE: all twenty-six
+  // letters are bound in this handler, and the marks that were left when the
+  // satchel took ' are the two brackets. ] is the one under the same hand, one
+  // key up and one over from the bag it comes out of, which is the right place
+  // for a thing that lives IN that bag.
+  //
+  // Above the pause guard, with the bag: the phone is a read-out too — the
+  // quotes, the battery, her on the camera — and the one thing on it that
+  // acts, the Lovense button, goes through `signal` and is harmless against a
+  // stopped world. And it opens the bag's own question from the other side:
+  // what have I got, versus what can I do with it.
+  if (e.code === 'BracketRight') { e.preventDefault(); phoneToggle(); return; }
   if (e.code === 'KeyO') { e.preventDefault(); skipToComputer(); return; }
   // P and Escape stop the world, and Escape can be pressed twice for the
   // silent version of it — see `escPause`, which owns that decision. Every
@@ -1537,6 +1551,11 @@ const HELP = [
     ['Y', 'help.k.drink'],
     [';', 'help.k.lick'],
     [', .', 'help.k.menu'],
+    // The bag and the phone that is in it, which were both keys nobody could
+    // find: ' has been the satchel since it was built and appeared on no
+    // sheet, and ] is new. See src/62-satchel.js and src/63-phone.js.
+    ["'", 'help.k.bag'],
+    [']', 'help.k.cell'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -6858,6 +6877,10 @@ function frame() {
   // And the ice cream, which unlike the bottle is on a clock whether you are
   // eating it or not — see MELT in src/61-cream.js.
   creamTick(real);
+  // And the phone, which has a clock, a battery and five seconds of buzz to
+  // count down — all of them wall time, like the ice cream and for the same
+  // reason. See src/63-phone.js.
+  phoneTick(real);
   if (flyCamT >= 0) {
     if (!flyCamHold) flyCamT += real;
     const S = jadrija.vik.fly.shot();
@@ -7511,6 +7534,10 @@ function frame() {
   chuteAudio();
   if (mirror) mirror.update(renderer, scene, camera);
   if (mirrorP) mirrorP.update(renderer, scene, camera);
+  // Her, live, into the phone's own target — before the frame for the mirror's
+  // reason, and at 20 Hz rather than 60 for its own. Nothing at all when the
+  // phone is away or on another app. See src/63-phone.js.
+  phoneCamStep(renderer, scene, real);
   // The world, through the occlusion pass if it is on. It returns false when
   // it has not drawn — off, or a target it could not make — and then this is
   // the renderer exactly as it was before any of that existed.
@@ -7556,6 +7583,11 @@ function frame() {
       jadrija.zombies.count());
     shot.render(renderer, true);
   }
+  // And the phone's glass, last of all: a quad the size of the hole the DOM
+  // has left for it, with the target `phoneCamStep` filled on it. After the
+  // fly cam and the insert because it is the nearest thing to the player of
+  // anything in this list — it is in their hand.
+  phoneCamBlit(renderer);
   const now = performance.now();
   if (lastFrameMs) state.fps = damp(state.fps, 1000 / Math.max(1, now - lastFrameMs), 2, dt);
   lastFrameMs = now;
@@ -9454,6 +9486,16 @@ window.__fr = {
    * No `clear()` on purpose: a handle that empties the bag is one mistyped
    * line away from resetting the state a test is measuring.
    */
+  /**
+   * The phone — see src/63-phone.js. `phone()` answers what it is doing,
+   * `phone.out(true)` takes it out, `phone.app('coin')` opens one, and
+   * `phone.press()` is the Lovense button.
+   */
+  phone: Object.assign(() => phoneStats(), {
+    out: (v) => phoneToggle(v),
+    app: (k) => { phoneToggle(true); phoneApp = k; phoneDraw(); return phoneStats(); },
+    press: () => { phonePress(); return phoneStats(); },
+  }),
   satchel: {
     put: (key, n) => satchelPut(key, n == null ? 1 : n),
     take: (key, n) => satchelTake(key, n == null ? 1 : n),

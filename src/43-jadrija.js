@@ -47195,6 +47195,17 @@ async function buildJadrija(scene) {
     /** The shop counter you are standing at, or null — see `counterAt`. */
     counter: (x, z) => counterAt(x, z),
     /**
+     * The four quotes, and the one GET that replaces them with live ones.
+     *
+     * Both are `phoneQuotes` — the bathers' own screens have fetched these
+     * since 1.35x and cache them for the life of the page, so YOUR phone
+     * (src/63-phone.js) reads the same numbers off the same object and costs
+     * nothing extra. `quotesRefresh` is idempotent: after the first call it
+     * returns without touching the network.
+     */
+    quotes: () => phoneQuotes.q,
+    quotesRefresh: () => phoneQuotes.refresh(),
+    /**
      * Send a signal to something you have put down — see SIGNAL. Answers in
      * words: 'on', 'off', 'not out', 'no receiver', or 'no sender' when you
      * have neither your phone on you nor the laptop in front of you.
