@@ -14,7 +14,11 @@
 set -u
 cd "$(dirname "$0")/.."
 
-WANT=$(grep -oP 'VERSION = "\K[^"]+' build.py)
+# ANCHORED AT THE LINE START. Without the caret this also matches
+# `THREE_VERSION = "0.180.0"` two lines below it, and what comes back is two
+# versions separated by a newline — which never equals the one the server
+# serves, so a deploy that worked reports as a failure and retries twice.
+WANT=$(grep -oP '^VERSION = "\K[^"]+' build.py)
 DEST=edeliverables.com:/var/www/vhost/edeliverables/public_html/flamme-retarde/index.html
 
 for try in 1 2 3; do
