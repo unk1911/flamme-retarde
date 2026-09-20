@@ -8,6 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.442.3] — 2026-09-20
+
+### a phone gets the seven who are standing
+
+Twenty-one blobs is 161 323 triangles and twenty-one draw calls against the
+instanced tier's twenty-two calls for everybody, which is free on a laptop
+and is not free on the device this game is most often played on. `IS_SMALL`
+is its own name for that device — every other tier in the build already
+answers to it — and on one, the boat keeps the seven who are STANDING and
+leaves the fourteen sitters instanced. They are the ones at your eye height
+on the side deck you squeeze past, so they are the seven worth paying for.
+
+Measured: 640 by 360 with a coarse pointer gives 7 real at 53 954 triangles;
+1280 by 720 gives 21 at 161 323. The dog stands either way.
+
+**And the whole crossing, end to end, in one run** — which is the first time
+anybody has watched it since the time-lapse turned itself on:
+
+    t+6 s     berth      0 m      calls said 0    ×1
+    t+36 s    run      311 m      calls said 1    ×8
+    t+66 s    run    1 794 m      calls said 3    ×8
+    t+96 s    run    3 278 m      calls said 5    ×8
+    t+126 s   slow   3 697 m      calls said 6    ×1, by itself
+    t+156 s   alongside 3 813 m   all seven       E to step ashore
+
+Two minutes twenty, all seven calls said, the compression engaging on its own
+at a hundred metres and giving itself up at the braking mark. Nine and a half
+minutes of channel is still in there for anybody who wants it.
+
 ## [1.442.2] — 2026-09-20
 
 ### and it stops for the sights

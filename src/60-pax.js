@@ -514,9 +514,17 @@ async function buildBrodPax(scene, deckAt, boat) {
       if (fg.mode !== 'stand' || fg.scale < 0.85) continue;
       upgrade(fg, k++, fg.y, 'idle');
     }
+    // AND A PHONE GETS THE STANDERS AND NOT THE SITTERS. 21 blobs is 161 323
+    // triangles and 21 draw calls against the instanced tier's 22 calls for
+    // everybody, which is free on a laptop and is not free on the device this
+    // is most often played on — `IS_SMALL` is the game's own name for that
+    // device and every other tier in this file answers to it. The seven who
+    // are standing are the ones at your eye height on the side deck, so they
+    // are the seven worth paying for.
+    const sitN = typeof IS_SMALL !== 'undefined' && IS_SMALL ? 0 : PAX_SKIN_SIT;
     let j = 0;
     for (const fg of cast) {
-      if (j >= PAX_SKIN_SIT) break;
+      if (j >= sitN) break;
       if (fg.mode !== 'sit' || fg.scale < 0.85) continue;
       // The SOLE and not the plank — see PAX_SKIN_SIT. `B.y` is authored and
       // `B.top` is built, which is the one trap in this table.
