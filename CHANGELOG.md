@@ -8,6 +8,69 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.459.0] — 2026-09-21
+
+### 8 is the kabina
+
+Misha: *"can u assign button '8' to teleport into the kabine? lately been
+spending lots of time in the kabine"*
+
+`9` lands you sixteen metres up the promenade from her, and from there the
+room is another walk and a doorway to find. `8` is that doorway taken as
+read: the middle of the kabina floor, on your feet, facing the back of the
+room with the opening behind you.
+
+It is the walking entry and not `placeNamed`, which resets the flight model
+and puts you back in the aeroplane over the spot — for a room 4 m across that
+is a crash and a card, not a teleport. So it goes through `ground.dropIn`,
+exactly as `9` does, and answers from the air, from the ground and from the
+water.
+
+**Three latches are said by hand, because walking in says them by crossing a
+line and a teleport crosses nothing.**
+
+`inRoom` is set by a crossing and only by a crossing — see `crossThreshold`.
+Put down in the middle of the floor with it still false, the room is not
+somewhere you have ever been, so walking back out over the sill fires nothing
+and the way out of the room stops being the way out of the room. `roomStep`
+is the previous (t, s) that crossing is measured against; left at wherever
+the key was pressed, the next frame reads a step of two hundred metres that
+happens to pass through the doorway and cuts you into the room you are
+already standing in. `inLatch` and the two exposures would sort themselves
+out on their own — `kabina.inside` is a function of position — but `indoors`
+ramps at 3.6 a second, so arriving without them is a third of a second of a
+dark room lit for white concrete.
+
+What is kept of the door's own cut is the fade **up** and not the whole of
+it. There is nothing to hide on the way in, and half a second of black in
+front of a teleport that was instant is a loading screen; half a second of an
+eye opening on a dark room is the grammar this doorway already has.
+
+**Measured**, headless, `q=low`, pressing the real binding with
+`__fr.key('Digit8')` rather than calling the handler:
+
+| | before | after |
+|---|---|---|
+| from the air | `fly`, t 159.64, s −3691.99, `inRoom` false | `ground`, t **426.53**, s **19.65**, `inRoom` **true** |
+| after `9`, on foot | `ground`, t 445.03, s 8.80, `inRoom` false | `ground`, t **426.55**, s **19.61**, `inRoom` **true** |
+| from the water (`R`) | `swim`, t 254.42, s −43.83, `inRoom` false | `ground`, t **426.53**, s **19.65**, `inRoom` **true** |
+
+The room's own numbers: face 17.20, back 22.50, sill 17.54, floor 3.11. So
+19.65 is 2.45 m past the face and 2.85 m off the back wall, `kabina.inside`
+answers **1.000**, and the walker's y is 3.13 against a floor of 3.11 — on
+his feet, on the boards. One metre along his heading lands at s 20.61, which
+is deeper in: he is facing the room and not the door.
+
+And the exit still works, which is the whole reason `inRoom` is set by hand.
+Walking backwards out of it for 2.2 s of ground sim: `inRoom` **false**,
+`dipPhase` 2 with the screen at 0.65 and falling, and the walker set down at
+s **15.80** — `standOut`, to the centimetre. Pressed twice in a row it is
+idempotent; pressed before Jadrija exists it toasts and does nothing, like
+`9`.
+
+On the help sheet under *getting somewhere*, between `9` and `0`: **8 —
+inside the kabina**, in all three languages.
+
 ## [1.457.0] — 2026-09-21
 
 ### it was never the bend
