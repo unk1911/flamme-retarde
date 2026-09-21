@@ -38040,9 +38040,12 @@ async function buildJadrija(scene) {
         // on her way down.
         const along = sat((lu - 0.530) / 0.190);
         cokeTakeSet(along);
+        // Published for `cokeReach`, which picks the elbow off it.
+        show.strawUp = lift;
         if (skinFig) strawHold(skinFig, grip, lift, Math.min(COKE.lines - 1, cokeGone), along);
         if (lu >= 1) {
           cokeGone = Math.min(COKE.lines, cokeGone + 1);
+          show.strawUp = 0;
           if (skinFig) strawHold(skinFig, 0, 0, 0, 0);
           go('dwell', 'idle', 0.42);
         }
@@ -41543,8 +41546,31 @@ async function buildJadrija(scene) {
   // place it can go on an arm reaching down at something in front of it.
   // +z is her right on this rig — measured: `armUR` sits at z +0.179.
   const REACH_POLE = new THREE.Vector3(-0.45, 0.10, 1).normalize();
+  /**
+   * ── AND A HAND COMING TO HER OWN FACE WANTS A DIFFERENT ELBOW ──────────
+   *
+   * Misha, 20 Sep 2026: *"she still does some weird shit with her hand"*.
+   * Shot as a twelve-frame strip rather than as stills, it is unmistakable:
+   * from the moment the straw starts up, her elbow is thrown WIDE to her
+   * right and stays there — an arm folded up with the point of the elbow out
+   * at shoulder height, which reads as somebody scratching their head.
+   *
+   * `REACH_POLE` is why, and it is correct for what it was written for: an
+   * arm reaching DOWN at a table wants its elbow out to the side and a
+   * little behind, because that is the only place it can go. Bringing a hand
+   * to your own nose is the opposite problem — the arm has to fold right up,
+   * and the elbow drops and comes forward, under the hand, tucked in against
+   * the ribs. Nobody lifts a straw to their face with their elbow out level
+   * with their ear.
+   *
+   * So the face beat gets its own pole: down, forward, and much less to the
+   * side. The reach beat keeps the one it has.
+   */
+  const FACE_POLE = new THREE.Vector3(0.25, -1, 0.30).normalize();
   const COKE_ARM = { up: COKE_HAND.lift, fwd: -COKE_HAND.back,
     follow: COKE_HAND.follow, pole: REACH_POLE };
+  const FACE_ARM = { up: COKE_HAND.lift, fwd: -COKE_HAND.back,
+    follow: COKE_HAND.follow, pole: FACE_POLE };
   function cokeReach(f, dt, free) {
     // The taking is the same arm on the same plate — see `cokeTakeSet`. It
     // shares `show.cokeU`, and the phase decides what the hand is over:
@@ -41572,11 +41598,15 @@ async function buildJadrija(scene) {
       // face and not on the plate. The hand follows the object.
       if (!cokeStrawAt(_ckBlade)) return;
     } else if (!cokeHoldAt(_ckBlade, u)) return;
+    // And which elbow. Down and forward once the object has left the plate,
+    // out to the side while she is still reaching for it — see `FACE_POLE`.
+    const arm = (show.phase === 'line' && (show.strawUp || 0) > 0.35)
+      ? FACE_ARM : COKE_ARM;
     // Lower over the wrap than over the blade: the blade number leaves the
     // grip 21 mm clear of steel lying flat, and the wrap is 2 mm of folded
     // paper she is pinching rather than a tool she is holding.
     COKE_ARM.up = u < 0.25 ? COKE_HAND.liftWrap : COKE_HAND.lift;
-    reachRight(f, dt, 'coke', _ckBlade, show.cutAt, COKE_ARM);
+    reachRight(f, dt, 'coke', _ckBlade, show.cutAt, arm);
   }
 
   /**

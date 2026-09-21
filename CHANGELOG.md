@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.454.1] — 2026-09-21
+
+### the elbow, and why the straw cannot be seen
+
+*"She still does some weird shit with her hand... and i don't see the straw
+in her nose... i mean maybe u don't know the right thing to do?"*
+
+Fair, and the method was the fault: this had been judged off single stills,
+which is the wrong instrument for a movement. Shot instead as a **twelve-frame
+strip on a fixed camera**, both faults name themselves in one look.
+
+**The elbow.** From the moment the straw starts up, it is thrown wide to her
+right and stays there — an arm folded up with the point of the elbow out at
+shoulder height, which reads as somebody scratching their head.
+
+`REACH_POLE` is why, and it is correct for what it was written for: an arm
+reaching DOWN at a table wants its elbow out to the side and a little behind,
+because that is the only place it can go. Bringing a hand to your own nose is
+the opposite problem — the arm folds right up and the elbow drops forward,
+under the hand and in against the ribs. Nobody lifts a straw to their face
+with their elbow level with their ear. The face beat has its own pole now,
+switched on when the object leaves the plate; the reach beat keeps the one it
+has.
+
+**And the straw cannot be seen because it is fifteen pixels.** 42 mm long and
+6.8 mm thick, held against skin, at the distance anybody actually watches
+this from. That is not a positioning problem and no amount of aiming fixes
+it: there is nothing there to see. It is written down here rather than tuned
+again.
+
 ## [1.454.0] — 2026-09-20
 
 ### three sub-steps, and the hand stops chasing the straw
