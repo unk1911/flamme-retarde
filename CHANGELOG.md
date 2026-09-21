@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.453.1] — 2026-09-20
+
+### the depth comes from the knees
+
+*"She bends lower now but not low enough to reach the line.. lol. it looks
+quite awkward tbh."* Right on both counts, and the second bake was worse than
+the first in a way the number did not show.
+
+    fold 74, knee 16     head 0.465 m above the plate   short of it
+    fold 100, knee 40    head 0.115 m                   AND draped over it
+    fold 50, knee 98     head 0.252 m                   at it
+
+**A fold past horizontal carries her head forward as well as down.** At 100
+degrees the number looked excellent — 0.115 m, her face all but on the plate
+— and the picture was a woman lying across the tabletop with her head hanging
+off the far edge. It is the clearest case this file has produced of a measure
+that improves while the thing it measures gets worse.
+
+Depth has to come from the knees. A squat takes her straight down; a fold
+throws her over. So the fold is back to 50, which is enough to bring her face
+over what is in front of her, and the knees carry 98 — most of a full squat,
+and what anybody does at a table this low.
+
+The ankle is capped at 26 degrees. It had been following the knee at 0.45 of
+it, which at a 98-degree knee is a 44-degree ankle: she went up on her toes
+at the bottom of the squat.
+
+One other thing worth writing down, because it cost a render: the pose helper
+is `_stoop(fold, neck, head, knee, root)`, and a ladder built by passing the
+knee angles into the `neck` slot produces a figure leaning backwards with her
+chin up — which looks like a rig problem and is an argument order.
+
 ## [1.453.0] — 2026-09-20
 
 ### a real bend

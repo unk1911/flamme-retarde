@@ -4916,9 +4916,23 @@ CROUCH = {
 # even along the back is a banana and a fold that is all in the lowest joint
 # is a hinge — real backs are somewhere between and nearer the hinge.
 #
-# 68 degrees is the depth. At 60 her face is around hip height and at 75 she
-# is nearly horizontal; 68 is what puts her eyes over a plate on a table with
-# her heels still down.
+# ── AND THE DEPTH COMES FROM THE KNEES ────────────────────────────────────
+#
+# Three bakes to get this right and the middle one is the instructive one.
+# 74 degrees of fold left her head 0.465 m above the plate — peering at it
+# from a distance. So the fold went to 100, and that was worse in a way the
+# number did not show: **a fold past horizontal carries her head FORWARD as
+# well as down.** Her head reached 0.115 m of the plate and she was draped
+# across the tabletop with her face hanging off the far edge.
+#
+# Depth has to come from the knees. A squat takes her straight down; a fold
+# throws her over. So the fold is back to 50 — enough to bring her face over
+# what is in front of her — and the knees carry 98, which is most of a full
+# squat and is what anybody does at a table this low.
+#
+# The ankle is capped at 26. It was following the knee at 0.45 of it, which
+# at a 98-degree knee is a 44-degree ankle, and that lifts her heels: she
+# went up on her toes at the bottom of the squat.
 #
 # The knees take twelve degrees. Stiff-legged at this depth is a hamstring
 # stretch and not a stoop, and the small bend is also what stops her reading
@@ -4942,10 +4956,10 @@ def _stoop(a, neck, head, knee=12, root=-0.02):
         "armUL": (14, 0, 22), "armLL": (-30, 0, 6), "handL": (-10, 0, 0),
         "legUL": (-knee * 0.5, 0, STAND_TRACK),
         "legLL": (knee, 0, STAND_SHANK),
-        "footL": (-knee * 0.45, STAND_SOLE, 0),
+        "footL": (-min(knee * 0.45, 26), STAND_SOLE, 0),
         "legUR": (-knee * 0.5, 3, -STAND_TRACK),
         "legLR": (knee, 0, -STAND_SHANK),
-        "footR": (-knee * 0.45, -STAND_SOLE, 0),
+        "footR": (-min(knee * 0.45, 26), -STAND_SOLE, 0),
     })
 
 
@@ -4955,20 +4969,23 @@ def _stoop(a, neck, head, knee=12, root=-0.02):
 # already points at the floor and the neck only has to bring her gaze FORWARD
 # on to the plate, which is about 16. At 40 it carried her head all the way
 # back to level and she was stooping at the room.
-STOOP = _stoop(74, 16, 4, knee=16)
+
+
+
+STOOP = _stoop(50, 16, 4, knee=98, root=-0.42)
 
 # Halfway down, for the clip to pass through, so the fold arrives as a
 # movement rather than as a cut.
-STOOP_IN = _stoop(34, 14, 6, knee=8, root=-0.012)
+STOOP_IN = _stoop(26, 14, 4, knee=46, root=-0.19)
 
 # A breath lower, the way every held pose in this file has one — a position
 # that does not move is a mannequin.
-STOOP_B = _stoop(77, 17, 5, knee=17, root=-0.030)
+STOOP_B = _stoop(53, 17, 5, knee=101, root=-0.435)
 
 # And the head off it, which is the only fast thing in the beat. Still folded
 # — she comes off the plate before she comes up — so this is the neck and
 # nothing else, thrown a long way back from where it was resting.
-STOOP_UP = _stoop(66, -20, -18, knee=13, root=-0.022)
+STOOP_UP = _stoop(44, -20, -18, knee=92, root=-0.395)
 
 
 # The throw: arms up and over, legs driving straight, and the hips already
