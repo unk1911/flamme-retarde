@@ -391,6 +391,10 @@ addEventListener('keydown', (e) => {
   // pressing the key it told you about should work.
   if (e.code === 'Digit0' || e.code === 'Numpad0') { e.preventDefault(); skipToGround(); return; }
   if (e.code === 'Digit9' || e.code === 'Numpad9') { e.preventDefault(); skipToJadrija(); return; }
+  // 8 — inside the kabina, which is one door further on from where 9 lands
+  // you. Ahead of the pause guard with the other two digits, and for the same
+  // reason. See `skipToKabina`.
+  if (e.code === 'Digit8' || e.code === 'Numpad8') { e.preventDefault(); skipToKabina(); return; }
   // V for the vikendica, and pressed again in there for the other roof. Like
   // 9 it is ahead of the pause guard, because reading the hint and then
   // pressing the key it names should work.
@@ -1574,6 +1578,7 @@ const HELP = [
   ['help.g.doors', [
     ['J', 'help.k.bail'],
     ['9', 'help.k.jadrija'],
+    ['8', 'help.k.kabina'],
     ['0', 'help.k.rokici'],
     ['V', 'help.k.vikendica'],
     ['R', 'help.k.race'],
@@ -2130,6 +2135,86 @@ function skipToJadrija() {
   if (!IS_TOUCH) grabPointer();
   paintDeviceText();
   toast(T('toast.cheatJad'));
+}
+
+/**
+ * The third back door, on `8` — inside the kabina.
+ *
+ * Misha, 21 Sep: *"can u assign button '8' to teleport into the kabine? lately
+ * been spending lots of time in the kabine"*. `9` lands you sixteen metres up
+ * the promenade from her, and from there the room is another walk and a door
+ * to find; this is the door taken as read.
+ *
+ * NOT `placeNamed`: that one resets the flight model and puts you back in the
+ * aeroplane over the spot, which for a room 4 m across is a crash and a card.
+ * This is the walking entry — `dropIn`, exactly as `9` is — and it is on the
+ * digit next to it because it is the same errand one building further in.
+ *
+ * Three things are said by hand that walking in through the doorway says for
+ * you, and all three are latches rather than functions of where you are:
+ *
+ *   `inRoom` is set by a CROSSING and only by one — see `crossThreshold`. Put
+ *   down in the middle of the floor with it still false, the room is not
+ *   somewhere you have ever been, so walking back out over the sill fires
+ *   nothing and the way out of the room is not the way out of the room.
+ *
+ *   `roomStep` is the previous (t, s) that crossing is measured against. Left
+ *   at wherever you pressed the key — the far end of the promenade, the
+ *   channel, the air — the very next frame reads a step of two hundred metres
+ *   that happens to pass through the doorway, and cuts you into the room you
+ *   are already standing in.
+ *
+ *   `inLatch` and the two exposures would sort themselves out on their own,
+ *   because `kabina.inside` is a function of position and answers 1 here. But
+ *   `indoors` ramps at 3.6 a second, so arriving without them is a third of a
+ *   second of a dark room lit for white concrete.
+ *
+ * The iris is the fade UP and not the whole cut. There is nothing to hide on
+ * the way in — the move has already happened by the time the screen would go
+ * down — and half a second of black before a teleport that was instant is a
+ * loading screen. What is worth keeping is the other half: an eye opening on a
+ * dark room, which is the grammar this doorway already has.
+ */
+function skipToKabina() {
+  const K = jadrija && jadrija.kabina;
+  if (!ground || !ground.ok || !K) {
+    // Same as `9`: a back door that silently does nothing is indistinguishable
+    // from one that took you somewhere and something else took you back.
+    toast(T('toast.noComputer'));
+    return;
+  }
+  if (state.paused) setPaused(false);
+  if (vikWalk) { vikWalk = null; vikHold = false; }
+  camOverride = null;
+  if (state.phase !== 'fly' && state.phase !== 'ground'
+    && state.phase !== 'chute' && !inWater()) return;
+  if (eject) eject.reset();
+  leaveWater();
+  const w = jadrija.toWorld(K.standIn[0], K.standIn[1]);
+  // Facing into the room: the back wall, not the doorway. Everything in here —
+  // the cot, the table, the glass — is behind you otherwise, and a teleport
+  // that lands you looking at the way out has shown you nothing.
+  const deep = jadrija.toWorld(K.standIn[0], K.back);
+  if (!ground.retarget(jadrija) || !ground.dropIn(w[0], w[2],
+    Math.atan2(-(deep[0] - w[0]), -(deep[2] - w[2])))) {
+    toast(T('ground.noPlane'));
+    return;
+  }
+  state.phase = 'ground';
+  $('hud').hidden = true;
+  $('chute-hud').hidden = true;
+  $('ground-hud').hidden = false;
+  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = false; }
+  if (!IS_TOUCH) grabPointer();
+  paintDeviceText();
+  // The three latches, and the iris. `dipPhase = 2` is the fade up on its own;
+  // `dipPin` is where the walker is held for the half second it lasts, which is
+  // where we just put him.
+  inRoom = true;
+  roomStep = [K.standIn[0], K.standIn[1]];
+  inLatch = 1; darkWant = 1; indoors = 1; roomDark = 1;
+  dipPhase = 2; dipT = 0; dipDo = null; dipPin = [w[0], w[2]];
+  toast(T('toast.cheatKab'));
 }
 
 // ── the way in ───────────────────────────────────────────────────────────────
