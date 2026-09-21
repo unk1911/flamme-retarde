@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.453.2] — 2026-09-20
+
+### the plate in front of her rather than under her
+
+*"Now she leans far enough, but like the plate is under her, not in front of
+her lol."*
+
+**0.41 m is the reach mark and it is right for a reach.** An arm comes out of
+a shoulder, so standing close is exactly what puts a hand on the plate — and
+that mark has been correct for the cutting since the cutting was built. A
+FACE does not come out of a shoulder. Squatting from the same spot folds her
+over the top of the table and leaves the plate beneath her chest.
+
+So the face beat has its own mark, on the same rule with the body's own depth
+in it: **0.74 m**, because she leans about 0.35 m forward out of the squat.
+And `LEAD` drops from 0.35 rad to 0.10 — those twenty degrees of turn exist
+to put an object off her working shoulder rather than off her chest, and for
+this beat her chest is exactly where it should be.
+
+Measured at the deepest frame, her head against the plate:
+
+    0.249 m above it      0.163 m from it in plan
+
+She walks the extra third of a metre on the way in, through `stepTo`, the
+same leg that already carries her between the plate and the stool.
+
 ## [1.453.1] — 2026-09-20
 
 ### the depth comes from the knees

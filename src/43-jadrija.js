@@ -28187,7 +28187,30 @@ async function buildJadrija(scene) {
           const mt = bt + o[0] / L * OUT, ms = bs + o[1] / L * OUT;
           return [mt, ms, Math.atan2(-o[1] / L, -o[0] / L) + LEAD];
         };
-        return { coke: at(LAY.plate), lift: at(LAY.spot), out: OUT };
+        // ── AND THE FACE BEAT STANDS FURTHER BACK ────────────────────────
+        //
+        // Misha, 20 Sep 2026: *"now she leans far enough, but like the plate
+        // is under her, not in front of her lol"*.
+        //
+        // 0.41 is the reach mark and it is right for a reach: an arm comes
+        // out from a shoulder, so standing close is what puts a hand on the
+        // plate. A FACE does not come out of a shoulder. Squatting from the
+        // same mark folds her over the top of the table and the plate ends up
+        // beneath her chest.
+        //
+        // 0.74 is the same rule with the body's own depth in it: she leans
+        // about 0.35 m forward out of the squat, so the plate wants to be
+        // that much further out than it would for a hand. And `LEAD` drops
+        // from 0.35 to 0.10 — the twenty degrees of turn exist to put an
+        // object off her working shoulder rather than off her chest, and for
+        // this one her chest is exactly where it should be.
+        const face = (o) => {
+          const L = Math.hypot(o[0], o[1]) || 1;
+          return [bt + o[0] / L * 0.74, bs + o[1] / L * 0.74,
+            Math.atan2(-o[1] / L, -o[0] / L) + 0.10];
+        };
+        return { coke: at(LAY.plate), line: face(LAY.plate),
+          lift: at(LAY.spot), out: OUT };
       })(),
       // The cot, for the dog: where he lies on it, how high the mattress is,      // The cot, for the dog: where he lies on it, how high the mattress is,
       // and where he stands on the floor to get up. Off `cm`/`cs0` rather than
@@ -37456,10 +37479,11 @@ async function buildJadrija(scene) {
         show.byAsk = 1;
         show.queue.length = 0;
         showSay('trill', d);
-        // Same mark as the cutting, and on to it the same way.
-        if (kit && kit.work
-            && Math.hypot(show.t - kit.work.coke[0], show.s - kit.work.coke[1]) > 0.26) {
-          show.goMark = kit.work.coke;
+        // Its OWN mark, further back than the cutting's — see `face` in the
+        // kit. A squat done from the reach mark puts the plate under her.
+        const lm = kit && kit.work && (kit.work.line || kit.work.coke);
+        if (lm && Math.hypot(show.t - lm[0], show.s - lm[1]) > 0.20) {
+          show.goMark = lm;
           show.goNext = 'line';
           go('stepTo', 'walk', 0.34);
         } else go('line', 'snort', 0.30);
@@ -37908,9 +37932,10 @@ async function buildJadrija(scene) {
         // which is what lets `cokeStoop` and `cokeReach` carry over from the
         // cutting without knowing there is a second beat: both of them read
         // that one number and ramp on it.
-        show.want = kit && kit.work ? kit.work.coke[2] : show.want;
+        const LM = kit && kit.work && (kit.work.line || kit.work.coke);
+        show.want = LM ? LM[2] : show.want;
         showHold(dt);
-        if (show.tmr < 0.62 && kit && kit.work) showSettle(kit.work.coke, dt, 10.0);
+        if (show.tmr < 0.62 && LM) showSettle(LM, dt, 10.0);
         const LN = 3.4;
         const lu = Math.max(0, show.tmr - 0.55) / LN;
         show.cokeU = Math.min(1, lu);
