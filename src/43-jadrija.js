@@ -38020,27 +38020,30 @@ async function buildJadrija(scene) {
         show.want = LM ? LM[2] : show.want;
         showHold(dt);
         if (show.tmr < 0.62 && LM) showSettle(LM, dt, 10.0);
-        const LN = 3.4;
+        // ── THE SAME SIX BEATS THE CLIP HAS ──────────────────────────
+        //
+        // 4.60 s, and every number below is a fraction of it read straight
+        // off the clip's own keys in tools/blender/human_mh.py — 0.75 pick,
+        // 1.45 nose, 2.35 down, 3.10 hold, 3.45 head off, 4.60 stand. The
+        // clip and the phase are one timeline and this is where the two are
+        // tied together; a beat that drifted from its key would have her
+        // taking a line off a plate her face had already left.
+        const LN = 4.6;
         const lu = Math.max(0, show.tmr - 0.55) / LN;
         show.cokeU = Math.min(1, lu);
-        // The powder only goes during the middle beat.
-        const along = sat((lu - 0.26) / 0.41);
+        // Fingers close on it where it lies, over the reach.
+        const grip = sat((lu - 0.100) / 0.060);
+        // And it comes up to her face between the pick and the nose keys.
+        const lift = sat((lu - 0.163) / 0.152);
+        // The powder only goes once her face is down there — which is the
+        // whole point of the re-timing. It used to start while she was still
+        // on her way down.
+        const along = sat((lu - 0.530) / 0.190);
         cokeTakeSet(along);
-        // AND THE STRAW IS IN HER HAND FOR IT. In over the reach, held flat
-        // through the middle, and back down in the well by the end — the
-        // same ramp shape the crouch uses, so the object arrives in her fist
-        // on the frame she is low enough to use it and is lying in the plate
-        // again before she straightens up. See `strawHold`.
-        if (skinFig) {
-          strawHold(skinFig, sat((lu - 0.14) / 0.10) * sat((0.94 - lu) / 0.08),
-            Math.min(COKE.lines - 1, cokeGone), along);
-        }
-        // The head off the plate at the top is IN THE CLIP and not an aim
-        // any more — see STOOP_UP. It was a neck rotation laid over `idle`,
-        // which is a woman standing up straight nodding at a table.
+        if (skinFig) strawHold(skinFig, grip, lift, Math.min(COKE.lines - 1, cokeGone), along);
         if (lu >= 1) {
           cokeGone = Math.min(COKE.lines, cokeGone + 1);
-          if (skinFig) strawHold(skinFig, 0);
+          if (skinFig) strawHold(skinFig, 0, 0, 0, 0);
           go('dwell', 'idle', 0.42);
         }
         break;
@@ -40962,6 +40965,7 @@ async function buildJadrija(scene) {
   const _stU = new THREE.Vector3(0, 1, 0);
   const _stP = new THREE.Vector3(), _stA = new THREE.Vector3();
   const _stD = new THREE.Vector3(), _stH = new THREE.Vector3();
+  const _stN = new THREE.Vector3();
   const _stQ = new THREE.Quaternion(), _stT = new THREE.Quaternion();
 
   /**
@@ -40989,30 +40993,39 @@ async function buildJadrija(scene) {
    * child of — the palm comes back in world metres and `worldToLocal` is the
    * one line that joins the two.
    */
-  function strawHold(f, amt, i, along) {
-    const k = cokeKit;
+  /**
+   * The straw, through the three beats.
+   *
+   * ── WHICH WAY ROUND THIS GOES ─────────────────────────────────────────
+   *
+   * Misha, 20 Sep 2026: *"she does some weird ting with her hand"*. She did,
+   * and it was structural. The straw was pinned to her NOSTRIL and the arm
+   * solver was aimed at the straw — so her hand was chasing an object that
+   * was already fixed to her face, and what it did on the way there was
+   * whatever the solver felt like.
+   *
+   * A held object does not lead the hand that holds it. So the anchor is
+   * what moves — from where the straw is lying on the plate, to her nostril,
+   * over the lift beat — the straw hangs off that anchor pointing at the
+   * line, and the HAND is aimed at the middle of the straw. On the way up
+   * the hand and the object travel together because they are the same
+   * movement, which is the whole of what was missing.
+   *
+   * `grip` is the fingers closing, `lift` is the carry. They are separate
+   * because a hand that starts rising before it has closed is a hand that
+   * pushes the straw across the plate.
+   */
+  function strawHold(f, grip, lift, i, along) {
+    const k = cokeBuild();
     const st = k && k.straws && k.straws[0];
     if (!st || !st.userData.restP) return;
-    if (amt <= 0.001) {
+    if (grip <= 0.001 && lift <= 0.001) {
       st.position.copy(st.userData.restP);
       st.quaternion.copy(st.userData.restQ);
       return;
     }
-    // ── THE NEAR END GOES IN HER NOSE ─────────────────────────────────
-    //
-    // Misha, 20 Sep 2026: *"still i don't see her putting the straw in her
-    // nose"*. It was held from her PALM to the line, which is a woman
-    // pointing a straw at a plate.
-    //
-    // So the near end is her nostril and not her hand: the head bone, plus
-    // 0.085 forward and 0.055 down in her own frame, which is where a nose
-    // is on this skull. The hand follows it rather than leading it — see the
-    // `line` branch in `cokeReach`, which now aims at the same point.
-    //
-    // The straw is 42 mm and her face is about 0.15 m above the plate at the
-    // bottom of the squat, so it does not BRIDGE the gap and it is not meant
-    // to: what somebody actually does is put the straw in and bring their
-    // face down, and a 0.15 m straw would read as a snorkel.
+    // Her nostril: the head bone, plus 0.085 forward and 0.055 down in her
+    // own frame, which is where a nose is on this skull.
     const hd = f.boneIndex('head');
     if (hd < 0) return;
     f.mesh.updateMatrixWorld();
@@ -41022,19 +41035,22 @@ async function buildJadrija(scene) {
     _stP.set(0.085, -0.055, 0).applyQuaternion(_stQ).add(_stH);
     k.g.updateMatrixWorld();
     k.g.worldToLocal(_stP);
-    // Where on the line the working end is, in the plate's frame.
+    // Where on the line the far end is working, in the plate's frame.
     const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
     _stA.set(0.012 - COKE.len / 2 + COKE.len * along, 0.0060, z);
-    // Aimed from the nostril at the line, and placed half a straw down that
-    // run — so the top of it is AT her nose rather than near it.
-    _stD.copy(_stA).sub(_stP);
-    if (_stD.lengthSq() > 1e-8) {
-      _stD.normalize();
-      _stH.copy(_stP).addScaledVector(_stD, 0.021);
-      st.position.copy(st.userData.restP).lerp(_stH, amt);
-      _stQ.setFromUnitVectors(_stU, _stD.negate());
-      st.quaternion.copy(st.userData.restQ).slerp(_stQ, amt);
-    }
+    // THE ANCHOR IS THE TOP OF THE STRAW and it is what travels: its own
+    // resting place on the plate at lift 0, her nostril at lift 1.
+    _stN.copy(st.userData.restP).lerp(_stP, lift);
+    _stD.copy(_stA).sub(_stN);
+    if (_stD.lengthSq() < 1e-8) return;
+    _stD.normalize();
+    // Lying flat until the fingers have closed on it, and hanging off the
+    // anchor once they have.
+    st.position.copy(st.userData.restP)
+      .lerp(_stH.copy(_stN).addScaledVector(_stD, 0.021), Math.max(grip, lift));
+    _stQ.setFromUnitVectors(_stU, _stD.clone().negate());
+    st.quaternion.copy(st.userData.restQ)
+      .slerp(_stQ, Math.max(grip, lift));
   }
 
   /**

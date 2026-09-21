@@ -4976,6 +4976,22 @@ STOOP = _stoop(50, 16, 4, knee=98, root=-0.42)
 
 # Halfway down, for the clip to pass through, so the fold arrives as a
 # movement rather than as a cut.
+# ── AND THE BEAT IS THREE THINGS, NOT ONE ─────────────────────────────────
+#
+# Misha, 20 Sep 2026: *"maybe break it down into sub-steps. first perfect the
+# taking the straw in hand, bringing into the nose and then moving the head
+# towards plate"*. He is right that it was one movement doing three jobs: she
+# went down and the straw and the hand sorted themselves out somewhere in the
+# middle of it, which is why the hand looked like it was doing something odd.
+#
+# So the clip has three, and they happen in the order a person does them.
+# PICK is a small lean over the table — the ARM does the reaching, not the
+# back, because picking a 42 mm straw off a plate is a hand's job. NOSE is
+# almost upright again: she has it, and she is putting it to her face, and
+# nobody squats to do that. Only then does STOOP take her down to the line.
+STOOP_PICK = _stoop(30, 14, 4, knee=20, root=-0.085)
+STOOP_NOSE = _stoop(13, 10, 2, knee=9, root=-0.035)
+
 STOOP_IN = _stoop(26, 14, 4, knee=46, root=-0.19)
 
 # A breath lower, the way every held pose in this file has one — a position
@@ -7430,9 +7446,16 @@ CLIPS = [
     # The keys are the beat: down by 1.05, along the line through the middle
     # of it, the head off it at 2.55, and back up. The fold comes in slower
     # than it goes out, because it does.
+    # 4.60 s and six beats, which is the length the `line` phase runs for —
+    # the clip and the phase are one number. It was 3.40 and one movement:
+    # she folded and the straw and the hand arrived somewhere in the middle
+    # of it. Now the order is the order a person does it in. Reach down and
+    # take it (0.75), back up with it at her face (1.45), THEN down to the
+    # line (2.35), hold it (3.10), head off it (3.45), stand (4.60).
     {"name": "snort", "loop": False,
-     "keys": [(0.00, IDLE_A), (0.55, STOOP_IN), (1.05, STOOP),
-              (2.15, STOOP_B), (2.55, STOOP_UP), (3.40, IDLE_A)]},
+     "keys": [(0.00, IDLE_A), (0.75, STOOP_PICK), (1.45, STOOP_NOSE),
+              (2.35, STOOP), (3.10, STOOP_B), (3.45, STOOP_UP),
+              (4.60, IDLE_A)]},
     {"name": "crawl", "loop": True,
      "keys": [(0.0, CRAWL_A), (0.55, CRAWL_B), (1.10, CRAWL_A)]},
     {"name": "getup", "loop": False,

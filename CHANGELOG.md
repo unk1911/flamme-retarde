@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.454.0] — 2026-09-20
+
+### three sub-steps, and the hand stops chasing the straw
+
+*"She does some weird ting with her hand... maybe break it down into
+sub-steps. first perfect the taking the straw in hand, bringing into the nose
+and then moving the head towards plate."*
+
+**The hand was chasing an object that was fixed to her face.** That is the
+structural fault and it is why the arm did something unaccountable: the straw
+was pinned to her nostril, and `cokeReach` was aimed at the straw — so the
+solver was steering her hand towards a point already stuck to her head, and
+whatever it did on the way was its own business.
+
+A held object does not lead the hand that holds it. So the ANCHOR moves —
+from where the straw lies on the plate to her nostril, over the lift — the
+straw hangs off that anchor pointing at the line, and the hand is aimed at
+the middle of the straw. Going up, the hand and the object travel together
+because they are now the same movement.
+
+`grip` and `lift` are separate for a reason: a hand that starts rising before
+it has closed is a hand that pushes the straw across the plate.
+
+**And the clip is six keys instead of three**, in the order a person does it
+in. It was one movement doing three jobs, which is what he was looking at.
+
+    0.75  reach down and take it   — the ARM reaches, not the back
+    1.45  back up, straw at her face — nobody squats to do this
+    2.35  down to the line
+    3.10  hold
+    3.45  head off it
+    4.60  stand
+
+4.60 s, and the phase runs on the same 4.60 with every beat written as a
+fraction of it read straight off those keys. The powder now only goes from
+0.53 to 0.72 — once her face is down there. It used to start while she was
+still on her way.
+
+**Still unsettled, and said plainly**: this has been judged off stills, and
+what is wrong with a movement is not a thing a still shows. The structure is
+right now — the hand leads, the object follows, the beats are separate and
+tied to the clip — but whether it reads at speed wants an eye on it moving.
+
 ## [1.453.4] — 2026-09-20
 
 ### Escape gives the mouse back
