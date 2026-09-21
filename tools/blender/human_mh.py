@@ -5007,6 +5007,9 @@ def _stoop(z, neck, head):
 
 
 
+# `STOOP` is still the arm source for the retargeter and still a `--reskin`
+# preview. The five beside it are previews now and nothing else: the clip
+# stopped being keyed on 21 Sep and none of them is in it. See `_snort_keys`.
 STOOP = _stoop(0.973, 16, 4)
 
 # Halfway down, for the clip to pass through, so the fold arrives as a
@@ -5038,6 +5041,107 @@ STOOP_B = _stoop(0.936, 17, 5)
 # nothing else, thrown a long way back from where it was resting.
 STOOP_UP = _stoop(1.076, -34, -28)
 
+
+
+# ── AND THEN THE KEYS WENT TOO ────────────────────────────────────────────
+#
+# Misha, 21 Sep 2026, on the sixth version of this beat: *"the way she bends
+# down to the line of coke, is still awkward... maybe break it down into many
+# more sub-tasks... and perfect each one?"*
+#
+# It is the opposite. Measured on the seven-key version, the speed of her head
+# through the beat:
+#
+#     t 0.73  key STOOP_PICK   0.03 m/s
+#     t 1.47  key STOOP_NOSE   0.03 m/s
+#     t 2.33  key STOOP        0.02 m/s
+#     t 3.27  key STOOP_B      0.01 m/s
+#     t 3.53  key STOOP_UP     0.12 m/s
+#
+# `_bake_clip` eases between keys with a smoothstep, and **a smoothstep has
+# zero velocity at both ends**. Every key is therefore a full stop, and the
+# beat was six separate movements with five dead stops in four and a half
+# seconds. Each sub-step that was added to make it read better added another
+# one. That is why six rounds of better poses never fixed it: the poses were
+# not what was wrong.
+#
+# Worse, the three sub-steps made her head go 1.584 -> 1.440 -> 1.540 ->
+# 0.965. She ducked fourteen centimetres, stood back up ten, and only then
+# dived. That bob is the thing he kept calling weird, and it was authored.
+#
+# So there are no keys now. The beat is sampled at SAMPLE_FPS from a single
+# continuous height-against-time curve, and the capture supplies the SHAPE at
+# each height the way it already did — `_mc_body` was always a function of
+# depth, and it was only ever being asked for seven values of it.
+#
+# The three sub-steps he asked for are still all there. They just live in the
+# arm, which is where the note over `STOOP_PICK` always claimed they lived:
+# picking a 42 mm straw off a plate is a hand's job and the back has no
+# business doing it. `reachRight` solves that arm in the game on top of this,
+# so the clip's job is to hold the body still enough for it to work in.
+_SNORT_DUR = 4.60
+# Unchanged, because the game is keyed to them: the powder is consumed over
+# 0.540 to 0.710 of the beat and the head comes off it at 0.765.
+_SNORT_BOTTOM, _SNORT_LIFT = 2.48, 3.27
+# The lean, and the pause in it that the hand works in.
+_SNORT_LEAN, _SNORT_HOLD = 0.75, 1.20
+
+
+def _ss(u):
+    u = min(1.0, max(0.0, u))
+    return u * u * (3.0 - 2.0 * u)
+
+
+def _snort_keys():
+    """The beat, sampled rather than keyed. One descent, no stops in it."""
+    top, lean, plate, deep = 1.584, 1.468, 0.975, 0.936
+    out = []
+    for k in range(int(round(_SNORT_DUR * SAMPLE_FPS)) + 1):
+        t = min(k / SAMPLE_FPS, _SNORT_DUR)
+        if t <= _SNORT_LEAN:
+            # The lean that puts the plate inside her arm's reach. Her
+            # shoulder stands at about 1.4 m and the tabouret is at 0.73, so
+            # a straight arm does not get there and something has to give;
+            # this is the smallest amount of back that will do it.
+            w = _ss(t / _SNORT_LEAN)
+            z, neck, head = top + (lean - top) * w, 12 + 2 * w, 3 + 0.5 * w
+        elif t <= _SNORT_HOLD:
+            # And then it stops, ON PURPOSE, while the hand takes the straw
+            # off the plate and puts it to her face. This is the one pause in
+            # the descent and it is the difference between a stop and a
+            # stutter: a body that is still because it is waiting for a hand
+            # reads as a person, and the five stops the old version had read
+            # as a mechanism, because none of them meant anything.
+            #
+            # `reachRight` solves that arm in the game and 1.454.0 established
+            # that it wants a body that is not moving under it.
+            z, neck, head = lean, 14, 3.5
+        elif t <= _SNORT_BOTTOM:
+            # One descent. No keys in it, and no coming back up first.
+            w = _ss(_ss((t - _SNORT_HOLD) / (_SNORT_BOTTOM - _SNORT_HOLD)))
+            z, neck, head = lean + (plate - lean) * w, 14 + 2 * w, 3.5 + 0.5 * w
+        elif t <= _SNORT_LIFT:
+            u = (t - _SNORT_BOTTOM) / (_SNORT_LIFT - _SNORT_BOTTOM)
+            z, neck, head = plate + (deep - plate) * _ss(u), 16 + u, 4 + u
+        else:
+            u = (t - _SNORT_LIFT) / (_SNORT_DUR - _SNORT_LIFT)
+            # Fast off the plate and easing into standing, which is the one
+            # place in the beat a velocity step is wanted: a sniff ends, it
+            # does not fade out. Everywhere else the curve is smooth.
+            z = deep + (top - deep) * (1.0 - (1.0 - u) ** 2.4)
+            snap = _ss((t - _SNORT_LIFT) / 0.25)
+            back = _ss((t - _SNORT_LIFT - 0.25) / (_SNORT_DUR - _SNORT_LIFT - 0.25))
+            neck = (17 - 51 * snap) * (1 - back)
+            head = (5 - 33 * snap) * (1 - back)
+        # The left arm braces on the table as she goes in and lets go as she
+        # comes up; both ends of the clip have to BE `IDLE_A` or the loop it
+        # returns to pops.
+        g = _ss(t / 0.55) * _ss((_SNORT_DUR - t) / 0.85)
+        out.append((round(t, 4), _lerp_pose(IDLE_A, _stoop(z, neck, head), g)))
+    return out
+
+
+SNORT_KEYS = _snort_keys()
 
 # The throw: arms up and over, legs driving straight, and the hips already
 # turning. Everything after this is ballistic.
@@ -7487,10 +7591,7 @@ CLIPS = [
     # of it. Now the order is the order a person does it in. Reach down and
     # take it (0.75), back up with it at her face (1.45), THEN down to the
     # line (2.35), hold it (3.10), head off it (3.45), stand (4.60).
-    {"name": "snort", "loop": False,
-     "keys": [(0.00, IDLE_A), (0.75, STOOP_PICK), (1.45, STOOP_NOSE),
-              (2.35, STOOP), (3.28, STOOP_B), (3.52, STOOP_UP),
-              (4.60, IDLE_A)]},
+    {"name": "snort", "loop": False, "keys": SNORT_KEYS},
     {"name": "crawl", "loop": True,
      "keys": [(0.0, CRAWL_A), (0.55, CRAWL_B), (1.10, CRAWL_A)]},
     {"name": "getup", "loop": False,

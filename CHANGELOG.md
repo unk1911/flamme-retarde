@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.456.0] — 2026-09-21
+
+### there were five dead stops in it
+
+Misha, on the sixth version of this beat: *"the way she bends down to the
+line of coke, is still awkward... maybe break it down into many more
+sub-tasks... and perfect each one?"*
+
+It is the opposite, and this is the measurement that says so — the speed of
+her head through the 1.455.0 clip:
+
+| t | key | speed |
+|---|---|---|
+| 0.73 | STOOP_PICK | 0.03 m/s |
+| 1.47 | STOOP_NOSE | 0.03 m/s |
+| 2.33 | STOOP | 0.02 m/s |
+| 3.27 | STOOP_B | 0.01 m/s |
+| 3.53 | STOOP_UP | 0.12 m/s |
+
+`_bake_clip` eases between keys with a smoothstep and **a smoothstep has zero
+velocity at both ends**, so every key was a full stop. The beat was six
+separate movements with five dead stops in four and a half seconds, and every
+sub-step added to make it read better added another one.
+
+And the three sub-steps put a **bob** in it: her head went 1.584 → 1.440 →
+1.540 → 0.965. She ducked fourteen centimetres, stood back up ten, and only
+then dived.
+
+Six releases went into the poses. The poses were not what was wrong.
+
+### so the keys went
+
+`snort` is sampled at `SAMPLE_FPS` off one continuous height-against-time
+curve — 139 keys where there were seven, at no cost, because `_bake_clip`
+samples to 30 fps either way. `_mc_body` was always a function of depth and
+was only ever being asked for seven values of it; now it is asked for all of
+them. The capture supplies the shape at each height exactly as before.
+
+What the curve has, and what it does not:
+
+- **Monotone.** 1.584 → 1.481 → 0.965. No coming back up first.
+- **One pause, at 0.80–1.20 s, and it is exactly 0.000 m/s** — on purpose,
+  while the hand takes the straw off the plate and puts it to her face.
+  1.454.0 established that `reachRight` wants a body that is not moving
+  under it. A body still because it is waiting for a hand reads as a person;
+  the other five stops meant nothing, which is why they read as a mechanism.
+- **One descent**, peaking 0.95 m/s, with nothing in the middle of it.
+- **One rise**, peaking 1.11 m/s, where there used to be a twitch, a stop and
+  then a launch. The velocity step off the plate is kept and is the only one
+  in the clip: a sniff ends, it does not fade out.
+
+The three sub-steps he asked for are all still there. They live in the arm,
+which is where the note over `STOOP_PICK` always claimed they lived — picking
+a 42 mm straw off a plate is a hand's job and the back has no business doing
+it.
+
+**Nothing moved that the game is keyed to.** The powder is still consumed over
+0.540 to 0.710 of the beat and the head still comes off it at 0.765, and at
+the deep beat her head measures 0.036 m and 0.032 m from the plate against
+1.455.0's 0.036 and 0.032. The straw grab now completes at `at` 0.78 by
+t=1.02, inside the pause built for it.
+
+`STOOP_PICK`, `STOOP_NOSE`, `STOOP_IN`, `STOOP_B` and `STOOP_UP` are
+`--reskin` previews now and nothing else.
+
 ## [1.455.0] — 2026-09-21
 
 ### the fold is a motion capture now
