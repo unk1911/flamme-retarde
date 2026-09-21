@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.453.4] — 2026-09-20
+
+### Escape gives the mouse back
+
+*"When i press 'I', the mouse controls change so i can no longer control the
+mouse until i press Escape."* Two things were true at once, and the second is
+why Escape did not really fix it either.
+
+**`I` cannot close the line**, and that part is correct: once the caret is in
+the box, `I` is the letter i. The keydown handler asks `ears.typing()` before
+it reads a key as a control, which is what stops a W being the throttle.
+
+**And Escape only ever called `blur()`.** The caret left the box, `typedOn`
+stayed true, the line stayed open, and nothing re-grabbed the pointer — so
+the mouse was dead until something else happened to take the lock back. The
+re-grab existed, but it lived in the toggle's close branch, which Escape does
+not go through.
+
+It is part of `closeTyped` now, so every way out of the box ends with the
+mouse being a head again — Escape, the SAY button on glass, and the toggle.
+Driven through the real key path:
+
+    start      typing false   box closed   focus BODY
+    press I    typing true    box open     focus ears-say
+    press Esc  typing false   box closed   focus BODY
+
+The pointer lock itself cannot be granted to a headless browser, so what is
+verified here is the state machine either side of it; the grab is the same
+call `togglePanel` has always made from a keypress.
+
 ## [1.453.3] — 2026-09-20
 
 ### the straw goes in her nose

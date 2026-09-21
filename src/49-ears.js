@@ -76,6 +76,21 @@
  */
 const MUTE_TALK = { coke: 1, line: 1, reset: 1 };
 
+/**
+ * THE POINTER COMES BACK WITH THE LINE CLOSING, which is what `togglePanel`
+ * does for the settings sheet and for the same reason: the lock was dropped
+ * to let a caret into a box, so the moment the box is gone the mouse is a
+ * head again. The key press is the gesture the browser wants, so this is a
+ * grab that will actually be granted.
+ */
+function earsRegrab() {
+  if (typeof IS_TOUCH !== 'undefined' && IS_TOUCH) return;
+  if (typeof grabPointer !== 'function' || typeof state === 'undefined') return;
+  if (state.phase === 'fly' || state.phase === 'ground'
+    || state.phase === 'chute' || state.phase === 'swim'
+    || state.phase === 'brod') grabPointer();
+}
+
 const EARS = {
   rate: 16000,
   pre: 0.35,
@@ -247,7 +262,7 @@ const ears = (() => {
       }
       if (e.code === 'Escape' || e.key === 'Escape') {
         e.preventDefault();
-        sayEl.blur();
+        closeTyped();
       }
     });
     sayEl.addEventListener('keyup', (e) => e.stopPropagation());
@@ -321,11 +336,31 @@ const ears = (() => {
    * the panel is the only thing that knows when it has closed itself, so the
    * lit state is set from here rather than from the tap that opened it.
    */
+  /**
+   * Shut the typed line and hand the mouse back.
+   *
+   * Misha, 20 Sep 2026: *"when i press 'I', the mouse controls change so i
+   * can no longer control the mouse until i press Escape"* — and pressing
+   * Escape did not fix it either, it only looked as though it had.
+   *
+   * Two things were true at once. `I` cannot close the line, because once
+   * the caret is in the box `I` is the letter i — the keydown handler in
+   * 90-app.js asks `ears.typing()` before it reads a key as a control, which
+   * is exactly right and is what stops a W being the throttle. And Escape
+   * only ever called `blur()`: the caret left the box, `typedOn` stayed
+   * true, and nothing re-grabbed the pointer. So the mouse was dead until
+   * something else happened to take the lock back.
+   *
+   * `earsRegrab` is now part of closing rather than part of the toggle, so
+   * every way out of the box — Escape, the SAY button on glass, the toggle —
+   * ends with the mouse being a head again.
+   */
   function closeTyped() {
     typedOn = false;
     if (sayEl) sayEl.blur();
     draw();
     syncSay();
+    earsRegrab();
   }
 
   function syncSay() {
@@ -866,19 +901,7 @@ const ears = (() => {
         document.exitPointerLock?.();
         sayEl.focus();
       }
-      if (!typedOn && sayEl) {
-        sayEl.blur();
-        // AND THE POINTER COMES BACK WITH THE LINE CLOSING, which is what
-        // `togglePanel` does for the settings sheet and for the same reason:
-        // the lock was dropped to let a caret into a box, so the moment the
-        // box is gone the mouse is a head again. The key press is the gesture
-        // the browser wants, so this is a grab that will actually be granted.
-        if (typeof IS_TOUCH !== 'undefined' && !IS_TOUCH
-          && typeof grabPointer === 'function' && typeof state !== 'undefined'
-          && (state.phase === 'fly' || state.phase === 'ground'
-            || state.phase === 'chute' || state.phase === 'swim'
-            || state.phase === 'brod')) grabPointer();
-      }
+      if (!typedOn && sayEl) earsRegrab();
       syncSay();
       return typedOn;
     },
