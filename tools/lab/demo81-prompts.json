@@ -1,0 +1,26 @@
+{
+  "_": [
+    "One prompt per chunk of the 81 s demo. At cfg 1.0 the distill LoRA turns",
+    "classifier-free guidance off, so the negative prompt is inert and the",
+    "positive prompt is the ENTIRE text conditioning — it has to describe the",
+    "picture that is actually in these control frames.",
+    "",
+    "The film is one room except for chunk 6, which is 2.4 s of sunlit",
+    "exterior (the phone's camera view of the shore) cut into the middle of a",
+    "dark interior. Measured, not guessed: mean luma goes 39 -> 177 at t=31.0",
+    "and back to 49 at t=33.4, and every one of those frames is inside chunk 6",
+    "(30.375-35.44 s). One chunk, one prompt, no seam to pay for.",
+    "",
+    "Subjects are weighted by frame area, per the note that a Canadair filling",
+    "1% of frame came back as a foreground helicopter. The stool, the cot and",
+    "the handstand are each what the camera is actually pointed at."
+  ],
+
+  "0-5": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. Dim interior in deep shadow, grey ceramic floor tiles, rough painted concrete walls. A bare-skinned woman standing beside a small round wooden stool that holds a green glass wine bottle, a glass of red wine and a white plate. A printed poster curling on the wall behind her. An old cathode-ray television on a wooden stand glowing faintly in the dark. One narrow doorway at the left edge, a hard slot of white sunlight and deep blue Adriatic sea beyond it. Skin lit only by that daylight, warm and cool light mixed, dust in the air. Real photographed video, available light, film grain, 35mm, cinematic colour grade",
+
+  "6": "photorealistic documentary video of a public bathing station on the Dalmatian coast near Sibenik, Croatia, at midday in high summer, filmed from a distance across the water. A long low timber sunshade over a concrete bathing terrace, dark green umbrella pines behind it, a painted metal railing, a few holidaymakers in swimwear, the deep blue Adriatic filling the middle of the frame, bare grey limestone hills baked in August heat, dry golden scrub, harsh overhead sun, heat haze. Real photographed video, film grain, 35mm, cinematic colour grade",
+
+  "7-9": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. Dim interior in deep shadow, grey ceramic floor tiles, rough painted concrete walls. A bare-skinned woman upside down in a handstand on the tiled floor, legs straight up toward the low ceiling, her weight on her hands. An old cathode-ray television on a wooden stand glowing faintly beside her, a small white cool box on a wooden table. Skin lit only by daylight leaking in from one doorway, warm and cool light mixed, dust in the air. Real photographed video, available light, film grain, 35mm, cinematic colour grade",
+
+  "10-15": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. Dim interior in deep shadow, grey ceramic floor tiles, rough painted concrete walls. A bare-skinned woman lying on a low narrow cot with a thin white mattress and a dark red blanket, pushed against the wall. A stack of folded striped beach towels in red, white and blue on a shelf above her. Skin lit only by faint daylight from off frame, deep shadow, warm and cool light mixed. Real photographed video, available light, low light, film grain, 35mm, cinematic colour grade"
+}

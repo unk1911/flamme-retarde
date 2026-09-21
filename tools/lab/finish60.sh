@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# Twelve chunks of restyled frames -> one .mp4 with the game's own sound on it.
+# N chunks of restyled frames -> one .mp4 with the game's own sound on it.
 #
 #   tools/lab/finish60.sh ~/fr-video/demo60/out ~/fr-video/demo60/demo60.mp4
+#
+# CHUNKS defaults to 12 because that is what a 60 s film is. An 81 s film is
+# 16, which is the length worth preferring on a fleet — see the note in
+# burst.py about a film being a count of jobs. OUTW and the output geometry
+# follow the frames: they are not all 16:9, and a 2:1 source stays 2:1.
 #
 # Everything the box sends back is `vace_dNN_00001.png`, and there are twelve
 # sets of those numbered from one. Interleaving them by name would give
@@ -23,13 +28,14 @@ DST="${2:-$HOME/fr-video/demo60/demo60.mp4}"
 CLIP="${CLIP:-/mnt/c/tmp/flamme-retarde/fr-clip-20260823-135829.webm}"
 FPS="${FPS:-16}"
 OUTW="${OUTW:-1920}"
+CHUNKS="${CHUNKS:-12}"
 TAG="${TAG:-_d}"
 WORK="$(mktemp -d /tmp/finish60.XXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
 
 mkdir -p "$WORK/seq"
 n=0
-for c in $(seq -w 0 11); do
+for c in $(seq -w 0 $((CHUNKS - 1))); do
   # `sort -V` and not `sort`: frame 10 sorts before frame 9 otherwise, and a
   # chunk in the wrong order is a chunk that plays backwards in the middle.
   mapfile -t fs < <(find "$SRC" -maxdepth 1 -name "vace${TAG}${c}_*" | sort -V)

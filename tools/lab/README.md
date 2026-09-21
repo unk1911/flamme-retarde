@@ -20,6 +20,26 @@ it.
 - **73 frames a clip.** 4k+1 — the model wants 4n+1 and silently mangles
   anything else.
 
+## The HUD has to go before the frames do — 21 Sep 2026
+
+A restyle of a *recorded session* is not a restyle of the game: the recording
+has the EARS console and the subtitle line burnt into it, and text is the one
+thing this pipeline reliably destroys. Two ways of painting it out were tried
+on a rented A100 and both came back worse than the text would have been —
+`unhud.py` has the full account, and the short version is that **VACE reads
+an edge as geometry and a mirror as a wrong perspective**. What worked was
+cropping: the console is anchored to the right edge, so 1280 -> 1024 takes
+all of it and costs nothing in the picture.
+
+The general rule: **do not hand the model a region you have invented.** If
+an overlay can be cropped out, crop it. Only the subtitle, which sits in the
+middle of the floor, is worth filtering — and it is thin bright glyphs over
+tiles, which a median takes cleanly.
+
+Also from the same run: **a 2:1 recording does not want 1280x720.** The model
+is fine at 1024x640; what it is not fine at is a letterbox, so crop to the
+ratio rather than padding to the trained one.
+
 ## Rented-GPU gotchas
 
 Each of these cost a run.
