@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.454.2] — 2026-09-21
+
+### the sniff is the punctuation
+
+On his word that the object is a detail nobody sees and the beat should be
+judged on the body, the last weak thing in the strip is the end of it: she
+was simply rising. There was no moment where the head comes off the plate.
+
+The hold at the bottom runs 0.18 s longer and the head-back is 0.24 s after
+it instead of 0.35 — a quarter of a second is what makes it a snap rather
+than a lift — and `STOOP_UP` throws the neck to −34 where it was −20. On the
+strip the hold is three frames at the plate where it was two, and the rise is
+its own movement rather than a continuation of it.
+
+The powder finishes before the head comes off: 0.540 to 0.710 of the beat,
+against the head-back at 0.765. She does not sniff at a line that is still
+there.
+
+**The prop stays as it is, deliberately.** A 42 mm straw is fifteen pixels at
+the distance this is watched from and cannot be made to read by aiming it;
+the choice was to leave the object and spend the effort on the body. That
+choice is why there is nothing here about the straw.
+
 ## [1.454.1] — 2026-09-21
 
 ### the elbow, and why the straw cannot be seen

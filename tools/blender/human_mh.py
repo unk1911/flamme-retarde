@@ -5001,7 +5001,7 @@ STOOP_B = _stoop(53, 17, 5, knee=101, root=-0.435)
 # And the head off it, which is the only fast thing in the beat. Still folded
 # — she comes off the plate before she comes up — so this is the neck and
 # nothing else, thrown a long way back from where it was resting.
-STOOP_UP = _stoop(44, -20, -18, knee=92, root=-0.395)
+STOOP_UP = _stoop(41, -34, -28, knee=88, root=-0.375)
 
 
 # The throw: arms up and over, legs driving straight, and the hips already
@@ -7454,7 +7454,7 @@ CLIPS = [
     # line (2.35), hold it (3.10), head off it (3.45), stand (4.60).
     {"name": "snort", "loop": False,
      "keys": [(0.00, IDLE_A), (0.75, STOOP_PICK), (1.45, STOOP_NOSE),
-              (2.35, STOOP), (3.10, STOOP_B), (3.45, STOOP_UP),
+              (2.35, STOOP), (3.28, STOOP_B), (3.52, STOOP_UP),
               (4.60, IDLE_A)]},
     {"name": "crawl", "loop": True,
      "keys": [(0.0, CRAWL_A), (0.55, CRAWL_B), (1.10, CRAWL_A)]},

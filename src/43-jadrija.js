@@ -38035,10 +38035,10 @@ async function buildJadrija(scene) {
         const grip = sat((lu - 0.100) / 0.060);
         // And it comes up to her face between the pick and the nose keys.
         const lift = sat((lu - 0.163) / 0.152);
-        // The powder only goes once her face is down there — which is the
-        // whole point of the re-timing. It used to start while she was still
-        // on her way down.
-        const along = sat((lu - 0.530) / 0.190);
+        // The powder only goes once her face is down there, and it is done
+        // before the head comes off it at 0.765 of the beat — she does not
+        // sniff at a line that is still there.
+        const along = sat((lu - 0.540) / 0.170);
         cokeTakeSet(along);
         // Published for `cokeReach`, which picks the elbow off it.
         show.strawUp = lift;
