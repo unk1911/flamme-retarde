@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.453.3] — 2026-09-20
+
+### the straw goes in her nose
+
+*"Still i don't see her putting the straw in her nose."* It was held from her
+PALM to the line, which is a woman pointing a straw at a plate. The near end
+is her nostril now — the head bone plus 0.085 forward and 0.055 down in her
+own frame — and the hand follows the object rather than leading it, because
+`cokeReach` aims at wherever the straw has got to.
+
+It does NOT bridge the gap and is not meant to. The straw is 42 mm and her
+face is about 0.15 m above the plate at the bottom of the squat; what
+somebody actually does is put the straw in and bring their face down, and a
+0.15 m straw would read as a snorkel.
+
+### and she walks round the table rather than through it
+
+*"Sometimes she stands, and her thigh cuts into the tabourette... i guess she
+needs to respect the table and not walk through it."*
+
+`showClear` is switched off inside the kabina and that is deliberate — its
+own note explains that her wine mark is 0.306 m from the tabouret and that
+pushing her out would take her 0.43 m off the mark the pour is solved
+against. Turning it on would break four hand-checked positions to fix one
+walk.
+
+**And the marks were not the problem**, which is what the measurement was
+for. From the table's own middle: `coke` 0.410, `lift` 0.410, `wine` 0.447,
+`line` 0.740, against a table 0.23 in radius. Every one is clear. What is not
+clear is the straight line BETWEEN two of them, which is what `stepTo` walks
+— the plate mark and the stool mark are most of the way round the table from
+each other.
+
+So the route bends and the marks do not move. Measured across a full walk:
+**61 samples, closest approach 0.408 m** — 0.178 m of daylight, where the
+straight line used to go over the middle.
+
+**The first cut of it orbited**, and that is worth keeping. The marks stand
+at 0.410 to 0.447, which is inside the 0.46 the route keeps — so with her on
+one mark and another as the target, the chord passes inside the ring, the
+bend fires, she steps one place round the rim, and the same test fires again.
+She circled the table until the six-second timeout let her go. Two guards:
+a hop under 0.55 m goes direct, because there is no room to route round
+anything in half a metre, and somebody already inside the ring goes direct,
+because she is standing on a mark and the mark is allowed to be there.
+
 ## [1.453.2] — 2026-09-20
 
 ### the plate in front of her rather than under her

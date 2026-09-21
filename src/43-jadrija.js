@@ -28180,6 +28180,8 @@ async function buildJadrija(scene) {
        * that much of the reach sideways. Twenty degrees of turn puts the
        * object off that shoulder instead of off her chest.
        */
+      /** The round table itself: where its middle is, and how wide. */
+      table: [bt, bs, 0.23],
       work: (() => {
         const OUT = 0.410, LEAD = 0.35;
         const at = (o) => {
@@ -33246,6 +33248,15 @@ async function buildJadrija(scene) {
    * you are coming; 46 m is far enough that giving up does not look like a sulk.
    */
   const SHOW = {
+    /**
+     * How near the round table's middle her route may pass — see `showRound`.
+     *
+     * The table is 0.23 in radius and she is about 0.19 through the hips, so
+     * 0.44 is the two of them touching and 0.46 is that with a thumb's width
+     * of daylight. It is a ROUTE number and not a collider: the marks
+     * themselves stand at 0.410 to 0.740 and none of them moves.
+     */
+    round: 0.46,
     near: 17,           // she notices you inside this many metres
     far: 46,            // and gives up if you get this far away
     crawl: 0.95,        // m/s on all fours. One clip cycle is 1.1 s and covers
@@ -34210,6 +34221,77 @@ async function buildJadrija(scene) {
       if (tk && tk.laps != null) o.laps = Math.max(0, Math.min(99, tk.laps | 0));
     }
     return o;
+  }
+
+  /**
+   * ── AND SHE WALKS ROUND THE TABLE RATHER THAN THROUGH IT ────────────────
+   *
+   * Misha, 20 Sep 2026: *"sometimes she stands, and her thigh cuts into the
+   * tabourette"*, and then *"i guess she needs to respect the table and not
+   * walk through it"*.
+   *
+   * `showClear` is switched OFF inside the kabina and that is deliberate —
+   * the note over it explains that her wine mark is 0.306 m from the
+   * tabouret's centre and that pushing her out would take her 0.43 m off the
+   * mark the whole pour is solved against. Turning it on in here would break
+   * four hand-checked positions to fix one walk.
+   *
+   * MEASURED FIRST, because the obvious suspect was the marks and it was
+   * wrong: from the table's own centre, `coke` stands at 0.410, `lift` at
+   * 0.410, `wine` at 0.447 and the new `line` mark at 0.740, against a table
+   * 0.23 in radius. Every one of them is clear. What is not clear is the
+   * straight line BETWEEN two of them, which is what `stepTo` walks — the
+   * plate mark and the stool mark are most of the way round the table from
+   * each other, and the shortest path from one to the other goes across it.
+   *
+   * So the route bends and the marks do not move. When the segment she is
+   * about to walk passes within `SHOW.round` of the middle, she is aimed at
+   * a point on that circle instead, one step round from where she stands
+   * towards where she is going — and that aim is recomputed every frame, so
+   * what comes out is an arc round the table rather than a waypoint she
+   * turns at. The arrival test still measures the real mark.
+   */
+  const _rtA = [0, 0];
+  function showRound(mk) {
+    const C = kit && kit.table;
+    if (!C) return mk;
+    const d0 = mk[0] - show.t, d1 = mk[1] - show.s;
+    const L2 = d0 * d0 + d1 * d1;
+    if (L2 < 1e-6) return mk;
+    // ── AND TWO GUARDS, BECAUSE THE FIRST CUT ORBITED ──────────────────
+    //
+    // The marks themselves stand at 0.410 to 0.447, which is INSIDE the
+    // 0.46 the route is asked to keep. So with her on one mark and another
+    // as the target, the chord between them passes inside the ring, the
+    // bend fires, and she is sent one step round the rim — where the same
+    // test fires again. She circled the table until `show.tmr > 6` timed
+    // the walk out, which from outside is a woman pacing round a table for
+    // six seconds before doing anything.
+    //
+    // So: a short hop goes direct, because there is no room to route round
+    // anything in half a metre; and somebody already standing inside the
+    // ring goes direct, because she is at a mark and the mark is allowed to
+    // be there. What is left is the long way round — stool to plate and
+    // back — which is the walk that was crossing the table.
+    if (L2 < 0.55 * 0.55) return mk;
+    if (Math.hypot(show.t - C[0], show.s - C[1]) < SHOW.round) return mk;
+    // How near the straight line gets to the middle, clamped to the segment.
+    const u = Math.max(0, Math.min(1,
+      ((C[0] - show.t) * d0 + (C[1] - show.s) * d1) / L2));
+    const cx = show.t + d0 * u - C[0], cy = show.s + d1 * u - C[1];
+    if (Math.hypot(cx, cy) > SHOW.round) return mk;
+    // Round the rim, the short way, one step at a time.
+    const pa = Math.atan2(show.s - C[1], show.t - C[0]);
+    const ma = Math.atan2(mk[1] - C[1], mk[0] - C[0]);
+    let da = ma - pa;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    const a = pa + Math.sign(da || 1) * Math.min(Math.abs(da), 0.55);
+    const r = Math.max(SHOW.round,
+      Math.min(Math.hypot(show.t - C[0], show.s - C[1]), 0.85));
+    _rtA[0] = C[0] + Math.cos(a) * r;
+    _rtA[1] = C[1] + Math.sin(a) * r;
+    return _rtA;
   }
 
   function showTo(tt, ss, dt, mul = 1) {
@@ -37884,7 +37966,9 @@ async function buildJadrija(scene) {
       case 'stepTo': {
         const mk = show.goMark;
         if (!mk) { showNext(); break; }
-        const gone = showTo(mk[0], mk[1], dt, 0.74);
+        const aim = showRound(mk);
+        showTo(aim[0], aim[1], dt, 0.74);
+        const gone = Math.hypot(mk[0] - show.t, mk[1] - show.s);
         if (gone < 0.20 || show.tmr > 6) {
           const nx = show.goNext;
           show.goMark = null;
@@ -40914,26 +40998,41 @@ async function buildJadrija(scene) {
       st.quaternion.copy(st.userData.restQ);
       return;
     }
-    const hR = f.boneIndex('handR');
-    if (hR < 0) return;
+    // ── THE NEAR END GOES IN HER NOSE ─────────────────────────────────
+    //
+    // Misha, 20 Sep 2026: *"still i don't see her putting the straw in her
+    // nose"*. It was held from her PALM to the line, which is a woman
+    // pointing a straw at a plate.
+    //
+    // So the near end is her nostril and not her hand: the head bone, plus
+    // 0.085 forward and 0.055 down in her own frame, which is where a nose
+    // is on this skull. The hand follows it rather than leading it — see the
+    // `line` branch in `cokeReach`, which now aims at the same point.
+    //
+    // The straw is 42 mm and her face is about 0.15 m above the plate at the
+    // bottom of the squat, so it does not BRIDGE the gap and it is not meant
+    // to: what somebody actually does is put the straw in and bring their
+    // face down, and a 0.15 m straw would read as a snorkel.
+    const hd = f.boneIndex('head');
+    if (hd < 0) return;
     f.mesh.updateMatrixWorld();
-    f.boneAt(hR, _stH).applyMatrix4(f.mesh.matrixWorld);
-    f.boneTurn(hR, _stT);
+    f.boneAt(hd, _stH).applyMatrix4(f.mesh.matrixWorld);
+    f.boneTurn(hd, _stT);
     _stQ.copy(f.mesh.quaternion).multiply(_stT);
-    _stP.copy(PALM).applyQuaternion(_stQ).add(_stH);
+    _stP.set(0.085, -0.055, 0).applyQuaternion(_stQ).add(_stH);
     k.g.updateMatrixWorld();
     k.g.worldToLocal(_stP);
     // Where on the line the working end is, in the plate's frame.
     const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
     _stA.set(0.012 - COKE.len / 2 + COKE.len * along, 0.0060, z);
-    // The straw is placed by its MIDDLE, so the fist end and the plate end
-    // are half a straw either side of where it sits.
-    st.position.copy(st.userData.restP).lerp(
-      _stH.copy(_stP).add(_stA).multiplyScalar(0.5), amt);
-    _stD.copy(_stP).sub(_stA);
+    // Aimed from the nostril at the line, and placed half a straw down that
+    // run — so the top of it is AT her nose rather than near it.
+    _stD.copy(_stA).sub(_stP);
     if (_stD.lengthSq() > 1e-8) {
       _stD.normalize();
-      _stQ.setFromUnitVectors(_stU, _stD);
+      _stH.copy(_stP).addScaledVector(_stD, 0.021);
+      st.position.copy(st.userData.restP).lerp(_stH, amt);
+      _stQ.setFromUnitVectors(_stU, _stD.negate());
       st.quaternion.copy(st.userData.restQ).slerp(_stQ, amt);
     }
   }
@@ -41453,6 +41552,8 @@ async function buildJadrija(scene) {
       return;
     }
     if (show.phase === 'line') {
+      // The straw, wherever it is — which for most of this beat is up at her
+      // face and not on the plate. The hand follows the object.
       if (!cokeStrawAt(_ckBlade)) return;
     } else if (!cokeHoldAt(_ckBlade, u)) return;
     // Lower over the wrap than over the blade: the blade number leaves the
