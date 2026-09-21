@@ -41456,7 +41456,8 @@ async function buildJadrija(scene) {
   const _ckQc = new THREE.Quaternion(), _ckQd = new THREE.Quaternion();
   const _ckShift = new THREE.Vector3(), _ckS = new THREE.Vector3();
   const _ckE = new THREE.Vector3(), _ckW = new THREE.Vector3();
-  const _ckID = new THREE.Quaternion();
+  const _ckID = new THREE.Quaternion(), _ckQt = new THREE.Quaternion();
+  const _ckAx = new THREE.Vector3();
 
   /**
    * THE SOLVE ITSELF, which is the whole of the note above with the coke's
@@ -41546,6 +41547,7 @@ async function buildJadrija(scene) {
       _ckE.copy(A.E).sub(A.C).applyQuaternion(_ckQc).add(_ckShift);
       _ckW.copy(A.W).sub(A.C).applyQuaternion(_ckQc).add(_ckShift);
     } else {
+      _ckQc.identity();
       _ckS.copy(A.S); _ckE.copy(A.E); _ckW.copy(A.W);
     }
     A.at.lerp(to, 1 - Math.exp(-o.follow * Math.max(dt, 0)));
@@ -41553,15 +41555,74 @@ async function buildJadrija(scene) {
     // to know what this mesh is scaled by.
     _ckFwd.set(1, 0, 0).transformDirection(f.mesh.matrixWorld);
     _ckGoal.copy(A.at);
-    _ckGoal.y += o.up;
-    _ckGoal.addScaledVector(_ckFwd, o.fwd);
+    if (o.body) {
+      // In her own frame, carried by the chest, so it means the same thing at
+      // any fold. `transformDirection` normalises, so these stay world metres
+      // and do not have to know what the mesh is scaled by.
+      const iB = f.boneIndex('chest');
+      f.boneTurn(iB >= 0 ? iB : 0, _ckQt);
+      _ckAx.set(0, 1, 0).applyQuaternion(_ckQt)
+        .transformDirection(f.mesh.matrixWorld);
+      _ckGoal.addScaledVector(_ckAx, -o.body.down);
+      _ckAx.set(0, 0, 1).applyQuaternion(_ckQt)
+        .transformDirection(f.mesh.matrixWorld);
+      _ckGoal.addScaledVector(_ckAx, o.body.right);
+      _ckAx.set(1, 0, 0).applyQuaternion(_ckQt)
+        .transformDirection(f.mesh.matrixWorld);
+      _ckGoal.addScaledVector(_ckAx, o.body.fwd);
+    } else {
+      _ckGoal.y += o.up;
+      _ckGoal.addScaledVector(_ckFwd, o.fwd);
+    }
     f.mesh.worldToLocal(_ckGoal);
     _ckGoal.lerpVectors(_ckW, _ckGoal, amt);
     // The target itself in her frame as well, for the wrist below. Converted
     // rather than offset, because the two conversions must be the same one.
     _ckTo.copy(A.at);
     f.mesh.worldToLocal(_ckTo);
+    // ── AND THE POLE TURNS WITH HER RIBCAGE ──────────────────────────────
+    //
+    // Misha, 21 Sep 2026: *"her right arm doing something awkward/funky, her
+    // elbow is out"*, after two releases that fixed everything except this.
+    //
+    // `wheelLimb` places the elbow at `root + l1 * v`, where `v` is the pole
+    // with its component along the shoulder-to-wrist axis taken out. When the
+    // arm is folded right up — a hand at her own face — `d` is small, `sa` is
+    // nearly 1, and the elbow sits almost exactly along `v`. So `v` IS the
+    // elbow direction, and everything depends on the pole being square to the
+    // arm.
+    //
+    // FACE_POLE is (0.25, -1, 0.30) in FIGURE space, which is very nearly
+    // straight down in the world. That is correct while she is upright. Fold
+    // her 68 degrees over a tabouret and her shoulder-to-wrist axis points
+    // down and forward as well — so the pole goes nearly PARALLEL to the arm,
+    // `v` is whatever ragged residual is left after the projection, and the
+    // elbow flies off into it. Measured, elbow abduction from her own torso
+    // axis, where a hanging arm is 8 degrees and a hand at the face wants
+    // about 25:
+    //
+    //     clip 1.45   48 deg      elbow  +0.158 m down the torso
+    //     clip 1.80  116 deg             -0.105   ABOVE the shoulder
+    //     clip 2.13  133 deg             -0.163
+    //     clip 2.82  123 deg             -0.130
+    //
+    // For the whole of the snort her elbow was ten to sixteen centimetres
+    // above her shoulder and nineteen behind it — a wing pointing back over
+    // her shoulder. That is the funky arm, and no amount of choosing between
+    // two poles fixes it, because BOTH of them are written in a frame her
+    // torso has left.
+    //
+    // So the pole is carried by the chest. `boneTurn` is how far a bone has
+    // turned since the bind pose, in figure space — the same call `PALM` goes
+    // through two dozen lines down, for the same reason — so a pole authored
+    // against a standing figure keeps its meaning at any fold. "Down the
+    // torso" stays down the torso, which is square to an arm reaching at her
+    // own face however far over she is bent.
     _ckPole.copy(o.pole);
+    if (o.torso) {
+      const iT = f.boneIndex('chest');
+      if (iT >= 0) _ckPole.applyQuaternion(f.boneTurn(iT, _ckQt));
+    }
     _ckQa.copy(wheelLimb(f, 'armUR', 'armLR', _ckS, _ckE, _ckW, _ckGoal, _ckPole));
     // ── AND THE WRIST, WHICH IS THE DIFFERENCE BETWEEN HOLDING IT AND
     //    HAVING A HAND NEAR IT ──────────────────────────────────────────
@@ -41578,7 +41639,16 @@ async function buildJadrija(scene) {
     // gives, which is also the one with the least twist in the wrist — nobody
     // is asking for a correct forearm here, only for a hand that is holding
     // something.
-    _ckPalm.copy(A.P).applyQuaternion(_ckQa);
+    // AND THE GRIP OFFSET IS CARRIED TOO, which it was not. The chain above
+    // is moved rigidly by however far the clavicle has turned since the cache
+    // — that is the whole point of `_ckQc` — and `A.P` was left out of it, so
+    // the palm direction the rotation below starts from was stale by the
+    // torso's own movement. At a 68-degree stoop that is 36 degrees of error:
+    // measured, wrist 0.090 m from the straw exactly as asked, grip 0.055 m
+    // from it where the arithmetic says 0.008. Her hand was a straw's length
+    // off the straw for the whole beat, and it was the same class of mistake
+    // the note above this one was written about.
+    _ckPalm.copy(A.P).applyQuaternion(_ckQc).applyQuaternion(_ckQa);
     _ckTo.sub(_ckGoal);
     if (_ckPalm.lengthSq() > 1e-8 && _ckTo.lengthSq() > 1e-8) {
       _ckQb.setFromUnitVectors(_ckPalm.normalize(), _ckTo.normalize());
@@ -41615,11 +41685,72 @@ async function buildJadrija(scene) {
    * So the face beat gets its own pole: down, forward, and much less to the
    * side. The reach beat keeps the one it has.
    */
-  const FACE_POLE = new THREE.Vector3(0.25, -1, 0.30).normalize();
+  /**
+   * MEASURED OFF AN AUTHORED POSE, not chosen. `YAWN` in human_mh.py brings
+   * this same hand to this same face by hand, it has never drawn a complaint,
+   * and it is the only reference on this rig for what a hand-to-face arm is
+   * supposed to look like. Posed in Blender and read out in her own frame,
+   * relative to the right shoulder:
+   *
+   *     YAWN     abduction 64 deg   elbow  0.03 medial, 0.105 down, 0.213 FORWARD
+   *     snort    abduction 74 deg   elbow  0.229 medial, 0.067 down, 0.019 back
+   *
+   * The authored elbow swings FORWARD of the shoulder and hangs under it. The
+   * solved one was jammed across her chest and slightly behind — which is the
+   * funky arm, and it is what a pole of "straight down" gives you once the
+   * shoulder-to-wrist axis is also pointing down.
+   *
+   * So the pole is the yawn's own elbow direction, in figure axes
+   * (x forward, y up, z her right). With `torso` set it is carried by the
+   * chest, so her arm keeps that shape against her body at any depth of stoop
+   * — which is the whole point: an arm at her face should look the same
+   * whether she is standing or bent double over a tabouret.
+   */
+  const FACE_POLE = new THREE.Vector3(0.891, -0.439, -0.126).normalize();
+  // `torso` on both: she is stooped for every frame of this beat and a pole
+  // in figure space means something different at every depth of the stoop.
+  // The other reaches in this file do not set it — they happen with her
+  // standing, where the chest's turn is small and it would change nothing —
+  // but `liftIt` and `strapIt` stoop too and should probably follow.
   const COKE_ARM = { up: COKE_HAND.lift, fwd: -COKE_HAND.back,
-    follow: COKE_HAND.follow, pole: REACH_POLE };
-  const FACE_ARM = { up: COKE_HAND.lift, fwd: -COKE_HAND.back,
-    follow: COKE_HAND.follow, pole: FACE_POLE };
+    follow: COKE_HAND.follow, pole: REACH_POLE, torso: 1 };
+  /**
+   * AND THE WRIST GOES BESIDE THE STRAW, NOT ON IT.
+   *
+   * `lift` and `back` are the blade's numbers: a hand hovering 0.105 m above
+   * a blade lying flat on a table and 0.028 m behind it, both in WORLD axes.
+   * Pointed at a straw held to her nostril they put her wrist bone on the
+   * nostril — measured 0.202 m across her own body and 0.167 m ABOVE her
+   * shoulder — and an arm whose wrist is there has nowhere to put an elbow.
+   *
+   * Her grip point rides 0.088 m off the wrist (see `PALM`), so the wrist has
+   * to sit about that far from the straw and the only question is which way.
+   * Down the torso and out to her right, in HER frame: a hand pinching
+   * something at its own nose comes at it from below and from outside, never
+   * from above and behind.
+   */
+  const FACE_ARM = { up: 0, fwd: 0, body: { down: 0.070, right: 0.058, fwd: 0.030 },
+    follow: COKE_HAND.follow, pole: FACE_POLE, torso: 1 };
+
+  /**
+   * AND THE ELBOW HANGS AGAIN ON THE WAY DOWN.
+   *
+   * With the pole switched rather than blended there was a 94-degree spike at
+   * clip 3.77, on the release: the hand is falling from her face to her side,
+   * `FACE_POLE` is still asking for an elbow out in front, and for a fifth of
+   * a second the point of her elbow leads the movement at shoulder height.
+   * Measured elbow there: 0.018 m ABOVE the shoulder, 0.236 forward.
+   *
+   * So the pole is mixed on `strawUp`, which is now a smooth nought-to-one
+   * and back. Its other end is where the elbow belongs when there is nothing
+   * in the hand: `IDLE_A`'s own, read off the rig at (0.028 right, 0.237
+   * down, 0.007 back) — straight down with a couple of centimetres of
+   * clearance. Before the straw has ever been up it is `REACH_POLE` instead,
+   * because that end of the beat is a hand reaching down at a table and that
+   * is the pole that was measured for it.
+   */
+  const HANG_POLE = new THREE.Vector3(-0.029, -0.997, 0.118).normalize();
+  const _ckMix = new THREE.Vector3();
   function cokeReach(f, dt, free) {
     // The taking is the same arm on the same plate — see `cokeTakeSet`. It
     // shares `show.cokeU`, and the phase decides what the hand is over:
@@ -41657,6 +41788,12 @@ async function buildJadrija(scene) {
     } else if (!cokeHoldAt(_ckBlade, u)) return;
     // And which elbow. Down and forward once the object has left the plate,
     // out to the side while she is still reaching for it — see `FACE_POLE`.
+    if (show.phase === 'line') {
+      _ckMix.copy(show.strawFace ? HANG_POLE : REACH_POLE)
+        .lerp(FACE_POLE, sat(show.strawUp || 0));
+      if (_ckMix.lengthSq() > 1e-6) _ckMix.normalize();
+      FACE_ARM.pole = _ckMix;
+    }
     const arm = (show.phase === 'line' && show.strawFace) ? FACE_ARM : COKE_ARM;
     // Lower over the wrap than over the blade: the blade number leaves the
     // grip 21 mm clear of steel lying flat, and the wrap is 2 mm of folded
@@ -47935,6 +48072,11 @@ async function buildJadrija(scene) {
           // The far end of the indoor hose, so a still of it can be taken
           // without holding a branch on her for five seconds at one frame a
           // second — which a headless page cannot do at all.
+          // The coke beat, which is eleven seconds of walking, pouring and
+          // meeting away from a probe that wants to look at the four and a
+          // half seconds of it that matter. `coke` is the cutting and is
+          // posed by its own reach; `line` is the one with the clip.
+          line: 'snort',
           recline: 'recline', cradle: 'cradle', situp: 'situp',
           // And the sitting family, for the same reason: `bedFor` is seven
           // minutes and the way in is a kneel, a recline and a clip, which is
@@ -48751,7 +48893,18 @@ async function buildJadrija(scene) {
       const u = +(show.cokeU || 0).toFixed(3);
       const h = new THREE.Vector3();
       const held = cokeHoldAt(h, u) ? (u < 0.25 ? 'wrap' : 'blade') : null;
+      // AND THE STRAW, for the same reason the line above exists. Through the
+      // whole `line` beat the thing in her hand is the straw and every number
+      // here was measured to the blade lying on the plate — so a grip
+      // correctly on the straw at her nose reported 0.15 m and read as a
+      // miss. `dStraw` is the one to look at once `lift` is up.
+      const st = new THREE.Vector3();
+      const onStraw = cokeStrawAt(st);
       return { u, at: +(show.cutAt || 0).toFixed(3),
+        straw: onStraw ? r3(st) : null,
+        dStraw: onStraw ? +p.distanceTo(st).toFixed(3) : null,
+        dStrawWrist: onStraw ? +w.distanceTo(st).toFixed(3) : null,
+        lift: +(show.strawUp || 0).toFixed(3),
         crouch: +(show.crouch || 0).toFixed(3), duck: +(show.duck || 0).toFixed(3),
         held, blade: r3(b), wrist: r3(w), palm: r3(p),
         dWrist: +w.distanceTo(b).toFixed(3), dPalm: +p.distanceTo(b).toFixed(3),

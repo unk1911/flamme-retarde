@@ -8,6 +8,105 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.458.0] — 2026-09-21
+
+### the elbow, measured against an arm that was drawn by hand
+
+Misha: *"nope it's still not right... her right arm doing something
+awkward/funky, her elbow is out.. just get this right, even if it takes long
+time, keep re-verifying"*.
+
+**The measurement that was missing.** "Elbow is out" cannot be read in world
+Y, because for most of this beat her torso is folded 68 degrees and world-down
+is not body-down. It has to be taken in HER frame — hip-to-hip for lateral,
+chest-to-pelvis for the torso axis — and then it is one number: the elbow's
+abduction from the torso axis. A hanging arm reads 8 degrees on this rig.
+
+**And the reference was in the repo all along.** `YAWN` in human_mh.py brings
+this same hand to this same face, it was authored by hand, and it has never
+drawn a complaint. Posed in Blender and read out in her own frame, relative to
+the right shoulder:
+
+| | abduction | elbow: medial, down, forward |
+|---|---|---|
+| `YAWN`, authored | 64° | 0.030, 0.105, **+0.213** |
+| snort, 1.457.0 | **133°** | 0.094, **−0.163**, −0.148 |
+| snort, 1.458.0 | 53° | 0.023, 0.141, **+0.192** |
+
+At 1.457.0 her elbow was sixteen centimetres ABOVE her shoulder and fifteen
+behind it, for the whole of the snort — a wing pointing back over her
+shoulder. The authored arm swings the elbow forward of the shoulder and hangs
+it underneath. Three separate faults were behind that.
+
+### one: the pole was written in a frame her torso had left
+
+`wheelLimb` puts the elbow at `root + l1 * v`, where `v` is the pole with its
+component along the shoulder-to-wrist axis removed. When the arm is folded
+right up — a hand at her own face — `sa` is near 1 and the elbow sits almost
+exactly along `v`, so **`v` IS the elbow direction** and everything depends on
+the pole being square to the arm.
+
+`FACE_POLE` was `(0.25, -1, 0.30)` in figure space: very nearly straight down
+in the world. Correct while she is upright. Fold her over a tabouret and the
+shoulder-to-wrist axis points down as well, the pole goes nearly PARALLEL to
+the arm, and `v` is whatever ragged residual survives the projection. The
+elbow flew off into it.
+
+The pole is carried by the chest now, through `boneTurn` — the same call
+`PALM` has always gone through. "Down the torso" stays down the torso at any
+fold. `FACE_POLE` itself is no longer a guess either: it is the yawn's own
+measured elbow direction, `(0.891, -0.439, -0.126)`.
+
+### two: her wrist was being sent to her nostril
+
+The straw is placed from her nose and the hand is solved on to the straw, and
+the offsets that hold a hand clear of the thing it is holding — `lift` 0.105
+up, `back` 0.028 — are the BLADE's numbers, measured for a blade lying flat on
+a table, in world axes. Pointed at a straw held to her face they put her wrist
+bone 0.202 m across her own body and 0.167 m ABOVE her shoulder, and an arm
+whose wrist is there has nowhere to put an elbow. `FACE_ARM` has its own
+offset now, in her frame: down the torso and out to her right, which is how a
+hand comes at something at its own nose.
+
+### three: the grip offset was never carried with the arm
+
+Found while checking the fix, and the oldest of the three. `reachRight` moves
+its cached chain rigidly by however far the clavicle has turned since the
+cache — that is what `_ckQc` is for, and there is a long note above it saying
+why. **`A.P`, the grip offset, was left out of that carry.** So the palm
+direction the wrist rotation starts from was stale by the torso's own
+movement: 36 degrees of error at a 68-degree stoop.
+
+Measured: her wrist landed 0.090 m from the straw, exactly as asked, and her
+grip point landed **0.055 m** from it where the arithmetic says 0.008. Her
+hand was more than a straw's length off the straw for the entire beat. Now
+**0.007**. The cutting beat got it too — grip to blade 0.037–0.074 m before,
+0.021–0.042 after.
+
+### and the pole is mixed, not switched
+
+A 94-degree spike survived all of the above, at clip 3.77 on the release: the
+hand is falling from her face to her side, `FACE_POLE` is still asking for an
+elbow out in front, and for a fifth of a second the point of her elbow led the
+movement at shoulder height. The pole is blended on `strawUp` now, between
+`FACE_POLE` and `HANG_POLE` — `IDLE_A`'s own elbow direction, read off the
+rig. That spike is 15.8 degrees.
+
+Across the whole beat the abduction now runs 7 → 22 → 46 → 19 → 67 → 53 → 54
+→ 39 → 16 → 6, with no step in it.
+
+### and a probe that was measuring the wrong thing
+
+`cokeHand()` reports distances to the blade and the wrap and never to the
+straw, so a grip correctly on the straw reported 0.15 m and read as a failure.
+It carries `dStraw` and `lift` now. There is a note directly above it, written
+when the same mistake was made with the wrap, saying that a probe measuring
+the wrong target is worse than no probe. It was right.
+
+`put(t, s, 'line')` also plays the `snort` clip now instead of falling through
+to `idle`, so the beat can be reached from a probe without eleven seconds of
+walking, pouring and greeting first.
+
 ## [1.457.0] — 2026-09-21
 
 ### it was never the bend
