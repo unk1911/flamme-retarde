@@ -8,6 +8,89 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.455.0] — 2026-09-21
+
+### the fold is a motion capture now
+
+Misha, on the tenth release of the coke beat: *"it still looks weird/awkward"*
+— and then, after a long look at what this engine can and cannot do,
+*"can u bake whatever u just learned into our thing?"*
+
+Her stoop is no longer typed. It comes off subject 26, trial 9 of the CMU
+motion capture database — a man bending down to pick something up —
+retargeted on to this rig.
+
+**Why ten releases of typing it did not work.** Every stoop in `human_mh.py`
+was one fold angle shared out down the spine on a fixed 0.55/0.25/0.12/0.08,
+with a knee bend proportional to it. At the bottom of this capture the real
+body has **−68° at the lowest spine joint and +11° at the third**: the lower
+back folds and the upper back *arches back*, because that is how a person
+keeps their eyes on what they are reaching for. No weighting of one number
+can produce a sign change, which is why every version of this read as a
+mannequin hinging at the waist. That was the defect, and it was never going
+to be found by adjusting the number.
+
+**What it measures.** At the deep beat, against 1.454.2:
+
+| | 1.454.2 | 1.455.0 |
+|---|---|---|
+| head to plate, horizontal | 0.175 m / 0.160 m | **0.036 m / 0.032 m** |
+| head above plate | 0.277 m / 0.247 m | 0.282 m / 0.250 m |
+| straw hand to plate | 0.279 m / 0.246 m | **0.229 m / 0.194 m** |
+
+Her face was a hand's width to the SIDE of the plate and is now over it, at
+the same height. Which is the complaint from three releases ago — *"the plate
+is under her, not in front of her"* — coming back in the other direction, and
+being answered by a body that actually knows where it is reaching.
+
+### the pipeline, because the next one should take an hour
+
+- `tools/mocap/asfamc.py` — the ASF/AMC reader. An AMC's angles are in each
+  bone's *own* axis frame, so a local rotation is `C·R·C⁻¹`; skip that
+  conjugation and the numbers look plausible and the skeleton is wrong.
+- `tools/blender/mocap_retarget.py` — the transfer. For every bone: take the
+  capture's global orientation, subtract *its own* rest, apply the change to
+  *her* rest, and let Blender solve the local Euler.
+- `tools/blender/mocap_stoop.py` — generated, 24 keys.
+- Two CMU files under `tools/mocap/cmu/`, so the bake is reproducible from
+  this repository alone. Their licence permits redistribution and forbids
+  resale; see README.
+
+**Three wrong versions of four lines**, all of which passed the identity test
+(pose the rest frame, get her rest back), and each of which had to be
+rendered to be caught:
+
+1. *World-space delta.* Correct only when the subject happens to face the
+   same way her armature does. 02_06's man never turns and it looked perfect;
+   26_09's turns 87°, and she came out in a wide lunge.
+2. *Measure in the root's frame.* This removes the turn and also removes the
+   **pitch** — a man bending over tips his pelvis twenty degrees forward, that
+   lives in the root, and subtracting it subtracted most of the bend. She came
+   up arched backwards with her chin in the air.
+3. *Conjugate by the capture's rest root.* A no-op dressed up as a fix: it
+   lands the delta back in CMU world, Y-up and facing wherever the subject
+   stood.
+
+What works is to remove the **yaw only**, about an up axis read off the body,
+and carry the result across with a change of basis built from anatomy —
+hip-to-hip is right, root-to-thorax is up, forward is the cross of the two.
+Both captures retarget correctly under it.
+
+**And the index is where her head goes, not how far her hips drop.** Hip drop
+was the obvious key, because `root=` in every `_stoop` call already *was* hip
+drop in metres. It collapses the shallow half of the beat: over the first
+third of the capture the torso folds forty degrees and the hips come down
+four centimetres, so the lean to pick the straw up and the near-upright beat
+where she puts it to her face landed on the same rung. Labelling each key
+with where it puts her skull base keeps all three sub-steps apart — and at
+the two keys that matter, the deep ones where her face has to be over the
+plate, the capture lands within two centimetres of the head position that ten
+releases of measuring put there. Those numbers were the one part of the old
+poses worth keeping, and they are kept.
+
+Arms, neck and head stay hand written. She is holding a 42 mm straw to her
+face and no subject in the database is.
+
 ## [1.454.2] — 2026-09-21
 
 ### the sniff is the punctuation

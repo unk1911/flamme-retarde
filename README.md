@@ -204,6 +204,23 @@ this repository and none may be — the licence is free and royalty-free for use
 *inside* a work and does not permit redistributing the character or animation
 files themselves.
 
+**Her stoop is a motion capture**, and it is the only clip in the game that
+is. The beat where she bends over the tabouret takes its fold and its knees
+from subject 26, trial 9 of the **[CMU Graphics Lab Motion Capture
+Database](http://mocap.cs.cmu.edu/)** — a man bending down to pick something
+up. The database was created with funding from NSF EIA-0196217 and its terms
+are that the data may be copied, modified and redistributed freely; it may not
+be *resold*, in converted form or otherwise, and nothing here does that. Two
+files are committed under `tools/mocap/cmu/` (the skeleton, and the first 280
+frames of the trial, which is the part used) so that the bake is reproducible
+from this repository alone.
+
+What ships is not the capture. `tools/blender/mocap_retarget.py` transfers it
+on to this project's own rig — twenty-four keys, each labelled with where it
+puts her head — and `tools/blender/mocap_stoop.py` is that table. Her arms,
+neck and head in the clip are hand written, and the note over `_stoop` in
+`tools/blender/human_mh.py` says why the fold could not be.
+
 **The sea, partly**: the whitecap and capillary work was done after reading
 **[ABYSSAL](https://github.com/Token-Gremlin/natural-disasters)** by **Davi
 (Token-Gremlin)**, MIT. No code was copied — what was taken is the *reasoning*,

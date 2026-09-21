@@ -90,6 +90,11 @@ from mathutils import Euler, Matrix, Quaternion, Vector  # type: ignore
 from mathutils.bvhtree import BVHTree  # type: ignore
 from mathutils.kdtree import KDTree  # type: ignore
 
+# The captured stoop ladder. Generated, never edited by hand — see
+# tools/blender/mocap_retarget.py and the note on `_stoop` below.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from mocap_stoop import HEAD as MC_HEAD, LADDER as MC_LADDER  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "build" / "mh_base.obj"
 BLEND = ROOT / "build" / "human_mh.blend"
@@ -4947,20 +4952,50 @@ CROUCH = {
 # takes its rest chain from the frame the job starts — so a clip that threw
 # the arm somewhere first would hand the solver a shoulder it then has to
 # undo. The LEFT one braces out and forward, where the edge of a table is.
-def _stoop(a, neck, head, knee=12, root=-0.02):
-    return dict(IDLE_A, **{
-        "@root": (0.0, 0.020, -0.006 + root),
-        "spine01": (-a * 0.55, 0, 1.0), "spine02": (-a * 0.25, 0, 1.0),
-        "spine03": (-a * 0.12, 0, 0.5), "chest": (-a * 0.08, 0, 0),
+# ── AND THEN IT STOPPED BEING TYPED AT ALL ────────────────────────────────
+#
+# Everything above this line is the record of ten releases of guessing, and
+# the guess it kept making was that a fold is one angle shared out down the
+# spine on a fixed 0.55/0.25/0.12/0.08 with a knee bend proportional to it.
+# A real body does not do that. At the bottom of this capture CMU subject 26
+# has −68 at the lowest spine joint and +11 at the third — his upper back
+# ARCHES BACK while his lower back folds, because that is how a person keeps
+# their eyes on what they are reaching for. No weighting of one number can
+# produce a sign change, which is why every version of this read as a
+# mannequin hinging at the waist.
+#
+# So the fold comes off a capture now. `mocap_stoop.py` is 24 keys of a man
+# bending down to pick something up, retargeted on to her rig by
+# tools/blender/mocap_retarget.py, and each key is labelled with where it
+# puts her skull base once its feet are on the deck.
+#
+# THE ARGUMENT IS THAT HEIGHT, and it is chosen so the six poses below keep
+# the head positions they already had — which were not guesses, they were
+# measured in the game against the plate on the tabouret over about ten
+# releases. At the two that matter, the deep ones where her face has to be
+# over the plate, the capture lands within two centimetres of where the typed
+# pose put it. The transitional keys drift up to twelve centimetres forward
+# and that is fine: nothing touches anything on the way past.
+#
+# Arms, neck and head stay hand written. She is holding a 42 mm straw to her
+# face and no subject in the database is.
+def _mc_body(z):
+    """The captured body with her skull base at height `z`, between two keys."""
+    i = 0
+    while i < len(MC_HEAD) - 2 and MC_HEAD[i + 1][1] > z:
+        i += 1
+    lo, hi = MC_HEAD[i][1], MC_HEAD[i + 1][1]
+    t = 0.0 if hi == lo else min(max((z - lo) / (hi - lo), 0.0), 1.0)
+    a, b = MC_LADDER[i], MC_LADDER[i + 1]
+    return {k: tuple(a[k][j] + (b[k][j] - a[k][j]) * t for j in range(3))
+            for k in a}
+
+
+def _stoop(z, neck, head):
+    return dict(IDLE_A, **dict(_mc_body(z), **{
         "neck": (neck, 0, 0), "head": (head, -2, 0),
         "armUL": (14, 0, 22), "armLL": (-30, 0, 6), "handL": (-10, 0, 0),
-        "legUL": (-knee * 0.5, 0, STAND_TRACK),
-        "legLL": (knee, 0, STAND_SHANK),
-        "footL": (-min(knee * 0.45, 26), STAND_SOLE, 0),
-        "legUR": (-knee * 0.5, 3, -STAND_TRACK),
-        "legLR": (knee, 0, -STAND_SHANK),
-        "footR": (-min(knee * 0.45, 26), -STAND_SOLE, 0),
-    })
+    }))
 
 
 # THE NECK WAS WRONG BY TWENTY-FIVE DEGREES on the first bake, and the fold
@@ -4972,7 +5007,7 @@ def _stoop(a, neck, head, knee=12, root=-0.02):
 
 
 
-STOOP = _stoop(50, 16, 4, knee=98, root=-0.42)
+STOOP = _stoop(0.973, 16, 4)
 
 # Halfway down, for the clip to pass through, so the fold arrives as a
 # movement rather than as a cut.
@@ -4989,19 +5024,19 @@ STOOP = _stoop(50, 16, 4, knee=98, root=-0.42)
 # back, because picking a 42 mm straw off a plate is a hand's job. NOSE is
 # almost upright again: she has it, and she is putting it to her face, and
 # nobody squats to do that. Only then does STOOP take her down to the line.
-STOOP_PICK = _stoop(30, 14, 4, knee=20, root=-0.085)
-STOOP_NOSE = _stoop(13, 10, 2, knee=9, root=-0.035)
+STOOP_PICK = _stoop(1.425, 14, 4)
+STOOP_NOSE = _stoop(1.533, 10, 2)
 
-STOOP_IN = _stoop(26, 14, 4, knee=46, root=-0.19)
+STOOP_IN = _stoop(1.337, 14, 4)
 
 # A breath lower, the way every held pose in this file has one — a position
 # that does not move is a mannequin.
-STOOP_B = _stoop(53, 17, 5, knee=101, root=-0.435)
+STOOP_B = _stoop(0.936, 17, 5)
 
 # And the head off it, which is the only fast thing in the beat. Still folded
 # — she comes off the plate before she comes up — so this is the neck and
 # nothing else, thrown a long way back from where it was resting.
-STOOP_UP = _stoop(41, -34, -28, knee=88, root=-0.375)
+STOOP_UP = _stoop(1.076, -34, -28)
 
 
 # The throw: arms up and over, legs driving straight, and the hips already
