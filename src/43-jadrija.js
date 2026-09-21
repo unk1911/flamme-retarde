@@ -38028,24 +38028,73 @@ async function buildJadrija(scene) {
         // clip and the phase are one timeline and this is where the two are
         // tied together; a beat that drifted from its key would have her
         // taking a line off a plate her face had already left.
-        const LN = 4.6;
+        // ── AND THE TWO TIMELINES WERE 0.55 s APART ──────────────────
+        //
+        // This block says it is tied to the clip and it was not. `lu` starts
+        // 0.55 s in, to let `showSettle` put her on the mark first, but the
+        // CLIP starts with the phase — so every fraction below was 0.55 s
+        // later in clip time than the key it was named after, and `lu` ran to
+        // 1 at clip time 5.15 on a clip that is 4.60 long. The last 12 % of
+        // the beat played against a clip frozen on its final frame, standing
+        // up: the powder was still going at clip 3.82 when her head had come
+        // off the plate at 3.27. She was finishing the line after she had
+        // stood up, in every version of this since the beat was written.
+        //
+        // The span is the clip MINUS the settle now, so `lu` 0 to 1 is clip
+        // 0.55 to 4.60 and the phase and the clip end together. Every
+        // fraction below is re-derived from that, and the clip times they
+        // land on are written beside them.
+        const LN = 4.05;
         const lu = Math.max(0, show.tmr - 0.55) / LN;
         show.cokeU = Math.min(1, lu);
-        // Fingers close on it where it lies, over the reach.
-        const grip = sat((lu - 0.100) / 0.060);
-        // And it comes up to her face between the pick and the nose keys.
-        const lift = sat((lu - 0.163) / 0.152);
+        // Fingers close on it where it lies, over the reach — and they close
+        // inside the pause the clip holds open for them at 0.75 to 1.20.
+        const grip = sat((lu - 0.088) / 0.060);          // clip 0.91 -> 1.15
+        // And it comes up to her face between the pick and the nose keys —
+        // AND BACK DOWN AGAIN, which it never did.
+        //
+        // Misha, 21 Sep 2026: *"it's not her bend that's bad.. it's her right
+        // arm.. she is doing some weird contortions with it"*. He had said
+        // some version of that three times and each time it got read as a
+        // complaint about the stoop; it never was. MEASURED, hand to head, in
+        // metres: 0.691 at t 0.92, 0.040 at 2.25 — and 0.074 at 4.76, with
+        // the beat over and her standing upright. The hand arrived at her
+        // face and STAYED there for the last 78 % of the beat, through the
+        // whole stand-up.
+        //
+        // `lift` only ever ramped up. The straw is placed from her nostril
+        // and the hand is solved on to the straw, so a lift that never falls
+        // is a hand nailed to her nose.
+        const lift = sat((lu - 0.148) / 0.136)           // clip 1.15 -> 1.70
+                   * sat((0.860 - lu) / 0.120);          // clip 3.55 -> 4.04
         // The powder only goes once her face is down there, and it is done
-        // before the head comes off it at 0.765 of the beat — she does not
-        // sniff at a line that is still there.
-        const along = sat((lu - 0.540) / 0.170);
+        // before the head comes off the plate at clip 3.27 — she does not
+        // sniff at a line that is still there, and now she does not sniff
+        // standing up either. It starts at clip 2.55, which is inside the
+        // hold the clip has at the bottom, and finishes at 3.20.
+        const along = sat((lu - 0.494) / 0.160);         // clip 2.55 -> 3.20
         cokeTakeSet(along);
-        // Published for `cokeReach`, which picks the elbow off it.
+        // Published for `cokeReach`, which picks the elbow off it — and
+        // LATCHED, which is the other half of the same defect. The elbow was
+        // chosen by `lift > 0.35` read fresh every frame, so at the end of
+        // the beat, the instant `strawUp` went to zero, the pole flipped from
+        // FACE_POLE back to REACH_POLE *while the hand was still up at her
+        // face*. REACH_POLE is correct for an arm reaching DOWN at a table
+        // and it puts the elbow out to her side; with the wrist at her nose
+        // it puts the point of the elbow out level with her shoulder.
+        // Measured at the end of the beat: elbow 0.001 m BELOW the shoulder,
+        // where a hand at the face wants it about 0.20 m below. That is the
+        // contortion, and it is a one-frame change of mind about which elbow
+        // this is. Once the straw is up, it stays the face elbow until the
+        // arm is handed back.
         show.strawUp = lift;
+        if (lu <= 0.001) show.strawFace = 0;
+        if (lift > 0.35) show.strawFace = 1;
         if (skinFig) strawHold(skinFig, grip, lift, Math.min(COKE.lines - 1, cokeGone), along);
         if (lu >= 1) {
           cokeGone = Math.min(COKE.lines, cokeGone + 1);
           show.strawUp = 0;
+          show.strawFace = 0;
           if (skinFig) strawHold(skinFig, 0, 0, 0, 0);
           go('dwell', 'idle', 0.42);
         }
@@ -41586,7 +41635,15 @@ async function buildJadrija(scene) {
     // AND IT HAS TO BE THERE BEFORE THE PAPER TIPS. At (u-0.03)/0.08 the arm
     // was only arriving as the wrap went over at u 0.125, so her grip was
     // still 53 mm off it when the pour handed on. Full by u 0.055.
-    const want = on ? sat((u - 0.004) / 0.05) * sat((0.99 - u) / 0.05) : 0;
+    // AND IT LETS GO AFTER THE SNIFF, not at the end of the phase. The
+    // powder is gone at 0.710 and her head comes off the plate at 0.765;
+    // holding the solve to 0.99 kept her hand on a straw at her nose for the
+    // whole second and a bit it takes her to stand up. It hands the chain
+    // back over 0.78 to 0.90 now, so the arm is the clip's again — and
+    // falling to her side with the rest of her — before she is upright.
+    const OUT = show.phase === 'line' ? 0.86 : 0.99;
+    const SPAN = show.phase === 'line' ? 0.12 : 0.05;
+    const want = on ? sat((u - 0.004) / 0.05) * sat((OUT - u) / SPAN) : 0;
     show.cutAt = damp(show.cutAt || 0, want, 4.5, dt);
     if (show.cutAt < 0.004) {
       reachRight(f, dt, 'coke', _ckBlade, 0, COKE_ARM);
@@ -41600,8 +41657,7 @@ async function buildJadrija(scene) {
     } else if (!cokeHoldAt(_ckBlade, u)) return;
     // And which elbow. Down and forward once the object has left the plate,
     // out to the side while she is still reaching for it — see `FACE_POLE`.
-    const arm = (show.phase === 'line' && (show.strawUp || 0) > 0.35)
-      ? FACE_ARM : COKE_ARM;
+    const arm = (show.phase === 'line' && show.strawFace) ? FACE_ARM : COKE_ARM;
     // Lower over the wrap than over the blade: the blade number leaves the
     // grip 21 mm clear of steel lying flat, and the wrap is 2 mm of folded
     // paper she is pinching rather than a tool she is holding.

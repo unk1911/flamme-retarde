@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.457.0] — 2026-09-21
+
+### it was never the bend
+
+Misha: *"it's not her bend that's bad.. it's her right arm.. she is doing
+some weird contortions with it... i mean she is doing ballet moves! why can't
+she do a line of coke properly?"*
+
+He had said a version of that three times — *"she still does some weird shit
+with her hand"* — and all three times it was read as a complaint about the
+stoop, and six releases went into the stoop. The ballet question is the one
+that gives it away: ballet's arms are **authored in the clip**. This arm is
+the only one in the game solved at runtime, by `reachRight`, and that is the
+whole difference.
+
+**Measured, hand to head, in metres:**
+
+| clip t | 1.456.0 | 1.457.0 |
+|---|---|---|
+| 0.92 | 0.691 | 0.698 |
+| 2.25 | 0.040 | 0.047 |
+| 3.51 | 0.067 | 0.066 |
+| 4.76 | **0.074** | **0.664** |
+
+Her hand arrived at her face and **never came down**. It stayed there for the
+last 78 % of the beat, through the entire stand-up. `lift` only ever ramped
+up; the straw is placed from her nostril and the hand is solved on to the
+straw, so a lift that never falls is a hand nailed to her nose.
+
+**And the elbow, which is the contortion itself.** The elbow pole was picked
+fresh every frame off `lift > 0.35`, so at the instant the beat ended and
+`strawUp` went to zero, the pole flipped from `FACE_POLE` — down, forward,
+tucked — back to `REACH_POLE`, which is correct for an arm reaching DOWN at a
+table and puts the elbow out to her side. With the wrist still up at her nose
+that is the point of the elbow out level with her shoulder. Measured at the
+end of the beat: elbow **0.001 m** below the shoulder, where a hand at the
+face wants about 0.20. Now **0.234 m**, and the pole is latched once the
+straw is up so it cannot change its mind while the arm is still there.
+
+The arm also hands the chain back after the sniff now, over 0.78 to 0.86 of
+the beat, instead of holding the solve to 0.99. It is the clip's arm again —
+falling to her side with the rest of her — before she is upright.
+
+### and the two timelines were 0.55 s apart
+
+Found while fixing the above, and older than any of it. The `line` phase says
+it is tied to the clip and it was not: `lu` starts 0.55 s in, to let
+`showSettle` put her on the mark first, but the **clip starts with the
+phase**. So every fraction in that block was 0.55 s later in clip time than
+the key it was named after, and `lu` reached 1 at clip time 5.15 on a clip
+that is 4.60 long — the last 12 % of the beat played against a clip frozen on
+its final frame.
+
+The powder was therefore still going at clip 3.82 when her head had come off
+the plate at 3.27. **She was finishing the line after she had stood up**, in
+every version of this beat since it was written.
+
+The span is the clip minus the settle now — `LN` 4.60 → 4.05 — so `lu` 0 to 1
+is clip 0.55 to 4.60 and the phase and the clip end together. Every fraction
+is re-derived from that and carries the clip time it lands on:
+
+    grip   clip 0.91 -> 1.15   inside the pause the clip holds for the hand
+    lift   clip 1.15 -> 1.70   and back down over 3.55 -> 4.04
+    powder clip 2.55 -> 3.20   inside the hold at the bottom
+
 ## [1.456.0] — 2026-09-21
 
 ### there were five dead stops in it
