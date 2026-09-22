@@ -914,10 +914,34 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
       const ph = t * 0.9 + fg.seed * 6.283;
       const g = Math.sin(ph * 0.20 * rate + fg.seed * 5.1) > 0.94;
       if (g && !fg.bizOn) {
-        f.play(BIZ[(fg.seed * BIZ.length * 7) % BIZ.length | 0],
-          { fade: 0.25, next: want });
+        // Remembered, so the block below can tell a piece of business from a
+        // greeting's wave. Only this one may be cut short.
+        fg.bizClip = BIZ[(fg.seed * BIZ.length * 7) % BIZ.length | 0];
+        f.play(fg.bizClip, { fade: 0.25, next: want });
       }
       fg.bizOn = g;
+    }
+
+    // ── AND IT IS CUT SHORT IF THEY START WALKING ────────────────────────
+    //
+    // The gate above starts a one-shot on somebody standing and then leaves
+    // it to run, which was right while `BIZ` held one entry: `notice` is a
+    // second long and never outlived the mode that began it. `stretch` is
+    // seven and a half. Measured on the promenade: of five bathers mid-
+    // routine, one was in `walk` and covered **1.9 m in 1.8 s** — a standing
+    // leg-swing gliding down the deck, because `midBiz` holds the clip while
+    // the step below goes on writing `fg.x`.
+    //
+    // The person decided to walk, so the business is over. Only `fg.bizClip`
+    // is cancelled and never a cued clip: `fg.cue` carries a greeting's wave,
+    // which `freeToGreet` in 43-jadrija.js is happy to hand to a walker, and
+    // cutting that would break greetings on the move.
+    if (fg.bizClip) {
+      if (!midBiz(f)) fg.bizClip = null;
+      else if (fg.mode !== 'stand' && fg.mode !== 'wade') {
+        f.play(want, { fade: 0.25 });
+        fg.bizClip = null;
+      }
     }
 
     if (!midBiz(f) && f.playing() !== want) {

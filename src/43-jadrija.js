@@ -47478,7 +47478,22 @@ async function buildJadrija(scene) {
        * demotions since the page loaded, which is how you tell hysteresis that
        * is working from hysteresis that is not there.
        */
-      cast: () => ({
+      // Figure -> the clip drawing it, for `playing` below and for the `clip`
+      // column in `who`. `crowds.skin.pairs()` is the only route from a crowd
+      // person to the mesh that is drawing them, and nothing else exposes it.
+      cast: () => {
+        // One pass over `crowds.skin.pairs()`, which is the only route from a
+        // crowd person to the mesh drawing them, shared by the histogram and
+        // by the `clip` column in `who`.
+        const drawnBy = new Map();
+        if (crowds.skin && crowds.skin.pairs) {
+          for (const [fg2, f] of crowds.skin.pairs()) {
+            if (fg2 && f) drawnBy.set(fg2, f.playing() || 'none');
+          }
+        }
+        const castPlaying = () => drawnBy.entries();
+        const castClipOf = (fg) => drawnBy.get(fg) || null;
+        return {
         natH: (castNatH || []).map((h) => +h.toFixed(3)),
         // The histogram of what the whole skinned cast is playing, which is
         // the only way to find out whether a clip added to `BIZ` ever gets
@@ -47486,13 +47501,7 @@ async function buildJadrija(scene) {
         // fires perhaps once a minute, so watching one figure proves nothing.
         playing: (() => {
           const h = {};
-          if (crowds.skin) {
-            for (const [fg2, f] of crowds.skin.pairs()) {
-              if (!fg2 || !f) continue;
-              const n = f.playing() || 'none';
-              h[n] = (h[n] || 0) + 1;
-            }
-          }
+          for (const [, n] of castPlaying()) h[n] = (h[n] || 0) + 1;
           return h;
         })(),
         rigH: Object.values(crowds).filter((c) => c.height)
@@ -47511,7 +47520,11 @@ async function buildJadrija(scene) {
             // anybody had ever performed it. `greets()` carries this for the
             // handful of figures mid-greeting; every other skinned bather on
             // the shore was unobservable. A crowd clip that cannot be read
-            // back is a crowd clip nobody can test.
+            // back is a crowd clip nobody can test — and the histogram alone
+            // says how many are doing a thing without saying WHERE any of
+            // them is, which is the question somebody trying to go and look
+            // at one actually has. This row carries `d` already.
+            clip: castClipOf(fg),
             // The third column that has to agree, and did not until 1.353.0:
             // `sex` picks the instanced rig and the bark voice, `blob` picks
             // the body you become. A row where these disagree is a woman at
@@ -47522,7 +47535,8 @@ async function buildJadrija(scene) {
             instM: +(((crowds.m || crowds.f || {}).height || 0)
               * fg.scale).toFixed(3),
           })).sort((a2, b2) => a2.d - b2.d) : [],
-      }),
+        };
+      },
       /**
        * Walk into somebody without walking into them.
        *

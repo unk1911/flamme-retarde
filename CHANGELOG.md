@@ -8,6 +8,37 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.466.0] — 2026-09-22
+
+### the routine is cut short if they start walking
+
+Found while answering *"how to see it?"* — which is its own lesson, because
+the way to find it was to ask where a stretching bather actually is, and the
+histogram added in 1.464.0 only says how many.
+
+`BIZ` starts a one-shot on somebody standing and then leaves it to run. That
+was right while the array held one entry: `notice` is a second long and never
+outlived the mode that began it. `stretch` is seven and a half. Measured on
+the promenade, of five bathers mid-routine **one was in `walk` mode and
+covered 1.9 m in 1.8 s** — a standing leg-swing gliding down the deck,
+because `midBiz` holds the clip while the step below goes on writing `fg.x`.
+
+The person decided to walk, so the business is over. Only `fg.bizClip` is
+cancelled and never a cued clip: `fg.cue` carries a greeting's wave, which
+`freeToGreet` is happy to hand to a walker, and cutting that would break
+greetings on the move.
+
+After: every sampled stretcher is `stand` or `wade` and every distance is
+constant across samples. Nobody slides.
+
+### and `cast().who` carries the clip
+
+The histogram says five people are stretching and not where any of them is,
+which is the question somebody trying to go and look at one actually has.
+That row already carried `d`; it carries `clip` now, off the same one-pass
+map the histogram uses. `__fr.jad.cast().who.filter(w => w.clip === 'stretch')`
+is the nearest-first list.
+
 ## [1.465.0] — 2026-09-21
 
 ### `seq -w` pads to the widest number, not to two digits
