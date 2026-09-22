@@ -2671,7 +2671,12 @@ function buildAudio() {
     // out of everybody's way. Two and a half, because the argument that drove
     // that number down was that a tune demands to be listened to and a bed
     // does not; a promenade is the room, not a thing in it.
-    gain: 0.30,
+    // AND IT KEPT 0.30 WHEN IT DROPPED ITS SECOND HEAD, an hour after the
+    // clip was replaced, which cost it 3 dB it was never meant to lose. The
+    // new tape measures the same −28.6 dB mean as the one it replaced, so the
+    // pair really was carrying +3.01 dB of incoherent sum. Same √2 as `LAP`
+    // and for the same reason: 0.30 × √2 = 0.424.
+    gain: 0.424,
     inside: 0.27,        // and what an airframe with two turboprops leaves of it
     lpNear: 4000,        // Hz — the filter as far open as it goes, on the spot
     lpFar: 750,          // and what a kilometre of sea over water leaves of it
@@ -2781,7 +2786,28 @@ function buildAudio() {
     // 0.30² + 0.20² was 0.130; 0.30²(1 − 0.62) + 0.28² is 0.121, which is two
     // tenths of a decibel and is the point — the balance moved, the level did
     // not.
-    gain: 0.28,
+    //
+    // ── AND THEN IT LOST A PLAYHEAD, SO IT GAINED 3 dB ──────────────────
+    //
+    // Misha, 21 Sep 2026, on the shore bed: *"yeah do the free one-line fix
+    // for lapping too"*. Same disease, measured the same way: `lapping` is
+    // `heard` at 67.0 s and is not a texture — six pitched events at
+    // 282–552 Hz with clarities to 0.90, one of them +14.7 dB at 58.4 s. Two
+    // playheads do not make that a longer period; they make every slap in the
+    // recording arrive twice as often.
+    //
+    // It is its own number now and not `BED.voices`, because that constant is
+    // shared with the rows and the cicadas and those are textures — a cicada
+    // bed has nothing in it to recognise, which is the whole test.
+    //
+    // THE GAIN GOES UP BY √2 AND THAT IS NOT A TASTE CHANGE. Two playheads of
+    // the same recording, detuned and started at different offsets, are
+    // incoherent: their POWER adds, so the pair is 3.01 dB louder than one.
+    // Dropping a head without touching the gain quietly takes 3 dB off the
+    // sea. 0.28 × √2 = 0.396 holds the level exactly where the arithmetic
+    // above put it.
+    voices: 1,
+    gain: 0.396,
   };
 
   // ── the body under it ───────────────────────────────────────────────────────
@@ -2988,11 +3014,11 @@ function buildAudio() {
       const g = ctx.createGain();
       g.gain.value = 0.0001;
       g.connect(outBus);
-      // Two playheads, 69.5 s apiece: the whole of the pier recording bar its
-      // two ends, and its pair comes round every twenty-five minutes. It had
-      // one until 1.433.0 on the argument that a minute is long enough — see
-      // the note on length at the top, where that argument is retracted.
-      const srcs = voices(lapBuf, BED.voices, BED.detune, g, t0);
+      // ONE playhead, 69.5 s: the whole of the pier recording bar its two
+      // ends. It had one until 1.433.0, then two on the argument that a pair
+      // comes round every twenty-five minutes — which is true of their PHASE
+      // and is not what the ear is doing. See `LAP`.
+      const srcs = voices(lapBuf, LAP.voices, BED.detune, g, t0);
       // And the body under it, into the same gain, so it is the same bed and
       // not a second one to keep in step. See BODY.
       lapNodes = { srcs, g, body: seaBody(srcs[0], g) };

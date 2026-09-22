@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.462.0] — 2026-09-21
+
+### the sea loses a playhead and keeps its level
+
+Misha: *"yeah do the free one-line fix for lapping too"*.
+
+`lapping` had the same disease `shore` was just treated for, measured the same
+way: `heard` at **67.0 s**, and it is not a texture — six pitched events at
+282–552 Hz with clarities to 0.90, one of them **+14.7 dB at 58.4 s**. Two
+playheads do not make that a longer period. They make every slap in the
+recording arrive twice as often.
+
+It was not quite a one-line fix, because `lapping` was reading `BED.voices`,
+which is shared with the rows and the cicadas — and those two ARE textures,
+with nothing in them to recognise. The lapping bed has its own `voices` now
+and the shared constant is left alone.
+
+### and the 3 dB nobody asked to lose
+
+Dropping a playhead is not free, and 1.461.0 spent it without noticing. Two
+playheads of the same recording, detuned and started at different offsets, are
+incoherent — their **power** adds, so a pair is 3.01 dB louder than one. Both
+beds went from two heads to one with their gains untouched.
+
+It is not the new tape making up for it either: `shore.mp3` measures the same
+**−28.6 dB mean** as the clip it replaced, so the pair really was carrying the
+whole +3.01 dB.
+
+    LAP.gain    0.28 -> 0.396      0.28 x sqrt2
+    SHORE.gain  0.30 -> 0.424      0.30 x sqrt2
+
+Measured live at 25 m from the middle of Jadrija, before and after: the shore
+bed's applied gain 0.179 → 0.253 and the lapping bed's 0.0558 → 0.0789, both
+a ratio of 1.414. `each.lap` 2 → 1. The balance moved; the level did not,
+which is the same sentence the note over `LAP.gain` was already written
+around.
+
 ## [1.461.0] — 2026-09-21
 
 ### the child came round every twenty-three seconds
