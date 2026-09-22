@@ -35,6 +35,17 @@ const APPR = {
   lag: 0.34,              // s of delay on both the clip and the path
   side: 1.15,             // m to the leader's left, in the leader's own frame
   back: 1.30,             // m behind her
+  // AND INDOORS SHE QUEUES UP INSTEAD OF STANDING OFF THE SHOULDER.
+  //
+  // The kabina is 1.45 m wide. Carrying 1.15 m of side offset in there puts
+  // her through a wall — measured, 1.7 m from the middle of a room half that
+  // across — and no amount of clamping makes standing beside somebody work in
+  // a space where there is no beside. Behind is the only free direction, and
+  // behind is also where she already is: the leader walks in facing the back
+  // wall, so "further along her own backward axis" is straight down the room
+  // toward the door.
+  sideIn: 0.0,
+  backIn: 1.75,
   ring: 64,               // samples of history; 64 at 60 fps is a second
   // Hair, brows and lashes are dark keratin, not black paint. The sheen is
   // what separates the two and it is the one thing the assets cannot carry,
@@ -189,7 +200,7 @@ async function loadApprentice() {
  * `updateMatrixWorld`, because what she follows is where the leader ENDED UP
  * this frame and not where the movers thought she was going.
  */
-function apprenticeStep(dt, leader) {
+function apprenticeStep(dt, leader, inside = null, floorY = null) {
   if (!appr || !leader || !leader.mesh) return;
   // Leader gone — into the kabina, out of range, off the phase that has her
   // at all. An apprentice with nobody to follow stands and waits.
@@ -219,8 +230,24 @@ function apprenticeStep(dt, leader) {
   // produces and the same handedness the horns ride on.
   const fx = Math.cos(yaw), fz = -Math.sin(yaw);
   const sx = Math.sin(yaw), sz = Math.cos(yaw);
-  appr.mesh.position.set(x - fx * APPR.back + sx * APPR.side,
-    y, z - fz * APPR.back + sz * APPR.side);
+  // How far into the kabina the LEADER is, 0..1. The resort's own test, in
+  // world metres, so nothing here needs to know about the (t, s) frame — and
+  // it is already a ramp across the threshold rather than a boolean, which is
+  // what keeps the offsets from stepping as she crosses the doorway.
+  const inK = inside ? inside(x, z) : 0;
+  const bk = APPR.back + (APPR.backIn - APPR.back) * inK;
+  const sd = APPR.side + (APPR.sideIn - APPR.side) * inK;
+  // AND INDOORS SHE IS ON THE FLOOR, whatever the leader is on.
+  //
+  // The ring buffer carries the leader's y, which is right while both of them
+  // are walking on the same concrete and wrong the moment the leader lies
+  // down on the cot: that lift is a PLACE and not a body motion, and the
+  // apprentice is 1.75 m down the room from it. Copied, it hangs her in the
+  // air off the end of the bed. Outdoors the same y carries a somersault,
+  // which is a body motion and must be copied, so this is gated on the room
+  // — where the floor is one number and there is nothing to somersault over.
+  const py = floorY == null ? y : y + (floorY - y) * inK;
+  appr.mesh.position.set(x - fx * bk + sx * sd, py, z - fz * bk + sz * sd);
   appr.mesh.rotation.y = yaw;
   appr.mesh.visible = apprN > 4;
 
@@ -256,16 +283,19 @@ function apprenticeStep(dt, leader) {
  * So the pose goes through to both. Same offset as `apprenticeStep` uses, so
  * a frozen pair stand exactly where a moving pair would.
  */
-function apprenticePose(name, at, settle, leader) {
+function apprenticePose(name, at, settle, leader, inside = null) {
   if (!appr) return null;
   if (leader && leader.mesh) {
     const yaw = leader.mesh.rotation.y;
     const fx = Math.cos(yaw), fz = -Math.sin(yaw);
     const sx = Math.sin(yaw), sz = Math.cos(yaw);
+    const inK = inside ? inside(leader.mesh.position.x, leader.mesh.position.z) : 0;
+    const bk = APPR.back + (APPR.backIn - APPR.back) * inK;
+    const sd = APPR.side + (APPR.sideIn - APPR.side) * inK;
     appr.mesh.position.set(
-      leader.mesh.position.x - fx * APPR.back + sx * APPR.side,
+      leader.mesh.position.x - fx * bk + sx * sd,
       leader.mesh.position.y,
-      leader.mesh.position.z - fz * APPR.back + sz * APPR.side);
+      leader.mesh.position.z - fz * bk + sz * sd);
     appr.mesh.rotation.y = yaw;
   }
   if (!name) { appr.mesh.updateMatrixWorld(); return { posed: appr.playing() }; }

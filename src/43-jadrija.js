@@ -33911,6 +33911,19 @@ async function buildJadrija(scene) {
    * One test, so they can never disagree about which side of the doorway she
    * is on.
    */
+  /**
+   * How far into the special kabina a world point is, 0..1 — the same ramp
+   * `jad.kabina().inside` publishes, hoisted so `stepShow` can hand it to the
+   * apprentice without allocating a closure sixty times a second.
+   */
+  function kabinaInside(x, z) {
+    if (!special) return 0;
+    const [t, s] = local(x, z);
+    if (t < special.t0 - 0.25 || t > special.t1 + 0.25) return 0;
+    if (s < special.face - 0.30 || s > special.s1 + 0.25) return 0;
+    return sat((s - (special.face - 0.05)) / 0.40);
+  }
+
   function sheIsIn() {
     const K0 = special;
     return !!K0 && !!show && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
@@ -40339,7 +40352,8 @@ async function buildJadrija(scene) {
     // stepped here rather than anywhere above: every mover has run, the
     // position is final, and the matrix she is about to be measured against
     // has just been pushed.
-    apprenticeStep(dt, f);
+    apprenticeStep(dt, f, special ? kabinaInside : null,
+      special ? special.floor : null);
 
     wearTick(dt);
     hairAim();
@@ -48154,7 +48168,8 @@ async function buildJadrija(scene) {
       skinFig.state.curT = at;
       // And the apprentice, who is stepped from inside `stepShow` and would
       // otherwise be left mid-wander while the leader stands still.
-      const a2 = apprenticePose(name, at, settle, skinFig);
+      const a2 = apprenticePose(name, at, settle, skinFig,
+        special ? kabinaInside : null);
       return { posed: name, at, playing: skinFig.playing(), appr: a2 };
     },
     /**
@@ -48311,12 +48326,7 @@ async function buildJadrija(scene) {
       of: SCARVES.length,
     }),
     kabina: special && {
-      inside: (x, z) => {
-        const [t, s] = local(x, z);
-        if (t < special.t0 - 0.25 || t > special.t1 + 0.25) return 0;
-        if (s < special.face - 0.30 || s > special.s1 + 0.25) return 0;
-        return sat((s - (special.face - 0.05)) / 0.40);
-      },
+      inside: (x, z) => kabinaInside(x, z),
       // Where in the resort's own frame it is, for anything that has to walk
       // there — and for the tests, which otherwise have to find a door by eye.
       at: [(special.t0 + special.t1) * 0.5, (special.face + special.s1) * 0.5],

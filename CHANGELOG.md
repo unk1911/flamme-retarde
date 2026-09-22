@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.470.0] — 2026-09-22
+
+### the apprentice follows her indoors
+
+Misha: *"can u make baye v2.0 follow the same stuff baye v1.0 is doing inside
+the kabine?"* She was already trying to. `stepShow` is the only path the
+leader is placed on and it runs in there as well as on the deck, so the
+apprentice walked the lagged trail through the doorway on her own. What she
+could not do was stand anywhere once she arrived.
+
+**The kabina is 1.45 m wide.** Carrying 1.15 m of side offset into it put her
+1.7 m from the middle of a room half that across — through a wall. No amount
+of clamping makes standing *beside* somebody work in a space where there is no
+beside. Behind is the only free direction, and behind is also where she
+already is, because the leader walks in facing the back wall: "further along
+her own backward axis" is straight down the room toward the door. So indoors
+the offset becomes 1.75 m back and nothing sideways.
+
+Blended by `kabina.inside(x, z)`, which the resort already publishes and which
+is already a ramp across the threshold rather than a boolean — so the offsets
+slide over as she crosses the doorway instead of stepping. It is hoisted to
+`kabinaInside` so `stepShow` can hand it over without allocating a closure
+sixty times a second, and the published `jad.kabina().inside` now defers to
+it, because two copies of a test is one copy too many.
+
+**And indoors she is on the floor, whatever the leader is on.** The ring
+buffer carries the leader's y, which is right while both of them are walking
+on the same concrete and wrong the moment the leader lies down on the cot:
+that lift is a PLACE, not a body motion, and the apprentice is 1.75 m down the
+room from it. Copied, it hangs her in the air off the end of the bed.
+Outdoors the same y carries a somersault, which *is* a body motion and has to
+be copied — so the correction is gated on the room, where the floor is one
+number and there is nothing to somersault over.
+
+Measured in there: `inside` 1.0, apprentice at y 3.11 against a floor of
+3.114, playing what the leader is playing.
+
 ## [1.469.0] — 2026-09-22
 
 ### v2.0 gets what every community skin leaves out
