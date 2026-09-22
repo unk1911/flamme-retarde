@@ -8558,6 +8558,8 @@ window.__fr = {
     coke: (u) => (jadrija && jadrija.coke ? jadrija.coke(u) : null),
     pose: (n, at, settle) => (jadrija && jadrija.pose ? jadrija.pose(n, at, settle) : null),
     plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
+    /** Debug: turn Baye v2.0 to an absolute yaw — see 46-apprentice.js. */
+    apprFace: (yaw) => apprenticeFace(yaw),
     /** Blade, hand, and the gap between them — see `cokeReach`. */
     cokeHand: () => (jadrija && jadrija.cokeHand ? jadrija.cokeHand() : null),
     /** What she saw on the last recon, and what she brought back. */

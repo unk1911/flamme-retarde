@@ -8,6 +8,70 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.469.0] — 2026-09-22
+
+### v2.0 gets what every community skin leaves out
+
+Misha, of the two of them standing side by side: *"the only thing that i
+notice, is v2.0 doesn't seems to have any pubic hair."* Every skin in the pack
+is hairless there and v1.0 is not, so it reads immediately.
+
+v1.0 does it with GEOMETRY — five overlapping ellipsoid cutters in a column,
+punched through the mesh and painted `PUBIC_P`, with the decimator's own
+averaging doing the softening. That mechanism does not exist on a textured
+figure and should not: the whole of what makes v2.0 different is that her
+surface detail lives in a map. So `tools/baye2_tex.py` evaluates the same
+wedge and rasterises it into UV space off the mesh's own UVs, per-vertex
+coverage interpolated barycentrically across each face, and composites it into
+her skin. Eighteen body faces, 3 297 texels.
+
+**Two mistakes, and the second is the interesting one.**
+
+The first was judging the map instead of the render. Transcribed from v1.0 the
+wedge rasterised to 44 texels across and 118 tall — a dark vertical spike —
+and the reflex was to widen it until the map looked like a triangle. That
+reflex is wrong. The body island is about 1.75x anisotropic there, so a patch
+that *is* wider than it is tall on her is taller than it is wide in the
+texture. What the map looks like is not information.
+
+The second: rendered, v1.0's numbers put the mass of it **between her legs**,
+where it reads as a shadow rather than as hair. v1.0's own note says exactly
+why, and it took reading it twice to hear it — the hip wrap is rigid to her
+pelvis and spans z 0.828 to 0.940, so the whole mons sits behind cloth and the
+only rows that ever do any work are the bottom two, down where the gap under
+the hem is. **Those heights are a costume decision, not an anatomical one**,
+and v2.0 wears no wrap.
+
+So it is hung on the mesh instead. The midline front surface runs x 0.1076 at
+z 0.832, 0.1276 at 0.865, 0.1366 at 0.891 and 0.1449 at 0.922 and flattens
+into belly above that — the mound is z 0.845 to 0.920, and the triangle goes
+there: 76 mm across the top, tapering to 24 mm, 67 mm tall.
+
+The noise multiplies the coverage and not the colour, because what varies
+across a patch of hair is how much of the skin behind it you can see, not what
+shade the hair is.
+
+### the textures moved out of the Blender half
+
+They were written by `tools/blender/baye2.py` for one release. Blender's
+Python has numpy and no PIL, and the alternative — a colour JPEG through
+Blender's own colour management — is a gamma applied twice that nobody sees
+until she is standing next to somebody. Worse, `baye2_tex.py` does not only
+copy the maps any more: a copy step left in the Blender half would silently
+overwrite the painted skin with the plain one on the next rebuild, which is a
+defect that shows up only on a figure nobody is currently looking at. The two
+halves keep their own `WEAR` dicts and **check each other**, because two dicts
+that can drift silently are worse than one.
+
+### and a way to look at her
+
+`jad.pose` stops `stepShow`, and `apprenticeStep` is called from inside
+`stepShow` — so posing the leader left the apprentice holding whatever she was
+doing, three metres away, facing wherever she last walked. Every check on her
+cost ten screenshots and a montage while the two of them crawled around the
+deck. `jad.pose` now poses both, at the same offset a moving pair would stand
+at, and `jad.apprFace(yaw)` turns her without waiting for the wander.
+
 ## [1.468.0] — 2026-09-22
 
 ### Baye v2.0, walking two paces behind Baye v1.0

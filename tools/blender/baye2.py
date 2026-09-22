@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """Baye v2.0 — the textured figure, built straight off the base mesh.
 
-    blender -b -noaudio -P tools/blender/baye2.py
+    blender -b -noaudio -P tools/blender/baye2.py    # the blob
+    python3 tools/baye2_tex.py                        # and her textures
 
-Writes build/payload/baye2.fr3d.gz plus her textures, and `src/41-skin.js`
-reads them. She does not replace Baye v1.0 and is not meant to yet; she
+Writes build/payload/baye2.fr3d.gz; `tools/baye2_tex.py` writes the textures
+beside it and `src/41-skin.js` reads both.
+
+THE TEXTURES ARE NOT WRITTEN HERE, and they were, for one release. Blender's
+Python has numpy and no PIL, and `baye2_tex.py` does not only copy the maps —
+it paints pubic hair into the skin, which every community skin in the pack
+lacks and v1.0 has. A copy step in this file would silently overwrite that
+with the plain map on the next rebuild, which is a defect that only shows up
+on a figure nobody is currently looking at. She does not replace Baye v1.0 and is not meant to yet; she
 shadows the shore figure so that a year of clips can be watched on her before
 anyone decides.
 
@@ -83,6 +91,9 @@ WEAR = {
     'lash': 'mindfront_eyelashes_04',
     'leg':  'v0rt3x_stockings_black_fishnet_medium',
 }
+# `tools/baye2_tex.py` carries the same three names it needs; if they ever
+# disagree she is wearing one asset's geometry under another's texture, which
+# on a hairstyle is obvious and on a skin is not.
 # Which base-mesh groups become which part. Anything not named here is a
 # fitting helper or a joint marker and is dropped: `helper-hair` is a VOLUME
 # that hair is fitted inside rather than hair, and the base's own eyelashes are
@@ -530,23 +541,6 @@ def main():
     H.ballet_floor(rig)
     H.wine_floor(rig)
     baked = [H._bake_clip(rest, c) for c in H.CLIPS]
-
-    # Her maps go into build/payload under stable names, so build.py inlines
-    # them the way it inlines every other asset and the runtime asks for
-    # `PAYLOAD.baye2_skin` rather than knowing which artist made it.
-    import shutil
-    for kind, want in (('skin', WEAR['skin']), ('hair', WEAR['hair']),
-                       ('leg', WEAR['leg'])):
-        src = next((p for p in WORK.glob('%s__%s.*' % (kind, want))
-                    if p.suffix in ('.png', '.jpg')), None)
-        if src is None:
-            sys.exit('[baye2] no texture for %s — run tools/wardrobe/make.py' % want)
-        dst = OUT / ('baye2_%s%s' % (kind, src.suffix))
-        for stale in OUT.glob('baye2_%s.*' % kind):
-            if stale != dst:
-                stale.unlink()
-        shutil.copy(src, dst)
-        print('[baye2] %-6s texture %s  %.0f KB' % (kind, dst.name, dst.stat().st_size / 1024))
 
     write_blob(buf, rest, baked, OUT / 'baye2.fr3d.gz')
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))

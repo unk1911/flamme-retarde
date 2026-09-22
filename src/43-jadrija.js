@@ -48144,7 +48144,7 @@ async function buildJadrija(scene) {
      */
     pose: (name, at = 0, settle = 1.5) => {
       if (!skinFig) return null;
-      if (!name) { posed = null; return { posed: null }; }
+      if (!name) { posed = null; return { posed: null, appr: apprenticePose(null) }; }
       if (!skinFig.clips.includes(name)) return { posed: null, clips: skinFig.clips };
       posed = { name, at };
       skinFig.play(name, { fade: 0 });
@@ -48152,7 +48152,10 @@ async function buildJadrija(scene) {
       const n = Math.max(1, Math.round(settle * 60));
       for (let i = 0; i < n; i++) { skinFig.state.curT = at; skinFig.update(1 / 60); }
       skinFig.state.curT = at;
-      return { posed: name, at, playing: skinFig.playing() };
+      // And the apprentice, who is stepped from inside `stepShow` and would
+      // otherwise be left mid-wander while the leader stands still.
+      const a2 = apprenticePose(name, at, settle, skinFig);
+      return { posed: name, at, playing: skinFig.playing(), appr: a2 };
     },
     /**
      * Debug: put her at (t, s), and optionally straight into a phase.

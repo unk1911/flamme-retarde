@@ -243,6 +243,52 @@ function apprenticeStep(dt, leader) {
   appr.mesh.updateMatrixWorld();
 }
 
+/**
+ * Freeze her on one clip, beside a frozen leader.
+ *
+ * `jad.pose` stops `stepShow`, and `apprenticeStep` is called from inside
+ * `stepShow` — so posing the leader leaves the apprentice holding whatever
+ * she happened to be doing, three metres away, facing wherever she last
+ * walked. Every check on her then costs ten screenshots and a montage while
+ * the two of them crawl around the deck, which is how the first look at her
+ * pubic hair went.
+ *
+ * So the pose goes through to both. Same offset as `apprenticeStep` uses, so
+ * a frozen pair stand exactly where a moving pair would.
+ */
+function apprenticePose(name, at, settle, leader) {
+  if (!appr) return null;
+  if (leader && leader.mesh) {
+    const yaw = leader.mesh.rotation.y;
+    const fx = Math.cos(yaw), fz = -Math.sin(yaw);
+    const sx = Math.sin(yaw), sz = Math.cos(yaw);
+    appr.mesh.position.set(
+      leader.mesh.position.x - fx * APPR.back + sx * APPR.side,
+      leader.mesh.position.y,
+      leader.mesh.position.z - fz * APPR.back + sz * APPR.side);
+    appr.mesh.rotation.y = yaw;
+  }
+  if (!name) { appr.mesh.updateMatrixWorld(); return { posed: appr.playing() }; }
+  if (!appr.clips.includes(name)) return { posed: null, clips: appr.clips };
+  apprClip = name;
+  appr.play(name, { fade: 0 });
+  appr.state.prev = null;
+  const n = Math.max(1, Math.round((settle == null ? 1.5 : settle) * 60));
+  for (let i = 0; i < n; i++) { appr.state.curT = at || 0; appr.update(1 / 60); }
+  appr.state.curT = at || 0;
+  appr.mesh.visible = true;
+  appr.mesh.updateMatrixWorld();
+  return { posed: name, at: at || 0 };
+}
+
+/** Debug: turn her to an absolute yaw, without waiting for her to wander. */
+function apprenticeFace(yaw) {
+  if (!appr) return null;
+  appr.mesh.rotation.y = yaw;
+  appr.mesh.updateMatrixWorld();
+  return +yaw.toFixed(3);
+}
+
 /** What she is doing, for `__fr.stats().jadrija.apprentice`. */
 function apprenticeStats() {
   if (!appr) return 'none';
