@@ -59,29 +59,7 @@ let appr = null;                 // the figure
 let apprRing = null;             // Float32Array of [x, y, z, yaw] * APPR.ring
 let apprHead = 0, apprN = 0, apprClock = 0;
 let apprClip = null;             // what the leader was last seen playing
-
-/** A payload image as a texture, decoded off the data URI. */
-function apprTex(key, wrap) {
-  const b64 = PAYLOAD[key];
-  if (!b64) return null;
-  const img = new Image();
-  const t = new THREE.Texture(img);
-  // NoColorSpace, like every other texture in this game and for the same
-  // reason: `aVCol` is sRGB bytes handed to the shader as linear, so the whole
-  // palette is authored in that stretched space. A skin decoded to linear here
-  // would be the only surface in Šibenik that was not, and she would read as
-  // washed out standing next to a wall that was not.
-  t.colorSpace = THREE.NoColorSpace;
-  t.anisotropy = 8;
-  t.minFilter = THREE.LinearMipmapLinearFilter;
-  if (wrap) { t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping; }
-  // The payload is a data URI, so this decode is a microtask rather than a
-  // request — but it is still not synchronous, and a texture whose image has
-  // no width yet uploads as nothing at all.
-  img.onload = () => { t.needsUpdate = true; };
-  img.src = b64;
-  return t;
-}
+let apprEye = null;              // her iris and blink uniforms
 
 /**
  * Build her. Returns null — quietly — if the blob is not in this build, which
@@ -90,101 +68,28 @@ function apprTex(key, wrap) {
  */
 async function loadApprentice() {
   if (!PAYLOAD.baye2_fr3d) return null;
-  const skin = apprTex('baye2_skin');
-  const hair = apprTex('baye2_hair');
-  const leg = apprTex('baye2_leg');
+  // Everything about how a v5 figure is put together lives in 41-skin.js, so
+  // that she and Chloe cannot drift apart. What is hers is the four lines
+  // below: which maps, and what colour her hair is.
+  const look = v5Parts({
+    hairTex: 'baye2_hair', legTex: 'baye2_leg',
+    hairCol: APPR.hairCol, browCol: APPR.browCol, lidCol: 0xcf9e86,
+  });
+  apprEye = look.eye;
 
   const fig = await loadSkin('baye2_fr3d', {
     spec: 0.10, specPower: 26, vcol: false,
-    uniforms: { uSkin: { value: skin } },
+    uniforms: { uSkin: { value: v5Tex('baye2_skin') } },
     decl: 'uniform sampler2D uSkin;',
     // The whole of what makes her a different figure: one texture lookup.
     body: 'base = texture2D(uSkin, vUv).rgb;',
-    parts: {
-      // The eyeballs' UV layout is not known to us, so the iris is drawn in
-      // BIND space instead — `vLocal` is the unskinned position, so an eye
-      // socket that has been carried across the beach by the head bone is
-      // still at the coordinates this was measured at. Filled in below, once
-      // there is geometry to measure.
-      eyes: { color: 0xcfc8bd, spec: 0.55, specPower: 90,
-        uniforms: { uEyeL: { value: new THREE.Vector3() },
-          uEyeR: { value: new THREE.Vector3() },
-          uEyeF: { value: new THREE.Vector3(1, 0, 0) } },
-        decl: 'uniform vec3 uEyeL;\nuniform vec3 uEyeR;\nuniform vec3 uEyeF;',
-        body: `
-          vec3 ec = distance(vLocal, uEyeL) < distance(vLocal, uEyeR) ? uEyeL : uEyeR;
-          vec3 rd = normalize(vLocal - ec);
-          float a = dot(rd, normalize(uEyeF));
-          float iris = smoothstep(0.918, 0.941, a);
-          float pupil = smoothstep(0.9885, 0.9925, a);
-          float limb = smoothstep(0.925, 0.937, a) * (1.0 - smoothstep(0.945, 0.960, a));
-          base = mix(base, vec3(0.30, 0.40, 0.34), iris);
-          base = mix(base, vec3(0.02), pupil);
-          base *= 1.0 - 0.75 * limb;
-        ` },
-      mouth: { color: 0xd8b3ae, spec: 0.20 },
-      // Hair cards are rectangles that only look like hair because most of
-      // each one is cut away by its alpha. A discard rather than blending, so
-      // they sort against each other without a depth-sorted pass.
-      hair: { color: APPR.hairCol, side: THREE.DoubleSide,
-        spec: 0.20, specPower: 30,
-        uniforms: { uHair: { value: hair } },
-        decl: 'uniform sampler2D uHair;',
-        body: 'vec4 hc = texture2D(uHair, vUv);\n'
-          + 'if (hc.a < 0.5) discard;\n'
-          + 'base *= hc.rgb * 1.6;' },
-      // Eyebrows and eyelashes carry no map at all, so they are a colour and
-      // a sheen and nothing else. Double-sided because their own material
-      // says `backfaceCull False` and a strand seen from the far side is half
-      // of every strand.
-      brow: { color: APPR.browCol, side: THREE.DoubleSide, spec: 0.18 },
-      lash: { color: APPR.browCol, side: THREE.DoubleSide, spec: 0.18 },
-      // A fishnet is not skin and must not take skin's lift. `SKIN_EMISSIVE`
-      // exists because light entering skin scatters under it and leaves
-      // somewhere else; a thread of nylon does no such thing, and a black net
-      // handed 0.16 of unconditional ambient over a pale leg comes out silver.
-      leg: { color: 0xffffff, side: THREE.DoubleSide, spec: 0.05, specPower: 40,
-        emissive: 0.03,
-        uniforms: { uLeg: { value: leg } },
-        decl: 'uniform sampler2D uLeg;',
-        body: 'vec4 lc = texture2D(uLeg, vUv);\n'
-          + 'if (lc.a < 0.5) discard;\n'
-          + 'base *= lc.rgb;' },
-    },
+    parts: look.parts,
   });
   if (!fig) return null;
 
-  // The eyes, measured off the geometry rather than guessed. Same argument as
-  // `faceAnchors` for v1.0: the eyeballs say exactly where the eyes are, and a
-  // number typed here is a number that goes wrong the day the mesh changes.
-  const eyes = fig.parts && fig.parts.eyes;
-  if (eyes) {
-    const pos = fig.mesh.geometry.getAttribute('position');
-    const ix = fig.mesh.geometry.getIndex();
-    const seen = new Set();
-    let lx = 0, ly = 0, lz = 0, ln = 0, rx = 0, ry = 0, rz = 0, rn = 0;
-    const start = eyes.geometry.drawRange.start;
-    const count = eyes.geometry.drawRange.count;
-    for (let i = start; i < start + count; i++) {
-      const v = ix.getX(i);
-      if (seen.has(v)) continue;
-      seen.add(v);
-      // Her right and her left, split on the figure's own z — the export puts
-      // her facing +x, so z is across her.
-      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
-      if (z >= 0) { lx += x; ly += y; lz += z; ln++; } else { rx += x; ry += y; rz += z; rn++; }
-    }
-    if (ln && rn) {
-      const u = eyes.material.uniforms;
-      u.uEyeL.value.set(lx / ln, ly / ln, lz / ln);
-      u.uEyeR.value.set(rx / rn, ry / rn, rz / rn);
-      // Which way she looks: from the midpoint of the two eyes, along the
-      // axis the export faces. Measured as a direction rather than assumed so
-      // that it stays right if the export's facing ever changes — the two eye
-      // centres and the figure's own forward are the only things involved.
-      u.uEyeF.value.set(1, 0, 0);
-    }
-  }
+  // The eyes, measured off the geometry rather than guessed.
+  v5Eyes(fig, apprEye);
+
   appr = fig;
   apprRing = new Float32Array(APPR.ring * 4);
   apprHead = 0; apprN = 0; apprClock = 0; apprClip = null;
@@ -266,6 +171,7 @@ function apprenticeStep(dt, leader, inside = null, floorY = null) {
   // apprentice walking at a different cadence to the person in front of her
   // is the one thing that would give the whole arrangement away.
   if (leader.state) appr.state.speed = leader.state.speed;
+  v5Blink(apprEye, dt);
   appr.update(dt);
   appr.mesh.updateMatrixWorld();
 }
@@ -309,6 +215,13 @@ function apprenticePose(name, at, settle, leader, inside = null) {
   appr.mesh.visible = true;
   appr.mesh.updateMatrixWorld();
   return { posed: name, at: at || 0 };
+}
+
+/** Where she is and which way she is facing, in world metres. */
+function apprenticeAt() {
+  if (!appr) return null;
+  return { x: appr.mesh.position.x, y: appr.mesh.position.y,
+    z: appr.mesh.position.z, yaw: appr.mesh.rotation.y };
 }
 
 /** Debug: turn her to an absolute yaw, without waiting for her to wander. */

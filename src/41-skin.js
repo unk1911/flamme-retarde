@@ -1614,6 +1614,16 @@ function skinnedFigure(data, opts = {}) {
    * on her shoulders is worse than her hair not casting one.
    */
   const parts = {};
+  // THE BODY IS A DRAW RANGE TOO, and leaving it out was a real bug rather
+  // than a tidiness point. `mesh` is built on `data.geo` with no range, so it
+  // draws the WHOLE index buffer — body, eyes, mouth, hair, brows, lashes —
+  // every one of them a second time in the body's own material. What that
+  // looks like is a hairstyle with half its cards rendered in skin: flat
+  // peach shapes fanning out of the crown, interleaved with the blue ones,
+  // which is exactly what it looked like. Setting the hair to magenta and
+  // watching the peach shapes stay peach is what found it.
+  const bodyGrp = (data.groups || []).find((g) => g.name === 'body');
+  if (bodyGrp) data.geo.setDrawRange(bodyGrp.start, bodyGrp.count);
   for (const grp of (data.groups || [])) {
     if (grp.name === 'body') continue;
     const po = opts.parts && opts.parts[grp.name];
@@ -1630,7 +1640,11 @@ function skinnedFigure(data, opts = {}) {
       spec: 0.06, specPower: 32, emissive: SKIN_EMISSIVE, vcol: false,
       ...po,
       defines: { FR_SKIN: '', FR_BONES: nb },
-      uniforms: { uBones, uBoneRows, ...(po.uniforms || {}) },
+      // `uFace` goes in as well, and is empty unless `opts.face` asked for a
+      // face. A part that wants to know whether she is blinking should be able
+      // to ask the same uniform the body asks, rather than being handed a
+      // second copy that somebody has to remember to drive.
+      uniforms: { uBones, uBoneRows, ...uFace, ...(po.uniforms || {}) },
     });
     const pmesh = new THREE.Mesh(geo, pm);
     pmesh.castShadow = false;
@@ -2239,6 +2253,11 @@ function skinnedFigure(data, opts = {}) {
    */
   function wear(on) {
     worn = !!on;
+    // A v5 figure's body is already a range — see `bodyGrp` above — and has
+    // nothing to shed, so putting the whole buffer back would draw every part
+    // twice in the skin material. Its wrap, if it ever gets one, will be a
+    // part of its own.
+    if (bodyGrp) return;
     data.geo.setDrawRange(0, on ? Infinity : data.ni - data.shed);
   }
 
@@ -2325,4 +2344,212 @@ async function loadSkin(key, opts) {
     console.warn('skin failed:', key, e.message);
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// The shared half of a v5 figure.
+//
+// Baye v2.0 and Chloe v2.0 are the same construction: one skinned mesh in
+// several named parts, a photographic skin on the body, an alpha-cut hairstyle
+// and strand-modelled brows and lashes that ship with no texture at all. What
+// differs between them is which assets and what colour, so that is what these
+// take as arguments and everything else lives here once.
+//
+// ── why they do not use `face: true` ────────────────────────────────────────
+//
+// `faceAnchors` and `FACE_FRAG` are built for a figure that is PAINTED. The
+// blink is a colour run down the eyeball and the smile is a displacement found
+// by looking for `MOUTH_P` vertices — neither of which exists here: a v5 blob
+// carries UVs instead of vertex colours, and its eyeballs are a separate part
+// with their own material that the body's fragment shader cannot reach.
+// Pointing that machinery at a textured face would be asking a system to find
+// landmarks it has no way to find, and the failure mode is paint on a
+// photograph. So the one piece of it that matters at this distance — the blink
+// — is done here instead, on the part that actually owns the eyeball.
+// ---------------------------------------------------------------------------
+
+/** A payload image as a texture, decoded off its data URI. */
+function v5Tex(key, wrap) {
+  const b64 = PAYLOAD[key];
+  if (!b64) return null;
+  const img = new Image();
+  const t = new THREE.Texture(img);
+  // NoColorSpace, like every other texture in this game and for the same
+  // reason: `aVCol` is sRGB bytes handed to the shader as linear, so the whole
+  // palette is authored in that stretched space. A skin decoded to linear here
+  // would be the only surface in Šibenik that was not, and she would read as
+  // washed out standing next to a wall that was not.
+  t.colorSpace = THREE.NoColorSpace;
+  t.anisotropy = 8;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  if (wrap) { t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping; }
+  // The payload is a data URI, so this decode is a microtask rather than a
+  // request — but it is still not synchronous, and a texture whose image has
+  // no width yet uploads as nothing at all.
+  img.onload = () => { t.needsUpdate = true; };
+  img.src = b64;
+  return t;
+}
+
+/** How a blink runs. A human's is quicker than people guess. */
+const V5_BLINK = { shut: 0.075, open: 0.145, gap: 2.4, spread: 4.6, again: 0.22 };
+
+/**
+ * The part materials for a v5 figure.
+ *
+ * `o.hairTex` / `o.legTex` are payload keys; `o.hairCol`, `o.browCol` and
+ * `o.lidCol` are colours; `o.lock` is an optional extra fragment for the hair,
+ * which is how Chloe gets her pink through it and her beanie takes it off.
+ */
+function v5Parts(o) {
+  const eye = {
+    uEyeL: { value: new THREE.Vector3() },
+    uEyeR: { value: new THREE.Vector3() },
+    uEyeF: { value: new THREE.Vector3(1, 0, 0) },
+    uEyeY: { value: new THREE.Vector2(0, 1) },   // bind-space bottom and top
+    uLid: { value: 0 },
+    uLidCol: { value: new THREE.Color(o.lidCol || 0xd8ab94) },
+  };
+  const hairTex = o.hairTex ? v5Tex(o.hairTex) : null;
+  const legTex = o.legTex ? v5Tex(o.legTex) : null;
+  const parts = {
+    // THE IRIS IS DRAWN IN BIND SPACE. The eyeball's UV layout is not known to
+    // us, so it is drawn from the geometry instead — and `vLocal` is the
+    // unskinned position, so an eye socket that has been carried across the
+    // beach by the head bone is still at the coordinates this was measured at.
+    eyes: { color: 0xcfc8bd, spec: 0.55, specPower: 90, uniforms: eye,
+      decl: 'uniform vec3 uEyeL;\nuniform vec3 uEyeR;\nuniform vec3 uEyeF;\n'
+        + 'uniform vec2 uEyeY;\nuniform float uLid;\nuniform vec3 uLidCol;',
+      body: `
+        vec3 ec = distance(vLocal, uEyeL) < distance(vLocal, uEyeR) ? uEyeL : uEyeR;
+        vec3 rd = normalize(vLocal - ec);
+        float a = dot(rd, normalize(uEyeF));
+        float iris = smoothstep(0.918, 0.941, a);
+        float pupil = smoothstep(0.9885, 0.9925, a);
+        float limb = smoothstep(0.925, 0.937, a) * (1.0 - smoothstep(0.945, 0.960, a));
+        base = mix(base, ${o.iris || 'vec3(0.30, 0.40, 0.34)'}, iris);
+        base = mix(base, vec3(0.02), pupil);
+        base *= 1.0 - 0.75 * limb;
+        // The lid, and it is a LID and not a fade: an eyelid has an edge and
+        // the edge is the thing you see moving. Bind space again, so it works
+        // in every clip she has including the ones that put her upside down.
+        float lidAt = mix(uEyeY.y, uEyeY.x - 0.002, uLid);
+        if (vLocal.y > lidAt) {
+          base = uLidCol;
+          spec = 0.10;
+        }
+      ` },
+    mouth: { color: 0xd8b3ae, spec: 0.20 },
+    // Hair cards are rectangles that only look like hair because most of each
+    // one is cut away by its alpha. A discard rather than blending, so they
+    // sort against each other without a depth-sorted pass.
+    // `o.hairDye` is the difference between wearing a colour and being one.
+    //
+    // Multiplying the card texture by a dye is right when the asset already
+    // ships the colour you want and you are nudging it. It is wrong when you
+    // are RECOLOURING: these textures are a dark scalp patch plus lighter
+    // strands, so a dark crown times blue is a dark crown, and what you get is
+    // a black cap with blue tips. Chloe is blue, not blue-tipped.
+    //
+    // A dye takes the texture's LUMINANCE as shading and supplies the colour
+    // itself, which is also what dye does to real hair.
+    hair: { color: o.hairCol || 0x6b4f3c, side: THREE.DoubleSide,
+      spec: 0.20, specPower: 30,
+      uniforms: { uHair: { value: hairTex } },
+      decl: 'uniform sampler2D uHair;' + (o.hairDecl || ''),
+      body: 'vec4 hc = texture2D(uHair, vUv);\n'
+        + 'if (hc.a < 0.5) discard;\n'
+        + (o.hairDye
+          ? 'float hl = dot(hc.rgb, vec3(0.299, 0.587, 0.114));\n'
+            + 'base *= ' + (o.hairGain || 0.55).toFixed(2) + ' + '
+            + (o.hairLit || 1.45).toFixed(2) + ' * hl;\n'
+          : 'base *= hc.rgb * ' + (o.hairGain || 1.6).toFixed(2) + ';\n')
+        + (o.hairBody || '') },
+    // Eyebrows and eyelashes carry no map at all — their `.mhmat` is
+    // `diffuseColor 0 0 0`, `backfaceCull False` and nothing else — so they
+    // are a colour and a sheen. Double-sided, because a strand seen from the
+    // far side is half of every strand.
+    brow: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
+    lash: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
+  };
+  if (legTex) {
+    // A fishnet is not skin and must not take skin's lift. `SKIN_EMISSIVE`
+    // exists because light entering skin scatters under it and leaves
+    // somewhere else; a thread of nylon does no such thing, and a black net
+    // handed 0.16 of unconditional ambient over a pale leg comes out silver.
+    parts.leg = { color: 0xffffff, side: THREE.DoubleSide, spec: 0.05,
+      specPower: 40, emissive: 0.03,
+      uniforms: { uLeg: { value: legTex } },
+      decl: 'uniform sampler2D uLeg;',
+      body: 'vec4 lc = texture2D(uLeg, vUv);\n'
+        + 'if (lc.a < 0.5) discard;\n'
+        + 'base *= lc.rgb;' };
+  }
+  return { parts, eye };
+}
+
+/**
+ * Measure the eyes off the geometry, once, and point the iris at them.
+ *
+ * Same argument as `faceAnchors` makes for the painted figure: the eyeballs
+ * say exactly where the eyes are, and a number typed here is a number that
+ * goes wrong the day the mesh changes.
+ */
+function v5Eyes(fig, eye) {
+  const part = fig.parts && fig.parts.eyes;
+  if (!part) return false;
+  const pos = fig.mesh.geometry.getAttribute('position');
+  const ix = fig.mesh.geometry.getIndex();
+  const start = part.geometry.drawRange.start;
+  const count = part.geometry.drawRange.count;
+  const seen = new Set();
+  let lx = 0, ly = 0, lz = 0, ln = 0, rx = 0, ry = 0, rz = 0, rn = 0;
+  let lo = 1e9, hi = -1e9;
+  for (let i = start; i < start + count; i++) {
+    const v = ix.getX(i);
+    if (seen.has(v)) continue;
+    seen.add(v);
+    const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+    if (y < lo) lo = y;
+    if (y > hi) hi = y;
+    // Her right and her left, split on the figure's own z — the export puts
+    // her facing +x, so z is across her.
+    if (z >= 0) { lx += x; ly += y; lz += z; ln++; } else { rx += x; ry += y; rz += z; rn++; }
+  }
+  if (!ln || !rn) return false;
+  eye.uEyeL.value.set(lx / ln, ly / ln, lz / ln);
+  eye.uEyeR.value.set(rx / rn, ry / rn, rz / rn);
+  eye.uEyeY.value.set(lo, hi);
+  return true;
+}
+
+/**
+ * Advance a v5 figure's blink. Call it once a frame with the frame's dt.
+ *
+ * State rides on the uniform holder rather than on a module variable, so two
+ * v5 figures on screen at once do not blink in lockstep — which is the tell
+ * that would give away that they are the same construction.
+ */
+function v5Blink(eye, dt) {
+  if (!eye) return;
+  if (eye._t === undefined) { eye._t = Math.random() * V5_BLINK.spread; eye._p = 0; }
+  eye._t -= dt;
+  if (eye._p > 0) {
+    eye._p -= dt;
+    const d = V5_BLINK.shut + V5_BLINK.open;
+    const u = 1 - eye._p / d;
+    eye.uLid.value = u < V5_BLINK.shut / d
+      ? u / (V5_BLINK.shut / d)
+      : 1 - (u - V5_BLINK.shut / d) / (V5_BLINK.open / d);
+    if (eye._p <= 0) {
+      eye.uLid.value = 0;
+      // A double blink often enough to be noticed and rarely enough not to
+      // read as a stutter.
+      eye._t = Math.random() < V5_BLINK.again
+        ? 0.06 : V5_BLINK.gap + Math.random() * V5_BLINK.spread;
+    }
+  } else if (eye._t <= 0) {
+    eye._p = V5_BLINK.shut + V5_BLINK.open;
+  }
+  eye.uLid.value = Math.max(0, Math.min(1, eye.uLid.value));
 }

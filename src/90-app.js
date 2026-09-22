@@ -8560,6 +8560,31 @@ window.__fr = {
     plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
     /** Debug: turn Baye v2.0 to an absolute yaw — see 46-apprentice.js. */
     apprFace: (yaw) => apprenticeFace(yaw),
+    /**
+     * Debug: stand in front of the apprentice, looking at her. One call,
+     * because doing it by hand costs a screenshot a guess.
+     *
+     * The yaw is the one thing here worth writing down. `you.yaw`'s forward
+     * is (−sin, −cos) — see the walker at `fx`/`fz` in 47-ground.js — so
+     * looking AT a point is `atan2(x − lx, z − lz)`, with the subtraction the
+     * way round that looks wrong. `look()` in that file already spells it
+     * out; this is the same line and deliberately so. Getting the sign
+     * backwards points the camera at the kabine, which is a perfectly
+     * plausible photograph of the wrong thing.
+     */
+    apprLook: (back = 2.6, side = 0) => {
+      const a = apprenticeAt();
+      if (!a || !jadrija) return null;
+      // Her own facing, so "in front of her" means in front of HER and not
+      // on some compass bearing. Her forward is (cos y, -sin y); the camera
+      // goes out along it and turns round.
+      const fx = Math.cos(a.yaw), fz = -Math.sin(a.yaw);
+      const sx = Math.sin(a.yaw), sz = Math.cos(a.yaw);
+      const cx = a.x + fx * back + sx * side;
+      const cz = a.z + fz * back + sz * side;
+      const [t, s] = jadrija.local(cx, cz);
+      return __fr.jad.stand(t, s, Math.atan2(cx - a.x, cz - a.z));
+    },
     /** Blade, hand, and the gap between them — see `cokeReach`. */
     cokeHand: () => (jadrija && jadrija.cokeHand ? jadrija.cokeHand() : null),
     /** What she saw on the last recon, and what she brought back. */

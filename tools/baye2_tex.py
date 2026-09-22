@@ -2,7 +2,7 @@
 """Baye v2.0's textures: pick them off the rack, and paint what the rack has no
 way to carry.
 
-    python3 tools/baye2_tex.py
+    python3 tools/baye2_tex.py --figure baye2
 
 ── why this is a separate step from tools/blender/baye2.py ───────────────────
 
@@ -54,15 +54,23 @@ WORK = ROOT / 'build' / 'wardrobe'
 OUT = ROOT / 'build' / 'payload'
 TARGET_H = 1.75
 
-# Which of the rack she is wearing. The same dict `tools/blender/baye2.py`
-# carries; they are checked against each other below rather than shared,
-# because one of them runs in Blender and importing across that line to save
-# five lines of dict is how a build ends up needing Blender to answer a
-# question about a JPEG.
-WEAR = {
-    'skin': 'darthfurby_caucasian_female',
-    'hair': 'elvs_unkempt_french_braid',
-    'leg':  'v0rt3x_stockings_black_fishnet_medium',
+# The textures each figure needs, and whether it gets the wedge. The same
+# table `tools/blender/baye2.py` carries; they are checked against each other
+# below rather than shared, because one of them runs in Blender and importing
+# across that line to save ten lines of dict is how a build ends up needing
+# Blender to answer a question about a JPEG.
+#
+# Chloe does not get the wedge. She is in jeans from the hip down — painted,
+# in `src/49-you.js`, on thresholds measured off this same body — so it would
+# be under denim in every frame she is ever in.
+FIGURES = {
+    'baye2': {'body': 'build/mh_base.obj', 'pubic': True,
+              'tex': {'skin': 'darthfurby_caucasian_female',
+                      'hair': 'elvs_unkempt_french_braid',
+                      'leg':  'v0rt3x_stockings_black_fishnet_medium'}},
+    'chloe2': {'body': 'build/mh_bodies/mh_chloe.obj', 'pubic': False,
+               'tex': {'skin': 'toigo_light_skin_female_freckles',
+                       'hair': 'cortu_short_messy_hair'}},
 }
 
 # (height, half-width) per row, in game metres, already through v1.0's 0.686
@@ -224,47 +232,53 @@ def raster(size, vs, vts, faces, scale, drop):
     return mask
 
 
-def check_wear():
-    """The Blender half carries its own copy of WEAR; they have to agree.
+def check_wear(name):
+    """The Blender half carries its own copy; they have to agree.
 
-    Two dicts rather than an import, because one of them runs inside Blender
-    and reaching across that line to save five lines is how a build ends up
-    needing Blender to answer a question about a JPEG. Two dicts that can
-    drift silently are worse than one, though, so they are compared: a
-    mismatch is her wearing one asset's geometry under another's texture,
-    which on a hairstyle is obvious and on a skin is not.
+    Two tables rather than an import, because one of them runs inside Blender.
+    Two tables that can drift silently are worse than one, though, so they are
+    compared: a mismatch is the figure wearing one asset's geometry under
+    another's texture, which on a hairstyle is obvious and on a skin is not.
     """
     src = (ROOT / 'tools' / 'blender' / 'baye2.py').read_text()
-    blk = re.search(r'^WEAR = \{(.*?)^\}', src, re.S | re.M)
+    blk = re.search(r"'%s':\s*\{(.*?)\n    \}," % name, src, re.S)
     if not blk:
-        sys.exit('[baye2tex] cannot find WEAR in tools/blender/baye2.py')
+        sys.exit('[baye2tex] cannot find figure %r in tools/blender/baye2.py' % name)
     theirs = dict(re.findall(r"'(\w+)':\s*'([^']+)'", blk.group(1)))
-    for k, v in WEAR.items():
+    if theirs.get('body') != FIGURES[name]['body']:
+        sys.exit('[baye2tex] %s body disagrees: %r here, %r in baye2.py'
+                 % (name, FIGURES[name]['body'], theirs.get('body')))
+    for k, v in FIGURES[name]['tex'].items():
         if theirs.get(k) != v:
-            sys.exit('[baye2tex] WEAR disagrees on %r: %r here, %r in baye2.py'
-                     % (k, v, theirs.get(k)))
+            sys.exit('[baye2tex] %s %r disagrees: %r here, %r in baye2.py'
+                     % (name, k, v, theirs.get(k)))
 
 
 def main():
-    check_wear()
-    base = ROOT / 'build' / 'mh_base.obj'
+    argv = sys.argv[1:]
+    name = argv[argv.index('--figure') + 1] if '--figure' in argv else 'baye2'
+    if name not in FIGURES:
+        sys.exit('[baye2tex] no figure %r; have %s' % (name, ', '.join(FIGURES)))
+    check_wear(name)
+    spec = FIGURES[name]
+    base = ROOT / spec['body']
     if not base.exists():
-        sys.exit('[baye2tex] no build/mh_base.obj — run tools/blender/baye2.py once')
+        sys.exit('[baye2tex] no body %s — run tools/blender/mh_morph.py' % base)
     vs, vts, faces = read_obj(base)
     ys = [v[1] for f in faces for vi, _t in f for v in (vs[vi],)]
     scale = TARGET_H / (max(ys) - min(ys))
     drop = -min(ys) * scale
 
     OUT.mkdir(parents=True, exist_ok=True)
-    for kind, want in WEAR.items():
+    for kind, want in spec['tex'].items():
         src = next((p for p in sorted(WORK.glob('%s__%s.*' % (kind, want)))
                     if p.suffix in ('.png', '.jpg')), None)
         if src is None:
             sys.exit('[baye2tex] no texture for %s — run tools/wardrobe/make.py' % want)
-        for stale in OUT.glob('baye2_%s.*' % kind):
+        for stale in OUT.glob('%s_%s.*' % (name, kind)):
             stale.unlink()
-        if kind != 'skin':
-            dst = OUT / ('baye2_%s%s' % (kind, src.suffix))
+        if kind != 'skin' or not spec['pubic']:
+            dst = OUT / ('%s_%s%s' % (name, kind, src.suffix))
             shutil.copy(src, dst)
         else:
             im = Image.open(src).convert('RGB')
@@ -277,11 +291,11 @@ def main():
             # you can see, not what shade the hair is.
             alpha = (m * PUBIC_MAX * (0.45 + 0.75 * n)).clip(0.0, PUBIC_MAX)
             a = a * (1.0 - alpha[..., None]) + PUBIC_RGB * alpha[..., None]
-            dst = OUT / 'baye2_skin.jpg'
+            dst = OUT / ('%s_skin.jpg' % name)
             Image.fromarray(a.round().clip(0, 255).astype(np.uint8)).save(
                 dst, quality=86, optimize=True)
-        print('[baye2tex] %-4s %-22s -> %s  %.0f KB'
-              % (kind, want[:22], dst.name, dst.stat().st_size / 1024))
+        print('[baye2tex] %-4s %-24s -> %-18s %.0f KB'
+              % (kind, want[:24], dst.name, dst.stat().st_size / 1024))
 
 
 if __name__ == '__main__':

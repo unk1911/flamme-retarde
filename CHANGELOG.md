@@ -8,6 +8,86 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.471.0] — 2026-09-22
+
+### Chloe v2.0
+
+Misha: *"can u actually re-generate me (Chloe Price) by using baye v2.0's
+features... eyes, eye lashes, eyebrows, hair, more amazing face/skin."*
+
+She is the same body. `mh_chloe.obj` is the base mesh with face targets
+applied, so it is the same 19 158 vertices in the same order with the same
+21 334 UVs — which is the entire reason a photographic skin and a fitted
+hairstyle work on her at all. **61 533 triangles, 1.56 MB gzipped.**
+
+**What she keeps: all of it.** The jeans, the boots, the vest, the print and
+the sleeve are functions of `vLocal`, the bind-pose position, and that is the
+same body in the same space. The one part of her paint that was ever about
+vertex COLOUR is the hair dye, which looks for vertices painted `HAIR_P` — and
+a v5 blob has no vertex colours, so `dye` evaluates to zero and the whole hair
+section, beanie discard and all, is *already inert*. It did not need removing,
+which is worth recording because removing it was the plan and would have been
+three hundred lines of surgery on a working shader.
+
+**What did need doing is one line at the bottom of it.** `base *= vcol` is
+right while base is white and wrong the moment it is a photograph: a white
+vest multiplied over a skin texture is a white vest you can see her through.
+So the garments now accumulate `cover` as they go on and the combine is
+`base = mix(base * vcol, vcol, cover)` — a tattoo still multiplies the skin it
+is on, a garment replaces it. On the painted figure base is white, so
+`base * vcol` is `vcol` and mixing `vcol` with `vcol` is `vcol` whatever
+`cover` holds: **provably a no-op there**, which is why it went in
+unconditionally.
+
+Her hair is a fitted mesh now, dyed blue with the pink still running through
+it on the angle round the skull. The beanie is unchanged and still hers.
+
+### every part was being drawn twice
+
+The bug this release actually turned on. `skinnedFigure` builds `mesh` on
+`data.geo` with no draw range, so it drew the WHOLE index buffer — body, eyes,
+mouth, hair, brows, lashes — every part a second time in the body's own
+material. On Baye v2.0 the ghost copy sat inside her braid and nobody saw it.
+On Chloe it was flat peach cards fanning out of her crown, interleaved with
+the blue ones, and it looked exactly like a hairstyle that had been fitted
+wrong.
+
+Three things were measured before the cause was found, and all three were
+innocent: the `.mhclo` fit (identical on both bodies to three decimal places),
+the texture (a blond strip with clean alpha, no scalp patch), and the material
+(`col += base * uEmissive`, so a blue base cannot go peach). **Setting the
+hair to magenta and watching the peach shapes stay peach** is what found it.
+The body is a draw range like every other part now, and `wear` leaves a v5
+figure's alone.
+
+### a dye is not a tint
+
+Multiplying a hair card by a colour is right when the asset ships nearly the
+colour you want. It is wrong when you are recolouring: these textures are a
+dark scalp region plus lighter strands, so a dark crown times blue is a dark
+crown and what you get is a black cap with blue tips. `hairDye` takes the
+texture's luminance as shading and supplies the colour itself, which is also
+what dye does to real hair.
+
+### and the shared half
+
+`v5Tex`, `v5Parts`, `v5Eyes` and `v5Blink` in 41-skin.js. Both v2.0 figures
+are the same construction and differ only in which assets and what colour, so
+that is all they pass. They do **not** use `face: true`: `faceAnchors` and
+`FACE_FRAG` are built for a painted face — the blink is a colour run down the
+eyeball, the smile is found by looking for `MOUTH_P` vertices — and neither
+landmark exists on a figure whose eyeballs are a separate part with their own
+material. The one piece that matters at this distance is done instead on the
+part that owns the eyeball, as a lid with an edge, in bind space so it works
+upside down. Blink state rides on the uniform holder rather than a module
+variable, so two v2.0 figures on screen do not blink in lockstep.
+
+`jad.apprLook(back, side)` stands the camera in front of the apprentice
+looking at her. `you.yaw`'s forward is (−sin, −cos), so looking AT a point is
+`atan2(x − lx, z − lz)` with the subtraction the way round that looks wrong —
+getting the sign backwards points the camera at the kabine, which is a
+perfectly plausible photograph of the wrong thing, and cost four of them.
+
 ## [1.470.0] — 2026-09-22
 
 ### the apprentice follows her indoors

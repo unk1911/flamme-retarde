@@ -286,15 +286,59 @@ async function buildYou(scene) {
   // the end of the body quotes fourteen of them. `rgb` is that, once.
   const rgb = (c) => 'vec3(' + c.map((n) => n.toFixed(3)).join(', ') + ')';
 
-  const fig = await loadSkin('chloe_skin_fr3d', {
+  // ── Chloe v2.0 ───────────────────────────────────────────────────────────
+  //
+  // Same body, rebuilt the way Baye v2.0 is: `mh_chloe.obj` is the base mesh
+  // with face targets applied, so it is the same 19 158 vertices in the same
+  // order with the same UVs — which is the whole reason a photographic skin
+  // and a fitted hairstyle work on her at all. See tools/blender/baye2.py.
+  //
+  // WHAT SHE KEEPS. Everything below this is her paint, untouched: the jeans,
+  // the boots, the vest, the print and the sleeve are functions of `vLocal`,
+  // the bind-pose position, and that is the same body in the same space. The
+  // only part of it that was ever about vertex COLOUR is the hair dye, which
+  // looks for vertices painted `HAIR_P` — and a v5 blob has no vertex colours,
+  // so on this figure `dye` evaluates to zero and the whole hair section,
+  // beanie discard and all, is already inert. It did not need removing, which
+  // is worth saying because removing it was the plan.
+  //
+  // WHAT SHE GAINS: a photographic skin, real hair, modelled brows and lashes,
+  // eyes with an iris and a blink.
+  const V2 = !!PAYLOAD.chloe2_fr3d;
+  const look = V2 ? v5Parts({
+    hairTex: 'chloe2_hair',
+    // The asset ships blond, which is a gift: a light texture takes a dye.
+    hairCol: 0x2f8ed0, browCol: 0x2b2019, lidCol: 0xe0b49b,
+    iris: 'vec3(0.34, 0.47, 0.54)',
+    hairDye: true, hairGain: 0.50, hairLit: 1.55,
+    hairDecl: 'float chHash(vec3 p){ return fract(sin(dot(p,'
+      + 'vec3(127.1, 311.7, 74.7))) * 43758.545); }',
+    // AND THE PINK THROUGH IT, which used to be paint on a painted bob and is
+    // now paint on a real one. On the angle round the skull and not on height,
+    // which is the whole difference between highlights and dip-dye: a lock
+    // that is pink is pink from root to tip and the ones either side of it are
+    // not. Broken up a little, because a hard-edged stripe of magenta reads as
+    // paint rather than as hair.
+    hairBody: 'float lock = sin(atan(vLocal.z, vLocal.x - 0.033) * 6.0 + 0.9)'
+      + ' * 0.5 + 0.5;\n'
+      + 'lock = smoothstep(0.86, 0.995, lock)'
+      + ' * (0.62 + 0.38 * chHash(floor(vLocal * 46.0)));\n'
+      + 'base = mix(base, vec3(0.560, 0.150, 0.330) * 1.45, lock * 0.80);',
+  }) : null;
+
+  const fig = await loadSkin(V2 ? 'chloe2_fr3d' : 'chloe_skin_fr3d', {
     spec: 0.09,
     specPower: 24,
-    face: true,
-    uniforms: { uSwim },
+    // `faceAnchors` and `FACE_FRAG` are built for a PAINTED face and would be
+    // asked to find landmarks a textured one does not have. v5 figures get
+    // their blink from `v5Blink` on the part that owns the eyeball instead.
+    face: !V2,
+    ...(V2 ? { parts: look.parts } : {}),
+    uniforms: V2 ? { uSwim, uSkin: { value: v5Tex('chloe2_skin') } } : { uSwim },
     // Declared out here because the body is spliced into main() and GLSL ES 1.0
     // will not take a function inside a function. Everything below is used by
     // the sleeve and the print and by nothing else on this figure.
-    decl: `
+    decl: (V2 ? 'uniform sampler2D uSkin;\n' : '') + `
       uniform float uSwim;
       float youHash(vec3 p) {
         return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
@@ -324,8 +368,21 @@ async function buildYou(scene) {
         return 1.0 - smoothstep(0.86, 1.0, length((p - c) / r));
       }
     `,
-    body: `
+    body: (V2 ? 'base = texture2D(uSkin, vUv).rgb;\n' : '') + `
       vec3 vcol = vVCol;
+      // HOW MUCH OF HER IS CLOTHED AT THIS FRAGMENT, 0..1.
+      //
+      // Everything she wears is a mix into vcol, and the last line of this
+      // shader used to be \`base *= vcol\` — which is right while base is
+      // white, and wrong the moment it is a photograph. A white vest
+      // multiplied over a skin texture is a white vest you can see her
+      // through. So the garments are tracked as they go on, and the combine
+      // at the bottom replaces rather than multiplies where they are.
+      //
+      // Only the GARMENTS write to it. A tattoo is on skin and has to
+      // multiply the skin that is there; the same goes for anything else
+      // that is a mark rather than a thing worn.
+      float cover = 0.0;
 
       // ------------------------------------------------------ jeans and boots
       //
@@ -473,6 +530,7 @@ async function buildYou(scene) {
           // a 10 mm slit reading as a drawn black line.
           rip *= step(0.30, fract(vLocal.z * 190.0 + ly * 40.0));
           vcol = mix(vcol, cloth, trews * (1.0 - rip));
+          cover = max(cover, trews * (1.0 - rip));
         }
 
         // ---- the boots
@@ -565,6 +623,7 @@ async function buildYou(scene) {
           lea = mix(lea, ${rgb(YOU.welt)},
             smoothstep(0.026, 0.030, ly) * (1.0 - smoothstep(0.033, 0.038, ly)));
           vcol = mix(vcol, lea, boot);
+          cover = max(cover, boot);
         }
       }
 
@@ -675,6 +734,7 @@ async function buildYou(scene) {
           * (1.0 - uSwim));
         vcol = mix(vcol,
           vec3(${YOU.vest.map((n) => n.toFixed(3)).join(', ')}), vest);
+        cover = max(cover, vest);
 
         // What is under it, showing where the vest stops: a dark edge round
         // the scoop, and a narrower dark strap inboard of each white one.
@@ -689,6 +749,8 @@ async function buildYou(scene) {
         vcol = mix(vcol,
           vec3(${YOU.under.map((n) => n.toFixed(3)).join(', ')}),
           scoop * smoothstep(neck - 0.013, neck - 0.006, vLocal.y)
+            * (1.0 - smoothstep(0.082, 0.108, abs(vLocal.z))) * 0.92);
+        cover = max(cover, scoop * smoothstep(neck - 0.013, neck - 0.006, vLocal.y)
             * (1.0 - smoothstep(0.082, 0.108, abs(vLocal.z))) * 0.92);
         // There is a second dark strap inboard of each white one in the
         // reference, and it is not here. It was, for one build: the straps are
@@ -780,6 +842,7 @@ async function buildYou(scene) {
             * (1.0 - smoothstep(0.044, 0.051, abs(P.x))));
 
           vcol = mix(vcol, pc, pa * on);
+          cover = max(cover, pa * on);
         }
       }
 
@@ -843,10 +906,14 @@ async function buildYou(scene) {
           vcol = mix(vcol, tat, arm * min(1.0, max(ink, line * 0.85)) * 0.93);
         }
       }
-      base *= vcol;
+      // A no-op on the painted figure and the whole point on the textured
+      // one: there base is white, so base * vcol is vcol and mixing vcol with
+      // vcol is vcol, whatever cover happens to be.
+      base = mix(base * vcol, vcol, cover);
     `,
   });
   if (!fig) return null;
+  if (V2) v5Eyes(fig, look.eye);
 
   fig.play('idle', { fade: 0 });
   const mesh = fig.mesh;
@@ -1134,6 +1201,7 @@ async function buildYou(scene) {
   function tick(dt, camera) {
     fig.update(dt);
     if (fig.faceTick) fig.faceTick(dt);
+    if (look) v5Blink(look.eye, dt);
     if (hi >= 0) {
       fig.boneAt(hi, at);
       head.position.copy(at);

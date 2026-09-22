@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Baye v2.0 — the textured figure, built straight off the base mesh.
 
-    blender -b -noaudio -P tools/blender/baye2.py    # the blob
-    python3 tools/baye2_tex.py                        # and her textures
+    blender -b -noaudio -P tools/blender/baye2.py -- --figure baye2
+    python3 tools/baye2_tex.py --figure baye2
 
 Writes build/payload/baye2.fr3d.gz; `tools/baye2_tex.py` writes the textures
 beside it and `src/41-skin.js` reads both.
@@ -77,23 +77,45 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import human_mh as H  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
-WORK = ROOT / 'build' / 'wardrobe'
+PACKS = ROOT / 'build' / 'mh_assets'
 OUT = ROOT / 'build' / 'payload'
-BLEND = ROOT / 'build' / 'baye2.blend'
 
-# What she wears, from the same rack tools/wardrobe builds. Picked by Misha in
-# the viewer: caucasian skin, the unkempt french braid, eyebrows 09, eyelashes
-# 04, black fishnet, and nothing else.
-WEAR = {
-    'skin': 'darthfurby_caucasian_female',
-    'hair': 'elvs_unkempt_french_braid',
-    'brow': 'mindfront_eyebrows_09',
-    'lash': 'mindfront_eyelashes_04',
-    'leg':  'v0rt3x_stockings_black_fishnet_medium',
+# Every v5 figure: which body, and what off the rack `tools/wardrobe` builds.
+#
+# THE BODY MATTERS AND IS NOT A DETAIL. Chloe's is `mh_chloe.obj`, which
+# `mh_morph.py` writes by applying MakeHuman face targets to the base — so it
+# is the same 19 158 vertices in the same order with the same 21 334 UVs, with
+# some of them moved. That is what makes all of this work on her: the same
+# skins fit, and because a garment is fitted through its `.mhclo` against
+# WHICHEVER body it is handed, her hair lands on her skull and not on the
+# neutral one. Fitting is done here rather than read out of build/wardrobe for
+# exactly that reason; the viewer's copies are fitted to the base.
+FIGURES = {
+    # Picked by Misha in the viewer.
+    'baye2': {
+        'body': 'build/mh_base.obj',
+        'wear': {'skin': 'darthfurby_caucasian_female',
+                 'hair': 'elvs_unkempt_french_braid',
+                 'brow': 'mindfront_eyebrows_09',
+                 'lash': 'mindfront_eyelashes_04',
+                 'leg':  'v0rt3x_stockings_black_fishnet_medium'},
+    },
+    # Chloe. Pale and freckled, short messy hair — dyed at runtime, because
+    # the asset ships blond and she is not. No garments: everything she wears
+    # is painted in `src/49-you.js` on height thresholds measured off this
+    # same body, and that paint is years of work that has nothing wrong with
+    # it. What she is getting here is a face, a skin and real hair.
+    'chloe2': {
+        'body': 'build/mh_bodies/mh_chloe.obj',
+        'wear': {'skin': 'toigo_light_skin_female_freckles',
+                 'hair': 'cortu_short_messy_hair',
+                 'brow': 'mindfront_eyebrows_03',
+                 'lash': 'mindfront_eyelashes_02'},
+    },
 }
-# `tools/baye2_tex.py` carries the same three names it needs; if they ever
-# disagree she is wearing one asset's geometry under another's texture, which
-# on a hairstyle is obvious and on a skin is not.
+# `tools/baye2_tex.py` carries the same table; if they ever disagree the
+# figure is wearing one asset's geometry under another's texture, which on a
+# hairstyle is obvious and on a skin is not. Checked, not hoped for.
 # Which base-mesh groups become which part. Anything not named here is a
 # fitting helper or a joint marker and is dropped: `helper-hair` is a VOLUME
 # that hair is fitted inside rather than hair, and the base's own eyelashes are
@@ -294,16 +316,21 @@ def expand(vs, vts, faces, names, wt, scale, drop, fallback=None, uv=True):
     return [(v[0], v[1], v[2], v[3], v[4]) for v in verts], tris
 
 
-def read_mhclo_refs(path):
-    """(refs, weights) per asset vertex — see tools/wardrobe/assets.py.
+def read_mhclo(path):
+    """(scales, refs, weights, offsets) — see tools/wardrobe/assets.py.
 
     Re-read here rather than imported because Blender's Python does not have
-    the repository on its path and the parse is fifteen lines.
+    the repository on its path and the parse is twenty lines. One reader for
+    all four, because the fit needs the offsets and the bone weights need the
+    references and reading the file twice is how they end up disagreeing.
     """
-    refs, ws, inv = [], [], False
+    sc, refs, ws, offs, inv = {}, [], [], [], False
     for ln in path.read_text(errors='ignore').splitlines():
         w = ln.split()
         if not w:
+            continue
+        if w[0] in ('x_scale', 'y_scale', 'z_scale'):
+            sc[w[0][0]] = (int(w[1]), int(w[2]), float(w[3]))
             continue
         if w[0] == 'verts':
             inv = True
@@ -314,14 +341,38 @@ def read_mhclo_refs(path):
             if len(w) >= 9:
                 refs.append((int(w[0]), int(w[1]), int(w[2])))
                 ws.append((float(w[3]), float(w[4]), float(w[5])))
+                offs.append((float(w[6]), float(w[7]), float(w[8])))
             elif len(w) == 1:
                 i = int(w[0])
                 refs.append((i, i, i)); ws.append((1.0, 0.0, 0.0))
+                offs.append((0.0, 0.0, 0.0))
             else:
                 break
         except ValueError:
             break
-    return refs, ws
+    return sc, refs, ws, offs
+
+
+def fit_verts(sc, refs, ws, offs, body):
+    """Where each asset vertex sits on THIS body — see tools/wardrobe/assets.py.
+
+    The same barycentric blend plus an offset in units of the body's own
+    proportions, run again here because the body is not the neutral one:
+    Chloe's skull is a different shape and her hair has to land on it.
+
+        sx = |B[a].x - B[b].x| / d
+        fitted = w0*B[v0] + w1*B[v1] + w2*B[v2] + (dx*sx, dy*sy, dz*sz)
+    """
+    s = [1.0, 1.0, 1.0]
+    for k, ax in (('x', 0), ('y', 1), ('z', 2)):
+        if k in sc:
+            a, b, d = sc[k]
+            s[ax] = abs(body[a][ax] - body[b][ax]) / d if d else 1.0
+    out = []
+    for (a, b, c), (wa, wb, wc), off in zip(refs, ws, offs):
+        out.append(tuple(body[a][i] * wa + body[b][i] * wb + body[c][i] * wc
+                         + off[i] * s[i] for i in range(3)))
+    return out
 
 
 def blend_weights(refs, ws, wt, near):
@@ -420,7 +471,7 @@ def decimate(verts, tris, target, label):
 
 # ── the v5 blob ──────────────────────────────────────────────────────────── #
 
-def write_blob(buf, rest, baked, path):
+def write_blob(buf, rest, baked, path, label='baye2'):
     nv, ni = len(buf.pos) // 3, len(buf.idx)
     xs, ys, zs = buf.pos[0::3], buf.pos[1::3], buf.pos[2::3]
     # v5 = v4 plus a UV array and a table of named parts. v4's single `shed`
@@ -464,24 +515,34 @@ def write_blob(buf, rest, baked, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(path, 'wb', compresslevel=9) as f:
         f.write(b''.join(parts))
-    print('[baye2] %s  %d verts  %d tris  %d parts  %d bones  %d clips  %.0f KB gz'
-          % (path.name, nv, ni // 3, len(buf.groups), len(rest), len(baked),
-             path.stat().st_size / 1024))
+    print('[%s] %s  %d verts  %d tris  %d parts  %d bones  %d clips  %.0f KB gz'
+          % (label, path.name, nv, ni // 3, len(buf.groups), len(rest),
+             len(baked), path.stat().st_size / 1024))
 
 
 def main():
-    base = H.fetch()
-    vs, vts, faces = read_obj(base)
-    _J, scale, drop = H.read_joints(base)
-    print('[baye2] base %d verts %d uvs %d groups' % (len(vs), len(vts), len(faces)))
+    argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+    name = argv[argv.index('--figure') + 1] if '--figure' in argv else 'baye2'
+    if name not in FIGURES:
+        sys.exit('[baye2] no figure %r; have %s' % (name, ', '.join(FIGURES)))
+    spec = FIGURES[name]
+    body = ROOT / spec['body']
+    if not body.exists():
+        sys.exit('[baye2] no body %s — run tools/blender/mh_morph.py' % body)
+    wear = spec['wear']
 
-    wt, rig, rest, solved = solve_weights(vs, faces, scale, drop)
-    print('[baye2] weighted %d base verts over %d bones' % (len(wt), len(rest)))
+    vs, vts, faces = read_obj(body)
+    _J, scale, drop = H.read_joints(body)
+    print('[%s] body %s: %d verts %d uvs %d groups'
+          % (name, body.name, len(vs), len(vts), len(faces)))
 
-    # A base vertex the solve never saw — a helper the figure does not carry —
-    # still has to answer, because a garment may ride a triangle with one
+    wt, rig, rest, _solved = solve_weights(vs, faces, scale, drop)
+    print('[%s] weighted %d body verts over %d bones' % (name, len(wt), len(rest)))
+
+    # A body vertex the solve never saw — a helper this figure does not carry
+    # — still has to answer, because a garment may ride a triangle with one
     # corner on it. The nearest weighted vertex is the honest fallback and it
-    # is reported, because a fallback nobody counts is a fallback that grows.
+    # is counted, because a fallback nobody counts is a fallback that grows.
     kd = [(Vector(game_space(vs[i], scale, drop)), i) for i in wt]
     missed = [0]
 
@@ -491,44 +552,50 @@ def main():
         return wt[min(kd, key=lambda e: (e[0] - p).length_squared)[1]]
 
     buf = Buf()
-    for name, groups in BASE_PARTS.items():
+    for part, groups in BASE_PARTS.items():
         verts, tris = expand(vs, vts, faces, groups, wt, scale, drop, near,
-                             uv=name not in NO_UV)
-        buf.part(name, MAT[name], verts, tris)
+                             uv=part not in NO_UV)
+        buf.part(part, MAT[part], verts, tris)
 
-    # The garments, each already rewritten into the base mesh's own space by
-    # tools/wardrobe/assets.py, and each weighted through its own .mhclo.
-    packs = ROOT / 'build' / 'mh_assets'
+    # THE GARMENTS ARE FITTED HERE, against THIS body, rather than read out of
+    # build/wardrobe. The viewer's copies are fitted to the neutral base; a
+    # morphed face wants its hair fitted to the morphed skull, and the `.mhclo`
+    # gives that for free — the asset vertex rides a triangle of BODY vertices,
+    # so handing it a different body moves the asset with it. That is the whole
+    # payoff of doing the fit properly rather than hand-placing.
     for kind in ('hair', 'brow', 'lash', 'leg'):
-        aid = WEAR.get(kind)
+        aid = wear.get(kind)
         if not aid:
             continue
-        objp = WORK / ('%s__%s.obj' % (kind, aid))
-        d = next((x for x in packs.rglob(aid) if x.is_dir()), None)
+        d = next((x for x in PACKS.rglob(aid) if x.is_dir()), None)
         if d is None:
-            for x in packs.rglob('*'):
+            for x in PACKS.rglob('*'):
                 if x.is_dir() and (x / (aid + '.mhclo')).exists():
                     d = x
                     break
         mhclo = next(iter(sorted(d.glob('*.mhclo'))), None) if d else None
-        if not (objp.exists() and mhclo):
-            sys.exit('[baye2] %s: need %s and its .mhclo — run tools/wardrobe/make.py'
-                     % (kind, objp.name))
+        objp = next(iter(sorted(d.glob('*.obj'))), None) if d else None
+        if not (objp and mhclo):
+            sys.exit('[%s] %s: no .obj/.mhclo for %s — run tools/wardrobe/assets.py'
+                     % (name, kind, aid))
         avs, avts, afaces = read_obj(objp)
-        refs, ws = read_mhclo_refs(mhclo)
+        sc, refs, ws, offs = read_mhclo(mhclo)
         if len(refs) != len(avs):
-            sys.exit('[baye2] %s: %d mhclo rows vs %d obj verts'
-                     % (aid, len(refs), len(avs)))
+            sys.exit('[%s] %s: %d mhclo rows vs %d obj verts'
+                     % (name, aid, len(refs), len(avs)))
+        # Positions and bone weights out of the same table, so a vertex cannot
+        # be fitted to one place and weighted to another.
+        fitted = fit_verts(sc, refs, ws, offs, vs)
         aw = dict(enumerate(blend_weights(refs, ws, wt, near)))
-        verts, tris = expand(avs, avts, afaces, list(afaces), aw, scale, drop,
+        verts, tris = expand(fitted, avts, afaces, list(afaces), aw, scale, drop,
                              lambda i: ((0, 0, 0, 0), (255, 0, 0, 0)),
                              uv=kind not in NO_UV)
         if kind in THIN:
             verts, tris = decimate(verts, tris, THIN[kind], kind)
         buf.part(kind, MAT[kind], verts, tris)
 
-    print('[baye2] %d garment corners fell back to the nearest weighted vertex'
-          % missed[0])
+    print('[%s] %d garment corners fell back to the nearest weighted vertex'
+          % (name, missed[0]))
 
     # The floor passes solve the hip heights the clips below are authored
     # against, and several of the clip lists are EMPTY until they run. Baking
@@ -542,8 +609,8 @@ def main():
     H.wine_floor(rig)
     baked = [H._bake_clip(rest, c) for c in H.CLIPS]
 
-    write_blob(buf, rest, baked, OUT / 'baye2.fr3d.gz')
-    bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
+    write_blob(buf, rest, baked, OUT / ('%s.fr3d.gz' % name), name)
+    bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'build' / ('%s.blend' % name)))
 
 
 if __name__ == '__main__':
