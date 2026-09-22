@@ -41,6 +41,11 @@ shots/
 !docs/*.png
 !build/payload/*.png
 !refs/panels/*.png
+# The two detail maps the wardrobe viewer puts over a diffuse-only skin. The
+# community skins are photographic colour and nothing else, so pores and the
+# roughness break-up are ours; they are the one procedural thing from that
+# evening worth keeping.
+!tools/wardrobe/maps/*.png
 
 # The reference photographs are other people's work — Wikimedia contributors,
 # press and stock libraries — gathered locally to model from. They are not ours
@@ -64,3 +69,9 @@ build/*.json
 # afternoon's work on one animation, force-added at the time and then left. If
 # a working directory turns out to be worth keeping, it earns a .md.
 plan/*-wip/
+
+# The asset packs tools/wardrobe/assets.py downloads, and what it fits out of
+# them. 200 MB of other people's zips and a few megabytes of rewritten .obj,
+# all regenerable in one command. What survives is the committed wardrobe.html.
+build/mh_assets/
+build/wardrobe/

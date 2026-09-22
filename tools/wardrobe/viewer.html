@@ -1,0 +1,264 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Flamme Retardé — wardrobe</title>
+<style>html,body{margin:0;height:100%;background:#15171a;color:#cfd4da;
+ font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;overflow:hidden}
+ #c{display:block;width:100%;height:100%}
+ #hud{position:fixed;left:12px;bottom:12px;background:#0009;padding:8px 11px;
+  border-radius:6px;white-space:pre;pointer-events:none;font-size:12px}
+ #ui{position:fixed;right:10px;top:10px;bottom:10px;width:238px;overflow-y:auto;
+  background:#0b0d0fdd;padding:10px 12px;border-radius:8px;border:1px solid #2a2f35}
+ h4{margin:12px 0 4px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#7b8794;font-weight:600}
+ h4:first-child{margin-top:0}
+ button{font:inherit;font-size:12px;background:#22262b;color:#b9c0c8;border:1px solid #363c43;
+  border-radius:4px;padding:3px 7px;margin:2px 2px 0 0;cursor:pointer}
+ button:hover{background:#2c3238}
+ button.on{background:#3c6e9c;border-color:#6ba0cf;color:#fff}
+ #ui::-webkit-scrollbar{width:7px} #ui::-webkit-scrollbar-thumb{background:#333a41;border-radius:4px}
+ #cred{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  max-height:76vh;overflow-y:auto;background:#0e1114f2;border:1px solid #2a2f35;
+  border-radius:8px;padding:16px 20px;font-size:12px;max-width:560px}
+ #cred table{border-collapse:collapse;margin-top:6px} #cred td,#cred th{padding:2px 10px 2px 0;text-align:left}
+ #cred th{color:#7b8794;font-weight:600;border-bottom:1px solid #2a2f35}
+ #cred a{color:#6ba0cf} #cred p{color:#98a2ad}</style></head>
+<body><canvas id="c"></canvas><div id="hud">booting…</div><div id="ui"></div><div id="cred"></div>
+<script type="importmap">{"imports":{"three":"./three.module.min.js","three/addons/":"./"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from './GLTFLoader.js';
+import { OrbitControls } from './OrbitControls.js';
+
+const MAN = await (await fetch('../../build/wardrobe/manifest.json')).json();
+const hud = document.getElementById('hud'), ui = document.getElementById('ui');
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b1e22);
+const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+{ const s = 64, d = new Uint8Array(s * s * 4);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    const t = y / (s - 1), i = (y * s + x) * 4;
+    const sky = [150, 185, 225], sand = [205, 190, 165];
+    for (let k = 0; k < 3; k++) d[i+k] = t < 0.55 ? sky[k]*(0.75+0.45*(1-t)) : sand[k]*0.72;
+    d[i+3] = 255; }
+  const tex = new THREE.DataTexture(d, s, s);
+  tex.mapping = THREE.EquirectangularReflectionMapping; tex.needsUpdate = true;
+  scene.environment = new THREE.PMREMGenerator(renderer).fromEquirectangular(tex).texture; }
+{ const k = new THREE.DirectionalLight(0xfff1dd, 2.6); k.position.set(1.6, 2.6, 2.2); scene.add(k);
+  const r = new THREE.DirectionalLight(0xbcd4f0, 1.1); r.position.set(-2.0, 1.4, -1.8); scene.add(r); }
+
+// FLIP DEPENDS ON WHO PAINTED IT. My own maps are written with row 0 at v=0
+// and need flipY; every asset from the library is authored the normal way
+// round, top of the image at v=1. Flipping one of those put the eyebrows
+// between her eyes, which is a memorable way to learn it.
+const tl = new THREE.TextureLoader(), cache = new Map();
+function tex(file, srgb, mine) {
+  const k = file + (srgb ? '|s' : '');
+  if (!cache.has(k)) { const t = tl.load(file);
+    t.flipY = !!mine; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.anisotropy = 8; cache.set(k, t); }
+  return cache.get(k);
+}
+const asset = (rec) => tex('../../build/wardrobe/' + rec.tex, true, false);
+
+const MAT = {};
+MAT.body = new THREE.MeshPhysicalMaterial({
+  map: asset(MAN.skin[0]), normalMap: tex('./maps/skin_normal.png', false, true),
+  roughnessMap: tex('./maps/skin_roughness.png', false, true), metalness: 0,
+  normalScale: new THREE.Vector2(0.45, 0.45),
+  sheen: 0.5, sheenRoughness: 0.9, sheenColor: new THREE.Color(0xff8f6e),
+  clearcoat: 0.10, clearcoatRoughness: 0.55 });
+// A cheap stand-in for subsurface: light wrapping round the silhouette, red.
+MAT.body.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace(
+  '#include <lights_fragment_begin>', '#include <lights_fragment_begin>\n' +
+  'irradiance += vec3(0.55,0.17,0.12) * pow(1.0 - abs(dot(normal, geometryViewDir)), 2.4) * 0.85;'); };
+
+const EYE = { l: new THREE.Vector3(), r: new THREE.Vector3(), f: new THREE.Vector3(0,0,1) };
+MAT.eyes = new THREE.MeshPhysicalMaterial({ color: 0xcfc8bd, roughness: 0.10,
+  metalness: 0, clearcoat: 1.0, clearcoatRoughness: 0.03 });
+MAT.eyes.onBeforeCompile = (sh) => {
+  sh.uniforms.uL = { value: EYE.l }; sh.uniforms.uR = { value: EYE.r }; sh.uniforms.uF = { value: EYE.f };
+  sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace(
+    '#include <begin_vertex>', '#include <begin_vertex>\n vWP = (modelMatrix * vec4(position,1.0)).xyz;');
+  sh.fragmentShader = 'uniform vec3 uL; uniform vec3 uR; uniform vec3 uF; varying vec3 vWP;\n'
+    + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    vec3 ec = (distance(vWP,uL) < distance(vWP,uR)) ? uL : uR;
+    vec3 rd = normalize(vWP - ec);
+    float a = dot(rd, normalize(uF));
+    float iris = smoothstep(0.918, 0.941, a);
+    float pupil = smoothstep(0.9885, 0.9925, a);
+    float limb = smoothstep(0.925, 0.937, a) * (1.0 - smoothstep(0.945, 0.960, a));
+    vec3 ir = mix(vec3(0.30,0.44,0.38), vec3(0.55,0.68,0.52),
+                  fract(sin(atan(rd.y,rd.x)*14.0)*43758.5));
+    diffuseColor.rgb = mix(diffuseColor.rgb, ir, iris);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.02), pupil);
+    diffuseColor.rgb *= 1.0 - 0.75 * limb;`);
+};
+MAT.mouth = new THREE.MeshStandardMaterial({ color: 0xd8b3ae, roughness: 0.35 });
+// Lashes and brows ship as MODELLED STRANDS with no texture at all — their
+// .mhmat is `diffuseColor 0 0 0`, `backfaceCull False` and nothing else. So
+// they want a dark, slightly glossy double-sided material and no map.
+const hairish = () => new THREE.MeshPhysicalMaterial({ color: 0x1c1410,
+  roughness: 0.48, metalness: 0, side: THREE.DoubleSide,
+  sheen: 0.6, sheenRoughness: 0.35, sheenColor: new THREE.Color(0x6b4a33) });
+// Hair cards are rectangles that only look like hair because most of each one
+// is cut away by its alpha. alphaTest, not blending, so cards sort against
+// each other without a depth-sorted transparency pass.
+// NO alphaMap. The map's own alpha channel is the cut-out; an alphaMap reads
+// the GREEN channel instead, and a dark auburn hair strip is nearly zero
+// green, so every card failed alphaTest and she came out bald.
+const hairMat = (rec) => new THREE.MeshPhysicalMaterial({
+  map: asset(rec), transparent: false, alphaTest: 0.5,
+  roughness: 0.42, metalness: 0, side: THREE.DoubleSide,
+  sheen: 0.8, sheenRoughness: 0.4, sheenColor: new THREE.Color(0x8a5c38) });
+// The sheen was at 0.7 with a warm pink sheenColor, which is fine on a cotton
+// bikini and turns a black fishnet — a thin double-sided mesh with a lot of
+// silhouette — into something that glows pink. Cloth wants a hint of it, not
+// a coat.
+const clothMat = (rec) => new THREE.MeshPhysicalMaterial({
+  map: asset(rec), transparent: false, alphaTest: rec.alpha ? 0.5 : 0,
+  roughness: 0.92, metalness: 0, side: THREE.DoubleSide,
+  // A fishnet is nearly all silhouette — thin double-sided threads, lit from
+  // both faces, against a bright sky environment. At full envMapIntensity a
+  // black net renders as silver chainmail.
+  envMapIntensity: 0.4,
+  sheen: 0.25, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xc9b6ad) });
+
+const TINT = [['as authored', 0xffffff], ['black', 0x413730], ['dark brown', 0x6b4f3c],
+  ['chestnut', 0xa07048], ['blonde', 0xe8c089], ['ash', 0xbdb5a8], ['copper', 0xc66a34]];
+const parts = {}, pick = { skin: 0, hair: 0, brow: 0, top: 0, btm: 0, lash: 0, leg: 0 };
+let tint = 0;
+const ON = { hair: true, brow: true, lash: true, top: true, btm: true, leg: false };
+let ready = false;
+
+new GLTFLoader().load('../../build/wardrobe/wardrobe.glb?b=' + Date.now(), (g) => {
+  scene.add(g.scene);
+  g.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const n = o.name.replace(/\.\d+$/, '');
+    parts[n] = o;
+    if (n === 'body') o.material = MAT.body;
+    else if (n === 'eyes' || n === 'mouth') o.material = MAT[n];
+    else {
+      const [kind, id] = n.split('__');
+      const rec = (MAN[kind] || []).find((r) => r.id === id) || {};
+      o.material = rec.tex ? (kind === 'hair' ? hairMat(rec) : clothMat(rec)) : hairish();
+      o.visible = false;
+      o.renderOrder = kind === 'hair' ? 1 : 0;
+    }
+  });
+  const b = new THREE.Box3().setFromObject(parts.body);
+  const c = new THREE.Box3().setFromObject(parts.eyes).getCenter(new THREE.Vector3());
+  EYE.l.set(c.x - 0.032, c.y, c.z); EYE.r.set(c.x + 0.032, c.y, c.z);
+  EYE.f.copy(c).sub(new THREE.Vector3(c.x, c.y, b.min.z + (b.max.z - b.min.z) * 0.5)).setY(0).normalize();
+  build(); apply(); view('whole'); ready = true;
+});
+
+const nice = (s) => s.replace(/^(punkduck|mindfront|elvs|littleright|cortu|culturalibre|o4saken|toigo|darthfurby|onlytheghosts|callharvey3d|cutoff3d|wolgade|jaldmic|v0rt3x|rehmanpolanski|sonntag78)_/, '')
+  .replace(/_(bra|slip|hair)$/, '').replace(/_/g, ' ');
+function key(kind, i) { return kind + '__' + MAN[kind][i].id; }
+function apply() {
+  MAT.body.map = asset(MAN.skin[pick.skin]); MAT.body.needsUpdate = true;
+  for (const n in parts) if (n.startsWith('hair__') || n.startsWith('brow__') || n.startsWith('lash__')) {
+    // The tint multiplies the card texture, so 'as authored' has to be white
+    // rather than absent. Brows and lashes have no map at all and are already
+    // near-black; they take the tint only when it would lighten them.
+    const m = parts[n].material, t = TINT[tint][1];
+    if (n.startsWith('hair__')) m.color.setHex(t);
+    else if (tint === 0) m.color.setHex(0x1c1410);
+    else m.color.setHex(t).multiplyScalar(0.55);
+    m.needsUpdate = true;
+  }
+  for (const kind of ['hair', 'brow', 'lash', 'top', 'btm', 'leg'])
+    (MAN[kind] || []).forEach((r, i) => {
+      const o = parts[kind + '__' + r.id];
+      if (o) o.visible = ON[kind] && i === pick[kind];
+    });
+  for (const b of ui.querySelectorAll('button[data-k]'))
+    b.classList.toggle('on', pick[b.dataset.k] === +b.dataset.i && ON[b.dataset.k] !== false);
+  for (const b of ui.querySelectorAll('button[data-off]'))
+    b.classList.toggle('on', !ON[b.dataset.off]);
+  for (const b of ui.querySelectorAll('button[data-t]'))
+    b.classList.toggle('on', +b.dataset.t === tint);
+}
+function build() {
+  const LBL = { skin: 'skin', hair: 'hair', brow: 'eyebrows', lash: 'eyelashes',
+                top: 'top', btm: 'bottom', leg: 'legwear' };
+  let h = '';
+  for (const kind of ['skin', 'hair', 'brow', 'lash', 'top', 'btm', 'leg']) {
+    if (!(MAN[kind] || []).length) continue;
+    h += '<h4>' + LBL[kind] + (kind === 'skin' ? '' :
+      ' <button data-off="' + kind + '">none</button>') + '</h4>';
+    MAN[kind].forEach((r, i) => { h += '<button data-k="' + kind + '" data-i="' + i + '">' + nice(r.id) + '</button>'; });
+  }
+  h += '<h4>hair colour</h4>' + TINT.map((t, i) =>
+    '<button data-t="' + i + '">' + t[0] + '</button>').join('');
+  h += '<h4>view</h4>' + ['face', 'bust', 'whole'].map((v) => '<button data-v="' + v + '">' + v + '</button>').join('');
+  h += '<h4>look</h4><button data-r="1">shuffle</button><button data-spin="1">turntable</button>'
+     + '<button data-cred="1">credits</button>';
+  ui.innerHTML = h;
+  ui.onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.k) { pick[b.dataset.k] = +b.dataset.i; ON[b.dataset.k] = true; apply(); }
+    else if (b.dataset.off) { ON[b.dataset.off] = !ON[b.dataset.off]; apply(); }
+    else if (b.dataset.t !== undefined) { tint = +b.dataset.t; apply(); }
+    else if (b.dataset.v) { for (const o of ui.querySelectorAll('button[data-v]')) o.classList.remove('on');
+      b.classList.add('on'); view(b.dataset.v); }
+    else if (b.dataset.r) { for (const k in pick) pick[k] = Math.floor(Math.random() * MAN[k].length);
+      for (const k in ON) ON[k] = k !== 'leg' || Math.random() < 0.25; tint = Math.floor(Math.random() * TINT.length); apply(); }
+    else if (b.dataset.spin) { spin = !spin; b.classList.toggle('on', spin); }
+    else if (b.dataset.cred) { credits(); b.classList.toggle('on',
+      document.getElementById('cred').style.display === 'block'); }
+  };
+}
+// CC-BY is only free if you actually attribute, so the names are in the page
+// and not only in a file next to it. `lic` and `author` ride along in the
+// manifest for exactly this.
+function credits() {
+  const d = document.getElementById('cred');
+  if (d.style.display === 'block') { d.style.display = 'none'; return; }
+  const rows = [];
+  for (const kind of ['skin', 'hair', 'brow', 'lash', 'top', 'btm', 'leg'])
+    for (const r of MAN[kind] || [])
+      rows.push('<tr><td>' + kind + '</td><td>' + nice(r.id) + '</td><td>'
+        + (r.author || '?') + '</td><td>' + (r.lic || '?') + '</td></tr>');
+  d.innerHTML = '<b>Every asset here is from the MakeHuman community packs</b>'
+    + '<p>Fitted to this project\'s own base mesh through each asset\'s '
+    + '<code>.mhclo</code>. CC0 and CC-BY only.<br>'
+    + '<a href="https://static.makehumancommunity.org/assets/assetpacks.html" '
+    + 'target="_blank" rel="noopener">static.makehumancommunity.org</a></p>'
+    + '<table><tr><th>kind</th><th>asset</th><th>author</th><th>licence</th></tr>'
+    + rows.join('') + '</table>';
+  d.style.display = 'block';
+}
+function view(v) {
+  const e = new THREE.Box3().setFromObject(parts.eyes).getCenter(new THREE.Vector3());
+  const f = EYE.f, D = { face: 0.42, bust: 0.95, whole: 3.0 }[v];
+  const y = { face: e.y, bust: e.y - 0.22, whole: 0.9 }[v];
+  camera.position.set(e.x + f.x * D, y + D * 0.12, e.z + f.z * D);
+  controls.target.set(e.x, y, e.z); controls.update();
+  for (const b of ui.querySelectorAll('button[data-v]')) b.classList.toggle('on', b.dataset.v === v);
+}
+let spin = false;
+function size() { renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+let n = 0, t0 = performance.now(), fps = 0;
+renderer.setAnimationLoop(() => {
+  if (spin && ready) { const t = controls.target, r = camera.position.clone().sub(t);
+    r.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.006); camera.position.copy(t).add(r); }
+  controls.update(); renderer.render(scene, camera);
+  if (++n >= 30) { const t = performance.now(); fps = 30000 / (t - t0); t0 = t; n = 0; }
+  if (ready) hud.textContent =
+    `${nice(MAN.skin[pick.skin].id)}  ·  ${ON.hair ? nice(MAN.hair[pick.hair].id) : 'bald'}\n` +
+    `${ON.top ? nice(MAN.top[pick.top].id) : '—'} / ${ON.btm ? nice(MAN.btm[pick.btm].id) : '—'}\n` +
+    `${fps.toFixed(0)} fps · ${renderer.info.render.calls} calls · ` +
+    `${renderer.info.render.triangles.toLocaleString()} tris`;
+});
+window.__t = () => ({ fps: +fps.toFixed(1), calls: renderer.info.render.calls,
+  tris: renderer.info.render.triangles, ready, parts: Object.keys(parts), pick, on: { ...ON } });
+window.__set = (k, i) => { pick[k] = i; ON[k] = true; apply(); };
+window.__tint = (i) => { tint = i; apply(); };
+window.__off = (k) => { ON[k] = false; apply(); };
+window.__view = view;
+</script></body></html>

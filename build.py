@@ -46,7 +46,7 @@ SHARE = Path("/mnt/synology/shared/micko/flamme-retarde")
 # rebuild byte-for-byte identically, because comparing checksums is how we
 # check that what is on the server is what is in the repo. Bump them together
 # when cutting a release, next to the CHANGELOG entry.
-VERSION = "1.466.0"
+VERSION = "1.467.0"
 BUILD_DATE = "2026-09-22"
 
 THREE_VERSION = "0.180.0"
@@ -60,6 +60,24 @@ def fetch(name: str) -> str:
     if not cached.exists():
         print(f"  downloading {name}")
         with urllib.request.urlopen(f"{CDN}/{name}") as r:
+            cached.write_bytes(r.read())
+    return cached.read_text()
+
+
+# The three addons, which live under a different path on the CDN than the
+# build does. The game itself needs none of them — it reads its own .fr3d and
+# drives its own camera — but tools/wardrobe builds a standalone viewer and
+# does, and a second downloader next to this one would be a second place for
+# the version to drift.
+ADDONS = f"https://unpkg.com/three@{THREE_VERSION}/examples/jsm"
+
+
+def fetch_addon(path: str) -> str:
+    VENDOR.mkdir(exist_ok=True)
+    cached = VENDOR / path.replace("/", "_")
+    if not cached.exists():
+        print(f"  downloading {path}")
+        with urllib.request.urlopen(f"{ADDONS}/{path}") as r:
             cached.write_bytes(r.read())
     return cached.read_text()
 

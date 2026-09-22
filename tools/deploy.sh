@@ -19,7 +19,26 @@ cd "$(dirname "$0")/.."
 # versions separated by a newline — which never equals the one the server
 # serves, so a deploy that worked reports as a failure and retries twice.
 WANT=$(grep -oP '^VERSION = "\K[^"]+' build.py)
-DEST=edeliverables.com:/var/www/vhost/edeliverables/public_html/flamme-retarde/index.html
+WEB=edeliverables.com:/var/www/vhost/edeliverables/public_html/flamme-retarde
+DEST=$WEB/index.html
+
+# The wardrobe viewer goes up beside the game, and NOT in the retry loop: it
+# has no version stamp to read back, it changes on the rare days the rack
+# changes rather than on every increment, and a failure to copy it must not
+# report the game as undeployed. Unchanged bytes are skipped outright, because
+# the whole reason deploy.sh counts its attempts is that this host starts
+# refusing connections when fifteen large files go up in seven hours.
+if [ -f wardrobe.html ]; then
+  SUM=$(md5sum wardrobe.html | cut -c1-32)
+  GOTSUM=$(curl -s https://flamme-retarde.edeliverables.com/wardrobe.html | md5sum | cut -c1-32)
+  if [ "$SUM" = "$GOTSUM" ]; then
+    echo "wardrobe.html unchanged"
+  elif scp -C -o ConnectTimeout=20 wardrobe.html "$WEB/wardrobe.html" 2>/dev/null; then
+    echo "wardrobe.html deployed"
+  else
+    echo "wardrobe.html FAILED to copy (the game deploy below is unaffected)"
+  fi
+fi
 
 for try in 1 2 3; do
   if scp -C -o ConnectTimeout=20 flamme-retarde.html "$DEST" 2>/dev/null; then

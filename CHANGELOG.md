@@ -8,6 +8,68 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.467.0] — 2026-09-22
+
+### the wardrobe ships
+
+`wardrobe.html` — a second built artifact beside the game, deployed to
+<https://flamme-retarde.edeliverables.com/wardrobe.html>, where anyone can put
+**7 skins × 8 hairstyles × 3 eyebrows × 2 eyelashes × 9 tops × 9 bottoms ×
+2 legwear** on the base mesh this project builds all its people from and look
+at the result at 60 fps. Built by `tools/wardrobe/make.py`; not part of
+`build.py`, because the rack changes on rare days and the output is committed
+the way `build/payload/` is.
+
+**What made it possible, and it is not what I said it was.** An asset's `.obj`
+is NOT in the base mesh's space. The first hairstyle tried landed perfectly
+and that was a coincidence — its author happened to model on the default mesh.
+Four of the next five hung off the face with a bald crown and every bikini sat
+wrong.
+
+The fit lives in the `.mhclo` next to each asset. One line per asset vertex:
+
+    v0 v1 v2  w0 w1 w2  dx dy dz
+
+The vertex rides a triangle of BASE mesh vertices at those barycentric
+weights, plus an offset in units of the body's own proportions — which is what
+the three header lines are for:
+
+    x_scale 5399 11998 1.3980   # |B[5399].x - B[11998].x| when I modelled this
+
+so `sx = |B[a].x - B[b].x| / d`, and
+
+    fitted = w0·B[v0] + w1·B[v1] + w2·B[v2] + (dx·sx, dy·sy, dz·sz)
+
+`tools/wardrobe/assets.py` implements that, rewriting only the `v` lines and
+leaving faces and UVs alone. **All 40 assets came out with vertex counts
+matching exactly**, which is the check that the indices landed — they index
+the base `.obj` in FILE ORDER, so it is parsed in Python rather than through
+Blender, whose importer reorders and splits.
+
+Because it is a real fit and not hand-placement, every garment follows the
+body if the body is ever reshaped. That is the door to the next thing.
+
+**Licences, because this repository is public.** Every pack ships
+`packs/<pack>.json`, the community site's own registry, and that is
+authoritative. The `# license` comment inside an individual `.mhclo` is
+MakeHuman boilerplate: it says AGPL3 on assets the registry lists as CC0, and
+trusting it would have thrown out half the rack — including the french braid —
+for nothing. `assets.py` reads the registry, refuses anything that is not CC0
+or CC-BY **loudly rather than skipping it quietly**, and generates
+`tools/wardrobe/CREDITS.md`. The 17 CC-BY authors are also named in the page
+itself, behind a `credits` button, because CC-BY is only free if you actually
+attribute.
+
+Two smaller things that each cost a render: PIL's default quantiser silently
+drops the alpha channel, so hair cards go opaque and you get a rectangle of
+scalp across the face — only `FASTOCTREE` keeps RGBA. And `alphaMap` reads the
+GREEN channel, so pointing it at a hair texture that already carries alpha
+makes dark auburn hair fail `alphaTest` everywhere and she comes out bald.
+
+`tools/deploy.sh` copies the viewer beside the game, outside the retry loop
+and skipped when the bytes are unchanged — it has no version stamp to read
+back, and a failure to copy it must not report the game as undeployed.
+
 ## [1.466.0] — 2026-09-22
 
 ### the routine is cut short if they start walking
