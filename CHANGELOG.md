@@ -8,6 +8,114 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.458.0] — 2026-09-21
+
+### the child came round every twenty-three seconds
+
+Misha: *"the audio when we are in jadrija beach, i like it, with children and
+all, but the loop is too repetitive, it gets repetitive after about 30s... any
+way to extend it to be i dunno maybe 90s? there's so much audio/video sample
+data to borrow from, surely we can make the jadrija audio more engaging,
+longer..."*
+
+**What he was hearing, measured.** The promenade bed was 23.5 s of tape with
+exactly one loud thing in it. Band the clip 500-2800 Hz, take the RMS of every
+0.4 s block, subtract the median: the whole clip sits inside ±6 dB except
+11.6-14.0 s, which runs +8.3, +10.3, **+12.3**, +9.5, +8.1. Autocorrelate the
+loudest of those blocks and the fundamental is **505 Hz at a clarity of 0.88**
+— half a kilohertz, almost perfectly periodic. That is one child shrieking,
+close, and it is the thing he was timing.
+
+So the defect is not a seam and it is not the material. It is a **recognisable
+event on a fixed period**, which is the one thing that never happens on a real
+beach. He is right that he likes the children; they just should not be on a
+metronome.
+
+**Why it was not caught.** 80-audio.js claimed this bed came round at 8.5
+minutes, and that number was correct about the wrong question. The bed ran two
+playheads 4.6 % apart, and 8.5 minutes is when those two line up in *phase*
+again. The ear does not wait for a phase alignment — it recognises a child and
+times the next one, and that interval is tape over playback rate:
+
+| | tape | heads | phase | **heard** |
+|---|---|---|---|---|
+| 1.457.0 | 23.5 s | 2 | 510.9 s | **22.97 s and 24.05 s** |
+| 1.458.0 | 116.5 s | 1 | 116.5 s | **116.5 s** |
+
+Detune cannot move `heard` at all, and the second head made it worse, not
+better: every voice in the recording arrived **twice** per pass. `loopStats()`
+now prints both numbers and says which one to read.
+
+**What replaces it.** There is no more of the 13 Aug promenade recording — 27.6
+s is the whole file. But the survey folder holds 22 minutes of Misha's own
+video of this beach, and `kabine` already proved a phone's video track will
+cut. All of it was read in third-octave bands against the shipped clip, after
+the same 180 Hz high-pass, scored over 250 Hz - 7 kHz:
+
+| source | best 30 s windows | 500-2800 share |
+|---|---|---|
+| `20260821_144848` (132 s) | d 3.07, 3.24, 3.96 | −25.7 … −22.6 |
+| the kabine pan (370 s) | d 2.73, 3.32, 3.38 | −26.3 … −24.2 |
+| `1000149597` (377 s) | d 3.26, 3.35, 3.74 | −25.8 … −25.1 |
+| `1000149595` (439 s) | d 3.09, 4.11, 4.46 | −31.5 … −25.0 |
+
+The old clip's own share is −26.2, and this repo already records that two
+0.35 s blocks drawn at random out of one promenade recording differ by 4.7 dB
+— so a 3 dB distance is inside what the place does to itself. The 21 Aug
+waterfront video wins because it is **one continuous shot** of the concrete
+edge by the jetty, it is the loudest of them (−30.6 to −32.2 dBFS), and it has
+the ingredient he named spread out instead of stacked: pitched vocal events at
+48.8 s (414 Hz, clarity 0.64), 54.0 (414, 0.82), 64.0 (244, 0.77), 78.8 (571,
+0.66), 81.2 (600, 0.74), 110.8 (293, 0.56) and 122.0 (436, 0.64). **Seven
+children over two minutes, where the old clip had one every twenty-three
+seconds.**
+
+**The seam is the best in the payload.** The length search returned 117.5 s
+from 12.74 s of source at **+0.03 dB of level and 0.96 dB of spectrum** across
+the join, against the file's previous worst of 3.3 dB.
+
+**The bitrate drops 96 → 64 kbps and costs nothing,** which is measured. This
+is the one bed that is always heard through a filter — `SHORE.lp` runs 750 Hz
+out in the channel to 4 000 Hz on the concrete and never opens further — so
+the same 40 s window was encoded six ways, decoded, put through that filter at
+its most open 4 kHz, and read in bands against a 48 kHz float reference:
+
+| encode | KB/s | after the 4 kHz lowpass |
+|---|---|---|
+| 22 kHz 96 kbps | 11.75 | the reference |
+| **22 kHz 64 kbps** | **7.83** | **within 0.05 dB to 7 kHz, 0.12 above** |
+| 16 kHz 64 kbps | 7.84 | −0.4 dB at 4.6-7 kHz, −8.7 at 7-11 kHz |
+| 12 kHz 48 kbps | 5.89 | −4.5 dB at 4.6-7 kHz, and gone above |
+
+64 kbps at 22 050 Hz is free and 16 kHz is not, so a third of the bytes go and
+pay for the length. `shore.mp3` is 288 KB → 919 KB: **4.8× the tape for 3.2×
+the file, and +0.82 MB on the page** (32.71 → 33.53 MB).
+
+Nothing about the mix moved. Standing at (250, 8), `shore`'s gain is 0.1963
+and its lowpass 3 999 Hz in both builds — the level, the distance ramps and
+the morph against the sea and the pines are untouched. Only the tape changed.
+
+**The whole recording is used, including the gust.** There is wind on the mic
+at 103.0-104.25 s, +14.6 dB over median in 30-200 Hz, which looks fatal and is
+not: measured *after* the bed's 180 Hz high-pass (36 dB an octave once
+`sosfiltfilt` has doubled it), 200-600 Hz, it is +7.5 dB — and the same
+recording reads +6.9 at 17.0 s, +7.7 at 22.0 and +8.2 at 27.0 from people on
+the concrete. Cutting the window at 102 s would have thrown away a quarter of
+the tape to remove what the filter had already removed.
+
+**Still on a clock, and named rather than quietly changed.** `lapping` — the
+sea against the concrete, full level within 7 m of the edge — is 68.5 s of
+tape on two heads, so it is `heard` at **67.0 s**, and it is not a texture: it
+carries six pitched events at 282-552 Hz and clarities to 0.90, including a
++14.7 dB one at 58.4 s. At (250, 8) it is the louder of the two beds; by
+(250, 35) `shore` has it. Its period is three times the complaint and fixing it
+means either halving the slap density or another 900 KB of water, so it is
+written down here instead of decided unasked.
+
+Source: `/mnt/c/tmp/refs/jadrija/survey/20260821_144848.mp4`, Misha's own
+footage of Jadrija, cut by `tools/cut_field.py` as source 11. No third-party
+audio added, so `assets/audio/CREDITS.md` is unchanged.
+
 ## [1.457.0] — 2026-09-21
 
 ### it was never the bend
