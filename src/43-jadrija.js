@@ -45919,6 +45919,10 @@ async function buildJadrija(scene) {
    * rim and a hub. `spokes` draws three diameters across it, which is what
    * makes a 0.68 m ring read as a bicycle wheel rather than as a hoop; a
    * scooter's small wheel is solid, so it gets a disc instead.
+   *
+   * Drawn about `cx, cy` because the chainring is drawn about the bottom
+   * bracket; a road wheel is built about nought and carried to its axle by
+   * `wheelDisc`, so that it can be turned.
    */
   function wheelRim(b, cx, cy, R, w, tyre, rim, spokes) {
     const N = 14, Ri = R - 0.042, Rr = R - 0.070;
@@ -45947,6 +45951,27 @@ async function buildJadrija(scene) {
     b.box(cx, cy, 0, 0.05, 0.05, w * 2 + 0.03, rim);
   }
 
+  /**
+   * A road wheel as a thing of its own: the rim built about the origin, and
+   * where its axle sits in the machine.
+   *
+   * A WHEEL IS NOT PART OF THE FRAME. It was — both wheels were welded into
+   * the same triangle soup as the down tube, and three spokes that never
+   * moved on a bicycle doing 4.6 m/s is the one thing on this promenade that
+   * reads as a toy on a rail. The cranks were already out on their own node
+   * for exactly this reason; the wheels are out for the same one, and they
+   * turn off the distance the machine has covered and nothing else. Rolling
+   * without slipping is the whole of it: the angle is the arc length over the
+   * radius, so a wheel stops when the rider stops, crawls through a turn, and
+   * a 0.10 m scooter wheel goes round three and a bit times for every turn of
+   * a 0.34 m bicycle one without either of them being told a rate.
+   */
+  function wheelDisc(x, y, R, w, tyre, rim, spokes) {
+    const b = propBuilder();
+    wheelRim(b, 0, 0, R, w, tyre, rim, spokes);
+    return { geo: b.geo(), tris: b.count() / 3, x, y, R };
+  }
+
   // The grips are swept back from the stem to 0.18 m ahead of the bottom
   // bracket and stand at 1.08, which is a Dutch bar and not a racing one. They
   // were at 0.29 and 1.00 first, and every rider came out leaning 33 to 36
@@ -45963,14 +45988,16 @@ async function buildJadrija(scene) {
    * The saddle is set for whoever rides it — see THE SADDLE IS SET FOR THE
    * RIDER where they are built — and the rest is a 1.08 m wheelbase on 0.34 m
    * wheels, an upright bar, a rear rack, and for one of them a step-through
-   * frame and a basket. The cranks are their own mesh, because they go round.
+   * frame and a basket. The cranks are their own mesh, and so are the two
+   * wheels, because they all go round. See `wheelDisc`.
    */
   function wheelBike(seatY, col, low, basket) {
     const b = propBuilder(), c = propBuilder();
     const K = WHEEL_BIKE;
     const TYRE = [0.058, 0.058, 0.062], RIM = [0.600, 0.610, 0.620];
     const DARK = [0.095, 0.092, 0.090], STEEL = [0.520, 0.530, 0.540];
-    for (const x of [-K.axle, K.axle]) wheelRim(b, x, K.R, K.R, 0.019, TYRE, RIM, true);
+    const wheels = [];
+    for (const x of [-K.axle, K.axle]) wheels.push(wheelDisc(x, K.R, K.R, 0.019, TYRE, RIM, true));
     const BB = [K.bb[0], K.bb[1], 0];
     const at2 = (y) => [K.bb[0] - (y - K.bb[1]) * K.seatK, y, 0];
     const clY = Math.min(seatY - 0.10, K.clamp);
@@ -46016,13 +46043,22 @@ async function buildJadrija(scene) {
       c.box(0, s * WHEELS.crank, s * 0.150, 0.10, 0.025, 0.09, DARK);
     }
     wheelRim(c, 0, 0, 0.10, 0.004, DARK, [0.300, 0.300, 0.310], false);
-    return { geo: b.geo(), crank: c.geo(), tris: (b.count() + c.count()) / 3 };
+    let wt = 0;
+    for (const W of wheels) wt += W.tris;
+    return { geo: b.geo(), crank: c.geo(), wheels,
+      tris: (b.count() + c.count()) / 3 + wt };
   }
 
   /**
    * An e-scooter, in the same frame: a low deck, two small solid wheels, a
    * stem raked back to a bar at about a metre. Dark, with nothing written on
    * it.
+   *
+   * Its wheels come off the same `wheelDisc` as a bicycle's and turn the same
+   * way, and because they are solid discs of one colour almost none of that
+   * shows. They are out on their own nodes anyway: a wheel that is nailed to
+   * the deck is wrong whether or not anybody can see it, and the day one of
+   * these gets a spoked hub it would be wrong visibly.
    */
   const WHEEL_SCOOT = { deck: 0.155, bar: [0.36, 1.10], grip: 0.21 };
   function wheelScoot(col) {
@@ -46030,8 +46066,8 @@ async function buildJadrija(scene) {
     const K = WHEEL_SCOOT;
     const TYRE = [0.055, 0.055, 0.058], HUB = [0.300, 0.305, 0.310];
     const DARK = [0.080, 0.080, 0.085];
-    wheelRim(b, -0.44, 0.10, 0.10, 0.026, TYRE, HUB, false);
-    wheelRim(b, 0.45, 0.11, 0.11, 0.026, TYRE, HUB, false);
+    const wheels = [wheelDisc(-0.44, 0.10, 0.10, 0.026, TYRE, HUB, false),
+      wheelDisc(0.45, 0.11, 0.11, 0.026, TYRE, HUB, false)];
     b.box(-0.03, K.deck - 0.035, 0, 0.74, 0.07, 0.17, col, [0.120, 0.120, 0.125]);
     b.box(-0.45, 0.215, 0, 0.22, 0.015, 0.075, col);
     wheelTube(b, [0.30, 0.12, 0], [0.42, 0.21, 0], 0.030, col);
@@ -46043,7 +46079,9 @@ async function buildJadrija(scene) {
     }
     b.box(K.bar[0] + 0.01, K.bar[1] + 0.025, 0, 0.06, 0.02, 0.07, DARK);
     b.box(0.385, 0.90, 0, 0.03, 0.045, 0.055, [0.820, 0.820, 0.780]);
-    return { geo: b.geo(), crank: null, tris: b.count() / 3 };
+    let wt = 0;
+    for (const W of wheels) wt += W.tris;
+    return { geo: b.geo(), crank: null, wheels, tris: b.count() / 3 + wt };
   }
 
   // Scratch, because a solve runs a few times a frame per rider.
@@ -46231,6 +46269,16 @@ async function buildJadrija(scene) {
         crank.position.set(WHEEL_BIKE.bb[0], WHEEL_BIKE.bb[1], 0);
         veh.add(crank);
       }
+      // A node per wheel, hung on the machine at its own axle and turned in
+      // `wheelDraw`. `circ` is cached because the angle is taken off the
+      // distance covered modulo one turn, which keeps a rider that has done
+      // twenty kilometres as exact as one that has just set off.
+      const wheels = g.wheels.map((W) => {
+        const m = new THREE.Mesh(W.geo, mat);
+        m.position.set(W.x, W.y, 0);
+        veh.add(m);
+        return { m, R: W.R, circ: TAU * W.R, x: W.x, y: W.y };
+      });
       scene.add(fig.mesh);
       wheelTris += g.tris + fig.tris;
       wheelMachineTris += g.tris;
@@ -46238,7 +46286,7 @@ async function buildJadrija(scene) {
       // the same nominal speed are not riding in formation.
       const cruise = c.v * (0.94 + jit(i, 9313) * 0.12);
       wheelers.push({
-        i, c, fig, veh, crank, F, arms, legs, lean, bike, seatY,
+        i, c, fig, veh, crank, wheels, F, arms, legs, lean, bike, seatY,
         v: cruise, vCruise: cruise,
         dir: jit(i, 9314) < 0.5 ? 1 : -1,
         // Where along its stretch it starts. Planned lanes are filled in on
@@ -46246,6 +46294,8 @@ async function buildJadrija(scene) {
         u0: jit(i, 9315),
         t: 0, s: 12, off: 0, offV: 0, seg: 'lane', arc: 0, arcFrom: 0, arcTo: 0, turnAt: 0,
         x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, yawRate: 0, placed: false,
+        // Metres of promenade under the tyres, which is what turns them.
+        dist: 0,
         fT: 0, fS: 0, bT: 0, bS: 0,
         phase: jit(i, 9316) * TAU, clock: jit(i, 9317) * 40,
         look: 0, posed: false, gap: Infinity, whyJ: 0, whyT: 0, whyS: 0, whyBox: false,
@@ -46809,6 +46859,12 @@ async function buildJadrija(scene) {
       }
     }
     r.s = s;
+    // WHAT THE WHEELS RUN OFF. Not a clock and not a nominal speed: the
+    // ground that has actually gone under them this step. Which is why it is
+    // taken here, on `wheelMove`'s own `dt` — `wheels.hold` hands that in as
+    // nought, and a rider held in the air is a rider whose wheels are
+    // stopped, however fast it was going when it was caught.
+    r.dist += r.v * dt;
     // The crank goes round with the back wheel, except when it does not: every
     // rider freewheels now and then, and always through a turn.
     const coast = r.seg === 'turn' || r.v < 0.3
@@ -46918,6 +46974,10 @@ async function buildJadrija(scene) {
     // slope.
     r.veh.rotation.set(r.roll, r.yaw, r.pitch, 'YZX');
     if (r.crank) r.crank.rotation.z = -r.phase;
+    // Negative about +z is the top of the wheel going forward, the same sense
+    // the crank takes. The modulo is in metres, not in radians, so it costs
+    // nothing in precision.
+    for (const W of r.wheels) W.m.rotation.z = -(r.dist % W.circ) / W.R;
     r.veh.updateMatrixWorld(true);
     r.fig.mesh.position.copy(r.F).applyMatrix4(r.veh.matrixWorld);
     r.fig.mesh.rotation.set(r.roll, r.yaw, r.pitch, 'YZX');
@@ -49078,6 +49138,8 @@ async function buildJadrija(scene) {
         who: r.c.who, on: r.c.on, seg: r.seg, dir: r.dir,
         t: +r.t.toFixed(2), s: +r.s.toFixed(2), off: +r.off.toFixed(2),
         v: +r.v.toFixed(2), gap: r.gap === Infinity ? null : +r.gap.toFixed(2),
+        dist: +r.dist.toFixed(3),
+        spin: r.wheels.map((W) => +(-W.m.rotation.z).toFixed(4)),
         x: +r.x.toFixed(2), y: +r.y.toFixed(2), z: +r.z.toFixed(2),
         yaw: +r.yaw.toFixed(3), roll: +r.roll.toFixed(3),
         lean: +r.lean.toFixed(2), seat: +r.seatY.toFixed(3),
