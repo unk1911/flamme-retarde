@@ -74,7 +74,7 @@
 // ── and what it must not bury ────────────────────────────────────────────────
 //
 // The bed at Jadrija is a FIELD RECORDING OF THIS PROMENADE, with the people on
-// it — `shore` in 80-audio.js, 24.5 s at -28.2 dBFS scaled by 0.30, which lands
+// it — `shore` in 80-audio.js, 117.5 s at -28.2 dBFS scaled by 0.30, which lands
 // about -38.5 dBFS on the outdoor bus at the water's edge. So a continuous
 // synthesised murmur is not missing; it is already there, and laying a second
 // one over it is the mistake that file names explicitly about the cicadas:

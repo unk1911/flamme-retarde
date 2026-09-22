@@ -89,6 +89,13 @@ FILES = {
     # FileNotFoundError.
     10: 'WhatsApp Audio 2026-08-24 at 2.12.14 PM.mp '
         '- eurasian collared dove.mp4',
+    # Also not a recording, and the second source in here that is a video's own
+    # track. 132.4 s of the waterfront on 21 Aug, held up at the concrete edge
+    # by the jetty: the frame at ten seconds is the promenade, the slipway and
+    # the bathers on it. It is in the survey folder with the stills and not in
+    # with the recordings, so again an absolute path. See `shore` below, which
+    # is cut from it and which it replaced the 13 Aug recording as the source of.
+    11: '/mnt/c/tmp/refs/jadrija/survey/20260821_144848.mp4',
 }
 # 1 is not cut. It was recorded at 21:38 and is broadband 200-2000 Hz with no
 # cicada and no cricket band in it; nobody has been able to say what it is, and
@@ -106,8 +113,9 @@ FILES = {
 # `window` is the stretch of the source the search is allowed to look in, and it
 # is the only place a judgement about content is made:
 #
-#   shore    all of the promenade recording. It runs 27.6 s and there is no
-#            more of it; 26 s is the whole thing bar a handling bump at each end.
+#   shore    all of the 21 Aug waterfront video, 132.4 s, bar a second at each
+#            end. It used to be all of the 13 Aug promenade recording, which
+#            runs 27.6 s and gave 24.5 — see THE PROMENADE, TWICE below.
 #   cicadas  the chorus is in the first twelve seconds of the hillside
 #            recording and after that it is 15 dB down and gone — the 4.2-6.2
 #            kHz band drops from -38 to -55 at second twelve and never comes
@@ -134,10 +142,100 @@ FILES = {
 # 0.55 s at a fifth of a millisecond and summing the response at one, two and
 # four beats: 0.47220 s a beat, 1.88880 s a bar, comb score 0.79 against a
 # noise floor of about 0.1. Twenty bars is 37.8 s and the source gives 39.2.
+#
+# ── THE PROMENADE, TWICE ────────────────────────────────────────────────────
+#
+# Misha, 21 Sep 2026: *"the audio when we are in jadrija beach, i like it, with
+# children and all, but the loop is too repetitive, it gets repetitive after
+# about 30s... any way to extend it to be i dunno maybe 90s? there's so much
+# audio/video sample data to borrow from"*.
+#
+# He is right, the number is right, and the reason it was not caught is written
+# down here because the same mistake is available to every bed in this file.
+#
+# WHAT HE WAS HEARING, measured. The 13 Aug recording has ONE loud thing in it.
+# Band the clip 500-2800 Hz, take the RMS of every 0.4 s block and compare with
+# the median block: the whole clip sits inside +/- 6 dB except for 11.6-14.0 s,
+# which runs +8.3, +10.3, +12.3, +9.5, +8.1. Autocorrelating the loudest of
+# those blocks gives a fundamental of **505 Hz at a clarity of 0.88** — half a
+# kilohertz and almost perfectly periodic, which is a child shrieking, close,
+# and not a crowd. By comparison `cicadas` peaks 3.6 dB over its own median and
+# `kabine` 8.3, and those two are textures with nothing in them to recognise.
+#
+# So the promenade bed is 23.5 s of tape with a two-and-a-half-second child's
+# shriek at second twelve, and 80-audio.js looped it. That child came back
+# every 23 s, and — because that end ran TWO playheads 4.6 % apart — she came
+# back TWICE every 23 s, at 22.97 s and at 24.05 s. Misha says "about 30s",
+# which is what a 23 s period sounds like when you need the second recurrence
+# to be sure of the first.
+#
+# THE DETUNE NEVER ADDRESSED THIS, and the note in 80-audio.js that says the
+# promenade comes round at 8.5 minutes is answering a different question: 8.5
+# minutes is when the two playheads line up in PHASE again. The ear does not
+# wait for a phase alignment. It recognises a child and times the next one, and
+# that interval is the length of the tape divided by the playback rate, which
+# detuning cannot change. Two heads made it worse, not better: one shriek per
+# pass became two. The trick is right for `cicadas`, which has nothing in it to
+# recognise, and wrong for anything with a voice in it.
+#
+# WHAT REPLACES IT. There is no more of the 13 Aug recording — 27.6 s is the
+# whole file. But the survey folder has 22 minutes of video of this beach, and
+# `kabine` already proves a phone's video track is a usable bed. All of it was
+# read in third-octave bands against the shipped `shore.mp3`, after the same
+# 180 Hz high-pass, scored as RMS distance over 250 Hz - 7 kHz (below is
+# filtered away, above is past what the game's own 4 kHz lowpass leaves):
+#
+#     source                          best 30 s windows      500-2800 share
+#     20260821_144848  132 s          d 3.07, 3.24, 3.96     -25.7 .. -22.6
+#     1000150414 (the kabine pan)     d 2.73, 3.32, 3.38     -26.3 .. -24.2
+#     1000149597       377 s          d 3.26, 3.35, 3.74     -25.8 .. -25.1
+#     1000149595       439 s          d 3.09, 4.11, 4.46     -31.5 .. -25.0
+#
+# The shipped clip's own 500-2800 share is -26.2, and this file's note on seams
+# already records that two 0.35 s blocks drawn at random out of one promenade
+# recording differ by 4.7 dB — so a 3 dB distance is inside what the place does
+# to itself, and all four are honest promenades.
+#
+# 20260821_144848 wins on three counts that the table does not show. It is ONE
+# CONTINUOUS SHOT of the waterfront, so a hundred and thirty seconds of it is a
+# hundred and thirty seconds of one place rather than a walk through four. It
+# is the loudest of them — -30.6 to -32.2 dBFS against the pan's -28 to -39 —
+# because the phone was held still and not carried. And it has the ingredient
+# Misha named, spread out instead of stacked: pitched vocal events at 48.8 s
+# (414 Hz, clarity 0.64), 54.0 (414, 0.82), 64.0 (244, 0.77), 78.8 (571, 0.66),
+# 81.2 (600, 0.74), 110.8 (293, 0.56) and 122.0 (436, 0.64). Seven children
+# over two minutes, where the old clip had one every twenty-three seconds.
+#
+# THE WHOLE RECORDING IS USED, including the gust. There is wind on the mic at
+# 103.0-104.25 s: +14.6 dB over median in 30-200 Hz, which looks fatal. It is
+# not, because the bed is high-passed at 180 Hz and `sosfiltfilt` doubles that
+# to 36 dB an octave. Measured AFTER the filter, 200-600 Hz, the gust is +7.5
+# dB over median — and the same recording reads +6.9 at 17.0 s, +7.7 at 22.0
+# and +8.2 at 27.0 s from people on the concrete. Post-filter it is the size of
+# an ordinary beach event, so cutting the window at 102 s would throw away a
+# quarter of the tape to remove something the high-pass has already removed.
+#
+# THE BITRATE DROPS 96 -> 64 AND COSTS NOTHING, which is measured and not
+# assumed. `shore` is the one bed that is always heard through a filter:
+# SHORE.lp in 80-audio.js is a biquad lowpass at Q 0.4 running 750 Hz out in
+# the channel to 4 000 Hz on the concrete, and never opens further. So the same
+# 40 s window was encoded six ways, decoded, and put through that filter at its
+# most open 4 kHz — the worst case — and read in bands against a 48 kHz float
+# reference:
+#
+#     22 kHz 96 kbps  11.75 KB/s   within 0.01 dB of the reference everywhere
+#     22 kHz 64 kbps   7.83 KB/s   within 0.05 dB of 96 kbps to 7 kHz, 0.12 above
+#     16 kHz 64 kbps   7.84 KB/s   -0.4 dB at 4.6-7 kHz, -8.7 at 7-11 kHz
+#     12 kHz 48 kbps   5.89 KB/s   -4.5 dB at 4.6-7 kHz, and gone above
+#
+# 64 kbps at 22 050 Hz is free and 16 kHz is not, so the rate stays where it
+# was and a third of the bytes go. That is what pays for the longer window:
+# the search lands on 117.5 s and 919 KB, where 24.5 s at 96 kbps was 288, so
+# 4.8 times the tape costs 3.2 times the file.
 BEDS = [
-    dict(key='shore',   src=3, window=(0.6, 26.9), length=(23.0, 26.0),
-         rate=22050, kbps=96, hp=(3, 180), lp=None,  rms=-28.16,
-         what='the promenade, 13 Aug'),
+    dict(key='shore',   src=11, window=(0.8, 131.6), length=(112.0, 128.0),
+         rate=22050, kbps=64, hp=(3, 180), lp=None,  rms=-28.16,
+         what='the waterfront, 21 Aug'),
     dict(key='cicadas', src=2, window=(0.3, 12.2), length=(9.5, 11.5),
          rate=24000, kbps=96, hp=(8, 1900), lp=(2, 10500), rms=-25.17,
          what='the hillside, 12 Aug'),

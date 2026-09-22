@@ -2266,20 +2266,24 @@ function buildAudio() {
    * same lesson the ćuk taught, and it cost the same three rounds to learn.
    *
    * So there are six clips, cut on the spot at Jadrija in August by
-   * `tools/cut_field.py`, 3.0 MB of mono MP3 in the payload:
+   * `tools/cut_field.py`, 3.6 MB of mono MP3 in the payload:
    *
-   *     shore     24.5 s  22 050 Hz  96 kbps  the promenade, 13 Aug
+   *     shore    117.5 s  22 050 Hz  64 kbps  the waterfront, 21 Aug
    *     cicadas   10.0 s  24 000 Hz  96 kbps  the hillside, 12 Aug
    *     wood      68.0 s  24 000 Hz  96 kbps  inside the pines, 17 Aug
    *     lapping   69.5 s  22 050 Hz  96 kbps  the pier, 16 Aug
    *     boat      44.0 s  16 000 Hz  64 kbps  the channel off Sibenik, 17 Aug
    *     kabine    55.5 s  22 050 Hz  96 kbps  along the rows, 23 Aug
    *
-   * The last of those is the only one that is not from the recorder: it is the
-   * sound track of a six-minute 4K pan along the kabine, and it went in ahead
-   * of the recording made specially for the same job because the two were
-   * measured against each other and the video won by thirteen decibels in the
-   * band voices live in. See the note in `tools/cut_field.py`.
+   * TWO of those are not from the recorder, and the first one was the proof
+   * for the second. `kabine` is the sound track of a six-minute 4K pan along
+   * the rows, and it went in ahead of the recording made specially for the
+   * same job because the two were measured against each other and the video
+   * won by thirteen decibels in the band voices live in. `shore` followed it
+   * off a 132 s video of the waterfront on 21 Aug, for a different reason and
+   * with the same result — see the note on length below, and THE PROMENADE,
+   * TWICE in `tools/cut_field.py`. What the phone gives up in noise floor it
+   * gives back in minutes, and minutes are what a bed is short of.
    *
    * There is a seventh clip in the payload and it is not one of these. The
    * firestarter cue, 109.7 s at 1 072 KB, comes out of the same tool by a
@@ -2310,8 +2314,8 @@ function buildAudio() {
    * nineteen seconds is the one thing that does not happen in a real place, and
    * once the ear has the interval it cannot put it down again.
    *
-   * So each window is now as long as its source honestly gives. The promenade
-   * recording is 27.6 s end to end and 24.5 of that is the bed; the pier and
+   * So each window is now as long as its source honestly gives. The waterfront
+   * video is 132.4 s end to end and 117.5 of that is the bed; the pier and
    * the walk through the pines are a minute and more each. Where the source
    * will not give a long one, it will not: the hillside chorus is in the first
    * twelve seconds of that recording and the other twenty-nine have no chorus
@@ -2319,38 +2323,81 @@ function buildAudio() {
    * never comes back — so that clip is ten seconds and there is no honest way
    * to make it more.
    *
-   * What makes up the shortfall is playheads rather than tape. Each clip is
-   * played twice at once, from spread starting points and at rates 2.3 %
-   * either side of one, so what returns is not the clip but the *pair*, and
-   * the pair returns when the two have walked a whole loop apart from each
-   * other. It costs one extra buffer source a bed and it works because a
-   * detune of a fortieth is a fortieth of a semitone below anything anybody
-   * hears as pitch in a crowd, and because two copies of a hillside of insects
-   * is a hillside of insects.
+   * What used to make up the shortfall is playheads rather than tape. Each
+   * clip is played twice at once, from spread starting points and at rates
+   * 2.3 % either side of one, so what returns is not the clip but the *pair*,
+   * and the pair returns when the two have walked a whole loop apart from each
+   * other. It costs one extra buffer source a bed. It works because a detune
+   * of a fortieth is a fortieth of a semitone below anything anybody hears as
+   * pitch in a crowd, and because two copies of a hillside of insects is a
+   * hillside of insects.
    *
-   * ALL OF THEM, WHICH IS A CHANGE OF MIND. This note used to say the trick
-   * was for "the two short clips" and that a bed with a period over a minute
-   * does not need help having one. Misha, 19 Sep 2026: *"enhance the ambient
-   * audio sounds in certain locations so they are less repetitive"* — and he
-   * is right and the old reasoning was wrong in a way worth writing down. A
-   * minute is not long for a bed you STAND IN. The alley between the kabine
-   * is 55.5 s and it is where the whole indoor routine happens; the pier is
-   * 69.5 s and it is where you swim from. Both of them have events in them —
-   * a laugh, a door, a child — and one distinctive event is all the ear needs
-   * to learn an interval. What is long enough is not "longer than a minute",
-   * it is "longer than anybody stands there", and that is twenty minutes and
-   * not one:
+   * ── AND FOR THE PROMENADE IT DID NOT WORK, WHICH IS THE SECOND CHANGE OF
+   * MIND AND THE ONE WITH A MEASUREMENT UNDER IT ──
    *
-   *     kabine   55.5 s  ->  20.1 min      wood      68.0 s  ->  24.6 min
-   *     lapping  69.5 s  ->  25.2 min      promenade 24.5 s  ->   8.5 min
-   *     hillside 10.0 s  ->   7.3 min (three heads, see below)
+   * Misha, 21 Sep 2026: *"the audio when we are in jadrija beach, i like it,
+   * with children and all, but the loop is too repetitive, it gets repetitive
+   * after about 30s... any way to extend it to be i dunno maybe 90s?"*
    *
-   * The arithmetic is the same one every time: the pair comes round when the
-   * playheads have walked a whole loop apart, which at 4.6 % of relative rate
-   * takes 1/0.046 = 21.7 loops. `loopStats` prints it off the running nodes
-   * rather than off this note, which is how the rest of it was found: every
-   * word above is about the six recordings, and the eleven SYNTHESISED beds
-   * had the same fault and a far worse number — see `makeNoise`.
+   * This note used to claim the promenade came round at 8.5 minutes. It came
+   * round at twenty-three seconds, and the two statements are not in conflict
+   * because they are about different things — which is the whole lesson.
+   *
+   *   8.5 MINUTES is when the two playheads line up in PHASE again: 23.5 s of
+   *   tape divided by 4.6 % of relative rate, 21.7 loops, 511 s. `loopPeriod`
+   *   computes exactly that and computes it correctly.
+   *
+   *   TWENTY-THREE SECONDS is when the ear hears the same child again. That
+   *   is the length of the tape over the playback rate — 23.5/0.977 = 24.05 s
+   *   on one head, 23.5/1.023 = 22.97 s on the other — and DETUNE CANNOT MOVE
+   *   IT. Worse: two heads meant every voice in the recording was heard twice
+   *   per pass instead of once, so the trick doubled the thing it was fitted
+   *   to cure.
+   *
+   * The ear does not wait for a phase alignment. It recognises a thing and
+   * times the next one. So the number that matters for a bed with a VOICE in
+   * it is the single-head period, and `loopStats` now prints both: `period`
+   * is the phase figure and `heard` is the one to read.
+   *
+   * Which bed has a voice in it is measurable, and is not a matter of taste.
+   * Band a clip 500-2800 Hz, take the RMS of every 0.4 s block, and subtract
+   * the median block from the loudest — call it salience:
+   *
+   *     shore, as it was    12.3 dB   one child, 11.6-14.0 s, F0 505 Hz at a
+   *                                   clarity of 0.88. A shriek, not a crowd.
+   *     lapping             14.7 dB   somebody on the pier, at 58.4 s
+   *     kabine               8.3 dB   a door and a family going past
+   *     cicadas              3.6 dB   nothing. It is a texture all the way
+   *                                   through, and the trick is right for it.
+   *
+   * So the fix for the promenade was not a cleverer playhead, it was TAPE. The
+   * 13 Aug recording is 27.6 s and there is no more of it, but the survey
+   * folder holds 22 minutes of video of this beach and `kabine` had already
+   * proved a phone's video track will cut. `shore` is now 117.5 s off the
+   * 21 Aug waterfront video, on ONE head, at 64 kbps — which was measured to
+   * cost nothing through this bed's own 4 kHz lowpass and is what pays for the
+   * length. See THE PROMENADE, TWICE in `tools/cut_field.py`.
+   *
+   * What each bed gives the ear, as `loopStats().rows` reports it:
+   *
+   *     bed        tape     heads   heard          phase
+   *     shore     116.5 s     1     116.5 s        the same, there is no pair
+   *     lapping    68.5 s     2      67.0 s        24.8 min
+   *     wood       67.0 s     2      65.5 s        24.3 min
+   *     kabine     54.5 s     2      53.3 s        19.7 min
+   *     cicadas     9.0 s     3       8.8 s        6.5 min
+   *
+   * The four that still run two heads are LEFT THAT WAY, and not out of
+   * inertia. `cicadas` has nothing in it to recognise, so for it the pair is a
+   * real gain and the doubling costs nothing. The other three are 53 to 67 s
+   * on a head, which is twice what the promenade was and past what anybody
+   * stands in one spot for; the promenade is the one you are in for the whole
+   * routine, and it is the one that got the tape. If `lapping` is ever named
+   * the same way, its answer is the same answer: the pier recording is 73 s
+   * and the survey folder has more water in it.
+   *
+   * The eleven SYNTHESISED beds had the same fault as the first cut and a far
+   * worse number — see `makeNoise`.
    *
    * Each window was chosen by searching its source for the two ends that match
    * best in level and in spectrum, so that the loop seam is inaudible. That
@@ -2447,23 +2494,37 @@ function buildAudio() {
   /**
    * How long before a listener standing still hears the same thing twice.
    *
-   * The arithmetic the note on length does by hand, done off the nodes that
-   * are actually running — because the interesting failure is not a wrong
-   * multiplication, it is a bed that was meant to get a second playhead and
-   * did not, and from outside those two look identical. See `loopStats`.
+   * TWO ANSWERS, and shipping only the flattering one is what let the
+   * promenade bed repeat every twenty-three seconds under a note claiming
+   * eight and a half minutes. See the change of mind in the note on length.
+   *
+   *   `phase`  when the playheads line up with EACH OTHER again, so that the
+   *            whole mix is bit-for-bit what it was. Tape over relative rate.
+   *            It is the long number and it is the one nobody hears.
+   *
+   *   `heard`  when any ONE head comes round, which is when a thing you can
+   *            recognise — a laugh, a door, a child — arrives again. Tape over
+   *            that head's rate, shortest head wins. Detune cannot lengthen
+   *            this, and adding a head makes the recognisable thing arrive
+   *            MORE often, not less. It is the short number and it is the one
+   *            the ear is actually keeping.
+   *
+   * Both are computed off the nodes that are running rather than off the note,
+   * because the interesting failure is not a wrong multiplication, it is a bed
+   * that was meant to get a second playhead and did not, and from outside
+   * those two look identical. See `loopStats`.
    *
    * The length is what the playhead traverses and not what the clip is, which
    * is a second shorter: `voices` insets both ends by half a second, so the
-   * promenade's 24.5 s loop is 23.5 s of tape and comes round at 8.5 minutes
-   * rather than the 8.9 the raw duration would give.
+   * promenade's 117.5 s clip is 116.5 s of tape.
    *
-   * For more than two heads it is the CLOSEST pair, not the whole ensemble.
-   * Three heads at ±2.3 % line up completely once in 21.7 loops, but the ear
-   * is not waiting for all three — the first coincidence is between the two
-   * that are 2.3 % apart, at half that.
+   * For `phase` with more than two heads it is the CLOSEST pair, not the whole
+   * ensemble. Three heads at ±2.3 % line up completely once in 21.7 loops, but
+   * the ear is not waiting for all three — the first coincidence is between
+   * the two that are 2.3 % apart, at half that.
    */
   function loopPeriod(srcs) {
-    if (!srcs || !srcs.length || !srcs[0].buffer) return 0;
+    if (!srcs || !srcs.length || !srcs[0].buffer) return { phase: 0, heard: 0 };
     const s0 = srcs[0];
     const len = s0.loopEnd > s0.loopStart
       ? s0.loopEnd - s0.loopStart : s0.buffer.duration;
@@ -2472,7 +2533,12 @@ function buildAudio() {
     for (let i = 0; i < r.length; i++) {
       for (let j = i + 1; j < r.length; j++) d = Math.min(d, Math.abs(r[i] - r[j]));
     }
-    return d > 1e-6 && d < Infinity ? len / d : len / r[0];
+    // The FASTEST head is the one that comes round soonest, so it is the one
+    // that sets when the ear next gets the same second of tape.
+    return {
+      phase: d > 1e-6 && d < Infinity ? len / d : len / r[0],
+      heard: len / Math.max(...r),
+    };
   }
 
   // ── where you are, and what that does to the mix ────────────────────────────
@@ -2609,11 +2675,13 @@ function buildAudio() {
     inside: 0.27,        // and what an airframe with two turboprops leaves of it
     lpNear: 4000,        // Hz — the filter as far open as it goes, on the spot
     lpFar: 750,          // and what a kilometre of sea over water leaves of it
-    // The clip is 24.5 s, which is all the recording there is, so this is the
-    // bed that most needs the second playhead. 2.3 % puts the pair's own period
-    // at eight and a half minutes.
-    voices: 2,
-    detune: 0.023,
+    // ONE PLAYHEAD, AND IT USED TO BE TWO. This is the bed that taught the
+    // rest of the file what the second playhead is actually for — see the note
+    // on length above. The clip is 117.5 s of the waterfront and it has people
+    // in it, and for a clip with people in it a second head is not a longer
+    // period, it is every voice in the recording heard twice as often.
+    voices: 1,
+    detune: 0,
   };
   let shoreBuf = null, shoreNodes = null;
 
@@ -7740,9 +7808,16 @@ function buildAudio() {
      * sharing one two-second loop for the whole of the project.
      *
      * `secs` is the tape a playhead traverses, which is a second less than the
-     * clip wherever `voices` has inset the ends. `period` is `loopPeriod` — how
-     * long a listener standing there has before he hears it again — and `-1`
-     * means nothing of that bed is running to be asked.
+     * clip wherever `voices` has inset the ends. `-1` in any of the period
+     * columns means nothing of that bed is running to be asked.
+     *
+     * THERE ARE TWO PERIOD COLUMNS AND `heard` IS THE ONE TO READ. `period`
+     * and `mins` are when the playheads line up with each other again, which
+     * is the flattering number and the one nobody can hear; `heard` is when
+     * one head comes round and hands the ear the same second of tape, which is
+     * what a listener standing at Jadrija is actually timing. They differ by
+     * 21.7x on a two-head bed, and reading the first one is how the promenade
+     * shipped a 23 s loop under a note claiming 8.5 minutes. See `loopPeriod`.
      *
      * `noise` is the buffer every synthesised bed shares. Its length is eleven
      * of the rows below at once; its RMS is here because changing that length
@@ -7763,8 +7838,9 @@ function buildAudio() {
         return {
           key, where, heads: srcs.length, secs: +len.toFixed(2),
           rate: srcs.map((x) => +x.playbackRate.value.toFixed(4)),
-          period: srcs.length ? +p.toFixed(1) : -1,
-          mins: srcs.length ? +(p / 60).toFixed(2) : -1,
+          period: srcs.length ? +p.phase.toFixed(1) : -1,
+          mins: srcs.length ? +(p.phase / 60).toFixed(2) : -1,
+          heard: srcs.length ? +p.heard.toFixed(1) : -1,
         };
       };
       // The hillside and the wood are one node set with two clips in it, so
