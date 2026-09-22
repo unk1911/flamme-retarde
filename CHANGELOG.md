@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.460.0] — 2026-09-21
+
+### the spokes were welded to the frame
+
+Misha: *"the bicycle wheels are not spinning, the spokes in the wheels are
+fixed, they should really be spinning."*
+
+They were not spinning because they could not. `wheelBike` drew both wheels
+into the **same triangle soup as the down tube** — one `propBuilder`, one
+`BufferGeometry`, one `THREE.Mesh` per machine — and that mesh only ever gets
+yaw, pitch and the lean. The cranks were the one moving part on a bicycle
+here: they were built into a builder of their own and hung on their own node
+at the bottom bracket, and `wheelDraw` turned them with `rotation.z =
+-r.phase`. Nothing was ever written for the wheels, so three spokes and a
+hub rode 230 m of promenade at 4.6 m/s in exactly the attitude they were
+lathed in. The scooters were worse: their vehicle node had **no children at
+all**.
+
+**Measured over 66 frames, bikes at 2.75 to 4.42 m/s:**
+
+| | 1.457.0 | 1.458.0 |
+|---|---|---|
+| frames in which a wheel turned | 0 / 65 | 64 / 64 |
+| front-wheel rim point, machine frame | 77.14° for all 66 samples | sweeps the full turn |
+| ground covered while it sat still | 3.55–5.81 m (bikes), 6.44–6.91 m (scooters) | — |
+| turns those metres owed | 2.72 on a 0.34 m wheel, 10.0 on a 0.11 m one | all of them paid |
+| radians per metre, min / median / max | — | 2.9412 / 2.9412 / 2.9412 |
+| 1/R for a 0.34 m wheel | — | 2.9412 |
+| radians per metre, scooters | — | 9.0909, and 1/0.11 = 9.0909 |
+
+**The wheel is driven by the ground, not by a clock.** `wheelMove` now
+accumulates `r.dist += r.v * dt` — metres of promenade actually gone under
+the tyres — and `wheelDraw` sets each wheel's `rotation.z` to
+`-(r.dist % W.circ) / W.R`. So the angular velocity is the linear speed over
+the radius and nothing else: the same rider's wheel slowed from 34.15° a
+frame to 11.42° a frame as it braked, and the ratio came out 2.9412 rad/m on
+**every one of the 64 steps**, whatever the step was worth — 0.036 m, 0.076 m
+or 0.203 m. The front wheel of a scooter turns at 9.09 rad/m off the same
+`dist` because it divides by its own 0.11 m, and its rear wheel by 0.10 m,
+without either of them being told a rate. Rendered angle against
+`-(dist mod circ)/R`: **max error 0.0 rad** over all five riders.
+
+**A held rider's wheels are stopped.** `dist` is taken on `wheelMove`'s own
+`dt`, which `wheels.hold` hands in as nought, so a rider caught at 5.35 m/s
+for a screenshot does not stand there spinning. Measured under
+`__fr.jad.raw().wheels.hold(true)`: 235 frames, **0 of 234 steps** turned a
+wheel, and travel was 0.00000 m.
+
+**Nothing was added and nothing was lost.** The wheels are built by the same
+`wheelRim` calls with the same arguments; only the builder they write into
+changed, and `wheelDisc` lathes each one about the origin so its node can
+carry it to its axle. Machine triangles **2442 before, 2442 after**; the
+per-mesh counts summed over every node come to 2442 as well. The sampled rim
+vertex sits at exactly 0.340 m from the axle in the machine's frame in both
+builds and starts at the same 77.14°, so the wheel is where it always was.
+Five machines went from 8 nodes to 18 — ten wheels — and `wheels.stats().ms`
+moved 0.75 → 0.79.
+
+The scooters' wheels are solid discs of one colour, so almost none of this
+shows on them. They were split out anyway: a wheel nailed to the deck is
+wrong whether or not anybody can see it.
+
+`wheels.list()` reports `dist` and each machine's wheel angles now, which is
+what the numbers above were read off.
+
 ## [1.459.0] — 2026-09-21
 
 ### 8 is the kabina
