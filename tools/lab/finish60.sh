@@ -35,7 +35,11 @@ trap 'rm -rf "$WORK"' EXIT
 
 mkdir -p "$WORK/seq"
 n=0
-for c in $(seq -w 0 $((CHUNKS - 1))); do
+# `seq -w` pads to the width of the LARGEST number, not to two digits, so a
+# 5-chunk film asked for vace_a0_* while `burst.py fan` had written vace_a00_*
+# — five "NO FRAMES" lines and an empty encode. printf is the fixed width the
+# tag actually has (`f"{a.tag}{c:02d}"` in fan).
+for c in $(seq 0 $((CHUNKS - 1)) | xargs -n1 printf '%02d\n'); do
   # `sort -V` and not `sort`: frame 10 sorts before frame 9 otherwise, and a
   # chunk in the wrong order is a chunk that plays backwards in the middle.
   mapfile -t fs < <(find "$SRC" -maxdepth 1 -name "vace${TAG}${c}_*" | sort -V)
