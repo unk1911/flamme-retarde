@@ -1,0 +1,28 @@
+{
+  "_": [
+    "Variant A — HARSH MIDDAY. 25.3 s (5 chunks of 81) of fr-clip-20260921-201706,",
+    "the kabina interior at Jadrija. At cfg 1.0 the distill LoRA turns CFG off, so",
+    "the negative prompt is inert and the positive prompt is the ENTIRE text",
+    "conditioning; it has to describe what is really in these control frames.",
+    "",
+    "Cuts measured, not guessed: mean luma per control frame is flat at ~55 for",
+    "frames 0-186, then a montage from 188 to 260 (56->34->83->42, six changes of",
+    "more than 6 luma), then flat at ~39 from 262 to the end. The montage straddles",
+    "the chunk 2/3 boundary at frame 243, so chunks 2 and 3 each get a prompt that",
+    "covers a push-in and a detail rather than a full-figure composition.",
+    "",
+    "A and B differ ONLY in the light and the grade. The geometry sentences are",
+    "word-for-word the same in both files, because the geometry is the thing VACE",
+    "is holding and the prompt is not being asked to change it."
+  ],
+
+  "0": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. Grey-blue ceramic floor tiles, dark olive painted concrete walls, a dark timber plank ceiling with beams, a small metal pendant lampshade. A bare-skinned woman standing still in the middle of the room facing the camera, arms at her sides, full figure. A framed cocktail poster on the wall behind her, a round wooden stool holding a green glass wine bottle, a glass of red wine and a dark plate, an old blue portable television on a wooden side table at the right. A louvred wooden door open at the left, the deep blue Adriatic and a concrete bathing terrace beyond it. Harsh white midday August sun outside, blown out through the louvre slats, hard-edged bars of light on the tiles, cool blue open shade inside, high contrast, neutral cold colour, real photographed video, available light, 35mm documentary, film grain",
+
+  "1": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. Grey-blue ceramic floor tiles, dark olive painted concrete walls, a dark timber plank ceiling with beams. A bare-skinned woman turning side-on and bending forward from the waist over a round wooden stool, back arched, hair falling, then straightening up again. The stool holds a green glass wine bottle, a glass of red wine and a dark plate. A framed cocktail poster on the wall, an old blue portable television on a wooden side table at the right, a louvred wooden door open at the left onto the deep blue Adriatic. Harsh white midday August sun outside, blown out through the louvre slats, hard-edged bars of light on the tiles, cool blue open shade inside, high contrast, neutral cold colour, real photographed video, available light, 35mm documentary, film grain",
+
+  "2": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. The camera pushes slowly in from the whole room to a close shot of a bare-skinned woman's face and bare chest, then to the framed cocktail poster hanging on the dark olive wall beside her, a printed orange drink in a tall glass on white paper in a thin black frame. Shallow depth of field, skin texture, fine hair, dark painted concrete behind. Harsh white midday August sun outside the frame, cool blue open shade on the skin, hard falloff into black, high contrast, neutral cold colour, real photographed video, available light, 35mm documentary, film grain",
+
+  "3": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. A close shot across the top of a round wooden stool: a green glass wine bottle with a pale label, a glass of dark red wine, a small pink object and a dark ceramic plate with a painted rim, on scratched varnished wood. The camera pulls slowly back to reveal the whole room and a bare-skinned naked woman standing in the middle of it, arms at her sides, nothing on her, full figure, bare skin. Grey-blue ceramic floor tiles, dark olive walls, a timber plank ceiling, a louvred wooden door open at the left onto the deep blue Adriatic, an old blue portable television on a side table at the right. Harsh white midday August sun outside, hard-edged bars of light on the tiles, cool blue open shade inside, high contrast, neutral cold colour, real photographed video, available light, 35mm documentary, film grain",
+
+  "4": "photorealistic documentary video shot inside a small concrete beach changing cabin on the Dalmatian coast near Sibenik, Croatia, in high summer. Grey-blue ceramic floor tiles, dark olive painted concrete walls, a dark timber plank ceiling with beams. A bare-skinned woman crossing the room and perching on a round wooden stool beside a small table, a green glass wine bottle, a glass of red wine and a dark plate at her elbow. A framed cocktail poster on the wall behind her, an old blue portable television on a wooden side table at the right, a louvred wooden door open at the left onto the deep blue Adriatic. Harsh white midday August sun outside, blown out through the louvre slats, hard-edged bars of light on the tiles, cool blue open shade inside, high contrast, neutral cold colour, real photographed video, available light, 35mm documentary, film grain"
+}
