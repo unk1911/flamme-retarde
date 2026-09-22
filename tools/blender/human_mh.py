@@ -94,6 +94,7 @@ from mathutils.kdtree import KDTree  # type: ignore
 # tools/blender/mocap_retarget.py and the note on `_stoop` below.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mocap_stoop import HEAD as MC_HEAD, LADDER as MC_LADDER  # noqa: E402
+from mocap_stretch import KEYS as STRETCH_KEYS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "build" / "mh_base.obj"
@@ -7815,6 +7816,20 @@ CLIPS = [
               (1.55, HAND_STAND)]},
     {"name": "handHeld", "loop": True,
      "keys": [(0.0, HAND_STAND), (1.3, HAND_STAND_B), (2.6, HAND_STAND)]},
+    # ── A WARM-UP, AND NOBODY TYPED A DEGREE OF IT ───────────────────────
+    #
+    # CMU subject 42 trial 1, "stretch": seven and a half seconds of somebody
+    # standing on the spot swinging a leg back with their arms out. 226 keys,
+    # one per sampled frame, straight off `mocap_retarget.py --clip` — which
+    # is the difference between this and `snort`. The stoop is baked as a
+    # LADDER indexed by depth, because a stoop is asked for a depth; a routine
+    # is asked for a duration, and what has to survive is the timing. The
+    # counter-swing before the leg goes back, the pause at the top, the settle
+    # when the foot lands: that is the half a pose ladder throws away and the
+    # half six releases of hand-keying could not put back.
+    #
+    # It went from picking the capture to standing on the beach in one pass.
+    {"name": "stretch", "loop": False, "keys": STRETCH_KEYS},
     # And the yawn, which is the only one here that is not a place she goes.
     # Upper body over the idle, one breath, back to where it started.
     {"name": "yawn", "loop": False,

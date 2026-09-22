@@ -1634,7 +1634,7 @@ def sit_clips(rig, J):
 # height is fixed in metres. See `sit_clips`.
 BATHER_CLIPS = [c for c in MH.CLIPS
                 if c["name"] in ("idle", "walk", "wave", "notice",
-                                 "kneel", "getup")]
+                                 "kneel", "getup", "stretch")]
 # The walk was fixed on 22 Aug and its six numbers are `WALK_TRACK` and
 # friends in human_mh.py. Everything else on this list is built on `IDLE_A`,
 # which now carries `STAND_TRACK` and friends — Baye's numbers, on Baye's

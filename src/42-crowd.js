@@ -686,7 +686,14 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   // of this file: the bake flattens it, the arm comes up fifteen centimetres,
   // and what a quarter of this beach was actually doing every half minute was
   // nothing at all. The greeting solves its own arm instead.
-  const BIZ = ['notice'];
+  // `stretch` is CMU subject 42 retargeted whole — see the note over the clip
+  // in human_mh.py. It is seven and a half seconds where `notice` is one, so
+  // it is worth saying why that is fine here: `midBiz` gates the scheduler on
+  // whatever is playing, `next: want` takes them back to their idle after it,
+  // and the gate below is an EDGE, so a long one-shot is started once and left
+  // alone. What it buys is a beach where somebody is doing something that
+  // takes a while, instead of forty people each doing a one-second thing.
+  const BIZ = ['notice', 'stretch'];
   // How often, in metres, a figure is re-posed. Posing one of these is
   // twenty-eight bones on the CPU and then a texture upload of the palette,
   // and the upload is the expensive half — it is a driver call per figure per

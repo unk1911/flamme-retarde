@@ -47480,6 +47480,21 @@ async function buildJadrija(scene) {
        */
       cast: () => ({
         natH: (castNatH || []).map((h) => +h.toFixed(3)),
+        // The histogram of what the whole skinned cast is playing, which is
+        // the only way to find out whether a clip added to `BIZ` ever gets
+        // performed — the gate is an edge on each figure's own clock and
+        // fires perhaps once a minute, so watching one figure proves nothing.
+        playing: (() => {
+          const h = {};
+          if (crowds.skin) {
+            for (const [fg2, f] of crowds.skin.pairs()) {
+              if (!fg2 || !f) continue;
+              const n = f.playing() || 'none';
+              h[n] = (h[n] || 0) + 1;
+            }
+          }
+          return h;
+        })(),
         rigH: Object.values(crowds).filter((c) => c.height)
           .map((c) => +c.height.toFixed(3)),
         slots: castSlot || [],
@@ -47491,6 +47506,12 @@ async function buildJadrija(scene) {
         who: crowds.skin ? crowds.skin.slots.filter(Boolean)
           .map((fg) => ({
             idx: fg.idx, blob: BATHER_CAST[fg.blob], mode: fg.mode,
+            // WHAT THEY ARE ACTUALLY PLAYING, which nothing exposed until a
+            // clip was added to `BIZ` and there was no way to find out whether
+            // anybody had ever performed it. `greets()` carries this for the
+            // handful of figures mid-greeting; every other skinned bather on
+            // the shore was unobservable. A crowd clip that cannot be read
+            // back is a crowd clip nobody can test.
             // The third column that has to agree, and did not until 1.353.0:
             // `sex` picks the instanced rig and the bark voice, `blob` picks
             // the body you become. A row where these disagree is a woman at

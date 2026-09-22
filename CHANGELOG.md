@@ -8,6 +8,68 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.464.0] — 2026-09-21
+
+### a bather does seven and a half seconds nobody typed
+
+Misha: *"can u demonstrate how we are leveraging this table, and the CMU /
+motion capture, by having one of the prominent bathers do some body
+routines... i know we often struggle to get 1 move right.. so i wanna see if
+these new tools help us get movement looking more natural and implemented
+faster"*.
+
+CMU subject 42 trial 1, "stretch": somebody standing on the spot swinging a
+leg back with their arms out for balance. **226 keys, one per sampled frame,
+7.50 s**, retargeted whole and dropped on the beach.
+
+**What it took:** find the capture, retarget, bake, wire, verify. One pass.
+The coke stoop took **ten releases** and is four and a half seconds.
+
+### and the reason it is one pass is a new bake mode
+
+`--bake` indexes its keys by the DEPTH they reach, because a stoop is asked
+for a depth. A routine is not — it is asked for a duration, and what has to
+survive is the **timing**: the counter-swing before the leg goes back, the
+pause at the top, the settle when the foot lands. That is the half of a
+capture a pose ladder throws away, and the half that six releases of
+hand-keying the stoop could not put back. So `--clip` writes one key per
+sampled frame and there is no interpolation of ours anywhere in it.
+
+Floor pass: `floor_poses` with the smoothing ON, which for a *sampled* clip is
+the right way round — the note in that function says the staircase a frame-by-
+frame solve leaves is an artefact, and only hand-placed keys want it left
+alone. Deepest foot after it: **−0.007 m**.
+
+### the ROM table earns its keep here
+
+`romcheck` over the whole clip, 25 samples across 7.50 s at 5 deg of slack:
+**zero violations**. Which is the point — a real body is legal by
+construction, and the check is there to catch the frames a *solver* invents.
+
+### wiring: one array entry
+
+`BIZ` in 42-crowd.js is the one-shot business a standing figure draws from on
+its own clock. It had exactly one entry, `notice`, since it was written. It
+has two now. `midBiz` already gates the scheduler on whatever is playing and
+`next: want` already takes them back to their idle, so a 7.5 s one-shot needed
+nothing new — the gate is an edge, so a long clip is started once and left.
+
+### and a way to find out whether any of that happened
+
+Nothing exposed what the crowd was playing. `greets()` carries it for the
+handful of figures mid-greeting; every other skinned bather on the shore was
+unobservable, so a clip added to `BIZ` could not be tested at all.
+`__fr.jad.cast().playing` is the histogram of the whole skinned cast now.
+
+**Measured, 45 s on the promenade**, of the 24-strong skinned cast:
+
+    stretch  1 .. 6        notice 1
+    idle     9 .. 16       walk   4 .. 9
+    sit sitlap sittable sittalk sitfwd sitback sitquay quaytalk sunbathe
+
+Between one and six people warming up on that beach at any moment, and none
+of it authored.
+
 ## [1.463.0] — 2026-09-21
 
 ### a joint-limit check, and what it is honestly worth
