@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.465.0] — 2026-09-21
+
+### `seq -w` pads to the widest number, not to two digits
+
+`finish60.sh` stitched a film by globbing `vace${TAG}${c}_*` with `c` from
+`seq -w 0 $((CHUNKS-1))`. `seq -w` pads to the width of the **largest** number
+in the range, so a 12- or 16-chunk film gets `00 01 … 11` and works, and a
+**five**-chunk film gets `0 1 2 3 4` — which asks for `vace_a0_*` while
+`burst.py fan` wrote `vace_a00_*`. Five "NO FRAMES" lines and an empty encode.
+
+It has been there since the script was written and was invisible because every
+film until tonight was twelve or sixteen chunks, the two lengths where `seq -w`
+happens to agree with `fan`'s own `f"{a.tag}{c:02d}"`. Fixed to the fixed width
+the tag actually has.
+
+Also lands `tools/lab/kabina25-prompts-{a,b}.json`, the two grades from the
+25 s kabina restyle. Their geometry sentences are word-for-word identical and
+only the light differs, which is what makes them a comparison rather than two
+descriptions.
+
 ## [1.464.0] — 2026-09-21
 
 ### a bather does seven and a half seconds nobody typed
