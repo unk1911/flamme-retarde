@@ -30889,6 +30889,20 @@ async function buildJadrija(scene) {
       }
       testFigure = { mesh, fig: skinFig, tris: skinFig.tris, at: [ft, fs] };
 
+      // Baye v2.0, off her shoulder. The same skeleton and the same
+      // forty-nine clips, textured rather than painted — see 46-apprentice.js
+      // for what she is and why she follows rather than replaces. Awaited
+      // here so she is in the scene before the first `stepShow`, and null if
+      // this build has no blob for her, which costs nothing.
+      const a2 = await loadApprentice();
+      if (a2) {
+        a2.mesh.position.copy(mesh.position);
+        a2.mesh.rotation.y = mesh.rotation.y;
+        a2.mesh.updateMatrixWorld();
+        scene.add(a2.mesh);
+        a2.cast(shadow);
+      }
+
       // The survey pole that used to stand here is gone.
       //
       // It was a kilometre of red-and-white banding put up so that a 1.75 m
@@ -40320,6 +40334,12 @@ async function buildJadrija(scene) {
       p[2]);
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
+
+    // The apprentice follows what the leader ENDED UP doing, so she is
+    // stepped here rather than anywhere above: every mover has run, the
+    // position is final, and the matrix she is about to be measured against
+    // has just been pushed.
+    apprenticeStep(dt, f);
 
     wearTick(dt);
     hairAim();

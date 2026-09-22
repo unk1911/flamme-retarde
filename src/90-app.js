@@ -8087,6 +8087,7 @@ window.__fr = {
       // The bicycles and scooters on the promenade. Not in `tris` either.
       riders: jadrija.wheels ? jadrija.wheels.stats() : null,
       testFigure: jadrija.testFigure || 'none',
+      apprentice: apprenticeStats(),
     } : null,
     rail: rail ? { ways: rail.ways, km: +rail.km.toFixed(1), cars: rail.cars,
       lineKm: +rail.lineKm.toFixed(2), tris: Math.round(rail.tris) } : null,

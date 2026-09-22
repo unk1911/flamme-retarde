@@ -8,6 +8,77 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.468.0] — 2026-09-22
+
+### Baye v2.0, walking two paces behind Baye v1.0
+
+A second figure on the terrace: **the same skeleton, the same bind pose and
+the same forty-nine clips**, textured rather than painted. Misha picked what
+she is wearing in `wardrobe.html` — the caucasian skin, the unkempt french
+braid, eyebrows 09, eyelashes 04, black fishnet and nothing else — and
+`tools/blender/baye2.py` builds exactly that.
+
+**What is different about her is one thing.** v1.0 paints a person with
+GEOMETRY: the base mesh subdivided, decimated to 26 000 triangles and coloured
+by a few dozen hand-placed cutters. It carries no UVs at all — `uv` does not
+appear once in the 8 400 lines of `human_mh.py`. v2.0 keeps the base mesh's
+own topology and its own UV layout and puts a photographic skin on it. The rig
+is solved by the same `skin()`, the clips are baked by the same `_bake_clip`
+after the same seven floor passes, so there is nothing she cannot do that v1.0
+can do — it is literally the same animation data.
+
+**She is an apprentice and not a replacement, on purpose.** Nobody has watched
+this mesh do the other forty-seven clips. v1.0 can be told what to do, can
+hold a straw, can cartwheel down a promenade and put her feet on the concrete
+each time, and all of that lives in `43-jadrija.js` and has never been asked
+of her. So she shadows: a third of a second behind through a ring buffer, off
+the leader's left shoulder, playing whatever the leader has just started. The
+lag is the trick — copy the clip on the same frame and you have two dancers in
+lockstep, which reads as one figure drawn twice.
+
+**How a garment knows which bone owns it.** The `.mhclo` again. A garment
+vertex rides a triangle of base vertices at known barycentric weights, so its
+bone weights are the same blend of the same three vertices' weights — not a
+projection and not a nearest-neighbour guess, the exact answer by
+construction. It matters: the nearest body vertex to the tip of a braid is a
+shoulder blade, so a proximity transfer would have hung her hair off her back
+instead of her head. 81 corners of 33 000 fell through to the nearest weighted
+vertex and are counted rather than assumed.
+
+**.fr3d v5** = v4 plus a UV array and a table of named parts. v4's own note
+said the day a second removable thing arrived was the day its one `shed`
+counter became a table, and that the version number was there so that day
+would be a clean break. The two headers are word for word identical. Parts are
+hung as CHILDREN of the body mesh sharing one attribute set and differing only
+in `drawRange`, so a part costs a draw call rather than a copy of the mesh,
+and every mover that has ever positioned `fig.mesh` goes on working untouched.
+
+**75 717 triangles, 1.88 MB gzipped, 60–63 fps with both women on screen.**
+
+Three things cost a render each, and two of them were not what they looked
+like:
+
+- **A bright crease down her spine.** It looked like a geometry seam and was
+  not. A UV seam is one position with two texture coordinates, which has to
+  become two GPU vertices — and the normals were being accumulated into each
+  of those separately, so the lighting stepped across a mesh with no crease in
+  it. Accumulated over the BASE vertex instead and it is invisible, which is
+  what a seam is for.
+- **And it was still there.** Because there was a second one underneath: at an
+  island's edge the bilinear tap straddles the boundary and mixes in the flat
+  tone the artist filled behind the islands, which does not match the shaded
+  skin next to it. `tools/wardrobe/assets.py` now rasterises the UV islands
+  from `mh_base.obj`'s own `vt` table and grows island colour outward ten
+  passes, which pushes that tone out of filtering range. It fixes the viewer
+  too.
+- **The rectangular facets on her back were never hers.** v1.0 has the
+  identical patches in the identical places. Checked before changing anything
+  further, which is the only reason a third render did not get spent on them.
+
+A black fishnet came out silver until it stopped being given `SKIN_EMISSIVE`.
+That lift exists because light entering skin scatters under it and leaves
+somewhere else; a thread of nylon does no such thing.
+
 ## [1.467.0] — 2026-09-22
 
 ### the wardrobe ships

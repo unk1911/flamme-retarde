@@ -57,7 +57,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from PIL import Image, ImageFile
+import numpy as np
+from PIL import Image, ImageDraw, ImageFile
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -119,6 +120,73 @@ PICK = {
 MAXPX = {'skin': 1024, 'hair': 1024, 'top': 512, 'btm': 512, 'leg': 1024,
          'lash': 256, 'brow': 256}
 QUANT = {'hair': 64, 'top': 96, 'btm': 96, 'leg': 16}
+
+
+def uv_mask(size):
+    """Which texels the base mesh's UV islands actually land on.
+
+    Rasterised from `build/mh_base.obj`'s own `vt` table — the same file the
+    fit indexes into — so it is the truth rather than a guess at where an
+    artist drew.
+    """
+    vts, faces, cur = [], [], None
+    for ln in (ROOT / 'build' / 'mh_base.obj').read_text(errors='ignore').splitlines():
+        if ln.startswith('vt '):
+            a = ln.split()
+            vts.append((float(a[1]), float(a[2])))
+        elif ln.startswith('g '):
+            cur = ln[2:].strip()
+        elif ln.startswith('f ') and cur == 'body':
+            c = []
+            for tok in ln.split()[1:]:
+                q = tok.split('/')
+                if len(q) > 1 and q[1]:
+                    c.append(int(q[1]) - 1)
+            if len(c) >= 3:
+                faces.append(c)
+    im = Image.new('L', (size, size), 0)
+    d = ImageDraw.Draw(im)
+    for c in faces:
+        # v is up in a .obj and down in an image, which is the same flip a
+        # texture's `flipY` is about; get it wrong here and the mask is the
+        # mirror of the islands rather than the islands.
+        d.polygon([(vts[i][0] * size, (1.0 - vts[i][1]) * size) for i in c], fill=255)
+    return np.asarray(im) > 127
+
+
+def dilate(im, mask, px=10):
+    """Push island colour outward into the gutter.
+
+    WHY A FULLY PAINTED TEXTURE STILL NEEDS THIS. These skins have no
+    transparent gutter — the background is a flat flesh tone the artist filled
+    behind the islands — so it looks like there is nothing to fix. There is.
+    At an island's edge the bilinear tap straddles the boundary and mixes that
+    flat tone into the last texel of real skin, and the flat tone does not
+    match the shaded skin next to it. What you get is a thin LIGHT LINE along
+    every seam: down her spine, round the sacrum, along the inside of an arm.
+    It reads as a crease in a mesh that has no crease in it, and it survives
+    every geometry fix you try, because it was never geometry.
+
+    So the island colour is grown outward a few texels and the flat tone is
+    pushed out of filtering range. Four-neighbour, vectorised; ten passes is
+    about four texels of real spread and costs a few milliseconds.
+    """
+    a = np.asarray(im.convert('RGB')).astype(np.float32)
+    m = mask.copy()
+    for _ in range(px):
+        acc = np.zeros_like(a)
+        cnt = np.zeros(m.shape, np.float32)
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            sa = np.roll(np.roll(a, dy, 0), dx, 1)
+            sm = np.roll(np.roll(m, dy, 0), dx, 1)
+            acc += sa * sm[..., None]
+            cnt += sm
+        grow = (~m) & (cnt > 0)
+        if not grow.any():
+            break
+        a[grow] = acc[grow] / cnt[grow][..., None]
+        m |= grow
+    return Image.fromarray(a.round().clip(0, 255).astype(np.uint8))
 
 
 def packs():
@@ -292,6 +360,8 @@ def main():
                         im = im.convert('RGBA').quantize(colors=q, method=Image.FASTOCTREE)
                     im.save(OUT / rec['tex'], optimize=True)
                 else:
+                    if kind == 'skin':
+                        im = dilate(im.convert('RGB'), uv_mask(im.size[0]))
                     im.convert('RGB').save(OUT / rec['tex'], quality=84, optimize=True)
             man[kind].append(rec)
             print('  %-5s %-40s %-6s %-7s %s'

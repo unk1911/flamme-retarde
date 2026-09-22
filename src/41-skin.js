@@ -41,11 +41,21 @@
 // -----------------------------------------------------------------------------
 
 /**
- * Decode a .fr3d **v3** blob: mesh, skeleton, clips.
+ * Decode a .fr3d **v4 or v5** blob: mesh, skeleton, clips.
  *
  * Layout is fixed-size-first so that everything large can be a view straight
  * on to the decompressed buffer; only the variable-length tables at the end,
  * which are a few kilobytes, are walked with a DataView.
+ *
+ * v5 is Baye v2.0's format and adds two things to v4: a UV array, because she
+ * is a TEXTURED figure rather than a painted one, and a table of named parts
+ * so that hair, eyes and a fishnet can each have their own material. v4's own
+ * note said that the day a second removable thing arrived was the day its one
+ * `shed` counter became a table, and that the version number was there so
+ * that day would be a clean break rather than a guess. The two versions share
+ * a header WORD FOR WORD — the last field is `shed * 3` in v4 and the number
+ * of parts in v5 — so everything below the header is the only thing that
+ * forks.
  */
 function readFR3DSkin(buf) {
   const dv = new DataView(buf);
@@ -53,22 +63,44 @@ function readFR3DSkin(buf) {
     dv.getUint8(2), dv.getUint8(3));
   if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
   const version = dv.getUint32(4, true);
-  if (version !== 4) throw new Error('fr3d skin needs version 4, got ' + version);
+  if (version !== 4 && version !== 5) {
+    throw new Error('fr3d skin needs version 4 or 5, got ' + version);
+  }
+  const v5 = version === 5;
   const nv = dv.getUint32(8, true);
   const ni = dv.getUint32(12, true);
-  // How many indices at the *end* of the buffer are the hip wrap — the one
-  // thing on this figure that comes off. The exporter puts it last precisely so
+  // v4: how many indices at the *end* of the buffer are the hip wrap — the one
+  // thing on that figure that comes off. The exporter puts it last precisely so
   // that this is a number and not a list; see `post_geometry`.
-  const shed = dv.getUint32(40, true);
+  // v5: how many named parts there are, which the table below repeats.
+  const shed = v5 ? 0 : dv.getUint32(40, true);
 
   let o = 44;
   const pos = new Float32Array(buf, o, nv * 3); o += nv * 12;
   const nrm = new Float32Array(buf, o, nv * 3); o += nv * 12;
-  const col = new Uint8Array(buf, o, nv * 3); o += nv * 3;
+  // v4 carries three colour bytes a vertex and no UV; v5 carries two floats of
+  // UV and no colour. They are alternatives rather than additions: a painted
+  // figure has nothing to look up and a textured one has nothing to paint.
+  const uvs = v5 ? new Float32Array(buf, o, nv * 2) : null;
+  const col = v5 ? null : new Uint8Array(buf, o, nv * 3);
+  o += v5 ? nv * 8 : nv * 3;
   const bidx = new Uint8Array(buf, o, nv * 4); o += nv * 4;
   const bwgt = new Uint8Array(buf, o, nv * 4); o += nv * 4;
   o = (o + 3) & ~3;                          // the exporter pads to match
   const idx = new Uint32Array(buf, o, ni); o += ni * 4;
+
+  const dec0 = new TextDecoder();
+  const groups = [];
+  if (v5) {
+    const np = dv.getUint32(o, true); o += 4;
+    for (let i = 0; i < np; i++) {
+      const len = dv.getUint16(o, true); o += 2;
+      const name = dec0.decode(new Uint8Array(buf, o, len)); o += len;
+      groups.push({ name, mat: dv.getUint32(o, true),
+        start: dv.getUint32(o + 4, true), count: dv.getUint32(o + 8, true) });
+      o += 12;
+    }
+  }
 
   const dec = new TextDecoder();
   const nb = dv.getUint32(o, true); o += 4;
@@ -120,7 +152,13 @@ function readFR3DSkin(buf) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-  g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3, true));
+  if (uvs) g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  // A v5 figure has no vertex colours and the shader multiplies by them, so
+  // it gets white ones rather than a branch. Three bytes a vertex against a
+  // uniform test in every fragment is the right side of that trade, and it
+  // keeps `uHasVCol` meaning one thing.
+  g.setAttribute('aVCol', new THREE.BufferAttribute(
+    col || new Uint8Array(nv * 3).fill(255), 3, true));
   // Bone numbers, and they go up *normalised* even though they are integers —
   // the shader multiplies the 27/255 back out to 27. Which looks like a
   // pointless round trip and is not. An unnormalised UNSIGNED_BYTE attribute is
@@ -136,7 +174,7 @@ function readFR3DSkin(buf) {
   // a somersault leaves it — and a figure that pops out of existence when she
   // reaches up is worse than one that is occasionally drawn off screen.
   g.boundingSphere.radius *= 1.9;
-  return { geo: g, bones, clips, nv, tris: ni / 3, ni, shed };
+  return { geo: g, bones, clips, nv, tris: ni / 3, ni, shed, groups, version };
 }
 
 /**
@@ -1554,6 +1592,55 @@ function skinnedFigure(data, opts = {}) {
   });
   const mesh = new THREE.Mesh(data.geo, mat);
 
+  /**
+   * The other parts of a v5 figure — hair, eyes, teeth, a fishnet — each with
+   * its own material, hung as CHILDREN of the body.
+   *
+   * Children rather than siblings, and one geometry rather than several. The
+   * vertex array is one figure in one space, so a child at an identity
+   * transform under the body is already in the right place, and every mover in
+   * this game that has ever positioned `fig.mesh` goes on working untouched.
+   *
+   * The geometries share their attribute objects and their index outright, so
+   * three.js uploads each buffer exactly once and the parts differ only in
+   * `drawRange`. That is the same mechanism `wear` uses to take the hip wrap
+   * off v1.0 — a draw range belongs to the geometry — and it is why a part
+   * costs a draw call and not a copy of the mesh.
+   *
+   * They do not cast. `cast` registers `mesh` alone, which is the body, and
+   * that is deliberate: a hair card is a rectangle that only looks like hair
+   * because most of it is cut away by its alpha, and a depth-only pass shared
+   * across every part cannot know which parts to cut. A blocky slab of shadow
+   * on her shoulders is worse than her hair not casting one.
+   */
+  const parts = {};
+  for (const grp of (data.groups || [])) {
+    if (grp.name === 'body') continue;
+    const po = opts.parts && opts.parts[grp.name];
+    if (!po) continue;
+    const geo = new THREE.BufferGeometry();
+    for (const k of ['position', 'normal', 'uv', 'aVCol', 'aBoneIdx', 'aBoneWt']) {
+      const a = data.geo.getAttribute(k);
+      if (a) geo.setAttribute(k, a);
+    }
+    geo.setIndex(data.geo.getIndex());
+    geo.setDrawRange(grp.start, grp.count);
+    geo.boundingSphere = data.geo.boundingSphere;
+    const pm = solidMaterial(po.color ?? 0xffffff, {
+      spec: 0.06, specPower: 32, emissive: SKIN_EMISSIVE, vcol: false,
+      ...po,
+      defines: { FR_SKIN: '', FR_BONES: nb },
+      uniforms: { uBones, uBoneRows, ...(po.uniforms || {}) },
+    });
+    const pmesh = new THREE.Mesh(geo, pm);
+    pmesh.castShadow = false;
+    pmesh.receiveShadow = false;
+    pmesh.renderOrder = po.renderOrder || 0;
+    pmesh.frustumCulled = false;      // the body decides for all of her
+    mesh.add(pmesh);
+    parts[grp.name] = pmesh;
+  }
+
   // Rest hierarchy, and the inverse bind that undoes it. Both are derived here
   // rather than shipped: the blob carries the parent-relative rest transform
   // and nothing else, so there is no way for the two to disagree.
@@ -2161,7 +2248,7 @@ function skinnedFigure(data, opts = {}) {
 
   update(0);
   return {
-    mesh, material: mat, bones: data.bones, uBones, cast, wear, tattoo,
+    mesh, material: mat, bones: data.bones, uBones, cast, wear, tattoo, parts,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
     play, over, update, state: st, face, faceTick, uFace, aim,
     playing: () => (st.cur ? st.cur.name : null),
