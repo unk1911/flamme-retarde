@@ -8,6 +8,69 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.463.0] — 2026-09-21
+
+### a joint-limit check, and what it is honestly worth
+
+Misha sent posecode (https://github.com/posecode-dev/posecode) and asked
+whether anything in it could help. One thing can: `rom.ts`, a table of
+range-of-motion limits per joint — shoulder flexion 180 and extension 60,
+elbow 154, hip 135, knee 144. It is in that project's **Apache-2.0** package.
+Its renderer, eval, MCP and embed packages are **AGPL-3.0-only** and nothing
+from them is here or ever will be, because this game ships as one public HTML
+file and AGPL would take the whole of it.
+
+`tools/rom.js` carries the table and the geometry; `tools/romcheck.mjs` runs
+it against the live page and exits non-zero on a violation. `--clips` sweeps
+every clip in the figure. Nothing in the game reads any of it at runtime — it
+is an assertion, not a clamp.
+
+**AND IT WOULD NOT HAVE CAUGHT THE ARM.** This has to be said plainly because
+the opposite was claimed a few hours ago, on a hand-worked number that had a
+sign error in it. Run properly against the pre-fix build, the arm Misha spent
+six releases calling funky measures:
+
+    shoulder  134 deg flexion   (max 180)   legal
+    shoulder   21 deg adduction (max  50)   legal
+    elbow     109 deg flexion   (max 154)   legal
+
+Every joint inside the table. The pose was *possible* and it was not *natural*
+— 134 degrees of shoulder flexion with the elbow above the shoulder is a thing
+a person can do and does not do when putting a straw to their nose. **This
+table catches impossible, not unnatural**, and what actually caught that bug
+was comparing against `YAWN`, a pose somebody had drawn by hand.
+
+### the check needed the same care as the thing it checks
+
+Three versions, two of them wrong in exactly the way they exist to find:
+
+- `atan2(lateral, down)` for abduction reported **157 degrees of hip
+  abduction** for perfectly straight thighs in a deep stoop, because the
+  component along the torso axis goes negative past 90 degrees of flexion.
+- `asin` for the frontal and `atan2` for the sagittal fixed that, then read an
+  arm raised **overhead** as 162 degrees of shoulder **extension**, because an
+  arm straight up sits at `atan2(±epsilon, −1)` and the sign of epsilon
+  chooses between flexion and extension.
+- What works is an envelope: elevation off the torso axis, 0 to 180 and never
+  ambiguous, with the limit interpolated round the plane of elevation and
+  relaxed by `sin(elev)` toward the most permissive of the four, because at
+  either pole the plane is rounding error. Checked against cases with known
+  answers: horizontal-and-straight-back violates by 30, overhead passes, 45
+  degrees of extension passes.
+
+### what the sweep found
+
+48 clips, 4 frames each, 5 deg of slack: **21 of 193 samples outside**, in
+five places. `upsideHeld` is the loudest at 98 degrees of shoulder extension
+against a limit of 60 — and rendered, it is a tripod headstand with her hands
+cradling her head, which is a pose people do. **Unconfirmed, not a defect.**
+`flip` shows 147 degrees of hip flexion in a tuck and `swim` 144 of adduction
+overhead; both are athletic and both are arguable.
+
+So the honest value is not that it finds bugs. It is that it turns "look at
+every clip in the file" into five places worth looking at, in ninety seconds,
+without anybody watching anything.
+
 ## [1.462.0] — 2026-09-21
 
 ### the sea loses a playhead and keeps its level
