@@ -23,10 +23,13 @@ build/barrier_debug.png
 # see a new filename. Two rebakes put 96 MB of blob in the history. Untracked
 # from 1.148.0 — the history still carries what it carries, and that is a
 # separate decision because this repository is public.
+#
+# baye2.blend is the fourth name on this list and it got here the same way
+# chloe_mh.blend did — a new figure, a new filename, and a rule that lists
+# filenames does not see a new filename. It was tracked for exactly one
+# commit (1.468.0, 2.7 MB) before the pattern below replaced the list.
 build/mh_base.obj
-build/human.blend
-build/human_mh.blend
-build/chloe_mh.blend
+build/*.blend
 
 # The morph targets and the bodies they make, for the same reason and by the
 # same rule as the base above: 8 MB of .target files that tools/blender/
