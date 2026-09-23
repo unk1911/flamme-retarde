@@ -646,10 +646,10 @@ def cmd_fan(a):
     if n != a.chunk:
         say(f"--chunk {a.chunk} rounded to {n} (the VAE's temporal stride is 4, "
             "so output is always 4k+1 frames)")
-    chunks = a.chunks or len(have) // n
-    if chunks * n > len(have):
-        sys.exit(f"{chunks} chunks of {n} needs {chunks * n} frames, "
-                 f"and there are {len(have)}")
+    chunks = a.chunks or len(have) // n - a.first
+    if (a.first + chunks) * n > len(have):
+        sys.exit(f"chunks {a.first}..{a.first + chunks - 1} of {n} need "
+                 f"{(a.first + chunks) * n} frames, and there are {len(have)}")
 
     # How many workers the box actually started, which the bootstrap wrote down.
     # Asking nvidia-smi here would count GPUs; this counts servers, and on a box
@@ -744,8 +744,14 @@ def cmd_fan(a):
             sys.exit(f"the tunnel on :{PORT} is NOT this instance — set "
                      "BURST_PORT and retry")
 
+        # What is already in the output under this tag — an earlier segment of
+        # the same film. Counted before queueing so this call waits for ITS
+        # frames and not for frames that were there when it started.
+        r = ssh(ip, "ls ~/ComfyUI/output 2>/dev/null | grep -c "
+                + shlex.quote(f"^vace{a.tag}") + " || true", check=False)
+        base = int((r.stdout or "0").strip().splitlines()[-1] or 0)
         tags = []
-        for c in range(chunks):
+        for c in range(a.first, a.first + chunks):
             tag = f"{a.tag}{c:02d}"
             tags.append(tag)
             k = c % workers
@@ -783,7 +789,7 @@ def cmd_fan(a):
                 print((r.stdout or "")[-1500:], (r.stderr or "")[-1500:])
                 sys.exit(f"chunk {c} was not accepted — nothing else queued")
 
-        want = chunks * n
+        want = base + chunks * n
         t0 = time.time()
         while True:
             r = ssh(ip, "ls ~/ComfyUI/output 2>/dev/null | grep -c "
@@ -957,6 +963,12 @@ def main():
     # every 5.06 s. A picture of who they are, handed to all of them, is the one
     # thing a chunk can be told about identity that is not the text.
     f.add_argument("--ref", default="")
+    # Which chunk to start at. A film with more than one scene wants a
+    # different reference for each (the two women in the kabina, nobody on the
+    # promenade), and --ref is per call — so the film is fanned in segments,
+    # each with its own --first/--chunks/--ref, all on the same frames. Tags
+    # stay GLOBAL chunk numbers, so finish60.sh sees one film.
+    f.add_argument("--first", type=int, default=0)
     f.add_argument("--timeout", type=float, default=75)
     f.add_argument("--attn", default="")
     # 20, and NOT `run`'s 0, and the difference cost $2.84 and eleven minutes on
