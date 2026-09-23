@@ -41731,22 +41731,18 @@ async function buildJadrija(scene) {
     if (!faceIdx) {
       faceIdx = [];
       const v = new THREE.Vector3();
-      // Forward of the eyes, within 75 mm of the nostril: nose, both lips,
-      // the chin and the cheek the hand comes up beside — and only the FRONT
-      // of it. A face looked at from in front is a height field, so each 5 mm
-      // cell of her (height, width) keeps its most forward vertex and nothing
-      // behind it. Taking everything in the sphere took 3 134 vertices —
-      // teeth, tongue and the inside of her head among them — and cost 4 ms a
-      // frame; the surface a hand can actually touch is a few hundred.
-      const cells = new Map();
+      // Forward of the eyes, within 75 mm of the nostril: nose, both lips, the
+      // chin and the cheek the hand comes up beside — 3 134 vertices, ALL of
+      // them. Two reduced sets were tried for the search (a 5 mm height field,
+      // 480; outward-facing on a 3 mm voxel grid, 1 590) and both failed the
+      // probe with knuckles 11 to 24 mm into her chin: `faceSigned` takes its
+      // sign from the nearest vertex, so a thinned set does not mean a coarser
+      // face, it means a different answer to "is this inside her". The cost is
+      // taken out of the LOOKUP instead — see `faceSigned`.
       for (let i = 0; i < P.count; i++) {
         v.fromBufferAttribute(P, i);
-        if (v.x <= 0.100 || v.distanceTo(n0) >= 0.075) continue;
-        const key = Math.round(v.y / 0.005) * 1000 + Math.round(v.z / 0.005);
-        const had = cells.get(key);
-        if (had === undefined || P.getX(had) < v.x) cells.set(key, i);
+        if (v.x > 0.100 && v.distanceTo(n0) < 0.075) faceIdx.push(i);
       }
-      for (const i of cells.values()) faceIdx.push(i);
     }
     const H = bindHeadsOf(f);
     const out = [];
@@ -41774,18 +41770,41 @@ async function buildJadrija(scene) {
       }
       out.push([p, n]);
     }
+    // Hashed on 25 mm cells, once a frame. A lookup then reads the 27 cells
+    // round a point and nothing else — exact for anything within 25 mm of the
+    // face, which is every distance a cost or a check below acts on (they all
+    // stop caring past 12), and a plain "far away" beyond it.
+    const grid = new Map();
+    for (const e of out) {
+      const k = faceKey(e[0].x, e[0].y, e[0].z);
+      const c = grid.get(k);
+      if (c) c.push(e); else grid.set(k, [e]);
+    }
+    out.grid = grid;
     return out;
   }
+  const FACE_CELL = 0.025;
+  const faceKey = (x, y, z) => (Math.floor(x / FACE_CELL) + 4096) * 67108864
+    + (Math.floor(y / FACE_CELL) + 4096) * 8192 + (Math.floor(z / FACE_CELL) + 4096);
   /**
    * Signed distance of a point from the face: along the normal of the nearest
    * face vertex. Negative is inside her.
    */
   function faceSigned(face, pt) {
-    let best = 1e9, sgn = 1;
-    for (const [p, n] of face) {
-      const d = pt.distanceTo(p);
-      if (d < best) { best = d; sgn = pt.clone().sub(p).dot(n) < 0 ? -1 : 1; }
+    let best = 1e9, bp = null, bn = null;
+    const cx = Math.floor(pt.x / FACE_CELL), cy = Math.floor(pt.y / FACE_CELL),
+      cz = Math.floor(pt.z / FACE_CELL);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
+      const c = face.grid.get((cx + i + 4096) * 67108864 + (cy + j + 4096) * 8192 + (cz + k + 4096));
+      if (!c) continue;
+      for (const e of c) {
+        const d = pt.distanceToSquared(e[0]);
+        if (d < best) { best = d; bp = e[0]; bn = e[1]; }
+      }
     }
+    if (!bp) return 1;
+    best = Math.sqrt(best);
+    const sgn = (pt.x - bp.x) * bn.x + (pt.y - bp.y) * bn.y + (pt.z - bp.z) * bn.z < 0 ? -1 : 1;
     // The patch is a patch and not a closed surface, so "behind its nearest
     // vertex" only means inside her while that vertex is close. A wrist in
     // front of her chest is behind the underside of her chin and measured 84

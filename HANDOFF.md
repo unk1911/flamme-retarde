@@ -1,6 +1,15 @@
 # Coke-line beat — handoff (WIP checkpoint)
 
-## State in one paragraph
+## DONE (supersedes the paragraph below)
+Resolved with the FULL 3 134-vertex face set kept, and the nearest-vertex
+lookup put on a per-frame 25 mm spatial hash (exact for every distance any
+cost or check acts on). r18: all 13 sub-steps pass on all four lines back to
+back; lineBeat 1.0 ms median, 1.3 p95, 1.8 max (was 4.1 / 9.0). Both reduced
+sets tried (5 mm height field 480 verts; outward-facing 3 mm voxels 1 590)
+FAILED handFace by 11-24 mm — the sign comes from the nearest vertex, so a
+thinner set gives a different answer, not a coarser one.
+
+## State in one paragraph (at the WIP checkpoint)
 The line beat was rebuilt as 13 measured sub-steps. At the last fully-green
 run (r15) EVERY sub-step passed on all four lines, asked back-to-back. The
 final commit in progress was a PERFORMANCE cut to the face-collision set
