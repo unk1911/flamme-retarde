@@ -8587,6 +8587,9 @@ window.__fr = {
     },
     /** Blade, hand, and the gap between them — see `cokeReach`. */
     cokeHand: () => (jadrija && jadrija.cokeHand ? jadrija.cokeHand() : null),
+    /** The line beat's every-frame numbers — see tools/coke_probe.mjs. */
+    cokeProbe: () => (jadrija && jadrija.cokeProbe ? jadrija.cokeProbe() : null),
+    cokeMarks: () => (jadrija && jadrija.cokeMarks ? jadrija.cokeMarks() : null),
     /** What she saw on the last recon, and what she brought back. */
     seen: () => (jadrija ? jadrija.seen() : null),
     told: () => (jadrija ? jadrija.told() : null),

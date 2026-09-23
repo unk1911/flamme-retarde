@@ -37590,7 +37590,10 @@ async function buildJadrija(scene) {
         showSay('trill', d);
         // Its OWN mark, further back than the cutting's — see `face` in the
         // kit. A squat done from the reach mark puts the plate under her.
-        const lm = kit && kit.work && (kit.work.line || kit.work.coke);
+        // The mark that puts her nose over the line she is about to take —
+        // see `lineMark` — and not the authored one, which is up to 9 cm off
+        // it and left the settle to slide her the rest of the way.
+        const lm = lineMark(Math.min(COKE.lines - 1, cokeGone));
         if (lm && Math.hypot(show.t - lm[0], show.s - lm[1]) > 0.20) {
           show.goMark = lm;
           show.goNext = 'line';
@@ -38034,95 +38037,41 @@ async function buildJadrija(scene) {
       case 'line': {
         // ── ONE OFF THE PLATE ──────────────────────────────────────────
         //
-        // Three beats over 3.4 s and the middle one is the only one anybody
-        // watches: down (0.9), along the line (1.4), and up (1.1). The last
-        // is the longest on purpose — coming up off a line is slower than
-        // going down to it, and the sniff is at the top of it.
+        // Thirteen sub-steps on the clip's own clock — see `LINE`, where each
+        // is listed and where the four things that were wrong with the last
+        // ten versions of this are written down. This case drives the clock,
+        // the mark and the powder; the straw and the hand are `lineBeat`,
+        // which runs after she has been placed this frame.
         //
-        // `show.cokeU` is this phase's own progress and not the plate's,
-        // which is what lets `cokeStoop` and `cokeReach` carry over from the
-        // cutting without knowing there is a second beat: both of them read
-        // that one number and ramp on it.
-        const LM = kit && kit.work && (kit.work.line || kit.work.coke);
+        // THE CLIP'S OWN TIME and not the phase's. The old beat ran a second
+        // clock 0.55 s behind the clip and derived every sub-step off that,
+        // and the two drifted: the powder was still going after her head had
+        // come off the plate. There is one clock now and it is the clip's.
+        // AND THE CLIP STARTS WITH THE PHASE, whatever `play` thinks. Asked for
+        // a second line inside the fade out of the first, `snort` is still the
+        // clip being faded from, and `play` turns a fade round rather than
+        // starting the clip again — correctly, for every other clip in the
+        // game — so the clip came back at 6.3 s, the beat was over on its
+        // first frame, and a line went off the plate with nobody taking it.
+        if (S.cur && S.cur.name === 'snort' && Math.abs(S.curT - show.tmr) > 0.25) {
+          S.curT = show.tmr;
+        }
+        const lt = S.cur && S.cur.name === 'snort' ? S.curT : show.tmr;
+        show.lineT = lt;
+        const li = Math.min(COKE.lines - 1, cokeGone);
+        const LM = lineMark(li);
         show.want = LM ? LM[2] : show.want;
         showHold(dt);
-        if (show.tmr < 0.62 && LM) showSettle(LM, dt, 10.0);
-        // ── THE SAME SIX BEATS THE CLIP HAS ──────────────────────────
-        //
-        // 4.60 s, and every number below is a fraction of it read straight
-        // off the clip's own keys in tools/blender/human_mh.py — 0.75 pick,
-        // 1.45 nose, 2.35 down, 3.10 hold, 3.45 head off, 4.60 stand. The
-        // clip and the phase are one timeline and this is where the two are
-        // tied together; a beat that drifted from its key would have her
-        // taking a line off a plate her face had already left.
-        // ── AND THE TWO TIMELINES WERE 0.55 s APART ──────────────────
-        //
-        // This block says it is tied to the clip and it was not. `lu` starts
-        // 0.55 s in, to let `showSettle` put her on the mark first, but the
-        // CLIP starts with the phase — so every fraction below was 0.55 s
-        // later in clip time than the key it was named after, and `lu` ran to
-        // 1 at clip time 5.15 on a clip that is 4.60 long. The last 12 % of
-        // the beat played against a clip frozen on its final frame, standing
-        // up: the powder was still going at clip 3.82 when her head had come
-        // off the plate at 3.27. She was finishing the line after she had
-        // stood up, in every version of this since the beat was written.
-        //
-        // The span is the clip MINUS the settle now, so `lu` 0 to 1 is clip
-        // 0.55 to 4.60 and the phase and the clip end together. Every
-        // fraction below is re-derived from that, and the clip times they
-        // land on are written beside them.
-        const LN = 4.05;
-        const lu = Math.max(0, show.tmr - 0.55) / LN;
-        show.cokeU = Math.min(1, lu);
-        // Fingers close on it where it lies, over the reach — and they close
-        // inside the pause the clip holds open for them at 0.75 to 1.20.
-        const grip = sat((lu - 0.088) / 0.060);          // clip 0.91 -> 1.15
-        // And it comes up to her face between the pick and the nose keys —
-        // AND BACK DOWN AGAIN, which it never did.
-        //
-        // Misha, 21 Sep 2026: *"it's not her bend that's bad.. it's her right
-        // arm.. she is doing some weird contortions with it"*. He had said
-        // some version of that three times and each time it got read as a
-        // complaint about the stoop; it never was. MEASURED, hand to head, in
-        // metres: 0.691 at t 0.92, 0.040 at 2.25 — and 0.074 at 4.76, with
-        // the beat over and her standing upright. The hand arrived at her
-        // face and STAYED there for the last 78 % of the beat, through the
-        // whole stand-up.
-        //
-        // `lift` only ever ramped up. The straw is placed from her nostril
-        // and the hand is solved on to the straw, so a lift that never falls
-        // is a hand nailed to her nose.
-        const lift = sat((lu - 0.148) / 0.136)           // clip 1.15 -> 1.70
-                   * sat((0.860 - lu) / 0.120);          // clip 3.55 -> 4.04
-        // The powder only goes once her face is down there, and it is done
-        // before the head comes off the plate at clip 3.27 — she does not
-        // sniff at a line that is still there, and now she does not sniff
-        // standing up either. It starts at clip 2.55, which is inside the
-        // hold the clip has at the bottom, and finishes at 3.20.
-        const along = sat((lu - 0.494) / 0.160);         // clip 2.55 -> 3.20
+        if (lt < LINE.settle && LM) showSettle(LM, dt, 10.0);
+        show.cokeU = Math.min(1, lt / LINE.dur);
+        // The powder goes exactly as far as the straw's far end has got.
+        const along = lineSS(lineRamp(lt, LINE.along));
+        show.strawAlong = along;
         cokeTakeSet(along);
-        // Published for `cokeReach`, which picks the elbow off it — and
-        // LATCHED, which is the other half of the same defect. The elbow was
-        // chosen by `lift > 0.35` read fresh every frame, so at the end of
-        // the beat, the instant `strawUp` went to zero, the pole flipped from
-        // FACE_POLE back to REACH_POLE *while the hand was still up at her
-        // face*. REACH_POLE is correct for an arm reaching DOWN at a table
-        // and it puts the elbow out to her side; with the wrist at her nose
-        // it puts the point of the elbow out level with her shoulder.
-        // Measured at the end of the beat: elbow 0.001 m BELOW the shoulder,
-        // where a hand at the face wants it about 0.20 m below. That is the
-        // contortion, and it is a one-frame change of mind about which elbow
-        // this is. Once the straw is up, it stays the face elbow until the
-        // arm is handed back.
-        show.strawUp = lift;
-        if (lu <= 0.001) show.strawFace = 0;
-        if (lift > 0.35) show.strawFace = 1;
-        if (skinFig) strawHold(skinFig, grip, lift, Math.min(COKE.lines - 1, cokeGone), along);
-        if (lu >= 1) {
+        if (lt >= LINE.dur) {
           cokeGone = Math.min(COKE.lines, cokeGone + 1);
-          show.strawUp = 0;
-          show.strawFace = 0;
-          if (skinFig) strawHold(skinFig, 0, 0, 0, 0);
+          show.strawAlong = 0;
+          lineDone(f);
           go('dwell', 'idle', 0.42);
         }
         break;
@@ -40969,11 +40918,26 @@ async function buildJadrija(scene) {
         side: THREE.DoubleSide, body: 'n = gl_FrontFacing ? n : -n;' });
     const straws = [];
     {
+      // 70 mm now — see `STRAW` — and too long to lie in the flat of the
+      // well at 40 degrees without crossing a line. So 30 degrees off them,
+      // out on the side away from the blade, with its outer end riding up
+      // the cavetto the way a straw that has been dropped in a dish does.
+      // Both ends are put ON the plate's inner surface, read off its lathe
+      // profile (`PL_PROF`), so it lies tilted rather than floating flat.
+      //   inner end (-26, -25) mm, r 36, on the flat, 2 mm clear of line 0
+      //   outer end ( 34, -60) mm, r 69, 6.9 mm up the curve
+      const surf = plateSurf;
       const m = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.0034, 0.0034, 0.042, 10, 1, true),
+        new THREE.CylinderGeometry(STRAW.r, STRAW.r, STRAW.len, 10, 1, true),
         tube([0.720, 0.255, 0.230]));
-      m.rotation.set(0, 0.70, Math.PI / 2);
-      m.position.set(0.002, 0.0034, -0.031);
+      const cx = 0.004, cz = -0.042, dx = 0.866, dz = -0.5, h = STRAW.half;
+      const ax = cx - dx * h, az = cz - dz * h, bx = cx + dx * h, bz = cz + dz * h;
+      // The inner end is the TOP — the end that goes to her nose.
+      const endA = new THREE.Vector3(ax, surf(Math.hypot(ax, az)) + STRAW.r, az);
+      const endB = new THREE.Vector3(bx, surf(Math.hypot(bx, bz)) + STRAW.r, bz);
+      m.position.copy(endA).add(endB).multiplyScalar(0.5);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0),
+        endA.clone().sub(endB).normalize());
       // Where it lies when nobody has hold of it, kept so that `strawHold`
       // has somewhere to put it back. Read off the mesh rather than repeated
       // as two more literals, so moving it in the well moves both.
@@ -41048,95 +41012,922 @@ async function buildJadrija(scene) {
     return { line: i, left: COKE.lines - cokeGone - f, v: +f.toFixed(3) };
   }
 
-  const _stU = new THREE.Vector3(0, 1, 0);
-  const _stP = new THREE.Vector3(), _stA = new THREE.Vector3();
-  const _stD = new THREE.Vector3(), _stH = new THREE.Vector3();
-  const _stN = new THREE.Vector3();
-  const _stQ = new THREE.Quaternion(), _stT = new THREE.Quaternion();
+  /**
+   * ── THE LINE, AS THIRTEEN SUB-STEPS ─────────────────────────────────────
+   *
+   * Misha, 23 Sep 2026, after ten rounds of this beat: *"the straw never goes
+   * into her nose, the right arm doesn't quite hold the straw... maybe by
+   * breaking it down into many many sub-steps?"*. Each window below is one of
+   * them, in CLIP seconds, and `_snort_keys` in tools/blender/human_mh.py is
+   * keyed to the same boundaries — change one, change the other.
+   *
+   * WHY IT NEVER WORKED, measured by tools/coke_probe.mjs rather than argued,
+   * and it was four separate things wearing one symptom:
+   *
+   *   1. The "nostril" was the head bone plus (0.085, −0.055) — a guess, and it
+   *      was 78 mm off the real one, inside her face at the upper lip. The
+   *      straw's top end was pinned to that point for the whole beat.
+   *   2. At the bottom of the old clip her nostril was 135 to 170 mm above the
+   *      plate and 84 mm to the SIDE of the line, holding a 42 mm straw. The
+   *      powder went away under a straw hovering twelve centimetres off it.
+   *   3. The straw flew on its own lerp and the hand chased its middle through
+   *      a goal damped at 9 a second — a 0.11 s lag — and a frame late on top,
+   *      because the arm's aims only reach the skin on the NEXT update. Measured
+   *      50 to 150 mm between the grip and the straw in every sub-step that
+   *      moved. The hand only held it while nothing was moving.
+   *   4. Only the palm DIRECTION was aimed at the straw, from a grip point
+   *      measured for a fist round a bottle. The twist was whatever came out,
+   *      and the fingers were the clip's relaxed curl — an open hand, splayed,
+   *      next to a straw.
+   *
+   * SO THE ORDER IS THE OTHER WAY ROUND NOW. Every frame: the straw's pose is
+   * decided first, from the sub-step and the live nostril; the hand is SOLVED
+   * to hold it exactly — wrist position and full hand orientation, off a pinch
+   * measured on this mesh — with no damping; the skin is re-evaluated so the
+   * hand shown is this frame's hand; and then the straw is placed FROM THE
+   * HAND, so it cannot slip whatever the solve does.
+   */
+  const LINE = {
+    dur: 6.30,
+    settle: 0.60,
+    reach: [0.55, 1.00], grip: [1.00, 1.20], lift: [1.20, 1.70],
+    insert: [1.70, 1.95], down: [1.95, 3.05], along: [3.15, 3.85],
+    out: [4.05, 4.30], back: [4.30, 4.95], release: [4.95, 5.10],
+    let: [5.10, 5.45],
+  };
+  const lineRamp = (t, w) => sat((t - w[0]) / (w[1] - w[0]));
+  /**
+   * The plate's inner surface above its well floor at radius `r` — `PL_PROF`
+   * read from the inside, which is what a straw lying in it or a finger
+   * reaching into it touches. Flat to 50 mm and then up the cavetto.
+   */
+  function plateSurf(r) {
+    const P = [[0.050, 0], [0.0555, 0.0005], [0.062, 0.0045], [0.080, 0.0110], [0.102, 0.0170]];
+    if (r <= P[0][0]) return 0;
+    for (let j = 1; j < P.length; j++) {
+      if (r <= P[j][0]) {
+        const u = (r - P[j - 1][0]) / (P[j][0] - P[j - 1][0]);
+        return P[j - 1][1] + u * (P[j][1] - P[j - 1][1]);
+      }
+    }
+    return 0.017;
+  }
+  const lineSS = (u) => u * u * (3 - 2 * u);
 
   /**
-   * ── AND SHE PICKS THE STRAW UP ────────────────────────────────────────
-   *
-   * Misha, 20 Sep 2026: *"when she does coke doesn't really do anything she
-   * should really be taking the straw and doing it u know"*.
-   *
-   * The first cut of the beat moved her HAND to the straw and left the straw
-   * lying in the well — so the powder went and nothing was seen to take it,
-   * which is a line disappearing under a hovering palm. The object has to
-   * move.
-   *
-   * `amt` is how much of it she has: 0 is lying in the well, 1 is in her
-   * fist. Position eases between the two, and so does the turn, so the pick
-   * up and the put down are the same code run in opposite directions.
-   *
-   * THE FAR END IS AIMED AT THE LINE and the near end is in her palm, which
-   * is what makes it read as a straw rather than as a stick she is holding:
-   * the cylinder's own axis is +y, so one `setFromUnitVectors` from that to
-   * the run between the two points is the whole of the orientation. `aim` is
-   * where on the line it is working, which travels with the powder going.
-   *
-   * All of it in the PLATE'S frame, because that is the frame the straw is a
-   * child of — the palm comes back in world metres and `worldToLocal` is the
-   * one line that joins the two.
+   * The straw. 70 mm and not 42: a cut snorting straw is six to ten
+   * centimetres, and at 42 the only way to get it from a nostril to the powder
+   * was a face four centimetres off the plate with the hand holding it under
+   * the table. `gripT` is where along it her pinch is, from the bottom — 21 mm
+   * under her nostril. It was 15 and her knuckles were in her upper lip; lower
+   * than 21 and the straw's lower half runs down the web of her thumb into
+   * the bracelet. `ins` is how far up the nostril the top end goes.
    */
+  const STRAW = { len: 0.070, r: 0.0034, gripT: 0.62, ins: 0.005, pre: 0.022,
+    half: 0.035 };
+
   /**
-   * The straw, through the three beats.
+   * THE PINCH, measured on this mesh. The rig has one bone for all four fingers
+   * and one for the thumb, so a pinch is a pivot at the knuckles and a swing of
+   * the thumb: 65 degrees of curl on top of the clip's relaxed 26 about the
+   * knuckle axis, and the thumb 35 degrees across the palm. That brings the
+   * thumb pad and the index pad to 8.0 mm apart, which is a 6.8 mm straw with
+   * 0.6 mm of skin either side.
    *
-   * ── WHICH WAY ROUND THIS GOES ─────────────────────────────────────────
-   *
-   * Misha, 20 Sep 2026: *"she does some weird ting with her hand"*. She did,
-   * and it was structural. The straw was pinned to her NOSTRIL and the arm
-   * solver was aimed at the straw — so her hand was chasing an object that
-   * was already fixed to her face, and what it did on the way there was
-   * whatever the solver felt like.
-   *
-   * A held object does not lead the hand that holds it. So the anchor is
-   * what moves — from where the straw is lying on the plate, to her nostril,
-   * over the lift beat — the straw hangs off that anchor pointing at the
-   * line, and the HAND is aimed at the middle of the straw. On the way up
-   * the hand and the object travel together because they are the same
-   * movement, which is the whole of what was missing.
-   *
-   * `grip` is the fingers closing, `lift` is the carry. They are separate
-   * because a hand that starts rising before it has closed is a hand that
-   * pushes the straw across the plate.
+   * `grip` is the middle of that gap and `axis` is which way the straw runs
+   * through it, both in the BIND pose — the axis is the one of all those square
+   * to the pads with the most clearance from the rest of the hand, found by
+   * sampling the straw against the posed hand's own vertices. Everything here
+   * is bind-space figure axes, so it turns with the hand for free.
    */
-  function strawHold(f, grip, lift, i, along) {
+  const PINCH = {
+    grip: [0.2650, 1.0191, 0.4199],
+    // WHICH END IS UP matters as much as the line. The same line through the
+    // pinch the other way round — top towards the wrist — measured the same
+    // clearance and hung her hand DOWN from a wrist held up at her face: 92 to
+    // 143 degrees of wrist bend, where a wrist does seventy. This way the top
+    // leaves the pinch towards the fingertips, so with it in her nose the wrist
+    // is below and the fingers point up at her face, which is how a straw is
+    // held there.
+    axis: [-0.118, -0.767, 0.631],
+    // Where the fingertips are, for keeping them out of the plate.
+    iTip: [0.3371, 1.0286, 0.4830], tTip: [0.3030, 1.0684, 0.4094],
+    fAxis: [0.496, 0.190, -0.847], fAng: 65 * Math.PI / 180,
+    tAxis: [0.040, -0.422, -0.906], tAng: 35 * Math.PI / 180,
+  };
+
+  const _lb = {
+    v: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(() => new THREE.Vector3()),
+    q: [0, 1, 2, 3, 4, 5].map(() => new THREE.Quaternion()),
+    m: new THREE.Matrix4(), m2: new THREE.Matrix4(),
+  };
+  const LB = { held: null, aims: false };
+  const _up = new THREE.Vector3(0, 1, 0);
+
+  /** A pose is the top end and the direction down the straw, world metres. */
+  const strawPose = () => ({ top: new THREE.Vector3(), D: new THREE.Vector3(0, -1, 0) });
+
+  /**
+   * Where the straw lies in the well, as a pose.
+   *
+   * WHICH END IS ITS TOP is decided here, once a beat, and it is the end
+   * pointing AWAY from her. The pinch holds the straw with its top towards
+   * the fingertips, so the top end is where her fingers point as she picks it
+   * up — and the inner end, which it was, points back at her: measured, 96 to
+   * 137 degrees of wrist bend to pinch it, a hand folded back on itself over a
+   * plate. Away from her, the hand simply carries on from the forearm.
+   */
+  function strawRestPose(out, f) {
+    const k = cokeKit;
+    const st = k.straws[0];
+    k.g.updateMatrixWorld();
+    const q = _lb.q[0].copy(st.userData.restQ);
+    const A = _lb.v[0].set(0, 1, 0).applyQuaternion(q);
+    if (LB.restFlip == null && f) {
+      const sh = f.boneAt(f.boneIndex('armUR'), _lb.v[1]).applyMatrix4(f.mesh.matrixWorld);
+      const a = k.g.localToWorld(_lb.v[2].copy(st.userData.restP).addScaledVector(A, STRAW.half));
+      const b = k.g.localToWorld(_lb.v[3].copy(st.userData.restP).addScaledVector(A, -STRAW.half));
+      LB.restFlip = a.distanceTo(sh) < b.distanceTo(sh) ? -1 : 1;
+    }
+    if (LB.restFlip === -1) A.negate();
+    out.top.copy(st.userData.restP).addScaledVector(A, STRAW.half);
+    k.g.localToWorld(out.top);
+    out.D.copy(A).negate().transformDirection(k.g.matrixWorld);
+    return out;
+  }
+
+  /** The point on line `i` the far end is working, `along` 0 to 1, world. */
+  function lineAimAt(i, along, out) {
+    const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
+    out.set(0.012 - COKE.len / 2 + COKE.len * along, COKE.tall + 0.0010, z);
+    return cokeKit.g.localToWorld(out);
+  }
+
+  /** Blend two poses by their GRIP points, so the hand's path is the smooth one. */
+  function poseBlend(a, b, sPos, sRot, arc, out) {
+    const gA = _lb.v[1].copy(a.top).addScaledVector(a.D, STRAW.len * (1 - STRAW.gripT));
+    const gB = _lb.v[2].copy(b.top).addScaledVector(b.D, STRAW.len * (1 - STRAW.gripT));
+    const g = gA.lerp(gB, sPos);
+    g.y += arc * Math.sin(Math.PI * sPos);
+    _lb.q[1].setFromUnitVectors(a.D, b.D);
+    _lb.q[2].identity().slerp(_lb.q[1], sRot);
+    out.D.copy(a.D).applyQuaternion(_lb.q[2]).normalize();
+    out.top.copy(g).addScaledVector(out.D, -STRAW.len * (1 - STRAW.gripT));
+    return out;
+  }
+
+  const _poseRest = strawPose(), _posePre = strawPose(), _poseNow = strawPose();
+
+  /**
+   * Where the straw should be at clip time `lt` — the thirteen sub-steps, one
+   * branch each. World metres, off her live nostril.
+   */
+  function lineStrawPose(f, lt, i, along, out) {
+    strawRestPose(_poseRest, f);
+    if (lt < LINE.lift[0]) {
+      out.top.copy(_poseRest.top);
+      out.D.copy(_poseRest.D);
+      return out;
+    }
+    if (lt >= LINE.out[0] && LB.held) {
+      // Out of her nose and back on the plate. The straw stays where the hand
+      // had it while her head comes off it — the sniff moves the nose, not
+      // the straw — and then is laid back down, lifted a little on the way so
+      // it is put down rather than dragged.
+      if (lt < LINE.back[0]) {
+        out.top.copy(LB.held.top);
+        out.D.copy(LB.held.D);
+        return out;
+      }
+      const u = lineRamp(lt, LINE.back);
+      return poseBlend(LB.held, _poseRest, lineSS(u), lineSS(sat(u / 0.75)), 0.030, out);
+    }
+    // Her nostril and which way it opens, both off the mesh.
+    const N = bindPointAt(f, NOSE.nostrilR, NOSE.w, _lb.v[3]);
+    const dN = bindPointAt(f, NOSE.out, NOSE.w, _lb.v[4]).sub(N).normalize();
+    const inside = _lb.v[5].copy(N).addScaledVector(dN, -STRAW.ins);
+    // Hanging from just under the nose, pointing out of it: where the lift ends.
+    _posePre.top.copy(inside).addScaledVector(dN, STRAW.ins + STRAW.pre);
+    _posePre.D.copy(dN);
+    if (lt < LINE.insert[0]) {
+      // Off the plate and up. It RISES before it turns, or the long end swings
+      // down through the plate: 70 mm pivoting about a pinch 50 mm from its
+      // bottom puts that end in the powder at the first degree of tilt.
+      const u = lineRamp(lt, LINE.lift);
+      poseBlend(_poseRest, _posePre, lineSS(u), lineSS(sat((u - 0.25) / 0.75)), 0.02, out);
+    } else if (lt < LINE.down[0]) {
+      // Into the nostril, along its own axis.
+      const u = lineSS(lineRamp(lt, LINE.insert));
+      out.D.copy(dN);
+      out.top.copy(_posePre.top).lerp(inside, u);
+    } else {
+      // Down to the line with it in, and along it. The straw turns from the
+      // nostril's own axis to the powder as her face gets close, so it goes in
+      // straight and arrives at the line pointing at it.
+      const Q = lineAimAt(i, along, _lb.v[6]);
+      const toQ = _lb.v[7].copy(Q).sub(inside).normalize();
+      const w = lineSS(lineRamp(lt, LINE.down));
+      _lb.q[3].setFromUnitVectors(dN, toQ);
+      _lb.q[4].identity().slerp(_lb.q[3], w);
+      out.D.copy(dN).applyQuaternion(_lb.q[4]).normalize();
+      out.top.copy(inside);
+    }
+    if (!LB.held) LB.held = strawPose();
+    LB.held.top.copy(out.top);
+    LB.held.D.copy(out.D);
+    return out;
+  }
+
+  /** Put the straw mesh on a pose. It is a child of the plate's group. */
+  function strawAt(st, pose) {
+    const k = cokeKit;
+    k.g.updateMatrixWorld();
+    const A = _lb.v[8].copy(pose.D).negate();
+    const c = _lb.v[9].copy(pose.top).addScaledVector(A, -STRAW.half);
+    st.position.copy(k.g.worldToLocal(c));
+    k.g.getWorldQuaternion(_lb.q[5]).invert();
+    st.quaternion.setFromUnitVectors(_up, A).premultiply(_lb.q[5]);
+  }
+
+  /**
+   * And from where the hand actually is, after the solve and the re-skin — so
+   * the straw is rigid in her fingers by construction. Whatever the solve
+   * gets wrong shows up as the straw missing her NOSE, which the probe
+   * measures, and never as the straw floating out of her hand.
+   */
+  function strawFromHand(f, st, out) {
+    const iW = f.boneIndex('handR');
+    const H = bindHeadsOf(f);
+    const Dh = f.boneTurn(iW, _lb.q[0]);
+    const W = f.boneAt(iW, _lb.v[0]);
+    const G = _lb.v[1].set(PINCH.grip[0], PINCH.grip[1], PINCH.grip[2])
+      .sub(H.T[iW]).applyQuaternion(Dh).add(W);
+    const A = _lb.v[2].set(PINCH.axis[0], PINCH.axis[1], PINCH.axis[2])
+      .normalize().applyQuaternion(Dh);
+    f.mesh.localToWorld(G);
+    A.applyQuaternion(f.mesh.quaternion);
+    out.D.copy(A).negate();
+    out.top.copy(G).addScaledVector(A, STRAW.len * (1 - STRAW.gripT));
+    strawAt(st, out);
+    return out;
+  }
+
+  /** Hand the arm, the hand and the fingers back to the clip. */
+  function lineClear(f) {
+    for (const n of ['armUR', 'armLR', 'handR', 'fingersR', 'thumbR']) f.aim(n, 0, 1, 0, 0);
+  }
+
+  /**
+   * THE HAND, SOLVED ON TO THE STRAW.
+   *
+   * Everything in figure space, off the clip's own pose (the aims this job set
+   * last frame have been cleared and the skin re-evaluated before this runs,
+   * so there is no cached rest chain and nothing to carry). The target is a
+   * FRAME and not a point: the pinch's grip point on the straw's grip point,
+   * the pinch's straw axis along the straw, and the one free turn about that
+   * axis chosen so the wrist lies on the side of the straw facing her
+   * shoulder — which is where a forearm comes from.
+   */
+  function lineHand(f, dt, pose, reachAmt, gripAmt, faceAmt, lineT) {
+    const H = bindHeadsOf(f);
+    const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'), iW = f.boneIndex('handR');
+    if (iS < 0 || iE < 0 || iW < 0) return;
+    const S = f.boneAt(iS, new THREE.Vector3());
+    const E = f.boneAt(iE, new THREE.Vector3());
+    const Wc = f.boneAt(iW, new THREE.Vector3());
+    const Tc = f.boneTurn(iW, new THREE.Quaternion());
+    const inv = f.mesh.quaternion.clone().invert();
+    // The target frame, figure space.
+    const At = pose.D.clone().negate().applyQuaternion(inv).normalize();
+    const Gt = f.mesh.worldToLocal(pose.top.clone())
+      .addScaledVector(At, -STRAW.len * (1 - STRAW.gripT));
+    // A hand coming down on to a straw lying on a plate comes down on it: a
+    // few millimetres of hover while the fingers close, and more below if the
+    // open fingers need it — see `lift`.
+    const upF = _up.clone().applyQuaternion(inv);
+    Gt.addScaledVector(upF, 0.006 * (1 - gripAmt));
+    // The pinch's own frame, bind space.
+    const Wb = H.T[iW];
+    const Gb = new THREE.Vector3(PINCH.grip[0], PINCH.grip[1], PINCH.grip[2]);
+    const Ab = new THREE.Vector3(PINCH.axis[0], PINCH.axis[1], PINCH.axis[2]).normalize();
+    const ub = Wb.clone().sub(Gb);
+    ub.addScaledVector(Ab, -ub.dot(Ab)).normalize();
+    // ── WHICH WAY ROUND THE STRAW THE HAND SITS ────────────────────────
+    //
+    // The pinch fixes everything about the hand but one turn about the straw
+    // itself, and that turn is the difference between a wrist and a
+    // contortion. It was chosen by a rule — wrist towards her shoulder — and
+    // the rule measured 92 to 143 degrees of wrist bend. So it is SEARCHED:
+    // twenty-four turns, and for each one the elbow the two-bone solve would
+    // give, the forearm that makes, and the angle between that forearm and the
+    // hand. The least bend wins, with two costs on top — any fingertip,
+    // knuckle or wrist below the plate's surface, and a jump from last frame's
+    // turn, which keeps the answer from flicking between two near-equal ones.
+    const Fb = H.T[f.boneIndex('fingersR')], Tb = H.T[f.boneIndex('thumbR')];
+    const RF = Tc.clone().invert().multiply(f.boneTurn(f.boneIndex('fingersR'), new THREE.Quaternion()));
+    const RT = Tc.clone().invert().multiply(f.boneTurn(f.boneIndex('thumbR'), new THREE.Quaternion()));
+    // THE FACE, which the hand has to stay out of. The least wrist bend on its
+    // own put her palm up in front of her mouth — inside it, with only the
+    // bracelet and her nails showing either side of the straw — because
+    // nothing told the search there was a face there. So the skinned vertices
+    // round her nose and mouth are in it, and the BULK of the hand is tested
+    // against them: wrist, knuckles, the base of the thumb and the palm, as
+    // well as the tips. Only while the straw is anywhere near her face.
+    const face = faceAmt > 0.02 ? faceNear(f, true) : null;
+    const bulk = [Wb.clone(), Fb.clone(), Tb.clone(), Wb.clone().lerp(Fb, 0.5),
+      Wb.clone().lerp(Tb, 0.6)];
+    const toFig = new THREE.Matrix4().copy(f.mesh.matrixWorld).invert();
+    // The hand's low points in bind space with `g` of the pinch in them.
+    const lowsAt = (g) => {
+      const PF = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(...PINCH.fAxis).normalize(), PINCH.fAng * g).multiply(RF);
+      const PT = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(...PINCH.tAxis).normalize(), PINCH.tAng * g).multiply(RT);
+      return [
+        new THREE.Vector3(...PINCH.iTip).sub(Fb).applyQuaternion(PF).add(Fb),
+        new THREE.Vector3(...PINCH.tTip).sub(Tb).applyQuaternion(PT).add(Tb),
+        Fb.clone(), Wb.clone(),
+      ];
+    };
+    // CHOSEN WITH THE PINCH CLOSED, whatever the fingers are doing this frame.
+    // Chosen with them as they are, the best turn changed as they closed — the
+    // open fingers are what touch the plate — and measured, the hand flipped
+    // between 58, 91 and 14 degrees of wrist bend on three frames running,
+    // the elbow jumping 38 degrees with it. The closed hand is the one that
+    // has to hold the straw; the open one is kept off the plate by lifting it
+    // (below), which does not need a different turn.
+    const lows = lowsAt(1);
+    // THE PINCH IS SHAPED ON THE WAY THERE. A hand reaching for something
+    // small closes most of the way while it travels and only finishes on it —
+    // an open hand has fingers that reach seven centimetres past the pinch,
+    // and measured, closing only at the straw meant hovering that high and
+    // then dropping on to it in a fifth of a second.
+    const curl = Math.max(gripAmt, 0.6 * reachAmt);
+    // The plate's floor and centre in figure space: a hand point only has a
+    // surface under it when it is over the plate (its lathe profile) or over
+    // the tabouret round it (a centimetre under the plate's floor).
+    const pc = cokeKit ? f.mesh.worldToLocal(cokeKit.g.getWorldPosition(new THREE.Vector3())) : null;
+    const surfAt = (p) => {
+      if (!pc) return -1e9;
+      const r = Math.hypot(p.x - pc.x, p.z - pc.z);
+      if (r < 0.105) return pc.y + plateSurf(r);
+      if (r < 0.150) return pc.y - 0.010;
+      return -1e9;
+    };
+    const l1 = E.distanceTo(S), l2 = Wc.distanceTo(E);
+    const hb = Fb.clone().sub(Wb).normalize();
+    const pole = REACH_POLE.clone().lerp(FACE_POLE, faceAmt).normalize();
+    const iT = f.boneIndex('chest');
+    if (iT >= 0) pole.applyQuaternion(f.boneTurn(iT, new THREE.Quaternion()));
+    const r1 = S.clone().sub(Gt);
+    r1.addScaledVector(At, -r1.dot(At));
+    if (r1.lengthSq() < 1e-8) r1.set(0, 1, 0).addScaledVector(At, -At.y);
+    r1.normalize();
+    const r2 = new THREE.Vector3().crossVectors(At, r1);
+    const basis = (a, u, q) => {
+      const w = new THREE.Vector3().crossVectors(a, u);
+      _lb.m.makeBasis(a, u, w);
+      return q.setFromRotationMatrix(_lb.m);
+    };
+    const Bb = basis(Ab, ub, new THREE.Quaternion()).invert();
+    // AND WHERE THE LIFT IS GOING. The twist is rate-limited — see below — so
+    // a turn that only becomes necessary as the hand arrives under her nose
+    // arrives late: measured, one frame of knuckles 13 mm into her chin. So
+    // while she is lifting, every turn is also scored against the face at the
+    // pose the lift ENDS in (`_posePre`, hanging just under her nostril), and
+    // the hand is already turned the right way when it gets there.
+    let pre = null;
+    if (face && lineT != null && lineT < LINE.insert[0]) {
+      const Ap = _posePre.D.clone().negate().applyQuaternion(inv).normalize();
+      const Gp = f.mesh.worldToLocal(_posePre.top.clone())
+        .addScaledVector(Ap, -STRAW.len * (1 - STRAW.gripT));
+      const q1 = S.clone().sub(Gp);
+      q1.addScaledVector(Ap, -q1.dot(Ap));
+      if (q1.lengthSq() < 1e-8) q1.set(0, 1, 0).addScaledVector(Ap, -Ap.y);
+      q1.normalize();
+      pre = { A: Ap, G: Gp, r1: q1, r2: new THREE.Vector3().crossVectors(Ap, q1) };
+    }
+    const Dp = new THREE.Quaternion(), up2 = new THREE.Vector3();
+    const ut = new THREE.Vector3(), Dq = new THREE.Quaternion();
+    const Wt = new THREE.Vector3(), u = new THREE.Vector3(), v = new THREE.Vector3();
+    const elb = new THREE.Vector3(), fore = new THREE.Vector3(), tmp = new THREE.Vector3();
+    let best = null;
+    const N = 24;
+    for (let k = 0; k < N; k++) {
+      const phi = (k / N) * Math.PI * 2;
+      ut.copy(r1).multiplyScalar(Math.cos(phi)).addScaledVector(r2, Math.sin(phi));
+      basis(At, ut, Dq).multiply(Bb);
+      Wt.copy(Wb).sub(Gb).applyQuaternion(Dq).add(Gt);
+      // The elbow, the way `wheelLimb` places it.
+      u.copy(Wt).sub(S);
+      const dl = u.length() || 1e-3;
+      u.multiplyScalar(1 / dl);
+      const d = clamp(dl, Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
+      const ca = clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
+      const sa = Math.sqrt(1 - ca * ca);
+      v.copy(pole).addScaledVector(u, -pole.dot(u));
+      if (v.lengthSq() < 1e-8) v.set(1, 0, 0).addScaledVector(u, -u.x);
+      v.normalize();
+      elb.copy(S).addScaledVector(u, l1 * ca).addScaledVector(v, l1 * sa);
+      fore.copy(Wt).sub(elb).normalize();
+      const bend = fore.angleTo(tmp.copy(hb).applyQuaternion(Dq)) * 180 / Math.PI;
+      let under = 0;
+      for (const p of lows) {
+        tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
+        under = Math.max(under, surfAt(tmp) + 0.004 - tmp.y);
+      }
+      // Short of reach is a cost too: an arm that cannot get there is a hand
+      // that is somewhere else.
+      const short = Math.max(0, dl - (l1 + l2) * 0.999);
+      let inFace = 0;
+      if (face) {
+        for (const p of bulk) {
+          tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
+          inFace = Math.max(inFace, 0.012 - faceSigned(face, tmp));
+        }
+        for (const p of lows) {
+          tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
+          inFace = Math.max(inFace, 0.002 - faceSigned(face, tmp));
+        }
+      }
+      const dphi = LB.phi == null ? 0
+        : Math.abs(Math.atan2(Math.sin(phi - LB.phi), Math.cos(phi - LB.phi)));
+      if (pre) {
+        up2.copy(pre.r1).multiplyScalar(Math.cos(phi)).addScaledVector(pre.r2, Math.sin(phi));
+        basis(pre.A, up2, Dp).multiply(Bb);
+        for (const p of bulk) {
+          tmp.copy(p).sub(Gb).applyQuaternion(Dp).add(pre.G);
+          inFace = Math.max(inFace, 0.012 - faceSigned(face, tmp));
+        }
+      }
+      const cost = bend + under * 4000 + short * 4000 + inFace * 6000 + dphi * 4;
+      if (!best || cost < best.cost) best = { cost, phi, bend, under, short };
+    }
+    LB.bestBend = best.bend;
+    // And it DRIFTS to the best turn rather than jumping to it: at most 150
+    // degrees a second, so the one free turn of the hand is always a
+    // movement and never a cut.
+    if (LB.phi == null) LB.phi = best.phi;
+    else {
+      const dp = Math.atan2(Math.sin(best.phi - LB.phi), Math.cos(best.phi - LB.phi));
+      const cap = (150 * Math.PI / 180) * Math.max(dt, 1 / 240);
+      LB.phi += clamp(dp, -cap, cap);
+    }
+    ut.copy(r1).multiplyScalar(Math.cos(LB.phi)).addScaledVector(r2, Math.sin(LB.phi));
+    basis(At, ut, Dq).multiply(Bb);
+    // The open hand, lifted just clear of whatever is under it: the pinch
+    // comes down on to the straw as the fingers close, by exactly as much as
+    // the fingers that are still open need.
+    let lift = 0;
+    for (const p of lowsAt(curl)) {
+      tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
+      lift = Math.max(lift, surfAt(tmp) + 0.003 - tmp.y);
+    }
+    Gt.addScaledVector(upF, lift);
+    Wt.copy(Wb).sub(Gb).applyQuaternion(Dq).add(Gt);
+    LB.bend = (() => {
+      const w = Wt.clone().sub(S);
+      const dl = w.length() || 1e-3;
+      w.multiplyScalar(1 / dl);
+      const d = clamp(dl, Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
+      const ca = clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
+      const vv = pole.clone().addScaledVector(w, -pole.dot(w)).normalize();
+      const e = S.clone().addScaledVector(w, l1 * ca).addScaledVector(vv, l1 * Math.sqrt(1 - ca * ca));
+      return Wt.clone().sub(e).angleTo(hb.clone().applyQuaternion(Dq)) * 180 / Math.PI;
+    })();
+    // Blended in and out with the clip's own hand, which is what the reach at
+    // the start and the hand going back at the end are.
+    const Wg = Wc.clone().lerp(Wt, reachAmt);
+    // Over the rim and not through it: a hand going to something on a table
+    // comes down on to it from above, so the path bows up on the way in and
+    // on the way back out.
+    Wg.addScaledVector(upF, 0.07 * Math.sin(Math.PI * reachAmt) * (1 - faceAmt));
+    const Dg = Tc.clone().slerp(Dq, reachAmt);
+    // The elbow is the pole the search used: out and back over the plate, down
+    // and forward at her face, carried by her chest so it means the same at any
+    // depth of stoop.
+    const Qa = wheelLimb(f, 'armUR', 'armLR', S, E, Wc, Wg, pole).clone();
+    // The hand's own turn, on top of what the arm has done to it.
+    armAimQ(f, 'handR', Dg.clone().multiply(Qa.multiply(Tc).invert()));
+    // And the pinch, in the hand's frame — so a figure-space aim about the
+    // hand's final turn of the bind-space axis.
+    const fa = new THREE.Vector3(PINCH.fAxis[0], PINCH.fAxis[1], PINCH.fAxis[2])
+      .normalize().applyQuaternion(Dg);
+    const ta = new THREE.Vector3(PINCH.tAxis[0], PINCH.tAxis[1], PINCH.tAxis[2])
+      .normalize().applyQuaternion(Dg);
+    armAimQ(f, 'fingersR', new THREE.Quaternion().setFromAxisAngle(fa, PINCH.fAng * curl));
+    armAimQ(f, 'thumbR', new THREE.Quaternion().setFromAxisAngle(ta, PINCH.tAng * curl));
+    LB.aims = true;
+  }
+
+  /**
+   * One frame of the beat's straw and hand. Called from `cokeReach`, which runs
+   * after the mesh has been placed and its matrix pushed — everything here is
+   * measured off where she actually is this frame.
+   */
+  function lineBeat(f, dt) {
+    const t0 = performance.now();
+    lineBeatInner(f, dt);
+    LB.ms = performance.now() - t0;
+  }
+  function lineBeatInner(f, dt) {
     const k = cokeBuild();
     const st = k && k.straws && k.straws[0];
-    if (!st || !st.userData.restP) return;
-    if (grip <= 0.001 && lift <= 0.001) {
+    if (!st) return;
+    const lt = show.lineT || 0;
+    const i = Math.min(COKE.lines - 1, cokeGone);
+    const along = show.strawAlong || 0;
+    const reachAmt = lineSS(lineRamp(lt, LINE.reach)) * (1 - lineSS(lineRamp(lt, LINE.let)));
+    const gripAmt = lineSS(lineRamp(lt, LINE.grip)) * (1 - lineSS(lineRamp(lt, LINE.release)));
+    const faceAmt = lineSS(lineRamp(lt, LINE.lift)) * (1 - lineSS(lineRamp(lt, LINE.back)));
+    show.strawGrip = gripAmt;
+    // The clip's own pose first, with nothing of this job's on it.
+    lineClear(f);
+    f.update(0);
+    f.mesh.updateMatrixWorld();
+    lineStrawPose(f, lt, i, along, _poseNow);
+    if (reachAmt > 0.002) {
+      lineHand(f, dt, _poseNow, reachAmt, gripAmt, faceAmt, lt);
+      f.update(0);
+      f.mesh.updateMatrixWorld();
+    }
+    // In her fingers only once they have CLOSED on it — not half way, which
+    // is where this switched first: the pinch hovers over the straw while the
+    // fingers close and comes down on to it as they do, so at half closed it
+    // is still 11 mm above it and the straw jumped up into her hand. Closed,
+    // the hover is gone and the hand's straw and the lying straw are the same
+    // straw; the handover is invisible because there is nothing to hand over.
+    // The same on the way out: the hand is exactly on the lying straw when
+    // the fingers begin to open.
+    if (gripAmt > 0.999) strawFromHand(f, st, _poseNow);
+    else strawAt(st, _poseNow);
+  }
+
+  /** The beat is over: straw on the plate, arm back to the clip. */
+  function lineDone(f) {
+    LB.held = null;
+    LB.phi = null;
+    LB.restFlip = null;
+    show.strawAlong = 0;
+    const k = cokeKit;
+    const st = k && k.straws && k.straws[0];
+    if (st && st.userData.restP) {
       st.position.copy(st.userData.restP);
       st.quaternion.copy(st.userData.restQ);
-      return;
     }
-    // Her nostril: the head bone, plus 0.085 forward and 0.055 down in her
-    // own frame, which is where a nose is on this skull.
-    const hd = f.boneIndex('head');
-    if (hd < 0) return;
-    f.mesh.updateMatrixWorld();
-    f.boneAt(hd, _stH).applyMatrix4(f.mesh.matrixWorld);
-    f.boneTurn(hd, _stT);
-    _stQ.copy(f.mesh.quaternion).multiply(_stT);
-    _stP.set(0.085, -0.055, 0).applyQuaternion(_stQ).add(_stH);
+    if (f && LB.aims) { lineClear(f); LB.aims = false; }
+  }
+
+  /**
+   * THE MARK, SOLVED SO HER NOSE IS OVER THE LINE.
+   *
+   * The authored mark put her nostril 84 mm to the side of the first line at
+   * the bottom of the beat and over its far end. Where her nose ends up is a
+   * fact about the clip — a figure-space offset at the middle of the sweep —
+   * so it is measured once, off the clip itself, and the mark for line `i` is
+   * wherever puts that offset over the middle of line `i`. Four lines 11.5 mm
+   * apart are four marks.
+   */
+  let lineNoseFig = null;
+  const lineMarks = [];
+  function lineMark(i) {
+    const base = kit && kit.work && (kit.work.line || kit.work.coke);
+    if (!base || !skinFig || !cokeBuild()) return base;
+    if (lineMarks[i]) return lineMarks[i];
+    if (!lineNoseFig) {
+      lineNoseFig = clipPointFig(skinFig, 'snort',
+        (LINE.along[0] + LINE.along[1]) / 2, NOSE.nostrilR, NOSE.w);
+    }
+    if (!lineNoseFig) return base;
+    const k = cokeKit;
     k.g.updateMatrixWorld();
-    k.g.worldToLocal(_stP);
-    // Where on the line the far end is working, in the plate's frame.
     const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
-    _stA.set(0.012 - COKE.len / 2 + COKE.len * along, 0.0060, z);
-    // THE ANCHOR IS THE TOP OF THE STRAW and it is what travels: its own
-    // resting place on the plate at lift 0, her nostril at lift 1.
-    _stN.copy(st.userData.restP).lerp(_stP, lift);
-    _stD.copy(_stA).sub(_stN);
-    if (_stD.lengthSq() < 1e-8) return;
-    _stD.normalize();
-    // Lying flat until the fingers have closed on it, and hanging off the
-    // anchor once they have.
-    st.position.copy(st.userData.restP)
-      .lerp(_stH.copy(_stN).addScaledVector(_stD, 0.021), Math.max(grip, lift));
-    _stQ.setFromUnitVectors(_stU, _stD.clone().negate());
-    st.quaternion.copy(st.userData.restQ)
-      .slerp(_stQ, Math.max(grip, lift));
+    const M = k.g.localToWorld(new THREE.Vector3(0.012, 0, z));
+    let t = base[0], s = base[1];
+    for (let it = 0; it < 4; it++) {
+      const yaw = faceYaw(t, base[2]);
+      const c = Math.cos(yaw), sn = Math.sin(yaw);
+      const nx = lineNoseFig.x * c + lineNoseFig.z * sn;
+      const nz = -lineNoseFig.x * sn + lineNoseFig.z * c;
+      [t, s] = local(M.x - nx, M.z - nz);
+    }
+    lineMarks[i] = [t, s, base[2]];
+    return lineMarks[i];
+  }
+
+  /**
+   * A bind-space point on her, in FIGURE space, as a clip holds it at a given
+   * time — sampled on the live figure and put back exactly as it was.
+   */
+  function clipPointFig(f, clip, time, p, w) {
+    if (!f.clips.includes(clip)) return null;
+    const S = f.state;
+    const save = { cur: S.cur, curT: S.curT, prev: S.prev, prevT: S.prevT,
+      fade: S.fade, fadeLen: S.fadeLen, next: S.next, overW: S.overW };
+    f.play(clip, { fade: 0 });
+    S.prev = null;
+    S.overW = 0;
+    S.curT = time;
+    f.update(0);
+    const out = bindPointFig(f, p, w, new THREE.Vector3());
+    Object.assign(S, save);
+    f.update(0);
+    return out;
+  }
+
+
+  /**
+   * ── HER NOSTRIL, OFF THE MESH ─────────────────────────────────────────
+   *
+   * Read off the blob rather than guessed. The underside of the nose on this
+   * mesh is a ring of vertices facing straight down (normal y −0.9 to −1.0)
+   * at y 1.5795, and the two openings in it are centred at x 0.1655,
+   * z ±0.010 — bind space, figure axes, +z her right. The tip is at
+   * (0.1762, 1.5846, 0). Those vertices are weighted 0.68 to `jaw`, 0.30 to
+   * `head` and 0.02 to `neck`, which is a rig oddity but it is the one the
+   * skin is drawn with, so a point skinned any other way is a point that
+   * drifts off the nose the moment the jaw bone turns.
+   */
+  const NOSE = {
+    nostrilR: [0.1655, 1.5795, 0.0100],
+    nostrilL: [0.1655, 1.5795, -0.0100],
+    tip: [0.1762, 1.5846, 0.0],
+    // 20 mm out of the right nostril along the way it opens: down, a little
+    // forward and a hair outward. The nostril's axis is these two points.
+    out: [0.1715, 1.5605, 0.0110],
+    w: [['jaw', 0.68], ['head', 0.30], ['neck', 0.02]],
+  };
+  let bindHeads = null;
+  const _bpA = new THREE.Vector3(), _bpB = new THREE.Vector3();
+  const _bpQ = new THREE.Quaternion();
+
+  /** Every bone's bind-pose head, in figure space, composed once off the rest. */
+  function bindHeadsOf(f) {
+    if (bindHeads && bindHeads.f === f) return bindHeads;
+    const n = f.bones.length;
+    const T = [], Q = [];
+    for (let i = 0; i < n; i++) {
+      const b = f.bones[i];
+      const q = new THREE.Quaternion(b.q[0], b.q[1], b.q[2], b.q[3]);
+      const t = new THREE.Vector3(b.t[0], b.t[1], b.t[2]);
+      if (b.parent < 0) { T.push(t); Q.push(q); } else {
+        T.push(t.applyQuaternion(Q[b.parent]).add(T[b.parent]));
+        Q.push(Q[b.parent].clone().multiply(q));
+      }
+    }
+    bindHeads = { f, T };
+    return bindHeads;
+  }
+
+  /**
+   * A bind-space point on her, skinned the way her mesh is, in world metres.
+   * `w` is [[bone, weight], ...] — the weights of the vertices it sits on.
+   */
+  function bindPointAt(f, p, w, out) {
+    return bindPointFig(f, p, w, out).applyMatrix4(f.mesh.matrixWorld);
+  }
+  function bindPointFig(f, p, w, out) {
+    const H = bindHeadsOf(f);
+    out.set(0, 0, 0);
+    let tot = 0;
+    for (const [name, wt] of w) {
+      const i = f.boneIndex(name);
+      if (i < 0) continue;
+      _bpA.set(p[0], p[1], p[2]).sub(H.T[i]).applyQuaternion(f.boneTurn(i, _bpQ));
+      f.boneAt(i, _bpB).add(_bpA);
+      out.addScaledVector(_bpB, wt);
+      tot += wt;
+    }
+    if (tot > 0) out.multiplyScalar(1 / tot);
+    return out;
+  }
+
+  /** Where a straw's two ends are, world metres: top is the one at her nose. */
+  function strawEnds(top, bot) {
+    const st = cokeKit && cokeKit.straws && cokeKit.straws[0];
+    if (!st) return false;
+    st.updateWorldMatrix(true, false);
+    top.set(0, STRAW.half, 0).applyMatrix4(st.matrixWorld);
+    bot.set(0, -STRAW.half, 0).applyMatrix4(st.matrixWorld);
+    return true;
+  }
+
+  const _pbV = () => new THREE.Vector3();
+
+  /**
+   * The face round her nose, skinned, with normals — so a finger or the straw
+   * can be tested for being INSIDE her rather than only near her. Every vertex
+   * of the blob within 45 mm of the right nostril and forward of the eyes,
+   * found once off the bind buffer; each is skinned with its own four weights
+   * and its normal turned by the same blend. A few hundred points a frame on
+   * the CPU, and only asked for while the straw is near her face.
+   */
+  let faceIdx = null;
+  function faceNear(f, fig = false) {
+    const g = f.mesh.geometry;
+    const P = g.getAttribute('position'), Nn = g.getAttribute('normal');
+    const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+    const n0 = new THREE.Vector3(...NOSE.nostrilR);
+    if (!faceIdx) {
+      faceIdx = [];
+      const v = new THREE.Vector3();
+      // Forward of the eyes, within 75 mm of the nostril: nose, both lips,
+      // the chin and the cheek the hand comes up beside — and only the FRONT
+      // of it. A face looked at from in front is a height field, so each 5 mm
+      // cell of her (height, width) keeps its most forward vertex and nothing
+      // behind it. Taking everything in the sphere took 3 134 vertices —
+      // teeth, tongue and the inside of her head among them — and cost 4 ms a
+      // frame; the surface a hand can actually touch is a few hundred.
+      const cells = new Map();
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i);
+        if (v.x <= 0.100 || v.distanceTo(n0) >= 0.075) continue;
+        const key = Math.round(v.y / 0.005) * 1000 + Math.round(v.z / 0.005);
+        const had = cells.get(key);
+        if (had === undefined || P.getX(had) < v.x) cells.set(key, i);
+      }
+      for (const i of cells.values()) faceIdx.push(i);
+    }
+    const H = bindHeadsOf(f);
+    const out = [];
+    const q = new THREE.Quaternion(), a = new THREE.Vector3(), b = new THREE.Vector3();
+    for (const i of faceIdx) {
+      const p = new THREE.Vector3(), n = new THREE.Vector3();
+      const bp = new THREE.Vector3().fromBufferAttribute(P, i);
+      const bn = new THREE.Vector3().fromBufferAttribute(Nn, i);
+      let tot = 0;
+      for (let k = 0; k < 4; k++) {
+        const w = BW.getComponent(i, k);
+        if (w <= 0) continue;
+        const bone = Math.round(BI.getComponent(i, k) * 255);
+        f.boneTurn(bone, q);
+        a.copy(bp).sub(H.T[bone]).applyQuaternion(q);
+        p.addScaledVector(f.boneAt(bone, b).add(a), w);
+        n.addScaledVector(b.copy(bn).applyQuaternion(q), w);
+        tot += w;
+      }
+      p.multiplyScalar(1 / tot);
+      n.normalize();
+      if (!fig) {
+        p.applyMatrix4(f.mesh.matrixWorld);
+        n.applyQuaternion(f.mesh.quaternion);
+      }
+      out.push([p, n]);
+    }
+    return out;
+  }
+  /**
+   * Signed distance of a point from the face: along the normal of the nearest
+   * face vertex. Negative is inside her.
+   */
+  function faceSigned(face, pt) {
+    let best = 1e9, sgn = 1;
+    for (const [p, n] of face) {
+      const d = pt.distanceTo(p);
+      if (d < best) { best = d; sgn = pt.clone().sub(p).dot(n) < 0 ? -1 : 1; }
+    }
+    // The patch is a patch and not a closed surface, so "behind its nearest
+    // vertex" only means inside her while that vertex is close. A wrist in
+    // front of her chest is behind the underside of her chin and measured 84
+    // mm "inside" her face. Past 25 mm a point is simply not in it.
+    return best > 0.025 ? best : best * sgn;
+  }
+
+  function cokeProbeNow() {
+    const f = skinFig;
+    if (!f) return null;
+    f.mesh.updateMatrixWorld();
+    const W = (name) => {
+      const i = f.boneIndex(name);
+      return i < 0 ? null : f.boneAt(i, _pbV()).applyMatrix4(f.mesh.matrixWorld);
+    };
+    const r3 = (v) => (v ? [+v.x.toFixed(4), +v.y.toFixed(4), +v.z.toFixed(4)] : null);
+    const nR = bindPointAt(f, NOSE.nostrilR, NOSE.w, _pbV());
+    const nL = bindPointAt(f, NOSE.nostrilL, NOSE.w, _pbV());
+    const tip = bindPointAt(f, NOSE.tip, NOSE.w, _pbV());
+    const wrist = W('handR'), elbow = W('armLR'), shoulder = W('armUR'),
+      thumb = W('thumbR'), fingers = W('fingersR'), head = W('head');
+    const iH = f.boneIndex('handR');
+    const palm = PALM.clone().applyQuaternion(
+      f.boneTurn(iH, new THREE.Quaternion()).premultiply(f.mesh.quaternion)).add(wrist);
+    const top = _pbV(), bot = _pbV();
+    const haveStraw = strawEnds(top, bot);
+    const k = cokeKit;
+    let line = null, plateY = null, aimPt = null;
+    if (k) {
+      k.g.updateMatrixWorld();
+      plateY = k.g.getWorldPosition(_pbV()).y;
+      const i = Math.min(COKE.lines - 1, cokeGone);
+      const z = (i - (COKE.lines - 1) / 2) * COKE.pitch;
+      const a = k.g.localToWorld(_pbV().set(0.012 - COKE.len / 2, 0.0060, z));
+      const b = k.g.localToWorld(_pbV().set(0.012 + COKE.len / 2, 0.0060, z));
+      line = [r3(a), r3(b)];
+      const al = show.strawAlong || 0;
+      aimPt = a.clone().lerp(b, al);
+    }
+    // Where on the straw's axis her pinch is, and how far off the axis — the
+    // PINCH's grip point, carried by the hand, and the two pads themselves,
+    // skinned off the vertices they are.
+    const H = bindHeadsOf(f);
+    const pinch = new THREE.Vector3(PINCH.grip[0], PINCH.grip[1], PINCH.grip[2])
+      .sub(H.T[iH]).applyQuaternion(f.boneTurn(iH, new THREE.Quaternion()))
+      .add(f.boneAt(iH, _pbV())).applyMatrix4(f.mesh.matrixWorld);
+    const padI = bindPointAt(f, [0.3317, 1.0251, 0.4765], [['fingersR', 1]], _pbV());
+    const padT = bindPointAt(f, [0.3014, 1.0691, 0.4069], [['thumbR', 1]], _pbV());
+    let gripOff = null, gripT = null, padOffI = null, padOffT = null;
+    const offAxis = (pt) => {
+      const ax = top.clone().sub(bot);
+      const t = pt.clone().sub(bot).dot(ax) / ax.lengthSq();
+      const c = bot.clone().addScaledVector(ax, Math.max(0, Math.min(1, t)));
+      return [pt.distanceTo(c), t];
+    };
+    if (haveStraw) {
+      const [d, t] = offAxis(pinch);
+      gripOff = +d.toFixed(4);
+      gripT = +t.toFixed(3);
+      padOffI = +offAxis(padI)[0].toFixed(4);
+      padOffT = +offAxis(padT)[0].toFixed(4);
+    }
+    // Fingers and straw against her face; hand against the plate.
+    const face = faceNear(f);
+    const iTip = bindPointAt(f, [0.3371, 1.0286, 0.4830], [['fingersR', 1]], _pbV());
+    const tTip = bindPointAt(f, [0.3030, 1.0684, 0.4094], [['thumbR', 1]], _pbV());
+    const fingerFace = Math.min(...[padI, padT, iTip, tTip].map((q) => faceSigned(face, q)));
+    // And the hand's bulk, which is what ended up in her mouth: wrist,
+    // knuckles, the base of the thumb.
+    const kn = f.boneAt(f.boneIndex('fingersR'), _pbV()).applyMatrix4(f.mesh.matrixWorld);
+    const tb = f.boneAt(f.boneIndex('thumbR'), _pbV()).applyMatrix4(f.mesh.matrixWorld);
+    const handFace = Math.min(...[wrist, kn, tb, wrist.clone().lerp(kn, 0.5)]
+      .map((q) => faceSigned(face, q)));
+    let strawFace = null;
+    if (haveStraw) {
+      // Along the straw below the nostril's own 10 mm: the part that is IN
+      // her nose is meant to be in her.
+      strawFace = 1e9;
+      const ax = bot.clone().sub(top);
+      for (let k = 0; k <= 12; k++) {
+        const pt = top.clone().addScaledVector(ax, 0.2 + 0.8 * k / 12);
+        strawFace = Math.min(strawFace, faceSigned(face, pt));
+      }
+    }
+    // Height above whatever is UNDER each hand point — the plate, the
+    // tabouret round it, or nothing (a hand hanging beside the table is not
+    // in it, however low it is).
+    let handLow = null;
+    if (k) {
+      const c = k.g.getWorldPosition(_pbV());
+      for (const q of [padI, padT, iTip, tTip, wrist, pinch]) {
+        const r = Math.hypot(q.x - c.x, q.z - c.z);
+        const s0 = r < 0.105 ? c.y + plateSurf(r) : r < 0.150 ? c.y - 0.010 : null;
+        if (s0 == null) continue;
+        handLow = handLow == null ? q.y - s0 : Math.min(handLow, q.y - s0);
+      }
+    }
+    // How far the wrist is bent off the forearm's line.
+    const iF = f.boneIndex('fingersR');
+    const knuck = f.boneAt(iF, _pbV()).applyMatrix4(f.mesh.matrixWorld);
+    const wristBend = wrist.clone().sub(elbow).angleTo(knuck.clone().sub(wrist)) * 180 / Math.PI;
+    const ua = elbow && shoulder ? shoulder.clone().sub(elbow) : null;
+    const fa = elbow && wrist ? wrist.clone().sub(elbow) : null;
+    // The fingers' and the thumb's turn RELATIVE TO THE HAND, which is what the
+    // clip's relaxed curl is and what a pinch has to be added on top of.
+    const rel = (n) => {
+      const i = f.boneIndex(n);
+      if (i < 0) return null;
+      const q = f.boneIncrement ? null : f.boneTurn(iH, new THREE.Quaternion()).invert()
+        .multiply(f.boneTurn(i, new THREE.Quaternion()));
+      return q ? [+q.x.toFixed(5), +q.y.toFixed(5), +q.z.toFixed(5), +q.w.toFixed(5)] : null;
+    };
+    return {
+      rrelF: rel('fingersR'), rrelT: rel('thumbR'),
+      phase: show.phase, tmr: +(show.tmr || 0).toFixed(3),
+      clip: f.playing(), clipT: f.state.cur ? +f.state.curT.toFixed(3) : null,
+      lu: +(show.cokeU || 0).toFixed(4),
+      grip: +(show.strawGrip || 0).toFixed(3),
+      along: +(show.strawAlong || 0).toFixed(3), cutAt: +(show.cutAt || 0).toFixed(3),
+      nostrilR: r3(nR), nostrilL: r3(nL), tip: r3(tip), head: r3(head),
+      top: haveStraw ? r3(top) : null, bot: haveStraw ? r3(bot) : null,
+      wrist: r3(wrist), palm: r3(palm), thumb: r3(thumb), fingers: r3(fingers),
+      elbow: r3(elbow), shoulder: r3(shoulder),
+      plateY: plateY == null ? null : +plateY.toFixed(4), line, aim: r3(aimPt),
+      dTopNostril: haveStraw ? +top.distanceTo(nR).toFixed(4) : null,
+      dBotAim: haveStraw && aimPt ? +bot.distanceTo(aimPt).toFixed(4) : null,
+      botAbovePlate: haveStraw && plateY != null ? +(bot.y - plateY).toFixed(4) : null,
+      nostrilAbovePlate: plateY != null ? +(nR.y - plateY).toFixed(4) : null,
+      gripOff, gripT, padOffI, padOffT,
+      fingerFace: +fingerFace.toFixed(4), handFace: +handFace.toFixed(4),
+      strawFace: strawFace == null ? null : +strawFace.toFixed(4),
+      handLow: handLow == null ? null : +handLow.toFixed(4),
+      searchBend: LB.bend == null ? null : +LB.bend.toFixed(1),
+      bestBend: LB.bestBend == null ? null : +LB.bestBend.toFixed(1),
+      lineMs: LB.ms == null ? null : +LB.ms.toFixed(2), faceN: faceIdx ? faceIdx.length : null,
+      wristBend: +wristBend.toFixed(1),
+      padGap: +padI.distanceTo(padT).toFixed(4), pinch: r3(pinch),
+      lineI: Math.min(COKE.lines - 1, cokeGone),
+      elbowDeg: ua && fa ? +(ua.angleTo(fa) * 180 / Math.PI).toFixed(1) : null,
+      elbowBelowShoulder: elbow && shoulder ? +(shoulder.y - elbow.y).toFixed(4) : null,
+      palmToTip: +palm.distanceTo(tip).toFixed(4),
+    };
   }
 
   /**
@@ -41748,49 +42539,22 @@ async function buildJadrija(scene) {
   // but `liftIt` and `strapIt` stoop too and should probably follow.
   const COKE_ARM = { up: COKE_HAND.lift, fwd: -COKE_HAND.back,
     follow: COKE_HAND.follow, pole: REACH_POLE, torso: 1 };
-  /**
-   * AND THE WRIST GOES BESIDE THE STRAW, NOT ON IT.
-   *
-   * `lift` and `back` are the blade's numbers: a hand hovering 0.105 m above
-   * a blade lying flat on a table and 0.028 m behind it, both in WORLD axes.
-   * Pointed at a straw held to her nostril they put her wrist bone on the
-   * nostril — measured 0.202 m across her own body and 0.167 m ABOVE her
-   * shoulder — and an arm whose wrist is there has nowhere to put an elbow.
-   *
-   * Her grip point rides 0.088 m off the wrist (see `PALM`), so the wrist has
-   * to sit about that far from the straw and the only question is which way.
-   * Down the torso and out to her right, in HER frame: a hand pinching
-   * something at its own nose comes at it from below and from outside, never
-   * from above and behind.
-   */
-  const FACE_ARM = { up: 0, fwd: 0, body: { down: 0.070, right: 0.058, fwd: 0.030 },
-    follow: COKE_HAND.follow, pole: FACE_POLE, torso: 1 };
-
-  /**
-   * AND THE ELBOW HANGS AGAIN ON THE WAY DOWN.
-   *
-   * With the pole switched rather than blended there was a 94-degree spike at
-   * clip 3.77, on the release: the hand is falling from her face to her side,
-   * `FACE_POLE` is still asking for an elbow out in front, and for a fifth of
-   * a second the point of her elbow leads the movement at shoulder height.
-   * Measured elbow there: 0.018 m ABOVE the shoulder, 0.236 forward.
-   *
-   * So the pole is mixed on `strawUp`, which is now a smooth nought-to-one
-   * and back. Its other end is where the elbow belongs when there is nothing
-   * in the hand: `IDLE_A`'s own, read off the rig at (0.028 right, 0.237
-   * down, 0.007 back) — straight down with a couple of centimetres of
-   * clearance. Before the straw has ever been up it is `REACH_POLE` instead,
-   * because that end of the beat is a hand reaching down at a table and that
-   * is the pole that was measured for it.
-   */
-  const HANG_POLE = new THREE.Vector3(-0.029, -0.997, 0.118).normalize();
-  const _ckMix = new THREE.Vector3();
   function cokeReach(f, dt, free) {
-    // The taking is the same arm on the same plate — see `cokeTakeSet`. It
-    // shares `show.cokeU`, and the phase decides what the hand is over:
-    // `cokeHoldAt` follows the blade during the cutting and `cokeStrawAt`
-    // follows the straw while a line goes away.
-    const on = free && (show.phase === 'coke' || show.phase === 'line');
+    // The line is its own solve now — see `lineBeat`. It owns the arm, the
+    // hand and the fingers for the whole beat and hands them back at the end,
+    // and the blade's cached chain has no business being carried into it.
+    if (show.phase === 'line') {
+      if (reachArm && reachArm.who === 'coke') reachArm = null;
+      show.cutAt = 0;
+      lineBeat(f, dt);
+      return;
+    }
+    // Out of the beat without finishing it — asked for something else half
+    // way — and the straw goes back on the plate rather than staying in the
+    // air where her hand let go of it, and the arm goes back to the clip.
+    if (LB.aims) lineDone(f);
+    // The cutting: the hand on the wrap and then the blade, off `show.cokeU`.
+    const on = free && show.phase === 'coke';
     const u = on ? (show.cokeU || 0) : 0;
     // FROM THE POUR AND NOT FROM THE FIRST LINE. This used to start at 0.25,
     // which is where `cokeSet` hands the scrub from the pour to the cutting —
@@ -41806,29 +42570,15 @@ async function buildJadrija(scene) {
     // whole second and a bit it takes her to stand up. It hands the chain
     // back over 0.78 to 0.90 now, so the arm is the clip's again — and
     // falling to her side with the rest of her — before she is upright.
-    const OUT = show.phase === 'line' ? 0.86 : 0.99;
-    const SPAN = show.phase === 'line' ? 0.12 : 0.05;
-    const want = on ? sat((u - 0.004) / 0.05) * sat((OUT - u) / SPAN) : 0;
+    const want = on ? sat((u - 0.004) / 0.05) * sat((0.99 - u) / 0.05) : 0;
     show.cutAt = damp(show.cutAt || 0, want, 4.5, dt);
     if (show.cutAt < 0.004) {
       reachRight(f, dt, 'coke', _ckBlade, 0, COKE_ARM);
       show.cutAt = 0;
       return;
     }
-    if (show.phase === 'line') {
-      // The straw, wherever it is — which for most of this beat is up at her
-      // face and not on the plate. The hand follows the object.
-      if (!cokeStrawAt(_ckBlade)) return;
-    } else if (!cokeHoldAt(_ckBlade, u)) return;
-    // And which elbow. Down and forward once the object has left the plate,
-    // out to the side while she is still reaching for it — see `FACE_POLE`.
-    if (show.phase === 'line') {
-      _ckMix.copy(show.strawFace ? HANG_POLE : REACH_POLE)
-        .lerp(FACE_POLE, sat(show.strawUp || 0));
-      if (_ckMix.lengthSq() > 1e-6) _ckMix.normalize();
-      FACE_ARM.pole = _ckMix;
-    }
-    const arm = (show.phase === 'line' && show.strawFace) ? FACE_ARM : COKE_ARM;
+    if (!cokeHoldAt(_ckBlade, u)) return;
+    const arm = COKE_ARM;
     // Lower over the wrap than over the blade: the blade number leaves the
     // grip 21 mm clear of steel lying flat, and the wrap is 2 mm of folded
     // paper she is pinching rather than a tool she is holding.
@@ -48999,6 +49749,14 @@ async function buildJadrija(scene) {
      * `PALM` the bottle is held by — which is the thing that is supposed to be
      * on the steel; `wrist` is the bone the solver actually aims.
      */
+    /**
+     * Debug: everything the line beat is judged by, in world metres, on this
+     * frame. Written for tools/coke_probe.mjs, which samples it every frame of
+     * the beat at a fixed step and grades each sub-step against it.
+     */
+    cokeProbe: () => cokeProbeNow(),
+    /** Debug: the marks the plate beats stand on, [t, s, yaw]. */
+    cokeMarks: () => (kit && kit.work ? { coke: kit.work.coke, line: kit.work.line || null } : null),
     cokeHand: () => {
       const b = new THREE.Vector3();
       if (!skinFig || !cokeBladeAt(b)) return null;
@@ -49032,7 +49790,6 @@ async function buildJadrija(scene) {
         straw: onStraw ? r3(st) : null,
         dStraw: onStraw ? +p.distanceTo(st).toFixed(3) : null,
         dStrawWrist: onStraw ? +w.distanceTo(st).toFixed(3) : null,
-        lift: +(show.strawUp || 0).toFixed(3),
         crouch: +(show.crouch || 0).toFixed(3), duck: +(show.duck || 0).toFixed(3),
         held, blade: r3(b), wrist: r3(w), palm: r3(p),
         dWrist: +w.distanceTo(b).toFixed(3), dPalm: +p.distanceTo(b).toFixed(3),

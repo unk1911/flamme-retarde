@@ -5080,12 +5080,44 @@ STOOP_UP = _stoop(1.076, -34, -28)
 # picking a 42 mm straw off a plate is a hand's job and the back has no
 # business doing it. `reachRight` solves that arm in the game on top of this,
 # so the clip's job is to hold the body still enough for it to work in.
-_SNORT_DUR = 4.60
-# Unchanged, because the game is keyed to them: the powder is consumed over
-# 0.540 to 0.710 of the beat and the head comes off it at 0.765.
-_SNORT_BOTTOM, _SNORT_LIFT = 2.48, 3.27
-# The lean, and the pause in it that the hand works in.
-_SNORT_LEAN, _SNORT_HOLD = 0.75, 1.20
+_SNORT_DUR = 6.30
+# ── THE BEAT IS NOW THIRTEEN SUB-STEPS AND THIS IS ITS CLOCK ─────────────────
+#
+# Misha, 23 Sep 2026, after ten rounds of this: *"the straw never goes into her
+# nose, the right arm doesn't quite hold the straw... maybe by breaking it down
+# into many many sub-steps?"*. That is what it is now, and every boundary below
+# is a sub-step the game's `LINE` table in src/43-jadrija.js is keyed to — the
+# two are one timeline, so change one and change the other.
+#
+#     0.00  lean in                       3.05  bottom: straw on the line
+#     0.55  reach for the straw           3.15  along the line (0.70 s)
+#     1.00  fingers close on it           4.05  head comes off, straw out
+#     1.20  lift it off the plate         4.30  put it back on the plate
+#     1.70  bring it to her nose          4.95  let go of it
+#     1.95  down to the line              5.10  arm goes back, she rises
+#
+# WHAT WAS WRONG WITH THE DEPTH. Measured with a probe that reads the nostril
+# off the mesh, at the bottom of the old beat her nostril was 135 to 170 mm
+# above the plate — and the straw was 42 mm long. The powder was disappearing
+# under a straw hovering twelve centimetres over it, in every version. The
+# bottom is now deep enough that a 70 mm straw reaches from inside her nostril
+# to the line, and it is HELD there for the whole sweep rather than drifting.
+#
+# AND SHE STAYS DOWN TO PUT IT BACK. The old beat stood up straight off the
+# plate with the straw still somewhere in her hand. She comes off the line with
+# the head (the sniff is in the neck, thrown back, and nothing else), lays the
+# straw down on the plate from where she is, lets go of it, and only then
+# rises.
+_SN_LEAN, _SN_HOLD, _SN_BOTTOM = 0.75, 1.95, 3.05
+_SN_UP, _SN_BACK, _SN_RISE = 4.05, 4.30, 4.95
+# Skull base height at the bottom, in metres. The capture's own depth scale —
+# see `_mc_body` — so this is how far down she goes and nothing else.
+SNORT_DEEP = 0.8705
+# And how far she leans to pick it up. The old lean was 1.468 and it did not
+# reach: measured, her pinch finished 100 mm short of a straw on a 0.72 m
+# tabouret and the straw then jumped into her hand. So she bends to pick it up,
+# brings it to her nose from there, and goes the rest of the way down with it.
+SNORT_LEAN = 1.300
 
 
 def _ss(u):
@@ -5094,46 +5126,58 @@ def _ss(u):
 
 
 def _snort_keys():
-    """The beat, sampled rather than keyed. One descent, no stops in it."""
-    top, lean, plate, deep = 1.584, 1.468, 0.975, 0.936
+    """The beat, sampled rather than keyed: holds where a hand is working, one
+    descent, and no stop that does not mean something."""
+    top, lean, deep = 1.584, SNORT_LEAN, SNORT_DEEP
     out = []
     for k in range(int(round(_SNORT_DUR * SAMPLE_FPS)) + 1):
         t = min(k / SAMPLE_FPS, _SNORT_DUR)
-        if t <= _SNORT_LEAN:
-            # The lean that puts the plate inside her arm's reach. Her
-            # shoulder stands at about 1.4 m and the tabouret is at 0.73, so
-            # a straight arm does not get there and something has to give;
-            # this is the smallest amount of back that will do it.
-            w = _ss(t / _SNORT_LEAN)
+        if t <= _SN_LEAN:
+            # The lean that puts the plate inside her arm's reach.
+            w = _ss(t / _SN_LEAN)
             z, neck, head = top + (lean - top) * w, 12 + 2 * w, 3 + 0.5 * w
-        elif t <= _SNORT_HOLD:
-            # And then it stops, ON PURPOSE, while the hand takes the straw
-            # off the plate and puts it to her face. This is the one pause in
-            # the descent and it is the difference between a stop and a
-            # stutter: a body that is still because it is waiting for a hand
-            # reads as a person, and the five stops the old version had read
-            # as a mechanism, because none of them meant anything.
-            #
-            # `reachRight` solves that arm in the game and 1.454.0 established
-            # that it wants a body that is not moving under it.
+        elif t <= _SN_HOLD:
+            # Held while the hand does four things in a row: reach, close, lift
+            # and put it to her nose. A body that is still because it is
+            # waiting for a hand reads as a person.
             z, neck, head = lean, 14, 3.5
-        elif t <= _SNORT_BOTTOM:
-            # One descent. No keys in it, and no coming back up first.
-            w = _ss(_ss((t - _SNORT_HOLD) / (_SNORT_BOTTOM - _SNORT_HOLD)))
-            z, neck, head = lean + (plate - lean) * w, 14 + 2 * w, 3.5 + 0.5 * w
-        elif t <= _SNORT_LIFT:
-            u = (t - _SNORT_BOTTOM) / (_SNORT_LIFT - _SNORT_BOTTOM)
-            z, neck, head = plate + (deep - plate) * _ss(u), 16 + u, 4 + u
+        elif t <= _SN_BOTTOM:
+            # One descent with the straw in her nose, no stop in it.
+            w = _ss(_ss((t - _SN_HOLD) / (_SN_BOTTOM - _SN_HOLD)))
+            z, neck, head = lean + (deep - lean) * w, 14 + 3 * w, 3.5 + 1.5 * w
+        elif t <= _SN_UP:
+            # Down on the line for the sweep. A breath lower, the way every held
+            # pose in this file has one.
+            u = _ss((t - _SN_BOTTOM) / (_SN_UP - _SN_BOTTOM))
+            z, neck, head = deep - 0.004 * u, 17 + u, 5 + 0.5 * u
+        elif t <= _SN_BACK:
+            # The sniff, and it is the neck: thrown back from where it was, the
+            # body still folded. The straw comes out of her nose because her
+            # nose leaves it — her hand holds it where it was.
+            #
+            # BACK IS POSITIVE on this rig. The old beat's snap went to −34 and
+            # its comment called that thrown back; it is flexion, chin to chest,
+            # and measured with the body held still it drove her nostril to
+            # 10.7 mm UNDER the plate. It only ever looked like a throw because
+            # the body was rising fast enough to hide which way the head went.
+            s = _ss((t - _SN_UP) / (_SN_BACK - _SN_UP))
+            z, neck, head = deep - 0.004 + 0.012 * s, 18 + 22 * s, 5.5 + 14 * s
+        elif t <= _SN_RISE:
+            # Coming up off the line as she puts the straw back — the pick in
+            # reverse, and for the same reason: the straw is put down from the
+            # lean it was picked up from. Put down from the bottom of the fold
+            # it measured 84 degrees of wrist bend, a shoulder low over the
+            # plate and a forearm near vertical; from the lean, 20.
+            s = _ss((t - _SN_BACK) / (_SN_RISE - _SN_BACK))
+            z = deep + 0.008 + (lean - deep - 0.008) * s
+            neck, head = 40 - 26 * s, 19.5 - 16 * s
         else:
-            u = (t - _SNORT_LIFT) / (_SNORT_DUR - _SNORT_LIFT)
-            # Fast off the plate and easing into standing, which is the one
-            # place in the beat a velocity step is wanted: a sniff ends, it
-            # does not fade out. Everywhere else the curve is smooth.
-            z = deep + (top - deep) * (1.0 - (1.0 - u) ** 2.4)
-            snap = _ss((t - _SNORT_LIFT) / 0.25)
-            back = _ss((t - _SNORT_LIFT - 0.25) / (_SNORT_DUR - _SNORT_LIFT - 0.25))
-            neck = (17 - 51 * snap) * (1 - back)
-            head = (5 - 33 * snap) * (1 - back)
+            # And up the rest of the way.
+            u = (t - _SN_RISE) / (_SNORT_DUR - _SN_RISE)
+            z0 = lean
+            z = z0 + (top - z0) * (1.0 - (1.0 - u) ** 2.4)
+            neck = 14 * (1 - _ss(u))
+            head = 3.5 * (1 - _ss(u))
         # The left arm braces on the table as she goes in and lets go as she
         # comes up; both ends of the clip have to BE `IDLE_A` or the loop it
         # returns to pops.
