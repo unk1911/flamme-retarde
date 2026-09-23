@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.478.0] — 2026-09-23
+
+### the thumb opens her mouth, and her recorded noises are parked
+
+Misha: *"it should work like thumb in the kabine regardless of whether the
+mouth is wide open or not. basically when facing her and pressing hose or
+spacebar should be the thumb thing, which should cause her to open wider."*
+
+- **No longer waits for "open wide".** In the kabina, facing her — her mouth
+  within about 40° of the middle of your view AND you in front of her face —
+  within 1.8 m of her lip, the button is the thumb.
+- **You step in.** Left to herself she stops 1.40–1.53 m off you (measured,
+  facing you), which is outside anybody's arm; leaning the arm the rest of the
+  way would leave a shoulder hanging in the room. So while the button is held
+  you walk in at 1.3 m/s, through the same `confine` as every step, until her
+  lip is 55 cm from your eye, and your view eases on to her mouth as you come.
+- **The thumb is what opens her mouth.** `jadrija.thumbTouch(k)` hands the
+  hand's progress over every frame, and past 0.6 it keeps `show.mouthFor` up,
+  so the jaw opens on the same curve "open wide" uses and holds while the
+  thumb is there. Measured through the real button from 1.38 m away: 0.56 m
+  and the thumb on her lip (1 mm) inside 1.3 s, her mouth 0 → 1.0 as it
+  arrives, and closed again two seconds after you let go.
+
+And: *"that old audio that we parked seems to come out still sometimes, the
+one that is about 30s long... no don't keep the 1 second reaction either"*.
+1.475.0 parked her synthesised `cuk` syllables and left `showNoise` — her
+recorded takes — on as her own voice. Those included `show_wetlong` (18 s,
+hosed in the kabina) and `show_bumplong` (23 s). `PARKED.noises` now stops
+`showNoise` outright, the one-second reactions with it. Flags, not deletions.
+
 ## [1.477.0] — 2026-09-23
 
 ### your thumb, instead of the water

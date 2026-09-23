@@ -33294,7 +33294,15 @@ async function buildJadrija(scene) {
    * are her own voice and are NOT parked. Flip either flag to bring one back;
    * nothing behind them has been touched.
    */
-  const PARKED = { squeaks: true, cards: true };
+  //
+  // And `longNoises`, the same evening: *"that old audio that we parked seems
+  // to come out still sometimes, the one that is about 30s long"*. Those are
+  // the two long recorded takes, `show_wetlong` (18 s, hosed in the kabina)
+  // and `show_bumplong` (23 s) — `showNoise` was left on above as her own
+  // voice, and its one-second reactions still are; the long takes are not.
+  // Then, a minute later: *"no don't keep the 1 second reaction either...
+  // they are currently not needed"* — so `noises` parks all of `showNoise`.
+  const PARKED = { squeaks: true, cards: true, longNoises: true, noises: true };
   const SHOW = {
     /**
      * How near the round table's middle her route may pass — see `showRound`.
@@ -35351,6 +35359,8 @@ async function buildJadrija(scene) {
    * person does not vocalise on the same sample as the thing that made them.
    */
   function showNoise(set, d, keep, delay = 190) {
+    if (PARKED.noises) return;
+    if (PARKED.longNoises && /long$/.test(set)) return;
     if (!audio || !audio.noises || state.phase === 'intro') return;
     const g = clamp(1.15 - d / 30, 0, 1);
     if (g <= 0.05) return;
@@ -37346,6 +37356,11 @@ async function buildJadrija(scene) {
         } else if (show.lipT) { show.lipT = 0; show.lipPeak = 0; }
         // Asked to open wide: a full drop, eased in and out rather than
         // stepped, and bigger than anything else wins as always.
+        // Your thumb on her lip opens her mouth, and keeps it open while it
+        // is there and for a moment after — see `thumbTouch`. Misha: *"when
+        // facing her and pressing hose or spacebar should be the thumb thing,
+        // which should cause her to open wider"*.
+        if ((show.thumbK || 0) > 0.6) show.mouthFor = Math.max(show.mouthFor || 0, 1.2);
         show.mouthFor = Math.max(0, (show.mouthFor || 0) - dt);
         show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? 1 : 0, 6, dt);
         f.face.gape = Math.max(talk, show.mouthW,
@@ -49267,9 +49282,8 @@ async function buildJadrija(scene) {
      * metres, or null. See `updateReach` in 60-arms.js and the gate in
      * 90-app.js that turns the branch into a hand.
      *
-     * Only in the kabina and only while she is holding it open because she
-     * was asked to (`show.mouthW`) — the hose's own gape and her talking are
-     * her mouth doing something else. The lip is the centre of her mouth
+     * Only in the kabina. Her mouth does not have to be open — the thumb is
+     * what opens it (`thumbTouch`). The lip is the centre of her mouth
      * (`uLipC`, measured off the MOUTH_P paint), 6 mm down onto the lower
      * lip, carried down and back by exactly the jaw drop FACE_VERT is giving
      * it this frame — that drop is in the vertex shader and not in any bone,
@@ -49277,9 +49291,13 @@ async function buildJadrija(scene) {
      * skinned the way the skin round her mouth is. Four millimetres into the
      * mouth, because a thumb on a lip rests on the inside edge of it.
      */
+    /** How far out your thumb is, 0..1, handed over every frame by the app. */
+    thumbTouch: (k) => { if (show) show.thumbK = k; },
     thumbReach: () => {
       if (!skinFig || !skinFig.mesh.visible || !show || !skinFig.uFace) return null;
-      if ((show.mouthW || 0) < 0.35 || !sheIsIn()) return null;
+      // Whether or not her mouth is open: the thumb is what opens it. See
+      // `thumbTouch` below.
+      if (!sheIsIn()) return null;
       const u = skinFig.uFace;
       const c = u.uLipC.value;
       if (c.y < -50) return null;

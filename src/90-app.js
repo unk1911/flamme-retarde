@@ -963,7 +963,10 @@ const CAMS = ['chase', 'close', 'cockpit', 'wing'];
 // closes her mouth under it. THUMB_D is how close counts as within reach, eye
 // to lip: an arm and a lean.
 let thumbK = 0, thumbAt = null;
-const THUMB_D = 1.0;
+const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
+const THUMB_D = 1.8;         // how far off her lip the button means the thumb
+const THUMB_STAND = 0.55;    // and where you stop, eye to lip
+const THUMB_WALK = 1.3;      // m/s you step in at
 let camMode = 0;
 const camPos = new THREE.Vector3();
 const camAim = new THREE.Vector3();
@@ -6791,9 +6794,11 @@ function frame() {
     // AND YOUR THUMB INSTEAD OF THE WATER, at her mouth. Misha, 23 Sep 2026:
     // *"in the kabine, and when her mouth is open, instead of spraying with
     // water, it should be my (chloe price)'s thumb reaching for her open
-    // mouth and lips"*. The same button, and the same finger on it: close
-    // enough to touch her while she is holding her mouth open for you, the
-    // branch stays shut and the hand goes out instead. First person only —
+    // mouth and lips"*, and then: *"regardless of whether the mouth is wide
+    // open or not... which should cause her to open wider"*. The same button
+    // and the same finger on it: in the kabina, facing her, close enough to
+    // touch, the branch stays shut and the hand goes out instead — and the
+    // thumb on her lip is what opens her mouth. First person only —
     // the view-model arm is the only arm there is to send; in the third
     // person the branch behaves as it always has.
     const pressing = mouseDrop || (keys.has('Space') && !spaceLeapt)
@@ -6805,12 +6810,45 @@ function frame() {
       && ((camera.position.x - lip.x) * lip.fx + (camera.position.y - lip.y) * lip.fy
         + (camera.position.z - lip.z) * lip.fz)
         > 0.5 * Math.hypot(camera.position.x - lip.x, camera.position.y - lip.y,
-          camera.position.z - lip.z);
+          camera.position.z - lip.z)
+      // And YOU are looking at her: her mouth within about forty degrees of
+      // the middle of the view. Facing her means both ways round — a press
+      // with your back to her, or with her off at the edge of the frame, is a
+      // press for the branch.
+      && camera.getWorldDirection(_thumbF).dot(_thumbV.set(lip.x - camera.position.x,
+        lip.y - camera.position.y, lip.z - camera.position.z).normalize()) > 0.77;
     if (lip) thumbAt = lip;
     const thumbing = pressing && lipNear;
+    // AND YOU STEP IN. Left to herself she stops about a metre and a half off
+    // you — measured, facing you, 1.40 to 1.53 m — which is outside anybody's
+    // arm, and leaning the arm the rest of the way leaves a shoulder hanging
+    // in the middle of the room. So while the button is held you walk in on
+    // her at walking pace until her lip is 55 cm from your eye, through the
+    // same `confine` every step you take goes through, and the thumb arrives
+    // as you do.
+    if (thumbing && ground.you && ground.confine) {
+      const Y = ground.you;
+      const hx = lip.x - camera.position.x, hz = lip.z - camera.position.z;
+      const hd = Math.hypot(hx, hz);
+      if (hd > THUMB_STAND) {
+        const step = Math.min(hd - THUMB_STAND, THUMB_WALK * dt);
+        const [nx, nz] = ground.confine(Y.x + (hx / hd) * step, Y.z + (hz / hd) * step);
+        Y.x = nx; Y.z = nz;
+      }
+      // And your eyes settle on her mouth as you come in. Eased, and only
+      // the last of the turn — the gate above already wants her within forty
+      // degrees, so this is a head finding the mouth, not a camera snatched.
+      const wantYaw = Math.atan2(camera.position.x - lip.x, camera.position.z - lip.z);
+      const wantPitch = Math.atan2(lip.y - camera.position.y, Math.max(hd, 0.05));
+      let dy = wantYaw - Y.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      Y.yaw += dy * (1 - Math.exp(-5 * dt));
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-5 * dt));
+    }
     // Out a little slower than it comes back: a reach is a decision, and
     // letting go is just letting go.
     thumbK = damp(thumbK, thumbing ? 1 : 0, thumbing ? 4.5 : 7, dt);
+    if (jadrija && jadrija.thumbTouch) jadrija.thumbTouch(thumbK);
     ground.setSpray(!swatCut && !pourCut && pressing && !lipNear);
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
