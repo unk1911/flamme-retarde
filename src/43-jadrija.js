@@ -33924,6 +33924,88 @@ async function buildJadrija(scene) {
     return sat((s - (special.face - 0.05)) / 0.40);
   }
 
+  /**
+   * Can a whole body stand here? The special kabina, as a test a pose can be
+   * put through — for the apprentice, who has to find somewhere in that room
+   * to do what the woman she follows is doing.
+   *
+   * WHY A WHOLE BODY AND NOT A POINT. The first placement put one point — her
+   * root — 1.75 m behind the leader along the leader's own facing, and hoped.
+   * Measured over a minute of the room doing what it does, she was inside it
+   * for 15 of the 539 samples the leader was: the leader does not face the
+   * back wall in there, she faces the wine table, the stool and you, so
+   * "behind her" was straight through a side wall. Clamping that one point
+   * into the room would have fixed the root and not the rest of her — a woman
+   * lying down is 1.7 m long and her root is at one end of it. So every bone
+   * of the pose she is about to wear is tested.
+   *
+   * `pts` is the bone positions in WORLD metres, packed x, y, z. Three rules:
+   * every point inside the room's own walls with `inset` to spare for flesh;
+   * none inside a blocker that overlaps the room below its height (the TV's
+   * stand, and the walls again, which are cheap); none inside the cot below
+   * its mattress, because she stands BESIDE the bed the leader is lying on.
+   *
+   * The shore's (t, s) frame is not affine over a kilometre and is over five
+   * metres, so it is linearised once about the middle of the room rather than
+   * asked thirty times a candidate.
+   */
+  // What the apprentice is handed every frame; one object, reused.
+  const apprRoomArgs = { inside: kabinaInside, fit: null, lift: 0 };
+
+  let kabinaFitCache = null;
+  function kabinaFit() {
+    if (!special) return null;
+    if (kabinaFitCache) return kabinaFitCache;
+    const tm = (special.t0 + special.t1) * 0.5, sm = (special.s0 + special.s1) * 0.5;
+    const c = toWorld(tm, sm);
+    const a = local(c[0], c[2]), bx = local(c[0] + 1, c[2]), bz = local(c[0], c[2] + 1);
+    const J = [bx[0] - a[0], bx[1] - a[1], bz[0] - a[0], bz[1] - a[1]];
+    const boxes = blockers.filter((b) => !b.rot
+      && b.t + b.a > special.t0 - 0.3 && b.t - b.a < special.t1 + 0.3
+      && b.s + b.c > special.s0 - 0.3 && b.s - b.c < special.s1 + 0.3);
+    const fit = {
+      floor: special.floor,
+      boxes: boxes.length,
+      /** World to the room's own (t, s), on the linearised frame. */
+      ts(x, z, out) {
+        const dx = x - c[0], dz = z - c[2];
+        out[0] = a[0] + dx * J[0] + dz * J[2];
+        out[1] = a[1] + dx * J[1] + dz * J[3];
+        return out;
+      },
+      /**
+       * How many of the points are through a wall or into the furniture.
+       * Zero is a body that fits. Counted rather than refused on the first,
+       * so that when nothing fits the least bad place can still be chosen.
+       */
+      bad(pts, n, inset = 0.10, stop = 1e9) {
+        const T = fit._ts || (fit._ts = [0, 0]);
+        let k = 0;
+        for (let i = 0; i < n && k < stop; i++) {
+          const x = pts[i * 3], y = pts[i * 3 + 1], z = pts[i * 3 + 2];
+          fit.ts(x, z, T);
+          const t = T[0], s = T[1];
+          if (t < special.t0 + inset || t > special.t1 - inset
+            || s < special.s0 + inset || s > special.s1 - inset) { k++; continue; }
+          let hit = false;
+          for (const b of boxes) {
+            if (Math.abs(t - b.t) < b.a + inset && Math.abs(s - b.s) < b.c + inset
+              && y > b.y - 0.05 && y < b.y + b.h) { hit = true; break; }
+          }
+          if (!hit && kit && kit.cot
+            && Math.abs(t - kit.cot[0]) < 0.35 + inset
+            && Math.abs(s - (kit.cot[1] + 0.10)) < 0.95 + inset
+            && y < kit.cot[2]) hit = true;
+          if (hit) k++;
+        }
+        return k;
+      },
+      ok(pts, n, inset = 0.10) { return fit.bad(pts, n, inset, 1) === 0; },
+    };
+    kabinaFitCache = fit;
+    return fit;
+  }
+
   function sheIsIn() {
     const K0 = special;
     return !!K0 && !!show && show.t > K0.t0 - 0.2 && show.t < K0.t1 + 0.2
@@ -40347,13 +40429,6 @@ async function buildJadrija(scene) {
       p[2]);
     f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
     f.mesh.updateMatrixWorld();
-
-    // The apprentice follows what the leader ENDED UP doing, so she is
-    // stepped here rather than anywhere above: every mover has run, the
-    // position is final, and the matrix she is about to be measured against
-    // has just been pushed.
-    apprenticeStep(dt, f, special ? kabinaInside : null,
-      special ? special.floor : null);
 
     wearTick(dt);
     hairAim();
@@ -47263,6 +47338,18 @@ async function buildJadrija(scene) {
         // After both, because it reads the bones the step above has just
         // solved and it has to run on the held frame as well as the live one.
         placeHorns(dt);
+        // And the apprentice, LAST, for the same two reasons and one more.
+        // She wears the leader's finished palette — every `aim` stepShow laid
+        // on after the clip, the arms held wide, the hand at the stool — and
+        // that palette is only finished here. She has to run on a held frame
+        // too, which inside `stepShow` she did not. And indoors she needs the
+        // room: where it is, a test for where a whole body fits in it, and
+        // how much of the leader's height this frame is the cot under her.
+        if (special) {
+          apprRoomArgs.fit = kabinaFit();
+          apprRoomArgs.lift = show ? show.mat || 0 : 0;
+        }
+        apprenticeStep(dt, skinFig, special ? apprRoomArgs : null);
       }
     }
     // Outside the range gate above, because a ball that is already in the air
@@ -48166,10 +48253,9 @@ async function buildJadrija(scene) {
       const n = Math.max(1, Math.round(settle * 60));
       for (let i = 0; i < n; i++) { skinFig.state.curT = at; skinFig.update(1 / 60); }
       skinFig.state.curT = at;
-      // And the apprentice, who is stepped from inside `stepShow` and would
-      // otherwise be left mid-wander while the leader stands still.
-      const a2 = apprenticePose(name, at, settle, skinFig,
-        special ? kabinaInside : null);
+      // And the apprentice, who wears whatever the leader wears and only
+      // needs telling not to wait out her lag before she does.
+      const a2 = apprenticePose(name, at, settle, skinFig);
       return { posed: name, at, playing: skinFig.playing(), appr: a2 };
     },
     /**
@@ -48325,6 +48411,8 @@ async function buildJadrija(scene) {
       ix: ix === undefined ? scarfIx : showScarf(ix === 'next' ? null : ix),
       of: SCARVES.length,
     }),
+    /** Debug: the apprentice's whole body against the room and the leader. */
+    apprCheck: () => apprenticeCheck(skinFig, kabinaFit()),
     kabina: special && {
       inside: (x, z) => kabinaInside(x, z),
       // Where in the resort's own frame it is, for anything that has to walk
