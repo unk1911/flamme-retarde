@@ -40,7 +40,32 @@
 // ---------------------------------------------------------------------------
 
 /** How far behind, in seconds, and how far off the leader's shoulder. */
+/**
+ * WHICH BAYE IS DRAWN. Misha, 23 Sep 2026: *"i think we are ready to 'park'
+ * baye v1.0 and have baye v2.0 be the main one. can u 'stash away' baye
+ * v1.0 if we ever need to recover her but now baye v2.0 becomes the primary
+ * one"*.
+ *
+ * 'v2': v1.0 still runs — every routine, command, voice line, lip, straw
+ * and cartwheel is written against `skinFig`, and all of it goes on — but
+ * her own surface is not drawn (`material.visible`, NOT `mesh.visible`: the
+ * things in her hands and the firestarter's horns are children of her mesh
+ * and have to go on being drawn, now on v2.0's head) and casts no shadow.
+ * v2.0 wears her finished pose on the same frame in the same place — see
+ * `APPR.primary` in 46-apprentice.js.
+ *
+ * 'v1': the figure that shipped before, with v2.0 back as her apprentice.
+ */
+const BAYE = { primary: 'v2' };
+// At module scope rather than inside `buildJadrija`, because the figure load
+// reads it long before that function's body gets as far as its PARKED table —
+// declared there, it was in its temporal dead zone at the one moment it was
+// needed and the whole resort failed to build.
+
 const APPR = {
+  // True when v2.0 is THE figure rather than an apprentice — set by BAYE in
+  // 43-jadrija.js. See the note in `apprStepBody`.
+  primary: false,
   lag: 0.34,              // s of delay on both the clip and the path
   side: 1.15,             // m to the leader's left, in the leader's own frame
   back: 1.30,             // m behind her — outdoors; indoors see APPR_ROOM
@@ -283,7 +308,10 @@ function apprStepBody(dt, leader, room) {
   // with rather than by a count of frames — a lag counted in frames doubles
   // when the promenade drops to 30 with the fire up.
   let back = 0;
-  while (back < apprN - 1 && apprClock - apprRing[apprSlot(back)] < APPR.lag) back++;
+  // No lag at all when she is the primary: she is not following anybody,
+  // she IS the figure — the slot written this frame is the one she wears.
+  const lag = APPR.primary ? 0 : APPR.lag;
+  while (back < apprN - 1 && apprClock - apprRing[apprSlot(back)] < lag) back++;
   o = apprSlot(back);
   const x = apprRing[o + 1], y = apprRing[o + 2], z = apprRing[o + 3];
   const yaw = apprRing[o + 4], lift = apprRing[o + 5];
@@ -300,6 +328,31 @@ function apprStepBody(dt, leader, room) {
     if (want && want !== apprClip) { apprClip = want; appr.play(want, { fade: 0.18 }); }
     if (leader.state) appr.state.speed = leader.state.speed;
     appr.update(dt);
+  }
+
+  // ── AS THE PRIMARY: exactly where the driver is, and nothing else ─────────
+  //
+  // Misha, 23 Sep 2026: *"i think we are ready to 'park' baye v1.0 and have
+  // baye v2.0 be the main one... stash away baye v1.0 if we ever need to
+  // recover her"*. v1.0 is not deleted and does not stop: everything Baye
+  // does — every routine, every command, her voice, her lips, the straw in
+  // her hand — is written against her, and all of it goes on running on an
+  // undrawn figure. v2.0 wears that figure's finished pose on the same frame,
+  // in the same place, at the same height — the cot included, because here
+  // the lift IS where she is — and with the same mouth. See BAYE in
+  // 43-jadrija.js for the one switch that turns it back.
+  if (APPR.primary) {
+    appr.mesh.position.copy(m.position);
+    appr.mesh.rotation.y = m.rotation.y;
+    appr.mesh.visible = true;
+    apprMode = 'primary';
+    v5Blink(apprEye, dt);
+    if (apprJaw) {
+      apprJaw.uniforms.uGape.value = Math.min(1, Math.max(0,
+        leader.face && leader.face.gape ? leader.face.gape : 0));
+    }
+    appr.mesh.updateMatrixWorld();
+    return;
   }
 
   // ── where ────────────────────────────────────────────────────────────────

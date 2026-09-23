@@ -965,7 +965,7 @@ const CAMS = ['chase', 'close', 'cockpit', 'wing'];
 let thumbK = 0, thumbAt = null;
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
 const THUMB_D = 1.8;         // how far off her lip the button means the thumb
-const THUMB_STAND = 0.55;    // and where you stop, eye to lip
+const THUMB_STAND = 0.45;    // and where you stop, eye to lip
 const THUMB_WALK = 1.3;      // m/s you step in at
 let camMode = 0;
 const camPos = new THREE.Vector3();
@@ -1182,7 +1182,7 @@ async function boot() {
   // The skinned figure brings her own depth material, because her shape lives
   // in a bone palette that the two shared ones know nothing about. Near
   // cascade: she is 1.75 m and the far map cannot draw anything under two.
-  if (jadrija && jadrija.figure) jadrija.figure.cast(shadow);
+  if (jadrija && jadrija.figure && jadrija.figureCasts !== false) jadrija.figure.cast(shadow);
   // The same for the Bucketeer, plus the bucket — which is not skinned and is
   // the one thing she is carrying that a missing shadow would show up on,
   // because half of her loop is spent standing on a sunlit porch with it.
@@ -6803,53 +6803,60 @@ function frame() {
     // person the branch behaves as it always has.
     const pressing = mouseDrop || (keys.has('Space') && !spaceLeapt)
       || TOUCH.gjet || debugJet;
-    const lip = !bodyCam && jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null;
-    const lipNear = !!lip && Math.hypot(lip.x - camera.position.x,
-      lip.y - camera.position.y, lip.z - camera.position.z) < THUMB_D
-      // In front of her face, within about sixty degrees of it.
+    // IN THE KABINA THERE IS NO HOSE. Misha, 23 Sep 2026: *"sometimes it
+    // still breaks and becomes hose. in kabine it should just not be a hose
+    // at all. it should be a thumb no matter what."* Every gate below was a
+    // way for a press to fall through to the branch — facing her, her facing
+    // you, how far — and in there none of them is wanted. So inside, the
+    // branch never opens: holding the button walks you round to the front of
+    // her face, turns you on to her mouth and brings the thumb up as you get
+    // there. If she is not in the room it does nothing at all.
+    const inKab = !!(jadrija && jadrija.kabina && jadrija.kabina.inside
+      && jadrija.kabina.inside(camera.position.x, camera.position.z) > 0.5);
+    const lip = jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null;
+    const lipD = lip ? Math.hypot(lip.x - camera.position.x,
+      lip.y - camera.position.y, lip.z - camera.position.z) : Infinity;
+    // Outside the kabina — where she never publishes a lip anyway — the old
+    // gates stand: close, in front of her face, and her in your view.
+    const lipNear = !!lip && lipD < THUMB_D
       && ((camera.position.x - lip.x) * lip.fx + (camera.position.y - lip.y) * lip.fy
-        + (camera.position.z - lip.z) * lip.fz)
-        > 0.5 * Math.hypot(camera.position.x - lip.x, camera.position.y - lip.y,
-          camera.position.z - lip.z)
-      // And YOU are looking at her: her mouth within about forty degrees of
-      // the middle of the view. Facing her means both ways round — a press
-      // with your back to her, or with her off at the edge of the frame, is a
-      // press for the branch.
+        + (camera.position.z - lip.z) * lip.fz) > 0.5 * lipD
       && camera.getWorldDirection(_thumbF).dot(_thumbV.set(lip.x - camera.position.x,
         lip.y - camera.position.y, lip.z - camera.position.z).normalize()) > 0.77;
     if (lip) thumbAt = lip;
-    const thumbing = pressing && lipNear;
-    // AND YOU STEP IN. Left to herself she stops about a metre and a half off
-    // you — measured, facing you, 1.40 to 1.53 m — which is outside anybody's
-    // arm, and leaning the arm the rest of the way leaves a shoulder hanging
-    // in the middle of the room. So while the button is held you walk in on
-    // her at walking pace until her lip is 55 cm from your eye, through the
-    // same `confine` every step you take goes through, and the thumb arrives
-    // as you do.
+    const thumbing = pressing && (inKab ? !!lip : lipNear);
+    // AND YOU GO TO HER. Left to herself she stops about a metre and a half off
+    // you, which is outside anybody's arm, so while the button is held you
+    // walk — at walking pace, through the same `confine` as every step — to
+    // THE FRONT OF HER FACE: her lip plus 55 cm along the way her face points,
+    // so a press from behind her or from the side comes round to meet her
+    // rather than reaching through the back of her head. Your view turns on
+    // to her mouth as you go.
     if (thumbing && ground.you && ground.confine) {
       const Y = ground.you;
-      const hx = lip.x - camera.position.x, hz = lip.z - camera.position.z;
-      const hd = Math.hypot(hx, hz);
-      if (hd > THUMB_STAND) {
-        const step = Math.min(hd - THUMB_STAND, THUMB_WALK * dt);
-        const [nx, nz] = ground.confine(Y.x + (hx / hd) * step, Y.z + (hz / hd) * step);
+      const fh = Math.hypot(lip.fx, lip.fz) || 1;
+      const gx = lip.x + (lip.fx / fh) * THUMB_STAND, gz = lip.z + (lip.fz / fh) * THUMB_STAND;
+      const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
+      if (md > 0.02) {
+        const step = Math.min(md, THUMB_WALK * dt);
+        const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
         Y.x = nx; Y.z = nz;
       }
-      // And your eyes settle on her mouth as you come in. Eased, and only
-      // the last of the turn — the gate above already wants her within forty
-      // degrees, so this is a head finding the mouth, not a camera snatched.
+      const hd = Math.hypot(lip.x - camera.position.x, lip.z - camera.position.z);
       const wantYaw = Math.atan2(camera.position.x - lip.x, camera.position.z - lip.z);
       const wantPitch = Math.atan2(lip.y - camera.position.y, Math.max(hd, 0.05));
       let dy = wantYaw - Y.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      Y.yaw += dy * (1 - Math.exp(-5 * dt));
-      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-5 * dt));
+      Y.yaw += dy * (1 - Math.exp(-6 * dt));
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt));
     }
-    // Out a little slower than it comes back: a reach is a decision, and
-    // letting go is just letting go.
-    thumbK = damp(thumbK, thumbing ? 1 : 0, thumbing ? 4.5 : 7, dt);
+    // The hand comes up once she is within an arm and a lean, not across the
+    // room while you are still walking; and down a little faster than it goes
+    // out — a reach is a decision, and letting go is just letting go.
+    const reachNow = thumbing && lipD < 0.95;
+    thumbK = damp(thumbK, reachNow ? 1 : 0, reachNow ? 4.5 : 7, dt);
     if (jadrija && jadrija.thumbTouch) jadrija.thumbTouch(thumbK);
-    ground.setSpray(!swatCut && !pourCut && pressing && !lipNear);
+    ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear);
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
     // integrated was the chute branch, so the moment the canopy touched down she

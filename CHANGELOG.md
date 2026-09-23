@@ -8,6 +8,45 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.479.0] — 2026-09-23
+
+### Baye v2.0 is Baye; in the kabina there is no hose
+
+Misha: *"i think we are ready to 'park' baye v1.0 and have baye v2.0 be the
+main one. can u 'stash away' baye v1.0 if we ever need to recover her"* — and
+*"if she turns into firestarter, now baye v2.0 will have those cute horns"*.
+
+**`BAYE = { primary: 'v2' }`**, at module scope in 46-apprentice.js. v1.0 is
+not deleted and does not stop: every routine, command, voice line, lip, straw
+and cartwheel is written against her and all of it goes on running — but her
+own surface is not drawn and she casts no shadow. v2.0 wears her finished pose
+on the same frame, in the same place, at the same height (the cot included —
+as the primary, the lift IS where she is), with the same mouth in the same
+frame. Hidden by `material.visible` and not `mesh.visible`, which is the whole
+trick: the straw, the gifts and the firestarter's horns are children of
+v1.0's mesh, so they go on being drawn — now on v2.0's head and in v2.0's
+hands, because it is the same pose in the same place. `'v1'` puts everything
+back, with v2.0 her apprentice again.
+
+It went in with a temporal-dead-zone crash first: declared beside `PARKED`,
+halfway down `buildJadrija`, the switch was read by the figure load long
+before that line ran, and the resort failed to build. At module scope it is
+initialised before any of it is called.
+
+**In the kabina the button is only the thumb.** *"sometimes it still breaks
+and becomes hose. in kabine it should just not be a hose at all."* Every gate
+the thumb had — facing her, her facing you, distance — was a way for a press
+to fall through to the branch. Inside, the branch now never opens: holding the
+button walks you to the FRONT of her face (her lip plus 45 cm along the way it
+points, so a press from behind her comes round to meet her), turns your view
+on to her mouth, and the thumb comes up once she is in reach. If she is not in
+the room it does nothing. Measured from facing AWAY from her: round, thumb on,
+mouth fully open, and the water pack still at 400 litres throughout.
+
+The lean that closes the last of the reach is halved to 35 cm and you step 10
+cm closer instead: with her bent over the stool the old lean put your own
+shoulder in the bottom corner of the frame.
+
 ## [1.478.0] — 2026-09-23
 
 ### the thumb opens her mouth, and her recorded noises are parked

@@ -999,7 +999,10 @@ function buildArms() {
   const _tt = new THREE.Vector3();
   const THUMB_REST = new THREE.Vector3(0.24, -0.46, -0.20);   // low, right, out of shot
   const THUMB_REACH = 0.44;       // m of shoulder-to-target it will do without leaning
-  const THUMB_LEAN = 0.70;        // and how far the body may lean in to close the rest
+  // 0.35 and not the 0.70 it was: with her bent over the stool, a lean that big
+  // brought your own shoulder into the bottom corner of the frame as a pale
+  // blob. The walk-in (THUMB_STAND in 90-app.js) closes the rest instead.
+  const THUMB_LEAN = 0.35;        // and how far the body may lean in to close the rest
   // The hand's attitude at her mouth: elbow pole, palm normal, wrist flex.
   // A table rather than literals so a probe can try several and look — which
   // is the only way anybody has ever got a first-person hand right.

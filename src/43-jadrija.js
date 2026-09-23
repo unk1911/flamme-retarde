@@ -30910,6 +30910,10 @@ async function buildJadrija(scene) {
       // here so she is in the scene before the first `stepShow`, and null if
       // this build has no blob for her, which costs nothing.
       const a2 = await loadApprentice();
+      if (a2 && BAYE.primary === 'v2') {
+        APPR.primary = true;
+        skinFig.material.visible = false;
+      }
       if (a2) {
         a2.mesh.position.copy(mesh.position);
         a2.mesh.rotation.y = mesh.rotation.y;
@@ -33303,6 +33307,7 @@ async function buildJadrija(scene) {
   // Then, a minute later: *"no don't keep the 1 second reaction either...
   // they are currently not needed"* — so `noises` parks all of `showNoise`.
   const PARKED = { squeaks: true, cards: true, longNoises: true, noises: true };
+
   const SHOW = {
     /**
      * How near the round table's middle her route may pass — see `showRound`.
@@ -49367,6 +49372,8 @@ async function buildJadrija(scene) {
       playing: skinFig ? skinFig.playing() : 'none' },
     /** The skinned figure, for the debug API and for whatever animates her. */
     figure: skinFig,
+    // Whether v1.0 casts her own shadow — not while v2.0 is the one drawn.
+    figureCasts: !APPR.primary,
     /** The second one, on the vikendica's stairs with a bucket. */
     bucketeer,
     /** The Bucketeers of America, fly division — src/45-zombie.js. */
