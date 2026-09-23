@@ -844,6 +844,15 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     // person changes what they are doing and the wrong one here: there is
     // nothing to fade *from* except a stranger, in a different place, at a
     // different height.
+    // Their clothes, before anything else about them. A v2 figure is dyed per
+    // person (see 42-bathers2.js), so a slot that changes hands has to change
+    // outfits in the same frame — and a pinned one has to be dressed once, on
+    // the first frame anybody draws it. `dressedFor` rather than `rebind`
+    // because the pinned half of this tier is never rebound.
+    if (f.dress && f.dressedFor !== fg) {
+      f.dress(fg);
+      f.dressedFor = fg;
+    }
     if (fg.rebind) {
       fg.rebind = false;
       f.aim('head', 0, 1, 0, 0);

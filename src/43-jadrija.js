@@ -29756,11 +29756,20 @@ async function buildJadrija(scene) {
     };
     // Parsed in parallel — eight inflates of 150 KB apiece is worth doing at
     // once, and they are independent.
+    // v2 where the build carries it — a textured figure with real hair and
+    // swimwear, see 42-bathers2.js — and the painted v4 blob where it does
+    // not. Same skeleton and same clips either way, which is why nothing
+    // below this line needs to know which it got.
+    const T2 = bather2Table();
     const parsedAll = await Promise.all(BATHER_CAST.map(async (name) => {
-      const key = 'bather_' + name + '_fr3d';
+      const key2 = 'bather2_' + name + '_fr3d';
+      const v2 = !!(T2 && T2.bathers[name] && PAYLOAD[key2]);
+      const key = v2 ? key2 : 'bather_' + name + '_fr3d';
       if (!PAYLOAD[key]) return null;
       try {
-        return readFR3DSkin(await inflateBinary(PAYLOAD[key]));
+        const skin = readFR3DSkin(await inflateBinary(PAYLOAD[key]));
+        if (v2) skin.kind2 = name;
+        return skin;
       } catch (e) {
         console.warn('bather failed:', key, e.message);
         return null;
@@ -29773,7 +29782,13 @@ async function buildJadrija(scene) {
       parsed.push(skin);
       CAST_KIND.push(BATHER_CAST[i]);
     });
-    wheelBlobs = { parsed, kinds: CAST_KIND, opt: SKINOPT };
+    // One way to make a figure off one of these blobs, for the crowd, the
+    // riders and the boat alike. A v2 figure needs uniforms of its own — it
+    // is dyed per person — so it cannot be built off one shared option set
+    // the way a painted one can, and `make` is the door both kinds go through.
+    const mkFig = (p) => (p.kind2 ? bather2Figure(p, p.kind2) : skinnedFigure(p, SKINOPT));
+    wheelBlobs = { parsed, kinds: CAST_KIND, opt: SKINOPT,
+      make: (k) => mkFig(parsed[k]) };
     // WHO IS ON THEIR PHONE. Seated people, two in five, and split three to
     // one between looking at it and talking into it — which is roughly what a
     // café terrace looks like and is the only part of this anybody would
@@ -29899,9 +29914,9 @@ async function buildJadrija(scene) {
     // pinned half has to be the front of the array.
     const figs = [];
     for (let i = 0; parsed.length && i < SKIN_SEATED; i++) {
-      figs.push(skinnedFigure(parsed[i % parsed.length], SKINOPT));
+      figs.push(mkFig(parsed[i % parsed.length]));
     }
-    for (const c of castSlot || []) figs.push(skinnedFigure(parsed[c], SKINOPT));
+    for (const c of castSlot || []) figs.push(mkFig(parsed[c]));
     if (figs.length) {
       crowds.skin = makeSkinCrowd(scene, figs, figs.length,
         (castSlot || []).length);
@@ -45170,10 +45185,22 @@ async function buildJadrija(scene) {
     // is that nobody on this shore changes colour when you walk up to them,
     // and the sunbathers and the quay sitters — who can never be promoted and
     // are most of the towels — keep the full palette. See `BATHER_PAINT`.
+    //
+    // UNLESS THE FIGURE CAN BE TOLD. A v2 blob is dyed per person, so the
+    // copy runs the way it always should have: this person keeps the colours
+    // the beach dealt them, gets a real skin picked for them now — nearest in
+    // tone, from a pool right for the body they will be drawn on — and
+    // `bather2Pick` writes that skin's tone back on to `fg.skin`, so the
+    // stand-in and the figure agree before either has ever been drawn.
     if (roveOk) {
-      const paint = BATHER_PAINT[BATHER_CAST[fg.blob]];
-      if (paint) { fg.skin = paint.skin; fg.suit = paint.suit; }
-      fg.hair = BATHER_HAIR;
+      const p2 = wheelBlobs && wheelBlobs.parsed[fg.blob];
+      if (p2 && p2.kind2) {
+        bather2Pick(p2.kind2, fg);
+      } else {
+        const paint = BATHER_PAINT[BATHER_CAST[fg.blob]];
+        if (paint) { fg.skin = paint.skin; fg.suit = paint.suit; }
+        fg.hair = BATHER_HAIR;
+      }
     }
     // The phone comes across from the BATHER, which is a different object
     // from the figure. `b` is the person the shore placed and `fg` is the
@@ -46331,7 +46358,8 @@ async function buildJadrija(scene) {
     WHEELS.cast.forEach((c, i) => {
       const k = wheelBlobs.kinds.indexOf(c.who);
       if (k < 0) return;
-      const fig = skinnedFigure(wheelBlobs.parsed[k], wheelBlobs.opt);
+      const fig = wheelBlobs.make ? wheelBlobs.make(k)
+        : skinnedFigure(wheelBlobs.parsed[k], wheelBlobs.opt);
       // `idle` held at a frame and never advanced. The clip is only the rest
       // the solve starts from; everything a rider does with their body is an
       // `aim`, and a standing idle breathing under a solve would move the

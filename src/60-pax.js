@@ -486,7 +486,8 @@ async function buildBrodPax(scene, deckAt, boat) {
     ? jadrija.blobs() : null;
   /** One blob, placed in her frame once and told what it is doing. */
   const upgrade = (fg, k, y, clip) => {
-    const f = skinnedFigure(blobs.parsed[k % blobs.parsed.length], blobs.opt);
+    const f = blobs.make ? blobs.make(k % blobs.parsed.length)
+      : skinnedFigure(blobs.parsed[k % blobs.parsed.length], blobs.opt);
     f.mesh.position.set(fg.x, y, fg.z);
     f.mesh.rotation.y = fg.yaw;
     // A hull that is 22 m long and 460 m from the origin puts a figure well
