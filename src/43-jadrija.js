@@ -33611,6 +33611,10 @@ async function buildJadrija(scene) {
     // any distance anybody stands from her. 0.6 is 5-10 mm on a syllable: a
     // mouth you can see talking, and still well short of the hose.
     talkOpen: 0.6,
+    // And "open wide": the whole drop, held this long unless she is asked to
+    // close it. Long enough to look at, short enough that a mouth left open
+    // does not become the thing everybody notices about her.
+    mouthHold: 8,
     soakFor: 5.5,
     // And a second and a half of it inside the kabina. See the note on the
     // meter itself: in there the water is not buying a set piece, it is asking
@@ -36126,6 +36130,15 @@ async function buildJadrija(scene) {
     /** And her arms out, which is a latch on the pose like her legs. */
     'arms.wide': 1, 'arms.down': 1,
     /**
+     * And her mouth, wide. Misha, 23 Sep 2026: *"can you add a command 'open
+     * your mouth' or 'open wide', that she really opens the mouth wide"*. A
+     * latch over whatever she is doing, like the arms and the eyes: the jaw
+     * her lips talk with, all the way down, held `SHOW.mouthHold` seconds or
+     * until she is asked to close it. The apprentice copies it with the rest
+     * of her face.
+     */
+    'mouth.open': 1, 'mouth.close': 1,
+    /**
      * AND HER EYES ON YOU, which is not a pose at all.
      *
      * Misha, 19 Sep 2026: *"if you say 'look at me', she should look at me"*.
@@ -37331,7 +37344,11 @@ async function buildJadrija(scene) {
             : 0;
           talk = Math.max(lvl, dumb) * SHOW.talkOpen;
         } else if (show.lipT) { show.lipT = 0; show.lipPeak = 0; }
-        f.face.gape = Math.max(talk,
+        // Asked to open wide: a full drop, eased in and out rather than
+        // stepped, and bigger than anything else wins as always.
+        show.mouthFor = Math.max(0, (show.mouthFor || 0) - dt);
+        show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? 1 : 0, 6, dt);
+        f.face.gape = Math.max(talk, show.mouthW,
           show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
         // Both gated on `gape` rather than on `fill` alone, so everything in
         // her mouth leaves with her mouth. A closed mouth with foam painted on
@@ -37496,6 +37513,7 @@ async function buildJadrija(scene) {
       // a phase it may be entered from, which every held pose in that room
       // already is.
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
+      'mouth.open': 1, 'mouth.close': 1,
       // AND THE HAIR IS NOT ON THIS LIST, which it was for an afternoon.
       //
       // It reads as one of the adjustments — two seconds of her own hands,
@@ -37758,6 +37776,9 @@ async function buildJadrija(scene) {
         show.armsWide = name === 'arms.wide' ? 1 : 0;
         show.did = name;
         showSay('squee', d);
+      } else if (name === 'mouth.open' || name === 'mouth.close') {
+        show.mouthFor = name === 'mouth.open' ? SHOW.mouthHold : 0;
+        show.did = name;
       } else if (name === 'hair.down' || name === 'hair.up') {
         // A PHASE AND NOT A LATCH, which is the one place this differs from
         // the legs and the arms above it. Those two are a pose she is already

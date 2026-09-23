@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.476.0] — 2026-09-23 (baye 1.35.0)
+
+### "open your mouth"
+
+Misha: *"can you add a command 'open your mouth' or 'open wide', that she
+really opens the mouth wide"*.
+
+Two new skills, `mouth.open` and `mouth.close`, on the service and in
+`SHE_CAN`. A LATCH over whatever she is doing, like the arms and her eyes: the
+same jaw her lips talk with, all the way down, eased in, held for
+`SHOW.mouthHold` (8 s) unless she is asked to close it, and eased out. It is
+one more driver of `face.gape` and the biggest one wins, as ever, so the
+apprentice copies it with the rest of her face — measured through `jad.ask`:
+v1.0 fully open inside half a second, v2.0 a third of a second behind, both
+shut again at eight.
+
+On the service, CLOSE is matched before OPEN so "close your mouth" is never
+read as the open, and neither owns a bare "open", which is the wine's ("open
+the bottle"): each wants a mouth or jaw noun, or "open wide" whole, or "say
+ahh". Both phrasings also go into `ASK_RE`, since none of them carries a modal.
+Checked offline: open your mouth / open wide / keep your mouth open / say ahh
+→ open; close / shut your mouth → close; "your mouth is pretty" → nothing.
+
+Deployed to mpcn0 after a diff showed the live `baye.py` identical to the
+repo's, with a timestamped backup beside it.
+
 ## [1.475.2] — 2026-09-23
 
 ### she talks with her mouth, visibly

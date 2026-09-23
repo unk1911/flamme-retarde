@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.34.0"
+VERSION = "1.35.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -497,6 +497,18 @@ SKILLS = {
     # And the yawn, which owns its own word and nothing else's.
     "yawn": ("take her hand to her mouth and yawn",
              [r"\byawn\w*\b"]),
+    # HER MOUTH, WIDE. Misha, 23 Sep 2026: *"can you add a command 'open your
+    # mouth' or 'open wide', that she really opens the mouth wide"*. The same
+    # jaw her lips talk with, all the way down, held for a few seconds or
+    # until she is asked to close it. CLOSE FIRST, so "close your mouth" is
+    # never read as the open; and neither owns a bare "open", which is the
+    # wine's ("open the bottle") — each needs the mouth or jaw, or "open wide".
+    "mouth.close": ("close her mouth again",
+                    [r"\b(close|shut)\b.{0,20}\b(mouth|jaw)\b"
+                     r"|\b(mouth|jaw)\b.{0,12}\b(closed?|shut)\b"]),
+    "mouth.open": ("open her mouth wide and hold it open",
+                   [r"\bopen\b.{0,20}\b(mouth|jaw)\b|\bopen (it |up |them )?wide\b"
+                    r"|\b(mouth|jaw)\b.{0,12}\b(open|wide)\b|\bsay a+h+\b"]),
     # HER EYES ON YOU. Misha, 19 Sep 2026: *"if you say 'look at me', she
     # should look at me"*. Above `see.*`, which owns the word "look" for
     # errands — "go look at the kiosk" is a place and a verb, and this is a
@@ -788,6 +800,11 @@ ASK_RE = re.compile(
     r"|\bagainst the wall\b"
     r"|\bhand ?stands?\b|\bhead ?stands?\b|\bstand on (your|her|the) hands\b"
     r"|\byawn\w*\b"
+    # "Open your mouth", "open wide", "close your mouth" carry no modal either.
+    # The mouth or jaw noun, or "open wide" whole, and never a bare "open":
+    # "open the bottle" belongs to the wine.
+    r"|\b(open|close|shut)\b.{0,20}\b(mouth|jaw)\b|\bopen (it |up |them )?wide\b"
+    r"|\b(mouth|jaw)\b.{0,12}\b(open|wide|closed?|shut)\b|\bsay a+h+\b"
     # "look at me" carries no modal and none of the openers below.
     r"|\blook(ing)?\b.{0,12}\b(me|my|us|here|this way|camera|lens)\b"
     r"|\bwatch me\b"
