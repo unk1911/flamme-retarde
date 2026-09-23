@@ -2314,6 +2314,43 @@ function skinnedFigure(data, opts = {}) {
       return out;
     },
     boneIndex: (name) => data.bones.findIndex((b) => b.name === name),
+    /**
+     * The pose as it will be drawn this frame, by reference: the skinning
+     * palette, and the world rotation and position of every bone that
+     * `boneAt` and `boneTurn` read. Copy it before the next `update` if it has
+     * to outlive the frame.
+     *
+     * For one caller, and it is a figure rather than a prop: Baye v2.0 is
+     * built through the same `armature()` as the figure she follows, so the
+     * two rigs are bone for bone identical — names, parents and rest
+     * transforms to six decimals, checked at runtime in 46-apprentice.js — and
+     * a palette solved for one skins the other exactly. See `wearPose`.
+     */
+    pose: () => ({ palette, worldQ, worldT }),
+    rest: () => ({ restQ, restT }),
+    /**
+     * Wear a pose somebody else solved, instead of solving one.
+     *
+     * The whole of the apprentice's problem was the difference between doing
+     * the same CLIP and doing the same THING. Half of what the woman she
+     * follows does never passes through a clip at all: arms held wide on
+     * request, a straw lifted to a nostril, a head turned to whoever is
+     * talking, a hand fetching something off the stool — all of it is `aim`s
+     * solved on to that one figure, and a copy that only listens for clip
+     * names cannot even see it. The palette is where all of it has already
+     * been added up, so the palette is what gets copied.
+     *
+     * The arrays are copied, not held, so the caller can recycle its buffers.
+     * Nothing else about the figure changes: `update` is simply not called on
+     * a figure that is wearing somebody else's pose, and calling it again puts
+     * her back on her own clips.
+     */
+    wearPose: (P, Q, T) => {
+      palette.set(P);
+      worldQ.set(Q);
+      worldT.set(T);
+      boneTex.needsUpdate = true;
+    },
   };
 }
 

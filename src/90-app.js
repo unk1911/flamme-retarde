@@ -8560,6 +8560,9 @@ window.__fr = {
     plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
     /** Debug: turn Baye v2.0 to an absolute yaw — see 46-apprentice.js. */
     apprFace: (yaw) => apprenticeFace(yaw),
+    /** What the apprentice is doing, without building the whole of `stats`. */
+    appr: () => apprenticeStats(),
+    apprCheck: () => (jadrija && jadrija.apprCheck ? jadrija.apprCheck() : null),
     /**
      * Debug: stand in front of the apprentice, looking at her. One call,
      * because doing it by hand costs a screenshot a guess.
