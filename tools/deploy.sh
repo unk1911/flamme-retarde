@@ -22,23 +22,26 @@ WANT=$(grep -oP '^VERSION = "\K[^"]+' build.py)
 WEB=edeliverables.com:/var/www/vhost/edeliverables/public_html/flamme-retarde
 DEST=$WEB/index.html
 
-# The wardrobe viewer goes up beside the game, and NOT in the retry loop: it
-# has no version stamp to read back, it changes on the rare days the rack
-# changes rather than on every increment, and a failure to copy it must not
-# report the game as undeployed. Unchanged bytes are skipped outright, because
-# the whole reason deploy.sh counts its attempts is that this host starts
-# refusing connections when fifteen large files go up in seven hours.
-if [ -f wardrobe.html ]; then
-  SUM=$(md5sum wardrobe.html | cut -c1-32)
-  GOTSUM=$(curl -s https://flamme-retarde.edeliverables.com/wardrobe.html | md5sum | cut -c1-32)
+# The standalone viewers go up beside the game — the wardrobe, and the Slow
+# Doodle since 23 Sep 2026 ("can u upload the slowdoodle.html up on the public
+# website so i can share with friends"). NOT in the retry loop: they have no
+# version stamp to read back, they change on the rare days they change rather
+# than on every increment, and a failure to copy one must not report the game
+# as undeployed. Unchanged bytes are skipped outright, because the whole reason
+# deploy.sh counts its attempts is that this host starts refusing connections
+# when fifteen large files go up in seven hours.
+for page in wardrobe.html slowdoodle.html; do
+  [ -f "$page" ] || continue
+  SUM=$(md5sum "$page" | cut -c1-32)
+  GOTSUM=$(curl -s "https://flamme-retarde.edeliverables.com/$page" | md5sum | cut -c1-32)
   if [ "$SUM" = "$GOTSUM" ]; then
-    echo "wardrobe.html unchanged"
-  elif scp -C -o ConnectTimeout=20 wardrobe.html "$WEB/wardrobe.html" 2>/dev/null; then
-    echo "wardrobe.html deployed"
+    echo "$page unchanged"
+  elif scp -C -o ConnectTimeout=20 "$page" "$WEB/$page" 2>/dev/null; then
+    echo "$page deployed"
   else
-    echo "wardrobe.html FAILED to copy (the game deploy below is unaffected)"
+    echo "$page FAILED to copy (the game deploy below is unaffected)"
   fi
-fi
+done
 
 for try in 1 2 3; do
   if scp -C -o ConnectTimeout=20 flamme-retarde.html "$DEST" 2>/dev/null; then
