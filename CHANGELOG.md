@@ -8,6 +8,67 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.473.0] — 2026-09-23
+
+### the bathers get faces
+
+Misha: *"it would be cool if the bathers also looked nicer, right now they
+look rather horrendous."* They were painted the way v1.0 Baye is — vertex
+colour on 7 000 triangles — and on a body that coarse, eyes come out as black
+rims, eyebrows as tufts and hair as a helmet.
+
+`tools/blender/bathers_v2.py` rebuilds the eight bodies the way Baye v2.0 is
+built: each body's own UVs, a photographic skin, and a hairstyle and swimwear
+from the MakeHuman packs fitted through each asset's `.mhclo`. The skeleton is
+built from each body's OWN joint markers rather than the neutral base
+`baye2.solve_weights` uses, which would have put an adult rig inside a 1.24 m
+girl. The sixteen clips are unchanged, which is why the chairs, the quay, the
+towels, the riders and the boat needed nothing. `wheelBlobs.make` is now the
+one figure factory for the crowd, the riders and the boat passengers.
+
+**Dressed per person, not per body.** The painted blobs had their colours
+baked in, so the instanced far tier had to be repainted to match them and the
+promotable half of the beach lost its palette to that. A textured figure can
+be told what to wear: everybody keeps the colours the beach dealt them, dyed on
+luminance, with a real skin from a pool right for that body's age and sex,
+nearest in tone — and that tone is written back, so nobody changes colour when
+you walk up to them. A near-white suit is never dealt, because a pale one-piece
+reads as nude.
+
+**Hair and swimwear are one part**, one shader on one atlas dyed per tile. As
+two parts they cost 130 draw calls on the promenade; merged, 336 becomes 401
+rather than 466.
+
+**The children are dressed as children**: a full one-piece for the girl, a
+T-shirt and shorts for the boy.
+
+**A red nose, found by painting the map green.** MakeHuman skins paint the
+nose and mouth cavities red and trust MakeHuman's own renderer to shadow them;
+the old-age morphs tip the nose up and expose them, and the old woman had a red
+disc on her face. An ellipse round the visible nostrils changed nothing, and a
+mask built from the faces round the tip missed too. Painting every red texel
+in that corner of the map green turned the disc green, and that was the
+answer: texels clearly redder than the skin's own tone are pulled back to it,
+there and only there.
+
+Also: the system-asset hair `.mhclo` files put keyword lines inside the verts
+block, which a strict reader parses as zero rows. `bathers_v2.py` reads them
+tolerantly.
+
+9 470–13 120 triangles a figure, up from ~7 900. 22 skins, all CC0 or CC-BY
+(credits in `tools/bathers_v2_CREDITS.md`). The page grows 6.45 MB to
+45.55 MB. Measured A/B on a GPU shared with other work: about +0.5–1 ms a
+frame of clean draw, and in-game fps no worse — 61–62 on the promenade with
+all hundred people after the merge.
+
+Left for a decision: the eight old v4 bather blobs still ship as a fallback
+used only if a v2 blob is missing (dropping them saves about 2.8 MB of page);
+the distant instanced tier is still the rigid mannequin and still draws a
+two-piece where the v2 old woman and the girl wear one-pieces, visible only
+past the ~45 m promotion distance; and 60-pax.js can put an adult passenger on
+a child's body because it indexes blobs by k % 8 — older than this, not fixed
+here.
+
 ## [1.472.0] — 2026-09-23
 
 ### the apprentice wears the leader's pose, and finds room in the kabina
