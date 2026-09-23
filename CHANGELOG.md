@@ -8,6 +8,65 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.474.0] — 2026-09-23
+
+### the line, as thirteen sub-steps
+
+Misha, after about ten rounds of this: *"the straw never goes into her nose,
+the right arm doesn't quite hold the straw… maybe by breaking it down into
+many many sub-steps?"* It is now exactly that — reach, fingers close, lift,
+to her nose, in the nostril, down to the line, on the line, along the line,
+held, head off, back on the plate, let go, arm back and rise — and every one
+of them is graded every frame by `tools/coke_probe.mjs` and
+`tools/coke_grade.py`. The design record is `plan/coke-line-substeps.md`.
+
+**Four faults, all measured, none of them visible from where they were
+fixed before.**
+
+1. **The nostril was a guess** — the head bone plus a fixed offset, which
+   landed 78 mm from the real one, inside her face at the upper lip. It is
+   read off the mesh now and skinned with the mesh's own weights (jaw 0.68,
+   head 0.30), so it moves with her face.
+2. **The geometry could never have worked.** At the bottom of the old clip
+   her nostril was 135–170 mm above the plate and 84 mm to the side of the
+   line, holding a 42 mm straw. No amount of arm tuning closes that. The straw
+   is 70 mm, the clip goes lower, and her mark is solved per line so her nose
+   is over the line she is taking.
+3. **The hand chased the straw** through a goal damped at 9/s plus a frame of
+   lag, so the grip was 50–150 mm off the straw whenever anything moved. Now
+   the straw's pose is decided FIRST from the sub-step and her live nostril,
+   the arm is solved exactly with no damping, the skin is re-evaluated the same
+   frame, and the straw is placed FROM the hand — it cannot slip, by
+   construction.
+4. **Only the palm's direction was aimed**, with the clip's open, splayed
+   fingers. Now there is a measured pinch — thumb and fingers closing with the
+   pads 8 mm apart on a straw 4 mm across — and the one free twist of the hand
+   about the straw is searched every frame for the least wrist bend, with
+   costs for going into the plate or her face and a look-ahead to where the
+   lift ends.
+
+Two more on the way: the sniff "snap" was neck FLEXION on this rig, and drove
+her nose 10.7 mm into the plate — it is an extension now, her head going back.
+And a second "do a line" asked inside the first one's fade ate a line in a
+single frame, because `play()` turns a fade round.
+
+**Measured on the released build, four lines back to back: all thirteen
+sub-steps pass on every line.** Straw top 4.7–5.0 mm up her nostril, far end
+2.5–3.3 mm off the line and 2.7–7.8 mm above the plate while it travels, grip
+error 0. Before: 77.7 mm from the nostril, far end 113–145 mm off the line,
+grip 50–150 mm off the straw.
+
+The face check keeps all 3 134 face vertices on a per-frame 25 mm spatial
+hash: 1.0 ms median, 1.8 ms max, and only during the beat. Two thinned face
+sets were tried and both let knuckles 11–24 mm into her chin — the sign comes
+from the nearest vertex, so a thinner set gives a different answer, not a
+coarser one.
+
+Still imperfect: the rig has one bone for all four fingers, so the pinch is a
+whole-hand curl. `human_skin.fr3d.gz` was rebaked, and Baye v2.0 and Chloe
+were rebaked with it, so all three carry the same 6.3 s snort and the
+apprentice stays in step.
+
 ## [1.473.0] — 2026-09-23
 
 ### the bathers get faces
