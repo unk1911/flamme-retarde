@@ -1,0 +1,16 @@
+{
+ "_note": "What each of the eight Jadrija bathers wears in v2. Read by BOTH tools/blender/bathers_v2.py (Blender, geometry) and tools/bathers_v2_tex.py (system python, pixels), so the two halves cannot disagree about who has what on. Asset names are MakeHuman community pack names; every one is CC0 or CC-BY by its pack's own registry, and tools/bathers_v2_tex.py refuses anything else. `skins` is the pool a PERSON's skin is picked from, by nearest tone to their palette entry, so the pool is what keeps an old man old and a child a child; `grey` marks a body whose hair is dyed grey rather than from the beach palette.",
+ "body_tris": 7000,
+ "hair_tris": 3600,
+ "suit_tris": 1600,
+ "bathers": {
+  "woman_young_slim": {"hair": "long01", "top": "punkduck_bikini02_bra", "btm": "punkduck_bikini02_slip", "skins": ["toigo_light_skin_female_freckles", "young_caucasian_female", "toigo_light_skin_female_bronze", "cutoff3d_indian_female_enhanced"]},
+  "woman_young_full": {"hair": "afro01", "top": "punkduck_bandeau_bikini_bra", "btm": "punkduck_bandeau_bikini_slip", "skins": ["young_african_female", "cutoff3d_indian_female_enhanced", "callharvey3d_midtoned_female", "darthfurby_caucasian_female"]},
+  "woman_old": {"hair": "rehmanpolanski_hair_bun_brown", "grey": true, "btm": "mindfront_f_one-piece_swimsuit_01", "skins": ["old_caucasian_female", "onlytheghosts_old_eurasian_female", "old_asian_female", "old_african_female"]},
+  "girl_child": {"hair": "braid01", "child": true, "btm": "mindfront_f_one-piece_swimsuit_01", "skins": ["toigo_light_skin_female_freckles", "young_caucasian_female", "young_african_female"]},
+  "boy_child": {"hair": "short03", "child": true, "top": "elvs_crude_t-shirt_male", "btm": "cortu_jeans_shorts", "skins": ["toigo_light_skin_male_freckles", "young_caucasian_male", "young_african_male"]},
+  "man_young_fit": {"hair": "short02", "btm": "cortu_jeans_shorts", "skins": ["young_caucasian_male2", "toigo_light_skin_male_bronze", "mindfront_skin_male_african_middleage", "young_asian_male"]},
+  "man_young_lean": {"hair": "short04", "btm": "cortu_jeans_shorts", "skins": ["young_caucasian_male", "toigo_light_skin_male_freckles", "young_caucasian_male2", "young_african_male"]},
+  "man_old_heavy": {"hair": "short01", "grey": true, "btm": "cortu_jeans_shorts", "skins": ["jartur69_old_slavic_male_with_genitals_and_beard", "old_caucasian_male", "onlytheghosts_old_eurasian_male", "old_african_male"]}
+ }
+}
