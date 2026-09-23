@@ -8,6 +8,13 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.475.1] — 2026-09-23
+
+`__fr.jad.appr()` now reports `gape` and `lead`: the apprentice's mouth and
+v1.0's, 0 shut to 1 wide. Misha asked how to check that her lips move; this is
+a number instead of a squint. While v1.0 speaks the two move together a third
+of a second apart.
+
 ## [1.475.0] — 2026-09-23
 
 ### v2.0's lips move, and two old stand-ins are parked

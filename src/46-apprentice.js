@@ -92,6 +92,7 @@ let apprClip = null;             // what the leader was last seen playing
 let apprEye = null;              // her iris and blink uniforms
 let apprJaw = null;              // her jaw uniforms — see v5Parts
 let apprGape = null;             // the leader's mouth, per ring slot
+let apprLeadFace = null;         // the leader's face, for the stats readout
 let apprCalls = 0;               // frames apprenticeStep has run (diagnostic)
 // Whether the two rigs are the same rig, decided once against the first
 // leader she is handed. Null until then. If they ever are not, she falls back
@@ -268,6 +269,7 @@ function apprStepBody(dt, leader, room) {
   // `face.gape` is what v1.0's own jaw is driven by: the voice meter while she
   // speaks, the syllable fallback, the open mouth of the hose and the straw.
   apprGape[o / apprStride] = leader.face ? leader.face.gape || 0 : 0;
+  apprLeadFace = leader.face || null;
   if (apprSame) {
     const P = leader.pose();
     apprRing.set(P.palette, o + 6);
@@ -562,6 +564,12 @@ function apprenticeStats() {
     by: apprSame === null ? '-' : (apprSame ? 'pose' : 'clip'),
     mode: apprMode, cand: apprCand, ms: +apprMs.toFixed(3),
     playing: appr.playing(),
+    // Her mouth and the leader's, 0 shut to 1 wide — the way to check her
+    // lips without looking. `lead` is v1.0's face.gape now; `gape` is hers,
+    // which trails it by the lag and the damping, so while v1.0 speaks the two
+    // move together a third of a second apart.
+    gape: apprJaw ? +apprJaw.uniforms.uGape.value.toFixed(3) : null,
+    lead: apprLeadFace ? +(apprLeadFace.gape || 0).toFixed(3) : null,
     at: [+appr.mesh.position.x.toFixed(2), +appr.mesh.position.y.toFixed(2),
       +appr.mesh.position.z.toFixed(2)],
   };
