@@ -66,6 +66,20 @@ half-described: "a white plate" came back with food on it, and it is "a small
 black plate with a gold rim with a few neat lines of fine white powder"; and
 people the prompt did not say were naked came back in bikini bottoms.
 
+## And then grade it low-key — 23 Sep 2026
+
+The model exposes a dark room like a photographer would: the kabina came back
+lit, with blotchy plaster, at denoise 0.95 AND at 1.0 (so it is not the
+render's latents), and no prompt wording darkened it. A grade does, for free,
+on the laptop, and cannot touch identity or geometry. The one Misha picked
+(`…-demo2b-graded.mp4`):
+
+    ffmpeg -i in.mp4 -vf "curves=all='0/0 0.18/0.05 0.40/0.17 0.60/0.40 0.80/0.70 1/1',eq=saturation=0.92" \
+      -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -c:a copy out.mp4
+
+Midtones crushed, highlights kept: walls fall into shadow, skin, the doorway
+and the television stay bright. Deliver both, graded and not.
+
 ## Rented-GPU gotchas
 
 Each of these cost a run.
