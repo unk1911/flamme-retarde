@@ -160,11 +160,14 @@ const MAT = {
   Nose: new THREE.MeshPhysicalMaterial({ color: 0x050505, roughness: 0.28, clearcoat: 0.6 }),
   Eyes_Black: new THREE.MeshPhysicalMaterial({ color: 0x3a0e08, roughness: 0.05,
     clearcoat: 1, clearcoatRoughness: 0.02, emissive: 0x2a0600, emissiveIntensity: 0.6 }),
-  gold: new THREE.MeshPhysicalMaterial({ color: 0xe0a84e, metalness: 1, roughness: 0.26,
+  gold: new THREE.MeshPhysicalMaterial({ color: 0xe6b25a, metalness: 1, roughness: 0.22,
     clearcoat: 0.4, clearcoatRoughness: 0.2 }),
-  gem: new THREE.MeshPhysicalMaterial({ color: 0xb0061a, metalness: 0, roughness: 0.04,
-    transmission: 0.55, thickness: 0.02, ior: 1.77, clearcoat: 1, clearcoatRoughness: 0.0,
-    emissive: 0x5a0008, emissiveIntensity: 0.45, attenuationColor: new THREE.Color(0x800010), attenuationDistance: 0.01 }),
+  // A ruby: faceted (the mesh is flat-shaded), deep red, with its own inner
+  // glow so it reads as a stone and not a red bead even in the shadow of his
+  // chin — in the picture it is the brightest thing on him after the mane.
+  gem: new THREE.MeshPhysicalMaterial({ color: 0xc40a24, metalness: 0, roughness: 0.03,
+    clearcoat: 1, clearcoatRoughness: 0.0, ior: 1.77, specularIntensity: 1,
+    emissive: 0x8a0012, emissiveIntensity: 0.55, flatShading: true }),
   mouth: new THREE.MeshStandardMaterial({ color: 0x1a0708, roughness: 0.6 }),
   tongue: new THREE.MeshPhysicalMaterial({ color: 0xb04a58, roughness: 0.35, clearcoat: 0.5 }),
   teeth: new THREE.MeshPhysicalMaterial({ color: 0xf1ead8, roughness: 0.25, clearcoat: 0.6 }),
@@ -179,22 +182,34 @@ function tex(file, srgb) {
 // a dye, not a tint — with the tips pushed toward yellow and a little glow,
 // because in the picture the mane is backlit by the sunset and burns.
 function hairMat(file) {
-  const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.45, metalness: 0,
-    side: THREE.DoubleSide, alphaTest: 0.45, sheen: 0.6, sheenRoughness: 0.35,
-    sheenColor: new THREE.Color(0xffd080), emissive: 0xff7a20, emissiveIntensity: 0.62 });
+  // Soft, not shredded. alphaToCoverage turns the strand texture's alpha into
+  // MSAA coverage, so a lock's edge fades through its fine strands instead of
+  // being chopped at one threshold into a comb of hard spikes — which is what
+  // alphaTest alone did. The low alphaTest is only there so the shadow pass,
+  // which has no coverage, still cuts the cards into hair.
+  const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.38, metalness: 0,
+    side: THREE.DoubleSide, alphaTest: 0.18, alphaToCoverage: true,
+    sheen: 0.7, sheenRoughness: 0.3, sheenColor: new THREE.Color(0xffd890),
+    clearcoat: 0.35, clearcoatRoughness: 0.35,
+    // Glossy ALONG the strands: the highlight on real hair is a band across
+    // the lock, because each strand is a cylinder lying in it. The texture's
+    // strands run along v, so the anisotropy is turned a quarter from u.
+    anisotropy: 0.75, anisotropyRotation: Math.PI / 2,
+    emissive: 0xff6a18, emissiveIntensity: 0.34 });
   m.map = tex(file, true);
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uDye = { value: new THREE.Color(0xff8a26) };
-    sh.uniforms.uTip = { value: new THREE.Color(0xffdc86) };
+    sh.uniforms.uDye = { value: new THREE.Color(0xff8a24) };
+    sh.uniforms.uTip = { value: new THREE.Color(0xffd27a) };
     sh.fragmentShader = 'uniform vec3 uDye; uniform vec3 uTip;\n' + sh.fragmentShader.replace(
       '#include <map_fragment>',
       `vec4 hc = texture2D(map, vMapUv);
        float hl = dot(hc.rgb, vec3(0.299, 0.587, 0.114));
-       vec3 dye = mix(uDye, uTip, smoothstep(0.55, 1.0, vMapUv.y));
-       diffuseColor.rgb *= dye * (0.55 + 0.95 * hl);
+       // v runs root (1) to tip (0): the ends lighter, as in the picture
+       vec3 dye = mix(uTip, uDye, smoothstep(0.0, 0.55, vMapUv.y));
+       diffuseColor.rgb *= dye * (0.66 + 0.95 * hl);
        diffuseColor.a *= hc.a;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>',
-      '#include <emissivemap_fragment>\n totalEmissiveRadiance *= (0.35 + 0.9 * hl) * dye;');
+      '#include <emissivemap_fragment>\n totalEmissiveRadiance *= (0.3 + 0.9 * hl) * dye;');
   };
   return m; }
 
@@ -210,9 +225,6 @@ new GLTFLoader().load(SRC.glb + '?b=' + Date.now(), (g) => {
     const out = mats.map((m) => {
       const n = (m && m.name || '').replace(/\.\d+$/, '');
       if (n === 'mane' || n === 'tuft') return hairMat(n === 'mane' ? 'mane.png' : 'tuft.png');
-      if (n === 'filigree') {
-        const f = MAT.gold.clone(); f.map = tex('filigree.png', true); f.alphaTest = 0.5;
-        f.side = THREE.DoubleSide; return f; }
       return MAT[n] || m; });
     o.material = Array.isArray(o.material) ? out : out[0];
     parts[o.name] = o;
@@ -268,6 +280,8 @@ function frame() {
   V.side = [[c.x, c.y + d * 0.08, d * 1.02], [c.x, c.y, 0]];
   V.head = [[head.x + 0.46, head.y + 0.06, 0.40], [head.x - 0.01, head.y - 0.01, 0]];
   V.paws = [[c.x + 0.55, 0.16, 0.62], [c.x + 0.08, 0.08, 0]];
+  // In front and to one side, at chest height: the breastplate's view.
+  V.front = [[c.x + d * 0.78, c.y + d * 0.06, d * 0.40], [c.x + 0.25, c.y + 0.02, 0]];
   // Low and in front, looking up at him, the way the picture was taken.
   V.photo = [[c.x + d * 0.42, 0.10, d * 0.62], [c.x + 0.04, c.y + sz.y * 0.10, 0]];
 }
@@ -299,7 +313,7 @@ function credits() {
     + 'subdivided, given a jaw.</p>'
     + '<p><b>Mane and tuft strands</b>: hair textures from the MakeHuman community asset packs '
     + '(hair01), CC0, recoloured.</p>'
-    + '<p>Harness, breastplate, gem, boots, sky and rock: made for this page.</p>';
+    + '<p>Breastplate, girth, gem, boots, sky and rock: made for this page.</p>';
   d.style.display = 'block'; }
 function size() { renderer.setSize(innerWidth, innerHeight, false);
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }

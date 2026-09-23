@@ -283,25 +283,90 @@ def mouth(ctx, J):
 
 # ── hair: the mane and the tuft ───────────────────────────────────────────── #
 #
-# Cards, the way every hairstyle in the MakeHuman library is built: a strip of
-# quads along a curve, textured with a sheet of real strands whose alpha cuts
-# it into hair. The texture is cortu's "strawberry cloud" (CC0), long wavy
-# strands that curl at the tips, which is what the picture has.
+# LOCKS, the way the picture has them: long, heavy, wavy, combed back from a
+# line that runs from between the ears down the crest of the neck, streaming
+# BACKWARD in the wind and rolling over into big S-curls at the ends. The
+# first pass rooted short strips all over the crown and pointed them up and
+# out, and it read, fairly, as a mohawk made of spikes.
 #
-# Its layout, in Blender UV terms (v = 1 is the top of the image, the roots):
-#   u 0.00..0.63  a broad sheet of strands, curls along the bottom fifth
-#   u 0.66..0.98  a single narrower lock
-# Each card takes a random slice of one of those.
+# Each lock is a PATH and two cards swept along it:
+#
+#   the path is integrated from a heading and a pitch. For its first fifth it
+#   lies along the skin, combed back — out of the crown, down the slope of
+#   the neck — and then it leaves him into the wind: back, fanned a little
+#   out to its own side, lifted a few degrees. A slow S-wave rides on the
+#   pitch, gravity pulls the pitch down as the lock gets longer, and over the
+#   last third the pitch keeps falling past vertical, which is a ringlet
+#   rolling DOWN and under. Doing it on the pitch rather than by rotating
+#   points means the curl can never come round to point at the sky.
+#
+#   the two cards are crossed about the path at ±55° from level, so a lock
+#   shows a broad face from the side AND from above, and the whole mane has
+#   volume from anywhere rather than being a curtain seen edge-on.
+#
+# The strand texture runs along the length — roots at the top of the image,
+# the curls in its bottom fifth landing on the curls in the geometry — so
+# each card reads as many fine strands inside one lock.
 
-def card(spine, width_dir, w0, w1, u0, u1, v0=1.0, v1=0.0):
-    """Quad strip along `spine`, `width_dir(i)` giving the across direction."""
+UP = Vector((0.0, 0.0, 1.0))
+
+
+def heading(psi, theta, side):
+    """Unit direction: yaw `psi` out to `side` from straight back, pitch
+    `theta` up from level. theta = -pi/2 is straight down, -pi forward."""
+    c = math.cos(theta)
+    return Vector((-c * math.cos(psi), c * math.sin(psi) * side, math.sin(theta)))
+
+
+def lock_path(root, nrm, length, rng, elev, fan, wave, droop, curl, curl_from,
+              comb=0.20, segs=24):
+    side = 1.0 if root.y >= 0 else -1.0
+    if abs(root.y) < 0.004:
+        side = rng.choice((-1.0, 1.0))
+    back = Vector((-1.0, 0.0, 0.0))
+    combed = (back - nrm * back.dot(nrm)).normalized()
+    ph = rng.uniform(0, math.tau)
+    freq = rng.uniform(1.0, 1.5)
+
+    def theta(t):
+        th = elev + wave * math.sin(t * freq * math.tau + ph) * min(1.0, t * 3.0)
+        th -= droop * t * t
+        if t > curl_from:
+            u = (t - curl_from) / (1.0 - curl_from)
+            th -= curl * u ** 1.45
+        return th
+
+    step = length / segs
+    p = root + nrm * 0.003
+    pts, dirs = [p.copy()], []
+    for i in range(1, segs + 1):
+        t = i / segs
+        wind = heading(fan, theta(t), side)
+        if t < comb:
+            k = t / comb
+            k = k * k * (3 - 2 * k)
+            d = combed.lerp(wind, k).normalized()
+        else:
+            d = wind
+        p = p + d * step
+        pts.append(p.copy())
+        dirs.append(d)
+    dirs.insert(0, dirs[0])
+    # the lateral axis of the lock, constant along it: the curl turns about it
+    g = Vector((-math.cos(fan), math.sin(fan) * side, 0.0))
+    lat = UP.cross(g).normalized()
+    return pts, dirs, lat
+
+
+def sweep_card(pts, dirs, lat, alpha, w0, w1, u0, u1, v0=1.0, v1=0.0):
     vs, fs, uvs = [], [], []
-    n = len(spine)
-    for i, p in enumerate(spine):
+    n = len(pts)
+    for i, (p, d) in enumerate(zip(pts, dirs)):
         t = i / (n - 1)
+        across = d.cross(lat).normalized()          # in the lock's own plane
+        wv = (lat * math.cos(alpha) + across * math.sin(alpha)).normalized()
         w = w0 + (w1 - w0) * t
-        a = width_dir(i)
-        vs += [p - a * (w / 2), p + a * (w / 2)]
+        vs += [p - wv * (w / 2), p + wv * (w / 2)]
         v = v0 + (v1 - v0) * t
         uvs += [(u0, v), (u1, v)]
     for i in range(n - 1):
@@ -309,170 +374,383 @@ def card(spine, width_dir, w0, w1, u0, u1, v0=1.0, v1=0.0):
     return vs, fs, uvs
 
 
-def slerp(a, b, t):
-    q = a.rotation_difference(b)
-    return (Matrix.Identity(3) if t <= 0 else (Matrix.Identity(3).to_quaternion().slerp(q, t)).to_matrix()) @ a
-
-
-def lock(root, out, length, rng, elev, fan, wave, curl, segs=18, droop=0.20):
-    """The spine of one lock, as it is in the picture: out of the scalp, then
-    streaming BACK AND UP as if into a wind from in front of him, waving,
-    and rolling over into a curl at the tip.
-
-    `elev` tips the stream up from horizontal, `fan` swings it out to his
-    side. The first attempt let every lock fall back and DOWN from the crest,
-    which put a shaggy red saddle over his withers and nothing round his head.
-    """
-    back = Vector((-1.0, 0.0, 0.0))
-    stream = Matrix.Rotation(fan, 3, 'Z') @ Matrix.Rotation(elev, 3, 'Y') @ back
-    stream.normalize()
-    lat = Vector((0.0, 1.0, 0.0))
-    up = stream.cross(lat).normalized()
-    if up.z < 0:
-        up = -up
-    side = stream.cross(up).normalized()
-    ph = rng.uniform(0, math.tau)
-    k = rng.uniform(1.4, 2.4)
-    step = length / segs
-    p = root.copy()
-    pts = [p.copy()]
-    for i in range(1, segs + 1):
-        t = i / segs
-        d = slerp(out, stream, min(1.0, t / 0.16))
-        p = p + d * step
-        wv = (up * math.sin(t * k * math.pi + ph) + side * 0.5 * math.cos(t * k * 0.8 * math.pi + ph)) \
-            * (wave * length * t)
-        # Hair has WEIGHT. Without this every lock is a straight flat strip
-        # standing out of his head at its own angle, which is how a flame
-        # looks and not how hair does: the stream lifts it, gravity takes the
-        # ends, and the sag grows with the square of the distance out.
-        sag = Vector((0.0, 0.0, -1.0)) * (droop * length * t * t)
-        pts.append(p + wv + sag)
-    if curl > 0:
-        k0 = int(segs * 0.74)
-        piv = pts[k0]
-        ax = side if rng.random() < 0.5 else -side
-        for i in range(k0 + 1, segs + 1):
-            ang = curl * ((i - k0) / (segs - k0)) ** 1.5
-            pts[i] = piv + Matrix.Rotation(ang, 3, ax) @ (pts[i] - piv)
-    return pts
-
-
-def hair(ctx, name, roots, lengths, rng, elev, fan, curl, wave, width, vrange=(1.0, 0.0), droop=0.20):
-    """`elev` and `fan` are (lo, hi) ranges in degrees, drawn per lock; the
-    fan's sign follows the side of the neck the lock is rooted on."""
+def hair(ctx, name, roots, rng, spec):
     V, F, UV, W = [], [], [], []
-    for (root, out), L in zip(roots, lengths):
-        e = math.radians(rng.uniform(*elev))
-        f = math.radians(rng.uniform(*fan)) * (1 if root.y >= 0 else -1)
-        spine = lock(root, out, L, rng, e, f, wave * rng.uniform(0.6, 1.4),
-                     curl * rng.uniform(0.5, 1.2), droop=droop * rng.uniform(0.5, 1.3))
-        # Across the card: broadside to the side view, twisted a little per
-        # card so the mane has depth rather than being one flat curtain.
-        tw = rng.uniform(-0.7, 0.7)
-
-        def across(i, spine=spine, tw=tw):
-            a = spine[min(i + 1, len(spine) - 1)] - spine[max(i - 1, 0)]
-            a.normalize()
-            lat = Vector((0.0, 1.0, 0.0))
-            wv = a.cross(lat).normalized()
-            return (Matrix.Rotation(tw, 3, a) @ wv).normalized()
-
-        # Mostly the single lock at the right of the texture, which has air
-        # round it: the broad sheet is 73 per cent opaque, and a mane built
-        # from slices of it came out a solid orange mass at any distance.
-        if rng.random() < 0.40:
-            u0 = rng.uniform(0.02, 0.50)
-            u1 = u0 + rng.uniform(0.08, 0.12)
-        else:
-            u0, u1 = 0.66, 0.97
-        w = width * rng.uniform(0.75, 1.3)
-        vs, fs, uvs = card(spine, across, w, w * 0.8, u0, u1, *vrange)
-        k = len(V)
-        V += vs
-        UV += uvs
-        F += [tuple(k + i for i in f) for f in fs]
-        W += [norm_w(ctx.weights_near(root))] * len(vs)
+    for root, nrm, L in roots:
+        el = rng.uniform(*spec['elev'])
+        # The forelock, between the ears, lies back over the head: given the
+        # same lift as the crest it stood up between his ears on its own.
+        if spec is MANE and root.x > 0.46:
+            el = min(el, 8.0)
+        pts, dirs, lat = lock_path(
+            root, nrm, L, rng,
+            elev=math.radians(el),
+            fan=math.radians(rng.uniform(*spec['fan'])),
+            wave=math.radians(rng.uniform(*spec['wave'])),
+            droop=math.radians(rng.uniform(*spec['droop'])),
+            curl=math.radians(rng.uniform(*spec['curl'])),
+            curl_from=spec['curl_from'], comb=spec.get('comb', 0.20))
+        wd = norm_w(ctx.weights_near(root))
+        w = spec['width'] * rng.uniform(0.8, 1.2)
+        for k, alpha in enumerate((math.radians(55), math.radians(-55))):
+            # one card cut from the broad sheet — continuous strands — and one
+            # from the single lock beside it, which has air round its edges
+            if k == 0:
+                u0 = rng.uniform(0.02, 0.44)
+                u1 = u0 + rng.uniform(0.16, 0.20)
+            else:
+                u0, u1 = 0.66, 0.97
+            vs, fs, uvs = sweep_card(pts, dirs, lat, alpha + rng.uniform(-0.45, 0.45),
+                                     w, w * spec['taper'], u0, u1, *spec.get('v', (1.0, 0.0)))
+            base = len(V)
+            V += vs
+            UV += uvs
+            F += [tuple(base + i for i in f) for f in fs]
+            W += [wd] * len(vs)
     ob = new_object(ctx, name, V, F, W, name, UV)
-    log('%s: %d locks, %d tris' % (name, len(roots), sum(len(f) - 2 for f in F)))
+    log('%s: %d locks, %d tris' % (name, len(roots), 2 * len(F)))
     return ob
 
 
-def mane_roots(ctx, L, rng, n=150):
-    """Roots over the crown and down the upper crest of the neck.
+def not_ear(ctx, loc):
+    return sum(w for k, w in ctx.weights_near(loc).items() if k.startswith('Ear')) < 0.35
 
-    Weighted hard toward the head: in the picture the mane is a mass round
-    his head and poll that streams away behind him, not a hog-mane down to
-    the withers."""
-    ear = (ctx.bone('Ear1.L') + ctx.bone('Ear1.R')) / 2
-    # Crown, poll and the upper half of the crest — stopping at Neck2. Rooted
-    # any lower and the long locks lie on his back and read as a cape.
-    path = [L['eye'] + Vector((-0.02, 0, 0.03)), ear, ctx.bone('Neck3'), ctx.bone('Neck2')]
+
+def mane_roots(ctx, L, rng, n=64):
+    """A line from between the ears down the crest to the withers, and a
+    little way down each upper side of it — the parting of a mane."""
+    crest = []
+    for i in range(60):
+        x = 0.505 - i * (0.505 - 0.300) / 59
+        loc, nrm = ctx.surface(Vector((x, 0.0, 2.0)), Vector((0, 0, -1)))
+        crest.append(loc)
     roots = []
     tries = 0
-    why = {'miss': 0, 'steep': 0, 'face': 0, 'ear': 0}
-    while len(roots) < n and tries < n * 20:
+    while len(roots) < n and tries < n * 40:
         tries += 1
-        t = rng.random() ** 2.6
-        s = t * (len(path) - 1)
-        i = min(int(s), len(path) - 2)
-        c = path[i] + (path[i + 1] - path[i]) * (s - i)
-        lat = rng.uniform(-1, 1) * (0.030 + 0.020 * (1 - t))
-        # Aimed at a point just off the midline from above and outboard, so
-        # the roots land on the top and upper sides of the neck and a ray
-        # from one side never crosses to root on the other.
+        t = rng.random() ** 1.25                    # heavier toward the head
+        c = crest[min(int(t * 59), 59)]
+        lat = rng.uniform(-1, 1) * (0.040 - 0.012 * t)
         tgt = Vector((c.x, lat, c.z))
-        o = tgt + Vector((0.0, lat * 4.0, 0.35))
+        o = tgt + Vector((0.0, lat * 3.0, 0.30))
         loc, nrm = ctx.surface(o, (tgt - o).normalized())
-        if loc is None or nrm.z < 0.15:
-            why['miss' if loc is None else 'steep'] += 1
+        if loc is None or nrm.z < 0.10 or not not_ear(ctx, loc):
             continue
-        # not on the face: nothing roots in front of the eyes
-        if loc.x > L['eye'].x - 0.015:
-            why['face'] += 1
+        if loc.x > L['eye'].x - 0.02:              # nothing on the face
             continue
-        # And not on the ears, which stand up through the crown and are the
-        # first thing a ray from above and outboard hits. On the ear itself,
-        # that is — the ear bones carry a sliver of weight over the whole
-        # crown, and rejecting on ANY ear weight rejected every root there
-        # was once the lower neck stopped being on the path.
-        if sum(w for k, w in ctx.weights_near(loc).items() if k.startswith('Ear')) > 0.35:
-            why['ear'] += 1
-            continue
-        # Lying BACK out of the scalp, not standing up out of it: hair grows
-        # along the skin, and a lock that leaves the crown vertically spends
-        # its first fifteen centimetres being a plume.
-        out = (nrm * 0.30 + Vector((-0.75, 0.0, 0.18))).normalized()
-        roots.append((loc - nrm * 0.004, out))
-    log('mane roots: %d of %d tries; rejected %s; path %s' % (
-        len(roots), tries, why, [tuple(round(x, 3) for x in q) for q in path]))
+        # The crown locks are the longest; the ones from the withers are
+        # shorter because they start further back and the mane ends as one.
+        length = rng.uniform(0.50, 0.70) * (1.0 - 0.30 * t)
+        roots.append((loc - nrm * 0.002, nrm, length))
     return roots
 
 
-def tuft_roots(ctx, rng, n=64):
-    """The orange tuft over the hips, in front of the tail."""
-    t1 = ctx.bone('Tail1')
-    back = ctx.bone('Back')
+def tuft_roots(ctx, rng, n=18):
     roots = []
     tries = 0
-    while len(roots) < n and tries < n * 30:
+    while len(roots) < n and tries < n * 40:
         tries += 1
-        x = back.x + (t1.x - back.x) * rng.uniform(0.35, 1.05)
-        y = rng.uniform(-0.055, 0.055)
+        x = rng.uniform(-0.195, -0.085)
+        y = rng.uniform(-0.035, 0.035)
         loc, nrm = ctx.surface(Vector((x, y, 2.0)), Vector((0.0, 0.0, -1.0)))
-        if loc is None or nrm.z < 0.2:
+        if loc is None or nrm.z < 0.3:
             continue
-        roots.append((loc - nrm * 0.003, (nrm + Vector((0, 0, 0.8))).normalized()))
+        roots.append((loc - nrm * 0.002, nrm, rng.uniform(0.14, 0.22)))
     return roots
 
 
-# ── the harness ───────────────────────────────────────────────────────────── #
+# The curl is the last quarter only. Started at two-thirds, every lock rolled
+# under halfway along and the mane bunched into a mop behind his ears.
+MANE = dict(elev=(-4.0, 30.0), fan=(6.0, 40.0), wave=(9.0, 17.0), droop=(4.0, 18.0),
+            curl=(170.0, 260.0), curl_from=0.76, width=0.070, taper=0.55, comb=0.18)
+# The tuft rises off the croup and rolls back over, like a wave breaking.
+TUFT = dict(elev=(55.0, 78.0), fan=(0.0, 36.0), wave=(4.0, 9.0), droop=(0.0, 10.0),
+            curl=(160.0, 230.0), curl_from=0.28, width=0.050, taper=0.55, comb=0.0,
+            v=(0.9, 0.0))
+
+
+# ── bands: the girth and the straps ───────────────────────────────────────── #
 #
-# Shells, copied off the coat's own faces and pushed out along their normals,
-# so they carry the coat's weights and bend exactly as he does. The plate is a
-# generous patch across the front of the chest; its SHAPE and the openwork in
-# it are the alpha of a filigree texture drawn in filigree.py, projected on
-# from the front. The girth is a band round the barrel behind the elbows.
+# The first girth was a ring of the coat's own faces picked by distance from a
+# plane, and those faces follow the mesh's loops, which are not straight: seen
+# from the side it was a ragged vertical gold stripe down his shoulder. A band
+# is a swept thing — a flat box section carried along a path on his skin —
+# and its edges are straight because the path is smooth.
+
+def no_legs(wd):
+    """Bone weights without the leg bones. A metal strap round the barrel
+    must not be dragged by a swinging foreleg."""
+    k = {b: w for b, w in wd.items()
+         if not (b.endswith(('.L', '.R')) and not b.startswith('Ear'))}
+    return norm_w(k or wd)
+
+
+def band(ctx, name, pts, nrms, width, lift, thick, closed, mat, rigid=None):
+    n = len(pts)
+    V, F, W = [], [], []
+    for i in range(n):
+        p, nm = pts[i], nrms[i]
+        a = pts[(i + 1) % n] if (closed or i < n - 1) else pts[i]
+        b = pts[i - 1] if (closed or i > 0) else pts[i]
+        t = (a - b).normalized()
+        s = nm.cross(t).normalized()
+        nn = t.cross(s).normalized()
+        base = p + nn * lift
+        for dz, dw in ((0, -1), (0, 1), (thick, 1), (thick, -1)):
+            V.append(base + nn * dz + s * (dw * width / 2))
+        W += [rigid or no_legs(ctx.weights_near(p))] * 4
+    segs = n if closed else n - 1
+    for i in range(segs):
+        a, b = 4 * i, 4 * ((i + 1) % n)
+        for k in range(4):
+            F.append((a + k, a + (k + 1) % 4, b + (k + 1) % 4, b + k))
+    if not closed:
+        F.append((0, 1, 2, 3))
+        e = 4 * (n - 1)
+        F.append((e + 3, e + 2, e + 1, e))
+    return new_object(ctx, name, V, F, W, mat, smooth=False)
+
+
+def smooth_loop(P, k=2, closed=True):
+    for _ in range(k):
+        Q = []
+        n = len(P)
+        for i in range(n):
+            if not closed and (i == 0 or i == n - 1):
+                Q.append(P[i])
+                continue
+            Q.append((P[i - 1] + P[i] * 2 + P[(i + 1) % n]) / 4)
+        P = Q
+    return P
+
+
+def girth(ctx, top, bot, samples=96):
+    """A ring round the barrel in the plane through `top` and `bot` that
+    contains his lateral axis: tilted so the top rides forward over the
+    withers and the bottom passes under the chest behind the elbows."""
+    e1 = Vector((0.0, 1.0, 0.0))
+    e2 = (top - bot).normalized()
+    c = (top + bot) / 2
+    P, N = [], []
+    for i in range(samples):
+        a = 2 * math.pi * i / samples
+        d = (e1 * math.cos(a) + e2 * math.sin(a)).normalized()
+        loc, nrm = ctx.surface(c, d)
+        if loc is None:
+            continue
+        P.append(loc)
+        N.append(nrm)
+    P = smooth_loop(P, 3)
+    N = [n.normalized() for n in smooth_loop(N, 3)]
+    return band(ctx, 'girth', P, N, 0.022, 0.006, 0.004, True, 'gold')
+
+
+# ── the breastplate ───────────────────────────────────────────────────────── #
+#
+# REAL RELIEF. The first one was a texture on a shell of the coat — a picture
+# of filigree — and at any distance it was a thin gold line with a speck of
+# red in it. This one is made of metal: every rim, scroll and ring is a swept
+# tube standing off his chest, so it catches the light and throws shadows on
+# the coat between them, and the stone sits proud in a raised cup.
+#
+# It is designed flat, in a 2-D space of (s, z) — s the distance round his
+# chest from the breastbone, z the height — and wrapped on to him through a
+# cylinder: a point (s, z) is where a horizontal ray from an axis inside his
+# chest, at height z and angle s / R, comes out through the skin. So the
+# collar's arms wrap round the sides of his neck the way a made thing would,
+# instead of being projected from the front and smeared along his flanks.
+#
+# It is weighted RIGIDLY, all of it, to the bones under the stone. A metal
+# breastplate does not stretch; the legs move under it.
+
+AXIS_X = 0.36       # the wrapping axis, inside his chest
+RWRAP = 0.12        # metres of arc per radian round it
+Z0, ZA, SMAX = 0.528, 4.40, 0.185
+
+
+def zc(s):
+    """The collar's centreline: low at the breastbone, rising round his neck."""
+    return Z0 + ZA * s * s
+
+
+def hb(s):
+    """Half-height of the band: broader at the front."""
+    return 0.028 + 0.016 * math.exp(-(s / 0.07) ** 2)
+
+
+def wrap(ctx, s, z, lift):
+    a = s / RWRAP
+    o = Vector((AXIS_X, 0.0, z))
+    d = Vector((math.cos(a), math.sin(a), 0.0))
+    loc, nrm = ctx.surface(o, d)
+    if loc is None:
+        return None, None
+    return loc + nrm * lift, nrm
+
+
+def tube_geo(pts, nrms, r, sides=6, closed=False, caps=True):
+    V, F = [], []
+    n = len(pts)
+    for i in range(n):
+        a = pts[(i + 1) % n] if (closed or i < n - 1) else pts[i]
+        b = pts[i - 1] if (closed or i > 0) else pts[i]
+        t = (a - b)
+        t = t.normalized() if t.length > 1e-9 else Vector((1, 0, 0))
+        n1 = (nrms[i] - t * nrms[i].dot(t))
+        n1 = n1.normalized() if n1.length > 1e-9 else t.orthogonal().normalized()
+        n2 = t.cross(n1)
+        for j in range(sides):
+            ang = 2 * math.pi * j / sides
+            V.append(pts[i] + (n1 * math.cos(ang) + n2 * math.sin(ang)) * r)
+    segs = n if closed else n - 1
+    for i in range(segs):
+        a, b = i * sides, ((i + 1) % n) * sides
+        for j in range(sides):
+            F.append((a + j, a + (j + 1) % sides, b + (j + 1) % sides, b + j))
+    if caps and not closed:
+        F.append(tuple(range(sides - 1, -1, -1)))
+        e = (n - 1) * sides
+        F.append(tuple(e + j for j in range(sides)))
+    return V, F
+
+
+class Metal:
+    """Accumulates tubes and solids into one rigidly weighted object."""
+
+    def __init__(self, ctx, weights):
+        self.ctx, self.w = ctx, weights
+        self.V, self.F = [], []
+
+    def add(self, V, F):
+        k = len(self.V)
+        self.V += V
+        self.F += [tuple(k + i for i in f) for f in F]
+
+    def curve(self, sz, r, lift=0.006, sides=6, closed=False):
+        """A tube along a curve given in (s, z)."""
+        P, N = [], []
+        for s, z in sz:
+            p, nm = wrap(self.ctx, s, z, lift + r)
+            if p is not None:
+                P.append(p)
+                N.append(nm)
+        if len(P) > 1:
+            self.add(*tube_geo(P, N, r, sides, closed))
+
+    def build(self, name, mat):
+        ob = new_object(self.ctx, name, self.V, self.F, [self.w] * len(self.V), mat)
+        log('%s: %d verts %d tris' % (name, len(self.V),
+                                       sum(len(f) - 2 for f in self.F)))
+        return ob
+
+
+def spiral_sz(cx, cz, r0, turns, sgn, rot, n=30):
+    out = []
+    for i in range(n):
+        t = i / (n - 1)
+        a = rot + sgn * t * turns * math.tau
+        r = r0 * (1 - 0.82 * t)
+        out.append((cx + r * math.cos(a), cz + r * math.sin(a)))
+    return out
+
+
+def ellipse_sz(cx, cz, rs, rz, n=40, lobes=0, depth=0.0):
+    out = []
+    for i in range(n):
+        a = 2 * math.pi * i / n
+        k = 1.0 + depth * math.cos(lobes * a) if lobes else 1.0
+        out.append((cx + rs * k * math.cos(a), cz + rz * k * math.sin(a)))
+    return out
+
+
+def breastplate(ctx):
+    zg = zc(0.0) - 0.004
+    gem_at, gem_n = wrap(ctx, 0.0, zg, 0.0)
+    # Facing FORWARD, not along the skin: the breastbone faces half down and
+    # a stone set flush to it looked at his own feet. Tipped up toward level
+    # and kept on the midline, as a set stone on a made plate would be.
+    gem_n = Vector((gem_n.x + 0.8, 0.0, gem_n.z * 0.4)).normalized()
+    wd = no_legs(ctx.weights_near(gem_at))
+    M = Metal(ctx, wd)
+    S = [(-SMAX + 2 * SMAX * i / 90) for i in range(91)]
+    # the rims: a heavy outer edge top and bottom, a fine one inside each
+    for sign, r, inset in ((1, 0.0036, 0.0), (-1, 0.0036, 0.0),
+                           (1, 0.0016, 0.009), (-1, 0.0016, 0.009)):
+        M.curve([(s, zc(s) + sign * (hb(s) - inset)) for s in S
+                 if abs(s) > 0.052 or inset == 0.0], r)
+    # the ends, closed with a bar and a bead
+    for e in (-SMAX, SMAX):
+        M.curve([(e, zc(e) - hb(e) + 0.002 * i) for i in range(0, int(2 * hb(e) / 0.002) + 1)], 0.0034)
+    # the scrollwork: opposed C-scrolls along each arm, in the band's slope
+    for k in range(4):
+        for sgn in (-1, 1):
+            s = sgn * (0.074 + k * 0.028)
+            z = zc(s)
+            h = hb(s)
+            M.curve(spiral_sz(s - 0.007 * sgn, z + h * 0.30, h * 0.46, 1.15, sgn, 0.4), 0.0017, sides=5)
+            M.curve(spiral_sz(s + 0.007 * sgn, z - h * 0.30, h * 0.46, 1.15, -sgn, 3.6), 0.0017, sides=5)
+            M.curve([(s - 0.012, z), (s + 0.012, z)], 0.0015, sides=5)
+    # the medallion round the stone: a heavy ring, a scalloped ring, a fine one
+    M.curve(ellipse_sz(0.0, zg, 0.052, 0.066, 56), 0.0040, closed=True)
+    M.curve(ellipse_sz(0.0, zg, 0.043, 0.055, 72, lobes=12, depth=0.08), 0.0018, closed=True, sides=5)
+    M.curve(ellipse_sz(0.0, zg, 0.033, 0.043, 48), 0.0024, closed=True)
+    # scroll pairs in the medallion's shoulders, where it meets the arms
+    for sgn in (-1, 1):
+        M.curve(spiral_sz(sgn * 0.040, zg + 0.050, 0.016, 1.3, sgn, 1.2), 0.0018, sides=5)
+        M.curve(spiral_sz(sgn * 0.040, zg - 0.050, 0.016, 1.3, -sgn, 5.0), 0.0018, sides=5)
+    # the pendant: a drop hanging off the bottom of the medallion
+    drop = [(0.020 * math.sin(a) * (1 - 0.6 * max(0.0, math.cos(a))),
+             zg - 0.066 - 0.024 * (1 - math.cos(a))) for a in [i * math.tau / 36 for i in range(36)]]
+    M.curve(drop, 0.0024, closed=True)
+    # the cup the stone sits in: a shallow dome of solid gold
+    cup_c = gem_at + gem_n * 0.005
+    # An orthonormal frame round the stone's normal. The first build used
+    # (y, z, n) as it came, which is not orthogonal when n tips down, and the
+    # cup and the stone came out sheared and sitting low in their ring.
+    up = (Vector((0, 0, 1)) - gem_n * gem_n.z).normalized()
+    side = up.cross(gem_n).normalized()
+    R = Matrix((side, up, gem_n)).transposed()
+    cv, cf = ellipsoid(cup_c, (0.034, 0.045, 0.006), R, 28, 10)
+    M.add(cv, cf)
+    # six prongs over the stone's girdle
+    for i in range(6):
+        a = math.tau * i / 6 + 0.26
+        b = cup_c + R @ Vector((0.0215 * math.cos(a), 0.030 * math.sin(a), 0.006))
+        tip = cup_c + R @ Vector((0.0175 * math.cos(a), 0.0245 * math.sin(a), 0.017))
+        pv, pf = tube_geo([b, tip], [gem_n, gem_n], 0.0024, 6)
+        M.add(pv, pf)
+    plate = M.build('plate', 'gold')
+    # the stone: faceted, proud of the cup
+    gv, gf = ellipsoid(gem_at + gem_n * 0.014, (0.021, 0.029, 0.012), R, 16, 8)
+    new_object(ctx, 'gem', gv, gf, [wd] * len(gv), 'gem', smooth=False)
+    log('breastplate: stone at z %.3f, facing %s' % (zg, tuple(round(x, 2) for x in gem_n)))
+    return plate
+
+
+def straps(ctx):
+    """From each end of the collar back and down to the girth."""
+    out = []
+    for sgn in (-1, 1):
+        s0 = sgn * (SMAX - 0.012)
+        a, an = wrap(ctx, s0, zc(s0), 0.0)
+        # the girth's side at mid height, found the same way it was built
+        b_target = Vector((0.178, 0.0, 0.575))
+        loc, nrm = ctx.surface(b_target, Vector((0.0, float(sgn), 0.0)))
+        P, N = [], []
+        for i in range(24):
+            t = i / 23
+            q = a.lerp(loc, t)
+            # push out from the body's midline and re-find the skin under it
+            o = Vector((q.x, q.y * 0.2, q.z))
+            hit, hn = ctx.surface(o, (q - o).normalized() if (q - o).length > 1e-6 else Vector((0, sgn, 0)))
+            if hit is not None:
+                P.append(hit)
+                N.append(hn)
+        P = smooth_loop(P, 3, closed=False)
+        N = [n.normalized() for n in smooth_loop(N, 3, closed=False)]
+        out.append(band(ctx, 'strap', P, N, 0.016, 0.006, 0.0035, False, 'gold'))
+    return out
+
 
 def shell(ctx, name, pick, lift, mat, thick=0.0, uv=None):
     body = ctx.body
@@ -519,81 +797,6 @@ def shell(ctx, name, pick, lift, mat, thick=0.0, uv=None):
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
     log('%s: %d verts %d tris' % (name, len(me.vertices), tris))
     return ob
-
-
-def harness(ctx, L):
-    sh = (ctx.bone('FrontShoulder.L') + ctx.bone('FrontShoulder.R')) / 2
-    # The collar sits at the base of the neck, round the front of the chest,
-    # with the stone on the breastbone. `FrontShoulder` is the leg's own
-    # shoulder joint, which is low in the chest, so the collar is hung off a
-    # point well above it — the first cut was centred on the joint itself and
-    # put the whole thing between his elbows.
-    zc = sh.z + 0.085
-    chest_front = max(p.x for p in ctx.P if abs(p.y) < 0.03 and abs(p.z - zc) < 0.05)
-    zlo, zhi, half = zc - 0.12, zc + 0.12, 0.12
-
-    def pick_plate(f, mw):
-        c = mw @ f.calc_center_median()
-        nn = (mw.to_3x3() @ f.normal).normalized()
-        return (c.x > chest_front - 0.15 and zlo < c.z < zhi and nn.x > -0.25
-                and abs(c.y) < half)
-
-    # Projected from the front: u across him, v up him, over the plate's box.
-    def uv_plate(p):
-        return ((p.y + half) / (2 * half), (p.z - zlo) / (zhi - zlo))
-
-    plate = shell(ctx, 'plate', pick_plate, 0.006, 'filigree', 0.003, uv_plate)
-
-    # the girth: a band round the barrel just behind the elbows
-    gx = sh.x - 0.12
-
-    def pick_girth(f, mw):
-        c = mw @ f.calc_center_median()
-        return abs(c.x - gx) < 0.020 and c.z > 0.30
-
-    girth = shell(ctx, 'girth', pick_girth, 0.007, 'gold', 0.004)
-
-    # The straps from the collar's upper ends back and down to the girth. In
-    # the texture the collar's arms reach 72 per cent of the way up the plate
-    # at its sides, so that is where they start.
-    x0, z0 = chest_front - 0.07, zlo + 0.70 * (zhi - zlo)
-    zg = sh.z + 0.05
-
-    def pick_strap(f, mw):
-        c = mw @ f.calc_center_median()
-        if not (gx - 0.01 < c.x < x0) or abs(c.y) < 0.04:
-            return False
-        k = (x0 - c.x) / max(x0 - gx, 1e-6)
-        return abs(c.z - (z0 + (zg - z0) * k)) < 0.009
-
-    shell(ctx, 'strap', pick_strap, 0.0068, 'gold', 0.003)
-
-    # The stone, set where the texture's setting is: dead centre, at the
-    # bottom of the collar's U, 32.6 per cent of the way up the plate.
-    gz = zlo + 0.326 * (zhi - zlo)
-    loc, nrm = ctx.surface(Vector((chest_front + 0.3, 0.0, gz)), Vector((-1, 0, 0)))
-    c = loc + nrm * 0.016
-    R = Matrix((nrm.cross(Vector((0, 0, 1))).normalized(), Vector((0, 0, 1)), nrm)).transposed()
-    gv, gf = ellipsoid(c, (0.020, 0.030, 0.011), R, 20, 12)
-    wd = norm_w(ctx.weights_near(loc))
-    new_object(ctx, 'gem', gv, gf, [wd] * len(gv), 'gem')
-    bv, bf = [], []
-    seg, rs = 28, 8
-    for i in range(seg):
-        ang = 2 * math.pi * i / seg
-        ce = c - nrm * 0.004 + R @ Vector((0.024 * math.cos(ang), 0.034 * math.sin(ang), 0.0))
-        rad = (ce - (c - nrm * 0.004)).normalized()
-        for j in range(rs):
-            bb = 2 * math.pi * j / rs
-            bv.append(ce + (rad * math.cos(bb) + nrm * math.sin(bb)) * 0.0045)
-    for i in range(seg):
-        for j in range(rs):
-            a0, a1 = i * rs + j, i * rs + (j + 1) % rs
-            b0, b1 = ((i + 1) % seg) * rs + j, ((i + 1) % seg) * rs + (j + 1) % rs
-            bf.append((a0, b0, b1, a1))
-    new_object(ctx, 'bezel', bv, bf, [wd] * len(bv), 'gold')
-    log('collar centred %.3f m up, stone at %.3f' % (zc, gz))
-    return plate, girth
 
 
 # ── the boots ─────────────────────────────────────────────────────────────── #
@@ -692,23 +895,15 @@ def build_all(ar, body, seed=20260923):
     J = cut_jaw(ctx, L)
     ctx = Ctx(ar, body)       # the coat changed; measure it again
     mouth(ctx, J)
-    mr = mane_roots(ctx, L, rng)
-    # Curl kept under a right angle: rolled any further, a tip on a lock that
-    # is already streaming upward comes round to point at the sky, and the
-    # crown sprouted a row of spikes.
-    # Streaming UP and back as well as back, as if into a wind: in the picture
-    # the whole mane is lifted off him and it is the lift, more than the
-    # colour, that makes it read as a mane rather than a pelt.
-    # And not so long that it reaches his hips: the picture has clear air
-    # between the mane and the tuft, and a mane that streamed back along his
-    # spine merged with it into one orange saddle.
-    hair(ctx, 'mane', mr, [rng.uniform(0.34, 0.60) for _ in mr], rng,
-         elev=(10.0, 38.0), fan=(4.0, 40.0), curl=1.2, wave=0.15, width=0.032,
-         droop=0.12)
-    tr = tuft_roots(ctx, rng)
-    hair(ctx, 'tuft', tr, [rng.uniform(0.16, 0.30) for _ in tr], rng,
-         elev=(18.0, 62.0), fan=(0.0, 44.0), curl=2.4, wave=0.12, width=0.032,
-         vrange=(0.80, 0.0))
-    harness(ctx, L)
+    hair(ctx, 'mane', mane_roots(ctx, L, rng), rng, MANE)
+    hair(ctx, 'tuft', tuft_roots(ctx, rng), rng, TUFT)
+    breastplate(ctx)
+    # The girth rides forward over the withers under the mane and passes
+    # under the chest well behind the elbows — clear of the forelegs, which
+    # is what lets it be weighted to the body alone.
+    top, _ = ctx.surface(Vector((0.215, 0.0, 2.0)), Vector((0, 0, -1)))
+    bot, _ = ctx.surface(Vector((0.135, 0.0, 0.0)), Vector((0, 0, 1)))
+    girth(ctx, top, bot)
+    straps(ctx)
     boots(ctx)
     return J

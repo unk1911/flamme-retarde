@@ -122,4 +122,7 @@ def strands():
 if __name__ == '__main__':
     OUT.mkdir(parents=True, exist_ok=True)
     strands()
-    filigree()
+    # The breastplate is geometry now — swept tubes — so nothing is drawn.
+    stale = OUT / 'filigree.png'
+    if stale.exists():
+        stale.unlink()
