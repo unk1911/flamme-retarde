@@ -8,6 +8,79 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.472.0] — 2026-09-23
+
+### the apprentice wears the leader's pose, and finds room in the kabina
+
+Misha, twice: *"in kabine she wanders off somewhere"* and *"when i said
+'spread your arms', only baye v1.0 did but not baye v2.0"*.
+
+Measured by walking in the natural way, at ten samples a second for a minute.
+She was stepped every frame and played every clip the leader played. With the
+leader inside for 539 samples, she was inside for 15. She stood 1.75 m behind
+the leader along the leader's own facing, and indoors the leader faces the
+wine table, the stool and you, not the back wall — so "behind her" was through
+a side wall. **1.470.0 said the room was 1.45 m wide. That is the door**; the
+room is about 4.1 × 5.3 m, and the fix it shipped was aimed at the wrong
+geometry.
+
+**Pose, not clip.** Spreading the arms is `armsWide`, solved on to v1.0 as
+`aim`s after her clip. The clip name never changes, so a copy that listens for
+clip names cannot see it — nor a straw at a nostril, nor a head turned to you.
+The two rigs are the same rig, bone for bone, to six decimals, and that is
+checked again at runtime. So `skinnedFigure` gains `pose()` and `wearPose()`,
+and the apprentice wears v1.0's finished palette a third of a second late. She
+is stepped after `placeHorns`, where that palette is final. That point also
+runs while the leader is held, which inside `stepShow` it never did. If the
+rigs ever differ she falls back to copying clips.
+
+**A whole body, not a point.** `kabinaFit()` puts every bone of the pose she
+is about to wear through the room: walls, the TV stand, the cot. Places are
+tried close first — Misha's own suggestion, *"maybe if she would be a bit
+closer"* — 0.80 m behind, then half a metre either side. A place is held for
+three seconds once chosen, checked against the next third of a second of poses
+the lag already holds, and she moves round the leader rather than through her.
+On the floor, always: the cot's 0.44 m is a place, not a body motion.
+
+Measured: whole body inside the room 99.0% of the time the leader she follows
+is in it, up from 3%. `arms.wide` on the cot reaches her, settling to 5–18 mm
+once the lag has caught up; a held pose copies at 0.00° and 0.00 mm. 0.03 ms a
+frame. Still rough: she changes places about 35 times in 95 s as the pose goes
+kneeling → lying → sitting up, and on one kneel a toe crosses a wall line for
+0.7 s mid-move.
+
+### the Slow Doodle, before he goes in
+
+`slowdoodle.html` — a third built artifact beside the game and the wardrobe:
+the dog from the picture on poetry.edeliverables.com, rigged and animated, to
+be looked at before he is placed anywhere. Not deployed; it is on the share.
+Black and doberman-built, flame-orange mane streaming back off his head, a
+tuft over the hips, a gold filigree collar with a red stone, gold sabatons on
+all four feet. The poems call him "a smudge of gold, a cloud of cream" and the
+picture does not; the picture is what was pointed at, and the poem's coat is a
+button.
+
+**The body was found, not made.** The wardrobe's lesson, applied first this
+time: Quaternius's CC0 Wolf — 51 bones, an eight-bone tail, a dozen clips —
+re-proportioned into a doberman by warps and baked poses. Only what is
+specific to him is authored: a cut jaw (the wolf's head is one bone, and he
+yawns), a mane of alpha-cut hair cards from the MakeHuman hair01 pack dyed by
+luminance, a collar whose shape lives in a drawn filigree alpha, and cuffs
+lathed off each leg's measured radius. Two clips are his — the lazy sway and
+the big yawn — written as turns about world axes, because the Quaternius bones
+are points and their local axes are accidents. 30 414 triangles.
+
+Two silent failures on the way. The glTF exporter drops any action whose
+`id_root` is not OBJECT, and a freshly made action has none until it is
+assigned — the first build shipped without the yawn and said nothing. And the
+wolf's ear bones carry a sliver of weight over the whole crown, so rejecting
+mane roots on *any* ear weight rejected every root once the lower neck was off
+the path.
+
+First pass. The mane reads as a bush standing up off the head where the
+picture has long locks streaming back, and the collar is a band where the
+picture has a breastplate; both are being redone.
+
 ## [1.471.0] — 2026-09-22
 
 ### Chloe v2.0
