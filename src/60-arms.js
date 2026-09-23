@@ -947,6 +947,115 @@ function buildArms() {
     GRIP_OFF.multiplyScalar(0.5);
   }
 
+  // ── YOUR THUMB, TO HER MOUTH ──────────────────────────────────────────────
+  //
+  // Misha, 23 Sep 2026: *"in the kabine, and when her mouth is open, instead
+  // of spraying with water, it should be my (chloe price)'s thumb reaching
+  // for her open mouth and lips"*. The first arm this rig has ever had on dry
+  // land, and it is the right one — the tattooed one — because it is the one
+  // that reaches.
+  //
+  // THE HAND: fingers curled loosely under, thumb out. That is what a hand
+  // does when the thumb is the only part of it that is going anywhere; an
+  // open hand with a thumb on a lip reads as a slap about to happen.
+  function thumbDigits(a) {
+    for (const dg of a.digits) {
+      if (dg.kind === 'thumb') {
+        // OUT FROM THE FIST, not along it. At the kite's fan the thumb lies
+        // against the index and a curled hand hides it completely — six
+        // attitudes of the hand were tried against her mouth and every one of
+        // them read as a fist held up to it. Swung round to about 65 degrees
+        // off the fingers, it stands out sideways the way a thumb does when
+        // it is the only part of the hand that is going anywhere, and with the
+        // palm down its pad faces down on to the lip.
+        dg.joints[0].rotation.set(dg.pitch * 0.2, 0, dg.fan * 3.8);
+        dg.joints[1].rotation.x = 0.15;
+      } else {
+        for (let j = 0; j < dg.joints.length; j++) {
+          if (j === 0) dg.joints[j].rotation.set(dg.pitch + ARMS.fingerFist[0] * 0.95, 0, dg.fan * 0.3);
+          else dg.joints[j].rotation.x = ARMS.fingerFist[j] * 0.95;
+        }
+      }
+    }
+  }
+
+  // The pad of the thumb, in the wrist's frame — measured on the hand in that
+  // pose, for the reason GRIP_OFF is measured: where the end of a two-bone
+  // thumb fanned out off a palm lands is not a number anybody gets right by
+  // eye. The pad, not the tip: 6 mm back from the end and 4 mm to the palm
+  // side, which is the part of a thumb that actually touches a lip.
+  const THUMB_OFF = new THREE.Vector3();
+  {
+    const a = sides[1];
+    thumbDigits(a);
+    a.wrist.rotation.set(0, 0, 0);
+    a.wrist.updateWorldMatrix(true, true);
+    const th = a.digits.find((d) => d.kind === 'thumb');
+    const last = th.joints[th.joints.length - 1];
+    const tip = new THREE.Vector3(0, -ARMS.thumb * 0.44 + 0.006, 0.004);
+    THUMB_OFF.copy(a.wrist.worldToLocal(last.localToWorld(tip)));
+  }
+
+  const _tt = new THREE.Vector3();
+  const THUMB_REST = new THREE.Vector3(0.24, -0.46, -0.20);   // low, right, out of shot
+  const THUMB_REACH = 0.44;       // m of shoulder-to-target it will do without leaning
+  const THUMB_LEAN = 0.70;        // and how far the body may lean in to close the rest
+  // The hand's attitude at her mouth: elbow pole, palm normal, wrist flex.
+  // A table rather than literals so a probe can try several and look — which
+  // is the only way anybody has ever got a first-person hand right.
+  //
+  // Picked from nine tried against her open mouth on 23 Sep 2026: palm down
+  // and a little inboard, elbow down and out, so the thumb crosses on to her
+  // lip and the curled fist sits beside her face rather than in front of it.
+  const THUMB_AIM = { pole: [0.70, -0.70, 0.10], palm: [-0.35, -0.93, 0], flex: 0.10 };
+
+  /**
+   * `reach` is {x, y, z, k} — her lip in world metres, and 0..1 of the way
+   * there. At 0 the hand is down out of shot; the caller eases `k`.
+   */
+  function updateReach(dt, reach, camera) {
+    cam.fov = camera.fov;
+    cam.aspect = camera.aspect;
+    cam.position.copy(camera.position);
+    cam.quaternion.copy(camera.quaternion);
+    cam.updateProjectionMatrix();
+    rig.visible = false;
+    root.position.copy(camera.position);
+    // Yaw and pitch with the head, no roll: you are looking at her mouth and
+    // the arm goes where you look.
+    _e.setFromQuaternion(camera.quaternion, 'YXZ');
+    _e.z = 0;
+    root.quaternion.setFromEuler(_e);
+    root.updateMatrixWorld(true);
+
+    sides[0].shoulder.visible = false;
+    const a = sides[1];
+    a.shoulder.visible = true;
+    thumbDigits(a);
+
+    _tt.set(reach.x, reach.y, reach.z);
+    root.worldToLocal(_tt);
+    const k = ease(Math.min(1, Math.max(0, reach.k)));
+    _tt.lerpVectors(THUMB_REST, _tt, k);
+
+    // Lean in. The shoulder is 24 cm under the eye and 15 cm behind it, and a
+    // mouth at arm's length from the EYE is out of reach from the SHOULDER —
+    // so the body comes forward along the line to her by whatever the arm
+    // cannot close, the way anybody leans in to touch a face. The shoulder is
+    // never in shot, so nothing sees it move.
+    const S = ARMS.shoulder;
+    _p1.set(_tt.x - S[0], _tt.y - S[1], _tt.z - S[2]);
+    const need = _p1.length() - THUMB_REACH;
+    if (need > 0) body.position.copy(_p1.normalize().multiplyScalar(Math.min(need, THUMB_LEAN)));
+    else body.position.set(0, 0, 0);
+
+    // Elbow down and out to the right; palm down, so the thumb pad comes to
+    // the lip from in front with the fingers curled under her chin.
+    const P = THUMB_AIM.pole, N = THUMB_AIM.palm;
+    placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
+      THUMB_OFF.x, THUMB_OFF.y, THUMB_OFF.z, N[0], N[1], N[2], THUMB_AIM.flex, false);
+  }
+
   function barPose(a, pull, t) {
     // The grips, in the eye's frame. Same three numbers `updateRide` puts the
     // bar at, so the hands cannot drift off it however the bar is sheeted.
@@ -1008,6 +1117,14 @@ function buildArms() {
     // The bar grip is untouched. Hands on a kite bar are the same rig doing
     // the thing a first-person view is good at — holding still — and nobody
     // complained about those.
+    // The thumb, on land. Checked first: it is handed a context of its own and
+    // is never also a swim or a ride.
+    if (ctx && ctx.reach) {
+      root.visible = true;
+      return updateReach(dt, ctx.reach, camera);
+    }
+    sides[0].shoulder.visible = true;
+    sides[1].shoulder.visible = true;
     const on = !!ride;
     root.visible = on;
     rig.visible = !!ride;
@@ -1165,9 +1282,12 @@ function buildArms() {
   return {
     root, stage, cam,
     update, render,
+    /** Debug: try a hand attitude for the thumb — see THUMB_AIM. */
+    thumbAim: (o) => Object.assign(THUMB_AIM, o || {}),
     stats: () => ({
       on: root.visible ? 1 : 0,
-      mode: rig.visible ? 'bar' : (root.visible ? 'swim' : 'off'),
+      mode: rig.visible ? 'bar' : (root.visible
+        ? (sides[0].shoulder.visible ? 'swim' : 'thumb') : 'off'),
       // Two arms, three pieces each, plus fourteen finger and thumb bones a
       // side — every one of them a lathe, so this is still a rounding error
       // against a 3.4 M frame and the only reason to print it is to prove

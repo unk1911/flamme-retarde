@@ -49262,6 +49262,41 @@ async function buildJadrija(scene) {
     }),
     /** Debug: the apprentice's whole body against the room and the leader. */
     apprCheck: () => apprenticeCheck(skinFig, kabinaFit()),
+    /**
+     * Where your thumb goes when her mouth is open: her lower lip, in world
+     * metres, or null. See `updateReach` in 60-arms.js and the gate in
+     * 90-app.js that turns the branch into a hand.
+     *
+     * Only in the kabina and only while she is holding it open because she
+     * was asked to (`show.mouthW`) — the hose's own gape and her talking are
+     * her mouth doing something else. The lip is the centre of her mouth
+     * (`uLipC`, measured off the MOUTH_P paint), 6 mm down onto the lower
+     * lip, carried down and back by exactly the jaw drop FACE_VERT is giving
+     * it this frame — that drop is in the vertex shader and not in any bone,
+     * so a point skinned without it would sit on the closed mouth — and then
+     * skinned the way the skin round her mouth is. Four millimetres into the
+     * mouth, because a thumb on a lip rests on the inside edge of it.
+     */
+    thumbReach: () => {
+      if (!skinFig || !skinFig.mesh.visible || !show || !skinFig.uFace) return null;
+      if ((show.mouthW || 0) < 0.35 || !sheIsIn()) return null;
+      const u = skinFig.uFace;
+      const c = u.uLipC.value;
+      if (c.y < -50) return null;
+      const g = u.uGape.value;
+      const p = [c.x - 0.004 - 0.006 * g, c.y - 0.006 - 0.0185 * g, 0];
+      const w = bindPointAt(skinFig, p, [['jaw', 0.70], ['head', 0.30]], new THREE.Vector3());
+      // And which way her face is pointing: the lip against a point ten
+      // centimetres behind it in the head, skinned the same way. A thumb
+      // only goes to a mouth you are in FRONT of — from behind her it would
+      // be a hand drawn over the back of her head, because the view-model arm
+      // is always drawn on top.
+      const b = bindPointAt(skinFig, [p[0] - 0.10, p[1] + 0.02, 0],
+        [['head', 1]], new THREE.Vector3());
+      const f = w.clone().sub(b).normalize();
+      return { x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z,
+        open: +show.mouthW.toFixed(3) };
+    },
     kabina: special && {
       inside: (x, z) => kabinaInside(x, z),
       // Where in the resort's own frame it is, for anything that has to walk

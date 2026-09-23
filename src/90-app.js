@@ -957,6 +957,13 @@ function toggleAutopilot() {
 // ── camera modes ─────────────────────────────────────────────────────────────
 
 const CAMS = ['chase', 'close', 'cockpit', 'wing'];
+// Your thumb at her mouth — see the gate in the ground branch of the loop.
+// `thumbK` is how far out the hand is, 0..1, eased; `thumbAt` is the last place
+// her lip was, kept so the hand has somewhere to come back FROM when she
+// closes her mouth under it. THUMB_D is how close counts as within reach, eye
+// to lip: an arm and a lean.
+let thumbK = 0, thumbAt = null;
+const THUMB_D = 1.0;
 let camMode = 0;
 const camPos = new THREE.Vector3();
 const camAim = new THREE.Vector3();
@@ -6781,9 +6788,30 @@ function frame() {
     // poured at a wall nobody can see, and a trace and a cone of droplets
     // computed for a camera that is somewhere else. It comes straight back the
     // frame the shot ends, because the finger is still down.
-    ground.setSpray(!swatCut && !pourCut
-      && (mouseDrop || (keys.has('Space') && !spaceLeapt)
-      || TOUCH.gjet || debugJet));
+    // AND YOUR THUMB INSTEAD OF THE WATER, at her mouth. Misha, 23 Sep 2026:
+    // *"in the kabine, and when her mouth is open, instead of spraying with
+    // water, it should be my (chloe price)'s thumb reaching for her open
+    // mouth and lips"*. The same button, and the same finger on it: close
+    // enough to touch her while she is holding her mouth open for you, the
+    // branch stays shut and the hand goes out instead. First person only —
+    // the view-model arm is the only arm there is to send; in the third
+    // person the branch behaves as it always has.
+    const pressing = mouseDrop || (keys.has('Space') && !spaceLeapt)
+      || TOUCH.gjet || debugJet;
+    const lip = !bodyCam && jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null;
+    const lipNear = !!lip && Math.hypot(lip.x - camera.position.x,
+      lip.y - camera.position.y, lip.z - camera.position.z) < THUMB_D
+      // In front of her face, within about sixty degrees of it.
+      && ((camera.position.x - lip.x) * lip.fx + (camera.position.y - lip.y) * lip.fy
+        + (camera.position.z - lip.z) * lip.fz)
+        > 0.5 * Math.hypot(camera.position.x - lip.x, camera.position.y - lip.y,
+          camera.position.z - lip.z);
+    if (lip) thumbAt = lip;
+    const thumbing = pressing && lipNear;
+    // Out a little slower than it comes back: a reach is a decision, and
+    // letting go is just letting go.
+    thumbK = damp(thumbK, thumbing ? 1 : 0, thumbing ? 4.5 : 7, dt);
+    ground.setSpray(!swatCut && !pourCut && pressing && !lipNear);
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
     // integrated was the chute branch, so the moment the canopy touched down she
@@ -7162,7 +7190,10 @@ function frame() {
   if (arms) {
     // Not during the establishing shot: the camera is sixteen metres up and a
     // pair of arms drawn over the top of it is a pair of arms in the sky.
-    arms.update(dt, chaseCut || bodyCam ? null : (state.phase === 'ride' ? ride : swim),
+    arms.update(dt, chaseCut || bodyCam ? null
+      : state.phase === 'ground' && thumbK > 0.01 && thumbAt
+        ? { reach: { x: thumbAt.x, y: thumbAt.y, z: thumbAt.z, k: thumbK } }
+        : (state.phase === 'ride' ? ride : swim),
       camera);
   }
   // And what took the swimming arms' place — see 62-mask.js. Same gate for the
@@ -8560,6 +8591,21 @@ window.__fr = {
     plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
     /** Debug: turn Baye v2.0 to an absolute yaw — see 46-apprentice.js. */
     apprFace: (yaw) => apprenticeFace(yaw),
+    /** Where your thumb would go — her lower lip in world metres — or null. */
+    thumbReach: () => (jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null),
+    /**
+     * Debug: stand `d` metres in front of Baye's face, looking at her mouth.
+     * Only while her mouth is being held open, because that is the only time
+     * her lip is published — which is also the only time this is wanted.
+     */
+    faceLook: (d = 0.6) => {
+      const L = jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null;
+      if (!L || !jadrija) return null;
+      const n = Math.hypot(L.fx, L.fz) || 1;
+      const px = L.x + (L.fx / n) * d, pz = L.z + (L.fz / n) * d;
+      const [t, s] = jadrija.local(px, pz);
+      return __fr.jad.stand(t, s, Math.atan2(px - L.x, pz - L.z));
+    },
     /** What the apprentice is doing, without building the whole of `stats`. */
     appr: () => apprenticeStats(),
     apprCheck: () => (jadrija && jadrija.apprCheck ? jadrija.apprCheck() : null),
@@ -10139,6 +10185,7 @@ window.__fr = {
   arms: {
     stats: () => (arms ? arms.stats() : null),
     probe: () => (arms ? arms.probe() : null),
+    thumbAim: (o) => (arms ? arms.thumbAim(o) : null),
   },
   kites: () => kites,
   fire: () => fire,

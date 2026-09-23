@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.477.0] — 2026-09-23
+
+### your thumb, instead of the water
+
+Misha: *"in the kabine, and when her mouth is open, instead of spraying with
+water, it should be my (chloe price)'s thumb reaching for her open mouth and
+lips"*.
+
+The same button and the same finger on it. In the kabina, while she is holding
+her mouth open because she was asked to ("open wide"), within a metre of her
+lip and in front of her face, the branch stays shut and Chloe's right hand
+goes out instead — the tattooed one — thumb on to her lower lip, fingers
+curled beside her face. Let go and it comes back down out of shot.
+
+**The first arm this rig has had on dry land.** `60-arms.js` built two
+view-model arms for the swim and the kite bar; the thumb is a third mode,
+`updateReach`, on the same right arm with the same `placeHand` solve the kite
+uses for the hole in a fist, pointed at the PAD of the thumb instead —
+measured in the wrist's frame at build time, as GRIP_OFF is. It lands within
+0–4 mm of the target. The shoulder is 24 cm under the eye and 15 cm behind it,
+so a mouth at arm's length from your eye is out of reach from your shoulder:
+the body leans in along the line to her by whatever the arm cannot close, up
+to 70 cm, and nothing sees it because the shoulder is never in shot.
+
+**Where her lip is.** `jadrija.thumbReach()`: the centre of her mouth
+(`uLipC`, off the MOUTH_P paint), onto the lower lip, carried down and back by
+exactly the jaw drop `FACE_VERT` is giving it this frame — that drop is in the
+vertex shader and in no bone, so a point skinned without it sits on a closed
+mouth — then skinned with the weights round her mouth. It also returns which
+way her face points, because the view-model arm is always drawn on top: from
+behind her it was a hand painted over the back of her head, so the thumb only
+goes to a mouth you are in front of.
+
+**The hand took nine tries**, all from `__fr.arms.thumbAim` against the same
+held pose. With the thumb at the kite's fan it lies along the index and a
+curled hand hides it completely: six palm attitudes all read as a fist held up
+to her mouth. Swung out to about 65° off the fingers, it stands clear of the
+fist and its pad faces down on to the lip.
+
+First person only; in the third person the branch is the branch. Also new:
+`__fr.jad.faceLook(d)` stands you d metres in front of her face while her
+mouth is held open.
+
 ## [1.476.0] — 2026-09-23 (baye 1.35.0)
 
 ### "open your mouth"
