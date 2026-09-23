@@ -68,3 +68,28 @@ the build works from a clean clone, which is what this directory is for.
 onto the game's +X, scaled on a real cat's head-and-body length, dropped onto
 z = 0, decimated to 4 200 triangles and repainted as vertex colours, because
 nothing in this game samples a texture.
+
+## wolf.glb
+
+- **Wolf**, by **Quaternius** — https://quaternius.com
+- Obtained via Poly Pizza: https://poly.pizza/m/P1gU3Qkr9r
+- **CC0 1.0 Universal** (public domain dedication), as stated on that page:
+  https://creativecommons.org/publicdomain/zero/1.0/
+- 4 036 vertices (983 once welded), 2 042 triangles, four materials, a
+  51-bone quadruped armature — eight-bone tail, four-bone ears, three-bone
+  neck, IK feet — and twelve actions: Idle, Idle_2, Idle_2_HeadLow, Walk,
+  Gallop, Gallop_Jump, Eating, Attack, Death, Jump_ToIdle and two hit
+  reactions.
+
+The body of **the Slow Doodle** — `tools/slowdoodle/doodle.py` reads it and
+writes `slowdoodle.html`. Chosen over Quaternius's Husky and Shiba from the
+same pack for the tail and the ears: eight tail bones are what a sabre-carried
+tail curling at the tip needs, and a wolf's ears already stand. Everything that
+makes him a doberman rather than a wolf — legs twelve per cent longer, a
+shorter back, a tucked loin, a longer muzzle, taller ears, the neck carried
+up — is a warp or a baked pose in that file, and his jaw is cut there too,
+because the wolf's head is one bone and he yawns.
+
+As with the pug, the paws hang off root-level IK targets in the original and
+are re-parented on to the lower legs: the artist's IK agrees with the legs on
+the proportions they animated and on no others, and these legs are longer.
