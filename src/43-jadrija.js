@@ -33600,10 +33600,17 @@ async function buildJadrija(scene) {
     // the ones who did had no water left to fight the fire with afterwards.
     // Fifty litres is an eighth of the pack, which is a price worth paying
     // twice.
-    // How far her jaw comes down on the loudest part of a spoken line — a
-    // quarter of the drop the hose gets. See `voiceLevel` and the note where
-    // this is used: the ask was "a little bit".
-    talkOpen: 0.26,
+    // How far her jaw comes down on the loudest part of a spoken line, as a
+    // fraction of the drop the hose gets. See `voiceLevel` and the note where
+    // this is used.
+    //
+    // 0.26 was "a little bit", which is what was asked for on 16 Sep, and on
+    // 23 Sep it was invisible: *"right now i don't see the mouth moving tbh,
+    // when she talk"*. The meter reads a spoken line at roughly 0.4-0.9, so
+    // 0.26 of an 18.5 mm drop was 2-4 mm of jaw — there, and not readable at
+    // any distance anybody stands from her. 0.6 is 5-10 mm on a syllable: a
+    // mouth you can see talking, and still well short of the hose.
+    talkOpen: 0.6,
     soakFor: 5.5,
     // And a second and a half of it inside the kabina. See the note on the
     // meter itself: in there the water is not buying a set piece, it is asking

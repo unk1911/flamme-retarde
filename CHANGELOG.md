@@ -8,6 +8,18 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.475.2] — 2026-09-23
+
+### she talks with her mouth, visibly
+
+Misha: *"right now i don't see the mouth moving tbh, when she talk"*. Not a
+missing wire — v1.0's lips have followed the voice meter since 16 Sep, and
+v2.0's copy them since 1.475.0 — but a number. `talkOpen` was 0.26 of the jaw
+drop, set when the ask was "a little bit", and the meter reads a spoken line
+at roughly 0.4–0.9: 2–4 mm of jaw, which is not readable at any distance
+anybody stands from her. 0.6 is 5–10 mm on a syllable. Both women, since the
+apprentice takes the leader's `face.gape`.
+
 ## [1.475.1] — 2026-09-23
 
 `__fr.jad.appr()` now reports `gape` and `lead`: the apprentice's mouth and
