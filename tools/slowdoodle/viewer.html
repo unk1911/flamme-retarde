@@ -1,0 +1,343 @@
+<!doctype html><html><head><meta charset="utf-8"><title>The Slow Doodle</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%;background:#050914;color:#cfd4da;
+ font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;overflow:hidden}
+ #c{display:block;width:100%;height:100%}
+ #hud{position:fixed;left:12px;bottom:12px;background:#0009;padding:8px 11px;
+  border-radius:6px;white-space:pre;pointer-events:none;font-size:12px}
+ #title{position:fixed;left:14px;top:12px;pointer-events:none}
+ #title b{display:block;font:600 20px/1.2 Georgia,serif;color:#f1c27d;letter-spacing:.02em}
+ #title i{font:italic 13px/1.4 Georgia,serif;color:#a9b3c6}
+ #ui{position:fixed;right:10px;top:10px;width:212px;
+  background:#070b14dd;padding:10px 12px;border-radius:8px;border:1px solid #1e2636}
+ h4{margin:12px 0 4px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#7b8794;font-weight:600}
+ h4:first-child{margin-top:0}
+ button{font:inherit;font-size:12px;background:#141a26;color:#b9c0c8;border:1px solid #2a3344;
+  border-radius:4px;padding:3px 7px;margin:2px 2px 0 0;cursor:pointer}
+ button:hover{background:#1c2433}
+ button.on{background:#9a5a1c;border-color:#e59a45;color:#fff}
+ #cred{display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  max-height:76vh;overflow-y:auto;background:#0b0f18f2;border:1px solid #232c3d;
+  border-radius:8px;padding:16px 20px;font-size:12px;max-width:560px}
+ #cred a{color:#e59a45} #cred p{color:#98a2ad}
+ @media (max-width:640px){#ui{width:auto;left:10px;right:10px;top:auto;bottom:10px}#hud{display:none}}</style></head>
+<body><canvas id="c"></canvas>
+<div id="title"><b>The Slow Doodle</b><i>a smudge of gold, a cloud of cream</i></div>
+<div id="hud">booting…</div><div id="ui"></div><div id="cred"></div>
+<script type="importmap">{"imports":{"three":"../../vendor/three.module.min.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from '../../vendor/loaders_GLTFLoader.js';
+import { OrbitControls } from '../../vendor/controls_OrbitControls.js';
+
+const SRC = { glb: '../../build/slowdoodle/slowdoodle.glb', tex: '../../build/slowdoodle/' };
+const hud = document.getElementById('hud'), ui = document.getElementById('ui');
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.02, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.35; controls.maxDistance = 12;
+
+// ── the night, which is the photograph's and not a studio's ────────────────
+//
+// A sphere with the sky drawn on it procedurally: deep navy overhead, a band of
+// milky way across it, and the last of a sunset along the horizon behind the
+// mountains — the light that rims him in the picture. No texture, so nothing
+// to license and nothing to download.
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: { uT: { value: 0 } },
+  vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position);'
+    + ' gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: `
+    varying vec3 vD; uniform float uT;
+    float h3(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7))) * 43758.5453); }
+    float n3(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+      return mix(mix(mix(h3(i),h3(i+vec3(1,0,0)),f.x),mix(h3(i+vec3(0,1,0)),h3(i+vec3(1,1,0)),f.x),f.y),
+                 mix(mix(h3(i+vec3(0,0,1)),h3(i+vec3(1,0,1)),f.x),mix(h3(i+vec3(0,1,1)),h3(i+vec3(1,1,1)),f.x),f.y),f.z); }
+    void main(){
+      vec3 d = normalize(vD); float y = d.y;
+      float az = atan(d.z, d.x);
+      // Deep navy overhead to a pale blue haze at the horizon, which is the
+      // photograph's sky: the first version was a lavender-grey wash and
+      // every judgement of his colours was being made against the wrong one.
+      vec3 zen = vec3(0.004, 0.010, 0.040), mid = vec3(0.016, 0.050, 0.150);
+      vec3 hor = vec3(0.110, 0.200, 0.380);
+      vec3 col = mix(hor, mid, smoothstep(0.0, 0.28, y));
+      col = mix(col, zen, smoothstep(0.28, 0.85, y));
+      // the last of the sunset, low and to one side
+      float glow = exp(-pow((az + 2.4) * 1.1, 2.0));
+      col += vec3(1.00, 0.52, 0.22) * glow * (1.0 - smoothstep(-0.02, 0.20, y)) * 0.85;
+      col += vec3(0.55, 0.40, 0.45) * glow * (1.0 - smoothstep(0.0, 0.45, y)) * 0.12;
+      // the milky way: a tilted band of cloud, purple at its heart
+      vec3 bandN = normalize(vec3(0.62, 0.30, -0.72));
+      float band = exp(-pow(dot(d, bandN) * 2.6, 2.0)) * smoothstep(0.02, 0.30, y);
+      float cloud = n3(d * 4.0) * 0.55 + n3(d * 9.0) * 0.30 + n3(d * 21.0) * 0.15;
+      float lanes = smoothstep(0.35, 0.75, n3(d * 7.0 + 3.0));
+      col += band * mix(vec3(0.10, 0.12, 0.30), vec3(0.62, 0.48, 0.70), cloud) * cloud * (1.0 - 0.6 * lanes) * 0.9;
+      // stars, denser in the band, a few of them big and blue
+      for (int L = 0; L < 2; L++) {
+        float sc = L == 0 ? 220.0 : 520.0;
+        vec3 g = d * sc; vec3 id = floor(g); float s = h3(id + float(L) * 17.0);
+        float tw = 0.7 + 0.3 * sin(uT * (1.0 + 3.0 * h3(id + 7.0)) + s * 40.0);
+        float thr = L == 0 ? 0.9935 - band * 0.010 : 0.985 - band * 0.03;
+        float star = step(thr, s) * smoothstep(0.42, 0.0, length(fract(g) - 0.5));
+        vec3 sc3 = mix(vec3(1.0, 0.95, 0.85), vec3(0.70, 0.82, 1.0), h3(id + 3.0));
+        col += sc3 * star * tw * smoothstep(0.02, 0.12, y) * (L == 0 ? 2.2 : 0.8);
+      }
+      // mountains: a far ridge, blue in the haze, and a near one nearly black
+      float far = 0.050 + 0.045 * n3(vec3(az * 2.4, 0.0, 1.0)) + 0.02 * n3(vec3(az * 8.0, 2.0, 1.0));
+      float near = 0.012 + 0.030 * n3(vec3(az * 1.6, 5.0, 2.0)) + 0.012 * n3(vec3(az * 6.0, 9.0, 1.0));
+      vec3 farC = mix(hor, vec3(0.040, 0.070, 0.140), 0.55) + vec3(0.25, 0.12, 0.05) * glow * 0.35;
+      col = mix(col, farC, step(y, far));
+      col = mix(col, vec3(0.012, 0.018, 0.034), step(y, near));
+      gl_FragColor = vec4(col, 1.0);
+      #include <colorspace_fragment>
+    }`,
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(200, 48, 24), skyMat);
+scene.add(sky);
+
+// Reflections for the gold: a small equirect of the same night, warm at the
+// horizon where the sunset is, because gold only looks like gold by what it
+// reflects and a black studio reflects nothing.
+{ const W = 128, H = 64, d = new Float32Array(W * H * 4);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const v = 1 - j / (H - 1), y = v * 2 - 1, az = (i / W) * Math.PI * 2 - Math.PI, k = (j * W + i) * 4;
+    let r = 0.05, g = 0.08, b = 0.18;
+    if (y < 0.18) { const t = Math.max(0, 1 - Math.abs(y - 0.02) / 0.2);
+      const warm = Math.exp(-Math.pow((az + 2.4) * 1.3, 2));
+      r += t * (0.35 + 1.6 * warm); g += t * (0.30 + 0.8 * warm); b += t * (0.40 + 0.25 * warm); }
+    if (y < -0.05) { r = 0.05; g = 0.05; b = 0.06; }
+    if (y > 0.5) { r += 0.02; g += 0.03; b += 0.08; }
+    d[k] = r; d[k + 1] = g; d[k + 2] = b; d[k + 3] = 1; }
+  const t = new THREE.DataTexture(d, W, H, THREE.RGBAFormat, THREE.FloatType);
+  t.mapping = THREE.EquirectangularReflectionMapping; t.needsUpdate = true;
+  scene.environment = new THREE.PMREMGenerator(renderer).fromEquirectangular(t).texture;
+  scene.environmentIntensity = 0.9; }
+
+const moon = new THREE.DirectionalLight(0xbcd0ff, 1.25);
+moon.position.set(1.8, 3.2, 2.4); moon.castShadow = true;
+moon.shadow.mapSize.set(2048, 2048); moon.shadow.bias = -0.0004; moon.shadow.normalBias = 0.02;
+Object.assign(moon.shadow.camera, { left: -1.4, right: 1.4, top: 1.4, bottom: -1.4, near: 0.5, far: 8 });
+scene.add(moon);
+// The sunset behind him, low: the rim that lights the edge of the mane.
+const rim = new THREE.DirectionalLight(0xffa04a, 2.6);
+rim.position.set(-2.6, 0.7, -2.2); scene.add(rim);
+scene.add(new THREE.HemisphereLight(0x3a4c7a, 0x120e10, 0.55));
+
+// The rock he stands on. A displaced icosahedron with the top shaved flat.
+{ const g = new THREE.IcosahedronGeometry(1, 5), p = g.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i);
+    const n = Math.sin(v.x * 7.1 + v.z * 3.3) * 0.05 + Math.sin(v.y * 11.0 + v.x * 5.0) * 0.035
+      + Math.sin(v.z * 17.0 - v.y * 9.0) * 0.02;
+    v.multiplyScalar(1 + n); v.x *= 1.25; v.z *= 1.05; v.y *= 0.55;
+    if (v.y > 0.30) v.y = 0.30 + (v.y - 0.30) * 0.06;
+    p.setXYZ(i, v.x, v.y, v.z); }
+  g.computeVertexNormals();
+  const rock = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x101116, roughness: 0.97, flatShading: true }));
+  rock.position.y = -0.305; rock.receiveShadow = true; scene.add(rock); }
+
+// ── his materials, owned here rather than in the GLB ───────────────────────
+//
+// Owned here so the coat can be swapped in one line and so the numbers that
+// decide how he looks are all in one place. The GLB carries names.
+const COATS = {
+  // The picture: black, with a warm sheen where the light grazes the fur.
+  night: { main: 0x0d0d10, light: 0x16120f, sheen: 0x7a6552, nose: 0x050505 },
+  // The poem: "a smudge of gold, a cloud of cream".
+  cream: { main: 0xd8b77c, light: 0xf1e3c4, sheen: 0xfff1d6, nose: 0x2a1c16 },
+};
+const furMat = (c) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.62, metalness: 0,
+  sheen: 1.0, sheenRoughness: 0.42, sheenColor: new THREE.Color(0x7a6552) });
+const MAT = {
+  Main: furMat(COATS.night.main),
+  Main_Light: furMat(COATS.night.light),
+  Nose: new THREE.MeshPhysicalMaterial({ color: 0x050505, roughness: 0.28, clearcoat: 0.6 }),
+  Eyes_Black: new THREE.MeshPhysicalMaterial({ color: 0x3a0e08, roughness: 0.05,
+    clearcoat: 1, clearcoatRoughness: 0.02, emissive: 0x2a0600, emissiveIntensity: 0.6 }),
+  gold: new THREE.MeshPhysicalMaterial({ color: 0xe0a84e, metalness: 1, roughness: 0.26,
+    clearcoat: 0.4, clearcoatRoughness: 0.2 }),
+  gem: new THREE.MeshPhysicalMaterial({ color: 0xb0061a, metalness: 0, roughness: 0.04,
+    transmission: 0.55, thickness: 0.02, ior: 1.77, clearcoat: 1, clearcoatRoughness: 0.0,
+    emissive: 0x5a0008, emissiveIntensity: 0.45, attenuationColor: new THREE.Color(0x800010), attenuationDistance: 0.01 }),
+  mouth: new THREE.MeshStandardMaterial({ color: 0x1a0708, roughness: 0.6 }),
+  tongue: new THREE.MeshPhysicalMaterial({ color: 0xb04a58, roughness: 0.35, clearcoat: 0.5 }),
+  teeth: new THREE.MeshPhysicalMaterial({ color: 0xf1ead8, roughness: 0.25, clearcoat: 0.6 }),
+};
+const texLoader = new THREE.TextureLoader();
+function tex(file, srgb) {
+  const t = texLoader.load(SRC.tex + file);
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; t.flipY = false;
+  return t; }
+// Hair: alpha-cut cards, as every hairstyle in the MakeHuman library is, dyed.
+// The strand texture's luminance is kept as shading and the colour supplied —
+// a dye, not a tint — with the tips pushed toward yellow and a little glow,
+// because in the picture the mane is backlit by the sunset and burns.
+function hairMat(file) {
+  const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.45, metalness: 0,
+    side: THREE.DoubleSide, alphaTest: 0.45, sheen: 0.6, sheenRoughness: 0.35,
+    sheenColor: new THREE.Color(0xffd080), emissive: 0xff7a20, emissiveIntensity: 0.62 });
+  m.map = tex(file, true);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uDye = { value: new THREE.Color(0xff8a26) };
+    sh.uniforms.uTip = { value: new THREE.Color(0xffdc86) };
+    sh.fragmentShader = 'uniform vec3 uDye; uniform vec3 uTip;\n' + sh.fragmentShader.replace(
+      '#include <map_fragment>',
+      `vec4 hc = texture2D(map, vMapUv);
+       float hl = dot(hc.rgb, vec3(0.299, 0.587, 0.114));
+       vec3 dye = mix(uDye, uTip, smoothstep(0.55, 1.0, vMapUv.y));
+       diffuseColor.rgb *= dye * (0.55 + 0.95 * hl);
+       diffuseColor.a *= hc.a;`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\n totalEmissiveRadiance *= (0.35 + 0.9 * hl) * dye;');
+  };
+  return m; }
+
+let doodle = null, mixer = null, clips = {}, cur = null, ready = false, coat = 'night';
+const parts = {};
+new GLTFLoader().load(SRC.glb + '?b=' + Date.now(), (g) => {
+  doodle = g.scene; scene.add(doodle);
+  doodle.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = true;
+    o.frustumCulled = false;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const out = mats.map((m) => {
+      const n = (m && m.name || '').replace(/\.\d+$/, '');
+      if (n === 'mane' || n === 'tuft') return hairMat(n === 'mane' ? 'mane.png' : 'tuft.png');
+      if (n === 'filigree') {
+        const f = MAT.gold.clone(); f.map = tex('filigree.png', true); f.alphaTest = 0.5;
+        f.side = THREE.DoubleSide; return f; }
+      return MAT[n] || m; });
+    o.material = Array.isArray(o.material) ? out : out[0];
+    parts[o.name] = o;
+  });
+  mixer = new THREE.AnimationMixer(doodle);
+  mixer.addEventListener('finished', (e) => { if (e.action === cur) play('Idle', 0.6); });
+  for (const a of g.animations) clips[a.name] = a;
+  frame(); build(); play('Idle'); view('whole'); ready = true;
+}, undefined, (e) => { hud.textContent = 'load failed: ' + e.message; });
+
+// ── what he does ───────────────────────────────────────────────────────────
+// What he does, in the poem's words. The walk is played at a little over
+// half speed because he is the slow doodle; the gallop is there so there is
+// something for him to decline.
+const SHOW = [
+  ['Idle', 'idle', 1.0], ['Sway', 'lazy sway', 1.0], ['Yawn', 'big yawn', 1.0],
+  ['Walk', 'slow walk', 0.55], ['Idle_2_HeadLow', 'soulful gaze', 1.0],
+  ['Eating', 'the clover', 0.8], ['Idle_2', 'the breeze', 1.0], ['Gallop', 'hurry (no)', 0.8],
+];
+function play(name, fade = 0.45) {
+  const spec = SHOW.find((s) => s[0] === name);
+  const clip = clips[name]; if (!clip) return false;
+  const a = mixer.clipAction(clip);
+  a.reset(); a.timeScale = spec ? spec[2] : 1; a.setEffectiveWeight(1);
+  // The yawn is a thing that happens once; he goes back to idling after it.
+  if (name === 'Yawn') { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = false; }
+  else a.setLoop(THREE.LoopRepeat, Infinity);
+  if (cur && cur !== a) { a.crossFadeFrom(cur, fade, true); }
+  a.play(); cur = a;
+  for (const b of ui.querySelectorAll('button[data-a]')) b.classList.toggle('on', b.dataset.a === name);
+  return true; }
+function setCoat(k) {
+  coat = k; const c = COATS[k];
+  MAT.Main.color.setHex(c.main); MAT.Main_Light.color.setHex(c.light);
+  MAT.Main.sheenColor.setHex(c.sheen); MAT.Main_Light.sheenColor.setHex(c.sheen);
+  MAT.Nose.color.setHex(c.nose);
+  for (const b of ui.querySelectorAll('button[data-coat]')) b.classList.toggle('on', b.dataset.coat === k); }
+// Views are framed off his measured bounds rather than typed: a camera
+// position written down for one proportion is wrong for the next, and every
+// change to the shape is a change to the proportion.
+const V = {};
+function frame() {
+  const b = new THREE.Box3().setFromObject(doodle, true);
+  const c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+  const fit = (h) => (h / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const d = fit(Math.max(sz.y, sz.x / camera.aspect)) * 1.25;
+  // The head is found by its BONE, not by the box: the top of the box is the
+  // mane now, and a head view framed off it looked at the mane.
+  const hb = doodle.getObjectByName('Head');
+  const head = hb ? hb.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0.07, 0.02, 0))
+    : new THREE.Vector3(b.max.x - sz.x * 0.10, b.max.y - sz.y * 0.30, 0);
+  V.whole = [[c.x + d * 0.62, c.y + d * 0.07, d * 0.80], [c.x, c.y + 0.04, 0]];
+  V.side = [[c.x, c.y + d * 0.08, d * 1.02], [c.x, c.y, 0]];
+  V.head = [[head.x + 0.46, head.y + 0.06, 0.40], [head.x - 0.01, head.y - 0.01, 0]];
+  V.paws = [[c.x + 0.55, 0.16, 0.62], [c.x + 0.08, 0.08, 0]];
+  // Low and in front, looking up at him, the way the picture was taken.
+  V.photo = [[c.x + d * 0.42, 0.10, d * 0.62], [c.x + 0.04, c.y + sz.y * 0.10, 0]];
+}
+function view(k) {
+  if (!V[k]) frame();
+  const [p, t] = V[k]; camera.position.set(...p); controls.target.set(...t); controls.update();
+  for (const b of ui.querySelectorAll('button[data-v]')) b.classList.toggle('on', b.dataset.v === k); }
+let spin = false;
+function build() {
+  let h = '<h4>he does</h4>';
+  for (const [n, label] of SHOW) if (clips[n]) h += '<button data-a="' + n + '">' + label + '</button>';
+  h += '<h4>coat</h4><button data-coat="night" class="on">the picture</button><button data-coat="cream">the poem</button>';
+  h += '<h4>view</h4>' + Object.keys(V).map((v) => '<button data-v="' + v + '">' + v + '</button>').join('');
+  h += '<h4>look</h4><button data-spin="1">turntable</button><button data-cred="1">credits</button>';
+  ui.innerHTML = h;
+  ui.onclick = (e) => { const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.a) play(b.dataset.a);
+    else if (b.dataset.coat) setCoat(b.dataset.coat);
+    else if (b.dataset.v) view(b.dataset.v);
+    else if (b.dataset.spin) { spin = !spin; b.classList.toggle('on', spin); }
+    else if (b.dataset.cred) credits(); }; }
+function credits() {
+  const d = document.getElementById('cred');
+  if (d.style.display === 'block') { d.style.display = 'none'; return; }
+  d.innerHTML = '<b>The Slow Doodle</b><p>After the picture and the poems at '
+    + '<a href="https://poetry.edeliverables.com/" target="_blank" rel="noopener">poetry.edeliverables.com</a> — team clicko.</p>'
+    + '<p><b>Body, rig and animation</b>: "Wolf" by <b>Quaternius</b> (quaternius.com), CC0 1.0, '
+    + 'via <a href="https://poly.pizza/m/P1gU3Qkr9r" target="_blank" rel="noopener">Poly Pizza</a> — re-proportioned, '
+    + 'subdivided, given a jaw.</p>'
+    + '<p><b>Mane and tuft strands</b>: hair textures from the MakeHuman community asset packs '
+    + '(hair01), CC0, recoloured.</p>'
+    + '<p>Harness, breastplate, gem, boots, sky and rock: made for this page.</p>';
+  d.style.display = 'block'; }
+function size() { renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', size); size();
+const clock = new THREE.Clock();
+let n = 0, t0 = performance.now(), fps = 0;
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (mixer && !window.__frozen) mixer.update(dt);
+  skyMat.uniforms.uT.value += dt;
+  if (spin && ready) { const t = controls.target, r = camera.position.clone().sub(t);
+    r.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.004); camera.position.copy(t).add(r); }
+  controls.update(); renderer.render(scene, camera);
+  if (++n >= 30) { const t = performance.now(); fps = 30000 / (t - t0); t0 = t; n = 0; }
+  if (ready) hud.textContent = `${cur ? cur.getClip().name : ''}  ·  ${coat}\n`
+    + `${fps.toFixed(0)} fps · ${renderer.info.render.calls} calls · ${renderer.info.render.triangles.toLocaleString()} tris`;
+});
+window.__t = () => ({ ready, fps: +fps.toFixed(1), tris: renderer.info.render.triangles,
+  clips: Object.keys(clips), parts: Object.keys(parts), cur: cur ? cur.getClip().name : null });
+window.__bbox = () => { const b = new THREE.Box3().setFromObject(doodle, true);
+  return { min: b.min.toArray().map((v) => +v.toFixed(3)), max: b.max.toArray().map((v) => +v.toFixed(3)) }; };
+window.__nodes = () => { const out = []; doodle.traverse((o) => out.push(o.type + ':' + o.name + ' s' + o.scale.x.toFixed(3))); return out.slice(0, 12); };
+window.__clean = (on = true) => { for (const id of ['ui', 'hud', 'title'])
+  document.getElementById(id).style.display = on ? 'none' : ''; };
+window.__clipinfo = (n) => { const c = clips[n]; if (!c) return null;
+  return { dur: +c.duration.toFixed(2), tracks: c.tracks.length,
+    names: c.tracks.slice(0, 40).map((t) => t.name + ':' + t.times.length) }; };
+window.__partbox = (n) => { const o = parts[n]; if (!o) return null;
+  const b = new THREE.Box3().setFromObject(o, true);
+  return { vis: o.visible, min: b.min.toArray().map((v) => +v.toFixed(3)), max: b.max.toArray().map((v) => +v.toFixed(3)),
+    mat: o.material.name, alphaTest: o.material.alphaTest, map: !!o.material.map }; };
+window.__play = play; window.__view = view; window.__coat = setCoat;
+window.__cam = (p, t) => { camera.position.set(...p); controls.target.set(...t); controls.update(); };
+// Hold one frame of one clip, for a still that is the same every time.
+// Everything else is stopped first: a zero-length crossfade only resolves on
+// an update with a nonzero dt, so posing one clip over another left the old
+// one at full weight and the still showed the wrong clip.
+window.__at = (name, t) => { mixer.stopAllAction(); cur = null; play(name, 0);
+  cur.setEffectiveWeight(1); cur.time = t; mixer.update(0); window.__frozen = true; };
+window.__go = () => { window.__frozen = false; };
+</script></body></html>

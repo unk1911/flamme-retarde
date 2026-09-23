@@ -78,3 +78,8 @@ plan/*-wip/
 # all regenerable in one command. What survives is the committed wardrobe.html.
 build/mh_assets/
 build/wardrobe/
+
+# What tools/slowdoodle/make.py builds on the way to slowdoodle.html: the GLB,
+# its textures and a Blender scratch file. Regenerable in one command; the
+# committed artifact is the page.
+build/slowdoodle/
