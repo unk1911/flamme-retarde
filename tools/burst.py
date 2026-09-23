@@ -487,7 +487,19 @@ def cmd_run(a):
         refs_remote = ",".join(f"/home/ubuntu/job/refs/{r.name}" for r in local)
         say(f"refs: {refs_remote}")
 
-    ssh(ip, "mkdir -p ~/job/frames ~/job/out")
+    ssh(ip, "mkdir -p ~/job/frames ~/job/out ~/job/refs")
+    refs = [Path(r).expanduser() for r in a.ref.split(",") if r.strip()]
+    for r in refs:
+        if not r.is_file():
+            sys.exit(f"--ref: no such file {r}")
+    if refs:
+        subprocess.run(
+            ["rsync", "-az", "-e", " ".join(ssh_base(ip)[:-1])]
+            + [str(r) for r in refs] + [f"ubuntu@{ip}:job/refs/"],
+            check=True, stdin=subprocess.DEVNULL)
+        say(f"{len(refs)} reference image(s) up: "
+            + ", ".join(r.name for r in refs))
+    remote_refs = ",".join(f"/home/ubuntu/job/refs/{r.name}" for r in refs)
     subprocess.run(
         ["rsync", "-az", "--delete", "-e", " ".join(ssh_base(ip)[:-1]),
          str(frames) + "/", f"ubuntu@{ip}:job/frames/"], check=True,
@@ -671,7 +683,19 @@ def cmd_fan(a):
         attn = (r.stdout or "").strip() or "sageattn"
     say(f"attention: {attn}")
 
-    ssh(ip, "mkdir -p ~/job/frames ~/job/out")
+    ssh(ip, "mkdir -p ~/job/frames ~/job/out ~/job/refs")
+    refs = [Path(r).expanduser() for r in a.ref.split(",") if r.strip()]
+    for r in refs:
+        if not r.is_file():
+            sys.exit(f"--ref: no such file {r}")
+    if refs:
+        subprocess.run(
+            ["rsync", "-az", "-e", " ".join(ssh_base(ip)[:-1])]
+            + [str(r) for r in refs] + [f"ubuntu@{ip}:job/refs/"],
+            check=True, stdin=subprocess.DEVNULL)
+        say(f"{len(refs)} reference image(s) up: "
+            + ", ".join(r.name for r in refs))
+    remote_refs = ",".join(f"/home/ubuntu/job/refs/{r.name}" for r in refs)
     say("uploading frames (once — every worker reads a window out of the same "
         "directory)")
     subprocess.run(
@@ -743,6 +767,8 @@ def cmd_fan(a):
                    "--host", f"http://127.0.0.1:{PORT + k}"]
             if a.upscale:
                 cmd += ["--upscale", a.upscale, "--outw", str(a.outw)]
+            if remote_refs:
+                cmd += ["--ref", remote_refs]
             if prompts.get(c):
                 cmd += ["--pos", prompts[c]]
             elif a.pos:
@@ -925,6 +951,12 @@ def main():
     f.add_argument("--pos", default=None)
     f.add_argument("--neg", default=None)
     f.add_argument("--out", default=str(Path.home() / "fr-video" / "fan"))
+    # Reference images, comma-separated local paths. VACE applies them to EVERY
+    # chunk, and that is the whole point: each chunk is generated on its own,
+    # knows nothing of the one before, and otherwise reinvents the people in it
+    # every 5.06 s. A picture of who they are, handed to all of them, is the one
+    # thing a chunk can be told about identity that is not the text.
+    f.add_argument("--ref", default="")
     f.add_argument("--timeout", type=float, default=75)
     f.add_argument("--attn", default="")
     # 20, and NOT `run`'s 0, and the difference cost $2.84 and eleven minutes on

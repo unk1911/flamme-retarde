@@ -40,6 +40,32 @@ Also from the same run: **a 2:1 recording does not want 1280x720.** The model
 is fine at 1024x640; what it is not fine at is a letterbox, so crop to the
 ratio rather than padding to the trained one.
 
+## People stay the same people: a reference image — 23 Sep 2026
+
+Every chunk is generated on its own and knows nothing of the one before, so
+the people in it are reinvented every 5.06 s. Measured on
+fr-clip-20260923-144913: without a reference the dark-haired woman was blonde
+in black mesh briefs by chunk 2. With one, chunk 0 and chunk 2 are the same two
+women. **Always run a film with people in it this way:**
+
+1. `burst.py fan --chunks 1 ...` with the final prompts — chunk 0 alone.
+2. `tools/lab/refcut.py` on a good frame of it — the people front-on, whole
+   bodies — onto white, at exactly the job's size. Look at it before using it.
+3. `burst.py fan --chunks N --ref ref.png ...` — the whole film, every chunk
+   handed the same picture of who they are.
+
+Cut from the film's OWN chunk 0, so the reference carries the look the film
+will have rather than some other attempt's. Onto white, with the wall taken
+off, because a reference is a picture of *everything* in it and a mottled wall
+behind them would be pushed into every chunk. Costs one extra chunk (~$0.30 on
+an A100) and a few minutes of the box idling while the cut is checked.
+
+The other two lessons from the same film are prompt lessons, and they are the
+old rule — describe what is in the frame — applied to things that were only
+half-described: "a white plate" came back with food on it, and it is "a small
+black plate with a gold rim with a few neat lines of fine white powder"; and
+people the prompt did not say were naked came back in bikini bottoms.
+
 ## Rented-GPU gotchas
 
 Each of these cost a run.
