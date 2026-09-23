@@ -33276,6 +33276,25 @@ async function buildJadrija(scene) {
    * she is a person rather than a shape, so it is where she is allowed to know
    * you are coming; 46 m is far enough that giving up does not look like a sulk.
    */
+  /**
+   * PARKED, 23 Sep 2026 — two of her oldest ways of saying something, switched
+   * off rather than deleted.
+   *
+   * Misha: *"can u remove (or park for now) those digital audio sounds that
+   * baye makes while on the beach, like the cuk sounds... that used to be in
+   * the very beginning where we couldn't talk with voice. also there's no need
+   * for baye to hold up those white canvas things... now we have much better
+   * communication ways, as long as the lips move."*
+   *
+   * Both were built when she had no voice: the pitched `cuk` syllables through
+   * `showSay` (sixty-seven call sites, one gate), and the hand-lettered card
+   * she held up in the `note` and `boast` phases. She speaks now, with a mouth
+   * that moves on the voice meter, and both of those read as the stand-ins
+   * they were. The recorded noises when she is hosed or bumped (`showNoise`)
+   * are her own voice and are NOT parked. Flip either flag to bring one back;
+   * nothing behind them has been touched.
+   */
+  const PARKED = { squeaks: true, cards: true };
   const SHOW = {
     /**
      * How near the round table's middle her route may pass — see `showRound`.
@@ -35300,6 +35319,7 @@ async function buildJadrija(scene) {
    * below comes from.
    */
   function showSay(kind, d) {
+    if (PARKED.squeaks) return;
     if (!audio || state.phase === 'intro') return;
     const g = clamp(1.15 - d / 46, 0, 1) * (1 + (show ? show.wet : 0) * 0.75);
     if (g > 0.04) audio.squeak(kind, g);
@@ -37068,6 +37088,10 @@ async function buildJadrija(scene) {
       go('heart', 'heart', 0.36);
     };
     const enterNote = () => {
+      // Parked — see PARKED. Straight on to whatever comes next, so the
+      // opening routine and an ask for "note" both carry on as if the card
+      // had been held up and put down.
+      if (PARKED.cards) return showNext();
       show.card2 = null; show.card = 0;
       if (banner) {
         const line = banner.pick(showPlace());

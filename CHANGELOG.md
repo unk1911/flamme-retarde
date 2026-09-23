@@ -8,6 +8,40 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.475.0] — 2026-09-23
+
+### v2.0's lips move, and two old stand-ins are parked
+
+Misha: *"baye v2.0 is emulating baye v1.0, but her lips don't seem to be
+moving... can u remove (or park for now) those digital audio sounds... the
+cuk sounds... also there's no need for baye to hold up those white canvas
+things... now we have much better communication ways, as long as the lips
+move... lips move, and eyes blink u know facial expression convey much
+better."*
+
+**The jaw.** The apprentice has worn the leader's bones since 1.472.0, and
+v1.0's mouth is not a bone: it is `FACE_VERT` dropping the region below her
+lip line in the bind pose, driven by `face.gape` — the voice meter while she
+speaks, a syllable envelope when the meter reads nothing, the open mouth of
+the hose and the straw. So v2.0 figures get the same displacement from
+`v5Parts`, with v1.0's own `jawR` and `drop` so both women open by the same
+amount, on the body and on the teeth-and-tongue part, gated below the lip
+line so the lower teeth go with the jaw and the upper ones stay. The hinge is
+measured off her front teeth by `v5Jaw`. The apprentice takes `face.gape`
+through the same ring buffer as her pose, so her lips lag by exactly what her
+body lags by, and damps it at v1.0's own rate.
+
+**Parked, not deleted** — `PARKED` in 43-jadrija.js, one flag each:
+
+- `squeaks`: the pitched recorded `cuk` syllables through `showSay`, which
+  were her voice before she had one. Sixty-seven call sites, one gate. Her
+  recorded noises when hosed or bumped (`showNoise`) are her own voice and are
+  untouched.
+- `cards`: the hand-lettered card she held up in the `note` and `boast`
+  phases. `enterNote` goes straight on to whatever is next, so the opening
+  routine runs shimmy, twerk, heart, cartwheels, and an ask for a note carries
+  on as if it had been shown.
+
 ## [1.474.0] — 2026-09-23
 
 ### the line, as thirteen sub-steps

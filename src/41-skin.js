@@ -2447,6 +2447,28 @@ function v5Parts(o) {
     uLid: { value: 0 },
     uLidCol: { value: new THREE.Color(o.lidCol || 0xd8ab94) },
   };
+  // THE JAW, which is what a mouth that talks is. Misha, 23 Sep 2026: *"baye
+  // v2.0 is emulating baye v1.0, but her lips don't seem to be moving."* The
+  // apprentice copies the leader's bones, and v1.0's mouth is not a bone — it
+  // is `FACE_VERT` dropping the region below her lip line in the bind pose,
+  // driven by `face.gape` off the voice meter. So it is the same displacement
+  // here, with v1.0's own `jawR` and `drop` so both women open the same
+  // amount, on the body AND on the teeth and tongue part — gated below the
+  // lip line, so the lower teeth go with the jaw and the upper ones stay. The
+  // hinge, `uLipC`, is measured off the teeth by `v5Eyes`.
+  const jaw = {
+    uniforms: { uGape: { value: 0 }, uLipC: { value: new THREE.Vector3(0, -99, 0) },
+      uJawR: { value: new THREE.Vector3(...FACE.jawR) } },
+    decl: '\nuniform float uGape;\nuniform vec3 uLipC;\nuniform vec3 uJawR;\n',
+    vert: `
+      if (uGape > 0.0) {
+        vec3 jf = vec3(p.x, p.y, abs(p.z));
+        float jw = 1.0 - smoothstep(0.20, 1.0, length((jf - uLipC) / uJawR));
+        jw *= smoothstep(0.0015, -0.0090, p.y - uLipC.y);
+        p += uGape * jw * vec3(${FACE.drop[0]}, -${FACE.drop[1]}, 0.0);
+      }
+    `,
+  };
   const hairTex = o.hairTex ? v5Tex(o.hairTex) : null;
   const legTex = o.legTex ? v5Tex(o.legTex) : null;
   const parts = {
@@ -2476,7 +2498,8 @@ function v5Parts(o) {
           spec = 0.10;
         }
       ` },
-    mouth: { color: 0xd8b3ae, spec: 0.20 },
+    mouth: { color: 0xd8b3ae, spec: 0.20, uniforms: jaw.uniforms,
+      decl: jaw.decl, vert: jaw.vert },
     // Hair cards are rectangles that only look like hair because most of each
     // one is cut away by its alpha. A discard rather than blending, so they
     // sort against each other without a depth-sorted pass.
@@ -2522,7 +2545,7 @@ function v5Parts(o) {
         + 'if (lc.a < 0.5) discard;\n'
         + 'base *= lc.rgb;' };
   }
-  return { parts, eye };
+  return { parts, eye, jaw };
 }
 
 /**
@@ -2557,6 +2580,34 @@ function v5Eyes(fig, eye) {
   eye.uEyeL.value.set(lx / ln, ly / ln, lz / ln);
   eye.uEyeR.value.set(rx / rn, ry / rn, rz / rn);
   eye.uEyeY.value.set(lo, hi);
+  return true;
+}
+
+/**
+ * Where her jaw hinges, measured off the teeth: the midline, at the height
+ * between the upper and lower front teeth, at the front of them. The lips sit
+ * a few millimetres further forward, which the 50 mm jaw region swallows; the
+ * HEIGHT is the number that matters, because the drop is gated below it.
+ */
+function v5Jaw(fig, jaw) {
+  const part = fig.parts && fig.parts.mouth;
+  if (!part || !jaw) return false;
+  const pos = fig.mesh.geometry.getAttribute('position');
+  const ix = fig.mesh.geometry.getIndex();
+  const { start, count } = part.geometry.drawRange;
+  const vs = [];
+  const seen = new Set();
+  for (let i = start; i < start + count; i++) {
+    const v = ix.getX(i);
+    if (seen.has(v)) continue;
+    seen.add(v);
+    vs.push([pos.getX(v), pos.getY(v)]);
+  }
+  if (vs.length < 12) return false;
+  const xm = Math.max(...vs.map((q) => q[0]));
+  const front = vs.filter((q) => q[0] > xm - 0.010);
+  const y = front.reduce((a, q) => a + q[1], 0) / front.length;
+  jaw.uniforms.uLipC.value.set(xm, y, 0);
   return true;
 }
 

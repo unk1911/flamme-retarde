@@ -90,6 +90,8 @@ let apprStride = 0, apprRingN = 0;
 let apprHead = 0, apprN = 0, apprClock = 0;
 let apprClip = null;             // what the leader was last seen playing
 let apprEye = null;              // her iris and blink uniforms
+let apprJaw = null;              // her jaw uniforms — see v5Parts
+let apprGape = null;             // the leader's mouth, per ring slot
 let apprCalls = 0;               // frames apprenticeStep has run (diagnostic)
 // Whether the two rigs are the same rig, decided once against the first
 // leader she is handed. Null until then. If they ever are not, she falls back
@@ -117,19 +119,23 @@ async function loadApprentice() {
     hairCol: APPR.hairCol, browCol: APPR.browCol, lidCol: 0xcf9e86,
   });
   apprEye = look.eye;
+  apprJaw = look.jaw;
 
   const fig = await loadSkin('baye2_fr3d', {
     spec: 0.10, specPower: 26, vcol: false,
-    uniforms: { uSkin: { value: v5Tex('baye2_skin') } },
-    decl: 'uniform sampler2D uSkin;',
+    uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms },
+    decl: 'uniform sampler2D uSkin;' + look.jaw.decl,
     // The whole of what makes her a different figure: one texture lookup.
     body: 'base = texture2D(uSkin, vUv).rgb;',
+    // And a mouth that opens when the leader's does — see `jaw` in v5Parts.
+    vert: look.jaw.vert,
     parts: look.parts,
   });
   if (!fig) return null;
 
   // The eyes, measured off the geometry rather than guessed.
   v5Eyes(fig, apprEye);
+  v5Jaw(fig, apprJaw);
 
   appr = fig;
   // Sized for poses, and deep enough for the lag at 240 fps: 128 slots of a
@@ -138,6 +144,9 @@ async function loadApprentice() {
   apprStride = 6 + nb * 19;
   apprRingN = 128;
   apprRing = new Float32Array(apprRingN * apprStride);
+  // How far the leader's mouth was open, slot for slot with the ring, so her
+  // lips lag by exactly what her body lags by and not by some other amount.
+  apprGape = new Float32Array(apprRingN);
   apprPts = new Float32Array(nb * 3);
   apprLead = new Float32Array(nb * 3);
   apprHead = 0; apprN = 0; apprClock = 0; apprClip = null; apprSame = null;
@@ -256,6 +265,9 @@ function apprStepBody(dt, leader, room) {
   apprRing[o + 3] = m.position.z;
   apprRing[o + 4] = m.rotation.y;
   apprRing[o + 5] = room ? room.lift || 0 : 0;
+  // `face.gape` is what v1.0's own jaw is driven by: the voice meter while she
+  // speaks, the syllable fallback, the open mouth of the hose and the straw.
+  apprGape[o / apprStride] = leader.face ? leader.face.gape || 0 : 0;
   if (apprSame) {
     const P = leader.pose();
     apprRing.set(P.palette, o + 6);
@@ -411,6 +423,13 @@ function apprStepBody(dt, leader, room) {
   appr.mesh.visible = apprN > 4;
 
   v5Blink(apprEye, dt);
+  // The same damping v1.0's `faceTick` puts between face.gape and her uGape,
+  // so the two mouths move with the same softness and not only the same size.
+  if (apprJaw) {
+    const u = apprJaw.uniforms.uGape;
+    const want = Math.min(1, Math.max(0, apprGape[o / apprStride]));
+    u.value += (want - u.value) * (1 - Math.exp(-13 * dt));
+  }
   appr.mesh.updateMatrixWorld();
 }
 
