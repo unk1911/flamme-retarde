@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.485.0] — 2026-09-24
+
+### your hand is Chloe's hand
+
+Misha: *"is there anything that can be done to make my extended hand look more
+natural/realistic? don't we have baye's hand available that we could model my
+(Chloe's extended hand) hand from? with beautiful fingers"*.
+
+The first-person arms were 34 rigid blocks — a mannequin's hand. Now they are
+Chloe v2.0's own MakeHuman arm: cut from `mh_chloe.obj` below the shoulder,
+capped, subdivided once so the fingers are round at 40 cm (~16k triangles an
+arm, the left mirrored at runtime), her CC0 skin cut into a small atlas at
+twice the body texture's density, with nails painted in — cuticle, lunula,
+pink bed, pale free edge — and their own gloss. `tools/hand_fp.py` builds it
+(pure Python, 2 s): `build/payload/chloe2_arm.frhd.gz` + `chloe2_arm.jpg`,
++283 KB.
+
+Twenty bones a side from MakeHuman's joint helpers: upper arm, a forearm in
+three so its twist is shared rather than wrung at the wrist, the hand, and
+three per finger and thumb, each finger weighted only to its own bones. The
+chain and aim in `src/60-arms.js` are unchanged; the mesh is skinned on the
+GPU from them, lit, hazed and tinted like her body. Finger poses are a table
+(reach, fist, flat, loose) with the curl growing toward the little finger.
+
+The thumb reach now aims the whole hand frame rather than just the palm: pad
+across her lower lip, hand near level and palm down, fingers loosely curled
+under her mouth (wrist 32°, forearm twist 27°) — chosen from twenty
+candidates; the old palm-only aim put the knuckles in front of her nose. The
+thumb pad and fist centre are measured off the real hand at load, and the aim
+loop no longer reads a stale wrist. 0 mm miss on her lip. The tattoo sleeve's
+noise had a cell-edge step on this driver that drew a grid of squares at
+arm's length; the arm gets a continuous version, faded out raggedly at the
+wrist so the hand is bare.
+
+`__fr.arms.stats()` adds `model`, `tris`, `twistDeg`, `bendDeg`, `thumbOff`,
+`gripOff`; `__fr.arms.thumbAim({pole, along, palm, pose, ink})` to explore.
+
 ## [1.484.0] — 2026-09-24
 
 ### her lips part
