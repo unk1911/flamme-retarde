@@ -70,7 +70,7 @@ const APPR = {
   // the palm rides above the top of her hair (half a hand's thickness), how
   // much the round of her head drops at the ends of the stroke, and how far
   // her eyes close while it happens. Metres, and 0..1 of a blink.
-  petStroke: 0.045, petAbove: 0.016, petRound: 0.012, petLid: 0.18,
+  petStroke: 0.045, petAbove: 0.016, petRound: 0.012, petLid: 0.18, buzzLid: 0.92,
   // True when v2.0 is THE figure rather than an apprentice — set by BAYE in
   // 43-jadrija.js. See the note in `apprStepBody`.
   primary: false,
@@ -151,7 +151,7 @@ async function loadApprentice() {
   // below: which maps, and what colour her hair is.
   const look = v5Parts({
     hairTex: 'baye2_hair', legTex: 'baye2_leg', hair2Tex: 'baye2_hair2',
-    hairCol: APPR.hairCol, browCol: APPR.browCol, lidCol: 0xcf9e86,
+    hairCol: APPR.hairCol, browCol: APPR.browCol, lidCol: 0xdcbcad,
   });
   apprEye = look.eye;
   apprJaw = look.jaw;
@@ -364,6 +364,10 @@ function apprStepBody(dt, leader, room) {
     // Petted, her eyelids a little heavy — looking up at you, not asleep.
     if (apprEye && leader.face && leader.face.pet) {
       apprEye.uLid.value = Math.max(apprEye.uLid.value, APPR.petLid * leader.face.pet);
+    }
+    // And the toy's beat: her eyes close on it — see `buzzFace` in the show.
+    if (apprEye && leader.face && leader.face.buzz) {
+      apprEye.uLid.value = Math.max(apprEye.uLid.value, APPR.buzzLid * leader.face.buzz);
     }
     if (apprJaw) {
       apprJaw.uniforms.uGape.value = apprGapeHold != null ? apprGapeHold
@@ -762,6 +766,7 @@ function apprenticeStats() {
     // move together a third of a second apart.
     gape: apprJaw ? +apprJaw.uniforms.uGape.value.toFixed(3) : null,
     seal: apprJaw ? +apprJaw.uniforms.uSeal.value.toFixed(3) : null,
+    lid: apprEye ? +apprEye.uLid.value.toFixed(3) : null,
     lead: apprLeadFace ? +(apprLeadFace.gape || 0).toFixed(3) : null,
     at: [+appr.mesh.position.x.toFixed(2), +appr.mesh.position.y.toFixed(2),
       +appr.mesh.position.z.toFixed(2)],

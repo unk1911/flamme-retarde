@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.491.0] — 2026-09-24
+
+### on the beat
+
+Misha: *"when lovense is engaged/buzzing, she should part her lips and close
+her eyes, in sync with the rhythms of the lovense"*.
+
+Worn, the toy's envelope (`buzzNod`, which is `signalAmp` — every pattern the
+phone or the laptop can send, pulse for pulse) now drives her face as well as
+the nod: `buzzFace` follows it quickly enough to keep time and slowly enough
+to be a face, her lips part to a third of wide open on each pulse
+(`SHOW.buzzGape`) and her eyes close to 0.92 of shut (`APPR.buzzLid`). The
+old onset blink only ever reached v1.0, who is not drawn any more. On the
+tabouret it is still furniture and she does not react.
+
+And a held-shut eye was a flat orange oval — fine for the fifth of a second
+of a blink, not for a pulse she closes her eyes through. The lid is her skin
+tone now (0xdcbcad from 0xcf9e86), a little darker toward its edge, with a
+lash line along the edge once it is most of the way down.
+
 ## [1.490.0] — 2026-09-24
 
 ### not a doll

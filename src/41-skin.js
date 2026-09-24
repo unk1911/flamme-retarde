@@ -2530,7 +2530,15 @@ function v5Parts(o) {
         // in every clip she has including the ones that put her upside down.
         float lidAt = mix(uEyeY.y, uEyeY.x - 0.002, uLid);
         if (vLocal.y > lidAt) {
-          base = uLidCol;
+          // The lid, shaded a little darker toward its edge the way a lid
+          // curves away over the eye — and the lashes along that edge, which
+          // are what make a closed eye read as closed rather than as a blank.
+          // Only when it is well down: in a blink's passing frame the edge is
+          // moving and a line on it would strobe.
+          float fromEdge = vLocal.y - lidAt;
+          base = uLidCol * mix(0.84, 1.0, smoothstep(0.0, 0.006, fromEdge));
+          float lash = (1.0 - smoothstep(0.0006, 0.0016, fromEdge)) * smoothstep(0.35, 0.7, uLid);
+          base = mix(base, vec3(0.06, 0.04, 0.035), lash);
           spec = 0.10;
         }
       ` },

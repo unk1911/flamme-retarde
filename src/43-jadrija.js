@@ -33690,6 +33690,10 @@ async function buildJadrija(scene) {
     // Petted, this long, a stroke front to back and back again this often.
     // Her lips while it happens: parted, this much of wide open.
     petHold: 10, petCycle: 1.9, petGape: 0.28,
+    // The toy's beat on her face: lips this far open at the top of a pulse,
+    // and following the envelope this quickly (fast enough to keep time with
+    // a pulse pattern, slow enough that it is a face and not a flicker).
+    buzzGape: 0.34, buzzRate: 14,
     soakFor: 5.5,
     // And a second and a half of it inside the kabina. See the note on the
     // meter itself: in there the water is not buying a set piece, it is asking
@@ -37461,7 +37465,16 @@ async function buildJadrija(scene) {
         if (show.petK > 0.05) show.gaze = Math.max(show.gaze || 0, 0.6);
         const openTo = 1 + (SHOW.sealGape - 1) * show.seal;
         show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? openTo : 0, 6, dt);
+        // And the toy, worn: her lips part and her eyes close on its beat.
+        // Misha, 24 Sep 2026: *"when lovense is engaged/buzzing, she should
+        // part her lips and close her eyes, in sync with the rhythms"*.
+        // `buzzNod` IS the motor's envelope (`signalAmp`), set only while one
+        // is on her — on the tabouret it is furniture — so this follows every
+        // pattern the app can send, pulse for pulse.
+        show.buzzFace = damp(show.buzzFace || 0, show.buzzNod || 0, SHOW.buzzRate, dt);
+        f.face.buzz = show.buzzFace;
         f.face.gape = Math.max(talk, show.mouthW, SHOW.petGape * (show.petK || 0),
+          SHOW.buzzGape * show.buzzFace,
           show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
         // Both gated on `gape` rather than on `fill` alone, so everything in
         // her mouth leaves with her mouth. A closed mouth with foam painted on
