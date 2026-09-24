@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.481.0] — 2026-09-23
+
+### her hair, down
+
+Misha: *"the 'hair down' lets her hair down, but now the hair color doesn't
+match her new awesome hair... is there a way to at least match the colour, if
+not, somehow have her undo her awesome natural hair and let it loose? the old
+'hair down' is from before we had the awesome hair capability"*.
+
+The second of those. v1.0's "hair down" is her own simulated chain of cards
+(`looseHairGroup`), added to the scene in v1.0's brunette dye — so with v2.0
+drawn it hung over v2.0's braid in a different colour. v2.0 now has a second
+hairstyle baked into her blob, `hair2`: `o4saken_long01`, the long loose one
+from the same CC0 pack, fitted through its `.mhclo` to her own head exactly as
+the braid is, weighted to her skull the same way. While v1.0's latch says down,
+`apprenticeHair` draws `hair2` instead of the braid, and v1.0's chain is not
+drawn at all; back up, the braid returns. The gesture — her hands to the back
+of her head first — is v1.0's and comes through her pose as everything else
+does.
+
++13 268 triangles, drawn only while her hair is down; the blob grows 1.88 →
+2.30 MB.
+
 ## [1.480.0] — 2026-09-23 (baye 1.36.0)
 
 ### the right button does what the hose did to the radio and the TV; "on your knees"

@@ -48253,6 +48253,13 @@ async function buildJadrija(scene) {
           apprRoomArgs.lift = show ? show.mat || 0 : 0;
         }
         apprenticeStep(dt, skinFig, special ? apprRoomArgs : null);
+        // Her hair: v2.0's own loose hairstyle while it is down, and v1.0's
+        // simulated chain not drawn at all — it is v1.0's colour, and it would
+        // hang over v2.0's braid. Every frame, because the latch is v1.0's.
+        if (APPR.primary) {
+          if (hairFall && hairFall.mesh) hairFall.mesh.visible = false;
+          apprenticeHair(!!hairFall);
+        }
       }
     }
     // Outside the range gate above, because a ball that is already in the air

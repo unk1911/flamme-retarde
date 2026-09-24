@@ -67,6 +67,7 @@ FIGURES = {
     'baye2': {'body': 'build/mh_base.obj', 'pubic': True,
               'tex': {'skin': 'darthfurby_caucasian_female',
                       'hair': 'elvs_unkempt_french_braid',
+                      'hair2': 'o4saken_long01',
                       'leg':  'v0rt3x_stockings_black_fishnet_medium'}},
     'chloe2': {'body': 'build/mh_bodies/mh_chloe.obj', 'pubic': False,
                'tex': {'skin': 'toigo_light_skin_female_freckles',
@@ -271,7 +272,9 @@ def main():
 
     OUT.mkdir(parents=True, exist_ok=True)
     for kind, want in spec['tex'].items():
-        src = next((p for p in sorted(WORK.glob('%s__%s.*' % (kind, want)))
+        # `hair2` is a second hairstyle, and the rack files hairstyles as `hair`.
+        rack = 'hair' if kind == 'hair2' else kind
+        src = next((p for p in sorted(WORK.glob('%s__%s.*' % (rack, want)))
                     if p.suffix in ('.png', '.jpg')), None)
         if src is None:
             sys.exit('[baye2tex] no texture for %s — run tools/wardrobe/make.py' % want)

@@ -2532,6 +2532,13 @@ function v5Parts(o) {
     brow: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
     lash: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
   };
+  // A second hairstyle, for her hair DOWN — see `hair2` in baye2.py. The same
+  // material as the first with its own card texture, and it starts hidden:
+  // `apprenticeHair` in 46-apprentice.js swaps the two.
+  if (o.hair2Tex) {
+    const h2 = v5Tex(o.hair2Tex);
+    parts.hair2 = { ...parts.hair, uniforms: { uHair: { value: h2 } } };
+  }
   if (legTex) {
     // A fishnet is not skin and must not take skin's lift. `SKIN_EMISSIVE`
     // exists because light entering skin scatters under it and leaves

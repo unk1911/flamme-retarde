@@ -96,6 +96,12 @@ FIGURES = {
         'body': 'build/mh_base.obj',
         'wear': {'skin': 'darthfurby_caucasian_female',
                  'hair': 'elvs_unkempt_french_braid',
+                 # Her hair DOWN. Misha, 23 Sep 2026: *"the 'hair down' lets
+                 # her hair down, but now the hair color doesn't match her new
+                 # awesome hair... somehow have her undo her awesome natural
+                 # hair and let it loose?"* A second hairstyle, fitted like
+                 # the first, drawn instead of the braid while it is down.
+                 'hair2': 'o4saken_long01',
                  'brow': 'mindfront_eyebrows_09',
                  'lash': 'mindfront_eyelashes_04',
                  'leg':  'v0rt3x_stockings_black_fishnet_medium'},
@@ -127,7 +133,8 @@ BASE_PARTS = {
 }
 # Material ids the runtime switches on. Kept as small integers in the blob so
 # that a part's name is a label and not a contract.
-MAT = {'body': 0, 'eyes': 1, 'mouth': 2, 'hair': 3, 'brow': 4, 'lash': 4, 'leg': 5}
+MAT = {'body': 0, 'eyes': 1, 'mouth': 2, 'hair': 3, 'brow': 4, 'lash': 4, 'leg': 5,
+       'hair2': 3}
 MAX_INFLUENCES = 4
 # Strand meshes, thinned. See `decimate`; the hair is left alone because its
 # cards carry the alpha cut-out that makes it read as hair at all.
@@ -563,7 +570,7 @@ def main():
     # gives that for free — the asset vertex rides a triangle of BODY vertices,
     # so handing it a different body moves the asset with it. That is the whole
     # payoff of doing the fit properly rather than hand-placing.
-    for kind in ('hair', 'brow', 'lash', 'leg'):
+    for kind in ('hair', 'hair2', 'brow', 'lash', 'leg'):
         aid = wear.get(kind)
         if not aid:
             continue

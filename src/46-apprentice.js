@@ -141,7 +141,7 @@ async function loadApprentice() {
   // that she and Chloe cannot drift apart. What is hers is the four lines
   // below: which maps, and what colour her hair is.
   const look = v5Parts({
-    hairTex: 'baye2_hair', legTex: 'baye2_leg',
+    hairTex: 'baye2_hair', legTex: 'baye2_leg', hair2Tex: 'baye2_hair2',
     hairCol: APPR.hairCol, browCol: APPR.browCol, lidCol: 0xcf9e86,
   });
   apprEye = look.eye;
@@ -162,6 +162,7 @@ async function loadApprentice() {
   // The eyes, measured off the geometry rather than guessed.
   v5Eyes(fig, apprEye);
   v5Jaw(fig, apprJaw);
+  if (fig.parts.hair2) fig.parts.hair2.visible = false;
 
   appr = fig;
   // Sized for poses, and deep enough for the lag at 240 fps: 128 slots of a
@@ -513,6 +514,22 @@ function apprenticePose(name, at, settle, leader) {
   for (let i = 0; i < n; i++) { appr.state.curT = at || 0; appr.update(1 / 60); }
   appr.state.curT = at || 0;
   return { posed: name, at: at || 0, by: 'clip' };
+}
+
+/**
+ * Her hair up in the braid, or down and loose. Handed the leader's state every
+ * frame by 43-jadrija.js — "hair down" is v1.0's latch (`hairDown`), and as
+ * the primary v2.0 answers it with a hairstyle of her own rather than v1.0's
+ * simulated chain, which was a different colour from her braid: Misha, *"the
+ * hair color doesn't match her new awesome hair... somehow have her undo her
+ * awesome natural hair and let it loose?"*.
+ */
+function apprenticeHair(down) {
+  if (!appr || !appr.parts) return;
+  const h = appr.parts.hair, h2 = appr.parts.hair2;
+  if (!h2) return;
+  h.visible = !down;
+  h2.visible = !!down;
 }
 
 /** Where she is and which way she is facing, in world metres. */
