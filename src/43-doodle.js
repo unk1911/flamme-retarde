@@ -79,6 +79,18 @@ const DOODLE = {
   wait: { ahead: 1.1, r: 0.55, every: 0.25 },
   // Where he is solid to you: two discs along his back.
   disc: { r: 0.26, off: 0.34, top: 0.95 },
+  // HIS NOSE IN THE KABINA. Misha, 24 Sep 2026: *"slow-doodle, he should
+  // periodically, like maybe once every 5 minutes or so, insert his muzzle
+  // inside the kabine to see what's going on in there"*. Every `peekEvery`
+  // seconds (a range, so it is not a clock) he goes to the door, faces it,
+  // and edges in until his root is `peekIn` short of the doorway — which, a
+  // muzzle being about three quarters of a metre ahead of his root, puts his
+  // nose some thirty centimetres inside — has a look for `peekLook`, and
+  // goes back to his stretch. His body stays on the deck; only his head goes
+  // through the curtain.
+  peekEvery: [240, 360],
+  peekIn: 0.12,
+  peekLook: [6, 10],
   // Mesh lift. The walk and the clover carry his paws up to 28 mm under the
   // floor he was placed on (fr3d.py prints the lowest vertex of each clip) —
   // a cuff edge at the bottom of a stride. The idle is 6 mm under. Split
@@ -198,6 +210,8 @@ async function buildDoodle(scene, J) {
     look: 0, lookWant: 0,
     far: false, dist: 0, bumped: 0, who: null, pickMs: 0,
     task: null,
+    peekIn: rnd(60, 120),     // the first one sooner, so it is seen at all
+    pk: null, pkT: 0,
     log: [],                  // the last few things he did, newest last
     counts: {},               // and how often each has come up
   };
@@ -427,6 +441,8 @@ async function buildDoodle(scene, J) {
         if (Math.abs(e) < 2.4) want = clamp(e, -DOODLE.look.max, DOODLE.look.max) * ySign;
       }
     }
+    // In the doorway his head goes round the room instead — see the peek.
+    if (d.mode === 'peek' && d.pk === 'look') want = d.lookWant * ySign;
     d.look = damp(d.look, want, DOODLE.look.rate, dt);
     fig.aim('Neck1', 0, 1, 0, Math.abs(d.look) > 1e-3 ? d.look * 0.55 : 0);
     fig.aim('Head', 0, 1, 0, Math.abs(d.look) > 1e-3 ? d.look * 0.45 : 0);
@@ -442,6 +458,72 @@ async function buildDoodle(scene, J) {
    * One frame. `cam` gates (is anybody close enough to see him); `who` is the
    * person, as (t, s), for the things he does about you.
    */
+  // ── the peek ─────────────────────────────────────────────────────────────
+  //
+  // Four stages: to the front of the door, round to face it, in until his
+  // nose is through, a look, and then back to wandering. A stage that cannot
+  // be done — the way to the door not clear — gives the peek up for this
+  // time and tries again later: he is a dog, not an errand.
+  function moveTo(g, dt, rate) {
+    const dtt = g[0] - d.t, dss = g[1] - d.s;
+    const gap = Math.hypot(dtt, dss);
+    if (gap < 0.05) return 0;
+    const e = turnToward(Math.atan2(dss, dtt), dt);
+    const k = clamp(Math.cos(e), 0.15, 1);
+    fig.play('walk', { fade: 0.5 });
+    fig.state.speed = rate * k;
+    const st = Math.min(DOODLE.walk * rate * k * dt, gap);
+    d.t += Math.cos(d.head) * st;
+    d.s += Math.sin(d.head) * st;
+    return gap - st;
+  }
+
+  function startPeek() {
+    d.peekIn = rnd(DOODLE.peekEvery[0], DOODLE.peekEvery[1]);
+    if (!J.door) return false;
+    const front = [J.door[0], J.door[1] - 1.7];
+    gather();
+    if (!lineClear(d.t, d.s, front[0], front[1])) { note('peek.blocked'); return false; }
+    d.mode = 'peek'; d.pk = 'go'; d.pkT = 0; d.path = null; d.skill = null;
+    note('peek');
+    return true;
+  }
+
+  function peekStep(dt) {
+    const [dc, face] = J.door;
+    d.pkT += dt;
+    if (d.pk === 'go') {
+      if (moveTo([dc, face - 1.7], dt, DOODLE.rate) < 0.12) { d.pk = 'turn'; d.pkT = 0; }
+      if (d.pkT > 90) d.pk = 'back';
+    } else if (d.pk === 'turn') {
+      // Round to face the doorway, walking the turn rather than spinning.
+      fig.play('idle', { fade: 0.5 });
+      fig.state.speed = 1;
+      if (Math.abs(turnToward(Math.PI * 0.5, dt)) < 0.04) { d.pk = 'in'; d.pkT = 0; }
+    } else if (d.pk === 'in') {
+      // Slower than a walk: nosing in, not arriving.
+      if (moveTo([dc, face - DOODLE.peekIn], dt, DOODLE.rate * 0.6) < 0.03) {
+        d.pk = 'look'; d.pkT = 0;
+        d.pkFor = rnd(DOODLE.peekLook[0], DOODLE.peekLook[1]);
+        fig.play('idle', { fade: 0.6 });
+        fig.state.speed = 1;
+      }
+    } else if (d.pk === 'look') {
+      // Looking round the room: the neck swung slowly one way and the other.
+      d.lookWant = Math.sin(d.pkT * 0.9) * 0.45;
+      if (d.pkT > d.pkFor) { d.pk = 'back'; d.pkT = 0; d.lookWant = 0; }
+    } else {
+      // Out, and back to where he wanders.
+      if (moveTo([dc + 1.5, face - 3.2], dt, DOODLE.rate) < 0.2 || d.pkT > 40) {
+        d.pk = null;
+        d.mode = 'pause';
+        d.timer = rnd(DOODLE.pause[0], DOODLE.pause[1]);
+        fig.play('idle', { fade: 0.8 });
+        fig.state.speed = 1;
+      }
+    }
+  }
+
   function step(cam, who, dt) {
     const dx = cam.x - mesh.position.x, dz = cam.z - mesh.position.z;
     d.dist = Math.hypot(dx, dz);
@@ -455,8 +537,14 @@ async function buildDoodle(scene, J) {
       d.queue.length = 0;
       doSkill(Math.random() < 0.5 ? 'gaze' : 'sway', 0.4);
     }
+    // Time for a look in the kabina — only between things, never mid-walk or
+    // mid-skill, and never while a task has him.
+    d.peekIn -= dt;
+    if (d.peekIn <= 0 && d.mode === 'pause') startPeek();
     if (d.mode === 'task' && d.task && d.task.step) {
       if (d.task.step(d, dt) === false) { d.task = null; d.mode = 'pause'; d.timer = 0.5; }
+    } else if (d.mode === 'peek') {
+      peekStep(dt);
     } else if (d.mode === 'wander') {
       walkStep(dt);
     } else if (d.mode === 'skill') {
@@ -491,7 +579,7 @@ async function buildDoodle(scene, J) {
     stats: () => ({
       t: +d.t.toFixed(2), s: +d.s.toFixed(2), head: +d.head.toFixed(3),
       at: [+mesh.position.x.toFixed(2), +mesh.position.y.toFixed(3), +mesh.position.z.toFixed(2)],
-      mode: d.mode, skill: d.skill,
+      mode: d.mode, skill: d.skill, peek: d.pk, peekIn: +d.peekIn.toFixed(1),
       label: d.skill ? DOODLE_SKILLS[d.skill].label : d.mode === 'wander' ? 'slow walk' : null,
       playing: fig.playing(), speed: +fig.state.speed.toFixed(3),
       left: +(d.mode === 'skill' ? d.skillLeft : d.timer).toFixed(2),
@@ -547,6 +635,8 @@ async function buildDoodle(scene, J) {
       return true;
     },
     release: () => api.task(null),
+    /** Send him to look in the kabina now (see the peek). */
+    peek: () => { d.path = null; d.mode = 'pause'; return startPeek() ? api.stats() : false; },
     nudge: () => { d.bumped = 1; },
     raw: () => d,
   };

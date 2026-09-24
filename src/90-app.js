@@ -8501,6 +8501,7 @@ window.__fr = {
       go: (t, s) => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().go(t, s) : null),
       hold: (clip, at) => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().hold(clip, at) : null),
       release: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().release() : null),
+      peek: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().peek() : null),
       look: (dist = 4, ang = 1.2) => {
         const a = __fr.jad.doodle.api();
         if (!a) return null;

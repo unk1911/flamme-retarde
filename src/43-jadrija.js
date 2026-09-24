@@ -31264,7 +31264,10 @@ async function buildJadrija(scene) {
    */
   const DOG = {
     trot: 0.93,
-    lane: SHOW_LANE0 - 0.8,
+    // Down by the water: on the lowest platform, the one the bathers sit on,
+    // a couple of metres in from the edge — see `comesIn`.
+    lane: JAD.lip * 0.55,
+    comesIn: false,
     // His beat straddles the open kabina's door, which is the whole of why he
     // can follow you in and get up on the cot: it was anchored to the jetty
     // and the kabine moved to t 396-557 without it, so he has been trotting up
@@ -31519,6 +31522,9 @@ async function buildJadrija(scene) {
     doodle = await buildDoodle(scene, {
       toWorld, rigYaw, blockers,
       home: special ? special.dc + 12 : JAD.jetty + 30,
+      // The kabina's doorway, (t, s) of its middle at the front face — for
+      // his look inside every few minutes.
+      door: special ? [special.dc, special.face] : null,
       others: (x, z, pad, fn) => {
         const n = bodies(x, z, pad);
         for (let i = 0; i < n; i++) if (bodyBuf[i].kind !== 'doodle') fn(bodyBuf[i]);
@@ -31653,9 +31659,14 @@ async function buildJadrija(scene) {
     // walk out and he is an ordinary dog again, which is also the one way back
     // that does not need him to know what she is doing.
     if (!inRoom) s.shooed = 0;
-    if (inRoom && !s.shooed && !DOG_IN[s.mode] && s.mode !== 'shake') {
+    // AND HE DOES NOT COME IN ANY MORE. Misha, 24 Sep 2026: *"that pug we
+    // have with the doge price on it, let's alter it so it doesn't come
+    // inside the kabine, just have it hang out outside near the water"*.
+    // `come`, `hop` and `rest` are still here, and nothing enters them: the
+    // room is hers, and the one who looks in now is the Slow Doodle.
+    if (DOG.comesIn && inRoom && !s.shooed && !DOG_IN[s.mode] && s.mode !== 'shake') {
       s.mode = 'come'; s.leg = 0;
-    } else if ((!inRoom || s.shooed) && DOG_IN[s.mode]) {
+    } else if ((!inRoom || s.shooed || !DOG.comesIn) && DOG_IN[s.mode]) {
       // Out, from wherever he had got to. Off the cot first if he is on it —
       // `out` walks, and a dog walking out of a hut two feet above the floor is
       // the funniest bug this could have and still a bug.

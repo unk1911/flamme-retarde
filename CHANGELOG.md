@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.494.0] — 2026-09-24
+
+### the pug stays out; the Doodle looks in
+
+Misha: *"that pug we have with the doge price on it, let's alter it so it
+doesn't come inside the kabine, just have it hang out outside near the water.
+and meanwhile slow-doodle, he should periodically, like maybe once every 5
+minutes or so, insert his muzzle inside the kabine to see what's going on in
+there"*.
+
+**The pug** walks his beat down on the lowest platform now, two metres in
+from the water's edge, where the bathers sit (`DOG.lane`), and no longer
+follows you into the kabina (`DOG.comesIn: false` — `come`, `hop` and `rest`
+are kept, and nothing enters them). His doge balloon goes with him.
+
+**The Slow Doodle** has a look in the kabina every four to six minutes (the
+first sooner, so you see it): he walks to the door, comes round to face it,
+noses in slowly until his head is through the bead curtain and his body is
+still on the deck, looks round the room for six to ten seconds — his neck
+swinging one way and the other — and ambles back to his stretch. If the way
+to the door is not clear he gives it up for that time. `peek` mode in
+43-doodle.js; `__fr.jad.doodle.peek()` sends him now.
+
 ## [1.493.0] — 2026-09-24
 
 ### what v1.0 had
