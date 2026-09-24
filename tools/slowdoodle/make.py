@@ -3,9 +3,10 @@
 
     python3 tools/slowdoodle/make.py
 
-Not part of `build.py`: he is not in the game yet, and this is the page for
-looking at him before he is. The output is committed, the way wardrobe.html
-is, so the page is there without Blender.
+Not part of `build.py`, and this is the page for looking at him. The output
+is committed, the way wardrobe.html is, so the page is there without Blender.
+He is in the game too, off the same GLB: `tools/slowdoodle/game.py` turns it
+into build/payload/doodle.fr3d.gz — run it after this whenever he changes.
 
 Needs `build/mh_assets/hair01` (for the strand texture) — `tools/wardrobe/
 assets.py` downloads it — and `tools/blender/assets/wolf.glb`, which is

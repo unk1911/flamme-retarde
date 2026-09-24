@@ -8435,6 +8435,37 @@ window.__fr = {
         ts: st.map((v) => +v.toFixed(1)) };
     },
     /**
+     * The Slow Doodle — see src/43-doodle.js.
+     *
+     *   __fr.jad.doodle.stats()            where he is and what he is doing
+     *   __fr.jad.doodle.skill('yawn')      do one now ('sway', 'gaze', ...)
+     *   __fr.jad.doodle.place(t, s, head)  put him somewhere on the deck
+     *   __fr.jad.doodle.go(t, s)           walk him there, if the line is clear
+     *   __fr.jad.doodle.hold('walk', 0.3)  one frame of one clip, frozen
+     *   __fr.jad.doodle.release()          and back to his own business
+     *   __fr.jad.doodle.look(4, 1.2)       stand 4 m off him, 1.2 rad round
+     *                                      from his nose, looking at him
+     */
+    doodle: {
+      api: () => (jadrija && jadrija.doodle) || null,
+      stats: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().stats() : null),
+      skills: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().skills() : null),
+      skill: (n, ...then) => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().skill(n, ...then) : null),
+      place: (t, s, head) => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().place(t, s, head) : null),
+      go: (t, s) => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().go(t, s) : null),
+      hold: (clip, at) => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().hold(clip, at) : null),
+      release: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().release() : null),
+      look: (dist = 4, ang = 1.2) => {
+        const a = __fr.jad.doodle.api();
+        if (!a) return null;
+        const st = a.stats();
+        const b = st.head + ang;
+        const tc = st.t + Math.cos(b) * dist, sc = st.s + Math.sin(b) * dist;
+        const w = jadrija.toWorld(tc, sc);
+        return __fr.jad.stand(tc, sc, Math.atan2(w[0] - st.at[0], w[2] - st.at[2]));
+      },
+    },
+    /**
      * Debug: the four trampoline beds, and standing on one of them.
      *
      * The park is at s 51, eighteen metres behind the back row and up through

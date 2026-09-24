@@ -31507,6 +31507,27 @@ async function buildJadrija(scene) {
     }
   }
 
+  // THE SLOW DOODLE, who wanders the deck either side of the open kabina and
+  // now and then does one of his things — see src/43-doodle.js, which is all
+  // of him. What this file lends him is the shore frame, the person
+  // collider's own blocker test, and everybody else who is standing about.
+  // His stretch is centred a dozen metres east of the kabina door: in the
+  // middle of where you are, and off the strip in front of the door that her
+  // routine and the pug's beat already fill.
+  let doodle = null;
+  try {
+    doodle = await buildDoodle(scene, {
+      toWorld, rigYaw, blockers,
+      home: special ? special.dc + 12 : JAD.jetty + 30,
+      others: (x, z, pad, fn) => {
+        const n = bodies(x, z, pad);
+        for (let i = 0; i < n; i++) if (bodyBuf[i].kind !== 'doodle') fn(bodyBuf[i]);
+      },
+    });
+  } catch (e) {
+    console.warn('doodle failed:', e.message);
+  }
+
   // Asked for once here and on their own intervals after, for as long as the
   // page is open. Started here rather than at the top of the file because there
   // has to be somebody to say them: no figure and no dog means no card and no
@@ -45191,6 +45212,12 @@ async function buildJadrija(scene) {
       // is looking for exist.
       return true;
     }
+    // Walk into the Slow Doodle and he stops what he was doing and looks at
+    // you about it. Armed here and acted on in his own step, like hers.
+    if (kind === 'doodle') {
+      if (doodle) doodle.nudge();
+      return true;
+    }
     if (kind !== 'bather') return false;
     const fg = crowdAt(t, s);
     if (!fg || fg.mode === 'lie') return false;
@@ -46487,6 +46514,16 @@ async function buildJadrija(scene) {
       pushBody(r.x + hx * hl, r.z + hz * hl, 0.34, r.y, r.y + 1.85, 'rider', r.i);
       pushBody(r.x - hx * hl, r.z - hz * hl, 0.34, r.y, r.y + 1.85, 'rider', r.i);
       if (r.bike) pushBody(r.x, r.z, 0.34, r.y, r.y + 1.85, 'rider', r.i);
+    }
+    // AND THE SLOW DOODLE, two discs along his back. He is a metre and a
+    // half of dog standing about on the deck, and walking through him would
+    // be walking through the one thing on the promenade that is looking at
+    // you. `doodle` is declared further up and is null until built.
+    if (doodle) {
+      doodle.discs((dx, dz, r, y0, top) => {
+        const ex = dx - x, ez = dz - z;
+        if (ex * ex + ez * ez < (pad + r) * (pad + r)) pushBody(dx, dz, r, y0, top, 'doodle', -1);
+      });
     }
     return bodyN;
   }
@@ -48200,6 +48237,7 @@ async function buildJadrija(scene) {
     // the same number. Gating out here would mean measuring it twice.
     stepDog(cam, dt, pt, ps);
     stepCat(cam, dt);
+    if (doodle) doodle.step(cam, { t: pt, s: ps }, dt);
     stepKabina(pt, ps, dt, who.y);
 
     if (skinFig) {
@@ -48366,6 +48404,9 @@ async function buildJadrija(scene) {
       if (show && skinFig && skinFig.mesh.visible) {
         push += yieldTo(w, here, show.t, show.s, 0.5);
       }
+      // And the Slow Doodle, who is not in `crowds` either, and who does not
+      // step round anybody — a dog that slow waits, and people go round him.
+      if (doodle && !doodle.far) push += yieldTo(w, here, doodle.t, doodle.s, 0.7);
       // And the bicycles, which are not in `crowds` either. The rider does the
       // avoiding — see `wheelMove` — and this is only the half-step aside that
       // anybody takes when a bicycle comes by close, and the one thing that
@@ -48732,6 +48773,7 @@ async function buildJadrija(scene) {
           out.push(r.fig.cast(shadow, { near: true }));
           out.push(...shadow.castTree(r.veh, { dynamic: true, near: true }));
         }
+        if (doodle) out.push(doodle.fig.cast(shadow, { near: true }));
         return out;
       },
     },
@@ -49458,6 +49500,8 @@ async function buildJadrija(scene) {
      * at 0.22 under a table is a very slow-moving animal, and "very slow" and
      * "frozen because the range gate shut" are the same screenshot.
      */
+    /** The Slow Doodle's handle — see `api` in src/43-doodle.js. */
+    doodle: doodle ? doodle.api : null,
     cat: () => {
       if (!cat) return null;
       const f = cat.fig, v = new THREE.Vector3();
