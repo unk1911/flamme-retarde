@@ -2602,7 +2602,10 @@ function v5Parts(o) {
     // are a colour and a sheen. Double-sided, because a strand seen from the
     // far side is half of every strand.
     brow: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
-    lash: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
+    // The upper lashes ride down with the lid — see LID below.
+    lash: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18,
+      uniforms: { uEyeL: eye.uEyeL, uEyeR: eye.uEyeR, uLid: eye.uLid },
+      decl: LID_DECL, vert: LID_VERT },
   };
   // HAIR THAT FALLS. Misha, 23 Sep 2026, of the loose hair: *"when she is
   // doing a headstand, the hair doesn't 'fall to the ground'"*. The cards are
@@ -2660,7 +2663,10 @@ function v5Parts(o) {
         + 'if (lc.a < 0.5) discard;\n'
         + 'base *= lc.rgb;' };
   }
-  return { parts, eye, jaw, hang };
+  // The lid, for the body — see LID_VERT.
+  const lid = { decl: LID_DECL, vert: LID_VERT,
+    uniforms: { uEyeL: eye.uEyeL, uEyeR: eye.uEyeR, uLid: eye.uLid } };
+  return { parts, eye, jaw, hang, lid };
 }
 
 /**
@@ -2735,6 +2741,52 @@ function v5Eyes(fig, eye) {
   eye.uEyeY.value.set(lo, hi);
   return true;
 }
+
+/**
+ * EYELIDS THAT CLOSE. Misha, 24 Sep 2026, of her eyes shut on the toy's beat:
+ * *"it's a bit freaky how she closes her eyelids... maybe b/c her eyelids are
+ * without much contours... maybe fix the eyelids to make closed eyes look
+ * more natural"*. They were paint: the eyeball coloured skin-tone above a
+ * line, which for the fifth of a second of a blink passes and held shut is a
+ * blank oval where an eye was. So the lid moves now, the real one — the
+ * upper eyelid of her own mesh, skin, crease and all, swung down about the
+ * middle of the eye the way a lid slides over the ball, carrying the upper
+ * lashes, and pushed out to clear the cornea as it goes.
+ *
+ * Measured on her (bind metres, from the eye's centre): the eyeball is a
+ * 15.7 mm sphere; the upper lid's margin sits 4 mm up and 13 mm forward, the
+ * lower's 4 mm down, and both margins are INSIDE the ball's radius by 2 mm,
+ * which the open eye hides and a closing one would not — hence the push to
+ * `clear`. 0.56 rad takes the upper margin from 17 degrees above the middle
+ * to 15 below, over the lower one. Full weight from the margin to the
+ * crease, gone by the brow bone and toward the corners, so what stretches is
+ * the skin above the crease and at the canthi, which is where a lid does.
+ * The paint underneath stays, as the backstop for anything the geometry
+ * does not quite cover.
+ */
+const V5_LID = { angle: 0.56, clear: 0.0166, up: [0.0005, 0.0030], top: [0.0055, 0.0165],
+  wide: [0.0105, 0.0172], front: [0.0040, 0.0100] };
+const LID_DECL = '\nuniform vec3 uEyeL;\nuniform vec3 uEyeR;\nuniform float uLid;\n';
+const LID_VERT = `
+  if (uLid > 0.001) {
+    vec3 ec = p.z >= 0.0 ? uEyeL : uEyeR;
+    vec3 ed = p - ec;
+    float lw = (1.0 - smoothstep(${V5_LID.wide[0]}, ${V5_LID.wide[1]}, abs(ed.z)))
+      * smoothstep(${V5_LID.up[0]}, ${V5_LID.up[1]}, ed.y)
+      * (1.0 - smoothstep(${V5_LID.top[0]}, ${V5_LID.top[1]}, ed.y))
+      * smoothstep(${V5_LID.front[0]}, ${V5_LID.front[1]}, ed.x)
+      * step(length(ed), 0.03);
+    if (lw > 0.0) {
+      float la = -${V5_LID.angle} * uLid * lw;
+      float lc = cos(la), ls = sin(la);
+      ed.xy = vec2(ed.x * lc - ed.y * ls, ed.x * ls + ed.y * lc);
+      n.xy = vec2(n.x * lc - n.y * ls, n.x * ls + n.y * lc);
+      float lr = max(length(ed), 1e-4);
+      ed *= mix(1.0, max(1.0, ${V5_LID.clear} / lr), lw * smoothstep(0.0, 0.3, uLid));
+      p = ec + ed;
+    }
+  }
+`;
 
 /**
  * A v5 figure's jaw — see `jaw` in v5Parts. All in her bind frame, metres:

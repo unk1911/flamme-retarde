@@ -8727,8 +8727,8 @@ window.__fr = {
     plate: () => (jadrija && jadrija.plate ? jadrija.plate() : null),
     /** Debug: turn Baye v2.0 to an absolute yaw — see 46-apprentice.js. */
     apprFace: (yaw) => apprenticeFace(yaw),
-    apprGape: (g, seal) => apprenticeGape(g, seal),
-    apprDump: (r) => apprenticeDump(r),
+    apprGape: (g, seal, lid) => apprenticeGape(g, seal, lid),
+    apprDump: (r, at) => apprenticeDump(r, at),
     /** Where your thumb would go — her lower lip in world metres — or null. */
     thumbReach: () => (jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null),
     petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),

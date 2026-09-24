@@ -158,14 +158,16 @@ async function loadApprentice() {
 
   const fig = await loadSkin('baye2_fr3d', {
     spec: 0.10, specPower: 26, vcol: false,
-    uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms },
-    decl: 'uniform sampler2D uSkin;' + look.jaw.decl,
+    uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms,
+      ...look.lid.uniforms },
+    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl,
     vdecl: look.jaw.vdecl,
     // The whole of what makes her a different figure: one texture lookup —
     // and the inside of her mouth.
     body: 'base = texture2D(uSkin, vUv).rgb;' + look.jaw.frag,
     // And a mouth that opens when the leader's does — see `jaw` in v5Parts.
-    vert: look.jaw.bodyVert,
+    // Her eyelids, which close for real — see LID_VERT — and then her jaw.
+    vert: look.lid.vert + look.jaw.bodyVert,
     parts: look.parts,
   });
   if (!fig) return null;
@@ -369,6 +371,7 @@ function apprStepBody(dt, leader, room) {
     if (apprEye && leader.face && leader.face.buzz) {
       apprEye.uLid.value = Math.max(apprEye.uLid.value, APPR.buzzLid * leader.face.buzz);
     }
+    if (apprEye && apprLidHold != null) apprEye.uLid.value = apprLidHold;
     if (apprJaw) {
       apprJaw.uniforms.uGape.value = apprGapeHold != null ? apprGapeHold
         : Math.min(1, Math.max(0, leader.face && leader.face.gape ? leader.face.gape : 0));
@@ -645,9 +648,11 @@ function apprenticeCheck(leader, fit) {
  */
 let apprGapeHold = null;
 let apprSealHold = null;
-function apprenticeGape(g, seal) {
+let apprLidHold = null;
+function apprenticeGape(g, seal, lid) {
   apprGapeHold = g == null ? null : Math.min(1, Math.max(0, +g));
   apprSealHold = seal == null ? null : Math.min(1, Math.max(0, +seal));
+  apprLidHold = lid == null ? null : Math.min(1, Math.max(0, +lid));
   return apprGapeHold;
 }
 
@@ -712,9 +717,9 @@ function apprenticeOccluder() {
 }
 
 /** Debug: her bind-space vertices within `r` of the jaw hinge, by part. */
-function apprenticeDump(r = 0.08) {
+function apprenticeDump(r = 0.08, at = null) {
   if (!appr || !apprJaw) return null;
-  const c = apprJaw.uniforms.uLipC.value;
+  const c = at === 'eye' && apprEye ? apprEye.uEyeL.value : apprJaw.uniforms.uLipC.value;
   const g = appr.mesh.geometry, pos = g.getAttribute('position'), ix = g.getIndex();
   const out = { c: c.toArray(), parts: {} };
   const groups = [['body', appr.mesh]].concat(Object.entries(appr.parts || {}));
