@@ -3998,21 +3998,75 @@ NOTICE = dict(IDLE_A, **{
 # down, and the knees fold 90° to lay the shins along the floor.
 DOWN = 96
 
+# ── HER HANDS FLAT ON THE FLOOR, AND WHY `hand` X NEVER COULD ────────────────
+#
+# Misha, 24 Sep 2026: *"when 'on all fours', the hands should be palms down.
+# right now looks awkward"*. They hung 0.11 m off the floor with the palms
+# facing forward and the fingers curled up, like somebody begging.
+#
+# `handL` (−70, 0, 0) was never a wrist extension. At rest the palm faces her
+# THIGH, so the hand's local X — which every other up-or-down bone swings on —
+# is the palm's own normal here, and a rotation about it is radial/ulnar
+# DEVIATION: seventy degrees of it, bending the hand sideways in the plane of
+# the palm. Flexion and extension are hand Z. And the palm cannot face the floor
+# by bending the wrist at all while it faces the thigh; that is the forearm's
+# job, pronation, which is `armL` Y.
+#
+# So the arms are solved, not typed (FK against the baye2 mesh, then the mesh
+# itself measured): wrist under the shoulder, the palm normal within 6° of
+# straight down, wrist-to-knuckle pointing forward and 12° out, the fingers
+# along the floor, the elbow straight, the elbow crease forward rather than
+# flared. Hand Y (a wrist twist nobody has) held to ±8 and deviation to ±25.
+# The left arm is solved and the right mirrored — x kept, y and z negated —
+# and the result is exactly symmetric, which two independent solves were not.
+#
+# Measured on the skinned mesh: lowest palm vertex −0.003 (it was +0.110),
+# palm normal (−0.10, ∓0.02, −0.995), wrists 0.064 over the floor and 0.02 in
+# front of the shoulders (they were 0.22 in front).
+#
+# AND HER FEET WERE NINE CENTIMETRES THROUGH THE FLOOR. With the shins laid
+# along it, `foot` −14 pointed the toes straight down into the concrete — the
+# lowest foot vertex was at −0.091. −42 on the foot and −35 on the toe (the rest
+# rig carries 34° of arch between them, see TOE_POINT in ballet.py) lays the
+# tops of the feet on the floor, lowest vertex +0.003.
+#
+# THE FINGERS ARE NOT MIRRORED BY THIS RIG, which is worth a line wherever a
+# hand gets shaped. `fingers` takes its roll from the knuckle line (see
+# `armature`) and the knuckle line points the same way on both hands, so +X
+# FLEXES the LEFT fingers and EXTENDS the right. Every `fingersL` in this file
+# written with the right hand's sign bends the left fingers backwards. Here
+# they are a few degrees extended, pressed flat, on both sides.
 FOURS = {
     "@root": (0.0, 0.0, -0.44),
     "pelvis": (-DOWN, 0, 0),
     "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (1, 0, 0),
     "chest": (1, 0, 0), "neck": (24, 0, 0), "head": (24, 0, 0),
     "clavicleL": (0, 0, 8), "clavicleR": (0, 0, -8),
+    "armUL": (-72.4, 13.2, 15.0), "armLL": (0, 22.4, -7.2),
+    "handL": (-17.1, -8.0, -81.1), "fingersL": (-8.8, 0, 0),
+    "armUR": (-72.4, -13.2, -15.0), "armLR": (0, -22.4, 7.2),
+    "handR": (-17.1, 8.0, 81.1), "fingersR": (8.8, 0, 0),
+    "legUL": (-DOWN, 0, 5), "legLL": (90, 0, 0),
+    "footL": (-42, 0, 0), "toeL": (-35, 0, 0),
+    "legUR": (-DOWN, 0, -5), "legLR": (90, 0, 0),
+    "footR": (-42, 0, 0), "toeR": (-35, 0, 0),
+}
+
+# The crawl keeps the arms and feet it had. It was built on FOURS and
+# overrides the swinging arm but not the planted one, so the new planted hand
+# — which only works on a pronated forearm — would have landed on the crawl's
+# untwisted one. Pinned rather than refitted: it is a different gait and
+# nobody asked about it.
+_CRAWL_LIMBS = {
     "armUL": (-DOWN, 0, 22), "armLL": (-6, 0, 2), "handL": (-70, 0, 0),
     "armUR": (-DOWN, 0, -22), "armLR": (-6, 0, -2), "handR": (-70, 0, 0),
-    "legUL": (-DOWN, 0, 5), "legLL": (90, 0, 0), "footL": (-14, 0, 0),
-    "legUR": (-DOWN, 0, -5), "legLR": (90, 0, 0), "footR": (-14, 0, 0),
+    "fingersL": (0, 0, 0), "fingersR": (0, 0, 0),
+    "footL": (-14, 0, 0), "footR": (-14, 0, 0), "toeL": (0, 0, 0), "toeR": (0, 0, 0),
 }
 
 
 def _fours(**kw):
-    p = dict(FOURS)
+    p = dict(FOURS, **_CRAWL_LIMBS)
     p.update(kw)
     return p
 
@@ -4212,64 +4266,138 @@ RECLINE_B = {
     "legUR": (-16, 0, -5), "legLR": (24, 0, 0), "footR": (-14, 0, 0),
 }
 
-# The hold. Knees up, hands round the shins, chin down off the deck so she is
-# looking along herself rather than at the ceiling — which from where you are
-# standing is her looking up at you, and is the whole of what the pose is for.
+# ── ON HER BACK, AND ALL OF IT SOLVED AGAINST THE COT ───────────────────────
 #
-# Parameterised because the reach is the whole problem and it was settled with
-# `--probe` rather than with renders, the way KNEEL_BACK's arms were. Measured
-# on this rig: shoulder to elbow 0.237 m, elbow to wrist 0.234, so a hand can
-# get 0.47 m from its shoulder with the arm straight and wants to be nearer
-# 0.40 to look like a grip rather than a lunge. The first cut had the thigh
-# 4 degrees past vertical, which put her knee 0.67 m from her shoulder — a
-# reach she does not have, and the hands went overhead instead.
+# Misha, 24 Sep 2026: *"the 'lay down on the cot', the hands look odd and the
+# back looks odd, like not fully lying down ... maybe the hands should either be
+# holding the legs up or, alternating between holding legs up and clasping
+# hands behind the head"*, and of `legs down`: *"they sink into the cot too
+# much ... and the arms/hands look awkward"*.
 #
-# Two levers close that gap and both are things a person actually does: the
-# knees come further over the chest, and the spine curls so the shoulders lift
-# toward them. The spine sign is the one to get right — negative X is forward
-# flexion on every spine bone (see `_tuck`, which curls to -14), and lying on
-# her back forward flexion is what lifts her head and shoulders off the floor.
-def _cradle(hip, knee, curl, sh, el, wr=-14, abU=18, abL=12, shy=0):
-    return {
-        "@root": (0.16, 0.0, RECLINE_ROOT),
-        "pelvis": (90, 0, 0),
-        "spine01": (curl, 0, 0), "spine02": (curl, 0, 0),
-        "spine03": (curl * 0.8, 0, 0), "chest": (curl * 0.8, 0, 0),
-        # Off the deck and looking down the length of herself. The neck carries
-        # most of it because a chin lift is a neck and not a back.
-        "neck": (-24, 0, 0), "head": (-20, 0, 0),
+# The old hold was `_cradle`, a parameterised pose settled on a grid of its own
+# joints, and it was never measured against the thing she lies on. On the
+# skinned mesh her lowest back vertex was 0.048 m OFF the mattress and her head
+# 0.277 m off the pillow: the spine curled -8 through four bones and the neck
+# -24 "to look at you", which from the doorway is a woman doing a crunch. Legs
+# down was an `aim` that undid the hips and knees and nothing else, so the arms
+# went on reaching for shins that had left, straight up at the ceiling.
+#
+# THE COT IN HER OWN FRAME. Measured in game and checked to the millimetre
+# against FK: on the cot her figure z 0 IS the mattress top (`show.mat` lifts
+# her by exactly `kit.cot[2]`), the pillow top is +0.090 over figure x −0.755 to
+# −0.485 (her head end is −x on her back), |y| < 0.205, the folded blanket is
+# +0.060 over x 0.345 to 0.895, and the foot rail +0.020 at x 0.92 to 0.97.
+# Every number below is a solve against those, on the baye2 mesh — the one
+# that is drawn — not a joint position and a guess at the flesh.
+#
+# THE TORSO is five numbers fitted together: `@root` x and z, the pelvis tilt,
+# one curl through the spine, and the neck and head. Two contacts and not one —
+# the shoulder blades AND the seat each 1 cm into the mattress — because a
+# single lowest point let the first fit lie her in a hammock with her shoulders
+# in the air. The back of her skull 7 mm into the pillow and a little way in
+# from its edge, the face 26° down her own length from straight up. The
+# pelvis at 108 is not a typo: the rest pelvis bone leans 27° back, and with
+# the curl it is what lays a lumbar spine flat.
+#
+# THE HOLD. Hips 118 and knees 80, which is where the backs of her thighs are
+# 0.41 m from her shoulders — a bent elbow, not a lunge — and 2° inside the hip
+# flexion limit in tools/rom.js (120 was 0.1 over, its breath 2.2). The palm is solved on
+# to the back of the thigh 0.11 m above the knee, 35° round toward its outside,
+# 0.075 off the thigh's axis (its radius there is 0.063, off the mesh), facing
+# into it, the hand across the thigh rather than along it; the fingers close
+# 45 round it. The left arm is fitted and the right mirrored. Residual 0.000 m.
+#
+# THE NAPE. Hands clasped under the back of her head: the head comes up 0.030
+# off the pillow by neck flexion — the thickness of two hands — the palms go
+# under the occiput facing up into it with the fingers across toward each
+# other, and the elbows out to 0.34 m either side, which is inside the 0.33
+# half-width of the mattress by the width of an elbow. The legs stay up without
+# hands: thighs vertical, shins level (hips 74, knees 90).
+#
+# AND THE WAY BETWEEN THEM, which is a key of its own because the straight line
+# is not safe: sampled at the bake's own smoothstep, hold to nape put a hand
+# 3.6 cm further into her skull than the nape itself does, half way. `_MID` has
+# both hands up off her legs above her face, 0.40 m over the mattress.
+#
+# LEGS DOWN is now a pose and not an aim: hips extended 13.4 and knees 8.1 lay
+# the backs of the thighs 1.3 cm into the mattress and the calves 6 mm into the
+# folded blanket, and her heels hang clear past the rail. Its arms are the
+# hands resting on her belly, palms on it and the fingers loosely across, or
+# the same nape as above. Before, the legs went 0.14 m under her hips' height.
+#
+# THE LEFT FINGERS CARRY THE OPPOSITE SIGN on purpose — see FOURS.
+def _supine(arms, legs, neck=(-13.9, 0, 0), head=(-10.0, 0, 0), dz=0.0):
+    p = {
+        "@root": (0.123, 0.0, round(-0.832 + dz, 3)),
+        "pelvis": (108.0, 0, 0),
+        "spine01": (-6.6, 0, 0), "spine02": (-6.6, 0, 0),
+        "spine03": (-5.2, 0, 0), "chest": (-5.2, 0, 0),
+        "neck": neck, "head": head,
         "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
-        "armUL": (sh, shy, abU), "armLL": (el, 0, abL), "handL": (wr, 0, -6),
-        "armUR": (sh, -shy, -abU), "armLR": (el, 0, -abL), "handR": (wr, 0, 6),
-        "legUL": (hip, 0, 9), "legLL": (knee, 0, 0), "footL": (-16, 0, 0),
-        "legUR": (hip, 0, -9), "legLR": (knee, 0, 0), "footR": (-16, 0, 0),
     }
+    p.update(arms)
+    p.update(legs)
+    return p
 
 
-# Settled on a grid rather than by eye, which is the second time this file has
-# had to do that for a pair of arms and for the same reason KNEEL_BACK gives:
-# where a hand ENDS UP is a question a coordinate answers in a second and a
-# picture answers in five minutes. Thirty-six candidates over shoulder, elbow
-# and abduction, scored on three numbers — how far down the shin the wrist
-# lands, how far off the shin's axis it sits, and how nearly the forearm points
-# ALONG the shin.
-#
-# That third number is the one nobody would think to score and it is the whole
-# difference between holding a leg and reaching past one. The hand on this
-# figure is a fixed mesh with the fingers spread: they continue the forearm and
-# they are 0.19 m long, so a wrist that is touching the shin with the forearm
-# crossing it at sixty degrees renders as a woman with her hands up by her own
-# face. The winner puts the wrist 0.049 m below the knee, 0.038 m off its axis
-# — which on a shin 0.05 m thick is contact — with the forearm 0.78 aligned, so
-# the fingers run up the leg.
-CRADLE = _cradle(-118, 78, -8, -40, -20, -20, 30, 24)
+_HOLD_ARMS = {
+    "armUL": (-33.5, 23.0, -3.1), "armLL": (-12.3, -18.2, 11.6),
+    "handL": (2.0, -8.0, 47.7), "fingersL": (45.0, 0, 0),
+    "armUR": (-33.5, -23.0, 3.1), "armLR": (-12.3, 18.2, -11.6),
+    "handR": (2.0, 8.0, -47.7), "fingersR": (-45.0, 0, 0),
+}
+_NAPE_ARMS = {
+    "armUL": (-153.2, -56.2, 61.2), "armLL": (-88.3, 13.3, 12.0),
+    "handL": (-2.9, -4.0, -6.2), "fingersL": (40.0, 0, 0),
+    "armUR": (-153.2, 56.2, -61.2), "armLR": (-88.3, -13.3, -12.0),
+    "handR": (-2.9, 4.0, 6.2), "fingersR": (-40.0, 0, 0),
+}
+_MID_ARMS = {
+    "armUL": (-57.7, 2.7, 19.2), "armLL": (-45.4, -10.7, 8.3),
+    "handL": (-0.6, 8.0, 25.9), "fingersL": (20.0, 0, 0),
+    "armUR": (-57.7, -2.7, -19.2), "armLR": (-45.4, 10.7, -8.3),
+    "handR": (-0.6, -8.0, -25.9), "fingersR": (-20.0, 0, 0),
+}
+_BELLY_ARMS = {
+    "armUL": (-13.0, 18.6, 21.8), "armLL": (-28.9, 54.0, 11.9),
+    "handL": (-8.1, 3.5, 31.2), "fingersL": (22.0, 0, 0),
+    "armUR": (-13.0, -18.6, -21.8), "armLR": (-28.9, -54.0, -11.9),
+    "handR": (-8.1, -3.5, -31.2), "fingersR": (-22.0, 0, 0),
+}
+_NAPE_HEAD = {"neck": (-34.9, 0, 0), "head": (12.6, 0, 0)}
+_MID_HEAD = {"neck": (-24.4, 0, 0), "head": (1.3, 0, 0)}
 
-# The same, a breath later, and everything in it is small for KNEEL_BACK_B's
-# reason: a held position that does not move is a mannequin. She breathes, the
-# knees ease a degree or two, and her chin comes up a little further.
-CRADLE_B = _cradle(-121, 76, -10, -42, -19, -20, 30, 24)
-CRADLE_B["@root"] = (0.16, 0.0, RECLINE_ROOT + 0.006)
-CRADLE_B["head"] = (-23, 4, 0)
+
+def _legs(hip, knee, abd, foot=-16.0):
+    return {"legUL": (hip, 0, abd), "legLL": (knee, 0, 0), "footL": (foot, 0, 0),
+            "legUR": (hip, 0, -abd), "legLR": (knee, 0, 0), "footR": (foot, 0, 0)}
+
+
+CRADLE = _supine(_HOLD_ARMS, _legs(-118, 80, 14))
+# The breath, for KNEEL_BACK_B's reason: a held position that does not move is
+# a mannequin. Two millimetres and two degrees — anything that moves her head
+# lifts it off the pillow, which is the thing this pose was rebuilt to stop.
+CRADLE_B = _supine(_HOLD_ARMS, _legs(-119, 78, 14), dz=0.002)
+CRADLE_MID = _supine(_MID_ARMS, _legs(-96, 85, 11), **_MID_HEAD)
+CRADLE_NAPE = _supine(_NAPE_ARMS, _legs(-74, 90, 8), **_NAPE_HEAD)
+CRADLE_NAPE_B = _supine(_NAPE_ARMS, _legs(-72, 90, 8), dz=0.002, **_NAPE_HEAD)
+SUPINE = _supine(_BELLY_ARMS, _legs(13.4, 8.1, 6, -11.8))
+SUPINE_B = _supine(_BELLY_ARMS, _legs(13.4, 10.1, 6, -11.8), dz=0.002)
+SUPINE_MID = _supine(_MID_ARMS, _legs(13.4, 8.1, 6, -11.8), **_MID_HEAD)
+SUPINE_NAPE = _supine(_NAPE_ARMS, _legs(13.4, 8.1, 6, -11.8), **_NAPE_HEAD)
+SUPINE_NAPE_B = _supine(_NAPE_ARMS, _legs(13.4, 10.1, 6, -11.8), dz=0.002, **_NAPE_HEAD)
+
+
+def _alternate(hold, hold_b, mid, nape, nape_b):
+    """Ten seconds of one, a two-second change, ten of the other, and back.
+
+    Both loops on the cot are cut to this one clock, so `legs.down` can cross
+    from one to the other at the same time into it and her arms stay where
+    they were — see `legsFlat` in src/43-jadrija.js.
+    """
+    return [(0.0, hold), (2.6, hold_b), (5.2, hold), (7.8, hold_b), (10.4, hold),
+            (11.4, mid), (12.4, nape), (15.0, nape_b), (17.6, nape),
+            (20.2, nape_b), (22.8, nape), (23.8, mid), (24.8, hold)]
 
 
 # ── FACE DOWN ─────────────────────────────────────────────────────────────────
@@ -4325,8 +4453,6 @@ PRONE = {
     "legUR": (-1, 0, -6), "legLR": (-1, 0, 0), "footR": (-14, 0, 0),
 }
 
-# The breath, for CRADLE_B's reason: a held pose that does not move is a
-# mannequin. Everything small.
 # ── ON HER SIDE ───────────────────────────────────────────────────────────────
 #
 # Misha: *"when laying on the cot, if i say 'roll onto your right side', should
@@ -4379,11 +4505,47 @@ def _mirror_pose(d):
 
 SIDE_R = _mirror_pose(SIDE_L)
 
-PRONE_B = dict(PRONE)
-PRONE_B["@root"] = (0.16, 0.0, RECLINE_ROOT + 0.005)
-PRONE_B["spine01"] = (-7, 0, 0)
-PRONE_B["chest"] = (-6, 0, 0)
-PRONE_B["head"] = (7, 50, 0)
+# ── FLAT ON HER FRONT ON THE PILLOW, WHICH PRONE NEVER WAS ──────────────────
+#
+# Misha, 24 Sep 2026: *"when 'flat on your tummy', looks good except the head
+# looks too sunk into the pillow"*.
+#
+# Measured, it was worse than it looked. PRONE's head is a LIFT — neck +64 and
+# head +34, a sphinx looking down the bed — turned 52° on top: her face pointed
+# (0.75, 0.65, 0.09), mostly along the bed INTO the pillow, and the lowest skull
+# vertex was 0.115 m under the pillow top. Under that the whole body was sunk:
+# chest 0.152 into the mattress, arms 0.088, feet 0.121 — `@root` was the
+# supine one, and her front is deeper than her back.
+#
+# A head lying on a cheek is a TWIST about her own neck, not a lift: neck and
+# head turned 32 and 46 about their own axes, pitch left near level. Solved on
+# the mesh with the cot in her frame (on her front her head end is +x and the
+# pillow top +0.090 over x 0.485 to 0.755): skull 6 mm into the pillow with its
+# lowest point on it, the face turned to her LEFT — which on this cot is the
+# walkway, where you are standing — (0.14, 0.97, −0.21); chest 5.8 cm into the
+# mattress (it is her breasts, and a mattress gives), seat and thighs on it,
+# arms and feet resting on it rather than through it.
+#
+# Only `flat` and `flatheld` use these. PRONE stays what it was because SIDE_L,
+# FETAL and PRONE_EDGE are built on it and were fitted against it — the edge's
+# hip angle was probed toe by toe against the floor.
+FLAT = dict(PRONE, **{
+    "@root": (0.08, 0.0, -0.784),
+    "spine01": (0.3, 0, 0), "spine02": (0.3, 0, 0),
+    "spine03": (0.2, 0, 0), "chest": (0.2, 0, 0),
+    "neck": (7.7, 31.8, 0), "head": (-0.5, 46.1, 2.3),
+    "armUL": (-4.0, 0, STAND_ARM_IN),
+    "armLL": (-14 + STAND_ELBOW_UNDO + 2.1, 0, STAND_FORE_IN),
+    "armUR": (-2.0, 0, -STAND_ARM_IN),
+    "armLR": (-11 + STAND_ELBOW_UNDO + 2.1, 0, -STAND_FORE_IN),
+    "footL": (-35.8, 0, 0), "footR": (-35.8, 0, 0),
+})
+# The breath: three millimetres and a knee. Nothing above the shoulders moves,
+# for CRADLE_B's reason.
+FLAT_B = dict(FLAT, **{
+    "@root": (0.08, 0.0, -0.781),
+    "legLL": (2, 0, 0), "legLR": (0, 0, 0),
+})
 
 
 # ── ON HER FRONT, WITH HER LEGS OFF THE EDGE ─────────────────────────────────
@@ -4697,25 +4859,46 @@ FETAL_ROLL = (-2.4, 22.0, 77.7)
 # Probed: head (+0.449 +0.457 +1.066) and knees at y +0.05 and −0.03, come up
 # from SIDE_L's −0.426 — 0.47 m along the axis toward her head, 0.43 m from the
 # head itself, which is knees drawn up to the chest. Nothing under the bed.
+#
+# THE ARMS AND THE HEAD, SOLVED ON THE MESH. Misha, 24 Sep 2026: *"for fetal
+# position: the arms look weird"*. The under arm was thrown out straight up the
+# bed past her head with the hand splayed open — "where somebody lying on their
+# side puts the arm", which in a curl nobody does — and that was also the
+# only part of her you could see past her back from the walkway. And the rest
+# was off the cot by more than it looked: the head 0.082 m clear of the pillow,
+# the side she lies on 0.056 m into the mattress.
+#
+# In her own frame on the cot (the same measured cot as the supine block,
+# rotated by SIDE_OFF): `@root` up 0.040 so the side she lies on is 1.5 cm into
+# the mattress; the head down on to the pillow by lateral flexion, 27 at the
+# neck and 10 at the head — and the rest of the gap is her own hand. A pillow
+# 9 cm deep is lower than half her shoulders, so a head that reached it unaided
+# needed 56° of neck; somebody curled up sleeps with the under hand under the
+# cheek. The palm is solved to 2.4 cm below the lowest point of her skull,
+# facing up into it, and the skull rests 4 cm over the pillow on it.
+#
+# The over arm drapes along her side with the palm on top of the upper knee,
+# the elbow no higher than her shoulder. Arms 3.9 cm into the mattress at the
+# under shoulder, which is the shoulder she is lying on.
+#
+# `fingersL` is POSITIVE: see FOURS, the left fingers curl the other way. The
+# old −30 on both bent the left ones backwards.
 FETAL = dict(SIDE_L, **{
+    "@root": (0.16, 0.0, -0.766),
     "pelvis": FETAL_ROLL,
     "spine01": (-6, 0, 0), "spine02": (-6, 0, 0), "spine03": (-6, 0, 0),
-    "chest": (-6, 0, 0), "neck": (-6, 0, 0), "head": (-6, 0, 0),
+    "chest": (-6, 0, 0), "neck": (-9.2, 0, 26.6), "head": (1.0, 0, 9.9),
     "legUL": (-120, 6, 6), "legLL": (105, 0, 0), "footL": (18, 0, 0),
     "legUR": (-112, -14, -6), "legLR": (109, 0, 0), "footR": (18, 0, 0),
-    # The under arm, which SIDE_L already had to solve once — it probed 0.14 m
-    # INSIDE the mattress there — and which the extra roll drops another
-    # 0.19 m. −150 is the number that brings it back out — wrist (+0.579 +0.182
-    # +0.918), 0.112 over the mattress — and lays it up the bed past her head,
-    # where somebody lying on their side puts the arm they are not lying on.
-    "armUL": (-150, 30, 0), "armLL": (120, 40, 0), "handL": (-14, 0, 0),
-    # And the over arm folded in, hand up by her own chin.
-    "armUR": (-120, 0, -20), "armLR": (-100, -20, 0), "handR": (-14, 0, 0),
-    "fingersL": (-30, 0, 0), "fingersR": (-30, 0, 0),
+    "armUL": (-75.8, 11.3, 66.3), "armLL": (-84.6, 1.0, 11.9),
+    "handL": (7.8, -0.2, -13.0), "fingersL": (35.0, 0, 0),
+    "armUR": (-16.7, -1.3, -55.0), "armLR": (-36.9, -7.0, -9.6),
+    "handR": (-5.3, -3.8, 24.9), "fingersR": (-40.0, 0, 0),
 })
 
+# The breath, two millimetres and the top knee; the head stays on the hand.
 FETAL_B = dict(FETAL, **{
-    "spine01": (-8, 0, 0), "chest": (-8, 0, 0), "neck": (-4, 0, 0),
+    "@root": (0.16, 0.0, -0.764),
     "legUR": (-114, -14, -6),
 })
 
@@ -7777,15 +7960,20 @@ CLIPS = [
     {"name": "recline", "loop": False,
      "keys": [(0.00, KNEEL_BACK), (0.75, RECLINE_A), (1.55, RECLINE_B),
               (2.30, CRADLE)]},
+    # Holding her legs up for ten seconds, then her hands behind her head with
+    # the legs still up for ten, and back — see `_alternate`. And `supine` is
+    # the same clock with her legs down, which is what `legs.down` crosses to.
     {"name": "cradle", "loop": True,
-     "keys": [(0.0, CRADLE), (2.6, CRADLE_B), (5.2, CRADLE)]},
+     "keys": _alternate(CRADLE, CRADLE_B, CRADLE_MID, CRADLE_NAPE, CRADLE_NAPE_B)},
+    {"name": "supine", "loop": True,
+     "keys": _alternate(SUPINE, SUPINE_B, SUPINE_MID, SUPINE_NAPE, SUPINE_NAPE_B)},
     # Over on to her front, from the pose she is already holding — so the clip
     # IS the roll and there is nothing to crossfade through. Once, because it
     # ends somewhere she stays; `flatheld` is the breathing loop after it.
     {"name": "flat", "loop": False,
-     "keys": [(0.0, CRADLE), (0.9, RECLINE_B), (1.9, PRONE)]},
+     "keys": [(0.0, CRADLE), (0.9, RECLINE_B), (1.9, FLAT)]},
     {"name": "flatheld", "loop": True,
-     "keys": [(0.0, PRONE), (2.4, PRONE_B), (4.8, PRONE)]},
+     "keys": [(0.0, FLAT), (2.4, FLAT_B), (4.8, FLAT)]},
     # And the same thing at the edge of the cot, legs over the side. Reached
     # through PRONE, because she gets on to her front first and only then do
     # the legs go over — see PRONE_EDGE.

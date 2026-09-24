@@ -33911,23 +33911,12 @@ async function buildJadrija(scene) {
      * she stays in that position. from here if i say 'legs down', she lowers
      * her legs down. if i say 'legs up', she raises legs up again"*.
      *
-     * The pose is `CRADLE` in tools/blender/human_mh.py and it is built by
-     * `_cradle(hip, knee, ...)` with hip −118° and knee 78° — so "legs down"
-     * is undoing a KNOWN amount rather than inventing one, which is what the
-     * hug taught me to stop doing. These are those two angles in radians,
-     * applied negatively through `aim` about the figure's own sagittal axis
-     * (+z, the axis the hop tuck uses to bring her knees up).
-     *
-     * Not quite all of it: a leg laid flat on a mattress is not a leg in
-     * anatomical zero, and the last few degrees of hip extension would drive
-     * her heels through the bed. 0.92 of the flexion, measured off the ankle
-     * height — see `legsFlat`.
+     * It was an `aim` that undid `_cradle`'s hip and knee angles; since
+     * 24 Sep 2026 it is a crossfade between the `cradle` and `supine` clips,
+     * both solved against the cot — see `legsFlat`.
      */
-    legsHip: 2.060,
-    legsKnee: 1.361,
-    legsAll: 0.92,
     /** Seconds for the legs to go down or come up. A leg is not a switch. */
-    legsIn: 0.9,
+    legsIn: 1.1,
     /**
      * ── FACE DOWN NEEDS A CLIP, AND HERE IS WHY ───────────────────────
      *
@@ -34896,32 +34885,31 @@ async function buildJadrija(scene) {
   const _hugGoal = new THREE.Vector3(), _hugPole = new THREE.Vector3();
 
   /**
-   * Her legs down, or back up, over `legsIn` seconds.
+   * Her legs down, or back up, over `legsIn` seconds — by crossing to the
+   * other CLIP, not by aiming the legs.
    *
-   * `aim` lays one rotation over whatever the clip is doing, in figure space
-   * — see 41-skin.js — so this is the clip's own flexion undone rather than a
-   * second pose fighting it. Both legs and both joints, and the FEET go with
-   * the knees: a shin that straightens while the ankle keeps the pose's
-   * −16° points the toes at the ceiling.
+   * Misha, 24 Sep 2026: *"when i say 'legs down': they come down but it looks
+   * weird/unnatural, they sink into the cot too much or something, and the
+   * arms/hands look awkward"*. It was an `aim` that undid the hips and knees
+   * and nothing else: the arms went on holding shins that had gone, straight
+   * up at the ceiling, and a figure-space rotation knows nothing about a
+   * mattress. Legs down is now `supine` in tools/blender/human_mh.py — legs
+   * solved on to the mattress and the blanket, hands on her belly — and it is
+   * cut to the same 24.8 s clock as `cradle`, ten seconds of one arm pose and
+   * ten of hands behind her head. So the cross starts `supine` at the time
+   * `cradle` is at, and whatever her arms were doing they go on doing while
+   * the legs come down.
+   *
+   * `legsWasOn` is cleared rather than used: nothing aims these bones any
+   * more, and the caller's `else if` must not keep calling in.
    */
-  function legsFlat(f, dt) {
-    const want = show.legsDown ? 1 : 0;
-    show.legsAt = damp(show.legsAt || 0, want, 1 / SHOW.legsIn, dt);
-    const k = show.legsAt * SHOW.legsAll;
-    if (k < 0.002 && !show.legsDown) {
-      if (show.legsWasOn) {
-        for (const n of ['legUL', 'legLL', 'legUR', 'legLR', 'footL', 'footR']) {
-          f.aim(n, 0, 0, 1, 0);
-        }
-        show.legsWasOn = 0;
-      }
-      return;
-    }
-    show.legsWasOn = 1;
-    for (const side of ['L', 'R']) {
-      f.aim('legU' + side, 0, 0, 1, -SHOW.legsHip * k);
-      f.aim('legL' + side, 0, 0, 1, -SHOW.legsKnee * k);
-    }
+  function legsFlat(f) {
+    show.legsWasOn = 0;
+    if (show.phase !== 'cradle') return;
+    const now = f.playing();
+    if (now !== 'cradle' && now !== 'supine') return;
+    const want = show.legsDown ? 'supine' : 'cradle';
+    if (now !== want) f.play(want, { fade: SHOW.legsIn, from: f.state.curT });
   }
 
   /**
