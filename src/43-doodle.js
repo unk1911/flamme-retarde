@@ -366,6 +366,10 @@ async function buildDoodle(scene, J) {
   }
 
   function walkStep(dt) {
+    // Wandering with nowhere to go: a skill that declined (its clip missing,
+    // or already the one playing) leaves the mode where it was and the path
+    // gone. That is a pause, not a crash in the crowd's frame.
+    if (!d.path || !d.path[d.wp]) { d.path = null; d.mode = 'pause'; d.timer = 0.5; return; }
     const g = d.path[d.wp];
     const dtt = g[0] - d.t, dss = g[1] - d.s;
     const gap = Math.hypot(dtt, dss);

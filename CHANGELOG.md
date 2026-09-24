@@ -8,6 +8,37 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.483.0] — 2026-09-23
+
+### the Slow Doodle, on the promenade
+
+Misha: *"the creature should walk around, kinda without too much purpose but
+creating a certain presence, and occasionally cycle through one of its
+skills"*.
+
+He is out of slowdoodle.html and on the Jadrija deck. Converted from the
+viewer's own GLB into the game's .fr3d (`tools/slowdoodle/game.py` runs
+`fr3d.py` in Blender; `build/payload/doodle.fr3d.gz`, 637 KB, plus a 256 px
+mane), so he is drawn, lit and shadowed like the pug and the cat — 28,767
+triangles after the breastplate was thinned from 13.5k to 3.8k.
+
+`src/43-doodle.js`: he wanders a 32 m stretch east of the kabina at 0.34 m/s
+(matched to the walk's stride), on straight lines that clear every bench and
+parasol, turning in a slow arc. Walks end, sometimes early, in one of his
+things where he stands — idle, the lazy sway, the big yawn, the soulful gaze,
+the clover, the breeze — now and then two or three in a row, crossfaded. The
+gallop is his joke: rarely, 0.6 s of it on the spot, then a yawn. He waits for
+people and bikes in his way rather than walking through them, walkers step
+round him, you cannot walk through him, and bumping him makes him stop and
+look at you; idling near you, his head comes round. Frozen beyond 110 m.
+
+Debug: `__fr.jad.doodle.stats()/skills()/skill(name)/place/go/hold/release/
+look(dist, ang)`, and `raw().doodle.task({ step(d, dt) })` hands his routine
+to a later job until `step` returns false.
+
+Licences: Quaternius "Wolf" (CC0) body, rig and clips; MakeHuman hair01
+(CC0) mane texture.
+
 ## [1.482.0] — 2026-09-23
 
 ### her hair falls
