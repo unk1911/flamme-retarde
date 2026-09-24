@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.492.0] — 2026-09-24
+
+### eyelids that close, and five poses fixed
+
+**Her eyelids close for real.** Misha: *"it's a bit freaky how she closes her
+eyelids... maybe b/c her eyelids are without much contours... maybe fix the
+eyelids to make closed eyes look more natural"*. They were paint — the
+eyeball coloured skin-tone above a line — which passes for the fifth of a
+second of a blink and held shut is a blank oval. Now the upper eyelid of her
+own mesh moves (`LID_VERT` in 41-skin.js): skin, crease and upper lashes swung
+down about the middle of the eye by up to 0.56 rad, the way a lid slides over
+the ball, pushed out to clear the cornea (the margins sit 2 mm inside the
+15.7 mm eyeball open, which a closing lid would otherwise show), rigid at the
+margin and stretching above it and toward the corners. Every blink uses it,
+and so do the toy's beat and petting. The paint stays underneath as a
+backstop.
+
+**Five poses, solved on her mesh** (Misha, with screenshots, all measured
+before and after against the floor, mattress and pillow):
+
+- **All fours: palms down.** `handL` X was never wrist extension on this rig
+  — it is deviation, the hand bending sideways in the plane of the palm —
+  so palms-down is forearm pronation plus wrist extension, solved: palms
+  flat (lowest point −3 mm, was hovering 110 mm), fingers forward, wrists
+  under the shoulders. Her feet had been 91 mm through the floor; now on it.
+- **Lying on the cot.** Back and shoulders down on the mattress (was 48 mm
+  off it, head 277 mm above the pillow), head on the pillow, hands hooked
+  behind her thighs with the fingers closed — and every 12 s she changes to
+  hands clasped behind her head, legs still up, and back, through a middle
+  pose so no hand passes through her head.
+- **Legs down.** Its own clip now (`supine`) rather than the legs aimed down
+  through the bed: flat on her back, legs on the mattress, hands on her belly
+  alternating with behind her head in step with the cot pose, crossfaded in
+  1.1 s (`legsFlat`).
+- **Fetal.** No arm flung out: her cheek rests on her under hand on the
+  pillow, the other arm along her side, hand on her knee.
+- **Flat on her tummy.** Her head was 115 mm into the pillow, face down in
+  it; now her cheek rests on it, turned toward the walkway (`FLAT`/`FLAT_B`;
+  the side-lying poses built on `PRONE` are unchanged).
+
+`ballet.py --verify` and the range-of-motion sweep pass for all of them.
+Rebaked `human_skin.fr3d.gz` (+30 KB).
+
 ## [1.491.0] — 2026-09-24
 
 ### on the beat
