@@ -2448,25 +2448,47 @@ function v5Parts(o) {
     uLidCol: { value: new THREE.Color(o.lidCol || 0xd8ab94) },
   };
   // THE JAW, which is what a mouth that talks is. Misha, 23 Sep 2026: *"baye
-  // v2.0 is emulating baye v1.0, but her lips don't seem to be moving."* The
-  // apprentice copies the leader's bones, and v1.0's mouth is not a bone — it
-  // is `FACE_VERT` dropping the region below her lip line in the bind pose,
-  // driven by `face.gape` off the voice meter. So it is the same displacement
-  // here, with v1.0's own `jawR` and `drop` so both women open the same
-  // amount, on the body AND on the teeth and tongue part — gated below the
-  // lip line, so the lower teeth go with the jaw and the upper ones stay. The
-  // hinge, `uLipC`, is measured off the teeth by `v5Eyes`.
+  // v2.0 is emulating baye v1.0, but her lips don't seem to be moving."* And
+  // then, the next day, of what that first answer did: *"her lips just become
+  // super big and puffy. instead the lips should remain the same size but
+  // should part, revealing white teeth, the way a normal person's would."*
+  //
+  // The first answer was v1.0's: slide everything below the lip line down,
+  // fading out over five centimetres. On a face that is a lower lip carried
+  // down by the whole drop and a chin carried by half of it, so the lip is
+  // what stretches — a lip two centimetres tall. A jaw is a bone: the lower
+  // lip, the chin, the lower teeth and the tongue all turn TOGETHER about a
+  // hinge in front of the ear, and nothing in between stretches but the
+  // cheeks at the corners of the mouth and the skin under the chin.
+  //
+  // So it is a rotation, about `uHinge`, by up to `uJawA` — and how much of it
+  // each vertex gets is `aJaw.x`, worked out once on the CPU by `v5Jaw`
+  // rather than as a function of where the vertex is. It has to be: at the
+  // middle of her mouth the upper lip and the lower touch, to the tenth of a
+  // millimetre, and the only thing that knows which lip a vertex belongs to
+  // is the mesh — they are two sheets that only meet at the corners. `aJaw.y`
+  // is how deep in her mouth a vertex is, on the body, and which of teeth or
+  // tongue it is, on the mouth part: a mouth that opens has to be dark inside.
   const jaw = {
     uniforms: { uGape: { value: 0 }, uLipC: { value: new THREE.Vector3(0, -99, 0) },
-      uJawR: { value: new THREE.Vector3(...FACE.jawR) } },
-    decl: '\nuniform float uGape;\nuniform vec3 uLipC;\nuniform vec3 uJawR;\n',
+      uHinge: { value: new THREE.Vector3(0, -99, 0) }, uJawA: { value: V5_JAW.angle } },
+    decl: '\nuniform float uGape;\nuniform vec3 uLipC;\nuniform vec3 uHinge;\n'
+      + 'uniform float uJawA;\nvarying float vCav;\n',
+    vdecl: '\nattribute vec2 aJaw;\n',
     vert: `
-      if (uGape > 0.0) {
-        vec3 jf = vec3(p.x, p.y, abs(p.z));
-        float jw = 1.0 - smoothstep(0.20, 1.0, length((jf - uLipC) / uJawR));
-        jw *= smoothstep(0.0015, -0.0090, p.y - uLipC.y);
-        p += uGape * jw * vec3(${FACE.drop[0]}, -${FACE.drop[1]}, 0.0);
+      vCav = aJaw.y;
+      if (uGape > 0.0 && aJaw.x > 0.0) {
+        float ja = -uGape * uJawA * aJaw.x;
+        float jc = cos(ja), js = sin(ja);
+        vec2 jr = p.xy - uHinge.xy;
+        p.xy = uHinge.xy + vec2(jr.x * jc - jr.y * js, jr.x * js + jr.y * jc);
+        n.xy = vec2(n.x * jc - n.y * js, n.x * js + n.y * jc);
       }
+    `,
+    // The inside of a mouth, on the body: the same skin, most of the light
+    // gone and what is left of it red.
+    frag: `
+      base *= mix(vec3(1.0), vec3(${V5_JAW.cav.join(', ')}), vCav);
     `,
   };
   const hairTex = o.hairTex ? v5Tex(o.hairTex) : null;
@@ -2498,8 +2520,36 @@ function v5Parts(o) {
           spec = 0.10;
         }
       ` },
-    mouth: { color: 0xd8b3ae, spec: 0.20, uniforms: jaw.uniforms,
-      decl: jaw.decl, vert: jaw.vert },
+    // Teeth and tongue: MakeHuman's helpers, with no UVs, so which is which is
+    // `aJaw.y` again — 1 on the tongue — and the colour is written here.
+    mouth: { color: 0xffffff, spec: 0.35, specPower: 60, uniforms: jaw.uniforms,
+      decl: jaw.decl, vdecl: jaw.vdecl, vert: jaw.vert,
+      // And darker the further back: the back of a mouth gets no light but
+      // what comes in past the lips, and teeth lit evenly to the molars are
+      // a white horseshoe rather than a mouth.
+      //
+      // The helpers are one smooth horseshoe per jaw, so the teeth are drawn
+      // on: a hairline between each, at the widths real teeth are (lower
+      // incisors narrow, upper centrals broad), measured round the arch from
+      // the middle; and gum where the crowns stop.
+      body: `
+        float dep = smoothstep(uLipC.x - 0.004, uLipC.x - ${V5_JAW.dark.toFixed(3)}, vLocal.x);
+        vec3 tc = vec3(${V5_JAW.teeth.join(', ')});
+        if (vCav < 0.5) {
+          bool up = vLocal.y > uLipC.y;
+          vec2 ac = vec2(uLipC.x - ${V5_JAW.arch.toFixed(3)}, 0.0);
+          vec2 q = vec2(vLocal.x, abs(vLocal.z)) - ac;
+          float arc = length(q) * atan(q.y, max(q.x, 1e-4));
+          float gap = 1.0;
+          if (up) { ${V5_JAW.upperAt.map((b) => `gap = min(gap, smoothstep(0.0, 0.00055, abs(arc - ${b.toFixed(4)})));`).join(' ')} }
+          else { ${V5_JAW.lowerAt.map((b) => `gap = min(gap, smoothstep(0.0, 0.00055, abs(arc - ${b.toFixed(4)})));`).join(' ')} }
+          tc *= mix(0.45, 1.0, gap);
+          float root = up ? vLocal.y - uLipC.y : uLipC.y - vLocal.y;
+          tc = mix(tc, vec3(${V5_JAW.gum.join(', ')}), smoothstep(${V5_JAW.crown[0].toFixed(4)}, ${V5_JAW.crown[1].toFixed(4)}, root));
+        }
+        base *= mix(tc, vec3(${V5_JAW.tongue.join(', ')}), vCav)
+          * (1.0 - ${V5_JAW.depth.toFixed(2)} * dep);
+      ` },
     // Hair cards are rectangles that only look like hair because most of each
     // one is cut away by its alpha. A discard rather than blending, so they
     // sort against each other without a depth-sorted pass.
@@ -2665,30 +2715,228 @@ function v5Eyes(fig, eye) {
 }
 
 /**
- * Where her jaw hinges, measured off the teeth: the midline, at the height
- * between the upper and lower front teeth, at the front of them. The lips sit
- * a few millimetres further forward, which the 50 mm jaw region swallows; the
- * HEIGHT is the number that matters, because the drop is gated below it.
+ * A v5 figure's jaw — see `jaw` in v5Parts. All in her bind frame, metres:
+ * +x forward, +y up, and the mouth is on the midline.
+ */
+const V5_JAW = {
+  // The hinge, from the middle of her mouth: back and up to just in front of
+  // the ear, where a jaw actually turns.
+  hinge: [-0.080, 0.030],
+  // Wide open is this far round it — about 22 mm between her lips at the
+  // front, which is a wide-open mouth and not a scream.
+  angle: 0.26,
+  // How far from the mouth anything moves at all; beyond it, nothing does.
+  reach: 0.12,
+  // The inside of her mouth, and the teeth and tongue — as multipliers on
+  // white, in the material's own (linear) terms.
+  cav: [0.30, 0.10, 0.10],
+  teeth: [0.72, 0.69, 0.61],
+  tongue: [0.58, 0.20, 0.21],
+  // Dimmer the further back into the mouth, by this much at this depth.
+  depth: 0.70, dark: 0.030,
+  // The teeth drawn on the helpers: where each tooth ends, round the arch
+  // from the middle, in metres — lower incisors 5.3 and 5.9 mm, canine 6.9,
+  // premolars 7; upper centrals 8.6, laterals 6.6, canine 7.6, premolars 7 —
+  // measured about a point this far behind the front teeth. And gum, from
+  // this far above (below) the bite to this.
+  arch: 0.024,
+  lowerAt: [0.0053, 0.0112, 0.0181, 0.0251, 0.0321],
+  upperAt: [0.0086, 0.0152, 0.0228, 0.0298, 0.0363],
+  crown: [0.0080, 0.0110],
+  gum: [0.62, 0.30, 0.30],
+};
+
+/**
+ * Where her jaw hinges, and how much of each vertex goes with it.
+ *
+ * `uLipC` first, measured off the teeth: the midline, at the height between
+ * the upper and lower front teeth, at the front of them. Then `aJaw`:
+ *
+ * On the teeth and tongue, the three helper meshes found as the three pieces
+ * of the part that do not touch — the tongue is the one furthest back, the
+ * upper teeth the higher of the other two — and the lower teeth and the
+ * tongue go with the jaw.
+ *
+ * On the body, three things multiplied. Below a line from her lips back up to
+ * the hinge (a line that is sharp at the lips and softens across the cheek);
+ * above the bottom edge of the mandible (so the neck stays where it is and
+ * the skin under the chin is what stretches); and in front of the hinge. And
+ * then the lips, which no line can do: within them, which LIP a vertex is on
+ * is decided by walking the mesh — how far round the surface it is from the
+ * middle of the upper lip against from the middle of the lower one. On the
+ * upper lip the lower one is round the corner of the mouth, six centimetres
+ * away; at the corners the two are the same, and there it is half and half,
+ * which is what a corner of a mouth does. UV seams are welded first so the
+ * walk crosses them, which does not join the lips: they never share a point.
  */
 function v5Jaw(fig, jaw) {
   const part = fig.parts && fig.parts.mouth;
   if (!part || !jaw) return false;
-  const pos = fig.mesh.geometry.getAttribute('position');
-  const ix = fig.mesh.geometry.getIndex();
+  const geo = fig.mesh.geometry;
+  const pos = geo.getAttribute('position');
+  const nrm = geo.getAttribute('normal');
+  const ix = geo.getIndex();
   const { start, count } = part.geometry.drawRange;
-  const vs = [];
+  const mv = [];
   const seen = new Set();
   for (let i = start; i < start + count; i++) {
     const v = ix.getX(i);
     if (seen.has(v)) continue;
     seen.add(v);
-    vs.push([pos.getX(v), pos.getY(v)]);
+    mv.push(v);
   }
-  if (vs.length < 12) return false;
-  const xm = Math.max(...vs.map((q) => q[0]));
-  const front = vs.filter((q) => q[0] > xm - 0.010);
-  const y = front.reduce((a, q) => a + q[1], 0) / front.length;
-  jaw.uniforms.uLipC.value.set(xm, y, 0);
+  if (mv.length < 12) return false;
+  const xm = Math.max(...mv.map((v) => pos.getX(v)));
+  const front = mv.filter((v) => pos.getX(v) > xm - 0.010);
+  const cy = front.reduce((a, v) => a + pos.getY(v), 0) / front.length;
+  const cx = xm;
+  jaw.uniforms.uLipC.value.set(cx, cy, 0);
+  const hx = cx + V5_JAW.hinge[0], hy = cy + V5_JAW.hinge[1];
+  jaw.uniforms.uHinge.value.set(hx, hy, 0);
+
+  const aj = new Float32Array(pos.count * 2);
+  const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+  // Teeth and tongue: the part's pieces.
+  const par = new Map(mv.map((v) => [v, v]));
+  const root = (v) => { while (par.get(v) !== v) { par.set(v, par.get(par.get(v))); v = par.get(v); } return v; };
+  for (let i = start; i + 2 < start + count; i += 3) {
+    const a = root(ix.getX(i)), b = root(ix.getX(i + 1)), c = root(ix.getX(i + 2));
+    par.set(b, a); par.set(c, a);
+  }
+  const pieces = new Map();
+  for (const v of mv) {
+    const r = root(v);
+    if (!pieces.has(r)) pieces.set(r, []);
+    pieces.get(r).push(v);
+  }
+  const mean = (vs, f) => vs.reduce((a, v) => a + f(v), 0) / vs.length;
+  const big = [...pieces.values()].sort((a, b) => b.length - a.length).slice(0, 3);
+  const tongue = big.reduce((a, b) => (mean(b, (v) => pos.getX(v)) < mean(a, (v) => pos.getX(v)) ? b : a));
+  const rest = big.filter((b) => b !== tongue);
+  const upper = rest.length ? rest.reduce((a, b) => (mean(b, (v) => pos.getY(v)) > mean(a, (v) => pos.getY(v)) ? b : a)) : null;
+  for (const piece of pieces.values()) {
+    for (const v of piece) {
+      // A stray piece, if the helpers ever come in more than three: by height.
+      const lower = piece === upper ? 0 : piece === tongue || rest.includes(piece) ? 1
+        : (pos.getY(v) < cy ? 1 : 0);
+      aj[v * 2] = lower;
+      aj[v * 2 + 1] = piece === tongue ? 1 : 0;
+    }
+  }
+
+  // The body, near her mouth.
+  const b0 = geo.drawRange.start, b1 = b0 + Math.min(geo.drawRange.count, ix.count - b0);
+  const R = V5_JAW.reach;
+  const near = (v) => Math.hypot(pos.getX(v) - cx, pos.getY(v) - cy, pos.getZ(v)) < R;
+  const weld = new Map(), key = new Map();
+  const keyOf = (v) => `${Math.round(pos.getX(v) * 1e4)},${Math.round(pos.getY(v) * 1e4)},${Math.round(pos.getZ(v) * 1e4)}`;
+  const adj = new Map();
+  const node = (v) => {
+    let k = key.get(v);
+    if (k === undefined) {
+      const kk = keyOf(v);
+      if (!weld.has(kk)) weld.set(kk, v);
+      k = weld.get(kk);
+      key.set(v, k);
+      if (!adj.has(k)) adj.set(k, new Set());
+    }
+    return k;
+  };
+  for (let i = b0; i + 2 < b1; i += 3) {
+    const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
+    if (!near(a) || !near(b) || !near(c)) continue;
+    const t = [node(a), node(b), node(c)];
+    for (let e = 0; e < 3; e++) {
+      const u = t[e], w = t[(e + 1) % 3];
+      if (u !== w) { adj.get(u).add(w); adj.get(w).add(u); }
+    }
+  }
+  const nodes = [...adj.keys()];
+  if (!nodes.length) return false;
+  const closest = (x, y) => nodes.reduce((a, v) => {
+    const d = (pos.getX(v) - x) ** 2 + (pos.getY(v) - y) ** 2 + pos.getZ(v) ** 2;
+    return d < a[1] ? [v, d] : a;
+  }, [nodes[0], 1e9])[0];
+  // Across the surface from one point, Dijkstra on a binary heap.
+  const walk = (src) => {
+    const d = new Map([[src, 0]]);
+    const h = [[0, src]];
+    const push = (e) => {
+      h.push(e);
+      let i = h.length - 1;
+      while (i > 0) { const q = (i - 1) >> 1; if (h[q][0] <= h[i][0]) break; [h[q], h[i]] = [h[i], h[q]]; i = q; }
+    };
+    const pop = () => {
+      const top = h[0], last = h.pop();
+      if (h.length) {
+        h[0] = last;
+        let i = 0;
+        for (;;) {
+          const l = 2 * i + 1, r = l + 1;
+          let m = i;
+          if (l < h.length && h[l][0] < h[m][0]) m = l;
+          if (r < h.length && h[r][0] < h[m][0]) m = r;
+          if (m === i) break;
+          [h[m], h[i]] = [h[i], h[m]]; i = m;
+        }
+      }
+      return top;
+    };
+    while (h.length) {
+      const [du, u] = pop();
+      if (du > d.get(u)) continue;
+      for (const w of adj.get(u)) {
+        const l = Math.hypot(pos.getX(u) - pos.getX(w), pos.getY(u) - pos.getY(w), pos.getZ(u) - pos.getZ(w));
+        if (du + l < (d.has(w) ? d.get(w) : 1e9)) { d.set(w, du + l); push([du + l, w]); }
+      }
+    }
+    return d;
+  };
+  const dU = walk(closest(cx + 0.009, cy + 0.005));
+  const dL = walk(closest(cx + 0.006, cy - 0.008));
+  const slope = (hy - (cy - 0.002)) / (cx - hx);
+  const mx = cx - 0.012, my = cy - 0.052;            // the point of the chin
+  const gx = hx + 0.002, gy = cy - 0.030;            // the angle of the jaw
+  const cav = [cx - 0.050, cy];                      // a point inside her mouth
+  const wOf = new Map();
+  for (const k of nodes) {
+    const x = pos.getX(k), y = pos.getY(k), az = Math.abs(pos.getZ(k));
+    // How far out of the mouth this is — round the corner, or back along the cheek.
+    const e = Math.max(0, az - 0.024) + Math.max(0, cx - 0.030 - x);
+    const yl = cy - 0.002 + (cx - x) * slope;
+    const band = 0.004 + 0.6 * e;
+    let top = sm(yl + band, yl - band, y);
+    const yj = my + (gy - my) * Math.min(1, Math.max(0, (mx - x) / (mx - gx)));
+    const bottom = sm(yj - 0.028, yj - 0.004, y);
+    const back = sm(hx - 0.010, hx + 0.020, x);
+    // The lips, by the walk.
+    const du = dU.has(k) ? dU.get(k) : 1, dl = dL.has(k) ? dL.get(k) : 1;
+    const side = sm(-0.010, 0.010, du - dl);
+    const lips = sm(0.034, 0.024, az) * sm(0.022, 0.012, Math.abs(y - cy));
+    top = top + (side - top) * lips;
+    // Fading to nothing at the edge of what was looked at, so there is no step.
+    const edge = sm(R, R - 0.02, Math.hypot(x - cx, y - cy, az));
+    const w = top * bottom * back * edge;
+    // Inside her mouth: facing in, towards a point in the middle of it, and
+    // behind the lips.
+    const nx = nrm.getX(k), ny = nrm.getY(k);
+    const inward = nx * (x - cav[0]) + ny * (y - cav[1]) < 0;
+    const deep = inward ? sm(cx - 0.002, cx - 0.014, x) * sm(0.034, 0.024, az)
+      * sm(0.045, 0.030, Math.abs(y - cy)) : 0;
+    wOf.set(k, [w, deep]);
+  }
+  for (const [v, k] of key) {
+    const [w, deep] = wOf.get(k) || [0, 0];
+    aj[v * 2] = w;
+    aj[v * 2 + 1] = deep;
+  }
+  const attr = new THREE.BufferAttribute(aj, 2);
+  geo.setAttribute('aJaw', attr);
+  for (const pm of Object.values(fig.parts || {})) pm.geometry.setAttribute('aJaw', attr);
+  jaw.pieces = [...pieces.values()].map((b) => [b.length, +mean(b, (v) => pos.getX(v)).toFixed(4),
+    +mean(b, (v) => pos.getY(v)).toFixed(4), b === tongue ? 'tongue' : b === upper ? 'upper' : 'lower']);
+  jaw.lipNodes = nodes.length;
   return true;
 }
 

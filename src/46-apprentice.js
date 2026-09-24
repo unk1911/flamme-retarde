@@ -152,8 +152,10 @@ async function loadApprentice() {
     spec: 0.10, specPower: 26, vcol: false,
     uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms },
     decl: 'uniform sampler2D uSkin;' + look.jaw.decl,
-    // The whole of what makes her a different figure: one texture lookup.
-    body: 'base = texture2D(uSkin, vUv).rgb;',
+    vdecl: look.jaw.vdecl,
+    // The whole of what makes her a different figure: one texture lookup —
+    // and the inside of her mouth.
+    body: 'base = texture2D(uSkin, vUv).rgb;' + look.jaw.frag,
     // And a mouth that opens when the leader's does — see `jaw` in v5Parts.
     vert: look.jaw.vert,
     parts: look.parts,
@@ -352,8 +354,8 @@ function apprStepBody(dt, leader, room) {
     apprMode = 'primary';
     v5Blink(apprEye, dt);
     if (apprJaw) {
-      apprJaw.uniforms.uGape.value = Math.min(1, Math.max(0,
-        leader.face && leader.face.gape ? leader.face.gape : 0));
+      apprJaw.uniforms.uGape.value = apprGapeHold != null ? apprGapeHold
+        : Math.min(1, Math.max(0, leader.face && leader.face.gape ? leader.face.gape : 0));
     }
     v5Hang(appr, apprHang);
     appr.mesh.updateMatrixWorld();
@@ -618,6 +620,63 @@ function apprenticeCheck(leader, fit) {
 }
 
 /** Debug: turn her to an absolute yaw, without waiting for her to wander. */
+/**
+ * Debug: hold her mouth at `g` (0 shut, 1 wide) whatever the leader says, or
+ * let go with null. Headless a frame is a second and the voice meter never
+ * holds still for a photograph of the jaw.
+ */
+let apprGapeHold = null;
+function apprenticeGape(g) {
+  apprGapeHold = g == null ? null : Math.min(1, Math.max(0, +g));
+  return apprGapeHold;
+}
+
+/**
+ * Where her lower lip is this frame, in her bind frame: the middle of her
+ * mouth, 6 mm down and 4 mm in, turned about the hinge by exactly what the
+ * jaw in v5Parts is giving it. For the thumb — see `thumbReach` in
+ * 43-jadrija.js — which has to land on the lip she is drawn with, and she is
+ * drawn with this jaw and not v1.0's. Null until she is loaded.
+ */
+function apprenticeLipBind() {
+  if (!appr || !apprJaw) return null;
+  const U = apprJaw.uniforms;
+  const c = U.uLipC.value, h = U.uHinge.value;
+  if (c.y < -50 || h.y < -50) return null;
+  const a = -U.uGape.value * U.uJawA.value;
+  const rx = c.x - 0.004 - h.x, ry = c.y - 0.006 - h.y;
+  return [h.x + rx * Math.cos(a) - ry * Math.sin(a),
+    h.y + rx * Math.sin(a) + ry * Math.cos(a), 0];
+}
+
+/** Debug: her bind-space vertices within `r` of the jaw hinge, by part. */
+function apprenticeDump(r = 0.08) {
+  if (!appr || !apprJaw) return null;
+  const c = apprJaw.uniforms.uLipC.value;
+  const g = appr.mesh.geometry, pos = g.getAttribute('position'), ix = g.getIndex();
+  const out = { c: c.toArray(), parts: {} };
+  const groups = [['body', appr.mesh]].concat(Object.entries(appr.parts || {}));
+  for (const [name, m] of groups) {
+    const { start, count } = m.geometry.drawRange;
+    const seen = new Set(), vs = [], tri = [], at = new Map();
+    const near = (v) => Math.hypot(pos.getX(v) - c.x, pos.getY(v) - c.y, pos.getZ(v) - c.z) < r;
+    for (let i = start; i + 2 < start + count; i += 3) {
+      const a = ix.getX(i), b = ix.getX(i + 1), d = ix.getX(i + 2);
+      if (name === 'body' && near(a) && near(b) && near(d)) tri.push([a, b, d]);
+    }
+    for (let i = start; i < start + Math.min(count, 1e7); i++) {
+      const v = ix.getX(i);
+      if (seen.has(v)) continue;
+      seen.add(v);
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      if (Math.hypot(x - c.x, y - c.y, z - c.z) < r) vs.push([v, +x.toFixed(5), +y.toFixed(5), +z.toFixed(5)]);
+    }
+    out.parts[name] = vs;
+    if (tri.length) out.tri = tri;
+  }
+  return out;
+}
+
 function apprenticeFace(yaw) {
   if (!appr) return null;
   appr.mesh.rotation.y = yaw;
@@ -648,6 +707,8 @@ function apprenticeStats() {
     at: [+appr.mesh.position.x.toFixed(2), +appr.mesh.position.y.toFixed(2),
       +appr.mesh.position.z.toFixed(2)],
     yaw: +appr.mesh.rotation.y.toFixed(4),
+    jaw: apprJaw ? { pieces: apprJaw.pieces, nodes: apprJaw.lipNodes,
+      hinge: apprJaw.uniforms.uHinge.value.toArray().map((v) => +v.toFixed(4)) } : null,
     // Which way is down for her hair, in her head's frame — see v5Hang.
     hang: apprHang ? apprHang.value.toArray().map((v) => +v.toFixed(3)) : null,
   };

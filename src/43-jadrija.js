@@ -49391,18 +49391,24 @@ async function buildJadrija(scene) {
       // Whether or not her mouth is open: the thumb is what opens it. See
       // `thumbTouch` below.
       if (!sheIsIn()) return null;
-      const u = skinFig.uFace;
-      const c = u.uLipC.value;
-      if (c.y < -50) return null;
-      const g = u.uGape.value;
-      const p = [c.x - 0.004 - 0.006 * g, c.y - 0.006 - 0.0185 * g, 0];
-      const w = bindPointAt(skinFig, p, [['jaw', 0.70], ['head', 0.30]], new THREE.Vector3());
+      // v2.0's lip when she is the one drawn — her own face, her own hinge.
+      const v2 = APPR.primary && appr && appr.mesh.visible ? apprenticeLipBind() : null;
+      const F = v2 ? appr : skinFig;
+      let p = v2;
+      if (!p) {
+        const u = skinFig.uFace;
+        const c = u.uLipC.value;
+        if (c.y < -50) return null;
+        const g = u.uGape.value;
+        p = [c.x - 0.004 - 0.006 * g, c.y - 0.006 - 0.0185 * g, 0];
+      }
+      const w = bindPointAt(F, p, [['jaw', 0.70], ['head', 0.30]], new THREE.Vector3());
       // And which way her face is pointing: the lip against a point ten
       // centimetres behind it in the head, skinned the same way. A thumb
       // only goes to a mouth you are in FRONT of — from behind her it would
       // be a hand drawn over the back of her head, because the view-model arm
       // is always drawn on top.
-      const b = bindPointAt(skinFig, [p[0] - 0.10, p[1] + 0.02, 0],
+      const b = bindPointAt(F, [p[0] - 0.10, p[1] + 0.02, 0],
         [['head', 1]], new THREE.Vector3());
       const f = w.clone().sub(b).normalize();
       return { x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z,

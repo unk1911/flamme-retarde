@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.484.0] — 2026-09-24
+
+### her lips part
+
+Misha: *"in the kabine when she opens her mouth, it looks weird, her lips just
+become super big and puffy. instead the lips should remain the same size but
+should part, revealing white teeth, the way a normal person's would."*
+
+v2.0's mouth was v1.0's trick: slide everything below the lip line down,
+fading out over five centimetres. That carries the lower lip the whole way and
+the chin half of it, so the thing that stretched was the lip — two centimetres
+of it. A jaw is a bone, and now it is one: the lower lip, chin, lower teeth
+and tongue turn together about a hinge in front of her ear (up to 0.26 rad,
+about 22 mm between the lips wide open), and the only skin that stretches is
+at the corners of her mouth and under her chin.
+
+How much of the jaw each vertex takes is baked once on load (`aJaw`, in
+`v5Jaw`) rather than worked out from position, because at the middle of her
+mouth the two lips touch to a tenth of a millimetre and only the mesh knows
+which is which: they are separate sheets that meet at the corners. So within
+the lips it walks the surface (Dijkstra, UV seams welded) and asks which lip
+middle a vertex is nearer, going round; at the corners that is half and half,
+which is what a corner of a mouth does. Everywhere else it is a line from the
+lips back to the hinge, sharp at the lips and soft across the cheek, cut off
+above the bottom of the mandible so her neck stays put.
+
+Inside: the mouth cavity is dark red instead of lit skin; the teeth and tongue
+(MakeHuman's helper meshes, found as the part's three separate pieces) are
+off-white and pink instead of one flat beige, darker the further back, with a
+hairline drawn between each tooth at real tooth widths and gum where the
+crowns stop. Your thumb in the kabina now aims at v2.0's own lower lip,
+turned by the same hinge, rather than v1.0's.
+
+Debug: `__fr.jad.apprGape(g)` holds her mouth at g (null lets go);
+`appr().jaw` reports the pieces and the hinge.
+
 ## [1.483.0] — 2026-09-23
 
 ### the Slow Doodle, on the promenade

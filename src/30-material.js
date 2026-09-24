@@ -320,7 +320,9 @@ function solidMaterial(color, opts = {}) {
       uHasVCol: { value: opts.vcol === false ? 0 : 1 },
       ...(opts.uniforms || {}),
     },
-    vertexShader: solidVertex(opts.vert || '', opts.decl || ''),
+    // `vdecl` is the vertex program's alone: an attribute cannot be declared
+    // in a fragment shader, and `decl` goes into both.
+    vertexShader: solidVertex(opts.vert || '', (opts.decl || '') + (opts.vdecl || '')),
     fragmentShader: solidFragment(opts.body || '', opts.decl || '',
       opts.lit || ''),
     side: opts.side ?? THREE.FrontSide,
