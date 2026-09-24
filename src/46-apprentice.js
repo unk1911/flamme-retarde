@@ -156,7 +156,9 @@ async function loadApprentice() {
   apprEye = look.eye;
   apprJaw = look.jaw;
 
-  const fig = await loadSkin('baye2_fr3d', {
+  // The leader's added finger bones too (41-hands.js): she wears v1.0's
+  // palette bone for bone, and `apprSameRig` checks the two agree.
+  const fig = await loadSkinHands('baye2_fr3d', {
     spec: 0.10, specPower: 26, vcol: false,
     uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms,
       ...look.lid.uniforms },

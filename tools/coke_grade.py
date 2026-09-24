@@ -22,6 +22,20 @@ The numbers, all millimetres unless marked:
   padI/T   index pad / thumb pad to the straw's axis. A 3.4 mm straw between
            two pads 8 mm apart puts both at about 4.
   aTop     straw top's acceleration, m/s^2 at 30 Hz: a pop, if big.
+
+And the SHAPE OF THE HAND (24 Sep 2026, the OK sign), which none of the above
+could see — every one of them passed on a hand that scooped the straw with all
+four fingers:
+
+  padGap     index pad to thumb pad, both on the last bone of each: closed on
+             a 6.8 mm straw is ~7.6.
+  otherStraw the middle, ring and little fingertips' clearance from the straw.
+             Wrapped round it they are on it; in an OK sign they are out.
+  curlF      those three fingers' curl off the hand, degrees (the scoop was 91).
+  a_fingers  the knuckles' acceleration: the hand turning about the pinch,
+             which moves nothing `a_pinch` measures.
+  w_phi/psi  how fast the hand turns about the straw and the straw pivots in
+             the pinch, degrees a second.
 """
 import json
 import math
@@ -47,13 +61,18 @@ def norm(v):
     return math.sqrt(sum(x * x for x in v))
 
 
-for key in ('wrist', 'top', 'head', 'pinch'):
+for key in ('wrist', 'top', 'head', 'pinch', 'fingers'):
     for i, r in enumerate(rows):
         r['v_' + key] = r['a_' + key] = None
         if 0 < i < len(rows) - 1 and all(x.get(key) for x in (r, rows[i - 1], rows[i + 1])):
             a, b, c = rows[i - 1][key], r[key], rows[i + 1][key]
             r['v_' + key] = norm([c[k] - a[k] for k in range(3)]) / (2 * DT)
             r['a_' + key] = norm([c[k] - 2 * b[k] + a[k] for k in range(3)]) / (DT * DT)
+for key in ('phi', 'psi', 'fd'):
+    for i, r in enumerate(rows):
+        r['w_' + key] = None
+        if 0 < i < len(rows) - 1 and all(x.get(key) is not None for x in (rows[i - 1], rows[i + 1])):
+            r['w_' + key] = abs(rows[i + 1][key] - rows[i - 1][key]) / (2 * DT)
 
 if not quiet:
     print('%4s %5s %4s | %6s %6s %6s %6s | %6s %5s %5s %5s | %5s %6s | %5s %5s'
@@ -72,12 +91,14 @@ if not quiet:
 # (label, window in clip seconds, [(key, op, limits)])
 HELD = [('gripOff', 'max', 0.0020), ('gripT', 'in', (0.60, 0.64)), ('handFace', 'min', 0.008),
         ('padOffI', 'in', (0.0030, 0.0060)), ('padOffT', 'in', (0.0030, 0.0060)),
-        ('fingerFace', 'min', -0.0015), ('handLow', 'min', -0.001), ('wristBend', 'maxdeg', 75)]
+        ('fingerFace', 'min', -0.0015), ('handLow', 'min', -0.001), ('wristBend', 'maxdeg', 75),
+        ('padGap', 'in', (0.0065, 0.0090)), ('otherStraw', 'min', 0.008),
+        ('w_phi', 'maxdeg', 200), ('w_psi', 'maxdeg', 200)]
 NOSE = [('dTopNostril', 'in', (0.0025, 0.0075)), ('strawFace', 'min', 0.0)]
 # Everywhere the hand is working: no fingertip or pad inside her face, no part
 # of the hand through the plate, and a wrist inside what a wrist does.
 BODY = [('fingerFace', 'min', -0.0015), ('handFace', 'min', 0.008), ('handLow', 'min', -0.001),
-        ('wristBend', 'maxdeg', 75)]
+        ('wristBend', 'maxdeg', 75), ('w_phi', 'maxdeg', 200), ('w_psi', 'maxdeg', 200)]
 STEPS = [
     ('1 reach for it',      (0.55, 1.00), BODY),
     ('2 fingers close',     (1.00, 1.21), BODY + [('gripOffEnd', 'max', 0.0010)]),
@@ -130,13 +151,16 @@ for name, (a, b), checks in STEPS:
             parts.append('%s %.3g..%.3g: %.3g..%.3g %s' % (key, lo * sc, hi * sc, min(vals) * sc,
                                                          max(vals) * sc, 'ok' if good else 'FAIL'))
         ok = ok and good
-    for key in ('a_top', 'a_pinch'):
+    for key in ('a_top', 'a_pinch', 'a_fingers'):
         vals = [r[key] for r in win if r.get(key) is not None]
         if vals:
             worst = max(vals)
             good = worst <= POP
             parts.append('%s %.0f %s' % (key, worst, 'ok' if good else 'POP'))
             ok = ok and good
+    cf = [r['curlF'] for r in win if r.get('curlF') is not None]
+    if cf:
+        parts.append('curlF %.0f..%.0f' % (min(cf), max(cf)))
     allok = allok and ok
     print('%-22s %s  %s' % (name, 'PASS' if ok else 'FAIL', ' | '.join(parts)))
 print()
