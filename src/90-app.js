@@ -1007,7 +1007,19 @@ let petK = 0, petAt = null;
 // press; `cupSide` is which of the two.
 let cupK = 0, cupAt = null, reachKind = 'thumb', reachWas = false, cupSide = 0;
 const _gripAt = new THREE.Vector3();
+// THE SHAKE. Misha, 24 Sep 2026: *"sometimes the entire kabine starts
+// shaking uncontrollably"*. Measured frame by frame (`camTrace`): with your
+// hand at her mouth the camera kept steering on to her lip — which moves with
+// her breathing, her head and her jaw, a centimetre of it being over a degree
+// of view at 45 cm — and kept stepping to a stand point that her collider
+// pushed back off, so the position stalled and jumped 6 cm a frame. The room
+// is what you see move. Once the hand has arrived the view is let go of (the
+// arm follows her, you do not) and the walk has a dead zone.
+const settleTurn = (k) => 1 - clamp((k - 0.55) / 0.35, 0, 1);
+const settleGap = (k) => (k > 0.6 ? 0.14 : 0.02);
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
+let camTraceOn = false;       // debug: the camera, frame by frame — see camTrace
+const camTrace = [];
 const CUP_AIM_R = 0.16;      // rad off the crosshair a breast still counts
 const CUP_STAND = 0.45;      // m, eye to her, where you stop
 const CUP_OFF = 0.046;       // m, the palm's bone line off her skin: the palm is 15 mm under it and the breast curves toward the hand either side of its point
@@ -6947,7 +6959,7 @@ function frame() {
       const fh = Math.hypot(lip.fx, lip.fz) || 1;
       const gx = lip.x + (lip.fx / fh) * THUMB_STAND, gz = lip.z + (lip.fz / fh) * THUMB_STAND;
       const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
-      if (md > 0.02) {
+      if (md > settleGap(thumbK)) {
         const step = Math.min(md, THUMB_WALK * dt);
         const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
         Y.x = nx; Y.z = nz;
@@ -6957,8 +6969,8 @@ function frame() {
       const wantPitch = Math.atan2(lip.y - camera.position.y, Math.max(hd, 0.05));
       let dy = wantYaw - Y.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      Y.yaw += dy * (1 - Math.exp(-6 * dt));
-      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt));
+      Y.yaw += dy * (1 - Math.exp(-6 * dt)) * settleTurn(thumbK);
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt)) * settleTurn(thumbK);
     }
     // The hand comes up once she is within an arm and a lean, not across the
     // room while you are still walking; and down a little faster than it goes
@@ -6968,7 +6980,7 @@ function frame() {
     if (jadrija && jadrija.thumbTouch) jadrija.thumbTouch(thumbK);
     // And the breast, the same way: to the front of her, turned on to it, and
     // the hand up once you are within reach of it.
-    if (cupNow0 && ground.you && ground.confine) {
+    if (cupNow0 && ground.you && ground.confine && !(reachForce && reachForce[2])) {
       const Y = ground.you, B = cupNow0;
       // Where you stand and what you look at. A breast: in front of it, at
       // it. A hip: in front of HER — its own outward way is sideways, and
@@ -6985,7 +6997,7 @@ function frame() {
       const st = reachKind === 'thigh' ? CUP_STAND - 0.08 : CUP_STAND;
       const gx = cx + (fx / fh) * st, gz = cz + (fz / fh) * st;
       const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
-      if (md > 0.02) {
+      if (md > settleGap(cupK)) {
         const step = Math.min(md, THUMB_WALK * dt);
         const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
         Y.x = nx; Y.z = nz;
@@ -6995,8 +7007,8 @@ function frame() {
       const wantPitch = Math.atan2(ly - camera.position.y, Math.max(hd, 0.05));
       let dy = wantYaw - Y.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      Y.yaw += dy * (1 - Math.exp(-6 * dt));
-      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt));
+      Y.yaw += dy * (1 - Math.exp(-6 * dt)) * settleTurn(cupK);
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt)) * settleTurn(cupK);
     }
     const cupD = cupNow0 ? Math.hypot(cupNow0.x - camera.position.x,
       cupNow0.y - camera.position.y, cupNow0.z - camera.position.z) : Infinity;
@@ -7006,7 +7018,7 @@ function frame() {
     cupK = damp(cupK, cupping ? 1 : 0, cupping ? 4.0 : 7, dt);
     if (jadrija && jadrija.cupTouch) {
       jadrija.cupTouch(cupK, reachKind === 'cup' && arms && arms.forearmAt
-        ? arms.forearmAt(_gripAt) : null);
+        ? arms.forearmAt(_gripAt) : null, reachKind);
     }
     // PETTING HER. Asked for rather than held: "pet her" and for the next ten
     // seconds you go to her, in front of her face, and your hand comes up on
@@ -7026,7 +7038,7 @@ function frame() {
       const gx = petNow0.x + (petNow0.fx / fh) * st;
       const gz = petNow0.z + (petNow0.fz / fh) * st;
       const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
-      if (md > 0.02) {
+      if (md > settleGap(petK)) {
         const step = Math.min(md, THUMB_WALK * dt);
         const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
         Y.x = nx; Y.z = nz;
@@ -7039,8 +7051,8 @@ function frame() {
       const wantPitch = Math.atan2(ly - camera.position.y, Math.max(hd, 0.05));
       let dy = wantYaw - Y.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      Y.yaw += dy * (1 - Math.exp(-6 * dt));
-      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt));
+      Y.yaw += dy * (1 - Math.exp(-6 * dt)) * settleTurn(petK);
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt)) * settleTurn(petK);
     }
     const petting = !!petNow0 && petD < PET_REACH;
     petK = damp(petK, petting ? 1 : 0, petting ? 3.5 : 6, dt);
@@ -7815,6 +7827,9 @@ function frame() {
   if (faceD != null) {
     wantNear = Math.min(wantNear, clamp(faceD - 0.28, 0.04, 1.2));
   }
+  // And the near plane held while a hand is out: it tracks her body and she
+  // sways, and a projection that changes every frame is the room wobbling.
+  if (thumbK > 0.3 || cupK > 0.3 || petK > 0.3) wantNear = camera.near;
   if (Math.abs(camera.near - wantNear) > 0.005) {
     camera.near = wantNear;
     camera.updateProjectionMatrix();
@@ -8038,6 +8053,15 @@ function frame() {
   // With her drawn into its depth, when your thumb is out — so a thumb in her
   // mouth is inside it, behind her lips.
   if (arms) arms.render(renderer, typeof apprenticeOccluder === 'function' ? apprenticeOccluder() : null);
+  // Debug: a frame-by-frame trace of the camera while a hand is out, for the
+  // shake — see `__fr.camTrace`.
+  if (camTraceOn && (thumbK > 0.01 || cupK > 0.01 || petK > 0.01)) {
+    const y = ground && ground.you;
+    camTrace.push([+camera.position.x.toFixed(4), +camera.position.y.toFixed(4),
+      +camera.position.z.toFixed(4), y ? +y.yaw.toFixed(4) : 0, y ? +y.pitch.toFixed(4) : 0,
+      +camera.near.toFixed(3)]);
+    if (camTrace.length > 600) camTrace.shift();
+  }
   // And the bottle, if there is one in your hand — same reason, same pass, and
   // after the arms because you do not drink while you are swimming a crawl.
   beerRender(renderer);
@@ -8874,7 +8898,8 @@ window.__fr = {
     petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),
     petK: () => +petK.toFixed(3),
     cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide }),
-    reachAs: (kind, side = 0) => { reachForce = kind ? [kind, side] : null; return reachForce; },
+    camTrace: (on) => { if (on != null) { camTraceOn = !!on; camTrace.length = 0; } return camTrace.slice(); },
+    reachAs: (kind, side = 0, still = false) => { reachForce = kind ? [kind, side, still] : null; return reachForce; },
     breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),
     hips: () => (jadrija && jadrija.hips ? jadrija.hips() : null),
     kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),

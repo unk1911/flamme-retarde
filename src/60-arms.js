@@ -1232,10 +1232,18 @@ function buildArms() {
     // the lip from in front with the fingers curled under her chin.
     const AIM = pet ? PET_AIM : cup ? CUP_AIM : thigh ? THIGH_AIM : hip ? HIP_AIM : THUMB_AIM;
     const OFF = pet || cup || hip ? PALM_OFF : THUMB_OFF;
-    const P = AIM.pole, N = AIM.palm;
+    let P = AIM.pole, N = AIM.palm, G = AIM.along || null;
+    // A hand laid ON her — breast, hip, thigh — is laid in the room's upright
+    // frame, not in your view's: the rig hangs off your eye and pitches with
+    // it, so looking down at her tipped a palm meant to face her chest into
+    // it, fingers first. Undo the pitch for those.
+    if (cup || hip) {
+      const c = Math.cos(-_e.x), sn = Math.sin(-_e.x);
+      const un = (v) => [v[0], v[1] * c - v[2] * sn, v[1] * sn + v[2] * c];
+      P = un(P); N = un(N); if (G) G = un(G);
+    }
     placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
-      OFF.x, OFF.y, OFF.z, N[0], N[1], N[2], AIM.flex, false,
-      AIM.along || null);
+      OFF.x, OFF.y, OFF.z, N[0], N[1], N[2], AIM.flex, false, G);
   }
 
   function barPose(a, pull, t) {

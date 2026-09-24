@@ -35003,6 +35003,65 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * HER HANDS OVER HERSELF. Misha, 24 Sep 2026: *"when reaching for inner
+   * thigh, she should cover her crotch area with her hands/fingers and then
+   * release"*. The moment your hand arrives on her thigh she brings both
+   * hands in front of herself, low, holds them there a moment, and lets them
+   * go. Once per touch. Solved like her arms out, to two points just in front
+   * of her, off her pelvis bone.
+   */
+  // `at` is off her pelvis bone's head as the pose has it: forward, down, out.
+  const COVER = { on: false, up: 0.35, hold: 2.2, down: 0.7, at: [0.16, -0.02, 0.05] };
+  let coverRest = null;
+  const _cvG = new THREE.Vector3(), _cvP = new THREE.Vector3();
+  function coverUp(f, dt) {
+    // PARKED until it lands: solved on v1.0's arm, the hands arrive at her
+    // waist or her chest on v2.0 rather than over herself — v2.0 wears v1.0's
+    // bone palette and their arms' rest poses differ. See `COVER.on`.
+    const touching = COVER.on && show.cupKind === 'thigh' && (show.cupK || 0) > 0.9
+      && !LYING[show.phase] && !HANDS[show.phase];
+    if (touching && !show.coverDone) { show.coverDone = 1; show.coverT = 0; }
+    if (!touching && (show.cupK || 0) < 0.1) show.coverDone = 0;
+    let e = 0;
+    if (show.coverT != null) {
+      show.coverT += dt;
+      const t = show.coverT;
+      e = t < COVER.up ? t / COVER.up
+        : t < COVER.up + COVER.hold ? 1
+          : Math.max(0, 1 - (t - COVER.up - COVER.hold) / COVER.down);
+      e = e * e * (3 - 2 * e);
+      if (t > COVER.up + COVER.hold + COVER.down) show.coverT = null;
+    }
+    if (e < 0.002) {
+      if (show.coverOn) {
+        for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+        show.coverOn = 0;
+      }
+      coverRest = null;
+      return;
+    }
+    if (!coverRest) {
+      coverRest = armChain(f);
+      if (!coverRest) return;
+      const ip = f.boneIndex('pelvis');
+      if (ip < 0) { coverRest = null; return; }
+      coverRest.pelvis = f.boneAt(ip, new THREE.Vector3()).clone();
+    }
+    show.coverOn = 1;
+    for (const side of ['L', 'R']) {
+      const S = coverRest['armU' + side], E = coverRest['armL' + side], W = coverRest['hand' + side];
+      const sg = Math.sign(S.z || 1);
+      _cvG.copy(coverRest.pelvis).add(_cvP.set(COVER.at[0], COVER.at[1], sg * COVER.at[2]));
+      _cvG.lerpVectors(W, _cvG, e);
+      _cvP.set(-0.2, -0.4, sg).normalize();
+      wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _cvG, _cvP);
+      show.coverDbg = show.coverDbg || {};
+      show.coverDbg[side] = { S: S.toArray().map((v) => +v.toFixed(3)), W: W.toArray().map((v) => +v.toFixed(3)),
+        G: _cvG.toArray().map((v) => +v.toFixed(3)), P: coverRest.pelvis.toArray().map((v) => +v.toFixed(3)), e: +e.toFixed(2) };
+    }
+  }
+
+  /**
    * HER HAND ON YOUR ARM. Misha, 24 Sep 2026: *"when touch her breast with
    * hand, she should sometimes grip my arm with her hand"*. While your hand
    * is on her breast, every so often she brings the hand on that side up and
@@ -40594,6 +40653,7 @@ async function buildJadrija(scene) {
     // And apart, last, so it is laid over whatever the legs above have done.
     legsSpread(f, dt);
     gripArm(f, dt);
+    coverUp(f, dt);
     // And the reach, IF SOMETHING TOOK HER OUT OF IT. `tieHair` clears its own
     // aims on the way out and that covers the only exit it controls; the hose,
     // the turn and the room can all take her mid-gesture, and `aim` holds a
@@ -49717,9 +49777,10 @@ async function buildJadrija(scene) {
       }
       return { spots: out, low: { x: lo.x, y: lo.y, z: lo.z }, thighs };
     },
-    cupTouch: (k, arm) => {
+    cupTouch: (k, arm, kind) => {
       if (!show) return;
       show.cupTouch = k;
+      show.cupKind = kind || null;
       // Where your forearm is, world — for her hand on it (`gripArm`).
       if (arm) { show.gripArm = show.gripArm || new THREE.Vector3(); show.gripArm.copy(arm); show.gripHave = 1; }
       else show.gripHave = 0;
@@ -50090,6 +50151,7 @@ async function buildJadrija(scene) {
       // identical from a still frame.
       gaze: +(show.gaze || 0).toFixed(2), gazeAt: +(show.gazeAt || 0).toFixed(3),
       gripAt: +(show.gripAt || 0).toFixed(2), gripFor: +(show.gripFor || 0).toFixed(1),
+      coverDbg: show.coverDbg || null,
       buzzNod: +(show.buzzNod || 0).toFixed(3),
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },

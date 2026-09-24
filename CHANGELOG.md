@@ -8,6 +8,35 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.504.0] — 2026-09-24
+
+### the shake, and the hand on her breast
+
+Misha: *"sometimes the entire kabine starts shaking uncontrollably"* — *"can
+u fix that jitter"* — and *"breast hand still sinks too far in"*.
+
+**The shake, measured.** A frame-by-frame trace of the camera with your hand
+at her mouth (`__fr.jad.camTrace`) showed two things moving the view: it kept
+steering on to her lip — which moves with her breathing, her head and her
+jaw, a centimetre of it being over a degree at 45 cm — and it kept stepping
+to a stand point her collider pushed back off, so the camera stalled and
+jumped 6 cm a frame; and the near plane was retuned every frame to her
+swaying body. Now, once a hand has arrived (thumb, breast, hip, thigh or
+petting), the view is let go of and the arm does the following; the walk has
+a 14 cm dead zone; and the near plane is held. Measured after: zero movement
+of position, yaw, pitch or near plane once the hand is there. The thumb
+still lands to 0 mm.
+
+**The breast.** The hand's attitude was written in your view's frame, and
+the rig pitches with your eye: looking down at her tipped a palm meant to
+face her chest into it, fingers first. For a hand laid on her (breast, hip,
+thigh) the pitch is now taken back out, so the palm faces her the way she is
+standing.
+
+The hands-over-herself reaction to the thigh touch is written but parked:
+solved on v1.0's arm, v2.0's hands arrive at her waist or chest instead —
+v2.0 wears v1.0's bone palette and their arms' rest poses differ.
+
 ## [1.503.0] — 2026-09-24
 
 ### a real kick-up
