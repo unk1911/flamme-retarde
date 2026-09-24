@@ -8,6 +8,24 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.490.0] — 2026-09-24
+
+### not a doll
+
+Misha, of the lotus: *"not explicit but i meant, at the moment there's
+literally nothing there which looks awkward... from the front it's like a
+barbie doll or something, can u add at least something there to kinda make
+it appear normal"*.
+
+What a figure drawing does and no more: one soft crease down the midline
+where the mons turns under between her legs, under the pubic hair, with a
+faint shadow either side to give the form — her own skin darkened a quarter,
+nothing drawn. Painted into v2.0's skin map by `tools/baye2_tex.py`
+(`cleft`, `raster_fn`), and per texel rather than per vertex: the mesh is
+smooth there with vertices 15-20 mm apart, so a line a few millimetres wide
+has to be evaluated at each texel's own point on her. The first pass was a
+hard brown stripe; this one is a shadow.
+
 ## [1.489.0] — 2026-09-24
 
 ### her eyes stay on you

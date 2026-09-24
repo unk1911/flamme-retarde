@@ -233,6 +233,93 @@ def raster(size, vs, vts, faces, scale, drop):
     return mask
 
 
+# THE CLEFT. Misha, 24 Sep 2026, of the lotus: *"at the moment there's
+# literally nothing there which looks awkward... from the front it's like a
+# barbie doll or something, can u add at least something there to kinda make
+# it appear normal"* — and, first, *"ok not explicit"*. So this is what a
+# figure drawing does and no more: one soft crease down the midline where
+# the mons turns under between her legs, and a faint shadow either side of
+# it to give the form, in her own skin darkened. Painted, because the mesh is
+# smooth there and its vertices are 15-20 mm apart — a 4 mm line interpolated
+# per vertex would not survive — so it is evaluated per TEXEL, at each
+# texel's own point on her, which `raster_fn` works out barycentrically.
+#
+# The midline surface, measured off the base mesh in game metres (x forward,
+# z up): 0.1076 at z 0.832, 0.0905 at 0.8195, 0.0666 at 0.8143, 0.0448 at
+# 0.8139 — the underside of her, curving back between her legs. The crease
+# starts under the pubic wedge and fades out before the back.
+CLEFT_X = (0.117, 0.106, 0.056, 0.040)   # fade in, full, full, fade out (x)
+CLEFT_W = 0.0028                         # m, the line's half-width
+CLEFT_SOFT = 0.0075                      # and the shadow either side of it
+CLEFT_RGB = np.array([0.76, 0.62, 0.61]) # skin multiplied by this at the line
+CLEFT_SOFT_K = 0.16                      # and darkened this much in the shadow
+
+
+def cleft(p):
+    """(line, shadow) at this point on her, each 0..1."""
+    x, y, z = p
+    if z > 0.846 or z < 0.800 or x < CLEFT_X[3] or x > CLEFT_X[0] or abs(y) > 0.03:
+        return 0.0, 0.0
+    def sm(a, b, t):
+        u = min(1.0, max(0.0, (t - a) / (b - a)))
+        return u * u * (3 - 2 * u)
+    along = sm(CLEFT_X[0], CLEFT_X[1], x) * sm(CLEFT_X[3], CLEFT_X[2], x)
+    line = along * math.exp(-(y / CLEFT_W) ** 2)
+    soft = along * math.exp(-(y / CLEFT_SOFT) ** 2)
+    return line, soft
+
+
+def raster_fn(size, vs, vts, faces, scale, drop, fn, box):
+    """`fn` evaluated per texel at the texel's own 3D point on her.
+
+    Only the faces with a vertex inside `box` (game metres, (lo, hi) per axis)
+    are touched. Returns one map per value `fn` returns.
+    """
+    def game(v):
+        return (v[2] * scale, v[0] * scale, v[1] * scale + drop)
+
+    lo, hi = box
+    outs = None
+    for f in faces:
+        P = [game(vs[vi]) for vi, _t in f]
+        if not any(all(lo[k] <= q[k] <= hi[k] for k in range(3)) for q in P):
+            continue
+        for k in range(1, len(f) - 1):
+            idx = (0, k, k + 1)
+            if min(f[i][1] for i in idx) < 0:
+                continue
+            uv = np.array([[vts[f[i][1]][0] * size, (1.0 - vts[f[i][1]][1]) * size] for i in idx])
+            G = np.array([P[i] for i in idx])
+            x0, y0 = np.floor(uv.min(0)).astype(int) - 1
+            x1, y1 = np.ceil(uv.max(0)).astype(int) + 1
+            x0, y0 = max(x0, 0), max(y0, 0)
+            x1, y1 = min(x1, size), min(y1, size)
+            if x1 <= x0 or y1 <= y0:
+                continue
+            (ax, ay), (bx, by), (cx, cy) = uv
+            den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+            if abs(den) < 1e-9:
+                continue
+            for ty in range(y0, y1):
+                for tx in range(x0, x1):
+                    px, py = tx + 0.5, ty + 0.5
+                    l0 = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / den
+                    l1 = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / den
+                    l2 = 1.0 - l0 - l1
+                    # A texel's worth of slack outside the triangle, so the
+                    # seam between two faces is covered from both sides.
+                    if min(l0, l1, l2) < -0.08:
+                        continue
+                    q = l0 * G[0] + l1 * G[1] + l2 * G[2]
+                    vals = fn(tuple(q))
+                    if outs is None:
+                        outs = [np.zeros((size, size), np.float32) for _ in vals]
+                    for o, v in zip(outs, vals):
+                        if v > o[ty, tx]:
+                            o[ty, tx] = v
+    return outs or [np.zeros((size, size), np.float32)] * 2
+
+
 def check_wear(name):
     """The Blender half carries its own copy; they have to agree.
 
@@ -292,6 +379,12 @@ def main():
             # The noise multiplies the coverage rather than the colour: what
             # varies across a patch of hair is how much of the skin behind it
             # you can see, not what shade the hair is.
+            # The cleft first, under the hair: skin darkened, then hair over.
+            line, soft = raster_fn(size, vs, vts, faces, scale, drop, cleft,
+                                   ((0.035, -0.035, 0.795), (0.120, 0.035, 0.850)))
+            print('[baye2tex] cleft touches %d texels' % int((line > 0.05).sum()))
+            a = a * (1.0 - CLEFT_SOFT_K * soft[..., None])
+            a = a * (1.0 - line[..., None] * (1.0 - CLEFT_RGB))
             alpha = (m * PUBIC_MAX * (0.45 + 0.75 * n)).clip(0.0, PUBIC_MAX)
             a = a * (1.0 - alpha[..., None]) + PUBIC_RGB * alpha[..., None]
             dst = OUT / ('%s_skin.jpg' % name)
