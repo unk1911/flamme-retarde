@@ -38957,9 +38957,10 @@ async function buildJadrija(scene) {
       case 'handstand':
         // HER BACK TO THE BOARDS, which is a fact about the pose and not a
         // taste: `pelvis` 180 turns her round, so her face points the way her
-        // back points standing up — probed, the fingers reach out on the side
-        // away from `show.ang`. Pointing her AT the wall is therefore what
-        // puts her heels near it.
+        // back points standing up. Pointing her AT the wall is therefore what
+        // puts her heels near it — and her fingers point at it too, flat on
+        // the floor, which is where a real kick-up puts them (see HAND_STAND
+        // in tools/blender/human_mh.py).
         show.want = Math.PI;
         showHold(dt);
         if (show.tmr < 0.50 && kit && kit.handSpot) {
