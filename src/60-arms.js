@@ -1169,6 +1169,9 @@ function buildArms() {
   // And the hand on her head: fingers pointing away from you over the top of
   // it and tipped down its far side, palm down on her hair, the elbow out.
   // And the hand on her breast: fingers up and a little in, palm toward her.
+  // And on her hip: fingers down and round the curve of it, palm in on her.
+  const HIP_AIM = { pole: [0.60, -0.75, 0.20], along: [0.10, -0.90, -0.40],
+    palm: [-0.70, 0.0, -0.70], flex: 0.10 };
   const CUP_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.20, 0.95, -0.10],
     palm: [0.0, 0.0, -1.0], flex: 0.10 };
   const PET_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.15, -0.30, -0.94],
@@ -1197,9 +1200,9 @@ function buildArms() {
     const a = sides[1];
     a.shoulder.visible = true;
     // The thumb, or the flat of the hand on her head — `kind` says which.
-    const pet = reach.kind === 'pet', cup = reach.kind === 'cup';
+    const pet = reach.kind === 'pet', cup = reach.kind === 'cup', hip = reach.kind === 'hip';
     if (pet) setHandPose(a.pose, HAND_POSE.pet);
-    else if (cup) setHandPose(a.pose, HAND_POSE.cup);
+    else if (cup || hip) setHandPose(a.pose, HAND_POSE.cup);
     else thumbDigits(a);
 
     _tt.set(reach.x, reach.y, reach.z);
@@ -1216,13 +1219,14 @@ function buildArms() {
     _p1.set(_tt.x - S[0], _tt.y - S[1], _tt.z - S[2]);
     const need = _p1.length() - THUMB_REACH;
     // Petting a head below you, you bend over it: more lean than a thumb gets.
-    const lean = pet ? PET_LEAN : THUMB_LEAN;
+    const lean = pet || reach.kind === 'hip' ? PET_LEAN : THUMB_LEAN;
     if (need > 0) body.position.copy(_p1.normalize().multiplyScalar(Math.min(need, lean)));
     else body.position.set(0, 0, 0);
 
     // Elbow down and out to the right; palm down, so the thumb pad comes to
     // the lip from in front with the fingers curled under her chin.
-    const AIM = pet ? PET_AIM : cup ? CUP_AIM : THUMB_AIM, OFF = pet || cup ? PALM_OFF : THUMB_OFF;
+    const AIM = pet ? PET_AIM : cup ? CUP_AIM : hip ? HIP_AIM : THUMB_AIM;
+    const OFF = pet || cup || hip ? PALM_OFF : THUMB_OFF;
     const P = AIM.pole, N = AIM.palm;
     placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
       OFF.x, OFF.y, OFF.z, N[0], N[1], N[2], AIM.flex, false,
@@ -1481,6 +1485,8 @@ function buildArms() {
   return {
     root, stage, cam,
     update, render,
+    /** Debug: try a hand attitude on her hip — see HIP_AIM. */
+    hipAim: (o) => Object.assign(HIP_AIM, o || {}),
     /** Debug: try a hand attitude on her breast — see CUP_AIM. */
     cupAim: (o) => {
       const { pose, ...aim } = o || {};

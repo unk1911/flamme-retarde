@@ -8,6 +8,24 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.498.0] — 2026-09-24
+
+### a hand on her hip
+
+Misha: *"ok do the hip/waist one then"*.
+
+Aim low on her in the kabina — at a hip, or at the middle of her below the
+navel — and press, and your hand goes to rest on her hip: the one on your
+right, always, because it is your right hand and reaching it to the far one
+takes the forearm across the front of her. You stand in front of her (not
+round at the hip's own outward side, which put you over her shoulder looking
+straight down), looking at her middle, lean in as far as for petting, and the
+open hand rests on the front of her hip bone. The point is measured off her
+mesh (`apprenticeHipBind`): the front-outer curve of her side just below the
+waist, on her body only — her hands hang at that height too, and the widest
+thing in the band was her wrist. 0 mm miss. Same small reaction as the
+breast.
+
 ## [1.497.0] — 2026-09-24
 
 ### where you are looking

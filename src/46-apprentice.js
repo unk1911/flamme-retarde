@@ -66,6 +66,8 @@ const APPR = {
   // How far behind the front of her teeth your thumb pad goes — see
   // `apprenticeLipBind`. Metres.
   thumbIn: 0.014,
+  // Where a hand on her hip goes: the band of her height, metres.
+  hipY: [0.96, 1.04], hipZ: 0.175,
   // Petting her: how far each way along her head the stroke goes, how far
   // the palm rides above the top of her hair (half a hand's thickness), how
   // much the round of her head drops at the ends of the stroke, and how far
@@ -735,6 +737,41 @@ function apprenticeBreastBind(side) {
     _apprBreast = best;
   }
   return _apprBreast[side] || null;
+}
+
+/**
+ * Her hip, in her bind frame, for a hand resting on it: the front-outer curve
+ * of her side just below the waist — the vertex in the band where a hand on a
+ * hip sits that stands furthest out along the diagonal between forward and
+ * sideways. With the outward normal there, flattened level, for the palm to
+ * face. `side` +1 her left, −1 her right. Measured once.
+ */
+let _apprHip = null;
+function apprenticeHipBind(side) {
+  if (!appr) return null;
+  if (!_apprHip) {
+    const g = appr.mesh.geometry, pos = g.getAttribute('position');
+    const { start, count } = g.drawRange;
+    const ix = g.getIndex();
+    const best = { 1: null, '-1': null };
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      // Her body only: her hands hang at this height too, a little further
+      // out, and the widest thing in the band was her wrist.
+      if (y < APPR.hipY[0] || y > APPR.hipY[1] || Math.abs(z) < 0.06
+        || Math.abs(z) > APPR.hipZ) continue;
+      const k = z > 0 ? 1 : -1;
+      // More forward than sideways: the front of the hip bone, where a hand
+      // resting on it shows, rather than round the side of her where it is
+      // behind her.
+      const sc = 0.80 * x + 0.60 * Math.abs(z);
+      if (!best[k] || sc > best[k][3]) best[k] = [x, y, z, sc];
+    }
+    _apprHip = best;
+  }
+  const b = _apprHip[side];
+  return b ? [b[0], b[1], b[2]] : null;
 }
 
 /** Her, for the arm pass to draw into its depth — see `render` in 60-arms.js. */

@@ -6856,6 +6856,7 @@ function frame() {
     // every frame, or turning on to her as you step in would flip it back to
     // the thumb halfway there.
     const brs = inKab && jadrija && jadrija.breasts ? jadrija.breasts() : null;
+    const hps = inKab && jadrija && jadrija.hips ? jadrija.hips() : null;
     if (pressing && !reachWas) {
       reachKind = 'thumb';
       if (brs) {
@@ -6872,12 +6873,32 @@ function frame() {
             b.z - camera.position.z).normalize());
           if (d > best) { best = d; reachKind = 'cup'; cupSide = i; }
         });
+        // And low on her: either hip, or the middle below her navel, which
+        // means the hip on whichever side of her middle you are aiming.
+        if (hps) {
+          const cand = hps.spots.map((h, i) => [h, i]);
+          cand.push([hps.low, -1]);
+          for (const [h, i] of cand) {
+            const d = fw.dot(_thumbV.set(h.x - camera.position.x, h.y - camera.position.y,
+              h.z - camera.position.z).normalize());
+            if (d > best) {
+              best = d; reachKind = 'hip';
+              // Always the hip on YOUR right: it is your right hand, and
+              // reaching it to the far one takes the forearm across the
+              // front of her.
+              const rx = camera.matrixWorld.elements[0], rz = camera.matrixWorld.elements[2];
+              const s0 = (hps.spots[0].x - hps.spots[1].x) * rx + (hps.spots[0].z - hps.spots[1].z) * rz;
+              cupSide = s0 >= 0 ? 0 : 1;
+            }
+          }
+        }
       }
     }
     reachWas = pressing;
-    const cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide] : null;
+    const cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
+      : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide] : null;
     if (cupNow0) cupAt = cupNow0;
-    const thumbing = pressing && reachKind !== 'cup' && (inKab ? !!lip : lipNear);
+    const thumbing = pressing && reachKind === 'thumb' && (inKab ? !!lip : lipNear);
     // AND YOU GO TO HER. Left to herself she stops about a metre and a half off
     // you, which is outside anybody's arm, so while the button is held you
     // walk — at walking pace, through the same `confine` as every step — to
@@ -6913,17 +6934,28 @@ function frame() {
     // the hand up once you are within reach of it.
     if (cupNow0 && ground.you && ground.confine) {
       const Y = ground.you, B = cupNow0;
-      const fh = Math.hypot(B.fx, B.fz) || 1;
-      const gx = B.x + (B.fx / fh) * CUP_STAND, gz = B.z + (B.fz / fh) * CUP_STAND;
+      // Where you stand and what you look at. A breast: in front of it, at
+      // it. A hip: in front of HER — its own outward way is sideways, and
+      // walking round to it put you over her shoulder looking straight down
+      // — and looking at her middle, a hand's span above the hip.
+      let fx = B.fx, fz = B.fz, cx = B.x, cz = B.z, ly = B.y;
+      if (reachKind === 'hip' && hps && brs) {
+        fx = brs[0].fx; fz = brs[0].fz;
+        cx = (hps.spots[0].x + hps.spots[1].x) * 0.5;
+        cz = (hps.spots[0].z + hps.spots[1].z) * 0.5;
+        ly = B.y + 0.30;
+      }
+      const fh = Math.hypot(fx, fz) || 1;
+      const gx = cx + (fx / fh) * CUP_STAND, gz = cz + (fz / fh) * CUP_STAND;
       const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
       if (md > 0.02) {
         const step = Math.min(md, THUMB_WALK * dt);
         const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
         Y.x = nx; Y.z = nz;
       }
-      const hd = Math.hypot(B.x - camera.position.x, B.z - camera.position.z);
-      const wantYaw = Math.atan2(camera.position.x - B.x, camera.position.z - B.z);
-      const wantPitch = Math.atan2(B.y - camera.position.y, Math.max(hd, 0.05));
+      const hd = Math.hypot(cx - camera.position.x, cz - camera.position.z);
+      const wantYaw = Math.atan2(camera.position.x - cx, camera.position.z - cz);
+      const wantPitch = Math.atan2(ly - camera.position.y, Math.max(hd, 0.05));
       let dy = wantYaw - Y.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       Y.yaw += dy * (1 - Math.exp(-6 * dt));
@@ -7357,7 +7389,7 @@ function frame() {
           // The palm's middle a hand's thickness off the skin, out along the
           // way her chest faces, so it rests on her rather than in her.
           ? { reach: { x: cupAt.x + cupAt.fx * CUP_OFF, y: cupAt.y + cupAt.fy * CUP_OFF,
-            z: cupAt.z + cupAt.fz * CUP_OFF, k: cupK, kind: 'cup' } }
+            z: cupAt.z + cupAt.fz * CUP_OFF, k: cupK, kind: reachKind === 'hip' ? 'hip' : 'cup' } }
         : state.phase === 'ground' && petK > 0.01 && petAt
           ? { reach: { x: petAt.x, y: petAt.y, z: petAt.z, k: petK, kind: 'pet' } }
         : (state.phase === 'ride' ? ride : swim),
@@ -8800,6 +8832,7 @@ window.__fr = {
     petK: () => +petK.toFixed(3),
     cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide }),
     breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),
+    hips: () => (jadrija && jadrija.hips ? jadrija.hips() : null),
     kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),
     /** Debug: a right-click, as if the mouse had done it. */
     poke: () => (jadrija && jadrija.kabinaPoke

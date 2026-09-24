@@ -49490,6 +49490,31 @@ async function buildJadrija(scene) {
       }
       return out;
     },
+    /**
+     * Her hips, for your hand when the crosshair is low on her — on her belly
+     * or below it — as you press. Misha, 24 Sep 2026, after the crotch was
+     * turned down: *"ok do the hip/waist one then"*. Each with the outward
+     * way from her middle, level, for the palm; and `low`, the point in the
+     * middle of her below the navel that counts as "aiming low" and sends
+     * the hand to the hip on the side you are aiming toward.
+     */
+    hips: () => {
+      if (!show || !sheIsIn()) return null;
+      if (!(APPR.primary && appr && appr.mesh.visible)) return null;
+      const out = [];
+      for (const side of [1, -1]) {
+        const p = apprenticeHipBind(side);
+        if (!p) return null;
+        const w = bindPointAt(appr, p, [['pelvis', 1]], new THREE.Vector3());
+        const m = bindPointAt(appr, [0, p[1], 0], [['pelvis', 1]], new THREE.Vector3());
+        const f = w.clone().sub(m);
+        f.y = 0;
+        f.normalize();
+        out.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side });
+      }
+      const lo = bindPointAt(appr, [0.09, 0.93, 0], [['pelvis', 1]], new THREE.Vector3());
+      return { spots: out, low: { x: lo.x, y: lo.y, z: lo.z } };
+    },
     cupTouch: (k) => { if (show) show.cupTouch = k; },
     /** How far out your thumb is, 0..1, handed over every frame by the app. */
     thumbTouch: (k) => { if (show) show.thumbK = k; },
