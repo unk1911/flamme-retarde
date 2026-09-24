@@ -8,6 +8,31 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.505.0] — 2026-09-24
+
+### the line, with an OK-sign pinch
+
+Misha: *"her right hand wraps around in a scooping way, but instead, really
+she should bring up the straw with her thumb and index finger (like making an
+OK sign)"*.
+
+The rig could not make an OK sign: one bone for all four fingers and a rigid
+thumb, so the only pinch there was was four fingers curled 88° round the
+straw. `src/41-hands.js` (new) gives both Baye figures an index finger and a
+thumb of their own at load — five bones, the finger weights split between
+them by position; the index follows the four-finger bone's animation, so
+every other grip is unchanged (the wine pour and the cutting checked before
+and after). The pinch is solved on v2.0's mesh (`tools/pinch_solve.py`):
+straw between the pads of thumb and index (3.8 mm each side), the other
+three fingers relaxed and out, 71–116 mm clear of the straw. The hand is
+planned over the whole beat rather than chosen frame by frame, so it no
+longer flips mid-descent through her face; the straw leans forward so the
+pinch sits clear of her lip; wrist bend at most 54° (was 66°). Straw top to
+nostril 5 mm, straw bottom along the line within 3.2 mm. The grader
+(`tools/coke_grade.py`) now checks the hand's shape and smoothness as well
+as where the straw is — the old one passed all 13 sub-steps on the scooping
+hand. All 13 pass, on one line and on four back to back.
+
 ## [1.504.0] — 2026-09-24
 
 ### the shake, and the hand on her breast
