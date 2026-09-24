@@ -30,6 +30,9 @@
 
 const GROUND = {
   eye: 1.66,
+  // Crouched — on your knees, Shift: the eye this high, walking this much of
+  // a walk. See `you.crouch`.
+  kneel: 1.00, crouchPace: 0.40,
   // The hop. `hopV` is the launch speed and `hopG` the gravity that brings you
   // back, so the apex is hopV² / 2g. It exists as an escape hatch as much as a
   // move: the walker follows the ground exactly and has no way at all to get
@@ -376,6 +379,7 @@ async function buildGround(scene, field) {
     aim: [0, 0, 0], aimKind: null, aimSoak: -1, aimHot: false,
     gait: 0, bob: 0,                 // where you are in the stride, and how much of it shows
     eye: GROUND.eye,                 // how tall you are standing right now — see `stoop`
+    crouch: false,                   // on your knees — Shift, see 90-app.js
     // The hop, and the ground under it. `y` is where your feet are and it has
     // always been read straight back out of `walkY` every tick, which is what
     // makes this a ground-follower with no way to leave the ground. `gy` is
@@ -1620,8 +1624,10 @@ async function buildGround(scene, field) {
     // so the one that should have moved was the rare one. It did, to U.
     //
     // Q still runs. Nobody has to unlearn a key that costs a boolean to keep.
-    let top = (keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyQ')
-      || TOUCH.grun) ? GROUND.run : GROUND.walk;
+    // AND SHIFT IS THE CROUCH NOW (24 Sep 2026), so the run is Q alone; and
+    // crouched you shuffle, whatever you are holding.
+    let top = (keys.has('KeyQ') || TOUCH.grun) ? GROUND.run : GROUND.walk;
+    if (you.crouch) top = GROUND.walk * GROUND.crouchPace;
     // Indoors you walk, and you walk slowly. A 4 m room crossed in a second is
     // a room you cannot look at. See `GROUND.indoorPace`.
     if (field.tightTS) {
@@ -1744,7 +1750,8 @@ async function buildGround(scene, field) {
     // Eased, so ducking under the eaves is a movement and not a cut. The hard
     // cap in pose() is what stops a teleport arriving on the deck at full
     // height with its head outside.
-    you.eye = damp(you.eye, eyeAt(you.x, you.z, you.y), 9, dt);
+    you.eye = damp(you.eye, you.crouch ? Math.min(GROUND.kneel, eyeAt(you.x, you.z, you.y))
+      : eyeAt(you.x, you.z, you.y), you.crouch ? 6 : 9, dt);
     gait(moved, dt, air);
     // Two boots at once, off `footstep` rather than a sound of its own — it is
     // a boot arriving and that is what the function is. Louder than a stride

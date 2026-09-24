@@ -8,6 +8,30 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.500.0] — 2026-09-24
+
+### Shift crouches; i types, I listens
+
+Misha: *"inside the kabine, if i press 'Shift', i'd like to be able to crouch
+on my knees and thus have a lower vantage point/view. actually even outside
+kabine, just press shift, should do a crouch"* — and *"if it's lowercase 'i',
+then it's ears by typing, and if it's upper case 'I', it should be the old
+ears using microphone... sometimes i wanna be able to retain control of the
+navigation controls without opening the ears dialog box"*.
+
+**The crouch.** On foot, a tap of Shift puts you on your knees: your eye
+eases down from 1.66 m to 1.00 m, you shuffle at 40% of a walk, and another
+tap stands you up (`you.crouch`, `GROUND.kneel`, `GROUND.crouchPace`). It
+toggles on the release and only if nothing else was pressed with it, so
+Shift held with another key is still a modifier. Shift was the run, and the
+run is **Q**, which it always also was; swimming and the kite keep Shift as
+they had it. Under a low roof the eye is the lower of the two.
+
+**The ears.** `i` is the typing line, as `I` was (it takes the pointer so
+you can type); **Shift+I** (or `I` with Caps Lock) is the microphone on its
+own — listening, with the pointer and W A S D left with you — and again to
+switch it off. Help sheet updated in all three languages.
+
 ## [1.499.0] — 2026-09-24
 
 ### legs apart, and together

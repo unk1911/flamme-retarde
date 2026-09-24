@@ -215,6 +215,9 @@ function keyboardIsBusy(e) {
 
 addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  // Shift on its own is the crouch, on its RELEASE — see the keyup — so that
+  // Shift held with another key (Shift+I, Shift+/) stays a modifier.
+  shiftTap = e.code === 'ShiftLeft' || e.code === 'ShiftRight';
   // A chord belongs to the browser, not to the game. Every branch below this
   // line is happy to call preventDefault on a bare letter, and R is a letter:
   // start the race and Ctrl+R stops reloading the page, because the handler
@@ -319,7 +322,20 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyN') { e.preventDefault(); voice.toggle(); return; }
   // I — ears: the microphone, for talking to them. See src/49-ears.js. Up here
   // with N for the same reason: it is a switch you want mid-sentence.
-  if (e.code === 'KeyI') { e.preventDefault(); ears.toggle(); return; }
+  //
+  // And split by case since 24 Sep 2026. Misha: *"if it's lowercase 'i',
+  // then it's ears by typing, and if it's upper case 'I', it should be the
+  // old ears using microphone... sometimes i wanna be able to retain control
+  // of the navigation controls without opening the ears dialog box"*. So
+  // `i` is the typing line (which takes the pointer, to type), and `I` —
+  // Shift+I or with Caps Lock — is the microphone alone: listening, with the
+  // pointer and W A S D left where they are.
+  if (e.code === 'KeyI') {
+    e.preventDefault();
+    shiftTap = false;
+    if (e.key === 'I') ears.mic(); else ears.toggle();
+    return;
+  }
 
   // ? and F1 — the help sheet. Above the pause guard because a paused game is
   // exactly when somebody goes looking for it, and ESC closes it rather than
@@ -662,7 +678,21 @@ addEventListener('keydown', (e) => {
   if (['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyZ',
        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
+// THE CROUCH. Misha, 24 Sep 2026: *"inside the kabine, if i press 'Shift',
+// i'd like to be able to crouch on my knees and thus have a lower vantage
+// point/view. actually even outside kabine, just press shift, should do a
+// crouch"*. A tap of Shift on foot toggles it: down on your knees, a slower
+// walk, and a tap again to stand. On the release and only if nothing else was
+// pressed with it, so Shift+I and Shift+/ are still what they were. It was
+// the run; the run is Q, which it always also was.
+let shiftTap = false;
 addEventListener('keyup', (e) => {
+  if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && shiftTap
+    && state.phase === 'ground' && ground && ground.you && !computer.active
+    && !keyboardIsBusy(e)) {
+    ground.you.crouch = !ground.you.crouch;
+  }
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') shiftTap = false;
   keys.delete(e.code);
   if (e.code === 'Space') spaceLeapt = false;
 });
@@ -769,8 +799,7 @@ let spaceLeapt = false;
 /** Whichever key is running you, and whichever is sending you forward. The run
  *  list is `walk`'s own in 47-ground.js and the forward list is its `iz`, so a
  *  key added there is a key this already knows about. */
-const runHeld = () => keys.has('KeyQ') || keys.has('ShiftLeft')
-  || keys.has('ShiftRight') || !!TOUCH.grun;
+const runHeld = () => keys.has('KeyQ') || !!TOUCH.grun;
 const fwdHeld = () => keys.has('KeyW') || keys.has('ArrowUp') || (TOUCH.gy || 0) > 0.2;
 addEventListener('mousedown', (e) => { if (pointerLocked && e.button === 0) mouseDrop = true; });
 // The right button, in the kabina only: point at the radio or the TV and click
@@ -1575,7 +1604,8 @@ const HELP = [
   ]],
   ['help.g.foot', [
     ['W A S D · arrows', 'help.k.walk'],
-    ['SHIFT · Q', 'help.k.run'],
+    ['Q', 'help.k.run'],
+    ['SHIFT', 'help.k.crouch'],
     ['SPACE', 'help.k.branch'],
     ['ENTER', 'help.k.hop'],
     ['Z', 'help.k.lens'],
@@ -1616,7 +1646,8 @@ const HELP = [
     ['P · ESC', 'help.k.pause'],
     ['ESC ESC', 'help.k.silent'],
     ['N', 'help.k.voice'],
-    ['I', 'help.k.ears'],
+    ['i', 'help.k.ears'],
+    ['SHIFT + I', 'help.k.mic'],
     ["'", 'help.k.satchel'],
     ['M', 'help.k.settings'],
     ['H', 'help.k.hud'],
