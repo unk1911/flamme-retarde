@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.497.0] — 2026-09-24
+
+### where you are looking
+
+Misha: *"if i have the cross-hairs on or near her breasts instead of thumb in
+the mouth, the hand should reach towards the breast"*.
+
+In the kabina the press still means your hand, and what it reaches for is
+decided on the frame the button goes down, from where the crosshair is: a
+breast within 0.16 rad of it, and nearer the crosshair than her mouth is,
+and the hand goes there instead of the thumb to her lips (decided once, so
+turning on to her as you step in does not flip it back). You step to the
+front of her, turn on to it, and your hand comes up open, fingers together
+and gently curved, palm toward her, and rests on it — the palm's middle a
+hand's thickness off her skin along the way her chest faces. Her points are
+her own: the forward-most point of each breast in the band under the armpit,
+measured off v2.0's mesh (`apprenticeBreastBind`) and skinned to her chest
+bone (`breasts`). Her eyelids go a little heavy and her lips part a little.
+0 mm miss. `__fr.arms.cupAim(...)` to explore the hand.
+
 ## [1.496.0] — 2026-09-24
 
 ### the braid goes round her, not through her

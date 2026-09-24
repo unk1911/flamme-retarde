@@ -33705,6 +33705,8 @@ async function buildJadrija(scene) {
     // and following the envelope this quickly (fast enough to keep time with
     // a pulse pattern, slow enough that it is a face and not a flicker).
     buzzGape: 0.34, buzzRate: 14,
+    // Your hand on her breast: how much of the petting face, and her lips.
+    cupFace: 0.8, cupGape: 0.20,
     soakFor: 5.5,
     // And a second and a half of it inside the kabina. See the note on the
     // meter itself: in there the water is not buying a set piece, it is asking
@@ -37455,7 +37457,10 @@ async function buildJadrija(scene) {
         if (show.petFor > 0) show.petT = (show.petT || 0) + dt;
         show.petK = damp(show.petK || 0, show.petFor > 0 && (show.petTouch || 0) > 0.9 ? 1 : 0,
           3, dt);
-        f.face.pet = show.petK;
+        // Your hand on her breast: her eyelids heavy and her lips a little
+        // apart, like the petting, a touch less.
+        show.cupK = damp(show.cupK || 0, (show.cupTouch || 0) > 0.9 ? 1 : 0, 3, dt);
+        f.face.pet = Math.max(show.petK, SHOW.cupFace * show.cupK);
         // And while your hand is on her she looks up at you, lips parted.
         // Misha, 24 Sep: *"she should also look up while being petted and
         // look at me (Chloe) and part lips, which she already knows how to
@@ -37473,6 +37478,7 @@ async function buildJadrija(scene) {
         show.buzzFace = damp(show.buzzFace || 0, show.buzzNod || 0, SHOW.buzzRate, dt);
         f.face.buzz = show.buzzFace;
         f.face.gape = Math.max(talk, show.mouthW, SHOW.petGape * (show.petK || 0),
+          SHOW.cupGape * (show.cupK || 0),
           SHOW.buzzGape * show.buzzFace,
           show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
         // Both gated on `gape` rather than on `fill` alone, so everything in
@@ -49462,6 +49468,29 @@ async function buildJadrija(scene) {
       return { x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, left: show.petFor };
     },
     petTouch: (k) => { if (show) show.petTouch = k; },
+    /**
+     * Her two breasts, world metres, and which way her chest faces — for your
+     * hand when the crosshair is on one of them as you press (see the gate in
+     * 90-app.js). Misha, 24 Sep 2026: *"if i have the cross-hairs on or near
+     * her breasts instead of thumb in the mouth, the hand should reach
+     * towards the breast"*. v2.0's own points, skinned to her chest bone; only
+     * in the kabina, and only when she is the one drawn.
+     */
+    breasts: () => {
+      if (!show || !sheIsIn()) return null;
+      if (!(APPR.primary && appr && appr.mesh.visible)) return null;
+      const out = [];
+      for (const side of [1, -1]) {
+        const p = apprenticeBreastBind(side);
+        if (!p) return null;
+        const w = bindPointAt(appr, p, [['chest', 1]], new THREE.Vector3());
+        const b = bindPointAt(appr, [p[0] - 0.10, p[1], p[2]], [['chest', 1]], new THREE.Vector3());
+        const f = w.clone().sub(b).normalize();
+        out.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side });
+      }
+      return out;
+    },
+    cupTouch: (k) => { if (show) show.cupTouch = k; },
     /** How far out your thumb is, 0..1, handed over every frame by the app. */
     thumbTouch: (k) => { if (show) show.thumbK = k; },
     thumbReach: () => {

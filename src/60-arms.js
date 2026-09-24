@@ -160,6 +160,13 @@ const HAND_POSE = {
     fan: [-0.35, 0.0, -0.35, -0.45],
     t: [0.30, 0.10, 0.10, 0.10, 0.10],
   },
+  // A hand resting on a breast: open, the fingers together and gently curved
+  // to its round, the thumb a little out.
+  cup: {
+    f: [[0.30, 0.38, 0.22], [0.32, 0.40, 0.22], [0.36, 0.42, 0.24], [0.40, 0.44, 0.26]],
+    fan: [-0.20, 0.0, -0.20, -0.25],
+    t: [0.25, 0.45, 0.10, 0.12, 0.10],
+  },
   // The paddle and the let-go hand of a crawl.
   flat: {
     f: [[0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11]],
@@ -1161,6 +1168,9 @@ function buildArms() {
     palm: [-1.0, 0.0, 0.0], flex: 0.10 };
   // And the hand on her head: fingers pointing away from you over the top of
   // it and tipped down its far side, palm down on her hair, the elbow out.
+  // And the hand on her breast: fingers up and a little in, palm toward her.
+  const CUP_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.20, 0.95, -0.10],
+    palm: [0.0, 0.0, -1.0], flex: 0.10 };
   const PET_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.15, -0.30, -0.94],
     palm: [0.0, -1.0, 0.0], flex: 0.10 };
 
@@ -1187,8 +1197,9 @@ function buildArms() {
     const a = sides[1];
     a.shoulder.visible = true;
     // The thumb, or the flat of the hand on her head — `kind` says which.
-    const pet = reach.kind === 'pet';
+    const pet = reach.kind === 'pet', cup = reach.kind === 'cup';
     if (pet) setHandPose(a.pose, HAND_POSE.pet);
+    else if (cup) setHandPose(a.pose, HAND_POSE.cup);
     else thumbDigits(a);
 
     _tt.set(reach.x, reach.y, reach.z);
@@ -1211,7 +1222,7 @@ function buildArms() {
 
     // Elbow down and out to the right; palm down, so the thumb pad comes to
     // the lip from in front with the fingers curled under her chin.
-    const AIM = pet ? PET_AIM : THUMB_AIM, OFF = pet ? PALM_OFF : THUMB_OFF;
+    const AIM = pet ? PET_AIM : cup ? CUP_AIM : THUMB_AIM, OFF = pet || cup ? PALM_OFF : THUMB_OFF;
     const P = AIM.pole, N = AIM.palm;
     placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
       OFF.x, OFF.y, OFF.z, N[0], N[1], N[2], AIM.flex, false,
@@ -1470,6 +1481,13 @@ function buildArms() {
   return {
     root, stage, cam,
     update, render,
+    /** Debug: try a hand attitude on her breast — see CUP_AIM. */
+    cupAim: (o) => {
+      const { pose, ...aim } = o || {};
+      Object.assign(CUP_AIM, aim);
+      if (pose) Object.assign(HAND_POSE.cup, pose);
+      return CUP_AIM;
+    },
     /** Debug: try a hand attitude for petting — see PET_AIM. */
     petAim: (o) => {
       const { pose, ...aim } = o || {};

@@ -711,6 +711,32 @@ function apprenticeCrownBind(stroke) {
   return [cx + APPR.petStroke * stroke, top + APPR.petAbove - APPR.petRound * stroke * stroke, 0];
 }
 
+/**
+ * Her breasts, in her bind frame: the forward-most point of each in the band
+ * between the armpit and the fold under it — measured off her mesh the first
+ * time, the way the areolae were placed (and NOT the forward-most point of
+ * the chest, which is the sternum). `side` +1 is her left (+z), −1 her right.
+ */
+let _apprBreast = null;
+function apprenticeBreastBind(side) {
+  if (!appr) return null;
+  if (!_apprBreast) {
+    const g = appr.mesh.geometry, pos = g.getAttribute('position');
+    const { start, count } = g.drawRange;
+    const ix = g.getIndex();
+    const best = { 1: null, '-1': null };
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      const y = pos.getY(v), z = pos.getZ(v), x = pos.getX(v);
+      if (y < 1.18 || y > 1.32 || Math.abs(z) < 0.045 || Math.abs(z) > 0.12) continue;
+      const k = z > 0 ? 1 : -1;
+      if (!best[k] || x > best[k][0]) best[k] = [x, y, z];
+    }
+    _apprBreast = best;
+  }
+  return _apprBreast[side] || null;
+}
+
 /** Her, for the arm pass to draw into its depth — see `render` in 60-arms.js. */
 function apprenticeOccluder() {
   return appr && appr.mesh.visible ? appr.mesh : null;

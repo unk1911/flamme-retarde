@@ -974,6 +974,12 @@ let thumbK = 0, thumbAt = null;
 // And your hand on her head — "pet her". Same shape as the thumb: `petK` how
 // far out, `petAt` the last place the top of her hair was.
 let petK = 0, petAt = null;
+// And your hand on her breast — see the gate. `reachKind` is decided on the
+// press; `cupSide` is which of the two.
+let cupK = 0, cupAt = null, reachKind = 'thumb', reachWas = false, cupSide = 0;
+const CUP_AIM_R = 0.16;      // rad off the crosshair a breast still counts
+const CUP_STAND = 0.45;      // m, eye to her, where you stop
+const CUP_OFF = 0.018;       // m, the palm's middle off her skin
 const PET_STAND = 0.50;      // m, eye to crown, horizontally, where you stop
 const PET_REACH = 0.95;      // and how close the hand comes up from
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
@@ -6843,7 +6849,35 @@ function frame() {
       && camera.getWorldDirection(_thumbF).dot(_thumbV.set(lip.x - camera.position.x,
         lip.y - camera.position.y, lip.z - camera.position.z).normalize()) > 0.77;
     if (lip) thumbAt = lip;
-    const thumbing = pressing && (inKab ? !!lip : lipNear);
+    // HER BREAST, IF THAT IS WHERE YOU ARE LOOKING. Misha, 24 Sep 2026: *"if
+    // i have the cross-hairs on or near her breasts instead of thumb in the
+    // mouth, the hand should reach towards the breast"*. Decided once, on
+    // the frame the button goes down, from where the crosshair is then — not
+    // every frame, or turning on to her as you step in would flip it back to
+    // the thumb halfway there.
+    const brs = inKab && jadrija && jadrija.breasts ? jadrija.breasts() : null;
+    if (pressing && !reachWas) {
+      reachKind = 'thumb';
+      if (brs) {
+        const fw = camera.getWorldDirection(_thumbF);
+        // Near a breast, and nearer it than her mouth: the mouth keeps the
+        // thumb whenever it is the thing you are looking at.
+        let best = Math.cos(CUP_AIM_R);
+        if (lip) {
+          best = Math.max(best, fw.dot(_thumbV.set(lip.x - camera.position.x,
+            lip.y - camera.position.y, lip.z - camera.position.z).normalize()));
+        }
+        brs.forEach((b, i) => {
+          const d = fw.dot(_thumbV.set(b.x - camera.position.x, b.y - camera.position.y,
+            b.z - camera.position.z).normalize());
+          if (d > best) { best = d; reachKind = 'cup'; cupSide = i; }
+        });
+      }
+    }
+    reachWas = pressing;
+    const cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide] : null;
+    if (cupNow0) cupAt = cupNow0;
+    const thumbing = pressing && reachKind !== 'cup' && (inKab ? !!lip : lipNear);
     // AND YOU GO TO HER. Left to herself she stops about a metre and a half off
     // you, which is outside anybody's arm, so while the button is held you
     // walk — at walking pace, through the same `confine` as every step — to
@@ -6875,6 +6909,31 @@ function frame() {
     const reachNow = thumbing && lipD < 0.95;
     thumbK = damp(thumbK, reachNow ? 1 : 0, reachNow ? 4.5 : 7, dt);
     if (jadrija && jadrija.thumbTouch) jadrija.thumbTouch(thumbK);
+    // And the breast, the same way: to the front of her, turned on to it, and
+    // the hand up once you are within reach of it.
+    if (cupNow0 && ground.you && ground.confine) {
+      const Y = ground.you, B = cupNow0;
+      const fh = Math.hypot(B.fx, B.fz) || 1;
+      const gx = B.x + (B.fx / fh) * CUP_STAND, gz = B.z + (B.fz / fh) * CUP_STAND;
+      const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
+      if (md > 0.02) {
+        const step = Math.min(md, THUMB_WALK * dt);
+        const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
+        Y.x = nx; Y.z = nz;
+      }
+      const hd = Math.hypot(B.x - camera.position.x, B.z - camera.position.z);
+      const wantYaw = Math.atan2(camera.position.x - B.x, camera.position.z - B.z);
+      const wantPitch = Math.atan2(B.y - camera.position.y, Math.max(hd, 0.05));
+      let dy = wantYaw - Y.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      Y.yaw += dy * (1 - Math.exp(-6 * dt));
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt));
+    }
+    const cupD = cupNow0 ? Math.hypot(cupNow0.x - camera.position.x,
+      cupNow0.y - camera.position.y, cupNow0.z - camera.position.z) : Infinity;
+    const cupping = !!cupNow0 && cupD < 0.95;
+    cupK = damp(cupK, cupping ? 1 : 0, cupping ? 4.0 : 7, dt);
+    if (jadrija && jadrija.cupTouch) jadrija.cupTouch(cupK);
     // PETTING HER. Asked for rather than held: "pet her" and for the next ten
     // seconds you go to her, in front of her face, and your hand comes up on
     // to the top of her head and strokes her hair — forehead to crown and
@@ -7294,6 +7353,11 @@ function frame() {
     arms.update(dt, chaseCut || bodyCam ? null
       : state.phase === 'ground' && thumbK > 0.01 && thumbAt
         ? { reach: { x: thumbAt.x, y: thumbAt.y, z: thumbAt.z, k: thumbK } }
+        : state.phase === 'ground' && cupK > 0.01 && cupAt
+          // The palm's middle a hand's thickness off the skin, out along the
+          // way her chest faces, so it rests on her rather than in her.
+          ? { reach: { x: cupAt.x + cupAt.fx * CUP_OFF, y: cupAt.y + cupAt.fy * CUP_OFF,
+            z: cupAt.z + cupAt.fz * CUP_OFF, k: cupK, kind: 'cup' } }
         : state.phase === 'ground' && petK > 0.01 && petAt
           ? { reach: { x: petAt.x, y: petAt.y, z: petAt.z, k: petK, kind: 'pet' } }
         : (state.phase === 'ride' ? ride : swim),
@@ -8734,6 +8798,8 @@ window.__fr = {
     thumbReach: () => (jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null),
     petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),
     petK: () => +petK.toFixed(3),
+    cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide }),
+    breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),
     kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),
     /** Debug: a right-click, as if the mouse had done it. */
     poke: () => (jadrija && jadrija.kabinaPoke
