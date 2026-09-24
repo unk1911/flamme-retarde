@@ -2532,12 +2532,48 @@ function v5Parts(o) {
     brow: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
     lash: { color: o.browCol || 0x2a1f18, side: THREE.DoubleSide, spec: 0.18 },
   };
+  // HAIR THAT FALLS. Misha, 23 Sep 2026, of the loose hair: *"when she is
+  // doing a headstand, the hair doesn't 'fall to the ground'"*. The cards are
+  // skinned rigidly to her skull, so upside down they stand up off it. v1.0's
+  // loose hair was a simulated chain and fell; this is the cheap honest
+  // version of the same thing for a skinned mesh. `uHang` is which way DOWN
+  // is, in her head's bind frame — worked out per frame on the CPU from the
+  // head bone (see `v5Hang`) — and every vertex below a pivot in the middle
+  // of her skull is swung about it by the turn that takes the bind pose's
+  // down on to that, weighted from nothing at the pivot to all of it twelve
+  // centimetres below. Standing, `uHang` IS the bind down and nothing moves;
+  // on her hands, it is up, and the lengths go to the floor while the scalp
+  // stays on her head. In bind space and before the skin, so the skin carries
+  // it everywhere else. Shared by both hairstyles; the pivot is per style.
+  const hang = { value: new THREE.Vector3(0, -1, 0) };
+  const HANG = `
+    {
+      vec3 dn = vec3(0.0, -1.0, 0.0);
+      vec3 hh = normalize(uHang);
+      float ang = acos(clamp(dot(dn, hh), -1.0, 1.0));
+      if (ang > 0.02) {
+        vec3 ax = cross(dn, hh);
+        float sl = length(ax);
+        ax = sl > 1e-4 ? ax / sl : vec3(0.0, 0.0, 1.0);
+        float a = ang * smoothstep(0.0, 0.12, uPivot.y - p.y);
+        float ca = cos(a), sa = sin(a);
+        vec3 r = p - uPivot;
+        p = uPivot + r * ca + cross(ax, r) * sa + ax * dot(ax, r) * (1.0 - ca);
+        n = n * ca + cross(ax, n) * sa + ax * dot(ax, n) * (1.0 - ca);
+      }
+    }
+  `;
+  parts.hair.uniforms = { ...parts.hair.uniforms, uHang: hang,
+    uPivot: { value: new THREE.Vector3(0, -99, 0) } };
+  parts.hair.decl += '\nuniform vec3 uHang;\nuniform vec3 uPivot;\n';
+  parts.hair.vert = HANG;
   // A second hairstyle, for her hair DOWN — see `hair2` in baye2.py. The same
   // material as the first with its own card texture, and it starts hidden:
   // `apprenticeHair` in 46-apprentice.js swaps the two.
   if (o.hair2Tex) {
     const h2 = v5Tex(o.hair2Tex);
-    parts.hair2 = { ...parts.hair, uniforms: { uHair: { value: h2 } } };
+    parts.hair2 = { ...parts.hair, uniforms: { uHair: { value: h2 }, uHang: hang,
+      uPivot: { value: new THREE.Vector3(0, -99, 0) } } };
   }
   if (legTex) {
     // A fishnet is not skin and must not take skin's lift. `SKIN_EMISSIVE`
@@ -2552,7 +2588,45 @@ function v5Parts(o) {
         + 'if (lc.a < 0.5) discard;\n'
         + 'base *= lc.rgb;' };
   }
-  return { parts, eye, jaw };
+  return { parts, eye, jaw, hang };
+}
+
+/**
+ * Where each hairstyle pivots when it falls: the middle of the skull under its
+ * crown, measured off its own vertices — the top of the style, 9 cm down, at
+ * the front-to-back middle of what is up there. Below that it hangs; above it
+ * is the scalp and stays.
+ */
+function v5HairPivot(fig) {
+  for (const name of ['hair', 'hair2']) {
+    const part = fig.parts && fig.parts[name];
+    if (!part) continue;
+    const pos = fig.mesh.geometry.getAttribute('position');
+    const ix = fig.mesh.geometry.getIndex();
+    const { start, count } = part.geometry.drawRange;
+    let top = -1e9;
+    for (let i = start; i < start + count; i++) top = Math.max(top, pos.getY(ix.getX(i)));
+    let sx = 0, n = 0;
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      if (pos.getY(v) > top - 0.05) { sx += pos.getX(v); n++; }
+    }
+    part.material.uniforms.uPivot.value.set(n ? sx / n : 0, top - 0.09, 0);
+  }
+}
+
+/**
+ * Which way is down, in her head's bind frame — for `HANG`. The head bone's
+ * turn from the bind pose, undone from world down. The figure is only ever
+ * turned about y, so its own down is the world's.
+ */
+const _hangQ = new THREE.Quaternion();
+function v5Hang(fig, hang) {
+  if (!fig || !hang) return;
+  if (fig._headB === undefined) fig._headB = fig.boneIndex ? fig.boneIndex('head') : -1;
+  if (fig._headB < 0) return;
+  fig.boneTurn(fig._headB, _hangQ);
+  hang.value.set(0, -1, 0).applyQuaternion(_hangQ.invert());
 }
 
 /**

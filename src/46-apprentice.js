@@ -116,6 +116,7 @@ let apprHead = 0, apprN = 0, apprClock = 0;
 let apprClip = null;             // what the leader was last seen playing
 let apprEye = null;              // her iris and blink uniforms
 let apprJaw = null;              // her jaw uniforms — see v5Parts
+let apprHang = null;             // which way is down, for her hair
 let apprGape = null;             // the leader's mouth, per ring slot
 let apprLeadFace = null;         // the leader's face, for the stats readout
 let apprCalls = 0;               // frames apprenticeStep has run (diagnostic)
@@ -163,6 +164,8 @@ async function loadApprentice() {
   v5Eyes(fig, apprEye);
   v5Jaw(fig, apprJaw);
   if (fig.parts.hair2) fig.parts.hair2.visible = false;
+  apprHang = look.hang;
+  v5HairPivot(fig);
 
   appr = fig;
   // Sized for poses, and deep enough for the lag at 240 fps: 128 slots of a
@@ -352,6 +355,7 @@ function apprStepBody(dt, leader, room) {
       apprJaw.uniforms.uGape.value = Math.min(1, Math.max(0,
         leader.face && leader.face.gape ? leader.face.gape : 0));
     }
+    v5Hang(appr, apprHang);
     appr.mesh.updateMatrixWorld();
     return;
   }
@@ -486,6 +490,7 @@ function apprStepBody(dt, leader, room) {
     const want = Math.min(1, Math.max(0, apprGape[o / apprStride]));
     u.value += (want - u.value) * (1 - Math.exp(-13 * dt));
   }
+  v5Hang(appr, apprHang);
   appr.mesh.updateMatrixWorld();
 }
 
@@ -642,5 +647,8 @@ function apprenticeStats() {
     lead: apprLeadFace ? +(apprLeadFace.gape || 0).toFixed(3) : null,
     at: [+appr.mesh.position.x.toFixed(2), +appr.mesh.position.y.toFixed(2),
       +appr.mesh.position.z.toFixed(2)],
+    yaw: +appr.mesh.rotation.y.toFixed(4),
+    // Which way is down for her hair, in her head's frame — see v5Hang.
+    hang: apprHang ? apprHang.value.toArray().map((v) => +v.toFixed(3)) : null,
   };
 }

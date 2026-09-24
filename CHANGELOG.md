@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.482.0] — 2026-09-23
+
+### her hair falls
+
+Misha: *"i love her hair down look! umm the only inconsistency is when she is
+doing a headstand, the hair doesn't 'fall to the ground'"*.
+
+The loose hair is cards skinned rigidly to her skull, so on her hands it stood
+straight up off her head like it was gelled. Now it hangs. Each frame the head
+bone's turn since the bind pose is undone from world down, which gives "which
+way is down" in her head's own frame (`v5Hang`); in the vertex shader, before
+the skin, every hair vertex below a pivot in the middle of her skull is swung
+about it by the turn from the bind pose's down to that one, weighted from
+nothing at the pivot to all of it 12 cm below. So the scalp stays on her head
+and the lengths go to the floor: standing she is exactly as before, upside
+down the hair pools on the ground under her head, and on her back or bent
+forward it drops the way gravity says. The pivot is measured per hairstyle
+from its own crown, and the braid gets the same treatment.
+
+The skin now lights a vertex by the normal the shader above it bent (`n`
+rather than the raw attribute); nothing else bends one, so every other figure
+is unchanged.
+
 ## [1.481.0] — 2026-09-23
 
 ### her hair, down

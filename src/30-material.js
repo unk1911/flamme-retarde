@@ -105,7 +105,10 @@ void main(){
     // p, not position: the body above has already had its say, and on the one
     // figure that uses it that say is the shape of her face.
     vec4 hp = vec4(p, 1.0);
-    vec4 hn = vec4(normal, 0.0);
+    // n, not normal, for the same reason as p: a vertex the body above has
+    // bent — v2.0's hair falling under gravity — has to be lit as bent. No
+    // other figure touches n, so for all of them this is normal exactly.
+    vec4 hn = vec4(n, 0.0);
     vec3 sp = vec3(0.0), sn = vec3(0.0);
     addBone(aBoneIdx.x, aBoneWt.x, hp, hn, sp, sn);
     addBone(aBoneIdx.y, aBoneWt.y, hp, hn, sp, sn);
