@@ -888,6 +888,8 @@ const voice = (() => {
     if (y.spraying || y.jet > 0.05) return 'hose';
     if (y.hop > 0.05) return 'jump';
     const sp = Math.hypot(y.vx, y.vz);
+    // Crouched (Shift) — which she can see, and was never told.
+    if (y.crouch) return sp > 0.2 ? 'crawl' : 'crouch';
     return sp > 3.0 ? 'run' : sp > 0.35 ? 'walk' : 'stand';
   }
 

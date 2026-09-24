@@ -8,6 +8,19 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.501.0] — 2026-09-24
+
+### she knows you are crouching
+
+Misha: *"when i crouch in the kabine with 'Shift' now, and i ask her 'am i
+crouching?', she says 'no'? she should know i'm crouching or not"*.
+
+She was never told: what the page sends her about you (`youDoing` in
+49-voice.js) knew standing, walking, running, hopping, the hose, swimming
+and flying, and the crouch arrived after it. Now crouched is `crouch`
+("crouched down low, on their knees") and moving crouched is `crawl` —
+voice server 1.41.0, which accepts the two new values.
+
 ## [1.500.0] — 2026-09-24
 
 ### Shift crouches; i types, I listens

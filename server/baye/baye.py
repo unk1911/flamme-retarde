@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.40.0"
+VERSION = "1.41.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -3150,6 +3150,10 @@ YOU_DOING = {
     "walk": "walking about",
     "jump": "hopping about",
     "stand": "standing still",
+    # Shift, since 24 Sep 2026 — Misha: *"when i crouch in the kabine ... and
+    # i ask her 'am i crouching?', she says 'no'"*. She was never told.
+    "crouch": "crouched down low, on their knees",
+    "crawl": "shuffling about on their knees, crouched down low",
 }
 YOU_IN = {"vikendica": "inside the vikendica", "kabina": "inside the beach hut",
           "terrace": "on the vikendica's upper terrace"}
