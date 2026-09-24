@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.503.0] — 2026-09-24
+
+### a real kick-up
+
+Misha: *"yeah re-do the kick properly"*.
+
+The old `handstand` clip blended four poses, and HAND_STAND's pelvis is +180
+— which on this rig tips the head backward, so the blend went through a back
+walkover. Now a solver (`tools/blender/kickup.py`, which writes
+`kickup_keys.py`; `--verify` re-solves and compares against what ships)
+works out all 76 frames (2.5 s) with forward kinematics: arms rise by her
+ears (0–0.45 s), a step into a lunge (to 0.85 s), the back leg swings up
+straight behind her (0.97 s), both palms land flat, fingers to the wall
+(1.30 s), the front leg pushes off (1.33 s), the shoulders swing forward over
+the planted wrists, heels reach the wall (~1.97 s) and she settles into
+exactly the 1.495.0 handstand. Planted hands drift 1.9 mm, planted feet under
+3 mm; the pelvis now turns 0 → −180, forward.
+
+A real kick-up starts a step and a body behind where the hands land, so the
+clip travels 1.45 m (`KICK`): `handGo` walks her to a start point 1.45 m out
+from the handstand spot, she squares up to the wall in the first half
+second, and when the clip ends she is moved forward and handed to `handHeld`
+with no fade and no pop (measured: no bone moves at the handover). A "get
+up" mid-kick waits until she lands. `ballet.py --verify` and the
+range-of-motion sweep on both clips are clean.
+
 ## [1.502.0] — 2026-09-24
 
 ### the hand on her, and hers on yours
