@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.38.0"
+VERSION = "1.39.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -509,7 +509,7 @@ SKILLS = {
     # strokes her hair for ten seconds, and she bows into it. Above the hair
     # skills, which would read "let me stroke your hair" as "let ... hair" —
     # a request to take it down.
-    "pet": ("let you pet her head and stroke her hair",
+    "pet": ("be petted: they stroke her head and her hair",
             [r"\bpet(ting)? (her|you|u|baye)\b|\blet me pet\b"
              r"|\b(strok\w*|pet|pett\w*|pat|patt\w*)\b.{0,20}\b(hair|head)\b"]),
     "mouth.close": ("close her mouth again",
@@ -759,6 +759,18 @@ SKILLS = {
 # of ballet?" as a request for one. A request is a modal aimed at her, a please,
 # a give-me, or an imperative verb opening the sentence — and "do you like…" is
 # a question however it starts, so that one is excluded by name.
+# Skills that are done TO her rather than by her — see the prompt, where each
+# gets its own line in place of "THEY HAVE ASKED YOU TO ...".
+DONE_TO_HER = {
+    "pet": ("THEY ARE PETTING YOU RIGHT NOW: their hand is on top of your "
+            "head, stroking your hair, slowly, and you are looking up at "
+            "them. YOU are the one being petted — they are doing it to you, "
+            "you are not doing it to them. Say one short line about how it "
+            "feels to be petted by them, the way you would say it. Do not "
+            "say that you are petting anyone, and do not describe it."),
+}
+
+
 ASK_RE = re.compile(
     r"\b(can|could|would|will|wanna|want to)\s+(you|u)\b"
     r"|\b(please|pls|plz)\b"
@@ -3882,7 +3894,16 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
     # legs walk her to the bottle. The routine has already been armed in the
     # page by the time this prompt is built, so the only honest thing she can
     # say is yes.
-    if does and does in SKILLS:
+    # AND THE ONE THAT IS DONE TO HER. Every other skill is something she
+    # does, and "THEY HAVE ASKED YOU TO <skill>" says so; petting is their
+    # hand on her head, and read through that line it came back as her
+    # petting them — Misha, 24 Sep 2026: *"she says that *she* is petting
+    # me... should be vice versa"*. So it gets its own line, with the actor
+    # spelled out.
+    if does in DONE_TO_HER:
+        lines.append("")
+        lines.append(DONE_TO_HER[does])
+    elif does and does in SKILLS:
         lines.append("")
         lines.append("THEY HAVE ASKED YOU TO " + SKILLS[does][0].upper()
                      + ", AND YOU ARE DOING IT RIGHT NOW — you are already on "
