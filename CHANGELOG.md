@@ -8,6 +8,27 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.495.0] — 2026-09-24
+
+### hands flat in the handstand
+
+Misha: *"when she is doing her headstand, her hands are weird: they should be
+palms down to the floor, similar to what u did to 'on all fours'"*.
+
+The same fault as the fours had: `handL/R (82, 0, 0)` is radial deviation on
+this rig, so it bent each hand sideways in the plane of its own palm and
+stood the palms on edge facing each other (palm normal 123° off down, 526
+vertices a hand under the floor). Solved the way the fours were — the hand
+fixed flat first and the arm solved under it, one side solved and the other
+mirrored — in `HAND_STAND`, and `HAND_STAND_B`'s arms re-solved so the hands
+stay planted while her back and legs wobble in `handHeld` (they used to slide
+16 mm). Palm 0.5° off straight down, lowest point −2 mm, wrist extended 96°
+as a real handstand's is, hands a little over shoulder width, thumbs on the
+floor. The fingers point toward the wall, which is where a kick-up lands them
+and the only way the arms reach it without a forearm wrung 78°. The rest of
+the pose is unchanged. `ballet.py --verify` and the range-of-motion sample
+are clean; rebaked `human_skin.fr3d.gz`.
+
 ## [1.494.0] — 2026-09-24
 
 ### the pug stays out; the Doodle looks in
