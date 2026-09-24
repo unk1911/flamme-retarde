@@ -4964,30 +4964,67 @@ SHOULDER_UP_B = dict(SHOULDER_UP, **{
 # 0.460 and her crown at 0.128 — and then the arms go overhead, which inverted
 # means down to the floor.
 #
-# −180 on the shoulder, which is 40° past LAUNCH's arms-up-and-over −150 and is
-# a straight overhead reach. With 45 at the elbow undoing the A-pose's own bend
-# the arm comes out straight: shoulder 0.464, wrist (−0.097 +0.216 −0.005),
-# which is 0.469 m below it against an arm of 0.477, and 0.43 m between the
-# two hands.
+# The shoulder was −180 on X, 40° past LAUNCH's arms-up-and-over −150 and a
+# straight overhead reach, with 45 at the elbow undoing the A-pose's own bend.
+# The arms below are solved (next paragraphs) and keep that reach and the
+# wrists where it put them in x, 0.097 m to her face side of the root: now
+# ±0.190 across, which is 0.38 between the hands where it was 0.43.
 #
-# THE WRIST IS +82 AND THAT IS THE POSE. A hand left in line with the arm goes
-# into the floor fingers-first — the tips probe 0.14 m below the wrist. +82
-# lays the palm flat: wrist −0.005, heel of the hand +0.016, fingertips −0.002,
-# three points within 0.02 m of one plane, with the fingers 0.17 m out in front
-# spread on the ground. Forward, here, is −x — the inversion turns her round,
-# so −x is her face, and that is the way a handstand's fingers point.
+# THE WRIST WAS +82 AND IT WAS NOT A WRIST. Misha, 24 Sep 2026: *"when she is
+# doing her headstand, her hands are weird: they should be palms down to the
+# floor, similar to what u did to 'on all fours'"*. Exactly FOURS's fault: hand
+# X is radial/ulnar DEVIATION on this rig (see "HER HANDS FLAT ON THE FLOOR"
+# above), so +82 bent each hand sideways in the plane of its own palm. Measured
+# on the baye2 mesh the palms stood on edge facing each other, 123° off facing
+# the floor, the lowest hand vertex 31 mm through it and 526 vertices a hand
+# more than 5 mm under it.
+#
+# Solved now the same way (FK in mathutils, then the skinned mesh measured),
+# but the other way up: the hand's world orientation is FIXED — palm normal
+# down, wrist-to-knuckle 10° out from +x — and the arm is solved underneath it.
+# The wrist is judged the way a wrist works, in the FOREARM's frame: twist
+# about the forearm, which is pronation's job and so held at 0; deviation about
+# the palm normal, 8°; extension across the wrist, the rest. Judged in the
+# hand's own rest frame instead, twist and deviation trade against each other
+# and no pronation zeroes both, because the rest hand is bent 40° off the
+# forearm and its bone is 4 cm long. Which is also why `handL`'s Euler below
+# looks like a twisted wrist and is not one.
+#
+# THE FINGERS POINT AT HER BACK — +x, at the wall — and that is anatomy, not
+# taste. The note that was here said −x, "her face, and that is the way a
+# handstand's fingers point". It is the other way: you face the wall, put your
+# hands down fingers to the plaster, kick up, and your back arrives there.
+# Solved both ways: fingers to +x wants 60° of external rotation at the
+# shoulder (elbow creases facing each other, as a handstand's do) and a
+# forearm near neutral; fingers to −x wants the upper arm turned IN, or the
+# forearm pronated to 78.
+#
+# `thumb` (30, 0, 0) lays the thumb on the floor, spread in toward the other
+# hand; at rest it hangs 18 mm under the palm. `fingers` +10 on the left and
+# −10 on the right (NOT mirrored by this rig — see FOURS) puts the finger pads
+# level with the palm.
+#
+# The solve aims the palm 7.6° short of straight down, on purpose: the palm's
+# vertices are partly weighted to the forearm, so on the skinned mesh a hand
+# extended this far lags its bone by that much. Aimed there, the MESH's palm
+# normal is 0.5° off straight down (B: 0.4).
+#
+# Measured on the mesh: lowest hand vertex −0.002 (the thumb and the heel of
+# the hand; the finger pads −0.001), wrists 0.024 up, forearm to the
+# wrist-knuckle line 96°, elbows at the 9° the carrying angle leaves, arms
+# 5.5° off vertical, wrists 0.379 apart for shoulders 0.352. HAND_STAND_B is
+# solved to put its wrists exactly there, so the wobble is in her back and legs
+# and her hands stay planted — which they did not: 2° a side at the shoulder
+# slid each hand 16 mm.
 #
 # The straddle is the hip's THIRD number and not the second, because this hip
 # is NOT flexed — see the note at the top — and 32 a side probes the ankles at
 # ±0.656, 37.7° off vertical each, 75° of straddle.
 #
-# `@root` +0.020 puts the floor under the lowest of the six hand points, and
-# it is solved off HAND_STAND_B and not off this one: the wobble rolls the
-# hands a couple of degrees and takes 8 mm off the low point. Her hips then
-# stand at 0.954 m and her toes at 1.740, with 0.229 of daylight under her
-# crown.
+# `@root` +0.030 puts the floor under the lowest hand vertex of both keys, and
+# leaves 0.157 m of daylight under the lowest vertex of her head (B: 0.154).
 HAND_STAND = {
-    "@root": (0.0, 0.0, 0.020),
+    "@root": (0.0, 0.0, 0.030),
     "pelvis": (180, 0, 0),
     "spine01": (-2, 0, 0), "spine02": (-2, 0, 0), "spine03": (-2, 0, 0),
     "chest": (-3, 0, 0),
@@ -4995,18 +5032,25 @@ HAND_STAND = {
     # between her own hands, and it lifts the crown to 0.209 — 0.23 m of air
     # under her head instead of the 0.10 a neutral neck leaves.
     "neck": (45, 0, 0), "head": (15, 0, 0),
-    "armUL": (-180, 0, 40), "armLL": (45, 0, 0), "handL": (82, 0, 0),
-    "armUR": (-180, 0, -40), "armLR": (45, 0, 0), "handR": (82, 0, 0),
-    "fingersL": (6, 0, 0), "fingersR": (6, 0, 0),
+    "armUL": (-173.2, -59.9, 33.5), "armLL": (45.8, 7.1, 7.2),
+    "handL": (-10.0, -54.5, -93.3),
+    "armUR": (-173.2, 59.9, -33.5), "armLR": (45.8, -7.1, -7.2),
+    "handR": (-10.0, 54.5, 93.3),
+    "fingersL": (10, 0, 0), "fingersR": (-10, 0, 0),
+    "thumbL": (30, 0, 0), "thumbR": (30, 0, 0),
     "legUL": (0, 0, -32), "legLL": (-4, 0, 0), "footL": (-25, 0, 0),
     "legUR": (0, 0, 32), "legLR": (-4, 0, 0), "footR": (-25, 0, 0),
 }
 
 # The wobble, which on a handstand is not decoration: a held handstand is a
 # constant correction and a still one is a shop dummy standing on its hands.
-# Small at the shoulder, larger at the feet, which is where the lever is.
+# Larger at the feet, which is where the lever is. The arms are re-solved for
+# B's back so the hands do not move (see above).
 HAND_STAND_B = dict(HAND_STAND, **{
-    "armUL": (-178, 0, 40), "armUR": (-182, 0, -40),
+    "armUL": (-176.0, -60.0, 35.9), "armLL": (46.0, 7.4, 7.6),
+    "handL": (-10.0, -53.7, -91.8),
+    "armUR": (-176.0, 60.0, -35.9), "armLR": (46.0, -7.4, -7.6),
+    "handR": (-10.0, 53.7, 91.8),
     "spine01": (-4, 0, 0), "chest": (-1, 0, 0),
     "legUL": (-3, 0, -35), "legUR": (3, 0, 29),
     "neck": (42, 0, 0),
