@@ -63,6 +63,9 @@ const BAYE = { primary: 'v2' };
 // needed and the whole resort failed to build.
 
 const APPR = {
+  // How far behind the front of her teeth your thumb pad goes — see
+  // `apprenticeLipBind`. Metres.
+  thumbIn: 0.014,
   // True when v2.0 is THE figure rather than an apprentice — set by BAYE in
   // 43-jadrija.js. See the note in `apprStepBody`.
   primary: false,
@@ -643,10 +646,19 @@ function apprenticeLipBind() {
   const U = apprJaw.uniforms;
   const c = U.uLipC.value, h = U.uHinge.value;
   if (c.y < -50 || h.y < -50) return null;
-  const a = -U.uGape.value * U.uJawA.value;
-  const rx = c.x - 0.004 - h.x, ry = c.y - 0.006 - h.y;
+  // IN her mouth, since 24 Sep: 14 mm behind the front of her teeth and
+  // halfway between the upper and lower rows — the point that is turned by
+  // half of what the lower row is, which is the middle of the gap. The thumb
+  // pad goes there, so the tip is further in still.
+  const a = -0.5 * U.uGape.value * U.uJawA.value;
+  const rx = c.x - APPR.thumbIn - h.x, ry = c.y - 0.003 - h.y;
   return [h.x + rx * Math.cos(a) - ry * Math.sin(a),
     h.y + rx * Math.sin(a) + ry * Math.cos(a), 0];
+}
+
+/** Her, for the arm pass to draw into its depth — see `render` in 60-arms.js. */
+function apprenticeOccluder() {
+  return appr && appr.mesh.visible ? appr.mesh : null;
 }
 
 /** Debug: her bind-space vertices within `r` of the jaw hinge, by part. */

@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.486.0] — 2026-09-24
+
+### your thumb, in her mouth
+
+Misha, of the thumb on her lip: *"it needs to be in her mouth, with the other
+fingers more clenched. but arm and hand already looks MUCH better than
+before!"*
+
+Three things, and the first is the one that makes the other two possible.
+
+**Her lips go over it.** The arm pass clears the depth buffer and draws over
+the finished frame — a first-person arm has to, on a near plane the world
+cannot have — so nothing of hers could ever be in front of it, and a thumb
+aimed between her teeth would have been drawn across her lips. While the
+thumb is out, the pass now draws her into its own depth first, colour off
+(`render(renderer, occ)` in 60-arms.js, `apprenticeOccluder()`), so her upper
+lip and teeth hide the thumb that is behind them — and her hands, when she
+raises them, are in front of yours instead of under them.
+
+**It aims inside.** The thumb pad goes 14 mm behind the front of her teeth,
+halfway between the upper and lower rows (`APPR.thumbIn`), turned by half the
+jaw so it stays in the middle of the gap as she opens.
+
+**The hand is a different hand.** The four fingers close nearly to a fist,
+still curling more toward the little finger, with only the thumb out. And the
+attitude that put the pad across her lip — palm down, from the side — put an
+inserted thumb into her cheek, so it was chosen again from 28 attitudes by
+which way the thumb points against the way her face does (new
+`arms.stats().thumbDir`): the fist below her chin, knuckles up and forward,
+palm turned in, the thumb rising from it between her lips. Wrist 36° off the
+forearm, forearm turned 19°; 0 mm miss.
+
 ## [1.485.0] — 2026-09-24
 
 ### your hand is Chloe's hand

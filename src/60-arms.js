@@ -132,9 +132,14 @@ const HAND_POSE = {
   // Thumb out to her lip, the rest of the hand let go — not a fist. Misha's
   // brief: "thumb extended toward her mouth, other fingers loosely curled, a
   // natural relaxed pose".
+  //
+  // And then, 24 Sep: *"it needs to be in her mouth, with the other fingers
+  // more clenched"*. So the four close nearly to a fist — a hitchhiker's
+  // hand, the curl still growing toward the little finger — and only the
+  // thumb is out.
   reach: {
-    f: [[0.30, 0.45, 0.25], [0.50, 0.65, 0.35], [0.65, 0.75, 0.38], [0.80, 0.80, 0.38]],
-    fan: [0.25, 0.0, 0.25, 0.45],
+    f: [[1.05, 1.30, 0.80], [1.20, 1.45, 0.85], [1.28, 1.52, 0.85], [1.36, 1.52, 0.82]],
+    fan: [-0.15, 0.0, -0.15, -0.30],
     // A touch past straight at the end joint: a thumb pressing on something
     // soft bends back at the tip, and one that stays dead straight is posed.
     t: [0.10, 0.40, 0.05, -0.05, 0.05],
@@ -1079,7 +1084,12 @@ function buildArms() {
     for (let k = 0; k < 3; k++) GRIP_OFF.add(handPoint(md, fist, 2, k, md.J.f[2][k + 1]));
     GRIP_OFF.multiplyScalar(0.25);
     THUMB_OFF.copy(handPoint(md, handPose(HAND_POSE.reach), 0, 2, md.pad));
+    // And which way the thumb points, for `stats` — last joint to tip.
+    THUMB_MID.copy(handPoint(md, handPose(HAND_POSE.reach), 0, 2, md.J.f[0][2]));
+    THUMB_TIP.copy(handPoint(md, handPose(HAND_POSE.reach), 0, 2, md.J.f[0][3]));
   }
+  const THUMB_MID = new THREE.Vector3();
+  const THUMB_TIP = new THREE.Vector3();
 
   // ── YOUR THUMB, TO HER MOUTH ──────────────────────────────────────────────
   //
@@ -1122,8 +1132,19 @@ function buildArms() {
   // [0.1, 0.1, 1]}), and the same palm-down hand with the wrist let droop
   // ({along [−0.4, −0.5, −0.75], palm [−0.2, −0.7, 0.65]}) — tender, but a
   // limp wrist at 62 degrees.
-  const THUMB_AIM = { pole: [0.40, -0.90, 0.00], along: [-0.55, 0.10, -0.83],
-    palm: [-0.20, -0.95, 0.10], flex: 0.10 };
+  //
+  // That was the thumb ON her lip. Since 24 Sep it goes IN — *"it needs to be
+  // in her mouth, with the other fingers more clenched"* — and the hand that
+  // does that is a different one: the fist below her chin, knuckles up and
+  // forward, palm turned in to the left, so the thumb rises from it straight
+  // into her mouth between her lips. Picked from twenty-odd attitudes by
+  // which way the thumb actually points against the way her face does (0.44
+  // of the way from across-the-mouth to dead into it, the rest being that it
+  // comes up from below, as a thumb does), with the wrist 35 degrees off and
+  // the forearm barely turned. The palm-down hand above put the thumb across
+  // her mouth from the side, into her cheek.
+  const THUMB_AIM = { pole: [0.40, -0.90, 0.00], along: [0.0, 0.70, -0.70],
+    palm: [-1.0, 0.0, 0.0], flex: 0.10 };
 
   /**
    * `reach` is {x, y, z, k} — her lip in world metres, and 0..1 of the way
@@ -1247,6 +1268,7 @@ function buildArms() {
     // complained about those.
     // The thumb, on land. Checked first: it is handed a context of its own and
     // is never also a swim or a ride.
+    reaching = !!(ctx && ctx.reach);
     if (ctx && ctx.reach) {
       root.visible = true;
       return updateReach(dt, ctx.reach, camera);
@@ -1395,11 +1417,28 @@ function buildArms() {
    * keeps the colour buffer and throws away the depth, and a renderer left
    * with autoClear off would wipe nothing on the *next* frame either.
    */
-  function render(renderer) {
+  //
+  // `occ`, if given while the thumb is out, is her: drawn into this pass's
+  // depth only, before the arm, so that a thumb in her mouth is IN it — behind
+  // her upper lip and teeth — and her hands, when she raises them, in front
+  // of yours. Otherwise the arm is on top of everything, and a thumb aimed
+  // between her teeth would be drawn across her lips. Every material under
+  // her is set not to write colour for the one draw and put back after.
+  let reaching = false;
+  const _occM = [];
+  function render(renderer, occ) {
     if (!root.visible) return;
     const auto = renderer.autoClear;
     renderer.autoClear = false;
     renderer.clearDepth();
+    if (occ && reaching) {
+      _occM.length = 0;
+      occ.traverseVisible((o) => {
+        if (o.material && o.material.colorWrite) { o.material.colorWrite = false; _occM.push(o.material); }
+      });
+      renderer.render(occ, cam);
+      for (const m of _occM) m.colorWrite = true;
+    }
     renderer.render(stage, cam);
     renderer.autoClear = auto;
   }
@@ -1436,6 +1475,14 @@ function buildArms() {
       bendDeg: Math.round((sides[1].bend || 0) * 180 / Math.PI),
       // The two measured points, mm in the wrist's frame.
       thumbOff: THUMB_OFF.toArray().map((v) => Math.round(v * 1000)),
+      // Which way the thumb points, world, unit — against her face's forward
+      // this says whether it goes INTO her mouth or across it.
+      thumbDir: (() => {
+        const w = sides[1].wrist;
+        w.updateWorldMatrix(true, false);
+        const t = w.localToWorld(THUMB_TIP.clone()), m = w.localToWorld(THUMB_MID.clone());
+        return t.sub(m).normalize().toArray().map((v) => +v.toFixed(3));
+      })(),
       gripOff: GRIP_OFF.toArray().map((v) => Math.round(v * 1000)),
     }),
     /**

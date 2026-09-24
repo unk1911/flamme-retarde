@@ -7852,7 +7852,9 @@ function frame() {
   if (!ao || !ao.render(scene, camera)) renderer.render(scene, camera);
   // And your own arms over the top of it, on a near plane the world cannot
   // afford. See src/60-arms.js.
-  if (arms) arms.render(renderer);
+  // With her drawn into its depth, when your thumb is out — so a thumb in her
+  // mouth is inside it, behind her lips.
+  if (arms) arms.render(renderer, typeof apprenticeOccluder === 'function' ? apprenticeOccluder() : null);
   // And the bottle, if there is one in your hand — same reason, same pass, and
   // after the arms because you do not drink while you are swimming a crawl.
   beerRender(renderer);
