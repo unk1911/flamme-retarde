@@ -8,6 +8,31 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.480.0] — 2026-09-23 (baye 1.36.0)
+
+### the right button does what the hose did to the radio and the TV; "on your knees"
+
+Misha: *"in the kabine, since we no longer have the hose, can we use the
+'right'-mouse-button click, when pointed to the radio, to do what we used to
+do with the hose? same with the TV? also... she doesn't get down on her knees,
+so need a new command 'down on your knees'"*.
+
+**Right-click.** `kabinaPoke(eye, dir)`: the nearer of the radio and the
+television the view ray passes within reach of (three metres, a hand's width
+of slack), and then exactly the call the jet made — `radioWet` or `tvWet`,
+behind the same probes and the same 0.85 s latch — so a click turns the knob
+one just as a hit did. Kabina only; the browser's own menu is suppressed while
+the pointer is locked. Measured: the radio from dead to station 1 to station
+2 on two clicks, the TV one channel on, and a click at the ceiling nothing.
+
+**"Down on your knees".** The kneel was never missing — `submit` has matched
+"on your knees", "kneel" and "get down on your knees" since it was built, and
+the hose was the other way to it. But "down on your knees" and the bare "on
+your knees" carry no modal, no "please" and no "get", so `ASK_RE` read them as
+talk and they never reached the table. They are in the gate now. Offline:
+down on your knees / on your knees / onto your knees → `submit`; "your knees
+are pretty" → nothing.
+
 ## [1.479.0] — 2026-09-23
 
 ### Baye v2.0 is Baye; in the kabina there is no hose

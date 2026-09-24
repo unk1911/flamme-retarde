@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.35.0"
+VERSION = "1.36.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -800,6 +800,12 @@ ASK_RE = re.compile(
     r"|\bagainst the wall\b"
     r"|\bhand ?stands?\b|\bhead ?stands?\b|\bstand on (your|her|the) hands\b"
     r"|\byawn\w*\b"
+    # "Down on your knees" and the bare "on your knees" carry no modal and no
+    # "get", so they read as talk and never reached `submit`. Misha, 23 Sep
+    # 2026, once the hose that used to put her there had become a thumb:
+    # *"need a new command 'down on your knees' or equivalent"*. The skill was
+    # there all along; the sentence could not get to it.
+    r"|\b(down )?on(to)? your knees\b|\bto your knees\b"
     # "Open your mouth", "open wide", "close your mouth" carry no modal either.
     # The mouth or jaw noun, or "open wide" whole, and never a bare "open":
     # "open the bottle" belongs to the wine.

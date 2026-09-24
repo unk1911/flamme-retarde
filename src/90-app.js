@@ -773,6 +773,14 @@ const runHeld = () => keys.has('KeyQ') || keys.has('ShiftLeft')
   || keys.has('ShiftRight') || !!TOUCH.grun;
 const fwdHeld = () => keys.has('KeyW') || keys.has('ArrowUp') || (TOUCH.gy || 0) > 0.2;
 addEventListener('mousedown', (e) => { if (pointerLocked && e.button === 0) mouseDrop = true; });
+// The right button, in the kabina only: point at the radio or the TV and click
+// — what hosing them used to do, now that the branch is a thumb in there. See
+// `kabinaPoke` in 43-jadrija.js. Taken on the frame, not in the handler, so it
+// is answered from the same camera the picture was drawn with.
+let rightClick = false;
+addEventListener('mousedown', (e) => { if (pointerLocked && e.button === 2) rightClick = true; });
+// And no browser menu over the game while you are playing it.
+addEventListener('contextmenu', (e) => { if (pointerLocked) e.preventDefault(); });
 addEventListener('mouseup', (e) => { if (e.button === 0) mouseDrop = false; });
 
 function readKeys(dt) {
@@ -6813,6 +6821,12 @@ function frame() {
     // there. If she is not in the room it does nothing at all.
     const inKab = !!(jadrija && jadrija.kabina && jadrija.kabina.inside
       && jadrija.kabina.inside(camera.position.x, camera.position.z) > 0.5);
+    if (rightClick) {
+      rightClick = false;
+      if (inKab && jadrija.kabinaPoke) {
+        jadrija.kabinaPoke(camera.position, camera.getWorldDirection(_thumbF));
+      }
+    }
     const lip = jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null;
     const lipD = lip ? Math.hypot(lip.x - camera.position.x,
       lip.y - camera.position.y, lip.z - camera.position.z) : Infinity;
@@ -8638,6 +8652,10 @@ window.__fr = {
     apprFace: (yaw) => apprenticeFace(yaw),
     /** Where your thumb would go — her lower lip in world metres — or null. */
     thumbReach: () => (jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null),
+    kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),
+    /** Debug: a right-click, as if the mouse had done it. */
+    poke: () => (jadrija && jadrija.kabinaPoke
+      ? jadrija.kabinaPoke(camera.position, camera.getWorldDirection(new THREE.Vector3())) : null),
     /**
      * Debug: stand `d` metres in front of Baye's face, looking at her mouth.
      * Only while her mouth is being held open, because that is the only time

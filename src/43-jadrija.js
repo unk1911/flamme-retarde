@@ -28459,6 +28459,40 @@ async function buildJadrija(scene) {
     if (audio) audio.radioClick(SET.band >= 0);
   }
 
+  /**
+   * What the right mouse button does in the kabina: point at the radio or
+   * the television and click, and it is what hosing it used to be.
+   *
+   * Misha, 23 Sep 2026: *"in the kabine, since we no longer have the hose,
+   * can we use the 'right'-mouse-button click, when pointed to the radio, to
+   * do what we used to do with the hose? same with the TV?"* The branch is a
+   * thumb in there now, so the two things in the room that answered to water
+   * need another way to be reached — and it is the same two calls the jet
+   * made (`radioWet`, `tvWet`), behind the same two probes and the same
+   * latch, so a click turns the knob one exactly as a hit did.
+   *
+   * `o` is the eye and `d` a unit direction. The nearer of the two things the
+   * ray passes within reach of, three metres out at most, with a hand's width
+   * of slack round each so a click does not have to be pixel-perfect.
+   */
+  function kabinaPoke(o, d) {
+    let best = null, bestT = 3.0;
+    for (const [what, probe, wet] of [['radio', radioProbe, radioWet], ['tv', tvProbe, tvWet]]) {
+      const p = probe();
+      if (!p) continue;
+      const cx = p.x, cy = p.y + (p.h || 0) * 0.5, cz = p.z;
+      const t = (cx - o.x) * d.x + (cy - o.y) * d.y + (cz - o.z) * d.z;
+      if (t <= 0 || t >= bestT) continue;
+      const ex = o.x + d.x * t - cx, ey = o.y + d.y * t - cy, ez = o.z + d.z * t - cz;
+      const rad = Math.max(p.r || 0.1, (p.h || 0.2) * 0.5) + 0.08;
+      if (ex * ex + ey * ey + ez * ez > rad * rad) continue;
+      best = [what, wet]; bestT = t;
+    }
+    if (!best) return null;
+    best[1]();
+    return best[0];
+  }
+
   function stepKabina(pt, ps, dt, camY) {
     if (!kit || !special) return;
     const K = special;
@@ -49296,6 +49330,11 @@ async function buildJadrija(scene) {
      * skinned the way the skin round her mouth is. Four millimetres into the
      * mouth, because a thumb on a lip rests on the inside edge of it.
      */
+    /** Right-click in the kabina: the radio or the TV, as a hose hit was. */
+    kabinaPoke: (o, d) => kabinaPoke(o, d),
+    /** Where the two clickable things are, for a probe that has to aim. */
+    kabinaTargets: () => ({ radio: radioProbe(), tv: tvProbe(),
+      band: SET.band, chan: typeof tvChan === 'number' ? tvChan : null }),
     /** How far out your thumb is, 0..1, handed over every frame by the app. */
     thumbTouch: (k) => { if (show) show.thumbK = k; },
     thumbReach: () => {
