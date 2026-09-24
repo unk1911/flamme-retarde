@@ -971,6 +971,11 @@ const CAMS = ['chase', 'close', 'cockpit', 'wing'];
 // closes her mouth under it. THUMB_D is how close counts as within reach, eye
 // to lip: an arm and a lean.
 let thumbK = 0, thumbAt = null;
+// And your hand on her head — "pet her". Same shape as the thumb: `petK` how
+// far out, `petAt` the last place the top of her hair was.
+let petK = 0, petAt = null;
+const PET_STAND = 0.50;      // m, eye to crown, horizontally, where you stop
+const PET_REACH = 0.95;      // and how close the hand comes up from
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
 const THUMB_D = 1.8;         // how far off her lip the button means the thumb
 const THUMB_STAND = 0.45;    // and where you stop, eye to lip
@@ -6870,6 +6875,43 @@ function frame() {
     const reachNow = thumbing && lipD < 0.95;
     thumbK = damp(thumbK, reachNow ? 1 : 0, reachNow ? 4.5 : 7, dt);
     if (jadrija && jadrija.thumbTouch) jadrija.thumbTouch(thumbK);
+    // PETTING HER. Asked for rather than held: "pet her" and for the next ten
+    // seconds you go to her, in front of her face, and your hand comes up on
+    // to the top of her head and strokes her hair — forehead to crown and
+    // back, riding her head wherever it goes. The thumb, if you press for it,
+    // wins.
+    const petNow0 = !thumbing && jadrija && jadrija.petReach ? jadrija.petReach() : null;
+    if (petNow0) petAt = petNow0;
+    const petD = petNow0 ? Math.hypot(petNow0.x - camera.position.x,
+      petNow0.y - camera.position.y, petNow0.z - camera.position.z) : Infinity;
+    if (petNow0 && ground.you && ground.confine) {
+      const Y = ground.you;
+      const fh = Math.hypot(petNow0.fx, petNow0.fz) || 1;
+      // Closer the lower her head is: kneeling, the top of it is a long way
+      // down from your shoulder, and you step in over her to reach it.
+      const st = PET_STAND - 0.3 * clamp(camera.position.y - petNow0.y - 0.2, 0, 0.4);
+      const gx = petNow0.x + (petNow0.fx / fh) * st;
+      const gz = petNow0.z + (petNow0.fz / fh) * st;
+      const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
+      if (md > 0.02) {
+        const step = Math.min(md, THUMB_WALK * dt);
+        const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
+        Y.x = nx; Y.z = nz;
+      }
+      // Looking at her face, a hand's width under the top of her head — her
+      // eyes, not your own knuckles.
+      const lx = petNow0.x, ly = petNow0.y - 0.10, lz = petNow0.z;
+      const hd = Math.hypot(lx - camera.position.x, lz - camera.position.z);
+      const wantYaw = Math.atan2(camera.position.x - lx, camera.position.z - lz);
+      const wantPitch = Math.atan2(ly - camera.position.y, Math.max(hd, 0.05));
+      let dy = wantYaw - Y.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      Y.yaw += dy * (1 - Math.exp(-6 * dt));
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt));
+    }
+    const petting = !!petNow0 && petD < PET_REACH;
+    petK = damp(petK, petting ? 1 : 0, petting ? 3.5 : 6, dt);
+    if (jadrija && jadrija.petTouch) jadrija.petTouch(petK);
     ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear);
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
@@ -7252,6 +7294,8 @@ function frame() {
     arms.update(dt, chaseCut || bodyCam ? null
       : state.phase === 'ground' && thumbK > 0.01 && thumbAt
         ? { reach: { x: thumbAt.x, y: thumbAt.y, z: thumbAt.z, k: thumbK } }
+        : state.phase === 'ground' && petK > 0.01 && petAt
+          ? { reach: { x: petAt.x, y: petAt.y, z: petAt.z, k: petK, kind: 'pet' } }
         : (state.phase === 'ride' ? ride : swim),
       camera);
   }
@@ -8687,6 +8731,8 @@ window.__fr = {
     apprDump: (r) => apprenticeDump(r),
     /** Where your thumb would go — her lower lip in world metres — or null. */
     thumbReach: () => (jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null),
+    petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),
+    petK: () => +petK.toFixed(3),
     kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),
     /** Debug: a right-click, as if the mouse had done it. */
     poke: () => (jadrija && jadrija.kabinaPoke

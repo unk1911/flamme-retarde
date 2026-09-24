@@ -33687,6 +33687,9 @@ async function buildJadrija(scene) {
     // down to this much of wide open — where her lips meet a thumb — at this
     // rate. See `thumbHeld`.
     sealAfter: 2.0, sealGape: 0.22, sealRate: 2.5,
+    // Petted, this long, a stroke front to back and back again this often.
+    // Her lips while it happens: parted, this much of wide open.
+    petHold: 10, petCycle: 1.9, petGape: 0.28,
     soakFor: 5.5,
     // And a second and a half of it inside the kabina. See the note on the
     // meter itself: in there the water is not buying a set piece, it is asking
@@ -36213,6 +36216,14 @@ async function buildJadrija(scene) {
      */
     'mouth.open': 1, 'mouth.close': 1,
     /**
+     * And you, petting her. Misha, 24 Sep 2026: *"add a new command 'pet her'
+     * which makes the hand pet her on top of the head, pet her hair"*. Not a
+     * pose of hers at all: a latch that brings YOUR hand up to her head for
+     * `SHOW.petHold` seconds (see `petReach`), over whatever she is doing,
+     * and her eyes half close while it is there.
+     */
+    'pet': 1,
+    /**
      * AND HER EYES ON YOU, which is not a pose at all.
      *
      * Misha, 19 Sep 2026: *"if you say 'look at me', she should look at me"*.
@@ -37435,9 +37446,22 @@ async function buildJadrija(scene) {
         show.seal = damp(show.seal || 0, show.thumbHeld > SHOW.sealAfter ? 1 : 0,
           SHOW.sealRate, dt);
         f.face.seal = show.seal;
+        // Petted: how long is left, where the stroke is, and how much she
+        // is feeling it — which waits for your hand to actually be there.
+        show.petFor = Math.max(0, (show.petFor || 0) - dt);
+        if (show.petFor > 0) show.petT = (show.petT || 0) + dt;
+        show.petK = damp(show.petK || 0, show.petFor > 0 && (show.petTouch || 0) > 0.9 ? 1 : 0,
+          3, dt);
+        f.face.pet = show.petK;
+        // And while your hand is on her she looks up at you, lips parted.
+        // Misha, 24 Sep: *"she should also look up while being petted and
+        // look at me (Chloe) and part lips, which she already knows how to
+        // do"* — the gaze is `look` (gazeTick) kept topped up, and the lips
+        // are the jaw she talks with, a little way open.
+        if (show.petK > 0.05) show.gaze = Math.max(show.gaze || 0, 0.6);
         const openTo = 1 + (SHOW.sealGape - 1) * show.seal;
         show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? openTo : 0, 6, dt);
-        f.face.gape = Math.max(talk, show.mouthW,
+        f.face.gape = Math.max(talk, show.mouthW, SHOW.petGape * (show.petK || 0),
           show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
         // Both gated on `gape` rather than on `fill` alone, so everything in
         // her mouth leaves with her mouth. A closed mouth with foam painted on
@@ -37602,7 +37626,7 @@ async function buildJadrija(scene) {
       // a phase it may be entered from, which every held pose in that room
       // already is.
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
-      'mouth.open': 1, 'mouth.close': 1,
+      'mouth.open': 1, 'mouth.close': 1, 'pet': 1,
       // AND THE HAIR IS NOT ON THIS LIST, which it was for an afternoon.
       //
       // It reads as one of the adjustments — two seconds of her own hands,
@@ -37867,6 +37891,9 @@ async function buildJadrija(scene) {
         showSay('squee', d);
       } else if (name === 'mouth.open' || name === 'mouth.close') {
         show.mouthFor = name === 'mouth.open' ? SHOW.mouthHold : 0;
+        show.did = name;
+      } else if (name === 'pet') {
+        show.petFor = SHOW.petHold;
         show.did = name;
       } else if (name === 'hair.down' || name === 'hair.up') {
         // A PHASE AND NOT A LATCH, which is the one place this differs from
@@ -38444,11 +38471,12 @@ async function buildJadrija(scene) {
         // than the one this room is.
         if (inside && Math.hypot(pt - show.t, ps - show.s) > SHOW.creepFrom) {
           go('creep', 'knees', 0.35);
-        } else if (show.hit <= 0
-            && show.tmr > (show.byAsk ? SHOW.keptAsked : SHOW.keptFor)) {
-          show.byAsk = 0;
-          go('rise', 'getup', 0.35);
         }
+        // AND SHE STAYS DOWN. Misha, 24 Sep 2026: *"once she is kneeling she
+        // should remain kneeling until command to 'stand up'"*. She used to
+        // get up on her own — `keptFor` after the water, `keptAsked` after a
+        // request — and now nothing but `getUp` (above) or going further
+        // down takes her off her knees.
         break;
 
       // ── and the far end of it ──
@@ -39515,11 +39543,7 @@ async function buildJadrija(scene) {
         // actually inside something, so this costs nothing when she is not.
         untangle(dt);
         if (show.getUp) { show.getUp = 0; go('rise', 'getup', 0.35); break; }
-        if (show.hit > 0) show.tmr = 0;
-        if (show.tmr > (show.byAsk ? SHOW.keptAsked : SHOW.keptFor)) {
-          show.byAsk = 0;
-          go('rise', 'getup', 0.35);
-        }
+        // And held until she is told to get up, like the kneel — see `kept`.
         break;
 
       // AND THE CLOSING CONTINUES THROUGH THE HOLD, which is the difference
@@ -49398,6 +49422,25 @@ async function buildJadrija(scene) {
     /** Where the two clickable things are, for a probe that has to aim. */
     kabinaTargets: () => ({ radio: radioProbe(), tv: tvProbe(),
       band: SET.band, chan: typeof tvChan === 'number' ? tvChan : null }),
+    /**
+     * Where your palm goes to pet her: the top of v2.0's hair, moving along
+     * the stroke, in world metres — and which way her face points, as
+     * `thumbReach` gives it. Null unless she has been asked (`pet`) and is in
+     * the kabina. The hand is the app's to bring; see 90-app.js.
+     */
+    petReach: () => {
+      if (!show || !(show.petFor > 0) || !sheIsIn()) return null;
+      if (!(APPR.primary && appr && appr.mesh.visible)) return null;
+      const st = Math.sin((show.petT || 0) * Math.PI * 2 / SHOW.petCycle);
+      const p = apprenticeCrownBind(st);
+      if (!p) return null;
+      const w = bindPointAt(appr, p, [['head', 1]], new THREE.Vector3());
+      const b = bindPointAt(appr, [p[0] - 0.10, p[1] - 0.12, 0], [['head', 1]], new THREE.Vector3());
+      const fwd = bindPointAt(appr, [p[0] + 0.10, p[1] - 0.12, 0], [['head', 1]], new THREE.Vector3());
+      const f = fwd.sub(b).normalize();
+      return { x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, left: show.petFor };
+    },
+    petTouch: (k) => { if (show) show.petTouch = k; },
     /** How far out your thumb is, 0..1, handed over every frame by the app. */
     thumbTouch: (k) => { if (show) show.thumbK = k; },
     thumbReach: () => {

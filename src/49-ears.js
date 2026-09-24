@@ -705,6 +705,7 @@ const ears = (() => {
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
     'mouth.open': 'her mouth wide open', 'mouth.close': 'her mouth closed',
+    'pet': 'you petting her hair',
     // Her hands up to the back of her head, and then the swap. See `tieHair`
     // in 43-jadrija.js: it is the same latch the console has always driven,
     // with the two seconds of gesture in front of it that it never had.

@@ -66,6 +66,11 @@ const APPR = {
   // How far behind the front of her teeth your thumb pad goes — see
   // `apprenticeLipBind`. Metres.
   thumbIn: 0.014,
+  // Petting her: how far each way along her head the stroke goes, how far
+  // the palm rides above the top of her hair (half a hand's thickness), how
+  // much the round of her head drops at the ends of the stroke, and how far
+  // her eyes close while it happens. Metres, and 0..1 of a blink.
+  petStroke: 0.045, petAbove: 0.016, petRound: 0.012, petLid: 0.18,
   // True when v2.0 is THE figure rather than an apprentice — set by BAYE in
   // 43-jadrija.js. See the note in `apprStepBody`.
   primary: false,
@@ -356,6 +361,10 @@ function apprStepBody(dt, leader, room) {
     appr.mesh.visible = true;
     apprMode = 'primary';
     v5Blink(apprEye, dt);
+    // Petted, her eyelids a little heavy — looking up at you, not asleep.
+    if (apprEye && leader.face && leader.face.pet) {
+      apprEye.uLid.value = Math.max(apprEye.uLid.value, APPR.petLid * leader.face.pet);
+    }
     if (apprJaw) {
       apprJaw.uniforms.uGape.value = apprGapeHold != null ? apprGapeHold
         : Math.min(1, Math.max(0, leader.face && leader.face.gape ? leader.face.gape : 0));
@@ -658,6 +667,39 @@ function apprenticeLipBind() {
   const rx = c.x - APPR.thumbIn - h.x, ry = c.y - 0.003 - h.y;
   return [h.x + rx * Math.cos(a) - ry * Math.sin(a),
     h.y + rx * Math.sin(a) + ry * Math.cos(a), 0];
+}
+
+/**
+ * The top of her hair, in her bind frame, for your hand to pet — `stroke` −1
+ * to 1 runs it from her forehead back to her crown along the midline, and
+ * down the round of her head at either end. Whichever hairstyle she is
+ * wearing, measured off its own cards the first time it is asked for: the top
+ * of it, and the middle front-to-back of what is up there.
+ */
+const _apprCrown = {};
+function apprenticeCrownBind(stroke) {
+  if (!appr || !appr.parts) return null;
+  const name = appr.parts.hair2 && appr.parts.hair2.visible ? 'hair2' : 'hair';
+  const part = appr.parts[name];
+  if (!part) return null;
+  if (!_apprCrown[name]) {
+    const g = appr.mesh.geometry, pos = g.getAttribute('position'), ix = g.getIndex();
+    const { start, count } = part.geometry.drawRange;
+    let top = -1e9;
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      if (Math.abs(pos.getZ(v)) < 0.03) top = Math.max(top, pos.getY(v));
+    }
+    let sx = 0, n = 0;
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      if (Math.abs(pos.getZ(v)) < 0.03 && pos.getY(v) > top - 0.012) { sx += pos.getX(v); n++; }
+    }
+    _apprCrown[name] = [n ? sx / n : 0, top];
+  }
+  const [cx, top] = _apprCrown[name];
+  // Forward is +x in her bind frame; the stroke goes forehead (+) to back (−).
+  return [cx + APPR.petStroke * stroke, top + APPR.petAbove - APPR.petRound * stroke * stroke, 0];
 }
 
 /** Her, for the arm pass to draw into its depth — see `render` in 60-arms.js. */

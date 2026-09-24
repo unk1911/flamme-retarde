@@ -152,6 +152,14 @@ const HAND_POSE = {
     fan: [-0.25, 0.0, -0.20, -0.35],
     t: [0.95, 0.10, 0.20, 0.55, 0.45],
   },
+  // Petting her head — Misha, 24 Sep: *"pet her on top of the head, pet her
+  // hair"*. A hand laid on a head is nearly flat and a little cupped to its
+  // round, the fingers together, the thumb lying along the index.
+  pet: {
+    f: [[0.22, 0.26, 0.16], [0.24, 0.28, 0.16], [0.28, 0.30, 0.18], [0.32, 0.32, 0.20]],
+    fan: [-0.35, 0.0, -0.35, -0.45],
+    t: [0.30, 0.10, 0.10, 0.10, 0.10],
+  },
   // The paddle and the let-go hand of a crawl.
   flat: {
     f: [[0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11]],
@@ -1087,9 +1095,14 @@ function buildArms() {
     // And which way the thumb points, for `stats` — last joint to tip.
     THUMB_MID.copy(handPoint(md, handPose(HAND_POSE.reach), 0, 2, md.J.f[0][2]));
     THUMB_TIP.copy(handPoint(md, handPose(HAND_POSE.reach), 0, 2, md.J.f[0][3]));
+    PALM_OFF.copy(md.J.w).applyMatrix4(md.FhInv)
+      .lerp(md.J.f[2][0].clone().applyMatrix4(md.FhInv), 0.55);
   }
   const THUMB_MID = new THREE.Vector3();
   const THUMB_TIP = new THREE.Vector3();
+  // The middle of the palm, for petting: a little over halfway from the wrist
+  // to the middle finger's knuckle — measured off her hand like the rest.
+  const PALM_OFF = new THREE.Vector3();
 
   // ── YOUR THUMB, TO HER MOUTH ──────────────────────────────────────────────
   //
@@ -1114,6 +1127,7 @@ function buildArms() {
   // brought your own shoulder into the bottom corner of the frame as a pale
   // blob. The walk-in (THUMB_STAND in 90-app.js) closes the rest instead.
   const THUMB_LEAN = 0.35;        // and how far the body may lean in to close the rest
+  const PET_LEAN = 0.55;          // and for petting, where you are bending over her
   // The hand's attitude at her mouth: elbow pole, the way the fingers point,
   // and the way the palm faces — all in the body's frame, +x right, +y up,
   // −z toward her. A table rather than literals so a probe can try several and
@@ -1145,6 +1159,10 @@ function buildArms() {
   // her mouth from the side, into her cheek.
   const THUMB_AIM = { pole: [0.40, -0.90, 0.00], along: [0.0, 0.70, -0.70],
     palm: [-1.0, 0.0, 0.0], flex: 0.10 };
+  // And the hand on her head: fingers pointing away from you over the top of
+  // it and tipped down its far side, palm down on her hair, the elbow out.
+  const PET_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.15, -0.30, -0.94],
+    palm: [0.0, -1.0, 0.0], flex: 0.10 };
 
   /**
    * `reach` is {x, y, z, k} — her lip in world metres, and 0..1 of the way
@@ -1168,7 +1186,10 @@ function buildArms() {
     sides[0].shoulder.visible = false;
     const a = sides[1];
     a.shoulder.visible = true;
-    thumbDigits(a);
+    // The thumb, or the flat of the hand on her head — `kind` says which.
+    const pet = reach.kind === 'pet';
+    if (pet) setHandPose(a.pose, HAND_POSE.pet);
+    else thumbDigits(a);
 
     _tt.set(reach.x, reach.y, reach.z);
     root.worldToLocal(_tt);
@@ -1183,15 +1204,18 @@ function buildArms() {
     const S = ARMS.shoulder;
     _p1.set(_tt.x - S[0], _tt.y - S[1], _tt.z - S[2]);
     const need = _p1.length() - THUMB_REACH;
-    if (need > 0) body.position.copy(_p1.normalize().multiplyScalar(Math.min(need, THUMB_LEAN)));
+    // Petting a head below you, you bend over it: more lean than a thumb gets.
+    const lean = pet ? PET_LEAN : THUMB_LEAN;
+    if (need > 0) body.position.copy(_p1.normalize().multiplyScalar(Math.min(need, lean)));
     else body.position.set(0, 0, 0);
 
     // Elbow down and out to the right; palm down, so the thumb pad comes to
     // the lip from in front with the fingers curled under her chin.
-    const P = THUMB_AIM.pole, N = THUMB_AIM.palm;
+    const AIM = pet ? PET_AIM : THUMB_AIM, OFF = pet ? PALM_OFF : THUMB_OFF;
+    const P = AIM.pole, N = AIM.palm;
     placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
-      THUMB_OFF.x, THUMB_OFF.y, THUMB_OFF.z, N[0], N[1], N[2], THUMB_AIM.flex, false,
-      THUMB_AIM.along || null);
+      OFF.x, OFF.y, OFF.z, N[0], N[1], N[2], AIM.flex, false,
+      AIM.along || null);
   }
 
   function barPose(a, pull, t) {
@@ -1446,6 +1470,13 @@ function buildArms() {
   return {
     root, stage, cam,
     update, render,
+    /** Debug: try a hand attitude for petting — see PET_AIM. */
+    petAim: (o) => {
+      const { pose, ...aim } = o || {};
+      Object.assign(PET_AIM, aim);
+      if (pose) Object.assign(HAND_POSE.pet, pose);
+      return PET_AIM;
+    },
     /** Debug: try a hand attitude for the thumb — see THUMB_AIM. */
     thumbAim: (o) => {
       const { pose, ink, ...aim } = o || {};

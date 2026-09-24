@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.488.0] — 2026-09-24
+
+### "pet her"; and on her knees she stays on her knees
+
+Misha: *"maybe add a new command 'pet her' which makes the hand pet her on top
+of the head, pet her hair"* — *"also should be easy to pet her while she is in
+submit pose"* — *"she should also look up while being petted and look at me
+(Chloe) and part lips, which she already knows how to do"* — *"once she is
+kneeling she should remain kneeling until command to 'stand up'"*.
+
+**Pet her.** A new ask, `pet` — "pet her", "can I pet you", "let me stroke
+your hair", "pat your head" (voice server 1.37.0; above the hair skills, which
+would have read "let me stroke your hair" as "let … hair" down). For ten
+seconds you go to her, in front of her face, and your right hand — Chloe's,
+from 1.485.0 — comes up flat on to the top of her head and strokes her hair,
+forehead to crown and back every 1.9 s along the round of her head
+(`petReach`, `apprenticeCrownBind`: the top of whichever hairstyle she has
+on, measured off its own cards, skinned to her head so it goes wherever her
+head does). A new flat, slightly cupped hand pose, palm centre measured off
+the hand, and a deeper lean for a head below you. 0 mm miss standing and
+kneeling. While your hand is on her she looks up at you — `look`'s gaze kept
+topped up — with her lips parted and her eyelids a little heavy.
+
+Kneeling is where it wants doing, and it works there: you step in over her
+and look down on her looking up. The thumb, if you press for it, wins.
+
+**She stays down.** `kept` (on her knees) and `fours` no longer end on a
+timer — `keptFor` after the water, `keptAsked` after a request. Only "stand
+up" (`rise`), or going further down, takes her off her knees.
+
 ## [1.487.0] — 2026-09-24
 
 ### she closes her lips on it

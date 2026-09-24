@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.36.0"
+VERSION = "1.37.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -503,6 +503,15 @@ SKILLS = {
     # until she is asked to close it. CLOSE FIRST, so "close your mouth" is
     # never read as the open; and neither owns a bare "open", which is the
     # wine's ("open the bottle") — each needs the mouth or jaw, or "open wide".
+    # AND YOU, PETTING HER. Misha, 24 Sep 2026: *"add a new command 'pet
+    # her' which makes the hand pet her on top of the head, pet her hair"*.
+    # Not a thing she does: your hand comes up to the top of her head and
+    # strokes her hair for ten seconds, and she bows into it. Above the hair
+    # skills, which would read "let me stroke your hair" as "let ... hair" —
+    # a request to take it down.
+    "pet": ("let you pet her head and stroke her hair",
+            [r"\bpet(ting)? (her|you|u|baye)\b|\blet me pet\b"
+             r"|\b(strok\w*|pet|pett\w*|pat|patt\w*)\b.{0,20}\b(hair|head)\b"]),
     "mouth.close": ("close her mouth again",
                     [r"\b(close|shut)\b.{0,20}\b(mouth|jaw)\b"
                      r"|\b(mouth|jaw)\b.{0,12}\b(closed?|shut)\b"]),
@@ -755,6 +764,9 @@ ASK_RE = re.compile(
     r"|\blegs? (hang\w*|dangl\w*|off|over)\b"
     r"|\b(coke|cocaine)\b|\bcut (me )?(a |some )?lines?\b|\brack '?em\b"
     r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
+    # Petting her — see the `pet` skill.
+    r"|\bpet(ting)? (her|you|u|baye)\b|\blet me pet\b"
+    r"|\b(strok\w*|pet|pett\w*|pat|patt\w*)\b.{0,20}\b(hair|head)\b"
     # AND HER HAIR. Every phrasing of it — "undo ponytail", "take your hair
     # out", "let your hair down", "hair down", "put your hair up", "tie your
     # hair back", the bare "ponytail" — carries no modal, no please and none
