@@ -160,7 +160,7 @@ async function loadApprentice() {
     // and the inside of her mouth.
     body: 'base = texture2D(uSkin, vUv).rgb;' + look.jaw.frag,
     // And a mouth that opens when the leader's does — see `jaw` in v5Parts.
-    vert: look.jaw.vert,
+    vert: look.jaw.bodyVert,
     parts: look.parts,
   });
   if (!fig) return null;
@@ -359,6 +359,8 @@ function apprStepBody(dt, leader, room) {
     if (apprJaw) {
       apprJaw.uniforms.uGape.value = apprGapeHold != null ? apprGapeHold
         : Math.min(1, Math.max(0, leader.face && leader.face.gape ? leader.face.gape : 0));
+      apprJaw.uniforms.uSeal.value = apprSealHold != null ? apprSealHold
+        : Math.min(1, Math.max(0, leader.face && leader.face.seal ? leader.face.seal : 0));
     }
     v5Hang(appr, apprHang);
     appr.mesh.updateMatrixWorld();
@@ -629,8 +631,10 @@ function apprenticeCheck(leader, fit) {
  * holds still for a photograph of the jaw.
  */
 let apprGapeHold = null;
-function apprenticeGape(g) {
+let apprSealHold = null;
+function apprenticeGape(g, seal) {
   apprGapeHold = g == null ? null : Math.min(1, Math.max(0, +g));
+  apprSealHold = seal == null ? null : Math.min(1, Math.max(0, +seal));
   return apprGapeHold;
 }
 
@@ -715,6 +719,7 @@ function apprenticeStats() {
     // which trails it by the lag and the damping, so while v1.0 speaks the two
     // move together a third of a second apart.
     gape: apprJaw ? +apprJaw.uniforms.uGape.value.toFixed(3) : null,
+    seal: apprJaw ? +apprJaw.uniforms.uSeal.value.toFixed(3) : null,
     lead: apprLeadFace ? +(apprLeadFace.gape || 0).toFixed(3) : null,
     at: [+appr.mesh.position.x.toFixed(2), +appr.mesh.position.y.toFixed(2),
       +appr.mesh.position.z.toFixed(2)],

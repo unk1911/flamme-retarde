@@ -8,6 +8,24 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.487.0] — 2026-09-24
+
+### she closes her lips on it
+
+Misha: *"and then after it's held there a while she closes her lips on the
+thumb"*.
+
+Your thumb in her mouth for two seconds (`SHOW.sealAfter`) and `seal` rises
+over about a second: her jaw comes up from wide open to 0.22 of it — about
+5 mm between the lips at the middle, which with a thumb there is lips on a
+thumb — and her lips purse round it, drawn in 30% from the corners and
+pushed out 4 mm (`pucker`, ahead of the jaw in the body's vertex shader;
+the teeth are left alone). The depth pass from 1.486.0 is what makes it
+read: the lips close over the thumb rather than under it. The thumb's aim
+rides the gap as it narrows (0 mm miss throughout). Take your thumb away and
+it all undoes. `face.seal` on v1.0, copied to v2.0's `uSeal`;
+`__fr.jad.apprGape(g, seal)` holds both for a probe.
+
 ## [1.486.0] — 2026-09-24
 
 ### your thumb, in her mouth

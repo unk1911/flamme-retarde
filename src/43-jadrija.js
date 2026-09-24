@@ -33683,6 +33683,10 @@ async function buildJadrija(scene) {
     // close it. Long enough to look at, short enough that a mouth left open
     // does not become the thing everybody notices about her.
     mouthHold: 8,
+    // Your thumb held in her mouth this long, and she closes her lips on it:
+    // down to this much of wide open — where her lips meet a thumb — at this
+    // rate. See `thumbHeld`.
+    sealAfter: 2.0, sealGape: 0.22, sealRate: 2.5,
     soakFor: 5.5,
     // And a second and a half of it inside the kabina. See the note on the
     // meter itself: in there the water is not buying a set piece, it is asking
@@ -37422,7 +37426,17 @@ async function buildJadrija(scene) {
         // which should cause her to open wider"*.
         if ((show.thumbK || 0) > 0.6) show.mouthFor = Math.max(show.mouthFor || 0, 1.2);
         show.mouthFor = Math.max(0, (show.mouthFor || 0) - dt);
-        show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? 1 : 0, 6, dt);
+        // And held there a while, she closes her lips on it. Misha, 24 Sep:
+        // *"after it's held there a while she closes her lips on the
+        // thumb"*. The jaw comes up to where her lips meet a thumb — not shut,
+        // there is a thumb in the way — and her lips purse round it (`seal`,
+        // the pucker in v5Parts). Let go and it all undoes.
+        show.thumbHeld = (show.thumbK || 0) > 0.95 ? (show.thumbHeld || 0) + dt : 0;
+        show.seal = damp(show.seal || 0, show.thumbHeld > SHOW.sealAfter ? 1 : 0,
+          SHOW.sealRate, dt);
+        f.face.seal = show.seal;
+        const openTo = 1 + (SHOW.sealGape - 1) * show.seal;
+        show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? openTo : 0, 6, dt);
         f.face.gape = Math.max(talk, show.mouthW,
           show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
         // Both gated on `gape` rather than on `fill` alone, so everything in

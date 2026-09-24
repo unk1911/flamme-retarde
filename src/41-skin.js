@@ -2471,10 +2471,23 @@ function v5Parts(o) {
   // tongue it is, on the mouth part: a mouth that opens has to be dark inside.
   const jaw = {
     uniforms: { uGape: { value: 0 }, uLipC: { value: new THREE.Vector3(0, -99, 0) },
-      uHinge: { value: new THREE.Vector3(0, -99, 0) }, uJawA: { value: V5_JAW.angle } },
+      uHinge: { value: new THREE.Vector3(0, -99, 0) }, uJawA: { value: V5_JAW.angle },
+      uSeal: { value: 0 } },
     decl: '\nuniform float uGape;\nuniform vec3 uLipC;\nuniform vec3 uHinge;\n'
-      + 'uniform float uJawA;\nvarying float vCav;\n',
+      + 'uniform float uJawA;\nuniform float uSeal;\nvarying float vCav;\n',
     vdecl: '\nattribute vec2 aJaw;\n',
+    // Lips closed on something: both lips, drawn in from the corners and
+    // pushed forward a little, before the jaw turns them. The body only — the
+    // front teeth are within reach of it and teeth do not pucker.
+    pucker: `
+      if (uSeal > 0.0) {
+        float lz = smoothstep(${V5_JAW.purseW[0].toFixed(3)}, ${V5_JAW.purseW[1].toFixed(3)}, abs(p.z))
+          * smoothstep(0.014, 0.007, abs(p.y - uLipC.y))
+          * smoothstep(uLipC.x - 0.016, uLipC.x - 0.004, p.x);
+        p.z *= 1.0 - ${V5_JAW.purse[0].toFixed(3)} * uSeal * lz;
+        p.x += ${V5_JAW.purse[1].toFixed(4)} * uSeal * lz;
+      }
+    `,
     vert: `
       vCav = aJaw.y;
       if (uGape > 0.0 && aJaw.x > 0.0) {
@@ -2491,6 +2504,7 @@ function v5Parts(o) {
       base *= mix(vec3(1.0), vec3(${V5_JAW.cav.join(', ')}), vCav);
     `,
   };
+  jaw.bodyVert = jaw.pucker + jaw.vert;
   const hairTex = o.hairTex ? v5Tex(o.hairTex) : null;
   const legTex = o.legTex ? v5Tex(o.legTex) : null;
   const parts = {
@@ -2734,6 +2748,9 @@ const V5_JAW = {
   tongue: [0.58, 0.20, 0.21],
   // Dimmer the further back into the mouth, by this much at this depth.
   depth: 0.70, dark: 0.030,
+  // Lips closed on a thumb: the corners drawn in by this fraction and the
+  // lips pushed out this far, over this band of |z| (full inside, none out).
+  purse: [0.30, 0.0040], purseW: [0.036, 0.016],
   // The teeth drawn on the helpers: where each tooth ends, round the arch
   // from the middle, in metres — lower incisors 5.3 and 5.9 mm, canine 6.9,
   // premolars 7; upper centrals 8.6, laterals 6.6, canine 7.6, premolars 7 —
