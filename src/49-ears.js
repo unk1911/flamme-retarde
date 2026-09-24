@@ -701,7 +701,7 @@ const ears = (() => {
     // And the one that is not a place she goes — see `yawnTick`.
     yawn: 'a yawn',
     coke: 'to the plate',
-    look: 'her eyes on you',
+    look: 'her eyes on you', 'look.stop': 'her eyes her own again',
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
     'mouth.open': 'her mouth wide open', 'mouth.close': 'her mouth closed',

@@ -8,6 +8,20 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.489.0] — 2026-09-24
+
+### her eyes stay on you
+
+Misha: *"when i say 'look at me', it works perfect, the problem is after about
+10s, she stops looking at me. instead she should continue looking at me,
+unless told to 'stop looking at me'"*.
+
+`look` no longer runs on a seven-second clock: it holds until she is told
+otherwise. New ask `look.stop` — "stop looking at me", "look away", "don't
+look at me", "stop staring" (voice server 1.38.0; above `look`, whose pattern
+would have read "stop looking at me" as the request it cancels). Petting
+still tops the gaze up and leaves an asked one alone.
+
 ## [1.488.0] — 2026-09-24
 
 ### "pet her"; and on her knees she stays on her knees

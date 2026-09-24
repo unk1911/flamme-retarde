@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.37.0"
+VERSION = "1.38.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -532,6 +532,13 @@ SKILLS = {
     # It is the same request and the same latch: the gaze goes to whoever is
     # watching, and "look at the camera" and "smile for the camera" are what
     # anybody says to somebody they are filming.
+    # AND OFF YOU AGAIN, since "look at me" no longer runs out (24 Sep 2026).
+    # Above `look`, whose pattern "looking ... me" would take "stop looking
+    # at me" as the opposite of what it says.
+    "look.stop": ("stop looking at you and let her eyes wander again",
+                  [r"\b(stop|quit)\b.{0,6}\b(looking|staring|watching)\b"
+                   r"|\blook away\b|\b(don'?t|do not)\s+(look|stare)\b"
+                   r"|\beyes off me\b"]),
     "look": ("look at them, and hold their eye",
              [r"\blook(ing)?\b.{0,12}\b(at|to)?\s*(me|my|us)\b"
               r"|\beyes?\b.{0,10}\b(on|at)\s*me\b"
@@ -827,6 +834,7 @@ ASK_RE = re.compile(
     r"|\blook(ing)?\b.{0,12}\b(me|my|us|here|this way|camera|lens)\b"
     r"|\bwatch me\b"
     r"|\beyes?\b.{0,10}\b(on|at)\s*me\b"
+    r"|\blook away\b|\b(stop|quit)\b.{0,6}\b(looking|staring|watching)\b"
     r"|\bsmile\b.{0,12}\b(camera|lens|phone|me)\b"
     r"|\b(po)?gledaj me\b|\bregarde[- ]moi\b"
     # AND THE ONE WORD THAT CALLS HER OVER IN HER OWN LANGUAGE. "Come here"

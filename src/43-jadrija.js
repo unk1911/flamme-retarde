@@ -36231,7 +36231,7 @@ async function buildJadrija(scene) {
      * from her back, from a handstand and from the middle of a cartwheel, and
      * it changes nothing about any of them. See GAZE.
      */
-    look: 1,
+    look: 1, 'look.stop': 1,
     /**
      * AND HER HAIR, OUT OF THE TAIL OR BACK INTO IT.
      *
@@ -37662,7 +37662,7 @@ async function buildJadrija(scene) {
       // And her eyes, for the same reason and more so: "look at me" is a
       // request about the next second, and one that waits for a cartwheel to
       // finish has answered a different request.
-      look: 1 };
+      look: 1, 'look.stop': 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
@@ -37988,9 +37988,17 @@ async function buildJadrija(scene) {
         // A LATCH AND NOT A PHASE. Her feet, her hands and her clip are none
         // of this function's business: all that happens is that a clock is
         // set, and `gazeTick` turns her head while it runs.
-        show.gaze = GAZE.hold;
+        //
+        // AND IT DOES NOT RUN OUT. Misha, 24 Sep 2026: *"after about 10s, she
+        // stops looking at me. instead she should continue looking at me,
+        // unless told to 'stop looking at me'"*. So the clock is set to
+        // for ever, and `look.stop` is what sets it back to nothing.
+        show.gaze = Infinity;
         show.did = name;
         showSay('trill', d);
+      } else if (name === 'look.stop') {
+        show.gaze = 0;
+        show.did = name;
       } else if (name === 'yawn') {
         // A LATCH AND NOT A PHASE, exactly like `legs.down` below: she stays
         // in whatever she was doing, her place and her legs are untouched, and
