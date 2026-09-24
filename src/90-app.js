@@ -1006,9 +1006,11 @@ let petK = 0, petAt = null;
 // And your hand on her breast — see the gate. `reachKind` is decided on the
 // press; `cupSide` is which of the two.
 let cupK = 0, cupAt = null, reachKind = 'thumb', reachWas = false, cupSide = 0;
+const _gripAt = new THREE.Vector3();
+let reachForce = null;       // debug: [kind, side] instead of the crosshair
 const CUP_AIM_R = 0.16;      // rad off the crosshair a breast still counts
 const CUP_STAND = 0.45;      // m, eye to her, where you stop
-const CUP_OFF = 0.018;       // m, the palm's middle off her skin
+const CUP_OFF = 0.046;       // m, the palm's bone line off her skin: the palm is 15 mm under it and the breast curves toward the hand either side of its point
 const PET_STAND = 0.50;      // m, eye to crown, horizontally, where you stop
 const PET_REACH = 0.95;      // and how close the hand comes up from
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
@@ -6913,7 +6915,7 @@ function frame() {
             const d = fw.dot(_thumbV.set(h.x - camera.position.x, h.y - camera.position.y,
               h.z - camera.position.z).normalize());
             if (d > best) {
-              best = d; reachKind = 'hip';
+              best = d; reachKind = i < 0 ? 'thigh' : 'hip';
               // Always the hip on YOUR right: it is your right hand, and
               // reaching it to the far one takes the forearm across the
               // front of her.
@@ -6925,9 +6927,12 @@ function frame() {
         }
       }
     }
+    // A probe cannot aim a crosshair to the degree; it can say what it meant.
+    if (pressing && reachForce) { reachKind = reachForce[0]; cupSide = reachForce[1]; }
     reachWas = pressing;
     const cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
-      : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide] : null;
+      : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide]
+        : pressing && reachKind === 'thigh' && hps ? hps.thighs[cupSide] : null;
     if (cupNow0) cupAt = cupNow0;
     const thumbing = pressing && reachKind === 'thumb' && (inKab ? !!lip : lipNear);
     // AND YOU GO TO HER. Left to herself she stops about a metre and a half off
@@ -6970,14 +6975,15 @@ function frame() {
       // walking round to it put you over her shoulder looking straight down
       // — and looking at her middle, a hand's span above the hip.
       let fx = B.fx, fz = B.fz, cx = B.x, cz = B.z, ly = B.y;
-      if (reachKind === 'hip' && hps && brs) {
+      if ((reachKind === 'hip' || reachKind === 'thigh') && hps && brs) {
         fx = brs[0].fx; fz = brs[0].fz;
         cx = (hps.spots[0].x + hps.spots[1].x) * 0.5;
         cz = (hps.spots[0].z + hps.spots[1].z) * 0.5;
         ly = B.y + 0.30;
       }
       const fh = Math.hypot(fx, fz) || 1;
-      const gx = cx + (fx / fh) * CUP_STAND, gz = cz + (fz / fh) * CUP_STAND;
+      const st = reachKind === 'thigh' ? CUP_STAND - 0.08 : CUP_STAND;
+      const gx = cx + (fx / fh) * st, gz = cz + (fz / fh) * st;
       const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
       if (md > 0.02) {
         const step = Math.min(md, THUMB_WALK * dt);
@@ -6994,9 +7000,14 @@ function frame() {
     }
     const cupD = cupNow0 ? Math.hypot(cupNow0.x - camera.position.x,
       cupNow0.y - camera.position.y, cupNow0.z - camera.position.z) : Infinity;
-    const cupping = !!cupNow0 && cupD < 0.95;
+    // Low on her, the thing is well below your eye, so the distance that
+    // counts as within an arm and a lean is longer.
+    const cupping = !!cupNow0 && cupD < (reachKind === 'thigh' ? 1.30 : 0.95);
     cupK = damp(cupK, cupping ? 1 : 0, cupping ? 4.0 : 7, dt);
-    if (jadrija && jadrija.cupTouch) jadrija.cupTouch(cupK);
+    if (jadrija && jadrija.cupTouch) {
+      jadrija.cupTouch(cupK, reachKind === 'cup' && arms && arms.forearmAt
+        ? arms.forearmAt(_gripAt) : null);
+    }
     // PETTING HER. Asked for rather than held: "pet her" and for the next ten
     // seconds you go to her, in front of her face, and your hand comes up on
     // to the top of her head and strokes her hair — forehead to crown and
@@ -7420,7 +7431,8 @@ function frame() {
           // The palm's middle a hand's thickness off the skin, out along the
           // way her chest faces, so it rests on her rather than in her.
           ? { reach: { x: cupAt.x + cupAt.fx * CUP_OFF, y: cupAt.y + cupAt.fy * CUP_OFF,
-            z: cupAt.z + cupAt.fz * CUP_OFF, k: cupK, kind: reachKind === 'hip' ? 'hip' : 'cup' } }
+            z: cupAt.z + cupAt.fz * CUP_OFF, k: cupK,
+            kind: reachKind === 'hip' || reachKind === 'thigh' ? reachKind : 'cup' } }
         : state.phase === 'ground' && petK > 0.01 && petAt
           ? { reach: { x: petAt.x, y: petAt.y, z: petAt.z, k: petK, kind: 'pet' } }
         : (state.phase === 'ride' ? ride : swim),
@@ -8862,6 +8874,7 @@ window.__fr = {
     petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),
     petK: () => +petK.toFixed(3),
     cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide }),
+    reachAs: (kind, side = 0) => { reachForce = kind ? [kind, side] : null; return reachForce; },
     breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),
     hips: () => (jadrija && jadrija.hips ? jadrija.hips() : null),
     kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),

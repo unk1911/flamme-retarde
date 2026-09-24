@@ -8,6 +8,28 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.502.0] — 2026-09-24
+
+### the hand on her, and hers on yours
+
+Misha: *"when cross-hairs on her breast, the hand extends and somehow lands
+too deep inside her flesh"* — *"when cross-hairs on crotch area, the hand
+should extend closer to inner thigh"* — *"when touch her breast with hand,
+she should sometimes grip my arm with her hand"*.
+
+- **Not into her.** The hand's target point is its bone line, and the palm is
+  15 mm under that: 18 mm off her skin put the palm into her. Now 46 mm, with
+  the fingers flatter so they lie along her rather than curl in.
+- **Her inner thigh.** Aiming at the middle of her, low, now sends your hand
+  to the front of her inner thigh (the one on your right) rather than her
+  hip — measured off her mesh a hand's length below the top of her legs,
+  skinned to that leg — and you bend right down for it. The hips are still
+  where aiming at a hip goes.
+- **Her hand on your arm.** While your hand is on her breast, every few
+  seconds she brings the hand on that side up and takes hold of your
+  forearm for three to six seconds, then lets go — solved to a point on your
+  forearm that follows it (`gripArm`, `arms.forearmAt`).
+
 ## [1.501.0] — 2026-09-24
 
 ### she knows you are crouching

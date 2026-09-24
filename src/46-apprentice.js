@@ -68,6 +68,8 @@ const APPR = {
   thumbIn: 0.014,
   // Where a hand on her hip goes: the band of her height, metres.
   hipY: [0.96, 1.04], hipZ: 0.175,
+  // And her inner thigh, a hand's length below the top of her legs.
+  thighY: [0.66, 0.72],
   // Petting her: how far each way along her head the stroke goes, how far
   // the palm rides above the top of her hair (half a hand's thickness), how
   // much the round of her head drops at the ends of the stroke, and how far
@@ -771,6 +773,35 @@ function apprenticeHipBind(side) {
     _apprHip = best;
   }
   const b = _apprHip[side];
+  return b ? [b[0], b[1], b[2]] : null;
+}
+
+/**
+ * The front of her inner thigh, bind frame: in the band a hand's length below
+ * the top of her legs, the forward-most point of the inner half of each thigh.
+ * `side` +1 her left, −1 her right. Measured once.
+ */
+let _apprThigh = null;
+function apprenticeThighBind(side) {
+  if (!appr) return null;
+  if (!_apprThigh) {
+    const g = appr.mesh.geometry, pos = g.getAttribute('position');
+    const { start, count } = g.drawRange;
+    const ix = g.getIndex();
+    const best = { 1: null, '-1': null };
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      if (y < APPR.thighY[0] || y > APPR.thighY[1]) continue;
+      if (Math.abs(z) < 0.035 || Math.abs(z) > 0.085) continue;
+      const k = z > 0 ? 1 : -1;
+      // Forward, and toward the middle: the front of the inside of it.
+      const sc = x - 0.5 * Math.abs(z);
+      if (!best[k] || sc > best[k][3]) best[k] = [x, y, z, sc];
+    }
+    _apprThigh = best;
+  }
+  const b = _apprThigh[side];
   return b ? [b[0], b[1], b[2]] : null;
 }
 

@@ -163,7 +163,7 @@ const HAND_POSE = {
   // A hand resting on a breast: open, the fingers together and gently curved
   // to its round, the thumb a little out.
   cup: {
-    f: [[0.30, 0.38, 0.22], [0.32, 0.40, 0.22], [0.36, 0.42, 0.24], [0.40, 0.44, 0.26]],
+    f: [[0.14, 0.18, 0.10], [0.16, 0.20, 0.10], [0.18, 0.22, 0.12], [0.20, 0.24, 0.14]],
     fan: [-0.20, 0.0, -0.20, -0.25],
     t: [0.25, 0.45, 0.10, 0.12, 0.10],
   },
@@ -1170,6 +1170,9 @@ function buildArms() {
   // it and tipped down its far side, palm down on her hair, the elbow out.
   // And the hand on her breast: fingers up and a little in, palm toward her.
   // And on her hip: fingers down and round the curve of it, palm in on her.
+  // And on the front of her inner thigh: fingers down along it, palm on her.
+  const THIGH_AIM = { pole: [0.60, -0.75, 0.20], along: [-0.15, -0.95, -0.25],
+    palm: [-0.30, 0.0, -0.95], flex: 0.10 };
   const HIP_AIM = { pole: [0.60, -0.75, 0.20], along: [0.10, -0.90, -0.40],
     palm: [-0.70, 0.0, -0.70], flex: 0.10 };
   const CUP_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.20, 0.95, -0.10],
@@ -1200,7 +1203,8 @@ function buildArms() {
     const a = sides[1];
     a.shoulder.visible = true;
     // The thumb, or the flat of the hand on her head — `kind` says which.
-    const pet = reach.kind === 'pet', cup = reach.kind === 'cup', hip = reach.kind === 'hip';
+    const pet = reach.kind === 'pet', cup = reach.kind === 'cup';
+    const thigh = reach.kind === 'thigh', hip = reach.kind === 'hip' || thigh;
     if (pet) setHandPose(a.pose, HAND_POSE.pet);
     else if (cup || hip) setHandPose(a.pose, HAND_POSE.cup);
     else thumbDigits(a);
@@ -1219,13 +1223,14 @@ function buildArms() {
     _p1.set(_tt.x - S[0], _tt.y - S[1], _tt.z - S[2]);
     const need = _p1.length() - THUMB_REACH;
     // Petting a head below you, you bend over it: more lean than a thumb gets.
-    const lean = pet || reach.kind === 'hip' ? PET_LEAN : THUMB_LEAN;
+    // And bending right down for her thigh, which is a metre below your eye.
+    const lean = thigh ? 0.95 : pet || hip ? PET_LEAN : THUMB_LEAN;
     if (need > 0) body.position.copy(_p1.normalize().multiplyScalar(Math.min(need, lean)));
     else body.position.set(0, 0, 0);
 
     // Elbow down and out to the right; palm down, so the thumb pad comes to
     // the lip from in front with the fingers curled under her chin.
-    const AIM = pet ? PET_AIM : cup ? CUP_AIM : hip ? HIP_AIM : THUMB_AIM;
+    const AIM = pet ? PET_AIM : cup ? CUP_AIM : thigh ? THIGH_AIM : hip ? HIP_AIM : THUMB_AIM;
     const OFF = pet || cup || hip ? PALM_OFF : THUMB_OFF;
     const P = AIM.pole, N = AIM.palm;
     placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
@@ -1485,6 +1490,18 @@ function buildArms() {
   return {
     root, stage, cam,
     update, render,
+    /**
+     * Your right forearm in world metres — a point a third of the way from
+     * wrist to elbow, where a hand would take hold of it — or null when the
+     * arm is not out. For her hand on yours; see `gripArm` in 43-jadrija.js.
+     */
+    forearmAt: (out) => {
+      const a = sides[1];
+      if (!root.visible || !a.shoulder.visible) return null;
+      const w = a.wrist.getWorldPosition(new THREE.Vector3());
+      const e = a.elbow.getWorldPosition(new THREE.Vector3());
+      return out.copy(w).lerp(e, 0.30);
+    },
     /** Debug: try a hand attitude on her hip — see HIP_AIM. */
     hipAim: (o) => Object.assign(HIP_AIM, o || {}),
     /** Debug: try a hand attitude on her breast — see CUP_AIM. */

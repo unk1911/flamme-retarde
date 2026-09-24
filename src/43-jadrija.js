@@ -35003,6 +35003,62 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * HER HAND ON YOUR ARM. Misha, 24 Sep 2026: *"when touch her breast with
+   * hand, she should sometimes grip my arm with her hand"*. While your hand
+   * is on her breast, every so often she brings the hand on that side up and
+   * takes hold of your forearm for a few seconds, and lets go. Solved like
+   * her arms out (`wheelLimb`) to a point on YOUR forearm that 60-arms.js
+   * reports every frame, turned into her frame — so it follows your arm.
+   * Standing phases only; the arm chain is sampled when the grip starts.
+   */
+  const GRIP_ARM = { every: [4, 9], hold: [3, 6], secs: 0.45 };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  let gripRest = null;
+  const _gaL = new THREE.Vector3(), _gaG = new THREE.Vector3(), _gaP = new THREE.Vector3();
+  function gripArm(f, dt) {
+    const on = (show.cupK || 0) > 0.9 && show.gripHave && !LYING[show.phase]
+      && !HANDS[show.phase] && (show.vel || 0) < 0.05;
+    if (!on) {
+      show.gripWait = rnd(1.5, 3.5);
+      show.gripFor = 0;
+    } else if (show.gripFor > 0) {
+      show.gripFor -= dt;
+      if (show.gripFor <= 0) show.gripWait = rnd(GRIP_ARM.every[0], GRIP_ARM.every[1]);
+    } else {
+      show.gripWait = (show.gripWait == null ? 2 : show.gripWait) - dt;
+      if (show.gripWait <= 0) show.gripFor = rnd(GRIP_ARM.hold[0], GRIP_ARM.hold[1]);
+    }
+    const want = on && show.gripFor > 0 ? 1 : 0;
+    show.gripAt = damp(show.gripAt || 0, want, 1 / GRIP_ARM.secs, dt);
+    if (show.gripAt < 0.002) {
+      if (show.gripOn) {
+        for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+        show.gripOn = 0;
+      }
+      gripRest = null;
+      return;
+    }
+    if (!gripRest) {
+      gripRest = armChain(f);
+      if (!gripRest) return;
+    }
+    show.gripOn = 1;
+    // Your forearm in her frame, and the side of her it is on.
+    _gaL.copy(show.gripArm);
+    f.mesh.worldToLocal(_gaL);
+    const side = _gaL.z >= 0 ? 'L' : 'R';
+    const S = gripRest['armU' + side], E = gripRest['armL' + side], W = gripRest['hand' + side];
+    // Her wrist a hand's length short of your forearm, so it is her PALM on it.
+    _gaG.copy(_gaL);
+    _gaP.copy(_gaG).sub(S);
+    const L = _gaP.length();
+    if (L > 0.12) _gaG.addScaledVector(_gaP, -0.07 / L);
+    _gaG.lerpVectors(W, _gaG, show.gripAt);
+    _hugPole.set(0, -0.6, Math.sign(S.z || 1)).normalize();
+    wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _gaG, _hugPole);
+  }
+
+  /**
    * HER LEGS APART — `legs.spread`, and `legs.close` to undo it.
    *
    * Solved like the arms: each ankle goes out to her side from where the
@@ -40492,6 +40548,7 @@ async function buildJadrija(scene) {
     else if (show.legsWasOn) legsFlat(f, dt);
     // And apart, last, so it is laid over whatever the legs above have done.
     legsSpread(f, dt);
+    gripArm(f, dt);
     // And the reach, IF SOMETHING TOOK HER OUT OF IT. `tieHair` clears its own
     // aims on the way out and that covers the only exit it controls; the hose,
     // the turn and the room can all take her mid-gesture, and `aim` holds a
@@ -49599,9 +49656,29 @@ async function buildJadrija(scene) {
         out.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side });
       }
       const lo = bindPointAt(appr, [0.09, 0.93, 0], [['pelvis', 1]], new THREE.Vector3());
-      return { spots: out, low: { x: lo.x, y: lo.y, z: lo.z } };
+      // And her inner thighs — where the hand goes when you aim at the middle
+      // of her, low: Misha, 24 Sep 2026, *"when cross-hairs on crotch area,
+      // the hand should extend closer to inner thigh"*. Skinned to each upper
+      // leg, facing forward off it.
+      const thighs = [];
+      for (const side of [1, -1]) {
+        const p = apprenticeThighBind(side);
+        if (!p) return null;
+        const bone = side > 0 ? 'legUL' : 'legUR';
+        const w = bindPointAt(appr, p, [[bone, 1]], new THREE.Vector3());
+        const b = bindPointAt(appr, [p[0] - 0.08, p[1], p[2]], [[bone, 1]], new THREE.Vector3());
+        const f = w.clone().sub(b).normalize();
+        thighs.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side });
+      }
+      return { spots: out, low: { x: lo.x, y: lo.y, z: lo.z }, thighs };
     },
-    cupTouch: (k) => { if (show) show.cupTouch = k; },
+    cupTouch: (k, arm) => {
+      if (!show) return;
+      show.cupTouch = k;
+      // Where your forearm is, world — for her hand on it (`gripArm`).
+      if (arm) { show.gripArm = show.gripArm || new THREE.Vector3(); show.gripArm.copy(arm); show.gripHave = 1; }
+      else show.gripHave = 0;
+    },
     /** How far out your thumb is, 0..1, handed over every frame by the app. */
     thumbTouch: (k) => { if (show) show.thumbK = k; },
     thumbReach: () => {
@@ -49967,6 +50044,7 @@ async function buildJadrija(scene) {
       // the two above — an aim that is running and an aim that expired look
       // identical from a still frame.
       gaze: +(show.gaze || 0).toFixed(2), gazeAt: +(show.gazeAt || 0).toFixed(3),
+      gripAt: +(show.gripAt || 0).toFixed(2), gripFor: +(show.gripFor || 0).toFixed(1),
       buzzNod: +(show.buzzNod || 0).toFixed(3),
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
