@@ -30653,7 +30653,9 @@ async function buildJadrija(scene) {
 
   if (PAYLOAD.human_skin_fr3d) {
     try {
-      skinFig = await loadSkin('human_skin_fr3d', {
+      // With an index finger and a thumb tip of her own — see 41-hands.js.
+      // v2.0 is built the same way, because she wears this palette.
+      skinFig = await loadSkinHands('human_skin_fr3d', {
         spec: 0.09,
         specPower: 24,
         face: true,
@@ -41586,6 +41588,8 @@ async function buildJadrija(scene) {
     let: [5.10, 5.45],
   };
   const lineRamp = (t, w) => sat((t - w[0]) / (w[1] - w[0]));
+  /** How far forward of the nostril's own axis the straw leans — see `dN`. */
+  const LINE_TILT = 20 * Math.PI / 180;
   /**
    * The plate's inner surface above its well floor at radius `r` — `PL_PROF`
    * read from the inside, which is what a straw lying in it or a finger
@@ -41617,34 +41621,134 @@ async function buildJadrija(scene) {
     half: 0.035 };
 
   /**
-   * THE PINCH, measured on this mesh. The rig has one bone for all four fingers
-   * and one for the thumb, so a pinch is a pivot at the knuckles and a swing of
-   * the thumb: 65 degrees of curl on top of the clip's relaxed 26 about the
-   * knuckle axis, and the thumb 35 degrees across the palm. That brings the
-   * thumb pad and the index pad to 8.0 mm apart, which is a 6.8 mm straw with
-   * 0.6 mm of skin either side.
+   * THE PINCH: AN OK SIGN, thumb pad to index pad on the straw.
    *
-   * `grip` is the middle of that gap and `axis` is which way the straw runs
-   * through it, both in the BIND pose — the axis is the one of all those square
-   * to the pads with the most clearance from the rest of the hand, found by
-   * sampling the straw against the posed hand's own vertices. Everything here
-   * is bind-space figure axes, so it turns with the hand for free.
+   * Misha, 24 Sep 2026: *"her right hand wraps around in a scooping way, but
+   * instead, really she should bring up the straw with her thumb and index
+   * finger (like making an OK sign)"*. The pinch this replaces curled all four
+   * fingers 65 degrees round the straw, because the rig had one bone for all
+   * four and that is the only pinch one bone makes. The index has a chain of
+   * its own now and the thumb its two outer joints — see src/41-hands.js — so
+   * this is the pose a person makes: index curled at all three joints into a
+   * ring, thumb opposed to meet it, pads facing across the straw, and the
+   * middle, ring and little fingers left OUT in a gentle curve rather than
+   * folded round anything.
+   *
+   * SOLVED, NOT TYPED (tools/pinch_solve.py, on v2.0's own mesh with the same
+   * reweighting 41-hands.js does). The index was held near the angles of a
+   * real OK sign — 40, 60, 32 at its three joints — and everything else was
+   * fitted: index pad and thumb pad 7.6 mm apart, which is the 6.8 mm straw
+   * and a little skin; each pad facing the other at 0.85 or better; index and
+   * thumb nowhere nearer each other than 2.4 mm away from the pinch, so the O
+   * is open; and the straw, square to both pads, 2.7 mm clear of every other
+   * vertex of the hand along its whole length. Left free with the pads made to
+   * face squarely it ran every joint to its limit and made a fist.
+   *
+   * All bind-space figure axes. Angles are degrees; `t` is the thumb's turn at
+   * its root as a rotation vector. `grip` is the middle of the pads and `axis`
+   * points from it to the straw's top end, both with the hand at rest and the
+   * pinch closed, so they ride `handR` for free.
    */
   const PINCH = {
-    grip: [0.2650, 1.0191, 0.4199],
-    // WHICH END IS UP matters as much as the line. The same line through the
-    // pinch the other way round — top towards the wrist — measured the same
-    // clearance and hung her hand DOWN from a wrist held up at her face: 92 to
-    // 143 degrees of wrist bend, where a wrist does seventy. This way the top
-    // leaves the pinch towards the fingertips, so with it in her nose the wrist
-    // is below and the fingers point up at her face, which is how a straw is
-    // held there.
-    axis: [-0.118, -0.767, 0.631],
-    // Where the fingertips are, for keeping them out of the plate.
-    iTip: [0.3371, 1.0286, 0.4830], tTip: [0.3030, 1.0684, 0.4094],
-    fAxis: [0.496, 0.190, -0.847], fAng: 65 * Math.PI / 180,
-    tAxis: [0.040, -0.422, -0.906], tAng: 35 * Math.PI / 180,
+    f: 15,
+    i: [17.79, 41.86, 24.86], iab: 9.45,
+    t: [1.48, -3.93, -23.54], t4: -4.55, t5: 19.50,
+    grip: [0.2805, 1.0443, 0.4290],
+    // THE STRAW PIVOTS IN THE PINCH. Held between two pads, a straw turns
+    // freely about the line between them, and which way it points relative to
+    // the hand is the difference between a hand that can reach her nostril
+    // with a straight wrist and one that cannot reach the plate without its
+    // little finger going through it: the knuckles are 67 mm across, and
+    // square to the straw that is the whole height of the hand. So it is not a
+    // constant. `e` is the pad line, `n0` the straw with psi = 0 (square to
+    // the O), and `psis` the pivots at which the straw clears every other
+    // vertex of the hand (1.6 mm at -50 on the palm side, 1.7 at +10 on the
+    // back) — measured, beyond them it runs into the curled index or the
+    // fingers. The plan (`linePlanStart`) chooses one with the hand's turn.
+    e: [-0.3891, 0.6581, -0.6446], n0: [0.9127, 0.3702, -0.1730],
+    psis: [-50, -40, -30, -20, -10, 0, 10], psi0: -20,
+    // AND THE THREE FREE FINGERS MOVE WHEN THEY HAVE TO. Left out at 15
+    // degrees they are the OK sign; they are also seven centimetres of hand
+    // that, measured, went 6 to 22 mm into the plate at the bottom of the
+    // bend and 4 to 7 mm into her lip at her nose. A relaxed hand coming down
+    // on to a table curls them — or, palm down over a plate, where curling
+    // takes the tips further down, lifts them, little finger up: the negative
+    // curls, to 40 of hyperextension at the knuckle, which a hand does. The
+    // least of these that keeps them clear, with a small price on every
+    // degree off 15.
+    fs: [15, 0, -15, -30, -40, 35, 55, 75],
+    // The pads, on the last bone of each, and the tips.
+    padI: [0.3265, 1.0308, 0.4702], padT: [0.2970, 1.0715, 0.4218],
+    tipI: [0.3361, 1.0251, 0.4768], tipT: [0.3044, 1.0682, 0.4112],
   };
+  // The other three fingertips, 6 mm past their last joint, on `fingersR`.
+  PINCH.tips = [3, 4, 5].map((k) => {
+    const a = HAND_R.j[k * 10 + 3], b = HAND_R.j[k * 10 + 4];
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    return [0, 1, 2].map((c) => b[c] + (b[c] - a[c]) / d * 0.006);
+  });
+  const _pv = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+  const _aa = (ax, deg) => new THREE.Quaternion().setFromAxisAngle(_pv(ax).normalize(),
+    deg * Math.PI / 180);
+  const PINCH_Q = (() => {
+    const tv = _pv(PINCH.t).multiplyScalar(Math.PI / 180);
+    const ta = tv.length();
+    return {
+      f: _aa(HAND_R.aF, PINCH.f),
+      i1: _aa(HAND_R.aI[0], PINCH.i[0]).multiply(_aa(HAND_R.vol, PINCH.iab)),
+      i2: _aa(HAND_R.aI[1], PINCH.i[1]),
+      i3: _aa(HAND_R.aI[2], PINCH.i[2]),
+      t: ta > 1e-9 ? new THREE.Quaternion().setFromAxisAngle(tv.normalize(), ta)
+        : new THREE.Quaternion(),
+      t4: _aa(HAND_R.aT[1], PINCH.t4),
+      t5: _aa(HAND_R.aT[2], PINCH.t5),
+    };
+  })();
+  const _pid = new THREE.Quaternion();
+  /** The straw's direction through the pinch at pivot `psi` degrees, bind. */
+  function pinchAxis(psi, out) {
+    return out.set(PINCH.n0[0], PINCH.n0[1], PINCH.n0[2])
+      .applyAxisAngle(_pv(PINCH.e).normalize(), psi * Math.PI / 180).normalize();
+  }
+  /**
+   * Every finger bone's turn RELATIVE TO THE HAND, bind space, with the pinch
+   * `g` of the way closed: from what the clip had (`RF`, `RT`) to the OK sign.
+   * The added bones are at their parent's turn in every clip, so their "clip"
+   * is identity on top of it.
+   */
+  function pinchRel(g, RF, RT, fDeg = PINCH.f, out = {}) {
+    const s = (q0, q1) => q0.clone().slerp(q1, g);
+    // The three free fingers at `fDeg` of curl — see `PINCH.fs`. The index
+    // hangs off the same bone, so its knuckle is set to where the OK sign
+    // wants it OUTRIGHT and not on top of the fingers: curling the three does
+    // not move the pinch.
+    out.fingersR = s(RF, fDeg === PINCH.f ? PINCH_Q.f : _aa(HAND_R.aF, fDeg));
+    out.idx1R = s(RF, PINCH_Q.f.clone().multiply(PINCH_Q.i1));
+    out.idx2R = out.idx1R.clone().multiply(s(_pid, PINCH_Q.i2));
+    out.idx3R = out.idx2R.clone().multiply(s(_pid, PINCH_Q.i3));
+    out.thumbR = s(RT, PINCH_Q.t);
+    out.thb2R = out.thumbR.clone().multiply(s(_pid, PINCH_Q.t4));
+    out.thb3R = out.thb2R.clone().multiply(s(_pid, PINCH_Q.t5));
+    return out;
+  }
+  const PINCH_PARENT = { fingersR: 'handR', thumbR: 'handR', idx1R: 'handR',
+    idx2R: 'idx1R', idx3R: 'idx2R', thb2R: 'thumbR', thb3R: 'thb2R' };
+  /**
+   * A bind-space point on finger bone `bone`, carried by the relative turns
+   * `rel`, still in the hand's bind frame — so the caller maps it on with the
+   * hand's own turn like any other point rigid to the hand.
+   */
+  function pinchPt(f, rel, bone, p, out) {
+    const H = bindHeadsOf(f);
+    const hd = (b) => H.T[f.boneIndex(b)];
+    const chain = [];
+    for (let b = bone; b !== 'handR'; b = PINCH_PARENT[b]) chain.unshift(b);
+    const W = new THREE.Vector3().copy(hd(chain[0]));
+    for (let k = 1; k < chain.length; k++) {
+      W.add(hd(chain[k]).clone().sub(hd(chain[k - 1])).applyQuaternion(rel[chain[k - 1]]));
+    }
+    return out.copy(p).sub(hd(bone)).applyQuaternion(rel[bone]).add(W);
+  }
 
   const _lb = {
     v: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(() => new THREE.Vector3()),
@@ -41735,6 +41839,14 @@ async function buildJadrija(scene) {
     // Her nostril and which way it opens, both off the mesh.
     const N = bindPointAt(f, NOSE.nostrilR, NOSE.w, _lb.v[3]);
     const dN = bindPointAt(f, NOSE.out, NOSE.w, _lb.v[4]).sub(N).normalize();
+    // Tipped forward, away from her mouth. The nostril opens 17 degrees off
+    // straight down, and along that a pinch 22 mm under it is ON her upper
+    // lip: measured, 4 mm of index tip in it however the hand turned. A straw
+    // is not a tube bored into a face; five millimetres of it in a nostril
+    // can lean, and 20 degrees more puts the pinch 9 mm out in front of her.
+    const fwd = _lb.v[6].set(1, 0, 0).applyQuaternion(f.mesh.quaternion);
+    fwd.addScaledVector(dN, -fwd.dot(dN)).normalize();
+    dN.multiplyScalar(Math.cos(LINE_TILT)).addScaledVector(fwd, Math.sin(LINE_TILT)).normalize();
     const inside = _lb.v[5].copy(N).addScaledVector(dN, -STRAW.ins);
     // Hanging from just under the nose, pointing out of it: where the lift ends.
     _posePre.top.copy(inside).addScaledVector(dN, STRAW.ins + STRAW.pre);
@@ -41792,8 +41904,7 @@ async function buildJadrija(scene) {
     const W = f.boneAt(iW, _lb.v[0]);
     const G = _lb.v[1].set(PINCH.grip[0], PINCH.grip[1], PINCH.grip[2])
       .sub(H.T[iW]).applyQuaternion(Dh).add(W);
-    const A = _lb.v[2].set(PINCH.axis[0], PINCH.axis[1], PINCH.axis[2])
-      .normalize().applyQuaternion(Dh);
+    const A = pinchAxis(LB.psi == null ? PINCH.psi0 : LB.psi, _lb.v[2]).applyQuaternion(Dh);
     f.mesh.localToWorld(G);
     A.applyQuaternion(f.mesh.quaternion);
     out.D.copy(A).negate();
@@ -41804,7 +41915,8 @@ async function buildJadrija(scene) {
 
   /** Hand the arm, the hand and the fingers back to the clip. */
   function lineClear(f) {
-    for (const n of ['armUR', 'armLR', 'handR', 'fingersR', 'thumbR']) f.aim(n, 0, 1, 0, 0);
+    for (const n of ['armUR', 'armLR', 'handR', 'fingersR', 'thumbR', 'idx1R', 'idx2R', 'idx3R',
+      'thb2R', 'thb3R']) f.aim(n, 0, 1, 0, 0);
   }
 
   /**
@@ -41814,239 +41926,696 @@ async function buildJadrija(scene) {
    * last frame have been cleared and the skin re-evaluated before this runs,
    * so there is no cached rest chain and nothing to carry). The target is a
    * FRAME and not a point: the pinch's grip point on the straw's grip point,
-   * the pinch's straw axis along the straw, and the one free turn about that
-   * axis chosen so the wrist lies on the side of the straw facing her
-   * shoulder — which is where a forearm comes from.
+   * the straw along the pinch's axis at the pivot the plan gives, and the
+   * one free turn of the hand about the straw the plan gives too — see
+   * `linePlanStart`, which is where those two are chosen, once a beat.
+   *
+   * `lineScorer` is everything a candidate hand is judged by, built once a
+   * beat and shared by the plan and by the frame: the wrist bend it needs,
+   * anything of it under the plate, an arm too short to get there, its bulk
+   * in her face, and the curl the three free fingers need to stay out of both.
    */
-  function lineHand(f, dt, pose, reachAmt, gripAmt, faceAmt, lineT) {
+  function lineScorer(f) {
     const H = bindHeadsOf(f);
-    const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'), iW = f.boneIndex('handR');
-    if (iS < 0 || iE < 0 || iW < 0) return;
-    const S = f.boneAt(iS, new THREE.Vector3());
-    const E = f.boneAt(iE, new THREE.Vector3());
-    const Wc = f.boneAt(iW, new THREE.Vector3());
-    const Tc = f.boneTurn(iW, new THREE.Quaternion());
-    const inv = f.mesh.quaternion.clone().invert();
-    // The target frame, figure space.
-    const At = pose.D.clone().negate().applyQuaternion(inv).normalize();
-    const Gt = f.mesh.worldToLocal(pose.top.clone())
-      .addScaledVector(At, -STRAW.len * (1 - STRAW.gripT));
-    // A hand coming down on to a straw lying on a plate comes down on it: a
-    // few millimetres of hover while the fingers close, and more below if the
-    // open fingers need it — see `lift`.
-    const upF = _up.clone().applyQuaternion(inv);
-    Gt.addScaledVector(upF, 0.006 * (1 - gripAmt));
-    // The pinch's own frame, bind space.
+    const bi = (n) => f.boneIndex(n);
+    const iS = bi('armUR'), iE = bi('armLR'), iW = bi('handR'), iT = bi('chest');
     const Wb = H.T[iW];
     const Gb = new THREE.Vector3(PINCH.grip[0], PINCH.grip[1], PINCH.grip[2]);
-    const Ab = new THREE.Vector3(PINCH.axis[0], PINCH.axis[1], PINCH.axis[2]).normalize();
-    const ub = Wb.clone().sub(Gb);
-    ub.addScaledVector(Ab, -ub.dot(Ab)).normalize();
-    // ── WHICH WAY ROUND THE STRAW THE HAND SITS ────────────────────────
-    //
-    // The pinch fixes everything about the hand but one turn about the straw
-    // itself, and that turn is the difference between a wrist and a
-    // contortion. It was chosen by a rule — wrist towards her shoulder — and
-    // the rule measured 92 to 143 degrees of wrist bend. So it is SEARCHED:
-    // twenty-four turns, and for each one the elbow the two-bone solve would
-    // give, the forearm that makes, and the angle between that forearm and the
-    // hand. The least bend wins, with two costs on top — any fingertip,
-    // knuckle or wrist below the plate's surface, and a jump from last frame's
-    // turn, which keeps the answer from flicking between two near-equal ones.
-    const Fb = H.T[f.boneIndex('fingersR')], Tb = H.T[f.boneIndex('thumbR')];
-    const RF = Tc.clone().invert().multiply(f.boneTurn(f.boneIndex('fingersR'), new THREE.Quaternion()));
-    const RT = Tc.clone().invert().multiply(f.boneTurn(f.boneIndex('thumbR'), new THREE.Quaternion()));
-    // THE FACE, which the hand has to stay out of. The least wrist bend on its
-    // own put her palm up in front of her mouth — inside it, with only the
-    // bracelet and her nails showing either side of the straw — because
-    // nothing told the search there was a face there. So the skinned vertices
-    // round her nose and mouth are in it, and the BULK of the hand is tested
-    // against them: wrist, knuckles, the base of the thumb and the palm, as
-    // well as the tips. Only while the straw is anywhere near her face.
-    const face = faceAmt > 0.02 ? faceNear(f, true) : null;
+    const Fb = H.T[bi('fingersR')], Tb = H.T[bi('thumbR')];
+    const hb = Fb.clone().sub(Wb).normalize();
+    // Bone lengths do not animate, so the bind pose's are the arm's.
+    const l1 = H.T[iE].distanceTo(H.T[iS]), l2 = H.T[iW].distanceTo(H.T[iE]);
+    // The closed pinch. With it closed the finger bones' turns do not depend
+    // on what the clip had them doing, so all of this is fixed in the hand.
+    const relC = pinchRel(1, _pid, _pid);
+    // THE BULK, which is what ended up in her mouth: wrist, knuckles, the
+    // base of the thumb, the palm — and with the OK sign the index's middle
+    // joint and the thumb's last, which are the knuckles nearest her face.
     const bulk = [Wb.clone(), Fb.clone(), Tb.clone(), Wb.clone().lerp(Fb, 0.5),
-      Wb.clone().lerp(Tb, 0.6)];
-    const toFig = new THREE.Matrix4().copy(f.mesh.matrixWorld).invert();
-    // The hand's low points in bind space with `g` of the pinch in them.
-    const lowsAt = (g) => {
-      const PF = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(...PINCH.fAxis).normalize(), PINCH.fAng * g).multiply(RF);
-      const PT = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(...PINCH.tAxis).normalize(), PINCH.tAng * g).multiply(RT);
-      return [
-        new THREE.Vector3(...PINCH.iTip).sub(Fb).applyQuaternion(PF).add(Fb),
-        new THREE.Vector3(...PINCH.tTip).sub(Tb).applyQuaternion(PT).add(Tb),
-        Fb.clone(), Wb.clone(),
-      ];
+      Wb.clone().lerp(Tb, 0.6),
+      pinchPt(f, relC, 'idx2R', H.T[bi('idx2R')], new THREE.Vector3()),
+      pinchPt(f, relC, 'thb3R', H.T[bi('thb3R')], new THREE.Vector3())];
+    // The low points: the two tips that hold the straw, the knuckles, the
+    // wrist. And the three free fingertips at each curl they may be given.
+    const lows = [pinchPt(f, relC, 'idx3R', _pv(PINCH.tipI), new THREE.Vector3()),
+      pinchPt(f, relC, 'thb3R', _pv(PINCH.tipT), new THREE.Vector3()), Fb.clone(), Wb.clone()];
+    const othersF = PINCH.fs.map((fd) => {
+      const rel = pinchRel(1, _pid, _pid, fd);
+      return PINCH.tips.map((t) => pinchPt(f, rel, 'fingersR', _pv(t), new THREE.Vector3()));
+    });
+    const basis = (a, u, q) => {
+      const w = new THREE.Vector3().crossVectors(a, u);
+      _lb.m.makeBasis(a, u, w);
+      return q.setFromRotationMatrix(_lb.m);
     };
-    // CHOSEN WITH THE PINCH CLOSED, whatever the fingers are doing this frame.
-    // Chosen with them as they are, the best turn changed as they closed — the
-    // open fingers are what touch the plate — and measured, the hand flipped
-    // between 58, 91 and 14 degrees of wrist bend on three frames running,
-    // the elbow jumping 38 degrees with it. The closed hand is the one that
-    // has to hold the straw; the open one is kept off the plate by lifting it
-    // (below), which does not need a different turn.
-    const lows = lowsAt(1);
-    // THE PINCH IS SHAPED ON THE WAY THERE. A hand reaching for something
-    // small closes most of the way while it travels and only finishes on it —
-    // an open hand has fingers that reach seven centimetres past the pinch,
-    // and measured, closing only at the straw meant hovering that high and
-    // then dropping on to it in a fifth of a second.
-    const curl = Math.max(gripAmt, 0.6 * reachAmt);
+    // The pinch's frame at each pivot, bind space: the straw's axis, and the
+    // way back to the wrist square to it.
+    const frames = new Map();
+    const frameAt = (psi) => {
+      const key = Math.round(psi * 100);
+      if (frames.has(key)) return frames.get(key);
+      const Ab = pinchAxis(psi, new THREE.Vector3());
+      const ub = Wb.clone().sub(Gb);
+      ub.addScaledVector(Ab, -ub.dot(Ab)).normalize();
+      const q = basis(Ab, ub, new THREE.Quaternion()).invert();
+      if (frames.size < 64) frames.set(key, q);
+      return q;
+    };
     // The plate's floor and centre in figure space: a hand point only has a
     // surface under it when it is over the plate (its lathe profile) or over
     // the tabouret round it (a centimetre under the plate's floor).
-    const pc = cokeKit ? f.mesh.worldToLocal(cokeKit.g.getWorldPosition(new THREE.Vector3())) : null;
+    const sc = { l1, l2, Wb, Gb, hb, lows, othersF, frameAt, basis, pc: null };
+    sc.plate = () => {
+      sc.pc = cokeKit ? f.mesh.worldToLocal(cokeKit.g.getWorldPosition(new THREE.Vector3())) : null;
+    };
     const surfAt = (p) => {
+      const pc = sc.pc;
       if (!pc) return -1e9;
       const r = Math.hypot(p.x - pc.x, p.z - pc.z);
       if (r < 0.105) return pc.y + plateSurf(r);
       if (r < 0.150) return pc.y - 0.010;
       return -1e9;
     };
-    const l1 = E.distanceTo(S), l2 = Wc.distanceTo(E);
-    const hb = Fb.clone().sub(Wb).normalize();
-    const pole = REACH_POLE.clone().lerp(FACE_POLE, faceAmt).normalize();
-    const iT = f.boneIndex('chest');
-    if (iT >= 0) pole.applyQuaternion(f.boneTurn(iT, new THREE.Quaternion()));
-    const r1 = S.clone().sub(Gt);
-    r1.addScaledVector(At, -r1.dot(At));
-    if (r1.lengthSq() < 1e-8) r1.set(0, 1, 0).addScaledVector(At, -At.y);
-    r1.normalize();
-    const r2 = new THREE.Vector3().crossVectors(At, r1);
-    const basis = (a, u, q) => {
-      const w = new THREE.Vector3().crossVectors(a, u);
-      _lb.m.makeBasis(a, u, w);
-      return q.setFromRotationMatrix(_lb.m);
-    };
-    const Bb = basis(Ab, ub, new THREE.Quaternion()).invert();
-    // AND WHERE THE LIFT IS GOING. The twist is rate-limited — see below — so
-    // a turn that only becomes necessary as the hand arrives under her nose
-    // arrives late: measured, one frame of knuckles 13 mm into her chin. So
-    // while she is lifting, every turn is also scored against the face at the
-    // pose the lift ENDS in (`_posePre`, hanging just under her nostril), and
-    // the hand is already turned the right way when it gets there.
-    let pre = null;
-    if (face && lineT != null && lineT < LINE.insert[0]) {
-      const Ap = _posePre.D.clone().negate().applyQuaternion(inv).normalize();
-      const Gp = f.mesh.worldToLocal(_posePre.top.clone())
-        .addScaledVector(Ap, -STRAW.len * (1 - STRAW.gripT));
-      const q1 = S.clone().sub(Gp);
-      q1.addScaledVector(Ap, -q1.dot(Ap));
-      if (q1.lengthSq() < 1e-8) q1.set(0, 1, 0).addScaledVector(Ap, -Ap.y);
+    sc.surfAt = surfAt;
+    /**
+     * A CONTEXT is what a candidate is scored against at one instant: the
+     * shoulder, the straw's axis and grip point, the elbow's pole and the
+     * face, all figure space. `r1`, `r2` are what the hand's turn about the
+     * straw is measured from — towards the shoulder — so a turn means the
+     * same thing at every instant, which is what lets a plan made off the
+     * clip be played back on the frame.
+     */
+    sc.ctx = (pose, faceAmt, gripAmt, face) => {
+      const inv = f.mesh.quaternion.clone().invert();
+      const A = pose.D.clone().negate().applyQuaternion(inv).normalize();
+      const G = f.mesh.worldToLocal(pose.top.clone())
+        .addScaledVector(A, -STRAW.len * (1 - STRAW.gripT));
+      // A hand coming down on to a straw lying on a plate comes down on it: a
+      // few millimetres of hover while the fingers close.
+      const upF = _up.clone().applyQuaternion(inv);
+      G.addScaledVector(upF, 0.006 * (1 - gripAmt));
+      const S = f.boneAt(iS, new THREE.Vector3());
+      // The elbow is out and back over the plate, down and forward at her
+      // face, carried by her chest so it means the same at any depth of stoop.
+      const pole = REACH_POLE.clone().lerp(FACE_POLE, faceAmt).normalize();
+      if (iT >= 0) pole.applyQuaternion(f.boneTurn(iT, new THREE.Quaternion()));
+      const q1 = S.clone().sub(G);
+      q1.addScaledVector(A, -q1.dot(A));
+      if (q1.lengthSq() < 1e-8) q1.set(0, 1, 0).addScaledVector(A, -A.y);
       q1.normalize();
-      pre = { A: Ap, G: Gp, r1: q1, r2: new THREE.Vector3().crossVectors(Ap, q1) };
-    }
-    const Dp = new THREE.Quaternion(), up2 = new THREE.Vector3();
-    const ut = new THREE.Vector3(), Dq = new THREE.Quaternion();
-    const Wt = new THREE.Vector3(), u = new THREE.Vector3(), v = new THREE.Vector3();
-    const elb = new THREE.Vector3(), fore = new THREE.Vector3(), tmp = new THREE.Vector3();
-    let best = null;
-    const N = 24;
-    for (let k = 0; k < N; k++) {
-      const phi = (k / N) * Math.PI * 2;
-      ut.copy(r1).multiplyScalar(Math.cos(phi)).addScaledVector(r2, Math.sin(phi));
-      basis(At, ut, Dq).multiply(Bb);
-      Wt.copy(Wb).sub(Gb).applyQuaternion(Dq).add(Gt);
-      // The elbow, the way `wheelLimb` places it.
-      u.copy(Wt).sub(S);
+      return { S, A, G, pole, face, upF, r1: q1, r2: new THREE.Vector3().crossVectors(A, q1) };
+    };
+    const ut = new THREE.Vector3(), Wt = new THREE.Vector3(), u = new THREE.Vector3();
+    const v = new THREE.Vector3(), elb = new THREE.Vector3(), fore = new THREE.Vector3();
+    const tmp = new THREE.Vector3(), Dc = new THREE.Quaternion();
+    /** The hand's turn for a turn `phi` about the straw, at pinch frame `Bb`. */
+    sc.handQ = (c, Bb, phi, out) => {
+      ut.copy(c.r1).multiplyScalar(Math.cos(phi)).addScaledVector(c.r2, Math.sin(phi));
+      return basis(c.A, ut, out).multiply(Bb);
+    };
+    /** Where the elbow goes for a wrist at `W`, the way `wheelLimb` puts it. */
+    sc.elbow = (c, W, out) => {
+      u.copy(W).sub(c.S);
       const dl = u.length() || 1e-3;
       u.multiplyScalar(1 / dl);
       const d = clamp(dl, Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
       const ca = clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
-      const sa = Math.sqrt(1 - ca * ca);
-      v.copy(pole).addScaledVector(u, -pole.dot(u));
+      v.copy(c.pole).addScaledVector(u, -c.pole.dot(u));
       if (v.lengthSq() < 1e-8) v.set(1, 0, 0).addScaledVector(u, -u.x);
       v.normalize();
-      elb.copy(S).addScaledVector(u, l1 * ca).addScaledVector(v, l1 * sa);
+      out.copy(c.S).addScaledVector(u, l1 * ca).addScaledVector(v, l1 * Math.sqrt(1 - ca * ca));
+      return dl;
+    };
+    /** The least curl of the three free fingers that keeps them 7 mm off
+     *  whatever is under them — 4 left the little finger grazing the rim
+     *  between samples — and 15 mm off her face, and what that costs. */
+    sc.fingers = (c, D, all = null) => {
+      let fk = 0, fPen = 1e9;
+      for (let q = 0; q < othersF.length; q++) {
+        let pen = 0.25 * Math.abs(PINCH.fs[q] - PINCH.f);
+        for (const p of othersF[q]) {
+          tmp.copy(p).sub(Gb).applyQuaternion(D).add(c.G);
+          pen += 20000 * Math.max(0, surfAt(tmp) + 0.007 - tmp.y);
+          if (c.face) pen += 6000 * Math.max(0, 0.015 - faceSigned(c.face, tmp));
+        }
+        if (all) all[q] = pen;
+        if (pen < fPen) { fPen = pen; fk = q; }
+      }
+      return [fk, fPen];
+    };
+    /** Everything one candidate costs at one instant. */
+    sc.score = (c, Bb, phi, fAll = null) => {
+      const D = sc.handQ(c, Bb, phi, Dc);
+      Wt.copy(Wb).sub(Gb).applyQuaternion(D).add(c.G);
+      const dl = sc.elbow(c, Wt, elb);
       fore.copy(Wt).sub(elb).normalize();
-      const bend = fore.angleTo(tmp.copy(hb).applyQuaternion(Dq)) * 180 / Math.PI;
+      const bend = fore.angleTo(tmp.copy(hb).applyQuaternion(D)) * 180 / Math.PI;
       let under = 0;
-      for (const p of lows) {
-        tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
+      // Where the frame lifts the pinch clear of the plate itself (`c.pick`,
+      // see `LB.pick`), the two tips that hold the straw are not the plan's
+      // problem: counted anyway, they priced every turn that puts a straw
+      // down with a wrist under 87 degrees out of the plan.
+      for (let j = c.pick ? 2 : 0; j < lows.length; j++) {
+        tmp.copy(lows[j]).sub(Gb).applyQuaternion(D).add(c.G);
         under = Math.max(under, surfAt(tmp) + 0.004 - tmp.y);
       }
       // Short of reach is a cost too: an arm that cannot get there is a hand
       // that is somewhere else.
       const short = Math.max(0, dl - (l1 + l2) * 0.999);
       let inFace = 0;
-      if (face) {
+      if (c.face) {
         for (const p of bulk) {
-          tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
-          inFace = Math.max(inFace, 0.012 - faceSigned(face, tmp));
+          tmp.copy(p).sub(Gb).applyQuaternion(D).add(c.G);
+          inFace = Math.max(inFace, 0.012 - faceSigned(c.face, tmp));
         }
+        // The pinching tips may come close — they are holding a straw in her
+        // nose. The three free fingers keep their margin in `fingers`.
         for (const p of lows) {
-          tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
-          inFace = Math.max(inFace, 0.002 - faceSigned(face, tmp));
+          tmp.copy(p).sub(Gb).applyQuaternion(D).add(c.G);
+          inFace = Math.max(inFace, 0.002 - faceSigned(c.face, tmp));
         }
       }
-      const dphi = LB.phi == null ? 0
-        : Math.abs(Math.atan2(Math.sin(phi - LB.phi), Math.cos(phi - LB.phi)));
-      if (pre) {
-        up2.copy(pre.r1).multiplyScalar(Math.cos(phi)).addScaledVector(pre.r2, Math.sin(phi));
-        basis(pre.A, up2, Dp).multiply(Bb);
-        for (const p of bulk) {
-          tmp.copy(p).sub(Gb).applyQuaternion(Dp).add(pre.G);
-          inFace = Math.max(inFace, 0.012 - faceSigned(face, tmp));
+      const [fk, fPen] = sc.fingers(c, D, fAll);
+      // Anything under the plate costs twenty a millimetre: a closed hand is
+      // never lifted clear of it (see `lineHand`), so a pinch that needed
+      // lifting would be a straw pulled off her nostril.
+      const cost = bend + under * 20000 + short * 40000 + inFace * 6000 + fPen;
+      return { cost, bend, under, short, inFace, fk };
+    };
+    /**
+     * `score` for every turn `b / NT` of a full circle at once, into `cost`
+     * (NT), `why` (NT × 5: bend, under mm, short mm, in-face mm, curl) and
+     * `fAll` (NT × curls) — the same numbers, a fifth of the time. The turns
+     * differ only by a rotation about the straw, so every point of the hand is
+     * put through the rest of the frame once and each turn is one Rodrigues
+     * rotation of it: scored one at a time the plan spent 430 ms on 15 000 of
+     * them, in 50 ms frames, as she settled on her mark.
+     */
+    const rowTmp = [0, 1, 2, 3, 4].map(() => new THREE.Vector3());
+    sc.scoreRow = (c, Bb, NT, cost, why, fAll) => {
+      const A = c.A, G = c.G;
+      const M0 = basis(A, c.r1, new THREE.Quaternion()).multiply(Bb);
+      const off = (p) => p.clone().sub(Gb).applyQuaternion(M0);
+      const oW = off(Wb), oH = hb.clone().applyQuaternion(M0);
+      const oLow = lows.map(off), oBulk = bulk.map(off);
+      const oOther = othersF.map((a) => a.map(off));
+      const NF = othersF.length;
+      const [P, H, E, F, X] = rowTmp;
+      let cs = 1, sn = 0;
+      const rotA = (v, out) => {
+        const d = A.x * v.x + A.y * v.y + A.z * v.z;
+        out.crossVectors(A, v).multiplyScalar(sn).addScaledVector(v, cs).addScaledVector(A, d * (1 - cs));
+        return out;
+      };
+      const at = (v) => rotA(v, P).add(G);
+      for (let b = 0; b < NT; b++) {
+        const phi = (b / NT) * Math.PI * 2;
+        cs = Math.cos(phi); sn = Math.sin(phi);
+        const W = rotA(oW, X).add(G);
+        const dl = sc.elbow(c, W, E);
+        F.copy(W).sub(E).normalize();
+        const bend = F.angleTo(rotA(oH, H)) * 180 / Math.PI;
+        let under = 0;
+        for (let j = c.pick ? 2 : 0; j < oLow.length; j++) {
+          const p = at(oLow[j]);
+          under = Math.max(under, surfAt(p) + 0.004 - p.y);
+        }
+        const short = Math.max(0, dl - (l1 + l2) * 0.999);
+        let inFace = 0;
+        if (c.face) {
+          for (const o of oBulk) inFace = Math.max(inFace, 0.012 - faceSigned(c.face, at(o)));
+          for (const o of oLow) inFace = Math.max(inFace, 0.002 - faceSigned(c.face, at(o)));
+        }
+        let fk = 0, fPen = 1e9;
+        for (let q = 0; q < NF; q++) {
+          let pen = 0.25 * Math.abs(PINCH.fs[q] - PINCH.f);
+          for (const o of oOther[q]) {
+            const p = at(o);
+            pen += 20000 * Math.max(0, surfAt(p) + 0.007 - p.y);
+            if (c.face) pen += 6000 * Math.max(0, 0.015 - faceSigned(c.face, p));
+          }
+          fAll[b * NF + q] = pen;
+          if (pen < fPen) { fPen = pen; fk = q; }
+        }
+        cost[b] = bend + under * 20000 + short * 40000 + inFace * 6000 + fPen;
+        why[b * 5] = bend;
+        why[b * 5 + 1] = under * 1e3;
+        why[b * 5 + 2] = short * 1e3;
+        why[b * 5 + 3] = inFace * 1e3;
+        why[b * 5 + 4] = PINCH.fs[fk];
+      }
+    };
+    return sc;
+  }
+
+  /**
+   * How far the straw is IN HER NOSE at clip time `lt`: from the insert to
+   * the end of `out`, where her head has come off it, ramped a tenth of a
+   * second either side. Not `face`, which is still 1 at the start of the way
+   * back down to the plate.
+   */
+  const lineInNose = (lt) => lineSS(lineRamp(lt, [LINE.insert[0] - 0.1, LINE.insert[0]]))
+    * (1 - lineSS(lineRamp(lt, [LINE.out[1], LINE.out[1] + 0.1])));
+
+  /** The three ramps every sub-step is made of, at clip time `lt`. */
+  const lineAmts = (lt) => ({
+    reach: lineSS(lineRamp(lt, LINE.reach)) * (1 - lineSS(lineRamp(lt, LINE.let))),
+    grip: lineSS(lineRamp(lt, LINE.grip)) * (1 - lineSS(lineRamp(lt, LINE.release))),
+    face: lineSS(lineRamp(lt, LINE.lift)) * (1 - lineSS(lineRamp(lt, LINE.back))),
+  });
+
+  /**
+   * THE PLAN: WHICH WAY ROUND THE STRAW THE HAND SITS, FOR THE WHOLE BEAT.
+   *
+   * The pinch fixes everything about the hand but two things: how far the
+   * straw has pivoted between the pads, and the hand's turn about the straw.
+   * Those two are the difference between a wrist and a contortion, a hand
+   * beside her face and a hand in her mouth, fingers over the plate and
+   * fingers through it — and the right answer for each changes as the beat
+   * goes on, because her face comes down to within 7 cm of the plate.
+   *
+   * CHOSEN FRAME BY FRAME, IT WAS NEVER SMOOTH. Greedy, each frame's best
+   * was a different pair from the last whenever the costs crossed: measured,
+   * a 135 degree change of mind on the way down to the line and a 60 degree
+   * one half way along it, and a hand rate-limited to turn only so fast then
+   * spent most of a second in the pose between the two, which is inside her
+   * face. Looking ahead to where each part ended helped one crossing and
+   * made the next one worse.
+   *
+   * So it is solved over the whole beat at once. The clip is sampled every
+   * tenth of a second from the reach to the straw going back down — her
+   * shoulder, her face, the straw where it will be — and at each sample all
+   * 120 pairs (five pivots, 24 turns) are scored exactly as a frame scores
+   * them. Then the cheapest PATH through the samples, by dynamic
+   * programming, with every step costing by how far the hand turns in it:
+   * free up to 15 degrees a tenth of a second, and steeply more past it. The
+   * frame plays the path back, interpolated, and turns only as fast as the
+   * path does. About 45 samples, done once as the reach begins.
+   */
+  function linePlanStart(f, i, sc) {
+    const psis = PINCH.psis, NP = psis.length, NT = 36;
+    const times = [];
+    // Every tenth of a second, and every twentieth where she is close to the
+    // plate — the last of the way down and the way back: the rim went by
+    // between two samples a tenth apart and her little finger went into it.
+    for (let t = LINE.reach[0]; t <= LINE.back[1] + 1e-6; t += 0.1) {
+      times.push(t);
+      if ((t >= 2.3 && t < 3.1) || (t >= 4.1 && t < 4.9)) times.push(t + 0.05);
+    }
+    return { f, i, sc, psis, NP, NT, NS: NP * NT, frames: psis.map((p) => sc.frameAt(p)),
+      times, k: 0, T: [], U: [], W: [], F: [], held: null, ms: 0, pose: strawPose() };
+  }
+
+  /**
+   * Sample up to `n` more instants of the beat, and leave the figure exactly
+   * as it was. SPREAD OVER FRAMES: the whole plan is about 45 samples of 252
+   * candidates, measured 190 ms on this machine — a frame that long, as the
+   * reach starts, is a hitch anybody would see. A few a frame from the top of
+   * the beat, while she settles on her mark, is not.
+   */
+  function linePlanStep(J, n) {
+    const t0 = performance.now();
+    const f = J.f, S = f.state;
+    if (!S.cur) { J.done = true; return; }
+    const save = { cur: S.cur, curT: S.curT, prev: S.prev, prevT: S.prevT,
+      fade: S.fade, fadeLen: S.fadeLen, next: S.next, overW: S.overW };
+    const held = LB.held;
+    LB.held = J.held;
+    const lt0 = show.lineT || 0;
+    // AND WHERE SHE WILL BE STANDING, FACING WHERE SHE WILL BE FACING. The
+    // line and the plate are in the world and the plan works in her frame,
+    // and at the top of the beat she is still sliding on to her mark and her
+    // yaw is still easing for a second and a half after that: 1.35 degrees of
+    // it measured 15 mm of line in her frame at 0.64 m, and a plan made
+    // facing the way she was put her little finger 25 mm into the tabouret.
+    const P0 = f.mesh.position.clone(), yaw0 = f.mesh.rotation.y;
+    const LM = lineMark(J.i);
+    if (LM) {
+      const w = toWorld(LM[0], LM[1]);
+      f.mesh.position.x = w[0];
+      f.mesh.position.z = w[2];
+      f.mesh.rotation.y = faceYaw(LM[0], LM[2] + (show.side || 0));
+    } else f.mesh.rotation.y = faceYaw(show.t, show.want + (show.side || 0));
+    f.mesh.updateMatrixWorld();
+    J.sc.plate();
+    const { NP, NT, NS, frames } = J;
+    for (let m = 0; m < n && J.k < J.times.length; m++, J.k++) {
+      const t = J.times[J.k];
+      S.prev = null;
+      S.overW = 0;
+      S.curT = save.curT + (t - lt0);
+      f.update(0);
+      f.mesh.updateMatrixWorld();
+      const am = lineAmts(t);
+      lineStrawPose(f, t, J.i, lineSS(lineRamp(t, LINE.along)), J.pose);
+      const face = am.face > 0.02 ? faceNear(f, true) : null;
+      const c = J.sc.ctx(J.pose, am.face, am.grip, face);
+      c.pick = am.grip > 0.5 && lineInNose(t) < 0.5;
+      const u = new Float32Array(NS);
+      const why = new Float32Array(NS * 5);
+      const NF = PINCH.fs.length;
+      const fp = new Float32Array(NS * NF), fAll = new Float32Array(NF);
+      for (let a = 0; a < NP; a++) {
+        J.sc.scoreRow(c, frames[a], NT, u.subarray(a * NT, (a + 1) * NT),
+          why.subarray(a * NT * 5, (a + 1) * NT * 5), fp.subarray(a * NT * NF, (a + 1) * NT * NF));
+      }
+      // `scoreRow` against `score`, once a plan, on every fifth turn: the
+      // largest difference in cost, which the probe reports (`planCheck`).
+      if (J.check == null) {
+        J.check = 0;
+        for (let a = 0; a < NP; a++) {
+          for (let b = 0; b < NT; b += 5) {
+            const r = J.sc.score(c, frames[a], (b / NT) * Math.PI * 2, fAll);
+            J.check = Math.max(J.check, Math.abs(r.cost - u[a * NT + b]));
+          }
         }
       }
-      const cost = bend + under * 4000 + short * 4000 + inFace * 6000 + dphi * 4;
-      if (!best || cost < best.cost) best = { cost, phi, bend, under, short };
+      J.T.push(t);
+      J.U.push(u);
+      J.W.push(why);
+      J.F.push(fp);
+      linePlanForward(J);
     }
-    LB.bestBend = best.bend;
-    // And it DRIFTS to the best turn rather than jumping to it: at most 150
-    // degrees a second, so the one free turn of the hand is always a
-    // movement and never a cut.
-    if (LB.phi == null) LB.phi = best.phi;
-    else {
-      const dp = Math.atan2(Math.sin(best.phi - LB.phi), Math.cos(best.phi - LB.phi));
-      const cap = (150 * Math.PI / 180) * Math.max(dt, 1 / 240);
-      LB.phi += clamp(dp, -cap, cap);
+    J.held = LB.held;
+    Object.assign(S, save);
+    LB.held = held;
+    f.mesh.position.copy(P0);
+    f.mesh.rotation.y = yaw0;
+    f.update(0);
+    f.mesh.updateMatrixWorld();
+    J.sc.plate();
+    J.done = J.k >= J.times.length;
+    J.ms += performance.now() - t0;
+    J.worst = Math.max(J.worst || 0, performance.now() - t0);
+  }
+
+  /**
+   * One step of the path, as each sample comes in, so that no frame has to
+   * do all of it: at the end of the samples, the whole thing in one go was a
+   * 55 ms frame just as the reach started.
+   *
+   * A step's price is its turn plus its pivot, in degrees: a fifth of a unit
+   * a degree anywhere, and 3 a degree SQUARED past what 120 degrees a second
+   * allows in the time between the two samples, which are not evenly spaced.
+   * At 0.3 it was cheaper to take one 10 degree step in a twentieth of a
+   * second than to spread it, and the hand turned at 200.
+   */
+  function linePlanForward(J) {
+    const { psis, NT, NS, T, U } = J;
+    if (!J.DB) {
+      const dG = 360 / NT;
+      J.DB = new Float32Array(NS * NS);
+      J.DP = new Float32Array(NS * NS);
+      for (let p = 0; p < NS; p++) {
+        for (let q = 0; q < NS; q++) {
+          let db = Math.abs((p % NT) - (q % NT)) * dG;
+          db = Math.min(db, 360 - db);
+          J.DB[p * NS + q] = db;
+          J.DP[p * NS + q] = Math.abs(psis[Math.floor(p / NT)] - psis[Math.floor(q / NT)]);
+        }
+      }
     }
-    ut.copy(r1).multiplyScalar(Math.cos(LB.phi)).addScaledVector(r2, Math.sin(LB.phi));
-    basis(At, ut, Dq).multiply(Bb);
+    const k = U.length - 1;
+    if (k === 0) { J.acc = Float32Array.from(U[0]); J.back = []; return; }
+    const { DB, DP, acc } = J;
+    const nxt = new Float32Array(NS), from = new Int16Array(NS);
+    const lim = 120 * (T[k] - T[k - 1]);
+    for (let q = 0; q < NS; q++) {
+      let bv = Infinity, bp = 0;
+      for (let p = 0; p < NS; p++) {
+        const i = p * NS + q;
+        const ov = Math.max(0, DB[i] - lim) + Math.max(0, DP[i] - lim);
+        const v = acc[p] + 0.2 * (DB[i] + DP[i]) + 3 * ov * ov;
+        if (v < bv) { bv = v; bp = p; }
+      }
+      nxt[q] = bv + U[k][q];
+      from[q] = bp;
+    }
+    J.back.push(from);
+    J.acc = nxt;
+  }
+
+  /** The path through the samples, once they are all in. */
+  function linePlanFinish(J) {
+    const t0 = performance.now();
+    const { psis, NT, NS, T, U, W } = J;
+    const dG = 360 / NT;
+    const K = T.length;
+    const acc = J.acc, back = J.back;
+    let s = 0;
+    for (let q = 1; q < NS; q++) if (acc[q] < acc[s]) s = q;
+    const path = [s];
+    for (let k = K - 2; k >= 0; k--) { s = back[k][s]; path.unshift(s); }
+    // Unwrapped, so playing it back never takes the long way round.
+    const phi = [], psi = [], fd = [];
+    for (let k = 0; k < K; k++) {
+      let b = (path[k] % NT) * dG;
+      if (k) { while (b - phi[k - 1] > 180) b -= 360; while (b - phi[k - 1] < -180) b += 360; }
+      phi.push(b);
+      psi.push(psis[Math.floor(path[k] / NT)]);
+    }
+    // THE FREE FINGERS' CURL, PATHED TOO. Chosen sample by sample it was
+    // 15, then 55, then -15, then 0 — curl them for one tenth of a second,
+    // lift them the next — and a hand chasing that was 70 degrees from the
+    // one it needed when it needed it, with her little finger 25 mm into the
+    // plate. So for the path's own turn at each sample, every curl's price,
+    // and the cheapest sequence of curls a hand can follow: free to 18
+    // degrees a tenth of a second, steeply dearer past it.
+    const fs = PINCH.fs, NF = fs.length;
+    let fa = new Float32Array(NF);
+    for (let j = 0; j < NF; j++) fa[j] = J.F[0][path[0] * NF + j];
+    const fb = [];
+    for (let k = 1; k < K; k++) {
+      const nx = new Float32Array(NF), fr = new Int8Array(NF);
+      const limF = 180 * (T[k] - T[k - 1]);
+      for (let j = 0; j < NF; j++) {
+        let bv = Infinity, bp = 0;
+        for (let i2 = 0; i2 < NF; i2++) {
+          const d = Math.abs(fs[j] - fs[i2]);
+          const v = fa[i2] + 0.05 * d + 2 * Math.max(0, d - limF) ** 2;
+          if (v < bv) { bv = v; bp = i2; }
+        }
+        nx[j] = bv + J.F[k][path[k] * NF + j];
+        fr[j] = bp;
+      }
+      fb.push(fr);
+      fa = nx;
+    }
+    let sj = 0;
+    for (let j = 1; j < NF; j++) if (fa[j] < fa[sj]) sj = j;
+    const fpath = [sj];
+    for (let k = K - 2; k >= 0; k--) { sj = fb[k][sj]; fpath.unshift(sj); }
+    for (const j of fpath) fd.push(fs[j]);
+    // AND SMOOTHED, ONCE. The path lives on a grid, so it is a staircase, and
+    // a spline through a staircase is a hand that turns in jerks: on a 15
+    // degree grid, measured, 10 and 170 degrees a second on alternate frames.
+    // Two passes of smoothing fixed that and broke the plan — they blurred
+    // away the one sample where the hand HAD to be somewhere else, and her
+    // little finger went 17 mm into the plate's rim there. So the grid is 10
+    // degrees and the smoothing one 1-4-6-4-1 pass, ends kept.
+    const smooth = (a) => {
+      const b = a.slice();
+      for (let k = 0; k < a.length; k++) {
+        const at = (j) => a[clamp(j, 0, a.length - 1)];
+        b[k] = (at(k - 2) + 4 * at(k - 1) + 6 * a[k] + 4 * at(k + 1) + at(k + 2)) / 16;
+      }
+      a.splice(0, a.length, ...b);
+      return a;
+    };
+    smooth(phi);
+    smooth(psi);
+    const why = (k, q) => ({ psi: psis[Math.floor(q / NT)], phi: (q % NT) * dG, cost: +U[k][q].toFixed(0),
+      bend: +W[k][q * 5].toFixed(0), under: +W[k][q * 5 + 1].toFixed(1), short: +W[k][q * 5 + 2].toFixed(1),
+      face: +W[k][q * 5 + 3].toFixed(1), fd: W[k][q * 5 + 4] });
+    const dbg = T.map((t, k) => {
+      let m = 0;
+      for (let q = 1; q < NS; q++) if (U[k][q] < U[k][m]) m = q;
+      return { t: +t.toFixed(2), chosen: why(k, path[k]), best: why(k, m) };
+    });
+    const fin = performance.now() - t0;
+    return { t: T, phi, psi, fd, dbg, check: J.check, ms: J.ms + fin, worstFrame: Math.max(J.worst || 0, fin) };
+  }
+
+  /** The plan at clip time `lt`: Catmull-Rom through the samples, degrees. */
+  function linePlanAt(P, lt) {
+    const K = P.t.length;
+    let k = 0;
+    while (k < K - 2 && P.t[k + 1] <= lt) k++;
+    const u = clamp((lt - P.t[k]) / (P.t[k + 1] - P.t[k]), 0, 1);
+    const at = (arr, j) => arr[clamp(j, 0, K - 1)];
+    const cr = (arr) => {
+      const p0 = at(arr, k - 1), p1 = at(arr, k), p2 = at(arr, k + 1), p3 = at(arr, k + 2);
+      return 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u * u
+        + (-p0 + 3 * p1 - 3 * p2 + p3) * u * u * u);
+    };
+    // Clamped to the pivots the pinch was measured to clear.
+    const ps = PINCH.psis;
+    return { phi: cr(P.phi), psi: clamp(cr(P.psi), ps[0], ps[ps.length - 1]),
+      fd: clamp(cr(P.fd), Math.min(...PINCH.fs), Math.max(...PINCH.fs)) };
+  }
+
+  /** One frame of the hand, on the plan. */
+  function lineHand(f, dt, pose, am, lineT) {
+    const iS = f.boneIndex('armUR'), iE = f.boneIndex('armLR'), iW = f.boneIndex('handR');
+    if (iS < 0 || iE < 0 || iW < 0) return;
+    const sc = LB.sc;
+    const S = f.boneAt(iS, new THREE.Vector3());
+    const E = f.boneAt(iE, new THREE.Vector3());
+    const Wc = f.boneAt(iW, new THREE.Vector3());
+    const Tc = f.boneTurn(iW, new THREE.Quaternion());
+    const RF = Tc.clone().invert().multiply(f.boneTurn(f.boneIndex('fingersR'), new THREE.Quaternion()));
+    const RT = Tc.clone().invert().multiply(f.boneTurn(f.boneIndex('thumbR'), new THREE.Quaternion()));
+    sc.plate();
+    const face = am.face > 0.02 ? faceNear(f, true) : null;
+    const c = sc.ctx(pose, am.face, am.grip, face);
+    const pl = LB.plan ? linePlanAt(LB.plan, lineT) : { phi: 0, psi: PINCH.psi0 };
+    LB.psi = pl.psi;
+    LB.phi = pl.phi * Math.PI / 180;
+    const Dq = sc.handQ(c, sc.frameAt(pl.psi), LB.phi, new THREE.Quaternion());
+    // THE PINCH IS SHAPED ON THE WAY THERE. A hand reaching for something
+    // small closes most of the way while it travels and only finishes on it —
+    // an open hand has fingers that reach seven centimetres past the pinch,
+    // and measured, closing only at the straw meant hovering that high and
+    // then dropping on to it in a fifth of a second.
+    const curl = Math.max(am.grip, 0.6 * am.reach);
+    // THE FREE FINGERS' CURL: near the plan's (see `linePlanFinish`), and
+    // clear of the plate and her face for the hand as it is AND as it will be
+    // in 0.15 s, carried on from how it has moved since last frame. The plan
+    // samples every tenth of a second and the bend comes down past the rim of
+    // the plate faster than that: played back alone, its curl left the little
+    // finger 5 to 20 mm into the rim between samples on three marks in four.
+    // Chosen for the hand as it is and nothing else, it arrived late: 11 mm.
+    const fAll = new Float32Array(PINCH.fs.length), fAhead = new Float32Array(PINCH.fs.length);
+    sc.fingers(c, Dq, fAll);
+    if (LB.prevDq && dt > 1e-4) {
+      const k = 0.15 / dt;
+      const dq = Dq.clone().multiply(LB.prevDq.clone().invert());
+      const ang = 2 * Math.acos(clamp(Math.abs(dq.w), -1, 1));
+      const ax = new THREE.Vector3(dq.x, dq.y, dq.z);
+      const Dp = Dq.clone();
+      if (ax.lengthSq() > 1e-12 && ang > 1e-5) {
+        Dp.premultiply(new THREE.Quaternion().setFromAxisAngle(ax.normalize().multiplyScalar(Math.sign(dq.w) || 1),
+          Math.min(ang * k, 1.2)));
+      }
+      const cp = Object.assign({}, c, { G: c.G.clone().addScaledVector(c.G.clone().sub(LB.prevG), Math.min(k, 8)) });
+      sc.fingers(cp, Dp, fAhead);
+    }
+    LB.prevDq = Dq.clone();
+    LB.prevG = c.G.clone();
+    const fPlan = LB.plan ? pl.fd : PINCH.f;
+    // Clear, here and ahead, for each curl — its price less the small one on
+    // leaving 15, which is a preference and not a collision.
+    const clear = (q) => fAll[q] + fAhead[q] - 0.5 * Math.abs(PINCH.fs[q] - PINCH.f) < 1;
+    let lo = -1, hi = -1;
+    for (let q = 0; q < PINCH.fs.length; q++) {
+      const v = PINCH.fs[q];
+      if (v <= fPlan && (lo < 0 || v > PINCH.fs[lo])) lo = q;
+      if (v >= fPlan && (hi < 0 || v < PINCH.fs[hi])) hi = q;
+    }
+    let fWant = fPlan;
+    if (!(lo >= 0 && hi >= 0 && clear(lo) && clear(hi))) {
+      let fBest = Infinity;
+      for (let q = 0; q < PINCH.fs.length; q++) {
+        const v = fAll[q] + fAhead[q] + 0.5 * Math.abs(PINCH.fs[q] - fPlan);
+        if (v < fBest) { fBest = v; fWant = PINCH.fs[q]; }
+      }
+    }
+    const capF = 240 * Math.max(dt, 1 / 240);
+    LB.fd = LB.fd == null ? fWant : LB.fd + clamp(fWant - LB.fd, -capF, capF);
+    const rel = pinchRel(curl, RF, RT, LB.fd);
     // The open hand, lifted just clear of whatever is under it: the pinch
     // comes down on to the straw as the fingers close, by exactly as much as
-    // the fingers that are still open need.
-    let lift = 0;
-    for (const p of lowsAt(curl)) {
-      tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
-      lift = Math.max(lift, surfAt(tmp) + 0.003 - tmp.y);
+    // the fingers that are still open need. NOT while it holds the straw — a
+    // lifted pinch is a straw out of her nose, and a closed hand keeps its
+    // fingers off the plate by curling them. And FADED IN AT THE TABLE'S EDGE:
+    // `surfAt` steps from nothing to the tabouret at 150 mm from the plate.
+    const Gt = c.G.clone();
+    const Gb = sc.Gb, Wb = sc.Wb;
+    // PICKED UP AS IT IS CLOSED ON. An OK sign holds a straw by the pads,
+    // 13 mm back from the fingertips, so closed on a straw lying in the well
+    // the tips go through the plate — measured, 3 to 5 mm, whichever way round
+    // the hand came at it, at the frame the fingers met and the frame they
+    // let go. So the hand rises by exactly that as it closes, and the straw
+    // with it: fingers meeting under a thing is how it comes off a table.
+    // Only while the straw is out of her nose — `face` is 1 from the lift to
+    // the sweep, where the straw is in her nose and nothing may move it — and
+    // for the whole hand, not just the two tips: on the way back down to the
+    // plate the planned turn, smoothed, passes a wrist or a free fingertip a
+    // millimetre or three under the tabletop, and a hand carrying a straw
+    // back to a plate can carry it 3 mm higher.
+    LB.pick = 0;
+    // Gated on the straw being out of her nose (`lineInNose`), and NOT on
+    // `face`, which is still 1 at the start of the way back down and let a
+    // free fingertip graze the plate there.
+    const inNose = lineInNose(lineT);
+    if (sc.pc && am.grip > 0 && inNose < 0.999) {
+      const tmp = new THREE.Vector3();
+      const pts = [...sc.lows,
+        ...PINCH.tips.map((t) => pinchPt(f, rel, 'fingersR', _pv(t), new THREE.Vector3()))];
+      let pick = 0;
+      for (const p of pts) {
+        tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
+        const r = Math.hypot(tmp.x - sc.pc.x, tmp.z - sc.pc.z);
+        const s0 = r < 0.150 ? sc.surfAt(tmp) : sc.pc.y - 0.010;
+        pick = Math.max(pick, (s0 + 0.001 - tmp.y) * clamp((0.170 - r) / 0.020, 0, 1));
+      }
+      LB.pick = Math.min(0.012, pick) * am.grip * (1 - inNose);
+      Gt.addScaledVector(c.upF, LB.pick);
     }
-    Gt.addScaledVector(upF, lift);
-    Wt.copy(Wb).sub(Gb).applyQuaternion(Dq).add(Gt);
-    LB.bend = (() => {
-      const w = Wt.clone().sub(S);
-      const dl = w.length() || 1e-3;
-      w.multiplyScalar(1 / dl);
-      const d = clamp(dl, Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
-      const ca = clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
-      const vv = pole.clone().addScaledVector(w, -pole.dot(w)).normalize();
-      const e = S.clone().addScaledVector(w, l1 * ca).addScaledVector(vv, l1 * Math.sqrt(1 - ca * ca));
-      return Wt.clone().sub(e).angleTo(hb.clone().applyQuaternion(Dq)) * 180 / Math.PI;
-    })();
+    if (am.grip < 0.999 && sc.pc) {
+      const H = bindHeadsOf(f);
+      const pts = [pinchPt(f, rel, 'idx3R', _pv(PINCH.tipI), new THREE.Vector3()),
+        pinchPt(f, rel, 'thb3R', _pv(PINCH.tipT), new THREE.Vector3()),
+        H.T[f.boneIndex('fingersR')].clone(), Wb.clone(),
+        ...PINCH.tips.map((t) => pinchPt(f, rel, 'fingersR', _pv(t), new THREE.Vector3()))];
+      let lift = 0;
+      const tmp = new THREE.Vector3();
+      for (const p of pts) {
+        tmp.copy(p).sub(Gb).applyQuaternion(Dq).add(Gt);
+        const r = Math.hypot(tmp.x - sc.pc.x, tmp.z - sc.pc.z);
+        const s0 = r < 0.150 ? sc.surfAt(tmp) : sc.pc.y - 0.010;
+        lift = Math.max(lift, (s0 + 0.003 - tmp.y) * clamp((0.170 - r) / 0.020, 0, 1));
+      }
+      Gt.addScaledVector(c.upF, lift);
+    }
+    const Wt = Wb.clone().sub(Gb).applyQuaternion(Dq).add(Gt);
+    const e = new THREE.Vector3();
+    sc.elbow(c, Wt, e);
+    LB.bend = Wt.clone().sub(e).angleTo(sc.hb.clone().applyQuaternion(Dq)) * 180 / Math.PI;
     // Blended in and out with the clip's own hand, which is what the reach at
     // the start and the hand going back at the end are.
-    const Wg = Wc.clone().lerp(Wt, reachAmt);
+    const Wg = Wc.clone().lerp(Wt, am.reach);
     // Over the rim and not through it: a hand going to something on a table
     // comes down on to it from above, so the path bows up on the way in and
     // on the way back out.
-    Wg.addScaledVector(upF, 0.07 * Math.sin(Math.PI * reachAmt) * (1 - faceAmt));
-    const Dg = Tc.clone().slerp(Dq, reachAmt);
-    // The elbow is the pole the search used: out and back over the plate, down
-    // and forward at her face, carried by her chest so it means the same at any
-    // depth of stoop.
-    const Qa = wheelLimb(f, 'armUR', 'armLR', S, E, Wc, Wg, pole).clone();
-    // The hand's own turn, on top of what the arm has done to it.
-    armAimQ(f, 'handR', Dg.clone().multiply(Qa.multiply(Tc).invert()));
-    // And the pinch, in the hand's frame — so a figure-space aim about the
-    // hand's final turn of the bind-space axis.
-    const fa = new THREE.Vector3(PINCH.fAxis[0], PINCH.fAxis[1], PINCH.fAxis[2])
-      .normalize().applyQuaternion(Dg);
-    const ta = new THREE.Vector3(PINCH.tAxis[0], PINCH.tAxis[1], PINCH.tAxis[2])
-      .normalize().applyQuaternion(Dg);
-    armAimQ(f, 'fingersR', new THREE.Quaternion().setFromAxisAngle(fa, PINCH.fAng * curl));
-    armAimQ(f, 'thumbR', new THREE.Quaternion().setFromAxisAngle(ta, PINCH.tAng * curl));
+    Wg.addScaledVector(c.upF, 0.07 * Math.sin(Math.PI * am.reach) * (1 - am.face));
+    const Qa = wheelLimb(f, 'armUR', 'armLR', S, E, Wc, Wg, c.pole).clone();
+    // The hand's own turn, on top of what the arm has done to it — and blended
+    // AT THE WRIST. Slerped in figure space from the clip's hand to the
+    // pinch's, the hand turned on its own while the forearm swung on its own,
+    // and half way between two hands bent 11 and 45 degrees off their
+    // forearms it was bent 94: measured, the worst wrist in the beat. Blended
+    // as a turn relative to the forearm this frame's arm gives it, the wrist
+    // goes from one bend to the other and never past either.
+    const QaTc = Qa.clone().multiply(Tc);
+    const Rw = new THREE.Quaternion().slerp(Dq.clone().multiply(QaTc.clone().invert()), am.reach);
+    const Dg = Rw.clone().multiply(QaTc);
+    armAimQ(f, 'handR', Rw);
+    // And the pinch. Each finger bone is wanted at `Dg · rel` and would be,
+    // with no aim of its own, at `Dg · (what it inherits)` — the clip's turn
+    // for the two the clip keys, its parent's wanted turn for the five added
+    // ones, which the clip holds at identity. An aim is figure space and goes
+    // on in front, so it is the difference between the two, seen through Dg.
+    const DgI = Dg.clone().invert();
+    const aimRel = (name, want, has) => armAimQ(f, name,
+      Dg.clone().multiply(want).multiply(has.clone().invert()).multiply(DgI));
+    aimRel('fingersR', rel.fingersR, RF);
+    aimRel('idx1R', rel.idx1R, RF);
+    aimRel('idx2R', rel.idx2R, rel.idx1R);
+    aimRel('idx3R', rel.idx3R, rel.idx2R);
+    aimRel('thumbR', rel.thumbR, RT);
+    aimRel('thb2R', rel.thb2R, rel.thumbR);
+    aimRel('thb3R', rel.thb3R, rel.thb2R);
     LB.aims = true;
   }
 
@@ -42067,17 +42636,33 @@ async function buildJadrija(scene) {
     const lt = show.lineT || 0;
     const i = Math.min(COKE.lines - 1, cokeGone);
     const along = show.strawAlong || 0;
-    const reachAmt = lineSS(lineRamp(lt, LINE.reach)) * (1 - lineSS(lineRamp(lt, LINE.let)));
-    const gripAmt = lineSS(lineRamp(lt, LINE.grip)) * (1 - lineSS(lineRamp(lt, LINE.release)));
-    const faceAmt = lineSS(lineRamp(lt, LINE.lift)) * (1 - lineSS(lineRamp(lt, LINE.back)));
-    show.strawGrip = gripAmt;
+    const am = lineAmts(lt);
+    show.strawGrip = am.grip;
+    LB.pick = 0;
     // The clip's own pose first, with nothing of this job's on it.
     lineClear(f);
     f.update(0);
     f.mesh.updateMatrixWorld();
+    // The plan, once a beat, sampled a few instants a frame from the top of it
+    // while she settles on her mark — made as if she were already standing
+    // on it, facing its way (see `linePlanStep`) — and pathed as soon as the
+    // last sample is in.
+    if (!LB.sc || LB.sc.f !== f) { LB.sc = lineScorer(f); LB.sc.f = f; }
+    if (!LB.plan) {
+      if (!LB.job) LB.job = linePlanStart(f, i, LB.sc);
+      // Five samples a frame; whatever is left, all at once, if the reach is
+      // about to start without it.
+      linePlanStep(LB.job, lt >= LINE.reach[0] - 0.05 ? 1e9 : 5);
+      if (LB.job.done) {
+        LB.plan = linePlanFinish(LB.job);
+        LB.planMs = LB.plan.ms;
+        LB.planWorst = LB.plan.worstFrame;
+        LB.job = null;
+      }
+    }
     lineStrawPose(f, lt, i, along, _poseNow);
-    if (reachAmt > 0.002) {
-      lineHand(f, dt, _poseNow, reachAmt, gripAmt, faceAmt, lt);
+    if (am.reach > 0.002) {
+      lineHand(f, dt, _poseNow, am, lt);
       f.update(0);
       f.mesh.updateMatrixWorld();
     }
@@ -42089,14 +42674,24 @@ async function buildJadrija(scene) {
     // straw; the handover is invisible because there is nothing to hand over.
     // The same on the way out: the hand is exactly on the lying straw when
     // the fingers begin to open.
-    if (gripAmt > 0.999) strawFromHand(f, st, _poseNow);
-    else strawAt(st, _poseNow);
+    if (am.grip > 0.999) strawFromHand(f, st, _poseNow);
+    else {
+      // Lying, it rises with the pinch closing on it — see `LB.pick`.
+      if (LB.pick) _poseNow.top.y += LB.pick;
+      strawAt(st, _poseNow);
+    }
   }
 
   /** The beat is over: straw on the plate, arm back to the clip. */
   function lineDone(f) {
     LB.held = null;
     LB.phi = null;
+    LB.psi = null;
+    LB.fd = null;
+    LB.plan = null;
+    LB.job = null;
+    LB.prevDq = null;
+    LB.prevG = null;
     LB.restFlip = null;
     show.strawAlong = 0;
     const k = cokeKit;
@@ -42300,32 +42895,48 @@ async function buildJadrija(scene) {
       }
       out.push([p, n]);
     }
-    // Hashed on 25 mm cells, once a frame. A lookup then reads the 27 cells
-    // round a point and nothing else — exact for anything within 25 mm of the
-    // face, which is every distance a cost or a check below acts on (they all
-    // stop caring past 12), and a plain "far away" beyond it.
-    const grid = new Map();
+    // Binned on 15 mm cells, once a frame. A lookup then reads the 27 cells
+    // round a point and nothing else — exact for anything within 15 mm of the
+    // face, which is every distance a cost acts on (the widest is the free
+    // fingers' 15), and a plain "far away" beyond it.
+    //
+    // A FLAT ARRAY OVER THE FACE'S OWN BOX, not a hash. The line's plan asks
+    // this half a million times, and as 27 `Map.get`s a lookup it spent 430 ms
+    // of a 500 ms plan on the keys alone — most of them for points nowhere
+    // near her, which the box now turns away before a single cell is read.
+    let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+    const cellOf = (v) => [Math.floor(v.x / FACE_CELL), Math.floor(v.y / FACE_CELL),
+      Math.floor(v.z / FACE_CELL)];
     for (const e of out) {
-      const k = faceKey(e[0].x, e[0].y, e[0].z);
-      const c = grid.get(k);
-      if (c) c.push(e); else grid.set(k, [e]);
+      const [a, b, c] = cellOf(e[0]);
+      x0 = Math.min(x0, a); y0 = Math.min(y0, b); z0 = Math.min(z0, c);
+      x1 = Math.max(x1, a); y1 = Math.max(y1, b); z1 = Math.max(z1, c);
     }
-    out.grid = grid;
+    const nx = x1 - x0 + 1, ny = y1 - y0 + 1, nz = z1 - z0 + 1;
+    const cells = new Array(Math.max(0, nx * ny * nz));
+    for (const e of out) {
+      const [a, b, c] = cellOf(e[0]);
+      const k = ((a - x0) * ny + (b - y0)) * nz + (c - z0);
+      (cells[k] || (cells[k] = [])).push(e);
+    }
+    out.grid = { x0, y0, z0, nx, ny, nz, cells };
     return out;
   }
-  const FACE_CELL = 0.025;
-  const faceKey = (x, y, z) => (Math.floor(x / FACE_CELL) + 4096) * 67108864
-    + (Math.floor(y / FACE_CELL) + 4096) * 8192 + (Math.floor(z / FACE_CELL) + 4096);
+  const FACE_CELL = 0.015;
   /**
    * Signed distance of a point from the face: along the normal of the nearest
    * face vertex. Negative is inside her.
    */
   function faceSigned(face, pt) {
     let best = 1e9, bp = null, bn = null;
-    const cx = Math.floor(pt.x / FACE_CELL), cy = Math.floor(pt.y / FACE_CELL),
-      cz = Math.floor(pt.z / FACE_CELL);
+    const G = face.grid;
+    const cx = Math.floor(pt.x / FACE_CELL) - G.x0, cy = Math.floor(pt.y / FACE_CELL) - G.y0,
+      cz = Math.floor(pt.z / FACE_CELL) - G.z0;
+    if (cx < -1 || cy < -1 || cz < -1 || cx > G.nx || cy > G.ny || cz > G.nz) return 1;
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) {
-      const c = face.grid.get((cx + i + 4096) * 67108864 + (cy + j + 4096) * 8192 + (cz + k + 4096));
+      const X = cx + i, Y = cy + j, Z = cz + k;
+      if (X < 0 || Y < 0 || Z < 0 || X >= G.nx || Y >= G.ny || Z >= G.nz) continue;
+      const c = G.cells[(X * G.ny + Y) * G.nz + Z];
       if (!c) continue;
       for (const e of c) {
         const d = pt.distanceToSquared(e[0]);
@@ -42381,8 +42992,8 @@ async function buildJadrija(scene) {
     const pinch = new THREE.Vector3(PINCH.grip[0], PINCH.grip[1], PINCH.grip[2])
       .sub(H.T[iH]).applyQuaternion(f.boneTurn(iH, new THREE.Quaternion()))
       .add(f.boneAt(iH, _pbV())).applyMatrix4(f.mesh.matrixWorld);
-    const padI = bindPointAt(f, [0.3317, 1.0251, 0.4765], [['fingersR', 1]], _pbV());
-    const padT = bindPointAt(f, [0.3014, 1.0691, 0.4069], [['thumbR', 1]], _pbV());
+    const padI = bindPointAt(f, PINCH.padI, [['idx3R', 1]], _pbV());
+    const padT = bindPointAt(f, PINCH.padT, [['thb3R', 1]], _pbV());
     let gripOff = null, gripT = null, padOffI = null, padOffT = null;
     const offAxis = (pt) => {
       const ax = top.clone().sub(bot);
@@ -42399,9 +43010,25 @@ async function buildJadrija(scene) {
     }
     // Fingers and straw against her face; hand against the plate.
     const face = faceNear(f);
-    const iTip = bindPointAt(f, [0.3371, 1.0286, 0.4830], [['fingersR', 1]], _pbV());
-    const tTip = bindPointAt(f, [0.3030, 1.0684, 0.4094], [['thumbR', 1]], _pbV());
-    const fingerFace = Math.min(...[padI, padT, iTip, tTip].map((q) => faceSigned(face, q)));
+    const iTip = bindPointAt(f, PINCH.tipI, [['idx3R', 1]], _pbV());
+    const tTip = bindPointAt(f, PINCH.tipT, [['thb3R', 1]], _pbV());
+    // THE SHAPE OF THE HAND, which is what "scooping" was and no number above
+    // could see: the middle, ring and little fingertips against the straw. In
+    // an OK sign they are out of its way; wrapped round it they are on it.
+    const others = PINCH.tips.map((t) => bindPointAt(f, t, [['fingersR', 1]], _pbV()));
+    let otherStraw = null, tipOffI = null, tipOffT = null;
+    if (haveStraw) {
+      otherStraw = +(Math.min(...others.map((q) => offAxis(q)[0])) - STRAW.r).toFixed(4);
+      tipOffI = +offAxis(iTip)[0].toFixed(4);
+      tipOffT = +offAxis(tTip)[0].toFixed(4);
+    }
+    // How far the three fingers are curled off the hand, degrees: the clip's
+    // relaxed hand is 26, the OK sign 15, the scoop was 91.
+    const qF = f.boneTurn(iH, new THREE.Quaternion()).invert()
+      .multiply(f.boneTurn(f.boneIndex('fingersR'), new THREE.Quaternion()));
+    const curlF = 2 * Math.acos(Math.min(1, Math.abs(qF.w))) * 180 / Math.PI;
+    const fingerFace = Math.min(...[padI, padT, iTip, tTip, ...others]
+      .map((q) => faceSigned(face, q)));
     // And the hand's bulk, which is what ended up in her mouth: wrist,
     // knuckles, the base of the thumb.
     const kn = f.boneAt(f.boneIndex('fingersR'), _pbV()).applyMatrix4(f.mesh.matrixWorld);
@@ -42422,15 +43049,16 @@ async function buildJadrija(scene) {
     // Height above whatever is UNDER each hand point — the plate, the
     // tabouret round it, or nothing (a hand hanging beside the table is not
     // in it, however low it is).
-    let handLow = null;
+    let handLow = null, handLowAt = null;
     if (k) {
       const c = k.g.getWorldPosition(_pbV());
-      for (const q of [padI, padT, iTip, tTip, wrist, pinch]) {
+      const names = ['padI', 'padT', 'tipI', 'tipT', 'tip3', 'tip4', 'tip5', 'wrist', 'pinch'];
+      [padI, padT, iTip, tTip, ...others, wrist, pinch].forEach((q, j) => {
         const r = Math.hypot(q.x - c.x, q.z - c.z);
         const s0 = r < 0.105 ? c.y + plateSurf(r) : r < 0.150 ? c.y - 0.010 : null;
-        if (s0 == null) continue;
-        handLow = handLow == null ? q.y - s0 : Math.min(handLow, q.y - s0);
-      }
+        if (s0 == null) return;
+        if (handLow == null || q.y - s0 < handLow) { handLow = q.y - s0; handLowAt = names[j]; }
+      });
     }
     // How far the wrist is bent off the forearm's line.
     const iF = f.boneIndex('fingersR');
@@ -42466,12 +43094,18 @@ async function buildJadrija(scene) {
       gripOff, gripT, padOffI, padOffT,
       fingerFace: +fingerFace.toFixed(4), handFace: +handFace.toFixed(4),
       strawFace: strawFace == null ? null : +strawFace.toFixed(4),
-      handLow: handLow == null ? null : +handLow.toFixed(4),
+      handLow: handLow == null ? null : +handLow.toFixed(4), handLowAt,
       searchBend: LB.bend == null ? null : +LB.bend.toFixed(1),
-      bestBend: LB.bestBend == null ? null : +LB.bestBend.toFixed(1),
+      planMs: LB.planMs == null ? null : +LB.planMs.toFixed(1),
+      planWorst: LB.planWorst == null ? null : +LB.planWorst.toFixed(1), planCheck: LB.plan ? LB.plan.check : null,
+      // The plan's per-sample breakdown, once, on the first row after it is made.
+      planDbg: LB.plan && !LB.plan.shown ? (LB.plan.shown = 1, LB.plan.dbg) : undefined,
+      fd: LB.fd == null ? null : +LB.fd.toFixed(1), psi: LB.psi == null ? null : +LB.psi.toFixed(1), phi: LB.phi == null ? null : +(LB.phi * 180 / Math.PI).toFixed(1),
       lineMs: LB.ms == null ? null : +LB.ms.toFixed(2), faceN: faceIdx ? faceIdx.length : null,
       wristBend: +wristBend.toFixed(1),
       padGap: +padI.distanceTo(padT).toFixed(4), pinch: r3(pinch),
+      otherStraw, tipOffI, tipOffT, curlF: +curlF.toFixed(1),
+      tipGap: +iTip.distanceTo(tTip).toFixed(4),
       lineI: Math.min(COKE.lines - 1, cokeGone),
       elbowDeg: ua && fa ? +(ua.angleTo(fa) * 180 / Math.PI).toFixed(1) : null,
       elbowBelowShoulder: elbow && shoulder ? +(shoulder.y - elbow.y).toFixed(4) : null,
