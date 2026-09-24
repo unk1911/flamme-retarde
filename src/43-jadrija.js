@@ -35924,12 +35924,27 @@ async function buildJadrija(scene) {
    * And on her hands on the floor, which is neither.
    *
    * Its own pair because the way out of it is neither a sit-up nor a get-up:
-   * `handstand` runs IDLE_A → CROUCH → LUNGE → HAND_STAND, so it is a
-   * one-shot from STANDING that holds its last frame, and the honest way back
-   * down is the same clip in reverse — which does not exist. `getup` from
-   * LUNGE is the nearest thing in the bank and that is what `rise` plays.
+   * `handstand` is a kick-up from STANDING that ends in HAND_STAND, so it is
+   * a one-shot that holds its last frame, and the honest way back down is the
+   * same clip in reverse — which does not exist. `getup` is the nearest thing
+   * in the bank and that is what `rise` plays.
    */
   const HANDS = { handGo: 1, handstand: 1, handHeld: 1 };
+
+  /**
+   * How far the kick-up carries her, in metres along the way she faces.
+   *
+   * A kick-up starts a step and a body's length BEHIND where the hands go
+   * down: stand, step into a lunge, hinge forward on to the palms, legs over.
+   * The `handstand` clip is solved that way (tools/blender/kickup.py) and its
+   * root travels this far, ending on HAND_STAND exactly with her origin on
+   * `kit.handSpot`. So `handGo` walks her to a mark this far out from the
+   * spot, and on the frame the clip ends she is moved this far forward and
+   * cut to `handHeld` with no fade — the same pose in the same place, so
+   * there is nothing to blend. MUST equal TRAVEL in kickup.py, which
+   * `kickup.py --verify` checks by reading this line.
+   */
+  const KICK = 1.45;
 
   const KNEES = { submit: 1, kept: 1, creep: 1,
     // On her back she still drinks it — the mouth, the foam and what runs down
@@ -38074,6 +38089,11 @@ async function buildJadrija(scene) {
         // with her and going through it is the way in run backwards. `getUp`
         // is read there — see `case 'cradle'`.
         if (POSED[show.phase]) { show.getUp = 1; go('cradle', 'cradle', 0.44); }
+        // NOT IN THE MIDDLE OF THE KICK-UP. That clip carries her up to 1.45 m
+        // (`KICK`) and a crossfade out of it slides her back across the floor
+        // by however far she had got. `getUp` is latched above and `handHeld`
+        // reads it on its first frame, so she lands and then comes down.
+        else if (show.phase === 'handstand') { /* handHeld takes it */ }
         else if (HANDS[show.phase]) go('rise', 'getup', 0.35);
         else if (LYING[show.phase]) go('situp', 'situp', 0.30);
         else go('rise', 'getup', 0.35);
@@ -38930,13 +38950,14 @@ async function buildJadrija(scene) {
 
       // ── AND ON HER HANDS, ON THE FLOOR, AGAINST THE WALL ──────────────
       //
-      // Three phases because getting there is a walk. HAND_STAND is entered
-      // from IDLE_A through CROUCH and LUNGE — a standing entry — and the
-      // mark is 2 m across the room at `kit.handSpot`, so she goes there on
-      // her feet first. `showSettle` in the clip's own first half second does
-      // the last few centimetres, which is `wine`'s arrangement and for the
-      // same reason: the walk arrives loosely and the pose is solved to
-      // millimetres against the wall behind her.
+      // Three phases because getting there is a walk. The kick-up starts
+      // STANDING, facing the wall, `KICK` metres out from `kit.handSpot`
+      // (where HAND_STAND's origin lands), so she walks to that mark first.
+      // `showSettle` in the clip's own first half second does the last few
+      // centimetres, and turns her square to the wall, while the clip is
+      // still only raising her arms — `wine`'s arrangement, for the same
+      // reason: the walk arrives loosely and the pose is solved to
+      // millimetres. Nothing may move her once her hands are down.
       case 'handGo': {
         const mk = kit && kit.handSpot;
         if (!mk) { go('dwell', 'idle', 0.40); break; }
@@ -38949,32 +38970,56 @@ async function buildJadrija(scene) {
         // it clears it itself rather than trusting where she came from.
         if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
         if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
-        const dist = showTo(mk[0], mk[1], dt, 0.62);
+        // The wall is at low t and she faces it (ang π), so her start mark is
+        // `KICK` further out along +t.
+        const dist = showTo(mk[0] + KICK, mk[1], dt, 0.62);
         if (dist < 0.22) go('handstand', 'handstand', 0.36);
         break;
       }
 
-      case 'handstand':
-        // HER BACK TO THE BOARDS, which is a fact about the pose and not a
-        // taste: `pelvis` 180 turns her round, so her face points the way her
-        // back points standing up. Pointing her AT the wall is therefore what
-        // puts her heels near it — and her fingers point at it too, flat on
-        // the floor, which is where a real kick-up puts them (see HAND_STAND
-        // in tools/blender/human_mh.py).
+      case 'handstand': {
+        // FACING THE WALL, and she goes over FORWARD: hands down in front of
+        // her, fingers to the plaster, legs over the top, and her back
+        // arrives at the boards — which is why HAND_STAND's `pelvis` of 180
+        // leaves her face pointing the way her back pointed standing up.
         show.want = Math.PI;
         showHold(dt);
-        if (show.tmr < 0.50 && kit && kit.handSpot) {
-          showSettle(kit.handSpot, dt, 9.0);
+        const mk = kit && kit.handSpot;
+        if (show.tmr < 0.50) {
+          if (mk) showSettle([mk[0] + KICK, mk[1]], dt, 9.0);
+          const e = Math.atan2(Math.sin(show.want - show.ang),
+            Math.cos(show.want - show.ang));
+          show.ang += e * (1 - Math.exp(-9 * dt));
+        } else {
+          // Square, and held: the hands go down at 1.3 s and from then on a
+          // degree of yaw is a palm sliding on the floor.
+          show.ang = show.want;
+          show.rate = 0;
         }
-        if (done) go('handHeld', 'handHeld', 0.28);
+        if (done) {
+          // The clip has carried her `KICK` forward; carry the figure the
+          // same distance and play the hold from its first frame, unfaded.
+          // Same pose, same place: HAND_STAND on `kit.handSpot`.
+          show.t += Math.cos(show.ang) * KICK;
+          show.s += Math.sin(show.ang) * KICK;
+          go('handHeld', 'handHeld', 0);
+          // AND POSED NOW, not next frame. The figure was sampled before this
+          // ran, on the kick-up's last frame with its 1.45 m of travel still in
+          // the root, and she is placed after it on the moved mark — so without
+          // this one frame draws her, hands and all, 1.45 m through the wall.
+          // MEASURED at 60 fps before it was here: every bone stepped 1.450 m
+          // and back.
+          f.update(0);
+        }
         break;
+      }
 
       case 'handHeld':
         showHold(dt);
-        // `getup` begins on FOURS and the nearest thing to it in this clip is
-        // LUNGE, which `handstand` passes through on the way up — so the way
-        // down is the way up, crossfaded, and there is nothing in the bank
-        // that does it properly. 0.46 s rather than the usual third, because
+        // `getup` begins on FOURS, and there is nothing in the bank that
+        // comes down off the hands properly — the kick-up in reverse would,
+        // and it would have to travel back `KICK` to do it. So it is a
+        // crossfade, and 0.46 s rather than the usual third, because
         // what is being blended is a whole body coming off its hands.
         if (show.getUp || show.tmr > SHOW.handFor) {
           show.getUp = 0;

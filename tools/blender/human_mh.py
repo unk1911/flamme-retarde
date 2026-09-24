@@ -95,6 +95,9 @@ from mathutils.kdtree import KDTree  # type: ignore
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mocap_stoop import HEAD as MC_HEAD, LADDER as MC_LADDER  # noqa: E402
 from mocap_stretch import KEYS as STRETCH_KEYS  # noqa: E402
+# The kick-up into the handstand, solved frame by frame. Generated, never edited
+# by hand — see tools/blender/kickup.py and the note on `handstand` below.
+from kickup_keys import KEYS as KICKUP_KEYS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = ROOT / "build" / "mh_base.obj"
@@ -8084,12 +8087,24 @@ CLIPS = [
      "keys": [(0.0, CRADLE), (0.7, RECLINE_B), (2.3, SHOULDER_UP)]},
     {"name": "upsideHeld", "loop": True,
      "keys": [(0.0, SHOULDER_UP), (2.4, SHOULDER_UP_B), (4.8, SHOULDER_UP)]},
-    # And on the floor, on her hands, against a wall. From standing through the
-    # half-kneel LUNGE, which is the pose that already has one hand going down
-    # and is what she would pass through on the way to planting them.
-    {"name": "handstand", "loop": False,
-     "keys": [(0.00, IDLE_A), (0.45, CROUCH), (0.85, LUNGE),
-              (1.55, HAND_STAND)]},
+    # And on the floor, on her hands, against a wall — a KICK-UP, and every
+    # frame of it solved. It used to be IDLE_A → CROUCH → LUNGE → HAND_STAND
+    # blended, and HAND_STAND's pelvis is +180, which on this rig tips her head
+    # BACKWARD: she went over like a back walkover, and nothing held her hands
+    # or her feet on the floor on the way (LUNGE alone has a foot 0.20 m
+    # through it). Now: arms up by her ears, a step into a lunge, a hinge
+    # forward until both palms are flat on the floor with the fingers to the
+    # wall, the straight back leg swinging over and the bent front one pushing
+    # and following, the heels arriving 3 cm off the wall and settling back
+    # into the straddle. The pelvis runs 0 → −180: forward, over the hands.
+    #
+    # 76 keys, one per baked frame, out of tools/blender/kickup.py: from the
+    # plant on the palms are held by IK to HAND_STAND's own (wrist drift under
+    # 2 mm), and the feet to the floor while they are on it. It ends on
+    # HAND_STAND exactly, moved `TRAVEL` (1.45 m) forward — a kick-up starts a
+    # step and a body's length behind where the hands go down. `KICK` in
+    # src/43-jadrija.js is that number; see `handGo` there.
+    {"name": "handstand", "loop": False, "keys": KICKUP_KEYS},
     {"name": "handHeld", "loop": True,
      "keys": [(0.0, HAND_STAND), (1.3, HAND_STAND_B), (2.6, HAND_STAND)]},
     # ── A WARM-UP, AND NOBODY TYPED A DEGREE OF IT ───────────────────────
