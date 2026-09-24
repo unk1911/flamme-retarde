@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.39.0"
+VERSION = "1.40.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -512,6 +512,14 @@ SKILLS = {
     "pet": ("be petted: they stroke her head and her hair",
             [r"\bpet(ting)? (her|you|u|baye)\b|\blet me pet\b"
              r"|\b(strok\w*|pet|pett\w*|pat|patt\w*)\b.{0,20}\b(hair|head)\b"]),
+    # HER LEGS APART, OR TOGETHER. Misha, 24 Sep 2026: *"new command 'spread
+    # your legs' should spread legs"*. A latch over whatever she is in, like
+    # the arms. Above `arms.wide`, whose "spread" would take it otherwise;
+    # CLOSE FIRST so "close your legs" is never read as the spread.
+    "legs.close": ("put her legs back together",
+                   [r"\b(close|together)\b.{0,20}\blegs?\b|\blegs?\b.{0,12}\b(together|closed?)\b"]),
+    "legs.spread": ("spread her legs apart",
+                    [r"\b(spread|open|part)\b.{0,20}\blegs?\b|\blegs?\b.{0,12}\b(apart|open|wide)\b"]),
     "mouth.close": ("close her mouth again",
                     [r"\b(close|shut)\b.{0,20}\b(mouth|jaw)\b"
                      r"|\b(mouth|jaw)\b.{0,12}\b(closed?|shut)\b"]),
@@ -783,6 +791,8 @@ ASK_RE = re.compile(
     r"|\blegs? (hang\w*|dangl\w*|off|over)\b"
     r"|\b(coke|cocaine)\b|\bcut (me )?(a |some )?lines?\b|\brack '?em\b"
     r"|\bspread\b|\barms? (wide|out|down|apart)\b|\bon(to)? your (left|right)\b"
+    r"|\blegs?\b.{0,12}\b(together|closed?|apart|open|wide)\b"
+    r"|\b(close|open|part)\b.{0,20}\blegs?\b"
     # Petting her — see the `pet` skill.
     r"|\bpet(ting)? (her|you|u|baye)\b|\blet me pet\b"
     r"|\b(strok\w*|pet|pett\w*|pat|patt\w*)\b.{0,20}\b(hair|head)\b"

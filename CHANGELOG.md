@@ -8,6 +8,25 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.499.0] — 2026-09-24
+
+### legs apart, and together
+
+Misha: *"new command 'spread your legs' should spread legs ... just trying to
+add all ranges of motion"*.
+
+New asks `legs.spread` ("spread your legs", "open your legs", "legs apart")
+and `legs.close` ("close your legs", "legs together") — voice server 1.40.0,
+above `arms.wide`, whose "spread" would otherwise have taken it. A latch like
+the arms, over whatever pose she holds (`legsSpread` in 43-jadrija.js): each
+ankle goes out to her side from where the pose holds it and `wheelLimb`
+solves the hip and knee with the knee pushed outward from the way it already
+bends — standing her feet step out to a wide stance, kneeling her knees part,
+lying back with her knees up they fall open. The pose is sampled with no aim
+on her legs, and sampled again when the pose changes (the aims come off and
+the clip lands first), or when she walks — a leg measured mid-stride is one
+stride frozen. Not on her hands.
+
 ## [1.498.0] — 2026-09-24
 
 ### a hand on her hip

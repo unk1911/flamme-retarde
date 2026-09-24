@@ -35003,6 +35003,72 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * HER LEGS APART — `legs.spread`, and `legs.close` to undo it.
+   *
+   * Solved like the arms: each ankle goes out to her side from where the
+   * pose she is in holds it, and `wheelLimb` works out the hip and knee, with
+   * the knee pushed outward from wherever it already points, so lying on her
+   * back with her knees up they fall open, kneeling they part, and standing
+   * her feet step out to a wide stance. The pose she is in is sampled with
+   * no aim on her legs — so when her pose changes the aims come off, the
+   * clip is given a moment to land, and the legs are sampled again: a hip
+   * measured in one pose is a leg thrown through the floor in the next.
+   */
+  const LEGSP = { out: 0.26, stand: 0.14, secs: 0.9, settle: 0.35 };
+  const STANDS = { dwell: 1, idle: 1, meet: 1, play: 1, wait: 1, pour: 1 };
+  let legsRest = null, legsRestPhase = null, legsSettle = 0;
+  const _lsGoal = new THREE.Vector3(), _lsPole = new THREE.Vector3(), _lsMid = new THREE.Vector3();
+  function legsSpread(f, dt) {
+    const want = show.legsSp && !HANDS[show.phase] ? 1 : 0;
+    show.legsSpAt = damp(show.legsSpAt || 0, want, 1 / LEGSP.secs, dt);
+    const clear = () => {
+      for (const n of ['legUL', 'legLL', 'legUR', 'legLR']) f.aim(n, 0, 1, 0, 0);
+    };
+    if (show.legsSpAt < 0.002) {
+      if (show.legsSpOn) { clear(); show.legsSpOn = 0; }
+      legsRest = null; legsRestPhase = null;
+      return;
+    }
+    // Not while she is walking: a leg sampled mid-stride and spread from
+    // there is one stride frozen. Off, and measured again when she stops.
+    if ((show.vel || 0) > 0.05) {
+      if (show.legsSpOn) { clear(); show.legsSpOn = 0; }
+      legsRest = null; legsRestPhase = null;
+      return;
+    }
+    if (show.phase !== legsRestPhase) {
+      clear();
+      legsRest = null; legsRestPhase = show.phase; legsSettle = LEGSP.settle;
+      return;
+    }
+    if (legsSettle > 0) { legsSettle -= dt; return; }
+    if (!legsRest) {
+      legsRest = {};
+      const v = new THREE.Vector3();
+      for (const n of ['legUL', 'legLL', 'footL', 'legUR', 'legLR', 'footR']) {
+        const i = f.boneIndex(n);
+        if (i < 0) { legsRest = null; return; }
+        legsRest[n] = f.boneAt(i, v).clone();
+      }
+    }
+    show.legsSpOn = 1;
+    const out = STANDS[show.phase] ? LEGSP.stand : LEGSP.out;
+    for (const side of ['L', 'R']) {
+      const S = legsRest['legU' + side], E = legsRest['legL' + side], W = legsRest['foot' + side];
+      const sgn = Math.sign(S.z || (side === 'L' ? 1 : -1));
+      _lsGoal.set(W.x, W.y, W.z + sgn * out * show.legsSpAt);
+      // The knee out of the line it already bends from, and further out.
+      _lsMid.copy(S).add(W).multiplyScalar(0.5);
+      _lsPole.copy(E).sub(_lsMid);
+      if (_lsPole.lengthSq() < 1e-6) _lsPole.set(1, 0, 0);
+      _lsPole.normalize();
+      _lsPole.z += sgn * 0.9 * show.legsSpAt;
+      _lsPole.normalize();
+      wheelLimb(f, 'legU' + side, 'legL' + side, S, E, W, _lsGoal, _lsPole);
+    }
+  }
+
+  /**
    * ── BOTH HANDS TO THE BACK OF HER HEAD ─────────────────────────────────
    *
    * The gesture the hair swap was missing. `hairDown` has always been able to
@@ -36212,6 +36278,13 @@ async function buildJadrija(scene) {
     /** And her arms out, which is a latch on the pose like her legs. */
     'arms.wide': 1, 'arms.down': 1,
     /**
+     * And her legs apart, or together again. Misha, 24 Sep 2026: *"new
+     * command 'spread your legs' should spread legs ... just trying to add
+     * all ranges of motion"*. A latch like the arms, over whatever pose she
+     * is in — see `legsSpread`.
+     */
+    'legs.spread': 1, 'legs.close': 1,
+    /**
      * And her mouth, wide. Misha, 23 Sep 2026: *"can you add a command 'open
      * your mouth' or 'open wide', that she really opens the mouth wide"*. A
      * latch over whatever she is doing, like the arms and the eyes: the jaw
@@ -36418,6 +36491,13 @@ async function buildJadrija(scene) {
         return 'already';
       }
       if (name === 'recline.bed' && (!kit || !kit.cot)) return 'nobed';
+      return null;
+    }
+    if (name === 'legs.spread' || name === 'legs.close') {
+      // Anywhere she is holding still — not on her hands, and not walking.
+      if (HANDS[show.phase]) return 'hands';
+      const want = name === 'legs.spread' ? 1 : 0;
+      if ((show.legsSp || 0) === want) return want ? 'spreadalready' : 'closed';
       return null;
     }
     if (name === 'legs.down' || name === 'legs.up') {
@@ -37644,6 +37724,7 @@ async function buildJadrija(scene) {
       // a phase it may be entered from, which every held pose in that room
       // already is.
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
+      'legs.spread': 1, 'legs.close': 1,
       'mouth.open': 1, 'mouth.close': 1, 'pet': 1,
       // AND THE HAIR IS NOT ON THIS LIST, which it was for an afternoon.
       //
@@ -38044,6 +38125,9 @@ async function buildJadrija(scene) {
           else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
           else go('submit', 'submit', 0.30);
         }
+      } else if (name === 'legs.spread' || name === 'legs.close') {
+        show.legsSp = name === 'legs.spread' ? 1 : 0;
+        show.did = name;
       } else if (name === 'legs.down' || name === 'legs.up') {
         // A LATCH AND NOT A PHASE. She stays in `cradle` — it is the same
         // pose with her legs somewhere else — so the hold, the aim at you and
@@ -40406,6 +40490,8 @@ async function buildJadrija(scene) {
     else if (show.armsWasOn) armsWide(f, dt);
     if (LYING[show.phase]) legsFlat(f, dt);
     else if (show.legsWasOn) legsFlat(f, dt);
+    // And apart, last, so it is laid over whatever the legs above have done.
+    legsSpread(f, dt);
     // And the reach, IF SOMETHING TOOK HER OUT OF IT. `tieHair` clears its own
     // aims on the way out and that covers the only exit it controls; the hose,
     // the turn and the room can all take her mid-gesture, and `aim` holds a
