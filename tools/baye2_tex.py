@@ -269,6 +269,35 @@ def cleft(p):
     return line, soft
 
 
+# THE AREOLAE, which v1.0 had and v2.0 did not carry over — Misha, 24 Sep
+# 2026: *"i think baye v2.0 is missing nipples, i think that's the other
+# thing baye v1.0 had that we didn't transfer over"*. The MakeHuman skin map
+# has them, but as a pale pink a shade off the skin that nobody at two metres
+# sees. v1.0's are a 28 mm disc in AREOLA_P from human_mh.py, placed at the
+# breast apex found as the forward-most point in the breast band (NOT the
+# forward-most on the chest, which is the sternum) — measured on this mesh
+# at x 0.1678, y ±0.0735, z 1.254, within 4 mm of v1.0's. Same colour, same
+# size, a soft edge, and the nipple a little deeper at the middle.
+AREOLA_AT = (0.1678, 0.0735, 1.254)
+AREOLA_R = (0.0140, 0.0030)         # radius, and the feather outside it
+NIPPLE_R = (0.0045, 0.0015)
+AREOLA_RGB = np.array([116.0, 73.0, 68.0])    # AREOLA_P, as bytes
+NIPPLE_RGB = np.array([104.0, 62.0, 58.0])
+AREOLA_MAX, NIPPLE_MAX = 0.72, 0.55
+
+
+def areola(p):
+    """(areola, nipple) at this point on her, each 0..1."""
+    x, y, z = p
+    ax, ay, az = AREOLA_AT
+    if x < ax - 0.030 or abs(abs(y) - ay) > 0.03 or abs(z - az) > 0.03:
+        return 0.0, 0.0
+    d = math.hypot(abs(y) - ay, z - az)
+    def edge(r, f):
+        return max(0.0, min(1.0, (r + f - d) / (2 * f)))
+    return edge(*AREOLA_R), edge(*NIPPLE_R)
+
+
 def raster_fn(size, vs, vts, faces, scale, drop, fn, box):
     """`fn` evaluated per texel at the texel's own 3D point on her.
 
@@ -385,6 +414,13 @@ def main():
             print('[baye2tex] cleft touches %d texels' % int((line > 0.05).sum()))
             a = a * (1.0 - CLEFT_SOFT_K * soft[..., None])
             a = a * (1.0 - line[..., None] * (1.0 - CLEFT_RGB))
+            ar, ni = raster_fn(size, vs, vts, faces, scale, drop, areola,
+                               ((0.130, -0.110, 1.215), (0.180, 0.110, 1.295)))
+            print('[baye2tex] areolae touch %d texels' % int((ar > 0.05).sum()))
+            al = (ar * AREOLA_MAX)[..., None]
+            a = a * (1.0 - al) + AREOLA_RGB * al
+            al = (ni * NIPPLE_MAX)[..., None]
+            a = a * (1.0 - al) + NIPPLE_RGB * al
             alpha = (m * PUBIC_MAX * (0.45 + 0.75 * n)).clip(0.0, PUBIC_MAX)
             a = a * (1.0 - alpha[..., None]) + PUBIC_RGB * alpha[..., None]
             dst = OUT / ('%s_skin.jpg' % name)

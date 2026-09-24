@@ -8,6 +8,21 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.493.0] — 2026-09-24
+
+### what v1.0 had
+
+Misha: *"i think baye v2.0 is missing nipples, i think that's the other thing
+baye v1.0 had that we didn't transfer over"*.
+
+It was. The MakeHuman skin map has areolae, but a pale pink a shade off the
+skin that nobody at two metres sees; v1.0's were a 28 mm disc in `AREOLA_P`.
+Now v2.0's are the same: painted into her skin map by `tools/baye2_tex.py`
+(`areola`, per texel like the cleft) at her breast apex — measured on her mesh
+as the forward-most point of the breast band, x 0.1678, y ±0.0735, z 1.254,
+within 4 mm of v1.0's — v1.0's colour and size with a soft edge, and the
+nipple a little deeper at the middle.
+
 ## [1.492.0] — 2026-09-24
 
 ### eyelids that close, and five poses fixed
