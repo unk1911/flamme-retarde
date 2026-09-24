@@ -8,6 +8,23 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.496.0] — 2026-09-24
+
+### the braid goes round her, not through her
+
+Misha: *"when baye bends down to put 'coke', her hair ponytail sometimes comes
+through her chest in the front.. basically the hair on her back doesn't
+respect the body/torso"*.
+
+1.482.0's fault. The hair's swing toward the ground turns everything below a
+pivot in the middle of her skull, and bent forward, "down" is toward her
+face — so the braid was turned forward through her head and neck and hung
+down the front of her chest. A braid off the back of a bowed head slides off
+to one side, over a shoulder. Now so does hers: the part of "down" that
+points toward her face is capped at 0.18 and the rest is turned sideways, to
+whichever side it already leans (`V5_HANG_FWD`, in the hair's vertex shader).
+Standing, upside down and lying back are unchanged.
+
 ## [1.495.0] — 2026-09-24
 
 ### hands flat in the handstand

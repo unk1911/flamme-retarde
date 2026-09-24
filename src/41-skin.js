@@ -2438,6 +2438,9 @@ const V5_BLINK = { shut: 0.075, open: 0.145, gap: 2.4, spread: 4.6, again: 0.22 
  * `o.lidCol` are colours; `o.lock` is an optional extra fragment for the hair,
  * which is how Chloe gets her pink through it and her beanie takes it off.
  */
+/** The most of "down" that may point toward her face, for the hair's swing. */
+const V5_HANG_FWD = 0.18;
+
 function v5Parts(o) {
   const eye = {
     uEyeL: { value: new THREE.Vector3() },
@@ -2621,10 +2624,23 @@ function v5Parts(o) {
   // stays on her head. In bind space and before the skin, so the skin carries
   // it everywhere else. Shared by both hairstyles; the pivot is per style.
   const hang = { value: new THREE.Vector3(0, -1, 0) };
+  // How far toward her face the hair may be swung — see NOT THROUGH HER.
   const HANG = `
     {
       vec3 dn = vec3(0.0, -1.0, 0.0);
       vec3 hh = normalize(uHang);
+      // NOT THROUGH HER. Bent forward — at the plate, over the tabouret —
+      // down is toward her face, and swinging the hair about the middle of
+      // her skull that way carried the braid through her head and neck to
+      // hang down the front of her chest (Misha, 24 Sep 2026: "the hair on
+      // her back doesn't respect the body"). A braid off the back of a
+      // bowed head slides off to one side, over a shoulder, and that is what
+      // this does: the forward part of down past ${V5_HANG_FWD.toFixed(2)} is
+      // turned into sideways, on whichever side it already leans.
+      if (hh.x > ${V5_HANG_FWD.toFixed(2)}) {
+        float ex = sqrt(max(hh.x * hh.x - ${(V5_HANG_FWD * V5_HANG_FWD).toFixed(4)}, 0.0));
+        hh = normalize(vec3(${V5_HANG_FWD.toFixed(2)}, hh.y, hh.z + (hh.z >= 0.0 ? ex : -ex)));
+      }
       float ang = acos(clamp(dot(dn, hh), -1.0, 1.0));
       if (ang > 0.02) {
         vec3 ax = cross(dn, hh);
