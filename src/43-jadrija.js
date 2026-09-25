@@ -51039,6 +51039,27 @@ async function buildJadrija(scene) {
       }
       return { spots: out, low: { x: lo.x, y: lo.y, z: lo.z }, thighs };
     },
+    /**
+     * Her two buttocks, world metres — for the slap. Misha, 25 Sep 2026: *"if
+     * cross-hairs click on her butt, play the sound"*. Same conditions as
+     * `hips`: in the kabina, v2.0. Skinned to her pelvis, which is what the
+     * fullest point of a buttock moves with; the gate is in 90-app.js with
+     * the breasts, the hips and the hair.
+     */
+    butt: () => {
+      if (!show || !sheIsIn()) return null;
+      if (!(APPR.primary && appr && appr.mesh.visible)) return null;
+      const out = [];
+      for (const side of [1, -1]) {
+        const p = apprenticeButtBind(side);
+        if (!p) return null;
+        const w = bindPointAt(appr, p, [['pelvis', 1]], new THREE.Vector3());
+        out.push({ x: w.x, y: w.y, z: w.z, side });
+      }
+      return out;
+    },
+    /** Debug: the bind-frame points and her rear profile they came off. */
+    buttProfile: () => (appr ? apprenticeButtBind(1, true) : null),
     cupTouch: (k, arm, kind) => {
       if (!show) return;
       show.cupTouch = k;

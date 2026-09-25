@@ -1019,6 +1019,7 @@ const settleTurn = (k) => 1 - clamp((k - 0.55) / 0.35, 0, 1);
 const settleGap = (k) => (k > 0.6 ? 0.14 : 0.02);
 let thighT = 0;
 const THIGH_STROKE = 2.6;    // s, down the thigh and back up
+let buttSlaps = 0;              // debug: how many the click has actually played
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
 let camTraceOn = false;       // debug: the camera, frame by frame — see camTrace
 const camTrace = [];
@@ -6913,6 +6914,9 @@ function frame() {
     // the thumb halfway there.
     const brs = inKab && jadrija && jadrija.breasts ? jadrija.breasts() : null;
     const hps = inKab && jadrija && jadrija.hips ? jadrija.hips() : null;
+    // Decoded while she is in the room with you, so the first click on her
+    // backside is not the silent one that asks for it (see `slap`).
+    if (hps && audio && audio.slapWarm) audio.slapWarm();
     if (pressing && !reachWas) {
       reachKind = 'thumb';
       if (brs) {
@@ -6961,12 +6965,32 @@ function frame() {
             if (d > best) { best = d; reachKind = 'pet'; }
           }
         }
+        // AND HER BACKSIDE. Misha, 25 Sep 2026: *"if cross-hairs click on her
+        // butt, play the sound"*. Only from behind her — from the front the
+        // same two points sit right under the hips and the crotch, which
+        // already mean something — and the click is the whole of it: a sound,
+        // no reach, one per press.
+        const bt = jadrija.butt ? jadrija.butt() : null;
+        if (bt && hps) {
+          const mx = (hps.spots[0].x + hps.spots[1].x) * 0.5;
+          const mz = (hps.spots[0].z + hps.spots[1].z) * 0.5;
+          const bx = (bt[0].x + bt[1].x) * 0.5 - mx, bz = (bt[0].z + bt[1].z) * 0.5 - mz;
+          const behind = (camera.position.x - mx) * bx + (camera.position.z - mz) * bz > 0;
+          for (const h of behind ? bt : []) {
+            const d = fw.dot(_thumbV.set(h.x - camera.position.x, h.y - camera.position.y,
+              h.z - camera.position.z).normalize());
+            if (d > best) { best = d; reachKind = 'butt'; }
+          }
+        }
       }
     }
     // A probe cannot aim a crosshair to the degree; it can say what it meant.
     if (pressing && reachForce) { reachKind = reachForce[0]; cupSide = reachForce[1]; }
     if (pressing && !reachWas && reachKind === 'pet' && jadrija && jadrija.askShow) {
       jadrija.askShow('pet');
+    }
+    if (pressing && !reachWas && reachKind === 'butt' && audio && audio.slap) {
+      buttSlaps += audio.slap() ? 1 : 0;
     }
     reachWas = pressing;
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
@@ -8939,6 +8963,7 @@ window.__fr = {
     cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide,
       y: cupAt ? +cupAt.y.toFixed(3) : null, t: +thighT.toFixed(2) }),
     camTrace: (on) => { if (on != null) { camTraceOn = !!on; camTrace.length = 0; } return camTrace.slice(); },
+    slaps: () => buttSlaps,
     reachAs: (kind, side = 0, still = false) => { reachForce = kind ? [kind, side, still] : null; return reachForce; },
     breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),
     handsV2: () => (jadrija && jadrija.handsV2 ? jadrija.handsV2() : null),

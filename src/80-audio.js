@@ -813,6 +813,31 @@ function buildAudio() {
     return true;
   }
 
+  // ── the slap ─────────────────────────────────────────────────────────────────
+  /**
+   * A click on her backside. Misha, 25 Sep 2026: *"if cross-hairs click on her
+   * butt, play the sound"*, his clip, cut by `tools/cut_slap.py`. At arm's
+   * length and in the room, so no distance term; on `bed` so the fire ducks
+   * it, and a short send, since a flat hit in a small wooden room rings.
+   * One per click — the gate in 90-app.js fires it on the press only.
+   */
+  let slapBuf = null;
+  function slapWarm() { if (!slapBuf) sampleLoad('slap', (b) => { slapBuf = b; }); }
+  function slap() {
+    if (!ctx || !bed) return false;
+    if (!slapBuf) { slapWarm(); return false; }
+    const src = ctx.createBufferSource();
+    src.buffer = slapBuf;
+    // Not the same hand twice.
+    src.playbackRate.value = 0.95 + Math.random() * 0.10;
+    const g = ctx.createGain();
+    g.gain.value = 0.85;
+    src.connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.20; g.connect(w).connect(verbSend); }
+    src.start(ctx.currentTime);
+    return true;
+  }
+
   // ── the Slow Doodle's "hmm?" ─────────────────────────────────────────────────
   /**
    * What he says with his nose through the kabina's curtain. Misha, 25 Sep
@@ -7520,7 +7545,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

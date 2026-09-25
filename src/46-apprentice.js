@@ -68,6 +68,9 @@ const APPR = {
   thumbIn: 0.014,
   // Where a hand on her hip goes: the band of her height, metres.
   hipY: [0.96, 1.04], hipZ: 0.175,
+  // The band her buttocks are measured in (bind frame) — see
+  // `apprenticeButtBind`. Under the hip band and above the fold.
+  buttY: [0.78, 0.96],
   // Her inner thigh: the band the hand arrives in — the top of the stroke,
   // well short of the top of her legs — and the band it strokes down to.
   thighY: [0.67, 0.78], thighLo: [0.53, 0.58],
@@ -776,6 +779,40 @@ function apprenticeHipBind(side) {
   }
   const b = _apprHip[side];
   return b ? [b[0], b[1], b[2]] : null;
+}
+
+/**
+ * Her buttock, in her bind frame: the rearmost vertex of each cheek in
+ * `APPR.buttY`, off her own mesh the first time, as the breasts and the hips
+ * are. For the crosshair — Misha, 25 Sep 2026, *"if cross-hairs click on her
+ * butt, play the sound"* — so it has to be where the eye puts her backside,
+ * which is the fullest point, not a joint. `side` +1 her left, −1 her right.
+ * Returns the profile too, rearmost x per 2 cm of height, for a probe.
+ */
+let _apprButt = null;
+function apprenticeButtBind(side, profile = false) {
+  if (!appr) return null;
+  if (!_apprButt) {
+    const g = appr.mesh.geometry, pos = g.getAttribute('position');
+    const { start, count } = g.drawRange;
+    const ix = g.getIndex();
+    const best = { 1: null, '-1': null }, rows = {};
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      // Off her midline, where the cleft is, and inside her own width: her
+      // hands hang in this band, further out.
+      if (y < APPR.buttY[0] || y > APPR.buttY[1] || Math.abs(z) < 0.03
+        || Math.abs(z) > 0.15) continue;
+      const k = z > 0 ? 1 : -1;
+      if (!best[k] || x < best[k][0]) best[k] = [x, y, z];
+      const r = (Math.round(y * 50) / 50).toFixed(2);
+      if (!(r in rows) || x < rows[r]) rows[r] = +x.toFixed(3);
+    }
+    _apprButt = { best, rows };
+  }
+  if (profile) return _apprButt;
+  return _apprButt.best[side] || null;
 }
 
 /**
