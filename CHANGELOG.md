@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.506.0] — 2026-09-24
+
+### she pours when asked, and pours like a person
+
+Misha: *"first, she shouldn't automatically pour wine, we have a command for
+it now. but if triggered, her pour should look more natural ... she should
+grab that bottle with right hand properly... the way humans pick up objects
+like bottles, beer cans, not in the twisted way she is doing it now"*.
+
+**No pour on the way in.** She walks into the kabina and settles at the
+table facing you, glass empty or not; the pour is the `wine` ask and only
+that. (She now unties her scarf only after an asked pour, where it used to
+follow every walk-in.)
+
+**The grip, solved first.** The twist was never in her arm: the bottle's
+place in her hand had been measured off the idle pose's hanging fist, so it
+stuck out of the back of her hand at 50° to the palm and every pose had to
+wring the wrist to aim it — up to 31° of twist about the hand's own axis,
+which no wrist can do. `tools/blender/wine_solve.py` now solves the grip on
+v2.0's own skinned hand before anything else — palm on the bottle, fingers
+closed round it to 0.5–2.8 mm, thumb opposing on the near side, nothing more
+than 1.5 mm inside the glass — and the body round that. The clip (8.55 s):
+she reaches from the side, thumb up; closes her hand; lifts; turns the
+forearm over with the elbow coming out and pours for 2.25 s, the spout over
+the middle of the glass and 4 cm above the rim; a lift-and-twist to stop the
+drip; upright, set down, let go, and she looks up at you. Wrist bend −9° to
++14°, twist within ±7° (was 31°), forearm roll up to 47°. The bottle no
+longer slides along its axis in her fist; pick-up and set-down move it
+3.6 mm. Her pour spot is 8 cm further from the table, so she bends and dips
+her knees instead of squatting bolt upright. `ballet.py --verify` and the
+kick-up verify are clean after one rebake with both changes in it.
+
 ## [1.505.0] — 2026-09-24
 
 ### the line, with an OK-sign pinch
