@@ -50427,7 +50427,12 @@ async function buildJadrija(scene) {
         const w = bindPointAt(appr, p, [[bone, 1]], new THREE.Vector3());
         const b = bindPointAt(appr, [p[0] - 0.08, p[1], p[2]], [[bone, 1]], new THREE.Vector3());
         const f = w.clone().sub(b).normalize();
-        thighs.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side });
+        // And the same, a hand's width further down the thigh, for the
+        // stroke — see THIGH_STROKE in 90-app.js. Down the leg, never up it.
+        const q = apprenticeThighBind(side, APPR.thighStroke);
+        const lw = q ? bindPointAt(appr, q, [[bone, 1]], new THREE.Vector3()) : w;
+        thighs.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side,
+          lo: { x: lw.x, y: lw.y, z: lw.z } });
       }
       return { spots: out, low: { x: lo.x, y: lo.y, z: lo.z }, thighs };
     },

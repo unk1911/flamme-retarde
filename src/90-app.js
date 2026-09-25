@@ -1017,6 +1017,8 @@ const _gripAt = new THREE.Vector3();
 // arm follows her, you do not) and the walk has a dead zone.
 const settleTurn = (k) => 1 - clamp((k - 0.55) / 0.35, 0, 1);
 const settleGap = (k) => (k > 0.6 ? 0.14 : 0.02);
+let thighT = 0;
+const THIGH_STROKE = 2.6;    // s, down the thigh and back up
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
 let camTraceOn = false;       // debug: the camera, frame by frame — see camTrace
 const camTrace = [];
@@ -6942,9 +6944,19 @@ function frame() {
     // A probe cannot aim a crosshair to the degree; it can say what it meant.
     if (pressing && reachForce) { reachKind = reachForce[0]; cupSide = reachForce[1]; }
     reachWas = pressing;
-    const cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
+    let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
       : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide]
         : pressing && reachKind === 'thigh' && hps ? hps.thighs[cupSide] : null;
+    // THE STROKE. Misha, 24 Sep 2026: *"do the stroke along the thigh"*. Once
+    // the hand is on her thigh it slides slowly down the front of it a hand's
+    // width and back up, and no higher than where it arrived — along the leg,
+    // not between her legs.
+    if (cupNow0 && reachKind === 'thigh' && cupNow0.lo) {
+      thighT = cupK > 0.9 ? thighT + dt : 0;
+      const u = 0.5 - 0.5 * Math.cos(thighT * Math.PI * 2 / THIGH_STROKE);
+      const A = cupNow0, L = cupNow0.lo;
+      cupNow0 = { ...A, x: A.x + (L.x - A.x) * u, y: A.y + (L.y - A.y) * u, z: A.z + (L.z - A.z) * u };
+    }
     if (cupNow0) cupAt = cupNow0;
     const thumbing = pressing && reachKind === 'thumb' && (inKab ? !!lip : lipNear);
     // AND YOU GO TO HER. Left to herself she stops about a metre and a half off
@@ -8897,7 +8909,8 @@ window.__fr = {
     thumbReach: () => (jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null),
     petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),
     petK: () => +petK.toFixed(3),
-    cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide }),
+    cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide,
+      y: cupAt ? +cupAt.y.toFixed(3) : null, t: +thighT.toFixed(2) }),
     camTrace: (on) => { if (on != null) { camTraceOn = !!on; camTrace.length = 0; } return camTrace.slice(); },
     reachAs: (kind, side = 0, still = false) => { reachForce = kind ? [kind, side, still] : null; return reachForce; },
     breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),

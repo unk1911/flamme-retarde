@@ -8,6 +8,19 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.507.0] — 2026-09-24
+
+### the hand strokes her thigh
+
+Misha: *"yeah do the stroke along the thigh"*.
+
+Once your hand has arrived on the front of her inner thigh it slides slowly
+down the thigh — about a hand's width, to a point measured off her mesh
+14 cm lower on the same leg (`apprenticeThighBind(side, lower)`), skinned to
+that leg — and back up, every 2.6 s (`THIGH_STROKE`). It never goes higher
+than where it arrived: along the leg, not between her legs. The view stays
+still while it does (the 1.504.0 settle), so the hand moves and you do not.
+
 ## [1.506.0] — 2026-09-24
 
 ### she pours when asked, and pours like a person
