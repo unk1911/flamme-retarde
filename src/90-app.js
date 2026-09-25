@@ -1020,6 +1020,7 @@ const settleGap = (k) => (k > 0.6 ? 0.14 : 0.02);
 let thighT = 0;
 const THIGH_STROKE = 2.6;    // s, down the thigh and back up
 let buttSlaps = 0;              // debug: how many the click has actually played
+let buttSide = 1;               // which cheek the crosshair picked, +1 her left
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
 let camTraceOn = false;       // debug: the camera, frame by frame — see camTrace
 const camTrace = [];
@@ -6979,7 +6980,7 @@ function frame() {
           for (const h of behind ? bt : []) {
             const d = fw.dot(_thumbV.set(h.x - camera.position.x, h.y - camera.position.y,
               h.z - camera.position.z).normalize());
-            if (d > best) { best = d; reachKind = 'butt'; }
+            if (d > best) { best = d; reachKind = 'butt'; buttSide = h.side; }
           }
         }
       }
@@ -6991,6 +6992,11 @@ function frame() {
     }
     if (pressing && !reachWas && reachKind === 'butt' && audio && audio.slap) {
       buttSlaps += audio.slap() ? 1 : 0;
+    }
+    // And the mark it leaves — see `apprenticeSlap`. On the press whether or
+    // not the sound was ready: the hand landed either way.
+    if (pressing && !reachWas && reachKind === 'butt' && typeof apprenticeSlap === 'function') {
+      apprenticeSlap(reachForce && reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
     }
     reachWas = pressing;
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
@@ -8964,6 +8970,19 @@ window.__fr = {
       y: cupAt ? +cupAt.y.toFixed(3) : null, t: +thighT.toFixed(2) }),
     camTrace: (on) => { if (on != null) { camTraceOn = !!on; camTrace.length = 0; } return camTrace.slice(); },
     slaps: () => buttSlaps,
+    slapMark: () => apprenticeSlapState(),
+    /**
+     * Debug: stand `d` metres behind v2.0, looking down at her backside — to
+     * photograph the slap's mark. `ground.put` rather than `jad.stand`, which
+     * leaves you in the small kabina and not the one she is in.
+     */
+    slapLook: (d = 1.05, pitch = -0.42) => {
+      const a = apprenticeAt();
+      if (!a) return null;
+      const cx = a.x - Math.cos(a.yaw) * d, cz = a.z + Math.sin(a.yaw) * d;
+      ground.put(cx, cz, Math.atan2(cx - a.x, cz - a.z), pitch);
+      return [+cx.toFixed(2), +cz.toFixed(2)];
+    },
     reachAs: (kind, side = 0, still = false) => { reachForce = kind ? [kind, side, still] : null; return reachForce; },
     breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),
     handsV2: () => (jadrija && jadrija.handsV2 ? jadrija.handsV2() : null),

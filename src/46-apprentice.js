@@ -98,6 +98,11 @@ const APPR = {
   // `backfaceCull False` is the whole of their material.
   hairCol: 0x6b4f3c,
   browCol: 0x2a1f18,
+  // The mark a slap leaves — see `apprenticeSlap`. Metres, seconds, and the
+  // skin's green and blue at the full of it (red is left alone, so the cheek
+  // goes crimson rather than dark).
+  slapR0: 0.018, slapR: 0.085, slapSpread: 0.7,
+  slapRise: 0.12, slapFade: 30, slapHit: 0.6, slapTint: [0.52, 0.58],
 };
 
 // ── indoors ─────────────────────────────────────────────────────────────────
@@ -154,6 +159,84 @@ let apprPts = null, apprLead = null;   // scratch: her bones, the leader's bones
 const apprP = new THREE.Vector3(), apprTgt = new THREE.Vector3();
 let apprHave = false;            // whether `apprP` holds where she was last frame
 
+// ── the mark a slap leaves ──────────────────────────────────────────────────
+//
+// Misha, 25 Sep 2026: *"after the butt click event, her buttocks should turn
+// slightly crimson, the colours radiating out"*. One flush per cheek, centred
+// on the point the crosshair picks (`apprenticeButtBind`), in her BIND frame —
+// `vLocal` — so it stays on her skin whatever she does after. It blooms at the
+// centre in a tenth of a second, spreads out to a hand's width over the next
+// second or so, and then fades over half a minute. A second slap on a warm
+// cheek adds to it up to the full `slapTint`, and does not shrink it back to
+// a point. Everything is solved here per frame; the shader only draws it.
+const apprSlapU = {
+  // xyz: the cheek, bind frame; w: how far out the flush has spread, metres.
+  uSlap0: { value: new THREE.Vector4(0, -99, 0, 0) },
+  uSlap1: { value: new THREE.Vector4(0, -99, 0, 0) },
+  // How strong each cheek's flush is now, 0..1.
+  uSlapK: { value: new THREE.Vector2(0, 0) },
+  // The green and blue the skin keeps at the full of it.
+  uSlapTint: { value: new THREE.Vector2(APPR.slapTint[0], APPR.slapTint[1]) },
+};
+// (No backticks in the GLSL below — it goes inside a template literal.)
+const SLAP_DECL = '\nuniform vec4 uSlap0;\nuniform vec4 uSlap1;\nuniform vec2 uSlapK;\nuniform vec2 uSlapTint;\n'
+  + 'float slapMark(vec4 s, float k){\n'
+  + '  if (k < 0.002) return 0.0;\n'
+  // Front to back counts for a little more than up and down or across: a
+  // buttock is shallower than it is wide, and the flush must not come round
+  // on to her hip.
+  + '  vec3 d = vLocal - s.xyz; d.x *= 1.4;\n'
+  + '  float r = length(d) / max(s.w, 1e-3);\n'
+  // Deepest where the hand landed, soft out to the edge of the spread.
+  + '  return k * (1.0 - smoothstep(0.25, 1.0, r)) * (1.0 - 0.35 * min(r, 1.0));\n'
+  + '}\n';
+const SLAP_FRAG = '{ float sm = min(slapMark(uSlap0, uSlapK.x) + slapMark(uSlap1, uSlapK.y), 1.0);\n'
+  + '  base *= mix(vec3(1.0), vec3(1.0, uSlapTint), sm); }\n';
+// Per cheek: where it is (bind), how far the flush has spread, how strong it
+// is, and how strong it is heading for.
+const apprSlaps = [1, -1].map((side) => ({ side, r: 0, k: 0, want: 0, n: 0 }));
+
+/**
+ * A slap on her `side` cheek (+1 her left, −1 her right) — called by the
+ * click in 90-app.js on the press that plays the sound.
+ */
+function apprenticeSlap(side) {
+  const s = apprSlaps[side > 0 ? 0 : 1];
+  if (!appr) return false;
+  const p = apprenticeButtBind(side);
+  if (!p) return false;
+  const u = (side > 0 ? apprSlapU.uSlap0 : apprSlapU.uSlap1).value;
+  u.set(p[0], p[1], p[2], u.w);
+  // A cheek that has cooled all the way starts again from the handprint.
+  if (s.k < 0.01) s.r = APPR.slapR0;
+  s.want = Math.min(1, s.want + APPR.slapHit);
+  s.n++;
+  return true;
+}
+
+/** Spread and fade the flush; every frame, visible or not. */
+function apprSlapStep(dt) {
+  const spread = 1 - Math.exp(-dt / APPR.slapSpread);
+  const rise = 1 - Math.exp(-dt / APPR.slapRise);
+  const fade = Math.exp(-dt / APPR.slapFade);
+  for (let i = 0; i < 2; i++) {
+    const s = apprSlaps[i];
+    if (s.want <= 0 && s.k <= 0) continue;
+    s.want *= fade;
+    s.k += (s.want - s.k) * rise;
+    s.r += (APPR.slapR - s.r) * spread;
+    if (s.k < 0.002 && s.want < 0.002) { s.k = 0; s.want = 0; }
+    const u = (i === 0 ? apprSlapU.uSlap0 : apprSlapU.uSlap1).value;
+    u.w = s.r;
+    if (i === 0) apprSlapU.uSlapK.value.x = s.k; else apprSlapU.uSlapK.value.y = s.k;
+  }
+}
+
+/** Debug: each cheek's flush — spread (m), strength, and how many slaps. */
+function apprenticeSlapState() {
+  return apprSlaps.map((s) => ({ side: s.side, r: +s.r.toFixed(3), k: +s.k.toFixed(3), n: s.n }));
+}
+
 /**
  * Build her. Returns null — quietly — if the blob is not in this build, which
  * is the same failure `loadSkin` already has and the same one it deserves:
@@ -176,12 +259,12 @@ async function loadApprentice() {
   const fig = await loadSkinHands('baye2_fr3d', {
     spec: 0.10, specPower: 26, vcol: false,
     uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms,
-      ...look.lid.uniforms },
-    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl,
+      ...look.lid.uniforms, ...apprSlapU },
+    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl + SLAP_DECL,
     vdecl: look.jaw.vdecl,
     // The whole of what makes her a different figure: one texture lookup —
-    // and the inside of her mouth.
-    body: 'base = texture2D(uSkin, vUv).rgb;' + look.jaw.frag,
+    // and the inside of her mouth, and wherever she has been slapped.
+    body: 'base = texture2D(uSkin, vUv).rgb;' + SLAP_FRAG + look.jaw.frag,
     // And a mouth that opens when the leader's does — see `jaw` in v5Parts.
     // Her eyelids, which close for real — see LID_VERT — and then her jaw.
     vert: look.lid.vert + look.jaw.bodyVert,
@@ -297,6 +380,7 @@ function apprGap(A, B, n) {
 function apprenticeStep(dt, leader, room = null) {
   if (!appr || !leader || !leader.mesh) return;
   apprCalls++;
+  apprSlapStep(dt);
   const t0 = performance.now();
   apprStepBody(dt, leader, room);
   // What she costs, as a running average in milliseconds — measured on the
