@@ -35026,21 +35026,253 @@ async function buildJadrija(scene) {
    * thigh, she should cover her crotch area with her hands/fingers and then
    * release"*. The moment your hand arrives on her thigh she brings both
    * hands in front of herself, low, holds them there a moment, and lets them
-   * go. Once per touch. Solved like her arms out, to two points just in front
-   * of her, off her pelvis bone.
+   * go. Once per touch.
+   *
+   * THE FIRST CUT PUT THE WRISTS WHERE THE HANDS SHOULD BE, and that was the
+   * whole of what was wrong with it. It aimed the wrist at a point 2 cm below
+   * her pelvis bone's head — and a wrist is not a hand. Shoulder to wrist her
+   * arm is 0.476 m and that point was 0.533 away, so the solver did what an
+   * impossible target makes it do: straightened the arm along the line and
+   * stopped short, wrists at y 0.96, level with the bottom of her belly, and
+   * the hands carried along at whatever angle the forearm left them —
+   * pointing in, and crossing. The parked note blamed v2.0 wearing v1.0's
+   * palette on a different arm. Measured, it is not that: skinning v2.0's own
+   * hand vertices with the palette she wears (`handsV2`) puts them exactly on
+   * the shared hand bones — palm 3 cm and fingertip 18 cm from the wrist —
+   * because the two rigs are one rig (`apprSameRig`), arms included.
+   *
+   * So `handTo` below solves the whole arm, from where the clip has it:
+   *   - the SHOULDERS come in: each clavicle a few degrees forward and down,
+   *     which is what shoulders do when somebody covers herself, and is also
+   *     the 2 cm her arm needs to reach low over her without locking out;
+   *   - the WRIST goes to a point over the bottom of her belly (`wrist`, her
+   *     bind frame, carried by her pelvis bone), elbows out and back a little;
+   *   - the HAND turns so the fingers point down and in (`dir`) with the
+   *     thumb toward her middle, which is palm-to-her, and the fingers
+   *     straighten to `curl`. The two hands cross in an X over her pubis, the
+   *     left over the right: wrists 5.5 cm either side of her middle, so the
+   *     palms overlap there — at 10 cm the two V's left a diamond of her
+   *     showing between the thumbs and the first fingers.
+   * Measured at the hold on v2.0, skinned: wrists on their goals to the
+   * millimetre; the middle of each hand 3 cm out from her skin and the
+   * fingers 1-3 cm, for a hand 2.5 cm thick; palms facing (−0.72, 0.55, ±0.4),
+   * into her and up — lying along the front of her as it curves under.
    */
-  // `at` is off her pelvis bone's head as the pose has it: forward, down, out.
-  const COVER = { on: false, up: 0.35, hold: 2.2, down: 0.7, at: [0.16, -0.02, 0.05] };
-  let coverRest = null;
-  const _cvG = new THREE.Vector3(), _cvP = new THREE.Vector3();
+  const COVER = {
+    on: true, up: 0.45, hold: 2.0, down: 0.8,
+    // Clavicle forward and down, radians.
+    fwd: 0.20, drop: 0.12,
+    // Where the wrist goes, her bind frame (x forward, y up, z out to the
+    // side of the hand), and which way the fingers point from it.
+    wrist: [0.170, 0.965, 0.055], dir: [-0.25, -1, -0.8],
+    // Her left hand (−z on this rig) lies over the right: this much further
+    // out in front of her.
+    over: 0.022,
+    // How much of the hand's turn about the forearm the forearm takes.
+    roll: 0.65,
+    // The fingers' bend toward the palm past the knuckles, radians.
+    curl: 0.14,
+  };
+  /**
+   * A fingertip in the bind frame: of the vertices whose heaviest bone is
+   * `fingers` on that side, the one furthest from the knuckles. v2.0's mesh
+   * when she is loaded (it is the one drawn), else the figure's own. Once.
+   */
+  const coverTips = {};
+  function coverTipBind(f, side) {
+    if (coverTips[side] !== undefined) return coverTips[side];
+    const F = typeof appr !== 'undefined' && appr ? appr : f;
+    const g = F.mesh.geometry, pos = g.getAttribute('position');
+    const bi = g.getAttribute('aBoneIdx'), bw = g.getAttribute('aBoneWt');
+    const ib = F.boneIndex('fingers' + side);
+    if (!bi || !bw || ib < 0) { coverTips[side] = null; return null; }
+    const K = bindHeadsOf(F).T[ib];
+    let best = null, bd = -1;
+    for (let v = 0; v < pos.count; v++) {
+      let m = 0, mb = -1;
+      for (let k = 0; k < 4; k++) {
+        const w = bw.array[v * 4 + k];
+        if (w > m) { m = w; mb = bi.array[v * 4 + k]; }
+      }
+      if (mb !== ib) continue;
+      const d = Math.hypot(pos.getX(v) - K.x, pos.getY(v) - K.y, pos.getZ(v) - K.z);
+      if (d > bd) { bd = d; best = [pos.getX(v), pos.getY(v), pos.getZ(v)]; }
+    }
+    coverTips[side] = best;
+    return best;
+  }
+  /** What `handTo` laid on one arm last frame — see "THE CLIP GOES ON MOVING". */
+  function armLaid() {
+    return { c: new THREE.Quaternion(), u: new THREE.Quaternion(), l: new THREE.Quaternion(),
+      h: new THREE.Quaternion(), f: new THREE.Quaternion() };
+  }
+  /** Give one arm back to the clip, clavicle to fingers, and forget what was laid. */
+  function armLetGo(f, side, laid) {
+    for (const n of ['clavicle', 'armU', 'armL', 'hand', 'fingers']) f.aim(n + side, 0, 1, 0, 0);
+    for (const k of ['c', 'u', 'l', 'h', 'f']) laid[k].identity();
+  }
+  const coverLaid = { L: armLaid(), R: armLaid() };
+  const _cvG = new THREE.Vector3(), _cvA = new THREE.Vector3(), _cvX = new THREE.Vector3();
+  const _cvD = new THREE.Vector3(), _cvT = new THREE.Vector3(), _cvV = new THREE.Vector3();
+  const _cvC = new THREE.Vector3(), _cvS = new THREE.Vector3(), _cvE = new THREE.Vector3();
+  const _cvW = new THREE.Vector3(), _cvK = new THREE.Vector3(), _cvB = new THREE.Vector3();
+  const _cvN = new THREE.Vector3(), _cvP = new THREE.Vector3();
+  const _cvQc = new THREE.Quaternion(), _cvQ1 = new THREE.Quaternion(), _cvQa = new THREE.Quaternion();
+  const _cvQch = new THREE.Quaternion(), _cvQf = new THREE.Quaternion(), _cvQh = new THREE.Quaternion();
+  const _cvQr = new THREE.Quaternion(), _cvQt = new THREE.Quaternion(), _cvQw = new THREE.Quaternion();
+  const _cvQp = new THREE.Quaternion(), _cvI = new THREE.Quaternion();
+  const _cvM0 = new THREE.Matrix4(), _cvM1 = new THREE.Matrix4();
+  /** A right-handed frame whose first axis is `d` and second is `t`. */
+  function coverFrame(M, d, t) {
+    _cvX.crossVectors(d, t);
+    return M.makeBasis(d, t, _cvX);
+  }
+  /** `out = from + q⁻¹ · (at − base)`: one bone's offset with an aim taken off. */
+  function coverUnturn(out, from, at, base, q) {
+    _cvQ1.copy(q).invert();
+    return out.copy(at).sub(base).applyQuaternion(_cvQ1).add(from);
+  }
+  /**
+   * Which way a palm faces, for fingers along `d` and the thumb along `t`
+   * (squared off `d`), on the arm whose shoulder is on side `sg` of her.
+   *
+   * −sg · (d × t). MEASURED, not reasoned: the hand's plane from its own
+   * vertices, faced by the side the thumb stands out on (`handsV2`), has both
+   * palms to her thighs in the idle (z +0.98 on the −z hand, −0.93 on the +z
+   * one) and this formula agrees on both.
+   */
+  function palmOf(out, d, t, sg) {
+    return out.crossVectors(d, t).multiplyScalar(-sg).normalize();
+  }
+
+  /**
+   * ONE ARM, SHOULDER TO FINGERTIPS, ON TO A HAND POSE. Shared by the cover
+   * and the grip, and the reason each of them needed more than a wrist goal.
+   *
+   * `o.goal` is where the WRIST goes (figure frame), `o.dir` which way the
+   * fingers point from it and `o.thumb` roughly which way the thumb does —
+   * a frame of two directions, so the hand is stated as what it is doing and
+   * not as angles on hand axes nobody has measured. `o.fwd`/`o.drop` bring the
+   * clavicle forward and down first (radians); `o.curl` is the fingers' bend
+   * toward the palm past the knuckles; `o.roll` how much of the hand's turn
+   * about the forearm the forearm takes, because a hand that pronates by
+   * itself is a wrist wrung like a cloth. `o.e` eases all of it in from the
+   * clip, 0 to 1. `laid` is this caller's record of what it put on the arm.
+   *
+   * THE CLIP GOES ON MOVING UNDER THIS, and a rest sampled once is a rest that
+   * is wrong a second later. The first cover sampled the arm when the gesture
+   * began, and by the hold her idle's breathing sway had carried the clavicle a
+   * centimetre — which at the end of a nearly straight arm put the wrists 3 cm
+   * off their goals. So the arm is read again every frame and what this laid
+   * last frame is taken back off it: the bones `boneAt` reports are last
+   * frame's aims on this frame's clip (`update` runs before the show step),
+   * premultiplied down the chain, so each offset is unturned by the product of
+   * the aims above it. Returns null if the rig lacks a bone.
+   */
+  function handTo(f, side, laid, o) {
+    const bi = {};
+    for (const n of ['clavicle', 'armU', 'armL', 'hand', 'fingers', 'thumb']) {
+      bi[n] = f.boneIndex(n + side);
+      if (bi[n] < 0) return null;
+    }
+    const tipB = coverTipBind(f, side);
+    if (!tipB) return null;
+    const e = o.e;
+    const C = f.boneAt(bi.clavicle, _cvC);
+    const Sa = f.boneAt(bi.armU, _cvV).clone();
+    const Ea = f.boneAt(bi.armL, _cvV).clone();
+    const Wa = f.boneAt(bi.hand, _cvV).clone();
+    const Ka = f.boneAt(bi.fingers, _cvV).clone();
+    const Ta = f.boneAt(bi.thumb, _cvV).clone();
+    _cvQt.copy(laid.c);
+    coverUnturn(_cvS, C, Sa, C, _cvQt);
+    _cvQt.premultiply(laid.u);
+    coverUnturn(_cvE, _cvS, Ea, Sa, _cvQt);
+    _cvQt.premultiply(laid.l);
+    coverUnturn(_cvW, _cvE, Wa, Ea, _cvQt);
+    _cvQt.premultiply(laid.h);
+    coverUnturn(_cvK, _cvW, Ka, Wa, _cvQt);
+    coverUnturn(_cvB, _cvW, Ta, Wa, _cvQt);
+    // And which way the fingers point past the knuckles, as the clip has them:
+    // her fingertip, skinned, with the finger aim taken off as well.
+    bindPointFig(f, tipB, [['fingers' + side, 1]], _cvX);
+    _cvQt.premultiply(laid.f);
+    const fClip = _cvX.sub(Ka).applyQuaternion(_cvQ1.copy(_cvQt).invert()).normalize().clone();
+    const sg = Math.sign(_cvS.z || 1);
+    // The shoulder: forward about the vertical, down about the fore-aft axis,
+    // both signed by the side so the two mirror.
+    _cvQc.setFromAxisAngle(_cvA.set(0, sg, 0), (o.fwd || 0) * e);
+    _cvQ1.setFromAxisAngle(_cvA.set(sg, 0, 0), (o.drop || 0) * e);
+    _cvQc.premultiply(_cvQ1);
+    armAimQ(f, 'clavicle' + side, _cvQc);
+    laid.c.copy(_cvQc);
+    // The arm's clip points, carried round the clavicle's head by it.
+    const S = _cvS.clone().sub(C).applyQuaternion(_cvQc).add(C);
+    const E = _cvE.clone().sub(C).applyQuaternion(_cvQc).add(C);
+    const W = _cvW.clone().sub(C).applyQuaternion(_cvQc).add(C);
+    const G = _cvG.lerpVectors(W, o.goal, e);
+    const Qarm = _cvQa.copy(wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, G, o.pole));
+    laid.u.copy(_wkQ);
+    const Rl = _cvQr.copy(_wkR);
+    const fore = _cvA.copy(_wkE);                 // the forearm's axis, as solved
+    const elbow = _wkD.clone();
+    // Everything below the forearm has been turned by the clavicle and then
+    // the arm; the hand starts from that.
+    const Qchain = _cvQch.multiplyQuaternions(Qarm, _cvQc);
+    // THE HAND. Its clip frame: knuckles off the wrist, thumb joint squared
+    // off that. Its goal: `dir`, with `thumb` squared off it.
+    _cvD.copy(_cvK).sub(_cvW).normalize();
+    _cvT.copy(_cvB).sub(_cvW);
+    _cvT.addScaledVector(_cvD, -_cvT.dot(_cvD)).normalize();
+    coverFrame(_cvM0, _cvD, _cvT);
+    _cvD.copy(o.dir).normalize();
+    _cvT.copy(o.thumb);
+    _cvT.addScaledVector(_cvD, -_cvT.dot(_cvD)).normalize();
+    coverFrame(_cvM1, _cvD, _cvT);
+    // goal = rel · clip, so rel = goal · clipᵀ — eased in from the chain.
+    _cvM1.multiply(_cvM0.transpose());
+    _cvQf.setFromRotationMatrix(_cvM1);
+    _cvQh.copy(Qchain).slerp(_cvQf, e);
+    // What the hand still has to turn once the chain has carried it, and the
+    // part of that about the forearm's own axis, `roll` of which the forearm
+    // takes — it turns about its elbow on its own axis, so the wrist stays
+    // where the arm put it.
+    const H = _cvQt.copy(Qchain).invert().premultiply(_cvQh);
+    const pr = fore.x * H.x + fore.y * H.y + fore.z * H.z;
+    _cvQw.set(fore.x * pr, fore.y * pr, fore.z * pr, H.w);
+    if (_cvQw.lengthSq() < 1e-12) _cvQw.identity(); else _cvQw.normalize();
+    _cvQw.copy(_cvI.identity().slerp(_cvQw, o.roll));
+    laid.l.copy(Rl.premultiply(_cvQw));
+    armAimQ(f, 'armL' + side, laid.l);
+    // And the hand: its goal, less everything above it — twist · arm · clavicle.
+    _cvQt.multiplyQuaternions(_cvQw, Qchain).invert().premultiply(_cvQh);
+    laid.h.copy(_cvQt);
+    armAimQ(f, 'hand' + side, _cvQt);
+    // THE FINGERS, to `dir` bent `curl` toward the palm, from wherever the
+    // clip had them. The idle carries her right fingers curled 27 degrees to
+    // the left's 9, which on the cover turned the right fingertips back into
+    // her and read from the front as a hand held level across her, not down.
+    palmOf(_cvX, _cvD, _cvT, sg);
+    _cvT.copy(_cvD).multiplyScalar(Math.cos(o.curl)).addScaledVector(_cvX, Math.sin(o.curl));
+    _cvX.copy(fClip).applyQuaternion(_cvQh);                    // where they would point
+    _cvQt.setFromUnitVectors(_cvX, _cvT.normalize());
+    _cvQt.copy(_cvI.identity().slerp(_cvQt, e));
+    laid.f.copy(_cvQt);
+    armAimQ(f, 'fingers' + side, _cvQt);
+    const r3 = (v) => v.toArray().map((q) => +q.toFixed(3));
+    return { G: r3(G), Wa: r3(Wa), El: r3(elbow), e: +e.toFixed(2),
+      // How far past the arm's full length the goal is: > 0 means short.
+      over: +(S.distanceTo(G) - S.distanceTo(E) - E.distanceTo(W)).toFixed(3) };
+  }
+
   function coverUp(f, dt) {
-    // PARKED until it lands: solved on v1.0's arm, the hands arrive at her
-    // waist or her chest on v2.0 rather than over herself — v2.0 wears v1.0's
-    // bone palette and their arms' rest poses differ. See `COVER.on`.
     const touching = COVER.on && show.cupKind === 'thigh' && (show.cupK || 0) > 0.9
       && !LYING[show.phase] && !HANDS[show.phase];
     if (touching && !show.coverDone) { show.coverDone = 1; show.coverT = 0; }
     if (!touching && (show.cupK || 0) < 0.1) show.coverDone = 0;
+    // A phase that has her lying down or on her hands takes the arms at once:
+    // nothing here is solved for a body that is not standing.
+    if (show.coverT != null && (LYING[show.phase] || HANDS[show.phase])) show.coverT = null;
     let e = 0;
     if (show.coverT != null) {
       show.coverT += dt;
@@ -35051,47 +35283,171 @@ async function buildJadrija(scene) {
       e = e * e * (3 - 2 * e);
       if (t > COVER.up + COVER.hold + COVER.down) show.coverT = null;
     }
+    show.coverE = e;
     if (e < 0.002) {
       if (show.coverOn) {
-        for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+        armLetGo(f, 'L', coverLaid.L);
+        armLetGo(f, 'R', coverLaid.R);
         show.coverOn = 0;
       }
-      coverRest = null;
       return;
     }
-    if (!coverRest) {
-      coverRest = armChain(f);
-      if (!coverRest) return;
-      const ip = f.boneIndex('pelvis');
-      if (ip < 0) { coverRest = null; return; }
-      coverRest.pelvis = f.boneAt(ip, new THREE.Vector3()).clone();
-    }
+    const ip = f.boneIndex('pelvis');
+    if (ip < 0) return;
+    // How her pelvis has turned since the bind pose: the goals are written in
+    // her bind frame and go wherever her hips do.
+    f.boneTurn(ip, _cvQp);
     show.coverOn = 1;
+    show.coverDbg = show.coverDbg || {};
     for (const side of ['L', 'R']) {
-      const S = coverRest['armU' + side], E = coverRest['armL' + side], W = coverRest['hand' + side];
-      const sg = Math.sign(S.z || 1);
-      _cvG.copy(coverRest.pelvis).add(_cvP.set(COVER.at[0], COVER.at[1], sg * COVER.at[2]));
-      _cvG.lerpVectors(W, _cvG, e);
-      _cvP.set(-0.2, -0.4, sg).normalize();
-      wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _cvG, _cvP);
-      show.coverDbg = show.coverDbg || {};
-      show.coverDbg[side] = { S: S.toArray().map((v) => +v.toFixed(3)), W: W.toArray().map((v) => +v.toFixed(3)),
-        G: _cvG.toArray().map((v) => +v.toFixed(3)), P: coverRest.pelvis.toArray().map((v) => +v.toFixed(3)), e: +e.toFixed(2) };
+      const iu = f.boneIndex('armU' + side);
+      if (iu < 0) return;
+      const sg = Math.sign(f.boneAt(iu, _cvP).z || 1);
+      // The wrist over the bottom of her belly; the left hand lies over the right.
+      const ov = sg < 0 ? COVER.over : 0;
+      bindPointFig(f, [COVER.wrist[0] + ov, COVER.wrist[1], sg * COVER.wrist[2]], [['pelvis', 1]], _cvP);
+      // Fingers down and in; thumb toward her middle, which is palm-to-her.
+      _cvN.set(COVER.dir[0], COVER.dir[1], sg * COVER.dir[2]).normalize().applyQuaternion(_cvQp);
+      const th = new THREE.Vector3(0, 0, -sg).applyQuaternion(_cvQp);
+      const pole = new THREE.Vector3(-0.45, -0.25, sg).normalize();   // elbows out, a little back
+      const r = handTo(f, side, coverLaid[side], { e, fwd: COVER.fwd, drop: COVER.drop,
+        goal: _cvP.clone(), pole, dir: _cvN.clone(), thumb: th, curl: COVER.curl, roll: COVER.roll });
+      if (!r) return;
+      show.coverDbg[side] = r;
     }
+  }
+
+  /** See `handsV2` in the debug handle. */
+  function coverHandsMeasure() {
+    if (!(typeof appr !== 'undefined' && appr)) return null;
+    const g = appr.mesh.geometry, pos = g.getAttribute('position');
+    const bi = g.getAttribute('aBoneIdx').array, bw = g.getAttribute('aBoneWt').array;
+    const P = appr.pose().palette;
+    const names = appr.bones.map((b) => b.name);
+    const out = {};
+    for (const s of ['L', 'R']) {
+      const hand = names.indexOf('hand' + s);
+      const fing = new Set();
+      names.forEach((n, i) => {
+        if (n.endsWith(s) && /^(fingers|thumb|idx|thb)/.test(n)) fing.add(i);
+      });
+      const pa = [0, 0, 0], fa = [0, 0, 0];
+      let np = 0, nf = 0, tip = null, td = -1;
+      const hP = [], thP = [];
+      const w = appr.boneAt(hand, new THREE.Vector3());
+      for (let v = 0; v < pos.count; v++) {
+        let m = 0, mb = -1;
+        for (let k = 0; k < 4; k++) if (bw[v * 4 + k] > m) { m = bw[v * 4 + k]; mb = bi[v * 4 + k]; }
+        if (mb !== hand && !fing.has(mb)) continue;
+        const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+        let sx = 0, sy = 0, sz = 0, st = 0;
+        for (let k = 0; k < 4; k++) {
+          const wt = bw[v * 4 + k] / 255;
+          if (!wt) continue;
+          const o = bi[v * 4 + k] * 12;
+          sx += wt * (P[o] * x + P[o + 1] * y + P[o + 2] * z + P[o + 3]);
+          sy += wt * (P[o + 4] * x + P[o + 5] * y + P[o + 6] * z + P[o + 7]);
+          sz += wt * (P[o + 8] * x + P[o + 9] * y + P[o + 10] * z + P[o + 11]);
+          st += wt;
+        }
+        sx /= st; sy /= st; sz /= st;
+        const isThumb = /^(thumb|thb)/.test(names[mb]);
+        (isThumb ? thP : hP).push(sx, sy, sz);
+        if (mb === hand) { pa[0] += sx; pa[1] += sy; pa[2] += sz; np++; } else if (!isThumb) {
+          fa[0] += sx; fa[1] += sy; fa[2] += sz; nf++;
+          const d = Math.hypot(sx - w.x, sy - w.y, sz - w.z);
+          if (d > td) { td = d; tip = [sx, sy, sz]; }
+        }
+      }
+      // Which way her palm faces: the hand's plane is the least-spread axis of
+      // its vertices, and the palm is the side the thumb stands out on.
+      const mean = (A) => {
+        const m = [0, 0, 0];
+        for (let i = 0; i < A.length; i += 3) { m[0] += A[i]; m[1] += A[i + 1]; m[2] += A[i + 2]; }
+        return m.map((q) => q / (A.length / 3));
+      };
+      const hm = mean(hP), tm = mean(thP);
+      const cv = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      for (let i = 0; i < hP.length; i += 3) {
+        const d = [hP[i] - hm[0], hP[i + 1] - hm[1], hP[i + 2] - hm[2]];
+        for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) cv[a][b] += d[a] * d[b];
+      }
+      const mul = (M, v) => [0, 1, 2].map((a) => M[a][0] * v[0] + M[a][1] * v[1] + M[a][2] * v[2]);
+      // Power iteration: the most-spread axis, then the next with it removed.
+      const pow = (M, v) => {
+        for (let k = 0; k < 60; k++) {
+          const u = mul(M, v), l = Math.hypot(...u) || 1;
+          v = u.map((q) => q / l);
+        }
+        return v;
+      };
+      const e1 = pow(cv, [1, 0.3, 0.2]);
+      const l1 = mul(cv, e1).reduce((q, u, i) => q + u * e1[i], 0);
+      const cv2 = cv.map((row, a) => row.map((q, b) => q - l1 * e1[a] * e1[b]));
+      const e2 = pow(cv2, [0.2, 0.3, 1]);
+      let nm = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+      const sd = (tm[0] - hm[0]) * nm[0] + (tm[1] - hm[1]) * nm[1] + (tm[2] - hm[2]) * nm[2];
+      if (sd < 0) nm = nm.map((q) => -q);
+      const r = (a, n) => a.map((q) => +(q / n).toFixed(3));
+      out[s] = { wrist: w.toArray().map((q) => +q.toFixed(3)), palm: r(pa, np), fing: r(fa, nf),
+        tip: tip && tip.map((q) => +q.toFixed(3)), np, nf, faces: nm.map((q) => +q.toFixed(2)) };
+    }
+    // Her front, bind frame: the forward-most body vertex per 2 cm band of
+    // height, in 2.4 cm bands of width either side of the midline.
+    const { start, count } = g.drawRange, ix = g.getIndex();
+    const fr = {};
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      const y = pos.getY(v), z = pos.getZ(v), x = pos.getX(v);
+      if (y < 0.74 || y > 1.02) continue;
+      const zc = Math.round(z / 0.03);
+      if (Math.abs(zc) > 3 || Math.abs(z - zc * 0.03) > 0.012) continue;
+      const k = (Math.round(y * 50) / 50).toFixed(2);
+      fr[k] = fr[k] || {};
+      if (fr[k][zc] == null || x > fr[k][zc]) fr[k][zc] = +x.toFixed(3);
+    }
+    out.front = fr;
+    const bh = {};
+    for (const n of ['pelvis', 'clavicleL', 'clavicleR', 'armUL', 'armUR', 'armLL', 'armLR', 'handL', 'handR',
+      'fingersL', 'fingersR', 'thumbL', 'thumbR']) {
+      const i = names.indexOf(n);
+      if (i >= 0) bh[n] = appr.boneAt(i, new THREE.Vector3()).toArray().map((q) => +q.toFixed(3));
+    }
+    out.bones = bh;
+    return out;
   }
 
   /**
    * HER HAND ON YOUR ARM. Misha, 24 Sep 2026: *"when touch her breast with
    * hand, she should sometimes grip my arm with her hand"*. While your hand
    * is on her breast, every so often she brings the hand on that side up and
-   * takes hold of your forearm for a few seconds, and lets go. Solved like
-   * her arms out (`wheelLimb`) to a point on YOUR forearm that 60-arms.js
-   * reports every frame, turned into her frame — so it follows your arm.
-   * Standing phases only; the arm chain is sampled when the grip starts.
+   * takes hold of your forearm for a few seconds, and lets go. Standing
+   * phases only. The point on YOUR forearm is what 60-arms.js reports every
+   * frame, turned into her frame — so it follows your arm.
+   *
+   * IT WAS BOTH HANDS AT HER CHEST, CROSSED, and the cause was a side picked
+   * every frame. Your forearm comes in near her midline — measured at z 0.001
+   * in her frame — and `z >= 0 ? 'L' : 'R'` flipped with every millimetre of
+   * sway; each flip solved the other arm and left the last one's aims where
+   * they were, because aims are only cleared on the way out. So both her
+   * hands ended up reaching for the middle of her. It also picked the arm on
+   * the WRONG side: 'L' is the −z shoulder on this rig. Now the side is the
+   * shoulder on your arm's side of her, chosen once when the grip starts.
+   *
+   * And a wrist on your forearm is not a hand on it. The wrist went 7 cm
+   * short and the hand came along as the forearm left it — palm to her own
+   * chest, the BACK of her hand against your arm. So it is `handTo` now, like
+   * the cover: her palm on top of your forearm, fingers across it and curled
+   * down round the far side, thumb along it toward her.
    */
-  const GRIP_ARM = { every: [4, 9], hold: [3, 6], secs: 0.45 };
+  const GRIP_ARM = {
+    every: [4, 9], hold: [3, 6], secs: 0.45,
+    // Palm this far above the point on your forearm (its radius and a bit),
+    // wrist this far back from the palm along the fingers; fingers' wrap.
+    over: 0.045, palm: 0.055, curl: 0.95,
+  };
   const rnd = (a, b) => a + Math.random() * (b - a);
-  let gripRest = null;
+  const gripLaid = { L: armLaid(), R: armLaid() };
   const _gaL = new THREE.Vector3(), _gaG = new THREE.Vector3(), _gaP = new THREE.Vector3();
   function gripArm(f, dt) {
     const on = (show.cupK || 0) > 0.9 && show.gripHave && !LYING[show.phase]
@@ -35110,31 +35466,40 @@ async function buildJadrija(scene) {
     show.gripAt = damp(show.gripAt || 0, want, 1 / GRIP_ARM.secs, dt);
     if (show.gripAt < 0.002) {
       if (show.gripOn) {
-        for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+        armLetGo(f, show.gripOn, gripLaid[show.gripOn]);
         show.gripOn = 0;
       }
-      gripRest = null;
       return;
     }
-    if (!gripRest) {
-      gripRest = armChain(f);
-      if (!gripRest) return;
-    }
-    show.gripOn = 1;
-    // Your forearm in her frame, and the side of her it is on.
+    if (!show.gripArm) return;
+    // Your forearm in her frame.
     _gaL.copy(show.gripArm);
     f.mesh.worldToLocal(_gaL);
-    const side = _gaL.z >= 0 ? 'L' : 'R';
-    const S = gripRest['armU' + side], E = gripRest['armL' + side], W = gripRest['hand' + side];
-    // Her wrist a hand's length short of your forearm, so it is her PALM on it.
-    _gaG.copy(_gaL);
-    _gaP.copy(_gaG).sub(S);
-    const L = _gaP.length();
-    if (L > 0.12) _gaG.addScaledVector(_gaP, -0.07 / L);
-    _gaG.lerpVectors(W, _gaG, show.gripAt);
-    _hugPole.set(0, -0.6, Math.sign(S.z || 1)).normalize();
-    wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _gaG, _hugPole);
+    // The arm on your side of her, once per grip.
+    if (!show.gripOn) {
+      const iL = f.boneIndex('armUL');
+      if (iL < 0) return;
+      const zL = f.boneAt(iL, _gaP).z;
+      show.gripOn = (_gaL.z >= 0) === (zL >= 0) ? 'L' : 'R';
+    }
+    const side = show.gripOn;
+    const iu = f.boneIndex('armU' + side);
+    const sg = Math.sign(f.boneAt(iu, _gaP).z || 1);
+    // Fingers across your forearm from her side, a little down; thumb back
+    // along it toward her — which puts her palm down on it (`palmOf`).
+    const dir = new THREE.Vector3(0, -0.3, -sg).normalize();
+    const thumb = new THREE.Vector3(-1, 0, 0);
+    const pn = palmOf(new THREE.Vector3(), dir, thumb.clone().addScaledVector(dir, -thumb.dot(dir)).normalize(), sg);
+    // Palm on top of your forearm; the wrist back along the fingers from it,
+    // and up off the palm by half a hand's thickness.
+    _gaG.copy(_gaL).addScaledVector(pn, -GRIP_ARM.over)
+      .addScaledVector(dir, -GRIP_ARM.palm).addScaledVector(pn, -0.012);
+    const r = handTo(f, side, gripLaid[side], { e: show.gripAt, fwd: 0.08, drop: 0,
+      goal: _gaG, pole: _gaP.set(-0.2, -1, 0.35 * sg).normalize(), dir, thumb,
+      curl: GRIP_ARM.curl, roll: 0.65 });
+    if (r) show.gripDbg = Object.assign(r, { side, arm: _gaL.toArray().map((q) => +q.toFixed(3)) });
   }
+
 
   /**
    * HER LEGS APART — `legs.spread`, and `legs.close` to undo it.
@@ -50400,6 +50765,18 @@ async function buildJadrija(scene) {
      * middle of her below the navel that counts as "aiming low" and sends
      * the hand to the hip on the side you are aiming toward.
      */
+    /**
+     * Debug: where v2.0's hands ACTUALLY are — every vertex whose heaviest
+     * bone is a hand, finger or thumb bone, skinned on the CPU by the palette
+     * she is wearing, in her figure frame. `palm` is the mean of the
+     * hand-bone vertices, `fing` of the finger ones, `tip` the finger vertex
+     * furthest from the wrist, `wrist` the hand bone's head, and `faces` the
+     * way the palm faces (the hand's plane, on the side the thumb stands out).
+     * Plus `front`, her bind-frame front profile per 2 cm of height and
+     * 3 cm of width off her midline, and `bones`, the arm chain's heads.
+     * What `coverUp` and `gripArm` were tuned against.
+     */
+    handsV2: () => coverHandsMeasure(),
     hips: () => {
       if (!show || !sheIsIn()) return null;
       if (!(APPR.primary && appr && appr.mesh.visible)) return null;
@@ -50812,7 +51189,9 @@ async function buildJadrija(scene) {
       // identical from a still frame.
       gaze: +(show.gaze || 0).toFixed(2), gazeAt: +(show.gazeAt || 0).toFixed(3),
       gripAt: +(show.gripAt || 0).toFixed(2), gripFor: +(show.gripFor || 0).toFixed(1),
-      coverDbg: show.coverDbg || null,
+      coverDbg: show.coverDbg || null, gripDbg: show.gripDbg || null,
+      // Her hands over herself: seconds into it (null when not), and how far.
+      coverT: show.coverT == null ? null : +show.coverT.toFixed(2), coverE: +(show.coverE || 0).toFixed(2),
       buzzNod: +(show.buzzNod || 0).toFixed(3),
       balls: balls.length, fires: fires.filter((f) => f.burning > 0).length,
     },
