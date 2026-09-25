@@ -18,6 +18,7 @@ filesystem with no server and no requests.
 import base64
 import json
 import re
+import os
 import shutil
 import datetime
 import sys
@@ -336,8 +337,15 @@ def main() -> None:
         # this mount raises PermissionError even though the write itself is
         # fine. The file lands, the build then dies on the metadata. Nothing
         # here needs the timestamp preserved.
-        shutil.copyfile(OUT, SHARE / "flamme-retarde.html")
-        shutil.copyfile(OUT, SHARE / "index.html")
+        # Through a temporary name and a rename, not straight over the top:
+        # the share refuses to overwrite a file Windows has open — the game
+        # loaded from it in a browser — with a PermissionError, 24 Sep 2026,
+        # which left the copy there stale while the build said nothing useful.
+        # A rename replaces it even while it is open.
+        for name in ("flamme-retarde.html", "index.html"):
+            tmp = SHARE / (name + ".new")
+            shutil.copyfile(OUT, tmp)
+            os.replace(tmp, SHARE / name)
         print(f"deployed to {SHARE}")
     else:
         print(f"note: {SHARE.parent} not mounted — skipped share")
