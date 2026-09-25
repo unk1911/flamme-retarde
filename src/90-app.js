@@ -8916,6 +8916,7 @@ window.__fr = {
     camTrace: (on) => { if (on != null) { camTraceOn = !!on; camTrace.length = 0; } return camTrace.slice(); },
     reachAs: (kind, side = 0, still = false) => { reachForce = kind ? [kind, side, still] : null; return reachForce; },
     breasts: () => (jadrija && jadrija.breasts ? jadrija.breasts() : null),
+    handsV2: () => (jadrija && jadrija.handsV2 ? jadrija.handsV2() : null),
     hips: () => (jadrija && jadrija.hips ? jadrija.hips() : null),
     kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),
     /** Debug: a right-click, as if the mouse had done it. */

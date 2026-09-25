@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.509.0] — 2026-09-24
+
+### she covers herself; she takes your arm
+
+Misha: *"when reaching for inner thigh, she should cover her crotch area with
+her hands/fingers and then release"* and *"she should sometimes grip my arm
+with her hand"*.
+
+Both gestures were solved but landed wrong (hands at her waist, crossed at her
+chest). The suspected v1.0/v2.0 rig mismatch was not it — skinned with the
+palette she wears, v2.0's hand vertices sit exactly on the shared bones. The
+faults were ordinary ones: the cover's wrist target was 0.533 m from a
+shoulder with a 0.476 m arm, so the arm locked straight at her waist; nothing
+turned the hand or the fingers; the arm was sampled once and her idle sway
+walked it 3 cm off; and the grip re-chose its arm every frame from a point on
+her midline (and picked the wrong one — 'L' is the −z shoulder on this rig),
+leaving the other arm's aims behind, which is the two hands crossed at her
+chest.
+
+A shared solver, `handTo()`, re-reads the arm each frame with last frame's
+aims off, brings the collarbone forward and down, puts the wrist on its goal
+to the millimetre, turns the hand from its fingers and thumb directions with
+the forearm taking most of the twist, and sets the finger curl — palm
+direction checked against each hand's own vertex plane.
+
+- **Cover:** when your hand reaches her inner thigh, both her hands come in
+  over herself in 0.45 s, crossed, left over right, fingers down, hold 2 s and
+  release over 0.8 s — once per touch; lying down or on her hands she lets go.
+- **Grip:** with your hand on her breast, every few seconds her hand on your
+  side comes up and rests on top of your forearm, fingers round it, elbow
+  low, then lets go.
+
 ## [1.508.0] — 2026-09-24
 
 ### the inner thigh, properly
