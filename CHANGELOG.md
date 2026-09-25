@@ -8,6 +8,60 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.520.0] — 2026-09-25 (baye 1.42.0)
+
+### "turn around"
+
+Misha: *"add another command: 'turn around', so if she's standing up, she
+turns and remains standing with her back to me. if she is laying down, then
+she flips from whatever pose she was in"*. One command, `turn`, and which of
+the two it does depends on which way up she is.
+
+**Standing** in the kabina — or kneeling, or on all fours — she turns round
+at her ordinary turning rate and stays with her back to you: 90° at 0.65 s,
+178° at 1.3 s, then held at 179–179.5° off you for as long as measured (twelve
+seconds). Walk round her and she keeps her back to you. There is no timeout.
+Say it again and she turns back to face you. Anything new she is asked to do
+(a kiss, a kneel, "get up", the hose) ends it. Her eyes, her mouth, a yawn,
+petting, and her arms and legs do not, so "look at me" while she is turned
+away is a glance over her shoulder. Out on the promenade it is refused ("in
+the kabina").
+
+**Lying down** she turns over. She gets off her front or a side by the same
+baked roll she got onto it with, **played backwards**: no new clip, and no
+crossfade between front and back. The crossfade was the only way back until
+now, and it tipped her end over end. Measured on the cot:
+
+- **back → front** is `flat`'s roll, 1.9 s.
+- **front → back**, 1.8 s. She lands on the cradle she rolled out of, head,
+  pelvis and feet all within 1 mm.
+- **left side → right side**, 3.5 s: the left roll backwards, then the right
+  roll forwards. Right to left works the same way. Curled up (fetal) counts as
+  her left side and turns over onto her right side lying straight, since
+  there is no curled-up right.
+- **front on the edge of the cot → back**, 2.7 s, in the same place. Turned
+  again, her legs go back over the same side, to within 1 cm.
+- Said half way through a roll, the roll reverses from where it is.
+
+Moving into the reversed clip moves no bone more than 1 mm, because each held
+pose is its roll's last key. Sitting on the cot (sit, knees, lotus, perch) has
+no other side, so it is refused with "lie her down first". The handstand and
+upside down are refused as "her hands are holding her up".
+
+Phrases (`server/baye/baye.py`, which needs redeploying and restarting on
+mpcn0): "turn around/round/over/away", "flip over/around", "show me your
+back", "turn your back to me", "stand with your back to me", "face the
+wall/the other way", Croatian "okreni se", French "retourne-toi" /
+"tourne-toi". Commands that name where she should end up still go to that
+place: "roll over" and "on your tummy" are `flat`, "turn onto your left
+side" is `side.left`, and "turn over on your back" is `recline`, a
+sentence that reached nothing at all before. "Do a flip" is still the
+somersault. The lovense's "turn the lovense off" is unaffected, "turn it on"
+still reaches nothing (on purpose, see `buzz_of`), and the word "turnover"
+does not trigger it. 44 sentences were checked offline against the file,
+with `skills_of`. Apart from the turn phrases and "turn over on your
+back", every one gave the same answer as HEAD.
+
 ## [1.519.0] — 2026-09-25
 
 ### and sometimes her hands go back

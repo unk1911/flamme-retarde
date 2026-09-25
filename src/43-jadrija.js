@@ -36680,6 +36680,8 @@ async function buildJadrija(scene) {
     // tools/blender/human_mh.py, and the note there about which number of the
     // pelvis triple is the roll. It is not the one you would pick.
     sideL: 0.95, sideR: 0.95,
+    // And back over again, which is those same rolls run the other way.
+    unroll: 0.95,
   };
 
   /**
@@ -36706,7 +36708,12 @@ async function buildJadrija(scene) {
     // sitting family does not: she is lying on her side in it, so "arms out"
     // and "legs down" mean the same thing they mean in the sides it is built
     // from, and "roll onto your back" is the same move.
-    fetal: 1, fetalHeld: 1 };
+    fetal: 1, fetalHeld: 1,
+    // AND ON THE WAY BACK OVER — `unroll`, the `turn` played backwards. She
+    // is lying down for every frame of it, and off this list "get up" asked
+    // mid-roll would be answered with the standing get-up on a woman lying
+    // on a cot, which is `situp`'s whole note.
+    unroll: 1 };
 
   /**
    * AND THE ONES WHERE SHE IS ON THE COT AND NOT LYING ON IT.
@@ -36748,6 +36755,66 @@ async function buildJadrija(scene) {
    * and stay on `LYING`.
    */
   const onCot = (p) => !!(LYING[p] || POSED[p]);
+
+  /**
+   * ── WITH HER BACK TO YOU ───────────────────────────────────────────────
+   *
+   * Misha, 25 Sep 2026: *"if she's standing up, she turns and remains
+   * standing with her back to me"*.
+   *
+   * THE HOLDS THAT FACE YOU, which are the only places there is anything to
+   * turn. Each of these three sets `show.want` at you on every frame — that
+   * is why walking round her in the kabina has her turning to follow you —
+   * and every one of them now adds half a turn to it while `show.turnBack`
+   * is set. The turn itself is `turnRate`, the rate she turns at everywhere
+   * else (`SHOW.turnMax`, 3 rad/s, eased), so half a turn is a person
+   * turning round rather than a figure being rotated. MEASURED from `dwell`:
+   * 90° at 0.65 s, 178° at 1.3 s, and then 179.3–179.5° off you for the six
+   * seconds after. And it goes on being re-aimed, so she keeps her back to
+   * you as you move: walked a quarter of the way round her, she was still
+   * 179.3° off. "Back to me" is about where you are, not where you were.
+   *
+   * Nothing else in the room reads it, so any phase NOT on this list lets it
+   * go (`rise` apart — see the clear above the switch) — the hose taking her
+   * down, "get up", leaving because you did. That is
+   * "until something natural takes her out of it", and no clock: a held pose
+   * that runs out on its own was the 24 Sep complaint about her gaze.
+   */
+  const TURN_HOLD = { dwell: 1, kept: 1, fours: 1 };
+  /**
+   * And the requests that do NOT turn her back round, because they are laid
+   * over whatever she is doing rather than being something new: her eyes,
+   * her mouth, a yawn, your hand on her hair, her arms and her legs. Any
+   * other request she takes is her doing a new thing, and she does it facing
+   * the way that thing faces.
+   */
+  const TURN_KEEP = { look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1,
+    yawn: 1, 'mouth.open': 1, 'mouth.close': 1, pet: 1,
+    'legs.spread': 1, 'legs.close': 1, 'arms.wide': 1, 'arms.down': 1,
+    'legs.down': 1, 'legs.up': 1 };
+
+  /**
+   * ── AND OVER, LYING DOWN: THE ROLL SHE CAME IN BY, BACKWARDS ─────────
+   *
+   * Every way on to her front or a side is a baked roll that starts on her
+   * back — `flat`, `flatEdge`, `sideL`, `sideR`, `fetal`, all CRADLE at their
+   * first key — and nothing in the bank rolls the other way. The only way
+   * back that existed was a crossfade to `cradle`, which is what "get up"
+   * from her front has always done, and a crossfade between a front and a
+   * back is not a roll: it slerps every bone independently, and the pelvis
+   * takes the short way through 180 degrees, which is end over end.
+   *
+   * But `sample` in 41-skin.js clamps a one-shot's clock at both ends and
+   * `update` adds `dt * speed` to it, so a clip at speed −1 is that clip
+   * backwards, frame for frame, and ends clamped on its FIRST key — which is
+   * the cradle. So the way back is the way there, run in reverse, and it is
+   * the same bake: no new clip. The value is which roll each held pose came
+   * in by; the clock starts wherever that clip's clock is, so a turn asked
+   * half way through a roll reverses it from half way.
+   */
+  const UNROLL = { flat: 'flat', flatheld: 'flat', flatEdge: 'flatEdge',
+    edgeHeld: 'flatEdge', sideL: 'sideL', sideR: 'sideR',
+    fetal: 'fetal', fetalHeld: 'fetal' };
 
   /**
    * And on her hands on the floor, which is neither.
@@ -37051,6 +37118,22 @@ async function buildJadrija(scene) {
     coke: 1,
     /** And over on to one side or the other, which are two baked clips. */
     'side.left': 1, 'side.right': 1,
+    /**
+     * AND ROUND, OR OVER. Misha, 25 Sep 2026: *"add another command: 'turn
+     * around', so if she's standing up, she turns and remains standing with
+     * her back to me. if she is laying down, then she flips from whatever
+     * pose she was in"*.
+     *
+     * One word and two answers, because the word means two things depending
+     * on which way up she is — and neither adds an animation. Standing (or
+     * kneeling, or on all fours) it is a LATCH on the heading those holds
+     * already re-aim every frame: `show.turnBack` puts half a turn on it, so
+     * she turns at the rate she turns at anyway and stays turned however you
+     * walk round her. Lying down it is the roll she came in by, PLAYED
+     * BACKWARDS — see `unroll` — and then, for a side, the other side's roll
+     * forwards. See `askWhy` for the poses it has no answer for.
+     */
+    turn: 1,
     /** And her arms out, which is a latch on the pose like her legs. */
     'arms.wide': 1, 'arms.down': 1,
     /**
@@ -37365,6 +37448,31 @@ async function buildJadrija(scene) {
     if (name === 'side.left' || name === 'side.right') {
       const at = name === 'side.left' ? 'sideL' : 'sideR';
       if (show.phase === at) return 'already';
+      return null;
+    }
+    if (name === 'turn') {
+      // Half way through turning over already. Asked again it would be
+      // answered — the roll would reverse again — but a second "turn over"
+      // said while she is rolling is the first one repeated, not a change of
+      // mind.
+      if (show.phase === 'unroll') return 'turning';
+      // Lying down, in any of them, is the flip — see the dispatch.
+      if (LYING[show.phase]) return null;
+      // AND THE POSES THAT HAVE NO OTHER SIDE. Sitting on the cot with her
+      // legs out, cross-legged, perched against the wall, kneeling up on the
+      // mattress, upside down on her shoulders, on her hands: none of them is
+      // a pose lying on a front or a back, there is no baked roll out of any
+      // of them, and "turn over" answered by a sit-up, a walk and a kneel is
+      // answering a different sentence. The road out of every one of them is
+      // "lie down" or "get up", and she will take either.
+      if (HANDS[show.phase] || show.phase === 'upside'
+        || show.phase === 'upsideHeld') return 'hands';
+      if (POSED[show.phase]) return 'noturn';
+      // On her feet or her knees: the heading latch. Indoors for the same
+      // reason as `dwell` — it is the kabina's own standing idle that holds
+      // it, and out on the promenade every phase she is in has somewhere of
+      // its own to face.
+      if (!sheIsIn()) return 'outside';
       return null;
     }
     if (name === 'arms.wide' || name === 'arms.down') {
@@ -37767,6 +37875,9 @@ async function buildJadrija(scene) {
     // is walked back to the bottle in the middle of the reach.
     tieHair: 1,
     sideL: 1, sideR: 1, takeIt: 1, studyIt: 1, placeIt: 1, wearIt: 1,
+    // And rolling back over, which is every one of those four run backwards
+    // and belongs to the room for the same reason they do.
+    unroll: 1,
     // And the fetch off the tabouret, which is two more phases at the same
     // mark the plate and the pour use — out of this list the room walks her
     // back to the bottle on the frame after she gets there.
@@ -38064,6 +38175,7 @@ async function buildJadrija(scene) {
       show.queue.length = 0;
       show.ask = null; show.why = null; show.did = null; show.don = null;
       show.byAsk = 0; show.side = 0; show.sideWant = null;
+      show.turnBack = 0;
       show.goMark = null; show.goNext = null;
       show.bumped = 0; show.buzzNod = 0; show.buzzBlink = 0;
       if (skinFig) hugArms(skinFig, 0);
@@ -38575,9 +38687,21 @@ async function buildJadrija(scene) {
       // And her eyes, for the same reason and more so: "look at me" is a
       // request about the next second, and one that waits for a cartwheel to
       // finish has answered a different request.
-      look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1 };
+      look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1,
+      // AND TURNING OVER, which has to be here or it cannot be asked from
+      // her front on the edge of the cot at all: `edgeHeld` is not in
+      // `ASKABLE`, and nor are the rolls themselves. It never re-arms the
+      // request, so there is nothing for the licence to fire twice. BUT ONLY
+      // LYING DOWN OR IN A HOLD THAT FACES YOU — see the test below. Standing
+      // anywhere else in the room she is in the middle of something (a pour,
+      // a get-up, her hands in her hair) and the heading latch waits for the
+      // `dwell` that every one of those ends in, like a dance does.
+      turn: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
-    if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
+    const nowOk = NOW[show.ask] && !busy
+      && (show.ask !== 'turn' || LYING[show.phase] || TURN_HOLD[show.phase]
+        || show.phase === 'creep');
+    if (show.ask && (ASKABLE[show.phase] || nowOk)) {
       const name = show.ask;
       show.ask = null;
       show.did = name;
@@ -38606,6 +38730,9 @@ async function buildJadrija(scene) {
       askLog.push({ name, from: show.phase, why: show.why || null, to: null,
         feet: onHerFeet(), getUp: !!show.getUp });
       while (askLog.length > 12) askLog.shift();
+      // Anything new she is asked to DO, she does facing the way it faces —
+      // see `TURN_KEEP` for the handful laid over her that leave her turned.
+      if (!show.why && name !== 'turn' && !TURN_KEEP[name]) show.turnBack = 0;
       if (show.why) {
         show.did = null;
       } else if (ON_FEET[name.split(':')[0]] && !onHerFeet()) {
@@ -38797,6 +38924,83 @@ async function buildJadrija(scene) {
           show.lieWant = show.onBed || (kit && kit.cot) ? 'bed' : 'floor';
           if (KNEES[show.phase]) lieDown(pt, ps, d, go);
           else go('submit', 'submit', 0.30);
+        }
+      } else if (name === 'turn') {
+        // ── ROUND, OR OVER ────────────────────────────────────────────────
+        //
+        // Which of the two is decided by nothing but which way up she is:
+        // `askWhy` has already turned away the poses that are neither.
+        const ph = show.phase;
+        if (UNROLL[ph]) {
+          // ON HER FRONT OR A SIDE: the roll she came in by, backwards, to
+          // her back — see `UNROLL` and `case 'unroll'`. From a side the far
+          // side is one more roll on from there, and `sideWant` is the latch
+          // the cradle already reads for exactly that. Curled up counts as
+          // her left side, which is what FETAL is built on; there is no
+          // curled-up right, so the far side of a curl is `sideR` lying
+          // straight.
+          const clip = UNROLL[ph];
+          show.byAsk = 1;
+          show.queue.length = 0;
+          show.legsDown = 0;
+          show.flatWant = 0;
+          show.poseWant = null;
+          show.sideWant = ph === 'sideR' ? 'sideL'
+            : (ph === 'sideL' || ph === 'fetal' || ph === 'fetalHeld') ? 'sideR' : null;
+          showSay('squee', d);
+          // Where the edge roll finished, so that turning her again from the
+          // cradle it leaves her in puts her legs back over the same side —
+          // see the branch below. A place and not a flag, so a stale one is
+          // harmless: she is never on that exact spot again by accident.
+          show.edgeAt = clip === 'flatEdge' ? [show.t, show.s] : null;
+          // Into the roll she came in by, at the END of it — the held poses
+          // are that clip's last key breathing, so this is a snap of a breath
+          // and no fade, which a clock running backwards cannot have (the
+          // fade's own clock would run backwards with it). Mid-roll it is the
+          // clip already playing, and its clock is simply turned round where
+          // it stands. `go` sets the speed back to 1, so it is set after.
+          go('unroll', null);
+          if (!S.cur || S.cur.name !== clip) f.play(clip, { fade: 0, from: 1e3 });
+          if (S.cur && S.cur.name === clip) S.curT = Math.min(S.curT, S.cur.dur);
+          S.prev = null;
+          S.speed = -1;
+          show.unroll = clip;
+          show.unSide = show.side;
+        } else if (LYING[ph]) {
+          // ON HER BACK — or on her way down to it — and over on to her
+          // front is `flat`, exactly as "roll over" gets it. On the spot
+          // where she has just rolled back off `flatEdge`, it is `flatEdge`
+          // again: the same place, the other way up, legs back over the side
+          // — so "turn over" said twice is the pose she started in.
+          show.byAsk = 1;
+          show.queue.length = 0;
+          show.legsDown = 0;
+          showSay('squee', d);
+          const edge = !!(show.onBed && show.edgeAt
+            && Math.hypot(show.t - show.edgeAt[0], show.s - show.edgeAt[1]) < 0.02);
+          if (ph === 'cradle') {
+            show.edgeWant = edge ? 1 : 0;
+            go(edge ? 'flatEdge' : 'flat', edge ? 'flatEdge' : 'flat', 0.34);
+          } else {
+            // Still going down: `recline` hands over to `cradle`, and
+            // `cradle` reads this on its first frame — `flat`'s own road.
+            show.flatWant = edge ? 2 : 1;
+          }
+        } else {
+          // ON HER FEET, OR HER KNEES, OR ALL FOURS: half a turn on the
+          // heading. And turned already, it is half a turn back — "turn
+          // around" said to somebody with their back to you is asking them to
+          // face you, and that is the only other thing it could mean.
+          show.turnBack = show.turnBack ? 0 : 1;
+          show.queue.length = 0;
+          // The two ways of being in the room that are not one of the holds:
+          // shuffling after you on her knees (stop, and stay down), and
+          // standing in something that ends in `dwell` anyway — `meet`,
+          // `leave` — which is ended here, so the latch has a phase to be
+          // read in.
+          if (ph === 'creep') go('kept', 'kept', 0.35);
+          else if (!TURN_HOLD[ph]) go('dwell', 'idle', 0.40);
+          showSay('trill', d);
         }
       } else if (name === 'arms.wide' || name === 'arms.down') {
         show.armsWide = name === 'arms.wide' ? 1 : 0;
@@ -39114,6 +39318,18 @@ async function buildJadrija(scene) {
       }
     }
 
+    // AND HER BACK TO YOU ENDS WITH THE HOLD THAT KEPT IT — see `TURN_HOLD`.
+    // Here and not in each exit, because the exits are everything: the hose,
+    // the get-up, the room's own walk, you leaving.
+    // Except across `rise`, the one phase between two holds: "turn around"
+    // said while she was already on her way up from her knees is read in
+    // `kept` on the frame the kneel arrives, and `kept` then hands straight
+    // on to `rise` — so without this it was spent before she was standing.
+    // "Get up" asked in so many words still lets it go, in the dispatch.
+    if (show.turnBack && !TURN_HOLD[show.phase] && show.phase !== 'rise') {
+      show.turnBack = 0;
+    }
+
     switch (show.phase) {
       // ── in ──
       // Three waypoints and not one, because a straight line from the deck to
@@ -39363,7 +39579,10 @@ async function buildJadrija(scene) {
       // dozen frames of her wandering off through a wall, and standing there
       // is the honest end of what has been built.
       case 'dwell':
-        show.want = Math.atan2(ps - show.s, pt - show.t);
+        // At you — or, asked to turn around, half a turn from you, re-aimed
+        // every frame all the same. See `TURN_HOLD`.
+        show.want = Math.atan2(ps - show.s, pt - show.t)
+          + (show.turnBack ? Math.PI : 0);
         showHold(dt);
         if (!inside) go('leave', 'walk', 0.34);
         break;
@@ -39379,7 +39598,8 @@ async function buildJadrija(scene) {
         break;
 
       case 'kept':
-        show.want = Math.atan2(ps - show.s, pt - show.t);
+        show.want = Math.atan2(ps - show.s, pt - show.t)
+          + (show.turnBack ? Math.PI : 0);
         // ASKED TO GET UP, and the kneel is the landing between her back and
         // her feet — `situp` ends here, so a request made while she was lying
         // down is finished here and not forgotten.
@@ -39421,7 +39641,10 @@ async function buildJadrija(scene) {
         // kabina the way out is one metre of doorway, and a woman shuffling
         // after you on her knees out onto a public beach is a different game
         // than the one this room is.
-        if (inside && Math.hypot(pt - show.t, ps - show.s) > SHOW.creepFrom) {
+        // Not with her back to you: shuffling after somebody on your knees
+        // is done facing them, and she was asked to face the other way.
+        if (inside && !show.turnBack
+            && Math.hypot(pt - show.t, ps - show.s) > SHOW.creepFrom) {
           go('creep', 'knees', 0.35);
         }
         // AND SHE STAYS DOWN. Misha, 24 Sep 2026: *"once she is kneeling she
@@ -39777,6 +40000,35 @@ async function buildJadrija(scene) {
         }
         break;
 
+      // ── AND BACK OVER: A ROLL, BACKWARDS ──────────────────────────────
+      //
+      // `turn` from her front or a side — see `UNROLL`. The clip's clock runs
+      // down at −1 until it is clamped on the first key, which every one of
+      // these rolls shares with CRADLE, and the cradle takes over from there
+      // with nothing to cross: the same pose, breathing. For a side she then
+      // rolls on to the far one, because `sideWant` is set and the cradle
+      // reads it on its first frame. `show.side` is run back in step with the
+      // clip below, where the forward rolls run it out.
+      //
+      // MEASURED on the cot: front to back in 1.8 s, landing on the cradle
+      // she rolled out of to the millimetre (head, pelvis and feet all
+      // within 1 mm of where they were before "turn over" was first said);
+      // left side to right in 3.5 s, the two rolls end to end; the edge back
+      // to her back in 2.7 s in the same place, and "turn over" again puts
+      // her legs back over the side within 1 cm of where they were. The snap
+      // into the reversed clip moves no bone more than 1 mm from any of the
+      // five held poses — they are each their roll's last key.
+      case 'unroll':
+        matTick(dt);
+        // Every frame, and not only on entry: `go` puts the speed back to 1
+        // on any clip change, and a clip change is the only way out of here.
+        S.speed = -1;
+        if (!S.cur || S.cur.name !== show.unroll || S.curT <= 0) {
+          S.speed = 1;
+          go('cradle', 'cradle', 0.30);
+        }
+        break;
+
       // ── THE SITTING FAMILY ────────────────────────────────────────────
       //
       // Five of the six arrive and hand over, which is `flat` → `flatheld`'s
@@ -40056,7 +40308,11 @@ async function buildJadrija(scene) {
       // way out of a floor and it ends in a somersault, which in a room four
       // metres across is a person going through a wall.
       case 'rise':
-        show.want = Math.atan2(ps - show.s, pt - show.t);
+        // Turned away on the way up too, when the latch is carried across —
+        // see the clear above the switch — or she swings round to you as she
+        // stands and back again in `dwell`.
+        show.want = Math.atan2(ps - show.s, pt - show.t)
+          + (show.turnBack ? Math.PI : 0);
         // The same step clear, because this phase ends a pose too and a kneel
         // can be taken inside the furniture as easily as on top of it.
         untangle(dt);
@@ -40513,7 +40769,8 @@ async function buildJadrija(scene) {
       // see `keptAsked`, and the argument there about a request having no jet
       // to stop. `rise` is the way out, and `getup` begins exactly here.
       case 'fours':
-        show.want = Math.atan2(ps - show.s, pt - show.t);
+        show.want = Math.atan2(ps - show.s, pt - show.t)
+          + (show.turnBack ? Math.PI : 0);
         // Out of the furniture, on the way DOWN as well as up: she goes down
         // where she was standing, and where she was standing was the pour
         // mark, which is a hand's width from the tabouret. Photographed with
@@ -41491,7 +41748,28 @@ async function buildJadrija(scene) {
       const ROLL_T = { sideL: 1.7, sideR: 1.7, flat: 1.9, flatEdge: 2.7,
         fetal: 1.8 };
       const rollT = ROLL_T[show.phase];
-      if (rollT) {
+      if (show.phase === 'unroll') {
+        // AND THE SAME ROLL BACKWARDS, off the CLIP's clock and not the
+        // phase's: it runs down from wherever the clip was, which is its end
+        // from a held pose and part way along it from a roll that was still
+        // going. So the offset is the forward one read at that clock —
+        // `wantSide` for the pose it came in by, times the same smoothstep —
+        // and it arrives at nought on the frame the clip arrives at CRADLE.
+        // The constant is taken on the first frame, so whatever whole turns
+        // the offset has picked up are kept and nothing jumps.
+        const un = show.unroll;
+        const rt = ROLL_T[un] || 1.9;
+        const to = un === 'sideR' ? Math.PI + SIDE_OFF
+          : (un === 'sideL' || un === 'fetal') ? Math.PI - SIDE_OFF : Math.PI;
+        const c = clamp((S.curT || 0) / rt, 0, 1);
+        const e = to * c * c * (3 - 2 * c);
+        if (show.sidePhase !== 'unroll') {
+          show.sidePhase = 'unroll';
+          show.sideFrom = show.side - e;
+        }
+        show.side = show.sideFrom + e;
+        show.sideRate = 0;
+      } else if (rollT) {
         if (show.sidePhase !== show.phase) {
           show.sidePhase = show.phase;
           show.sideFrom = show.side;
@@ -51574,6 +51852,8 @@ async function buildJadrija(scene) {
       // identical from a still frame.
       gaze: +(show.gaze || 0).toFixed(2), gazeAt: +(show.gazeAt || 0).toFixed(3),
       eyesDown: show.eyesDown || 0, downAt: +(show.downAt || 0).toFixed(3),
+      // Her back to you (the `turn` latch), and the roll being run backwards.
+      turnBack: show.turnBack || 0, unroll: show.phase === 'unroll' ? show.unroll : null,
       gripAt: +(show.gripAt || 0).toFixed(2), gripFor: +(show.gripFor || 0).toFixed(1),
       coverDbg: show.coverDbg || null, gripDbg: show.gripDbg || null,
       // Her hands over herself: seconds into it (null when not), and how far.
