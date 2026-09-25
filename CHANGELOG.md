@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.512.0] — 2026-09-25
+
+### the kabina is bigger inside than out
+
+Misha: make the room bigger inside than it is from outside, about twice the
+size. From the promenade nothing has changed: the same two-bay front, door,
+sign and bead curtain, with the two neighbouring doors to the east still
+there. Behind them the room now runs on under those two bays to the end of
+the run (`KAB.wing`), and their hut bodies are no longer drawn. The floor
+goes from 4.10 × 5.20 m to 8.40 × 5.20 m, 21.3 m² to 43.7 m² (2.05×).
+
+Sideways, not deeper: the alley behind the row is 6 m wide and a 7.5 m-deep
+room would have closed it. East only: the west wall, and everything staged
+against it and the door (tabouret, plate, glass, lamp, poster, radio,
+television, handstand spot), stays exactly where it was, so the wine pour and
+the line are unchanged. `coke_probe` agrees with 1.511.0 to 1 mm. The cot and
+the striped towel moved with the east wall; perch, curl and lying flat land in
+the same place relative to the cot and wall as before. The towel now hangs
+against the wall (it had been 19 cm off it since the room went to two bays).
+
+Collision: the new east wall holds you 0.22 m off, like the others; the
+neighbours' faces still hold you 1.10 m off from the promenade; the alley
+behind stays walkable. From the alley the annex is now as wide as the room,
+under a wider lean-to. From the air the run's roof over the room reads grey
+where the plain huts' tops show through.
+
 ## [1.511.0] — 2026-09-24
 
 ### the hand a little higher on her thigh

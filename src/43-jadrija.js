@@ -1565,6 +1565,30 @@ async function buildJadrija(scene) {
     // the one that is twice as wide being the one with the sign over it is a
     // second, quieter way of finding the door.
     bays: 2,
+    // ── AND BIGGER INSIDE THAN OUT ────────────────────────────────────────
+    //
+    // Misha, 23 Sep 2026: the room should be bigger inside than it is from
+    // the promenade, the way other games do it — and "about 2x". So the
+    // frontage stays the two bays above, door, sign and all, and the room
+    // behind it runs on EAST under the next `wing` bays of the row. Their
+    // doors, vents and render are still drawn on the promenade side, and the
+    // bodies behind them are not: that volume is this room now. 4.10 m of
+    // floor across becomes 8.40, and 21.3 m² becomes 43.7 — 2.05 times.
+    //
+    // Sideways and not back, on purpose. The alley behind the row is 6.0 m
+    // wall to wall and the annex already takes 2.5 of it; the 7.5 m-deep room
+    // first proposed would have closed it outright, and the doorway through
+    // the screen wall is how you get into that alley at all.
+    //
+    // East only, and not half each side, because every set piece in the room
+    // is staged off the WEST wall and the door: the tabouret with the plate
+    // and the glass on it, the lamp over it, the radio, the poster, the
+    // handstand spot, the television. The wine pour's yaw was chosen against
+    // where the crossing stands you (`standIn`), and moving that table even a
+    // bay would put her back between you and the pour. So the west wall stays
+    // exactly where it was, and only the cot and the towel go with the east
+    // one. Shrunk by `cabinRun` if the run has not got the bays to spare.
+    wing: 2,
     depth: 5.40,           // how far back it goes from the seaward face
     door: 1.45,            // clear width of the opening
     head: 1.98,            // and its head height above the floor
@@ -2998,6 +3022,13 @@ async function buildJadrija(scene) {
     // the middle of the bend at the tip of the spit. See `squareRow`.
     const sk = front === JAD.rowA && !special && t0 >= kabFrom
       ? Math.min(KAB.nth, n - KAB.bays) : -1;
+    // How many bays past the door the room runs on under — see `KAB.wing`.
+    // As far as the run's own east end and no further. On this seed that is
+    // exactly two: the run has six bays and the door is the third and fourth,
+    // so the room's east wall stands 5 cm inside the gable the map board is
+    // hung on. Its render, its board and its end of the roof are untouched.
+    const wing = sk < 0 ? 0
+      : Math.max(0, Math.min(KAB.wing, n - sk - KAB.bays));
     for (let k = 0; k < n; k++) {
       const a = t0 + k * JAD.cabW, c = a + JAD.cabW;
       const col = CAB[Math.floor(rng() * CAB.length)];
@@ -3017,7 +3048,8 @@ async function buildJadrija(scene) {
         // was half the size: the beach behind it does not move because a room
         // in front of it got bigger.
         for (let i = 1; i < KAB.bays; i++) rng();
-        kabina(a, a + JAD.cabW * KAB.bays, front, y0, eave, ridge, col, wash, roofCol);
+        kabina(a, a + JAD.cabW * KAB.bays, front, y0, eave, ridge, col, wash, roofCol,
+          a + JAD.cabW * (KAB.bays + wing));
         k += KAB.bays - 1;
         continue;
       }
@@ -3072,9 +3104,17 @@ async function buildJadrija(scene) {
       // in front of it. These are the same three spans `frontSkin` uses, so the
       // body and the face now share their ends and cannot disagree at all.
       const kbH = DOORW * 0.5;
-      for (const [kbA, kbC] of
-        [[a, dc - kbH], [dc - kbH, dc + kbH], [dc + kbH, c]]) {
-        boxTS(kbA, kbC, front + REVEAL, back, fl, eave, wash);
+      // Not behind a bay the open kabina runs on under (`KAB.wing`): the face
+      // below is still drawn, and that is all of this hut there is. Its body
+      // would stand in the middle of the room. Nothing on a face reaches past
+      // `REVEAL`, not even an open bay's dark backing, so the room's own lining
+      // at `front + KAB.wall` is what closes it from within.
+      const underRoom = sk >= 0 && k >= sk + KAB.bays && k < sk + KAB.bays + wing;
+      if (!underRoom) {
+        for (const [kbA, kbC] of
+          [[a, dc - kbH], [dc - kbH, dc + kbH], [dc + kbH, c]]) {
+          boxTS(kbA, kbC, front + REVEAL, back, fl, eave, wash);
+        }
       }
       frontSkin(a, c, dc, front, fl, eave, wash);
       // Two bays in the block are faced in stone instead of rendered, and they
@@ -3363,9 +3403,13 @@ async function buildJadrija(scene) {
       // far side starts after the second one. Left at a single bay this ran a
       // solid blocker up the middle of the room, and the right-hand half of a
       // 4 m floor was a wall you could see across and not walk across.
-      const a = t0 + sk * JAD.cabW, c = a + JAD.cabW * KAB.bays;
+      // And the `wing` bays past it, which are the room now — see `KAB.wing`.
+      // The room's own shell holds their faces from the promenade instead.
+      const a = t0 + sk * JAD.cabW, c = a + JAD.cabW * (KAB.bays + wing);
       if (a > t0) pushRun(t0 - 0.5, a - SNUG);
-      if (c < t1) pushRun(c + SNUG, t1 + 0.5);
+      // Down to the sliver past the gable when the room reaches the run's
+      // end, so the end wall still holds you off where it always did.
+      if (c < t1 + 0.01) pushRun(c + SNUG, t1 + 0.5);
     }
     b = deck;
   }
@@ -3405,13 +3449,18 @@ async function buildJadrija(scene) {
    * back wall — it runs 5.4 m into the alley, which is dead ground between the
    * rows, under a lean-to hung off the run's rear eave. From the promenade the
    * only thing wrong with it is the sign and the fact that the door is missing.
+   *
+   * `a`..`c` is the frontage, the two bays you see. `wr` is where the room
+   * really ends, which is further east under the bays next door — see
+   * `KAB.wing`. Everything on the seaward face keeps to `a`..`c`, and every
+   * wall, floor, ceiling and roof behind it runs to `wr`.
    */
-  function kabina(a, c, front, y0, eave, ridge, col, wash, roofCol) {
+  function kabina(a, c, front, y0, eave, ridge, col, wash, roofCol, wr = c) {
     const floor = y0 + JAD.plinth;
     const s1 = front + KAB.depth;
     const dc = (a + c) * 0.5;
     const dj = KAB.door * 0.5;
-    const wl = a, wr = c;                    // the render, continuous with the row
+    const wl = a;                            // the render, continuous with the row
     const dark = [wash[0] * 0.30, wash[1] * 0.25, wash[2] * 0.21];
 
     // The pad carries on under the annex. In the deck buffer with the rest of
@@ -3430,11 +3479,17 @@ async function buildJadrija(scene) {
     // of them the moment you look along the wall.
     b = rendNow;
     // Sides, back, and the two jambs. The lintel closes the wall over the door.
+    //
+    // The east wall starts behind the face when the room runs on under its
+    // neighbours: there it stands where one of their party walls meets the
+    // promenade, and from `front` it would put 10 cm of this hut's paint in the
+    // same plane as their render. The east jamb stops at `c` for the same
+    // reason — past it the face is theirs.
     boxTS(wl, wl + w, front, s1, floor, eave, wash);
-    boxTS(wr - w, wr, front, s1, floor, eave, wash);
+    boxTS(wr - w, wr, wr > c ? front + REVEAL : front, s1, floor, eave, wash);
     boxTS(wl, wr, s1 - w, s1, floor, eave, wash);
     boxTS(wl, dc - dj, front, front + w, floor, eave, wash);
-    boxTS(dc + dj, wr, front, front + w, floor, eave, wash);
+    boxTS(dc + dj, c, front, front + w, floor, eave, wash);
     // Over the opening: the rail, then the vent's own hole, then the wall over
     // it. Four panels rather than one, for the same reason the plain huts get
     // three — a vent drawn on unbroken masonry is a grille in front of a white
@@ -3499,7 +3554,10 @@ async function buildJadrija(scene) {
     boxTS(dc - dj, dc + dj, front, fs, floor + KAB.head, floor + KAB.head + 0.014, dark);
     // The ceiling is a slab and not a plane, so the lean-to overhead has
     // something to sit on and the room does not open into the roof void.
-    boxTS(wl, wr, front, s1, top, top + 0.06, dark);
+    // From just behind the face and not from it: under the neighbours' bays
+    // the face is their render, and a slab edge at `front` is a dark 6 cm
+    // band drawn in the same plane as it, right along the row.
+    boxTS(wl, wr, front + REVEAL + 0.002, s1, top, top + 0.06, dark);
 
     // The lean-to over the annex, hung off the run's rear eave. A shallower
     // pitch than the roof it comes off, which is what a lean-to is.
@@ -3543,7 +3601,12 @@ async function buildJadrija(scene) {
         [T1 - HOLD, wr + REACH, front - HOLD, S1 + HOLD],   // right
         [wl - REACH, wr + REACH, S1 - HOLD, s1 + REACH],    // back
         [wl - REACH, dc - dj, front - HOLD, S0 + HOLD],     // front, left of the door
-        [dc + dj, wr + REACH, front - HOLD, S0 + HOLD],     // front, right of it
+        [dc + dj, c + (wr > c ? 0 : REACH), front - HOLD, S0 + HOLD],  // right of it
+        // And the neighbours' faces the room runs on behind, which hold you
+        // off where every other face on the row does — `runs` stand 0.55 out
+        // and `confine` adds the girth again — and not at this door's 0.22.
+        ...(wr > c
+          ? [[c, wr + REACH, front - 0.55 - GROUND.girth, S0 + HOLD]] : []),
       ],
       face: front, dc, dj, floor, top, y0, eave,
       // Where you are standing when you are in it, for the audio and the light.
@@ -27154,13 +27217,22 @@ async function buildJadrija(scene) {
    * middle of the floor, because there was no wall to put it against that was
    * not already touching it. Now the walls are 2.02 m out and the furniture is
    * on them, which is what leaves 2.78 m of clear floor down the centre.
+   *
+   * Since the room ran on east under two more bays (`KAB.wing`) the east wall
+   * is at dc + 6.35 and not dc + 2.05, and the two things that stand against
+   * it — the cot and the towel — are placed off `K.t1` instead. Everything on
+   * the west side is where it was, and the floor between is new.
    */
   function kabinaKit(K) {
     const f = K.floor, dc = K.dc;
     const tv = tvPanel(), radio = radioPanel();
 
     // ── the cot ──
-    const c0 = dc + 1.20, c1 = dc + 1.90, cs0 = 18.55, cs1 = 20.45;
+    // Off the east wall and not off `dc`, since the room went on under the
+    // next two bays (`KAB.wing`): 0.15 m clear of the boards, which is where it
+    // stood when that wall was at dc + 2.05 and `c1` was dc + 1.90. `perch`
+    // sits her back against that wall, so the two have to move together.
+    const c1 = K.t1 - 0.15, c0 = c1 - 0.70, cs0 = 18.55, cs1 = 20.45;
     for (const [t, s] of [[c0 + 0.06, cs0 + 0.07], [c1 - 0.06, cs0 + 0.07],
       [c0 + 0.06, cs1 - 0.07], [c1 - 0.06, cs1 - 0.07]]) {
       post(facing(t, s, 0), 0, 0, f, f + 0.30, 0.022, KIT.steel, 6);
@@ -28052,10 +28124,11 @@ async function buildJadrija(scene) {
       // The towel on a hook, on the near wall where you would actually hang
       // one: striped, because every towel in every one of these frames is.
       {
-        // dc+1.86 and not dc+1.94: the room is 4.04 m across, so its inner
-        // wall face is at dc+1.92, and a hook at 1.94 is a hook inside the
-        // masonry with its towel hanging in the plane of the plaster.
-        const ht = dc + 1.86, hs = K.face + 2.30, hy = f + 1.58;
+        // Off the east wall, which moved two bays when the room ran on under
+        // its neighbours (`KAB.wing`). Back against the lining, which is 4 mm
+        // in from `K.t1` — it was typed as dc + 1.86 against a wall that had
+        // since gone out to dc + 2.05, and hung 19 cm clear of the plaster.
+        const ht = K.t1 - 0.005, hs = K.face + 2.30, hy = f + 1.58;
         boxTS(ht - 0.05, ht, hs - 0.03, hs + 0.03, hy, hy + 0.05,
           [0.155, 0.150, 0.148]);
         const BANDS = [[0.620, 0.235, 0.145], [0.700, 0.688, 0.640],
@@ -28240,9 +28313,9 @@ async function buildJadrija(scene) {
        *
        * Where she sits for `perch` — *"her back perched against the wall"* —
        * and it cannot be flush, which is worth writing down because it looks
-       * like a bug and is the furniture: `c1` is dc + 1.90 and the boards of
-       * the side wall are at `K.t1` = dc + 2.05, so the cot stands 0.15 m off
-       * the wall it is against. A body sitting at the very edge of this
+       * like a bug and is the furniture: `c1` is `K.t1` - 0.15, and `K.t1` is
+       * the boards of the side wall, so the cot stands 0.15 m off the wall it
+       * is against. A body sitting at the very edge of this
        * mattress has its shoulders about 0.13 m from the plaster and there is
        * nothing to be done about that from here.
        *
