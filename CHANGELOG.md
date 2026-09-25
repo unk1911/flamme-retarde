@@ -8,6 +8,19 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.518.0] — 2026-09-25
+
+### and she answers it
+
+Misha: *"after the slap audio is played, the next sound that should play is a
+randomized play of one of these: mo-0.mp3, mo-1.mp3, mo-2.mp3"*. The moment
+the slap has finished, she moans: one of three of his own recordings, picked
+at random and never the same one twice running. One at a time: slap her again
+while she is still answering and the old one fades out as the new one starts,
+rather than her voice piling up on itself. `tools/cut_moan.py` trims the
+silence off each and levels them, since as supplied they were about 15 dB
+apart.
+
 ## [1.517.0] — 2026-09-25
 
 ### the slap leaves a mark
