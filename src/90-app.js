@@ -7002,12 +7002,7 @@ function frame() {
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
       : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide]
         : pressing && reachKind === 'thigh' && hps ? hps.thighs[cupSide] : null;
-    // THE STROKE. Misha, 24 Sep 2026: *"do the stroke along the thigh"* —
-    // and, of 'along the leg, not between her legs': *"i don't get the
-    // refusal"*. Fair: the line is her genitals, not her inner thighs. So the
-    // hand is on the inner face of her thigh, between her legs, and slides
-    // down it and back up, never higher than where it arrived — the top of the
-    // stroke is 8 cm and more below the top of her legs.
+    // THE STROKE. 
     if (cupNow0 && reachKind === 'thigh' && cupNow0.lo) {
       thighT = cupK > 0.9 ? thighT + dt : 0;
       const u = 0.5 - 0.5 * Math.cos(thighT * Math.PI * 2 / THIGH_STROKE);
