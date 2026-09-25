@@ -8,6 +8,25 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.508.0] — 2026-09-24
+
+### the inner thigh, properly
+
+Misha: *"i don't see the stroke happening ... i don't get the refusal around
+stroke between thighs"*. Two fixes.
+
+**The line was drawn too far out.** It is her genitals, not her inner
+thighs. The hand now goes to the inner face of her thigh — the side facing
+her other leg, a little toward the front — found from her own vertices as
+the leg's cross-section in that band (`apprenticeThighBind(side, y0, y1)`),
+with the palm turned on to it.
+
+**And the stroke is one you can see.** It was 14 cm down the front of the
+thigh, which from your eye height is a hand barely moving. Now it runs the
+inner thigh from 67–72 cm down to 53–58 cm — about 14 cm of leg, but along
+the part you are looking straight at — every 2.6 s, and never higher than
+where it arrived, 8 cm and more below the top of her legs.
+
 ## [1.507.0] — 2026-09-24
 
 ### the hand strokes her thigh

@@ -1170,9 +1170,10 @@ function buildArms() {
   // it and tipped down its far side, palm down on her hair, the elbow out.
   // And the hand on her breast: fingers up and a little in, palm toward her.
   // And on her hip: fingers down and round the curve of it, palm in on her.
-  // And on the front of her inner thigh: fingers down along it, palm on her.
-  const THIGH_AIM = { pole: [0.60, -0.75, 0.20], along: [-0.15, -0.95, -0.25],
-    palm: [-0.30, 0.0, -0.95], flex: 0.10 };
+  // And on the inner face of her thigh — always the leg on your right, see the
+  // gate in 90-app.js — so the palm faces right, on to it, fingers down.
+  const THIGH_AIM = { pole: [0.60, -0.75, 0.20], along: [-0.05, -0.95, -0.30],
+    palm: [0.45, 0.0, -0.89], flex: 0.10 };
   const HIP_AIM = { pole: [0.60, -0.75, 0.20], along: [0.10, -0.90, -0.40],
     palm: [-0.70, 0.0, -0.70], flex: 0.10 };
   const CUP_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.20, 0.95, -0.10],

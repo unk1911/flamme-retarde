@@ -50425,11 +50425,13 @@ async function buildJadrija(scene) {
         if (!p) return null;
         const bone = side > 0 ? 'legUL' : 'legUR';
         const w = bindPointAt(appr, p, [[bone, 1]], new THREE.Vector3());
-        const b = bindPointAt(appr, [p[0] - 0.08, p[1], p[2]], [[bone, 1]], new THREE.Vector3());
+        // The way off her skin there: in toward her middle and a little
+        // forward, which is where the inner face of a thigh looks.
+        const b = bindPointAt(appr, [p[0] - 0.05, p[1], p[2] + Math.sign(p[2]) * 0.08], [[bone, 1]], new THREE.Vector3());
         const f = w.clone().sub(b).normalize();
         // And the same, a hand's width further down the thigh, for the
         // stroke — see THIGH_STROKE in 90-app.js. Down the leg, never up it.
-        const q = apprenticeThighBind(side, APPR.thighStroke);
+        const q = apprenticeThighBind(side, APPR.thighLo[0], APPR.thighLo[1]);
         const lw = q ? bindPointAt(appr, q, [[bone, 1]], new THREE.Vector3()) : w;
         thighs.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side,
           lo: { x: lw.x, y: lw.y, z: lw.z } });

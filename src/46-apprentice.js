@@ -68,10 +68,9 @@ const APPR = {
   thumbIn: 0.014,
   // Where a hand on her hip goes: the band of her height, metres.
   hipY: [0.96, 1.04], hipZ: 0.175,
-  // And her inner thigh, a hand's length below the top of her legs.
-  thighY: [0.66, 0.72],
-  // And how far down the thigh the hand strokes from there, metres.
-  thighStroke: 0.14,
+  // Her inner thigh: the band the hand arrives in — the top of the stroke,
+  // well short of the top of her legs — and the band it strokes down to.
+  thighY: [0.67, 0.72], thighLo: [0.53, 0.58],
   // Petting her: how far each way along her head the stroke goes, how far
   // the palm rides above the top of her hair (half a hand's thickness), how
   // much the round of her head drops at the ends of the stroke, and how far
@@ -781,34 +780,43 @@ function apprenticeHipBind(side) {
 }
 
 /**
- * The front of her inner thigh, bind frame: in the band a hand's length below
- * the top of her legs, the forward-most point of the inner half of each thigh.
- * `side` +1 her left, −1 her right. Measured once.
+ * A point on the INNER face of her thigh, bind frame — the side that faces
+ * her other leg, a little toward the front — in the height band `[y0, y1]`.
+ * The leg's cross-section in that band is found from her own vertices (its
+ * middle, per side), and the point is the one furthest toward her midline
+ * with a little weight on being in front. `side` +1 her left, −1 her right.
+ * Cached per band.
  */
 const _apprThighs = {};
-let _apprThigh = null;
-function apprenticeThighBind(side, lower = 0) {
+function apprenticeThighBind(side, y0 = APPR.thighY[0], y1 = APPR.thighY[1]) {
   if (!appr) return null;
-  _apprThigh = _apprThighs[lower] || null;
-  if (!_apprThigh) {
+  const key = y0.toFixed(3) + ':' + y1.toFixed(3);
+  if (!_apprThighs[key]) {
     const g = appr.mesh.geometry, pos = g.getAttribute('position');
     const { start, count } = g.drawRange;
     const ix = g.getIndex();
-    const best = { 1: null, '-1': null };
+    const pts = { 1: [], '-1': [] };
     for (let i = start; i < start + count; i++) {
       const v = ix.getX(i);
       const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
-      if (y < APPR.thighY[0] - lower || y > APPR.thighY[1] - lower) continue;
-      if (Math.abs(z) < 0.035 || Math.abs(z) > 0.085) continue;
-      const k = z > 0 ? 1 : -1;
-      // Forward, and toward the middle: the front of the inside of it.
-      const sc = x - 0.5 * Math.abs(z);
-      if (!best[k] || sc > best[k][3]) best[k] = [x, y, z, sc];
+      if (y < y0 || y > y1 || Math.abs(z) < 0.005 || Math.abs(z) > 0.15) continue;
+      pts[z > 0 ? 1 : -1].push([x, y, z]);
     }
-    _apprThigh = best;
-    _apprThighs[lower] = best;
+    const best = {};
+    for (const k of [1, -1]) {
+      const P = pts[k];
+      if (!P.length) { best[k] = null; continue; }
+      const cx = P.reduce((a, p) => a + p[0], 0) / P.length;
+      let b = null, bs = -1e9;
+      for (const p of P) {
+        const sc = -Math.abs(p[2]) + 1.1 * (p[0] - cx);
+        if (sc > bs) { bs = sc; b = p; }
+      }
+      best[k] = b;
+    }
+    _apprThighs[key] = best;
   }
-  const b = _apprThigh[side];
+  const b = _apprThighs[key][side];
   return b ? [b[0], b[1], b[2]] : null;
 }
 
