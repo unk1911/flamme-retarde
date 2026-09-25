@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.510.0] — 2026-09-24
+
+### hair that hangs off her, not out of her
+
+Misha: the braid stuck out sideways, stiff, when she bent over the table.
+
+Below the nape the braid's vertices are skinned to her neck, chest and spine,
+not her head; the 1.482.0 gravity swing was worked out in the head's frame
+and applied to vertices the chest then carried, and 1.496.0 turned its
+excess forward swing into a sideways one. Replaced: each hairstyle is cut
+into 8 sectors round her neck and 3 cm bands down its length — chains of
+nodes, solved on the CPU each frame. A segment keeps its authored direction
+until it points further from straight down than it does standing, then
+gravity takes the rest; every node is kept outside 12 capsules measured off
+her mesh (head, face, neck, shoulders, ribs, back, arms) and above whatever
+she lies on; hair under her back stays pinned. The shader turns each vertex
+about its chain (narrow blend for the braid, wide for loose hair). Standing
+the hair is within 1–2 mm of the authored shape. The braid now runs down her
+back at the wine stool, hangs beside her head in the line, drops over her
+shoulder to the floor on all fours, reaches the floor in the handstand and
+lies under her on the cot. Both `hair` and `hair2`. Debug:
+`__fr.jad.apprDump(0, 'hair')`.
+
 ## [1.509.0] — 2026-09-24
 
 ### she covers herself; she takes your arm
