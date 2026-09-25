@@ -1567,28 +1567,25 @@ async function buildJadrija(scene) {
     bays: 2,
     // ── AND BIGGER INSIDE THAN OUT ────────────────────────────────────────
     //
-    // Misha, 23 Sep 2026: the room should be bigger inside than it is from
-    // the promenade, the way other games do it — and "about 2x". So the
-    // frontage stays the two bays above, door, sign and all, and the room
-    // behind it runs on EAST under the next `wing` bays of the row. Their
-    // doors, vents and render are still drawn on the promenade side, and the
-    // bodies behind them are not: that volume is this room now. 4.10 m of
-    // floor across becomes 8.40, and 21.3 m² becomes 43.7 — 2.05 times.
+    // Misha, 23 and 25 Sep 2026: bigger inside than it is from the promenade,
+    // the way other games do it, and "just scaled 2x" — the same room, not a
+    // room with more floor bolted on down one side, which is what 1.512.0 was
+    // and which he rejected as not natural at all.
     //
-    // Sideways and not back, on purpose. The alley behind the row is 6.0 m
-    // wall to wall and the annex already takes 2.5 of it; the 7.5 m-deep room
-    // first proposed would have closed it outright, and the doorway through
-    // the screen wall is how you get into that alley at all.
+    // So there are TWO rooms behind this door and only one is ever drawn. The
+    // hut you see from outside is exactly the one this constant describes,
+    // and the room you are standing in once the door's dip has put you
+    // through it is that room scaled by `grow` — across, back and up, about
+    // the middle of the doorway — with the furniture laid out at the same
+    // scale and still its own size. √2, so the floor is twice the area.
     //
-    // East only, and not half each side, because every set piece in the room
-    // is staged off the WEST wall and the door: the tabouret with the plate
-    // and the glass on it, the lamp over it, the radio, the poster, the
-    // handstand spot, the television. The wine pour's yaw was chosen against
-    // where the crossing stands you (`standIn`), and moving that table even a
-    // bay would put her back between you and the pour. So the west wall stays
-    // exactly where it was, and only the cot and the towel go with the east
-    // one. Shrunk by `cabinRun` if the run has not got the bays to spare.
-    wing: 2,
+    // It cannot be one room. The alley behind the row is 6.0 m wall to wall
+    // and a 7.35 m-deep room closes it; its 2.97 m ceiling goes up through the
+    // roof of the row; its walls stand in the huts either side. So the swap is
+    // done at the bottom of the dip, where nobody can see it (`kabinaMode`):
+    // outside, the huts, the roof and the small annex, and the old collision;
+    // inside, none of those and the big room, its furniture and its walls.
+    grow: Math.SQRT2,
     depth: 5.40,           // how far back it goes from the seaward face
     door: 1.45,            // clear width of the opening
     head: 1.98,            // and its head height above the floor
@@ -1614,6 +1611,19 @@ async function buildJadrija(scene) {
   // is supposed to feel like. Nothing outside this building is affected.
   const SNUG = GROUND.girth - 0.22;
   let special = null;
+  // The two rooms' own geometry — see `KAB.grow`. `kabOut` is drawn only
+  // while you are outside (the small annex's walls and lining, its lean-to,
+  // the roof over the big room's span), `kabIn` only while you are in (the
+  // big room and everything in it). Both on the `up` material. The render
+  // that has to go with them — the huts the big room stands in, the annex's
+  // outside walls — is `kabRendOut`, which is its run's own render buffer
+  // over again, seeded the same, so the walls in it weather identically.
+  const kabOut = propBuilder(), kabIn = propBuilder();
+  let kabRendOut = null;
+  // And the kit's own meshes that stand where only the big room has floor —
+  // the television's screen and the radio's dial are out in the alley as far
+  // as the outside is concerned. Hidden with it.
+  const kabInOnly = [];
   // The blank end of the run that has the open kabina in it, kept as it is laid
   // so the tourist board can be hung on it. It is the only large flat wall on
   // this promenade with nothing on it: every other face in the resort is either
@@ -3000,7 +3010,7 @@ async function buildJadrija(scene) {
     // `rendMat`, which is where the argument for all three is.
     const runIx = runSeq++;
     rendNow = propBuilder();
-    rends.push({ buf: rendNow, foot: y0 + JAD.plinth,
+    rends.push({ buf: rendNow, foot: y0 + JAD.plinth, seed: runIx,
       wear: WEAR[washRun(runIx)], dado: DADO[washRun(runIx)],
       mid: W(t0 + n * JAD.cabW * 0.5, (front + back) * 0.5, 0) });
     footLo = Math.min(footLo, y0 + JAD.plinth);
@@ -3022,13 +3032,18 @@ async function buildJadrija(scene) {
     // the middle of the bend at the tip of the spit. See `squareRow`.
     const sk = front === JAD.rowA && !special && t0 >= kabFrom
       ? Math.min(KAB.nth, n - KAB.bays) : -1;
-    // How many bays past the door the room runs on under — see `KAB.wing`.
-    // As far as the run's own east end and no further. On this seed that is
-    // exactly two: the run has six bays and the door is the third and fourth,
-    // so the room's east wall stands 5 cm inside the gable the map board is
-    // hung on. Its render, its board and its end of the roof are untouched.
-    const wing = sk < 0 ? 0
-      : Math.max(0, Math.min(KAB.wing, n - sk - KAB.bays));
+    // The big room's footprint along the row, outside face to outside face —
+    // see `KAB.grow`. Whatever of this run stands inside it goes into the
+    // outside-only buffers, so that it is not standing in the middle of the
+    // room once you are in it. A second render buffer for this run, seeded as
+    // this run is, so what goes in it weathers exactly as it did in `rendNow`.
+    const kHalf = (JAD.cabW * KAB.bays * 0.5 - KAB.wall) * KAB.grow + KAB.wall;
+    const kDc = t0 + (sk + KAB.bays * 0.5) * JAD.cabW;
+    const RT0 = sk >= 0 ? kDc - kHalf : 0, RT1 = sk >= 0 ? kDc + kHalf : 0;
+    if (sk >= 0) {
+      kabRendOut = propBuilder();
+      rends.push({ ...rends[rends.length - 1], buf: kabRendOut, out: true });
+    }
     for (let k = 0; k < n; k++) {
       const a = t0 + k * JAD.cabW, c = a + JAD.cabW;
       const col = CAB[Math.floor(rng() * CAB.length)];
@@ -3048,8 +3063,7 @@ async function buildJadrija(scene) {
         // was half the size: the beach behind it does not move because a room
         // in front of it got bigger.
         for (let i = 1; i < KAB.bays; i++) rng();
-        kabina(a, a + JAD.cabW * KAB.bays, front, y0, eave, ridge, col, wash, roofCol,
-          a + JAD.cabW * (KAB.bays + wing));
+        kabina(a, a + JAD.cabW * KAB.bays, front, y0, eave, ridge, col, wash, roofCol);
         k += KAB.bays - 1;
         continue;
       }
@@ -3104,18 +3118,16 @@ async function buildJadrija(scene) {
       // in front of it. These are the same three spans `frontSkin` uses, so the
       // body and the face now share their ends and cannot disagree at all.
       const kbH = DOORW * 0.5;
-      // Not behind a bay the open kabina runs on under (`KAB.wing`): the face
-      // below is still drawn, and that is all of this hut there is. Its body
-      // would stand in the middle of the room. Nothing on a face reaches past
-      // `REVEAL`, not even an open bay's dark backing, so the room's own lining
-      // at `front + KAB.wall` is what closes it from within.
-      const underRoom = sk >= 0 && k >= sk + KAB.bays && k < sk + KAB.bays + wing;
-      if (!underRoom) {
-        for (const [kbA, kbC] of
-          [[a, dc - kbH], [dc - kbH, dc + kbH], [dc + kbH, c]]) {
-          boxTS(kbA, kbC, front + REVEAL, back, fl, eave, wash);
-        }
+      // Behind the face only, and outside-only where the big room stands in
+      // this hut (`KAB.grow`): from the promenade it is a hut like the rest,
+      // and from inside the room it is not there. The face stays in `rendNow`
+      // because it is the one part of it both rooms have.
+      b = sk >= 0 && c > RT0 && a < RT1 ? kabRendOut : rendNow;
+      for (const [kbA, kbC] of
+        [[a, dc - kbH], [dc - kbH, dc + kbH], [dc + kbH, c]]) {
+        boxTS(kbA, kbC, front + REVEAL, back, fl, eave, wash);
       }
+      b = rendNow;
       frontSkin(a, c, dc, front, fl, eave, wash);
       // Two bays in the block are faced in stone instead of rendered, and they
       // get neither the skirt nor the render patch nor the eave shadow — see
@@ -3301,12 +3313,36 @@ async function buildJadrija(scene) {
       ? [[T0, EAST_CAFE.t0], [EAST_CAFE.t1, T1]] : [[T0, T1]]) {
       if (rc - ra < 0.15) continue;
       const nR = Math.max(1, Math.ceil((rc - ra) / JAD.cabW));
-      for (const [sa, sb, ya, yb] of [[e0, mid, eave, ridge], [mid, e1, ridge, eave]]) {
-        for (let i = 0; i < nR; i++) {
-          const a0 = ra + (rc - ra) * (i / nR), a1 = ra + (rc - ra) * ((i + 1) / nR);
-          b.quad(W(a0, sa, ya), W(a1, sa, ya), W(a1, sb, yb), W(a0, sb, yb), roofCol);
-          b.quad(W(a0, sb, yb - 0.09), W(a1, sb, yb - 0.09),
-            W(a1, sa, ya - 0.09), W(a0, sa, ya - 0.09), [0.145, 0.135, 0.125]);
+      const slab = (a0, a1, sa, sb, ya, yb) => {
+        b.quad(W(a0, sa, ya), W(a1, sa, ya), W(a1, sb, yb), W(a0, sb, yb), roofCol);
+        b.quad(W(a0, sb, yb - 0.09), W(a1, sb, yb - 0.09),
+          W(a1, sa, ya - 0.09), W(a0, sa, ya - 0.09), [0.145, 0.135, 0.125]);
+      };
+      // Cut again where the big room's walls are, if it is this run (see
+      // `KAB.grow`): over the room the roof is outside-only from the front
+      // wall's inner face back, because the room's ceiling is 0.5 m above it.
+      // The eave in front of that stays, so the view out of the door is the
+      // view out of the door either way.
+      const cuts = [];
+      for (let i = 0; i <= nR; i++) cuts.push(ra + (rc - ra) * (i / nR));
+      if (sk >= 0) for (const T of [RT0, RT1]) if (T > ra && T < rc) cuts.push(T);
+      cuts.sort((x, y) => x - y);
+      const sF = front + KAB.wall;
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const a0 = cuts[i], a1 = cuts[i + 1];
+        if (a1 - a0 < 1e-4) continue;
+        const under = sk >= 0 && a0 >= RT0 - 1e-6 && a1 <= RT1 + 1e-6;
+        for (const [sa, sb, ya, yb] of [[e0, mid, eave, ridge], [mid, e1, ridge, eave]]) {
+          if (!under || sb <= sF) { slab(a0, a1, sa, sb, ya, yb); continue; }
+          const keep = b;
+          if (sa >= sF) {
+            b = kabOut; slab(a0, a1, sa, sb, ya, yb);
+          } else {
+            const yF = ya + (yb - ya) * (sF - sa) / (sb - sa);
+            slab(a0, a1, sa, sF, ya, yF);
+            b = kabOut; slab(a0, a1, sF, sb, yF, yb);
+          }
+          b = keep;
         }
       }
       // The cut ends only. `T0` and `T1` already get a gable and an end wall
@@ -3383,12 +3419,12 @@ async function buildJadrija(scene) {
     // for weeks, and it has the same shape: geometry and collision written in
     // two places, and only one of them told about the exception. Anything that
     // opens a hole in a row here has to open it in both.
-    const pushRun = (a, c) => {
+    const pushRun = (a, c, kab) => {
       for (const [pa, pc] of cafeBlocks(a, c, front)
         ? [[a, EAST_CAFE.t0], [EAST_CAFE.t1, c]]
         : [[a, c]]) {
         if (pc - pa < 0.15) continue;
-        runs.push({ t0: pa, t1: pc, s0: front - 0.55, s1: back + 0.45, y: y0, h });
+        runs.push({ t0: pa, t1: pc, s0: front - 0.55, s1: back + 0.45, y: y0, h, kab });
       }
     };
     if (sk < 0) {
@@ -3403,13 +3439,14 @@ async function buildJadrija(scene) {
       // far side starts after the second one. Left at a single bay this ran a
       // solid blocker up the middle of the room, and the right-hand half of a
       // 4 m floor was a wall you could see across and not walk across.
-      // And the `wing` bays past it, which are the room now — see `KAB.wing`.
-      // The room's own shell holds their faces from the promenade instead.
-      const a = t0 + sk * JAD.cabW, c = a + JAD.cabW * (KAB.bays + wing);
-      if (a > t0) pushRun(t0 - 0.5, a - SNUG);
-      // Down to the sliver past the gable when the room reaches the run's
-      // end, so the end wall still holds you off where it always did.
-      if (c < t1 + 0.01) pushRun(c + SNUG, t1 + 0.5);
+      const a = t0 + sk * JAD.cabW, c = a + JAD.cabW * KAB.bays;
+      if (a > t0) pushRun(t0 - 0.5, a - SNUG, 'out');
+      if (c < t1) pushRun(c + SNUG, t1 + 0.5, 'out');
+      // And the same run with the big room cut out of it instead, for while
+      // you are in there (`KAB.grow`) — its walls stand in these huts, and
+      // their blockers would be a wall down each side of the floor.
+      if (RT0 > t0 - 0.5 + SNUG) pushRun(t0 - 0.5, RT0 - SNUG, 'in');
+      if (RT1 < t1 + 0.5 - SNUG) pushRun(RT1 + SNUG, t1 + 0.5, 'in');
     }
     b = deck;
   }
@@ -3449,18 +3486,13 @@ async function buildJadrija(scene) {
    * back wall — it runs 5.4 m into the alley, which is dead ground between the
    * rows, under a lean-to hung off the run's rear eave. From the promenade the
    * only thing wrong with it is the sign and the fact that the door is missing.
-   *
-   * `a`..`c` is the frontage, the two bays you see. `wr` is where the room
-   * really ends, which is further east under the bays next door — see
-   * `KAB.wing`. Everything on the seaward face keeps to `a`..`c`, and every
-   * wall, floor, ceiling and roof behind it runs to `wr`.
    */
-  function kabina(a, c, front, y0, eave, ridge, col, wash, roofCol, wr = c) {
+  function kabina(a, c, front, y0, eave, ridge, col, wash, roofCol) {
     const floor = y0 + JAD.plinth;
     const s1 = front + KAB.depth;
     const dc = (a + c) * 0.5;
     const dj = KAB.door * 0.5;
-    const wl = a;                            // the render, continuous with the row
+    const wl = a, wr = c;                    // the render, continuous with the row
     const dark = [wash[0] * 0.30, wash[1] * 0.25, wash[2] * 0.21];
 
     // The pad carries on under the annex. In the deck buffer with the rest of
@@ -3477,19 +3509,17 @@ async function buildJadrija(scene) {
     // inside is a dark lined box and stays in `up`. The one you can walk into
     // has to weather exactly like the eighty you cannot, or it stops being one
     // of them the moment you look along the wall.
-    b = rendNow;
-    // Sides, back, and the two jambs. The lintel closes the wall over the door.
-    //
-    // The east wall starts behind the face when the room runs on under its
-    // neighbours: there it stands where one of their party walls meets the
-    // promenade, and from `front` it would put 10 cm of this hut's paint in the
-    // same plane as their render. The east jamb stops at `c` for the same
-    // reason — past it the face is theirs.
+    // Sides and back into the outside-only render, since the big room stands
+    // across all three of them (`KAB.grow`); the front wall is the one both
+    // rooms have and stays in the run's own.
+    b = kabRendOut;
     boxTS(wl, wl + w, front, s1, floor, eave, wash);
-    boxTS(wr - w, wr, wr > c ? front + REVEAL : front, s1, floor, eave, wash);
+    boxTS(wr - w, wr, front, s1, floor, eave, wash);
     boxTS(wl, wr, s1 - w, s1, floor, eave, wash);
+    b = rendNow;
+    // The two jambs. The lintel closes the wall over the door.
     boxTS(wl, dc - dj, front, front + w, floor, eave, wash);
-    boxTS(dc + dj, c, front, front + w, floor, eave, wash);
+    boxTS(dc + dj, wr, front, front + w, floor, eave, wash);
     // Over the opening: the rail, then the vent's own hole, then the wall over
     // it. Four panels rather than one, for the same reason the plain huts get
     // three — a vent drawn on unbroken masonry is a grille in front of a white
@@ -3502,7 +3532,10 @@ async function buildJadrija(scene) {
     boxTS(dc - dj, dc + dj, front, front + w, v1, eave, wash);
     // The vent opens into the void over the ceiling, not into the room, so it
     // needs its own back or it is a slot with the roof timbers behind it.
-    boxTS(dc - vh - 0.02, dc + vh + 0.02, front + w, front + w + 0.008, v0, v1,
+    // Inside the wall's own thickness and not proud of it: the big room's
+    // lining is 4 mm in from `front + w` and its ceiling is well above this, so
+    // standing out behind the wall it would be a dark tile on the room side.
+    boxTS(dc - vh - 0.02, dc + vh + 0.02, front + w - 0.008, front + w, v0, v1,
       [0.045, 0.041, 0.038]);
     // Rendered and painted exactly like its neighbours, which is the whole
     // trick: from fifty metres down the row this is a hut with its door taken
@@ -3534,6 +3567,9 @@ async function buildJadrija(scene) {
     // a dark room with the *outside* colour showing through it in wedges that
     // swim as you walk.
     const IN = 0.004;
+    // The small room, which is what the doorway shows from outside — through
+    // a bead curtain, so dark boards and not much else. Outside-only.
+    b = kabOut;
     roomTS(wl + w + IN, wr - w - IN, front + w + IN, s1 - w - IN,
       floor + 0.01, top - IN,
       dark, [0.190, 0.158, 0.126], [0.052, 0.046, 0.042], true);
@@ -3546,6 +3582,7 @@ async function buildJadrija(scene) {
     inFace(wl + w, dc - dj, floor, top, fs, dark);
     inFace(dc + dj, wr - w, floor, top, fs, dark);
     inFace(dc - dj, dc + dj, floor + KAB.head, top, fs, dark);
+    b = up;
     // And the reveals: slivers standing in the thickness of the opening, so the
     // door is a hole through 10 cm of wall rather than a rectangle cut in paper.
     for (const o of [-1, 1]) {
@@ -3554,10 +3591,10 @@ async function buildJadrija(scene) {
     boxTS(dc - dj, dc + dj, front, fs, floor + KAB.head, floor + KAB.head + 0.014, dark);
     // The ceiling is a slab and not a plane, so the lean-to overhead has
     // something to sit on and the room does not open into the roof void.
-    // From just behind the face and not from it: under the neighbours' bays
-    // the face is their render, and a slab edge at `front` is a dark 6 cm
-    // band drawn in the same plane as it, right along the row.
-    boxTS(wl, wr, front + REVEAL + 0.002, s1, top, top + 0.06, dark);
+    // Outside-only, with the lean-to, both of which the big room's ceiling
+    // is higher than.
+    b = kabOut;
+    boxTS(wl, wr, front, s1, top, top + 0.06, dark);
 
     // The lean-to over the annex, hung off the run's rear eave. A shallower
     // pitch than the roof it comes off, which is what a lean-to is.
@@ -3568,6 +3605,27 @@ async function buildJadrija(scene) {
     b.quad(W(wl - 0.16, r1, y1 - 0.08), W(wr + 0.16, r1, y1 - 0.08),
       W(wr + 0.16, r0, eave - 0.08), W(wl - 0.16, r0, eave - 0.08),
       [0.145, 0.135, 0.125]);
+    b = up;
+
+    // ── the big room ─────────────────────────────────────────────────────
+    //
+    // The same room scaled by `KAB.grow` about the middle of the doorway at
+    // the inner face of the front wall — across, back, and up — and drawn
+    // only while you are in it. It needs no masonry: nothing outside it is
+    // drawn at the same time that it could be seen against, so it is the
+    // lining and nothing else, and the one wall it shares with the small room
+    // is the front, which is real and is where the door is.
+    const G = KAB.grow;
+    const fs0 = front + w;                   // the inner face, both rooms
+    const bT0 = dc - (dc - (wl + w)) * G, bT1 = dc + ((wr - w) - dc) * G;
+    const bS1 = fs0 + ((s1 - w) - fs0) * G, bTop = floor + KAB.ceil * G;
+    b = kabIn;
+    roomTS(bT0, bT1, fs0 + IN, bS1, floor + 0.01, bTop,
+      dark, [0.190, 0.158, 0.126], [0.052, 0.046, 0.042], true);
+    inFace(bT0, dc - dj, floor, bTop, fs0 + IN, dark);
+    inFace(dc + dj, bT1, floor, bTop, fs0 + IN, dark);
+    inFace(dc - dj, dc + dj, floor + KAB.head, bTop, fs0 + IN, dark);
+    b = up;
 
     // ── what you cannot walk through ──────────────────────────────────────
     //
@@ -3593,22 +3651,27 @@ async function buildJadrija(scene) {
     // for three of them is the solid hut next door and for the back one is a
     // yard of alley nobody has any business standing in anyway.
     const HOLD = 0.22, REACH = 0.75;
-    const T0 = wl + w, T1 = wr - w, S0 = front + w, S1 = s1 - w;
+    // The same five walls for either room, off the room's inside faces and
+    // the outside faces of the walls round it — which for the big room are
+    // notional, `w` beyond its lining, since nothing is drawn there.
+    const room = (T0, T1, S0, S1, top) => {
+      const L = T0 - w, R = T1 + w, B = S1 + w;
+      return { t0: T0, t1: T1, s0: S0, s1: S1, top, shell: [
+        [L - REACH, T0 + HOLD, front - HOLD, S1 + HOLD],    // left
+        [T1 - HOLD, R + REACH, front - HOLD, S1 + HOLD],    // right
+        [L - REACH, R + REACH, S1 - HOLD, B + REACH],       // back
+        [L - REACH, dc - dj, front - HOLD, S0 + HOLD],      // front, left of the door
+        [dc + dj, R + REACH, front - HOLD, S0 + HOLD],      // front, right of it
+      ] };
+    };
+    const small = room(wl + w, wr - w, front + w, s1 - w, top);
+    const big = room(bT0, bT1, fs0, bS1, bTop);
+    // `t0`..`top` and `shell` are whichever room is drawn — see `kabinaMode`,
+    // which is the only thing that changes them — so every "am I in the
+    // room" test in this file asks about the room that is actually there.
     special = {
-      t0: T0, t1: T1, s0: S0, s1: S1,
-      shell: [
-        [wl - REACH, T0 + HOLD, front - HOLD, S1 + HOLD],   // left
-        [T1 - HOLD, wr + REACH, front - HOLD, S1 + HOLD],   // right
-        [wl - REACH, wr + REACH, S1 - HOLD, s1 + REACH],    // back
-        [wl - REACH, dc - dj, front - HOLD, S0 + HOLD],     // front, left of the door
-        [dc + dj, c + (wr > c ? 0 : REACH), front - HOLD, S0 + HOLD],  // right of it
-        // And the neighbours' faces the room runs on behind, which hold you
-        // off where every other face on the row does — `runs` stand 0.55 out
-        // and `confine` adds the girth again — and not at this door's 0.22.
-        ...(wr > c
-          ? [[c, wr + REACH, front - 0.55 - GROUND.girth, S0 + HOLD]] : []),
-      ],
-      face: front, dc, dj, floor, top, y0, eave,
+      ...small, small, big, inside: false,
+      face: front, dc, dj, floor, y0, eave,
       // Where you are standing when you are in it, for the audio and the light.
       // A metre of the doorway is included on purpose: the room should have
       // gone quiet by the time you are through the frame, not a stride later.
@@ -27218,21 +27281,31 @@ async function buildJadrija(scene) {
    * not already touching it. Now the walls are 2.02 m out and the furniture is
    * on them, which is what leaves 2.78 m of clear floor down the centre.
    *
-   * Since the room ran on east under two more bays (`KAB.wing`) the east wall
-   * is at dc + 6.35 and not dc + 2.05, and the two things that stand against
-   * it — the cot and the towel — are placed off `K.t1` instead. Everything on
-   * the west side is where it was, and the floor between is new.
+   * AND IT IS FURNISHED IN THE BIG ROOM NOW (`KAB.grow`), laid out the way it
+   * was in the small one and scaled with it: every place that was a distance
+   * from the doorway is that distance times `grow` — `along` across the room
+   * from the middle of the door, `back` in from the front wall's inner face —
+   * and every piece that stood against a wall still stands against it, the
+   * same few centimetres off. The pieces are their own size; a cot is as long
+   * as a person whatever room it is in. Scaling about the doorway is what
+   * keeps the room's set pieces facing you: from where the crossing stands
+   * you (`standIn`, scaled too) every one of them is in the same direction as
+   * it was, only further off.
    */
   function kabinaKit(K) {
     const f = K.floor, dc = K.dc;
+    const along = (d) => dc + d * KAB.grow, back = (d) => K.s0 + d * KAB.grow;
     const tv = tvPanel(), radio = radioPanel();
 
     // ── the cot ──
-    // Off the east wall and not off `dc`, since the room went on under the
-    // next two bays (`KAB.wing`): 0.15 m clear of the boards, which is where it
-    // stood when that wall was at dc + 2.05 and `c1` was dc + 1.90. `perch`
-    // sits her back against that wall, so the two have to move together.
-    const c1 = K.t1 - 0.15, c0 = c1 - 0.70, cs0 = 18.55, cs1 = 20.45;
+    // Along the east wall and its middle 2.20 m (scaled) back from the front
+    // wall. 0.60 m OFF that wall, where it was 0.15: Misha, 25 Sep 2026,
+    // "move the bed a little bit away from the wall ... to have more access".
+    // 0.60 is what makes the far side a way along rather than a gap — the cot
+    // holds you 0.22 m off its edge and the wall 0.22 off the boards.
+    const COT_OFF = 0.60;
+    const c1 = K.t1 - COT_OFF, c0 = c1 - 0.70;
+    const cs0 = back(2.20) - 0.95, cs1 = back(2.20) + 0.95;
     for (const [t, s] of [[c0 + 0.06, cs0 + 0.07], [c1 - 0.06, cs0 + 0.07],
       [c0 + 0.06, cs1 - 0.07], [c1 - 0.06, cs1 - 0.07]]) {
       post(facing(t, s, 0), 0, 0, f, f + 0.30, 0.022, KIT.steel, 6);
@@ -27257,7 +27330,7 @@ async function buildJadrija(scene) {
       h: 0.5, y: f });
 
     // ── the television, on its stand against the back wall ──
-    const vt = dc - 1.10, vs = 22.10;
+    const vt = along(-1.10), vs = K.s1 - 0.40;     // 0.40 off the back wall
     for (const o of [[-0.31, -0.15], [0.31, -0.15], [-0.31, 0.15], [0.31, 0.15]]) {
       post(facing(vt + o[0], vs + o[1], 0), 0, 0, f, f + 0.50, 0.028, KIT.dark, 5);
     }
@@ -27307,6 +27380,7 @@ async function buildJadrija(scene) {
       const st = at(vt);
       tv.mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
       scene.add(tv.mesh);
+      kabInOnly.push(tv.mesh);
     }
     // Rabbit ears: a chromed base and two rods in a V, which is the one detail
     // that dates the thing from across a dark room.
@@ -27342,7 +27416,7 @@ async function buildJadrija(scene) {
     // rim and the wall, her pour mark lands 0.33 m off it, and nothing else in
     // the room is anywhere near — the radio table is 1.7 m inland along the
     // same wall and the cot is 2.4 m across the room.
-    const bt = dc - 1.15, bs = 18.20;
+    const bt = along(-1.15), bs = back(0.90);
 
     /**
      * ── AND WHAT IS ON THE TOP, WHICH IS ALSO WHERE SHE CAN STAND ─────────
@@ -27887,7 +27961,7 @@ async function buildJadrija(scene) {
       const gbuf = propBuilder();
       const keep2 = b;
       b = gbuf;
-      const lt = K.t0 + 0.55, ls = bs - 0.10, ly = f + 1.92;
+      const lt = bt - 0.35, ls = bs - 0.10, ly = f + 1.92;
       // The inside of the cone, a hair inside the enamel, and the bulb.
       lathe(W, lt, ls, [[ly + 0.026, 0.023], [ly - 0.108, 0.130]],
         [1.000, 0.905, 0.720], 12);
@@ -27971,22 +28045,25 @@ async function buildJadrija(scene) {
     // where the bright things have somewhere to be bright from is a room and
     // not a set of exposure decisions.
     {
-      // 0.55 and not 0.30: the table went out to dc − 1.15 and a work light
-      // over the floor beside a table is a work light over nothing. The arm is
-      // the length that puts the cone over the half of the top she works at.
-      const lt = K.t0 + 0.55, ls = bs - 0.10, ly = f + 1.92;
+      // Over the half of the top she works at, 0.35 m west of its middle, and
+      // HUNG FROM THE CEILING now rather than off the wall. In the small room
+      // it was a 0.50 m arm off the boards; the big one (`KAB.grow`) put the
+      // table 1.27 m out from the wall, and an arm that long is a pole across
+      // the room at eye height. A 2.97 m ceiling is what a pendant is for.
+      const lt = bt - 0.35, ls = bs - 0.10, ly = f + 1.92;
       const ENAM = [0.640, 0.628, 0.600];
-      boxTS(K.t0 + 0.01, K.t0 + 0.06, ls - 0.075, ls + 0.075,
-        ly - 0.10, ly + 0.09, [0.400, 0.392, 0.375], [0.440, 0.432, 0.415]);
-      boxTS(K.t0 + 0.05, lt, ls - 0.018, ls + 0.018, ly - 0.005, ly + 0.030,
-        [0.400, 0.392, 0.375]);
+      // The flex, and the rose it hangs from.
+      boxTS(lt - 0.005, lt + 0.005, ls - 0.005, ls + 0.005, ly + 0.028, K.top - 0.03,
+        [0.110, 0.104, 0.098]);
+      lathe(W, lt, ls, [[K.top - 0.012, 0.045], [K.top - 0.045, 0.040],
+        [K.top - 0.050, 0.012]], [0.400, 0.392, 0.375], 10);
       // The shade: a cone, wide side down, with the enamel rim a shade lighter.
       lathe(W, lt, ls, [[ly + 0.030, 0.026], [ly + 0.020, 0.030],
         [ly - 0.110, 0.135], [ly - 0.118, 0.135]], ENAM, 12);
     }
 
     // ── the radio, on a small table against the near wall ──
-    const rt = dc - 1.66, rs = 19.90;
+    const rt = K.t0 + 0.39, rs = back(2.60);       // 0.39 off the west wall
     for (const o of [[-0.16, -0.12], [0.16, -0.12], [-0.16, 0.12], [0.16, 0.12]]) {
       post(facing(rt + o[0], rs + o[1], 0), 0, 0, f, f + 0.58, 0.020, KIT.dark, 5);
     }
@@ -28014,6 +28091,7 @@ async function buildJadrija(scene) {
       const st = at(rt);
       radio.mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
       scene.add(radio.mesh);
+      kabInOnly.push(radio.mesh);
     }
 
     // ── the poster, on the wall the tabouret stands against ──
@@ -28055,6 +28133,7 @@ async function buildJadrija(scene) {
       const st = at(pt);
       poster.rotation.y = Math.atan2(st.ux, st.uz);
       scene.add(poster);
+      kabInOnly.push(poster);
     }
 
     // ── what else is in one, off 0:09 and 3:48 ──────────────────────────────
@@ -28093,18 +28172,10 @@ async function buildJadrija(scene) {
       // needs a caption to be recognised is furniture the room is worse for
       // having. Same shelf as the moonwalk — if it comes back it needs the
       // folded legs and a crossbar, so the silhouette says lounger on its own.
-      // The cool box, on the floor by the foot of the cot. Red body, pale lid,
-      // a dark strap handle over it.
-      {
-        const bt = dc + 0.30, bs = K.s1 - 0.72;
-        boxTS(bt - 0.29, bt + 0.29, bs - 0.19, bs + 0.19, f, f + 0.30,
-          RED2, shade(RED2, 1.16));
-        boxTS(bt - 0.31, bt + 0.31, bs - 0.21, bs + 0.21, f + 0.30, f + 0.37,
-          PALE, shade(PALE, 1.10));
-        boxTS(bt - 0.06, bt + 0.06, bs - 0.21, bs + 0.21, f + 0.36, f + 0.42,
-          [0.115, 0.112, 0.110]);
-        furniture.push({ t: bt, s: bs, a: 0.32, c: 0.24, h: 0.42, y: f });
-      }
+      // THE COOL BOX IS NOT HERE EITHER, on Misha's word, 25 Sep 2026: "that
+      // red cooler in the kabine is unnecessary, needs to be ditched". Same
+      // shelf as the lounger above. It was the loudest colour in a dark room
+      // and was doing nothing but being red on the floor.
       // The shelf, high on the back wall, on two brackets, with a bag on it.
       {
         const sy = f + 1.62, sb = K.s1 - 0.26;
@@ -28124,11 +28195,8 @@ async function buildJadrija(scene) {
       // The towel on a hook, on the near wall where you would actually hang
       // one: striped, because every towel in every one of these frames is.
       {
-        // Off the east wall, which moved two bays when the room ran on under
-        // its neighbours (`KAB.wing`). Back against the lining, which is 4 mm
-        // in from `K.t1` — it was typed as dc + 1.86 against a wall that had
-        // since gone out to dc + 2.05, and hung 19 cm clear of the plaster.
-        const ht = K.t1 - 0.005, hs = K.face + 2.30, hy = f + 1.58;
+        // Back against the east wall's lining, which is where the cot is.
+        const ht = K.t1 - 0.005, hs = back(2.20), hy = f + 1.58;
         boxTS(ht - 0.05, ht, hs - 0.03, hs + 0.03, hy, hy + 0.05,
           [0.155, 0.150, 0.148]);
         const BANDS = [[0.620, 0.235, 0.145], [0.700, 0.688, 0.640],
@@ -28313,9 +28381,9 @@ async function buildJadrija(scene) {
        *
        * Where she sits for `perch` — *"her back perched against the wall"* —
        * and it cannot be flush, which is worth writing down because it looks
-       * like a bug and is the furniture: `c1` is `K.t1` - 0.15, and `K.t1` is
-       * the boards of the side wall, so the cot stands 0.15 m off the wall it
-       * is against. A body sitting at the very edge of this
+       * like a bug and is the furniture: `c1` is `K.t1` - 0.15 and `K.t1` is
+       * the boards of the side wall, so the cot stands 0.15 m off
+       * the wall it is against. A body sitting at the very edge of this
        * mattress has its shoulders about 0.13 m from the plaster and there is
        * nothing to be done about that from here.
        *
@@ -28346,17 +28414,18 @@ async function buildJadrija(scene) {
        * And the patch of floor the handstand goes on — *"on the floor, against
        * a wall"*.
        *
-       * THE NEAR WALL AND NOT THE COT'S, and in the one gap along it: the
-       * tabouret with the plate on it is at s 18.20, the radio table at 19.90
-       * and the television at 22.10, which leaves the run from about 20.5 to
-       * 21.6 and nothing else. 21.05 is the middle of that.
+       * THE NEAR WALL AND NOT THE COT'S, and in the one gap along it. In the
+       * small room the tabouret was at s 18.20, the radio table at 19.90 and
+       * the television at 22.10, leaving 20.5 to 21.6, and 21.05 was the
+       * middle of that — 3.75 m in from the front wall, which `back` scales
+       * with the rest of the room (`KAB.grow`).
        *
        * 0.38 m off the boards. `HOLD` in `special.shell` lets her stand 0.22 m
        * from them, so this is inside what the walk will accept, and 0.38 is
        * what "against a wall" is for a handstand: you kick up and your heels
        * arrive at the plaster rather than a stride short of it.
        */
-      handSpot: [K.t0 + 0.38, 21.05],
+      handSpot: [K.t0 + 0.38, back(3.75)],
       // The ornamental plate: the middle of its well, and the height of the
       // flat floor inside it. The well is flat out to r = 0.050 and then
       // rises, so anything laid in it stays inside that.
@@ -28648,7 +28717,18 @@ async function buildJadrija(scene) {
     }
   }
 
-  if (special) kit = kabinaKit(special);
+  // Furnished in the BIG room — `KAB.grow` — into its own buffer, and every
+  // blocker it puts down belongs to that room and is off until you are in it.
+  if (special) {
+    const keep = b, nF = furniture.length;
+    b = kabIn;
+    kit = kabinaKit({ ...special, ...special.big });
+    b = keep;
+    for (let i = nF; i < furniture.length; i++) {
+      furniture[i].kab = 'in';
+      furniture[i].off = true;
+    }
+  }
 
   // ── the village ────────────────────────────────────────────────────────────
   /**
@@ -29331,6 +29411,11 @@ async function buildJadrija(scene) {
   const upMesh = new THREE.Mesh(up.geo(), solidMaterial(0xffffff, {
     spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22, body: FACE,
   }));
+  // The kabina's two rooms, on the same material as `up` and switched by
+  // `kabinaMode`. Outside to start with, which is where everybody starts.
+  const kabOutMesh = new THREE.Mesh(kabOut.geo(), upMesh.material);
+  const kabInMesh = new THREE.Mesh(kabIn.geo(), upMesh.material);
+  kabInMesh.visible = false;
   // The village gets a bounce too but a much smaller one — a house forty metres
   // inland is standing on limestone and a lane, not on the terrace.
   const vilMesh = new THREE.Mesh(vil.geo(), solidMaterial(0xffffff, {
@@ -29497,16 +29582,23 @@ async function buildJadrija(scene) {
   // metres of hut and there are eighteen of them along a hundred and sixty
   // metres of shore, so standing at one end most of them are behind you.
   const rendTris = rends.reduce((n, r) => n + r.buf.count(), 0) / 3;
-  const rendMeshes = rends.map((r, i) => {
+  // Seeded by the run and not by the place in this list, which since the
+  // kabina's outside-only buffer is not the same thing (see `kabRendOut`).
+  const rendMeshes = rends.map((r) => {
     const m = new THREE.Mesh(r.buf.geo(), rendMat(
       new THREE.Vector3(r.mid[0], r.foot, r.mid[2]),
-      new THREE.Vector2((i * 137.4) % 311, (i * 71.9) % 197), r.wear,
+      new THREE.Vector2((r.seed * 137.4) % 311, (r.seed * 71.9) % 197), r.wear,
       new THREE.Vector4(...r.dado)));
     m.geometry.computeBoundingSphere();
     return m;
   });
-  for (const m of [deckMesh, upMesh, vilMesh]) { m.frustumCulled = false; }
-  for (const m of [deckMesh, upMesh, vilMesh, ...rendMeshes]) scene.add(m);
+  const kabRendMesh = rendMeshes[rends.findIndex((r) => r.out)] || null;
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh]) {
+    m.frustumCulled = false;
+  }
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, ...rendMeshes]) {
+    scene.add(m);
+  }
 
   // ── the locale ─────────────────────────────────────────────────────────────
   /**
@@ -29704,10 +29796,13 @@ async function buildJadrija(scene) {
   // laid out in — so they are axis-aligned boxes here for free, which is exactly
   // what `confine` wants and exactly why the aerodrome uses runway-local axes
   // for the same job.
+  // `kab` is which of the kabina's two rooms a blocker belongs to, if either,
+  // and the inside one starts switched off — see `kabinaMode`.
   const blockers = runs.map((r) => ({
     t: (r.t0 + r.t1) * 0.5, s: (r.s0 + r.s1) * 0.5,
     a: (r.t1 - r.t0) * 0.5, c: (r.s1 - r.s0) * 0.5,
     h: r.h, y: r.y,
+    ...(r.kab ? { kab: r.kab, off: r.kab === 'in' } : {}),
   }));
   // The trees. Squared off to the trunk, not to the crown — being stopped by
   // foliage two metres over your head is worse than walking through it.
@@ -29720,14 +29815,18 @@ async function buildJadrija(scene) {
   // The special kabina's own walls, as the room itself drew them — see `shell`
   // in `kabina()`. Nothing else on this shore is built this way, and nothing
   // else on this shore is a room.
+  // Both rooms' walls, the big one's switched off until you are in it.
   if (special) {
-    for (const [t0, t1, s0, s1] of special.shell) {
-      blockers.push({
-        t: (t0 + t1) * 0.5, s: (s0 + s1) * 0.5,
-        a: (t1 - t0) * 0.5 - GROUND.girth, c: (s1 - s0) * 0.5 - GROUND.girth,
-        h: KAB.ceil, y: special.y0,
-      });
+    for (const [room, kab] of [[special.small, 'out'], [special.big, 'in']]) {
+      for (const [t0, t1, s0, s1] of room.shell) {
+        blockers.push({
+          t: (t0 + t1) * 0.5, s: (s0 + s1) * 0.5,
+          a: (t1 - t0) * 0.5 - GROUND.girth, c: (s1 - s0) * 0.5 - GROUND.girth,
+          h: KAB.ceil, y: special.y0, kab, off: kab === 'in',
+        });
+      }
     }
+    kabinaMode(false, true);
   }
 
   // The houses were laid out to their lanes rather than to the shore, so each
@@ -34134,6 +34233,35 @@ async function buildJadrija(scene) {
    * `jad.kabina().inside` publishes, hoisted so `stepShow` can hand it to the
    * apprentice without allocating a closure sixty times a second.
    */
+  /**
+   * Which of the kabina's two rooms is drawn, walked in and asked about —
+   * see `KAB.grow`. Called every frame by the door's dip in 90-app.js, and
+   * does nothing unless the answer has changed; the dip calls it at the
+   * bottom of its black, which is the only moment the swap can be made
+   * without being seen. `force` is for the first call, at build.
+   *
+   * What changes: the big room, its furniture and its screens against the
+   * small room, the huts it stands in, the annex and the roof over it; the
+   * blockers each of those put down (`kab` on the blocker); and `special`'s
+   * own `t0`..`top` and `shell`, which every "am I in the room" test in this
+   * file reads. So from outside, the alley behind the row is the alley and
+   * not the back of a room nobody can see, and from inside, the room is the
+   * room and not a room with two huts and a roof standing in it.
+   */
+  function kabinaMode(inside, force) {
+    inside = !!inside;
+    if (!special || (special.inside === inside && !force)) return;
+    const R = inside ? special.big : special.small;
+    special.inside = inside;
+    special.t0 = R.t0; special.t1 = R.t1; special.s0 = R.s0; special.s1 = R.s1;
+    special.top = R.top; special.shell = R.shell;
+    kabOutMesh.visible = !inside;
+    if (kabRendMesh) kabRendMesh.visible = !inside;
+    kabInMesh.visible = inside;
+    for (const m of kabInOnly) m.visible = inside;
+    for (const bk of blockers) if (bk.kab) bk.off = (bk.kab === 'in') !== inside;
+  }
+
   function kabinaInside(x, z) {
     if (!special) return 0;
     const [t, s] = local(x, z);
@@ -34174,13 +34302,16 @@ async function buildJadrija(scene) {
   function kabinaFit() {
     if (!special) return null;
     if (kabinaFitCache) return kabinaFitCache;
-    const tm = (special.t0 + special.t1) * 0.5, sm = (special.s0 + special.s1) * 0.5;
+    // The big room, always, whichever is drawn: she is only ever fitted in
+    // there, and this is worked out once (`KAB.grow`).
+    const Q = special.big;
+    const tm = (Q.t0 + Q.t1) * 0.5, sm = (Q.s0 + Q.s1) * 0.5;
     const c = toWorld(tm, sm);
     const a = local(c[0], c[2]), bx = local(c[0] + 1, c[2]), bz = local(c[0], c[2] + 1);
     const J = [bx[0] - a[0], bx[1] - a[1], bz[0] - a[0], bz[1] - a[1]];
-    const boxes = blockers.filter((b) => !b.rot
-      && b.t + b.a > special.t0 - 0.3 && b.t - b.a < special.t1 + 0.3
-      && b.s + b.c > special.s0 - 0.3 && b.s - b.c < special.s1 + 0.3);
+    const boxes = blockers.filter((b) => !b.rot && b.kab !== 'out'
+      && b.t + b.a > Q.t0 - 0.3 && b.t - b.a < Q.t1 + 0.3
+      && b.s + b.c > Q.s0 - 0.3 && b.s - b.c < Q.s1 + 0.3);
     const fit = {
       floor: special.floor,
       boxes: boxes.length,
@@ -34203,8 +34334,8 @@ async function buildJadrija(scene) {
           const x = pts[i * 3], y = pts[i * 3 + 1], z = pts[i * 3 + 2];
           fit.ts(x, z, T);
           const t = T[0], s = T[1];
-          if (t < special.t0 + inset || t > special.t1 - inset
-            || s < special.s0 + inset || s > special.s1 - inset) { k++; continue; }
+          if (t < Q.t0 + inset || t > Q.t1 - inset
+            || s < Q.s0 + inset || s > Q.s1 - inset) { k++; continue; }
           let hit = false;
           for (const b of boxes) {
             if (Math.abs(t - b.t) < b.a + inset && Math.abs(s - b.s) < b.c + inset
@@ -50304,7 +50435,7 @@ async function buildJadrija(scene) {
       return !isSea(x, z);
     },
     blockers, local, toWorld, walkY, inField, vik, stoneBays, washLines,
-    openBays, steelBay,
+    openBays, steelBay, kabinaMode,
     /**
      * The four trampoline beds, in world metres, and which one you are on.
      *
@@ -50809,6 +50940,23 @@ async function buildJadrija(scene) {
     },
     petTouch: (k) => { if (show) show.petTouch = k; },
     /**
+     * Her hair, as points the crosshair can be on — the crown, the back of
+     * her head and either side of it, world metres. Misha, 25 Sep 2026: *"if
+     * the cross-hairs points at her hair, it should trigger the same as 'pet
+     * her' already does"*. The gate is in 90-app.js with the breasts and the
+     * hips; this is only where to aim. Same conditions as `petReach`: she is
+     * in the kabina and it is v2.0 you are looking at.
+     */
+    hairAim: () => {
+      if (!show || !sheIsIn()) return null;
+      if (!(APPR.primary && appr && appr.mesh.visible)) return null;
+      const p = apprenticeCrownBind(0);
+      if (!p) return null;
+      return [p, [p[0] - 0.10, p[1] - 0.12, 0], [p[0] - 0.04, p[1] - 0.06, 0.08],
+        [p[0] - 0.04, p[1] - 0.06, -0.08]]
+        .map((q) => bindPointAt(appr, q, [['head', 1]], new THREE.Vector3()));
+    },
+    /**
      * Her two breasts, world metres, and which way her chest faces — for your
      * hand when the crosshair is on one of them as you press (see the gate in
      * 90-app.js). Misha, 24 Sep 2026: *"if i have the cross-hairs on or near
@@ -50930,14 +51078,20 @@ async function buildJadrija(scene) {
       inside: (x, z) => kabinaInside(x, z),
       // Where in the resort's own frame it is, for anything that has to walk
       // there — and for the tests, which otherwise have to find a door by eye.
-      at: [(special.t0 + special.t1) * 0.5, (special.face + special.s1) * 0.5],
+      // The big room's, which is the one you are in once you are in it — see
+      // `KAB.grow`. `special` itself answers for whichever is drawn.
+      at: [(special.big.t0 + special.big.t1) * 0.5,
+        (special.face + special.big.s1) * 0.5],
       door: [special.dc, special.face - 1.1],
-      face: special.face, back: special.s1, floor: special.floor,
+      face: special.face, back: special.big.s1, floor: special.floor,
       // The doorway itself, and the two places the crossing puts you down:
       // the middle of the floor with the room in front of you, and a stride
       // out on the concrete with the row in front of you.
       dc: special.dc, dj: special.dj,
-      standIn: [special.dc, special.face + 2.45],
+      // 2.35 m in from the front wall's inner face in the small room, and
+      // scaled with everything else, so the room's set pieces are where they
+      // were from here — see `kabinaKit`.
+      standIn: [special.dc, special.big.s0 + 2.35 * KAB.grow],
       standOut: [special.dc, special.face - 1.40],
       // And the marks the room's own furniture defines — `wine` above all,
       // which is where she has to be standing for a solve measured in
@@ -50965,7 +51119,13 @@ async function buildJadrija(scene) {
     // them out of the caster list and the rows stop throwing the long shadows
     // that are half of what the promenade looks like at seven in the evening.
     meshes: [deckMesh, upMesh, vilMesh, ...rendMeshes],
-    casters: [upMesh, vilMesh, ...rendMeshes], length: LEN,
+    casters: [upMesh, vilMesh, ...rendMeshes.filter((m) => m !== kabRendMesh)],
+    // The kabina's two rooms cast only while they are drawn — `dynamic`
+    // proxies follow their mesh's `visible`. The big room has to: nothing
+    // else is over its floor once the roof and the huts are out of the way,
+    // and in full sun it is a lit patio and not a dark room.
+    castersLive: [kabOutMesh, kabInMesh, kabRendMesh].filter(Boolean),
+    length: LEN,
     /** The town builder asks this so it does not draw these twice. */
     ownsBuilding: (bl) => taken.has(bl),
     houses: houses.length,

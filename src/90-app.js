@@ -1243,6 +1243,7 @@ async function boot() {
   shadow.cast(airfield.buildings);
   shadow.cast(airfield.objMesh);
   if (jadrija) for (const m of jadrija.casters) shadow.cast(m);
+  if (jadrija) for (const m of jadrija.castersLive || []) shadow.cast(m, { dynamic: true });
   // The skinned figure brings her own depth material, because her shape lives
   // in a bone palette that the two shared ones know nothing about. Near
   // cascade: she is 1.75 m and the far map cannot draw anything under two.
@@ -2266,6 +2267,9 @@ function skipToKabina() {
     && state.phase !== 'chute' && !inWater()) return;
   if (eject) eject.reset();
   leaveWater();
+  // The big room before the drop, so the walker is put down in its walls and
+  // not the small one's — see `KAB.grow`.
+  if (jadrija.kabinaMode) jadrija.kabinaMode(true);
   const w = jadrija.toWorld(K.standIn[0], K.standIn[1]);
   // Facing into the room: the back wall, not the doorway. Everything in here —
   // the cot, the table, the glass — is behind you otherwise, and a teleport
@@ -6595,12 +6599,15 @@ function crossThreshold(dt, afoot) {
 
   const el = dipEl();
   if (el && el.style.opacity !== '0') el.style.opacity = '0';
-  if (!afoot || !K || !ground || !ground.ok || dipCool > 0) {
-    // Walking away from the resort, baling out, or dying in it all count as
-    // having left the room, or you come back to Jadrija already indoors.
-    if (!afoot) { inRoom = false; roomStep = null; }
-    return;
-  }
+  // Walking away from the resort, baling out, or dying in it all count as
+  // having left the room, or you come back to Jadrija already indoors.
+  if (!afoot) { inRoom = false; roomStep = null; }
+  // Which of the kabina's two rooms is there — the small one everybody sees
+  // from outside, or the big one you are in (`KAB.grow`). Swapped at the
+  // bottom of the dip below; this only catches every other way of arriving
+  // or leaving, and costs nothing when it already agrees.
+  if (jadrija && jadrija.kabinaMode) jadrija.kabinaMode(inRoom);
+  if (!afoot || !K || !ground || !ground.ok || dipCool > 0) return;
 
   // The eye and not the camera — see `personAt`. In the third person the cut
   // was being fired by a point up to 3.1 m behind you, so walking in put the
@@ -6623,6 +6630,7 @@ function crossThreshold(dt, afoot) {
   if (!inRoom && entered) {
     inRoom = true;
     dipStart(() => {
+      jadrija.kabinaMode(true);
       const w = jadrija.toWorld(K.standIn[0], K.standIn[1]);
       dipPin = [w[0], w[2]];
       ground.stepTo(w[0], w[2]);
@@ -6632,6 +6640,7 @@ function crossThreshold(dt, afoot) {
   } else if (inRoom && prev && prev[1] >= K.face && s < K.face) {
     inRoom = false;
     dipStart(() => {
+      jadrija.kabinaMode(false);
       const w = jadrija.toWorld(K.standOut[0], K.standOut[1]);
       dipPin = [w[0], w[2]];
       ground.stepTo(w[0], w[2]);
@@ -6939,10 +6948,26 @@ function frame() {
             }
           }
         }
+        // AND HER HAIR, which is "pet her" without saying it. Misha, 25 Sep
+        // 2026: *"if the cross-hairs points at her hair, it should trigger the
+        // same as 'pet her' already does"* — so it asks for exactly that, once,
+        // on the press, and from there it is the petting below with its own
+        // ten seconds. The mouth still wins when it is nearer the crosshair.
+        const hair = jadrija.hairAim ? jadrija.hairAim() : null;
+        if (hair) {
+          for (const h of hair) {
+            const d = fw.dot(_thumbV.set(h.x - camera.position.x, h.y - camera.position.y,
+              h.z - camera.position.z).normalize());
+            if (d > best) { best = d; reachKind = 'pet'; }
+          }
+        }
       }
     }
     // A probe cannot aim a crosshair to the degree; it can say what it meant.
     if (pressing && reachForce) { reachKind = reachForce[0]; cupSide = reachForce[1]; }
+    if (pressing && !reachWas && reachKind === 'pet' && jadrija && jadrija.askShow) {
+      jadrija.askShow('pet');
+    }
     reachWas = pressing;
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
       : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide]

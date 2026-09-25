@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.513.0] — 2026-09-25
+
+### the kabina is the same room, twice the size — and her hair is a place to pet
+
+Misha, of 1.512.0: *"instead of everything just being scaled 2x u added more
+space on the right... that doesn't feel natural at all"*. Replaced. The room
+you walk into is now the old room scaled by √2 across, back and up (`KAB.grow`),
+about the middle of the doorway: 4.10 × 5.20 m with a 2.10 m ceiling becomes
+5.80 × 7.35 m with a 2.97 m ceiling, twice the floor. The furniture is laid out
+at the same scale and keeps its own size. Because it is scaled about the door,
+where the crossing puts you down (`standIn`, scaled too) sees every set piece
+in the same direction as before: the pour and the line face you as they did.
+The coke-line probe agrees with 1.511.0 except for world position (the table
+moved 0.48 m); perch, curl, lying flat and the handstand all land where they
+should.
+
+It is bigger inside than out, the way you asked on 23 Sep. From the promenade,
+the alley and the air, nothing has changed since 1.511.0: the same two-bay
+hut, neighbours, roof and small annex, and the same collision. The big room
+stands in the huts either side, through the roof and across the alley, so the
+two are swapped at the bottom of the door's fade (`kabinaMode`), along with
+their blockers, their shadows and the room's "am I inside" tests. The alley
+stays walkable.
+
+Also:
+- **The red cool box is gone.**
+- **The cot stands 0.60 m off the east wall** (it was 0.15), so you can walk
+  down the far side of it. The perch still seats her on that edge, upright,
+  but no longer with the wall at her back.
+- **The tabouret is 1.27 m off the west and front walls** (it was 0.90), from
+  the scaling.
+- **The lamp over the tabouret hangs from the ceiling** on a flex. Its old wall
+  arm would have had to be 0.87 m long to reach the table.
+- **Crosshair on her hair + reach = "pet her".** Aimed nearer her hair (crown,
+  back or sides of her head) than her mouth, breasts or hips when you press,
+  it asks her exactly as the spoken command does, and the ten seconds of
+  petting follow.
+
 ## [1.512.0] — 2026-09-25
 
 ### the kabina is bigger inside than out
