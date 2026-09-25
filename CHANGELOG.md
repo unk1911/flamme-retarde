@@ -8,6 +8,27 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.516.0] — 2026-09-25
+
+### "look down"
+
+Misha: *"add command 'look down', so she lowers her eyes in the kabine"*.
+`look.down` turns her irises about 16° down and brings her upper lids 42 %
+of the way to a blink, with about 4.5° of chin. It eases in over roughly a
+second and layers over any pose. It stays until "look up" or "look at me",
+because a gaze command that runs out was the 24 Sep complaint. Asked while
+she is already looking at you, her face stays on you and only her eyes drop.
+
+Phrases, matched by the voice service (`server/baye/baye.py`, which needs
+redeploying and restarting on mpcn0 before the new phrases work): "look
+down", "lower your eyes/gaze", "eyes down", "look at the floor", Croatian
+"spusti oči", French "baisse les yeux"; and for `look.up`, "look up", "eyes
+up", "raise your eyes", "stop looking down".
+
+Fixed on the way: lowered eyelids (petting, the toy's beat) stayed down until
+her next blink ended. `v5Blink` now reopens the lid every frame outside a
+blink, and those effects re-apply on top of it.
+
 ## [1.515.0] — 2026-09-25
 
 ### a slap, and a kiss you can hear
