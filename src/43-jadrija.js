@@ -28148,12 +28148,22 @@ async function buildJadrija(scene) {
       // rt +1.00, a clean side-on of the pour, which is a perfectly good thing
       // to walk past. Nothing else moves: the mark is still solved backwards
       // from the glass, so the glass stays on the stool and she walks round it.
+      //
+      // AND EIGHT CENTIMETRES FURTHER BACK, 24 Sep 2026, for the grasp. The
+      // pour was re-solved with her hand taking the bottle the way a hand
+      // does — from the side, palm to the glass, thumb up, forearm neutral —
+      // and at 0.315 the bottle stood 0.22 m in front of her feet: beside her
+      // hip, too close to lean over and too low to reach standing, so the
+      // only answer the solver had was a 50-degree squat with her back bolt
+      // upright. 0.395 puts it 0.30 m out, and she takes it with a lean and a
+      // knee (see `WINE_HOLD` in tools/blender/human_mh.py). The mark is
+      // still 0.26 m off the wall behind her.
       wine: (() => {
         const a = 30 * Math.PI / 180;
         const u = [Math.cos(a), Math.sin(a)], r = [u[1], -u[0]];
         // p = mark + fwd * u + right * r, solved for the mark.
-        return [gt - 0.315 * u[0] - 0.235 * r[0],
-          gs - 0.315 * u[1] - 0.235 * r[1], a];
+        return [gt - 0.395 * u[0] - 0.235 * r[0],
+          gs - 0.395 * u[1] - 0.235 * r[1], a];
       })(),
       /**
        * AND WHERE SHE STANDS TO WORK AT THE TABLE, which is not where she
@@ -28284,10 +28294,17 @@ async function buildJadrija(scene) {
       // one. It was six centimetres over it, which is defensible and was also
       // invisible — the stream is drawn from here down to the wine, so six
       // centimetres of a 3 mm cylinder in a dim room is nothing at all. The
-      // rim is `by + 0.168`, so this is fourteen centimetres of pour, which is
-      // a pour you can see from across the room and still a pour and not a
-      // stunt.
-      pourAt: [gt, gs, by + 0.310],
+      // rim is `by + 0.168`, so this was fourteen centimetres of pour.
+      //
+      // AND IT IS FOUR NOW, which is where a person actually holds a bottle
+      // over a glass. Fourteen centimetres is a waiter showing off, and it had
+      // a cost that never showed up in a still: to hang a lip that high off a
+      // bottle held round its body, the fist has to ride up level with her
+      // chin. At four the neck is just over the rim and inside it, the mouth
+      // of the bottle 2.5 cm clear of the crystal, and the stream is still
+      // ten centimetres long by the time it reaches the wine in an empty
+      // glass — which is the one you are watching.
+      pourAt: [gt, gs, by + 0.208],
       // And where the stream stops, which is the surface of what is already in
       // the glass whether or not any of it is there yet.
       cupAt: [gt, gs, by + 0.122],
@@ -38407,13 +38424,16 @@ async function buildJadrija(scene) {
       // took her back — after a kiss, a hug, a pose, anything it does not own
       // — she walked out of the door she was already through and came back in
       // through it.
-      // Already in here with the glass full: there is nothing to come in for,
-      // so she stays where she is standing rather than walking the last two
-      // waypoints to a bottle she has already poured.
-      if (sheIsIn() && show.level >= 0) {
+      // Already in here: there is nothing to come in for, so she stays where
+      // she is standing rather than walking the last two waypoints to the
+      // table. This used to be "in here WITH THE GLASS FULL", because the end
+      // of coming in was the pour and an empty glass was a reason to walk to
+      // it. It is not any more — see `come` — so an empty glass is no reason
+      // to go anywhere either.
+      if (sheIsIn()) {
         go('dwell', 'idle', 0.40);
       } else {
-        show.leg = sheIsIn() ? 2 : 0;
+        show.leg = 0;
         go('come', 'walk', 0.34);
       }
     }
@@ -38482,7 +38502,16 @@ async function buildJadrija(scene) {
             // for both of them. `byAsk` is the one bit that says which of the
             // two is walking. The room still will not pour a second glass;
             // asked in so many words, she pours it.
-            if (show.level >= 0 && !show.byAsk) go('dwell', 'idle', 0.40);
+            //
+            // AND THE ROOM DOES NOT POUR THE FIRST ONE EITHER. Misha, 24 Sep
+            // 2026: *"she shouldn't automatically pour wine, we have a command
+            // for it now"*. Walking in used to end at the bottle whenever the
+            // glass was empty, so the first time you went in she poured before
+            // you had said a word. Now coming in ends with her settling at the
+            // table, facing you (`dwell` turns her), and the only way to the
+            // pour is the `wine` ask — which sets `byAsk` and sends her on
+            // this same walk.
+            if (!show.byAsk) go('dwell', 'idle', 0.40);
             else { show.byAsk = 0; go('wine', 'wine', 0.42); }
           }
           else show.leg++;
@@ -38593,13 +38622,13 @@ async function buildJadrija(scene) {
         show.want = kit.wine[2];
         showHold(dt);
         const u = S.cur ? S.curT : 0;
-        // On to the mark, over the first second, before the bottle leaves the
-        // stool at 1.95. See `showSettle`.
+        // On to the mark before her hand gets to the bottle (REACH, 0.92).
+        // See `showSettle`.
         // PLANTED BEFORE SHE REACHES, not while. This ran to 1.2 s against a
         // clip whose REACH key was at 0.75 — so her hand was going to a bottle
         // on a stool while her feet were still sliding the last centimetres on
         // to the mark every millimetre of the solve is measured from. The
-        // reach is at 0.62 now, so the settle has to be finished before it:
+        // settle has to be finished well before the hand arrives:
         // at rate 10 the 0.203 m she can arrive adrift is down to 0.8 mm by
         // 0.55 s, against 7.5 mm at the old rate over the same window.
         if (u < 0.58) showSettle(kit.wine, dt, 10.0);
@@ -40983,61 +41012,47 @@ async function buildJadrija(scene) {
         // and left square to the world slides off the moment the bone rotates.
         //
         // So: the hand's whole frame. `boneTurn` is how far the wrist has come
-        // since the bind pose, `PALM` is where the bottle's grip point sits in
-        // that hand — a finger's breadth medial of the wrist joint and a hand's
-        // depth down it, which is the middle of a closed fist — and `GRIP_UP`
-        // is the direction that fist points a bottle. Both are measured off
-        // `IDLE_A`, the arm hanging at her side, because that is the one pose
-        // where what a hand does with a bottle needs no argument: it holds it
-        // upright. Everything after that is the wrist's own business, which is
-        // what makes the poses in tools/blender/human_mh.py able to *aim* it.
+        // since the bind pose; `BOT_AT` is where the bottle's axis passes
+        // through that hand, `BOT.grip` up from its foot, and `BOT_AX` is the
+        // way the axis runs across the palm. See the note over the three of
+        // them for where they come from — they are solved on the skinned hand,
+        // not measured off a pose.
         f.boneTurn(handR, qTurn);
         qHand.copy(f.mesh.quaternion).multiply(qTurn);
-        vPalm.copy(PALM).applyQuaternion(qHand).add(vHand);
-        vAx.copy(GRIP_UP).applyQuaternion(qHand);
-        let grip = BOT.grip;
-        // And the pour, which is now a correction rather than a replacement.
-        // The lip goes to a fixed point six centimetres over the glass, and
-        // the bottle is turned off the axis her wrist is already holding it on
-        // by the smallest rotation that gets it there — so the further the
-        // pose is from the pour, the more work this does, and when the pose is
-        // right it does almost none. A bottle that agrees with the hand for
-        // four seconds and disagrees with it for one is worse than one that
-        // never agrees at all.
+        vPalm.copy(BOT_AT).applyQuaternion(qHand).add(vHand);
+        vAx.copy(BOT_AX).applyQuaternion(qHand);
+        // And the pour, which is a correction and, now, a SMALL one. The lip
+        // goes to `pourAt`, four centimetres over the rim, and the bottle is
+        // turned off the axis her hand is holding it on by the smallest
+        // rotation that gets it there. The poses in human_mh.py put the lip
+        // within millimetres of the target on their own, so this has a degree
+        // or two to do — and it is capped at `BOT.aim`, because anything past
+        // that is the bottle swinging in a fist that has not moved, which is
+        // the one thing this rewrite exists to stop.
         //
-        // The target used to be her mouth, and a mouth is a hard target — it
-        // is 3 cm above a bone called `head` that is really the atlas, it moves
-        // when she tips her head back, and every centimetre the aim is out puts
-        // 30 cm of glass through her face. The glass on the stool does not move
-        // and is not part of her, so the whole class of error goes away: the
-        // worst a bad frame can do now is pour two centimetres wide.
+        // IT NO LONGER SLIDES. This used to move the bottle up to 5.5 cm along
+        // its own axis so the lip landed whatever the arm was doing — which is
+        // a bottle slipping through her fingers on every frame of the pour.
+        // The hand closes on it once, at the stool, and it stays there.
         if (show.pour > 0 && kit.pourAt) {
           const g = kit.pourAt, gw = toWorld(g[0], g[1]);
           vMouth.set(gw[0], g[2], gw[2]);
-          vSip.subVectors(vMouth, vPalm);
-          const reach = vSip.length();
-          vSip.multiplyScalar(1 / reach);
-          qFix.setFromUnitVectors(vAx, vSip).slerp(qId, 1 - show.pour);
+          vSip.subVectors(vMouth, vPalm).normalize();
+          const off = vAx.angleTo(vSip);
+          const k = off > BOT.aim ? BOT.aim / off : 1;
+          qFix.setFromUnitVectors(vAx, vSip).slerp(qId, 1 - show.pour * k);
           vAx.applyQuaternion(qFix);
-          // How far up the bottle her hand ends up. Hanging the lip on the
-          // target and letting the rest fall where it may is right only while
-          // the gap happens to be a bottle long; outside that the choice is
-          // between a bottle through the stool and one held by nothing. So the
-          // grip stays inside a few centimetres of where her fingers closed on
-          // it, and any leftover is spent on the lip stopping short — which is
-          // a stream a centimetre longer and is the error nobody sees.
-          grip += (clamp(BOT.lip - reach, BOT.grip - 0.055, BOT.grip + 0.035)
-            - BOT.grip) * show.pour;
         }
         qAim.setFromUnitVectors(UPV, vAx);
-        vHold.copy(vPalm).addScaledVector(vAx, -grip);
+        vHold.copy(vPalm).addScaledVector(vAx, -BOT.grip);
         vPos.lerp(vHold, show.held);
-        // On the way off the stool and back on to it the bottle is half hers
-        // and half the room's, so its attitude is too: it stands up out of her
-        // hand as she takes it and settles square again as she lets go. Without
-        // this it snaps upright on the frame `held` reaches nought, and a
-        // bottle set down is the one moment in the clip you are looking
-        // straight at it.
+        // On the way off the table and back on to it. `held` ramps across a
+        // tenth of a second in which her closed hand is PARKED on the bottle
+        // standing where it stands — the clip holds the same key either side
+        // of both windows — so the two ends of this lerp are the same place
+        // and the same attitude to within the solve's millimetres. It used to
+        // ramp across the whole lift, which drew the bottle sliding up out of
+        // a hand that had already risen past it.
         if (show.held < 1) qAim.slerp(qId, 1 - show.held);
       }
       kit.bottle.position.copy(vPos);
@@ -41105,16 +41120,49 @@ async function buildJadrija(scene) {
   // a lean (1 deg, bolt upright) and forced the bottle nearly flat (119 deg)
   // to reach at all.
   //
-  // A wine bottle is held around its LABEL, which on this one runs 48 to
-  // 128 mm up. 0.108 puts the middle of a closed fist there, which leaves
-  // 198 mm reaching past it, which is what lets the hand sit back and outboard
-  // where a hand belongs. The poses in tools/blender/human_mh.py were re-solved
-  // against this number and the standing mark below was re-derived from it;
-  // all three move together or the wine goes on the floor.
-  const BOT = { grip: 0.108, lip: 0.306 };
-  // The bottle in the hand, both measured off `IDLE_A` with the arm hanging —
-  // see the long note at the grip above. Figure space: +x is in front of her,
-  // +y is up, +z is her right.
+  // A wine bottle is held around its body. 0.120 is the middle of her palm on
+  // the top of the label — the label runs 48 to 128 mm up and the shoulder
+  // starts at 146 — so her fingers span the label's upper half and her thumb
+  // and forefinger sit just under the shoulder, which is where a hand that is
+  // about to tip a full bottle puts itself. It is 12 mm higher than it was
+  // because every centimetre up the bottle is a centimetre less she has to
+  // bend to take it off the table.
+  //
+  // `aim` is the most the pour's correction may turn the bottle in her hand,
+  // in radians. See the bottle block.
+  const BOT = { grip: 0.120, lip: 0.306, aim: 0.07 };
+  // ── THE BOTTLE IN HER FIST, SOLVED ON THE HAND THAT HOLDS IT ─────────
+  //
+  // Misha, 24 Sep 2026: *"she should grab that bottle with right hand
+  // properly... the way humans pick up objects like bottles, beer cans, not in
+  // the twisted way she is doing it now"*.
+  //
+  // The twist was these two numbers. They used to be `PALM` and `GRIP_UP`,
+  // which were measured off `IDLE_A` as "the way a hanging fist points a
+  // bottle" — and a hanging fist does not hold anything, so the axis ran out of
+  // the back of her hand at 50 degrees to her palm. Every pose that aimed that
+  // bottle had to wring the wrist to do it: measured on the old keys, the hand
+  // was TWISTED about its own long axis 16 to 31 degrees relative to her
+  // forearm, which a wrist cannot do at all, with 45 to 50 of extension and 25
+  // of radial deviation under it.
+  //
+  // Now the grip is solved first and the arm second. tools/blender/
+  // wine_solve.py lays the bottle's own profile across the SKINNED baye2 hand
+  // — palm on the glass, the one `fingers` bone closed until the first finger
+  // touches, the thumb wrapped round the other side — and scores every vertex
+  // against the bottle's surface. What came out: the axis runs across the palm
+  // from the heel toward the web of the thumb, 20 degrees off the knuckle line;
+  // all four fingers within 5 mm of the glass (the middle finger on it), each
+  // one wrapped 79 to 86 degrees round from the palm; the thumb pad on the
+  // near side 47 degrees the other way; nothing of the hand more than 2 mm
+  // inside the bottle. Figure space, from the `handR` joint in the bind pose:
+  // +x in front of her, +y up, +z her right.
+  //
+  // `PALM` and `GRIP_UP` stay, below, for the cone and the handed-over gifts,
+  // which are carried and never grasped off a table.
+  const BOT_AT = new THREE.Vector3(0.0358, -0.0746, -0.0344);
+  const BOT_AX = new THREE.Vector3(0.3605, 0.7602, -0.5404);
+  // The cone's rig, and the bottle's before it was solved — see above.
   const PALM = new THREE.Vector3(0.0443, -0.0748, 0.0096);
   const GRIP_UP = new THREE.Vector3(-0.5014, 0.6297, -0.5934);
 
@@ -45867,63 +45915,35 @@ async function buildJadrija(scene) {
    */
   function wineAt(u) {
     // Key to key, in both directions, and that is the whole rule. Every one of
-    // these six numbers is a keyframe time out of the `wine` clip in
+    // these numbers is a keyframe time out of the `wine` clip in
     // tools/blender/human_mh.py, so a ramp never starts or stops in the middle
     // of a movement:
     //
-    //     1.35 hold -> 1.95 lift    the bottle comes off the stool
-    //     2.60 tip  -> 3.20 pour    the wrist rolls over and the wine starts
-    //     5.30 pourB -> 5.85 tip    it comes back up and stops
-    //     6.85 hold -> 7.10 reach   it is set down and the fingers open
+    //     1.05 hold -> 1.20 hold    her closed hand parked on the bottle:
+    //                               it becomes hers
+    //     2.45 tip  -> 2.95 pour    the forearm rolls over and the wine starts
+    //     5.20 pourB -> 5.55 cut    the lift-and-twist that stops it
+    //     6.60 hold -> 6.75 hold    set down, hand still closed: it is the
+    //                               table's again
     //
-    // THE CLIP IS 7.6 s AND IT WAS 5.05. Nobody had ever timed it against the
-    // thing it is of: she took the bottle off the stool, poured and put it
-    // back in five seconds flat, with 0.65 s of that spent pouring, and a
-    // glass of wine takes three. That is not a person pouring a drink, it is a
-    // person in a hurry.
+    // THE TWO `held` WINDOWS ARE A TENTH OF A SECOND AND THAT IS THE POINT.
+    // They used to be half a second each and they sat across HOLD->LIFT, so
+    // for the whole of the lift the bottle was drawn part-way between the
+    // table and a hand that had already risen past it — it slid up through
+    // her fingers. Now the clip holds the grasp key still either side of each
+    // window, the hand's frame and the bottle's resting frame are the same
+    // frame there (the grasp is solved on the bottle where it stands), and
+    // the handover is invisible because there is nothing to see.
     //
-    // They used to end 0.35 s adrift of the keys either side, which put the
-    // whole of the aim correction inside a window where the pose was already
-    // moving — a bottle tipping itself while her wrist was still turning. Move
-    // a key up there and these move with it or the two argue.
-    //
-    // `full` is the third of them and it used to be a bare `u > 2.65` sitting
-    // in the phase's own switch. It is here now for the reason the other two
-    // are: the debug scrubber copies this function so that a headless
-    // screenshot has the bottle in her hand rather than waiting for a tick a
-    // headless clock may never give it — and it could not copy a number that
-    // was not in here, so every sheet ever shot of this clip had an empty
-    // glass under a running stream. The middle is arithmetic, not a guess:
-    // `kit.stream` is drawn while `pour` is over 0.6, which off the ramps
-    // above is 2.35 s to 3.44 s, and this is halfway down that. Wine that
-    // appears before the stream does is wine somebody else poured.
+    // `full` and `level` ride on the stream: `kit.stream` is drawn while
+    // `pour` is over 0.6, which off the ramp below is 2.75 s to 5.34 s. Wine
+    // appearing before the stream does is wine somebody else poured; wine
+    // still rising after it stops is wine coming from nowhere.
     return {
-      // MOVED WITH THE KEYS, 1.197.0. The note above is right that these and
-      // the clip's key times argue if one moves without the other, and the
-      // clip was retimed off a metronome and on to an actual tempo: HOLD 1.35
-      // -> 0.84, LIFT 1.95 -> 1.42, TIP 2.60 -> 2.24, POUR 3.20 -> 2.72,
-      // POUR_B 5.30 -> 5.05, the recovery TIP 5.85 -> 5.42, HOLD 6.85 -> 6.55.
-      // `held` is the bottle leaving the stool, so it ramps across HOLD->LIFT
-      // and releases across HOLD->REACH; `pour` is the tilt, so it ramps
-      // across TIP->POUR and cuts across POUR_B->TIP.
-      held: sat((u - 0.86) / 0.56) * (1 - sat((u - 6.55) / 0.26)),
-      pour: sat((u - 2.24) / 0.48) * (1 - sat((u - 5.05) / 0.37)),
-      // The stream is drawn while `pour` is over 0.6, which off those ramps is
-      // 2.53 s to 5.20 s, and this is the first frame of it. Wine that appears
-      // before the stream does is wine somebody else poured.
-      full: u > 2.57,
-      // AND HOW FULL, which the glass never used to say. It went from empty to
-      // its final level between two frames, on the one object in the room a
-      // player is watching — and a glass that fills instantly is the tell that
-      // undoes a pour however good the arm is. `kit.fills` is six shells and
-      // this is which of them.
-      //
-      // The window is the stream's own: `kit.stream` is drawn while `pour` is
-      // over 0.6, which off the ramps above is 2.96 s to 5.52 s, and the level
-      // rises across exactly that. Wine appearing before the stream does is
-      // wine somebody else poured; wine still rising after it stops is wine
-      // coming from nowhere.
-      level: sat((u - 2.53) / 2.67),
+      held: sat((u - 1.05) / 0.12) * (1 - sat((u - 6.60) / 0.12)),
+      pour: sat((u - 2.45) / 0.50) * (1 - sat((u - 5.20) / 0.35)),
+      full: u > 2.75,
+      level: sat((u - 2.75) / 2.45),
     };
   }
   const vHand = new THREE.Vector3(), vMouth = new THREE.Vector3();

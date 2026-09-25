@@ -1,879 +1,1199 @@
 #!/usr/bin/env python3
-"""Solve the wine-pour poses against the room, instead of guessing them.
+"""Solve the wine pour: first the bottle in her hand, then her body round it.
 
-    tools/blender/blender.sh -b build/human_mh.blend -P tools/blender/wine_solve.py \
-        -- --solve POUR TIP LIFT HOLD REACH
+Two halves, because Blender is only needed for one of them:
 
-Why this exists, and why it is a file rather than four numbers typed into
-human_mh.py: the pour has to satisfy six things at once and every one of them
-is invisible in a render until it is wrong.
+    # once per rebind — the rig, the skinned baye2 mesh and the shipped poses
+    tools/blender/blender.sh -b build/baye2.blend -P tools/blender/wine_solve.py -- --dump
 
-    the bottle's LIP has to be over the glass          — a point, in metres
-    the bottle has to be TILTED like a bottle          — 100 deg, not 119
-    the ELBOW has to be bent like an arm               — not 168 deg
-    the bottle must not be BURIED IN HER FOREARM       — both are ~75 mm across
-    she has to LEAN, because the stool is 0.72 m high  — and not fold in half
-    her HEAD has to be looking at what she is pouring into
+    python3 tools/blender/wine_solve.py --check        # FK + skinning vs Blender's own
+    python3 tools/blender/wine_solve.py --grip         # the bottle in the fist
+    python3 tools/blender/wine_solve.py --solve [KEY]  # the body keys (all, or the named)
+    python3 tools/blender/wine_solve.py --clip         # bake it as human_mh.py does, measure every frame
+    python3 tools/blender/wine_solve.py --emit         # the WINE_* block for human_mh.py
+    python3 tools/blender/wine_solve.py --clip --shipped   # the same measurements on what SHIPS
+    python3 tools/blender/wine_solve.py --render KEY...    # needs Blender: see --render below
 
-Nudging an angle to fix any one of those moves the other five, which is how the
-shipped pose ended up with a locked arm holding a bottle by its shoulder: each
-individual number was argued into place against the last picture taken, and
-nothing ever checked all six at once.
+The second half is numpy and scipy, in a plain python3, because a solve of
+twenty-odd keys against a skinned mesh is a hundred thousand evaluations and
+Blender's Python has no scipy. `--dump` writes everything the solve needs to
+/tmp/wine_rig.npz and /tmp/wine_rig.json; nothing else in here opens a blend.
 
-**No Blender evaluation in the inner loop.** `bpy.ops.object.mode_set` plus a
-depsgraph update is about 8 ms, and 8 ms times a hundred thousand candidate
-poses is fifteen minutes. Blender is opened once, for the rest matrices, and
-after that the forward kinematics is forty lines of `mathutils` — the same
-recursion Blender itself runs:
+── WHY THIS FILE WAS REWRITTEN ─────────────────────────────────────────────
 
-    pose(bone) = pose(parent) @ (rest(parent)^-1 @ rest(bone)) @ basis
+Misha, 24 Sep 2026: *"she should grab that bottle with right hand properly...
+the way humans pick up objects like bottles, beer cans, not in the twisted way
+she is doing it now"*.
 
-`--check` proves that against Blender's own `pose_bone.matrix` on a real pose
-before any solving happens, because a hand-rolled FK that is subtly wrong
-produces beautifully converged nonsense.
+The version this replaces solved WHERE HER WRIST WENT and took the bottle's
+place in her hand as given: a palm point and an axis measured off `IDLE_A`,
+the arm hanging, "the way a fist points a bottle". A hanging fist does not hold
+anything, and that axis came out of the back of her hand at fifty degrees to
+the palm. Every key then had to wring the wrist to aim it. Measured on the
+shipped keys with `arm_measures` below: the hand TWISTED 16 to 31 degrees about
+its own long axis relative to her forearm — which no wrist can do — on top of
+45 to 50 degrees of extension and 25 of radial deviation through the pour.
+That is the "twisted way". No amount of solving the arm fixes it, because the
+arm was never what was wrong.
 
-The frame throughout is HERS, which is Blender's world here: **+x in front of
-her, +y her LEFT, +z up**, origin between her feet. The room's numbers were
-measured out of the running game (`__fr.jad.bones`, `__fr.scene`) rather than
-read off `kabinaKit`, so they include the standing mark, the yaw and the shore
-frame's own rotation — see ROOM below.
+So the order is reversed. The grip is solved FIRST, on the skinned hand of the
+figure that is actually drawn (baye2), and then every key is solved with that
+grip held fixed:
+
+  --grip   The bottle's own lathe profile is laid across the palm and scored
+           against every vertex of the hand. Its axis is set 20 degrees off the
+           knuckle line (`GRIP_G`) toward the heel of the hand; the palm is put
+           on the glass (0.5 mm); the one `fingers` bone is closed until the
+           first finger touches; the thumb is searched until its pad lies on
+           the near side. There are no finger joints on this rig — one bone per
+           hand for four fingers — so straight fingers can wrap a 77 mm bottle
+           only so far before they would have to pass through it: about 85
+           degrees round from the palm, and that is where they are.
+
+  --solve  The body, key by key, chained, with the grip fixed. The wrist is
+           parameterised as flexion and deviation about the hand's own
+           anatomical axes, so it CANNOT twist; the forearm carries
+           pronation; the legs dip on a fitted table that keeps the soles flat
+           (see `dip`); and every key is scored for the things a render cannot
+           show — wrist, pronation and elbow ranges, the forearm against her
+           torso, the bottle against her body, the table and the glass, the
+           tabletop against her thighs, and where she is looking.
+
+  --clip   Bakes the clip EXACTLY as `_bake_clip` in human_mh.py does it —
+           Euler angles lerped key to key on a smoothstep, the floor root
+           lerped with them — and measures all of the above at 30 fps, plus
+           the spout against the rim, the correction the game's aim would
+           need, and the hand's speed. A key that is right and an in-between
+           that is wrong is the commonest failure there is.
+
+The rig's sign traps for the hand, learned the day this was written:
+`handR` X is radial/ulnar DEVIATION and Z is flexion/extension; pronation is
+the forearm's own Y; `fingersR` -X closes the RIGHT fingers (the left is the
+other way — the finger bones do not mirror).
+
+The frame is HERS throughout, which is Blender's: +x in front of her, +y her
+LEFT, +z up, origin between her feet on the floor she stands on.
 """
 
 import json
 import math
-import random
 import sys
 from pathlib import Path
 
-import bpy
-from mathutils import Euler, Matrix, Vector
-
+RIG_NPZ = Path("/tmp/wine_rig.npz")
+RIG_JSON = Path("/tmp/wine_rig.json")
+GRIP_JSON = Path("/tmp/wine_grip.json")
+KEYS_JSON = Path("/tmp/wine_keys.json")
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# --------------------------------------------------------------------------- #
-#  the room                                                                    #
-# --------------------------------------------------------------------------- #
-#
-# Everything the pour has to hit, in her frame, in metres off the floor she is
-# standing on. These come from `kabinaKit` in src/43-jadrija.js through the new
-# standing mark below; changing either end without the other is what "move one
-# and the bottle pours past the glass" in that file is about.
-#
-# THE STANDING MARK MOVED. It used to put the glass 0.29 m in front of her and
-# 0.04 m to her right and the bottle dead on her midline — so a right hand had
-# to cross her own centre line to pour, which is a knot no amount of solving
-# gets out of. `kit.wine` is now solved the other way round: from wanting the
-# glass 0.33 in front and 0.14 out to her right, and the bottle 0.42 and 0.23,
-# which is where a right-handed person stands to pour something.
-# SHE STANDS A HAND'S WIDTH FURTHER ROUND THE STOOL THAN SHE DID. The glass
-# used to be 0.33 in front of her and only 0.14 out to her right, and that one
-# number is why the pour would not read from anywhere in the room: with the
-# glass almost on her midline, a right hand pouring into it holds the bottle
-# out at her hip and points it straight across her body. Its axis then runs
-# left-right, so it is foreshortened to a disc from her right, foreshortened to
-# a disc from her left, and only reads from dead in front — which in this room
-# is a wall. Rendered from the door you saw a woman with a green ellipse
-# stuck to her hand.
-#
-# 0.235 out instead of 0.140 puts the glass on the diagonal a person actually
-# sets a glass down on, and swings the bottle round with it: 0.168 m of it now
-# lies fore-and-aft against 0.242 across, where it used to be 0.058 against
-# 0.290. It is the same stool in the same place — what moved is her, 0.095 m
-# along the shore, which `kit.wine` in src/43-jadrija.js carries.
-#
-# AND THE BOTTLE MOVED ON THE SEAT. It used to stand dead in the middle of the
-# tabouret, 0.405 m in front of her, and her whole reach — shoulder to the
-# middle of a closed fist — is 0.547 m against a drop of 0.579: she could not
-# touch it without folding. It now stands on the near half of the seat beside
-# the glass, 0.330 in front and 0.360 out, which with the knees is a reach
-# rather than a bow. `rest` in `kabinaKit` carries it.
-ROOM = {
-    "stool": 0.722,           # the seat, and what both objects stand on
-    "glass": (0.315, -0.235),  # (x, y): the glass's axis, y negative = her right
-    "rim": 0.890,             # the top of the glass
-    "bottleFoot": (0.330, -0.360, 0.722),
-}
-# Where the lip goes when she is pouring. 0.14 m over the rim rather than the
-# 0.06 it was: the stream is drawn from the lip down to the wine, so the old
-# number left about six centimetres of 3 mm cylinder to see, and at three
-# metres in a dim room that is nothing. A pour you can see is the point.
-ROOM["lip"] = (ROOM["glass"][0], ROOM["glass"][1], ROOM["rim"] + 0.140)
-
-# How far up the bottle her fist closes. THE ONE NUMBER THAT MADE IT LOOK
-# BACKWARDS: at 0.185 the hand is on the bottle's shoulder, so 185 mm of bottle
-# sticks out behind her fist and only 121 mm reaches past it — the long half
-# points away into the room and the wine appears to come out from under her
-# palm. A wine bottle is held around its label, which on a 306 mm Dingac is
-# 48 to 128 mm up. 0.108 puts the middle of a closed fist there.
-GRIP = 0.108
-BOTTLE = 0.306            # foot to lip
-BOTTLE_R = 0.0385         # widest radius
-FOREARM_R = 0.038
-
-# Figure space in the GAME is +x front, +y up, +z her right; Blender's is
-# +x front, +y left, +z up. So (gx, gy, gz) -> (gx, -gz, gy).
-def from_game(v):
-    return Vector((v[0], -v[2], v[1]))
+try:
+    import bpy  # type: ignore
+except ImportError:
+    bpy = None
 
 
-PALM = from_game((0.0443, -0.0748, 0.0096))
-GRIP_UP = from_game((-0.5014, 0.6297, -0.5934))
+# =========================================================================== #
+#  Blender half: dump what the solve needs                                     #
+# =========================================================================== #
 
-# --------------------------------------------------------------------------- #
-#  forward kinematics, without Blender in the loop                             #
-# --------------------------------------------------------------------------- #
+def blender_main(argv):
+    import numpy as np
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import human_mh as H
+    ob = bpy.data.objects["human"]
+    rig = bpy.data.objects["rig"]
+    bones = [b.name for b in rig.data.bones]
+    bi = {n: i for i, n in enumerate(bones)}
+    if "--render" in argv:
+        return blender_render(argv, H)
+    gn = {g.index: g.name for g in ob.vertex_groups}
+    N = len(ob.data.vertices)
+    W = np.zeros((N, len(bones)), dtype=np.float32)
+    for v in ob.data.vertices:
+        for g in v.groups:
+            n = gn[g.group]
+            if n in bi and g.weight > 0:
+                W[v.index, bi[n]] = g.weight
+    co = np.array([tuple(v.co) for v in ob.data.vertices])
+    nrm = np.array([tuple(v.normal) for v in ob.data.vertices])
+    rest = np.array([np.array(b.matrix_local) for b in rig.data.bones])
+    parent = [bi[b.parent.name] if b.parent else -1 for b in rig.data.bones]
+    poses = {}
+    for k in dir(H):
+        v = getattr(H, k)
+        if (k.startswith("WINE_") or k == "IDLE_A") and isinstance(v, dict):
+            poses[k] = {a: list(b) for a, b in v.items()}
+    clip = next(c for c in H.CLIPS if c["name"] == "wine")
+    names = {id(v): k for k, v in vars(H).items() if isinstance(v, dict)}
+    shipped = [[t, names.get(id(p), "?")] for t, p in clip["keys"]]
+    # Blender's own answer on one pose, for --check.
+    spec = {k: v for k, v in H.WINE_POUR.items() if not k.startswith("@")}
+    H.pose(rig, spec)
+    pm = np.array([np.array(rig.matrix_world @ pb.matrix) for pb in rig.pose.bones])
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = ob.evaluated_get(dg)
+    me = ev.to_mesh()
+    eco = np.array([tuple(v.co) for v in me.vertices])
+    ev.to_mesh_clear()
+    np.savez(RIG_NPZ, co=co, nrm=nrm, W=W, rest=rest, parent=np.array(parent),
+             check_pose=pm, check_mesh=eco)
+    RIG_JSON.write_text(json.dumps({
+        "bones": bones, "length": [b.length for b in rig.data.bones],
+        "pnames": [pb.name for pb in rig.pose.bones], "poses": poses,
+        "check_spec": spec, "tips": list(H.TIPS), "shipped_keys": shipped}))
+    print("[wine] dumped %d verts, %d bones, %d poses -> %s" % (N, len(bones), len(poses), RIG_NPZ))
 
-rig = bpy.data.objects["rig"]
-ARM = rig.data
-REST = {b.name: b.matrix_local.copy() for b in ARM.bones}
-PARENT = {b.name: (b.parent.name if b.parent else None) for b in ARM.bones}
-RW = rig.matrix_world.copy()
-RW3 = RW.to_3x3()
 
+def blender_render(argv, H):
+    """`-- --render job.json`: pose baye2 and draw it with the room's props.
 
-def fk(spec, want):
-    """World matrices for `want`, given {bone: (rx, ry, rz)} in degrees."""
-    cache = {}
+    Workbench, flat skin, because the question is only ever where things are.
+    The job file is written by `--render` in the python half.
+    """
+    from mathutils import Vector
+    job = json.loads(Path(argv[argv.index("--render") + 1]).read_text())
+    rig = bpy.data.objects["rig"]
+    body = bpy.data.objects["human"]
+    scene = bpy.context.scene
+    scene.render.engine = "BLENDER_WORKBENCH"
+    scene.display.shading.light = "STUDIO"
+    scene.display.shading.color_type = "MATERIAL"
+    scene.display.shading.show_cavity = True
 
-    def solve(name):
-        m = cache.get(name)
-        if m is not None:
-            return m
-        rot = spec.get(name, (0.0, 0.0, 0.0))
-        basis = Euler([math.radians(a) for a in rot], "XYZ").to_matrix().to_4x4()
-        p = PARENT[name]
-        if p is None:
-            m = REST[name] @ basis
-        else:
-            m = solve(p) @ (REST[p].inverted() @ REST[name]) @ basis
-        cache[name] = m
+    def mat(name, rgb):
+        m = bpy.data.materials.new(name)
+        m.diffuse_color = tuple(rgb) + (1.0,)
         return m
 
-    return {n: RW @ solve(n) for n in want}
+    body.data.materials.clear()
+    body.data.materials.append(mat("skin", (0.80, 0.60, 0.50)))
+    for p in body.data.polygons:
+        p.material_index = 0
+
+    def lathe(name, prof, rgb, seg=32):
+        verts, faces = [], []
+        for h, r in prof:
+            for i in range(seg):
+                a = 2 * math.pi * i / seg
+                verts.append((r * math.cos(a), r * math.sin(a), h))
+        for j in range(len(prof) - 1):
+            for i in range(seg):
+                a0, a1 = j * seg + i, j * seg + (i + 1) % seg
+                faces.append((a0, a1, a1 + seg, a0 + seg))
+        me = bpy.data.meshes.new(name)
+        me.from_pydata(verts, [], faces)
+        o = bpy.data.objects.new(name, me)
+        bpy.context.collection.objects.link(o)
+        me.materials.append(mat(name + "m", rgb))
+        return o
+
+    made = []
+    cam_data = bpy.data.cameras.new("cam")
+    cam = bpy.data.objects.new("cam", cam_data)
+    bpy.context.collection.objects.link(cam)
+    scene.camera = cam
+    for fr in job["frames"]:
+        for o in made:
+            bpy.data.objects.remove(o, do_unlink=True)
+        made = []
+        for b in rig.pose.bones:
+            b.rotation_mode = "XYZ"
+            b.rotation_euler = (0, 0, 0)
+        for n, v in fr["spec"].items():
+            if n in rig.pose.bones:
+                rig.pose.bones[n].rotation_euler = tuple(math.radians(a) for a in v)
+        rig.location = Vector(fr["root"])
+        bt = fr["bottle"]
+        for nm, prof, rgb in (("bottle", job["bottle"], (0.05, 0.25, 0.10)),
+                              ("label", [[0.048, 0.0395], [0.128, 0.0395]], (0.85, 0.80, 0.65))):
+            o = lathe(nm, prof, rgb)
+            o.rotation_mode = "QUATERNION"
+            o.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(Vector(bt["axis"]))
+            o.location = Vector(bt["foot"])
+            made.append(o)
+        g = lathe("glass", job["glass_prof"], (0.75, 0.80, 0.85))
+        g.location = Vector(job["glass"])
+        tr = job["table"][3]
+        t = lathe("table", [[-0.02, 0.0], [-0.02, tr], [0.0, tr], [0.0, 0.0]], (0.45, 0.32, 0.2), 48)
+        t.location = Vector(job["table"][:3])
+        made += [g, t]
+        bpy.context.view_layer.update()
+        for s in fr["shots"]:
+            cam.location = Vector(s["eye"])
+            cam.rotation_mode = "QUATERNION"
+            cam.rotation_quaternion = (Vector(s["at"]) - Vector(s["eye"])).to_track_quat("-Z", "Y")
+            cam_data.lens = s.get("lens", 40)
+            cam_data.clip_start = 0.01
+            scene.render.resolution_x, scene.render.resolution_y = s.get("res", [360, 400])
+            scene.render.filepath = s["out"]
+            bpy.ops.render.render(write_still=True)
+    print("[wine] rendered %d frames" % len(job["frames"]))
 
 
-def head_of(m4):
-    return m4.to_translation()
+if bpy is not None:
+    _argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    blender_main(_argv)
+    raise SystemExit(0)
 
 
-def bottle_of(mats):
-    """(grip point, unit axis foot->lip) for the bottle in her right hand.
+# =========================================================================== #
+#  Python half                                                                 #
+# =========================================================================== #
 
-    The same two lines the game runs in `stepShow`: the palm is a fixed offset
-    in the hand's frame and the bottle's axis is a fixed direction in it, both
-    measured off IDLE_A, and everything the wrist does after that aims the
-    bottle. If this and 43-jadrija.js ever disagree the bottle moves on the
-    frame a clip is scrubbed, which is the tell.
-    """
-    m = mats["handR"]
-    delta = (m.to_3x3() @ (RW3 @ REST["handR"].to_3x3()).inverted())
-    palm = head_of(m) + delta @ PALM
-    axis = (delta @ GRIP_UP).normalized()
-    return palm, axis
+import numpy as np  # noqa: E402
+from scipy.optimize import brentq, minimize  # noqa: E402
+from scipy.spatial import cKDTree  # noqa: E402
 
-
-def seg_gap(a0, a1, b0, b1):
-    """Closest approach between two segments. Clamped, not the infinite-line
-    answer — a bottle whose axis passes near her forearm behind her elbow is
-    not touching her forearm."""
-    d1, d2 = a1 - a0, b1 - b0
-    r = a0 - b0
-    a, e, f = d1.dot(d1), d2.dot(d2), d2.dot(r)
-    c, b = d1.dot(r), d1.dot(d2)
-    den = a * e - b * b
-    s = 0.0 if den < 1e-9 else max(0.0, min(1.0, (b * f - c * e) / den))
-    t = max(0.0, min(1.0, (b * s + f) / e)) if e > 1e-9 else 0.0
-    s = 0.0 if a < 1e-9 else max(0.0, min(1.0, (b * t - c) / a))
-    return ((a0 + d1 * s) - (b0 + d2 * t)).length
+D = np.load(RIG_NPZ)
+J = json.loads(RIG_JSON.read_text())
+BONES = J["bones"]
+BI = {n: i for i, n in enumerate(BONES)}
+REST, PARENT, CO, W, NRM = D["rest"], D["parent"], D["co"], D["W"], D["nrm"]
+REST_INV = np.linalg.inv(REST)
+LOCAL = np.array([REST[i] if PARENT[i] < 0 else REST_INV[PARENT[i]] @ REST[i]
+                  for i in range(len(BONES))])
+IDLE = {k: list(v) for k, v in J["poses"]["IDLE_A"].items() if not k.startswith("@")}
 
 
-def band(v, lo, hi):
-    """0 inside [lo, hi], and the square of how far outside, outside it."""
-    if v < lo:
-        return (lo - v) ** 2
-    if v > hi:
-        return (v - hi) ** 2
-    return 0.0
+# ── forward kinematics and skinning, the recursion Blender runs ───────────── #
+
+def euler(v):
+    """Blender XYZ Euler, degrees -> 3x3 (Rz @ Ry @ Rx)."""
+    x, y, z = (math.radians(a) for a in v)
+    cx, sx, cy, sy, cz, sz = math.cos(x), math.sin(x), math.cos(y), math.sin(y), math.cos(z), math.sin(z)
+    Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+    Ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+    Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+    return Rz @ Ry @ Rx
 
 
-# --------------------------------------------------------------------------- #
-#  what a pose is scored on                                                    #
-# --------------------------------------------------------------------------- #
-
-WANT = ("pelvis", "spine01", "spine02", "spine03", "chest", "neck", "head",
-        "clavicleR", "armUR", "armLR", "handR",
-        "legUL", "legLL", "footL", "toeL",
-        "legUR", "legLR", "footR", "toeR")
-
-# --------------------------------------------------------------------------- #
-#  the knees                                                                   #
-# --------------------------------------------------------------------------- #
-#
-# WHY THERE ARE LEGS IN A POUR SOLVER. Her fist hangs at 0.865 m and the
-# bottle's grip point stands at 0.830, so the height is nothing — but the
-# bottle is 0.40 m in front of her and her whole reach, shoulder to the middle
-# of a closed fist, is 0.547 m against a drop of 0.579. She cannot touch it
-# standing up. The first solve was given one way to close that gap, the trunk,
-# and it spent 28 degrees of it: she folded over the stool with her legs
-# straight and her arm hanging, which is the single thing that made the clip
-# read as a shop dummy taking a bow.
-#
-# A person reaching to something at stool height bends the knees and keeps the
-# back long. So the legs get a dip, and it is FITTED rather than typed: given a
-# knee flexion, the hip and ankle angles are searched for the pair that (a)
-# leaves the foot pointing exactly where it points in IDLE_A — a foot that
-# rolls is a heel coming off the floor — and (b) leaves her pelvis over her
-# ankles rather than behind them. Two unknowns, two conditions, a few hundred
-# evaluations, once per angle, cached.
-_DIP_CACHE = {}
+def to_euler(R):
+    """3x3 -> Blender XYZ Euler, degrees."""
+    sy = max(-1.0, min(1.0, -R[2, 0]))
+    y = math.asin(sy)
+    if abs(sy) < 0.99999:
+        return (math.degrees(math.atan2(R[2, 1], R[2, 2])), math.degrees(y),
+                math.degrees(math.atan2(R[1, 0], R[0, 0])))
+    return (math.degrees(math.atan2(-R[1, 2], R[1, 1])), math.degrees(y), 0.0)
 
 
-def _leg_spec(k, hip, ankle, out=11.0):
-    d = {}
-    for side, sg in (("L", 1.0), ("R", -1.0)):
-        d["legU" + side] = (hip, -out * sg, 0.0)
-        d["legL" + side] = (k, 0.0, 0.0)
-        d["foot" + side] = (ankle, 0.0, 0.0)
-        d["toe" + side] = (0.0, 0.0, 0.0)
-    return d
-
-
-def _foot_dir(mats):
-    m = mats["footL"]
-    return (m.to_3x3() @ Vector((0.0, 1.0, 0.0))).normalized()
-
-
-def dip_legs(k, idle):
-    """A knee bend of `k` degrees, with the foot flat and the ankle under it.
-
-    THE PELVIS IS THE ROOT, so nothing here can be checked against it: a hip
-    angle rotates the leg, not the body, and a fit that asks the pelvis to hold
-    still is a fit with no conditions in it at all. The first version did
-    exactly that and came out at 68 deg of hip flexion with a straight knee,
-    which is a woman lying on her back with her legs in the air — and because
-    the ground correction then drops everything by however far the toes went
-    up, it rendered as a full squat.
-
-    What has to hold still is the FOOT: its direction, so the sole stays flat
-    on the floor, and where the ankle is fore-and-aft, so her feet do not walk
-    forward as she dips. Two conditions, two unknowns. The drop out of the
-    floor correction is then whatever the knee angle is worth, which is what a
-    knee bend is.
-    """
-    key = round(k, 2)
-    got = _DIP_CACHE.get(key)
-    if got is not None:
-        return got
-    base = {n: v for n, v in idle.items() if not n.startswith("@")}
-    ref = fk(base, WANT)
-    d0, x0 = _foot_dir(ref), head_of(ref["footL"]).x
-    rnd = random.Random(11)
-    hip, ank = -0.55 * k, -0.45 * k
-    best = None
-    sig = 5.0
-    for n in range(2400):
-        h = max(-42.0, min(12.0, hip + rnd.gauss(0, sig)))
-        a = max(-38.0, min(22.0, ank + rnd.gauss(0, sig)))
-        m = fk(dict(base, **_leg_spec(k, h, a)), WANT)
-        e = (400.0 * (1.0 - _foot_dir(m).dot(d0))
-             + 900.0 * (head_of(m["footL"]).x - x0) ** 2)
-        if best is None or e < best:
-            best, hip, ank = e, h, a
-        if (n + 1) % 150 == 0:
-            sig = max(0.03, sig * 0.80)
-    out = _leg_spec(k, hip, ank)
-    _DIP_CACHE[key] = out
+def fk(spec):
+    """{bone: euler degrees | 3x3} -> (bones, 4, 4) armature-space matrices."""
+    out = np.zeros((len(BONES), 4, 4))
+    for i, n in enumerate(BONES):
+        b = np.eye(4)
+        v = spec.get(n)
+        if v is not None:
+            b[:3, :3] = v if isinstance(v, np.ndarray) else euler(v)
+        out[i] = (LOCAL[i] @ b) if PARENT[i] < 0 else (out[PARENT[i]] @ LOCAL[i] @ b)
     return out
 
 
-def ground_of(mats):
-    """How far the balls of her feet have come up off the floor.
-
-    A pose with the knees bent is a pose whose feet are in the air until
-    something drops the root, and at export `wine_floor` does exactly that. In
-    here the same correction is arithmetic: every height the solver scores is
-    measured off the lowest foot rather than off the rig's origin, so a target
-    0.830 m up means 0.830 m above the floor she is standing on and not 0.830
-    above where her feet would be if her knees were straight.
-    """
-    return min(head_of(mats["toeL"]).z, head_of(mats["toeR"]).z)
+def lowest(P):
+    """The lowest tail of `TIPS` — what `floor_poses` puts 4 mm off the floor."""
+    z = 1e9
+    for n in J["tips"]:
+        i = BI[n]
+        z = min(z, (P[i][:3, 3] + P[i][:3, 1] * J["length"][i])[2])
+    return z
 
 
-GROUND0 = None
+def unit(v):
+    return v / np.linalg.norm(v)
 
 
-def measure(spec):
-    global GROUND0
-    mats = fk(spec, WANT)
-    if GROUND0 is None:
-        GROUND0 = ground_of(fk({}, WANT))
-    # Everything is measured off the floor she is standing on, so a bent knee
-    # does not quietly move the room. See `ground_of`.
-    gz = Vector((0.0, 0.0, ground_of(mats) - GROUND0))
-    for k in mats:
-        mats[k] = Matrix.Translation(-gz) @ mats[k]
-    palm, axis = bottle_of(mats)
-    foot = palm - axis * GRIP
-    lip = palm + axis * (BOTTLE - GRIP)
-    sh, el, wr = (head_of(mats["armUR"]), head_of(mats["armLR"]),
-                  head_of(mats["handR"]))
-    u, l = (el - sh).length, (wr - el).length
-    d = (wr - sh).length
-    cosph = max(-1.0, min(1.0, (u * u + l * l - d * d) / (2 * u * l)))
-    hips, chest = head_of(mats["pelvis"]), head_of(mats["chest"])
-    trunk = chest - hips
-    return {
-        "palm": palm, "axis": axis, "foot": foot, "lip": lip,
-        "tilt": math.degrees(math.acos(max(-1.0, min(1.0, axis.z)))),
-        "elbow": math.degrees(math.acos(cosph)),
-        "lean": math.degrees(math.atan2(trunk.x, trunk.z)),
-        # The forearm shortened at the wrist end: the bottle passes through
-        # her palm, which is 87 mm off the wrist joint, so a gap measured to
-        # the joint itself can never exceed that and the constraint is
-        # unsatisfiable by construction. What "buried in her arm" means is the
-        # bottle lying along the SHAFT of the forearm, so that is what is
-        # measured.
-        "gap": seg_gap(foot, lip, el, el + (wr - el) * 0.72),
-        "head": head_of(mats["head"]),
-        "gaze": (mats["head"].to_3x3()
-                 @ (RW3 @ REST["head"].to_3x3()).inverted()
-                 @ Vector((1.0, 0.0, 0.0))),
-        "el": el, "wr": wr, "sh": sh,
-        "hips": head_of(mats["pelvis"]).z,
-    }
+def band(v, lo, hi):
+    return (lo - v) ** 2 if v < lo else ((v - hi) ** 2 if v > hi else 0.0)
 
 
-def cost(spec, goal):
-    m = measure(spec)
-    c = 0.0
-    parts = {}
-
-    def add(k, v):
-        nonlocal c
-        parts[k] = v
-        c += v
-
-    if goal.get("lip"):
-        add("lip", 900.0 * (m["lip"] - Vector(goal["lip"])).length_squared)
-    if goal.get("palm"):
-        w = goal.get("palmW", 900.0)
-        add("palm", w * (m["palm"] - Vector(goal["palm"])).length_squared)
-    add("tilt", 0.020 * band(m["tilt"], *goal["tilt"]))
-    add("elbow", 0.010 * band(m["elbow"], *goal["elbow"]))
-    add("lean", 0.012 * band(m["lean"], *goal["lean"]))
-    # The bottle must clear the forearm. Both are cylinders; touching is the sum
-    # of the radii, and a bottle whose axis lies along the forearm scores
-    # perfectly on every other term while being buried inside her arm.
-    add("gap", 400.0 * band(m["gap"], BOTTLE_R + FOREARM_R + 0.012, 9.0))
-    # Looking at it. A person pouring looks into the glass; a person pouring
-    # while staring straight ahead is a person who has done this before and is
-    # not the read we want.
-    # LOOK AT IT. Without this she reaches down to a stool at knee height with
-    # her face pointed at the far wall, which is the one thing in the first
-    # renders that read as a mannequin rather than a person — a hand goes where
-    # the eyes went a moment earlier, always.
-    if goal.get("look"):
-        to = (Vector(goal["look"]) - m["head"]).normalized()
-        add("gaze", 90.0 * max(0.0, 0.72 - m["gaze"].dot(to)) ** 2)
-    # And keep it near the pose it grows out of, so the clip interpolates
-    # instead of lurching. Cheap L2 on the angles, not on the geometry.
-    ref = goal.get("near")
-    if ref:
-        s = 0.0
-        for b, r in ref.items():
-            if b.startswith("@"):
-                continue
-            v = spec.get(b, (0, 0, 0))
-            s += sum((a - c2) ** 2 for a, c2 in zip(v, r))
-        add("near", goal.get("nearW", 0.00020) * s)
-    return c, parts, m
-
-
-# --------------------------------------------------------------------------- #
-#  the search                                                                  #
-# --------------------------------------------------------------------------- #
+# ── the hand's own axes ─────────────────────────────────────────────────── #
 #
-# (1+1) evolution strategy with a one-fifth success rule on the step size, from
-# several restarts. Eighteen dimensions of smooth-ish reach: nothing here needs
-# a real optimiser, and a real optimiser is a dependency Blender does not ship.
-
-# spine01 IS ON THIS LIST AND THAT MATTERS. Without it the only forward bend
-# available is spine02/spine03/chest, which is a bend from the middle of the
-# back — and what came out was a hunch: she curled over the stool with her
-# chin out, like somebody reading a label rather than picking a bottle up.
-# A person bending to something at knee height hinges at the HIPS and keeps
-# the back long. So the low joint gets the range and the upper three are
-# capped at a third of what they had.
-FREE = {
-    "spine01": [(-38, 6), (-6, 6), (-4, 6)],
-    "spine02": [(-13, 8), (-6, 6), (-4, 6)],
-    "spine03": [(-11, 8), (-6, 6), (-4, 6)],
-    "chest": [(-10, 2), (-8, 8), (-6, 6)],
-    "neck": [(-16, 10), (-6, 6), (-4, 4)],
-    "head": [(-40, 14), (-14, 10), (-6, 8)],
-    "clavicleR": [(-8, 8), (-4, 4), (-14, 14)],
-    "armUR": [(-95, 20), (-55, 30), (-70, 10)],
-    "armLR": [(-40, 70), (-60, 40), (-45, 20)],
-    "handR": [(-60, 60), (-45, 60), (-30, 70)],
-}
-KEYS = [(b, i) for b in FREE for i in range(3)]
+# r radial (toward the index), l along the hand (wrist to middle knuckle), n
+# palmar. Built off the bind pose: l from the `handR` joint to the `fingersR`
+# joint, r from the knuckle line (`fingersR` local X runs index to little
+# finger), n = r x l — which agrees with the direction the right fingers
+# close in to 1 degree.
+HI, FI, TI, ALI, AUI = BI["handR"], BI["fingersR"], BI["thumbR"], BI["armLR"], BI["armUR"]
+W0 = REST[HI][:3, 3]
+_l = unit(REST[FI][:3, 3] - W0)
+_k = REST[FI][:3, 0]
+_r = unit(-(_k - _k.dot(_l) * _l))
+A = np.stack([_r, _l, np.cross(_r, _l)], 1)
+A_H = REST[HI][:3, :3].T @ A                   # the same, in handR's local frame
+A_F = REST[ALI][:3, :3].T @ A                  # ... and carried by the forearm
+HINGE_L = (REST_INV[AUI] @ REST[ALI])[:3, 0]  # the elbow's axis, in armUR's frame
 
 
-def unpack(x, base):
-    spec = dict(base)
-    for k, (b, i) in enumerate(KEYS):
-        v = list(spec.get(b, (0.0, 0.0, 0.0)))
-        v[i] = x[k]
-        spec[b] = tuple(v)
-    return spec
+def sang(a, b, ax):
+    a = unit(a - a.dot(ax) * ax)
+    b = unit(b - b.dot(ax) * ax)
+    return math.degrees(math.atan2(np.cross(a, b).dot(ax), a.dot(b)))
 
 
-def clampx(x):
-    for k, (b, i) in enumerate(KEYS):
-        lo, hi = FREE[b][i]
-        x[k] = max(lo, min(hi, x[k]))
-    return x
+def arm_measures(P):
+    """The right arm in anatomical terms, all from joint positions and frames.
+
+    flex   + palmar flexion, - extension; the hand's long axis against the
+           forearm's, in the plane of the palm's normal
+    dev    + ulnar deviation, - radial
+    twist  the hand about its own long axis against the forearm. A wrist has
+           none; the shipped pour had up to 31 degrees of it.
+    pron   + pronation, measured as the palm's normal round the forearm from
+           the elbow's hinge axis, which is where it sits with the thumb up
+    elbow  interior angle, 180 straight
+    off    how far the forearm leaves the elbow's hinge plane (carrying angle)
+    """
+    Rh = P[HI][:3, :3] @ A_H
+    Rf = P[ALI][:3, :3] @ A_F
+    sh, el, wr = P[AUI][:3, 3], P[ALI][:3, 3], P[HI][:3, 3]
+    yf = unit(wr - el)
+    nf = unit(Rf[:, 2] - Rf[:, 2].dot(yf) * yf)
+    rf = np.cross(yf, nf)
+    l = Rh[:, 1]
+    h = P[AUI][:3, :3] @ HINGE_L
+    return dict(
+        flex=math.degrees(math.atan2(l.dot(nf), l.dot(yf))),
+        dev=math.degrees(math.atan2(-l.dot(rf), l.dot(yf))),
+        twist=sang(nf, Rh[:, 2], yf), pron=-sang(h, nf, yf),
+        elbow=math.degrees(math.acos(max(-1, min(1, -unit(el - sh).dot(yf))))),
+        off=math.degrees(math.asin(max(-1, min(1, yf.dot(unit(h)))))),
+        Rh=Rh, sh=sh, el=el, wr=wr)
 
 
-def solve(base, goal, seed=0, iters=9000, restarts=5):
-    rnd = random.Random(seed)
-    best, bx = None, None
-    for r in range(restarts):
-        x = []
-        for b, i in KEYS:
-            lo, hi = FREE[b][i]
-            start = goal.get("seed", {}).get(b, base.get(b, (0, 0, 0)))[i]
-            x.append(max(lo, min(hi, start + (0 if r == 0 else rnd.gauss(0, 9)))))
-        f = cost(unpack(x, base), goal)[0]
-        sig, good = 7.0, 0
-        for n in range(iters):
-            y = clampx([v + rnd.gauss(0, sig) for v in x])
-            g = cost(unpack(y, base), goal)[0]
-            if g < f:
-                x, f, good = y, g, good + 1
-            if (n + 1) % 60 == 0:
-                sig *= 1.35 if good > 12 else 0.82
-                sig = max(0.05, min(16.0, sig))
-                good = 0
-        if best is None or f < best:
-            best, bx = f, x
-    return unpack(bx, base), best
+# ── the bottle and the room ─────────────────────────────────────────────── #
+
+# The Dingac's lathe from `kabinaKit` in src/43-jadrija.js, label included.
+PROF = np.array([[0.000, 0.0300], [0.005, 0.0368], [0.014, 0.0385], [0.048, 0.0390],
+                 [0.128, 0.0390], [0.146, 0.0385], [0.158, 0.0380], [0.171, 0.0364],
+                 [0.186, 0.0326], [0.201, 0.0266], [0.215, 0.0203], [0.229, 0.0162],
+                 [0.243, 0.0146], [0.286, 0.0144], [0.294, 0.0158], [0.303, 0.0160],
+                 [0.306, 0.0152]])
+BOT_LEN = 0.306
+GLASS_PROF = np.array([[0.0, 0.038], [0.005, 0.038], [0.013, 0.009], [0.074, 0.0053],
+                       [0.082, 0.018], [0.093, 0.032], [0.109, 0.0398], [0.130, 0.0425],
+                       [0.152, 0.0398], [0.168, 0.0350]])
 
 
-# --------------------------------------------------------------------------- #
-#  goals                                                                       #
-# --------------------------------------------------------------------------- #
-
-GRIP_STAND = (ROOM["bottleFoot"][0], ROOM["bottleFoot"][1],
-              ROOM["bottleFoot"][2] + GRIP)
+def radius(h):
+    return np.interp(h, PROF[:, 0], PROF[:, 1])
 
 
-# How far the knees go down at each key, in degrees of knee flexion, and it is
-# the shape of the clip as much as any angle in it: she dips to the stool, comes
-# most of the way back up with the bottle, and pours standing. `dip_legs` turns
-# each of these into a hip, a knee and an ankle that leave her feet flat and
-# her hips over them.
-DIP = {"REACH": 42.0, "HOLD": 42.0, "LIFT": 16.0,
-       "TIP": 5.0, "POUR": 5.0, "POURB": 5.0,
-       # Straightening up out of the last of the bend, on her way to standing.
-       "MEET": 20.0}
+# Where the room is, in her frame, off her own floor. Measured out of the
+# running game at the pour mark (`__fr.jad.raw().kabina.kit()` against
+# `__fr.jad.bones(['@x', '@z'])`): the table top is 0.706 above the floor she
+# stands on (the kabina floor is 16 mm under her mat), the glass stands where
+# `kit.wine` is solved from, and the bottle's `kit.rest` falls 0.090 m nearer
+# her and 0.075 m further right, because that is where `LAY` put it.
+#
+# `MARK_BACK` is how much further from the glass her mark is than it was: 0.08.
+# Taking a standing bottle from the side, thumb up, forearm neutral, is a hand
+# at bottle height with the forearm no more than about 40 degrees below
+# horizontal — radial deviation gives 20 of that and the grip's own slant
+# (`GRIP_G`) the other 20 — and at the old mark the bottle stood 0.22 m in
+# front of her feet, beside her hip. Nothing reaches down beside its own hip
+# with a forearm that flat except a squat, and that is what the solve found:
+# 53 degrees of knee with the back bolt upright. At 0.30 m it is a lean and a
+# knee, which is what a person does.
+MARK_BACK = 0.08
+TOP = 0.706
+BOTTLE_FOOT = np.array([0.2245 + MARK_BACK, -0.3097, TOP])
+GLASS = np.array([0.315 + MARK_BACK, -0.235, TOP])
+RIM = TOP + 0.168
+TABLE = (np.array([0.409 + MARK_BACK, -0.181]), 0.300)
+# The lip's target: over the middle of the glass, four centimetres above the
+# rim. `kit.pourAt` in 43-jadrija.js is the same point.
+LIP_T = np.array([GLASS[0], GLASS[1], RIM + 0.040])
+# Somebody standing in front of her at the distance you talk to someone.
+PLAYER = np.array([1.9, 0.10, 1.62])
+
+# The grip. `GRIP_G` is the slant of the bottle's axis in her palm, degrees off
+# the knuckle line, negative toward the heel of the hand; `GRIP_H` is how far up
+# the bottle her palm's middle is. See `solve_grip`.
+GRIP_G = -20.0
+GRIP_H = 0.120
 
 
-def goals(idle):
-    lip = ROOM["lip"]
-    # Lifted clear of the stool, upright, and already on the way to the glass:
-    # a hand's width up and a hand's width in, and no detour out to her hip.
-    lift = (0.318, -0.350, 1.000)
-    # Where her fist goes to pour, worked backwards from the lip along the axis
-    # the bottle is wanted on, which is SQUARE ACROSS HER: nothing fore-and-aft,
-    # 0.97 lateral and a quarter of it down.
-    #
-    # That is the opposite of what the first attempt at this did, and the
-    # reason is the doorway. A bottle 306 mm long seen down its own axis is a
-    # green ellipse, so the only question worth asking is which way the person
-    # watching is looking — and in this room there is exactly one place to
-    # watch from. The first pass swung the bottle round to point forward-left
-    # to get it off her hip; the door is forward-left of where she stood, so it
-    # was still 95 per cent end-on and it still read as a disc.
-    #
-    # The fix is her yaw, not the bottle's. She turns 40 deg to face the
-    # doorway — `kit.wine` in src/43-jadrija.js derives the mark and the angle
-    # from the glass, so it moved with her — and the bottle then lies straight
-    # across the line you are looking down: 17 per cent along the view instead
-    # of 95, which is a bottle instead of a coin.
-    g0, g1 = ROOM["glass"]
-    hand = (0.315, -0.426, 1.081)
-    # AND THIS IS WHAT SETS THE TILT, not the tilt band. The bottle is a rigid
-    # rod: 0.198 m from the grip to the lip. Pin the lip over the glass and pin
-    # the palm, and the angle between them is arithmetic — there is no freedom
-    # left for a `band` to express an opinion about. Which is why asking POURB
-    # for 110-118 moved it from 103.7 to 109.5 and no further, and why loosening
-    # its chain to POUR did almost nothing: nothing was holding it back except
-    # where its own hand was told to be.
-    #
-    #   tilt 105  grip (0.315 -0.426 1.081)   <- which is exactly `hand`
-    #   tilt 110  grip (0.315 -0.421 1.098)
-    #   tilt 117  grip (0.315 -0.411 1.120)
-    #
-    # So `handB` is the grip for 117 with the lip 14 mm higher than `hand`'s:
-    # 53 mm up and 15 mm in toward the glass, against the 22 up and 2 in it
-    # carried before. It is also, incidentally, an easier reach — raising a hand
-    # toward shoulder height shortens it, 0.463 m from the shoulder against
-    # 0.502 at the old value.
-    handB = (0.315, -0.411, 1.134)
-    return {
-        # Bending to a stool. The hand has to get to 0.83 m off the floor with
-        # a shoulder that starts at 1.40, which is a 0.57 m drop against a
-        # 0.48 m arm — so the lean is not decoration, it is the only way the
-        # hand arrives at all, and the elbow stays open because a reach is not
-        # a curl.
-        "REACH": dict(palm=GRIP_STAND, look=GRIP_STAND, tilt=(0, 9), elbow=(104, 152),
-                      lean=(15, 27), near=idle, nearW=0.00008),
-        # Closed on it. Same place, elbow in a little as the hand takes the
-        # weight, which is the whole of what makes a grasp read as a grasp.
-        "HOLD": dict(palm=GRIP_STAND, look=GRIP_STAND, tilt=(0, 7), elbow=(98, 142),
-                     lean=(15, 27), near=idle, nearW=0.00008),
-        "LIFT": dict(palm=lift, look=(g0, g1, ROOM["rim"]), tilt=(0, 12), elbow=(80, 118),
-                     lean=(3, 14), near=idle, nearW=0.00008),
-        # Arrived over the glass, tipped but not yet pouring. Splitting the
-        # travel from the turn is most of why the clip reads as deliberate —
-        # so this shares the pour's HAND and differs only in the wrist, and
-        # therefore carries no lip target at all: at 65 deg the lip is still
-        # up in the air and pinning it there would drag the arm back out.
-        #
-        # 58-72 rather than the 38-54 it asked for at first, and the number is
-        # the wrist's, not a preference: with the arm parked where the pour
-        # needs it, `handR` runs out of roll about 37 deg short of upright, so
-        # a tighter band buys nothing but an arm that swings out of the pour
-        # and back into it to satisfy it. Nothing pours at 65 deg either.
-        "TIP": dict(palm=hand, palmW=90.0, look=(g0, g1, ROOM["rim"]),
-                    tilt=(58, 72), elbow=(92, 130), lean=(6, 13),
-                    near=idle, nearW=0.00008),
-        # THE PALM IS A TARGET AS WELL AS THE LIP, and softly, which is the
-        # difference between this and the first pass. With only the lip pinned
-        # the solver is free to park her hand half a metre in front of her
-        # navel and lean the bottle BACK over the glass — every number passes
-        # and the bottle points at her, which is the thing being fixed. Her
-        # hand belongs outboard of the glass, on her right, with the bottle
-        # leaning in across it: that is what a right-handed pour looks like
-        # from any seat in the room.
-        # AND THEN SHE LOOKS UP AT YOU, which is the beat this clip has never
-        # had. Tabulated, every one of the six goals above aims `look` at the
-        # bottle or at the glass — so for all 7.6 seconds she never once looks
-        # at the person she is pouring for. That was defensible while she was
-        # facing a doorway nobody stands in; 1.203.0 turned her to face
-        # `standIn`, and there is now somewhere for her eyes to go.
-        #
-        # The bottle is back on the stool by 6.81 (`held` releases across
-        # 6.55 to 6.81), so this pose has no lip and no tilt to satisfy. It is
-        # three things: her hand coming away, her back coming up, and her eyes
-        # arriving on yours. `standIn` scores fwd +1.00, rt -0.09 at 2.3 m from
-        # her mark, and stands 1.66 off the floor she is on — so in her own
-        # frame that is (2.30, +0.21, 1.66), and it is a shade above her own
-        # head, which is right: she is looking up at somebody standing while
-        # she is still bent over a stool.
-        "MEET": dict(palm=(0.26, -0.34, 0.92), palmW=140.0,
-                     look=(2.30, 0.21, 1.66), tilt=(0, 24), elbow=(112, 165),
-                     lean=(0, 9), near=idle, nearW=0.00030),
-        "POUR": dict(lip=lip, palm=hand, palmW=260.0, look=(g0, g1, ROOM["rim"]),
-                     tilt=(96, 103), elbow=(92, 122), lean=(4, 13),
-                     near=idle, nearW=0.00008),
-        # A pour is held for a second, and a still frame held for forty frames
-        # is the one thing an eye is certain about. So it drifts: further over
-        # as the glass fills, and the hand comes up with it.
-        #
-        # AND THE TWO BANDS MUST NOT OVERLAP, which is the whole of why they
-        # did not drift. `band` is zero anywhere inside its range, so 99-108
-        # against 106-114 leaves the solver free to satisfy both at 107 — and
-        # `POURB` is chained to `POUR` with a `near` term that actively pulls
-        # it there. It landed at 103.7 and 105.9. Measured across the retimed
-        # clip, the whole body moved **0.9 degrees in 2.33 seconds** through
-        # the pour: 0.4 deg/s, over nearly a third of the clip, in the one
-        # stretch of it anybody is looking at. A held frame is a held frame
-        # whether or not the note above it says it drifts.
-        #
-        # 96-103 and 110-118 cannot both be satisfied, so the drift is now a
-        # condition rather than a hope: about fourteen degrees, which is what a
-        # bottle has to give back as the fifth of it that fills a glass leaves,
-        # and about 49 mm of travel at the punt where an eye can see it. The
-        # hand rise stays at 14 mm and not the 35 the wine climbs, because the
-        # stream shortening as the level comes up to meet it is the better cue
-        # of the two and raising the lip in step would cancel exactly that.
-        "POURB": dict(lip=(lip[0], lip[1], lip[2] + 0.014), palm=handB,
-                      look=(g0, g1, ROOM["rim"]),
-                      palmW=260.0, tilt=(114, 120),
-                      elbow=(92, 122), lean=(2, 10),
-                      near=idle, nearW=0.00008),
-    }
+# ── the hand alone ─────────────────────────────────────────────────────── #
+
+HAND = np.where((W[:, HI] + W[:, FI] + W[:, TI]) > 0.05)[0]
+_HCO = CO[HAND]
+_HWF = W[HAND, FI][:, None]
+_HWT = W[HAND, TI][:, None]
 
 
-def fmt(spec, name):
-    out = ["%s = {" % name]
-    for b in ("spine01", "spine02", "spine03", "chest", "neck", "head",
-              "clavicleR",
-              "armUR", "armLR", "handR",
-              "legUL", "legLL", "footL", "legUR", "legLR", "footR"):
-        v = spec[b]
-        out.append('    "%s": (%.1f, %.1f, %.1f),' % (b, v[0], v[1], v[2]))
-    out.append("}")
+def _conj(bone, e):
+    B = np.eye(4)
+    B[:3, :3] = euler(e)
+    return REST[bone] @ B @ REST_INV[bone]
+
+
+def hand_local(curl, spread, thumb):
+    """The hand's vertices, bind pose, fingers and thumb posed, in (r, l, n)
+    from the wrist joint. Only two bones move, so their skin matrices are
+    conjugations of their own rest frames and the rest are the identity."""
+    Sf, St = _conj(FI, (curl, 0.0, spread)), _conj(TI, tuple(thumb))
+    vf = _HCO @ Sf[:3, :3].T + Sf[:3, 3]
+    vt = _HCO @ St[:3, :3].T + St[:3, 3]
+    V = _HCO * (1 - _HWF - _HWT) + _HWF * vf + _HWT * vt
+    return (V - W0) @ A
+
+
+def sdist(V, foot, a):
+    """Signed distance of points to the bottle's surface."""
+    d = V - foot
+    h = d @ a
+    rad = np.linalg.norm(d - h[:, None] * a[None], axis=1)
+    sd = rad - radius(np.clip(h, 0, BOT_LEN))
+    sd = np.where(h < 0, np.maximum(sd, -h), sd)
+    return np.where(h > BOT_LEN, np.maximum(sd, h - BOT_LEN), sd)
+
+
+_V0 = hand_local(0, 0, (0, 0, 0))
+PALM = ((_V0[:, 2] > 0.008) & (_V0[:, 1] > -0.005) & (_V0[:, 1] < 0.095)
+        & (_V0[:, 0] > -0.04) & (_V0[:, 0] < 0.035))
+THUMBV = (_V0[:, 0] > 0.035) & (_V0[:, 1] > 0.03)
+TTIP = THUMBV & (_V0[:, 1] > 0.075)
+FING = (W[HAND, FI] > 0.5) & (_V0[:, 1] > 0.10)
+# The four fingers, told apart by where they sit across the hand at the tips.
+_tips = FING & (_V0[:, 1] > 0.12)
+_c = np.percentile(_V0[_tips, 0], [10, 35, 65, 90])
+for _ in range(30):
+    _lab = np.argmin(np.abs(_V0[_tips, 0][:, None] - _c[None]), 1)
+    _c = np.sort([_V0[_tips, 0][_lab == j].mean() for j in range(4)])
+FLAB = np.full(len(HAND), -1)
+FLAB[FING] = np.argmin(np.abs(_V0[FING, 0][:, None] - _c[None]), 1)
+FINGER_NAMES = ("little", "ring", "middle", "index")
+
+
+def grip_axis(g):
+    g = math.radians(g)
+    return np.array([math.cos(g), math.sin(g), 0.0])
+
+
+def place_on_palm(V, a, lc, rc=-0.005, gap=0.0005):
+    """The axis through (rc, lc, ?) with ? chosen so the palm just touches."""
+    return np.array([rc, lc, brentq(
+        lambda nc: sdist(V[PALM], np.array([rc, lc, nc]) - a * GRIP_H, a).min() - gap, 0.0, 0.2)])
+
+
+def first_touch(a, p, spread, thumb, gap=0.0005):
+    """The curl at which the first finger reaches the glass, closing from open."""
+    def f(curl):
+        return sdist(hand_local(curl, spread, thumb)[FING], p - a * GRIP_H, a).min() - gap
+    cs = np.arange(0, -171, -5.0)
+    vals = [f(c) for c in cs]
+    for i in range(1, len(cs)):
+        if vals[i] <= 0 < vals[i - 1]:
+            return brentq(f, cs[i], cs[i - 1])
+    return None
+
+
+def wrap_angle(V, a, p, mask, sd):
+    """How far round the bottle from the palm the nearest vertex of `mask` is,
+    degrees, positive toward the fingertips' side."""
+    i = np.where(mask)[0][np.argmin(sd[mask])]
+    d = V[i] - p
+    d = d - (d @ a) * a
+    e1 = unit(np.array([0, 0, -1.0]) - a * (-a[2]))
+    e2 = np.cross(a, e1)
+    if e2[1] < 0:
+        e2 = -e2
+    return math.degrees(math.atan2(d @ e2, d @ e1))
+
+
+def grip_build(lc, spread, thumb):
+    a = grip_axis(GRIP_G)
+    p = place_on_palm(hand_local(-70, spread, thumb), a, lc)
+    curl = first_touch(a, p, spread, thumb)
+    if curl is None:
+        return None
+    p = place_on_palm(hand_local(curl, spread, thumb), a, lc)
+    curl = first_touch(a, p, spread, thumb) or curl
+    V = hand_local(curl, spread, thumb)
+    sd = sdist(V, p - a * GRIP_H, a)
+    fr = [float(sd[FING & (FLAB == j)].min()) for j in range(4)]
+    fa = [wrap_angle(V, a, p, FING & (FLAB == j), sd) for j in range(4)]
+    return dict(a=a, p=p, curl=curl, V=V, sd=sd, fingers=fr, wrap=fa,
+                thumb_gap=float(sd[THUMBV].min()), ttip=float(sd[TTIP].min()),
+                thumb_wrap=wrap_angle(V, a, p, THUMBV, sd), pen=float(sd.min()))
+
+
+def grip_cost(lc, spread, thumb):
+    m = grip_build(lc, spread, thumb)
+    if m is None:
+        return 1e3
+    sd = m["sd"]
+    return (1e5 * sum(band(f, 0, 0.006) for f in m["fingers"])
+            + 1e5 * band(m["thumb_gap"], 0, 0.0015) + 3e4 * band(m["ttip"], 0, 0.004)
+            + 1e5 * float(np.sum(np.minimum(sd + 0.0015, 0) ** 2))
+            + 1e-3 * band(m["thumb_wrap"], -130, -60)
+            + 1e-3 * sum(band(f, 70, 180) for f in m["wrap"])
+            + 1e-4 * spread ** 2 + 1e-1 * band(spread, -12, 12)
+            + 1e-5 * float(np.sum(np.square(thumb)))
+            + 1e-1 * (band(thumb[0], -70, 60) + band(thumb[1], -35, 30) + band(thumb[2], -20, 85)))
+
+
+def solve_grip():
+    """Search the palm position and finger spread on a grid, the thumb for each
+    by simplex, then polish all five together."""
+    best = None
+    t0 = np.array([16.8, -22.1, 78.9])
+    for sp in (0, 4, 8, 12):
+        for lc in (0.06, 0.065, 0.07, 0.075):
+            r = minimize(lambda t: grip_cost(lc, sp, t), t0, method="Nelder-Mead",
+                         options={"maxiter": 500, "xatol": 0.05, "fatol": 1e-8})
+            if best is None or r.fun < best[0]:
+                best = (r.fun, [lc, sp, *r.x])
+    r = minimize(lambda v: grip_cost(v[0], v[1], v[2:]), best[1], method="Nelder-Mead",
+                 options={"maxiter": 1500, "xatol": 1e-3, "fatol": 1e-9})
+    lc, sp, *th = r.x
+    m = grip_build(lc, sp, th)
+    out = dict(curl=float(m["curl"]), spread=float(sp), thumb=[float(t) for t in th],
+               a=m["a"].tolist(), p=m["p"].tolist(), g=GRIP_G, h=GRIP_H,
+               fingers_mm=[f * 1e3 for f in m["fingers"]], wrap=m["wrap"],
+               thumb_mm=m["thumb_gap"] * 1e3, thumb_wrap=m["thumb_wrap"], pen_mm=m["pen"] * 1e3)
+    GRIP_JSON.write_text(json.dumps(out, indent=1))
+    report_grip(out)
+    return out
+
+
+def report_grip(g):
+    print("[grip] fingers closed %.1f deg, spread %.1f, thumb (%.1f %.1f %.1f)"
+          % (g["curl"], g["spread"], *g["thumb"]))
+    print("[grip] finger to glass, mm:   %s" % "  ".join(
+        "%s %.1f" % (n, f) for n, f in zip(FINGER_NAMES, g["fingers_mm"])))
+    print("[grip] wrapped round from the palm, deg: %s" % "  ".join(
+        "%s %.0f" % (n, f) for n, f in zip(FINGER_NAMES, g["wrap"])))
+    print("[grip] thumb %.1f mm, %.0f deg the other way; deepest vertex %.1f mm"
+          % (g["thumb_mm"], g["thumb_wrap"], g["pen_mm"]))
+    conv = lambda v: (v[0], v[2], -v[1])  # noqa: E731  Blender -> game figure space
+    at, ax = conv(A @ np.array(g["p"])), conv(A @ np.array(g["a"]))
+    print("[grip] BOT_AT (%.4f, %.4f, %.4f)  BOT_AX (%.4f, %.4f, %.4f)  BOT.grip %.3f"
+          % (*at, *ax, g["h"]))
+
+
+# ── the body ─────────────────────────────────────────────────────────────── #
+
+G = json.loads(GRIP_JSON.read_text()) if GRIP_JSON.exists() else None
+
+
+def _grip_consts():
+    g = G or {"curl": -70, "spread": 0, "thumb": [0, 0, 0], "a": [1, 0, 0], "p": [0, 0.06, 0.06]}
+    return g["curl"], g["spread"], g["thumb"], np.array(g["a"]), np.array(g["p"])
+
+
+CURL, SPREAD, THUMB, A_GRIP, P_GRIP = _grip_consts()
+# The hand coming at the bottle: fingers straight, thumb swung 40 degrees out
+# of its wrap. Checked along the whole closing path — the thumb's other
+# settings all put its tip through the glass on the way in.
+OPEN_F = [-18.0, 0.0, SPREAD]
+OPEN_T = [THUMB[0] + 40.0, THUMB[1], THUMB[2]]
+RELAX_F, RELAX_T = [-26.0, 0.0, 0.0], [-12.0, 0.0, 0.0]
+
+# Body parts for the clearance checks, by the bone each vertex mostly follows.
+DOM = W.argmax(1)
+
+
+def _verts(names, step=1):
+    return np.where(np.isin(DOM, [BI[n] for n in names]))[0][::step]
+
+
+_parts = dict(torso=_verts(["pelvis", "spine01", "spine02", "spine03", "chest", "clavicleL"]),
+              legs=_verts(["legUL", "legUR", "legLL", "legLR"], 2),
+              larm=_verts(["armUL", "armLL", "handL"], 2), rarm=_verts(["armUR", "armLR"]),
+              hand=_verts(["handR", "fingersR", "thumbR"]), head=_verts(["head", "neck"], 6))
+SUB = np.unique(np.concatenate(list(_parts.values())))
+_pos = {v: i for i, v in enumerate(SUB)}
+S_ = {k: np.array([_pos[v] for v in a]) for k, a in _parts.items()}
+S_["bodyB"] = np.concatenate([S_[k] for k in ("torso", "legs", "larm", "rarm", "head")])
+S_["solid"] = np.concatenate([S_["torso"], S_["legs"]])
+_WS, _CS, _NS, _DS = W[SUB], CO[SUB], NRM[SUB], DOM[SUB]
+
+
+def skin_sub(P):
+    """Linear blend skinning of the parts above; normals ride the dominant bone."""
+    S4 = P @ REST_INV
+    M = (_WS @ S4[:, :3, :].reshape(len(BONES), 12)).reshape(-1, 3, 4)
+    V = np.einsum('vij,vj->vi', M[:, :, :3], _CS) + M[:, :, 3]
+    return V, np.einsum('vij,vj->vi', S4[_DS, :3, :3], _NS)
+
+
+# The knee dip. Given a knee flexion and a forward tilt of the pelvis, the hip
+# and ankle are fitted so each sole stays exactly as flat as IDLE_A's and each
+# ankle stays over the same spot — two conditions, two unknowns, per side.
+# Tabulated once and interpolated, because the body solve differentiates
+# through it numerically and a cache keyed on rounded angles has a gradient of
+# nought (which is how the first version of this came to use no knee at all).
+_REF = fk(IDLE)
+KS, PTS = np.arange(0, 57.5, 2.5), np.arange(-40, 7.5, 2.5)
+
+
+def _dip_fit(k, pt):
+    base = dict(IDLE, pelvis=[IDLE["pelvis"][0] + pt, IDLE["pelvis"][1], IDLE["pelvis"][2]])
+    out = []
+    for s in ("L", "R"):
+        d0 = _REF[BI["foot" + s]][:3, 1]
+        x0 = _REF[BI["foot" + s]][:3, 3]
+
+        def spec(h, a):
+            return {"legU" + s: [base["legU" + s][0] + h] + base["legU" + s][1:],
+                    "legL" + s: [base["legL" + s][0] + k] + base["legL" + s][1:],
+                    "foot" + s: [base["foot" + s][0] + a] + base["foot" + s][1:]}
+
+        def cost(v):
+            P = fk(dict(base, **spec(*v)))
+            f = P[BI["foot" + s]]
+            return 400 * (1 - f[:3, 1].dot(d0)) + 900 * ((f[0, 3] - x0[0]) ** 2 + (f[1, 3] - x0[1]) ** 2)
+
+        r = minimize(cost, [-0.5 * k + pt, -0.45 * k], method="Nelder-Mead",
+                     options={"xatol": 1e-4, "fatol": 1e-12, "maxiter": 4000})
+        out += list(r.x)
+    return out
+
+
+_DIP_NPY = Path("/tmp/wine_dip.npy")
+if _DIP_NPY.exists():
+    DIP_T = np.load(_DIP_NPY)
+else:
+    DIP_T = np.array([[_dip_fit(float(k), float(pt)) for pt in PTS] for k in KS])
+    np.save(_DIP_NPY, DIP_T)
+
+
+def dip(k, pt):
+    fi_ = np.clip(k / 2.5, 0, len(KS) - 1.0001)
+    fj = np.clip((pt - PTS[0]) / 2.5, 0, len(PTS) - 1.0001)
+    i, j = int(fi_), int(fj)
+    u, v = fi_ - i, fj - j
+    t = (DIP_T[i, j] * (1 - u) * (1 - v) + DIP_T[i + 1, j] * u * (1 - v)
+         + DIP_T[i, j + 1] * (1 - u) * v + DIP_T[i + 1, j + 1] * u * v)
+    b = IDLE
+    return {"legUL": [b["legUL"][0] + t[0]] + b["legUL"][1:], "legLL": [b["legLL"][0] + k] + b["legLL"][1:],
+            "footL": [b["footL"][0] + t[1]] + b["footL"][1:],
+            "legUR": [b["legUR"][0] + t[2]] + b["legUR"][1:], "legLR": [b["legLR"][0] + k] + b["legLR"][1:],
+            "footR": [b["footR"][0] + t[3]] + b["footR"][1:],
+            "pelvis": [b["pelvis"][0] + pt, b["pelvis"][1], b["pelvis"][2]]}
+
+
+def wrist_basis(flex, dev):
+    """`handR`'s local rotation for a wrist flexed (+palmar) and deviated
+    (+ulnar) about the hand's own axes, relative to the rest. It has no
+    twist term, which is the point: the only way left to turn the hand over
+    is the forearm."""
+    c, s = math.cos(math.radians(flex)), math.sin(math.radians(flex))
+    Rr = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
+    c, s = math.cos(math.radians(dev)), math.sin(math.radians(dev))
+    Rn = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+    return A_H @ (Rn @ Rr) @ A_H.T
+
+
+# The free numbers of one key. The trunk's flexion is shared out down the
+# spine (spine01 takes 40 per cent: a person bending to something at table
+# height hinges low), side bend and twist evenly; the neck takes a third of
+# the head; the left arm has two numbers so it can go on hanging while the
+# body leans over it.
+NAMES = ["sx", "sz", "sy", "hx", "hy", "hz", "cy", "cz", "ux", "uy", "uz",
+         "lx", "ly", "lz", "wf", "wd", "k", "lux", "luz", "pt"]
+IX = {n: i for i, n in enumerate(NAMES)}
+BOUNDS = {"sx": (-40, 12), "sz": (-14, 14), "sy": (-25, 25), "hx": (-50, 20), "hy": (-40, 40),
+          "hz": (-20, 20), "cy": (-10, 10), "cz": (-15, 20), "ux": (-110, 40), "uy": (-60, 60),
+          "uz": (-80, 20), "lx": (-60, 120), "ly": (-100, 100), "lz": (-60, 40), "wf": (-60, 60),
+          "wd": (-30, 30), "k": (0, 55), "lux": (-40, 30), "luz": (0, 50), "pt": (-35, 5)}
+LB = np.array([BOUNDS[n][0] for n in NAMES], float)
+UB = np.array([BOUNDS[n][1] for n in NAMES], float)
+
+
+def spec_of(x, fingers=None, thumb=None):
+    v = dict(zip(NAMES, x))
+    s = dict(IDLE)
+    for i, (b, share) in enumerate((("spine01", 0.40), ("spine02", 0.25), ("spine03", 0.20), ("chest", 0.15))):
+        s[b] = [IDLE[b][0] + v["sx"] * share, IDLE[b][1] + v["sy"] * 0.25, IDLE[b][2] + v["sz"] * 0.25]
+    s["neck"] = [IDLE["neck"][0] + v["hx"] * 0.35, v["hy"] * 0.35, v["hz"] * 0.35]
+    s["head"] = [IDLE["head"][0] + v["hx"] * 0.65, IDLE["head"][1] + v["hy"] * 0.65,
+                 IDLE["head"][2] + v["hz"] * 0.65]
+    s["clavicleR"] = [0.0, v["cy"], v["cz"]]
+    s["armUR"] = [v["ux"], v["uy"], v["uz"]]
+    s["armLR"] = [v["lx"], v["ly"], v["lz"]]
+    s["handR"] = wrist_basis(v["wf"], v["wd"])
+    s["armUL"] = [v["lux"], IDLE["armUL"][1], v["luz"]]
+    s.update(dip(v["k"], v["pt"]))
+    s["fingersR"] = list(fingers) if fingers is not None else [CURL, 0.0, SPREAD]
+    s["thumbR"] = list(thumb) if thumb is not None else list(THUMB)
+    return s
+
+
+def seed_idle():
+    v = {n: 0.0 for n in NAMES}
+    v.update(ux=IDLE["armUR"][0], uy=IDLE["armUR"][1], uz=IDLE["armUR"][2],
+             lx=IDLE["armLR"][0], ly=IDLE["armLR"][1], lz=IDLE["armLR"][2],
+             lux=IDLE["armUL"][0], luz=IDLE["armUL"][2])
+    return np.array([v[n] for n in NAMES])
+
+
+def bottle_of(P):
+    """(foot, axis, grip point) of the bottle in her right hand."""
+    Rh = P[HI][:3, :3] @ A_H
+    g = P[HI][:3, 3] + Rh @ P_GRIP
+    a = Rh @ A_GRIP
+    return g - a * GRIP_H, a, g
+
+
+def measure_P(P):
+    m = arm_measures(P)
+    m["P"] = P
+    m["foot"], m["axis"], m["grip"] = bottle_of(P)
+    m["lip"] = m["foot"] + m["axis"] * BOT_LEN
+    m["tilt"] = math.degrees(math.acos(max(-1, min(1, m["axis"][2]))))
+    Rd = P[BI["head"]][:3, :3] @ REST[BI["head"]][:3, :3].T
+    m["gaze"], m["headp"] = Rd @ np.array([1.0, 0, 0]), P[BI["head"]][:3, 3]
+    return m
+
+
+def measure(x, goal):
+    spec = spec_of(x, goal.get("fingers"), goal.get("thumb"))
+    P = fk(spec)
+    dz = 0.004 - lowest(P)
+    P[:, 2, 3] += dz
+    m = measure_P(P)
+    m["dz"], m["spec"] = dz, spec
+    return m
+
+
+HS = np.linspace(0.0, BOT_LEN, 24)
+HR = radius(HS)
+
+
+def clearance(m, goal):
+    """(penalty, report in metres) for everything that must not go through
+    anything else. Negative in the report is inside."""
+    V, N = skin_sub(m["P"])
+    rep, pen = {}, 0.0
+    # Her right forearm and hand against her torso and legs, signed by the
+    # nearest surface vertex's normal. Not the upper arm within 15 cm of the
+    # shoulder: the armpit is a fold, and a nearest-vertex sign in a fold is
+    # noise (IDLE_A itself reads -37 mm there).
+    solid = S_["solid"]
+    tree = cKDTree(V[solid])
+    q = V[np.concatenate([S_["rarm"], S_["hand"]])]
+    q = q[np.linalg.norm(q - m["sh"], axis=1) > 0.15]
+    d, j = tree.query(q)
+    sd = np.where(np.einsum('ij,ij->i', q - V[solid][j], N[solid][j]) < 0, -d, d)
+    rep["arm_body"] = float(sd.min())
+    pen += 2e4 * float(np.sum(np.minimum(sd - 0.006, 0) ** 2))
+    # Nothing of her inside the tabletop, a slab 64 mm deep under TOP.
+    hd = np.linalg.norm(V[:, :2] - TABLE[0], axis=1)
+    slab = (hd < TABLE[1]) & (V[:, 2] < TOP + 0.004) & (V[:, 2] > TOP - 0.064)
+    depth = np.where(slab, np.minimum(np.minimum(V[:, 2] - (TOP - 0.064), TOP + 0.004 - V[:, 2]),
+                                      TABLE[1] - hd), 0.0)
+    rep["table_body"] = -float(depth.max())
+    pen += 2e4 * float(np.sum(depth ** 2))
+    if goal.get("static_bottle"):
+        hv = V[S_["hand"]] - BOTTLE_FOOT
+        h = hv[:, 2]
+        gap = np.where((h > 0) & (h < BOT_LEN),
+                       np.linalg.norm(hv[:, :2], axis=1) - radius(np.clip(h, 0, BOT_LEN)), 1.0)
+        rep["hand_bottle"] = float(gap.min())
+        pen += 2e4 * float(np.sum(np.minimum(gap - goal.get("static_gap", 0.004), 0) ** 2))
+    if goal.get("held", True):
+        foot, a = m["foot"], m["axis"]
+        d = V[S_["bodyB"]] - foot
+        h = d @ a
+        gap = np.where((h > 0) & (h < BOT_LEN), np.linalg.norm(d - h[:, None] * a[None], axis=1)
+                       - radius(np.clip(h, 0, BOT_LEN)), 1.0)
+        rep["bottle_body"] = float(gap.min())
+        pen += 2e4 * float(np.sum(np.minimum(gap - 0.010, 0) ** 2))
+        axp = foot[None] + HS[:, None] * a[None]
+        low = axp[:, 2] - HR * np.linalg.norm(np.array([0, 0, -1.0]) + a * a[2])
+        on = np.linalg.norm(axp[:, :2] - TABLE[0], axis=1) < TABLE[1] + 0.02
+        tgap = np.where(on, low - TOP, 1.0)
+        rep["bottle_table"] = float(tgap.min())
+        if not goal.get("on_table"):
+            pen += 2e4 * float(np.sum(np.minimum(tgap - 0.008, 0) ** 2))
+        gh = axp[:, 2] - TOP
+        gr = np.interp(np.clip(gh, 0, 0.168), GLASS_PROF[:, 0], GLASS_PROF[:, 1])
+        ggap = np.where((gh > -0.02) & (gh < 0.188),
+                        np.linalg.norm(axp[:, :2] - GLASS[:2], axis=1) - gr - HR, 1.0)
+        rep["bottle_glass"] = float(ggap.min())
+        pen += 2e4 * float(np.sum(np.minimum(ggap - 0.006, 0) ** 2))
+    return pen, rep
+
+
+def cost(x, goal, verbose=False):
+    m = measure(x, goal)
+    v = dict(zip(NAMES, x))
+    p = {}
+    p["bounds"] = 1e-1 * sum(band(x[i], *BOUNDS[n]) for i, n in enumerate(NAMES))
+    if "grip" in goal:
+        p["grip"] = goal.get("gripW", 3e4) * float(np.sum((m["grip"] - goal["grip"]) ** 2))
+    if "axis" in goal:
+        p["axis"] = 30.0 * float(1 - m["axis"].dot(goal["axis"]))
+    if "axAz" in goal:
+        p["axAz"] = 1e-2 * band(math.degrees(math.atan2(m["axis"][1], m["axis"][0])), *goal["axAz"])
+    if "lip" in goal:
+        p["lip"] = 3e4 * float(np.sum((m["lip"] - goal["lip"]) ** 2))
+    if "tilt" in goal:
+        p["tilt"] = 2e-2 * band(m["tilt"], *goal["tilt"])
+    # Human ranges. Radial deviation is the tight one, 18 or so; pronation is
+    # kept near neutral except where the pour needs it.
+    p["wrist"] = (2e-3 * (band(m["flex"], *goal.get("flexB", (-35, 40)))
+                          + band(m["dev"], *goal.get("devB", (-18, 25))))
+                  + 3e-5 * (m["flex"] ** 2 + m["dev"] ** 2))
+    p["pron"] = 2e-3 * band(m["pron"], *goal.get("pronB", (-25, 25)))
+    p["elbow"] = 2e-3 * band(m["elbow"], 70, 165)
+    p["off"] = 2e-3 * band(m["off"], -5, 25)
+    p["trunk"] = 1e-4 * (v["sz"] ** 2 + v["sy"] ** 2) + 2e-3 * band(v["sx"], *goal.get("leanB", (-30, 5)))
+    # Knees cost more than a lean: bending to a table is a hinge first.
+    p["knee"] = 1.2e-4 * v["k"] ** 2 + 4e-5 * v["pt"] ** 2
+    p["uy"] = 1e-4 * band(v["uy"], -35, 35)
+    lu = unit(m["P"][BI["armLL"]][:3, 3] - m["P"][BI["armUL"]][:3, 3])
+    p["larm"] = 2.0 * (1 + lu[2])
+    if "look" in goal:
+        to = unit(np.array(goal["look"]) - m["headp"])
+        p["gaze"] = 30.0 * max(0.0, goal.get("lookCos", 0.9) - m["gaze"].dot(to)) ** 2
+    if "palmAz" in goal:
+        n = m["Rh"][:, 2]
+        p["palmAz"] = 1e-2 * band(math.degrees(math.atan2(n[1], n[0])), *goal["palmAz"])
+    if goal.get("near") is not None:
+        p["near"] = goal.get("nearW", 2e-5) * float(np.sum((np.array(x) - goal["near"]) ** 2))
+    pen, rep = (0.0, {}) if goal.get("noclear") else clearance(m, goal)
+    p["clear"] = pen
+    c = sum(p.values())
+    if verbose:
+        m["parts"], m["rep"], m["cost"] = p, rep, c
+        return m
+    return c
+
+
+def solve_key(goal, seed, iters=3, rs=0):
+    """Bounded quasi-Newton from a few starts: first without the clearance
+    terms (cheap and smooth), then with them."""
+    rng = np.random.default_rng(rs)
+    lb, ub = LB.copy(), UB.copy()
+    for nm in goal.get("fix", ()):
+        lb[IX[nm]] = ub[IX[nm]] = float(seed[IX[nm]])
+    best, bf = None, None
+    for k in range(iters):
+        x0 = np.clip(np.array(seed, float) + (rng.normal(0, 1, len(seed)) * 8 if k else 0), lb, ub)
+        r = minimize(cost, x0, args=(dict(goal, noclear=True),), method="L-BFGS-B",
+                     bounds=list(zip(lb, ub)), options={"maxiter": 3000, "eps": 1e-4})
+        r = minimize(cost, r.x, args=(goal,), method="L-BFGS-B",
+                     bounds=list(zip(lb, ub)), options={"maxiter": 3000, "eps": 1e-4})
+        f = cost(r.x, goal)
+        if best is None or f < bf:
+            best, bf = r.x, f
+    return best
+
+
+def show(nm, x, goal):
+    m = cost(x, goal, True)
+    print("== %-6s cost %.4f  %s" % (nm, m["cost"], "  ".join(
+        "%s %.3f" % (k, v) for k, v in m["parts"].items() if v > 1e-3)))
+    print("   wrist flex %+.1f dev %+.1f twist %+.1f  pron %+.1f  elbow %.1f  tilt %.1f  drop %.3f"
+          % (m["flex"], m["dev"], m["twist"], m["pron"], m["elbow"], m["tilt"], m["dz"]))
+    print("   grip (%+.3f %+.3f %.3f)  lip (%+.3f %+.3f %.3f)  clear mm %s" % (
+        *m["grip"], *m["lip"], {k: round(v * 1e3, 1) for k, v in m["rep"].items()}))
+    return m
+
+
+def solve_keys(only=()):
+    """Every key, chained: each is seeded from and held near the one it is a
+    variation on, so the clip interpolates instead of lurching."""
+    keys = json.loads(KEYS_JSON.read_text()) if KEYS_JSON.exists() else {}
+    Z = np.array([0, 0, 1.0])
+    grasp = BOTTLE_FOOT + Z * GRIP_H
+    look_b, look_g = list(grasp), [GLASS[0], GLASS[1], RIM]
+
+    def run(name, goal, seed, iters=3):
+        if only and name not in only and name in keys:
+            return np.array(keys[name]["x"])
+        x = solve_key(goal, seed, iters=iters)
+        show(name, x, goal)
+        keys[name] = {"x": x.tolist(), "fingers": goal.get("fingers"), "thumb": goal.get("thumb")}
+        KEYS_JSON.write_text(json.dumps(keys, indent=1))
+        return x
+
+    x = seed_idle()
+    x[IX["sx"]], x[IX["k"]], x[IX["ux"]], x[IX["lx"]], x[IX["wd"]] = -30, 40, -20, -20, -18
+    # Closed on the bottle where it stands: the grip point where the bottle's
+    # is, the bottle's axis upright, the palm facing across it from her right.
+    hold = run("HOLD", dict(grip=grasp, axis=Z, look=look_b, lookCos=0.86, palmAz=(35, 125),
+                            on_table=True, leanB=(-40, 5)), x, iters=4)
+    mh = measure(hold, {})
+    away = -mh["Rh"][:, 2]
+    away[2] = 0
+    away = unit(away)
+    # Coming in: the open hand 10 cm out along its own palm's normal, 5 up and
+    # 4 back, and on the way there from her side a key that keeps her
+    # fingers out of the bottle — lerped straight from IDLE_A to PRE the
+    # swing of the lean carries them through it (38 mm, measured).
+    pre = run("PRE", dict(grip=grasp + away * 0.10 + Z * 0.05 + np.array([-0.04, 0, 0]), gripW=1e4,
+                          axis=mh["axis"], held=False, static_bottle=True, static_gap=0.008,
+                          look=look_b, lookCos=0.86, fingers=OPEN_F, thumb=OPEN_T,
+                          leanB=(-40, 5), near=hold, nearW=4e-5), hold)
+    mid = 0.5 * (seed_idle() + pre)
+    run("PRE0", dict(grip=np.array([0.17, -0.37, 0.93]), gripW=4e3, held=False, static_bottle=True,
+                     static_gap=0.03, look=look_b, lookCos=0.80, fingers=[-22.0, 0.0, SPREAD * 0.5],
+                     thumb=[(OPEN_T[0] - 12) * 0.5, OPEN_T[1] * 0.5, OPEN_T[2] * 0.5],
+                     leanB=(-40, 5), near=mid, nearW=1e-4), mid)
+    lift = run("LIFT", dict(grip=grasp + np.array([-0.01, -0.01, 0.10]), axis=Z, look=look_g,
+                            lookCos=0.86, leanB=(-35, 5), near=hold, nearW=3e-5), hold)
+    # The pour. The lip on its target, tipped 100 to 105, the neck pointing
+    # across her toward her left so that you, in front of her, see the bottle
+    # side-on. Pronation is let out to 85 and ulnar deviation to 28: this is
+    # the key the turn happens in, and it is the forearm and the wrist's
+    # sideways bend that do it, with the elbow coming out — not the wrist
+    # bending back, which is what the shipped version did.
+    pour = run("POUR", dict(lip=LIP_T, tilt=(100, 105), axAz=(60, 115), look=look_g, lookCos=0.88,
+                            leanB=(-30, 5), flexB=(-35, 35), devB=(-15, 28), pronB=(-30, 85),
+                            near=lift, nearW=1e-5), lift, iters=4)
+    pourb = run("POUR_B", dict(lip=LIP_T + np.array([0, 0, 0.012]), tilt=(111, 116), axAz=(60, 115),
+                               look=look_g, lookCos=0.88, leanB=(-30, 5), flexB=(-35, 35),
+                               devB=(-15, 30), pronB=(-30, 88), near=pour, nearW=2e-4), pour)
+    mp, mb = measure(pour, {}), measure(pourb, {})
+    run("TIP", dict(grip=mp["grip"] + np.array([0, 0.01, 0.03]), gripW=1e4, tilt=(55, 65),
+                    look=look_g, lookCos=0.88, leanB=(-30, 5), pronB=(-30, 85), devB=(-15, 28),
+                    near=pour, nearW=3e-4), pour)
+    run("CUT", dict(grip=mb["grip"] + np.array([0, 0.0, 0.05]), gripW=1e4, tilt=(40, 52),
+                    look=look_g, lookCos=0.88, leanB=(-30, 5), pronB=(-30, 85), devB=(-15, 28),
+                    near=pourb, nearW=2e-4), pourb)
+    run("LIFT2", dict(grip=grasp + np.array([0.0, 0.0, 0.07]), axis=Z, look=look_b, lookCos=0.86,
+                      leanB=(-38, 5), near=hold, nearW=6e-5), hold)
+    meet = seed_idle()
+    meet[IX["k"]] = 8
+    # Up, and looking at you. The arms are IDLE_A's: this is the beat where the
+    # hands have nothing to do.
+    run("MEET", dict(held=False, look=list(PLAYER), lookCos=0.95, fingers=RELAX_F, thumb=RELAX_T,
+                     leanB=(-10, 5), near=seed_idle(), nearW=4e-4,
+                     fix=("cy", "cz", "ux", "uy", "uz", "lx", "ly", "lz", "wf", "wd", "lux", "luz")), meet)
+    return keys
+
+
+# ── the clip ────────────────────────────────────────────────────────────── #
+
+# Seconds. `wineAt` in src/43-jadrija.js carries the four windows that ride on
+# these: `held` across the two HOLD..HOLD pairs, `pour` across TIP..POUR and
+# POUR_B..CUT. Move a key and move those with it.
+TIMELINE = [
+    (0.00, "IDLE"), (0.36, "PRE0"), (0.66, "PRE"), (0.92, "REACH"), (1.10, "HOLD"), (1.24, "HOLD"),
+    (1.85, "LIFT"), (2.45, "TIP"), (2.95, "POUR"), (5.20, "POUR_B"), (5.60, "CUT"), (6.20, "LIFT2"),
+    (6.60, "HOLD"), (6.75, "HOLD"), (6.95, "REACH"), (7.25, "PRE"), (7.55, "PRE0"), (7.95, "MEET"),
+    (8.55, "IDLE"),
+]
+
+
+def wine_at(u):
+    sat = lambda v: max(0.0, min(1.0, v))  # noqa: E731
+    return (sat((u - 1.10) / 0.12) * (1 - sat((u - 6.60) / 0.12)),
+            sat((u - 2.45) / 0.50) * (1 - sat((u - 5.20) / 0.35)))
+
+
+def key_pose(keys, nm):
+    """The pose as it SHIPS: Euler everywhere, the root off the floor pass."""
+    if nm == "IDLE":
+        d = {k: list(v) for k, v in J["poses"]["IDLE_A"].items()}
+        d["@root"] = [0.0, 0.020, 0.004 - lowest(fk(IDLE))]
+        return d
+    src = keys["HOLD" if nm == "REACH" else nm]
+    f = OPEN_F if nm == "REACH" else (src.get("fingers") or [CURL, 0.0, SPREAD])
+    t = OPEN_T if nm == "REACH" else (src.get("thumb") or THUMB)
+    d = {b: (list(to_euler(v)) if isinstance(v, np.ndarray) else list(v))
+         for b, v in spec_of(np.array(src["x"]), f, t).items()}
+    d["@root"] = [0.0, 0.0, 0.004 - lowest(fk(d))]
+    return d
+
+
+def lerp_pose(a, b, u):
+    return {k: [x + (y - x) * u for x, y in zip(a.get(k, [0, 0, 0]), b.get(k, [0, 0, 0]))]
+            for k in set(a) | set(b)}
+
+
+def sample(seq, t):
+    i = 0
+    while i < len(seq) - 2 and seq[i + 1][0] <= t:
+        i += 1
+    (t0, p0), (t1, p1) = seq[i], seq[i + 1]
+    u = 0.0 if t1 <= t0 else min(1.0, max(0.0, (t - t0) / (t1 - t0)))
+    return lerp_pose(p0, p1, u * u * (3 - 2 * u))
+
+
+def clip_rows(seq):
+    """Every frame at 30 fps, measured."""
+    dur = seq[-1][0]
+    nf = int(round(dur * 30)) + 1
+    rows, prev = [], None
+    for f in range(nf):
+        t = f / (nf - 1) * dur
+        d = sample(seq, t)
+        P = fk({b: v for b, v in d.items() if not b.startswith("@")})
+        P[:, 1, 3] += d["@root"][1]
+        P[:, 2, 3] += d["@root"][2]
+        m = measure_P(P)
+        held, pour = wine_at(t)
+        _pen, rep = clearance(m, {"held": held > 0.5})
+        rot = sp = 0.0
+        if prev is not None:
+            dR = m["Rh"] @ prev[1].T
+            rot = math.degrees(math.acos(max(-1, min(1, (np.trace(dR) - 1) / 2)))) * 30
+            sp = float(np.linalg.norm(m["grip"] - prev[0])) * 30
+        prev = (m["grip"].copy(), m["Rh"].copy())
+        V, _ = skin_sub(P)
+        bf, ba = (m["foot"], m["axis"]) if held > 0.5 else (BOTTLE_FOOT, np.array([0, 0, 1.0]))
+        hv = V[S_["hand"]] - bf
+        h = hv @ ba
+        gap = np.where((h > 0) & (h < BOT_LEN), np.linalg.norm(hv - h[:, None] * ba[None], axis=1)
+                       - radius(np.clip(h, 0, BOT_LEN)), 1.0)
+        row = dict(t=t, held=held, pour=pour, flex=m["flex"], dev=m["dev"], twist=m["twist"],
+                   pron=m["pron"], elbow=m["elbow"], tilt=m["tilt"],
+                   lipdx=float(np.linalg.norm(m["lip"][:2] - GLASS[:2])), lipz=float(m["lip"][2] - RIM),
+                   rot=rot, speed=sp, hand_bottle=float(gap.min()), **rep)
+        if pour > 0:
+            want = unit(LIP_T - m["grip"])
+            row["aim"] = math.degrees(math.acos(max(-1, min(1, want.dot(m["axis"])))))
+        rows.append(row)
+    return rows
+
+
+def report_clip(rows):
+    def rng(k, sel=lambda r: True):
+        v = [r[k] for r in rows if sel(r) and k in r]
+        return "%+8.1f .. %+7.1f" % (min(v), max(v)) if v else "-"
+    held = lambda r: r["held"] > 0.99  # noqa: E731
+    free = lambda r: r["held"] < 0.01  # noqa: E731
+    stream = lambda r: r["pour"] > 0.6  # noqa: E731
+
+    def mm(k, sel=lambda r: True):
+        v = [r[k] for r in rows if sel(r) and k in r]
+        return "%+7.1f .. %+7.1f mm" % (min(v) * 1e3, max(v) * 1e3) if v else "-"
+    print("[clip] %d frames, %.2f s" % (len(rows), rows[-1]["t"]))
+    print("[clip] wrist flexion      %s deg  (+ palmar)" % rng("flex"))
+    print("[clip] wrist deviation    %s deg  (+ ulnar)" % rng("dev"))
+    print("[clip] wrist twist        %s deg  (a wrist has none)" % rng("twist"))
+    print("[clip] pronation          %s deg" % rng("pron"))
+    print("[clip] elbow              %s deg" % rng("elbow"))
+    print("[clip] forearm to body    %s  (IDLE_A itself reads -37 at the hip)" % mm("arm_body"))
+    print("[clip] body in tabletop   %s" % mm("table_body"))
+    print("[clip] hand vs bottle standing, free frames   %s" % mm("hand_bottle", free))
+    print("[clip] hand vs bottle in the hand             %s" % mm("hand_bottle", held))
+    print("[clip] bottle vs her body  %s   vs table %s   vs glass %s" % (
+        mm("bottle_body", held), mm("bottle_table", held), mm("bottle_glass", held)))
+    print("[clip] while the stream shows: spout off the glass's axis %s, above the rim %s, tilt %s"
+          % (mm("lipdx", stream), mm("lipz", stream), rng("tilt", stream)))
+    print("[clip] aim the game would have to add while pouring: %s deg (capped at 4)" % rng("aim", stream))
+    print("[clip] hand turning %s deg/s, grip point moving %s m/s" % (rng("rot"), rng("speed")))
+
+
+# ── emitting the block human_mh.py ships ─────────────────────────────────── #
+
+EMIT_ORDER = ("PRE0", "PRE", "REACH", "HOLD", "LIFT", "TIP", "POUR", "POUR_B", "CUT", "LIFT2", "MEET")
+EMIT_BONES = ("pelvis", "spine01", "spine02", "spine03", "chest", "neck", "head",
+              "clavicleR", "armUR", "armLR", "handR", "fingersR", "thumbR", "armUL",
+              "legUL", "legLL", "footL", "legUR", "legLR", "footR")
+
+
+def emit(keys):
+    out = []
+    for nm in EMIT_ORDER:
+        d = key_pose(keys, nm)
+        out.append("WINE_%s = dict(IDLE_A, **{" % nm)
+        out.append('    "@root": (0.0, 0.0, -0.006),')
+        for b in EMIT_BONES:
+            v = d[b]
+            out.append('    "%s": (%.1f, %.1f, %.1f),' % (b, v[0], v[1], v[2]))
+        out.append("})")
+        out.append("")
     return "\n".join(out)
 
 
-def props(m):
-    """A bottle, a glass and a stool top, put where the solve says they are.
-
-    Rendering the figure on her own is how the shipped pose passed review: a
-    naked woman with her arm out is a fine picture and says nothing at all
-    about whether the thing in her hand is pointing the right way. These are
-    four cylinders and they answer the only question being asked.
-    """
-    made = []
-
-    def cyl(r, h, base, axis=Vector((0, 0, 1)), mat=None):
-        bpy.ops.mesh.primitive_cylinder_add(radius=r, depth=h,
-                                            location=(0, 0, 0), vertices=24)
-        o = bpy.context.object
-        q = Vector((0, 0, 1)).rotation_difference(axis.normalized())
-        o.rotation_mode = "QUATERNION"
-        o.rotation_quaternion = q
-        o.location = base + axis.normalized() * (h * 0.5)
-        if mat:
-            o.data.materials.append(mat)
-        made.append(o)
-        return o
-
-    def flat(name, rgb):
-        mt = bpy.data.materials.new(name)
-        mt.use_nodes = True
-        bsdf = mt.node_tree.nodes["Principled BSDF"]
-        bsdf.inputs["Base Color"].default_value = rgb + (1.0,)
-        return mt
-
-    dark = flat("wsGlass", (0.02, 0.09, 0.04))
-    pale = flat("wsLabel", (0.86, 0.82, 0.70))
-    wood = flat("wsWood", (0.42, 0.30, 0.19))
-    red = flat("wsWine", (0.32, 0.03, 0.06))
-
-    foot, axis = m["foot"], m["axis"]
-    cyl(BOTTLE_R, 0.146, foot, axis, dark)                       # body
-    cyl(BOTTLE_R + 0.001, 0.080, foot + axis * 0.048, axis, pale)  # label
-    cyl(0.024, 0.100, foot + axis * 0.146, axis, dark)           # shoulder
-    cyl(0.0152, 0.062, foot + axis * 0.244, axis, dark)          # neck
-    st = ROOM["stool"]
-    cyl(0.168, 0.022, Vector((ROOM["bottleFoot"][0] - 0.06,
-                              ROOM["bottleFoot"][1] + 0.06, st - 0.022)),
-        Vector((0, 0, 1)), wood)
-    g = ROOM["glass"]
-    cyl(0.006, 0.075, Vector((g[0], g[1], st)), Vector((0, 0, 1)), pale)
-    cyl(0.040, 0.083, Vector((g[0], g[1], st + 0.085)), Vector((0, 0, 1)), pale)
-    cyl(0.036, 0.040, Vector((g[0], g[1], st + 0.083)), Vector((0, 0, 1)), red)
-    # The stream, from the lip down to the wine, which is the thing the whole
-    # `pourAt` number is about.
-    lip = m["lip"]
-    drop = lip.z - (st + 0.123)
-    if drop > 0.005 and m["tilt"] > 95:
-        cyl(0.004, drop, Vector((lip.x, lip.y, lip.z - drop)),
-            Vector((0, 0, 1)), red)
-    return made
+def shipped_seq():
+    P = J["poses"]
+    seq = []
+    for t, nm in J["shipped_keys"]:
+        d = {k: list(v) for k, v in P[nm].items()}
+        spec = {k: v for k, v in d.items() if not k.startswith("@")}
+        d["@root"] = [0.0, d.get("@root", [0, 0, 0])[1], 0.004 - lowest(fk(spec))]
+        seq.append((t, d))
+    return seq
 
 
-def main():
-    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    import human_mh as H
-
-    idle = {k: v for k, v in H.IDLE_A.items() if not k.startswith("@")}
-
+def main(argv):
     if "--check" in argv:
-        # The hand-rolled FK against Blender's own, on a pose with something in
-        # every joint. A wrong recursion converges beautifully on nonsense.
-        H.pose(rig, H.WINE_POUR)
-        mats = fk(H.WINE_POUR, WANT)
-        worst = 0.0
-        for n in WANT:
-            a = (rig.matrix_world @ rig.pose.bones[n].matrix).to_translation()
-            worst = max(worst, (a - head_of(mats[n])).length)
-        print("[wine] FK vs blender, worst joint: %.6f m" % worst)
-        # And the bottle, against what the shipped pose actually does.
-        p, ax = bottle_of(mats)
-        print("[wine] shipped WINE_POUR: palm(%+.3f %+.3f %+.3f) tilt %.1f"
-              % (p.x, p.y, p.z, math.degrees(math.acos(ax.z))))
-        m = measure(H.WINE_POUR)
-        print("[wine]   elbow %.0f  lean %.0f  gap %.3f  lip(%+.3f %+.3f %+.3f)"
-              % (m["elbow"], m["lean"], m["gap"], m["lip"].x, m["lip"].y,
-                 m["lip"].z))
-        # And the whole clip, key by key, because what reads as wrong on screen
-        # is never one key — it is the same fault held for five seconds.
-        print("[wine] key        lean elbow tilt   palm(x y z)        "
-              "shoulder(x z)  head(x z)")
-        for nm in ("IDLE_A", "WINE_REACH", "WINE_HOLD", "WINE_LIFT",
-                   "WINE_TIP", "WINE_POUR", "WINE_POUR_B"):
-            mm = measure(getattr(H, nm))
-            print("[wine] %-10s %5.1f %5.0f %5.1f  %+.3f %+.3f %+.3f  "
-                  "%+.3f %+.3f  %+.3f %+.3f"
-                  % (nm, mm["lean"], mm["elbow"], mm["tilt"],
-                     mm["palm"].x, mm["palm"].y, mm["palm"].z,
-                     mm["sh"].x, mm["sh"].z, mm["head"].x, mm["head"].z))
-        if "--solve" not in argv:
-            return
-
-    if "--dip" in argv:
-        for k in (0, 6, 10, 14, 20, 26, 32, 40, 50):
-            spec = dict(idle, **dip_legs(float(k), idle))
-            m = measure(spec)
-            print("[wine] knee %2d  hips %.3f  drop %.3f  palm %.3f  "
-                  "legU %+.1f foot %+.1f"
-                  % (k, m["hips"], measure(idle)["hips"] - m["hips"],
-                     m["palm"].z, spec["legUL"][0], spec["footL"][0]))
+        P = fk(J["check_spec"])
+        worst = max(np.abs(P[BI[n]] - D["check_pose"][i]).max() for i, n in enumerate(J["pnames"]))
+        S4 = P @ REST_INV
+        M = (W @ S4[:, :3, :].reshape(len(BONES), 12)).reshape(-1, 3, 4)
+        V = np.einsum('vij,vj->vi', M[:, :, :3], CO) + M[:, :, 3]
+        print("[check] FK vs Blender, worst matrix element %.2e" % worst)
+        print("[check] skinning vs Blender, worst vertex %.2e m" % np.abs(V - D["check_mesh"]).max())
+        for nm in ("IDLE_A",) + tuple("WINE_" + k for k in EMIT_ORDER if k != "REACH"):
+            if nm in J["poses"]:
+                m = arm_measures(fk({k: v for k, v in J["poses"][nm].items() if not k.startswith("@")}))
+                print("[check] %-12s flex %+6.1f dev %+6.1f twist %+6.1f pron %+6.1f elbow %6.1f"
+                      % (nm, m["flex"], m["dev"], m["twist"], m["pron"], m["elbow"]))
         return
-
-    if "--verify" in argv:
-        # THE SAME GUARD `ballet.py` GOT IN 1.208.0, and this file is the other
-        # half of the same trap: the goals live here, the poses ship from
-        # `human_mh.py`, and nothing has ever checked that the second still
-        # answers the first.
-        #
-        # WHAT IT CANNOT DO is check the bands. A hill climb is stochastic, so
-        # re-solving and comparing angle for angle proves nothing — and the
-        # bands are not hard constraints anyway, they are terms with weights.
-        # Tried that first and it reported six "failures" that are all the
-        # solver doing its job: TIP is 90 mm off a palm target carrying a
-        # weight of 90 against POUR's 260, and is chained to POUR at 0.0230,
-        # the strongest chain in the file. It is SUPPOSED to be dragged. A
-        # checker that calls that broken is a checker nobody will run twice.
-        #
-        # What it can do is measure DRIFT. `cost()` is the solver's own
-        # objective, it is deterministic, and every pose below was written down
-        # with the cost the solve that produced it reported. Recompute it. If a
-        # pose has been edited by hand, or a goal has been changed without
-        # re-solving, or a splice dropped a block, the number moves.
-        # Measured off the shipped poses at 1.209.0, `near` excluded on both
-        # sides. These are NOT the costs the solve printed — those carry the
-        # chain, which is scored against whichever pose the run happened to
-        # chain from and is therefore not reconstructible from the file. TIP is
-        # the big one and stays the big one: it is 90 mm off a palm target
-        # weighted 90 while being pulled by the strongest chain here, on
-        # purpose.
-        SOLVED = {"REACH": 0.0582, "HOLD": 0.0652, "LIFT": 0.0230,
-                  "POUR": 0.0147, "POURB": 0.0356, "TIP": 1.4426,
-                  # Nearly all of MEET's is the `gap` term, which measures
-                  # clearance between her forearm and a bottle she has
-                  # already put down. Harmless, and recorded rather than
-                  # special-cased so the baseline stays honest.
-                  "MEET": 0.1561}
-        G = goals(idle)
-        bad = 0
-        print("[verify] %-7s %9s %9s   %s" % ("pose", "solved", "now", "drift"))
-        for nm, key in (("REACH", "REACH"), ("HOLD", "HOLD"), ("LIFT", "LIFT"),
-                        ("TIP", "TIP"), ("POUR", "POUR"), ("POUR_B", "POURB"),
-                        ("MEET", "MEET")):
-            g = dict(G[key])
-            # `near` is scored against whatever the solve chained it to, which
-            # is not reconstructible here, so it comes out of the comparison on
-            # both sides rather than being guessed at.
-            g.pop("near", None)
-            c = cost(getattr(H, "WINE_" + nm), g)[0]
-            ref = SOLVED[key]
-            d = abs(c - ref)
-            flag = ""
-            if d > max(0.05, ref * 0.15):
-                flag = "  <<< DRIFTED"
-                bad += 1
-            print("[verify] %-7s %9.4f %9.4f   %+.4f%s" % (nm, ref, c, c - ref, flag))
-        print("[verify] %s" % ("%d pose(s) drifted -- re-run --solve" % bad if bad
-                               else "every shipped pose still answers its own goal"))
+    if "--grip" in argv:
+        solve_grip()
         return
-
-    if "--shipped" in argv:
-        # The poses as they stand in human_mh.py, drawn with the room's own
-        # props, on a plain ground and from three fixed angles. Judging a pour
-        # from inside the kabina is judging it through a bead curtain in the
-        # dark; this is the same six poses with nothing in the way.
-        # Her RIGHT side and her right three-quarter, because that is the
-        # side the bottle is on and every view in human_mh.py's table is
-        # either her front or her left.
-        H.VIEWS["rside"] = (-90.0, 6.0, 1.00, 2.5, 760, 1000)
-        H.VIEWS["r3q"] = (-42.0, 10.0, 1.00, 2.3, 760, 1000)
-        for nm in ("REACH", "HOLD", "LIFT", "TIP", "POUR", "POUR_B"):
-            spec = getattr(H, "WINE_" + nm)
-            m = measure(spec)
-            print("[wine] %-7s lean %5.1f elbow %5.0f tilt %5.1f gap %.3f hips %.3f"
-                  % (nm, m["lean"], m["elbow"], m["tilt"], m["gap"], m["hips"]))
-            H.pose(rig, spec)
-            H._lights()
-            made = props(m)
-            H.render("ship_" + nm.lower(), ("rside", "r3q", "front"))
-            for o in made:
-                bpy.data.objects.remove(o, do_unlink=True)
-        return
-
+    if G is None:
+        sys.exit("run --grip first")
     if "--solve" in argv:
-        names = [n for n in argv[argv.index("--solve") + 1:]
-                 if not n.startswith("-")]
-        G = goals(idle)
-        names = names or ["REACH", "HOLD", "LIFT", "POUR", "POURB", "TIP",
-                          "MEET"]
-        # Each key is seeded from the one before it, so the clip comes out as
-        # one movement rather than six poses that happen to share a room.
-        base = dict(idle)
-        blob = {}
-        # Which key each one has to stay NEAR. Regularising everything toward
-        # the idle gives six poses that each solve their own problem and then
-        # argue with their neighbours across the clip: POUR and POUR_B came out
-        # eleven degrees apart in spine01, which over the 0.65 s between them
-        # is her whole torso rocking in the middle of a held pour. So the keys
-        # that are meant to differ only in the wrist say so, and are pulled
-        # hard toward the one they are a variation on.
-        # SOLVE POUR BEFORE TIP. `TIP` is a variation on the pour — the arm has
-        # arrived and only the wrist has yet to roll — so it is chained to it,
-        # and a chain to a key that has not been solved yet is no chain at all.
-        # Solved in clip order the first time round, TIP came out 20 deg away
-        # from POUR in `spine01`: her whole back straightening and hinging again
-        # inside half a second, twice, which is the lurch this file exists to
-        # stop. The names default below are in solve order, not clip order.
-        # POURB's chain to POUR is a quarter of what it was. The chain exists so
-        # the clip interpolates instead of lurching between neighbours, and at
-        # 0.0060 it was strong enough to hold POURB a degree short of its own
-        # tilt band: the pour drifted 6 degrees where the band asked for 14.
-        # POUR to POURB is 2.33 s of interpolation — the longest hold in the
-        # clip by a factor of three — so it is exactly the pair that can afford
-        # to differ, and the one that has to.
-        CHAIN = {"HOLD": ("REACH", 0.0016), "POURB": ("POUR", 0.0015),
-                 "TIP": ("POUR", 0.0230), "MEET": ("REACH", 0.0012)}
-        solved = {}
-        for n in names:
-            g = dict(G[n])
-            g["seed"] = base
-            if n in CHAIN and CHAIN[n][0] in solved:
-                g["near"], g["nearW"] = solved[CHAIN[n][0]], CHAIN[n][1]
-                g["seed"] = solved[CHAIN[n][0]]
-            # The knees, fitted for this key and then left alone: they are not
-            # on the free list, so the arm and the back solve around a dip
-            # that is already anatomically consistent instead of the solver
-            # discovering a squat that lifts one heel.
-            base = dict(base, **dip_legs(DIP[n], idle))
-            spec, f = solve(base, g, seed=abs(hash(n)) % 9999)
-            c, parts, m = cost(spec, g)
-            print("\n# %s  cost %.4f  %s" % (n, f, " ".join(
-                "%s=%.3f" % (k, v) for k, v in sorted(parts.items()) if v > 1e-4)))
-            print("#   palm(%+.3f %+.3f %+.3f) lip(%+.3f %+.3f %+.3f)"
-                  % (m["palm"].x, m["palm"].y, m["palm"].z,
-                     m["lip"].x, m["lip"].y, m["lip"].z))
-            print("#   tilt %.1f  elbow %.0f  lean %.0f  gap %.3f  hips %.3f"
-                  % (m["tilt"], m["elbow"], m["lean"], m["gap"], m["hips"]))
-            print(fmt(spec, "WINE_" + n))
-            blob[n] = {k: list(v) for k, v in spec.items()
-                       if not k.startswith("@")}
-            solved[n] = spec
-            base = spec
-            if "--preview" in argv:
-                H.pose(rig, spec)
-                H._lights()
-                made = props(m)
-                H.render("wine_" + n.lower(), ("side", "hero", "front"))
-                for o in made:
-                    bpy.data.objects.remove(o, do_unlink=True)
-        Path("/tmp/wine_solved.json").write_text(json.dumps(blob, indent=1))
+        only = [a for a in argv[argv.index("--solve") + 1:] if not a.startswith("-")]
+        solve_keys(only)
+        return
+    keys = json.loads(KEYS_JSON.read_text()) if KEYS_JSON.exists() else None
+    if "--clip" in argv:
+        if "--shipped" in argv:
+            seq = shipped_seq()
+        else:
+            seq = [(t, key_pose(keys, nm)) for t, nm in TIMELINE]
+        rows = clip_rows(seq)
+        Path("/tmp/wine_clip.json").write_text(json.dumps(rows))
+        report_clip(rows)
+        return
+    if "--emit" in argv:
+        print(emit(keys))
+        return
+    if "--render" in argv:
+        render(keys, [a for a in argv[argv.index("--render") + 1:] if not a.startswith("-")])
+        return
+    print(__doc__)
 
 
-main()
+def render(keys, names):
+    """Write a job for the Blender half and run it: each named key (or a time
+    in seconds along the clip) from in front of her, from her right, and the
+    hand close up, to /tmp/wine_<name>_<view>.png."""
+    import subprocess
+    seq = [(t, key_pose(keys, nm)) for t, nm in TIMELINE]
+    frames = []
+    for nm in names:
+        try:
+            t = float(nm)
+            d = sample(seq, t)
+            held = wine_at(t)[0] > 0.5
+        except ValueError:
+            d = key_pose(keys, nm)
+            held = nm not in ("PRE0", "PRE", "REACH", "MEET")
+        P = fk({b: v for b, v in d.items() if not b.startswith("@")})
+        P[:, 1, 3] += d["@root"][1]
+        P[:, 2, 3] += d["@root"][2]
+        m = measure_P(P)
+        g = m["grip"]
+        views = {"front": ([1.45, 0.05, 1.45], [0.30, -0.25, 0.92], 38),
+                 "side": ([0.35, -1.70, 1.15], [0.30, -0.25, 0.92], 38),
+                 "hand": (list(g + np.array([0.55, -0.25, 0.20])), list(g), 30)}
+        frames.append({
+            "spec": {b: v for b, v in d.items() if not b.startswith("@")},
+            "root": d["@root"],
+            "bottle": {"foot": list(m["foot"]), "axis": list(m["axis"])} if held
+            else {"foot": list(BOTTLE_FOOT), "axis": [0, 0, 1]},
+            "shots": [{"out": "/tmp/wine_%s_%s.png" % (nm, v), "eye": e, "at": a, "lens": ln}
+                      for v, (e, a, ln) in views.items()]})
+    job = {"frames": frames, "bottle": PROF.tolist(), "glass": list(GLASS),
+           "glass_prof": GLASS_PROF.tolist(), "table": [*TABLE[0], TOP, TABLE[1]]}
+    jf = Path("/tmp/wine_render.json")
+    jf.write_text(json.dumps(job))
+    subprocess.run([str(ROOT / "tools/blender/blender.sh"), "-b", str(ROOT / "build/baye2.blend"),
+                    "-P", str(Path(__file__).resolve()), "--", "--render", str(jf)], check=True)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
