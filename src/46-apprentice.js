@@ -128,7 +128,7 @@ let apprHead = 0, apprN = 0, apprClock = 0;
 let apprClip = null;             // what the leader was last seen playing
 let apprEye = null;              // her iris and blink uniforms
 let apprJaw = null;              // her jaw uniforms — see v5Parts
-let apprHang = null;             // which way is down, for her hair
+let apprDrape = null;            // the chains her hair hangs on — see v5Drape
 let apprGape = null;             // the leader's mouth, per ring slot
 let apprLeadFace = null;         // the leader's face, for the stats readout
 let apprCalls = 0;               // frames apprenticeStep has run (diagnostic)
@@ -182,8 +182,7 @@ async function loadApprentice() {
   v5Eyes(fig, apprEye);
   v5Jaw(fig, apprJaw);
   if (fig.parts.hair2) fig.parts.hair2.visible = false;
-  apprHang = look.hang;
-  v5HairPivot(fig);
+  apprDrape = v5DrapeSetup(fig);
 
   appr = fig;
   // Sized for poses, and deep enough for the lag at 240 fps: 128 slots of a
@@ -384,7 +383,7 @@ function apprStepBody(dt, leader, room) {
       apprJaw.uniforms.uSeal.value = apprSealHold != null ? apprSealHold
         : Math.min(1, Math.max(0, leader.face && leader.face.seal ? leader.face.seal : 0));
     }
-    v5Hang(appr, apprHang);
+    v5Drape(appr, apprDrape);
     appr.mesh.updateMatrixWorld();
     return;
   }
@@ -519,7 +518,7 @@ function apprStepBody(dt, leader, room) {
     const want = Math.min(1, Math.max(0, apprGape[o / apprStride]));
     u.value += (want - u.value) * (1 - Math.exp(-13 * dt));
   }
-  v5Hang(appr, apprHang);
+  v5Drape(appr, apprDrape);
   appr.mesh.updateMatrixWorld();
 }
 
@@ -815,6 +814,10 @@ function apprenticeOccluder() {
 /** Debug: her bind-space vertices within `r` of the jaw hinge, by part. */
 function apprenticeDump(r = 0.08, at = null) {
   if (!appr || !apprJaw) return null;
+  // `apprDump(0, 'hair')` — her hair as drawn this frame, measured against
+  // her body and against the authored hair: see `v5DrapeProbe`. `r` names a
+  // style ('hair', 'hair2') to measure one she is not wearing.
+  if (at === 'hair') return v5DrapeProbe(appr, apprDrape, typeof r === 'string' ? r : null);
   const c = at === 'eye' && apprEye ? apprEye.uEyeL.value : apprJaw.uniforms.uLipC.value;
   const g = appr.mesh.geometry, pos = g.getAttribute('position'), ix = g.getIndex();
   const out = { c: c.toArray(), parts: {} };
@@ -874,7 +877,9 @@ function apprenticeStats() {
     yaw: +appr.mesh.rotation.y.toFixed(4),
     jaw: apprJaw ? { pieces: apprJaw.pieces, nodes: apprJaw.lipNodes,
       hinge: apprJaw.uniforms.uHinge.value.toArray().map((v) => +v.toFixed(4)) } : null,
-    // Which way is down for her hair, in her head's frame — see v5Hang.
-    hang: apprHang ? apprHang.value.toArray().map((v) => +v.toFixed(3)) : null,
+    // How her hair is hanging — see v5Drape: what she rests on, whether
+    // she is lying on her back, and which side a braid falls to.
+    hang: apprDrape ? { floor: +apprDrape.floor.toFixed(3), pin: +apprDrape.pin.toFixed(3),
+      side: apprDrape.side } : null,
   };
 }
