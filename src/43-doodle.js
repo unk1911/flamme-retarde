@@ -485,6 +485,8 @@ async function buildDoodle(scene, J) {
     gather();
     if (!lineClear(d.t, d.s, front[0], front[1])) { note('peek.blocked'); return false; }
     d.mode = 'peek'; d.pk = 'go'; d.pkT = 0; d.path = null; d.skill = null;
+    // Decoded on the walk over, so it is there when his nose is.
+    if (J.hmmWarm) J.hmmWarm();
     note('peek');
     return true;
   }
@@ -504,6 +506,10 @@ async function buildDoodle(scene, J) {
       // Slower than a walk: nosing in, not arriving.
       if (moveTo([dc, face - DOODLE.peekIn], dt, DOODLE.rate * 0.6) < 0.03) {
         d.pk = 'look'; d.pkT = 0;
+        // His nose is through the curtain: "hmm?". Misha, 25 Sep 2026. Once,
+        // here, on the frame he arrives — `d.dist` is how far you are.
+        const said = J.hmm ? J.hmm(d.dist) : false;
+        note(said ? 'peek.hmm' : 'peek.hmm.silent');
         d.pkFor = rnd(DOODLE.peekLook[0], DOODLE.peekLook[1]);
         fig.play('idle', { fade: 0.6 });
         fig.state.speed = 1;

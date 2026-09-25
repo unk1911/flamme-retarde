@@ -31716,6 +31716,9 @@ async function buildJadrija(scene) {
       // The kabina's doorway, (t, s) of its middle at the front face — for
       // his look inside every few minutes.
       door: special ? [special.dc, special.face] : null,
+      // And what he says when his nose gets there — see `hmm` in 80-audio.js.
+      hmm: (d) => (audio && audio.hmm ? audio.hmm(d) : false),
+      hmmWarm: () => { if (audio && audio.hmmWarm) audio.hmmWarm(); },
       others: (x, z, pad, fn) => {
         const n = bodies(x, z, pad);
         for (let i = 0; i < n; i++) if (bodyBuf[i].kind !== 'doodle') fn(bodyBuf[i]);

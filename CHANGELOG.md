@@ -8,6 +8,21 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.514.0] — 2026-09-25
+
+### the Slow Doodle says "hmm?"
+
+Misha: *"when he puts his muzzle into the kabine, he should make a 'hmm?'
+sound"*, with the take chosen: the first two seconds of
+`freesound_community-hmm-ahh-6426.mp3`. That is Pixabay's re-host of
+[Hmm Ahh.wav](https://freesound.org/people/esperar/sounds/170781/) by esperar
+on Freesound, CC0, so it can ship in the public page. The one "hmm?" in those
+two seconds (0.93–1.66 s) is cut with 50 ms either side, levelled to −18 dBFS
+RMS and encoded mono at 22.05 kHz, 7.6 KB (`tools/cut_hmm.py`). It fires once
+per peek, on the frame his nose reaches its mark through the curtain; it fades
+linearly to nothing at 18 m and sits on the ducked bed with a touch of reverb.
+Credited in `assets/audio/CREDITS.md` and the README.
+
 ## [1.513.0] — 2026-09-25
 
 ### the kabina is the same room, twice the size — and her hair is a place to pet

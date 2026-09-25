@@ -20,6 +20,26 @@ CC BY 4.0 permits redistribution and modification, including commercially, on
 the condition that the author is credited and changes are indicated. Both are
 done here and in the README.
 
+## `hmm_freesound_170781_esperar.mp3`
+
+**"Hmm Ahh.wav"** by **esperar**, freesound.org
+<https://freesound.org/people/esperar/sounds/170781/>
+
+Released under **CC0 1.0 Universal** (public domain dedication)
+<https://creativecommons.org/publicdomain/zero/1.0/>
+
+A young man saying "hmm" and "ahh" several times with different inflections,
+39.8 s. The file here is the copy Pixabay's `freesound_community` account
+re-hosts of the same recording (<https://pixabay.com/sound-effects/people-hmm-ahh-6426/>),
+which is where it was downloaded from; the Freesound original's CC0 is the
+licence that applies.
+
+Used as the Slow Doodle's "hmm?" when he puts his nose through the kabina's
+curtain: the one "hmm?" at 0.93–1.66 s, cut out, levelled and encoded by
+`tools/cut_hmm.py`, whose note lists the changes. The result is
+`build/payload/doodle_hmm.mp3`. CC0 asks for no attribution; this is here
+anyway.
+
 ## Everything else
 
 Every other sound in this game is synthesised at runtime in `src/80-audio.js`

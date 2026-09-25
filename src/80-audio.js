@@ -813,6 +813,38 @@ function buildAudio() {
     return true;
   }
 
+  // ── the Slow Doodle's "hmm?" ─────────────────────────────────────────────────
+  /**
+   * What he says with his nose through the kabina's curtain. Misha, 25 Sep
+   * 2026: *"when he puts his muzzle into the kabine, he should make a 'hmm?'
+   * sound"* — his pick of take, CC0, cut by `tools/cut_hmm.py`. Once per
+   * peek, fired by 43-doodle.js on the frame his nose arrives.
+   *
+   * On `bed` like the bumps, so the fire and the voices duck it, and with a
+   * little more send than a voice in the open: it is said into a doorway.
+   * Linear over 18 m — it is a murmur, and further than that it is somebody
+   * else's dog.
+   */
+  let hmmBuf = null;
+  function hmmWarm() { if (!hmmBuf) sampleLoad('doodle_hmm', (b) => { hmmBuf = b; }); }
+  /** @param d  metres from him to the listener */
+  function hmm(d = 0) {
+    if (!ctx || !bed) return false;
+    if (!hmmBuf) { hmmWarm(); return false; }
+    const far = 1 - Math.max(0, d) / 18;
+    if (far <= 0) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = hmmBuf;
+    // A shade either way, so the fourth peek is not the first one again.
+    src.playbackRate.value = 0.97 + Math.random() * 0.06;
+    const g = ctx.createGain();
+    g.gain.value = 0.70 * far;
+    src.connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.22 * far; g.connect(w).connect(verbSend); }
+    src.start(ctx.currentTime + 0.01);
+    return true;
+  }
+
   // ── and the noises she makes herself ────────────────────────────────────────
   /**
    * Her own recorded noises, for the two things that happen TO her.
@@ -7488,7 +7520,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *
