@@ -74,7 +74,10 @@
  * is nothing to answer. It is not a thing she does, it is the room being put
  * straight, and a line about it would be her narrating housekeeping.
  */
-const MUTE_TALK = { coke: 1, line: 1, reset: 1 };
+// And the kiss. Misha, 25 Sep 2026, of *"kiss me"* getting "Yeah, I'm kissing
+// you now." in her voice: *"she shouldn't be saying anything just kissing"*.
+// The line also landed on the contact and ducked the kiss sound out.
+const MUTE_TALK = { coke: 1, line: 1, reset: 1, kiss: 1 };
 
 /**
  * THE POINTER COMES BACK WITH THE LINE CLOSING, which is what `togglePanel`

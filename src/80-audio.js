@@ -1072,7 +1072,32 @@ function buildAudio() {
    * your ear, so it needs to be small. Anything you could hear from the other
    * end of the promenade would be a comedy sound effect.
    */
+  // AND NOW A RECORDING, which is what plays whenever it has decoded. Misha,
+  // 25 Sep 2026: *"during the kiss, there should be kissing sound, here is
+  // one"*. His clip, cut by `tools/cut_kiss.py` to the five smacks in it: the
+  // first on contact, three through the hold, the last as she leaves — it
+  // runs as long as the kiss does, where the synth below is one pop. The
+  // synth stays as the fallback, for a payload without it or the frame before
+  // it decodes.
+  let kissBuf = null;
+  function kissWarm() { if (!kissBuf) sampleLoad('kiss', (b) => { kissBuf = b; }); }
   function kiss() {
+    if (!ctx) return;
+    if (kissBuf && bed) {
+      const src = ctx.createBufferSource();
+      src.buffer = kissBuf;
+      const g = ctx.createGain();
+      g.gain.value = 0.80;
+      src.connect(g).connect(bed);
+      src.start(ctx.currentTime);
+      kissPlayed += 1;
+      return;
+    }
+    kissWarm();
+    kissSynth();
+  }
+  let kissPlayed = 0;
+  function kissSynth() {
     if (!ctx) return;
     const t0 = ctx.currentTime;
     // LOUDER THAN THE FIRST CUT, which Misha could not hear at all: *"i don't
@@ -7545,7 +7570,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

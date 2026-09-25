@@ -40435,6 +40435,9 @@ async function buildJadrija(scene) {
       // a kiss rather than a peck.
       case 'kiss': {
         showHold(dt);
+        // Decoded now, while the lean is still going in, so the recording
+        // and not the synth is what lands on contact — see `kiss` there.
+        if (!show.kiss && audio && audio.kissWarm) audio.kissWarm();
         show.kiss = (show.kiss || 0) + dt;
         show.want = Math.atan2(ps - show.s, pt - show.t);
         nearClose(pt, ps, dir, SHOW.kissGap, dt);
