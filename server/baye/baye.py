@@ -540,6 +540,21 @@ SKILLS = {
     # It is the same request and the same latch: the gaze goes to whoever is
     # watching, and "look at the camera" and "smile for the camera" are what
     # anybody says to somebody they are filming.
+    # HER EYES LOWERED, AND UP AGAIN. Misha, 25 Sep 2026: *"add command 'look
+    # down', so she lowers her eyes in the kabine"*. A latch on her eyes like
+    # `look`, and it holds until undone. UP FIRST, and above `look.stop`, so
+    # "don't look down" and "stop looking down" are the undo and not a
+    # lowering or a gaze let go; and "look up at me" is left to `look`,
+    # which raises them anyway.
+    "look.up": ("raise her eyes again after lowering them",
+                [r"\b(don'?t|do not|stop|quit)\b.{0,8}\blook(ing)?\s+down\b"
+                 r"|\blook(ing)?\s+up\b(?!.{0,12}\b(me|us)\b)"
+                 r"|\beyes\s+up\b|\b(raise|lift)\b.{0,12}\b(eyes|gaze)\b"]),
+    "look.down": ("lower her eyes, demurely, and keep them lowered",
+                  [r"\blook(ing)?\s+down\b|\beyes\b.{0,12}\bdown\b"
+                   r"|\b(lower|drop|cast)\b.{0,12}\b(eyes|gaze)\b"
+                   r"|\b(look|eyes)\b.{0,12}\b(floor|ground|your feet)\b"
+                   r"|\bspusti\b.{0,8}\b(o[čc]i|pogled)\b|\bbaisse les yeux\b"]),
     # AND OFF YOU AGAIN, since "look at me" no longer runs out (24 Sep 2026).
     # Above `look`, whose pattern "looking ... me" would take "stop looking
     # at me" as the opposite of what it says.
@@ -859,6 +874,12 @@ ASK_RE = re.compile(
     r"|\blook away\b|\b(stop|quit)\b.{0,6}\b(looking|staring|watching)\b"
     r"|\bsmile\b.{0,12}\b(camera|lens|phone|me)\b"
     r"|\b(po)?gledaj me\b|\bregarde[- ]moi\b"
+    # Her eyes lowered and raised — see `look.down`. "Look down" and "look up"
+    # open on `look` and get in below; these carry no verb that does.
+    r"|\beyes\b.{0,12}\b(up|down|floor|ground)\b"
+    r"|\b(lower|drop|cast|raise|lift)\b.{0,12}\b(eyes|gaze)\b"
+    r"|\b(don'?t|do not)\s+look\s+down\b"
+    r"|\bspusti\b.{0,8}\b(o[čc]i|pogled)\b|\bbaisse les yeux\b"
     # AND THE ONE WORD THAT CALLS HER OVER IN HER OWN LANGUAGE. "Come here"
     # has belonged to the hug since 1.407.0 and carried no modal either, which
     # is why it is written out below; "dođi" is the same sentence said on the

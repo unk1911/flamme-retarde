@@ -76,6 +76,13 @@ const APPR = {
   // much the round of her head drops at the ends of the stroke, and how far
   // her eyes close while it happens. Metres, and 0..1 of a blink.
   petStroke: 0.045, petAbove: 0.016, petRound: 0.012, petLid: 0.18, buzzLid: 0.92,
+  // Her eyes lowered — `look.down` in 43-jadrija.js: how far the iris turns
+  // down on the ball (radians, bind space) and how far the upper lid follows
+  // it (0..1 of a blink). The lid is what a lowered look is: without it the
+  // iris slides under the lower lid and she looks startled, not demure.
+  // Photographed at 0.20/0.30 to 0.30/0.45: the low end does not read from
+  // two metres, the high end hides half the pupil under the lower lid.
+  downEye: 0.28, downLid: 0.42,
   // True when v2.0 is THE figure rather than an apprentice — set by BAYE in
   // 43-jadrija.js. See the note in `apprStepBody`.
   primary: false,
@@ -376,6 +383,12 @@ function apprStepBody(dt, leader, room) {
     // And the toy's beat: her eyes close on it — see `buzzFace` in the show.
     if (apprEye && leader.face && leader.face.buzz) {
       apprEye.uLid.value = Math.max(apprEye.uLid.value, APPR.buzzLid * leader.face.buzz);
+    }
+    // And lowered, when asked: the iris down and the lid after it.
+    if (apprEye) {
+      const dn = leader.face && leader.face.down ? leader.face.down : 0;
+      apprEye.uEyeF.value.set(Math.cos(APPR.downEye * dn), -Math.sin(APPR.downEye * dn), 0);
+      if (dn) apprEye.uLid.value = Math.max(apprEye.uLid.value, APPR.downLid * dn);
     }
     if (apprEye && apprLidHold != null) apprEye.uLid.value = apprLidHold;
     if (apprJaw) {
@@ -884,6 +897,8 @@ function apprenticeStats() {
     gape: apprJaw ? +apprJaw.uniforms.uGape.value.toFixed(3) : null,
     seal: apprJaw ? +apprJaw.uniforms.uSeal.value.toFixed(3) : null,
     lid: apprEye ? +apprEye.uLid.value.toFixed(3) : null,
+    // Where her irises point, in her bind frame: (1, 0, 0) is straight ahead.
+    eyeF: apprEye ? apprEye.uEyeF.value.toArray().map((v) => +v.toFixed(3)) : null,
     lead: apprLeadFace ? +(apprLeadFace.gape || 0).toFixed(3) : null,
     at: [+appr.mesh.position.x.toFixed(2), +appr.mesh.position.y.toFixed(2),
       +appr.mesh.position.z.toFixed(2)],

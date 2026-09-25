@@ -37029,6 +37029,14 @@ async function buildJadrija(scene) {
      */
     look: 1, 'look.stop': 1,
     /**
+     * And her eyes lowered. Misha, 25 Sep 2026: *"add command 'look down', so
+     * she lowers her eyes in the kabine"*. The same kind of latch: her irises
+     * turn down, her upper lids follow part way and her chin drops a few
+     * degrees, over whatever she is doing — see `eyesDown` in `gazeTick`.
+     * `look.up`, or "look at me", undoes it.
+     */
+    'look.down': 1, 'look.up': 1,
+    /**
      * AND HER HAIR, OUT OF THE TAIL OR BACK INTO IT.
      *
      * `hairDown` and `looseHairGroup` have been able to do this since the
@@ -38479,7 +38487,7 @@ async function buildJadrija(scene) {
       // And her eyes, for the same reason and more so: "look at me" is a
       // request about the next second, and one that waits for a cartwheel to
       // finish has answered a different request.
-      look: 1, 'look.stop': 1 };
+      look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     if (show.ask && (ASKABLE[show.phase] || (NOW[show.ask] && !busy))) {
       const name = show.ask;
@@ -38811,10 +38819,21 @@ async function buildJadrija(scene) {
         // unless told to 'stop looking at me'"*. So the clock is set to
         // for ever, and `look.stop` is what sets it back to nothing.
         show.gaze = Infinity;
+        // And her eyes come up to yours: "look at me" said to a woman looking
+        // at the floor is a request to stop.
+        show.eyesDown = 0;
         show.did = name;
         showSay('trill', d);
       } else if (name === 'look.stop') {
         show.gaze = 0;
+        show.did = name;
+      } else if (name === 'look.down' || name === 'look.up') {
+        // Her eyes lowered, or raised again — a latch like `look` and for
+        // `look`'s reason it does not run out: Misha's 24 Sep note about the
+        // gaze is about these same eyes. It leaves `show.gaze` alone, so
+        // asked while she is looking at you her face stays on you and only
+        // her eyes drop, which is what lowering your eyes to somebody is.
+        show.eyesDown = name === 'look.down' ? 1 : 0;
         show.did = name;
       } else if (name === 'yawn') {
         // A LATCH AND NOT A PHASE, exactly like `legs.down` below: she stays
@@ -44589,6 +44608,14 @@ async function buildJadrija(scene) {
      * head reacting rather than a head nodding.
      */
     nod: 0.055,
+    /**
+     * And her eyes lowered — `look.down`. The eyes themselves are the
+     * figure's (`APPR.downEye`, `APPR.downLid` in 46-apprentice.js); this is
+     * how fast they go, and the few degrees of chin that go with them. 0.08
+     * rad is under five degrees: enough that the face agrees with the eyes,
+     * short of a bow of the head, which is not what was asked for.
+     */
+    downRate: 3.0, chin: 0.08,
   };
   /** And the eyes, which are not a bone: a flutter on each pulse's onset. */
   const BUZZFACE = { lid: 0.55, fade: 0.32 };
@@ -44604,8 +44631,14 @@ async function buildJadrija(scene) {
     if (neckB < 0 || headGz < 0) return;
     if (show.gaze > 0) show.gaze = Math.max(0, show.gaze - dt);
     show.gazeAt = damp(show.gazeAt || 0, show.gaze > 0 ? 1 : 0, GAZE.rate, dt);
+    // Her eyes lowered: eased in and out, and handed to whichever figure
+    // draws the eyes as `face.down`, the way the petting is `face.pet`.
+    show.downAt = damp(show.downAt || 0, show.eyesDown ? 1 : 0, GAZE.downRate, dt);
+    if (show.downAt < 0.002 && !show.eyesDown) show.downAt = 0;
+    if (f.face) f.face.down = show.downAt;
     const nod = show.buzzNod || 0;
-    if (show.gazeAt < 0.004 && nod < 0.004) {
+    const down = show.downAt;
+    if (show.gazeAt < 0.004 && nod < 0.004 && down < 0.004) {
       // Handed back once, or an aim outlives the thing that asked for it —
       // every other aim in this file makes the same point.
       if (gazeOn) {
@@ -44645,6 +44678,10 @@ async function buildJadrija(scene) {
     // And the motor's own nod on top of it, about her left-right axis.
     if (nod > 0.004) {
       _gzR.multiply(_gzQ.setFromAxisAngle(_gzZ, -GAZE.nod * nod));
+    }
+    // And her chin, a little way after her eyes, about the same axis.
+    if (down > 0.004) {
+      _gzR.multiply(_gzQ.setFromAxisAngle(_gzZ, -GAZE.chin * down));
     }
     // The two shares compose back to the whole of it, which is why one
     // quaternion is enough to remember: 0.58 and 0.42 of the same turn,
@@ -51421,6 +51458,7 @@ async function buildJadrija(scene) {
       // the two above — an aim that is running and an aim that expired look
       // identical from a still frame.
       gaze: +(show.gaze || 0).toFixed(2), gazeAt: +(show.gazeAt || 0).toFixed(3),
+      eyesDown: show.eyesDown || 0, downAt: +(show.downAt || 0).toFixed(3),
       gripAt: +(show.gripAt || 0).toFixed(2), gripFor: +(show.gripFor || 0).toFixed(1),
       coverDbg: show.coverDbg || null, gripDbg: show.gripDbg || null,
       // Her hands over herself: seconds into it (null when not), and how far.

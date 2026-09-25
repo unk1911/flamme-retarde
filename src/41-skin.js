@@ -3744,6 +3744,11 @@ function v5Blink(eye, dt) {
   if (!eye) return;
   if (eye._t === undefined) { eye._t = Math.random() * V5_BLINK.spread; eye._p = 0; }
   eye._t -= dt;
+  // OPEN, EVERY FRAME, unless a blink says otherwise. The petting, the toy
+  // and eyes lowered (`look.down`) are all max'd on to this after the call,
+  // and before this line the value they left was never taken back off: a
+  // lowered lid stayed lowered until the next blink happened to end.
+  if (!(eye._p > 0)) eye.uLid.value = 0;
   if (eye._p > 0) {
     eye._p -= dt;
     const d = V5_BLINK.shut + V5_BLINK.open;
