@@ -2432,15 +2432,81 @@ function v5Tex(key, wrap) {
 const V5_BLINK = { shut: 0.075, open: 0.145, gap: 2.4, spread: 4.6, again: 0.22 };
 
 /**
+ * How her hair drapes — see DRAPE in `v5Parts`, and `v5DrapeSetup` and
+ * `v5Drape` below it. Metres and radians, her bind frame.
+ */
+const V5_DRAPE = {
+  // Chains round her head, one every 45° about a vertical line through her
+  // neck: a braid is one of them, loose hair is all eight.
+  sectors: 8, axisX: 0.02,
+  // Bind height between a chain's nodes, and where the hanging starts: this
+  // far under the top of the style. Above it is scalp and rides her skull.
+  step: 0.03, root: 0.17,
+  // How far a segment may point away from down before gravity takes the
+  // rest, by node from the root (the last number holds for the rest) — and
+  // never less than it already points away standing, plus `slack`, which is
+  // what keeps the authored shape exactly when she is upright.
+  allow: [0, 0.9, 0.6, 0.32, 0.22], slack: 0.10,
+  // A strand that lands square on top of her neck has to go one way or the
+  // other: gravity leaned this much toward a side, chosen with hysteresis.
+  bias: 0.18, flip: 0.12,
+  // Her back toward the floor (cos of it): lying on it, and whatever of her
+  // hair is under her back is pinned there rather than falling through the bed.
+  pin: [0.35, 0.75],
+  // How thick a strand is, for keeping it off her: the braid, loose hair.
+  thick: { hair: 0.020, hair2: 0.010 },
+  // How much of the sector either side of its middle goes wholly to its own
+  // chain (of the half-sector): a braid sits inside one sector and must not
+  // be smeared into its neighbours; loose hair is one sheet and is blended
+  // all the way across, or neighbouring chains tear it.
+  blend: { hair: 0.3, hair2: 0.0 },
+  iter: 3,
+  // And every vertex below the root is kept this far outside the body
+  // capsules, or as far inside them as it was made — less of that the
+  // further its chain has been moved: all of it under moved[0] (metres,
+  // plus 5 cm a radian of turn), none of it past moved[1].
+  skin: 0.010, moved: [0.01, 0.05],
+};
+
+/**
+ * Her body as the hair sees it: spheres and capsules in her bind frame, each
+ * carried by one bone, measured off her mesh in 2 cm slices (skull back at
+ * x −0.041, top 1.77, sides ±0.09; neck x −0.034…0.078 at 1.47; back of her
+ * ribs x −0.064 at 1.35; shoulders ±0.20 at 1.44). `to` is a limb, joint to
+ * joint. They sit on her skin or a shade inside it, and a strand is never
+ * pushed further off one than the authored hair sits from it (see `v5Drape`
+ * and DRAPE), so upright they move nothing.
+ */
+const V5_BODY = [
+  { bone: 'head', a: [0.055, 1.665, 0], r: 0.095 },
+  { bone: 'head', a: [0.085, 1.56, 0], r: 0.06 },
+  { bone: 'neck', a: [0.012, 1.45, 0], b: [0.02, 1.585, 0], r: 0.052 },
+  { bone: 'chest', a: [-0.005, 1.405, -0.15], b: [-0.005, 1.405, 0.15], r: 0.055 },
+  { bone: 'chest', a: [0.03, 1.24, -0.06], b: [0.03, 1.37, -0.06], r: 0.09 },
+  { bone: 'chest', a: [0.03, 1.24, 0.06], b: [0.03, 1.37, 0.06], r: 0.09 },
+  { bone: 'spine03', a: [0.035, 1.08, -0.055], b: [0.035, 1.24, -0.055], r: 0.085 },
+  { bone: 'spine03', a: [0.035, 1.08, 0.055], b: [0.035, 1.24, 0.055], r: 0.085 },
+  { bone: 'armUL', to: 'armLL', r: 0.042 }, { bone: 'armUR', to: 'armLR', r: 0.042 },
+  { bone: 'armLL', to: 'handL', r: 0.034 }, { bone: 'armLR', to: 'handR', r: 0.034 },
+];
+
+/**
+ * What she is lying or standing on, for her hair: the lowest of these joints
+ * less how much of her is under each. On her feet it is the floor, on her
+ * hands it is the floor, on her back on the cot it is the mattress — and the
+ * lowest of her body's capsules goes in as well.
+ */
+const V5_REST = { pelvis: 0.09, legUL: 0.08, legUR: 0.08, legLL: 0.05, legLR: 0.05,
+  footL: 0.035, footR: 0.035, toeL: 0.02, toeR: 0.02, handL: 0.02, handR: 0.02,
+  fingersL: 0.012, fingersR: 0.012, armLL: 0.04, armLR: 0.04 };
+
+/**
  * The part materials for a v5 figure.
  *
  * `o.hairTex` / `o.legTex` are payload keys; `o.hairCol`, `o.browCol` and
  * `o.lidCol` are colours; `o.lock` is an optional extra fragment for the hair,
  * which is how Chloe gets her pink through it and her beanie takes it off.
  */
-/** The most of "down" that may point toward her face, for the hair's swing. */
-const V5_HANG_FWD = 0.18;
-
 function v5Parts(o) {
   const eye = {
     uEyeL: { value: new THREE.Vector3() },
@@ -2610,61 +2676,114 @@ function v5Parts(o) {
       uniforms: { uEyeL: eye.uEyeL, uEyeR: eye.uEyeR, uLid: eye.uLid },
       decl: LID_DECL, vert: LID_VERT },
   };
-  // HAIR THAT FALLS. Misha, 23 Sep 2026, of the loose hair: *"when she is
-  // doing a headstand, the hair doesn't 'fall to the ground'"*. The cards are
-  // skinned rigidly to her skull, so upside down they stand up off it. v1.0's
-  // loose hair was a simulated chain and fell; this is the cheap honest
-  // version of the same thing for a skinned mesh. `uHang` is which way DOWN
-  // is, in her head's bind frame — worked out per frame on the CPU from the
-  // head bone (see `v5Hang`) — and every vertex below a pivot in the middle
-  // of her skull is swung about it by the turn that takes the bind pose's
-  // down on to that, weighted from nothing at the pivot to all of it twelve
-  // centimetres below. Standing, `uHang` IS the bind down and nothing moves;
-  // on her hands, it is up, and the lengths go to the floor while the scalp
-  // stays on her head. In bind space and before the skin, so the skin carries
-  // it everywhere else. Shared by both hairstyles; the pivot is per style.
-  const hang = { value: new THREE.Vector3(0, -1, 0) };
-  // How far toward her face the hair may be swung — see NOT THROUGH HER.
-  const HANG = `
-    {
-      vec3 dn = vec3(0.0, -1.0, 0.0);
-      vec3 hh = normalize(uHang);
-      // NOT THROUGH HER. Bent forward — at the plate, over the tabouret —
-      // down is toward her face, and swinging the hair about the middle of
-      // her skull that way carried the braid through her head and neck to
-      // hang down the front of her chest (Misha, 24 Sep 2026: "the hair on
-      // her back doesn't respect the body"). A braid off the back of a
-      // bowed head slides off to one side, over a shoulder, and that is what
-      // this does: the forward part of down past ${V5_HANG_FWD.toFixed(2)} is
-      // turned into sideways, on whichever side it already leans.
-      if (hh.x > ${V5_HANG_FWD.toFixed(2)}) {
-        float ex = sqrt(max(hh.x * hh.x - ${(V5_HANG_FWD * V5_HANG_FWD).toFixed(4)}, 0.0));
-        hh = normalize(vec3(${V5_HANG_FWD.toFixed(2)}, hh.y, hh.z + (hh.z >= 0.0 ? ex : -ex)));
-      }
-      float ang = acos(clamp(dot(dn, hh), -1.0, 1.0));
-      if (ang > 0.02) {
-        vec3 ax = cross(dn, hh);
-        float sl = length(ax);
-        ax = sl > 1e-4 ? ax / sl : vec3(0.0, 0.0, 1.0);
-        float a = ang * smoothstep(0.0, 0.12, uPivot.y - p.y);
-        float ca = cos(a), sa = sin(a);
-        vec3 r = p - uPivot;
-        p = uPivot + r * ca + cross(ax, r) * sa + ax * dot(ax, r) * (1.0 - ca);
-        n = n * ca + cross(ax, n) * sa + ax * dot(ax, n) * (1.0 - ca);
+  // HAIR THAT HANGS. Misha, 23 Sep 2026, of the loose hair: *"when she is
+  // doing a headstand, the hair doesn't 'fall to the ground'"* — and then, of
+  // what answered it, the braid through her head and down her chest when she
+  // bent (1.496.0), and the braid standing out sideways off the back of her
+  // head at the wine stool (24 Sep). The answer to the first was one rigid
+  // turn of everything below a pivot in her skull, and the second and third
+  // were that turn's own shape: a braid is not a stick hinged in the middle
+  // of a head, and pointing it "down" from there puts it through whatever is
+  // below the hinge. What made it worse than it looked: this braid is not
+  // even skinned to her head. MakeHuman fits a braid to the triangles it lies
+  // on, so below the nape it rides her neck, her chest and her spine — and a
+  // turn worked out in the head's frame was being handed to the chest's.
+  //
+  // So it is a CHAIN now, the way games hang a braid: a line of nodes down
+  // the middle of each lock (`v5DrapeSetup`, measured off the cards), solved
+  // every frame on the CPU (`v5Drape`) — each segment keeps its authored
+  // direction until that points further from down than it does standing, then
+  // gravity takes the rest; each node is kept off her head, neck, shoulders,
+  // back and arms and off whatever she is lying on; and the length is kept.
+  // Upright, nothing moves and the authored shape is exactly what is drawn.
+  // Here each vertex takes the move of the node pair it lies between (a
+  // turn about the node, not about her feet), blended between the two chains
+  // either side of it round her head, and is then kept outside her body. All of
+  // it happens before the skin and the hair is skinned rigidly to her head
+  // (`v5DrapeSetup` rewrites its weights), so the node moves are worked out
+  // in the head's own bind frame.
+  //
+  // `uDrape` holds three texels a node: its turn, where it is (w: how far it
+  // has been moved, 0…1) and its bind point, all in her head's bind frame.
+  // `uDrapeK` is (root height, 1 / step, nodes a chain, texels); nodes 0 is
+  // off — Chloe, whose short hair has nothing to hang. `aDrape` is (chain,
+  // second chain, how much of the second, how deep in her it was made).
+  const drapeTex = () => {
+    const t = new THREE.DataTexture(new Float32Array([0, 0, 0, 1, 0, 0, 0, 0]), 2, 1,
+      THREE.RGBAFormat, THREE.FloatType);
+    t.minFilter = THREE.NearestFilter;
+    t.magFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    t.needsUpdate = true;
+    return t;
+  };
+  const DRAPE = `
+    if (uDrapeK.z > 1.5) {
+      float ds = (uDrapeK.x - p.y) * uDrapeK.y;
+      if (ds > 0.0) {
+        ds = min(ds, uDrapeK.z - 1.0);
+        float dk = min(floor(ds), uDrapeK.z - 2.0);
+        float df = ds - dk;
+        float ia = (aDrape.x * uDrapeK.z + dk) * 3.0;
+        vec4 qa = normalize(mix(drTex(ia), drTex(ia + 3.0), df));
+        vec3 pa = mix(drTex(ia + 1.0).xyz, drTex(ia + 4.0).xyz, df)
+          + qrot(qa, p - mix(drTex(ia + 2.0).xyz, drTex(ia + 5.0).xyz, df));
+        vec3 na = qrot(qa, n);
+        float mv = mix(drTex(ia + 1.0).w, drTex(ia + 4.0).w, df);
+        if (aDrape.z > 0.0) {
+          float ib = (aDrape.y * uDrapeK.z + dk) * 3.0;
+          vec4 qb = normalize(mix(drTex(ib), drTex(ib + 3.0), df));
+          pa = mix(pa, mix(drTex(ib + 1.0).xyz, drTex(ib + 4.0).xyz, df)
+            + qrot(qb, p - mix(drTex(ib + 2.0).xyz, drTex(ib + 5.0).xyz, df)), aDrape.z);
+          na = mix(na, qrot(qb, n), aDrape.z);
+          mv = mix(mv, mix(drTex(ib + 1.0).w, drTex(ib + 4.0).w, df), aDrape.z);
+        }
+        // The chains keep their middles off her; a lock is wider than its
+        // middle, and two chains that disagree average a vertex to inside
+        // the arc between them — so each vertex is put back outside her as
+        // well. How far outside: aDrape.w is how deep inside the capsules
+        // it was made, and hair where it was made may sit that deep — the
+        // authored shape is never pushed — but the further its chain has
+        // been taken from there (the node texel's w), the less of that
+        // allowance it keeps. Faded in over the first node, as the chain is.
+        pa = mix(pa, drOff(pa, aDrape.w * (1.0 - mv)), min(ds, 1.0));
+        p = pa;
+        n = na;
       }
     }
   `;
-  parts.hair.uniforms = { ...parts.hair.uniforms, uHang: hang,
-    uPivot: { value: new THREE.Vector3(0, -99, 0) } };
-  parts.hair.decl += '\nuniform vec3 uHang;\nuniform vec3 uPivot;\n';
-  parts.hair.vert = HANG;
+  const drapeDecl = '\nuniform sampler2D uDrape;\nuniform vec4 uDrapeK;\n';
+  // Her body again, for that last step: `V5_BODY` in her head's bind frame,
+  // rewritten every frame by `v5Drape`. Shared by both styles.
+  const NB = V5_BODY.length;
+  const body = { uBodyA: { value: new Float32Array(NB * 4) },
+    uBodyB: { value: new Float32Array(NB * 4) } };
+  const drapeVdecl = '\nattribute vec4 aDrape;\n'
+    + 'uniform vec4 uBodyA[' + NB + '];\nuniform vec4 uBodyB[' + NB + '];\n'
+    + 'vec4 drTex(float i) { return texture2D(uDrape, vec2((i + 0.5) / uDrapeK.w, 0.5)); }\n'
+    + 'vec3 drOff(vec3 q, float al) {\n'
+    + '  for (int i = 0; i < ' + NB + '; i++) {\n'
+    + '    vec3 a = uBodyA[i].xyz, e = uBodyB[i].xyz - a;\n'
+    + '    vec3 c = a + e * clamp(dot(q - a, e) / max(dot(e, e), 1e-8), 0.0, 1.0);\n'
+    + '    vec3 v = q - c;\n'
+    + '    float d = length(v);\n'
+    + '    float r = uBodyA[i].w - al;\n'
+    + '    if (d < r && d > 1e-5) q = c + v * (r / d);\n'
+    + '  }\n'
+    + '  return q;\n'
+    + '}\n';
+  const drapeU = () => ({ uDrape: { value: drapeTex() },
+    uDrapeK: { value: new THREE.Vector4(0, 1, 0, 2) }, ...body });
+  parts.hair.uniforms = { ...parts.hair.uniforms, ...drapeU() };
+  parts.hair.decl += drapeDecl;
+  parts.hair.vdecl = drapeVdecl;
+  parts.hair.vert = DRAPE;
   // A second hairstyle, for her hair DOWN — see `hair2` in baye2.py. The same
   // material as the first with its own card texture, and it starts hidden:
   // `apprenticeHair` in 46-apprentice.js swaps the two.
   if (o.hair2Tex) {
     const h2 = v5Tex(o.hair2Tex);
-    parts.hair2 = { ...parts.hair, uniforms: { uHair: { value: h2 }, uHang: hang,
-      uPivot: { value: new THREE.Vector3(0, -99, 0) } } };
+    parts.hair2 = { ...parts.hair, uniforms: { uHair: { value: h2 }, ...drapeU() } };
   }
   if (legTex) {
     // A fishnet is not skin and must not take skin's lift. `SKIN_EMISSIVE`
@@ -2682,45 +2801,626 @@ function v5Parts(o) {
   // The lid, for the body — see LID_VERT.
   const lid = { decl: LID_DECL, vert: LID_VERT,
     uniforms: { uEyeL: eye.uEyeL, uEyeR: eye.uEyeR, uLid: eye.uLid } };
-  return { parts, eye, jaw, hang, lid };
+  return { parts, eye, jaw, lid, body };
 }
 
 /**
- * Where each hairstyle pivots when it falls: the middle of the skull under its
- * crown, measured off its own vertices — the top of the style, 9 cm down, at
- * the front-to-back middle of what is up there. Below that it hangs; above it
- * is the scalp and stays.
+ * Measure the chains her hair hangs on, once — see DRAPE in `v5Parts`.
+ *
+ * Each hairstyle is cut into eight sectors round a vertical line through her
+ * neck and into 3 cm bands down from `V5_DRAPE.root` under its top; a chain's
+ * node is the middle of its sector's cards in that band, and carries the
+ * blend of their bone weights — which is what the lock does standing, and so
+ * what it is asked to keep doing until gravity says otherwise. A band with
+ * too little in it carries on straight down from the one above.
+ *
+ * And then the hair is skinned to her head alone. The node moves are what
+ * carry it now; leaving the braid on her chest and spine as well would move
+ * it twice. Every vertex is told which two chains it lies between and how
+ * much of the second it takes (`aDrape`), and its original weights are kept
+ * for `v5DrapeProbe`, which compares the drawn hair against them.
  */
-function v5HairPivot(fig) {
-  for (const name of ['hair', 'hair2']) {
-    const part = fig.parts && fig.parts[name];
-    if (!part) continue;
-    const pos = fig.mesh.geometry.getAttribute('position');
-    const ix = fig.mesh.geometry.getIndex();
-    const { start, count } = part.geometry.drawRange;
-    let top = -1e9;
-    for (let i = start; i < start + count; i++) top = Math.max(top, pos.getY(ix.getX(i)));
-    let sx = 0, n = 0;
-    for (let i = start; i < start + count; i++) {
-      const v = ix.getX(i);
-      if (pos.getY(v) > top - 0.05) { sx += pos.getX(v); n++; }
+function v5DrapeSetup(fig) {
+  if (!fig || !fig.parts || !fig.pose || !fig.boneIndex) return null;
+  const head = fig.boneIndex('head'), chest = fig.boneIndex('chest');
+  if (head < 0 || chest < 0) return null;
+  const g = fig.mesh.geometry;
+  const pos = g.getAttribute('position'), ix = g.getIndex();
+  const bi = g.getAttribute('aBoneIdx'), bw = g.getAttribute('aBoneWt');
+  if (!bi || !bw || !ix) return null;
+  const D = V5_DRAPE, K = D.sectors, step = D.step;
+  const bsc = bi.normalized ? 255 : 1;
+  // Where each joint is in the bind frame, off the rest skeleton the same way
+  // `skinnedFigure` builds it — and not off the pose, which for her is
+  // somebody else's and at load has not been handed over yet.
+  const { restQ, restT } = fig.rest();
+  const nb = fig.bones.length;
+  const bQ = new Float32Array(nb * 4), bT = new Float32Array(nb * 3);
+  for (let i = 0; i < nb; i++) {
+    const pa = fig.bones[i].parent;
+    if (pa < 0) {
+      bQ.set(restQ.subarray(i * 4, i * 4 + 4), i * 4);
+      bT.set(restT.subarray(i * 3, i * 3 + 3), i * 3);
+    } else {
+      qmul(bQ, i * 4, bQ, pa * 4, restQ, i * 4);
+      qrotv(bT, i * 3, bQ, pa * 4, restT, i * 3);
+      for (let k = 0; k < 3; k++) bT[i * 3 + k] += bT[pa * 3 + k];
     }
-    part.material.uniforms.uPivot.value.set(n ? sx / n : 0, top - 0.09, 0);
+  }
+  const bindAt = (b) => [bT[b * 3], bT[b * 3 + 1], bT[b * 3 + 2]];
+  const body = [];
+  for (const c of V5_BODY) {
+    const b = fig.boneIndex(c.bone);
+    if (b < 0) continue;
+    let a = c.a, e = c.b || c.a;
+    if (c.to) {
+      const t = fig.boneIndex(c.to);
+      if (t < 0) continue;
+      a = bindAt(b); e = bindAt(t);
+    }
+    body.push({ bone: b, a, b: e, r: c.r });
+  }
+  const rest = [];
+  for (const [name, r] of Object.entries(V5_REST)) {
+    const b = fig.boneIndex(name);
+    if (b >= 0) rest.push([b, r]);
+  }
+  const drape = { head, chest, body, rest, parts: [], side: 1, nb,
+    bq: new Float32Array(nb * 4), cw: new Float32Array(body.length * 7),
+    floor: 0, pin: 0, back: [0, 0, 0], left: [0, 0, 0] };
+  const aDrape = new THREE.BufferAttribute(new Float32Array(pos.count * 4), 4);
+  for (const name of ['hair', 'hair2']) {
+    const part = fig.parts[name];
+    const U = part && part.material.uniforms;
+    if (!U || !U.uDrapeK) continue;
+    const { start, count } = part.geometry.drawRange;
+    const seen = new Set();
+    for (let i = start; i < start + count; i++) seen.add(ix.getX(i));
+    const vs = Int32Array.from(seen);
+    let top = -1e9, low = 1e9;
+    for (const v of vs) {
+      const y = pos.getY(v);
+      if (y > top) top = y;
+      if (y < low) low = y;
+    }
+    const y0 = top - D.root;
+    const N = Math.max(2, Math.ceil((y0 - low) / step) + 2);
+    const KN = K * N;
+    const sum = new Float64Array(KN * 2), cnt = new Int32Array(KN);
+    const hist = Array.from({ length: KN }, () => new Map());
+    const kOf = new Int8Array(vs.length), duOf = new Float32Array(vs.length);
+    const jOf = new Int16Array(vs.length);
+    for (let q = 0; q < vs.length; q++) {
+      const v = vs[q];
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      const u = Math.atan2(z, x - D.axisX) / (2 * Math.PI / K);
+      const ru = Math.round(u);
+      const k = ((ru % K) + K) % K;
+      kOf[q] = k; duOf[q] = u - ru;
+      const j = Math.round((y0 - y) / step);
+      jOf[q] = j;
+      if (j < 0 || j >= N) continue;
+      const c = k * N + j;
+      sum[c * 2] += x; sum[c * 2 + 1] += z; cnt[c]++;
+      const h = hist[c];
+      for (let w = 0; w < 4; w++) {
+        const wt = bw.getComponent(v, w);
+        if (wt <= 0) continue;
+        const b = Math.round(bi.getComponent(v, w) * bsc);
+        h.set(b, (h.get(b) || 0) + wt);
+      }
+    }
+    const real = new Uint8Array(KN), alive = new Uint8Array(K);
+    const bind = new Float32Array(KN * 3);
+    const wb = new Int16Array(KN * 4), ww = new Float32Array(KN * 4);
+    for (let k = 0; k < K; k++) {
+      let first = -1;
+      for (let j = 0; j < N; j++) {
+        const c = k * N + j;
+        if (cnt[c] < 4) continue;
+        real[c] = 1;
+        if (first < 0) first = j;
+        bind[c * 3] = sum[c * 2] / cnt[c];
+        bind[c * 3 + 2] = sum[c * 2 + 1] / cnt[c];
+        const top4 = [...hist[c]].sort((p, q) => q[1] - p[1]).slice(0, 4);
+        const tot = top4.reduce((s, e) => s + e[1], 0);
+        top4.forEach(([b, w], i) => { wb[c * 4 + i] = b; ww[c * 4 + i] = w / tot; });
+      }
+      if (first < 0) continue;
+      alive[k] = 1;
+      for (let j = 0; j < N; j++) {
+        const c = k * N + j;
+        bind[c * 3 + 1] = y0 - j * step;
+        if (real[c]) continue;
+        const s = j < first ? k * N + first : c - 1;
+        bind[c * 3] = bind[s * 3];
+        bind[c * 3 + 2] = bind[s * 3 + 2];
+        for (let i = 0; i < 4; i++) { wb[c * 4 + i] = wb[s * 4 + i]; ww[c * 4 + i] = ww[s * 4 + i]; }
+      }
+    }
+    // Per segment: its length, how far from down it may point, whether it is
+    // on her back (and so pinned under her when she lies on it).
+    const L = new Float32Array(KN), allow = new Float32Array(KN), back = new Uint8Array(KN);
+    const side = new Int8Array(K);
+    for (let k = 0; k < K; k++) {
+      if (!alive[k]) continue;
+      let mz = 0, nz = 0;
+      for (let j = 1; j < N; j++) {
+        const c = k * N + j;
+        const dx = bind[c * 3] - bind[c * 3 - 3], dy = bind[c * 3 + 1] - bind[c * 3 - 2],
+          dz = bind[c * 3 + 2] - bind[c * 3 - 1];
+        L[c] = Math.hypot(dx, dy, dz);
+        const ang = Math.acos(Math.min(1, Math.max(-1, -dy / L[c])));
+        allow[c] = Math.max(D.allow[Math.min(j, D.allow.length - 1)], ang + D.slack);
+        back[c] = bind[c * 3] < D.axisX - 0.03 ? 1 : 0;
+        if (real[c]) { mz += bind[c * 3 + 2]; nz++; }
+      }
+      // A lock that hangs to one side of her is left to fall on its own;
+      // only the one down the middle of her back is leaned toward whichever
+      // side she tips. Leaning the side locks outward as well parted loose
+      // hair down the middle of her back like a pair of curtains.
+      if (nz && Math.abs(mz / nz) > 0.035) side[k] = mz > 0 ? 1 : -1;
+    }
+    const orig = new Float32Array(vs.length * 8);
+    for (let q = 0; q < vs.length; q++) {
+      const v = vs[q];
+      const k = kOf[q], du = duOf[q];
+      const kb = (k + (du >= 0 ? 1 : -1) + K) % K;
+      const j = Math.min(N - 1, Math.max(0, jOf[q]));
+      let wB = 0.5 * smoothstep(D.blend[name] || 0, 0.5, Math.abs(du));
+      if (!alive[kb] || !real[kb * N + j]) wB = 0;
+      // How deep inside her body capsules this vertex was made, which is
+      // as deep as the shader will let it go again.
+      let al = 0;
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      for (const c of body) {
+        const ex = c.b[0] - c.a[0], ey = c.b[1] - c.a[1], ez = c.b[2] - c.a[2];
+        const ee = Math.max(ex * ex + ey * ey + ez * ez, 1e-9);
+        const t = Math.min(1, Math.max(0, ((x - c.a[0]) * ex + (y - c.a[1]) * ey + (z - c.a[2]) * ez) / ee));
+        const d = Math.hypot(x - c.a[0] - ex * t, y - c.a[1] - ey * t, z - c.a[2] - ez * t);
+        al = Math.max(al, c.r + D.skin - d);
+      }
+      aDrape.setXYZW(v, k, kb, wB, al);
+      for (let w = 0; w < 4; w++) {
+        orig[q * 8 + w] = Math.round(bi.getComponent(v, w) * bsc);
+        orig[q * 8 + 4 + w] = bw.getComponent(v, w);
+      }
+      bi.setXYZW(v, head / bsc, 0, 0, 0);
+      bw.setXYZW(v, 1, 0, 0, 0);
+    }
+    const W = KN * 3;
+    const data = new Float32Array(W * 4);
+    for (let i = 0; i < KN; i++) {
+      data[i * 12 + 3] = 1;
+      for (let k = 0; k < 3; k++) data[i * 12 + 4 + k] = data[i * 12 + 8 + k] = bind[i * 3 + k];
+    }
+    const tex = new THREE.DataTexture(data, W, 1, THREE.RGBAFormat, THREE.FloatType);
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
+    U.uDrape.value = tex;
+    U.uDrapeK.value.set(y0, 1 / step, N, W);
+    part.geometry.setAttribute('aDrape', aDrape);
+    drape.bodyA = U.uBodyA.value;
+    drape.bodyB = U.uBodyB.value;
+    drape.parts.push({ name, part, K, N, y0, bind, real, alive, wb, ww, L, allow, back,
+      side, tex, data, vs, orig, thick: D.thick[name] || 0.01,
+      A: new Float32Array(KN * 3), n: new Float32Array(KN * 3), ra: new Float32Array(KN * 4) });
+  }
+  bi.needsUpdate = true;
+  bw.needsUpdate = true;
+  return drape.parts.length ? drape : null;
+}
+
+// Scratch for the solve, so a frame allocates nothing.
+const _drQ = new THREE.Quaternion();
+const _drV = new Float32Array(16);
+
+/** v rotated by the unit quaternion q[qi..], into out[o..]. */
+function drQrot(out, o, q, qi, x, y, z) {
+  const qx = q[qi], qy = q[qi + 1], qz = q[qi + 2], qw = q[qi + 3];
+  const tx = 2 * (qy * z - qz * y), ty = 2 * (qz * x - qx * z), tz = 2 * (qx * y - qy * x);
+  out[o] = x + qw * tx + (qy * tz - qz * ty);
+  out[o + 1] = y + qw * ty + (qz * tx - qx * tz);
+  out[o + 2] = z + qw * tz + (qx * ty - qy * tx);
+}
+
+/** Closest point to (x,y,z) on segment a–b of collider i in `cw`, into _drV[8..10]. */
+function drClosest(cw, i, x, y, z) {
+  const o = i * 7;
+  const ax = cw[o], ay = cw[o + 1], az = cw[o + 2];
+  const ex = cw[o + 3] - ax, ey = cw[o + 4] - ay, ez = cw[o + 5] - az;
+  const ee = ex * ex + ey * ey + ez * ez;
+  const t = ee > 1e-9 ? Math.min(1, Math.max(0, ((x - ax) * ex + (y - ay) * ey + (z - az) * ez) / ee)) : 0;
+  _drV[8] = ax + ex * t; _drV[9] = ay + ey * t; _drV[10] = az + ez * t;
+}
+
+/**
+ * Hang her hair for this frame — see DRAPE in `v5Parts`.
+ *
+ * For each chain, root first: the node where the authored lock would be
+ * (its bind point, skinned by its own blend of bones) gives the direction the
+ * segment wants; if that is further from down than the segment is allowed,
+ * gravity turns it the rest of the way; then it is kept off her body and off
+ * whatever she is resting on, and put back at its own length from the node
+ * above. A body capsule is never allowed to push a node further off than the
+ * authored lock sits from it this frame — so upright, nothing is pushed and
+ * nothing turns, and the hair is exactly as it was made.
+ *
+ * What goes to the shader is, per node, the rigid move that takes the bind
+ * pose's lock there: the authored turn of its bones, then the turn from where
+ * the authored segment points to where the solved one does — and all of it
+ * seen from her head's bind frame, because that is what the hair is skinned
+ * to now.
+ */
+function v5Drape(fig, drape) {
+  if (!fig || !drape || !fig.pose) return;
+  const { palette: P, worldT: WT } = fig.pose();
+  const D = V5_DRAPE, bq = drape.bq, cw = drape.cw, V = _drV;
+  for (let b = 0; b < drape.nb; b++) {
+    fig.boneTurn(b, _drQ);
+    bq[b * 4] = _drQ.x; bq[b * 4 + 1] = _drQ.y; bq[b * 4 + 2] = _drQ.z; bq[b * 4 + 3] = _drQ.w;
+  }
+  const xf = (b, x, y, z, out, o) => {
+    const m = b * 12;
+    out[o] = P[m] * x + P[m + 1] * y + P[m + 2] * z + P[m + 3];
+    out[o + 1] = P[m + 4] * x + P[m + 5] * y + P[m + 6] * z + P[m + 7];
+    out[o + 2] = P[m + 8] * x + P[m + 9] * y + P[m + 10] * z + P[m + 11];
+  };
+  // Her body, and what she rests on, in figure space. The figure is only
+  // ever turned about y, so its down is the world's.
+  let floor = 1e9;
+  drape.body.forEach((c, i) => {
+    xf(c.bone, c.a[0], c.a[1], c.a[2], cw, i * 7);
+    xf(c.bone, c.b[0], c.b[1], c.b[2], cw, i * 7 + 3);
+    cw[i * 7 + 6] = c.r;
+    floor = Math.min(floor, cw[i * 7 + 1] - c.r, cw[i * 7 + 4] - c.r);
+  });
+  for (const [b, r] of drape.rest) floor = Math.min(floor, WT[b * 3 + 1] - r);
+  drape.floor = floor;
+  const cm = drape.chest * 12;
+  const bkx = -P[cm], bky = -P[cm + 4], bkz = -P[cm + 8];     // her back, outward
+  const lfx = P[cm + 2], lfy = P[cm + 6], lfz = P[cm + 10];   // her left
+  drape.back[0] = bkx; drape.back[1] = bky; drape.back[2] = bkz;
+  drape.left[0] = lfx; drape.left[1] = lfy; drape.left[2] = lfz;
+  const pin = smoothstep(D.pin[0], D.pin[1], -bky);
+  drape.pin = pin;
+  // Which way she tips, with some hysteresis so a braid square on the top
+  // of her neck does not flick from one side to the other.
+  if (-lfy > D.flip) drape.side = 1;
+  else if (-lfy < -D.flip) drape.side = -1;
+  const hm = drape.head * 12, hq = drape.head * 4;
+  const nbody = drape.body.length;
+  // And the same body in her head's bind frame, for the shader's last step.
+  const toHead = (x, y, z, out, o) => {
+    x -= P[hm + 3]; y -= P[hm + 7]; z -= P[hm + 11];
+    out[o] = P[hm] * x + P[hm + 4] * y + P[hm + 8] * z;
+    out[o + 1] = P[hm + 1] * x + P[hm + 5] * y + P[hm + 9] * z;
+    out[o + 2] = P[hm + 2] * x + P[hm + 6] * y + P[hm + 10] * z;
+  };
+  if (drape.bodyA) {
+    for (let i = 0; i < nbody; i++) {
+      toHead(cw[i * 7], cw[i * 7 + 1], cw[i * 7 + 2], drape.bodyA, i * 4);
+      toHead(cw[i * 7 + 3], cw[i * 7 + 4], cw[i * 7 + 5], drape.bodyB, i * 4);
+      drape.bodyA[i * 4 + 3] = cw[i * 7 + 6] + D.skin;
+    }
+  }
+
+  for (const H of drape.parts) {
+    if (!H.part.visible && !H.force) continue;
+    const { K, N, bind, wb, ww, A, n, ra, data } = H;
+    const th = H.thick;
+    for (let k = 0; k < K; k++) {
+      if (!H.alive[k]) continue;
+      // The authored lock this frame: position and turn of each node.
+      for (let j = 0; j < N; j++) {
+        const c = k * N + j;
+        let x = 0, y = 0, z = 0, qx = 0, qy = 0, qz = 0, qw = 0;
+        const bx = bind[c * 3], by = bind[c * 3 + 1], bz = bind[c * 3 + 2];
+        for (let i = 0; i < 4; i++) {
+          const w = ww[c * 4 + i];
+          if (w <= 0) continue;
+          const b = wb[c * 4 + i];
+          xf(b, bx, by, bz, V, 0);
+          x += w * V[0]; y += w * V[1]; z += w * V[2];
+          const s = (qx * bq[b * 4] + qy * bq[b * 4 + 1] + qz * bq[b * 4 + 2] + qw * bq[b * 4 + 3]) < 0 ? -w : w;
+          qx += s * bq[b * 4]; qy += s * bq[b * 4 + 1]; qz += s * bq[b * 4 + 2]; qw += s * bq[b * 4 + 3];
+        }
+        A[c * 3] = x; A[c * 3 + 1] = y; A[c * 3 + 2] = z;
+        const ql = Math.hypot(qx, qy, qz, qw) || 1;
+        ra[c * 4] = qx / ql; ra[c * 4 + 1] = qy / ql; ra[c * 4 + 2] = qz / ql; ra[c * 4 + 3] = qw / ql;
+      }
+      // The root rides her skull.
+      const c0 = k * N;
+      xf(drape.head, bind[c0 * 3], bind[c0 * 3 + 1], bind[c0 * 3 + 2], n, c0 * 3);
+      const sd = H.side[k] ? 0 : drape.side;
+      let gx = D.bias * sd * lfx, gy = -1 + D.bias * sd * lfy, gz = D.bias * sd * lfz;
+      const gl = Math.hypot(gx, gy, gz);
+      gx /= gl; gy /= gl; gz /= gl;
+      for (let j = 1; j < N; j++) {
+        const c = c0 + j;
+        let ax = A[c * 3] - A[c * 3 - 3], ay = A[c * 3 + 1] - A[c * 3 - 2], az = A[c * 3 + 2] - A[c * 3 - 1];
+        const al = Math.hypot(ax, ay, az) || 1;
+        ax /= al; ay /= al; az /= al;
+        const len = H.L[c];
+        let th0 = H.allow[c];
+        if (H.back[c]) th0 += (Math.PI - th0) * pin;
+        const ang = Math.acos(Math.min(1, Math.max(-1, ax * gx + ay * gy + az * gz)));
+        let dx = ax, dy = ay, dz = az;
+        if (ang > th0) {
+          // Turn toward down by what is over the allowance. Head over heels
+          // the turn has no axis of its own, so it goes round her back.
+          let kx = ay * gz - az * gy, ky = az * gx - ax * gz, kz = ax * gy - ay * gx;
+          const kl = Math.hypot(kx, ky, kz);
+          if (kl < 0.2) {
+            let fx = ay * bkz - az * bky, fy = az * bkx - ax * bkz, fz = ax * bky - ay * bkx;
+            const fl = Math.hypot(fx, fy, fz) || 1;
+            kx += (0.2 - kl) * fx / fl; ky += (0.2 - kl) * fy / fl; kz += (0.2 - kl) * fz / fl;
+          }
+          const kn = Math.hypot(kx, ky, kz) || 1;
+          kx /= kn; ky /= kn; kz /= kn;
+          const phi = ang - th0, cp = Math.cos(phi), sp = Math.sin(phi);
+          dx = ax * cp + (ky * az - kz * ay) * sp;
+          dy = ay * cp + (kz * ax - kx * az) * sp;
+          dz = az * cp + (kx * ay - ky * ax) * sp;
+        }
+        const px = n[c * 3 - 3], py = n[c * 3 - 2], pz = n[c * 3 - 1];
+        let x = px + len * dx, y = py + len * dy, z = pz + len * dz;
+        const Ax = A[c * 3], Ay = A[c * 3 + 1], Az = A[c * 3 + 2];
+        const fl = Math.min(floor + th, Ay);
+        for (let it = 0; it < D.iter; it++) {
+          for (let i = 0; i < nbody; i++) {
+            drClosest(cw, i, Ax, Ay, Az);
+            const da = Math.hypot(Ax - V[8], Ay - V[9], Az - V[10]);
+            const R = Math.min(cw[i * 7 + 6] + th, da);
+            drClosest(cw, i, x, y, z);
+            let vx = x - V[8], vy = y - V[9], vz = z - V[10];
+            const dl = Math.hypot(vx, vy, vz);
+            if (dl >= R || dl < 1e-6) continue;
+            x = V[8] + vx / dl * R; y = V[9] + vy / dl * R; z = V[10] + vz / dl * R;
+          }
+          if (y < fl) y = fl;
+          const ex = x - px, ey = y - py, ez = z - pz;
+          const el = Math.hypot(ex, ey, ez) || 1;
+          x = px + ex / el * len; y = py + ey / el * len; z = pz + ez / el * len;
+        }
+        n[c * 3] = x; n[c * 3 + 1] = y; n[c * 3 + 2] = z;
+      }
+      // The moves, in her head's bind frame.
+      data[c0 * 12] = 0; data[c0 * 12 + 1] = 0; data[c0 * 12 + 2] = 0; data[c0 * 12 + 3] = 1;
+      for (let j = 1; j < N; j++) {
+        const c = c0 + j;
+        let ax = A[c * 3] - A[c * 3 - 3], ay = A[c * 3 + 1] - A[c * 3 - 2], az = A[c * 3 + 2] - A[c * 3 - 1];
+        let sx = n[c * 3] - n[c * 3 - 3], sy = n[c * 3 + 1] - n[c * 3 - 2], sz = n[c * 3 + 2] - n[c * 3 - 1];
+        const al = Math.hypot(ax, ay, az) || 1, sl = Math.hypot(sx, sy, sz) || 1;
+        ax /= al; ay /= al; az /= al; sx /= sl; sy /= sl; sz /= sl;
+        // The shortest turn from the authored segment to the solved one.
+        const dt = ax * sx + ay * sy + az * sz;
+        if (dt > -0.999) {
+          V[0] = ay * sz - az * sy; V[1] = az * sx - ax * sz; V[2] = ax * sy - ay * sx; V[3] = 1 + dt;
+        } else {
+          V[0] = ay * bkz - az * bky; V[1] = az * bkx - ax * bkz; V[2] = ax * bky - ay * bkx; V[3] = 0;
+        }
+        const ql = Math.hypot(V[0], V[1], V[2], V[3]) || 1;
+        V[0] /= ql; V[1] /= ql; V[2] /= ql; V[3] /= ql;
+        // How far this node has been taken from the authored lock: the
+        // shader's licence to push its hair right out of her.
+        const moved = Math.hypot(n[c * 3] - A[c * 3], n[c * 3 + 1] - A[c * 3 + 1], n[c * 3 + 2] - A[c * 3 + 2])
+          + 0.05 * 2 * Math.acos(Math.min(1, Math.abs(V[3])));
+        qmul(V, 4, V, 0, ra, c * 4);                   // then the authored turn under it
+        V[0] = -bq[hq]; V[1] = -bq[hq + 1]; V[2] = -bq[hq + 2]; V[3] = bq[hq + 3];
+        qmul(V, 12, V, 0, V, 4);                       // seen from her head
+        const o = c * 12;
+        let s = 1;
+        if (data[o - 12] * V[12] + data[o - 11] * V[13] + data[o - 10] * V[14] + data[o - 9] * V[15] < 0) s = -1;
+        data[o] = s * V[12]; data[o + 1] = s * V[13]; data[o + 2] = s * V[14]; data[o + 3] = s * V[15];
+        // Where the node is, in the head's bind frame. Its bind point is
+        // already in the next texel, from `v5DrapeSetup`, and a vertex turns
+        // about that: interpolating two turns about her FEET, a metre and a
+        // half away, is half a metre of error at a 90° bend.
+        const qx = n[c * 3] - P[hm + 3], qy = n[c * 3 + 1] - P[hm + 7], qz = n[c * 3 + 2] - P[hm + 11];
+        const hx = P[hm] * qx + P[hm + 4] * qy + P[hm + 8] * qz;
+        const hy = P[hm + 1] * qx + P[hm + 5] * qy + P[hm + 9] * qz;
+        const hz = P[hm + 2] * qx + P[hm + 6] * qy + P[hm + 10] * qz;
+        data[o + 4] = hx; data[o + 5] = hy; data[o + 6] = hz;
+        data[o + 7] = smoothstep(D.moved[0], D.moved[1], moved);
+      }
+    }
+    H.tex.needsUpdate = true;
   }
 }
 
 /**
- * Which way is down, in her head's bind frame — for `HANG`. The head bone's
- * turn from the bind pose, undone from world down. The figure is only ever
- * turned about y, so its own down is the world's.
+ * Debug: her hair as it is drawn this frame, measured. The shader's sums done
+ * again on the CPU for every vertex of the style she is wearing, and then:
+ * how far each is from where the authored hair (its original weights) would
+ * be; how deep any is inside the body capsules, or inside her actual skin
+ * (nearest skinned body vertex, and which side of its normal); and down each
+ * chain, the height above what she rests on and the angle off straight down.
+ * Figure space, metres, degrees.
  */
-const _hangQ = new THREE.Quaternion();
-function v5Hang(fig, hang) {
-  if (!fig || !hang) return;
-  if (fig._headB === undefined) fig._headB = fig.boneIndex ? fig.boneIndex('head') : -1;
-  if (fig._headB < 0) return;
-  fig.boneTurn(fig._headB, _hangQ);
-  hang.value.set(0, -1, 0).applyQuaternion(_hangQ.invert());
+function v5DrapeProbe(fig, drape, which) {
+  if (!fig || !drape) return null;
+  const H = drape.parts.find((h) => (which ? h.name === which : h.part.visible));
+  if (!H) return null;
+  if (!H.part.visible) { H.force = true; v5Drape(fig, drape); H.force = false; }
+  const { palette: P } = fig.pose();
+  const g = fig.mesh.geometry, pos = g.getAttribute('position'), nrm = g.getAttribute('normal');
+  const bi = g.getAttribute('aBoneIdx'), bw = g.getAttribute('aBoneWt');
+  const bsc = bi.normalized ? 255 : 1;
+  const U = H.part.material.uniforms.uDrapeK.value;
+  const xf = (b, x, y, z, w, out) => {
+    const m = b * 12;
+    out[0] += w * (P[m] * x + P[m + 1] * y + P[m + 2] * z + P[m + 3]);
+    out[1] += w * (P[m + 4] * x + P[m + 5] * y + P[m + 6] * z + P[m + 7]);
+    out[2] += w * (P[m + 8] * x + P[m + 9] * y + P[m + 10] * z + P[m + 11]);
+  };
+  const T = (i, k) => H.data[i * 4 + k];
+  const drawn = (v, ad) => {
+    let x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+    let ds = (U.x - y) * U.y;
+    if (ds > 0) {
+      ds = Math.min(ds, U.z - 1);
+      const dk = Math.min(Math.floor(ds), U.z - 2), df = ds - dk;
+      const one = (ch) => {
+        const i = (ch * U.z + dk) * 3;
+        const lerp = (t, k) => T(i + t, k) + (T(i + t + 3, k) - T(i + t, k)) * df;
+        const q = [0, 1, 2, 3].map((k) => lerp(0, k));
+        const ql = Math.hypot(...q);
+        const r = new Float32Array(3);
+        drQrot(r, 0, q.map((e) => e / ql), 0, x - lerp(2, 0), y - lerp(2, 1), z - lerp(2, 2));
+        return [0, 1, 2].map((k) => r[k] + lerp(1, k));
+      };
+      let p = one(ad[0]);
+      if (ad[2] > 0) {
+        const pb = one(ad[1]);
+        p = p.map((e, k) => e + (pb[k] - e) * ad[2]);
+      }
+      const mvOf = (ch) => { const i = (ch * U.z + dk) * 3; return T(i + 1, 3) + (T(i + 4, 3) - T(i + 1, 3)) * df; };
+      const mw = mvOf(ad[0]) + (ad[2] > 0 ? (mvOf(ad[1]) - mvOf(ad[0])) * ad[2] : 0);
+      const mv = Math.min(ds, 1);
+      {
+        const q = p.slice();
+        const BA = drape.bodyA, BB = drape.bodyB;
+        for (let i = 0; i < drape.body.length; i++) {
+          const ex = BB[i * 4] - BA[i * 4], ey = BB[i * 4 + 1] - BA[i * 4 + 1], ez = BB[i * 4 + 2] - BA[i * 4 + 2];
+          const ee = Math.max(ex * ex + ey * ey + ez * ez, 1e-8);
+          const t = Math.min(1, Math.max(0, ((q[0] - BA[i * 4]) * ex + (q[1] - BA[i * 4 + 1]) * ey + (q[2] - BA[i * 4 + 2]) * ez) / ee));
+          const c = [BA[i * 4] + ex * t, BA[i * 4 + 1] + ey * t, BA[i * 4 + 2] + ez * t];
+          const v = [q[0] - c[0], q[1] - c[1], q[2] - c[2]];
+          const d = Math.hypot(...v), R = BA[i * 4 + 3] - ad[3] * (1 - mw);
+          if (d < R && d > 1e-5) for (let k = 0; k < 3; k++) q[k] = c[k] + v[k] * R / d;
+        }
+        p = p.map((e, k) => e + (q[k] - e) * mv);
+      }
+      [x, y, z] = p;
+    }
+    const out = [0, 0, 0];
+    xf(drape.head, x, y, z, 1, out);
+    return out;
+  };
+  const ad = H.part.geometry.getAttribute('aDrape');
+  const cw = drape.cw, nbody = drape.body.length;
+  const capsule = (p) => {
+    let worst = 1e9, at = -1;
+    for (let i = 0; i < nbody; i++) {
+      drClosest(cw, i, p[0], p[1], p[2]);
+      const d = Math.hypot(p[0] - _drV[8], p[1] - _drV[9], p[2] - _drV[10]) - cw[i * 7 + 6];
+      if (d < worst) { worst = d; at = i; }
+    }
+    return [worst, at];
+  };
+  // Her skin, skinned, in a 3 cm hash.
+  const cell = 0.03, grid = new Map();
+  const key = (x, y, z) => Math.floor(x / cell) + ',' + Math.floor(y / cell) + ',' + Math.floor(z / cell);
+  const { start, count } = g.drawRange;
+  const ix = g.getIndex();
+  const bodyV = new Set();
+  for (let i = start; i < start + count; i++) bodyV.add(ix.getX(i));
+  const skin = [];
+  for (const v of bodyV) {
+    const p = [0, 0, 0], nn = [0, 0, 0];
+    for (let w = 0; w < 4; w++) {
+      const wt = bw.getComponent(v, w);
+      if (wt <= 0) continue;
+      const b = Math.round(bi.getComponent(v, w) * bsc), m = b * 12;
+      xf(b, pos.getX(v), pos.getY(v), pos.getZ(v), wt, p);
+      const nx = nrm.getX(v), ny = nrm.getY(v), nz = nrm.getZ(v);
+      nn[0] += wt * (P[m] * nx + P[m + 1] * ny + P[m + 2] * nz);
+      nn[1] += wt * (P[m + 4] * nx + P[m + 5] * ny + P[m + 6] * nz);
+      nn[2] += wt * (P[m + 8] * nx + P[m + 9] * ny + P[m + 10] * nz);
+    }
+    const e = [p, nn.map((c) => c / (Math.hypot(...nn) || 1))];
+    skin.push(e);
+    const k = key(p[0], p[1], p[2]);
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(e);
+  }
+  const inSkin = (p) => {
+    let best = null, bd = 0.05;
+    const cx = Math.floor(p[0] / cell), cy = Math.floor(p[1] / cell), cz = Math.floor(p[2] / cell);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+      const l = grid.get((cx + a) + ',' + (cy + b) + ',' + (cz + c));
+      if (!l) continue;
+      for (const e of l) {
+        const d = Math.hypot(p[0] - e[0][0], p[1] - e[0][1], p[2] - e[0][2]);
+        if (d < bd) { bd = d; best = e; }
+      }
+    }
+    if (!best) return 0;
+    const s = (p[0] - best[0][0]) * best[1][0] + (p[1] - best[0][1]) * best[1][1] + (p[2] - best[0][2]) * best[1][2];
+    return s < 0 ? -s : 0;
+  };
+  const tally = () => ({ n: 0, cap: 0, capWorst: 0, skin: 0, skinWorst: 0 });
+  const now = tally(), was = tally();
+  let dev = 0, devMax = 0, devN = 0;
+  const count1 = (t, p, v) => {
+    t.n++;
+    const [c] = capsule(p);
+    if (c < -0.01) t.cap++;
+    t.capWorst = Math.min(t.capWorst, c);
+    const s = inSkin(p);
+    if (s > 0.005) t.skin++;
+    if (s > t.skinWorst && v != null) {
+      // Which of her hair it is: bind height, chains, and where it is now.
+      t.where = [+pos.getY(v).toFixed(3), ad.getX(v), ad.getY(v), +ad.getZ(v).toFixed(2),
+        ...p.map((e) => +e.toFixed(3))];
+    }
+    t.skinWorst = Math.max(t.skinWorst, s);
+  };
+  for (let q = 0; q < H.vs.length; q += 2) {
+    const v = H.vs[q];
+    const p = drawn(v, [ad.getX(v), ad.getY(v), ad.getZ(v), ad.getW(v)]);
+    const a = [0, 0, 0];
+    for (let w = 0; w < 4; w++) {
+      const wt = H.orig[q * 8 + 4 + w];
+      if (wt > 0) xf(H.orig[q * 8 + w], pos.getX(v), pos.getY(v), pos.getZ(v), wt, a);
+    }
+    const d = Math.hypot(p[0] - a[0], p[1] - a[1], p[2] - a[2]);
+    dev += d; devN++; devMax = Math.max(devMax, d);
+    count1(now, p, v);
+    count1(was, a);
+  }
+  const f3 = (x) => +x.toFixed(3);
+  const fin = (t) => ({ n: t.n, inCaps: t.cap, capDeepest: f3(t.capWorst), inSkin: t.skin,
+    skinDeepest: f3(t.skinWorst), where: t.where });
+  // Down the busiest chain (the braid, on `hair`): every other node.
+  let best = -1, bn = -1;
+  for (let k = 0; k < H.K; k++) {
+    if (!H.alive[k]) continue;
+    let r = 0;
+    for (let j = 0; j < H.N; j++) r += H.real[k * H.N + j];
+    if (r > bn) { bn = r; best = k; }
+  }
+  const chain = [];
+  const n = H.n, N = H.N;
+  for (let j = 0; j < N; j += 2) {
+    const c = best * N + j;
+    const p = [n[c * 3], n[c * 3 + 1], n[c * 3 + 2]];
+    const row = { j, real: H.real[c], up: f3(p[1] - drape.floor), clear: f3(capsule(p)[0]) };
+    if (j > 0) {
+      const dx = p[0] - n[c * 3 - 6], dy = p[1] - n[c * 3 - 5], dz = p[2] - n[c * 3 - 4];
+      row.offDown = Math.round(Math.acos(Math.max(-1, Math.min(1, -dy / (Math.hypot(dx, dy, dz) || 1)))) * 180 / Math.PI);
+    }
+    chain.push(row);
+  }
+  // The whole chain from its root to its last real node: off straight down,
+  // and how much of it is sideways across her, forward, and down.
+  let last = 0;
+  for (let j = 0; j < N; j++) if (H.real[best * N + j]) last = j;
+  const r0 = best * N, r1 = best * N + last;
+  const tx = n[r1 * 3] - n[r0 * 3], ty = n[r1 * 3 + 1] - n[r0 * 3 + 1], tz = n[r1 * 3 + 2] - n[r0 * 3 + 2];
+  const tl = Math.hypot(tx, ty, tz) || 1;
+  const L = drape.left, B = drape.back;
+  return {
+    part: H.name, chain: best, nodes: N, floor: f3(drape.floor), pin: f3(drape.pin), side: drape.side,
+    tip: { offDown: Math.round(Math.acos(Math.max(-1, Math.min(1, -ty / tl))) * 180 / Math.PI),
+      across: f3((tx * L[0] + ty * L[1] + tz * L[2]) / tl), back: f3((tx * B[0] + ty * B[1] + tz * B[2]) / tl),
+      down: f3(-ty / tl), up: f3(n[r1 * 3 + 1] - drape.floor), len: f3(tl) },
+    fromAuthored: { mean: f3(dev / Math.max(1, devN)), max: f3(devMax) },
+    drawn: fin(now), authored: fin(was), nodes2: chain,
+  };
 }
 
 /**
