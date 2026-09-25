@@ -8,6 +8,22 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.517.0] — 2026-09-25
+
+### the slap leaves a mark
+
+Misha: *"after the butt click event, her buttocks should turn slightly
+crimson, the colours radiating out"*. A slap now flushes the cheek you hit.
+The colour appears where the crosshair landed in about a tenth of a second,
+spreads to a hand's width (8.5 cm) over the next second, and fades over about
+half a minute. It is deepest where the hand landed and soft at the edge. Each
+cheek has its own flush, and a second slap on a cheek that is still red
+deepens it, up to a limit, without starting it again from a spot. The flush
+sits in her bind frame, so it stays on her skin whatever she does after, and
+only the skin's green and blue are lowered, so it reads as crimson rather
+than a bruise. The numbers are in `APPR` in `src/46-apprentice.js`
+(`slapR`, `slapSpread`, `slapFade`, `slapHit`, `slapTint`).
+
 ## [1.516.0] — 2026-09-25
 
 ### "look down"
