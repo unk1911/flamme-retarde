@@ -8,6 +8,26 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.515.0] — 2026-09-25
+
+### a slap, and a kiss you can hear
+
+- **Click her backside with the crosshair and you hear a slap.** Misha: *"if
+  cross-hairs click on her butt, play the sound"*, his `b_0.ogg`. Her two
+  buttocks are measured off her mesh (the rearmost point of each, 0.92 m up
+  in her bind frame) and skinned to her pelvis. They are offered to the
+  crosshair only from behind her, since from the front they sit under her
+  hips and crotch, which already mean something. One slap per click, and no
+  reach. `tools/cut_slap.py` cuts the one hit, 0.44 s.
+- **"Kiss me" is a kiss and not a sentence.** Misha: *"she shouldn't be saying
+  anything just kissing"*. `kiss` joins `MUTE_TALK`, so her voice line
+  ("Yeah, I'm kissing you now.") is no longer asked for. It also landed on the
+  moment of contact and ducked the kiss sound out, which is why that had gone
+  quiet.
+- **The kiss is a recording now**, his `kiss.mp3`, cut by `tools/cut_kiss.py`
+  to its five smacks: the first on contact, three through the 3.4 s hold, the
+  last as she leaves. The old synthesised pop stays as the fallback.
+
 ## [1.514.0] — 2026-09-25
 
 ### the Slow Doodle says "hmm?"
