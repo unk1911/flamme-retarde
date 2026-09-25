@@ -103,6 +103,15 @@ const APPR = {
   // goes crimson rather than dark).
   slapR0: 0.018, slapR: 0.085, slapSpread: 0.7,
   slapRise: 0.12, slapFade: 30, slapHit: 0.6, slapTint: [0.52, 0.58],
+  // Her cheeks parted by her own hands — see `apprenticeSpread`. Bind frame,
+  // metres: how far each cheek goes out at the full of it; the middle of the
+  // region (height, distance off the midline) and its two radii; the depth
+  // band it fades in over, behind her hip; and the strip either side of the
+  // midline over which it comes to nothing, so the skin at the bottom of the
+  // cleft stretches rather than tears. MUST match `SP` in the solver that put
+  // her hands there (tools/blender/human_mh.py, SPREAD_A/SPREAD_B), which was
+  // solved against this surface.
+  spread: { d: 0.022, u: 0.89, ru: 0.075, l: 0.06, rl: 0.075, f: [-0.05, 0.0], strip: 0.012 },
 };
 
 // ── indoors ─────────────────────────────────────────────────────────────────
@@ -192,6 +201,37 @@ const SLAP_DECL = '\nuniform vec4 uSlap0;\nuniform vec4 uSlap1;\nuniform vec2 uS
   + '}\n';
 const SLAP_FRAG = '{ float sm = min(slapMark(uSlap0, uSlapK.x) + slapMark(uSlap1, uSlapK.y), 1.0);\n'
   + '  base *= mix(vec3(1.0), vec3(1.0, uSlapTint), sm); }\n';
+// ── her cheeks, parted ──────────────────────────────────────────────────────
+//
+// Misha, 25 Sep 2026: *"after the butt slap can she sometimes spread her butt
+// cheeks with her hands"*. The hands are a clip (`spread`, laid over her arms
+// by 43-jadrija.js); this is what they are doing. A bone cannot do it — both
+// cheeks are skinned to the one pelvis — so it is the vertex shader, in her
+// BIND frame before skinning, the way the jaw and the lids are: each cheek
+// slides out along its own side by up to `spread.d`, most over the middle of
+// the cheek, nothing on her hip, her front or her thigh, and nothing at all
+// in a strip down the midline, which is the bottom of the cleft staying where
+// it is while its two walls come away from it. `vLocal` stays undisplaced, so
+// the slap's flush stays on the skin it was put on.
+const apprSpreadU = { uSpread: { value: 0 } };
+const SPREAD_VERT = (() => {
+  const c = APPR.spread, f = (v) => v.toFixed(4);
+  return `
+  if (uSpread > 0.001) {
+    float sl = abs(p.z);
+    float su = (p.y - ${f(c.u)}) / ${f(c.ru)}, sv = (sl - ${f(c.l)}) / ${f(c.rl)};
+    float sw = exp(-su * su - sv * sv)
+      * (1.0 - smoothstep(${f(c.f[0])}, ${f(c.f[1])}, p.x))
+      * smoothstep(0.0, ${f(c.strip)}, sl);
+    p.z += sign(p.z) * ${f(c.d)} * uSpread * sw;
+  }
+`;
+})();
+
+/** How far her cheeks are parted, 0..1 — set every frame by `spreadTick`. */
+function apprenticeSpread(k) { apprSpreadU.uSpread.value = k; }
+function apprenticeSpreadK() { return +apprSpreadU.uSpread.value.toFixed(3); }
+
 // Per cheek: where it is (bind), how far the flush has spread, how strong it
 // is, and how strong it is heading for.
 const apprSlaps = [1, -1].map((side) => ({ side, r: 0, k: 0, want: 0, n: 0 }));
@@ -259,15 +299,17 @@ async function loadApprentice() {
   const fig = await loadSkinHands('baye2_fr3d', {
     spec: 0.10, specPower: 26, vcol: false,
     uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms,
-      ...look.lid.uniforms, ...apprSlapU },
-    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl + SLAP_DECL,
+      ...look.lid.uniforms, ...apprSlapU, ...apprSpreadU },
+    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl + SLAP_DECL
+      + '\nuniform float uSpread;\n',
     vdecl: look.jaw.vdecl,
     // The whole of what makes her a different figure: one texture lookup —
     // and the inside of her mouth, and wherever she has been slapped.
     body: 'base = texture2D(uSkin, vUv).rgb;' + SLAP_FRAG + look.jaw.frag,
     // And a mouth that opens when the leader's does — see `jaw` in v5Parts.
     // Her eyelids, which close for real — see LID_VERT — and then her jaw.
-    vert: look.lid.vert + look.jaw.bodyVert,
+    // And her cheeks, when her hands part them — see SPREAD_VERT.
+    vert: look.lid.vert + look.jaw.bodyVert + SPREAD_VERT,
     parts: look.parts,
   });
   if (!fig) return null;

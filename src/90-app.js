@@ -6998,6 +6998,11 @@ function frame() {
     if (pressing && !reachWas && reachKind === 'butt' && typeof apprenticeSlap === 'function') {
       apprenticeSlap(reachForce && reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
     }
+    // And sometimes her hands go back to where it landed — see `slapped` in
+    // 43-jadrija.js, which decides whether this is one of those times.
+    if (pressing && !reachWas && reachKind === 'butt' && jadrija && jadrija.slapped) {
+      jadrija.slapped();
+    }
     reachWas = pressing;
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
       : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide]
@@ -8966,6 +8971,12 @@ window.__fr = {
     camTrace: (on) => { if (on != null) { camTraceOn = !!on; camTrace.length = 0; } return camTrace.slice(); },
     slaps: () => buttSlaps,
     slapMark: () => apprenticeSlapState(),
+    // Her hands to her cheeks, on the cot's edge — now, or with the coin when
+    // `force` is false — and where it has got to. See `slapped` in
+    // 43-jadrija.js.
+    spreadNow: (force = true) => (jadrija && jadrija.slapped ? jadrija.slapped(force) : false),
+    spreadState: () => ({ ...(jadrija && jadrija.spreadState ? jadrija.spreadState() : {}),
+      k: typeof apprenticeSpreadK === 'function' ? apprenticeSpreadK() : null }),
     /**
      * Debug: stand `d` metres behind v2.0, looking down at her backside — to
      * photograph the slap's mark. `ground.put` rather than `jad.stand`, which

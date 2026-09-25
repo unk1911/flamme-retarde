@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.519.0] — 2026-09-25
+
+### and sometimes her hands go back
+
+Misha: *"when she is lying on the cot with legs hanging off on her tummy after
+the butt slap can she sometimes spread her butt cheeks with her hands, her
+hands are already nearby"*. On her front on the edge of the cot, about one
+slap in three (40 per cent; measured 22 of 60) brings both her hands back to
+her cheeks just after she moans. She pulls them apart, holds for a little over
+two and a half seconds, and lets go: 4.9 s in all. Anything that moves her
+off the cot edge ends it at once. A yawn asked for meanwhile is refused
+(*"her hands are busy"*).
+
+**The hands** are a new baked clip, `spread`, laid over her arms the way the
+yawn is. The two poses were solved on v2.0's own mesh rather than typed, by
+`tools/blender/spread_solve.py`. That tool reproduces Blender's FK and skinning
+to 1e-7. It puts the palm on the top of each cheek and the finger pads at the
+inside edge by the cleft, square to the skin. Its `--verify` scores what ships:
+palm 1.0 mm and pads 0.6 mm from target on arrival, 2.6 and 2.5 mm at the pull.
+
+**The cheeks** cannot be moved by a bone, because both are skinned to one
+pelvis. So v2.0's vertex shader slides each cheek outward by up to 22 mm, in
+her bind frame. The movement fades to nothing at her hip, her thigh and in a
+strip down the midline, so the bottom of the cleft stretches rather than tears.
+It is driven by the clip's own timing, so the skin parts when the hands pull
+and not before. The slap's crimson flush stays on the skin it was put on.
+
+**Two things the solve caught.** The first targets were out of reach: shoulder
+to palm was 0.545 m against 0.537 m of arm, and every seed stopped 2.4 cm short
+with its wrist bent 94 and 114 degrees. The hands were moved up to the top of
+the cheek. Separately, the finger bones are not rolled as mirror images, so the
+file's L↔R mirror rule curled one hand onto her and stood the other 10 cm off
+her as a claw. `fingersR` takes the negated first number of `fingersL`. Checked
+on the skinned vertices, and in the game.
+
+Debug: `__fr.jad.spreadNow(force = true)`, `__fr.jad.spreadState()`.
+
 ## [1.518.0] — 2026-09-25
 
 ### and she answers it

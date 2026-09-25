@@ -783,6 +783,7 @@ const ears = (() => {
     // and `lying` are above and are the same facts about the same room.
     nowall: 'there is no wall in here she can get her heels to',
     yawning: 'she is in the middle of one',
+    handsbusy: 'her hands are busy',
     hands: 'her hands are holding her up',
   };
 

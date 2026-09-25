@@ -34910,6 +34910,61 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * Her hands back to her cheeks, after a slap, and then taken off again.
+   *
+   * Misha, 25 Sep 2026: *"when she is lying on the cot with legs hanging off
+   * on her tummy after the butt slap can she sometimes spread her butt cheeks
+   * with her hands, her hands are already nearby"*. So `edgeHeld` only, one
+   * slap in `SPREAD_AT.chance`, and it is the yawn's machinery exactly: the
+   * `spread` clip laid over the arms by `fig.over`, on its own clock, ramped
+   * at both ends. The clip starts and ends on PRONE_EDGE, which is the pose
+   * she is holding, so at the moments the weight moves the overlay is asking
+   * for nothing she is not already doing.
+   *
+   * `show.spread` counts up from minus `SPREAD_AT.wait`: the moan is laid
+   * after the slap's own sound (see `moan` in 80-audio.js), and she answers
+   * it rather than the hand. The cheeks themselves are v2.0's — see
+   * `apprenticeSpread` — and are handed the clip's own spread every frame, so
+   * the skin parts when the hands pull and not before they arrive.
+   */
+  function spreadTick(f, dt) {
+    if (show.spread == null) return;
+    // Anything that takes her out of the pose takes the hands with it.
+    if (show.phase !== 'edgeHeld') {
+      show.spread = null;
+      if (show.spreadOn) { f.over(null); show.spreadOn = 0; }
+      if (typeof apprenticeSpread === 'function') apprenticeSpread(0);
+      return;
+    }
+    show.spread += dt;
+    const t = show.spread;
+    if (t < 0) return;
+    if (!show.spreadOn) {
+      if (!f.over('spread', { bones: SPREAD_OVER, from: 0 })) { show.spread = null; return; }
+      show.spreadOn = 1;
+    }
+    const A = SPREAD_AT;
+    const T = A.pull[1] + A.hold + A.pull[1] - A.pull[0] + A.pull[0];
+    const u = t < A.ramp ? t / A.ramp : t > T - A.ramp ? (T - t) / A.ramp : 1;
+    const e = sat(u);
+    f.state.overW = e * e * (3 - 2 * e);
+    f.state.overT = t;
+    // How far the cheeks are parted: the clip's own SPREAD_A → SPREAD_B, with
+    // the same smoothstep `_bake_clip` puts between its keys.
+    const off = A.pull[1] + A.hold;
+    const v = t < A.pull[0] ? 0 : t < A.pull[1] ? (t - A.pull[0]) / (A.pull[1] - A.pull[0])
+      : t < off ? 1 : t < off + A.pull[1] - A.pull[0] ? 1 - (t - off) / (A.pull[1] - A.pull[0]) : 0;
+    const k = sat(v);
+    if (typeof apprenticeSpread === 'function') apprenticeSpread(k * k * (3 - 2 * k));
+    if (t > T) {
+      show.spread = null;
+      show.spreadOn = 0;
+      f.over(null);
+      if (typeof apprenticeSpread === 'function') apprenticeSpread(0);
+    }
+  }
+
   function poseOut(dt, go) {
     // `getUp` is NOT cleared on the way through, so that `cradle` passes it on
     // to `situp` and `kept` finishes the request — see the note in `cradle`.
@@ -37147,6 +37202,33 @@ async function buildJadrija(scene) {
   const YAWN_AT = { up: 0.55, hold: 1.20, down: 0.65 };
 
   /**
+   * And the bones the spread is laid over — both arm chains, whole, for the
+   * yawn's reason, and the right index and thumb tip that 41-hands.js adds,
+   * because they copy `fingersR`'s keys and an overlay that left them out
+   * would curl three fingers round a cheek and leave the fourth where it was.
+   *
+   * AND THE SPINE ABOVE THE PELVIS, which the yawn deliberately leaves out.
+   * `edgeHeld` breathes — PRONE_EDGE_B lifts the chest two degrees — and a
+   * hand is a long lever from the chest: two degrees there is a centimetre
+   * and a half at the wrist, a hand sliding up and down a cheek it is meant
+   * to be holding. The clip's spine is PRONE_EDGE's own, so this only holds
+   * her breath while her hands are busy.
+   */
+  const SPREAD_OVER = ['spine01', 'spine02', 'spine03', 'chest',
+    'clavicleL', 'armUL', 'armLL', 'handL', 'thumbL', 'fingersL',
+    'clavicleR', 'armUR', 'armLR', 'handR', 'thumbR', 'fingersR',
+    'idx1R', 'idx2R', 'idx3R', 'thb2R', 'thb3R'];
+
+  /**
+   * The spread, in seconds of the `spread` clip — MUST match its keys in
+   * tools/blender/human_mh.py: hands arrive at `pull[0]` (SPREAD_A), have
+   * pulled by `pull[1]` (SPREAD_B), hold, and go back the same way. `wait`
+   * is from the slap to the first movement; `chance` is how often a slap
+   * gets it at all — "sometimes".
+   */
+  const SPREAD_AT = { chance: 0.4, wait: 0.9, pull: [0.75, 1.15], hold: 2.6, ramp: 0.2 };
+
+  /**
    * ── WHAT HAS TO BE TRUE FIRST, AND WHAT IS ALREADY TRUE ────────────────
    *
    * Misha, 17 Sep 2026: *"if i ask to pour some wine, she executes her entire
@@ -37352,6 +37434,9 @@ async function buildJadrija(scene) {
       // ONE AT A TIME, because it is a latch on a clock and re-arming it
       // half way through restarts a yawn she is in the middle of.
       if (show.yawn != null) return 'yawning';
+      // Nor while both her hands are on her backside: there is one overlay,
+      // and the spread is holding it.
+      if (show.spread != null) return 'handsbusy';
       // AND NOT WHILE HER HANDS ARE HOLDING HER UP. The overlay takes her
       // right arm off whatever it is doing, and in these four that arm is
       // load-bearing: a woman on her hands who lifts one to her mouth and
@@ -41290,6 +41375,9 @@ async function buildJadrija(scene) {
     // reason: it is a thing laid over a pose, so it runs once the pose is
     // decided and whatever phase she is in.
     yawnTick(f, dt);
+    // And the hands to her cheeks after a slap, which is the same kind of
+    // thing and shares the one overlay the yawn uses — see `spreadTick`.
+    spreadTick(f, dt);
 
     // ── AND DOWN TO THE PLATE ─────────────────────────────────────────────
     //
@@ -51727,6 +51815,23 @@ async function buildJadrija(scene) {
      * is up to her, because it is entered from `stepShow` on a frame where the
      * phase she is in can legally be left.
      */
+    /**
+     * A slap has landed — called by the click in 90-app.js, on the press. On
+     * her front on the edge of the cot, sometimes, her hands go back to her
+     * cheeks: see `spreadTick`. `force` is for a probe, which cannot wait for
+     * a coin to come up.
+     */
+    slapped: (force = false) => {
+      if (!show || show.phase !== 'edgeHeld') return false;
+      if (show.spread != null || show.yawn != null) return false;
+      if (!force && Math.random() >= SPREAD_AT.chance) return false;
+      show.spread = -SPREAD_AT.wait;
+      show.spreadOn = 0;
+      return true;
+    },
+    /** Debug: where the spread is — seconds into it, or null. */
+    spreadState: () => (show ? { t: show.spread, on: show.spreadOn || 0,
+      phase: show.phase } : null),
     askShow: (rawName) => {
       // WHICH ROAD, decided here and once — see `askRoad`. Everything below
       // and everything in the dispatch reads the normalised name, so neither

@@ -4592,6 +4592,57 @@ PRONE_EDGE_B["legUL"] = (-43, 0, 7)
 PRONE_EDGE_B["legUR"] = (-49, 0, -7)
 
 
+# ── AND HER HANDS BACK TO HER CHEEKS ─────────────────────────────────────────
+#
+# Misha, 25 Sep 2026: *"when she is lying on the cot with legs hanging off on
+# her tummy after the butt slap can she sometimes spread her butt cheeks with
+# her hands, her hands are already nearby"*.
+#
+# ARM BONES ONLY, over PRONE_EDGE — the `spread` clip is laid over her arms
+# by `fig.over` in 43-jadrija.js, the yawn's way, so it goes PRONE_EDGE →
+# SPREAD_A → SPREAD_B and back and nothing below the collarbones moves.
+#
+# SOLVED ON v2.0's MESH, by tools/blender/spread_solve.py, and not typed: the palm on
+# the top of each cheek, the finger pads at the inside of it by the cleft, the
+# palm square to the skin, and nothing of the hand or forearm more than 3 mm
+# into her. The first two sets of targets were unreachable — shoulder to palm
+# was 0.545 m against 0.537 of arm, and the fingertips 0.586 — and the solver
+# said so the way `reachable()` warns it will: every seed stopped 2.4 cm
+# short with the wrist at 94 and 114 degrees. A hand on the UPPER cheek with
+# the fingers reaching down across it is both the reachable one and the
+# natural one. A: residual 1.0 mm palm, 0.6 mm pads, palm square to the skin;
+# the finger tips press 6 mm into the cheek, which is a grip.
+#
+# B is the pull: the same targets on the surface `apprenticeSpread` moves
+# (46-apprentice.js, APPR.spread — each cheek out by 22 mm at the full of it),
+# so the pads travel out with the skin they are holding. Residual 2.6 and
+# 2.5 mm, and nothing of the hand or arm below her skin. `spread_solve.py
+# --verify` reads these dicts back and scores them; run it after any edit. The right hand is the left mirrored by
+# `_mirror_pose`'s rule, and the rig is symmetric to the tenth of a millimetre
+# — EXCEPT THE FINGERS, which that rule gets wrong: `fingersL` and `fingersR`
+# are not rolled as mirror images, so a shared first number curls one hand
+# into the cheek and lifts the other off it, 10 cm higher at the tips. In the
+# game that was one hand flat on her and one a claw in the air. Checked on the
+# skinned finger vertices: the mirror of `fingersL` (x, 0, 0) is `fingersR`
+# (−x, 0, 0), to 1e-12 — which is also why YAWN's right hand curls at −30.
+SPREAD_A = dict(PRONE_EDGE, **{
+    "clavicleL": (0.8, 12.0, 18.2), "armUL": (-4.1, -55.8, 38.7),
+    "armLL": (48.3, 2.8, 31.4), "handL": (-11.8, -42.1, 28.7),
+    "fingersL": (40.0, 0, 0),
+    "clavicleR": (0.8, -12.0, -18.2), "armUR": (-4.1, 55.8, -38.7),
+    "armLR": (48.3, -2.8, -31.4), "handR": (-11.8, 42.1, -28.7),
+    "fingersR": (-40.0, 0, 0),
+})
+SPREAD_B = dict(PRONE_EDGE, **{
+    "clavicleL": (2.7, 9.9, 21.4), "armUL": (-2.1, -58.7, 38.2),
+    "armLL": (48.5, 1.5, 31.6), "handL": (-13.4, -34.5, 24.1),
+    "fingersL": (40.0, 0, 0),
+    "clavicleR": (2.7, -9.9, -21.4), "armUR": (-2.1, 58.7, -38.2),
+    "armLR": (48.5, -1.5, -31.6), "handR": (-13.4, 34.5, -24.1),
+    "fingersR": (-40.0, 0, 0),
+})
+
+
 # ── SITTING, AND THE POSES MADE OF IT ────────────────────────────────────────
 #
 # Misha, 18 Sep 2026, in one run: fetal position, lotus position, sit up on the
@@ -8081,6 +8132,12 @@ CLIPS = [
     {"name": "yawn", "loop": False,
      "keys": [(0.00, IDLE_A), (0.55, YAWN), (1.25, YAWN_B), (1.75, YAWN),
               (2.40, IDLE_A)]},
+    # And her hands to her cheeks after a slap — over PRONE_EDGE, arms only.
+    # The times are `SPREAD_AT` in 43-jadrija.js and MUST move with it: the
+    # hands arrive at 0.75, have pulled by 1.15, hold to 3.75 and go back.
+    {"name": "spread", "loop": False,
+     "keys": [(0.00, PRONE_EDGE), (0.75, SPREAD_A), (1.15, SPREAD_B),
+              (3.75, SPREAD_B), (4.15, SPREAD_A), (4.90, PRONE_EDGE)]},
     # And going somewhere on them, at 0.40 m/s — 1.2 s a cycle, two half
     # strides, which is a knee and about 24 cm each. `SHOW.creep` in
     # 43-jadrija.js is that number and the two have to move together or she
