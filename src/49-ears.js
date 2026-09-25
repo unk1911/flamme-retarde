@@ -707,6 +707,9 @@ const ears = (() => {
     look: 'her eyes on you', 'look.stop': 'her eyes her own again',
     'look.down': 'her eyes lowered', 'look.up': 'her eyes up again',
     'side.left': 'on to her left side', 'side.right': 'on to her right side',
+    // One name for two moves — her back to you standing, and over the other
+    // way lying down — so the label says both. See `turn` in 43-jadrija.js.
+    turn: 'turning round, or over',
     'arms.wide': 'arms out wide', 'arms.down': 'arms back down',
     'mouth.open': 'her mouth wide open', 'mouth.close': 'her mouth closed',
     'pet': 'you petting her hair',
@@ -784,6 +787,9 @@ const ears = (() => {
     nowall: 'there is no wall in here she can get her heels to',
     yawning: 'she is in the middle of one',
     hands: 'her hands are holding her up',
+    // And `turn`'s two. `hands` above covers the handstand and upside down.
+    noturn: 'sitting up there is no other way round — lie her down first',
+    turning: 'she is already turning over',
   };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */

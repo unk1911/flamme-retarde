@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.41.0"
+VERSION = "1.42.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -710,7 +710,9 @@ SKILLS = {
     "rise": ("get up off her knees or off her back and stand up",
              [r"\b(stand|get|sit)\s*(up|upright)\b|\bon your feet\b"
               r"|\bget off (the|that) (bed|cot|floor)\b|\boff your knees\b"
-              r"|\bstand\b(?!\s*(there|still|by))"]),
+              # Not "stand with your back to me", which is `turn` below and
+              # is a request about which way she faces, not whether she is up.
+              r"|\bstand\b(?!\s*(there|still|by|with your back))"]),
     # AND THE FAR END OF THE SAME STAIRCASE. Misha, 17 Sep 2026: *"if i say
     # 'lie down on your back' or something equivalent, she says 'yeah', but
     # doesn't actually do it"*, and *"sometimes she should 'lie down on the
@@ -727,6 +729,37 @@ SKILLS = {
     "recline": ("lie down on her back in the kabina, knees up",
                 [r"\b(lie|lay|lye)\s*(down|back)\b|\bon your back\b"
                  r"|\blie down\b|\blay down\b"]),
+    # ROUND, OR OVER. Misha, 25 Sep 2026: *"add another command: 'turn
+    # around', so if she's standing up, she turns and remains standing with
+    # her back to me. if she is laying down, then she flips from whatever pose
+    # she was in"*. One name, because it is one sentence: the page decides
+    # which of the two it means from which way up she is — see `turn` in
+    # src/43-jadrija.js.
+    #
+    # BELOW EVERY PLACED POSE, so a sentence that names where she ends up is
+    # answered by the place: "turn over on your back" is `recline`, "turn on
+    # to your left side" is `side.left`, "turn onto your tummy" is `flat`.
+    # This is the bare turn, which is relative to wherever she is. And
+    # "roll over" stays `flat`'s, which it has been since 1.401.
+    #
+    # ABOVE `joy`, which owns the bare word "flip" for a somersault. "Flip
+    # over" and "flip around" carry a direction and are this; "do a flip" is
+    # still hers.
+    #
+    # NEVER A BARE "turn", which is the remote's verb as much as hers: "turn
+    # it on" and "turn the lovense off" are `buzz_of`'s and are answered
+    # before this table is read at all. Every pattern here wants a direction
+    # (round, over, away), her back, or a thing to face that is not you. And
+    # "back to me" only with "your" in front of it — "come back to me" is a
+    # sentence somebody says to call her over.
+    "turn": ("turn around: stand with her back to you, or turn over if she "
+             "is lying down",
+             [r"\bturn(ing)?\s+(yourself\s+)?(a?round|over|away)\b"
+              r"|\bflip\s+(yourself\s+)?(over|a?round)\b"
+              r"|\b(turn|show|put)\b.{0,12}\byour back\b"
+              r"|\byour back (to|towards?) (me|us)\b"
+              r"|\bface (the wall|the other way|away)\b"
+              r"|\bokreni\s*se\b|\b(re)?tourne[- ]toi\b"]),
     "ballet": ("dance ballet at the barre: a pirouette, a relevé, an "
                "arabesque, going up on her toes",
                [r"\b(ballet|pirouette|piruette|pirouet\w*|releve|relevé|"
@@ -880,6 +913,14 @@ ASK_RE = re.compile(
     r"|\b(lower|drop|cast|raise|lift)\b.{0,12}\b(eyes|gaze)\b"
     r"|\b(don'?t|do not)\s+look\s+down\b"
     r"|\bspusti\b.{0,8}\b(o[čc]i|pogled)\b|\bbaisse les yeux\b"
+    # Turning round or over — see `turn`. "Turn around" carries no modal and
+    # no opener below, and neither does "flip over" or "okreni se". The
+    # skill's own shape and never a bare "turn", which is the remote's.
+    r"|\bturn(ing)?\s+(yourself\s+)?(a?round|over|away)\b"
+    r"|\bflip\s+(yourself\s+)?(over|a?round)\b"
+    r"|\bturn your back\b|\byour back (to|towards?) (me|us)\b"
+    r"|\bface (the wall|the other way|away)\b"
+    r"|\bokreni\s*se\b|\b(re)?tourne[- ]toi\b"
     # AND THE ONE WORD THAT CALLS HER OVER IN HER OWN LANGUAGE. "Come here"
     # has belonged to the hug since 1.407.0 and carried no modal either, which
     # is why it is written out below; "dođi" is the same sentence said on the
