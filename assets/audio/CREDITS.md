@@ -40,6 +40,14 @@ curtain: the one "hmm?" at 0.93–1.66 s, cut out, levelled and encoded by
 `build/payload/doodle_hmm.mp3`. CC0 asks for no attribution; this is here
 anyway.
 
+## `slap_b_0.ogg` and `kiss_misha.mp3`
+
+The owner's own recordings (Misha, supplied 25 Sep 2026 as `b_0.ogg` and
+`kiss.mp3`), so no third-party terms. The slap is cut to its one hit by
+`tools/cut_slap.py` (`build/payload/slap.mp3`), and the kiss to its five smacks
+by `tools/cut_kiss.py` (`build/payload/kiss.mp3`); each tool's note lists what
+it changes.
+
 ## Everything else
 
 Every other sound in this game is synthesised at runtime in `src/80-audio.js`

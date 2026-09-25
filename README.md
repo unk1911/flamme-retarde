@@ -145,6 +145,9 @@ seam is inaudible, notched and high-passed to remove a 117–120 Hz rumble, and
 levelled so nothing passes −0.6 dBFS peak. Distance, weather, walls and Doppler
 are applied live and none of it is baked in.
 
+**The slap and the kiss** — recorded by me, no third-party terms; cut by
+[`tools/cut_slap.py`](tools/cut_slap.py) and [`tools/cut_kiss.py`](tools/cut_kiss.py).
+
 **The birds** — eight species, seven of them other people's recordings:
 
 | clip | species | source | recordist | licence |
