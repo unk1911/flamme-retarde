@@ -166,7 +166,8 @@ once); `JAD.cabW` at 2.15 m against 0.95-1.05 measured.
 
 **Blocked on somebody saying WHERE.** `a_030`, `b_046`, `b_076`, the white
 flat-roofed block with the shade canopy, the doorway through the concrete
-wall. None carries a geotag.
+wall. None carries a geotag. **Since 24 Sep, the aerial reel may answer
+these** (see SURVEY → aerial).
 
 **Blocked on rule 12.** Four shops ship unnamed. No photograph reads them.
 
@@ -1090,6 +1091,62 @@ bed. See the commit.
   s 42.7` geotag is not where it went and is not meant to be; the photograph
   settles the object, Misha settles the wall.
 
+
+### aerial — 24 Sep 2026, a drone reel from above
+
+`/mnt/c/tmp/refs/jadrija/aerial/`. This is Šibenik News' "PLAŽE NA JADRIJI"
+(Facebook reel 1059252540202612): 124.4 s, 1920x1080, 24 fps.
+**It is third-party footage, like `refs/`.** Use it to read from and to check
+against. Never commit it, never ship a frame of it, and never use it as a
+restyle reference image.
+The original is AV1. The conda `torchure` ffmpeg cannot decode it, so use
+`/usr/bin/ffmpeg` or `jadrija_aerial_h264.mp4`.
+
+It is the first overhead view of Jadrija that we have. Everything else we have
+was shot at eye height with no geotag, which is why the list below is mostly
+items that were stuck on **WHERE** or on **HOW MANY**. Nothing on it has been
+built yet. Roughly 0:00-1:12 is Jadrija; the rest is Sv. Nikola.
+
+- [ ] **Count the kabine.** 0:06-0:08 is a square-on pass along the coloured
+      row with the parking lot behind it, 0:10-0:14 follows both rows down the
+      bend to the pier, and 0:44-0:50 is the coloured row and the white row
+      from above at an angle. That should be enough to count doors per row.
+      It settles "124 is a chosen number, not a count" (SETTLED) and gives
+      the count the `JAD.cabW` item under survey/4 asks for.
+- [ ] **Measure the bay pitch from above.** Cross-check the 0.95-1.05 m that
+      survey/4 measured at ground level. If top-down agrees, the `JAD.cabW`
+      2.15 m question has two independent sources and can go back to Misha
+      with a number.
+- [ ] **Check the plan shape of the shore.** 0:10-0:14 and 0:54-0:58 show the
+      promenade edge, the breakwater, the pier and the jetty from above.
+      Compare against the OSM trace and the bend that rule 9b is about
+      (46 degrees between t 360 and t 410).
+- [ ] **Unblock the WHERE items.** `a_030`, `b_046`, `b_076`, the white
+      flat-roofed block with the shade canopy, and the doorway through the
+      concrete wall. Look for each of them in the overheads.
+- [ ] **The marina in the inlet behind the Brod's root.** This question was
+      closed unanswered on 26 Aug. 0:16-0:18 and 0:28 look straight down the
+      channel with its moorings and the swim line, and 0:34 is the marina
+      basin.
+- [ ] **The playground and the pool court behind the coloured row**
+      (0:44-0:50): the blue surface, the swings, and how they sit against the
+      kabine and the parking lot.
+- [ ] **The promenade apron and the planted squares** at 0:54-0:56: the
+      paving layout, the benches, the terraces. These are the frontages that
+      STATE OF THE QUEUE says want reading before the apron treatment.
+- [ ] **Mali Viganj and the western beach** (1:02-1:12): shingle, rows of
+      umbrellas, beach bars, parking. This checks `JAD.beachTo: 205` and the
+      "no photograph reaches that stretch" note under SETTLED.
+- [ ] **Colour and cover from altitude.** How dense the pine canopy is, what
+      colour the water is over sand and over weed, and how the shallows grade.
+      This is the view the Canadair actually has.
+
+Method: pull stills with
+`/usr/bin/ffmpeg -ss <t> -i jadrija_aerial_h264.mp4 -frames:v 1 out.png`, then
+read them. The shots are oblique and there is no lens data, so take ratios
+from them (counts, door/pier, lengths against a known object), not absolute
+metres.
+
 ## SOURCES
 
 - 39 photos + 132 s 4K walk — `~/fr-video/survey/{photos,vframes}`
@@ -1124,6 +1181,9 @@ bed. See the commit.
   `geotag.tsv` has nothing to say about them. Anything built from the fourth is
   a placement. The catalogue is `plan/survey-3.md`.
 - Report: https://claude.ai/code/artifact/6b992f51-c846-414a-8819-3d939d4a6d37
+- Aerial drone reel, 24 Sep 2026 — `/mnt/c/tmp/refs/jadrija/aerial/`.
+  **Third-party (Šibenik News), reference only.** The timecoded work list is
+  under SURVEY → aerial.
 
 ## MECHANICS
 
