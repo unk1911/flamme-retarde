@@ -8,6 +8,14 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.511.0] — 2026-09-24
+
+### the hand a little higher on her thigh
+
+Misha's own change: the band the hand arrives in on her inner thigh is now
+67–75 cm up her leg (`APPR.thighY`, was 67–72), so the top of the stroke sits
+a little higher.
+
 ## [1.510.0] — 2026-09-24
 
 ### hair that hangs off her, not out of her

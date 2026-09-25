@@ -70,7 +70,7 @@ const APPR = {
   hipY: [0.96, 1.04], hipZ: 0.175,
   // Her inner thigh: the band the hand arrives in — the top of the stroke,
   // well short of the top of her legs — and the band it strokes down to.
-  thighY: [0.67, 0.72], thighLo: [0.53, 0.58],
+  thighY: [0.67, 0.78], thighLo: [0.53, 0.58],
   // Petting her: how far each way along her head the stroke goes, how far
   // the palm rides above the top of her hair (half a hand's thickness), how
   // much the round of her head drops at the ends of the stroke, and how far
