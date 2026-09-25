@@ -48,6 +48,13 @@ The owner's own recordings (Misha, supplied 25 Sep 2026 as `b_0.ogg` and
 by `tools/cut_kiss.py` (`build/payload/kiss.mp3`); each tool's note lists what
 it changes.
 
+## `moan_mo-0.mp3`, `moan_mo-1.mp3` and `moan_mo-2.mp3`
+
+The owner's own recordings (Misha, supplied 25 Sep 2026 as `mo-0.mp3` ..
+`mo-2.mp3`), so no third-party terms. Trimmed of silence at each end, levelled
+to sit together and faded by `tools/cut_moan.py` (`build/payload/moan0..2.mp3`);
+the tool's note lists what it changes.
+
 ## Everything else
 
 Every other sound in this game is synthesised at runtime in `src/80-audio.js`

@@ -822,19 +822,66 @@ function buildAudio() {
    * One per click — the gate in 90-app.js fires it on the press only.
    */
   let slapBuf = null;
-  function slapWarm() { if (!slapBuf) sampleLoad('slap', (b) => { slapBuf = b; }); }
+  function slapWarm() {
+    if (!slapBuf) sampleLoad('slap', (b) => { slapBuf = b; });
+    moanWarm();
+  }
   function slap() {
     if (!ctx || !bed) return false;
     if (!slapBuf) { slapWarm(); return false; }
     const src = ctx.createBufferSource();
     src.buffer = slapBuf;
     // Not the same hand twice.
-    src.playbackRate.value = 0.95 + Math.random() * 0.10;
+    const rate = 0.95 + Math.random() * 0.10;
+    src.playbackRate.value = rate;
     const g = ctx.createGain();
     g.gain.value = 0.85;
     src.connect(g).connect(bed);
     if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.20; g.connect(w).connect(verbSend); }
-    src.start(ctx.currentTime);
+    const t0 = ctx.currentTime;
+    src.start(t0);
+    // And her answer, the moment the hit has finished ringing.
+    moan(t0 + slapBuf.duration / rate);
+    return true;
+  }
+
+  // ── her moan, after it ───────────────────────────────────────────────────────
+  /**
+   * Misha, 25 Sep 2026: *"after the slap audio is played, the next sound that
+   * should play is a randomized play of one of these: mo-0.mp3, mo-1.mp3,
+   * mo-2.mp3"* — cut and levelled by `tools/cut_moan.py`. One of the three at
+   * random, never the same one twice running. One at a time: a slap while she
+   * is still answering the last one fades that out as the new one starts,
+   * rather than stacking her voice on itself (mo-0 alone is ten seconds).
+   */
+  const moanBufs = [null, null, null];
+  let moanLast = -1, moanNow = null, moanPlayed = 0;
+  function moanWarm() {
+    moanBufs.forEach((b, i) => { if (!b) sampleLoad('moan' + i, (d) => { moanBufs[i] = d; }); });
+  }
+  function moan(at) {
+    const ready = [0, 1, 2].filter((i) => moanBufs[i] && i !== moanLast);
+    if (!ready.length) { moanWarm(); return false; }
+    const i = ready[Math.floor(Math.random() * ready.length)];
+    moanLast = i;
+    if (moanNow) {
+      const { src: o, g: og } = moanNow;
+      og.gain.cancelScheduledValues(at);
+      og.gain.setValueAtTime(og.gain.value, at);
+      og.gain.linearRampToValueAtTime(0, at + 0.08);
+      try { o.stop(at + 0.1); } catch (e) { /* already ended */ }
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = moanBufs[i];
+    const g = ctx.createGain();
+    g.gain.value = 0.75;
+    src.connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.15; g.connect(w).connect(verbSend); }
+    src.start(at);
+    const me = { src, g, i };
+    moanNow = me;
+    src.onended = () => { if (moanNow === me) moanNow = null; };
+    moanPlayed++;
     return true;
   }
 
@@ -7570,7 +7617,7 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
-    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, moanCount: () => ({ n: moanPlayed, last: moanLast }), noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *
