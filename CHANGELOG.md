@@ -8,7 +8,7 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
-## [1.526.0] — 2026-09-26
+## [1.525.0] — 2026-09-26
 
 ### the flags move — the Brod's ensign is cloth, Maslina's feathers ripple
 
