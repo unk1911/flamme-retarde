@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.42.0"
+VERSION = "1.45.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -390,6 +390,24 @@ INTENTS = [
                   r"\b(fl(y|ies|ie)|zombie\w*)\b"]),
     ("fly.site", [r"\b(dad'?s|father'?s|the clinic'?s)\b",
                   r"\b(web ?site|web ?page|site|page)\b"]),
+    # ── THE SLOW DOODLE'S SLOW LICK ──────────────────────────────────────
+    #
+    # Misha, 25 Sep 2026: *"if you're somewhere near him and say 'lick', the
+    # Slow Doodle executes one of his superpowers: the slow lick"*. A command
+    # and not one of her skills: it is the dog that does it, to her or to
+    # you, and the page decides which — see `lickCmd` in src/43-doodle.js —
+    # and says "too far away to hear you" when he is.
+    #
+    # The VERB is the whole of it, in the three languages he asked for:
+    # "lick", "lick her", "lick me", "give her a lick", "slow lick", "doodle
+    # lick"; Croatian "poliži" (and "liži"), typed with or without the
+    # diacritic; French "lèche" / "lécher" — the accent required on its own,
+    # because bare "leche" is Spanish for milk and this beach has counters.
+    # What is NOT his is kept out in `intents_of`: the ice cream you lick
+    # yourself (the `;` key, and something people say at the Slastičarnica),
+    # and "lick your lips", which is a thing said to HER.
+    ("doodle.lick", [r"\b(lick\w*|poli[žz]i\w*|li[žz]i|l[èé]ch(e|er|ez)|"
+                     r"leche[\s-]+(moi|la|le))\b"]),
 ]
 
 
@@ -1503,6 +1521,12 @@ def skills_of(text: str) -> list:
     return out[:1]
 
 
+# What makes a "lick" not the dog's: an ice cream, a cone, a lolly, a spoon,
+# or lips — "lick your lips" is flirting with her, not a command to him.
+LICK_NOT = (r"\b(ice ?cream|gelato|sladoled\w*|cone|cornet|lolly|lollipop|popsicle|"
+            r"spoon|lips?|usne|lèvres?|levres?)\b")
+
+
 def intents_of(text: str) -> list:
     t = (text or "").lower()
     out = []
@@ -1532,6 +1556,10 @@ def intents_of(text: str) -> list:
         if name.startswith("fly.") and to_her:
             continue
         if name == "fly.dance" and not a_fly:
+            continue
+        # A lick that is somebody licking something else — see the note over
+        # `doodle.lick` in INTENTS.
+        if name == "doodle.lick" and re.search(LICK_NOT, t):
             continue
         if name not in out and all(re.search(p, t) for p in pats):
             out.append(name)
@@ -1856,6 +1884,8 @@ INTENT_NAMES = {
                                 "dance or a song in honour of somebody's birthday",
                 "fly.brush": "ask the fly to demonstrate the electric toothbrush, "
                              "the Sonicare, or to show how to brush your teeth",
+                "doodle.lick": "tell the Slow Doodle (the dog) to lick, or to "
+                               "give somebody a lick on the face",
                 }
 # And the same menu for her own numbers, so that asking in Russian for a
 # pirouette works as well as asking in English. `do.` prefixed, filtered

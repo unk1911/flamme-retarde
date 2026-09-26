@@ -31719,6 +31719,21 @@ async function buildJadrija(scene) {
       // And what he says when his nose gets there — see `hmm` in 80-audio.js.
       hmm: (d) => (audio && audio.hmm ? audio.hmm(d) : false),
       hmmWarm: () => { if (audio && audio.hmmWarm) audio.hmmWarm(); },
+      // THE SLOW LICK — see `── the slow lick ──` in 43-doodle.js, and
+      // `lickHer` below for what it does to her. The sounds are all optional
+      // slots in 80-audio.js: a build without them licks in silence.
+      local, walkY,
+      // The kabina's walls, which the blocker list cannot tell him about:
+      // they go into it shrunk by your girth, 0.55 m a side, and a wall
+      // thinner than that comes out with negative extents and is filtered.
+      room: () => (special ? { inside: !!special.inside, t0: special.t0, t1: special.t1,
+        s1: special.s1, face: special.face, dc: special.dc } : null),
+      lickFaces: () => lickFaces(),
+      lickHer: (o) => lickHer(o),
+      slurp: (d) => (audio && audio.doodleSlurp ? audio.doodleSlurp(d) : false),
+      laugh: (who, d) => (audio && audio.lickLaugh ? audio.lickLaugh(who, d) : false),
+      laughStop: (who) => { if (audio && audio.lickLaughStop) audio.lickLaughStop(who); },
+      lickWarm: () => { if (audio && audio.lickWarm) audio.lickWarm(); },
       others: (x, z, pad, fn) => {
         const n = bodies(x, z, pad);
         for (let i = 0; i < n; i++) if (bodyBuf[i].kind !== 'doodle') fn(bodyBuf[i]);
@@ -31726,6 +31741,271 @@ async function buildJadrija(scene) {
     });
   } catch (e) {
     console.warn('doodle failed:', e.message);
+  }
+
+  // ── THE SLOW LICK, the half of it that happens to her ─────────────────────
+  //
+  // Misha, 25 Sep 2026: *"he runs toward either Baye or toward the player,
+  // goes for the FACE, and does a slurpy, messy lick-lick-lick. While he's
+  // licking, the victim laughs uncontrollably from ticklishness"*. The dog is
+  // all in src/43-doodle.js; this is her.
+  //
+  // FROM THE MOMENT HE SETS OFF FOR HER SHE IS HELD: `stepShow` is not called
+  // — the same door `__fr.jad.pose` goes through — so her phase, her clock and
+  // her place all wait for him, and when he has gone she picks up where she
+  // was. A walk is swapped for the idle while she waits, and given back. While
+  // she is held, `lickHold` does her instead:
+  //
+  //   she turns to face him as he comes (standing only)
+  //   she bends over him laughing — `cokeStoop`'s own knee solve and its bow,
+  //     a good deal less of both — which is also what brings her face down to
+  //     him. MEASURED: her lips are 1.56 m off the deck standing and he gets
+  //     his nose to 1.50 at the most, bolt upright; bent, they are at 1.44,
+  //     which he reaches three quarters of the way up, paws on her shoulders.
+  //     A deeper crouch (0.55 rad at the knee) was tried first and is why this
+  //     is shallow: it put her face at 1.35, him only half up, and his
+  //     forepaws at her hips instead of her shoulders
+  //   her hands go to his forelegs, fending him off (standing only)
+  //   her head turns away and back, her shoulders shake, her mouth opens on a
+  //   ha-ha-ha and her eyes screw shut (`face.laugh`, read in 46-apprentice.js)
+  //
+  // Where she can be licked is two lists. Standing about — which includes
+  // walking about, since a walk can be stopped — and down: kneeling, and
+  // lying or sitting on the cot, where he comes to her face with his head
+  // down instead. Everything else is a number with a clock in it, and he does
+  // not interrupt one: a cartwheel, a swim, the wine, the bend.
+  const LICK_STAND = { idle: 1, dwell: 1, play: 1, home: 1, orbit: 1,
+    toYou: 1, stepTo: 1, backTo: 1 };
+  const LICK_DOWN = { kept: 1, bedKneel: 1, cradle: 1, flatheld: 1, edgeHeld: 1,
+    sideL: 1, sideR: 1, fetalHeld: 1, sitHeld: 1, lotusHeld: 1, perchHeld: 1 };
+  const LICK_LAUGH = {
+    knee: 0.20,          // rad at the knee — CROUCH's, for the plate, is 0.60
+    bow: 0.24,           // rad down the spine, bent over him
+    chin: 0.15,          // and the neck, so she is laughing at him and not the floor
+    turn: 0.42,          // rad her head goes away and back, at `turnHz`
+    turnHz: 0.75,
+    shake: 0.055,        // rad of shoulder shudder, at `shakeHz`
+    shakeHz: 5.2,
+    haHz: 4.6,           // syllables of it a second
+    gape: [0.30, 0.50],  // jaw open, at rest and on each "ha"
+    lid: 0.85,           // eyes screwed up — see APPR in 46-apprentice.js
+  };
+  const lickYou = { ok: false, x: 0, y: 0, z: 0, fx: 1, fz: 0, t: 0, s: 0 };
+  let lickOn = null;
+  const _lkA = new THREE.Vector3(), _lkB = new THREE.Vector3();
+  const _lkQ = new THREE.Quaternion(), _lkR = new THREE.Quaternion();
+  const _lkX = new THREE.Vector3(1, 0, 0), _lkY = new THREE.Vector3(0, 1, 0);
+  const _lkZ = new THREE.Vector3(0, 0, 1);
+
+  /** Where you are, for him: the walker's eye and the way you are looking. */
+  function lickSeen(cam, at, dir) {
+    lickYou.ok = !!at;
+    if (!at) return;
+    const eye = typeof ground !== 'undefined' && ground && ground.you ? ground.you.eye : 1.66;
+    lickYou.x = at.x; lickYou.y = at.y + eye; lickYou.z = at.z;
+    const fx = dir ? dir.x : 1, fz = dir ? dir.z : 0;
+    const l = Math.hypot(fx, fz) || 1;
+    lickYou.fx = fx / l; lickYou.fz = fz / l;
+    const ts = local(at.x, at.z);
+    lickYou.t = ts[0]; lickYou.s = ts[1];
+  }
+
+  /** Why she cannot be licked now, or null if she can. */
+  function lickWhyNot() {
+    if (!show || !skinFig || !skinFig.mesh.visible) return 'gone';
+    if (posed || (show.air || 0) > 0.02) return 'busy';
+    if (show.phase === 'swim' || (show.dip || 0) > 0) return 'water';
+    if (!LICK_STAND[show.phase] && !LICK_DOWN[show.phase]) return 'busy';
+    // In the kabina, and you are not: the room you would see her in is not
+    // the room drawn, and the dog would be nosing into the small one.
+    if (sheIsIn() && !(special && special.inside)) return 'inside';
+    return null;
+  }
+
+  /**
+   * Her face, for him: the middle of her mouth and which way her face points,
+   * off the figure that is drawn — `thumbReach`'s own points, without its
+   * "only in the kabina". And for somebody lying down, where the rest of her
+   * is, so he stands beside her and not on her.
+   */
+  function lickFace() {
+    if (!show || !skinFig) return null;
+    const why = lickWhyNot();
+    const out = { who: 'baye', ok: !why, why, t: show.t, s: show.s,
+      lying: !LICK_STAND[show.phase], phase: show.phase };
+    if (why === 'gone') return out;
+    const v2 = APPR.primary && appr && appr.mesh.visible ? apprenticeLipBind() : null;
+    const F = v2 ? appr : skinFig;
+    let p = v2;
+    if (!p) {
+      const c = skinFig.uFace ? skinFig.uFace.uLipC.value : null;
+      if (!c || c.y < -50) { out.ok = false; out.why = 'gone'; return out; }
+      p = [c.x - 0.004, c.y - 0.006, 0];
+    }
+    const w = bindPointAt(F, p, [['jaw', 0.70], ['head', 0.30]], _lkA);
+    const b = bindPointAt(F, [p[0] - 0.10, p[1] + 0.02, 0], [['head', 1]], _lkB);
+    const f = b.sub(w).negate().normalize();
+    out.x = w.x; out.y = w.y; out.z = w.z;
+    out.fx = f.x; out.fy = f.y; out.fz = f.z;
+    // Her shoulders, for his forepaws.
+    skinFig.mesh.updateMatrixWorld();
+    out.shoulders = ['armUL', 'armUR'].map((n) => {
+      skinFig.boneAt(skinFig.boneIndex(n), _lkB).applyMatrix4(skinFig.mesh.matrixWorld);
+      return [_lkB.x, _lkB.y, _lkB.z];
+    });
+    // The cot she is on, the whole of it and not the collider's snug box,
+    // in (t, s): he stands beside it, not on it.
+    if (show.onBed && kit && kit.cot) out.cot = [kit.cot[0], kit.cot[1] + 0.10, 0.35, 0.95];
+    if (out.lying) {
+      out.body = [];
+      skinFig.mesh.updateMatrixWorld();
+      for (const n of ['pelvis', 'spine02', 'legUL', 'legUR', 'legLL', 'legLR', 'footL', 'footR']) {
+        const i = skinFig.boneIndex(n);
+        if (i < 0) continue;
+        skinFig.boneAt(i, _lkB).applyMatrix4(skinFig.mesh.matrixWorld);
+        out.body.push([_lkB.x, _lkB.z]);
+      }
+    }
+    return out;
+  }
+  function lickFaces() {
+    return {
+      // Your shoulders are where a body of your height has them: 24 cm under
+      // your eye and 17 either side, and 4 cm forward of it.
+      you: lickYou.ok ? { who: 'you', ok: true, x: lickYou.x, y: lickYou.y, z: lickYou.z,
+        fx: lickYou.fx, fy: 0, fz: lickYou.fz, t: lickYou.t, s: lickYou.s,
+        shoulders: [1, -1].map((sd) => [lickYou.x + lickYou.fx * 0.04 - lickYou.fz * 0.17 * sd,
+          lickYou.y - 0.24, lickYou.z + lickYou.fz * 0.04 + lickYou.fx * 0.17 * sd]) } : null,
+      baye: lickFace(),
+    };
+  }
+
+  /**
+   * Called by the dog every frame he has her: `k` is how hard she is
+   * laughing, 0 to 1; `to` is where he is coming to stand, (t, s), for her
+   * to turn to; `grip` the two sides of the base of his neck, world metres,
+   * while he is up on her, for her hands; `up` how far up he is. Null lets
+   * her go.
+   */
+  function lickHer(o) {
+    if (!show || !skinFig) return;
+    if (!o) { if (lickOn) lickLetGo(); return; }
+    if (!lickOn) {
+      const clip = skinFig.playing();
+      lickOn = { k: 0, t: 0, c: 0, h: 0, stand: !!LICK_STAND[show.phase], clip,
+        swapped: false, to: null, grip: null, up: 0, legs: null, seen: 0 };
+      if (clip === 'walk') { skinFig.play('idle', { fade: 0.35 }); lickOn.swapped = true; }
+    }
+    lickOn.k = o.k; lickOn.to = o.to || null; lickOn.grip = o.grip || null;
+    lickOn.up = o.up || 0; lickOn.seen = 0;
+  }
+
+  const LICK_AIMS = ['legUL', 'legLL', 'legUR', 'legLR', 'spine01', 'spine02',
+    'spine03', 'neck', 'head', 'armUL', 'armLL', 'armUR', 'armLR'];
+  function lickLetGo() {
+    const f = skinFig, L = lickOn;
+    for (const n of LICK_AIMS) f.aim(n, 0, 1, 0, 0);
+    if (f.face) f.face.laugh = 0;
+    if (L.swapped && L.clip) f.play(L.clip, { fade: 0.4 });
+    // Anything that happened to her while she was held is not a thing to
+    // answer now: a walk into her mid-lick is not a reason to twerk after.
+    show.bumped = 0;
+    show.dWas = Math.hypot(show.t - (show.pt || show.t), show.s - (show.ps || show.s));
+    lickOn = null;
+  }
+
+  /** Her, held, laughing. In place of `stepShow` — see `updateCrowd`. */
+  function lickHold(dt) {
+    const L = lickOn, f = skinFig, A = LICK_LAUGH;
+    L.t += dt;
+    // A dog that stopped calling — out of range and no longer stepped — is
+    // not a reason to stand frozen on the deck for the rest of the session.
+    L.seen += dt;
+    if (L.seen > 2) { lickLetGo(); return; }
+    const k = L.k;
+    if (L.stand && L.to) {
+      // Round to face where he is coming to stand, at a woman's pace.
+      let e = Math.atan2(L.to[1] - show.s, L.to[0] - show.t) - show.side - show.ang;
+      while (e > Math.PI) e -= TAU;
+      while (e < -Math.PI) e += TAU;
+      show.ang += Math.sign(e) * Math.min(Math.abs(e), 2.6 * dt);
+      show.want = show.ang;
+    }
+    // Doubled over: as soon as he is nearly there, and all the way while he
+    // is up on her.
+    L.c = damp(L.c, L.stand ? sat((k - 0.2) / 0.3) : 0, 4, dt);
+    L.h = damp(L.h, L.stand && L.grip && L.up > 0.25 ? 1 : 0, 5, dt);
+    const t = L.t;
+    let drop = 0;
+    if (L.c > 0.002) {
+      if (!L.legs) {
+        const R = crouchLegAt(f, 'legUR', 'legLR', 'footR');
+        const Lg = crouchLegAt(f, 'legUL', 'legLL', 'footL');
+        L.legs = R && Lg ? { R, L: Lg } : null;
+      }
+      if (L.legs) {
+        const a = A.knee * L.c;
+        drop = L.legs.R.y * (1 - Math.cos(a)) + L.legs.R.x * Math.sin(a);
+        const b = crouchFold(L.legs.L, drop);
+        f.aim('legUR', 0, 0, 1, a);
+        f.aim('legLR', 0, 0, 1, -2 * a);
+        f.aim('legUL', 0, 0, 1, b);
+        f.aim('legLL', 0, 0, 1, -2 * b);
+      }
+    } else if (L.legs) {
+      for (const n of ['legUL', 'legLL', 'legUR', 'legLR']) f.aim(n, 0, 1, 0, 0);
+      L.legs = null;
+    }
+    // The bow, and the shudder of the laugh in the top of it.
+    const bow = A.bow * L.c;
+    const shake = A.shake * k * Math.sin(t * TAU * A.shakeHz);
+    f.aim('spine01', 0, 0, -1, bow * 0.45);
+    f.aim('spine02', 0, 0, -1, bow * 0.33);
+    _lkQ.setFromAxisAngle(_lkZ, -bow * 0.22);
+    _lkR.setFromAxisAngle(_lkX, shake);
+    armAimQ(f, 'spine03', _lkQ.multiply(_lkR));
+    f.aim('neck', 0, 0, -1, A.chin * L.c);
+    // Her head away and back, and a nod on every "ha".
+    const ha = Math.abs(Math.sin(t * Math.PI * A.haHz));
+    _lkQ.setFromAxisAngle(_lkY, k * A.turn * Math.sin(t * TAU * A.turnHz));
+    _lkR.setFromAxisAngle(_lkZ, -k * 0.06 * ha);
+    armAimQ(f, 'head', _lkQ.multiply(_lkR));
+    if (f.face) {
+      f.face.gape = k * (A.gape[0] + (A.gape[1] - A.gape[0]) * ha);
+      f.face.laugh = k * A.lid;
+    }
+    // Where she stands: as `stepShow` would put her, less the crouch.
+    if (L.stand) {
+      const p = toWorld(show.t, show.s);
+      const yw = faceYaw(show.t, show.ang + show.side);
+      const back = CROUCH.back * L.c;
+      f.mesh.position.set(p[0] - Math.cos(yw) * back, p[1] + (show.mat || 0) - drop,
+        p[2] + Math.sin(yw) * back);
+      f.mesh.rotation.y = yw;
+    }
+    f.mesh.updateMatrixWorld();
+    // Her hands either side of his neck, holding him off. The arms are
+    // solved on the pose as it now is — clip, crouch and bow — so her
+    // shoulders are where they are and not where the idle had them.
+    if (L.h > 0.01 && L.grip) {
+      const nm = ['armUL', 'armLL', 'handL', 'armUR', 'armLR', 'handR'];
+      for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+      f.update(0);
+      const P = nm.map((n) => f.boneAt(f.boneIndex(n), new THREE.Vector3()));
+      // In her frame, and her left (+z) hand to whichever side is on her left.
+      const G = L.grip.map((q) => f.mesh.worldToLocal(new THREE.Vector3(q[0], q[1], q[2])));
+      if (G[0].z < G[1].z) G.reverse();
+      for (const [side, o, g] of [['L', 0, G[0]], ['R', 3, G[1]]]) {
+        const goal = _lkA.lerpVectors(P[o + 2], g, L.h);
+        // The elbows out and down.
+        _lkB.set(-0.1, -0.5, side === 'L' ? 1 : -1).normalize();
+        wheelLimb(f, 'armU' + side, 'armL' + side, P[o], P[o + 1], P[o + 2], goal, _lkB);
+      }
+    } else if (L.h <= 0.01 && L.armsOn) {
+      for (const n of ['armUL', 'armLL', 'armUR', 'armLR']) f.aim(n, 0, 1, 0, 0);
+    }
+    L.armsOn = L.h > 0.01;
+    f.update(0);
   }
 
   // Asked for once here and on their own intervals after, for as long as the
@@ -50182,6 +50462,9 @@ async function buildJadrija(scene) {
     // the same number. Gating out here would mean measuring it twice.
     stepDog(cam, dt, pt, ps);
     stepCat(cam, dt);
+    // Where you are for the slow lick — the walker's eye, and the way you are
+    // looking — before he is stepped. See `lickSeen`.
+    lickSeen(cam, at, dir);
     if (doodle) doodle.step(cam, { t: pt, s: ps }, dt);
     stepKabina(pt, ps, dt, who.y);
 
@@ -50220,6 +50503,8 @@ async function buildJadrija(scene) {
         // clip — the fringe's swing among it — and a pose held with a frozen
         // dt is a pose whose cloth never arrives.
         if (posed) skinFig.state.curT = posed.at;
+        // And held while the Slow Doodle has her — see `lickHold`.
+        else if (lickOn) lickHold(dt);
         else stepShow(dt, pt, ps, dir);
         // After both, because it reads the bones the step above has just
         // solved and it has to run on the held frame as well as the live one.
@@ -51610,6 +51895,15 @@ async function buildJadrija(scene) {
      */
     /** The Slow Doodle's handle — see `api` in src/43-doodle.js. */
     doodle: doodle ? doodle.api : null,
+    /**
+     * "Lick" — the command, from 49-ears.js. 'baye' or 'you' for who he has
+     * gone for, or a key of DOODLE_LICK_WHY for why not. `who` forces one.
+     */
+    doodleLick: (who) => (doodle ? doodle.api.lick(who) : 'nodog'),
+    /** Debug: who there is to lick, and whether she is held for it. */
+    lickFaces: () => lickFaces(),
+    lickHeld: () => (lickOn ? { k: +lickOn.k.toFixed(3), c: +lickOn.c.toFixed(3),
+      h: +lickOn.h.toFixed(3), stand: lickOn.stand, clip: lickOn.clip, t: +lickOn.t.toFixed(2) } : null),
     cat: () => {
       if (!cat) return null;
       const f = cat.fig, v = new THREE.Vector3();

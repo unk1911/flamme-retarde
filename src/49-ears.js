@@ -840,6 +840,19 @@ const ears = (() => {
       if (typeof startFlyCam === 'function') startFlyCam('site');
       return;
     }
+    // The Slow Doodle's slow lick — see `lickCmd` in 43-doodle.js, which
+    // decides who (her or you, at random, among whoever he can reach) and
+    // answers with a reason when it is nobody.
+    if (name === 'doodle.lick') {
+      const J = typeof jadrija !== 'undefined' && jadrija;
+      const got = J && J.doodleLick ? J.doodleLick() : 'nodog';
+      const ok = got === 'baye' || got === 'you';
+      note('doodle: ' + (got === 'baye' ? 'off at a gallop — for Baye\'s face'
+        : got === 'you' ? 'off at a gallop — for your face'
+          : (typeof DOODLE_LICK_WHY !== 'undefined' && DOODLE_LICK_WHY[got]) || got),
+      ok ? 'did' : 'meta');
+      return;
+    }
     if (name === 'baye.time') {
       note('baye: asking…', 'meta');
       const res = await voice.answer('time', lang);
