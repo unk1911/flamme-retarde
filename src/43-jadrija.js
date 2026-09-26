@@ -35770,63 +35770,273 @@ async function buildJadrija(scene) {
    * pose she is in holds it, and `wheelLimb` works out the hip and knee, with
    * the knee pushed outward from wherever it already points, so lying on her
    * back with her knees up they fall open, kneeling they part, and standing
-   * her feet step out to a wide stance. The pose she is in is sampled with
-   * no aim on her legs — so when her pose changes the aims come off, the
-   * clip is given a moment to land, and the legs are sampled again: a hip
-   * measured in one pose is a leg thrown through the floor in the next.
+   * her feet step out to a wide stance. When her pose changes the aims come
+   * off, the clip is given a moment to land, and the legs are taken up again:
+   * a hip measured in one pose is a leg thrown through the floor in the next.
+   *
+   * ── AND WIDER ─────────────────────────────────────────────────────────
+   *
+   * Misha, 25 Sep 2026: *"new command 'wider', to spread legs wider"*.
+   *
+   * `show.legsSp` WAS A LATCH AND IS AN AMOUNT NOW: 0 is together, 1 is the
+   * spread above exactly as it was, and each "wider" adds `step` (1.35, 1.7,
+   * 2.05 ...) up to a ceiling that belongs to the pose she is in (`top`).
+   * Everything that read it as a flag reads it as "more than nothing", which
+   * it still is.
+   *
+   * PAST 1 THE LEGS SWING; THEY ARE NOT PUSHED. The first cut simply went on
+   * sliding the ankle sideways — 0.26 m a unit — and on her back with her
+   * knees up that is a goal out of reach by the second step: the solver
+   * straightens the leg at it, the knee flips to whichever side of the line
+   * the pole happens to favour, and MEASURED, the ankles came 0.64 m apart at
+   * the spread, 0.17 at one "wider" and 1.43 at four. So from 1 on the whole
+   * leg as the spread left it — ankle goal and knee pole together — turns
+   * about the hip, in the plane of the leg and her side, `swing` a unit:
+   * 8 degrees a step. A rigid turn keeps the goal exactly as far from the hip
+   * as it was, so the solve cannot flip, and the knee keeps the bend the pose
+   * gave it.
+   *
+   * STANDING, SHE GOES DOWN AS HER FEET GO OUT, or they leave the floor: a
+   * straight leg turned 8 degrees about the hip lifts its heel 1 per cent of
+   * its length, and turned 40 it lifts it 19 cm. MEASURED with the push
+   * alone, her left foot was 4.8 cm in the air at the fourth step. So the
+   * turned feet are put back on the floor by lowering all of her — `legsDrop`,
+   * taken off her height where she is placed, the same subtraction `duck` is
+   * for the crouch at the plate — by exactly the higher foot's lift, with the
+   * other knee bending the difference. And the feet are held flat, with the
+   * turn the chain gave them taken back off the foot bone: turned with the
+   * leg, a foot 40 degrees out is standing on its inside edge. Measured now:
+   * both ankles within 4 mm of where they stand together, toes within 4 mm,
+   * at every step to the ceiling.
+   *
+   * AND THE LEGS ARE TAKEN UP EVERY FRAME, NOT ONCE. The spread used to
+   * sample the pose a single time and solve against that sample for as long
+   * as she held it, and `cradle` does not hold still: it is 24.8 s of two arm
+   * poses, and its legs move with them. MEASURED at one amount, ankles 0.78 m
+   * apart for twelve seconds and 1.52 m for the next twelve. Now each frame
+   * reads where the clip has put her legs, with last frame's own aims taken
+   * back off first (`legsLaid`, the same un-turn `handTo` does for an arm),
+   * and solves from there — so the spread goes with the pose instead of
+   * fighting it.
+   *
+   * THE CEILINGS, measured in the kabina per pose, a full clip cycle at each
+   * step, against three things: the joints against what is under them (floor,
+   * or mattress top where the mattress is), the limbs as capsules against the
+   * mattress edge, and how far the thighs have gone from each other.
+   *
+   *   standing   2.4   4 "wider"s. Thighs 86–89° apart, 43–44° a side,
+   *                    against "roughly 45–50" — ankles 1.25 m apart, hips
+   *                    down 0.18 m. The fifth is 51° a side.
+   *   on her     2.4   legs up: 4. A wide V in the air, the thighs 117–125°
+   *   back             apart; each thigh passes the mattress edge with 4.4 cm of
+   *                    it to spare, toes 0.18 m off the side wall. At the
+   *                    seventh the thigh is through the mattress (−1.4 cm).
+   *   legs down  1     on the cot: none. The mattress is 0.66 m wide and the
+   *   or on her        spread ALREADY has her ankles 0.78 m apart — 6 cm out
+   *   front            past each edge, over nothing. A leg any further out
+   *                    would be hanging off the side.
+   *              2.05  on the floor: 3, 44° a side, the legs sliding apart
+   *                    along it with nothing to fall off. (Her front is
+   *                    never on the floor while the room has a cot.)
+   *   upside     2.05  3 in the air: 43° a side, toes 0.22 m off the wall;
+   *   down             the fourth is 0.13 and the fifth 0.04.
+   *   wall perch 1.35  1: the pose already sits in a V (60° between the
+   *                    thighs); spread 90, one more 106 — 53° a side sat.
+   *   the rest   1     none, and each for a reason the spread already has:
+   *                    kneeling (floor or cot) and on all fours the spread
+   *                    lifts her knees 11–13 cm off what they knelt on; on
+   *                    the edge of the cot her feet leave the floor 4 cm at
+   *                    the first step; lotus is 148° between the thighs at
+   *                    the spread and 173 at the second; sitting with her
+   *                    legs out has them past the mattress like lying; and
+   *                    on her side "her side" is not the way the spread
+   *                    moves them.
    */
-  const LEGSP = { out: 0.26, stand: 0.14, secs: 0.9, settle: 0.35 };
+  const LEGSP = { out: 0.26, stand: 0.14, secs: 0.9, settle: 0.35,
+    step: 0.35, swing: (8 * Math.PI / 180) / 0.35,
+    top: { stand: 2.4, cradle: 2.4, flatBed: 1, flatFloor: 2.05,
+      upsideHeld: 2.05, perchHeld: 1.35, other: 1 },
+    // How far out a step puts a standing foot, for the room test — see
+    // `legsRoom`. The most any step moved one, measured: 0.117 m.
+    room: 0.13 };
   const STANDS = { dwell: 1, idle: 1, meet: 1, play: 1, wait: 1, pour: 1 };
-  let legsRest = null, legsRestPhase = null, legsSettle = 0;
-  const _lsGoal = new THREE.Vector3(), _lsPole = new THREE.Vector3(), _lsMid = new THREE.Vector3();
+  // Legs straight out along the mattress: her back with them down, her front.
+  const LEGS_FLAT = { flat: 1, flatheld: 1 };
+  /** The ceiling on `show.legsSp` in the pose she is in. See LEGSP. */
+  function legsSpMax(phase) {
+    const T = LEGSP.top;
+    if (STANDS[phase]) return T.stand;
+    if (LEGS_FLAT[phase] || (phase === 'cradle' && show.legsDown)) {
+      return show.onBed ? T.flatBed : T.flatFloor;
+    }
+    return T[phase] != null ? T[phase] : T.other;
+  }
+  /** And why, when she is at it: the cot, or her. */
+  function legsSpWhy(phase) {
+    const flat = LEGS_FLAT[phase] || (phase === 'cradle' && show.legsDown);
+    return flat && show.onBed ? 'cotnarrow' : 'widest';
+  }
+  /**
+   * Whether both feet, a step further out, are still in the room.
+   *
+   * Standing only, which is the one pose she is not in a fixed place for:
+   * she stands wherever she stopped, and a 1.25 m stance beside the cot or
+   * the TV is a foot through the furniture. Her ankles and toes as they are
+   * this frame, each moved `LEGSP.room` further out along her own side, put
+   * through the room's own body test (`kabinaFit`) — the walls, everything
+   * standing in there, and the cot below its mattress.
+   */
+  const _lrPts = new Float32Array(12);
+  function legsRoom() {
+    const fit = kabinaFit();
+    if (!fit || !skinFig || !STANDS[show.phase]) return true;
+    const m = skinFig.mesh;
+    m.updateMatrixWorld();
+    const iu = skinFig.boneIndex('legUL');
+    if (iu < 0) return true;
+    const sgnL = Math.sign(skinFig.boneAt(iu, _lsV).z || 1);
+    let k = 0;
+    for (const n of ['footL', 'toeL', 'footR', 'toeR']) {
+      const i = skinFig.boneIndex(n);
+      if (i < 0) return true;
+      skinFig.boneAt(i, _lsV);
+      _lsV.z += (n.endsWith('L') ? sgnL : -sgnL) * LEGSP.room;
+      _lsV.applyMatrix4(m.matrixWorld);
+      _lrPts[k++] = _lsV.x; _lrPts[k++] = _lsV.y; _lrPts[k++] = _lsV.z;
+    }
+    return fit.ok(_lrPts, 4, 0.03);
+  }
+  let legsRest = null, legsRestPhase = null, legsSettle = 0, legsDropNext = 0;
+  // Where she was last frame, for whether she is walking — see below.
+  const legsWas = { t: null, s: null };
+  // The turns last frame's solve put on each thigh and shin, to be taken back
+  // off what the palette reports. See `handTo`, which does this for an arm.
+  const legsLaid = { L: { u: new THREE.Quaternion(), l: new THREE.Quaternion() },
+    R: { u: new THREE.Quaternion(), l: new THREE.Quaternion() } };
+  const _lsGoal = new THREE.Vector3(), _lsMid = new THREE.Vector3(), _lsV = new THREE.Vector3();
+  const _lsAx = new THREE.Vector3(), _lsOut = new THREE.Vector3(), _lsQ = new THREE.Quaternion();
+  const _lsG = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _lsP = { L: new THREE.Vector3(), R: new THREE.Vector3() };
   function legsSpread(f, dt) {
-    const want = show.legsSp && !HANDS[show.phase] ? 1 : 0;
+    // Capped by the pose, so an amount asked for standing comes down to what
+    // the cot allows when she lies on it, and goes back when she gets up.
+    const want = HANDS[show.phase] ? 0 : Math.min(show.legsSp || 0, legsSpMax(show.phase));
     show.legsSpAt = damp(show.legsSpAt || 0, want, 1 / LEGSP.secs, dt);
     const clear = () => {
-      for (const n of ['legUL', 'legLL', 'legUR', 'legLR']) f.aim(n, 0, 1, 0, 0);
+      for (const n of ['legUL', 'legLL', 'legUR', 'legLR', 'footL', 'footR']) f.aim(n, 0, 1, 0, 0);
+      for (const s of ['L', 'R']) { legsLaid[s].u.identity(); legsLaid[s].l.identity(); }
     };
+    // ONE FRAME LATE, because the legs are. The aims below go into the
+    // palette at the NEXT `update`, and her height is set this frame — so the
+    // drop that goes with the legs being drawn is the one worked out last
+    // frame, and nothing if last frame solved nothing. MEASURED on time,
+    // closing from the widest: both feet 1.6 cm off the floor while the hips
+    // came up, which is one frame of the ease.
+    show.legsDrop = legsDropNext;
+    legsDropNext = 0;
     if (show.legsSpAt < 0.002) {
       if (show.legsSpOn) { clear(); show.legsSpOn = 0; }
       legsRest = null; legsRestPhase = null;
       return;
     }
     // Not while she is walking: a leg sampled mid-stride and spread from
-    // there is one stride frozen. Off, and measured again when she stops.
-    if ((show.vel || 0) > 0.05) {
+    // there is one stride frozen. Off, and taken up again when she stops.
+    //
+    // WALKING IS HER MOVING, NOT `show.vel`. That number is only eased back
+    // to nothing by the phases that stand or creep, and every pose she is
+    // laid down in leaves it where it was: MEASURED, 0.38 for as long as she
+    // lay on the cot after crawling up it on her knees, and "legs down, legs
+    // apart" did nothing at all. How far she went since last frame is what
+    // walking is, and the walk clip on the spot is a stride as well.
+    const moved = dt > 0 && legsWas.t != null
+      ? Math.hypot(show.t - legsWas.t, show.s - legsWas.s) / dt : 0;
+    legsWas.t = show.t; legsWas.s = show.s;
+    if (moved > 0.05 || f.playing() === 'walk') {
       if (show.legsSpOn) { clear(); show.legsSpOn = 0; }
       legsRest = null; legsRestPhase = null;
       return;
     }
+    // AND THE EASE WAITS FOR THE SETTLE. The aims are off while the clip
+    // lands, so the amount is held just above off rather than left to run on
+    // — MEASURED, it had reached 0.36 of the spread in those 0.35 s, and the
+    // legs went there in one frame when the settle ended. Held, they ease out
+    // from together, which is also how they come back after she stops
+    // walking or her pose changes.
     if (show.phase !== legsRestPhase) {
       clear();
       legsRest = null; legsRestPhase = show.phase; legsSettle = LEGSP.settle;
+      show.legsSpAt = Math.min(show.legsSpAt, 0.003);
       return;
     }
-    if (legsSettle > 0) { legsSettle -= dt; return; }
+    if (legsSettle > 0) {
+      legsSettle -= dt;
+      show.legsSpAt = Math.min(show.legsSpAt, 0.003);
+      return;
+    }
     if (!legsRest) {
       legsRest = {};
-      const v = new THREE.Vector3();
       for (const n of ['legUL', 'legLL', 'footL', 'legUR', 'legLR', 'footR']) {
-        const i = f.boneIndex(n);
-        if (i < 0) { legsRest = null; return; }
-        legsRest[n] = f.boneAt(i, v).clone();
+        if (f.boneIndex(n) < 0) { legsRest = null; return; }
+        legsRest[n] = new THREE.Vector3();
       }
     }
+    // Her legs as the clip has them this frame: the palette is the clip with
+    // last frame's aims on it, thigh then shin, so those come off in the
+    // other order.
+    for (const side of ['L', 'R']) {
+      const S = f.boneAt(f.boneIndex('legU' + side), legsRest['legU' + side]);
+      const E = f.boneAt(f.boneIndex('legL' + side), legsRest['legL' + side]);
+      const W = f.boneAt(f.boneIndex('foot' + side), legsRest['foot' + side]);
+      const L = legsLaid[side];
+      _lsV.copy(W).sub(E).applyQuaternion(_lsQ.copy(L.l).invert())
+        .applyQuaternion(_lsQ.copy(L.u).invert());
+      E.sub(S).applyQuaternion(_lsQ).add(S);
+      W.copy(E).add(_lsV);
+    }
     show.legsSpOn = 1;
-    const out = STANDS[show.phase] ? LEGSP.stand : LEGSP.out;
+    const stand = !!STANDS[show.phase];
+    const out = stand ? LEGSP.stand : LEGSP.out;
+    // The spread itself, and the swing past it.
+    const e = Math.min(1, show.legsSpAt);
+    const sw = Math.max(0, show.legsSpAt - 1) * LEGSP.swing;
+    let drop = 0;
     for (const side of ['L', 'R']) {
       const S = legsRest['legU' + side], E = legsRest['legL' + side], W = legsRest['foot' + side];
       const sgn = Math.sign(S.z || (side === 'L' ? 1 : -1));
-      _lsGoal.set(W.x, W.y, W.z + sgn * out * show.legsSpAt);
+      const G = _lsG[side].set(W.x, W.y, W.z + sgn * out * e);
       // The knee out of the line it already bends from, and further out.
       _lsMid.copy(S).add(W).multiplyScalar(0.5);
-      _lsPole.copy(E).sub(_lsMid);
-      if (_lsPole.lengthSq() < 1e-6) _lsPole.set(1, 0, 0);
-      _lsPole.normalize();
-      _lsPole.z += sgn * 0.9 * show.legsSpAt;
-      _lsPole.normalize();
-      wheelLimb(f, 'legU' + side, 'legL' + side, S, E, W, _lsGoal, _lsPole);
+      const P = _lsP[side].copy(E).sub(_lsMid);
+      if (P.lengthSq() < 1e-6) P.set(1, 0, 0);
+      P.normalize();
+      P.z += sgn * 0.9 * e;
+      P.normalize();
+      // And wider: the leg turned about the hip toward her own side, the goal
+      // and the pole together. `hip→ankle × side` is the axis that carries
+      // the one toward the other.
+      if (sw > 0) {
+        _lsGoal.copy(G).sub(S);
+        _lsAx.crossVectors(_lsGoal, _lsOut.set(0, 0, sgn));
+        if (_lsAx.lengthSq() > 1e-8) {
+          _lsQ.setFromAxisAngle(_lsAx.normalize(), sw);
+          G.copy(S).add(_lsGoal.applyQuaternion(_lsQ));
+          P.applyQuaternion(_lsQ);
+        }
+      }
+      if (stand) drop = Math.max(drop, G.y - W.y);
     }
+    for (const side of ['L', 'R']) {
+      const S = legsRest['legU' + side], E = legsRest['legL' + side], W = legsRest['foot' + side];
+      const G = _lsG[side];
+      // Both feet back down to the floor she is lowered to.
+      if (stand) G.y = W.y + drop;
+      const chain = wheelLimb(f, 'legU' + side, 'legL' + side, S, E, W, G, _lsP[side]);
+      legsLaid[side].u.copy(_wkQ);
+      legsLaid[side].l.copy(_wkR);
+      if (stand) armAimQ(f, 'foot' + side, _lsQ.copy(chain).invert());
+      else f.aim('foot' + side, 0, 1, 0, 0);
+    }
+    legsDropNext = drop;
   }
 
   /**
@@ -37144,6 +37354,12 @@ async function buildJadrija(scene) {
      */
     'legs.spread': 1, 'legs.close': 1,
     /**
+     * And further apart. Misha, 25 Sep 2026: *"new command 'wider', to
+     * spread legs wider"*. Each one a step out from where they are, to a
+     * ceiling measured per pose — see `legsSpMax`.
+     */
+    'legs.wider': 1,
+    /**
      * And her mouth, wide. Misha, 23 Sep 2026: *"can you add a command 'open
      * your mouth' or 'open wide', that she really opens the mouth wide"*. A
      * latch over whatever she is doing, like the arms and the eyes: the jaw
@@ -37387,12 +37603,21 @@ async function buildJadrija(scene) {
       if (name === 'recline.bed' && (!kit || !kit.cot)) return 'nobed';
       return null;
     }
-    if (name === 'legs.spread' || name === 'legs.close') {
+    if (name === 'legs.spread' || name === 'legs.close' || name === 'legs.wider') {
       // Anywhere she is holding still — not on her hands, and not walking.
       if (HANDS[show.phase]) return 'hands';
-      const want = name === 'legs.spread' ? 1 : 0;
-      if ((show.legsSp || 0) === want) return want ? 'spreadalready' : 'closed';
-      return null;
+      // AN AMOUNT NOW AND NOT A LATCH — see `legsSpread`. "Together" is 0,
+      // "apart" is at least 1, and "wider" is whatever is left under this
+      // pose's ceiling. What she already has is the asked amount capped by
+      // the pose she is in, because an amount asked for standing is more
+      // than the cot will take once she is lying on it with her legs down.
+      const top = legsSpMax(show.phase);
+      const has = Math.min(show.legsSp || 0, top);
+      if (name === 'legs.close') return has > 0 ? null : 'closed';
+      if (name === 'legs.spread') return has >= 1 ? 'spreadalready' : null;
+      if (has >= top - 0.01) return legsSpWhy(show.phase);
+      // And standing, whether there is floor for it where she is.
+      return has >= 1 && !legsRoom() ? 'noroom' : null;
     }
     if (name === 'legs.down' || name === 'legs.up') {
       // Only from the pose they are about. Everywhere else her legs are
@@ -38650,7 +38875,7 @@ async function buildJadrija(scene) {
       // a phase it may be entered from, which every held pose in that room
       // already is.
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
-      'legs.spread': 1, 'legs.close': 1,
+      'legs.spread': 1, 'legs.close': 1, 'legs.wider': 1,
       'mouth.open': 1, 'mouth.close': 1, 'pet': 1,
       // AND THE HAIR IS NOT ON THIS LIST, which it was for an afternoon.
       //
@@ -39156,6 +39381,13 @@ async function buildJadrija(scene) {
         }
       } else if (name === 'legs.spread' || name === 'legs.close') {
         show.legsSp = name === 'legs.spread' ? 1 : 0;
+        show.did = name;
+      } else if (name === 'legs.wider') {
+        // A step out from where they are, to the pose's ceiling; from
+        // together it is the spread itself. See `legsSpread`.
+        const top = legsSpMax(show.phase);
+        const has = Math.min(show.legsSp || 0, top);
+        show.legsSp = has < 1 ? 1 : Math.min(top, has + LEGSP.step);
         show.did = name;
       } else if (name === 'legs.down' || name === 'legs.up') {
         // A LATCH AND NOT A PHASE. She stays in `cradle` — it is the same
@@ -41807,7 +42039,8 @@ async function buildJadrija(scene) {
     // reason `air` is an addition: the deck has not moved and she has. Her
     // knees fold by the same amount in figure space, so her feet stay on the
     // floor while her hips come down — see `cokeStoop`.
-    const yNow = p[1] + show.air + (show.mat || 0) - (show.duck || 0);
+    const yNow = p[1] + show.air + (show.mat || 0) - (show.duck || 0)
+      - (show.legsDrop || 0);
     // AND HER HIPS GO BACK WITH THE STOOP, which is the same argument `duck`
     // makes one line up: the deck has not moved and she has. In world metres
     // and after `toWorld`, because what it is measured along is her own
@@ -51935,6 +52168,10 @@ async function buildJadrija(scene) {
       // preconditions now — see `askWhy` — and a precondition that cannot be
       // read from outside is one no test can measure.
       level: +(show.level ?? -1).toFixed(2), why: show.why || null,
+      // Her legs apart: what was asked for, the pose's ceiling on it, and
+      // where the easing has got to. See `legsSpread`.
+      legsSp: +(show.legsSp || 0).toFixed(2), legsSpMax: legsSpMax(show.phase),
+      legsSpAt: +(show.legsSpAt || 0).toFixed(3),
       wet: +show.wet.toFixed(2), lock: +show.lock.toFixed(1),
       // Whether the water on her is drawn as water. See sheIsIn().
       indoors: sheIsIn(), streak: skinFig && skinFig.face

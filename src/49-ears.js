@@ -714,6 +714,7 @@ const ears = (() => {
     'mouth.open': 'her mouth wide open', 'mouth.close': 'her mouth closed',
     'pet': 'you petting her hair',
     'legs.spread': 'her legs apart', 'legs.close': 'her legs together',
+    'legs.wider': 'her legs wider apart',
     // Her hands up to the back of her head, and then the swap. See `tieHair`
     // in 43-jadrija.js: it is the same latch the console has always driven,
     // with the two seconds of gesture in front of it that it never had.
@@ -791,6 +792,15 @@ const ears = (() => {
     // And `turn`'s two. `hands` above covers the handstand and upside down.
     noturn: 'sitting up there is no other way round — lie her down first',
     turning: 'she is already turning over',
+    // Her legs, which had two keys and no words for either until "wider"
+    // made a third, and the panel said "cannot do that here" to a woman who
+    // plainly could — she already had. The ceiling is per pose; see
+    // `legsSpMax` in 43-jadrija.js.
+    spreadalready: 'her legs are already apart',
+    closed: 'her legs are already together',
+    widest: 'she cannot go any wider',
+    cotnarrow: 'the cot is too narrow for her legs to go any wider',
+    noroom: 'there is no room to go any wider where she is standing',
   };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
