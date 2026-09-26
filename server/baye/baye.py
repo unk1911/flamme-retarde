@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.41.0"
+VERSION = "1.42.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -425,6 +425,41 @@ SEE_RE = (r"\b(see|check|look|find out|report|scout|peek|spy|recon|"
           r"what'?s|whats|who'?s|whos|how many|how much|price\w*|cost\w*|"
           r"charge|menu|available|got|have they|do they)\b")
 
+# HER LEGS FURTHER APART. Misha, 25 Sep 2026: *"new command 'wider', to
+# spread legs wider"*. Up here and not in the table because `ASK_RE` below
+# needs it too: "even wider" and "a bit wider" carry no modal, no please and
+# no opener, and read as talk without it.
+#
+# ONLY WHEN IT CAN MEAN HER LEGS, which the bare word mostly does in that
+# room and a sentence with another body part in it does not. So the whole
+# thing is fenced off from the parts that are somebody else's: "open your
+# mouth wider" is `mouth.open`, "spread your arms wider" is `arms.wide`, and
+# "your eyes are wider than mine" is talk. Inside the fence, one of:
+#
+#   "wider", "even wider", "a bit wider"   the sentence OPENS on it
+#   "spread (them) wider/more/further"     a spreading verb and a direction
+#   "open them wider", "open your legs wider"
+#   "legs wider", "knees further apart"    her legs and a comparative
+#   "further apart", "more apart"
+#   "šire", "još šire", "raširi više"      Croatian
+#   "plus écartées", "écarte encore"       French
+#
+# NOT the bare "open wider", which is a dentist's sentence and goes to the
+# mouth with "open wide"; and NOT a bare "more", which is the wine's as much
+# as anybody's — "spread more" and "more apart" say what it is more of.
+WIDER_RE = (r"(?:^(?!.*\b(?:mouth|jaw|lips?|tongue|arms?|eyes?|hands?|door|window)\b)"
+            r"(?=.*(?:^\W*(?:(?:even|a|bit|little|tiny|touch|go|now|ok|okay|yes|yeah|"
+            r"please|baye|babe|more|much|lot|some|and|then|just|still|come on)\W+)*"
+            r"wider\b"
+            r"|\b(?:spread|part)\w*\b.{0,24}\b(?:wider|further|farther|more)\b"
+            r"|\bopen (?:them|your legs|those legs|your knees)\s+(?:up\s+)?(?:even\s+)?wider\b"
+            r"|\b(?:legs?|knees|thighs)\b.{0,20}"
+            r"\b(?:wider|(?:further|farther|more) apart|apart more)\b"
+            r"|\b(?:go|get|any|even|bit|little|lot|much)\s+wider\b"
+            r"|\b(?:further|farther|more|wider) apart\b"
+            r"|\bšire\b|\braširi\w*\b.{0,16}\b(?:više|jače)\b"
+            r"|\bplus (?:é|e)cart\w*|\b(?:é|e)carte\w*\b.{0,16}\b(?:plus|encore|davantage)\b)))")
+
 SKILLS = {
     "see.slast": ("walk up to the ice cream place and see what flavours are in "
                   "the case", [r"\b(ice ?cream|gelato|flavou?rs?|slast\w*)\b", SEE_RE]),
@@ -518,6 +553,12 @@ SKILLS = {
     # CLOSE FIRST so "close your legs" is never read as the spread.
     "legs.close": ("put her legs back together",
                    [r"\b(close|together)\b.{0,20}\blegs?\b|\blegs?\b.{0,12}\b(together|closed?)\b"]),
+    # AND FURTHER APART, BETWEEN THE TWO: after the close, so "don't close
+    # them, wider" is still read the way it starts; before the spread, whose
+    # "spread ... legs" would take "spread your legs wider" as the first step
+    # all over again. See `WIDER_RE` for what it will and will not take.
+    "legs.wider": ("spread her legs wider apart than they are now",
+                   [WIDER_RE]),
     "legs.spread": ("spread her legs apart",
                     [r"\b(spread|open|part)\b.{0,20}\blegs?\b|\blegs?\b.{0,12}\b(apart|open|wide)\b"]),
     "mouth.close": ("close her mouth again",
@@ -525,6 +566,7 @@ SKILLS = {
                      r"|\b(mouth|jaw)\b.{0,12}\b(closed?|shut)\b"]),
     "mouth.open": ("open her mouth wide and hold it open",
                    [r"\bopen\b.{0,20}\b(mouth|jaw)\b|\bopen (it |up |them )?wide\b"
+                    r"|\bopen (it |up )?wider\b"
                     r"|\b(mouth|jaw)\b.{0,12}\b(open|wide)\b|\bsay a+h+\b"]),
     # HER EYES ON YOU. Misha, 19 Sep 2026: *"if you say 'look at me', she
     # should look at me"*. Above `see.*`, which owns the word "look" for
@@ -864,8 +906,11 @@ ASK_RE = re.compile(
     r"|\b(down )?on(to)? your knees\b|\bto your knees\b"
     # "Open your mouth", "open wide", "close your mouth" carry no modal either.
     # The mouth or jaw noun, or "open wide" whole, and never a bare "open":
-    # "open the bottle" belongs to the wine.
+    # "open the bottle" belongs to the wine. "Open wider" is the mouth's too.
     r"|\b(open|close|shut)\b.{0,20}\b(mouth|jaw)\b|\bopen (it |up |them )?wide\b"
+    r"|\bopen (it |up )?wider\b"
+    # And her legs further apart — see `WIDER_RE`.
+    r"|" + WIDER_RE +
     r"|\b(mouth|jaw)\b.{0,12}\b(open|wide|closed?|shut)\b|\bsay a+h+\b"
     # "look at me" carries no modal and none of the openers below.
     r"|\blook(ing)?\b.{0,12}\b(me|my|us|here|this way|camera|lens)\b"

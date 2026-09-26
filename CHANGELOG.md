@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.520.0] — 2026-09-25 (baye 1.42.0)
+
+### "wider"
+
+Misha: *"new command 'wider', to spread legs wider"*.
+
+`legs.wider` takes her legs a step further apart than they are, in whatever
+pose she is holding. From together it is the same as "spread your legs"; from
+apart, each "wider" swings both legs another 8° outward about the hip and eases
+there over about a second, like the spread does. "Close your legs" still
+brings them all the way together. Each pose has its own limit, measured in
+the kabina over a full clip cycle at every step, and asked past it she says
+why: *she cannot go any wider*, *the cot is too narrow for her legs to go any
+wider*, or, standing next to the furniture, *there is no room to go any wider
+where she is standing*.
+
+- **Standing: 4 steps.** Ankles 0.39 m apart at the spread, then 0.62, 0.84,
+  1.05, 1.25. At the widest each thigh is 43–44° from vertical. She lowers
+  her hips as her feet go out (0.18 m at the widest), so both feet stay flat
+  on the floor, within 4 mm of where they stand together. Without that they
+  lifted 5 cm.
+- **On her back, legs up: 4 steps.** Ankles 0.71 m apart, then 0.87, 1.01,
+  1.15, 1.29, ending in a wide V with 4.4 cm between each thigh and the
+  mattress edge and toes 0.18 m from the side wall.
+- **Upside down: 3. Wall perch: 1.** On her back with her legs down on the
+  floor: 3, her legs sliding apart along the floor to 44° a side.
+- **None** kneeling, on all fours, on the edge of the cot, in lotus, on her
+  side, sitting with her legs out, and on the cot with her legs flat. In
+  those poses the spread already lifts her knees 11–13 cm off what they knelt
+  on, or already puts her ankles past the 0.66 m mattress.
+
+Fixed on the way, in the spread itself:
+
+- **"Legs apart" did nothing with her legs down on the cot** if she had
+  crawled up it on her knees first. The walking test read a speed that lying
+  down never resets (0.38 m/s for as long as she lay there). It now checks
+  whether she actually moved.
+- **The spread now follows the pose.** It used to measure her legs once and
+  hold that for as long as she stayed in the pose. `cradle` changes its legs
+  halfway through its 24.8 s loop, so at one setting her ankles were 0.78 m
+  apart for twelve seconds and 1.52 m for the next twelve. Her legs are now
+  re-measured every frame.
+- **No jump at the start.** The spread used to wait 0.35 s for the pose to
+  settle and then jump a third of the way at once. It now eases from
+  together.
+
+Phrases (`server/baye/baye.py`, which needs redeploying on mpcn0): "wider",
+"even wider", "a bit wider", "go wider", "spread (them / your legs) wider",
+"spread them more", "legs wider", "open your legs wider", "further apart",
+"more apart", Croatian "šire", "još šire", "raširi više", French "plus
+écartées", "écarte encore". It never takes a sentence that mentions her mouth,
+jaw, arms, eyes or hands. "Open your mouth wider" and the bare "open wider"
+go to `mouth.open`, and "spread your arms wider" stays `arms.wide`. A bare
+"more" is not taken. 50 sentences tested offline, none wrong, and 1,339
+quoted phrases from the changelog and the service compared against 1.41.0:
+the only 18 that changed are these.
+
 ## [1.518.0] — 2026-09-25
 
 ### and she answers it
