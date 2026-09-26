@@ -46163,23 +46163,52 @@ async function buildJadrija(scene) {
    *
    * MEASURED FIRST, because the length is the whole of whether this works.
    * Her wrists sit 0.41–0.45 m apart standing, 0.33 on all fours, 0.16
-   * kneeling, and reach 0.61 at the widest frame of the dances. A real
+   * kneeling, and reach 0.61 at the widest frame of the dances — and, it
+   * turns out, 1.13 at the top of the flare and 1.08 in the ballet, which
+   * nothing can be long enough for (see `tautK`). A real
    * handcuff chain is nine centimetres and would be stretched to five times
    * its length every time she stands up, so this is not that chain: it is a
    * swag, long enough to hang in a deep curve at her usual 0.43 and short
    * enough to come taut when she throws her arms out.
    *
-   * ONE FREE POINT AND NOT A ROPE SOLVER. The middle of it is a particle
-   * with gravity and drag; the two ends are wherever her wrists went this
-   * frame; neither half is allowed to stretch past half the chain. The links
-   * are then laid along the curve through those three points. That is enough
-   * to swing when she turns and to snap taut when she reaches, and it is
-   * thirty transforms a frame rather than a solver.
+   * ── FORTY-TWO BODIES, AND NOT ONE PARTICLE ─────────────────────────────
    *
-   * AND IT LIES AGAINST HER RATHER THAN THROUGH HER. A chain hanging between
-   * two wrists at her hips passes exactly through her pelvis, so the free
-   * point is kept in front of her belly whenever it is low and between her
-   * hips — the hair's own skull rule, one plane instead of one sphere.
+   * Misha, 26 Sep 2026, after reading three-avbd: *"try that"* — for this
+   * chain. Until then it was one free point with gravity and drag, the two
+   * ends were her wrists, and the links were laid along the curve through
+   * the three. It swung, and it came taut, and it went through her: kneeling
+   * it cut straight through both thighs, and the only thing keeping it out
+   * of her belly was a plane held in front of it.
+   *
+   * Now every link is a rigid body — a position, an orientation, a mass of
+   * a couple of grams — jointed to the next at its end, and the two end
+   * joints hang off her cuffs, which move with her bones and do not care
+   * what the chain weighs. That is the hard case for a physics solver: two
+   * infinite masses and forty-two light ones between them, and joints that
+   * must not stretch. It is solved with Augmented Vertex Block Descent
+   * (43-avbd.js, ported from the CPU reference in three-avbd), whose whole
+   * point is that case: the joint force is carried from iteration to
+   * iteration in a Lagrange multiplier, so eight iterations hold forty-three
+   * joints to a total of about a millimetre where a plain penalty would
+   * either stretch like a bungee or blow up.
+   *
+   * HER BODY IS CAPSULES, measured off her mesh — see CHAIN_BODY — and a
+   * floor under whatever she is lying or standing on, and the links collide
+   * with them as contact constraints in the same solve. So it drapes: round
+   * the front of her thighs standing, across both thighs and down into the
+   * gap between them sitting with her hands on her legs, over her hip on
+   * her side on the cot, in a heap on her belly on her back, and on the
+   * floor between her hands in a handstand — not, as it was, a line drawn
+   * through her from wrist to wrist.
+   *
+   * AND IT HAS A WORLD. It is simulated in world metres, not in her frame,
+   * so when she turns on the spot the chain is left behind by its own
+   * inertia and swings back — which a chain in her frame cannot do, because
+   * in her frame she never moved.
+   *
+   * WHAT IT COSTS is in `chainStats` and on the CHANGELOG: about 0.15 ms a
+   * step, two steps a frame at 60 fps — a third of a millisecond with her
+   * body against it, on the CPU, measured in the game.
    */
   const CHAIN = {
     /**
@@ -46195,18 +46224,166 @@ async function buildJadrija(scene) {
      * makes a chain read as a chain. Spaced at their own length they read as
      * a row of separate rings with daylight between them, and at this size
      * every other one is edge-on and nearly invisible, so the gaps come out
-     * twice as wide as the arithmetic says.
+     * twice as wide as the arithmetic says. The joints are at those 15 mm,
+     * which is where one link actually hangs from the next.
      */
-    /** Gravity on the free point, and how fast it gives it up. */
-    g: 7.5, damp: 0.86, step: 1 / 120,
     /**
-     * How far in front of her the low point is held, how wide that rule is,
-     * and how high up it stops applying — above her shoulders there is no
-     * body in the way and a chain pushed forward up there is a chain being
-     * held out by nothing.
+     * A link's mass (kg) — what a plated hollow link 77 mm round weighs; the
+     * wire as drawn is 4.4 mm through and solid steel would be four times
+     * that. Under gravity alone the mass cancels out of how it hangs and
+     * swings; it counts against her skin's springs (`contactK`), where a
+     * lighter link is turned by her thigh rather than driven into it. Real
+     * gravity, which the old particle had to soften to 7.5 to stop the swag
+     * bouncing. And the fixed step, and how many of them a frame may run
+     * before the rest of a long frame is dropped.
      */
-    front: 0.115, wide: 0.17, high: 1.32,
+    mass: 0.0023, g: 9.81, step: 1 / 120, maxSteps: 4,
+    /**
+     * The solver (43-avbd.js). Eight iterations and alpha 0.9 are measured,
+     * in node, on this chain hung at her 0.43: alpha 0.99 (the reference's)
+     * forgives 99 % of whatever error a step starts with, and a chain laid
+     * down a few per cent long stayed that long for seconds; 0.9 takes a
+     * tenth off every step and the whole chain sits within a millimetre of
+     * its length. Five iterations held it to 2 mm, eight to under 1, twelve
+     * cost half as much again for a tenth of a millimetre.
+     */
+    iterations: 8, alpha: 0.9, alphaContact: 0.9, beta: 1e5, gamma: 0.999,
+    /**
+     * The quarter turn from each link to the next, as a spring (N·m/rad), and
+     * how fast the swing is taken out of it (1/s) — which is not the air, it
+     * is the links rubbing on each other: at 0.3 a spin on the spot left it
+     * swinging for five seconds, and a steel chain stops in two. And a
+     * ceiling on how fast a link may go (m/s), above her wrists in a flip.
+     */
+    twist: 2e-3, drag: 1.0, vMax: 20,
+    /**
+     * A link as a collider: a ball this big about its middle, how far off
+     * her skin a contact is picked up, and how much it grips (steel on skin).
+     * The ball is the link on the flat — the wire is 4.4 mm through — plus a
+     * little, and a link on edge sinks in by the rest of its width, which at
+     * 16 mm across is under the skin by less than a stone on the cuff.
+     */
+    rLink: 0.006, margin: 0.004, mu: 0.45,
+    /**
+     * HER SKIN GIVES, AND THE CHAIN DOES NOT. Contacts are springs of this
+     * many N/m and not the reference's hard contacts, and that is what lets
+     * a physical chain live on an animation that is not physical. Walking,
+     * her hands hang at her hips with the chain round the front of her, and
+     * that path is already the chain's whole length; every stride brings a
+     * thigh forward into it. With hard contacts and hard joints one of the
+     * two had to break, and it was the joints — measured, 40 to 120 mm of
+     * stretch on every step, and a chain caught round her forty times in
+     * eighty seconds. A spring takes the difference instead: the chain goes
+     * into her thigh by as much as her stride demands and comes back out
+     * when it passes. Resting on her it is nothing — the whole chain weighs
+     * a newton, which sinks a link a fortieth of a millimetre.
+     */
+    contactK: 2000,
+    /**
+     * How many links at each end do not collide with that end's forearm and
+     * hand — the ring on the cuff is ON her wrist, so the first link is
+     * already touching the arm it hangs from — and how far a wrist may move
+     * in one frame before it is a teleport rather than a movement, and the
+     * chain is hung afresh rather than dragged through the room.
+     */
+    free: 4, jump: 0.5,
+    /**
+     * On a fresh hang, how many steps it settles for before it is drawn: a
+     * fifth of a second, which costs one frame about 10 ms — once, when the
+     * cuffs go on or she teleports.
+     */
+    settle: 24,
+    /**
+     * HER ANIMATIONS ARE NOT PHYSICAL, and a chain that is has to be let off
+     * where they are not. Her arms go through her own body in half the
+     * dances, and hands that go up behind her head and come down in front
+     * put a real chain round her neck — measured, before her skin was a
+     * spring, the first twenty seconds of her routine did exactly that, and
+     * the chain hung there stretched by 45 cm between wrists that were
+     * pulling it through her. With `contactK` it is about once a minute, in
+     * the flip.
+     *
+     * So: `deep` — a link found this far inside a part of her it was not
+     * already touching is let through rather than thrown out of the far side
+     * (see `touched` in 43-avbd.js). And a chain whose joints add up to
+     * `slip` of stretch for `trapFor` seconds, while her wrists are not
+     * pulling it past its own length, is caught on her, and is hung afresh
+     * in front of her. Past its length is not caught — that is her arms
+     * thrown wide, and the chain does what it can.
+     */
+    deep: 0.03, slip: 0.10, trapFor: 0.5,
+    /**
+     * AND PAST ITS LENGTH THE JOINTS GIVE. Her wrists are 1.13 m apart at the
+     * top of the flare and 1.08 in the ballet — nearly twice the chain — and
+     * a hard joint asked for that pulls with whatever force it takes, which
+     * ran the chain 8 cm into her chest. So from `tautAt` of its length the
+     * joints are springs of `tautK` N/m: the stretch is spread evenly down
+     * the chain (the links part, the way a chain drawn between two points
+     * that far apart has to), and at the top of the flare it lies across
+     * her collarbones, 3 mm clear. Back to hard below `hardAt`.
+     */
+    tautAt: 0.98, hardAt: 0.94, tautK: 3000,
   };
+
+  /**
+   * ── HER BODY, AS FAR AS THE CHAIN CAN TELL ─────────────────────────────
+   *
+   * Capsules on her bones, in her BIND frame (metres, +x in front of her,
+   * +y up, +z her right), so each rides its bone the way her skin does.
+   * `to` is a limb from one joint to the next; `a`/`b` are two points on
+   * the bone; `r` is the radius at each end; `cuff` marks the forearm and
+   * hand a cuff is on, which the links next to that cuff ignore.
+   *
+   * MEASURED OFF BAYE V2.0'S OWN MESH, which is the one drawn — see
+   * `chainFit`, which prints these numbers from the vertices skinned to each
+   * bone. The limbs' radii are the 75th percentile of distance from the
+   * middle of the flesh in each third of the limb, a hair inside the
+   * outline, so a link comes to rest on her skin and not a millimetre off
+   * it; `off` is where that middle is against the bone's own line — her
+   * thighs are fuller on the inside, her calves behind.
+   *
+   *     thigh   hip→knee   103 · 89 · 68 mm   middle 16 mm to the inside
+   *     shin    knee→ankle  64 · 62 · 43      middle 18 mm behind
+   *     arm     shoulder→elbow  56 · 48 · 43
+   *     forearm elbow→wrist 38 · 34 · 25
+   *
+   * THE TRUNK IS NOT A CAPSULE along her spine: she is 36 cm across the
+   * hips and 24 through, and a round section that wide would stand the
+   * chain 6 cm off her belly. So it is three pairs of upright capsules side
+   * by side — two circles make an oval — sized off 4 cm slices of her:
+   *
+   *     y 0.88–1.00  hips     back −0.10 … front 0.15, ±0.18 wide
+   *     y 1.08–1.20  belly    back −0.03 … front 0.17, ±0.14
+   *     y 1.28–1.40  breasts and shoulders, back −0.06 … front 0.17, ±0.17
+   */
+  const CHAIN_BODY = [
+    // Hips and bottom, on the pelvis.
+    { bone: 'pelvis', a: [0.018, 0.88, -0.065], b: [0.041, 1.00, -0.070], r: [0.118, 0.111] },
+    { bone: 'pelvis', a: [0.018, 0.88, 0.065], b: [0.041, 1.00, 0.070], r: [0.118, 0.111] },
+    // Belly and waist, on the middle of her spine.
+    { bone: 'spine02', a: [0.058, 1.06, -0.047], b: [0.070, 1.20, -0.030], r: [0.094, 0.100] },
+    { bone: 'spine02', a: [0.058, 1.06, 0.047], b: [0.070, 1.20, 0.030], r: [0.094, 0.100] },
+    // Breasts, and up to her collarbones, on the chest.
+    { bone: 'chest', a: [0.061, 1.27, -0.040], b: [0.027, 1.40, -0.080], r: [0.105, 0.086] },
+    { bone: 'chest', a: [0.061, 1.27, 0.040], b: [0.027, 1.40, 0.080], r: [0.105, 0.086] },
+    // Neck and head, as her hair already has them (V5_BODY).
+    { bone: 'neck', a: [0.012, 1.45, 0], b: [0.02, 1.585, 0], r: [0.050] },
+    { bone: 'head', a: [0.055, 1.665, 0], r: [0.095] },
+    { bone: 'head', a: [0.085, 1.56, 0], r: [0.06] },
+    // Legs.
+    { bone: 'legUL', to: 'legLL', off: [0.006, 0, 0.014], r: [0.110, 0.060] },
+    { bone: 'legUR', to: 'legLR', off: [0.006, 0, -0.014], r: [0.110, 0.060] },
+    { bone: 'legLL', to: 'footL', off: [-0.012, 0, 0], r: [0.065, 0.040] },
+    { bone: 'legLR', to: 'footR', off: [-0.012, 0, 0], r: [0.065, 0.040] },
+    // Arms. The forearm and the hand are the ones the cuff is on.
+    { bone: 'armUL', to: 'armLL', off: [-0.006, 0, 0], r: [0.055, 0.042] },
+    { bone: 'armUR', to: 'armLR', off: [-0.006, 0, 0], r: [0.055, 0.042] },
+    { bone: 'armLL', to: 'handL', r: [0.040, 0.025], cuff: 'L' },
+    { bone: 'armLR', to: 'handR', r: [0.040, 0.025], cuff: 'R' },
+    // The hand is a paddle, and this is the ball down the middle of it.
+    { bone: 'handL', to: 'fingersL', off: [-0.014, -0.014, 0], r: [0.020], cuff: 'L' },
+    { bone: 'handR', to: 'fingersR', off: [-0.014, -0.014, 0], r: [0.020], cuff: 'R' },
+  ];
 
   /**
    * The stones, as light: one hash per stone, so no two of them are quite
@@ -46317,7 +46494,7 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * The chain, as thirty links and one particle. See CHAIN.
+   * The chain: forty-two links, each a mesh and a body. See CHAIN.
    */
   function chainGroup(L, R) {
     const g = new THREE.Group();
@@ -46327,158 +46504,532 @@ async function buildJadrija(scene) {
     const links = [];
     for (let i = 0; i < CHAIN.links; i++) {
       const m = new THREE.Mesh(geo, mat);
-      // Drawn round and worn oval: the basis below puts local x along the run
-      // of the chain, so this is the one axis that stretches a link into the
-      // shape a link is.
+      // Drawn round and worn oval: a body's local x is the run of the chain
+      // through it, so this is the one axis that stretches a link into the
+      // shape a link is. The torus lies in its own xy plane, which is the
+      // plane the link's metal lies in.
       m.scale.set(CHAIN.long, 1, 1);
       m.castShadow = false; m.receiveShadow = false;
       g.add(m);
       links.push(m);
     }
     return { group: g, bone: null,
-      chain: { L, R, links, mid: new THREE.Vector3(),
-        vel: new THREE.Vector3(), on: 0 } };
+      chain: { L, R, links, sim: null, on: 0, acc: 0,
+        // The cuffs (centre and axis, each wrist) and her capsules, in the
+        // world, as they were at the last step and as they are this frame.
+        cuffWas: new Float64Array(12), cuffNow: new Float64Array(12),
+        bodyWas: null, bodyNow: null, floorWas: 0, floorNow: 0,
+        // The way out of her for a fresh hang, and the caught-on-her clock —
+        // see `chainOut` and CHAIN.slip. The rest is for `chainStats`.
+        front: [1, 0, 0], trap: 0, traps: 0, caught: null, why: null,
+        ms: 0, msMax: 0, steps: 0, frames: 0, resets: 0 } };
   }
 
-  const _chA = new THREE.Vector3(), _chB = new THREE.Vector3();
-  const _chM = new THREE.Vector3(), _chV = new THREE.Vector3();
-  const _chC = new THREE.Vector3(), _chP = new THREE.Vector3();
-  const _chQ = new THREE.Quaternion(), _chT = new THREE.Vector3();
-  const _chX = new THREE.Vector3(), _chY = new THREE.Vector3();
-  const _chZ = new THREE.Vector3(0, 0, 1), _chW = new THREE.Matrix4();
+  // Scratch, allocated once.
+  const _chV = new THREE.Vector3(), _chP = new THREE.Vector3();
+  const _chQ = new THREE.Quaternion(), _chMQ = new THREE.Quaternion();
+  const _chMI = new THREE.Matrix4(), _chMQI = new THREE.Quaternion();
+  const _chBQ = new THREE.Quaternion();
+  const _chA = new Float64Array(3);
+
+  /** CHAIN_BODY against her rig: bone numbers and bind points, once. */
+  let chainCaps = null, chainRest = null;
+  function chainCapsules() {
+    if (chainCaps) return chainCaps;
+    const H = bindHeadsOf(skinFig);
+    const list = [];
+    for (const c of CHAIN_BODY) {
+      const b = skinFig.boneIndex(c.bone);
+      if (b < 0) continue;
+      let a, e;
+      if (c.to) {
+        const t = skinFig.boneIndex(c.to);
+        if (t < 0) continue;
+        const o = c.off || [0, 0, 0];
+        a = [H.T[b].x + o[0], H.T[b].y + o[1], H.T[b].z + o[2]];
+        e = [H.T[t].x + o[0], H.T[t].y + o[1], H.T[t].z + o[2]];
+        // Trimmed at the far end where the next capsule takes over, so a
+        // knee is one rounded end and not two stacked.
+        if (c.trim) for (let k = 0; k < 3; k++) e[k] = a[k] + (e[k] - a[k]) * (1 - c.trim);
+      } else { a = c.a; e = c.b || c.a; }
+      list.push({ bone: b, a, e, head: H.T[b], r0: c.r[0], r1: c.r.length > 1 ? c.r[1] : c.r[0],
+        cuff: c.cuff || null, name: c.bone + (c.to ? '>' + c.to : '') });
+    }
+    if (list.length > 31) list.length = 31;   // one bit each, and 31 is the floor's
+    chainCaps = list;
+    chainRest = [];
+    for (const [name, r] of Object.entries(V5_REST)) {
+      const b = skinFig.boneIndex(name);
+      if (b >= 0) chainRest.push([b, r]);
+    }
+    return list;
+  }
 
   /**
-   * Where on a cuff the chain has got to.
+   * Where everything the chain touches is this frame, in the world: her
+   * capsules, the floor under her, and each cuff's ring (centre and axis).
+   */
+  function chainWorld(c) {
+    const caps = chainCapsules();
+    const M = skinFig.mesh.matrixWorld;
+    if (!c.bodyNow || c.bodyNow.length !== caps.length * 6) {
+      c.bodyNow = new Float64Array(caps.length * 6);
+      c.bodyWas = new Float64Array(caps.length * 6);
+    }
+    for (let k = 0; k < caps.length; k++) {
+      const cp = caps[k];
+      skinFig.boneAt(cp.bone, _chP);
+      skinFig.boneTurn(cp.bone, _chBQ);
+      for (let e = 0; e < 2; e++) {
+        const p = e ? cp.e : cp.a;
+        _chV.set(p[0] - cp.head.x, p[1] - cp.head.y, p[2] - cp.head.z)
+          .applyQuaternion(_chBQ).add(_chP).applyMatrix4(M);
+        c.bodyNow[6 * k + 3 * e] = _chV.x;
+        c.bodyNow[6 * k + 3 * e + 1] = _chV.y;
+        c.bodyNow[6 * k + 3 * e + 2] = _chV.z;
+      }
+    }
+    // The floor: what she is lying or standing on, the way her hair finds it
+    // — the lowest of her joints less how much of her is under each — or the
+    // deck (or the cot) under her, whichever is lower. The second is for the
+    // air: mid-somersault her lowest joint is a metre up, and a floor there
+    // held the chain up in the sky under her.
+    let lo = Infinity;
+    for (const [b, r] of chainRest) {
+      skinFig.boneAt(b, _chV).applyMatrix4(M);
+      if (_chV.y - r < lo) lo = _chV.y - r;
+    }
+    if (show) lo = Math.min(lo, toWorld(show.t, show.s)[1] + (show.mat || 0));
+    c.floorNow = lo;
+    // The cuffs, whose groups `wearTick` has just put on her wrists in her
+    // own frame. The ring's axis is the group's z, which is along her arm.
+    skinFig.mesh.getWorldQuaternion(_chMQ);
+    for (let s = 0; s < 2; s++) {
+      const grp = (s ? c.R : c.L).group;
+      _chV.copy(grp.position).applyMatrix4(M);
+      c.cuffNow[6 * s] = _chV.x; c.cuffNow[6 * s + 1] = _chV.y; c.cuffNow[6 * s + 2] = _chV.z;
+      _chV.set(0, 0, 1).applyQuaternion(grp.quaternion).applyQuaternion(_chMQ);
+      c.cuffNow[6 * s + 3] = _chV.x; c.cuffNow[6 * s + 4] = _chV.y; c.cuffNow[6 * s + 5] = _chV.z;
+    }
+  }
+
+  /**
+   * Where on a cuff the chain has got to, `u` of the way through this frame.
    *
    * A jewellery chain is not welded to a point on the band: its ring slides
-   * round to wherever it is pulled, which is why this is solved rather than
-   * being a fixed lug. It also means nothing here has to know which way the
-   * wrist bone's axes point, which is the one fact about this rig that is
-   * different on the left hand and the right.
+   * round to wherever it is pulled. So the end joint hangs from the point
+   * of the ring nearest the end of the first link — found afresh every
+   * step, which is why it is a world point that moves and not a fixed lug.
+   * It also means nothing here has to know which way the wrist bone's axes
+   * point, which is the one fact about this rig that is different on the
+   * left hand and the right.
    */
-  function chainEnd(group, to, out) {
-    out.copy(to).sub(group.position)
-      .applyQuaternion(_chQ.copy(group.quaternion).invert());
-    out.z = 0;
-    if (out.lengthSq() < 1e-9) out.set(1, 0, 0);
-    out.setLength(CUFF.r).applyQuaternion(group.quaternion).add(group.position);
-    return out;
+  function chainRing(c, s, u, tx, ty, tz, out, o) {
+    const W = c.cuffWas, N = c.cuffNow, b = 6 * s;
+    const cx = W[b] + (N[b] - W[b]) * u, cy = W[b + 1] + (N[b + 1] - W[b + 1]) * u;
+    const cz = W[b + 2] + (N[b + 2] - W[b + 2]) * u;
+    let ax = W[b + 3] + (N[b + 3] - W[b + 3]) * u, ay = W[b + 4] + (N[b + 4] - W[b + 4]) * u;
+    let az = W[b + 5] + (N[b + 5] - W[b + 5]) * u;
+    const al = Math.hypot(ax, ay, az) || 1;
+    ax /= al; ay /= al; az /= al;
+    let dx = tx - cx, dy = ty - cy, dz = tz - cz;
+    const d = dx * ax + dy * ay + dz * az;
+    dx -= d * ax; dy -= d * ay; dz -= d * az;
+    let l = Math.hypot(dx, dy, dz);
+    if (l < 1e-6) { dx = 0; dy = -1; dz = 0; l = 1; }
+    const R = CUFF.r + CUFF.deep * 0.5;
+    out[o] = cx + dx / l * R; out[o + 1] = cy + dy / l * R; out[o + 2] = cz + dz / l * R;
   }
 
-  /** One point on the curve through the three we have. */
-  function chainAt(a, c, b, t, out) {
-    const s = 1 - t;
-    return out.set(s * s * a.x + 2 * s * t * c.x + t * t * b.x,
-      s * s * a.y + 2 * s * t * c.y + t * t * b.y,
-      s * s * a.z + 2 * s * t * c.z + t * t * b.z);
+  /** The body and the floor, `u0`→`u1` of the way through this frame. */
+  function chainShapes(c, u0, u1) {
+    const sh = c.sim.shapes, W = c.bodyWas, N = c.bodyNow;
+    for (let k = 0; k < sh.count; k++) {
+      for (let j = 0; j < 3; j++) {
+        const a = 6 * k + j, b = 6 * k + 3 + j;
+        sh.a0[3 * k + j] = W[a] + (N[a] - W[a]) * u0;
+        sh.b0[3 * k + j] = W[b] + (N[b] - W[b]) * u0;
+        sh.a1[3 * k + j] = W[a] + (N[a] - W[a]) * u1;
+        sh.b1[3 * k + j] = W[b] + (N[b] - W[b]) * u1;
+      }
+    }
+    sh.floor0 = c.floorWas + (c.floorNow - c.floorWas) * u0;
+    sh.floor1 = c.floorWas + (c.floorNow - c.floorWas) * u1;
   }
 
-  /** The carried normal — see the note in `chainTick`. */
-  const _chN = new THREE.Vector3();
+  /** The solver, built the first time the cuffs are on. */
+  function chainSim(c) {
+    const caps = chainCapsules();
+    const n = CHAIN.links, m = CHAIN.mass;
+    // The link as a box round the oval it is drawn as: near enough for its
+    // inertia, which only has to be the right size and the right shape.
+    const lx = 2 * (CHAIN.r * CHAIN.long + CHAIN.wire);
+    const ly = 2 * (CHAIN.r + CHAIN.wire), lz = 2 * CHAIN.wire;
+    const sim = avbdChain({ n, pitch: CHAIN.len / n, mass: m,
+      moment: [m * (ly * ly + lz * lz) / 12, m * (lx * lx + lz * lz) / 12, m * (lx * lx + ly * ly) / 12],
+      rLink: CHAIN.rLink, mu: CHAIN.mu, twist: CHAIN.twist,
+      iterations: CHAIN.iterations, alpha: CHAIN.alpha, alphaContact: CHAIN.alphaContact,
+      beta: CHAIN.beta, gamma: CHAIN.gamma, gravity: [0, -CHAIN.g, 0],
+      drag: CHAIN.drag, vMax: CHAIN.vMax, margin: CHAIN.margin, deep: CHAIN.deep,
+      contactK: CHAIN.contactK });
+    sim.setShapeCount(caps.length);
+    for (let k = 0; k < caps.length; k++) {
+      sim.shapes.r[2 * k] = caps[k].r0;
+      sim.shapes.r[2 * k + 1] = caps[k].r1;
+    }
+    // The links next to each cuff do not collide with that arm.
+    for (let i = 0; i < n; i++) {
+      let mask = 0;
+      for (let k = 0; k < caps.length; k++) {
+        if ((caps[k].cuff === 'L' && i < CHAIN.free)
+          || (caps[k].cuff === 'R' && i >= n - CHAIN.free)) mask |= 1 << k;
+      }
+      sim.shapes.ignore[i] = mask;
+    }
+    c.sim = sim;
+    return sim;
+  }
+
+  /**
+   * Hang it afresh: a curve from cuff to cuff of the chain's own length,
+   * straight down between them — and then IN FRONT OF HER wherever that
+   * curve goes through her, and a few steps to settle into it.
+   *
+   * Straight down between two hands at her hips is straight through her
+   * hips, and a link laid inside her is either let through (see CHAIN.deep)
+   * or pushed out whichever side is nearer, which is behind her as often as
+   * not. So every point of the curve that is inside one of her capsules is
+   * walked out of her until it is clear, the way her HANDS are from her
+   * trunk: across her spine from its middle toward the point between her
+   * wrists. That is in front of her for hands at her hips, behind her for
+   * hands behind her back or her head, and up for hands on her belly lying
+   * down — where the chain is on the side of her they are. When her hands
+   * are on her spine's own line (over her head, or down her front at her
+   * middle) there is no side, and it is the way her chest faces.
+   */
+  function chainOut(c) {
+    const M = skinFig.mesh.matrixWorld;
+    const pb = skinFig.boneAt(skinFig.boneIndex('pelvis'), new THREE.Vector3()).applyMatrix4(M);
+    const cb = skinFig.boneAt(skinFig.boneIndex('chest'), new THREE.Vector3()).applyMatrix4(M);
+    const ax = cb.clone().sub(pb).normalize();
+    const N = c.cuffNow;
+    const d = new THREE.Vector3((N[0] + N[6]) * 0.5, (N[1] + N[7]) * 0.5, (N[2] + N[8]) * 0.5)
+      .sub(pb.add(cb).multiplyScalar(0.5));
+    d.addScaledVector(ax, -d.dot(ax));
+    if (d.length() < 0.05) {
+      skinFig.boneTurn(skinFig.boneIndex('chest'), _chBQ);
+      d.set(1, 0, 0).applyQuaternion(_chBQ).applyQuaternion(_chMQ);
+    }
+    d.normalize();
+    c.front = [d.x, d.y, d.z];
+  }
+  const _chCurve = new Float64Array(65 * 4);
+  /** One point of a fresh hang walked out of her along `c.front`. */
+  function chainFront(c, x, y, z, out) {
+    const B = c.bodyNow, caps = chainCapsules(), R = CHAIN.rLink + 0.004;
+    let px = x, py = y, pz = z;
+    for (let pass = 0; pass < 12; pass++) {
+      let moved = false;
+      for (let k = 0; k < caps.length; k++) {
+        const o = 6 * k;
+        const ax = B[o], ay = B[o + 1], az = B[o + 2];
+        const ex = B[o + 3] - ax, ey = B[o + 4] - ay, ez = B[o + 5] - az;
+        const ee = ex * ex + ey * ey + ez * ez;
+        let t = ee > 1e-12 ? ((px - ax) * ex + (py - ay) * ey + (pz - az) * ez) / ee : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d = Math.hypot(px - ax - ex * t, py - ay - ey * t, pz - az - ez * t);
+        const need = caps[k].r0 + (caps[k].r1 - caps[k].r0) * t + R - d;
+        if (need > 0) {
+          const st = need + 0.01;
+          px += c.front[0] * st; py += c.front[1] * st; pz += c.front[2] * st;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    out[0] = px; out[1] = py; out[2] = pz;
+  }
+  function chainHang(c) {
+    const sim = c.sim, N = c.cuffNow;
+    c.cuffWas.set(N);
+    c.bodyWas.set(c.bodyNow);
+    c.floorWas = c.floorNow;
+    // Each end on its ring, facing the other cuff.
+    chainRing(c, 0, 1, N[6], N[7], N[8], sim.anchor, 0);
+    chainRing(c, 1, 1, N[0], N[1], N[2], sim.anchor, 3);
+    sim.anchor0.set(sim.anchor);
+    const A = sim.anchor;
+    // A parabola hung below the chord, as deep as makes it the chain's
+    // length — found by halving, on a 64-piece polyline.
+    const S = 64;
+    const curve = (sag) => {
+      let len = 0;
+      for (let j = 0; j <= S; j++) {
+        const u = j / S, o = 4 * j;
+        _chCurve[o] = A[0] + (A[3] - A[0]) * u;
+        _chCurve[o + 1] = A[1] + (A[4] - A[1]) * u - sag * 4 * u * (1 - u);
+        _chCurve[o + 2] = A[2] + (A[5] - A[2]) * u;
+        if (j) {
+          len += Math.hypot(_chCurve[o] - _chCurve[o - 4], _chCurve[o + 1] - _chCurve[o - 3],
+            _chCurve[o + 2] - _chCurve[o - 2]);
+        }
+        _chCurve[o + 3] = len;
+      }
+      return len;
+    };
+    let lo = 0, hi = CHAIN.len;
+    for (let it = 0; it < 30; it++) {
+      const mid = (lo + hi) * 0.5;
+      if (curve(mid) < CHAIN.len) lo = mid; else hi = mid;
+    }
+    curve(lo);
+    // Out of her, toward her hands — see above.
+    chainOut(c);
+    for (let j = 1; j < S; j++) {
+      const o = 4 * j;
+      chainFront(c, _chCurve[o], _chCurve[o + 1], _chCurve[o + 2], _chA);
+      _chCurve[o] = _chA[0]; _chCurve[o + 1] = _chA[1]; _chCurve[o + 2] = _chA[2];
+    }
+    let total = 0;
+    for (let j = 1; j <= S; j++) {
+      const o = 4 * j;
+      total += Math.hypot(_chCurve[o] - _chCurve[o - 4], _chCurve[o + 1] - _chCurve[o - 3],
+        _chCurve[o + 2] - _chCurve[o - 2]);
+      _chCurve[o + 3] = total;
+    }
+    sim.lay((u, out, o) => {
+      // By arc length, so every link spans one link's worth of the curve.
+      const want = u * total;
+      let j = 1;
+      while (j < S && _chCurve[4 * j + 3] < want) j++;
+      const l0 = _chCurve[4 * j - 1], l1 = _chCurve[4 * j + 3];
+      const f = l1 > l0 ? (want - l0) / (l1 - l0) : 0;
+      for (let k = 0; k < 3; k++) out[o + k] = _chCurve[4 * j - 4 + k] + (_chCurve[4 * j + k] - _chCurve[4 * j - 4 + k]) * f;
+    });
+    chainShapes(c, 1, 1);
+    for (let s = 0; s < CHAIN.settle; s++) {
+      sim.anchor0.set(sim.anchor);
+      sim.step(CHAIN.step);
+    }
+    c.acc = 0;
+    c.resets++;
+  }
 
   function chainTick(c, dt) {
     if (!c.L.group.visible || !c.R.group.visible) return;
-    // Where it is hanging from, which needs where it is hanging to — so the
-    // first frame guesses and every frame after it knows.
-    if (!c.on) {
-      _chM.copy(c.L.group.position).add(c.R.group.position).multiplyScalar(0.5);
-      c.mid.copy(_chM);
-      c.mid.y -= CHAIN.len * 0.35;
-      c.vel.set(0, 0, 0);
+    const t0 = performance.now();
+    c.frames++;
+    const sim = c.sim || chainSim(c);
+    chainWorld(c);
+    const N = c.cuffNow, W = c.cuffWas;
+    // First frame, or a wrist that has gone somewhere rather than moved
+    // there: hang it afresh rather than drag it through the room.
+    const jump = Math.max(Math.hypot(N[0] - W[0], N[1] - W[1], N[2] - W[2]),
+      Math.hypot(N[6] - W[6], N[7] - W[7], N[8] - W[8]));
+    if (!c.on || jump > CHAIN.jump) {
+      c.why = c.on ? ['jump', +jump.toFixed(2), skinFig.playing()] : ['on'];
+      chainHang(c);
       c.on = 1;
     }
-    chainEnd(c.L.group, c.mid, _chA);
-    chainEnd(c.R.group, c.mid, _chB);
-    // GRAVITY IS STRAIGHT DOWN IN HER OWN FRAME and not the world's, which
-    // sounds wrong and is not: her mesh is only ever yawed. A handstand is
-    // her BONES upside down, and her wrists come with them, so a chain that
-    // hangs on -y in figure space hangs towards the sky in a handstand,
-    // which is what a chain does.
-    let t = Math.min(dt, 0.1);
-    while (t > 1e-5) {
-      const h = Math.min(CHAIN.step, t);
-      t -= h;
-      _chP.copy(c.mid);
-      c.vel.y -= CHAIN.g * h;
-      c.vel.multiplyScalar(Math.pow(CHAIN.damp, h * 60));
-      c.mid.addScaledVector(c.vel, h);
-      // Neither half stretches.
-      for (let k = 0; k < 2; k++) {
-        const e = k ? _chB : _chA;
-        _chV.copy(c.mid).sub(e);
-        const L = _chV.length();
-        if (L > CHAIN.len * 0.5) {
-          c.mid.copy(e).addScaledVector(_chV, (CHAIN.len * 0.5) / L);
+    // Fixed steps, the frame's own time shared out among them; a frame long
+    // enough to want more than `maxSteps` loses the rest rather than
+    // spending the next frame catching up.
+    c.acc += Math.min(dt, CHAIN.maxSteps * CHAIN.step);
+    let n = Math.floor(c.acc / CHAIN.step + 1e-9);
+    if (n > CHAIN.maxSteps) n = CHAIN.maxSteps;
+    c.acc -= n * CHAIN.step;
+    // Taut past its length: the joints give — see CHAIN.tautK.
+    {
+      const A = sim.anchor;
+      const span = Math.hypot(A[3] - A[0], A[4] - A[1], A[5] - A[2]);
+      if (span > CHAIN.len * CHAIN.tautAt) sim.setJointK(CHAIN.tautK);
+      else if (span < CHAIN.len * CHAIN.hardAt) sim.setJointK(Infinity);
+    }
+    if (n > 0) {
+      const P = sim.P, Q = sim.Q, h = sim.half, last = 3 * (sim.n - 1);
+      for (let s = 1; s <= n; s++) {
+        const u0 = (s - 1) / n, u1 = s / n;
+        chainShapes(c, u0, u1);
+        sim.anchor0.set(sim.anchor);
+        // Each end joint from the ring point nearest that end of its link.
+        let x = Q[0], y = Q[1], z = Q[2], w = Q[3];
+        _chA[0] = (1 - 2 * (y * y + z * z)) * h; _chA[1] = 2 * (x * y + w * z) * h; _chA[2] = 2 * (x * z - w * y) * h;
+        chainRing(c, 0, u1, P[0] - _chA[0], P[1] - _chA[1], P[2] - _chA[2], sim.anchor, 0);
+        const q = 4 * (sim.n - 1);
+        x = Q[q]; y = Q[q + 1]; z = Q[q + 2]; w = Q[q + 3];
+        _chA[0] = (1 - 2 * (y * y + z * z)) * h; _chA[1] = 2 * (x * y + w * z) * h; _chA[2] = 2 * (x * z - w * y) * h;
+        chainRing(c, 1, u1, P[last] + _chA[0], P[last + 1] + _chA[1], P[last + 2] + _chA[2], sim.anchor, 3);
+        sim.step(CHAIN.step);
+      }
+      c.cuffWas.set(c.cuffNow);
+      c.bodyWas.set(c.bodyNow);
+      c.floorWas = c.floorNow;
+      c.steps += n;
+      // Caught on her — see CHAIN.slip.
+      sim.measure();
+      const A = sim.anchor;
+      const span = Math.hypot(A[3] - A[0], A[4] - A[1], A[5] - A[2]);
+      // Stretched with nothing touching it is a chain being flung, and it
+      // comes back by itself; only stretched against her is caught.
+      let who = -1, most = -1;
+      if (sim.stats.sumStretch > CHAIN.slip && span < CHAIN.len * 0.92) {
+        for (let i = 0; i < sim.n; i++) {
+          for (let m = 0; m < sim.cN[i]; m++) {
+            const g = -sim.cC0[i * sim.MAXC + m];
+            if (g > most) { most = g; who = sim.cId[i * sim.MAXC + m]; }
+          }
         }
       }
-      // And it lies against her rather than through her.
-      if (c.mid.x < CHAIN.front && Math.abs(c.mid.z) < CHAIN.wide
-        && c.mid.y < CHAIN.high) {
-        c.mid.x = CHAIN.front;
-      }
-      // What the constraints did is part of how it is moving, or the sag
-      // pumps itself up against the ends it keeps being pulled back to.
-      c.vel.copy(c.mid).sub(_chP).divideScalar(h);
+      if (who >= 0) {
+        c.trap += n * CHAIN.step;
+        if (c.trap > CHAIN.trapFor) {
+          // What it was caught on and in what, for `chainStats`.
+          const caps = chainCapsules();
+          c.caught = [skinFig.playing(), who === 31 ? 'floor' : caps[who] ? caps[who].name : null,
+            +(sim.stats.sumStretch * 1000).toFixed(0)];
+          chainHang(c); c.traps++; c.trap = 0;
+        }
+      } else c.trap = 0;
     }
-    // The curve through the three points, and the links laid along it.
-    _chC.copy(c.mid).multiplyScalar(2)
-      .addScaledVector(_chA, -0.5).addScaledVector(_chB, -0.5);
-    const n = c.links.length;
-    // The seed for the carried normal. Any vector not along the first run
-    // will do; it is orthogonalised before it is used.
-    _chN.set(0, 0, 1);
-    for (let i = 0; i < n; i++) {
+    // And the links drawn where the bodies are, back in her frame — the
+    // group is a child of her mesh, like everything else she wears.
+    _chMI.copy(skinFig.mesh.matrixWorld).invert();
+    _chMQI.copy(_chMQ).invert();
+    for (let i = 0; i < c.links.length; i++) {
       const m = c.links[i];
-      chainAt(_chA, _chC, _chB, i / n, _chP);
-      chainAt(_chA, _chC, _chB, (i + 1) / n, _chV);
-      m.position.copy(_chP).add(_chV).multiplyScalar(0.5);
-      _chT.copy(_chV).sub(_chP);
-      if (_chT.lengthSq() < 1e-10) _chT.set(1, 0, 0);
-      _chT.normalize();
-      // A chain is links at right angles to each other, so every other one
-      // turns a quarter turn about the run of it. The torus lies in its own
-      // xy plane, which is the plane a link's metal lies in, so the run of
-      // the chain has to be IN that plane and the axis across it.
-      //
-      // ── AND THE FRAME IS CARRIED, NOT REDERIVED ────────────────────────
-      //
-      // Misha, 20 Sep 2026, on a handstand with the cuffs on: *"one of the
-      // arms gets stuck in an unnatural shape"*. The arm is fine. What is
-      // down her forearm is this chain, drawn as a corkscrew — forty-two
-      // links each rotated a little further about the run than the last,
-      // which at a glance is a limb with a screw thread on it.
-      //
-      // The cause was a fixed reference axis. Each link built its own frame
-      // from world `+z`, swapping to `+y` when the run came within 26° of
-      // `z` — and both halves of that are wrong. A frame built from a
-      // CONSTANT against a tangent that TURNS rolls steadily about the run,
-      // which is the corkscrew; and the swap is a discontinuity, so the
-      // roll also jumps by a quarter turn somewhere in the middle of the
-      // chain. Standing, her wrists are 0.43 m apart and the swag barely
-      // turns, so it never showed. Upside down the chain hangs the length of
-      // her forearm in a tight curve and the run sweeps through most of a
-      // right angle, which is the pose that made it obvious.
-      //
-      // So the normal is PARALLEL-TRANSPORTED: seeded once at the top of the
-      // chain and then carried link to link, each time with the component
-      // along the new tangent taken out. That is the standard way to frame a
-      // curve without torsion, it costs one subtraction a link, and the
-      // alternating quarter turn is now a real alternation rather than a
-      // quarter turn added to a frame that was already spinning.
-      _chN.addScaledVector(_chT, -_chN.dot(_chT));
-      if (_chN.lengthSq() < 1e-8) {
-        // The carried normal has collapsed onto the run, which happens when
-        // the curve doubles back on itself. Any perpendicular will do and
-        // the next link carries on from it.
-        _chN.set(-_chT.y, _chT.x, 0);
-        if (_chN.lengthSq() < 1e-8) _chN.set(0, 1, 0);
-      }
-      _chN.normalize();
-      _chY.copy(_chN);
-      if (i & 1) _chY.copy(_chT).cross(_chY).normalize();
-      _chX.copy(_chT).cross(_chY);
-      m.quaternion.setFromRotationMatrix(_chW.makeBasis(_chT, _chX, _chY));
+      m.position.set(sim.P[3 * i], sim.P[3 * i + 1], sim.P[3 * i + 2]).applyMatrix4(_chMI);
+      _chQ.set(sim.Q[4 * i], sim.Q[4 * i + 1], sim.Q[4 * i + 2], sim.Q[4 * i + 3]);
+      m.quaternion.copy(_chMQI).multiply(_chQ);
     }
+    const ms = performance.now() - t0;
+    c.ms += (ms - c.ms) * 0.05;
+    if (ms > c.msMax) c.msMax = ms;
+  }
+
+  /**
+   * The chain, measured — for `__fr.jad.chain()`. Stretch is the worst gap
+   * at any of the 43 joints and the sum of them all; `pen` is how far the
+   * worst link centre is inside one of her capsules (negative is clear of
+   * it — the ball round a link keeps a centre `rLink` off her skin).
+   */
+  function chainStats() {
+    const part = worn.cuffs && worn.cuffs.find((p) => p.chain);
+    const c = part && part.chain;
+    if (!c || !c.sim) return null;
+    const sim = c.sim;
+    sim.measure();
+    const pen = sim.depth();
+    const caps = chainCapsules();
+    const who = sim.stats.penShape === 31 ? 'floor' : caps[sim.stats.penShape]
+      ? caps[sim.stats.penShape].name : null;
+    const mm = (x) => +(x * 1000).toFixed(2);
+    // Where the links are in HER frame, every sixth: +x in front of her, +y
+    // up from her feet, so a test can read "below her hands, in front of her".
+    _chMI.copy(skinFig.mesh.matrixWorld).invert();
+    const pts = [];
+    for (let i = 0; i < sim.n; i += 6) {
+      _chV.set(sim.P[3 * i], sim.P[3 * i + 1], sim.P[3 * i + 2]).applyMatrix4(_chMI);
+      pts.push([+_chV.x.toFixed(3), +_chV.y.toFixed(3), +_chV.z.toFixed(3)]);
+    }
+    let v = 0;
+    for (let i = 0; i < sim.V.length; i += 3) v = Math.max(v, Math.hypot(sim.V[i], sim.V[i + 1], sim.V[i + 2]));
+    const A = sim.anchor;
+    return { on: c.on, steps: c.steps, frames: c.frames, resets: c.resets, why: c.why,
+      traps: c.traps, caught: c.caught,
+      ms: +c.ms.toFixed(3), msMax: +c.msMax.toFixed(3),
+      stretchMax: mm(sim.stats.maxStretch), stretchSum: mm(sim.stats.sumStretch),
+      pen: mm(pen), penAt: who, contacts: sim.stats.contacts,
+      span: +Math.hypot(A[3] - A[0], A[4] - A[1], A[5] - A[2]).toFixed(3),
+      vMax: +v.toFixed(3), floor: +(c.floorNow - skinFig.mesh.position.y).toFixed(3),
+      yaw: +skinFig.mesh.rotation.y.toFixed(4), pts };
+  }
+
+  /**
+   * Where CHAIN_BODY's numbers come from: her drawn mesh (Baye v2.0 when she
+   * is the one drawn), in the bind frame, vertex by vertex. For each limb,
+   * the vertices skinned mostly to that bone, cut into thirds along it, and
+   * in each third how far off the bone's own line they sit (50th, 75th, 90th
+   * percentile) and where their middle is relative to that line. For the
+   * trunk, horizontal slices: how far forward and back, and how wide.
+   * `__fr.jad.chainFit()`; nothing in the game calls it.
+   */
+  function chainFit() {
+    const f = APPR.primary && appr ? appr : skinFig;
+    if (!f) return null;
+    const g = f.mesh.geometry;
+    const pos = g.getAttribute('position'), bi = g.getAttribute('aBoneIdx'), bw = g.getAttribute('aBoneWt');
+    const H = bindHeadsOf(skinFig);
+    const nv = pos.count, dom = new Int16Array(nv), domW = new Float32Array(nv);
+    for (let v = 0; v < nv; v++) {
+      let best = -1, bwt = 0;
+      for (let k = 0; k < 4; k++) {
+        const w = bw.getComponent(v, k);
+        if (w > bwt) { bwt = w; best = Math.round(bi.getComponent(v, k) * (bi.normalized ? 255 : 1)); }
+      }
+      dom[v] = best; domW[v] = bwt;
+    }
+    const pct = (a, p) => { if (!a.length) return null; a.sort((x, y) => x - y); return +a[Math.min(a.length - 1, Math.floor(p * a.length))].toFixed(4); };
+    const limbs = [['armUL', 'armLL'], ['armLL', 'handL'], ['handL', 'fingersL'],
+      ['armUR', 'armLR'], ['armLR', 'handR'], ['handR', 'fingersR'],
+      ['legUL', 'legLL'], ['legLL', 'footL'], ['legUR', 'legLR'], ['legLR', 'footR'],
+      ['neck', 'head']];
+    const out = { limbs: {}, trunk: [], heads: {} };
+    for (const [nm] of [['pelvis'], ['spine01'], ['spine02'], ['spine03'], ['chest'], ['neck'], ['head'], ['legUL'], ['legUR'], ['armUL'], ['clavicleL']]) {
+      const b = skinFig.boneIndex(nm);
+      if (b >= 0) out.heads[nm] = [+H.T[b].x.toFixed(3), +H.T[b].y.toFixed(3), +H.T[b].z.toFixed(3)];
+    }
+    const p = new THREE.Vector3();
+    for (const [an, bn] of limbs) {
+      const a = skinFig.boneIndex(an), b = skinFig.boneIndex(bn);
+      if (a < 0 || b < 0) continue;
+      const A = H.T[a], B = H.T[b];
+      const e = B.clone().sub(A), L = e.length();
+      e.normalize();
+      const bins = [[], [], []], cen = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], offs = [[], [], []];
+      for (let v = 0; v < nv; v++) {
+        if (dom[v] !== a || domW[v] < 0.5) continue;
+        p.fromBufferAttribute(pos, v).sub(A);
+        const t = p.dot(e) / L;
+        if (t < 0 || t > 1) continue;
+        const k = Math.min(2, Math.floor(t * 3));
+        const q = p.clone().addScaledVector(e, -p.dot(e));
+        cen[k][0] += q.x; cen[k][1] += q.y; cen[k][2] += q.z; cen[k][3]++;
+        offs[k].push(q);
+      }
+      const res = [];
+      for (let k = 0; k < 3; k++) {
+        const nC = cen[k][3] || 1;
+        const cx = cen[k][0] / nC, cy = cen[k][1] / nC, cz = cen[k][2] / nC;
+        const d0 = offs[k].map((q) => q.length());
+        const d1 = offs[k].map((q) => Math.hypot(q.x - cx, q.y - cy, q.z - cz));
+        res.push({ n: offs[k].length, axis: [pct(d0.slice(), 0.5), pct(d0.slice(), 0.75), pct(d0.slice(), 0.9)],
+          ctr: [+cx.toFixed(4), +cy.toFixed(4), +cz.toFixed(4)],
+          fromCtr: [pct(d1.slice(), 0.5), pct(d1.slice(), 0.75), pct(d1.slice(), 0.9)] });
+      }
+      out.limbs[an + '>' + bn] = { len: +L.toFixed(3), A: [+A.x.toFixed(3), +A.y.toFixed(3), +A.z.toFixed(3)], B: [+B.x.toFixed(3), +B.y.toFixed(3), +B.z.toFixed(3)], thirds: res };
+    }
+    // The trunk, in 4 cm slices, from vertices skinned to the spine and
+    // pelvis (and the tops of her thighs, which are her hips).
+    const trunk = new Set(['pelvis', 'spine01', 'spine02', 'spine03', 'chest', 'legUL', 'legUR', 'clavicleL', 'clavicleR']
+      .map((nm) => skinFig.boneIndex(nm)));
+    for (let y = 0.70; y < 1.50; y += 0.04) {
+      const xs = [], zs = [], xl = [], xr = [];
+      for (let v = 0; v < nv; v++) {
+        if (!trunk.has(dom[v])) continue;
+        p.fromBufferAttribute(pos, v);
+        if (p.y < y || p.y >= y + 0.04) continue;
+        // Arms hang beside her in the bind pose; keep only what is inside
+        // the width of her shoulders' joints.
+        if (Math.abs(p.z) > 0.20) continue;
+        xs.push(p.x); zs.push(p.z);
+        if (Math.abs(p.z) < 0.04) xl.push(p.x);
+      }
+      if (!xs.length) continue;
+      out.trunk.push({ y: +(y + 0.02).toFixed(2), n: xs.length,
+        x: [pct(xs.slice(), 0.03), pct(xs.slice(), 0.97)], z: [pct(zs.slice(), 0.03), pct(zs.slice(), 0.97)],
+        midX: [pct(xl.slice(), 0.03), pct(xl.slice(), 0.97)] });
+    }
+    return out;
   }
 
   /**
@@ -50882,9 +51433,14 @@ async function buildJadrija(scene) {
         // of it, because the step is what drives everything that is *not* the
         // clip — the fringe's swing among it — and a pose held with a frozen
         // dt is a pose whose cloth never arrives.
-        if (posed) skinFig.state.curT = posed.at;
+        //
+        // WHAT SHE IS WEARING GOES ON BEING WORN on a held frame too: `wearTick`
+        // is called from inside `stepShow`, so before 1.526.0 a pose held here
+        // (or by the Slow Doodle) left the cuffs where her wrists were when
+        // the hold began, and their chain frozen in the air with them.
+        if (posed) { skinFig.state.curT = posed.at; wearTick(dt); }
         // And held while the Slow Doodle has her — see `lickHold`.
-        else if (lickOn) lickHold(dt);
+        else if (lickOn) { lickHold(dt); wearTick(dt); }
         else stepShow(dt, pt, ps, dir);
         // After both, because it reads the bones the step above has just
         // solved and it has to run on the held frame as well as the live one.
@@ -53094,6 +53650,23 @@ async function buildJadrija(scene) {
         +m.position.z.toFixed(3)] })),
     /** And what she has ON, which is the other half of the same question. */
     worn: () => Object.keys(worn),
+    /**
+     * The cuff chain, measured (see `chainStats`), and where its body's
+     * numbers came from (`chainFit`). And the cuffs on or off without the
+     * errand — the walk to you and the lift are ten seconds a headless page
+     * spends at two frames a second, and the chain is not in them.
+     */
+    chain: () => chainStats(),
+    chainFit: () => chainFit(),
+    cuffs: (on = true) => {
+      if (!skinFig) return null;
+      if (!on) return doffNow('cuffs') ? 'off' : 'notworn';
+      if (worn.cuffs) return 'wearing';
+      const parts = wearableParts('cuffs', 'wrists');
+      worn.cuffs = parts;
+      for (const part of parts) skinFig.mesh.add(part.group);
+      return 'on';
+    },
     /**
      * The fall, node by node, in HER frame: where each ring has got to
      * relative to the head bone, with +x in front of her and +y up.
