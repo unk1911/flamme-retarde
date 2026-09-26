@@ -8,6 +8,82 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.526.0] — 2026-09-26
+
+### the flags move — the Brod's ensign is cloth, Maslina's feathers ripple
+
+Misha: *"can AVBD chains be used for things like the croatian flag on the
+boat?"* They can, and for one flag they are the wrong tool: three-avbd's
+"Flag in the Wind" builds it from 1 536 rigid plates solved on the GPU. A flag
+is a particle cloth. What came across from three-avbd (MIT, Steven Bobyn;
+the notice is in the source where it is used) is the part that makes it a
+flag and not a sheet: **the air**.
+
+**The Brod's ensign** (src/59-brod.js, `brodEnsign`).
+
+- **What was there.** Three painted 2 cm slabs, red, white and blue, with no
+  arms on them. They were fixed to the **forward** side of the mast, which is
+  the one place a flag on a boat under way can never be. They are gone.
+- **What is there now.** The flag of Croatia at the masthead, 1.44 × 0.72 m.
+  It is 13 × 8 = **104 particles**, 168 triangles and 521 distance constraints
+  (structural, shear, weak bend) solved 12 times a step. There are 288
+  long-range tethers to the luff and the mast is a collider. The luff is lashed
+  to `BROD_MAST`, the same numbers the mast is drawn from. Fixed 1/120 s
+  steps, at most four a frame. The print is drawn in the shader off the
+  cloth's UVs: tricolour, šahovnica (first square red), and a crown of five.
+  There is no canvas, so there is no extra gamma. Past 22 m the checkerboard
+  hands over to its average so it cannot crawl. Normals are rebuilt every
+  frame, and the face away from the sun glows through.
+- **The air is the apparent wind.** That is the true wind minus her way
+  through the water minus the cloth's own motion. Pressure drag is
+  ½ρC_d A (n·u)|n·u| along the normal, linearised implicitly. Skin friction is
+  6 % of that. Travelling gusts along, across and up are carried down the flag
+  by the air itself. The wind at the masthead is `state.windSpeed` through
+  57-eject.js's friction-layer gradient read at 10 m, which is 0.27 of the
+  bura, or about 2.6 m/s.
+- **It is simulated on world axes from the head of the luff.** So a teleport,
+  a `seek` or the ×8 time-lapse never reaches it, and a turn is physical. She
+  comes round, the luff goes with her, and the cloth lags and swings on to the
+  new wind. Nothing had to be written to get that.
+
+**Measured** (RTX 4090 laptop, ANGLE/D3D12, headless):
+
+| | stopped, alongside Šibenik | cruising, 8 m/s |
+|---|---|---|
+| apparent wind | 2.6 m/s, from astern | 5.2 m/s, from ahead |
+| fly end under level (mean, range) | 31°, 9–54° | 9°, −2–22° |
+| reach (fraction of the fly) | 0.83 | 0.95 |
+| structural stretch (mean / max) | 5.4 % / 7.7 % | 2.5 % / 4.7 % |
+
+- **Cost:** 0.22 ms a 60 Hz frame (two steps, normals and upload included).
+- **Hard turn:** at the 36.5° corner at 894 m of the channel, the flag goes
+  from 1° to 44° off her centreline in the frame the heading snaps. It is back
+  through 0° in 0.5 s, overshoots to −7°, and settles.
+- **Soak:** 1 800 frames at ×8 (the whole passage, every corner, and the
+  arrival) and then 3 600 frames stopped. **No resets** except the one
+  deliberate teleport. Max structural stretch is 8.1 % and 8.6 %. The worst is
+  always stopped, with the flag wrapped round the pole from astern.
+- It is stepped only when she is drawn and the eye is within 400 m.
+
+**Maslina's two feather flags** (src/43-jadrija.js, `FEATHER_WAVE`). These are
+a vertex-shader wave, not a simulation. The luff is bound to the pole, so all
+that moves is a ripple running off it. The amplitude is zero at the luff and
+grows as the 1.5 power out to the leech. It is pushed along the cloth's normal,
+so the hand-drawn profile and its print are unchanged. Size and speed follow
+`uWindSpeed`: about 11 cm and two cycles a second in the bura. Each flag has
+its own phase and a 13 % different frequency, so the pair never beat in step.
+The printed `Maslina` plane gets the same function spliced into its
+`MeshBasicMaterial`, so the words ride the ripple. Each cloth is now its own
+buffer, 8 cells across each band. The back face is wound on the same diagonal
+as the front: with two diagonals, a bent quad is two surfaces poking through
+each other in a checker.
+
+**Not done.** The ferry and "his boat" are the same boat. 60-pax.js is her
+passengers, not a second vessel, so there was one ensign to do. The feather
+flags keep a thin light slit at each band seam. That slit was already there:
+the leech corners of adjacent bands are drawn 2 cm apart, −0.06 above and
+−0.04 below. It was left as it was, because the brief was motion only.
+
 ## [1.524.0] — 2026-09-26
 
 ### ?pose — pose her by hand, in the game

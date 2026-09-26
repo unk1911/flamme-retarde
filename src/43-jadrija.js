@@ -285,6 +285,65 @@ function shoreStations(raw) {
   return ST;
 }
 
+/**
+ * Maslina's feather flags, MOVING. Misha, 26 Sep, asked whether the cloth
+ * that went on to the Brod's ensign could do *"things like the croatian flag
+ * on the boat"* — and a flag on a pole is the same question. These two get a
+ * wave in the vertex program and not a simulation, because they do not need
+ * one: a feather flag is bound to its pole down the whole luff and its head is
+ * held out by the bent top section, so the only part of it that moves is the
+ * leech, and the only way it moves is a ripple running off the pole.
+ *
+ * So: a travelling wave across the cloth, luff to leech, of an amplitude that
+ * is ZERO at the luff and grows as the 1.5 power of the distance out — which
+ * is how a cloth pinned along one edge moves — pushed along the cloth's own
+ * normal so the shape in the plane is exactly the hand-drawn profile it was.
+ * Its speed and its size follow `uWindSpeed`, the gusting number the sea is
+ * drawn from — in the 9.5 m/s bura the leech swings up to 11 cm either side
+ * about twice a second, and in a calm it barely stirs, at 1.5 cm and once a
+ * second; a slow envelope on top so it breathes rather than buzzes; and a
+ * phase and a frequency of its own per flag so that two of them ten metres
+ * apart are never in step — "a pair blowing identically is the machined
+ * read", as the note where they are built says about their profiles.
+ *
+ * `uFPole` is the pole's foot at the tack's height and the flag's phase;
+ * `uFDir` the way the leech falls, level, and how far it falls (the profile's
+ * 0.62 m); `uFNrm` the cloth's normal, level, and its frequency multiplier.
+ * All world space. The same function moves the cloth and the print hung
+ * 4 cm in front of it, so the print stays on the cloth.
+ *
+ * (NO BACKTICKS IN HERE: this is inside a template literal.)
+ */
+const FEATHER_WAVE = /* glsl */ `
+uniform float uTime;
+uniform float uWindSpeed;
+uniform vec4 uFPole;
+uniform vec4 uFDir;
+uniform vec4 uFNrm;
+vec2 featherWave(vec3 wp){
+  vec2 d = wp.xz - uFPole.xz;
+  float u = wp.y - uFPole.y;
+  // The head leans out with the top section of the pole, by the same lean
+  // the profile is built with, so distance is measured from the luff and
+  // not from the pole.
+  float lean = max(u - 2.30, 0.0) * 0.30;
+  float e = max(dot(d, uFDir.xz) - lean, 0.0);
+  float q = e / uFDir.w;
+  float w = clamp(uWindSpeed, 0.0, 20.0);
+  float amp = (0.015 + 0.010 * w)
+    * (0.72 + 0.28 * sin(uTime * 0.37 + uFPole.w * 1.7) * sin(uTime * 0.13 + uFPole.w));
+  float A = amp * q * sqrt(q);
+  // One wavelength across the flag, and the frequency off the wind: about
+  // two cycles a second in the bura, one in a calm.
+  float k = 6.2832 / 0.62;
+  float om = 6.2832 * (0.9 + 0.11 * w) * uFNrm.w;
+  float ph = k * e - om * uTime + uFPole.w + 0.9 * u;
+  float s = sin(ph);
+  // The displacement, and its slope across the cloth for the lighting.
+  return vec2(A * s, A * k * cos(ph) + 1.5 * amp * sqrt(q) / uFDir.w * s);
+}
+`;
+
 async function buildJadrija(scene) {
   // The one building on this shore you can go inside. Built near the end,
   // once the shore frame exists; declared here because walkY asks it for the
@@ -498,6 +557,10 @@ async function buildJadrija(scene) {
   // the aerodrome casts its hangars and its objects and never its apron.
   const deck = propBuilder();
   const up = propBuilder();
+  // Maslina's two feather flags, which are NOT in `up` any more: each is its
+  // own small buffer so its vertex program can move it. Filled where the flags
+  // are built, made into meshes beside `upMesh` — see `FEATHER_WAVE`.
+  const feathers = [];
   // And a third: the rendered masonry of the kabine, which is the same lighting
   // as `up` with a surface on it.
   //
@@ -15590,6 +15653,13 @@ async function buildJadrija(scene) {
         // is in. Built across t at a constant s, so the leech runs out along
         // the frontage and `seaFacing` can hang the print on it with no turn.
         const lean = (u) => (u < 2.30 ? 0 : (u - 2.30) * 0.30);
+        // Into a buffer of its own, and each band cut into a grid: the wave
+        // in `FEATHER_WAVE` moves vertices, and the six quads a side this used
+        // to be had none between the luff and the leech to move. Eight across
+        // and a row every 0.2 m up, laid bilinearly over the same four
+        // corners, so the flat shape is the profile exactly.
+        const fb = propBuilder();
+        const NC = 8;
         for (let i = 0; i < PRO.length - 1; i++) {
           const [u0, e0] = PRO[i], [u1, e1] = PRO[i + 1];
           const A = W(ft + lean(u0) * wind, fs - 0.03, tack + u0);
@@ -15602,15 +15672,47 @@ async function buildJadrija(scene) {
             tack + u1 - 0.06);
           const D = W(ft + lean(u0) * wind + lw * e0, fs - 0.03,
             tack + u0 - 0.04);
-          b.quad(A, B, C2, D, S.flag);
-          b.quad(D, C2, B, A, shade(S.flag, 0.86));
+          const NR = Math.max(1, Math.ceil((u1 - u0) / 0.2));
+          const grid = (ci, rj) => {
+            const a = ci / NC, c = rj / NR;
+            return [0, 1, 2].map((k) => {
+              const lo = A[k] + (D[k] - A[k]) * a, hi = B[k] + (C2[k] - B[k]) * a;
+              return lo + (hi - lo) * c;
+            });
+          };
+          for (let ci = 0; ci < NC; ci++) {
+            for (let rj = 0; rj < NR; rj++) {
+              const qa = grid(ci, rj), qb = grid(ci, rj + 1);
+              const qc = grid(ci + 1, rj + 1), qd = grid(ci + 1, rj);
+              // The back face on the SAME diagonal as the front. `quad` cuts
+              // a b c d along a–c and d c b a along d–b, which on a flat
+              // quad is the same plane twice and once it bends is two
+              // different surfaces poking through each other in a checker.
+              const bk = shade(S.flag, 0.86);
+              fb.quad(qa, qb, qc, qd, S.flag);
+              fb.tri(qc, qb, qa, bk);
+              fb.tri(qd, qc, qa, bk);
+            }
+          }
         }
         // The print, on a plane four centimetres seaward of the cloth. Its own
         // panel is the middle 1.95 m of the flag against the luff, which is
         // where the script sits in the frame.
-        seaFacing(maslinaFlagPrint(0.58, 1.95), ft + 0.30 * wind,
+        const print = seaFacing(maslinaFlagPrint(0.58, 1.95), ft + 0.30 * wind,
           fs - 0.07, tack + 1.30, 0.58, 1.95,
           'maslina:flag' + (wind > 0 ? 'W' : 'E'));
+        // And what the wave needs to know about this one: where the luff is,
+        // which way the leech falls, the cloth's normal — all level, and all
+        // off the same frame the cloth was just laid in.
+        const P0 = W(ft, fs - 0.03, tack), P1 = W(ft + wind, fs - 0.03, tack);
+        const dl = Math.hypot(P1[0] - P0[0], P1[2] - P0[2]) || 1;
+        const fst = at(ft);
+        feathers.push({ fb, print, pole: [P0[0], tack, P0[2]],
+          dir: [(P1[0] - P0[0]) / dl, (P1[2] - P0[2]) / dl],
+          nrm: [fst.nx, fst.nz], lw: Math.abs(lw),
+          // West 0 and east 2.1 rad on; east 13 % quicker, so they drift
+          // through each other rather than beating at one fixed offset.
+          phase: wind > 0 ? 0 : 2.1, fmul: wind > 0 ? 1 : 1.13 });
       }
     }
     // Maslina is a kiosk and six metres long, and from the lane its back was
@@ -29411,6 +29513,50 @@ async function buildJadrija(scene) {
   const upMesh = new THREE.Mesh(up.geo(), solidMaterial(0xffffff, {
     spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22, body: FACE,
   }));
+  // Maslina's feather flags: `up`'s material with `FEATHER_WAVE` in its
+  // vertex program, one material each because each carries its own pole. The
+  // print hung in front of each is a plain `MeshBasicMaterial` off
+  // `seaFacing`; it gets the same function spliced in, on a plane cut fine
+  // enough to bend, so the words ride the ripple instead of floating off it.
+  const featherMeshes = feathers.map((F) => {
+    const uni = {
+      uWindSpeed: U.uWindSpeed,
+      uFPole: { value: new THREE.Vector4(F.pole[0], F.pole[1], F.pole[2], F.phase) },
+      uFDir: { value: new THREE.Vector4(F.dir[0], 0, F.dir[1], F.lw) },
+      uFNrm: { value: new THREE.Vector4(F.nrm[0], 0, F.nrm[1], F.fmul) },
+    };
+    const m = new THREE.Mesh(F.fb.geo(), solidMaterial(0xffffff, {
+      spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22,
+      body: FACE, vdecl: FEATHER_WAVE, uniforms: uni,
+      // The cloth is built in world metres, so the model matrix is the
+      // identity and `p` is world space already.
+      vert: `
+        vec2 fw = featherWave(p);
+        p += uFNrm.xyz * fw.x;
+        n = normalize(n - uFDir.xyz * fw.y * dot(n, uFNrm.xyz));
+      `,
+    }));
+    m.geometry.computeBoundingSphere();
+    m.geometry.boundingSphere.radius += 0.25;
+    m.name = F.print.name + ':cloth';
+    const pr = F.print;
+    pr.geometry.dispose();
+    pr.geometry = new THREE.PlaneGeometry(0.58, 1.95, 6, 16);
+    pr.material.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = U.uTime;
+      Object.assign(sh.uniforms, uni);
+      sh.vertexShader = FEATHER_WAVE + sh.vertexShader.replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        {
+          vec3 fp = (modelMatrix * vec4(transformed, 1.0)).xyz;
+          vec3 dw = uFNrm.xyz * featherWave(fp).x;
+          transformed += vec3(dot(dw, modelMatrix[0].xyz),
+            dot(dw, modelMatrix[1].xyz), dot(dw, modelMatrix[2].xyz));
+        }`);
+    };
+    return m;
+  });
   // The kabina's two rooms, on the same material as `up` and switched by
   // `kabinaMode`. Outside to start with, which is where everybody starts.
   const kabOutMesh = new THREE.Mesh(kabOut.geo(), upMesh.material);
@@ -29596,7 +29742,8 @@ async function buildJadrija(scene) {
   for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh]) {
     m.frustumCulled = false;
   }
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, ...rendMeshes]) {
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, ...rendMeshes,
+    ...featherMeshes]) {
     scene.add(m);
   }
 
@@ -52202,7 +52349,11 @@ async function buildJadrija(scene) {
     // them out of the caster list and the rows stop throwing the long shadows
     // that are half of what the promenade looks like at seven in the evening.
     meshes: [deckMesh, upMesh, vilMesh, ...rendMeshes],
-    casters: [upMesh, vilMesh, ...rendMeshes.filter((m) => m !== kabRendMesh)],
+    // The feather flags cast as they stand: the shadow pass does not run the
+    // wave, and a ripple of a few centimetres in a shadow is nothing anybody
+    // could see.
+    casters: [upMesh, vilMesh, ...rendMeshes.filter((m) => m !== kabRendMesh),
+      ...featherMeshes],
     // The kabina's two rooms cast only while they are drawn — `dynamic`
     // proxies follow their mesh's `visible`. The big room has to: nothing
     // else is over its floor once the roof and the huts are out of the way,
