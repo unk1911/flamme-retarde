@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.44.0"
+VERSION = "1.45.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -1000,7 +1000,16 @@ ASK_RE = re.compile(
     # whole of `SKILLS` and come back a request to pour wine.
     r"|\b(put|strap|wear|wearing|attach|fasten|fit|clip|insert)\b.{0,24}"
     r"\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy|"
-    r"headphones|bose|(hand[\s-]?)?cuffs|bangles|bracelets|chain\w*)\b"
+    r"headphones|bose|(hand[\s-]?)?cuffs|bangles|bracelets|chain\w*|"
+    r"anklets?|leg[\s-]?irons?|shackles?)\b"
+    # AND OFF, SAID THE OTHER WAY ROUND. "Take off the cuffs" and "remove the
+    # anklets" carry the noun AFTER the word, and neither the "<thing> off"
+    # below nor `take ... out` reached them — measured against 1.44.0, both
+    # were talk for every wearable. `doff_of` is what answers them.
+    r"|\b(take off|remove|removes|unfasten|unclip)\b.{0,24}"
+    r"\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy|"
+    r"headphones|bose|(hand[\s-]?)?cuffs?|bangles?|bracelets?|chain\w*|"
+    r"anklets?|leg[\s-]?irons?|shackles?)\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     r"|\b(stop|silence)\b"
     # And the tangle. None of these words mean anything else on this beach,
@@ -1019,7 +1028,8 @@ ASK_RE = re.compile(
     # off' to take them off"*. Two words, no verb, and `doff_of` is what
     # answers it — see the note there about `take ... off` having been a
     # spoken refusal because nothing could undo a `wear:`.
-    r"|\b((hand[\s-]?)?cuffs?|bangles?|bracelets?|chain\w*|headphones|bose)\b"
+    r"|\b((hand[\s-]?)?cuffs?|bangles?|bracelets?|chain\w*|headphones|bose|"
+    r"anklets?|irons?|shackles?)\b"
     r".{0,16}\boff\b"
     # And taking it back out, which carries `take` — a handover verb — and
     # went to `give_of` as an offer of the thing she is already wearing. See
@@ -1214,7 +1224,27 @@ GIVE_RE = re.compile(r"\b(give|hand|pass|take)\b")
 # take their nouns from `GIVE_WORDS`, so a spelling added here is added to all
 # three at once.
 LOVENSE = r"lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator"
+# ── AND THE PAIR FOR HER ANKLES ───────────────────────────────────────────────
+#
+# Misha, 26 Sep 2026: *"Ankle cuffs, matching the wrist ones"* — the same pavé on
+# her ankles, and a chain between them (ANKLE_CUFF, ANKLE_CHAIN in
+# src/43-jadrija.js). Satchel key `anklecuffs`.
+#
+# FIRST IN `GIVE_WORDS`, BECAUSE THE WRIST CUFFS' ROW WOULD TAKE IT. That row is
+# `cuffs?|bracelets?|chain\w*` with nothing in front, so "wear the ankle cuffs"
+# matched it on its second word and came back `wear:cuffs` — every loop over
+# this table takes the first row that matches. This row wants the thing named
+# as an ANKLE thing: "ankle cuffs / chains / bracelets", "anklets", "leg cuffs",
+# "leg irons", or a cuff-word followed within a few words by her ankles or
+# feet — "put the cuffs on her ankles". A bare "cuffs", "handcuffs",
+# "bracelets" or "chain" matches none of that and stays the wrists', and
+# "ankles" alone is never the thing: "put your hands on your ankles" is a pose.
+ANKLE = (r"ankle[\s-]?(?:cuffs?|chains?|bracelets?|bangles?|irons?|shackles?)\b"
+         r"|anklets?\b|leg[\s-]?(?:cuffs?|chains?|irons?|shackles?)\b"
+         r"|(?:(?:hand[\s-]?)?cuffs?|chains?|bracelets?|bangles?|shackles?)\b"
+         r"[\w\s']{0,20}\b(?:ankles?|feet)\b")
 GIVE_WORDS = (
+    ("anklecuffs", ANKLE),
     # THE CUFFS ARE ONE THING WITH THREE NAMES ON IT NOW. They were two plain
     # bangles when this row was written; since 1.428.0 they are pavé-set with
     # diamonds and a chain hangs between them — see CUFF and CHAIN in
@@ -1245,7 +1275,7 @@ GIVE_WORDS = (
 # The three rows that name a thing with a bone on it — see the `wear` column in
 # src/62-satchel.js. Spelled off `GIVE_WORDS` rather than beside it, so a noun
 # only ever has one spelling in this file.
-WEAR_KEYS = ("lovense", "headphones", "cuffs")
+WEAR_KEYS = ("lovense", "headphones", "anklecuffs", "cuffs")
 WEAR_WORDS = tuple((k, p) for k, p in GIVE_WORDS if k in WEAR_KEYS)
 
 
@@ -1372,7 +1402,7 @@ OFF_RE = re.compile(r"\boff\b")
 # she gives in words, and `give:cuffs` would have come back "she already has it
 # on" while she stood there wearing them.
 TAKE_OFF_RE = re.compile(r"\btake\b.{0,24}\boff\b|\btake off\b|\bunclip\b"
-                         r"|\bundo\b.{0,20}\b(cuffs?|chain\w*)\b")
+                         r"|\bundo\b.{0,20}\b(cuffs?|chain\w*|anklets?)\b")
 
 
 # ── AND TAKING IT BACK OUT ────────────────────────────────────────────────────
@@ -1398,7 +1428,10 @@ DOFF_RE = re.compile(r"\b(take|takes|pull|pulls|get|gets|slip|slips|remove|"
                      r"|\btake it out\b|\bpull it out\b|\bout it comes\b"
                      # AND THE BARE "<thing> off", which carries no verb at
                      # all: "cuffs off". The noun is checked by `doff_of`.
-                     r"|\boff\b")
+                     r"|\boff\b"
+                     # And the verbs that mean it on their own, with neither
+                     # word: "remove the anklets". The noun again.
+                     r"|\b(remove|removes|unfasten|unclip)\b")
 DOFF_IT = re.compile(r"\b(it|that|this)\b")
 
 
@@ -3307,6 +3340,8 @@ KIND_NOUN = {
 WORN_NOUN = {
     "cuffs": "you have their diamond cuffs on both wrists with the chain "
              "hanging between them",
+    "anklecuffs": "you have their diamond cuffs on both ankles, with a chain "
+                  "between them that trails on the floor when you walk",
     "headphones": "you have their big Bose headphones on",
     "lovense": "you are wearing the Lovense they gave you",
 }
@@ -3335,8 +3370,9 @@ WORN_NOUN = {
 # facts that most turns never touch. Five short ones say the same things.
 HER_WORLD = (
     "the cuffs they can put on you are pavé diamonds, fifty-two stones a "
-    "band, with a long chain swagged between your wrists. Ornament, not "
-    "restraint",
+    "band, with a long chain swagged between your wrists, and there is a "
+    "matching pair for your ankles with a longer chain that lies on the "
+    "floor between your feet. Ornament, not restraint",
     "the toy you wear is a Lovense, and it is radio: a button in an app on "
     "their phone sets it going for five seconds, from anywhere, without a "
     "word said",

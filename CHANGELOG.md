@@ -8,6 +8,166 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.528.0] — 2026-09-26 (baye 1.45.0)
+
+### Ankle cuffs to match the wrist ones, with a real chain between her ankles
+
+After the wrist chain shipped (*"the cuffs look great btw"*), Misha chose the
+next item from the list: ankle cuffs that match the wrist ones. The chain
+between them should lie on the floor between her feet, drag when she walks,
+and go taut as "wider" spreads her legs. "Wear the ankle cuffs" should work
+the same way "wear the cuffs" does.
+
+**The cuffs** use the same pavé as the wrist cuffs, fitted to her ankle,
+which was measured rather than guessed. `__fr.jad.ankleFit()` cuts Baye
+v2.0's drawn mesh, skin and fishnet together, into 1 cm slices across the
+shin. Her ankle is an oval, 92 mm front to back and 72 mm across at its
+narrowest. A round band big enough to clear it would stand 20 mm off her at
+the sides, so the band is built round and worn oval. The stones stretch about
+a tenth of their width at the ends. Each band is 26 mm wide. Its middle is
+7.5 cm up the shin from the ankle joint, 7.5 mm behind and 9.5 mm outside
+the shin's line. The bore is the outline plus 5 mm. The lock plate and
+keyhole are on the outside of each ankle.
+
+The height came from `ankleFit(true)`. It skins her mesh into whatever pose
+she is holding and measures how far anything under the band gets past the
+bore:
+
+- **At 6 cm**, the narrowest point, the heel of a pointed foot came up
+  through the back of the band: 64 mm past the bore in the handstand, 59 mm
+  in the ballet, and in 22 of the 64 frames of a walk.
+- **At 7.5 cm** the handstand, ballet, lotus, kneeling, cartwheel, flip,
+  swimming and every held pose on the cot are clear by 0.6–3.5 mm at their
+  worst frame. The one miss left is the walk's push-off: in 10 of 64 frames
+  the heel comes up to 13.5 mm up the back of the band.
+- **At 8 cm** the band reaches the calf, which comes through it by a
+  millimetre in half the ballet.
+
+**The chain** is a second instance of the 1.526.0 AVBD chain. It uses the
+same links, pitch, solver and body. The only difference is the length, and
+that was measured first. Her ankle joints are:
+
+- 0.11 m apart standing
+- 0.16–0.67 m walking (0.43 on average)
+- 0.26–0.46 m kneeling and lying
+- 0.39, 0.62, 0.84, 1.05 and 1.25 m through "legs apart" and each "wider"
+- up to 1.31 m in the handstand and 1.61 m in the cartwheel
+
+The chain is **0.75 m, 50 links**: her longest stride plus the drop to the
+floor on either side. A fresh hang goes down and out toward her toes and
+lies along the floor, instead of hanging straight down into the concrete.
+
+Measured in the kabina, and every screenshot was read:
+
+- **Standing:** 22–28 links on the floor. The chain runs from each cuff down
+  over the tops of her feet and pools in front of her toes.
+- **Spreading:** at "legs apart" it lies on the floor between her feet (28–31
+  links on the floor). At the first "wider" it is at 72 % of its length and
+  still on the floor. At the second (ankles 0.84 m) it is 97 % straight and
+  off the floor. At the third and fourth it is **taut**. From there the joints
+  give, as the wrist chain's do in the flare: 185 mm and 355 mm of stretch
+  spread over 51 joints (3.7 and 7 mm each), so the links part a little and
+  it still reads as a chain.
+- **Kneeling:** all 50 links on the floor between and behind her heels.
+- **Other poses:** 46 links on the floor on all fours. 42 lie on the tiles
+  with her legs over the edge of the cot, and 47 when she sits on it. In the
+  held handstand the chain is straight between her feet 1.31 m apart. No
+  re-hang in any pose; `ankleFit(true)` is clear in all of them.
+- **Walking**, 120 s of her routine on the promenade with both chains on:
+  - The chain swings and drags between her feet.
+  - In 6–10 % of walk frames a link is 10 mm or more inside her. The worst
+    was 46 mm.
+  - A link is under the floor by more than 10 mm in 0.3 % of frames.
+  - Joint stretch averages 1.2 mm a joint.
+  - Nothing was caught on her. 12 re-hangs, all from the cartwheels, where an
+    ankle moves more than 0.5 m between frames.
+
+Three things were needed to get the walk there:
+
+- **Her shins and feet as capsules.** The wrist chain's single knee-to-ankle
+  capsule stood 12 mm outside the band's own bore on the inside of the ankle.
+  It now stops 12 cm above the ankle. The last of the shin is two capsules,
+  front and back, which make an oval. Each foot is four capsules: heel,
+  forefoot twice and toes, with every underside at the sole. The first single
+  capsule down the foot bone went 4 cm into the floor and drove the chain into
+  the tiles at every step. That makes 31 capsules, the most the mask holds.
+  The wrist chain skips the feet.
+- **The ring point follows the fourth link**, not the first, so it slides
+  round the band ahead of the chain. Before, the first link went straight
+  through her own ankle and dragged the next ones in after it.
+- **Firmer skin at the ankle:** 8000 N/m against the wrist's 2000. With
+  these two changes, walk frames with a link 10 mm or more inside her fell
+  from 31 % to 6–10 %. Neither change alone got below 18 %.
+
+**The floor**, fixed for both chains:
+
+- It was the lower of her lowest joint and the deck, which put it 1–3 cm
+  under the tiles when standing. Kneeling it was 15 cm under, because her
+  toes go through the floor in that clip. It is now the mattress top if she
+  is on the mattress, otherwise the deck. Her joints count only when they
+  are far below the deck, as in the sea.
+- The floor now rises at 1 m/s rather than jumping to the mattress top in
+  one frame. That jump used to throw the whole chain up at 13 m/s.
+
+**Found on the way, and fixed:** taking the wrist cuffs off and putting them
+back on made the chain 2.5 times slower for the rest of the session (0.30 →
+0.76 ms a frame, measured). With two chains, both paid it all the time. The
+cause is V8: a closure specialised to one instance is thrown away as soon as
+a second is made from the same source. Each chain now gets its own compiled
+copy of the solver (`avbdChainOwn`, `src/43-avbd.js`), and everything the
+caller reads is built outside that copy, so the caller's code stays
+monomorphic. The per-link `Math.hypot` calls in the solve became `Math.sqrt`.
+
+**Cost** is ~0.9 ms a frame for both chains together: 0.47 ms for the ankle
+chain and 0.42 ms for the wrist chain (0.30–0.37 at rest). This was measured
+on the promenade at ~47 fps headless, 2.5 steps a frame. Standing in the
+kabina at 60 fps the ankle chain costs 0.45–0.49 ms, with about 60 contacts
+on the floor and her feet.
+
+**To wear them:**
+
+- Satchel row `anklecuffs`, "a pair of ornamental ankle cuffs", `wear:
+  'ankles'`. You start with it in the bag.
+- "Wear the ankle cuffs" plays the same handover as the wrist cuffs: she
+  comes to you, takes them, looks at them and puts them on. Checked in the
+  game.
+- Voice (`server/baye/baye.py` 1.45.0, which needs redeploying on mpcn0):
+  - Putting on: "wear the ankle cuffs", "put the ankle cuffs on (her)",
+    "put the cuffs on her ankles".
+  - Handing over: "give her the ankle cuffs / anklets / ankle chains / leg
+    cuffs".
+  - Also: "leg irons", "ankle bracelets".
+  - Taking off: "ankle cuffs off", "anklets off", "take the cuffs off her
+    ankles", "remove the ankle cuffs".
+  - "Cuffs", "handcuffs", "bracelets" and "chain" on their own still mean the
+    wrist cuffs. "Put your hands on your ankles" is still not a request for
+    anything.
+  - Also new, for every wearable: "take off the cuffs", "remove the
+    headphones". Both used to be treated as conversation.
+  - Tested offline: 55 sentences, all as expected. Every quoted phrase in the
+    changelog and the service (2,097) was run through 1.44.0 and 1.45.0; the
+    14 that changed are all these.
+
+**Still not perfect:**
+
+- The heel of the walk's push-off, above.
+- A flip or cartwheel whips links under the floor for a frame or two, up to
+  14 cm.
+- The two chains do not collide with each other.
+- The wrist chain's own walk numbers are unchanged from 1.527.0: its end links
+  sit 10 mm or more inside her thighs in about half of walk frames.
+
+Debug:
+
+- `__fr.jad.ankles(on)` puts the cuffs on or off without the errand.
+  `__fr.jad.ankles(true, {at, mid, oval, len, links, free, contactK, ringFrom,
+  iterations})` puts them on afresh with those numbers changed.
+- `__fr.jad.chain('ankles')` gives the numbers, with new fields for both
+  chains: `penBody`, `penFloor`, `penBodyLink`, `onFloor`, `lift`, `msSum`.
+- `__fr.jad.ankleFit(posed)` gives the fit measurements, and
+  `__fr.jad.chainFit().toes` the foot measurements.
+- `__fr.jad.pose()` now returns the clip's `dur`.
+
 ## [1.527.0] — 2026-09-26
 
 ### a Croatian flag on the front at Jadrija
