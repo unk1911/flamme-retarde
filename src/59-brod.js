@@ -2668,7 +2668,7 @@ function brodLocaleCached(city) {
 // 13 × 8 = 104 particles, 168 triangles, 521 constraints solved twelve times
 // a step and 288 tethers once, at a fixed 1/120 s step with at most four
 // steps a frame — about 0.2 ms of a 60 Hz frame. Measured: see the CHANGELOG
-// for 1.526.0. Stepped only while she is on the screen at all
+// for 1.525.0. Stepped only while she is on the screen at all
 // (`group.visible`) and the camera is inside `near` of her — past 400 m a
 // 1.44 m flag is two pixels at 720 lines, and a frozen one is the same two.
 const ENSIGN = {
