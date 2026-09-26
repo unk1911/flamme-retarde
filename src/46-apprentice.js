@@ -534,6 +534,11 @@ function apprStepBody(dt, leader, room) {
     if (apprEye && leader.face && leader.face.buzz) {
       apprEye.uLid.value = Math.max(apprEye.uLid.value, APPR.buzzLid * leader.face.buzz);
     }
+    // And laughing, with the Slow Doodle's tongue on her face: her eyes
+    // screwed up. Already a lid, 0 to 1 — see LICK_LAUGH in 43-jadrija.js.
+    if (apprEye && leader.face && leader.face.laugh) {
+      apprEye.uLid.value = Math.max(apprEye.uLid.value, Math.min(1, leader.face.laugh));
+    }
     // And lowered, when asked: the iris down and the lid after it.
     if (apprEye) {
       const dn = leader.face && leader.face.down ? leader.face.down : 0;

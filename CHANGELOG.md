@@ -8,6 +8,82 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.523.0] — 2026-09-25 (baye 1.44.0)
+
+### the slow lick
+
+Misha: *"if you're somewhere near him and say 'lick', the Slow Doodle
+executes one of his superpowers: the slow lick. He runs toward either Baye or
+toward the player, goes for the FACE, and does a slurpy, messy
+lick-lick-lick. While he's licking, the victim laughs uncontrollably from
+ticklishness"*.
+
+**The command.** "Lick", "lick her", "lick me", "give her a lick", "slow
+lick", "doodle lick", and in Croatian "poliži" or "liži", and in French
+"lèche". "Lick your lips" and licking an ice cream are left alone. He hears
+it from 25 m away. Past that the panel says *he is too far away to hear
+you*. He picks Baye or you at random, from whoever he can get to. She counts
+if she is standing about or walking, kneeling, or lying or sitting on the
+cot, and within 35 m of him. She does not count if she is in the middle of a
+number, a cartwheel or a swim, or if she is in the kabina and you are not.
+
+**The gallop.** For once the slow dog is fast: he gallops at 3.6 m/s, which
+is a little faster than you walk. The speed is measured off the gallop clip:
+0.46 m of paw stance in 0.139 s. He goes round benches and parasols, and goes
+in and out of the kabina through its door. He slows over the last metre and
+stops with his nose 14 cm short of the face. From ten metres down the
+promenade he gets there in 2.8 to 3.0 s. Into the kabina it takes 4 to 8 s,
+depending on where he starts.
+
+**The lick.** He gets up on his hind legs in 0.42 s, with his forepaws on her
+shoulders, and licks for 4 s at 3.4 licks a second. The Wolf rig has no clip
+for standing up, so the rear is solved every frame from aims. His body
+pitches up, his hind legs and tail keep their pose, and his neck bends back so
+his muzzle points at her face. The amount is set so the tip of his nose is
+5 cm off her skin, and his mesh is placed so his hind paws are on the floor.
+Up on his hind legs his nose reaches 1.50 m. Her lips are 1.56 m up when she
+stands, and 1.44 m when she bends over him laughing, so he gets there three
+quarters of the way up. He licks with a procedural tongue, because his baked
+one is part of his jaw. It comes out, curls up her face and goes back in on
+each lick, and it stops at the surface of her face. For somebody lying down
+he stands beside the cot, square to her at her head, and lowers his head
+instead.
+
+Measured over whole licks: the nose stayed 0.1–5.8 cm from its target
+(median 4.1). The tongue tip went at most 4 mm into the surface of her lips,
+standing or kneeling, and worked her mouth, chin and nose (median 8 cm from
+the middle of her mouth). Lying on the cot it was at most 1.6 cm in, in 3 of
+146 frames. Before his mouth opened less and his stroke was halved with his
+head down, it went 5 cm in. His body never came within 0.38 m of hers,
+bone-centre to bone-centre, and his forepaws never came within 0.27 m of her
+hips while he rose. They come up on an arc out toward him; on a straight
+line they passed within 7 cm of her thighs. Then he drops back, stepping away as he does, and
+saunters off at a slower walk than his own. He moves away from her, and out
+of the kabina first if that is where he is.
+
+**Her.** From the moment he sets off she is held. Her phase, her clock and
+her place wait for him, and when he is done she carries on from where she
+was: a walk resumes, and a kneel, the cot or a routine goes on. She turns to
+face him and bends over him. Her hands go either side of his neck to hold
+him off. She laughs: her head turns away and back, her shoulders shake, her
+mouth opens on each "ha" and her eyes screw shut.
+
+**You.** He comes at you from the way you are looking, puts his paws on your
+shoulders and licks. Your view doubles over 22 cm and shakes with the laugh.
+The front clipping plane comes in to 5 cm, so his face and tongue fill the
+view. A light wet blur builds in the middle of the screen with each lick and
+dries over about 2.5 s.
+
+**Sounds: slots, waiting for Misha's files.** `doodle_lick0`–`3`,
+`laugh_baye0`–`2` and `laugh_chloe0`–`2` in `build/payload`. Each is
+optional. `tools/cut_lick.py` trims and levels them from
+`assets/audio/doodle_lick_*`, `laugh_baye_*` and `laugh_chloe_*`. Until the
+slurps arrive there is a quiet synthesised one. There is no synthesised
+laugh: until the laugh files arrive, nobody laughs out loud.
+
+Debug: `__fr.jad.doodle.lick('baye' | 'you')`, `.lickStats()`, `.lickTrace()`,
+`.rearTune({...})`; `__fr.jad.raw().lickFaces()`, `.lickHeld()`.
+
 ## [1.522.0] — 2026-09-25 (baye 1.43.0)
 
 ### "wider"

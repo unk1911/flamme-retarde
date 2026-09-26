@@ -917,6 +917,118 @@ function buildAudio() {
     return true;
   }
 
+  // ── the slow lick ───────────────────────────────────────────────────────────
+  /**
+   * The Slow Doodle's slurp, and the laugh of whoever he is licking. Misha,
+   * 25 Sep 2026, commissioning the routine: *"Misha will provide sound effects
+   * shortly"*. So these are SLOTS, every one of them optional: a payload key
+   * that is not there is never asked for (`sampleLoad` returns before it
+   * decodes anything), and the routine runs in silence around the hole.
+   *
+   *   build/payload/doodle_lick0.mp3 .. doodle_lick3.mp3   one slurp each
+   *   build/payload/laugh_baye0.mp3  .. laugh_baye2.mp3    her laughing
+   *   build/payload/laugh_chloe0.mp3 .. laugh_chloe2.mp3   you laughing
+   *
+   * `build.py` inlines everything in build/payload as base64 under its file
+   * name, and that name is the key asked for here — so a file dropped in and a
+   * rebuild is the whole of wiring one up. `tools/cut_lick.py` does the
+   * trimming and levelling first, from whatever is in assets/audio.
+   *
+   * A slurp is played once a stroke, three and a half a second, a different
+   * one each time and a shade off pitch, so four takes do not come round as a
+   * loop. With none of them there, a placeholder: the ice cream `lick` above,
+   * a wet brush of filtered noise, quieter and lower — a big dog and not a
+   * person at a cone. NO SYNTHESISED LAUGH: a laugh made of noise bursts is
+   * worse than none, so without the files there is no laugh.
+   *
+   * The laugh runs the length of the licking and past it: when one take ends
+   * and he is still at it, another starts, never the same one twice running;
+   * `lickLaughStop` fades whatever is playing over a second when he drops.
+   * Hers is placed like her other noises, linear to nothing at 30 m; yours
+   * is in your head, and not attenuated at all.
+   */
+  const LICK_SLOTS = {
+    lick: ['doodle_lick0', 'doodle_lick1', 'doodle_lick2', 'doodle_lick3'],
+    baye: ['laugh_baye0', 'laugh_baye1', 'laugh_baye2'],
+    you: ['laugh_chloe0', 'laugh_chloe1', 'laugh_chloe2'],
+  };
+  const lickBufs = {};
+  const lickLast = { lick: -1, baye: -1, you: -1 };
+  const laughNow = { baye: null, you: null };
+  function lickWarm() {
+    for (const keys of Object.values(LICK_SLOTS)) {
+      for (const key of keys) if (!lickBufs[key]) sampleLoad(key, (b) => { lickBufs[key] = b; });
+    }
+  }
+  /** One of a slot's takes that has decoded, not the last one played. */
+  function lickPick(slot) {
+    const ok = [];
+    LICK_SLOTS[slot].forEach((key, i) => { if (lickBufs[key]) ok.push(i); });
+    if (!ok.length) return -1;
+    const fresh = ok.length > 1 ? ok.filter((i) => i !== lickLast[slot]) : ok;
+    const i = fresh[Math.floor(Math.random() * fresh.length)];
+    lickLast[slot] = i;
+    return i;
+  }
+  let slurps = 0;
+  /** @param d  metres from him to the listener */
+  function doodleSlurp(d = 0) {
+    if (!ctx || !bed) return false;
+    const far = 1 - Math.max(0, d) / 22;
+    if (far <= 0) return false;
+    slurps++;
+    const i = lickPick('lick');
+    if (i < 0) {
+      // The placeholder. Two layers of `lick`'s wet brush, lower and softer.
+      const t0 = ctx.currentTime;
+      burst({ freq: 760, q: 0.8, dur: 0.16, gain: 0.030 * far, sweep: 0.55, at: t0, dest: bed });
+      burst({ freq: 300, q: 1.2, dur: 0.12, gain: 0.024 * far, sweep: 0.7, at: t0 + 0.015, dest: bed });
+      burst({ freq: 2400, q: 4, dur: 0.02, gain: 0.010 * far, at: t0 + 0.14, dest: bed });
+      return true;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = lickBufs[LICK_SLOTS.lick[i]];
+    src.playbackRate.value = 0.94 + Math.random() * 0.12;
+    const g = ctx.createGain();
+    g.gain.value = 0.65 * far;
+    src.connect(g).connect(bed);
+    src.start(ctx.currentTime + 0.005);
+    return true;
+  }
+  /** Start `who` laughing — 'baye' or 'you' — `d` metres from the listener. */
+  function lickLaugh(who, d = 0) {
+    if (!ctx || !bed || !LICK_SLOTS[who]) return false;
+    lickLaughStop(who, 0.15);
+    const i = lickPick(who);
+    if (i < 0) { lickWarm(); return false; }
+    const far = who === 'you' ? 1 : 1 - Math.max(0, d) / 30;
+    if (far <= 0) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = lickBufs[LICK_SLOTS[who][i]];
+    const g = ctx.createGain();
+    g.gain.value = 0.8 * far;
+    src.connect(g).connect(bed);
+    if (verbSend && who !== 'you') {
+      const w = ctx.createGain(); w.gain.value = 0.12 * far; g.connect(w).connect(verbSend);
+    }
+    src.start(ctx.currentTime + 0.01);
+    const me = { src, g, d, on: true };
+    laughNow[who] = me;
+    // Still at it when the take runs out: another one.
+    src.onended = () => { if (laughNow[who] === me && me.on) { laughNow[who] = null; lickLaugh(who, d); } };
+    return true;
+  }
+  function lickLaughStop(who, fade = 1.0) {
+    const me = laughNow[who];
+    if (!me || !ctx) return;
+    me.on = false;
+    laughNow[who] = null;
+    const at = ctx.currentTime;
+    me.g.gain.setValueAtTime(me.g.gain.value, at);
+    me.g.gain.linearRampToValueAtTime(0, at + fade);
+    try { me.src.stop(at + fade + 0.05); } catch (e) { /* already ended */ }
+  }
+
   // ── and the noises she makes herself ────────────────────────────────────────
   /**
    * Her own recorded noises, for the two things that happen TO her.
@@ -7618,6 +7730,10 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
     beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, moanCount: () => ({ n: moanPlayed, last: moanLast }), noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
+    // The slow lick's slots — see `── the slow lick ──` above.
+    doodleSlurp, lickLaugh, lickLaughStop, lickWarm,
+    lickCount: () => ({ slurps, have: Object.keys(lickBufs),
+      laughing: { baye: !!laughNow.baye, you: !!laughNow.you }, last: { ...lickLast } }),
     /**
      * Two bathers, talking to each other. See `chatSay` in 43-chatter.js.
      *

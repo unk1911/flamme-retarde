@@ -8003,6 +8003,12 @@ function frame() {
     camera.near = wantNear;
     camera.updateProjectionMatrix();
   }
+  // And the Slow Doodle's tongue, when it is you he came for: the laugh in
+  // the camera, and his face inside the front plane. After the plane, since
+  // it moves it. See `doodleLickView` in 43-doodle.js.
+  if (typeof doodleLickView === 'function') {
+    doodleLickView(camera, dt, !camOverride && state.phase === 'ground' ? (bodyCam ? 2 : 1) : 0);
+  }
 
   // And Jadrija itself, off the promenade. Measured from the camera rather
   // than from the aeroplane, which is the same point in every mode except the
@@ -8823,6 +8829,8 @@ window.__fr = {
      *   __fr.jad.doodle.release()          and back to his own business
      *   __fr.jad.doodle.look(4, 1.2)       stand 4 m off him, 1.2 rad round
      *                                      from his nose, looking at him
+     *   __fr.jad.doodle.lick('baye')       the slow lick, at her, at 'you',
+     *                                      or at either; lickStats() after
      */
     doodle: {
       api: () => (jadrija && jadrija.doodle) || null,
@@ -8834,6 +8842,12 @@ window.__fr = {
       hold: (clip, at) => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().hold(clip, at) : null),
       release: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().release() : null),
       peek: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().peek() : null),
+      // The slow lick: `lick('baye')`, `lick('you')` or `lick()` for either,
+      // exactly as the spoken command does it; `lickStats()` is where it has
+      // got to, `lickTrace()` its whole run, frame by frame.
+      lick: (who) => (jadrija && jadrija.doodleLick ? jadrija.doodleLick(who || null) : null),
+      lickStats: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().lickStats() : null),
+      lickTrace: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().lickTrace() : null),
       look: (dist = 4, ang = 1.2) => {
         const a = __fr.jad.doodle.api();
         if (!a) return null;
