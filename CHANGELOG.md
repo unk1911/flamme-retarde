@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.525.0] — 2026-09-26
+
+### The cuff chain is a real chain — 42 rigid links, solved with AVBD
+
+Misha, after reading three-avbd: *"try that"* — for the chain between the
+diamond cuffs.
+
+**Before**, the chain was one free particle with gravity and drag. The links
+were laid along the curve through that particle and her two wrists. It swung
+and it came taut, but it went through her: kneeling it cut through both
+thighs, and only a plane held in front of her belly kept it out of her.
+
+**Now** every one of the 42 links is a rigid body (2.3 g) with a position and
+an orientation. Each is jointed to the next at the 15 mm pitch the links were
+already drawn at. The two end joints hang off her cuffs, which are kinematic:
+they move with her bones and nothing in the chain can push them. Each end
+joint's ring point slides round the cuff to wherever the chain pulls, as
+before. The chain is simulated in world metres, not in her frame, so when she
+spins on the spot it gets left behind and swings back.
+
+- **The solver** is Augmented Vertex Block Descent, in a new file,
+  `src/43-avbd.js`. It is ported from the CPU reference in three-avbd
+  (`src/avbd3d/ref/`), which is itself a port of Chris Giles's avbd-demo3d. It
+  keeps the per-body 6×6 block solve and its LDLᵀ, the hard ball joint (penalty
+  and multiplier per row, stabilisation, warm start, penalty ramp), the lumped
+  geometric stiffness, the contact rows with their friction cone, and BDF1
+  velocities. None of the WebGPU code is used. Both MIT notices are at the top
+  of the file.
+- **Added on top of the reference:** kinematic world-point ends, stabilised
+  against where the wrist was at the start of the step, so the chain follows
+  all of the wrist's move and none of the lag. A soft twist row holds each link
+  a quarter turn from the next, modulo a half turn. So consecutive links are at
+  right angles because the solver keeps them there, and the handstand
+  corkscrew (1.451.1) cannot come back: nothing is framed after the
+  fact. There is also a capsule-and-floor contact.
+- **Her body** is 19 capsules on her bones, measured off Baye v2.0's own mesh
+  by a new `__fr.jad.chainFit()`: thighs 103 → 68 mm, shins 64 → 43, arms,
+  forearms, hands, neck and head. The trunk is three pairs of upright capsules
+  side by side, sized off 4 cm slices of her. The floor is the lower of her
+  lowest joint and the deck (or cot) under her. The four links at each end
+  ignore that end's forearm and hand.
+- **Her animations are not physical**, so four measured escape valves:
+  - Her skin is a spring (2000 N/m). Hard contacts and hard joints left the
+    joints to break when a stride drove a thigh into a chain already round
+    her: 40–120 mm of stretch, caught 40 times in 80 s. Now the chain sinks
+    into her by what the stride demands and comes back out.
+  - A link found more than 3 cm inside a part of her it was not already
+    touching is let through, not thrown out of the far side.
+  - Past 98 % of its length the joints become springs. Her wrists are 1.13 m
+    apart in the flare and 1.08 in the ballet, and hard joints ran the chain
+    8 cm into her chest.
+  - A chain stretched 10 cm against her for half a second is hung afresh on
+    the side of her its hands are on.
+- **Fixed on the way:** `wearTick` only ran inside `stepShow`. A pose held by
+  `__fr.jad.pose`, the poser or the Slow Doodle therefore left the cuffs, and
+  the chain, frozen where her wrists had been.
+
+**Measured** in the game (headless, RTX 4090 over D3D12, about 40 fps, so about
+2.5 steps a frame):
+
+- **Cost:** 0.31–0.45 ms a frame, about 0.15 ms a 1/120 s step, so about
+  0.3 ms at 60 fps. A fresh hang (cuffs on, teleport) costs one frame about
+  18 ms.
+- **Stretch**, summed over all 43 joints: at rest 0.02–0.2 mm (idle, lotus,
+  supine, handstand, sitting with the chain over her thighs). At 8 iterations
+  the node bench holds a hanging chain to 0.8 mm total, against 160 mm creep
+  with the reference's alpha 0.99 at 5 iterations, and 3 mm at 10. A 6 rad/s
+  spin on the spot peaks at 20 mm on one joint and settles in 1.9 s. Walking
+  runs 20–60 mm total, transient.
+- **Link centres against her capsules:** draped at rest they sit 5–6 mm off
+  (the link's own 6 mm ball on her skin). Standing idle, pulled round the
+  front of her thighs, 3 mm in. Peaks are 14 mm in the spin and about 20 mm
+  mid-stride.
+- **Caught-and-rehung:** once in 80 s of her routine (the flip), and once
+  each lying down onto the cot. The flare lies across her collarbones 3 mm
+  clear, links parted at 13 mm a joint.
+
+Debug: `__fr.jad.cuffs(on)` puts them on or off without the errand.
+`__fr.jad.chain()` returns the numbers above. `__fr.jad.chainFit()` returns
+the capsule measurements.
+
 ## [1.524.0] — 2026-09-26
 
 ### ?pose — pose her by hand, in the game
