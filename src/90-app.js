@@ -703,7 +703,8 @@ canvas.addEventListener('click', () => {
   // iOS throws up a permission bar over the top of the game.
   if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground'
     || state.phase === 'chute' || state.phase === 'swim'
-    || state.phase === 'brod') && !pointerLocked) grabPointer();
+    || state.phase === 'brod') && !pointerLocked
+    && !(typeof poser !== 'undefined' && poser.on)) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
   const had = pointerLocked;
@@ -731,7 +732,8 @@ document.addEventListener('pointerlockchange', () => {
   // game just opened for them. "Sometimes" is whether the lock was held at
   // the moment — after a settings panel or a sign-in sheet it is not, and
   // then `I` behaved.
-  if (had && !pointerLocked && $('panel').hidden && !comp && !ears.open()) {
+  if (had && !pointerLocked && $('panel').hidden && !comp && !ears.open()
+    && !(typeof poser !== 'undefined' && poser.on)) {
     setPaused(true);
   }
 });
@@ -8212,6 +8214,10 @@ function frame() {
   // it renders into a target of its own, so the order that matters is that the
   // glass has something in it by the time the room it is hanging in is drawn.
   if (you) you.tick(dt, camera);
+  // `?pose` takes the camera AFTER your body has been put where you are — the
+  // body hangs off the camera — and before anything draws. See 93-poser.js.
+  const posing = typeof poser !== 'undefined' && poser.on;
+  if (posing) poser.frame(dt, camera);
   chuteAudio();
   if (mirror) mirror.update(renderer, scene, camera);
   if (mirrorP) mirrorP.update(renderer, scene, camera);
@@ -8227,7 +8233,7 @@ function frame() {
   // afford. See src/60-arms.js.
   // With her drawn into its depth, when your thumb is out — so a thumb in her
   // mouth is inside it, behind her lips.
-  if (arms) arms.render(renderer, typeof apprenticeOccluder === 'function' ? apprenticeOccluder() : null);
+  if (arms && !posing) arms.render(renderer, typeof apprenticeOccluder === 'function' ? apprenticeOccluder() : null);
   // Debug: a frame-by-frame trace of the camera while a hand is out, for the
   // shake — see `__fr.camTrace`.
   if (camTraceOn && (thumbK > 0.01 || cupK > 0.01 || petK > 0.01)) {
@@ -8412,7 +8418,7 @@ function playIntro() {
   // would be the whole of what is annoying about a bookmark. `?jadrija` and
   // `?ground` still play it: those are back doors into the mission, and the
   // mission is what the cinematic is the beginning of.
-  if (location.search.includes('nointro')
+  if (location.search.includes('nointro') || QUERY.has('pose')
     || QUERY.has('gps') || QUERY.has('tgps')) { beginFlight(); return; }
   $('cine').hidden = false;
   requestAnimationFrame(() => $('cine').classList.add('open'));
@@ -8442,7 +8448,7 @@ function beginFlight() {
   // The same back door as `0`, as a link — which is the only version of it a
   // phone can use, there being no keyboard to press it on.
   if (QUERY.has('gps') || QUERY.has('tgps')) setTimeout(queryDoor, 60);
-  else if (location.search.includes('jadrija')) setTimeout(skipToJadrija, 60);
+  else if (location.search.includes('jadrija') || QUERY.has('pose')) setTimeout(skipToJadrija, 60);
   else if (location.search.includes('ground')) setTimeout(skipToGround, 60);
 }
 

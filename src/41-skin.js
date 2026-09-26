@@ -1962,6 +1962,18 @@ function skinnedFigure(data, opts = {}) {
       }
     }
 
+    // ── and then the poser, over all of it ────────────────────────────────
+    //
+    // `?pose` (src/93-poser.js) hands the figure a whole local pose — every
+    // bone's parent-relative rotation and the root's translation — and it
+    // REPLACES what the clips said rather than blending with it, because what
+    // is on the screen while somebody is posing her has to be exactly the
+    // numbers they are going to export and nothing the routine left behind.
+    // The aims go too, below, for the same reason: a head turned in figure
+    // space by the routine is not in the pose dict and would not be in the bake.
+    const man = st.manual;
+    if (man) { localQ.set(man.q); localT.set(man.t); }
+
     const P = palette;
     for (let i = 0; i < nb; i++) {
       const p = data.bones[i].parent;
@@ -1983,7 +1995,7 @@ function skinnedFigure(data, opts = {}) {
         worldT[i * 3 + 2] += worldT[p * 3 + 2];
       }
 
-      if (aims.size) {
+      if (aims.size && !man) {
         const aq = aims.get(i);
         if (aq) qmul(worldQ, i * 4, aq, 0, worldQ, i * 4);
       }
@@ -2270,6 +2282,15 @@ function skinnedFigure(data, opts = {}) {
     mesh, material: mat, bones: data.bones, uBones, cast, wear, tattoo, parts,
     clips: Object.keys(data.clips), tris: data.tris, nv: data.nv,
     play, over, update, state: st, face, faceTick, uFace, aim,
+    /**
+     * The poser's door. `manual({ q, t })` holds her in that local pose — `q`
+     * nb×4 parent-relative quaternions, `t` the root's translation — over any
+     * clip; `manual(null)` hands her back. `local()` is this frame's local
+     * pose, a copy; `bindRest()` the rest skeleton and the bind it composes to.
+     */
+    manual: (m) => { st.manual = m || null; },
+    local: () => ({ q: localQ.slice(), t: localT.slice() }),
+    bindRest: () => ({ q: restQ, t: restT, bindQ, bindT }),
     playing: () => (st.cur ? st.cur.name : null),
     /**
      * Where a bone's head has got to this frame, in figure space.

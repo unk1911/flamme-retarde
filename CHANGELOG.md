@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.524.0] — 2026-09-26
+
+### ?pose — pose her by hand, in the game
+
+Misha: *"u know how we spend sometimes 1h-2h trying to perfect some move …
+with all the joints and fingers that i can rotate .. and like.. u can record
+what i do, and then later replay those things in the game"*.
+
+**Open it** with `?pose` on the URL. It drops you at Jadrija and opens the
+panel. **F8** or **Esc** goes back to the game and F8 comes back to the panel,
+so you can walk her to the kabina, tell her to lie down, and then pose her there.
+
+- **"her, now"** freezes whatever she is doing and takes that as the pose.
+  Clicking a joint does the same. **take** starts her from any baked clip at
+  any time instead. **release** hands her back to the routine.
+- **Joints.** Click a dot on her, or a name in the list. Three sliders turn the
+  joint, or use Q/A, W/S, E/D (Shift for 5°). The coloured lines on the
+  selected joint are the axes each slider turns about. **→ other side** and
+  **mirror-edit** mirror it on to her other side. **undo** is Ctrl+Z.
+- **Camera.** Drag to orbit, right-drag to pan, wheel to zoom, F to frame
+  the selected joint. It has its own near plane, so she is not sliced at arm's
+  length.
+- **Keyframes.** Press **+ key** (K) and move the time. **play** (Space) runs
+  them on her, eased between keys the way the Blender bake eases them, so what
+  plays is what ships.
+- **Export.** **python** gives the pose dicts and the `CLIPS` entry in exactly
+  the form `tools/blender/human_mh.py` reads. **json** / **save file** /
+  **load** round-trip a session, and the last session also comes back from the
+  browser's storage.
+
+**The numbers are Blender's.** A dict is bone-local XYZ Eulers, and the bake
+ships `CONV·(rest·euler)·CONV⁻¹`, so here a joint is `restQ · euler` with
+Blender's x, y, z read as figure +x, −z, +y. Every bone's roll is already in
+the rest quaternion the blob carries. Checked against Blender's own dicts:
+IDLE_A (idle 0 s), SPREAD_A and SPREAD_B (spread 0.75 s and 2 s) rebuild the
+baked frames to within 0.05° on every bone. That is the file's int16
+quaternions. `@root` matches to 0 mm.
+
+**The mirror is computed, not sign-flipped.** Each bone's turn relative to its
+parent is reflected through her midline. From SPREAD_B's left side it gives
+back the solver's right side exactly, including `fingersR (−40, 0, 0)`: the
+finger case that `_mirror_pose`'s sign rule gets wrong (1.519.0).
+
+**Game-only bones.** Her right index (`idx1-3R`) and thumb tip (`thb2-3R`) are
+added at load by src/41-hands.js, so they pose here and export in a separate,
+commented block.
+
+Hooks: `fig.manual({q, t})` / `local()` / `bindRest()` in src/41-skin.js, which
+replace the clip's local pose and turn the aims off. `jadrija.poser` holds her
+and puts her on a clip frame. Console: `__fr.poser` (capture, set, get,
+mirror, keys, exportPy, verify).
+
 ## [1.523.0] — 2026-09-25 (baye 1.44.0)
 
 ### the slow lick

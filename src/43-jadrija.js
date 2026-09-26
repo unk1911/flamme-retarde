@@ -51658,6 +51658,35 @@ async function buildJadrija(scene) {
      * because the swing on the fringe is a damped follow and a pose stepped
      * once is a pose whose cloth has not caught up with it yet.
      */
+    /**
+     * `?pose` (src/93-poser.js): her figure, and a hold on the routine.
+     *
+     * `hold(true)` pins whatever clip frame she is on — the same `posed` the
+     * debug `pose` below uses, so the routine stops deciding things (she does
+     * not walk off, stand up or turn round while somebody has her arm) — and
+     * `hold(false)` hands her back to it where she was. `where()` is her
+     * figure's world matrix, for the poser's camera.
+     */
+    poser: {
+      fig: () => skinFig,
+      hold: (on) => {
+        if (!skinFig) return false;
+        posed = on ? { name: skinFig.playing(), at: skinFig.state.curT } : null;
+        return true;
+      },
+      held: () => !!posed,
+      clips: () => (skinFig ? skinFig.clips.slice() : []),
+      /** Put her on one frame of a baked clip, where she stands. */
+      frame: (name, at) => {
+        if (!skinFig || !skinFig.clips.includes(name)) return false;
+        skinFig.play(name, { fade: 0 });
+        skinFig.state.prev = null;
+        skinFig.state.curT = at;
+        posed = { name, at };
+        skinFig.update(0);
+        return true;
+      },
+    },
     pose: (name, at = 0, settle = 1.5) => {
       if (!skinFig) return null;
       if (!name) { posed = null; return { posed: null, appr: apprenticePose(null) }; }
