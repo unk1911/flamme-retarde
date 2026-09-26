@@ -113,7 +113,7 @@ const CARRY = [
   { key: 'kupovi', label: 'kupovi', give: true, consumed: true },
   { key: 'frappe', label: 'frappe', consumed: true },
   { key: 'krafne', label: 'krafne', give: true, consumed: true },
-  // ── AND THE THREE YOU START WITH ──────────────────────────────────────
+  // ── AND THE ONES YOU START WITH ───────────────────────────────────────
   //
   // The satchel vocabulary includes the Lovense row so the signal and object
   // tables share one key, but the live receiver is pre-placed on the kabina
@@ -128,6 +128,13 @@ const CARRY = [
   // takes a PAIR of bones here, which is the one thing the head did not need.
   { key: 'cuffs', label: 'a pair of ornamental cuffs', give: true, worn: true,
     box: [0.075, 0.025, 0.075], col: [0.78, 0.76, 0.70], wear: 'wrists' },
+  // And the pair that matches them, for her ankles. Misha, 26 Sep 2026:
+  // *"Ankle cuffs, matching the wrist ones"*. `wear: 'ankles'` is the second
+  // pair of bones — `wearableParts` in 43-jadrija.js answers it with two
+  // bands on her shins and the chain between them (ANKLE_CUFF, ANKLE_CHAIN).
+  // The box is the band's own size, 108 mm across the long way.
+  { key: 'anklecuffs', label: 'a pair of ornamental ankle cuffs', give: true, worn: true,
+    box: [0.11, 0.026, 0.09], col: [0.78, 0.76, 0.70], wear: 'ankles' },
   // `wear` is the bone it goes on when she is handed it — see WEAR in
   // 43-jadrija.js. Anything without one is set down instead.
   { key: 'headphones', label: 'Bose noise-cancelling headphones',
@@ -177,12 +184,12 @@ for (const c of CARRY) {
 const SATCHEL = {
   // ── WHAT YOU ARRIVE WITH ───────────────────────────────────────────────
   //
-  // Three things, and they are in the bag from the first frame rather than
+  // Four things, and they are in the bag from the first frame rather than
   // put there by a shop — see `worn` in CARRY. Everything else in here is
   // something you bought.
   // The Lovense is intentionally absent here: one receiver is already on the
   // tabouret from boot. See the note over `giftProps` in src/43-jadrija.js.
-  have: { cuffs: 1, headphones: 1, phone: 1 },
+  have: { cuffs: 1, anklecuffs: 1, headphones: 1, phone: 1 },
 };
 
 /**

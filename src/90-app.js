@@ -9072,10 +9072,16 @@ window.__fr = {
     props: () => (jadrija && jadrija.props ? jadrija.props() : null),
     /** What she has on, and the one of those that has a motor in it. */
     worn: () => (jadrija && jadrija.worn ? jadrija.worn() : null),
-    /** The cuff chain, measured; its body's numbers; the cuffs on or off, now. */
-    chain: () => (jadrija && jadrija.chain ? jadrija.chain() : null),
+    /**
+     * The cuff chain, measured — `chain('ankles')` for the one between her
+     * ankles; its body's numbers; the cuffs (or the ankle cuffs) on or off,
+     * now, without the errand.
+     */
+    chain: (which) => (jadrija && jadrija.chain ? jadrija.chain(which) : null),
     chainFit: () => (jadrija && jadrija.chainFit ? jadrija.chainFit() : null),
+    ankleFit: (posed) => (jadrija && jadrija.ankleFit ? jadrija.ankleFit(posed) : null),
     cuffs: (on) => (jadrija && jadrija.cuffs ? jadrija.cuffs(on) : null),
+    ankles: (on, o) => (jadrija && jadrija.ankles ? jadrija.ankles(on, o) : null),
     hairSim: () => (jadrija && jadrija.hairSim ? jadrija.hairSim() : null),
     toy: (o) => (jadrija && jadrija.toy ? jadrija.toy(o) : null),
     hair: (on) => (jadrija && jadrija.hair ? jadrija.hair(on) : null),

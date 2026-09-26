@@ -154,10 +154,8 @@ function avbdChain(o) {
   // The world the contacts are against: capsules at the start (`a0`, `b0`)
   // and end (`a1`, `b1`) of the step, their radius at each end, and a mask
   // per link of the ones it ignores. And a floor, as a height at each end.
-  const shapes = {
-    count: 0, a0: null, b0: null, a1: null, b1: null, r: null,
-    ignore: new Uint32Array(n), floor0: -1e9, floor1: -1e9,
-  };
+  // (Made by the caller when it is `avbdChainOwn` — see there.)
+  const shapes = o.shapes || avbdShapes(n);
   function setShapeCount(k) {
     shapes.count = k;
     shapes.a0 = new Float64Array(3 * k); shapes.b0 = new Float64Array(3 * k);
@@ -186,7 +184,7 @@ function avbdChain(o) {
     if (k !== Infinity) jLam.fill(0);
   }
 
-  const stats = { maxStretch: 0, sumStretch: 0, maxPen: 0, penShape: -1, contacts: 0, steps: 0 };
+  const stats = o.stats || avbdStats();
 
   // ── small helpers, all scalar ─────────────────────────────────────────
 
@@ -305,7 +303,11 @@ function avbdChain(o) {
     let ux = tmp3[0], uy = tmp3[1], uz = tmp3[2];
     axisX(b, 1, tmp3, 0);
     ux += tmp3[0]; uy += tmp3[1]; uz += tmp3[2];
-    const ul = Math.hypot(ux, uy, uz);
+    // `Math.sqrt` of the sum and not `Math.hypot` in everything that runs per
+    // link per iteration: hypot is correct about overflow nobody here can
+    // reach and several times slower, and with two chains on her (1.528.0)
+    // it was a measurable share of the solve.
+    const ul = Math.sqrt(ux * ux + uy * uy + uz * uz);
     if (ul < 1e-6) return 0;
     ux /= ul; uy /= ul; uz /= ul;
     axisY(a, tmp3, 0);
@@ -316,7 +318,7 @@ function avbdChain(o) {
     let bx = tmp3[0], by = tmp3[1], bz = tmp3[2];
     d = bx * ux + by * uy + bz * uz;
     bx -= d * ux; by -= d * uy; bz -= d * uz;
-    const la = Math.hypot(ax, ay, az) * Math.hypot(bx, by, bz);
+    const la = Math.sqrt((ax * ax + ay * ay + az * az) * (bx * bx + by * by + bz * bz));
     if (la < 1e-8) return 0;
     const c = (ax * bx + ay * by + az * bz) / la;
     const s = (ux * (ay * bz - az * by) + uy * (az * bx - ax * bz) + uz * (ax * by - ay * bx)) / la;
@@ -361,7 +363,7 @@ function avbdChain(o) {
     for (let r = 0; r < 3; r++) cF[r] = cPen[3 * q + r] * cC[r] + cLam[3 * q + r];
     if (cF[0] > 0) cF[0] = 0;
     cBound = -cF[0] * o.mu;
-    cFric = Math.hypot(cF[1], cF[2]);
+    cFric = Math.sqrt(cF[1] * cF[1] + cF[2] * cF[2]);
     if (cFric > cBound && cFric > 0) {
       const s = cBound / cFric;
       cF[1] *= s; cF[2] *= s;
@@ -456,7 +458,10 @@ function avbdChain(o) {
         const qx = ax + ex * t, qy = ay + ey * t, qz = az + ez * t;
         const rr = sh.r[2 * s] + (sh.r[2 * s + 1] - sh.r[2 * s]) * t;
         let nx = px - qx, ny = py - qy, nz = pz - qz;
-        const d = Math.hypot(nx, ny, nz);
+        // Out of reach on the square first: most of her is, for most links.
+        const lim = rr + R + margin, dd = nx * nx + ny * ny + nz * nz;
+        if (dd > lim * lim) continue;
+        const d = Math.sqrt(dd);
         const gap = d - rr - R;
         if (gap > margin) continue;
         if (d < 1e-6) continue;
@@ -618,10 +623,13 @@ function avbdChain(o) {
    * How far the worst link centre is inside a shape's surface, against the
    * shapes where they are now (`a1`, `b1`) — positive is inside, metres.
    * Ignored pairs are skipped, as in the solve. And which shape it was.
+   * `floor` false leaves the floor out, so her body can be asked about on
+   * its own — a chain that lies on the floor is 6 mm clear of it at rest,
+   * and the worst of the two would always be the floor.
    */
-  function depth() {
+  function depth(floor = true) {
     const sh = shapes;
-    let worst = -1, who = -1;
+    let worst = -1, who = -1, link = -1;
     for (let i = 0; i < n; i++) {
       const px = P[3 * i], py = P[3 * i + 1], pz = P[3 * i + 2];
       for (let s = 0; s < sh.count; s++) {
@@ -634,13 +642,14 @@ function avbdChain(o) {
         t = t < 0 ? 0 : t > 1 ? 1 : t;
         const d = Math.hypot(px - ax - ex * t, py - ay - ey * t, pz - az - ez * t);
         const inside = sh.r[2 * s] + (sh.r[2 * s + 1] - sh.r[2 * s]) * t - d;
-        if (inside > worst) { worst = inside; who = s; }
+        if (inside > worst) { worst = inside; who = s; link = i; }
       }
       const fl = sh.floor1 - py;
-      if (fl > worst) { worst = fl; who = 31; }
+      if (floor && fl > worst) { worst = fl; who = 31; link = i; }
     }
     stats.maxPen = worst;
     stats.penShape = who;
+    stats.penLink = link;
     return worst;
   }
 
@@ -681,6 +690,61 @@ function avbdChain(o) {
 }
 
 /** Rotation matrix columns (x, y, z) to a quaternion, into out[o]. */
+/**
+ * ── A COPY OF THE SOLVER OF ITS OWN, FOR EVERY CHAIN ───────────────────────
+ *
+ * `avbdChain` keeps its state in closures — the reference's classes, flattened
+ * into one function's locals so every hot loop reads typed arrays it can see.
+ * That is fast for ONE chain and 2.5 times slower for two, measured: the wrist
+ * chain at rest cost 0.30 ms a frame, and the same chain taken off and put
+ * back on cost 0.76 from then on; with the ankle chain on as well (1.528.0)
+ * both paid it all the time. It is the engine, not the arithmetic. V8 compiles
+ * a closure specialised to the one set of variables it closes over, and the
+ * moment a second closure is made from the same source it throws that away
+ * for code that must fetch every array through whichever instance it is
+ * handed — for every link, every iteration.
+ *
+ * So each chain gets its own compiled copy: the same source text made into a
+ * new function, whose closures are the first and only ones of their kind.
+ * The three names it uses from outside are handed in, because a function made
+ * this way sees only the global scope. Parsing it costs about a millisecond,
+ * once, when the cuffs go on. If the page ever cannot make functions from
+ * text (a content-security policy), it falls back to the shared one, which is
+ * correct and merely slower.
+ */
+function avbdChainOwn(o) {
+  // AND EVERYTHING THE CALLER READS IS MADE OUT HERE. An object literal
+  // inside the copy is a literal of the copy's, with a hidden class of its
+  // own, so the caller's code — `chainTick`, `chainShapes`, reading
+  // `sim.shapes.a0` and `sim.P` for every chain — saw a new class for every
+  // chain put on and went megamorphic by the fourth: the fix made the second
+  // chain fast and the fifth slow again. Made here, by this one function,
+  // they are one class however many copies there are.
+  const shapes = avbdShapes(o.n), stats = avbdStats();
+  let s;
+  try {
+    const make = new Function('AVBD', 'avbdQuatFromBasis', 'avbdSolve6', 'avbdShapes', 'avbdStats',
+      'return (' + avbdChain.toString() + ');');
+    s = make(AVBD, avbdQuatFromBasis, avbdSolve6, avbdShapes, avbdStats)(Object.assign({ shapes, stats }, o));
+  } catch (e) {
+    console.warn('avbdChainOwn: ' + (e && e.message) + ' - using the shared solver');
+    s = avbdChain(Object.assign({ shapes, stats }, o));
+  }
+  return { n: s.n, half: s.half, P: s.P, Q: s.Q, V: s.V, anchor: s.anchor, anchor0: s.anchor0,
+    shapes: s.shapes, setShapeCount: s.setShapeCount, setJointK: s.setJointK, step: s.step,
+    lay: s.lay, measure: s.measure, depth: s.depth, stats: s.stats,
+    cN: s.cN, cC0: s.cC0, cId: s.cId, MAXC: s.MAXC, jointC: s.jointC };
+}
+
+/** A chain's world, and its numbers — see `avbdChainOwn` for why out here. */
+function avbdShapes(n) {
+  return { count: 0, a0: null, b0: null, a1: null, b1: null, r: null,
+    ignore: new Uint32Array(n), floor0: -1e9, floor1: -1e9 };
+}
+function avbdStats() {
+  return { maxStretch: 0, sumStretch: 0, maxPen: 0, penShape: -1, penLink: -1, contacts: 0, steps: 0 };
+}
+
 function avbdQuatFromBasis(m00, m10, m20, m01, m11, m21, m02, m12, m22, out, o) {
   const tr = m00 + m11 + m22;
   let x, y, z, w;
