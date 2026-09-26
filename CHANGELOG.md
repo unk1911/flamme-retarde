@@ -8,6 +8,28 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.527.0] — 2026-09-26
+
+### a Croatian flag on the front at Jadrija
+
+Misha: *"can you install a croatian flag near the kabines and by the sea"*.
+
+A white seven-metre pole with a gilt ball on top, on the slab at t 402,
+s 5.5. That is between the western end of the kabine and the water, clear of
+the ladders. It flies a 2 × 1 m flag of Croatia, and the flag is the same
+particle cloth as the Brod's ensign (1.525.0). `brodEnsign` now takes a
+config (size, the head of the luff, the pole's axis and radius), and with
+none it builds her ensign exactly as before.
+
+The pole stands still, so the flag feels only the true wind: the channel's
+2.6 m/s with its gusts. Measured over twelve seconds, it hangs 23–57° below
+level and reaches 0.72–0.88 of its length. That is a flag that stirs and
+lifts, not a flag flying flat. Cost is 0.22 ms a frame, and it is only
+stepped inside 300 m. The worst link stretch was 5.8%, with no resets. The
+pole blocks you like any other post.
+
+Debug: `__fr.jad.raw().shoreFlag()`.
+
 ## [1.526.0] — 2026-09-26
 
 ### The cuff chain is a real chain — 42 rigid links, solved with AVBD

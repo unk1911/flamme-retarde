@@ -51344,6 +51344,53 @@ async function buildJadrija(scene) {
     wheelMs += (performance.now() - t0 - wheelMs) * 0.02;
   }
 
+  // ── the flag on the front ───────────────────────────────────────────────
+  //
+  // Misha, 26 Sep 2026: *"can you install a croatian flag near the kabines
+  // and by the sea"*. A white municipal pole on the slab between the western
+  // end of the kabine and the water, flying the same cloth as the Brod's
+  // ensign — the particle flag in src/59-brod.js (`brodEnsign`), handed a
+  // pole instead of a mast. Bigger than hers, 2 m by 1, because a shore pole
+  // is seven metres and a flag that size is what flies off one. Standing
+  // still, it is the true wind alone: the channel's two and a half metres a
+  // second, which is a flag stirring, lifting in the gusts, not flying flat.
+  const SHORE_FLAG = { t: 402, s: 5.5, h: 7.0, r: 0.045, fly: 2.0, hoist: 1.0 };
+  let shoreFlag = null;
+  {
+    const F = SHORE_FLAG;
+    const gy = surfaceY(F.t, F.s);
+    const foot = W(F.t, F.s, gy);
+    // The carrier: its +X is INTO the wind, so the cloth is laid out
+    // downwind of the pole when it starts and never has to swing round
+    // through it. `brodEnsign` reads only its world matrix.
+    const pole = new THREE.Object3D();
+    pole.position.set(foot[0], foot[1], foot[2]);
+    pole.rotation.y = Math.PI - state.windDir;
+    pole.updateMatrixWorld(true);
+    const mat = solidMaterial(0xdcdcd6, { spec: 0.35, specPower: 40 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(F.r * 0.7, F.r, F.h, 10), mat);
+    shaft.position.set(foot[0], foot[1] + F.h * 0.5, foot[2]);
+    const truck = new THREE.Mesh(new THREE.SphereGeometry(F.r * 1.6, 10, 8),
+      solidMaterial(0xc9a64a, { spec: 0.6, specPower: 60 }));
+    truck.position.set(foot[0], foot[1] + F.h + F.r * 1.2, foot[2]);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(F.r * 2.6, F.r * 3.0, 0.16, 12), mat);
+    base.position.set(foot[0], foot[1] + 0.08, foot[2]);
+    for (const m of [shaft, truck, base]) { m.name = 'shoreflag:pole'; scene.add(m); }
+    // The head of the luff: just off the pole on its downwind side, a hand
+    // under the truck.
+    const off = F.r * 0.8 + 0.03;
+    shoreFlag = brodEnsign({
+      name: 'shoreflag:cloth',
+      E: { fly: F.fly, hoist: F.hoist, near: 300 },
+      head: new THREE.Vector3(-off, F.h - 0.14, 0),
+      mastF: off,
+      mastR: F.r * 0.8 + 0.01,
+    });
+    shoreFlag.pole = pole;
+    scene.add(shoreFlag.mesh);
+    furniture.push({ t: F.t, s: F.s, a: 0.2, c: 0.2, h: F.h, y: gy });
+  }
+
   /**
    * Walk the walkers, then pose everybody.
    *
@@ -51397,6 +51444,7 @@ async function buildJadrija(scene) {
     // looking — before he is stepped. See `lickSeen`.
     lickSeen(cam, at, dir);
     if (doodle) doodle.step(cam, { t: pt, s: ps }, dt);
+    if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
 
     if (skinFig) {
@@ -53657,6 +53705,7 @@ async function buildJadrija(scene) {
      * spends at two frames a second, and the chain is not in them.
      */
     chain: () => chainStats(),
+    shoreFlag: () => (shoreFlag ? { ...shoreFlag.stats(), at: SHORE_FLAG } : null),
     chainFit: () => chainFit(),
     cuffs: (on = true) => {
       if (!skinFig) return null;

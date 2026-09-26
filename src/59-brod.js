@@ -2857,15 +2857,22 @@ function ensignAir(E, h, xi, Wm, dx, dz, wx, wy, wz, cx, cy, cz, vx, vy, vz,
   out[0] = nx * p + tx * s; out[1] = ny * p + ty * s; out[2] = nz * p + tz * s;
 }
 
-function brodEnsign() {
-  const E = ENSIGN, NU = E.nu, NV = E.nv, N = NU * NV;
+function brodEnsign(cfg = null) {
+  // `cfg` flies the same cloth off something that is not her mast — the
+  // flagpole on the shore at Jadrija (43-jadrija.js, `shoreFlag`): `E` over
+  // the constants (its size, mostly), `head` the head of the luff in the
+  // carrier's frame, `mastF` the pole's axis straight along the carrier's +X
+  // from there, `mastR` the circle the cloth is kept out of.
+  const E = cfg && cfg.E ? { ...ENSIGN, ...cfg.E } : ENSIGN;
+  const NU = E.nu, NV = E.nv, N = NU * NV;
   const du = E.fly / (NU - 1), dv = E.hoist / (NV - 1);
   // The head of the luff in HER frame, built metres, and the mast's axis
   // relative to it — which is straight forward of it, `mastF` metres.
-  const head = new THREE.Vector3(
+  const head = cfg && cfg.head ? cfg.head.clone() : new THREE.Vector3(
     (BROD_MAST.x - BROD_MAST.w * 0.5) * BROD_K - E.halyard,
     BROD_MAST.y1 * BROD_K - E.drop, 0);
-  const mastF = BROD_MAST.x * BROD_K - head.x;
+  const mastF = cfg && cfg.mastF != null ? cfg.mastF : BROD_MAST.x * BROD_K - head.x;
+  const mastR = cfg && cfg.mastR != null ? cfg.mastR : BROD_MAST.w * 0.5 * BROD_K + E.pad;
   // The section is square, 0.245 m; the cloth is kept outside the circle
   // through the middle of its faces plus a centimetre. It only ever touches
   // it when the wind is from astern of her and the flag wraps.
@@ -2944,7 +2951,7 @@ function brodEnsign() {
     spec: 0.06, specPower: 18, side: THREE.DoubleSide, vcol: false,
     body: ENSIGN_GLSL, lit: ENSIGN_LIT,
   }));
-  mesh.name = 'brod:ensign';
+  mesh.name = cfg && cfg.name ? cfg.name : 'brod:ensign';
 
   // Her axes in the world, and where the head of the luff is, this frame and
   // last. `ok` is false until the first frame she is placed.
@@ -3068,7 +3075,6 @@ function brodEnsign() {
       for (let c = 1; c < NU; c++) {
         const i = id(c, r) * 3;
         const mx = x[i] - ax, mz = x[i + 2] - az, md = Math.sqrt(mx * mx + mz * mz);
-        const mastR = BROD_MAST.w * 0.5 * BROD_K + E.pad;
         if (md < mastR && md > 1e-6) {
           x[i] = ax + mx * mastR / md; x[i + 2] = az + mz * mastR / md;
         }
