@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.521.0] — 2026-09-25
+
+### the hand comes up her, fingers toward where her legs meet
+
+Misha: *"when we pet her thigh, the arm should come up higher, almost all
+the way to her navel"*, and then *"for that stroke, the finger should reach
+towards the crotch area"*.
+
+**Higher.** The thigh stroke still starts where it always did and still goes
+down to the same low point, but it no longer stops at the old top. It goes
+on up the front of her thigh, over the crease of her hip, and onto her lower
+belly, until the fingertips are 3.4 cm below her navel. The path is five
+points taken off her own mesh, and each point moves with her own skin in any
+pose (`apprenticeStrokeBind`). Her navel was found by measuring her mesh:
+a 4 mm dip at 1.050 m. The hand follows a curve through the points at an
+even speed. The whole stroke, bottom to top and back, takes 4.1 s. The path
+is 35 cm now, so that keeps the 17 cm/s pace the old 22 cm stroke had.
+
+**The fingers.** Low on her thigh they point up and in toward where her legs
+meet, 11–17° off pointing straight at it. Nearer the top they turn to point
+up her body, and at the top they point at the spot under her navel where
+they stop. If they kept pointing at her crotch from close up, the fingers
+would lie across her genitals. Instead, the hand's inner edge stays 27 mm or
+more from her midline between 4 cm below and 9 cm above where her legs meet.
+The hand lies flat on her skin, laid in a plane fitted to her skin under the
+whole hand. The thumb is tucked in (a new `stroke` hand pose). The forearm
+comes up from the bottom of the picture, and the wrist bends back about 90°:
+a hand pressed flat to her with the fingers up.
+
+**Measured, standing:** the palm's target point is within 3 mm of her skin
+along the whole path. The hand rests 0–9 mm off her, and no part of it goes
+more than 4.5 mm in. Its outer edge touches her own hanging fingers at the
+top of her thigh but does not go into them.
+
+**Lying back on the cot with her knees drawn up,** her thigh folds over the
+crease of her hip. Following the path there would put the hand 5–8 cm
+inside her. So, a few times a second, `thighOpen` checks how much of the
+path has room for a hand, and the stroke only goes that far. With her hip
+bent about 58° it strokes the lower third of her thigh, and the worst
+clearance is 6 mm in. With her knees pulled all the way up, the hand rests
+at the bottom of the stroke and does not move.
+
 ## [1.518.0] — 2026-09-25
 
 ### and she answers it
