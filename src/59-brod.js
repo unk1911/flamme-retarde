@@ -204,6 +204,16 @@ const BROD_WELL = 0.72;                               // the cockpit sole
  * stands on, and it is the edge you see. What the change actually looks like is
  * a wider gangway: 4.06 m between the cockpit benches becomes 4.84.
  */
+/**
+ * The mast, authored: its x on the centreline, its foot and its head, and its
+ * square section. Out here and not inside `brodProto` because two things read
+ * it — the builder, which draws it, and `brodEnsign`, which lashes a flag to
+ * it and has to keep the cloth out of it. The head is 5.91 authored, which is
+ * the 10.34 m over the waterline 60-pax.js clears its gulls against.
+ */
+const BROD_MAST = { x: 4.44, y0: 1.06 + 2.90 - 1.95, y1: 1.06 + 2.90 + 1.95,
+  w: 0.14 };
+
 const BROD_SEAT = BROD_P(0.45);        // the plank's middle over its own sole
 const BROD_SEATT = BROD_P(0.08);       // and how thick the plank is
 const BROD_BENCH = {
@@ -1700,9 +1710,18 @@ function brodProto() {
   // ── the fittings ─────────────────────────────────────────────────────────
   // A mast forward of the house with the ensign at its head, a stub exhaust out
   // of the port quarter of the roof, and benches down both sides of the
-  // cockpit. The ensign is a flat panel and not cloth, because the only thing
-  // that reads from the far side of a fifteen-metre deck is red-white-blue.
-  b.box(4.44, 1.06 + 2.90, 0, 0.14, 3.90, 0.14, TRIM);
+  // cockpit. The mast is `BROD_MAST`, so the ensign's luff is lashed to the
+  // same numbers it is drawn from. The ensign itself is NOT in this buffer: it
+  // is cloth, simulated every frame, and lives in `brodEnsign`.
+  //
+  // It was "a flat panel and not cloth, because the only thing that reads from
+  // the far side of a fifteen-metre deck is red-white-blue" — three painted
+  // slabs at the end of this function, standing rigid off the FORWARD side of
+  // the mast whatever she was doing. Misha, 26 Sep: *"can AVBD chains be used for things like the
+  // croatian flag on the boat?"* — and a flag is the one thing on a boat whose
+  // whole job is to show you which way the air is going over her.
+  b.box(BROD_MAST.x, (BROD_MAST.y0 + BROD_MAST.y1) * 0.5, 0, BROD_MAST.w,
+    BROD_MAST.y1 - BROD_MAST.y0, BROD_MAST.w, TRIM);
 
   // ── the funnel casing, and what was there instead ────────────────────────
   //
@@ -2067,9 +2086,10 @@ function brodProto() {
   //
   // The posts stand hard against the bulwark rather than inboard, so the whole
   // 0.55 m gangway between the benches stays clear. The canvas is a solid
-  // panel and not cloth, for the same reason the ensign is: at the distance
-  // this is looked at, a slack surface and a flat one differ by nothing and
-  // one of them costs a simulation.
+  // panel and not cloth: at the distance this is looked at, a slack awning
+  // laced to four posts and a flat one differ by nothing and one of them costs
+  // a simulation. The ensign is the opposite case — nothing holds it but its
+  // luff, and a flag that does not move is a sign — see `brodEnsign`.
   {
     // 2.15 m of headroom under the canvas, which is a person plus a hat.
     const yS = BROD_WELL, yT = BROD_WELL + BROD_P(2.15);
@@ -2116,10 +2136,9 @@ function brodProto() {
     // at z 0, which is now the middle of the stairwell, and a beam down the
     // middle of an opening is a beam you walk your head into.
   }
-  for (let i = 0; i < 3; i++) {
-    const col = [[0.78, 0.16, 0.16], [0.94, 0.94, 0.94], [0.10, 0.20, 0.52]][i];
-    b.box(4.90, 1.06 + 4.40 - i * 0.18, 0, 0.80, 0.18, 0.02, col);
-  }
+  // The flat red-white-blue board that stood here — three 2 cm slabs, flown
+  // FORWARD of the mast, which no flag can do on a boat making way — is gone.
+  // The ensign is cloth now and is not in this buffer: see `brodEnsign`.
   // Her paint, last, off the finished triangle soup — see `brodPaint`.
   return brodPaint(b.geo(), { HULL, SHEER, COVE, HOUSE, BOOT });
 }
@@ -2607,6 +2626,590 @@ function brodLocaleCached(city) {
   return brodLoc;
 }
 
+// ── the ensign ───────────────────────────────────────────────────────────────
+//
+// The flag of Croatia at her masthead, and it is CLOTH: a grid of particles
+// with its luff lashed to the mast, hanging under its own weight and pushed by
+// the air she is actually moving through. Misha, 26 Sep: *"can AVBD chains be
+// used for things like the croatian flag on the boat?"*
+//
+// They can, and it is not what this is. three-avbd (Steven Bobyn's MIT solver,
+// github.com/sbobyn/three-avbd) has a "Flag in the Wind" scene, and it builds
+// the flag out of 1 536 rigid plates joined at their edges and solved on the
+// GPU — the right answer for a benchmark of a rigid-body solver and far too
+// much machinery for a metre and a half of bunting. A flag is the textbook
+// case for a particle cloth: a hundred points, distance constraints between
+// neighbours, a few Gauss-Seidel passes a step. What IS borrowed from that
+// scene, whole, is the part that makes it a flag rather than a sheet: THE AIR.
+// See `ensignAir` for exactly what came across and what it had to change.
+//
+// ── what it is simulated in ─────────────────────────────────────────────────
+//
+// NOT her frame and NOT the world's, and the choice is the whole of why she
+// can turn. The particles live in a frame that TRANSLATES with the luff and
+// keeps the world's orientation: every position is metres from the head of the
+// luff, on world axes. Three things fall out of that for nothing:
+//
+//   - A teleport is not an event. `seek` moves her four kilometres and the
+//     time-lapse moves her a metre a frame; neither reaches the cloth, which is
+//     metres from the luff wherever the luff is. Precision is the same at the
+//     berth as at the far quay, because nothing here is ever 1 500 m.
+//   - A TURN IS PHYSICAL. When she comes round, her luff swings with her and
+//     the cloth does not: it has the world's inertia, so it lags, is dragged
+//     round by its luff, and settles on the new apparent wind — which is what
+//     a flag on a boat does, and nothing had to be written to get it.
+//   - Gravity is (0, −9.81, 0), always, whatever she is heeled to.
+//
+// The price is that her own acceleration is left out (she makes 0.26 m/s² and
+// the air is pushing the cloth at tens), and that is the right price.
+//
+// ── what it costs ───────────────────────────────────────────────────────────
+//
+// 13 × 8 = 104 particles, 168 triangles, 521 constraints solved twelve times
+// a step and 288 tethers once, at a fixed 1/120 s step with at most four
+// steps a frame — about 0.2 ms of a 60 Hz frame. Measured: see the CHANGELOG
+// for 1.526.0. Stepped only while she is on the screen at all
+// (`group.visible`) and the camera is inside `near` of her — past 400 m a
+// 1.44 m flag is two pixels at 720 lines, and a frozen one is the same two.
+const ENSIGN = {
+  nu: 13, nv: 8,             // particles out along the fly, and down the hoist
+  // 1 : 2, which is the flag of Croatia's own proportion. A passenger boat
+  // this size flies about a metre and a half of it, and at 1.44 the arms are
+  // still the size of a hand from the upper deck, which is where anybody looks
+  // up at it from.
+  fly: 1.44, hoist: 0.72,
+  halyard: 0.03,             // m abaft the mast's after face the luff is bent on
+  drop: 0.12,                // and how far under the masthead its head sits
+  // Heavy knitted polyester, the grade flown on a working boat. The mass only
+  // ever appears as area over mass, in the drag, so this number is how hard
+  // the air throws the cloth about — and it was chosen by what the flag does
+  // and not off a spec sheet. Alongside at Šibenik in 2.6 m/s, over half a
+  // minute: at 0.15 the fly held out 20° under level on average and never
+  // dropped past 37°, which is a flag FLYING in what Beaufort calls a light
+  // air; at 0.24 it averages 31° and swings between 9 and 54°, half out and
+  // stirring. Under way the two differ by three degrees.
+  sigma: 0.24,               // kg/m²
+  // Three numbers straight out of three-avbd: ½ρC_d for a flat plate (its
+  // `windPressure`), the skin friction as a share of that, and the gustiness.
+  press: 0.72, skin: 0.06, gust: 0.4,
+  h: 1 / 120, maxSub: 4, iters: 12,
+  near: 400,
+  damp: 0.003,               // velocity lost per step to everything unmodelled
+  pad: 0.01,                 // m the cloth is kept off the mast's faces
+};
+
+/**
+ * The print, in the shader, off the cloth's own UVs — so it is the SAME flag
+ * at every size and there is no canvas to square (a canvas in this game is
+ * gamma'd twice; see `maslinaFlagPrint`'s note in 43-jadrija.js). Red, white
+ * and blue are the aircraft's cheatline, which is the other Croatian flag in
+ * the game, so the two agree.
+ *
+ * `f` is in HOIST units, measured down from the head and out from the hoist:
+ * the flag runs 0..2 by 0..1. The arms stand on the middle of it — the crown
+ * of five small shields in the red, the šahovnica across the white and down
+ * into the blue — at proportions read off the flag by eye rather than out of
+ * the law that fixes them: the shield a little under a third of the hoist
+ * across, five squares by a hair over five down to its point, the crown's
+ * foot on the line between the red and the white, and the first square, top
+ * left, RED.
+ *
+ * Handed over on pixel footprint and not drawn at every distance. A square of
+ * the šahovnica is 43 mm, which is a pixel at about 40 m, and a checkerboard a
+ * pixel a square is a moiré that crawls as the cloth moves. Past 22 m it fades
+ * to what it averages to — thirteen red squares to twelve white — and the
+ * crown fades to its blue. The stripes never need it.
+ *
+ * Both faces, and the far one is the mirror image, which is also what a real
+ * flag is: it is printed through.
+ *
+ * (NO BACKTICKS IN HERE: this is inside a template literal.)
+ */
+const ENSIGN_GLSL = /* glsl */ `
+  n = gl_FrontFacing ? n : -n;
+  vec2 f = vec2(vUv.x * 2.0, 1.0 - vUv.y);
+  vec3 RED = vec3(0.810, 0.125, 0.152);
+  vec3 WHT = vec3(0.950, 0.950, 0.940);
+  vec3 BLU = vec3(0.067, 0.200, 0.530);
+  base = f.y < 0.3333 ? RED : (f.y < 0.6667 ? WHT : BLU);
+  float far = smoothstep(22.0, 45.0, length(vWorld - uCamPos));
+  float ax = f.x - 1.0;
+  // The shield: straight sides for its upper 0.58, then curving in to a
+  // point. A red rim round the outside of it, which is on the real one.
+  float sy = (f.y - 0.335) / 0.33;
+  float hw = sy < 0.58 ? 1.0
+    : 1.0 - pow(clamp((sy - 0.58) / 0.42, 0.0, 1.0), 1.7);
+  float sx = abs(ax) / 0.15;
+  if (sy > -0.03 && sy < 1.03 && sx < hw * 1.04 + 0.035) {
+    base = RED;
+    if (sy > 0.0 && sy < 1.0 && sx < hw) {
+      vec2 q = floor(vec2(ax + 0.15, f.y - 0.335) / 0.06);
+      vec3 chk = mod(q.x + q.y, 2.0) < 0.5 ? RED : WHT;
+      base = mix(chk, mix(WHT, RED, 0.52), far);
+    }
+  }
+  // The crown: five small shields on the head of the big one, their tops on
+  // an arc. Oldest Croatia, Dubrovnik, Dalmatia, Istria, Slavonia, left to
+  // right, as a field and one or two marks each — at 43 mm across that is
+  // all any of them is from the deck.
+  float crTop = 0.205 + 1.4 * ax * ax;
+  if (abs(ax) < 0.15 && f.y > crTop && f.y < 0.333) {
+    float k = floor((ax + 0.15) / 0.06);
+    float lx = fract((ax + 0.15) / 0.06);
+    float ly = (f.y - crTop) / (0.333 - crTop);
+    vec3 fld = vec3(0.180, 0.450, 0.800);
+    vec3 GLD = vec3(0.920, 0.740, 0.120);
+    float dot0 = length(vec2(lx - 0.5, (ly - 0.45) * 1.6));
+    if (k < 0.5) {
+      fld = dot0 < 0.2 ? GLD : fld;
+    } else if (k < 1.5) {
+      fld = vec3(0.040, 0.090, 0.360);
+      fld = (ly > 0.35 && ly < 0.5) || (ly > 0.65 && ly < 0.8) ? RED : fld;
+    } else if (k < 2.5) {
+      fld = vec3(0.100, 0.320, 0.720);
+      fld = length(vec2(lx - 0.5, (ly - 0.3) * 1.6)) < 0.13
+        || length(vec2(abs(lx - 0.5) - 0.2, (ly - 0.62) * 1.6)) < 0.13 ? GLD : fld;
+    } else if (k < 3.5) {
+      fld = dot0 < 0.24 ? GLD : fld;
+    } else {
+      fld = vec3(0.100, 0.320, 0.720);
+      fld = ly > 0.42 && ly < 0.72 ? RED : fld;
+      fld = (ly > 0.34 && ly < 0.42) || (ly > 0.72 && ly < 0.8) ? WHT : fld;
+    }
+    float inside = step(0.1, lx) * step(lx, 0.9) * step(0.1, ly);
+    base = mix(RED, mix(fld, vec3(0.120, 0.320, 0.700), far), inside);
+  }
+`;
+
+/**
+ * And light THROUGH it, which is what a flag against the sun does and a sign
+ * never does: bunting is thin enough that the face away from the sun glows
+ * the colour of the cloth. A share of the sun term on the far face, after the
+ * lighting so it adds rather than replaces.
+ */
+const ENSIGN_LIT = /* glsl */ `
+  col += base * uSunColor * uSunI * max(dot(-n, uSunDir), 0.0) * sh * INV_PI * 0.45;
+`;
+
+/**
+ * THE AIR, from three-avbd — src/avbd3d/gpu/wgsl-solve.ts, `windAccel` —
+ * Copyright (c) 2026 Steven Bobyn, MIT License:
+ *
+ *   Permission is hereby granted, free of charge, to any person obtaining a
+ *   copy of this software and associated documentation files (the
+ *   "Software"), to deal in the Software without restriction, including
+ *   without limitation the rights to use, copy, modify, merge, publish,
+ *   distribute, sublicense, and/or sell copies of the Software, and to permit
+ *   persons to whom the Software is furnished to do so, subject to the
+ *   following conditions: The above copyright notice and this permission
+ *   notice shall be included in all copies or substantial portions of the
+ *   Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ *   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ *   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+ *   NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+ *   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+ *   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+ *   USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Their model, as they write it: pressure drag ½ρC_d A (n·u)|n·u| along the
+ * plate's normal, u the wind relative to the plate, plus skin friction along
+ * the plate at 6 % of that coefficient, which is what streams a flag out
+ * downwind; the pressure linearised implicitly in the normal speed — divided
+ * by 1 + 2 dt k|n·u| — because a light plate in real air is stiff and explicit
+ * drag blows up. And the gusts: a few travelling sines, along the wind, across
+ * it and up, so a flag lying dead along the wind still catches it and ripples.
+ *
+ * What changed on the way over, and why:
+ *
+ *   - A plate is a TRIANGLE of cloth here, and its push is shared between its
+ *     three corners. k is ½ρC_d A/m and the cloth has one areal density, so it
+ *     is `press / sigma` times the triangle's area over its rest area.
+ *   - u is the APPARENT wind: the true wind, minus her own way through the
+ *     water, minus the cloth's own velocity. The last term was theirs; the
+ *     middle one is the boat. Stopped, the flag is in whatever the channel is
+ *     doing; at eight metres a second it is in a stiff breeze from ahead
+ *     whatever the channel is doing; in a turn the breeze swings round.
+ *   - Their gust field is laid out for a 9.6 m flag. Its shortest ripple is
+ *     3.7 m long and would move a 1.44 m flag as a board, so the wavenumbers
+ *     are five times theirs — and the pattern is carried down the flag by the
+ *     air rather than by a clock, at 60 to 80 % of the apparent wind, so it
+ *     ripples faster the harder she drives: `xi` is metres of air gone by.
+ */
+function ensignAir(E, h, xi, Wm, dx, dz, wx, wy, wz, cx, cy, cz, vx, vy, vz,
+  nx, ny, nz, kA, out) {
+  const a = cx * dx + cz * dz;           // downwind of the luff
+  const c = cx * -dz + cz * dx;          // across it, level
+  const along = 0.5 * Math.sin(1.75 * (0.8 * xi - a) + 1.0 * c)
+    + 0.3 * Math.sin(4.0 * (0.7 * xi - a) + 3.0 * cy)
+    + 0.2 * Math.sin(8.5 * (0.6 * xi - a) + 6.5 * cy + 4.5 * c);
+  const across = 0.6 * Math.sin(3.0 * (0.7 * xi - a) + 2.0 * cy)
+    + 0.4 * Math.sin(6.5 * (0.6 * xi - a) - 3.5 * cy);
+  const lift = Math.sin(4.5 * (0.7 * xi - a) + 5.5 * c);
+  const g = E.gust, gs = g * Wm, ga = 1 + g * along;
+  const ux = wx * ga - dz * 0.25 * across * gs - vx;
+  const uy = wy * ga + 0.1 * lift * gs - vy;
+  const uz = wz * ga + dx * 0.25 * across * gs - vz;
+  const un = ux * nx + uy * ny + uz * nz;
+  const tx = ux - nx * un, ty = uy - ny * un, tz = uz - nz * un;
+  const aun = Math.abs(un);
+  const p = kA * un * aun / (1 + 2 * h * kA * aun);
+  const s = E.skin * kA * Math.sqrt(tx * tx + ty * ty + tz * tz);
+  out[0] = nx * p + tx * s; out[1] = ny * p + ty * s; out[2] = nz * p + tz * s;
+}
+
+function brodEnsign() {
+  const E = ENSIGN, NU = E.nu, NV = E.nv, N = NU * NV;
+  const du = E.fly / (NU - 1), dv = E.hoist / (NV - 1);
+  // The head of the luff in HER frame, built metres, and the mast's axis
+  // relative to it — which is straight forward of it, `mastF` metres.
+  const head = new THREE.Vector3(
+    (BROD_MAST.x - BROD_MAST.w * 0.5) * BROD_K - E.halyard,
+    BROD_MAST.y1 * BROD_K - E.drop, 0);
+  const mastF = BROD_MAST.x * BROD_K - head.x;
+  // The section is square, 0.245 m; the cloth is kept outside the circle
+  // through the middle of its faces plus a centimetre. It only ever touches
+  // it when the wind is from astern of her and the flag wraps.
+  const id = (c, r) => r * NU + c;
+
+  const x = new Float64Array(N * 3), px = new Float64Array(N * 3);
+  const acc = new Float64Array(N * 3);
+  const cnt = new Float64Array(N);
+
+  // Constraints: [i, j, rest, stiffness]. Structural, shear and bend, the
+  // three every cloth has. Bend is weak on purpose — bunting has almost none,
+  // and what it has is the reason a flag makes waves instead of creases.
+  const CI = [], CJ = [], CR = [], CK = [];
+  const con = (a, b, rest, k) => { CI.push(a); CJ.push(b); CR.push(rest); CK.push(k); };
+  for (let r = 0; r < NV; r++) {
+    for (let c = 0; c < NU; c++) {
+      if (c + 1 < NU) con(id(c, r), id(c + 1, r), du, 1);
+      if (r + 1 < NV) con(id(c, r), id(c, r + 1), dv, 1);
+    }
+  }
+  const nStruct = CI.length;
+  const dg = Math.hypot(du, dv);
+  for (let r = 0; r + 1 < NV; r++) {
+    for (let c = 0; c + 1 < NU; c++) {
+      con(id(c, r), id(c + 1, r + 1), dg, 0.6);
+      con(id(c + 1, r), id(c, r + 1), dg, 0.6);
+    }
+  }
+  for (let r = 0; r < NV; r++) {
+    for (let c = 0; c < NU; c++) {
+      if (c + 2 < NU) con(id(c, r), id(c + 2, r), 2 * du, 0.08);
+      if (r + 2 < NV) con(id(c, r), id(c, r + 2), 2 * dv, 0.08);
+    }
+  }
+  const nCon = CI.length;
+  const cI = Int32Array.from(CI), cJ = Int32Array.from(CJ);
+  const cR = Float64Array.from(CR), cK = Float64Array.from(CK);
+  // A luff particle has no inverse mass: it is where the mast is.
+  const wI = Float64Array.from(CI, (v) => (v % NU === 0 ? 0 : 1));
+  const wJ = Float64Array.from(CJ, (v) => (v % NU === 0 ? 0 : 1));
+
+  // Triangles, wound so that (b − a) × (c − a) is the same way round as the
+  // normals below: out along the fly × up the hoist.
+  const T = [];
+  for (let r = 1; r < NV; r++) {
+    for (let c = 0; c + 1 < NU; c++) {
+      T.push(id(c, r), id(c + 1, r), id(c, r - 1));
+      T.push(id(c + 1, r), id(c + 1, r - 1), id(c, r - 1));
+    }
+  }
+  const tri = Uint16Array.from(T), NT = tri.length / 3;
+  for (const v of T) cnt[v]++;
+  const aRest = du * dv * 0.5;
+
+  const geo = new THREE.BufferGeometry();
+  const posA = new THREE.BufferAttribute(new Float32Array(N * 3), 3);
+  const nrmA = new THREE.BufferAttribute(new Float32Array(N * 3), 3);
+  posA.setUsage(THREE.DynamicDrawUsage);
+  nrmA.setUsage(THREE.DynamicDrawUsage);
+  const uv = new Float32Array(N * 2);
+  for (let r = 0; r < NV; r++) {
+    for (let c = 0; c < NU; c++) {
+      uv[id(c, r) * 2] = c / (NU - 1);
+      uv[id(c, r) * 2 + 1] = 1 - r / (NV - 1);
+    }
+  }
+  geo.setAttribute('position', posA);
+  geo.setAttribute('normal', nrmA);
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(tri, 1));
+  // Everything is metres from the head of the luff, and no particle can be
+  // further from it than the fly's diagonal — see the check in `step`.
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(),
+    Math.hypot(E.fly, E.hoist) * 1.05);
+  const mesh = new THREE.Mesh(geo, solidMaterial(0xffffff, {
+    spec: 0.06, specPower: 18, side: THREE.DoubleSide, vcol: false,
+    body: ENSIGN_GLSL, lit: ENSIGN_LIT,
+  }));
+  mesh.name = 'brod:ensign';
+
+  // Her axes in the world, and where the head of the luff is, this frame and
+  // last. `ok` is false until the first frame she is placed.
+  const A = new THREE.Vector3(), A0 = new THREE.Vector3();
+  const ex = [1, 0, 0], ey = [0, 1, 0], ez = [0, 0, 1], ex0 = [1, 0, 0];
+  let ok = false, pend = 0, t = 0, xi = 0, resets = 0, live = false;
+  let ms = 0, stretch = 0, wTrue = 0, wApp = 0;
+  const F = [0, 0, 0];
+
+  /** Laid out flat and straight aft of the luff, at rest. */
+  function reset() {
+    for (let r = 0; r < NV; r++) {
+      for (let c = 0; c < NU; c++) {
+        const i = id(c, r) * 3;
+        for (let k = 0; k < 3; k++) {
+          x[i + k] = -ex[k] * c * du - ey[k] * r * dv;
+          px[i + k] = x[i + k];
+        }
+      }
+    }
+    pend = 0;
+  }
+
+  /** One fixed step. `w*` is the apparent wind at the flag, `W` its speed. */
+  function sub(h, wx, wy, wz, W) {
+    t += h;
+    xi += W * h;
+    const dx = W > 1e-3 ? wx / W : 1, dz = W > 1e-3 ? wz / W : 0;
+    acc.fill(0);
+    const kS = E.press / E.sigma;
+    for (let q = 0; q < NT; q++) {
+      const a = tri[q * 3] * 3, b = tri[q * 3 + 1] * 3, c = tri[q * 3 + 2] * 3;
+      const e1x = x[b] - x[a], e1y = x[b + 1] - x[a + 1], e1z = x[b + 2] - x[a + 2];
+      const e2x = x[c] - x[a], e2y = x[c + 1] - x[a + 1], e2z = x[c + 2] - x[a + 2];
+      let nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z;
+      let nz = e1x * e2y - e1y * e2x;
+      const L = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (L < 1e-9) continue;
+      nx /= L; ny /= L; nz /= L;
+      const kA = kS * (L * 0.5) / aRest;
+      const cx = (x[a] + x[b] + x[c]) / 3, cy = (x[a + 1] + x[b + 1] + x[c + 1]) / 3;
+      const cz = (x[a + 2] + x[b + 2] + x[c + 2]) / 3;
+      const k3 = 1 / (3 * h);
+      const vx = (x[a] - px[a] + x[b] - px[b] + x[c] - px[c]) * k3;
+      const vy = (x[a + 1] - px[a + 1] + x[b + 1] - px[b + 1] + x[c + 1] - px[c + 1]) * k3;
+      const vz = (x[a + 2] - px[a + 2] + x[b + 2] - px[b + 2] + x[c + 2] - px[c + 2]) * k3;
+      ensignAir(E, h, xi, W, dx, dz, wx, wy, wz, cx, cy, cz, vx, vy, vz,
+        nx, ny, nz, kA, F);
+      acc[a] += F[0]; acc[a + 1] += F[1]; acc[a + 2] += F[2];
+      acc[b] += F[0]; acc[b + 1] += F[1]; acc[b + 2] += F[2];
+      acc[c] += F[0]; acc[c + 1] += F[1]; acc[c + 2] += F[2];
+    }
+    // Verlet, every particle but the luff, which is not integrated at all — it
+    // is where the frame put it, see `step`. Each corner takes the mean of its
+    // triangles' pushes, which on a grid of equal triangles is exactly the
+    // force shared by area over the mass shared by area.
+    const h2 = h * h, kd = 1 - E.damp;
+    for (let r = 0; r < NV; r++) {
+      for (let c = 1; c < NU; c++) {
+        const v = id(c, r), i = v * 3, m = 1 / cnt[v];
+        for (let k = 0; k < 3; k++) {
+          const cur = x[i + k];
+          x[i + k] += (cur - px[i + k]) * kd + (acc[i + k] * m - (k === 1 ? 9.81 : 0)) * h2;
+          px[i + k] = cur;
+        }
+      }
+    }
+    // The constraints, Gauss-Seidel, with the mast inside the loop rather
+    // than after it: a flag wrapped round its pole is the one state where the
+    // links and the pole disagree, and resolving the pole once at the end
+    // left the links next to the luff stretched 20 % round it.
+    const ax = ex[0] * mastF, az = ex[2] * mastF;
+    for (let it = 0; it < E.iters; it++) {
+      for (let q = 0; q < nCon; q++) {
+        const wa = wI[q], wb = wJ[q];
+        if (wa + wb === 0) continue;
+        const i = cI[q] * 3, j = cJ[q] * 3;
+        const ddx = x[j] - x[i], ddy = x[j + 1] - x[i + 1], ddz = x[j + 2] - x[i + 2];
+        const L = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+        if (L < 1e-9) continue;
+        const s = cK[q] * (L - cR[q]) / (L * (wa + wb));
+        x[i] += wa * s * ddx; x[i + 1] += wa * s * ddy; x[i + 2] += wa * s * ddz;
+        x[j] -= wb * s * ddx; x[j + 1] -= wb * s * ddy; x[j + 2] -= wb * s * ddz;
+      }
+      mast(ax, az);
+    }
+    // Tethers. A long-range tether holds a particle within its rest distance
+    // of a particle that cannot move — the cheap way to stop a cloth
+    // stretching under load without a hundred more iterations. Every particle
+    // is tethered to three points of the luff: the one on its own row, which
+    // holds the fly out, and the head and the foot, which hold the weight.
+    // The flag is flat at rest, so the rest distance to each is straight.
+    for (let r = 0; r < NV; r++) {
+      for (let c = 1; c < NU; c++) {
+        const i = id(c, r) * 3;
+        tether(i, id(0, r) * 3, c * du);
+        tether(i, 0, Math.sqrt(c * du * c * du + r * dv * r * dv));
+        const up = NV - 1 - r;
+        tether(i, id(0, NV - 1) * 3, Math.sqrt(c * du * c * du + up * dv * up * dv));
+      }
+    }
+    mast(ax, az);
+  }
+
+  /** Particle `i` no further than `lim` from the luff particle `p`. */
+  function tether(i, p, lim) {
+    const ddx = x[i] - x[p], ddy = x[i + 1] - x[p + 1], ddz = x[i + 2] - x[p + 2];
+    const L2 = ddx * ddx + ddy * ddy + ddz * ddz;
+    if (L2 <= lim * lim) return;
+    const s = lim / Math.sqrt(L2);
+    x[i] = x[p] + ddx * s; x[i + 1] = x[p + 1] + ddy * s; x[i + 2] = x[p + 2] + ddz * s;
+  }
+
+  /**
+   * Out of the mast: a circle about its axis, which in this frame stands
+   * `mastF` forward of the luff along her heading. Upright to within her heel,
+   * which is a couple of degrees and a couple of millimetres at this height.
+   */
+  function mast(ax, az) {
+    for (let r = 0; r < NV; r++) {
+      for (let c = 1; c < NU; c++) {
+        const i = id(c, r) * 3;
+        const mx = x[i] - ax, mz = x[i + 2] - az, md = Math.sqrt(mx * mx + mz * mz);
+        const mastR = BROD_MAST.w * 0.5 * BROD_K + E.pad;
+        if (md < mastR && md > 1e-6) {
+          x[i] = ax + mx * mastR / md; x[i + 2] = az + mz * mastR / md;
+        }
+      }
+    }
+  }
+
+  /**
+   * One frame. `boat` must already be placed for it — `place` has run and her
+   * matrix is current — and `sp` is her way through the water, m/s, along her
+   * own +X. `cam` is the eye in world metres, or null for a probe that wants
+   * it stepped wherever the eye is.
+   */
+  function step(dt, boat, sp, cam) {
+    const M = boat.matrixWorld.elements;
+    ex[0] = M[0]; ex[1] = M[1]; ex[2] = M[2];
+    ey[0] = M[4]; ey[1] = M[5]; ey[2] = M[6];
+    ez[0] = M[8]; ez[1] = M[9]; ez[2] = M[10];
+    A.copy(head).applyMatrix4(boat.matrixWorld);
+    mesh.position.copy(A);
+    live = !cam || Math.hypot(cam.x - A.x, cam.y - A.y, cam.z - A.z) < E.near;
+    if (!live) { pend = 0; return; }
+    const t0 = performance.now();
+    // A jump she could not have made in a frame — a teleport, a first frame, a
+    // `seek` — starts the cloth again rather than asking it to catch up with
+    // four kilometres or half a turn in one step. The corners of her route
+    // are taken in a single frame — `atS` gives each leg its own heading —
+    // and the worst of them is 36.5°, so the limit is well clear of that: a
+    // corner is exactly the thing the cloth is supposed to ride out.
+    if (!ok || A.distanceTo(A0) > 40
+      || ex[0] * ex0[0] + ex[1] * ex0[1] + ex[2] * ex0[2] < Math.cos(1.2)) {
+      reset();
+      if (ok) resets++;
+      ok = true;
+    }
+    A0.copy(A); ex0[0] = ex[0]; ex0[1] = ex[1]; ex0[2] = ex[2];
+
+    // The luff, where her mast now is: straight down her own up axis from the
+    // head. Set once a frame; `px` keeps where it was, so the triangles along
+    // it see its velocity for the first step and none after.
+    for (let r = 0; r < NV; r++) {
+      const i = id(0, r) * 3;
+      for (let k = 0; k < 3; k++) { px[i + k] = x[i + k]; x[i + k] = -ey[k] * r * dv; }
+    }
+
+    // THE AIR. The bura is `state.windSpeed` where the fire is, on the ridge;
+    // the channel at masthead height is in the friction layer under it, and
+    // the fraction is 57-eject.js's `windAt` gradient read at 10 m — the one
+    // place this game has already said how much of that wind reaches the
+    // surface. 0.27 of 9.5 is 2.6 m/s, which with the gusts on it is Beaufort
+    // 2: a flag that stirs and does not fly. At her 8 m/s the air over her is
+    // 5 to 10 m/s from ahead, and it flies. The slow wander on the direction
+    // is local and is what keeps a stopped flag from hanging at one bearing.
+    const air = 0.26 + 0.46 * sat(A.y / 420);
+    wTrue = state.windSpeed * (0.8 + 0.4 * state.gust) * air;
+    const wd = state.windDir + 0.35 * Math.sin(t * 0.071) * Math.sin(t * 0.029 + 1.3);
+    const wx = Math.cos(wd) * wTrue - ex[0] * sp;
+    const wy = -ex[1] * sp;
+    const wz = Math.sin(wd) * wTrue - ex[2] * sp;
+    wApp = Math.hypot(wx, wz);
+
+    pend += Math.min(dt, 0.25);
+    let n = Math.floor(pend / E.h);
+    if (n > E.maxSub) { n = E.maxSub; pend = 0; } else pend -= n * E.h;
+    for (let k = 0; k < n; k++) sub(E.h, wx, wy, wz, wApp);
+
+    // Nothing may be further from the head than the diagonal. If anything is,
+    // or anything is not a number, the step went wrong and the flag starts
+    // again — counted, so a probe can say it never happened.
+    const far = Math.hypot(E.fly, E.hoist) * 1.02;
+    for (let i = 0; i < N * 3; i += 3) {
+      if (!(x[i] * x[i] + x[i + 1] * x[i + 1] + x[i + 2] * x[i + 2] < far * far)) { reset(); resets++; break; }
+    }
+
+    // The worst stretch of any structural link, for the probe.
+    stretch = 0;
+    for (let q = 0; q < nStruct; q++) {
+      const i = cI[q] * 3, j = cJ[q] * 3;
+      const lx = x[j] - x[i], ly = x[j + 1] - x[i + 1], lz = x[j + 2] - x[i + 2];
+      const L = Math.sqrt(lx * lx + ly * ly + lz * lz);
+      stretch = Math.max(stretch, L / cR[q] - 1);
+    }
+    // And one more way for it to have gone wrong that is not an explosion: a
+    // link across the mast. A particle that got to the far side of it cannot
+    // be pushed back — the mast pushes it out, the wrong way, forever — and
+    // what that looks like is one link held at double its length. Nothing in
+    // a step can put it there short of a teleport, and this is the net.
+    if (stretch > 0.35) { reset(); resets++; stretch = 0; }
+
+    // Out to the GPU, with normals off the grid — central differences, so the
+    // light moves across every ripple rather than across every triangle.
+    const P = posA.array, Nn = nrmA.array;
+    for (let i = 0; i < N * 3; i++) P[i] = x[i];
+    for (let r = 0; r < NV; r++) {
+      for (let c = 0; c < NU; c++) {
+        const cl = id(Math.max(0, c - 1), r) * 3, cr = id(Math.min(NU - 1, c + 1), r) * 3;
+        const ru = id(c, Math.max(0, r - 1)) * 3, rd = id(c, Math.min(NV - 1, r + 1)) * 3;
+        const ux = x[cr] - x[cl], uy = x[cr + 1] - x[cl + 1], uz = x[cr + 2] - x[cl + 2];
+        const vx = x[ru] - x[rd], vy = x[ru + 1] - x[rd + 1], vz = x[ru + 2] - x[rd + 2];
+        const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const L = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        const i = id(c, r) * 3;
+        Nn[i] = nx / L; Nn[i + 1] = ny / L; Nn[i + 2] = nz / L;
+      }
+    }
+    posA.needsUpdate = true;
+    nrmA.needsUpdate = true;
+    ms += (performance.now() - t0 - ms) * 0.1;
+  }
+
+  /**
+   * For a probe. `sag` is how far the middle of the fly end hangs under the
+   * middle of the luff, in degrees below level; `off` is which way it points,
+   * in degrees off dead aft of her (+ to starboard); `reach` is how far out it
+   * gets as a share of the fly, 1 being flat out.
+   */
+  function stats() {
+    const m = Math.floor(NV / 2);
+    const i = id(NU - 1, m) * 3, j = id(0, m) * 3;
+    const dx = x[i] - x[j], dy = x[i + 1] - x[j + 1], dz = x[i + 2] - x[j + 2];
+    const hz = Math.hypot(dx, dz) || 1e-9;
+    // Her aft and her starboard (+Z), in the world.
+    const along = -(dx * ex[0] + dz * ex[2]), across = dx * ez[0] + dz * ez[2];
+    return {
+      n: N, tris: NT, cons: nCon, live, resets,
+      ms: +ms.toFixed(3),
+      stretch: +(stretch * 100).toFixed(2),
+      sag: +(Math.atan2(-dy, hz) * 57.3).toFixed(1),
+      off: +(Math.atan2(across, along) * 57.3).toFixed(1),
+      reach: +(Math.hypot(dx, dy, dz) / E.fly).toFixed(3),
+      wTrue: +wTrue.toFixed(2), wApp: +wApp.toFixed(2),
+    };
+  }
+
+  /** Where the head of the luff is and which way she points, for a probe. */
+  const where = () => ({ at: [A.x, A.y, A.z], fwd: ex.slice(), stb: ez.slice() });
+
+  // `E` is the constants, live — a probe can vary one and step it.
+  return { mesh, step, reset, stats, where, E };
+}
+
 /**
  * The boat, the berth and the voyage.
  *
@@ -2627,6 +3230,11 @@ function buildBrod(scene) {
   const boat = new THREE.Group();
   boat.add(hull);
   group.add(boat);
+  // The ensign is a child of `group` and not of `boat`: it is simulated on
+  // world axes from the head of its luff, and `step` puts it there each frame.
+  // Going down with `group.visible` is the part of her it shares.
+  const ensign = brodEnsign();
+  group.add(ensign.mesh);
 
   let fitting = null;            // the pier furniture, once we know where it goes
   let lines = null;              // her mooring lines — see `moorLines` below
@@ -3885,6 +4493,8 @@ function buildBrod(scene) {
       lines.visible = group.visible && d < 300;
       if (lines.visible) drawMoor();
     }
+    // Her ensign, in whatever the channel is doing — she has no way on.
+    if (group.visible) ensign.step(dt, boat, 0, cam);
     // And the people on her, who are the whole point of walking out to the
     // Brod: what tells you from the road that there is a boat to catch is that
     // there are people already sitting on it. `place` has just left
@@ -3922,6 +4532,10 @@ function buildBrod(scene) {
   /** Her passengers, and you, while you are aboard. See `drawPax`. */
   function draw(dt, cam) {
     if (cam) drawPax(dt, cam, group.visible);
+    // Once a frame and not once an `update`: the time-lapse steps her eight
+    // times a frame and the cloth does not need to know. `sp` is her real way
+    // through the water, which the time-lapse leaves alone.
+    ensign.step(dt, boat, sp, cam || null);
     driveBody(dt);
   }
 
@@ -3998,7 +4612,16 @@ function buildBrod(scene) {
         + (fitting ? fitting.geometry.attributes.position.count / 3 : 0),
       pax: pax ? pax.stats() : null,
       gulls: gulls ? gulls.stats() : null,
+      ensign: ensign.stats(),
     }),
+    /**
+     * Step her ensign `dt` seconds on its own, for a probe driving `update`
+     * without the frame loop — `__fr.brod.tick` does not draw, so nothing
+     * else would move the cloth. The camera gate is off.
+     */
+    ensignStep: (dt) => { ensign.step(dt, boat, sp, null); return ensign.stats(); },
+    /** The ensign itself — its mesh, `where` and `stats` — for a probe. */
+    flag: ensign,
     /** The passengers, for a probe. Null until their rigs have inflated. */
     get pax() { return pax; },
     /** And her gulls, likewise — see `buildBrodGulls` in 60-pax.js. */
