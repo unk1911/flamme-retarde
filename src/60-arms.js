@@ -167,6 +167,18 @@ const HAND_POSE = {
     fan: [-0.20, 0.0, -0.20, -0.25],
     t: [0.25, 0.45, 0.10, 0.12, 0.10],
   },
+  // Stroking her, from her thigh up to her belly: flatter than on a breast,
+  // the fingers together and only a little curved, and the thumb tucked in
+  // along the side of the hand, a little behind the palm, rather than swung
+  // in front of it. Eight thumbs were tried against her skin the length of
+  // the stroke: the cup's went 10 to 12 mm into her thigh and 40 into her
+  // belly, and came within 20 mm of her midline beside her genitals; this
+  // one rests on her, 4 mm in at the most, and keeps 38 mm off it.
+  stroke: {
+    f: [[0.10, 0.14, 0.08], [0.12, 0.16, 0.10], [0.14, 0.18, 0.10], [0.16, 0.20, 0.12]],
+    fan: [-0.25, 0.0, -0.25, -0.30],
+    t: [-0.60, -0.60, -0.20, -0.10, 0.0],
+  },
   // The paddle and the let-go hand of a crawl.
   flat: {
     f: [[0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11]],
@@ -1128,6 +1140,9 @@ function buildArms() {
   }
 
   const _tt = new THREE.Vector3();
+  const _qr = new THREE.Quaternion();
+  const _v3a = new THREE.Vector3();
+  const _v3b = new THREE.Vector3();
   const THUMB_REST = new THREE.Vector3(0.24, -0.46, -0.20);   // low, right, out of shot
   const THUMB_REACH = 0.44;       // m of shoulder-to-target it will do without leaning
   // 0.35 and not the 0.70 it was: with her bent over the stool, a lean that big
@@ -1171,9 +1186,11 @@ function buildArms() {
   // And the hand on her breast: fingers up and a little in, palm toward her.
   // And on her hip: fingers down and round the curve of it, palm in on her.
   // And on the inner face of her thigh — always the leg on your right, see the
-  // gate in 90-app.js — so the palm faces right, on to it, fingers down.
+  // gate in 90-app.js — so the palm faces right, on to it, fingers down. That
+  // is only if she has no stroke path; with one, the path says how the hand
+  // lies and `lift` is all that is used here — see below.
   const THIGH_AIM = { pole: [0.60, -0.75, 0.20], along: [-0.05, -0.95, -0.30],
-    palm: [0.45, 0.0, -0.89], flex: 0.10 };
+    palm: [0.45, 0.0, -0.89], flex: 0.10, lift: 2.5 };
   const HIP_AIM = { pole: [0.60, -0.75, 0.20], along: [0.10, -0.90, -0.40],
     palm: [-0.70, 0.0, -0.70], flex: 0.10 };
   const CUP_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.20, 0.95, -0.10],
@@ -1207,6 +1224,7 @@ function buildArms() {
     const pet = reach.kind === 'pet', cup = reach.kind === 'cup';
     const thigh = reach.kind === 'thigh', hip = reach.kind === 'hip' || thigh;
     if (pet) setHandPose(a.pose, HAND_POSE.pet);
+    else if (thigh && reach.along) setHandPose(a.pose, HAND_POSE.stroke);
     else if (cup || hip) setHandPose(a.pose, HAND_POSE.cup);
     else thumbDigits(a);
 
@@ -1242,6 +1260,36 @@ function buildArms() {
       const c = Math.cos(-_e.x), sn = Math.sin(-_e.x);
       const un = (v) => [v[0], v[1] * c - v[2] * sn, v[1] * sn + v[2] * c];
       P = un(P); N = un(N); if (G) G = un(G);
+    }
+    // The thigh stroke hands the hand's lie over itself, in the world — the
+    // fingers toward where her legs meet and the palm in on her skin, both
+    // changing all the way up her (see THE STROKE in 90-app.js). Brought into
+    // the body's frame, which is the view's.
+    if (thigh && reach.along && reach.palm) {
+      _qr.copy(root.quaternion).invert();
+      G = _v3a.fromArray(reach.along).applyQuaternion(_qr).toArray();
+      N = _v3a.fromArray(reach.palm).applyQuaternion(_qr).toArray();
+      // AND THE ARM COMES TO THE HAND, not the hand to the arm. Fingers up
+      // her thigh from a forearm that reaches down to it from your shoulder
+      // is a wrist folded back on itself — measured 93 to 160 degrees of bend
+      // and the forearm wrung 170, with the shoulder left where it was. So
+      // the elbow goes where the hand wants it: a forearm's length back from
+      // the wrist, along the fingers tipped `lift` of the way out of her
+      // toward you (2.5 is 68 degrees); the shoulder an upper arm on from
+      // there toward where it really is; and the elbow hinted at that point.
+      // Lying along the fingers (`lift` 0.45) put the elbow at her knees and
+      // the arm along her legs to the floor, which from your eye is an arm
+      // growing out of the floor. Tipped out it comes up from under the
+      // picture, and the wrist is bent back 91 to 95 degrees — a hand pressed
+      // flat to her with the fingers up, which is what this is. The shoulder
+      // moves to suit, and the upper arm runs out of the bottom of the picture.
+      const fd = _v3a.set(G[0] + N[0] * THIGH_AIM.lift, G[1] + N[1] * THIGH_AIM.lift,
+        G[2] + N[2] * THIGH_AIM.lift).normalize();
+      const E = _v3b.copy(_tt).addScaledVector(fd, -(ARMS.fore + PALM_OFF.length()));
+      const s0 = _p1.set(S[0], S[1], S[2]).sub(E).normalize();
+      const sh = s0.multiplyScalar(ARMS.upper * 0.97).add(E);
+      body.position.set(sh.x - S[0], sh.y - S[1], sh.z - S[2]).multiplyScalar(k);
+      P = [E.x - (sh.x + _tt.x) * 0.5, E.y - (sh.y + _tt.y) * 0.5, E.z - (sh.z + _tt.z) * 0.5];
     }
     placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
       OFF.x, OFF.y, OFF.z, N[0], N[1], N[2], AIM.flex, false, G);
@@ -1510,6 +1558,51 @@ function buildArms() {
       const w = a.wrist.getWorldPosition(new THREE.Vector3());
       const e = a.elbow.getWorldPosition(new THREE.Vector3());
       return out.copy(w).lerp(e, 0.30);
+    },
+    /**
+     * Debug: your right hand as drawn — every vertex the hand or a finger
+     * carries, skinned on the CPU by this frame's palette, world metres — and
+     * the middle finger's knuckle and tip. What the thigh stroke's clearance
+     * off her skin and its fingers' aim were measured with.
+     */
+    hand: () => {
+      const a = sides[1], md = a.model;
+      if (!md || !root.visible || !a.shoulder.visible) return null;
+      const g = md.geo, P = g.getAttribute('position');
+      const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+      const pal = a.palette, out = [], v = new THREE.Vector3();
+      const mul = (b, x, y, z) => {
+        const o = b * 12;
+        return [pal[o] * x + pal[o + 1] * y + pal[o + 2] * z + pal[o + 3],
+          pal[o + 4] * x + pal[o + 5] * y + pal[o + 6] * z + pal[o + 7],
+          pal[o + 8] * x + pal[o + 9] * y + pal[o + 10] * z + pal[o + 11]];
+      };
+      root.updateMatrixWorld(true);
+      for (let i = 0; i < P.count; i++) {
+        let top = -1, tw = 0;
+        for (let k = 0; k < 4; k++) {
+          if (BW.getComponent(i, k) > tw) { tw = BW.getComponent(i, k); top = Math.round(BI.getComponent(i, k) * 255); }
+        }
+        if (top < 4) continue;
+        let x = 0, y = 0, z = 0;
+        for (let k = 0; k < 4; k++) {
+          const w = BW.getComponent(i, k);
+          if (w <= 0) continue;
+          const r = mul(Math.round(BI.getComponent(i, k) * 255), P.getX(i), P.getY(i), P.getZ(i));
+          x += r[0] * w; y += r[1] * w; z += r[2] * w;
+        }
+        v.set(x, y, z).applyMatrix4(root.matrixWorld);
+        out.push([v.x, v.y, v.z, top]);
+      }
+      const j = (p, b) => v.fromArray(mul(b, p.x, p.y, p.z)).applyMatrix4(root.matrixWorld).toArray();
+      return { verts: out, knuckle: j(md.J.f[2][0], 4), tip: j(md.J.f[2][3], 13), wrist: j(md.J.w, 4) };
+    },
+    /** Debug: try an arm for the thigh stroke — see THIGH_AIM. */
+    thighAim: (o) => {
+      const { pose, ...aim } = o || {};
+      Object.assign(THIGH_AIM, aim);
+      if (pose) Object.assign(HAND_POSE.stroke, pose);
+      return THIGH_AIM;
     },
     /** Debug: try a hand attitude on her hip — see HIP_AIM. */
     hipAim: (o) => Object.assign(HIP_AIM, o || {}),

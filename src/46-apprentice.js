@@ -71,9 +71,30 @@ const APPR = {
   // The band her buttocks are measured in (bind frame) — see
   // `apprenticeButtBind`. Under the hip band and above the fold.
   buttY: [0.78, 0.96],
-  // Her inner thigh: the band the hand arrives in — the top of the stroke,
-  // well short of the top of her legs — and the band it strokes down to.
+  // Her inner thigh: the band the hand used to arrive in, and the band it
+  // strokes down to — the bottom of the stroke. See `apprenticeStrokeBind`.
   thighY: [0.67, 0.78], thighLo: [0.53, 0.58],
+  // And on up from there, since 25 Sep 2026 — *"when we pet her thigh, the
+  // arm should come up higher, almost all the way to her navel"*: up the front
+  // of her thigh and over the fold of her hip on to her lower belly, [height,
+  // off her midline], bind metres. The hand arrives at the second, the height
+  // it always arrived at.
+  //
+  // Wide of her inner thigh at the top on purpose, and not so wide as her own
+  // hand. Standing, her legs are drawn in to her midline and her hands hang
+  // at her hips, and the hand has 12.5 cm between the two to be in: this
+  // keeps its inner edge 27 mm and more off her midline from 4 cm below where
+  // her legs meet to 9 cm above (her genitals and her hair), and its outer
+  // edge against — not in — her fingers.
+  thighUp: [[0.665, 0.135], [0.77, 0.125], [0.83, 0.100]],
+  // The top of the stroke, measured from her navel down: where the middle of
+  // the palm stops, and the point the fingertips point at and reach, 3.5 cm
+  // under her navel beside her midline. [down, off her midline], metres.
+  thighNavel: [0.172, 0.050], thighTip: [0.035, 0.035],
+  // How far below where her legs meet the hand must be for the fingers to
+  // point at it — see `strokeAim` — and how far off her midline that point
+  // is taken: the inside top of the thigh, beside her genitals.
+  thighSafe: 0.18, thighCrotch: 0.05,
   // Petting her: how far each way along her head the stroke goes, how far
   // the palm rides above the top of her hair (half a hand's thickness), how
   // much the round of her head drops at the ends of the stroke, and how far
@@ -993,6 +1014,240 @@ function apprenticeThighBind(side, y0 = APPR.thighY[0], y1 = APPR.thighY[1]) {
   }
   const b = _apprThighs[key][side];
   return b ? [b[0], b[1], b[2]] : null;
+}
+
+/**
+ * Where a ray first meets her skin, bind frame: the point, the way the skin
+ * faces there (toward the ray's origin), and the skin weights at the point —
+ * the three corners' four bones each, blended by where in the triangle it
+ * landed, which is exactly the weighting her own skinning gives that spot.
+ * Her body's triangles only. Null for a miss.
+ *
+ * A level ray is only tested against the triangles in its centimetre of her
+ * height (`_apprTriY`, filed once): 140 of them against all 26 756 of her
+ * triangles took 166 ms, which is a hitch the first time you are in the
+ * room with her.
+ */
+let _apprTriY = null;
+function apprenticeSkinHit(o, d) {
+  if (!appr) return null;
+  const g = appr.mesh.geometry, pos = g.getAttribute('position');
+  const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+  const { start, count } = g.drawRange;
+  const ix = g.getIndex();
+  if (!_apprTriY) {
+    _apprTriY = new Map();
+    for (let i = start; i + 2 < start + count; i += 3) {
+      const ya = pos.getY(ix.getX(i)), yb = pos.getY(ix.getX(i + 1)), yc = pos.getY(ix.getX(i + 2));
+      const y0 = Math.floor(Math.min(ya, yb, yc) * 100), y1 = Math.floor(Math.max(ya, yb, yc) * 100);
+      for (let y = y0; y <= y1; y++) {
+        if (!_apprTriY.has(y)) _apprTriY.set(y, []);
+        _apprTriY.get(y).push(i);
+      }
+    }
+  }
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), pv = new THREE.Vector3();
+  const tv = new THREE.Vector3(), qv = new THREE.Vector3();
+  const O = new THREE.Vector3(...o), D = new THREE.Vector3(...d).normalize();
+  let tris = null;
+  if (d[1] === 0) tris = _apprTriY.get(Math.floor(o[1] * 100)) || [];
+  let best = null;
+  const n = tris ? tris.length : Math.floor(count / 3);
+  for (let k = 0; k < n; k++) {
+    const i = tris ? tris[k] : start + k * 3;
+    const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
+    A.fromBufferAttribute(pos, a); B.fromBufferAttribute(pos, b); C.fromBufferAttribute(pos, c);
+    e1.subVectors(B, A); e2.subVectors(C, A);
+    pv.crossVectors(D, e2);
+    const det = e1.dot(pv);
+    if (Math.abs(det) < 1e-12) continue;
+    tv.subVectors(O, A);
+    const u = tv.dot(pv) / det;
+    if (u < 0 || u > 1) continue;
+    qv.crossVectors(tv, e1);
+    const v = D.dot(qv) / det;
+    if (v < 0 || u + v > 1) continue;
+    const t = e2.dot(qv) / det;
+    if (t > 0 && (!best || t < best.t)) {
+      const n = new THREE.Vector3().crossVectors(e1, e2).normalize();
+      if (n.dot(D) > 0) n.negate();
+      best = { t, n, bary: [1 - u - v, u, v], vs: [a, b, c] };
+    }
+  }
+  if (!best) return null;
+  const p = O.clone().addScaledVector(D, best.t);
+  const w = new Map();
+  best.vs.forEach((vi, k) => {
+    for (let j = 0; j < 4; j++) {
+      const wt = BW.getComponent(vi, j) * best.bary[k];
+      if (wt <= 0) continue;
+      const bone = Math.round(BI.getComponent(vi, j) * 255);
+      w.set(bone, (w.get(bone) || 0) + wt);
+    }
+  });
+  return { p: p.toArray(), n: best.n.toArray(), w: [...w.entries()] };
+}
+
+/**
+ * The thigh stroke's whole path, bind frame, bottom to top: points on her
+ * skin, each with its normal and its skin weights (`apprenticeSkinHit`), so
+ * that skinned they ride her in any pose — the thigh end with her thigh, the
+ * belly end with her pelvis and spine, and the fold of the hip with the blend
+ * of both her own skin has there. `side` +1 her left, −1 her right. Measured
+ * once, off her mesh.
+ *
+ * Misha, 25 Sep 2026: *"when we pet her thigh, the arm should come up higher,
+ * almost all the way to her navel"*. The bottom is where the stroke always
+ * went down to (`APPR.thighLo`), and from there `APPR.thighUp`, up the front
+ * of her thigh, to `APPR.thighNavel` under her navel.
+ *
+ * Every point is where a ray straight in at her front first touches her, at
+ * that height and that distance off her midline: the front of the thigh, the
+ * fold, the belly. `navel` is measured, not typed: the deepest dip in her
+ * front midline between 0.98 and 1.12 m against the skin 16 mm above and
+ * below it — 4 mm deep, at 1.050 m. `crotch` and `tip` are what the fingers
+ * point at (`strokeAim`), and each point carries where the hand is there
+ * (`hand`) for `thighOpen` in 43-jadrija.js.
+ */
+const _apprStroke = {};
+function apprenticeStrokeBind(side) {
+  if (!appr) return null;
+  if (_apprStroke[side] !== undefined) return _apprStroke[side];
+  const front = (y, z) => apprenticeSkinHit([0.6, y, z], [-1, 0, 0]);
+  // The navel: the deepest point of the front midline, against the mean of
+  // the skin 16 mm either side of it.
+  const xs = [];
+  for (let y = 0.964; y <= 1.1361; y += 0.002) {
+    const h = front(y, 0);
+    xs.push([y, h ? h.p[0] : NaN, h]);
+  }
+  let navel = null, deep = 0;
+  for (let i = 8; i < xs.length - 8; i++) {
+    const d = (xs[i - 8][1] + xs[i + 8][1]) * 0.5 - xs[i][1];
+    if (d > deep) { deep = d; navel = xs[i][2]; }
+  }
+  // Where her legs meet, on this side: the first height, coming up, that a
+  // ray `APPR.thighCrotch` off her midline finds skin at — the inside top of
+  // this thigh, beside her genitals rather than on them.
+  let crotch = null;
+  for (let y = 0.70; y < 0.95 && !crotch; y += 0.005) crotch = front(y, APPR.thighCrotch * side);
+  const lo = apprenticeThighBind(side, APPR.thighLo[0], APPR.thighLo[1]);
+  const tip = navel && front(navel.p[1] - APPR.thighTip[0], APPR.thighTip[1] * side);
+  if (!navel || !crotch || !lo || !tip) { _apprStroke[side] = null; return null; }
+  const at = [[lo[1], Math.abs(lo[2])], ...APPR.thighUp,
+    [navel.p[1] - APPR.thighNavel[0], APPR.thighNavel[1]]];
+  const pts = at.map(([y, z]) => front(y, z * side));
+  if (pts.some((h) => !h)) { _apprStroke[side] = null; return null; }
+  let len = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1].p, b = pts[i].p;
+    len += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  }
+  // HOW THE HAND LIES THERE. A palm is flat and 16 cm long, heel to the tip
+  // of the middle finger, and her skin under it is not: the thigh is round,
+  // the fold of the hip is a hollow and the belly a dome, and a hand laid on
+  // the normal at the middle of the palm is in her at one end and off her at
+  // the other. So per point, her skin under the whole hand — every vertex of
+  // her in the footprint it covers there, 7.5 cm behind the middle of the
+  // palm to 12.5 cm ahead along the way the fingers point (`strokeAim`), 7 cm
+  // either side for the thumb — is fitted with a plane, least squares; the
+  // palm lies in that plane (`n`), and `off` is how far the highest of her
+  // skin stands above it, which is how far out the palm goes. Measured
+  // standing, the hand then rests 0 to 9 mm off her with nothing of it more
+  // than 4.5 mm in.
+  const g = appr.mesh.geometry, P = g.getAttribute('position'), N = g.getAttribute('normal');
+  const { start, count } = g.drawRange, ix = g.getIndex();
+  const seen = new Uint8Array(P.count), vs = [];
+  for (let i = start; i < start + count; i++) {
+    const v = ix.getX(i);
+    if (seen[v]) continue;
+    seen[v] = 1;
+    if (P.getY(v) > 0.40 && P.getY(v) < 1.20 && P.getX(v) > -0.02) vs.push(v);
+  }
+  pts.forEach((h, i) => {
+    const n = new THREE.Vector3(...h.n);
+    const a = new THREE.Vector3(...strokeAim(h.p, crotch.p, tip.p, navel.p, h.n));
+    const b = new THREE.Vector3().crossVectors(n, a);
+    const rows = [];
+    for (const v of vs) {
+      const dx = P.getX(v) - h.p[0], dy = P.getY(v) - h.p[1], dz = P.getZ(v) - h.p[2];
+      const u = dx * a.x + dy * a.y + dz * a.z, w = dx * b.x + dy * b.y + dz * b.z;
+      const z = dx * n.x + dy * n.y + dz * n.z;
+      if (u < -0.075 || u > 0.125 || Math.abs(w) > 0.07 || Math.abs(z) > 0.05) continue;
+      if (N.getX(v) * n.x + N.getY(v) * n.y + N.getZ(v) * n.z < 0.2) continue;
+      rows.push([u, w, z]);
+    }
+    // z = c0 + c1 u + c2 w, by the normal equations.
+    const M = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], r = [0, 0, 0];
+    for (const [u, w, z] of rows) {
+      const q = [1, u, w];
+      for (let j = 0; j < 3; j++) { r[j] += q[j] * z; for (let k = 0; k < 3; k++) M[j][k] += q[j] * q[k]; }
+    }
+    const det = (m) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+      - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    const D = det(M);
+    const c = [0, 1, 2].map((j) => (Math.abs(D) < 1e-12 ? 0
+      : det(M.map((row, k) => row.map((e, l) => (l === j ? r[k] : e)))) / D));
+    const np = n.clone().addScaledVector(a, -c[1]).addScaledVector(b, -c[2]).normalize();
+    let off = 0;
+    for (const [u, w, z] of rows) {
+      off = Math.max(off, (u * a.dot(np) + w * b.dot(np) + z * n.dot(np)));
+    }
+    h.n = np.toArray();
+    h.off = off;
+    h.foot = rows.length;
+    // Where the hand is, as five points 3 cm off her skin — heel, middle,
+    // fingertips, and either side — for `thighOpen` in 43-jadrija.js.
+    const lift = off + 0.03;
+    h.hand = [[-0.05, 0], [0.03, 0], [0.10, 0], [0.03, 0.035], [0.03, -0.035]].map(([u, w]) => [
+      h.p[0] + np.x * lift + a.x * u + b.x * w,
+      h.p[1] + np.y * lift + a.y * u + b.y * w,
+      h.p[2] + np.z * lift + a.z * u + b.z * w]);
+  });
+  // And the rest of her body that could come over the hand when she bends —
+  // every other vertex of her front from the knees to the ribs, arms left
+  // out (see `thighOpen`).
+  const near = [];
+  for (let k = 0; k < vs.length; k += 2) {
+    const v = vs[k];
+    if (Math.abs(P.getZ(v)) <= 0.2) near.push(v);
+  }
+  _apprStroke[side] = { pts, arrive: 2, navel, crotch, tip, len, near };
+  return _apprStroke[side];
+}
+
+/**
+ * Which way the fingers point on the thigh stroke, from `p`, laid in the
+ * skin's plane there (normal `n`): at where her legs meet (`crotch`) while
+ * the hand is `APPR.thighSafe` and more below it; straight up her (`navel`
+ * less `crotch`) from 10 cm below it to level with it; and at `tip`, the
+ * point under her navel the fingertips stop at, by the time it is 10 cm
+ * above — blended between. Misha, 25 Sep 2026: *"for that stroke, the
+ * finger should reach towards the crotch area"*. Low on her thigh that is up
+ * and in along it, 11 to 17 degrees off dead at it. A fingertip is 11 cm out
+ * from the middle of the palm, and pointed at it from much nearer the
+ * fingers lay on her genitals — which is not where this goes — so up her
+ * instead, to her belly. Bind or world, [x, y, z] each:
+ * `apprenticeStrokeBind` asks it of the bind points once and 90-app.js of
+ * the skinned ones every frame, so the plane fitted under the hand is fitted
+ * under the hand that is drawn.
+ */
+function strokeAim(p, crotch, tip, navel, n) {
+  const C = [crotch[0] - p[0], crotch[1] - p[1], crotch[2] - p[2]];
+  const T = [tip[0] - p[0], tip[1] - p[1], tip[2] - p[2]];
+  const U = [navel[0] - crotch[0], navel[1] - crotch[1], navel[2] - crotch[2]];
+  const ul = Math.hypot(...U) || 1;
+  const below = (C[0] * U[0] + C[1] * U[1] + C[2] * U[2]) / ul;
+  const cd = Math.hypot(...C) || 1, tl = Math.hypot(...T) || 1;
+  const wc = Math.min(1, Math.max(0, (below - 0.10) / (APPR.thighSafe - 0.10)));
+  const wt = Math.min(1, Math.max(0, -below / 0.10));
+  const g = [0, 1, 2].map((k) => C[k] / cd * wc
+    + (1 - wc) * (U[k] / ul * (1 - wt) + T[k] / tl * wt));
+  const gn = g[0] * n[0] + g[1] * n[1] + g[2] * n[2];
+  const r = [g[0] - gn * n[0], g[1] - gn * n[1], g[2] - gn * n[2]];
+  const rl = Math.hypot(...r) || 1;
+  return r.map((v) => v / rl);
 }
 
 /** Her, for the arm pass to draw into its depth — see `render` in 60-arms.js. */

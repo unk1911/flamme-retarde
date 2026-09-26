@@ -51436,14 +51436,120 @@ async function buildJadrija(scene) {
         // forward, which is where the inner face of a thigh looks.
         const b = bindPointAt(appr, [p[0] - 0.05, p[1], p[2] + Math.sign(p[2]) * 0.08], [[bone, 1]], new THREE.Vector3());
         const f = w.clone().sub(b).normalize();
-        // And the same, a hand's width further down the thigh, for the
-        // stroke — see THIGH_STROKE in 90-app.js. Down the leg, never up it.
-        const q = apprenticeThighBind(side, APPR.thighLo[0], APPR.thighLo[1]);
-        const lw = q ? bindPointAt(appr, q, [[bone, 1]], new THREE.Vector3()) : w;
+        // And the stroke's whole path, bottom of the thigh to under her
+        // navel — see `apprenticeStrokeBind` and THIGH_STROKE in 90-app.js.
+        // Each point skinned by her own weights at that spot, with its
+        // normal turned the same way, so it stays on her skin however she
+        // stands or lies; and the points the fingers point at, and her navel.
+        // The hand arrives at `arrive`, where it always did.
+        const sb = apprenticeStrokeBind(side);
+        let path = null, crotch = null, navel = null, tip = null;
+        if (sb) {
+          const H = bindHeadsOf(appr), q = new THREE.Quaternion();
+          appr.mesh.updateMatrixWorld();
+          const mq = appr.mesh.getWorldQuaternion(new THREE.Quaternion());
+          const skin = (h) => {
+            const P = new THREE.Vector3(), N = new THREE.Vector3(), a = new THREE.Vector3();
+            let tot = 0;
+            for (const [bi, wt] of h.w) {
+              appr.boneTurn(bi, q);
+              a.set(h.p[0], h.p[1], h.p[2]).sub(H.T[bi]).applyQuaternion(q);
+              P.addScaledVector(appr.boneAt(bi, new THREE.Vector3()).add(a), wt);
+              N.addScaledVector(a.set(h.n[0], h.n[1], h.n[2]).applyQuaternion(q), wt);
+              tot += wt;
+            }
+            P.multiplyScalar(1 / tot).applyMatrix4(appr.mesh.matrixWorld);
+            N.applyQuaternion(mq).normalize();
+            return { x: P.x, y: P.y, z: P.z, nx: N.x, ny: N.y, nz: N.z, off: h.off || 0 };
+          };
+          path = sb.pts.map(skin);
+          crotch = skin(sb.crotch);
+          navel = skin(sb.navel);
+          tip = skin(sb.tip);
+        }
         thighs.push({ x: w.x, y: w.y, z: w.z, fx: f.x, fy: f.y, fz: f.z, side,
-          lo: { x: lw.x, y: lw.y, z: lw.z } });
+          path, arrive: sb ? sb.arrive : 0, crotch, navel, tip });
       }
       return { spots: out, low: { x: lo.x, y: lo.y, z: lo.z }, thighs };
+    },
+    /**
+     * How far up the thigh stroke's path (`hips().thighs[i].path`) there is
+     * room for your hand: the last point, counting up from the bottom, with
+     * none of the rest of her in the way — or 0. Standing, all of it. On her
+     * back with her knees drawn up, her thigh folds down over the crease of
+     * her hip and her lower belly, and a hand laid there by the path is a
+     * hand 5 to 8 cm inside her (measured, `cradle` on the cot: 50 to 77 mm
+     * from 40 per cent of the way up).
+     *
+     * So each point's hand — five points of it 3 cm off her skin, see
+     * `apprenticeStrokeBind` — is skinned where it is now and tested against
+     * her body as it is now (every other vertex of her front, knees to ribs,
+     * without her arms, with its normal), leaving out the skin within 9 cm of
+     * it as she was modelled, which is the skin it is lying on. Any other
+     * skin of her within 5 cm that the point is not at least 2 cm in front of
+     * is her folded over it — and that is behind as well as near, because a
+     * point pressed deep into her belly can be further than 2.5 cm from the
+     * nearest vertex of it; asked by distance alone it passed, 44 mm inside.
+     * The app asks this a few times a second, and only while the stroke is
+     * on. -1 when not even the bottom of the stroke is clear.
+     */
+    thighOpen: (i) => {
+      if (!show || !sheIsIn()) return null;
+      if (!(APPR.primary && appr && appr.mesh.visible)) return null;
+      const sb = apprenticeStrokeBind(i === 0 ? 1 : -1);
+      if (!sb) return null;
+      const g = appr.mesh.geometry, P = g.getAttribute('position');
+      const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+      const H = bindHeadsOf(appr), q = new THREE.Quaternion();
+      const a = new THREE.Vector3(), b = new THREE.Vector3();
+      appr.mesh.updateMatrixWorld();
+      const M = appr.mesh.matrixWorld;
+      const skin = (x, y, z, w, out) => {
+        out.set(0, 0, 0);
+        let tot = 0;
+        for (const [bi, wt] of w) {
+          appr.boneTurn(bi, q);
+          a.set(x, y, z).sub(H.T[bi]).applyQuaternion(q);
+          out.addScaledVector(appr.boneAt(bi, b).add(a), wt);
+          tot += wt;
+        }
+        return out.multiplyScalar(1 / tot).applyMatrix4(M);
+      };
+      const Nm = g.getAttribute('normal');
+      const nv = sb.near.length, her = new Float32Array(nv * 6), w4 = [];
+      const o = new THREE.Vector3(), nn = new THREE.Vector3(), mq = appr.mesh.getWorldQuaternion(new THREE.Quaternion());
+      for (let k = 0; k < nv; k++) {
+        const v = sb.near[k];
+        w4.length = 0;
+        nn.set(0, 0, 0);
+        for (let j = 0; j < 4; j++) {
+          const wt = BW.getComponent(v, j);
+          if (wt <= 0) continue;
+          const bi = Math.round(BI.getComponent(v, j) * 255);
+          w4.push([bi, wt]);
+          appr.boneTurn(bi, q);
+          nn.addScaledVector(b.set(Nm.getX(v), Nm.getY(v), Nm.getZ(v)).applyQuaternion(q), wt);
+        }
+        skin(P.getX(v), P.getY(v), P.getZ(v), w4, o);
+        nn.applyQuaternion(mq).normalize();
+        her.set([o.x, o.y, o.z, nn.x, nn.y, nn.z], k * 6);
+      }
+      const hp = new THREE.Vector3();
+      for (let j = 0; j < sb.pts.length; j++) {
+        const h = sb.pts[j];
+        for (const bp of h.hand) {
+          skin(bp[0], bp[1], bp[2], h.w, hp);
+          for (let k = 0; k < nv; k++) {
+            const v = sb.near[k];
+            const bx = P.getX(v) - bp[0], by = P.getY(v) - bp[1], bz = P.getZ(v) - bp[2];
+            if (bx * bx + by * by + bz * bz < 0.0081) continue;
+            const dx = hp.x - her[k * 6], dy = hp.y - her[k * 6 + 1], dz = hp.z - her[k * 6 + 2];
+            if (dx * dx + dy * dy + dz * dz > 0.0025) continue;
+            if (dx * her[k * 6 + 3] + dy * her[k * 6 + 4] + dz * her[k * 6 + 5] < 0.02) return j - 1;
+          }
+        }
+      }
+      return sb.pts.length - 1;
     },
     /**
      * Her two buttocks, world metres — for the slap. Misha, 25 Sep 2026: *"if

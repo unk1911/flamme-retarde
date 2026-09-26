@@ -1018,7 +1018,34 @@ const _gripAt = new THREE.Vector3();
 const settleTurn = (k) => 1 - clamp((k - 0.55) / 0.35, 0, 1);
 const settleGap = (k) => (k > 0.6 ? 0.14 : 0.02);
 let thighT = 0;
-const THIGH_STROKE = 2.6;    // s, down the thigh and back up
+let thighHold = null;         // debug: 0..1 up the stroke, held there — see `thighHold`
+// How much of the stroke's path there is room for, 0..1 of its length — see
+// `thighOpen` in 43-jadrija.js — as asked, and eased to.
+let thighCap = 1, thighCapWant = 1, thighCapT = 0;
+// s, bottom of the stroke to the top and back. It was 2.6 s for the 22 cm of
+// thigh the stroke used to be; the path is 35 cm now, and this keeps the hand
+// at the pace it had — 17 cm a second on average.
+const THIGH_STROKE = 4.1;
+/**
+ * Centripetal Catmull–Rom between Q[1] and Q[2] at `t`, the other two for
+ * the tangents — Barry and Goldman's pyramid, with the knots spaced by the
+ * square root of each step's length. Points are anything with x, y, z.
+ */
+function catmullC(Q, t) {
+  const k = [0];
+  for (let j = 1; j < 4; j++) {
+    const a = Q[j - 1], b = Q[j];
+    k.push(k[j - 1] + Math.max(Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)), 1e-4));
+  }
+  const u = k[1] + (k[2] - k[1]) * t;
+  const lerp = (a, b, ka, kb) => {
+    const w = (u - ka) / (kb - ka);
+    return { x: a.x + (b.x - a.x) * w, y: a.y + (b.y - a.y) * w, z: a.z + (b.z - a.z) * w };
+  };
+  const A1 = lerp(Q[0], Q[1], k[0], k[1]), A2 = lerp(Q[1], Q[2], k[1], k[2]);
+  const A3 = lerp(Q[2], Q[3], k[2], k[3]);
+  return lerp(lerp(A1, A2, k[0], k[2]), lerp(A2, A3, k[1], k[3]), k[1], k[2]);
+}
 let buttSlaps = 0;              // debug: how many the click has actually played
 let buttSide = 1;               // which cheek the crosshair picked, +1 her left
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
@@ -1027,6 +1054,13 @@ const camTrace = [];
 const CUP_AIM_R = 0.16;      // rad off the crosshair a breast still counts
 const CUP_STAND = 0.45;      // m, eye to her, where you stop
 const CUP_OFF = 0.046;       // m, the palm's bone line off her skin: the palm is 15 mm under it and the breast curves toward the hand either side of its point
+// On the thigh stroke it is the bone line off the plane the palm lies in
+// there, clear of the highest of her skin under the whole hand — see
+// `apprenticeStrokeBind`. With the bone line 46 mm out the palm stood 16 to
+// 22 mm off the round of her thigh, so it is some 26 mm thick under it; 30
+// is the palm resting on her rather than in her.
+const THIGH_OFF = 0.030;
+const cupOff = () => (reachKind === 'thigh' && cupAt && cupAt.off != null ? THIGH_OFF + cupAt.off : CUP_OFF);
 const PET_STAND = 0.50;      // m, eye to crown, horizontally, where you stop
 const PET_REACH = 0.95;      // and how close the hand comes up from
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
@@ -7007,12 +7041,74 @@ function frame() {
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
       : pressing && reachKind === 'hip' && hps ? hps.spots[cupSide]
         : pressing && reachKind === 'thigh' && hps ? hps.thighs[cupSide] : null;
-    // THE STROKE. 
-    if (cupNow0 && reachKind === 'thigh' && cupNow0.lo) {
+    // THE STROKE. Misha, 24 Sep 2026: *"do the stroke along the thigh"* —
+    // and, of 'along the leg, not between her legs': *"i don't get the
+    // refusal"*. Fair: the line is her genitals, not her inner thighs. So the
+    // hand is on the inner face of her thigh, between her legs, and slides
+    // down it and back up.
+    //
+    // AND NOW ON UP HER. Misha, 25 Sep 2026: *"when we pet her thigh, the arm
+    // should come up higher, almost all the way to her navel"*. From the old
+    // bottom of the stroke, up the front of her thigh, over the fold of her
+    // hip outside the line of her hair, and on to her lower belly, until the
+    // tips of the fingers are 3.4 cm under her navel — five points on her
+    // skin (`path`, see `apprenticeStrokeBind`), and the hand runs along the
+    // curve through them by distance, so it keeps one pace over the short
+    // steps at the top and the long run up her thigh. A straight line from
+    // the bottom to the top stands up to 12 mm off the round of her thigh.
+    // Starting where it arrived — where it always did — and going up first.
+    //
+    // And the fingers — Misha, same evening: *"for that stroke, the finger
+    // should reach towards the crotch area"*. Low on her thigh they point up
+    // and in at where her legs meet; nearer, up her, and at the top at the
+    // point under her navel they stop at (`strokeAim`), laid flat along her
+    // skin (`along`), the palm on her (`palm`) — see `updateReach` in
+    // 60-arms.js.
+    if (cupNow0 && reachKind === 'thigh' && cupNow0.path) {
       thighT = cupK > 0.9 ? thighT + dt : 0;
-      const u = 0.5 - 0.5 * Math.cos(thighT * Math.PI * 2 / THIGH_STROKE);
-      const A = cupNow0, L = cupNow0.lo;
-      cupNow0 = { ...A, x: A.x + (L.x - A.x) * u, y: A.y + (L.y - A.y) * u, z: A.z + (L.z - A.z) * u };
+      const P = cupNow0.path, n = P.length;
+      const cum = [0];
+      for (let i = 1; i < n; i++) {
+        cum.push(cum[i - 1] + Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y, P[i].z - P[i - 1].z));
+      }
+      // Only as far up her as there is room for the hand: lying back with
+      // her knees drawn up, her thigh is folded down over the top of the
+      // path. Asked a few times a second, and eased, so the top of the
+      // stroke comes down as she curls up and goes back up as she opens.
+      thighCapT -= dt;
+      if (thighCapT <= 0 && jadrija.thighOpen) {
+        thighCapT = 0.15;
+        const op = jadrija.thighOpen(cupSide);
+        // Not even the bottom clear: the hand rests there and does not stroke.
+        thighCapWant = op == null ? 1 : op < 0 ? 0 : cum[Math.min(op, n - 1)] / cum[n - 1];
+      }
+      thighCap = thighT === 0 ? thighCapWant : damp(thighCap, thighCapWant, 2.5, dt);
+      const L = Math.max(cum[n - 1] * thighCap, 1e-3), sA = Math.min(cum[cupNow0.arrive], L);
+      // s(t) = L (1 − cos(ωt + φ)) / 2, with φ putting t = 0 where the hand
+      // arrived, on its way up.
+      const ph = Math.acos(clamp(1 - 2 * sA / L, -1, 1));
+      const s = thighHold != null ? cum[n - 1] * clamp(thighHold, 0, 1)
+        : L * (0.5 - 0.5 * Math.cos(thighT * Math.PI * 2 / THIGH_STROKE + ph));
+      let i = 1;
+      while (i < n - 1 && cum[i] < s) i++;
+      const t = clamp((s - cum[i - 1]) / Math.max(cum[i] - cum[i - 1], 1e-6), 0, 1);
+      // Centripetal Catmull–Rom through the four round the step: the steps
+      // are 5 to 11 cm apart and a uniform spline over steps that uneven
+      // overshoots the short ones.
+      const Q = [P[Math.max(0, i - 2)], P[i - 1], P[i], P[Math.min(n - 1, i + 1)]];
+      const at = catmullC(Q, t);
+      const nx = P[i - 1].nx + (P[i].nx - P[i - 1].nx) * t;
+      const ny = P[i - 1].ny + (P[i].ny - P[i - 1].ny) * t;
+      const nz = P[i - 1].nz + (P[i].nz - P[i - 1].nz) * t;
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      // Which way the fingers point: see `strokeAim` in 46-apprentice.js.
+      const C = cupNow0.crotch, T = cupNow0.tip, V = cupNow0.navel;
+      const G = strokeAim([at.x, at.y, at.z], [C.x, C.y, C.z], [T.x, T.y, T.z],
+        [V.x, V.y, V.z], [nx / nl, ny / nl, nz / nl]);
+      cupNow0 = { ...cupNow0, x: at.x, y: at.y, z: at.z,
+        fx: nx / nl, fy: ny / nl, fz: nz / nl,
+        off: P[i - 1].off + (P[i].off - P[i - 1].off) * t,
+        along: G, up: s / cum[n - 1], cap: thighCap };
     }
     if (cupNow0) cupAt = cupNow0;
     const thumbing = pressing && reachKind === 'thumb' && (inKab ? !!lip : lipNear);
@@ -7511,9 +7607,13 @@ function frame() {
         : state.phase === 'ground' && cupK > 0.01 && cupAt
           // The palm's middle a hand's thickness off the skin, out along the
           // way her chest faces, so it rests on her rather than in her.
-          ? { reach: { x: cupAt.x + cupAt.fx * CUP_OFF, y: cupAt.y + cupAt.fy * CUP_OFF,
-            z: cupAt.z + cupAt.fz * CUP_OFF, k: cupK,
-            kind: reachKind === 'hip' || reachKind === 'thigh' ? reachKind : 'cup' } }
+          ? { reach: { x: cupAt.x + cupAt.fx * cupOff(), y: cupAt.y + cupAt.fy * cupOff(),
+            z: cupAt.z + cupAt.fz * cupOff(), k: cupK,
+            kind: reachKind === 'hip' || reachKind === 'thigh' ? reachKind : 'cup',
+            // The thigh stroke says which way the hand lies on her, world:
+            // the fingers (`strokeAim`), and the palm in on her skin.
+            along: reachKind === 'thigh' ? cupAt.along : null,
+            palm: reachKind === 'thigh' && cupAt.along ? [-cupAt.fx, -cupAt.fy, -cupAt.fz] : null } }
         : state.phase === 'ground' && petK > 0.01 && petAt
           ? { reach: { x: petAt.x, y: petAt.y, z: petAt.z, k: petK, kind: 'pet' } }
         : (state.phase === 'ride' ? ride : swim),
@@ -8967,7 +9067,17 @@ window.__fr = {
     petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),
     petK: () => +petK.toFixed(3),
     cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide,
-      y: cupAt ? +cupAt.y.toFixed(3) : null, t: +thighT.toFixed(2) }),
+      y: cupAt ? +cupAt.y.toFixed(3) : null, t: +thighT.toFixed(2),
+      // The thigh stroke: where the palm is aimed on her, world, and how far
+      // up the path, 0 the bottom of her thigh and 1 the top; and how much of
+      // it there is room for (`thighOpen`).
+      at: cupAt ? [cupAt.x, cupAt.y, cupAt.z] : null,
+      n: cupAt && cupAt.fx != null ? [cupAt.fx, cupAt.fy, cupAt.fz] : null,
+      along: cupAt && cupAt.along ? cupAt.along : null,
+      up: cupAt && cupAt.up != null ? +cupAt.up.toFixed(3) : null,
+      cap: cupAt && cupAt.cap != null ? +cupAt.cap.toFixed(3) : null }),
+    /** Debug: hold the thigh stroke at `u` of the way up it; null lets it go. */
+    thighHold: (u) => { thighHold = u == null ? null : +u; return thighHold; },
     camTrace: (on) => { if (on != null) { camTraceOn = !!on; camTrace.length = 0; } return camTrace.slice(); },
     slaps: () => buttSlaps,
     slapMark: () => apprenticeSlapState(),
@@ -10590,6 +10700,8 @@ window.__fr = {
     stats: () => (arms ? arms.stats() : null),
     probe: () => (arms ? arms.probe() : null),
     thumbAim: (o) => (arms ? arms.thumbAim(o) : null),
+    hand: () => (arms ? arms.hand() : null),
+    thighAim: (o) => (arms ? arms.thighAim(o) : null),
   },
   kites: () => kites,
   fire: () => fire,
