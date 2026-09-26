@@ -8,6 +8,131 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.529.0] — 2026-09-26 (baye 1.46.0)
+
+### A beach ball for the Slow Doodle, on AVBD
+
+The ball was offered as *"a real one that rolls and bounces off the frame and
+the fence. The Slow Doodle could chase it, which gives him a second
+'superpower', with no one's face involved"*. Misha: *"let's do ankle cuffs
+thing first and then after that, the ball for doodle"*, and *"we wanna use
+AVBD for various stuff"*.
+
+**The ball** (`src/43-ball.js`) is a 22 cm vinyl beach ball, 80 g, in six
+gores: red, white, yellow, white, blue, white, with white caps. The gores are
+drawn in the shader from the mesh's own position, so the stripes stay sharp
+and turn with it. It is in your satchel from the start. `[` throws it: your
+hand comes up into view with the ball against your palm, and at the top of
+the gesture it leaves along where you are looking at 9 m/s, lifted a little.
+Standing over it, `[` puts it back in the satchel. In the sea you can swim up
+to it and take it back the same way.
+
+**The physics** is `avbdBall` in `src/43-avbd.js`: one free rigid sphere on
+the same AVBD solve as the cuff chain. It uses the per-body 6x6 LDLᵀ, the
+contact rows with the Coulomb cone inside the step, and the warm start and
+dual update. What a ball needs and the chain did not have is documented at
+the top of the function:
+
+- **The friction rows' lever arm.** The chain dropped it. With it, the ball
+  rolls because friction holds the contact point still, not because rolling
+  is scripted.
+- **A positive gap counts in full.** The reference forgives 90 % of a
+  contact's starting error. Applied to a gap, that stopped a falling ball in
+  mid-air, so only penetration is forgiven.
+- **Restitution.** AVBD contact is inelastic, so the bounce is a
+  velocity-level pass after the solve (XPBD's, Müller et al. 2020). e = 0.70
+  on concrete, 0.35 on people, 0.30 off his snout. Nothing bounces below
+  0.35 m/s of approach.
+- **Rolling resistance** of 0.08 of the weight, which also holds the ball
+  still in the breeze on the deck.
+- **The floor and its steps.** The floor is the promenade's own height
+  query, with a ring of probes for the terrace steps. Seaward of the quay it
+  is the sea bed and not the lip.
+- **Boxes.** It meets every walk-blocker box. For the kabina it uses the
+  room's real walls, not the girth-shrunk ones.
+- **Water and air.** Buoyancy comes from the displaced cap; drag in water
+  and in the wind is solved implicitly.
+- **People are springs** (2500 N/m). A ball squeezed between his snout and a
+  terrace wall used to go through the wall and leave the top at 6 m/s. Now it
+  gives into the snout instead.
+
+It collides with you, Baye's 31 chain capsules, his snout, skull, body and
+legs, and the bathers. It also hits both playgrounds, whose frames, railings,
+slides and swings were never colliders: they are now boxes and rods for the
+ball only. The fenced playground's one solid walk-blocker is replaced for the
+ball by its fence and frame (`ball: false` on the run).
+
+**The fetch** (`── the fetch ──` in `src/43-doodle.js`). Throw it, or say
+"fetch", within 25 m of him:
+
+1. **He watches it go.** A 0.7–1.6 s beat of slowness, turning after it,
+   until it is down and slower than 3 m/s.
+2. **He gallops to it.** The gallop is still the only fast thing about him.
+   His route goes round the furniture, fanned round the ball until a
+   standing place is clear.
+3. **He noses it on once or twice.** His snout and forelegs are capsules in
+   the ball's world. He walks at it, head down in a measured nose-down pose
+   (nose 0.19 m off the floor), and flicks his head. Whatever moves the ball
+   is him.
+4. **He picks it up** into his mouth.
+5. **He walks it back** at 0.74 m/s.
+6. **He drops it at your feet** and it rolls the last bit.
+
+Sometimes (30 %) he takes it to Baye instead, if she is within 8 m of you and
+free. In the sea he stops on the lip, looks at it, and yawns: he does not
+swim, and the quay is 1–2 m above the water. A ball up on something gets the
+same. "Lick" while he has the ball gets *he is busy with the ball*.
+
+Measured headless (GPU Chrome), every screenshot read:
+
+- **Promenade throw:** lands 6–11 m out, bounces, rolls and sleeps. Over
+  five throws it was never more than 2.5 mm into the floor, with 0 rescues.
+- **Fetch:** five in a row without a reset, each 31–48 s. The ball was
+  returned 0.64–0.67 m from you every time. The fastest fetch was 23.8 s.
+  Throwing again while he waits after a drop starts a new fetch.
+- **Playground:** a throw at the climbing frame bounced off it at head
+  height (7.1 → 4.6 m/s, reversed), then off your legs. A throw at the
+  railing bounced off it at s 37.2.
+- **Sea:** floats 1.5–1.6 cm deep (1.4 cm from the numbers). It rides the
+  swell and drifts in the wind at about 0.4 m/s. He reached the edge in 7 s,
+  looked, yawned, and was done at 14.7 s.
+- **Baye:** 6.5 m/s into her chest capsule came back at about 2.2 m/s. A
+  thrown ball glanced her arm and hip. Asked to take it to her, he twice
+  brought it to you, because she started a routine (twerk, cartwheel) while
+  he was carrying it.
+- **Cost:** the ball costs 0.055–0.085 ms a frame on average, 0.6 ms at
+  worst, and 2.5 ms on the one frame the box bins are built. His route
+  planning costs at most 0.6 ms a plan, and he plans about once a second.
+
+Voice (`server/baye/baye.py` 1.46.0, which needs redeploying on mpcn0):
+
+- The noun: "throw the ball", "ball", "beach ball", "play ball", Croatian
+  "lopta / loptu / baci loptu", French "la balle / le ballon / lance la
+  balle".
+- The fetch verb on its own: "fetch", "go fetch", "fetch it, boy",
+  "donesi", "rapporte", "va chercher", "play fetch", "Doodle, fetch".
+- Left alone: "fetch me an ice cream", "donesi mi pivo", "rapporte-moi une
+  bière", "ballet", "balls", "fireball".
+- "Lick the ball" is the ball.
+- Tested offline: 31 sentences, all as expected. Every quoted phrase in the
+  changelog and the service (2,330) was run through 1.45.0 and 1.46.0; the 23
+  that changed are all ball phrases, or regex source text quoted in comments.
+
+**Still not perfect:**
+
+- A nudge connects about half the time. His paws sometimes get there before
+  his nose, and he counts the attempt either way.
+- A fetch takes half a minute, which is his character, and there is no way
+  to hurry him.
+- His stretch of promenade is 250 m from the playgrounds. He only hears you
+  there if he has been brought there.
+- The ball thrown into the fenced playground stays in there: you cannot
+  walk in, and neither can he.
+
+Debug: `__fr.jad.ball.stats() / info() / key() / aim(yaw, pitch) /
+put(x, y, z, vx, vy, vz) / stow() / trace() / fetch('baye') / fetchStats() /
+fetchTrace()`; `__fr.jad.raw().ballCapsAt(x, z)`.
+
 ## [1.528.0] — 2026-09-26 (baye 1.45.0)
 
 ### Ankle cuffs to match the wrist ones, with a real chain between her ankles

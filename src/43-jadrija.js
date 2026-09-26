@@ -4372,6 +4372,25 @@ async function buildJadrija(scene) {
   // read it, the whole resort throws, and the only symptom is a page that
   // never finishes loading. See the note on `facing`.
   const PLAY = { t0: 157, t1: 176, s0: 28.9, s1: 37.4 };
+  // THE BALL'S OWN PLAYGROUND SHAPES, hoisted with PLAY for PLAY's reason:
+  // they are filled where the two playgrounds are drawn, twenty thousand
+  // lines above the ball (`── THE BEACH BALL ──`). Neither playground's
+  // frame, railing, slide or swing was ever a collider — you walk through
+  // the municipal one's railing and the other is one solid box you cannot
+  // enter — and a ball thrown in there has to hit them. Boxes for the flat
+  // things, rods (static capsules) for the round and the raked ones, and the
+  // pads they stand on as floors.
+  const ballExtraBoxes = [], ballRods = [], ballPads = [];
+  function ballBoxTS(t0, t1, s0, s1, y0, y1) {
+    ballExtraBoxes.push(ballBoxOf((t0 + t1) * 0.5, (s0 + s1) * 0.5, Math.abs(t1 - t0) * 0.5,
+      Math.abs(s1 - s0) * 0.5, y0, y1 - y0, 0));
+  }
+  function ballRodTS(t0, s0, y0, t1, s1, y1, r) {
+    const A = at(t0), B = at(t1);
+    const p = [A.x + A.nx * s0, y0, A.z + A.nz * s0, B.x + B.nx * s1, y1, B.z + B.nz * s1];
+    ballRods.push({ t: (t0 + t1) * 0.5, ext: Math.abs(t1 - t0) * 0.5 + Math.abs(s1 - s0) * 0.5,
+      p, mx: (p[0] + p[3]) * 0.5, mz: (p[2] + p[5]) * 0.5, r, i: ballRods.length % 480, seen: 0 });
+  }
   const SAN = { t0: 347.4, t1: 357.2, s0: 32.0, s1: 36.6 };
   const TRAMP = { t0: 346.4, t1: 363.6, s0: 44.4, s1: 57.6 };
   // The way in, in t, on the seaward side of the fence — the side you arrive
@@ -24152,7 +24171,30 @@ async function buildJadrija(scene) {
         boxTS(st3 + o - 0.22, st3 + o + 0.22, fs - 0.13, fs + 0.13,
           y + 0.56, y + 0.62, PLAY[3]);
       }
-      runs.push({ t0: pt0, t1: pt1, s0: ps0, s1: ps1, y, h: 1.35 });
+      // `ball: false`: to you this is one box you cannot walk into, and to
+      // the ball it is what it is — a fence round a pad with a frame, a
+      // slide and a swing on it. See `ballBoxTS`.
+      runs.push({ t0: pt0, t1: pt1, s0: ps0, s1: ps1, y, h: 1.35, ball: false });
+      ballBoxTS(pt0, pt1, ps0 - 0.03, ps0 + 0.03, y - 0.1, y + 1.35);
+      ballBoxTS(pt0, pt1, ps1 - 0.03, ps1 + 0.03, y - 0.1, y + 1.35);
+      ballBoxTS(pt0 - 0.03, pt0 + 0.03, ps0, ps1, y - 0.1, y + 1.35);
+      ballBoxTS(pt1 - 0.03, pt1 + 0.03, ps0, ps1, y - 0.1, y + 1.35);
+      for (const [ot, os] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) {
+        ballRodTS(ft + ot, fs + os, y - 0.1, ft + ot, fs + os, y + 1.90, 0.055);
+      }
+      ballBoxTS(ft - 1.2, ft + 1.2, fs - 1.2, fs + 1.2, y + 1.16, y + 1.28);
+      ballBoxTS(ft - 1.2, ft + 1.2, fs - 1.2, fs + 1.2, y + 1.90, y + 2.06);
+      for (const o of [-0.30, 0, 0.30]) ballRodTS(ft + 1.2, fs + o, y + 1.10, ft + 4.2, fs + o, y + 0.0, 0.06);
+      for (const o of [-1.6, 1.6]) {
+        ballRodTS(st3 + o, fs - 1.0, y - 0.1, st3 + o, fs - 1.0, y + 2.10, 0.05);
+        ballRodTS(st3 + o, fs + 1.0, y - 0.1, st3 + o, fs + 1.0, y + 2.10, 0.05);
+      }
+      ballBoxTS(st3 - 1.7, st3 + 1.7, fs - 0.06, fs + 0.06, y + 2.04, y + 2.14);
+      for (const o of [-0.8, 0.8]) {
+        ballRodTS(st3 + o, fs, y + 0.62, st3 + o, fs, y + 2.04, 0.02);
+        ballBoxTS(st3 + o - 0.22, st3 + o + 0.22, fs - 0.13, fs + 0.13, y + 0.56, y + 0.62);
+      }
+      ballPads.push({ t0: pt0 - 0.4, t1: pt1 + 0.4, s0: ps0 - 0.4, s1: ps1 + 0.4, y: () => y + 0.02 });
     }
     b = back5;
   }
@@ -25268,6 +25310,75 @@ async function buildJadrija(scene) {
     // handed back a NaN position to anybody who walked into it and could only
     // be passed by jumping. Measured before: every lane from s 4 to s 50 dead
     // at t 169.95. There is no bench, so there is no collider.
+
+    // AND THE BALL'S. Everything above, as the ball meets it: the railing
+    // as a wall (its uprights are 14.5 cm apart and the ball is 22 cm), the
+    // gate left open, the frame's legs, deck, rails and roof, the ladder,
+    // the slide as three rods along its bed, the monkey bars' legs, the
+    // swing's A-legs, bar, seats and chains, and the rider. See `ballBoxTS`.
+    {
+      const railBall = (t0, t1, s, gapT) => {
+        const g0 = gapT == null ? Infinity : gapT - 1.5, g1 = gapT == null ? -Infinity : gapT + 1.5;
+        const piece = (u0, u1) => {
+          if (u1 - u0 > 0.05) ballBoxTS(u0, u1, s - 0.03, s + 0.03, yg(u0, s) - 0.1, yg(u0, s) + 1.12);
+        };
+        for (let t = t0; t < t1 - 0.01; t += 2.4) {
+          const tb = Math.min(t + 2.4, t1);
+          if (tb <= g0 || t >= g1) { piece(t, tb); continue; }
+          piece(t, Math.min(tb, g0));
+          piece(Math.max(t, g1), tb);
+        }
+      };
+      railBall(PLAY.t0, PLAY.t1, PLAY.s0, PLAY.t0 + 5.5);
+      railBall(PLAY.t0, PLAY.t1, PLAY.s1, null);
+      for (const t of [PLAY.t0, PLAY.t1]) {
+        for (let s = PLAY.s0; s < PLAY.s1 - 0.01; s += 2.4) {
+          const sb = Math.min(s + 2.4, PLAY.s1);
+          ballBoxTS(t - 0.03, t + 0.03, s, sb, yg(t, s) - 0.1, yg(t, s) + 1.12);
+        }
+      }
+      for (const [ot, os] of [[-0.85, -0.85], [0.85, -0.85], [-0.85, 0.85], [0.85, 0.85]]) {
+        ballRodTS(ct + ot, cs + os, cy - 0.1, ct + ot, cs + os, cy + 2.34, 0.058);
+      }
+      ballBoxTS(ct - 0.92, ct + 0.92, cs - 0.92, cs + 0.92, cy + 1.24, cy + 1.32);
+      ballBoxTS(ct - 0.92, ct + 0.92, cs - 0.92, cs - 0.86, cy + 1.32, cy + 1.86);
+      ballBoxTS(ct - 0.92, ct - 0.86, cs - 0.92, cs + 0.92, cy + 1.32, cy + 1.86);
+      ballBoxTS(ct + 0.86, ct + 0.92, cs - 0.92, cs + 0.92, cy + 1.32, cy + 1.86);
+      ballBoxTS(ct - 0.85, ct + 0.85, cs - 0.85, cs + 0.85, cy + 2.34, cy + 2.62);
+      for (const o of [-0.34, 0.34]) ballRodTS(ct + o, cs + 1.55, cy - 0.1, ct + o, cs + 1.55, cy + 1.34, 0.035);
+      for (let i = 0; i < 4; i++) {
+        const yy = cy + 0.28 + i * 0.30 + 0.025;
+        ballRodTS(ct - 0.36, cs + 1.55, yy, ct + 0.36, cs + 1.55, yy, 0.03);
+      }
+      // The slide's bed, raked from the deck to the turf, as three rods whose
+      // tops are its surface, and its two side rails.
+      {
+        const sa = cs - 0.90, sb = cs - 3.30, ya = cy + 1.26, yb = cy + 0.30;
+        for (const o of [-0.26, 0, 0.26]) ballRodTS(ct + o, sa, ya - 0.06, ct + o, sb, yb - 0.06, 0.06);
+        for (const o of [-0.36, 0.36]) ballRodTS(ct + o, sa, ya + 0.11, ct + o, sb, yb + 0.11, 0.11);
+        ballBoxTS(ct - 0.38, ct + 0.38, sb - 0.55, sb + 0.02, cy + 0.24, cy + 0.32);
+      }
+      const mt = ct + 3.4;
+      for (const os of [-0.62, 0.62]) {
+        ballRodTS(mt, cs + os, cy - 0.1, mt, cs + os, cy + 2.10, 0.052);
+        ballBoxTS(ct + 0.85, mt, cs + os - 0.035, cs + os + 0.035, cy + 2.02, cy + 2.10);
+      }
+      const st = PLAY.t1 - 4.6, ss = PLAY.s0 + 4.6, sy = yg(st, ss);
+      for (const ot of [-1.55, 1.55]) {
+        for (const os of [-0.95, 0.95]) ballRodTS(st + ot, ss + os, sy - 0.1, st + ot, ss, sy + 2.24, 0.05);
+      }
+      ballBoxTS(st - 1.70, st + 1.70, ss - 0.055, ss + 0.055, sy + 2.20, sy + 2.30);
+      for (const ot of [-0.72, 0.72]) {
+        for (const o2 of [-0.19, 0.19]) ballRodTS(st + ot + o2, ss, sy + 0.56, st + ot + o2, ss, sy + 2.20, 0.012);
+        ballBoxTS(st + ot - 0.24, st + ot + 0.24, ss - 0.10, ss + 0.10, sy + 0.52, sy + 0.58);
+      }
+      const rt = PLAY.t0 + 3.2, rs = PLAY.s0 + 6.4, ry = yg(rt, rs);
+      ballRodTS(rt, rs, ry - 0.1, rt, rs, ry + 0.40, 0.075);
+      ballBoxTS(rt - 0.62, rt + 0.62, rs - 0.20, rs + 0.20, ry + 0.40, ry + 0.62);
+      ballBoxTS(rt - 0.10, rt + 0.10, rs - 0.30, rs + 0.30, ry + 0.62, ry + 0.94);
+      // The turf it all stands on, which is not where `surfaceY` is out here.
+      ballPads.push({ t0: PLAY.t0, t1: PLAY.t1, s0: PLAY.s0, s1: PLAY.s1, y: (t, s) => yg(t, s) + 0.04 });
+    }
     b = back8;
   }
 
@@ -29950,6 +30061,7 @@ async function buildJadrija(scene) {
     a: (r.t1 - r.t0) * 0.5, c: (r.s1 - r.s0) * 0.5,
     h: r.h, y: r.y,
     ...(r.kab ? { kab: r.kab, off: r.kab === 'in' } : {}),
+    ...(r.ball === false ? { ball: false } : {}),
   }));
   // The trees. Squared off to the trunk, not to the crown — being stopped by
   // foliage two metres over your head is worse than walking through it.
@@ -31881,6 +31993,9 @@ async function buildJadrija(scene) {
       laugh: (who, d) => (audio && audio.lickLaugh ? audio.lickLaugh(who, d) : false),
       laughStop: (who) => { if (audio && audio.lickLaughStop) audio.lickLaughStop(who); },
       lickWarm: () => { if (audio && audio.lickWarm) audio.lickWarm(); },
+      // THE FETCH — the beach ball, which is built just below him and so is
+      // asked for, not handed over. See `── THE BEACH BALL ──`.
+      ball: () => (ball ? ball.api : null),
       others: (x, z, pad, fn) => {
         const n = bodies(x, z, pad);
         for (let i = 0; i < n; i++) if (bodyBuf[i].kind !== 'doodle') fn(bodyBuf[i]);
@@ -31888,6 +32003,209 @@ async function buildJadrija(scene) {
     });
   } catch (e) {
     console.warn('doodle failed:', e.message);
+  }
+
+  // ── THE BEACH BALL ─────────────────────────────────────────────────────────
+  //
+  // Misha, 26 Sep 2026: the ball for the Slow Doodle — see src/43-ball.js for
+  // the ball, `avbdBall` in 43-avbd.js for the solver it runs on, and `── the
+  // fetch ──` in 43-doodle.js for him. What this file lends it is the world:
+  // the ground you stand on with the sea bed under the water, the sea, the
+  // boxes the person collider keeps you out of, and everybody's body.
+  let ball = null;
+  let ballYou = null;         // where you are standing this frame, or null
+
+  // (t, s) near the ball, fast. `local` is a search down the whole traced
+  // shore and the ground is asked a dozen times a step, each a few
+  // centimetres from the last; within a metre and a half of the last answer
+  // the frame there is straight to a couple of millimetres, so it is used.
+  const ballFr = { x: NaN, z: NaN, t: 0, s: 0, ux: 1, uz: 0, nx: 0, nz: 1 };
+  const _bts = [0, 0];
+  function ballTS(x, z) {
+    const F = ballFr;
+    const dx = x - F.x, dz = z - F.z;
+    if (!(dx * dx + dz * dz < 2.25)) {
+      const [t, s] = local(x, z);
+      const st = at(t);
+      F.x = x; F.z = z; F.t = t; F.s = s; F.ux = st.ux; F.uz = st.uz; F.nx = st.nx; F.nz = st.nz;
+      _bts[0] = t; _bts[1] = s;
+      return _bts;
+    }
+    _bts[0] = F.t + dx * F.ux + dz * F.uz;
+    _bts[1] = F.s + dx * F.nx + dz * F.nz;
+    return _bts;
+  }
+
+  /**
+   * The ground under the ball: `walkY`'s answer, taken in the same order, with
+   * two differences. Seaward of the quay it is the SEA BED and not the lip —
+   * `walkY` answers the lip out over the water so that you cannot walk off
+   * the edge, and a ball is allowed to — and on the two playgrounds it is the
+   * pads they are actually drawn on.
+   */
+  function ballFloor(x, z, y) {
+    const ts = ballTS(x, z), t = ts[0], s = ts[1];
+    if (vik) {
+      const f = vik.floorAt(t, s, y);
+      if (f != null) return f;
+    }
+    if (onMoleY(t, s)) return JET.top;
+    const bed = bedAtTS(t, s);
+    if (bed) return bed.y;
+    const mo = onMole(x, z);
+    if (mo != null) return mo;
+    // The quay goes down `JAD.quay` under the water before it meets the bed
+    // (the terrain there is a 30 m grid and says less), so no shallower.
+    if (s < 0 && t > -5 && t < LEN + 5) return Math.min(groundAt(x, z), -JAD.quay);
+    if (t < -5 || t > LEN + 5 || s < -3 || s > JAD.back + JAD.bleed) return Math.max(groundAt(x, z), 0);
+    let f = standY(t, s);
+    for (const P of ballPads) {
+      if (t > P.t0 && t < P.t1 && s > P.s0 && s < P.s1) f = Math.max(f, P.y(t, s));
+    }
+    return f;
+  }
+  /** The sea's surface under (x, z), or NaN where it is not sea. */
+  function ballWater(x, z) {
+    const ts = ballTS(x, z), t = ts[0], s = ts[1];
+    if (s >= 0 && t > -5 && t < LEN + 5) return NaN;
+    if (onMoleY(t, s) || onMole(x, z) != null) return NaN;
+    return typeof seaHeightAt === 'function' ? seaHeightAt(x, z) : 0;
+  }
+
+  // The boxes, in the world, binned along the shore so a query is a couple of
+  // bins and not eight hundred boxes. Built the first time the ball is out:
+  // the kabina and the vikendica have added theirs by then.
+  const BALL_BIN = 4;
+  let ballBins = null, ballRodBins = null, ballStamp = 0;
+  function ballBoxOf(t, s, a, c, y0, h, rot, kab, ref) {
+    const st = at(t);
+    const co = Math.cos(rot), sn = Math.sin(rot);
+    return { t, x: st.x + st.nx * s, z: st.z + st.nz * s, y: y0 + h * 0.5,
+      ux: co * st.ux + sn * st.nx, uz: co * st.uz + sn * st.nz,
+      a, hy: h * 0.5, c, kab: kab || null, ref: ref || null, ext: a + c, seen: 0 };
+  }
+  function ballBin(map, o) {
+    for (let k = Math.floor((o.t - o.ext) / BALL_BIN); k <= Math.floor((o.t + o.ext) / BALL_BIN); k++) {
+      let l = map.get(k);
+      if (!l) { l = []; map.set(k, l); }
+      l.push(o);
+    }
+  }
+  function ballWorldInit() {
+    ballBins = new Map();
+    for (const b of blockers) {
+      // The kabina's walls went into the list shrunk by your girth, and the
+      // thin ones came out inside-out: the room's own shell is used instead,
+      // below. And anything that asked to be left out of the ball's world
+      // (`ball: false` — the second playground's solid block).
+      if (b.kab || b.ball === false) continue;
+      if (!(b.a > 0) || !(b.c > 0) || !(b.h > 0)) continue;
+      // `b.y` is two things in this list (see `showAhead`): a world height
+      // where it is positive, the shore frame's zero where it is not.
+      ballBin(ballBins, ballBoxOf(b.t, b.s, b.a, b.c, b.y > 0 ? b.y : standY(b.t, b.s), b.h, b.rot || 0, null, b));
+    }
+    if (special) {
+      for (const [room, kab] of [[special.small, 'out'], [special.big, 'in']]) {
+        for (const [t0, t1, s0, s1] of room.shell) {
+          ballBin(ballBins, ballBoxOf((t0 + t1) * 0.5, (s0 + s1) * 0.5, (t1 - t0) * 0.5, (s1 - s0) * 0.5,
+            special.y0, KAB.ceil, 0, kab));
+        }
+      }
+    }
+    for (const B of ballExtraBoxes) ballBin(ballBins, B);
+    ballRodBins = new Map();
+    for (const R of ballRods) ballBin(ballRodBins, R);
+  }
+  function ballBoxes(x, z, r, put) {
+    if (!ballBins) ballWorldInit();
+    const t = ballTS(x, z)[0];
+    const inside = !!(special && special.inside);
+    ballStamp++;
+    for (let k = Math.floor((t - r) / BALL_BIN); k <= Math.floor((t + r) / BALL_BIN); k++) {
+      const l = ballBins.get(k);
+      if (!l) continue;
+      for (const B of l) {
+        if (B.seen === ballStamp) continue;
+        B.seen = ballStamp;
+        if (B.kab && (B.kab === 'in') !== inside) continue;
+        if (B.ref && B.ref.off) continue;
+        const dx = x - B.x, dz = z - B.z, lim = r + B.ext;
+        if (dx * dx + dz * dz > lim * lim) continue;
+        put(B.x, B.y, B.z, B.ux, B.uz, B.a, B.hy, B.c);
+      }
+    }
+  }
+
+  // Everybody's body, as capsules, in the ball's own ids (see `world.cid` in
+  // `avbdBall`): you 1, the creature 10-19, Baye 20-50, the crowd 300-499,
+  // the playground's rods from 500.
+  const _bbP = new THREE.Vector3(), _bbV = new THREE.Vector3(), _bbQ = new THREE.Quaternion();
+  function ballCaps(x, z, r, add) {
+    const Y = ballYou;
+    if (Y) {
+      const dx = x - Y.x, dz = z - Y.z;
+      if (dx * dx + dz * dz < (r + 0.4) * (r + 0.4)) add(1, Y.x, Y.y + 0.22, Y.z, Y.x, Y.y + 1.46, Y.z, 0.19, 0.19);
+    }
+    if (doodle && !doodle.far) doodle.ballCaps(x, z, r, add);
+    // Her, as the cuff chain sees her: CHAIN_BODY's capsules on her bones —
+    // v1.0's skeleton, which is posed whichever of the two is drawn (v2.0
+    // is driven off it, see `apprenticeStep`), so it is asked whether either
+    // of them is visible and not whether v1.0 is.
+    const herOn = skinFig && show && (skinFig.mesh.visible
+      || (APPR.primary && appr && appr.mesh.visible));
+    if (herOn) {
+      const p = skinFig.mesh.position, dx = x - p.x, dz = z - p.z;
+      if (dx * dx + dz * dz < (r + 1.3) * (r + 1.3)) {
+        const caps = chainCapsules(), M = skinFig.mesh.matrixWorld;
+        for (let k = 0; k < caps.length && k < 31; k++) {
+          const cp = caps[k];
+          skinFig.boneAt(cp.bone, _bbP);
+          skinFig.boneTurn(cp.bone, _bbQ);
+          _bbV.set(cp.a[0] - cp.head.x, cp.a[1] - cp.head.y, cp.a[2] - cp.head.z)
+            .applyQuaternion(_bbQ).add(_bbP).applyMatrix4(M);
+          const ax = _bbV.x, ay = _bbV.y, az = _bbV.z;
+          _bbV.set(cp.e[0] - cp.head.x, cp.e[1] - cp.head.y, cp.e[2] - cp.head.z)
+            .applyQuaternion(_bbQ).add(_bbP).applyMatrix4(M);
+          add(20 + k, ax, ay, az, _bbV.x, _bbV.y, _bbV.z, cp.r0, cp.r1);
+        }
+      }
+    }
+    // The crowd, as their discs stood up: a bather is a column. Not her own
+    // column, which is the collider's cylinder round the body just above.
+    const n = bodies(x, z, r);
+    const hp = herOn ? skinFig.mesh.position : null;
+    for (let i = 0; i < n; i++) {
+      const b = bodyBuf[i];
+      if (b.kind === 'doodle') continue;
+      if (hp && (b.x - hp.x) * (b.x - hp.x) + (b.z - hp.z) * (b.z - hp.z) < 0.09) continue;
+      add(300 + (i % 200), b.x, b.y0 + b.r, b.z, b.x, Math.max(b.y0 + b.r, b.top - b.r), b.z, b.r, b.r);
+    }
+    // The playground's posts, legs, chains and slide.
+    if (!ballRodBins) ballWorldInit();
+    const t = ballTS(x, z)[0];
+    ballStamp++;
+    for (let k = Math.floor((t - r) / BALL_BIN); k <= Math.floor((t + r) / BALL_BIN); k++) {
+      const l = ballRodBins.get(k);
+      if (!l) continue;
+      for (const R of l) {
+        if (R.seen === ballStamp) continue;
+        R.seen = ballStamp;
+        const dx = x - R.mx, dz = z - R.mz, lim = r + R.ext + R.r;
+        if (dx * dx + dz * dz > lim * lim) continue;
+        add(500 + R.i, R.p[0], R.p[1], R.p[2], R.p[3], R.p[4], R.p[5], R.r, R.r, BALL.e, BALL.mu);
+      }
+    }
+  }
+
+  try {
+    ball = buildBall(scene, {
+      floor: ballFloor, water: ballWater, boxes: ballBoxes, caps: ballCaps,
+      local: (x, z) => { const ts = ballTS(x, z); return [ts[0], ts[1]]; },
+      inland: (x, z, out) => { const st = at(ballTS(x, z)[0]); out[0] = st.nx; out[1] = st.nz; },
+      sheltered: (x, z) => { const ts = ballTS(x, z); return ts[1] > JAD.lip && ts[1] < JAD.back + 4; },
+    });
+  } catch (e) {
+    console.warn('ball failed:', e.message);
   }
 
   // ── THE SLOW LICK, the half of it that happens to her ─────────────────────
@@ -52097,6 +52415,12 @@ async function buildJadrija(scene) {
     // looking — before he is stepped. See `lickSeen`.
     lickSeen(cam, at, dir);
     if (doodle) doodle.step(cam, { t: pt, s: ps }, dt);
+    // The beach ball, after him, so the capsules it is pushed by are where
+    // he has just put them. See `── THE BEACH BALL ──`.
+    if (ball) {
+      ballYou = at || null;
+      ball.step(dt, cam);
+    }
     if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
 
@@ -52641,6 +52965,7 @@ async function buildJadrija(scene) {
           out.push(...shadow.castTree(r.veh, { dynamic: true, near: true }));
         }
         if (doodle) out.push(doodle.fig.cast(shadow, { near: true }));
+        if (ball) out.push(...shadow.castTree(ball.mesh, { dynamic: true, near: true }));
         return out;
       },
     },
@@ -53679,6 +54004,20 @@ async function buildJadrija(scene) {
      * gone for, or a key of DOODLE_LICK_WHY for why not. `who` forces one.
      */
     doodleLick: (who) => (doodle ? doodle.api.lick(who) : 'nodog'),
+    /** The beach ball's handle — see `api` in src/43-ball.js. */
+    ball: ball ? ball.api : null,
+    /** Debug: the capsules the ball would meet round (x, z), as it sees them. */
+    ballCapsAt: (x, z, r = 1.5) => {
+      const out = [];
+      ballCaps(x, z, r, (id, ax, ay, az, bx, by, bz, r0, r1) => out.push([id,
+        ...[ax, ay, az, bx, by, bz, r0, r1].map((v) => +v.toFixed(3))]));
+      return out;
+    },
+    /**
+     * "Fetch" — the creature, after the ball wherever it is. What he answers
+     * is a key of DOODLE_FETCH_WHY, or who he is bringing it to.
+     */
+    doodleFetch: (o) => (doodle ? doodle.api.fetch(o) : 'nodog'),
     /** Debug: who there is to lick, and whether she is held for it. */
     lickFaces: () => lickFaces(),
     lickHeld: () => (lickOn ? { k: +lickOn.k.toFixed(3), c: +lickOn.c.toFixed(3),

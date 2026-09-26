@@ -548,6 +548,21 @@ addEventListener('keydown', (e) => {
     if (got === 'no cream') toast(T('cream.none'));
     return;
   }
+  // [ — the beach ball: out of the satchel and thrown, or, standing over it,
+  // back into the satchel. See `ballKey` and src/43-ball.js.
+  //
+  // THE OTHER BRACKET, for the reason the phone took the first: every letter
+  // is bound here, the apostrophe is the bag and ] is the phone out of it,
+  // and [ is the last mark under that hand — one key along from the phone,
+  // which is where the other thing you carry in that bag belongs. Checked
+  // before taking it: 'BracketLeft' appeared nowhere in src/. Below the pause
+  // guard, unlike those two: a throw acts on the world.
+  if (e.code === 'BracketLeft') {
+    e.preventDefault();
+    const got = ballKey();
+    if (got.toast) toast(T(got.toast));
+    return;
+  }
   // And the menu at a counter. Two keys rather than one, so that E means buy
   // and only buy: a key that cycled AND bought is a key that buys the wrong
   // thing the moment you press it once too often.
@@ -1068,6 +1083,117 @@ const PET_REACH = 0.95;      // and how close the hand comes up from
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
 const THUMB_D = 1.8;         // how far off her lip the button means the thumb
 const THUMB_STAND = 0.45;    // and where you stop, eye to lip
+
+// ── THE BEACH BALL, out of your hand ─────────────────────────────────────────
+//
+// Misha, 26 Sep 2026: the ball for the Slow Doodle. `[` (or "throw the ball")
+// brings your hand up into view with it, and at the top of that it leaves
+// your hand along where you are looking — see BALL in src/43-ball.js for the
+// speed and the numbers, and `── the fetch ──` in 43-doodle.js for what he
+// does about it. `throwT` is the gesture's clock (−1 when there is none),
+// `throwK` how far out the hand is, `throwAt` where it is going.
+let throwT = -1, throwK = 0, throwDone = false;
+const throwAt = new THREE.Vector3();
+const _thF = new THREE.Vector3(), _thR = new THREE.Vector3(), _thU = new THREE.Vector3();
+let ballFetchSaid = null;       // what the creature said to the last throw, for a probe
+
+/**
+ * The key, and the voice's way into it. Out of the bag and thrown; or, when
+ * it is lying within reach, back into the bag. Answers `{ got, toast }` —
+ * `toast` an i18n key or nothing.
+ */
+function ballKey() {
+  const B = jadrija && jadrija.ball;
+  if (!B) return { got: 'noball', toast: null };
+  // IN THE SEA: he will not go in after it — see the fetch's `sad` — so
+  // somebody has to. Swim up to it and it comes back into the bag; it does
+  // not get thrown from the water.
+  if (state.phase === 'swim' && swim && swim.you && B.where === 'out') {
+    const I = B.info(), Y = swim.you;
+    const dh = Math.hypot(I.x - Y.x, I.z - Y.z);
+    if (dh < BALL.pick && Math.abs(I.y - Y.y) < 1.2) {
+      B.stow();
+      satchelPut('ball');
+      return { got: 'picked', toast: 'ball.picked', far: +dh.toFixed(2) };
+    }
+    return { got: 'away', toast: 'ball.away', far: +dh.toFixed(1) };
+  }
+  if (state.phase !== 'ground' || !ground || !ground.ok || !ground.you) return { got: 'foot', toast: 'ball.foot' };
+  if (throwT >= 0) return { got: 'throwing', toast: null };
+  if (B.where === 'out') {
+    const I = B.info(), Y = ground.you;
+    const dh = Math.hypot(I.x - Y.x, I.z - Y.z), dy = I.y - Y.y;
+    if (dh < BALL.pick && dy > -0.9 && dy < 2.3) {
+      B.stow();
+      satchelPut('ball');
+      return { got: 'picked', toast: 'ball.picked', far: +dh.toFixed(2) };
+    }
+    return { got: 'away', toast: 'ball.away', far: +dh.toFixed(1) };
+  }
+  if (B.where === 'held') return { got: 'held', toast: null };
+  if (!satchelHas('ball')) return { got: 'noball', toast: null };
+  throwT = 0;
+  throwDone = false;
+  ballHand();
+  // Drawn in your hand from the first frame of the gesture: `hold` is the
+  // same door the creature's mouth uses.
+  B.hold(() => [throwAt.x + _thF.x * BALL.r, throwAt.y + _thF.y * BALL.r, throwAt.z + _thF.z * BALL.r]);
+  return { got: 'thrown', toast: null };
+}
+
+/** Where your hand is going: BALL.hand in the eye's frame, into `throwAt`. */
+function ballHand() {
+  camera.getWorldDirection(_thF);
+  _thU.set(0, 1, 0);
+  _thR.crossVectors(_thF, _thU).normalize();
+  _thU.crossVectors(_thR, _thF).normalize();
+  const H = BALL.hand;
+  if (bodyCam && ground && ground.you) {
+    // In the third person the camera is not where you are: from your chest.
+    const Y = ground.you;
+    throwAt.set(Y.x, Y.y + 1.35, Y.z).addScaledVector(_thF, H[0]);
+    return;
+  }
+  throwAt.copy(camera.position).addScaledVector(_thF, H[0]).addScaledVector(_thR, H[1])
+    .addScaledVector(_thU, H[2]);
+}
+
+/** The gesture, once a frame: up, let go at the top, and down again. */
+function ballThrowTick(dt) {
+  if (throwT < 0) { throwK = damp(throwK, 0, 8, dt); return; }
+  const B = jadrija && jadrija.ball;
+  if (!B || state.phase !== 'ground') {
+    if (B && B.where === 'held' && !throwDone) B.stow();
+    throwT = -1;
+    return;
+  }
+  throwT += dt;
+  ballHand();
+  if (throwT < BALL.windup) {
+    const u = throwT / BALL.windup;
+    throwK = u * u * (3 - 2 * u);
+    return;
+  }
+  if (!throwDone) {
+    throwDone = true;
+    throwK = 1;
+    if (!satchelTake('ball')) { B.stow(); throwT = -1; return; }
+    // Along the look, lifted by `loft`, and out of the palm: the ball's
+    // centre a radius in front of the hand.
+    const vx = _thF.x, vy = _thF.y + BALL.loft, vz = _thF.z;
+    const l = Math.hypot(vx, vy, vz) || 1;
+    const k = BALL.throwV / l;
+    B.throwFrom(throwAt.x + _thF.x * BALL.r, throwAt.y + _thF.y * BALL.r, throwAt.z + _thF.z * BALL.r,
+      vx * k, vy * k, vz * k);
+    // And the creature, if he heard it: he answers who he is bringing it to,
+    // or why not — which is said only when it was asked for in words.
+    ballFetchSaid = jadrija.doodleFetch ? jadrija.doodleFetch() : 'nodog';
+    return;
+  }
+  const u = (throwT - BALL.windup) / BALL.follow;
+  throwK = Math.max(0, 1 - u);
+  if (u >= 1) throwT = -1;
+}
 const THUMB_WALK = 1.3;      // m/s you step in at
 let camMode = 0;
 const camPos = new THREE.Vector3();
@@ -1678,6 +1804,7 @@ const HELP = [
     // sheet, and ] is new. See src/62-satchel.js and src/63-phone.js.
     ["'", 'help.k.bag'],
     [']', 'help.k.cell'],
+    ['[', 'help.k.ball'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -7603,7 +7730,12 @@ function frame() {
   if (arms) {
     // Not during the establishing shot: the camera is sixteen metres up and a
     // pair of arms drawn over the top of it is a pair of arms in the sky.
+    ballThrowTick(dt);
     arms.update(dt, chaseCut || bodyCam ? null
+      // The throw — see `ballThrowTick`. The cupped hand, because it has a
+      // ball in it; ahead of the others, because it is over in half a second.
+      : state.phase === 'ground' && throwK > 0.01
+        ? { reach: { x: throwAt.x, y: throwAt.y, z: throwAt.z, k: throwK, kind: 'cup' } }
       : state.phase === 'ground' && thumbK > 0.01 && thumbAt
         ? { reach: { x: thumbAt.x, y: thumbAt.y, z: thumbAt.z, k: thumbK } }
         : state.phase === 'ground' && cupK > 0.01 && cupAt
@@ -8001,6 +8133,10 @@ function frame() {
   // And the near plane held while a hand is out: it tracks her body and she
   // sways, and a projection that changes every frame is the room wobbling.
   if (thumbK > 0.3 || cupK > 0.3 || petK > 0.3) wantNear = camera.near;
+  // And the beach ball in your hand, which is half a metre from your eye:
+  // inside the promenade's 1.2 m front plane it is not drawn at all, and the
+  // hand came up empty. For the half second the throw lasts.
+  if (throwT >= 0) wantNear = Math.min(wantNear, 0.08);
   if (Math.abs(camera.near - wantNear) > 0.005) {
     camera.near = wantNear;
     camera.updateProjectionMatrix();
@@ -8863,6 +8999,48 @@ window.__fr = {
         const w = jadrija.toWorld(tc, sc);
         return __fr.jad.stand(tc, sc, Math.atan2(w[0] - st.at[0], w[2] - st.at[2]));
       },
+    },
+    /**
+     * The beach ball — see src/43-ball.js, and the fetch in 43-doodle.js.
+     *
+     *   __fr.jad.ball.stats()             where it is, the solver, ms a frame
+     *   __fr.jad.ball.key()               the [ key: throw it, or pick it up
+     *   __fr.jad.ball.aim(yaw, pitch)     turn your head first (radians)
+     *   __fr.jad.ball.put(x, y, z, vx, vy, vz)  out of the bag, into the world
+     *   __fr.jad.ball.stow()              and back into the bag from anywhere
+     *   __fr.jad.ball.trace(clear)        its path, frame by frame
+     *   __fr.jad.ball.fetch('baye')       send him after it; fetchStats() after
+     */
+    ball: {
+      api: () => (jadrija && jadrija.ball) || null,
+      stats: () => (jadrija && jadrija.ball ? jadrija.ball.stats() : null),
+      info: () => (jadrija && jadrija.ball ? jadrija.ball.info() : null),
+      key: () => ballKey(),
+      aim: (yaw, pitch = 0) => {
+        if (!ground || !ground.you) return null;
+        ground.you.yaw = yaw;
+        ground.you.pitch = pitch;
+        return true;
+      },
+      put: (x, y, z, vx = 0, vy = 0, vz = 0) => {
+        const B = jadrija && jadrija.ball;
+        if (!B) return null;
+        if (B.where === 'bag') satchelTake('ball');
+        B.drop(x, y, z, vx, vy, vz);
+        return B.stats();
+      },
+      stow: () => {
+        const B = jadrija && jadrija.ball;
+        if (!B) return null;
+        if (B.where !== 'bag') { B.stow(); satchelPut('ball'); }
+        return B.where;
+      },
+      trace: (clear) => (jadrija && jadrija.ball ? jadrija.ball.trace(clear) : null),
+      reset: () => (jadrija && jadrija.ball ? jadrija.ball.resetStats() : null),
+      fetch: (who) => (jadrija && jadrija.doodleFetch ? jadrija.doodleFetch(who ? { who } : {}) : null),
+      fetchStats: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().fetchStats() : null),
+      fetchTrace: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().fetchTrace() : null),
+      said: () => ballFetchSaid,
     },
     /**
      * Debug: the four trampoline beds, and standing on one of them.

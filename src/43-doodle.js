@@ -49,6 +49,14 @@
 // in 43-jadrija.js for what it does to her, and `doodleLickView` at the
 // bottom of this file for what it does to you.
 //
+// AND THE FETCH, his second. Misha, 26 Sep 2026: the ball for the Slow
+// Doodle — the beach ball in 43-ball.js, a real one on the AVBD solver. You
+// throw it; he watches it go for a beat (he is still the slow one), gallops
+// after it, noses it on a time or two with his snout — which pushes it for
+// real, being a capsule in the ball's world — picks it up and walks it back,
+// and drops it at your feet. Or at hers. In the sea or up on something he
+// cannot have it, and says so with a yawn. See `── the fetch ──` below.
+//
 // The state machine is a `mode` and a `timer` and nothing that knows about the
 // promenade beyond what `J` hands in, so a task later is a new mode.
 //
@@ -212,6 +220,84 @@ const DOODLE_LICK = {
 };
 
 /**
+ * THE FETCH. Misha, 26 Sep 2026: the ball for the Slow Doodle — the beach
+ * ball in src/43-ball.js, which you throw (`[`, or "throw the ball") and he
+ * goes after. See `── the fetch ──` inside `buildDoodle`. Metres, seconds,
+ * radians; the pose numbers were measured off his rig in the game.
+ */
+const DOODLE_FETCH = {
+  // He hears "fetch" from as far as he hears "lick", and will go this far for
+  // the ball — a long throw from the far end of his stretch and then some.
+  hear: 25,
+  reach: 40,
+  // THE BEAT OF SLOWNESS. The ball goes and he watches it go: a second or so
+  // of looking, turning his head after it, before he believes it — and never
+  // before it has come down and is going slower than `settle`.
+  notice: [0.7, 1.6],
+  settle: 3.0,
+  // Where the run ends: his root this far short of the ball's centre. His
+  // nose is 0.70 m ahead of his root standing, so this is his nose a
+  // hand's breadth off the vinyl.
+  short: 0.85,
+  // Under this far he walks up to it rather than galloping.
+  walkIn: 2.2,
+  // The dribble: how many times he noses it on before he picks it up.
+  nudges: [1, 2],
+  nudgeRate: 1.1,          // walk clip rate going at it, 0.62 m/s
+  flick: 0.26,             // s of the head flick that sends it
+  flickAmp: 0.50,          // rad of neck, head-down to head-up, in the flick
+  watch: [0.6, 2.8],       // s of watching it roll: at least, at most
+  // THE POSE, nose down to the ball. `u` from 0 (as the clip has him) to 1:
+  // the body pitched nose-down about his middle, the forelegs reached forward
+  // so his front stays on the floor, and the neck bowed. MEASURED at 1: nose
+  // 0.19 m above the floor his paws are on, 0.58 ahead of his root, with the
+  // front paws 0.55 ahead — the ball between his forelegs, his nose on it —
+  // and his root 2 cm lower. (A search over body pitch, forelegs, elbows,
+  // hocks and neck; this is the one that keeps both pairs of paws down and
+  // bends nothing the wrong way.)
+  bowBody: 0.15, bowLegs: 0.40, bowNeck: 1.8, bowDrop: 0.02,
+  bowT: 0.45,              // s to get his nose down to it
+  jaw: 0.55,               // rad of mouth, open for it
+  bite: 0.26,              // and closed on it
+  // Where the ball's centre is while he has it: on his head bone, in his bind
+  // frame — just ahead of and under his nose leather, between his jaws.
+  mouth: [0.70, 0.70, 0],
+  // Coming back. Not a gallop: the gallop in was the joke, and he brings it
+  // back at a walk — twice his stroll, 0.74 m/s, which is a proud walk for
+  // him and a slow one for anybody else — head a little down with it.
+  carryRate: 1.3,
+  carryBow: 0.22,
+  // Where he lets go: his root this far from your feet, on the side he came
+  // from — his nose is then about half a metre short of you — and a nudge
+  // of this much as it leaves his mouth, so it rolls to you.
+  dropAt: 1.30,
+  dropV: 0.55,
+  wait: [1.2, 2.4],        // s of looking at you after
+  // AND WHEN HE CANNOT HAVE IT. In the sea — he does not swim; the quay is a
+  // metre or two above the water — or on top of something. He goes to the
+  // nearest place he can stand, looks at it for `sadLook`, and yawns.
+  sadLook: [2.5, 3.5],
+  edgeS: 0.85,             // s of the lip he stands on, looking at the water
+  high: 0.35,              // m off the floor under it that is out of his reach
+  // Sometimes he takes it to Baye instead, if she is near you and free.
+  herChance: 0.3,
+  herNear: 8,
+  give: 80,                // s from the command to giving up on the whole thing
+};
+
+/** What to tell you when he will not fetch — after "doodle: ". */
+const DOODLE_FETCH_WHY = {
+  nodog: 'there is no Slow Doodle here',
+  noball: 'there is no ball',
+  bag: 'the ball is in your satchel — throw it first ( [ )',
+  far: 'he is too far away to hear you',
+  toofar: 'the ball is too far away for him',
+  busy: 'he is in the middle of licking somebody',
+  held: 'he already has it',
+  already: 'he is already after it',
+};
+
+/**
  * What the lick is doing to YOUR view — see `doodleLickView` at the bottom of
  * the file. Written by the dog's step, read by the frame loop.
  */
@@ -225,6 +311,7 @@ const DOODLE_LICK_WHY = {
   nodog: 'there is no Slow Doodle here',
   far: 'he is too far away to hear you',
   busy: 'he is already licking somebody',
+  fetching: 'he is busy with the ball',
   blocked: 'there is no way through to anybody\'s face',
   // And hers, when she was asked for by name — see `lickWhyNot` in
   // 43-jadrija.js. Asked for either, he just goes for you instead.
@@ -272,6 +359,7 @@ function doodleBodyGLSL() {
  *   local(x, z), walkY(x, z)        world to shore frame, and the floor there
  *   lickFaces()                     who there is to lick — see the slow lick
  *   lickHer(o), slurp, laugh, ...   and what it does to them
+ *   ball()                          the beach ball's `api` — see the fetch
  *
  * Returns null when there is no payload, so the promenade is exactly what it
  * was without him.
@@ -991,6 +1079,8 @@ async function buildDoodle(scene, J) {
    * key of DOODLE_LICK_WHY.
    */
   function lickCmd(who = null) {
+    // With the ball in his mouth, or on his way to it, he is busy.
+    if (d.mode === 'fetch') return 'fetching';
     // On his way off after one he can be sent again — and turns round and
     // runs, which is the joke told twice. In the middle of one he cannot.
     if (d.mode === 'lick' && d.lk.stage !== 'off') return 'busy';
@@ -1507,6 +1597,502 @@ async function buildDoodle(scene, J) {
     note('lick.done');
   }
 
+  // ── the fetch ────────────────────────────────────────────────────────────
+  //
+  // Misha, 26 Sep 2026: the ball for the Slow Doodle. His second superpower,
+  // and the one with nobody's face in it. Seven stages on `d.fx.stage`, all of
+  // them `mode` 'fetch', which takes his neck away from `lookStep` for the
+  // length of it, as the lick does:
+  //
+  //   notice  he watches it go — the beat of slowness that is his whole
+  //           character — turning after it, until it is down and slowing
+  //   go      the gallop to it (a walk, when it is only a couple of metres),
+  //           along a route round the furniture, re-aimed as it rolls
+  //   nudge   head down, walking into it, and a flick of the head that sends
+  //           it on: his snout is a capsule in the ball's world (`ballCaps`),
+  //           so what moves the ball is his snout and nothing else
+  //   watch   and he watches it roll, and goes after it again
+  //   grab    up to it, nose down, mouth open, and it is in his mouth
+  //   back    to you (or to her), at a walk, carrying it
+  //   drop    head down, mouth open, and it rolls the last half metre to you
+  //
+  // And `sad`, for a ball he cannot have: in the sea, or up on something. He
+  // goes to the nearest place he can stand, looks at it, and yawns.
+  //
+  // THE POSE is `u`, one number, as the lick's rear is `s`: `fetchAims`. It
+  // is aims over whatever clip is playing — the walk, while he dribbles and
+  // carries — so his legs keep walking under a head that is down.
+  const FT = DOODLE_FETCH;
+  for (const n of ['Body', 'FrontLowerLeg.L', 'FrontLowerLeg.R', 'BackLowerLeg.L', 'BackLowerLeg.R',
+    'FF.L', 'FF.R', 'FFB.L', 'FFB.R']) bi[n] = fig.boneIndex(n);
+  const FETCH_BONES = ['Body', 'BackShoulder.L', 'BackShoulder.R', 'Tail1',
+    'FrontUpperLeg.L', 'FrontUpperLeg.R', 'Neck1', 'Neck2', 'Head', 'Jaw'];
+  function fetchClear() { for (const n of FETCH_BONES) fig.aim(n, 0, 1, 0, 0); }
+  /**
+   * Nose down by `u`, the neck lifted back by `lift` (the flick), the mouth
+   * open by `jaw`. All about figure z, his lateral axis, as the rear is.
+   */
+  function fetchAims(u, lift = 0, jaw = 0) {
+    const p = FT.bowBody * u, nk = FT.bowNeck * u - lift;
+    fig.aim('Body', 0, 0, 1, -p);
+    fig.aim('BackShoulder.L', 0, 0, 1, p);
+    fig.aim('BackShoulder.R', 0, 0, 1, p);
+    fig.aim('Tail1', 0, 0, 1, p * 0.5);
+    fig.aim('FrontUpperLeg.L', 0, 0, 1, p + FT.bowLegs * u);
+    fig.aim('FrontUpperLeg.R', 0, 0, 1, p + FT.bowLegs * u);
+    fig.aim('Neck1', 0, 0, 1, -nk * 0.45);
+    fig.aim('Neck2', 0, 0, 1, -nk * 0.30);
+    fig.aim('Head', 0, 0, 1, -nk * 0.25);
+    fig.aim('Jaw', 0, 0, 1, -jaw);
+  }
+  /** His head turned toward a bearing (the look, while he is upright). */
+  function fetchLook(e) {
+    const w = clamp(e, -0.75, 0.75) * ySign;
+    fig.aim('Neck1', 0, 1, 0, w * 0.55);
+    fig.aim('Head', 0, 1, 0, w * 0.45);
+  }
+
+  const _fw = new THREE.Vector3(), _fb = new THREE.Vector3();
+  /** The tip of his nose, in the world, off the pose he is in. */
+  function noseAt(out) {
+    mesh.updateMatrixWorld();
+    return onBone(bi.Head, LK.tip, out).applyMatrix4(mesh.matrixWorld);
+  }
+  /** Where the ball's centre is while he has it. */
+  function mouthAt(out) {
+    mesh.updateMatrixWorld();
+    return onBone(bi.Head, FT.mouth, out).applyMatrix4(mesh.matrixWorld);
+  }
+
+  /**
+   * Him, as the ball meets him: his snout, his skull, his body and his four
+   * lower legs, as capsules, in the ids the ball keeps for him (10-19). The
+   * snout is softer than the rest (`eSnout`): it is what nudges.
+   */
+  const _c0 = new THREE.Vector3(), _c1 = new THREE.Vector3();
+  const headBind = bindT[bi.Head].toArray();
+  function ballCaps(x, z, r, add) {
+    const dx = x - mesh.position.x, dz = z - mesh.position.z;
+    if (dx * dx + dz * dz > (r + 1.6) * (r + 1.6)) return;
+    mesh.updateMatrixWorld();
+    const M = mesh.matrixWorld;
+    const F = d.fx;
+    // Nose down on it to pick it up, his snout is not a bat — nor are his
+    // forelegs, which reach forward either side of it as he bows.
+    const mouthing = !!F && (F.stage === 'grab' || F.stage === 'back' || F.stage === 'drop');
+    if (!mouthing) {
+      onBone(bi.Head, [0.52, 0.80, 0], _c0).applyMatrix4(M);
+      onBone(bi.Head, LK.tip, _c1).applyMatrix4(M);
+      add(10, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.05, 0.045, BALL.eSnout, BALL.muBody);
+      onBone(bi.Head, headBind, _c0).applyMatrix4(M);
+      onBone(bi.Head, [0.55, 0.79, 0], _c1).applyMatrix4(M);
+      add(11, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.085, 0.07);
+    }
+    fig.boneAt(bi.Body, _c0).applyMatrix4(M);
+    fig.boneAt(bi.Neck1, _c1).applyMatrix4(M);
+    add(12, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.15, 0.13);
+    let k = 13;
+    for (const [a, b] of [['FrontLowerLeg.L', 'FF.L'], ['FrontLowerLeg.R', 'FF.R'],
+      ['BackLowerLeg.L', 'FFB.L'], ['BackLowerLeg.R', 'FFB.R']]) {
+      if (mouthing && k < 15) { k++; continue; }
+      fig.boneAt(bi[a], _c0).applyMatrix4(M);
+      fig.boneAt(bi[b], _c1).applyMatrix4(M);
+      add(k++, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.035, 0.035);
+    }
+  }
+
+  /**
+   * Send him after the ball. `o.who` 'you' or 'baye' for who he brings it
+   * to, or left out for you (and sometimes her, if she is near you). Answers
+   * who he is bringing it to, or a key of DOODLE_FETCH_WHY.
+   */
+  function fetchCmd(o = {}) {
+    const B = J.ball ? J.ball() : null;
+    if (!B) return 'noball';
+    if (d.mode === 'lick' && d.lk && d.lk.stage !== 'off') return 'busy';
+    if (d.mode === 'fetch') {
+      const F = d.fx, st = F.stage;
+      // Done with the last one — dropped at your feet and waiting, or
+      // yawning at one he could not have — and it is up again: a new one.
+      if (st === 'wait' || st === 'sad' || (st === 'drop' && F.let)) fetchEnd('again');
+      else return st === 'back' || st === 'drop' || (st === 'grab' && F.has) ? 'held' : 'already';
+    }
+    if (B.where === 'bag') return 'bag';
+    if (B.where === 'held') return 'held';
+    const me = d.who;
+    if (d.far || !me || Math.hypot(me.t - d.t, me.s - d.s) > FT.hear) return 'far';
+    const I = B.info();
+    if (Math.hypot(I.t - d.t, I.s - d.s) > FT.reach) return 'toofar';
+    // To her, sometimes, if she is near you and free — see DOODLE_FETCH.
+    let to = o.who === 'baye' ? 'baye' : 'you';
+    if (!o.who) {
+      const faces = J.lickFaces ? J.lickFaces() : null;
+      const her = faces && faces.baye, you = faces && faces.you;
+      if (her && her.ok && you && Math.hypot(her.t - you.t, her.s - you.s) < FT.herNear
+        && Math.random() < FT.herChance) to = 'baye';
+    }
+    if (d.mode === 'lick') {
+      // Walking off after a lick: let whoever it was go.
+      const L = d.lk;
+      if (!L.freed && L.who === 'baye' && J.lickHer) J.lickHer(null);
+      if (L.who === 'you') DOODLE_VIEW.want = 0;
+      d.lkLast = { who: L.who, all: +L.all.toFixed(2), strokes: L.strokes, trace: L.trace };
+      d.lk = null;
+      rearClear();
+      if (tongue) tongue.visible = false;
+    }
+    d.mode = 'fetch'; d.path = null; d.skill = null; d.queue.length = 0;
+    d.pk = null; d.task = null; d.look = 0;
+    fetchClear();
+    lookClear();
+    d.fx = { to, stage: 'notice', t: 0, all: 0, noticeFor: rnd(FT.notice[0], FT.notice[1]),
+      nudges: Math.floor(rnd(FT.nudges[0], FT.nudges[1] + 0.999)), nudged: 0,
+      path: null, wp: 0, re: 0, purpose: null, u: 0, lift: 0, jaw: 0, fl: -1, trace: [],
+      gallops: 0, t0: performance.now() };
+    fig.play('idle', { fade: 0.4 });
+    fig.state.speed = 1;
+    note('fetch.' + to);
+    return to;
+  }
+  function lookClear() { fig.aim('Neck1', 0, 1, 0, 0); fig.aim('Head', 0, 1, 0, 0); }
+
+  /** A bearing in the shore frame from him to (t, s), less his heading. */
+  function bearing(t, s) {
+    let e = Math.atan2(s - d.s, t - d.t) - d.head;
+    while (e > Math.PI) e -= TAU;
+    while (e < -Math.PI) e += TAU;
+    return e;
+  }
+
+  /**
+   * Where to go for the ball, and what for: `ball` (to it), `edge` (the
+   * water's edge nearest it), `under` (as near as he can get to it up on
+   * something). Sets the route; false if there is none.
+   */
+  function fetchPlan() {
+    const c0 = performance.now();
+    const ok = fetchPlanNow();
+    const F = d.fx;
+    F.planMs = Math.max(F.planMs || 0, performance.now() - c0);
+    F.plans = (F.plans || 0) + 1;
+    return ok;
+  }
+  function fetchPlanNow() {
+    const F = d.fx, B = J.ball(), I = B.info();
+    avoid = []; avoidBox = null;
+    let purpose, path = null, g = null;
+    if (I.wet) {
+      purpose = 'edge';
+      g = [I.t, FT.edgeS];
+      path = lkRoute(g);
+    } else {
+      purpose = I.up > FT.high && I.asleep ? 'under' : 'ball';
+      // Where to stand: `short` off it on his side of it, or — when that is
+      // in the furniture, which is where a ball against a wall or under a
+      // bench puts it — round it in a fan until there is somewhere clear he
+      // can get to. Measured before the fan: a ball at rest against the
+      // front of a row of kabine, his side of it 3 cm from the wall, and he
+      // went and yawned at it.
+      const L = Math.hypot(I.t - d.t, I.s - d.s) || 1;
+      const k = Math.min(purpose === 'under' ? 0.9 : FT.short, L);
+      const a0 = Math.atan2(d.s - I.s, d.t - I.t);
+      for (const da of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.2, -2.2, Math.PI]) {
+        const cand = [I.t + Math.cos(a0 + da) * k, I.s + Math.sin(a0 + da) * k];
+        const p = lkRoute(cand);
+        if (p) { g = cand; path = p; break; }
+        if (!g) g = cand;
+      }
+      // Nothing through: near enough is near enough for the ball itself —
+      // the last half metre is his nose, not his feet.
+      if (!path && purpose === 'ball' && Math.hypot(g[0] - d.t, g[1] - d.s) < 1.2) path = [g];
+      // Come at it from anywhere but straight, and it is against something:
+      // nosing it on would be nosing it into the wall. Straight to the grab.
+      if (path && purpose === 'ball' && Math.abs(Math.atan2(g[1] - I.s, g[0] - I.t) - a0) > 0.3
+        && F.nudged < F.nudges) F.nudged = F.nudges;
+    }
+    F.purpose = purpose;
+    F.goal = g;
+    if (!path) return false;
+    F.path = path; F.wp = 0;
+    return true;
+  }
+
+  /** Along `F.path` at `v` m/s with the given clip; answers what is left of the last leg. */
+  function fetchMove(dt, clip, v, rateFor) {
+    const F = d.fx;
+    const g = F.path[Math.min(F.wp, F.path.length - 1)];
+    const last = F.wp >= F.path.length - 1;
+    const dtt = g[0] - d.t, dss = g[1] - d.s;
+    const gap = Math.hypot(dtt, dss);
+    if (!last && gap < 0.35) { F.wp++; return Infinity; }
+    const turn = clip === 'gallop' ? LK.turn : DOODLE.turn * 1.8;
+    let e = Math.atan2(dss, dtt) - d.head;
+    while (e > Math.PI) e -= TAU;
+    while (e < -Math.PI) e += TAU;
+    d.head += Math.sign(e) * Math.min(Math.abs(e), turn * dt);
+    const k = clamp(Math.cos(e), 0.2, 1);
+    const vv = (last ? Math.min(v, 0.6 + 2.5 * gap) : v) * k;
+    fig.play(clip, { fade: 0.25 });
+    fig.state.speed = Math.max(0.35, rateFor(vv));
+    const st = Math.min(vv * dt, gap);
+    d.t += Math.cos(d.head) * st;
+    d.s += Math.sin(d.head) * st;
+    return last ? gap - st : Infinity;
+  }
+  const gallopRate = (v) => v / LK.gallop;
+  const walkRate = (v) => v / DOODLE.walk;
+
+  function fetchEnd(why) {
+    const F = d.fx;
+    const B = J.ball ? J.ball() : null;
+    let dropDist = null;
+    if (B && B.where === 'out') {
+      const faces = J.lickFaces ? J.lickFaces() : null;
+      const T = faces && (F.to === 'baye' ? faces.baye : faces.you);
+      const I = B.info();
+      if (T && T.x != null) dropDist = Math.hypot(I.x - T.x, I.z - T.z);
+    }
+    d.fxLast = { to: F.to, why, all: +F.all.toFixed(2), nudged: F.nudged, hits: F.hits || 0, dropDist, trace: F.trace,
+      planMs: +(F.planMs || 0).toFixed(2), plans: F.plans || 0,
+      stages: F.stages || null };
+    d.fx = null;
+    fetchClear();
+    lookClear();
+    d.mode = 'pause';
+    d.timer = rnd(DOODLE.pause[0], DOODLE.pause[1]);
+    fig.play('idle', { fade: 0.6 });
+    fig.state.speed = 1;
+    note('fetch.' + why);
+  }
+
+  function fetchStage(st) {
+    const F = d.fx;
+    (F.stages || (F.stages = [])).push([st, +F.all.toFixed(2)]);
+    F.stage = st; F.t = 0; F.re = 0; F.planAt = null;
+  }
+
+  /** One frame of it: the stage, the clip, the aims, and where he is. */
+  function fetchStep(dt) {
+    const F = d.fx;
+    F.t += dt; F.all += dt;
+    const B = J.ball ? J.ball() : null;
+    if (!B) { fetchEnd('noball'); return; }
+    // Back in your bag while he was after it: that is the end of that.
+    if (B.where === 'bag') { fetchEnd('lost'); return; }
+    if (F.all > FT.give && F.stage !== 'back' && F.stage !== 'drop') { fetchEnd('gaveup'); return; }
+    const I = B.info();
+    // In somebody's hand — yours, picked up while he was on his way to it,
+    // and about to go up again: he stands and watches it, and starts over
+    // when it has gone.
+    if (B.where === 'held' && !F.has && F.stage !== 'notice') {
+      fetchStage('notice');
+      F.noticeFor = rnd(FT.notice[0], FT.notice[1]);
+    }
+    let uWant = 0, liftWant = 0, jawWant = 0, look = null;
+    if (F.stage === 'notice') {
+      // He watches it go. Round toward it at his own pace — the stroll's
+      // turn, not the gallop's — with his head leading.
+      fig.play('idle', { fade: 0.4 });
+      fig.state.speed = 1;
+      const e = bearing(I.t, I.s);
+      turnToward(d.head + e, dt);
+      look = bearing(I.t, I.s);
+      const out = B.where === 'out';
+      const down = out && (I.wet || (I.speed < FT.settle && I.up < 0.4));
+      if (F.t > F.noticeFor && (down || (out && F.t > 6))) {
+        if (!fetchPlan()) fetchStage('sad'); else fetchStage('go');
+      }
+    } else if (F.stage === 'go') {
+      // Re-aimed as it rolls: when it has moved a hand's breadth from where
+      // the route was planned to, and once a second regardless. Not every
+      // few frames: a plan is up to ten routes round the furniture.
+      F.re -= dt;
+      const moved = F.planAt ? Math.hypot(I.t - F.planAt[0], I.s - F.planAt[1]) : Infinity;
+      if (F.re <= 0 || moved > 0.3) {
+        F.re = 1.0;
+        F.planAt = [I.t, I.s];
+        if (!fetchPlan()) { fetchStage('sad'); return; }
+      }
+      const far = Math.hypot(F.goal[0] - d.t, F.goal[1] - d.s);
+      const gallop = far > FT.walkIn;
+      if (gallop && fig.playing() !== 'gallop') F.gallops++;
+      const left = gallop
+        ? fetchMove(dt, 'gallop', LK.gallop * LK.rate, gallopRate)
+        : fetchMove(dt, 'walk', DOODLE.walk * FT.nudgeRate, walkRate);
+      if (F.purpose === 'ball') uWant = gallop ? 0 : 0.35;
+      if (left < 0.12) {
+        if (F.purpose === 'ball') fetchStage(F.nudged < F.nudges ? 'nudge' : 'grab');
+        else fetchStage('sad');
+      }
+    } else if (F.stage === 'nudge') {
+      // At it, head down, and the flick when his nose gets there.
+      const nose = noseAt(_fw);
+      const nb = Math.hypot(nose.x - I.x, nose.y - I.y, nose.z - I.z);
+      const e = bearing(I.t, I.s);
+      d.head += Math.sign(e) * Math.min(Math.abs(e), DOODLE.turn * 2 * dt);
+      uWant = 0.65;
+      if (F.fl < 0 && nb < BALL.r + 0.16) { F.fl = 0; B.clearTouched(); }
+      if (F.fl >= 0) {
+        F.fl += dt;
+        const x = F.fl / FT.flick;
+        liftWant = FT.flickAmp * Math.sin(Math.PI * Math.min(1, x));
+        // Nosed or pawed: his forelegs are either side of his nose, bowed.
+        for (let id = 10; id <= 16; id++) if (B.touched(id)) F.hit = true;
+        if (x >= 1) {
+          // A nudge is a nudge whether it connected or not — a creature
+          // this slow gets the number he gets — and the ones that did are
+          // counted apart, for the probe.
+          F.nudged++;
+          if (F.hit) F.hits = (F.hits || 0) + 1;
+          F.hit = false; F.fl = -1;
+          fetchStage('watch');
+        }
+      }
+      if (F.stage === 'nudge') {
+        const k = clamp(Math.cos(e), 0.2, 1);
+        const v = DOODLE.walk * FT.nudgeRate * k * (nb > BALL.r + 0.05 ? 1 : 0.3);
+        fig.play('walk', { fade: 0.3 });
+        fig.state.speed = Math.max(0.35, v / DOODLE.walk);
+        d.t += Math.cos(d.head) * v * dt;
+        d.s += Math.sin(d.head) * v * dt;
+        // Gone off ahead of him before he got there: after it again.
+        if (Math.hypot(I.t - d.t, I.s - d.s) > FT.short + 1.2 || F.t > 5) { F.nudged++; fetchStage('watch'); }
+      }
+    } else if (F.stage === 'watch') {
+      fig.play('idle', { fade: 0.35 });
+      fig.state.speed = 1;
+      look = bearing(I.t, I.s);
+      turnToward(d.head + look, dt);
+      if (F.t > FT.watch[1] || (F.t > FT.watch[0] && I.speed < 0.35) || I.wet) {
+        if (!fetchPlan()) fetchStage('sad'); else fetchStage('go');
+      }
+    } else if (F.stage === 'grab') {
+      const nose = noseAt(_fw);
+      const nb = Math.hypot(nose.x - I.x, nose.y - I.y, nose.z - I.z);
+      const e = bearing(I.t, I.s);
+      d.head += Math.sign(e) * Math.min(Math.abs(e), DOODLE.turn * 2 * dt);
+      const near = Math.hypot(I.x - mesh.position.x, I.z - mesh.position.z);
+      if (near > FT.short + 0.9 || I.wet) { if (!fetchPlan()) fetchStage('sad'); else fetchStage('go'); return; }
+      if (!F.has) {
+        // Up to it until his nose, going down, is on it; then down on it.
+        const reachH = near - 0.58;      // his nose is 0.58 ahead of his root, nose down
+        if (reachH > 0.06 && F.t < 5) {
+          const v = DOODLE.walk * 0.6 * clamp(Math.cos(e), 0.2, 1);
+          fig.play('walk', { fade: 0.3 });
+          fig.state.speed = 0.6;
+          d.t += Math.cos(d.head) * Math.min(v * dt, reachH);
+          d.s += Math.sin(d.head) * Math.min(v * dt, reachH);
+          uWant = 0.45;
+          jawWant = FT.jaw * 0.5;
+          F.low = 0;
+        } else {
+          fig.play('idle', { fade: 0.3 });
+          fig.state.speed = 1;
+          F.low = (F.low || 0) + dt;
+          uWant = 1; jawWant = FT.jaw;
+          if (F.u > 0.9 || F.low > FT.bowT * 2) {
+            // In it goes. Its centre from where it lies to between his jaws
+            // over a quarter of a second — see `hold` in 43-ball.js.
+            B.hold(() => {
+              const p = mouthAt(_fb);
+              return [p.x, p.y, p.z];
+            });
+            F.has = true; F.t = 0;
+            note('fetch.grab');
+          }
+        }
+      } else {
+        uWant = F.t < 0.3 ? 1 : FT.carryBow;
+        jawWant = F.t < 0.2 ? FT.jaw : FT.bite;
+        if (F.t > 0.55) { F.re = 0; fetchStage('back'); }
+      }
+      F.nb = nb;
+    } else if (F.stage === 'back') {
+      uWant = FT.carryBow; jawWant = FT.bite;
+      const faces = J.lickFaces ? J.lickFaces() : null;
+      let T = faces && (F.to === 'baye' ? faces.baye : faces.you);
+      if (F.to === 'baye' && !(T && T.ok)) { F.to = 'you'; T = faces && faces.you; }
+      if (!T) { fetchStage('drop'); return; }
+      const [tt, ts] = J.local(T.x, T.z);
+      F.re -= dt;
+      if (F.re <= 0 || !F.path) {
+        F.re = 0.6;
+        const L = Math.hypot(d.t - tt, d.s - ts) || 1;
+        const g = [tt + (d.t - tt) / L * FT.dropAt, ts + (d.s - ts) / L * FT.dropAt];
+        avoid = [[tt, ts, 0.55]]; avoidBox = null;
+        const path = lkRoute(g) || (L < FT.dropAt + 1.5 ? [g] : null);
+        F.goal = g;
+        if (path) { F.path = path; F.wp = 0; }
+        if (!F.path) { fetchStage('drop'); return; }
+      }
+      const left = fetchMove(dt, 'walk', DOODLE.walk * FT.carryRate, walkRate);
+      const dT = Math.hypot(d.t - tt, d.s - ts);
+      if (left < 0.15 || dT < FT.dropAt + 0.1 || F.t > 45) {
+        F.faceT = [tt, ts];
+        fetchStage('drop');
+      }
+    } else if (F.stage === 'drop') {
+      // Round to face them, head down, mouth open, and let go.
+      fig.play('idle', { fade: 0.35 });
+      fig.state.speed = 1;
+      if (F.faceT) turnToward(d.head + bearing(F.faceT[0], F.faceT[1]), dt);
+      uWant = F.t < 0.75 ? 0.62 : 0;
+      jawWant = F.t < 0.35 ? FT.bite : F.t < 0.9 ? FT.jaw : 0;
+      if (!F.let && F.t > 0.45 && B.where === 'held') {
+        const p = mouthAt(_fb);
+        const hx = Math.cos(mesh.rotation.y), hz = -Math.sin(mesh.rotation.y);
+        B.drop(p.x, p.y, p.z, hx * FT.dropV, -0.2, hz * FT.dropV);
+        F.let = true;
+        note('fetch.drop');
+      }
+      if (F.t > 1.0) { F.waitFor = rnd(FT.wait[0], FT.wait[1]); fetchStage('wait'); }
+    } else if (F.stage === 'wait') {
+      fig.play('idle', { fade: 0.5 });
+      fig.state.speed = 1;
+      const faces = J.lickFaces ? J.lickFaces() : null;
+      const T = faces && (F.to === 'baye' ? faces.baye : faces.you);
+      if (T && T.x != null) { const [tt, ts] = J.local(T.x, T.z); look = bearing(tt, ts); }
+      if (F.t > F.waitFor) { fetchEnd('done'); return; }
+    } else if (F.stage === 'sad') {
+      // He cannot have it. Round to it, a long look, and the yawn.
+      fig.state.speed = 1;
+      const e = bearing(I.t, I.s);
+      if (!F.yawn) {
+        fig.play('idle', { fade: 0.5 });
+        turnToward(d.head + e, dt);
+        look = e;
+        if (!F.lookFor) F.lookFor = rnd(FT.sadLook[0], FT.sadLook[1]);
+        // It came back within reach while he looked: go on then.
+        if (!I.wet && !(I.up > FT.high) && F.t > 1.0 && fetchPlan() && F.purpose === 'ball') {
+          fetchStage('go');
+        } else if (F.t > F.lookFor) {
+          F.yawn = true; F.t = 0;
+          lookClear();
+          fig.play('yawn', { fade: 0.5, next: 'idle' });
+          note('fetch.sad.' + (I.wet ? 'water' : 'high'));
+        }
+      } else if (F.t > (durs.yawn || 3)) { fetchEnd('sad'); return; }
+    }
+    // The pose, eased — and nothing of it while he looks round, which is
+    // the same two bones turned the other way.
+    F.u = damp(F.u, uWant, uWant > F.u ? 1 / FT.bowT * 3 : 6, dt);
+    F.lift = liftWant > F.lift ? liftWant : damp(F.lift, liftWant, 10, dt);
+    F.jaw = damp(F.jaw, jawWant, 10, dt);
+    if (look != null && F.u < 0.05) { fetchAims(0, 0, F.jaw); fetchLook(look); } else fetchAims(F.u, F.lift, F.jaw);
+    if (F.trace.length < 4000) {
+      F.trace.push([+F.all.toFixed(2), F.stage, +d.t.toFixed(2), +d.s.toFixed(2),
+        +Math.hypot(I.t - d.t, I.s - d.s).toFixed(2), +F.u.toFixed(2), B.where[0], +I.speed.toFixed(2)]);
+    }
+  }
+
+  function fetchPlace() {
+    const p = J.toWorld(d.t, d.s);
+    const F = d.fx;
+    mesh.position.set(p[0], J.walkY(p[0], p[2]) + DOODLE.lift - FT.bowDrop * (F ? F.u : 0), p[2]);
+    mesh.rotation.y = J.rigYaw(d.t, d.head);
+    mesh.updateMatrixWorld();
+  }
+
   function step(cam, who, dt) {
     const dx = cam.x - mesh.position.x, dz = cam.z - mesh.position.z;
     d.dist = Math.hypot(dx, dz);
@@ -1514,7 +2100,7 @@ async function buildDoodle(scene, J) {
     if (d.far) return;
     d.who = who;
     // Walked into mid-lick: he has more important things on.
-    if (d.bumped && d.mode === 'lick') d.bumped = 0;
+    if (d.bumped && (d.mode === 'lick' || d.mode === 'fetch')) d.bumped = 0;
     if (d.bumped) {
       // Walked into. He stops whatever it was and looks at you about it.
       d.bumped = 0;
@@ -1526,7 +2112,17 @@ async function buildDoodle(scene, J) {
     // mid-skill, and never while a task has him.
     d.peekIn -= dt;
     if (d.peekIn <= 0 && d.mode === 'pause') startPeek();
-    if (d.mode === 'lick') {
+    if (d.mode === 'fetch') {
+      // The fetch the other way round from the lick: its aims first, because
+      // they go over whatever clip it has just chosen, then the clip.
+      fetchStep(dt);
+      if (d.mode === 'fetch') {
+        fig.update(dt);
+        fetchPlace();
+        return;
+      }
+      dt = 0;
+    } else if (d.mode === 'lick') {
       // The clip first and the lick after it, because the lick solves its
       // pose on the frame the clip has got to, and places the mesh itself.
       fig.update(dt);
@@ -1581,6 +2177,7 @@ async function buildDoodle(scene, J) {
       at: [+mesh.position.x.toFixed(2), +mesh.position.y.toFixed(3), +mesh.position.z.toFixed(2)],
       mode: d.mode, skill: d.skill, peek: d.pk, peekIn: +d.peekIn.toFixed(1),
       lick: d.lk ? d.lk.who + ':' + d.lk.stage : null,
+      fetch: d.fx ? d.fx.to + ':' + d.fx.stage : null,
       label: d.skill ? DOODLE_SKILLS[d.skill].label : d.mode === 'wander' ? 'slow walk' : null,
       playing: fig.playing(), speed: +fig.state.speed.toFixed(3),
       left: +(d.mode === 'skill' ? d.skillLeft : d.timer).toFixed(2),
@@ -1667,6 +2264,25 @@ async function buildDoodle(scene, J) {
     },
     lickTrace: () => (d.lk ? d.lk.trace : d.lkLast ? d.lkLast.trace : null),
     /**
+     * The fetch, now — the spoken "fetch" and the throw both come here.
+     * `{ who: 'baye' }` makes him take it to her. Answers who he is bringing
+     * it to, or a key of DOODLE_FETCH_WHY.
+     */
+    fetch: (o) => fetchCmd(o || {}),
+    /** Where the fetch has got to; `last` is the one before, whole. */
+    fetchStats: () => {
+      const F = d.fx;
+      return { on: !!F, to: F ? F.to : null, stage: F ? F.stage : null,
+        t: F ? +F.t.toFixed(2) : null, all: F ? +F.all.toFixed(2) : null,
+        u: F ? +F.u.toFixed(3) : null, nudges: F ? F.nudges : null, nudged: F ? F.nudged : null,
+        purpose: F ? F.purpose : null, nb: F && F.nb != null ? +F.nb.toFixed(3) : null,
+        stages: F ? F.stages : null,
+        last: d.fxLast ? { to: d.fxLast.to, why: d.fxLast.why, all: d.fxLast.all, nudged: d.fxLast.nudged,
+          hits: d.fxLast.hits, planMs: d.fxLast.planMs, plans: d.fxLast.plans,
+          dropDist: d.fxLast.dropDist == null ? null : +d.fxLast.dropDist.toFixed(3), stages: d.fxLast.stages } : null };
+    },
+    fetchTrace: () => (d.fx ? d.fx.trace : d.fxLast ? d.fxLast.trace : null),
+    /**
      * Debug: change DOODLE_LICK's pose numbers and re-tabulate the reach —
      * `rearTune({ pitch: 1.45 })` — answering the table at s -1, 0, 0.5, 1
      * as [s, nose height, reach], and where his front shoulders get to.
@@ -1689,7 +2305,7 @@ async function buildDoodle(scene, J) {
   };
 
   return {
-    fig, mesh, api, step,
+    fig, mesh, api, step, ballCaps,
     /**
      * Him, as the person collider sees him: two discs along his back, pushed
      * through whatever `push(x, z, r, y0, top)` the promenade hands in.

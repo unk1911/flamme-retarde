@@ -863,6 +863,44 @@ const ears = (() => {
       ok ? 'did' : 'meta');
       return;
     }
+    // The ball — see src/43-ball.js and the fetch in 43-doodle.js. "Throw the
+    // ball" with it in your satchel, or lying at your feet, is the [ key: up
+    // it goes and he goes after it. With it lying somewhere else, "fetch" is
+    // him going for it where it is.
+    if (name === 'doodle.ball') {
+      const J = typeof jadrija !== 'undefined' && jadrija;
+      const B = J && J.ball;
+      if (!B) { note('doodle: there is no ball here', 'meta'); return; }
+      let got = null;
+      if (B.where === 'bag' || B.where === 'out') {
+        const k = typeof ballKey === 'function' ? ballKey() : { got: 'noball' };
+        // Standing over it: picked up, so throw it — which is what was asked.
+        if (k.got === 'picked') got = ballKey().got; else got = k.got;
+        if (got === 'thrown') {
+          // What he made of it is known when it leaves your hand, a sixth of
+          // a second from now — see `ballThrowTick`.
+          setTimeout(() => {
+            const f = typeof ballFetchSaid !== 'undefined' ? ballFetchSaid : null;
+            note('doodle: the ball is up' + (f === 'you' ? ' — and he is after it'
+              : f === 'baye' ? ' — and he is after it, for Baye'
+                : f && typeof DOODLE_FETCH_WHY !== 'undefined' && DOODLE_FETCH_WHY[f]
+                  ? ' — but ' + DOODLE_FETCH_WHY[f] : ''), 'did');
+          }, 400);
+          return;
+        }
+        if (got === 'foot') { note('doodle: you need to be on foot on the beach', 'meta'); return; }
+        if (got === 'away') {
+          const f = J.doodleFetch ? J.doodleFetch() : 'nodog';
+          const ok = f === 'you' || f === 'baye';
+          note('doodle: ' + (f === 'you' ? 'off after the ball — for you'
+            : f === 'baye' ? 'off after the ball — for Baye'
+              : (typeof DOODLE_FETCH_WHY !== 'undefined' && DOODLE_FETCH_WHY[f]) || f), ok ? 'did' : 'meta');
+          return;
+        }
+      } else got = 'held';
+      note('doodle: ' + ((typeof DOODLE_FETCH_WHY !== 'undefined' && DOODLE_FETCH_WHY[got]) || got), 'meta');
+      return;
+    }
     if (name === 'baye.time') {
       note('baye: asking…', 'meta');
       const res = await voice.answer('time', lang);

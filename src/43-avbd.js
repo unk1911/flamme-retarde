@@ -100,6 +100,12 @@
 // there because what drives the ends of this chain is an animation, which is
 // not physical, and CHAIN in 43-jadrija.js says where each one was measured
 // to be needed.
+//
+// (5) AND ONE BALL (1.529.0) — `avbdBall` at the bottom of the file, for the
+// Slow Doodle's beach ball (BALL in 43-ball.js). The same block solve, the
+// same contact rows with their cone and their warm start, the same dual
+// update, on ONE free body with no joints; what a ball needs and a link did
+// not is written there, each with its reason.
 // ---------------------------------------------------------------------------
 
 const AVBD = {
@@ -808,4 +814,615 @@ function avbdSolve6(aLin, aAng, aCross, bLin, bAng, xLin, xAng) {
   xLin[2] = z3 - L43 * xAng[0] - L53 * xAng[1] - L63 * xAng[2];
   xLin[1] = z2 - L32 * xLin[2] - L42 * xAng[0] - L52 * xAng[1] - L62 * xAng[2];
   xLin[0] = z1 - L21 * xLin[1] - L31 * xLin[2] - L41 * xAng[0] - L51 * xAng[1] - L61 * xAng[2];
+}
+
+// ---------------------------------------------------------------------------
+// ── AND ONE BALL ────────────────────────────────────────────────────────────
+//
+// Misha, 26 Sep 2026, after the ankle cuffs: *"the ball for doodle"*, and *"we
+// wanna use AVBD for various stuff"*. The Slow Doodle's beach ball — BALL in
+// src/43-ball.js — is one free rigid sphere, and it is solved here the way the
+// chain's links are: the per-body 6x6 block solve over an inertial target,
+// contact rows with a push-only normal and a Coulomb cone Taylor-expanded
+// about the start of the step, the dual variable and the ramped penalty, the
+// warm start matched by shape, the BDF1 velocities.
+//
+// IT IS NOT `avbdChain` WITH n = 1, and that was the first thing tried on
+// paper. The chain is specialised to what a chain is — every body jointed to
+// its neighbours, the two ends to moving anchors, its contacts at the link's
+// centre with the angular part dropped (note (3) at the top) — and it is kept
+// fast by being compiled once per chain (`avbdChainOwn`). A ball has no joints
+// at all, and the one thing the chain threw away is the whole of a ball: the
+// friction row's lever arm, which is what turns a slide into a roll. So this
+// is the same solver written for a different body, over the same primitives
+// (`avbdSolve6`, AVBD's clamps, the quaternion helpers just below, which are
+// the chain's own `qaddv` and `qsub` lifted out), and the chain's hot loop is
+// left exactly as it was measured.
+//
+// WHAT IS NEW, and why:
+//
+// (a) THE LEVER ARM. A contact is at the ball's surface, r = −R·n from its
+// centre, so each friction row has an angular Jacobian r × t — the reference's
+// `J[3..5]` for body A — and its stamp fills the cross block the chain's never
+// touch. The normal row has none (r ∥ n for a sphere). Friction then sticks
+// the contact point and the body rolls; nothing about rolling is scripted.
+//
+// (b) A POSITIVE GAP COUNTS IN FULL. The reference forgives `alpha` of a
+// contact's starting error, which is right for a PENETRATION (ease it out) and
+// wrong for a GAP (the contact is found `margin` early, so the body is still
+// in the air). A ball arriving at 6 m/s is 5 cm from the floor one step out,
+// and forgiving 90 % of that would stop it 4.5 cm up in mid-air and let it
+// creep down over the next dozen steps. So a gap is counted whole and only a
+// penetration is forgiven.
+//
+// (c) RESTITUTION, HONESTLY. AVBD's contact is inelastic: a hard row makes the
+// relative normal velocity zero, and the paper has no bounce. So a bounce is
+// a velocity pass after the solve, which is where position-based methods put
+// it (Müller et al., "Detailed Rigid Body Simulation with Extended Position
+// Based Dynamics", SCA 2020, sec. 3.6): for every contact that actually pushed
+// this step, the relative normal velocity it arrived with (`cVn`, measured at
+// the start of the step against the shape's own velocity) is reflected,
+// times `e`, and written over what BDF1 said. Below `eMin` of approach there
+// is no bounce, or a ball at rest would buzz on gravity's own 8 cm/s a step.
+// The tangential velocity is the solve's — the cone did the spin.
+//
+// (d) ROLLING RESISTANCE. A rolling ball on a hard floor never stops in the
+// solve, because the friction row holds rolling exactly. The vinyl flattens
+// where it touches and the flags are not glass, so a torque of `roll`·N·R
+// opposes the roll; applied at the velocity level it slows the contact's
+// rolling by `roll`·g/(1 + I/mR²), and stops it when that is more than is
+// left. Which also makes it a static threshold: a ball at rest stays at rest
+// in a breeze that is less than `roll` of its weight.
+//
+// (e) THE FLOOR IS A FUNCTION, and it has steps. `world.floor(x, z)` is the
+// promenade's own height query. A sphere against a height field is a contact
+// under its centre (the normal off the slope there, unless one side of the
+// slope is a step), plus a ring of eight probes a radius out: a probe that
+// finds the ground higher is a step, bisected for its edge, and contacted as
+// a wall (the ball's centre below the top) or as the edge's corner (above
+// it). Without the ring, a ball rolling at a terrace is lifted up it through
+// the wall on the frame its centre crosses.
+//
+// (f) BOXES. The promenade's walk-blockers, yawed boxes in the shore frame,
+// handed in as world boxes: nearest point, normal from it, or out along the
+// least-penetrated axis from inside.
+//
+// (g) WATER AND AIR, as forces in the inertial target and drag solved
+// implicitly: buoyancy is the weight of the sea displaced by the cap under the
+// waterline (π d²(3R − d)/3); drag is ½ρ·Cd·A|v|v against the water's drift
+// and against the wind, each on its own share of the ball, and applied as
+// v/(1 + k·h) so a ball that hits the sea at 8 m/s cannot overshoot to −8 in
+// one step, which an explicit quadratic drag in water does at once.
+//
+// (h) PEOPLE ARE SPRINGS. A capsule on somebody is kinematic — infinitely
+// heavy, going where the animation puts it — and the ground and the boxes
+// are hard. Squeeze the ball between the two, which is what a creature
+// nosing it along a terrace wall does, and there is no answer: a hard row
+// each way, and whichever wins the ball goes through the other. It went
+// through the terrace, and came out of the top at 6 m/s. So the capsules'
+// rows are the reference's finite-stiffness contact (`capK` N/m, no
+// multiplier — the chain's `contactK`), and in a squeeze it is the snout the
+// ball gives into, a centimetre or two, and not the concrete.
+// ---------------------------------------------------------------------------
+
+/** q ← normalize(q + ½(v, 0)·q), the demo's `quat + float3`, out of place. */
+function avbdQAddV(q, oq, vx, vy, vz, out, oo) {
+  const ax = q[oq], ay = q[oq + 1], az = q[oq + 2], aw = q[oq + 3];
+  const rx = vx * aw + vy * az - vz * ay;
+  const ry = -vx * az + vy * aw + vz * ax;
+  const rz = vx * ay - vy * ax + vz * aw;
+  const rw = -vx * ax - vy * ay - vz * az;
+  const x = ax + rx * 0.5, y = ay + ry * 0.5, z = az + rz * 0.5, w = aw + rw * 0.5;
+  const l = 1 / Math.sqrt(x * x + y * y + z * z + w * w);
+  out[oo] = x * l; out[oo + 1] = y * l; out[oo + 2] = z * l; out[oo + 3] = w * l;
+}
+/** The demo's `quat − quat`: 2·vec(a·b⁻¹), into out[0..2]. */
+function avbdQSub(a, oa, b, ob, out) {
+  const ax = a[oa], ay = a[oa + 1], az = a[oa + 2], aw = a[oa + 3];
+  const bx = -b[ob], by = -b[ob + 1], bz = -b[ob + 2], bw = b[ob + 3];
+  out[0] = 2 * (aw * bx + ax * bw + ay * bz - az * by);
+  out[1] = 2 * (aw * by - ax * bz + ay * bw + az * bx);
+  out[2] = 2 * (aw * bz + ax * by - ay * bx + az * bw);
+}
+/** A contact frame for normal n into out[o..o+8]: n, t1, t2. manifold.ts's `orthonormal`. */
+function avbdOrtho(out, o, nx, ny, nz) {
+  out[o] = nx; out[o + 1] = ny; out[o + 2] = nz;
+  let tx, ty, tz;
+  if (Math.abs(nx) > Math.abs(nz)) { tx = -ny; ty = nx; tz = 0; } else { tx = 0; ty = -nz; tz = ny; }
+  const l = 1 / Math.sqrt(tx * tx + ty * ty + tz * tz);
+  tx *= l; ty *= l; tz *= l;
+  out[o + 3] = tx; out[o + 4] = ty; out[o + 5] = tz;
+  out[o + 6] = ny * tz - nz * ty; out[o + 7] = nz * tx - nx * tz; out[o + 8] = nx * ty - ny * tx;
+}
+
+/**
+ * Ids a contact is warm-started by. Capsules bring their own (`world.cid`),
+ * which the caller keeps under 1000; the ground and the boxes are these.
+ */
+const AVBD_BALL_ID = { floor: 1000, step: 1001, box: 2000 };
+
+/**
+ * One ball. `o` — r (m), mass (kg), moment (kg·m², the same about every axis),
+ * mu, e, eMin (m/s), roll (rolling-resistance coefficient), spin (1/s, how
+ * fast a spin about the contact normal dies), iterations, alpha, beta, gamma,
+ * gravity [x, y, z], margin (m), vMax (m/s), deep (m), sleep (s at rest before
+ * it sleeps), capK (N/m, the capsules' stiffness — see (h)), air { rho, cd },
+ * water { rho, cd, zeta, ang }.
+ *
+ * The world is `world`, filled by the caller before every step: kinematic
+ * capsules at the start and end of the step (`a0 b0 a1 b1`, the radius at
+ * each end in `cr`, and their own `ce`, `cmu`), static yawed boxes (`box`,
+ * eleven numbers each — see `boxes`), `floor(x, z, y)`, `water(x, z)` (the
+ * surface height, or NaN where there is no sea), the water's drift and the
+ * wind.
+ */
+function avbdBall(o) {
+  const R = o.r, mass = o.mass, Im = o.moment;
+  const gx = o.gravity[0], gy = o.gravity[1], gz = o.gravity[2];
+  const P = new Float64Array(3), Q = new Float64Array([0, 0, 0, 1]);
+  const V = new Float64Array(3), W = new Float64Array(3), VP = new Float64Array(3);
+  const P0 = new Float64Array(3), Q0 = new Float64Array(4);
+  const PI = new Float64Array(3), QI = new Float64Array(4);
+
+  // ── contacts: at most MAXC at once, matched step to step by id ────────
+  const MAXC = 8;
+  let cN = 0, pN = 0;
+  const cId = new Int32Array(MAXC), pId = new Int32Array(MAXC);
+  const cB = new Float64Array(9 * MAXC);          // n, t1, t2
+  const cC0 = new Float64Array(MAXC);             // the gap at x-
+  const cDq = new Float64Array(3 * MAXC);         // the shape's move this step
+  const cPen = new Float64Array(3 * MAXC), cLam = new Float64Array(3 * MAXC);
+  const pPen = new Float64Array(3 * MAXC), pLam = new Float64Array(3 * MAXC);
+  const cE = new Float64Array(MAXC), cMu = new Float64Array(MAXC);
+  const cVn = new Float64Array(MAXC);             // approach speed at x-, < 0 closing
+  const cFn = new Float64Array(MAXC);             // the normal force it ended on, N
+  const cArm = new Float64Array(6 * MAXC);        // r × t1, r × t2
+  const cK = new Float64Array(MAXC);              // Infinity: hard; else N/m, see (h)
+
+  const CAPS = 64, BOXES = 128;
+  const world = {
+    capN: 0, a0: new Float64Array(3 * CAPS), b0: new Float64Array(3 * CAPS),
+    a1: new Float64Array(3 * CAPS), b1: new Float64Array(3 * CAPS),
+    cr: new Float64Array(2 * CAPS), ce: new Float64Array(CAPS), cmu: new Float64Array(CAPS),
+    // Each capsule's own id, which is what its contact is warm-started and
+    // remembered by: the caller's list is rebuilt every frame and a shape's
+    // place in it is not the same from one frame to the next.
+    cid: new Int32Array(CAPS),
+    capMax: CAPS,
+    boxN: 0, box: new Float64Array(11 * BOXES), boxMax: BOXES,
+    floor: null, floorE: o.e, floorMu: o.mu,
+    water: null, flowX: 0, flowZ: 0,
+    windX: 0, windY: 0, windZ: 0,
+  };
+
+  const stats = { steps: 0, contacts: 0, bounces: 0, rescues: 0, asleep: false, sub: 0,
+    depth: 0, floorPen: 0, lastId: -1, lastV: 0, hits: 0 };
+  // Which shapes pushed on it since the caller last cleared this — the dog's
+  // snout asks whether it has touched the ball yet.
+  const touched = new Set();
+
+  let still = 0, asleep = false, surfWas = NaN;
+
+  const aL = new Float64Array(9), aA = new Float64Array(9), aX = new Float64Array(9);
+  const bL = new Float64Array(3), bA = new Float64Array(3);
+  const dxL = new Float64Array(3), dxA = new Float64Array(3);
+  const dth = new Float64Array(3);
+  const cC = new Float64Array(3), cF = new Float64Array(3);
+  let cBound = 0, cFric = 0;
+
+  function addContact(id, nx, ny, nz, gap, mx, my, mz, e, mu, h, k = Infinity) {
+    let m = cN;
+    if (cN === MAXC) {
+      let worst = -1, wg = gap;
+      for (let j = 0; j < MAXC; j++) if (cC0[j] > wg) { wg = cC0[j]; worst = j; }
+      if (worst < 0) return;
+      m = worst;
+    } else cN++;
+    cId[m] = id;
+    avbdOrtho(cB, 9 * m, nx, ny, nz);
+    cC0[m] = gap;
+    cDq[3 * m] = mx; cDq[3 * m + 1] = my; cDq[3 * m + 2] = mz;
+    cE[m] = e; cMu[m] = mu; cFn[m] = 0; cK[m] = k;
+    // The approach speed, against the shape's own velocity over the step.
+    cVn[m] = nx * (V[0] - mx / h) + ny * (V[1] - my / h) + nz * (V[2] - mz / h);
+    // The lever arm r = −R·n, and each friction row's angular Jacobian r × t.
+    const rx = -nx * R, ry = -ny * R, rz = -nz * R;
+    for (let r = 1; r < 3; r++) {
+      const b = 9 * m + 3 * r, t0 = cB[b], t1 = cB[b + 1], t2 = cB[b + 2];
+      const a = 6 * m + 3 * (r - 1);
+      cArm[a] = ry * t2 - rz * t1; cArm[a + 1] = rz * t0 - rx * t2; cArm[a + 2] = rx * t1 - ry * t0;
+    }
+    // Warm start from the same shape last step (Eq. 19): the normal row's
+    // multiplier, and every row's penalty. The friction rows' multipliers
+    // were in last step's tangent basis and are not carried — the chain's
+    // rule, for the chain's reason.
+    let found = -1;
+    for (let j = 0; j < pN; j++) if (pId[j] === id) { found = j; break; }
+    for (let r = 0; r < 3; r++) {
+      cLam[3 * m + r] = found >= 0 && r === 0 && k === Infinity ? pLam[3 * found] * o.alpha * o.gamma : 0;
+      cPen[3 * m + r] = found >= 0
+        ? Math.min(AVBD.penMax, k, Math.max(AVBD.penMin, pPen[3 * found + r] * o.gamma)) : AVBD.penMin;
+    }
+  }
+  const wasTouching = (id) => { for (let j = 0; j < pN; j++) if (pId[j] === id) return true; return false; };
+
+  /**
+   * The boxes. Eleven numbers each: centre (x, y, z), the box's own long axis
+   * in the horizontal (ux, uz), half extents along it, up and across, then
+   * `e` and `mu`, and one spare.
+   */
+  function boxes(margin, h) {
+    const B = world.box, px = P[0], py = P[1], pz = P[2];
+    for (let k = 0; k < world.boxN; k++) {
+      const b = 11 * k;
+      const dx = px - B[b], dy = py - B[b + 1], dz = pz - B[b + 2];
+      const ux = B[b + 3], uz = B[b + 4];
+      const ha = B[b + 5], hy = B[b + 6], hc = B[b + 7];
+      // Out of reach on the bounding sphere first: most of them are.
+      const reach = R + margin + ha + hy + hc;
+      if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
+      const la = dx * ux + dz * uz, lc = -dx * uz + dz * ux;
+      const qa = la < -ha ? -ha : la > ha ? ha : la;
+      const qy = dy < -hy ? -hy : dy > hy ? hy : dy;
+      const qc = lc < -hc ? -hc : lc > hc ? hc : lc;
+      let na = la - qa, ny = dy - qy, nc = lc - qc;
+      const d = Math.sqrt(na * na + ny * ny + nc * nc);
+      let gap;
+      if (d > 1e-7) { na /= d; ny /= d; nc /= d; gap = d - R; } else {
+        // Centre inside: out through whichever face is nearest.
+        const pa = ha - Math.abs(la), py2 = hy - Math.abs(dy), pc = hc - Math.abs(lc);
+        na = 0; ny = 0; nc = 0;
+        if (pa <= py2 && pa <= pc) { na = la < 0 ? -1 : 1; gap = -pa - R; } else if (py2 <= pc) {
+          ny = dy < 0 ? -1 : 1; gap = -py2 - R;
+        } else { nc = lc < 0 ? -1 : 1; gap = -pc - R; }
+      }
+      if (gap > margin) continue;
+      addContact(AVBD_BALL_ID.box + k, na * ux - nc * uz, ny, na * uz + nc * ux, gap,
+        0, 0, 0, B[b + 8], B[b + 9], h);
+    }
+  }
+
+  /** The kinematic capsules: people and the dog. See the chain's `collide`. */
+  function capsules(margin, h) {
+    const w = world, px = P[0], py = P[1], pz = P[2];
+    for (let s = 0; s < w.capN; s++) {
+      const a = 3 * s;
+      const ax = w.a0[a], ay = w.a0[a + 1], az = w.a0[a + 2];
+      const ex = w.b0[a] - ax, ey = w.b0[a + 1] - ay, ez = w.b0[a + 2] - az;
+      const ee = ex * ex + ey * ey + ez * ez;
+      let t = ee > 1e-12 ? ((px - ax) * ex + (py - ay) * ey + (pz - az) * ez) / ee : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = ax + ex * t, qy = ay + ey * t, qz = az + ez * t;
+      const rr = w.cr[2 * s] + (w.cr[2 * s + 1] - w.cr[2 * s]) * t;
+      // Where that point of it goes by the end of the step — which is also
+      // how much further out it can reach the ball from.
+      const mx = (w.a1[a] + (w.b1[a] - w.a1[a]) * t) - qx;
+      const my = (w.a1[a + 1] + (w.b1[a + 1] - w.a1[a + 1]) * t) - qy;
+      const mz = (w.a1[a + 2] + (w.b1[a + 2] - w.a1[a + 2]) * t) - qz;
+      const mv = Math.sqrt(mx * mx + my * my + mz * mz);
+      let nx = px - qx, ny = py - qy, nz = pz - qz;
+      const lim = rr + R + margin + mv, dd = nx * nx + ny * ny + nz * nz;
+      if (dd > lim * lim) continue;
+      const d = Math.sqrt(dd);
+      if (d < 1e-6) continue;
+      const gap = d - rr - R;
+      // The chain's rule, for the same reason: a ball found deep inside
+      // somebody it was not touching did not get there by rolling into them
+      // — a limb swept through it faster than a step — and shoving it out
+      // along the nearest normal fires it across the promenade.
+      if (gap < -o.deep && !wasTouching(w.cid[s])) continue;
+      nx /= d; ny /= d; nz /= d;
+      addContact(w.cid[s], nx, ny, nz, gap, mx, my, mz, w.ce[s], w.cmu[s], h, o.capK);
+    }
+  }
+
+  /** The ground: under the centre, and the ring for the steps. See (e). */
+  function ground(margin, h) {
+    const F = world.floor;
+    if (!F) return;
+    const x = P[0], y = P[1], z = P[2], yb = y - R;
+    const hc = F(x, z, yb);
+    const ring = R + Math.min(margin, 0.10);
+    stats.floorPen = Math.max(0, hc - yb);
+    if (hc - yb > 0.5 * R) {
+      // THE CENTRE IS OVER A STEP IT IS NOT ON TOP OF — squeezed into the
+      // wall, or at it faster than the ring could see. Out of it is the
+      // shortest way sideways to the lower ground, and not up on top: a
+      // floor contact 55 cm deep, forgiven at 90 %, still threw the ball off
+      // the terrace at 6 m/s. A wall contact from the inside, as far in as
+      // the edge is, and eased out like any penetration.
+      let best = Infinity, bx = 0, bz = 0;
+      for (let k = 0; k < 8; k++) {
+        const cx = Math.cos(k * Math.PI * 0.25), cz = Math.sin(k * Math.PI * 0.25);
+        let lo = 0, hi = 2 * ring;
+        if (F(x + cx * hi, z + cz * hi, yb) > yb + 0.02) continue;
+        for (let it = 0; it < 5; it++) {
+          const mid = (lo + hi) * 0.5;
+          if (F(x + cx * mid, z + cz * mid, yb) > yb + 0.02) lo = mid; else hi = mid;
+        }
+        const re = (lo + hi) * 0.5;
+        if (re < best) { best = re; bx = cx; bz = cz; }
+      }
+      if (best < Infinity) addContact(AVBD_BALL_ID.step, bx, 0, bz, -(best + R), 0, 0, 0, world.floorE, world.floorMu, h);
+      return;
+    }
+    // The slope, off both sides where both are the same surface and off the
+    // one that is where the other is a step: 3 cm over 7 is a 23-degree ramp,
+    // and nothing out here is steeper than that without being a step.
+    const e = 0.07, st = 0.03;
+    const dxp = F(x + e, z, yb) - hc, dxm = hc - F(x - e, z, yb);
+    const dzp = F(x, z + e, yb) - hc, dzm = hc - F(x, z - e, yb);
+    const okxp = Math.abs(dxp) < st, okxm = Math.abs(dxm) < st;
+    const okzp = Math.abs(dzp) < st, okzm = Math.abs(dzm) < st;
+    const sx = okxp && okxm ? (dxp + dxm) / (2 * e) : okxp ? dxp / e : okxm ? dxm / e : 0;
+    const sz = okzp && okzm ? (dzp + dzm) / (2 * e) : okzp ? dzp / e : okzm ? dzm / e : 0;
+    const nl = 1 / Math.sqrt(sx * sx + 1 + sz * sz);
+    const gap = (y - hc) * nl - R;
+    if (gap < margin) {
+      addContact(AVBD_BALL_ID.floor, -sx * nl, nl, -sz * nl, gap, 0, 0, 0, world.floorE, world.floorMu, h);
+    }
+    // The ring: the nearest step up within a radius and the margin.
+    let bg = Infinity, bx = 0, by = 0, bz = 0;
+    for (let k = 0; k < 8; k++) {
+      const cx = Math.cos(k * Math.PI * 0.25), cz = Math.sin(k * Math.PI * 0.25);
+      const hk = F(x + cx * ring, z + cz * ring, yb);
+      if (hk - hc < 0.04) continue;
+      let lo = 0, hi = ring;
+      for (let it = 0; it < 5; it++) {
+        const mid = (lo + hi) * 0.5;
+        if (F(x + cx * mid, z + cz * mid, yb) - hc > 0.02) hi = mid; else lo = mid;
+      }
+      const re = (lo + hi) * 0.5;
+      let g, nx2, ny2, nz2;
+      if (y <= hk) { g = re - R; nx2 = -cx; ny2 = 0; nz2 = -cz; } else {
+        const vy = y - hk, dl = Math.sqrt(re * re + vy * vy);
+        g = dl - R; nx2 = -cx * re / dl; ny2 = vy / dl; nz2 = -cz * re / dl;
+      }
+      if (g < bg) { bg = g; bx = nx2; by = ny2; bz = nz2; }
+    }
+    if (bg < margin) addContact(AVBD_BALL_ID.step, bx, by, bz, bg, 0, 0, 0, world.floorE, world.floorMu, h);
+  }
+
+  /** Contact m: its three rows' C and the cone-clamped force, into cC, cF. */
+  function contactEval(m, alpha) {
+    const b = 9 * m;
+    const dx = P[0] - P0[0] - cDq[3 * m], dy = P[1] - P0[1] - cDq[3 * m + 1], dz = P[2] - P0[2] - cDq[3 * m + 2];
+    cC[0] = cB[b] * dx + cB[b + 1] * dy + cB[b + 2] * dz;
+    // (b): a gap in full, a penetration forgiven — unless the contact is a
+    // spring (h), which has nothing to forgive.
+    const c0 = cC0[m], soft = cK[m] !== Infinity;
+    cC[0] += c0 > 0 || soft ? c0 : c0 * (1 - alpha);
+    for (let r = 1; r < 3; r++) {
+      const a = 6 * m + 3 * (r - 1);
+      cC[r] = cB[b + 3 * r] * dx + cB[b + 3 * r + 1] * dy + cB[b + 3 * r + 2] * dz
+        + cArm[a] * dth[0] + cArm[a + 1] * dth[1] + cArm[a + 2] * dth[2];
+    }
+    for (let r = 0; r < 3; r++) cF[r] = cPen[3 * m + r] * cC[r] + (soft ? 0 : cLam[3 * m + r]);
+    if (cF[0] > 0) cF[0] = 0;
+    cBound = -cF[0] * cMu[m];
+    cFric = Math.sqrt(cF[1] * cF[1] + cF[2] * cF[2]);
+    if (cFric > cBound && cFric > 0) { const s = cBound / cFric; cF[1] *= s; cF[2] *= s; }
+  }
+
+  /** The circular segment of the ball's silhouette under a waterline d up it. */
+  function segA(d) {
+    if (d <= 0) return 0;
+    if (d >= 2 * R) return Math.PI * R * R;
+    const c = R - d;
+    return R * R * Math.acos(c / R) - c * Math.sqrt(Math.max(0, R * R - c * c));
+  }
+
+  /** The water and the air: forces into `acc`, drag into V and W. See (g). */
+  const acc = new Float64Array(3);
+  function fluids(h) {
+    const x = P[0], y = P[1], z = P[2];
+    acc[0] = gx; acc[1] = gy; acc[2] = gz;
+    const surf = world.water ? world.water(x, z) : NaN;
+    let d = 0;
+    if (surf === surf) d = Math.min(2 * R, Math.max(0, surf - (y - R)));
+    stats.depth = d;
+    const Wt = o.water, Ai = o.air;
+    const Aw = segA(d), Aa = Math.PI * R * R - Aw;
+    let kw = 0, kz = 0, wvy = 0;
+    if (d > 0) {
+      const Vs = Math.PI * d * d * (3 * R - d) / 3;
+      acc[1] += Wt.rho * -gy * Vs / mass;
+      const rx = V[0] - world.flowX, ry = V[1], rz = V[2] - world.flowZ;
+      kw = 0.5 * Wt.rho * Wt.cd * Aw * Math.sqrt(rx * rx + ry * ry + rz * rz) / mass;
+      // Bobbing is damped by the waves it makes, which no drag law has in
+      // it: a fraction `zeta` of critical on the waterplane's stiffness.
+      const dm = Math.min(d, R);
+      const kb = Wt.rho * -gy * Math.PI * Math.max(0, 2 * R * dm - dm * dm) / mass;
+      kz = 2 * Wt.zeta * Math.sqrt(kb);
+      // And against the surface's own rise and fall, not against still water.
+      wvy = surfWas === surfWas ? (surf - surfWas) / h : 0;
+    }
+    surfWas = surf;
+    const ax = V[0] - world.windX, ay = V[1] - world.windY, az = V[2] - world.windZ;
+    const ka = 0.5 * Ai.rho * Ai.cd * Aa * Math.sqrt(ax * ax + ay * ay + az * az) / mass;
+    const den = 1 + h * (kw + ka);
+    V[0] = (V[0] + h * (kw * world.flowX + ka * world.windX)) / den;
+    V[2] = (V[2] + h * (kw * world.flowZ + ka * world.windZ)) / den;
+    V[1] = (V[1] + h * (ka * world.windY + kz * wvy)) / (den + h * kz);
+    const kAng = (d > 0 ? Wt.ang * d / (2 * R) : 0) + 0.05;
+    const keep = 1 / (1 + h * kAng);
+    W[0] *= keep; W[1] *= keep; W[2] *= keep;
+  }
+
+  /** One step of h seconds. */
+  function step(h) {
+    stats.sub = h;
+    const speed = Math.sqrt(V[0] * V[0] + V[1] * V[1] + V[2] * V[2]);
+    const margin = o.margin + speed * h * 1.5;
+    if (asleep) {
+      // Asleep: nothing is integrated until something comes at it. A shape
+      // within reach, the floor gone from under it, or the sea come up.
+      pN = cN; pId.set(cId); pPen.set(cPen); pLam.set(cLam);
+      cN = 0;
+      capsules(o.margin, h);
+      let wake = cN > 0;
+      cN = pN; cId.set(pId); cPen.set(pPen); cLam.set(pLam);
+      if (!wake && world.floor && P[1] - R - world.floor(P[0], P[2], P[1] - R) > 0.02) wake = true;
+      if (!wake && world.water && world.water(P[0], P[2]) > P[1] - R) wake = true;
+      if (!wake) return;
+      asleep = false; still = 0; stats.asleep = false;
+    }
+    fluids(h);
+    // Contacts at x-, with every shape where it was at the start of the step.
+    pN = cN; pId.set(cId); pPen.set(cPen); pLam.set(cLam);
+    cN = 0;
+    capsules(margin, h);
+    boxes(margin, h);
+    ground(margin, h);
+    stats.contacts = cN;
+    // The inertial target and the adaptive warm start, as the chain's.
+    const h2 = h * h;
+    const aa = Math.sqrt(acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2]) || 1;
+    PI[0] = P[0] + V[0] * h + acc[0] * h2;
+    PI[1] = P[1] + V[1] * h + acc[1] * h2;
+    PI[2] = P[2] + V[2] * h + acc[2] * h2;
+    avbdQAddV(Q, 0, W[0] * h, W[1] * h, W[2] * h, QI, 0);
+    let wgt = ((V[0] - VP[0]) * acc[0] + (V[1] - VP[1]) * acc[1] + (V[2] - VP[2]) * acc[2]) / h / (aa * aa);
+    wgt = wgt > 1 ? 1 : wgt > 0 ? wgt : 0;
+    P0.set(P); Q0.set(Q);
+    P[0] += V[0] * h + acc[0] * wgt * h2;
+    P[1] += V[1] * h + acc[1] * wgt * h2;
+    P[2] += V[2] * h + acc[2] * wgt * h2;
+    Q.set(QI);
+    const mh = mass / h2, ih = Im / h2, alpha = o.alpha;
+    for (let it = 0; it < o.iterations; it++) {
+      // Primal: the one body's 6x6. A sphere's inertia is the same in every
+      // frame, so the angular block starts as a diagonal.
+      aL.fill(0); aA.fill(0); aX.fill(0);
+      aL[0] = mh; aL[4] = mh; aL[8] = mh;
+      aA[0] = ih; aA[4] = ih; aA[8] = ih;
+      bL[0] = mh * (P[0] - PI[0]); bL[1] = mh * (P[1] - PI[1]); bL[2] = mh * (P[2] - PI[2]);
+      avbdQSub(Q, 0, QI, 0, dth);
+      bA[0] = ih * dth[0]; bA[1] = ih * dth[1]; bA[2] = ih * dth[2];
+      avbdQSub(Q, 0, Q0, 0, dth);
+      for (let m = 0; m < cN; m++) {
+        contactEval(m, alpha);
+        if (cF[0] >= 0) continue;           // not pushing: not there
+        const b = 9 * m;
+        for (let r = 0; r < 3; r++) {
+          const k = cPen[3 * m + r], f = cF[r];
+          const jx = cB[b + 3 * r], jy = cB[b + 3 * r + 1], jz = cB[b + 3 * r + 2];
+          aL[0] += k * jx * jx; aL[1] += k * jx * jy; aL[2] += k * jx * jz;
+          aL[3] += k * jy * jx; aL[4] += k * jy * jy; aL[5] += k * jy * jz;
+          aL[6] += k * jz * jx; aL[7] += k * jz * jy; aL[8] += k * jz * jz;
+          bL[0] += f * jx; bL[1] += f * jy; bL[2] += f * jz;
+          if (r === 0) continue;
+          // (a) The friction rows' lever arm: angular block, cross block and
+          // the angular half of the right-hand side.
+          const a = 6 * m + 3 * (r - 1);
+          const qx = cArm[a], qy = cArm[a + 1], qz = cArm[a + 2];
+          aA[0] += k * qx * qx; aA[1] += k * qx * qy; aA[2] += k * qx * qz;
+          aA[3] += k * qy * qx; aA[4] += k * qy * qy; aA[5] += k * qy * qz;
+          aA[6] += k * qz * qx; aA[7] += k * qz * qy; aA[8] += k * qz * qz;
+          aX[0] += k * qx * jx; aX[1] += k * qx * jy; aX[2] += k * qx * jz;
+          aX[3] += k * qy * jx; aX[4] += k * qy * jy; aX[5] += k * qy * jz;
+          aX[6] += k * qz * jx; aX[7] += k * qz * jy; aX[8] += k * qz * jz;
+          bA[0] += f * qx; bA[1] += f * qy; bA[2] += f * qz;
+        }
+      }
+      bL[0] = -bL[0]; bL[1] = -bL[1]; bL[2] = -bL[2];
+      bA[0] = -bA[0]; bA[1] = -bA[1]; bA[2] = -bA[2];
+      avbdSolve6(aL, aA, aX, bL, bA, dxL, dxA);
+      P[0] += dxL[0]; P[1] += dxL[1]; P[2] += dxL[2];
+      avbdQAddV(Q, 0, dxA[0], dxA[1], dxA[2], Q, 0);
+      // Dual (manifold.ts updateDual): the multiplier is the force, and the
+      // penalty ramps on the rows still in error.
+      avbdQSub(Q, 0, Q0, 0, dth);
+      for (let m = 0; m < cN; m++) {
+        contactEval(m, alpha);
+        const cap = Math.min(AVBD.penMax, cK[m]);
+        if (cK[m] === Infinity) { cLam[3 * m] = cF[0]; cLam[3 * m + 1] = cF[1]; cLam[3 * m + 2] = cF[2]; }
+        cFn[m] = -cF[0];
+        if (cF[0] < 0) cPen[3 * m] = Math.min(cap, cPen[3 * m] + o.beta * Math.abs(cC[0]));
+        if (cFric <= cBound) {
+          cPen[3 * m + 1] = Math.min(cap, cPen[3 * m + 1] + o.beta * Math.abs(cC[1]));
+          cPen[3 * m + 2] = Math.min(cap, cPen[3 * m + 2] + o.beta * Math.abs(cC[2]));
+        }
+      }
+    }
+    // BDF1.
+    VP.set(V);
+    V[0] = (P[0] - P0[0]) / h; V[1] = (P[1] - P0[1]) / h; V[2] = (P[2] - P0[2]) / h;
+    avbdQSub(Q, 0, Q0, 0, dth);
+    W[0] = dth[0] / h; W[1] = dth[1] / h; W[2] = dth[2] / h;
+    // (c) The bounce, and (d) the roll, at the velocity level.
+    let onFloor = false;
+    for (let m = 0; m < cN; m++) {
+      if (cFn[m] <= 0) continue;
+      touched.add(cId[m]);
+      stats.hits++;
+      const b = 9 * m, nx = cB[b], ny = cB[b + 1], nz = cB[b + 2];
+      const svx = cDq[3 * m] / h, svy = cDq[3 * m + 1] / h, svz = cDq[3 * m + 2] / h;
+      if (cVn[m] < -o.eMin) {
+        const vn = nx * (V[0] - svx) + ny * (V[1] - svy) + nz * (V[2] - svz);
+        const want = -cE[m] * cVn[m];
+        if (want > vn) {
+          V[0] += nx * (want - vn); V[1] += ny * (want - vn); V[2] += nz * (want - vn);
+          stats.bounces++;
+          stats.lastId = cId[m]; stats.lastV = -cVn[m];
+        }
+      }
+      if (ny > 0.5) {
+        onFloor = true;
+        // The rolling part of the velocity, and the decel on it.
+        const vn = nx * V[0] + ny * V[1] + nz * V[2];
+        const tx = V[0] - nx * vn, ty = V[1] - ny * vn, tz = V[2] - nz * vn;
+        const s = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        const dec = o.roll * cFn[m] / mass / (1 + Im / (mass * R * R)) * h;
+        const cut = s > 1e-9 ? Math.min(1, dec / s) : 1;
+        const cx = tx * cut, cy = ty * cut, cz = tz * cut;
+        V[0] -= cx; V[1] -= cy; V[2] -= cz;
+        // ω −= n × Δv / R: the roll that went with the speed that went.
+        W[0] -= (ny * cz - nz * cy) / R; W[1] -= (nz * cx - nx * cz) / R; W[2] -= (nx * cy - ny * cx) / R;
+        // And the spin about the normal, which nothing else would ever stop.
+        const wn = nx * W[0] + ny * W[1] + nz * W[2];
+        const kn = wn * Math.min(1, o.spin * h);
+        W[0] -= nx * kn; W[1] -= ny * kn; W[2] -= nz * kn;
+      }
+    }
+    const v = Math.sqrt(V[0] * V[0] + V[1] * V[1] + V[2] * V[2]);
+    if (v > o.vMax) { V[0] *= o.vMax / v; V[1] *= o.vMax / v; V[2] *= o.vMax / v; }
+    // Under the floor after all that, which is one bad step: put it back on
+    // top, take the downward speed off, and count it. Only a little under —
+    // a centre gone in under a step's top is the wall's to push out, above.
+    if (world.floor) {
+      const hc = world.floor(P[0], P[2], P[1] - R);
+      const under = hc - (P[1] - R);
+      if (under > 0.03 && under < 0.5 * R && stats.depth <= 0) {
+        P[1] = hc + R;
+        if (V[1] < 0) V[1] = 0;
+        stats.rescues++;
+      }
+    }
+    // Asleep once it has been still on the floor for `sleep` seconds.
+    const wl = Math.sqrt(W[0] * W[0] + W[1] * W[1] + W[2] * W[2]);
+    if (onFloor && stats.depth <= 0 && v < 0.03 && wl * R < 0.03) still += h; else still = 0;
+    if (still > o.sleep) {
+      asleep = true; stats.asleep = true;
+      V.fill(0); W.fill(0); VP.fill(0);
+    }
+    stats.steps++;
+  }
+
+  /** Put it somewhere, at rest and awake. */
+  function place(x, y, z) {
+    P[0] = x; P[1] = y; P[2] = z;
+    V.fill(0); W.fill(0); VP.fill(0);
+    cN = 0; pN = 0; asleep = false; still = 0; stats.asleep = false; surfWas = NaN;
+  }
+  /** Send it off at (vx, vy, vz), spinning at (wx, wy, wz). */
+  function launch(vx, vy, vz, wx = 0, wy = 0, wz = 0) {
+    V[0] = vx; V[1] = vy; V[2] = vz; VP.set(V);
+    W[0] = wx; W[1] = wy; W[2] = wz;
+    asleep = false; still = 0; stats.asleep = false;
+  }
+  function wake() { asleep = false; still = 0; stats.asleep = false; }
+
+  return { P, Q, V, W, world, stats, touched, step, place, launch, wake, MAXC, cId, cFn, cB,
+    get asleep() { return asleep; }, get cN() { return cN; } };
 }

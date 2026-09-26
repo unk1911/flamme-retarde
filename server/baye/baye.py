@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.45.0"
+VERSION = "1.46.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -408,6 +408,29 @@ INTENTS = [
     # and "lick your lips", which is a thing said to HER.
     ("doodle.lick", [r"\b(lick\w*|poli[žz]i\w*|li[žz]i|l[èé]ch(e|er|ez)|"
                      r"leche[\s-]+(moi|la|le))\b"]),
+    # ── AND HIS BALL ─────────────────────────────────────────────────────
+    #
+    # Misha, 26 Sep 2026: the ball for the Slow Doodle — a beach ball you
+    # throw and he fetches (src/43-ball.js, and `fetchCmd` in 43-doodle.js).
+    # The page decides what the command means where you are standing: with
+    # the ball in your satchel or at your feet it is thrown, and with it
+    # lying somewhere else he is sent for it.
+    #
+    # THE NOUN, in the three languages: "ball", "beach ball", "throw the
+    # ball", "play ball"; Croatian "lopta", "loptu", "loptica", "baci loptu";
+    # French "la balle", "le ballon", "lance la balle". `\bball\b` and not
+    # `ball\w*`: "ballet" is her barre (`SKILLS['ballet']`) and "balls" is
+    # nothing of his. And the FETCH VERB, which is a word people say to her
+    # too — "fetch me an ice cream" is `fetch.cream` — so it is his only on
+    # its own ("fetch!", "go fetch", "fetch it, boy"), in "play fetch", or
+    # with him named. The same three rules for "donesi" (bring), which is
+    # "donesi mi pivo" at a counter, and "rapporte" / "va chercher".
+    ("doodle.ball", [r"\b(beach ?ball|ball|lopt[aeiu]\w*|balle|ballon)\b"]),
+    ("doodle.ball", [r"^\W*(go\W+|idi\W+|va\W+)?(fetch|donesi|aport|rapporte|chercher)"
+                     r"(\W+(it|boy|doodle|je|ga|le|la)){0,2}\W*$"]),
+    ("doodle.ball", [r"\bplay\w*\b", r"\bfetch\b"]),
+    ("doodle.ball", [r"\b(fetch\w*|donesi|rapporte\w*|va chercher)\b",
+                     r"\b(doodle|dudl\w*|slow doodle|good boy)\b"]),
 ]
 
 
@@ -1652,6 +1675,10 @@ def intents_of(text: str) -> list:
     # in it wants the one with the toothbrush in it.
     if "fly.brush" in out and "fly.dance" in out:
         out.remove("fly.dance")
+    # And "lick the ball" is about the ball: one thing for him at a time, and
+    # the one with the noun in it.
+    if "doodle.ball" in out and "doodle.lick" in out:
+        out.remove("doodle.lick")
     return out
 
 
@@ -1964,6 +1991,9 @@ INTENT_NAMES = {
                              "the Sonicare, or to show how to brush your teeth",
                 "doodle.lick": "tell the Slow Doodle (the dog) to lick, or to "
                                "give somebody a lick on the face",
+                "doodle.ball": "throw the ball for the Slow Doodle (the dog), "
+                               "play ball or fetch with him, or tell him to "
+                               "fetch the ball",
                 }
 # And the same menu for her own numbers, so that asking in Russian for a
 # pirouette works as well as asking in English. `do.` prefixed, filtered

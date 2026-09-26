@@ -152,6 +152,15 @@ const CARRY = [
   { key: 'lovense', label: 'a Lovense remote-control toy',
     give: true, worn: true, box: [0.04, 0.12, 0.04], col: [0.62, 0.12, 0.18],
     radio: true, wear: 'pelvis' },
+  // ── AND A BALL ────────────────────────────────────────────────────────
+  //
+  // Misha, 26 Sep 2026: the ball for the Slow Doodle. A 22 cm beach ball in
+  // six gores — see BALL in 43-ball.js, which draws and simulates it, and
+  // `── the fetch ──` in 43-doodle.js. Out of the bag with `[`, which throws
+  // it; back in with `[` again when you are standing over it. Not a gift: it
+  // is his.
+  { key: 'ball', label: 'a beach ball', worn: true,
+    box: [0.22, 0.22, 0.22], col: [0.80, 0.07, 0.06] },
   // ── AND A PHONE ───────────────────────────────────────────────────────
   //
   // Misha, 18 Sep 2026: *"that's another thing Chloe needs, a cellphone"*.
@@ -184,12 +193,12 @@ for (const c of CARRY) {
 const SATCHEL = {
   // ── WHAT YOU ARRIVE WITH ───────────────────────────────────────────────
   //
-  // Four things, and they are in the bag from the first frame rather than
+  // Five things, and they are in the bag from the first frame rather than
   // put there by a shop — see `worn` in CARRY. Everything else in here is
   // something you bought.
   // The Lovense is intentionally absent here: one receiver is already on the
   // tabouret from boot. See the note over `giftProps` in src/43-jadrija.js.
-  have: { cuffs: 1, anklecuffs: 1, headphones: 1, phone: 1 },
+  have: { cuffs: 1, anklecuffs: 1, headphones: 1, phone: 1, ball: 1 },
 };
 
 /**
