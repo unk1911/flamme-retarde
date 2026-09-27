@@ -95,8 +95,63 @@ const DOODLE = {
   pause: [0.8, 3.5],       // standing about between things, seconds
   // Bodies he waits for: how far ahead of his chest he looks, and how wide.
   wait: { ahead: 1.1, r: 0.55, every: 0.25 },
-  // Where he is solid to you: two discs along his back.
-  disc: { r: 0.26, off: 0.34, top: 0.95 },
+  // Where he is solid to you: a capsule along his back, and his head.
+  //
+  // It was two discs, 0.26 m at 0.34 m either side of his root, and that
+  // was two holes. Misha, 27 Sep 2026, with a screenshot of the inside of
+  // his skull: *"the game allows me to get too close to the slow doodle and
+  // the result is i see/slice through his head into his tongue etc... it
+  // shouldn't permit me to get so close to him that it starts to slice
+  // through him"*. MEASURED on 1.533.0: two discs 0.68 m apart and 0.52 m
+  // across do not even meet, so beside his middle you stood 0.44 m off his
+  // spine instead of 0.56; and they ended 0.60 m ahead of his root while his
+  // nose is 0.72 ahead and swings round to you when you are near, so his
+  // head was outside the collider altogether. Walked at head on, you stood
+  // with your eye 0.90 m from his root, over the top of his muzzle.
+  //
+  // So the back is one capsule, the same two centres with the same radius
+  // and everything between them — `off` is its half-length now — and his
+  // head is a disc of its own, `head` across, put wherever his head
+  // actually is: between the head bone and the tip of his nose, so it goes
+  // round with the look, down with the clover and down with the fetch.
+  // With your own 0.30 that holds your eye 0.52 m off the middle of his
+  // muzzle and 0.56 off his spine. `headTop` is his ears and the flames.
+  //
+  // THIS ALONE COULD NOT HAVE FIXED IT, and the reason is `lens` below.
+  disc: { r: 0.26, off: 0.34, top: 0.95, head: 0.22, headTop: 1.15 },
+  // What the front clip plane must stay short of — see `lensNear` and the
+  // near plane in 90-app.js. The keep-out above holds your BODY off him; the
+  // plane is 1.2 m in front of your EYE, and your eye is 1.66 m up looking
+  // down at a dog whose back is at 0.6. MEASURED at the edge of that
+  // collider, every vertex of him skinned on the CPU: the nearest of him is
+  // 0.80 m from your eye at his flank, 0.83 at his head, 0.88 looking
+  // straight down on his skull and 0.43 kneeling at his face. He is inside
+  // the plane at any distance a person stands from a dog, and it cuts him
+  // wherever it crosses — from above, through the top of his skull and into
+  // his mouth, which is the screenshot. A collider big enough to keep him
+  // out of a 1.2 m plane would hold you a metre off him standing and more
+  // kneeling (the corners of the frame reach further than its middle),
+  // which is a dog nobody can reach, a fetch that shoves you away as he
+  // brings the ball back, and a lick that cannot happen. People got the
+  // same answer on 22 Aug: the stand-off is the thing that was measured and
+  // the front plane is free.
+  //
+  // So the plane is told where he is, the way it is told about a face: his
+  // body as capsules on his own bones, (from, to, radius), and the plane put
+  // `pad` short of what they allow. The radii are FITTED, not guessed: every
+  // vertex of him skinned on the CPU in all eight clips and tested against
+  // these capsules. The flames along his back and round his neck stand
+  // 0.46 m off the spine at 1.15 m up and are what set the two big ones; the
+  // muzzle needs 0.07 and has 0.25, which covers the open jaw of the yawn,
+  // the tongue and the ball in his mouth. `null` is the tip of his nose
+  // (`DOODLE_LICK.tip`, carried on the head bone). Past `reach` of his root
+  // nothing of him can be inside a 1.2 m plane even in the corner of the
+  // frame, so it is not asked. `floor` is where his own lick puts the plane.
+  lens: {
+    reach: 3.6, pad: 0.05, floor: 0.05,
+    parts: [['Tail1', 'Neck1', 0.56], ['Neck1', 'Head', 0.58],
+      ['Head', null, 0.25], ['Tail2', 'Tail8', 0.23]],
+  },
   // HIS NOSE IN THE KABINA. Misha, 24 Sep 2026: *"slow-doodle, he should
   // periodically, like maybe once every 5 minutes or so, insert his muzzle
   // inside the kabine to see what's going on in there"*. Every `peekEvery`
@@ -2169,6 +2224,63 @@ async function buildDoodle(scene, J) {
   rearClear();
   fig.update(0);
 
+  // ── what the front clip plane may not cut ───────────────────────────────
+  //
+  // See `DOODLE.lens`. His bones' ends in the world, once a frame, off the
+  // pose he has actually been given this frame — the clip, the look, the
+  // lick's rear and the fetch's bow all move bones and nothing here needs to
+  // know which of them did. `null` in a part is the tip of his nose.
+  const LENS = DOODLE.lens.parts.map(([a, b, r]) => [fig.boneIndex(a), b ? fig.boneIndex(b) : -1, r]);
+  const _ga = new THREE.Vector3(), _gb = new THREE.Vector3(), _gp = new THREE.Vector3(),
+    _gq = new THREE.Vector3(), _gf = new THREE.Vector3();
+  /** Where bone `i`'s head is in the world; -1 is the tip of his nose. */
+  function lensEnd(i, out) {
+    if (i < 0) onBone(bi.Head, LK.tip, out); else fig.boneAt(i, out);
+    return out.applyMatrix4(mesh.matrixWorld);
+  }
+  /**
+   * The deepest the front clip plane of `cam` may sit without cutting him, in
+   * metres — null when he is not drawn or nowhere near. For the near plane
+   * in 90-app.js.
+   *
+   * TWO BOUNDS, AND THE ANSWER IS WHICHEVER IS KINDER. The plane cuts on
+   * DEPTH, the distance along the view axis, and a straight distance is not
+   * that: the first cut of this measured his nearest capsule 1.25 m from the
+   * lens, left the plane at 1.2, and a vertex of his tail 1.48 m away in the
+   * corner of the frame sat at a depth of 1.19 and was cut. So:
+   *   - straight distance over `k`, where `k` is how much longer the ray to
+   *     the corner of the frustum is than the axis — 1.74 at 70 degrees and
+   *     16:9. Nothing inside the frame is shallower than its distance over
+   *     that. Good when he is off to one side of the view.
+   *   - the depth of the nearest end of each capsule, less its radius: a
+   *     plane at that depth misses the whole of him, in the frame or out of
+   *     it. Good when he is square in front of you.
+   * Either alone is safe, so the larger is.
+   */
+  function lensNear(cam) {
+    if (d.far) return null;
+    const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
+    const dx0 = cx - mesh.position.x, dz0 = cz - mesh.position.z;
+    if (dx0 * dx0 + dz0 * dz0 > DOODLE.lens.reach * DOODLE.lens.reach) return null;
+    mesh.updateMatrixWorld();
+    cam.getWorldDirection(_gf);
+    const tv = Math.tan(cam.fov * Math.PI / 360) / (cam.zoom || 1), th = tv * cam.aspect;
+    const k = Math.sqrt(1 + tv * tv + th * th);
+    _gp.set(cx, cy, cz);
+    let gap = Infinity, deep = Infinity;
+    for (const [a, b, r] of LENS) {
+      lensEnd(a, _ga);
+      lensEnd(b, _gb);
+      const da = _gq.copy(_ga).sub(_gp).dot(_gf), db = _gq.copy(_gb).sub(_gp).dot(_gf);
+      deep = Math.min(deep, Math.min(da, db) - r);
+      _gb.sub(_ga);
+      const l = _gb.lengthSq();
+      const u = l > 1e-9 ? clamp(_gq.copy(_gp).sub(_ga).dot(_gb) / l, 0, 1) : 0;
+      gap = Math.min(gap, _ga.addScaledVector(_gb, u).distanceTo(_gp) - r);
+    }
+    return Math.max(gap / k, deep);
+  }
+
   // ── the handle a task, a probe or the console gets ──────────────────────
   const api = {
     /** Where he is, what he is doing, and why he is not moving if he is not. */
@@ -2301,16 +2413,21 @@ async function buildDoodle(scene, J) {
         shoulderAt1: sh, hindAt1: [hx, hy] };
     },
     nudge: () => { d.bumped = 1; },
+    /** How deep a camera's front clip plane may sit — see `lensNear`. */
+    lensNear: (cam) => lensNear(cam),
     raw: () => d,
   };
 
   return {
     fig, mesh, api, step, ballCaps,
     /**
-     * Him, as the person collider sees him: two discs along his back, pushed
-     * through whatever `push(x, z, r, y0, top)` the promenade hands in.
+     * Him, as the person collider sees him, pushed through whatever
+     * `push(x, z, r, y0, top)` the promenade hands in: a capsule along his
+     * back and a disc on his head — see `DOODLE.disc`. (x, z) is who is
+     * asking, because a capsule is a disc at the nearest point of its spine
+     * to them; without it he is the two end discs, as he was.
      */
-    discs(push) {
+    discs(push, x = null, z = null) {
       if (d.far) return;
       const y = mesh.position.y;
       // Stood up on somebody he is one small disc where his hind paws are:
@@ -2323,8 +2440,32 @@ async function buildDoodle(scene, J) {
       }
       const ax = Math.cos(mesh.rotation.y), az = -Math.sin(mesh.rotation.y);
       const D = DOODLE.disc;
-      push(mesh.position.x + ax * D.off, mesh.position.z + az * D.off, D.r, y, y + D.top);
-      push(mesh.position.x - ax * D.off, mesh.position.z - az * D.off, D.r, y, y + D.top);
+      const px = mesh.position.x, pz = mesh.position.z;
+      // AND THE LICK IS LEFT AS IT WAS MEASURED. Galloping in, he stops with
+      // his nose `LK.short` off your face and the rear carries him the rest;
+      // a head disc on him then is a hand on your chest pushing you back out
+      // of his reach, and he replans after you. Its own numbers were taken
+      // against the two discs, so while he is on his way to a face he is
+      // those, and nothing more. The front clip plane still knows where he
+      // is — that is `lensNear`, which does not care what he is doing.
+      if (x == null || (L && d.mode === 'lick' && L.stage !== 'off')) {
+        push(px + ax * D.off, pz + az * D.off, D.r, y, y + D.top);
+        push(px - ax * D.off, pz - az * D.off, D.r, y, y + D.top);
+        return;
+      }
+      // The back: the nearest point of his spine to you, as a disc, so the
+      // push is straight out from his side wherever along him you are and
+      // you slide round him rather than catching in a notch.
+      const k = clamp((x - px) * ax + (z - pz) * az, -D.off, D.off);
+      push(px + ax * k, pz + az * k, D.r, y, y + D.top);
+      // The head: halfway between the head bone and the tip of his nose, as
+      // posed this frame. Not asked from further off than any caller's reach
+      // plus his length: the head is never 0.9 m from his root.
+      if ((x - px) * (x - px) + (z - pz) * (z - pz) > 16) return;
+      mesh.updateMatrixWorld();
+      lensEnd(bi.Head, _ga);
+      lensEnd(-1, _gb);
+      push((_ga.x + _gb.x) * 0.5, (_ga.z + _gb.z) * 0.5, D.head, y, y + D.headTop);
     },
     get t() { return d.t; },
     get s() { return d.s; },

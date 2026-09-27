@@ -8226,6 +8226,34 @@ function frame() {
   // And the near plane held while a hand is out: it tracks her body and she
   // sways, and a projection that changes every frame is the room wobbling.
   if (thumbK > 0.3 || cupK > 0.3 || petK > 0.3) wantNear = camera.near;
+  // And a seventh, the Slow Doodle, who is the one body `nearBody` could
+  // never see. Misha, 27 Sep 2026: *"the game allows me to get too close to
+  // the slow doodle and the result is i see/slice through his head into his
+  // tongue etc..."*.
+  //
+  // `nearBody` measures columns and skips any whose top is under your eye —
+  // right for a sunbather at your feet, and the whole of him: his column is
+  // 0.95 m and your eye is 1.66. So the plane stayed at 1.2 m with a dog a
+  // metre off, and looking down at him it went through his skull. Measured
+  // off every vertex of him skinned on the CPU, 1.533.0, walking at his
+  // flank: nearest vertex 0.74 m from the lens, plane 1.20, and 14,740 of
+  // the 21,442 vertices of him in view in front of it and not drawn.
+  // Kneeling at his face your eye was 0.23 m from him.
+  //
+  // Asked of HIM, in three dimensions and of the camera — which in the third
+  // person is not where you are — so looking down on him, kneeling beside him
+  // and him walking under the lens are one question. See `DOODLE.lens` for
+  // the capsules and why the answer is not a bigger collider, and `lensNear`
+  // for why it is two bounds and not a distance. After the hold above, so a
+  // hand out to Baye cannot keep a plane that cuts him; floored at 5 cm,
+  // which is where his own lick puts it. Standing at his side it comes to
+  // about 0.4 m.
+  const dogNear = jadrija && jadrija.doodle && jadrija.doodle.lensNear
+    ? jadrija.doodle.lensNear(camera)
+    : null;
+  if (dogNear != null) {
+    wantNear = Math.min(wantNear, clamp(dogNear - DOODLE.lens.pad, DOODLE.lens.floor, 1.2));
+  }
   // And the beach ball in your hand, which is half a metre from your eye:
   // inside the promenade's 1.2 m front plane it is not drawn at all, and the
   // hand came up empty. For the half second the throw lasts.

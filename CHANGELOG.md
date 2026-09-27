@@ -8,6 +8,85 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.534.1] — 2026-09-27
+
+### the Slow Doodle is not sliced open any more
+
+Misha, with a screenshot of the inside of his skull: *"the game allows me to
+get too close to the slow doodle and the result is i see/slice through his
+head into his tongue etc... it shouldn't permit me to get so close to him
+that it starts to slice through him"*.
+
+**Why it happened.** Two separate things.
+
+- **The front clip plane never knew he was there.** On the promenade the
+  near plane sits 1.2 m in front of your eye. It is pulled in for anybody
+  within reach by `ground.nearBody`, the face ramp, but that measures
+  columns and skips any column whose top is below your eye. That is right
+  for a sunbather at your feet. It also skipped the whole of him: his column
+  is 0.95 m tall and your eye is at 1.66 m. So with a dog a metre away the
+  plane stayed at 1.2 m, and looking down at him it went through his skull.
+  Measured on 1.533.0 by skinning every vertex of him on the CPU against the
+  real camera: walking at his flank, the nearest vertex was 0.74 m from the
+  lens and 14 740 of the 21 442 vertices in view were in front of the plane.
+  Kneeling at his face, your eye was 0.23 m from him.
+- **His collider had holes.** It was two discs of 0.26 m radius, 0.34 m either
+  side of his root. Two discs 0.68 m apart and 0.52 m across do not meet, so
+  beside his middle you could stand 0.44 m off his spine instead of 0.56. And
+  they stopped 0.60 m ahead of his root, while his nose is 0.72 m ahead and
+  swings round to you when you are near. His head was outside the collider.
+
+**Why the fix is not just a bigger collider.** To keep all of him outside a
+1.2 m plane you would have to stand about a metre off him, and further when
+kneeling, because the corners of the frame reach further than its middle.
+Nobody could reach the dog, the fetch would shove you away as he brought the
+ball back, and the lick could not happen. People had the same problem on
+22 Aug and the answer then was also to leave the stand-off alone and move the
+plane.
+
+**What changed.**
+
+- **Keep-out (`DOODLE.disc`, `discs()` in 43-doodle.js).** His back is now one
+  capsule with the same two centres and the same 0.26 m radius. It pushes out
+  from the nearest point of his spine, so you slide round him instead of
+  catching in the notch. His head has its own 0.22 m disc, placed halfway
+  between the head bone and the tip of his nose as posed this frame, so it
+  follows the look, the clover and the fetch's bow. With your own 0.30 m
+  that holds your eye 0.52 m off the middle of his muzzle and 0.56 m off his
+  spine. `bodies` in 43-jadrija.js now passes who is asking, which is a
+  one-line change.
+- **The near plane (`lensNear`, and the seventh case in 90-app.js).** His
+  body is four capsules on his own bones: back, neck, muzzle and tail. The
+  radii were fitted by skinning every vertex in all eight clips and are
+  0.56, 0.58, 0.25 and 0.23 m. The flames on his back and neck set the two
+  large ones. The plane is set 5 cm short of whichever is the less strict of
+  two safe bounds: the straight distance to him divided by the frustum's
+  corner factor (1.74 at 70° and 16:9), or the depth of the nearest capsule
+  end less its radius. The first cut used the straight distance alone. It
+  left the plane at 1.2 m as he walked off after a lick, and a tail vertex
+  1.48 m away in the corner of the frame was cut at a depth of 1.19 m. It is
+  measured from the camera, so the third person is covered too. The floor is
+  5 cm, which is where his own lick already puts the plane. Standing beside
+  him the plane comes to about 0.4 m.
+- **The lick is left exactly as it was measured.** While he is on his way to
+  a face, and while he is up on it, he is the old two discs or the single
+  hind-paw disc. A head disc would push you back out of his reach as he
+  arrived. Before and after: the same stages, a nose gap of 1 to 4 cm and
+  14 strokes.
+
+**Measured, before and after, by skinning every vertex against the camera.**
+
+| | 1.533.0 | 1.533.1 |
+|---|---|---|
+| walking head-on / from above / at his flank / diagonally / kneeling, held in the idle | 4 of 5 cut (head-on was spared only because a cyclist's face ramp had the plane at 0.60) | 0 of 5 |
+| him walking into you | cut | not cut: he bumps you and stops at 1.12 m |
+| 50 random stands round him, 35% kneeling, random clip and heading, looking at a random point on him | 46 cut | 0 cut, nearest eye-to-dog 0.29 m kneeling |
+| two fetches to you, sampled every 150 ms for 60 s | 83 of 408 samples cut: bringing it back, dropping it 1.4 m from you, waiting, and standing about after | 0 of 410; the fetch is unchanged, dropped 0.28 m from its mark both times |
+| the lick, first and third person | not cut (5 cm plane) | not cut, same plane |
+
+The third-person camera never came within 2 m of him, in 36 random stands
+or with him walking in under it, so that was never part of the bug.
+
 ## [1.534.0] — 2026-09-27
 
 ### the trees: needles, round trunks and bark
