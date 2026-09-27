@@ -1040,7 +1040,25 @@ body.cell-out #ears { right: calc(24px + var(--cell-gap)); }
   padding: .45rem .6rem;
 }
 #ears[hidden] { display: none; }
-#ears .ears-head { text-transform: uppercase; letter-spacing: .16em; color: #8fb3c0; }
+#ears .ears-head {
+  text-transform: uppercase; letter-spacing: .16em; color: #8fb3c0;
+  padding-right: 1.4rem;
+}
+/* The × — Misha, 27 Sep 2026: "the ears 'E' should have an 'X' so i could
+   'close it out'". The sheets' own close (#help-close, #panel-close): the same
+   glyph, the same grey that goes to salt under the mouse. `pointer-events` back
+   on, like the typing line, because the panel is a read-out and this is a
+   control. Two rem square, which is the 32 px a thumb needs; it sits in the
+   corner over the head line, whose padding keeps the words out from under it. */
+#ears .ears-close {
+  position: absolute; top: 0; right: 0; width: 2rem; height: 2rem;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; pointer-events: auto;
+  font-size: 1rem; line-height: 1; color: #6f8189;
+}
+#ears .ears-close:hover { color: var(--salt); }
+html.touch #ears .ears-close { width: 2.4rem; height: 2.4rem; font-size: 1.2rem; }
+html.touch #ears .ears-head { padding-right: 2rem; }
 #ears .ears-bar { height: 3px; margin: .3rem 0 .35rem; background: rgba(160, 200, 214, .15); }
 #ears .ears-bar i { display: block; height: 100%; width: 0; background: #7fd1e6; }
 #ears .ears-line { white-space: pre-wrap; overflow-wrap: anywhere; }

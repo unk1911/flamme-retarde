@@ -278,7 +278,28 @@ const ears = (() => {
     sayForm.autocomplete = 'off';
     sayForm.addEventListener('submit', (e) => { e.preventDefault(); sendTyped(); });
     sayForm.appendChild(sayEl);
-    panelEl.append(head, bar, list, sayForm);
+    // ── AND A WAY TO SHUT IT WITH THE MOUSE ─────────────────────────────
+    //
+    // Misha, 27 Sep 2026: *"one minor annoying thing: the ears 'E' should
+    // have an 'X' so i could 'close it out'"*. The only doors were keys — `I`,
+    // Escape in the box — and `I` shuts the line but leaves the panel up for
+    // as long as it has lines in it, which on a desktop is for ever. So this
+    // is `dismiss`: the same close the key does, and the lines with it, so
+    // the panel is actually gone. A `button`, which is what both the touch
+    // sticks (`isControl` in 91-touch.js) and the settings sheet's outside-tap
+    // guard in 90-app.js already know to leave alone; and the same `&times;`
+    // the help, sign-in and settings sheets close with.
+    const shut = document.createElement('button');
+    shut.type = 'button';
+    shut.className = 'ears-close';
+    shut.textContent = '×';
+    shut.title = T('ears.close');
+    shut.setAttribute('aria-label', T('ears.close'));
+    // Not the game's: a mousedown here is not a bucket drop, and a focus left
+    // on the button would be a Space or Enter that pressed it again.
+    shut.addEventListener('mousedown', (e) => { e.stopPropagation(); e.preventDefault(); });
+    shut.addEventListener('click', (e) => { e.stopPropagation(); dismiss(); });
+    panelEl.append(shut, head, bar, list, sayForm);
     document.body.appendChild(panelEl);
     // ── AND WHERE THE KEYBOARD IS ────────────────────────────────────────
     //
@@ -364,6 +385,23 @@ const ears = (() => {
     draw();
     syncSay();
     earsRegrab();
+  }
+
+  /**
+   * The ×: everything `I` shuts, and the panel with it.
+   *
+   * The microphone goes first through `stop`, as the toggle does — a close
+   * that left a live mic behind a panel you can no longer see would be the
+   * worst way for this to differ from the key. Then the lines, which are what
+   * keep a closed panel on screen (see `draw`), and the touch fade's timer
+   * with them, since there is nothing left for it to clear. `closeTyped` is
+   * the rest: the caret out, the SAY button unlit, and the mouse a head again.
+   */
+  function dismiss() {
+    if (on) stop();
+    lines.length = 0;
+    clearTimeout(fadeT);
+    closeTyped();
   }
 
   function syncSay() {
@@ -1001,6 +1039,8 @@ const ears = (() => {
     typing: () => !!sayEl && !sayEl.hidden && document.activeElement === sayEl,
     /** Whether the line is open at all, mic or no mic. */
     open: () => !!typedOn || !!on,
+    /** The ×, for a probe: the line, the microphone and the lines, all shut. */
+    dismiss,
     /**
      * Put the caret in it, which needs the pointer let go of: this is a
      * pointer-locked game and a locked pointer cannot click an input. Answers
