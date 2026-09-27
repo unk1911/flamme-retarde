@@ -8,6 +8,93 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.531.0] — 2026-09-27
+
+### the bicycles, built as bicycles
+
+Misha: *"right now, the bicycles are too 'simplistic', would be nice to have
+more complex structure for bicycle. maybe there's a few bicycle models
+available from that same place where u pulled up the bathing suits and
+all?"*
+
+His screenshot showed the problem. The frame was square box beams in flat
+green (`wheelTube` is a four-sided tube). The bar was three straight grey
+sticks with box grips. The pedals were black bricks welded to the cranks, so
+they tumbled round with them. The wheels were 14-sided rings with three
+spokes. There was no chain, no fork, no mudguard, and the saddle was a slab.
+
+**Not a downloaded model.** The bathing suits came from the MakeHuman
+community asset packs (skins, hair and clothes for the base mesh), and those
+have no bicycles. Poly Haven's 521 CC0 models have none either; the nearest
+are two rusted rims. Sketchfab does have CC0 and CC-BY bicycles, but every
+download needs an account token, and most are 20k to 800k triangles of
+textured mesh. The bigger reason is that a bicycle here has to fit its rider.
+The saddle height is solved per rider, eight different bodies' wrists are
+aimed at the grips, the cranks turn under their feet, and the fork has to
+steer about its own axis. A downloaded model would still have had to be cut
+into moving parts and re-fitted to all of that. So it is built in code from
+those numbers, and nothing needs crediting.
+
+**What it is now** (`wheelBike`, `bikeWheel`, `bikeSweep` in 43-jadrija.js):
+a Dutch-style city bicycle.
+
+- Frame: round tubes swept along real curves with smooth shading, a 69° head
+  angle and 45 mm of fork offset.
+- Front end: a curved fork with a crown, a quill stem, a swept-back city bar
+  with rubber grips, brake levers and their cables, and a lamp.
+- Wheels: 36 laced spokes, a round-section 38 mm tyre on a box-section rim,
+  flanged hubs, and a valve (the one mark that shows a wheel turning).
+- Drivetrain: a 38-tooth chainring on a five-arm spider, the chain round it
+  and a 16-tooth sprocket, and pedals with tread and amber reflectors.
+- The rest: a sprung saddle on coil springs, mudguards with stays, a rear rack
+  with a tail lamp, and a kickstand.
+
+The three bicycles are no longer one bicycle three times:
+
+- **Green diamond frame:** plated mudguards, a black rack and a bell.
+- **Cream Dutch roadster:** gumwall tyres, a chainguard, a brown saddle and a
+  bell.
+- **Red step-through:** a chainguard and a wicker basket with two towels in
+  it.
+
+The paint colours are the ones they already had.
+
+**Things that move now and did not before:**
+
+- **The bar steers.** The fork, bar, front wheel, front mudguard and basket
+  turn about the head tube's axis by atan(wheelbase × rate of turn ÷ speed),
+  held to 29°. The hands follow the grips round.
+- **The pedals stay level.** Each pedal rides the end of its crank arm but
+  keeps the 12° nose-down angle the feet are solved to.
+
+Everything the riders are fitted to is unchanged: the bottom bracket, crank
+length, seat-tube angle, grip positions and wheel size. The bathers
+themselves are untouched.
+
+**Measured** (the three bicycles, not counting riders):
+
+- **Triangles:** 1,794 before, 24,848 now within 24 m, and 8,194 when all
+  three are further away.
+- **Draw calls:** 12 before, 21 now (+9). Each bicycle is now seven meshes:
+  frame, steering, cranks, two pedals and two wheels.
+- **Far copy:** past 24 m each bicycle swaps to a copy with four-sided tubes
+  and no spokes, teeth, springs or cables. A spoke under a pixel only
+  crawls. The swap distance scales with the zoom, so a bicycle seen through
+  the long lens keeps its detail.
+- **Script time:** `wheelMs` went from 0.095 to 0.105 ms a frame.
+
+Checked on the ANGLE/D3D12 build from the front, the side, three-quarter and
+behind: hands on the grips, seated on the saddle, and feet on the pedals at
+0°, 90°, 180° and 270° of crank. Also checked with the bar turned to 26° and
+29°.
+
+Not changed: the four bicycles parked in the rack by the kabine. They are
+baked into the shore's own buffers and are still the old chord-ring wheels.
+
+Debug: `__fr.jad.raw().wheels.set(i, { phase, steer, far })` pins a
+bicycle's crank angle, bar angle and near/far copy for a photograph (use it
+with `hold`). `stats()` now reports `draws`, `machineTrisFar` and `far`.
+
 ## [1.530.2] — 2026-09-27
 
 ### the diver walks forward, climbs out without a hop, and the ladder is whole
