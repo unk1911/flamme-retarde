@@ -8,6 +8,120 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.534.0] — 2026-09-27
+
+### up the skakaonica's ladder, and off its board: a springboard on AVBD
+
+Misha: *"i would like to be able to swim up to the trampouline, and go up the
+ladder just like that diver, and also dive from the board... is this something
+that we can use that awesome AVBD effects.. like i might bounce off the board a
+few times to increase the trajectory of my jump or do some cool acrobatics for
+my dive/jump.. would be cool to use 'B' or whatever to see myself (Chloe) from
+different angles as i execute this dive"*
+
+New file, `src/61-plunge.js`, and a new phase, `plunge`, between the swim and
+the swim.
+
+- **Getting there.** Swim to the foot of the tower's ladder and the swim hint
+  says **E** to climb the ladder. E there climbs instead of going ashore
+  (anywhere else in the sea E is ashore as before).
+  - The climb is solved on her own bones, not played: a gait of diagonal
+    pairs (right hand with left foot), each limb up two rungs while the
+    other pair holds, and every hand and foot put on its rung by a two-bone
+    IK in her sagittal plane (`fk`/`ik` over `fig.aim`, which composes by
+    addition about her lateral axis). She leans back 8° off the rungs with
+    her pelvis 0.46 m out, so her arms are nearly straight to the rung
+    above. The diver's baked `ladder` clip is his skeleton's, and was not
+    used.
+  - Then over the lip, across the deck on to the plank, and round to face
+    the tip: about eight seconds, bottom rung to standing.
+  - In her own eyes she is drawn too, and the view looks down at her own
+    hands on the rungs. MEASURED: her eye is 0.38 m off the rungs. At 0.22 m
+    (the first cut) the 58° lens saw one rung and concrete.
+- **The board is AVBD.** The cantilever, fulcrum to tip (3.04 m), is four
+  rigid planks in an `avbdNet`, ball-jointed hard end to end, with a
+  torsional spring in each joint: EI/l, and 2EI/l at the root, so that the
+  tip stiffness comes out at the beam's 3EI/L³.
+  - EI is 65 000 N·m², a 6.8 kN/m tip against dive.py's 8 kN/m under an
+    80 kg man. Mass 44 kg. It is solved at 240 Hz, 10 iterations,
+    0.05 ms a step. At 120 Hz, backward Euler took a third of the bounce out
+    every second.
+  - She is a fifth body, hung off the plank under her foot by one stiff
+    spring (1e5 N/m) whose rest length is her leg. A press of **Space** is a
+    crouch, then a push that is still accelerating when it ends. She leaves
+    the board when that spring goes into tension with her going up faster
+    than the plank under her. That is the solve's call, not a timer's.
+  - Pumping falls out of ∫F·dL: F is largest at the bottom. A press just
+    before landing is counted from the landing (a 0.22 s buffer).
+  - MEASURED in Node on the same solve, standing at the tip, pressing a
+    tenth of a second before each landing: takeoffs of 3.0, 4.6, 5.1, 5.5
+    and 6.1 m/s, then a plateau near 5.8. In the game, off the same presses:
+    2.72, 4.55, 5.02 and 5.35 (the dive).
+  - Pressed late, a quarter second after each landing: 2.7, 0.5, 1.1, 1.8,
+    0.7, 0.6, 0.8. It never builds.
+  - Not pressed: the loaded board throws her once (3.0, then 1.7 to 2.0
+    m/s) and she sticks.
+  - The tip goes 0.55 m down and 0.2 m up at full pump, and the hard joints
+    open 6 mm at the worst.
+  - The leg is advanced a substep at a time. Stepped once a frame, the same
+    pump came out 3.0, 4.6, 5.1 at 60 fps and 1.5, 2.7, 4.4 at 30. Now they
+    agree to 0.1.
+- **It stays up.** The hammock's guard, as written there: a joint open past
+  15 mm, a plank faster than 20 m/s or out of place, or her further from
+  her foot than a leg rolls back to a quarter-second snapshot, cold. Three
+  in four seconds and the board goes back to how it was built, with her
+  standing on it. Tested with `__fr.plunge.blowUp()`, which throws the
+  planks upward at 30 m/s. One throw was one rescue. Three in 0.3 s were
+  three more rescues and one reset, and she was left standing still on a
+  flat board.
+- **The dive.** Hold **W** as she leaves for a forward dive, **S** for a
+  reverse; neither is a bounce straight up.
+  - Leaning gives her 0.95 m/s out over the water and a somersault spin
+    scaled to how hard she left.
+  - In the air her angular momentum is fixed: ω = L / I. Hold **Space** to
+    tuck (I 0.30, 3.3× the spin), **C** to pike (0.50, 2×), and let go to
+    open out. **A D** twist. The shapes are aims (hips, knees, spine,
+    toes), with the hands IK'd to her shins.
+  - The flight is ballistic about her centre of mass, from de Leva's
+    female segment masses on her posed bones. So tucking moves her body
+    round the parabola, and the parabola does not move.
+  - Laid out, a forward dive off a pumped board turns half a somersault
+    and goes in head first. Tuck through the top and it is a 1½.
+- **The entry.** At the surface: the bathers' splash (`bodySplash`), sized
+  by how flat she hit, and a line. The score is 10 at vertical, 5 at 30°,
+  nothing past 60, less a closed tuck or pike. The line names what she did
+  (*Clean — 1½ somersaults forward, tucked · 7.0/10*, *Clean — ½ somersault
+  reverse, straight · 8.0/10*), and past 60° it is a *Belly flop*. Then she
+  is in the swim where she went in, as deep as she went.
+- **B is a dial on the tower.** Her eyes, then round her (the mouse orbits;
+  on the ladder it starts behind her shoulder), the judges' chair side on
+  from the seaward side, a float off the tip looking up, and the deck behind
+  her. Behind her, the shot holds 1.3 s on the water closing over her
+  before the swim's own camera takes over. In her own eyes the whole
+  somersault is hers, horizon and all.
+- **The diver takes turns.** While she is on the tower he is held
+  (`diveHeld` in 43-jadrija.js). Waiting on the board, he goes at once and
+  clears it. Arriving at the ladder, he treads water at its foot until she
+  has gone in. She cannot step past the ladder on to the plank while he is
+  on it. E at the foot while he is climbing says so. Nothing else he does
+  changes.
+- **Out.** The only way down is off the end (E on the tower says so). 9, 0,
+  V and R work from the top, because the tower now counts as in the water
+  for the back doors (`inWater`).
+- `avbdNet` gains `setString` (move a string's end along its body, its rest
+  length, on or off), for the leg walking from plank to plank. `you.drive`
+  takes a `quat`, for an attitude three Euler angles cannot say.
+- Debug: `__fr.plunge.go()`, `.top()`, `.stats()`, `.autoPump(bounces,
+  lean, shape, turns, twist, late)`, `.script([...])`, `.cam(i)`,
+  `.blowUp()`.
+- **Not in this:**
+  - climbing back down;
+  - touch controls on the tower;
+  - the hurdle as its own move (walking off the end into a bounce does
+    it);
+  - twists that change the somersault;
+  - a proper judges' panel.
+
 ## [1.533.1] — 2026-09-27
 
 ### the hammock stays in the pines, a wider clearing, and no oleanders
