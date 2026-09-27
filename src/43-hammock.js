@@ -131,6 +131,41 @@ const HAMMOCK = {
   // half her weight, where rolling out takes 40 cm — and it is nothing at
   // all while she swings, because she and the bed swing together.
   keep: 3000,
+  // THE HAND ON THE BED, N/m for the whole bed, across the span only. Misha,
+  // 27 Sep 2026: *"somehow the hammock broke now, she gets there and it
+  // breaks and gets thrown into the sky or something"*. `wrong` (below)
+  // catches the sky. What goes wrong first is getting in, and it is the
+  // same thing every time. MEASURED, frame by frame through thirty get-ins,
+  // the middle row of the cloth across the span against her centre: while
+  // the guide has her, her seat and legs lean on a bed of two kilograms
+  // with the guide's twelve thousand newtons a metre behind them, and the
+  // bed goes. Either it swings away across the span — its middle 0.25 to 0.55
+  // m from her by the time the guide lets go, where on a get-in that works
+  // it is 0.05 to 0.17 — or it folds shut under her, five plates across
+  // stacked into two, 0.25 m wide. Either way she is lowered on to the edge
+  // of it, rolls off, and lies under the bed with the cloth over her. That
+  // was 15 get-ins in 30 before 1.535.2, and 8 in 30 on the settled
+  // hammock — which one you get is chaotic; which way it goes is not.
+  //
+  // So while the guide has her, and for `holdFor` s after it lets her go
+  // (then eased off over `holdFade`), every plate is held by a soft spring
+  // across the span only — where it lay across relative to the rest of the
+  // bed when she started, with the whole bed carried to under her centre
+  // (as far as `holdAcross` either side of the line between the ties). It
+  // is the hand a person keeps on a hammock getting in. The bed sags, folds
+  // along the span and takes her weight as it likes; it only cannot swing
+  // away from her or fold shut across. And the same while the guide takes
+  // her out. MEASURED: 30 of 30 on the cloth, six ways — walked there,
+  // asleep, after forty seconds, after a push, you on the other side, at
+  // warp 8 — where it had been 22 of 30; she lies where a good get-in
+  // always put her (y 3.203 to 3.209, against 3.20). TRIED FIRST: the
+  // middle column held where it was, which kept the bed from swinging and
+  // let it fold shut (5 in 9); the whole bed held at the line under the
+  // ties, 7 in 10; no friction on her while guided, 0 in 9 — the friction
+  // is what drags the bed along with her, and the push is what the normals
+  // do. At 20 000 N/m, 9 in 10, and she is pushed up off the rim 18 cm as
+  // she sits.
+  hold: 8000, holdAcross: 0.08, holdFor: 1.5, holdFade: 1.0,
   // ── the solve ───────────────────────────────────────────────────────────
   // The chain's constants (CHAIN in 43-jadrija.js), and ten iterations at
   // 120 Hz, which is two steps a frame at 60.
@@ -272,7 +307,7 @@ function hammockSim(o) {
   const rope = Math.max(H.ropeMin, half - H.bed / 2 - H.fan);
 
   const net = avbdNet({
-    maxBodies: NU * NV + 3, maxJoints: 3 * ((NU - 1) * NV + NU * (NV - 1)) + 3,
+    maxBodies: NU * NV + 3, maxJoints: 3 * ((NU - 1) * NV + NU * (NV - 1)) + 3 + NU * NV,
     maxStrings: 2 * NV + 2 + NU * (NV - 2) + (NU - 2) * NV, maxPoints: NU * NV * 4, maxBoxes: NU * NV, maxCaps: 32, maxContacts: 900,
     pointsHitCaps: false,
     iterations: H.iterations, alpha: H.alpha, alphaContact: H.alphaContact, beta: H.beta,
@@ -409,6 +444,11 @@ function hammockSim(o) {
   const guide = net.addJoint(-1, [0, 0, 0], her, [0, 0, 0], 0, 0, 1);
   // ── and the sling's hold on her — see HAMMOCK.keep ────────────────────
   const keep = net.addJoint(plate[NU >> 1][NV >> 1], [0, 0, 0], her, [0, 0, 0], 0, 0, 1);
+  // ── the hand on the bed while she is guided — see HAMMOCK.hold. One  ──
+  // world joint per plate, off (both stiffnesses 0) until `herGuide`
+  // turns it on: nothing about the empty hammock is changed by them.
+  const holds = [];
+  for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) holds.push([plate[i][j], net.addJoint(-1, [0, 0, 0], plate[i][j], [0, 0, 0], 0, 0, 1)]);
   // ── her capsules, rewritten every frame by `herShape` ────────────────
   const caps = [];
   for (let k = 0; k < 32; k++) { const c = net.addCap(her, k); net.cpOn[c] = 0; caps.push(c); }
@@ -456,7 +496,7 @@ function hammockSim(o) {
     return q >= H.restHold;
   }
 
-  return { net, plate, gA, gB, her, guide, keep, caps, ropeA, ropeB, ex, ey, ez, M: [Mx, My, Mz], settle, rest, hush, motion,
+  return { net, plate, gA, gB, her, guide, keep, holds, caps, ropeA, ropeB, ex, ey, ez, M: [Mx, My, Mz], settle, rest, hush, motion,
     D, rope, len, wid, NU, NV, floorM, drop };
 }
 
@@ -702,6 +742,17 @@ function buildHammock(scene, J) {
     return [J.A[0], J.A[1], J.A[2], dx / l, dy / l, dz / l];
   })();
   let herIn = false, kept = false;
+  // The hand on the bed — see HAMMOCK.hold: how the bed lay across the span
+  // when it was taken (each plate, m from the middle, and their mean), and
+  // when the guide let her go (sim s; −1 while it has her).
+  const holdAt = new Float64Array(S.holds.length);
+  let holdCen = 0, letGo = -1;
+  const across = (b) => (P[3 * b] - S.M[0]) * S.ez[0] + (P[3 * b + 2] - S.M[2]) * S.ez[2];
+  function holdTake() {
+    holdCen = 0;
+    for (let k = 0; k < S.holds.length; k++) { holdAt[k] = across(S.holds[k][0]); holdCen += holdAt[k]; }
+    holdCen /= S.holds.length;
+  }
   const _hq = new THREE.Quaternion(), _hv = new THREE.Vector3();
   /**
    * Her capsules this frame, in her mesh's own frame: [ax, ay, az, bx, by,
@@ -768,6 +819,9 @@ function buildHammock(scene, J) {
     _hv.set(com[0], com[1], com[2]).applyQuaternion(_hq);
     net.setLive(her, true);
     net.place(her, mp.x + _hv.x, mp.y + _hv.y, mp.z + _hv.z, [mq.x, mq.y, mq.z, mq.w]);
+    // How the bed lies as she starts — see HAMMOCK.hold.
+    holdTake();
+    letGo = -1;
     herIn = true;
     rouse();
     forget();
@@ -801,6 +855,31 @@ function buildHammock(scene, J) {
     // within a second of lying down. From inside, the cloth holds her; a
     // leg over the rim is a leg over the rim.
     net.setOneSided(true, tiesLine);
+    // And the hand on the bed — see HAMMOCK.hold. Full while the guide has
+    // her; kept `holdFor` s once it lets her go, on the bed as it lies then,
+    // and eased off over `holdFade`; and on again, on the bed as it lies,
+    // when the guide takes her to get out.
+    let kh = H.hold;
+    if (kLin > 0) {
+      if (letGo >= 0) { holdTake(); letGo = -1; }
+    } else {
+      if (letGo < 0) { letGo = simT; holdTake(); }
+      kh *= Math.max(0, Math.min(1, 1 - (simT - letGo - H.holdFor) / H.holdFade));
+    }
+    // Across the span only: each plate's target is where it is, moved across
+    // to where it lay relative to the rest when the hold was taken, with the
+    // whole bed carried under her (as far as `holdAcross` either side of
+    // the middle). So the bed sags, folds along and takes her weight as it
+    // likes, and only cannot swing away from her or fold shut across.
+    let hx = across(her);
+    hx = Math.max(-H.holdAcross, Math.min(H.holdAcross, hx));
+    for (let k = 0; k < S.holds.length; k++) {
+      const [b, j] = S.holds[k];
+      if (!(kh > 0)) { net.setJointK(j, 0, 0); continue; }
+      const d = holdAt[k] - holdCen + hx - across(b);
+      net.setTarget(j, P[3 * b] + S.ez[0] * d, P[3 * b + 1], P[3 * b + 2] + S.ez[2] * d);
+      net.setJointK(j, kh / S.holds.length, 0);
+    }
   }
   /** Where her mesh is to be drawn: the body, less the centre of mass. */
   function herPose(outP, outQ) {
@@ -814,6 +893,7 @@ function buildHammock(scene, J) {
     herIn = false;
     net.setJointK(S.guide, 0, 0);
     net.setJointK(S.keep, 0, 0); kept = false;
+    for (const [, j] of S.holds) net.setJointK(j, 0, 0);
     net.setOneSided(false);
     net.setLive(her, false);
     for (const c of S.caps) net.cpOn[c] = 0;
@@ -1065,6 +1145,8 @@ function buildHammock(scene, J) {
 
   const api = {
     sim: S, net, cloth,
+    /** Debug: the constants, live — a probe can try a number without a build. */
+    H,
     get herIn() { return herIn; },
     get asleep() { return asleep; },
     get far() { return far; },

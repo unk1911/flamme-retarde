@@ -62,13 +62,78 @@ millimetres.
   of busy main-thread time near it after load: 21.3 % → 0. It is unchanged
   while it swings. The empty push trace over 8 s in-game is within about 1°
   of the old one.
-- **Known, and not new:** Baye's get-in is fragile against a hammock that has
-  hung still for a while. She sometimes goes through the bed and lies under
-  it. The old build did this on 10 of 18 get-ins once the hammock had hung
-  for 40 s or slept, against 3 of 15 in the first half-minute after load.
-  The hammock is now always the settled one, so this is the case you meet:
-  6 of 10 on this build. That fix is in the get-in and is not in this
-  release.
+
+### and she gets into it
+
+Misha, earlier the same day: *"somehow the hammock broke now, she gets there
+and it breaks and gets thrown into the sky or something"*. The divergence
+guard (`sane`/`wrong`) catches the sky. Underneath it was a get-in that
+failed on its own: she sat back, the bed went away, and she ended up lying
+under it with the cloth over her. This happened on 15 of 30 get-ins on
+1.535.1. The sleep fix above made the settled hammock the normal case, and
+on it the count was 8 of 30. That hammock can't ship with it, so this goes
+in the same release.
+
+**Why.** Recorded frame by frame through thirty get-ins: the middle row of
+the cloth across the span, her centre, the contacts. While the guide has
+her, her seat and legs lean on a 2 kg bed with the guide's 12 000 N/m
+behind them, and the bed gives way in one of two ways:
+
+- **It swings away.** Its middle is 0.25–0.55 m from her when the guide
+  lets go, where on a get-in that works it is 0.05–0.17 m.
+- **It folds shut.** The five plates across stack into two, 0.25 m wide.
+
+Either way she is lowered onto its edge, rolls off, and goes under. Which
+get-in fails is chaotic (frame timing). Why it fails is always this.
+
+- **A hand on the bed** (`HAMMOCK.hold`, the `holds` joints in
+  `hammockSim`). While the guide has her, and for 1.5 s after it lets her
+  go (then eased off over 1 s), every plate is held by a soft spring,
+  8000 N/m for the whole bed, across the span only:
+  - each plate is held where it lay relative to the rest of the bed when
+    she started;
+  - the whole bed is carried to under her centre, at most 8 cm either side
+    of the line under the ties.
+
+  The bed still sags, folds along the span and takes her weight freely.
+  It just can't swing away from her or fold shut across. The same hold
+  comes on while the guide takes her out. The joints are off otherwise, so
+  the empty hammock is untouched: the rest shape, sleep and push numbers
+  below are bit-identical in the Node harness.
+- **Tried and dropped** (numbers in the comment):
+  - the middle column held in place: 5 of 9 get-ins OK;
+  - the whole bed held at the line under the ties: 7 of 10;
+  - no friction on her while guided: 0 of 9 (the friction is what keeps
+    the bed with her);
+  - a stiffer hold, 20 000 N/m: 9 of 10, and she was pushed 18 cm up off
+    the rim as she sat.
+
+**Get-ins on the cloth, 5 of each:**
+
+| condition | 1.535.1 | sleep fix alone | now |
+|---|---|---|---|
+| walked there, just after load | 2 | 3 | 5 |
+| hammock asleep | 3 | 4 | 5 |
+| after 40 s | 4 | 5 | 5 |
+| after a push has died down | 1 | 2 | 5 |
+| you on the other side | 3 | 3 | 5 |
+| at warp 8 | 2 | 5 | 5 |
+| **total** | **15 of 30** | **22 of 30** | **30 of 30** |
+
+- **After lying down she is where a good get-in always put her:**
+  y 3.203–3.209, against 3.20–3.21 before.
+- **Full cycles** (in, 10 s, two pushes, out), 6 runs:
+  - pushes swing her ±11–18°, as before;
+  - no guard rescues on this build, against 2 of 6 runs with a rescue
+    before;
+  - after she gets out, the empty cloth swings ±6–12°, against ±25–49° and
+    one bail before.
+- **Sleep fix re-checked with this in:**
+  - rest low 3.213, sag 0.925, 11.6°;
+  - asleep 0 s after load and after arriving from far;
+  - 158.4 s to sleep after an empty push;
+  - the empty push trace is unchanged;
+  - hammock share of busy main thread after load 0 %, while swinging 22.6 %.
 
 ## [1.535.1] — 2026-09-27
 
