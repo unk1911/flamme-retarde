@@ -15,11 +15,17 @@
 // This is the machinery for the second case. Same rig format, same joint names,
 // same sign convention, and — the point — the *same walk cycle*, because a
 // second implementation of a gait is a second thing to get wrong. What is
-// different is how they are drawn: one instanced layer per rig part, so a
-// hundred and twenty people cost twenty-two draw calls instead of thirteen
-// hundred. Posing happens on one scratch skeleton that is re-posed per figure
-// and read out into the instance buffers, which means the whole crowd carries
-// no per-figure Three.js objects at all.
+// different is how they are drawn: instanced, so a hundred and twenty people
+// cost a handful of draw calls instead of thirteen hundred. Posing happens on
+// one scratch skeleton that is re-posed per figure and read out into the
+// instance buffers, which means the whole crowd carries no per-figure Three.js
+// objects at all.
+//
+// Until 27 Sep the instances were tube figures, eleven rigid lofts a person
+// out of tools/blender/bather.py, one instanced layer per tube — the
+// "prehistoric wooden manequins" of Misha's report. They are the eight real
+// bathers now, skinned to the same eleven joints on the GPU, one layer per
+// body: see `readFR3DCrowd`.
 //
 // The sign convention, restated because every line of the animation depends on
 // it and it is the one thing that is not obvious from the code:
@@ -196,88 +202,289 @@ function rigSkeleton(rig) {
     f[p.name] = g;
   }
   f.restY = f.pelvis.position.y;
+  // Where the hip joint goes when this person sits on a slab: see `sit` in
+  // `pose`. The old tube rig was measured by hand at 0.14 m, which is what
+  // `restY - 0.72` came to on it; a body out of crowd_far.py says for itself,
+  // off the underside of its own thighs, because a heavy woman sits higher on
+  // her thighs than a lean man and a figure told otherwise sits in the slab.
+  f.sitY = rig.sitHip != null ? rig.sitHip : f.restY - 0.72;
   return f;
 }
 
 /**
- * One instanced layer for one rig part.
+ * The far tier's bodies — tools/blender/crowd_far.py, one .fr3d v6 per person.
  *
- * The marker palette is the whole reason this has its own material rather than
- * sharing the landmarks' `base *= vVCol`. tools/blender/bather.py paints three
- * reserved colours that mean "ask the instance", and this is where they are
- * asked. See that file's docstring for the convention.
+ * ── what this replaced ─────────────────────────────────────────────────────
+ *
+ * Misha, 27 Sep 2026: *"lookin from very far away ... in the distance, one of
+ * the bathers still appears as our 'prehistoric' wooden manequins. but as i
+ * approached her closer, she transformed into modern v2.0 bather ... can we
+ * just get rid of those prehistoric manequins completely"*.
+ *
+ * This tier used to draw everybody with two rigs out of tools/blender/
+ * bather.py — eleven lofted tubes a person, one instanced layer per tube, and a
+ * marker palette in the vertex colours asking each instance what colour its
+ * skin, swimwear and hair were. Those were the mannequins: the one kind of
+ * person on the shore that was not one of the eight people the near tier
+ * draws, which is why walking up to somebody turned a wooden doll into a
+ * woman in a red bikini.
+ *
+ * Now the far tier draws the SAME eight. The bake takes each v2 bather as it
+ * ships, brings the arms down to the rest pose `pose()` below is written
+ * against, folds its MakeHuman skeleton into the eleven joints this tier
+ * animates, decimates it to the old rig's triangle budget and paints every
+ * vertex with which of the person's three colours it wants and how much
+ * shading the texture had there. A person at two hundred metres is the same
+ * body, the same skin tone, the same swimsuit and the same hair as at two.
+ *
+ * The file:
+ *
+ *     '<4sIIIfI'  magic, 6, nv, ni, height, nparts
+ *     per part:   u16 len, name, i32 parent, 3 f32 pivot (from parent's)
+ *     u16 len, JSON meta
+ *     f32 pos[nv*3]  i8 nrm[nv*3]  u8 tint[nv*4]  u8 bone[nv*4]  u16 idx[ni]
+ *
+ * `parts` is the same table `rigSkeleton` has always read — names, parents
+ * and pivots — and `bind` is where each joint stands in the bind pose, which
+ * is the inverse every joint matrix is written against in `flush`.
  */
-function crowdLayer(scene, proto, cap, part) {
+function readFR3DCrowd(buf) {
+  const dv = new DataView(buf);
+  const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1),
+    dv.getUint8(2), dv.getUint8(3));
+  if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
+  const version = dv.getUint32(4, true);
+  if (version !== 6) throw new Error('fr3d crowd body needs version 6, got ' + version);
+  const nv = dv.getUint32(8, true);
+  const ni = dv.getUint32(12, true);
+  const height = dv.getFloat32(16, true);
+  const np = dv.getUint32(20, true);
+  const dec = new TextDecoder();
+  let o = 24;
+  const parts = [];
+  for (let i = 0; i < np; i++) {
+    const len = dv.getUint16(o, true); o += 2;
+    const name = dec.decode(new Uint8Array(buf, o, len)); o += len;
+    parts.push({
+      name, parent: dv.getInt32(o, true),
+      pivot: [dv.getFloat32(o + 4, true), dv.getFloat32(o + 8, true),
+        dv.getFloat32(o + 12, true)],
+    });
+    o += 16;
+  }
+  const ml = dv.getUint16(o, true); o += 2;
+  const meta = JSON.parse(dec.decode(new Uint8Array(buf, o, ml))); o += ml;
+  // Copies, once, at load: the table above is variable-length, so nothing
+  // after it lands on the alignment a typed-array view needs.
+  const pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+  const nrm = new Int8Array(buf.slice(o, o + nv * 3)); o += nv * 3;
+  const tint = new Uint8Array(buf.slice(o, o + nv * 4)); o += nv * 4;
+  const bone = new Uint8Array(buf.slice(o, o + nv * 4)); o += nv * 4;
+  const idx = new Uint16Array(buf.slice(o, o + ni * 2));
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3, true));
+  geo.setAttribute('aTint', new THREE.BufferAttribute(tint, 4, true));
+  geo.setAttribute('aBone', new THREE.BufferAttribute(bone, 4, true));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+
+  // Parents come first — the bake writes them in `PARTS` order — so one pass
+  // accumulates every joint's bind position.
+  const bind = [];
+  for (const p of parts) {
+    const b = p.parent < 0 ? [0, 0, 0] : bind[p.parent];
+    bind.push([b[0] + p.pivot[0], b[1] + p.pivot[1], b[2] + p.pivot[2]]);
+  }
+  return {
+    parts, bind, geo, height, tris: ni / 3,
+    // How high the hip joint sits over a seat with the thighs level, off this
+    // body's own thighs. See `sitY` in `rigSkeleton`.
+    sitHip: meta.sitHip, meta,
+  };
+}
+
+/**
+ * One body out of the payload, parsed once and shared by every crowd that
+ * draws it — the shore's two and the boat's. Null if the build does not carry
+ * it, which leaves that person to the other bodies of their sex.
+ */
+const CROWD_BODIES = new Map();
+function loadCrowdBody(kind) {
+  if (CROWD_BODIES.has(kind)) return CROWD_BODIES.get(kind);
+  const key = 'crowd_' + kind + '_fr3d';
+  const p = (async () => {
+    if (typeof PAYLOAD === 'undefined' || !PAYLOAD[key]) return null;
+    try {
+      const b = readFR3DCrowd(await inflateBinary(PAYLOAD[key]));
+      b.kind = kind;
+      return b;
+    } catch (e) {
+      console.warn('crowd body failed:', key, e.message);
+      return null;
+    }
+  })();
+  CROWD_BODIES.set(kind, p);
+  return p;
+}
+
+/**
+ * Every body of one sex, in casting order. What `makeCrowd` is built from.
+ *
+ * By sex because the crowd is split by sex, and it is split by sex because
+ * everything downstream of a person already is — the voice, the bark, which
+ * of the eight a promotable bather becomes (`BATHER_SEX`). Four bodies a crowd
+ * is four draws a crowd: eight for the whole far tier, where the old rigs cost
+ * twenty-two.
+ */
+async function loadCrowdBodies(sex) {
+  const kinds = BATHER_CAST.filter((k) => BATHER_SEX[k] === sex);
+  const all = await Promise.all(kinds.map(loadCrowdBody));
+  return all.filter(Boolean);
+}
+
+/**
+ * Which body this person is drawn with, and dressed to match it.
+ *
+ * `kin` is the body they already are, if they are one — a promotable bather
+ * is dealt one of the eight at build time (`castBlob` in 43-jadrija.js) and
+ * turns into it when you walk up, so the far tier has to BE it or walking up
+ * changes their shape. Everybody else — the shop staff, a boat's passengers —
+ * gets one by hash off their seed, a child's body for a child (`child`) and an
+ * adult's for everybody else, which is the one thing about them the old
+ * mannequin could only fake by shrinking.
+ *
+ * And then `bather2Pick`, which is the near tier's own choice of skin, hair
+ * and swimwear for that body, written back on to `fg`. For a promotable
+ * bather it has already been made and is returned as it was; for anybody else
+ * it replaces the beach palette's skin with a real skin's own mean tone, so a
+ * far figure is a colour a person on that body can actually be.
+ *
+ * Rule 4: no draw of `rng` — `crowdJit` off the seed, like everything else in
+ * this file.
+ */
+function crowdBody(crowd, fg, kin, child) {
+  const kinds = crowd.kinds || [];
+  let k = kin ? kinds.indexOf(kin) : -1;
+  if (k < 0 && kinds.length) {
+    const T = bather2Table();
+    const isKid = (n) => (T && T.bathers[n] ? !!T.bathers[n].child : n.includes('child'));
+    let pool = kinds.map((_n, i) => i).filter((i) => isKid(kinds[i]) === !!child);
+    if (!pool.length) pool = kinds.map((_n, i) => i);
+    k = pool[Math.floor(crowdJit(fg.seed * 977 + 13, 74) * pool.length) % pool.length];
+  }
+  fg.body = Math.max(0, k);
+  if (kinds[fg.body]) bather2Pick(kinds[fg.body], fg);
+  return fg.body;
+}
+
+/**
+ * The shadow of one body layer: `GLSL_CROWD`, the same skinning the surface
+ * does, so the shadow is cast from where the person is.
+ */
+const CROWD_CASTER_VERT = /* glsl */ `
+attribute vec4 aBone;
+varying float vDepth;
+${GLSL_CROWD}
+void main(){
+  vec3 sp = vec3(0.0), sn = vec3(0.0);
+  crowdSkin(aBone, vec4(position, 1.0), vec4(0.0), sp, sn);
+  gl_Position = projectionMatrix * viewMatrix * vec4(sp, 1.0);
+  vDepth = gl_Position.z / gl_Position.w * 0.5 + 0.5;
+}
+`;
+
+/**
+ * One instanced layer for one BODY: everybody in a crowd who is drawn with
+ * it, in one draw.
+ *
+ * Per instance it carries the person's three colours (and a fourth, the
+ * shirt, whose alpha says whether there is one) as attributes, and their
+ * eleven joints as one row of `tex` — see `GLSL_CROWD` in 30-material.js for
+ * the layout. The row is the instance's index, so `flush` writes person n's
+ * joints to row n and their colours to slot n and nothing else has to agree.
+ *
+ * Double-sided, as the old layers were: the hair and swimwear are single
+ * sheets, and the near tier draws them from both sides too.
+ */
+function crowdBodyLayer(scene, body, cap) {
   const geo = new THREE.InstancedBufferGeometry();
-  geo.setAttribute('position', proto.attributes.position);
-  geo.setAttribute('normal', proto.attributes.normal);
-  geo.setAttribute('aVCol', proto.attributes.aVCol);
-  geo.setIndex(proto.index);
+  for (const k of ['position', 'normal', 'aTint', 'aBone']) {
+    geo.setAttribute(k, body.geo.attributes[k]);
+  }
+  geo.setIndex(body.geo.index);
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
 
   const A = {
-    aPos: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
-    aRot: new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4),
-    aScale: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
     aColor: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
     aSuit: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
     aHair: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+    aShirt: new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4),
   };
-  const NAME = {
-    aPos: 'aInstPos', aRot: 'aInstRot', aScale: 'aInstScale',
-    aColor: 'aInstColor', aSuit: 'aInstSuit', aHair: 'aInstHair',
-  };
+  const NAME = { aColor: 'aInstColor', aSuit: 'aInstSuit', aHair: 'aInstHair',
+    aShirt: 'aInstShirt' };
   for (const k in A) {
     A[k].setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute(NAME[k], A[k]);
   }
 
+  const W = body.parts.length * 3;
+  const uCrowdBones = { value: null };
+
   const mesh = new THREE.Mesh(geo, solidMaterial(0xffffff, {
     instanced: true,
+    vcol: false,
+    defines: { FR_CROWD: '' },
+    uniforms: {
+      uCrowdBones,
+      uCrowdCap: { value: new THREE.Vector2(body.meta.capHair || 1,
+        body.meta.capSuit || 1) },
+    },
     spec: 0.09,
     specPower: 24,
-    // The same floor the hand-loaded skins get. These are people on the same
-    // beach as her and they carry the same `spec` for the same reason; lifting
-    // one and not the other puts two kinds of human in one frame lit two ways.
+    // The same floor the near tier's skin gets — `SKIN_EMISSIVE`, see the
+    // note there — because these are the same people on the same beach.
     emissive: SKIN_EMISSIVE,
-    body: `
-      // The marker palette from tools/blender/bather.py. Skin is painted pure
-      // white, swimwear pure black and hair pure red, and none of those is a
-      // colour anybody wanted — they are three questions the mesh asks of the
-      // instance, so that one pair of meshes can be a whole beach of different
-      // people. Anything else is taken literally.
-      float s3 = vVCol.r + vVCol.g + vVCol.b;
-      base = vVCol;
-      base = mix(base, vColor, step(2.94, s3));
-      base = mix(base, vSuit, 1.0 - step(0.06, s3));
-      base = mix(base, vHair, step(0.94, vVCol.r) * (1.0 - step(0.06, vVCol.g + vVCol.b)));
-      n = gl_FrontFacing ? n : -n;
-    `,
+    // The colour was resolved per vertex (see FR_CROWD in 30-material.js);
+    // all that is left here is to light the back of a sheet as a front.
+    body: 'n = gl_FrontFacing ? n : -n;',
     side: THREE.DoubleSide,
   }));
   mesh.frustumCulled = false;
   mesh.renderOrder = 1;
-  // Named so that the crowd can be MEASURED. `aInstPos` on one of these is the
-  // world origin of one joint of one person, which is the only place the pose
-  // this tier actually drew is written down — `pose` runs on a scratch skeleton
-  // that is overwritten by the next figure before anything could read it. A
-  // probe that walks the scene for `crowd:head` and `crowd:pelvis` can take the
-  // head-over-hips offset of every person on the beach in one frame, and that
-  // is how "are these ninety people all standing the same way" stops being a
-  // matter of opinion. Costs a string per part.
-  mesh.name = 'crowd:' + (part || 'part');
+  // Named so a probe walking the scene can find them — `crowd:woman_old` is
+  // everybody the far tier is drawing on that body right now.
+  mesh.name = 'crowd:' + body.kind;
   scene.add(mesh);
   geo.instanceCount = 0;
-  return { geo, mesh, ...A };
+  const L = { geo, mesh, tex: null, data: null, rows: 0, W, uCrowdBones, body, n: 0, ...A };
+  crowdRows(L, 1);
+  return L;
 }
 
 /**
- * A crowd sharing one rig.
+ * Make a layer's joint texture `rows` people deep.
  *
- * `figures` is the caller's to fill and to move: this end owns posing and
- * drawing and knows nothing about where anybody is going, which is how the
- * promenade logic stays in 43-jadrija.js where it belongs.
+ * Sized to the people who are actually on this body, not to the crowd's cap:
+ * the texture goes up whole every frame (a DataTexture has no partial
+ * upload), and eight layers each a hundred deep was 420 KB a frame of
+ * matrices for a few dozen people. `makeCrowd` grows it the first time it
+ * sees who is on which body, and again only if that changes.
  */
+function crowdRows(L, rows) {
+  if (rows <= L.rows) return;
+  if (L.tex) L.tex.dispose();
+  const was = L.data;
+  L.rows = rows;
+  L.data = new Float32Array(L.W * 4 * rows);
+  if (was) L.data.set(was);
+  L.tex = new THREE.DataTexture(L.data, L.W, rows, THREE.RGBAFormat, THREE.FloatType);
+  L.tex.minFilter = L.tex.magFilter = THREE.NearestFilter;
+  L.tex.generateMipmaps = false;
+  L.tex.needsUpdate = true;
+  L.uCrowdBones.value = L.tex;
+}
+
 /**
  * The eight, in the order they are cast.
  *
@@ -381,33 +588,6 @@ function skinHeight(data) {
   const p = data.geo.attributes.position.array;
   let hi = 0;
   for (let i = 1; i < p.length; i += 3) if (p[i] > hi) hi = p[i];
-  return hi;
-}
-
-/**
- * The same question of the instanced rig, which has no vertices in one place.
- *
- * The rig is a tree of pivots with a lump of geometry hanging off each, so the
- * top of the head is the head part's own highest vertex plus every pivot
- * between it and the ground. Walked rather than looked up for the reason
- * above: 42-crowd.js has said "a canonical 1.70 m figure" in prose for as long
- * as it has existed and nothing has ever checked.
- *
- * The parts are in parent-before-child order — `rigSkeleton` already depends
- * on it — so one pass accumulates the chain.
- */
-function rigHeight(rig) {
-  const up = new Float64Array(rig.parts.length);
-  let hi = 0;
-  for (let i = 0; i < rig.parts.length; i++) {
-    const p = rig.parts[i];
-    up[i] = p.pivot[1] + (p.parent < 0 ? 0 : up[p.parent]);
-    const a = p.geo.attributes.position.array;
-    for (let k = 1; k < a.length; k += 3) {
-      const v = up[i] + a[k];
-      if (v > hi) hi = v;
-    }
-  }
   return hi;
 }
 
@@ -1131,16 +1311,26 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   };
 }
 
-function makeCrowd(scene, rig, cap) {
-  const layers = rig.parts.map((p) => crowdLayer(scene, p.geo, cap, p.name));
-  const skel = rigSkeleton(rig);
-  // Which layer is the trunk, so that one person on this beach can be wearing
-  // something. See `fg.shirt` in the write below.
-  const torsoIx = rig.parts.findIndex((p) => p.name === 'torso');
+/**
+ * A crowd: everybody drawn by the instanced tier, on a set of bodies.
+ *
+ * `bodies` is `loadCrowdBodies(sex)` — one instanced layer and one scratch
+ * skeleton each — and `fg.body` says which a person is drawn with.
+ * `figures` is the caller's to fill and to move: this end owns posing and
+ * drawing and knows nothing about where anybody is going, which is how the
+ * promenade logic stays in 43-jadrija.js where it belongs.
+ */
+function makeCrowd(scene, bodies, cap) {
+  // One layer — one draw — per body, and one scratch skeleton per body with
+  // that body's own joints in it. `fg.body` says which a person is; see
+  // `crowdBody`, which is what sets it.
+  const layers = bodies.map((b) => crowdBodyLayer(scene, b, cap));
+  const skels = bodies.map((b) => rigSkeleton(b));
+  // Re-pointed at the right body before every `pose`, which is written
+  // against `skel` and does not need to know there is more than one.
+  let skel = skels[0];
+  const kinds = bodies.map((b) => b.kind);
   const figures = [];
-  const _p = new THREE.Vector3();
-  const _q = new THREE.Quaternion();
-  const _s = new THREE.Vector3();
   /**
    * The frame everybody in this crowd is placed in, or null for the world.
    *
@@ -1216,7 +1406,11 @@ function makeCrowd(scene, rig, cap) {
         // has their hip joint about 14 cm above it. Anything less leaves them
         // hovering, which is exactly what the first cut did — a row of people
         // sitting on nothing, half a metre in the air, legs straight out.
-        skel.pelvis.position.y = skel.restY - 0.72;
+        //
+        // About 14 cm on the old tube rig; on a real body it is the depth of
+        // the thigh under the joint, measured per body by the bake — see
+        // `sitY` in `rigSkeleton`.
+        skel.pelvis.position.y = skel.sitY;
         // AND HOW FAR THE SOLES ARE UNDER THE SEAT, which is the one thing
         // about this pose that is a property of the seat and not of the person.
         //
@@ -1941,6 +2135,7 @@ function makeCrowd(scene, rig, cap) {
   }
 
   let drawn = 0;
+  let sized = -1;
 
   /**
    * Pose everybody in range and hand the transforms to the GPU.
@@ -1957,6 +2152,15 @@ function makeCrowd(scene, rig, cap) {
     frame = fr || null;
     if (frame) cam = _cl.copy(cam).applyMatrix4(_inv.copy(frame).invert());
     let n = 0;
+    for (const L of layers) L.n = 0;
+    // Who is on which body is settled once the caller has filled `figures`,
+    // and this is the first moment that is known — see `crowdRows`.
+    if (figures.length !== sized) {
+      sized = figures.length;
+      const per = new Int32Array(layers.length);
+      for (const fg of figures) per[fg.body > 0 && fg.body < layers.length ? fg.body : 0]++;
+      layers.forEach((L, i) => crowdRows(L, Math.max(1, per[i])));
+    }
     const maxSq = CROWD.poseM * CROWD.poseM;
     for (const fg of figures) {
       if (n >= cap) break;
@@ -1968,56 +2172,85 @@ function makeCrowd(scene, rig, cap) {
       if (fg.hidden) continue;
       const dx = fg.x - cam.x, dz = fg.z - cam.z;
       if (dx * dx + dz * dz > maxSq) continue;
+      const bi = fg.body > 0 && fg.body < layers.length ? fg.body : 0;
+      const L = layers[bi];
+      skel = skels[bi];
       pose(fg, t);
-      for (let j = 0; j < layers.length; j++) {
-        const L = layers[j];
-        skel.joints[j].matrixWorld.decompose(_p, _q, _s);
-        L.aPos.array[n * 3] = _p.x;
-        L.aPos.array[n * 3 + 1] = _p.y;
-        L.aPos.array[n * 3 + 2] = _p.z;
-        L.aRot.array[n * 4] = _q.x; L.aRot.array[n * 4 + 1] = _q.y;
-        L.aRot.array[n * 4 + 2] = _q.z; L.aRot.array[n * 4 + 3] = _q.w;
-        L.aScale.array[n * 3] = _s.x;
-        L.aScale.array[n * 3 + 1] = _s.y;
-        L.aScale.array[n * 3 + 2] = _s.z;
-        // A t-shirt, and it is paint rather than a garment.
-        //
-        // `aColor` is what the marker palette hands to every vertex the bake
-        // painted pure white, which is skin — and the parts are separate
-        // layers with separate attribute buffers, so answering that question
-        // differently for the trunk than for the head and the arms costs one
-        // comparison and dresses the figure in something with sleeves. It also
-        // deforms, which is the whole reason it is this and not a shell: the
-        // survey's plan for the two behind the gelato counter was a static box
-        // over the chest, and a box does not breathe with the ribcage the
-        // standing pose rocks through five degrees.
-        //
-        // The neck goes black with it. The neck is on the trunk part and there
-        // is nothing to be done about that short of a re-bake; at the two
-        // metres this is ever seen from it reads as a collar.
-        const skin = fg.shirt && j === torsoIx ? fg.shirt : fg.skin;
-        for (const [a, c] of [[L.aColor, skin], [L.aSuit, fg.suit],
-          [L.aHair, fg.hair]]) {
-          a.array[n * 3] = c[0]; a.array[n * 3 + 1] = c[1]; a.array[n * 3 + 2] = c[2];
+      // Eleven joints, each as world-from-bind: the joint's world matrix with
+      // the joint's own bind position taken off the far side, which is the
+      // whole of the inverse bind for a skeleton whose rest has no rotation in
+      // it. Written as the three rows of a 3x4 — `GLSL_CROWD` dots each with
+      // the vertex — straight into this person's row of the layer's texture.
+      const r = L.n++;
+      // Somebody moved body since the texture was sized: grow it, keeping
+      // the rows already written this frame.
+      if (r >= L.rows) crowdRows(L, L.rows * 2);
+      const bind = L.body.bind;
+      const D = L.data;
+      for (let j = 0; j < skel.joints.length; j++) {
+        const e = skel.joints[j].matrixWorld.elements;
+        const b = bind[j];
+        const o = (r * L.W + j * 3) * 4;
+        for (let row = 0; row < 3; row++) {
+          const a0 = e[row], a1 = e[row + 4], a2 = e[row + 8];
+          D[o + row * 4] = a0;
+          D[o + row * 4 + 1] = a1;
+          D[o + row * 4 + 2] = a2;
+          D[o + row * 4 + 3] = e[row + 12] - (a0 * b[0] + a1 * b[1] + a2 * b[2]);
         }
       }
+      for (const [a, c] of [[L.aColor, fg.skin], [L.aSuit, fg.suit],
+        [L.aHair, fg.hair]]) {
+        a.array[r * 3] = c[0]; a.array[r * 3 + 1] = c[1]; a.array[r * 3 + 2] = c[2];
+      }
+      // A t-shirt, and it is paint rather than a garment: the vertices the
+      // bake bound to the trunk take this colour instead of skin or
+      // swimwear (FR_CROWD in 30-material.js). It deforms with the ribcage,
+      // which is the reason it is paint and not a box over the chest.
+      const sh = fg.shirt;
+      L.aShirt.array[r * 4] = sh ? sh[0] : 0;
+      L.aShirt.array[r * 4 + 1] = sh ? sh[1] : 0;
+      L.aShirt.array[r * 4 + 2] = sh ? sh[2] : 0;
+      L.aShirt.array[r * 4 + 3] = sh ? 1 : 0;
       n++;
     }
     for (const L of layers) {
-      L.geo.instanceCount = n;
-      L.aPos.needsUpdate = L.aRot.needsUpdate = L.aScale.needsUpdate = true;
+      const was = L.geo.instanceCount;
+      L.geo.instanceCount = L.n;
+      if (!L.n && !was) continue;
+      L.tex.needsUpdate = true;
       L.aColor.needsUpdate = L.aSuit.needsUpdate = L.aHair.needsUpdate = true;
+      L.aShirt.needsUpdate = true;
     }
     drawn = n;
   }
 
   return {
     figures, layers, flush, kind: 'inst',
+    /** Which body each layer is — `fg.body` indexes this. See `crowdBody`. */
+    kinds,
     /** Everybody this tier is answerable for right now. See `tierCount`. */
     live: () => figures.filter((fg) => !fg.hidden),
-    /** How tall this rig stands at scale 1. See `rigHeight`. */
-    height: rigHeight(rig),
-    tris: rig.parts.reduce((a, p) => a + p.geo.index.count / 3, 0),
+    /**
+     * How tall a person on this tier stands at scale 1. Every body is baked
+     * to the same stature (`H0` in crowd_far.py — the old rig's 1.696, kept
+     * so nobody on the beach changed height), so any one of them answers.
+     * The bake's number and not a top vertex: a decimated crown can end a few
+     * millimetres either side of it, and the near tier is scaled off this.
+     */
+    height: bodies.length ? (bodies[0].meta.stature || bodies[0].height) : 1.696,
+    /** Triangles a person, at most — the bodies differ by a few. */
+    tris: bodies.reduce((a, b) => Math.max(a, b.tris), 0),
     get drawn() { return drawn; },
+    /**
+     * Register every layer with the shadow pass. Not the shared instanced
+     * depth material: a person's shape here is in the joint texture, and the
+     * caster has to be handed it too — see `CROWD_CASTER_VERT`.
+     */
+    cast: (shadow) => layers.map((L) => shadow.cast(L.mesh, {
+      near: true,
+      material: shadow.casterMaterial(CROWD_CASTER_VERT,
+        { uCrowdBones: L.uCrowdBones }),
+    })),
   };
 }

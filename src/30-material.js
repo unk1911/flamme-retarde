@@ -8,6 +8,39 @@
 // -----------------------------------------------------------------------------
 
 /**
+ * Skinning for the far tier of the crowd, one skeleton per instance.
+ *
+ * Shared by the surface (under FR_CROWD in `solidVertex`) and by the crowd's
+ * shadow caster in src/42-crowd.js, because the two have to put every vertex
+ * in exactly the same place or a person's shadow is somewhere they are not.
+ *
+ * `uCrowdBones` is RGBA float, eleven joints across and one person down: row
+ * `gl_InstanceID`, texels 3j to 3j+2 are the three rows of joint j's 3x4
+ * (world from bind). `aBone` is the two joints a vertex rides, and the first
+ * one's share, all as normalised bytes — so 1/255 is joint one — and `w` is
+ * the vertex kind, which this does not read.
+ *
+ * texelFetch and not a sampled lookup: this is an array of matrices that
+ * happens to be stored as a picture, and a filter anywhere near it would
+ * blend two people's elbows.
+ */
+const GLSL_CROWD = /* glsl */ `
+uniform highp sampler2D uCrowdBones;
+void crowdJoint(float j, float w, vec4 hp, vec4 hn, inout vec3 sp, inout vec3 sn){
+  int c = int(floor(j * 255.0 + 0.5)) * 3;
+  vec4 a = texelFetch(uCrowdBones, ivec2(c, gl_InstanceID), 0);
+  vec4 b = texelFetch(uCrowdBones, ivec2(c + 1, gl_InstanceID), 0);
+  vec4 d = texelFetch(uCrowdBones, ivec2(c + 2, gl_InstanceID), 0);
+  sp += w * vec3(dot(a, hp), dot(b, hp), dot(d, hp));
+  sn += w * vec3(dot(a, hn), dot(b, hn), dot(d, hn));
+}
+void crowdSkin(vec4 bone, vec4 hp, vec4 hn, inout vec3 sp, inout vec3 sn){
+  crowdJoint(bone.x, bone.z, hp, hn, sp, sn);
+  crowdJoint(bone.y, 1.0 - bone.z, hp, hn, sp, sn);
+}
+`;
+
+/**
  * The shared vertex program.
  *
  * @param body  GLSL run on the *bind* pose, before anything is done to it —
@@ -93,6 +126,21 @@ void addBone(float bi, float w, vec4 hp, vec4 hn, inout vec3 sp, inout vec3 sn){
 }
 #endif
 
+// The far tier of the Jadrija crowd — src/42-crowd.js, makeCrowd. Skinned
+// like FR_SKIN, but PER INSTANCE: every person drawn by one of these meshes
+// has eleven joints of their own, in a row of their own of a float texture
+// the crowd rewrites each frame. See GLSL_CROWD for the layout.
+// (No backticks anywhere in this program: it is a template literal.)
+#ifdef FR_CROWD
+attribute vec4 aTint;
+attribute vec4 aBone;
+attribute vec4 aInstShirt;
+// The mean shading of this body's hair and swimwear, for the skin painted
+// under them: see the under-paint below.
+uniform vec2 uCrowdCap;
+${GLSL_CROWD}
+#endif
+
 void main(){
   vec3 p = position;
   vec3 n = normal;
@@ -118,7 +166,42 @@ void main(){
     n = sn;
   }
 #endif
+#ifdef FR_CROWD
+  {
+    // Straight to world space: the joint matrices already carry the person's
+    // place, bearing and stature, so there is no instance transform after it.
+    vec3 sp = vec3(0.0), sn = vec3(0.0);
+    crowdSkin(aBone, vec4(p, 1.0), vec4(n, 0.0), sp, sn);
+    p = sp;
+    n = sn;
+    // And the colour, resolved here once a vertex rather than once a pixel:
+    // which of the person's three colours this vertex asked for, times the
+    // shading the bake left on it. See tools/blender/crowd_far.py.
+    vec3 sh = aTint.rgb * 2.0;
+    float kind = floor(aBone.w * 255.0 + 0.5);
+    // A shirt is paint on the trunk — the joint the bake called torso — over
+    // skin and swimwear alike, so a bikini top does not show through it.
+    bool shirt = aInstShirt.w > 0.5 && kind < 1.5
+      && floor(aBone.x * 255.0 + 0.5) == 1.0;
+    // Skin under hair or under swimwear takes that colour instead, so a gap
+    // the bake thinned out of either shows the right thing behind it. One
+    // byte, two ranges: 0 to 127 is swimwear, 128 to 255 is hair.
+    float ua = floor(aTint.a * 255.0 + 0.5);
+    float uSuit = ua < 127.5 ? ua / 127.0 : 0.0;
+    float uHair = ua > 127.5 ? (ua - 128.0) / 127.0 : 0.0;
+    vec3 c = kind < 0.5
+      ? mix(mix(aInstColor * sh, aInstSuit * uCrowdCap.y, uSuit),
+        aInstHair * uCrowdCap.x, uHair)
+      : kind < 1.5 ? aInstSuit * sh
+      : kind < 2.5 ? aInstHair * sh
+      : sh;
+    vColor = shirt ? aInstShirt.rgb : c;
+    vSuit = aInstSuit;
+    vHair = aInstHair;
+  }
+#endif
   if (uInstanced > 0.5) {
+#ifndef FR_CROWD
     p *= aInstScale;
     p = qrot(aInstRot, p);
     p += aInstPos;
@@ -126,6 +209,7 @@ void main(){
     vColor = aInstColor;
     vSuit = aInstSuit;
     vHair = aInstHair;
+#endif
   } else {
     // p and n rather than position and normal: they are the same thing for
     // everything in the game except a skinned figure, where they are the only

@@ -8,6 +8,96 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.533.0] — 2026-09-27
+
+### no more mannequins: the far crowd is the same eight people
+
+Misha: *"lookin from very far away ... in the distance, one of the bathers
+still appears as our 'prehistoric' wooden manequins. but as i approached her
+closer, she transformed into modern v2.0 bather. and then i moved back and
+again she appeared as wooden prehistoric manequin. but can we just get rid of
+those prehistoric manequins completely... they look so bad, why are they
+still in the game? i thot we got rid of them?"*
+
+**Why they were still there.** The bathers are drawn in two tiers. The near
+tier is the v2 bathers: textured, skinned, 24 roving slots that go to
+whoever is nearest. Everybody else (35 to 53 people within 200 m of a
+promenade station) was drawn by the instanced tier. Its bodies were still
+the two figures `tools/blender/bather.py` built in August: eleven lofted
+tubes a person, one man and one woman, recoloured per instance. Those were
+the mannequins. Only the near tier had been replaced, so every promotion
+turned a doll into a person, and every demotion turned her back.
+
+**What it is now.** The instanced tier draws the same eight bodies the near
+tier does. A new bake, `tools/blender/crowd_far.py`, takes each shipped
+`bather2_*` blob and:
+
+- brings the arms down from MakeHuman's A-pose to the rest pose the crowd's
+  poses are written against. The angle is measured per body: the smallest
+  one at which the hands clear the hips and shorts by 2.2 cm (7° for the fit
+  man, 13° for the girl).
+- folds its 30-bone skeleton into the crowd's eleven joints, placed at that
+  body's own hips, knees, waist, shoulders, elbows and neck.
+- decimates it to about 2 770 triangles, a little under the old 3 036/3 232
+  per person, with a slightly larger share kept for the face.
+- paints each vertex with which of the person's colours it wants (skin,
+  swimwear or hair) and how much shading the texture had there. Hair cards
+  and swimwear are thinned by texture coverage at the same 0.5 the near
+  tier's alpha test cuts at, and the scalp under the hair is painted hair.
+
+At runtime each body is ONE instanced mesh, skinned per instance on the GPU
+from a small float texture of eleven matrices a person
+(`GLSL_CROWD` in 30-material.js). The walk, stand, sit, lie, wade and serve
+poses are untouched, and so are the near-tier figures and their clips.
+
+- **Same person at both distances.** A promotable bather's far body is the
+  body they are promoted to, and their colours come from the near tier's own
+  `bather2Pick`: the real skin's mean tone, their swimwear, their hair.
+  Everybody else is dealt a body of their own sex and age by hash, so the
+  shop staff and the boat's odd child are real bodies too.
+- **Seat height per body.** `sit` used a fixed hip drop that was right for
+  the tube rig's thigh. Each body now carries its own (`sitHip`, 8.6 to
+  15.6 cm), measured off the underside of its own thighs.
+- The old `bather_m` / `bather_f` blobs are gone from the payload.
+  `bather.py` stays, marked retired, for its notes.
+- A probe hook, `__fr.jad.raw().crowd.hold(true)`, freezes promotion so one
+  person can be photographed on both tiers from the same spot.
+
+**Checked side by side, and two things changed because of it.** With
+promotion frozen, the same person was shot on both tiers at 5 m, 14 m and
+through a long lens at 60 to 140 m. Their mean skin colour matches the near
+tier to within 2%.
+
+- The first cut painted the skin under swimwear to fill the coverage gaps.
+  On a decimated body that is a red glow two or three centimetres wide round
+  every bikini, so it came out. The gaps are mostly on the near tier too: the
+  jeans shorts are ripped and the one-piece has cut-outs.
+- Hair drew a shade lighter than the same person up close. The near tier
+  lights the back faces of hair cards from behind; this tier turns their
+  normals round. Far hair is drawn at 0.72 of its dye shading to match.
+
+**Measured.** Uncapped, 1280×720, RTX 4090. Three promenade stations
+(t 215, 330 and 460, looking along the shore), before and after run
+alternately:
+
+| per frame | west | middle | east |
+|---|---|---|---|
+| draw calls | 842 → 814 | 722 → 693 | 834 → 796 |
+| triangles, all passes | 18.96 → 18.93 M | 18.86 → 18.74 M | 19.10 → 19.06 M |
+| GPU, timer queries | 17.2 → 15.8 ms | 11.4 → 10.5 ms | 17.6 → 16.8 ms |
+| main-thread CPU, mean | 22.1 → 21.4 ms | 15.7 → 14.9 ms | 23.5 → 22.7 ms |
+| frame interval, mean over 6 s | 21.8 → 21.8 ms | 15.1 → 15.4 ms | 22.5 → 23.5 ms |
+
+The far tier's own GPU draw time is 0.23–0.27 ms a frame, down from
+0.35–0.64 ms: eight draws instead of twenty-two, and about 2 770 triangles a
+person instead of 3 036/3 232. The crowd update (`jadrija.update`, which
+includes posing) takes 1.4–1.5 ms, down from 1.5–1.7. The frame interval is
+within noise at every station. Its median jumps between two modes, so the
+means are what is reported: over eight alternated runs the medians came out
++2.0, −0.5 and +0.35 ms, and three 6-second means came out −0.05, +0.3 and
++1.0 ms. The payload grows by 0.3 MB of bodies, less the 52 KB of mannequins
+taken out.
+
 ## [1.531.0] — 2026-09-27
 
 ### the bicycles, built as bicycles

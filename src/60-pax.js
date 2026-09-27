@@ -274,6 +274,10 @@ const PAX_SHIRT = [
  * `wheelBlobs` exist and why the people you can walk up to at Jadrija are
  * drawn with them.
  *
+ * (And since 27 Sep the instanced tier is not two rigs any more but those
+ * same eight bodies, cut down and skinned per instance — see `readFR3DCrowd`
+ * in 42-crowd.js — so whoever is left on it is a person too.)
+ *
  * The boat never had that second tier. It has one now, and it is eight of
  * them, and it is the EIGHT WHO ARE STANDING — the pair at the starboard
  * rail, the two on the foredeck, the two up top, the ones at the side decks.
@@ -365,13 +369,15 @@ const PAX_DOG = { x: -6.40, z: -1.90, yaw: Math.PI / 2, r: 0.30 };
  */
 async function buildBrodPax(scene, deckAt, boat) {
   const rigs = {};
-  for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
-    // Re-inflated rather than borrowed off the beach's crowds, which live in
-    // `buildJadrija`'s closure. 25 KB of payload and one more copy of a 3 036
-    // triangle rig is cheaper than an accessor reaching down the concatenation
-    // into somebody else's scope, and it means the boat's people do not care
-    // whether the shore has finished building.
-    rigs[sex] = await loadRig(key);
+  for (const sex of ['m', 'f']) {
+    // The far tier's bodies, which are the eight v2 bathers cut down — see
+    // `readFR3DCrowd` in 42-crowd.js. They used to be the two tube rigs out of
+    // tools/blender/bather.py, the "prehistoric wooden manequins" Misha asked
+    // on 27 Sep to be rid of everywhere. Parsed once and shared with the
+    // shore (`loadCrowdBody` caches), so this costs the boat nothing to load
+    // and it still does not care whether the shore has finished building.
+    const bodies = await loadCrowdBodies(sex);
+    rigs[sex] = bodies.length ? bodies : null;
   }
   if (!rigs.m && !rigs.f) return null;
 
@@ -427,9 +433,9 @@ async function buildBrodPax(scene, deckAt, boat) {
     cast.push(paint(i++, { mode: 'stand', x: p.x, y, z: p.z, yaw: p.yaw }));
   }
 
-  // Which rig each of them is on. Drawn off the hash like everything else, and
-  // resolved after the cast is closed so a crowd is never built with a cap it
-  // can overrun.
+  // Which crowd — which sex — each of them is in. Drawn off the hash like
+  // everything else, and resolved after the cast is closed so a crowd is
+  // never built with a cap it can overrun.
   const by = { m: [], f: [] };
   for (let k = 0; k < cast.length; k++) {
     const want = paxJit(k, 21) < 0.48 ? 'f' : 'm';
@@ -440,7 +446,14 @@ async function buildBrodPax(scene, deckAt, boat) {
   for (const sex of ['m', 'f']) {
     if (!rigs[sex] || !by[sex].length) continue;
     const c = makeCrowd(scene, rigs[sex], by[sex].length);
-    for (const fg of by[sex]) c.figures.push(fg);
+    // A body each: a child's for the children (`paint` makes one of every
+    // seventh or so, at 0.68 to 0.76 of an adult's stature), an adult's for
+    // everybody else, and the colours `bather2Pick` chooses for that body —
+    // a real skin's own tone rather than a palette entry.
+    for (const fg of by[sex]) {
+      crowdBody(c, fg, null, fg.scale < 0.85);
+      c.figures.push(fg);
+    }
     crowds.push(c);
   }
   if (!crowds.length) return null;
@@ -608,10 +621,10 @@ async function buildBrodPax(scene, deckAt, boat) {
       real: real.length,
       realTris: real.reduce((a, r) => a + r.f.tris, 0),
       dog: dog ? dog.tris : 0,
-      // What she costs, and both halves of it matter. `layers` is the draw
-      // calls — one instanced mesh per rig part per rig — and it is the number
-      // that does NOT go down when the crowd is small, which is why there are
-      // two rigs and not eight. `tris` is the whole ship's company.
+      // What she costs, and both halves of it matter. `layers` is the most
+      // draw calls — one instanced mesh per body, four bodies a sex — and a
+      // layer with nobody on it this frame is skipped by the renderer, so it
+      // is a ceiling rather than the bill. `tris` is the whole ship's company.
       layers: crowds.reduce((a, c) => a + c.layers.length, 0),
       tris: crowds.reduce((a, c) => a + c.figures.length * c.tris, 0),
       drawn,
