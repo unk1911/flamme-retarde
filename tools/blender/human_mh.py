@@ -7883,6 +7883,125 @@ def ballet_floor(rig, clear=0.004):
     return worst
 
 
+# ── IN THE HAMMOCK ───────────────────────────────────────────────────────────
+#
+# Misha, 27 Sep 2026: a hammock in the pines behind the kabine, "and I can
+# sorta swing baye on it" — src/43-hammock.js. Two clips: `hamIn`, the way in,
+# which played backwards is the way out; and `hamLie`, lying in it, breathing.
+#
+# WHERE THE HAMMOCK IS, IN HER FRAME. She walks to a mark `HAM_MARK` in front
+# of the middle of it and turns her back on it, so she faces +X with the line
+# between the two trees `HAM_MARK` behind her, across her. The cloth there,
+# with her weight coming on to it, is `HAM_SEAT` over the ground — measured in
+# the game: the lowest plate of the loaded cloth, 0.34 to 0.40 over the floor
+# on the pair the grove gives, and the edge she sits on a little higher.
+#
+# NONE OF THIS HAS TO BE EXACT, and that is the point of the hammock being
+# simulated: in the game her body is pulled along this clip by a spring
+# (`HAMMOCK.guideLin`) that eases off as she lies back, and the cloth is what
+# holds her up. The clip says where she means to go; the cloth says where she
+# ends up — a few centimetres either way, which is the sag taking her weight.
+# What has to be right is the SHAPE: the seat going back over the edge, the
+# legs coming up and round, and the curl of lying in a hammock.
+#
+# THE TURN IS `@turn`, the pirouette's whole-body yaw about the root joint —
+# which is the hip, so she turns about her own seat, which is what a person
+# swinging their legs up into a hammock does. +90 turns her forward (+X) to
+# her left (+Y): lying on her back her head was at −X, and it ends at −Y.
+# The mark's distance in front of the span, m — HAM_MARK_M in 43-hammock.js,
+# and the note there is how 0.60 was arrived at: it depends on how the empty
+# cloth hangs, and it was measured against the game's.
+HAM_MARK = 0.60
+HAM_SEAT = 0.45                 # the cloth under her seat, over the ground, m
+HAM_HIP = 0.934                 # her hip joint over the ground, standing
+HAM_SIT_Z = HAM_SEAT + 0.109 - HAM_HIP    # SIT's own hip-over-surface, 0.109
+
+# Sat on the edge, back to it, feet on the ground: the seat gone back 0.40 so
+# the feet stay under her knees, and the hands planted on the cloth behind her
+# — SIT's arms, which are measured to plant a straight arm behind the hips.
+# Hip −78 and knee 72, PROBED: −86/80 laid the thigh level and left the ankle
+# 0.404 under the hip, which from a 0.45 seat is feet 8 cm off the ground; a
+# thigh sloping ten degrees down to the knee, as a thigh on a seat that height
+# does, puts the ankle 0.466 under the hip — 0.093 over the ground against
+# the 0.073 she stands at, which the ground contact and the guide take up.
+HAM_SIT = {
+    "@root": (-0.40, 0.0, round(HAM_SIT_Z, 3)),
+    "pelvis": (4, 0, 0),
+    "spine01": (2, 0, 0), "spine02": (2, 0, 0), "spine03": (1, 0, 0),
+    "chest": (0, 0, 0), "neck": (4, 0, 0), "head": (-4, 0, 0),
+    "armUL": (40, 15, 30), "armLL": (0, -40, 0), "handL": (32, 0, 0),
+    "armUR": (40, -15, -30), "armLR": (0, 40, 0), "handR": (32, 0, 0),
+    "fingersL": (-34, 0, 0), "fingersR": (-34, 0, 0),
+    "legUL": (-78, 0, 8), "legLL": (72, 0, 0), "footL": (4, 0, 0),
+    "legUR": (-78, 0, -8), "legLR": (72, 0, 0), "footR": (4, 0, 0),
+}
+
+# Weight going back on to the hands, the feet still down: the pelvis tips back
+# twenty and the hips give the same twenty back, so the thighs hold still.
+HAM_LEAN = dict(HAM_SIT, **{
+    "@root": (-0.46, 0.0, round(HAM_SIT_Z - 0.02, 3)),
+    "pelvis": (24, 0, 0),
+    "spine01": (-2, 0, 0), "spine02": (-2, 0, 0), "spine03": (-1, 0, 0),
+    "neck": (-6, 0, 0), "head": (-6, 0, 0),
+    "armUL": (52, 15, 30), "armUR": (52, -15, -30),
+    "legUL": (-58, 0, 8), "legUR": (-58, 0, -8),
+})
+
+# Half way round: lying back on to her elbows' worth of cloth, the legs up off
+# the ground and coming round with the turn.
+HAM_SWING = {
+    "@root": (-0.54, 0.0, round(HAM_SIT_Z - 0.06, 3)),
+    "@turn": (45.0,),
+    "pelvis": (62, 0, 0),
+    "spine01": (-5, 0, 0), "spine02": (-5, 0, 0), "spine03": (-4, 0, 0),
+    "chest": (-3, 0, 0), "neck": (-18, 0, 0), "head": (-4, 0, 0),
+    "armUL": (20, 10, 34), "armLL": (-30, -30, 0), "handL": (10, 0, 0),
+    "armUR": (20, -10, -34), "armLR": (-30, 30, 0), "handR": (10, 0, 0),
+    "fingersL": (-20, 0, 0), "fingersR": (-20, 0, 0),
+    "legUL": (-58, 0, 8), "legLL": (62, 0, 0), "footL": (-14, 0, 0),
+    "legUR": (-58, 0, -8), "legLR": (62, 0, 0), "footR": (-14, 0, 0),
+}
+
+# Lying in it. On her back along the hammock, and CURLED, which is the whole
+# difference between lying in a hammock and lying on a bed: the cloth is a
+# sling and she is in the bottom of it, so her seat is the lowest thing and her
+# shoulders and her knees ride up it either side. Pelvis 94 and not the cot's
+# 108, a curl of −12 through each of the three spine bones below the chest, and
+# the hips flexed 26 with the knees 32, which lays the thighs up the far side
+# of the sling and the shins back level along it. PROBED against her hip
+# joint: chest +0.107, head +0.33, knees +0.24, feet +0.19 — a sling. The
+# first cut (pelvis 100, curl −7) had her chest level with her hips and only
+# her head and legs up, which is a woman on a bed with a pillow and her knees
+# raised, not a woman in a hammock.
+#
+# HANDS BEHIND HER HEAD — `_NAPE_ARMS` and `_NAPE_HEAD`, the cot's, solved
+# there to put the palms under the back of her skull. They are unchanged here
+# and still true, because nothing between them and the head has moved: the
+# arms hang off the chest through the clavicles and the head off the chest
+# through the neck, and the curl is all below the chest.
+#
+# `@root` x puts her hips on the line between the trees; z puts her hip joint
+# 0.12 over the cloth under it. The sim then lets her settle.
+def _ham_lie(curl=-12.0, knee=32.0, dz=0.0):
+    p = {
+        "@root": (-HAM_MARK, 0.0, round(HAM_SEAT - 0.07 + 0.12 - HAM_HIP + dz, 3)),
+        "@turn": (90.0,),
+        "pelvis": (94.0, 0, 0),
+        "spine01": (curl, 0, 0), "spine02": (curl, 0, 0), "spine03": (curl, 0, 0),
+        "chest": (-5.2, 0, 0),
+        "clavicleL": (0, 0, 6), "clavicleR": (0, 0, -6),
+    }
+    p.update(_NAPE_ARMS)
+    p.update(_NAPE_HEAD)
+    p.update(_legs(-26, knee, 9, -22.0))
+    return p
+
+
+HAM_LIE = _ham_lie()
+# The breath: a hair more curl, the knee a degree, two millimetres.
+HAM_LIE_B = _ham_lie(curl=-12.6, knee=33.0, dz=0.002)
+
+
 CLIPS = [
     {"name": "idle", "loop": True,
      "keys": [(0.0, IDLE_A), (2.3, IDLE_B), (4.6, IDLE_A)]},
@@ -8157,6 +8276,11 @@ CLIPS = [
     {"name": "flare", "loop": False, "keys": FLARE},
     {"name": "firestarter", "loop": True, "keys": FIRE},
     {"name": "cast", "loop": False, "keys": CAST},
+    # Into the hammock, and — played backwards — out of it. See HAM_SIT.
+    {"name": "hamIn", "loop": False,
+     "keys": [(0.0, IDLE_A), (0.95, HAM_SIT), (1.55, HAM_LEAN), (2.45, HAM_SWING), (3.40, HAM_LIE)]},
+    {"name": "hamLie", "loop": True,
+     "keys": [(0.0, HAM_LIE), (2.4, HAM_LIE_B), (4.8, HAM_LIE)]},
 ]
 
 

@@ -647,6 +647,46 @@ function buildAudio() {
     setTimeout(() => beep(560, 0.070, 0.10), 60);
   }
 
+  /**
+   * A rope creaking on bark — the hammock, at each end of its swing.
+   *
+   * SYNTHESISED, and not for want of looking: the one CC0 creak worth having
+   * is a door, and a door is a hinge — a low groan with a pitch — where a
+   * rope on a pine is dry friction, which is a different noise. It is stick-
+   * slip: the fibre grips, the load builds, it lets go, and it does that forty
+   * to ninety times a second, so what the ear hears is a train of tiny clicks
+   * whose RATE is the pitch and which rises and falls with the load. So that
+   * is what this is — a burst train with its spacing swept, each click a
+   * short high-Q band of noise in the range dry wood and hemp ring in, and a
+   * second, fainter train a little behind it for the other rope.
+   *
+   * `amp` is how far the swing went (0..1), `d` how far away you are.
+   */
+  function creak(amp = 1, d = 0) {
+    if (!ctx || amp <= 0.02) return;
+    const far = Math.max(0, 1 - d / 30);
+    if (far <= 0) return;
+    const t0 = ctx.currentTime;
+    for (const [lag, g0, f0] of [[0, 1, 900 + Math.random() * 300], [0.05 + Math.random() * 0.06, 0.45, 650 + Math.random() * 250]]) {
+      const dur = 0.22 + 0.22 * Math.min(1, amp);
+      const hz0 = 38 + Math.random() * 14, hz1 = hz0 * (1.5 + Math.random() * 0.6);
+      let t = 0;
+      while (t < dur) {
+        const u = t / dur;
+        // Up and back down: the load comes on, peaks, and comes off.
+        const hz = hz0 + (hz1 - hz0) * Math.sin(Math.PI * u);
+        burst({
+          freq: f0 * (0.92 + Math.random() * 0.16),
+          q: 14 + Math.random() * 8,
+          dur: 0.010 + Math.random() * 0.006,
+          gain: 0.030 * g0 * Math.min(1, amp) * far * Math.sin(Math.PI * Math.min(1, u * 1.15)) + 0.0002,
+          at: t0 + lag + t,
+        });
+        t += 1 / hz;
+      }
+    }
+  }
+
   function rattle(amp = 1, d = 0) {
     if (!ctx || amp <= 0.02) return;
     const t0 = ctx.currentTime;
@@ -7728,7 +7768,7 @@ function buildAudio() {
     return dur;
   }
 
-  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle,
+  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle, creak,
     beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, moanCount: () => ({ n: moanPlayed, last: moanLast }), noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     // The slow lick's slots — see `── the slow lick ──` above.
     doodleSlurp, lickLaugh, lickLaughStop, lickWarm,

@@ -66,7 +66,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.46.0"
+VERSION = "1.47.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -501,6 +501,30 @@ WIDER_RE = (r"(?:^(?!.*\b(?:mouth|jaw|lips?|tongue|arms?|eyes?|hands?|door|windo
             r"|\bšire\b|\braširi\w*\b.{0,16}\b(?:više|jače)\b"
             r"|\bplus (?:é|e)cart\w*|\b(?:é|e)carte\w*\b.{0,16}\b(?:plus|encore|davantage)\b)))")
 
+# The hammock's noun, in the four languages anybody here says it in: English,
+# French (hamac), German (Hängematte, which the transcriber writes without the
+# umlaut as often as with), and Croatian — viseća mreža, "hanging net", or
+# ležaljka/ljuljačka said of one; "mreža" alone is also a fishing net and a
+# volleyball net, so it only counts with "viseć-" in front or a verb of lying
+# or swinging round it, which is `HAM_ASK`'s job.
+HAMMOCK_RE = (r"\b(hammock\w*|hamac\w*|h(ä|ae|a)ngemat\w*|viseć\w*\s+mrež\w*|visec\w*\s+mrez\w*)\b")
+# And out of it. The verbs of getting out, with or without the noun: "get out
+# of the hammock" and "climb out" are the same request once she is in it.
+HAM_OUT_RE = (r"\b(get|getting|climb|climbing|come|hop|jump|step|roll|swing)\s+"
+              r"(yourself\s+)?(back\s+)?out\b|\bout of (the |that |your |this )?"
+              r"(hammock|hamac|h(ä|ae|a)ngemat\w*|mrež\w*)\b|\bget off (the |that )?hammock\b"
+              r"|\biza[đd]i\b|\bsors\b|\bsortir\b|\braus\b")
+# The ask, with the noun: a verb of going, getting in, lying or swinging
+# within a clause of it — so "get in the hammock", "go lie in the hammock",
+# "climb into the hammock", "chill in the hammock". The noun on its own gets
+# in only as the whole sentence (`bare_skill`): "that hammock looks comfy" is
+# a thing somebody said, not a request.
+HAM_ASK = (r"\b(get|go|goes|climb|hop|jump|lie|lay|lying|laying|sit|chill|relax|rest|"
+           r"swing|nap|head|walk|come|try|use|into|lezi|legni|idi|u[đd]i|ljulja\w*|"
+           r"allonge\w*|va|vas|allez|monte\w*|leg dich|out)\b.{0,28}" + HAMMOCK_RE +
+           r"|" + HAMMOCK_RE + r".{0,16}\b(now|please|pls|time)\b"
+           r"|\b(lezi|legni|idi|u[đd]i)\b.{0,12}\bu\s+mrež\w*\b")
+
 SKILLS = {
     "see.slast": ("walk up to the ice cream place and see what flavours are in "
                   "the case", [r"\b(ice ?cream|gelato|flavou?rs?|slast\w*)\b", SEE_RE]),
@@ -890,6 +914,16 @@ SKILLS = {
              [r"\b(swim\w*|bathe|paddle|go in the (water|sea))\b"]),
     "tramp": ("walk up to the trampolines and jump on them",
               [r"\b(trampolin\w*|trampol\w*|tramp)\b"]),
+    # AND THE HAMMOCK, in and out. Misha, 27 Sep 2026: *"some people put up
+    # hammocks there. so maybe we can setup a hammock there and I can sorta
+    # swing baye on it"*. It hangs in the pines behind the kabine and she walks
+    # there, gets in, and lies in it — see `ham*` in src/43-jadrija.js. The
+    # sentence is read by `hammock_of` BEFORE this table, because "lie in the
+    # hammock" is also a lie-down and "get out" is also a get-up; these two
+    # entries are here for the one-word ask ("hammock") and for the ticket.
+    "hammock.out": ("get out of the hammock and stand up", [HAMMOCK_RE, HAM_OUT_RE]),
+    "hammock": ("go to the hammock in the pines behind the kabine and lie in it",
+                [HAMMOCK_RE]),
 }
 # The ask itself, so that TALKING about wine is not a request for it. "I love
 # a cold white in this heat" names the noun and asks for nothing; "can you pour
@@ -1067,6 +1101,10 @@ ASK_RE = re.compile(
     r"|\b(take|have|hit|snort|hoover)\b.{0,12}\b(line|bump|rail)s?\b"
     r"|\bsnort\w*\b"
     r"|\b(let'?s see|let'?s go|lets go|i want|i'?d like|how about|go on|for me)\b"
+    # AND THE HAMMOCK — see `HAM_ASK`, which is the skill's own shape, verb
+    # and noun, for the hair's reason: a bare noun past this gate is a noun
+    # every pattern in `SKILLS` gets a look at.
+    r"|" + HAM_ASK +
     # "what do they charge at the ice cream place" is a question, and walking
     # up there to find out is the right answer to it. A place name and a
     # looking word still have to be in the sentence, so "do they like me" is
@@ -1580,9 +1618,37 @@ def bare_skill(text: str):
     return None
 
 
+def hammock_of(t: str):
+    """`hammock` or `hammock.out` if the sentence is about the hammock, else None.
+
+    Ahead of everything in `skills_of`, because every way of asking for it
+    reads as something else to the table: "lie in the hammock" has a lie-down
+    in it, "get out of the hammock" a get-up and a take-out. The noun decides
+    it, and then the direction: out if a verb of getting out is there, in
+    otherwise. And "get out" said on its own, which is how anybody asks
+    somebody lying in a hammock to get out of it — the page answers "she is
+    not in the hammock" if she is not, which is the truth.
+    """
+    if not re.search(HAMMOCK_RE, t):
+        bare = re.sub(r"[^a-zđšžćč' ]+", " ", t)
+        bare = re.sub(r"\b(please|pls|plz|baye|now|ok|okay|come on|babe|hey)\b", " ", bare).split()
+        if " ".join(bare) in ("get out", "climb out", "hop out", "get out of it",
+                              "get out of there", "out you get", "izađi", "izadji"):
+            return "hammock.out"
+        return None
+    if re.search(HAM_OUT_RE, t):
+        return "hammock.out"
+    return "hammock"
+
+
 def skills_of(text: str) -> list:
     """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
     t = (text or "").lower()
+    # THE HAMMOCK FIRST — see `hammock_of`. A sentence with the noun in it and
+    # none of the gate's shapes ("that hammock looks comfy") is still talk.
+    ham = hammock_of(t)
+    if ham and (ASK_RE.search(t) or ham == "hammock.out" or bare_skill(t)):
+        return [ham]
     if not ASK_RE.search(t):
         bare = bare_skill(t)
         return [bare] if bare else []
@@ -3322,6 +3388,12 @@ SHORE_DOING = {
     "blaze": "on fire, a flamme fatale, stamping on the spot",
     "boast": "on fire and holding up a card to show off about it",
     "cast": "on fire and throwing a fireball",
+    "hamGo": "walking up through the pines behind the kabine to the hammock",
+    "hamTurn": "at the hammock in the pines, about to get in",
+    "hamIn": "getting into the hammock in the pines behind the kabine",
+    "hamHeld": "lying in the hammock in the pines behind the kabine, "
+               "hands behind your head, and they can push you to swing it",
+    "hamOut": "getting out of the hammock",
     "hutGo": "heading for the changing hut",
     "hutIn": "going into the changing hut",
     "hutOn": "in the changing hut, changing your hip scarf",

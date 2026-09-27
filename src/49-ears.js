@@ -735,6 +735,8 @@ const ears = (() => {
     wheel: 'cartwheels', joy: 'a somersault',
     // The two she has to go somewhere for, which is why these say where.
     swim: 'off for a swim', tramp: 'off to the trampolines',
+    // And the hammock in the pines behind the kabine, in and out.
+    hammock: 'off to the hammock in the pines', 'hammock.out': 'getting out of the hammock',
     // And the recon missions. She walks off and there is nothing else to see
     // until she is back, so the panel says where she has gone.
     'see.slast': 'off to the ice cream place, back in a minute',
@@ -801,6 +803,15 @@ const ears = (() => {
     widest: 'she cannot go any wider',
     cotnarrow: 'the cot is too narrow for her legs to go any wider',
     noroom: 'there is no room to go any wider where she is standing',
+    // The hammock's. Short, and each a fact about where she is.
+    nohammock: 'there is no hammock here',
+    inhammock: 'she is already in the hammock',
+    hamgoing: 'she is already on her way to it',
+    hamout: 'she is already getting out',
+    nothammock: 'she is not in the hammock',
+    kabinain: 'she is in the kabina — the hammock is out in the pines behind it',
+    swimming: 'she is in the sea',
+    noway: 'she cannot find a way through to it from here',
   };
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
