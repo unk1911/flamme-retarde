@@ -8,6 +8,106 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.534.0] — 2026-09-27
+
+### the trees: needles, round trunks and bark
+
+Misha: *"improve the quality of the procedural trees"*.
+
+**What was wrong.** Held against `20260821_175032` and `_175924`, the shape
+of the crowns was already right: the grown skeleton and the boughs had given
+them the Aleppo umbrella. What they were made of was wrong. A real crown is a
+heap of separate needle tufts, each lit on its own: bright yellow-green where
+the sun catches the tips, near-black in the pockets, and an outline made of
+tufts with sky showing through its edge. In the game every crown was a set of
+smooth green balloons, one flat green on all of them, with hard polygon rims.
+Seven or nine corners each, visible against the sky from anywhere on the
+promenade. The hand-planted pines in the stand behind the promenade had a
+second problem: the trunk was two heptagonal prisms stacked with a sideways
+step in them, and the crown hung a few tens of centimetres off the end.
+
+**The crowns, per pixel, and on every tree in the game** (`GLSL_FOLIAGE`,
+`foliageBody`, `FOLIAGE_LIT` in 45-trees.js). The geometry does not change.
+All of it runs in the one tree material, `treeMaterial`, which the landscape's
+instanced trees and the resort's own now share.
+
+- **Tufts.** Four octaves of 3D value noise in world space: 3 m, 0.75 m,
+  0.28 m and 9 cm. Pockets go to about 0.6 and caps to 1.4, and the brightest
+  caps shift towards yellow. World space, so instanced trees do not all wear
+  the same pattern. Each octave fades out by pixel footprint and is skipped
+  entirely once its weight is zero, so nothing sub-pixel sparkles or costs.
+- **Needles.** On a conifer, closer than about 30 m, the nearest tuft centre
+  on a 3D cell grid (`folCell`) is drawn as a thirteen-spiked star facing you.
+  The ratio that picks the needles is (g − r) / g of the vertex colour: 0.29
+  to 0.47 on pine and cypress, 0.12 to 0.15 on olive and maquis. The olive
+  was tried with round leaf tufts and came out a bunch of grapes, so
+  broadleaves keep the value noise only.
+- **Outline.** Over the outer half of the rim, where the surface turns away
+  from you, a pixel outside a tuft is discarded, and only tuft cores survive
+  right at the edge. Further out the value field does the same job. The
+  first cut eroded only the last few pixels and every straight polygon edge
+  survived with a fringe on it. Eroded to a tuft's depth, the corners go.
+  The far model does not discard: it is 30-odd thousand trees and early
+  depth is worth more than an outline under a pixel.
+- **Light through the crown.** Looking into the sun, foliage takes a share of
+  the sun's light on its unlit side, so a crown against the sky glows at its
+  thin edges as it does in `_175032`.
+- **Dappled shadow.** The near models and the resort's trees cast with
+  `FOLIAGE_CASTER_FRAG`, which opens holes in the pockets of the same tuft
+  field. The ground under the stand is dappled, not shaded. This fades by
+  shadow-texel footprint, so it only happens in the near cascade.
+
+**Bark.** The seams were the half-level contour of smooth noise. Up close on
+a round trunk that read as contour lines on a map, then as a giraffe. Real
+bark is a mosaic, so the plates are now a 2D Voronoi diagram (`barkCell`) on
+the trunk's two vertical planes, stretched to about 13 by 40 cm. The crack is
+where F2 − F1 is under a tenth of a cell, and it is dark, a shadow before it
+is a colour. The plates are greyed towards the photographs, each its own
+shade and rounded into the crack. The orange is left only at the bottom of
+the deepest cracks. The instanced pines get this too.
+
+**The resort's pines and olives** (43-jadrija.js):
+
+- Drawn into their own buffer, `arbor`, with `treeMaterial` and its caster.
+  That is one extra draw and one extra caster, so the stand matches the wood
+  behind it.
+- `pineTrunk`: one stem with 10 sides and 11 rings and smooth normals.
+  It is flared into the ground, tapers to about half by the fork, and bends
+  into its lean above head height. It ends at the boughs' own root, so the
+  crown sits on the trunk. **Plumb and exactly `rad` from 0.55 m to 2.4 m**,
+  because the hammock's straps go round it at 1.45 m. The colour is
+  `PINEBARK`, so the plate shader recognises it.
+- Boughs and twigs go through `limb`, which puts rings square to the branch
+  instead of level. Through level rings a twenty-degree bough is a plank.
+- Crown puffs go from 7×3 and 6×3 to 9×4 and 8×4. This is for the shading
+  across a puff seen from below, which creased at every ring.
+- The olive's wood is now a bole and four limbs running out to the four
+  outer lobes, replacing a pentagonal post with two square ones standing
+  beside it.
+- No `rng` draws were added or removed. Every new variation is `jit` off the
+  tree's own station (`pineKey`). Checked before and after: all 186 `greens`
+  blockers in the same place (147 pines, hash identical), the hammock frame
+  at (−1923.174, 4.138, 443.162) both times, and the first 40 bathers
+  identical.
+
+**Measured.** 1280×720, RTX 4090, GPU timer queries round every render. Two
+valid runs each side, alternated. The machine was shared and the first run
+after a pause was thrown out twice.
+
+| per frame | prom t 330 | prom t 460 | wood t 452 | under the stand | aerial |
+|---|---|---|---|---|---|
+| draw calls | 721 → 724 | 853 → 856 | 808 → 811 | 581 → 584 | 747 → 749 |
+| triangles, all passes | 18.85 → 19.41 M | 19.09 → 19.58 M | 19.05 → 19.53 M | 18.58 → 19.06 M | 15.90 → 16.38 M |
+| GPU, median | 9.4 → 9.4 ms | 15.9 → 16.5 ms | 15.2 → 15.0 ms | 8.7 → 8.0 ms | 10.2 → 9.5 ms |
+
+The +0.48 M triangles is the resort's ~155 trees across the main pass and
+both cascades: rounder puffs, round trunks and round limbs. The GPU is flat
+within noise everywhere except t 460, at +0.6 ms. The first version was
++1.1 to +3 ms. It evaluated all four noise octaves unconditionally, and the
+far layer, most of the trees on screen, paid for two it then multiplied by
+zero. The far layer also cast through the discarding depth program. Both
+are fixed.
+
 ## [1.533.2] — 2026-09-27
 
 ### the fire waits while you swim, too

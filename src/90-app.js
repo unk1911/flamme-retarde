@@ -1465,7 +1465,14 @@ async function boot() {
   // a hangar does not move.
   shadow.cast(airfield.buildings);
   shadow.cast(airfield.objMesh);
-  if (jadrija) for (const m of jadrija.casters) shadow.cast(m);
+  // The resort's own trees are drawn with the landscape's tree material
+  // (`arbor` in 43-jadrija.js), and cast with its depth program for the same
+  // reason the landscape does: a dappled crown throws a dappled shadow.
+  if (jadrija) {
+    for (const m of jadrija.casters) {
+      shadow.cast(m, m.userData.tree ? { material: treeCaster(shadow, false) } : {});
+    }
+  }
   if (jadrija) for (const m of jadrija.castersLive || []) shadow.cast(m, { dynamic: true });
   // The skinned figure brings her own depth material, because her shape lives
   // in a bone palette that the two shared ones know nothing about. Near
@@ -1589,7 +1596,14 @@ async function boot() {
   // the sort of thing that is only ever noticed on foot.
   for (const k in trees.layers) {
     for (const lod in trees.layers[k]) {
-      shadow.cast(trees.layers[k][lod].mesh, { instanced: true });
+      // The near model with the foliage's own depth program, which opens the
+      // same tufts in the shadow that it opens in the crown — see
+      // FOLIAGE_CASTER_FRAG. Not the far one: it is never inside the near
+      // cascade, the far cascade's texels are too coarse to hold a hole, and
+      // a program that can discard costs early depth on thirty thousand trees.
+      shadow.cast(trees.layers[k][lod].mesh, lod === 'near'
+        ? { instanced: true, material: treeCaster(shadow, true) }
+        : { instanced: true });
     }
   }
 
