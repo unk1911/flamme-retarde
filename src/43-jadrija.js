@@ -51709,7 +51709,8 @@ async function buildJadrija(scene) {
       pushBody(r.x - hx * hl, r.z - hz * hl, 0.34, r.y, r.y + 1.85, 'rider', r.i);
       if (r.bike) pushBody(r.x, r.z, 0.34, r.y, r.y + 1.85, 'rider', r.i);
     }
-    // AND THE SLOW DOODLE, two discs along his back. He is a metre and a
+    // AND THE SLOW DOODLE, a capsule along his back and a disc on his head —
+    // see `DOODLE.disc`, which needs to know who is asking. He is a metre and a
     // half of dog standing about on the deck, and walking through him would
     // be walking through the one thing on the promenade that is looking at
     // you. `doodle` is declared further up and is null until built.
@@ -51717,7 +51718,7 @@ async function buildJadrija(scene) {
       doodle.discs((dx, dz, r, y0, top) => {
         const ex = dx - x, ez = dz - z;
         if (ex * ex + ez * ez < (pad + r) * (pad + r)) pushBody(dx, dz, r, y0, top, 'doodle', -1);
-      });
+      }, x, z);
     }
     return bodyN;
   }
