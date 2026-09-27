@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.532.1] — 2026-09-27
+
+### a way through to the hammock, and out of it on her feet
+
+Misha: *"there's no easy way to "walk" there... b/c there's too many walls
+and buildings... can u clear off some of those buildings ... remove some of
+those walls, and maybe remove some of the cars"*, and *"when i say 'get out',
+she does get up, but then she just disappears/vanishes.... also it should
+accept command 'stand up', or 'get up'"*.
+
+- **The way through.** The new `HAM_WALK` cut, t 436.2 to 442.8, removes the
+  huts from both rows of kabine, the same way the `EAST_CAFE` cut does at
+  Caffe TRAMPULIN.
+  - Both cuts go through one `cutSpans`, which splits the pads, the roofs and
+    the blockers alike.
+  - A run whose end now falls inside the cut no longer draws its end wall.
+    Before this, the end wall stayed behind as a white slab standing alone in
+    the gap.
+  - The lane wall at s 29.2 has a gap there too.
+  - No car is parked within 6 m of the cut.
+  - The hammock's choice of trees now prefers the site at the end of the cut,
+    which is the site it already had: 43.724019, 15.846098.
+  - The way from the promenade to her mark was ten legs round by t 410. It is
+    now three, straight up the cut.
+- **She did not vanish; she was put back on the promenade.** `hamLeft` stood
+  her on the mark, 18 m inland of her strip. `play` then walks her with
+  `showMove`, which clamps her to `SHOW.lane`, so on the next frame she was
+  back on the promenade, out of sight of anyone standing by the hammock. The
+  new `hamBack` phase walks her out along `hamPath`, leg by leg, with the
+  unclamped `showTo`, and she only goes back to playing once she is on the
+  lane. Anything asked on the way waits for her there. Measured: the reverse
+  of `hamIn`, then 18 s of walking straight down the cut to s 9, then `play`.
+- **"Stand up" and "get up".** The server hears both as `rise`. In the
+  hammock, `askShow` now takes `rise` as `hammock.out`. Before this, it got her
+  out as "anything else asked", and then asked her to rise again once she was
+  already standing.
+
 ## [1.532.0] — 2026-09-27 (baye 1.47.0)
 
 ### a hammock in the pines, on AVBD, and Baye in it

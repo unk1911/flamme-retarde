@@ -3045,8 +3045,32 @@ async function buildJadrija(scene) {
   // times, and its only symptom is a page that never finishes loading. Keep
   // these numbers in step with the `tramp2` entry by hand.
   const EAST_CAFE = { t0: 467.6, t1: 476.4, s0: 16.6, s1: 27.2 };
-  const cafeBlocks = (a, c, front) => c > EAST_CAFE.t0 && a < EAST_CAFE.t1
-    && EAST_CAFE.s1 > front && EAST_CAFE.s0 < front + JAD.cabD;
+  // AND A WAY THROUGH TO THE HAMMOCK. Misha, 27 Sep 2026, standing on the
+  // promenade: *"there's no easy way to 'walk' there... b/c there's too many
+  // walls and buildings... can u clear off some of those buildings ... remove
+  // some of the cars, so one can easily walk to the hammock"*. The hammock
+  // (src/43-hammock.js) hangs at t 439.5 between the back row and the lane
+  // wall, and the only ways in were the alleys between runs, round the ends of
+  // runs twenty metres either side. So both rows are cut open here, the same
+  // way and in the same four places they are cut for Trampulin — the pad, the
+  // huts, the blocker and the roof — and the car row behind is kept clear.
+  // Baye's kabina is at t 426.5 and nowhere near it. The hammock picks the
+  // pine pair nearest `HAM_WALK.t` (see `hammockSpec`), so the hole and the
+  // thing it is a way to stay together however the grove is planted.
+  const HAM_WALK = { t0: 436.2, t1: 442.8, s0: 16.6, s1: 30.0, t: 439.5 };
+  const KAB_CUTS = [EAST_CAFE, HAM_WALK];
+  const cutHit = (C, a, c, front) => c > C.t0 && a < C.t1
+    && C.s1 > front && C.s0 < front + JAD.cabD;
+  const cafeBlocks = (a, c, front) => KAB_CUTS.some((C) => cutHit(C, a, c, front));
+  /** [a, c] with every cut through this row taken out of it. */
+  const cutSpans = (a, c, front) => {
+    let spans = [[a, c]];
+    for (const C of KAB_CUTS) {
+      spans = spans.flatMap(([p, q]) => (cutHit(C, p, q, front)
+        ? [[p, Math.max(p, C.t0)], [Math.min(q, C.t1), q]] : [[p, q]]));
+    }
+    return spans;
+  };
 
   function cabinRun(t0, n, front, roofCol) {
     const back = front + JAD.cabD;
@@ -3059,9 +3083,7 @@ async function buildJadrija(scene) {
     b = deck;
     // In up to two pieces, so the pad stops at the cafe instead of running
     // under its floor.
-    for (const [pa, pc] of cafeBlocks(t0 - 0.5, t1 + 0.5, front)
-      ? [[t0 - 0.5, EAST_CAFE.t0], [EAST_CAFE.t1, t1 + 0.5]]
-      : [[t0 - 0.5, t1 + 0.5]]) {
+    for (const [pa, pc] of cutSpans(t0 - 0.5, t1 + 0.5, front)) {
       if (pc - pa < 0.15) continue;
       boxTS(pa, pc, front - 0.55, back + 0.45,
         y0 - 0.4, y0 + JAD.plinth, CONC[1], CONC[2]);
@@ -3372,8 +3394,7 @@ async function buildJadrija(scene) {
     //
     // Split at `EAST_CAFE` on the same test the huts and the blocker use, and
     // capped at each cut so the ribbon ends as a gable and not as paper.
-    for (const [ra, rc] of cafeBlocks(T0, T1, front)
-      ? [[T0, EAST_CAFE.t0], [EAST_CAFE.t1, T1]] : [[T0, T1]]) {
+    for (const [ra, rc] of cutSpans(T0, T1, front)) {
       if (rc - ra < 0.15) continue;
       const nR = Math.max(1, Math.ceil((rc - ra) / JAD.cabW));
       const slab = (a0, a1, sa, sb, ya, yb) => {
@@ -3417,7 +3438,12 @@ async function buildJadrija(scene) {
         if (o > 0) b.tri(A, B, C, TRIM); else b.tri(C, B, A, TRIM);
       }
     }
+    // Only the ends a cut has left standing. A run that starts inside
+    // HAM_WALK keeps its `T0` on paper and has no huts there; its end wall
+    // drawn anyway was a white slab standing on its own in the way through.
+    const kept = cutSpans(T0, T1, front).filter(([a, c]) => c - a >= 0.15);
     for (const [T, o] of [[T0, -1], [T1, 1]]) {
+      if (!kept.length || (o < 0 ? kept[0][0] !== T0 : kept[kept.length - 1][1] !== T1)) continue;
       const A = W(T, e0, eave), B = W(T, mid, ridge), C = W(T, e1, eave);
       if (o > 0) b.tri(A, B, C, TRIM); else b.tri(C, B, A, TRIM);
       b = rendNow;
@@ -3483,9 +3509,7 @@ async function buildJadrija(scene) {
     // two places, and only one of them told about the exception. Anything that
     // opens a hole in a row here has to open it in both.
     const pushRun = (a, c, kab) => {
-      for (const [pa, pc] of cafeBlocks(a, c, front)
-        ? [[a, EAST_CAFE.t0], [EAST_CAFE.t1, c]]
-        : [[a, c]]) {
+      for (const [pa, pc] of cutSpans(a, c, front)) {
         if (pc - pa < 0.15) continue;
         runs.push({ t0: pa, t1: pc, s0: front - 0.55, s1: back + 0.45, y: y0, h, kab });
       }
@@ -21993,6 +22017,8 @@ async function buildJadrija(scene) {
       // first cut rendered, twice, one either side.
       if (Math.abs(t - BACK.rock[0]) < 3.4) continue;
       if (Math.abs(t - BACK.anchor[0]) < 3.0) continue;
+      // Nobody parks across the way through to the hammock (`HAM_WALK`).
+      if (t > HAM_WALK.t0 - 6.0 && t < HAM_WALK.t1 + 6.0) continue;
       const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
       // Which of the five, off a *sixth* slot of the same sine hash. Nothing in
       // this loop touches `rng`, so the model table in src/44-cars.js is free to
@@ -25588,7 +25614,10 @@ async function buildJadrija(scene) {
       // the two runs either side of it into one and moves a blocker, and that
       // is a separate argument from the one the slab lost.
       || (t > PLAZA.t0 - 8 && t < PLAZA.t1 + 8)
-      || (t > VIK.t - 12 && t < VIK.t + 12);
+      || (t > VIK.t - 12 && t < VIK.t + 12)
+      // And the way to the hammock, which HAM_WALK cuts through both rows of
+      // huts: a gap in the huts that ends at a wall is a yard, not a way.
+      || (t > HAM_WALK.t0 && t < HAM_WALK.t1);
     const step = 2.4;
     let run0 = null;
     for (let t = 300; t < LEN - 14 + step; t += step) {
@@ -26305,7 +26334,7 @@ async function buildJadrija(scene) {
           }
           if (!ok || cs.size > 2) continue;
           cands.push({ A: [A0[0], A0[1], A0[4] || 0.22], B: [B0[0], B0[1], B0[4] || 0.22], span: d,
-            mark: [kt, ks], cars: [...cs], score: Math.abs(mt - home) + 6 * cs.size });
+            mark: [kt, ks], cars: [...cs], score: Math.abs(mt - HAM_WALK.t) + 6 * cs.size });
         }
       }
     }
@@ -32981,6 +33010,29 @@ async function buildJadrija(scene) {
     if (skinFig && skinFig.face) { skinFig.face.gape = 0; skinFig.face.laugh = 0; }
   }
 
+  /**
+   * AND BACK TO HER LANE ON HER FEET. Misha, 27 Sep 2026: *"when i say 'get
+   * out', she does get up, but then she just disappears/vanishes"*. She did
+   * not vanish: `hamLeft` stood her on the mark, eighteen metres inland of
+   * her strip, and `play` walks her with `showMove`, which clamps to
+   * SHOW.lane — so the next frame put her back on the promenade, out of
+   * sight of anyone standing by the hammock. The way in was `hamPath`; the
+   * way out is the same search the other way round, walked leg by leg by
+   * `hamBack` with `showTo`, which does not clamp. Only on the lane does she
+   * go back to playing, and only there are asks taken again (`hamBack` is
+   * not ASKABLE — one asked on the way waits for her there).
+   */
+  function hamHome(go) {
+    hamLeft();
+    const goal = [show.t, LANE_S()];
+    const legs = show.s > SHOW.lane[1] + 0.3
+      ? (hamPath(show.t, show.s, goal[0], goal[1]) || [goal]) : null;
+    if (!legs) { go('play', 'walk', 0.36); return; }
+    show.job = { name: 'hamBack', t: goal[0], s: goal[1], since: 0, leg: 0, legs,
+      best: null, stall: 0 };
+    go('hamBack', 'walk', 0.36);
+  }
+
   /** A push has landed — from 90-app.js. Answers whether she was in it to feel it. */
   function hamPushed(dv) {
     if (!show || show.phase !== 'hamHeld' || !show.ham) return false;
@@ -38375,7 +38427,7 @@ async function buildJadrija(scene) {
   const SMILE = {
     // In the hammock: pleased with it, and more when you swing her — see
     // `case 'hamHeld'`, which adds the swing on top of this.
-    hamGo: 0.55, hamTurn: 0.60, hamIn: 0.65, hamHeld: 0.55, hamOut: 0.50,
+    hamGo: 0.55, hamTurn: 0.60, hamIn: 0.65, hamHeld: 0.55, hamOut: 0.50, hamBack: 0.50,
     idle: 0.30, notice: 0.62, down: 0.55, crawl: 0.50, up: 0.72,
     flip: 0.85, play: 0.55, aim: 0.70, wheel: 0.85, bask: 1.00,
     orbit: 0.80, joy: 1.00, shimmy: 0.90, home: 0.45,
@@ -42709,7 +42761,7 @@ async function buildJadrija(scene) {
 
       case 'hamTurn': {
         const H = show.ham;
-        if (!H || !hammock) { hamLeft(); go('play', 'walk', 0.36); break; }
+        if (!H || !hammock) { hamHome(go); break; }
         H.t += dt;
         show.vel = 0;
         showSettle([H.mark.t, H.mark.s], dt, 8);
@@ -42730,7 +42782,7 @@ async function buildJadrija(scene) {
 
       case 'hamIn': {
         const H = show.ham;
-        if (!H || !hammock) { hamLeft(); go('play', 'walk', 0.36); break; }
+        if (!H || !hammock) { hamHome(go); break; }
         H.t += dt;
         show.vel = 0;
         if (done) { H.t = 0; go('hamHeld', 'hamLie', 0.50); }
@@ -42739,7 +42791,7 @@ async function buildJadrija(scene) {
 
       case 'hamHeld': {
         const H = show.ham;
-        if (!H || !hammock || !hammock.api.herIn) { hamLeft(); go('play', 'walk', 0.36); break; }
+        if (!H || !hammock || !hammock.api.herIn) { hamHome(go); break; }
         H.t += dt;
         show.vel = 0;
         // And the way out. Asked for; or anything else asked that is not her
@@ -42796,7 +42848,27 @@ async function buildJadrija(scene) {
         S.speed = -1;
         if (!S.cur || S.cur.name !== 'hamIn' || S.curT <= 0) {
           S.speed = 1;
-          hamLeft();
+          hamHome(go);
+        }
+        break;
+      }
+
+      case 'hamBack': {
+        // See `hamHome`. Out along the legs; past a stall, straight on —
+        // `showClear` keeps her off what is in the way, and the lane is
+        // never more than a few huts off.
+        const j = show.job;
+        if (!j || !j.legs) { show.job = null; go('play', 'walk', 0.36); break; }
+        j.since += dt;
+        const g = j.legs[Math.min(j.leg, j.legs.length - 1)];
+        const dist = showTo(g[0], g[1], dt, HAM_T.pace);
+        if (dist < (j.best == null ? 1e9 : j.best) - 0.2) { j.best = dist; j.stall = 0; } else j.stall += dt;
+        if (dist < 0.55 || j.stall > HAM_T.stall) {
+          if (j.leg < j.legs.length - 1) { j.leg++; j.best = null; j.stall = 0; break; }
+          show.job = null;
+          go('play', 'walk', 0.36);
+        } else if (j.since > 60) {
+          show.job = null;
           go('play', 'walk', 0.36);
         }
         break;
@@ -55813,6 +55885,10 @@ async function buildJadrija(scene) {
     hamMark: () => hamMark(),
     /** Debug: her side of it — phase, clip clock, the mark, laughs. */
     hamState: () => (show ? { phase: show.phase, job: show.job ? show.job.name : null,
+      vis: skinFig ? skinFig.mesh.visible : null,
+      apprVis: typeof appr !== 'undefined' && appr ? appr.mesh.visible : null,
+      pos: skinFig ? skinFig.mesh.position.toArray().map((v) => +v.toFixed(2)) : null,
+      apprPos: typeof appr !== 'undefined' && appr ? appr.mesh.position.toArray().map((v) => +v.toFixed(2)) : null,
       clip: skinFig && skinFig.state.cur ? skinFig.state.cur.name : null,
       curT: skinFig ? +(skinFig.state.curT || 0).toFixed(2) : null,
       speed: skinFig ? skinFig.state.speed : null,
@@ -56353,7 +56429,14 @@ async function buildJadrija(scene) {
       // WHICH ROAD, decided here and once — see `askRoad`. Everything below
       // and everything in the dispatch reads the normalised name, so neither
       // has to know that the two words are the same request.
-      const name = askRoad(rawName);
+      // AND UP, IN THE HAMMOCK, IS OUT. Misha, 27 Sep 2026: *"it should
+      // accept command 'stand up', or 'get up'"*. The server hears either as
+      // `rise` — off her knees, off her back — and lying in the hammock is
+      // her back; so there it is the way out, and not a get-up asked again
+      // once she is already standing.
+      const road = askRoad(rawName);
+      const name = road === 'rise' && show && HAM[show.phase] && show.phase !== 'hamGo'
+        ? 'hammock.out' : road;
       // THE FLAVOUR RIDES ON THE NAME — see `fetch.cream` in SHE_CAN. The
       // table is checked against the base, so one entry covers every tray in
       // the case and nothing downstream has to learn a second argument.
