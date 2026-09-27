@@ -784,16 +784,18 @@ for _s, _t in (("l", "L"), ("r", "R")):
 # sides mirror in sign. Bones running fore-aft or across take Z as world up.
 ROLL_UP = Vector((-1.0, 0.0, 0.0))
 ROLL_FLAT = Vector((0.0, 0.0, 1.0))
-# NOT `FLAT`. It was, and on 17 Sep 2026 (1.410.0) the pose "flat on her
-# front" was added four thousand lines below as `FLAT = dict(PRONE, ...)`,
-# which rebinds the module name at import. From then on `armature()` read
+# NOT `FLAT`. It was, and on 24 Sep 2026 (0502c0f) a pose "flat on her back"
+# was added four thousand lines below as `FLAT = dict(PRONE, ...)`, which
+# rebinds the module name at import. From then on `armature()` read
 # `name in FLAT` against a POSE — every bone is a key of it — so every bone got
 # ROLL_FLAT, a leg hanging straight down got a roll vector parallel to itself,
 # and the sagittal axis came out wherever Blender's degenerate case put it.
 # Measured 27 Sep on a fresh bather rig: `legU` +x swung the leg FORWARD and
-# the shared walk played as a moonwalk. Baye's rig predates it (she is loaded
-# from build/human_mh.blend); every rig built fresh since — the v2 bathers of
-# 23 Sep among them — has it. Named for what it is so nothing can shadow it.
+# the shared walk played as a moonwalk. NOTHING THAT SHIPPED HAD IT: Baye is
+# loaded from build/human_mh.blend, and the v2 bathers were baked on 23 Sep,
+# the day before — their rigs compare identical, bone for bone, with a rebake
+# on this fix. Only a rig built fresh between 24 and 27 Sep would have. Named
+# for what it is so nothing can shadow it again.
 ROLL_FLAT_BONES = ("footL", "footR", "toeL", "toeR", "clavicleL", "clavicleR",
                    "thumbL", "thumbR", "fingersL", "fingersR", "jaw", "eyeL", "eyeR")
 

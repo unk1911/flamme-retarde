@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.530.1] — 2026-09-27
+
+### the bathers put back exactly as they were; the diver walks at their pace
+
+Misha: *"I think they were actually walking fine before but now they walk a
+bit weird. can you put it back to how they used to walk, including the
+diver"*.
+
+**They were walking fine before, and 1.530.0 did not change their walk.** I
+was wrong about them. 1.530.0 said the v2 bathers were built on a broken rig
+and walked backwards. Measured against the files that shipped before it, the
+rebake in 1.530.0 has the same skeleton and the same walk and idle,
+bone for bone to 0.000°. The shadowing bug only began on 24 Sep, the day after
+they were baked. The one thing 1.530.0 did change was `kneel` and `getup`,
+which picked up Baye's newer hands-flat-on-the-floor poses.
+
+So all eight are back to their original files. The diver's body type is its
+original file with only the four new clips (`dive`, `ladder`, `swim`, `tread`)
+appended; the skeleton is identical, so they fit it exactly.
+
+**The walk that did look different was the diver's.** Walking back along the
+deck, he played the walk at his measured stride of 1.485 m/s a cycle. The
+crowd plays the same clip at 0.92 (`clipRate` in 42-crowd.js), so beside them
+he strolled with a slower, longer-legged cadence. He now uses the crowd's
+number.
+
 ## [1.530.0] — 2026-09-27
 
 ### the diver at the skakaonica, solved
@@ -51,14 +77,12 @@ The plank bends by the baked deflection table, in a true cantilever shape,
 and rings after he leaves. The splash lands where his hands enter. From the
 moment he is in the water he rides the actual swell.
 
-**And a bug underneath everything.** `human_mh.FLAT`, the list of bones built
-with a flat roll, had been overwritten on 17 Sep by the "flat on her front"
-pose of the same name. Every skeleton built since then had the wrong roll on
-every bone, which reverses the sagittal joints and plays the shared walk as a
-moonwalk. Baye is unaffected, because she is loaded from an older saved
-.blend. The v2 bathers were built on 23 Sep and have it. The list is now
-`ROLL_FLAT_BONES`, and all eight v2 bathers are rebaked on the corrected rig.
-Their walk plays forward again.
+**And a bug underneath, which turned out not to touch anything shipped.**
+`human_mh.FLAT`, the list of bones built with a flat roll, had been overwritten
+on 24 Sep by a pose of the same name, so a skeleton built fresh after that got
+the wrong roll on every bone. That is where the diver's first test rig came
+from. It is now `ROLL_FLAT_BONES`. (This entry first said the v2 bathers had
+it and walked backwards; they did not. See 1.530.1.)
 
 Debug: `__fr.jad.raw().dive.stats()` / `.now()`.
 

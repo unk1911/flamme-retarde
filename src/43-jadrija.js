@@ -30500,9 +30500,11 @@ async function buildJadrija(scene) {
   const DIVE_FULCRUM = 2.06, DIVE_TIP = 5.10;     // along t from DIVE.t
   const DIVE_LADDER = { u: -0.74, v: -1.40 };     // the rungs' face, mid-ladder
   const DIVE_SPEED = { walk: 1.05, swim: 0.85 };  // m/s
-  // The walk clip's own ground speed at clock rate 1: dive.py measures four
-  // steps of it at 2.97 m in two cycles of 1.0 s.
-  const WALK_NATIVE = 1.485;
+  // The walk clip's ground speed at clock rate 1 — the CROWD's number
+  // (`clipRate` in 42-crowd.js), so he walks back along the deck at the same
+  // cadence as every other bather. 1.485, the stride dive.py measures, gave
+  // him a slow long-legged stroll next to them that read as a different walk.
+  const WALK_NATIVE = 0.92;
   // How much higher than the solve's still-water surfacing he treads: the
   // bake puts the top of his skull 26 cm out, which on this swell measured
   // the base of it 17 cm over the local surface — a face at the waterline,

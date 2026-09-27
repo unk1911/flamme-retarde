@@ -36,9 +36,10 @@ tip's place in the clip, the entry, and where each clip hands over) for
 src/43-jadrija.js, which only places and chains them.
 
 THE RIG HAS TO BE BUILT RIGHT. This file found that `human_mh.FLAT` — the
-bones given a flat roll — had been shadowed by a pose of the same name, so any
-rig built since 17 Sep had the wrong roll on every bone and played the shared
-walk as a moonwalk. See ROLL_FLAT_BONES. The conventions below are off --calib
+bones given a flat roll — had been shadowed by a pose of the same name on 24
+Sep, so a rig built fresh after that had the wrong roll on every bone and
+played the shared walk as a moonwalk. Nothing shipped had it (the bathers were
+baked on the 23rd). See ROLL_FLAT_BONES. The conventions below are off --calib
 renders of a correctly-rolled rig.
 """
 
