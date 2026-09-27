@@ -25,10 +25,10 @@ it's just the one main concrete slab, there is no secondary concrete slab"*.
   3EI/L³ at the tip at 6.8 kN/m, and the plank mass goes with the length
   (55 kg).
 - **The solved board's length is no longer typed in.** It was a 3.04 literal
-  in , and the first build of this left the solved board ending
+  in `plungeBoard`, and the first build of this left the solved board ending
   0.76 m short of the drawn tip. Under her feet that board was twice as
   stiff, and the pumping went flat at about 4.4 m/s. It is now the tower's
-  own .
+  own `tip − fulcrum`.
 - **Measured, the same pumping plan on both builds:**
 
 | board | takeoffs (m/s), the last is the dive |
