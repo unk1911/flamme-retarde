@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.1] — 2026-09-27
+
+### an × on the ears
+
+Misha: *"one minor annoying thing: the ears 'E' should have an 'X' so i could
+'close it out'"*.
+
+The ears panel (the EARS console, `I`) had only keys for doors: `I` to shut
+the line, Escape in the box. Neither took the panel away. A closed panel stays
+on screen for as long as it has lines in it, and on a desktop nothing ever
+cleared them, so once you had said anything it stayed there for good.
+
+- **An × in its top-right corner** (`dismiss` in 49-ears.js). It does what `I`
+  does: the microphone off through the same `stop` if it is live, the caret out
+  of the box, the SAY button unlit, the pointer re-grabbed. It also clears the
+  lines, so the panel really goes. `I` opens it again, empty.
+- It is a `button`, so the touch sticks and the settings sheet's outside-tap
+  guard already leave it alone, and its mousedown stops there. The glyph and
+  grey are the help, sign-in and settings sheets' close. It is 32 px square on
+  a desktop and 38 on glass. Its tooltip and aria-label come from the new
+  `ears.close` string, in English, Croatian and French.
+- Checked headless, on a desktop and with `?touch`: open, type, Enter, then
+  click the ×. The panel is hidden, `open()` is false, no lines are left, the
+  caret is back on the body and SAY is unlit. `I` brings it back.
+
+### and the test pipeline, faster
+
+Misha: *"do you think we can optimize some of our pipelines to somehow build
+things faster?"*. Nothing a player sees changes here; this is how a test gets
+run.
+
+- **`__fr.warp(n)` / `?warp=n`.** The world runs `n` steps per animation
+  frame, each at its usual clamped size, and only the last one is drawn.
+  The walk to the hammock and into it took 21.6 s of wall time at ×1, 5.4 s
+  at ×4 and 3.3 s at ×8. The CPU is the limit from about ×8. No rescues at
+  any speed.
+- **`tools/shoot.mjs`:**
+  - **Never a background page.** Chrome sometimes treated the headless page
+    as hidden and the game paused itself mid-plan. The three
+    anti-backgrounding flags and focus emulation are now on.
+  - **A clean launch every time.** Each run gets a fresh profile and the
+    first free debugging port, and Chrome's whole process group is killed at
+    the end. This is the "fails every other launch" fault.
+  - **Probes are awaited.** A probe that is a promise used to print `{}`.
+  - **`until` steps** wait for a condition instead of a guessed `settle`.
+  - **Jadrija is waited for, not guessed.** On a Jadrija URL the tool waits
+    for the resort to be ready (about 0.3 s after enter) instead of the
+    20 s settles plans used to open with.
+  - **`--warp`**, a per-step `warp`, and a **`profile` step** that prints the
+    main thread's top self-time functions.
+- **`tools/shootmany.mjs`** runs plans in parallel, each in its own Chrome.
+  Three plans took 19.9 s side by side against 47.4 s one after another.
+
 ## [1.535.0] — 2026-09-27
 
 ### up the skakaonica's ladder, and off its board: a springboard on AVBD
