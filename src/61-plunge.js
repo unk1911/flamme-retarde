@@ -1054,6 +1054,15 @@ function buildPlunge(jad, you, hooks = {}) {
   }
   function drawBoard() {
     if (D.mode && D.mode() === 'dive') return;     // his table has it while he is on it
+    // THE SHAPE READ FIRST. Misha, 27 Sep 2026: *"when i (chloe) go on the
+    // diving board, and jump, the board seems to not bend... so it doesn't
+    // look realistic"*. It did bend — the solve had the tip 0.46 m down under
+    // her landings, and she rode that surface — but `deflect` draws from the
+    // joint heights `shape()` copies out of the solve, and nothing ever called
+    // `shape()`: the drawn plank measured 0.000 m of bend through a whole
+    // pumping sequence, a straight board with her sinking into and rising off
+    // it. Read every time it is drawn.
+    board.shape();
     D.bend((u) => board.deflect(u - UF));
   }
 

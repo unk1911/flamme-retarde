@@ -8,6 +8,24 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.2] — 2026-09-27
+
+### the springboard bends where you can see it
+
+Misha: *"when i (chloe) go on the diving board, and jump, the board seems to
+not bend... so it doesn't look realistic"*.
+
+It did bend, but only in the physics. The AVBD solve had the tip 0.46 m down
+under her landings, and she rode that surface. The drawn plank reads its
+shape from joint heights that `board.shape()` copies out of the solve, and
+nothing ever called `shape()`. Measured over a whole pumping sequence, the
+mesh bent 0.000 m: a straight board, with her sinking into it and rising off
+it.
+
+`drawBoard` now reads the shape each time it draws. Measured the same way,
+the mesh now follows the solve: 0.486 m on the mesh against 0.487 m in the
+solve at the deepest landing, and it recoils between bounces.
+
 ## [1.535.1] — 2026-09-27
 
 ### an × on the ears
