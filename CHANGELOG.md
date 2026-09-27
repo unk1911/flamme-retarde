@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.5] — 2026-09-27
+
+### the diving station turned to face the kabine
+
+Misha: *"in reality, the entire diving station, along with the board, needs
+to be rotated 90 degrees counter-clockwise. basically the diving board must
+face the kabine"*.
+
+- **The whole tower is turned a quarter about its anchor** (t 396.8,
+  s −54.8): the slab, footing, bearers, ladder, board and the ground under
+  it. It has its own axes now, `DIVE.axis`:
+  - **Along the plank** (anchor to tip) is the shore's normal, pointing
+    inland at the huts.
+  - **Across** is the shore's own direction reversed. That keeps the pair
+    right-handed, so nothing comes out mirrored.
+  - **Checked:** the cross product of the old heading with the new one is
+    +0.999 up, a counter-clockwise quarter seen from above.
+- **Everything that moves on it follows:** the tower is drawn through
+  `DIVE.P`, the board mesh takes its heading from `DIVE.axis`, and
+  `diveAxis` is `DIVE.axis`. That covers his walk, dive, splash and ladder,
+  and her climb, board, dive and camera presets.
+- **Measured after the turn:**
+  - He dives and comes up treading.
+  - She climbs, and the board bends 0.48 m under her.
+  - Her takeoffs go 2.5, 3.4, 4.4, 4.75, then a 5.6 m/s dive, as before
+    the turn. No rescues.
+
 ## [1.535.4] — 2026-09-27
 
 ### one slab under the board, not two

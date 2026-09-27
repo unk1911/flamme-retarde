@@ -20008,11 +20008,28 @@ async function buildJadrija(scene) {
     // lower and the deck would silently drop with it.
     top: at(430).lip + 0.55,
   };
-  DIVE.P = (() => {
+  // AND TURNED TO FACE THE KABINE. Misha, 27 Sep 2026: *"in reality, the
+  // entire diving station, along with the board, needs to be rotated 90
+  // degrees counter-clockwise. basically the diving board must face the
+  // kabine"*. The platform's own axes, turned a quarter about the anchor:
+  // `ux, uz` — the way the plank runs, anchor to tip — is the shore's normal
+  // now, pointing inland at the huts, and `nx, nz` is the shore's own
+  // direction reversed, which keeps the pair right-handed as it was, so
+  // nothing on the tower comes out mirrored. Everything on it is drawn
+  // through `DIVE.P`, and everything that moves on it — his walk, dive and
+  // splash, her climb, board and cameras — takes its heading from
+  // `DIVE.axis`, so this is the whole of the turn.
+  DIVE.axis = (() => {
     const st = at(DIVE.t);
+    // About the tower's own anchor (DIVE.t, DIVE.s), not the shore line.
+    return { x: st.x + st.nx * DIVE.s, z: st.z + st.nz * DIVE.s,
+      ux: st.nx, uz: st.nz, nx: -st.ux, nz: -st.uz };
+  })();
+  DIVE.P = (() => {
+    const A = DIVE.axis;
     return (u, v, y) => [
-      st.x + st.ux * (u - DIVE.t) + st.nx * v, y,
-      st.z + st.uz * (u - DIVE.t) + st.nz * v,
+      A.x + A.ux * (u - DIVE.t) + A.nx * (v - DIVE.s), y,
+      A.z + A.uz * (u - DIVE.t) + A.nz * (v - DIVE.s),
     ];
   })();
   const DIVE_BOARD = { length: 7.52, width: 0.80, thick: 0.09 };
@@ -20360,7 +20377,7 @@ async function buildJadrija(scene) {
     diveBoard.name = 'jadrija-diving-board';
     const boardMid = P(D.t + 1.34, D.s, y + 0.06);
     diveBoard.position.set(boardMid[0], boardMid[1], boardMid[2]);
-    const boardAxis = at(D.t);
+    const boardAxis = D.axis;
     diveBoard.rotation.y = Math.atan2(-boardAxis.uz, boardAxis.ux);
     const boardCol = new Float32Array(boardBase.length);
     for (let i = 0; i < boardCol.length; i += 3) {
@@ -30899,7 +30916,8 @@ async function buildJadrija(scene) {
     origin: [0, 0, 0], yaw: 0, pelvisY: 1.0, loops: 0,
   };
   function diveYaw(dx, dz) { return Math.atan2(-dz, dx); }
-  const diveAxis = (() => { const a = at(DIVE.t); return { ux: a.ux, uz: a.uz, nx: a.nx, nz: a.nz }; })();
+  // The platform's axes, turned with it — see AND TURNED TO FACE THE KABINE.
+  const diveAxis = { ux: DIVE.axis.ux, uz: DIVE.axis.uz, nx: DIVE.axis.nx, nz: DIVE.axis.nz };
   // Where the dive clip's origin goes: its board tip lands on the real tip.
   function diveOrigin() {
     const u0 = DIVE_TIP - (DV ? DV.dive.x_tip : 3.13);
