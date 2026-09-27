@@ -7118,6 +7118,18 @@ function setDressed(v) {
 /** What `state.phase` was last frame, so the change itself can be acted on. */
 let lastPhase = '';
 
+// FAST-FORWARD, for tests and nothing else. Misha, 27 Sep 2026, on why
+// things take an hour: *"do you think we can optimize some of our pipelines
+// to somehow build things faster?"*. The measured answer was that most of an
+// agent's hour is spent WAITING ON THE WORLD'S OWN CLOCK — a probe asking
+// whether the hammock holds watched Baye walk there for 17 s and lie in it
+// for 70, two minutes a question, a dozen questions. `__fr.warp(n)` runs the
+// world `n` times per animation frame on the same clamped step, and draws
+// only the last of them: n x the world per wall second, every step the size
+// it always is, so nothing that is stable at 1 is asked to be stable at a
+// bigger dt. Off (1) unless a test turns it on; `?warp=n` does it from the
+// address bar.
+let warp = Math.max(1, Math.min(64, (+QUERY.get("warp")) | 0 || 1));
 function frame() {
   requestAnimationFrame(frame);
   // Read the clock even when paused, and read it before anything can bail out.
@@ -7126,6 +7138,11 @@ function frame() {
   // thirty seconds would resume by integrating thirty seconds of flight in a
   // single step, straight through whichever hill you were over.
   const wall = Math.min(0.05, clock.getDelta());
+  for (let i = warp; i > 0; i--) tick(wall, i === 1);
+}
+
+/** One step of the world, and — when `draw` — the picture of it. See `warp`. */
+function tick(wall, draw) {
   // Filming. `__fr.filmDt(1/16)` pins the world's step to a fixed number of
   // seconds a frame, whatever the renderer is managing.
   //
@@ -8553,7 +8570,7 @@ function frame() {
   shadow.update(state.phase === 'ground' ? camera.position
     : eject.active ? eject.pos : flight.p.pos, camera.position);
   shadow.syncMoving();
-  shadow.render(renderer);
+  if (draw) shadow.render(renderer);
 
   // The mix: your own engines, and only your own engines.
   //
@@ -8645,6 +8662,8 @@ function frame() {
   const posing = typeof poser !== 'undefined' && poser.on;
   if (posing) poser.frame(dt, camera);
   chuteAudio();
+  // Everything below is the picture: skipped on a fast-forward step.
+  if (!draw) return;
   if (mirror) mirror.update(renderer, scene, camera);
   if (mirrorP) mirrorP.update(renderer, scene, camera);
   // Her, live, into the phone's own target — before the frame for the mirror's
@@ -11150,6 +11169,8 @@ window.__fr = {
    * is what makes a headless page usable as a camera. See `frame()`.
    */
   filmDt: (v) => { filmDt = Math.max(0, +v || 0); return filmDt; },
+  /** Fast-forward: the world `n` times a frame, drawn once — see `warp`. */
+  warp: (n) => { warp = Math.max(1, Math.min(64, n | 0 || 1)); return warp; },
   /**
    * Run exactly one frame of a paused world and resolve when it is on screen.
    *

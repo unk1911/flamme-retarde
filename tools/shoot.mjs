@@ -6,7 +6,8 @@
 //                                [--q low] [--wait 120] [--fly] [--size WxH]
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { gpuLaunch, RENDERER_JS } from './gpu.mjs';
 
 const args = process.argv.slice(2);
@@ -18,7 +19,22 @@ const opt = (name, dflt) => {
 const flag = (name) => args.includes('--' + name);
 
 const [W, H] = (opt('size', '1280x720')).split('x').map(Number);
-const PORT = 9333 + (Number(opt('port', 0)) | 0);
+// The debugging port. `--port n` asks for 9333 + n, and gets the first free
+// one from there: two runs asked for the same number used to find each
+// other's Chrome on it and fail, silently, about one launch in two — which is
+// what made running several at once impossible. See `freePort`.
+const PORT_WANT = 9333 + (Number(opt('port', 0)) | 0);
+const freePort = (p) => new Promise((res) => {
+  const srv = createServer();
+  srv.once('error', () => res(false));
+  srv.listen(p, '127.0.0.1', () => srv.close(() => res(true)));
+});
+let PORT = PORT_WANT;
+for (let k = 0; k < 64 && !(await freePort(PORT)); k++) PORT = PORT_WANT + 1 + k * 7;
+const PROFILE = '/tmp/claude-chrome-profile-' + PORT;
+// A fresh profile every launch: a stale one (a crashed run's lock file, or a
+// session restore) is the other way the same run failed on alternate tries.
+rmSync(PROFILE, { recursive: true, force: true });
 const URL_BASE = opt('url', 'http://127.0.0.1:8794/flamme-retarde.html');
 const quality = opt('q', 'low');
 const maxWait = Number(opt('wait', 150)) * 1000;
@@ -38,6 +54,14 @@ const chrome = spawn('google-chrome', [
     '--use-fake-device-for-media-stream',
     '--use-file-for-fake-audio-capture=' + opt('mic')] : []),
   '--hide-scrollbars', '--mute-audio',
+  // NEVER A BACKGROUND TAB. Headless, Chrome decided the page was hidden
+  // often enough that the game paused itself mid-plan (`document.hidden`) and
+  // timers were throttled to once a second — two agents on 27 Sep lost runs to
+  // it independently. These three, and focus emulation below, keep it the
+  // foreground page for the whole run.
+  '--disable-background-timer-throttling',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
   // Output stays muted, but the AudioContext has to actually run: without this
   // Chrome holds it suspended until a user gesture that a headless driver never
   // makes, its clock never advances, and every setTargetAtTime in the mix sits
@@ -46,9 +70,18 @@ const chrome = spawn('google-chrome', [
   '--autoplay-policy=no-user-gesture-required',
   `--window-size=${W},${H}`,
   `--remote-debugging-port=${PORT}`,
-  '--user-data-dir=/tmp/claude-chrome-profile-' + PORT,
+  '--user-data-dir=' + PROFILE,
   'about:blank',
-], { stdio: ['ignore', 'ignore', 'pipe'], env: GL.env });
+  // Its own process group, so `killChrome` takes the GPU process, the
+  // renderers and the crashpad handlers with it. `chrome.kill()` alone killed
+  // the parent and left the rest holding the port and the profile.
+], { stdio: ['ignore', 'ignore', 'pipe'], env: GL.env, detached: true });
+const killChrome = () => {
+  try { process.kill(-chrome.pid, 'SIGKILL'); } catch { /* gone */ }
+  rmSync(PROFILE, { recursive: true, force: true });
+};
+process.on('SIGINT', () => { killChrome(); process.exit(130); });
+process.on('SIGTERM', () => { killChrome(); process.exit(143); });
 
 const logs = [];
 chrome.stderr.on('data', (d) => logs.push(String(d)));
@@ -118,6 +151,8 @@ async function main() {
 
   await send('Runtime.enable');
   await send('Page.enable');
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+  await send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
 
   const mobile = flag('mobile');
   await send('Emulation.setDeviceMetricsOverride',
@@ -215,6 +250,7 @@ async function main() {
   if (!status?.ready) {
     console.log('BUILD DID NOT FINISH:', JSON.stringify(status));
     console.log(consoleLines.slice(0, 40).join('\n'));
+    killChrome();
     process.exit(2);
   }
 
@@ -225,7 +261,26 @@ async function main() {
     await sleep(400);
   }
   const renderer = await evalJs(RENDERER_JS).catch(() => '?');
-  console.log(`build ${buildSeconds.toFixed(1)}s · ${renderer}`);
+  console.log(`build ${buildSeconds.toFixed(1)}s · ${renderer} · port ${PORT}`);
+  // AND AT JADRIJA, UNTIL IT IS THERE. Measured 27 Sep: the resort is built
+  // and walkable 1.8 s after the enter click, and plans were opening with a
+  // guessed `settle` of 20 000 ms — eighteen seconds of every run spent
+  // waiting on nothing. On a Jadrija URL the tool now waits for the thing
+  // itself (you on foot, the crowd and the hammock built), up to 60 s.
+  if (/[?&]jadrija\b/.test(URL_BASE) && !flag('veil')) {
+    const t2 = Date.now();
+    while (Date.now() - t2 < 60000) {
+      const ok = await evalJs(`(() => { try { const J = __fr.jad.raw();
+        return !!(J && J.crowd && J.hammock) && __fr.stats().phase === 'ground'; }
+        catch (e) { return false; } })()`).catch(() => false);
+      if (ok) break;
+      await sleep(150);
+    }
+    console.log(`jadrija ready ${((Date.now() - t2) / 1000).toFixed(1)}s`);
+  }
+  // --warp n: the world n times a frame from here on — see `warp` in
+  // src/90-app.js. A plan step can set its own with `"warp": n`.
+  if (opt('warp', null)) await evalJs(`__fr.warp(${Number(opt('warp'))})`).catch(() => {});
 
   // A plan file shoots many viewpoints from one launch, which is the whole
   // point: the world takes longer to start Chrome than to generate.
@@ -248,19 +303,63 @@ async function main() {
     }
     if (shotSpec.cam != null) poses.push(`__fr.cam(${shotSpec.cam})`);
     if (shotSpec.js) poses.push(shotSpec.js);
-    if (poses.length) await evalJs(`(() => { ${poses.join(';')}; return 1; })()`);
+    if (shotSpec.warp != null) await evalJs(`__fr.warp(${Number(shotSpec.warp)})`).catch(() => {});
+    // Async, so a step's `js` may `await` — and a promise it ends on is waited
+    // for rather than dropped.
+    if (poses.length) await evalJs(`(async () => { ${poses.join(';')}; return 1; })()`);
     if (shotSpec.drag) {
       await touchDrag(shotSpec.drag, shotSpec.dragHold ?? 140, !!shotSpec.keep);
     }
     if (shotSpec.release) await touchRelease();
 
+    // `until`: wait for a condition instead of guessing a time — polled every
+    // 200 ms, up to `timeout` ms (default 180 s), and THEN `settle`. The
+    // guess was the other half of an agent's hour: a settle long enough for
+    // the slow run is a settle twice too long for every other one.
+    if (shotSpec.until) {
+      const t1 = Date.now(), lim = Number(shotSpec.timeout ?? 180000);
+      let ok = false;
+      while (Date.now() - t1 < lim) {
+        ok = await evalJs(`!!(${shotSpec.until})`).catch(() => false);
+        if (ok) break;
+        await sleep(200);
+      }
+      if (!ok) console.log(`until timed out after ${lim / 1000}s: ${shotSpec.until}`);
+    }
     await sleep(Number(shotSpec.settle ?? opt('settle', 2200)));
+    // `profile`: ms of the main thread through Chrome's sampling profiler,
+    // printed as the top self-time functions — the answer to "where does the
+    // frame go" without opening DevTools.
+    if (shotSpec.profile) {
+      await send('Profiler.enable');
+      await send('Profiler.setSamplingInterval', { interval: 200 });
+      await send('Profiler.start');
+      await sleep(Number(shotSpec.profile));
+      const { profile } = await send('Profiler.stop');
+      if (shotSpec.profileOut) writeFileSync(shotSpec.profileOut, JSON.stringify(profile));
+      const self = new Map();
+      const dtOf = new Map();
+      profile.samples.forEach((id, i) => dtOf.set(id, (dtOf.get(id) || 0) + (profile.timeDeltas[i] || 0)));
+      let total = 0;
+      for (const n of profile.nodes) {
+        const t = (dtOf.get(n.id) || 0) / 1000;
+        total += t;
+        const cf = n.callFrame;
+        const key = `${cf.functionName || '(anon)'}:${cf.lineNumber + 1}`;
+        self.set(key, (self.get(key) || 0) + t);
+      }
+      const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, Number(shotSpec.top || 25));
+      console.log(`profile ${shotSpec.profile} ms, ${total.toFixed(0)} ms sampled:`);
+      for (const [k, v] of top) console.log(`  ${(100 * v / total).toFixed(1).padStart(5)}%  ${v.toFixed(0).padStart(6)} ms  ${k}`);
+    }
 
     // `probe` runs at capture time and is printed instead of the full stats
     // dump — for checking one specific thing (what the GPWS is saying, what
     // language the HUD is in) without wading through the aircraft telemetry.
     const probe = shotSpec.probe
-      ? await evalJs(`JSON.stringify(${shotSpec.probe})`).catch((e) => 'probe failed: ' + e.message)
+      // Awaited: a probe that is a promise used to print `{}`, because
+      // JSON.stringify of a pending promise is an empty object.
+      ? await evalJs(`(async () => JSON.stringify(await (${shotSpec.probe})))()`).catch((e) => 'probe failed: ' + e.message)
       : null;
     const stats = probe ? null : await evalJs(`__fr.stats()`).catch(() => null);
     const shot = await send('Page.captureScreenshot', { format: 'png' });
@@ -272,7 +371,7 @@ async function main() {
   const interesting = consoleLines.filter((l) => !noise.test(l));
   if (interesting.length) console.log('console:\n' + interesting.slice(0, 30).join('\n'));
 
-  chrome.kill();
+  killChrome();
   process.exit(0);
 }
 
@@ -280,6 +379,6 @@ main().catch((e) => {
   console.error('FAILED:', e.message);
   console.error(consoleLines.slice(0, 30).join('\n'));
   console.error(logs.join('').split('\n').filter((l) => /ERROR|error/.test(l)).slice(0, 10).join('\n'));
-  chrome.kill();
+  killChrome();
   process.exit(1);
 });
