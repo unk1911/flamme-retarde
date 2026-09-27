@@ -20303,8 +20303,15 @@ async function buildJadrija(scene) {
     // union of what stood here — big at t-1.64…t+0.40, small at t+1.36…t+2.76,
     // s -0.98…+0.98 between them — which is 4.40 m by 1.96 m, centred half a
     // metre east of the old mass because the newer block is that side.
-    frustumD(-8.0, [D.t + 0.56, D.s, 2.20, 0.98],
-      -0.55, [D.t + 0.56, D.s, 2.20, 0.98], WET);
+    //
+    // AND THEN THERE WAS ONE. Misha, 27 Sep 2026, looking down on it from the
+    // board: *"the diving station, in real life, it's just the one main
+    // concrete slab, there is no secondary concrete slab"*. The "newer block"
+    // below was a reading of the survey photograph, and the man who swims out
+    // to it says it is not there. So the footing is the old mass's own, and
+    // the smaller block, its bearer and its share of the footing are gone.
+    frustumD(-8.0, [D.t - 0.62, D.s, 1.02, 0.98],
+      -0.55, [D.t - 0.62, D.s, 1.02, 0.98], WET);
 
     // ── the big mass ─────────────────────────────────────────────────────────
     // The flare, which is the whole shape, standing on the footing above. Not
@@ -20322,25 +20329,9 @@ async function buildJadrija(scene) {
     frustumD(y - 0.26, [D.t - 0.62, D.s, 1.96, 1.38],
       y, [D.t - 0.62, D.s, 1.98, 1.40], [0.712, 0.730, 0.702], CONC[2]);
 
-    // ── the smaller, newer block ─────────────────────────────────────────────
-    // Squarer, whiter, a hand lower, and set half a metre further out. In the
-    // photograph it reads as a separate pour that arrived later, which is what
-    // happens to every one of these on this coast.
-    // It has no shaft of its own any more; it stands on the shared footing at
-    // -0.55, five centimetres below where its own leg used to start.
-    // It gets the tidal band and almost nothing else. In the photograph the
-    // newer block's face is still white to within a hand of the water while
-    // the old mass beside it is black to the cap, and that difference is the
-    // only thing that says one pour arrived after the other — so `wear` is
-    // 0.32. On its 2.166 m face that caps the plateau at 0.24 m and the tallest
-    // run at 0.69 m, so most of what it has is the wet edge the sea gives
-    // everything, with a scallop or two standing on it.
-    weathered(-0.55, [D.t + 2.06, D.s - 0.16, 0.70, 0.74],
-      y - 0.46, [D.t + 2.06, D.s - 0.16, 0.94, 0.92],
-      stainAt(NEW, y - 0.46, 0.32), 12, 0.14);
-    frustumD(y - 0.46, [D.t + 2.06, D.s - 0.16, 0.96, 0.94],
-      y - 0.26, [D.t + 2.06, D.s - 0.16, 0.98, 0.96], [0.808, 0.806, 0.778],
-      [0.836, 0.834, 0.804]);
+    // The smaller, newer block stood here, at t+2.06 — see AND THEN THERE WAS
+    // ONE above. The board's fulcrum was its bearer; it is the old mass's cap
+    // edge now (DIVE_FULCRUM).
 
     // Three boxes of dark used to hang on the ladder face here, 6 cm proud of
     // the concrete, standing in for the drip off forty years of wet feet. They
@@ -20357,7 +20348,7 @@ async function buildJadrija(scene) {
     // thing you see first: a dark line against the channel with nothing under
     // the far end of it.
     // The plank is a separate, lightly deformable beam rather than part of the
-    // static shore buffer. Its support at the newer block is the root of the
+    // static shore buffer. Its support at the old mass's cap edge is the root of the
     // cantilever; the free end is the part a diver loads and springs from.
     const boardGeo = new THREE.BoxGeometry(DIVE_BOARD.length, DIVE_BOARD.thick,
       DIVE_BOARD.width, 36, 1, 2);
@@ -20382,7 +20373,8 @@ async function buildJadrija(scene) {
     scene.add(diveBoard);
     // And the two bearers under it where it crosses each mass, which is what
     // stops it reading as a decal on the top of the concrete.
-    for (const ot of [-0.62, 2.06]) {
+    // The outer one at the cap's edge, where the fulcrum is — see DIVE_FULCRUM.
+    for (const ot of [-0.62, 1.00]) {
       boxD(D.t + ot - 0.36, D.t + ot + 0.36, D.s - 0.30, D.s + 0.30,
         y - 0.05, y + 0.015, [0.560, 0.548, 0.512]);
     }
@@ -30885,7 +30877,10 @@ async function buildJadrija(scene) {
   // bend the plank by the table.
   const DV = typeof PAYLOAD !== 'undefined' ? PAYLOAD.dive : null;
   const DIVE_TOP = DIVE.top + 0.105;              // the plank's top surface
-  const DIVE_FULCRUM = 2.06, DIVE_TIP = 5.10;     // along t from DIVE.t
+  // The fulcrum is the old mass's cap edge (the cap runs to t+1.36), since the
+  // newer block it used to stand on is gone — see AND THEN THERE WAS ONE. The
+  // tip has not moved, so the dive clip's takeoff is where it was.
+  const DIVE_FULCRUM = 1.30, DIVE_TIP = 5.10;     // along t from DIVE.t
   const DIVE_LADDER = { u: -0.74, v: -1.40 };     // the rungs' face, mid-ladder
   const DIVE_SPEED = { walk: 1.05, swim: 0.85 };  // m/s
   // The walk clip's ground speed at clock rate 1 — the CROWD's number
@@ -30918,7 +30913,7 @@ async function buildJadrija(scene) {
     if (!diveBoard) return;
     const pos = diveBoard.geometry.attributes.position, base = diveBoard.userData.flexBase;
     // Local x runs the plank's length about its middle at DIVE.t + 1.34; the
-    // fulcrum is the newer block's bearer. Tip-loaded cantilever shape.
+    // fulcrum is the cap edge's bearer. Tip-loaded cantilever shape.
     const x0 = DIVE_FULCRUM - 1.34, L = DIVE_TIP - DIVE_FULCRUM;
     for (let i = 0; i < pos.count; i++) {
       const x = Math.max(0, Math.min(L, base[3 * i] - x0));

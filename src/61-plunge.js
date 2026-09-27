@@ -38,14 +38,20 @@
 
 const PLUNGE = {
   // ── the board ─────────────────────────────────────────────────────────────
-  // The cantilever only, fulcrum (the newer block's bearer, DIVE_FULCRUM) to
-  // tip (DIVE_TIP): 3.04 m. The plank behind the fulcrum lies on concrete and
+  // The cantilever only, fulcrum (the cap edge, DIVE_FULCRUM) to tip
+  // (DIVE_TIP): 3.80 m. The plank behind the fulcrum lies on concrete and
   // does not move, so it is not simulated.
+  //
+  // 3.80 and not the 3.04 this was tuned at: the fulcrum was the newer block's
+  // bearer, and Misha says there is no newer block — *"it's just the one main
+  // concrete slab"*. The board is kept the same UNDER HER FEET rather than
+  // the same plank made longer: EI goes up by (3.80/3.04)³ = 1.953 so that
+  // 3EI/L³ at the tip is still 6.8 kN/m, and the mass goes with the length.
   board: {
     segs: 4,
     // kg, the four planks together. A 3 m aluminium springboard is ~90 kg over
     // its 4.9 m; the part past the fulcrum is about half of it.
-    mass: 44,
+    mass: 55,
     // N·m², the bending stiffness. Chosen for the stiffness at the tip, which
     // is the number anybody who has stood on one can feel: 3EI/L³ = 6.8 kN/m,
     // against dive.py's K_LAND of 8 kN/m under an 80 kg man a little back
@@ -53,7 +59,7 @@ const PLUNGE = {
     // pumped, the tip goes 0.55 m down and 0.2 m up, and the hard joints
     // open 6 mm at the worst of it (the guard trips at 15).
     // MEASURED in Node on this solve.
-    EI: 65000,
+    EI: 127000,
     thick: 0.09, width: 0.80,
     // The solve. 240 Hz and not the hammock's 120, because the implicit Euler
     // the whole solver is takes ω²h/2 of the swing out every second: at 120 Hz
@@ -125,9 +131,13 @@ const PLUNGE = {
  * level. Her, a fifth body, is held to the plank under her foot by one
  * spring — `leg` — whose rest length is how straight her legs are.
  */
-function plungeBoard() {
+function plungeBoard(L = 3.80) {
   const B = PLUNGE.board, H = PLUNGE.her;
-  const n = B.segs, L = 3.04, l = L / n, t = B.thick, w = B.width;
+  // `L` from the tower's own numbers (tip − fulcrum), not typed in here: it
+  // was 3.04 as a literal, and moving the fulcrum left the solved board ending
+  // 0.76 m short of the drawn tip, twice as stiff under her feet — measured,
+  // the pumping went flat at 4.4 m/s where it had built to 5.9.
+  const n = B.segs, l = L / n, t = B.thick, w = B.width;
   const net = avbdNet({
     maxBodies: n + 1, maxJoints: n, maxStrings: n, maxPoints: 1, maxBoxes: 0,
     maxCaps: 1, maxContacts: 4, pointsHitCaps: false,
@@ -617,7 +627,7 @@ function buildPlunge(jad, you, hooks = {}) {
   const D = jad && jad.dive;
   if (!D || !D.frame || !you || !you.fig) return null;
   const F = D.frame, fig = you.fig, H = PLUNGE.her, C = PLUNGE_CLIMB;
-  const board = plungeBoard();
+  const board = plungeBoard(F.tip - F.fulcrum);
   const UF = F.fulcrum;
   const rider = plungeRider(board, { back: F.back + 0.15 - UF, u: F.ladder.u - UF });
   // Headings, as `you.drive` wants them: the rig faces +X, and a yaw of θ

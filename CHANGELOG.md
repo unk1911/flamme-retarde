@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.4] — 2026-09-27
+
+### one slab under the board, not two
+
+Misha, looking down on it from the board: *"the diving station, in real life,
+it's just the one main concrete slab, there is no secondary concrete slab"*.
+
+- **The newer block is gone:** the smaller white block at t+2.06, its bearer
+  and its share of the shared footing. The footing is now the old mass's own.
+- **The fulcrum moves** to the old mass's cap edge, t+1.30, with a bearer
+  under it. Before this it was the newer block's bearer at t+2.06. The tip
+  stays at t+5.10, so the other diver's dive clip takes off where it did.
+- **The springboard stays the same under her feet.** The free board grows
+  from 3.04 m to 3.80 m. EI goes up by (3.80/3.04)³ to 127 000, keeping
+  3EI/L³ at the tip at 6.8 kN/m, and the plank mass goes with the length
+  (55 kg).
+- **The solved board's length is no longer typed in.** It was a 3.04 literal
+  in , and the first build of this left the solved board ending
+  0.76 m short of the drawn tip. Under her feet that board was twice as
+  stiff, and the pumping went flat at about 4.4 m/s. It is now the tower's
+  own .
+- **Measured, the same pumping plan on both builds:**
+
+| board | takeoffs (m/s), the last is the dive |
+|---|---|
+| 1.535.3 | 2.7, 4.6, 5.05, 5.3, 5.9 |
+| 1.535.4 | 2.5, 3.5, 4.4, 4.9, 5.7 |
+
+  It builds a little more gradually on the longer plank. No rescues.
+
 ## [1.535.3] — 2026-09-27
 
 ### the hammock falls asleep, and hangs the same

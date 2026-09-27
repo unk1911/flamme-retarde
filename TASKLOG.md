@@ -33,3 +33,4 @@ runs with `tools/shootmany.mjs`).
 | 2026-09-27 | Empty hammock sleeps at once | agent | new | perf | 58 | 154 | ? | 1.535.3 |
 | 2026-09-27 | Baye's hammock get-in (30/30, was 15/30) | agent | new | fix | 60 | 82 | ~40 | 1.535.3 |
 | 2026-09-27 | Springboard drawn flat (board.shape never called) | lead | new | fix | ~10 | ~10 | 3 | 1.535.2 |
+| 2026-09-27 | Remove the diving tower's second slab (+ fulcrum move, board retune, found hard-coded board length) | lead | new | fix | 7 | ~30 | 13 | 1.535.4 |
