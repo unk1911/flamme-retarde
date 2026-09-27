@@ -779,6 +779,463 @@ const VEG_SIZE = {
   bush: [0.9, 2.2, 1.47],        // 1.7 m           ÷ 2 × 0.58
 };
 
+// ── needles, not lumps ───────────────────────────────────────────────────────
+//
+// Misha, 27 Sep 2026: "improve the quality of the procedural trees". Put a
+// frame of the stand behind the promenade beside `20260821_175032` and
+// `_175924` and the difference is not the shape of the crowns any more — the
+// grown skeleton and the boughs got those right — it is what the crowns are
+// MADE of. In the photographs an Aleppo crown is a heap of separate needle
+// tufts, each lit on its own: a bright yellow-green cap where the sun catches
+// the tips, near-black in the pockets between them, and an outline that is
+// nothing but tufts, with sky showing through it for a hand's breadth inside
+// the edge. In the game it was a set of smooth green balloons with hard
+// polygon rims — eight or nine corners each, visible against the sky from
+// anywhere on the promenade — and one flat green on every one of them.
+//
+// Neither of those is a polygon problem, and adding polygons does not fix
+// either: a sphere with three hundred faces is a smoother balloon. They are
+// both answered per pixel, off world position, and the geometry does not
+// change at all.
+//
+//   · THE TUFTS. Four octaves of value noise in world space — 3 m, 0.75 m,
+//     0.28 m and 9 cm: the crown's sides, its lobes, the tuft and the needle
+//     cluster — and the sum darkens the pockets to about three fifths and
+//     lifts the caps two fifths,
+//     with the brightest of them pushed towards the yellow the photographs
+//     have on every sunlit tip. World space and not the model's, so the
+//     instanced trees do not all wear the same pattern, and two puffs that
+//     overlap agree about which tuft is where.
+//   · THE NEEDLES. On a conifer and within about thirty metres, the tuft is
+//     drawn as what it is: the nearest of a 3D scatter of tuft centres, seen
+//     face on as a thirteen-spiked star — see `folCell` and the note on it
+//     in foliageBody.
+//   · THE OUTLINE. Where the surface turns away from you — the rim of a puff,
+//     where a real crown is thin and you are looking through the edge of it —
+//     a pixel whose tuft is weaker than the rim is steep is discarded. Square
+//     on, almost nothing goes; at the silhouette, almost everything, so the
+//     edge becomes the tufts themselves and the corners of the puff are never
+//     drawn. Through the holes is the back of the same puff, darker, which is
+//     what the inside of a crown looks like.
+//   · THE LIGHT THROUGH IT. Against the sun a pine crown glows at its thin
+//     edges — `_175032` is exactly that — and a solid surface cannot do it:
+//     its far side is in its own shadow. So foliage takes a little of the
+//     sun's light on the side AWAY from it, in proportion to how nearly you
+//     are looking into the sun through it.
+//
+// Every one of these is faded by pixel footprint, the same rule the bark and
+// the needle floor live by: an octave a pixel cannot resolve is not drawn
+// fainter, it is not drawn, because a threshold under a pixel is a sparkle and
+// a sparkle on forty thousand trees is the whole hillside crawling. The fine
+// octave is gone by eight centimetres a pixel, the tuft by twenty-six, the
+// lobes by a metre, and what the far hillside keeps is the three-metre one,
+// which is the only one of the four that is visible from the air.
+//
+// Which pixels are foliage is read off the vertex colour, exactly as the bark
+// is: every leaf colour in the game is greener than it is red (pine, cypress,
+// olive, maquis, and the hand-planted crowns at Jadrija) and every bark is
+// redder than it is green. One number, no second attribute and no second draw.
+
+/**
+ * Three-dimensional value noise with its own hash. Its own because this goes
+ * into `decl`, which is in the vertex program as well as the fragment one, and
+ * the vertex program does not have GLSL_NOISE — a call to `h31` in here was a
+ * link failure and a black forest.
+ */
+const GLSL_FOLIAGE = /* glsl */ `
+float folH(vec3 p){
+  p = fract(p * 0.1031);
+  p += dot(p, p.yzx + 33.33);
+  return fract((p.x + p.y) * p.z);
+}
+float folN(vec3 p){
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = mix(mix(folH(i), folH(i + vec3(1.0, 0.0, 0.0)), f.x),
+                mix(folH(i + vec3(0.0, 1.0, 0.0)), folH(i + vec3(1.0, 1.0, 0.0)), f.x), f.y);
+  float b = mix(mix(folH(i + vec3(0.0, 0.0, 1.0)), folH(i + vec3(1.0, 0.0, 1.0)), f.x),
+                mix(folH(i + vec3(0.0, 1.0, 1.0)), folH(i + vec3(1.0, 1.0, 1.0)), f.x), f.y);
+  return mix(a, b, f.z);
+}
+// The tuft field, about 0.5 and running roughly 0.1 to 0.9. fp is metres per
+// pixel, and each octave hands back its mean once it is below the pixel. The
+// middle octave is stretched along y by a third: an Aleppo tuft is a spray
+// that stands up off its twig, and round cells read as a hedge.
+//
+// And a fourth octave under the other three, at three metres, which is the
+// only one the hillside has left from the air: it is what turns a crown seen
+// from four hundred metres from a dark green dome into a dark green dome with
+// a lit side and a pocket in it. It lives until a pixel is four metres wide.
+float folTuft(vec3 w, float fp){
+  float kH = 1.0 - smoothstep(1.00, 4.00, fp);
+  float kB = 1.0 - smoothstep(0.30, 1.10, fp);
+  float kM = 1.0 - smoothstep(0.07, 0.26, fp);
+  float kF = 1.0 - smoothstep(0.022, 0.080, fp);
+  // Each octave only where it is drawn at all. Measured, not assumed: all
+  // four unconditionally put 2 to 3 ms of GPU on the promenade, because the
+  // far layer is most of the trees on the screen and it was paying for two
+  // octaves it then multiplied by zero.
+  float t = 0.5;
+  if (kH > 0.0) t += (folN(w * 0.33 + 1.7) - 0.5) * 0.40 * kH;
+  if (kB > 0.0) t += (folN(w * 1.33 + 4.1) - 0.5) * 0.60 * kB;
+  if (kM > 0.0) t += (folN(vec3(w.x * 3.6, w.y * 2.7, w.z * 3.6)) - 0.5) * 0.95 * kM;
+  if (kF > 0.0) t += (folN(w * 11.0 + 9.3) - 0.5) * 0.42 * kF;
+  return t;
+}
+vec3 folH3(vec3 p){
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.xxy + p.yxx) * p.zyx);
+}
+// The nearest needle tuft: a point scattered in each cell of a 3D grid, and
+// the one closest to here. xyz is the offset to its centre in cell units, w
+// is the tuft's own random number. Twenty-seven cells, because the nearest
+// point can be in any neighbour; it is only ever called where a tuft is
+// several pixels across, so it is never called for more than the near crowns.
+vec4 folCell(vec3 p){
+  vec3 i = floor(p), f = fract(p);
+  float best = 9.0;
+  vec4 o = vec4(0.0);
+  for (int z = -1; z <= 1; z++) {
+    for (int y = -1; y <= 1; y++) {
+      for (int x = -1; x <= 1; x++) {
+        vec3 g = vec3(float(x), float(y), float(z));
+        vec3 h = folH3(i + g);
+        vec3 r = g + 0.15 + h * 0.70 - f;
+        float d = dot(r, r);
+        if (d < best) { best = d; o = vec4(r, h.x + h.z); }
+      }
+    }
+  }
+  return o;
+}
+// The bark's mosaic, in 2D: x is F2 - F1 (zero on a crack), y the plate's
+// own random shade, z F1. Nine cells; see the plates in treeMaterial.
+vec3 barkCell(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  float d1 = 9.0, d2 = 9.0, id = 0.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec3 h = folH3(vec3(i + g, 7.0));
+      vec2 r = g + 0.10 + h.xy * 0.80 - f;
+      float d = dot(r, r);
+      if (d < d1) { d2 = d1; d1 = d; id = h.z; } else if (d < d2) { d2 = d; }
+    }
+  }
+  d1 = sqrt(d1);
+  return vec3(sqrt(d2) - d1, id, d1);
+}
+`;
+
+/**
+ * The fragment half: after the bark, before the light. Declares `leaf` at the
+ * top level of main so FOLIAGE_LIT can read it after the lighting.
+ *
+ * The derivative is taken before anything can discard, which is not style:
+ * fwidth under non-uniform control flow is undefined, and on the one GPU that
+ * cares about it the result is a checkerboard of tufts along every edge.
+ */
+function foliageBody(cut) {
+  return /* glsl */ `
+  float leaf = smoothstep(0.004, 0.020, vVCol.g - vVCol.r);
+  float folFp = length(fwidth(vWorld));
+  if (leaf > 0.0) {
+    float tuft = folTuft(vWorld, folFp);
+    float lift = mix(0.58, 1.40, clamp(tuft, 0.0, 1.0));
+    float warm = smoothstep(0.60, 0.88, tuft);
+    ${cut ? `
+    // rim is 0 square on and 1 edge on.
+    vec3 V = normalize(uCamPos - vWorld);
+    float rim = 1.0 - abs(dot(normalize(vNormal), V));
+    // How well a needle tuft is resolved here: one is about a third of a
+    // metre across, and it is worth drawing as a star while it is seven
+    // pixels or more. Past that the value noise above answers alone.
+    //
+    // And only on a conifer. The pine and the cypress are much greener than
+    // they are red — (g - r) / g is 0.29 to 0.47 on every one of them — and
+    // the olive and the maquis are grey-greens at 0.12 to 0.15, so the same
+    // ratio that finds the leaves finds the needles, and it does not care
+    // how brightly the crown gradient has painted the vertex. The olive was
+    // given the tufts too, at a finer grain and without spikes, and came out
+    // a bunch of grapes: a broadleaf's leaves are far below a pixel at any
+    // distance you see its crown from, and the value noise is the right
+    // answer for it all the way in.
+    float needle = smoothstep(0.20, 0.26, (vVCol.g - vVCol.r) / max(vVCol.g, 1e-3));
+    float kStar = (1.0 - smoothstep(0.030, 0.075, folFp)) * needle;
+    if (kStar > 0.5) {
+      // The tuft, seen face on: the offset to its centre flattened onto the
+      // screen, and its bearing round that centre. Thirteen needles, and the
+      // radius runs out along each of them and back between them, so the
+      // edge of a tuft is spikes and not a disc.
+      vec4 cc = folCell(vWorld * 3.1);
+      vec3 Ux = normalize(cross(V, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
+      vec3 Wy = cross(Ux, V);
+      vec2 q = vec2(dot(cc.xyz, Ux), dot(cc.xyz, Wy));
+      float ang = atan(q.y, q.x);
+      float nd = 0.5 + 0.5 * sin(ang * 13.0 + cc.w * 31.0);
+      nd = nd * nd * nd;
+      // The distance is the 3D one and the bearing the screen one. Measured
+      // on the screen alone, nearly every pixel is within a tuft's radius of
+      // some centre — depth is thrown away — and the first cut of this chewed
+      // nothing: the puffs kept every one of their corners.
+      float d = length(cc.xyz);
+      float R = 0.34 + 0.22 * nd;
+      float inT = R - d;
+      // Discarded outside every tuft towards the rim, and only the cores of
+      // them right at it, so the outline is needle tips; in the middle of
+      // the crown only in the deep gaps, which is where the sky shows
+      // through a real one.
+      //
+      // Over the outer HALF of the rim and not the last few pixels of it,
+      // and that is the number that matters. A puff's straight edges are
+      // half a metre long, and its normal is the smooth ellipsoid's while
+      // its outline is jagged, so the rim only reaches one on the parts of
+      // the outline that happen to stick out. Eroded over the last few
+      // pixels, every one of those straight edges survived with a fringe on
+      // it; eroded to the depth of a tuft, they are gone.
+      float rimT = smoothstep(0.04, 0.55, rim);
+      if (leaf > 0.5 && inT < mix(-0.30, 0.24, rimT) + (0.5 - tuft) * 0.7 * rimT) discard;
+      // Inside a tuft its centre is the mass and the tips are lit; outside
+      // one is the dark of the crown behind. And the needles themselves, as
+      // a streak of light along each.
+      float body = clamp(inT / R, -1.0, 1.0);
+      float star = body > 0.0 ? mix(0.95, 1.30, nd) * (0.80 + 0.35 * body)
+        : 0.50 + 0.35 * (1.0 + body);
+      lift = mix(lift, lift * 0.35 + star * 0.75, kStar);
+      warm = mix(warm, smoothstep(0.1, 0.9, nd) * step(0.0, inT), kStar * 0.7);
+    }
+    // Further out the value field does the chewing: a pixel whose tuft is
+    // weaker than the rim is steep goes, over the same outer half of the rim
+    // and for the same reason. Faded with the tuft octave, so an outline the
+    // tuft cannot be resolved in keeps the polygon it has rather than
+    // dissolving into noise. This is the one that matters from the
+    // promenade: a pine in the stand is thirty to a hundred metres off for
+    // most of the walk, and that is the range the old crowns showed their
+    // corners at.
+    float kCut = kStar > 0.5 ? 0.0 : 1.0 - smoothstep(0.07, 0.26, folFp);
+    if (leaf > 0.5 && tuft < (0.10 + 0.72 * smoothstep(0.04, 0.60, rim)) * kCut) discard;` : ''}
+    // Pockets to about three fifths, caps up two fifths: a little brighter
+    // on the mean than the vertex colour, which the crown gradient had
+    // already darkened for the underside.
+    base *= mix(1.0, lift, leaf);
+    // And the brightest caps towards the yellow on every sunlit tip in the
+    // survey. Blue down and red up, so it is a warmer green and not a paler one.
+    base *= mix(vec3(1.0), vec3(1.12, 1.07, 0.74), leaf * warm * 0.75);
+  }`;
+}
+
+/**
+ * After the light: the sun through the crown. viewDir runs from the eye to
+ * the pixel, so it lines up with the sun exactly when you are looking into
+ * it. Strongest where the surface faces away from the sun (that is the side
+ * the light is coming out of) and still taken in the crown's own shadow at a
+ * quarter, because the shadow map is a surface and a crown is not.
+ */
+const FOLIAGE_LIT = /* glsl */ `
+  if (leaf > 0.0) {
+    float into = pow(max(dot(viewDir, uSunDir), 0.0), 5.0);
+    float thru = (1.0 - ndl * 0.7) * (0.25 + 0.75 * sh);
+    col += base * uSunColor * uSunI * INV_PI * leaf * into * thru * 0.85;
+  }
+`;
+
+/**
+ * And the shadow, which has to be chewed as well, or it is the shadow of the
+ * balloons. `20260821_175924` has the ground under the stand dappled rather
+ * than shaded, and this is the whole of that: the depth pass discards the same
+ * tuft field, thresholded low so it opens holes in the pockets and not across
+ * the whole crown. The caster draws back faces only (see casterMaterial), so a
+ * hole there is a hole in the far side of a closed puff, which is a hole the
+ * sun gets through.
+ *
+ * Faded by texel footprint like everything else: fwidth in the depth pass is
+ * the size of a shadow texel on the surface. 5.4 cm in the near cascade and
+ * the holes are there; a metre and more in the far one and they are not,
+ * because a hole the map cannot hold is a speckle that swims as the sun moves.
+ */
+const FOLIAGE_CASTER_VERT = /* glsl */ `
+attribute vec3 aInstPos;
+attribute vec4 aInstRot;
+attribute vec3 aInstScale;
+attribute vec3 aVCol;
+uniform float uInstanced;
+varying float vDepth;
+varying vec3 vFolW;
+varying vec3 vFolC;
+vec3 qrot(vec4 q, vec3 v){
+  return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+}
+void main(){
+  vec3 p = position;
+  if (uInstanced > 0.5) {
+    p *= aInstScale;
+    p = qrot(aInstRot, p);
+    p += aInstPos;
+  } else {
+    p = (modelMatrix * vec4(position, 1.0)).xyz;
+  }
+  vFolW = p;
+  vFolC = aVCol;
+  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+  vDepth = gl_Position.z / gl_Position.w * 0.5 + 0.5;
+}
+`;
+
+const FOLIAGE_CASTER_FRAG = /* glsl */ `
+precision highp float;
+varying float vDepth;
+varying vec3 vFolW;
+varying vec3 vFolC;
+${GLSL_PACK}
+${GLSL_FOLIAGE}
+void main(){
+  float fp = length(fwidth(vFolW));
+  float kM = 1.0 - smoothstep(0.07, 0.26, fp);
+  if (vFolC.g - vFolC.r > 0.012 && kM > 0.0) {
+    if (folTuft(vFolW, fp) < 0.34 * kM) discard;
+  }
+  gl_FragColor = packDepth(clamp(vDepth, 0.0, 1.0));
+}
+`;
+
+const _treeCasters = {};
+/**
+ * The depth material for anything drawn with treeMaterial — one per kind,
+ * shared, so registering every tree layer and the resort's own trees costs
+ * two programs and nothing a caster.
+ */
+function treeCaster(shadow, instanced) {
+  const k = instanced ? 'inst' : 'plain';
+  if (!_treeCasters[k]) {
+    _treeCasters[k] = shadow.casterMaterial(FOLIAGE_CASTER_VERT,
+      { uInstanced: { value: instanced ? 1 : 0 } }, FOLIAGE_CASTER_FRAG);
+  }
+  return _treeCasters[k];
+}
+
+/**
+ * The one material every tree in the game is drawn with — the instanced
+ * landscape here, and since 1.534.0 the hand-planted pines and olives at
+ * Jadrija as well (`arbor` in 43-jadrija.js), so a pine in the stand and a
+ * pine in the wood behind it are the same bark and the same needles.
+ *
+ * `cut` is whether the foliage may chew its own outline — see GLSL_FOLIAGE.
+ * The near models and the hand-planted trees may; the far model may not,
+ * because a `discard` anywhere in a program switches off early depth for the
+ * whole draw, and the far layer is thirty-odd thousand trees a frame whose
+ * outline is under a pixel of tuft at the distances it is drawn at anyway.
+ */
+function treeMaterial({ instanced = true, cut = false, emissive = 0 } = {}) {
+  return solidMaterial(0xffffff, {
+    instanced,
+    spec: 0.03,
+    specPower: 12,
+    emissive,
+    side: THREE.DoubleSide,
+    decl: GLSL_FOLIAGE,
+    // The prototype carries bark and leaf in its vertex colours; the per
+    // instance colour is the individual's own tint and its charring.
+    //
+    // Then the bark, which is the one thing at Jadrija you stand right next
+    // to. _344/_345/_347: grey-brown plates with orange-red inner bark at
+    // the seams. Three things make this cheap enough to put on forty
+    // thousand trees.
+    //
+    // It is masked by species, off the vertex colour rather than off a
+    // second attribute or a second draw: only the pine is plated, and the
+    // pine is the only bark warm enough to clear the threshold. It is
+    // masked by pixel footprint, so a tree far enough away that a plate is
+    // sub-pixel pays nothing at all and, more to the point, does not
+    // shimmer — the same lesson as the whitecaps and the needle floor, that
+    // a threshold the pixel cannot resolve is a mark and not a fainter
+    // version of the thing. And the noise is two-plane rather than 3D,
+    // blended by which way the surface faces, because a trunk is vertical
+    // and the two planes that matter are the two vertical ones.
+    //
+    // The seam colour is multiplied by vColor so a charred tree gets
+    // charred seams. Orange fissures on a black trunk would be embers.
+    body: [
+      'base *= vVCol;',
+      'n = gl_FrontFacing ? n : -n;',
+      'float plated = smoothstep(0.058, 0.086, vVCol.r - vVCol.g)',
+      // 0.030 to 0.100, which is full strength to about eleven metres and
+      // gone by thirty-six. The needle floor's 0.012/0.055 was copied here
+      // first and it is a GROUND number: a floor is seen at a grazing angle
+      // so its footprint runs away with distance, and a trunk is seen
+      // square on. At those thresholds the plates died at four metres and
+      // the only bark in the wood was the bottom of the nearest tree.
+      '  * (1.0 - smoothstep(0.018, 0.060, length(fwidth(vWorld))));',
+      'if (plated > 0.002) {',
+      // Which plane a face is parameterised by is the OTHER two axes, not
+      // the one it faces. Written the intuitive way round, a surface whose
+      // normal is mostly +X samples noise in x and y, and x barely changes
+      // across that face, so the plates collapse into horizontal bands
+      // around the trunk. Every trunk in the wood was a stack of rings.
+      '  vec2 nb = abs(normalize(vNormal).xz);',
+      '  float wx = nb.x / (nb.x + nb.y + 1e-4);',
+      // Value noise and not fbm2, and that is why the first three cuts of
+      // this were invisible. A seam is a threshold and a threshold needs a
+      // distribution wide enough to cut: fbm2 averages its octaves, so two
+      // of them pile up around 0.5 with a spread of about 0.12 and a cut at
+      // 0.36 catches almost nothing. Rendering f straight to the screen is
+      // what showed it — grey trunks, one dark patch on one tree in ten.
+      // A single vnoise2 uses the whole of 0 to 1; the second tap is
+      // weighted a fifth, enough to break the lattice and not enough to
+      // narrow the spread again. Plates run 0.16 m around the trunk and
+      // 0.48 m up it, which is what the frames show.
+      '  vec2 px = vec2(vWorld.x * 10.0, vWorld.y * 5.0);',
+      '  vec2 pz = vec2(vWorld.z * 10.0, vWorld.y * 5.0) + 19.7;',
+      // The second tap is ROTATED as well as scaled, which is the same
+      // 1.71/-1.06 matrix fbm2 uses and for the same reason: two value
+      // noises on the same axes share a lattice, and what came out was a
+      // trunk of diagonal parallelograms. A regular pattern is worse than
+      // no pattern.
+      '  mat2 rot = mat2(1.71, -1.06, 1.06, 1.71);',
+      '  float f = mix(vnoise2(px) * 0.80 + vnoise2(rot * px + 11.3) * 0.20,',
+      '                vnoise2(pz) * 0.80 + vnoise2(rot * pz + 11.3) * 0.20, wx);',
+      // ── 1.534.0: THE PLATES ARE CELLS, AND THE SEAMS ARE THEIR EDGES ──────
+      //
+      // What follows used to take a level set of `f` for the seams — the
+      // distance to its half value, cut at a finger's width — and that is
+      // right for a trunk you see at ten metres and wrong at one. A level set
+      // of smooth noise is a family of closed round loops; on the old prism
+      // trunks, which were seen from the promenade, that read as a network,
+      // and on the round trunks of the stand at arm's length it read as
+      // contour lines on a map, then (with the plates stretched) as a
+      // giraffe. Held against the big trunk on the right of `_175924`, bark
+      // is a MOSAIC: flat grey-brown plates, each a little lighter or darker
+      // than its neighbour, three or four times as tall as they are wide, and
+      // between them a narrow dark crack that is a shadow before it is a
+      // colour. The orange is at the bottom of the deepest cracks and not
+      // along every one of them.
+      //
+      // A mosaic is a Voronoi diagram, and the crack is where the nearest and
+      // second-nearest cell centres are equally far: F2 - F1, under a tenth
+      // of a cell. `barkCell` does it on the same two vertical planes as
+      // above, stretched 7.5 round and 2.5 up so a plate is about 13 cm by
+      // 40. `f` stays, as the weathering across a plate.
+      '  vec3 cX = barkCell(vec2(vWorld.x * 7.5, vWorld.y * 2.5));',
+      '  vec3 cZ = barkCell(vec2(vWorld.z * 7.5, vWorld.y * 2.5) + 19.7);',
+      '  float edge = mix(cX.x, cZ.x, wx);',
+      '  float pid = wx < 0.5 ? cX.y : cZ.y;',
+      // Grey-brown plates, a good deal greyer than the vertex colour the
+      // species test needs. Each its own shade, weathered across its face,
+      // and rounded off into the crack rather than cut square.
+      '  float lum = dot(base, vec3(0.36, 0.42, 0.22));',
+      '  base = mix(base, vec3(lum) * vec3(1.10, 1.0, 0.90), 0.50 * plated);',
+      '  base *= 1.0 + plated * ((pid - 0.5) * 0.30 + (f - 0.5) * 0.35',
+      '    - 0.34 * (1.0 - smoothstep(0.0, 0.35, edge)));',
+      '  base = mix(base, vec3(0.070, 0.050, 0.040) * vColor,',
+      '             (1.0 - smoothstep(0.03, 0.12, edge)) * 0.85 * plated);',
+      '  base = mix(base, vec3(0.330, 0.120, 0.055) * vColor,',
+      '             (1.0 - smoothstep(0.0, 0.035, edge)) * step(0.62, f) * 0.60 * plated);',
+      '}',
+    ].join('\n  ') + '\n  ' + foliageBody(cut),
+    lit: FOLIAGE_LIT,
+  });
+}
+
 function buildTrees(scene, fire) {
   const protos = { far: vegPrototypes(), near: vegNearPrototypes() };
   const T = VEG.tile;
@@ -807,86 +1264,7 @@ function buildTrees(scene, fire) {
       geo.setAttribute(n, a);
     }
 
-    const mat = solidMaterial(0xffffff, {
-      instanced: true,
-      spec: 0.03,
-      specPower: 12,
-      side: THREE.DoubleSide,
-      // The prototype carries bark and leaf in its vertex colours; the per
-      // instance colour is the individual's own tint and its charring.
-      //
-      // Then the bark, which is the one thing at Jadrija you stand right next
-      // to. _344/_345/_347: grey-brown plates with orange-red inner bark at
-      // the seams. Three things make this cheap enough to put on forty
-      // thousand trees.
-      //
-      // It is masked by species, off the vertex colour rather than off a
-      // second attribute or a second draw: only the pine is plated, and the
-      // pine is the only bark warm enough to clear the threshold. It is
-      // masked by pixel footprint, so a tree far enough away that a plate is
-      // sub-pixel pays nothing at all and, more to the point, does not
-      // shimmer — the same lesson as the whitecaps and the needle floor, that
-      // a threshold the pixel cannot resolve is a mark and not a fainter
-      // version of the thing. And the noise is two-plane rather than 3D,
-      // blended by which way the surface faces, because a trunk is vertical
-      // and the two planes that matter are the two vertical ones.
-      //
-      // The seam colour is multiplied by vColor so a charred tree gets
-      // charred seams. Orange fissures on a black trunk would be embers.
-      body: [
-        'base *= vVCol;',
-        'n = gl_FrontFacing ? n : -n;',
-        'float plated = smoothstep(0.058, 0.086, vVCol.r - vVCol.g)',
-        // 0.030 to 0.100, which is full strength to about eleven metres and
-        // gone by thirty-six. The needle floor's 0.012/0.055 was copied here
-        // first and it is a GROUND number: a floor is seen at a grazing angle
-        // so its footprint runs away with distance, and a trunk is seen
-        // square on. At those thresholds the plates died at four metres and
-        // the only bark in the wood was the bottom of the nearest tree.
-        '  * (1.0 - smoothstep(0.018, 0.060, length(fwidth(vWorld))));',
-        'if (plated > 0.002) {',
-        // Which plane a face is parameterised by is the OTHER two axes, not
-        // the one it faces. Written the intuitive way round, a surface whose
-        // normal is mostly +X samples noise in x and y, and x barely changes
-        // across that face, so the plates collapse into horizontal bands
-        // around the trunk. Every trunk in the wood was a stack of rings.
-        '  vec2 nb = abs(normalize(vNormal).xz);',
-        '  float wx = nb.x / (nb.x + nb.y + 1e-4);',
-        // Value noise and not fbm2, and that is why the first three cuts of
-        // this were invisible. A seam is a threshold and a threshold needs a
-        // distribution wide enough to cut: fbm2 averages its octaves, so two
-        // of them pile up around 0.5 with a spread of about 0.12 and a cut at
-        // 0.36 catches almost nothing. Rendering f straight to the screen is
-        // what showed it — grey trunks, one dark patch on one tree in ten.
-        // A single vnoise2 uses the whole of 0 to 1; the second tap is
-        // weighted a fifth, enough to break the lattice and not enough to
-        // narrow the spread again. Plates run 0.16 m around the trunk and
-        // 0.48 m up it, which is what the frames show.
-        '  vec2 px = vec2(vWorld.x * 10.0, vWorld.y * 5.0);',
-        '  vec2 pz = vec2(vWorld.z * 10.0, vWorld.y * 5.0) + 19.7;',
-        // The second tap is ROTATED as well as scaled, which is the same
-        // 1.71/-1.06 matrix fbm2 uses and for the same reason: two value
-        // noises on the same axes share a lattice, and what came out was a
-        // trunk of diagonal parallelograms. A regular pattern is worse than
-        // no pattern.
-        '  mat2 rot = mat2(1.71, -1.06, 1.06, 1.71);',
-        '  float f = mix(vnoise2(px) * 0.80 + vnoise2(rot * px + 11.3) * 0.20,',
-        '                vnoise2(pz) * 0.80 + vnoise2(rot * pz + 11.3) * 0.20, wx);',
-        // A fissure is a CONTOUR of the noise, not its low ground. Cut at a
-        // threshold and what you get is the shape of the low regions, which
-        // for smooth noise is a scatter of ovals: the first cut of this put
-        // orange blotches on the trunks like a plane tree. Fissures are a
-        // connected network, and the connected thing in a scalar field is a
-        // level set. So take the distance to the half level, and the seam is
-        // wherever that distance is small: |f - 0.5| under about 0.11, which
-        // at this frequency is a band two to four centimetres wide.
-        '  float fis = 1.0 - abs(f - 0.5) * 2.0;',
-        '  base *= 1.0 + plated * (f - 0.5) * 0.44;',
-        '  base = mix(base, vec3(0.420, 0.150, 0.062) * vColor,',
-        '             smoothstep(0.845, 0.972, fis) * 0.86 * plated);',
-        '}',
-      ].join('\n  '),
-    });
+    const mat = treeMaterial({ instanced: true, cut: lod === 'near' });
 
     const mesh = new THREE.Mesh(geo, mat);
     mesh.frustumCulled = false;

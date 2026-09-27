@@ -557,6 +557,12 @@ async function buildJadrija(scene) {
   // the aerodrome casts its hangars and its objects and never its apron.
   const deck = propBuilder();
   const up = propBuilder();
+  // And the trees, which were in `up` and are not any more: `pine` and `olive`
+  // draw into this whatever buffer they are called with, and it is drawn with
+  // the landscape's own tree material (`treeMaterial` in 45-trees.js) so the
+  // stand behind the promenade has the same bark, the same needles and the
+  // same dappled shadow as the wood behind it. One draw and one caster.
+  const arbor = propBuilder();
   // Maslina's two feather flags, which are NOT in `up` any more: each is its
   // own small buffer so its vertex program can move it. Filled where the flags
   // are built, made into meshes beside `upMesh` — see `FEATHER_WAVE`.
@@ -21271,6 +21277,12 @@ async function buildJadrija(scene) {
     // out of the shade of each other, towards the open water — at ten to
     // twenty-five degrees. A uniform random lean is a wood nobody planted; a
     // shared bias is a wood that grew somewhere.
+    //
+    // Into `arbor`, whatever buffer the caller had — see `arbor` at the top.
+    // Put back on the way out, because every caller goes on drawing into the
+    // buffer it set.
+    const bWas = b;
+    b = arbor;
     const P = facing(t, s, rng() * TAU);
     const lean = leanTo == null ? (rng() - 0.5) * 0.9
       : leanTo * (0.55 + rng() * 0.85);
@@ -21279,16 +21291,21 @@ async function buildJadrija(scene) {
     // row of trees all fork the same way and the stand reads as a hedge cut by
     // a machine. One draw, and it is the cheapest variation in the file.
     const spin = rng() * TAU;
-    post(P, 0, 0, y, y + h * 0.34, rad, [0.330, 0.270, 0.215], 7);
-    post(P, lean * 0.34, 0, y + h * 0.32, y + h * 0.76, rad * 0.74,
-      [0.360, 0.295, 0.235], 7);
     const cx = lean, fork = y + h * 0.72, top = y + h * 0.80;
+    // The trunk, as one bent and tapering stem — see `pineTrunk`. It was two
+    // heptagonal prisms stood one on the other with the upper one shoved
+    // sideways by the lean, which from anywhere on the promenade is a stack of
+    // two telegraph poles with a step in it.
+    pineTrunk(P, y, h, rad, cx * 0.55, fork, y + h * 0.78, pineKey(t, s));
     // The gradient runs over the whole crown and not over one puff, or thirteen
     // of these read as thirteen balls. It has to reach below the lowest fork
     // and above the highest cluster, both of which moved.
     const band = [y + h * 0.70, y + h * 0.92];
     const DK = [0.118, 0.178, 0.100], LT = [0.250, 0.350, 0.195];
-    const WOOD = [0.345, 0.280, 0.222];
+    // The same bark as the trunk now. It was a separate grey-brown, which
+    // under the plate shader is a species test failed halfway up the tree:
+    // plated to the fork and plain from there.
+    const WOOD = PINEBARK;
     // The boughs. Five, leaving the top of the trunk together and going out
     // and up — which is the whole of why an Aleppo reads as an umbrella and
     // not as a fir. `lathe` takes a per-ring offset, so one call is the bent
@@ -21306,11 +21323,15 @@ async function buildJadrija(scene) {
       const rise = h * (0.035 + rng() * 0.075);
       const b0t = cx * 0.55;
       const b1t = b0t + Math.cos(a) * reach, b1s = Math.sin(a) * reach;
-      lathe(P, 0, 0, [
+      // `limb`, not `lathe`: a lathe's rings are level, and a bough going out
+      // at twenty degrees off level through level rings is a plank — four
+      // flat faces, 17 cm tall and 3 thick seen end on. Rings square to the
+      // bough and smooth normals, and it is a round branch.
+      limb(P, [
         [fork - h * 0.03, 0.085, b0t, 0],
         [fork + rise * 0.45, 0.050, b0t + (b1t - b0t) * 0.52, b1s * 0.52],
         [fork + rise, 0.022, b1t, b1s],
-      ], WOOD, 4);
+      ], WOOD, 6);
       // And the fork at the end of it, which is where the needles are. Two
       // twigs at a shared spread, one a little above the other, so no two
       // clusters on the tree sit in the same plane and the crown comes apart
@@ -21327,18 +21348,24 @@ async function buildJadrija(scene) {
         const tw = h * 0.085;
         const ct = b1t + Math.cos(ta) * tw, cs = b1s + Math.sin(ta) * tw;
         const cy = fork + rise + h * (k ? 0.040 : -0.018);
-        lathe(P, 0, 0, [[fork + rise * 0.92, 0.022, b1t, b1s],
-          [cy, 0, ct, cs]], WOOD, 3);
+        limb(P, [[fork + rise * 0.92, 0.022, b1t, b1s],
+          [cy, 0.006, ct, cs]], WOOD, 4);
         // Two clusters on each twig and not one. A single ball at the end of a
         // stick is a leaf, and thirteen of them are a lime tree in a park; what
         // an Aleppo hangs out there is a spray, several tufts strung along the
         // last metre of the branch and running back towards the trunk. The
         // second is smaller, nearer and a little lower, and it costs no draw on
         // the stream because it is derived from the first.
-        puff(P, ct, cs, cy, rr * 0.66, rr, DK, LT, band, 7, 3, 0.58,
+        //
+        // Nine sides and four rows where they were seven and three. Not for
+        // the outline — the tree material chews that into tufts now, see
+        // GLSL_FOLIAGE — but for the light across the middle of a puff, which
+        // is interpolated between rings: at three rows the shading of a
+        // flattened puff seen from below had a visible crease at each ring.
+        puff(P, ct, cs, cy, rr * 0.66, rr, DK, LT, band, 9, 4, 0.58,
           i * 4 + k * 2 + 1);
         puff(P, b1t + (ct - b1t) * 0.42, b1s + (cs - b1s) * 0.42, cy - h * 0.014,
-          rr * 0.57, rr * 0.86, DK, LT, band, 6, 3, 0.58, i * 4 + k * 2 + 2);
+          rr * 0.57, rr * 0.86, DK, LT, band, 8, 4, 0.58, i * 4 + k * 2 + 2);
       }
     }
     // Three over the middle, higher than the ring and small. Without them the
@@ -21349,9 +21376,10 @@ async function buildJadrija(scene) {
       const rr = Math.min(h * (0.062 + rng() * 0.036), 1.05);
       const d = h * (0.07 + i * 0.030);
       puff(P, cx * 0.5 + Math.cos(a) * d, Math.sin(a) * d,
-        top + h * (0.020 + i * 0.032), rr * 0.66, rr, DK, LT, band, 7, 3, 0.58,
+        top + h * (0.020 + i * 0.032), rr * 0.66, rr, DK, LT, band, 9, 4, 0.58,
         21 + i);
     }
+    b = bWas;
     // The trunk's radius, for whoever ties something round it — the hammock's
     // ropes go round the bark at `rad`, and without it they stopped a hand's
     // breadth short of the thin ones and inside the fat ones. Returned, not
@@ -21359,12 +21387,152 @@ async function buildJadrija(scene) {
     return rad;
   }
 
+  /** A key for `jit` off a tree's own station, so its trunk is its own. */
+  function pineKey(t, s) {
+    return ((t * 8) | 0) * 7919 + ((s * 8) | 0);
+  }
+
+  /**
+   * An Aleppo trunk: one stem, plumb where you stand next to it, bending into
+   * its lean above your head, flared at the foot and tapering to the fork.
+   *
+   * `20260821_175924` is the one to hold it against — the big trunk on the
+   * right of that frame. What it has that two stacked prisms did not: it is
+   * ROUND, which at 0.3-0.6 m through and a metre away is the first thing
+   * seen; it spreads into the ground over the last hand's breadth instead of
+   * standing on it like a post; it narrows as it goes up, to about half by
+   * the fork; and it does not kink. The lean is a curve that starts above
+   * head height and carries on into the boughs, and the boughs leave from the
+   * top of it — the old upper prism stood at 0.34 of the lean and the boughs
+   * at 0.55, so every pine on the shore had its crown hanging a few tens of
+   * centimetres off the end of its own trunk.
+   *
+   * PLUMB AND EXACTLY `rad` FROM A METRE TO 2.4 M, and that is a contract,
+   * not a look: the hammock's straps go round the bark at 1.45 m on a trunk
+   * the hammock reads as a vertical cylinder of radius `rad` standing on the
+   * tree's own (t, s) — `greens[4]`, see src/43-hammock.js. Everything this
+   * does to the stem it does above or below that band.
+   *
+   * The plates and seams are not in the geometry. The colour is PINEBARK, the
+   * one the tree material's plate test is keyed to, and the shader does the
+   * bark. What is in the geometry is a few per cent of irregularity round
+   * each ring off `jit` — a trunk is not turned on a lathe — and none at all
+   * in the strap band.
+   *
+   * No draw on `rng`. Rule 4: every variation here is `jit` off the station.
+   */
+  function pineTrunk(P, y, h, rad, endT, fork, top, key) {
+    const SIDES = 10;
+    const plumb = y + 2.4;
+    // A sideways bow across the lean, up to 4 % of the height at its middle,
+    // so a row of them is not a row of identical arcs.
+    const bow = (jit(key, 961) - 0.5) * 0.08 * h;
+    const zs = [0, 0.10, 0.28, 0.55, 1.0, 2.4 - 1e-3];
+    for (let k = 1; k <= 6; k++) zs.push(plumb - y + (top - plumb) * (k / 6));
+    const rings = [];
+    for (let k = 0; k < zs.length; k++) {
+      const z = y + zs[k];
+      // The flare dies off in about 0.18 m and is gone to a tenth of a
+      // millimetre by a metre, so the band the straps go round is `rad`.
+      let r = rad * (1 + 0.34 * Math.exp(-zs[k] / 0.16));
+      let u = 0;
+      if (z > plumb) {
+        u = (z - plumb) / Math.max(top - plumb, 1e-3);
+        r = rad * (1 - 0.46 * u);
+      }
+      const e = Math.pow(Math.min(u * (top - plumb) / Math.max(fork - plumb, 1e-3), 1), 1.5);
+      const c = [endT * e, bow * Math.sin(Math.PI * Math.min(u, 1))];
+      const band = zs[k] > 0.5 && zs[k] < 2.45;
+      const ring = [];
+      for (let i = 0; i < SIDES; i++) {
+        const a = (i / SIDES) * TAU;
+        const ir = band ? 1 : 1 + (jit(key * 13 + k * SIDES + i, 962) - 0.5) * 0.10;
+        const dx = Math.cos(a), dz = Math.sin(a);
+        const p = P(c[0] + dx * r * ir, c[1] + dz * r * ir, z);
+        const o = P(c[0], c[1], z);
+        const nx = p[0] - o[0], nz = p[2] - o[2];
+        const L = Math.hypot(nx, nz) || 1;
+        ring.push({ p, n: [nx / L, 0.08, nz / L] });
+      }
+      rings.push(ring);
+    }
+    for (let k = 0; k < rings.length - 1; k++) {
+      for (let i = 0; i < SIDES; i++) {
+        const j = (i + 1) % SIDES;
+        const A = rings[k][i], B = rings[k][j], C = rings[k + 1][j], D = rings[k + 1][i];
+        b.smooth(A.p, B.p, C.p, A.n, B.n, C.n, PINEBARK, PINEBARK, PINEBARK);
+        b.smooth(A.p, C.p, D.p, A.n, C.n, D.n, PINEBARK, PINEBARK, PINEBARK);
+      }
+    }
+  }
+
+  /**
+   * A round limb along a polyline of `[y, r, dt, ds]`, `lathe`'s profile
+   * format, with its rings square to the limb rather than level and smooth
+   * normals. For anything that is not upright — a bough, a twig — which
+   * `lathe` flattens into a plank. See the boughs in `pine`.
+   */
+  function limb(P, prof, col, sides = 6) {
+    const C = prof.map(([y, , dt = 0, ds = 0]) => P(dt, ds, y));
+    const rings = [];
+    for (let k = 0; k < prof.length; k++) {
+      const a = C[Math.max(0, k - 1)], z = C[Math.min(prof.length - 1, k + 1)];
+      let tx = z[0] - a[0], ty = z[1] - a[1], tz = z[2] - a[2];
+      const tl = Math.hypot(tx, ty, tz) || 1;
+      tx /= tl; ty /= tl; tz /= tl;
+      // u = t x up, or t x east when the limb is nearly vertical.
+      let ux = -tz, uy = 0, uz = tx;
+      if (Math.hypot(ux, uz) < 0.2) { ux = 0; uy = tz; uz = -ty; }
+      const ul = Math.hypot(ux, uy, uz) || 1;
+      ux /= ul; uy /= ul; uz /= ul;
+      const vx = ty * uz - tz * uy, vy = tz * ux - tx * uz, vz = tx * uy - ty * ux;
+      const r = prof[k][1];
+      const ring = [];
+      for (let i = 0; i < sides; i++) {
+        const an = (i / sides) * TAU;
+        const ca = Math.cos(an), sa = Math.sin(an);
+        const nx = ux * ca + vx * sa, ny = uy * ca + vy * sa, nz = uz * ca + vz * sa;
+        ring.push({ p: [C[k][0] + nx * r, C[k][1] + ny * r, C[k][2] + nz * r],
+          n: [nx, ny, nz] });
+      }
+      rings.push(ring);
+    }
+    for (let k = 0; k < rings.length - 1; k++) {
+      for (let i = 0; i < sides; i++) {
+        const j = (i + 1) % sides;
+        const A = rings[k][i], B = rings[k][j], D = rings[k + 1][i], E = rings[k + 1][j];
+        b.smooth(A.p, B.p, E.p, A.n, B.n, E.n, col, col, col);
+        b.smooth(A.p, E.p, D.p, A.n, E.n, D.n, col, col, col);
+      }
+    }
+  }
+
   /** An olive: a short trunk that forks low, and a silver-grey crown. */
   function olive(t, s, y, h) {
+    // Into `arbor`, like the pine, and put back on the way out.
+    const bWas = b;
+    b = arbor;
     const P = facing(t, s, rng() * TAU);
-    post(P, 0, 0, y, y + h * 0.36, 0.19, [0.400, 0.360, 0.300], 5);
-    for (const o of [-0.16, 0.18]) {
-      post(P, o, o * 0.4, y + h * 0.30, y + h * 0.58, 0.10, [0.420, 0.380, 0.315], 4);
+    // The wood, which was a pentagonal post with two square ones stood beside
+    // it at head height, not touching it and not touching the crown either.
+    // An olive's whole character below the leaves is a short fat bole that
+    // twists and splits into three or four limbs, each going out to a mass of
+    // leaf — so that is what is drawn: the bole as one `limb` with a lean off
+    // `jit`, and a limb from its top out towards each of the four outer
+    // lobes, ending under it. Grey and not warm, so the plate shader leaves
+    // it alone; the olive is not plated.
+    const key = pineKey(t, s);
+    const BARK = [0.400, 0.360, 0.300];
+    const tt = (jit(key, 971) - 0.5) * 0.20 * h, ts = (jit(key, 972) - 0.5) * 0.20 * h;
+    limb(P, [[y - 0.05, 0.25, 0, 0], [y + h * 0.14, 0.19, tt * 0.3, ts * 0.5],
+      [y + h * 0.36, 0.16, tt, ts]], BARK, 8);
+    for (const i of [1, 2, 3, 4]) {
+      const [dx, dz, r, hy] = OLIVE_LOBES[i];
+      const ex = dx * h * 0.5 * 0.72, ez = dz * h * 0.5 * 0.72;
+      limb(P, [[y + h * 0.33, 0.10, tt, ts],
+        [y + h * (0.36 + (hy - 0.36) * 0.45), 0.075,
+          tt + (ex - tt) * 0.45, ts + (ez - ts) * 0.45 + (jit(key + i, 973) - 0.5) * 0.3],
+        [y + h * (hy - r * 0.55), 0.035, ex, ez]], BARK, 6);
     }
     // Lobes with light between them, which is what makes an olive read as an
     // olive: you can see the sky through the middle of one.
@@ -21385,17 +21553,20 @@ async function buildJadrija(scene) {
     // tree rather than at a tree" — this is the first version of them that is.
     const band = [y + h * 0.34, y + h * 0.96];
     const DK = [0.205, 0.240, 0.162], LT = [0.392, 0.448, 0.302];
-    const olC = [[0.06, -0.08, 0.16, 0.80], [-0.68, 0.48, 0.15, 0.52],
-      [0.66, -0.42, 0.14, 0.48], [0.34, 0.66, 0.13, 0.72],
-      [-0.42, -0.62, 0.13, 0.62], [-0.14, 0.74, 0.12, 0.42],
-      [0.60, 0.26, 0.12, 0.64], [-0.60, -0.10, 0.11, 0.44],
-      [0.18, -0.72, 0.11, 0.56]];
+    const olC = OLIVE_LOBES;
     for (let i = 0; i < olC.length; i++) {
       const [dx, dz, r, hy] = olC[i];
       puff(P, dx * h * 0.5, dz * h * 0.5, y + h * hy, h * r * 0.82, h * r,
-        DK, LT, band, 7, 3, 0.52, i + 3);
+        DK, LT, band, 9, 4, 0.52, i + 3);
     }
+    b = bWas;
   }
+  // Hoisted out of `olive` so its limbs can find the lobes they carry.
+  const OLIVE_LOBES = [[0.06, -0.08, 0.16, 0.80], [-0.68, 0.48, 0.15, 0.52],
+    [0.66, -0.42, 0.14, 0.48], [0.34, 0.66, 0.13, 0.72],
+    [-0.42, -0.62, 0.13, 0.62], [-0.14, 0.74, 0.12, 0.42],
+    [0.60, 0.26, 0.12, 0.64], [-0.60, -0.10, 0.11, 0.44],
+    [0.18, -0.72, 0.11, 0.56]];
 
   /**
    * The shrub mass behind the promenade: a mound of dark leaf, the shoots
@@ -29804,6 +29975,13 @@ async function buildJadrija(scene) {
   const upMesh = new THREE.Mesh(up.geo(), solidMaterial(0xffffff, {
     spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22, body: FACE,
   }));
+  // The trees. A little of `up`'s bounce and not all of it: they stand on
+  // gravel and needle litter, not on the white terrace, and the landscape's
+  // own pines next to them have none — 0.10 keeps a trunk in the stand from
+  // being a shade lighter than the identical trunk two metres behind it.
+  const arborMesh = new THREE.Mesh(arbor.geo(),
+    treeMaterial({ instanced: false, cut: true, emissive: 0.10 }));
+  arborMesh.userData.tree = true;
   // Maslina's feather flags: `up`'s material with `FEATHER_WAVE` in its
   // vertex program, one material each because each carries its own pole. The
   // print hung in front of each is a plain `MeshBasicMaterial` off
@@ -30030,10 +30208,10 @@ async function buildJadrija(scene) {
     return m;
   });
   const kabRendMesh = rendMeshes[rends.findIndex((r) => r.out)] || null;
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh]) {
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh]) {
     m.frustumCulled = false;
   }
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, ...rendMeshes,
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, ...rendMeshes,
     ...featherMeshes]) {
     scene.add(m);
   }
@@ -55821,11 +55999,11 @@ async function buildJadrija(scene) {
     // until this pass and which is where a hundred metres of hut belongs: take
     // them out of the caster list and the rows stop throwing the long shadows
     // that are half of what the promenade looks like at seven in the evening.
-    meshes: [deckMesh, upMesh, vilMesh, ...rendMeshes],
+    meshes: [deckMesh, upMesh, vilMesh, arborMesh, ...rendMeshes],
     // The feather flags cast as they stand: the shadow pass does not run the
     // wave, and a ripple of a few centimetres in a shadow is nothing anybody
     // could see.
-    casters: [upMesh, vilMesh, ...rendMeshes.filter((m) => m !== kabRendMesh),
+    casters: [upMesh, vilMesh, arborMesh, ...rendMeshes.filter((m) => m !== kabRendMesh),
       ...featherMeshes],
     // The kabina's two rooms cast only while they are drawn — `dynamic`
     // proxies follow their mesh's `visible`. The big room has to: nothing
