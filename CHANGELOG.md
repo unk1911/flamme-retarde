@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.530.2] — 2026-09-27
+
+### the diver walks forward, climbs out without a hop, and the ladder is whole
+
+Misha, watching the diver on the big screen: *"when he runs up for the jump,
+he does seem to be running 'backwards' somewhat"*. He also noticed *"once he is
+done climbing up from the ladder onto the platform, he does this unnecessary
+jump UPwards"*, and that *"the diving board ladder is missing some parts"*.
+
+**The run-up.** Measured on the board, every lifted foot travelled 20–30 cm
+backwards before it swung through. The run-up borrowed the crowd's walk and
+moved his body to follow its planted foot, but that clip's planted foot drifts
+back and forth under the body within a step. Following it made him surge and
+stall. Moving at a steady pace instead left the foot sliding 19 cm a step. So
+he now has his own four steps, solved in tools/blender/dive.py:
+
+- each planted foot stays put on the board;
+- each lifted foot goes forward on a low arc;
+- a trailing foot comes up onto its toes as the body passes it;
+- his pelvis follows the footfalls, with a small bob;
+- his legs are IK'd onto all of that every frame, and his arms swing against
+  them.
+
+In the bake, the lifted foot's worst move backwards is now 1.4 cm in a frame,
+where it was 7. The crowd's walk is unchanged.
+
+**The hop.** When he stepped off the ladder, the game blended the ladder
+clip's body position (2.6 m above its origin, at the water) with the walk's
+(on the deck), and that lifted him half a metre mid-fade. His pelvis went from
+3.62 m to 4.12 m and back. `play(..., { keepRoot: true })` now cross-fades the
+pose but not the body position; the diver uses it wherever he is re-placed.
+Measured: 3.62, 3.63, 3.62.
+
+**The ladder.** It was two canes standing in the deck and two square stiles
+down the face, with nothing joining them. Now each side is one round swept
+tube: out of the deck, up to hand height, an arch over the lip and straight
+down the face as the stile the rungs are fixed to.
+
 ## [1.530.1] — 2026-09-27
 
 ### the bathers put back exactly as they were; the diver walks at their pace

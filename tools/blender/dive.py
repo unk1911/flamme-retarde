@@ -12,8 +12,10 @@ That one bent a crowd bather's walk and idle clips with figure-space aims and
 slid the figure along a hand-drawn arc. This one is SOLVED, end to end, on the
 diver's own skeleton (man_young_fit, 1.84 m, 80 kg), and baked:
 
-  walk     four steps of the shared WALK, the stance foot pinned so nothing
-           slides (the planted foot is the one with heel AND ball down)
+  walk     his own four steps, SOLVED: planted feet stay put on the board,
+           lifted feet go forward on an arc, the pelvis follows the footfalls,
+           legs IK'd each frame (the shared WALK drifts its planted foot within
+           a step and made him look like he was walking backwards)
   hurdle   a push off the planted foot, a parabola for the centre of mass,
            mirrored to whichever foot the walk left down
   board    the diver and the plank as ONE sprung mass (K_LAND at the landing
@@ -439,41 +441,129 @@ def simulate(rig, x_tip=None, verbose=True):
         return 0.0 if x_tip is None else flex_at(x_load, x_tip)
 
     # ── stand, then walk: feet on the board, the stance foot pinned ────────
-    STAND_T, BLEND_T, WALK_T = 1.2, 0.35, 2.0 * 1.10   # two cycles, a touch slow
+    # ── the approach: his own four steps, SOLVED ────────────────────────────
+    #
+    # Misha, 27 Sep: *"he does seem to be running 'backwards' somewhat"*. He
+    # was. The approach first borrowed the crowd's walk and moved the body
+    # after its planted foot; that clip's planted foot drifts forward and back
+    # under the body within a step, so whatever speed is read off it either
+    # surges and stalls (pinned: 48 cm in a third of a second, then a slide
+    # back) or slides (steady at the crowd's 0.92 m/s: 19 cm a step), and in
+    # both the lifted foot travelled backward along the board. So the steps are
+    # made here, the way a person walks them: each planted foot STAYS PUT on
+    # the board, each lifted foot goes forward on a low arc and never back,
+    # the pelvis moves at a steady pace with a small bob, and the legs are IK'd
+    # onto those feet every frame (`solve_limbs`). Arms swing against the legs.
+    STAND_T, BLEND_T = 1.2, 0.30
+    STEP, FIRST, T_STEP, LIFT = 0.64, 0.36, 0.50, 0.11
+    # Footfalls: R half a step, then L, R, L — so he leaves the fourth step on
+    # his left foot planted and hurdles off it (the hurdle mirrors to suit).
+    falls = [("R", FIRST), ("L", FIRST + STEP), ("R", FIRST + 2 * STEP),
+             ("L", FIRST + 3 * STEP)]
+    st0 = state(rig, POSES["STAND"])
+    z0, _s, _k, _v = lowest(st0)
+    feet0 = {q: (st0["pts"]["ball" + q].x, st0["pts"]["ball" + q].z - z0) for q in "LR"}
+    pv0 = st0["pts"]["pivot"]
+    hip0 = pv0.z - z0 - 0.035                       # knees just soft
+    WALK_T = len(falls) * T_STEP
+    # The pelvis track, off the footfalls: at each landing it is 18 cm behind
+    # the landing foot — between the feet, as at any heel strike — and the
+    # points are joined by a monotone cubic so the pace is continuous. A steady
+    # speed instead left the last foot landing beyond the leg's reach and the
+    # ball of it hovering 9 cm over the board.
+    track = [(0.0, 0.0)] + [((k + 1) * T_STEP, x - feet0["L"][0] * 0 - 0.18)
+                            for k, (_q, x) in enumerate(falls)]
+
+    def pelvis_x(tw):
+        tw = max(0.0, min(WALK_T, tw))
+        k = min(len(track) - 2, int(tw // T_STEP))
+        (t0, x0), (t1, x1) = track[k], track[k + 1]
+        # slopes at the knots: centred differences, zero at the start
+        def m(i):
+            if i == 0:
+                return 0.0
+            if i == len(track) - 1:
+                return (track[i][1] - track[i - 1][1]) / T_STEP
+            return (track[i + 1][1] - track[i - 1][1]) / (2 * T_STEP)
+        u = (tw - t0) / (t1 - t0)
+        h00, h10 = 2 * u ** 3 - 3 * u ** 2 + 1, u ** 3 - 2 * u ** 2 + u
+        h01, h11 = -2 * u ** 3 + 3 * u ** 2, u ** 3 - u ** 2
+        return h00 * x0 + h10 * T_STEP * m(k) + h01 * x1 + h11 * T_STEP * m(k + 1)
+
+    def feet_at(tw):
+        """Where each ball is at walk time tw: on its last footfall, or partway
+        along an arc to the next one."""
+        pos = {q: feet0[q][0] for q in "LR"}
+        out = {q: (pos[q], 0.0) for q in "LR"}
+        for k, (q, x1) in enumerate(falls):
+            a, b = k * T_STEP, (k + 1) * T_STEP
+            if tw >= b:
+                pos[q] = x1
+                out[q] = (x1, 0.0)
+            elif tw > a:
+                u = ease((tw - a) / (b - a))
+                x = pos[q] + (x1 - pos[q]) * u
+                out[q] = (x, LIFT * math.sin(math.pi * min(1.0, (tw - a) / (b - a))))
+            if tw < b:
+                break
+        return out, (falls[min(len(falls) - 1, int(tw // T_STEP))][0] if tw < WALK_T else "L")
+
     t = 0.0
     root = [0.0, 0.0]
-    prev = None
-    pin_x = None
-    walk_scale = 1.10
-    while t < STAND_T + WALK_T - 1e-9:
+    prev_p = POSES["STAND"]
+    side = "L"
+    while t <= STAND_T + WALK_T + 1e-9:
         if t < STAND_T:
             p = POSES["STAND"]
-        else:
-            tw = (t - STAND_T) / walk_scale
-            p = lerp(POSES["STAND"], walk_at(tw), ease((t - STAND_T) / BLEND_T))
+            st = st0
+            root = [0.0, -z0]
+            film.add(p, root, 0.0, "walk")
+            t += dt
+            continue
+        tw = t - STAND_T
+        feet, moving = feet_at(tw)
+        side = "R" if moving == "L" else "L"            # the planted one
+        # Pelvis: steady after a short ramp, and a bob — lowest as the feet
+        # pass (mid-swing is highest in a walk: over a straight stance leg).
+        px = pv0.x + pelvis_x(tw)
+        ph = (tw % T_STEP) / T_STEP
+        pz = hip0 - 0.018 * math.cos(2 * math.pi * ph)
+        # The arms swing against the legs; a hint of forward lean.
+        sw = math.sin(math.pi * tw / T_STEP)
+        base = dict(prev_p)
+        for q, sgn in (("L", 1), ("R", -1)):
+            ax_, ay_, az_ = POSES["STAND"]["armU" + q]
+            base["armU" + q] = (ax_ + 16 * sgn * sw, ay_, az_)
+            lx, ly, lz = POSES["STAND"]["armL" + q]
+            base["armL" + q] = (lx - 8, ly, lz)
+        base["spine01"] = (-3.0, 0.0, 0.0)
+        stp = state(rig, base)
+        pv = stp["pts"]["pivot"]
+        root = [px - pv.x, pz - pv.z]
+        tg = {}
+        for q in "LR":
+            fx, fz = feet[q]
+            tg["foot" + q] = (fx, fz + flex_at(fx, fx))
+        p = solve_limbs(rig, base, root, 0.0, tg)
+        # Keep the planted sole flat and point the lifted toe a little: the
+        # foot turns by whatever the leg did, taken back. And a planted foot
+        # the body has gone well past comes up onto its toes — heel off, ball
+        # down — which is what lets a real trailing leg reach: held flat it
+        # ran out of leg and the IK dragged it 6 cm along the board.
+        for q in "LR":
+            hx = p["legU" + q][0] + p["legL" + q][0]
+            fz = feet[q][1]
+            behind = px - pv0.x - feet[q][0]
+            heel = 38.0 * min(1.0, max(0.0, (behind - 0.10) / 0.30)) if fz <= 0 else 0.0
+            p["foot" + q] = (-hx * 0.9 - (18.0 * fz / LIFT if fz > 0 else 0.0) - heel,
+                             POSES["STAND"]["foot" + q][1], POSES["STAND"]["foot" + q][2])
+        p = solve_limbs(rig, p, root, 0.0, tg, iters=8)
         st = state(rig, p)
-        z, _side, k, v = lowest(st)
-        # The planted foot is the one whose heel AND ball are both down; a
-        # swinging foot can dip its pointed toe lower than either.
-        side = min("LR", key=lambda q: max(st["pts"]["ankle" + q].z - 0.07,
-                                            st["pts"]["ball" + q].z))
-        foot = st["pts"]["ankle" + side] * 0.5 + st["pts"]["ball" + side] * 0.5
-        if prev is None:
-            root[0] = 0.0
-        elif side == prev[0]:
-            root[0] = pin_x - foot.x
-        else:
-            pin_x = foot.x + root[0]
-        if prev is None or side != prev[0]:
-            pin_x = foot.x + root[0]
-        xw = foot.x + root[0]
-        root[1] = surf(xw) + flex_at(xw, xw) - z
-        film.add(p, root, tip_of(xw), "walk")
-        if verbose and int(round(t * FPS)) % 3 == 0:
-            print("[dive] walk t=%.2f side=%s pt=%s z=%.3f foot.x=%.3f root=(%.3f,%.3f)"
-                  % (t, side, k, z, foot.x, root[0], root[1]))
-        prev = (side,)
+        film.add(p, root, tip_of(feet[side][0]), "walk")
+        prev_p = p
         t += dt
+    # The fourth footfall is down: he stands on his left and hurdles off it.
+    side = "L"
     walk_end = (p, st, list(root), side)
 
     # ── the hurdle: push off the stance foot, fly, land two-footed ──────────
@@ -484,6 +574,8 @@ def simulate(rig, x_tip=None, verbose=True):
     if side == "L":
         HP, HT = MH._mirror(HP), MH._mirror(HT)
     ball_pin = (st0["pts"]["ball" + side].x + r0[0], st0["pts"]["ball" + side].z + r0[1])
+    if verbose:
+        print("[dive] walk end: side %s pin (%.3f, %.3f) tw_end %.3f" % (side, ball_pin[0], ball_pin[1], len(film.frames) / FPS))
     n_push = int(round(0.20 * FPS))
     for i in range(1, n_push + 1):
         u = ease(i / n_push)

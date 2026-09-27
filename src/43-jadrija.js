@@ -20339,36 +20339,68 @@ async function buildJadrija(scene) {
         y - 0.05, y + 0.015, [0.560, 0.548, 0.512]);
     }
 
-    // ── the two pipes ────────────────────────────────────────────────────────
-    // The whole of the ironwork, and the silhouette. They stand out of the
-    // deck a little inboard of the shoreward edge, go up a metre and a bit,
-    // and then bend over toward the ladder — which is what your hands are
-    // reaching for when you come up it, and is why they lean that way and not
-    // some other.
-    for (const ot of [-1.28, -0.20]) {
-      const bt = D.t + ot, bs = D.s - 0.86;
-      const prof = [[y - 0.06, 0.036, 0, 0]];
-      for (let k = 0; k <= 5; k++) {
-        // A quarter of a circle of radius 0.30, walked in five steps: straight
-        // up to y+1.16 and then over, finishing horizontal and 30 cm shoreward.
-        const a = (k / 5) * (Math.PI / 2);
-        prof.push([y + 1.34 + Math.sin(a) * 0.30, 0.036,
-          0, -(1 - Math.cos(a)) * 0.30]);
+    // ── the two pipes, which ARE the ladder ─────────────────────────────────
+    //
+    // Misha, 27 Sep 2026, with a screenshot from the deck: *"the diving board
+    // ladder is missing some parts"*. It was: two canes standing in the deck
+    // half a metre inboard and a pair of square stiles down the face, with
+    // nothing between them. A lido ladder is ONE bent tube a side — out of the
+    // deck, up to a hand's height, over the edge in an arch, and straight down
+    // the face as the stile the rungs are fixed to — and that line, the arch
+    // over the lip, is the silhouette that says "ladder" from anywhere.
+    //
+    // Swept, not lathed: `lathe` stacks horizontal rings, which is right for a
+    // post and flattens a tube wherever it runs sideways, so the arch was a
+    // ribbon edge-on. `sweep` turns each ring to the tube's own direction.
+    const sweep = (Pf, pts, r, col, sides = 8) => {
+      const ring = [];
+      for (let k = 0; k < pts.length; k++) {
+        const a = pts[Math.max(0, k - 1)], c = pts[Math.min(pts.length - 1, k + 1)];
+        let tx = c[0] - a[0], ts = c[1] - a[1], ty = c[2] - a[2];
+        const tl = Math.hypot(tx, ts, ty) || 1; tx /= tl; ts /= tl; ty /= tl;
+        // First normal: the along-shore axis, made square to the tangent;
+        // every ladder path here lies in a plane of constant t, so it never
+        // runs along it.
+        let ux = 1 - tx * tx, us = -tx * ts, uy = -tx * ty;
+        const ul = Math.hypot(ux, us, uy) || 1; ux /= ul; us /= ul; uy /= ul;
+        const vx = ts * uy - ty * us, vs = ty * ux - tx * uy, vy = tx * us - ts * ux;
+        const row = [];
+        for (let i = 0; i < sides; i++) {
+          const q = (i / sides) * TAU, cq = Math.cos(q) * r, sq = Math.sin(q) * r;
+          row.push(Pf(pts[k][0] + ux * cq + vx * sq, pts[k][1] + us * cq + vs * sq,
+            pts[k][2] + uy * cq + vy * sq));
+        }
+        ring.push(row);
       }
-      lathe(P, bt, bs, prof, PIPE, 8);
+      for (let k = 0; k < ring.length - 1; k++) {
+        for (let i = 0; i < sides; i++) {
+          const i1 = (i + 1) % sides;
+          b.quad(ring[k][i], ring[k][i1], ring[k + 1][i1], ring[k + 1][i], col);
+        }
+      }
+    };
+    const S_DECK = D.s - 0.86, S_FACE = D.s - 1.385, TOP = y + 0.92;
+    const R_ARCH = (S_DECK - S_FACE) / 2;
+    for (const ot of [-1.28, -0.20]) {
+      const bt = D.t + ot;
+      const path = [[bt, S_DECK, y - 0.06], [bt, S_DECK, TOP]];
+      for (let k = 1; k < 12; k++) {
+        const a = (k / 12) * Math.PI;
+        path.push([bt, S_DECK - R_ARCH * (1 - Math.cos(a)), TOP + R_ARCH * Math.sin(a)]);
+      }
+      path.push([bt, S_FACE, TOP], [bt, S_FACE, y - 2.55]);
+      sweep(P, path, 0.034, PIPE, 10);
       // The foot: a collar where it goes into the concrete, because a pipe
       // that simply stops at a surface reads as sunk into mud.
-      post(P, bt, bs, y - 0.02, y + 0.07, 0.062, [0.612, 0.616, 0.606], 8);
+      post(P, bt, S_DECK, y - 0.02, y + 0.07, 0.062, [0.612, 0.616, 0.606], 8);
+      // And the bracket that holds the stile off the face at the lip.
+      boxD(bt - 0.025, bt + 0.025, D.s - 1.40, S_FACE, y - 0.34, y - 0.28, PIPE);
     }
 
-    // ── the ladder ───────────────────────────────────────────────────────────
-    // Down the seaward face, under the pipes, which is where the two of them
-    // are bending to. Six rungs to the water and two more under it, because
-    // the last one you can see is never the last one there is.
-    for (const ot of [-1.28, -0.20]) {
-      boxD(D.t + ot - 0.030, D.t + ot + 0.030,
-        D.s - 1.40, D.s - 1.33, y - 2.55, y - 0.10, PIPE);
-    }
+    // ── the rungs ────────────────────────────────────────────────────────────
+    // Down the seaward face between the two stiles. Six to the water and two
+    // more under it, because the last one you can see is never the last one
+    // there is.
     for (let k = 0; k < 8; k++) {
       const yy = y - 0.34 - k * 0.30;
       boxD(D.t - 1.31, D.t - 0.17, D.s - 1.42, D.s - 1.35,
@@ -30540,10 +30572,10 @@ async function buildJadrija(scene) {
     diveBoard.geometry.computeVertexNormals();
     diveBoardState.flex = tip;
   }
-  function divePlay(name, fade = 0.25) {
+  function divePlay(name, fade = 0.25, keepRoot = false) {
     const f = diveFigure;
     if (!f || !f.clips.includes(name)) return false;
-    f.play(name, { fade });
+    f.play(name, { fade, keepRoot });
     f.state.speed = 1;
     return true;
   }
@@ -30651,7 +30683,7 @@ async function buildJadrija(scene) {
         const wy0 = typeof seaHeightAt === 'function' ? seaHeightAt(dv.cur[0], dv.cur[2]) : 0;
         dv.cur = [dv.cur[0], dv.treadY + wy0, dv.cur[2]];
         divePlace(dv.cur, dv.yaw);
-        divePlay('tread', 0.2);
+        divePlay('tread', 0.2, true);
         diveBoardBend(0);
         diveSet('tread');
       }
@@ -30681,7 +30713,7 @@ async function buildJadrija(scene) {
         dv.yaw = diveYaw(diveAxis.nx, diveAxis.nz);
         dv.ladder = L;
         divePlace(L, dv.yaw);
-        divePlay('ladder', 0.6);
+        divePlay('ladder', 0.6, true);
         diveSet('ladder');
       }
     } else if (dv.mode === 'ladder') {
@@ -30690,7 +30722,7 @@ async function buildJadrija(scene) {
         const s0 = diveFrom(dv.ladder, dv.yaw, er[0], DIVE.top - dv.ladder[1]);
         dv.path = divePathToBoard(s0); dv.seg = 0; dv.cur = s0;
         divePlace(s0, dv.yaw);
-        divePlay('walk', 0.35);
+        divePlay('walk', 0.35, true);
         f.state.speed = DIVE_SPEED.walk / WALK_NATIVE;
         diveSet('walk');
       }
@@ -53271,10 +53303,26 @@ async function buildJadrija(scene) {
           const v = diveFigure.boneAt(diveFigure.boneIndex('head'), new THREE.Vector3());
           return +v.applyMatrix4(diveFigure.mesh.matrixWorld).y.toFixed(2);
         })() : null,
+        feet: diveFigure ? ['footL', 'footR'].map((n) => {
+          const v = diveFigure.boneAt(diveFigure.boneIndex(n), new THREE.Vector3());
+          diveFigure.mesh.updateMatrixWorld();
+          return v.applyMatrix4(diveFigure.mesh.matrixWorld).toArray().map((x) => +x.toFixed(3));
+        }) : null,
         sea: diveFigure ? +seaHeightAt(diveFigure.mesh.position.x, diveFigure.mesh.position.z).toFixed(2) : null }),
       /** Skip the wait: dive now (from wherever he is, he is put on the board). */
       now: () => { if (dv.mode === 'off') return false; return diveStart(); },
       set: (mode) => { dv.mode = mode; dv.t = 0; return dv.mode; },
+      /** Straight onto the foot of the ladder, climbing — for a probe. */
+      ladder: () => {
+        if (!diveFigure || !DV || dv.mode === 'off') return false;
+        const L = DIVE.P(DIVE.t + DIVE_LADDER.u, DIVE.s + DIVE_LADDER.v, 0);
+        dv.yaw = diveYaw(diveAxis.nx, diveAxis.nz);
+        dv.ladder = L;
+        divePlace(L, dv.yaw);
+        divePlay('ladder', 0);
+        diveSet('ladder');
+        return true;
+      },
     },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     /**

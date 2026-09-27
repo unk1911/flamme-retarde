@@ -1821,7 +1821,13 @@ function skinnedFigure(data, opts = {}) {
    * @param fade   seconds to cross into it
    * @param next   clip to fall back to when a one-shot finishes
    */
-  function play(name, { fade = 0.30, next = null, from = 0 } = {}) {
+  function play(name, { fade = 0.30, next = null, from = 0, keepRoot = false } = {}) {
+    // `keepRoot`: cross-fade the POSE but not where the body is. For a caller
+    // that moves the figure's origin at the same moment it changes clip —
+    // the diver climbing out (the ladder clip ends 2.6 m above its origin, the
+    // walk starts from a new one on the deck) — blending the two clips' root
+    // translations lifts him half a metre in the middle of the fade.
+    st.keepRoot = keepRoot;
     const clip = data.clips[name];
     if (!clip || clip === st.cur) return false;
     // ── asked back for the clip we are still fading OUT of ────────────────
@@ -1928,7 +1934,7 @@ function skinnedFigure(data, opts = {}) {
       st.prevT += step;
       sample(st.prev, st.prevT, mixQ, mixT);
       for (let i = 0; i < nb; i++) qnlerp(localQ, i * 4, mixQ, i * 4, localQ, i * 4, u);
-      for (let k = 0; k < 3; k++) localT[k] = mixT[k] + (localT[k] - mixT[k]) * u;
+      if (!st.keepRoot) for (let k = 0; k < 3; k++) localT[k] = mixT[k] + (localT[k] - mixT[k]) * u;
       if (u >= 1) st.prev = null;
     }
 
