@@ -1214,7 +1214,7 @@ def _rel_target(rig, base, side, want, drop):
 #
 # — ours run ACROSS the chest and theirs run along it, and the minimal arc
 # between those two comes out about an axis of (0.00, -0.11, -0.99): world up,
-# to within six degrees. The clavicles are in `human_mh.FLAT`, so `align_roll`
+# to within six degrees. The clavicles are in `human_mh.ROLL_FLAT_BONES`, so `align_roll`
 # gives them a local Z that IS world up. The alignment therefore lands entirely
 # on the one axis that yaws the shoulder girdle. And it lands the same way
 # round on both sides — +Y to +X and -Y to -X are both a negative turn about up

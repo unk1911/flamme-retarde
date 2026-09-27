@@ -8960,6 +8960,11 @@ window.__fr = {
       return { at: [+w[0].toFixed(1), +w[1].toFixed(2), +w[2].toFixed(1)],
         ts: st.map((v) => +v.toFixed(1)) };
     },
+    /** The skakaonica's hybrid springboard dive, for inspection and repeatable tests. */
+    dive: {
+      start: () => (jadrija && jadrija.dive ? jadrija.dive.start() : false),
+      stats: () => (jadrija && jadrija.dive ? jadrija.dive.stats() : null),
+    },
     /**
      * The Slow Doodle — see src/43-doodle.js.
      *

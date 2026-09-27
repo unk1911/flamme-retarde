@@ -8,6 +8,60 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.530.0] — 2026-09-27
+
+### the diver at the skakaonica, solved
+
+Misha: *"i asked the other model to build a person diving off the diving board
+in jadrija ... it wasn't anywhere near a quality product ... can u see if u can
+make this diving person awesome"*.
+
+The first version was a crowd bather playing his walk and idle clips, with
+typed figure-space twists layered on top. His whole body tilted along the
+flight path, he jumped several metres in one frame at takeoff, and he vanished
+when he hit the water. All of that is replaced.
+
+**The dive is a baked clip solved on his own skeleton** (tools/blender/dive.py,
+man_young_fit, 1.84 m, 80 kg):
+
+- **The walk:** four walking steps with the planted foot pinned, so nothing
+  slides.
+- **The hurdle:** a knee drive and arm swing, with his centre of mass on a
+  parabola. It lands two-footed on the tip.
+- **The board:** diver and plank ride as one sprung mass. The plank bottoms
+  out 38 cm down (drawn bending in the game), he rides it for 0.42 s, and he
+  leaves as it comes back up through flat. Takeoff is the board's recoil plus
+  his leg drive, 2.3 + 1.1 = 3.4 m/s up.
+- **The flight:** his centre of mass is ballistic and his **angular momentum
+  is conserved**. The turn is (L − L_internal)/I, with I taken off his posed
+  body segments, so folding into the pike spins him faster and opening out
+  slows him. The takeoff spin is solved so his fingertips reach the water at
+  182°. He is in the air for 1.19 s, and the entry is a streamlined line with
+  his arms by his ears.
+- **In the water:** he is dragged to a stop, arcs forward and surfaces into a
+  tread.
+
+**Then the loop.** He treads water, then swims round the platform with his own
+gentler crawl; the shared one lifts a whole shin out of the water. He climbs
+the ladder, and every hand and foot on a rung is IK-solved onto that rung. He
+gets out onto the deck, walks back along the board, waits a few seconds and
+goes again.
+
+The plank bends by the baked deflection table, in a true cantilever shape,
+and rings after he leaves. The splash lands where his hands enter. From the
+moment he is in the water he rides the actual swell.
+
+**And a bug underneath everything.** `human_mh.FLAT`, the list of bones built
+with a flat roll, had been overwritten on 17 Sep by the "flat on her front"
+pose of the same name. Every skeleton built since then had the wrong roll on
+every bone, which reverses the sagittal joints and plays the shared walk as a
+moonwalk. Baye is unaffected, because she is loaded from an older saved
+.blend. The v2 bathers were built on 23 Sep and have it. The list is now
+`ROLL_FLAT_BONES`, and all eight v2 bathers are rebaked on the corrected rig.
+Their walk plays forward again.
+
+Debug: `__fr.jad.raw().dive.stats()` / `.now()`.
+
 ## [1.529.0] — 2026-09-26 (baye 1.46.0)
 
 ### A beach ball for the Slow Doodle, on AVBD

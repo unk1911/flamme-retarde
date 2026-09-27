@@ -393,6 +393,13 @@ def one(name, height, obj):
     MH.fire_floor(rig)
     MH.ballet_floor(rig)
     MH.wine_floor(rig)
+    # The diver at the skakaonica is one of these — see tools/blender/dive.py,
+    # which solves his dive, his climb out and the board, on THIS rig, and
+    # writes build/dive.json for src/43-jadrija.js. After the floor passes,
+    # because the dive walks on the solved WALK.
+    import dive as DV
+    if name == DV.DIVER:
+        clips = clips + DV.dive_clips(rig, J)
     MH.pose(rig, {})
     baked = [MH._bake_clip(rest, c) for c in clips]
     out = OUT / ('bather2_%s.fr3d.gz' % name)

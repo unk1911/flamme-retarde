@@ -19945,6 +19945,9 @@ async function buildJadrija(scene) {
   // below is drawn through it. `local()` is not asked anything: the anchor was
   // found by searching the *forward* map for the (t, s) whose `W` is the
   // arrowhead, which lands within 0.10 m.
+  // The plank and the man who dives off it — see "the diving board and its
+  // diver" further down, where both are driven.
+  let diveBoard = null, diveFigure = null;
   const DIVE = {
     t: 396.8,
     s: -54.8,
@@ -19964,6 +19967,7 @@ async function buildJadrija(scene) {
       st.z + st.uz * (u - DIVE.t) + st.nz * v,
     ];
   })();
+  const DIVE_BOARD = { length: 7.52, width: 0.80, thick: 0.09 };
   {
     const D = DIVE, y = D.top, P = D.P;
     // The shore-frame helpers, on the platform's frame instead. Same arguments,
@@ -20304,10 +20308,30 @@ async function buildJadrija(scene) {
     // way past the small one. It is the thinnest thing out here and it is the
     // thing you see first: a dark line against the channel with nothing under
     // the far end of it.
-    barIn(P, D.t - 2.42, D.t + 5.10,
-      [[D.s - 0.40, y + 0.015], [D.s + 0.40, y + 0.015],
-       [D.s + 0.40, y + 0.105], [D.s - 0.40, y + 0.105]], PLANK,
-      [0.796, 0.780, 0.722]);
+    // The plank is a separate, lightly deformable beam rather than part of the
+    // static shore buffer. Its support at the newer block is the root of the
+    // cantilever; the free end is the part a diver loads and springs from.
+    const boardGeo = new THREE.BoxGeometry(DIVE_BOARD.length, DIVE_BOARD.thick,
+      DIVE_BOARD.width, 36, 1, 2);
+    const boardBase = new Float32Array(boardGeo.attributes.position.array);
+    const boardMat = solidMaterial(0xffffff, {
+      spec: 0.16, specPower: 28, body: 'base *= vVCol;',
+    });
+    diveBoard = new THREE.Mesh(boardGeo, boardMat);
+    diveBoard.name = 'jadrija-diving-board';
+    const boardMid = P(D.t + 1.34, D.s, y + 0.06);
+    diveBoard.position.set(boardMid[0], boardMid[1], boardMid[2]);
+    const boardAxis = at(D.t);
+    diveBoard.rotation.y = Math.atan2(-boardAxis.uz, boardAxis.ux);
+    const boardCol = new Float32Array(boardBase.length);
+    for (let i = 0; i < boardCol.length; i += 3) {
+      boardCol[i] = PLANK[0]; boardCol[i + 1] = PLANK[1]; boardCol[i + 2] = PLANK[2];
+    }
+    boardGeo.setAttribute('aVCol', new THREE.BufferAttribute(boardCol, 3));
+    boardGeo.computeBoundingSphere();
+    boardGeo.boundingSphere.radius += 0.5;
+    diveBoard.userData.flexBase = boardBase;
+    scene.add(diveBoard);
     // And the two bearers under it where it crosses each mass, which is what
     // stops it reading as a decal on the top of the concrete.
     for (const ot of [-0.62, 2.06]) {
@@ -30417,6 +30441,20 @@ async function buildJadrija(scene) {
       const rig = await loadRig(key);
       if (rig) crowds[sex] = makeCrowd(scene, rig, bathers.length);
     }
+    // One dedicated skinned adult is reserved for the diving platform. A crowd
+    // slot is deliberately not borrowed: it can be reassigned while the diver
+    // is airborne, and the instanced tier cannot play the dive's individual
+    // poses. Reuse the already-parsed adult bather asset instead.
+    if (parsed.length) {
+      let k = CAST_KIND.indexOf('man_young_fit');
+      if (k < 0) k = CAST_KIND.findIndex((name) => !name.includes('child'));
+      if (k >= 0) {
+        diveFigure = mkFig(parsed[k]);
+        diveFigure.mesh.name = 'jadrija-diver';
+        diveFigure.mesh.visible = false;
+        scene.add(diveFigure.mesh);
+      }
+    }
   }
 
   /**
@@ -30432,6 +30470,246 @@ async function buildJadrija(scene) {
     const c = Math.cos(ang), sn = Math.sin(ang);
     return Math.atan2(-(st.uz * c + st.nz * sn), st.ux * c + st.nx * sn);
   };
+
+  // ── the diving board and its diver ────────────────────────────────────────
+  //
+  // Misha, 27 Sep 2026: *"i asked the other model to build a person diving off
+  // the diving board in jadrija ... it wasn't anywhere near a quality product
+  // ... can u see if u can make this diving person awesome"*.
+  //
+  // NOTHING ABOUT WHERE HIS BODY IS IS TYPED HERE. The dive is a baked clip,
+  // `dive`, solved in tools/blender/dive.py on his own skeleton: the stance
+  // foot pinned through four walking steps, a hurdle on a parabola, the board
+  // and the diver ridden as one sprung mass (he leaves as it comes back up
+  // through flat, with its recoil plus his leg drive), then the flight with
+  // his angular momentum CONSERVED — the spin is L/I with I off the posed
+  // segments, so the pike turns him faster and opening out slows him, and the
+  // takeoff spin is solved so his hands reach the water at 182 degrees.
+  // Under, he is dragged to a stop, arcs forward and surfaces into a tread.
+  // The climb out is the `ladder` clip: every hand and foot on a rung is IK'd
+  // onto the rung. The numbers the game needs to join these up — where the
+  // tip is in the clip's frame, the board's deflection every frame, when the
+  // hands meet the water, where each clip hands over — are in `PAYLOAD.dive`
+  // (build/payload/dive.json), written by the same run.
+  //
+  // What this file does is place and chain them: wait at the back of the
+  // board, dive, tread, swim round to the ladder, climb, walk back, wait. And
+  // bend the plank by the table.
+  const DV = typeof PAYLOAD !== 'undefined' ? PAYLOAD.dive : null;
+  const DIVE_TOP = DIVE.top + 0.105;              // the plank's top surface
+  const DIVE_FULCRUM = 2.06, DIVE_TIP = 5.10;     // along t from DIVE.t
+  const DIVE_LADDER = { u: -0.74, v: -1.40 };     // the rungs' face, mid-ladder
+  const DIVE_SPEED = { walk: 1.05, swim: 0.85 };  // m/s
+  // The walk clip's own ground speed at clock rate 1: dive.py measures four
+  // steps of it at 2.97 m in two cycles of 1.0 s.
+  const WALK_NATIVE = 1.485;
+  // How much higher than the solve's still-water surfacing he treads: the
+  // bake puts the top of his skull 26 cm out, which on this swell measured
+  // the base of it 17 cm over the local surface — a face at the waterline,
+  // washed over by every crest. Head and neck out is a treading swimmer.
+  const TREAD_LIFT = 0.22;
+  const diveBoardState = { flex: 0 };
+  const dv = {
+    mode: 'off', t: 0, next: 0, path: null, seg: 0, splash: false,
+    origin: [0, 0, 0], yaw: 0, pelvisY: 1.0, loops: 0,
+  };
+  function diveYaw(dx, dz) { return Math.atan2(-dz, dx); }
+  const diveAxis = (() => { const a = at(DIVE.t); return { ux: a.ux, uz: a.uz, nx: a.nx, nz: a.nz }; })();
+  // Where the dive clip's origin goes: its board tip lands on the real tip.
+  function diveOrigin() {
+    const u0 = DIVE_TIP - (DV ? DV.dive.x_tip : 3.13);
+    return DIVE.P(DIVE.t + u0, DIVE.s, DIVE_TOP);
+  }
+  // A clip-frame offset (forward, up) from an origin, along a heading.
+  function diveFrom(o, yaw, fwd, up) {
+    return [o[0] + Math.cos(yaw) * fwd, o[1] + up, o[2] - Math.sin(yaw) * fwd];
+  }
+  function diveBoardBend(tip) {
+    if (!diveBoard) return;
+    const pos = diveBoard.geometry.attributes.position, base = diveBoard.userData.flexBase;
+    // Local x runs the plank's length about its middle at DIVE.t + 1.34; the
+    // fulcrum is the newer block's bearer. Tip-loaded cantilever shape.
+    const x0 = DIVE_FULCRUM - 1.34, L = DIVE_TIP - DIVE_FULCRUM;
+    for (let i = 0; i < pos.count; i++) {
+      const x = Math.max(0, Math.min(L, base[3 * i] - x0));
+      pos.array[3 * i + 1] = base[3 * i + 1] + tip * x * x * (3 * L - x) / (2 * L * L * L);
+    }
+    pos.needsUpdate = true;
+    diveBoard.geometry.computeVertexNormals();
+    diveBoardState.flex = tip;
+  }
+  function divePlay(name, fade = 0.25) {
+    const f = diveFigure;
+    if (!f || !f.clips.includes(name)) return false;
+    f.play(name, { fade });
+    f.state.speed = 1;
+    return true;
+  }
+  function divePlace(pos, yaw) {
+    const m = diveFigure.mesh;
+    m.position.set(pos[0], pos[1], pos[2]);
+    m.rotation.set(0, yaw, 0);
+  }
+  function diveSet(mode) { dv.mode = mode; dv.t = 0; }
+  function diveStart() {
+    if (!diveFigure || !DV) return false;
+    dv.origin = diveOrigin();
+    dv.yaw = diveYaw(diveAxis.ux, diveAxis.uz);
+    divePlace(dv.origin, dv.yaw);
+    divePlay('dive', 0.3);
+    dv.splash = false;
+    diveSet('dive');
+    return true;
+  }
+  // Swim round the platform to the foot of the ladder: along the seaward face
+  // of the newer block, then the old mass, a metre off the concrete.
+  function divePathToLadder(from) {
+    const P = (u, v) => DIVE.P(DIVE.t + u, DIVE.s + v, 0);
+    const L0 = P(DIVE_LADDER.u, DIVE_LADDER.v - 0.35);
+    return [from, P(3.9, -2.1), P(1.5, -2.35), P(DIVE_LADDER.u + 0.6, DIVE_LADDER.v - 0.9), L0];
+  }
+  function divePathToBoard(from) {
+    const u0 = DIVE_TIP - (DV ? DV.dive.x_tip : 3.13);
+    return [from, DIVE.P(DIVE.t + DIVE_LADDER.u + 0.3, DIVE.s - 0.25, DIVE.top),
+      DIVE.P(DIVE.t + 0.4, DIVE.s, DIVE_TOP), DIVE.P(DIVE.t + u0, DIVE.s, DIVE_TOP)];
+  }
+  // Walk a polyline at speed v; returns true when the end is reached.
+  function divePathStep(dt, v, turnRate, onPos) {
+    const P = dv.path;
+    let left = v * dt;
+    while (left > 0 && dv.seg < P.length - 1) {
+      const a = P[dv.seg], b = P[dv.seg + 1];
+      const cur = dv.cur || a;
+      const dx = b[0] - cur[0], dz = b[2] - cur[2], d = Math.hypot(dx, dz);
+      if (d <= left) { dv.cur = b; left -= d; dv.seg++; continue; }
+      dv.cur = [cur[0] + dx / d * left, cur[1] + (b[1] - cur[1]) * left / d, cur[2] + dz / d * left];
+      left = 0;
+    }
+    const c = dv.cur, b = P[Math.min(dv.seg + 1, P.length - 1)];
+    const want = diveYaw(b[0] - c[0], b[2] - c[2]);
+    if (Math.hypot(b[0] - c[0], b[2] - c[2]) > 0.05) {
+      let d = ((want - dv.yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+      dv.yaw += Math.max(-turnRate * dt, Math.min(turnRate * dt, d));
+    }
+    onPos(c);
+    return dv.seg >= P.length - 1;
+  }
+  const DIVE_MODE_CODE = { wait: 0, dive: 1, tread: 2, swim: 3, ladder: 4, walk: 5, turn: 6, off: 7 };
+
+  function diveStep(dt, cam) {
+    if (!diveFigure || !DV) return;
+    const f = diveFigure, m = f.mesh;
+    const o = diveOrigin();
+    const near = cam && Math.hypot(cam.x - o[0], cam.z - o[2]) < 320;
+    if (!near) {
+      // Out of sight he is not simulated; he comes back waiting to go.
+      if (dv.mode !== 'off') { m.visible = false; diveBoardBend(0); diveSet('off'); }
+      return;
+    }
+    if (dv.mode === 'off') {
+      dv.origin = o; dv.yaw = diveYaw(diveAxis.ux, diveAxis.uz);
+      dv.pelvisY = f.bones[0].t[1]; dv.cur = o;
+      divePlace(o, dv.yaw); divePlay('idle', 0); diveSet('wait');
+      dv.next = 2.5 + Math.random() * 3.0;
+    }
+    const h = Math.min(Math.max(dt, 0), 0.05);
+    dv.t += h;
+    m.visible = true;
+    if (dv.mode === 'wait') {
+      if (dv.t >= dv.next) diveStart();
+    } else if (dv.mode === 'dive') {
+      const T = f.state.curT;
+      const fr = Math.min(DV.dive.flex.length - 1, Math.max(0, Math.round(T * DV.fps)));
+      diveBoardBend(DV.dive.flex[fr]);
+      if (!dv.splash && T >= DV.dive.entry_t) {
+        dv.splash = true;
+        const p = diveFrom(dv.origin, dv.yaw, DV.dive.entry_x, 0);
+        const wy = typeof seaHeightAt === 'function' ? seaHeightAt(p[0], p[2]) : 0;
+        if (bodySplash) bodySplash.at(p[0], wy, p[2], 1.45, 1.7, diveAxis.ux, diveAxis.uz);
+        if (typeof audio !== 'undefined' && audio && audio.plunge) audio.plunge(0.85);
+      }
+      // THE SEA IS NOT FLAT. The clip was solved against still water 2.745 m
+      // under the board; the swell here runs a good half metre either way, so
+      // from the moment he is in it the whole figure rides the surface where
+      // he will come up — otherwise a trough leaves him standing in air and a
+      // crest closes over a man who is supposed to be treading water.
+      if (T >= DV.dive.entry_t) {
+        const er = DV.dive.end_root;
+        const p = diveFrom(dv.origin, dv.yaw, er[0], 0);
+        const wy = typeof seaHeightAt === 'function' ? seaHeightAt(p[0], p[2]) : 0;
+        const k = smoothstep(DV.dive.entry_t, DV.dive.entry_t + 1.2, T);
+        divePlace([dv.origin[0], dv.origin[1] + (wy + TREAD_LIFT) * k, dv.origin[2]], dv.yaw);
+      }
+      if (T >= DV.dive.dur - 0.02) {
+        // Into the tread where the clip left him: same pose, and the mesh
+        // moved by the difference between the two clips' roots.
+        const er = DV.dive.end_root, tr = DV.tread_root;
+        dv.cur = diveFrom(dv.origin, dv.yaw, er[0] - tr[0], er[1] - tr[2]);
+        dv.treadY = dv.cur[1] + TREAD_LIFT;
+        const wy0 = typeof seaHeightAt === 'function' ? seaHeightAt(dv.cur[0], dv.cur[2]) : 0;
+        dv.cur = [dv.cur[0], dv.treadY + wy0, dv.cur[2]];
+        divePlace(dv.cur, dv.yaw);
+        divePlay('tread', 0.2);
+        diveBoardBend(0);
+        diveSet('tread');
+      }
+    } else if (dv.mode === 'tread') {
+      const wy = typeof seaHeightAt === 'function' ? seaHeightAt(dv.cur[0], dv.cur[2]) : 0;
+      divePlace([dv.cur[0], dv.treadY + wy, dv.cur[2]], dv.yaw);
+      dv.cur = [dv.cur[0], dv.treadY + wy, dv.cur[2]];
+      if (dv.t > 1.3) {
+        dv.path = divePathToLadder(dv.cur); dv.seg = 0;
+        dv.swimY0 = dv.cur[1];
+        divePlay('swim', 0.5);
+        diveSet('swim');
+      }
+    } else if (dv.mode === 'swim') {
+      // The tread and the crawl ride at different depths in their clips; the
+      // mesh eases from one to the other over the crossfade.
+      // Flat and crawling, his pelvis rides at the surface — on the swell,
+      // not under it: the crawl's back and head are only just out of it.
+      const ySwim = 0.08 - dv.pelvisY - DV.swim_root[2];
+      const k = smoothstep(0, 0.8, dv.t);
+      const done = divePathStep(h, DIVE_SPEED.swim, 1.6, (c) => {
+        const wy = typeof seaHeightAt === 'function' ? seaHeightAt(c[0], c[2]) : 0;
+        divePlace([c[0], dv.swimY0 + (ySwim + wy - dv.swimY0) * k, c[2]], dv.yaw);
+      });
+      if (done) {
+        const L = DIVE.P(DIVE.t + DIVE_LADDER.u, DIVE.s + DIVE_LADDER.v, 0);
+        dv.yaw = diveYaw(diveAxis.nx, diveAxis.nz);
+        dv.ladder = L;
+        divePlace(L, dv.yaw);
+        divePlay('ladder', 0.6);
+        diveSet('ladder');
+      }
+    } else if (dv.mode === 'ladder') {
+      if (f.state.curT >= DV.ladder.dur - 0.02) {
+        const er = DV.ladder.end_root;
+        const s0 = diveFrom(dv.ladder, dv.yaw, er[0], DIVE.top - dv.ladder[1]);
+        dv.path = divePathToBoard(s0); dv.seg = 0; dv.cur = s0;
+        divePlace(s0, dv.yaw);
+        divePlay('walk', 0.35);
+        f.state.speed = DIVE_SPEED.walk / WALK_NATIVE;
+        diveSet('walk');
+      }
+    } else if (dv.mode === 'walk') {
+      f.state.speed = DIVE_SPEED.walk / WALK_NATIVE;
+      const done = divePathStep(h, DIVE_SPEED.walk, 2.4, (c) => divePlace(c, dv.yaw));
+      if (done) { divePlay('idle', 0.4); diveSet('turn'); }
+    } else if (dv.mode === 'turn') {
+      const want = diveYaw(diveAxis.ux, diveAxis.uz);
+      let d = ((want - dv.yaw + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+      dv.yaw += Math.max(-2.0 * h, Math.min(2.0 * h, d));
+      divePlace(dv.cur, dv.yaw);
+      if (Math.abs(d) < 0.01 && dv.t > 0.5) {
+        dv.loops++;
+        diveSet('wait');
+        dv.next = 3.0 + Math.random() * 4.0;
+      }
+    }
+    f.update(h);
+    m.userData.diveMode = DIVE_MODE_CODE[dv.mode] || 0;
+  }
 
   /**
    * One figure from the new pipeline — tools/blender/human_mh.py.
@@ -52404,6 +52682,9 @@ async function buildJadrija(scene) {
     // point that wanders round the room on its own. What they are about is
     // where the PERSON is.
     signalTick(dt, who);
+    // The diving board and its reserved figure are their own little scene
+    // interaction; step them regardless of the crowd's distance tier.
+    diveStep(dt, cam);
 
     // Unconditional, and carries its own gate inside instead. The balloon work
     // is two subtractions and a hypot and wants no gate at all; the pose is
@@ -52966,8 +53247,32 @@ async function buildJadrija(scene) {
         }
         if (doodle) out.push(doodle.fig.cast(shadow, { near: true }));
         if (ball) out.push(...shadow.castTree(ball.mesh, { dynamic: true, near: true }));
+        if (diveFigure) out.push(diveFigure.cast(shadow, { near: true }));
+        if (diveBoard) out.push(...shadow.castTree(diveBoard, { dynamic: true, near: true }));
         return out;
       },
+    },
+    dive: {
+      start: diveStart,
+      stats: () => ({ mode: dv.mode, t: +dv.t.toFixed(2), loops: dv.loops,
+        clip: diveFigure ? diveFigure.playing() : null,
+        clipT: diveFigure ? +diveFigure.state.curT.toFixed(2) : 0,
+        flex: +diveBoardState.flex.toFixed(3), figure: !!diveFigure, data: !!DV,
+        at: diveFigure ? diveFigure.mesh.position.toArray().map((v) => +v.toFixed(2)) : null,
+        body: diveFigure ? (() => {
+          const v = diveFigure.boneAt(0, new THREE.Vector3());
+          diveFigure.mesh.updateMatrixWorld();
+          return v.applyMatrix4(diveFigure.mesh.matrixWorld).toArray().map((x) => +x.toFixed(2));
+        })() : null,
+        origin: dv.origin.map((v) => +v.toFixed(2)),
+        head: diveFigure ? (() => {
+          const v = diveFigure.boneAt(diveFigure.boneIndex('head'), new THREE.Vector3());
+          return +v.applyMatrix4(diveFigure.mesh.matrixWorld).y.toFixed(2);
+        })() : null,
+        sea: diveFigure ? +seaHeightAt(diveFigure.mesh.position.x, diveFigure.mesh.position.z).toFixed(2) : null }),
+      /** Skip the wait: dive now (from wherever he is, he is put on the board). */
+      now: () => { if (dv.mode === 'off') return false; return diveStart(); },
+      set: (mode) => { dv.mode = mode; dv.t = 0; return dv.mode; },
     },
     site: { x: mid.x + mid.nx * 16, z: mid.z + mid.nz * 16, yaw: Math.atan2(mid.ux, -mid.uz) },
     /**
