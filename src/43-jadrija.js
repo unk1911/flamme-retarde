@@ -30593,9 +30593,16 @@ async function buildJadrija(scene) {
     // hundred and twenty at twenty-two draw calls — see the note over
     // `makeCrowd` — so the answer is both: the blobs where you can see a face,
     // the instances everywhere else.
-    for (const [sex, key] of [['m', 'bather_m_fr3d'], ['f', 'bather_f_fr3d']]) {
-      const rig = await loadRig(key);
-      if (rig) crowds[sex] = makeCrowd(scene, rig, bathers.length);
+    //
+    // AND SINCE 27 SEP THE INSTANCES ARE THE SAME PEOPLE. The pair were
+    // tools/blender/bather.py's tube figures, and from the promenade they were
+    // what Misha called the prehistoric wooden mannequins: somebody at two
+    // hundred metres was a doll, and became a woman in a bikini as you walked
+    // up. Now each sex's crowd draws that sex's bodies out of the eight — see
+    // `readFR3DCrowd` in 42-crowd.js — four draws a crowd.
+    for (const sex of ['m', 'f']) {
+      const bodies = await loadCrowdBodies(sex);
+      if (bodies.length) crowds[sex] = makeCrowd(scene, bodies, bathers.length);
     }
     // One dedicated skinned adult is reserved for the diving platform. A crowd
     // slot is deliberately not borrowed: it can be reassigned while the diver
@@ -51351,6 +51358,16 @@ async function buildJadrija(scene) {
         fg.hair = BATHER_HAIR;
       }
     }
+    // Which of the eight bodies the far tier draws them with. A promotable
+    // bather is the body they will be promoted to — anything else and walking
+    // up to them would change their shape — and everybody else is dealt one
+    // of their own sex and age by hash, and dressed by the same `bather2Pick`
+    // the near tier uses, so the shop staff are real skin tones too. After
+    // the block above on purpose: that one has already picked a promotable
+    // person's skin, and `crowdBody` hands it back unchanged.
+    if (C.kinds) {
+      crowdBody(C, fg, roveOk && CAST_KIND ? CAST_KIND[fg.blob] : null, b.k < 0.9);
+    }
     // The phone comes across from the BATHER, which is a different object
     // from the figure. `b` is the person the shore placed and `fg` is the
     // record a crowd tier draws, and everything the tier needs has to be
@@ -51427,6 +51444,11 @@ async function buildJadrija(scene) {
   // Long, so the first frame the resort is stepped does a full casting pass
   // rather than leaving twenty-four blobs standing on the origin.
   let castClk = 1e9;
+  // Held: nobody is promoted or demoted until it is let go. For a probe and
+  // nothing else — it is how one person is photographed on BOTH tiers from
+  // the same spot, which is the only honest test that walking up to somebody
+  // does not change them. See `hold` on the crowd handle.
+  let castHold = false;
 
   /**
    * Re-point the roving slots at whoever is nearest, and keep everybody's
@@ -51445,7 +51467,7 @@ async function buildJadrija(scene) {
       for (const fg of g) if (!fg.hidden) fg.clock += dt * clipRate(fg);
     }
     castClk += dt;
-    if (castClk < ROVE.every) return;
+    if (castHold || castClk < ROVE.every) return;
     castClk = 0;
     for (let c = 0; c < rove.length; c++) {
       const list = rove[c], js = slotsOf[c];
@@ -54547,6 +54569,9 @@ async function buildJadrija(scene) {
       all: () => Object.values(crowds).flatMap((c) => c.figures),
       /** How many of each tier are within `r` metres of you. See `tierCount`. */
       tiers: tierCount,
+      /** Freeze the roving cast where it is (`true`), or let it go. Probes
+       *  only — see `castHold`. */
+      hold: (v) => { castHold = !!v; return castHold; },
       /**
        * The roving cast: who the eight are, how tall, and who is in a slot.
        *
@@ -54764,8 +54789,14 @@ async function buildJadrija(scene) {
       chatMute: (v) => chatter.mute(v),
       chatLines: () => chatter.lines(),
       chatSurvey: () => chatter.survey(crowds, lastCam),
-      /** The instanced layers, so the near shadow cascade can occlude with them. */
-      meshes: () => Object.values(crowds).flatMap((c) => c.layers.map((L) => L.mesh)),
+      /**
+       * The instanced layers that can share the plain instanced depth
+       * material, so the near shadow cascade can occlude with them. The far
+       * tier's bodies cannot — their shape is in a joint texture — and cast
+       * through `shadows` below instead.
+       */
+      meshes: () => Object.values(crowds).filter((c) => !c.cast)
+        .flatMap((c) => c.layers.map((L) => L.mesh)),
       /**
        * And the skinned ones, which each need a palette of their own.
        *
@@ -54776,6 +54807,7 @@ async function buildJadrija(scene) {
        */
       shadows: (shadow) => {
         const out = crowds.skin ? crowds.skin.shadows(shadow) : [];
+        for (const k in crowds) if (crowds[k].cast) out.push(...crowds[k].cast(shadow));
         for (const r of wheelers) {
           out.push(r.fig.cast(shadow, { near: true }));
           out.push(...shadow.castTree(r.veh, { dynamic: true, near: true }));

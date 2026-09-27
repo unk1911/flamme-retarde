@@ -1,5 +1,14 @@
 """Build the Jadrija bathers in Blender and bake them for the game.
 
+RETIRED, 27 Sep 2026. These two figures were the crowd's far tier until
+Misha asked, of the promenade: *"can we just get rid of those prehistoric
+manequins completely"*. The far tier is now the eight v2 bathers themselves,
+skinned to the same eleven joints — tools/blender/crowd_far.py — and the two
+blobs this writes are no longer in build/payload or read by anything. Kept
+for its notes, which are still the best account of why the joint tree and
+the sign convention are what they are. Running it again would put the
+mannequins back in the payload for nothing to draw.
+
     blender --background --python tools/blender/bather.py
 
 Writes build/payload/bather_m.fr3d.gz, build/payload/bather_f.fr3d.gz and
