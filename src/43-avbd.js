@@ -106,6 +106,14 @@
 // same contact rows with their cone and their warm start, the same dual
 // update, on ONE free body with no joints; what a ball needs and a link did
 // not is written there, each with its reason.
+//
+// (6) AND A NET (1.531.0) — `avbdNet`, after the ball, for the hammock in the
+// pines behind the kabine (HAMMOCK in 43-hammock.js). The reference's own
+// general case, which the chain and the ball each specialise away: any number
+// of bodies, jointed to any others or to the world by the reference's Joint
+// (a ball socket, with the angle lock when it is asked for), plus a one-row
+// string that only pulls, plus two-body contacts with the lever arm on BOTH
+// sides — the reference's manifold rows. Written there, with what is new.
 // ---------------------------------------------------------------------------
 
 const AVBD = {
@@ -1425,4 +1433,1044 @@ function avbdBall(o) {
 
   return { P, Q, V, W, world, stats, touched, step, place, launch, wake, MAXC, cId, cFn, cB,
     get asleep() { return asleep; }, get cN() { return cN; } };
+}
+
+// ---------------------------------------------------------------------------
+// ── AND A NET ───────────────────────────────────────────────────────────────
+//
+// Misha, 27 Sep 2026: *"I want to add some more AVBD stuff to the game ...
+// some people put up hammocks there. so maybe we can setup a hammock there and
+// I can sorta swing baye on it"*. The hammock — HAMMOCK in src/43-hammock.js —
+// is some sixty rigid bodies in a graph: a grid of cloth plates jointed at
+// their edges, two gathers the plates are strung to, two ropes to the trees,
+// and one heavy body that is Baye. Neither solver above can hold it, and each
+// for the reason it is fast: the chain knows every body has exactly two
+// neighbours in a line, and the ball knows there is only one body.
+//
+// SO THIS IS THE REFERENCE'S GENERAL CASE, and not either of them forked. The
+// chain and the ball are left exactly as they were measured (the wrist chain's
+// 0.3 ms, the ankle chain's 0.5, the ball's 0.08 are all still their own
+// code), and this is written over the same primitives — `avbdSolve6`,
+// `avbdQAddV`, `avbdQSub`, `avbdOrtho`, AVBD's clamps — the way the reference
+// lays the general case out in solver.ts, forces.ts and manifold.ts:
+//
+//   the body loop       every live body, newest first, its 6x6 system from
+//                       its inertia about the inertial target (Eqs. 4-6),
+//                       every force touching it stamped in, LDLᵀ, update;
+//                       then every force's dual update. solver.ts, `step`.
+//   Joint               forces.ts: a ball socket, three rows, anchor A minus
+//                       anchor B in the world; body A may be the world, in
+//                       which case its anchor is a world point. Hard rows
+//                       carry a multiplier and are stabilised against their
+//                       own error at x- (Eq. 18); finite ones are springs with
+//                       the penalty clamped to the stiffness. The lumped
+//                       geometric stiffness on the diagonal. And the ANGLE
+//                       LOCK, the reference's `stiffnessAng` rows, scaled to
+//                       length by `torqueArm` — used here only by the hand
+//                       that guides Baye in and out, a finite joint from the
+//                       world to her body, position AND attitude.
+//   the manifold rows   manifold.ts: normal and two tangents in a basis fixed
+//                       for the step, Taylor-expanded about x- (Sec. 4), the
+//                       normal push-only, friction in the cone, and — what the
+//                       chain dropped and the ball kept for one side — the
+//                       lever arm on BOTH bodies, `cross(r, row)` for A and
+//                       for B. Cloth against a body is two dynamic bodies
+//                       touching, which is exactly the reference's case.
+//
+// WHAT IS NEW, and why:
+//
+// (a) A STRING. One row, C = |pA − pB| − L, which may only PULL — the contact's
+// normal row turned round and clamped the other way. That is what a rope is: it
+// holds a hammock up and it does not hold it apart. The two ropes to the trees
+// are strings, and so is the gathered end: every row of the cloth is strung to
+// the gather, which is how a gathered hammock is made (the cloth runs down to
+// the whipping in a fan; on a Mayan hammock it literally is strings). A string
+// that was slack at the start of the step counts its slack in full and only a
+// stretch is forgiven — the ball's rule (b), for the same reason.
+//
+// (b) SOFT CONTACTS ON A FLAGGED BODY. The ball's rule (h): a body that is
+// being walked about by an animation is a spring to whatever it touches
+// (`capK`), and everything else is the reference's hard contact.
+//
+// (c) PER-BODY DRAG, applied to the BDF1 velocity, which is where the chain
+// puts its air: a hammock's swing dies over half a minute in the real thing,
+// and implicit Euler at 120 Hz already takes a good share of that — see
+// HAMMOCK.drag for what was measured.
+//
+// (d) CONTACT POINTS AND CAPSULES AS DATA. A body carries a list of points
+// (each with a radius) and a list of capsules, all in its own frame. Points
+// meet capsules on other bodies and the floor; capsules meet the floor. The
+// cloth plates are points (their corners and middle); Baye is capsules — the
+// nineteen measured off v2.0 for the cuff chains, and her arms — rewritten
+// every frame in her body's frame by the caller, so a breath or a leg drawn
+// up pushes on the cloth as it happens.
+//
+// (e) AND A BOX, for a plate of cloth against a capsule of her, because points
+// were not enough. With five points a plate — the corners and the middle —
+// the gaps between them are the size of a limb: by the geometry a hip
+// capsule 12 cm round sits 4.7 cm down into the square between four points
+// before any one of them is inside it, and a shin fits through. MEASURED on
+// a test body, the probe's penetration read 10 to 14 mm (at the points, which
+// is the least of it) and the body ended its swing test on the ground. So a
+// plate is a thin box, and a capsule meets it at the closest pair of points
+// between the capsule's axis and the box — a ternary search along the axis,
+// see `collide` — with one contact row set per pair, warm-started like the
+// rest. Points stay for the floor.
+//
+// (f) AND A SPRING: a string given a stiffness is the reference's Spring
+// (forces.ts) — two-way, finite, no multiplier. The hammock uses it for the
+// cloth's bend, from each plate to the one two along: see HAMMOCK.bend.
+//
+// (g) AND A ONE-WAY BOX, switched on while somebody is in the hammock. A
+// hammock's empty bed is a deep trough, rims up, and a woman sitting back on
+// to it comes at the outside of it below the rim: two-sided, the cloth was
+// pushed away from her and she sat down UNDER it (MEASURED — her seat 0.3 m
+// below the bed, and then on the ground). A plate's +y is the inside of the
+// bed, so while the guide has her the cloth meets only what is inside it, and
+// the outside of it lets her through to where she is going — which is how a
+// real one is got into, holding the rim down with a hand. WHICH face is the
+// inside is not the plate's own +y, which is what it was first: plates fold
+// over, a folded plate's +y faces down, and one-sided on +y it let her
+// straight through (MEASURED, one get-in in four she fell through the bed a
+// second after lying down). It is the face toward a line handed in with the
+// switch — the line between the ties, which is over the whole bed whatever
+// the cloth does. And it stays on
+// while she lies in it: see the guide in 43-hammock.js for why. A capsule
+// can be marked to meet it from both sides regardless (`cpTwo`): her arms,
+// whose elbows lie out over the rims with her hands behind her head, and
+// which one-sided the rim went straight through (MEASURED, 46 mm into a
+// forearm at the top of a swing).
+//
+// NOT TAKEN: the box-box manifold, the broadphase (the only pair that matters
+// is cloth against her, and her bounding sphere is the broadphase), fracture.
+// ---------------------------------------------------------------------------
+
+/**
+ * A net of rigid bodies. `o` — maxBodies, maxJoints, maxStrings, maxPoints,
+ * maxCaps, maxContacts; iterations, alpha, alphaContact, beta, betaAng, gamma,
+ * gravity [x, y, z], drag (1/s, the default per body), vMax, wMax (m/s, rad/s
+ * — one bad step is one bad frame), margin (m, how near a contact is made),
+ * deep (m, how far inside a new one is refused), mu, floorMu, capK (N/m for
+ * the contacts of a `softBody`).
+ */
+function avbdNet(o) {
+  const NB = o.maxBodies;
+  const gx = o.gravity[0], gy = o.gravity[1], gz = o.gravity[2];
+  const gLen = Math.hypot(gx, gy, gz) || 1;
+
+  // ── bodies ────────────────────────────────────────────────────────────
+  const P = new Float64Array(3 * NB), Q = new Float64Array(4 * NB);
+  const V = new Float64Array(3 * NB), W = new Float64Array(3 * NB);
+  const VP = new Float64Array(3 * NB);
+  const P0 = new Float64Array(3 * NB), Q0 = new Float64Array(4 * NB);
+  const PI = new Float64Array(3 * NB), QI = new Float64Array(4 * NB);
+  const mass = new Float64Array(NB);
+  // The inertia in the body's own frame, symmetric: xx yy zz xy xz yz.
+  const inert = new Float64Array(6 * NB);
+  const drag = new Float64Array(NB);
+  // In the solve. A body that is not is not integrated, not collided and not
+  // stamped — the heavy body is `live` only while she is in the hammock.
+  const live = new Uint8Array(NB);
+  let nb = 0;
+
+  // ── joints ────────────────────────────────────────────────────────────
+  const NJ = o.maxJoints;
+  const jA = new Int32Array(NJ), jB = new Int32Array(NJ);
+  const jRA = new Float64Array(3 * NJ), jRB = new Float64Array(3 * NJ);
+  const jQW = new Float64Array(4 * NJ);          // A's attitude when A is the world
+  const jKL = new Float64Array(NJ), jKA = new Float64Array(NJ), jArm = new Float64Array(NJ);
+  const jPL = new Float64Array(3 * NJ), jLL = new Float64Array(3 * NJ);
+  const jPA = new Float64Array(3 * NJ), jLA = new Float64Array(3 * NJ);
+  const jC0L = new Float64Array(3 * NJ), jC0A = new Float64Array(3 * NJ);
+  const jOn = new Uint8Array(NJ);
+  let nj = 0;
+
+  // ── strings ───────────────────────────────────────────────────────────
+  const NS = o.maxStrings;
+  const sA = new Int32Array(NS), sB = new Int32Array(NS);
+  const sRA = new Float64Array(3 * NS), sRB = new Float64Array(3 * NS);
+  const sLen = new Float64Array(NS), sPen = new Float64Array(NS), sLam = new Float64Array(NS);
+  const sC0 = new Float64Array(NS), sF = new Float64Array(NS);
+  const sOn = new Uint8Array(NS);
+  // A string with a stiffness is a SPRING instead: two-way, that many N/m,
+  // no multiplier — the reference's Spring (forces.ts). See (f).
+  const sK = new Float64Array(NS);
+  let ns = 0;
+
+  // ── points and capsules, in their bodies' frames ─────────────────────
+  const NPT = o.maxPoints, NCP = o.maxCaps;
+  const ptBody = new Int32Array(NPT), ptL = new Float64Array(3 * NPT), ptR = new Float64Array(NPT);
+  let npt = 0;
+  const cpBody = new Int32Array(NCP), cpA = new Float64Array(3 * NCP), cpB = new Float64Array(3 * NCP);
+  const cpR0 = new Float64Array(NCP), cpR1 = new Float64Array(NCP);
+  const cpOn = new Uint8Array(NCP);
+  // A capsule that meets a one-sided box from both sides anyway — see (g).
+  const cpTwo = new Uint8Array(NCP);
+  // A capsule's own id, which is what its contacts are warm-started by.
+  const cpId = new Int32Array(NCP);
+  let ncp = 0;
+  // Contacts on these bodies are springs of `capK` and not hard — see (b).
+  const softBody = new Uint8Array(NB);
+  let floor = null;
+  // Boxes: a body's own thin box, half extents in its frame — see (e). A
+  // box meets capsules on other bodies; its corners, as points, meet the floor.
+  const NBX = o.maxBoxes || 0;
+  const bxBody = new Int32Array(NBX), bxH = new Float64Array(3 * NBX);
+  let nbx = 0;
+  // Boxes meet only what is on their +y side — see (g).
+  let oneSided = false;
+  const inAx = new Float64Array([0, 0, 0, 1, 0, 0]);   // a point and a unit direction
+
+  // ── contacts, made every step ────────────────────────────────────────
+  const NC = o.maxContacts;
+  const cA = new Int32Array(NC), cB = new Int32Array(NC);
+  const cRA = new Float64Array(3 * NC), cRB = new Float64Array(3 * NC);
+  const cBas = new Float64Array(9 * NC);
+  const cC0 = new Float64Array(NC), cMu = new Float64Array(NC), cK = new Float64Array(NC);
+  const cPen = new Float64Array(3 * NC), cLam = new Float64Array(3 * NC);
+  const cId = new Int32Array(NC), cFn = new Float64Array(NC);
+  let nc = 0;
+  // Last step's, for the warm start (Eq. 19), found by id through a small
+  // open-addressed table stamped with a generation rather than cleared.
+  const pPen = new Float64Array(3 * NC), pLam = new Float64Array(3 * NC);
+  const HT = 4096, htKey = new Int32Array(HT), htVal = new Int32Array(HT), htGen = new Uint32Array(HT);
+  let gen = 1;
+  // Who touches what: joints and strings (fixed, `finish`), contacts (per step).
+  let adjOff = new Int32Array(NB + 1), adjIdx = new Int32Array(0);
+  const conOff = new Int32Array(NB + 1), conIdx = new Int32Array(2 * NC), conFill = new Int32Array(NB);
+
+  const stats = { steps: 0, contacts: 0, maxStretch: 0, maxString: 0, maxPen: 0, penWho: -1,
+    refused: 0, lost: 0, ms: 0 };
+
+  // ── building ─────────────────────────────────────────────────────────
+
+  /** A body: mass (kg), its inertia [xx, yy, zz, xy, xz, yz] in its frame, where. */
+  function addBody(m, I, px, py, pz, q) {
+    const i = nb++;
+    mass[i] = m;
+    for (let k = 0; k < 6; k++) inert[6 * i + k] = I[k] || 0;
+    P[3 * i] = px; P[3 * i + 1] = py; P[3 * i + 2] = pz;
+    if (q) { Q[4 * i] = q[0]; Q[4 * i + 1] = q[1]; Q[4 * i + 2] = q[2]; Q[4 * i + 3] = q[3]; } else Q[4 * i + 3] = 1;
+    live[i] = 1;
+    drag[i] = o.drag || 0;
+    return i;
+  }
+  /**
+   * A joint: body `a`'s point `ra` to body `b`'s point `rb`, both in their
+   * own frames — or, with `a` −1, `ra` a WORLD point. `kLin` Infinity is the
+   * hard ball socket; `kAng` > 0 adds the angle lock, of `arm` metres a
+   * radian, holding `b` to `a`'s attitude (or to `setTarget`'s, for the world).
+   */
+  function addJoint(a, ra, b, rb, kLin = Infinity, kAng = 0, arm = 1) {
+    const k = nj++;
+    jA[k] = a; jB[k] = b;
+    for (let r = 0; r < 3; r++) { jRA[3 * k + r] = ra[r]; jRB[3 * k + r] = rb[r]; }
+    jQW[4 * k + 3] = 1;
+    jKL[k] = kLin; jKA[k] = kAng; jArm[k] = arm;
+    jPL.fill(AVBD.penMin, 3 * k, 3 * k + 3); jPA.fill(AVBD.penMin, 3 * k, 3 * k + 3);
+    jOn[k] = kLin > 0 || kAng > 0 ? 1 : 0;
+    return k;
+  }
+  /** A string of rest length `len` from `a`'s `ra` (a world point if `a` < 0) to `b`'s `rb`. */
+  function addString(a, ra, b, rb, len, k = 0) {
+    const s = ns++;
+    sA[s] = a; sB[s] = b;
+    for (let r = 0; r < 3; r++) { sRA[3 * s + r] = ra[r]; sRB[3 * s + r] = rb[r]; }
+    sLen[s] = len; sK[s] = k; sPen[s] = k > 0 ? k : AVBD.penMin; sOn[s] = 1;
+    return s;
+  }
+  function addPoint(b, x, y, z, r) {
+    const p = npt++;
+    ptBody[p] = b; ptL[3 * p] = x; ptL[3 * p + 1] = y; ptL[3 * p + 2] = z; ptR[p] = r;
+    return p;
+  }
+  function addBox(b, hx, hy, hz) {
+    const k = nbx++;
+    bxBody[k] = b; bxH[3 * k] = hx; bxH[3 * k + 1] = hy; bxH[3 * k + 2] = hz;
+    return k;
+  }
+  function addCap(b, id) {
+    const c = ncp++;
+    cpBody[c] = b; cpId[c] = id; cpOn[c] = 1;
+    return c;
+  }
+  /** Rewrite capsule c: ends (in its body's frame) and the radius at each. */
+  function setCap(c, ax, ay, az, bx, by, bz, r0, r1) {
+    cpA[3 * c] = ax; cpA[3 * c + 1] = ay; cpA[3 * c + 2] = az;
+    cpB[3 * c] = bx; cpB[3 * c + 1] = by; cpB[3 * c + 2] = bz;
+    cpR0[c] = r0; cpR1[c] = r1;
+  }
+  /** Joints and strings are fixed once built: who touches what, once. */
+  function finish() {
+    const cnt = new Int32Array(NB);
+    for (let k = 0; k < nj; k++) { if (jA[k] >= 0) cnt[jA[k]]++; cnt[jB[k]]++; }
+    for (let s = 0; s < ns; s++) { if (sA[s] >= 0) cnt[sA[s]]++; cnt[sB[s]]++; }
+    adjOff = new Int32Array(NB + 1);
+    for (let i = 0; i < NB; i++) adjOff[i + 1] = adjOff[i] + cnt[i];
+    adjIdx = new Int32Array(adjOff[NB]);
+    const fill = new Int32Array(NB);
+    const put = (i, v) => { adjIdx[adjOff[i] + fill[i]++] = v; };
+    for (let k = 0; k < nj; k++) { if (jA[k] >= 0) put(jA[k], k); put(jB[k], k); }
+    for (let s = 0; s < ns; s++) { if (sA[s] >= 0) put(sA[s], -1 - s); put(sB[s], -1 - s); }
+  }
+
+  // ── scratch ──────────────────────────────────────────────────────────
+  const aL = new Float64Array(9), aA = new Float64Array(9), aX = new Float64Array(9);
+  const bL = new Float64Array(3), bA = new Float64Array(3);
+  const dxL = new Float64Array(3), dxA = new Float64Array(3);
+  const S = new Float64Array(9), T = new Float64Array(9);
+  const Rm = new Float64Array(9);                 // a rotation, rows
+  const th = new Float64Array(3), thB = new Float64Array(3);
+  const pA = new Float64Array(3), pB = new Float64Array(3), rw = new Float64Array(3);
+  const rwB = new Float64Array(3), C = new Float64Array(3), F = new Float64Array(3);
+  const tmpv = new Float64Array(3);
+  const sgA = new Float64Array(6), sgB = new Float64Array(3);
+  /** Squared distance from the point t along a segment to a box about the origin. */
+  function segBox2(ax, ay, az, ux, uy, uz, t, hx, hy, hz) {
+    const sx = ax + ux * t, sy = ay + uy * t, sz = az + uz * t;
+    const dx = sx < -hx ? sx + hx : sx > hx ? sx - hx : 0;
+    const dy = sy < -hy ? sy + hy : sy > hy ? sy - hy : 0;
+    const dz = sz < -hz ? sz + hz : sz > hz ? sz - hz : 0;
+    return dx * dx + dy * dy + dz * dz;
+  }
+  // Whether points meet capsules, or only the floor — when a body has a box,
+  // the box is what meets her and its points are only its footing.
+  const pointCaps = o.pointsHitCaps !== false;
+
+  /** Body i's rotation into Rm (row-major). */
+  function rot(i) {
+    const x = Q[4 * i], y = Q[4 * i + 1], z = Q[4 * i + 2], w = Q[4 * i + 3];
+    Rm[0] = 1 - 2 * (y * y + z * z); Rm[1] = 2 * (x * y - w * z); Rm[2] = 2 * (x * z + w * y);
+    Rm[3] = 2 * (x * y + w * z); Rm[4] = 1 - 2 * (x * x + z * z); Rm[5] = 2 * (y * z - w * x);
+    Rm[6] = 2 * (x * z - w * y); Rm[7] = 2 * (y * z + w * x); Rm[8] = 1 - 2 * (x * x + y * y);
+  }
+  /** R_i · (L[oi..oi+2]) into out[oo..]: v + 2w(q×v) + 2q×(q×v). */
+  function turn(i, L, oi, out, oo) {
+    const x = Q[4 * i], y = Q[4 * i + 1], z = Q[4 * i + 2], w = Q[4 * i + 3];
+    const vx = L[oi], vy = L[oi + 1], vz = L[oi + 2];
+    const tx = 2 * (y * vz - z * vy), ty = 2 * (z * vx - x * vz), tz = 2 * (x * vy - y * vx);
+    out[oo] = vx + w * tx + (y * tz - z * ty);
+    out[oo + 1] = vy + w * ty + (z * tx - x * tz);
+    out[oo + 2] = vz + w * tz + (x * ty - y * tx);
+  }
+  /** R_iᵀ · (a world vector) into out[oo..]. */
+  function unturn(i, vx, vy, vz, out, oo) {
+    const x = -Q[4 * i], y = -Q[4 * i + 1], z = -Q[4 * i + 2], w = Q[4 * i + 3];
+    const tx = 2 * (y * vz - z * vy), ty = 2 * (z * vx - x * vz), tz = 2 * (x * vy - y * vx);
+    out[oo] = vx + w * tx + (y * tz - z * ty);
+    out[oo + 1] = vy + w * ty + (z * tx - x * tz);
+    out[oo + 2] = vz + w * tz + (x * ty - y * tx);
+  }
+  const ok = (a) => a < 0 || live[a] === 1;
+
+  // ── joints ───────────────────────────────────────────────────────────
+  /** C = pA − pB for joint k, into C; the arms into rw (A) and rwB (B). */
+  function jointEval(k) {
+    const a = jA[k], b = jB[k];
+    if (a < 0) { pA[0] = jRA[3 * k]; pA[1] = jRA[3 * k + 1]; pA[2] = jRA[3 * k + 2]; rw[0] = rw[1] = rw[2] = 0; } else {
+      turn(a, jRA, 3 * k, rw, 0);
+      pA[0] = P[3 * a] + rw[0]; pA[1] = P[3 * a + 1] + rw[1]; pA[2] = P[3 * a + 2] + rw[2];
+    }
+    turn(b, jRB, 3 * k, rwB, 0);
+    pB[0] = P[3 * b] + rwB[0]; pB[1] = P[3 * b + 1] + rwB[1]; pB[2] = P[3 * b + 2] + rwB[2];
+    C[0] = pA[0] - pB[0]; C[1] = pA[1] - pB[1]; C[2] = pA[2] - pB[2];
+  }
+  /** The angle lock's C: qsub(qA, qB)·arm, into th. */
+  function jointAng(k) {
+    const a = jA[k], b = jB[k];
+    if (a < 0) avbdQSub(jQW, 4 * k, Q, 4 * b, th);
+    else avbdQSub(Q, 4 * a, Q, 4 * b, th);
+    const m = jArm[k];
+    th[0] *= m; th[1] *= m; th[2] *= m;
+  }
+  function stampJoint(k, i, alpha) {
+    const isA = jA[k] === i;
+    jointEval(k);
+    const o3 = 3 * k;
+    const hard = jKL[k] === Infinity;
+    if (jKL[k] > 0) {
+      const k0 = jPL[o3], k1 = jPL[o3 + 1], k2 = jPL[o3 + 2];
+      const a = hard ? alpha : 0;
+      const c0 = C[0] - a * jC0L[o3], c1 = C[1] - a * jC0L[o3 + 1], c2 = C[2] - a * jC0L[o3 + 2];
+      F[0] = k0 * c0; F[1] = k1 * c1; F[2] = k2 * c2;
+      if (hard) { F[0] += jLL[o3]; F[1] += jLL[o3 + 1]; F[2] += jLL[o3 + 2]; }
+      // The arm for this side, and the angular Jacobian skew(s): s = −r for
+      // A, +r for B — the chain's `stampJoint`, for any pair of bodies.
+      const sgn = isA ? 1 : -1;
+      const r0 = isA ? rw[0] : rwB[0], r1 = isA ? rw[1] : rwB[1], r2 = isA ? rw[2] : rwB[2];
+      const sx = -sgn * r0, sy = -sgn * r1, sz = -sgn * r2;
+      S[0] = 0; S[1] = -sz; S[2] = sy;
+      S[3] = sz; S[4] = 0; S[5] = -sx;
+      S[6] = -sy; S[7] = sx; S[8] = 0;
+      aL[0] += k0; aL[4] += k1; aL[8] += k2;
+      for (let r = 0; r < 3; r++) {
+        T[3 * r] = S[r] * k0; T[3 * r + 1] = S[3 + r] * k1; T[3 * r + 2] = S[6 + r] * k2;
+      }
+      for (let r = 0; r < 3; r++) {
+        const t0 = T[3 * r], t1 = T[3 * r + 1], t2 = T[3 * r + 2];
+        aA[3 * r] += t0 * S[0] + t1 * S[3] + t2 * S[6];
+        aA[3 * r + 1] += t0 * S[1] + t1 * S[4] + t2 * S[7];
+        aA[3 * r + 2] += t0 * S[2] + t1 * S[5] + t2 * S[8];
+        aX[3 * r] += t0 * sgn; aX[3 * r + 1] += t1 * sgn; aX[3 * r + 2] += t2 * sgn;
+      }
+      // Lumped geometric stiffness: column norms of −(F·g)I + g Fᵀ, g = sgn·r.
+      const g0 = sgn * r0, g1 = sgn * r1, g2 = sgn * r2;
+      const fr = F[0] * g0 + F[1] * g1 + F[2] * g2;
+      for (let c = 0; c < 3; c++) {
+        const h0 = g0 * F[c] - (c === 0 ? fr : 0);
+        const h1 = g1 * F[c] - (c === 1 ? fr : 0);
+        const h2 = g2 * F[c] - (c === 2 ? fr : 0);
+        aA[4 * c] += Math.sqrt(h0 * h0 + h1 * h1 + h2 * h2);
+      }
+      bL[0] += sgn * F[0]; bL[1] += sgn * F[1]; bL[2] += sgn * F[2];
+      bA[0] += S[0] * F[0] + S[3] * F[1] + S[6] * F[2];
+      bA[1] += S[1] * F[0] + S[4] * F[1] + S[7] * F[2];
+      bA[2] += S[2] * F[0] + S[5] * F[1] + S[8] * F[2];
+    }
+    // The angle lock: J = ±arm·I, so it is the angular diagonal and the rhs.
+    if (jKA[k] > 0) {
+      jointAng(k);
+      const hA = jKA[k] === Infinity;
+      const m = jArm[k], s2 = isA ? m : -m;
+      for (let r = 0; r < 3; r++) {
+        const kk = jPA[o3 + r];
+        const c = th[r] - (hA ? alpha * jC0A[o3 + r] : 0);
+        const f = kk * c + (hA ? jLA[o3 + r] : 0);
+        aA[4 * r] += kk * m * m;
+        bA[r] += s2 * f;
+      }
+    }
+  }
+
+  // ── strings ──────────────────────────────────────────────────────────
+  /** The stretch of string s now; its direction (A from B) into tmpv, arms into rw, rwB. */
+  function stringEval(s) {
+    const a = sA[s], b = sB[s];
+    if (a < 0) { pA[0] = sRA[3 * s]; pA[1] = sRA[3 * s + 1]; pA[2] = sRA[3 * s + 2]; rw[0] = rw[1] = rw[2] = 0; } else {
+      turn(a, sRA, 3 * s, rw, 0);
+      pA[0] = P[3 * a] + rw[0]; pA[1] = P[3 * a + 1] + rw[1]; pA[2] = P[3 * a + 2] + rw[2];
+    }
+    turn(b, sRB, 3 * s, rwB, 0);
+    pB[0] = P[3 * b] + rwB[0]; pB[1] = P[3 * b + 1] + rwB[1]; pB[2] = P[3 * b + 2] + rwB[2];
+    const dx = pA[0] - pB[0], dy = pA[1] - pB[1], dz = pA[2] - pB[2];
+    const L = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const l = L > 1e-9 ? 1 / L : 0;
+    tmpv[0] = dx * l; tmpv[1] = dy * l; tmpv[2] = dz * l;
+    return L - sLen[s];
+  }
+  /** The string's force, pull only — see (a). Its stabilised C into `sCC`. */
+  let sCC = 0;
+  function stringF(s, alpha) {
+    const c = stringEval(s);
+    if (sK[s] > 0) { sCC = c; return sK[s] * c; }
+    const c0 = sC0[s];
+    sCC = c - (c0 > 0 ? alpha * c0 : 0);
+    const f = sPen[s] * sCC + sLam[s];
+    return f > 0 ? f : 0;
+  }
+  function stampString(s, i, alpha) {
+    const f = stringF(s, alpha);
+    if (f === 0 || (f < 0 && !(sK[s] > 0))) return;
+    const isA = sA[s] === i;
+    const k = sPen[s];
+    const sg = isA ? 1 : -1;
+    const nx = tmpv[0] * sg, ny = tmpv[1] * sg, nz = tmpv[2] * sg;
+    const r0 = isA ? rw[0] : rwB[0], r1 = isA ? rw[1] : rwB[1], r2 = isA ? rw[2] : rwB[2];
+    // Angular Jacobian r × n, n already signed for this side.
+    const qx = r1 * nz - r2 * ny, qy = r2 * nx - r0 * nz, qz = r0 * ny - r1 * nx;
+    aL[0] += k * nx * nx; aL[1] += k * nx * ny; aL[2] += k * nx * nz;
+    aL[3] += k * ny * nx; aL[4] += k * ny * ny; aL[5] += k * ny * nz;
+    aL[6] += k * nz * nx; aL[7] += k * nz * ny; aL[8] += k * nz * nz;
+    aA[0] += k * qx * qx; aA[1] += k * qx * qy; aA[2] += k * qx * qz;
+    aA[3] += k * qy * qx; aA[4] += k * qy * qy; aA[5] += k * qy * qz;
+    aA[6] += k * qz * qx; aA[7] += k * qz * qy; aA[8] += k * qz * qz;
+    aX[0] += k * qx * nx; aX[1] += k * qx * ny; aX[2] += k * qx * nz;
+    aX[3] += k * qy * nx; aX[4] += k * qy * ny; aX[5] += k * qy * nz;
+    aX[6] += k * qz * nx; aX[7] += k * qz * ny; aX[8] += k * qz * nz;
+    bL[0] += f * nx; bL[1] += f * ny; bL[2] += f * nz;
+    bA[0] += f * qx; bA[1] += f * qy; bA[2] += f * qz;
+  }
+
+  // ── contacts ─────────────────────────────────────────────────────────
+  const cC = new Float64Array(3), cF = new Float64Array(3);
+  const jaA = new Float64Array(9), jaB = new Float64Array(9);   // r × row, per row
+  let cBound = 0, cFric = 0;
+  /** Contact c's three rows' C and the cone-clamped force, into cC and cF. */
+  function contactEval(c, alpha) {
+    const a = cA[c], b = cB[c], bb = 9 * c;
+    const dax = P[3 * a] - P0[3 * a], day = P[3 * a + 1] - P0[3 * a + 1], daz = P[3 * a + 2] - P0[3 * a + 2];
+    avbdQSub(Q, 4 * a, Q0, 4 * a, th);
+    turn(a, cRA, 3 * c, rw, 0);
+    let dbx = 0, dby = 0, dbz = 0;
+    if (b >= 0) {
+      dbx = P[3 * b] - P0[3 * b]; dby = P[3 * b + 1] - P0[3 * b + 1]; dbz = P[3 * b + 2] - P0[3 * b + 2];
+      avbdQSub(Q, 4 * b, Q0, 4 * b, thB);
+      turn(b, cRB, 3 * c, rwB, 0);
+    }
+    for (let r = 0; r < 3; r++) {
+      const nx = cBas[bb + 3 * r], ny = cBas[bb + 3 * r + 1], nz = cBas[bb + 3 * r + 2];
+      const ax = rw[1] * nz - rw[2] * ny, ay = rw[2] * nx - rw[0] * nz, az = rw[0] * ny - rw[1] * nx;
+      jaA[3 * r] = ax; jaA[3 * r + 1] = ay; jaA[3 * r + 2] = az;
+      let v = nx * dax + ny * day + nz * daz + ax * th[0] + ay * th[1] + az * th[2];
+      if (b >= 0) {
+        const bx = rwB[1] * nz - rwB[2] * ny, by = rwB[2] * nx - rwB[0] * nz, bz = rwB[0] * ny - rwB[1] * nx;
+        jaB[3 * r] = bx; jaB[3 * r + 1] = by; jaB[3 * r + 2] = bz;
+        v -= nx * dbx + ny * dby + nz * dbz + bx * thB[0] + by * thB[1] + bz * thB[2];
+      }
+      cC[r] = v;
+    }
+    // A gap in full, a penetration forgiven — the ball's (b); a spring has
+    // nothing to forgive.
+    const c0 = cC0[c], soft = cK[c] !== Infinity;
+    cC[0] += c0 > 0 || soft ? c0 : c0 * (1 - alpha);
+    for (let r = 0; r < 3; r++) cF[r] = cPen[3 * c + r] * cC[r] + (soft ? 0 : cLam[3 * c + r]);
+    if (cF[0] > 0) cF[0] = 0;
+    cBound = -cF[0] * cMu[c];
+    cFric = Math.sqrt(cF[1] * cF[1] + cF[2] * cF[2]);
+    if (cFric > cBound && cFric > 0) { const s = cBound / cFric; cF[1] *= s; cF[2] *= s; }
+  }
+  function stampContact(c, i, alpha) {
+    contactEval(c, alpha);
+    if (cF[0] >= 0) return;               // not pushing: not there
+    const isA = cA[c] === i, sg = isA ? 1 : -1, bb = 9 * c;
+    const J = isA ? jaA : jaB;
+    for (let r = 0; r < 3; r++) {
+      const k = cPen[3 * c + r], f = cF[r];
+      const nx = sg * cBas[bb + 3 * r], ny = sg * cBas[bb + 3 * r + 1], nz = sg * cBas[bb + 3 * r + 2];
+      const qx = sg * J[3 * r], qy = sg * J[3 * r + 1], qz = sg * J[3 * r + 2];
+      aL[0] += k * nx * nx; aL[1] += k * nx * ny; aL[2] += k * nx * nz;
+      aL[3] += k * ny * nx; aL[4] += k * ny * ny; aL[5] += k * ny * nz;
+      aL[6] += k * nz * nx; aL[7] += k * nz * ny; aL[8] += k * nz * nz;
+      aA[0] += k * qx * qx; aA[1] += k * qx * qy; aA[2] += k * qx * qz;
+      aA[3] += k * qy * qx; aA[4] += k * qy * qy; aA[5] += k * qy * qz;
+      aA[6] += k * qz * qx; aA[7] += k * qz * qy; aA[8] += k * qz * qz;
+      aX[0] += k * qx * nx; aX[1] += k * qx * ny; aX[2] += k * qx * nz;
+      aX[3] += k * qy * nx; aX[4] += k * qy * ny; aX[5] += k * qy * nz;
+      aX[6] += k * qz * nx; aX[7] += k * qz * ny; aX[8] += k * qz * nz;
+      bL[0] += f * nx; bL[1] += f * ny; bL[2] += f * nz;
+      bA[0] += f * qx; bA[1] += f * qy; bA[2] += f * qz;
+    }
+  }
+
+  function prevSlot(id) {
+    let hs = (Math.imul(id, 0x9E3779B1) >>> 20) & (HT - 1);
+    for (let n = 0; n < HT; n++) {
+      if (htGen[hs] !== gen) return -1;
+      if (htKey[hs] === id) return htVal[hs];
+      hs = (hs + 1) & (HT - 1);
+    }
+    return -1;
+  }
+  function remember(id, slot) {
+    let hs = (Math.imul(id, 0x9E3779B1) >>> 20) & (HT - 1);
+    while (htGen[hs] === gen) hs = (hs + 1) & (HT - 1);
+    htGen[hs] = gen; htKey[hs] = id; htVal[hs] = slot;
+  }
+
+  /** Record a contact; world points xA (on a) and xB (on b, or the world's). */
+  function addContact(id, a, b, nx, ny, nz, gap, xAx, xAy, xAz, xBx, xBy, xBz, mu, k) {
+    if (nc >= NC) { stats.lost++; return; }
+    const c = nc++;
+    cA[c] = a; cB[c] = b; cId[c] = id; cMu[c] = mu; cK[c] = k; cFn[c] = 0;
+    unturn(a, xAx - P[3 * a], xAy - P[3 * a + 1], xAz - P[3 * a + 2], cRA, 3 * c);
+    if (b >= 0) unturn(b, xBx - P[3 * b], xBy - P[3 * b + 1], xBz - P[3 * b + 2], cRB, 3 * c);
+    else { cRB[3 * c] = xBx; cRB[3 * c + 1] = xBy; cRB[3 * c + 2] = xBz; }
+    avbdOrtho(cBas, 9 * c, nx, ny, nz);
+    cC0[c] = gap;
+    // Warm start from the same pair last step: the normal row's multiplier
+    // and every row's penalty; the tangents' multipliers were in last
+    // step's basis and are not carried (the chain's rule).
+    const f = prevSlot(id);
+    for (let r = 0; r < 3; r++) {
+      cLam[3 * c + r] = f >= 0 && r === 0 && k === Infinity ? pLam[3 * f] * o.alpha * o.gamma : 0;
+      cPen[3 * c + r] = f >= 0 ? Math.min(AVBD.penMax, k, Math.max(AVBD.penMin, pPen[3 * f + r] * o.gamma))
+        : AVBD.penMin;
+    }
+  }
+
+  // Each live body's reach for its capsules, and the capsules and points in
+  // the world, this step.
+  const bsX = new Float64Array(NB), bsY = new Float64Array(NB), bsZ = new Float64Array(NB), bsR = new Float64Array(NB);
+  const capW = new Float64Array(6 * NCP);
+  const ptW = new Float64Array(3 * NPT);
+
+  /** This step's contacts, all at x-, with the warm start carried over. */
+  function collide(margin) {
+    gen++;
+    if (gen > 0xfffffff0) { gen = 1; htGen.fill(0); }
+    for (let c = 0; c < nc; c++) {
+      pPen[3 * c] = cPen[3 * c]; pPen[3 * c + 1] = cPen[3 * c + 1]; pPen[3 * c + 2] = cPen[3 * c + 2];
+      pLam[3 * c] = cLam[3 * c]; pLam[3 * c + 1] = cLam[3 * c + 1]; pLam[3 * c + 2] = cLam[3 * c + 2];
+      remember(cId[c], c);
+    }
+    nc = 0;
+    // Capsules in the world, and their bodies' reach.
+    bsR.fill(-1);
+    for (let c = 0; c < ncp; c++) {
+      const b = cpBody[c];
+      if (!cpOn[c] || !live[b]) continue;
+      turn(b, cpA, 3 * c, capW, 6 * c);
+      turn(b, cpB, 3 * c, capW, 6 * c + 3);
+      for (let k = 0; k < 6; k++) capW[6 * c + k] += P[3 * b + (k % 3)];
+      const reach = Math.max(Math.hypot(cpA[3 * c], cpA[3 * c + 1], cpA[3 * c + 2]) + cpR0[c],
+        Math.hypot(cpB[3 * c], cpB[3 * c + 1], cpB[3 * c + 2]) + cpR1[c]);
+      if (reach > bsR[b]) { bsR[b] = reach; bsX[b] = P[3 * b]; bsY[b] = P[3 * b + 1]; bsZ[b] = P[3 * b + 2]; }
+    }
+    // Points against capsules on other bodies, and against the floor.
+    for (let p = 0; p < npt; p++) {
+      const a = ptBody[p];
+      if (!live[a]) continue;
+      turn(a, ptL, 3 * p, ptW, 3 * p);
+      const wx = ptW[3 * p] + P[3 * a], wy = ptW[3 * p + 1] + P[3 * a + 1], wz = ptW[3 * p + 2] + P[3 * a + 2];
+      const R = ptR[p];
+      for (let c = 0; c < (pointCaps ? ncp : 0); c++) {
+        const b = cpBody[c];
+        if (b === a || !cpOn[c] || !live[b]) continue;
+        const ex = wx - bsX[b], ey = wy - bsY[b], ez = wz - bsZ[b], lim = bsR[b] + R + margin;
+        if (ex * ex + ey * ey + ez * ez > lim * lim) continue;
+        const ax = capW[6 * c], ay = capW[6 * c + 1], az = capW[6 * c + 2];
+        const ux = capW[6 * c + 3] - ax, uy = capW[6 * c + 4] - ay, uz = capW[6 * c + 5] - az;
+        const uu = ux * ux + uy * uy + uz * uz;
+        let t = uu > 1e-12 ? ((wx - ax) * ux + (wy - ay) * uy + (wz - az) * uz) / uu : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const qx = ax + ux * t, qy = ay + uy * t, qz = az + uz * t;
+        const rr = cpR0[c] + (cpR1[c] - cpR0[c]) * t;
+        let nx = wx - qx, ny = wy - qy, nz = wz - qz;
+        const l2 = rr + R + margin, dd = nx * nx + ny * ny + nz * nz;
+        if (dd > l2 * l2) continue;
+        const d = Math.sqrt(dd);
+        if (d < 1e-7) continue;
+        const gap = d - rr - R;
+        const id = p * 128 + 2 + cpId[c];
+        // ONLY FROM OUTSIDE, the chain's rule: a point found deep inside a
+        // shape it was not touching got there faster than a step can follow,
+        // and the nearest way out is as often the wrong side.
+        if (gap < -o.deep && prevSlot(id) < 0) { stats.refused++; continue; }
+        nx /= d; ny /= d; nz /= d;
+        addContact(id, a, b, nx, ny, nz, gap,
+          wx - nx * R, wy - ny * R, wz - nz * R, qx + nx * rr, qy + ny * rr, qz + nz * rr,
+          o.mu, softBody[b] || softBody[a] ? o.capK : Infinity);
+      }
+      if (floor) {
+        const fy = floor(wx, wz);
+        const gap = wy - R - fy;
+        if (gap < margin) addContact(p * 128, a, -1, 0, 1, 0, gap, wx, wy - R, wz, wx, fy, wz, o.floorMu, Infinity);
+      }
+    }
+    // Boxes against capsules on other bodies — see (e).
+    for (let k = 0; k < nbx; k++) {
+      const a = bxBody[k];
+      if (!live[a]) continue;
+      const hx = bxH[3 * k], hy = bxH[3 * k + 1], hz = bxH[3 * k + 2];
+      const reachA = Math.sqrt(hx * hx + hy * hy + hz * hz);
+      const px = P[3 * a], py = P[3 * a + 1], pz = P[3 * a + 2];
+      // Which face is the inside: the one toward the line `setOneSided`
+      // was given (the line between the ties), whichever way up the plate
+      // has turned — a plate folded over is still cloth with an inside.
+      let inSign = 1;
+      if (oneSided) {
+        const tx = px - inAx[0], ty = py - inAx[1], tz = pz - inAx[2];
+        const u = tx * inAx[3] + ty * inAx[4] + tz * inAx[5];
+        unturn(a, inAx[0] + inAx[3] * u - px, inAx[1] + inAx[4] * u - py, inAx[2] + inAx[5] * u - pz, sgB, 0);
+        inSign = sgB[1] >= 0 ? 1 : -1;
+      }
+      for (let c = 0; c < ncp; c++) {
+        const b = cpBody[c];
+        if (b === a || !cpOn[c] || !live[b]) continue;
+        const ex = px - bsX[b], ey = py - bsY[b], ez = pz - bsZ[b], lim = bsR[b] + reachA + margin;
+        if (ex * ex + ey * ey + ez * ez > lim * lim) continue;
+        // The capsule's ends in the box's frame.
+        unturn(a, capW[6 * c] - px, capW[6 * c + 1] - py, capW[6 * c + 2] - pz, sgA, 0);
+        unturn(a, capW[6 * c + 3] - px, capW[6 * c + 4] - py, capW[6 * c + 5] - pz, sgA, 3);
+        const ax = sgA[0], ay = sgA[1], az = sgA[2];
+        const ux = sgA[3] - ax, uy = sgA[4] - ay, uz = sgA[5] - az;
+        const uu = ux * ux + uy * uy + uz * uz;
+        // Quick out: the segment's own box against this one's, with the radius.
+        const r0 = cpR0[c], r1 = cpR1[c], rm = Math.max(r0, r1) + margin;
+        if (Math.min(ax, ax + ux) > hx + rm || Math.max(ax, ax + ux) < -hx - rm
+          || Math.min(ay, ay + uy) > hy + rm || Math.max(ay, ay + uy) < -hy - rm
+          || Math.min(az, az + uz) > hz + rm || Math.max(az, az + uz) < -hz - rm) continue;
+        // The closest pair. The squared distance from a point sliding along
+        // the axis to a convex box is convex in how far along it is, so a
+        // ternary search on that one number finds it: sixteen rounds is
+        // 0.15 % of the axis, half a millimetre on a thigh. (Alternating
+        // projection was the first cut and it is the textbook answer; on a
+        // capsule lying nearly parallel to a plate — her back on the cloth,
+        // which is the whole case — it converges at the square of the
+        // cosine a round and four rounds left her chest 10 mm into it.)
+        let lo = 0, hi = 1;
+        for (let it = 0; it < 16; it++) {
+          const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+          if (segBox2(ax, ay, az, ux, uy, uz, m1, hx, hy, hz) < segBox2(ax, ay, az, ux, uy, uz, m2, hx, hy, hz)) hi = m2;
+          else lo = m1;
+        }
+        const t = (lo + hi) * 0.5;
+        const sx = ax + ux * t, sy = ay + uy * t, sz = az + uz * t;
+        const qx = sx < -hx ? -hx : sx > hx ? hx : sx;
+        let qy = sy < -hy ? -hy : sy > hy ? hy : sy;
+        const qz = sz < -hz ? -hz : sz > hz ? hz : sz;
+        const rr = r0 + (r1 - r0) * t;
+        let nx = sx - qx, ny = sy - qy, nz = sz - qz;
+        const dd = nx * nx + ny * ny + nz * nz;
+        const lim2 = rr + margin;
+        if (dd > lim2 * lim2) continue;
+        let d = Math.sqrt(dd), gap;
+        // ONE-SIDED, when asked (`oneSided`): a box only meets what is on
+        // its inside face — see (g). The capsule's axis on the far side of
+        // the plate, and not merely off its edge, is let through.
+        if (oneSided && !cpTwo[c] && inSign * sy < -hy && inSign * ny < -0.3 * Math.sqrt(dd)) continue;
+        if (d > 1e-6) { nx /= d; ny /= d; nz /= d; gap = d - rr; } else {
+          // The axis is inside the plate: out through its face on the side
+          // the segment's middle is, which is the side it came from.
+          const my = ay + uy * 0.5;
+          nx = 0; ny = my >= 0 ? 1 : -1; nz = 0;
+          qy = ny * hy; d = 0;
+          gap = -rr - Math.abs(sy - qy);
+        }
+        const id = (NPT + NCP + k) * 128 + 2 + cpId[c];
+        if (gap < -o.deep && prevSlot(id) < 0) { stats.refused++; continue; }
+        // Back to the world: the normal, the point on the box and on her.
+        sgA[0] = nx; sgA[1] = ny; sgA[2] = nz;
+        turn(a, sgA, 0, sgB, 0);
+        const wnx = sgB[0], wny = sgB[1], wnz = sgB[2];
+        sgA[0] = qx; sgA[1] = qy; sgA[2] = qz;
+        turn(a, sgA, 0, sgB, 0);
+        const qwx = sgB[0] + px, qwy = sgB[1] + py, qwz = sgB[2] + pz;
+        sgA[0] = sx; sgA[1] = sy; sgA[2] = sz;
+        turn(a, sgA, 0, sgB, 0);
+        const swx = sgB[0] + px, swy = sgB[1] + py, swz = sgB[2] + pz;
+        addContact(id, a, b, -wnx, -wny, -wnz, gap, qwx, qwy, qwz,
+          swx - wnx * rr, swy - wny * rr, swz - wnz * rr,
+          o.mu, softBody[b] || softBody[a] ? o.capK : Infinity);
+      }
+    }
+    // Capsules against the floor, at each end's lowest point.
+    if (floor) {
+      for (let c = 0; c < ncp; c++) {
+        const b = cpBody[c];
+        if (!cpOn[c] || !live[b]) continue;
+        for (let e = 0; e < 2; e++) {
+          const x = capW[6 * c + 3 * e], y = capW[6 * c + 3 * e + 1], z = capW[6 * c + 3 * e + 2];
+          const r = e ? cpR1[c] : cpR0[c];
+          const fy = floor(x, z), gap = y - r - fy;
+          if (gap < margin) {
+            addContact((NPT + cpId[c]) * 128 + e, b, -1, 0, 1, 0, gap, x, y - r, z, x, fy, z, o.floorMu,
+              softBody[b] ? o.capK : Infinity);
+          }
+        }
+      }
+    }
+    // Who touches what, this step.
+    conFill.fill(0);
+    for (let c = 0; c < nc; c++) { conFill[cA[c]]++; if (cB[c] >= 0) conFill[cB[c]]++; }
+    conOff[0] = 0;
+    for (let i = 0; i < NB; i++) conOff[i + 1] = conOff[i] + conFill[i];
+    conFill.fill(0);
+    for (let c = 0; c < nc; c++) {
+      const a = cA[c], b = cB[c];
+      conIdx[conOff[a] + conFill[a]++] = c;
+      if (b >= 0) conIdx[conOff[b] + conFill[b]++] = c;
+    }
+    stats.contacts = nc;
+  }
+
+  // ── the step (solver.ts, Solver.step) ───────────────────────────────
+  function step(h) {
+    const t0 = performance.now();
+    const alpha = o.alpha, alphaC = o.alphaContact;
+    collide(o.margin);
+    // Joints and strings: C at x-, and the warm start (Eq. 19).
+    for (let k = 0; k < nj; k++) {
+      if (!jOn[k] || !ok(jA[k]) || !live[jB[k]]) continue;
+      jointEval(k);
+      const capL = Math.min(AVBD.penMax, jKL[k]);
+      for (let r = 0; r < 3; r++) {
+        const q = 3 * k + r;
+        jC0L[q] = C[r];
+        jLL[q] = jKL[k] === Infinity ? jLL[q] * o.alpha * o.gamma : 0;
+        jPL[q] = Math.min(capL, Math.max(AVBD.penMin, jPL[q] * o.gamma));
+      }
+      if (jKA[k] > 0) {
+        jointAng(k);
+        const capA = Math.min(AVBD.penMax, jKA[k]);
+        for (let r = 0; r < 3; r++) {
+          const q = 3 * k + r;
+          jC0A[q] = th[r];
+          jLA[q] = jKA[k] === Infinity ? jLA[q] * o.alpha * o.gamma : 0;
+          jPA[q] = Math.min(capA, Math.max(AVBD.penMin, jPA[q] * o.gamma));
+        }
+      }
+    }
+    for (let s = 0; s < ns; s++) {
+      if (!sOn[s] || !ok(sA[s]) || !live[sB[s]]) continue;
+      sC0[s] = stringEval(s);
+      if (sK[s] > 0) { sPen[s] = sK[s]; sLam[s] = 0; continue; }
+      sLam[s] *= o.alpha * o.gamma;
+      sPen[s] = Math.min(AVBD.penMax, Math.max(AVBD.penMin, sPen[s] * o.gamma));
+    }
+    // Bodies: the inertial target (Eq. 2) and the adaptive warm start.
+    const h2 = h * h;
+    for (let i = 0; i < nb; i++) {
+      if (!live[i]) continue;
+      const p = 3 * i, q = 4 * i;
+      PI[p] = P[p] + V[p] * h + gx * h2;
+      PI[p + 1] = P[p + 1] + V[p + 1] * h + gy * h2;
+      PI[p + 2] = P[p + 2] + V[p + 2] * h + gz * h2;
+      avbdQAddV(Q, q, W[p] * h, W[p + 1] * h, W[p + 2] * h, QI, q);
+      const ax = (V[p] - VP[p]) / h, ay = (V[p + 1] - VP[p + 1]) / h, az = (V[p + 2] - VP[p + 2]) / h;
+      let wgt = (ax * gx + ay * gy + az * gz) / (gLen * gLen);
+      wgt = wgt > 1 ? 1 : wgt > 0 ? wgt : 0;
+      P0[p] = P[p]; P0[p + 1] = P[p + 1]; P0[p + 2] = P[p + 2];
+      Q0[q] = Q[q]; Q0[q + 1] = Q[q + 1]; Q0[q + 2] = Q[q + 2]; Q0[q + 3] = Q[q + 3];
+      P[p] += V[p] * h + gx * wgt * h2;
+      P[p + 1] += V[p + 1] * h + gy * wgt * h2;
+      P[p + 2] += V[p + 2] * h + gz * wgt * h2;
+      Q[q] = QI[q]; Q[q + 1] = QI[q + 1]; Q[q + 2] = QI[q + 2]; Q[q + 3] = QI[q + 3];
+    }
+    for (let it = 0; it < o.iterations; it++) {
+      // Primal, newest body first, as the reference walks its list.
+      for (let i = nb - 1; i >= 0; i--) {
+        if (!live[i]) continue;
+        const p = 3 * i, q = 4 * i;
+        const mh = mass[i] / h2;
+        aL.fill(0); aX.fill(0);
+        aL[0] = mh; aL[4] = mh; aL[8] = mh;
+        // R·I·Rᵀ over h²: the body's inertia in the world, which for a plate
+        // is the chain's diagonal case and for her is a full tensor.
+        rot(i);
+        {
+          const I = 6 * i, ih = 1 / h2;
+          const i00 = inert[I] * ih, i11 = inert[I + 1] * ih, i22 = inert[I + 2] * ih;
+          const i01 = inert[I + 3] * ih, i02 = inert[I + 4] * ih, i12 = inert[I + 5] * ih;
+          const m00 = Rm[0] * i00 + Rm[1] * i01 + Rm[2] * i02, m01 = Rm[0] * i01 + Rm[1] * i11 + Rm[2] * i12,
+            m02 = Rm[0] * i02 + Rm[1] * i12 + Rm[2] * i22;
+          const m10 = Rm[3] * i00 + Rm[4] * i01 + Rm[5] * i02, m11 = Rm[3] * i01 + Rm[4] * i11 + Rm[5] * i12,
+            m12 = Rm[3] * i02 + Rm[4] * i12 + Rm[5] * i22;
+          const m20 = Rm[6] * i00 + Rm[7] * i01 + Rm[8] * i02, m21 = Rm[6] * i01 + Rm[7] * i11 + Rm[8] * i12,
+            m22 = Rm[6] * i02 + Rm[7] * i12 + Rm[8] * i22;
+          aA[0] = m00 * Rm[0] + m01 * Rm[1] + m02 * Rm[2];
+          aA[1] = m00 * Rm[3] + m01 * Rm[4] + m02 * Rm[5];
+          aA[2] = m00 * Rm[6] + m01 * Rm[7] + m02 * Rm[8];
+          aA[4] = m10 * Rm[3] + m11 * Rm[4] + m12 * Rm[5];
+          aA[5] = m10 * Rm[6] + m11 * Rm[7] + m12 * Rm[8];
+          aA[8] = m20 * Rm[6] + m21 * Rm[7] + m22 * Rm[8];
+          aA[3] = aA[1]; aA[6] = aA[2]; aA[7] = aA[5];
+        }
+        bL[0] = mh * (P[p] - PI[p]); bL[1] = mh * (P[p + 1] - PI[p + 1]); bL[2] = mh * (P[p + 2] - PI[p + 2]);
+        avbdQSub(Q, q, QI, q, th);
+        bA[0] = aA[0] * th[0] + aA[1] * th[1] + aA[2] * th[2];
+        bA[1] = aA[3] * th[0] + aA[4] * th[1] + aA[5] * th[2];
+        bA[2] = aA[6] * th[0] + aA[7] * th[1] + aA[8] * th[2];
+        for (let e = adjOff[i]; e < adjOff[i + 1]; e++) {
+          const v = adjIdx[e];
+          if (v >= 0) {
+            if (jOn[v] && ok(jA[v]) && live[jB[v]]) stampJoint(v, i, alpha);
+          } else {
+            const s = -1 - v;
+            if (sOn[s] && ok(sA[s]) && live[sB[s]]) stampString(s, i, alpha);
+          }
+        }
+        for (let e = conOff[i]; e < conOff[i + 1]; e++) stampContact(conIdx[e], i, alphaC);
+        bL[0] = -bL[0]; bL[1] = -bL[1]; bL[2] = -bL[2];
+        bA[0] = -bA[0]; bA[1] = -bA[1]; bA[2] = -bA[2];
+        avbdSolve6(aL, aA, aX, bL, bA, dxL, dxA);
+        P[p] += dxL[0]; P[p + 1] += dxL[1]; P[p + 2] += dxL[2];
+        avbdQAddV(Q, q, dxA[0], dxA[1], dxA[2], Q, q);
+      }
+      // Dual: forces.ts `updateDual`, manifold.ts `updateDual`, and (a).
+      for (let k = 0; k < nj; k++) {
+        if (!jOn[k] || !ok(jA[k]) || !live[jB[k]]) continue;
+        if (jKL[k] > 0) {
+          jointEval(k);
+          const hard = jKL[k] === Infinity, capL = Math.min(AVBD.penMax, jKL[k]);
+          for (let r = 0; r < 3; r++) {
+            const q = 3 * k + r;
+            const c = hard ? C[r] - alpha * jC0L[q] : C[r];
+            if (hard) jLL[q] += jPL[q] * c;
+            jPL[q] = Math.min(capL, jPL[q] + o.beta * Math.abs(c));
+          }
+        }
+        if (jKA[k] > 0) {
+          jointAng(k);
+          const hA = jKA[k] === Infinity, capA = Math.min(AVBD.penMax, jKA[k]);
+          for (let r = 0; r < 3; r++) {
+            const q = 3 * k + r;
+            const c = hA ? th[r] - alpha * jC0A[q] : th[r];
+            if (hA) jLA[q] += jPA[q] * c;
+            jPA[q] = Math.min(capA, jPA[q] + o.betaAng * Math.abs(c));
+          }
+        }
+      }
+      for (let s = 0; s < ns; s++) {
+        if (!sOn[s] || !ok(sA[s]) || !live[sB[s]] || sK[s] > 0) continue;
+        const f = stringF(s, alpha);
+        sLam[s] = f;
+        sF[s] = f;
+        if (f > 0) sPen[s] = Math.min(AVBD.penMax, sPen[s] + o.beta * Math.abs(sCC));
+      }
+      for (let c = 0; c < nc; c++) {
+        contactEval(c, alphaC);
+        const cap = Math.min(AVBD.penMax, cK[c]);
+        if (cK[c] === Infinity) { cLam[3 * c] = cF[0]; cLam[3 * c + 1] = cF[1]; cLam[3 * c + 2] = cF[2]; }
+        cFn[c] = -cF[0];
+        if (cF[0] < 0) cPen[3 * c] = Math.min(cap, cPen[3 * c] + o.beta * Math.abs(cC[0]));
+        if (cFric <= cBound) {
+          cPen[3 * c + 1] = Math.min(cap, cPen[3 * c + 1] + o.beta * Math.abs(cC[1]));
+          cPen[3 * c + 2] = Math.min(cap, cPen[3 * c + 2] + o.beta * Math.abs(cC[2]));
+        }
+      }
+    }
+    // BDF1, with each body's drag and the two ceilings.
+    for (let i = 0; i < nb; i++) {
+      if (!live[i]) continue;
+      const p = 3 * i, q = 4 * i;
+      const keep = Math.exp(-drag[i] * h);
+      VP[p] = V[p]; VP[p + 1] = V[p + 1]; VP[p + 2] = V[p + 2];
+      let vx = (P[p] - P0[p]) / h * keep, vy = (P[p + 1] - P0[p + 1]) / h * keep, vz = (P[p + 2] - P0[p + 2]) / h * keep;
+      const v = Math.sqrt(vx * vx + vy * vy + vz * vz);
+      if (v > o.vMax) { vx *= o.vMax / v; vy *= o.vMax / v; vz *= o.vMax / v; }
+      V[p] = vx; V[p + 1] = vy; V[p + 2] = vz;
+      avbdQSub(Q, q, Q0, q, th);
+      let wx = th[0] / h * keep, wy = th[1] / h * keep, wz = th[2] / h * keep;
+      const w = Math.sqrt(wx * wx + wy * wy + wz * wz);
+      if (w > o.wMax) { wx *= o.wMax / w; wy *= o.wMax / w; wz *= o.wMax / w; }
+      W[p] = wx; W[p + 1] = wy; W[p + 2] = wz;
+    }
+    stats.steps++;
+    stats.ms = performance.now() - t0;
+  }
+
+  // ── reading it, and moving it ────────────────────────────────────────
+
+  /** The hard joints and the strings as they stand: the worst gap, the worst stretch. */
+  function measure() {
+    let js = 0, ss = -1e9;
+    for (let k = 0; k < nj; k++) {
+      if (!jOn[k] || jKL[k] !== Infinity || !ok(jA[k]) || !live[jB[k]]) continue;
+      jointEval(k);
+      js = Math.max(js, Math.hypot(C[0], C[1], C[2]));
+    }
+    for (let s = 0; s < ns; s++) {
+      if (!sOn[s] || !ok(sA[s]) || !live[sB[s]] || sK[s] > 0) continue;
+      ss = Math.max(ss, stringEval(s));
+    }
+    stats.maxStretch = js; stats.maxString = ss;
+    return stats;
+  }
+  /**
+   * How far the deepest point is inside a capsule on another body, NOW —
+   * every pair and not only the ones in contact, so a point that has gone
+   * through without a contact is counted too. Positive is inside, metres,
+   * surface to surface (the point's own radius included).
+   */
+  function depth(skipTwo = false) {
+    let worst = -1, who = -1;
+    // Boxes: the capsule's axis against the box, closest pair as `collide`
+    // finds it but with twelve rounds — this is the measurement, not the solve.
+    for (let k = 0; k < nbx; k++) {
+      const a = bxBody[k];
+      if (!live[a]) continue;
+      const hx = bxH[3 * k], hy = bxH[3 * k + 1], hz = bxH[3 * k + 2];
+      const px = P[3 * a], py = P[3 * a + 1], pz = P[3 * a + 2];
+      for (let c = 0; c < ncp; c++) {
+        const b = cpBody[c];
+        if (b === a || !cpOn[c] || !live[b] || (skipTwo && cpTwo[c])) continue;
+        turn(b, cpA, 3 * c, pA, 0); turn(b, cpB, 3 * c, pB, 0);
+        unturn(a, pA[0] + P[3 * b] - px, pA[1] + P[3 * b + 1] - py, pA[2] + P[3 * b + 2] - pz, sgA, 0);
+        unturn(a, pB[0] + P[3 * b] - px, pB[1] + P[3 * b + 1] - py, pB[2] + P[3 * b + 2] - pz, sgA, 3);
+        const ax = sgA[0], ay = sgA[1], az = sgA[2];
+        const ux = sgA[3] - ax, uy = sgA[4] - ay, uz = sgA[5] - az;
+        let lo = 0, hi = 1;
+        for (let it = 0; it < 30; it++) {
+          const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+          if (segBox2(ax, ay, az, ux, uy, uz, m1, hx, hy, hz) < segBox2(ax, ay, az, ux, uy, uz, m2, hx, hy, hz)) hi = m2;
+          else lo = m1;
+        }
+        const t = (lo + hi) * 0.5;
+        const d = Math.sqrt(segBox2(ax, ay, az, ux, uy, uz, t, hx, hy, hz));
+        const inside = cpR0[c] + (cpR1[c] - cpR0[c]) * t - d;
+        if (inside > worst) { worst = inside; who = cpId[c]; }
+      }
+    }
+    for (let p = 0; p < (pointCaps ? npt : 0); p++) {
+      const a = ptBody[p];
+      if (!live[a]) continue;
+      turn(a, ptL, 3 * p, tmpv, 0);
+      const wx = tmpv[0] + P[3 * a], wy = tmpv[1] + P[3 * a + 1], wz = tmpv[2] + P[3 * a + 2];
+      for (let c = 0; c < ncp; c++) {
+        const b = cpBody[c];
+        if (b === a || !cpOn[c] || !live[b] || (skipTwo && cpTwo[c])) continue;
+        turn(b, cpA, 3 * c, pA, 0); turn(b, cpB, 3 * c, pB, 0);
+        const ax = pA[0] + P[3 * b], ay = pA[1] + P[3 * b + 1], az = pA[2] + P[3 * b + 2];
+        const ux = pB[0] - pA[0], uy = pB[1] - pA[1], uz = pB[2] - pA[2];
+        const uu = ux * ux + uy * uy + uz * uz;
+        let t = uu > 1e-12 ? ((wx - ax) * ux + (wy - ay) * uy + (wz - az) * uz) / uu : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const d = Math.hypot(wx - ax - ux * t, wy - ay - uy * t, wz - az - uz * t);
+        const inside = cpR0[c] + (cpR1[c] - cpR0[c]) * t + ptR[p] - d;
+        if (inside > worst) { worst = inside; who = cpId[c]; }
+      }
+    }
+    stats.maxPen = worst; stats.penWho = who;
+    return worst;
+  }
+
+  /** Velocity added to body i — a push. */
+  function kick(i, vx, vy, vz) {
+    V[3 * i] += vx; V[3 * i + 1] += vy; V[3 * i + 2] += vz;
+    VP[3 * i] += vx; VP[3 * i + 1] += vy; VP[3 * i + 2] += vz;
+  }
+  /** Put body i somewhere, at rest. */
+  function place(i, px, py, pz, q) {
+    P[3 * i] = px; P[3 * i + 1] = py; P[3 * i + 2] = pz;
+    if (q) { Q[4 * i] = q[0]; Q[4 * i + 1] = q[1]; Q[4 * i + 2] = q[2]; Q[4 * i + 3] = q[3]; }
+    V.fill(0, 3 * i, 3 * i + 3); W.fill(0, 3 * i, 3 * i + 3); VP.fill(0, 3 * i, 3 * i + 3);
+  }
+  /** Where a world-anchored joint's world end is to be, and its attitude. */
+  function setTarget(k, px, py, pz, q) {
+    jRA[3 * k] = px; jRA[3 * k + 1] = py; jRA[3 * k + 2] = pz;
+    if (q) { jQW[4 * k] = q[0]; jQW[4 * k + 1] = q[1]; jQW[4 * k + 2] = q[2]; jQW[4 * k + 3] = q[3]; }
+  }
+  /** A joint's two stiffnesses; both 0 switches it off. */
+  function setJointK(k, kLin, kAng) {
+    const was = jOn[k];
+    jOn[k] = kLin > 0 || kAng > 0 ? 1 : 0;
+    jKL[k] = kLin; jKA[k] = kAng;
+    if (!was && jOn[k]) {
+      jPL.fill(AVBD.penMin, 3 * k, 3 * k + 3); jPA.fill(AVBD.penMin, 3 * k, 3 * k + 3);
+      jLL.fill(0, 3 * k, 3 * k + 3); jLA.fill(0, 3 * k, 3 * k + 3);
+    }
+  }
+  /** Every multiplier to nought and every penalty to the floor — a cold start. */
+  function resetDuals() {
+    jLL.fill(0); jLA.fill(0); sLam.fill(0); cLam.fill(0); pLam.fill(0);
+    jPL.fill(AVBD.penMin); jPA.fill(AVBD.penMin);
+    for (let q = 0; q < ns; q++) sPen[q] = sK[q] > 0 ? sK[q] : AVBD.penMin;
+    cPen.fill(AVBD.penMin); pPen.fill(AVBD.penMin);
+    nc = 0; gen++;
+  }
+  /** A body in or out of the solve. */
+  function setLive(i, on) {
+    live[i] = on ? 1 : 0;
+    V.fill(0, 3 * i, 3 * i + 3); W.fill(0, 3 * i, 3 * i + 3); VP.fill(0, 3 * i, 3 * i + 3);
+  }
+  /** What body i is held up by: the upward force of its contacts, N, as last solved. */
+  function support(i) {
+    let f = 0;
+    for (let e = conOff[i]; e < conOff[i + 1]; e++) {
+      const c = conIdx[e], sg = cA[c] === i ? 1 : -1;
+      f += cFn[c] * cBas[9 * c + 1] * sg;
+    }
+    return f;
+  }
+
+  return { P, Q, V, W, mass, inert, live, softBody, drag, stats, sF, sLen, cpOn, cpTwo,
+    addBody, addJoint, addString, addPoint, addBox, addCap, setCap, finish,
+    setFloor: (fn) => { floor = fn; },
+    setOneSided: (on, line) => {
+      oneSided = !!on;
+      if (line) for (let k = 0; k < 6; k++) inAx[k] = line[k];
+    },
+    step, measure, depth, kick, place, setTarget, setJointK, setLive, support, resetDuals,
+    get nb() { return nb; }, get nc() { return nc; }, get ns() { return ns; }, get nj() { return nj; } };
 }

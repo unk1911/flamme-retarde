@@ -8,6 +8,140 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.532.0] — 2026-09-27 (baye 1.47.0)
+
+### a hammock in the pines, on AVBD, and Baye in it
+
+Misha: *"I want to add some more AVBD stuff to the game. I was thinking in
+the magical forest area ... some people put up hammocks there. so maybe we
+can setup a hammock there and I can sorta swing baye on it"*, and then *"yes
+go ahead and when done just send me the gps coordinates of it"*.
+
+**Where it is.** It is at 43.724019, 15.846098: world (−1923.17, 4.14,
+443.16), shore (t 439.47, s 33.14), in the car park under the pines behind
+the back row of kabine. Paste the coordinates into `?gps=` and you are put
+down in the middle of it. The painted hammock from 1.276.0, at t 21, is
+gone; it was not behind the kabine. The new site is chosen, not typed in,
+from the pines that are planted:
+
+- **The trees.** It needs two trunks 3 to 4.8 m apart with nothing else in
+  the cloth's footprint.
+- **Her place.** There has to be a clear standing place 0.60 m in front of
+  the middle, where she gets in.
+- **A way there.** She needs a walkable route from her lane. `hamPath` is a
+  0.25 m grid BFS over the huts, cars, trunks, the lane wall and the back
+  wall.
+
+The first pair it found was just behind the resort's back wall, and she
+walked through the render to get in: the wall had never been a blocker.
+There is no planting further back, so the hammock hangs on the car park
+gravel. The two cars that parked in its bay are not parked there any more.
+The pair is 4.68 m between trunks and 4.21 m between the ties, and her walk
+there is 57.6 m.
+
+**The hammock** (`src/43-hammock.js`, on the new `avbdNet` in
+`src/43-avbd.js`):
+
+- **The cloth** is 9 × 5 thin rigid plates, 2.30 × 1.30 m, 45 g each,
+  jointed at the middle of every shared edge. This is three-avbd's flag,
+  hung by its ends. The corners are soft joints, and weak springs across and
+  along the cloth keep it from creasing into a rope.
+- **The gathered ends** are pull-only strings fanning from each row's end
+  plate to a whipped gather, then a rope to a strap round each trunk at
+  1.45 m. The rope length is solved from the span, so the loaded seat comes
+  out at 0.25–0.36 m.
+- **She is a 55 kg body** carrying her 19 cuff-chain capsules plus four down
+  her arms. They are rewritten every frame from the pose she is in, and they
+  push the cloth and are pushed back. Nothing else holds her up: the measured
+  support is 525–540 N, which is her weight.
+
+What `avbdNet` adds to the solver for this is documented as (a)–(g) over
+the function:
+
+- a general body graph;
+- pull-only strings and two-way springs;
+- box-vs-capsule contact by a ternary search for the closest pair;
+- soft contacts per body and drag per body;
+- **one-sided cloth**, which only meets what is on its inside face. The
+  inside face is the one toward the line between the ties, not the plate's
+  own +y. A folded plate's +y points down, and one get-in in four fell
+  through the bed that way.
+
+Her arms are two-sided, because an elbow over the rim is outside the cloth.
+
+**The push.** Walk up to her, within 1.35 m, and press. Your hand comes up
+and the whole hammock, with her in it, is given the same velocity (38 N·s
+over her and the cloth). A uniform push matters: pushing only her rolled her
+over the rim within five pushes. Pushes timed with the swing build it up;
+pushes against it take it down. It creaks at each end of the swing with a
+stick-slip creak synthesized in `audio.creak`, so there is no sample to
+license. She smiles while she swings, and a hard swing (over 0.38 rad) makes
+her laugh.
+
+**The commands.** Baye 1.47.0 has two:
+
+- **"get in the hammock"**, "lie in the hammock", or just "hammock". She
+  walks there by `hamPath`, turns, sits on the rim holding it down, swings
+  her legs in and lies back (`hamIn` and `hamLie`, solved in
+  tools/blender/human_mh.py and rebaked into human_skin).
+- **"get out"**, or "get out of the hammock". The same clip plays reversed.
+
+She gets out by herself after eight minutes, or after 25 s once you have
+walked away.
+
+**Refusals** are short, and each one is a fact about where she is:
+
+- "she is already in the hammock";
+- "she is already on her way to it";
+- "she is in the kabina — the hammock is out in the pines behind it"
+  (measured: key 8, she follows you in, you ask);
+- "she is in the sea";
+- "she cannot find a way through to it from here";
+- "she is not in the hammock", when you say "get out" and she isn't
+  (measured).
+
+The phrases were tested offline: 30 new ones, including Croatian ("lezi u
+viseću mrežu", "izađi iz viseće mreže"), French and German, all routed
+right. Things said *about* the hammock ("that hammock looks comfy") are
+not commands. 88 regression phrases are unchanged against HEAD.
+
+**Measured** (in the game, headless Chrome on the GPU):
+
+- **Staying in.** Six trials of getting in and taking five in-phase pushes
+  each: 6/6 stayed in. Twenty seconds of pushes took the swing 12.0° →
+  15.9° → 19.5° → 20.9° → 23.5°. It then dies away by about 1.3° a swing,
+  to 15° in 8 s.
+- **Swing period** is 2.25 s. Joint stretch is under 1 mm (0.5–0.7 mm).
+- **Penetration.** Her deepest capsule into the cloth is 0.5–0.8 mm lying
+  still and 1.7–4.4 mm at the top of a hard swing, at an elbow on the rim.
+  The solver's NaN guard never fired (rescues 0).
+- **The cuff chains** are unaffected: wrist 0.485 ms, ankle 0.468 ms,
+  stretch ≤ 0.07 mm.
+
+**Cost, and it is over the 1.5 ms budget.** With her in it, the hammock
+takes a median 1.7 ms a frame (p90 1.9, p99 2.4; 600 frames). That is two
+1/120 s substeps of 10 iterations at about 0.8 ms each, plus the draw. There
+was one 15.7 ms frame at the moment of getting in. Fewer iterations do not
+work: at 8 the node harness went to NaN, and at 6 she sank through. Empty
+and awake it is about 1 ms. It sleeps after 2 s still with nobody in it and
+costs nothing then, or from 60 m away. It takes at most 3 substeps a frame,
+so below 40 fps it swings in slight slow motion rather than costing more.
+
+**Two things that are not what the plan said:**
+
+- **The empty sag is 0.95 m (0.23 of the span).** The 1.276.0 picture drew
+  1/12. A gathered hammock has its ropes at about 30° and a cloth that
+  closes round you, and the seat has to be at sitting height once she is in.
+  Rope lengths that give 1/12 empty put the loaded seat on the floor.
+- **There is a "keep" spring.** Once nothing is guiding her, a 3000 N/m
+  spring holds her centre where she lay down, relative to the middle of the
+  bed. It is the one thing here that is not the cloth. A real sling holds
+  you by wrapping round a whole side of your body, and 45 rigid plates touch
+  her in a handful of places. Without the spring, over four get-ins with
+  five pushes each, she rolled out over the rim twice, once a second after
+  lying down. At rest the spring does nothing: it gives 300 N at 10 cm,
+  where rolling out takes 40 cm, and she and the bed swing together.
+
 ## [1.531.0] — 2026-09-27
 
 ### the bicycles, built as bicycles

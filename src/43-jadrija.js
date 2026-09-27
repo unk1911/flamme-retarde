@@ -21328,6 +21328,11 @@ async function buildJadrija(scene) {
         top + h * (0.020 + i * 0.032), rr * 0.66, rr, DK, LT, band, 7, 3, 0.58,
         21 + i);
     }
+    // The trunk's radius, for whoever ties something round it — the hammock's
+    // ropes go round the bark at `rad`, and without it they stopped a hand's
+    // breadth short of the thin ones and inside the fat ones. Returned, not
+    // drawn again: nothing downstream of this costs the stream a draw.
+    return rad;
   }
 
   /** An olive: a short trunk that forks low, and a silver-grey crown. */
@@ -22012,7 +22017,7 @@ async function buildJadrija(scene) {
       // short of unit length and want normalising before the atan2.
       carSites.push({ x, y, z, model: model.key, tint,
         yaw: Math.atan2(st.nz * inv, -st.nx * inv) });
-      runs.push({ t0: t - size.hw - 0.06, t1: t + size.hw + 0.06,
+      runs.push({ car: carSites.length, t0: t - size.hw - 0.06, t1: t + size.hw + 0.06,
         s0: s0 - 0.1, s1: s0 + len + 0.1, y, h: size.h });
     }
   }
@@ -24147,6 +24152,8 @@ async function buildJadrija(scene) {
     b = backT;
   }
 
+  // Its bays, [t0, t1, s] — see the loop below and `hamPath`.
+  const backWall = [];
   // ── the wall along the back, and the playground behind it ─────────────────
   // Both from the approach lane, and both recurring: a low rendered wall capped
   // with dressed limestone blocks runs the length of it with planters standing
@@ -24165,6 +24172,10 @@ async function buildJadrija(scene) {
     const ws = JAD.back + 3.2;
     for (let t = JAD.beachTo - 30; t < LEN - 24; t += 2.4) {
       if (!clearOfShops(t)) continue;
+      // Kept, for the one walk that has to know where the wall is — see
+      // `hamPath`. It is not a blocker and never has been; nothing else is
+      // routed past it.
+      backWall.push([t, t + 2.34, ws]);
       const y = surfaceY(t, ws);
       boxTS(t, t + 2.34, ws - 0.16, ws + 0.16, y, y + 0.78, REND,
         shade(REND, 1.04));
@@ -24920,6 +24931,10 @@ async function buildJadrija(scene) {
   // it is to declare a variable beside the thing it is DERIVED from, which for
   // this one is the tree list.
   let hammockAt = null;
+  // And what the hammock is built from once the figure is loaded — the two
+  // trees, their trunks and the ground — see `── THE HAMMOCK ──`. Declared
+  // here for the same reason as `hammockAt`.
+  let hammockSpec = null, hammockCands = [];
   // How many tussocks and limestone lumps the grove floor got. Beside
   // `greens` for the reason written above it.
   let groveFloor = 0;
@@ -25488,8 +25503,9 @@ async function buildJadrija(scene) {
       const r = rng();
       if (r < 0.72) {
         // Leaning seaward — negative s is the water — by a shared bias.
-        pine(t, s, y, 9.0 + rng() * 5.5, -1);
-        greens.push([t, s, 0.42, 9]);
+        // The fifth number is the trunk's own radius — see the end of `pine`.
+        const rad = pine(t, s, y, 9.0 + rng() * 5.5, -1);
+        greens.push([t, s, 0.42, 9, rad]);
       } else if (r < 0.86) {
         olive(t, s, y, 3.8 + rng() * 1.8);
         greens.push([t, s, 0.50, 5]);
@@ -25499,148 +25515,10 @@ async function buildJadrija(scene) {
     }
   }
 
-  /**
-   * The floor of the grove: dry tussocks and limestone breaking the surface.
-   *
-   * The terrain shader already lays dead Aleppo needles over limestone dust —
-   * see the needle floor in TERRAIN_FRAG — and that is the right ground colour
-   * and the wrong ground *texture*, because a shader cannot put anything on
-   * the surface. In `1000150345` and `_349` the grove floor is not a surface at
-   * all: it is pale chippings with grey-green tussocks standing in it, dry
-   * khaki grass between them, and lumps of limestone coming through wherever
-   * the dust is thin. From standing height that is the difference between a
-   * wood and a brown plane with trees on it.
-   *
-   * CLUSTERED ON THE TREES, and that is the whole placement rule. Needle
-   * litter and the tufts that survive it are under and around pines, because
-   * that is where the shade and the drip line are — scattered evenly over the
-   * band, the same objects read as confetti. So each pine is asked for its own
-   * two, at 1.4 to 3.4 m, off `jit` of its index.
-   *
-   * `greens` is read back rather than the loop being extended, which keeps
-   * this off the shared `rng` stream — Rule 4 — and means it cannot move a
-   * single parasol.
-   */
-  {
-    const TUSS = [0.318, 0.352, 0.268];      // grey-green, the live tufts
-    const DRYG = [0.462, 0.430, 0.298];      // and the dry khaki between them
-    const ROCK = [0.560, 0.522, 0.442];      // limestone through the dust
-    let n = 0;
-    greens.forEach((g, i) => {
-      if (g[3] !== 9) return;                // pines only: olives are elsewhere
-      const [gt, gs] = g;
-      if (gs < 30 || gs > 78) return;        // the grove behind the kabine
-      for (let k = 0; k < 2; k++) {
-        const a2 = jit(i, 311 + k) * TAU;
-        const r = 1.4 + jit(i, 331 + k) * 2.0;
-        const t = gt + Math.cos(a2) * r, ss = gs + Math.sin(a2) * r;
-        const y = surfaceY(t, ss);
-        const w = jit(i, 351 + k);
-        if (w < 0.34) {
-          // Limestone. Wider than it is tall — this is bedrock showing, not a
-          // boulder sitting on the dust, and the first cut had them as domes
-          // half a metre proud which read as a field of molehills.
-          const rr = 0.26 + jit(i, 371 + k) * 0.34;
-          dome(W, t, ss, y - 0.06, rr * 0.30, rr,
-            shade(ROCK, 0.92 + jit(i, 381 + k) * 0.16), 5);
-        } else {
-          const rr = 0.22 + jit(i, 391 + k) * 0.26;
-          dome(W, t, ss, y - 0.05, rr * (0.55 + jit(i, 401 + k) * 0.30), rr,
-            shade(w < 0.68 ? TUSS : DRYG, 0.90 + jit(i, 411 + k) * 0.22), 5);
-        }
-        n++;
-      }
-    });
-    groveFloor = n;
-  }
-
-  /**
-   * A hammock, slung between two of the pines that were just planted.
-   *
-   * `1000150346`: two people sitting in a blue-and-teal hammock strung between
-   * two trunks in the grove behind the kabine, on the pale gravel, with the
-   * shadows running long across it. It is the single most alive thing in the
-   * whole of that part of the survey and there was nothing like it in the game.
-   *
-   * SLUNG BETWEEN PINES THAT ACTUALLY EXIST, which is why this reads `greens`
-   * rather than choosing a spot. The grove is planted with `rng()` and the pair
-   * that ends up 3 to 5 m apart is different in every build of the shore; a
-   * typed pair of coordinates would be a hammock hanging in mid-air the first
-   * time anybody touched the planting. Reading the list back costs no draw —
-   * Rule 4 — because every one of these trees has already been placed.
-   *
-   * A catenary and not a straight line, and the sag is not a guess: a hammock
-   * with nobody in it hangs about a twelfth of its span; with somebody in it,
-   * nearer a sixth. 0.16 of the span is a hammock that has just been got out
-   * of, which is what it looks like from a distance and what it means at any
-   * other one.
-   */
-  {
-    // The band is where the grove behind the kabine actually is, and it was
-    // 40..62 on the first cut, which found no pair at all: the pines run
-    // further inland than that and the ones nearest the huts are the young
-    // staked ones, which are not in `greens` as pines. 34..76 with a 3.0-6.0 m
-    // separation finds one every build.
-    const pines = greens.filter((g) => g[3] === 9 && g[1] > 34 && g[1] < 76);
-    let pair = null;
-    for (let i = 0; i < pines.length && !pair; i++) {
-      for (let j = i + 1; j < pines.length; j++) {
-        const d = Math.hypot(pines[i][0] - pines[j][0], pines[i][1] - pines[j][1]);
-        if (d > 3.0 && d < 6.0) { pair = [pines[i], pines[j], d]; break; }
-      }
-    }
-    if (pair) {
-      const [A, B, span] = pair;
-      hammockAt = [+A[0].toFixed(1), +A[1].toFixed(1),
-        +B[0].toFixed(1), +B[1].toFixed(1), +span.toFixed(2)];
-      // 1.45 m up each trunk, which is where a hammock is tied: high enough
-      // that the sag clears the ground and low enough to get into.
-      const yA = surfaceY(A[0], A[1]) + 1.45;
-      const yB = surfaceY(B[0], B[1]) + 1.45;
-      const sag = span * 0.16;
-      const CLOTH = [0.118, 0.318, 0.372];      // teal, off the frame
-      const EDGE = [0.545, 0.180, 0.118];       // the red-orange selvedge
-      const ROPE = [0.404, 0.372, 0.300];
-      const N = 12;
-      // Half-width: gathered to nothing at the ends and full in the middle,
-      // which is the whole shape of a hammock and the reason a flat strip
-      // reads as a plank.
-      const wAt = (u) => 0.30 * Math.sin(Math.PI * u) ** 0.55;
-      // The cloth is gathered SHORT of each trunk and the whipping spans the
-      // gap. Run right to the trunk it disappears into the bark, which reads
-      // as a hammock growing out of a tree — and it also leaves the two ropes
-      // with no length, so the thing that says "tied on" was never drawn.
-      const INSET = 0.34 / span;
-      const pt = (u, o) => {
-        const uu = INSET + u * (1 - 2 * INSET);
-        const t = A[0] + (B[0] - A[0]) * uu, ss = A[1] + (B[1] - A[1]) * uu;
-        // Across the span, in the shore's own frame.
-        const dt = -(B[1] - A[1]) / span, ds = (B[0] - A[0]) / span;
-        const y = yA + (yB - yA) * uu - sag * Math.sin(Math.PI * u) ** 0.85;
-        return W(t + dt * o, ss + ds * o, y);
-      };
-      for (let i = 0; i < N; i++) {
-        const u0 = i / N, u1 = (i + 1) / N;
-        const w0 = wAt(u0), w1 = wAt(u1);
-        b.quad(pt(u0, -w0), pt(u1, -w1), pt(u1, w1), pt(u0, w0), CLOTH);
-        b.quad(pt(u0, w0), pt(u1, w1), pt(u1, -w1), pt(u0, -w0), CLOTH);
-        // The selvedge, a hand's breadth of it, on both edges and both faces.
-        for (const sg of [1, -1]) {
-          b.quad(pt(u0, sg * w0), pt(u1, sg * w1),
-            pt(u1, sg * w1 * 0.80), pt(u0, sg * w0 * 0.80), EDGE);
-          b.quad(pt(u0, sg * w0 * 0.80), pt(u1, sg * w1 * 0.80),
-            pt(u1, sg * w1), pt(u0, sg * w0), EDGE);
-        }
-      }
-      // The two whippings, trunk to gathered end.
-      for (const [E, yE, u] of [[A, yA, 0], [B, yB, 1]]) {
-        const g = pt(u, 0);
-        const o = W(E[0], E[1], yE);
-        b.quad(o, g, [g[0], g[1] + 0.035, g[2]], [o[0], o[1] + 0.035, o[2]], ROPE);
-        b.quad([o[0], o[1] + 0.035, o[2]], [g[0], g[1] + 0.035, g[2]], g, o, ROPE);
-      }
-    }
-  }
+  // The buffer the stand was drawn into, for the grove floor — which is
+  // drawn further down now, after the lane wall, with the hammock: see
+  // `── the hammock's pair of trees ──`.
+  const groveBuf = b;
   // The young ones, staked in a gravel square cut through the concrete. Four
   // photographs and two frames of the walk have these, continuing east as an
   // avenue, and they are the one piece of planting on this shore that somebody
@@ -26315,6 +26193,223 @@ async function buildJadrija(scene) {
       post(W, t, s, y + 2.92, gy, 0.055, [0.300, 0.302, 0.298], 7);
     }
   }
+
+  // ── the hammock's pair of trees, and the grove floor round them ────────────
+  //
+  // Here, after the lane wall and not beside the planting, because choosing
+  // the pair asks whether she can walk to it, and the lane wall at s 29.2 is
+  // between her and every tree behind the rows: before it was built the way
+  // there went straight through it. The floor comes after the choice for the
+  // reason it always had — it keeps its stones out from under the hammock.
+  /**
+   * A hammock, slung between two of the pines that were just planted.
+   *
+   * `1000150346`: two people sitting in a blue-and-teal hammock strung between
+   * two trunks in the grove behind the kabine, on the pale gravel, with the
+   * shadows running long across it. It is the single most alive thing in the
+   * whole of that part of the survey and there was nothing like it in the game.
+   *
+   * SLUNG BETWEEN PINES THAT ACTUALLY EXIST, which is why this reads `greens`
+   * rather than choosing a spot. The grove is planted with `rng()` and the pair
+   * that ends up the right distance apart is different in every build of the
+   * shore; a typed pair of coordinates would be a hammock hanging in mid-air
+   * the first time anybody touched the planting. Reading the list back costs
+   * no draw — Rule 4 — because every one of these trees has already been
+   * placed.
+   *
+   * ── AND BEHIND THE KABINE, WHICH IT WAS NOT ─────────────────────────────
+   *
+   * 1.276.0 took "the first pair in the band" and the band was only a band in
+   * `s`: the list is planted in order of `t`, so the first pair was at t 21,
+   * the far west end of the shore, 375 m from the first hut of the rows
+   * (`JAD.rows`, t 396 to 557) that the photograph and this comment put it
+   * behind. Nobody noticed because nobody walks out there. Misha, 27 Sep 2026,
+   * asking for one Baye can be swung in, wants it where she is — so the pair
+   * is now looked for among the pines behind the rows themselves, nearest the
+   * back of the kabina she lives in.
+   *
+   * THOSE PINES STAND AMONG PARKED CARS, IN FRONT OF A WALL. Between the
+   * back row and the resort's back wall — 0.92 m of render with planters on
+   * the coping, at s 36.3 (`── the wall along the back ──`) — the stand is the
+   * car park: nose-in, a car every four metres (`── what is parked in the
+   * wood ──`), and a trunk every few metres among them. The first pair this
+   * found was over the wall, 0.2 m behind it, and MEASURED she walked through
+   * the render to get in, because the wall has never been a blocker; there
+   * is no pair in the wood behind it at all — the planting stops at s 38.
+   *
+   * So the hammock hangs where the photograph has it, on the pale gravel of
+   * the car park under the pines, and it takes a parking place: whichever
+   * cars stand in its footprint, or where she stands to get in, are not
+   * parked (`carSites`, which is not drawn until the shore is built, and
+   * whose blocker is taken out of `runs` with it). Somebody has hung a
+   * hammock in the bay; nobody parks there today. At most two cars.
+   *
+   * Otherwise a pair is a candidate only if nothing ELSE stands in the
+   * cloth's footprint — a third trunk, a hut, the wall — the mark HAM_MARK_M in
+   * front of its middle is clear by the half metre her walk keeps off
+   * everything, and she has a way there from her lane in front of her kabina
+   * (`hamPath`, over what is built so far: huts, cars, trunks, the lane wall
+   * and the back wall). Of those, the one nearest the back of her kabina.
+   *
+   * Three to four metres eighty apart, which is what a gathered hammock is
+   * hung across; the ropes are sized to the span — see HAMMOCK.seat.
+   *
+   * It is BUILT later, once there is a figure to put in it, because it is no
+   * longer drawn into the static buffer: it is a cloth of jointed plates
+   * simulated by AVBD. See src/43-hammock.js.
+   */
+  {
+    const [r0, r1] = JAD.rows[0];
+    const wallS = JAD.back + 3.2;
+    const pines = greens.filter((g) => g[3] === 9 && g[1] > JAD.rowB + JAD.cabD + 0.8
+      && g[1] < wallS - 0.6 && g[0] > r0 - 20 && g[0] < r1 + 20);
+    const PAD = 0.55 + 0.10;
+    const hitRun = (t, s, pad, keepCars) => runs.find((r) => !r.kab && !(keepCars && r.car)
+      && t > r.t0 - pad && t < r.t1 + pad && s > r.s0 - pad && s < r.s1 + pad);
+    const inGreen = (t, s, pad, skip) => greens.some((g) => g !== skip[0] && g !== skip[1]
+      && Math.abs(t - g[0]) < g[2] + pad && Math.abs(s - g[1]) < g[2] + pad);
+    const inWall = (t, s, pad) => backWall.some((w) => t > w[0] - pad && t < w[1] + pad
+      && Math.abs(s - w[2]) < 0.22 + pad);
+    const home = special ? special.dc : (r0 + r1) * 0.5;
+    const cands = [];
+    for (let i = 0; i < pines.length; i++) {
+      for (let j = i + 1; j < pines.length; j++) {
+        const A0 = pines[i], B0 = pines[j];
+        const d = Math.hypot(A0[0] - B0[0], A0[1] - B0[1]);
+        if (d < 3.0 || d > 4.8) continue;
+        const mt = (A0[0] + B0[0]) * 0.5, ms = (A0[1] + B0[1]) * 0.5;
+        const ux = (B0[0] - A0[0]) / d, us = (B0[1] - A0[1]) / d;
+        const cars = new Set();
+        let clear = true;
+        const look = (t, s, pad, skip) => {
+          const r = hitRun(t, s, pad, false);
+          if (r && r.car) { cars.add(r); return; }
+          if (r || inGreen(t, s, pad, skip) || inWall(t, s, pad)) clear = false;
+        };
+        for (let a = 0.5; a < d - 0.5 && clear; a += 0.35) {
+          for (let c = -0.8; c <= 0.8 && clear; c += 0.2) {
+            look(A0[0] + ux * a - us * c, A0[1] + us * a + ux * c, 0.05, [A0, B0]);
+          }
+        }
+        if (!clear) continue;
+        for (const sg of [1, -1]) {
+          const kt = mt - us * sg * HAM_MARK_M, ks = ms + ux * sg * HAM_MARK_M;
+          const cs = new Set(cars);
+          let ok = true;
+          for (let a = -0.6; a <= 0.6 && ok; a += 0.3) {
+            for (let c = -0.6; c <= 0.6 && ok; c += 0.3) {
+              const r = hitRun(kt + a, ks + c, 0.10, false);
+              if (r && r.car) cs.add(r);
+              else if (r || inGreen(kt + a, ks + c, 0.10, [null, null]) || inWall(kt + a, ks + c, 0.10)) ok = false;
+            }
+          }
+          if (!ok || cs.size > 2) continue;
+          cands.push({ A: [A0[0], A0[1], A0[4] || 0.22], B: [B0[0], B0[1], B0[4] || 0.22], span: d,
+            mark: [kt, ks], cars: [...cs], score: Math.abs(mt - home) + 6 * cs.size });
+        }
+      }
+    }
+    cands.sort((x, y) => x.score - y.score);
+    // The first she can walk to, over what is built so far — the cars it
+    // would move already moved.
+    const obsOf = (drop) => {
+      const o = [];
+      for (const r of runs) {
+        if (r.kab || drop.includes(r)) continue;
+        o.push({ t: (r.t0 + r.t1) * 0.5, s: (r.s0 + r.s1) * 0.5, a: (r.t1 - r.t0) * 0.5, c: (r.s1 - r.s0) * 0.5 });
+      }
+      for (const g of greens) o.push({ t: g[0], s: g[1], a: g[2], c: g[2] });
+      return o;
+    };
+    hammockCands = cands;
+    hammockSpec = null;
+    for (const C of cands.slice(0, 12)) {
+      const legs = hamPath(home, JAD.mid + 2.5, C.mark[0], C.mark[1], obsOf(C.cars));
+      if (!legs) continue;
+      let L = 0, p = [home, JAD.mid + 2.5];
+      for (const q of legs) { L += Math.hypot(q[0] - p[0], q[1] - p[1]); p = q; }
+      C.walk = L;
+      hammockSpec = C;
+      break;
+    }
+    // And the bays it takes, out of the car park.
+    if (hammockSpec) {
+      for (const r of hammockSpec.cars) {
+        carSites[r.car - 1] = null;
+        runs.splice(runs.indexOf(r), 1);
+      }
+    }
+  }
+
+  /**
+   * The floor of the grove: dry tussocks and limestone breaking the surface.
+   *
+   * The terrain shader already lays dead Aleppo needles over limestone dust —
+   * see the needle floor in TERRAIN_FRAG — and that is the right ground colour
+   * and the wrong ground *texture*, because a shader cannot put anything on
+   * the surface. In `1000150345` and `_349` the grove floor is not a surface at
+   * all: it is pale chippings with grey-green tussocks standing in it, dry
+   * khaki grass between them, and lumps of limestone coming through wherever
+   * the dust is thin. From standing height that is the difference between a
+   * wood and a brown plane with trees on it.
+   *
+   * CLUSTERED ON THE TREES, and that is the whole placement rule. Needle
+   * litter and the tufts that survive it are under and around pines, because
+   * that is where the shade and the drip line are — scattered evenly over the
+   * band, the same objects read as confetti. So each pine is asked for its own
+   * two, at 1.4 to 3.4 m, off `jit` of its index.
+   *
+   * `greens` is read back rather than the loop being extended, which keeps
+   * this off the shared `rng` stream — Rule 4 — and means it cannot move a
+   * single parasol.
+   */
+  {
+    const bWas = b;
+    b = groveBuf;
+    const TUSS = [0.318, 0.352, 0.268];      // grey-green, the live tufts
+    const DRYG = [0.462, 0.430, 0.298];      // and the dry khaki between them
+    const ROCK = [0.560, 0.522, 0.442];      // limestone through the dust
+    let n = 0;
+    greens.forEach((g, i) => {
+      if (g[3] !== 9) return;                // pines only: olives are elsewhere
+      const [gt, gs] = g;
+      if (gs < 30 || gs > 78) return;        // the grove behind the kabine
+      for (let k = 0; k < 2; k++) {
+        const a2 = jit(i, 311 + k) * TAU;
+        const r = 1.4 + jit(i, 331 + k) * 2.0;
+        const t = gt + Math.cos(a2) * r, ss = gs + Math.sin(a2) * r;
+        // Not under the hammock, nor where she stands to get into it — under
+        // any of the first few pairs it may end up between, since which one
+        // she can walk to is only known once the whole shore is built (see
+        // `── THE HAMMOCK ──`). `jit` and not `rng`, so skipping one moves
+        // nothing else.
+        if (hammockCands.slice(0, 6).some((H) => {
+          const ux = (H.B[0] - H.A[0]) / H.span, us = (H.B[1] - H.A[1]) / H.span;
+          const a = (t - H.A[0]) * ux + (ss - H.A[1]) * us;
+          const c = -(t - H.A[0]) * us + (ss - H.A[1]) * ux;
+          return a > 0.3 && a < H.span - 0.3 && Math.abs(c) < 1.6;
+        })) continue;
+        const y = surfaceY(t, ss);
+        const w = jit(i, 351 + k);
+        if (w < 0.34) {
+          // Limestone. Wider than it is tall — this is bedrock showing, not a
+          // boulder sitting on the dust, and the first cut had them as domes
+          // half a metre proud which read as a field of molehills.
+          const rr = 0.26 + jit(i, 371 + k) * 0.34;
+          dome(W, t, ss, y - 0.06, rr * 0.30, rr,
+            shade(ROCK, 0.92 + jit(i, 381 + k) * 0.16), 5);
+        } else {
+          const rr = 0.22 + jit(i, 391 + k) * 0.26;
+          dome(W, t, ss, y - 0.05, rr * (0.55 + jit(i, 401 + k) * 0.30), rr,
+            shade(w < 0.68 ? TUSS : DRYG, 0.90 + jit(i, 411 + k) * 0.22), 5);
+        }
+        n++;
+      }
+    });
+    groveFloor = n;
+    b = bWas;
+  }
+
 
   // ── towels, cones, flags, bicycles ─────────────────────────────────────────
   //
@@ -30174,7 +30269,7 @@ async function buildJadrija(scene) {
   // here, because inflating five pairs of blobs is the async half of the job
   // and this is where the async half of the resort happens. Their walk blockers
   // went into `runs` at placement time and are already accounted for.
-  const cars = await buildJadrijaCars(scene, carSites);
+  const cars = await buildJadrijaCars(scene, carSites.filter(Boolean));
 
   // ── the crowd ──────────────────────────────────────────────────────────────
   /**
@@ -32518,6 +32613,379 @@ async function buildJadrija(scene) {
     });
   } catch (e) {
     console.warn('ball failed:', e.message);
+  }
+
+  // ── THE HAMMOCK ────────────────────────────────────────────────────────────
+  //
+  // Misha, 27 Sep 2026: a hammock in the pines behind the kabine that Baye can
+  // get into and that you can swing her in — see src/43-hammock.js for the
+  // hammock and `avbdNet` in 43-avbd.js for the solver. The pair of trees is
+  // chosen where the grove is planted (`hammockSpec`, beside `greens`); what
+  // this adds is the world: the ties on the bark at `HAMMOCK.tie`, the
+  // ground under it, and — in `stepShow` — her.
+  let hammock = null;
+  // The cloth, as something to walk round and not through — see `hamPath`.
+  let hamBlock = null;
+  if (hammockSpec) {
+    const H = hammockSpec;
+    hammockAt = [+H.A[0].toFixed(1), +H.A[1].toFixed(1), +H.B[0].toFixed(1), +H.B[1].toFixed(1),
+      +H.span.toFixed(2), hammockCands.indexOf(H), H.cars.length, +(H.walk || 0).toFixed(1)];
+    hamBlock = { t: (H.A[0] + H.B[0]) / 2, s: (H.A[1] + H.B[1]) / 2, a: H.span / 2 - 0.4, c: 0.02,
+      rot: Math.atan2(H.B[1] - H.A[1], H.B[0] - H.A[0]), h: 1.5, y: 0 };
+  }
+  if (hammockSpec) {
+    try {
+      const HS = hammockSpec;
+      const wa = toWorld(HS.A[0], HS.A[1]), wb = toWorld(HS.B[0], HS.B[1]);
+      // The ground under it as a plane, least squares over a 5 by 5 grid
+      // across the whole footprint: a hammock is asked where the ground is a
+      // few hundred times a step, and `toWorld` is a search down the shore.
+      const ux = (HS.B[0] - HS.A[0]) / HS.span, us = (HS.B[1] - HS.A[1]) / HS.span;
+      let n = 0, sx = 0, sz = 0, sy = 0, sxx = 0, szz = 0, sxz = 0, sxy = 0, szy = 0;
+      for (let i = 0; i <= 4; i++) {
+        for (let j = 0; j <= 4; j++) {
+          const a = -0.5 + (HS.span + 1) * i / 4, c = -1.5 + 3 * j / 4;
+          const w = toWorld(HS.A[0] + ux * a - us * c, HS.A[1] + us * a + ux * c);
+          n++; sx += w[0]; sz += w[2]; sy += w[1];
+          sxx += w[0] * w[0]; szz += w[2] * w[2]; sxz += w[0] * w[2]; sxy += w[0] * w[1]; szy += w[2] * w[1];
+        }
+      }
+      // Solve [n sx sz; sx sxx sxz; sz sxz szz]·[a b c] = [sy sxy szy] about the mean.
+      const mx = sx / n, mz = sz / n, my = sy / n;
+      const cxx = sxx / n - mx * mx, czz = szz / n - mz * mz, cxz = sxz / n - mx * mz;
+      const cxy = sxy / n - mx * my, czy = szy / n - mz * my;
+      const det = cxx * czz - cxz * cxz || 1;
+      const gb = (cxy * czz - czy * cxz) / det, gc = (czy * cxx - cxy * cxz) / det;
+      const floorAt = (x, z) => my + gb * (x - mx) + gc * (z - mz);
+      // The ties: on the bark of each trunk, facing the other.
+      const tie = (P0, P1, r) => {
+        const dx = P1[0] - P0[0], dz = P1[2] - P0[2], l = Math.hypot(dx, dz) || 1;
+        return [P0[0] + dx / l * r, floorAt(P0[0], P0[2]) + HAMMOCK.tie, P0[2] + dz / l * r];
+      };
+      const A = tie(wa, wb, HS.A[2]), B = tie(wb, wa, HS.B[2]);
+      hammock = buildHammock(scene, {
+        A, B, floor: floorAt,
+        trunks: [[wa[0], wa[2], HS.A[2]], [wb[0], wb[2], HS.B[2]]],
+      });
+      hammock.api.onCreak = (amp, d) => {
+        if (audio && audio.creak) audio.creak(Math.min(1, amp / 0.35), d);
+      };
+    } catch (e) {
+      console.warn('hammock failed:', e.message);
+      hammock = null;
+    }
+  }
+
+  // ── HER, IN IT ─────────────────────────────────────────────────────────────
+  //
+  // The phases are in `stepShow` — `hamTurn`, `hamIn`, `hamHeld`, `hamOut`,
+  // with the walk there an `errand` — and these are what they share.
+  //
+  //   hamIn    `hamIn` played forwards: sat on the edge, legs up and round,
+  //            lain back. Her body goes into the hammock's solve on the first
+  //            frame, where her mesh is, and is pulled along the clip by the
+  //            guide (HAMMOCK.guideLin) toward the mark she turned on. The
+  //            guide eases off over the last `release` seconds, so the cloth
+  //            takes her weight a little at a time; by the end she is lying
+  //            in it and nothing but the cloth is holding her.
+  //   hamHeld  `hamLie`, breathing. Her mesh is wherever her body is — the
+  //            swing, the sag, the roll of it — and you can push her.
+  //   hamOut   `hamIn` backwards, with the guide coming ON over `HAM.grab`
+  //            toward an upright mark under where she is, so the swing is
+  //            stopped by her own legs going down and not by a cut.
+  const HAM = { hamGo: 1, hamTurn: 1, hamIn: 1, hamHeld: 1, hamOut: 1 };
+  const HAM_SIM = { hamIn: 1, hamHeld: 1, hamOut: 1 };
+  // The only requests that are answered in the hammock without getting out of
+  // it first: her eyes, her mouth, a yawn, your hand on her head.
+  const HAM_KEEP = { look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1, 'mouth.open': 1,
+    'mouth.close': 1, yawn: 1, pet: 1 };
+  const HAM_T = {
+    mark: HAM_MARK_M,    // the mark in front of the middle, m — HAM_MARK in human_mh.py
+    at: 0.30,            // arrived at it, m
+    pace: 1.15,          // her walk there, a multiple of SHOW.walk: a stroll
+    stall: 5.0,          // s of getting no closer before the way is found again
+    turnFor: 2.5,        // s, at most, turning her back on it
+    grab: 0.8,           // s the guide takes to come on, getting out
+    stay: 480,           // s she stays in it before she gets out on her own
+    alone: 25,           // s with you gone before she does
+    smileSwing: 0.9,     // smile a radian of swing adds, on top of SMILE
+    laughAt: 0.38,       // rad of swing a push has to build for a laugh (22 deg)
+    laughFor: 2.6,       // s of laughing
+  };
+  const _hmP = new THREE.Vector3(), _hmQ = new THREE.Quaternion(), _hmV = new THREE.Vector3();
+  const _hmBQ = new THREE.Quaternion(), _hmBP = new THREE.Vector3();
+
+  /**
+   * Where she stands to get in: the mark on the side of the middle the
+   * hammock was chosen for (`hammockSpec.mark`, the side with a way to it),
+   * in the shore frame, with the heading that has her back to it.
+   */
+  function hamMark() {
+    if (!hammock || !show) return null;
+    const want = hammockSpec ? hammockSpec.mark : [show.t, show.s];
+    let best = null;
+    for (const m of hammock.api.marks(HAM_T.mark)) {
+      const [t, s] = local(m.x, m.z);
+      const d = Math.hypot(t - want[0], s - want[1]);
+      if (!best || d < best.d) {
+        // The heading, in the shore frame, of facing out along `m.out`.
+        const st = at(t);
+        const ang = Math.atan2(m.out[0] * st.nx + m.out[1] * st.nz, m.out[0] * st.ux + m.out[1] * st.uz);
+        best = { t, s, x: m.x, z: m.z, ang, side: m.side, d };
+      }
+    }
+    return best;
+  }
+
+  /**
+   * A way from (t0, s0) to (t1, s1) through everything standing on the shore,
+   * as a list of points to walk between — or null if there is none.
+   *
+   * THE ERRANDS DO NOT NEED THIS AND THE HAMMOCK DOES. Every other place she
+   * is sent is on the promenade or straight up a gap from it, so `errandLegs`
+   * looks for one clear column and walks it. The hammock is past two rows of
+   * huts whose alleys do not line up, and then among parked cars and the
+   * trunks they are parked under: MEASURED, sent there by column she came up
+   * the alley, walked the last leg straight at the mark, and stood against the
+   * back of a car until the errand gave up.
+   *
+   * So this is a search: a half-metre grid over the ground between the two,
+   * each cell free if `blockedAt` says so with the same pad her own collider
+   * keeps, eight neighbours, breadth first from the goal; then the chain of
+   * cells pulled tight by dropping every point the one before it can see past.
+   * Once per request, over a few thousand cells and only the blockers inside
+   * the box — a few milliseconds.
+   */
+  function hamPath(t0, s0, t1, s1, obs = null) {
+    // A quarter-metre grid, and 0.40 m kept off everything: her own collider
+    // is 0.24 (`SHOW.solid`), and the rest is room to turn a corner. On the
+    // half-metre grid with the walk's 0.55 whether a way existed at all
+    // depended on where the grid happened to fall — the gap between two
+    // parked cars is 2.2 m and the cells either fitted it or did not.
+    //
+    // `obs` is for the one caller that runs while the shore is still being
+    // built (the choice of trees, over `hammockCands`) and so cannot ask
+    // `blockers`, which does not exist yet: it hands in what does.
+    const R = 0.25, PADP = 0.40;
+    const tMin = Math.min(t0, t1) - 40, tMax = Math.max(t0, t1) + 40;
+    // `JAD.mid - 2` is her lane's seaward edge — SHOW_LANE0, which is not
+    // declared yet when this is first called.
+    const sMin = Math.max(JAD.mid - 3.5, Math.min(s0, s1) - 4), sMax = Math.max(s0, s1) + 5;
+    const nt = Math.ceil((tMax - tMin) / R) + 1, ns = Math.ceil((sMax - sMin) / R) + 1;
+    const near = (obs || blockers).filter((b) => !b.off && b.a >= 0 && b.c >= 0
+      && b.t + b.a + b.c + PADP > tMin && b.t - b.a - b.c - PADP < tMax
+      && b.s + b.a + b.c + PADP > sMin && b.s - b.a - b.c - PADP < sMax);
+    if (!obs && hamBlock) near.push(hamBlock);
+    // And the back wall, which is not a blocker to anything else — see
+    // `backWall` — and has to be walked round to reach the wood.
+    for (const w of backWall) {
+      if (w[1] + PADP > tMin && w[0] - PADP < tMax && w[2] + PADP > sMin && w[2] - PADP < sMax) {
+        near.push({ t: (w[0] + w[1]) * 0.5, s: w[2], a: (w[1] - w[0]) * 0.5, c: 0.22 });
+      }
+    }
+    const inB = (b, t, s) => {
+      const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+      const dt0 = t - b.t, ds0 = s - b.s;
+      const dt1 = dt0 * co + ds0 * sn, ds1 = -dt0 * sn + ds0 * co;
+      return Math.abs(dt1) < b.a + PADP && Math.abs(ds1) < b.c + PADP;
+    };
+    const hit = (t, s) => {
+      for (const b of near) if (inB(b, t, s)) return true;
+      return false;
+    };
+    // Each blocker drawn into the grid over its own bounding box, rather
+    // than every cell asking every blocker.
+    const free = new Uint8Array(nt * ns).fill(1);
+    for (const b of near) {
+      const e = (b.rot ? Math.hypot(b.a, b.c) : Math.max(b.a, b.c)) + PADP;
+      const i0 = Math.max(0, Math.floor((b.t - e - tMin) / R)), i1 = Math.min(nt - 1, Math.ceil((b.t + e - tMin) / R));
+      const k0 = Math.max(0, Math.floor((b.s - e - sMin) / R)), k1 = Math.min(ns - 1, Math.ceil((b.s + e - sMin) / R));
+      for (let i = i0; i <= i1; i++) {
+        for (let k = k0; k <= k1; k++) if (free[i * ns + k] && inB(b, tMin + i * R, sMin + k * R)) free[i * ns + k] = 0;
+      }
+    }
+    const cell = (t, s) => [Math.round((t - tMin) / R), Math.round((s - sMin) / R)];
+    const nearestFree = (t, s, lim) => {
+      const [ci, ck] = cell(t, s);
+      let bi = -1, bk = -1, bd = Infinity;
+      const r = Math.ceil(lim / R);
+      for (let i = ci - r; i <= ci + r; i++) {
+        for (let k = ck - r; k <= ck + r; k++) {
+          if (i < 0 || k < 0 || i >= nt || k >= ns || !free[i * ns + k]) continue;
+          const d = (i - ci) * (i - ci) + (k - ck) * (k - ck);
+          if (d < bd) { bd = d; bi = i; bk = k; }
+        }
+      }
+      return bi < 0 ? null : [bi, bk];
+    };
+    const st = nearestFree(t0, s0, 2.0), gl = nearestFree(t1, s1, 0.6);
+    if (!st || !gl) return null;
+    // Breadth first from the goal, so the start follows its parents to it.
+    const par = new Int32Array(nt * ns).fill(-1);
+    const q = new Int32Array(nt * ns);
+    let qh = 0, qt = 0;
+    const g0 = gl[0] * ns + gl[1], s0i = st[0] * ns + st[1];
+    par[g0] = g0; q[qt++] = g0;
+    while (qh < qt && par[s0i] < 0) {
+      const c = q[qh++], ci = (c / ns) | 0, ck = c - ci * ns;
+      for (let di = -1; di <= 1; di++) {
+        for (let dk = -1; dk <= 1; dk++) {
+          if (!di && !dk) continue;
+          const i = ci + di, k = ck + dk;
+          if (i < 0 || k < 0 || i >= nt || k >= ns) continue;
+          const n = i * ns + k;
+          if (par[n] >= 0 || !free[n]) continue;
+          // No cutting a corner between two blocked cells.
+          if (di && dk && (!free[ci * ns + k] || !free[i * ns + ck])) continue;
+          par[n] = c; q[qt++] = n;
+        }
+      }
+    }
+    if (par[s0i] < 0) return null;
+    const pts = [];
+    for (let c = s0i; ; c = par[c]) {
+      const ci = (c / ns) | 0;
+      pts.push([tMin + ci * R, sMin + (c - ci * ns) * R]);
+      if (c === g0) break;
+    }
+    pts[pts.length - 1] = [t1, s1];
+    // Pulled tight: from each kept point, the furthest one it can see.
+    // Line of sight off the grid itself, a sample every 0.1 m.
+    const sees = (a, b) => {
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.ceil(L / 0.1);
+      for (let k = 1; k < n; k++) {
+        const t = a[0] + (b[0] - a[0]) * k / n, s = a[1] + (b[1] - a[1]) * k / n;
+        const i = Math.round((t - tMin) / R), q = Math.round((s - sMin) / R);
+        if (i < 0 || q < 0 || i >= nt || q >= ns || !free[i * ns + q]) return false;
+      }
+      return true;
+    };
+    const legs = [];
+    let i = 0;
+    while (i < pts.length - 1) {
+      let j = Math.min(pts.length - 1, i + 80);
+      while (j > i + 1 && !sees(pts[i], pts[j])) j--;
+      legs.push(pts[j]);
+      i = j;
+    }
+    return legs;
+  }
+
+  /** The way to the mark from where she is — found once and kept a moment,
+   *  because `askWhy` and the dispatch both ask in the same second. */
+  let hamRouteMemo = null;
+  function hamRoute(mk) {
+    const M = hamRouteMemo, now = performance.now();
+    if (M && now - M.at < 1500 && Math.hypot(M.t - show.t, M.s - show.s) < 0.3
+      && M.mt === mk.t && M.ms === mk.s) return M.legs;
+    const legs = hamPath(show.t, show.s, mk.t, mk.s);
+    hamRouteMemo = { at: now, t: show.t, s: show.s, mt: mk.t, ms: mk.s, legs };
+    return legs;
+  }
+
+  /**
+   * Her capsules this frame, in her mesh's own frame: the nineteen the cuff
+   * chains are made against (CHAIN_BODY) and her arms, which nothing needed
+   * before — the chains never reach them, and the cloth comes up round them.
+   */
+  const HAM_ARMS = [
+    ['armUL', 'armLL', 0.046, 0.038], ['armLL', 'handL', 0.036, 0.029],
+    ['armUR', 'armLR', 0.046, 0.038], ['armLR', 'handR', 0.036, 0.029],
+  ];
+  let hamArmCaps = null;
+  const hamList = [];
+  function hamCaps(f) {
+    const caps = chainCapsules();
+    if (!hamArmCaps) {
+      const H = bindHeadsOf(f);
+      hamArmCaps = [];
+      for (const [a, b, r0, r1] of HAM_ARMS) {
+        const ia = f.boneIndex(a), ib = f.boneIndex(b);
+        if (ia < 0 || ib < 0) continue;
+        hamArmCaps.push({ bone: ia, head: H.T[ia], a: [H.T[ia].x, H.T[ia].y, H.T[ia].z],
+          e: [H.T[ib].x, H.T[ib].y, H.T[ib].z], r0, r1 });
+      }
+    }
+    let n = 0;
+    const put = (cp) => {
+      f.boneAt(cp.bone, _hmBP);
+      f.boneTurn(cp.bone, _hmBQ);
+      const row = hamList[n] || (hamList[n] = new Float64Array(8));
+      _hmV.set(cp.a[0] - cp.head.x, cp.a[1] - cp.head.y, cp.a[2] - cp.head.z).applyQuaternion(_hmBQ).add(_hmBP);
+      row[0] = _hmV.x; row[1] = _hmV.y; row[2] = _hmV.z;
+      _hmV.set(cp.e[0] - cp.head.x, cp.e[1] - cp.head.y, cp.e[2] - cp.head.z).applyQuaternion(_hmBQ).add(_hmBP);
+      row[3] = _hmV.x; row[4] = _hmV.y; row[5] = _hmV.z;
+      row[6] = cp.r0; row[7] = cp.r1;
+      n++;
+    };
+    for (const cp of caps) put(cp);
+    for (const cp of hamArmCaps) put(cp);
+    hamList.length = n;
+    return hamList;
+  }
+
+  /**
+   * Her mesh, while the hammock has her: off her body in the solve, and her
+   * shape handed back to it for the next step. Called at the end of
+   * `stepShow`, after the ordinary placement, which this overrides.
+   */
+  function hamPlace(f, dt) {
+    const H = show.ham;
+    const api = hammock.api;
+    if (H && H.enter) {
+      // The first frame: into the solve where she is standing.
+      H.enter = false;
+      f.mesh.updateMatrixWorld();
+      H.mp = f.mesh.position.clone();
+      H.mq = f.mesh.quaternion.clone();
+      api.herEnter(H.mp, H.mq, hamCaps(f), chainCapsules().length);
+    }
+    if (!api.herIn) return;
+    api.herPose(f.mesh.position, f.mesh.quaternion);
+    f.mesh.updateMatrixWorld();
+    // Where she is, for everything else in this file that asks.
+    const [t, s] = local(f.mesh.position.x, f.mesh.position.z);
+    show.t = t; show.s = s;
+    // Her arms meet the cloth from both sides — see (g) over `avbdNet`.
+    api.herShape(hamCaps(f), chainCapsules().length);
+    // The guide: full through the clip, eased off over its last `release`
+    // seconds going in, eased on over `grab` coming out — see HAM.
+    if (H && H.mp) {
+      const S = f.state;
+      let k = 0;
+      if (show.phase === 'hamIn' && S.cur && S.cur.name === 'hamIn') {
+        const left = S.cur.dur - S.curT;
+        k = clamp(left / HAMMOCK.release, 0, 1);
+      } else if (show.phase === 'hamOut') {
+        k = clamp(show.tmr / HAM_T.grab, 0, 1);
+      }
+      k = k * k * (3 - 2 * k);
+      api.herGuide(H.mp, H.mq, HAMMOCK.guideLin * k, HAMMOCK.guideAng * k);
+    }
+  }
+
+  /**
+   * Out of it: her body out of the solve, and her back on the mark she got
+   * in from — where the guide has just stood her up. Also the way out of
+   * any ham phase that has lost its hammock.
+   */
+  function hamLeft() {
+    if (hammock && hammock.api.herIn) hammock.api.herLeave();
+    const H = show.ham;
+    if (H && H.mark) {
+      show.t = H.mark.t; show.s = H.mark.s;
+      show.ang = H.mark.ang; show.want = show.ang; show.rate = 0;
+    }
+    show.ham = null;
+    show.byAsk = 0;
+    if (skinFig && skinFig.face) { skinFig.face.gape = 0; skinFig.face.laugh = 0; }
+  }
+
+  /** A push has landed — from 90-app.js. Answers whether she was in it to feel it. */
+  function hamPushed(dv) {
+    if (!show || show.phase !== 'hamHeld' || !show.ham) return false;
+    show.ham.pushedAt = show.ham.t;
+    return true;
   }
 
   // ── THE SLOW LICK, the half of it that happens to her ─────────────────────
@@ -37874,7 +38342,12 @@ async function buildJadrija(scene) {
     // going down onto her knees from a position she is already in.
     submit: 1, kept: 1, rise: 1, creep: 1,
     // And the second stage of it, for the same reason again.
-    recline: 1, cradle: 1, situp: 1 };
+    recline: 1, cradle: 1, situp: 1,
+    // And the hammock, where the water has nothing to answer: her body is in
+    // the hammock's solve and a flare or a kneel from there would leave it
+    // lying in the cloth without her. She smiles at it — see `bask`'s share
+    // of SMILE, which the water adds whatever she is doing.
+    hamTurn: 1, hamIn: 1, hamHeld: 1, hamOut: 1 };
 
   // And the three of those that have a beat under them. `flare` is in it
   // because the riser is the point of the riser: the music starts a second and
@@ -37900,6 +38373,9 @@ async function buildJadrija(scene) {
    * does there is not a smaller smile. It is a different face.
    */
   const SMILE = {
+    // In the hammock: pleased with it, and more when you swing her — see
+    // `case 'hamHeld'`, which adds the swing on top of this.
+    hamGo: 0.55, hamTurn: 0.60, hamIn: 0.65, hamHeld: 0.55, hamOut: 0.50,
     idle: 0.30, notice: 0.62, down: 0.55, crawl: 0.50, up: 0.72,
     flip: 0.85, play: 0.55, aim: 0.70, wheel: 0.85, bask: 1.00,
     orbit: 0.80, joy: 1.00, shimmy: 0.90, home: 0.45,
@@ -38195,7 +38671,7 @@ async function buildJadrija(scene) {
   const askLog = [];
   const ON_FEET = { wine: 1, coke: 1, give: 1, wear: 1, kiss: 1, hug: 1,
     fours: 1, handstand: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
-    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
+    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1, hammock: 1,
     'hair.down': 1, 'hair.up': 1, 'fetch.cream': 1,
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
     'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1 };
@@ -38243,6 +38719,13 @@ async function buildJadrija(scene) {
   // server/baye/baye.py, which now answers `doff:<key>`.
   const SHE_CAN = { line: 1, reset: 1, doff: 1, wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
     note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
+    /**
+     * AND THE HAMMOCK, in and out. Misha, 27 Sep 2026: *"I can sorta swing
+     * baye on it"*. An errand to the pines behind the kabine and two clips —
+     * `hamIn` and `hamLie` in tools/blender/human_mh.py — with the hammock
+     * itself holding her up in between: see HAM below and src/43-hammock.js.
+     */
+    hammock: 1, 'hammock.out': 1,
     // AND THE POSE SHE ALREADY HAD AND NOTHING COULD ASK FOR.
     //
     // Misha, 17 Sep 2026: *"i tell her to get down on her knees, and eventho
@@ -38614,6 +39097,26 @@ async function buildJadrija(scene) {
    */
   function askWhy(name) {
     if (!show) return 'gone';
+    if (name === 'hammock') {
+      if (!hammock) return 'nohammock';
+      // In it, or on her way — asked again it is the same request.
+      if (show.phase === 'hamGo') return 'hamgoing';
+      if (HAM[show.phase]) return show.phase === 'hamOut' ? 'hamout' : 'inhammock';
+      // Under the kabina's roof the room drawn is the big one, and the door
+      // out of it is a dip, not a walk — see `kabinaMode`. The hammock is
+      // out in the pines behind it; ask her out here first.
+      if (sheIsIn()) return 'kabinain';
+      if (show.phase === 'swim' || (show.dip || 0) > 0) return 'swimming';
+      // And a way there from where she is — see `hamPath`.
+      const mk = hamMark();
+      if (!mk || !hamRoute(mk)) return 'noway';
+      return null;
+    }
+    if (name === 'hammock.out') {
+      if (!HAM[show.phase] || show.phase === 'hamGo') return 'nothammock';
+      if (show.phase === 'hamOut') return 'hamout';
+      return null;
+    }
     if (name === 'wine') {
       // AND A FULL GLASS IS NO LONGER A REFUSAL. "The glass is already full"
       // is the room's own rule — written over `fillTo`, nobody drinks it —
@@ -39982,7 +40485,10 @@ async function buildJadrija(scene) {
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
     const nowOk = NOW[show.ask] && !busy
       && (show.ask !== 'turn' || LYING[show.phase] || TURN_HOLD[show.phase]
-        || show.phase === 'creep');
+        || show.phase === 'creep')
+      // In the hammock only the things her face and your hand do — see
+      // HAM_KEEP; anything else waits for `hamHeld` to get her out first.
+      && (!HAM[show.phase] || HAM_KEEP[show.ask]);
     if (show.ask && (ASKABLE[show.phase] || nowOk)) {
       const name = show.ask;
       show.ask = null;
@@ -40499,6 +41005,25 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toBar', 'walk', 0.32);
         } else show.did = null;      // no ladder to hold: she cannot, honestly
+      } else if (name === 'hammock') {
+        // TO THE HAMMOCK: the mark in front of it on the near side, and the
+        // way there through the huts and the cars — `hamPath`, which `askWhy`
+        // has just found too — walked by `hamGo`; the rest is `hamTurn`.
+        const mk = hamMark();
+        const legs = mk ? hamRoute(mk) : null;
+        if (mk && legs) {
+          show.job = { name, t: mk.t, s: mk.s, since: 0, leg: 0, legs,
+            best: null, stall: 0, replan: 0 };
+          show.ham = { mark: mk, t: 0, enter: false, laugh: 0, pushedAt: -9, alone: 0 };
+          show.stuck = null;
+          show.byAsk = 1;
+          show.queue.length = 0;
+          showSay('trill', d);
+          go('hamGo', 'walk', 0.32);
+        } else { show.did = null; show.why = 'noway'; }
+      } else if (name === 'hammock.out') {
+        // Answered in `hamHeld`, which is where she is when it means anything.
+        show.did = null;
       } else if (ERRANDS[name] || name.startsWith('see.')
           || name.startsWith('fetch.cream')) {
         const mk = errandMark(name);
@@ -42149,6 +42674,134 @@ async function buildJadrija(scene) {
         break;
       }
 
+      // ── THE HAMMOCK ─────────────────────────────────────────────────────
+      //
+      // See HAM, over `hamMark`. There along `hamPath`'s legs; then the last
+      // few centimetres and her back turned on it, then in.
+      case 'hamGo': {
+        const j = show.job, H = show.ham;
+        if (!j || !H || !hammock) { show.job = null; show.ham = null; go('play', 'walk', 0.36); break; }
+        // Asked for anything else on the way, she lets the hammock go.
+        if (show.ask && show.ask !== 'hammock') {
+          show.job = null; show.ham = null; show.byAsk = 0;
+          go('play', 'walk', 0.36);
+          break;
+        }
+        j.since += dt;
+        const last = j.leg >= j.legs.length - 1;
+        const g = j.legs[Math.min(j.leg, j.legs.length - 1)];
+        const dist = showTo(g[0], g[1], dt, HAM_T.pace);
+        if (!last && dist < 0.55) { j.leg++; j.best = null; j.stall = 0; break; }
+        if (last && dist < HAM_T.at) { show.job = null; H.t = 0; go('hamTurn', 'idle', 0.35); break; }
+        // Stalled against something that was not there when the way was
+        // found — somebody standing in it, the creature, you: find it again
+        // from here, twice, and then let it go.
+        if (dist < (j.best == null ? 1e9 : j.best) - 0.2) { j.best = dist; j.stall = 0; } else j.stall += dt;
+        if (j.stall > HAM_T.stall) {
+          const again = j.replan < 2 ? hamPath(show.t, show.s, H.mark.t, H.mark.s) : null;
+          if (again) { j.legs = again; j.leg = 0; j.best = null; j.stall = 0; j.replan++; } else {
+            show.job = null; show.ham = null; show.stuck = 'hammock'; show.byAsk = 0;
+            go('play', 'walk', 0.36);
+          }
+        }
+        break;
+      }
+
+      case 'hamTurn': {
+        const H = show.ham;
+        if (!H || !hammock) { hamLeft(); go('play', 'walk', 0.36); break; }
+        H.t += dt;
+        show.vel = 0;
+        showSettle([H.mark.t, H.mark.s], dt, 8);
+        show.want = H.mark.ang;
+        const e = Math.atan2(Math.sin(H.mark.ang - show.ang), Math.cos(H.mark.ang - show.ang));
+        const near = Math.hypot(show.t - H.mark.t, show.s - H.mark.s);
+        if ((Math.abs(e) < 0.05 && near < 0.03) || H.t > HAM_T.turnFor) {
+          // Onto it exactly — the last couple of centimetres and degrees are
+          // not a thing anybody can see her do.
+          show.t = H.mark.t; show.s = H.mark.s;
+          show.ang += e; show.want = show.ang; show.rate = 0;
+          H.t = 0;
+          H.enter = true;           // `hamPlace` puts her body in, this frame
+          go('hamIn', 'hamIn', 0.30);
+        }
+        break;
+      }
+
+      case 'hamIn': {
+        const H = show.ham;
+        if (!H || !hammock) { hamLeft(); go('play', 'walk', 0.36); break; }
+        H.t += dt;
+        show.vel = 0;
+        if (done) { H.t = 0; go('hamHeld', 'hamLie', 0.50); }
+        break;
+      }
+
+      case 'hamHeld': {
+        const H = show.ham;
+        if (!H || !hammock || !hammock.api.herIn) { hamLeft(); go('play', 'walk', 0.36); break; }
+        H.t += dt;
+        show.vel = 0;
+        // And the way out. Asked for; or anything else asked that is not her
+        // face or your hand (HAM_KEEP), which is kept and answered once she is
+        // standing; or eight minutes; or you gone for twenty-five seconds.
+        H.alone = withYou ? 0 : H.alone + dt;
+        const out = show.ask === 'hammock.out';
+        if (out) { show.ask = null; show.did = 'hammock.out'; }
+        if (out || (show.ask && !HAM_KEEP[show.ask]) || H.t > HAM_T.stay || H.alone > HAM_T.alone) {
+          if (f.face) { f.face.gape = 0; f.face.laugh = 0; }
+          if (H.laugh > 0 && audio && audio.lickLaughStop) audio.lickLaughStop('baye', 0.4);
+          H.laugh = 0;
+          // Into the end of `hamIn` — the lying key `hamLie` breathes about
+          // — and its clock turned round, with no fade: see `unroll`.
+          go('hamOut', null);
+          if (!S.cur || S.cur.name !== 'hamIn') f.play('hamIn', { fade: 0, from: 1e3 });
+          if (S.cur && S.cur.name === 'hamIn') S.curT = S.cur.dur;
+          S.prev = null;
+          S.speed = -1;
+          break;
+        }
+        // Her face: the swing on it, and a laugh at a big one — a push in the
+        // last second and a half that has built the swing past `laughAt`.
+        const sw = hammock.api.swing();
+        if (f.face) {
+          f.face.smile = clamp(SMILE.hamHeld + Math.abs(sw.peak) * HAM_T.smileSwing
+            + show.wet * 0.32, 0, 1);
+          if (H.laugh <= 0 && H.t - H.pushedAt < 1.5 && sw.peak > HAM_T.laughAt) {
+            H.laugh = HAM_T.laughFor;
+            H.laughs = (H.laughs || 0) + 1;
+            if (audio && audio.lickLaugh) audio.lickLaugh('baye', d);
+          }
+          if (H.laugh > 0) {
+            H.laugh -= dt;
+            const L = LICK_LAUGH;
+            const k = clamp(Math.min(H.laugh, HAM_T.laughFor - H.laugh) / 0.35, 0, 1);
+            const ha = Math.abs(Math.sin(H.t * Math.PI * L.haHz));
+            f.face.gape = k * (L.gape[0] + (L.gape[1] - L.gape[0]) * ha);
+            f.face.laugh = k * L.lid;
+            f.face.smile = 1;
+            if (H.laugh <= 0) {
+              f.face.gape = 0; f.face.laugh = 0;
+              if (audio && audio.lickLaughStop) audio.lickLaughStop('baye', 0.6);
+            }
+          }
+        }
+        break;
+      }
+
+      case 'hamOut': {
+        // `hamIn` backwards, off the clip's clock — `unroll`'s way — with
+        // the guide coming on under her (see `hamPlace`).
+        show.vel = 0;
+        S.speed = -1;
+        if (!S.cur || S.cur.name !== 'hamIn' || S.curT <= 0) {
+          S.speed = 1;
+          hamLeft();
+          go('play', 'walk', 0.36);
+        }
+        break;
+      }
+
       case 'errand': {
         const j = show.job;
         if (!j) { showNext(); break; }
@@ -43112,8 +43765,16 @@ async function buildJadrija(scene) {
         ? lerp(yNow, CONFIG.seaLevel + ERRAND.floatY, show.dip * show.dip * (3 - 2 * show.dip))
         : yNow,
       p[2]);
-    f.mesh.rotation.y = faceYaw(show.t, show.ang + show.side);
+    // ALL THREE, and not the yaw alone. The hammock (`hamPlace`) writes her
+    // whole attitude as a quaternion, and three.js reads that back into the
+    // Euler as whatever triple it decomposes to — a yaw past a quarter turn
+    // comes out as x π, z π. Setting `.y` alone on the way out of it kept the
+    // other two: MEASURED, she stood up out of the hammock and was drawn
+    // upside down under the ground on the next frame.
+    f.mesh.rotation.set(0, faceYaw(show.t, show.ang + show.side), 0);
     f.mesh.updateMatrixWorld();
+    // AND IN THE HAMMOCK SHE IS WHERE HER BODY IS — see `hamPlace`.
+    if (hammock && HAM_SIM[show.phase]) hamPlace(f, dt);
 
     wearTick(dt);
     hairAim();
@@ -53501,6 +54162,9 @@ async function buildJadrija(scene) {
       ballYou = at || null;
       ball.step(dt, cam);
     }
+    // The hammock, before her: `stepShow` below places her mesh off the body
+    // this has just solved, so she and the cloth are drawn from the same step.
+    if (hammock) hammock.step(dt, cam);
     if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
 
@@ -55126,6 +55790,43 @@ async function buildJadrija(scene) {
     doodleLick: (who) => (doodle ? doodle.api.lick(who) : 'nodog'),
     /** The beach ball's handle — see `api` in src/43-ball.js. */
     ball: ball ? ball.api : null,
+    /** The hammock's handle — see `api` in src/43-hammock.js. */
+    hammock: hammock ? hammock.api : null,
+    /** A push on it has landed — see `hammockPush` in 90-app.js. */
+    hamPushed: (dv) => hamPushed(dv),
+    /** Debug: the way from (t0, s0) to (t1, s1) — see `hamPath` — and her mark. */
+    hamPath: (t0, s0, t1, s1) => hamPath(t0, s0, t1, s1),
+    /**
+     * Debug: skip the walk — her on the mark, turning to get in, as if she
+     * had just arrived. For probes that cannot spend forty seconds on the
+     * way there every time.
+     */
+    hamSkip: () => {
+      const mk = hamMark();
+      if (!mk || !show || !skinFig) return null;
+      show.t = mk.t; show.s = mk.s; show.job = null; show.ask = null;
+      show.ham = { mark: mk, t: 0, enter: false, laugh: 0, pushedAt: -9, alone: 0 };
+      show.byAsk = 1; show.phase = 'hamTurn'; show.tmr = 0; show.vel = 0;
+      skinFig.play('idle', { fade: 0.2 });
+      return mk;
+    },
+    hamMark: () => hamMark(),
+    /** Debug: her side of it — phase, clip clock, the mark, laughs. */
+    hamState: () => (show ? { phase: show.phase, job: show.job ? show.job.name : null,
+      clip: skinFig && skinFig.state.cur ? skinFig.state.cur.name : null,
+      curT: skinFig ? +(skinFig.state.curT || 0).toFixed(2) : null,
+      speed: skinFig ? skinFig.state.speed : null,
+      ham: show.ham ? { t: +show.ham.t.toFixed(2), laugh: +(show.ham.laugh || 0).toFixed(2),
+        laughs: show.ham.laughs || 0, mark: show.ham.mark ? [+show.ham.mark.t.toFixed(2), +show.ham.mark.s.toFixed(2)] : null } : null,
+      ts: [+show.t.toFixed(2), +show.s.toFixed(2)],
+      // Which of her capsules the hammock's depth measure last found deepest.
+      penAt: (() => {
+        if (!hammock) return null;
+        const id = hammock.api.net.stats.penWho, c = chainCapsules();
+        if (id < 0) return null;
+        return id < c.length ? c[id].name : (HAM_ARMS[id - c.length] || ['?', '?']).slice(0, 2).join('>');
+      })(),
+      smile: skinFig && skinFig.face ? +(skinFig.face.smile || 0).toFixed(2) : null } : null),
     /** Debug: the capsules the ball would meet round (x, z), as it sees them. */
     ballCapsAt: (x, z, r = 1.5) => {
       const out = [];
@@ -55500,7 +56201,7 @@ async function buildJadrija(scene) {
       at: bathers.filter((b) => b.phone)
         .map((b) => [+b.t.toFixed(1), +b.s.toFixed(1), b.phone]),
       quote: phoneQuotes.q,
-      hammock: hammockAt,
+      hammock: hammockAt, hammockCands: hammockCands.length,
       pines: greens.filter((g) => g[3] === 9).length,
       groveFloor,
       world: phones ? phones.filter((m) => m && m.g.visible)

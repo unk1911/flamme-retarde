@@ -522,7 +522,11 @@ function apprStepBody(dt, leader, room) {
   // 43-jadrija.js for the one switch that turns it back.
   if (APPR.primary) {
     appr.mesh.position.copy(m.position);
-    appr.mesh.rotation.y = m.rotation.y;
+    // The whole attitude and not the yaw: in the hammock (1.531.0) she is
+    // rolled and pitched with the cloth, and a yaw alone stood v2.0 bolt
+    // upright in the air beside it. Everywhere else the leader has only a
+    // yaw, so this is the same thing it always was.
+    appr.mesh.quaternion.copy(m.quaternion);
     appr.mesh.visible = true;
     apprMode = 'primary';
     v5Blink(apprEye, dt);

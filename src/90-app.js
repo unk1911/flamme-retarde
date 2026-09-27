@@ -1022,7 +1022,7 @@ let thumbK = 0, thumbAt = null;
 let petK = 0, petAt = null;
 // And your hand on her breast — see the gate. `reachKind` is decided on the
 // press; `cupSide` is which of the two.
-let cupK = 0, cupAt = null, reachKind = 'thumb', reachWas = false, cupSide = 0;
+let cupK = 0, cupAt = null, reachKind = 'thumb', reachWas = false, cupSide = 0, pressHam = false;
 const _gripAt = new THREE.Vector3();
 // THE SHAKE. Misha, 24 Sep 2026: *"sometimes the entire kabine starts
 // shaking uncontrollably"*. Measured frame by frame (`camTrace`): with your
@@ -1193,6 +1193,65 @@ function ballThrowTick(dt) {
   const u = (throwT - BALL.windup) / BALL.follow;
   throwK = Math.max(0, 1 - u);
   if (u >= 1) throwT = -1;
+}
+
+// ── THE HAMMOCK PUSH ──────────────────────────────────────────────────────
+//
+// Misha, 27 Sep 2026: *"I can sorta swing baye on it"*. The same button the
+// branch is on, and the same finger: standing by the hammock with the cloth
+// (or her in it) in front of you, a press is a shove with the flat of your
+// hand instead of water — the way the kabina's press is a thumb instead of
+// water. Once per press: the swing is a pendulum, and pushing again as it
+// comes back toward you and starts away is what builds it, which is the whole
+// game of pushing somebody in a hammock.
+//
+// The hand goes out to where the cloth is and comes back — `pushK`, the
+// throw's gesture with the open palm — over `PUSH_HAND` seconds.
+const PUSH_HAND = { out: 0.14, back: 0.30 };
+let pushT = -1, pushK = 0, hammockPushes = 0;
+const pushAt = new THREE.Vector3();
+const _pushV = new THREE.Vector3(), _pushF = new THREE.Vector3();
+/**
+ * The hammock is within reach and in front of you: the point to push, or
+ * null. `any` skips the aim (a probe cannot aim a crosshair to the degree).
+ */
+function hammockAim(any = false) {
+  const H = jadrija && jadrija.hammock;
+  if (!H || state.phase !== 'ground' || !ground || !ground.ok || !ground.you) return null;
+  const Y = ground.you;
+  const n = H.nearest(Y.x, Y.z);
+  if (!n || n.d > HAMMOCK.reach) return null;
+  if (any) return n;
+  const fw = camera.getWorldDirection(_pushF);
+  _pushV.set(n.x - camera.position.x, n.y - camera.position.y, n.z - camera.position.z).normalize();
+  return fw.dot(_pushV) > 0.55 ? n : null;
+}
+/** Push it, if you can; the velocity it was given, or null. */
+function hammockPush(any = false) {
+  const n = hammockAim(any);
+  if (!n || pushT >= 0) return null;
+  const H = jadrija.hammock, Y = ground.you;
+  const r = H.push(Y.x, Y.z);
+  if (!r) return null;
+  pushT = 0;
+  pushAt.set(r.at[0], r.at[1] + 0.05, r.at[2]);
+  hammockPushes++;
+  // And her, if she is in it: a smile at a push, and a laugh at a big one —
+  // see `hamPushed` in 43-jadrija.js.
+  if (jadrija.hamPushed) jadrija.hamPushed(r.dv);
+  return r;
+}
+function hammockPushTick(dt) {
+  if (pushT < 0) { pushK = damp(pushK, 0, 8, dt); return; }
+  pushT += dt;
+  if (pushT < PUSH_HAND.out) {
+    const u = pushT / PUSH_HAND.out;
+    pushK = u * u * (3 - 2 * u);
+    return;
+  }
+  const u = (pushT - PUSH_HAND.out) / PUSH_HAND.back;
+  pushK = Math.max(0, 1 - u);
+  if (u >= 1) pushT = -1;
 }
 const THUMB_WALK = 1.3;      // m/s you step in at
 let camMode = 0;
@@ -7148,6 +7207,11 @@ function frame() {
         }
       }
     }
+    // THE HAMMOCK, outside: a press with the cloth in front of you and within
+    // an arm is a shove and not the branch, for the whole of the press — see
+    // `hammockPush`. Decided on the frame the button goes down, like the reach.
+    if (pressing && !reachWas) pressHam = !inKab && !!hammockPush();
+    if (!pressing) pressHam = false;
     // A probe cannot aim a crosshair to the degree; it can say what it meant.
     if (pressing && reachForce) { reachKind = reachForce[0]; cupSide = reachForce[1]; }
     if (pressing && !reachWas && reachKind === 'pet' && jadrija && jadrija.askShow) {
@@ -7351,7 +7415,7 @@ function frame() {
     const petting = !!petNow0 && petD < PET_REACH;
     petK = damp(petK, petting ? 1 : 0, petting ? 3.5 : 6, dt);
     if (jadrija && jadrija.petTouch) jadrija.petTouch(petK);
-    ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear);
+    ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear && !pressHam);
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
     // integrated was the chute branch, so the moment the canopy touched down she
@@ -7731,11 +7795,15 @@ function frame() {
     // Not during the establishing shot: the camera is sixteen metres up and a
     // pair of arms drawn over the top of it is a pair of arms in the sky.
     ballThrowTick(dt);
+    hammockPushTick(dt);
     arms.update(dt, chaseCut || bodyCam ? null
       // The throw — see `ballThrowTick`. The cupped hand, because it has a
       // ball in it; ahead of the others, because it is over in half a second.
       : state.phase === 'ground' && throwK > 0.01
         ? { reach: { x: throwAt.x, y: throwAt.y, z: throwAt.z, k: throwK, kind: 'cup' } }
+      // The push — see `hammockPush`. The open palm, out to the cloth and back.
+      : state.phase === 'ground' && pushK > 0.01
+        ? { reach: { x: pushAt.x, y: pushAt.y, z: pushAt.z, k: pushK, kind: 'cup' } }
       : state.phase === 'ground' && thumbK > 0.01 && thumbAt
         ? { reach: { x: thumbAt.x, y: thumbAt.y, z: thumbAt.z, k: thumbK } }
         : state.phase === 'ground' && cupK > 0.01 && cupAt
@@ -9046,6 +9114,37 @@ window.__fr = {
       fetchStats: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().fetchStats() : null),
       fetchTrace: () => (__fr.jad.doodle.api() ? __fr.jad.doodle.api().fetchTrace() : null),
       said: () => ballFetchSaid,
+    },
+    /**
+     * The hammock — see src/43-hammock.js, and `ham*` in 43-jadrija.js.
+     *
+     *   __fr.jad.hammock.stats()          sag, swing, stretch, her depth in it, ms
+     *   __fr.jad.hammock.go()             stand beside it, looking at it
+     *   __fr.jad.hammock.push()           the push, from where you are standing
+     *   __fr.jad.hammock.gps()            where it is, in degrees and in the world
+     */
+    hammock: {
+      api: () => (jadrija && jadrija.hammock) || null,
+      stats: () => (jadrija && jadrija.hammock ? jadrija.hammock.stats() : null),
+      go: (off = 1.6, side = 1) => {
+        const H = jadrija && jadrija.hammock;
+        if (!H || !ground || !ground.ok) return null;
+        const F = H.frame();
+        const x = F.M[0] + F.ez[0] * off * side, z = F.M[2] + F.ez[2] * off * side;
+        ground.retarget(jadrija);
+        ground.dropIn(x, z, Math.atan2(-(F.M[0] - x), -(F.M[2] - z)));
+        return { at: [x, z], M: F.M };
+      },
+      push: () => hammockPush(true),
+      gps: () => {
+        const H = jadrija && jadrija.hammock;
+        if (!H) return null;
+        const F = H.frame();
+        const M_LAT = 111320.0, M_LON = 111320.0 * Math.cos(43.7150 * Math.PI / 180);
+        const lat = 43.7280 - F.M[2] / M_LAT, lon = 15.8700 + F.M[0] / M_LON;
+        return { lat: +lat.toFixed(6), lon: +lon.toFixed(6), world: F.M.map((v) => +v.toFixed(2)),
+          ts: jadrija.local(F.M[0], F.M[2]).map((v) => +v.toFixed(2)), span: +F.D.toFixed(2) };
+      },
     },
     /**
      * Debug: the four trampoline beds, and standing on one of them.
