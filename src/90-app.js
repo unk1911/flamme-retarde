@@ -7075,8 +7075,19 @@ function frame() {
   // with nobody in the frame looking at it, every single time, so the side
   // quest would be a way of losing. Get off her and the fire is where you left
   // it — which is also the only honest thing to do with a clock you stopped.
-  recess = ((state.phase === 'ground' || state.phase === 'chute') && !!jadrija
-    && jadrija.inField(camera.position.x, camera.position.z))
+  //
+  // AND IN THE WATER, AND ON THE BIKE, AND ON THE FOIL. Misha, 27 Sep 2026,
+  // at Jadrija: the "fire is out" screen came up anyway — *"but i don't care
+  // about the fire at this point... ya know?"*. The recess only knew two ways
+  // of being here, on foot and under the chute, and only the field itself,
+  // which stops four metres out from the edge of the concrete. Swimming out
+  // to the diving tower was a way of leaving Jadrija; so was riding a bike
+  // or the foil. It is anywhere within a quarter of a kilometre of the place
+  // now, water included, however you are getting about — Rokići is forty
+  // kilometres off, so nothing on the mission's own ground is inside that.
+  const atJad = !!jadrija && jadrija.inField(camera.position.x, camera.position.z, 250);
+  recess = (atJad && (state.phase === 'ground' || state.phase === 'chute'
+    || state.phase === 'swim' || state.phase === 'ride' || state.phase === 'foil'))
     || state.phase === 'brod';
 
   if (state.phase === 'ground') {

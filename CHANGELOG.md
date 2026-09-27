@@ -8,6 +8,29 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.533.2] — 2026-09-27
+
+### the fire waits while you swim, too
+
+Misha, at Jadrija: the "fire is out" screen came up anyway. *"but i don't
+care about the fire at this point... ya know?"*
+
+The recess, which is what holds the fire while you are at Jadrija, had two
+gaps:
+
+- **Too few ways of being there.** It covered only being on foot and being
+  under the chute. Swimming, riding the bike and riding the foil were not
+  covered at all.
+- **Too little ground.** It covered only the field itself, which stops 4 m
+  out from the edge of the concrete. Swimming out towards the diving tower
+  counted as leaving Jadrija.
+
+With the recess off, the fire went on burning, went out on its own, and the
+game ended over the beach. The recess now covers all five of those phases,
+anywhere within 250 m of the resort, water included. Rokići is 40 km away,
+so none of the mission's own ground falls inside that. Checked: a point 60 m
+out to sea counts as Jadrija, and one 400 m out does not.
+
 ## [1.533.1] — 2026-09-27
 
 ### the hammock stays in the pines, a wider clearing, and no oleanders
