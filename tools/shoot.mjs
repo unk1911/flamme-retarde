@@ -34,7 +34,7 @@ for (let k = 0; k < 64 && !(await freePort(PORT)); k++) PORT = PORT_WANT + 1 + k
 const PROFILE = '/tmp/claude-chrome-profile-' + PORT;
 // A fresh profile every launch: a stale one (a crashed run's lock file, or a
 // session restore) is the other way the same run failed on alternate tries.
-rmSync(PROFILE, { recursive: true, force: true });
+if (!flag('keep-profile')) rmSync(PROFILE, { recursive: true, force: true });
 const URL_BASE = opt('url', 'http://127.0.0.1:8794/flamme-retarde.html');
 const quality = opt('q', 'low');
 const maxWait = Number(opt('wait', 150)) * 1000;
@@ -78,7 +78,7 @@ const chrome = spawn('google-chrome', [
 ], { stdio: ['ignore', 'ignore', 'pipe'], env: GL.env, detached: true });
 const killChrome = () => {
   try { process.kill(-chrome.pid, 'SIGKILL'); } catch { /* gone */ }
-  rmSync(PROFILE, { recursive: true, force: true });
+  if (!flag('keep-profile')) rmSync(PROFILE, { recursive: true, force: true });
 };
 process.on('SIGINT', () => { killChrome(); process.exit(130); });
 process.on('SIGTERM', () => { killChrome(); process.exit(143); });
@@ -128,8 +128,10 @@ function connect(url) {
 
 const consoleLines = [];
 
+const T_START = Date.now();
 async function main() {
   const wsUrl = await endpoint();
+  const chromeUp = (Date.now() - T_START) / 1000;
   const browser = connect(wsUrl);
   await browser.ready;
 
@@ -220,7 +222,18 @@ async function main() {
     });
   }
 
+  const TS = (w) => { if (flag('timing')) console.log(`  t+${((Date.now() - T_START) / 1000).toFixed(2)} ${w}`); };
+  TS('navigate');
+  // --profile-boot file: the main thread from navigate to the first frame
+  // after enter, saved as a .cpuprofile (DevTools opens it) — where boot goes.
+  const bootProf = opt('profile-boot', null);
+  if (bootProf) {
+    await send('Profiler.enable');
+    await send('Profiler.setSamplingInterval', { interval: 500 });
+    await send('Profiler.start');
+  }
   await send('Page.navigate', { url });
+  TS('navigated');
 
   const evalJs = async (expr) => {
     const r = await send('Runtime.evaluate',
@@ -232,6 +245,7 @@ async function main() {
 
   // --- wait for the build ---------------------------------------------------
   const t0 = Date.now();
+  TS('wait build');
   let status = null;
   while (Date.now() - t0 < maxWait) {
     await sleep(500);
@@ -260,8 +274,14 @@ async function main() {
     await evalJs(`document.getElementById('enter').click()`);
     await sleep(400);
   }
+  TS('entered');
   const renderer = await evalJs(RENDERER_JS).catch(() => '?');
-  console.log(`build ${buildSeconds.toFixed(1)}s · ${renderer} · port ${PORT}`);
+  TS('renderer read');
+  if (bootProf) {
+    const { profile } = await send('Profiler.stop');
+    writeFileSync(bootProf, JSON.stringify(profile));
+  }
+  console.log(`build ${buildSeconds.toFixed(1)}s · chrome up ${chromeUp.toFixed(1)}s · ${renderer} · port ${PORT}`);
   // AND AT JADRIJA, UNTIL IT IS THERE. Measured 27 Sep: the resort is built
   // and walkable 1.8 s after the enter click, and plans were opening with a
   // guessed `settle` of 20 000 ms — eighteen seconds of every run spent
@@ -277,6 +297,7 @@ async function main() {
       await sleep(150);
     }
     console.log(`jadrija ready ${((Date.now() - t2) / 1000).toFixed(1)}s`);
+    TS('jadrija ready');
   }
   // --warp n: the world n times a frame from here on — see `warp` in
   // src/90-app.js. A plan step can set its own with `"warp": n`.
@@ -362,7 +383,9 @@ async function main() {
       ? await evalJs(`(async () => JSON.stringify(await (${shotSpec.probe})))()`).catch((e) => 'probe failed: ' + e.message)
       : null;
     const stats = probe ? null : await evalJs(`__fr.stats()`).catch(() => null);
+    TS('capture');
     const shot = await send('Page.captureScreenshot', { format: 'png' });
+    TS('captured');
     writeFileSync(shotSpec.out, Buffer.from(shot.data, 'base64'));
     console.log(`${shotSpec.out}  ${probe ?? (stats ? JSON.stringify(stats) : '')}`);
   }
@@ -371,6 +394,7 @@ async function main() {
   const interesting = consoleLines.filter((l) => !noise.test(l));
   if (interesting.length) console.log('console:\n' + interesting.slice(0, 30).join('\n'));
 
+  console.log(`total ${((Date.now() - T_START) / 1000).toFixed(1)}s`);
   killChrome();
   process.exit(0);
 }
