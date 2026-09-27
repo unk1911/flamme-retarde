@@ -2043,6 +2043,24 @@ html.touch #brod-hud { bottom: calc(7.4rem + var(--wrap)); }
 }
 #sw-fill.low { background: #e8703c; }
 #sw-hint { min-height: 1.2em; opacity: .9; }
+/* On the tower: the swim HUD's place and manner, one reading and one hint. */
+#plunge-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 4.2vh;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .45em;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .75);
+}
+#plunge-hud[hidden] { display: none; }
+#pl-read { letter-spacing: .12em; font-size: .82em; opacity: .8; }
+#pl-hint { min-height: 1.2em; opacity: .9; max-width: 92vw; }
 /* The autopilot light. Not a colour of its own: the aeroplane's says AUTO in
    the same warm amber and it is the same claim — the controls are somebody
    else's until you take them back — so it borrows it rather than teaching a

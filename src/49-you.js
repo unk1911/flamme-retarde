@@ -1225,6 +1225,10 @@ async function buildYou(scene) {
       // outermost means.
       mesh.rotation.set(drive.roll || 0, drive.yaw + YOU.face,
         drive.pitch || 0, 'YZX');
+      // Or a whole attitude, for a body that is not the right way up for
+      // three Euler angles to say it: a somersault with a twist on it — see
+      // src/61-plunge.js. `yaw` is still read by callers as her heading.
+      if (drive.quat) mesh.quaternion.copy(drive.quat);
       mesh.updateMatrixWorld();
       return;
     }

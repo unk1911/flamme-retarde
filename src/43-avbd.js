@@ -1679,6 +1679,18 @@ function avbdNet(o) {
     sLen[s] = len; sK[s] = k; sPen[s] = k > 0 ? k : AVBD.penMin; sOn[s] = 1;
     return s;
   }
+  /**
+   * Re-hang string s between the same two bodies: `a`'s end moved to `ra`,
+   * its rest length to `len`, and on or off. For the springboard's leg in
+   * src/61-plunge.js (1.534.0), which is one spring a plank from her to the
+   * board and walks from plank to plank with her foot — the bodies a string
+   * joins are fixed at `finish` and its ends and length are not.
+   */
+  function setString(s, ra, len, on) {
+    if (ra) { sRA[3 * s] = ra[0]; sRA[3 * s + 1] = ra[1]; sRA[3 * s + 2] = ra[2]; }
+    if (len != null) sLen[s] = len;
+    if (on != null) sOn[s] = on ? 1 : 0;
+  }
   function addPoint(b, x, y, z, r) {
     const p = npt++;
     ptBody[p] = b; ptL[3 * p] = x; ptL[3 * p + 1] = y; ptL[3 * p + 2] = z; ptR[p] = r;
@@ -2465,7 +2477,7 @@ function avbdNet(o) {
   }
 
   return { P, Q, V, W, mass, inert, live, softBody, drag, stats, sF, sLen, cpOn, cpTwo,
-    addBody, addJoint, addString, addPoint, addBox, addCap, setCap, finish,
+    addBody, addJoint, addString, setString, addPoint, addBox, addCap, setCap, finish,
     setFloor: (fn) => { floor = fn; },
     setOneSided: (on, line) => {
       oneSided = !!on;

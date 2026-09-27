@@ -150,7 +150,7 @@ function stepLens(dt) {
   // nine-minute crossing is the strongest case in the game for exactly that.
   const want = (state.phase === 'ground' || state.phase === 'swim'
     || state.phase === 'ride' || state.phase === 'foil'
-    || state.phase === 'brod')
+    || state.phase === 'brod' || state.phase === 'plunge')
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
   zoom = damp(zoom, want, LENS.ease, dt);
   if (zoom < 1e-4 && want === 0) zoom = 0;
@@ -474,6 +474,19 @@ addEventListener('keydown', (e) => {
   //
   // The kite and the foil are in the water too — `inWater()` has always said
   // so — and E means the same thing in both: put the gear away, then walk out.
+  // And E at the foot of the skakaonica's ladder is up it, not ashore: the
+  // one place in the sea where E has somewhere nearer to go. On the tower it
+  // is the reminder that the way down is off the end.
+  if (e.code === 'KeyE' && state.phase === 'swim' && plungeHere()) {
+    e.preventDefault();
+    climbTower();
+    return;
+  }
+  if (e.code === 'KeyE' && state.phase === 'plunge') {
+    e.preventDefault();
+    toast(T('plunge.down'));
+    return;
+  }
   if (e.code === 'KeyE' && inWater()) {
     e.preventDefault();
     goAshore();
@@ -676,9 +689,12 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyT' && state.phase === 'brod') {
     e.preventDefault(); toggleBrodFast(); return;
   }
+  // Space on the tower is a press, and the press is the event: a bounce on
+  // the board, or the tuck in the air. Held, it is read in the frame loop.
+  if (e.code === 'Space' && state.phase === 'plunge' && plunge && !e.repeat) plunge.press();
   if (state.phase === 'ground' || state.phase === 'chute'
     || state.phase === 'swim' || state.phase === 'foil'
-    || state.phase === 'brod') {
+    || state.phase === 'brod' || state.phase === 'plunge') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
     // and several of them would quietly reconfigure an aircraft you are not
     // sitting in — or, by then, an aircraft that is a hole in a hillside.
@@ -718,7 +734,7 @@ canvas.addEventListener('click', () => {
   // iOS throws up a permission bar over the top of the game.
   if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground'
     || state.phase === 'chute' || state.phase === 'swim'
-    || state.phase === 'brod') && !pointerLocked
+    || state.phase === 'brod' || state.phase === 'plunge') && !pointerLocked
     && !(typeof poser !== 'undefined' && poser.on)) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
@@ -777,6 +793,12 @@ addEventListener('mousemove', (e) => {
   if (state.phase === 'foil') {
     const g = 0.0022 * flight.p.sens * (camera.fov / baseFov);
     foil.look(e.movementX * g, e.movementY * g);
+    return;
+  }
+  // On the tower: her head in her own eyes, the orbit round her behind them.
+  if (state.phase === 'plunge' && plunge) {
+    const g = 0.0020 * flight.p.sens * (camera.fov / baseFov);
+    plunge.look(e.movementX * g, e.movementY * g, bodyCam);
     return;
   }
   // And in the water, where it is a head again — a slower one, because the
@@ -1322,7 +1344,7 @@ function updateCamera(dt) {
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
   mirror, mirrorP, swim, under, seabed, arms, mask, kites, ride, foil, chase, you,
-  brod, ao, backlane, backlaneCars;
+  brod, ao, backlane, backlaneCars, plunge;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -1629,6 +1651,18 @@ async function boot() {
   flight = buildFlight(plane, fire);
   eject = buildEject(scene, flight, chuteDown);
   swim = buildSwim(sea);
+  // Up the skakaonica's ladder and off its board — src/61-plunge.js. After
+  // the swim, because the swim is the only way to the foot of the ladder and
+  // the only thing she comes back to.
+  plunge = buildPlunge(jadrija, you, {
+    splash: (x, y, z, hard, fwd, fx, fz) => { if (bodySplash) bodySplash.at(x, y, z, hard, fwd, fx, fz); },
+    sound: (kind, amt) => {
+      if (!audio) return;
+      if (kind === 'plunge' && audio.plunge) audio.plunge(amt);
+      else if (kind === 'land' && audio.nudge) audio.nudge();
+    },
+    toast: (msg) => toast(msg),
+  });
   arms = buildArms();
   mask = buildMask(scene);
   // The occlusion pass. Built here rather than beside the renderer because it
@@ -2233,6 +2267,10 @@ function leaveWater(was = state.phase) {
   // bathroom mirror mid-dive with the sea still playing.
   if (chase && chase.active) chase.stop();
   chaseCut = null;
+  // Off the tower too, whatever took her: the board back to hanging empty
+  // and the diver back to his own afternoon. See `abort` in 61-plunge.js.
+  if (plunge && plunge.active) plunge.abort();
+  $('plunge-hud').hidden = true;
   if (you) you.drive(null);
   bodyCam = false;
   syncBodyBtn();
@@ -2255,7 +2293,7 @@ function leaveWater(was = state.phase) {
   // Leaving a mode that is not running is free — read them, they set a flag —
   // and hiding a hidden div is free. What is not free is a screen that has to
   // be told which of three overlays it is wearing.
-  const wet = was === 'swim' || was === 'ride' || was === 'foil'
+  const wet = was === 'swim' || was === 'ride' || was === 'foil' || was === 'plunge'
     || (swim && swim.active) || (ride && ride.active) || (foil && foil.active);
   if (swim && swim.active) swim.leave();
   if (ride && ride.active) ride.leave();
@@ -2298,8 +2336,11 @@ function goAshore() {
 }
 
 /** True where a back door is allowed to fire from. */
+// The skakaonica's tower counts: you only ever get up it from the sea, it is
+// the sea you go back into, and without it 9, 0, V and R did nothing at all
+// from the top of the ladder (MEASURED — 9 left her standing on the plank).
 const inWater = () => state.phase === 'swim' || state.phase === 'ride'
-  || state.phase === 'foil';
+  || state.phase === 'foil' || state.phase === 'plunge';
 
 // Two rings of eight bearings: one at the near cascade's reach, one at the far
 // cascade's. `shoreAt` saturates at 400 m, so on its own it can promise that
@@ -4308,6 +4349,18 @@ let bodyCam = false;
  * first-person view is worse than no button.
  */
 function toggleBodyCam() {
+  // On the tower B is not a switch but a dial — her eyes, round her, the
+  // judge's chair, the water under the board, the deck behind her — because
+  // the ask was to see the dive "from different angles". `bodyCam` is only
+  // "anything but her eyes" there, so it hands the swim the right answer
+  // when she comes up.
+  if (state.phase === 'plunge' && plunge) {
+    const i = plunge.cycleCam();
+    bodyCam = i > 0;
+    syncBodyBtn();
+    toast(T('plunge.cam.' + plunge.cam));
+    return;
+  }
   if (state.phase !== 'swim' && state.phase !== 'ground'
     && state.phase !== 'brod') return;
   bodyCam = !bodyCam;
@@ -4362,6 +4415,9 @@ function poseSwimBody(dt) {
   // boards on the first frame of the cut if the third person happened to be
   // on when R was pressed.
   if (chaseCut) { clearJump(); return; }
+  // On the tower 61-plunge.js drives her, every bone of it. `_bodyHas` is
+  // dropped so the swim, when she comes up, starts her where she is.
+  if (state.phase === 'plunge') { _bodyHas = false; return; }
   // On foot, which is the other half of this now. Kept in front of the swim
   // branch rather than folded into it: everything below is about a body in
   // water — how deep it floats, how far its root leads its eye when it is
@@ -5382,6 +5438,7 @@ function paintSwimHud() {
   ap.textContent = swim.apNote === 'up' ? T('swim.apUp') : T('swim.auto');
   $('sw-hint').innerHTML = swim.spent ? T('swim.spent')
     : swim.auto ? T('swim.apHint')
+      : plungeHere() ? T(plunge.blocked() || 'plunge.here')
       : wade ? TK('swim.wade', 'swim.wadeTouch')
         : TK('swim.hint', 'swim.hintTouch');
   if (IS_TOUCH) paintSwimTouch(wade, swim.auto);
@@ -5629,6 +5686,83 @@ function landing(from) {
     return { at: [ax, az, airfield.site.yaw], loc: airfield, how: 'apron' };
   }
   return { at: null, loc: null, how: 'none' };
+}
+
+// ── the skakaonica, from the water ──────────────────────────────────────────
+
+/** Is she treading water at the foot of the tower's ladder? */
+function plungeHere() {
+  if (!plunge || state.phase !== 'swim' || !swim || !swim.active) return false;
+  if (chaseCut || (chase && chase.active)) return false;
+  const y = swim.you;
+  return y.depth < 1.2 && plunge.toLadder(y.x, y.z) < plunge.reach;
+}
+
+/**
+ * E at the foot of the ladder: out of the swim and on to the rungs.
+ *
+ * Not `leaveWater`, which is a door out of the water altogether and turns
+ * the third person off on its way — and the whole point of pressing B out
+ * here is to watch her climb. What it shares with it is the HUD going and
+ * the tint coming off.
+ */
+function climbTower() {
+  if (!plungeHere()) return false;
+  const why = plunge.blocked();
+  if (why) { toast(T(why)); return false; }
+  const y = swim.you;
+  if (!plunge.climb([y.x, y.y, y.z])) return false;
+  swim.leave();
+  if (mask) mask.reset();
+  state.phase = 'plunge';
+  $('swim-hud').hidden = true;
+  $('under').classList.remove('on');
+  $('under').style.opacity = '0';
+  $('under').hidden = true;
+  wasUnder = false;
+  // B out here was the swim's single view; on the tower it is a dial, and a
+  // swimmer who had the third person on arrives on its first stop.
+  if (bodyCam) plunge.setCam(1); else plunge.setCam(0);
+  $('plunge-hud').hidden = false;
+  paintPlungeHud();
+  toast(T('plunge.climb'));
+  return true;
+}
+
+/** The splash, as far as the app is concerned: the verdict. */
+function plungeEntry(r) {
+  if (!r) return;
+  toast(T('plunge.q.' + r.word) + ' — ' + r.what + ' · ' + r.score.toFixed(1) + '/10');
+}
+
+/** And back into the swim, where she went in, however deep that was. */
+function plungeToSwim() {
+  if (!plunge || !swim) return false;
+  const h = plunge.handover();
+  plunge.end();
+  const sy = swim.surfaceAt(h.x, h.z);
+  swim.enter(h.x, h.z, h.yaw, 0);
+  swim.you.depth = clamp(sy - h.y, 0.4, 3.5);
+  swim.you.y = sy - swim.you.depth;
+  swim.you.pitch = 0.2;
+  state.phase = 'swim';
+  $('plunge-hud').hidden = true;
+  $('swim-hud').hidden = false;
+  // Her own eyes hand the body back; behind her, `poseSwimBody` picks it up
+  // from where she is on the next frame.
+  if (!bodyCam && you) you.drive(null);
+  paintSwimHud();
+  return true;
+}
+
+/** Two lines: how the board is moving under her, and what the keys do now. */
+function paintPlungeHud() {
+  if (!plunge) return;
+  const r = plunge.readout();
+  $('pl-read').textContent = T('plunge.read')
+    .replace('{d}', Math.round(-r.tip * 100)).replace('{v}', r.v.toFixed(1));
+  const h = plunge.hint;
+  $('pl-hint').innerHTML = h ? T('plunge.hint.' + h) : '';
 }
 
 /**
@@ -7101,7 +7235,8 @@ function frame() {
   // kilometres off, so nothing on the mission's own ground is inside that.
   const atJad = !!jadrija && jadrija.inField(camera.position.x, camera.position.z, 250);
   recess = (atJad && (state.phase === 'ground' || state.phase === 'chute'
-    || state.phase === 'swim' || state.phase === 'ride' || state.phase === 'foil'))
+    || state.phase === 'swim' || state.phase === 'ride' || state.phase === 'foil'
+    || state.phase === 'plunge'))
     || state.phase === 'brod';
 
   if (state.phase === 'ground') {
@@ -7574,6 +7709,36 @@ function frame() {
     updateMission(real);
   }
 
+  // On the tower. Its own phase, like the kite and the foil: the swim is
+  // left behind at the foot of the ladder and picked up again at the splash.
+  if (state.phase === 'plunge' && plunge) {
+    if (eject.active) flyDerelict(dt);
+    const ev = plunge.update(dt, {
+      fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
+        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0),
+      // W or S held as she leaves the board is the dive, and which way.
+      lean: keys.has('KeyW') || keys.has('ArrowUp') ? 1
+        : keys.has('KeyS') || keys.has('ArrowDown') ? -1 : 0,
+      tuck: keys.has('Space'),
+      pike: keys.has('KeyC') || keys.has('ControlLeft'),
+      twist: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),
+    });
+    if (ev && ev.type === 'top') toast(T('plunge.top'));
+    if (ev && ev.type === 'entry') plungeEntry(ev.rate);
+    // In her own eyes she is in the sea the moment she is; behind her, the
+    // shot holds a second on the water closing over her first.
+    if (ev && (ev.type === 'done' || (ev.type === 'entry' && !bodyCam))) plungeToSwim();
+    else paintPlungeHud();
+    updateMission(real);
+  } else if (plunge) {
+    // The board rings on after she has gone, whatever she is doing now; and
+    // if anything took her off the tower without going through the water,
+    // the tower is let go of here.
+    if (plunge.active) plunge.abort();
+    plunge.tick(dt);
+  }
+
   if (state.phase === 'foil') {
     if (eject.active) flyDerelict(dt);
     const out = foil.update(dt, {
@@ -7772,6 +7937,7 @@ function frame() {
   // too, but it is kept where the reasoning for it lives.
   else if (state.phase === 'brod') brod.pose(camera, bodyCam ? BROD.third : 0, dt);
   else if (state.phase === 'swim') swim.pose(camera);
+  else if (state.phase === 'plunge') plunge.pose(camera, bodyCam, dt);
   else if (state.phase === 'chute' || eject.active) eject.pose(camera);
   else if (state.phase !== 'intro') updateCamera(dt);
   // Every frame and not inside a branch, which it was while the swim was the
@@ -8200,8 +8366,11 @@ function frame() {
   // so near that it spends the depth this view needs, because the far end of
   // it is four kilometres of Šibenik coming up the channel.
   const brodNear = state.phase === 'brod' ? 0.82 : 0;
+  // And the tower, where her own hands are on a rung a forearm from her face
+  // and the eye is in front of her own nose: 0.95 puts the plane at 0.12 m.
+  const plungeNear = state.phase === 'plunge' ? 0.95 : 0;
   const faceD = state.phase === 'ground' && ground.nearBody ? ground.nearBody() : null;
-  clipNear = Math.max(indoors, hullNow, bedNow, rideNear, brodNear);
+  clipNear = Math.max(indoors, hullNow, bedNow, rideNear, brodNear, plungeNear);
   let wantNear = 1.2 - 1.14 * clipNear;
   // Somebody else's face, and it is taken out of the ramp above rather than
   // fed into it.
@@ -8759,6 +8928,45 @@ boot().catch((e) => {
 
 // A small handle for the screenshot tool.
 window.__fr = {
+  /**
+   * The skakaonica — src/61-plunge.js.
+   *
+   *   __fr.plunge.go()              in the water at the foot of the ladder, and up it
+   *   __fr.plunge.top()             straight to standing on the plank, facing the tip
+   *   __fr.plunge.stats()           the board, her, the last takeoffs, the entry
+   *   __fr.plunge.press()           one Space
+   *   __fr.plunge.script([{t, jump, fwd, lean, tuck, pike, twist}])
+   *   __fr.plunge.autoPump(3, 1, 'tuck', 1)   three bounces, then a forward 1½ tucked
+   *   __fr.plunge.cam(2)            0 her eyes, 1 round her, 2 judge, 3 water, 4 deck
+   */
+  plunge: {
+    raw: () => plunge,
+    stats: () => (plunge ? plunge.stats() : null),
+    go: () => {
+      if (!plunge || !swim) return false;
+      const f = plunge.foot();
+      __fr.swim.dip(f[0], f[2], 0, 0.1);
+      return climbTower();
+    },
+    top: () => {
+      if (!plunge) return false;
+      if (state.phase !== 'plunge' && !__fr.plunge.go()) return false;
+      return plunge.top();
+    },
+    press: () => (plunge ? (plunge.press(), true) : false),
+    script: (list, end) => (plunge ? plunge.script(list, end) : false),
+    autoPump: (n, lean, shape, turns, twist, late) => (plunge ? plunge.autoPump(n, lean, shape, turns, twist, late) : false),
+    cam: (i) => {
+      if (!plunge) return null;
+      const k = plunge.setCam(i);
+      bodyCam = k > 0;
+      syncBodyBtn();
+      return plunge.cam;
+    },
+    blowUp: (v = 30) => (plunge ? plunge.blowUp(v) : false),
+    here: () => plungeHere(),
+    phase: () => state.phase,
+  },
   /** The help sheet. Toggles when called with nothing, like `body`. */
   help: (v) => { toggleHelp(v); return !$('help').hidden; },
   /**

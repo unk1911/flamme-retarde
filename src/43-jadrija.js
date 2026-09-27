@@ -30985,6 +30985,12 @@ async function buildJadrija(scene) {
     return dv.seg >= P.length - 1;
   }
   const DIVE_MODE_CODE = { wait: 0, dive: 1, tread: 2, swim: 3, ladder: 4, walk: 5, turn: 6, off: 7 };
+  // HER TURN. Set by src/61-plunge.js while she is on the tower (1.534.0), so
+  // the two of them are never on one plank or one ladder: waiting on the
+  // board he goes now, which clears it for her, and arriving at the foot of
+  // the ladder he treads water there until she has gone in. Nothing else he
+  // does changes, and with nobody on the tower it is never set.
+  let diveHeld = false;
 
   function diveStep(dt, cam) {
     if (!diveFigure || !DV) return;
@@ -31006,7 +31012,7 @@ async function buildJadrija(scene) {
     dv.t += h;
     m.visible = true;
     if (dv.mode === 'wait') {
-      if (dv.t >= dv.next) diveStart();
+      if (dv.t >= dv.next || diveHeld) diveStart();
     } else if (dv.mode === 'dive') {
       const T = f.state.curT;
       const fr = Math.min(DV.dive.flex.length - 1, Math.max(0, Math.round(T * DV.fps)));
@@ -31064,7 +31070,17 @@ async function buildJadrija(scene) {
         const wy = typeof seaHeightAt === 'function' ? seaHeightAt(c[0], c[2]) : 0;
         divePlace([c[0], dv.swimY0 + (ySwim + wy - dv.swimY0) * k, c[2]], dv.yaw);
       });
-      if (done) {
+      if (done && diveHeld) {
+        // At the foot of it with her up there: tread, eased from the crawl's
+        // depth to the tread's on the swell over 0.8 s, and wait.
+        if (f.playing() !== 'tread') divePlay('tread', 0.5, true);
+        const c = dv.cur, wy = typeof seaHeightAt === 'function' ? seaHeightAt(c[0], c[2]) : 0;
+        const tY = diveOrigin()[1] + DV.dive.end_root[1] - DV.tread_root[2] + TREAD_LIFT;
+        const k = smoothstep(0, 0.8, dv.held = (dv.held || 0) + h);
+        const ySwim = dv.swimY0 + (0.08 - dv.pelvisY - DV.swim_root[2] + wy - dv.swimY0);
+        divePlace([c[0], ySwim + (tY + wy - ySwim) * k, c[2]], dv.yaw);
+      } else if (done) {
+        dv.held = 0;
         const L = DIVE.P(DIVE.t + DIVE_LADDER.u, DIVE.s + DIVE_LADDER.v, 0);
         dv.yaw = diveYaw(diveAxis.nx, diveAxis.nz);
         dv.ladder = L;
@@ -55072,6 +55088,35 @@ async function buildJadrija(scene) {
         sea: diveFigure ? +seaHeightAt(diveFigure.mesh.position.x, diveFigure.mesh.position.z).toFixed(2) : null }),
       /** Skip the wait: dive now (from wherever he is, he is put on the board). */
       now: () => { if (dv.mode === 'off') return false; return diveStart(); },
+      /**
+       * Hers — src/61-plunge.js. The tower in the platform's own frame, the
+       * plank's numbers, and the ladder, all as they are built above; `hold`
+       * is whose turn it is (see `diveHeld`); `bend` draws the plank to a
+       * deflection function of u (m along from `DIVE.t`, down negative).
+       */
+      frame: {
+        P: (u, v, y) => DIVE.P(DIVE.t + u, DIVE.s + v, y),
+        axis: diveAxis, top: DIVE.top, plank: DIVE_TOP, mid: DIVE.top + 0.06,
+        fulcrum: DIVE_FULCRUM, tip: DIVE_TIP, back: 1.34 - DIVE_BOARD.length / 2,
+        // The rungs' middles and the two tube offsets, as the ladder above is
+        // built (S_FACE, S_DECK and `yy` are block-scoped there).
+        ladder: { u: DIVE_LADDER.u, face: -1.385, rungs: [0, 1, 2, 3, 4, 5, 6, 7]
+          .map((k) => DIVE.top - 0.34 - k * 0.30 + 0.018), deckIn: -0.86 },
+      },
+      hold: (on) => { diveHeld = !!on; return diveHeld; },
+      mode: () => dv.mode,
+      clipT: () => (diveFigure ? diveFigure.state.curT : 0),
+      free: () => (DV ? DV.dive.free : 3),
+      bend: (fn) => {
+        if (!diveBoard) return false;
+        const pos = diveBoard.geometry.attributes.position, base = diveBoard.userData.flexBase;
+        for (let i = 0; i < pos.count; i++) {
+          pos.array[3 * i + 1] = base[3 * i + 1] + (fn ? fn(base[3 * i] + 1.34) : 0);
+        }
+        pos.needsUpdate = true;
+        diveBoard.geometry.computeVertexNormals();
+        return true;
+      },
       set: (mode) => { dv.mode = mode; dv.t = 0; return dv.mode; },
       /** Straight onto the foot of the ladder, climbing — for a probe. */
       ladder: () => {
