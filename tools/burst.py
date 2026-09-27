@@ -696,6 +696,20 @@ def cmd_fan(a):
         say(f"{len(refs)} reference image(s) up: "
             + ", ".join(r.name for r in refs))
     remote_refs = ",".join(f"/home/ubuntu/job/refs/{r.name}" for r in refs)
+    # Extra LoRAs: `HIGH|LOW:strength`, the files looked up in ~/fr-video/loras
+    # and rsynced into the box's ComfyUI/models/loras (rsync skips them the
+    # second time). See vacejob22.py --lora.
+    for spec in a.lora:
+        files = spec.rpartition(":")[0].split("|")
+        local = [Path.home() / "fr-video" / "loras" / f for f in files]
+        for f in local:
+            if not f.is_file():
+                sys.exit(f"--lora: no such file {f}")
+        subprocess.run(
+            ["rsync", "-az", "-e", " ".join(ssh_base(ip)[:-1])]
+            + [str(f) for f in local] + [f"ubuntu@{ip}:ComfyUI/models/loras/"],
+            check=True, stdin=subprocess.DEVNULL)
+        say(f"lora up: {spec}")
     say("uploading frames (once — every worker reads a window out of the same "
         "directory)")
     subprocess.run(
@@ -775,6 +789,8 @@ def cmd_fan(a):
                 cmd += ["--upscale", a.upscale, "--outw", str(a.outw)]
             if remote_refs:
                 cmd += ["--ref", remote_refs]
+            for spec in a.lora:
+                cmd += ["--lora", spec]
             if prompts.get(c):
                 cmd += ["--pos", prompts[c]]
             elif a.pos:
@@ -963,6 +979,8 @@ def main():
     # every 5.06 s. A picture of who they are, handed to all of them, is the one
     # thing a chunk can be told about identity that is not the text.
     f.add_argument("--ref", default="")
+    f.add_argument("--lora", action="append", default=[],
+                   help="HIGHFILE|LOWFILE:STRENGTH, files in ~/fr-video/loras (repeatable)")
     # Which chunk to start at. A film with more than one scene wants a
     # different reference for each (the two women in the kabina, nobody on the
     # promenade), and --ref is per call — so the film is fanned in segments,

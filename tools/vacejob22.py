@@ -109,7 +109,18 @@ AP.add_argument("--no-check", dest="check", action="store_false")
 AP.add_argument("--fastlora", dest="lowmem", action="store_false",
                 help="merge LoRAs the fast (threaded) way; segfaulted on an "
                      "A100 with fp8-scaled Wan 2.2 weights")
+# Extra LoRAs on top of (or instead of) Lightning — Wan 2.2 A14B is two models,
+# so a LoRA for it is two files: `HIGH.safetensors|LOW.safetensors:strength`,
+# repeatable, chained after Lightning in the order given. The files have to be
+# in the box's ComfyUI/models/loras; `burst.py fan --lora` puts them there.
+AP.add_argument("--lora", action="append", default=[],
+                help="HIGHFILE|LOWFILE:STRENGTH (repeatable)")
 A = AP.parse_args()
+EXTRA = []
+for spec in A.lora:
+    files, _, st = spec.rpartition(":")
+    hi, _, lo = files.partition("|")
+    EXTRA.append((hi, lo or hi, float(st)))
 
 HIGH = "Wan2_2-T2V-A14B_HIGH_fp8_e4m3fn_scaled_KJ.safetensors"
 LOW = "Wan2_2-T2V-A14B_LOW_fp8_e4m3fn_scaled_KJ.safetensors"
@@ -164,11 +175,21 @@ for side, base, vace, lora in (("h", HIGH, VACE_HIGH, LORA_HIGH),
          "extra_model": ["vacesel_" + side, 0]}
     if A.swap:
         m["block_swap_args"] = ["swap", 0]
+    prev = None
     if A.light:
         node("lora_" + side, "WanVideoLoraSelect",
              {"lora": lora, "strength": A.light,
               "low_mem_load": A.lowmem})
-        m["lora"] = ["lora_" + side, 0]
+        prev = "lora_" + side
+    for k, (hi, lo, st) in enumerate(EXTRA):
+        inp = {"lora": hi if side == "h" else lo, "strength": st,
+               "low_mem_load": A.lowmem}
+        if prev:
+            inp["prev_lora"] = [prev, 0]
+        node(f"xlora{k}_" + side, "WanVideoLoraSelect", inp)
+        prev = f"xlora{k}_" + side
+    if prev:
+        m["lora"] = [prev, 0]
     node("model_" + side, "WanVideoModelLoader", m)
 
 node("txt", "WanVideoTextEncode",
