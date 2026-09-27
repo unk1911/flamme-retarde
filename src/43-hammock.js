@@ -131,6 +131,41 @@ const HAMMOCK = {
   // half her weight, where rolling out takes 40 cm — and it is nothing at
   // all while she swings, because she and the bed swing together.
   keep: 3000,
+  // THE HAND ON THE BED, N/m for the whole bed, across the span only. Misha,
+  // 27 Sep 2026: *"somehow the hammock broke now, she gets there and it
+  // breaks and gets thrown into the sky or something"*. `wrong` (below)
+  // catches the sky. What goes wrong first is getting in, and it is the
+  // same thing every time. MEASURED, frame by frame through thirty get-ins,
+  // the middle row of the cloth across the span against her centre: while
+  // the guide has her, her seat and legs lean on a bed of two kilograms
+  // with the guide's twelve thousand newtons a metre behind them, and the
+  // bed goes. Either it swings away across the span — its middle 0.25 to 0.55
+  // m from her by the time the guide lets go, where on a get-in that works
+  // it is 0.05 to 0.17 — or it folds shut under her, five plates across
+  // stacked into two, 0.25 m wide. Either way she is lowered on to the edge
+  // of it, rolls off, and lies under the bed with the cloth over her. That
+  // was 15 get-ins in 30 before 1.535.2, and 8 in 30 on the settled
+  // hammock — which one you get is chaotic; which way it goes is not.
+  //
+  // So while the guide has her, and for `holdFor` s after it lets her go
+  // (then eased off over `holdFade`), every plate is held by a soft spring
+  // across the span only — where it lay across relative to the rest of the
+  // bed when she started, with the whole bed carried to under her centre
+  // (as far as `holdAcross` either side of the line between the ties). It
+  // is the hand a person keeps on a hammock getting in. The bed sags, folds
+  // along the span and takes her weight as it likes; it only cannot swing
+  // away from her or fold shut across. And the same while the guide takes
+  // her out. MEASURED: 30 of 30 on the cloth, six ways — walked there,
+  // asleep, after forty seconds, after a push, you on the other side, at
+  // warp 8 — where it had been 22 of 30; she lies where a good get-in
+  // always put her (y 3.203 to 3.209, against 3.20). TRIED FIRST: the
+  // middle column held where it was, which kept the bed from swinging and
+  // let it fold shut (5 in 9); the whole bed held at the line under the
+  // ties, 7 in 10; no friction on her while guided, 0 in 9 — the friction
+  // is what drags the bed along with her, and the push is what the normals
+  // do. At 20 000 N/m, 9 in 10, and she is pushed up off the rim 18 cm as
+  // she sits.
+  hold: 8000, holdAcross: 0.08, holdFor: 1.5, holdFade: 1.0,
   // ── the solve ───────────────────────────────────────────────────────────
   // The chain's constants (CHAIN in 43-jadrija.js), and ten iterations at
   // 120 Hz, which is two steps a frame at 60.
@@ -153,6 +188,29 @@ const HAMMOCK = {
   // Past this from the camera it is not stepped at all; nearer, it sleeps
   // once it has been still for `sleepAfter` seconds with nobody in it.
   far: 60, sleepAfter: 2.0, still: 0.015,
+  // AND THE LAST DEGREE IS HUSHED. Misha, 27 Sep 2026, offered "fix the
+  // hammock's slow sleep properly, without changing how it hangs": *"both"*.
+  // MEASURED, the empty hammock is a pendulum 3.58 s long (the ropes and the
+  // bed swing about the line between the ties like a bob on 3.2 m) and it
+  // loses 1.9 % of its swing a second — 6.8 % a swing, a time constant of
+  // 53 s, which is `drag` and BDF1 and right for a swing anybody can see.
+  // But `still` is a swing of 0.3 degrees (the fastest thing in it, the
+  // gathers bobbing, at 0.045 m/s per degree), and at 1.9 % a second a
+  // swing takes two minutes to get from a degree to that: the 11.7-degree
+  // hammock that was 31 % of the page at Jadrija was hanging at rest to a
+  // centimetre and awake for the last few millimetres. It is not solver
+  // noise — at true rest the fastest thing in it is 0.0003 m/s. So: once
+  // the fastest thing in the empty cloth has stayed under `hushV` (about a
+  // degree of swing, 16 mm at the bed) for a whole window of `hushWin`,
+  // longer than a swing, the cloth and the gathers take `hush` more air,
+  // which lands them on the rest in two or three seconds instead of two
+  // minutes, and it sleeps. Never with her in it; never before the swing
+  // is down to a degree, so a push looks exactly as it did for as long as
+  // anybody could tell; and off again the moment anything wakes it. 2.5/s
+  // is MEASURED as the most that lands on the true rest: at 6 the swing is
+  // overdamped and creeps, and stopped where the velocity ran out 3.6 mm
+  // short of the rest; at 20, 14 mm short, and it swung again when let go.
+  hush: 2.5, hushV: 0.045, hushWin: 4.0,
   // What counts as the net going wrong — see `wrong`. Measured when it is
   // right: the hard joints open 0.1-0.5 mm lying, 2.4 mm at worst getting in;
   // the fastest thing in it is a pushed swing at about 2 m/s.
@@ -160,6 +218,42 @@ const HAMMOCK = {
   // How long the empty cloth is settled for at build, s — so the first time
   // anybody walks up to it, it is hanging and not falling.
   settle: 3.0,
+  // AND THEN HUSHED TO ITS REST, at build, until the fastest thing in it
+  // has been under `restV` for `restHold` s (at most `restMax` s). MEASURED:
+  // the settle draws the gathered ends in, which sets the whole hammock
+  // swinging 2.5 degrees either side of where it hangs, and left to itself
+  // it swung like that for 75 s before it slept — which is what you walked
+  // up to, every time, from anywhere past `far`. Hushed after the settle it
+  // is at rest 3.5 s of steps later — 416 steps, about 0.22 s of build
+  // beside the settle's 0.28 — within half a millimetre of where it hangs
+  // after four minutes of swinging free, and it is built asleep.
+  //
+  // AFTER the settle, and not in it, and that is measured too. The empty
+  // cloth has more than one way to hang — its gathered ends buckle one way
+  // or another as they are drawn in, and which way decides everything
+  // else: the way it has always hung is low 3.213, sag 0.925, the bed 11.5
+  // degrees round from under the ties. Air in the second half of the settle
+  // (a velocity bled 10 % a step, the first try) chose another, 5.2
+  // degrees and 19 cm less sag; hushed from 2.0 s it chose a third, 0.6
+  // degrees; hushed from 1.5 s it happened to choose the right one. From
+  // 3.0 s every strength tried, 1.5 to 20, lands on the right one.
+  restV: 0.005, restHold: 0.2, restMax: 5.0,
+  // AND ITS PENALTIES AGED, once it is at rest. AVBD's penalty on a joint
+  // ramps up with the joint's error and sheds a tenth of a percent a step
+  // (`gamma`), and at ten iterations a joint is as stiff as its penalty —
+  // so the solve remembers. Drawing the ends in leaves them high (joints
+  // median 7100, ropes 8400), and a hammock that has hung free for a minute
+  // has shed that (4400, 6000). Nothing about how it hangs changes, but how
+  // it swings does: MEASURED, pushed straight from the hush its third swing
+  // came 0.3 s late and the trace was 4.8 degrees rms off the old hammock's
+  // over the first 8 s — which is the hammock you would have met pushing it
+  // in the first few seconds after the page loaded, not the one you met
+  // after it had slept. Forty more seconds of steps sheds it (0.23 rms),
+  // at 4800 steps of build; scaling the hard joints' and the ropes'
+  // penalties by this does it for nothing, the multipliers untouched so
+  // not a thing moves: 0.2 to 0.7 degrees rms, three places pushed. 0.6
+  // and 0.8 are 1.8 to 2.6 and 0.8 to 1.9.
+  relax: 0.7,
   // Creak: at each end of a swing this big (rad), louder with more.
   creakAt: 0.12,
 };
@@ -213,7 +307,7 @@ function hammockSim(o) {
   const rope = Math.max(H.ropeMin, half - H.bed / 2 - H.fan);
 
   const net = avbdNet({
-    maxBodies: NU * NV + 3, maxJoints: 3 * ((NU - 1) * NV + NU * (NV - 1)) + 3,
+    maxBodies: NU * NV + 3, maxJoints: 3 * ((NU - 1) * NV + NU * (NV - 1)) + 3 + NU * NV,
     maxStrings: 2 * NV + 2 + NU * (NV - 2) + (NU - 2) * NV, maxPoints: NU * NV * 4, maxBoxes: NU * NV, maxCaps: 32, maxContacts: 900,
     pointsHitCaps: false,
     iterations: H.iterations, alpha: H.alpha, alphaContact: H.alphaContact, beta: H.beta,
@@ -350,6 +444,11 @@ function hammockSim(o) {
   const guide = net.addJoint(-1, [0, 0, 0], her, [0, 0, 0], 0, 0, 1);
   // ── and the sling's hold on her — see HAMMOCK.keep ────────────────────
   const keep = net.addJoint(plate[NU >> 1][NV >> 1], [0, 0, 0], her, [0, 0, 0], 0, 0, 1);
+  // ── the hand on the bed while she is guided — see HAMMOCK.hold. One  ──
+  // world joint per plate, off (both stiffnesses 0) until `herGuide`
+  // turns it on: nothing about the empty hammock is changed by them.
+  const holds = [];
+  for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) holds.push([plate[i][j], net.addJoint(-1, [0, 0, 0], plate[i][j], [0, 0, 0], 0, 0, 1)]);
   // ── her capsules, rewritten every frame by `herShape` ────────────────
   const caps = [];
   for (let k = 0; k < 32; k++) { const c = net.addCap(her, k); net.cpOn[c] = 0; caps.push(c); }
@@ -365,8 +464,39 @@ function hammockSim(o) {
       net.step(h);
     }
   }
+  /** The fastest thing in it, m/s, |vx| + |vy| + |vz| — what `still` is measured in. */
+  function motion() {
+    let vmax = 0;
+    const V = net.V;
+    for (let b = 0; b < net.nb; b++) {
+      if (!net.live[b]) continue;
+      vmax = Math.max(vmax, Math.abs(V[3 * b]) + Math.abs(V[3 * b + 1]) + Math.abs(V[3 * b + 2]));
+    }
+    return vmax;
+  }
+  /** The empty cloth's extra air on or off — see HAMMOCK.hush. Her drag is her own. */
+  function hush(on) {
+    const d = on ? H.drag + H.hush : H.drag;
+    for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) net.drag[plate[i][j]] = d;
+    net.drag[gA] = d; net.drag[gB] = d;
+  }
+  /**
+   * After `settle`: hushed until still, and the solve's memory of getting
+   * there aged — see HAMMOCK.restV and HAMMOCK.relax. Answers whether it got
+   * there; the hush is left on, for the caller to take off.
+   */
+  function rest(h) {
+    hush(true);
+    let t = 0, q = 0;
+    while (t < H.restMax && q < H.restHold) {
+      net.step(h); t += h;
+      q = motion() < H.restV ? q + h : 0;
+    }
+    net.relax(H.relax);
+    return q >= H.restHold;
+  }
 
-  return { net, plate, gA, gB, her, guide, keep, caps, ropeA, ropeB, ex, ey, ez, M: [Mx, My, Mz], settle,
+  return { net, plate, gA, gB, her, guide, keep, holds, caps, ropeA, ropeB, ex, ey, ez, M: [Mx, My, Mz], settle, rest, hush, motion,
     D, rope, len, wid, NU, NV, floorM, drop };
 }
 
@@ -612,6 +742,17 @@ function buildHammock(scene, J) {
     return [J.A[0], J.A[1], J.A[2], dx / l, dy / l, dz / l];
   })();
   let herIn = false, kept = false;
+  // The hand on the bed — see HAMMOCK.hold: how the bed lay across the span
+  // when it was taken (each plate, m from the middle, and their mean), and
+  // when the guide let her go (sim s; −1 while it has her).
+  const holdAt = new Float64Array(S.holds.length);
+  let holdCen = 0, letGo = -1;
+  const across = (b) => (P[3 * b] - S.M[0]) * S.ez[0] + (P[3 * b + 2] - S.M[2]) * S.ez[2];
+  function holdTake() {
+    holdCen = 0;
+    for (let k = 0; k < S.holds.length; k++) { holdAt[k] = across(S.holds[k][0]); holdCen += holdAt[k]; }
+    holdCen /= S.holds.length;
+  }
   const _hq = new THREE.Quaternion(), _hv = new THREE.Vector3();
   /**
    * Her capsules this frame, in her mesh's own frame: [ax, ay, az, bx, by,
@@ -678,8 +819,11 @@ function buildHammock(scene, J) {
     _hv.set(com[0], com[1], com[2]).applyQuaternion(_hq);
     net.setLive(her, true);
     net.place(her, mp.x + _hv.x, mp.y + _hv.y, mp.z + _hv.z, [mq.x, mq.y, mq.z, mq.w]);
+    // How the bed lies as she starts — see HAMMOCK.hold.
+    holdTake();
+    letGo = -1;
     herIn = true;
-    asleep = false; still = 0;
+    rouse();
     forget();
     herGuide(mp, mq, H.guideLin, H.guideAng);
   }
@@ -711,6 +855,31 @@ function buildHammock(scene, J) {
     // within a second of lying down. From inside, the cloth holds her; a
     // leg over the rim is a leg over the rim.
     net.setOneSided(true, tiesLine);
+    // And the hand on the bed — see HAMMOCK.hold. Full while the guide has
+    // her; kept `holdFor` s once it lets her go, on the bed as it lies then,
+    // and eased off over `holdFade`; and on again, on the bed as it lies,
+    // when the guide takes her to get out.
+    let kh = H.hold;
+    if (kLin > 0) {
+      if (letGo >= 0) { holdTake(); letGo = -1; }
+    } else {
+      if (letGo < 0) { letGo = simT; holdTake(); }
+      kh *= Math.max(0, Math.min(1, 1 - (simT - letGo - H.holdFor) / H.holdFade));
+    }
+    // Across the span only: each plate's target is where it is, moved across
+    // to where it lay relative to the rest when the hold was taken, with the
+    // whole bed carried under her (as far as `holdAcross` either side of
+    // the middle). So the bed sags, folds along and takes her weight as it
+    // likes, and only cannot swing away from her or fold shut across.
+    let hx = across(her);
+    hx = Math.max(-H.holdAcross, Math.min(H.holdAcross, hx));
+    for (let k = 0; k < S.holds.length; k++) {
+      const [b, j] = S.holds[k];
+      if (!(kh > 0)) { net.setJointK(j, 0, 0); continue; }
+      const d = holdAt[k] - holdCen + hx - across(b);
+      net.setTarget(j, P[3 * b] + S.ez[0] * d, P[3 * b + 1], P[3 * b + 2] + S.ez[2] * d);
+      net.setJointK(j, kh / S.holds.length, 0);
+    }
   }
   /** Where her mesh is to be drawn: the body, less the centre of mass. */
   function herPose(outP, outQ) {
@@ -724,10 +893,11 @@ function buildHammock(scene, J) {
     herIn = false;
     net.setJointK(S.guide, 0, 0);
     net.setJointK(S.keep, 0, 0); kept = false;
+    for (const [, j] of S.holds) net.setJointK(j, 0, 0);
     net.setOneSided(false);
     net.setLive(her, false);
     for (const c of S.caps) net.cpOn[c] = 0;
-    asleep = false; still = 0;
+    rouse();
     forget();
   }
 
@@ -785,7 +955,7 @@ function buildHammock(scene, J) {
         }
       }
     }
-    asleep = false; still = 0;
+    rouse();
     pushes++;
     return { dv: +(dv * sg).toFixed(3), at: [n.x, n.y, n.z] };
   }
@@ -803,6 +973,17 @@ function buildHammock(scene, J) {
 
   // ── stepping ────────────────────────────────────────────────────────────
   let asleep = false, still = 0, acc = 0, far = false;
+  // The hush — see HAMMOCK.hush: whether it is on, and the fastest thing in
+  // the empty cloth over the window before this one and this one so far.
+  // Infinity before a whole window has been seen, so nothing is hushed on
+  // less than one.
+  let hushed = false, winT = 0, winCur = 0, winWas = Infinity;
+  /** Anything that moves it — a push, her, a debug kick — wakes it and takes the hush off. */
+  function rouse() {
+    asleep = false; still = 0;
+    if (hushed) { S.hush(false); hushed = false; }
+    winT = 0; winCur = 0; winWas = Infinity;
+  }
   const stats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, sleep: 0, rescues: 0, bails: 0 };
   // The last good state — see the guard in `step`.
   const goodP = new Float64Array(P.length), goodQ = new Float64Array(Q.length);
@@ -925,11 +1106,12 @@ function buildHammock(scene, J) {
     swingPeak = Math.max(swingPeak * Math.exp(-dt * 0.35), Math.abs(swingA));
     // Asleep once nobody is in it and nothing has moved for a while.
     if (!herIn) {
-      let vmax = 0;
-      for (let b = 0; b < net.nb; b++) {
-        if (!net.live[b]) continue;
-        vmax = Math.max(vmax, Math.abs(net.V[3 * b]) + Math.abs(net.V[3 * b + 1]) + Math.abs(net.V[3 * b + 2]));
-      }
+      const vmax = S.motion();
+      // Hushed once a whole window and this one have stayed under a degree.
+      winCur = Math.max(winCur, vmax);
+      winT += n * H.sub;
+      if (winT >= H.hushWin) { winWas = winCur; winCur = 0; winT = 0; }
+      if (!hushed && Math.max(winWas, winCur) < H.hushV) { S.hush(true); hushed = true; }
       still = vmax < H.still ? still + dt : 0;
       if (still > H.sleepAfter) asleep = true;
     }
@@ -939,9 +1121,13 @@ function buildHammock(scene, J) {
   }
 
   // Hung at build: settled empty, so the first time anybody walks up to it
-  // it is hanging and not falling.
+  // it is hanging and not falling — and hushed to its rest and asleep, so
+  // it is hanging still and costs nothing until something moves it. See
+  // HAMMOCK.restV.
   {
     S.settle(H.settle, H.sub);
+    hushed = true;
+    asleep = S.rest(H.sub);
     keep();
     restP.set(P); restQ.set(Q);
     draw();
@@ -959,15 +1145,17 @@ function buildHammock(scene, J) {
 
   const api = {
     sim: S, net, cloth,
+    /** Debug: the constants, live — a probe can try a number without a build. */
+    H,
     get herIn() { return herIn; },
     get asleep() { return asleep; },
     get far() { return far; },
     herEnter, herGuide, herShape, herPose, herLeave, push, nearest, marks,
-    wake: () => { asleep = false; still = 0; },
+    wake: () => rouse(),
     /** Debug: throw everything in it upward, to watch `wrong` catch it. */
     blowUp: (v = 40) => {
       for (let b = 0; b < net.nb; b++) if (net.live[b]) net.kick(b, 0, v * (0.5 + 0.5 * Math.sin(b * 7.1)), 0);
-      asleep = false; still = 0;
+      rouse();
     },
     set onCreak(fn) { onCreak = fn; },
     /** How far it is swung (rad), how fast, and the recent peak. */
@@ -1002,7 +1190,7 @@ function buildHammock(scene, J) {
         contacts: net.nc, lost: net.stats.lost, refused: net.stats.refused,
         ms: +stats.ms.toFixed(3), msMax: +stats.msMax.toFixed(3),
         msMean: stats.frames ? +(stats.msSum / stats.frames).toFixed(3) : 0,
-        frames: stats.frames, steps: stats.steps, asleep, creaks, pushes, rescues: stats.rescues, bails: stats.bails, why: stats.why, snaps: snaps.filter((q) => q.ok).length,
+        frames: stats.frames, steps: stats.steps, asleep, hushed, creaks, pushes, rescues: stats.rescues, bails: stats.bails, why: stats.why, snaps: snaps.filter((q) => q.ok).length,
       };
     },
     resetStats: () => { stats.msMax = 0; stats.msSum = 0; stats.frames = 0; net.stats.refused = 0; },

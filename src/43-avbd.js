@@ -2461,6 +2461,19 @@ function avbdNet(o) {
     cPen.fill(AVBD.penMin); pPen.fill(AVBD.penMin);
     nc = 0; gen++;
   }
+  /**
+   * The hard joints' and the ropes' penalties times `f`, floored — the
+   * multipliers left as they are, so nothing moves. For a net brought to
+   * rest at build, whose penalties still remember how it got there: see
+   * HAMMOCK.relax.
+   */
+  function relax(f) {
+    for (let k = 0; k < nj; k++) {
+      if (jKL[k] !== Infinity) continue;
+      for (let r = 0; r < 3; r++) jPL[3 * k + r] = Math.max(AVBD.penMin, jPL[3 * k + r] * f);
+    }
+    for (let s = 0; s < ns; s++) if (!(sK[s] > 0)) sPen[s] = Math.max(AVBD.penMin, sPen[s] * f);
+  }
   /** A body in or out of the solve. */
   function setLive(i, on) {
     live[i] = on ? 1 : 0;
@@ -2483,6 +2496,6 @@ function avbdNet(o) {
       oneSided = !!on;
       if (line) for (let k = 0; k < 6; k++) inAx[k] = line[k];
     },
-    step, measure, depth, kick, place, setTarget, setJointK, setLive, support, resetDuals,
+    step, measure, depth, kick, place, setTarget, setJointK, setLive, support, resetDuals, relax,
     get nb() { return nb; }, get nc() { return nc; }, get ns() { return ns; }, get nj() { return nj; } };
 }

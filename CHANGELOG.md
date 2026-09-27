@@ -8,6 +8,133 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.3] — 2026-09-27
+
+### the hammock falls asleep, and hangs the same
+
+Offered "fix the hammock's slow sleep properly, without changing how it
+hangs", Misha said *"both"*. Awake, the AVBD hammock at Jadrija cost about
+2.3 ms of main thread a frame, 31 % of the page's CPU in one profile there.
+It is meant to sleep when it is empty and still, but it took 70 s to do it
+after the page loaded, and more than three minutes after a push.
+
+**Why it took so long.** It was not solver noise. At true rest the fastest
+thing in the cloth moves at 0.0003 m/s. The empty hammock is a pendulum with a
+3.58 s period, and it loses 1.9 % of its swing a second (`drag` plus BDF1's
+own loss), which is right for a swing you can see. Drawing the gathered ends
+in during the build's `settle` leaves it swinging about 2.5° either side of
+where it hangs. The sleep test (`still`, 0.015 m/s) is about a 0.3° swing, and
+at 1.9 % a second that takes a minute or more to reach. So it spent those
+70 s hanging at rest to within a centimetre, awake for the last few
+millimetres.
+
+- **Hushed to its rest at build** (`rest` in `hammockSim`, `HAMMOCK.restV`).
+  After the unchanged 3 s settle, the cloth and gathers get 2.5/s more air
+  until they are still: 3.5 s of steps, about 0.22 s of build. It then
+  starts asleep. It ends within 0.4 mm of where it hangs after four minutes
+  of swinging free. **Rest shape, before → after:** low 3.213 → 3.213, sag
+  0.925 → 0.925, bed angle 11.3–11.7° (wherever the old one happened to stop
+  in its last swing) → 11.6°. The true rest is 11.54°.
+- **After the settle, not in it.** The empty cloth can hang more than one way,
+  depending on which way its ends buckle as they are drawn in. Air added in
+  the second half of the settle (the first attempt, which was rejected) hung
+  it at 5.2° with 19 cm more sag. Hushed from 2.0 s it hung at 0.6°. From
+  3.0 s, every strength tried between 1.5 and 20 lands on the usual shape.
+- **The solve's memory aged** (`relax` on `avbdNet`, `HAMMOCK.relax`). AVBD
+  joint penalties ramp up with a joint's error and shed 0.1 % a step. With
+  ten iterations a joint is only as stiff as its penalty, so a freshly built
+  hammock swings differently from one that has hung for a minute. Pushed
+  straight from the hush, its third swing came 0.3 s late, 4.8° rms off the
+  old hammock's trace over 8 s. The hard joints' and ropes' penalties are
+  now scaled by 0.7 at the end of the build, with the multipliers left alone
+  so nothing moves. That brings it to 0.2–0.7° rms at three push points,
+  the same as 40 s of free hanging (0.23°).
+- **The last degree hushed at run time** (`HAMMOCK.hush`). Once the fastest
+  thing in the empty cloth has stayed under 0.045 m/s (about a 1° swing,
+  16 mm at the bed) for a whole 4 s window (longer than one swing), the same
+  2.5/s goes on. It sleeps about 3 s later. It is never on with her in it.
+  Anything that wakes the hammock (a push, her getting in or out, `wake`,
+  `blowUp`) takes the hush off (`rouse`).
+- **Measured, before → after:** asleep after load, with you beside it:
+  68.7 s → 0. Arriving from past `far`: 68.7 s awake → 0. After an empty
+  push: 196 s → 158–162 s. The swing is visible for about 150 s of that, and
+  it now sleeps about 3 s after it drops under a degree. The hammock's share
+  of busy main-thread time near it after load: 21.3 % → 0. It is unchanged
+  while it swings. The empty push trace over 8 s in-game is within about 1°
+  of the old one.
+
+### and she gets into it
+
+Misha, earlier the same day: *"somehow the hammock broke now, she gets there
+and it breaks and gets thrown into the sky or something"*. The divergence
+guard (`sane`/`wrong`) catches the sky. Underneath it was a get-in that
+failed on its own: she sat back, the bed went away, and she ended up lying
+under it with the cloth over her. This happened on 15 of 30 get-ins on
+1.535.1. The sleep fix above made the settled hammock the normal case, and
+on it the count was 8 of 30. That hammock can't ship with it, so this goes
+in the same release.
+
+**Why.** Recorded frame by frame through thirty get-ins: the middle row of
+the cloth across the span, her centre, the contacts. While the guide has
+her, her seat and legs lean on a 2 kg bed with the guide's 12 000 N/m
+behind them, and the bed gives way in one of two ways:
+
+- **It swings away.** Its middle is 0.25–0.55 m from her when the guide
+  lets go, where on a get-in that works it is 0.05–0.17 m.
+- **It folds shut.** The five plates across stack into two, 0.25 m wide.
+
+Either way she is lowered onto its edge, rolls off, and goes under. Which
+get-in fails is chaotic (frame timing). Why it fails is always this.
+
+- **A hand on the bed** (`HAMMOCK.hold`, the `holds` joints in
+  `hammockSim`). While the guide has her, and for 1.5 s after it lets her
+  go (then eased off over 1 s), every plate is held by a soft spring,
+  8000 N/m for the whole bed, across the span only:
+  - each plate is held where it lay relative to the rest of the bed when
+    she started;
+  - the whole bed is carried to under her centre, at most 8 cm either side
+    of the line under the ties.
+
+  The bed still sags, folds along the span and takes her weight freely.
+  It just can't swing away from her or fold shut across. The same hold
+  comes on while the guide takes her out. The joints are off otherwise, so
+  the empty hammock is untouched: the rest shape, sleep and push numbers
+  below are bit-identical in the Node harness.
+- **Tried and dropped** (numbers in the comment):
+  - the middle column held in place: 5 of 9 get-ins OK;
+  - the whole bed held at the line under the ties: 7 of 10;
+  - no friction on her while guided: 0 of 9 (the friction is what keeps
+    the bed with her);
+  - a stiffer hold, 20 000 N/m: 9 of 10, and she was pushed 18 cm up off
+    the rim as she sat.
+
+**Get-ins on the cloth, 5 of each:**
+
+| condition | 1.535.1 | sleep fix alone | now |
+|---|---|---|---|
+| walked there, just after load | 2 | 3 | 5 |
+| hammock asleep | 3 | 4 | 5 |
+| after 40 s | 4 | 5 | 5 |
+| after a push has died down | 1 | 2 | 5 |
+| you on the other side | 3 | 3 | 5 |
+| at warp 8 | 2 | 5 | 5 |
+| **total** | **15 of 30** | **22 of 30** | **30 of 30** |
+
+- **After lying down she is where a good get-in always put her:**
+  y 3.203–3.209, against 3.20–3.21 before.
+- **Full cycles** (in, 10 s, two pushes, out), 6 runs:
+  - pushes swing her ±11–18°, as before;
+  - no guard rescues on this build, against 2 of 6 runs with a rescue
+    before;
+  - after she gets out, the empty cloth swings ±6–12°, against ±25–49° and
+    one bail before.
+- **Sleep fix re-checked with this in:**
+  - rest low 3.213, sag 0.925, 11.6°;
+  - asleep 0 s after load and after arriving from far;
+  - 158.4 s to sleep after an empty push;
+  - the empty push trace is unchanged;
+  - hammock share of busy main thread after load 0 %, while swinging 22.6 %.
+
 ## [1.535.2] — 2026-09-27
 
 ### the springboard bends where you can see it

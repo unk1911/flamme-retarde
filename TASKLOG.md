@@ -30,5 +30,6 @@ runs with `tools/shootmany.mjs`).
 | 2026-09-27 | Hammock blow-up: reproduce + divergence guard | lead | old | investigate | ~40 | ? | ~12 | 1.533.1 |
 | 2026-09-27 | Pipeline speed-ups (warp, until, shootmany) | lead | new | perf | ~60 | ? | ~25 | 1.535.1 |
 | 2026-09-27 | Shader precompile attempt | lead | new | investigate | ~25 | ? | ~8 | reverted |
-| 2026-09-27 | Empty hammock sleeps at once | agent | new | perf | 58 | 154 | ? | pending |
+| 2026-09-27 | Empty hammock sleeps at once | agent | new | perf | 58 | 154 | ? | 1.535.3 |
+| 2026-09-27 | Baye's hammock get-in (30/30, was 15/30) | agent | new | fix | 60 | 82 | ~40 | 1.535.3 |
 | 2026-09-27 | Springboard drawn flat (board.shape never called) | lead | new | fix | ~10 | ~10 | 3 | 1.535.2 |
