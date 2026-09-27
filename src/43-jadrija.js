@@ -51421,11 +51421,18 @@ async function buildJadrija(scene) {
       // The ends are staggered by seven or eight metres, so that no two of
       // them are ever swinging round in the same patch of concrete.
       { who: 'man_young_fit', on: 'scoot', v: 5.6, t0: 289, t1: 521, paint: 0 },
-      { who: 'woman_young_slim', on: 'bike', v: 4.6, t0: 296, t1: 472, paint: 0 },
-      { who: 'man_old_heavy', on: 'bike', v: 3.3, t0: 304, t1: 513, paint: 1 },
+      // `kit` is what else is on the bicycle — see `wheelBike`. Three different
+      // city bicycles and not one bicycle three times: a green diamond frame
+      // with plated mudguards and a black rack, a cream Dutch roadster with
+      // gumwalls, a chainguard and a brown sprung saddle, and a red
+      // step-through with a basket.
+      { who: 'woman_young_slim', on: 'bike', v: 4.6, t0: 296, t1: 472, paint: 0,
+        kit: { fender: 'chrome', rack: 'black', bell: true } },
+      { who: 'man_old_heavy', on: 'bike', v: 3.3, t0: 304, t1: 513, paint: 1,
+        kit: { guard: true, gum: true, brown: true, bell: true } },
       { who: 'man_young_lean', on: 'scoot', v: 5.0, t0: 312, t1: 498, paint: 1 },
       { who: 'woman_old', on: 'bike', v: 2.9, t0: 334, t1: 506, paint: 2,
-        low: true, basket: true },
+        low: true, basket: true, kit: { guard: true, rack: 'black' } },
     ],
     // KEEP RIGHT. Facing +t the shore normal points to your LEFT — `n` is
     // `(uz, -ux)` and a Three.js right vector is `(-fz, 0, fx)` — so the sea is
@@ -51473,6 +51480,9 @@ async function buildJadrija(scene) {
     // per second is 2.1 turns of a 0.34 m wheel and about 66 rpm at the
     // pedals, which is a relaxed cadence and not a spin.
     crank: 0.17, gear: 1.9, circ: 2.14,
+    // Past this many metres a bicycle is drawn from its far copy: four-sided
+    // tubes, no spokes, no teeth, no springs. See `wheelBike`.
+    lod: 24,
   };
 
   // The paint. Plain colours and not a letter anywhere — rule 12, and the
@@ -51515,6 +51525,11 @@ async function buildJadrija(scene) {
    * Drawn about `cx, cy` because the chainring is drawn about the bottom
    * bracket; a road wheel is built about nought and carried to its axle by
    * `wheelDisc`, so that it can be turned.
+   *
+   * THE SCOOTERS' ONLY, since 1.532.0. The bicycles' wheels, chainring and
+   * everything else are `bikeWheel` and `wheelBike` below; the spoked branch
+   * here is kept because it costs nothing and a spoked scooter hub is one
+   * line away.
    */
   function wheelRim(b, cx, cy, R, w, tyre, rim, spokes) {
     const N = 14, Ri = R - 0.042, Rr = R - 0.070;
@@ -51564,12 +51579,390 @@ async function buildJadrija(scene) {
     return { geo: b.geo(), tris: b.count() / 3, x, y, R };
   }
 
+  // ── the bicycle, built as a bicycle ─────────────────────────────────────────
+  //
+  // Misha, 27 Sep 2026, from in front of a rider on the promenade: *"right now,
+  // the bicycles are too 'simplistic', would be nice to have more complex
+  // structure for bicycle."* He was right, and the screenshot said exactly how:
+  // the frame was square box beams (`wheelTube` is a FOUR-sided tube, flat
+  // shaded, alternate faces lightened, which is a box), the bar was three
+  // straight grey sticks with black box grips, the pedals were black bricks
+  // welded to the cranks so they tumbled with them, the wheels were 14-gon rings
+  // with three diameters for spokes, and there was no chain, no chainring worth
+  // the name, no fork, no mudguard, no saddle but a slab. At the two metres a
+  // cyclist passes you at, it read as a toy made of boxes.
+  //
+  // NOT A DOWNLOADED MODEL, and on purpose. He asked whether the place the
+  // bathing suits came from had bicycles; it does not — those are the
+  // MakeHuman community asset packs, skins and hair and clothes for the base
+  // mesh, and nothing with wheels. Poly Haven's 521 CC0 models have no bicycle
+  // either (the nearest are two rusted rims and a wheelchair). Sketchfab has
+  // CC0 and CC-BY bicycles, but every download wants an account token, most are
+  // 20 to 800 thousand triangles of textured mesh, and — the real reason — a
+  // bicycle here is not a prop. The saddle height is solved per rider, the
+  // grips are where eight different bodies' wrists are aimed, the cranks turn
+  // with their feet on them, and the fork has to steer about its own axis.
+  // A model would have had to be cut into five moving parts and re-fitted to
+  // all of those numbers anyway. Built from the numbers, it fits them by
+  // construction and costs one vertex-coloured material like everything else
+  // on this shore.
+  //
+  // What it is: a Dutch-style city bicycle, which is what a Dalmatian beach is
+  // ridden to on. Round tubes swept along real curves with smooth normals, a
+  // 69 degree head angle with 45 mm of fork offset, a curved fork with a crown,
+  // a quill stem, a swept-back city bar with rubber grips, brake levers and
+  // their cables, 36 laced spokes a side-and-side, a round-section tyre on a box
+  // rim, hubs with flanges, a chainring with teeth on a five-arm spider, a
+  // chain, a sprung saddle, mudguards with their stays, a rear rack with a
+  // lamp, a kickstand, and — by rider — a chainguard, gumwall tyres, a bell, a
+  // front lamp and a wicker basket with a towel in it.
+  //
+  // FIVE MOVING PARTS: the frame, the steering (fork, bar, front guard and the
+  // basket if there is one, turned about the head tube's axis), the cranks and
+  // chainring, the two pedals (which stay level under the feet instead of
+  // tumbling with the cranks) and the two wheels. Seven draw calls a bicycle
+  // where there were four; three bicycles, so nine more in all.
+  //
+  // AND A FAR COPY OF EVERY PIECE. The same builder run with `lo` set drops to
+  // four-sided tubes, half the curve segments and no spokes, teeth, springs or
+  // cables, and `wheelDraw` swaps the geometries past `WHEELS.lod`. A spoke is
+  // two millimetres of steel; past twenty-odd metres it is less than a pixel
+  // and all it can do is crawl.
+  //
   // The grips are swept back from the stem to 0.18 m ahead of the bottom
   // bracket and stand at 1.08, which is a Dutch bar and not a racing one. They
   // were at 0.29 and 1.00 first, and every rider came out leaning 33 to 36
-  // degrees into them — a road-bike crouch on a promenade.
-  const WHEEL_BIKE = { axle: 0.54, R: 0.34, bb: [-0.06, 0.29], bar: [0.18, 1.08],
-    stem: [0.36, 1.04], grip: 0.27, seatK: 0.325, clamp: 0.84 };
+  // degrees into them — a road-bike crouch on a promenade. Those numbers, the
+  // bottom bracket, the 72 degree seat tube (`seatK`) and the wheels are what
+  // the riders are fitted to, and none of them moved when the bicycle was
+  // rebuilt round them.
+  const WHEEL_BIKE = {
+    axle: 0.54, R: 0.34, bb: [-0.06, 0.29], bar: [0.18, 1.08],
+    grip: 0.27, seatK: 0.325, clamp: 0.84,
+    // The steering axis, 21 degrees back from vertical — a 69 degree head
+    // angle, which is a city bicycle's — with the front axle 45 mm ahead of it,
+    // which is the fork's offset. Positions up it are in metres from where it
+    // crosses axle height; the head tube runs from 0.405 to 0.60 of that.
+    tilt: 21 * Math.PI / 180, rake: 0.045,
+    // The quill stem's clamp, where the bar is held.
+    stem: [0.33, 1.045],
+    // What the steering turns about: a point on the axis, in the head tube.
+    pivot: 0.50,
+    // The drivetrain, across the machine: the chain's plane, the crank arms'
+    // plane, the chainring's and the sprocket's pitch radii (38 and 16 teeth
+    // on half-inch chain).
+    chain: 0.045, arm: 0.078, ring: 0.078, cog: 0.033,
+  };
+  const BK_SIN = Math.sin(WHEEL_BIKE.tilt), BK_COS = Math.cos(WHEEL_BIKE.tilt);
+  const BK_TAN30 = Math.tan(Math.PI / 6);
+  /** A point on the steering axis, `t` metres up it from axle height. */
+  const bkAxis = (t, z = 0) => [
+    WHEEL_BIKE.axle - WHEEL_BIKE.rake / BK_COS - BK_SIN * t,
+    WHEEL_BIKE.R + BK_COS * t, z];
+  /** The axis itself, pointing up it. */
+  const BK_AXIS = new THREE.Vector3(-BK_SIN, BK_COS, 0);
+  const BK_PIVOT = new THREE.Vector3(...bkAxis(WHEEL_BIKE.pivot));
+
+  // The things a bicycle is made of that are not its paint.
+  const BK = {
+    tyre: [0.052, 0.052, 0.056], gum: [0.470, 0.345, 0.215],
+    // Plating is darker than it looks: there is one material and no
+    // reflection, and at 0.76 the chrome read as white paint in the sun.
+    rim: [0.580, 0.590, 0.605], spoke: [0.520, 0.530, 0.545],
+    chrome: [0.600, 0.610, 0.630], steel: [0.440, 0.450, 0.460],
+    dark: [0.095, 0.092, 0.090], rubber: [0.065, 0.063, 0.062],
+    chain: [0.230, 0.220, 0.215], black: [0.060, 0.060, 0.064],
+    leather: [0.300, 0.175, 0.095], hide: [0.080, 0.074, 0.070],
+    lens: [0.880, 0.860, 0.760], red: [0.600, 0.060, 0.050],
+    amber: [0.820, 0.470, 0.080],
+    wicker: [0.580, 0.430, 0.240], wicker2: [0.380, 0.260, 0.135],
+    towel: [0.300, 0.500, 0.620], towel2: [0.880, 0.870, 0.840],
+  };
+
+  // Tiny vector sums on plain arrays, because everything below is plain arrays.
+  const bkAdd = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k];
+  const bkSub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const bkDot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const bkCross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0]];
+  const bkNorm = (a) => {
+    const l = Math.hypot(a[0], a[1], a[2]) || 1;
+    return [a[0] / l, a[1] / l, a[2] / l];
+  };
+  const bkLerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t];
+  /** A Bézier of any order through its control points, as `n + 1` points. */
+  function bkBez(P, n) {
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      let Q = P.slice();
+      while (Q.length > 1) {
+        const R = [];
+        for (let k = 0; k < Q.length - 1; k++) R.push(bkLerp(Q[k], Q[k + 1], i / n));
+        Q = R;
+      }
+      out.push(Q[0]);
+    }
+    return out;
+  }
+
+  /**
+   * One smooth triangle, WOUND TO AGREE WITH ITS NORMALS.
+   *
+   * The material flips the normal on a back face (`FACE`), which is what lets
+   * one sided sheet of mudguard be lit from both sides — and which turns any
+   * triangle wound against its own normals inside out: lit from within, dark
+   * where the sun is on it. So the winding is not trusted to whoever called:
+   * it is checked against the normals and turned round if it disagrees.
+   */
+  function bkTri(b, p0, p1, p2, n0, n1, n2, c0, c1, c2) {
+    const f = bkCross(bkSub(p1, p0), bkSub(p2, p0));
+    const s = [n0[0] + n1[0] + n2[0], n0[1] + n1[1] + n2[1], n0[2] + n1[2] + n2[2]];
+    if (bkDot(f, s) < 0) b.smooth(p0, p2, p1, n0, n2, n1, c0, c2, c1);
+    else b.smooth(p0, p1, p2, n0, n1, n2, c0, c1, c2);
+  }
+
+  /**
+   * A round tube swept along a line of points: the frame, the fork, the bar,
+   * the stays, the spokes, the chain, the springs — every round thing on the
+   * machine.
+   *
+   * The ring at each point is carried along by parallel transport, so a tube
+   * that curves does not twist, and the normals are the ring's own radial
+   * directions, so it shades round instead of as facets. `bi` pins the ring's
+   * second axis for a curve that lies flat in a plane — the chain, which goes
+   * all the way round and would otherwise come back to its start turned.
+   * `r` and `col` may be functions of the point's index along the line.
+   */
+  function bikeSweep(b, pts, r, col, o = {}) {
+    const n = o.sides || 8, N = pts.length, closed = !!o.closed;
+    const rad = typeof r === 'function' ? r : () => r;
+    const colAt = typeof col === 'function' ? col : () => col;
+    const T = [];
+    for (let i = 0; i < N; i++) {
+      const a = closed ? pts[(i - 1 + N) % N] : pts[Math.max(0, i - 1)];
+      const c = closed ? pts[(i + 1) % N] : pts[Math.min(N - 1, i + 1)];
+      T.push(bkNorm(bkSub(c, a)));
+    }
+    const U = [], V = [];
+    for (let i = 0; i < N; i++) {
+      let u;
+      if (o.bi) {
+        u = bkNorm(bkCross(T[i], o.bi));
+      } else if (i === 0) {
+        const w = Math.abs(T[0][1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+        u = bkNorm(bkCross(T[0], w));
+      } else {
+        const p = U[i - 1];
+        u = bkNorm(bkAdd(p, T[i], -bkDot(p, T[i])));
+      }
+      U.push(u);
+      V.push(bkCross(T[i], u));
+    }
+    const ring = [], nrm = [];
+    for (let i = 0; i < N; i++) {
+      const R = [], M = [];
+      for (let k = 0; k < n; k++) {
+        const a = (k + 0.5) / n * TAU;
+        const d = bkAdd(bkAdd([0, 0, 0], U[i], Math.cos(a)), V[i], Math.sin(a));
+        R.push(bkAdd(pts[i], d, rad(i)));
+        M.push(d);
+      }
+      ring.push(R); nrm.push(M);
+    }
+    const segs = closed ? N : N - 1;
+    for (let i = 0; i < segs; i++) {
+      const j = (i + 1) % N, ci = colAt(i), cj = colAt(j);
+      for (let k = 0; k < n; k++) {
+        const k1 = (k + 1) % n;
+        bkTri(b, ring[i][k], ring[j][k], ring[j][k1], nrm[i][k], nrm[j][k], nrm[j][k1], ci, cj, cj);
+        bkTri(b, ring[i][k], ring[j][k1], ring[i][k1], nrm[i][k], nrm[j][k1], nrm[i][k1], ci, cj, ci);
+      }
+    }
+    if (o.caps && !closed) {
+      for (const [i, sg] of [[0, -1], [N - 1, 1]]) {
+        const nn = [T[i][0] * sg, T[i][1] * sg, T[i][2] * sg], c = colAt(i);
+        for (let k = 0; k < n; k++) {
+          bkTri(b, pts[i], ring[i][k], ring[i][(k + 1) % n], nn, nn, nn, c, c, c);
+        }
+      }
+    }
+    return pts;
+  }
+
+  /**
+   * A surface given as a grid of points — the saddle, the rims, the tyres, the
+   * mudguards, the basket. Normals are taken off the grid itself, by central
+   * differences, and pointed away from `out(i, j)`: the row's own centre for
+   * a closed shape, the wheel's axle for a mudguard.
+   */
+  function bikeGrid(b, G, col, o = {}) {
+    const I = G.length, J = G[0].length;
+    const ci = !!o.closedI, cj = !!o.closedJ;
+    const at = (i, j) => G[ci ? (i + I) % I : clamp(i, 0, I - 1)][cj ? (j + J) % J : clamp(j, 0, J - 1)];
+    const N = [];
+    for (let i = 0; i < I; i++) {
+      const row = [];
+      let cen = [0, 0, 0];
+      for (let j = 0; j < J; j++) cen = bkAdd(cen, G[i][j], 1 / J);
+      for (let j = 0; j < J; j++) {
+        let n = bkNorm(bkCross(bkSub(at(i + 1, j), at(i - 1, j)), bkSub(at(i, j + 1), at(i, j - 1))));
+        const ref = o.out ? o.out(i, j, G[i][j]) : bkSub(G[i][j], cen);
+        if (bkDot(n, ref) < 0) n = [-n[0], -n[1], -n[2]];
+        row.push(n);
+      }
+      N.push(row);
+    }
+    const colAt = typeof col === 'function' ? col : () => col;
+    for (let i = 0; i < (ci ? I : I - 1); i++) {
+      const i1 = (i + 1) % I;
+      for (let j = 0; j < (cj ? J : J - 1); j++) {
+        const j1 = (j + 1) % J;
+        const a = G[i][j], bq = G[i1][j], c = G[i1][j1], d = G[i][j1];
+        const ca = colAt(i, j), cb = colAt(i1, j), cc = colAt(i1, j1), cd = colAt(i, j1);
+        bkTri(b, a, bq, c, N[i][j], N[i1][j], N[i1][j1], ca, cb, cc);
+        bkTri(b, a, c, d, N[i][j], N[i1][j1], N[i][j1], ca, cc, cd);
+      }
+    }
+  }
+
+  /** A fan closing a ring of points, lit along `n`. */
+  function bikeFan(b, ring, centre, n, col) {
+    for (let k = 0; k < ring.length; k++) {
+      bkTri(b, centre, ring[k], ring[(k + 1) % ring.length], n, n, n, col, col, col);
+    }
+  }
+
+  /**
+   * A mudguard: a shallow channel bent round a wheel at `Rg`, from angle `a0`
+   * to `a1` in the wheel's own plane, with its edges rolled down. Lit away
+   * from the axle, and seen from both sides.
+   */
+  function bikeGuard(b, cx, cy, a0, a1, Rg, hw, col, lo) {
+    const G = [], rows = lo ? 12 : 26;
+    const zs = [-1, -0.6, 0, 0.6, 1], lift = [-0.011, 0.003, 0.006, 0.003, -0.011];
+    for (let i = 0; i <= rows; i++) {
+      const a = a0 + (a1 - a0) * i / rows, c = Math.cos(a), s = Math.sin(a);
+      G.push(zs.map((z, j) => [cx + c * (Rg + lift[j]), cy + s * (Rg + lift[j]), z * hw]));
+    }
+    bikeGrid(b, G, col, { out: (i, j, p) => [p[0] - cx, p[1] - cy, 0] });
+  }
+
+  /** A toothed disc in the plane `z`: the chainring's teeth, a sprocket. */
+  function bikeTeeth(b, cx, cy, z, r, teeth, col) {
+    for (let k = 0; k < teeth; k++) {
+      const a0 = k / teeth * TAU, a1 = (k + 1) / teeth * TAU, am = (a0 + a1) * 0.5;
+      const P = (a, rr) => [cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, z];
+      b.quad(P(a0, r - 0.012), P(a1, r - 0.012), P(a1, r), P(a0, r), col);
+      b.tri(P(a0 + 0.15 / teeth, r), P(a1 - 0.15 / teeth, r), P(am, r + 0.0075), col);
+    }
+  }
+
+  // The two wheels and the pedal are the same on every bicycle, so they are
+  // built once — per variant, per level of detail — and shared.
+  const bikeWheelCache = new Map();
+
+  /**
+   * A bicycle wheel about its own axle, in the machine's plane: a 38 mm tyre
+   * of round section on a box-section rim, 36 spokes laced from two flanged
+   * hub shells, a valve — which is the one mark on the thing that shows it
+   * going round — and on the back one, the sprocket in the chain's plane.
+   * Gumwall tyres, tan in the sidewall, for the Dutch roadster.
+   */
+  function bikeWheel(rear, gum, lo) {
+    const key = (rear ? 'r' : 'f') + (gum ? 'g' : '') + (lo ? 'l' : '');
+    if (bikeWheelCache.has(key)) return bikeWheelCache.get(key);
+    const b = propBuilder();
+    const R = WHEEL_BIKE.R, tr = 0.019, Rt = R - tr;
+    const AR = lo ? 18 : 36, SEC = lo ? 5 : 8;
+    // The tyre, a torus. The part of its section inside the rim is never seen
+    // and is not built.
+    {
+      const G = [];
+      for (let i = 0; i < AR; i++) {
+        const a = i / AR * TAU, c = Math.cos(a), s = Math.sin(a), row = [];
+        for (let j = 0; j <= SEC; j++) {
+          const p = -1.25 * Math.PI / 2 + 2.5 * Math.PI / 2 * j / SEC;
+          const rr = Rt + Math.cos(p) * tr;
+          row.push([c * rr, s * rr, Math.sin(p) * tr]);
+        }
+        G.push(row);
+      }
+      const tcol = (i, j) => {
+        if (!gum) return BK.tyre;
+        const p = -1.25 * Math.PI / 2 + 2.5 * Math.PI / 2 * j / SEC;
+        return Math.abs(Math.sin(p)) > 0.62 ? BK.gum : BK.tyre;
+      };
+      bikeGrid(b, G, tcol, { closedI: true, out: (i, j, p) => {
+        const a = i / AR * TAU;
+        return [p[0] - Math.cos(a) * Rt, p[1] - Math.sin(a) * Rt, p[2]];
+      } });
+    }
+    // The rim: a closed box section carried round.
+    {
+      const sec = [[0.306, -0.0115], [0.289, -0.0090], [0.289, 0.0090], [0.306, 0.0115]];
+      const G = [];
+      for (let i = 0; i < AR; i++) {
+        const a = i / AR * TAU, c = Math.cos(a), s = Math.sin(a);
+        G.push(sec.map(([rr, z]) => [c * rr, s * rr, z]));
+      }
+      bikeGrid(b, G, (i, j) => (j === 1 || j === 2 ? shade(BK.rim, 0.82) : BK.rim),
+        { closedI: true, closedJ: true, out: (i, j, p) => {
+          const a = i / AR * TAU, m = 0.2975;
+          return [p[0] - Math.cos(a) * m, p[1] - Math.sin(a) * m, p[2]];
+        } });
+    }
+    // The hub: a shell, two flanges, the axle ends.
+    const hw = rear ? 0.062 : 0.048, fz = rear ? 0.030 : 0.028;
+    const hs = lo ? 6 : 12;
+    bikeSweep(b, [[0, 0, -hw], [0, 0, hw]], rear ? 0.021 : 0.017, BK.chrome, { sides: hs, caps: true });
+    for (const z of [-fz, fz]) {
+      bikeSweep(b, [[0, 0, z - 0.002], [0, 0, z + 0.002]], 0.027, BK.chrome, { sides: hs, caps: true });
+    }
+    bikeSweep(b, [[0, 0, -hw - 0.012], [0, 0, hw + 0.012]], 0.0065, BK.steel, { sides: 6, caps: true });
+    if (!lo) {
+      // Thirty-six spokes, eighteen from each flange, alternately leading and
+      // trailing so that they cross on the way out as a laced wheel's do. 1.7 mm
+      // of radius is a little over a real spoke's; at 2 mm a spoke is too thin
+      // to survive being drawn at the distance anybody sees one from.
+      for (let k = 0; k < 36; k++) {
+        const sd = k % 2 ? 1 : -1, lead = (k >> 1) % 2 ? 1 : -1;
+        const ah = k / 36 * TAU, ar = ah + lead * 0.30;
+        bikeSweep(b, [[Math.cos(ah) * 0.025, Math.sin(ah) * 0.025, sd * fz],
+          [Math.cos(ar) * 0.2895, Math.sin(ar) * 0.2895, sd * 0.003]], 0.0017, BK.spoke, { sides: 3 });
+      }
+      // The valve, poking in through the rim.
+      b.box(0.278, 0, 0, 0.024, 0.0075, 0.0075, BK.steel);
+    }
+    if (rear) {
+      // The sprocket, in the chain's plane, and the brake arm of the hub.
+      const z = WHEEL_BIKE.chain;
+      if (!lo) bikeTeeth(b, 0, 0, z, WHEEL_BIKE.cog + 0.004, 16, BK.dark);
+      bikeFan(b, Array.from({ length: 12 }, (_, k) => [Math.cos(k / 12 * TAU) * 0.033,
+        Math.sin(k / 12 * TAU) * 0.033, z]), [0, 0, z], [0, 0, 1], BK.dark);
+    }
+    const out = { geo: b.geo(), tris: b.count() / 3 };
+    bikeWheelCache.set(key, out);
+    return out;
+  }
+
+  /**
+   * A pedal about its spindle, standing out along +z: a platform with a rubber
+   * tread and an amber reflector at each end. Mirrored in z for the left one.
+   * The platform's middle is 0.055 out from the crank arm, which puts it under
+   * the ball of the foot at the 0.125 the legs are solved to.
+   */
+  function bikePedal() {
+    if (bikeWheelCache.has('pedal')) return bikeWheelCache.get('pedal');
+    const b = propBuilder();
+    bikeSweep(b, [[0, 0, -0.004], [0, 0, 0.022]], 0.0055, BK.steel, { sides: 6, caps: true });
+    b.box(0, 0, 0.056, 0.092, 0.020, 0.070, BK.dark, BK.rubber);
+    for (const x of [-0.034, 0, 0.034]) b.box(x, 0.0105, 0.056, 0.010, 0.003, 0.068, BK.black);
+    for (const x of [-0.047, 0.047]) b.box(x, 0, 0.056, 0.004, 0.011, 0.036, BK.amber);
+    const out = { geo: b.geo(), tris: b.count() / 3 };
+    bikeWheelCache.set('pedal', out);
+    return out;
+  }
 
   /**
    * A city bicycle, in its own frame: +x forward, +y up, +z to the rider's
@@ -51578,67 +51971,349 @@ async function buildJadrija(scene) {
    * figure's offset and nothing has to be turned.
    *
    * The saddle is set for whoever rides it — see THE SADDLE IS SET FOR THE
-   * RIDER where they are built — and the rest is a 1.08 m wheelbase on 0.34 m
-   * wheels, an upright bar, a rear rack, and for one of them a step-through
-   * frame and a basket. The cranks are their own mesh, and so are the two
-   * wheels, because they all go round. See `wheelDisc`.
+   * RIDER where they are built. `st` is the rider's bicycle:
+   *   low     a step-through frame, two curved tubes down from the head
+   *   basket  a wicker basket on the front, carried on the steering
+   *   guard   a chainguard over the top run of the chain
+   *   gum     gumwall tyres
+   *   brown   a brown leather saddle rather than a black one
+   *   bell    a bell on the left of the bar
+   *   rack    'black' for a black rear rack, steel otherwise
+   *   fender  'chrome' for plated mudguards, the paint otherwise
+   *
+   * Returns a geometry for each moving part, in the frame above except the
+   * steering, which is built about `BK_PIVOT` so that it can be turned about
+   * the head tube's axis, and the cranks, which are built about the bottom
+   * bracket. `lo` builds the far copy.
    */
-  function wheelBike(seatY, col, low, basket) {
-    const b = propBuilder(), c = propBuilder();
-    const K = WHEEL_BIKE;
-    const TYRE = [0.058, 0.058, 0.062], RIM = [0.600, 0.610, 0.620];
-    const DARK = [0.095, 0.092, 0.090], STEEL = [0.520, 0.530, 0.540];
-    const wheels = [];
-    for (const x of [-K.axle, K.axle]) wheels.push(wheelDisc(x, K.R, K.R, 0.019, TYRE, RIM, true));
+  function wheelBike(seatY, col, st, lo) {
+    const b = propBuilder(), f = propBuilder(), c = propBuilder();
+    const K = WHEEL_BIKE, R = K.R;
+    const S = lo ? 4 : 8, SS = lo ? 3 : 6, seg = (n) => (lo ? Math.max(2, n >> 1) : n);
+    const RA = [-K.axle, R, 0], FA = [K.axle, R, 0];
     const BB = [K.bb[0], K.bb[1], 0];
-    const at2 = (y) => [K.bb[0] - (y - K.bb[1]) * K.seatK, y, 0];
+    const at2 = (y, z = 0) => [K.bb[0] - (y - K.bb[1]) * K.seatK, y, z];
     const clY = Math.min(seatY - 0.10, K.clamp);
-    const CL = at2(clY), SEAT = at2(seatY);
-    const HT = [0.40, 0.86, 0], HB = [0.45, 0.66, 0];
-    wheelTube(b, BB, CL, 0.020, col);
-    wheelTube(b, CL, SEAT, 0.012, STEEL);
-    if (low) {
-      // The step-through: the top tube comes down to meet the down tube low,
-      // which is the frame a woman of seventy rides to the beach on.
-      wheelTube(b, [BB[0] + 0.10, BB[1] + 0.10, 0], [HB[0] - 0.02, HB[1] + 0.05, 0], 0.020, col);
+    const DARKP = shade(col, 0.70);
+    const guardCol = st.fender === 'chrome' ? BK.chrome : col;
+    const rackCol = st.rack === 'black' ? BK.black : BK.steel;
+    const tube = (bld, pts, r, cl, o = {}) => bikeSweep(bld, pts, r, cl, { sides: S, ...o });
+
+    // ── the frame ──
+    // The bottom bracket shell, across.
+    tube(b, [[BB[0], BB[1], -0.036], [BB[0], BB[1], 0.036]], 0.020, col, { caps: true });
+    // The head tube, on the steering axis, with the headset's two cups.
+    tube(b, [bkAxis(0.405), bkAxis(0.60)], 0.019, col);
+    tube(b, [bkAxis(0.392), bkAxis(0.408)], 0.022, BK.chrome, { caps: true });
+    tube(b, [bkAxis(0.597), bkAxis(0.612)], 0.022, BK.chrome, { caps: true });
+    // The seat tube, and the collar that clamps the post.
+    tube(b, [BB, at2(clY)], 0.0150, col);
+    tube(b, [at2(clY - 0.014), at2(clY + 0.006)], 0.0185, BK.chrome, { caps: true });
+    if (st.low) {
+      // The step-through: two tubes curving down from the head, the upper one
+      // into the seat tube low and the lower one into the bottom bracket, which
+      // is the frame a woman of seventy rides to the beach on and the one
+      // every Dutch bicycle in a Dalmatian car park has.
+      tube(b, bkBez([bkAxis(0.575), [0.14, 0.80, 0], [-0.03, 0.56, 0], at2(0.44)], seg(14)), 0.0175, col);
+      tube(b, bkBez([bkAxis(0.43), [0.20, 0.56, 0], [0.05, 0.36, 0], [BB[0] + 0.015, BB[1] + 0.012, 0]], seg(12)), 0.0185, col);
     } else {
-      wheelTube(b, CL, HT, 0.018, col);
+      // The diamond: a top tube from under the collar to the top of the head
+      // tube, and a down tube from the bottom bracket to its foot.
+      tube(b, [at2(clY - 0.04), bkAxis(0.565)], 0.0150, col);
+      tube(b, [BB, bkAxis(0.435)], 0.0180, col);
     }
-    wheelTube(b, BB, HB, 0.022, col);
-    for (const z of [-0.055, 0.055]) {
-      wheelTube(b, [BB[0], BB[1], z * 0.5], [-K.axle, K.R, z], 0.011, col);
-      wheelTube(b, [CL[0], CL[1], z * 0.3], [-K.axle, K.R, z], 0.010, col);
-      wheelTube(b, [HB[0], HB[1], z * 0.6], [K.axle, K.R, z * 0.8], 0.012, col);
-    }
-    wheelTube(b, HT, HB, 0.024, col);
-    wheelTube(b, HT, [K.stem[0], K.stem[1], 0], 0.014, STEEL);
-    // The bar, swept back to the grips, and the grips.
-    wheelTube(b, [K.stem[0], K.stem[1], -0.14], [K.stem[0], K.stem[1], 0.14], 0.011, STEEL);
+    // The stays, a pair of each, flaring round the tyre to the dropouts.
+    const DO = [-K.axle + 0.004, R - 0.001];
+    const SST = at2(clY - 0.03);
+    const stayZ = 0.066;
+    let bridge = null;
     for (const s of [-1, 1]) {
-      wheelTube(b, [K.stem[0], K.stem[1], s * 0.14], [K.bar[0] + 0.06, K.bar[1], s * (K.grip - 0.04)], 0.011, STEEL);
-      wheelTube(b, [K.bar[0] + 0.07, K.bar[1], s * (K.grip - 0.05)], [K.bar[0] - 0.03, K.bar[1], s * (K.grip + 0.03)], 0.017, DARK);
+      tube(b, bkBez([[BB[0] - 0.02, BB[1], s * 0.026], [-0.25, 0.305, s * 0.062],
+        [DO[0], DO[1], s * stayZ]], seg(8)), 0.0092, col);
+      const ss = bkBez([[SST[0], SST[1], s * 0.018], [(SST[0] + DO[0]) * 0.5, (SST[1] + DO[1]) * 0.5, s * 0.062],
+        [DO[0], DO[1] + 0.012, s * stayZ]], seg(8));
+      tube(b, ss, 0.0085, col);
+      // Where the stays pass 0.39 m from the axle, the bridge between them.
+      if (s > 0) {
+        for (let i = 0; i < ss.length; i++) {
+          if (Math.hypot(ss[i][0] - RA[0], ss[i][1] - RA[1]) < 0.40) { bridge = ss[Math.max(0, i - 1)]; break; }
+        }
+      }
+      b.box(DO[0], DO[1], s * stayZ, 0.034, 0.030, 0.006, DARKP);
     }
-    // Saddle and rack.
-    b.box(SEAT[0] + 0.03, seatY + 0.025, 0, 0.26, 0.05, 0.14, DARK, [0.180, 0.130, 0.090]);
-    b.box(-0.40, 0.735, 0, 0.34, 0.02, 0.13, STEEL);
-    wheelTube(b, [-0.24, 0.735, 0], [CL[0] - 0.02, CL[1] - 0.04, 0], 0.008, STEEL);
-    for (const z of [-0.06, 0.06]) wheelTube(b, [-0.55, 0.735, z], [-K.axle, K.R, z], 0.008, STEEL);
-    if (basket) {
-      // Wicker, on the front, with a towel in it.
-      b.box(K.axle + 0.08, 0.93, 0, 0.26, 0.20, 0.33, [0.520, 0.380, 0.220], [0.300, 0.500, 0.620]);
+    if (bridge) tube(b, [[bridge[0], bridge[1], -bridge[2]], bridge], 0.0065, col);
+    // The seat post, and the saddle on it.
+    tube(b, [at2(clY - 0.02), at2(seatY - 0.032)], 0.0125, BK.chrome, { sides: SS + 2 });
+    const SEAT = at2(seatY);
+    {
+      // The saddle: a wide leather city saddle, lofted from its outline — broad
+      // and rounded behind, a narrow nose, domed across the top with its skirt
+      // turned down. Its top is 0.05 over `seatY`, as the slab's was, because
+      // the hips are solved to sit there.
+      const rows = lo ? 7 : 13, ring = lo ? 8 : 16, G = [];
+      const smooth01 = (a, e, x) => { const t = clamp((x - a) / (e - a), 0, 1); return t * t * (3 - 2 * t); };
+      for (let i = 0; i <= rows; i++) {
+        const u = i / rows, x = SEAT[0] - 0.10 + u * 0.27;
+        let w = 0.028 + 0.070 * (1 - smooth01(0.30, 0.82, u));
+        if (u < 0.2) w *= 0.30 + 0.70 * Math.sqrt(1 - ((0.2 - u) / 0.2) ** 2);
+        if (u > 0.94) w *= 0.55 + 0.45 * (1 - u) / 0.06;
+        const top = seatY + 0.050 - 0.008 * u, h = 0.046 - 0.016 * u;
+        const row = [];
+        for (let j = 0; j < ring; j++) {
+          const p = j / ring * TAU, cx = Math.cos(p), sy = Math.sin(p);
+          const ac = Math.sign(cx) * Math.abs(cx) ** 0.55, as = Math.sign(sy) * Math.abs(sy) ** 0.8;
+          const dome = sy > 0 ? 0.009 * ac * ac : 0;
+          row.push([x, top - h * 0.5 + as * h * 0.5 - dome, ac * w]);
+        }
+        G.push(row);
+      }
+      const top = st.brown ? BK.leather : BK.hide, skirt = shade(top, 0.62);
+      bikeGrid(b, G, (i, j) => (Math.sin(j / ring * TAU) < -0.35 ? skirt : top), { closedJ: true });
+      bikeFan(b, G[0], bkLerp(G[0][0], G[0][ring >> 1], 0.5), [-1, 0, 0], skirt);
+      bikeFan(b, G[rows], bkLerp(G[rows][0], G[rows][ring >> 1], 0.5), [1, 0, 0], skirt);
+      // The clamp on top of the post, the rails, and two coil springs behind.
+      b.box(SEAT[0] + 0.012, seatY - 0.028, 0, 0.045, 0.022, 0.07, BK.chrome);
+      for (const s of [-1, 1]) {
+        const back = [SEAT[0] - 0.062, seatY - 0.058, s * 0.046];
+        tube(b, bkBez([[SEAT[0] + 0.14, seatY + 0.012, s * 0.012], [SEAT[0] + 0.04, seatY - 0.034, s * 0.030],
+          back], seg(6)), 0.0036, BK.chrome, { sides: SS });
+        if (!lo) {
+          const coil = [];
+          for (let k = 0; k <= 40; k++) {
+            const a = k / 40 * TAU * 4.5;
+            coil.push([back[0] + Math.cos(a) * 0.012, back[1] + 0.004 + k / 40 * 0.052,
+              back[2] + Math.sin(a) * 0.012]);
+          }
+          bikeSweep(b, coil, 0.0024, BK.chrome, { sides: 4 });
+        } else {
+          tube(b, [bkAdd(back, [0, 0.004, 0]), bkAdd(back, [0, 0.056, 0])], 0.014, BK.chrome);
+        }
+      }
     }
-    // The cranks, in their own frame at the bottom bracket, pointing straight
-    // up and down so that `rotation.z = -phase` puts the right pedal at the
-    // top at phase nought and carries it forward.
+    // The chain: round the sprocket and the ring as a closed loop in its own
+    // plane. The two straight runs are the tangents common to both circles.
+    const cz = K.chain;
+    {
+      const d = [RA[0] - BB[0], RA[1] - BB[1]], D = Math.hypot(d[0], d[1]);
+      const th = Math.atan2(d[1], d[0]), al = Math.acos((K.ring - K.cog) / D);
+      const up = th - al, dn = th + al;   // the normals of the upper and lower runs
+      const loop = [];
+      const arc = (cx, cy, r, a0, a1, n) => {
+        for (let k = 0; k <= n; k++) {
+          const a = a0 + (a1 - a0) * k / n;
+          loop.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, cz]);
+        }
+      };
+      // Round the ring's front from the lower run's point to the upper's...
+      let a0 = dn - TAU, a1 = up;
+      while (a1 < a0) a1 += TAU;
+      arc(BB[0], BB[1], K.ring, a0, a1, seg(16));
+      // ...across the top to the sprocket, round its back, and home underneath.
+      let b0 = up, b1 = dn;
+      while (b1 < b0) b1 += TAU;
+      arc(RA[0], RA[1], K.cog, b0, b1, seg(10));
+      bikeSweep(b, loop, 0.0045, BK.chain, { sides: 4, closed: true, bi: [0, 0, 1] });
+    }
+    if (st.guard) {
+      // A half chainguard, in the paint, between the ring and the crank arm:
+      // over the top of the ring and along the top run, with a lip turned in.
+      const gz = 0.058, outer = [], inner = [];
+      for (let k = 0; k <= 10; k++) {
+        const a = -0.25 + (Math.PI * 0.62 + 0.25) * k / 10;
+        outer.push([BB[0] + Math.cos(a) * 0.112, BB[1] + Math.sin(a) * 0.112, gz]);
+        inner.push([BB[0] + Math.cos(a) * 0.060, BB[1] + Math.sin(a) * 0.060, gz]);
+      }
+      const e0 = outer[10], e1 = inner[10];
+      const tail = [RA[0] + 0.055, RA[1] + K.cog + 0.030, gz], tailIn = [RA[0] + 0.055, RA[1] + K.cog - 0.022, gz];
+      for (let k = 1; k <= 6; k++) {
+        outer.push(bkLerp(e0, tail, k / 6));
+        inner.push(bkLerp(e1, tailIn, k / 6));
+      }
+      for (let k = 0; k < outer.length - 1; k++) {
+        b.quad(outer[k], outer[k + 1], inner[k + 1], inner[k], col);
+        b.quad(outer[k], outer[k + 1], bkAdd(outer[k + 1], [0, 0, -0.030]), bkAdd(outer[k], [0, 0, -0.030]), DARKP);
+      }
+    }
+    // The mudguards: the back one here, the front one on the steering.
+    bikeGuard(b, RA[0], RA[1], 0.40, 3.62, R + 0.022, 0.029, guardCol, lo);
     for (const s of [-1, 1]) {
-      wheelTube(c, [0, 0, s * 0.09], [0, s * WHEELS.crank, s * 0.09], 0.012, STEEL);
-      c.box(0, s * WHEELS.crank, s * 0.150, 0.10, 0.025, 0.09, DARK);
+      const a = 3.30, e = [RA[0] + Math.cos(a) * (R + 0.012), RA[1] + Math.sin(a) * (R + 0.012), s * 0.026];
+      tube(b, [e, [DO[0] - 0.01, DO[1] + 0.004, s * (stayZ + 0.006)]], 0.0028, BK.steel, { sides: 4 });
     }
-    wheelRim(c, 0, 0, 0.10, 0.004, DARK, [0.300, 0.300, 0.310], false);
-    let wt = 0;
-    for (const W of wheels) wt += W.tris;
-    return { geo: b.geo(), crank: c.geo(), wheels,
-      tris: (b.count() + c.count()) / 3 + wt };
+    // The rear rack, and a lamp on the back of it.
+    {
+      const RY = 0.738;
+      for (const s of [-1, 1]) {
+        tube(b, [[-0.27, RY - 0.030, s * 0.056], [-0.30, RY, s * 0.062], [-0.785, RY, s * 0.062],
+          [-0.80, RY - 0.028, s * 0.062]], 0.0055, rackCol, { sides: SS });
+        tube(b, [[-0.76, RY, s * 0.062], [DO[0] - 0.006, DO[1] + 0.02, s * (stayZ + 0.008)]], 0.0055, rackCol, { sides: SS });
+        tube(b, [[-0.60, RY, s * 0.062], [DO[0] + 0.004, DO[1] + 0.03, s * (stayZ + 0.008)]], 0.0055, rackCol, { sides: SS });
+        if (bridge) tube(b, [[-0.27, RY - 0.030, s * 0.056], [bridge[0] - 0.01, bridge[1] - 0.005, s * 0.05]], 0.0045, rackCol, { sides: SS });
+      }
+      for (const x of [-0.36, -0.50, -0.64, -0.775]) tube(b, [[x, RY, -0.062], [x, RY, 0.062]], 0.0045, rackCol, { sides: SS });
+      tube(b, [[-0.30, RY, 0], [-0.785, RY, 0]], 0.0045, rackCol, { sides: SS });
+      b.box(-0.805, RY - 0.038, 0, 0.030, 0.042, 0.078, BK.black);
+      b.box(-0.821, RY - 0.038, 0, 0.004, 0.034, 0.066, BK.red);
+    }
+    // The kickstand, folded up along the left chainstay.
+    tube(b, [[-0.13, 0.282, -0.040], [-0.43, 0.298, -0.070]], 0.0065, BK.steel, { sides: SS, caps: true });
+    b.box(-0.435, 0.298, -0.072, 0.03, 0.010, 0.020, BK.dark);
+    if (!lo) {
+      // The rear brake's cable, from the head down the frame to the hub's arm.
+      const from = st.low ? bkAxis(0.44, -0.02) : bkAxis(0.47, -0.02);
+      tube(b, [bkAdd(from, [-0.02, -0.01, 0]), [BB[0] + 0.05, BB[1] + 0.03, -0.024],
+        [BB[0] - 0.03, BB[1] + 0.016, -0.034], [-0.30, 0.322, -0.068], [-0.49, 0.345, -0.074]],
+      0.0026, BK.dark, { sides: 4 });
+    }
+
+    // ── the steering: fork, stem, bar, the front guard, a lamp, a basket ──
+    // The fork: a crown under the head tube, and two blades curving forward to
+    // the axle — that bend is the 45 mm of offset, and it is what makes a fork
+    // look like one.
+    tube(f, [bkAxis(0.388, -0.064), bkAxis(0.388, 0.064)], 0.0145, col, { caps: true });
+    for (const s of [-1, 1]) {
+      const bl = bkBez([bkAxis(0.388, s * 0.052), bkAxis(0.14, s * 0.052), [FA[0], FA[1], s * 0.050]], seg(9));
+      tube(f, bl, (i) => 0.0125 - 0.0045 * i / (bl.length - 1), col);
+      f.box(FA[0], FA[1], s * 0.050, 0.026, 0.024, 0.006, DARKP);
+    }
+    // The steerer showing above the headset, and the quill stem off it.
+    const STEM = [K.stem[0], K.stem[1], 0];
+    tube(f, [bkAxis(0.61), ...bkBez([bkAxis(0.70), bkAxis(0.765), STEM], seg(6))], 0.0120, BK.chrome, { sides: SS + 2 });
+    tube(f, [bkAdd(STEM, [0, 0, -0.030]), bkAdd(STEM, [0, 0, 0.030])], 0.0165, BK.chrome, { caps: true, sides: SS + 2 });
+    // The bar: out from the stem, round, and swept back into the grips.
+    const G0 = (s) => [K.bar[0] + 0.07, K.bar[1], s * (K.grip - 0.05)];
+    const G1 = (s) => [K.bar[0] - 0.03, K.bar[1], s * (K.grip + 0.03)];
+    const barPts = {};
+    for (const s of [-1, 1]) {
+      const g0 = G0(s), g1 = G1(s), g = bkNorm(bkSub(g1, g0));
+      const fwd = [Math.abs(g[2]), 0, -g[0] * s];
+      const bar = [[STEM[0], STEM[1], 0], ...bkBez([[STEM[0], STEM[1], s * 0.04],
+        [STEM[0] + 0.05, STEM[1] + 0.012, s * 0.15], bkAdd(g0, g, -0.075), g0], seg(12)), g1];
+      barPts[s] = bar;
+      tube(f, bar, 0.0115, BK.chrome, { sides: SS + 2 });
+      // The grip: rubber, a little fatter towards its end, capped.
+      const gp = [bkAdd(g0, g, 0.004), bkAdd(g0, g, 0.04), bkAdd(g0, g, 0.08), bkAdd(g1, g, -0.004), bkAdd(g1, g, 0.004)];
+      tube(f, gp, (i) => [0.0160, 0.0165, 0.0172, 0.0190, 0.0190][i], BK.rubber, { caps: true, sides: S + 2 });
+      // The brake lever: a clamp on the bar just inboard of the grip, and the
+      // blade lying under and ahead of the fingers.
+      const perch = bkAdd(g0, g, -0.016);
+      const pEnd = bkAdd(bkAdd(perch, fwd, 0.034), [0, -0.012, 0]);
+      tube(f, [perch, pEnd], 0.0085, BK.dark, { caps: true, sides: SS });
+      tube(f, bkBez([pEnd, bkAdd(bkAdd(bkAdd(g0, g, 0.035), fwd, 0.046), [0, -0.018, 0]),
+        bkAdd(bkAdd(bkAdd(g0, g, 0.095), fwd, 0.034), [0, -0.022, 0])], seg(6)), 0.0042, BK.steel, { caps: true, sides: SS });
+      if (!lo) {
+        // Its cable, looping forward and down to the head.
+        tube(f, bkBez([pEnd, bkAdd(pEnd, [0.13, -0.01, -s * 0.02]), bkAxis(0.66, s * 0.03), bkAxis(0.58, s * 0.022)], 10)
+          .map((p, i) => (i > 7 ? bkAdd(p, [0.028, 0, 0]) : p)), 0.0026, BK.dark, { sides: 4 });
+      }
+    }
+    if (st.bell) {
+      // A bell on the left of the bar, where a left thumb finds it.
+      const p = barPts[-1][4];
+      const base = bkAdd(p, [0.004, 0.016, 0]);
+      const prof = [[0.0, 0.0], [0.024, 0.0], [0.026, 0.004], [0.023, 0.012], [0.015, 0.019], [0.0, 0.022]];
+      const G = [];
+      for (let i = 0; i < prof.length; i++) {
+        const row = [];
+        for (let k = 0; k < (lo ? 6 : 12); k++) {
+          const a = k / (lo ? 6 : 12) * TAU;
+          row.push([base[0] + Math.cos(a) * prof[i][0], base[1] + prof[i][1], base[2] + Math.sin(a) * prof[i][0]]);
+        }
+        G.push(row);
+      }
+      bikeGrid(f, G, BK.chrome, { closedJ: true, out: (i, j, q) => bkSub(q, [base[0], base[1] - 0.004, base[2]]) });
+      f.box(base[0] + 0.01, base[1] - 0.006, base[2] - 0.022, 0.012, 0.006, 0.02, BK.dark);
+    }
+    bikeGuard(f, FA[0], FA[1], -0.06, 3.56, R + 0.022, 0.029, guardCol, lo);
+    for (const s of [-1, 1]) {
+      const a = 0.12, e = [FA[0] + Math.cos(a) * (R + 0.012), FA[1] + Math.sin(a) * (R + 0.012), s * 0.026];
+      tube(f, [e, [FA[0] + 0.005, FA[1] + 0.006, s * 0.056]], 0.0028, BK.steel, { sides: 4 });
+    }
+    if (st.basket) {
+      // Wicker, on a carrier over the front wheel, with a towel in it. A
+      // rounded box of seven woven bands, open at the top, rimmed, and stood on
+      // two stays to the axle and two hooks to the bar.
+      const BC = [0.605, 0.905], LX = 0.30, LY = 0.20, LZ = 0.34, rc = 0.035;
+      const loop = [];
+      const side = lo ? 3 : 5;
+      for (const [qx, qz, a0] of [[1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI], [1, -1, Math.PI * 1.5]]) {
+        for (let k = 0; k <= side; k++) {
+          const a = a0 + Math.PI / 2 * k / side;
+          loop.push([BC[0] + qx * (LX / 2 - rc) + Math.cos(a) * rc, qz * (LZ / 2 - rc) + Math.sin(a) * rc]);
+        }
+      }
+      const bands = lo ? 3 : 7, G = [];
+      for (let i = 0; i <= bands; i++) {
+        const y = BC[1] - LY / 2 + LY * i / bands, flare = 1 + 0.06 * i / bands;
+        G.push(loop.map(([x, z]) => [BC[0] + (x - BC[0]) * flare, y, z * flare]));
+      }
+      bikeGrid(f, G, (i) => (i % 2 ? BK.wicker2 : BK.wicker), { closedJ: true,
+        out: (i, j, p) => [p[0] - BC[0], 0, p[2]] });
+      const floor = G[0];
+      bikeFan(f, floor, [BC[0], BC[1] - LY / 2, 0], [0, -1, 0], BK.wicker2);
+      bikeSweep(f, G[bands].map((p) => bkAdd(p, [0, 0.004, 0])), 0.009, BK.wicker2, { sides: SS, closed: true });
+      for (const s of [-1, 1]) {
+        tube(f, [[BC[0] + 0.08, BC[1] - LY / 2, s * 0.10], [FA[0] + 0.01, FA[1] + 0.012, s * 0.056]], 0.0042, BK.steel, { sides: SS });
+        tube(f, [[BC[0] - LX / 2 + 0.01, BC[1] + LY / 2 - 0.03, s * 0.09], [STEM[0] + 0.035, STEM[1] + 0.008, s * 0.09]], 0.0045, BK.steel, { sides: SS });
+      }
+      // The towel, folded, and a second one rolled, in stripes.
+      f.box(BC[0] - 0.02, BC[1] + LY / 2 - 0.035, 0.03, 0.20, 0.075, 0.24, BK.towel, shade(BK.towel, 1.08));
+      bikeSweep(f, bkBez([[BC[0] + 0.07, BC[1] + LY / 2 + 0.004, -0.14], [BC[0] + 0.07, BC[1] + LY / 2 + 0.004, 0.10]], lo ? 2 : 8),
+        0.034, (i) => (i % 2 ? BK.towel2 : BK.red), { sides: S + 2, caps: true });
+      // And the lamp on the basket's front.
+      tube(f, [[BC[0] + LX / 2 * 1.06 - 0.005, BC[1] - 0.02, 0], [BC[0] + LX / 2 * 1.06 + 0.045, BC[1] - 0.02, 0]],
+        (i) => (i ? 0.024 : 0.018), BK.black, { caps: true, sides: S + 2 });
+      tube(f, [[BC[0] + LX / 2 * 1.06 + 0.045, BC[1] - 0.02, 0], [BC[0] + LX / 2 * 1.06 + 0.047, BC[1] - 0.02, 0]],
+        0.020, BK.lens, { caps: true, sides: S + 2 });
+    } else {
+      // A lamp on a bracket off the fork crown.
+      const L0 = bkAdd(bkAxis(0.40), [0.030, 0.010, 0]);
+      tube(f, [bkAxis(0.40), L0], 0.006, BK.steel, { sides: SS });
+      tube(f, [L0, bkAdd(L0, [0.055, 0.004, 0])], (i) => (i ? 0.024 : 0.017), BK.black, { caps: true, sides: S + 2 });
+      tube(f, [bkAdd(L0, [0.055, 0.004, 0]), bkAdd(L0, [0.057, 0.004, 0])], 0.020, BK.lens, { caps: true, sides: S + 2 });
+    }
+
+    // ── the cranks, about the bottom bracket ──
+    // Pointing straight up and down so that `rotation.z = -phase` puts the
+    // right pedal at the top at phase nought and carries it forward.
+    tube(c, [[0, 0, -K.arm - 0.008], [0, 0, K.arm + 0.008]], 0.0085, BK.steel, { sides: SS, caps: true });
+    for (const s of [-1, 1]) {
+      const z = s * K.arm;
+      tube(c, [[0, 0, z], [0, s * WHEELS.crank * 0.5, z], [0, s * WHEELS.crank, z]],
+        (i) => [0.0140, 0.0115, 0.0100][i], BK.chrome, { caps: true, sides: SS + 2 });
+      tube(c, [[0, s * WHEELS.crank, z - 0.008], [0, s * WHEELS.crank, z + 0.008]], 0.0115, BK.chrome, { caps: true, sides: SS + 2 });
+    }
+    // The chainring, in the chain's plane: teeth, a band round its edge to
+    // give it a thickness side-on, and a five-arm spider to the right crank.
+    // The far copy's ring is the band and a plain disc.
+    if (!lo) bikeTeeth(c, 0, 0, K.chain, K.ring + 0.006, 38, BK.chrome);
+    {
+      const n = lo ? 16 : 38, r = K.ring + 0.006;
+      for (let k = 0; k < n; k++) {
+        const a0 = k / n * TAU, a1 = (k + 1) / n * TAU;
+        const P = (a, z) => [Math.cos(a) * r, Math.sin(a) * r, z];
+        c.quad(P(a0, K.chain - 0.002), P(a1, K.chain - 0.002), P(a1, K.chain + 0.002), P(a0, K.chain + 0.002), BK.steel);
+        if (lo) c.tri([0, 0, K.chain], P(a0, K.chain), P(a1, K.chain), BK.steel);
+      }
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * TAU + Math.PI / 2, ca = Math.cos(a), sa = Math.sin(a);
+        const e = 0.007, r0 = 0.012, r1 = K.ring - 0.004;
+        c.quad([ca * r0 - sa * e, sa * r0 + ca * e, K.chain + 0.003], [ca * r1 - sa * e, sa * r1 + ca * e, K.chain + 0.003],
+          [ca * r1 + sa * e, sa * r1 - ca * e, K.chain + 0.003], [ca * r0 + sa * e, sa * r0 - ca * e, K.chain + 0.003], BK.chrome);
+      }
+    }
+
+    // The steering is turned about the pivot, so it is built about it.
+    const fg = f.geo();
+    fg.translate(-BK_PIVOT.x, -BK_PIVOT.y, -BK_PIVOT.z);
+    const wF = bikeWheel(false, !!st.gum, lo), wR = bikeWheel(true, !!st.gum, lo);
+    const pd = bikePedal();
+    return {
+      geo: b.geo(), steer: fg, crank: c.geo(), pedal: pd.geo,
+      wheels: [{ geo: wR.geo, tris: wR.tris, x: RA[0], y: R, R, front: false },
+        { geo: wF.geo, tris: wF.tris, x: FA[0], y: R, R, front: true }],
+      tris: (b.count() + f.count() + c.count()) / 3 + wF.tris + wR.tris + pd.tris * 2,
+    };
   }
 
   /**
@@ -51646,8 +52321,8 @@ async function buildJadrija(scene) {
    * stem raked back to a bar at about a metre. Dark, with nothing written on
    * it.
    *
-   * Its wheels come off the same `wheelDisc` as a bicycle's and turn the same
-   * way, and because they are solid discs of one colour almost none of that
+   * Its wheels come off `wheelDisc`, which the bicycles' used to, and turn the
+   * same way as theirs, and because they are solid discs of one colour almost none of that
    * shows. They are out on their own nodes anyway: a wheel that is nailed to
    * the deck is wrong whether or not anybody can see it, and the day one of
    * these gets a spoked hub it would be wrong visibly.
@@ -51683,6 +52358,7 @@ async function buildJadrija(scene) {
   const _wkQ = new THREE.Quaternion(), _wkR = new THREE.Quaternion();
   const _wkS = new THREE.Quaternion(), _wkZ = new THREE.Vector3(0, 0, 1);
   const _wkY = new THREE.Vector3(0, 1, 0), _wkPole = new THREE.Vector3();
+  const _bkQ = new THREE.Quaternion();
 
   /**
    * Two bones from `root` to `goal`, the middle joint bending towards `pole`,
@@ -51734,7 +52410,7 @@ async function buildJadrija(scene) {
   }
 
   const wheelers = [];
-  let wheelTris = 0, wheelMachineTris = 0;
+  let wheelTris = 0, wheelMachineTris = 0, wheelMachineLoTris = 0, wheelDraws = 0;
   // The grid the lanes are planned on, and the length of `blockers` it was
   // planned against. See `wheelPlan`.
   const WG = { t0: 0, rows: 0, cols: 0, busy: null, forced: 0, turnsBad: 0 };
@@ -51826,7 +52502,10 @@ async function buildJadrija(scene) {
         { sd: sdL, u: 'armUL', l: 'armLL', S: leaned(R.armUL), E: leaned(R.armLL), W: leaned(R.handL) },
         { sd: sdR, u: 'armUR', l: 'armLR', S: leaned(R.armUR), E: leaned(R.armLR), W: leaned(R.handR) },
       ];
-      for (const A of arms) A.goal = wrist(A.sd).clone();
+      // `w0` is the same wrist in the machine's own frame, with the bar
+      // straight: the steering turns it about the head tube's axis in
+      // `wheelPose`, and the hand follows the grip round.
+      for (const A of arms) { A.goal = wrist(A.sd).clone(); A.w0 = A.goal.clone().add(F); }
       const legs = [
         { sd: sdL, u: 'legUL', l: 'legLL', f: 'footL', H: R.legUL, K: R.legLL, A: R.footL, T: R.toeL },
         { sd: sdR, u: 'legUR', l: 'legLR', f: 'footR', H: R.legUR, K: R.legLR, A: R.footR, T: R.toeR },
@@ -51852,34 +52531,71 @@ async function buildJadrija(scene) {
         }
       }
       const paint = WHEEL_PAINT[c.on][c.paint % WHEEL_PAINT[c.on].length];
-      const g = bike ? wheelBike(seatY, paint, !!c.low, !!c.basket) : wheelScoot(paint);
+      const kit = { ...(c.kit || {}), low: !!c.low, basket: !!c.basket };
+      const g = bike ? wheelBike(seatY, paint, kit, false) : wheelScoot(paint);
+      // The far copy of the same bicycle, swapped in past `WHEELS.lod`.
+      const gLo = bike ? wheelBike(seatY, paint, kit, true) : null;
       const veh = new THREE.Mesh(g.geo, mat);
       veh.name = 'wheels:' + c.who;
       scene.add(veh);
-      let crank = null;
+      let crank = null, steer = null, pedals = null;
       if (g.crank) {
         crank = new THREE.Mesh(g.crank, mat);
         crank.position.set(WHEEL_BIKE.bb[0], WHEEL_BIKE.bb[1], 0);
         veh.add(crank);
       }
+      if (g.steer) {
+        // The fork, bar and everything on them, hung at a point on the head
+        // tube's axis and turned about that axis in `wheelDraw`.
+        steer = new THREE.Mesh(g.steer, mat);
+        steer.position.copy(BK_PIVOT);
+        veh.add(steer);
+      }
+      if (g.pedal) {
+        // Two pedals off one geometry, the left one mirrored. They hang on the
+        // machine and not on the crank so that they can stay level under the
+        // feet while the crank carries them round, which is what a pedal does.
+        pedals = [1, -1].map((sd) => {
+          const m = new THREE.Mesh(g.pedal, mat);
+          if (sd < 0) m.scale.z = -1;
+          veh.add(m);
+          return { m, sd };
+        });
+      }
       // A node per wheel, hung on the machine at its own axle and turned in
-      // `wheelDraw`. `circ` is cached because the angle is taken off the
-      // distance covered modulo one turn, which keeps a rider that has done
-      // twenty kilometres as exact as one that has just set off.
-      const wheels = g.wheels.map((W) => {
+      // `wheelDraw` — the front one on the steering, so that it steers. `circ`
+      // is cached because the angle is taken off the distance covered modulo
+      // one turn, which keeps a rider that has done twenty kilometres as exact
+      // as one that has just set off.
+      const wheels = g.wheels.map((W, k) => {
         const m = new THREE.Mesh(W.geo, mat);
-        m.position.set(W.x, W.y, 0);
-        veh.add(m);
-        return { m, R: W.R, circ: TAU * W.R, x: W.x, y: W.y };
+        if (W.front && steer) {
+          m.position.set(W.x - BK_PIVOT.x, W.y - BK_PIVOT.y, -BK_PIVOT.z);
+          steer.add(m);
+        } else {
+          m.position.set(W.x, W.y, 0);
+          veh.add(m);
+        }
+        return { m, R: W.R, circ: TAU * W.R, x: W.x, y: W.y,
+          hi: W.geo, lo: gLo ? gLo.wheels[k].geo : null };
       });
+      // Both copies of the three built parts, for the swap.
+      const lod = gLo ? {
+        hi: [g.geo, g.steer, g.crank], lo: [gLo.geo, gLo.steer, gLo.crank], far: false,
+      } : null;
       scene.add(fig.mesh);
       wheelTris += g.tris + fig.tris;
       wheelMachineTris += g.tris;
+      if (gLo) wheelMachineLoTris += gLo.tris;
+      veh.traverse((o) => { if (o.isMesh) wheelDraws++; });
       // Six per cent either way on the cruise, so two on the same machine at
       // the same nominal speed are not riding in formation.
       const cruise = c.v * (0.94 + jit(i, 9313) * 0.12);
       wheelers.push({
-        i, c, fig, veh, crank, wheels, F, arms, legs, lean, bike, seatY,
+        i, c, fig, veh, crank, steer, pedals, lod, wheels, F, arms, legs, lean, bike, seatY,
+        // The bar's angle about the head tube, radians, positive to the left;
+        // and a debug pin for it. See `wheelPlace`.
+        steerA: 0, steerPin: null, lodPin: null,
         v: cruise, vCruise: cruise,
         dir: jit(i, 9314) < 0.5 ? 1 : -1,
         // Where along its stretch it starts. Planned lanes are filled in on
@@ -52521,6 +53237,23 @@ async function buildJadrija(scene) {
         r.roll += (want2 - r.roll) * Math.min(1, dt * 4);
       }
     }
+    // AND STEERED INTO IT. A bicycle turning at a rate `yawRate` while going
+    // at `v` has its front wheel turned by atan(wheelbase * yawRate / v) on
+    // the ground, which is about 26 degrees for the end-of-lane turn and one
+    // or two for a sidestep. The bar turns about a head tube tilted 21 degrees
+    // back, so the angle about that axis is the ground's over its cosine.
+    // Smoothed off the rate of turn that is already smoothed for the lean; and
+    // when the machine is stopped, left where it was, as a bar is. Held to 29
+    // degrees: the tightest U-turn at the end of a lane asks for about 34, and
+    // past 29 the outside hand has to reach further than an arm goes.
+    if (r.bike) {
+      let want = r.steerA;
+      if (r.steerPin != null) want = r.steerPin;
+      else if (rolling && r.v > 0.4) {
+        want = clamp(Math.atan(WHEEL_BIKE.axle * 2 * r.yawRate / r.v) / BK_COS, -0.5, 0.5);
+      }
+      r.steerA += (want - r.steerA) * Math.min(1, dt * 6);
+    }
   }
 
   /** Put the body on the machine. See `wheelLimb`. */
@@ -52548,7 +53281,10 @@ async function buildJadrija(scene) {
       _wkQ.setFromUnitVectors(toe, Lg.dir);
       armAimQ(fig, Lg.f, _wkQ);
     }
+    // The hands go where the grips have been turned to.
+    if (r.steer) _bkQ.setFromAxisAngle(BK_AXIS, r.steerA);
     for (const A of r.arms) {
+      if (r.steer) A.goal.copy(A.w0).sub(BK_PIVOT).applyQuaternion(_bkQ).add(BK_PIVOT).sub(F);
       _wkPole.set(-0.45, -0.55, A.sd * 0.75);
       wheelLimb(fig, A.u, A.l, A.S, A.E, A.W, A.goal, _wkPole);
     }
@@ -52567,6 +53303,35 @@ async function buildJadrija(scene) {
     // slope.
     r.veh.rotation.set(r.roll, r.yaw, r.pitch, 'YZX');
     if (r.crank) r.crank.rotation.z = -r.phase;
+    if (r.steer) r.steer.quaternion.setFromAxisAngle(BK_AXIS, r.steerA);
+    if (r.pedals) {
+      // Each pedal at the end of its arm, the left half a turn behind, and
+      // held at the twelve degrees nose-down the feet are solved to.
+      for (const P of r.pedals) {
+        const ph = r.phase + (P.sd > 0 ? 0 : Math.PI);
+        P.m.position.set(WHEEL_BIKE.bb[0] + Math.sin(ph) * WHEELS.crank,
+          WHEEL_BIKE.bb[1] + Math.cos(ph) * WHEELS.crank, P.sd * WHEEL_BIKE.arm);
+        P.m.rotation.z = -0.21;
+      }
+    }
+    if (r.lod) {
+      // Near or far copy. Swapped on a threshold with a metre of slack either
+      // side, so a rider cruising at 24 m does not flicker between them — and
+      // on what a spoke is on the screen, not on metres: the threshold is for
+      // a 60 degree view, and the long lens (Z) at eight degrees makes a
+      // bicycle at 150 m as big as one at 20, so it moves out with the lens.
+      const lens = Math.tan(camera.fov * Math.PI / 360) / BK_TAN30;
+      const lim = (WHEELS.lod + (r.lod.far ? -1 : 1)) / lens;
+      const far = r.lodPin != null ? r.lodPin : d2 > lim * lim;
+      if (far !== r.lod.far) {
+        r.lod.far = far;
+        const G = far ? r.lod.lo : r.lod.hi;
+        r.veh.geometry = G[0];
+        if (r.steer) r.steer.geometry = G[1];
+        if (r.crank) r.crank.geometry = G[2];
+        for (const W of r.wheels) if (W.lo) W.m.geometry = far ? W.lo : W.hi;
+      }
+    }
     // Negative about +z is the top of the wheel going forward, the same sense
     // the crank takes. The modulo is in metres, not in radians, so it costs
     // nothing in precision.
@@ -55343,6 +56108,8 @@ async function buildJadrija(scene) {
         bikes: wheelers.filter((r) => r.bike).length,
         scooters: wheelers.filter((r) => !r.bike).length,
         tris: wheelTris, machineTris: wheelMachineTris,
+        machineTrisFar: wheelMachineLoTris, draws: wheelDraws,
+        far: wheelers.filter((r) => r.lod && r.lod.far).length,
         forced: WG.forced, turnsBad: WG.turnsBad,
         planAt: wheelPlanAt, ms: +wheelMs.toFixed(3),
       }),
@@ -55352,6 +56119,7 @@ async function buildJadrija(scene) {
         v: +r.v.toFixed(2), gap: r.gap === Infinity ? null : +r.gap.toFixed(2),
         dist: +r.dist.toFixed(3),
         spin: r.wheels.map((W) => +(-W.m.rotation.z).toFixed(4)),
+        steer: r.bike ? +r.steerA.toFixed(3) : null, phase: +r.phase.toFixed(3),
         x: +r.x.toFixed(2), y: +r.y.toFixed(2), z: +r.z.toFixed(2),
         yaw: +r.yaw.toFixed(3), roll: +r.roll.toFixed(3),
         lean: +r.lean.toFixed(2), seat: +r.seatY.toFixed(3),
@@ -55373,6 +56141,20 @@ async function buildJadrija(scene) {
       },
       raw: () => wheelers,
       hold: (v = true) => { wheelHold = !!v; return wheelHold; },
+      /**
+       * Pin a bicycle's crank `phase`, bar `steer` (radians, left positive)
+       * and `far` copy for a photograph; `null` gives either of the last two
+       * back. With `hold`.
+       * `i` counts bicycles only.
+       */
+      set: (i, o = {}) => {
+        const r = wheelers.filter((q) => q.bike)[i];
+        if (!r) return null;
+        if (o.phase != null) r.phase = o.phase;
+        if ('steer' in o) r.steerPin = o.steer;
+        if ('far' in o) r.lodPin = o.far;
+        return { phase: +r.phase.toFixed(3), steer: +r.steerA.toFixed(3), pin: r.steerPin };
+      },
       /** The planning grid as text, one row a metre, with rider `i`'s lanes on it. */
       grid: (i = 0, t0 = WG.t0, t1 = WG.t0 + WG.rows * WHEELS.dT) => {
         const r = wheelers[i];
