@@ -8,6 +8,68 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.2] — 2026-09-27
+
+### the hammock falls asleep, and hangs the same
+
+Offered "fix the hammock's slow sleep properly, without changing how it
+hangs", Misha said *"both"*. Awake, the AVBD hammock at Jadrija cost about
+2.3 ms of main thread a frame, 31 % of the page's CPU in one profile there.
+It is meant to sleep when it is empty and still, but it took 70 s to do it
+after the page loaded, and more than three minutes after a push.
+
+**Why it took so long.** It was not solver noise. At true rest the fastest
+thing in the cloth moves at 0.0003 m/s. The empty hammock is a pendulum with a
+3.58 s period, and it loses 1.9 % of its swing a second (`drag` plus BDF1's
+own loss), which is right for a swing you can see. Drawing the gathered ends
+in during the build's `settle` leaves it swinging about 2.5° either side of
+where it hangs. The sleep test (`still`, 0.015 m/s) is about a 0.3° swing, and
+at 1.9 % a second that takes a minute or more to reach. So it spent those
+70 s hanging at rest to within a centimetre, awake for the last few
+millimetres.
+
+- **Hushed to its rest at build** (`rest` in `hammockSim`, `HAMMOCK.restV`).
+  After the unchanged 3 s settle, the cloth and gathers get 2.5/s more air
+  until they are still: 3.5 s of steps, about 0.22 s of build. It then
+  starts asleep. It ends within 0.4 mm of where it hangs after four minutes
+  of swinging free. **Rest shape, before → after:** low 3.213 → 3.213, sag
+  0.925 → 0.925, bed angle 11.3–11.7° (wherever the old one happened to stop
+  in its last swing) → 11.6°. The true rest is 11.54°.
+- **After the settle, not in it.** The empty cloth can hang more than one way,
+  depending on which way its ends buckle as they are drawn in. Air added in
+  the second half of the settle (the first attempt, which was rejected) hung
+  it at 5.2° with 19 cm more sag. Hushed from 2.0 s it hung at 0.6°. From
+  3.0 s, every strength tried between 1.5 and 20 lands on the usual shape.
+- **The solve's memory aged** (`relax` on `avbdNet`, `HAMMOCK.relax`). AVBD
+  joint penalties ramp up with a joint's error and shed 0.1 % a step. With
+  ten iterations a joint is only as stiff as its penalty, so a freshly built
+  hammock swings differently from one that has hung for a minute. Pushed
+  straight from the hush, its third swing came 0.3 s late, 4.8° rms off the
+  old hammock's trace over 8 s. The hard joints' and ropes' penalties are
+  now scaled by 0.7 at the end of the build, with the multipliers left alone
+  so nothing moves. That brings it to 0.2–0.7° rms at three push points,
+  the same as 40 s of free hanging (0.23°).
+- **The last degree hushed at run time** (`HAMMOCK.hush`). Once the fastest
+  thing in the empty cloth has stayed under 0.045 m/s (about a 1° swing,
+  16 mm at the bed) for a whole 4 s window (longer than one swing), the same
+  2.5/s goes on. It sleeps about 3 s later. It is never on with her in it.
+  Anything that wakes the hammock (a push, her getting in or out, `wake`,
+  `blowUp`) takes the hush off (`rouse`).
+- **Measured, before → after:** asleep after load, with you beside it:
+  68.7 s → 0. Arriving from past `far`: 68.7 s awake → 0. After an empty
+  push: 196 s → 158–162 s. The swing is visible for about 150 s of that, and
+  it now sleeps about 3 s after it drops under a degree. The hammock's share
+  of busy main-thread time near it after load: 21.3 % → 0. It is unchanged
+  while it swings. The empty push trace over 8 s in-game is within about 1°
+  of the old one.
+- **Known, and not new:** Baye's get-in is fragile against a hammock that has
+  hung still for a while. She sometimes goes through the bed and lies under
+  it. The old build did this on 10 of 18 get-ins once the hammock had hung
+  for 40 s or slept, against 3 of 15 in the first half-minute after load.
+  The hammock is now always the settled one, so this is the case you meet:
+  6 of 10 on this build. That fix is in the get-in and is not in this
+  release.
+
 ## [1.535.1] — 2026-09-27
 
 ### an × on the ears
