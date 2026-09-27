@@ -3057,16 +3057,34 @@ async function buildJadrija(scene) {
   // Baye's kabina is at t 426.5 and nowhere near it. The hammock picks the
   // pine pair nearest `HAM_WALK.t` (see `hammockSpec`), so the hole and the
   // thing it is a way to stay together however the grove is planted.
-  const HAM_WALK = { t0: 436.2, t1: 442.8, s0: 16.6, s1: 30.0, t: 439.5 };
-  const KAB_CUTS = [EAST_CAFE, HAM_WALK];
+  //
+  // AND WIDER. The same afternoon: *"for that area where there's a hammock,
+  // can u clear off more of the space there"*. The way through goes east to
+  // t 449, and the back row — the one the hammock hangs behind — goes back
+  // west to t 428 as well (`HAM_YARD`). The front row stops at t 433.4 on the
+  // west: the run from there down is the one with Baye's kabina in it.
+  const HAM_WALK = { t0: 434.0, t1: 449.0, s0: 16.6, s1: 30.0, t: 439.5 };
+  const HAM_YARD = { t0: 428.0, t1: 449.0, s0: 25.6, s1: 30.0 };
+  const KAB_CUTS = [EAST_CAFE, HAM_WALK, HAM_YARD];
   const cutHit = (C, a, c, front) => c > C.t0 && a < C.t1
     && C.s1 > front && C.s0 < front + JAD.cabD;
   const cafeBlocks = (a, c, front) => KAB_CUTS.some((C) => cutHit(C, a, c, front));
-  /** [a, c] with every cut through this row taken out of it. */
-  const cutSpans = (a, c, front) => {
+  /**
+   * [a, c] with every cut through this row taken out of it.
+   *
+   * `g0` is the run's first bay, when there is one, and the cut is widened
+   * out to whole bays of it — because that is how the huts are cut: the k
+   * loop skips every bay the cut touches, and a pad, a roof or a blocker cut
+   * at the cut's own number instead left up to a bay of roof standing over
+   * nothing, which 1.532.1 did at both ends of HAM_WALK.
+   */
+  const cutSpans = (a, c, front, g0 = null) => {
     let spans = [[a, c]];
-    for (const C of KAB_CUTS) {
-      spans = spans.flatMap(([p, q]) => (cutHit(C, p, q, front)
+    for (const C0 of KAB_CUTS) {
+      const C = g0 == null ? C0 : { ...C0,
+        t0: g0 + Math.floor((C0.t0 - g0) / JAD.cabW) * JAD.cabW,
+        t1: g0 + Math.ceil((C0.t1 - g0) / JAD.cabW) * JAD.cabW };
+      spans = spans.flatMap(([p, q]) => (cutHit(C0, p, q, front)
         ? [[p, Math.max(p, C.t0)], [Math.min(q, C.t1), q]] : [[p, q]]));
     }
     return spans;
@@ -3083,7 +3101,7 @@ async function buildJadrija(scene) {
     b = deck;
     // In up to two pieces, so the pad stops at the cafe instead of running
     // under its floor.
-    for (const [pa, pc] of cutSpans(t0 - 0.5, t1 + 0.5, front)) {
+    for (const [pa, pc] of cutSpans(t0 - 0.5, t1 + 0.5, front, t0)) {
       if (pc - pa < 0.15) continue;
       boxTS(pa, pc, front - 0.55, back + 0.45,
         y0 - 0.4, y0 + JAD.plinth, CONC[1], CONC[2]);
@@ -3394,7 +3412,7 @@ async function buildJadrija(scene) {
     //
     // Split at `EAST_CAFE` on the same test the huts and the blocker use, and
     // capped at each cut so the ribbon ends as a gable and not as paper.
-    for (const [ra, rc] of cutSpans(T0, T1, front)) {
+    for (const [ra, rc] of cutSpans(T0, T1, front, t0)) {
       if (rc - ra < 0.15) continue;
       const nR = Math.max(1, Math.ceil((rc - ra) / JAD.cabW));
       const slab = (a0, a1, sa, sb, ya, yb) => {
@@ -3441,7 +3459,7 @@ async function buildJadrija(scene) {
     // Only the ends a cut has left standing. A run that starts inside
     // HAM_WALK keeps its `T0` on paper and has no huts there; its end wall
     // drawn anyway was a white slab standing on its own in the way through.
-    const kept = cutSpans(T0, T1, front).filter(([a, c]) => c - a >= 0.15);
+    const kept = cutSpans(T0, T1, front, t0).filter(([a, c]) => c - a >= 0.15);
     for (const [T, o] of [[T0, -1], [T1, 1]]) {
       if (!kept.length || (o < 0 ? kept[0][0] !== T0 : kept[kept.length - 1][1] !== T1)) continue;
       const A = W(T, e0, eave), B = W(T, mid, ridge), C = W(T, e1, eave);
@@ -3509,7 +3527,7 @@ async function buildJadrija(scene) {
     // two places, and only one of them told about the exception. Anything that
     // opens a hole in a row here has to open it in both.
     const pushRun = (a, c, kab) => {
-      for (const [pa, pc] of cutSpans(a, c, front)) {
+      for (const [pa, pc] of cutSpans(a, c, front, t0)) {
         if (pc - pa < 0.15) continue;
         runs.push({ t0: pa, t1: pc, s0: front - 0.55, s1: back + 0.45, y: y0, h, kab });
       }
@@ -21397,6 +21415,8 @@ async function buildJadrija(scene) {
     }
   }
 
+  const OLEANDER_GONE = true;
+
   /**
    * The shrub mass behind the promenade: a mound of dark leaf, the shoots
    * coming out of it, and the flowers sitting in the top.
@@ -21432,6 +21452,18 @@ async function buildJadrija(scene) {
    * one more draw than it used to moves every parasol east of it.
    */
   function oleander(t, s, y, r) {
+    // AND NOT DRAWN AT ALL. Misha, 27 Sep 2026, a screenshot of one against
+    // the lane wall and another in a pot on its coping: *"remove these super
+    // ugly shrubberies"*. Every one of them, everywhere — the grove's, the
+    // lane wall's pots, the vikendica garden's. The thirty-five draws are
+    // still taken, in the same order, because RULE 4 is not about whether
+    // anything gets drawn: a shrub that stops spending its draws moves every
+    // parasol east of it. None of them was ever a blocker, so nothing you
+    // walk into goes with them.
+    if (OLEANDER_GONE) {
+      for (let k = 0; k < 35; k++) rng();
+      return;
+    }
     const P = facing(t, s, rng() * TAU);
     const band = [y, y + r * 2.1];
     const DK = [0.098, 0.158, 0.094], LT = [0.220, 0.350, 0.208];
@@ -22018,7 +22050,7 @@ async function buildJadrija(scene) {
       if (Math.abs(t - BACK.rock[0]) < 3.4) continue;
       if (Math.abs(t - BACK.anchor[0]) < 3.0) continue;
       // Nobody parks across the way through to the hammock (`HAM_WALK`).
-      if (t > HAM_WALK.t0 - 6.0 && t < HAM_WALK.t1 + 6.0) continue;
+      if (t > HAM_YARD.t0 - 6.0 && t < HAM_YARD.t1 + 6.0) continue;
       const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
       // Which of the five, off a *sixth* slot of the same sine hash. Nothing in
       // this loop touches `rng`, so the model table in src/44-cars.js is free to
@@ -25607,17 +25639,18 @@ async function buildJadrija(scene) {
       && S.s0 - (S.awn || 0) - 1.0 < WALL.s + 0.7 && S.s1 + 1.0 > WALL.s - 0.7);
     const doorway = (t) => SHOPS.some((S) => S.kind === 'box'
       && Math.abs(t - (S.t0 + (S.t1 - S.t0) * 0.33)) < 2.2);
-    const gap = (t) => crosses(t) || doorway(t)
+    const gap0 = (t) => crosses(t) || doorway(t)
       || (t > JET.t - 12 && t < JET.t + 12)
       // The plaza this opening was cut for is gone — see "the plaza that was
       // here, and is not". The hole is left standing because closing it welds
       // the two runs either side of it into one and moves a blocker, and that
       // is a separate argument from the one the slab lost.
       || (t > PLAZA.t0 - 8 && t < PLAZA.t1 + 8)
-      || (t > VIK.t - 12 && t < VIK.t + 12)
-      // And the way to the hammock, which HAM_WALK cuts through both rows of
-      // huts: a gap in the huts that ends at a wall is a yard, not a way.
-      || (t > HAM_WALK.t0 && t < HAM_WALK.t1);
+      || (t > VIK.t - 12 && t < VIK.t + 12);
+    // And the way to the hammock, which HAM_WALK cuts through both rows of
+    // huts: a gap in the huts that ends at a wall is a yard, not a way. Kept
+    // apart from `gap0` for the planters below, which spend `rng`.
+    const gap = (t) => gap0(t) || (t > HAM_YARD.t0 && t < HAM_YARD.t1);
     const step = 2.4;
     let run0 = null;
     for (let t = 300; t < LEN - 14 + step; t += step) {
@@ -26156,10 +26189,24 @@ async function buildJadrija(scene) {
     // East of 300 only: the piers on the approach are bare in b_061, and a
     // planter standing in one of the gaps between them would be standing on
     // nothing.
+    //
+    // RULE 4, and it was broken once already: what is in a pot spends `rng`
+    // (35 draws an oleander, 17 an agave), so a pot that stops being planted
+    // still spends them. 1.532.1 opened the wall at HAM_WALK with `gap`, the
+    // pot at t 439.8 went, and its draws went with it — every parasol east
+    // of the stream moved. So the draws follow `gap0`, the wall as it was,
+    // and only the planting follows `gap`.
     for (let t = 303; t < LEN - 18; t += 11.4) {
-      if (gap(t)) continue;
+      if (gap0(t)) continue;
       const y = yAt(t) + WALL.h + WALL.cap;
       const kind = jit(t | 0, 31);
+      // The pots that held an oleander go with it — see OLEANDER_GONE. An
+      // empty terracotta pot every eleven metres is not a planter.
+      if (gap(t) || (OLEANDER_GONE && kind < 0.45)) {
+        if (kind < 0.45) oleander(t, WALL.s, y, 0);
+        else for (let k = 0; k < 17; k++) rng();
+        continue;
+      }
       const POT = kind < 0.6 ? [0.545, 0.290, 0.180] : [0.505, 0.492, 0.462];
       frustumTS(y, [t, WALL.s, 0.20, 0.20], y + 0.34, [t, WALL.s, 0.26, 0.26],
         POT, shade(POT, 1.08));
@@ -42790,6 +42837,8 @@ async function buildJadrija(scene) {
       case 'hamIn': {
         const H = show.ham;
         if (!H || !hammock) { hamHome(go); break; }
+        // Put out of it by the net's own guard — see `wrong` in 43-hammock.js.
+        if (!H.enter && !hammock.api.herIn) { hamHome(go); break; }
         H.t += dt;
         show.vel = 0;
         if (done) { H.t = 0; go('hamHeld', 'hamLie', 0.50); }

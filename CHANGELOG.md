@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.533.1] — 2026-09-27
+
+### the hammock stays in the pines, a wider clearing, and no oleanders
+
+Misha: *"for that area where there's a hammock, can u clear off more of the
+space there, also remove these super ugly shrubberies"* (a screenshot of an
+oleander against the lane wall, and another in a pot on its coping), and
+*"somehow the hammock broke now, she gets there and it breaks and gets thrown
+into the sky or something"*.
+
+- **The hammock heals itself instead of blowing up.**
+  - How it failed: I reproduced it once in three headless runs. She lands in
+    the cloth 0.3 m off where she lands every other time, and 4 cm high. She
+    creeps along the cloth for three seconds, then the hard joints open
+    (1.7 mm, then 39, then 62) and half a second later everything is
+    kilometres away.
+  - Why the old guard missed it: it only caught NaN, and every coordinate
+    stayed finite.
+  - Not the frame hitch it looked like: the game clamps every frame to 50 ms.
+  - The new guard: the net is now also checked every frame for a hard joint
+    open past 15 mm, a body faster than 12 m/s, or anything further from
+    the ties than a hammock can reach. While the net is healthy it takes a
+    snapshot every quarter second. When it goes wrong, it rolls back to the
+    state of half a second earlier, at rest and with its multipliers cold.
+    If it goes wrong three times in four seconds, she is taken out, the
+    cloth goes back to hanging empty as built, and she walks home through
+    the corridor.
+  - Tested by throwing the net upward on purpose (`hammock.blowUp`). One
+    throw is rolled back and she stays lying there. Three throws in a second
+    take her out, and she walks home.
+  - Clean runs are untouched: 70 s lying, with the joints at 0.2 mm.
+- **The clearing is wider.**
+  - `HAM_WALK` now runs from t 434 to 449.
+  - The back row is cleared from t 428 as well (`HAM_YARD`), and so is the
+    lane wall.
+  - No car is parked from t 422 to 455.
+  - The front row still stops at t 433.4, because the run west of it has
+    Baye's kabina in it.
+- **The cuts end where the huts end.** Huts are skipped a whole 2.15 m bay
+  at a time, but the pad, the roof and the blocker were cut at the cut's own
+  number. That left up to a bay of roof standing over nothing at both ends
+  of the 1.532.1 cut, and 0.2 m of it at Caffe TRAMPULIN. `cutSpans` now
+  widens every cut out to the run's bays.
+- **No oleanders.** Every one is gone: the grove's, the lane wall's pots
+  (the pots go too) and the vikendica garden's. `oleander()` still takes its
+  35 `rng` draws, so nothing downstream moves.
+- **The rng stream is put back.** 1.532.1's lane-wall gap had also skipped
+  the pot at t 439.8 and its draws. The pots now spend their draws by the
+  wall as it was (`gap0`) and are planted by the wall as it is (`gap`).
+  Checked: every blocker in the resort matches 1.532.0, except in the
+  clearing itself and at the café trim above.
+
 ## [1.533.0] — 2026-09-27
 
 ### no more mannequins: the far crowd is the same eight people

@@ -153,6 +153,10 @@ const HAMMOCK = {
   // Past this from the camera it is not stepped at all; nearer, it sleeps
   // once it has been still for `sleepAfter` seconds with nobody in it.
   far: 60, sleepAfter: 2.0, still: 0.015,
+  // What counts as the net going wrong — see `wrong`. Measured when it is
+  // right: the hard joints open 0.1-0.5 mm lying, 2.4 mm at worst getting in;
+  // the fastest thing in it is a pushed swing at about 2 m/s.
+  snapStretch: 0.015, snapV: 12,
   // How long the empty cloth is settled for at build, s — so the first time
   // anybody walks up to it, it is hanging and not falling.
   settle: 3.0,
@@ -676,6 +680,7 @@ function buildHammock(scene, J) {
     net.place(her, mp.x + _hv.x, mp.y + _hv.y, mp.z + _hv.z, [mq.x, mq.y, mq.z, mq.w]);
     herIn = true;
     asleep = false; still = 0;
+    forget();
     herGuide(mp, mq, H.guideLin, H.guideAng);
   }
   /** Where the guide wants her mesh, and how hard; 0 and 0 lets her go. */
@@ -723,6 +728,7 @@ function buildHammock(scene, J) {
     net.setLive(her, false);
     for (const c of S.caps) net.cpOn[c] = 0;
     asleep = false; still = 0;
+    forget();
   }
 
   // ── the swing ───────────────────────────────────────────────────────────
@@ -797,7 +803,7 @@ function buildHammock(scene, J) {
 
   // ── stepping ────────────────────────────────────────────────────────────
   let asleep = false, still = 0, acc = 0, far = false;
-  const stats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, sleep: 0, rescues: 0 };
+  const stats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, sleep: 0, rescues: 0, bails: 0 };
   // The last good state — see the guard in `step`.
   const goodP = new Float64Array(P.length), goodQ = new Float64Array(Q.length);
   const finite = () => {
@@ -813,6 +819,78 @@ function buildHammock(scene, J) {
     }
     net.resetDuals();
   }
+  // AND ONE BAD SECOND IS ONE BAD SECOND. Misha, 27 Sep 2026: *"somehow the
+  // hammock broke now, she gets there and it breaks and gets thrown into the
+  // sky or something"*. The guard above only knows a number from not a
+  // number, and this was numbers: MEASURED, one run in three, she lands in
+  // the cloth 0.3 m off where she lands every other time and 4 cm high,
+  // creeps along it for three seconds, and then the joints open — 1.7 mm,
+  // 39, 62 — and the next half second everything is kilometres away, every
+  // coordinate finite. The two runs in three that land true lie there for
+  // seventy seconds at 0.2 mm.
+  //
+  // So the net is also watched for going WRONG, not only for going to NaN:
+  // a hard joint open past `H.snapStretch`, a body faster than `H.snapV`,
+  // or anything further from the ties than a hammock can reach. Wrong, it
+  // goes back to the state of half a second ago — a snapshot every quarter
+  // second while it is right, the oldest of three kept — at rest and with
+  // its multipliers cold. And if it goes wrong three times in four seconds
+  // the lie is not recoverable from where it is: she is taken out of it,
+  // the cloth goes back to hanging empty as it was built, and `hamHeld`
+  // finds her out and walks her home. A woman getting out of a hammock is
+  // a thing that happens; a hammock in the sky is not.
+  const snaps = [0, 1, 2].map(() => ({ P: new Float64Array(P.length), Q: new Float64Array(Q.length), ok: false }));
+  const restP = new Float64Array(P.length), restQ = new Float64Array(Q.length);
+  let snapT = 0, simT = 0, trips = [];
+  const sane = () => {
+    const R = S.D * 0.5 + S.rope + 2.5;
+    for (let b = 0; b < net.nb; b++) {
+      if (!net.live[b]) continue;
+      const dx = P[3 * b] - S.M[0], dy = P[3 * b + 1] - S.M[1], dz = P[3 * b + 2] - S.M[2];
+      if (dx * dx + dy * dy + dz * dz > R * R) { stats.why = 'far ' + b; return false; }
+      const V = net.V;
+      if (V[3 * b] * V[3 * b] + V[3 * b + 1] * V[3 * b + 1] + V[3 * b + 2] * V[3 * b + 2] > H.snapV * H.snapV) { stats.why = 'fast ' + b; return false; }
+    }
+    net.measure();
+    if (net.stats.maxStretch >= H.snapStretch) { stats.why = 'open ' + net.stats.maxStretch.toFixed(4); return false; }
+    return true;
+  };
+  const putBack = (sp, sq) => {
+    P.set(sp); Q.set(sq);
+    for (let b = 0; b < net.nb; b++) {
+      net.place(b, P[3 * b], P[3 * b + 1], P[3 * b + 2],
+        [Q[4 * b], Q[4 * b + 1], Q[4 * b + 2], Q[4 * b + 3]]);
+    }
+    net.resetDuals();
+    keep();
+  };
+  const forget = () => { for (const sn of snaps) sn.ok = false; snapT = 0; };
+  function wrong() {
+    stats.rescues++;
+    trips = trips.filter((t) => simT - t < 4);
+    trips.push(simT);
+    const old = snaps.find((sn) => sn.ok);
+    if (trips.length < 3 && old) {
+      putBack(old.P, old.Q);
+      forget();
+      return;
+    }
+    // Out, and hung up again empty.
+    stats.bails++;
+    if (herIn) herLeave();
+    putBack(restP, restQ);
+    forget();
+    trips = [];
+  }
+  function snapNow(h) {
+    snapT += h;
+    if (snapT < 0.25) return;
+    snapT = 0;
+    const sn = snaps.shift();
+    sn.P.set(P); sn.Q.set(Q); sn.ok = true;
+    snaps.push(sn);
+  }
+
   let onCreak = null;
   function step(dt, cam) {
     const dx = S.M[0] - cam.x, dz = S.M[2] - cam.z;
@@ -834,6 +912,8 @@ function buildHammock(scene, J) {
       keep();
     }
     if (!n) return;
+    simT += n * H.sub;
+    if (!sane()) wrong(); else snapNow(n * H.sub);
     // The swing, and its creak at each end.
     swingAWas = swingA;
     swingA = swingNow();
@@ -863,6 +943,7 @@ function buildHammock(scene, J) {
   {
     S.settle(H.settle, H.sub);
     keep();
+    restP.set(P); restQ.set(Q);
     draw();
     swingA = swingNow();
   }
@@ -883,6 +964,11 @@ function buildHammock(scene, J) {
     get far() { return far; },
     herEnter, herGuide, herShape, herPose, herLeave, push, nearest, marks,
     wake: () => { asleep = false; still = 0; },
+    /** Debug: throw everything in it upward, to watch `wrong` catch it. */
+    blowUp: (v = 40) => {
+      for (let b = 0; b < net.nb; b++) if (net.live[b]) net.kick(b, 0, v * (0.5 + 0.5 * Math.sin(b * 7.1)), 0);
+      asleep = false; still = 0;
+    },
     set onCreak(fn) { onCreak = fn; },
     /** How far it is swung (rad), how fast, and the recent peak. */
     swing: () => ({ a: swingA, w: swingW, peak: swingPeak }),
@@ -916,7 +1002,7 @@ function buildHammock(scene, J) {
         contacts: net.nc, lost: net.stats.lost, refused: net.stats.refused,
         ms: +stats.ms.toFixed(3), msMax: +stats.msMax.toFixed(3),
         msMean: stats.frames ? +(stats.msSum / stats.frames).toFixed(3) : 0,
-        frames: stats.frames, steps: stats.steps, asleep, creaks, pushes, rescues: stats.rescues,
+        frames: stats.frames, steps: stats.steps, asleep, creaks, pushes, rescues: stats.rescues, bails: stats.bails, why: stats.why, snaps: snaps.filter((q) => q.ok).length,
       };
     },
     resetStats: () => { stats.msMax = 0; stats.msSum = 0; stats.frames = 0; net.stats.refused = 0; },
