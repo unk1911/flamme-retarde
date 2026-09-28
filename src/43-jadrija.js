@@ -7833,15 +7833,507 @@ async function buildJadrija(scene) {
   const MESH_DK = [0.152, 0.150, 0.152];
   const MESH_PAD = [0.365, 0.205, 0.190];
 
-  // Where each moulded chair's triangles are, by its seat's (t, s): which
-  // buffer and which run of vertices in it — so one can be taken out of the
-  // terrace and put back, when somebody is hosed off it and it goes over with
-  // them (`hoseChair`, 1.540.0). Nothing drawn changes for it.
+  // ── THE CAFÉ SETS, ONE TO A TERRACE ───────────────────────────────────────
+  //
+  // Misha, 28 Sep 2026, having hosed a table of them over at the
+  // slastičarnica: *"the thing is now is the furniture, the chairs they sit
+  // on: can u step those up to look more fancy? i think folks gonna love
+  // fancier furniture"*. Every café on the boardwalk was seated on the same
+  // chair — a slab, a panel and four square sticks, in white or in dark grey
+  // — at the same table, a square slab on a pole. It was a placeholder that
+  // had been there so long it had become the furniture.
+  //
+  // What stands on a promenade terrace on this coast is bought as a SET, and
+  // the set is how a café tells you what it is before you have read the
+  // sign. So each terrace gets its own, and every chair on it is that one:
+  //
+  //   the SLASTIČARNICA   the ice-cream parlour's white wire chair, a heart
+  //                       bent into the back and a round pastel cushion on
+  //                       the seat, at round marble tables on a white cast
+  //                       baluster — the parlour, since 1974, as its sign says;
+  //   H2O                 anthracite aluminium and teak slats, the modern
+  //                       beach-bar set, at slatted teak tables;
+  //   caffe TRAMPULIN     the Paris bistro chair under its reed roof: rattan
+  //                       poles, a woven two-tone seat and an arched woven
+  //                       back, at a walnut-topped table on a black iron foot;
+  //   the trampoline park's red and black ones, which are nobody's shop, are
+  //                       the folding steel bistro chair every park café buys,
+  //                       slatted, at a round steel table.
+  //
+  // MINI's mesh armchairs and the konoba's chairs were done in 1.541.1–2 and
+  // are theirs; this is everybody else.
+  //
+  // WHAT DID NOT MOVE is everything anybody else reads. The seat is still
+  // 0.48 by 0.46 with its top at 0.46, the back still stands 0.17–0.23
+  // behind the middle of it and reaches 0.86, the legs still land on
+  // (±0.19, ±0.17), and the table top is still 0.60 across with its top at
+  // 0.75 — because `sitGeo` hands those numbers, as boxes, to the settle
+  // (1.538.0), the hands on the table (1.539.9) and the hose-off (1.540.0),
+  // and a chair that is drawn somewhere its boxes are not has people sitting
+  // in the air beside it. Same places, same headings, same blockers; `jit`
+  // only, so no draw off `rng` moves.
+  //
+  // All of it is smooth-normalled (`tubeTS`, `knSurf` and its lathes and
+  // slabs) and all of it goes into the terrace's own buffers, `b` and the
+  // konoba's woven `knTex` — there is not one draw call more for it.
+  const CAFE_STYLE = { slast: 'parlour', h2o: 'teak', tramp2: 'bistro' };
+
+  /**
+   * A rounded-rectangle section, `[v, w]` points counter-clockwise: `hv`
+   * half across, `hw` half up, corners of radius `r`. A slat, a flat bar.
+   */
+  function secRR(hv, hw, r, n = 2) {
+    const out = [];
+    for (const [cv, cw, a0] of [[1, 1, 0], [-1, 1, 0.5], [-1, -1, 1], [1, -1, 1.5]]) {
+      for (let i = 0; i <= n; i++) {
+        const a = (a0 + 0.5 * (i / n)) * Math.PI;
+        out.push([cv * (hv - r) + Math.cos(a) * r, cw * (hw - r) + Math.sin(a) * r]);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * A section swept along a LEVEL path in some local frame `P` — a slat bent
+   * in plan to hold a back, a flat bar round a table's apron. `w` in the
+   * section is straight up and `v` is level and square to the path, which is
+   * all a thing lying along a horizontal curve needs and saves `tubeTS`'s
+   * reference vector. Smooth round the section and along the path, and capped
+   * at both ends unless `o.closed`. `o.k(i, j)` sends it to `knTex`.
+   */
+  function secSweep(P, path, sec, col, o = {}) {
+    const n = path.length;
+    const dir = path.map((p, k) => {
+      const a = path[Math.max(0, k - 1)], c = path[Math.min(n - 1, k + 1)];
+      const tx = c[0] - a[0], ts = c[1] - a[1], l = Math.hypot(tx, ts) || 1;
+      return [tx / l, ts / l];
+    });
+    const G = path.map((p, k) => sec.map(([v, w]) =>
+      P(p[0] - dir[k][1] * v, p[1] + dir[k][0] * v, p[2] + w)));
+    knSurf(G, col, { wrap: true, k: o.k, out: (i) => P(path[i][0], path[i][1], path[i][2]) });
+    if (o.closed) return;
+    const cc = typeof col === 'function' ? col(0, 0) : col;
+    for (const [k, sg] of [[0, -1], [n - 1, 1]]) {
+      const p = path[k], C = P(p[0], p[1], p[2]);
+      const E = P(p[0] + sg * dir[k][0], p[1] + sg * dir[k][1], p[2]);
+      const l = Math.hypot(E[0] - C[0], E[1] - C[1], E[2] - C[2]) || 1;
+      const N = [(E[0] - C[0]) / l, (E[1] - C[1]) / l, (E[2] - C[2]) / l];
+      for (let j = 0; j < sec.length; j++) {
+        knTri(C, G[k][j], G[k][(j + 1) % sec.length], N, cc, o.k ? [0, 0, o.kind || 1] : null);
+      }
+    }
+  }
+
+  /**
+   * One café chair, in `terraceSet`'s chair frame: `P` to the world, `L` to
+   * the shore frame for `tubeTS`, `dt` across the seat and `ds` fore and aft
+   * with the back at +ds. `hk` is the seat's own hash, for the small
+   * differences between one chair of a set and the next — a cushion's colour,
+   * a slat's tone, an older coat of paint.
+   */
+  function cafeChair(P, L, y, style, col, hk) {
+    const AX = (() => { const a = L(0, 0, 0), c = L(1, 0, 0); return [c[0] - a[0], c[1] - a[1], 0]; })();
+    const UP = [0, 0, 1];
+    const tube = (pts, r, c, sides = 8, ref = UP) =>
+      tubeTS(pts.map((p) => L(p[0], p[1], p[2])), r, c, sides, ref);
+    const GLIDE = [0.060, 0.058, 0.056];
+    // A foot glide, which every chair here stands on and which is the thing
+    // that makes a tube a leg rather than a pipe stuck in the paving.
+    const glide = (dt, ds, r = 0.014) => knLathe(P, dt, ds,
+      [[y + 0.001, r], [y + 0.010, r * 0.8], [y + 0.012, 0]], GLIDE, 6);
+    // `bendPath` at only the corners named: a hoop whose arc is already
+    // smooth wants its two knees bent, and bent at every point it is four
+    // times the tube for nothing.
+    const bendSome = (pts, which, rad, n = 3) => {
+      const out = [];
+      pts.forEach((p, i) => {
+        if (!which.includes(i)) out.push(p);
+        else out.push(...bendPath([pts[i - 1], p, pts[i + 1]], rad, n).slice(1, -1));
+      });
+      return out;
+    };
+    // A level ring of tube, for a seat or a stretcher.
+    const loop = (rad, dsc, yy, n) => {
+      const o = [];
+      for (let i = 0; i <= n; i++) {
+        const a = (i / n) * TAU;
+        o.push([Math.cos(a) * rad, dsc + Math.sin(a) * rad, yy]);
+      }
+      return o;
+    };
+    const lerp3 = (a, c, f) => [a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f, a[2] + (c[2] - a[2]) * f];
+
+    if (style === 'parlour') {
+      // ── the ice-cream parlour chair ───────────────────────────────────────
+      //
+      // White-enamelled steel wire: a round seat on a ring, four legs bowed a
+      // little out and tied by a second ring near the floor, and a hoop for a
+      // back with a heart bent into it — the chair every gelateria from
+      // Trieste to Kotor has had outside it since before this one opened. The
+      // cushion is the one soft thing, and it comes in the case's colours:
+      // strawberry, mint, vanilla.
+      //
+      // The seat is 0.41 across on a centre 3 cm forward of the chair's,
+      // which puts its back edge at 0.175 — against the backrest box's front
+      // face at 0.17 — and its front edge at −0.235 on the box's −0.23.
+      const FR = shade([0.772, 0.770, 0.752], 0.96 + 0.06 * jit(hk, 831));
+      const PADS = [[0.760, 0.455, 0.505], [0.500, 0.700, 0.605], [0.830, 0.760, 0.590]];
+      const pad = PADS[(jit(hk, 832) * 3) | 0];
+      const DS = -0.030, RS = 0.205;
+      tube(loop(0.200, DS, y + 0.405, 20), 0.0085, FR, 6);
+      knLathe(P, 0, DS, [[y + 0.410, 0.188], [y + 0.414, 0.199], [y + 0.424, 0.205],
+        [y + 0.440, 0.205], [y + 0.451, 0.198], [y + 0.458, 0.180], [y + 0.460, 0.130],
+        [y + 0.460, 0]], pad, 24);
+      // The piping round the cushion's waist, a shade darker: a sewn cushion
+      // and not a disc of paint.
+      tube(loop(RS + 0.001, DS, y + 0.433, 20), 0.0038, shade(pad, 0.80), 4);
+      // Legs, from the ring at 45°, bowed out, to the feet the old chair
+      // stood on.
+      const legTop = [];
+      for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const top = [sx * 0.141, DS + sy * 0.141, y + 0.405];
+        const ft = [sx * 0.19, sy * 0.17, y + 0.012];
+        const mid = lerp3(top, ft, 0.5);
+        mid[0] += sx * 0.010; mid[1] += sy * 0.008;
+        tube([top, mid, ft], 0.0092, FR, 6);
+        glide(ft[0], ft[1], 0.012);
+        legTop.push(top);
+      }
+      tube(loop(0.232, DS + 0.004, y + 0.150, 20), 0.0060, FR, 6);
+      // The back: `bk` is where its wire stands, 0.18 behind the middle at
+      // the seat, raked back two centimetres to the top and wrapped round the
+      // sitter a little at the sides.
+      const bk = (dt, yy) => 0.180 + 0.020 * ((yy - y - 0.46) / 0.40) - 0.45 * dt * dt;
+      const at = (dt, yy) => [dt, bk(dt, yy), yy];
+      const hoop = [];
+      const HB = 0.182, Y0 = y + 0.600, RH = 0.240;
+      hoop.push([-0.141, legTop[2][1], y + 0.405]);
+      for (let i = 0; i <= 16; i++) {
+        const f = Math.PI * (1 - i / 16);
+        hoop.push(at(HB * Math.cos(f), Y0 + RH * Math.sin(f)));
+      }
+      hoop.push([0.141, legTop[3][1], y + 0.405]);
+      tube(bendSome(hoop, [1, 17], 0.04), 0.0100, FR, 8);
+      // The heart, from the curve everybody draws one with, 0.26 wide and
+      // hanging point-down on a stem out of the seat ring.
+      const HX = 0.0080, HY = 0.0082, HC = y + 0.500 + 17 * HY;
+      const heart = [];
+      for (let i = 0; i <= 36; i++) {
+        const q = (i / 36) * TAU;
+        const hx = 16 * Math.pow(Math.sin(q), 3);
+        const hy = 13 * Math.cos(q) - 5 * Math.cos(2 * q) - 2 * Math.cos(3 * q) - Math.cos(4 * q);
+        heart.push(at(hx * HX, HC + hy * HY));
+      }
+      tube(heart, 0.0058, FR, 6);
+      tube([[0, DS + 0.200, y + 0.405], at(0, y + 0.500)], 0.0058, FR, 6);
+      // and tied to the hoop at its widest and at its cusp.
+      const hw = HC + 4 * HY;
+      const hoopAt = (yy) => HB * Math.sqrt(Math.max(0, 1 - ((yy - Y0) / RH) ** 2));
+      for (const sx of [-1, 1]) {
+        tube([at(sx * 0.126, hw), at(sx * (hoopAt(hw) - 0.004), hw)], 0.0052, FR, 6);
+      }
+      tube([at(0, HC + 5 * HY), at(0, Y0 + RH - 0.006)], 0.0052, FR, 6);
+      return;
+    }
+
+    if (style === 'teak') {
+      // ── H2O: aluminium and teak ───────────────────────────────────────────
+      //
+      // The modern beach-bar chair: a powder-coated anthracite tube frame —
+      // front legs, a seat loop, and the back legs running on up into the
+      // back posts with a rake — carrying six teak slats to sit on and three
+      // to lean on, the back ones bent in plan to hold whoever is in it. The
+      // slats vary a little in tone, which is what teak does, board to board.
+      const AL = shade([0.178, 0.184, 0.194], 0.95 + 0.10 * jit(hk, 841));
+      const TK = [0.520, 0.340, 0.195];
+      const tk = (i) => shade(TK, 0.88 + 0.22 * jit(hk + i * 7, 842));
+      const R = 0.0125;
+      // Where the back post is at a height: 0.195 at the seat, 0.232 at the top.
+      const post = (yy) => 0.195 + 0.037 * Math.max(0, (yy - y - 0.40) / 0.455);
+      for (const sx of [-1, 1]) {
+        tube(bendPath([[sx * 0.200, 0.170, y + 0.012], [sx * 0.207, 0.195, y + 0.405],
+          [sx * 0.207, 0.232, y + 0.855]], 0.06, 4), R, AL, 8);
+        tube([[sx * 0.200, -0.170, y + 0.012], [sx * 0.207, -0.195, y + 0.405]], R, AL, 8);
+        knLathe(P, sx * 0.207, 0.232, [[y + 0.850, 0.0128], [y + 0.858, 0.0115],
+          [y + 0.864, 0.006], [y + 0.866, 0]], AL, 8);
+        glide(sx * 0.200, 0.170); glide(sx * 0.200, -0.170);
+      }
+      tube(bendPath([[-0.207, 0.195, y + 0.405], [-0.207, -0.195, y + 0.405],
+        [0.207, -0.195, y + 0.405], [0.207, 0.195, y + 0.405]], 0.035, 3, true), R, AL, 8);
+      // Two battens under the slats, fore and aft.
+      for (const sx of [-1, 1]) {
+        tube([[sx * 0.120, -0.195, y + 0.4275], [sx * 0.120, 0.195, y + 0.4275]], 0.0105, AL, 6);
+      }
+      // The seat: seven slats across, 52 mm with 6 mm between, their top at
+      // 0.46, from the front edge to the back posts.
+      const SS = secRR(0.026, 0.011, 0.006, 1);
+      for (let i = 0; i < 7; i++) {
+        const ds = -0.186 + i * 0.0583;
+        secSweep(P, [[-0.214, ds, y + 0.449], [0, ds, y + 0.449], [0.214, ds, y + 0.449]], SS, tk(i));
+      }
+      // The back: three slats, bent so their middle sits 15 mm further back
+      // than their ends, which are in front of the posts.
+      const SB = secRR(0.009, 0.036, 0.006, 1);
+      for (let i = 0; i < 3; i++) {
+        const yy = y + 0.565 + i * 0.105;
+        const pth = [];
+        for (let k = 0; k <= 6; k++) {
+          const dt = -0.214 + 0.428 * (k / 6);
+          pth.push([dt, post(yy) - 0.022 + 0.34 * (0.214 * 0.214 - dt * dt), yy]);
+        }
+        secSweep(P, pth, SB, tk(10 + i));
+      }
+      return;
+    }
+
+    if (style === 'bistro') {
+      // ── caffe Trampulin: the Paris bistro chair ───────────────────────────
+      //
+      // Rattan poles, honey-coloured, bound with cane at the joints; the rear
+      // legs run straight on up into an arched hoop that is the back; and the
+      // seat and the back are woven resin in two colours — ecru with a navy
+      // border and stripes, the pattern that says "café" on every terrace from
+      // the Seine to the Riva. Woven in `KONOBA_WEAVE`, the konoba's own
+      // print (1.541.1), the one draw call it already costs.
+      const RAT = shade([0.600, 0.432, 0.240], 0.92 + 0.14 * jit(hk, 851));
+      const BIND = [0.235, 0.145, 0.078];
+      const ECRU = shade([0.790, 0.752, 0.668], 1 / 0.855);
+      const NAVY = shade([0.118, 0.182, 0.315], 1 / 0.855);
+      const R = 0.0135;
+      const bk = (dt, yy) => 0.184 + 0.030 * ((yy - y - 0.46) / 0.40) - 0.40 * dt * dt;
+      const HB = 0.190, Y0 = y + 0.620, RH = 0.226;
+      const arch = (dt) => Y0 + RH * Math.sqrt(Math.max(0, 1 - (dt / HB) ** 2));
+      // The hoop, which is both back legs and the back.
+      const hoop = [[-0.190, 0.170, y + 0.012], [-0.178, 0.172, y + 0.440]];
+      for (let i = 0; i <= 14; i++) {
+        const f = Math.PI * (1 - i / 14);
+        const dt = HB * Math.cos(f), yy = Y0 + RH * Math.sin(f);
+        hoop.push([dt, bk(dt, yy), yy]);
+      }
+      hoop.push([0.178, 0.172, y + 0.440], [0.190, 0.170, y + 0.012]);
+      tube(bendSome(hoop, [1, 2, 16, 17], 0.04), R, RAT, 8);
+      // Front legs, a touch splayed.
+      for (const sx of [-1, 1]) {
+        tube([[sx * 0.190, -0.170, y + 0.012], [sx * 0.183, -0.195, y + 0.440]], R, RAT, 8);
+      }
+      // The seat's woven panel: a little wider at the front, the front edge
+      // bowed, domed 6 mm in the middle. Rows fore and aft, columns across.
+      const NR = 7, NC = 12;
+      const seatPt = (i, j) => {
+        const v = i / (NR - 1), u = (j / (NC - 1)) * 2 - 1;
+        const hw = 0.192 - 0.022 * v;
+        const ds = -0.200 - 0.014 * (1 - u * u) + v * (0.370 + 0.014 * (1 - u * u));
+        const yy = y + 0.452 + 0.006 * (1 - u * u) * Math.sin(Math.PI * v);
+        return [u * hw, ds, yy];
+      };
+      const SG = [];
+      for (let i = 0; i < NR; i++) {
+        const row = [];
+        for (let j = 0; j < NC; j++) { const p = seatPt(i, j); row.push(P(p[0], p[1], p[2])); }
+        SG.push(row);
+      }
+      // A navy border, and inside it ecru and navy in alternate strands,
+      // front to back: eleven across, so it is symmetrical about the middle.
+      const stripe = (i, j, nr, nc) => (i === 0 || i === nr - 2 || j === 0 || j === nc - 2
+        || j % 2 === 0 ? NAVY : ECRU);
+      knSurf(SG, ECRU, { q: (i, j) => stripe(i, j, NR, NC),
+        k: (i, j) => { const p = seatPt(i, j); return [p[0], p[1], 1]; },
+        out: () => P(0, 0, y + 0.20) });
+      // The seat's rim: a rattan pole bent round the panel.
+      const rim = [];
+      for (let f = 0; f <= 4; f++) rim.push(seatPt(0, (NC - 1) * (f / 4)));
+      rim.push(seatPt(NR - 1, NC - 1), seatPt(NR - 1, 0));
+      tube(bendPath(rim.map((p) => [p[0] * 1.03, p[1] < 0 ? p[1] - 0.004 : p[1] + 0.004, y + 0.446]),
+        0.04, 3, true), 0.0125, RAT, 6);
+      // The back's woven panel, filling the arch from 0.555 up.
+      const BR = 5, BC = 12;
+      const backPt = (i, j) => {
+        const dt = -0.176 + 0.352 * (j / (BC - 1));
+        const top = Math.min(y + 0.820, arch(dt) - 0.012);
+        const yy = y + 0.555 + (top - y - 0.555) * (i / (BR - 1));
+        return [dt, bk(dt, yy), yy];
+      };
+      const BG = [];
+      for (let i = 0; i < BR; i++) {
+        const row = [];
+        for (let j = 0; j < BC; j++) { const p = backPt(i, j); row.push(P(p[0], p[1], p[2])); }
+        BG.push(row);
+      }
+      knSurf(BG, ECRU, { q: (i, j) => stripe(i, j, BR, BC),
+        k: (i, j) => { const p = backPt(i, j); return [p[0], p[2] - y, 1]; },
+        out: () => P(0, 1.2, y + 0.65) });
+      tube([[-0.186, bk(-0.186, y + 0.548), y + 0.548], [0, bk(0, y + 0.548), y + 0.548],
+        [0.186, bk(0.186, y + 0.548), y + 0.548]], 0.0095, RAT, 6);
+      // A stretcher ring at the knee, and the cane binding at every joint.
+      const lr = [[-0.1885, -0.1755], [0.1885, -0.1755], [0.1875, 0.1705], [-0.1875, 0.1705]];
+      tube(bendPath(lr.map(([a, c]) => [a, c, y + 0.150]), 0.05, 3, true), 0.0090, RAT, 6);
+      for (const [a, c] of [[-0.184, -0.193], [0.184, -0.193], [-0.179, 0.172], [0.179, 0.172]]) {
+        tube([[a, c, y + 0.405], [a, c, y + 0.436]], 0.0168, BIND, 8);
+      }
+      for (const [a, c] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.17], [0.19, 0.17]]) glide(a, c, 0.0135);
+      return;
+    }
+
+    // ── the steel bistro chair, the trampoline park's ─────────────────────────
+    //
+    // Folding powder-coated steel in the set's red or black: round tube legs,
+    // six pressed slats to sit on, three curved ones to lean on, and the X
+    // under the seat that folds it. Nobody's shop, everybody's café.
+    const ST = shade(col, 0.95 + 0.10 * jit(hk, 861));
+    const R = 0.0105;
+    const post = (yy) => 0.182 + 0.033 * Math.max(0, (yy - y - 0.43) / 0.43);
+    for (const sx of [-1, 1]) {
+      tube(bendPath([[sx * 0.190, 0.170, y + 0.012], [sx * 0.200, 0.182, y + 0.430],
+        [sx * 0.203, 0.215, y + 0.858]], 0.05, 4), R, ST, 8);
+      tube(bendPath([[sx * 0.190, -0.170, y + 0.012], [sx * 0.200, -0.200, y + 0.430],
+        [sx * 0.200, 0.182, y + 0.430]], 0.04, 4), R, ST, 8);
+      glide(sx * 0.190, 0.170, 0.012); glide(sx * 0.190, -0.170, 0.012);
+    }
+    tube([[-0.200, -0.200, y + 0.430], [0.200, -0.200, y + 0.430]], R, ST, 8);
+    // The X, between the back legs.
+    tube([[-0.192, 0.172, y + 0.060], [0.197, 0.180, y + 0.380]], 0.0085, ST, 6);
+    tube([[0.192, 0.172, y + 0.060], [-0.197, 0.180, y + 0.380]], 0.0085, ST, 6);
+    const SS = secRR(0.024, 0.0055, 0.004, 1);
+    for (let i = 0; i < 6; i++) {
+      const ds = -0.194 + i * 0.0705;
+      // The front one rolled down over the edge, which is what a pressed
+      // slat seat does and why it does not cut the backs of your knees.
+      const dy = i === 0 ? -0.006 : 0;
+      secSweep(P, [[-0.206, ds, y + 0.4545 + dy], [0, ds, y + 0.4545 + dy],
+        [0.206, ds, y + 0.4545 + dy]], SS, shade(ST, 1.04));
+    }
+    const SB = secRR(0.0055, 0.030, 0.004, 1);
+    for (let i = 0; i < 3; i++) {
+      const yy = y + 0.600 + i * 0.090;
+      const pth = [];
+      for (let k = 0; k <= 6; k++) {
+        const dt = -0.206 + 0.412 * (k / 6);
+        pth.push([dt, post(yy) - 0.017 + 0.36 * (0.206 * 0.206 - dt * dt), yy]);
+      }
+      secSweep(P, pth, SB, shade(ST, 1.04));
+    }
+  }
+
+  /**
+   * The table of the set, on the old table's centre. Its top is 0.60 across
+   * with its top face at 0.75 whatever it is made of — `sitGeo` hands that
+   * to the hands (1.539.9) — and the square ones are still square to the
+   * shore, which is how `sitGeo` measures them.
+   */
+  function cafeTable(ct, cs, y, ang, style, col, hk) {
+    const Q = (dt, ds, yy) => W(ct + dt, cs + ds, yy);
+    const LQ = (dt, ds, yy) => [ct + dt, cs + ds, yy];
+    const tube = (pts, r, c, sides = 8, ref = [0, 0, 1]) =>
+      tubeTS(pts.map((p) => LQ(p[0], p[1], p[2])), r, c, sides, ref);
+    const GLIDE = [0.060, 0.058, 0.056];
+    // Cast feet radiating from the column, turned with the set: each one
+    // sweeps down off the column in a concave curve and ends on a round pad,
+    // which is how a cast base meets a floor. (Ended in a point first, and
+    // four points at the foot of a table read as a spider.)
+    const feet = (n, a0, r0, r1, yTop, col2, sec) => {
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (i / n) * TAU, c = Math.cos(a), sn = Math.sin(a);
+        const pts = [];
+        for (let k = 0; k <= 6; k++) {
+          const f = k / 6;
+          pts.push([c * (r0 + (r1 - r0) * f), sn * (r0 + (r1 - r0) * f),
+            y + 0.024 + (yTop - y - 0.024) * (1 - f) * (1 - f)]);
+        }
+        tube(pts, (k) => [sec[0] * (1 - 0.30 * k / 6), sec[1] * (1 - 0.30 * k / 6)], col2, 8, [-sn, c, 0]);
+        knLathe(Q, c * r1, sn * r1, [[y + 0.004, 0.024], [y + 0.014, 0.026], [y + 0.026, 0.021],
+          [y + 0.033, 0.010], [y + 0.034, 0]], col2, 12);
+        knLathe(Q, c * r1, sn * r1, [[y + 0.001, 0.020], [y + 0.004, 0.021], [y + 0.005, 0]], GLIDE, 8);
+      }
+    };
+
+    if (style === 'parlour') {
+      // Round Carrara marble, 22 mm with a bullnose, on a white cast-iron
+      // baluster and four scrolled feet: the ice-cream parlour table.
+      const MARBLE = shade([0.815, 0.808, 0.792], 0.97 + 0.04 * jit(hk, 871));
+      const IRON = [0.760, 0.758, 0.742];
+      knLathe(Q, 0, 0, [[y + 0.728, 0.270], [y + 0.728, 0.290], [y + 0.731, 0.298],
+        [y + 0.737, 0.302], [y + 0.743, 0.301], [y + 0.748, 0.295], [y + 0.750, 0.284],
+        [y + 0.750, 0]], MARBLE, 40);
+      knLathe(Q, 0, 0, [[y + 0.694, 0.050], [y + 0.702, 0.170], [y + 0.716, 0.235],
+        [y + 0.728, 0.255], [y + 0.729, 0]], IRON, 24);
+      knLathe(Q, 0, 0, [[y + 0.075, 0.056], [y + 0.095, 0.050], [y + 0.110, 0.030],
+        [y + 0.130, 0.036], [y + 0.145, 0.026], [y + 0.200, 0.022], [y + 0.560, 0.020],
+        [y + 0.590, 0.030], [y + 0.605, 0.022], [y + 0.650, 0.024], [y + 0.690, 0.046],
+        [y + 0.700, 0.050]], IRON, 16);
+      feet(4, ang + Math.PI / 4, 0.040, 0.232, y + 0.105, IRON, [0.016, 0.022]);
+      return;
+    }
+    if (style === 'teak') {
+      // Seven teak boards on an anthracite apron and four square legs.
+      const AL = [0.178, 0.184, 0.194];
+      const TK = [0.520, 0.340, 0.195];
+      const S = secRR(0.0398, 0.011, 0.006, 1);
+      for (let i = 0; i < 7; i++) {
+        const ds = -0.2602 + i * 0.0867;
+        secSweep(Q, [[-0.300, ds, y + 0.739], [0.300, ds, y + 0.739]], S,
+          shade(TK, 0.88 + 0.22 * jit(hk + i * 5, 872)));
+      }
+      secSweep(Q, bendPath([[-0.262, -0.262, y + 0.709], [0.262, -0.262, y + 0.709],
+        [0.262, 0.262, y + 0.709], [-0.262, 0.262, y + 0.709]], 0.03, 3, true),
+      secRR(0.008, 0.019, 0.004, 1), AL, { closed: true });
+      for (const [a, c] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        knRR(Q, a * 0.255 - 0.019, a * 0.255 + 0.019, c * 0.255 - 0.019, c * 0.255 + 0.019,
+          y + 0.012, y + 0.727, 0.008, 0, AL);
+        knLathe(Q, a * 0.255, c * 0.255, [[y + 0.001, 0.018], [y + 0.012, 0.019],
+          [y + 0.013, 0]], GLIDE, 8);
+      }
+      return;
+    }
+    if (style === 'bistro') {
+      // A walnut top with a brass edge band on a black cast-iron column and
+      // a four-footed base: the Paris bistro table, squared off.
+      const WAL = shade([0.340, 0.205, 0.118], 0.94 + 0.10 * jit(hk, 873));
+      const BRASS = [0.620, 0.480, 0.235];
+      const IRON = [0.090, 0.088, 0.092];
+      knRR(Q, -0.297, 0.297, -0.297, 0.297, y + 0.731, y + 0.750, 0.032, 0.006, WAL);
+      knRR(Q, -0.300, 0.300, -0.300, 0.300, y + 0.714, y + 0.743, 0.035, 0.004, BRASS,
+        null, { bottom: true });
+      knLathe(Q, 0, 0, [[y + 0.050, 0.060], [y + 0.080, 0.042], [y + 0.100, 0.030],
+        [y + 0.120, 0.040], [y + 0.135, 0.028], [y + 0.620, 0.025], [y + 0.645, 0.036],
+        [y + 0.665, 0.030], [y + 0.705, 0.070], [y + 0.714, 0.090], [y + 0.715, 0]], IRON, 16);
+      feet(4, ang + Math.PI / 4, 0.045, 0.235, y + 0.090, IRON, [0.022, 0.016]);
+      return;
+    }
+    // The park's: round pressed steel with a rolled rim, in the set's colour,
+    // on four splayed tube legs tied by a ring.
+    const ST = shade(col, 1.02);
+    knLathe(Q, 0, 0, [[y + 0.726, 0.250], [y + 0.727, 0.292], [y + 0.733, 0.301],
+      [y + 0.742, 0.302], [y + 0.748, 0.297], [y + 0.750, 0.290], [y + 0.750, 0]], ST, 36);
+    knLathe(Q, 0, 0, [[y + 0.712, 0.200], [y + 0.726, 0.255], [y + 0.727, 0]], shade(ST, 0.85), 24);
+    const ringR = 0.236;
+    for (let i = 0; i < 4; i++) {
+      const a = ang + Math.PI / 4 + (i / 4) * TAU, c = Math.cos(a), sn = Math.sin(a);
+      tube([[c * 0.205, sn * 0.205, y + 0.716], [c * 0.255, sn * 0.255, y + 0.012]], 0.0115, ST, 8);
+      knLathe(Q, c * 0.255, sn * 0.255, [[y + 0.001, 0.014], [y + 0.012, 0.015], [y + 0.013, 0]],
+        GLIDE, 8);
+    }
+    const ring = [];
+    for (let i = 0; i <= 20; i++) {
+      const a = (i / 20) * TAU;
+      ring.push([Math.cos(a) * ringR, Math.sin(a) * ringR, y + 0.200]);
+    }
+    tube(ring, 0.0070, ST, 6);
+  }
+
+  // Where each café chair's triangles are, by its seat's (t, s): which
+  // buffers and which run of vertices in each — so one can be taken out of
+  // the terrace and put back, when somebody is hosed off it and it goes over
+  // with them (`hoseChair`, 1.540.0). Nothing drawn changes for it.
+  //
+  // BUFFERS, plural, since the sets (1.542.2): the bistro chair's seat and
+  // back are woven and live in `knTex`, its rattan in `b`, and a chair that
+  // went over without its seat would leave the seat standing on the terrace.
   const chairGeo = new Map();
   const chairKey = (t, s) => t.toFixed(3) + ',' + s.toFixed(3);
   function terraceSet(t, s, y, ang, col, kind, shop) {
     const seat = [0.230, 0.235, 0.240];
     const R = seatRing(t, s, ang);
+    const style = CAFE_STYLE[shop] || 'steel';
     for (const [ct, cs, face] of R.seats) {
       // Each chair in its own frame, and that is the change. `boxTS` is
       // axis-aligned in (t, s) and cannot be anything else, so a chair built
@@ -7895,14 +8387,14 @@ async function buildJadrija(scene) {
         if (dk) meshChair(P, y, MESH_DK, MESH_PAD, L);
         else meshChair(P, y, col || seat, null, L);
       } else {
-        const v0 = b.count();
-        boxIn(P, -0.24, 0.24, -0.23, 0.23, y + 0.40, y + 0.46, col || seat);
-        boxIn(P, -0.24, 0.24, 0.17, 0.23, y + 0.46, y + 0.86, col || seat);
-        for (const [ot, os] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.17], [0.19, 0.17]]) {
-          boxIn(P, ot - 0.022, ot + 0.022, os - 0.022, os + 0.022,
-            y, y + 0.40, shade(col || seat, 0.8));
-        }
-        chairGeo.set(chairKey(ct, cs), { bld: b, v0, v1: b.count(), pivot: P(0, 0, y + 0.43) });
+        // The set's own chair — see `cafeChair` — where there were two
+        // boxes and four square sticks.
+        const L = (dt, ds, yy) => [ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy];
+        const v0 = b.count(), k0 = knTex.count();
+        cafeChair(P, L, y, style, col, ((ct * 13 + cs * 29) * 8) | 0);
+        const parts = [{ bld: b, v0, v1: b.count() }];
+        if (knTex.count() > k0) parts.push({ bld: knTex, v0: k0, v1: knTex.count() });
+        chairGeo.set(chairKey(ct, cs), { parts, pivot: P(0, 0, y + 0.43) });
       }
       // And the chair as a thing you cannot stand in.
       //
@@ -7930,9 +8422,7 @@ async function buildJadrija(scene) {
       pedestalTable(R.ct, R.cs, y);
       tableTop(R.ct, R.cs, y + 0.720, ang, shop);
     } else {
-      boxTS(R.ct - 0.30, R.ct + 0.30, R.cs - 0.30, R.cs + 0.30, y + 0.70, y + 0.75,
-        [0.520, 0.512, 0.492]);
-      post(W, R.ct, R.cs, y, y + 0.70, 0.035, [0.330, 0.334, 0.330], 6);
+      cafeTable(R.ct, R.cs, y, ang, style, col, ((R.ct * 17 + R.cs * 31) * 8) | 0);
       tableTop(R.ct, R.cs, y + 0.750, ang, shop);
     }
     // The table, which is a 0.60 m top on a single pedestal and the thing that
@@ -27181,7 +27671,9 @@ async function buildJadrija(scene) {
           at(t).deck, face, 'sit', 1);
         if (who) {
           who.chair = true; who.seat = chair++;
-          who.sitAt = { t, s: s2, face, ct: tab.ct, cs: tab.cs, ang: tab.ang, mesh: S.key === 'mini' };
+          who.sitAt = { t, s: s2, face, ct: tab.ct, cs: tab.cs, ang: tab.ang, mesh: S.key === 'mini',
+            // The parlour's marble tables are round (`cafeTable`, 1.542.2).
+            round: CAFE_STYLE[S.key] === 'parlour' };
         }
       }
     }
@@ -27198,7 +27690,9 @@ async function buildJadrija(scene) {
    * pad at 0.506, with a back raked 0.155 m a metre — two boxes, stepped — and
    * arms at 0.61–0.646. Their tables are a 0.60 m square top at 0.70–0.75,
    * square to the shore, and MINI's a 0.62 m disc at 0.690–0.722, which is a
-   * box here with its near edge toward the sitter. Everybody else sitting down
+   * box here with its near edge toward the sitter. (The café sets of 1.542.2,
+   * `cafeChair` and `cafeTable`, are drawn on exactly these numbers; the
+   * slastičarnica's marble top is a 0.60 disc, so its hands go `round`.) Everybody else sitting down
    * is on the lowest platform of the quay (`B(t, 0.55, …, Math.PI, 'sit')`),
    * and what is under them is the concrete itself, stepped — see below.
    *
@@ -27271,7 +27765,7 @@ async function buildJadrija(scene) {
     // kept inside the disc rather than the box (`handPlan` in 42-crowd.js).
     // `chair`: the first two boxes are a moulded chair that can go over
     // (43-topple.js) — MINI's mesh armchairs are not drawn as one piece.
-    return { boxes, floor: 0, back: true, round: !!A.mesh, chair: !A.mesh };
+    return { boxes, floor: 0, back: true, round: !!A.mesh || !!A.round, chair: !A.mesh };
   }
 
   // Somebody halfway down every other ladder, which is the one place on this
@@ -32706,7 +33200,8 @@ async function buildJadrija(scene) {
     spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22, body: FACE,
   }));
   // Which mesh a builder became, for a chair taken out of it (`chairGeo`).
-  const bldMesh = new Map([[deck, deckMesh], [up, upMesh]]);
+  // And `knTex`, which is where a bistro chair's woven seat and back are.
+  const bldMesh = new Map([[deck, deckMesh], [up, upMesh], [knTex, knTexMesh]]);
   // The trees. A little of `up`'s bounce and not all of it: they stand on
   // gravel and needle litter, not on the white terrace, and the landscape's
   // own pines next to them have none — 0.10 keeps a trunk in the stand from
@@ -38975,42 +39470,54 @@ async function buildJadrija(scene) {
     let C = H.chairMesh;
     if (!C) {
       const G = chairGeo.get(chairKey(A.t, A.s));
-      const M = G && bldMesh.get(G.bld);
-      if (!M) { H.chairMesh = { none: true }; return; }
-      const src = M.geometry, pos = src.getAttribute('position');
-      const n = G.v1 - G.v0, pv = G.pivot;
-      const g = new THREE.BufferGeometry();
-      const cut = (name, sub) => {
-        const a = src.getAttribute(name);
-        const arr = a.array.slice(G.v0 * 3, G.v1 * 3);
-        if (sub) for (let i = 0; i < n; i++) { arr[3 * i] -= pv[0]; arr[3 * i + 1] -= pv[1]; arr[3 * i + 2] -= pv[2]; }
-        g.setAttribute(name, new THREE.Float32BufferAttribute(arr, 3));
-      };
-      cut('position', true); cut('normal', false); cut('aVCol', false);
-      g.computeBoundingSphere();
-      const mesh = new THREE.Mesh(g, M.material);
-      mesh.frustumCulled = false;
-      scene.add(mesh);
-      // And out of the terrace: folded to its own middle, the originals kept.
-      const keep = pos.array.slice(G.v0 * 3, G.v1 * 3);
-      for (let i = G.v0; i < G.v1; i++) pos.setXYZ(i, pv[0], pv[1], pv[2]);
-      pos.needsUpdate = true;
-      C = H.chairMesh = { mesh, G, M, keep };
+      if (!G || !G.parts.every((pt) => bldMesh.get(pt.bld))) { H.chairMesh = { none: true }; return; }
+      const pv = G.pivot;
+      // One copy per buffer the chair is in (see `chairGeo`), each on its
+      // own buffer's material and every attribute that buffer carries — the
+      // woven ones have `aKn` for their print.
+      const cuts = G.parts.map((pt) => {
+        const M = bldMesh.get(pt.bld);
+        const src = M.geometry, pos = src.getAttribute('position');
+        const n = pt.v1 - pt.v0;
+        const g = new THREE.BufferGeometry();
+        for (const name of Object.keys(src.attributes)) {
+          const a = src.getAttribute(name), w = a.itemSize;
+          const arr = a.array.slice(pt.v0 * w, pt.v1 * w);
+          if (name === 'position') {
+            for (let i = 0; i < n; i++) { arr[3 * i] -= pv[0]; arr[3 * i + 1] -= pv[1]; arr[3 * i + 2] -= pv[2]; }
+          }
+          g.setAttribute(name, new THREE.Float32BufferAttribute(arr, w));
+        }
+        g.computeBoundingSphere();
+        const mesh = new THREE.Mesh(g, M.material);
+        mesh.frustumCulled = false;
+        scene.add(mesh);
+        // And out of the terrace: folded to its own middle, the originals kept.
+        const keep = pos.array.slice(pt.v0 * 3, pt.v1 * 3);
+        for (let i = pt.v0; i < pt.v1; i++) pos.setXYZ(i, pv[0], pv[1], pv[2]);
+        pos.needsUpdate = true;
+        return { mesh, pt, M, keep };
+      });
+      C = H.chairMesh = { cuts };
     }
     if (C.none) return;
-    C.mesh.position.copy(p);
-    C.mesh.quaternion.copy(q);
-    C.mesh.updateMatrixWorld();
+    for (const { mesh } of C.cuts) {
+      mesh.position.copy(p);
+      mesh.quaternion.copy(q);
+      mesh.updateMatrixWorld();
+    }
   }
   /** The terrace's chair back, and the copy gone. */
   function hoseChairBack(H) {
     const C = H && H.chairMesh;
     if (!C || C.none) return;
-    const pos = C.M.geometry.getAttribute('position');
-    pos.array.set(C.keep, C.G.v0 * 3);
-    pos.needsUpdate = true;
-    scene.remove(C.mesh);
-    C.mesh.geometry.dispose();
+    for (const { mesh, pt, M, keep } of C.cuts) {
+      const pos = M.geometry.getAttribute('position');
+      pos.array.set(keep, pt.v0 * 3);
+      pos.needsUpdate = true;
+      scene.remove(mesh);
+      mesh.geometry.dispose();
+    }
     H.chairMesh = null;
   }
 
