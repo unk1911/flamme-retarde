@@ -1441,9 +1441,27 @@ vec4 oliveSpray(vec2 q, float seed, float thick){
 
 const OLIVE_BODY = /* glsl */ `
   base *= vVCol;
-  n = gl_FrontFacing ? n : -n;
   float leaf = smoothstep(0.004, 0.020, vVCol.g - vVCol.r);
+  // The discs inside a cluster (blue a shade over red in the vertex colour)
+  // keep the ellipsoid normal they were given on both faces: flipped with the
+  // face, half of every cluster's middle was lit as if from inside out. And
+  // the blue marker is taken back out of the colour. How far over red it is
+  // runs from 0.030 at a disc's middle to 0.006 at its rim, which is how the
+  // edge is found below.
+  float inner = leaf * step(vVCol.r + 0.003, vVCol.b);
+  float discEdge = clamp(1.0 - (vVCol.b - vVCol.r - 0.006) / 0.024, 0.0, 1.0);
+  if (inner > 0.5) base.b = base.r * 0.80;
+  n = (gl_FrontFacing || inner > 0.5) ? n : -n;
   float folFp = length(fwidth(vWorld));
+  // And the footprint of a pixel at this distance seen FACE ON, which is the
+  // one the leaves' level of detail is keyed to. fwidth of the position is
+  // constant across a triangle and depends on how obliquely it is seen, so
+  // two neighbouring faces of a cluster could sit either side of a threshold
+  // and draw the triangle's edge as a ruled line through the leaves — close
+  // leaves on one face, the thickened far ones and the dark inside on the
+  // next. The direction to the eye changes smoothly over the screen whatever
+  // it lands on, so this does not.
+  float folIso = length(uCamPos - vWorld) * length(fwidth(normalize(vWorld - uCamPos)));
   // ── the bark ──
   float kB = (1.0 - leaf) * (1.0 - smoothstep(0.014, 0.055, folFp));
   if (kB > 0.002) {
@@ -1480,7 +1498,7 @@ const OLIVE_BODY = /* glsl */ `
     // metres, where one leaf is a pixel or two, a white one is a speck of
     // blossom and a crown of them is a tree in flower. So the silver comes
     // down towards the mean of the two faces as the leaves go sub-pixel.
-    float silverK = mix(1.0, 0.55, smoothstep(0.006, 0.030, folFp));
+    float silverK = mix(1.0, 0.55, smoothstep(0.006, 0.030, folIso));
     vec3 silverC = mix(base, vec3(lum) * vec3(1.34, 1.44, 1.36), silverK);
     // Paler and greyer than the pine beside it, which is how an olive grove
     // reads from anywhere: a quarter of the way to its own grey.
@@ -1490,8 +1508,8 @@ const OLIVE_BODY = /* glsl */ `
     vec3 farC = mix(topC, silverC, smoothstep(0.52, 0.74, mott) * 0.55)
       * mix(0.62, 1.28, clamp(tuft, 0.0, 1.0));
     vec3 leafCol = farC;
-    float kSpray = 1.0 - smoothstep(0.026, 0.050, folFp);
-    float kLeaf = 1.0 - smoothstep(0.0065, 0.016, folFp);
+    float kSpray = 1.0 - smoothstep(0.026, 0.050, folIso);
+    float kLeaf = 1.0 - smoothstep(0.0065, 0.016, folIso);
     float cut = 0.0;
     if (kSpray > 0.0) {
       vec4 cc = folCell(vWorld * 6.25);
@@ -1505,7 +1523,7 @@ const OLIVE_BODY = /* glsl */ `
       // A leaf is never drawn thinner than about a pixel: past four metres
       // they thicken instead of breaking up into sparks, and by the time the
       // spray is a few pixels across it is a herringbone of them.
-      float thick = max(folFp * 6.25 * 0.55 - 0.006, 0.0);
+      float thick = max(folIso * 6.25 * 0.55 - 0.006, 0.0);
       vec4 lf = oliveSpray(q, cc.w, thick);
       float inL = lf.x < 0.0 ? 1.0 : 0.0;
       // Some two in five show their undersides — more seen from under the
@@ -1523,6 +1541,13 @@ const OLIVE_BODY = /* glsl */ `
       leafCol = mix(leafCol, inL > 0.5 ? lc : topC * 0.40, kSpray);
       float gap = (kLeaf > 0.5 || rimT > 0.20 || tuft < 0.42) ? 1.0 : 0.0;
       cut = inL < 0.5 ? gap : 0.0;
+      // Leaves too, on the steep rim of a cluster's shell, each spray at its
+      // own depth into it. Where a surface turns edge on there is a lot of
+      // it per pixel, so the sprays crowd there: a cluster seen from under
+      // was a ring of leaves round an empty middle, and one seen along its
+      // flat bottom showed the polygon's straight edges drawn in leaves. Cut
+      // on the smooth normal's rim, the edge is a curve and the crowd thins.
+      if (inner < 0.5 && rim > 0.60 + 0.32 * fract(cc.w * 5.3)) cut = 1.0;
       if (inL > 0.5 && kLeaf > 0.5 && lf.y >= 0.0) {
         // Each leaf its own tilt, so the light breaks up leaf by leaf; the
         // tops are waxy and catch a highlight, the undersides are felt.
@@ -1533,9 +1558,18 @@ const OLIVE_BODY = /* glsl */ `
       }
     }
     // And far out, the value field chews the outline as the pine's does.
-    float kCut = 1.0 - smoothstep(0.08, 0.30, folFp);
+    float kCut = 1.0 - smoothstep(0.08, 0.30, folIso);
     float farCut = tuft < (0.12 + 0.70 * smoothstep(0.04, 0.60, rim)) * kCut ? 1.0 : 0.0;
     cut = mix(farCut, cut, kSpray);
+    // And none within half a metre of the eye. A camera that ends up in a
+    // cluster anyway (third person, the swing of the hammock) sees its far
+    // wall as loose sprays hung in the air, so the leaves go: all of them
+    // under 0.35 m, a dithered fraction out to 0.6.
+    // A disc's straight edge is eroded by the tuft field, leaves and all.
+    if (inner > 0.5 && discEdge > 0.40 + 0.55 * tuft) cut = 1.0;
+    float eyeD = length(uCamPos - vWorld);
+    float nearK = smoothstep(0.35, 0.60, eyeD);
+    if (nearK < 1.0 && olH(dot(floor(gl_FragCoord.xy), vec2(1.0, 57.0)) * 0.013) > nearK) cut = 1.0;
     if (leaf > 0.5 && cut > 0.5) discard;
     base = mix(base, leafCol, leaf);
   }

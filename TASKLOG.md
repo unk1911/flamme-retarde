@@ -39,4 +39,4 @@ runs with `tools/shootmany.mjs`).
 | 2026-09-27 | Hammock push: reach 2.8 m, wider aim, hold to rock harder | lead | new | feature | 6 | ~20 | 5 | 1.535.7 |
 | 2026-09-27 | Active ragdoll for Baye in the hammock: angle rows in avbdNet, fall-out over the rim, get-up (build ~25, fall tuning ~30, guard/regressions ~25, verify ~15) | agent | new | feature | 95 | ~150 | ~86 | 1.536.0 |
 | 2026-09-27 | Flora pass: rocks, grass, agaves, fan palms, potted plants, shrubs, wood-floor litter, crown wind (1.537.0) | agent | new | asset | 190 | ~230 | 52 | 1.537.0 |
-| 2026-09-27 | Olive rebuild: grown twisted bole and crooked limbs, per-pixel pinnate leaf sprays with silver undersides, fissured olive bark, own buffer/material (1.537.1) | agent | new | asset | 80 | ~100 | 26 | 1.537.1 |
+| 2026-09-27 | Olive rebuild: grown twisted bole and crooked limbs, per-pixel pinnate leaf sprays with silver undersides, fissured olive bark, own buffer/material; then the lead's floating-sprays fix (head room, twig to every cluster, inner discs, face-on LOD) (1.537.1) | agent | new | asset | 115 | ~135 | 36 | 1.537.1 |

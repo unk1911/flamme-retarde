@@ -90,14 +90,52 @@ drawn with a new `oliveMaterial`).
   - pale lichen blotches.
   - At 4.5 by 12 cm it read as a crocodile.
 
+**Nothing hangs in the air** (the lead's review, from where Misha stands to
+rock the hammock: *"several leaf sprays float in open sky with no visible
+twig or branch connecting them"*). There were four causes.
+
+- **The eye was inside a cluster.** The crown came down to 1.55 m, and the
+  eye is at 1.7 m. What looked like loose sprays in the sky was the far wall
+  of a cluster, seen from within, half a metre off.
+  - No leaf is now lower than 2.1 m on a tree over 3.5 m.
+  - No limb past its first level droops below 1.9 m.
+  - Leaves within 0.35 m of the eye are dropped, and a dithered share of
+    those out to 0.6 m, for a third-person camera that ends up in one anyway.
+- **Not every cluster had a twig.** The three over the middle had none, and
+  a tip cluster lifted to head height was left behind its branch. The twigs
+  that did exist were 6 mm through.
+  - Every cluster is now tied to its own branch, or to the nearest ring of
+    the nearest one, by a twig 1.4 cm through.
+  - The twig runs on into the cluster and forks there in two, so the leaves
+    have wood to stand on from any side.
+- **A cluster was a hollow shell.** From underneath, that is a ring of leaves
+  round an empty middle.
+  - Each cluster now has two crossed discs of leaves through it, lit with
+    the ellipsoid's outward normal.
+  - Each disc's straight edge is eroded by the tuft field. The discs are
+    marked by a blue-over-red shade in the vertex colour, which the shader
+    reads and takes back out.
+  - Sprays on the steep rim of a shell are thinned, each at its own depth.
+- **Ruled lines through the leaves.** The leaves' level of detail was keyed
+  to `fwidth` of the position. That is constant across a triangle and
+  depends on how obliquely the triangle is seen, so two neighbouring faces
+  could sit either side of the threshold and draw a triangle edge as a
+  straight line through a cluster. It is now keyed to the face-on footprint:
+  distance times `fwidth` of the direction to the eye, which is smooth over
+  the screen.
+
+Checked close up from seven places under and round three olives (the grove at
+t 441.6 and 461.4, and the vikendica's front), and from the lead's hammock
+frame. The before-and-after images are `olive_float_*`.
+
 **A new buffer, `olives`.** The olives moved out of `arbor` into it, with
 their own material. That is one draw and one caster through `treeCaster`, so
 their shadow is dappled like the pines'.
 
 - The pines and the landscape's instanced trees were not recompiled or
   touched.
-- Nothing is told apart by vertex colour: every pixel in this buffer is
-  olive.
+- Nothing is told apart from the other trees by vertex colour: every pixel
+  in this buffer is olive.
 
 **Invariance.** `olive` still takes exactly one `rng` draw, for the facing,
 and every call site is unchanged. All the new variation is `jit` off
@@ -116,15 +154,16 @@ buffer's draw range (main pass and both cascades) every 20 frames, with about
 | per frame | hammock view | olive close-up | under the crown | grove | vikendica | aerial |
 |---|---|---|---|---|---|---|
 | draw calls | 653 → 656 | 711 → 714 | 598 → 601 | 668 → 671 | 691 → 693 | 870 → 873 |
-| triangles, all passes | 19.89 → 20.27 M | 19.91 → 20.29 M | 19.65 → 20.03 M | 19.93 → 20.32 M | 19.81 → 20.19 M | 19.39 → 19.77 M |
-| GPU, olives on − off (median, two runs) | −0.11 / +0.21 ms | +0.01 / −0.12 | +0.03 / +0.17 | +0.15 / +0.07 | −0.31 / +0.40 | +0.57 / +0.41 |
+| triangles, all passes | 19.89 → 20.48 M | 19.91 → 20.50 M | 19.65 → 20.24 M | 19.93 → 20.53 M | 19.81 → 20.40 M | 19.39 → 19.98 M |
+| GPU, olives on − off (median, two runs) | +0.32 / +0.18 ms | −0.16 / +0.64 | +0.24 / +0.35 | +0.19 / +0.48 | −0.15 / −0.39 | +0.17 / +0.70 |
 
-- **Triangles.** The buffer is 148 k triangles, about 5,100 a tree against
-  about 800 before, split roughly half wood and half leaf. That is 0.44 M
-  over the three passes, and +0.38 M net of the old olives.
+- **Triangles.** The buffer is 218 k triangles, about 7,500 a tree against
+  about 800 before. That is 0.65 M over the three passes, and +0.59 M net of
+  the old olives. The inner discs and the thicker twigs are 70 k of it; the
+  first cut, without them, was 148 k.
 - **GPU.** The "off" side has no olives at all, old or new, so the GPU row is
-  an upper bound on the change. It sits within noise everywhere: at most
-  +0.6 ms, from the air.
+  an upper bound on the change. It is −0.4 to +0.7 ms, which is noise to
+  about half a millisecond.
 - **Main thread.** Render submission is unchanged within noise.
 
 Not changed: the palisade evergreen, the lavender and the ivy. They are

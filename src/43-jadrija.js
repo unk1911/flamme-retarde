@@ -21640,8 +21640,9 @@ async function buildJadrija(scene) {
    *
    * The crown is kept where the old one was: from about 0.4 h up, out to about
    * 0.55 h from the trunk. That is the open-crowned four metres the three in
-   * front of the vikendica were asked for, and nothing is lower than 1.55 m on
-   * any tree over 3.5 m, so walking under one is walking under it.
+   * front of the vikendica were asked for, and no leaf is lower than 2.1 m on
+   * any tree over 3.5 m, so walking under one is walking under it (see
+   * `crownFloor`: at 1.55 the eye by the hammock was inside a cluster).
    *
    * RULE 4. `rng` is drawn exactly once here, for the facing, as it always
    * was, and `olive` is called with the same rng-derived height at the same
@@ -21652,9 +21653,9 @@ async function buildJadrija(scene) {
    * 4.6 m tree and about 0.41 m at the ground, so it is inside the 0.5 m
    * `greens` blocker everywhere but the odd buttress at ankle height.
    *
-   * About 5,100 triangles a tree where the old one was about 800, half wood
-   * and half leaf, all in one buffer, `olives`: see the CHANGELOG for 1.537.1
-   * for what that costs.
+   * About 7,500 triangles a tree where the old one was about 800 — the wood,
+   * the twigs, and per cluster a shell and two discs — all in one buffer,
+   * `olives`: see the CHANGELOG for 1.537.1 for what that costs.
    */
   function olive(t, s, y, h) {
     // Into `olives`, and put back on the way out.
@@ -21686,8 +21687,19 @@ async function buildJadrija(scene) {
     };
     // Local x, height, z — height is world y, as `pine` and `puff` have it.
     const Wp = (p) => P(p[0], p[2], p[1]);
-    const floorY = y + (h > 3.5 ? 1.55 : h * 0.42);
+    // Head room. No leaf lower than 2.1 m on a tree over 3.5 m, and no limb
+    // past its first level lower than 1.9: the lead's frame was taken from
+    // where Misha stands to rock the hammock, eye at 1.7 m, and a cluster
+    // whose bottom was at 1.55 had the eye INSIDE it — what looked like
+    // sprays floating in the sky was the far wall of a cluster seen from
+    // within, half a metre off. An olive anybody walks under is pruned to
+    // about this.
+    const crownFloor = y + (h > 3.5 ? 2.10 : h * 0.50);
+    const limbFloor = y + (h > 3.5 ? 1.90 : h * 0.42);
     const clusters = [];
+    // Every ring of every limb from the second level out, for the clusters
+    // that are not hung off a branch of their own to find the nearest one.
+    const knots = [];
 
     // ── the bole ──
     const rb = 0.10 + 0.042 * h;
@@ -21742,8 +21754,10 @@ async function buildJadrija(scene) {
         // down at the tips, which is the weight of the leaf.
         const trop = lvl === 1 ? 0.06 : lvl === 2 ? 0.04 : 0.01 - 0.06 * u;
         d = nrm(add(add(d, UP, trop), outOf(p), lvl === 3 ? 0.05 : 0.02));
+        if (lvl >= 2 && p[1] + d[1] * step < limbFloor && d[1] < 0.35) d = nrm(add(d, UP, 0.45));
         p = add(p, d, step);
         C.push(p); R.push(r0 * (1 - 0.40 * u)); D.push(d);
+        if (lvl >= 2) knots.push(p);
       }
       const rEnd = r0 * 0.60;
       C.push(add(p, d, rEnd * 0.9)); R.push(rEnd * 0.35);
@@ -21787,7 +21801,7 @@ async function buildJadrija(scene) {
         // The leaves: one over the tip, and one or two strung back along the
         // branch on short twigs of their own.
         const rc = S * (0.34 + 0.18 * J());
-        clusters.push([add(p, d, rc * 0.35), rc, null]);
+        clusters.push([add(p, d, rc * 0.35), rc, C[segs - 1]]);
         const m = J() < 0.5 ? 2 : 1;
         for (let i = 0; i < m; i++) {
           const k = Math.max(1, Math.round(segs * (0.35 + 0.4 * J())));
@@ -21832,17 +21846,81 @@ async function buildJadrija(scene) {
     // shader.
     const band = [y + h * 0.36, y + h * 0.98];
     const DK = [0.212, 0.242, 0.172], LT = [0.418, 0.458, 0.338];
+    const nearest = (c) => {
+      let best = knots[0] || [0, y + hs, 0], bd = 1e9;
+      for (const q of knots) {
+        const dd = (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2 + (q[2] - c[2]) ** 2;
+        if (dd < bd) { bd = dd; best = q; }
+      }
+      return best;
+    };
+    // The local frame's axes in the world, for the discs' normals.
+    const O = P(0, 0, 0), EX = P(1, 0, 0), EZ = P(0, 1, 0);
+    const toW = (v) => nrm([v[0] * (EX[0] - O[0]) + v[2] * (EZ[0] - O[0]), v[1],
+      v[0] * (EX[2] - O[2]) + v[2] * (EZ[2] - O[2])]);
+    const twR = 0.014 * Math.max(S, 0.6);
     for (let i = 0; i < clusters.length; i++) {
-      const [c, rc, from] = clusters[i];
-      const cy = Math.max(c[1], floorY + rc * 0.7);
+      const [c0, rc, from0] = clusters[i];
+      const c = [c0[0], Math.max(c0[1], crownFloor + rc * 0.7), c0[2]];
       const k = 0.86 + 0.28 * J();
       const dk = DK.map((v) => v * k), lt = LT.map((v) => v * k);
-      if (from) {
-        limb(P, [[from[1], 0.013 * Math.max(S, 0.6), from[0], from[2]],
-          [cy, 0.006, c[0], c[2]]], BARK, 3);
+      // EVERY CLUSTER ON A TWIG, and the twig into the middle of it (1.537.1,
+      // the lead's frame from the hammock: sprays hanging in open sky). The
+      // three over the middle had no twig at all, a tip cluster lifted off
+      // the path by the head-height floor was left in the air, and the twig
+      // that did exist stopped at the cluster's centre at 6 mm, which from
+      // underneath is nothing. Now each one is tied to its own branch, or
+      // the nearest ring of the nearest one, by a twig 1.4 cm through that
+      // runs on into the cluster and forks there in two, so the leaves have
+      // wood to stand on from any side.
+      const from = from0 || nearest(c);
+      limb(P, [[from[1], twR, from[0], from[2]],
+        [(from[1] + c[1]) * 0.5, twR * 0.8, (from[0] + c[0]) * 0.5, (from[2] + c[2]) * 0.5],
+        [c[1], twR * 0.55, c[0], c[2]]], BARK, 4);
+      const dIn = nrm([c[0] - from[0], c[1] - from[1], c[2] - from[2]]);
+      for (let f = 0; f < 2; f++) {
+        const e = nrm(add(add(dIn, perp(dIn), 0.9), UP, 0.15));
+        const q = add(c, e, rc * 0.80);
+        limb(P, [[c[1], twR * 0.55, c[0], c[2]], [q[1], twR * 0.25, q[0], q[2]]], BARK, 3);
       }
-      puff(P, c[0], c[2], cy, rc * 0.66, rc * 1.08, dk, lt, band, 6, 3, 0.50,
+      // The shell: the cluster's outline from anywhere past a few metres.
+      puff(P, c[0], c[2], c[1], rc * 0.66, rc * 1.08, dk, lt, band, 6, 3, 0.50,
         (key % 97) + i * 3);
+      // And two discs through the middle of it, crossed, so that it has
+      // leaves INSIDE and not only on its skin. Under an olive, a shell of
+      // leaves seen from within is a ring of loose sprays round an empty
+      // middle — the rest of what the lead's frame showed. Each disc is a
+      // hexagon fan, lit with the ellipsoid's own outward normal so the
+      // inside of a cluster shades with it, and its colour carries blue a
+      // shade over red — 0.030 at the middle and 0.006 at the rim — which
+      // the shader reads twice: to leave the normal alone on either face,
+      // and to chew the hexagon's straight edge away (see OLIVE_BODY). Left
+      // alone, sprays at the edge of a disc were cut off along a ruler.
+      const g = (yy, mark) => {
+        let t2 = (yy - band[0]) / (band[1] - band[0]);
+        t2 = Math.min(1, Math.max(0, t2));
+        t2 = t2 * t2 * (3 - 2 * t2);
+        const col = [0, 1, 2].map((j) => (dk[j] + (lt[j] - dk[j]) * t2) * 0.92);
+        col[2] = col[0] + mark;
+        return col;
+      };
+      const ax = perp(UP);
+      for (let dsk = 0; dsk < 2; dsk++) {
+        const nA = dsk === 0 ? ax : nrm(add(crs(ax, UP), UP, 0.6 * (J() - 0.5)));
+        const e1 = perp(nA), e2 = crs(nA, e1);
+        const cW = Wp(c), cC = g(c[1], 0.030);
+        const ring = [];
+        for (let j = 0; j < 6; j++) {
+          const a = (j / 6) * TAU + J() * 0.4;
+          const v = add(add([0, 0, 0], e1, Math.cos(a)), e2, Math.sin(a));
+          const q = [c[0] + v[0] * rc * 0.92, c[1] + v[1] * rc * 0.62, c[2] + v[2] * rc * 0.92];
+          ring.push({ p: Wp(q), n: toW([v[0], v[1] * 1.4, v[2]]), c: g(q[1], 0.006) });
+        }
+        for (let j = 0; j < 6; j++) {
+          const A = ring[j], B = ring[(j + 1) % 6];
+          b.smooth(cW, A.p, B.p, [0, 1, 0], A.n, B.n, cC, A.c, B.c);
+        }
+      }
     }
     b = bWas;
   }
