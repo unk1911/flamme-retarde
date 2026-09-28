@@ -32766,6 +32766,20 @@ async function buildJadrija(scene) {
         kept.push(c);
       }
     }
+    // AND A THIRD FEWER. *"perhaps decrease total numbers of cars by 33%"*
+    // (Misha, 28 Sep, after 42 had already come down to 19). Taken off what
+    // is left once every rule above has had its say, so it is a third of the
+    // cars that are actually there and not of the bays the loop tried — and
+    // taken as whole stretches, not every third car: see `carsToDrop`. Slot
+    // 28 of the same sine hash, no `rng()`; the covered car is never dropped.
+    const live = runs.filter((r) => r.car && carSites[r.car - 1]);
+    const drop = carsToDrop(live.map((r) => (r.t0 + r.t1) * 0.5),
+      live.map((r) => carSites[r.car - 1].model === 'covered'), (t) => jit(t | 0, 28));
+    live.forEach((r, k) => {
+      if (!drop.has(k)) return;
+      carSites[r.car - 1] = null;
+      runs.splice(runs.indexOf(r), 1);
+    });
   }
 
   // Blockers are the huts, in locale coordinates, which is the frame they were
@@ -61084,7 +61098,7 @@ async function buildJadrija(scene) {
      * frame — which, being ten draw calls behind one bounding sphere, is very
      * often none of them.
      */
-    cars: { n: cars.count, tris: cars.tris, models: cars.counts },
+    cars: { n: cars.count, tris: cars.tris, trisNear: cars.trisNear, models: cars.counts },
     /**
      * The people on bicycles and scooters.
      *

@@ -8,6 +8,102 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.542.2] — 2026-09-28
+
+### a third fewer cars, sat lower and rounder — and a near tier that did not ship
+
+After 1.539.0 the cars were called "clearly better but still mid-detail, not
+photoreal". Misha: *"yes improve cars more, and perhaps decrease total numbers
+of cars by 33%"*.
+
+**Fewer: 19 → 13 in the wood, 5 → 3 on the back lane.** The cut is not every
+third car, which would be a thinned grid. It is taken after every other rule
+has run (trees, the back wall, the fold at the bend, the hammock), so it is a
+third of the cars that are actually there. Each car gets a popularity from two
+slow waves along the shore (64 m and 27 m) plus a little of its own hash, and
+the least popular third are not parked (`carsToDrop` in `src/44-cars.js`). What
+is left is clumps of two to four with real gaps between them. The dropped cars'
+walk blockers go with them. The back lane lists its bays first and parks
+second, using the same rule. It is all sine hashes (`jit` slots 28 and 126),
+with no `rng()`. The covered car is exempt in both places. The hammock is
+unchanged (`[437.4, 34.2, 441.6, 32.1]`).
+
+**Better bodies** (`tools/blender/cars.py`, rebaked):
+
+- **Ride height.** Every sill was a hand too high: 0.30–0.40 m, which is
+  daylight under a bumper where a real car has shadow. Sills are now at the
+  class's rocker height (supermini 0.20, crossover 0.29, van 0.24), and
+  bumpers are 0.29–0.38.
+- **Round arches.** The parabolic hump is now a circular opening 40 mm clear
+  of the tyre, dropping straight down to the sill. It is cut on stations
+  bunched where it is steep.
+- **Flares.** The flank swells 8–22 mm round each wheel and the belt does
+  not, so the arch reads as a lip over the tyre. The wheels move out with
+  it.
+- **Shut lines.** The bonnet and boot shut lines now get their own station
+  pair. Before, they fell between stations and were never drawn.
+- **A sedan**, the three-box car Misha's list asked for by name. It has a long
+  backlight onto a boot deck, with its own shut line. It takes 0.16 of the
+  mix. Most of that came off `oldhatch`, which at 0.14 had put three old red
+  three-doors in thirteen, two of them side by side.
+- **Rear plates.** The EU strip was at −Y on both plates, so every rear plate
+  was mirror-image. It now sits on the plate's left as you face it.
+
+**Materials** (`src/44-cars.js`):
+
+- **Metallic paint.** It has flop (darker toward the edges), a broad sheen in
+  its own colour, and a faint flake sparkle on a grid sized to the pixel.
+- **Dust.** Limestone dust covers the lower 40 cm of every car, and a little
+  sits on the flat tops. Where there is dust, the clearcoat loses its
+  reflection.
+- **The old car's red** is sun-bleached and chalky on top.
+- **Ground occlusion.** The lower body takes less of the sky.
+- **Trim** has its own matt finish.
+- **Wheel spots.** The dark under each car now has a darker spot where each
+  tyre meets the ground, placed from the axles and track in `cars.json`.
+
+**The near tier: built, measured, not shipped.** A second set of blobs covers
+a car within 40 m:
+
+- see-through glass, with a cabin behind it (seats, headrests, dash, a
+  steering wheel on the left, and the paint's back faces drawn as door trim
+  and headliner);
+- loaded tyres with a flat patch and a bulge, and moulded lettering;
+- deep spokes, lug nuts, and a brake disc and caliper behind the spokes;
+- lamps with a projector, an LED strip, an indicator and a gloss brow;
+- a legible HR plate ("ŠI 482-KM", with the šahovnica and "HR" on the strip);
+- grille bars, badges, wipers and an aerial.
+
+The body mesh is shared between the tiers, so the silhouette never pops. In
+the close-ups it was the biggest step the cars have taken (`cars2_after_*`
+from the first after-run, scratchpad).
+
+It cost too much. GPU time was measured by toggling every car layer on and
+off in the same page, 30 frames a block, 8–10 blocks alternated. Whole-frame
+timings were useless, because other agents were sharing the GPU (the same
+build read 9 to 18 ms). The table gives the cars' own cost, the on − off
+median, ms/frame:
+
+| | cars | car park | promenade |
+|---|---|---|---|
+| 1.539.0 | 19 | 0.47–1.20 | 0.65–2.53 |
+| with the near tier drawn | 13 | 2.90–3.77 | 0.04–3.0 |
+| near tier off (this release) | 13 | 1.03–2.57 | 0.66 |
+
+So 1.542.2 ships with the near blobs out of the payload.
+`buildJadrijaCars` finds none and draws the far tier all the way in. Baking
+them (`cars.py --near`) turns the near tier back on, and the loader, bands and
+materials for it are all in place. Making it cheap enough is the next job. The
+suspects:
+
+- the trim's environment term on the cabin;
+- the near gloss layer;
+- five shadow taps on the paint.
+
+A cheaper glass-plus-cabin-only tier is the likely shape.
+
+**Size:** 50.46 → 50.70 MB (+0.24 MB). With the near tier it would be 51.84.
+
 ## [1.541.1] — 2026-09-28
 
 ### The konoba, smooth
