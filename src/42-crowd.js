@@ -659,8 +659,12 @@ function clipRate(fg) {
 //
 //   And the mesh outlives the person on it. A slot changing hands with a
 //   delta still on its shoulder is the next occupant arriving with their arm
-//   in the air, so `clearArm` is called from the rebind as well as from the
-//   end of the greeting.
+//   in the air — which is why the deltas are kept on the MESH (`handRec`) and
+//   every solve starts by taking the last one off, whoever it was for.
+//
+// Since 1.539.5 this is one half of `handSide`, below: the wave is laid over
+// an arm that is resting on something rather than over the bare clip, so a
+// greeting lifts the hand off the table and puts it back.
 const WAVE = {
   // Where the upper arm points, in FIGURE space — +x is the way they face,
   // +y is up, and their own left is −z. Mostly OUT to the side being greeted
@@ -685,14 +689,9 @@ const WAVE = {
   // rather than the wrist flapping on the end of a fixed one.
   hz: 13.8, sweep: 0.22,
 };
-const _wS = new THREE.Vector3(), _wE = new THREE.Vector3();
-const _wW = new THREE.Vector3(), _wU = new THREE.Vector3();
-const _wF = new THREE.Vector3(), _wG = new THREE.Vector3();
+const _wG = new THREE.Vector3();
 const _wT = new THREE.Vector3(), _wP = new THREE.Vector3();
 const _wX = new THREE.Vector3(1, 0, 0);
-const _wI = new THREE.Quaternion(), _wJ = new THREE.Quaternion();
-const _wA = new THREE.Quaternion(), _wB = new THREE.Quaternion();
-const _wID = new THREE.Quaternion();
 
 /** `aim` takes an axis and an angle; a solve hands back a quaternion. */
 function armAimQ(f, name, q) {
@@ -700,64 +699,513 @@ function armAimQ(f, name, q) {
   f.aim(name, q.x, q.y, q.z, 2 * Math.atan2(s, q.w));
 }
 
-/** Give the arm back to the clip, and forget what was done to it. */
-function clearArm(f, rec) {
-  if (!rec || !rec.on) return;
-  rec.on = false;
-  rec.qa.identity();
-  rec.qb.identity();
-  // ONLY THE SIDE THAT WAS USED. Clearing both would delete the phone solve's
-  // own aims off the right arm of anybody reading one, and the symptom of that
-  // is twelve people whose hands drop off their phones the moment somebody
-  // near them says hello.
-  f.aim(rec.left ? 'armUL' : 'armUR', 0, 1, 0, 0);
-  f.aim(rec.left ? 'armLL' : 'armLR', 0, 1, 0, 0);
-}
-
 /**
- * Put this figure's hand up, `g` of the way, on the given side.
- *
- * @param g     0 to 1, the weight — ramped from identity rather than from the
- *              clip, so the arm rises and falls instead of snapping.
- * @param left  which arm. See the phone note above.
+ * The wave's two turns, against the clip's own arm: `u0` its upper arm and
+ * `f0` its forearm, unit, figure space. Two minimal rotations, each taking a
+ * bone's own direction where it has to go — the forearm's measured AFTER the
+ * upper arm's, because an aim on a parent carries its children round with it.
+ * The targets are `WAVE`'s, on the side being greeted and rocking.
  */
-function greetArm(f, rec, g, left, t, seed) {
-  // A side that has changed under a running greeting is the old side still
-  // holding a delta nobody is going to take off it.
-  if (rec.on && rec.left !== left) clearArm(f, rec);
-  const nu = left ? 'armUL' : 'armUR', nl = left ? 'armLL' : 'armLR';
-  const iu = f.boneIndex(nu), il = f.boneIndex(nl);
-  const ih = f.boneIndex(left ? 'handL' : 'handR');
-  if (iu < 0 || il < 0 || ih < 0) return;
-  f.boneAt(iu, _wS); f.boneAt(il, _wE); f.boneAt(ih, _wW);
-  // What the clip is doing under the last solve. A bone's delta is laid on
-  // outside its parent's — `measured = qb · qa · clip` for the forearm — so
-  // the clip's own arm is the measurement with those taken back off it in the
-  // order they went on.
-  const ia = _wI.copy(rec.qa).invert(), ib = _wJ.copy(rec.qb).invert();
-  _wU.copy(_wE).sub(_wS).applyQuaternion(ia).normalize();
-  _wF.copy(_wW).sub(_wE).applyQuaternion(ib).applyQuaternion(ia).normalize();
-  // The target, on the correct side and rocking.
+function waveTurns(u0, f0, left, t, seed, qa, qb) {
   const sd = left ? -1 : 1;
   const ph = Math.sin(t * WAVE.hz + seed * 6.283) * WAVE.sweep;
   _wT.set(WAVE.up[0], WAVE.up[1], sd * WAVE.up[2]).normalize()
     .applyAxisAngle(_wX, ph);
   _wP.set(WAVE.fore[0], WAVE.fore[1], sd * WAVE.fore[2]).normalize()
     .applyAxisAngle(_wX, ph);
-  // Two turns, each the minimal rotation that takes a bone's own direction
-  // where it has to go. The forearm's is measured AFTER the upper arm's,
-  // because an aim on a parent carries its children round with it.
-  _wA.setFromUnitVectors(_wU, _wT);
-  _wB.setFromUnitVectors(_wG.copy(_wF).applyQuaternion(_wA), _wP);
-  // Ramped from identity and not from the clip: at g = 1 both are exact, and
-  // below it the arm is part of the way to where it is going, which is what a
-  // hand coming up looks like.
-  rec.qa.copy(_wID).slerp(_wA, g);
-  rec.qb.copy(_wID).slerp(_wB, g);
-  armAimQ(f, nu, rec.qa);
-  armAimQ(f, nl, rec.qb);
-  rec.on = true;
-  rec.left = left;
+  qa.setFromUnitVectors(u0, _wT);
+  qb.setFromUnitVectors(_wG.copy(f0).applyQuaternion(qa), _wP);
+}
+
+// ── hands with nothing to do, resting on something ───────────────────────────
+//
+// Misha, 28 Sep 2026, a man at a café table at Jadrija with a phone at his
+// ear: *"the hands for the bathers and stuff, they all have that frankenstein
+// hand thing, when in doubt their hands should lay palms down on the tables
+// or whatnot, to look more natural u know?"* His free hand was up in front of
+// his chest, palm out, the four fingers straight and spread — held there, in
+// the air, resting on nothing.
+//
+// It was the clip's hand and it was two faults. The seated clips were solved
+// for where the WRIST goes (`sit_clips` in bathers_mh.py) and say nothing
+// about the hand past it, so `sittable` lays a forearm on the table's edge and
+// then carries on up the forearm's own line: the hand cocked up at the wrist,
+// palm to the room. And the fingers are the bind pose's, dead straight, on
+// every clip this rig plays — a flat plate on the end of every arm on this
+// shore, standing or sitting. The settle (43-settle.js) lets an idle arm fall
+// on to whatever is under it, but a ragdoll's hand is one rigid capsule with
+// the wrist and the fingers where the clip left them, so the plate came down
+// on to the table and stayed a plate.
+//
+// So the same shape of answer as the shop staff's (`counterArms`) and the
+// riders' (`wheelHand` in 43-jadrija.js): the HAND is put where it rests, and
+// the arm is solved to reach it.
+//
+//   at a table   the palm flat on the top, in front of the shoulder and a
+//                little in, fingers pointing across it and turned in, the
+//                knuckles up off the wood and the fingertips down on it —
+//                wherever the table can be reached without a straight arm,
+//                sitting forward from the hips a little if that is what it
+//                takes (`handPlan`).
+//   otherwise    on the thigh, half way to the knee, fingers along it and
+//                draped over the top. A quay sitter too — unless their clip
+//                has the hand planted on the concrete beside or behind them,
+//                which is already a hand resting on something and is left be.
+//   free         standing, walking, wading, lying: the clip's arm, which
+//                hangs them at their sides already, with the fingers relaxed.
+//
+// And the fingers everywhere, which is the half of "frankenstein" that was on
+// everybody. A relaxed hand is not straight: the four fingers fold a third of
+// the way at the knuckles and the thumb comes in toward the palm. This rig has
+// one bone for the four fingers and one for the thumb, so that is two turns,
+// about the hand's own measured axes (see `handBody`), and only ever MORE
+// curl than the clip's — a hand the clip closes round a ladder's rail stays
+// closed.
+//
+// A GREETING OR A GESTURE STARTS FROM THE REST AND ENDS IN IT. `aims` keeps
+// one rotation per bone, and the chatter's gesture and the greeting's wave
+// (`fg.gArm`) are aims on the same two bones, so they are solved here
+// together: the wave's turns are worked out against the clip exactly as they
+// always were (`waveTurns`), and the arm goes `g` of the way from resting to
+// them — the hand comes up off the table, opens, and goes back down on to it.
+//
+// THE PHONE'S HAND IS THE PHONE'S. `holdPhone` in 43-jadrija.js owns `armUR`,
+// `armLR`, `handR` and `fingersR` for anybody holding one, so for them this
+// does the other hand and nothing else.
+//
+// Poses from the same measurement the wave uses — the palette says where the
+// arm IS, the deltas this laid last time are taken back off it to find the
+// clip underneath (`measured = qh · qb · qa · clip` for the hand) — so the
+// same guard applies: only inside the pose ladder, once per `update`.
+const HANDS = {
+  // The palm's normal and the thumb's fold axis in the bind pose, figure
+  // space: the bucketeer's measurements of this rig's hand, the same numbers
+  // `WHEEL_HAND` grips the handlebars with. The palm is squared off each
+  // body's own wrist-to-knuckle line in `handBody`, and the knuckle line is
+  // the two crossed — which is the axis the four fingers fold about.
+  palm: { L: [-0.180, -0.487, 0.854], R: [-0.179, -0.485, -0.856] },
+  thumb: { L: [-0.149, -0.846, -0.514], R: [0.149, 0.847, -0.511] },
+  // A relaxed hand's fold, radians from straight: the four fingers at the
+  // knuckle, a person's own between the two, and the thumb in toward the
+  // palm. In a wave the fingers open to `open`.
+  curl: [0.55, 0.80], tuck: 0.30, open: 0.12,
+  // The palm on a surface. `heel` is where it touches along the
+  // wrist-to-knuckle line — the heel of the hand, because with the knuckles
+  // tipped `arch` up off the surface that is the low point of the palm, and
+  // the fingertips come back down on to it past the knuckle; `under` how far
+  // the skin there is under the bone line; `roll` a person's own lean on to
+  // the little finger's edge; `tip` half a finger's thickness. MEASURED on
+  // the first cut, which touched at the palm's middle with the skin 18 mm
+  // under the line: the wrist came out 3 mm over the table top and the
+  // forearm and heel of the hand went in under the surface, fingertips
+  // poking up through it.
+  heel: 0.25, under: 0.024, arch: 0.24, roll: [0.04, 0.26], tip: 0.009,
+  // Where on a table, from the shoulder: this far forward and this far in,
+  // each a person's own give or take `spread`, and the heel of the hand
+  // kept `inset` inside the edge — the palm and the fingers are further in.
+  // `toe` turns the fingers in toward each other.
+  fwd: 0.44, in: 0.05, spread: 0.05, inset: 0.035, toe: [0.15, 0.45],
+  // The most of a straight arm a rest may take, leaning in by up to `lean`
+  // to get there. Past it the table is too far — mostly the sitters leant
+  // back in `sit`, `sitlap` and `sitback` — and the hand goes on the thigh,
+  // which is where those clips had it anyway.
+  reach: 0.95,
+  // And the most a sitter leans forward from the hips to get there,
+  // radians. 0.38 was tried: the man in Misha's screenshot, whose clip
+  // already has him bowed over the phone at his ear, went down with his face
+  // a hand over the table top. At 0.22 the ones it reaches are sitting
+  // forward and the rest keep their hands on their thighs.
+  lean: 0.22, spare: 0.06,
+  // On the thigh: how far from hip to knee, the fingers' drape over it, and
+  // the odds a table sitter keeps one hand there rather than on the table,
+  // which is what stops every café on the shore being a row of the same
+  // four hands.
+  thigh: [0.46, 0.62], drape: 0.42, lap: 0.28,
+  // A hand whose wrist is lower than this over the floor is planted on it
+  // (standing and lying; a quay sitter's is measured against their hip).
+  planted: 0.13,
+  // Rest weight a second, in and out.
+  rate: 2.5,
+  // For a probe: everybody's hands as their clip has them.
+  off: false,
+};
+const HAND_SIDES = ['L', 'R'];
+const _hS = new THREE.Vector3(), _hE = new THREE.Vector3(), _hW = new THREE.Vector3();
+const _hU = new THREE.Vector3(), _hF = new THREE.Vector3(), _hG = new THREE.Vector3();
+const _hP = new THREE.Vector3(), _hD = new THREE.Vector3(), _hN = new THREE.Vector3();
+const _hC = new THREE.Vector3(), _hM = new THREE.Vector3(), _hV = new THREE.Vector3();
+const _hE1 = new THREE.Vector3(), _hA = new THREE.Vector3(), _hB = new THREE.Vector3();
+const _hY = new THREE.Vector3(0, 1, 0);
+const _hQm = new THREE.Quaternion(), _hQf = new THREE.Quaternion(), _hQt = new THREE.Quaternion();
+const _hI = new THREE.Quaternion(), _hH0 = new THREE.Quaternion(), _hF0 = new THREE.Quaternion();
+const _hT0 = new THREE.Quaternion(), _hRa = new THREE.Quaternion(), _hRb = new THREE.Quaternion();
+const _hRh = new THREE.Quaternion(), _hWa = new THREE.Quaternion(), _hWb = new THREE.Quaternion();
+const _hHf = new THREE.Quaternion(), _hX = new THREE.Quaternion(), _hID = new THREE.Quaternion();
+const _hQs = new THREE.Quaternion();
+const _hMa = new THREE.Matrix4(), _hMb = new THREE.Matrix4();
+const handStats = { table: 0, thigh: 0, planted: 0, free: 0, res: 0, resMax: 0, n: 0, worst: -1 };
+
+/**
+ * This body's hands, in its bind pose: for each side the bones, the
+ * wrist-to-knuckle line `d` and its length, the palm's normal `n` squared off
+ * it, the knuckle line `c = d × n` the fingers fold about (a positive turn
+ * takes the fingertips toward the palm), the thumb's fold axis `t`, the
+ * fingers' reach past the knuckle `fl` off the skin, and the thigh's radius
+ * off `settleCaps`. Once a body, on the parsed blob. Null if the rig has no
+ * finger bones.
+ */
+function handBody(f) {
+  const data = f.data;
+  if (data.handRest !== undefined) return data.handRest;
+  data.handRest = null;
+  const T = f.bindRest().bindT;
+  const pos = data.geo.getAttribute('position').array;
+  const bi = data.geo.getAttribute('aBoneIdx').array, bw = data.geo.getAttribute('aBoneWt').array;
+  const caps = typeof settleCaps === 'function' ? settleCaps(f) : [];
+  const out = {};
+  for (const s of HAND_SIDES) {
+    const ix = {};
+    for (const n of ['armU', 'armL', 'hand', 'fingers', 'thumb', 'legU', 'legL']) {
+      ix[n] = f.boneIndex(n + s);
+      if (ix[n] < 0) return null;
+    }
+    const at = (i) => new THREE.Vector3(T[3 * i], T[3 * i + 1], T[3 * i + 2]);
+    const W = at(ix.hand), K = at(ix.fingers);
+    const d = K.clone().sub(W);
+    const len = d.length();
+    d.normalize();
+    const n = new THREE.Vector3(...HANDS.palm[s]);
+    n.addScaledVector(d, -n.dot(d)).normalize();
+    const c = d.clone().cross(n);
+    // The fingertips: how far along the hand the fingers' own skin reaches
+    // past the knuckle, the 95th of it so a stray vertex does not count.
+    const reach = [];
+    for (let v = 0, nv = pos.length / 3; v < nv; v++) {
+      let best = 0;
+      for (let k = 1; k < 4; k++) if (bw[4 * v + k] > bw[4 * v + best]) best = k;
+      if (bi[4 * v + best] !== ix.fingers) continue;
+      reach.push((pos[3 * v] - K.x) * d.x + (pos[3 * v + 1] - K.y) * d.y + (pos[3 * v + 2] - K.z) * d.z);
+    }
+    reach.sort((a, b) => a - b);
+    const fl = reach.length > 8 ? reach[Math.floor(reach.length * 0.95)] : len * 0.8;
+    const cap = caps.find((q) => q.name === 'legU' + s);
+    out[s] = {
+      iu: ix.armU, il: ix.armL, ih: ix.hand, if: ix.fingers, it: ix.thumb, ik: ix.legU, iq: ix.legL,
+      hand: 'hand' + s, fing: 'fingers' + s, thumb: 'thumb' + s, armU: 'armU' + s, armL: 'armL' + s,
+      d, n, c, t: new THREE.Vector3(...HANDS.thumb[s]).normalize(), len, fl,
+      thighR: cap ? (cap.r0 + cap.r1) * 0.5 : 0.07,
+    };
+  }
+  out.spine = f.boneIndex('spine01');
+  if (out.spine < 0) return null;
+  data.handRest = out;
+  return out;
+}
+
+/** What `handsPose` keeps on a mesh, a side: the turns it has laid there. */
+function handRec() {
+  const q = () => new THREE.Quaternion();
+  return { on: false, who: null, w: 0, g: 0, qa: q(), qb: q(), qh: q(), qf: q(), qt: q(), goal: new THREE.Vector3(),
+    rest: false };
+}
+
+/** Take every turn this laid on one side back off, and forget it. */
+function handClear(f, B, r, keepPhone) {
+  if (!r.on) return;
+  if (!keepPhone) {
+    f.aim(B.armU, 0, 1, 0, 0); f.aim(B.armL, 0, 1, 0, 0);
+    f.aim(B.hand, 0, 1, 0, 0); f.aim(B.fing, 0, 1, 0, 0);
+  }
+  f.aim(B.thumb, 0, 1, 0, 0);
+  for (const k of ['qa', 'qb', 'qh', 'qf', 'qt']) r[k].identity();
+  r.on = false; r.rest = false;
+}
+
+/** The signed turn of `q` about the unit axis `a`, radians. */
+function twistAbout(q, a) {
+  let s = q.x * a.x + q.y * a.y + q.z * a.z, w = q.w;
+  if (w < 0) { s = -s; w = -w; }
+  return 2 * Math.atan2(s, w);
+}
+
+/**
+ * Where this person's hands rest, planned once on the body that draws them
+ * and kept: `{ data, L, R }`, each side `{ kind, P, h, toe, roll, curl, u }`.
+ * Planned against the pose as it is on the first frame they are drawn — the
+ * clip with this solve taken back off it — so it is where THEIR shoulder is
+ * over THEIR table. The palm's spot on a table is fixed there, in the
+ * figure's frame, so the hand stays put while the body breathes over it; a
+ * thigh rest follows the thigh.
+ */
+function handPlan(fg, H, geo, S0, W0, arm, piv, hipY, lean0, sd, s) {
+  const j = (k) => crowdJit((fg.seed || 0) * 977 + (sd > 0 ? 71 : 37), 960 + k);
+  const lo = (r, u) => r[0] + (r[1] - r[0]) * u;
+  const p = { kind: 'free', P: new THREE.Vector3(), h: new THREE.Vector3(1, 0, 0), lean: 0,
+    toe: lo(HANDS.toe, j(1)), roll: lo(HANDS.roll, j(2)), curl: lo(HANDS.curl, j(3)),
+    u: lo(HANDS.thigh, j(4)) };
+  if (fg.mode !== 'sit') {
+    if (W0.y < HANDS.planted) p.kind = 'planted';
+    return p;
+  }
+  // On the quay the floor is what they sit on, so a planted hand is one
+  // below the hip it is beside: propped on the concrete, which is resting.
+  if (!fg.sitAt && W0.y < hipY - 0.03) { p.kind = 'planted'; return p; }
+  p.kind = 'thigh';
+  // The table, if they are at one and it is not the hand that stays in the lap.
+  const tb = geo && geo.back && geo.boxes && geo.boxes.length >= 7 ? geo.boxes.slice(-7) : null;
+  if (!tb) { p.why = 'no table'; return p; }
+  // One of the two hands, now and then, and never both.
+  if (j(5) < HANDS.lap && (j(6) < 0.5) === (sd > 0)) { p.why = 'lap'; return p; }
+  const [cx, cy, cz, hx, hy, hz, ty] = tb;
+  const top = cy + hy;
+  // In front of the shoulder and a little in, give or take.
+  const Q = _hP.set(S0.x + HANDS.fwd + (j(7) - 0.5) * 2 * HANDS.spread, top,
+    S0.z - sd * HANDS.in + (j(8) - 0.5) * 2 * HANDS.spread);
+  // Into the top: the table's own frame, three.js's yaw turned back.
+  const ct = Math.cos(ty), st = Math.sin(ty);
+  const dx = Q.x - cx, dz = Q.z - cz;
+  let lx = dx * ct - dz * st, lz = dx * st + dz * ct;
+  if (geo.round) {
+    const r = Math.hypot(lx, lz), R = hx - HANDS.inset;
+    if (r > R) { lx *= R / r; lz *= R / r; }
+  } else {
+    lx = Math.max(-(hx - HANDS.inset), Math.min(hx - HANDS.inset, lx));
+    lz = Math.max(-(hz - HANDS.inset), Math.min(hz - HANDS.inset, lz));
+  }
+  const P = new THREE.Vector3(cx + lx * ct + lz * st, top, cz - lx * st + lz * ct);
+  // The way the fingers point: from the shoulder, level, and turned in.
+  const h = new THREE.Vector3(P.x - S0.x, 0, P.z - S0.z);
+  if (h.lengthSq() < 1e-6) h.set(1, 0, 0);
+  h.normalize().applyAxisAngle(_hY, sd * p.toe);
+  // Nor across their middle, nor behind them.
+  if (sd * P.z < -0.06 || P.x < S0.x + 0.12) { p.why = 'across'; return p; }
+  // Reachable without a straight arm: the wrist this palm puts, against the
+  // arm, `arm` long — measured off the pose, shoulder to elbow to wrist.
+  //
+  // AND LEANING IN TO IT, which is what somebody does whose table is a hand
+  // further off than their arm: MEASURED, the six seated clips put the table's
+  // near edge 0.5 to 0.65 m in front of the shoulders and the wrist on it is
+  // 1.1 to 1.4 arms away for everybody but the two `sittable` sitters, who are
+  // already leant over it. So they lean in from the hips (`spine01`, which
+  // nothing else on a bather aims) by as little as gets the hand there, up to
+  // `lean`; past that the table is too far and the hand stays on the thigh.
+  // From the hips and not the middle of the back: the first cut bent at
+  // `spine02`, and a quarter of a radian there moved the shoulders 7 cm and
+  // put a man's face over his table — the same turn from the hips is 11 cm,
+  // and reads as sitting forward rather than as slumping.
+  const B = H[s];
+  const Wg = handFrame(B, P, h, _hY, p.roll, sd, _hD, _hN, _hC, _hG);
+  p.why = +(Wg.distanceTo(S0) / arm).toFixed(2);
+  // From the shoulder as it would be sitting up: a plan made again after the
+  // settle is measured with this person's lean already on it, and a lean
+  // found from there is a lean on top of a lean — the first cut halved
+  // itself on every re-plan and left the old woman at Caffe TRAMPULIN's
+  // hands 14 cm short of her table.
+  const c0 = Math.cos(lean0), s0 = Math.sin(lean0);
+  const ox = (S0.x - piv.x) * c0 - (S0.y - piv.y) * s0, oy = (S0.x - piv.x) * s0 + (S0.y - piv.y) * c0;
+  let lean = -1;
+  for (let a = 0; a <= HANDS.lean + 1e-6; a += 0.02) {
+    const c = Math.cos(a), sn = Math.sin(a);
+    _hV.set(piv.x + ox * c + oy * sn, piv.y - ox * sn + oy * c, S0.z);
+    if (Wg.distanceTo(_hV) <= HANDS.reach * arm) { lean = a; break; }
+  }
+  if (lean < 0) return p;
+  // And a little further than just reaching, where there is any to give:
+  // the talking clips rock the trunk, and planned to the millimetre a hand
+  // came 8 cm off its table every time the clip sat its speaker back.
+  p.lean = lean > 0 ? Math.min(HANDS.lean, lean + HANDS.spare) : 0;
+  p.kind = 'table';
+  p.P.copy(P);
+  p.h.copy(h);
+  return p;
+}
+
+/**
+ * The hand's frame resting on a surface with normal `m`, the palm's middle
+ * at `P` and the fingers heading `h`: knuckles `d` (tipped `arch` up off
+ * it), palm normal `n` (on to it, rolled `roll` toward the little finger),
+ * knuckle line `c`; and the wrist that puts the palm there, into `W`.
+ */
+function handFrame(B, P, h, m, roll, sd, d, n, c, W) {
+  d.copy(h).addScaledVector(m, -h.dot(m)).normalize();
+  const ca = Math.cos(HANDS.arch), sa = Math.sin(HANDS.arch);
+  d.multiplyScalar(ca).addScaledVector(m, sa).normalize();
+  n.copy(m).negate().addScaledVector(d, d.dot(m)).normalize();
+  // Rolled on to the little finger's edge: the palm turns toward the thumb's
+  // side (`sd · c` — the thumb is +c on the right hand and −c on the left).
+  c.crossVectors(d, n);
+  n.multiplyScalar(Math.cos(roll)).addScaledVector(c, sd * Math.sin(roll)).normalize();
+  c.crossVectors(d, n);
+  return W.copy(P).addScaledVector(n, -HANDS.under).addScaledVector(d, -HANDS.heel * B.len);
+}
+
+/**
+ * One arm's rest, greeting and fingers, laid on as aims. See the note over
+ * `HANDS`. `g` is the greeting's weight on THIS side (0 if it is not this one).
+ */
+function handSide(f, r, B, H, fg, s, sd, g, t, dt, geo, lean0) {
+  // ── what the clip is doing under the last solve ─────────────────────────
+  f.boneAt(B.iu, _hS); f.boneAt(B.il, _hE); f.boneAt(B.ih, _hW);
+  const lu = _hS.distanceTo(_hE), ll = _hE.distanceTo(_hW);
+  // A figure that has never been posed has a palette of zeros.
+  if (lu < 0.05 || ll < 0.05) return;
+  // The undo, outermost last on and so first off.
+  const ia = _hX.copy(r.qa).invert();
+  const ib = _hQm.copy(r.qb).invert();
+  _hU.copy(_hE).sub(_hS).divideScalar(lu || 1).applyQuaternion(ia);
+  _hF.copy(_hW).sub(_hE).divideScalar(ll || 1).applyQuaternion(ib).applyQuaternion(ia);
+  // Hand, fingers and thumb, as turns off the bind: `measured = qh·qb·qa·clip`,
+  // and the fingers and the thumb with their own outside that.
+  _hI.copy(r.qh).multiply(r.qb).multiply(r.qa).invert();
+  f.boneTurn(B.ih, _hH0).premultiply(_hI);
+  f.boneTurn(B.if, _hF0).premultiply(_hQf.copy(r.qf).invert()).premultiply(_hI);
+  f.boneTurn(B.it, _hT0).premultiply(_hQt.copy(r.qt).invert()).premultiply(_hI);
+  // The clip's wrist, for the plan.
+  _hW.copy(_hS).addScaledVector(_hU, lu).addScaledVector(_hF, ll);
+
+  // ── the plan, once a person on a body ───────────────────────────────────
+  // AND AGAIN ONCE THEY HAVE SAT DOWN. A sitter is drawn in their bare clip
+  // until the settle gets to them and is eased into it over a second
+  // (`sitLayer`), and the settle moves a shoulder by several centimetres —
+  // MEASURED, a table planned off the bare clip was 10 cm out of reach once
+  // the man in Misha's screenshot had settled back. So the plan is keyed on
+  // the settle it was made against, and made again when that lands in full.
+  const set = fg.settled && f.sitL && f.sitL.on && f.sitL.w >= 1 ? fg.settled : null;
+  let pl = fg.handPlan;
+  if (!pl || pl.data !== f.data || pl.set !== set) {
+    pl = fg.handPlan = { data: f.data, set, L: null, R: null };
+  }
+  if (!pl[s]) {
+    const hipY = f.boneAt(B.ik, _hA).y;
+    pl[s] = handPlan(fg, H, geo, _hS, _hW, lu + ll, f.boneAt(H.spine, _hM), hipY, lean0, sd, s);
+  }
+  const p = pl[s];
+  const rest = p.kind === 'table' || p.kind === 'thigh';
+  // A new person on this mesh sits down resting; somebody already here eases.
+  if (r.who !== fg) { r.who = fg; r.w = rest ? 1 : 0; }
+  else r.w = rest ? Math.min(1, r.w + dt * HANDS.rate) : Math.max(0, r.w - dt * HANDS.rate);
+
+  // ── the rest: the hand where it goes, then the arm to it ────────────────
+  _hRa.identity(); _hRb.identity(); _hRh.identity();
+  let kt = p.curl, rel = false;
+  if (r.w > 0) {
+    if (p.kind === 'table') {
+      handFrame(B, p.P, p.h, _hY, p.roll, sd, _hD, _hN, _hC, _hG);
+      kt = HANDS.arch + Math.asin(Math.max(-0.4, Math.min(0.9,
+        (HANDS.under + (1 - HANDS.heel) * B.len * Math.sin(HANDS.arch) - HANDS.tip) / B.fl)));
+      _hV.set(-0.25, -1, sd * 0.55);
+    } else {
+      // On the thigh, which goes where the clip and the settle take it.
+      f.boneAt(B.ik, _hA); f.boneAt(B.iq, _hB);
+      const tl = _hA.distanceTo(_hB);
+      _hM.copy(_hB).sub(_hA).divideScalar(tl || 1);
+      _hC.copy(_hY).addScaledVector(_hM, -_hM.y).normalize();
+      _hP.copy(_hA).addScaledVector(_hM, p.u * tl).addScaledVector(_hC, B.thighR);
+      _hA.copy(_hM).applyAxisAngle(_hY, sd * p.toe);
+      _hB.copy(_hC);
+      handFrame(B, _hP, _hA, _hB, p.roll * 0.5, sd, _hD, _hN, _hC, _hG);
+      kt = HANDS.drape;
+      _hV.set(-0.6, -0.4, sd * 0.8);
+    }
+    rel = true;
+    // Two bones, shoulder to wrist, the elbow bent toward `_hV`.
+    _hA.copy(_hG).sub(_hS);
+    let dd = _hA.length();
+    _hA.divideScalar(dd || 1);
+    dd = Math.min(lu + ll - 1e-3, Math.max(Math.abs(lu - ll) + 1e-3, dd));
+    const a = (lu * lu - ll * ll + dd * dd) / (2 * dd);
+    const hh = Math.sqrt(Math.max(0, lu * lu - a * a));
+    _hV.addScaledVector(_hA, -_hV.dot(_hA)).normalize();
+    _hE1.copy(_hS).addScaledVector(_hA, a).addScaledVector(_hV, hh);
+    r.goal.copy(_hG);
+    _hB.copy(_hE1).sub(_hS).normalize();
+    _hRa.setFromUnitVectors(_hU, _hB);
+    _hB.copy(_hF).applyQuaternion(_hRa);
+    _hA.copy(_hG).sub(_hE1).normalize();
+    _hRb.setFromUnitVectors(_hB, _hA);
+    // The hand: the bind's frame on to this one, less what the arm carried.
+    _hMa.makeBasis(_hD, _hN, _hC);
+    _hMb.makeBasis(B.d, B.n, B.c).transpose();
+    _hRh.setFromRotationMatrix(_hMa.multiply(_hMb));
+    _hHf.copy(_hRb).multiply(_hRa).multiply(_hH0).invert();
+    _hRh.multiply(_hHf);
+    if (r.w < 1) {
+      _hRa.copy(_hQs.copy(_hID).slerp(_hRa, r.w));
+      _hRb.copy(_hQs.copy(_hID).slerp(_hRb, r.w));
+      _hRh.copy(_hQs.copy(_hID).slerp(_hRh, r.w));
+    }
+  }
+  // ── and the greeting's arm, `g` of the way from wherever that left it ───
+  if (g > 0) {
+    waveTurns(_hU, _hF, sd < 0, t, fg.seed, _hWa, _hWb);
+    _hRa.slerp(_hWa, g);
+    _hRb.slerp(_hWb, g);
+    _hRh.slerp(_hID, g);
+  }
+  r.qa.copy(_hRa); r.qb.copy(_hRb); r.qh.copy(_hRh);
+  // ── the fingers and the thumb, about the hand where it now is ───────────
+  const k0 = twistAbout(_hQf.copy(_hH0).invert().multiply(_hF0), B.c);
+  const j0 = twistAbout(_hQt.copy(_hH0).invert().multiply(_hT0), B.t);
+  let df, dth;
+  if (p.kind === 'planted') {
+    // Flat on the concrete, as the clip has it, unless it comes up to wave.
+    df = g * (HANDS.open - k0);
+    dth = 0;
+  } else {
+    const want = kt + (HANDS.open - kt) * g;
+    // Only ever more curl than the clip's when nothing is being rested:
+    // a hand the clip closes round something stays closed.
+    df = rel ? (want - k0) * r.w + Math.max(0, p.curl - k0) * (1 - r.w) : Math.max(0, want - k0);
+    if (g > 0 && !rel) df = (want - k0) * g + df * (1 - g);
+    dth = Math.max(0, HANDS.tuck - j0) * (1 - g);
+  }
+  _hHf.copy(r.qh).multiply(r.qb).multiply(r.qa).multiply(_hH0);
+  _hA.copy(B.c).applyQuaternion(_hHf);
+  r.qf.setFromAxisAngle(_hA, df);
+  _hA.copy(B.t).applyQuaternion(_hHf);
+  r.qt.setFromAxisAngle(_hA, dth);
+  armAimQ(f, B.armU, r.qa); armAimQ(f, B.armL, r.qb); armAimQ(f, B.hand, r.qh);
+  armAimQ(f, B.fing, r.qf); armAimQ(f, B.thumb, r.qt);
+  r.on = true;
+  r.rest = rel && r.w > 0;
+  r.g = g;
+  handStats[p.kind]++;
+}
+
+/**
+ * Both hands of one skinned bather, immediately before the `update` that
+ * rebuilds the palette and never anywhere else — see the note over `HANDS`.
+ */
+function handsPose(f, rec, fg, t, dt, geo) {
+  const H = handBody(f);
+  if (!H) return;
+  for (let k = 0; k < 2; k++) {
+    const s = HAND_SIDES[k], sd = k ? 1 : -1, r = rec[s], B = H[s];
+    // The phone's arm is the phone's; only the thumb was ever this one's.
+    if (HANDS.off || (sd > 0 && fg.phone)) { handClear(f, B, r, sd > 0 && !!fg.phone); continue; }
+    // Measured against where the last solve put the wrist: how far off the
+    // surface a resting hand actually got (a reach the arm did not have).
+    if (r.rest && r.who === fg && !r.g && r.w >= 1) {
+      const e = f.boneAt(B.ih, _hS).distanceTo(r.goal);
+      handStats.res += e; handStats.n++;
+      if (e > handStats.resMax) { handStats.resMax = e; handStats.worst = fg.idx; }
+    }
+    const g = fg.gArm > 0 && (fg.phone ? true : !!fg.gArmL) === (sd < 0) ? fg.gArm : 0;
+    handSide(f, r, B, H, fg, s, sd, g, t, dt, geo, rec.lean);
+  }
+  // The lean a table asked for, eased with the hand that asked for it. Not
+  // a delta against anything measured — the shoulder is measured with it on
+  // and is where the arm is solved from — so it is simply written.
+  let lean = 0;
+  const pl = !HANDS.off && fg.handPlan && fg.handPlan.data === f.data ? fg.handPlan : null;
+  if (pl) {
+    for (const s of HAND_SIDES) {
+      const p = pl[s];
+      if (p && p.kind === 'table') lean = Math.max(lean, p.lean * rec[s].w);
+    }
+  }
+  if (lean || rec.lean) f.aim('spine01', 0, 0, -1, lean);
+  rec.lean = lean;
 }
 
 /**
@@ -812,13 +1260,10 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   let drawn = 0;
   let last = -1;
   let ups = 0, downs = 0;
-  // What `greetArm` has done to each MESH, and it is per mesh and not per
-  // person for the reason `clearArm` gives: the delta lives on the bone and
-  // the bone outlives whoever is standing on it.
-  const waves = figs.map(() => ({
-    on: false, left: true,
-    qa: new THREE.Quaternion(), qb: new THREE.Quaternion(),
-  }));
+  // What `handsPose` has laid on each MESH's arms, and it is per mesh and not
+  // per person: the delta lives on the bone and the bone outlives whoever is
+  // standing on it. See the note over `HANDS`.
+  const hands = figs.map(() => ({ L: handRec(), R: handRec(), lean: 0 }));
 
   // What each pose is called over here. The crowd's `mode` is a body position
   // and a clip is a body position over time, so most of them land on `idle`:
@@ -871,7 +1316,7 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   // has to be asked for by whoever knows who that is: `stepGreet` in
   // 43-jadrija.js, through `fg.cue` below.
   //
-  // And the clip does not work. See the long note over `greetArm` at the top
+  // And the clip does not work. See the long note over `WAVE` at the top
   // of this file: the bake flattens it, the arm comes up fifteen centimetres,
   // and what a quarter of this beach was actually doing every half minute was
   // nothing at all. The greeting solves its own arm instead.
@@ -1093,7 +1538,8 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
       // wrenched round at nothing until they happen to greet somebody
       // themselves. Same argument as `dropHold` in 43-jadrija.js.
       f.aim('chest', 0, 1, 0, 0);
-      clearArm(f, waves[i]);
+      // Not the arms: `handsPose` takes its own last turns off whoever they
+      // were laid for, and lays this person's.
       fg.aimed = false;
       fg.lag = 0;
       // `|| phaseOf(fg)` and not `|| 0`, which is what these two said. Three
@@ -1270,18 +1716,21 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     const every = d2 < nearSq ? 1 : d2 < midSq ? 3 : 8;
     fg.lag = (fg.lag || 0) + dt;
     if (fg.rebound || every === 1 || (frame + i) % every === 0) {
-      // The greeting arm, immediately before the update and nowhere else.
-      // `aim` writes a delta and `boneAt` reads the palette, and the palette
-      // is only rebuilt by the line below — so a solve on a frame the ladder
-      // skips would measure a pose that does not yet carry the last solve and
-      // take the delta off a second time. Which arm, and why the phone gets a
-      // say in it, is over `greetArm`.
-      if (fg.gArm > 0) {
-        greetArm(f, waves[i], fg.gArm, fg.phone ? true : !!fg.gArmL,
-          t, fg.seed);
-      } else {
-        clearArm(f, waves[i]);
+      // The hands — resting, greeting, fingers — immediately before the
+      // update and nowhere else. `aim` writes a delta and `boneAt` reads the
+      // palette, and the palette is only rebuilt by the line below — so a
+      // solve on a frame the ladder skips would measure a pose that does not
+      // yet carry the last solve and take the delta off a second time. Which
+      // arm greets, and why the phone gets a say in it, is over `WAVE`.
+      //
+      // A slot that has just changed hands is posed once first: its palette
+      // is still the last occupant's, and where THIS person's hands rest is
+      // planned off the first pose they are measured in (`handPlan`).
+      if (fg.rebound) f.update(0);
+      if (fg.handGeo === undefined) {
+        fg.handGeo = settler && settler.geo && fg.mode === 'sit' ? settler.geo(fg) : null;
       }
+      handsPose(f, hands[i], fg, t, fg.lag, fg.handGeo);
       f.update(fg.lag);
       fg.lag = 0;
       fg.rebound = false;

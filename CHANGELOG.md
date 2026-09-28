@@ -8,6 +8,74 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.9] — 2026-09-28
+
+### the bathers' hands rest on something
+
+Misha: *"the hands for the bathers and stuff, they all have that frankenstein
+hand thing, when in doubt their hands should lay palms down on the tables or
+whatnot, to look more natural u know?"* His screenshot showed a man at a café
+table at Jadrija with a phone at his ear. His other hand was up in front of his
+chest, palm out, fingers straight and spread, resting on nothing.
+
+**Why.** The seated clips were solved for where the wrist goes and say nothing
+about the hand past it. `sittable` lays the forearm on the table's edge and
+then carries on up the forearm's own line, so the hand is cocked up with the
+palm to the room. Every clip this rig plays also leaves the fingers at the
+bind pose: dead straight. The 1.538.0 settle could not fix either. A ragdoll's
+hand is one rigid capsule, so the flat plate landed on the table and stayed a
+flat plate.
+
+**Now the hand is placed first and the arm is solved to reach it**
+(`HANDS`, `handPlan`, `handSide`, `handsPose` in 42-crowd.js). This is the
+same approach as the shop staff's counter and the riders' grips. It covers
+every skinned (near-tier) bather:
+
+- **At a café table:** the palm lies flat on the top, in front of the shoulder
+  and a little in. The fingers point across the table and turn slightly
+  inward. The knuckles are tipped up and the fingertips come down to the wood.
+  The contact point is the heel of the hand, so the wrist and forearm stay
+  above the surface. The spot on the table is fixed in the figure's frame, so
+  the hand stays put while the body breathes over it. Where the table is
+  slightly out of reach, the sitter leans in from the hips (`spine01`) by the
+  smallest amount that works, up to 0.22 rad. Where it is still out of reach,
+  the hand goes on the thigh instead. About a quarter of two-handed sitters
+  keep one hand on the thigh by choice (`lap`), so each café does not show a
+  row of identical hands. The plan is re-made once the person's settle has
+  fully landed, because the settle moves a shoulder by several centimetres.
+- **On the thigh** (café sitters with the table out of reach, and quay
+  sitters): the palm lies on top of the thigh about halfway to the knee, with
+  the fingers draped along it. On the quay, a hand the clip has propped on
+  the concrete below the hip is left where it is.
+- **Standing, walking, wading, lying:** the clip's arms are kept, since they
+  already hang the hands at the sides. Only the fingers change.
+- **Relaxed fingers everywhere.** The fingers fold 0.55 to 0.80 rad at the
+  knuckle (each person gets their own amount) and the thumb tucks 0.30 rad
+  toward the palm. The folds use the hand's own measured axes (`handBody`,
+  the same palm and thumb measurement `WHEEL_HAND` grips with). A hand only
+  ever gains curl compared with its clip, so a hand the clip closes around a
+  rail stays closed.
+- **Phone holders:** the phone keeps its hand. Only the other hand is solved.
+- **Greetings and chatter gestures start from the rest and end in it.** The
+  wave (`fg.gArm`) and the rest share bones, so `greetArm` has been folded
+  into the same solve (`waveTurns`). The arm goes `g` of the way from resting
+  to the wave, the fingers open, and the hand returns to the table or thigh
+  afterwards.
+
+**Measured** at the cafés in steady state: the wrists land a mean of 3 mm
+from where they were sent, and 4 to 6 cm at worst (while a talking clip rocks its
+speaker back). Of the 15 café sitters, 4 have one or both hands on the table
+and the rest have them on their thighs. The seated clips sit most people
+0.5 to 0.65 m from the table's near edge, reclined, which puts the table
+1.1 to 1.5 arm-lengths from the wrist. Settle is unchanged (21 to 25 done,
+0 failed). The frame rate held at 61 fps at the terrace. Shop staff, riders
+and Baye are unaffected.
+
+Probe: `__fr.jad.raw().crowd.hands` provides `stats(reset)`, `plans()` (who
+rests which hand on what, the reach ratio and the lean), `off(true)` (gives
+every hand back to its clip) and `cfg()`. `sitGeo` now reports `round` for
+the pedestal tables, and the settler exposes `geo`.
+
 ## [1.539.8] — 2026-09-28
 
 ### The Starlink dish moves to the corner of the vikendica

@@ -1199,7 +1199,8 @@ function makeChatter(dep) {
    * from the body with the elbow bent, which is what a hand does when somebody
    * is explaining something. At 0.30 the instanced tier puts the upper arm
    * about thirty degrees out; the skinned tier slerps thirty per cent of the
-   * way from wherever the clip has it.
+   * way from wherever the arm was resting — off the table, or the thigh, and
+   * back on to it (`handSide` in 42-crowd.js).
    *
    * `hold` is short and `every` is long on purpose. A hand that is up for the
    * whole conversation is a person hailing a taxi for half a minute.

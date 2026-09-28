@@ -698,6 +698,8 @@ function makeSettler(geoOf) {
       fg.settleQ = false;
       return { fk, a0, a1, bodies, seq, pelvis: p1.map((v, k) => +(v - p0[k]).toFixed(3)), stats: { ...net.stats } };
     },
+    /** What `fg` is sitting on, the caller's own answer — the hands rest on it too (`HANDS` in 42-crowd.js). */
+    geo: (fg) => geoOf(fg),
     stats: () => ({ ...stats, waiting: queue.length + (job ? 1 : 0), kinds: kinds.size,
       caps: [...kinds.values()].map((K) => K.rag.caps), pairs: [...kinds.values()].map((K) => K.pairs) }),
     /** Forget everybody's settle — a probe re-running them all (and the before shot). */
