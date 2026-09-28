@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.542.4] — 2026-09-28
+
+### The café sets, one to a terrace
+
+Misha, having hosed a table of them over at the slastičarnica: *"the thing is
+now is the furniture, the chairs they sit on: can u step those up to look more
+fancy? i think folks gonna love fancier furniture"*. Every café on the
+boardwalk sat on the same chair — a slab, a panel and four square sticks, white
+or dark grey — at a square slab on a pole. Now each terrace has its own set
+(`cafeChair` / `cafeTable` in `src/43-jadrija.js`), consistent within the shop:
+
+- **Slastičarnica** — the ice-cream parlour chair: white wire, a round seat on
+  a ring, legs bowed out and tied by a floor ring, a hoop back with a heart bent
+  into it, and a round piped cushion in strawberry, mint or vanilla. Round
+  Carrara marble tables with a bullnose edge on a white cast baluster with four
+  cast feet.
+- **H2O** — anthracite aluminium tube frame (back legs run on up into raked
+  posts) with seven teak seat slats and three back slats bent in plan; slatted
+  teak table on an aluminium apron and four square legs.
+- **Caffe Trampulin** — the Paris bistro chair: rattan poles bound with cane,
+  the rear legs running up into an arched hoop, the seat and back woven in navy
+  and ecru stripes (the konoba's `KONOBA_WEAVE` print). Square walnut top with
+  a brass edge band on a black cast-iron column and four cast feet.
+- **The trampoline park's** red and black sets — the folding steel bistro
+  chair: tube frame, pressed slats, the X under the seat; round steel table with
+  a rolled rim on four splayed legs and a ring.
+
+Glides on every foot, smooth normals throughout (`tubeTS`, `knSurf`, `knLathe`,
+`knRR`, and a new level-path section sweep `secSweep` for curved slats).
+Small per-chair variation by `jit` on the seat's position (cushion colour,
+slat tone, paint); no `rng` draws added or moved.
+
+**Nothing anybody reads moved.** Seat 0.48 × 0.46 with its top at 0.46, back
+0.17–0.23 up to 0.86, legs on (±0.19, ±0.17), table top 0.60 with its top at
+0.75, square tops still square to the shore; same positions, headings and
+blockers (800, hash identical). The one functional change: the slastičarnica's
+marble tops are discs, so its sitters' hands are kept inside the disc (`round`,
+as MINI's already were).
+
+**The hose-off chair is the new chair.** `chairGeo` now records every buffer a
+chair is in (`parts`) — the bistro's woven seat and back live in `knTex`, its
+rattan in `b` — and `hoseChair` cuts, poses and restores each, copying every
+attribute the buffer carries (`aKn` for the weave). `knTex` joins `bldMesh`.
+
+MINI's mesh armchairs and the konoba's furniture are untouched. No new draw
+calls; the resort's own buffers 542,684 → 627,084 triangles (+84k, 48 chairs
+and 16 tables); GPU ms at the slastičarnica and H2O within run-to-run noise.
+
 ## [1.542.3] — 2026-09-28
 
 ### a third fewer cars, sat lower and rounder — and a near tier that did not ship
