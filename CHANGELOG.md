@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.538.2] — 2026-09-28
+
+### the life rings, round
+
+Misha: *"the lifesaver, can u make it look prettier, right now looks too
+geometric, there are several of these throughout the promenade."*
+
+**What was wrong.** The ring was sixteen flat segments on a square section, so
+from ten metres it read as an octagon. The red and white were hard blocks. It
+hung off a box of an arm on a seven-sided post, over an eight-sided foot. The
+line was four washers stacked round the post.
+
+**What it is now** (`43-jadrija.js`, the life-ring loop). Every station on the
+promenade is built from smooth-normal triangles (`b.smooth`), in the same `up`
+buffer:
+
+- **The ring** is 32 × 8 on an elliptical section, fatter across the face than
+  it is thick. It has four red and four white sectors, with red on the top,
+  bottom and sides. The sector seams are duplicated vertices with a small
+  shade dip, so they are clean lines rather than smears. It keeps the same
+  outside diameter (0.754 m) and the same centre.
+- **The grab line** runs round the outside in four festoons, held by four
+  small bands on the white diagonals. It lies on the ring over the top and
+  hangs off it everywhere else.
+- **The hook** is a round bar through the ring's hole, with its end turned up.
+  The ring now hangs from its inner edge.
+- **The post** is a turned tube with a rounded cap. It has a collar where the
+  hook comes out, and a flanged foot plate.
+- **The throwing line** is three loose loops hung on a peg on the land side
+  of the post.
+- **Wear**, in vertex colour and varied per station off `jit`: the red faded
+  toward salmon on top, the white cream, the undersides a shade grubbier.
+
+Collision (`runs`) is unchanged, and there are no new `rng` draws. Each station
+is about 2,050 triangles, where it was about 390.
+
 ## [1.538.1] — 2026-09-28
 
 ### the olive, grown and leafed
