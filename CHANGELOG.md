@@ -8,6 +8,28 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.1] — 2026-09-28
+
+### the sea ladders are stainless tube, not square tubing
+
+Misha: *"the ladder for going into the sea, make it prettier, right now looks
+too rigid."* Every ladder on the quay was eleven boxes: 70 mm square stiles
+with a hard corner at each end of the top, and flat bars for rungs.
+
+`ladder(t)` now builds a stainless pool ladder: one round 48 mm tube a side,
+out of a bevelled deck flange, up, over the coping in two 0.19 m bends and
+down the face as the stile to a metre under the water; a round stand-off on a
+wall plate under the coping; and flat 80 mm treads with rounded front and
+back edges every 0.28 m from just under the coping to the stile ends. A new
+`tubeTS` does the sweeping — the skakaonica's `sweep`, with smooth normals, an
+optional elliptical section and a light top / dark underside in the vertex
+colour for the brushed-steel read. Same buffer, same position, rail height
+(0.90 m), 0.56 m between the rails and stand-off from the face, so `barreAt`
+and the dancer are unchanged. No `rng` draws.
+
+42 ladders; about 850 triangles each (was 132), +30,248 in all (411,772 →
+442,020 in the Jadrija build).
+
 ## [1.539.0] — 2026-09-28
 
 ### fewer cars in the wood, and better ones
