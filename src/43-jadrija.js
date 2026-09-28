@@ -24743,14 +24743,107 @@ async function buildJadrija(scene) {
   // breadth clear of the backrest — which reads, from the side, as somebody
   // perched on the front edge about to get up. Seven takes the buttocks to
   // within two centimetres of the back, where they belong.
+  //
+  // AND WHAT THEY ARE SITTING ON, which nothing needed to know until they
+  // had to sit down into it (1.538.0, 43-settle.js): the chair's middle and
+  // heading, the table's, and which of the two sets it is. `terraceTables`
+  // walked table by table is exactly `terraceSeats` — same order, same seats
+  // — so the draws off `rng` below are the draws they always were (rule 4).
   let chair = 0;
   for (const S of SHOPS) {
-    for (const [t, s2, face] of terraceSeats(S)) {
-      if (rng() < 0.34) continue;
-      const who = B(t - 0.07 * Math.cos(face), s2 - 0.07 * Math.sin(face),
-        at(t).deck, face, 'sit', 1);
-      if (who) { who.chair = true; who.seat = chair++; }
+    for (const tab of terraceTables(S)) {
+      for (const [t, s2, face] of tab.seats) {
+        if (rng() < 0.34) continue;
+        const who = B(t - 0.07 * Math.cos(face), s2 - 0.07 * Math.sin(face),
+          at(t).deck, face, 'sit', 1);
+        if (who) {
+          who.chair = true; who.seat = chair++;
+          who.sitAt = { t, s: s2, face, ct: tab.ct, cs: tab.cs, ang: tab.ang, mesh: S.key === 'mini' };
+        }
+      }
     }
+  }
+
+  /**
+   * What somebody is sitting on, in their own figure's frame, for the settle
+   * (43-settle.js): `{ boxes: [cx, cy, cz, hx, hy, hz, yaw, …], floor }`.
+   *
+   * THE CHAIRS ARE `terraceSet`'S, number for number, and they are read from
+   * there rather than measured off the drawn mesh: a moulded chair's seat is a
+   * box 0.48 by 0.46 at 0.40–0.46 with its back 0.17–0.23 behind the middle
+   * and up to 0.86; MINI's mesh armchair (`meshChair`) sits at 0.451, or on its
+   * pad at 0.506, with a back raked 0.155 m a metre — two boxes, stepped — and
+   * arms at 0.61–0.646. Their tables are a 0.60 m square top at 0.70–0.75,
+   * square to the shore, and MINI's a 0.62 m disc at 0.690–0.722, which is a
+   * box here with its near edge toward the sitter. Everybody else sitting down
+   * is on the lowest platform of the quay (`B(t, 0.55, …, Math.PI, 'sit')`),
+   * and what is under them is the concrete itself, stepped — see below.
+   *
+   * In figure space and so divided by the figure's scale: a quay sitter is
+   * drawn at their own stature (`fg.hscale`), and the ragdoll is built on
+   * the unscaled skeleton.
+   */
+  function sitGeo(fg) {
+    const k = 1 / (fg.hscale || 1);
+    const cy = Math.cos(fg.yaw), sy = Math.sin(fg.yaw);
+    const boxes = [];
+    // A world box into the figure's frame: three.js turns local +x to
+    // (cos, 0, −sin) and +z to (sin, 0, cos), so the way back is the transpose.
+    const put = (wx, wy, wz, hx, hy, hz, wyaw) => {
+      const dx = wx - fg.x, dz = wz - fg.z;
+      boxes.push((dx * cy - dz * sy) * k, (wy - fg.y) * k, (dx * sy + dz * cy) * k,
+        hx * k, hy * k, hz * k, wyaw - fg.yaw);
+    };
+    // The world's yaw of a direction (dt, ds) in the shore's frame at t.
+    const yawOf = (t, s, dt, ds) => {
+      const p = toWorld(t, s), q = toWorld(t + dt * 0.5, s + ds * 0.5);
+      return Math.atan2(-(q[2] - p[2]), q[0] - p[0]);
+    };
+    const A = fg.sitAt;
+    if (!A) {
+      // The quay: nothing but the concrete they sit on and the steps down in
+      // front of them. Every one of them is placed facing straight down the
+      // shore's −s (`B(t, 0.55, y, Math.PI, 'sit')`), so their own +x is −s
+      // and the ground under them is a profile in that one direction —
+      // `surfaceY` sampled every 2 cm and read back by the nearest, so a step
+      // stays a step. (THE LIP IS NOT AT s 0, which is what this assumed
+      // first: photographed from the side, the sitters are on the flat of
+      // the lowest platform with a step a shin's length in front of them.)
+      if (fg.mode !== 'sit') return null;
+      const hs = fg.hscale || 1, x0 = -1.0, dx = 0.02, n = 131;
+      const prof = new Float64Array(n);
+      for (let i = 0; i < n; i++) prof[i] = (surfaceY(fg.t, fg.lane - (x0 + i * dx) * hs) - fg.y) * k;
+      const floor = (x) => prof[Math.max(0, Math.min(n - 1, Math.round((x - x0) / dx)))];
+      return { boxes, floor, back: false };
+    }
+    // The chair, in its own frame: `dt` across, `ds` fore and aft with the
+    // back at +ds, turned `face + PI/2` — `terraceSet`'s.
+    const a = A.face + Math.PI * 0.5, c = Math.cos(a), sn = Math.sin(a);
+    const cyaw = yawOf(A.t, A.s, c, sn);
+    const chairBox = (dt0, ds0, y0, y1, hdt, hds) => {
+      const t = A.t + dt0 * c - ds0 * sn, s = A.s + dt0 * sn + ds0 * c;
+      const w = toWorld(t, s);
+      put(w[0], fg.y + (y0 + y1) / 2, w[2], hdt, (y1 - y0) / 2, hds, cyaw);
+    };
+    if (A.mesh) {
+      // `meshChair`: the dark ones carry a pad, hashed as it hashes them.
+      const pad = jit(((A.t * 13 + A.s * 29) * 8) | 0, 812) < 0.46;
+      const SEAT = 0.420;
+      chairBox(0, 0, SEAT, SEAT + (pad ? 0.086 : 0.031), 0.225, 0.215);
+      chairBox(0, 0.216, SEAT + 0.038, SEAT + 0.245, 0.225, 0.020);
+      chairBox(0, 0.248, SEAT + 0.245, SEAT + 0.453, 0.225, 0.020);
+      for (const sg of [-1, 1]) chairBox(sg * 0.213, 0.005, SEAT + 0.190, SEAT + 0.226, 0.021, 0.200);
+      // The pedestal table's disc, as a box whose near edge faces the chair.
+      const w = toWorld(A.ct, A.cs);
+      put(w[0], fg.y + 0.700, w[2], 0.29, 0.022, 0.29, cyaw);
+    } else {
+      chairBox(0, 0, 0.40, 0.46, 0.24, 0.23);
+      chairBox(0, 0.20, 0.46, 0.86, 0.24, 0.03);
+      // The square table, square to the shore.
+      const w = toWorld(A.ct, A.cs);
+      put(w[0], fg.y + 0.715, w[2], 0.30, 0.035, 0.30, yawOf(A.ct, A.cs, 1, 0));
+    }
+    return { boxes, floor: 0, back: true };
   }
 
   // Somebody halfway down every other ladder, which is the one place on this
@@ -31015,6 +31108,9 @@ async function buildJadrija(scene) {
     if (figs.length) {
       crowds.skin = makeSkinCrowd(scene, figs, figs.length,
         (castSlot || []).length);
+      // And everybody sitting sits down into what they are sitting on — see
+      // 43-settle.js and `sitGeo`.
+      crowds.skin.setSettler(makeSettler(sitGeo));
     }
     // And the instanced pair as well, which used to be the *fallback* for a
     // payload with no blobs in it and is now the second tier of a crowd.
@@ -51956,6 +52052,8 @@ async function buildJadrija(scene) {
       // on everybody who is not in one, which `wantClip` in 42-crowd.js reads
       // as nought and never asks, because it only looks at this for `sit`.
       seat: b.seat,
+      // And the chair and table under them, for the settle — see `sitGeo`.
+      sitAt: b.sitAt || null,
       seed: rng(),
       // The height jitter, off one draw and spent on both tiers below. It was
       // 0.94 to 1.07, which on the instanced rig's canonical 1.70 m is 1.60 m
@@ -55269,6 +55367,35 @@ async function buildJadrija(scene) {
       /** Freeze the roving cast where it is (`true`), or let it go. Probes
        *  only — see `castHold`. */
       hold: (v) => { castHold = !!v; return castHold; },
+      /**
+       * The sitters' settle (43-settle.js): `stats()` — how many, what each
+       * cost, the worst frame; `off(true)` draws everybody in their bare clip
+       * again (the before, for a photograph from the same build and the same
+       * places); `redo()` forgets every settle so they are all run again.
+       */
+      settle: {
+        stats: () => (crowds.skin && crowds.skin.settler ? crowds.skin.settler.stats() : null),
+        off: (v) => { SETTLE.off = !!v; return SETTLE.off; },
+        cfg: () => SETTLE,
+        fig: (seat) => {
+          const pr = crowds.skin && crowds.skin.pairs().find(([fg]) => fg && fg.seat === seat);
+          return pr ? pr[1] : null;
+        },
+        trace: (seat, steps, keep) => {
+          const pr = crowds.skin && crowds.skin.pairs().find(([fg]) => fg && fg.seat === seat);
+          return pr ? crowds.skin.settler.trace(pr[0], pr[1], pr[1].playing(), steps, keep) : null;
+        },
+        redo: () => {
+          for (const k in crowds) for (const fg of crowds[k].figures) { fg.settled = null; fg.settleQ = false; }
+          if (crowds.skin) for (const fg of crowds.skin.slots) if (fg) { fg.settled = null; fg.settleQ = false; }
+          return crowds.skin && crowds.skin.settler ? crowds.skin.settler.reset() : false;
+        },
+        bones: () => (crowds.skin ? crowds.skin.pairs()[0][1].bones.map((b) => b.name) : null),
+        geo: (seat) => {
+          const fg = crowds.skin && crowds.skin.figures.find((f) => f.seat === seat);
+          return fg ? sitGeo(fg) : null;
+        },
+      },
       /**
        * The roving cast: who the eight are, how tall, and who is in a slot.
        *

@@ -1968,6 +1968,35 @@ function skinnedFigure(data, opts = {}) {
       }
     }
 
+    // ── and then how this person has SETTLED into their seat ────────────────
+    //
+    // 1.538.0, src/43-settle.js. A café sitter is let go into their chair once
+    // as a ragdoll, off screen, and what comes back is a turn per bone: the
+    // settled pose against the clip's first frame. Laid on top of the clip
+    // every frame as that turn — local, so a shoulder that has dropped stays
+    // dropped under whatever the clip's breathing does to the chest above it —
+    // and the root's shift with it. `w` fades it in, and out for anything the
+    // settle was not measured against.
+    //
+    // Thirty quaternion products on a figure that is being posed anyway (under
+    // 1.5 µs, MEASURED over three runs, on a 6 µs pose).
+    // Nothing is simulated here, and nothing is allocated.
+    const sl = st.settle;
+    if (sl && sl.w > 0) {
+      const w = Math.min(1, sl.w), d = sl.q;
+      for (let i = 0; i < nb; i++) {
+        const o = i * 4;
+        if (w >= 1) qmul(localQ, o, localQ, o, d, o);
+        else {
+          tmp[0] = d[o] * w; tmp[1] = d[o + 1] * w; tmp[2] = d[o + 2] * w; tmp[3] = 1 + (d[o + 3] - 1) * w;
+          const l = Math.hypot(tmp[0], tmp[1], tmp[2], tmp[3]) || 1;
+          tmp[0] /= l; tmp[1] /= l; tmp[2] /= l; tmp[3] /= l;
+          qmul(localQ, o, localQ, o, tmp, 0);
+        }
+      }
+      localT[0] += sl.t[0] * w; localT[1] += sl.t[1] * w; localT[2] += sl.t[2] * w;
+    }
+
     // ── and then the poser, over all of it ────────────────────────────────
     //
     // `?pose` (src/93-poser.js) hands the figure a whole local pose — every
@@ -2308,6 +2337,14 @@ function skinnedFigure(data, opts = {}) {
      * pose, a copy; `bindRest()` the rest skeleton and the bind it composes to.
      */
     manual: (m) => { st.manual = m || null; },
+    /**
+     * A seated person's settle (43-settle.js): `{ q, t, w }`, a local turn a
+     * bone and a root shift laid over the clip, `w` its weight — see the
+     * layer in `update`. `settle(null)` takes it off.
+     */
+    settle: (L) => { st.settle = L || null; },
+    /** The parsed blob — its bind-pose vertices and their bones, for the settle's capsules. */
+    data,
     /** One clip's local pose at `t` s into `outQ` (4 a bone) and `outT` — nothing moves. */
     sample: (name, t, outQ, outT) => {
       const c = data.clips[name];

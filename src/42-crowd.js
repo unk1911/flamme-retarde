@@ -964,6 +964,47 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
 
   let frame = 0;
 
+  // ── how they have sat down ─────────────────────────────────────────────────
+  //
+  // 1.538.0 — see 43-settle.js. Everybody sitting is let go into their seat
+  // once as a ragdoll, and the pose they settle into is laid over their clip
+  // from then on (`f.settle`, the layer in 41-skin.js). The settler is handed
+  // in by 43-jadrija.js, which is the file that knows what a chair is.
+  //
+  // THE SETTLE BELONGS TO THE PERSON AND THE LAYER TO THE MESH, the same
+  // split `assign` makes for the clip clock: `fg.settled` is kept when a quay
+  // sitter is demoted, and `f.sitL` is re-pointed at whoever the slot is
+  // drawing now. A person promoted who has sat down before is sat down on the
+  // first frame; one who has not is drawn in their clip until the settler
+  // gets to them, and then eased into it over `SETTLE.fade` — somebody
+  // settling back into a chair, if you happen to be looking.
+  let settler = null;
+  function sitLayer(fg, f, want, dt) {
+    const S = fg.settled;
+    let L = f.sitL;
+    if (SETTLE.off || !S || S.failed || S.data !== f.data) {
+      if ((!S || S.data !== f.data) && !SETTLE.off) settler.want(fg, f, want);
+      if (L && L.on) { f.settle(null); L.on = false; L.who = null; }
+      return;
+    }
+    if (!L) L = f.sitL = { q: null, t: null, w: 0, on: false, who: null, rate: 1 };
+    if (L.who !== fg || !L.on) {
+      L.who = fg; L.q = S.q; L.t = S.t; L.on = true;
+      // Fresh: eased in. Sat down before: sat down already.
+      L.w = S.fresh ? 0 : 1;
+      L.rate = 1 / (S.fresh ? SETTLE.fade : SETTLE.swap);
+      S.fresh = false;
+      f.settle(L);
+    }
+    // Only over the clip it was measured against — anything else (a cued
+    // `notice`) is played as it was authored, and the settle comes back after.
+    const to = f.playing() === S.clip ? 1 : 0;
+    if (L.w < to) {
+      L.w = Math.min(to, L.w + dt * L.rate);
+      if (L.w >= 1) L.rate = 1 / SETTLE.swap;
+    } else if (L.w > to) L.w = Math.max(to, L.w - dt / SETTLE.swap);
+  }
+
   /**
    * Point slot `j` at `fg`, or at nobody.
    *
@@ -1163,6 +1204,9 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     // 3 cm off their own chair. See `sit_clips` in bathers_mh.py.
     f.mesh.scale.setScalar(fg.hscale || 1);
     f.mesh.updateMatrixWorld();
+    // Sat down into their seat, or not sitting — see `sitLayer`.
+    if (settler && fg.mode === 'sit') sitLayer(fg, f, want, dt);
+    else if (f.sitL && f.sitL.on) { f.settle(null); f.sitL.on = false; f.sitL.who = null; }
     // The same head turn the instanced tier does in `pose`, and the same two
     // numbers written from outside — see the note there. `aim` is in figure
     // space, where +y is up, so an extra yaw about +y is exactly what
@@ -1258,10 +1302,15 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
       if (step(fg, f, PIN + j, t, dt, cam, maxSq, nearSq, midSq)) n++;
     }
     drawn = n;
+    // And whoever is waiting to sit down, for `SETTLE.budget` ms at most.
+    if (settler) settler.tick(cam);
   }
 
   return {
     figures, flush, layers: [], kind: 'skin', slots, assign,
+    /** Hand in the settler (43-settle.js); null takes it away. */
+    setSettler: (s) => { settler = s || null; },
+    get settler() { return settler; },
     /**
      * Register every figure with the shadow map.
      *
@@ -1460,6 +1509,21 @@ function makeCrowd(scene, bodies, cap) {
         skel.head.rotation.z = 0.06 + Math.sin(ph * 0.35 * sr) * 0.07 - sact * 0.08;
         skel.head.rotation.y = Math.sin(ph * 0.23 * sr) * 0.30
           + Math.sin(ph * 0.52 * sr + 0.8) * 0.11;
+        // AND HOW THEY HAVE SAT DOWN, which up close is a ragdoll's settle
+        // (43-settle.js) and from here is its two biggest numbers — how far
+        // their back has rounded and their head gone forward — out of the same
+        // hand of cards (`settleLean`, off the seed), so a quay sitter with
+        // their head down on their chest at two metres still has it down when
+        // you have walked fifty away. Worked out once a person and kept.
+        if (fg.lean == null) {
+          const L = settleLean(fg, false);
+          fg.lean = L.slouch * 0.8;
+          fg.leanH = L.drop * 0.7;
+          fg.leanT = L.tilt * 0.6;
+        }
+        skel.torso.rotation.z += fg.lean;
+        skel.head.rotation.z += fg.leanH;
+        skel.head.rotation.x += fg.leanT;
         break;
 
       case 'lie': {

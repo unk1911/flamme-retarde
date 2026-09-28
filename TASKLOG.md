@@ -39,3 +39,4 @@ runs with `tools/shootmany.mjs`).
 | 2026-09-27 | Hammock push: reach 2.8 m, wider aim, hold to rock harder | lead | new | feature | 6 | ~20 | 5 | 1.535.7 |
 | 2026-09-27 | Active ragdoll for Baye in the hammock: angle rows in avbdNet, fall-out over the rim, get-up (build ~25, fall tuning ~30, guard/regressions ~25, verify ~15) | agent | new | feature | 95 | ~150 | ~86 | 1.536.0 |
 | 2026-09-27 | Flora pass: rocks, grass, agaves, fan palms, potted plants, shrubs, wood-floor litter, crown wind (1.537.0) | agent | new | asset | 190 | ~230 | 52 | 1.537.0 |
+| 2026-09-28 | Café/quay sitters settle into their seats: one-off ragdoll settle against chair/table/floor, kept as a per-bone layer over the clip; world boxes + capsule pairs in avbdNet; far-tier lean (build ~40, debug the fold ~30, tune ~25, verify/perf/Baye ~35) | agent | new | feature | 130 | ~150 | ~40 | 1.538.0 |
