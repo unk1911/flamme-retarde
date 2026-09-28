@@ -160,6 +160,29 @@ ROOFTILE = (0.660, 0.310, 0.190)
 SHUTTER = (0.880, 0.876, 0.855)     # white louvred, not the green of the town
 GLASS = (0.520, 0.600, 0.635)
 
+# ── the outside, finished ────────────────────────────────────────────────────
+# Misha, 28 Sep: *"the current vikendica, from the outside, looks 'ok' but it's
+# too low-poly, would be nice to make it look spiffier u know?"* Everything in
+# this block is a finish on the house as drawn — not one opening, level or wall
+# moved — and every value is off the photographs: the two of the terrace (the
+# railing, the awning, the tiles next door) and the one of the loggia, which is
+# the only picture there is of the render itself, and it is a coarse white
+# roughcast, not a smooth paint.
+#
+TREAD = (0.760, 0.738, 0.690)       # the stair treads, honed limestone
+SILL = (0.805, 0.790, 0.748)        # window sills, Brač-white stone
+# The railing is not stainless in the photographs. It is a mid-grey powder
+# coat — a shade darker than the render in the same light — and the posts are
+# flat bar, with six round rods run through them under a round top rail.
+RAIL = (0.520, 0.530, 0.545)
+GUTTER = (0.905, 0.902, 0.888)      # PVC, white, like the house next door
+FASCIA = (0.880, 0.874, 0.856)      # the eave board, painted
+HARDWARE = (0.070, 0.070, 0.075)    # hinges, catches, the shutter hooks
+UNDERLAY = (0.170, 0.150, 0.138)    # battens and felt, under the kupe
+LEAD = (0.420, 0.430, 0.440)        # the chimney's apron
+DRIP = (0.640, 0.650, 0.660)        # the aluminium edge on the terrace tiling
+SOFFIT_J = (0.560, 0.420, 0.250)    # the joint between two eave boards
+
 
 # --------------------------------------------------------------------------- #
 #  the plan                                                                    #
@@ -623,23 +646,44 @@ def tiled_face(kit, axis, at, a0, a1, z0, z1, face=1, size=0.20,
 # ------------------------------------------------------------------ openings --
 
 def reveal(kit, axis, at, a0, a1, z0, z1, thick, colour=WALL, bev=0.012,
-           floor=None):
+           floor=None, out=0):
     """The four inside faces of a hole in a wall. Cheap, and the difference
     between a window and a sticker.
 
     `floor` is the level the room's floor is at: an opening that starts on it
     is a door and gets three faces, and one that starts above it is a window
-    and gets an inside sill as well."""
+    and gets an inside sill as well.
+
+    `out` is the sign of the outside, for an opening in an outside wall. The
+    reveal used to be room paint right through the wall, so every window seen
+    from the promenade had a pale blue-grey picture frame round it where the
+    render turns the corner into the opening. Given `out`, the outer half is
+    RENDER — which is where the plasterer stops and the painter starts — and
+    the inside sill stops at the frame instead of running out through it."""
     t = thick / 2 - 0.002
-    kit.span(colour, *_face_span(axis, at, a0 - 0.02, a0 + 0.02, z0, z1,
-                                 -t, t), bev=bev)
-    kit.span(colour, *_face_span(axis, at, a1 - 0.02, a1 + 0.02, z0, z1,
-                                 -t, t), bev=bev)
-    kit.span(colour, *_face_span(axis, at, a0, a1, z1 - 0.02, z1 + 0.02,
-                                 -t, t), bev=bev)
+    halves = (((-t, t), colour),) if not out else (
+        ((min(0.0, out * t), max(0.0, out * t)), RENDER),
+        ((min(0.0, -out * t), max(0.0, -out * t)), colour))
+    for (d0, d1), c in halves:
+        kit.span(c, *_face_span(axis, at, a0 - 0.02, a0 + 0.02, z0, z1,
+                                d0, d1), bev=bev)
+        kit.span(c, *_face_span(axis, at, a1 - 0.02, a1 + 0.02, z0, z1,
+                                d0, d1), bev=bev)
+        kit.span(c, *_face_span(axis, at, a0, a1, z1 - 0.02, z1 + 0.02,
+                                d0, d1), bev=bev)
     if floor is not None and z0 - floor > 0.10:
-        kit.span(colour, *_face_span(axis, at, a0, a1, z0 - 0.03, z0 + 0.01,
-                                     -t - 0.02, t + 0.02), bev=bev)
+        if not out:
+            kit.span(colour, *_face_span(axis, at, a0, a1, z0 - 0.03, z0 + 0.01,
+                                         -t - 0.02, t + 0.02), bev=bev)
+        else:
+            # Inside half only, and 2 cm proud of the plaster into the room.
+            # The outer half is the stone sill `window` lays.
+            d0, d1 = sorted((0.0, -out * (t + 0.02)))
+            kit.span(colour, *_face_span(axis, at, a0, a1, z0 - 0.03,
+                                         z0 + 0.01, d0, d1), bev=bev)
+            kit.span(RENDER, *_face_span(axis, at, a0, a1, z0 - 0.03,
+                                         z0 + 0.01, *sorted((0.0, out * t))),
+                     bev=bev)
 
 
 def window(kit, axis, at, hole, base, thick=EXT, shutters=True, curtain_c=SHEER):
@@ -651,7 +695,8 @@ def window(kit, axis, at, hole, base, thick=EXT, shutters=True, curtain_c=SHEER)
     a0, a1, z0, z1 = hole
     z0 += base
     z1 += base
-    reveal(kit, axis, at, a0, a1, z0, z1, thick, floor=base)
+    out = 1 if at > 0 else -1
+    reveal(kit, axis, at, a0, a1, z0, z1, thick, floor=base, out=out)
     f = 0.045
     for (p, q) in ((a0, a0 + f), (a1 - f, a1)):
         kit.span(WHITEGOODS, *_face_span(axis, at, p, q, z0, z1, -0.03, 0.03),
@@ -661,21 +706,44 @@ def window(kit, axis, at, hole, base, thick=EXT, shutters=True, curtain_c=SHEER)
     kit.span(WHITEGOODS, *_face_span(axis, at, a0, a1, z0, z0 + f, -0.03, 0.03),
              bev=0.004)
     # A mullion, because a 1.4 m opening is two casements and not one sheet.
+    lights = [(a0 + f, a1 - f)]
     if a1 - a0 > 1.0:
         m = (a0 + a1) / 2
         kit.span(WHITEGOODS, *_face_span(axis, at, m - 0.028, m + 0.028,
                                          z0, z1, -0.03, 0.03), bev=0.004)
-    kit.span(GLASS, *_face_span(axis, at, a0 + f, a1 - f, z0 + f, z1 - f,
-                                -0.006, 0.006), bev=0.001)
-    # Outside sill, throated, sloping away.
-    out = 1 if at > 0 else -1
-    if axis == "x":
-        kit.span(CONCRETE, a0 - 0.06, a1 + 0.06, at + out * (thick / 2 - 0.02),
-                 at + out * (thick / 2 + 0.07), z0 - 0.05, z0 + 0.01, bev=0.008)
-    else:
-        kit.span(CONCRETE, at + out * (thick / 2 - 0.02),
-                 at + out * (thick / 2 + 0.07), a0 - 0.06, a1 + 0.06,
-                 z0 - 0.05, z0 + 0.01, bev=0.008)
+        lights = [(a0 + f, m - 0.028), (m + 0.028, a1 - f)]
+    # The sash, in each light. A uPVC casement is two frames, not one: the
+    # fixed outer frame and, stepped back inside it by a centimetre, the
+    # opening sash that actually holds the glass. It was one flat 45 mm ring
+    # with the pane straight off its inner edge, which is what a window in a
+    # model looks like and in nothing else. The step is the catch-light that
+    # says "this opens".
+    s = 0.050
+    for p, q in lights:
+        for (u0, u1, v0, v1) in ((p, p + s, z0 + f, z1 - f),
+                                 (q - s, q, z0 + f, z1 - f),
+                                 (p + s, q - s, z1 - f - s, z1 - f),
+                                 (p + s, q - s, z0 + f, z0 + f + s * 1.25)):
+            kit.span(WHITEGOODS, *_face_span(axis, at, u0, u1, v0, v1,
+                                             -0.022, 0.022), bev=0.004)
+        # And the glazing bead, the thin moulding the pane is held in by.
+        for (u0, u1, v0, v1) in ((p + s, p + s + 0.012, z0 + f + s * 1.25,
+                                  z1 - f - s),
+                                 (q - s - 0.012, q - s, z0 + f + s * 1.25,
+                                  z1 - f - s),
+                                 (p + s, q - s, z1 - f - s - 0.012, z1 - f - s),
+                                 (p + s, q - s, z0 + f + s * 1.25,
+                                  z0 + f + s * 1.25 + 0.012)):
+            kit.span(WHITEGOODS, *_face_span(axis, at, u0, u1, v0, v1,
+                                             *sorted((out * 0.004,
+                                                      out * 0.016))),
+                     bev=0.002)
+        kit.span(GLASS, *_face_span(axis, at, p + s, q - s, z0 + f + s * 1.25,
+                                    z1 - f - s, -0.006, 0.006), bev=0.001)
+    # Outside sill: stone, falling away from the frame, with a throat cut
+    # under its nose so the water drops off instead of running back to the
+    # wall. See `_sill`.
+    _sill(kit, axis, at, out, a0 - 0.06, a1 + 0.06, z0, thick)
     if shutters:
         # Hooked back against the render, one leaf either side, which is what
         # `louvred` has always said it was drawing and never was: the two leaves
@@ -685,25 +753,136 @@ def window(kit, axis, at, hole, base, thick=EXT, shutters=True, curtain_c=SHEER)
         # the fire already burning. The terrace window in particular was a grey
         # panel with a net curtain over it and nothing behind either.
         w = (a1 - a0) / 2
-        for (p, q) in ((a0 - w, a0), (a1, a1 + w)):
+        for (p, q), h in (((a0 - w, a0), a0), ((a1, a1 + w), a1)):
             louvred(kit, axis, at + out * (thick / 2 + 0.10),
-                    p, q, z0, z1, open_to=out)
+                    p, q, z0, z1, open_to=out, hinge=h,
+                    wall=at + out * thick / 2)
     if curtain_c:
         inn = -out
         curtain(kit, axis, at + inn * (thick / 2 + 0.09),
                 a0 - 0.16, a1 + 0.16, z0 - 0.04, z1 + 0.22, colour=curtain_c)
 
 
-def louvred(kit, axis, at, a0, a1, z0, z1, open_to=1, slats=None):
-    """A shutter leaf, hooked flat back against the render."""
-    kit.span(SHUTTER, *_face_span(axis, at, a0, a1, z0, z1, -0.016, 0.016),
-             bev=0.004)
-    n = slats or max(6, int((z1 - z0) / 0.075))
-    for j in range(n):
-        zz = z0 + 0.05 + (z1 - z0 - 0.10) * j / max(1, n - 1)
-        kit.span(tuple(v * 0.93 for v in SHUTTER),
-                 *_face_span(axis, at, a0 + 0.035, a1 - 0.035, zz, zz + 0.022,
-                             -0.030, 0.004), bev=0.002)
+def _sill(kit, axis, at, out, a0, a1, z0, thick):
+    """A stone window sill: sloped top, square nose, and a throat under it.
+
+    The throat is a real groove — three convex prisms with a gap between two
+    of them — because a sill is looked at from below, from the promenade, and
+    from there the groove is the line that makes it stone and not a box.
+    """
+    db, df = thick / 2 - 0.02, thick / 2 + 0.07        # back, front (outward)
+
+    def top(d):                                          # a 1:6 fall outward
+        return z0 + 0.012 - (d - db) / (df - db) * 0.016
+
+    bm = kit.bm(SILL, 0.003)
+    for p, q, zb in ((db, df - 0.030, z0 - 0.050),
+                     (df - 0.030, df - 0.018, z0 - 0.038),
+                     (df - 0.018, df, z0 - 0.050)):
+        quad = [(p, zb), (q, zb), (q, top(q)), (p, top(p))]
+        vs = []
+        for aa in (a0, a1):
+            for d, z in quad:
+                dd = at + out * d
+                vs.append(bm.verts.new((aa, dd, z) if axis == "x"
+                                       else (dd, aa, z)))
+        bm.verts.ensure_lookup_table()
+        for f_ in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2),
+                   (2, 6, 7, 3), (3, 7, 4, 0)):
+            bm.faces.new(tuple(vs[i] for i in f_))
+
+
+def louvred(kit, axis, at, a0, a1, z0, z1, open_to=1, slats=None,
+            hinge=None, wall=None):
+    """A shutter leaf, hooked flat back against the render.
+
+    Grilje, and made the way grilje are: two stiles, a rail top and bottom and
+    a lock rail across a tall one, and between them a stack of separate blades
+    set at forty-five degrees with daylight between them. It was a flat plate
+    with twelve strips stuck on its face, which from the promenade is a white
+    rectangle — the one detail these shutters are for, the stripes of shade,
+    was not there.
+
+    The blades lean the way they do on a real leaf folded back through 180°:
+    shut, they shed rain outward; hooked open against the wall, the same slope
+    now runs down toward the render. So from below you see through them to the
+    wall, and from eye height you see their undersides in shadow.
+
+    `hinge` is the edge the leaf turns on and `wall` the plane of the render
+    behind it; given both, it gets its two strap hinges on pintles and the
+    wrought hook that holds it back, which is what hangs it on the house
+    rather than floating ten centimetres off it."""
+    t = 0.016
+    st, rt, rb = 0.050, 0.070, 0.090
+    for (u0, u1, v0, v1) in ((a0, a0 + st, z0, z1), (a1 - st, a1, z0, z1),
+                             (a0 + st, a1 - st, z1 - rt, z1),
+                             (a0 + st, a1 - st, z0, z0 + rb)):
+        kit.span(SHUTTER, *_face_span(axis, at, u0, u1, v0, v1, -t, t),
+                 bev=0.004)
+    panels = [(z0 + rb, z1 - rt)]
+    if z1 - z0 > 1.5:
+        zm = z0 + (z1 - z0) * 0.42
+        kit.span(SHUTTER, *_face_span(axis, at, a0 + st, a1 - st, zm - 0.04,
+                                      zm + 0.04, -t, t), bev=0.004)
+        panels = [(z0 + rb, zm - 0.04), (zm + 0.04, z1 - rt)]
+    # Toward the wall is +w along the leaf's normal.
+    w = 1.0 if (wall if wall is not None else at - open_to) > at else -1.0
+    bm = kit.bm(tuple(v * 0.95 for v in SHUTTER), 0.0)
+    ch, th = 0.021, 0.0045          # half chord, half thickness
+    c45 = math.sqrt(0.5)
+    for p0, p1 in panels:
+        n = slats or max(4, int((p1 - p0) / 0.040))
+        pitch = (p1 - p0) / n
+        for j in range(n):
+            zc = p0 + pitch * (j + 0.5)
+            # The blade's chord runs down toward the wall; its thickness
+            # is square to that.
+            cd, cz = w * c45, -c45
+            nd, nz = -cz, cd                # perpendicular, in (d, z)
+            if nz < 0:
+                nd, nz = -nd, -nz
+            corners = [(sa * ch * cd + sb * th * nd, sa * ch * cz + sb * th * nz)
+                       for sa, sb in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+            vs = []
+            for aa in (a0 + st - 0.004, a1 - st + 0.004):
+                for dd, zz in corners:
+                    d = at + dd
+                    vs.append(bm.verts.new((aa, d, zc + zz) if axis == "x"
+                                           else (d, aa, zc + zz)))
+            bm.verts.ensure_lookup_table()
+            for f_ in ((0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1),
+                       (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)):
+                bm.faces.new(tuple(vs[i] for i in f_))
+    if hinge is None or wall is None:
+        return
+    # Two strap hinges on the face you see, each on a pintle driven into the
+    # reveal side of the wall, and the gap between leaf and render bridged by
+    # the pintle's own arm. Black, forged, and the only dark thing on a white
+    # elevation apart from the glass.
+    face = at - w * t                                   # the visible face
+    sgn = 1.0 if hinge > (a0 + a1) / 2 else -1.0       # toward the hinge
+    gap0, gap1 = sorted((at + w * t, wall))
+    for zc in (z0 + 0.20, z1 - 0.20):
+        kit.span(HARDWARE, *_face_span(axis, at, *sorted((hinge - sgn * 0.26,
+                                                          hinge + sgn * 0.006)),
+                                       zc - 0.016, zc + 0.016,
+                                       *sorted((face, face - w * 0.004))),
+                 bev=0.002)
+        kit.span(HARDWARE, *_face_span(axis, at, hinge - 0.010, hinge + 0.010,
+                                       zc - 0.040, zc + 0.040,
+                                       *sorted((face - w * 0.004,
+                                                gap1 if w > 0 else gap0))),
+                 bev=0.002)
+    # The hook, at the free edge, low: an eye on the leaf and a bar back to
+    # the render, with the turned-up end that stops the wind lifting it off.
+    free = a0 if sgn > 0 else a1
+    zh = z0 + min(0.32, (z1 - z0) * 0.3)
+    kit.span(HARDWARE, *_face_span(axis, at, free - sgn * 0.004 - 0.006,
+                                   free - sgn * 0.004 + 0.006, zh - 0.006,
+                                   zh + 0.006, gap0 - 0.004, gap1), bev=0.0)
+    kit.span(HARDWARE, *_face_span(axis, at, free - sgn * 0.004 - 0.006,
+                                   free - sgn * 0.004 + 0.006, zh, zh + 0.030,
+                                   *sorted((face, face - w * 0.012))), bev=0.0)
 
 
 def curtain(kit, axis, at, a0, a1, z0, z1, colour=SHEER, folds=None, amp=0.045):
@@ -821,13 +1000,14 @@ def slider(kit, axis, at, hole, base=F2, thick=INT, slide=1.0,
 
 
 def leaf_door(kit, axis, at, hole, base=F2, thick=EXT, colour=WHITEGOODS,
-              glazed=True, swing=0.0):
+              glazed=True, swing=0.0, out=0):
     """A hinged leaf standing in its opening — the front door, and the two
     that go out on to the terrace."""
     a0, a1, z0, z1 = hole
     z0 += base
     z1 += base
-    reveal(kit, axis, at, a0, a1, z0, z1, thick, colour=WALL, bev=0.010)
+    reveal(kit, axis, at, a0, a1, z0, z1, thick, colour=WALL, bev=0.010,
+           out=out)
     f = 0.055
     for p, q in ((a0, a0 + f), (a1 - f, a1)):
         kit.span(colour, *_face_span(axis, at, p, q, z0, z1, -0.035, 0.035),
@@ -951,7 +1131,7 @@ def shell(kit):
         kit.span(WALL_W, x1 - 0.012, x1 + 0.012, y0, y1, F2, F2 + sk, bev=0.003)
 
     # ── doors ───────────────────────────────────────────────────────────────
-    leaf_door(kit, "y", X1 - EXT / 2, D_ENTRY, glazed=True)
+    leaf_door(kit, "y", X1 - EXT / 2, D_ENTRY, glazed=True, out=1)
     slider(kit, "x", SPINE, D_S4, thick=INT * 2, slide=-1.0, open_frac=0.80)
     door_case(kit, "x", SPINE, D_S3, thick=INT * 2)
     # Hall side only. The bathroom side of this opening is tile.
@@ -1596,7 +1776,7 @@ def terrace_doors(kit, base=F2, hole=None, shutters=True):
     a0, a1, z0, z1 = hole if hole is not None else D_TERR
     at = Y0 + EXT / 2
     reveal(kit, "x", at, a0, a1, base + z0, base + z1, EXT, colour=WALL,
-           floor=base)
+           floor=base, out=-1)
     for p, q in ((a0, (a0 + a1) / 2), ((a0 + a1) / 2, a1)):
         f = 0.055
         kit.span(PINE, p, p + f, at - 0.035, at + 0.035, base, base + z1,
@@ -1612,15 +1792,16 @@ def terrace_doors(kit, base=F2, hole=None, shutters=True):
     kit.span(CHROME, (a0 + a1) / 2 - 0.06, (a0 + a1) / 2 + 0.06,
              at - 0.070, at - 0.030, base + 1.02, base + 1.10, bev=0.004)
     if shutters:
-        for p, q in ((a0 - 0.72, a0 - 0.02), (a1 + 0.02, a1 + 0.72)):
+        for (p, q), h in (((a0 - 0.72, a0 - 0.02), a0 - 0.02),
+                          ((a1 + 0.02, a1 + 0.72), a1 + 0.02)):
             louvred(kit, "x", at - EXT / 2 - 0.10, p, q, base + 0.05,
-                    base + z1, open_to=-1)
+                    base + z1, open_to=-1, hinge=h, wall=at - EXT / 2)
 
 
 def chimney(kit, top=CHIMNEY):
     """It is on all four elevations and it goes to +7.82, which is the highest
     thing on the house — worth the twelve boxes it costs."""
-    cx, cy = IX0 + 0.32, -0.62
+    cx, cy = CHIM_XY
     kit.span(RENDER, cx - 0.24, cx + 0.24, cy - 0.24, cy + 0.24,
              CEILZ - 0.20, top - 0.18, bev=0.02)
     kit.span(RENDER, cx - 0.30, cx + 0.30, cy - 0.30, cy + 0.30,
@@ -1636,18 +1817,46 @@ def chimney(kit, top=CHIMNEY):
 def terrace(kit):
     """Six metres eighty by two twenty, the whole south face, over the one
     below it. It is the room this house is actually lived in."""
-    kit.span(CONCRETE, X0, X1, TER_Y0, TER_Y1 + 0.10,
-             TER_Z - 0.22, TER_Z - 0.03, bev=0.02)
+    # The slab, rendered — its soffit is the ceiling of terrace 8 and in the
+    # loggia photograph that is the same coarse white render as the walls, not
+    # bare concrete. And its edge is a real one: a lip round the three free
+    # sides and, 3 cm in from it, a throat 18 mm wide and 15 deep, so the rain
+    # that runs round the nose drops off there instead of creeping back under
+    # to the wall. It was one 19 cm box. From the promenade the terrace is
+    # mostly this edge, and a box edge is what made it read as a shelf.
+    zs0, zs1 = TER_Z - 0.22, TER_Z - 0.03
+    g = 0.015
+    kit.span(RENDER, X0, X1, TER_Y0, TER_Y1 + 0.10, zs0 + g, zs1, bev=0.012)
+    kit.span(RENDER, X0 + 0.05, X1 - 0.05, TER_Y0 + 0.05, TER_Y1 + 0.10,
+             zs0, zs0 + g + 0.002, bev=0.004)
+    lip = 0.032
+    for a0, a1, b0, b1 in ((X0, X1, TER_Y0, TER_Y0 + lip),
+                           (X0, X0 + lip, TER_Y0, TER_Y1 + 0.10),
+                           (X1 - lip, X1, TER_Y0, TER_Y1 + 0.10)):
+        kit.span(RENDER, a0, a1, b0, b1, zs0, zs0 + g + 0.002, bev=0.004)
     floor_tiles(kit, X0 + 0.02, X1 - 0.02, TER_Y0 + 0.02, TER_Y1,
                 TER_Z, size=0.33, colour=TERRAZZO, accent=None,
                 grout=tuple(v * 0.85 for v in TERRAZZO))
-    railing(kit, [(X0 + 0.06, TER_Y0 + 0.06), (X1 - 0.06, TER_Y0 + 0.06)],
-            TER_Z, 1.06, bars=4)
-    railing(kit, [(X0 + 0.06, TER_Y0 + 0.06), (X0 + 0.06, TER_Y1)],
-            TER_Z, 1.06, bars=4)
-    railing(kit, [(X1 - 0.06, TER_Y0 + 0.06), (X1 - 0.06, TER_Y1)],
-            TER_Z, 1.06, bars=4)
+    # The aluminium drip edge the tiler finishes a balcony with: an angle
+    # under the last row of tiles, its face standing 6 mm proud of the slab
+    # and 7 cm down it. A thin bright line under the tiling, all the way
+    # round, which is the one thing every balcony on this coast has.
+    e, dz0, dz1 = 0.006, TER_Z - 0.075, TER_Z + 0.004
+    kit.span(DRIP, X0 - e, X1 + e, TER_Y0 - e, TER_Y0, dz0, dz1, bev=0.001)
+    kit.span(DRIP, X0 - e, X0, TER_Y0, TER_Y1, dz0, dz1, bev=0.001)
+    kit.span(DRIP, X1, X1 + e, TER_Y0, TER_Y1, dz0, dz1, bev=0.001)
+    railing(kit, [(X0 + 0.06, TER_Y1), (X0 + 0.06, TER_Y0 + 0.06),
+                  (X1 - 0.06, TER_Y0 + 0.06), (X1 - 0.06, TER_Y1)],
+            TER_Z, 1.06, rods=6, wall=(True, True))
     awning(kit)
+    # The socket by the terrace door, in the photograph at the foot of the
+    # frame: a white weatherproof box with a hinged lid, on the render east of
+    # the opening at knee height.
+    sx = D_TERR[1] + 0.12
+    kit.span(WHITEGOODS, sx - 0.042, sx + 0.042, Y0 - 0.036, Y0, F2 + 0.32,
+             F2 + 0.42, bev=0.006)
+    kit.span(tuple(v * 0.93 for v in WHITEGOODS), sx - 0.036, sx + 0.036,
+             Y0 - 0.046, Y0 - 0.036, F2 + 0.335, F2 + 0.41, bev=0.004)
     # The round table and its four chairs, drawn on the plan and in the video.
     plastic_table(kit, -1.55, TER_Y0 + 1.05, TER_Z, r=0.46)
     for i, yaw in enumerate((0.2, 1.75, 3.3, 4.85)):
@@ -1657,111 +1866,268 @@ def terrace(kit):
     plastic_chair(kit, 1.65, TER_Y0 + 1.35, TER_Z, yaw=-0.5)
 
 
-def railing(kit, pts, z, h, bars=4):
-    """Stainless: 42 mm posts, a top rail and horizontal bars between them.
+def _rtube(kit, colour, pts, r, seg=10):
+    """A round tube along a polyline, smooth-shaded, in a bmesh of its own.
 
-    Nothing about this is Dalmatian and it is on every balcony built here after
-    about 1998, which is why it is worth drawing rather than substituting the
-    stone balustrade the town would suggest. Runs are axis-aligned, which every
-    run on this house is, so a bar is a box and not a swept section."""
-    r = 0.021
-    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+    Rails, rods, gutters' downpipes, the awning's arms. Flat-shaded, a ten-
+    sided tube is ten stripes of light and reads as a pencil; smooth, it reads
+    as a tube. It cannot share a colour bucket, which is flat by construction.
+    """
+    bm = bmesh.new()
+    _tube(bm, pts, r, seg=seg)
+    kit.adopt(new_object(bm, "tube", smooth=True), colour)
+
+
+def _knob(kit, colour, x, y, z, r, rows=5, seg=10):
+    """A small smooth ball: an end cap, an elbow, a weld at a corner."""
+    bm = bmesh.new()
+    bm_ball(bm, x, y, z, r, r, r, rows=rows, seg=seg)
+    kit.adopt(new_object(bm, "knob", smooth=True), colour)
+
+
+def _sweep_x(bm, prof, x0, x1):
+    """A closed convex (y, z) section swept straight along X, capped."""
+    a = [bm.verts.new((x0, y, z)) for y, z in prof]
+    b = [bm.verts.new((x1, y, z)) for y, z in prof]
+    bm.verts.ensure_lookup_table()
+    n = len(prof)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((a[i], a[j], b[j], b[i]))
+    bm.faces.new(tuple(reversed(a)))
+    bm.faces.new(tuple(b))
+
+
+def railing(kit, pts, z, h, rods=6, wall=(False, False)):
+    """The terrace railing, as it is in the two photographs from the terrace.
+
+    Flat-bar posts — forty by twenty, standing on base plates bolted through
+    the tiling — a round 42 mm top rail welded over them and turned round the
+    corners, and six 12 mm round rods threaded through the posts below it.
+    Powder-coated mid grey, not stainless: next to the white render in full
+    sun it is the darker of the two, which is the whole reason it reads.
+
+    It was round posts and square bars, four of them, which is the railing of
+    a different house. `pts` is one polyline now, corners included, so a
+    corner has one post and a continuous rail over it instead of two posts in
+    the same place fighting over their faces. `wall` says which ends die into
+    the render, and those get a wall plate instead of a cap.
+    """
+    rt = 0.021
+    segs = list(zip(pts, pts[1:]))
+    for k, ((x0, y0), (x1, y1)) in enumerate(segs):
         L = math.hypot(x1 - x0, y1 - y0)
+        ux, uy = (x1 - x0) / L, (y1 - y0) / L
         n = max(2, int(round(L / 1.35)) + 1)
         for i in range(n):
+            if k > 0 and i == 0:
+                continue                         # the corner post is shared
             t = i / (n - 1)
             px, py = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
-            bm_cylinder(kit.bm(STEEL, 0.002), px, py, z, z + h, r, r, seg=10)
-        for j in range(bars + 1):
-            zz = z + 0.16 + (h - 0.16) * j / bars
-            rr = 0.028 if j == bars else 0.016
-            kit.span(STEEL, min(x0, x1) - (rr if x0 == x1 else 0.0),
-                     max(x0, x1) + (rr if x0 == x1 else 0.0),
-                     min(y0, y1) - (rr if y0 == y1 else 0.0),
-                     max(y0, y1) + (rr if y0 == y1 else 0.0),
-                     zz - rr, zz + rr, bev=0.004)
+            if wall[1] and k == len(segs) - 1 and i == n - 1:
+                px, py = px - ux * 0.05, py - uy * 0.05  # off the render
+            if wall[0] and k == 0 and i == 0:
+                px, py = px + ux * 0.05, py + uy * 0.05
+            sx, sy = (0.040, 0.020) if abs(ux) > abs(uy) else (0.020, 0.040)
+            kit.span(RAIL, px - sx / 2, px + sx / 2, py - sy / 2, py + sy / 2,
+                     z, z + h - 0.012, bev=0.003)
+            kit.span(RAIL, px - 0.045, px + 0.045, py - 0.045, py + 0.045,
+                     z, z + 0.008, bev=0.002)
+        for j in range(rods):
+            zz = z + 0.12 + (h - 0.27) * j / max(1, rods - 1)
+            _rtube(kit, RAIL, [(x0, y0, zz), (x1, y1, zz)], 0.006, seg=6)
+    _rtube(kit, RAIL, [(x, y, z + h) for x, y in pts], rt, seg=12)
+    for x, y in pts[1:-1]:
+        _knob(kit, RAIL, x, y, z + h, rt * 1.04)
+    for end, (x, y), (xn, yn) in ((0, pts[0], pts[1]), (1, pts[-1], pts[-2])):
+        if wall[end]:
+            ux, uy = x - xn, y - yn
+            L = math.hypot(ux, uy)
+            ux, uy = ux / L, uy / L
+            wx, wy = abs(uy) * 0.035 + abs(ux) * 0.004, abs(ux) * 0.035 + abs(uy) * 0.004
+            kit.span(RAIL, x - wx, x + wx, y - wy, y + wy,
+                     z + h - 0.035, z + h + 0.035, bev=0.002)
+        else:
+            _knob(kit, RAIL, x, y, z + h, rt * 1.08)
 
 
 def awning(kit):
-    """The folding-arm awning over the terrace doors, out and slightly dropped."""
+    """The folding-arm awning over the terrace doors, out and slightly dropped.
+
+    As photographed from under it: a white cassette on the wall, cream acrylic
+    cloth run out on two folding arms to a white front bar, and a straight
+    valance hanging off the bar. It was a thin box half buried in the wall and
+    a single tilted sheet — the arms were two sticks along its edges, and there
+    was nothing to fold.
+    """
     z = F2 + 2.30
-    kit.span(WHITEGOODS, D_TERR[0] - 0.40, D_TERR[1] + 0.40, Y0 - 0.02, Y0 + 0.10,
-             z, z + 0.16, bev=0.01)
     drop = 0.34
-    x0, x1 = D_TERR[0] - 0.38, D_TERR[1] + 0.38
-    y0, y1 = Y0 - 0.06, Y0 - 2.05
+    xa, xb = D_TERR[0] - 0.40, D_TERR[1] + 0.40
+    # The cassette: a rounded box standing 19 cm off the wall, the cloth
+    # coming out of the slot along the underside of its nose.
     bm = bmesh.new()
-    v = [bm.verts.new(p) for p in (
-        (x0, y0, z), (x1, y0, z), (x1, y1, z - drop), (x0, y1, z - drop))]
-    bm.faces.new(tuple(v))
-    for i in range(9):
-        a = x0 + (x1 - x0) * i / 9
-        b = x0 + (x1 - x0) * (i + 1) / 9
-        s = 0.10 + 0.06 * math.sin(i * 1.1)
-        w = [bm.verts.new(p) for p in (
-            (a, y1, z - drop), (b, y1, z - drop),
-            (b, y1 - 0.02, z - drop - s), (a, y1 - 0.02, z - drop - s))]
-        bm.faces.new(tuple(w))
-    ob = new_object(bm, "awning", recalc=False)
-    solidify(ob, 0.012)
+    _sweep_x(bm, [(Y0 + 0.002, z), (Y0 - 0.13, z), (Y0 - 0.172, z + 0.022),
+                  (Y0 - 0.190, z + 0.072), (Y0 - 0.180, z + 0.128),
+                  (Y0 - 0.140, z + 0.172), (Y0 - 0.080, z + 0.192),
+                  (Y0 + 0.002, z + 0.192)], xa, xb)
+    ob = new_object(bm, "cassette")
+    bevel(ob, 0.004)
+    kit.adopt(ob, WHITEGOODS)
+    for x in (xa - 0.012, xb):
+        kit.span(tuple(v * 0.9 for v in WHITEGOODS), x, x + 0.012,
+                 Y0 - 0.192, Y0, z - 0.004, z + 0.196, bev=0.004)
+
+    # The cloth, out to the bar, with a little belly in it between roller and
+    # bar. A tensioned cloth sags a few centimetres and no more, and those few
+    # are what make it cloth.
+    ys, y1 = Y0 - 0.12, Y0 - 2.05
+    zf = z - drop
+    nx, ny = 14, 8
+    bm = bmesh.new()
+    grid = []
+    for j in range(ny + 1):
+        v = j / ny
+        row = []
+        for i in range(nx + 1):
+            u = i / nx
+            yy = ys + (y1 - ys) * v
+            zz = z + 0.012 + (zf + 0.03 - z - 0.012) * v \
+                - 0.035 * math.sin(math.pi * v) * (0.6 + 0.4 * math.sin(math.pi * u))
+            row.append(bm.verts.new((xa + 0.03 + (xb - xa - 0.06) * u, yy, zz)))
+        grid.append(row)
+    for j in range(ny):
+        for i in range(nx):
+            bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1],
+                          grid[j + 1][i]))
+    ob = new_object(bm, "awning", smooth=True, recalc=False)
+    solidify(ob, 0.004)
     kit.adopt(ob, AWNING)
-    for x in (x0 + 0.25, x1 - 0.25):
-        kit.span(WHITEGOODS, x - 0.028, x + 0.028, y1 - 0.05, y0,
-                 z - drop - 0.03, z - drop + 0.03, bev=0.004)
-    kit.span(WHITEGOODS, x0, x1, y1 - 0.05, y1 + 0.03,
-             z - drop - 0.045, z - drop + 0.045, bev=0.006)
+
+    # The front bar, an extruded aluminium section, with grey end caps.
+    bm = bmesh.new()
+    _sweep_x(bm, [(y1 + 0.035, zf + 0.030), (y1 - 0.020, zf + 0.030),
+                  (y1 - 0.040, zf + 0.012), (y1 - 0.042, zf - 0.030),
+                  (y1 + 0.035, zf - 0.030)], xa + 0.012, xb - 0.012)
+    ob = new_object(bm, "front_bar")
+    bevel(ob, 0.004)
+    kit.adopt(ob, WHITEGOODS)
+    for x in (xa, xb - 0.012):
+        kit.span((0.62, 0.63, 0.64), x, x + 0.012, y1 - 0.046, y1 + 0.038,
+                 zf - 0.034, zf + 0.034, bev=0.003)
+    # The valance: straight, hanging off the bar's nose, 20 cm, and kicked out
+    # a little at the hem by its own weighted edge.
+    bm = bmesh.new()
+    rows = [[bm.verts.new((xa + 0.02 + (xb - xa - 0.04) * i / nx,
+                           y1 - 0.046 - 0.012 * v, zf - 0.020 - 0.20 * v))
+             for i in range(nx + 1)] for v in (0.0, 0.5, 1.0)]
+    for j in range(2):
+        for i in range(nx):
+            bm.faces.new((rows[j][i], rows[j][i + 1], rows[j + 1][i + 1],
+                          rows[j + 1][i]))
+    ob = new_object(bm, "valance", smooth=True, recalc=False)
+    solidify(ob, 0.004)
+    kit.adopt(ob, AWNING)
+
+    # Two folding arms, each a shoulder bracket on the wall under the
+    # cassette, an upper arm, an elbow bent in toward the middle, and a
+    # forearm out to the bar.
+    for sx, c in ((xa + 0.30, 1.0), (xb - 0.30, -1.0)):
+        kit.span(WHITEGOODS, sx - 0.05, sx + 0.05, Y0 - 0.035, Y0,
+                 z - 0.20, z - 0.02, bev=0.006)
+        sh = (sx, Y0 - 0.06, z - 0.10)
+        fr = (sx, y1 + 0.045, zf - 0.005)
+        el = (sx + c * 0.42, (sh[1] + fr[1]) / 2 - 0.05,
+              (sh[2] + fr[2]) / 2 - 0.035)
+        _rtube(kit, WHITEGOODS, [sh, el], 0.021, seg=8)
+        _rtube(kit, WHITEGOODS, [el, fr], 0.018, seg=8)
+        _knob(kit, (0.62, 0.63, 0.64), *el, 0.030)
+        _knob(kit, (0.62, 0.63, 0.64), *sh, 0.028)
 
 
 def outside_stair(kit):
-    """Seventeen risers of 17 and sixteen goings of 25, up the east face.
+    """Seventeen risers of 17 up the east face, on a cast flight.
 
     It is dimensioned on the plan and drawn on the east elevation, and it is
-    the reason the upper floor is at +2.90 rather than at a round number."""
+    the reason the upper floor is at +2.90 rather than at a round number.
+
+    It is drawn on the elevation as what it is: a saw-tooth on a sloping
+    waist slab, open underneath, with the ground-floor window seen under it.
+    It was seventeen loose 16 cm blocks, each hanging in the air a step above
+    the last — "square box steps", which is what it looked like. Now: one
+    rendered flight, a waist a hand and a half thick, and on each step a 3 cm
+    limestone tread with a 25 mm nosing over the riser and 20 mm over the
+    open side. The tread tops are exactly where the blocks' tops were, which
+    is the one number the walkers and the Bucketeer read (`floorAt` and
+    VIK.stair in src/44-vikendica.js).
+    """
+    T = 0.03
+    xw, xo = ST_X - ST_W / 2, ST_X + ST_W / 2
+    yA = ST_BOT - ST_GO                       # the foot, on the south face
+
+    def zn(y):                                 # the line of the nosings
+        return GRADE + (y - yA) / ST_GO * ST_RISE
+
+    waist, floor_ = 0.39, GRADE - 0.10
+
+    def zb(y):
+        return max(floor_, zn(y) - waist)
+
+    yk = yA + (floor_ + waist - GRADE) / ST_RISE * ST_GO   # where it meets grade
+    bm = bmesh.new()
     for i in range(ST_N):
         y1 = ST_BOT + ST_GO * i
         y0 = y1 - ST_GO
         z = GRADE + ST_RISE * (i + 1)
-        kit.span(CONCRETE, ST_X - ST_W / 2, ST_X + ST_W / 2, y0, y1 + 0.02,
-                 z - 0.16, z, bev=0.010)
-        kit.span(PLINTH, ST_X - ST_W / 2, ST_X + ST_W / 2, y0 - 0.005, y0 + 0.02,
-                 z - ST_RISE, z - 0.16, bev=0.006)
-    # The landing at the top, in front of the door.
-    kit.span(CONCRETE, X1 - 0.02, ST_X + ST_W / 2, ST_TOP - 0.02, ST_TOP + 1.10,
-             F2 - 0.18, F2 - 0.02, bev=0.015)
-    kit.span(CONCRETE, X1, ST_X + ST_W / 2 + 0.04, ST_TOP - 0.06, ST_TOP + 1.14,
+        low = [(y0, zb(y0))]
+        if y0 < yk < y1:
+            low.append((yk, floor_))
+        low.append((y1, zb(y1)))
+        prof = low + [(y1, z - T), (y0, z - T)]
+        a = [bm.verts.new((xw, y, zz)) for y, zz in prof]
+        b = [bm.verts.new((xo - 0.02, y, zz)) for y, zz in prof]
+        bm.verts.ensure_lookup_table()
+        n = len(prof)
+        for k in range(n):
+            j = (k + 1) % n
+            bm.faces.new((a[k], a[j], b[j], b[k]))
+        bm.faces.new(tuple(reversed(a)))
+        bm.faces.new(tuple(b))
+        kit.span(TREAD, xw, xo, y0 - 0.025, y1, z - T, z, bev=0.005)
+    ob = new_object(bm, "stair_flight")
+    kit.adopt(ob, RENDER)
+
+    # The landing at the top, in front of the door: its slab rendered, and the
+    # same limestone on top as the treads, nosed on the open side.
+    kit.span(RENDER, X1 - 0.02, xo, ST_TOP - 0.02, ST_TOP + 1.10,
+             F2 - 0.18, F2 - 0.05, bev=0.012)
+    kit.span(TREAD, X1 - 0.02, xo + 0.02, ST_TOP - 0.02, ST_TOP + 1.12,
+             F2 - 0.05, F2 - 0.02, bev=0.005)
+    kit.span(RENDER, X1, xo + 0.04, ST_TOP - 0.06, ST_TOP + 1.14,
              F2 - 0.44, F2 - 0.18, bev=0.02)
-    # A stainless rail down the open side, following the pitch.
-    r = 0.021
-    rx = ST_X + ST_W / 2 - 0.06
-    for i in range(0, ST_N + 1, 3):
-        y = ST_BOT - ST_GO + ST_GO * i
-        z = GRADE + ST_RISE * i
-        bm_cylinder(kit.bm(STEEL, 0.002), rx, y, z, z + 1.02, r, r, seg=10)
-    bm = bmesh.new()
-    for d in (0.0, -0.34, -0.68):
-        n = 10
-        pts = []
-        for i in range(n + 1):
-            t = i / n
-            y = (ST_BOT - ST_GO) + (ST_GO * ST_N) * t
-            z = GRADE + (ST_RISE * ST_N) * t + 1.02 + d
-            pts.append((y, z))
-        for i in range(n):
-            (ya, za), (yb, zb) = pts[i], pts[i + 1]
-            ang = math.atan2(zb - za, yb - ya)
-            L = math.hypot(yb - ya, zb - za)
-            vs = bm_box(bm, 0, 0, 0, 0.026, L, 0.026)
-            c, s = math.cos(ang), math.sin(ang)
-            for v in vs:
-                px, py, pz = v.co
-                v.co = (rx + px, (ya + yb) / 2 + py * c - pz * s,
-                        (za + zb) / 2 + py * s + pz * c)
-    ob = new_object(bm, "stair_rail")
-    bevel(ob, 0.004)
-    kit.adopt(ob, STEEL)
-    railing(kit, [(rx, ST_TOP), (rx, ST_TOP + 1.10)], F2 - 0.02, 1.04, bars=3)
-    railing(kit, [(rx, ST_TOP + 1.10), (X1, ST_TOP + 1.10)], F2 - 0.02, 1.04,
-            bars=3)
+
+    # The rail down the open side: flat-bar posts on every third tread, a
+    # round handrail a metre over the nosings, three rods under it on the
+    # pitch — the terrace's railing, turned down the stair.
+    rx = xo - 0.06
+    top_y = ST_TOP
+    ys = []
+    for i in range(0, ST_N, 3):
+        y = ST_BOT + ST_GO * i - ST_GO / 2
+        z = GRADE + ST_RISE * (i + 1)
+        ys.append(y)
+        kit.span(RAIL, rx - 0.010, rx + 0.010, y - 0.020, y + 0.020,
+                 z, zn(y) + 1.02 - 0.012, bev=0.003)
+        kit.span(RAIL, rx - 0.035, rx + 0.035, y - 0.045, y + 0.045,
+                 z, z + 0.008, bev=0.002)
+    y0 = ys[0]
+    _rtube(kit, RAIL, [(rx, y0 - 0.08, zn(y0 - 0.08) + 1.02),
+                       (rx, top_y, zn(top_y) + 1.02)], 0.021, seg=12)
+    _knob(kit, RAIL, rx, y0 - 0.08, zn(y0 - 0.08) + 1.02, 0.022)
+    for d in (0.26, 0.52, 0.78):
+        _rtube(kit, RAIL, [(rx, y0, zn(y0) + d), (rx, top_y, zn(top_y) + d)],
+               0.006, seg=6)
+    railing(kit, [(rx, ST_TOP), (rx, ST_TOP + 1.10), (X1, ST_TOP + 1.10)],
+            F2 - 0.02, 1.04, rods=3, wall=(False, True))
 
 
 def starlink(kit, head):
@@ -4297,6 +4663,12 @@ def _place(ob, x, y, z, yaw):
 
 PITCH_NOW = math.atan2(RIDGE_NOW - HEAD, (Y1 - Y0) / 2)
 
+# TILE_BASE is the top of the battens and felt: the plane the tile course is
+# laid on, this far above the top of the boarding.
+TILE_BASE = 0.035
+# The chimney, which the tiles have to go round.
+CHIM_XY = (X0 + EXT + 0.32, -0.62)
+
 
 def roof_now(kit):
     chimney(kit)
@@ -4307,17 +4679,159 @@ def roof_now(kit):
     for sgn in (-1, 1):
         _slope(kit, PLY, sgn, RIDGE_NOW, PITCH_NOW, 0.0, (Y1 - Y0) / 2 + ov,
                0.030, X0 - ov, X1 + ov)
-        _slope(kit, ROOFTILE, sgn, RIDGE_NOW, PITCH_NOW, 0.0,
-               (Y1 - Y0) / 2 + ov, 0.075, X0 - ov, X1 + ov, lift=0.14)
-    kit.span(ROOFTILE, X0 - ov - 0.02, X1 + ov + 0.02, -0.14, 0.14,
-             RIDGE_NOW + 0.08, RIDGE_NOW + 0.20, bev=0.03)
+    roof_trim(kit, RIDGE_NOW, PITCH_NOW, (Y1 - Y0) / 2, ov, HEAD,
+              rafters=True)
     for at in (X0 + EXT / 2, X1 - EXT / 2):
         _gable(kit, RENDER, at, EXT, HEAD, RIDGE_NOW, (Y1 - Y0) / 2)
-    for y in (Y0 - ov, Y1 + ov):
-        kit.span(WHITEGOODS, X0 - ov, X1 + ov, y - 0.03, y + 0.03,
-                 HEAD - 0.10, HEAD + 0.02, bev=0.01)
     # The dish, on the south-east corner under the eave.
     starlink(kit, HEAD)
+
+
+def roof_trim(kit, ridge, pitch, span, ov, head, rafters=False):
+    """Everything round the edge of a pitched roof that is not tile.
+
+    The same for both roofs — the one that is there and the renovation's —
+    so it is one function taking the pitch and the ridge. What it lays:
+
+    * battens and felt under the tile course, and the tiles and ridge on it;
+    * a painted fascia board along each eave, under the tile ends, where
+      there was a white strip standing through the roof edge;
+    * barge boards up both verges, and on top of them the mortared verge —
+      the white fillet the last row of kupe is bedded in along every gable
+      in Dalmatia;
+    * on the roof as built, the rafter tails under the overhang, and the
+      board joints in the soffit between them (the soffit was one yellow
+      sheet);
+    * a half-round gutter on both eaves, on hangers, with a rolled bead on
+      its front lip, and a downpipe from each: the lane side's straight down
+      the north-east pier into the yard, the sea side's down the one bay of
+      the south face the shutters leave clear, to a gully in the terrace;
+    * the lead apron round the chimney where it comes through the tiles.
+    """
+    run = span + ov
+    x0, x1 = X0 - ov, X1 + ov
+    tn = math.tan(pitch)
+
+    def zp(d):
+        return ridge - d * tn
+
+    for sgn in (-1, 1):
+        _slope(kit, UNDERLAY, sgn, ridge, pitch, 0.0, run - 0.02, TILE_BASE,
+               x0 + 0.03, x1 - 0.03, lift=TILE_BASE)
+        _slope(kit, ROOFTILE, sgn, ridge, pitch, 0.0, run + 0.05, 0.075,
+               x0 + 0.03, x1 - 0.03, lift=TILE_BASE + 0.075)
+        yf = sgn * run
+        kit.span(FASCIA, x0, x1, *sorted((yf, yf - sgn * 0.024)),
+                 zp(run) - 0.17, zp(run) + 0.012, bev=0.004)
+        for dd in (span + 0.13, span + 0.26):
+            _slope(kit, SOFFIT_J, sgn, ridge, pitch, dd, dd + 0.008, 0.003,
+                   x0, x1, lift=-0.029)
+        if rafters:
+            n = int((X1 - X0) / 0.62)
+            for i in range(n + 1):
+                x = X0 + 0.04 + i * ((X1 - X0 - 0.08) / n)
+                _slope(kit, BEECH, sgn, ridge, pitch, span - 0.10, run - 0.026,
+                       0.12, x - 0.035, x + 0.035, lift=-0.029)
+        _gutter(kit, sgn, run, zp(run) - 0.028, x0, x1)
+        for xe0, xe1 in ((x0, x0 + 0.024), (x1 - 0.024, x1)):
+            _slope(kit, FASCIA, sgn, ridge, pitch, 0.0, run, 0.20, xe0, xe1,
+                   lift=0.03)
+        for xe0, xe1 in ((x0, x0 + 0.12), (x1 - 0.12, x1)):
+            _slope(kit, RENDER, sgn, ridge, pitch, 0.0, run + 0.04, 0.12,
+                   xe0, xe1, lift=0.152)
+
+    kit.span(ROOFTILE, x0 - 0.02, x1 + 0.02, -0.14, 0.14,
+             ridge + 0.08, ridge + 0.20, bev=0.03)
+
+    # Downpipes. Both gutters fall to one end, and each pipe comes off the
+    # outlet, swan-necks back under the soffit to the wall, and goes down it
+    # on clips.
+    zr = zp(run) - 0.028
+    dg = run + 0.075
+    for sgn, xp, foot, face in ((-1, X0 + 0.20, TER_Z, Y0),
+                                (1, X1 - 0.12, GRADE + 0.02, Y1)):
+        wy = sgn * (abs(face) + 0.062)
+        pts = [(xp, sgn * dg, zr - 0.05), (xp, sgn * dg, zr - 0.13),
+               (xp, sgn * (dg - 0.10), zr - 0.24),
+               (xp, wy + sgn * 0.10, zr - 0.44), (xp, wy, zr - 0.54),
+               (xp, wy, foot + 0.16), (xp, wy + sgn * 0.035, foot + 0.07),
+               (xp, wy + sgn * 0.11, foot + 0.045)]
+        _rtube(kit, GUTTER, pts, 0.040, seg=12)
+        for p in pts[1:-1]:
+            _knob(kit, GUTTER, *p, 0.0405, rows=6, seg=12)
+        z = foot + 0.55
+        while z < zr - 0.70:
+            kit.span(GUTTER, xp - 0.048, xp + 0.048,
+                     *sorted((wy - sgn * 0.045, wy - sgn * 0.062)),
+                     z - 0.02, z + 0.02, bev=0.004)
+            kit.span(GUTTER, xp - 0.044, xp + 0.044,
+                     *sorted((wy - sgn * 0.045, wy + sgn * 0.044)),
+                     z - 0.014, z + 0.014, bev=0.004)
+            z += 1.25
+        # And the gully it runs into: a small square grating, dark in its
+        # frame, set flush in whatever it stands on.
+        gy = wy + sgn * 0.13
+        kit.span((0.32, 0.33, 0.34), xp - 0.09, xp + 0.09, gy - 0.09,
+                 gy + 0.09, foot - 0.01, foot + 0.004, bev=0.002)
+        kit.span((0.10, 0.10, 0.11), xp - 0.07, xp + 0.07, gy - 0.07,
+                 gy + 0.07, foot - 0.01, foot + 0.006, bev=0.0)
+
+    # The lead apron round the chimney stack.
+    cx, cy = CHIM_XY
+    d = abs(cy)
+    kit.span(LEAD, cx - 0.27, cx + 0.27, cy - 0.27, cy + 0.27,
+             zp(d + 0.27) + 0.03, zp(d - 0.27) + 0.17, bev=0.01)
+
+
+def _gutter(kit, sgn, run, zr, x0, x1):
+    """A half-round gutter, 125 mm, along one eave, capped at both ends."""
+    r, t = 0.063, 0.003
+    dg = run + 0.075
+    n = 10
+    bm = bmesh.new()
+    rows = []
+    for x in (x0 + 0.01, x1 - 0.01):
+        ring = []
+        for rr in (r, r - t):
+            for i in range(n + 1):
+                a = math.pi * i / n
+                ring.append((x, sgn * (dg - rr * math.cos(a)), zr - rr * math.sin(a)))
+        rows.append([bm.verts.new(p) for p in ring])
+    bm.verts.ensure_lookup_table()
+    m = n + 1
+    for i in range(n):
+        for off in (0, m):
+            a, b = rows[0], rows[1]
+            bm.faces.new((a[off + i], a[off + i + 1], b[off + i + 1], b[off + i]))
+    # The two lips, where the outer and inner skins meet.
+    for i in (0, n):
+        a, b = rows[0], rows[1]
+        bm.faces.new((a[i], a[m + i], b[m + i], b[i]))
+    ob = new_object(bm, "gutter", smooth=True)
+    kit.adopt(ob, GUTTER)
+    # Stop ends, and the bead rolled along the front edge.
+    for x in (x0 + 0.004, x1 - 0.016):
+        bm = bmesh.new()
+        poly = [(sgn * (dg - r * math.cos(math.pi * i / n)),
+                 zr - r * math.sin(math.pi * i / n)) for i in range(n + 1)]
+        a = [bm.verts.new((x, y, z)) for y, z in poly]
+        b = [bm.verts.new((x + 0.012, y, z)) for y, z in poly]
+        bm.verts.ensure_lookup_table()
+        for i in range(n + 1):
+            j = (i + 1) % (n + 1)
+            bm.faces.new((a[i], a[j], b[j], b[i]))
+        bm.faces.new(tuple(reversed(a)))
+        bm.faces.new(tuple(b))
+        kit.adopt(new_object(bm, "gutter_end"), GUTTER)
+    _rtube(kit, GUTTER, [(x0 + 0.01, sgn * (dg + r), zr + 0.004),
+                         (x1 - 0.01, sgn * (dg + r), zr + 0.004)], 0.008, seg=8)
+    # Hangers, from the fascia under the gutter's back lip.
+    k = int((x1 - x0) / 0.85)
+    for i in range(k + 1):
+        x = x0 + 0.12 + i * ((x1 - x0 - 0.24) / k)
+        kit.span(GUTTER, x - 0.012, x + 0.012,
+                 *sorted((sgn * run, sgn * (dg - r + 0.012))),
+                 zr - 0.010, zr + 0.004, bev=0.002)
 
 
 def _slope(kit, colour, sgn, ridge, pitch, d0, d1, thick, x0, x1, lift=0.0):
@@ -4389,8 +4903,6 @@ def roof_loft(kit):
     for sgn in (-1, 1):
         _slope(kit, PLY, sgn, RIDGE, PITCH, 0.0, span + ov, 0.028,
                X0 - ov, X1 + ov)
-        _slope(kit, ROOFTILE, sgn, RIDGE, PITCH, 0.0, span + ov, 0.075,
-               X0 - ov, X1 + ov, lift=0.16)
         n = int((X1 - X0 + 2 * ov) / 0.62)
         for i in range(n + 1):
             x = X0 - ov + i * ((X1 - X0 + 2 * ov) / n)
@@ -4398,8 +4910,7 @@ def roof_loft(kit):
                    x - 0.035, x + 0.035, lift=-0.028)
     kit.span(BEECH, X0 - ov, X1 + ov, -0.09, 0.09, RIDGE - 0.30, RIDGE - 0.02,
              bev=0.008)
-    kit.span(ROOFTILE, X0 - ov - 0.02, X1 + ov + 0.02, -0.14, 0.14,
-             RIDGE + 0.10, RIDGE + 0.22, bev=0.03)
+    roof_trim(kit, RIDGE, PITCH, span, ov, LOFT_HEAD)
     for at in (X0 + EXT / 2, X1 - EXT / 2):
         _gable(kit, RENDER, at, EXT, LOFT_HEAD, RIDGE, span)
         sgn = -1 if at < 0 else 1
@@ -4445,9 +4956,12 @@ def rooflight(kit, cx, cy):
     d = abs(cy)
     z = RIDGE - d * math.tan(PITCH)
     w, l = 0.78, 1.18
-    for (colour, hw, hl, dz, thick) in ((WHITEGOODS, w / 2, l / 2, 0.02, 0.10),
+    # Proud of the tiles. The frame used to stop two centimetres over the
+    # boarding and the old tile slab ran straight over it, so from outside
+    # the renovation had no roof lights at all. Its underside is where it was.
+    for (colour, hw, hl, dz, thick) in ((WHITEGOODS, w / 2, l / 2, 0.14, 0.22),
                                         (GLASS, w / 2 - 0.06, l / 2 - 0.06,
-                                         0.07, 0.02)):
+                                         0.125, 0.02)):
         bm = bmesh.new()
         za = z + hl * math.sin(PITCH) + dz
         zb = z - hl * math.sin(PITCH) + dz
