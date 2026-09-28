@@ -1164,7 +1164,7 @@ async function buildJadrija(scene) {
    */
   const SHOP_STAFF = [
     ['mini', 274.60, null, 'serve', 1.00],
-    ['konoba', 244.00, 0.35, 'stand', 1.02],
+    ['konoba', 246.00, 0.35, 'stand', 1.02],
     // Back on the standard standoff, and what was in the way was the shop.
     //
     // He was shipped at a `backOff` of 5.60 — s 21.40, 0.45 m out in front of
@@ -4454,7 +4454,29 @@ async function buildJadrija(scene) {
       name: 'PIZZERIA', sub: 'F2', roof: [0.430, 0.252, 0.180],
       body: [0.510, 0.512, 0.518], awn: 0, fg: '#b03024', bg: '#efeade',
       solid: true, painted: true },
-    { key: 'konoba', kind: 'canopy', t0: 240, t1: 252, s0: 10, s1: 19, h: 2.7,
+    // Misha, 28 Sep 2026: *"this structure that is close to vikendica, it
+    // needs to be moved just a bit further away from the vikendica"*. It was
+    // t 240-252, and its terrace pad (0.55 m proud of the posts all round)
+    // ended 2.8 m from the foot of the vikendica's outside stair and 3.5 m
+    // from its garden wall. Two metres east, and two is all the shore has:
+    // the lamp at t 255 s 9.6 and the young pine at t 255.1 s 10.6 stand
+    // 0.23 m off the pad's east edge now, and one more metre stands both of
+    // them in the paving. Everything the konoba is made of — pad, posts,
+    // counter, stools, cooler, bulb, pine and collar, wicker, poseurs,
+    // surfboard, its blockers and its drinkers — is built off these four
+    // numbers; the barman in `SHOP_STAFF` and the serving window in `STOCK`
+    // were typed and moved with them.
+    //
+    // `keep` is the stretch the promenade's own furniture was laid round,
+    // which is where the konoba USED to stand, and it has to stay there.
+    // `clearOfShops` is a skip inside loops that draw `rng`, so moving the
+    // stretch it skips moves the draws: tried, and the lamp at 255 and the
+    // young pine went, the bench east of the terrace got shorter, every young
+    // pine on the shore and half the wood behind the shops re-rolled, and two
+    // sunbathers on the far kabine beach swapped towels. Rule 4. Kept, the
+    // shore is the shore it was and only the konoba has moved.
+    { key: 'konoba', kind: 'canopy', t0: 242, t1: 254, s0: 10, s1: 19, h: 2.7,
+      keep: [240, 252],
       name: null, roof: [0.330, 0.285, 0.205], post: [0.055, 0.150, 0.115],
       body: [0.075, 0.290, 0.250] },
     // 175806: the walls are pale render and glass and the GREEN is the
@@ -4657,7 +4679,9 @@ async function buildJadrija(scene) {
   // What the promenade's own loops have to keep out of. A lamp coming up
   // through an awning and a bench standing inside a shop are the two failures
   // this prevents, and both of them look like a bug rather than like furniture.
-  const clearOfShops = (t) => !SHOPS.some((S) => t > S.t0 - 2.5 && t < S.t1 + 2.5);
+  // `keep` where a shop has one — see the konoba's row.
+  const clearOfShops = (t) => !SHOPS.some((S) => t > (S.keep ? S.keep[0] : S.t0) - 2.5
+    && t < (S.keep ? S.keep[1] : S.t1) + 2.5);
 
   // Hoisted, and this is the third time this file has taught the same lesson.
   // The playground is BUILT down beside the wood, but the car loop and the
@@ -31996,7 +32020,18 @@ async function buildJadrija(scene) {
   // as the kabine, in the same locale axes, because it was placed with its
   // own +X along the shore precisely so that they could.
   vik = await buildVikendica(scene, { toWorld, local });
-  if (vik) for (const b of vik.blockers()) blockers.push(b);
+  // And the extent of them, the plot as a whole, which is what the crowd is
+  // kept out of — see `layWalkBins`. Taken here, off the one call: a second
+  // `vik.blockers()` builds a second set and re-points `loftOnly` at it, and
+  // the roof switch would then be switching blockers nobody is reading.
+  const vikPlot = vik ? { t0: Infinity, t1: -Infinity, s0: Infinity, s1: -Infinity } : null;
+  if (vik) {
+    for (const b of vik.blockers()) {
+      blockers.push(b);
+      vikPlot.t0 = Math.min(vikPlot.t0, b.t - b.a); vikPlot.t1 = Math.max(vikPlot.t1, b.t + b.a);
+      vikPlot.s0 = Math.min(vikPlot.s0, b.s - b.c); vikPlot.s1 = Math.max(vikPlot.s1, b.s + b.c);
+    }
+  }
   // And the woman who carries water out of it — see src/45-bucketeer.js. She
   // takes no `rng()` draw, so the shore behind her is the same shore (rule 4).
   const bucketeer = vik ? await buildBucketeer(scene, vik, walkY) : null;
@@ -41616,7 +41651,7 @@ async function buildJadrija(scene) {
     // The prices are guesses in the same way MINI's and H2O's are, and the
     // list is what a Dalmatian konoba pours at four in the afternoon: a beer,
     // a gemišt, a glass of wine, a rakija and a coffee. No brands.
-    konoba: { at: 'konoba', name: 'konoba', win: [239, 253, 15.6, 18.6],
+    konoba: { at: 'konoba', name: 'konoba', win: [241, 255, 15.6, 18.6],
       items: [
         ['beer', 'a beer', 4.00], ['gemišt', 'a gemišt', 3.00],
         ['wine', 'a glass of wine', 3.50], ['rakija', 'a rakija', 3.00],
@@ -53883,13 +53918,46 @@ async function buildJadrija(scene) {
       // the ones that are costs a bin entry apiece.
       const rad = b.rot ? Math.hypot(b.a, b.c) : b.c;
       if (b.s + rad < sLo || b.s - rad > sHi) continue;
-      const along = (b.rot ? Math.hypot(b.a, b.c) : b.a) + reach;
-      const i0 = Math.floor((b.t - along) / WALK_BIN);
-      const i1 = Math.floor((b.t + along) / WALK_BIN);
-      for (let i = i0; i <= i1; i++) {
-        const list = walkBins.get(i);
-        if (list) list.push(b); else walkBins.set(i, [b]);
-      }
+      binBox(b, reach);
+    }
+    // And the vikendica's plot, which the loop above cannot see at all.
+    //
+    // Misha, 28 Sep 2026: *"the people shouldn't be walking through the
+    // front-yard of the vikendica the way they do now"*. Every wall the
+    // vikendica has is BANDED — its storeys, its railing, terrasa 8's own
+    // low walls and gate, the yard behind — because a banded wall is the
+    // only kind that lets you stand on the terrace above one. So every one
+    // of them is `y0 != null` and every one was skipped two lines up, and
+    // the two beats laid along s 15.40 and 15.77 walked the length of the
+    // front wall and 0.69 m into the yard behind it. Measured over 200 s of
+    // warped world: 64 of 307 walker samples beside the house were inside
+    // it.
+    //
+    // One box for the crowd and only the crowd: the whole plot, which is
+    // the extent of the house's own blockers — terrasa 8's front wall at
+    // s 15.25 to the yard wall at the back, and the side wall on the west to
+    // the foot of the outside stair on the east. Not pushed on `blockers`,
+    // which is also the list you are confined by, and you are allowed in —
+    // and Baye's visits are her own legs off `showClear`, which does not
+    // read these bins. Measured off the house's own blockers rather than
+    // typed — see `vikPlot` — so the plot moves if the house does. It
+    // reaches right back so the way out of it is always the promenade side:
+    // `freeS` takes whichever edge is inside the lane's window, and the
+    // inland one never is.
+    const P = vikPlot;
+    if (P && P.t1 > P.t0 && P.s0 < sHi) {
+      binBox({ t: (P.t0 + P.t1) * 0.5, s: (P.s0 + P.s1) * 0.5,
+        a: (P.t1 - P.t0) * 0.5, c: (P.s1 - P.s0) * 0.5, h: 6, y: 0,
+        plot: 'vikendica' }, reach);
+    }
+  }
+  function binBox(b, reach) {
+    const along = (b.rot ? Math.hypot(b.a, b.c) : b.a) + reach;
+    const i0 = Math.floor((b.t - along) / WALK_BIN);
+    const i1 = Math.floor((b.t + along) / WALK_BIN);
+    for (let i = i0; i <= i1; i++) {
+      const list = walkBins.get(i);
+      if (list) list.push(b); else walkBins.set(i, [b]);
     }
   }
   layWalkBins();
