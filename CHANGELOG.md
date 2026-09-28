@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.542.1] — 2026-09-28
+
+### The eFoil is gone
+
+Misha: *"remove the e-foil stuff.. we don't want e-foil anymore"*.
+
+**Removed, whole.** `src/59-foil.js` (the board, mast, wings, wake and the
+`foil` phase, 439 lines) is deleted, and every hook it had goes with it:
+`takeFoil`/`dropFoil`/`paintFoilHud`, the frame-loop step, the camera pose and
+draw, the mouse look, `inWater()`, the teardown in the mode reset, the
+`MODE_HUDS` list, the Jadrija recess list (1.533.2), the lens, the ride-near
+clip, the capped shore ambience, the voice's `AFOOT` table, `__fr.foil`, the
+`foil` entries in `__fr.stats()` and `__fr.modes()`, the `#foil-hud` markup and
+its CSS, and the F row in the help overlay. The i18n keys (`foil.*`,
+`toast.onTheFoil`, `toast.offTheFoil`, `toast.foilDown`, `help.k.foil`, 15 a
+language) are gone in English, Croatian and French, and "F takes a foil out" is
+off the on-foot settings line in all three.
+
+**F on foot now does nothing**, as it did before the foil; in the aeroplane it
+is still the drop. The foil had no prop in the world (it launched from wherever
+you stood on the beach) and no assets or sounds of its own, so nothing in
+Jadrija's layout or `build/payload/` changes. The kite, the swim, the
+skakaonica and the Brod are untouched and all checked: K from the beach, E off
+the kite into the sea and ashore, the tower's autoPump dive back to a swim, E
+ashore again. The touch layout has no foil control (it never had a button; the
+swim strip it shared is the kite's and stays). The page is 32 kB smaller.
+
 ## [1.542.0] — 2026-09-28
 
 ### The Bucketeer is Baye v2.0, the bucket has weight, and she throws the water
