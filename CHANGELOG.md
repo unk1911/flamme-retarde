@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.5] — 2026-09-28
+
+### Chloe's necklace follows her into the crouch
+
+Misha: *"when i (Chloe) crouch, the necklace doesn't seem to follow me it
+kinda sticks out weirdly."* The cord and its three shells were a child of the
+figure, not of a bone. That was fine while the only thing her chest did was
+breathe in an idle. 1.539.4's crouch bows her back through `spine01..03`, which
+moves the chest forward and down by about 12 cm. The necklace stayed where a
+standing chest had been: two black lines in the air over her back, and the
+shells hanging off nothing.
+
+It now rides `spine03`, the upper back bone under the base of the neck and the
+top of the chest. It is placed at the bone's head and turned by
+`fig.boneTurn` every tick, right after the `fig.update` that the crouch has
+already been written into. That is the same way the beanie rides the head bone,
+and the cord's numbers are still the bind-pose ones, offset by the bone's bind
+head. Measured, the pendant is 0.215 m from `spine03` standing, crouched and
+crouch-walking alike. Before the fix, that distance drifted and the pendant
+ended up 12 cm above her chest. Standing, the necklace sits within 1.5 cm of
+where it used to be.
+
+It is not on the neck bone, because the crouch turns the neck the other way to
+keep her head up. It still comes off in the water: that was also a choice, not
+only a workaround.
+
 ## [1.539.4] — 2026-09-28
 
 ### Chloe crouches when you do
