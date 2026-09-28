@@ -1591,6 +1591,34 @@ function avbdBall(o) {
 //   shin round the wrong way; the error is the true one every iteration, so
 //   the fixed point is exact either way and this only makes it converge.
 //
+// (i) AND THE FURNITURE, AND A BODY AGAINST ITSELF (1.538.0, 43-settle.js).
+// Misha, 27 Sep 2026, after the hammock: *"the ragdoll looks amazing! we
+// should utilize ragdoll concept in other places too ... maybe even for the
+// bathers when they sit at the cafes and stuff"*. A café sitter is settled
+// into a chair once, off screen, and two things a hammock never needed are
+// needed for it:
+//
+//   WORLD BOXES — a seat, a backrest, a table top, the arms of a chair, the
+//   quay's slab — which are the world and not a body: nothing moves them, so
+//   a capsule meets one as it meets the floor (`b` −1, the point on the box
+//   the world's), at the closest pair between the capsule's axis and the box
+//   by the same ternary search as (e). Turned about +y only, because nothing
+//   on a terrace stands at a slant.
+//
+//   CAPSULE PAIRS — a forearm on a thigh, a hand in a lap, one knee against
+//   the other. The reference's manifold rows between two bodies, at the
+//   closest points of two segments. A LIST of pairs, handed in, and not
+//   every capsule against every other, for the reason the ball gives for its
+//   broadphase: a ragdoll's neighbours share a socket and are always touching,
+//   so "everything" is mostly pairs that must be left alone. A pair already
+//   overlapping when the settle starts — the capsules are an approximation of
+//   the skin and a clip solved against the skin leaves an arm half a
+//   centimetre into a flank — is refused by `deep` like any other contact
+//   found inside, and passes as it lies.
+//
+// Both are empty unless asked for (`maxWorldBoxes`, `maxCapPairs`), so the
+// hammock, the chain and the springboard step exactly as they did.
+//
 // NOT TAKEN: the box-box manifold, the broadphase (the only pair that matters
 // is cloth against her, and her bounding sphere is the broadphase), fracture.
 // ---------------------------------------------------------------------------
@@ -1694,6 +1722,14 @@ function avbdNet(o) {
   // Boxes meet only what is on their +y side — see (g).
   let oneSided = false;
   const inAx = new Float64Array([0, 0, 0, 1, 0, 0]);   // a point and a unit direction
+  // World boxes — see (i): centre, half extents and a yaw about +y, seven a box.
+  const NWB = o.maxWorldBoxes || 0;
+  const wb = new Float64Array(7 * NWB);
+  let nwb = 0;
+  // Capsule pairs — see (i): two capsule indices a pair.
+  const NCPR = o.maxCapPairs || 0;
+  const cpr = new Int32Array(2 * NCPR);
+  let ncpr = 0;
 
   // ── contacts, made every step ────────────────────────────────────────
   const NC = o.maxContacts;
@@ -1766,8 +1802,11 @@ function avbdNet(o) {
    * board and walks from plank to plank with her foot — the bodies a string
    * joins are fixed at `finish` and its ends and length are not.
    */
-  function setString(s, ra, len, on) {
+  function setString(s, ra, len, on, rb) {
     if (ra) { sRA[3 * s] = ra[0]; sRA[3 * s + 1] = ra[1]; sRA[3 * s + 2] = ra[2]; }
+    // And B's end, for a string whose body is re-measured between uses — the
+    // settle's hold on a pelvis that is a different person every time (i).
+    if (rb) { sRB[3 * s] = rb[0]; sRB[3 * s + 1] = rb[1]; sRB[3 * s + 2] = rb[2]; }
     if (len != null) sLen[s] = len;
     if (on != null) sOn[s] = on ? 1 : 0;
   }
@@ -2398,6 +2437,101 @@ function avbdNet(o) {
         }
       }
     }
+    // World boxes against capsules — see (i). The box's own frame is the
+    // world's turned `yaw` about +y: local x = wx·c − wz·s, z = wx·s + wz·c.
+    for (let k = 0; k < nwb; k++) {
+      const o7 = 7 * k;
+      const cx = wb[o7], cy = wb[o7 + 1], cz = wb[o7 + 2];
+      const hx = wb[o7 + 3], hy = wb[o7 + 4], hz = wb[o7 + 5];
+      const yc = Math.cos(wb[o7 + 6]), ys = Math.sin(wb[o7 + 6]);
+      const reachA = Math.sqrt(hx * hx + hy * hy + hz * hz);
+      for (let c = 0; c < ncp; c++) {
+        const b = cpBody[c];
+        if (!cpOn[c] || !live[b]) continue;
+        const ex = cx - bsX[b], ey = cy - bsY[b], ez = cz - bsZ[b], lim = bsR[b] + reachA + margin;
+        if (ex * ex + ey * ey + ez * ez > lim * lim) continue;
+        const w0x = capW[6 * c] - cx, w0z = capW[6 * c + 2] - cz;
+        const w1x = capW[6 * c + 3] - cx, w1z = capW[6 * c + 5] - cz;
+        const ax = w0x * yc - w0z * ys, ay = capW[6 * c + 1] - cy, az = w0x * ys + w0z * yc;
+        const ux = w1x * yc - w1z * ys - ax, uy = capW[6 * c + 4] - cy - ay, uz = w1x * ys + w1z * yc - az;
+        const r0 = cpR0[c], r1 = cpR1[c], rm = Math.max(r0, r1) + margin;
+        if (Math.min(ax, ax + ux) > hx + rm || Math.max(ax, ax + ux) < -hx - rm
+          || Math.min(ay, ay + uy) > hy + rm || Math.max(ay, ay + uy) < -hy - rm
+          || Math.min(az, az + uz) > hz + rm || Math.max(az, az + uz) < -hz - rm) continue;
+        let lo = 0, hi = 1;
+        for (let it = 0; it < 16; it++) {
+          const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+          if (segBox2(ax, ay, az, ux, uy, uz, m1, hx, hy, hz) < segBox2(ax, ay, az, ux, uy, uz, m2, hx, hy, hz)) hi = m2;
+          else lo = m1;
+        }
+        const t = (lo + hi) * 0.5;
+        const sx = ax + ux * t, sy = ay + uy * t, sz = az + uz * t;
+        let qx = sx < -hx ? -hx : sx > hx ? hx : sx;
+        let qy = sy < -hy ? -hy : sy > hy ? hy : sy;
+        let qz = sz < -hz ? -hz : sz > hz ? hz : sz;
+        const rr = r0 + (r1 - r0) * t;
+        let nx = sx - qx, ny = sy - qy, nz = sz - qz;
+        const dd = nx * nx + ny * ny + nz * nz;
+        const lim2 = rr + margin;
+        if (dd > lim2 * lim2) continue;
+        let gap;
+        if (dd > 1e-12) {
+          const d = Math.sqrt(dd);
+          nx /= d; ny /= d; nz /= d; gap = d - rr;
+        } else {
+          // The axis is inside the box: out through the nearest face.
+          const px = hx - Math.abs(sx), py = hy - Math.abs(sy), pz = hz - Math.abs(sz);
+          nx = 0; ny = 0; nz = 0;
+          if (py <= px && py <= pz) { ny = sy >= 0 ? 1 : -1; qy = ny * hy; gap = -rr - py; }
+          else if (px <= pz) { nx = sx >= 0 ? 1 : -1; qx = nx * hx; gap = -rr - px; }
+          else { nz = sz >= 0 ? 1 : -1; qz = nz * hz; gap = -rr - pz; }
+        }
+        const id = (NPT + NCP + NBX + k) * 128 + 2 + cpId[c];
+        if (gap < -o.deep && prevSlot(id) < 0) { stats.refused++; continue; }
+        const wnx = nx * yc + nz * ys, wnz = -nx * ys + nz * yc;
+        const qwx = qx * yc + qz * ys + cx, qwy = qy + cy, qwz = -qx * ys + qz * yc + cz;
+        const swx = sx * yc + sz * ys + cx, swy = sy + cy, swz = -sx * ys + sz * yc + cz;
+        addContact(id, b, -1, wnx, ny, wnz, gap, swx - wnx * rr, swy - ny * rr, swz - wnz * rr,
+          qwx, qwy, qwz, o.mu, softBody[b] ? o.capK : Infinity);
+      }
+    }
+    // Capsule pairs, body against body — see (i). The closest points of two
+    // segments (Ericson, 5.1.9), and the normal pushes the first one's body.
+    for (let m = 0; m < ncpr; m++) {
+      const c1 = cpr[2 * m], c2 = cpr[2 * m + 1];
+      const a = cpBody[c1], b = cpBody[c2];
+      if (a === b || !cpOn[c1] || !cpOn[c2] || !live[a] || !live[b]) continue;
+      const p0x = capW[6 * c1], p0y = capW[6 * c1 + 1], p0z = capW[6 * c1 + 2];
+      const d1x = capW[6 * c1 + 3] - p0x, d1y = capW[6 * c1 + 4] - p0y, d1z = capW[6 * c1 + 5] - p0z;
+      const q0x = capW[6 * c2], q0y = capW[6 * c2 + 1], q0z = capW[6 * c2 + 2];
+      const d2x = capW[6 * c2 + 3] - q0x, d2y = capW[6 * c2 + 4] - q0y, d2z = capW[6 * c2 + 5] - q0z;
+      const rx = p0x - q0x, ry = p0y - q0y, rz = p0z - q0z;
+      const A = d1x * d1x + d1y * d1y + d1z * d1z, E = d2x * d2x + d2y * d2y + d2z * d2z;
+      const Fv = d2x * rx + d2y * ry + d2z * rz;
+      const cl = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+      let s = 0, t = 0;
+      if (A <= 1e-12 && E <= 1e-12) { s = 0; t = 0; } else if (A <= 1e-12) { t = cl(Fv / E); } else {
+        const Cv = d1x * rx + d1y * ry + d1z * rz;
+        if (E <= 1e-12) { s = cl(-Cv / A); } else {
+          const Bv = d1x * d2x + d1y * d2y + d1z * d2z, den = A * E - Bv * Bv;
+          s = den > 1e-12 ? cl((Bv * Fv - Cv * E) / den) : 0;
+          t = (Bv * s + Fv) / E;
+          if (t < 0) { t = 0; s = cl(-Cv / A); } else if (t > 1) { t = 1; s = cl((Bv - Cv) / A); }
+        }
+      }
+      const px = p0x + d1x * s, py = p0y + d1y * s, pz = p0z + d1z * s;
+      const qx = q0x + d2x * t, qy = q0y + d2y * t, qz = q0z + d2z * t;
+      const ra = cpR0[c1] + (cpR1[c1] - cpR0[c1]) * s, rb = cpR0[c2] + (cpR1[c2] - cpR0[c2]) * t;
+      let nx = px - qx, ny = py - qy, nz = pz - qz;
+      const d = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (d < 1e-7 || d - ra - rb > margin) continue;
+      nx /= d; ny /= d; nz /= d;
+      const gap = d - ra - rb;
+      const id = (NPT + NCP + NBX + NWB + m) * 128 + 1;
+      if (gap < -o.deep && prevSlot(id) < 0) { stats.refused++; continue; }
+      addContact(id, a, b, nx, ny, nz, gap, px - nx * ra, py - ny * ra, pz - nz * ra,
+        qx + nx * rb, qy + ny * rb, qz + nz * rb, o.mu, softBody[a] || softBody[b] ? o.capK : Infinity);
+    }
     // Who touches what, this step.
     conFill.fill(0);
     for (let c = 0; c < nc; c++) { conFill[cA[c]]++; if (cB[c] >= 0) conFill[cB[c]]++; }
@@ -2750,6 +2884,10 @@ function avbdNet(o) {
     },
     step, measure, depth, kick, place, setTarget, setJointK, setLive, support, resetDuals, relax,
     addAngle, setAngleFrame, setAngleTarget, setAngleK, setAngleLimits, setJointArms, setJointLoose,
+    /** The world boxes — see (i): `a` seven numbers a box (centre, half extents, yaw), `n` of them. */
+    setWorldBoxes: (a, n) => { nwb = Math.min(NWB, n); for (let k = 0; k < 7 * nwb; k++) wb[k] = a[k]; },
+    /** The capsule pairs — see (i): `a` two capsule indices a pair, `n` of them. */
+    setCapPairs: (a, n) => { ncpr = Math.min(NCPR, n); for (let k = 0; k < 2 * ncpr; k++) cpr[k] = a[k]; },
     /** Debug: angle m's rotation vector now, rad, in its joint frame. */
     angleNow: (m) => { angleEval(m); return [anPhi[0], anPhi[1], anPhi[2]]; },
     get nb() { return nb; }, get nc() { return nc; }, get ns() { return ns; }, get nj() { return nj; },

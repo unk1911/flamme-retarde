@@ -49,6 +49,9 @@
 //   rag.groundFrame(q, t, floor)
 //                            where to stand a clip whose first frame is pose
 //                            (q, t) so it starts where she lies: [x, y, z, yaw].
+//   rag.enterPose(q, t, meshP, meshQ)
+//       The same, at rest, from a local pose instead of the figure as drawn
+//       — the settle's (43-settle.js), which must not depend on the frame.
 //   rag.kick(vx, vy, vz), rag.leave(), rag.faceUp(), rag.speed(), rag.bodies.
 //
 // The net steps it; the caller decides when it is on. See 43-hammock.js for
@@ -233,6 +236,24 @@ function ragdollBuild(net, fig, caps, o = {}) {
       f.boneAt(b, _v); head[3 * b] = _v.x; head[3 * b + 1] = _v.y; head[3 * b + 2] = _v.z;
       f.boneTurn(b, _q); turn[4 * b] = _q.x; turn[4 * b + 1] = _q.y; turn[4 * b + 2] = _q.z; turn[4 * b + 3] = _q.w;
     }
+    take(mP, mQ, v, w, c);
+  }
+  /**
+   * The same, from a local pose (q 4 a bone, t the root's) rather than off
+   * the figure as drawn — at rest. For the settle (43-settle.js), which
+   * takes a sitter over at the first frame of their clip whatever the clip
+   * is doing on the screen, so the same person settles the same way on
+   * every visit.
+   */
+  function enterPose(q, t, mP, mQ) {
+    ragdollFK(fig, q, t, fkW, fkT);
+    for (let b = 0; b < NBN; b++) {
+      head[3 * b] = fkT[3 * b]; head[3 * b + 1] = fkT[3 * b + 1]; head[3 * b + 2] = fkT[3 * b + 2];
+      avbdQMul(fkW, 4 * b, BR.bindQ, 4 * b, turn, 4 * b, false, true);
+    }
+    take(mP, mQ, null, null, null);
+  }
+  function take(mP, mQ, v, w, c) {
     // The pose as DRAWN, which is the clip plus whatever was aimed on top of
     // it (her gaze turns her head in figure space) — so the local rotations
     // are taken off the drawn turns and not off the clip's own.
@@ -435,7 +456,9 @@ function ragdollBuild(net, fig, caps, o = {}) {
   function kick(vx, vy, vz) { for (const B of list) net.kick(B.i, vx, vy, vz); }
 
   return {
-    enter, leave, drive, tension, frame, write, groundFrame, faceUp, speed, kick, headWorld,
+    enter, enterPose, leave, drive, tension, frame, write, groundFrame, faceUp, speed, kick, headWorld,
+    /** Net capsule indices, with the bone each body is — for the settle's pairs. */
+    capsOf: () => list.map((B) => ({ bone: bones[B.bone].name, cp: B.cp.slice(), i: B.i })),
     get on() { return on; },
     get tens() { return tens; },
     /** Net indices: every body, the pelvis, and by bone name. */

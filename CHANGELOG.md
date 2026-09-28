@@ -8,6 +8,83 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.538.0] — 2026-09-28
+
+### the café sitters sit down into their chairs — a ragdoll's settle, done once
+
+Misha, after Baye went into the hammock as a ragdoll (1.536.0): *"the ragdoll
+looks amazing! we should utilize ragdoll concept in other places too, it
+makes her look more natural/less robotic ... maybe even for the bathers when
+they sit at the cafes and stuff, maybe they can be more ragdolly and thus
+appear even more natural"*.
+
+A café sitter was one of six seated clips solved against a 0.46 m chair,
+the same pose to the degree on every body that played it, every limb held
+exactly where it was keyed and nothing resting on anything. Now each seated
+person is let go into their seat **once**, as the 1.536.0 ragdoll, and what
+they settle into is kept and laid over their clip from then on.
+
+- **The settle** (`src/43-settle.js`, new). The clip's first frame is taken
+  over at rest (`rag.enterPose`, new in 43-ragdoll.js), the hips and the top
+  of the pelvis held by soft springs, the back held, the neck half held and
+  the arms let go, and 120 steps of 1/90 s are run against what they are
+  sitting on and against themselves. The pose it comes to rest in is kept as
+  a turn per bone against that first frame.
+- **What they sit on** (`sitGeo` in 43-jadrija.js), read off `terraceSet`
+  number for number: the moulded chair's seat and back and its square table,
+  MINI's mesh armchair (seat, pad where there is one, raked back as two
+  boxes, both arms) and its pedestal disc, and for the quay sitters the
+  concrete itself, a profile of `surfaceY` every 2 cm so a step stays a step.
+  The chair placement records the table each chair belongs to; it walks
+  `terraceTables` table by table, which is `terraceSeats` in the same order,
+  so every `rng` draw is where it was.
+- **avbdNet** (43-avbd.js, (i)): world boxes turned about +y, which a capsule
+  meets as it meets the floor, and a list of capsule pairs — forearm and hand
+  against trunk and thighs, knee against knee. Both empty unless asked for,
+  so the hammock, the chains and the springboard step as they did.
+- **The capsules** are measured off each of the eight bodies' own skin
+  (`settleCaps`): a quantile of the distance from each bone's vertices to its
+  segment, and a sole capsule heel to toe on the lowest vertex.
+- **Each person's own**, off their seed (`crowdJit`, never `rng`): muscle tone
+  a part, how far the back rounds — forward over the table or back on to the
+  backrest, and never back where nothing is behind them — and how the head
+  goes forward, over and round. The rest is the physics: which arm ends up on
+  the table, in the lap, on the chair's arm or hanging.
+- **No further than a settle**: a joint turns at most 8° at the back, 16° at
+  the neck, 28°/35° at the shoulder and elbow, and the hips move 3.5 cm at
+  most. At full tone with no limit, seat 26 at Caffe TRAMPULIN (`sittable`)
+  put her right hand 33 cm down and her head 22 cm forward over the table's
+  corner — asleep at the table, not sitting at it.
+- **The layer** (41-skin.js, `settle`): the turns are laid over the clip each
+  time the figure is posed, so the clip's breathing and fidgeting go on under
+  a body that has sat down. Eased in over 1.1 s when a settle is fresh, off
+  and back over 0.35 s for any clip it was not measured against.
+- **The far tier** takes the two biggest numbers of the same deal — how far
+  the back rounds and the head drops — on the instanced `sit` pose
+  (`settleLean`), so a quay sitter looks the same way at fifty metres.
+
+Measured:
+
+- Settle: 17–26 ms of solving a person warm, 35–46 ms for the first on a cold
+  page; one person at a time at most, 1.6 ms of it a frame, the body's net and
+  the take-over in frames of their own. With every sitter on the shore re-queued
+  at once the worst frame's share was 1.9 ms; on arrival, cold, 7.1 ms once.
+  Everybody within reach is sat down in about 5 s of arriving. The fastest
+  body at the last step is 0–7 cm/s.
+- Steady state: the layer is 0.3–1.3 µs on a 6 µs pose — under 0.03 ms a
+  frame for every sitter on the shore. Crowd update and GPU
+  at the café stations (t 330, t 460) are the same before and after to within
+  the run-to-run drift (before 1.47–2.04 ms update / 9.4–11.5 ms GPU a frame,
+  after 1.66–2.06 / 9.4–10.8).
+- Positions: the hash of every still person's x, y, z and yaw, and of every
+  seed and scale, is identical before and after; census 446/333/86/27.
+- Baye: get-in, lie (ragdoll on), get-out, and pumped in phase to 82° a fall
+  over the rim and the get-up, all as in 1.536.0.
+
+Probes: `__fr.jad.raw().crowd.settle` — `stats()`, `off(true)` (everybody in
+their bare clip, for a before from the same build), `redo()`, `trace(seat)`,
+`geo(seat)`, `fig(seat)`.
+
 ## [1.537.0] — 2026-09-27
 
 ### stone, grass and the small plants, at the distance you stand from them
