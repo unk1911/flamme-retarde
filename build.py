@@ -47,7 +47,7 @@ SHARE = Path("/mnt/synology/shared/micko/flamme-retarde")
 # rebuild byte-for-byte identically, because comparing checksums is how we
 # check that what is on the server is what is in the repo. Bump them together
 # when cutting a release, next to the CHANGELOG entry.
-VERSION = "1.543.1"
+VERSION = "1.543.2"
 BUILD_DATE = "2026-09-28"
 
 THREE_VERSION = "0.180.0"
@@ -192,6 +192,14 @@ def bundle_payload() -> str:
     total = 0
     for p in sorted(PAYLOAD.iterdir()):
         if p.is_dir() or p.name.startswith("."):
+            continue
+        # THE OLD BATHERS STAY ON DISK AND OUT OF THE PAGE. Misha, 28 Sep 2026,
+        # watching the file size: all eight have a v2 (`bather2_*`, listed in
+        # bathers2.json), and the painted v1 blobs were only the fallback for
+        # a v2 that was missing — 2.1 MB raw, 2.8 MB as base64, never drawn.
+        # See `BATHER_CAST` in src/43-jadrija.js; a name with no v2 now simply
+        # has no figure, which is what a failed inflate already gave it.
+        if p.name.startswith("bather_") and p.name.endswith(".fr3d.gz"):
             continue
         key = p.stem if p.suffix != ".gz" else p.name[: -len(".gz")].replace(".", "_")
         key = re.sub(r"[^A-Za-z0-9_]", "_", key)

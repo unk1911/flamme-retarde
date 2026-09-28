@@ -8,6 +8,18 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.543.2] — 2026-09-28
+
+### 2.7 MB lighter: the old swimmers stay out of the page
+
+Misha: *"can we maybe cut back on those swimmers for now, just trying to stay
+within certain filesizes"*. All eight swimmers have had a v2 since 1.464.0
+(`bather2_*`, listed in bathers2.json), and the painted v1 blobs
+(`bather_*.fr3d.gz`, 2.1 MB raw) were only the fallback for a missing v2 —
+never drawn. `build.py` now leaves them out of the html; they stay committed
+in build/payload/ as the bake's output. 53.21 → 50.49 MB. Nothing on screen
+changes.
+
 ## [1.543.1] — 2026-09-28
 
 ### She does what she says she is doing
