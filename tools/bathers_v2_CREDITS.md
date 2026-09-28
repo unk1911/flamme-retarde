@@ -52,3 +52,17 @@ Mindfront, punkduck
 | young_caucasian_female | CC0 | makehuman_system |
 | young_caucasian_male | CC0 | makehuman_system |
 | young_caucasian_male2 | CC0 | makehuman_system |
+
+## The Bucketeer (`bucketeer2.fr3d.gz`, 1.540.0)
+
+Built by `tools/blender/baye2.py --figure bucketeer2` on Baye v2.0's own
+base, and drawn with Baye v2.0's skin map (`baye2_skin`, from
+`darthfurby_caucasian_female`, CC0). The two things she wears that Baye does
+not are both in the table above:
+
+| part | asset | licence | author |
+| --- | --- | --- | --- |
+| hair (dyed blonde at runtime) | rehmanpolanski_hair_bun_brown | CC0 | RehmanPolanski |
+| one-piece (dyed red at runtime) | mindfront_f_one-piece_swimsuit_01 | CC-BY 4.0 | Mindfront |
+| brows | mindfront_eyebrows_09 | CC0 | Mindfront |
+| lashes | mindfront_eyelashes_04 | CC0 | Mindfront |

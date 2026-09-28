@@ -3639,7 +3639,11 @@ const POUR = {
   a: { eye: [3.28, 1.76, 1.10], at: [0.15, 0.30, 0.90], fov: 34 },
   b: { eye: [1.577, 2.751, 1.50], at: [0.00, 0.00, 1.42], fov: 26 },
   push: 0.30,        // m of lean-in on shot A, and then it stops
-  pushFor: 1.25,     // s, which is when the last of the water is over the lip
+  // s, which is when the last of the water is down. (1.540.0) The pour is a
+  // swing-toss now and the water leaves when the physics says, so this is
+  // read off the throw's own table rather than typed here — see `TOSS` in
+  // 45-bucketeer.js.
+  pushFor: TOSS.dry,
   // ── how long, on her clock. `cut` is the frame the pail comes upright.
   cut: POUR_INTO.rest,
   // 1.75 s past the pick-up, and the three numbers inside it are the reason.
@@ -3658,7 +3662,8 @@ const POUR = {
   back: 0.45,        // and how long the game takes to come back up out of it
   // ── and the one thing she says.
   line: 'tip_evo',
-  lineAt: 0.90,
+  // While the sheet is in the air — `TOSS.mid`, for the same reason.
+  lineAt: TOSS.mid,
 };
 
 /** The cut, or null. */
