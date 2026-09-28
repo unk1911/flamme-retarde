@@ -932,6 +932,27 @@ function avbdQSub(a, oa, b, ob, out) {
   out[1] = 2 * (aw * by - ax * bz + ay * bw + az * bx);
   out[2] = 2 * (aw * bz + ax * by - ay * bx + az * bw);
 }
+/**
+ * `avbdQSub` the short way round: 2·vec(a·b⁻¹), negated when the product's
+ * w is negative, so a difference past a half turn pulls back the near way
+ * and not on round. For the angles (h); the joints keep the demo's own.
+ */
+function avbdQSubNear(a, oa, b, ob, out) {
+  avbdQSub(a, oa, b, ob, out);
+  if (a[oa + 3] * b[ob + 3] + a[oa] * b[ob] + a[oa + 1] * b[ob + 1] + a[oa + 2] * b[ob + 2] < 0) {
+    out[0] = -out[0]; out[1] = -out[1]; out[2] = -out[2];
+  }
+}
+/** out = a·b, (x, y, z, w); `ca` conjugates a first, `cb` b. Aliasing-safe. */
+function avbdQMul(a, oa, b, ob, out, oo, ca = false, cb = false) {
+  const s = ca ? -1 : 1, t = cb ? -1 : 1;
+  const ax = s * a[oa], ay = s * a[oa + 1], az = s * a[oa + 2], aw = a[oa + 3];
+  const bx = t * b[ob], by = t * b[ob + 1], bz = t * b[ob + 2], bw = b[ob + 3];
+  out[oo] = aw * bx + ax * bw + ay * bz - az * by;
+  out[oo + 1] = aw * by - ax * bz + ay * bw + az * bx;
+  out[oo + 2] = aw * bz + ax * by - ay * bx + az * bw;
+  out[oo + 3] = aw * bw - ax * bx - ay * by - az * bz;
+}
 /** A contact frame for normal n into out[o..o+8]: n, t1, t2. manifold.ts's `orthonormal`. */
 function avbdOrtho(out, o, nx, ny, nz) {
   out[o] = nx; out[o + 1] = ny; out[o + 2] = nz;
@@ -1541,6 +1562,35 @@ function avbdBall(o) {
 // which one-sided the rim went straight through (MEASURED, 46 mm into a
 // forearm at the top of a swing).
 //
+// (h) AND AN ANGLE BETWEEN TWO BODIES, for a ragdoll (1.536.0, 43-ragdoll.js).
+// Misha, 27 Sep 2026, of her falling out of the hammock: *"she falls off very
+// stiffly, like a wooden doll ... is it possible to make her body like, super
+// elastic ... and can AVBD equations be used to achieve that fluidity"*. A
+// ball socket (the reference's Joint) holds two limbs together; what a body
+// also needs is what its muscles and its ligaments do about the angle, and
+// that is three things on one pair, all on the rotation of B relative to A
+// in a JOINT FRAME — `qL` on A, `qR` on B, so r = qL⁻¹·qA⁻¹·qB·qR is the
+// bone's own rotation off its rest, the frame every pose in this project is
+// written in (legU −x forward, legL +x the knee):
+//
+//   THE DRIVE, a spring toward a target r, `k` N·m/rad, with no multiplier
+//   and no ramp — the stiffness asked for is the stiffness it has, which the
+//   reference's finite joint is not (its penalty climbs to the stiffness by
+//   beta·|C| an iteration, and a soft muscle with a small error never gets
+//   there). The angle lock's C and Jacobian, turned by the target.
+//
+//   THE DAMPING, `kd` N·m·s/rad, as the same spring toward where B stood
+//   relative to A at the start of the step with kd/h of stiffness: the
+//   implicit form of a torque against the joint's own angular velocity.
+//
+//   THE LIMITS, a box on r's rotation vector, `lo` to `hi` a component. Each
+//   bound is a one-sided row with its own multiplier and penalty, the contact
+//   normal's rule turned to an angle: it may only push back into the box. The
+//   Jacobian is the log map's, J_l⁻¹(φ), because a knee at 90 degrees whose
+//   side-to-side row thought its axis was the bind pose's would push the
+//   shin round the wrong way; the error is the true one every iteration, so
+//   the fixed point is exact either way and this only makes it converge.
+//
 // NOT TAKEN: the box-box manifold, the broadphase (the only pair that matters
 // is cloth against her, and her bounding sphere is the broadphase), fracture.
 // ---------------------------------------------------------------------------
@@ -1551,7 +1601,8 @@ function avbdBall(o) {
  * gravity [x, y, z], drag (1/s, the default per body), vMax, wMax (m/s, rad/s
  * — one bad step is one bad frame), margin (m, how near a contact is made),
  * deep (m, how far inside a new one is refused), mu, floorMu, capK (N/m for
- * the contacts of a `softBody`).
+ * the contacts of a `softBody`); maxAngles and betaLim (the limits' penalty
+ * ramp, default `beta`) and limK (their ceiling) for (h).
  */
 function avbdNet(o) {
   const NB = o.maxBodies;
@@ -1583,6 +1634,9 @@ function avbdNet(o) {
   const jPA = new Float64Array(3 * NJ), jLA = new Float64Array(3 * NJ);
   const jC0L = new Float64Array(3 * NJ), jC0A = new Float64Array(3 * NJ);
   const jOn = new Uint8Array(NJ);
+  // Measured apart from the rest by `measure` — a ragdoll's sockets, whose
+  // gap is never drawn (her skin is written from the bodies' turns).
+  const jLoose = new Uint8Array(NJ);
   let nj = 0;
 
   // ── strings ───────────────────────────────────────────────────────────
@@ -1595,7 +1649,27 @@ function avbdNet(o) {
   // A string with a stiffness is a SPRING instead: two-way, that many N/m,
   // no multiplier — the reference's Spring (forces.ts). See (f).
   const sK = new Float64Array(NS);
+  const sPull = new Uint8Array(NS);
   let ns = 0;
+
+  // ── angles — see (h) ──────────────────────────────────────────────────
+  const NA = o.maxAngles || 0;
+  const anA = new Int32Array(NA), anB = new Int32Array(NA);
+  const anQL = new Float64Array(4 * NA), anQR = new Float64Array(4 * NA), anT = new Float64Array(4 * NA);
+  const anK = new Float64Array(NA), anKD = new Float64Array(NA);
+  const anLo = new Float64Array(3 * NA), anHi = new Float64Array(3 * NA);
+  // Six one-sided rows an angle, axis·2 + (0 lower, 1 upper): multiplier,
+  // penalty, and the error at the start of the step.
+  const anLam = new Float64Array(6 * NA), anPen = new Float64Array(6 * NA).fill(AVBD.penMin);
+  const anC0 = new Float64Array(6 * NA);
+  const anRel0 = new Float64Array(4 * NA);        // qA⁻¹·qB at the start of the step
+  const anOn = new Uint8Array(NA);
+  const betaLim = o.betaLim || o.beta;
+  // And a ceiling on the limits' penalty, N·m/rad: a limit is a ligament,
+  // firm and not infinitely so. See RAGDOLL.limK for why it has one.
+  const limCap = Math.min(AVBD.penMax, o.limK || AVBD.penMax);
+  let na = 0, hNow = 1 / 120;
+  let angOff = new Int32Array(NB + 1), angIdx = new Int32Array(0);
 
   // ── points and capsules, in their bodies' frames ─────────────────────
   const NPT = o.maxPoints, NCP = o.maxCaps;
@@ -1671,12 +1745,18 @@ function avbdNet(o) {
     jOn[k] = kLin > 0 || kAng > 0 ? 1 : 0;
     return k;
   }
-  /** A string of rest length `len` from `a`'s `ra` (a world point if `a` < 0) to `b`'s `rb`. */
-  function addString(a, ra, b, rb, len, k = 0) {
+  /**
+   * A string of rest length `len` from `a`'s `ra` (a world point if `a` < 0)
+   * to `b`'s `rb`. With `k` a spring (f); with `k` and `slackOnly` a spring
+   * that only pulls — a soft tether, which a hard contact always beats (the
+   * ragdoll's in the hammock, `ragHold`).
+   */
+  function addString(a, ra, b, rb, len, k = 0, slackOnly = false) {
     const s = ns++;
     sA[s] = a; sB[s] = b;
     for (let r = 0; r < 3; r++) { sRA[3 * s + r] = ra[r]; sRB[3 * s + r] = rb[r]; }
     sLen[s] = len; sK[s] = k; sPen[s] = k > 0 ? k : AVBD.penMin; sOn[s] = 1;
+    sPull[s] = slackOnly ? 1 : 0;
     return s;
   }
   /**
@@ -1724,6 +1804,47 @@ function avbdNet(o) {
     const put = (i, v) => { adjIdx[adjOff[i] + fill[i]++] = v; };
     for (let k = 0; k < nj; k++) { if (jA[k] >= 0) put(jA[k], k); put(jB[k], k); }
     for (let s = 0; s < ns; s++) { if (sA[s] >= 0) put(sA[s], -1 - s); put(sB[s], -1 - s); }
+    // And the angles, on a list of their own. `finish` may be called again
+    // after more is added — the ragdoll is built into the hammock's net the
+    // first time she lies in it, long after the cloth was hung.
+    const ca = new Int32Array(NB);
+    for (let m = 0; m < na; m++) { ca[anA[m]]++; ca[anB[m]]++; }
+    angOff = new Int32Array(NB + 1);
+    for (let i = 0; i < NB; i++) angOff[i + 1] = angOff[i] + ca[i];
+    angIdx = new Int32Array(angOff[NB]);
+    ca.fill(0);
+    for (let m = 0; m < na; m++) {
+      angIdx[angOff[anA[m]] + ca[anA[m]]++] = m;
+      angIdx[angOff[anB[m]] + ca[anB[m]]++] = m;
+    }
+  }
+  /**
+   * An angle between bodies a and b — see (h). `qL` in a's frame and `qR` in
+   * b's, [x, y, z, w]: r = qL⁻¹·qA⁻¹·qB·qR is what the drive, the damping and
+   * the limits are all about. Off (no drive, no damping, no limits) until set.
+   */
+  function addAngle(a, b, qL, qR) {
+    const m = na++;
+    anA[m] = a; anB[m] = b;
+    for (let k = 0; k < 4; k++) { anQL[4 * m + k] = qL[k]; anQR[4 * m + k] = qR[k]; anT[4 * m + k] = k === 3 ? 1 : 0; }
+    anK[m] = 0; anKD[m] = 0;
+    anLo.fill(-10, 3 * m, 3 * m + 3); anHi.fill(10, 3 * m, 3 * m + 3);
+    anOn[m] = 1;
+    return m;
+  }
+  /** The frames again — a ragdoll re-measured against a new pose. */
+  function setAngleFrame(m, qL, qR) {
+    for (let k = 0; k < 4; k++) { anQL[4 * m + k] = qL[k]; anQR[4 * m + k] = qR[k]; }
+  }
+  /** Where the drive pulls r to, as a quaternion. */
+  function setAngleTarget(m, x, y, z, w) {
+    anT[4 * m] = x; anT[4 * m + 1] = y; anT[4 * m + 2] = z; anT[4 * m + 3] = w;
+  }
+  /** The drive's stiffness, N·m/rad, and its damping, N·m·s/rad. */
+  function setAngleK(m, k, kd) { anK[m] = k; anKD[m] = kd; }
+  /** The box on r's rotation vector, rad; beyond ±π a side is no limit at all. */
+  function setAngleLimits(m, lo, hi) {
+    for (let k = 0; k < 3; k++) { anLo[3 * m + k] = lo[k]; anHi[3 * m + k] = hi[k]; }
   }
 
   // ── scratch ──────────────────────────────────────────────────────────
@@ -1874,7 +1995,7 @@ function avbdNet(o) {
   let sCC = 0;
   function stringF(s, alpha) {
     const c = stringEval(s);
-    if (sK[s] > 0) { sCC = c; return sK[s] * c; }
+    if (sK[s] > 0) { sCC = c; return sPull[s] && c < 0 ? 0 : sK[s] * c; }
     const c0 = sC0[s];
     sCC = c - (c0 > 0 ? alpha * c0 : 0);
     const f = sPen[s] * sCC + sLam[s];
@@ -1901,6 +2022,111 @@ function avbdNet(o) {
     aX[6] += k * qz * nx; aX[7] += k * qz * ny; aX[8] += k * qz * nz;
     bL[0] += f * nx; bL[1] += f * ny; bL[2] += f * nz;
     bA[0] += f * qx; bA[1] += f * qy; bA[2] += f * qz;
+  }
+
+  // ── angles — see (h) ─────────────────────────────────────────────────
+  const anF = new Float64Array(4), anR = new Float64Array(4), anPhi = new Float64Array(3);
+  const anJw = new Float64Array(9), anTq = new Float64Array(4), anE = new Float64Array(3);
+  /**
+   * Angle m as it stands: F = qA·qL into anF, r's rotation vector φ into
+   * anPhi, and in anJw the world direction each component of φ grows along
+   * when B turns — R(F)·(row k of J_l⁻¹(φ))ᵀ, the log map's left Jacobian.
+   */
+  function angleEval(m) {
+    const a = anA[m], b = anB[m];
+    avbdQMul(Q, 4 * a, anQL, 4 * m, anF, 0);
+    avbdQMul(anF, 0, Q, 4 * b, anR, 0, true);
+    avbdQMul(anR, 0, anQR, 4 * m, anR, 0);
+    let x = anR[0], y = anR[1], z = anR[2];
+    let w = anR[3];
+    if (w < 0) { x = -x; y = -y; z = -z; w = -w; }
+    const s = Math.sqrt(x * x + y * y + z * z);
+    const th = 2 * Math.atan2(s, w);
+    const g = s > 1e-9 ? th / s : 2;
+    const px = x * g, py = y * g, pz = z * g;
+    anPhi[0] = px; anPhi[1] = py; anPhi[2] = pz;
+    // J_l⁻¹ = I − ½[φ]× + c([φ]×)², c = 1/θ² − 1/(2θ·tan(θ/2)), 1/12 at nought.
+    const c = th > 1e-3 ? 1 / (th * th) - 1 / (2 * th * Math.tan(th / 2)) : 1 / 12;
+    const t2 = th * th;
+    // R(F), rows.
+    const fx = anF[0], fy = anF[1], fz = anF[2], fw = anF[3];
+    const r00 = 1 - 2 * (fy * fy + fz * fz), r01 = 2 * (fx * fy - fw * fz), r02 = 2 * (fx * fz + fw * fy);
+    const r10 = 2 * (fx * fy + fw * fz), r11 = 1 - 2 * (fx * fx + fz * fz), r12 = 2 * (fy * fz - fw * fx);
+    const r20 = 2 * (fx * fz - fw * fy), r21 = 2 * (fy * fz + fw * fx), r22 = 1 - 2 * (fx * fx + fy * fy);
+    for (let k = 0; k < 3; k++) {
+      // Row k of J_l⁻¹: (1 − cθ²)e_k + c·φ_k·φ − ½·(row k of [φ]×).
+      const pk = anPhi[k];
+      let j0 = c * pk * px, j1 = c * pk * py, j2 = c * pk * pz;
+      if (k === 0) { j0 += 1 - c * t2; j1 += 0.5 * pz; j2 -= 0.5 * py; }
+      else if (k === 1) { j1 += 1 - c * t2; j0 -= 0.5 * pz; j2 += 0.5 * px; }
+      else { j2 += 1 - c * t2; j0 += 0.5 * py; j1 -= 0.5 * px; }
+      anJw[3 * k] = r00 * j0 + r01 * j1 + r02 * j2;
+      anJw[3 * k + 1] = r10 * j0 + r11 * j1 + r12 * j2;
+      anJw[3 * k + 2] = r20 * j0 + r21 * j1 + r22 * j2;
+    }
+  }
+  /** A spring of k toward attitude `anTq` for B, on body i: the angle lock's form. */
+  function stampTurn(m, i, k) {
+    const b = anB[m], sg = anA[m] === i ? 1 : -1;
+    avbdQSubNear(anTq, 0, Q, 4 * b, anE);
+    aA[0] += k; aA[4] += k; aA[8] += k;
+    bA[0] += sg * k * anE[0]; bA[1] += sg * k * anE[1]; bA[2] += sg * k * anE[2];
+  }
+  function stampAngle(m, i, alpha) {
+    const a = anA[m], isA = a === i;
+    const lim = anLo[3 * m] > -3.2 || anLo[3 * m + 1] > -3.2 || anLo[3 * m + 2] > -3.2
+      || anHi[3 * m] < 3.2 || anHi[3 * m + 1] < 3.2 || anHi[3 * m + 2] < 3.2;
+    if (anK[m] > 0 || lim) angleEval(m);
+    // The drive: B's attitude for r = target is F·t·qR⁻¹.
+    if (anK[m] > 0) {
+      avbdQMul(anF, 0, anT, 4 * m, anTq, 0);
+      avbdQMul(anTq, 0, anQR, 4 * m, anTq, 0, false, true);
+      stampTurn(m, i, anK[m]);
+    }
+    // The damping: toward where B stood on A at the start of the step.
+    if (anKD[m] > 0) {
+      avbdQMul(Q, 4 * a, anRel0, 4 * m, anTq, 0);
+      stampTurn(m, i, anKD[m] / hNow);
+    }
+    if (!lim) return;
+    for (let r = 0; r < 6; r++) {
+      const ax = r >> 1, up = r & 1;
+      const bound = up ? anHi[3 * m + ax] : anLo[3 * m + ax];
+      if (up ? bound > 3.2 : bound < -3.2) continue;
+      const q = 6 * m + r;
+      const C = up ? bound - anPhi[ax] : anPhi[ax] - bound;
+      const c0 = anC0[q];
+      const f = anPen[q] * (C - (c0 < 0 ? alpha * c0 : 0)) + anLam[q];
+      if (f >= 0) continue;
+      const s = (up ? -1 : 1) * (isA ? -1 : 1);
+      const jx = s * anJw[3 * ax], jy = s * anJw[3 * ax + 1], jz = s * anJw[3 * ax + 2];
+      const k = anPen[q];
+      aA[0] += k * jx * jx; aA[1] += k * jx * jy; aA[2] += k * jx * jz;
+      aA[3] += k * jy * jx; aA[4] += k * jy * jy; aA[5] += k * jy * jz;
+      aA[6] += k * jz * jx; aA[7] += k * jz * jy; aA[8] += k * jz * jz;
+      bA[0] += f * jx; bA[1] += f * jy; bA[2] += f * jz;
+    }
+  }
+  /** The limits' rows at the start of a step (`dual` false) or after an iteration. */
+  function angleRows(m, alpha, dual) {
+    angleEval(m);
+    for (let r = 0; r < 6; r++) {
+      const ax = r >> 1, up = r & 1;
+      const bound = up ? anHi[3 * m + ax] : anLo[3 * m + ax];
+      if (up ? bound > 3.2 : bound < -3.2) continue;
+      const q = 6 * m + r;
+      const C = up ? bound - anPhi[ax] : anPhi[ax] - bound;
+      if (!dual) {
+        anC0[q] = C;
+        anLam[q] *= o.alpha * o.gamma;
+        anPen[q] = Math.min(limCap, Math.max(AVBD.penMin, anPen[q] * o.gamma));
+        continue;
+      }
+      const c = C - (anC0[q] < 0 ? alpha * anC0[q] : 0);
+      const f = anPen[q] * c + anLam[q];
+      anLam[q] = f < 0 ? f : 0;
+      if (f < 0) anPen[q] = Math.min(limCap, anPen[q] + betaLim * Math.abs(c));
+    }
   }
 
   // ── contacts ─────────────────────────────────────────────────────────
@@ -2220,6 +2446,14 @@ function avbdNet(o) {
       sLam[s] *= o.alpha * o.gamma;
       sPen[s] = Math.min(AVBD.penMax, Math.max(AVBD.penMin, sPen[s] * o.gamma));
     }
+    // Angles: where B stands on A now, for the damping, and the limits' C0
+    // and warm start — see (h).
+    hNow = h;
+    for (let m = 0; m < na; m++) {
+      if (!anOn[m] || !live[anA[m]] || !live[anB[m]]) continue;
+      avbdQMul(Q, 4 * anA[m], Q, 4 * anB[m], anRel0, 4 * m, true);
+      angleRows(m, alpha, false);
+    }
     // Bodies: the inertial target (Eq. 2) and the adaptive warm start.
     const h2 = h * h;
     for (let i = 0; i < nb; i++) {
@@ -2282,6 +2516,10 @@ function avbdNet(o) {
             if (sOn[s] && ok(sA[s]) && live[sB[s]]) stampString(s, i, alpha);
           }
         }
+        for (let e = angOff[i]; e < angOff[i + 1]; e++) {
+          const m = angIdx[e];
+          if (anOn[m] && live[anA[m]] && live[anB[m]]) stampAngle(m, i, alpha);
+        }
         for (let e = conOff[i]; e < conOff[i + 1]; e++) stampContact(conIdx[e], i, alphaC);
         bL[0] = -bL[0]; bL[1] = -bL[1]; bL[2] = -bL[2];
         bA[0] = -bA[0]; bA[1] = -bA[1]; bA[2] = -bA[2];
@@ -2320,6 +2558,12 @@ function avbdNet(o) {
         sF[s] = f;
         if (f > 0) sPen[s] = Math.min(AVBD.penMax, sPen[s] + o.beta * Math.abs(sCC));
       }
+      for (let m = 0; m < na; m++) {
+        if (!anOn[m] || !live[anA[m]] || !live[anB[m]]) continue;
+        if (anLo[3 * m] < -3.2 && anLo[3 * m + 1] < -3.2 && anLo[3 * m + 2] < -3.2
+          && anHi[3 * m] > 3.2 && anHi[3 * m + 1] > 3.2 && anHi[3 * m + 2] > 3.2) continue;
+        angleRows(m, alpha, true);
+      }
       for (let c = 0; c < nc; c++) {
         contactEval(c, alphaC);
         const cap = Math.min(AVBD.penMax, cK[c]);
@@ -2356,17 +2600,18 @@ function avbdNet(o) {
 
   /** The hard joints and the strings as they stand: the worst gap, the worst stretch. */
   function measure() {
-    let js = 0, ss = -1e9;
+    let js = 0, ss = -1e9, jl = 0;
     for (let k = 0; k < nj; k++) {
       if (!jOn[k] || jKL[k] !== Infinity || !ok(jA[k]) || !live[jB[k]]) continue;
       jointEval(k);
-      js = Math.max(js, Math.hypot(C[0], C[1], C[2]));
+      const e = Math.hypot(C[0], C[1], C[2]);
+      if (jLoose[k]) { if (e > jl) { jl = e; stats.worstLoose = k; } } else if (e > js) { js = e; stats.worstJ = k; }
     }
     for (let s = 0; s < ns; s++) {
       if (!sOn[s] || !ok(sA[s]) || !live[sB[s]] || sK[s] > 0) continue;
       ss = Math.max(ss, stringEval(s));
     }
-    stats.maxStretch = js; stats.maxString = ss;
+    stats.maxStretch = js; stats.maxString = ss; stats.maxLoose = jl;
     return stats;
   }
   /**
@@ -2443,6 +2688,12 @@ function avbdNet(o) {
     jRA[3 * k] = px; jRA[3 * k + 1] = py; jRA[3 * k + 2] = pz;
     if (q) { jQW[4 * k] = q[0]; jQW[4 * k + 1] = q[1]; jQW[4 * k + 2] = q[2]; jQW[4 * k + 3] = q[3]; }
   }
+  /** Joint k measured apart (`stats.maxLoose`) — see `jLoose`. */
+  function setJointLoose(k, on) { jLoose[k] = on ? 1 : 0; }
+  /** Where joint k is on each of its bodies, in their frames — a ragdoll re-measured. */
+  function setJointArms(k, ra, rb) {
+    for (let r = 0; r < 3; r++) { jRA[3 * k + r] = ra[r]; jRB[3 * k + r] = rb[r]; }
+  }
   /** A joint's two stiffnesses; both 0 switches it off. */
   function setJointK(k, kLin, kAng) {
     const was = jOn[k];
@@ -2456,6 +2707,7 @@ function avbdNet(o) {
   /** Every multiplier to nought and every penalty to the floor — a cold start. */
   function resetDuals() {
     jLL.fill(0); jLA.fill(0); sLam.fill(0); cLam.fill(0); pLam.fill(0);
+    anLam.fill(0); anPen.fill(AVBD.penMin);
     jPL.fill(AVBD.penMin); jPA.fill(AVBD.penMin);
     for (let q = 0; q < ns; q++) sPen[q] = sK[q] > 0 ? sK[q] : AVBD.penMin;
     cPen.fill(AVBD.penMin); pPen.fill(AVBD.penMin);
@@ -2497,5 +2749,9 @@ function avbdNet(o) {
       if (line) for (let k = 0; k < 6; k++) inAx[k] = line[k];
     },
     step, measure, depth, kick, place, setTarget, setJointK, setLive, support, resetDuals, relax,
-    get nb() { return nb; }, get nc() { return nc; }, get ns() { return ns; }, get nj() { return nj; } };
+    addAngle, setAngleFrame, setAngleTarget, setAngleK, setAngleLimits, setJointArms, setJointLoose,
+    /** Debug: angle m's rotation vector now, rad, in its joint frame. */
+    angleNow: (m) => { angleEval(m); return [anPhi[0], anPhi[1], anPhi[2]]; },
+    get nb() { return nb; }, get nc() { return nc; }, get ns() { return ns; }, get nj() { return nj; },
+    get na() { return na; } };
 }

@@ -32982,8 +32982,12 @@ async function buildJadrija(scene) {
   //   hamOut   `hamIn` backwards, with the guide coming ON over `HAM.grab`
   //            toward an upright mark under where she is, so the swing is
   //            stopped by her own legs going down and not by a cut.
-  const HAM = { hamGo: 1, hamTurn: 1, hamIn: 1, hamHeld: 1, hamOut: 1 };
-  const HAM_SIM = { hamIn: 1, hamHeld: 1, hamOut: 1 };
+  //   hamFall  out of it over the rim, as a ragdoll, and lying where she
+  //            landed until she is still — see HAM_RAG.
+  //   hamUp    up off the ground: from where she lies into a get-up clip,
+  //            and then `hamBack` home like any other way out.
+  const HAM = { hamGo: 1, hamTurn: 1, hamIn: 1, hamHeld: 1, hamOut: 1, hamFall: 1, hamUp: 1 };
+  const HAM_SIM = { hamIn: 1, hamHeld: 1, hamOut: 1, hamFall: 1 };
   // The only requests that are answered in the hammock without getting out of
   // it first: her eyes, her mouth, a yawn, your hand on her head.
   const HAM_KEEP = { look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1, 'mouth.open': 1,
@@ -33232,6 +33236,8 @@ async function buildJadrija(scene) {
     if (!api.herIn) return;
     api.herPose(f.mesh.position, f.mesh.quaternion);
     f.mesh.updateMatrixWorld();
+    // Lying in it: handed to the ragdoll — see `hamRagIn`.
+    if (show.phase === 'hamHeld' && H && !H.rag && !api.ragOn) hamRagIn(f);
     // Where she is, for everything else in this file that asks.
     const [t, s] = local(f.mesh.position.x, f.mesh.position.z);
     show.t = t; show.s = s;
@@ -33253,6 +33259,171 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── HER AS A RAGDOLL ───────────────────────────────────────────────────
+  //
+  // 1.536.0. Misha, 27 Sep 2026: *"she falls off very stiffly, like a
+  // wooden doll ... is it possible to make her body like, super elastic, to
+  // groove with the hammock the way a real human lying down on it would
+  // do"*. Getting in is the one body and the guide, as it was; once she is
+  // lying (`hamHeld`) the hammock hands her to the ragdoll (43-ragdoll.js),
+  // whose muscles pull toward `hamLie` — the clip goes on playing under it,
+  // and is what the drive is aimed at — and whose bodies are written back
+  // into her skeleton every frame, so nothing about the mesh is animated
+  // against the physics. Getting out, she is handed back to the one body and
+  // her pose eased from the ragdoll's to the clip's; falling out, she stays a
+  // ragdoll to the ground (`hamFall`) and is got up from wherever she lies
+  // (`hamUp`).
+  const HAM_RAG = {
+    // Muscle tone (RAGDOLL's `tension`): taken over at 1, the clip's own
+    // hold, and let go to `lie` over `settle` s — she relaxes into it.
+    settle: 1.4, lie: 0.55,
+    // Going over the rim, and on the ground. MEASURED at 0.35 her hands
+    // stayed laced behind her head all the way to the ground, `hamLie`'s
+    // arms held on the way down; at this she goes as she is thrown.
+    fall: 0.12, ground: 0.12,
+    // s with her pelvis clear of the cloth (HAMMOCK.fellAt) before she is out.
+    fellFor: 0.20,
+    // Getting out: s to ease her from the ragdoll's pose to the clip's.
+    backFade: 0.45,
+    // Down: still when nothing of her is faster than `rest` m/s for
+    // `restFor` s — or after `restMax` s whatever; `landed` her pelvis this
+    // near the ground.
+    rest: 0.15, restFor: 0.5, restMax: 4.0, landed: 0.30,
+    // Up: s from how she lies into the first frame of the get-up; and how far
+    // from the line under the ties it is stood, m — the empty bed is 1.3
+    // wide, and she is on all fours half a body along from where she stands.
+    upFade: 0.75, clear: 0.95,
+  };
+  // Whether her skeleton is being written by the ragdoll (`manual`) — so it
+  // is taken off again whichever way she leaves.
+  let hamManual = false;
+  const _hmY = new THREE.Vector3(0, 1, 0);
+
+  /** Lying in it: the ragdoll takes over from the one body, where she is drawn. */
+  function hamRagIn(f) {
+    const api = hammock.api, H = show.ham;
+    if (!api.rag) api.ragAttach(f, chainCapsules());
+    const nb = f.bones.length;
+    const pose = { q: new Float32Array(nb * 4), t: new Float32Array(3), w: 1,
+      clip: { q: new Float32Array(nb * 4), t: new Float32Array(3) } };
+    const L = f.local();
+    pose.clip.q.set(L.q); pose.clip.t.set(L.t.subarray(0, 3));
+    if (!api.ragEnter(f, f.mesh.position, f.mesh.quaternion)) return;
+    // This frame as the ragdoll will write it, which is this frame as drawn.
+    api.rag.write(pose, f.mesh.position, f.mesh.quaternion, pose.clip.q);
+    f.manual(pose);
+    hamManual = true;
+    H.rag = { pose, t: 0, fade: 0, out: 0, rest: 0, landed: false };
+  }
+
+  /**
+   * After the hammock's step, before her figure is posed: the ragdoll's
+   * muscle targets from the clip under it, and its bodies into her skeleton.
+   * Or, handed back, the ragdoll's last pose eased off over the clip.
+   */
+  function hamRagTick(dt) {
+    const H = show && show.ham;
+    if (!H || !H.rag || !skinFig) return;
+    const R = H.rag, api = hammock.api, f = skinFig;
+    if (api.ragOn) {
+      R.t += dt;
+      let k = HAM_RAG.lie;
+      if (show.phase === 'hamFall') k = R.landed ? HAM_RAG.ground : HAM_RAG.fall;
+      else {
+        const u = clamp(R.t / HAM_RAG.settle, 0, 1);
+        k = 1 + (HAM_RAG.lie - 1) * u * u * (3 - 2 * u);
+      }
+      const rag = api.rag;
+      rag.tension(k);
+      rag.drive(R.pose.clip.q);
+      rag.frame(_hmP, _hmQ);
+      rag.write(R.pose, _hmP, _hmQ, R.pose.clip.q);
+      R.pose.w = 1;
+    } else if (R.fade > 0 && show.phase !== 'hamUp') {
+      R.fade = Math.max(0, R.fade - dt);
+      const u = R.fade / HAM_RAG.backFade;
+      R.pose.w = u * u * (3 - 2 * u);
+      if (R.fade <= 0) { f.manual(null); hamManual = false; }
+    }
+  }
+
+  /** Getting out: from the ragdoll back to the one body, and the pose eased back. */
+  function hamRagOut(f) {
+    const api = hammock.api, H = show.ham;
+    if (!H || !H.rag || !api.ragOn) return;
+    api.herPose(_hmP, _hmQ);
+    api.ragToBody(_hmP, _hmQ, hamCaps(f), chainCapsules().length);
+    H.rag.fade = HAM_RAG.backFade;
+  }
+
+  /**
+   * Down on the ground and still: up again. On her back, `situp` and then
+   * `getup`; on her front, `getup` — each begun where she lies (the clip's
+   * first frame stood so its pelvis is over hers and its body the way hers
+   * points, `groundFrame`), her pose eased from the ragdoll's into it while
+   * its clock is held, and then played.
+   */
+  const _hmUQ = { q: null, t: new Float32Array(3) };
+  function hamUpStart(f, go) {
+    const api = hammock.api, H = show.ham, R = H.rag, rag = api.rag;
+    const up = hamUpForce != null ? hamUpForce === 'up' : rag.faceUp() > 0;
+    const clip = up ? 'situp' : 'getup';
+    if (!_hmUQ.q) _hmUQ.q = new Float32Array(f.bones.length * 4);
+    f.sample(clip, 0, _hmUQ.q, _hmUQ.t);
+    const g = rag.groundFrame(_hmUQ.q, _hmUQ.t, api.floor);
+    // OUT FROM UNDER IT. She mostly lands under the bed, and a get-up begun
+    // where she lies stood her up through the empty cloth — MEASURED, on her
+    // feet with the bed at her waist. So it is begun `clear` m across the
+    // span from the line under the ties, on the side she is on, and the
+    // blend into its first frame is a scramble out from under it.
+    {
+      const F = api.frame();
+      const ac = (g[0] - F.M[0]) * F.ez[0] + (g[2] - F.M[2]) * F.ez[2];
+      const want = Math.sign(ac || 1) * Math.max(Math.abs(ac), HAM_RAG.clear);
+      g[0] += F.ez[0] * (want - ac); g[2] += F.ez[2] * (want - ac);
+      g[1] = api.floor(g[0], g[2]);
+    }
+    _hmP.set(g[0], g[1], g[2]);
+    _hmQ.setFromAxisAngle(_hmY, g[3]);
+    rag.write(R.pose, _hmP, _hmQ, R.pose.clip.q);
+    R.pose.w = 1;
+    api.herLeave();
+    if (api.calm) api.calm();
+    H.up = { P: [g[0], g[1], g[2]], yaw: g[3], next: up ? 'getup' : null, fade: HAM_RAG.upFade, face: up ? 'up' : 'down' };
+    H.falls = (H.falls || 0) + 1;
+    hamFalls++;
+    go('hamUp', clip, 0);
+    f.state.speed = 0;
+    // Where she is, and which way the get-up faces, for everything after.
+    const [t, s] = local(g[0], g[2]);
+    show.t = t; show.s = s;
+    const st = at(t), dx = Math.cos(g[3]), dz = -Math.sin(g[3]);
+    show.ang = Math.atan2(dx * st.nx + dz * st.nz, dx * st.ux + dz * st.uz);
+    show.want = show.ang; show.rate = 0; show.side = 0; show.sideRate = 0;
+  }
+  let hamFalls = 0, hamUpForce = null;
+  function hamUpPlace(f) {
+    const U = show.ham.up;
+    f.mesh.position.set(U.P[0], U.P[1], U.P[2]);
+    f.mesh.rotation.set(0, U.yaw, 0);
+    f.mesh.updateMatrixWorld();
+  }
+  /** The laugh on her face, and its end — `hamHeld`'s, for the fall as well. */
+  function hamLaughFace(f, H, dt) {
+    if (!(H.laugh > 0) || !f.face) return;
+    H.laugh -= dt;
+    const L = LICK_LAUGH;
+    const k = clamp(Math.min(H.laugh, HAM_T.laughFor - H.laugh) / 0.35, 0, 1);
+    const ha = Math.abs(Math.sin(H.t * Math.PI * L.haHz));
+    f.face.gape = k * (L.gape[0] + (L.gape[1] - L.gape[0]) * ha);
+    f.face.laugh = k * L.lid;
+    f.face.smile = 1;
+    if (H.laugh <= 0) {
+      f.face.gape = 0; f.face.laugh = 0;
+      if (audio && audio.lickLaughStop) audio.lickLaughStop('baye', 0.6);
+    }
+  }
+
   /**
    * Out of it: her body out of the solve, and her back on the mark she got
    * in from — where the guide has just stood her up. Also the way out of
@@ -33261,6 +33432,9 @@ async function buildJadrija(scene) {
   function hamLeft() {
     if (hammock && hammock.api.herIn) hammock.api.herLeave();
     const H = show.ham;
+    // The ragdoll's pose off her skeleton, whatever state it was left in.
+    if (hamManual && skinFig) { skinFig.manual(null); hamManual = false; }
+    if (skinFig) skinFig.state.speed = 1;
     if (H && H.mark) {
       show.t = H.mark.t; show.s = H.mark.s;
       show.ang = H.mark.ang; show.want = show.ang; show.rate = 0;
@@ -38659,7 +38833,7 @@ async function buildJadrija(scene) {
     // the hammock's solve and a flare or a kneel from there would leave it
     // lying in the cloth without her. She smiles at it — see `bask`'s share
     // of SMILE, which the water adds whatever she is doing.
-    hamTurn: 1, hamIn: 1, hamHeld: 1, hamOut: 1 };
+    hamTurn: 1, hamIn: 1, hamHeld: 1, hamOut: 1, hamFall: 1, hamUp: 1 };
 
   // And the three of those that have a beat under them. `flare` is in it
   // because the riser is the point of the riser: the music starts a second and
@@ -38688,6 +38862,7 @@ async function buildJadrija(scene) {
     // In the hammock: pleased with it, and more when you swing her — see
     // `case 'hamHeld'`, which adds the swing on top of this.
     hamGo: 0.55, hamTurn: 0.60, hamIn: 0.65, hamHeld: 0.55, hamOut: 0.50, hamBack: 0.50,
+    hamFall: 0.70, hamUp: 0.85,
     idle: 0.30, notice: 0.62, down: 0.55, crawl: 0.50, up: 0.72,
     flip: 0.85, play: 0.55, aim: 0.70, wheel: 0.85, bask: 1.00,
     orbit: 0.80, joy: 1.00, shimmy: 0.90, home: 0.45,
@@ -39426,7 +39601,7 @@ async function buildJadrija(scene) {
     }
     if (name === 'hammock.out') {
       if (!HAM[show.phase] || show.phase === 'hamGo') return 'nothammock';
-      if (show.phase === 'hamOut') return 'hamout';
+      if (show.phase === 'hamOut' || show.phase === 'hamFall' || show.phase === 'hamUp') return 'hamout';
       return null;
     }
     if (name === 'wine') {
@@ -43062,10 +43237,26 @@ async function buildJadrija(scene) {
         H.alone = withYou ? 0 : H.alone + dt;
         const out = show.ask === 'hammock.out';
         if (out) { show.ask = null; show.did = 'hammock.out'; }
+        // OUT OVER THE RIM — see HAM_RAG. Her pelvis clear of the cloth for
+        // `fellFor` s and she has gone: the ragdoll takes her to the ground.
+        if (H.rag && hammock.api.ragOn) {
+          H.rag.out = hammock.api.herFell() ? H.rag.out + dt : 0;
+          if (H.rag.out > HAM_RAG.fellFor) {
+            hammock.api.ragOut = true;
+            H.rag.t = 0; H.rag.rest = 0;
+            if (f.face) { f.face.gape = 0.55; f.face.laugh = 0; }
+            if (H.laugh > 0 && audio && audio.lickLaughStop) audio.lickLaughStop('baye', 0.2);
+            H.laugh = 0;
+            go('hamFall', null);
+            break;
+          }
+        }
         if (out || (show.ask && !HAM_KEEP[show.ask]) || H.t > HAM_T.stay || H.alone > HAM_T.alone) {
           if (f.face) { f.face.gape = 0; f.face.laugh = 0; }
           if (H.laugh > 0 && audio && audio.lickLaughStop) audio.lickLaughStop('baye', 0.4);
           H.laugh = 0;
+          // Off the ragdoll and back on to the one body the guide can take.
+          hamRagOut(f);
           // Into the end of `hamIn` — the lying key `hamLie` breathes about
           // — and its clock turned round, with no fade: see `unroll`.
           go('hamOut', null);
@@ -43086,20 +43277,64 @@ async function buildJadrija(scene) {
             H.laughs = (H.laughs || 0) + 1;
             if (audio && audio.lickLaugh) audio.lickLaugh('baye', d);
           }
-          if (H.laugh > 0) {
-            H.laugh -= dt;
-            const L = LICK_LAUGH;
-            const k = clamp(Math.min(H.laugh, HAM_T.laughFor - H.laugh) / 0.35, 0, 1);
-            const ha = Math.abs(Math.sin(H.t * Math.PI * L.haHz));
-            f.face.gape = k * (L.gape[0] + (L.gape[1] - L.gape[0]) * ha);
-            f.face.laugh = k * L.lid;
-            f.face.smile = 1;
-            if (H.laugh <= 0) {
-              f.face.gape = 0; f.face.laugh = 0;
-              if (audio && audio.lickLaughStop) audio.lickLaughStop('baye', 0.6);
-            }
+          hamLaughFace(f, H, dt);
+        }
+        break;
+      }
+
+      case 'hamFall': {
+        // A ragdoll over the rim and on to the ground — see HAM_RAG. Still
+        // for `restFor` s (or `restMax` s whatever), and up.
+        const H = show.ham;
+        if (!H || !hammock || !hammock.api.herIn || !H.rag || !hammock.api.ragOn) { hamHome(go); break; }
+        H.t += dt;
+        show.vel = 0;
+        const R = H.rag, api = hammock.api;
+        // Landed: her pelvis near the ground. And she laughs it off.
+        if (!R.landed) {
+          const pv = api.rag.headWorld(f.boneIndex('pelvis'));
+          if (pv[1] - api.floor(pv[0], pv[2]) < HAM_RAG.landed) {
+            R.landed = true;
+            if (api.calm) api.calm();
+            if (f.face) f.face.gape = 0;
+            H.laugh = HAM_T.laughFor;
+            H.laughs = (H.laughs || 0) + 1;
+            if (audio && audio.lickLaugh) audio.lickLaugh('baye', d);
           }
         }
+        hamLaughFace(f, H, dt);
+        R.rest = R.landed && api.rag.speed() < HAM_RAG.rest ? R.rest + dt : 0;
+        if (R.rest > HAM_RAG.restFor || R.t > HAM_RAG.restMax) hamUpStart(f, go);
+        break;
+      }
+
+      case 'hamUp': {
+        // From where she lies into the get-up (`hamUpStart`): her pose eased
+        // over the clip's first frame with its clock held, then the clip,
+        // then — on her back — `getup` after `situp`, and home.
+        const H = show.ham, U = H && H.up;
+        if (!U) { hamHome(go); break; }
+        H.t += dt;
+        show.vel = 0;
+        hamLaughFace(f, H, dt);
+        if (U.fade > 0) {
+          U.fade = Math.max(0, U.fade - dt);
+          const u = U.fade / HAM_RAG.upFade;
+          if (H.rag) H.rag.pose.w = u * u * (3 - 2 * u);
+          S.speed = 0;
+          if (U.fade <= 0) { f.manual(null); hamManual = false; S.speed = 1; }
+          break;
+        }
+        if (!done) break;
+        if (U.next) { const n = U.next; U.next = null; go('hamUp', n, 0.35); break; }
+        // Standing: where her pelvis is over the ground, and home from here
+        // rather than from the mark she got in from.
+        f.boneAt(f.boneIndex('pelvis'), _hmV);
+        _hmV.applyMatrix4(f.mesh.matrixWorld);
+        const [t, s] = local(_hmV.x, _hmV.z);
+        show.t = t; show.s = s;
+        H.mark = null;
+        hamHome(go);
         break;
       }
 
@@ -44109,6 +44344,8 @@ async function buildJadrija(scene) {
     f.mesh.updateMatrixWorld();
     // AND IN THE HAMMOCK SHE IS WHERE HER BODY IS — see `hamPlace`.
     if (hammock && HAM_SIM[show.phase]) hamPlace(f, dt);
+    // And up off the ground where she fell — see `hamUpStart`.
+    if (show.phase === 'hamUp' && show.ham && show.ham.up) hamUpPlace(f);
 
     wearTick(dt);
     hairAim();
@@ -54515,6 +54752,9 @@ async function buildJadrija(scene) {
     // The hammock, before her: `stepShow` below places her mesh off the body
     // this has just solved, so she and the cloth are drawn from the same step.
     if (hammock) hammock.step(dt, cam);
+    // And her as a ragdoll written back into her skeleton, off the step just
+    // taken and before her figure is posed — see `hamRagTick`.
+    if (hammock && !posed && !lickOn) hamRagTick(dt);
     if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
 
@@ -56200,6 +56440,8 @@ async function buildJadrija(scene) {
       return mk;
     },
     hamMark: () => hamMark(),
+    /** Debug: which get-up she does after a fall — 'up', 'down', or null for how she lies. */
+    hamUpForce: (v = null) => { hamUpForce = v; return v; },
     /** Debug: her side of it — phase, clip clock, the mark, laughs. */
     hamState: () => (show ? { phase: show.phase, job: show.job ? show.job.name : null,
       vis: skinFig ? skinFig.mesh.visible : null,
@@ -56219,7 +56461,13 @@ async function buildJadrija(scene) {
         if (id < 0) return null;
         return id < c.length ? c[id].name : (HAM_ARMS[id - c.length] || ['?', '?']).slice(0, 2).join('>');
       })(),
-      smile: skinFig && skinFig.face ? +(skinFig.face.smile || 0).toFixed(2) : null } : null),
+      smile: skinFig && skinFig.face ? +(skinFig.face.smile || 0).toFixed(2) : null,
+      // The ragdoll — see HAM_RAG: taken over, out of the cloth, down, how
+      // many times she has fallen out and got up, and which way up.
+      rag: show.ham && show.ham.rag ? { t: +show.ham.rag.t.toFixed(2), landed: show.ham.rag.landed,
+        w: +show.ham.rag.pose.w.toFixed(2), fade: +show.ham.rag.fade.toFixed(2),
+        up: show.ham.up ? show.ham.up.face : null } : null,
+      falls: hamFalls } : null),
     /** Debug: the capsules the ball would meet round (x, z), as it sees them. */
     ballCapsAt: (x, z, r = 1.5) => {
       const out = [];

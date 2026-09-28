@@ -1978,7 +1978,20 @@ function skinnedFigure(data, opts = {}) {
     // The aims go too, below, for the same reason: a head turned in figure
     // space by the routine is not in the pose dict and would not be in the bake.
     const man = st.manual;
-    if (man) { localQ.set(man.q); localT.set(man.t); }
+    if (man) {
+      // THE RAGDOLL'S USE OF IT (1.536.0, src/43-ragdoll.js): `clip`, if the
+      // caller hands buffers for it, is given what the clips said before the
+      // manual pose replaced it — the ragdoll's muscles pull toward the clip
+      // that is still playing underneath — and `w` under 1 lays the manual
+      // pose over the clips instead of replacing them, which is how she is
+      // handed from the physics back to an animation without a jump.
+      if (man.clip) { man.clip.q.set(localQ); man.clip.t.set(localT.subarray(0, 3)); }
+      const w = man.w == null ? 1 : man.w;
+      if (w >= 1) { localQ.set(man.q); localT.set(man.t); } else if (w > 0) {
+        for (let i = 0; i < nb; i++) qnlerp(localQ, i * 4, localQ, i * 4, man.q, i * 4, w);
+        for (let k = 0; k < 3; k++) localT[k] += (man.t[k] - localT[k]) * w;
+      }
+    }
 
     const P = palette;
     for (let i = 0; i < nb; i++) {
@@ -2295,6 +2308,14 @@ function skinnedFigure(data, opts = {}) {
      * pose, a copy; `bindRest()` the rest skeleton and the bind it composes to.
      */
     manual: (m) => { st.manual = m || null; },
+    /** One clip's local pose at `t` s into `outQ` (4 a bone) and `outT` — nothing moves. */
+    sample: (name, t, outQ, outT) => {
+      const c = data.clips[name];
+      if (!c) return false;
+      sample(c, t, outQ, outT);
+      return true;
+    },
+    clipDur: (name) => (data.clips[name] ? data.clips[name].dur : 0),
     local: () => ({ q: localQ.slice(), t: localT.slice() }),
     bindRest: () => ({ q: restQ, t: restT, bindQ, bindT }),
     playing: () => (st.cur ? st.cur.name : null),
