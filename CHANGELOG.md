@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.8] — 2026-09-28
+
+### The konoba steps back from the vikendica, and the crowd stays out of its yard
+
+Misha: *"this structure that is close to vikendica, it needs to be moved just
+a bit further away from the vikendica, and the people shouldn't be walking
+through the front-yard of the vikendica the way they do now."* The structure is
+the konoba (yellow canopy, green posts, teal bar, red and lime stools,
+surfboard), not beach bar MINI, which is 30 m further east.
+
+**The konoba is 2 m further east**, t 240-252 to t 242-254 (43-jadrija.js,
+`SHOPS`). Its terrace pad used to end 2.8 m from the foot of the vikendica's
+outside stair and 3.5 m from the garden wall. It now ends 4.8 m and 5.5 m away.
+Two metres is as far as it can go: the promenade lamp at t 255 and the young
+pine at t 255.1 are now 0.23 m off the pad's east edge. Everything the konoba is
+built from is placed off the shop's own row and moved with it: pad, posts,
+roof, counter, stools, cooler, bulb, pine and collar, wicker chairs, poseur
+tables, surfboard, and its 20 blockers, each exactly +2.00 m. The two typed
+values moved as well: the barman (`SHOP_STAFF`, 244 to 246) and the serving
+window (`STOCK.konoba.win`).
+
+**The rest of the shore does not move.** `clearOfShops` skips spots inside
+loops that draw `rng`. Moving the konoba's footprint in that test re-rolled the
+whole shore on the first try: the lamp and young pine at t 255 disappeared,
+every young pine and half the wood behind the shops moved, and two sunbathers
+changed towels. So the konoba row carries `keep: [240, 252]`, the stretch the
+promenade furniture was laid around, and `clearOfShops` reads that instead.
+Verified by diffing every blocker and person against 1.539.7. Only the konoba's
+20 blockers and its barman changed. The two walkers who spawn at t 239.3-240.0
+keep their spawn positions and now start on the plain deck instead of on the
+pad's ramp.
+
+**Walkers stay out of the vikendica's plot.** Every vikendica wall is a
+*banded* blocker, because banding is what lets you stand on the terrace above
+it. `layWalkBins` skips banded blockers, so the crowd could not see the house
+at all. The two beats laid along s 15.40 and 15.77 walked the full length of
+terrasa 8's front wall and up to 0.69 m into the yard behind it. The crowd's
+bins now get one extra box covering the whole plot: the bounding box of the
+house's own blockers (t 228.1-236.65, s 15.25-32.1), measured where they are
+pushed (`vikPlot`) rather than typed in. This box is not on `blockers`, so you
+can still walk in. Baye's and the Bucketeer's visits walk off `showClear` and
+their own legs, not these bins, so they are unchanged. Measured over about
+200 s of warped world time, counting walker samples beside the house:
+**64 of 307 inside the plot before, 0 of 358 after**. The two walkers now pass
+at s 15.02-15.03, outside the front wall and clear of the olives.
+
 ## [1.539.7] — 2026-09-28
 
 ### Bar bottles that are glass
