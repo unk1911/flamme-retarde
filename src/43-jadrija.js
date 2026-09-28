@@ -16929,6 +16929,18 @@ async function buildJadrija(scene) {
    * is the rule the RENT A BOAT price rows and the NE PARKIRAJ second line
    * already ship under: what such a sign says is not in doubt and is also not
    * the same thing as reading it.
+   *
+   * MOVED, 28 Sep. Misha: "move this pomme frites thingie to back next to
+   * maslina, not behind some shoppe, in real jadrija it is next to maslina."
+   * The survey frame was one day's position and he knows the shore; at 325.6
+   * / 27.75 it stood in the slot between h2o's side wall and the
+   * slastičarnica, where nobody on the promenade could see it. It now stands
+   * off Maslina's WEST end, just outside the west feather flag and in its
+   * row, which is the end with the FRENCH FRIES poster on the sliding leaf —
+   * clear of the counter (t 352 to 358), of the flag's leech (which falls
+   * east, over the shop), and of the walk to the sanitary block behind (s 32
+   * and up). And it faces the promenade now, not the lane: the poster is on
+   * the seaward face.
    */
   function pommesBox(bt, bs) {
     const gy = surfaceY(bt, bs);
@@ -16982,15 +16994,16 @@ async function buildJadrija(scene) {
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
-    // On the INLAND face. The frame is taken from the wood looking at the
-    // shop's back, and the box is facing the photographer: this thing is read
-    // by somebody walking the lane, not by anybody on the boardwalk, which is
-    // on the other side of a building from it.
-    seaFacing(tex, bt, bs + HD + 0.012, (LO + HI) * 0.5, HW * 2 - 0.05,
-      HI - LO - 0.05, 'pommes', Math.PI);
+    // On the SEAWARD face. It was on the inland one while it stood behind
+    // the slastičarnica and was read from the lane; beside Maslina it is read
+    // by the promenade, which is what it is there for.
+    seaFacing(tex, bt, bs - HD - 0.012, (LO + HI) * 0.5, HW * 2 - 0.05,
+      HI - LO - 0.05, 'pommes');
     furniture.push({ t: bt, s: bs, a: 0.46, c: 0.12, h: HI - gy, y: gy });
   }
-  pommesBox(325.6, 27.75);
+  // Off Maslina's west end: the west flag is at 351.15 / 26.45, so this is
+  // 1.25 m west of its pole and in the same row. Was 325.6 / 27.75.
+  pommesBox(349.9, 26.5);
 
 
   /**
