@@ -5875,18 +5875,12 @@ async function buildJadrija(scene) {
           } else if (kind < 8) {
             // A bottle: base, body, shoulder, neck, cap. Narrower than the
             // carton it stands beside, which is most of what makes a mixed
-            // shelf read as a mixed shelf.
-            const h = 0.235 + 0.045 * ((i + r) % 3);
-            lathe(W, ct + 0.052, cy, [
-              [sy + 0.032, 0.030],
-              [sy + 0.040, 0.034],
-              [sy + h - 0.088, 0.034],
-              [sy + h - 0.034, 0.013],
-              [sy + h - 0.006, 0.012],
-            ], c, 6);
-            lathe(W, ct + 0.052, cy, [
-              [sy + h - 0.008, 0.0145], [sy + h + 0.010, 0.0145],
-            ], shade(col, 0.60), 6);
+            // shelf read as a mixed shelf. Water, juice or a bottle of wine,
+            // which is what a kiosk shelf has — see `bottleAt`.
+            const br = (i + r) % 3 === 2
+              ? BOTTLE_BRANDS[(i * 2 + r) % 3]
+              : FRIDGE_BRANDS[2 + ((i + r * 2) % 4)];
+            bottleAt(ct + 0.052, cy, sy + 0.031, br, jit(i * 7 + r * 13, 643));
           } else {
             // And a can, which is 66 mm across and 115 tall and is the one
             // thing on here that is unmistakable at a glance.
@@ -6325,6 +6319,403 @@ async function buildJadrija(scene) {
    * the poster before it use, enough to read as an interior and nowhere near
    * the outdoor exposure the original note warns about.
    */
+  // ── BOTTLES THAT ARE GLASS ────────────────────────────────────────────────
+  //
+  // "the bottles at bar h2o, they look so fake and 2-d, can u make them more
+  // advanced looking, with more polygons/triangles. i think it's the same for
+  // the other bars..." — Misha, 28 Sep. They were: every bottle on every back
+  // bar was the same six-sided lathe in one flat vertex colour, so a shelf of
+  // them was a row of identical paint-coloured silhouettes. What made them
+  // fake was not only the six sides. It was that nothing on them was GLASS —
+  // no highlight, no dark edge, no liquid standing in it at some level, no
+  // label, no cap that was a different stuff from the bottle — and that every
+  // one was the same shape, when the one thing a back bar never is is ten of
+  // the same bottle in a row.
+  //
+  // So they are now ten turned shapes — a Bordeaux wine bottle, a square
+  // whisky, a tall gin with a cap and one with a pourer, a short-necked vodka,
+  // a squat liqueur, a square squat bitter, a longneck beer, a contour cola and
+  // a half-litre PET — sixteen sides round and smooth-shaded, each drawn as ONE
+  // instanced mesh for the whole boardwalk. Hundreds of bottles are ten draw
+  // calls. The glass, the liquid at its fill line, the paper label and what is
+  // printed on it, the foil and the steel are all one cheap program, not a
+  // transmission pass: the glass is tinted by what it holds below the fill
+  // line and by the dim room behind it above it, goes darker towards its
+  // silhouette the way thick coloured glass does, takes the sky at grazing and
+  // carries the one vertical window highlight every photograph of a bottle
+  // has. The print is drawn in the shader from the label's own coordinates,
+  // so there is no canvas and no gamma to compensate.
+  //
+  // Placed through `bottleAt`, which takes the shore frame like everything
+  // else here and hashes on `jit` rather than drawing on `rng` (rule 4).
+  // Declared here, ahead of the first shop that calls it (rule 3).
+  const bottles = [];
+  // Profiles are [y, r, squareness]: 2 is round, 5 is a square with its
+  // corners taken off, which is what a whisky bottle's section actually is.
+  // `lab` is the paper: [y0, y1, half-angle]. `top` is the height; `fill` is
+  // how far up the liquid is allowed to go, which is the top of the body.
+  const BOTTLE_SHAPES = {
+    wine: {
+      glass: [[0, 0.0345], [0.006, 0.037], [0.195, 0.037], [0.214, 0.031],
+        [0.230, 0.019], [0.246, 0.0148], [0.292, 0.0140], [0.300, 0.0152]],
+      // The foil capsule, over the neck from the shoulder's end up.
+      cap: [[0.236, 0.0156], [0.300, 0.0160], [0.3025, 0.012], [0.303, 0]],
+      lab: [0.045, 0.135, 1.20], w: 0.074, fill: 0.225,
+    },
+    whisky: {
+      glass: [[0, 0.040, 5], [0.006, 0.0435, 5], [0.172, 0.0435, 5],
+        [0.192, 0.037, 4], [0.207, 0.023, 3], [0.216, 0.0165, 2],
+        [0.238, 0.0158, 2]],
+      cap: [[0.230, 0.0178], [0.266, 0.0178], [0.268, 0.013], [0.269, 0]],
+      lab: [0.050, 0.150, 0.70, 5], w: 0.088, fill: 0.195,
+    },
+    gin: {
+      glass: [[0, 0.0335], [0.006, 0.036], [0.205, 0.036], [0.222, 0.030],
+        [0.236, 0.0185], [0.247, 0.0146], [0.284, 0.0140], [0.289, 0.0156]],
+      cap: [[0.272, 0.0167], [0.302, 0.0167], [0.304, 0.011], [0.305, 0]],
+      lab: [0.060, 0.160, 1.05], w: 0.072, fill: 0.228,
+    },
+    // The same bottle with a speed pourer in it, which is what the three or
+    // four a barman actually reaches for all night have instead of a cap.
+    ginPour: {
+      glass: [[0, 0.0335], [0.006, 0.036], [0.205, 0.036], [0.222, 0.030],
+        [0.236, 0.0185], [0.247, 0.0146], [0.284, 0.0140], [0.289, 0.0156]],
+      cap: [[0.276, 0.0162], [0.294, 0.0162], [0.296, 0.0120], [0.297, 0.0075]],
+      spout: [[0.294, 0.0048], [0.338, 0.0036, 2, 0, 0.014],
+        [0.339, 0, 2, 0, 0.014]],
+      lab: [0.060, 0.160, 1.05], w: 0.072, fill: 0.228,
+    },
+    vodka: {
+      glass: [[0, 0.036], [0.006, 0.039], [0.178, 0.039], [0.198, 0.0345],
+        [0.211, 0.0245], [0.220, 0.0160], [0.246, 0.0152]],
+      cap: [[0.228, 0.0168], [0.260, 0.0168], [0.262, 0.012], [0.263, 0]],
+      lab: [0.075, 0.150, 1.35], w: 0.078, fill: 0.205,
+    },
+    liqueur: {
+      glass: [[0, 0.041], [0.006, 0.0465], [0.118, 0.0472], [0.148, 0.0425],
+        [0.170, 0.029], [0.183, 0.0175], [0.192, 0.0146], [0.222, 0.0140],
+        [0.226, 0.0152]],
+      cap: [[0.210, 0.0162], [0.244, 0.0162], [0.246, 0.011], [0.247, 0]],
+      lab: [0.032, 0.112, 1.10], w: 0.094, fill: 0.172,
+    },
+    squat: {
+      glass: [[0, 0.036, 4], [0.006, 0.0405, 4], [0.150, 0.0405, 4],
+        [0.170, 0.034, 3], [0.187, 0.021, 2], [0.196, 0.0146, 2],
+        [0.230, 0.0140, 2]],
+      cap: [[0.222, 0.0166], [0.252, 0.0166], [0.254, 0.011], [0.255, 0]],
+      lab: [0.040, 0.132, 0.72, 4], w: 0.082, fill: 0.180,
+    },
+    beer: {
+      glass: [[0, 0.0285], [0.006, 0.0305], [0.122, 0.0305], [0.150, 0.0262],
+        [0.176, 0.0172], [0.200, 0.0136], [0.221, 0.0130], [0.225, 0.0146]],
+      // A crown: steel, and a hair wider than the lip it is crimped on.
+      cap: [[0.2215, 0.0150], [0.231, 0.0150], [0.232, 0.010], [0.2325, 0]],
+      lab: [0.035, 0.105, 1.30], w: 0.062, fill: 0.195,
+    },
+    cola: {
+      glass: [[0, 0.0275], [0.006, 0.0298], [0.030, 0.0298], [0.058, 0.0262],
+        [0.086, 0.0300], [0.110, 0.0308], [0.142, 0.0245], [0.168, 0.0152],
+        [0.188, 0.0130], [0.192, 0.0146]],
+      cap: [[0.1885, 0.0150], [0.198, 0.0150], [0.199, 0.010], [0.1995, 0]],
+      lab: [0.084, 0.114, 1.50], w: 0.062, fill: 0.176,
+    },
+    pet: {
+      glass: [[0, 0.0300], [0.004, 0.0322], [0.020, 0.0330], [0.150, 0.0330],
+        [0.176, 0.0270], [0.193, 0.0160], [0.201, 0.0125], [0.212, 0.0125],
+        [0.214, 0.0162], [0.2155, 0.0125]],
+      cap: [[0.214, 0.0145], [0.233, 0.0145], [0.234, 0.010], [0.2345, 0]],
+      lab: [0.068, 0.132, 3.14], w: 0.068, fill: 0.205,
+    },
+  };
+  // What stands on a back bar in Šibenik, as glass, liquid, paper, ink and
+  // cap. Not brands — no trade dress is copied — but the kinds of thing every
+  // one of these bars has: a local red in dark glass with a black label, a
+  // Pošip in pale green, a square whisky with a black label, a blue gin, a
+  // dark herbal bitter in brown glass, a red aperitif, a clear rakija.
+  const CLEAR = [0.86, 0.88, 0.86];
+  const BOTTLE_BRANDS = [
+    { k: 'wine', g: [0.10, 0.17, 0.08], l: [0.22, 0.03, 0.05], p: [0.10, 0.09, 0.08],
+      i: [0.72, 0.58, 0.26], c: [0.32, 0.05, 0.07], f: [0.95, 1] },
+    { k: 'wine', g: [0.12, 0.20, 0.09], l: [0.24, 0.04, 0.05], p: [0.86, 0.82, 0.70],
+      i: [0.45, 0.08, 0.10], c: [0.60, 0.48, 0.20], f: [0.95, 1] },
+    { k: 'wine', g: [0.44, 0.54, 0.36], l: [0.78, 0.72, 0.50], p: [0.92, 0.91, 0.87],
+      i: [0.12, 0.16, 0.30], c: [0.66, 0.62, 0.52], f: [0.92, 1] },
+    { k: 'whisky', g: CLEAR, l: [0.56, 0.26, 0.05], p: [0.07, 0.07, 0.07],
+      i: [0.88, 0.86, 0.80], c: [0.06, 0.06, 0.06], f: [0.35, 0.95] },
+    { k: 'whisky', g: CLEAR, l: [0.62, 0.34, 0.08], p: [0.84, 0.80, 0.66],
+      i: [0.50, 0.09, 0.08], c: [0.62, 0.50, 0.22], f: [0.30, 0.90] },
+    { k: 'vodka', g: CLEAR, l: [0.80, 0.83, 0.82], p: [0.86, 0.88, 0.90],
+      i: [0.12, 0.22, 0.52], c: [0.66, 0.67, 0.70], f: [0.25, 0.95] },
+    { k: 'ginPour', g: [0.36, 0.56, 0.84], l: [0.72, 0.82, 0.92], p: [0.84, 0.86, 0.90],
+      i: [0.14, 0.24, 0.54], c: [0.05, 0.05, 0.05], f: [0.30, 0.85] },
+    { k: 'gin', g: [0.52, 0.72, 0.58], l: [0.80, 0.86, 0.82], p: [0.90, 0.88, 0.80],
+      i: [0.58, 0.10, 0.08], c: [0.62, 0.52, 0.22], f: [0.40, 0.95] },
+    { k: 'ginPour', g: CLEAR, l: [0.70, 0.06, 0.07], p: [0.92, 0.90, 0.84],
+      i: [0.68, 0.08, 0.08], c: [0.05, 0.05, 0.05], f: [0.35, 0.85] },
+    { k: 'liqueur', g: CLEAR, l: [0.92, 0.38, 0.05], p: [0.93, 0.90, 0.82],
+      i: [0.84, 0.34, 0.06], c: [0.80, 0.34, 0.06], f: [0.40, 0.95] },
+    { k: 'liqueur', g: [0.34, 0.20, 0.10], l: [0.14, 0.07, 0.03], p: [0.14, 0.26, 0.14],
+      i: [0.78, 0.64, 0.30], c: [0.14, 0.26, 0.14], f: [0.40, 0.95] },
+    { k: 'squat', g: [0.10, 0.20, 0.10], l: [0.18, 0.08, 0.03], p: [0.82, 0.46, 0.12],
+      i: [0.08, 0.16, 0.08], c: [0.08, 0.16, 0.08], f: [0.35, 0.95] },
+    { k: 'vodka', g: CLEAR, l: [0.80, 0.82, 0.62], p: [0.88, 0.84, 0.72],
+      i: [0.16, 0.30, 0.14], c: [0.16, 0.30, 0.14], f: [0.30, 0.95] },
+    { k: 'liqueur', g: CLEAR, l: [0.12, 0.34, 0.80], p: [0.92, 0.92, 0.92],
+      i: [0.10, 0.20, 0.55], c: [0.66, 0.67, 0.70], f: [0.40, 0.90] },
+    { k: 'gin', g: CLEAR, l: [0.30, 0.10, 0.03], p: [0.84, 0.78, 0.60],
+      i: [0.10, 0.08, 0.06], c: [0.06, 0.06, 0.06], f: [0.35, 0.90] },
+  ];
+  // And what is in a drinks fridge: beer in brown and in green, cola in its
+  // contour bottle, water and juice in PET.
+  const FRIDGE_BRANDS = [
+    { k: 'beer', g: [0.18, 0.40, 0.14], l: [0.70, 0.56, 0.18], p: [0.90, 0.88, 0.80],
+      i: [0.12, 0.34, 0.16], c: [0.62, 0.62, 0.60], f: [0.95, 1] },
+    { k: 'cola', g: [0.62, 0.66, 0.62], l: [0.13, 0.05, 0.03], p: [0.86, 0.08, 0.10],
+      i: [0.96, 0.95, 0.94], c: [0.80, 0.08, 0.10], f: [0.97, 1] },
+    { k: 'pet', g: CLEAR, l: [0.92, 0.52, 0.08], p: [0.95, 0.60, 0.10],
+      i: [0.16, 0.44, 0.14], c: [0.92, 0.56, 0.08], f: [0.96, 1] },
+    { k: 'beer', g: [0.36, 0.20, 0.07], l: [0.66, 0.44, 0.12], p: [0.10, 0.14, 0.34],
+      i: [0.92, 0.90, 0.84], c: [0.70, 0.62, 0.30], f: [0.95, 1] },
+    { k: 'pet', g: [0.82, 0.90, 0.94], l: [0.82, 0.88, 0.92], p: [0.90, 0.94, 0.98],
+      i: [0.14, 0.36, 0.72], c: [0.18, 0.40, 0.78], f: [0.96, 1] },
+    { k: 'pet', g: [0.70, 0.84, 0.94], l: [0.80, 0.88, 0.94], p: [0.18, 0.40, 0.78],
+      i: [0.96, 0.96, 0.96], c: [0.92, 0.92, 0.94], f: [0.96, 1] },
+  ];
+  /**
+   * One bottle standing at shore frame (t, s) on a surface at y, its label
+   * turned out towards the terrace (−s). `h` is a hash in [0, 1) that picks
+   * the fill, the turn and the print; `sc` scales the whole bottle.
+   */
+  function bottleAt(t, s, y, br, h, sc = 1) {
+    const p = W(t, s, y), q = W(t, s - 1, y);
+    const yaw = Math.atan2(q[0] - p[0], q[2] - p[2]) + (h - 0.5) * 0.34;
+    const f = br.f[0] + (br.f[1] - br.f[0]) * ((h * 7.31) % 1);
+    const S = BOTTLE_SHAPES[br.k];
+    bottles.push({ k: br.k, p, yaw, sc: sc * (0.97 + 0.06 * ((h * 3.7) % 1)),
+      g: br.g, l: [...br.l, f * S.fill], lab: [...br.p, (h * 13.7) % 1],
+      i: br.i, c: br.c });
+  }
+  /** The turned prototype for one shape, in its own frame: y up, label +z. */
+  function bottleProto(S) {
+    const pos = [], part = [], idx = [];
+    const SIDES = 16;
+    // A ring of a superellipse: n = 2 is a circle; above that it squares off.
+    const ring = (y, r, n, a, ot = 0, os = 0) => {
+      const c = Math.cos(a), sn = Math.sin(a);
+      const k = n > 2.01 ? r / Math.pow(Math.pow(Math.abs(sn), n)
+        + Math.pow(Math.abs(c), n), 1 / n) : r;
+      return [sn * k + ot, y, c * k + os];
+    };
+    // `a0`, `a1` null is a full turn with the seam shared; otherwise an arc
+    // of `seg` pieces, open at both ends, with its own (u, v) for the print.
+    const lathe3 = (prof, pid, a0 = null, a1 = null, seg = SIDES) => {
+      const full = a0 === null;
+      const nA = full ? SIDES : seg + 1;
+      const base = pos.length / 3;
+      const yA = prof[0][0], yB = prof[prof.length - 1][0];
+      for (const [y, r, n = 2, ot = 0, os = 0] of prof) {
+        for (let i = 0; i < nA; i++) {
+          const a = full ? (i / SIDES) * TAU : a0 + (a1 - a0) * (i / seg);
+          pos.push(...ring(y, r, n, a, ot, os));
+          part.push(pid, full ? i / SIDES : i / seg,
+            (y - yA) / Math.max(1e-6, yB - yA));
+        }
+      }
+      for (let k = 0; k < prof.length - 1; k++) {
+        const lim = full ? nA : nA - 1;
+        for (let i = 0; i < lim; i++) {
+          const i1 = full ? (i + 1) % nA : i + 1;
+          const A = base + k * nA + i, B = base + k * nA + i1;
+          const C = base + (k + 1) * nA + i1, D = base + (k + 1) * nA + i;
+          if (prof[k + 1][1] <= 0) idx.push(A, B, D);
+          else idx.push(A, B, C, A, C, D);
+        }
+      }
+    };
+    lathe3(S.glass, 0);
+    lathe3(S.cap, S.spout ? 4 : 2);
+    if (S.spout) lathe3(S.spout, 3);
+    // The label, a hair proud of the glass and following its section.
+    const [ly0, ly1, half, ln = 2] = S.lab;
+    const rAt = (y) => {
+      const G = S.glass;
+      for (let k = 0; k < G.length - 1; k++) {
+        if (y <= G[k + 1][0]) {
+          const u = (y - G[k][0]) / (G[k + 1][0] - G[k][0]);
+          return G[k][1] + (G[k + 1][1] - G[k][1]) * u;
+        }
+      }
+      return G[G.length - 1][1];
+    };
+    const labProf = [];
+    for (let j = 0; j <= 3; j++) {
+      const y = ly0 + (ly1 - ly0) * (j / 3);
+      labProf.push([y, rAt(y) + 0.0007, ln]);
+    }
+    lathe3(labProf, 1, -half, half, Math.max(6, Math.round(half * 9)));
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('aBot', new THREE.Float32BufferAttribute(part, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  }
+  /** Every bottle placed anywhere on the boardwalk, as one layer per shape. */
+  function bottleLayers() {
+    const mat = solidMaterial(0xffffff, {
+      instanced: true, vcol: false, spec: 0.8, specPower: 90, emissive: 0.28,
+      vdecl: 'attribute vec3 aBot; attribute vec4 aInstLiq;'
+        + ' attribute vec4 aInstLab; attribute vec3 aInstInk;'
+        + ' attribute vec3 aInstCap;',
+      decl: 'varying vec3 vBot; varying vec4 vLiq; varying vec4 vLab;'
+        + ' varying vec3 vInk; varying vec3 vCap;',
+      vert: 'vBot = aBot; vLiq = aInstLiq; vLab = aInstLab;'
+        + ' vInk = aInstInk; vCap = aInstCap;',
+      body: BOTTLE_GLSL,
+      lit: BOTTLE_LIT,
+    });
+    const byKind = new Map();
+    for (const o of bottles) {
+      if (!byKind.has(o.k)) byKind.set(o.k, []);
+      byKind.get(o.k).push(o);
+    }
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (const o of bottles) {
+      for (let a = 0; a < 3; a++) {
+        lo[a] = Math.min(lo[a], o.p[a]);
+        hi[a] = Math.max(hi[a], o.p[a]);
+      }
+    }
+    const ctr = new THREE.Vector3((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2,
+      (lo[2] + hi[2]) / 2);
+    const rad = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2 + 0.5;
+    for (const [k, list] of byKind) {
+      const proto = bottleProto(BOTTLE_SHAPES[k]);
+      const geo = new THREE.InstancedBufferGeometry();
+      for (const a of ['position', 'normal', 'aBot']) {
+        geo.setAttribute(a, proto.attributes[a]);
+      }
+      geo.setIndex(proto.index);
+      const n = list.length;
+      const A = (w) => new Float32Array(n * w);
+      const ap = A(3), ar = A(4), as = A(3), ac = A(3), al = A(4), ab = A(4),
+        ai = A(3), aq = A(3);
+      list.forEach((o, j) => {
+        ap.set(o.p, j * 3);
+        ar.set([0, Math.sin(o.yaw / 2), 0, Math.cos(o.yaw / 2)], j * 4);
+        as.set([o.sc, o.sc, o.sc], j * 3);
+        ac.set(o.g, j * 3);
+        al.set(o.l, j * 4);
+        ab.set(o.lab, j * 4);
+        ai.set(o.i, j * 3);
+        aq.set(o.c, j * 3);
+      });
+      for (const [nm, arr, w] of [['aInstPos', ap, 3], ['aInstRot', ar, 4],
+        ['aInstScale', as, 3], ['aInstColor', ac, 3], ['aInstLiq', al, 4],
+        ['aInstLab', ab, 4], ['aInstInk', ai, 3], ['aInstCap', aq, 3]]) {
+        geo.setAttribute(nm, new THREE.InstancedBufferAttribute(arr, w));
+      }
+      geo.instanceCount = n;
+      geo.boundingSphere = new THREE.Sphere(ctr.clone(), rad);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.name = 'bottles:' + k;
+      scene.add(mesh);
+    }
+  }
+  // The glass, the paper, the foil and the steel. (No backticks in here: it is
+  // a template literal, and one in a comment ends it.)
+  //
+  // Glass (part 0) has no transmission and does not need it. Below the fill
+  // line what comes through is the liquid, tinted by the glass; above it, the
+  // dim room behind, tinted the same — which is what makes a half-empty bottle
+  // of whisky read as half empty. Both darken towards the silhouette, where
+  // the eye looks through twice the glass, and it is there that the sky takes
+  // over. The meniscus is a line of the liquid's own colour, brighter.
+  const BOTTLE_GLSL = /* glsl */ `
+  float bPart = vBot.x;
+  vec3 bV = normalize(uCamPos - vWorld);
+  float bFr = pow(1.0 - clamp(abs(dot(n, bV)), 0.0, 1.0), 2.0);
+  float bGlass = 0.0;
+  // How many letters of the print fall in one pixel, taken out here in
+  // uniform control flow because fwidth inside a branch is undefined. Past
+  // about a letter a pixel the print is noise, and noise in a row of labels
+  // reads as a row of little faces; so it fades to the ink's mean over paper.
+  float bFar = smoothstep(0.30, 0.85, fwidth(vBot.y) * 15.0);
+  if (bPart < 0.5) {
+    bGlass = 1.0;
+    float wet = step(vLocal.y, vLiq.w);
+    vec3 room = vec3(0.25, 0.235, 0.21);
+    base = mix(room, vLiq.rgb, wet) * vColor * mix(1.0, 0.22, bFr);
+    base *= mix(0.45, 1.0, smoothstep(0.0, 0.012, vLocal.y));
+    float men = (1.0 - smoothstep(0.0, 0.003, abs(vLocal.y - vLiq.w)))
+      * step(0.02, vLiq.w);
+    base += vLiq.rgb * vColor * men * 0.45;
+    spec = 0.9;
+    env = 0.05 + 0.6 * bFr;
+  } else if (bPart < 1.5) {
+    // The label, printed from its own (u, v): a rule round the edge, a name
+    // in blocky capitals across the middle, two lines of small print under it
+    // and, on half of them, a roundel above.
+    vec2 uv = vBot.yz;
+    float sd = vLab.w;
+    float inner = step(0.05, uv.x) * step(uv.x, 0.95);
+    float frame = (step(0.09, uv.y) - step(0.115, uv.y)
+      + step(0.885, uv.y) - step(0.91, uv.y)) * inner;
+    float cx = floor(uv.x * 15.0), fx = fract(uv.x * 15.0);
+    float hl = fract(sin(cx * 12.9898 + sd * 311.7) * 43758.5453);
+    float tall = 0.13 + 0.07 * step(0.5, fract(sd * 5.0));
+    float name = step(0.40, uv.y) * step(uv.y, 0.40 + tall)
+      * step(0.2, hl) * step(0.14, fx) * step(fx, 0.80)
+      * step(0.16, uv.x) * step(uv.x, 0.84);
+    float cx2 = floor(uv.x * 36.0);
+    float h2 = fract(sin(cx2 * 7.13 + sd * 91.3) * 13758.5453);
+    float small = (step(0.25, uv.y) * step(uv.y, 0.29)
+      + step(0.18, uv.y) * step(uv.y, 0.21) * step(0.35, uv.x) * step(uv.x, 0.65))
+      * step(0.3, h2) * step(0.24, uv.x) * step(uv.x, 0.76);
+    float er = length(uv - vec2(0.5, 0.73));
+    float emb = step(0.6, fract(sd * 3.3))
+      * (1.0 - smoothstep(0.085, 0.10, er)) * smoothstep(0.05, 0.062, er);
+    float ink = mix(clamp(frame + name + small * 0.75 + emb, 0.0, 1.0), 0.2,
+      bFar);
+    base = mix(vLab.rgb, vInk, ink);
+    float edge = step(uv.y, 0.05) + step(0.95, uv.y);
+    base = mix(base, vCap, clamp(edge, 0.0, 1.0) * step(0.55, fract(sd * 2.1)));
+    spec = 0.05;
+    env = 0.015;
+  } else if (bPart < 2.5) {
+    // Foil, a cap, a crown: all of them brighter at the edge than paint.
+    base = vCap;
+    spec = 0.5;
+    env = 0.10 + 0.35 * bFr;
+  } else if (bPart < 3.5) {
+    base = vec3(0.50, 0.51, 0.53);
+    spec = 0.9;
+    env = 0.35;
+  } else {
+    base = vec3(0.045);
+    spec = 0.2;
+    env = 0.03;
+  }
+  base *= 1.0 + 2.6 * uNight;
+  `;
+  // And the window. Every photograph of a bottle has one: a hard vertical
+  // highlight a little way round from the middle and a softer one opposite.
+  // It is placed from the eye rather than from the sun, because what these
+  // bottles reflect is the bright terrace in front of the bar, and that is
+  // wherever the person looking at them is standing.
+  const BOTTLE_LIT = /* glsl */ `
+  if (bGlass > 0.5) {
+    vec3 bHn = normalize(vec3(n.x, 0.0, n.z) + vec3(1e-5));
+    vec3 bHv = normalize(vec3(-viewDir.x, 0.0, -viewDir.z) + vec3(1e-5));
+    vec3 bW1 = vec3(bHv.x * 0.82 - bHv.z * 0.57, 0.0, bHv.x * 0.57 + bHv.z * 0.82);
+    vec3 bW2 = vec3(bHv.x * 0.87 + bHv.z * 0.50, 0.0, -bHv.x * 0.50 + bHv.z * 0.87);
+    float bUp = 1.0 - abs(n.y);
+    float bS1 = pow(max(dot(bHn, bW1), 0.0), 70.0) * bUp;
+    float bS2 = pow(max(dot(bHn, bW2), 0.0), 18.0) * bUp;
+    col += vec3(0.95, 0.94, 0.90) * (bS1 * 0.42 + bS2 * 0.07);
+  }
+  `;
+
   function shopInside(S, y0, top) {
     const buf = propBuilder();
     const tube = propBuilder();
@@ -6472,49 +6863,60 @@ async function buildJadrija(scene) {
         TOP, shade(TOP, 1.20));
     }
     // Two shelves and the stock on them.
-    const BOT = [[0.720, 0.640, 0.180], [0.180, 0.360, 0.180],
-      [0.640, 0.180, 0.150], [0.230, 0.250, 0.300], [0.780, 0.760, 0.700],
-      [0.180, 0.280, 0.520], [0.700, 0.400, 0.140]];
+    const NOSE = [0.560, 0.560, 0.548];
     for (let k = 0; k < 2; k++) {
       const sy = wy + (deep ? 0.56 : 0.72) + k * 0.42;
       if (sy + 0.30 > oy1) break;
       for (const [u0, u1] of spans(oa + 0.10, oc - 0.10)) {
         boxTS(u0, u1, f0 + 0.03, f1, sy, sy + 0.030,
           shade(WALL, 0.80), shade(WALL, 0.94));
+        // A brushed nosing along the front edge, standing 4 mm over the board
+        // so the row of bottles has a line to stand behind — and under it the
+        // strip every back bar has, which is the `tube` the counter light is:
+        // an off-white nothing by day, and after dark the thing that lights
+        // the glass on the shelf below.
+        boxTS(u0, u1, f0 + 0.022, f0 + 0.034, sy - 0.004, sy + 0.034,
+          NOSE, shade(NOSE, 1.12));
+        b = tube;
+        boxTS(u0 + 0.03, u1 - 0.03, f0 + 0.040, f0 + 0.060, sy - 0.009,
+          sy - 0.001, [1, 1, 1]);
+        b = buf;
       }
       // BOTTLES AND NOT COLOURED RECTANGLES. They were `boxTS` — a flat
       // front 70 mm wide with a square top — and behind a counter you can
-      // walk up to that is a shelf of paint chips. It is the same call the
-      // back bar's stemware got and the bathers' swimwear before it: what
-      // makes a bottle a bottle is the shoulder and the neck, and neither of
-      // those is a thing a box has.
+      // walk up to that is a shelf of paint chips. What makes a bottle a
+      // bottle is the shoulder and the neck, and neither of those is a thing
+      // a box has. And then, 28 Sep, the next step of the same complaint:
+      // six-sided lathes in one flat colour, all one shape, were a shelf of
+      // bottle SILHOUETTES — see `bottleAt` for what they are now.
       //
-      // Six sides and five rings. A bottle on a shelf is seen from the front
-      // through a serving hatch and never from above, so the facets cost
-      // nothing and a seventh would buy nothing; the rings are where the
-      // shape actually is — base, body, shoulder, neck, lip.
+      // Stocked the way a bar stocks a shelf: a run of two to four of the same
+      // thing side by side, each at its own level, then a finger's gap and the
+      // next run, and now and then a hole where something is out on the bar.
+      // Not on a grid, and not a lattice at all — a few millimetres either way
+      // along the shelf and a centimetre or two back and forth across it.
       const bs = (f0 + 0.035 + f1 - 0.006) * 0.5;
-      for (let t = oa + 0.16; t < oc - 0.20; t += 0.105) {
-        const h = jit(((t * 9) | 0) + key + k * 53, 640);
-        if (h < 0.18) continue;
-        if (gaps.some((g) => Math.abs(t - g) < 0.31)) continue;
-        const c = BOT[(jit(((t * 9) | 0) + key + k * 53, 641) * BOT.length) | 0];
-        const y = sy + 0.030;
-        const bodyH = 0.105 + h * 0.085;      // where the shoulder starts
-        const topH = bodyH + 0.075 + h * 0.03;
-        lathe(W, t + 0.035, bs, [
-          [y + 0.002, 0.030],
-          [y + 0.010, 0.034],
-          [y + bodyH, 0.034],
-          [y + bodyH + 0.038, 0.013],         // the shoulder, which is the shape
-          [y + topH - 0.012, 0.012],
-        ], c, 6);
-        // The cap. Darker than the glass and a hair wider than the neck, which
-        // is the one detail that stops a neck reading as a spike.
-        lathe(W, t + 0.035, bs, [
-          [y + topH - 0.014, 0.0145],
-          [y + topH, 0.0145],
-        ], shade(c, 0.62), 6);
+      const y = sy + 0.029;              // a millimetre into the board
+      const sc = deep ? 1 : 0.88;        // the old ledge is 70 mm deep
+      let t = oa + 0.16 + jit(key + k * 53, 649) * 0.05, run = 0;
+      while (t < oc - 0.20) {
+        const hr = jit(key * 7 + k * 53 + run * 11, 650);
+        run++;
+        if (hr < 0.10) { t += 0.10; continue; }
+        const br = BOTTLE_BRANDS[(jit(key * 7 + k * 53 + run * 11, 651)
+          * BOTTLE_BRANDS.length) | 0];
+        const w = BOTTLE_SHAPES[br.k].w * sc;
+        const n = 2 + ((jit(key * 7 + k * 53 + run * 11, 652) * 3) | 0);
+        for (let j = 0; j < n && t + w < oc - 0.14; j++) {
+          const h = jit(key * 7 + k * 53 + run * 11 + j * 3, 653);
+          const tc = t + w * 0.5 + (h - 0.5) * 0.006;
+          t += w + 0.006 + h * 0.008;
+          // Cut where somebody is standing, as the shelf itself is.
+          if (gaps.some((g) => Math.abs(tc - g) < 0.31 + w * 0.5)) continue;
+          bottleAt(tc, bs + (deep ? ((h * 5.3) % 1 - 0.5) * 0.03 : 0), y,
+            br, h, sc);
+        }
+        t += 0.012 + hr * 0.045;
       }
     }
     // And the cold cabinet at one end, with the pale front a lit one has. Not
@@ -15734,9 +16136,6 @@ async function buildJadrija(scene) {
       // which is true of the cabinet and must not be true of what is in it.
       {
         const skey = S.t0 | 0;
-        const BOT = [[0.120, 0.360, 0.180], [0.680, 0.180, 0.130],
-          [0.820, 0.560, 0.130], [0.180, 0.220, 0.300],
-          [0.760, 0.740, 0.700], [0.240, 0.420, 0.560]];
         for (let sh = 0; sh < 4; sh++) {
           const sy = y0 + 0.30 + sh * 0.32;
           boxTS(ct - 0.37, ct + 0.37, cs - 0.339, cs - 0.322, sy, sy + 0.014,
@@ -15744,23 +16143,18 @@ async function buildJadrija(scene) {
           for (let i = 0; i < 9; i++) {
             const h = jit(skey * 17 + sh * 31 + i, 640);
             const bt = ct - 0.335 + i * 0.083;
-            const c = BOT[(h * BOT.length) | 0];
             // Turned, not boxed — the same call the kiosk's back shelf got.
             // The door of this cabinet is a FRAME and not a pane, which its
             // own note two paragraphs down is proud of, and the whole point of
             // that is that you see what is in it: a square-topped box behind
             // an open frame is a worse lie than one behind glass.
-            const top = sy + 0.185 + h * 0.050;
-            lathe(W, bt, cs - 0.3305, [
-              [sy + 0.016, 0.026],
-              [sy + 0.022, 0.029],
-              [top - 0.062, 0.029],
-              [top - 0.028, 0.011],           // the shoulder
-              [top, 0.010],
-            ], c, 6);
-            lathe(W, bt, cs - 0.3305, [
-              [top, 0.0125], [top + 0.020, 0.0125],
-            ], [0.760, 0.740, 0.690], 6);
+            //
+            // And since 28 Sep, in facings: a fridge is stocked three of a
+            // thing across, so the product changes every third bottle rather
+            // than every bottle — see `bottleAt`.
+            const br = FRIDGE_BRANDS[(jit(skey * 17 + sh * 31 + ((i / 3) | 0),
+              642) * FRIDGE_BRANDS.length) | 0];
+            bottleAt(bt, cs - 0.3305, sy + 0.013, br, h);
           }
         }
       }
@@ -16218,6 +16612,9 @@ async function buildJadrija(scene) {
     b = deck;
   }
   for (const S of SHOPS) shopfront(S);
+  // Every bottle the shops above put on a shelf or in a fridge, drawn at
+  // once: see `bottleAt`.
+  bottleLayers();
   // The three placements, all photographed. The hoarding beside Maslina, the
   // panel out on the plaza, and the pair at the west end by the cabins.
   // 349 / 33.2 was inside the sanitary block once that was built. East of

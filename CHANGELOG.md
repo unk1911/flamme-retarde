@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.7] — 2026-09-28
+
+### Bar bottles that are glass
+
+Misha: *"the bottles at bar h2o, they look so fake and 2-d, can u make them
+more advanced looking, with more polygons/triangles. i think it's the same for
+the other bars..."* Every bottle on every back bar was the same six-sided
+lathe in one flat colour, so a shelf of them was a row of identical coloured
+silhouettes. The drinks fridges and the kiosk shelf used the same lathe.
+
+**Ten turned shapes, instanced** (`bottleAt`, `bottleProto`, `bottleLayers`
+in 43-jadrija.js): a Bordeaux wine bottle with a foil capsule, a square whisky
+(a superellipse section), a tall gin with a cap and the same gin with a speed
+pourer, a short-necked vodka, a squat liqueur, a square squat bitter, a
+longneck beer with a crown, a contour cola and a half-litre PET. Each has
+16 sides, smooth normals and a separate label and cap. Each shape is one
+InstancedMesh for the whole boardwalk: 562 bottles in 10 draw calls, about
+400 triangles a bottle.
+
+**A glass program, not a transmission pass.** Below the fill line you see the
+liquid tinted by the glass. Above it you see the dim room behind, tinted the
+same, so a half-empty whisky reads as half empty. The glass darkens towards
+the silhouette and picks up the sky there. There is a meniscus line, and one
+vertical highlight a little way round from the eye plus a softer one opposite.
+The label is printed in the shader from its own (u, v): a rule, a name in
+blocky capitals, small print and sometimes a roundel. So there is no canvas
+and no gamma to correct. Where a letter is smaller than a pixel, the print
+fades to its average, because at that size a row of labels read as a row of
+little faces. Foil, caps, crowns, rubber collars and steel spouts each get
+their own finish.
+
+**Stocked like a bar.** Runs of two to four of the same product, each at its
+own fill level. There is a gap of a few centimetres between runs and now and
+then an empty slot. Spacing along the shelf varies by a few millimetres and
+depth by a centimetre or so, and the turn by ±10°. The products are 15 back-bar
+kinds (a local red with a black label, Pošip in pale green glass, square whisky,
+blue gin, Campari-red and Aperol-orange aperitifs, a brown herbal bitter,
+rakija, curaçao…) and 6 fridge kinds (green and brown beer, cola, water and
+juice in PET). Fridges are stocked three of a product across. Everything hashes
+on `jit`, so there are no new `rng` draws.
+
+**The shelves**: a brushed nosing along each front edge and an LED strip under
+it, on the counter light's `tube` buffer, so it is off-white by day and warm
+after dark.
+
+Measured at H2O from the terrace: 328 → 338 draw calls, 8.07 M → 8.27 M
+triangles (+2.6 %). Frame time was the same within noise. Staff, counters and
+shelf positions are unchanged, and the shelves are still cut where the barmen
+stand.
+
 ## [1.539.6] — 2026-09-28
 
 ### the olives step off the vikendica's wall
