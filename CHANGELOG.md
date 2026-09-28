@@ -8,6 +8,77 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.543.0] — 2026-09-28
+
+### The vikendica, finished on the outside
+
+Misha: *"the current vikendica, from the outside, looks 'ok' but it's too
+low-poly, would be nice to make it look spiffier u know?"* This is a finish
+pass on the house as drawn. No opening, level, wall or blocker moved: the plan
+sidecar is byte-identical and the blockers hash is unchanged (8602 chars,
+1571414864). Everything is in `tools/blender/vikendica.py`. The references are
+the two terrace photographs (the railing, the awning, the neighbour's white
+gutters and tiles), the loggia photograph (the render) and the elevations
+(gutters on both eaves, the stair on a waist slab).
+
+- **Stair:** it was seventeen loose 16 cm blocks hanging in the air. It is now
+  a cast flight on a sloping waist slab, open underneath as the east elevation
+  draws it. Each step has a 3 cm limestone tread with a 25 mm nosing over the
+  riser and 20 mm over the open side. The landing has the same stone on top.
+  The tread tops are exactly where the blocks' tops were, so `floorAt`, the
+  walkers and the Bucketeer see the same stair.
+- **Railings,** as photographed: flat-bar posts on base plates, a round
+  42 mm top rail welded round the corners, and six 12 mm round rods through the
+  posts (three on the stair and landing). They are powder-coated mid grey, not
+  stainless. Each railing is now one polyline, so a corner has one post
+  instead of two overlapping ones, and ends at the wall get a wall plate
+  instead of a cap. The stair handrail is round, on flat-bar posts, a metre
+  above the nosings.
+- **Terrace slab:** now render, not concrete. It has a lip round the three
+  free edges and a real drip groove 18 × 15 mm underneath. An aluminium drip
+  edge runs under the last row of tiles. The white weatherproof socket from
+  the photograph is next to the terrace door.
+- **Awning:** a rounded cassette 19 cm off the wall (it was half buried in
+  it). The cloth now sags slightly between the roller and a shaped front bar
+  with end caps. There is a straight valance, and two folding arms with
+  elbows, shoulder brackets and joints.
+- **Windows:** each light has a stepped sash inside the outer frame, with a
+  glazing bead. The outer half of every outside reveal is render; it used to
+  be room paint right through, which framed every window in blue-grey.
+  The sills are sloped stone with a throat cut under the nose.
+- **Shutters (grilje):** each leaf now has stiles, top and bottom rails and a
+  lock rail on the tall leaves. Between them are separate slats at 45°, with
+  gaps you can see the render through. The slats lean toward the wall, the
+  way a leaf folded back through 180° hangs. Each leaf also has two black
+  strap hinges on pintles and a hook at the free edge. They were a flat plate
+  with strips on its face.
+- **Roof edge** (both roofs, one `roof_trim`):
+  - battens and felt under the tile course;
+  - a painted fascia under the tile ends, replacing the white strip that stood
+    through the roof edge;
+  - barge boards and a white mortared verge up both gables;
+  - on the roof as built, rafter tails and board joints in the soffit;
+  - half-round gutters on both eaves, on hangers, with a rolled bead and stop
+    ends;
+  - two downpipes on clips with swan necks and shoes. The north one runs down
+    the north-east pier into a yard gully. The south one runs down the only bay
+    of the south face the shutters leave clear, to a gully on the terrace;
+  - a lead apron round the chimney.
+- **The renovation roof** gets the same trim, and its roof lights now stand
+  proud of the tiles. Before, the tile slab covered them from outside.
+
+**Skipped:** time ran out before real canal tiles (kupe) and a stucco shader.
+Both were planned as runtime work (tiles laid from the sidecar at no payload
+cost; grain, a damp line and sill streaks on the render). The roof is still a
+tile slab. The terrace soffit still renders near-white, because the interior
+material's downward-face lift applies to it.
+
+**Size:** HTML 55 274 621 → 55 496 081 bytes (+0.22 MB). The payload grew by
+shell +62 KB, roof +52 KB, loft +45 KB and glass +3 KB (gzipped).
+Triangles: shell 212.8k → 219.9k, roof 1.1k → 6.2k, loft 15.4k → 19.7k, which
+is about +12k drawn at once. No draw calls were added: it is the same four
+meshes. GPU time was not measured this pass.
+
 ## [1.542.1] — 2026-09-28
 
 ### The eFoil is gone
