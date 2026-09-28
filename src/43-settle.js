@@ -266,6 +266,140 @@ function settleCaps(fig) {
 }
 
 /**
+ * THE QUAY SITTERS' LEGS, LAID ON THE CEMENT (1.538.2).
+ *
+ * Misha, 28 Sep 2026, a man in yellow trunks and a woman in a teal bikini
+ * sitting on the quay by a ladder: *"some bathers like these, they have their
+ * legs sorta 'planted' into the cement which looks odd. their legs should be
+ * on the cement."*
+ *
+ * Their clip (`sitquay`, `quaytalk` — `quay_clips` in bathers_mh.py) was
+ * solved for somebody on the lip of the quay with their shins hanging over the
+ * water, and it was never played there. Every quay sitter is placed
+ * `B(t, 0.55, y, Math.PI, 'sit')`, and `ang` is a bearing off the shore's +t,
+ * not off its normal (`rigYaw`): Math.PI is straight down the shore. So all
+ * eleven sit on the flat of the lowest platform, side-on to the water, with
+ * a hundred metres of concrete in front of them — and their shins went 0.3 m
+ * down into it. Nobody is at an edge a leg could hang over, so nobody keeps
+ * the old legs.
+ *
+ * So they sit with their legs out along the ground, which is the one
+ * position that leaves everything the clip got right where it was: the clip's
+ * thighs are already level at the hip's height (`_quay_solve`), so the hips,
+ * the trunk and both hands resting half way down the thighs are untouched,
+ * and only the knee opens and the foot turns up off its heel. The shin and
+ * the foot are solved every frame onto the floor (`legRest` in 41-skin.js)
+ * from the numbers here, which are this body's own:
+ *
+ * - `calf`: how far the skin of the shin stands behind its bone, in a dozen
+ *   bands from knee to ankle — what, when the leg lies out, is underneath it.
+ * - `foot`: every foot vertex as (along the foot bone, over it, outward), so
+ *   how high the ankle sits off the back of the heel can be read for any
+ *   lean and splay a person is dealt (`heelOf`).
+ *
+ * Measured in the bind pose off the skin weights, as `settleCaps` is.
+ */
+function legRestOf(fig) {
+  const data = fig.data;
+  if (data.legRest !== undefined) return data.legRest;
+  const T = fig.bindRest().bindT;
+  const id = (n) => fig.boneIndex(n);
+  const hd = (i) => [T[3 * i], T[3 * i + 1], T[3 * i + 2]];
+  const pos = data.geo.getAttribute('position').array;
+  const bi = data.geo.getAttribute('aBoneIdx').array, bw = data.geo.getAttribute('aBoneWt').array;
+  const nv = pos.length / 3, nb = fig.bones.length;
+  const dom = new Int16Array(nv);
+  for (let v = 0; v < nv; v++) {
+    let best = 0;
+    for (let k = 1; k < 4; k++) if (bw[4 * v + k] > bw[4 * v + best]) best = k;
+    dom[v] = bi[4 * v + best];
+  }
+  const R = { at: new Int8Array(nb), child: new Int16Array(nb), side: new Int8Array(nb),
+    calf: [], foot: [] };
+  const sides = ['L', 'R'];
+  for (let sd = 0; sd < 2; sd++) {
+    const s = sides[sd];
+    const sh = id('legL' + s), ft = id('foot' + s), to = id('toe' + s);
+    if (sh < 0 || ft < 0 || to < 0) { data.legRest = null; return null; }
+    R.at[sh] = 1; R.child[sh] = ft; R.side[sh] = sd;
+    R.at[ft] = 2; R.child[ft] = to; R.side[ft] = sd;
+    const K = hd(sh), A = hd(ft), P = hd(to);
+    // The calf. `down` is what the shin's back becomes when the leg lies
+    // along the ground: its axis turned a quarter back in the side plane.
+    const ax = A[0] - K[0], ay = A[1] - K[1], L2 = ax * ax + ay * ay;
+    const al = Math.sqrt(L2) || 1, dnx = ay / al, dny = -ax / al;
+    const NB = 12, band = new Float32Array(NB * 2).fill(-1);
+    // The foot, in its own bone's frame: `f` along it, `n` over it (its
+    // top), `o` out to this side (the figure's left is −z).
+    let fx = P[0] - A[0], fy = P[1] - A[1];
+    const fl = Math.hypot(fx, fy) || 1;
+    fx /= fl; fy /= fl;
+    const out = sd ? 1 : -1, pts = [];
+    for (let v = 0; v < nv; v++) {
+      const b = dom[v];
+      const x = pos[3 * v], y = pos[3 * v + 1], z = pos[3 * v + 2];
+      if (b === sh) {
+        const u = ((x - K[0]) * ax + (y - K[1]) * ay) / (L2 || 1);
+        if (u < 0.08 || u > 1) continue;
+        const k = Math.min(NB - 1, Math.floor(u * NB));
+        const back = (x - K[0]) * dnx + (y - K[1]) * dny;
+        if (back > band[2 * k + 1]) { band[2 * k] = u; band[2 * k + 1] = back; }
+      } else if (b === ft || b === to) {
+        const dx = x - A[0], dy = y - A[1];
+        pts.push(dx * fx + dy * fy, dx * -fy + dy * fx, (z - A[2]) * out);
+      }
+    }
+    const bins = [];
+    for (let k = 0; k < NB; k++) if (band[2 * k + 1] > 0) bins.push(band[2 * k], band[2 * k + 1]);
+    R.calf.push(Float32Array.from(bins));
+    R.foot.push(Float32Array.from(pts));
+  }
+  data.legRest = R;
+  return R;
+}
+
+/**
+ * How high a foot stood up off its heel holds the ankle: the lowest of its
+ * vertices, with the bone leant `lean` past upright toward the toes and
+ * turned `splay` outward about the shin. See `legRest` for the frame.
+ */
+function heelOf(pts, lean, splay) {
+  const a = Math.cos(lean) * Math.cos(splay), b = Math.sin(lean) * Math.cos(splay), c = -Math.sin(splay);
+  let lo = 0;
+  for (let k = 0; k < pts.length; k += 3) {
+    const y = pts[k] * a + pts[k + 1] * b + pts[k + 2] * c;
+    if (y < lo) lo = y;
+  }
+  return -lo;
+}
+
+/**
+ * One quay sitter's legs on one body: the body's numbers above and this
+ * person's own way of lying them out — the legs a little apart, the feet
+ * leant and fallen outward by their own amounts — off their seed, never
+ * `rng` (RULE 4 in 42-crowd.js). Kept on the person for as long as the same
+ * body draws them.
+ */
+function legRestFor(fg, f) {
+  const R = legRestOf(f);
+  if (!R) return null;
+  const L = fg.legRestL;
+  if (L && L.data === f.data) return L;
+  const j = (k) => crowdJit((fg.seed || 0) * 977 + 31, 940 + k);
+  const lean = 0.18 + 0.30 * j(1);
+  const splay = [0.12 + 0.30 * j(2), 0.12 + 0.30 * j(3)];
+  const N = {
+    data: f.data, w: 1, at: R.at, child: R.child, side: R.side, calf: R.calf,
+    spread: [0.02 + 0.07 * j(4), 0.02 + 0.07 * j(5)], lean, splay,
+    // A couple of millimetres of skin into the concrete rather than a hair
+    // over it: a heel resting on a floor presses on it.
+    heel: [heelOf(R.foot[0], lean, splay[0]) - 0.002, heelOf(R.foot[1], lean, splay[1]) - 0.002],
+  };
+  fg.legRestL = N;
+  return N;
+}
+
+/**
  * The settler: one small net a body (the eight bathers are eight skeletons),
  * a queue, and a budget. `geoOf(fg)` is the caller's — what this person is
  * sitting on, in their own figure's frame (see `sitGeo` in 43-jadrija.js):
@@ -424,6 +558,13 @@ function makeSettler(geoOf) {
       qmul(_t, 0, [-K.refQ[o], -K.refQ[o + 1], -K.refQ[o + 2], K.refQ[o + 3]], 0, out.q, o);
       const l = (_t[3] < 0 ? -1 : 1) / (Math.hypot(_t[0], _t[1], _t[2], _t[3]) || 1);
       d[o] = _t[0] * l; d[o + 1] = _t[1] * l; d[o + 2] = _t[2] * l; d[o + 3] = _t[3] * l;
+      // A quay sitter's legs are not the settle's: they are laid on the
+      // concrete every frame (`legRestOf`), and what the ragdoll made of the
+      // clip's hanging shins — sunk through the same floor — is thrown away.
+      if (J.fg.ground && /^(leg|foot|toe)/.test(J.f.bones[i].name)) {
+        d[o] = d[o + 1] = d[o + 2] = 0; d[o + 3] = 1;
+        continue;
+      }
       // And no further than `most` for its part — see there.
       const lim = SETTLE_MOST.get(J.f.bones[i].name);
       const ang = 2 * Math.acos(Math.min(1, d[o + 3]));

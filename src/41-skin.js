@@ -1787,6 +1787,9 @@ function skinnedFigure(data, opts = {}) {
     // entirely — so this costs nothing to the four other skinned figures in
     // the game and to the crowd, which is not skinned at all.
     over: null, overT: 0, overRate: 1, overW: 0, overIdx: null,
+    // Legs laid on the floor — see `legRest`. Null for everybody but a
+    // quay sitter.
+    legs: null,
   };
   // Allocated on the first `over()` and never freed. See `st.over`.
   let overQ = null, overT3 = null;
@@ -1814,6 +1817,87 @@ function skinnedFigure(data, opts = {}) {
     const h = ang * 0.5, k = Math.sin(h) / l;
     aims.set(i, [ax * k, ay * k, az * k, Math.cos(h)]);
     return true;
+  }
+
+  /**
+   * LEGS LAID ON THE FLOOR — the quay sitters' (1.538.2; the numbers are made
+   * by `legRestOf` in 43-settle.js and handed in through `legs()`).
+   *
+   * Misha, 28 Sep 2026, two bathers on the quay at Jadrija: *"they have their
+   * legs sorta 'planted' into the cement which looks odd. their legs should
+   * be on the cement."* Their clip hangs the shins over the edge of a quay
+   * and they sit on the flat of it, so the shins went down through the slab.
+   *
+   * Solved here, every frame, and not keyed: the shin is turned to run
+   * forward along the thigh's own heading and down just far enough that the
+   * back of the heel, and the calf all the way up, are on the floor (`heel`
+   * and `calf`, measured off this body's own skin); the foot then stands up
+   * off that heel, leant forward and fallen outward by the person's own
+   * amounts. Each is the shortest turn from where the clip put the bone to
+   * there, in figure space, about the bone's own head — so the thigh, the
+   * hips and the hands resting on the thighs are the clip's to the
+   * millimetre, and whatever the clip does to a shin (the quay loop swings
+   * it) comes out as the same leg lying still, because the answer does not
+   * depend on where it started. Four bones, a few dozen multiplies each.
+   */
+  const _lv = new Float32Array(3), _lq = new Float32Array(4);
+  function legRest(L, i) {
+    const c = L.child[i], sd = L.side[i], o4 = i * 4, o3 = i * 3;
+    const p = data.bones[i].parent;
+    // The bone as the clip has it: its head to its child's.
+    qrotv(_lv, 0, worldQ, o4, restT, c * 3);
+    const len = Math.hypot(_lv[0], _lv[1], _lv[2]) || 1;
+    const cx = _lv[0] / len, cy = _lv[1] / len, cz = _lv[2] / len;
+    let tx, ty, tz;
+    if (L.at[i] === 1) {
+      // THE SHIN. Heading: the thigh's, hip to knee in plan, opened out by
+      // `spread` (the figure's left is −z). Pitch: whatever puts the heel on
+      // the floor — or, where the knee is low, whatever keeps the calf off it.
+      const ky = worldT[o3 + 1];
+      let hx = worldT[o3] - worldT[p * 3], hz = worldT[o3 + 2] - worldT[p * 3 + 2];
+      const hl = Math.hypot(hx, hz);
+      if (hl < 1e-4) { hx = 1; hz = 0; } else { hx /= hl; hz /= hl; }
+      const ph = sd ? -L.spread[1] : L.spread[0];
+      const cp = Math.cos(ph), sp = Math.sin(ph);
+      const rx = hx * cp + hz * sp;
+      hz = -hx * sp + hz * cp; hx = rx;
+      let ya = L.heel[sd];
+      const bins = L.calf[sd];
+      for (let k = 0; k < bins.length; k += 2) {
+        const u = bins[k], need = (bins[k + 1] - ky * (1 - u)) / u;
+        if (need > ya) ya = need;
+      }
+      const dy = Math.max(-0.9, Math.min(0.9, (ya - ky) / len));
+      const fl = Math.sqrt(1 - dy * dy);
+      tx = hx * fl; ty = dy; tz = hz * fl;
+    } else {
+      // THE FOOT, off the shin as it now lies: up (square to the shin),
+      // leant `lean` toward the toes' way, and turned `splay` outward about
+      // the shin — s × e is the figure's right, so the left foot negates it.
+      qrotv(_lv, 0, worldQ, p * 4, restT, o3);
+      const sl = Math.hypot(_lv[0], _lv[1], _lv[2]) || 1;
+      const sx = _lv[0] / sl, sy = _lv[1] / sl, sz = _lv[2] / sl;
+      let ex = -sy * sx, ey = 1 - sy * sy, ez = -sy * sz;
+      const el = Math.hypot(ex, ey, ez) || 1;
+      ex /= el; ey /= el; ez /= el;
+      let ox = sy * ez - sz * ey, oy = sz * ex - sx * ez, oz = sx * ey - sy * ex;
+      if (!sd) { ox = -ox; oy = -oy; oz = -oz; }
+      const cl = Math.cos(L.lean), sn = Math.sin(L.lean);
+      const a = cl * Math.cos(L.splay[sd]), b = cl * Math.sin(L.splay[sd]);
+      tx = ex * a + ox * b + sx * sn;
+      ty = ey * a + oy * b + sy * sn;
+      tz = ez * a + oz * b + sz * sn;
+    }
+    // The shortest turn from the one to the other, weighted, laid on.
+    const d = cx * tx + cy * ty + cz * tz;
+    if (d > 0.999999 || d < -0.99) return;
+    let qx = cy * tz - cz * ty, qy = cz * tx - cx * tz, qz = cx * ty - cy * tx, qw = 1 + d;
+    const ql = Math.hypot(qx, qy, qz, qw) || 1;
+    const w = Math.min(1, L.w);
+    qx *= w / ql; qy *= w / ql; qz *= w / ql; qw = 1 + (qw / ql - 1) * w;
+    const l2 = Math.hypot(qx, qy, qz, qw) || 1;
+    _lq[0] = qx / l2; _lq[1] = qy / l2; _lq[2] = qz / l2; _lq[3] = qw / l2;
+    qmul(worldQ, o4, _lq, 0, worldQ, o4);
   }
 
   /**
@@ -2007,6 +2091,7 @@ function skinnedFigure(data, opts = {}) {
     // The aims go too, below, for the same reason: a head turned in figure
     // space by the routine is not in the pose dict and would not be in the bake.
     const man = st.manual;
+    const legsOn = !!(st.legs && st.legs.w > 0);
     if (man) {
       // THE RAGDOLL'S USE OF IT (1.536.0, src/43-ragdoll.js): `clip`, if the
       // caller hands buffers for it, is given what the clips said before the
@@ -2047,6 +2132,8 @@ function skinnedFigure(data, opts = {}) {
         const aq = aims.get(i);
         if (aq) qmul(worldQ, i * 4, aq, 0, worldQ, i * 4);
       }
+      // Legs laid on the floor — see `legRest` below.
+      if (legsOn && !man && st.legs.at[i]) legRest(st.legs, i);
 
       // skin = world * bind^-1, written straight out as three rows of a 3x4.
       const sq = i * 4;
@@ -2343,6 +2430,11 @@ function skinnedFigure(data, opts = {}) {
      * layer in `update`. `settle(null)` takes it off.
      */
     settle: (L) => { st.settle = L || null; },
+    /**
+     * Legs laid on the floor, over any clip (`legRest` above): `{ w, at,
+     * child, side, heel, calf, spread, lean, splay }`, or null for the clip's.
+     */
+    legs: (L) => { st.legs = L || null; },
     /** The parsed blob — its bind-pose vertices and their bones, for the settle's capsules. */
     data,
     /** One clip's local pose at `t` s into `outQ` (4 a bone) and `outT` — nothing moves. */

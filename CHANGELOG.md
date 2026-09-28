@@ -8,6 +8,80 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.538.5] — 2026-09-28
+
+### the quay sitters' legs on the cement, and one woman off the shore
+
+Misha, of a man in yellow trunks and a woman in a teal bikini on the quay by
+a ladder: *"some bathers like these, they have their legs sorta 'planted'
+into the cement which looks odd. their legs should be on the cement."*
+
+**Why.** The quay clips (`sitquay`, `quaytalk`) were solved for somebody on
+the lip of the quay with their shins hanging over the water. They were never
+played there:
+
+- Every quay sitter is placed `B(t, 0.55, y, Math.PI, 'sit')`.
+- `ang` is a bearing off the shore's +t (`rigYaw`), not off its normal, so
+  Math.PI faces them straight down the shore, side-on to the water.
+- So all eleven sat on the flat of the lowest platform with concrete in front
+  of them. Their shins went about 0.3 m down into it, on both tiers.
+
+None of the eleven sits at an edge a leg could hang over, so none keeps the
+old legs. Where they sit and which way they face are unchanged.
+
+**The legs** (`legRestOf` and `legRestFor` in 43-settle.js, `legRest` in
+41-skin.js). They lie out along the ground. The clip already has the thighs
+level at the hip's height, so this changes the least:
+
+- The hips, the trunk and both hands resting on the thighs stay exactly
+  where the clip puts them. Only the knee opens and the foot turns up.
+- The shin and foot are solved every frame, in figure space, as the shortest
+  turn about the bone's head. The shin runs forward along the thigh's own
+  heading and drops just far enough to put the back of the heel on the
+  floor. Where a knee is low, it drops only as far as keeps the calf off the
+  floor.
+- The foot stands up off the heel, leant forward and turned outward.
+- The heel and the calf are measured off each of the eight bodies' own skin.
+  How far apart the legs lie and how the feet lean and fall are each
+  person's own, off their seed (`crowdJit`, never `rng`).
+- The quay loop's shin swing comes out as a still leg, because the answer
+  does not depend on where the clip started it.
+- The settle (1.538.0) keeps the upper body it measured. It no longer keeps
+  what the ragdoll made of the legs, which were the hanging shins sunk
+  through the same floor.
+- `sitGeo`'s quay floor profile now runs along −t, the way they face. It was
+  flat either way.
+
+**The far tier** (the `sit` case in 42-crowd.js, for `fg.ground`). The shins
+go on along the thighs and down to the heel (`shinDrop`, about 6°) and no
+longer swing. The boat's bench sitters and the café chairs are unchanged.
+
+**And the woman against the riser.** *"this one bather seems to have her
+right arm stuck in the cement ... just remove her completely."* She stood on
+the middle terrace at t 366.8, s 8.30. The riser up to the deck, at s 8.4,
+was 0.10 m behind her shoulder, and her arms go further than that when she
+stretches. She is the only stander that stride puts within a hand's breadth
+of it.
+
+She is still placed but marked `b.hidden`, so every `rng` draw is still
+taken for her:
+
+- her placement;
+- her deal of a body (`castBlob`, dealt round the shore in `t` order);
+- every draw the casting loop makes for her.
+
+She is simply never made a figure, never lent a roving slot, never a
+collider and never a target for the hose.
+
+Measured:
+
+- Of the other 99 people, the hash of every still person's placement and
+  live x, y, z and yaw is identical before and after, and so is the hash of
+  every seed, scale, body, sex, skin, suit and hair.
+- Census 446/333/86/27, blockers 821.
+- Figures 100 → 99, and `hidden` marks her alone.
+- Settle: done 12, failed 0 (café and quay together).
+
 ## [1.538.4] — 2026-09-28
 
 ### Chloe gets what Baye v2.0 got
