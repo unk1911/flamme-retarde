@@ -36412,7 +36412,35 @@ async function buildJadrija(scene) {
     // is the most any one can be; `fwd` how much of it goes along her, away
     // from the hand; and however they stack, the seat is never sent into the
     // mattress faster than `vMax` m/s, nor spun faster than `spin` rad/s.
-    spank: { J: [10, 13], hard: 18, hardP: 0.2, cap: 20, fwd: 0.35, vMax: 2.4, spin: 3 },
+    spank: { J: [10, 13], hard: 18, hardP: 0.2, cap: 20, fwd: 0.35, vMax: 2.4, spin: 3,
+      // AND WHERE IT LANDS (see `cotAim`). Misha, 28 Sep 2026: *"all the
+      // spanks land, on various parts of butt, lower back, even middle back,
+      // even thighs"*. Each region's slap goes on the body under the hand —
+      // the pelvis, the belly or chest body the capsule is on, or that thigh
+      // — at `J` of the slap (the back and the thighs are as heavy as the
+      // pelvis, 8 kg each, but a hand on them is the flat of it and not the
+      // swing into a cheek), with `seat` of it on the pelvis besides; and the
+      // reflex is scaled: `knee` the near knee's kick, `other` the far one's
+      // (of the full kick), `head` the flinch. On the back the chest goes
+      // into the foam and the head nods more, the legs hardly; on a thigh
+      // that leg kicks the more and the seat barely moves.
+      at: {
+        butt: { J: 1, seat: 0, knee: 1, other: 0.6, head: 1 },
+        back: { J: 0.85, seat: 0, knee: 0.3, other: 0.3, head: 1.8 },
+        thigh: { J: 0.75, seat: 0.25, knee: 1.3, other: 0.25, head: 0.6 },
+      },
+    },
+    // WHERE ON HER A PRESS LANDS — see `cotAim`. A ray that passes within
+    // `snap` m of the skin (or `snapK` of the distance, if more — 5.5 cm at a
+    // metre, 3 degrees) counts as on her: the capsules are a hair inside her,
+    // and where her back curves away from you a press on the skin you can
+    // see can pass over the one under it. `reach` m is as far as the hand
+    // goes. Her back ends at `top` (bind height, m), halfway up her shoulder
+    // blades: above it are her shoulders and her neck, which are not a slap.
+    // The back of a leg is a thigh down to `knee`, the hollow behind it
+    // included; below that is her calf. `seat` is the height her pelvis
+    // capsules stop being the cheeks and start being the small of her back.
+    aim: { snap: 0.04, snapK: 0.055, reach: 3, top: 1.38, knee: 0.42, seat: 0.97 },
     // The reflex: after `lag` s the knees flex by `deg` over `up`, hold, and
     // let go over `down` — the slapped side's the more — and her head comes
     // up off the pillow by `head` with them, a flinch. Degrees. And for as
@@ -36750,19 +36778,64 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * A slap, on the cot — called with the rest of the slap from 90-app.js.
-   * `side` +1 her left cheek; `from` where the hand came from (the camera);
-   * `k` N·s, or dealt (see COT_RAG.spank). Whether it landed on the ragdoll.
+   * An impulse `J` (world N·s, [x, y, z]) on body `b` at the world point `p`:
+   * its push, never into the mattress faster than `vMax`, and the turn it
+   * puts on the body about its middle, I⁻¹ (r × J) in the body's own frame,
+   * never faster than `spin`. What of it landed, 0..1 (see `vMax`).
    */
-  function cotSpank(side = 1, from = null, k = null) {
+  function cotImpulse(b, p, jx, jy, jz) {
+    const S = COT_RAG.spank, { net } = cotR, P = net.P, Q = net.Q;
+    const m = net.mass[b];
+    // Stacked, never into it faster than `vMax`: `sc` of this one lands.
+    const vy = net.V[3 * b + 1], dvy0 = jy / m;
+    const sc = vy + dvy0 < -S.vMax ? Math.max(0, (-S.vMax - vy) / dvy0) : 1;
+    net.kick(b, jx / m * sc, dvy0 * sc, jz / m * sc);
+    if (!p) return sc;
+    const rx = p[0] - P[3 * b], ry = p[1] - P[3 * b + 1], rz = p[2] - P[3 * b + 2];
+    const Lw = [(ry * jz - rz * jy) * sc, (rz * jx - rx * jz) * sc, (rx * jy - ry * jx) * sc];
+    const q = [Q[4 * b], Q[4 * b + 1], Q[4 * b + 2], Q[4 * b + 3]], qc = [-q[0], -q[1], -q[2], q[3]];
+    const Lb = [0, 0, 0];
+    qrotv(Lb, 0, qc, 0, Lw, 0);
+    const I = net.inert, o6 = 6 * b;
+    // [a b c; b d e; c e g] — xx yy zz xy xz yz — inverted by its cofactors.
+    const a = I[o6], d = I[o6 + 1], g = I[o6 + 2], bb = I[o6 + 3], c = I[o6 + 4], e = I[o6 + 5];
+    const A = d * g - e * e, Bc = c * e - bb * g, Cc = bb * e - c * d;
+    const det = a * A + bb * Bc + c * Cc;
+    if (Math.abs(det) > 1e-12) {
+      const Dd = a * g - c * c, E = bb * c - a * e, F = a * d - bb * bb;
+      const wb = [(A * Lb[0] + Bc * Lb[1] + Cc * Lb[2]) / det, (Bc * Lb[0] + Dd * Lb[1] + E * Lb[2]) / det,
+        (Cc * Lb[0] + E * Lb[1] + F * Lb[2]) / det];
+      const wl = Math.hypot(wb[0], wb[1], wb[2]);
+      if (wl > S.spin) for (let n = 0; n < 3; n++) wb[n] *= S.spin / wl;
+      const ww = [0, 0, 0];
+      qrotv(ww, 0, q, 0, wb, 0);
+      net.W[3 * b] += ww[0]; net.W[3 * b + 1] += ww[1]; net.W[3 * b + 2] += ww[2];
+    }
+    return sc;
+  }
+
+  /**
+   * A slap, on the cot — called with the rest of the slap from 90-app.js.
+   * `side` is the cheek, +1 the one on her bind +z (MEASURED: the cheek over
+   * `legUR`); `from` where the hand came from (the camera); `k` N·s, or dealt
+   * (see COT_RAG.spank); `hit` where on her it landed (`cotAim`), or null for
+   * the cheek. Whether it landed on the ragdoll.
+   */
+  function cotSpank(side = 1, from = null, k = null, hit = null) {
     const R = cotR;
     if (!R || !R.on || !skinFig) return false;
     const S = COT_RAG.spank, { net, rag } = R, pb = rag.pelvis;
-    const P = net.P, Q = net.Q;
-    // Where it landed: the fullest point of that cheek as she is drawn — the
-    // point the crosshair picked — or, without v2.0, over her pelvis.
+    const P = net.P;
+    const reg = hit && S.at[hit.reg] ? hit.reg : 'butt', A = S.at[reg];
+    // The body under the hand: the pelvis for a cheek, and otherwise the one
+    // the capsule it landed on rides.
+    const hb = hit && hit.bone ? rag.body(hit.bone) : -1;
+    const b = hb >= 0 ? hb : pb;
+    // Where it landed: the point the crosshair picked on her — or, without
+    // one, the fullest point of that cheek as she is drawn, or, without
+    // v2.0, over her pelvis.
     let px = P[3 * pb], py = P[3 * pb + 1] + 0.08, pz = P[3 * pb + 2];
-    if (APPR.primary && appr && appr.mesh.visible) {
+    if (hit) { px = hit.x; py = hit.y; pz = hit.z; } else if (APPR.primary && appr && appr.mesh.visible) {
       const bp = apprenticeButtBind(side);
       if (bp) {
         const w = bindPointAt(appr, bp, [['pelvis', 1]], _ctV);
@@ -36778,50 +36851,165 @@ async function buildJadrija(scene) {
       const l = Math.hypot(fx, fz) || 1;
       fx /= l; fz /= l;
     }
+    const Jb = J * A.J;
     let jx = fx * S.fwd, jy = -1, jz = fz * S.fwd;
     const jl = Math.hypot(jx, jy, jz);
-    jx *= J / jl; jy *= J / jl; jz *= J / jl;
-    const m = net.mass[pb];
-    // Stacked, never into it faster than `vMax`: `sc` of this one lands.
-    const vy = net.V[3 * pb + 1], dvy0 = jy / m;
-    const sc = vy + dvy0 < -S.vMax ? Math.max(0, (-S.vMax - vy) / dvy0) : 1;
-    net.kick(pb, jx / m * sc, dvy0 * sc, jz / m * sc);
-    // And the turn it puts on the pelvis: I⁻¹ (r × J), in the body's frame.
-    const rx = px - P[3 * pb], ry = py - P[3 * pb + 1], rz = pz - P[3 * pb + 2];
-    const Lw = [(ry * jz - rz * jy) * sc, (rz * jx - rx * jz) * sc, (rx * jy - ry * jx) * sc];
-    const q = [Q[4 * pb], Q[4 * pb + 1], Q[4 * pb + 2], Q[4 * pb + 3]], qc = [-q[0], -q[1], -q[2], q[3]];
-    const Lb = [0, 0, 0];
-    qrotv(Lb, 0, qc, 0, Lw, 0);
-    const I = net.inert, o6 = 6 * pb;
-    // [a b c; b d e; c e g] — xx yy zz xy xz yz — inverted by its cofactors.
-    const a = I[o6], d = I[o6 + 1], g = I[o6 + 2], b = I[o6 + 3], c = I[o6 + 4], e = I[o6 + 5];
-    const A = d * g - e * e, Bc = c * e - b * g, Cc = b * e - c * d;
-    const det = a * A + b * Bc + c * Cc;
-    if (Math.abs(det) > 1e-12) {
-      const Dd = a * g - c * c, E = b * c - a * e, F = a * d - b * b;
-      const wb = [(A * Lb[0] + Bc * Lb[1] + Cc * Lb[2]) / det, (Bc * Lb[0] + Dd * Lb[1] + E * Lb[2]) / det,
-        (Cc * Lb[0] + E * Lb[1] + F * Lb[2]) / det];
-      const wl = Math.hypot(wb[0], wb[1], wb[2]);
-      if (wl > S.spin) for (let n = 0; n < 3; n++) wb[n] *= S.spin / wl;
-      const ww = [0, 0, 0];
-      qrotv(ww, 0, q, 0, wb, 0);
-      net.W[3 * pb] += ww[0]; net.W[3 * pb + 1] += ww[1]; net.W[3 * pb + 2] += ww[2];
-    }
-    // The reflex: both knees, the slapped side's the more, sized with the slap.
+    jx /= jl; jy /= jl; jz /= jl;
+    const sc = cotImpulse(b, [px, py, pz], jx * Jb, jy * Jb, jz * Jb);
+    // And the seat's share of a slap that landed elsewhere, straight through
+    // its middle.
+    if (b !== pb && A.seat > 0) cotImpulse(pb, null, jx * Jb * A.seat, jy * Jb * A.seat, jz * Jb * A.seat);
+    // The reflex: both knees, the near one the more, sized with the slap and
+    // with where it landed. THE NEAR ONE IS THE ONE ON THE SIDE OF IT: +1 is
+    // bind +z, which is `legUR`'s side (MEASURED lying flat: that cheek's
+    // point is 4.7 cm off the right thigh's line and 18.5 off the left's).
+    // Through 1.542.0 a cheek kicked the knee across from it the more.
     const K = COT_RAG.kick, u = clamp((J - S.J[0]) / (S.hard - S.J[0]), 0, 1);
     const deg = (K.deg[0] + (K.deg[1] - K.deg[0]) * u) * (0.85 + 0.3 * Math.random()) * Math.PI / 180
       * (show.phase === 'edgeHeld' ? K.edge : 1);
-    // +1 is her left.
-    const head = (K.head[0] + (K.head[1] - K.head[0]) * u) * Math.PI / 180;
-    R.kicks.push({ t: 0, l: deg * (side > 0 ? 1 : K.other), r: deg * (side > 0 ? K.other : 1), h: head });
+    const head = (K.head[0] + (K.head[1] - K.head[0]) * u) * Math.PI / 180 * A.head;
+    const nearR = hit && hit.leg ? hit.leg === 'R' : side > 0;
+    const kn = deg * A.knee, ko = deg * A.other;
+    R.kicks.push({ t: 0, l: nearR ? ko : kn, r: nearR ? kn : ko, h: head });
     if (R.kicks.length > 3) R.kicks.shift();
     R.calm = COT_RAG.calm;
     // Past the warm-up at once: a slap in its first second is still a slap.
     if (R.t < COT_RAG.warmFor) R.t = COT_RAG.warmFor;
     cotStats.spanks++;
-    cotStats.last = { J: +J.toFixed(2), dv: +(J * sc / m).toFixed(3), side,
-      kick: +(deg * 180 / Math.PI).toFixed(1) };
+    cotStats.last = { J: +Jb.toFixed(2), dv: +(Jb * sc / net.mass[b]).toFixed(3), side, reg,
+      bone: hit ? hit.bone : 'pelvis', kick: +(kn * 180 / Math.PI).toFixed(1) };
     return true;
+  }
+
+  /**
+   * WHERE ON HER BACK THE CROSSHAIR IS, while she lies on her front on the
+   * cot (COT_RAG.phases). Misha, 28 Sep 2026, of 1.540.0: *"it seems like
+   * only about 25% of the spanks land, the others result in nothing. can u
+   * ... see that all the spanks land, on various parts of butt, lower back,
+   * even middle back, even thighs they should all land, really"*.
+   *
+   * WHY THREE IN FOUR DID NOTHING (MEASURED, 130 aimed presses from five
+   * places round the cot: 33 % lying flat, 38 % over the edge; 1 in 30 on
+   * the middle of her back, 2 in 30 on a thigh). The press was a contest of
+   * points by angle off the crosshair — her two breasts, her two hips, a
+   * point low on her front, her hair, her lip, and the fullest point of each
+   * cheek — won by whichever was nearest, and only inside 9 degrees of it.
+   * Standing up those points are well apart. Lying face down they are all
+   * within a hand of one another as you look down at her: the breasts are
+   * under the middle of her back, the hips at her sides level with the
+   * cheeks, and the point low on her front straight under them. So the
+   * middle of her back was nearly always the breast under it (the hand went
+   * off to a breast pressed into the mattress), the small of her back and the
+   * cheeks' edges a hip or the thigh stroke, and a thigh, further than 9
+   * degrees from any of them, the thumb — which on her front has no lip to go
+   * to. Nothing, in all three.
+   *
+   * SO IT IS HER BODY THE PRESS IS TESTED AGAINST, not points: the capsules
+   * the chains already lie on (CHAIN_BODY — measured off v2.0's own mesh, a
+   * hair inside her skin), each posed on its bone as she is drawn, and the
+   * crosshair's ray into them. The nearest one it goes into is where the
+   * hand lands; a ray that goes into none but passes within `aim.snap` of
+   * one lands at the nearest point of it. Her arms are left out — they lie
+   * along her sides, and a slap there is on the flank behind them — and her
+   * head and neck are in, so a press aimed at her face or her hair meets
+   * them first and is the thumb or the pet as before. What it answers: `reg`
+   * 'butt', 'back' or 'thigh'; `side` the cheek (+1 bind +z, as
+   * `apprenticeButtBind`'s); `leg` 'L'/'R', the side of her it is; `bone`
+   * the body it goes on; world `x y z`; `bind`, the same point in her bind
+   * frame (for the mark); `snap` whether it was a near miss. `{ miss: true }`
+   * when she is lying there and it is not her back, her bottom or a thigh —
+   * so the two cheeks' points are not asked after it (see 90-app.js) — and
+   * null when she is not lying on her front on the cot.
+   */
+  const _caA = new THREE.Vector3(), _caB = new THREE.Vector3(), _caQ = new THREE.Quaternion();
+  const _caMI = new THREE.Matrix4();
+  function cotAim(o, d) {
+    if (!show || !COT_RAG.phases[show.phase] || !show.onBed || !skinFig || !sheIsIn()) return null;
+    const G = COT_RAG.aim, caps = chainCapsules(), f = skinFig;
+    f.mesh.updateMatrixWorld();
+    const M = f.mesh.matrixWorld;
+    const dl = Math.hypot(d.x, d.y, d.z) || 1;
+    const dx = d.x / dl, dy = d.y / dl, dz = d.z / dl;
+    const seg = [];
+    for (const c of caps) {
+      if (c.only) continue;
+      const nm = f.bones[c.bone].name;
+      if (/^(arm|hand|finger|thumb)/.test(nm)) continue;
+      f.boneAt(c.bone, _caB);
+      f.boneTurn(c.bone, _caQ);
+      const e = [c.a, c.e].map((p) => _caA.set(p[0] - c.head.x, p[1] - c.head.y, p[2] - c.head.z)
+        .applyQuaternion(_caQ).add(_caB).applyMatrix4(M).toArray());
+      seg.push({ c, nm, a: e[0], b: e[1] });
+    }
+    // The nearest point of a capsule's line to a point on the ray: how far
+    // outside the skin that is (−: inside), its fraction along, the point on
+    // the line and the point on the ray.
+    const off = (s, t) => {
+      const px = o.x + dx * t, py = o.y + dy * t, pz = o.z + dz * t;
+      const ex = s.b[0] - s.a[0], ey = s.b[1] - s.a[1], ez = s.b[2] - s.a[2];
+      const ee = ex * ex + ey * ey + ez * ez;
+      const u = ee > 0 ? clamp(((px - s.a[0]) * ex + (py - s.a[1]) * ey + (pz - s.a[2]) * ez) / ee, 0, 1) : 0;
+      const qx = s.a[0] + ex * u, qy = s.a[1] + ey * u, qz = s.a[2] + ez * u;
+      return [Math.hypot(px - qx, py - qy, pz - qz) - (s.c.r0 + (s.c.r1 - s.c.r0) * u), u, qx, qy, qz, px, py, pz];
+    };
+    // Along the ray, the closest it comes to each: coarse, then fine; and if
+    // it went in, where, by halves between a point outside and the deepest.
+    let best = null;
+    for (const s of seg) {
+      let tb = 0, gb = Infinity;
+      for (let t = 0.1; t <= G.reach; t += 0.02) {
+        const g = off(s, t)[0];
+        if (g < gb) { gb = g; tb = t; }
+      }
+      for (let h = 0.01; h > 0.0005; h *= 0.5) {
+        for (const t of [tb - h, tb + h]) { const g = off(s, t)[0]; if (g < gb) { gb = g; tb = t; } }
+      }
+      if (gb < 0) {
+        let lo = Math.max(0, tb - 0.5), hi = tb;
+        for (let n = 0; n < 24; n++) { const m = (lo + hi) / 2; if (off(s, m)[0] > 0) lo = m; else hi = m; }
+        tb = hi;
+      }
+      if (!best || (gb < 0 && (best.gap >= 0 || tb < best.t)) || (gb >= 0 && best.gap >= 0 && gb < best.gap)) {
+        best = { s, t: tb, gap: gb };
+      }
+    }
+    const MISS = { miss: true };
+    if (!best) return MISS;
+    const hitIn = best.gap < 0;
+    // Missed by more than `snap`: not on her.
+    if (!hitIn && best.gap > Math.max(G.snap, G.snapK * best.t)) return MISS;
+    const s = best.s, r = off(s, best.t);
+    // The point on her skin: the ray's own point where it went in, or, for a
+    // near miss, the nearest point of the capsule's skin to the ray.
+    const w = new THREE.Vector3();
+    if (hitIn) w.set(r[5], r[6], r[7]);
+    else {
+      const rad = s.c.r0 + (s.c.r1 - s.c.r0) * r[1];
+      w.set(r[5] - r[2], r[6] - r[3], r[7] - r[4]).setLength(rad).add(_caA.set(r[2], r[3], r[4]));
+    }
+    // And the same point in her bind frame, off that capsule's bone.
+    _caMI.copy(M).invert();
+    f.boneAt(s.c.bone, _caB);
+    f.boneTurn(s.c.bone, _caQ).invert();
+    const bp = w.clone().applyMatrix4(_caMI).sub(_caB).applyQuaternion(_caQ).add(s.c.head);
+    // What it is. Her head and neck, her shins and feet, and her shoulders
+    // above `top` are not a slap; the top of the back of a thigh, under the
+    // fold, is the cheek.
+    let reg = null;
+    if (s.nm === 'pelvis') reg = bp.y < G.seat ? 'butt' : 'back';
+    else if (s.nm === 'spine02' || (s.nm === 'chest' && bp.y <= G.top)) reg = 'back';
+    else if (/^leg[UL]/.test(s.nm) && bp.y >= G.knee) reg = bp.y > APPR.buttY[0] && bp.x < 0 ? 'butt' : 'thigh';
+    if (!reg) return { miss: true, bone: s.nm, y: +bp.y.toFixed(3) };
+    // The body it goes on: the pelvis for a cheek, wherever on it; the belly
+    // for the small of her back, even where that is the top of the pelvis's
+    // capsules — on the pelvis, above its middle, it rocked her seat and
+    // both thighs 16 degrees (MEASURED), which is a slap on the bottom and
+    // not the back; and the thigh's body for the hollow of a knee too, since
+    // the shin under it is a third of the weight.
+    return { reg, side: bp.z > 0 ? 1 : -1, leg: bp.z > 0 ? 'R' : 'L',
+      bone: reg === 'butt' ? 'pelvis' : reg === 'thigh' ? 'legU' + (bp.z > 0 ? 'R' : 'L')
+        : s.nm === 'pelvis' ? 'spine02' : s.nm,
+      x: w.x, y: w.y, z: w.z, bind: [bp.x, bp.y, bp.z], snap: !hitIn, t: +best.t.toFixed(3) };
   }
 
   /**
@@ -60992,9 +61180,16 @@ async function buildJadrija(scene) {
     /**
      * And the slap's weight, on her on the cot — see `cotSpank`. Called with
      * the rest of the slap by 90-app.js: `side` +1 her left, `from` the hand's
-     * side of her (the camera), `k` N·s for a probe (dealt otherwise).
+     * side of her (the camera), `k` N·s for a probe (dealt otherwise), `hit`
+     * where on her it landed (`cotAim`), or null for the cheek.
      */
-    cotSpank: (side, from, k) => cotSpank(side, from, k),
+    cotSpank: (side, from, k, hit) => cotSpank(side, from, k, hit),
+    /**
+     * Where on her back, her bottom or a thigh the crosshair is — the ray from
+     * `o` along `d` — while she lies on her front on the cot; or null. See
+     * `cotAim`: the press in 90-app.js asks it first.
+     */
+    cotAim: (o, d) => cotAim(o, d),
     /**
      * Debug: COT_RAG's numbers, merged — `cotTune({ kick: { deg: [40, 70] } })`
      * — taking effect at the next time she is taken over (or now, for the

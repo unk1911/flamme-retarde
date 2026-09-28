@@ -1095,13 +1095,18 @@ let buttSlaps = 0;              // debug: how many the click has actually played
  * times); and, 1.540.0, its weight, when she is lying on her front on the cot
  * — see `cotSpank`, which is the ragdoll's.
  */
-function buttSlap(side, k = null) {
+function buttSlap(side, k = null, hit = null) {
   if (audio && audio.slap) buttSlaps += audio.slap() ? 1 : 0;
-  if (typeof apprenticeSlap === 'function') apprenticeSlap(side);
-  if (jadrija && jadrija.slapped) jadrija.slapped();
-  return !!(jadrija && jadrija.cotSpank && jadrija.cotSpank(side, camera.position, k));
+  // And, 1.542.1, `hit`: where on her back, bottom or thighs it landed, lying
+  // on her front on the cot (`cotAim`) — the mark goes there and the weight
+  // goes on the body under it. Her hands only go back to her cheeks for one
+  // that landed on them.
+  if (typeof apprenticeSlap === 'function') apprenticeSlap(side, hit ? hit.bind : null, hit ? hit.reg : 'butt');
+  if (jadrija && jadrija.slapped && (!hit || hit.reg === 'butt')) jadrija.slapped();
+  return !!(jadrija && jadrija.cotSpank && jadrija.cotSpank(side, camera.position, k, hit));
 }
 let buttSide = 1;               // which cheek the crosshair picked, +1 her left
+let buttHit = null;             // and where on her, on the cot — see `cotAim`
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
 let camTraceOn = false;       // debug: the camera, frame by frame — see camTrace
 const camTrace = [];
@@ -7714,6 +7719,7 @@ function tick(wall, draw) {
     if (hps && audio && audio.slapWarm) audio.slapWarm();
     if (pressing && !reachWas) {
       reachKind = 'thumb';
+      buttHit = null;
       if (brs) {
         const fw = camera.getWorldDirection(_thumbF);
         // Near a breast, and nearer it than her mouth: the mouth keeps the
@@ -7777,6 +7783,24 @@ function tick(wall, draw) {
             if (d > best) { best = d; reachKind = 'butt'; buttSide = h.side; }
           }
         }
+        // AND ALL OF HER BACK, LYING ON HER FRONT ON THE COT. Misha, 28 Sep
+        // 2026: *"only about 25% of the spanks land, the others result in
+        // nothing ... on various parts of butt, lower back, even middle back,
+        // even thighs they should all land, really"*. Face down, every point
+        // above is within a hand of every other as you look down at her, and
+        // the breast under her back or the hip at her side won the contest
+        // as often as a cheek did — see `cotAim` in 43-jadrija.js, which
+        // tests the crosshair against her body instead. On her it is the
+        // slap, whatever else was nearer by angle — and her head and neck are
+        // in that test, so a press nearer them than her back is not on her
+        // back, and goes on to the thumb or the pet as before (by angle alone
+        // her face is right behind the small of her back, seen from her
+        // feet). And off her it is not the slap, however near a cheek's
+        // point it passed: the mattress beside her took one in five before.
+        const bk = jadrija.cotAim ? jadrija.cotAim(camera.position, fw) : null;
+        if (bk && bk.miss) { if (reachKind === 'butt') reachKind = 'thumb'; } else if (bk) {
+          reachKind = 'butt'; buttSide = bk.side; buttHit = bk;
+        }
       }
     }
     // THE HAMMOCK, outside: a press with the cloth in front of you and within
@@ -7791,7 +7815,8 @@ function tick(wall, draw) {
       jadrija.askShow('pet');
     }
     if (pressing && !reachWas && reachKind === 'butt') {
-      buttSlap(reachForce && reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
+      if (reachForce) buttSlap(reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
+      else buttSlap(buttSide, null, buttHit);
     }
     reachWas = pressing;
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
