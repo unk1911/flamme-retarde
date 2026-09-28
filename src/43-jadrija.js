@@ -25624,7 +25624,9 @@ async function buildJadrija(scene) {
       const w = toWorld(A.ct, A.cs);
       put(w[0], fg.y + 0.715, w[2], 0.30, 0.035, 0.30, yawOf(A.ct, A.cs, 1, 0));
     }
-    return { boxes, floor: 0, back: true };
+    // `round`: the pedestal table's top is a disc, and a hand laid on it is
+    // kept inside the disc rather than the box (`handPlan` in 42-crowd.js).
+    return { boxes, floor: 0, back: true, round: !!A.mesh };
   }
 
   // Somebody halfway down every other ladder, which is the one place on this
@@ -56435,6 +56437,28 @@ async function buildJadrija(scene) {
           const fg = crowds.skin && crowds.skin.figures.find((f) => f.seat === seat);
           return fg ? sitGeo(fg) : null;
         },
+      },
+      /**
+       * The bathers' hands (`HANDS` in 42-crowd.js): `stats(reset)` — how
+       * many hand-poses of each kind since the last reset, and how far a
+       * resting wrist ended up from where it was sent (mean and worst, m);
+       * `plans()` — who is resting which hand on what; `off(true)` gives
+       * every hand back to its clip, for the before photograph.
+       */
+      hands: {
+        stats: (reset) => {
+          const o = { ...handStats, res: handStats.n ? +(handStats.res / handStats.n).toFixed(4) : 0,
+            resMax: +handStats.resMax.toFixed(4) };
+          if (reset) for (const k in handStats) handStats[k] = 0;
+          return o;
+        },
+        plans: () => (crowds.skin ? crowds.skin.pairs().filter(([fg]) => fg && fg.handPlan)
+          .map(([fg, f]) => ({ idx: fg.idx, mode: fg.mode, seat: fg.seat, phone: fg.phone || 0, clip: f.playing(),
+            L: fg.handPlan.L && fg.handPlan.L.kind, R: fg.handPlan.R && fg.handPlan.R.kind,
+            reach: [fg.handPlan.L && fg.handPlan.L.why, fg.handPlan.R && fg.handPlan.R.why],
+            lean: [fg.handPlan.L && +fg.handPlan.L.lean.toFixed(2), fg.handPlan.R && +fg.handPlan.R.lean.toFixed(2)] })) : null),
+        off: (v) => { HANDS.off = !!v; return HANDS.off; },
+        cfg: () => HANDS,
       },
       /**
        * The roving cast: who the eight are, how tall, and who is in a slot.
