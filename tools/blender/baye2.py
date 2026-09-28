@@ -118,6 +118,39 @@ FIGURES = {
                  'brow': 'mindfront_eyebrows_03',
                  'lash': 'mindfront_eyelashes_02'},
     },
+    # The Bucketeer, on Baye v2.0's body. Misha, 28 Sep 2026: *"we forgot to
+    # upgrade the bucketeer baye to baye v2.0 ... the only difference is she
+    # should wear a full swimsuit and have blonde hair in a bun"*.
+    #
+    # SAME BODY, SAME SKIN, SAME BROWS AND LASHES as `baye2`, so she is the
+    # same woman and not a relative: she draws with `baye2_skin` at runtime
+    # (no second copy of the map) and the fitted parts below land on the same
+    # skull. What differs is the two things he named.
+    #
+    #   the hair   `rehmanpolanski_hair_bun_brown` — CC0, RehmanPolanski, the
+    #              bun the bathers already wear. Brown in the pack, dyed blonde
+    #              at runtime off its luminance (`hairDye`), which is Chloe's
+    #              mechanism; the red velvet tie in the same map is kept red.
+    #   the suit   `mindfront_f_one-piece_swimsuit_01` — CC-BY 4.0, Mindfront.
+    #              A modelled one-piece with a leg line, a scoop back and
+    #              straps, fitted through its own `.mhclo` like the hair, and
+    #              dyed at runtime. `delete` takes the body out from under it
+    #              (the asset's own `delete_verts`), so a hip that bends
+    #              further than the offset cannot come through the cloth.
+    #
+    # `clips` is the three she plays (`idle`, `walk`, `ballet` — see
+    # src/45-bucketeer.js); the other forty-six are a megabyte she would never
+    # draw.
+    'bucketeer2': {
+        'body': 'build/mh_base.obj',
+        'wear': {'skin': 'darthfurby_caucasian_female',
+                 'hair': 'rehmanpolanski_hair_bun_brown',
+                 'brow': 'mindfront_eyebrows_09',
+                 'lash': 'mindfront_eyelashes_04',
+                 'suit': 'mindfront_f_one-piece_swimsuit_01'},
+        'delete': 'suit',
+        'clips': ['idle', 'walk', 'ballet'],
+    },
 }
 # `tools/baye2_tex.py` carries the same table; if they ever disagree the
 # figure is wearing one asset's geometry under another's texture, which on a
@@ -134,7 +167,7 @@ BASE_PARTS = {
 # Material ids the runtime switches on. Kept as small integers in the blob so
 # that a part's name is a label and not a contract.
 MAT = {'body': 0, 'eyes': 1, 'mouth': 2, 'hair': 3, 'brow': 4, 'lash': 4, 'leg': 5,
-       'hair2': 3}
+       'hair2': 3, 'suit': 6}
 MAX_INFLUENCES = 4
 # Strand meshes, thinned. See `decimate`; the hair is left alone because its
 # cards carry the alpha cut-out that makes it read as hair at all.
@@ -527,6 +560,41 @@ def write_blob(buf, rest, baked, path, label='baye2'):
              len(baked), path.stat().st_size / 1024))
 
 
+def asset_dir(aid):
+    """The pack folder an asset id lives in, by its name or by its `.mhclo`."""
+    d = next((x for x in PACKS.rglob(aid) if x.is_dir()), None)
+    if d is None:
+        for x in PACKS.rglob('*'):
+            if x.is_dir() and (x / (aid + '.mhclo')).exists():
+                return x
+    return d
+
+
+def read_delete(path):
+    """A `.mhclo`'s `delete_verts`: base-mesh indices, singles and `a - b` runs."""
+    out, on = set(), False
+    for ln in path.read_text(errors='ignore').splitlines():
+        w = ln.split()
+        if not w:
+            continue
+        if w[0] == 'delete_verts':
+            on = True
+            continue
+        if not on:
+            continue
+        if not w[0].isdigit():
+            break
+        i = 0
+        while i < len(w):
+            if i + 2 < len(w) and w[i + 1] == '-':
+                out.update(range(int(w[i]), int(w[i + 2]) + 1))
+                i += 3
+            else:
+                out.add(int(w[i]))
+                i += 1
+    return out
+
+
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
     name = argv[argv.index('--figure') + 1] if '--figure' in argv else 'baye2'
@@ -558,9 +626,25 @@ def main():
         p = Vector(game_space(vs[vi], scale, drop))
         return wt[min(kd, key=lambda e: (e[0] - p).length_squared)[1]]
 
+    # The body out from under a garment that says so — the `.mhclo`'s own
+    # `delete_verts`, which is how MakeHuman itself dresses a figure. Only a
+    # FACE whose every corner is on the list goes, so the body still runs a
+    # row of triangles in under the garment's edge and no seam can open there.
+    gone = set()
+    if spec.get('delete'):
+        dd = asset_dir(wear[spec['delete']])
+        gone = read_delete(next(iter(sorted(dd.glob('*.mhclo')))))
+        print('[%s] %d body verts under the %s' % (name, len(gone), spec['delete']))
     buf = Buf()
     for part, groups in BASE_PARTS.items():
-        verts, tris = expand(vs, vts, faces, groups, wt, scale, drop, near,
+        fs = faces
+        if gone and part == 'body':
+            fs = {g: [f for f in faces.get(g, []) if not all(vi in gone for vi, _t in f)]
+                  for g in groups}
+            print('[%s] body keeps %d of %d faces'
+                  % (name, sum(len(v) for v in fs.values()),
+                     sum(len(faces.get(g, [])) for g in groups)))
+        verts, tris = expand(vs, vts, fs, groups, wt, scale, drop, near,
                              uv=part not in NO_UV)
         buf.part(part, MAT[part], verts, tris)
 
@@ -570,16 +654,11 @@ def main():
     # gives that for free — the asset vertex rides a triangle of BODY vertices,
     # so handing it a different body moves the asset with it. That is the whole
     # payoff of doing the fit properly rather than hand-placing.
-    for kind in ('hair', 'hair2', 'brow', 'lash', 'leg'):
+    for kind in ('hair', 'hair2', 'brow', 'lash', 'leg', 'suit'):
         aid = wear.get(kind)
         if not aid:
             continue
-        d = next((x for x in PACKS.rglob(aid) if x.is_dir()), None)
-        if d is None:
-            for x in PACKS.rglob('*'):
-                if x.is_dir() and (x / (aid + '.mhclo')).exists():
-                    d = x
-                    break
+        d = asset_dir(aid)
         mhclo = next(iter(sorted(d.glob('*.mhclo'))), None) if d else None
         objp = next(iter(sorted(d.glob('*.obj'))), None) if d else None
         if not (objp and mhclo):
@@ -614,7 +693,9 @@ def main():
     H.fire_floor(rig)
     H.ballet_floor(rig)
     H.wine_floor(rig)
-    baked = [H._bake_clip(rest, c) for c in H.CLIPS]
+    keep = spec.get('clips')
+    baked = [H._bake_clip(rest, c) for c in H.CLIPS
+             if not keep or c['name'] in keep]
 
     write_blob(buf, rest, baked, OUT / ('%s.fr3d.gz' % name), name)
     bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'build' / ('%s.blend' % name)))

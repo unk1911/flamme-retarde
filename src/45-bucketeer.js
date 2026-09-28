@@ -22,15 +22,24 @@
 // far better thing to watch than an interior stairwell would have been, and is
 // the reason this loop is worth having at all.
 //
-// She is a second `human_skin_fr3d` and not a copy of Baye's. Two figures off
+// SINCE 1.540.0 SHE IS BAYE v2.0 — `bucketeer2.fr3d.gz`, Baye v2.0's body, rig,
+// face and skin map with a blonde bun and a modelled red one-piece; see
+// `buildBucketeer2`. What follows in this note is about the figure she was
+// until then, which is still here as the fallback (`buildBucketeer1`).
+//
+// She was a second `human_skin_fr3d` and not a copy of Baye's. Two figures off
 // one parse would share a geometry and `sway` writes back into it, so the wrap
 // would wear whichever of them was stepped last; `loadSkin` re-inflates, which
 // is the intended cost and is why the note over `fringe` in 41-skin.js promises
-// it. Her wrap comes straight off — `wear(false)` — and the swimsuit is painted
+// it. Her wrap came straight off — `wear(false)` — and the swimsuit was painted
 // in her own fragment, for the reason 49-you.js gives about Chloe's tank: the
 // geometry is already there and a garment that is a mask over the body it is on
 // cannot clip through that body, which a modelled one would every time she
-// bent down to a bucket.
+// bent down to a bucket. (The v2.0 suit IS modelled, and does not clip, because
+// the body under it has been taken out — the asset's own `delete_verts`.)
+//
+// AND THE BUCKET IS A BODY NOW, and the pour is a throw — the block over
+// `BCARRY`, and over `TOSS`, is the whole of that.
 // -----------------------------------------------------------------------------
 
 const BUCK = {
@@ -41,10 +50,21 @@ const BUCK = {
   // with an empty bucket who has done this four times already this morning and
   // would like to get it over with. The pair of them is most of what makes the
   // loop read as a person rather than as a shuttle.
-  downFlat: 0.76,
-  downStair: 0.44,
-  upFlat: 1.16,
-  upStair: 0.78,
+  //
+  // ── AND THEN HEAVIER, AND LIGHTER, ON PURPOSE (1.540.0) ──
+  //
+  // Misha, 28 Sep 2026, on the physics pass: the full bucket has to be
+  // *"CLEARLY HEAVY"* — *"slower, careful steps on the stairs with the full
+  // bucket"* — and the empty one *"visibly lighter and quicker"*. So the two
+  // walks were pulled apart: down the flight 0.44 became 0.34 (a careful
+  // step, each tread taken rather than passed over), down the flat 0.76
+  // became 0.68, and back up the flight 0.78 became 0.92, the flat 1.16 1.28.
+  // The stair pace is under the old `clipMin` — see there for what that
+  // costs and why it was moved with it.
+  downFlat: 0.68,
+  downStair: 0.34,
+  upFlat: 1.28,
+  upStair: 0.92,
   // What the `walk` clip's own feet cover, off `SHOW.walk` in 43-jadrija.js.
   // The clip is played at speed/clipSpeed so her feet keep up with the ground.
   clipSpeed: 1.37,
@@ -53,7 +73,12 @@ const BUCK = {
   // clip, and the choice on a staircase there is no baked clip for is between
   // a little foot slide and a woman skipping down it. The slide is on the two
   // stair legs only — everywhere else she is over the floor anyway.
-  clipMin: 0.30,
+  // (1.540.0) 0.30 became 0.24 WITH the stair pace, not as a taste: at 0.34
+  // m/s down the flight she is at 0.248 of the clip, so the old floor would
+  // have had her feet covering 0.41 m/s over treads she is crossing at 0.34 —
+  // an 18 per cent slide, where the floor now leaves her at 1 per cent. A
+  // quarter-speed walk clip is a slow, placed step, which is the brief.
+  clipMin: 0.24,
   clipMax: 1.75,
   // How fast her feet will take a STEP in the floor, in metres a second.
   //
@@ -323,7 +348,7 @@ const BUCK = {
   // `hum` is: `mutter()` below is the A/B, and a control run with the tail of
   // "ubi me vrućina" in the first second of it is not a control run.
   say: true,
-  // ── 105 to 157 s, AND THIS SUPERSEDES THE INSTRUCTION IT USED TO CARRY ─────
+  // ── 105 to 157 s, AND THIS SUPERSEDES THE INSTRUCTION IT USED TO BCARRY ─────
   //
   // These were 245 and 110 — 245 to 355 s, mean 300 — and the note here said,
   // correctly, that they were `VOICE.gapBucket` and `VOICE.jitterBucket` in
@@ -584,14 +609,18 @@ const BUCK = {
   // which would put the pail inside her thigh. It does not, because the arm
   // solve below re-points that arm at an absolute direction afterwards and only
   // the shoulder's own drop survives.
-  shrugL: 0.20, shrugR: 0.34,
+  // (1.540.0) And more of both, for *"a dropped shoulder"*: 0.34 and 0.20 were
+  // the numbers for a shoulder that was a constant times a flag; driven by the
+  // load now (`ln.sh`, the bucket's pull as a share of a full one's), the full
+  // bucket carries them at 0.46 and 0.24 and the empty one at a seventh.
+  shrugL: 0.24, shrugR: 0.46,
   // The free arm swung out for counterweight, on top of the shoulder lift.
   // Small, because the lift is already most of it: 0.20 on the clavicle takes
   // the left hand 86 mm out on its own and the lean carries the shoulder 43 mm
   // further, so this is the last 27 mm rather than the whole gesture. Measured
   // at 0.40 on `armUL` the left hand goes 178 mm out and 47 mm up, and 178 mm
   // is a scarecrow.
-  freeArm: 0.06,
+  freeArm: 0.10,
   // What is left of the clip's swing in the LOADED arm. 0.86 of the correction
   // and not all of it: a hand solved dead on to a fixed direction is a
   // shop-window mannequin holding a prop. Measured, the loaded hand travels
@@ -697,36 +726,15 @@ const BUCK = {
   // reason forward is the honest direction for this and sideways never was.
   offerUp: [0.15, -0.92, 0.36],
   offerFore: [0.86, -0.30, 0.42],
-  // WHERE THE SAME TWO BONES GO WHEN SHE TIPS IT, which is the third errand
-  // for this pair and the one that was being faked.
-  //
-  // `placePail` used to swing the BUCKET 220 mm forward and 80 mm up over the
-  // roll and leave the hand where it was — the one cheat that file admits to,
-  // and at full tip it put 207 mm of daylight between her fist and the bail.
-  // The note over it is right about why the swing has to happen (a pail emptied
-  // from a hand at the hip empties on to the foot under it, behind her own leg,
-  // and is unwatchable) and wrong about there being no way to do it: `offerUp`
-  // is a solved forward reach on these exact two bones and its own note ends
-  // "the pail — which hangs from the palm — goes with it".
-  //
-  // So this is the offer's mechanism with the pour's numbers. SOLVED AGAINST
-  // THE CHEAT rather than typed, because the bucket's world position at full
-  // tip is load-bearing three ways over — the jet, the puddle and both cut
-  // cameras are built on it — so the hand had to come to the pail and the pail
-  // had to stay put. See `tipFull` for what the sweep landed on.
-  // SOLVED, not typed — swept on a two-parameter blend between the carry
-  // targets and the offer's, at peak roll, against the position the cheat used
-  // to put the bucket in. `up` came out almost entirely off the forearm target
-  // and `forward` off both, and the lateral needed the upper arm's z opened
-  // back up by 0.073 on its own. Final error at the fist, against the three
-  // numbers the old swing produced: **-2.1 mm forward, +2.1 mm up, -1.6 mm
-  // outboard**. Inside RULE 5 on every axis, which is the whole point: the jet,
-  // the puddle and both cut cameras are aimed at where that bucket is.
-  tipUp: [0.213, -0.930, 0.405],
-  tipFore: [0.848, -0.310, 0.4205],
-  // How far into the roll the reach is complete, in the same units `placePail`
-  // ramped its swing over, so the timing is unchanged.
-  tipFull: 2.05,
+  // THE TIP USED TO BE A THIRD ERRAND FOR THESE TWO BONES — `tipUp` and
+  // `tipFore`, a one-armed forward reach solved to within 2 mm of where an
+  // older cheat had swung the bucket, so that the jet, the puddle and both cut
+  // cameras stayed aimed at it. Gone in 1.540.0 with the one-handed roll: the
+  // pour is a swing-toss now, the bail in her right and the base in her left
+  // from the bottom of the heave, and both arms are solved to the bucket
+  // rather than the bucket to one arm. See `TOSS`. (The cut's cameras are
+  // placed in her frame and look at her right hip at 0.9 m, which is where
+  // the throw goes over: 0.5 to 0.6 m in front of her and 0.22 to her right.)
   // And how stopped she has to be before any of it shows, in metres a second,
   // as a ramp that is squared so the bottom of it is properly dead.
   //
@@ -740,19 +748,10 @@ const BUCK = {
   // and a real stop, `yield` damping her to nothing at 9, at the whole of it
   // inside a third of a second.
   offerStill: 0.20,
-  // What a full stream is worth, as (level fall, in bucketfuls a second) times
-  // (the radius of what is still in it, in metres).
-  //
-  // The stream used to be a switch — a fixed sheet that appeared at 0.685 m
-  // tall on one frame and vanished on another — and both ends of that are the
-  // pop this whole pass exists to remove. What comes over a lip is as fat as
-  // the water going over it, so the cross-section is the product of how fast
-  // the level is falling and how wide the surface still is, and that product is
-  // zero at BOTH ends for free: at the start because the lip has only just gone
-  // under the surface, at the end because there is no surface left. Measured
-  // over the roll it peaks at 0.145 about two thirds of the way through, which
-  // is where a bucket does throw its widest sheet.
-  jetRef: 0.145,
+  // (`jetRef` was here — what a full stream over the lip of a slow roll was
+  // worth, 0.145 of level-fall times surface. The roll is a throw since
+  // 1.540.0 and the stream is a sheet of parcels; `st.pour` is now the rate the
+  // water leaves at, over `TOSS.flowRef`. See `TOSS` and `sheetEmit`.)
   // How fast the whole thing comes on and off, as a rate — 1/e in 0.29 s.
   // `held * fill` is a step at the top of `lift` and a ramp on the way out of
   // `tip`, and a lean that snapped on with the first frame of a pick-up would
@@ -765,6 +764,10 @@ const BUCK = {
   // a piruete or something ... i'm curious how easy it is to borrow from our
   // existing ballet moves that NPC Baye can do"*. It is easy, and this is the
   // whole of what it cost, so the answer is worth writing down properly.
+  //
+  // (1.540.0: she is `bucketeer2_fr3d` now, Baye v2.0's own rig out of the same
+  // `armature()` with `idle`, `walk` and `ballet` baked into it — so what
+  // follows is still true of the skeleton and the clip, bone for bone.)
   //
   // IT IS THE SAME FIGURE. Both women are `loadSkin('human_skin_fr3d')` —
   // 43-jadrija.js and this file pass the identical payload key — and
@@ -1379,7 +1382,7 @@ const BUCK = {
   // The wrong way to make a 52 s loop into a 5 minute one is to slow it down.
   // Every pace in this file is measured and human — 0.76 m/s with ten litres,
   // 0.44 down seventeen open risers, 1.16 back up empty — and six times any of
-  // those is a woman wading. The second wrong way is to make the CARRY longer:
+  // those is a woman wading. The second wrong way is to make the BCARRY longer:
   // the route down is the survey's own stair and there is no more of it, the
   // pour cut's clock is her clock beat for beat, and `sayInHold`, the hum's
   // cadence and `POUR_INTO` in 90-app.js are all cut against the beats as they
@@ -1877,11 +1880,22 @@ const BUCK_HAIR = {
 // thing that failed.
 const BUCK_SUIT = [0.520, 0.108, 0.122];
 const BUCK_HEM = [0.300, 0.058, 0.070];
-
-// Every bone the carry pose writes to, so that letting go of the pail is one
-// loop and not nine lines that have to be kept in step with the nine above.
-const CARRY_BONES = ['spine01', 'spine02', 'spine03', 'neck',
-  'clavicleL', 'clavicleR', 'armUL', 'armUR', 'armLR'];
+// And on v2.0 (1.540.0), where the suit is Mindfront's modelled one-piece and
+// this is its dye. LIFEGUARD RED — Misha's call, 28 Sep 2026: *"classic RED
+// one-piece (lifeguard-ish red that reads clearly against the white house and
+// stairs)"*. A sea-glass green was tried first and read well against the
+// channel and badly against the thing she is always in front of, which is a
+// white rendered wall and a white flight of stairs. Authored in the game's
+// stretched sRGB space, like every colour here; the map's luminance (0.60 on
+// the cloth) multiplies it by about one, and its black binding stays black.
+const BUCK_SUIT2 = [0.800, 0.070, 0.080];
+// Her hair on v2.0: honey blonde, dyed on to the bun's own strands. `gain`
+// is what the darkest strand keeps and `lit` what the lightest gains — the
+// same pair Chloe's blue is laid on with, opened up because blonde is a light
+// dye on a dark map and has to lift the shadows rather than fill them. The
+// brows and lashes are a darker honey: a natural blonde's brows are a shade
+// under her hair, and lashes darker still.
+const BUCK_HAIR2 = { col: 0xeccd95, gain: 0.52, lit: 1.32, brow: 0x6e5236 };
 
 const bckGl = (a) => a.map((n) => n.toFixed(3)).join(', ');
 
@@ -1900,6 +1914,520 @@ const bckGl = (a) => a.map((n) => n.toFixed(3)).join(', ');
  * left in the four places nobody had differenced.
  */
 const bckEase = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
+
+// -----------------------------------------------------------------------------
+// TEN LITRES THAT ARE ACTUALLY TEN LITRES (1.540.0).
+//
+// Misha, 28 Sep 2026: *"can u think about how we can improve that whole
+// sequence of her pouring out the water, we never really solved this
+// properly... her carrying the bucket, pouring out the water, maybe some of
+// these ragdoll concepts and the AVBD concepts, can be applied to the physics
+// of her carrying that water to make it look more natural? i never really
+// fully liked how that whole situation with her carrying that water panned
+// out, i know we had spent hours and hours on this in the past"*.
+//
+// ── WHY IT NEVER FELT RIGHT, READ OFF TWENTY-SEVEN COMMITS ──────────────────
+//
+// Every one of them fixed a real fault, measured, and every one of them was a
+// fault in the same ANIMATION: the bucket was never an object. It was a point
+// computed from her fist every frame — `vPalm` minus the bail, plus 60 mm
+// outboard — so it went exactly where the hand went, at exactly the same
+// instant, and a thing that does that has no mass. The whole of `BUCK`'s carry
+// block is the history of trying to put weight back into a picture that had
+// none by typing it in: a lean of 0.055 + 0.055 + 0.045 rad because that is
+// what a person with ten litres "stands at", a shrug of 0.34, an arm swing
+// damped to 14 per cent because a swinging pail "IS an empty one", and a pour
+// that was a smoothstep on one angle. Each was the right number. None of them
+// was CAUSED by anything, so none of them ever answered anything either: she
+// stopped at the foot of the stairs and the bucket stopped with her fist; she
+// turned and it turned; the lean was the same on the flat as on the flight.
+// The eye reads that, whatever the numbers are — it is the "robotic" he kept
+// describing without a measurement to hang it on.
+//
+// ── WHAT IS DIFFERENT NOW: THE BUCKET HAS A MASS AND EVERYTHING ELSE FOLLOWS ─
+//
+// `bckRig` below is an `avbdNet` (43-avbd.js, the hammock's solver) with four
+// bodies in it, hung the way the real thing is hung:
+//
+//   TRUNK   her shoulder, driven from the figure every frame — a body so heavy
+//           nothing hanging off it can move it, which is how a kinematic end
+//           is spelled in a solver whose angles want two live bodies.
+//   ARM     one rigid link, shoulder to the crook of the fist, 3 kg. Held at
+//           its carry angle by a MUSCLE — the ragdoll's angle drive, a spring
+//           toward the target with damping and the shoulder's limits as
+//           one-sided rows (43-ragdoll.js, the same row). It is not typed:
+//           the load pulls it down against that spring and it hangs where the
+//           two balance.
+//   BAIL    the wire handle, 0.25 kg, on a hard ball socket in the fist, with
+//           the fist's own angle limits — free to roll about the knuckle line
+//           (that is what a wire in a hand does), stiff about the other two.
+//   BUCKET  1.2 kg of plastic and ten of water, on TWO hard ball sockets, one
+//           at each lug — which is a hinge, which is what a bail is.
+//
+// So when she stops at the foot of the flight the bucket carries on for a
+// moment and comes back; when she sets off it lags; her walk's own sway and
+// bob drive it at the step rate and it swings at its own; the empty one on the
+// way back is a ninth of the mass on the same arm and swings freely and high.
+// None of that is a number anybody chose. And her body answers it: the lean,
+// the dropped shoulder and the counterweight arm are read off the TORQUE the
+// load puts about her hips, every frame, through a trunk that responds like a
+// trunk (a damped spring, `leanW`). Full, on the flat, it lands on 0.29 rad —
+// seventeen degrees, Misha's *"obvious lean away from the bucket"*; empty it is
+// a degree or two; and when the bucket swings forward she rocks back against
+// it.
+//
+// The fist is not glued to the bucket any more; the bucket is not glued to
+// the fist either. The ARM goes to where the physics put the hand — a proper
+// two-bone IK to a position (`armIK`), which is what the old note said the
+// last centimetre needed and was too stiff to have — and the bucket is drawn
+// where the solver has it, shifted by the few millimetres between the solver's
+// hand and the rig's so that the wire stays in the crook.
+//
+// ── AND THE WATER IS A THING, AND THE POUR IS A THROW ───────────────────────
+//
+// The surface sloshes: a damped oscillator at the first mode of a 26 cm
+// bucket, 1.8 Hz, driven by the bucket's own acceleration — so a swing does
+// not slop it (the water in a swinging bucket stays level WITH the bucket,
+// which is why you can swing one) and a jolt does. See `slosh`.
+//
+// The pour is a person throwing a bucketful out: she swings it back, catches
+// the base with her other hand as it comes past her hip, and heaves it over
+// (`TOSS` — which also says why a careful two-handed tip, the first cut of
+// this, was replaced). The water leaves when the lip cannot hold it any more
+// (`spillLevel`, kept — it was right — asked about the gravity the water
+// FEELS, which is `tossIntegrate`), flies as parcels at the speed it had
+// (`sheetEmit`), is drawn as the sheet through them, breaks up, and splashes
+// where it lands (`bckDrops`, the game's own spray sprite). She shakes the
+// last out, lets go with the left, and the empty bucket drops back into the
+// physics moving and swings off her fist.
+// -----------------------------------------------------------------------------
+const BCARRY = {
+  // The solver. 120 Hz because the bucket's pendulum is 1 Hz and its fist
+  // joint is stiff, and eight iterations because four bodies is nothing:
+  // measured in node, 0.035 ms a step, two steps a frame.
+  h: 1 / 120,
+  iterations: 8,
+  // The penalty ramp. MEASURED, with the trunk held still and the bucket full:
+  // at the hammock's 1e5 the shoulder socket sat 2.1 mm open at rest; 1e6
+  // closes it to 0.4. (The drawn bucket is glued to the rig's fist anyway —
+  // see `placeSim` — so this is about the solver's own honesty, not the eye.)
+  beta: 1e6,
+  // The arm: 3 kg, de Leva's upper arm, forearm and hand for a woman of 55.
+  armM: 3.0,
+  // The muscle. 250 N·m/rad, and it is SIZED ON WHAT THE ARM CARRIES: a full
+  // bucket 0.62 m out is 65 N·m/rad of gravity against it, so the arm sags
+  // from its target to 21 degrees of abduction — which is the 21 to 22 the old
+  // solve was measured standing at, and the angle the thigh needs (see
+  // `armUp`). Now it arrives there because ten litres pulled it there.
+  // Damping 40 is half of critical on the loaded arm: it swings on after she
+  // stops, twice, and settles.
+  kArm: 250, kdArm: 40,
+  // The shoulder's own box about the carry pose, rad: fore-aft, twist, out.
+  armLim: [0.60, 0.9, 0.45],
+  // The fist on the wire: a spring back to straight, friction, and limits —
+  // free about the knuckle line (z) as far as the limits go, and held to 0.12
+  // rad sideways. TUNED AGAINST `trace`, and the sideways limit is the one
+  // that mattered: at 0.30 the bucket was a free pendulum across her, and her
+  // walk sways her shoulders across at 0.9 Hz against its own 1.0, so it rang
+  // ±8 cm off her hip the length of the made ground. A fist does not let a
+  // wire roll across the palm; at 0.12 it is ±4.
+  fistK: 4.0, fistKD: 2.0, fistLim: [0.12, 0.25],
+  // The lugs: a hinge, with the friction of plastic on galvanised wire (a
+  // bucket swung once swings three times, not thirty — about 0.4 of critical),
+  // and the bucket cannot swing up past its own bail.
+  pinKD: 1.0, pinLim: 1.30,
+  // The bail: 8 mm galvanised wire over a 29 cm mouth, a quarter of a kilo.
+  bailM: 0.25,
+  // Where its centre of mass is above the pin, m — two thirds of the way up a
+  // half-arch, which is what the eleven prisms average to.
+  bailC: 0.100,
+  // The pail's own 1.2 kg, and where the two masses sit on its axis, measured
+  // from the pin (the ear line), m. The shell's is the cone's and base's
+  // average; the water's is the middle of its column, weighted to the mouth.
+  shellM: 1.2, waterM: 10.0, comShell: -0.112, comWater: -0.098,
+  // How much of the arm's swing the clip is allowed to put into the muscle's
+  // target — the rest of the swing is the load's. 0.14 is `1 − armDamp`, the
+  // share the old solve left in, now as a DRIVE rather than as what is left
+  // of the clip after it has been overridden.
+  swing: 0.14,
+  // The hand-over into the solver — out of the lift, out of the throw — in
+  // seconds: see `bucketTick`. MEASURED without it: 137 mm and 121 mm of pail
+  // in one frame, at the first frame of `down` and at `TOSS.back`.
+  handOver: 0.35,
+  // How the body answers the load's moment about her hips. `leanGain` is the
+  // share of that moment the trunk takes by leaning, the rest being her hips
+  // over the stance foot, which this rig cannot do without sliding her feet:
+  // 0.46 landed a full bucket hanging still on 0.155 rad, the lean the old note
+  // measured a person standing at (MEASURED in the page — `stats().lean`).
+  // 0.85 lands it on 0.29, seventeen degrees, because Misha asked for *"an
+  // obvious lean away from the bucket"* — 0.24 was photographed first and
+  // read as a woman standing a little crooked — and the empty one on 0.03. `upper` is the mass above the hips and
+  // how high its centre is, which is what a lean moves.
+  leanGain: 0.85, upperM: 36, upperH: 0.35,
+  // And the trunk is not a servo. A damped spring, 7 rad/s, 0.8 of critical:
+  // a quarter of a second to answer a swing, which is what a spine does.
+  leanW: 7.0, leanZ: 0.8,
+  // Pitch against a bucket swung forward is a smaller muscle doing a smaller
+  // job; the same law at a third.
+  pitchGain: 0.13,
+  // Slosh: the first antisymmetric mode of a cylinder, ω² = g·(1.841/R)
+  // ·tanh(1.841·h/R), R the surface's radius. At 13 cm and full that is 1.84
+  // Hz. The damping of water against a smooth wall is a few per cent, and at
+  // a few per cent it was MEASURED ringing at ±18 degrees the length of a
+  // level walk and emptying a fifth of the bucket in six seconds: the linear
+  // mode is the right frequency and far too little of the loss a real surface
+  // has once it breaks against the wall. 0.10 is the wall's share put back.
+  sloshZ: 0.10,
+  // What spills. The surface may lean `freeboard` past the axis before the
+  // lip on the low side is under it; past that — and past `spillOver` more,
+  // which is the water climbing the wall before it tops it, and which a flat
+  // plane does not model — it goes over at this many bucketfuls a second per
+  // radian of excess. What that buys is a slop at the turn at the foot of the
+  // flight and none on the straight, and the slop drips off the lip.
+  spillRate: 0.25, spillOver: 0.06,
+};
+
+// THE POUR IS A SWING-TOSS. Misha, 28 Sep 2026, on the first cut of this pass
+// — a careful two-handed tip over the drop, bail in one fist and base in the
+// other, which photographed cleanly and was the wrong character: *"a BRISK
+// SWING-TOSS. One confident swing, not a careful tip: she swings the bucket
+// back and heaves it forward, and the water leaves as a sheet that arcs out
+// and splashes wide. Quick, energetic, a bit careless"* — and *"drive the
+// sheet from the bucket's physics: its angular velocity and tilt at release
+// set the water's launch velocity and spread"*.
+//
+// So this is one arm, straight, swung about her shoulder like the pendulum it
+// is (`swing`), with the bucket free to turn about its pin at the end of it
+// (`flip`) — and the water is NOT told when to leave. Every step of `tip` the
+// water feels gravity less the bucket's own acceleration (`tossFlow`): while
+// the arm is sweeping round, that pushes the water into the base, which is why
+// a swung bucket does not spill; when she stops the arm at the top and the
+// bucket flips over its pin, it points out of the mouth, and the water goes —
+// with the velocity the MOUTH had at that instant, the pin's plus the spin's
+// (ω × r), which is what throws it out in an arc. How wide the sheet opens is
+// how fast the bucket was turning. Nothing about the release is a number; the
+// numbers are the swing.
+//
+// Her frame, as everywhere here: x forward, y up off her feet, z her right.
+// Seconds into `tip`, whose 2.85 s the cut is framed on and which this keeps.
+//
+//   0.00-0.30  a small forward gather out of the carry;
+//   0.30-0.72  the back swing, the bucket trailing behind her hip;
+//   0.72-1.20  the heave: forward and up, 3.3 m/s at the bottom of the arc;
+//   1.20       the stop, arm at 53 degrees, and the bucket flips over its pin —
+//              the water leaves here, of itself;
+//   1.62-2.02  a shake of the last drops;
+//   2.02-2.55  down to her side, where the solver takes the empty bucket back
+//              mid-swing and it swings on off her fist.
+const TOSS = {
+  // The swing, rad, of the arm-and-bail line about her right shoulder, +
+  // forward. The pin is `reach` out along it — see `pourTick`.
+  swing: [[0, 0], [0.15, 0.03], [0.70, -0.62], [1.00, 0.30], [1.17, 0.95], [1.36, 0.84],
+    [1.62, 0.74], [2.02, 0.66], [2.36, 0.14], [2.55, 0.03]],
+  // ── AND THE BUCKET'S OWN LEAN IS HERS, UNTIL SHE LETS IT GO ──
+  //
+  // The first cut of this hung the pail free on its pin at the end of the
+  // swing, as it hangs on the walk, and integrated it — and MEASURED, it did
+  // what a pail on a bail does: it trailed the back swing, spilt a fifth of
+  // itself at the reversal, poured the rest out over her feet at the bottom
+  // of the heave, and at the top, when the arm stopped, swung on over the pin
+  // BOTTOM first, mouth towards her. A bucket held by the bail cannot throw
+  // water forward; that is why nobody throws one that way.
+  //
+  // So she holds it the way a person does: by the bail AND, from the bottom of
+  // the heave, by the base (`twoHands`), and she carries its lean with her
+  // wrists so that the water stays square to what it feels — `stab`, the lean
+  // that cancels the swing's own acceleration, which is NOT a number: it is
+  // atan of the pin's acceleration over gravity's, off the swing, every step.
+  // Held to it the water does not move. And then at the top she stops holding
+  // it square and rolls it over (`flip`), while the arm is still decelerating
+  // — and the water, which is still going forward and up at the speed the pail
+  // had, leaves by the lip that has gone under it. `tossIntegrate` does the
+  // leaving; nothing here says when.
+  //
+  // `stab` is how much of the cancelling lean she is carrying (1 all the way
+  // through the swing, off as she rolls it), `flip` the roll on top of it,
+  // rad, + mouth forward.
+  stab: [[0, 1], [0.97, 1], [1.13, 0], [2.36, 0], [2.55, 1]],
+  flip: [[0, 0], [0.97, 0], [1.08, 0.60], [1.22, 1.60], [1.50, 1.95], [2.02, 1.85],
+    [2.36, 0.20], [2.55, 0]],
+  // Her left hand: off the base until the bucket comes past her hip on the
+  // heave (it cannot reach it behind her), on it through the roll and the
+  // shake, off as it goes back to her side.
+  twoHands: [[0, 0], [0.95, 0], [1.10, 1], [2.02, 1], [2.25, 0]],
+  // How far out from her side the pin is, m — the arm comes in across her in
+  // front and goes out again as it comes down.
+  out: [[0, 0.33], [0.72, 0.31], [1.20, 0.22], [2.02, 0.24], [2.55, 0.33]],
+  // Her body into it: the hip hinge (+ forward) and the twist of her trunk
+  // (+ turning her right shoulder back), rad.
+  hinge: [[0, 0], [0.72, -0.05], [1.12, 0.20], [1.50, 0.13], [2.20, 0.02], [2.55, 0]],
+  twist: [[0, 0], [0.72, 0.18], [1.15, -0.16], [1.60, -0.08], [2.40, 0]],
+  // And her free arm, the other way — the counter-swing, rad about her right
+  // (+ forward). It is what makes a throw a throw and not a lever.
+  counter: [[0, 0], [0.72, 0.40], [1.15, -0.70], [1.60, -0.35], [2.40, 0]],
+  // The shake: the arm jiggled, and the bucket on its pin with it.
+  shake: [1.62, 2.02], shakeHz: 5.0, shakeA: 0.16,
+  // Where the solver takes the empty bucket back.
+  back: 2.55,
+  // How long water takes to leave a bucket once it is free to: a tenth of a
+  // bucketful goes in six hundredths of a second.
+  leave: 0.06,
+  // And how long the water takes to answer a lean at all — see `tossIntegrate`.
+  slop: 0.14,
+  // What a full release is, for `st.pour`: bucketfuls a second.
+  flowRef: 8,
+  // Numbers the pour cut is framed on, in seconds of `tip` — when the sheet is
+  // in the air (her line) and when the last of it is down (the lean-in stops).
+  // READ OFF `trace` once the release was physical, not chosen.
+  mid: 1.18, dry: 1.70,
+};
+
+// Her left hand on the bottom rim, in the pail's frame off the pin (x toward
+// the mouth's forward, y up its axis, z her right): the side of the base
+// nearest her, 25 degrees round to her left.
+const POURK_RIM = [-0.109, -0.2425, -0.050];
+
+/** A monotone cubic through [t, v] keys — Fritsch–Carlson, no overshoot. */
+function bckMono(keys, t) {
+  const n = keys.length;
+  if (t <= keys[0][0]) return keys[0][1];
+  if (t >= keys[n - 1][0]) return keys[n - 1][1];
+  let i = 0;
+  while (t > keys[i + 1][0]) i++;
+  const sl = (k) => (keys[k + 1][1] - keys[k][1]) / (keys[k + 1][0] - keys[k][0]);
+  const tan = (k) => {
+    if (k === 0) return sl(0);
+    if (k === n - 1) return sl(n - 2);
+    const a = sl(k - 1), b = sl(k);
+    return a * b <= 0 ? 0 : 2 / (1 / a + 1 / b);
+  };
+  const x0 = keys[i][0], x1 = keys[i + 1][0], hh = x1 - x0, u = (t - x0) / hh;
+  const h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u;
+  const h01 = -2 * u * u * u + 3 * u * u, h11 = u * u * u - u * u;
+  return h00 * keys[i][1] + h10 * hh * tan(i) + h01 * keys[i + 1][1] + h11 * hh * tan(i + 1);
+}
+
+/**
+ * Where her hand has the pin at `t` seconds into `tip`, in her frame, off her
+ * shoulder `S` (her frame too) and the arm-plus-bail length `reach`: into `o`
+ * — the swing and the pin. Pure, so `tossStep` can difference it twice for
+ * the acceleration the bucket and the water feel, and a probe that jumps to
+ * 1.2 s into the throw gets the frame the loop would have drawn there.
+ */
+const TOSS_W = [0.06, 0.24, 0.40, 0.24, 0.06];
+function tossPin(t, S, reach, o) {
+  // Smoothed, over a twentieth of a second either side. The keys go through a
+  // monotone cubic, which has a velocity everywhere and an acceleration that
+  // STEPS at every key — and an acceleration is exactly what the water is
+  // asked to feel: unsmoothed, it read spikes of 8 g at the keys and threw
+  // water out of a bucket nobody had tipped. A person's arm is not C1.
+  let th = 0;
+  for (let k = 0; k < 5; k++) th += TOSS_W[k] * bckMono(TOSS.swing, t + (k - 2) * 0.03);
+  const [s0, s1] = TOSS.shake;
+  if (t > s0 && t < s1) {
+    const u = (t - s0) / (s1 - s0);
+    th += TOSS.shakeA * 0.35 * Math.sin(2 * Math.PI * TOSS.shakeHz * (t - s0))
+      * (1 - u) * Math.min(1, u * 6);
+  }
+  o.th = th;
+  o.pz = bckMono(TOSS.out, t);
+  // In the swing's plane at whatever of the reach is left after the pin's
+  // distance out from her shoulder, so the hand is always where an arm of
+  // that length can have it.
+  const dz = o.pz - S[2], rs = Math.sqrt(Math.max(0.04, reach * reach - dz * dz));
+  o.px = S[0] + rs * Math.sin(th);
+  o.py = S[1] - rs * Math.cos(th);
+  return o;
+}
+
+/**
+ * And the pail's lean at `t`, + mouth forward, rad: the lean that keeps the
+ * water square to the swing's own acceleration, carried by her wrists (`stab`),
+ * plus the roll she gives it at the top (`flip`). The acceleration is the pin's,
+ * differenced over a twentieth of a second either side — a person does not
+ * answer a jolt of her own arm inside a frame either.
+ */
+const tossSA = {}, tossSB = {}, tossSC = {};
+function tossTip(t, S, reach) {
+  const e = 0.08;
+  tossPin(t - e, S, reach, tossSA); tossPin(t, S, reach, tossSB); tossPin(t + e, S, reach, tossSC);
+  const ax = (tossSC.px - 2 * tossSB.px + tossSA.px) / (e * e);
+  const ay = (tossSC.py - 2 * tossSB.py + tossSA.py) / (e * e);
+  return bckMono(TOSS.stab, t) * Math.atan2(ax, Math.max(2, 9.81 + ay)) + bckMono(TOSS.flip, t);
+}
+
+/**
+ * The throw, integrated: the bucket turning on its pin at the end of her
+ * swinging hand, and the water in it, from `ts.t` to `t1`, at 240 Hz.
+ *
+ * THE PAIL is a compound pendulum off an accelerating pivot: it feels gravity
+ * less the pin's acceleration, and turns toward hanging along that with the
+ * stiffness of its own length `L` (`TOSS.pend`, longer as it empties). So it
+ * trails when she swings back, rides out square to the sweep, and when her
+ * arm stops at the top the pin's deceleration is a shove forward and the pail
+ * goes on over the top of it. THE WATER then feels the same thing at its own
+ * middle, plus what the pail's turning does to that point (the ω² and α
+ * terms), and `spillLevel` says how much of it the lip can hold at the lean
+ * that makes. What cannot be held goes, over about `TOSS.leave`.
+ *
+ * `ts` carries the state: `phi` (the pail's roll from vertical, + mouth
+ * forward, rad), `v` its rate, `fill`, and the effective gravity the water
+ * last felt (`gx`, `gy`, her frame) — which is the way it leaves.
+ */
+const tossIA = {}, tossIB = {}, tossIC = {};
+function tossIntegrate(ts, t1) {
+  const e = 1 / 480, A = tossIA, B = tossIB, C = tossIC;
+  while (ts.t < t1 - 1e-9) {
+    const h = Math.min(1 / 240, t1 - ts.t), t = ts.t;
+    // The water's middle, 0.10 m down the pail's axis from the pin, at three
+    // instants — and its acceleration off them.
+    const at = (tt, o) => {
+      tossPin(tt, ts.S, ts.reach, o);
+      o.tip = tossTip(tt, ts.S, ts.reach);
+      o.cx = o.px - 0.10 * Math.sin(o.tip);
+      o.cy = o.py - 0.10 * Math.cos(o.tip);
+      return o;
+    };
+    at(t - e, A); at(t, B); at(t + e, C);
+    const ax = (C.cx - 2 * B.cx + A.cx) / (e * e), ay = (C.cy - 2 * B.cy + A.cy) / (e * e);
+    ts.phi = B.tip;
+    ts.v = (C.tip - A.tip) / (2 * e);
+    ts.vx = (C.cx - A.cx) / (2 * e); ts.vy = (C.cy - A.cy) / (2 * e);
+    const wx = -ax, wy = -9.81 - ay, wl = Math.hypot(wx, wy);
+    const s2 = Math.sin(B.tip), c2 = Math.cos(B.tip);
+    // The lean the water feels, and it does not feel it at once: ten litres
+    // take about a tenth of a second to run across a 26 cm pail, so a jolt
+    // shorter than that slops against the wall and falls back, and only a
+    // lean that is HELD — the pail rolled over at the top — takes the water
+    // over the lip. Weightless (the top of a throw) is a lean of everything.
+    const lean = wl < 2 ? Math.PI : Math.acos(clamp((s2 * -wx + c2 * -wy) / wl, -1, 1));
+    ts.lw += (lean - ts.lw) * (1 - Math.exp(-h / TOSS.slop));
+    const keep = ts.lw > 1.40 ? 0 : levelFill(spillLevel(ts.lw));
+    if (ts.fill > keep) ts.fill -= (ts.fill - keep) * (1 - Math.exp(-h / TOSS.leave));
+    ts.gx = wx; ts.gy = wy;
+    // And the water's own velocity, which is the pail's a slop ago: once it
+    // is free of the pail it does not slow down with it. What a sheet thrown
+    // off the top of a swing leaves with is what the swing had.
+    const kv = 1 - Math.exp(-h / TOSS.slop);
+    ts.lvx += (ts.vx - ts.lvx) * kv; ts.lvy += (ts.vy - ts.lvy) * kv;
+    ts.t += h;
+  }
+  return ts;
+}
+
+/**
+ * The four bodies and what joins them — see the block over `BCARRY`.
+ *
+ * Every body's origin is its centre of mass, because that is what the net
+ * integrates; the local frames all share her figure's axes in the carry pose
+ * (x forward, y up, z her right), so the BAIL's and the BUCKET's z is the pin.
+ * The lugs are re-measured off the bucket's centre of mass whenever what is in
+ * it changes — see `simMass`.
+ */
+function bckRig(armL) {
+  const C = BCARRY;
+  const net = avbdNet({
+    maxBodies: 4, maxJoints: 4, maxStrings: 0, maxPoints: 0, maxBoxes: 0,
+    maxCaps: 0, maxContacts: 1, maxAngles: 3, pointsHitCaps: false,
+    iterations: C.iterations, alpha: 0.95, alphaContact: 0.9, beta: C.beta,
+    betaAng: 100, gamma: 0.99, gravity: [0, -9.81, 0], drag: 0,
+    vMax: 12, wMax: 40, margin: 0.01, deep: 0.05, mu: 0.5, floorMu: 0.5, capK: 1e4,
+  });
+  const L = armL, R = PAIL.rRim - 0.004;
+  const TR = net.addBody(1e4, [1e4, 1e4, 1e4, 0, 0, 0], 0, 0, 0);
+  const AR = net.addBody(C.armM, [C.armM * L * L / 12, 0.004, C.armM * L * L / 12, 0, 0, 0],
+    0, -L / 2, 0);
+  const BA = net.addBody(C.bailM, [0.004, 0.005, 0.002, 0, 0, 0], 0, -L - PAIL.bail + C.bailC, 0);
+  const BU = net.addBody(C.shellM + C.waterM, [0.09, 0.02, 0.09, 0, 0, 0], 0, -L - PAIL.bail - 0.1, 0);
+  const jSh = net.addJoint(TR, [0, 0, 0], AR, [0, L / 2, 0]);
+  const jHand = net.addJoint(AR, [0, -L / 2, 0], BA, [0, PAIL.bail - C.bailC, 0]);
+  const jL1 = net.addJoint(BA, [0, -C.bailC, R], BU, [0, 0.1, R]);
+  const jL2 = net.addJoint(BA, [0, -C.bailC, -R], BU, [0, 0.1, -R]);
+  const aSh = net.addAngle(TR, AR, [0, 0, 0, 1], [0, 0, 0, 1]);
+  const aFist = net.addAngle(AR, BA, [0, 0, 0, 1], [0, 0, 0, 1]);
+  const aPin = net.addAngle(BA, BU, [0, 0, 0, 1], [0, 0, 0, 1]);
+  net.setAngleK(aSh, C.kArm, C.kdArm);
+  net.setAngleLimits(aSh, C.armLim.map((v) => -v), C.armLim);
+  net.setAngleK(aFist, C.fistK, C.fistKD);
+  net.setAngleLimits(aFist, [-C.fistLim[0], -C.fistLim[1], -10], [C.fistLim[0], C.fistLim[1], 10]);
+  net.setAngleK(aPin, 0, C.pinKD);
+  net.setAngleLimits(aPin, [-10, -10, -C.pinLim], [10, 10, C.pinLim]);
+  net.finish();
+  return { net, L, R, TR, AR, BA, BU, jSh, jHand, jL1, jL2, aSh, aFist, aPin };
+}
+
+/**
+ * Water in the air: the break-up of the stream, the splash, the drips — the
+ * game's own spray sprite (`SPRAY_FRAG` over `SMOKE_VERT`, 58-waterfx.js) in a
+ * pool of her own, for one reason: `buildSprayPool` kills a droplet at the
+ * TERRAIN, and the porch is a slab that the made ground beside it stands 84 mm
+ * proud of (the seam `BUCK.stepRate` is about). Here every droplet carries the
+ * floor it was thrown over.
+ */
+function bckDrops(scene, max) {
+  const geo = new THREE.InstancedBufferGeometry();
+  const quad = new THREE.PlaneGeometry(1, 1);
+  geo.index = quad.index;
+  geo.attributes.position = quad.attributes.position;
+  geo.attributes.uv = quad.attributes.uv;
+  const aPos = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
+  const aParam = new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4);
+  aPos.setUsage(THREE.DynamicDrawUsage);
+  aParam.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('aPos', aPos);
+  geo.setAttribute('aParam', aParam);
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+  geo.instanceCount = 0;
+  const mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({
+    uniforms: {
+      ...shareLight(), ...shareHaze(), uCamPos: U.uCamPos,
+      uCamRight: { value: new THREE.Vector3(1, 0, 0) },
+      uCamUp: { value: new THREE.Vector3(0, 1, 0) },
+    },
+    vertexShader: SMOKE_VERT, fragmentShader: SPRAY_FRAG,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 3;
+  scene.add(mesh);
+  const F = 12;
+  const P = new Float32Array(max * F);   // x y z vx vy vz life max size floor seed grow
+  let cursor = 0, live = 0;
+  function spawn(x, y, z, vx, vy, vz, size, life, floor, grow = 0.6) {
+    const o = (cursor = (cursor + 1) % max) * F;
+    P[o] = x; P[o + 1] = y; P[o + 2] = z; P[o + 3] = vx; P[o + 4] = vy; P[o + 5] = vz;
+    P[o + 6] = life; P[o + 7] = life; P[o + 8] = size; P[o + 9] = floor;
+    P[o + 10] = (cursor * 0.6180339) % 1; P[o + 11] = grow;
+  }
+  function update(dt) {
+    let c = 0;
+    const k = Math.exp(-0.35 * dt);
+    for (let i = 0; i < max; i++) {
+      const o = i * F;
+      if (P[o + 6] <= 0) continue;
+      P[o + 6] -= dt;
+      if (P[o + 6] <= 0) continue;
+      P[o + 4] -= 9.81 * dt;
+      P[o + 3] *= k; P[o + 4] *= k; P[o + 5] *= k;
+      P[o] += P[o + 3] * dt; P[o + 1] += P[o + 4] * dt; P[o + 2] += P[o + 5] * dt;
+      if (P[o + 1] < P[o + 9]) { P[o + 6] = 0; continue; }
+      const age = 1 - P[o + 6] / P[o + 7];
+      aPos.array[c * 3] = P[o]; aPos.array[c * 3 + 1] = P[o + 1]; aPos.array[c * 3 + 2] = P[o + 2];
+      aParam.array[c * 4] = P[o + 8] * (1 + age * P[o + 11]);
+      aParam.array[c * 4 + 1] = P[o + 10];
+      aParam.array[c * 4 + 2] = Math.min(1, (1 - age) * 2.5) * 0.9;
+      aParam.array[c * 4 + 3] = age * 0.5;
+      c++;
+    }
+    live = c;
+    geo.instanceCount = c;
+    if (c) {
+      aPos.addUpdateRange(0, c * 3); aPos.needsUpdate = true;
+      aParam.addUpdateRange(0, c * 4); aParam.needsUpdate = true;
+    }
+  }
+  return { spawn, update, mesh, live: () => live };
+}
 
 
 /**
@@ -1937,6 +2465,113 @@ function pailLathe(b, prof, col, sides = 16) {
  * is a ramp or that the porch is a slab 2.80 m under the terrace.
  */
 async function buildBucketeer(scene, vik, walkY) {
+  const fig = PAYLOAD.bucketeer2_fr3d ? await buildBucketeer2() : await buildBucketeer1();
+  if (!fig) return null;
+  return buildBucketeerOn(fig, scene, vik, walkY);
+}
+
+// ── Baye v2.0, in a full swimsuit with her hair up (1.540.0) ────────────────
+//
+// Misha, 28 Sep 2026: *"we forgot to upgrade the bucketeer baye to baye v2.0.
+// can u upgrade her, the only difference is she should wear a full swimsuit
+// and have blonde hair in a bun"*.
+//
+// THE SAME CONSTRUCTION AS BAYE v2.0 AND NOT A LOOK-ALIKE OF IT. `bucketeer2`
+// in tools/blender/baye2.py is `baye2` with two garments changed: the same
+// MakeHuman base, the same UVs, the same 30-bone rig out of the same
+// `armature()` and `skin()`, the same brows and lashes — and at runtime the
+// same skin map, `baye2_skin`, painted once by tools/baye2_tex.py (so what
+// Baye has under her clothes she has under the suit, and it is one picture
+// and not two that can drift). Her face is Baye's face, her eyes blink on
+// Baye's lids, her mouth is the same `v5Parts` mouth. Everything in this file
+// that poses her — the carry, the grip, the ballet — names bones that exist
+// on both rigs bone for bone, which `apprSameRig` in 46-apprentice.js checks
+// for Baye and which the bake guarantees here.
+//
+// WHAT IS HERS:
+//
+//   the bun    `rehmanpolanski_hair_bun_brown` (CC0, RehmanPolanski), the
+//              bather pack's bun, fitted to her skull. It ships brown; it is
+//              DYED blonde off its own luminance, Chloe's mechanism (`hairDye`
+//              in `v5Parts`), so the strand shading is the asset's and only the
+//              colour is ours — and the red velvet tie the map carries is kept
+//              red (`hairBody`). No drape: a bun has nothing to hang.
+//   the suit   `mindfront_f_one-piece_swimsuit_01` (CC-BY 4.0, Mindfront —
+//              credited in tools/bathers_v2_CREDITS.md), a MODELLED one-piece
+//              fitted through its own `.mhclo`: a real leg line, a scoop back,
+//              straps and their buckles, and a black binding at every edge
+//              that the map draws. Dyed at runtime the same way — lifeguard
+//              red, `BUCK_SUIT2`, which is Misha's call and is argued there — and
+//              with the body taken out from under it at bake time (the asset's
+//              own `delete_verts`), so no hip can come through it in an
+//              arabesque. The part does not cast by itself (parts never do),
+//              and the body under it is gone, so it is registered with the
+//              shadow pass itself — see `cast` below — or she would throw a
+//              shadow with a hole through the middle of it.
+async function buildBucketeer2() {
+  const look = v5Parts({
+    hairTex: 'bucketeer2_hair', hairCol: BUCK_HAIR2.col, browCol: BUCK_HAIR2.brow,
+    lidCol: 0xdcbcad, hairDye: true, hairGain: BUCK_HAIR2.gain, hairLit: BUCK_HAIR2.lit,
+    // The tie. Anything in the map clearly redder than it is green or blue is
+    // the velvet band round the bun, and it keeps its own colour.
+    hairBody: 'float tie = smoothstep(0.10, 0.22, hc.r - max(hc.g, hc.b));\n'
+      + 'base = mix(base, hc.rgb * 1.25, tie);',
+  });
+  look.parts.suit = {
+    color: 0xffffff, side: THREE.DoubleSide, spec: 0.22, specPower: 38,
+    // Cloth, not skin: none of `SKIN_EMISSIVE`'s scatter — the fishnet's note.
+    emissive: 0.03,
+    uniforms: { uSuit: { value: v5Tex('bucketeer2_suit') } },
+    decl: 'uniform sampler2D uSuit;',
+    // The map is one flat orange with a black binding, so its luminance IS the
+    // shading: 0.60 on the cloth, under 0.1 on the binding. The dye is laid on
+    // that, and the inside of the suit (seen past a leg opening) is lit as the
+    // inside it is, which is what flipping the normal on a back face does.
+    body: 'n = gl_FrontFacing ? n : -n;\n'
+      + 'vec3 sc = texture2D(uSuit, vUv).rgb;\n'
+      + 'float sl = dot(sc, vec3(0.299, 0.587, 0.114));\n'
+      + 'base = vec3(' + bckGl(BUCK_SUIT2) + ') * clamp(sl * 1.70, 0.0, 1.15);\n'
+      + 'if (!gl_FrontFacing) base *= 0.55;',
+  };
+  const fig = await loadSkin('bucketeer2_fr3d', {
+    spec: 0.10, specPower: 26, vcol: false,
+    uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms,
+      ...look.lid.uniforms },
+    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl,
+    vdecl: look.jaw.vdecl,
+    body: 'base = texture2D(uSkin, vUv).rgb;' + look.jaw.frag,
+    vert: look.lid.vert + look.jaw.bodyVert,
+    parts: look.parts,
+  });
+  if (!fig) return null;
+  v5Eyes(fig, look.eye);
+  v5Jaw(fig, look.jaw);
+  fig.v5 = look;
+  // The suit into the shadow pass beside the body — see the note above. The
+  // same depth-only skinned caster `cast` makes for the body, on the suit's
+  // own draw range; `skinCasterVert` and the two bone uniforms are the
+  // figure's own.
+  const suit = fig.parts.suit;
+  if (suit) {
+    const bodyCast = fig.cast;
+    fig.cast = (shadow, o = {}) => {
+      const r = bodyCast(shadow, o);
+      const u = suit.material.uniforms;
+      shadow.cast(suit, { near: o.near !== false, dynamic: true,
+        material: shadow.casterMaterial(skinCasterVert(fig.bones.length, null),
+          { uBones: u.uBones, uBoneRows: u.uBoneRows }, null) });
+      return r;
+    };
+  }
+  return fig;
+}
+
+// ── the figure she was until 1.540.0, kept as the fallback ──────────────────
+//
+// A build without `bucketeer2.fr3d.gz` in its payload gets the woman who
+// shipped before, painted swimsuit and all — the same convention `loadSkin`
+// has, that a stripped payload is yesterday's game and not a broken one.
+async function buildBucketeer1() {
   const fig = await loadSkin('human_skin_fr3d', {
     spec: 0.09,
     specPower: 24,
@@ -2066,6 +2701,12 @@ async function buildBucketeer(scene, vik, walkY) {
     }
     g.index.needsUpdate = true;
   }
+  return fig;
+}
+
+/** Everything that is her and not her body — the loop, the bucket, the voice. */
+function buildBucketeerOn(fig, scene, vik, walkY) {
+  const V2 = !!fig.v5;
   fig.play('idle', { fade: 0 });
   const mesh = fig.mesh;
   // She spends the loop inside a 4 m room and on a landing, both of which are
@@ -2197,15 +2838,62 @@ async function buildBucketeer(scene, vik, walkY) {
   // in a second and a bottle takes a minute. Built wide and thin, and lit
   // hard, because falling water is the brightest thing in a sunlit frame and
   // the first version came out as a grey thread nobody could find.
-  const jetBuf = propBuilder();
-  pailLathe(jetBuf, [[0, 0.088], [0.35, 0.076], [1, 0.058]], [0.86, 0.93, 0.97], 7);
-  const jet = new THREE.Mesh(jetBuf.geo(), solidMaterial(0xffffff, {
-    spec: 0.55, specPower: 90, emissive: 0.52, opacity: 0.80,
-    transparent: true, depthWrite: false, body: 'base *= vVCol;',
+  //
+  // ── AND AN ARC, NOT A COLUMN (1.540.0) ──
+  //
+  // The sheet above was a lathe standing on the paving and reaching UP to the
+  // lip, which its own note admitted was the honest way round only while the
+  // lip was over the spot it landed on. Water leaving a lip leaves it moving:
+  // at the speed it comes over the weir, plus whatever the lip itself is doing
+  // — and then it falls. So this is a tube laid along that parabola, rebuilt
+  // every frame from where the lip is and how fast what is going over it is
+  // going (`stream`): 18 rings of 6, an ellipse across the lip and thin
+  // through it, narrowing as it falls and thinning to nothing in its last
+  // third, which is where a real one breaks into drops — and the drops are
+  // `drops`, thrown off it there.
+  const JET_N = 18, JET_R = 6;
+  const jetGeo = new THREE.BufferGeometry();
+  {
+    const nv = (JET_N + 1) * JET_R;
+    jetGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3)
+      .setUsage(THREE.DynamicDrawUsage));
+    jetGeo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nv * 3), 3)
+      .setUsage(THREE.DynamicDrawUsage));
+    const col = new Float32Array(nv * 3), fade = new Float32Array(nv);
+    for (let i = 0; i <= JET_N; i++) {
+      for (let j = 0; j < JET_R; j++) {
+        const k = i * JET_R + j;
+        // White at the lip where it is a sheet, bluer as it opens up.
+        const u = i / JET_N;
+        col[k * 3] = 0.86 - 0.10 * u; col[k * 3 + 1] = 0.93 - 0.05 * u; col[k * 3 + 2] = 0.97;
+        fade[k] = Math.min(1, (1 - u) / 0.38);
+      }
+    }
+    jetGeo.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
+    jetGeo.setAttribute('aFade', new THREE.BufferAttribute(fade, 1)
+      .setUsage(THREE.DynamicDrawUsage));
+    const idx = [];
+    for (let i = 0; i < JET_N; i++) {
+      for (let j = 0; j < JET_R; j++) {
+        const a = i * JET_R + j, b = i * JET_R + (j + 1) % JET_R;
+        idx.push(a, b, a + JET_R, b, b + JET_R, a + JET_R);
+      }
+    }
+    jetGeo.setIndex(idx);
+    jetGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+  }
+  const jet = new THREE.Mesh(jetGeo, solidMaterial(0xffffff, {
+    spec: 0.55, specPower: 90, emissive: 0.40, opacity: 0.62,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    decl: 'varying float vFade;', vdecl: 'attribute float aFade;', vert: 'vFade = aFade;',
+    body: 'base *= vVCol; alpha *= vFade;',
   }));
   jet.visible = false;
+  jet.frustumCulled = false;
   jet.renderOrder = 2;
   scene.add(jet);
+  // And what it throws: break-up, splash, drips.
+  const drops = bckDrops(scene, 420);
   // The wet patch. NO BOTTOM CAP, and that is rule 5 answered rather than
   // dodged: a disc laid on the porch is two nearly-parallel faces 2 km from the
   // world origin, which is the coin toss. A lens with its underside left open
@@ -2416,8 +3104,6 @@ async function buildBucketeer(scene, vik, walkY) {
   const cTF = new THREE.Vector3(...BUCK.armFore).normalize();
   const cOU = new THREE.Vector3(...BUCK.offerUp).normalize();
   const cOF = new THREE.Vector3(...BUCK.offerFore).normalize();
-  const cRU = new THREE.Vector3(...BUCK.tipUp).normalize();
-  const cRF = new THREE.Vector3(...BUCK.tipFore).normalize();
   // The two above blended towards the two below, when she offers. Both bones
   // and not just the upper one — see `offerUp`: moving the shoulder alone is
   // what put the elbow behind her.
@@ -2576,6 +3262,7 @@ async function buildBucketeer(scene, vik, walkY) {
     node: 0, was: -1, roamLeft: 0, dwellT: 0, roamI: 0,
     hold: false,        // debug: the loop stopped where it stands
     x: 0, y: 0, z: 0,
+    msAll: 0, msCarry: 0, jetH: 0,
   };
 
   // Start her at the tap with the bucket down and the loop about to run.
@@ -2865,24 +3552,15 @@ async function buildBucketeer(scene, vik, walkY) {
         // roll, and anything above that has gone over the edge; the level, the
         // start of the stream, its width and the moment the last of it is out
         // are then one fact instead of four numbers hoping to agree.
-        const k = Math.min(1, st.clock / BUCK.tipIn);
-        st.tip = k * k * (3 - 2 * k) * 2.05;
+        // (1.540.0) AND IT IS NOT A ROLL ANY MORE, IT IS A THROW. The lip still
+        // decides — `spillLevel`, all of the above — but what it is asked is
+        // how much the bucket can keep with the water feeling gravity LESS the
+        // bucket's own acceleration, as she swings it back and heaves it over.
+        // `tossStep` integrates the bucket turning on its pin and the level
+        // with it; see `TOSS`.
         const was = st.fill;
-        st.fill = Math.min(st.fill, levelFill(spillLevel(st.tip)));
-        // And the stream is as fat as what is going over: how fast the level is
-        // falling, times how much surface is left to fall. Zero at both ends
-        // for nothing — see `jetRef`.
-        // The last term is the weir getting going. The other two are already
-        // zero at the far end of the pour — no surface left to fall — but at
-        // the near end the level starts down with a rate of its own the moment
-        // the lip crosses it, which put the sheet at 26 per cent of full width
-        // on its first frame. The first twentieth of a bucketful going over an
-        // edge is a dribble finding the low point of a rim, and it takes about
-        // a tenth of a second.
-        st.pour = dt > 1e-6
-          ? clamp((was - st.fill) / dt * waterDisc(st.fill, st.tip).r
-            / BUCK.jetRef, 0, 1) * bckEase(clamp((1 - st.fill) / 0.05, 0, 1))
-          : 0;
+        tossStep();
+        st.pour = dt > 1e-6 ? clamp((was - st.fill) / dt / TOSS.flowRef, 0, 1) : 0;
         // The patch on the concrete grows by exactly what has landed on it,
         // which is the other half of the same fact. It used to be slammed to 1
         // on the first pouring frame, so a 0.96 m lens appeared out of dry
@@ -2902,8 +3580,10 @@ async function buildBucketeer(scene, vik, walkY) {
         // exceeds. The pail is on the end of a swung arm through all of it (see
         // `sw` in `placePail`), so that step was also 0.22 m of hand travel
         // starting from nothing and stopping dead.
-        const k = Math.min(1, st.clock / BUCK.tipOut);
-        st.tip = 2.05 * (1 - k * k * (3 - 2 * k));
+        // (1.540.0) The throw is over and the solver has the empty bucket back
+        // (at `TOSS.back`, inside `tip`): this beat is her standing with it
+        // swinging off her fist, getting her breath. See `TOSS`.
+        st.tip = 0;
         if (st.clock >= BUCK.tipOut) {
           st.phase = 'rest'; st.clock = 0;
           // And whether this is a lap she turns on, decided HERE and not in
@@ -3205,139 +3885,829 @@ async function buildBucketeer(scene, vik, walkY) {
     fig.aim(name, q.x, q.y, q.z, 2 * Math.atan2(s, q.w));
   }
 
+  // ── the weight, the bucket and the two arms ────────────────────────────────
+  //
+  // See the block over `BCARRY` for the design; this is its plumbing. A frame of
+  // her, in `drawFrame`, is now:
+  //
+  //   poseTrunk   the lean, the shoulders and the counterweight arm, off the
+  //               MOMENT the load put about her hips on the frame before;
+  //   update      the clip and the trunk folded, so her shoulder is where it
+  //               really is this frame;
+  //   bucketTick  the solver stepped with that shoulder (or the pour's hands
+  //               placed, or the bucket left on the floor), which says where
+  //               her hands have to be;
+  //   poseArms    both arms solved to there, the wrist turned on to the wire;
+  //   update      and folded again, so the fist is where the bucket is;
+  //   poseGrip    the fingers closed on it (and its own update);
+  //   placePail   the bucket drawn where the solver has it.
+  //
+  // Three `update`s of thirty bones a frame, for one figure within 150 m.
+
+  // Bone indices, found once. `null` until the first frame asks.
+  let bI = null;
+  function bones() {
+    if (bI) return bI;
+    bI = {
+      SR: fig.boneIndex('armUR'), ER: fig.boneIndex('armLR'), WR: fig.boneIndex('handR'),
+      SL: fig.boneIndex('armUL'), EL: fig.boneIndex('armLL'), WL: fig.boneIndex('handL'),
+      pel: fig.boneIndex('pelvis'),
+    };
+    return bI;
+  }
+
+  // Scratch, allocated once: everything below runs every frame.
+  const kV = [0, 1, 2, 3, 4, 5, 6, 7].map(() => new THREE.Vector3());
+  const kQ = [0, 1, 2, 3].map(() => new THREE.Quaternion());
+  const qFix = new THREE.Quaternion().setFromAxisAngle(qUp, -Math.PI * 0.5);
+  const qFixI = qFix.clone().invert();
+  const yDown = new THREE.Vector3(0, -1, 0);
+  const dFull = new THREE.Vector3(...BUCK.armUp).normalize();
+  const dEmpty = new THREE.Vector3(-0.05, -0.93, 0.33).normalize();
+  // Her left hand's contact on the rim: the right hand's crook, mirrored.
+  const GRIP_L = new THREE.Vector3(GRIP_B.x, GRIP_B.y, -GRIP_B.z);
+
+  // ── the solver's side ──────────────────────────────────────────────────────
+  const sim = {
+    rig: null, on: false, acc: 0, dirty: true,
+    // Her shoulder and her trunk's attitude on the frame before, in the world:
+    // each sub-step lays the trunk body somewhere between that and this.
+    pS: new THREE.Vector3(), pQ: new THREE.Quaternion(), have: false,
+    // What the solver says, in the world, after the last step.
+    hand: new THREE.Vector3(), pin: new THREE.Vector3(),
+    qBail: new THREE.Quaternion(), qBuck: new THREE.Quaternion(),
+    // Velocities a step ago, for the accelerations the lean and the slosh read.
+    vPrev: new Float64Array(9), aArm: new THREE.Vector3(),
+    aBail: new THREE.Vector3(), aBuck: new THREE.Vector3(),
+    fill: -1, dCom: 0.1, ms: 0, steps: 0, gap: 0,
+    from: new THREE.Vector3(), easeT: 0,
+  };
+  // The hands' targets, world, and how much of each hand they have.
+  const tgtR = new THREE.Vector3(), tgtL = new THREE.Vector3();
+  let wR = 0, wL = 0;
+  // The rig's own grip offset (wrist to the crook), figure space, off the
+  // last frame: the IK aims the WRIST, and the crook is where the wire is.
+  const offR = new THREE.Vector3(0.07, -0.09, 0.02), offL = new THREE.Vector3(0.07, -0.09, -0.02);
+  // The left arm's own two deltas — the right's are `carry.qa` and `carry.qb`.
+  const carL = { qa: new THREE.Quaternion(), qb: new THREE.Quaternion(), on: false };
+  // The last drawn bucket, for the hand-over between the solver and the floor.
+  const blend = { t: 0, dur: 0.35, pos: new THREE.Vector3(), q: new THREE.Quaternion(),
+    qp: new THREE.Quaternion() };
+  // Where the bucket was when the pour took it out of the solver.
+  const took = { pin: new THREE.Vector3(), qBail: new THREE.Quaternion(),
+    qBuck: new THREE.Quaternion(), ok: false };
+  // The pour's own bucket, world, this frame.
+  const pr = { pin: new THREE.Vector3(), qBail: new THREE.Quaternion(),
+    qBuck: new THREE.Quaternion(), on: false, hinge: 0, twist: 0, counter: 0,
+    was: false, last: new THREE.Vector3(), vel: new THREE.Vector3() };
+  // Her shoulder in the world, this frame.
+  const shW = new THREE.Vector3();
+  // The trunk's answer to the load — see `leanTick`.
+  const ln = { r: 0, rv: 0, p: 0, pv: 0, tr: 0, tp: 0, sh: 0, tsh: 0 };
+  // And the water's surface — see `slosh`.
+  const sl = { x: 0, z: 0, vx: 0, vz: 0, n: new THREE.Vector3(0, 1, 0),
+    pp: new THREE.Vector3(), pv: new THREE.Vector3(), pa: new THREE.Vector3(),
+    have: false, spilt: 0 };
+
+  /** Where the crook of a hand is, in the world, off the palette as it stands. */
+  function crookAt(iW, off, out) {
+    fig.boneAt(iW, out);
+    fig.boneTurn(iW, kQ[3]);
+    out.add(kV[7].copy(off).applyQuaternion(kQ[3]));
+    return mesh.localToWorld(out);
+  }
+
+  /** The arm the solver swings: shoulder to the crook of the fist, a little bent. */
+  function simBuild() {
+    if (sim.rig) return sim.rig;
+    const b = bones();
+    const S = fig.boneAt(b.SR, new THREE.Vector3());
+    const E = fig.boneAt(b.ER, new THREE.Vector3());
+    const W = fig.boneAt(b.WR, new THREE.Vector3());
+    // The wrist-to-crook length is the bind pose's; the elbow is left 5
+    // degrees short of straight — *"a nearly straight carrying arm"* — which
+    // is how an arm with ten kilos on it hangs: straight, and not locked.
+    const a = S.distanceTo(E), c = E.distanceTo(W), g = (gOn ? GRIP_B : PALM_B).length();
+    const L = Math.sqrt(a * a + c * c + 2 * a * c * Math.cos(0.09)) + 0.8 * g;
+    sim.rig = bckRig(L);
+    sim.arm = { a, c, L };
+    return sim.rig;
+  }
+
   /**
-   * Put the weight of ten litres into her, over whatever the clip is doing.
-   *
-   * BEFORE `fig.update`, and only ever once per update. `aim` stores a delta
-   * that `update` folds into the palette on its way past, so a pose set after
-   * it is a pose a frame late; and the arm solve below reads the palette to
-   * find the clip's own arm, so running it twice against one measurement would
-   * take its own delta off a second time and fold the arm again. Both of those
-   * are `holdPhone`'s notes in 43-jadrija.js, learned there.
-   *
-   * The trunk is four fixed turns scaled by `st.load`, which is all a lean
-   * needs. The carrying arm is a solve, because it is not enough to add a
-   * rotation to it: the thing that has to go is the clip's 397 mm of swing,
-   * and a constant delta moves a swing without shrinking it.
+   * What is in the bucket, into the solver: its mass, its inertia, and where
+   * its centre of mass is below the pin — which is where the lugs are measured
+   * from, so a bucket that empties rides higher on its bail.
    */
-  function poseCarry() {
-    // `g` is the WEIGHT and drives the trunk; `h` is the pail being in her hand
-    // at all and drives the arm. See `carryEmpty`: no water means no lean, and
-    // it does not mean a bucket may hang inside her leg.
-    const g = st.load;
-    const h = Math.max(g, st.held * BUCK.carryEmpty);
-    if (h < 0.002) {
-      // Empty-handed: every bone back to the clip, once. `aim` with a zero
-      // angle deletes the entry rather than storing an identity, so this is
-      // the whole of undoing it — and the latch is what keeps the beats she
-      // walks with nothing in her hand from paying for a solve every frame.
-      if (carry.off) return;
-      carry.off = true;
-      carry.qa.identity();
-      carry.qb.identity();
-      // The wrist's turn with them. It is not one of `CARRY_BONES` — the
-      // hand is the grip's and not the carry's — so the line below does not
-      // reach it, and a turn left on an empty hand would be subtracted from a
-      // hand that no longer had one the next time she picked the pail up.
-      gTurned = false; gHandQ.identity();
-      fig.aim(GRIP.R.hand, 0, 1, 0, 0);
-      for (const n of CARRY_BONES) fig.aim(n, 0, 1, 0, 0);
+  function simMass(fill) {
+    const R = sim.rig;
+    if (!R || Math.abs(fill - sim.fill) < 1e-3) return;
+    const C = BCARRY;
+    const base = PAIL_IN.base, top = base + (PAIL_IN.full - base) * fill;
+    const mw = C.waterM * fill, m = C.shellM + mw;
+    const comW = base + 0.5 * (top - base) + 0.008 * fill;
+    const d = -(C.shellM * C.comShell + mw * comW) / m;
+    // A column of water tilts nearly as a solid and does NOT spin with the
+    // pail about its axis (it is a fluid), so the axial term is the shell's.
+    const r2 = 0.125 * 0.125, hw = top - base;
+    const It = 0.02 + mw * (3 * r2 + hw * hw) / 12 + mw * (comW + d) * (comW + d);
+    const R_ = sim.rig.net;
+    R_.mass[R.BU] = m;
+    R_.inert[6 * R.BU] = It; R_.inert[6 * R.BU + 1] = 0.016 + 0.1 * mw * r2;
+    R_.inert[6 * R.BU + 2] = It;
+    // The body's origin is its centre of mass, so moving the mass moves the
+    // body and not the pin: carry the position with it.
+    if (sim.fill >= 0) {
+      kV[0].set(0, d - sim.dCom, 0).applyQuaternion(qOf(R.BU, kQ[0]));
+      const P = R_.P;
+      P[3 * R.BU] -= kV[0].x; P[3 * R.BU + 1] -= kV[0].y; P[3 * R.BU + 2] -= kV[0].z;
+    }
+    R_.setJointArms(R.jL1, [0, -BCARRY.bailC, R.R], [0, d, R.R]);
+    R_.setJointArms(R.jL2, [0, -BCARRY.bailC, -R.R], [0, d, -R.R]);
+    sim.fill = fill;
+    sim.dCom = d;
+  }
+
+  /** Body i's attitude as a THREE quaternion. */
+  function qOf(i, out) {
+    const Q = sim.rig.net.Q;
+    return out.set(Q[4 * i], Q[4 * i + 1], Q[4 * i + 2], Q[4 * i + 3]);
+  }
+  /** Body i's point `lp` (its own frame) in the world. */
+  function ptOf(i, lp, out) {
+    const P = sim.rig.net.P;
+    return out.copy(lp).applyQuaternion(qOf(i, kQ[1])).add(kV[6].set(P[3 * i], P[3 * i + 1], P[3 * i + 2]));
+  }
+
+  /**
+   * Put the four bodies where the figure is, at rest: the trunk on her
+   * shoulder, the arm from there to `hand`, the bail and the bucket hanging
+   * plumb under it in `qB` (the bail) and `qU` (the bucket) — or, with those
+   * null, square to her.
+   */
+  function simPlace(S, hand, qB, qU, vel) {
+    const R = simBuild(), net = R.net;
+    simMass(st.fill);
+    const qY = mesh.quaternion;
+    net.place(R.TR, S.x, S.y, S.z, [qY.x, qY.y, qY.z, qY.w]);
+    const d = kV[0].copy(hand).sub(S);
+    const len = d.length() || 1;
+    d.divideScalar(len);
+    // The arm's attitude: its local −y along shoulder-to-hand, and its local
+    // z (the knuckle line) as near her right as that allows.
+    kQ[0].setFromUnitVectors(kV[1].copy(yDown).applyQuaternion(qY), d);
+    const q0 = kQ[0].multiply(qY);
+    const L = R.L;
+    net.place(R.AR, S.x + d.x * L / 2, S.y + d.y * L / 2, S.z + d.z * L / 2,
+      [q0.x, q0.y, q0.z, q0.w]);
+    // The hand is where the ARM ends, not where it was asked to be — they
+    // differ by however far `hand` was off the arm's own length.
+    const hx = S.x + d.x * L, hy = S.y + d.y * L, hz = S.z + d.z * L;
+    const qb = qB || qY, qu = qU || qY;
+    kV[2].set(0, PAIL.bail - BCARRY.bailC, 0).applyQuaternion(qb);
+    const bx = hx - kV[2].x, by = hy - kV[2].y, bz = hz - kV[2].z;
+    net.place(R.BA, bx, by, bz, [qb.x, qb.y, qb.z, qb.w]);
+    kV[3].set(0, -BCARRY.bailC, 0).applyQuaternion(qb);     // bail COM → pin
+    kV[4].set(0, sim.dCom, 0).applyQuaternion(qu);         // bucket COM → pin
+    net.place(R.BU, bx + kV[3].x - kV[4].x, by + kV[3].y - kV[4].y, bz + kV[3].z - kV[4].z,
+      [qu.x, qu.y, qu.z, qu.w]);
+    net.resetDuals();
+    // WARMED, with her standing still: a cold solver has every penalty at the
+    // floor, and its first few steps let the joints open while the penalties
+    // climb — MEASURED, the hand it hands back jittered 5 to 10 cm a frame for
+    // the first five frames after a placement. Sixteen steps at rest, off
+    // screen, cost 0.8 ms once and put the multipliers where the load needs
+    // them; then everything is stopped again, so nothing it did is carried.
+    {
+      const P = net.P, V = net.V, W = net.W, T = R.TR, h = BCARRY.h;
+      for (let k = 0; k < 16; k++) {
+        P[3 * T] = S.x; P[3 * T + 1] = S.y; P[3 * T + 2] = S.z;
+        V[3 * T] = 0; V[3 * T + 1] = 9.81 * h; V[3 * T + 2] = 0;
+        W[3 * T] = W[3 * T + 1] = W[3 * T + 2] = 0;
+        net.step(h);
+      }
+      for (const i of [R.AR, R.BA, R.BU]) {
+        V.fill(0, 3 * i, 3 * i + 3); W.fill(0, 3 * i, 3 * i + 3);
+      }
+    }
+    if (vel) {
+      for (const i of [R.AR, R.BA, R.BU]) net.kick(i, vel.x, vel.y, vel.z);
+    }
+    sim.pS.copy(S); sim.pQ.copy(qY); sim.have = true;
+    sim.acc = 0;
+    for (let k = 0; k < 9; k++) sim.vPrev[k] = 0;
+    sim.aArm.set(0, 0, 0); sim.aBail.set(0, 0, 0); sim.aBuck.set(0, 0, 0);
+    simRead();
+    sim.on = true;
+    sim.dirty = false;
+  }
+
+  /** The solver's answer, into the world: the hand, the pin and the two attitudes. */
+  function simRead() {
+    const R = sim.rig;
+    ptOf(R.AR, kV[0].set(0, -R.L / 2, 0), sim.hand);
+    ptOf(R.BA, kV[0].set(0, -BCARRY.bailC, 0), sim.pin);
+    qOf(R.BA, sim.qBail);
+    qOf(R.BU, sim.qBuck);
+  }
+
+  /**
+   * Step the solver across one frame, with her shoulder at `S` (world) and
+   * her trunk square to `qY`.
+   *
+   * THE TRUNK IS LAID ALONG THE FRAME, NOT DROPPED AT ITS END. Each 1/120 s
+   * sub-step puts the trunk body at the start of its slice of the line from
+   * last frame's shoulder to this one and gives it that slice's velocity (plus
+   * the step's own fall, which a live body that weighs ten tonnes still does).
+   * Its inertial target is then exactly the end of the slice, so the socket
+   * sees her shoulder move and not jump, and the hard joint's stabilisation
+   * (which forgives an error it finds at the start of a step) has nothing to
+   * forgive. A frame longer than a tenth of a second — a stall, a tab put
+   * away — is not stepped at all: she is put back at rest where she stands.
+   */
+  function simStep(dt, S, qY, dTgt) {
+    const R = sim.rig, net = R.net, C = BCARRY;
+    if (!sim.have || dt > 0.1 || S.distanceTo(sim.pS) > 0.5) {
+      simPlace(S, kV[5].copy(dTgt).applyQuaternion(qY).multiplyScalar(R.L).add(S));
       return;
     }
-    carry.off = false;
-    // Away from the pail, which is in her right hand and so on +z: about −x.
-    fig.aim('spine01', -1, 0, 0, BUCK.leanA * g);
-    fig.aim('spine02', -1, 0, 0, BUCK.leanB * g);
-    fig.aim('spine03', -1, 0, 0, BUCK.leanC * g);
-    // The head back towards level, so the lean is in her body and not in her
-    // eye line. +x, because it is undoing a −x.
-    fig.aim('neck', 1, 0, 0, BUCK.leanHead * g);
-    // Free shoulder up, loaded shoulder down. Both are +x: the left clavicle
-    // points at −z and the right at +z, and one turn about +x therefore lifts
-    // the one and drops the other, which is exactly the shape wanted.
-    fig.aim('clavicleL', 1, 0, 0, BUCK.shrugL * g);
-    fig.aim('clavicleR', 1, 0, 0, BUCK.shrugR * g);
-    // And the free arm out. It keeps the clip's swing — the arm that is NOT
-    // carrying anything swings more, not less — and this is laid on top of it.
-    fig.aim('armUL', 1, 0, 0, BUCK.freeArm * g);
+    const t0 = performance.now();
+    // The muscle's target, square to her trunk: the carry direction with a
+    // share of the clip's own swing in it.
+    kQ[2].setFromUnitVectors(yDown, dTgt);
+    net.setAngleFrame(R.aSh, [kQ[2].x, kQ[2].y, kQ[2].z, kQ[2].w], [0, 0, 0, 1]);
+    sim.acc += dt;
+    const n = Math.floor(sim.acc / C.h + 1e-6);
+    sim.acc -= n * C.h;
+    const P = net.P, V = net.V, Q = net.Q, W = net.W;
+    // Her yaw rate, for the trunk body's spin.
+    kQ[1].copy(sim.pQ).invert().premultiply(qY);
+    const yawRate = dt > 1e-6 ? 2 * Math.atan2(kQ[1].y, kQ[1].w) / dt : 0;
+    for (let k = 0; k < n; k++) {
+      const u = n > 0 ? k / n : 0;
+      const T = R.TR;
+      P[3 * T] = sim.pS.x + (S.x - sim.pS.x) * u;
+      P[3 * T + 1] = sim.pS.y + (S.y - sim.pS.y) * u;
+      P[3 * T + 2] = sim.pS.z + (S.z - sim.pS.z) * u;
+      V[3 * T] = (S.x - sim.pS.x) / dt;
+      V[3 * T + 1] = (S.y - sim.pS.y) / dt + 9.81 * C.h;
+      V[3 * T + 2] = (S.z - sim.pS.z) / dt;
+      kQ[0].copy(sim.pQ).slerp(qY, u);
+      Q[4 * T] = kQ[0].x; Q[4 * T + 1] = kQ[0].y; Q[4 * T + 2] = kQ[0].z; Q[4 * T + 3] = kQ[0].w;
+      W[3 * T] = 0; W[3 * T + 1] = yawRate; W[3 * T + 2] = 0;
+      net.step(C.h);
+      sim.steps++;
+    }
+    sim.pS.copy(S); sim.pQ.copy(qY);
+    if (n > 0) {
+      // Accelerations over the frame, off the solver's own velocities.
+      const ids = [R.AR, R.BA, R.BU], out = [sim.aArm, sim.aBail, sim.aBuck];
+      const span = n * C.h;
+      for (let j = 0; j < 3; j++) {
+        const i = ids[j];
+        const ax = (V[3 * i] - sim.vPrev[3 * j]) / span;
+        const ay = (V[3 * i + 1] - sim.vPrev[3 * j + 1]) / span;
+        const az = (V[3 * i + 2] - sim.vPrev[3 * j + 2]) / span;
+        // Lightly smoothed: BDF1 velocities differenced over a frame are a
+        // second derivative of positions, and a lean driven by raw noise
+        // would shiver.
+        out[j].x += (ax - out[j].x) * 0.5;
+        out[j].y += (ay - out[j].y) * 0.5;
+        out[j].z += (az - out[j].z) * 0.5;
+        sim.vPrev[3 * j] = V[3 * i]; sim.vPrev[3 * j + 1] = V[3 * i + 1]; sim.vPrev[3 * j + 2] = V[3 * i + 2];
+      }
+    }
+    simRead();
+    sim.ms += (performance.now() - t0 - sim.ms) * 0.05;
+  }
 
-    // ── the carrying arm ──────────────────────────────────────────────────
+  /**
+   * The moment the load puts about her hips, in her own frame: x is the roll
+   * toward the bucket side, z the pitch. The arm, the bail and the bucket are
+   * each a weight at their own centre, pulled by gravity less whatever they
+   * are accelerating at — a bucket swinging out pulls harder than one hanging
+   * still — so this is Newton's law for what is hanging off her, not a guess
+   * at how heavy ten litres looks.
+   */
+  function loadMoment(out) {
+    out.set(0, 0, 0);
+    if (!sim.on && !pr.on) return out;
+    const b = bones();
+    const hip = mesh.localToWorld(fig.boneAt(b.pel, kV[0]));
+    // `g` is whether gravity counts: not for the arm, whose own weight the
+    // clip was already standing under before there was ever a bucket in it —
+    // only for what it is carrying. The arm's ACCELERATION counts: swinging it
+    // is work her trunk does.
+    const add = (px, py, pz, m, a, g = 1) => {
+      const fx = -m * a.x, fy = m * (-9.81 * g - a.y), fz = -m * a.z;
+      const rx = px - hip.x, ry = py - hip.y, rz = pz - hip.z;
+      out.x += ry * fz - rz * fy;
+      out.y += rz * fx - rx * fz;
+      out.z += rx * fy - ry * fx;
+    };
+    if (pr.on) {
+      // Held out in front of her: the pail and what is left in it at the pin.
+      const m = BCARRY.shellM + BCARRY.waterM * st.fill + BCARRY.bailM;
+      add(pr.pin.x, pr.pin.y - 0.1, pr.pin.z, m, kV[1].set(0, 0, 0));
+    } else {
+      const P = sim.rig.net.P, R = sim.rig, M = sim.rig.net.mass;
+      add(P[3 * R.AR], P[3 * R.AR + 1], P[3 * R.AR + 2], M[R.AR], sim.aArm, 0);
+      add(P[3 * R.BA], P[3 * R.BA + 1], P[3 * R.BA + 2], M[R.BA], sim.aBail);
+      add(P[3 * R.BU], P[3 * R.BU + 1], P[3 * R.BU + 2], M[R.BU], sim.aBuck);
+    }
+    // Into her frame: the inverse of her yaw.
+    return out.applyQuaternion(kQ[0].copy(mesh.quaternion).invert());
+  }
+
+  /**
+   * The trunk's answer, as a damped spring toward the lean that balances the
+   * moment. See `BCARRY.leanGain` and `leanW`.
+   *
+   * Off the solver when there is one; off the old static law when the bucket
+   * is on its way between the floor and her hand (`lift`, `set`), which is the
+   * same number the solver lands on at rest, eased on `st.load` as it always
+   * was.
+   */
+  const lm = new THREE.Vector3();
+  function leanTick(dt) {
+    const C = BCARRY, den = C.upperM * 9.81 * C.upperH;
+    if (sim.on || pr.on) {
+      loadMoment(lm);
+      ln.tr = C.leanGain * lm.x / den;
+      ln.tp = C.pitchGain * lm.z / den;
+      // The shoulder drops with what is pulling it down — the bucket and its
+      // bail, gravity plus whatever they are accelerating at — as a share of
+      // a full one hanging still.
+      const Wf = (C.shellM + C.waterM + C.bailM) * 9.81;
+      ln.tsh = sim.on
+        ? clamp((sim.rig.net.mass[sim.rig.BU] * (9.81 + sim.aBuck.y)
+          + C.bailM * (9.81 + sim.aBail.y)) / Wf, 0, 1.4)
+        : (C.shellM + C.waterM * st.fill + C.bailM) * 9.81 / Wf;
+    } else {
+      // The static law: a full bucket hanging still is 0.155, which is what
+      // the solver's moment gives at rest.
+      ln.tr = 0.155 * st.load;
+      ln.tp = 0;
+      ln.tsh = st.load;
+    }
+    if (dt <= 0) { ln.r = ln.tr; ln.p = ln.tp; ln.sh = ln.tsh; return; }
+    const w = C.leanW, z = C.leanZ;
+    const h = Math.min(dt, 0.05);
+    ln.rv += (-2 * z * w * ln.rv - w * w * (ln.r - ln.tr)) * h;
+    ln.r += ln.rv * h;
+    ln.pv += (-2 * z * w * ln.pv - w * w * (ln.p - ln.tp)) * h;
+    ln.p += ln.pv * h;
+    ln.sh += (ln.tsh - ln.sh) * (1 - Math.exp(-6 * h));
+  }
+
+  /**
+   * Put the load into her trunk, over whatever the clip is doing. BEFORE the
+   * first `update` of the frame: `aim` stores a delta that the update folds in.
+   *
+   * The same bones and the same measured signs as before — the pail is in her
+   * RIGHT hand, so leaning away from it is a turn about −x, split over three
+   * spine bones so it is a curve and not a hinge; the head gives two thirds of
+   * it back; the loaded shoulder drops and the free one lifts; the free arm goes
+   * out as a counterweight. What changed is what drives them: `ln`, which is
+   * the load's moment through a spine, and not a constant times a flag.
+   */
+  function poseTrunk() {
+    const lean = ln.r;
+    const k = lean / 0.155;                 // the old full-bucket lean, as one
+    const sh = ln.sh * (st.held > 0 ? 1 : 0);
+    const hinge = pr.hinge;
+    // Pitch: forward is a turn about −z. Her hinge into the pour, less what
+    // the load held out in front of her pulls her back by.
+    const pitch = hinge - ln.p;
+    if (Math.abs(lean) < 1e-4 && Math.abs(pitch) < 1e-4 && sh < 0.002 && !pr.on) {
+      if (!carry.trunkOff) {
+        carry.trunkOff = true;
+        for (const nm of ['spine01', 'spine02', 'spine03', 'neck', 'clavicleL', 'clavicleR']) {
+          fig.aim(nm, 0, 1, 0, 0);
+        }
+        if (!carL.on) fig.aim('armUL', 0, 1, 0, 0);
+      }
+      return;
+    }
+    carry.trunkOff = false;
+    // Roll and pitch together on each spine bone: one axis, one angle.
+    // And the twist of the throw, about her own up: the right shoulder back on
+    // the wind-up and round on the heave. Zero whenever she is not throwing.
+    const twist = pr.on ? pr.twist : 0;
+    const spine = (nm, share) => {
+      const ax = -lean * share, ay = twist * share, az = -pitch * share;
+      const a = Math.hypot(ax, ay, az);
+      fig.aim(nm, ax, ay, az, a);
+    };
+    spine('spine01', BUCK.leanA / 0.155);
+    spine('spine02', BUCK.leanB / 0.155);
+    spine('spine03', BUCK.leanC / 0.155);
+    fig.aim('neck', 1, 0, 0, BUCK.leanHead * k);
+    fig.aim('clavicleL', 1, 0, 0, BUCK.shrugL * sh);
+    fig.aim('clavicleR', 1, 0, 0, BUCK.shrugR * sh);
+    // The free arm out for balance — unless the pour has it on the rim, in
+    // which case the bone is `armIK`'s and is not touched here at all: this
+    // runs before the fold and the IK measures after it, so a delta cleared
+    // here is a delta the IK would take off a second time.
+    // And in the throw the free arm swings the other way to the bucket — a
+    // turn about her right, back as the bucket goes forward.
+    if (!carL.on) {
+      const fx = BUCK.freeArm * clamp(k, 0, 1.5), fz = pr.on ? pr.counter : 0;
+      fig.aim('armUL', fx, 0, fz, Math.hypot(fx, fz));
+    }
+  }
+
+  /**
+   * An arm to a point: two bones, the elbow where the clip had it.
+   *
+   * The wrist is aimed at `T` less the hand's own offset to where it holds
+   * (`off`, figure space, off the frame before), the elbow is placed by the
+   * law of cosines on the side the clip's elbow was already on — so it bends
+   * the way that elbow bends and cannot flip — and each bone is given the
+   * shortest turn from where the clip put it to there. Measured with this
+   * solve's own last deltas taken back off, for the reason `greetArm` and the
+   * old `poseCarry` both give: `aim` writes a delta and `boneAt` reports a
+   * result. `w` fades the whole thing, so an arm let go of goes back to the
+   * clip on a slerp and not in a frame.
+   */
+  function armIK(iS, iE, iW, T, off, w, mem, nmU, nmL) {
+    const S = fig.boneAt(iS, kV[0]), E = fig.boneAt(iE, kV[1]), W = fig.boneAt(iW, kV[2]);
+    const ia = kQ[0].copy(mem.qa).invert(), ib = kQ[1].copy(mem.qb).invert();
+    const cU = kV[3].copy(E).sub(S);
+    const a = cU.length();
+    cU.applyQuaternion(ia);
+    const cF = kV[4].copy(W).sub(E);
+    const c = cF.length();
+    cF.applyQuaternion(ib).applyQuaternion(ia);
+    // The target for the wrist, figure space.
+    const Wt = kV[5].copy(T);
+    mesh.worldToLocal(Wt);
+    Wt.sub(off);
+    const d = kV[6].copy(Wt).sub(S);
+    let dist = d.length();
+    if (dist < 1e-4) return;
+    d.divideScalar(dist);
+    dist = clamp(dist, Math.abs(a - c) + 1e-3, (a + c) * 0.999);
+    const x = (a * a - c * c + dist * dist) / (2 * dist);
+    const he = Math.sqrt(Math.max(0, a * a - x * x));
+    // The pole: the clip's elbow off the shoulder-to-wrist line.
+    const pole = kV[7].copy(cU).addScaledVector(d, -cU.dot(d));
+    if (pole.lengthSq() < 1e-8) pole.set(-1, 0, 0).addScaledVector(d, -d.x);
+    pole.normalize();
+    // Elbow target, then the two turns.
+    const Et = kV[2].copy(S).addScaledVector(d, x).addScaledVector(pole, he);
+    const up = kV[1].copy(Et).sub(S).normalize();
+    const qa = kQ[2].setFromUnitVectors(kV[3].copy(cU).normalize(), up);
+    const fore = kV[3].copy(cF).normalize().applyQuaternion(qa);
+    const want = kV[4].copy(S).addScaledVector(d, dist).sub(Et).normalize();
+    const qb = kQ[3].setFromUnitVectors(fore, want);
+    mem.qa.copy(cID).slerp(qa, w);
+    mem.qb.copy(cID).slerp(qb, w);
+    carryQ(nmU, mem.qa);
+    carryQ(nmL, mem.qb);
+  }
+
+  /**
+   * Where the bucket and both hands are this frame, by who owns the bucket:
+   * the solver (in her hand, on the walk and at rest), the pour (both hands),
+   * or the floor (under the tap, and the lift and set-down either side of
+   * that). AFTER the first update, so her shoulder is this frame's.
+   */
+  const dTg = new THREE.Vector3();
+  function bucketTick(dt) {
+    const b = bones();
+    // The throw owns the bucket from the top of `tip` to `TOSS.back`; after
+    // that the solver has it again, empty and swinging.
+    const pouring = st.phase === 'tip' && st.clock < TOSS.back;
+    if (!pouring && ts.on && st.phase !== 'tip') ts.on = false;
+    const inHand = st.held > 0.999;
+    wL = 0;
+    pr.on = false;
+    if (!(inHand && !pouring)) {
+      // Leaving the solver: remember the last drawn bucket, so the floor's
+      // placement can be blended from it rather than jumped to.
+      if (sim.on && !pouring) {
+        blend.t = blend.dur;
+        blend.pos.copy(kanta.position); blend.q.copy(kanta.quaternion); blend.qp.copy(pail.quaternion);
+      }
+      if (sim.on && pouring) {
+        took.pin.copy(sim.pin); took.qBail.copy(sim.qBail); took.qBuck.copy(sim.qBuck); took.ok = true;
+      }
+      sim.on = false;
+    }
+    if (pouring && st.held > 0.5) {
+      // The pin's velocity, kept for the hand-back.
+      if (pr.was && dt > 1e-4) pr.vel.copy(kV[5].copy(pr.pin)).sub(pr.last).divideScalar(dt);
+      pourTick();
+      pr.last.copy(pr.pin);
+      pr.was = true;
+      // The throw owns it, so the hand-back out of the throw is a hand-over
+      // and not a reset, however the throw was started.
+      sim.dirty = false;
+      return;
+    }
+    // On the floor the solver is not the bucket, so there is nothing for a
+    // later pick-up to be a jump FROM: the next time it goes into her hand is a
+    // hand-over, not a reset.
+    if (!inHand) { wR = 0; sim.dirty = false; return; }
+    // In her hand, and the solver has it.
+    const S = mesh.localToWorld(fig.boneAt(b.SR, shW));
+    simBuild();
+    simMass(st.fill);
+    // The muscle's target: the carry direction for what is in the bucket, the
+    // clip's fore-and-aft swing in it at `BCARRY.swing`.
+    dTg.copy(dEmpty).lerp(dFull, clamp(st.fill, 0, 1));
+    {
+      const ia = kQ[0].copy(carry.qa).invert();
+      const E = fig.boneAt(b.ER, kV[1]), S0 = fig.boneAt(b.SR, kV[2]);
+      const cu = kV[3].copy(E).sub(S0).applyQuaternion(ia).normalize();
+      dTg.x += BCARRY.swing * (cu.x + 0.02);
+    }
+    dTg.normalize();
+    // A frame with no time in it — `go` and `tick` mark her dirty and she is
+    // re-placed at rest where they left her; `hold` does not, and a held
+    // frame is the solver FROZEN mid-swing, which is what a probe that traced
+    // her to an instant and held her there came to photograph.
+    if (!sim.on || sim.dirty) {
+      // Wherever the fist is now, for the hand-over below: the solver's arm is
+      // one straight length and the fist it takes over from is not quite at
+      // the end of it, so the hand is walked from the one to the other over a
+      // third of a second rather than put there in a frame.
+      if (!sim.dirty) {
+        sim.from.copy(crookAt(bones().WR, gOn ? GRIP_B : PALM_B, kV[4]));
+        sim.easeT = BCARRY.handOver;
+        // And the drawn bucket from where it was last drawn, the same way
+        // (`placeSim`): the solver's hang and the lift's are a few
+        // centimetres apart, and a few centimetres in one frame is a pop.
+        blend.t = blend.dur;
+        blend.pos.copy(kanta.position); blend.q.copy(kanta.quaternion);
+        blend.qp.copy(pail.quaternion);
+      } else {
+        sim.easeT = 0;
+      }
+      if (pr.was && !sim.dirty) {
+        // OUT OF THE THROW, MOVING: the bucket as the swing left it — where
+        // it was, how it was turned, and going the way it was going — so the
+        // empty pail swings on off her fist instead of starting from still.
+        simPlace(S, tgtR, pr.qBail, pr.qBuck, pr.vel);
+        const R = sim.rig, W = R.net.W;
+        kV[5].set(0, 0, -ts.v).applyQuaternion(mesh.quaternion);
+        W[3 * R.BU] = kV[5].x; W[3 * R.BU + 1] = kV[5].y; W[3 * R.BU + 2] = kV[5].z;
+      } else if (!sim.dirty) {
+        // OUT OF THE LIFT: the fist is where the lift's own solve has it, and
+        // the bucket is hanging under it — start the solver there, at rest,
+        // or the first frame of `down` is the bucket jumping to a new hang.
+        // MEASURED the other way: 137 mm in one frame.
+        simPlace(S, crookAt(bones().WR, gOn ? GRIP_B : PALM_B, kV[5]), null, null);
+      } else {
+        // Into the solver at rest, hanging at the carry angle — never from
+        // wherever the arm last was, which after a jump is anywhere.
+        simPlace(S, kV[5].copy(dTg).applyQuaternion(mesh.quaternion).multiplyScalar(sim.rig.L)
+          .add(S), null, null);
+      }
+    }
+    pr.was = false;
+    if (dt > 0) simStep(dt, S, mesh.quaternion, dTg);
+    else simRead();
+    tgtR.copy(sim.hand);
+    if (sim.easeT > 0) {
+      tgtR.lerpVectors(sim.from, sim.hand, bckEase(1 - sim.easeT / BCARRY.handOver));
+      sim.easeT = Math.max(0, sim.easeT - dt);
+    }
+    wR = 1;
+    // THE OFFER, on the walk only and with her legs stopped — see `offerUp`
+    // for why both of those. Now a hand target, eased between where the
+    // solver has the hand and where the old solve put an offered one; the
+    // bucket goes with the hand (see `placeSim`).
+    const onWalk = st.phase === 'down' || st.phase === 'up';
+    const still = clamp(1 - st.vel / BUCK.offerStill, 0, 1);
+    const offer = (st.offered && onWalk) ? st.noticeAmt * still * still : 0;
+    if (offer > 0.002) {
+      const Sf = fig.boneAt(b.SR, kV[1]);
+      const oh = kV[2].copy(Sf).addScaledVector(cOU, sim.arm.a).addScaledVector(cOF, sim.arm.c)
+        .add(offR);
+      mesh.localToWorld(oh);
+      tgtR.lerp(oh, offer);
+    }
+  }
+
+  /**
+   * The throw: the bucket out of the solver and into her swing.
+   *
+   * Everything is a function of where she is in `tip`, in her own frame, off
+   * `ts` (which `tossStep` integrates in the loop, so `tick` gets it too) — a
+   * probe that jumps to 1.2 s into the throw gets the frame the loop would have
+   * drawn there. In from wherever the solver had the bucket swinging when she
+   * stopped (`took`), over the first quarter second, in the world; out at
+   * `TOSS.back`, where `bucketTick` hands it to the solver moving as it was.
+   */
+  const pWk = new THREE.Vector3(), tPin = {};
+  function pourTick() {
+    pr.on = true;
+    const t = st.clock;
+    const qY = mesh.quaternion;
+    const her = kV[6].set(st.x, st.y, st.z);
+    tossReady();
+    tossPin(t, ts.S, ts.reach, tPin);
+    pr.pin.set(tPin.px, tPin.py, tPin.pz).applyQuaternion(qY).add(her);
+    // The bail runs from the pin to her fist, which is on the line to her
+    // shoulder; the pail is rolled `ts.phi` about her right, mouth forward.
+    pWk.set(ts.S[0] - tPin.px, ts.S[1] - tPin.py, ts.S[2] - tPin.pz).normalize()
+      .applyQuaternion(qY);
+    pr.qBail.setFromUnitVectors(qUp, pWk).multiply(qY);
+    kQ[0].setFromAxisAngle(kV[0].set(0, 0, 1), -ts.phi);
+    pr.qBuck.copy(qY).multiply(kQ[0]);
+    if (took.ok && t < 0.25) {
+      const g = bckEase(t / 0.25);
+      pr.pin.lerpVectors(took.pin, pr.pin, g);
+      pr.qBail.copy(took.qBail).slerp(kQ[1].copy(pr.qBail), g);
+      pr.qBuck.copy(took.qBuck).slerp(kQ[1].copy(pr.qBuck), g);
+    }
+    pr.hinge = bckMono(TOSS.hinge, t);
+    pr.twist = bckMono(TOSS.twist, t);
+    pr.counter = bckMono(TOSS.counter, t);
+    // The hands: the bail's apex in the right; the bottom rim in the left from
+    // the bottom of the heave, which is as soon as it can reach it.
+    tgtR.set(0, PAIL.bail, 0).applyQuaternion(pr.qBail).add(pr.pin);
+    wR = 1;
+    tgtL.set(POURK_RIM[0], POURK_RIM[1], POURK_RIM[2]).applyQuaternion(pr.qBuck).add(pr.pin);
+    wL = bckMono(TOSS.twoHands, t);
+  }
+
+  // ── the throw's own state, integrated in the loop ──────────────────────────
+  const ts = { on: false, t: 0, phi: 0, v: 0, lw: 0, fill: 1, S: [0, 1.41, 0.17], reach: 0.713,
+    gx: 0, gy: -9.81, vx: 0, vy: 0, lvx: 0, lvy: 0 };
+  /**
+   * Start a throw, if one is not running: her shoulder off the rig as it stands
+   * (her own frame is the figure's), and the arm-plus-bail the solver swings.
+   */
+  function tossReady() {
+    if (ts.on) return;
+    const b = bones();
+    const S = fig.boneAt(b.SR, kV[7]);
+    ts.S[0] = S.x; ts.S[1] = S.y; ts.S[2] = S.z;
+    ts.reach = (sim.rig ? sim.rig.L : 0.555) + PAIL.bail;
+    ts.t = 0; ts.phi = 0; ts.v = 0; ts.lw = 0; ts.fill = st.fill;
+    ts.vx = ts.vy = ts.lvx = ts.lvy = 0; ts.gx = 0; ts.gy = -9.81;
+    ts.on = true;
+    landing.m = 0; thrown.m = 0;
+  }
+  /** One step of `tip`: the throw integrated to where the beat's clock is. */
+  function tossStep() {
+    if (!ts.on || ts.t > st.clock + 1e-6) { ts.on = false; tossReady(); }
+    ts.fill = st.fill;
+    tossIntegrate(ts, st.clock);
+    st.fill = ts.fill;
+    st.tip = ts.phi;
+  }
+
+  /**
+   * Both arms to the bucket, then the wrist on to the wire. See `armIK`.
+   *
+   * With the bucket on the floor, or on its way between the floor and her
+   * hand, the carrying arm keeps the old DIRECTION solve — hung at `armUp`,
+   * faded on `held` — because there is no bucket in the solver to reach for
+   * and the lift is a bucket travelling to meet a hand, which the pour cut's
+   * own note already argues about at length.
+   */
+  function poseArms() {
+    const b = bones();
+    const h = Math.max(st.load, st.held * BUCK.carryEmpty);
+    if (wR > 0.001) {
+      carry.off = false;
+      armIK(b.SR, b.ER, b.WR, tgtR, offR, wR, carry, 'armUR', 'armLR');
+    } else if (h > 0.002) {
+      carry.off = false;
+      armDirs(h);
+    } else if (!carry.off) {
+      carry.off = true;
+      carry.qa.identity(); carry.qb.identity();
+      gTurned = false; gHandQ.identity();
+      fig.aim(GRIP.R.hand, 0, 1, 0, 0);
+      fig.aim('armUR', 0, 1, 0, 0);
+      fig.aim('armLR', 0, 1, 0, 0);
+    }
+    if (wL > 0.001) {
+      carL.on = true;
+      armIK(b.SL, b.EL, b.WL, tgtL, offL, wL, carL, 'armUL', 'armLL');
+    } else if (carL.on) {
+      carL.on = false;
+      carL.qa.identity(); carL.qb.identity();
+      fig.aim('armUL', 0, 1, 0, 0);
+      fig.aim('armLL', 0, 1, 0, 0);
+    }
+    if (h > 0.002 || wR > 0.001) gripTurn();
+  }
+
+  /**
+   * Everything that carries over from one frame to the next, dropped: for a
+   * probe that has just moved her somewhere, and for nothing else. The next
+   * frame puts the bucket in the solver at rest where she stands.
+   */
+  function simReset() {
+    sim.dirty = true;
+    // And whatever the solver had is not the bucket any more: a pour started
+    // by `go('tip')` must not blend in from where the pail was before the jump.
+    sim.on = false;
+    took.ok = false;
+    pr.was = false; ts.on = false;
+    blend.t = 0;
+    sl.have = false; sl.x = sl.z = sl.vx = sl.vz = 0; sl.n.set(0, 1, 0);
+    ln.rv = ln.pv = 0;
+    fillSeen = -1;
+  }
+
+  /** The old direction solve, for the lift and the set-down. See `armUp`. */
+  function armDirs(h) {
     if (carry.iU < 0) {
       carry.iU = fig.boneIndex('armUR');
       carry.iL = fig.boneIndex('armLR');
       carry.iH = fig.boneIndex('handR');
     }
-    if (carry.iU < 0 || carry.iL < 0 || carry.iH < 0) return;
     fig.boneAt(carry.iU, cS);
     fig.boneAt(carry.iL, cE);
     fig.boneAt(carry.iH, cW);
-    // What the clip is doing under the last solve. A bone's delta is laid on
-    // OUTSIDE its parent's — `measured = qb · qa · clip` for the forearm — so
-    // the clip's own arm is the measurement with those taken back off it in
-    // the order they went on.
     const ia = cIA.copy(carry.qa).invert(), ib = cIB.copy(carry.qb).invert();
     cU.copy(cE).sub(cS).applyQuaternion(ia).normalize();
     cF.copy(cW).sub(cE).applyQuaternion(ib).applyQuaternion(ia).normalize();
-    // Two turns, each the minimal rotation taking a bone's own direction to an
-    // ABSOLUTE one in figure space. Absolute is the point: a hanging arm hangs
-    // under gravity whatever the trunk over it is doing, so solving to a fixed
-    // direction is what stops the lean above from carrying the pail sideways
-    // into her thigh. The forearm's is measured AFTER the upper arm's, because
-    // an aim on a parent carries its children round with it.
-    // THE OFFER, and it is a lift rather than a reach.
-    //
-    // An arm raised with a full pail on the end of it, by somebody who has
-    // just stopped and turned to look at you, reads as an offer without
-    // needing a word — and it is what she would do, because the alternative is
-    // putting ten litres down first. `offerUp` above is the whole account of
-    // what it now does and why the old one read as a defect instead; the three
-    // lines here are only the gate.
-    //
-    // AND SHE HAS TO BE STOPPED, which is the one thing that was missing. The
-    // ramp is squared so that a pull-up is not a half-offer, and it is on
-    // `st.vel` rather than on `st.yield` because there are two ways she comes
-    // to a stand in front of you and only one of them is the doorway: `yield`
-    // is you in her way, and `notice` with the legs already still is you beside
-    // her while she waits. Both are a woman standing there with a bucket.
-    //
-    // ON THE TWO WALKING BEATS ONLY. `st.offered` is latched off `held > 0.5`
-    // at the instant she notices you, and `held` is 1 through `tip` as well —
-    // so a notice that fired while she had the pail over the rail would have
-    // lifted the arm mid-pour, and `tip` is precisely a beat with `vel` at
-    // zero, which is to say the gate above would have let it through. There is
-    // no version of the offer that belongs on a beat where the weight is
-    // moving between the floor and her hand.
-    const onWalk = st.phase === 'down' || st.phase === 'up';
-    const still = clamp(1 - st.vel / BUCK.offerStill, 0, 1);
-    const offer = (st.offered && onWalk) ? st.noticeAmt * still * still : 0;
-    // THE TIP, and it takes precedence, though the two can never both be up:
-    // `offer` is gated on `down` or `up` and the roll only happens in `tip`.
-    // The `else if` is there so that the day somebody widens either gate, the
-    // arm holding ten litres over a rail wins over the arm being polite.
-    //
-    // Same ramp `placePail` swung the bucket on, so nothing about the timing of
-    // the pour moved — see `tipUp`.
-    const reach = st.tip > 0
-      ? Math.sin(clamp(st.tip / BUCK.tipFull, 0, 1) * Math.PI * 0.5) : 0;
-    if (reach > 0.002) {
-      cTO.copy(cTU).lerp(cRU, reach).normalize();
-      cTP.copy(cTF).lerp(cRF, reach).normalize();
-    } else if (offer > 0.002) {
-      cTO.copy(cTU).lerp(cOU, offer).normalize();
-      cTP.copy(cTF).lerp(cOF, offer).normalize();
-    } else {
-      cTO.copy(cTU);
-      cTP.copy(cTF);
-    }
-    cA.setFromUnitVectors(cU, cTO);
-    cB.setFromUnitVectors(cG.copy(cF).applyQuaternion(cA), cTP);
-    // Ramped from identity, so at h = 0 both are the identity and `carryQ`
-    // deletes them — the clip gets its arm back the moment she lets go.
+    cA.setFromUnitVectors(cU, cTU);
+    cB.setFromUnitVectors(cG.copy(cF).applyQuaternion(cA), cTF);
     carry.qa.copy(cID).slerp(cA, h * BUCK.armDamp);
     carry.qb.copy(cID).slerp(cB, h * BUCK.armDamp);
     carryQ('armUR', carry.qa);
     carryQ('armLR', carry.qb);
-    gripTurn();
+  }
+
+  /** Remember where each hand's crook is off its wrist, for the next frame. */
+  function gripOffsets() {
+    const b = bones();
+    const g = gOn ? GRIP_B : PALM_B;
+    fig.boneTurn(b.WR, kQ[0]); offR.copy(g).applyQuaternion(kQ[0]);
+    fig.boneTurn(b.WL, kQ[0]); offL.copy(GRIP_L).applyQuaternion(kQ[0]);
+  }
+
+  /**
+   * The water's surface: a damped oscillator on its slope, in the world.
+   *
+   * The surface lies square to the effective gravity the water feels, g less
+   * the bucket's own acceleration — so it leans INTO a push, and it comes back
+   * through level and past it at the bucket's first slosh mode. A bucket
+   * swinging on its bail accelerates exactly along the bail, so the water
+   * stays square to the bucket through a swing (which is why you can swing a
+   * bucket and not spill it), and what makes it slop is a JOLT: a stop, a
+   * turn, a stair.
+   */
+  function slosh(dt, pos, axis, acc) {
+    if (dt <= 0) return;
+    if (!sl.have) {
+      sl.pp.copy(pos); sl.pv.set(0, 0, 0); sl.pa.set(0, 0, 0); sl.have = true; return;
+    }
+    // THE SOLVER'S ACCELERATION WHEN THERE IS ONE, and not the drawn bucket's
+    // differenced twice. MEASURED the other way first: a second difference of
+    // positions taken on frames that are not evenly spaced (and the drawn pail
+    // carries the few millimetres of glue besides) read as 25 to 50 degrees of
+    // slop on a level walk and emptied a third of the bucket on to the made
+    // ground in four seconds. Out of the solver it is the bucket's own.
+    // Off the solver — the pour, the floor — the difference is taken, and
+    // smoothed over about a twentieth of a second.
+    const vx = (pos.x - sl.pp.x) / dt, vy = (pos.y - sl.pp.y) / dt, vz = (pos.z - sl.pp.z) / dt;
+    {
+      const k = 1 - Math.exp(-dt / 0.06);
+      const ax0 = acc ? acc.x : (vx - sl.pv.x) / dt;
+      const ay0 = acc ? acc.y : (vy - sl.pv.y) / dt;
+      const az0 = acc ? acc.z : (vz - sl.pv.z) / dt;
+      sl.pa.x += (ax0 - sl.pa.x) * k;
+      sl.pa.y += (ay0 - sl.pa.y) * k;
+      sl.pa.z += (az0 - sl.pa.z) * k;
+    }
+    const ax = sl.pa.x, ay = sl.pa.y, az = sl.pa.z;
+    sl.pp.copy(pos); sl.pv.set(vx, vy, vz);
+    const gy = Math.max(2, 9.81 + ay);
+    const ex = clamp(ax / gy, -0.8, 0.8), ez = clamp(az / gy, -0.8, 0.8);
+    const depth = Math.max(0.02, (PAIL_IN.full - PAIL_IN.base) * st.fill);
+    const Rs = 0.13, kk = 1.841 / Rs;
+    const w = Math.sqrt(9.81 * kk * Math.tanh(kk * depth));
+    const z = BCARRY.sloshZ;
+    // Sub-stepped: 11.6 rad/s against a 60 Hz frame is stable, against a
+    // 20 Hz one it is not, and the headless page runs at the latter.
+    const n = Math.max(1, Math.ceil(dt * w / 0.15));
+    const hh = dt / n;
+    for (let k = 0; k < n; k++) {
+      sl.vx += (-2 * z * w * sl.vx - w * w * (sl.x - ex)) * hh;
+      sl.vz += (-2 * z * w * sl.vz - w * w * (sl.z - ez)) * hh;
+      sl.x += sl.vx * hh; sl.z += sl.vz * hh;
+    }
+    sl.n.set(sl.x, 1, sl.z).normalize();
+    // And over the lip, if it has leaned past the freeboard.
+    const rel = Math.acos(clamp(sl.n.dot(axis), -1, 1));
+    const free = Math.atan2(Math.max(0, PAIL_IN.lip - (PAIL_IN.base
+      + (PAIL_IN.full - PAIL_IN.base) * st.fill)), PAIL_IN.rLip);
+    if (st.fill > 0.02 && rel > free + BCARRY.spillOver
+      && (st.phase === 'down' || st.phase === 'up')) {
+      const dv = Math.min(st.fill, BCARRY.spillRate * (rel - free - BCARRY.spillOver) * dt);
+      st.fill -= dv;
+      sl.spilt += dv;
+    }
   }
 
   /**
@@ -3416,7 +4786,17 @@ async function buildBucketeer(scene, vik, walkY) {
     // and the palm is the third axis, which is forced once the other two are
     // chosen — `curl` is `fing` cross `palm` by construction, so `palm` is
     // `curl` cross `fing` and there is nothing left to decide.
-    gT.set(0, 0, 1);
+    // (1.540.0) THE PIN AS IT ACTUALLY LIES. It was her own +z, which was where
+    // the pin was when the bucket was a point hung off her fist. It is a body
+    // now and the fist is on the wire, so the knuckle line goes where the wire
+    // is: the bail's own z, out of the solver, into her figure's frame.
+    if (sim.on) {
+      gT.set(0, 0, 1).applyQuaternion(sim.qBail)
+        .applyQuaternion(gTmpQ.copy(mesh.quaternion).invert());
+      if (gT.z < 0) gT.negate();
+    } else {
+      gT.set(0, 0, 1);
+    }
     gF.addScaledVector(gT, -gF.dot(gT));
     if (gF.lengthSq() < 1e-6) return;
     gF.normalize();
@@ -3513,6 +4893,9 @@ async function buildBucketeer(scene, vik, walkY) {
       // overlay's own shape with a little of this in it. Nothing here ever
       // touches the right arm, so the two have no bone in common at all.
       if (s === 'L') flex *= 1 - 0.5 * clamp(fig.state.overW, 0, 1);
+      // And the left closes on the rim while the pour has it there — not the
+      // whole way: a hand under a bucket's base is cupped, not a fist.
+      if (s === 'L' && wL > 0.001) flex += (GRIP.shut * 0.72 - flex) * wL;
       const opp = flex * GRIP.oppose;
       gFlex[s] = flex; gOpp[s] = opp;
       // The bind axes carried into this frame, per the note above. The
@@ -3598,7 +4981,82 @@ async function buildBucketeer(scene, vik, walkY) {
    * because the bucket is not a child of her mesh: it has to be able to stand
    * on a bathroom floor while she is on the porch.
    */
-  function placePail() {
+  let dtNow = 0;
+  function placePail(dt = 0) {
+    dtNow = dt;
+    if (sim.on) placeSim();
+    else if (pr.on) placePour();
+    else placeFloor(dt);
+    placeDisc(dt);
+  }
+
+  /**
+   * Where the solver has it — shifted by however far the rig's fist ended up
+   * from the solver's hand, so the wire is in the crook and not beside it.
+   *
+   * The two differ by millimetres, not centimetres: the arm is solved to the
+   * solver's hand this frame (`armIK`), so what is left is the wrist's own
+   * turn on to the wire, which the IK aimed with last frame's. A glue and not
+   * a lie — the SWING is all the solver's, and what is shifted is where it
+   * hangs from, by the width of a finger.
+   */
+  function placeSim() {
+    const b = bones();
+    crookAt(b.WR, gOn ? GRIP_B : PALM_B, vPalm);
+    kV[1].copy(vPalm).sub(sim.hand);
+    sim.gap = kV[1].length();
+    kanta.position.copy(sim.pin).add(kV[1]);
+    kanta.quaternion.copy(sim.qBail).multiply(qFix);
+    pail.quaternion.copy(qFixI).multiply(kQ[0].copy(sim.qBail).invert().multiply(sim.qBuck))
+      .multiply(qFix);
+    bail.rotation.set(0, 0, 0);
+    if (blend.t > 0) blendFrom(dtNow);
+  }
+  /** The drawn bucket eased in from where it was last drawn — see `blend`. */
+  function blendFrom(dt) {
+    const u = bckEase(1 - blend.t / blend.dur);
+    kanta.position.lerpVectors(blend.pos, kanta.position, u);
+    kQ[0].copy(kanta.quaternion); kQ[1].copy(pail.quaternion);
+    kanta.quaternion.copy(blend.q).slerp(kQ[0], u);
+    pail.quaternion.copy(blend.qp).slerp(kQ[1], u);
+    blend.t = Math.max(0, blend.t - dt);
+  }
+
+  /** In both her hands: where the pour has it, exactly. */
+  function placePour() {
+    const b = bones();
+    crookAt(b.WR, gOn ? GRIP_B : PALM_B, vPalm);
+    kanta.position.copy(pr.pin);
+    kanta.quaternion.copy(pr.qBail).multiply(qFix);
+    pail.quaternion.copy(qFixI).multiply(kQ[0].copy(pr.qBail).invert().multiply(pr.qBuck))
+      .multiply(qFix);
+    bail.rotation.set(0, 0, 0);
+  }
+
+  /**
+   * The water in it: level in the world — or rather square to the gravity it
+   * feels, which is `slosh` — and as wide as the pail is at that height. The
+   * disc is the pail's child, so it is turned by the pail's world attitude
+   * taken back off, and then by the surface's own.
+   */
+  function placeDisc(dt) {
+    kQ[0].copy(kanta.quaternion).multiply(pail.quaternion);
+    const axis = kV[2].set(0, 1, 0).applyQuaternion(kQ[0]);
+    const com = kV[3].copy(axis).multiplyScalar(-0.10).add(kanta.position);
+    slosh(dt, com, axis, sim.on ? sim.aBuck : null);
+    const rel = Math.acos(clamp(sl.n.dot(axis), -1, 1));
+    const w = waterDisc(st.fill, pr.on ? Math.max(rel, 0) : rel);
+    water.visible = w.r > 0.002;
+    if (water.visible) {
+      water.position.set(0, w.y, 0);
+      kQ[1].setFromUnitVectors(qUp, sl.n);
+      water.quaternion.copy(kQ[0]).invert().multiply(kQ[1]);
+      water.scale.set(w.r, 1, w.r);
+    }
+  }
+
+  /** On the floor, or between the floor and her fist: the placement as it was. */
+  function placeFloor(dt) {
     if (handB === null) handB = fig.boneIndex('handR');
     const standYaw = restAt(vRest);
     if (st.held > 0 && handB >= 0) {
@@ -3672,7 +5130,7 @@ async function buildBucketeer(scene, vik, walkY) {
     while (dy < -Math.PI) dy += Math.PI * 2;
     kanta.quaternion.setFromAxisAngle(qUp,
       standYaw + dy * st.held - Math.PI * 0.5);
-    pail.rotation.x = st.tip;
+    pail.rotation.set(st.tip, 0, 0);
     // And the handle laid over on its side once it is standing on something,
     // because a bail left bolt upright over an idle bucket is a bucket
     // somebody is still holding.
@@ -3684,62 +5142,205 @@ async function buildBucketeer(scene, vik, walkY) {
     // still flat on its side and nothing holding it. A fist closes on a bail
     // and the bail comes up; the rest of the beat is the bucket following it.
     bail.rotation.x = 1.42 * (1 - bckEase(st.held / 0.12));
-
-    // What is in it, and IT STANDS LEVEL. `waterDisc` is where it is and how
-    // wide, and the long note over it is the argument; here is only the one
-    // line that makes it level. The disc is a child of the pail and the pail is
-    // rolled by `tip` about its own local x, and the group over both carries
-    // nothing but a yaw about world up — so an equal and opposite roll on the
-    // disc puts its plane horizontal in the world, exactly, at any angle, for
-    // one assignment.
-    const w = waterDisc(st.fill, st.tip);
-    water.visible = w.r > 0.002;
-    if (water.visible) {
-      water.position.y = w.y;
-      water.rotation.x = -st.tip;
-      water.scale.set(w.r, 1, w.r);
-    }
+    // And out of the solver's hands into these, over a third of a second: the
+    // bucket was swinging when she got to the tap, and a swing does not stop
+    // in a frame.
+    if (blend.t > 0) blendFrom(dt);
   }
 
   /** The stream out of it, and the puddle it makes on the concrete. */
-  function placeWater(dt) {
-    // On exactly while something is going over the lip, and no wider than what
-    // is going over it — `st.pour` is written in `stepLoop` and its note over
-    // `jetRef` is the argument. It replaces `tip > 0.45 && fill > 0.015`, which
-    // was a switch: the sheet appeared 0.685 m tall on one frame and vanished
-    // on another, 0.33 s later, having missed most of the water.
-    const pouring = st.pour > 0.004;
-    jet.visible = pouring;
-    if (pouring) {
-      // Off the lip that has actually gone down, which is the pail's own +z rim
-      // rolled by the tip and then by her yaw. The stream stands on the ground
-      // and reaches up to wherever that lip is, the honest way round: gravity
-      // decides where water goes, and if the lip is not over the porch then
-      // what you see is a stream leaning off it, which is a thing to fix rather
-      // than a thing to hide.
-      const lipY = PAIL.h - PAIL.ear;
-      const c = Math.cos(st.tip), s = Math.sin(st.tip);
-      const ly = lipY * c - PAIL.rRim * s;      // R_x(tip) on (0, lipY, +rRim)
-      const lz = lipY * s + PAIL.rRim * c;
-      // The group's local +z in the world, from its yaw of `st.yaw − π/2`.
-      const zx = -Math.cos(st.yaw), zz = Math.sin(st.yaw);
-      const lx = kanta.position.x + zx * lz;
-      const lzw = kanta.position.z + zz * lz;
-      const ground = walkY(lx, lzw, st.y);
-      jet.position.set(lx, ground, lzw);
-      // Flattened across the lip and turned to it: the sheet is as wide as the
-      // rim it is coming over and a few centimetres thick, which is the axis
-      // the 0.34 is on. Round, it is a downpipe.
-      jet.scale.set(st.pour, Math.max(0.02, kanta.position.y + ly - ground),
-        0.34 * st.pour);
-      jet.rotation.y = st.yaw + Math.PI * 0.5;
-      // WHERE it landed, and only where. How MUCH is `st.poolT`, and that is
-      // written in the `tip` case by the water actually leaving the bucket —
-      // this line used to say `st.poolT = 1` as well, which is why a 0.96 m
-      // lens appeared on dry paving in one frame however gently the stream
-      // started.
-      st.poolAt = [lx, ground, lzw];
+  // A hash for the droplets, which is not `rng()` (RULE 4 — the shared stream
+  // is the beach's) and does not need to be anything but cheap and even.
+  let dSeed = 7;
+  const rnd = () => (dSeed = (dSeed * 16807) % 2147483647) / 2147483647;
+  // Droplets owed, carried between frames so the count follows the water and
+  // not the frame rate — `dropSplashes.emit`'s rule in 58-waterfx.js.
+  let owedBreak = 0, owedDrip = 0;
+  // How long the pail stays wet after a pour, s — and drips while it is.
+  let wetPail = 0;
+  const ja = new THREE.Vector3(), jb = new THREE.Vector3(), jp = new THREE.Vector3();
+
+  /**
+   * THE SHEET: the water that has left the bucket, as parcels in the air.
+   *
+   * Each drawn frame of the throw that lost water puts a parcel into the air
+   * holding what it lost — at the lip on the side the water is being pushed
+   * out of (the rim point furthest along the effective gravity it feels), with
+   * the velocity the water had (`ts.lvx`, `lvy`: the pail's a slop ago, which
+   * is what water that has come free of a decelerating pail is still doing),
+   * plus a little out of the lip along that gravity. Then each is a ballistic
+   * point until it reaches the floor under it, where it splashes as much as it
+   * weighs and wets the paving where it came down.
+   *
+   * The sheet you SEE is the ribbon through them, oldest to newest: the shape
+   * of a throw is the shape of the locus of what it threw, so the arc comes
+   * out of the swing without being drawn. How wide it opens is how fast the
+   * pail was turning when each parcel left it (`spread`, ω × the mouth's
+   * radius) — a hard flick fans, a slow roll pours.
+   */
+  const PARCEL_N = JET_N + 1;
+  const parcels = [];
+  for (let i = 0; i < PARCEL_N; i++) {
+    parcels.push({ on: false, p: new THREE.Vector3(), v: new THREE.Vector3(),
+      ac: new THREE.Vector3(), age: 0, m: 0, w: 0, spread: 0, floor: 0 });
+  }
+  let fillSeen = -1;
+  const thrown = { v: [0, 0, 0], m: 0 };
+  const landing = { x: 0, y: 0, z: 0, m: 0 };
+  function sheetEmit() {
+    if (!pr.on) { fillSeen = st.fill; return; }
+    const lost = fillSeen >= 0 ? fillSeen - st.fill : 0;
+    fillSeen = st.fill;
+    if (lost < 0.002) return;
+    // A free slot, or the oldest.
+    let q = parcels.find((x) => !x.on);
+    if (!q) q = parcels.reduce((a, x) => (x.age > a.age ? x : a));
+    const qY = mesh.quaternion;
+    kQ[0].copy(kanta.quaternion).multiply(pail.quaternion);
+    // Effective gravity the water feels, world; the lip point furthest along it.
+    const g = kV[0].set(ts.gx, ts.gy, 0).applyQuaternion(qY);
+    const gl = g.length() || 1;
+    g.divideScalar(gl);
+    const bx = kV[1].set(1, 0, 0).applyQuaternion(kQ[0]).dot(g);
+    const bz = kV[1].set(0, 0, 1).applyQuaternion(kQ[0]).dot(g);
+    const phi = Math.atan2(bz, bx);
+    q.p.set(Math.cos(phi) * PAIL_IN.rLip, PAIL.h - PAIL.ear, Math.sin(phi) * PAIL_IN.rLip)
+      .applyQuaternion(kQ[0]).add(kanta.position);
+    q.v.set(ts.lvx, ts.lvy, 0).applyQuaternion(qY).addScaledVector(g, 0.45);
+    q.ac.set(1, 0, 0).applyQuaternion(kQ[0]);
+    q.m = lost; q.age = 0;
+    q.w = 0.09 + 0.20 * Math.min(0.2, lost);
+    q.spread = 0.12 + Math.abs(ts.v) * PAIL_IN.rLip * 0.30;
+    q.floor = walkY(q.p.x + q.v.x * 0.4, q.p.z + q.v.z * 0.4, st.y);
+    q.on = true;
+    // For `stats().thrown`: what the last parcel left with, in her frame.
+    kV[2].copy(q.v).applyQuaternion(kQ[1].copy(qY).invert());
+    thrown.v[0] = +kV[2].x.toFixed(2); thrown.v[1] = +kV[2].y.toFixed(2);
+    thrown.v[2] = +kV[2].z.toFixed(2); thrown.m += lost;
+  }
+  function sheetFly(dt) {
+    let n = 0;
+    for (const q of parcels) {
+      if (!q.on) continue;
+      q.age += dt;
+      q.v.y -= 9.81 * dt;
+      q.p.addScaledVector(q.v, dt);
+      q.w += q.spread * dt;
+      // Drops thrown off its edges as it thins — more the older and wider.
+      if (q.age > 0.06) {
+        owedBreak += q.m * dt * 1500;
+        while (owedBreak >= 1) {
+          owedBreak -= 1;
+          const e = (rnd() - 0.5) * q.w;
+          drops.spawn(q.p.x + q.ac.x * e, q.p.y + q.ac.y * e, q.p.z + q.ac.z * e,
+            q.v.x + (rnd() - 0.5) * 0.5, q.v.y + (rnd() - 0.5) * 0.4, q.v.z + (rnd() - 0.5) * 0.5,
+            0.014 + 0.026 * rnd(), 0.5, q.floor - 0.005, 0.3);
+        }
+      }
+      if (q.p.y <= q.floor + 0.01 || q.age > 2.5) {
+        // Down: a crown of drops as heavy as it was, thrown up and out the way
+        // it was going, and the wet patch moved towards where it landed.
+        const k = Math.min(90, Math.round(q.m * 900));
+        const vh = Math.hypot(q.v.x, q.v.z);
+        for (let i = 0; i < k; i++) {
+          const a = rnd() * Math.PI * 2, r = rnd();
+          const sp = (0.3 + 1.4 * r) * (0.6 + 0.25 * vh);
+          const e = (rnd() - 0.5) * q.w;
+          drops.spawn(q.p.x + q.ac.x * e + Math.cos(a) * 0.04, q.floor + 0.01,
+            q.p.z + q.ac.z * e + Math.sin(a) * 0.04,
+            Math.cos(a) * sp + q.v.x * 0.30, 0.6 + 2.2 * rnd() * (1 - 0.5 * r),
+            Math.sin(a) * sp + q.v.z * 0.30,
+            0.022 + 0.04 * rnd(), 0.35 + 0.5 * rnd(), q.floor - 0.005, 0.8);
+        }
+        const m = landing.m + q.m;
+        landing.x = (landing.x * landing.m + q.p.x * q.m) / m;
+        landing.z = (landing.z * landing.m + q.p.z * q.m) / m;
+        landing.y = q.floor; landing.m = m;
+        st.poolAt = [landing.x, landing.y, landing.z];
+        q.on = false;
+        continue;
+      }
+      n++;
     }
+    return n;
+  }
+  /** The ribbon through the parcels in the air, oldest first. */
+  const sheetList = [];
+  function sheetDraw() {
+    sheetList.length = 0;
+    for (const q of parcels) if (q.on) sheetList.push(q);
+    sheetList.sort((a, b) => b.age - a.age);
+    const k = sheetList.length;
+    jet.visible = k >= 2;
+    if (!jet.visible) return;
+    const o = sheetList[k - 1].p;
+    jet.position.copy(o);
+    const pos = jetGeo.getAttribute('position').array;
+    const nrm = jetGeo.getAttribute('normal').array;
+    const fade = jetGeo.getAttribute('aFade').array;
+    for (let i = 0; i < k; i++) {
+      const q = sheetList[i];
+      const vt = ja.copy(q.v).normalize();
+      const ac = jb.copy(q.ac).addScaledVector(vt, -q.ac.dot(vt)).normalize();
+      const th = jp.crossVectors(vt, ac);
+      // Thin, and gone into drops by half a second: a sheet of water in the
+      // air is a sheet for a moment and spray after that, and a ribbon kept
+      // opaque for its whole flight read as a white board.
+      const hw = q.w * 0.5, ht = 0.016 + 0.30 * hw;
+      const f = clamp(q.m * 10, 0, 1) * clamp(1 - q.age / 0.55, 0, 1);
+      for (let j = 0; j < JET_R; j++) {
+        const an = (j / JET_R) * Math.PI * 2, ca = Math.cos(an), sa = Math.sin(an);
+        const kk = i * JET_R + j;
+        pos[kk * 3] = q.p.x - o.x + ac.x * ca * hw + th.x * sa * ht;
+        pos[kk * 3 + 1] = q.p.y - o.y + ac.y * ca * hw + th.y * sa * ht;
+        pos[kk * 3 + 2] = q.p.z - o.z + ac.z * ca * hw + th.z * sa * ht;
+        const nx = ac.x * ca / hw + th.x * sa / ht, ny = ac.y * ca / hw + th.y * sa / ht;
+        const nz = ac.z * ca / hw + th.z * sa / ht, nl = Math.hypot(nx, ny, nz) || 1;
+        nrm[kk * 3] = nx / nl; nrm[kk * 3 + 1] = ny / nl; nrm[kk * 3 + 2] = nz / nl;
+        fade[kk] = f;
+      }
+    }
+    jetGeo.setDrawRange(0, (k - 1) * JET_R * 6);
+    jetGeo.getAttribute('position').needsUpdate = true;
+    jetGeo.getAttribute('normal').needsUpdate = true;
+    jetGeo.getAttribute('aFade').needsUpdate = true;
+    st.jetH = Math.max(0, sheetList[0].p.y - sheetList[0].floor);
+  }
+
+  /**
+   * A wet pail drips for half a minute after it has been emptied, off the
+   * lowest point of its base, faster at first — and a bucket slopped over the
+   * lip on the stairs drips off it. Both fall to whatever floor is under them.
+   */
+  function drip(dt) {
+    if (st.held < 0.5) return;
+    let rate = wetPail > 0 ? 2.6 * (wetPail / 30) * (wetPail / 30) : 0;
+    if (sl.spilt > 1e-4) { rate += sl.spilt * 900; sl.spilt = 0; }
+    if (rate <= 0) return;
+    owedDrip += rate * dt;
+    if (owedDrip < 1) return;
+    owedDrip -= 1;
+    kQ[0].copy(kanta.quaternion).multiply(pail.quaternion);
+    const bx = kV[0].set(1, 0, 0).applyQuaternion(kQ[0]).y;
+    const bz = kV[0].set(0, 0, 1).applyQuaternion(kQ[0]).y;
+    const phi = Math.atan2(-bz, -bx);
+    const p = kV[1].set(Math.cos(phi) * PAIL.rBase, -PAIL.ear, Math.sin(phi) * PAIL.rBase)
+      .applyQuaternion(kQ[0]).add(kanta.position);
+    const floor = walkY(p.x, p.z, st.y);
+    drops.spawn(p.x, p.y - 0.005, p.z, 0, -0.2, 0, 0.010 + 0.006 * rnd(), 1.6, floor, 0.2);
+  }
+
+  function placeWater(dt) {
+    drops.update(dt);
+    // Whether water is leaving the pail this frame — `st.pour`, written by the
+    // throw in `stepLoop`. The sheet is what has already left it.
+    const pouring = st.pour > 0.004;
+    sheetEmit();
+    sheetFly(dt);
+    sheetDraw();
+    if (st.phase === 'tip' && st.fill < 0.02) wetPail = 30;
+    if (wetPail > 0) wetPail = Math.max(0, wetPail - dt);
+    drip(dt);
     // And the wet patch, which spreads while she is pouring and dries while
     // she is walking back up. Fifty seconds of concrete in August is about
     // right, and it means the porch is never quite dry — which is the point of
@@ -4149,17 +5750,36 @@ async function buildBucketeer(scene, vik, walkY) {
     // `poseCarry` only because both have to be before `fig.update`; they touch
     // different bones and cannot disagree.
     posePort(dt);
-    // The weight, immediately before the update and nowhere else — see the
-    // note over `poseCarry`. She already walks the loaded legs slower than the
-    // empty ones (0.44 m/s down the flight against 0.78 back up); this is the
-    // half of carrying ten litres that is above the waist.
-    poseCarry();
+    // The weight, in the order the block over `bones` sets out: the trunk off
+    // last frame's load, the clip and the trunk folded, the solver stepped
+    // with this frame's shoulder, the arms to where it has the hands, folded
+    // again, the fingers, and the bucket drawn where the solver has it. She
+    // already walks the loaded legs slower than the empty ones (0.44 m/s down
+    // the flight against 0.78 back up); this is the half of carrying ten
+    // litres that is above the waist, and now it is caused.
+    const t0 = performance.now();
+    leanTick(dt);
+    poseTrunk();
     fig.update(dt);
-    if (face) fig.faceTick(dt);
+    if (face) {
+      fig.faceTick(dt);
+      if (V2) v5Blink(fig.v5.eye, dt);
+    }
     mesh.updateMatrixWorld();
-    placePail();
+    const t1 = performance.now();
+    bucketTick(dt);
+    poseArms();
+    fig.update(0);
     poseGrip();
+    gripOffsets();
+    placePail(dt);
     placeWater(dt);
+    // What she costs, a running mean in milliseconds, CPU: all of the above
+    // (`msAll`), and the part that is new — the solver, both arm solves, the
+    // second fold and the water (`msCarry`).
+    const t2 = performance.now();
+    st.msAll += (t2 - t0 - st.msAll) * 0.05;
+    st.msCarry += (t2 - t1 - st.msCarry) * 0.05;
   }
 
   /**
@@ -4382,6 +6002,9 @@ async function buildBucketeer(scene, vik, walkY) {
    * read it, do not keep it.
    */
   const solidAt = { on: false, x: 0, y: 0, z: 0 };
+  // Debug: she does not notice you. For photographing the carry from a few
+  // metres off without her stopping to hold the bucket out at the lens.
+  let quiet = false;
   function buckSolid() {
     solidAt.on = mesh.visible && inFlat(st.x, st.y, st.z) <= 0.2;
     solidAt.x = st.x; solidAt.y = st.y; solidAt.z = st.z;
@@ -4521,7 +6144,7 @@ async function buildBucketeer(scene, vik, walkY) {
       lookAt = (dir.x * ex + dir.z * ez) / el > BUCK.noticeDot;
     }
     st.looked = lookAt;
-    const wants = near < BUCK.noticeM && lookAt;
+    const wants = !quiet && near < BUCK.noticeM && lookAt;
     if (wants && st.noticeCool <= 0) {
       st.notice = BUCK.noticeHold;
       st.noticeCool = BUCK.noticeGap;
@@ -4855,8 +6478,31 @@ async function buildBucketeer(scene, vik, walkY) {
       pourWarm: !!st.pourWarm,
       says: audio ? audio.mutter(0, { probe: true }) : -1,
       said: st.said.slice(),
-      jetOn: jet.visible, jetH: +jet.scale.y.toFixed(2),
-      jetAt: jet.position.toArray().map((n) => +n.toFixed(2)),
+      jetOn: jet.visible, jetH: +st.jetH.toFixed(2),
+      jetAt: st.poolAt ? st.poolAt.map((n) => +n.toFixed(2)) : null,
+      // (1.540.0) The bucket as a body: whether the solver has it, what it
+      // and the rest of her carry cost (ms, CPU, running means), how far the
+      // drawn fist is from the solver's hand (mm), the trunk's answer (rad),
+      // the water's lean off level (deg), how much of each hand the pour has,
+      // the droplets in the air, and where the pin is in HER frame — forward,
+      // up off her feet, out to her right.
+      sim: sim.on, simMs: +sim.ms.toFixed(4), msAll: +st.msAll.toFixed(3),
+      msCarry: +st.msCarry.toFixed(3), glueMm: +(sim.gap * 1000).toFixed(1),
+      lean: +ln.r.toFixed(3), pitch: +ln.p.toFixed(3), shrug: +ln.sh.toFixed(2),
+      slosh: +(Math.acos(clamp(sl.n.y, -1, 1)) * 180 / Math.PI).toFixed(2),
+      hands: [+wR.toFixed(2), +wL.toFixed(2)], drops: drops.live(),
+      thrown: { v: thrown.v.slice(), m: +thrown.m.toFixed(2),
+        land: landing.m > 0 ? (() => {
+          const dx = landing.x - st.x, dz = landing.z - st.z;
+          return [+(Math.cos(st.yaw) * dx - Math.sin(st.yaw) * dz).toFixed(2),
+            +(Math.sin(st.yaw) * dx + Math.cos(st.yaw) * dz).toFixed(2)];
+        })() : null },
+      pin: (() => {
+        const dx = kanta.position.x - st.x, dz = kanta.position.z - st.z;
+        return [+(Math.cos(st.yaw) * dx - Math.sin(st.yaw) * dz).toFixed(3),
+          +(kanta.position.y - st.y).toFixed(3),
+          +(Math.sin(st.yaw) * dx + Math.cos(st.yaw) * dz).toFixed(3)];
+      })(),
       poolOn: pool.visible,
       poolAt: pool.position.toArray().map((n) => +n.toFixed(2)),
     }),
@@ -4954,14 +6600,14 @@ async function buildBucketeer(scene, vik, walkY) {
       // a lean that had to be waited for would put half a lean in every frame
       // a probe took of `go`.
       st.load = st.held * st.fill;
-      poseCarry();
-      fig.update(0);
       mesh.position.set(st.x, st.y, st.z);
       mesh.rotation.y = st.yaw;
       mesh.updateMatrixWorld();
-      placePail();
-      poseGrip();
-      placeWater(0);
+      // And the bucket put back in her hand at rest — the solver re-placed
+      // from where she now stands, the water still, nothing left mid-swing
+      // from wherever she was before the jump.
+      simReset();
+      drawFrame(0, false);
       return this.stats();
     },
     /**
@@ -4978,12 +6624,11 @@ async function buildBucketeer(scene, vik, walkY) {
       }
       mesh.position.set(st.x, st.y, st.z);
       mesh.rotation.y = st.yaw;
-      poseCarry();
-      fig.update(0);
       mesh.updateMatrixWorld();
-      placePail();
-      poseGrip();
-      placeWater(0);
+      // `tick` does not draw, so the solver did not run: it is put back at
+      // rest where she has got to. Use `trace` to watch it swing.
+      simReset();
+      drawFrame(0, false);
       return this.stats();
     },
     /**
@@ -5020,6 +6665,12 @@ async function buildBucketeer(scene, vik, walkY) {
      */
     trace(secs, dtStep = 1 / 60, phase = null, leg = null) {
       if (phase) this.go(phase, leg);
+      // A held figure still traces: `hold` is "do not let the LIVE loop move
+      // her", and a trace is a probe drawing every frame on purpose. Held
+      // through it, every frame had no time in it — the solver froze and the
+      // water never left the lip. Put back afterwards.
+      const held = st.hold;
+      st.hold = false;
       const rows = [];
       for (let t = 0; t < secs; t += dtStep) {
         stepLoop(dtStep);
@@ -5072,10 +6723,31 @@ async function buildBucketeer(scene, vik, walkY) {
             fig.boneAt(trFR, trV); mesh.localToWorld(trV);
             return [lx, ly, lz,
               +trV.x.toFixed(5), +trV.y.toFixed(5), +trV.z.toFixed(5)];
-          })()]);
+          })(),
+          // (1.540.0) The water's lean off level, degrees, and her trunk's.
+          +(Math.acos(clamp(sl.n.y, -1, 1)) * 180 / Math.PI).toFixed(2),
+          +ln.r.toFixed(4), +sl.pa.x.toFixed(2), +sl.pa.y.toFixed(2), +sl.pa.z.toFixed(2)]);
       }
+      st.hold = held;
       return rows;
     },
+    /**
+     * Debug: change `BCARRY` from the console and put it into the solver as
+     * it stands — the muscle, the fist and the pin. The numbers in the table
+     * were settled this way, against `trace`.
+     */
+    tune: (o = {}) => {
+      Object.assign(BCARRY, o);
+      if (sim.rig) {
+        const R = sim.rig, n = R.net;
+        n.setAngleK(R.aSh, BCARRY.kArm, BCARRY.kdArm);
+        n.setAngleK(R.aFist, BCARRY.fistK, BCARRY.fistKD);
+        n.setAngleK(R.aPin, 0, BCARRY.pinKD);
+      }
+      return { ...BCARRY };
+    },
+    /** Debug: she stops noticing whoever is looking at her (see `quiet`). */
+    quiet: (on = true) => { quiet = !!on; st.notice = 0; st.noticeAmt = 0; return quiet; },
     /** Stop the loop where it stands, or let it run again. */
     hold: (on) => { st.hold = on == null ? !st.hold : !!on; return st.hold; },
     /**
@@ -5315,17 +6987,26 @@ async function buildBucketeer(scene, vik, walkY) {
       }
       st.phase = 'dwell'; st.clock = 0; st.vel = 0;
       st.dwellT = spot.hold[1];
-      poseCarry();
-      fig.update(0);
       mesh.position.set(st.x, st.y, st.z);
       mesh.rotation.y = st.yaw;
       mesh.updateMatrixWorld();
-      placePail();
-      placeWater(0);
+      simReset();
+      drawFrame(0, false);
       return this.stats();
     },
     /** Where she is standing, in world metres, for a camera to be aimed at. */
     where: () => [st.x, st.y, st.z],
+    /**
+     * Debug: the carry's own numbers, world — the solver's hand and pin, her
+     * shoulder, the rig's fist and the IK's target — and the solver's arm.
+     */
+    carry: () => {
+      const r = (v) => v.toArray().map((n) => +n.toFixed(3));
+      return { on: sim.on, hand: r(sim.hand), pin: r(sim.pin), S: r(shW), crook: r(vPalm),
+        tgt: r(tgtR), tgtL: r(tgtL), w: [wR, wL], arm: sim.arm || null, at: [st.x, st.y, st.z].map((n) => +n.toFixed(3)),
+        yaw: +st.yaw.toFixed(3), ang: sim.rig ? sim.rig.net.angleNow(sim.rig.aSh).map((n) => +n.toFixed(3)) : null,
+        gap: sim.rig ? +(sim.rig.net.measure().maxStretch * 1000).toFixed(2) : null };
+    },
     /**
      * The wander's graph, as the house sees it and as the world does, with the
      * floor under each node and who each one is next to. Same job `ways` does

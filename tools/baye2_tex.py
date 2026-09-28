@@ -93,7 +93,22 @@ FIGURES = {
                'paint': {'pubic': (70.0, 52.0, 37.0),
                          'areola': (112.0, 68.0, 59.0),
                          'nipple': (100.0, 58.0, 51.0)}},
+    # The Bucketeer. NO `skin` here, and that is the point rather than an
+    # omission: she is Baye v2.0's body with Baye v2.0's UVs, so she draws with
+    # `baye2_skin` — the same map, pubic hair, areolae and all, painted once —
+    # and a second copy of it in the page would be a copy that can drift. What
+    # is hers is the bun and the suit. The suit is not on the rack (the
+    # bathers fit it themselves), so it comes straight out of the pack, see
+    # `SUIT_PX`.
+    'bucketeer2': {'body': 'build/mh_base.obj', 'pubic': False,
+                   'tex': {'hair': 'rehmanpolanski_hair_bun_brown',
+                           'suit': 'mindfront_f_one-piece_swimsuit_01'}},
 }
+# The suit's map, which ships at 2048 square. It is one flat colour with a
+# black binding round every edge and is dyed at runtime off its luminance, so
+# what the map has to carry is the binding's width — 18 px at 2048, 4.5 at
+# 512 — and nothing finer.
+SUIT_PX = 512
 
 # (height, half-width) per row, in game metres, already through v1.0's 0.686
 # waist-to-painted factor. 22 mm apart against a 16 mm vertical radius, so
@@ -411,13 +426,21 @@ def main():
     for kind, want in spec['tex'].items():
         # `hair2` is a second hairstyle, and the rack files hairstyles as `hair`.
         rack = 'hair' if kind == 'hair2' else kind
-        src = next((p for p in sorted(WORK.glob('%s__%s.*' % (rack, want)))
-                    if p.suffix in ('.png', '.jpg')), None)
+        if kind == 'suit':
+            src = next((p for p in sorted((ROOT / 'build' / 'mh_assets').rglob(want + '/*.png'))
+                        if not p.stem.upper().endswith(('_NRM', '_SPEC'))), None)
+        else:
+            src = next((p for p in sorted(WORK.glob('%s__%s.*' % (rack, want)))
+                        if p.suffix in ('.png', '.jpg')), None)
         if src is None:
             sys.exit('[baye2tex] no texture for %s — run tools/wardrobe/make.py' % want)
         for stale in OUT.glob('%s_%s.*' % (name, kind)):
             stale.unlink()
-        if kind != 'skin' or not spec['pubic']:
+        if kind == 'suit':
+            dst = OUT / ('%s_suit.png' % name)
+            im = Image.open(src).convert('RGBA').resize((SUIT_PX, SUIT_PX), Image.LANCZOS)
+            im.save(dst, optimize=True)
+        elif kind != 'skin' or not spec['pubic']:
             dst = OUT / ('%s_%s%s' % (name, kind, src.suffix))
             shutil.copy(src, dst)
         else:

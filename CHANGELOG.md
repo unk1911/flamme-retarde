@@ -8,6 +8,91 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.542.0] — 2026-09-28
+
+### The Bucketeer is Baye v2.0, the bucket has weight, and she throws the water
+
+Misha: *"we forgot to upgrade the bucketeer baye to baye v2.0 ... she should
+wear a full swimsuit and have blonde hair in a bun, also can u think about how
+we can improve that whole sequence of her pouring out the water, we never really
+solved this properly ... maybe some of these ragdoll concepts and the AVBD
+concepts, can be applied to the physics of her carrying that water"*. And then,
+on the first cut: a **classic red** one-piece, the pour a **brisk swing-toss**,
+and the full bucket **clearly heavy**.
+
+**She is Baye v2.0.** `bucketeer2.fr3d.gz` is built by `tools/blender/baye2.py`
+the way `baye2` is: the same MakeHuman base, UVs, 30-bone rig, face, brows and
+lashes. At runtime she uses `baye2_skin` itself, so her skin is the same map as
+Baye's rather than a copy. Two things are hers. First, a **blonde bun**
+(`rehmanpolanski_hair_bun_brown`, CC0), dyed blonde from its own luminance the
+way Chloe's hair is dyed, with its red velvet tie kept red. Second, a
+**modelled lifeguard-red one-piece** (`mindfront_f_one-piece_swimsuit_01`,
+CC-BY 4.0, Mindfront), fitted through its `.mhclo` with straps, buckles, a scoop
+back and black binding. The body is removed from under the suit (the asset's
+own `delete_verts`), so no hip pokes through it in an arabesque. The suit is
+registered with the shadow pass separately, so her shadow has no hole. The blob
+bakes only the three clips she plays (`idle`, `walk`, `ballet`). It is 1.52 MB,
+plus 96 KB of hair and 55 KB of suit texture. The old painted figure is kept
+as the fallback for a build without the blob.
+
+**Why the carry never felt right.** Twenty-seven commits each fixed a real,
+measured fault, and every one was a fault in an animation. The bucket was
+never an object. It was a point computed from her fist every frame, so it
+moved exactly with her hand, at exactly the same instant: it had no mass. The
+lean, the shrug and the damped arm swing were all constants multiplied by a
+flag. None of them was caused by the load, so none of them ever responded to
+anything.
+
+**Now the bucket has mass.** A four-body `avbdNet` (the hammock's solver) is
+hung the way the real thing is:
+
+- her **shoulder** (a 10-tonne body driven from the rig, sub-step by sub-step);
+- an **arm** on a ragdoll-style angle drive (a muscle: 250 N·m/rad, half
+  critical, the shoulder's limits);
+- the **bail** in a hard socket at the fist, free about the knuckle line and
+  held to 0.12 rad sideways;
+- the **bucket** on two hard sockets at the lugs, which makes a hinge.
+
+It lags when she sets off, swings on when she stops, sloshes at the turn at the
+foot of the flight, and swings freely when empty. Her arm is solved by
+two-bone IK to where the solver has her hand. The **lean, dropped shoulder and
+counterweight arm come from the moment the load puts about her hips**, through
+a damped spring (7 rad/s). Full and hanging still, that is 0.29 rad (17°,
+*"an obvious lean"*). Empty, it is 0.03. The carrying arm is 5° short of
+straight. The paces are further apart: down the flight 0.44 → 0.34 m/s and
+careful (`clipMin` 0.24 so the feet do not slide), back up 0.78 → 0.92, and
+the flat 0.76 → 0.68 down and 1.16 → 1.28 up.
+
+**The water is a surface.** It sloshes at the bucket's first mode (1.84 Hz),
+driven by the solver's own acceleration. A swing leaves it square to the
+bucket, and a jolt makes it slop. Past the freeboard it spills and drips off
+the lip, about 2–6% at the pivot at the foot of the stairs.
+
+**The pour is a swing-toss, and the release is physical.** She swings the full
+bucket back one-handed, catches the base with her left hand as it comes past
+her hip, and heaves it forward and up. Her trunk twists into the throw and her
+free arm counter-swings. The water is not told when to leave. At 240 Hz it
+feels gravity minus the bucket's acceleration, `spillLevel` says what the lip
+can hold at that lean, and whatever cannot be held leaves. While she sweeps the
+bucket round, her wrists carry it at the lean that cancels the swing, so the
+water stays in. At the top she rolls it over and the water goes. Each frame's
+water becomes a parcel moving at the velocity the water had (the pail's, lagged
+by 0.14 s). The sheet is the ribbon through the parcels, and it opens by how
+fast the pail was turning. It breaks into the game's spray droplets and splashes
+about a metre and a bit ahead. Measured: 80% leaves in 0.2 s at 2.5–2.7 m/s,
+forward and up. Then she shakes out the last drops, and the empty bucket goes
+back into the solver moving, swinging off her fist. The pour cut's lean-in and
+her line now come from `TOSS.dry` and `TOSS.mid`, the only change in
+90-app.js.
+
+**Cost:** 0.22 ms a frame of CPU for all of her (clip, trunk, solver, both
+IKs, grip, water), 0.18 ms of it new. The solver is 0.12 ms for two 120 Hz
+steps. Nothing of hers shows in a 4 s profile's top eighteen.
+
+Also: `__fr.buck.raw()` gains `carry()`, `tune()` and `quiet()`. `trace` rows
+carry the water's lean, the trunk's and the solver's acceleration. `trace` runs
+with time in it even when she is held.
+
 ## [1.541.3] — 2026-09-28
 
 ### The parasols, smooth
