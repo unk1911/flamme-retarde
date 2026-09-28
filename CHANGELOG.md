@@ -8,6 +8,105 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.0] — 2026-09-28
+
+### fewer cars in the wood, and better ones
+
+Misha, from the pine car park behind the kabine: *"have fewer cars, and the
+ones that u keep, make them more sophisticated, right now the cars still look
+like shit"*. His frame showed boxy hatchbacks in a tight row: flat panels,
+block lamps and plates stuck on, a roof like a separate slab, chunky wheels with
+flat grey hubcaps.
+
+**Fewer: 42 → 19.** Most of the cars that went were broken, not surplus.
+Close-ups from fixed cameras found three faults in the old row, all older than
+this request:
+
+- **A pine through the car.** The row is placed long before the wood is
+  planted. The pines draw off `rng` and the cars do not, so the order cannot
+  change, and no car ever knew there was a trunk in its bay. Once every tree is
+  in `greens`, a car whose footprint holds a trunk or a bush is not parked, and
+  its blocker goes with it.
+- **The boot in the back wall.** The rendered wall at `JAD.back + 3.2` (36.3)
+  was added after the car rule of "tail ≤ 37.10" was written, and nothing
+  checked the two against each other. Tails are now clamped to 35.9 by pulling
+  the nose seaward, and each car is also tested against the wall in world
+  space, because at the bend the wall comes closer than its `s` says.
+- **Cars inside cars.** At the bend near t 380 the shore frame folds, and three
+  stations 4 m apart in `t` landed within a metre of each other. A car whose
+  middle is within 2.4 m of one already kept is dropped.
+
+On top of that, a light thinning (`jit` slots 26/27, wandering over 14 m
+blocks) opens gaps in clumps. The one covered car is exempt. All of this is
+sine hashes, with **no `rng` draws**. The tree and overlap pass runs after the
+hammock has chosen its trees, and the hammock is unchanged
+(`[437.4, 34.2, 441.6, 32.1]` before and after).
+
+**On the ground.** Each car used to be dropped level at the height of the ground
+under its middle. On the slopes, one wheel hung 9 cm in the air and another was
+buried 30 cm. Each car now reads the ground under each axle and each side, and
+is pitched and rolled to sit on it. It is also lifted 30 mm to meet the drawn
+surface. Measured by raycast under all four wheels of every car: the old row
+ranged from +0.11 to −0.53 m, the new one from +0.01 to −0.03 m, except one
+wheel at t 381 over a step. Under every car, one soft dark ellipse gives the
+ground a contact shadow: one instanced draw for the whole row.
+
+**Better** (`tools/blender/cars.py`, rebaked):
+
+- **One section from sill to roof.** The body is flank, shoulder, a ledge the
+  glass stands back from, tumblehome, cant rail and roof, lofted as one. Where
+  there is no glasshouse, the section folds down onto a crowned bonnet or boot,
+  so the windscreen rises out of the bonnet. This replaces two superellipse
+  bubbles, the join between which was the "slab".
+- **Rounded ends.** The ends are rounded on a quarter-circle and closed with a
+  ladder cap, so the grille and bumper edges are straight lines.
+- **Lamps shaped into the body.** Lamps are regions of the loft, shaped in plan
+  as well as height: swept headlamps and wrap-round tail lamps. The old car
+  gets rectangles.
+- **Glass and pillars.** Dark tinted glass, a gloss-black B-pillar and window
+  line, and C-pillars in the paint. The estate has a quarter-light, the van has
+  cab glass only plus two back-door windows.
+- **Detail.** Shut lines, a bonnet line, door handles, body-colour mirrors on
+  black feet, lip spoilers on the hatches, and black sill cladding on the
+  crossover.
+- **Wheels.** Tyres have a shoulder and a sidewall, with five-spoke,
+  seven-spoke or split-spoke alloys: gunmetal on the crossover, pressed hubcaps
+  on the old car and the van. Arch liners sit behind them.
+- **About 8k triangles a car**, in three blobs: paint, gloss and matt trim.
+
+**Materials** (`src/44-cars.js`):
+
+- **Paint** is a clearcoat. The base colour sits under a Fresnel reflection of
+  a wood-aware environment: sky above, dimmed toward the trunks at the horizon,
+  ground below, and occluded in the shade. It also has a tight sun glint.
+- **Gloss** covers glass, lenses and alloys. Glass is a dielectric whose
+  reflection replaces what is behind it. Bright parts are metal, with the
+  reflection tinted by the part's own colour.
+- **Softer canopy shadow.** The canopy shadow on the cars is a 5-tap average
+  pushed off the panel. One tap laid square blocks on a smooth door.
+- **Palette.** Black, navy and scarlet were added; the row is still
+  white-heavy, per the footage.
+
+**Cost.** Each model's layers draw only the cars within 130 m of the camera.
+The gloss layer does not cast a shadow: glass lets the sun through, and the
+rims are inside the tyres. GPU time per frame was measured with timer queries
+at `?q=high`, two runs each, before and after back to back:
+
+| | cars | car tris | draw calls | GPU ms |
+|---|---|---|---|---|
+| car park, before | 42 | 42k | 612–613 | 7.9–8.1 |
+| car park, after | 19 | 161k | 610–613 | 7.9–8.4 |
+| promenade, before | 42 | 42k | 836–839 | 14.7–15.0 |
+| promenade, after | 19 | 161k | 838–841 | 14.9–15.0 |
+| promenade, no cars at all | 0 | 0 | 798–801 | 13.8–14.4 |
+
+The first bake had about 14.5k triangles a car and 70 mm stations. It cost
++0.8 ms at the promenade with no difference anyone could see, and was cut to
+120 mm stations and a 24-sided wheel.
+
+The back-lane cars (`src/46-backlane.js`) use the same models and materials.
+They are not pitched to the ground and keep their own placement.
+
 ## [1.538.5] — 2026-09-28
 
 ### the quay sitters' legs on the cement, and one woman off the shore

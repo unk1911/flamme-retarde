@@ -1,16 +1,17 @@
 /**
  * The cars parked in the wood behind Jadrija.
  *
- * The geometry is baked by `tools/blender/cars.py` — five body types, two
+ * The geometry is baked by `tools/blender/cars.py` — five body types, three
  * blobs each — and everything in this file is about getting them onto the
  * ground facing the right way. The shore build in `src/43-jadrija.js` decides
  * *where* each one stands, because that is a question about the shore: which
  * bands of `t` are clear of the shops, how far inland a car can be before it is
  * standing in somebody's front room, and where the playground railing is. This
  * file decides what model turns up, what colour it is painted, and how the
- * whole row gets drawn in ten calls.
+ * whole row gets drawn: three calls a model, and one more for the dark under
+ * every car.
  *
- * ── two layers per model ──────────────────────────────────────────────────
+ * ── three layers per model ────────────────────────────────────────────────
  *
  * `SOLID_VERT` does `vColor = aInstColor` for an instanced draw and the
  * fragment stage does `base = uBase * vColor` and then `base *= vVCol`. So the
@@ -20,11 +21,15 @@
  * `src/37-props.js` has exactly that flaw and gets away with it because its
  * lamps are three boxes seen at 300 m; these are seen from two.
  *
- * So each model gets two instanced layers over the same instance list. The
- * `body` layer carries a mesh whose vertex colours are all white and an
- * `aInstColor` holding the paint. The `trim` layer carries glass, tyres, rims,
- * bumpers, lamps, plates, the underside and the roof furniture in their own
- * colours, with `aInstColor` left at 1.0 so nothing tints them.
+ * So each model gets instanced layers over the same instance list. The `body`
+ * layer carries a mesh whose vertex colours are white (and 0.3 in the shut
+ * lines, which the paint then darkens) and an `aInstColor` holding the paint.
+ * The `gloss` layer carries the glass, the lamp lenses, the alloys and the
+ * gloss-black trim; the `trim` layer the tyres, plastics, plates and the
+ * underside — both in their own colours, with `aInstColor` left at 1.0 so
+ * nothing tints them. Body and gloss are three materials' worth of difference
+ * from the trim (see `carMaterials`), which is why they are layers and not
+ * vertex colours in one mesh.
  *
  * ── why it does not borrow the town's layer ───────────────────────────────
  *
@@ -54,6 +59,12 @@ const CAR_PAINT = {
   blue: [0.148, 0.202, 0.328],
   red: [0.520, 0.128, 0.108],
   sand: [0.638, 0.608, 0.545],
+  // The two the row did not have, and a car park in 2026 does. Black is not
+  // zero: 0.03 of diffuse under a clearcoat is what a black car is, and the
+  // reflection on top of it (see `CAR_PAINT_GLSL`) is most of what you see.
+  black: [0.030, 0.031, 0.034],
+  navy: [0.050, 0.070, 0.135],
+  scarlet: [0.560, 0.045, 0.040],
   // Not a paint: the fitted cover on the car that is left for the season.
   //
   // The blue in it is measured OFF and not on, which is the same trap the
@@ -92,16 +103,20 @@ const CAR_MODELS = [
   // changes, and that is fine and is why the note on `carModelFor` exists: the
   // car loop takes no `rng()` calls, so nothing else on the beach moves with
   // it. Rule 4 is about the `rng` stream and this is not in it.
-  { key: 'covered', w: 0.05, paint: ['cover'] },
+  { key: 'covered', w: 0.05, paint: ['cover'], matte: true },
+  // Still white-heavy, because the footage is — but with a black, a navy and
+  // a red in the mix, since "per-car colours from a realistic palette" was
+  // the ask (28 Sep) and a row of nothing but white and silver is the other
+  // way the wood read as one car pasted forty times.
   { key: 'supermini', w: 0.29,
     paint: ['white', 'white', 'white', 'white', 'pearl', 'silver', 'silver',
-      'grey', 'slate', 'blue'] },
+      'grey', 'slate', 'blue', 'black', 'scarlet'] },
   { key: 'crossover', w: 0.25,
     paint: ['white', 'white', 'white', 'pearl', 'silver', 'silver', 'grey',
-      'slate', 'blue'] },
+      'slate', 'blue', 'black', 'navy'] },
   { key: 'estate', w: 0.17,
     paint: ['white', 'white', 'silver', 'silver', 'pearl', 'grey', 'slate',
-      'sand'] },
+      'sand', 'black', 'navy'] },
   { key: 'van', w: 0.11,
     paint: ['white', 'white', 'white', 'white', 'white', 'pearl', 'silver'] },
   { key: 'oldhatch', w: 0.13,
@@ -148,12 +163,141 @@ function carSize(key) {
 }
 
 /**
+ * The two finishes that are not matt, as `lit` hooks for `solidMaterial`.
+ *
+ * "The cars still look like shit" (28 Sep) was partly geometry and partly
+ * this: every car was lit by the prop shader's one blinn lobe at 0.34 with a
+ * mirror of the sky scaled by the same 0.34 — which is a plastic toy, the
+ * same sheen on the paint, the glass, the tyres and the number plates.
+ *
+ * Paint is a CLEARCOAT: a coloured diffuse base under a clear dielectric
+ * layer, so the reflection is Fresnel — 4 % looking straight at a panel, all
+ * of it at a grazing angle — and whatever it reflects is added over the
+ * colour, not multiplied by it. That is why a black car is black with the
+ * sky on it and a white car is white: the coat is the same on both.
+ *
+ * What it reflects is not the sky on its own. These are parked in a pine
+ * wood, so the reflection is dimmed toward the horizon, where the trunks and
+ * the canopy are, and below it is the ground; and it is dimmed again in the
+ * shade (`sh`), which is the cheapest occlusion there is and is right under
+ * a tree. A sky-mirror under a pine canopy is what made the last version's
+ * roofs glow.
+ *
+ * Gloss is glass, lamp lenses, alloys and the gloss-black trim, told apart by
+ * the vertex colour: anything bright is metal (reflection tinted by the base,
+ * F0 0.6), anything dark is a dielectric (F0 0.05) whose reflection REPLACES
+ * what is behind it as the angle closes, which is what a windscreen does.
+ *
+ * (NO BACKTICKS in the GLSL below — it is a template literal.)
+ */
+const CAR_ENV_GLSL = `
+  // The canopy's shadow, softened. One tap of the near cascade lays the pine
+  // shade on a car as square blocks a hand across, which the needle floor
+  // hides and a smooth white door does not. Five taps 18 cm apart, pushed 5 cm
+  // off the panel so a car does not shade itself, and the sun term already
+  // in col is corrected by the difference.
+  vec3 cP = vWorld + n * 0.05;
+  float cSh = (shadowAt(cP) + shadowAt(cP + vec3(0.18, 0.0, 0.0))
+    + shadowAt(cP - vec3(0.18, 0.0, 0.0)) + shadowAt(cP + vec3(0.0, 0.0, 0.18))
+    + shadowAt(cP - vec3(0.0, 0.0, 0.18))) * 0.2;
+  col += base * uSunColor * uSunI * ndl * INV_PI * (cSh - sh);
+  sh = cSh;
+  vec3 cV = -viewDir;
+  float cNV = clamp(dot(n, cV), 0.0, 1.0);
+  vec3 cR = reflect(viewDir, n);
+  vec3 cE = skyColor(normalize(cR), false);
+  cE *= mix(0.28, 1.0, smoothstep(0.02, 0.55, cR.y));
+  cE = mix(uAmbGround * uAmbI * 0.30, cE, smoothstep(-0.12, 0.04, cR.y));
+  float cOcc = mix(0.40, 1.0, sh);
+  float cSun = pow(max(dot(n, normalize(uSunDir - viewDir)), 0.0), 1200.0) * sh;
+`;
+const CAR_PAINT_GLSL = CAR_ENV_GLSL + `
+  float cF = 0.04 + 0.96 * pow(1.0 - cNV, 5.0);
+  col = col * (1.0 - cF * 0.85) + cE * cF * uCoat * cOcc;
+  col += uSunColor * cSun * 2.5;
+`;
+const CAR_GLOSS_GLSL = CAR_ENV_GLSL + `
+  float cM = smoothstep(0.30, 0.55, max(max(vVCol.r, vVCol.g), vVCol.b));
+  float cF0 = mix(0.09, 0.60, cM);
+  float cF = cF0 + (1.0 - cF0) * pow(1.0 - cNV, 5.0);
+  vec3 cTint = mix(vec3(1.0), base / max(max(base.r, base.g), max(base.b, 1e-3)), cM);
+  col = col * (1.0 - cF * (1.0 - cM) * 0.9) + cE * cF * cTint * uCoat * cOcc;
+  col += uSunColor * cSun * 3.0;
+`;
+
+/**
+ * Draw only the cars within `CAR_DRAW_M` of the camera.
+ *
+ * One layer holds every car of a model from one end of the shore to the
+ * other, so its bounding sphere is 360 m across and is in frame from nearly
+ * anywhere on the promenade — and the better cars are 8 000 triangles each
+ * where the old ones were 1 000. Measured at the promenade (t 460 looking
+ * west) that was +0.8 ms of GPU for cars standing behind two rows of kabine
+ * and a wood. So each layer keeps its full instance list aside and, when the
+ * set within range changes, packs just those to the front and draws that
+ * many. The camera is `U.uCamPos`, which is the eye in every pass — the
+ * shadow pass included, so a car does not lose its shadow before itself.
+ */
+const CAR_DRAW_M = 130;
+function nearOnly(L, n) {
+  const full = [L.aPos, L.aRot, L.aScale, L.aColor].map((a) => a.array.slice(0, n * a.itemSize));
+  let key = -1, pending = -1;
+  L.mesh.onBeforeRender = () => {
+    // A rewrite reaches the GPU at the start of the NEXT render call, so the
+    // new count waits for it; until then this draws a prefix of the old list.
+    if (pending >= 0) { L.geo.instanceCount = pending; pending = -1; }
+    const cp = U.uCamPos.value;
+    let k = 0, bits = 0;
+    const idx = [];
+    for (let i = 0; i < n; i++) {
+      const dx = full[0][i * 3] - cp.x, dz = full[0][i * 3 + 2] - cp.z;
+      if (dx * dx + dz * dz < CAR_DRAW_M * CAR_DRAW_M) { idx.push(i); bits = (bits * 31 + i + 1) % 1000000007; }
+    }
+    bits = bits * 64 + idx.length;
+    if (bits === key) return;
+    key = bits;
+    [L.aPos, L.aRot, L.aScale, L.aColor].forEach((a, m) => {
+      const w = a.itemSize;
+      k = 0;
+      for (const i of idx) {
+        for (let c = 0; c < w; c++) a.array[k * w + c] = full[m][i * w + c];
+        k++;
+      }
+      a.needsUpdate = true;
+    });
+    pending = idx.length;
+    L.geo.instanceCount = Math.min(L.geo.instanceCount, idx.length);
+  };
+}
+
+let carMats = null;
+/** One material per finish, shared by every model and both car parks. */
+function carMaterials() {
+  if (carMats) return carMats;
+  const mk = (lit, spec, specPower, coat) => solidMaterial(0xffffff, {
+    instanced: true, spec, specPower, side: THREE.DoubleSide,
+    // env 0: the default sky mirror is off, and the one in `lit` replaces it.
+    body: 'base *= vVCol;\n  n = gl_FrontFacing ? n : -n;\n  env = 0.0;',
+    uniforms: { uCoat: { value: coat } },
+    decl: 'uniform float uCoat;',
+    lit,
+  });
+  carMats = {
+    paint: mk(CAR_PAINT_GLSL, 0.10, 60, 0.95),
+    gloss: mk(CAR_GLOSS_GLSL, 0.10, 90, 1.0),
+  };
+  return carMats;
+}
+
+/**
  * Draw the row.
  *
- * `sites` is what the shore build collected: `{ x, y, z, yaw, model, tint }`
- * per car, already in world space and already turned to face the water. Ten
- * instanced layers come out of it — a body and a trim for each of the five
- * models — and each one is given a real bounding sphere over the instances
+ * `sites` is what the shore build collected: `{ x, y, z, yaw, pitch, roll,
+ * model, tint }` per car, already in world space, turned to face the water and
+ * tilted to sit on the slope it stands on. Three
+ * instanced layers per model come out of it — the paint, the gloss and the
+ * matt trim, one per material (`carMaterials`) — and each is given a real
+ * bounding sphere over the instances
  * that ended up in it, rather than `propLayer`'s 1e9 one, so the whole car park
  * culls as a unit the moment you are looking the other way.
  */
@@ -169,11 +313,11 @@ async function buildJadrijaCars(scene, sites) {
     counts[model.key] = mine.length;
     if (!mine.length) continue;
 
-    // Both halves or neither: a body with no trim is a car with no wheels and
-    // no glass, which is worse than the boxes this replaces.
-    const blobs = { body: null, trim: null };
+    // All three or none: a body with no trim is a car with no wheels, and one
+    // with no gloss is a car with no glass — worse than the boxes before.
+    const blobs = { body: null, gloss: null, trim: null };
     let bad = false;
-    for (const [half, suffix] of [['body', ''], ['trim', '_trim']]) {
+    for (const [half, suffix] of [['body', ''], ['gloss', '_gloss'], ['trim', '_trim']]) {
       const key = 'car_' + model.key + suffix + '_fr3d';
       const b64 = typeof PAYLOAD !== 'undefined' ? PAYLOAD[key] : null;
       if (!b64) { console.warn('no car payload:', key); bad = true; continue; }
@@ -186,10 +330,18 @@ async function buildJadrijaCars(scene, sites) {
     }
     if (bad) continue;
 
-    for (const half of ['body', 'trim']) {
+    for (const half of ['body', 'gloss', 'trim']) {
       const geo = blobs[half];
       tris += (geo.index.count / 3) * mine.length;
-      const L = propLayer(scene, geo, mine.length, { spec: 0.34, specPower: 60 });
+      // The trim is matt — tyres, black plastic, plates — and keeps the prop
+      // shader's own lobe, turned down from the 0.34 everything used to share.
+      const L = propLayer(scene, geo, mine.length, { spec: 0.08, specPower: 18 });
+      const fin = half === 'body' ? (model.matte ? null : 'paint')
+        : half === 'gloss' ? 'gloss' : null;
+      if (fin) {
+        L.mesh.material.dispose();
+        L.mesh.material = carMaterials()[fin];
+      }
       // The index used to be set here, because `propLayer` copied position,
       // normal and aVCol and stopped — every prototype it was written for comes
       // out of `propBuilder.geo()`, a raw triangle soup with no index at all,
@@ -204,7 +356,8 @@ async function buildJadrijaCars(scene, sites) {
       let lo = [1e9, 1e9, 1e9];
       let hi = [-1e9, -1e9, -1e9];
       mine.forEach((s, i) => {
-        _e.set(0, s.yaw, 0, 'YXZ');
+        // Roll about the model's X, pitch about its Z — see the shore build.
+        _e.set(s.roll || 0, s.yaw, s.pitch || 0, 'YXZ');
         _q.setFromEuler(_e);
         L.aPos.array[i * 3] = s.x;
         L.aPos.array[i * 3 + 1] = s.y;
@@ -213,9 +366,9 @@ async function buildJadrijaCars(scene, sites) {
         L.aRot.array[i * 4 + 2] = _q.z; L.aRot.array[i * 4 + 3] = _q.w;
         L.aScale.array[i * 3] = 1; L.aScale.array[i * 3 + 1] = 1;
         L.aScale.array[i * 3 + 2] = 1;
-        // The trim is never tinted. That is the whole point of it being a
-        // second layer: 1.0 through the multiply leaves the baked colours
-        // exactly as Blender wrote them.
+        // Only the paint is tinted. That is the whole point of the other two
+        // being layers of their own: 1.0 through the multiply leaves the baked
+        // colours exactly as Blender wrote them.
         const c = half === 'body' ? s.tint : [1, 1, 1];
         L.aColor.array[i * 3] = c[0]; L.aColor.array[i * 3 + 1] = c[1];
         L.aColor.array[i * 3 + 2] = c[2];
@@ -240,14 +393,74 @@ async function buildJadrijaCars(scene, sites) {
       L.geo.boundingSphere = new THREE.Sphere(c,
         span + (geo.boundingSphere ? geo.boundingSphere.radius : 3));
       L.mesh.frustumCulled = true;
+      nearOnly(L, mine.length);
+      L.half = half;
       layers.push(L);
     }
   }
 
+  // ── the dark under every car ────────────────────────────────────────────
+  // What made the last row look parked on glass was not the wheels, which
+  // touch the ground within 3 cm on every car (measured by raycast, 28 Sep),
+  // but the ground UNDER the car, lit exactly as brightly as the ground beside
+  // it. Under a real car it is nearly black — no sky reaches it — and that
+  // dark footprint is how the eye reads contact. One soft ellipse per car,
+  // one instanced draw for the whole row, blended over the ground and never
+  // written to depth. It follows the car's pitch and roll, so it follows the
+  // slope the car stands on.
+  if (sites.length) {
+    const q = new THREE.PlaneGeometry(1, 1, 1, 1);
+    q.rotateX(-Math.PI / 2);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', q.attributes.position);
+    g.setAttribute('normal', q.attributes.normal);
+    g.setAttribute('aVCol', new THREE.BufferAttribute(new Float32Array(12).fill(1), 3));
+    g.setIndex(q.index);
+    const L = propLayer(scene, g, sites.length);
+    L.mesh.material.dispose();
+    L.mesh.material = solidMaterial(0x000000, {
+      instanced: true, transparent: true, depthWrite: false,
+      // Radial in the car's own frame (`vLocal` is the unit quad), so one
+      // quad scaled per car is the right ellipse for every body.
+      body: 'float cd = length(vLocal.xz * 2.0);\n'
+        + '  alpha = 0.62 * (1.0 - smoothstep(0.35, 1.0, cd));\n'
+        + '  base = vec3(0.0); spec = 0.0; env = 0.0;',
+    });
+    L.mesh.renderOrder = 2;
+    let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    sites.forEach((s, i) => {
+      const sz = carSize(s.model);
+      _e.set(s.roll || 0, s.yaw, s.pitch || 0, 'YXZ');
+      _q.setFromEuler(_e);
+      // The footprint's middle, which is not the wheelbase centre.
+      const off = new THREE.Vector3((sz.x0 + sz.x1) * 0.5, 0.045, 0).applyQuaternion(_q);
+      const p = [s.x + off.x, s.y + off.y, s.z + off.z];
+      L.aPos.array.set(p, i * 3);
+      L.aRot.array.set([_q.x, _q.y, _q.z, _q.w], i * 4);
+      L.aScale.array.set([(sz.x1 - sz.x0) * 1.12, 1, sz.hw * 2.3], i * 3);
+      L.aColor.array.set([1, 1, 1], i * 3);
+      for (let k = 0; k < 3; k++) {
+        lo[k] = Math.min(lo[k], p[k]);
+        hi[k] = Math.max(hi[k], p[k]);
+      }
+    });
+    for (const a of [L.aPos, L.aRot, L.aScale, L.aColor]) a.needsUpdate = true;
+    L.geo.instanceCount = sites.length;
+    L.geo.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3((lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5, (lo[2] + hi[2]) * 0.5),
+      Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 0.5 + 3);
+    L.mesh.frustumCulled = true;
+  }
+
   return {
     layers,
-    /** For the shadow pass in src/90-app.js — instanced, near cascade only. */
-    meshes: () => layers.map((L) => L.mesh),
+    /**
+     * For the shadow pass in src/90-app.js — instanced, near cascade only. Not
+     * the gloss layer: glass lets the sun through, so the cabin of a real
+     * car throws a lighter shadow than its body, and a rim is inside its tyre.
+     * Six draws in the near shadow pass that bought nothing.
+     */
+    meshes: () => layers.filter((L) => L.half !== 'gloss').map((L) => L.mesh),
     count: sites.length,
     counts,
     tris,
