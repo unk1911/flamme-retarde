@@ -8,6 +8,51 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.1] — 2026-09-28
+
+### Chloe crouches when you do
+
+Misha: *"when i press 'B' to see me (Chloe) from external camera, and then
+press 'Shift' to crouch, Chloe doesn't actually crouch, just the camera lowers
+itself.. but I/Chloe should also crouch, for consistency."* Shift only ever
+moved the eye from 1.66 m to `GROUND.kneel` (1.00 m). In the third person she
+stood at full height with the lens at her chin. In the vikendica's bathroom
+mirror, which hangs her off the camera by a standing eye, she was 0.66 m into
+the floor.
+
+**A solved squat, not a typed one** (`crouchSolve` in 90-app.js). Only three
+angles are chosen: shin lean over the boots (0.62, the flat-footed limit), a
+back bow (0.55, spread over the spine the way Baye's crouch at the plate is)
+and the chin coming back up. The rest is solved so her eyes end up where the
+lens is. The bow's share of the 0.66 m is measured through her own spine chain,
+and each thigh folds exactly far enough to drop the hips by the remainder.
+Measured, her eye sits 0.052 m under the camera crouched against 0.046
+standing, so the body and the camera agree. The thighs come out about level:
+a flat-footed full squat, which is what an eye a metre up is for her height.
+The knees go out 0.30 rad about the hip-to-ankle line, so the ankle does not
+move. The arms give back the bow and hang forward over her knees.
+
+**Feet planted.** She is lowered by the hips' drop and moved back by the
+ankles' travel, so her boots stay where standing put them (within 5 mm,
+measured in world space). The hips go back over her heels and her head comes
+forward over her toes. It eases in and out on the eye's own two rates:
+`ground.you.low` is damped exactly as `you.eye` is.
+
+**Crouch-walking is a two-bone reach per leg against the walk as it is this
+frame.** Folding the walk clip was tried first. It put the planted boot 86 mm
+into the promenade and lifted the other 0.34 m. Re-solving the fold per leg
+fixed the heights, but the boots then skated at 0.9 m/s. Now each ankle goes
+where the walk puts it, on half the stride, with the clip run twice as fast
+(ceiling 3.0), which is a crouched shuffle. A swinging boot is pulled in until
+its knee clears the ground (it was 70 mm under it). The walk's arm swing is
+cut by 65%. Measured at a crouched 1.36 m/s: planted boots within ±0.15 m/s,
+feet never under the ground, swing lift 0.18 m like the walk's.
+
+The hop's tuck adds on top of the crouch. Everything that is not on foot (the
+water, the tower, the boats and bikes, the chase cut) takes the crouch off
+once, via `clearCrouch`. The first-person mirror gets the same pose through
+`you.lower`. `__fr.jad.crouch(v, snap)` is Shift from a probe.
+
 ## [1.539.0] — 2026-09-28
 
 ### fewer cars in the wood, and better ones

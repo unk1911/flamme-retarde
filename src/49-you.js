@@ -1197,6 +1197,10 @@ async function buildYou(scene) {
 
   /** Stand her where you are standing, facing where you are facing. */
   let frozen = false;
+  // Crouched, in the mirror: how much lower her root goes than a standing
+  // eye would put it, and how far back along her facing. Null standing. See
+  // `crouchSolve` in 90-app.js, which is what folds her and says by how much.
+  let low = null;
 
   function tick(dt, camera) {
     fig.update(dt);
@@ -1236,6 +1240,17 @@ async function buildYou(scene) {
     camera.getWorldDirection(dir);
     mesh.position.set(camera.position.x,
       camera.position.y - YOU.eye, camera.position.z);
+    if (low) {
+      // Misha, 28 Sep 2026: *"Chloe doesn't actually crouch, just the camera
+      // lowers itself"*. The camera comes down to a crouched eye, and hung
+      // off it by a STANDING eye she was 0.66 m into the vikendica's
+      // bathroom floor with her head where the lens is. Her root is where
+      // her folded feet are instead — see `crouchSolve` in 90-app.js.
+      const hl = Math.hypot(dir.x, dir.z) || 1;
+      mesh.position.x -= dir.x / hl * low.back;
+      mesh.position.y += low.dy;
+      mesh.position.z -= dir.z / hl * low.back;
+    }
     // An object at rotation.y = θ points its local +X at (cos θ, 0, −sin θ),
     // and the rig's forward is +X, so the z of where you are looking is the
     // one that gets negated. Yawing it as though the rig faced −Z, which is
@@ -1262,6 +1277,8 @@ async function buildYou(scene) {
      */
     swim: (v) => { uSwim.value = v ? 1 : 0; return uSwim.value; },
     freeze: (v) => { frozen = !!v; return frozen; },
+    /** Crouched in the mirror: `{ dy, back }` off a standing eye, or null. */
+    lower: (o) => { low = o || null; },
     /**
      * Take her off the camera and put her somewhere.
      *
