@@ -8,6 +8,43 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.1] — 2026-09-28
+
+### shop staff: bellies behind the counter, palms flat on it
+
+Misha: *"the 2 dudes working at the slastikarnica, their tummies are sticking
+out weirdly through the counters, and their hands are in weird positions ...
+same thing dude worker at cafe bar h2o, his hands are in that weird
+frankenstein pose, it should just be palms down"*.
+
+Both faults came from poses measured on the old tube rig and still used after
+the far tier moved to the MakeHuman bodies.
+
+- **The belly.** Every server stood at `s0 − 0.15`, "the front of the hip on
+  the panel's face", which was right for a hip 0.14 m wide. `man_old_heavy`
+  measures 0.27 m from the hip joint to the front of the belly, and the
+  slasticarnica pair are `k` 1.08, so the belly and trunks came about 0.15 m
+  out through the panel. Servers now stand 0.30 m behind the panel's face.
+  That is at the shop's own face, 0.15 to 0.17 m further back than before (0.10
+  at H2O). `staffAt` measures the face as the chord `shopKit` actually draws,
+  which at H2O is 0.07 m seaward of `s0 − 0.28`. They lean 0.30 rad at the
+  waist, so the head and shoulders are still out in the opening in front of
+  the mirror and the back wall.
+- **The hands.** `serve` held the elbows up at 0.55 / 1.15 rad. On the new
+  bodies that left the forearms in the air with the fingers spread. The arms
+  are now solved (`counterArms` in 42-crowd.js) against the counter height and
+  front edge that each server gets at placement: two-bone IK from the shoulder
+  to a planted palm, then the forearm turned palm-down about its own axis.
+  Forearms lie level along the top, angled in, with fingertips inside the
+  edge. Where a tall man's elbow cannot reach a low counter, he bends his
+  knees up to 0.15 m, behind the panel. MINI is the one counter where that
+  happens. The hands stay planted while the torso sways and turns, and the
+  bow, the pass and the turn to the machine are kept as body and head motion.
+- Applied to all four `shopKit` counters: slasticarnica ×2, H2O, MINI and
+  Caffe TRAMPULIN. Trampulin's server was `stand`, with his arms going down
+  into the counter top, and is now `serve`. The konoba barman stands well
+  behind his own bar and is unchanged.
+
 ## [1.539.0] — 2026-09-28
 
 ### fewer cars in the wood, and better ones

@@ -1157,8 +1157,10 @@ async function buildJadrija(scene) {
    * NOT DRAWN AT ALL, because two men are standing in it". This is that rule,
    * written once, for the shops whose bar is generated rather than hand-placed.
    *
-   * `[key, t, backOff, pose, scale]`. A null `backOff` means the standard
-   * `s0 - 0.15`, which puts the front of the hip on the counter's front panel.
+   * `[key, t, backOff, pose, scale]`. A null `backOff` means stand behind
+   * `shopKit`'s counter — see `staffAt`, which says where that is. It was
+   * `s0 - 0.15`, "the front of the hip on the counter's front panel", until
+   * the bodies stopped being tubes: see the note there.
    */
   const SHOP_STAFF = [
     ['mini', 274.60, null, 'serve', 1.00],
@@ -1191,8 +1193,66 @@ async function buildJadrija(scene) {
     // is in `shopfront`: the body is cut into 1.5 m pieces and its front
     // follows the shore like everything hung on it.
     ['h2o', 317.20, null, 'serve', 0.99],
-    ['tramp2', 471.60, null, 'stand', 1.03],
+    // `serve` and not `stand` since 1.539.1. `stand` is the promenade's idle,
+    // arms at his sides, and behind a 1.06 m counter that is two forearms
+    // going down into the top of it — the stumps the note over the gelato
+    // pair's elbows describes. `serve` is the one with both hands on the bar.
+    ['tramp2', 471.60, null, 'serve', 1.03],
   ];
+
+  /**
+   * Where somebody working one of `shopKit`'s counters stands, and where the
+   * counter is from where he stands.
+   *
+   * Misha, 28 Sep 2026: *"the 2 dudes working at the slastikarnica, their
+   * tummies are sticking out weirdly through the counters"*. They were. Every
+   * server on this shore stood at `s0 − 0.15` — "the front of the hip exactly
+   * on the panel's face" — and the hip was the old tube rig's, 0.14 m wide.
+   * The far tier draws the eight MakeHuman bodies now, and a server is dealt
+   * one of the men by hash: `man_old_heavy` measures 0.27 m from his hip
+   * joint to the front of his belly at 0.90 m, which at the gelato pair's
+   * `k` of 1.08 is 0.29 m in front of a point 0.13 m behind the panel. The
+   * belly and the waistband of the trunks came out through the panel's face,
+   * and the slab over it, by fifteen centimetres.
+   *
+   * So he stands with his belly behind the panel, which puts his hips back
+   * at the shop's own face and his back inside it — the body is solid from
+   * `s0` and nothing is ever seen through it. What keeps his head and
+   * shoulders out in the opening, in front of the mirror and the back wall,
+   * is the lean in `serve`: forward at the waist onto his forearms, both
+   * hands flat on the top (`COUNTER` in 42-crowd.js).
+   *
+   * 0.30 m behind the panel's face. The heavy man's belly, measured off the
+   * bake, is 0.25 m out below the panel's top at his largest scale and
+   * 0.27 m at his smallest, and 0.29 m level with the slab, which stands
+   * 0.06 m further out — so three centimetres clear at the worst of it. The
+   * lean men are 0.12 m and never come near.
+   *
+   * AND THE FACE IS MEASURED, NOT ASSUMED. `shopKit` draws its counter with
+   * `boxTS` and no `cut`, so the panel is a chord from `oa` to `oc` — the
+   * same bend that put H2O's whole building in front of its barman. The
+   * placement takes the chord where it crosses his own normal: at H2O that is
+   * 0.07 m seaward of `s0 − 0.28`, at the others two centimetres or less. The
+   * hands are placed off the same measurement, so a server at a bowed
+   * counter still has his fingertips inside its edge.
+   */
+  function staffAt(S, t) {
+    const oa = S.t0 + (S.t1 - S.t0) * 0.18, oc = S.t1 - (S.t1 - S.t0) * 0.18;
+    const o = at(t);
+    // Where the straight line through (ta, s) and (tb, s) crosses the shore
+    // normal at `t`, as an `s` on that normal.
+    const chord = (ta, tb, s) => {
+      const A = W(ta, s, 0), B = W(tb, s, 0);
+      const ex = B[0] - A[0], ez = B[2] - A[2];
+      const rx = A[0] - o.x, rz = A[2] - o.z;
+      const den = o.nx * -ez - o.nz * -ex;
+      return (rx * -ez - rz * -ex) / den;
+    };
+    const face = chord(oa, oc, S.s0 - 0.28);
+    const edge = chord(oa - 0.10, oc + 0.10, S.s0 - 0.34);
+    const s = face + 0.30;
+    return { s, face, edge };
+  }
 
   const CONC = [[0.479, 0.427, 0.364], [0.450, 0.402, 0.341], [0.507, 0.451, 0.383]];
   // The flags of the old promenade: warm honey limestone, five shades.
@@ -25698,6 +25758,13 @@ async function buildJadrija(scene) {
       // a man in swimming trunks apparently standing in front of his own
       // counter. s0−0.14 puts the front of the hip exactly on the panel's face.
       //
+      // 28 Sep: and on a MakeHuman body it put the front of the BELLY fifteen
+      // centimetres through it — "their tummies are sticking out weirdly
+      // through the counters". They stand behind the panel now, leaning on
+      // their forearms; `staffAt` has the measurement. What follows is the
+      // history of the old standoff and is kept because the mirror still
+      // stands where it put it.
+      //
       // That is 0.04 m in front of the mirror, which had to move 0.03 m inland
       // to make the room for it — see `backBar`, where the measurement is.
       // Not 0.05. A black t-shirt has about that albedo in life and it renders
@@ -25723,10 +25790,12 @@ async function buildJadrija(scene) {
       // goes at the west end of the opening, which is where the two lower
       // shelves now stop — see the note over them in `backBar`.
       for (const [t, pose] of [[cm - 3.50, 'barista'], [cm - 2.50, 'serve']]) {
-        const ss = S.s0 - 0.15;
-        bathers.push({ t, s: ss, y: y0, ang: -Math.PI / 2,
+        const P = staffAt(S, t);
+        // `counter` is what the arms are solved against: the top over his
+        // feet and the front edge in front of them, world metres.
+        bathers.push({ t, s: P.s, y: y0, ang: -Math.PI / 2,
           pose, k: 1.08, beat: null, sex: 'm', shirt: TEE, hair: CROP,
-          staff: true });
+          staff: true, counter: { top: 1.06, edge: P.s - P.edge } });
       }
       // And who they are serving. Two children at the open counter, facing the
       // shop — 20260823_111819 has one of them at the corner of the case with
@@ -25801,7 +25870,8 @@ async function buildJadrija(scene) {
     for (const [key, t, backOff, pose, k] of SHOP_STAFF) {
       const S = SHOPS.find((x) => x.key === key);
       if (!S) continue;
-      const ss = backOff == null ? S.s0 - 0.15 : S.s1 - backOff;
+      const P = backOff == null ? staffAt(S, t) : null;
+      const ss = P ? P.s : S.s1 - backOff;
       // The shop's OWN datum and not the deck under the man's feet.
       // `shopfront` builds every one of these from `at((t0+t1)/2).deck` and
       // the counter is 1.06 m above that, so a figure standing on the deck at
@@ -25846,10 +25916,21 @@ async function buildJadrija(scene) {
       // 0.066 -> 0.000, konoba 244.00 0.047 -> 0.047, untouched because that
       // one is the set-out datum of one flag under its own floor and not this
       // question at all.
+      //
+      // `standY` is read at `s0 − 0.15` and not at where he stands, which
+      // since 1.539.1 is behind the counter's panel at the shop's own face
+      // (`staffAt`): the floor behind a counter is the floor in front of the
+      // panel, and the question this paragraph settled was answered there.
+      // Asked at the face, the ground is whatever the building stands on.
+      const datum = at((S.t0 + S.t1) * 0.5).deck;
       const y0 = S.key === 'konoba' ? konobaFloor(S) - 0.047
-        : Math.max(at((S.t0 + S.t1) * 0.5).deck, standY(t, ss));
+        : Math.max(datum, standY(t, S.s0 - 0.15));
       bathers.push({ t, s: ss, y: y0, ang: -Math.PI / 2,
-        pose, k, beat: null, sex: 'm', shirt: TEE, hair: CROP, staff: true });
+        pose, k, beat: null, sex: 'm', shirt: TEE, hair: CROP, staff: true,
+        // What the arms are solved against — see `COUNTER` in 42-crowd.js.
+        // `shopKit`'s top is 1.06 over the datum, and he may be standing
+        // above the datum by the paragraph before last.
+        counter: P ? { top: datum + 1.06 - y0, edge: ss - P.edge } : null });
     }
   }
 
@@ -52847,6 +52928,9 @@ async function buildJadrija(scene) {
     // copied over — `fg.phone` was left behind on the first cut and the
     // symptom was twelve people marked as holding one and nought drawn.
     if (b.phone) fg.phone = b.phone;
+    // And the counter a server's hands are solved against, for the same
+    // reason. See `staffAt` and `COUNTER`.
+    if (b.counter) fg.counter = b.counter;
     // Somebody taken off the shore (`b.hidden` — the woman against the
     // riser at t 366.8): every draw above has been taken for her, and here
     // she stops. No figure, no roving slot, no collider.
@@ -57821,7 +57905,11 @@ async function buildJadrija(scene) {
       .map(([i, b]) => ({ i, t: +b.t.toFixed(1), s: +b.s.toFixed(2),
         pose: b.pose, k: b.k, beat: b.beat, hid: !!b.hidden,
         y: +b.y.toFixed(3), sunk: +(standY(b.t, b.s) - b.y).toFixed(3),
-        blob: b.blob == null ? null : b.blob })),
+        blob: b.blob == null ? null : b.blob,
+        // The counter his hands are solved against — top over his feet and
+        // front edge forward of them. See `staffAt`.
+        counter: b.counter ? { top: +b.counter.top.toFixed(3),
+          edge: +b.counter.edge.toFixed(3) } : null })),
     /** How many people are on a phone, how many are drawn, and what the
      *  screens are showing — which is the only way to tell a live quote from
      *  the baked one without walking up to somebody. */

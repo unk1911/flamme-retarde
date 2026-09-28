@@ -1376,6 +1376,226 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
 }
 
 /**
+ * Both hands flat on a counter — the shop staff's arms, SOLVED against the
+ * counter they are standing at rather than typed as angles.
+ *
+ * Misha, 28 Sep 2026: *"the 2 dudes working at the slastikarnica, their
+ * tummies are sticking out weirdly through the counters, and their hands are
+ * in weird positions / their hands should probably just be palms down.. same
+ * thing dude worker at cafe bar h2o, his hands are in that weird frankenstein
+ * pose, it should just be palms down i think to look more natural."*
+ *
+ * The frankenstein was the typed pose outliving the body it was typed for.
+ * `serve` held both arms up at 0.55 / 1.15 rad, which on the old tube rig put
+ * a hand ON the counter — "shoulder 1.38, elbow 1.07, hand 0.79", measured
+ * off that bake. The far tier draws the eight MakeHuman bodies now, and on
+ * those the same two angles leave the forearm pointing up and out over the
+ * counter with the hand edge-on and the fingers spread in the air: a hand
+ * reaching for nothing, twice over, on every server on the shore.
+ *
+ * So the arms are an answer to a question now. `fg.counter` is where the
+ * counter is — its top over this person's feet and its front edge forward of
+ * them, both in world metres, both measured off the counter's own geometry
+ * where the placement is (see `staffAt` in 43-jadrija.js). `counterPlan`
+ * turns that once into a palm target and an elbow direction, and every frame
+ * after that is a two-bone IK from wherever the shoulder has got to — so the
+ * torso can sway, breathe and turn to the queue and the hands stay planted.
+ *
+ * ── the pose ─────────────────────────────────────────────────────────────
+ *
+ * Leaning on his forearms, which is what a man behind a bar-height counter
+ * with nothing to do looks like: upper arms down at his sides, elbows back a
+ * little, forearms along the top and angled in, palms flat. It is also the
+ * only one of the natural answers this rig can draw. It has no wrist — hand
+ * and forearm are one bone — so a palm is flat only when the FOREARM is,
+ * and the classic straight-armed "hands on the bar" needs a ninety-degree
+ * wrist that is not there: tried on paper, it puts the fingertips straight
+ * down into the counter with the palm facing the shop.
+ *
+ * Level where the elbow can get down to the top, which is most of them; on a
+ * tall man at a low counter it cannot, the upper arm hangs as far as it goes
+ * and the forearm slopes to meet the top (MINI, 0.97 m over his feet, is the
+ * one where that happens). The rest is keeping the hands ON the counter: the
+ * counter is 0.34 m deep in front of a man standing behind its panel, and the
+ * forearm and hand together are 0.43 to 0.52 m — so they angle inward until
+ * the fingertips are inside the front edge, and stop short of crossing.
+ *
+ * ── the palm ─────────────────────────────────────────────────────────────
+ *
+ * `crowd_far.py` bakes the arms hanging with the palm to the thigh and the
+ * thumb forward — measured off the bake, the hand's thin axis is lateral —
+ * so the forearm's rest frame is (down, medial) and the solve maps it to
+ * (along the forearm, the part of straight down perpendicular to it). That
+ * is the whole of "palms down", and it is exact for a level forearm.
+ */
+const COUNTER = {
+  // How far forward he leans at the waist, radians. The head has to clear
+  // whatever hangs behind the counter — the slasticarnica's mirror is at
+  // `s0 − 0.11` — from a man whose hips are now behind the panel.
+  lean: 0.30,
+  // Elbow to palm centre over shoulder to elbow. Off the three male bakes:
+  // 1.31, 1.32 and 1.33.
+  fore: 1.32,
+  // Palm centre over the counter top, and the forearm at the elbow over the
+  // palm; body metres. Half a hand's thickness, and a forearm that is a hair
+  // off level so it rests on the top rather than sinking into it.
+  palm: 0.018, elbow: 0.022,
+  // Palm centre to fingertip, and how far inside the front edge the tips stop.
+  tip: 0.09, inset: 0.04,
+  // How far the forearms turn in, radians — and the closest the palms get to
+  // the midline, so that two hands never go through each other.
+  bMin: 0.20, bMax: 1.20, mid: 0.055,
+  // Which way the elbow swings, mostly out and a little back, and the most
+  // it swings. 0.9 rad puts it 0.2 m out from the shoulder.
+  out: 0.95, back: 0.31, phiMax: 0.90,
+  // How far over the top the shoulder may be, in upper arms, before he bends
+  // his knees to bring it down — cos 0.55, a third of a radian of swing
+  // left — and the most he bends them, body metres.
+  level: 0.85, crouch: 0.15,
+};
+const _cS = new THREE.Vector3(), _cE = new THREE.Vector3();
+const _cD = new THREE.Vector3(), _cN = new THREE.Vector3();
+const _cB = new THREE.Vector3(), _cA = new THREE.Vector3();
+const _cV = new THREE.Vector3();
+const _cZ = new THREE.Vector3(0, 0, 1), _cDown = new THREE.Vector3(0, -1, 0);
+const _cQp = new THREE.Quaternion(), _cQu = new THREE.Quaternion();
+const _cQl = new THREE.Quaternion();
+const _cM0 = new THREE.Matrix4(), _cM1 = new THREE.Matrix4();
+const _cA0 = new THREE.Vector3(0, -1, 0), _cN0 = new THREE.Vector3();
+const _cB0 = new THREE.Vector3();
+
+/**
+ * Where this figure's hand goes, and which way its elbow points, on one side
+ * (`side` +1 is the right arm, which the bake puts at +z). Once per figure:
+ * written against the neutral lean, in the figure's own unscaled frame —
+ * x forward, y up from the feet — so the counter's world metres are divided
+ * by the figure's scale on the way in.
+ */
+function counterPlan(f, fg, side) {
+  const C = fg.counter, k = fg.scale || 1;
+  const U = side > 0 ? f.armRU : f.armLU, L = side > 0 ? f.armRL : f.armLL;
+  const u = L.position.length(), lf = u * COUNTER.fore;
+  const top = C.top / k + COUNTER.palm;
+  const edge = C.edge / k;
+  // The shoulder with the lean on and nothing else.
+  _cQu.setFromAxisAngle(_cZ, -COUNTER.lean);
+  const S = new THREE.Vector3().copy(U.position).applyQuaternion(_cQu)
+    .add(f.torso.position);
+  S.x += f.pelvis.position.x; S.y += f.restY; S.z += f.pelvis.position.z;
+  // AND A BEND AT THE KNEE for a tall man at a low counter, which is what a
+  // tall man at a low counter does. Leaning on his forearms wants the elbow
+  // down at the top with some swing left in the upper arm to take it out
+  // sideways; with his shoulders more than `level` of an upper arm over the
+  // top there is none, and the first build sloped his forearms instead and
+  // pointed his fingers into the counter. Up to `crouch`, and nobody sees
+  // the knees: they are behind the panel.
+  const ey = top + COUNTER.elbow;
+  const drop = Math.min(COUNTER.crouch, Math.max(0, S.y - ey - COUNTER.level * u));
+  S.y -= drop;
+  const thigh = f.legLL.position.length(), shin = Math.max(0.2, f.restY - thigh);
+  const knee = Math.acos(Math.max(0.5, 1 - drop / (thigh + shin)));
+  // The elbow, and the one free choice in this pose is how far out it goes.
+  //
+  // Out is what makes the room. The forearm and hand together are longer
+  // than the counter is deep in front of him, so they have to lie across it
+  // at an angle, and how far they can turn in is how far the elbow is from
+  // his middle. A heavy man's short arms fit with the elbows at his sides;
+  // a tall young man's do not, and put there they had their palms hanging
+  // off the front edge in the air — the first build of this, photographed.
+  //
+  // So the swing is searched, from the elbow straight down to well out,
+  // and the first one that fits is the one used: fingertips inside the
+  // edge (`inset`), palms short of the midline (`mid`), and the elbow never
+  // below the top it is resting on. Level forearms where the arm is long
+  // enough to get the elbow down to the top; where it is not, the forearm
+  // slopes to meet it, which costs the fingertips a few centimetres of
+  // counter top and nobody at the counter can see them.
+  const E = new THREE.Vector3();
+  let sa = 0, ca = 1, cb = 1, sb = 0;
+  for (let phi = 0; phi <= COUNTER.phiMax + 1e-6; phi += 0.025) {
+    const sp = Math.sin(phi);
+    E.set(S.x - u * sp * COUNTER.back, S.y - u * Math.cos(phi),
+      S.z + side * u * sp * COUNTER.out);
+    if (E.y < ey && phi < COUNTER.phiMax) continue;
+    E.y = Math.max(E.y, ey);
+    sa = Math.min(0.9, Math.max(0, E.y - top) / lf);
+    ca = Math.sqrt(1 - sa * sa);
+    cb = (edge - COUNTER.inset - E.x) / ((lf + COUNTER.tip) * ca);
+    cb = Math.min(Math.cos(COUNTER.bMin), Math.max(Math.cos(COUNTER.bMax), cb));
+    sb = Math.sqrt(1 - cb * cb);
+    if (lf * ca * sb <= side * E.z - COUNTER.mid) break;
+  }
+  // Out of room anyway: keep the hands apart and let the tips overhang.
+  const room = Math.max(0, side * E.z - COUNTER.mid);
+  if (lf * ca * sb > room) {
+    sb = room / (lf * ca);
+    cb = Math.sqrt(Math.max(0, 1 - sb * sb));
+  }
+  const P = new THREE.Vector3(E.x + lf * ca * cb, E.y - lf * sa,
+    E.z - side * lf * ca * sb);
+  return { P, pole: E.sub(S), drop, knee };
+}
+
+/**
+ * Put both hands on the counter: two-bone IK, shoulder to palm, bent toward
+ * the planned elbow, then the forearm turned palm-down about its own length.
+ * Everything is composed in the figure's root frame and handed back to each
+ * joint as a local quaternion, so the torso's lean and sway are whatever the
+ * pose above set them to and the arm simply answers them.
+ */
+function counterArms(f, fg) {
+  if (!fg.counter) return;
+  if (!fg.cArm || fg.cArmBody !== fg.body) {
+    fg.cArm = [counterPlan(f, fg, 1), counterPlan(f, fg, -1)];
+    fg.cArmBody = fg.body;
+  }
+  // The crouch goes on first, because the shoulder is measured off it.
+  const cr = fg.cArm[0];
+  if (cr.drop > 0) {
+    f.pelvis.position.y -= cr.drop;
+    f.legLU.rotation.z += cr.knee;
+    f.legRU.rotation.z += cr.knee;
+    f.legLL.rotation.z -= 2 * cr.knee;
+    f.legRL.rotation.z -= 2 * cr.knee;
+  }
+  // The upper arm's parent frame: pelvis, then torso.
+  _cQp.copy(f.pelvis.quaternion).multiply(f.torso.quaternion);
+  for (const side of [1, -1]) {
+    const U = side > 0 ? f.armRU : f.armLU, L = side > 0 ? f.armRL : f.armLL;
+    const pl = fg.cArm[side > 0 ? 0 : 1];
+    _cS.copy(U.position).applyQuaternion(f.torso.quaternion)
+      .add(f.torso.position).applyQuaternion(f.pelvis.quaternion)
+      .add(f.pelvis.position);
+    const u = L.position.length(), lf = u * COUNTER.fore;
+    _cD.copy(pl.P).sub(_cS);
+    let d = _cD.length();
+    _cD.divideScalar(d);
+    d = Math.min(u + lf - 1e-3, Math.max(Math.abs(u - lf) + 1e-3, d));
+    const a = (u * u - lf * lf + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, u * u - a * a));
+    _cV.copy(pl.pole).addScaledVector(_cD, -pl.pole.dot(_cD)).normalize();
+    _cE.copy(_cS).addScaledVector(_cD, a).addScaledVector(_cV, h);
+    // The upper arm: the rest shoulder-to-elbow on to the solved one.
+    _cA.copy(L.position).normalize();
+    _cB.copy(_cE).sub(_cS).normalize();
+    _cQu.setFromUnitVectors(_cA, _cB);
+    U.quaternion.copy(_cQp).invert().multiply(_cQu);
+    // The forearm: (down, medial) at rest on to (along it, palm down).
+    _cD.copy(pl.P).sub(_cE).normalize();
+    _cN.copy(_cDown).addScaledVector(_cD, -_cD.dot(_cDown));
+    if (_cN.lengthSq() < 1e-6) _cN.set(1, 0, 0);
+    _cN.normalize();
+    _cB.crossVectors(_cD, _cN);
+    _cN0.set(0, 0, -side);
+    _cB0.set(side, 0, 0);
+    _cM0.makeBasis(_cA0, _cN0, _cB0).transpose();
+    _cM1.makeBasis(_cD, _cN, _cB).multiply(_cM0);
+    _cQl.setFromRotationMatrix(_cM1);
+    L.quaternion.copy(_cQu).invert().multiply(_cQl);
+  }
+}
+
+/**
  * A crowd: everybody drawn by the instanced tier, on a set of bodies.
  *
  * `bodies` is `loadCrowdBodies(sex)` — one instanced layer and one scratch
@@ -1868,127 +2088,43 @@ function makeCrowd(scene, bodies, cap) {
         skel.legLL.rotation.z = -(0.04 + 0.11 * Math.max(0, w));
         skel.legRL.rotation.z = -(0.04 + 0.11 * Math.max(0, -w));
 
-        // ELBOWS UP, and this is the number the whole pose turns on.
+        // ── THE ARMS ARE SOLVED NOW, and the typed ones are gone ──────────
         //
-        // A counter hides everything below 1.06 m, so an arm that reads at all
-        // has to have its hand ABOVE that line. The rig, measured off the bake
-        // rather than guessed: shoulder 1.38, elbow 1.07, hand 0.79, all at
-        // scale 1, and these two are drawn at 1.005 and 1.019. The old pose
-        // hung the upper arm at −0.12 and swung the forearm out flat at 1.52,
-        // which puts the hand at 1.08 m — two centimetres of wrist over the
-        // lip of the counter, from a shop the promenade looks at from four
-        // metres, and it is why the pair read as two busts with stumps.
+        // This block used to hold the elbows up at 0.55 / 1.15 and swing them
+        // through four pieces of business — a bow into the case, a hand across
+        // to the queue, a turn to the machine, a cup set down. Every one of
+        // those numbers was measured against the old tube rig, and on the
+        // MakeHuman bodies the far tier draws now they came out as two
+        // forearms up in the air with the fingers spread: the frankenstein
+        // Misha reported on 28 Sep. Both hands are flat on the counter
+        // instead, from `counterArms` below the switch — see `COUNTER`.
         //
-        // 0.55 at the shoulder and 1.15 at the elbow lifts the elbow to 1.12
-        // and puts the hand at 1.16 m, 0.45 m out: a hand ON the counter
-        // rather than under it, and both of them in the frame.
-        const eUp = 0.55, eFl = 1.15;
-        skel.armLU.rotation.x = SPLAY * 1.5;
-        skel.armRU.rotation.x = -SPLAY * 1.5;
-        skel.armLU.rotation.z = eUp;
-        skel.armRU.rotation.z = eUp;
-        skel.armLL.rotation.z = eFl;
-        skel.armRL.rotation.z = eFl;
-
-        // The idle head. Never at the sea, because that way is a mirror — it
-        // sweeps the shop and the queue, on two frequencies so that it arrives
-        // somewhere and looks about once it is there.
+        // The businesses survive as what the BODY does, because that is what
+        // still reads with the hands planted: the bow is a lean further in
+        // with the head down, the pass is the head up and round to the
+        // queue, the machine is a turn from the waist. Smaller than they were
+        // — a torso cannot swing 0.62 rad over two hands that do not move.
         let hy = Math.sin(ph * 0.27 * rate) * 0.30
           + Math.sin(ph * 0.58 * rate + 1.1) * 0.11;
-        let hz = -0.05;
-        let ty = Math.sin(ph * 0.27 * rate) * 0.10;
-        let tz = -0.04;
-
+        // The lean, and the chin brought back up by most of it so that he
+        // looks across the counter rather than into it. See `COUNTER.lean`.
+        let tz = -COUNTER.lean + Math.sin(ph * 0.21 * rate) * 0.015;
+        let hz = COUNTER.lean * 0.75;
+        let ty = Math.sin(ph * 0.27 * rate) * 0.06;
         if (!bar) {
-          // THE BOW. The case is 0.5 m east of where he stands, which is his
-          // own left — he faces the sea and the shore's `t` runs east — so it
-          // is a lean forward with a quarter turn into it and the chin down.
-          //
-          // 0.24 and not 0.30, and the six hundredths are the difference
-          // between a man and a man with a hole in him. The shoulder sits
-          // 0.42 m above the waist pivot this leans about, so it travels
-          // 0.42·sin(lean) SEAWARD — 0.14 m at 0.34 rad, which puts it at
-          // `s0−0.29`. The counter's front panel is a plane at `s0−0.28`, and
-          // in front of a plane there is no such thing as nearly hidden: at
-          // one centimetre out the whole of everything hanging off that
-          // shoulder renders in full. 0.28 rad total keeps it at `s0−0.266`.
-          tz -= dig * 0.24;
-          ty += dig * 0.34;
-          hz -= dig * 0.34;
-          hy = hy * (1 - dig) + dig * 0.30;
-          // AND THE ELBOW NEVER GOES BELOW THE COUNTER, which is the one rule
-          // this pose has. It is arithmetic: the elbow hangs at
-          // 1.39 − 0.31·cos θ off the shoulder angle θ, the counter is at
-          // 1.06, and the arm is 0.04 m thick — so θ must stay over 0.54 rad
-          // or the elbow is under the lip. Below that the forearm and the hand
-          // hang in front of the panel and there is a bare arm in the air over
-          // the promenade, which is the fault the old note recorded and which
-          // this pass reproduced twice: once at −0.45/−0.85, which hangs the
-          // arm at 39° and drops the hand to `s0−0.51`, and once at
-          // −0.62/−1.05, which hangs it plumb at 0.79 m and looked, from the
-          // promenade, like a pair of legs standing in front of the shop.
-          // Photographed both times; the arithmetic that said it would be
-          // hidden had left the lean out.
-          //
-          // So the bow closes the ELBOW and leaves the shoulder alone. 0.60 at
-          // the shoulder and 1.75 at the elbow puts the hand at 1.19 m and
-          // 0.47 m out — with the lean, 0.10 m over the counter top and 0.42 m
-          // in front of its face. Both hands out low over the counter with the
-          // head down between them, which is what reaching into a case looks
-          // like from the far side of one.
-          skel.armLU.rotation.z = eUp + dig * 0.05 + pass * 0.06;
-          skel.armLL.rotation.z = eFl + dig * 0.60;
-          // THE HAND ACROSS, on the other arm and on the other half of the
-          // cycle. His right is west, which is where the two children at the
-          // open counter are, and 1.05 at the shoulder with 0.77 at the elbow
-          // reaches the hand to 1.30 m and 0.55 m out — a quarter of a metre
-          // above the counter top and a third of a metre in front of its face,
-          // which is an arm out over a counter and cannot be read as anything
-          // else. It is 0.24 m clear of the counter slab at its lowest, so
-          // there is nothing here for rule 5 to catch.
-          //
-          // The two businesses have to be told apart at four metres, so they
-          // are told apart by more than the arm: the bow is both hands LOW and
-          // the head down and the body turned to the case, the pass is one
-          // hand HIGH and the head up and the body square to the queue.
-          skel.armRU.rotation.z = eUp + dig * 0.05 + pass * 0.50;
-          skel.armRL.rotation.z = eFl + dig * 0.60 - pass * 0.38;
-          skel.armRU.rotation.x = -SPLAY * 1.5 + pass * SPLAY * 1.1;
-          tz -= pass * 0.09;
-          ty -= pass * 0.13;
-          hy = hy * (1 - pass) - pass * 0.16;
-          hz += pass * 0.05;
+          tz -= dig * 0.08;
+          hz -= dig * 0.30;
+          hy = hy * (1 - dig) + dig * 0.25;
+          hy = hy * (1 - pass) - pass * 0.35;
+          hz += pass * 0.04;
+          ty -= pass * 0.05;
         } else {
-          // THE TURN TO THE MACHINE. 0.62 rad is 35°, and the point of doing
-          // it in the torso rather than in the arm is that a turned body aims
-          // the arm for nothing: his forward is then 35° west of seaward, so
-          // the same elbow-up posture puts his hand at 0.26 m west and 0.37 m
-          // out — over the grinder at t 331.63, which is 0.37 m west of him.
-          // An arm swung out sideways from a square body reaches the same
-          // place and reads as a man pointing at a wall.
-          ty -= pull * 0.62;
-          hy = hy * (1 - pull) - pull * 0.34;
-          hz -= pull * 0.26;
-          tz -= pull * 0.10;
-          skel.armRU.rotation.z = eUp + pull * 0.32;
-          skel.armRL.rotation.z = eFl - pull * 0.22;
-          skel.armRU.rotation.x = -SPLAY * 1.5 - pull * SPLAY * 1.6;
-          // The other arm stays at the counter through the turn — nobody works
-          // a machine with both hands and nothing to lean on. It comes DOWN by
-          // a tenth and no more: the elbow floor above is 0.54 rad and this
-          // one starts at 0.55.
-          skel.armLU.rotation.z = eUp - pull * 0.10;
-
-          // AND THE CUP DOWN. Back square to the counter, a shade of a lean
-          // into it, and the left hand out and down to where a saucer would
-          // go. Smaller than the gelato man's reach on purpose: he is putting
-          // something down 0.4 m away, not handing it to a child a metre off.
-          skel.armLU.rotation.z += set * 0.38;
-          skel.armLL.rotation.z = eFl - set * 0.24;
-          tz -= set * 0.11;
-          ty += set * 0.09;
-          hy = hy * (1 - set) + set * 0.12;
-          hz -= set * 0.16;
+          ty -= pull * 0.18;
+          hy = hy * (1 - pull) - pull * 0.55;
+          hz -= pull * 0.10;
+          tz -= set * 0.06;
+          hy = hy * (1 - set) + set * 0.10;
+          hz -= set * 0.22;
         }
 
         skel.torso.rotation.z = tz;
@@ -1996,6 +2132,9 @@ function makeCrowd(scene, bodies, cap) {
         skel.torso.rotation.x = -w * 0.045;
         skel.head.rotation.z = hz;
         skel.head.rotation.y = hy;
+        // Last, because it answers everything above: the shoulder is wherever
+        // the lean and the sway have put it this frame.
+        counterArms(skel, fg);
         break;
       }
 
