@@ -1567,6 +1567,17 @@ WEAR_NOT = re.compile(r"\b(on|in) (the|that|a|your|her|my)\s+"
                       r"bag|satchel|pocket|hand|hands)\b")
 
 
+def short_wear(text: str):
+    """`wear:<key>` for the verbless "<thing> on" — "ankle cuffs on", "legirons on"."""
+    t = re.sub(r"[^\w\s']", " ", (text or "").lower()).strip()
+    if not re.search(r"\bon\s*$", t) or len(t.split()) > 5:
+        return None
+    for key, pat in WEAR_WORDS:
+        if re.search(r"\b(" + pat + r")", t):
+            return "wear:" + key
+    return None
+
+
 def wear_of(text: str):
     """`wear:<key>` if the sentence puts something that is out on to her."""
     t = (text or "").lower()
@@ -1649,7 +1660,20 @@ def skills_of(text: str) -> list:
     ham = hammock_of(t)
     if ham and (ASK_RE.search(t) or ham == "hammock.out" or bare_skill(t)):
         return [ham]
+    # AND "LEG CUFFS ON" IS A REQUEST TOO. Misha, 28 Sep 2026, typing at her
+    # in the kabina: "legirons on", "leg cuffs on", "put on legcuffs" — and
+    # every one of them was talk, because none has a shape `ASK_RE` knows (no
+    # modal, no please, and "put on <one word>" is not the "put on the <noun>"
+    # the opener list carries). A sentence that names a thing she can wear and
+    # says put it on or take it off is a request whatever else it lacks; the
+    # short form "<thing> on" / "<thing> off" counts as that too.
     if not ASK_RE.search(t):
+        don = wear_of(t) or short_wear(t)
+        if don:
+            return [don]
+        off = doff_of(t)
+        if off:
+            return [off]
         bare = bare_skill(t)
         return [bare] if bare else []
     # THE FETCH GOES FIRST, because it shares its nouns with the recon: "go see
