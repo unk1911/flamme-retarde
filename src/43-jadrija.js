@@ -13113,22 +13113,28 @@ async function buildJadrija(scene) {
       // the livery band on the kiosk behind it. 0.66 is 27 degrees, which is
       // what the frame has.
       const eaveY = gy + 2.06, peak = gy + 2.72;
-      post(W, pt2, ps2, gy, gy + 0.13, 0.30, [0.325, 0.320, 0.310], 8);
-      post(W, pt2, ps2, gy + 0.06, eaveY + 0.30, 0.036,
-        [0.545, 0.540, 0.525], 6);
-      const cor = [[pt2 - half, ps2 - half], [pt2 + half, ps2 - half],
-        [pt2 + half, ps2 + half], [pt2 - half, ps2 + half]];
-      for (let i = 0; i < 4; i++) {
-        const a2 = cor[i], c2 = cor[(i + 1) % 4];
-        b.quad(W(pt2, ps2, peak), W(a2[0], a2[1], eaveY),
-          W(c2[0], c2[1], eaveY), W(pt2, ps2, peak),
-          i % 2 ? cloth : shade(cloth, 0.94));
-        // And the underside, because you stand under this one.
-        b.quad(W(c2[0], c2[1], eaveY - 0.012), W(a2[0], a2[1], eaveY - 0.012),
-          W(pt2, ps2, peak - 0.012), W(pt2, ps2, peak - 0.012),
-          shade(cloth, 0.80));
-      }
-      brandRing(key, cor, eaveY, eaveY - 0.20);
+      // The base, which was an octagonal drum: a round cast plate, chamfered,
+      // with a boss the pole sockets into — the weighted foot a hired market
+      // umbrella comes with. Same 0.30 m and 0.13 m.
+      const PL = [0.325, 0.320, 0.310];
+      knLathe(W, pt2, ps2, [[gy + 0.002, 0.288], [gy + 0.012, 0.300],
+        [gy + 0.070, 0.300], [gy + 0.100, 0.272], [gy + 0.110, 0.120],
+        [gy + 0.130, 0.070], [gy + 0.160, 0.052], [gy + 0.160, 0]], PL, 28);
+      // Square, and it stays square: four ribs to the corners the four flat
+      // facets ran to, the same peak and the same eave, and the cloth between
+      // two ribs a tensioned sheet — nearly straight along a rib (`pow` 1.1
+      // against the flat facet's 1.0) and sagging 5 cm at the middle of each
+      // edge, which is what a taut square of canvas on four spokes does. It
+      // used to be drawn twice, the underside 12 mm under the top and a shade
+      // darker; it is one sheet now and the underside is the same cloth lit
+      // from below.
+      smoothParasol({ t: pt2, s: ps2, n: 4, a0: -0.75 * Math.PI,
+        R: half * Math.SQRT2, hub: peak, rim: eaveY, sag: 0.050, pow: 1.1,
+        cols: 10, cloth: (p) => (p % 2 ? cloth : shade(cloth, 0.94)),
+        frame: [0.600, 0.596, 0.582], ribR: 0.012,
+        brand: key, drop: 0.20,
+        pole: { y0: gy + 0.10, r: 0.036, col: [0.545, 0.540, 0.525] },
+        crank: gy + 1.25 });
       furniture.push({ t: pt2, s: ps2, a: 0.34, c: 0.34, h: 0.13, y: gy });
     }
     // Two garden benches under the shade, timber slats on a dark frame with a
@@ -13884,6 +13890,193 @@ async function buildJadrija(scene) {
           P(bl[(j + 1) % bl.length][0], bl[(j + 1) % bl.length][1], y0), [0, -1, 0], col);
       }
     }
+  }
+
+  // ── THE PARASOLS, SMOOTH ──────────────────────────────────────────────────
+  //
+  // Misha, 28 Sep 2026, yes to *"give the cream parasols along the promenade
+  // the same smooth treatment the konoba's got"*. The konoba's parasol came
+  // out of 1.541.1 as the one parasol on the shore built like a parasol, and
+  // it made every other one look like what it was: eight flat triangles from
+  // a point to an octagon, drawn twice, each with one normal. The cafés'
+  // CORONA octagons, the kiosk's two square market ones, the tavern's crimson
+  // one, MINI's two taupe cantilevers and furled Stella, and every hired one
+  // on the sand went the same way.
+  //
+  // So `smoothParasol` is the konoba's parasol made general, and it is the
+  // same three findings: the cloth is ONE sheet through `knSurf`, so a rib is
+  // a crease the light rolls over and the sag between two is a real hollow;
+  // the frame is round tubes — ribs 25 mm under the cloth, a stretcher to
+  // each from a runner on the pole, a hub, a finial — which from underneath
+  // is most of what a parasol is; and the rim is a STRAIGHT CHORD between two
+  // rib tips, because cloth stretched between two spokes runs straight. That
+  // last one is also what makes square and round the same builder: a square
+  // market umbrella is four ribs to the corners with a chord between each
+  // pair, and it stays square; a café parasol is eight with the cloth domed
+  // along a rib. What differs is `pow` — 1.5 is a dome, nearly flat at the
+  // crown, and 1.0 is the old flat facet exactly — and how much the cloth
+  // sags between the ribs.
+  //
+  // Every number that fixes where a parasol is and how big it is — centre,
+  // turn, rib count, rib reach, crown height, eave height, hem drop, colours —
+  // is the caller's and is the number it shipped with. Nothing here draws on
+  // `rng` (rule 4), and nothing here is a blocker: the callers push exactly
+  // what they pushed before.
+  //
+  // The konoba's own parasol is NOT rebuilt through this. It shipped this
+  // morning and is signed off, and a refactor that changes its triangles by
+  // a rounding is a change nobody asked for. This is its twin, not its owner.
+  /**
+   * A parasol's canopy, valance and frame, smooth.
+   *
+   * `o.t`, `o.s` the pole in the shore frame and `o.ang` a turn about it;
+   * `o.n` ribs, the first at `o.a0`, each `o.R` long in plan; the cloth at
+   * `o.hub` over the pole and `o.rim` at a rib tip, falling as `u^pow` along
+   * a rib and sagging `o.sag` between two at the rim. `o.cloth(panel, row,
+   * col)` colours one quad — `col` runs 0..`cols`−1 across the panel — so a
+   * striped or littered canopy keeps its hard edges while the light over it
+   * stays smooth. `o.brand` and `o.drop` hang a printed valance off the rim
+   * through `brandBand`. `o.pole` is `{ y0, r, col }` and runs to the crown;
+   * `o.crank` puts a winding handle on it at that height. `o.frame` is the
+   * ribs, runner and hub, `o.ribR` a rib's radius, `o.run` how far under the
+   * crown the runner hangs (a third of a rib unless told), and `o.finial`
+   * its colour or `false`. `o.segs` and `o.cols` are the sheet's rings and
+   * columns to a panel.
+   */
+  function smoothParasol(o) {
+    const ca = Math.cos(o.ang || 0), sa = Math.sin(o.ang || 0);
+    // Local (x, z) about the pole to the shore frame, then to the world.
+    const L = (x, z, y) => [o.t + x * ca - z * sa, o.s + x * sa + z * ca, y];
+    const P = (x, z, y) => W(o.t + x * ca - z * sa, o.s + x * sa + z * ca, y);
+    const n = o.n, R = o.R, hub = o.hub, rim = o.rim, sag = o.sag || 0;
+    const pw = o.pow || 1.5, COL = o.cols || 6, SEG = o.segs || 8;
+    const FR = o.frame;
+    const ribA = (i) => (o.a0 || 0) + (i / n) * TAU;
+    const rimXZ = (i, v) => {
+      const A = ribA(i), B = ribA(i + 1);
+      return [R * (Math.cos(A) + (Math.cos(B) - Math.cos(A)) * v),
+        R * (Math.sin(A) + (Math.sin(B) - Math.sin(A)) * v)];
+    };
+    const yAt = (u, v) => hub - (hub - rim) * Math.pow(u, pw)
+      - sag * Math.sin(Math.PI * v) * u * u;
+    const can = (i, u, v) => {
+      const [x, z] = rimXZ(i, v);
+      return P(x * u, z * u, yAt(u, v));
+    };
+    // The cloth: one wrapped sheet, `cols` columns to a panel and `segs`
+    // rings out from a collar 2% of the way along the rib, which the hub and
+    // the finial close.
+    {
+      const G = [];
+      for (let i = 0; i <= SEG; i++) {
+        const u = 0.02 + 0.98 * Math.pow(i / SEG, 0.85);
+        const row = [];
+        for (let j = 0; j < n * COL; j++) row.push(can(Math.floor(j / COL), u, (j % COL) / COL));
+        G.push(row);
+      }
+      knSurf(G, null, { wrap: true, down: true,
+        q: (i, j) => o.cloth(Math.floor(j / COL), i, j % COL) });
+    }
+    // The valance, through the same rim points the cloth ends on, so the two
+    // meet at an edge and never overlap (rule 5). Built by increasing angle
+    // and reversed, for the reason written over `brandRing`.
+    if (o.brand) {
+      const ring = [];
+      for (let j = 0; j < n * COL; j++) ring.push(can(Math.floor(j / COL), 1, (j % COL) / COL));
+      ring.reverse();
+      ring.push(ring[0]);
+      brandBand(o.brand, ring, ring.map((p) => [p[0], p[1] - o.drop, p[2]]));
+    }
+    // The ribs, round, under the cloth and stopping short of the valance, and
+    // a stretcher to each from the runner — the konoba's frame at this
+    // parasol's size. The runner hangs a third of a rib under the crown.
+    const rr = o.ribR || 0.010;
+    const run = hub - (o.run || 0.33 * R);
+    const ribAt = (i, u, dy) => {
+      const A = ribA(i);
+      return L(Math.cos(A) * R * u, Math.sin(A) * R * u, yAt(u, 0) - dy);
+    };
+    for (let i = 0; i < n; i++) {
+      tubeTS([0.04, 0.28, 0.55, 0.80, 0.985].map((u) => ribAt(i, u, rr + 0.012)),
+        (k) => [rr * (1 - 0.18 * (k / 4)), rr * 0.75], FR, 8, [0, 0, 1], 0.10);
+      const A = ribA(i);
+      tubeTS([L(Math.cos(A) * 0.040, Math.sin(A) * 0.040, run), ribAt(i, 0.42, rr + 0.020)],
+        rr * 0.6, FR, 6, [0, 0, 1], 0.08);
+    }
+    knLathe(P, 0, 0, [[run - 0.045, 0.028], [run - 0.036, 0.037],
+      [run + 0.036, 0.037], [run + 0.045, 0.028]], FR, 14);
+    knLathe(P, 0, 0, [[hub - 0.085, 0.026], [hub - 0.068, 0.046],
+      [hub - 0.026, 0.050], [hub - 0.010, 0.028]], FR, 14);
+    // The finial, which also closes the cloth round the pole. (`false` where
+    // something else closes it — a cantilever's arm.)
+    if (o.finial !== false) {
+      knLathe(P, 0, 0, [[hub - 0.012, 0.040], [hub + 0.014, 0.040],
+        [hub + 0.034, 0.027], [hub + 0.062, 0.021], [hub + 0.084, 0.010],
+        [hub + 0.090, 0]], o.finial || FR, 14);
+    }
+    if (o.pole) {
+      const { y0, r, col } = o.pole;
+      tubeTS([L(0, 0, y0), L(0, 0, (y0 + hub) / 2), L(0, 0, hub - 0.02)],
+        r, col, 14, [1, 0, 0], 0.16);
+      // The crank: a housing on the pole, an arm out to the side and a dark
+      // handle, which is how a canopy this size gets up.
+      if (o.crank != null) {
+        const y = o.crank, rh = r + 0.012;
+        knLathe(P, 0, 0, [[y - 0.068, r + 0.002], [y - 0.056, rh], [y + 0.056, rh],
+          [y + 0.068, r + 0.002]], col, 14);
+        tubeTS([L(rh, 0, y), L(rh + 0.068, 0, y), L(rh + 0.085, 0, y - 0.018),
+          L(rh + 0.087, 0, y - 0.038)], 0.0070, col, 8, [0, 1, 0]);
+        const hx = L(rh + 0.087, 0, 0);
+        knLathe(W, hx[0], hx[1], [[y - 0.118, 0], [y - 0.112, 0.010],
+          [y - 0.052, 0.012], [y - 0.039, 0.007], [y - 0.038, 0]],
+        [0.050, 0.048, 0.046], 10);
+      }
+    }
+  }
+
+  /**
+   * The base every parasol on this coast stands in: a car's wheel rim laid
+   * flat and poured full of exposed aggregate, crowned where the float left
+   * it, with a sleeve where the pole goes in. Turned, the way the konoba's
+   * is, at the rim radius `Rr` and the heights the flat one shipped with.
+   */
+  function wheelBase(t, s, y, Rr, Hr, Hf, crown, sleeve) {
+    knLathe(W, t, s, [[y + 0.002, Rr - 0.015], [y + 0.012, Rr],
+      [y + Hr - 0.014, Rr], [y + Hr, Rr - 0.016], [y + Hr, Rr - 0.048]],
+    [0.140, 0.128, 0.118], 28);
+    const F = Rr - 0.047;
+    const FILL = [0.520, 0.492, 0.442], TOP = [0.545, 0.516, 0.464];
+    knLathe(W, t, s, [[y + Hr - 0.002, F], [y + Hf - 0.012, F - 0.004],
+      [y + Hf, F - 0.040], [y + Hf + crown * 0.7, F * 0.55], [y + Hf + crown, 0.06],
+      [y + Hf + crown, 0]], (i) => (i >= 2 ? TOP : FILL), 28);
+    if (sleeve) {
+      knLathe(W, t, s, [[y + Hf + crown - 0.01, sleeve[0]], [y + sleeve[1] - 0.012, sleeve[0]],
+        [y + sleeve[1], sleeve[0] - 0.014]], [0.480, 0.472, 0.452], 14);
+    }
+  }
+
+  /**
+   * A furled parasol: the cloth wound round the pole in eight gathered
+   * gores, fattest a third of the way up, and a strap round it. `prof` is
+   * `[y, r]` bottom to top, as it shipped as a lathe.
+   */
+  function furledCloth(t, s, prof, col) {
+    const G = [];
+    const C = 40;
+    for (const [y, r] of prof) {
+      const row = [];
+      for (let j = 0; j < C; j++) {
+        const a = (j / C) * TAU;
+        const rj = r * (0.90 + 0.10 * Math.cos(8 * a + y * 1.7));
+        row.push(W(t + Math.cos(a) * rj, s + Math.sin(a) * rj, y));
+      }
+      G.push(row);
+    }
+    // Outward from the axis at each ring's own height: one centre for a
+    // bundle two metres tall and twenty centimetres across would turn the
+    // top and bottom rings inside out.
+    const ax = prof.map(([y]) => W(t, s, y));
+    knSurf(G, col, { wrap: true, out: (i) => ax[i] });
   }
 
   /**
@@ -16278,29 +16471,31 @@ async function buildJadrija(scene) {
       // degrees, which is what the frame has — a market canopy is a taut sheet
       // with a slight crown, and anything steeper reads as a circus tent.
       const cy = top - 0.055;
-      const eave = cy - 0.34, crown = 0.34;
-      for (let e = 0; e < 4; e++) {
-        const sg = e < 2 ? 1 : -1, ax = e % 2 === 0;
-        const A = ax ? [t + sg * HALF, cs - HALF] : [t - HALF, cs + sg * HALF];
-        const Bp = ax ? [t + sg * HALF, cs + HALF] : [t + HALF, cs + sg * HALF];
-        const C = ax ? [t + sg * crown, cs + crown] : [t + crown, cs + sg * crown];
-        const D = ax ? [t + sg * crown, cs - crown] : [t - crown, cs + sg * crown];
-        const cl = e % 2 ? CANV : shade(CANV, 1.06);
-        b.quad(W(A[0], A[1], eave), W(Bp[0], Bp[1], eave),
-          W(C[0], C[1], cy), W(D[0], D[1], cy), cl);
-        b.quad(W(D[0], D[1], cy), W(C[0], C[1], cy),
-          W(Bp[0], Bp[1], eave), W(A[0], A[1], eave), shade(cl, 0.86));
-      }
-      // THE CROWN, which was a 0.68 m square hole in the middle of the cloth.
-      // Four panels rising to a small square and no square drawn: while the
-      // mast came up through the middle it was plugged by the mast and nobody
-      // could see it, and the moment the crank moved the mast off to one side
-      // it opened on to the sky. Both windings, like the panels, because you
-      // spend this terrace underneath it.
-      const cq = [W(t - crown, cs - crown, cy), W(t + crown, cs - crown, cy),
-        W(t + crown, cs + crown, cy), W(t - crown, cs + crown, cy)];
-      b.quad(cq[0], cq[1], cq[2], cq[3], shade(CANV, 1.10));
-      b.quad(cq[3], cq[2], cq[1], cq[0], shade(CANV, 0.86));
+      const eave = cy - 0.34;
+      // The canopy. Four panels falling from the crown to the eaves, and a
+      // valance hanging straight down off the rim. You spend the whole of this
+      // terrace underneath one, and the underside is what you are actually
+      // looking at.
+      //
+      // Nearly flat and not conical. 0.34 m of fall over 1.9 m is about ten
+      // degrees, which is what the frame has — a market canopy is a taut sheet
+      // with a slight crown, and anything steeper reads as a circus tent.
+      //
+      // And now it is that sheet — see "THE PARASOLS, SMOOTH". Four ribs to
+      // the four corners it always had, domed along each (`pow` 1.5, which is
+      // the "slight crown" the flat square in the middle used to stand in
+      // for) and sagging 6 cm between them at the edge, with the frame under
+      // it that a cantilever hangs its cloth from: ribs, stretchers, and the
+      // runner on a short stem under the hub, which is where the arm holds it.
+      // The crown is the cloth's own now, so the hole the crank once opened
+      // in the middle of it cannot come back. The arm still dies inside it.
+      const HI = shade(CANV, 1.06);
+      smoothParasol({ t, s: cs, n: 4, a0: -0.75 * Math.PI, R: HALF * Math.SQRT2,
+        hub: cy, rim: eave, sag: 0.060, pow: 1.5, cols: 10, segs: 10,
+        cloth: (p) => (p === 1 || p === 2 ? HI : CANV),
+        frame: MAST, ribR: 0.014, finial: false, run: 0.42,
+        pole: { y0: cy - 0.52, r: 0.030, col: MAST },
+        brand: 'jamnica', drop: 0.23 });
       // The valance, 0.23 m of it, which is the band the eye reads the canopy's
       // edge off. Without it the four panels end in a line in the air.
       //
@@ -16317,8 +16512,7 @@ async function buildJadrija(scene) {
       // print on the box's outer face is rule 5's co-planar pair exactly, and
       // standing it 0.10 m off would be a valance floating clear of its own
       // canopy. A valance is one ply of cloth and is now built as one.
-      brandRing('jamnica', [[t - HALF, cs - HALF], [t + HALF, cs - HALF],
-        [t + HALF, cs + HALF], [t - HALF, cs + HALF]], eave + 0.01, eave - 0.22);
+      // It hangs off the cloth's own rim now, 0.23 m of it as before.
       // Blocked: the plinth stops you and the mast stops you, and both are
       // things you would walk into rather than step over. The canopy is three
       // metres up and is not a blocker, which is the whole point of standing
@@ -17606,20 +17800,22 @@ async function buildJadrija(scene) {
         // the pebbles standing proud of the steel and the rim rusting round
         // them. It is the standard parasol base on this coast and it was a
         // plain grey disc. The rim first, then the fill standing above it.
-        post(W, t, s2, yy, yy + 0.15, 0.44, [0.140, 0.128, 0.118], 12);
-        // NINE ARGUMENTS INTO AN EIGHT-ARGUMENT FUNCTION, and it drew nothing.
-        // `post(P, dt, ds, y0, y1, r, col, sides)` has no `topCol`, so the
-        // second colour landed in `sides`, `i < sides` compared a number
-        // against an Array, that coerced to NaN, and the loop ran zero times.
-        // No error, no warning, no geometry: the rim has been standing empty
-        // since it was written. Found by a pass on the konoba's terrace that
-        // hit the same bug on `poseur`'s barrel drums and named these two.
-        post(W, t, s2, yy + 0.02, yy + 0.19, 0.375, [0.520, 0.492, 0.442], 12);
-        dome(W, t, s2, yy + 0.19, 0.05, 0.375, [0.545, 0.516, 0.464], 12);
-        // The nut on the collar, which is the only bright thing on it.
-        post(W, t, s2, yy + 0.19, yy + 0.27, 0.075, [0.480, 0.472, 0.452], 6);
-        post(W, t, s2, yy + 0.10, yy + 2.42, 0.035, [0.520, 0.512, 0.492], 6);
+        //
+        // (NINE ARGUMENTS INTO AN EIGHT-ARGUMENT FUNCTION once drew nothing
+        // here: `post` has no `topCol`, the second colour landed in `sides`
+        // and the loop ran zero times, so the rim stood empty until a pass on
+        // the konoba's terrace named it. `wheelBase` takes it all as numbers.)
+        //
+        // Turned now — see "THE PARASOLS, SMOOTH" — at the 0.44 m rim, the
+        // 0.15 m lip, the fill to 0.19 and its 0.05 crown it shipped with,
+        // and the nut on the collar, which is the only bright thing on it.
+        const POLE = [0.520, 0.512, 0.492];
+        wheelBase(t, s2, yy, 0.44, 0.15, 0.19, 0.05, [0.075, 0.27]);
         if (furled) {
+          tubeTS([[t, s2, yy + 0.10], [t, s2, yy + 1.30], [t, s2, yy + 2.64]],
+            0.035, POLE, 14, [1, 0, 0], 0.16);
+          knLathe(W, t, s2, [[yy + 2.63, 0.030], [yy + 2.66, 0.030],
+            [yy + 2.69, 0.020], [yy + 2.72, 0]], POLE, 14);
           // Tied: a long thin cone of cloth up the pole.
           //
           // And no band on it, which is the honest answer rather than the
@@ -17627,16 +17823,28 @@ async function buildJadrija(scene) {
           // and shows about a hand's width of it; printing CORONA up the side of
           // a tied cone would be a brand painted on a pole. After five these
           // simply stop advertising, the way they do on the boardwalk.
-          post(W, t, s2, yy + 0.95, yy + 2.62, 0.11, CREAM, 7);
+          //
+          // The same 0.95 to 2.62 and 0.11 across it shipped as, which was a
+          // heptagonal prism: now gathered in eight gores round the pole,
+          // narrowing into the tie at the foot and to the crown at the top,
+          // with the strap round its waist that says furled and not missing.
+          furledCloth(t, s2, [[yy + 0.95, 0.036], [yy + 1.06, 0.098],
+            [yy + 1.30, 0.110], [yy + 1.80, 0.106], [yy + 2.25, 0.090],
+            [yy + 2.50, 0.062], [yy + 2.62, 0.034]], CREAM);
+          knLathe(W, t, s2, [[yy + 1.60, 0.103], [yy + 1.61, 0.114],
+            [yy + 1.66, 0.114], [yy + 1.67, 0.103]], shade(CREAM, 0.80), 20);
         } else {
           const R = 1.42;
-          for (let i = 0; i < 8; i++) {
-            const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-            b.quad(W(t, s2, yy + 2.42),
-              W(t + Math.cos(a0) * R, s2 + Math.sin(a0) * R, yy + 2.04),
-              W(t + Math.cos(a1) * R, s2 + Math.sin(a1) * R, yy + 2.04),
-              W(t, s2, yy + 2.42), i % 2 ? CREAM : shade(CREAM, 0.94));
-          }
+          // Eight ribs from the same eight points, the crown at 2.42 and the
+          // rim at 2.04, the panels alternating the way they did. The cloth
+          // domes along a rib and sags 6 cm between two at the rim, and the
+          // pole now has its crank. See "THE PARASOLS, SMOOTH".
+          smoothParasol({ t, s: s2, n: 8, R, hub: yy + 2.42, rim: yy + 2.04,
+            sag: 0.060, pow: 1.35,
+            cloth: (p) => (p % 2 ? CREAM : shade(CREAM, 0.94)),
+            frame: [0.600, 0.592, 0.570], finial: POLE,
+            brand: k === spareK ? 'spare' : 'corona', drop: 0.18,
+            pole: { y0: yy + 0.10, r: 0.035, col: POLE }, crank: yy + 1.30 });
           // CORONA on the hem, and the hem is NEW: these eight panels ended in
           // a line in the air, which is the thing the beach parasols' own note
           // says a valance exists to stop. So the band pays for itself twice —
@@ -17655,11 +17863,10 @@ async function buildJadrija(scene) {
           // one Corona parasol and one still touting for an advertiser is a
           // terrace that sells Corona and has a pitch left, which is one
           // business, not two.
-          brandRing(k === spareK ? 'spare' : 'corona',
-            [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
-              const a = (i / 8) * TAU;
-              return [t + Math.cos(a) * R, s2 + Math.sin(a) * R];
-            }), yy + 2.04, yy + 1.86);
+          //
+          // It hangs off `smoothParasol` now, through the same eight rim
+          // points and the same 0.18 m of drop, and follows the scallop the
+          // sag puts in the rim.
         }
         runs.push({ t0: t - 0.5, t1: t + 0.5, s0: s2 - 0.5, s1: s2 + 0.5,
           y: yy, h: 0.10 });
@@ -22740,50 +22947,27 @@ async function buildJadrija(scene) {
    * beach underneath one.
    */
   function parasol(t, s, y, col) {
-    const P = facing(t, s, rng() * TAU);
+    // The one draw, and it stays: every bather east of here is placed off
+    // the stream after it (rule 4).
+    const ang = rng() * TAU;
     const POLE = [0.560, 0.545, 0.520];
     const WHITE = [0.930, 0.920, 0.895];
     const R = 1.18, tip = y + 2.26, rim = y + 1.84;
-    post(P, 0, 0, y, y + 2.36, 0.030, POLE, 6);
     // The foot is the same wheel rim the terrace parasols stand in, poured
-    // full of exposed aggregate — see the note on the cafe ones.
-    post(P, 0, 0, y, y + 0.13, 0.38, [0.140, 0.128, 0.118], 10);
-    // The same nine-into-eight as the cafe ones — see the note there — and on
-    // this one it costs more, because there is no `dome` after it to cap the
-    // fill. Nine hundred parasols have been standing in a hollow rusty ring
-    // with a hole through the middle of it, and from anywhere above the beach
-    // that is nine hundred holes.
-    post(P, 0, 0, y + 0.02, y + 0.17, 0.325, [0.520, 0.492, 0.442], 10);
-    dome(P, 0, 0, y + 0.17, 0.045, 0.325, [0.545, 0.516, 0.464], 10);
-    post(P, 0, 0, y + 1.94, y + 2.02, 0.058, POLE, 6);            // the hub
-
-    // `u` runs out along a rib, `v` across a panel between two of them.
-    const SEG = 3, CRS = 2;
-    const pt3 = (a, u, v) => {
-      const r = R * u;
-      // Zero at both ribs, deepest mid-panel, and growing with radius because
-      // there is more unsupported cloth further out.
-      const sag = 0.085 * Math.sin(Math.PI * v) * u * u;
-      return P(Math.cos(a) * r, Math.sin(a) * r,
-        tip - (tip - rim) * Math.pow(u, 1.5) - sag);
-    };
-    for (let i = 0; i < 8; i++) {
-      // Alternating panels, which is what every hired parasol on this coast is,
-      // and the one detail that stops a field of them looking like mushrooms.
-      const c = i % 2 ? col : WHITE;
-      const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-      for (let k = 0; k < CRS; k++) {
-        const v0 = k / CRS, v1 = (k + 1) / CRS;
-        const A0 = a0 + (a1 - a0) * v0, A1 = a0 + (a1 - a0) * v1;
-        for (let j = 0; j < SEG; j++) {
-          const u0 = j / SEG, u1 = (j + 1) / SEG;
-          const p00 = pt3(A0, u0, v0), p01 = pt3(A0, u1, v0);
-          const p11 = pt3(A1, u1, v1), p10 = pt3(A1, u0, v1);
-          b.quad(p00, p01, p11, p10, c);
-          b.quad(p10, p11, p01, p00, c);
-        }
-      }
-    }
+    // full of exposed aggregate — see the note on the cafe ones — at this
+    // one's 0.38 m, filled to 0.17 and crowned. (It was a hollow rusty ring
+    // with a hole through the middle for years, from a nine-into-eight
+    // argument slip; see the cafés'.)
+    wheelBase(t, s, y, 0.38, 0.13, 0.17, 0.045, null);
+    // `u` runs out along a rib, `v` across a panel between two of them — and
+    // it is now `smoothParasol`, with the dome, the 8.5 cm sag and the
+    // alternating panels this one found first. See "THE PARASOLS, SMOOTH":
+    // what it adds is one sheet of cloth instead of 96 flat quads drawn
+    // twice, a round pole, ribs and stretchers under it, a hub and a finial.
+    // The rim was a chord between two ribs already; it is now exactly one.
+    //
+    // Alternating panels, which is what every hired parasol on this coast is,
+    // and the one detail that stops a field of them looking like mushrooms.
     // The valance: a hand's width of cloth hanging off the rim, which every one
     // of these has and which is most of the silhouette from underneath.
     //
@@ -22806,21 +22990,11 @@ async function buildJadrija(scene) {
     // before it can be snapped to a whole number of names. So it is one band,
     // through the same scalloped rim points the panels end on — the sag is what
     // stops a printed hem reading as a hoop of card.
-    {
-      const ring = [];
-      for (let i = 0; i < 8; i++) {
-        for (let k = 0; k < CRS; k++) {
-          const v = k / CRS;
-          ring.push(pt3(((i + v) / 8) * TAU, 1, v));
-        }
-      }
-      // Backwards, for the reason written out over `brandRing`: the shore
-      // frame reverses handedness, so a rim built by increasing angle winds
-      // inward and prints on the side nobody can see.
-      ring.reverse();
-      ring.push(ring[0]);
-      brandBand('jana', ring, ring.map((p) => [p[0], p[1] - 0.12, p[2]]));
-    }
+    // (It hangs off the cloth's own rim, 0.12 m of it, from `smoothParasol`.)
+    smoothParasol({ t, s, ang, n: 8, R, hub: tip, rim, sag: 0.085, pow: 1.5,
+      cols: 4, segs: 6, cloth: (p) => (p % 2 ? col : WHITE),
+      frame: POLE, ribR: 0.008, brand: 'jana', drop: 0.12,
+      pole: { y0: y + 0.10, r: 0.030, col: POLE } });
   }
 
   /** A lounger: a frame, a back raked up at one end, and four short legs. */
@@ -25746,14 +25920,24 @@ async function buildJadrija(scene) {
       const pt0 = M.t0 - 2.8;
       const ps = M.s0 - M.awn - 1.4;
       const yy = surfaceY(pt0, ps);
-      post(W, pt0, ps, yy + 0.004, yy + 0.075, 0.290, BASE, 10);
-      post(W, pt0, ps, yy + 0.075, yy + 0.115, 0.230, BASE, 10);
-      post(W, pt0, ps, yy + 0.06, yy + 2.36, 0.032, WHITE, 6);
+      // Turned now, the moulding's two steps rounded off — see "THE
+      // PARASOLS, SMOOTH" — at the 0.29 and 0.23 m it shipped with.
+      knLathe(W, pt0, ps, [[yy + 0.004, 0.282], [yy + 0.014, 0.290],
+        [yy + 0.062, 0.290], [yy + 0.075, 0.272], [yy + 0.075, 0.232],
+        [yy + 0.106, 0.228], [yy + 0.115, 0.200], [yy + 0.118, 0.050],
+        [yy + 0.150, 0.040], [yy + 0.150, 0]], BASE, 28);
+      tubeTS([[pt0, ps, yy + 0.06], [pt0, ps, yy + 1.20], [pt0, ps, yy + 2.42]],
+        0.032, WHITE, 14, [1, 0, 0], 0.16);
+      knLathe(W, pt0, ps, [[yy + 2.40, 0.026], [yy + 2.47, 0.026],
+        [yy + 2.50, 0.016], [yy + 2.53, 0]], WHITE, 14);
       // Furled: a long thin cone of cloth bound to the pole, and the tie round
       // it, which is the thing that says furled rather than says missing.
-      lathe(W, pt0, ps, [[yy + 0.92, 0.028], [yy + 1.05, 0.105],
-        [yy + 2.28, 0.078], [yy + 2.44, 0.020]], WHITE, 8);
-      post(W, pt0, ps, yy + 1.62, yy + 1.68, 0.086, shade(WHITE, 0.86), 8);
+      // Gathered in eight gores rather than turned as an octagon.
+      furledCloth(pt0, ps, [[yy + 0.92, 0.028], [yy + 1.05, 0.105],
+        [yy + 1.40, 0.100], [yy + 2.00, 0.086], [yy + 2.28, 0.074],
+        [yy + 2.44, 0.020]], WHITE);
+      knLathe(W, pt0, ps, [[yy + 1.615, 0.090], [yy + 1.625, 0.101],
+        [yy + 1.675, 0.101], [yy + 1.685, 0.090]], shade(WHITE, 0.86), 20);
       // And the printed hem, hanging off the bottom of the bundle as a limp
       // cuff, which is where a furled parasol's valance actually ends up: the
       // canopy rolls into the tie and the hem is the last thing in, so it hangs
@@ -26299,67 +26483,61 @@ async function buildJadrija(scene) {
       const SEAT = [0.560, 0.140, 0.150];
       const pt2 = tt - 5.4, ps2 = ss - 0.8;
       const py = surfaceY(pt2, ps2);
-      post(W, pt2, ps2, py, py + 2.44, 0.045, TUBE, 6);
       // Four sloping panels and a valance, which is what a market parasol is.
       // A cone would be a garden one, and this is not that shape.
+      //
+      // And now four RIBS, to the same four corners, the same crown at 2.44
+      // and eave at 2.06 — see "THE PARASOLS, SMOOTH". The pole goes down
+      // through the middle of the poseur table, which is where a parasol
+      // over a standing table lives, and a grommet closes the hole round it.
       const HW = 1.55;
-      for (let i = 0; i < 4; i++) {
-        const a0 = i * Math.PI * 0.5 + Math.PI * 0.25;
-        const a1 = a0 + Math.PI * 0.5;
-        const c0 = [Math.cos(a0) * HW, Math.sin(a0) * HW];
-        const c1 = [Math.cos(a1) * HW, Math.sin(a1) * HW];
-        /**
-         * The panel, and the pine litter lying on it.
-         *
-         * `b_069` at full size: about a third of this canopy is covered in
-         * dropped needles and bracts from the pine standing over it, in
-         * ragged patches. Measured, the patches are **the same red lifted** —
-         * clean canopy 0.393/0.160/0.237 against litter at 0.451 to 0.573 on
-         * the same hue, a factor of about 1.35 — and not a tan or a grey laid
-         * over it. So they are drawn as a brighter shade of the panel rather
-         * than as a second material, which also means they cannot z-fight:
-         * the panel is subdivided and some cells are lifted, and nothing new
-         * is floated 30 mm above a surface two kilometres from the origin
-         * where rule 5 says it would flicker anyway.
-         *
-         * It is worth the sixteen quads a panel because it is the difference
-         * between a parasol and *this* parasol. Every other parasol at Jadrija
-         * stands on open concrete; this one has been under a pine all summer.
-         */
-        const AP = [0, 0, py + 2.44];
-        const BP = [c0[0], c0[1], py + 2.06];
-        const CP = [(c0[0] + c1[0]) * 0.5, (c0[1] + c1[1]) * 0.5, py + 2.14];
-        const DP = [c1[0], c1[1], py + 2.06];
-        const N = 4;
-        const at2 = (u, v) => {
-          const e0 = [0, 1, 2].map((k) => AP[k] + (BP[k] - AP[k]) * u);
-          const e1 = [0, 1, 2].map((k) => DP[k] + (CP[k] - DP[k]) * u);
-          const q = [0, 1, 2].map((k) => e0[k] + (e1[k] - e0[k]) * v);
-          return W(pt2 + q[0], ps2 + q[1], q[2]);
-        };
-        for (let r = 0; r < N; r++) {
-          for (let c = 0; c < N; c++) {
-            const key = i * 97 + r * 11 + c;
-            const j = jit(key, 61);
-            // Patchier toward the rim, which is where it collects: a panel
-            // seeded evenly came out looking like a chessboard.
-            // Mixed toward a pale warm grey, not `shade`d. `shade` scales all
-            // three channels and keeps the saturation, so the patches came
-            // out as a *brighter red* and read as lighting rather than as
-            // debris. The measurement says otherwise: clean canopy
-            // 0.393/0.160/0.237 against litter 0.573/0.253/0.330 lifts green
-            // by 1.58 and red by only 1.46, which is a wash-out and not a
-            // brightening. Dead needles over red go pink.
-            const k = 0.34 + jit(key, 63) * 0.30;
-            const col = j < 0.30 + 0.26 * (r / (N - 1))
-              ? [CRIM[0] + (0.660 - CRIM[0]) * k,
-                CRIM[1] + (0.505 - CRIM[1]) * k,
-                CRIM[2] + (0.430 - CRIM[2]) * k] : CRIM;
-            b.quad(at2(r / N, c / N), at2((r + 1) / N, c / N),
-              at2((r + 1) / N, (c + 1) / N), at2(r / N, (c + 1) / N), col);
-          }
-        }
-      }
+      /**
+       * The panel, and the pine litter lying on it.
+       *
+       * `b_069` at full size: about a third of this canopy is covered in
+       * dropped needles and bracts from the pine standing over it, in
+       * ragged patches. Measured, the patches are **the same red lifted** —
+       * clean canopy 0.393/0.160/0.237 against litter at 0.451 to 0.573 on
+       * the same hue, a factor of about 1.35 — and not a tan or a grey laid
+       * over it. So they are drawn as a brighter shade of the panel rather
+       * than as a second material, which also means they cannot z-fight:
+       * the panel is subdivided and some cells are lifted, and nothing new
+       * is floated 30 mm above a surface two kilometres from the origin
+       * where rule 5 says it would flicker anyway.
+       *
+       * It is worth the sixteen quads a panel because it is the difference
+       * between a parasol and *this* parasol. Every other parasol at Jadrija
+       * stands on open concrete; this one has been under a pine all summer.
+       */
+      const N = 4, SEG = 8, COLS = 8;
+      smoothParasol({ t: pt2, s: ps2, n: 4, a0: Math.PI * 0.25, R: HW,
+        hub: py + 2.44, rim: py + 2.06, sag: 0.040, pow: 1.1,
+        segs: SEG, cols: COLS, frame: TUBE, ribR: 0.012,
+        brand: 'ozujsko', drop: 0.20,
+        pole: { y0: py, r: 0.045, col: TUBE },
+        cloth: (i, row, col) => {
+          // The same sixteen cells a panel, keyed as they were: `r` out along
+          // the rib, `c` across the panel.
+          const r = Math.floor((row * N) / SEG), c = Math.floor((col * N) / COLS);
+          const key = i * 97 + r * 11 + c;
+          const j = jit(key, 61);
+          // Patchier toward the rim, which is where it collects: a panel
+          // seeded evenly came out looking like a chessboard.
+          // Mixed toward a pale warm grey, not `shade`d. `shade` scales all
+          // three channels and keeps the saturation, so the patches came
+          // out as a *brighter red* and read as lighting rather than as
+          // debris. The measurement says otherwise: clean canopy
+          // 0.393/0.160/0.237 against litter 0.573/0.253/0.330 lifts green
+          // by 1.58 and red by only 1.46, which is a wash-out and not a
+          // brightening. Dead needles over red go pink.
+          const k = 0.34 + jit(key, 63) * 0.30;
+          return j < 0.30 + 0.26 * (r / (N - 1))
+            ? [CRIM[0] + (0.660 - CRIM[0]) * k,
+              CRIM[1] + (0.505 - CRIM[1]) * k,
+              CRIM[2] + (0.430 - CRIM[2]) * k] : CRIM;
+        } });
+      knLathe(W, pt2, ps2, [[py + 1.098, 0.064], [py + 1.112, 0.064],
+        [py + 1.118, 0.052], [py + 1.118, 0.045]], TUBE, 16);
       // The valance — 0.20 m of it, and the thing that stops a parasol reading
       // as a paper hat. It is now genuinely printed rather than described as
       // printed: OŽUJSKO, white on the red it was already dyed.
@@ -26371,10 +26549,7 @@ async function buildJadrija(scene) {
       // gone rather than being left underneath: a printed band 2 km from the
       // origin, laid on a plain one in the same plane, is rule 5's flickering
       // band exactly, and there is nothing for the plain one to do anyway.
-      brandRing('ozujsko', [0, 1, 2, 3].map((i) => {
-        const a = i * Math.PI * 0.5 + Math.PI * 0.25;
-        return [pt2 + Math.cos(a) * HW, ps2 + Math.sin(a) * HW];
-      }), py + 2.06, py + 1.86);
+      // (`smoothParasol` hangs it, off the rim the sag scallops.)
       // The table: a column on a disc with a dark round top at elbow height.
       lathe(W, pt2, ps2, [[py + 0.02, 0.34], [py + 0.06, 0.34],
         [py + 0.08, 0.08], [py + 1.02, 0.08], [py + 1.04, 0.42],
