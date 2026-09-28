@@ -8,6 +8,24 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.538.2] — 2026-09-28
+
+### the POMMES FRITES lightbox stands beside Maslina
+
+Misha: *"move this pomme frites thingie to back next to maslina, not behind
+some shoppe, in real jadrija it is next to maslina."* It had been placed off
+`slasticarnica-behind-view`, at t 325.6, s 27.75 — wedged in the slot between
+h2o's side wall and the slastičarnica, with its poster on the inland face,
+invisible from the promenade.
+
+It now stands at **t 349.9, s 26.5**: off Maslina's west end, 1.25 m west of
+the west feather flag's pole and in the flag's row, which is the end with the
+FRENCH FRIES poster on the sliding leaf. Clear of the counter (t 352–358), of
+the flag's leech (which falls east over the shop), and of the walk to the
+sanitary block (s 32 and up). The poster moved to the seaward face so the
+promenade reads it. Its collision box moved with it (it is pushed from the
+same call); nothing else referenced the old spot, and no `rng` draws changed.
+
 ## [1.538.1] — 2026-09-28
 
 ### the olive, grown and leafed
