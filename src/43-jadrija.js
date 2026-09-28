@@ -54770,6 +54770,173 @@ async function buildJadrija(scene) {
     return out;
   }
 
+  // ── the hands on the grips ──────────────────────────────────────────────
+  //
+  // Misha, 28 Sep 2026: *"even the people riding the bicycles, their hands are
+  // not really 'gripping' the handlebars ... their hands are rigidly sticking
+  // out, would be nice if they got a grip...."* His screenshot was the woman
+  // on the red step-through: the left hand hovering by the left grip with the
+  // fingers stiff and splayed, the right one out in front of her belly and
+  // nowhere near the bar.
+  //
+  // Both were what the solve asked for. It only ever aimed the WRIST — at a
+  // point 45 mm behind and 30 mm over each grip's middle — and said nothing
+  // about the hand past it. So the hand kept whatever turn the frozen `idle`
+  // had given it relative to the forearm, carried round by the arm solve's
+  // shortest rotation, and pointed wherever that left it: sideways, up, or
+  // across her stomach with the palm at the sky. And the fingers were the
+  // idle's own, a flat plate with 26 degrees in it.
+  //
+  // So now the HAND is solved first and the arm is solved to fit it:
+  //
+  //   1. Where the knuckles point. Square to the grip, along the line from
+  //      the shoulder to it, and levelled `flat` of the way towards the
+  //      horizontal — the wrist cocked up a little, which is what a hand
+  //      resting its weight on a Dutch bar does. The thumb side is inboard
+  //      and the palm is on the top of the rubber, facing down and back.
+  //   2. Where that puts the wrist: the grip's axis lies across the palm
+  //      `back` behind the middle knuckle and `under + rad` below the bone
+  //      line, so the wrist is that far back from it along the hand. The hand
+  //      length is each body's own, wrist to knuckle off its bones.
+  //   3. The arm, two bones, to that wrist (`wheelLimb`, as before), elbows
+  //      out and down.
+  //   4. The hand turned from wherever the arm left it to the frame in (1).
+  //   5. The fingers folded round the rubber and the thumb brought under it.
+  //
+  // THE FINGERS ARE ONE BONE AND SO IS THE THUMB (see `GRIP` in
+  // 45-bucketeer.js, which found this out on the pail's bail): four fingers
+  // fold together at the knuckle and there are no phalanges to curl. So the
+  // grip is a fold, and what has to be right is where the tube crosses it —
+  // that is `back`, the tube's radius plus a finger's half-thickness, which
+  // is what lets the folded slab come down in front of the rubber instead of
+  // through it.
+  //
+  // THE AXES ARE MEASURED, NOT TYPED. `palm`, `curl` and `thumb` are
+  // the bucketeer's principal-axis measurements of this rig's hand off the
+  // bind mesh, in figure space, left measured separately from right. Carried
+  // into each rider's frozen idle by that hand's own `boneTurn` they agree
+  // with the bones' own wrist, knuckle and thumb heads to 0.92-0.96 on all
+  // five bodies — measured, not assumed — so the rig is the same one. The
+  // palm normal is squared off the wrist-to-knuckle line, which is the one
+  // direction the placement has to be exact along.
+  const WHEEL_HAND = {
+    R: { palm: [-0.179, -0.485, -0.856], curl: [0.7938, 0.4434, -0.4173],
+      thumb: [0.149, 0.847, -0.511] },
+    L: { palm: [-0.180, -0.487, 0.854], curl: [-0.7966, -0.4370, -0.4171],
+      thumb: [-0.149, -0.846, -0.514] },
+    // The rubber's radius (17 to 19 mm on the bicycle, 17 on the scooter).
+    rad: 0.017,
+    // The grip's axis this far behind the middle knuckle, and the palm's skin
+    // this far under the bone line — the tube's radius and a finger's
+    // half-thickness, and a palm's half-thickness.
+    back: 0.024, under: 0.012,
+    // How much of the knuckles' direction is level rather than along the arm.
+    // At 0.35 the hand drooped off a straight forearm, the wrist folded down
+    // like a paw; at 0.75 the back of the hand carries on the forearm's line.
+    flat: 0.75,
+    // The fold, radians, laid over the idle's own 26 degrees: 100 more at the
+    // knuckle. At 76 the fingers hung straight down the front of the rubber
+    // with the tips below it; at 100 they come back under it, which is as
+    // near a closed fist as one bone for four fingers gets. The thumb at the
+    // bake's own ratio for a closed hand (`wine`: 45 degrees of thumb to 110
+    // of fingers).
+    flex: 1.75, oppose: 0.7,
+  };
+  const _whD = new THREE.Vector3(), _whN = new THREE.Vector3();
+  const _whX = new THREE.Vector3(), _whV = new THREE.Vector3();
+  const _whM = new THREE.Matrix4(), _whQ = new THREE.Quaternion();
+  const _whS = new THREE.Quaternion(), _whL = new THREE.Quaternion();
+  const _whR = new THREE.Quaternion();
+
+  /**
+   * Each hand's measurements and its grip, keyed by side (−1 or +1, the same
+   * sign `sdL` and `sdR` carry). Read once, off the frozen idle, before any
+   * aim has been laid on the figure. Null if the rig has no finger bones.
+   */
+  function wheelGripOf(fig, bike) {
+    const out = {};
+    for (const s of ['L', 'R']) {
+      const hi = fig.boneIndex('hand' + s), fi = fig.boneIndex('fingers' + s);
+      if (hi < 0 || fi < 0 || fig.boneIndex('thumb' + s) < 0) return null;
+      const H = WHEEL_HAND[s];
+      const w = fig.boneAt(hi, new THREE.Vector3());
+      const d = fig.boneAt(fi, new THREE.Vector3()).sub(w);
+      const len = d.length();
+      d.normalize();
+      const turn = fig.boneTurn(hi, new THREE.Quaternion());
+      const n = new THREE.Vector3(...H.palm).normalize().applyQuaternion(turn);
+      n.addScaledVector(d, -n.dot(d)).normalize();
+      // The hand's frame in the idle, as a rotation, inverted: knuckles,
+      // palm, and the third axis off those two.
+      const q0i = new THREE.Quaternion().setFromRotationMatrix(
+        new THREE.Matrix4().makeBasis(d, n, d.clone().cross(n))).invert();
+      const sd = Math.sign(w.z) || (s === 'L' ? -1 : 1);
+      // The grip, in the machine's frame: its middle, and its axis pointing
+      // outboard. The bicycle's is swept back — the same two points `wheelBike`
+      // lays the rubber between — and the scooter's is straight across.
+      let C0, a0;
+      if (bike) {
+        const K = WHEEL_BIKE;
+        const g0 = new THREE.Vector3(K.bar[0] + 0.07, K.bar[1], sd * (K.grip - 0.05));
+        const g1 = new THREE.Vector3(K.bar[0] - 0.03, K.bar[1], sd * (K.grip + 0.03));
+        a0 = g1.clone().sub(g0).normalize();
+        C0 = g0.add(g1).multiplyScalar(0.5).addScaledVector(a0, 0.004);
+      } else {
+        const K = WHEEL_SCOOT;
+        C0 = new THREE.Vector3(K.bar[0], K.bar[1], sd * K.grip);
+        a0 = new THREE.Vector3(0, 0, sd);
+      }
+      out[sd] = {
+        hand: 'hand' + s, fing: 'fingers' + s, thumb: 'thumb' + s, len, q0i,
+        c0: new THREE.Vector3(...H.curl).normalize().applyQuaternion(turn),
+        t0: new THREE.Vector3(...H.thumb).normalize().applyQuaternion(turn),
+        C0, a0, C: new THREE.Vector3(), a: new THREE.Vector3(),
+      };
+    }
+    return out;
+  }
+
+  /**
+   * One hand on its grip: the frame, the wrist, the arm, the hand, the fold.
+   * See the note over `WHEEL_HAND`. The grip follows the bar round when it
+   * steers, so the hand does — `_bkQ` is the bar's turn, set by `wheelPose`.
+   */
+  function wheelHand(r, A) {
+    const fig = r.fig, K = WHEEL_HAND;
+    const C = A.C.copy(A.C0), a = A.a.copy(A.a0);
+    if (r.steer) {
+      C.sub(BK_PIVOT).applyQuaternion(_bkQ).add(BK_PIVOT);
+      a.applyQuaternion(_bkQ);
+    }
+    C.sub(r.F);
+    // (1) The knuckles, square to the grip: along the arm, partly levelled.
+    const d = _whD.copy(C).sub(A.S);
+    d.addScaledVector(a, -d.dot(a)).normalize();
+    _whX.set(1, 0, 0).addScaledVector(a, -a.x).normalize();
+    d.lerp(_whX, K.flat).normalize();
+    // The palm, down on to the rubber: thumb side inboard (−a), and the palm
+    // is `sd · (thumb side × knuckles)` — the chirality the bones measured.
+    const n = _whN.copy(a).negate().cross(d).multiplyScalar(A.sd).normalize();
+    _whM.makeBasis(d, n, _whX.copy(d).cross(n));
+    // Idle hand to this hand.
+    const Mh = _whQ.setFromRotationMatrix(_whM).multiply(A.q0i);
+    // (2) The wrist that puts the grip across the palm.
+    A.goal.copy(C).addScaledVector(d, -(A.len - K.back)).addScaledVector(n, -(K.under + K.rad));
+    // (3) The arm to it.
+    _wkPole.set(-0.45, -0.55, A.sd * 0.75);
+    _whS.copy(wheelLimb(fig, A.u, A.l, A.S, A.E, A.W, A.goal, _wkPole));
+    // (4) The hand: it has been carried by the lean and the arm, so what is
+    // laid on it is the rest of the way — `Mh · (arm · lean)⁻¹`.
+    _whL.setFromAxisAngle(_wkZ, -r.lean);
+    _whR.multiplyQuaternions(_whS, _whL).invert().premultiply(Mh);
+    armAimQ(fig, A.hand, _whR);
+    // (5) The fold, about the hand's own measured axes where it now is.
+    _whV.copy(A.c0).applyQuaternion(Mh);
+    fig.aim(A.fing, _whV.x, _whV.y, _whV.z, K.flex);
+    _whV.copy(A.t0).applyQuaternion(Mh);
+    fig.aim(A.thumb, _whV.x, _whV.y, _whV.z, K.oppose);
+  }
+
   const wheelers = [];
   let wheelTris = 0, wheelMachineTris = 0, wheelMachineLoTris = 0, wheelDraws = 0;
   // The grid the lanes are planned on, and the length of `blockers` it was
@@ -54867,6 +55034,11 @@ async function buildJadrija(scene) {
       // straight: the steering turns it about the head tube's axis in
       // `wheelPose`, and the hand follows the grip round.
       for (const A of arms) { A.goal = wrist(A.sd).clone(); A.w0 = A.goal.clone().add(F); }
+      // AND THE HAND ITSELF, which nothing had asked about. See `wheelHand`.
+      // Null if the rig has no finger bones, and then the wrist is aimed at
+      // the grip as it always was.
+      const hands = wheelGripOf(fig, bike);
+      if (hands) for (const A of arms) Object.assign(A, hands[A.sd]);
       const legs = [
         { sd: sdL, u: 'legUL', l: 'legLL', f: 'footL', H: R.legUL, K: R.legLL, A: R.footL, T: R.toeL },
         { sd: sdR, u: 'legUR', l: 'legLR', f: 'footR', H: R.legUR, K: R.legLR, A: R.footR, T: R.toeR },
@@ -55645,6 +55817,7 @@ async function buildJadrija(scene) {
     // The hands go where the grips have been turned to.
     if (r.steer) _bkQ.setFromAxisAngle(BK_AXIS, r.steerA);
     for (const A of r.arms) {
+      if (A.C0) { wheelHand(r, A); continue; }
       if (r.steer) A.goal.copy(A.w0).sub(BK_PIVOT).applyQuaternion(_bkQ).add(BK_PIVOT).sub(F);
       _wkPole.set(-0.45, -0.55, A.sd * 0.75);
       wheelLimb(fig, A.u, A.l, A.S, A.E, A.W, A.goal, _wkPole);
