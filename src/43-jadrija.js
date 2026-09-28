@@ -22618,6 +22618,22 @@ async function buildJadrija(scene) {
       // the wood given over to it in August.
       const j = jit(t | 0, 21);
       if (j > 0.80) continue;
+      // Which of the five, off a *sixth* slot of the same sine hash. Nothing in
+      // this loop touches `rng`, so the model table in src/44-cars.js is free to
+      // grow or shrink without moving a single bather — see the note over `jit`.
+      const model = carModelFor(jit(t | 0, 25));
+      // AND FEWER. *"have fewer cars, and the ones that u keep, make them more
+      // sophisticated"* (Misha, 28 Sep) — the row stood at 42, one every four
+      // metres wherever the rules allowed, and that is a wall of cars, not a
+      // car park in a wood. A car stays with a probability that itself wanders
+      // along the row (`jit` over 14 m blocks, slot 27), so some stretches are
+      // nearly full and some have one car in them: gaps in clumps, which is
+      // how people actually leave a car park, rather than every other bay.
+      // Slots 26 and 27 are sine hashes like the rest — no `rng()` here.
+      // The car under a cover is exempt: it is the one car in the wood the
+      // footage makes a point of, and the thinning took the only one.
+      if (model.key !== 'covered'
+        && jit(t | 0, 26) > 0.66 + 0.40 * jit((t / 14) | 0, 27)) continue;
       // Inside 39 m of the water, and that is not a taste call: the note over
       // the house thinning records that OSM maps nothing at all within 39 m of
       // this shore, which makes it the one band where a car cannot end up
@@ -22644,30 +22660,56 @@ async function buildJadrija(scene) {
       if (Math.abs(t - BACK.anchor[0]) < 3.0) continue;
       // Nobody parks across the way through to the hammock (`HAM_WALK`).
       if (t > HAM_YARD.t0 - 6.0 && t < HAM_YARD.t1 + 6.0) continue;
-      const s0 = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
-      // Which of the five, off a *sixth* slot of the same sine hash. Nothing in
-      // this loop touches `rng`, so the model table in src/44-cars.js is free to
-      // grow or shrink without moving a single bather — see the note over `jit`.
-      const model = carModelFor(jit(t | 0, 25));
+      const s0j = JAD.rowB + 5.0 + jit(t | 0, 23) * 1.4;
       const size = carSize(model.key);
       const len = size.x1 - size.x0;
       // The longest of the five is 4.60 m, so the deepest tail this can produce
       // is 32.50 + 4.60 = 37.10, which is still inside the 39 m band. That is
       // the number to check against if a longer model is ever added.
-      const y = surfaceY(t, s0 + len * 0.5);
+      //
+      // BUT NOT THROUGH THE WALL. The rendered wall along the back (`backWall`,
+      // built later and so never checked against this) stands at
+      // `JAD.back + 3.2` = 36.3, 0.44 m thick with its coping — so every car
+      // whose tail came past 35.9 was parked with its boot inside it, which
+      // the 28 Sep close-ups show on one car in three. The nose is pulled
+      // seaward instead, which the 1.2 m between the bollards at 29.7 and the
+      // shallowest nose at 31.1 has plenty of room for.
+      const s0 = Math.min(s0j, JAD.back + 3.2 - 0.22 - 0.18 - len);
+      // ON the ground, all four wheels. The car used to be dropped level at
+      // the height of the ground under its middle, and the wood falls away
+      // toward the sea and across the row, so on the slopes a front wheel
+      // hung in the air and a rear one was buried (both, in the close-ups).
+      // The ground is read under each axle and each side, and the car is
+      // pitched and rolled to sit on it; `y` is then the height of that
+      // plane under the wheelbase centre.
+      const sF = s0 + 0.78, sR = s0 + len - 0.78, sM = s0 + size.x1;
+      const yF = surfaceY(t, sF), yR = surfaceY(t, sR);
+      const dT = size.hw * 0.82;
+      const yA = surfaceY(t + dT, sM), yB = surfaceY(t - dT, sM);
+      // Plus 30 mm: raycast against what is drawn, the made ground stands 30-50 mm
+      // over `surfaceY` here, and the tyres were sunk into it by that much.
+      const y = (yF + yR) * 0.5 + (yF - yR) * ((sM - (sF + sR) * 0.5) / (sF - sR)) + 0.03;
       const tint = CAR_PAINT[model.paint[
         ((jit(t | 0, 24) * 97) | 0) % model.paint.length]];
       // The model's origin is the wheelbase centre and its +X is the nose, so
       // the origin stands `x1` inland of where the front bumper is.
       const st = at(t);
       const inv = 1 / (Math.hypot(st.nx, st.nz) || 1);
-      const [x, , z] = W(t, s0 + size.x1, y);
+      const [x, , z] = W(t, sM, y);
       // Seaward is `s` decreasing, so the nose has to look down −(nx, nz). A
       // yaw of `a` sends the model's +X to (cos a, −sin a), which gives this.
       // `at()` lerps its normals between stations, so they come back a hair
       // short of unit length and want normalising before the atan2.
+      //
+      // Pitch is about the model's own +Z and lifts the nose when positive;
+      // roll is about +X and lowers the +Z side, and which way along the shore
+      // +Z points is read off the world rather than assumed: +Z is (nz, −nx).
+      const pa = W(t + dT, sM, y), pb = W(t - dT, sM, y);
+      const zSide = Math.sign((pa[0] - pb[0]) * st.nz - (pa[2] - pb[2]) * st.nx) || 1;
       carSites.push({ x, y, z, model: model.key, tint,
-        yaw: Math.atan2(st.nz * inv, -st.nx * inv) });
+        yaw: Math.atan2(st.nz * inv, -st.nx * inv),
+        pitch: Math.atan2(yF - yR, sR - sF),
+        roll: -zSide * Math.atan2(yA - yB, 2 * dT) });
       runs.push({ car: carSites.length, t0: t - size.hw - 0.06, t1: t + size.hw + 0.06,
         s0: s0 - 0.1, s1: s0 + len + 0.1, y, h: size.h });
     }
@@ -31016,6 +31058,54 @@ async function buildJadrija(scene) {
     const [t, s] = local(x, z);
     return t > -pad && t < LEN + pad && s > -4 - pad && s < JAD.reachIn + pad;
   };
+
+  // No car parked round a tree, or in another car. The row is placed long
+  // before the wood is planted (the pines draw off `rng`, the cars do not, and
+  // the order cannot change), so nothing ever told a car there was a trunk in
+  // its bay — and on 28 Sep the close-ups had pines standing in bonnets. Now
+  // that every tree is in `greens`, a car whose footprint holds a trunk or a
+  // bush is simply not parked, and its blocker goes with it. And at the bend
+  // near t 380 the shore frame folds — three stations four metres apart in `t`
+  // land within a metre of each other at s 33 — so a car whose middle is
+  // within 2.4 m of one already kept goes too. Last, after the hammock has
+  // chosen its trees, so that choice is not moved by any of this.
+  {
+    const kept = [];
+    for (let i = 0; i < runs.length; i++) {
+      const r = runs[i];
+      if (!r.car || !carSites[r.car - 1]) continue;
+      const c = carSites[r.car - 1];
+      const tree = greens.some((g) => {
+        // The trunk itself, not its clearance: `r` is already the car plus a hand.
+        const pad = (g[4] || 0.18) * 0.8;
+        return g[0] > r.t0 - pad && g[0] < r.t1 + pad && g[1] > r.s0 - pad && g[1] < r.s1 + pad;
+      });
+      const car = kept.some((k) => Math.hypot(k.x - c.x, k.z - c.z) < 2.4);
+      // And the back wall, tested in the world and not in `(t, s)`: at the
+      // same fold the wall's s 36.3 comes round to within a metre of cars
+      // whose own s says their tail is at 35.9, and one stood with a back
+      // wheel on top of a planter. The car's footprint as a rectangle round
+      // its own axes, against the wall sampled every 0.8 m.
+      const sz = carSize(c.model);
+      const fx = Math.cos(c.yaw), fz = -Math.sin(c.yaw);
+      const wall = !tree && !car && backWall.some((w) => {
+        if (w[1] < r.t0 - 12 || w[0] > r.t1 + 12) return false;
+        for (let wt = w[0]; wt <= w[1] + 1e-6; wt += 0.78) {
+          const p = W(wt, w[2], 0);
+          const dx = p[0] - c.x, dz = p[2] - c.z;
+          const u = dx * fx + dz * fz, v = -dx * fz + dz * fx;
+          if (u > sz.x0 - 0.25 && u < sz.x1 + 0.25 && Math.abs(v) < sz.hw + 0.25) return true;
+        }
+        return false;
+      });
+      if (tree || car || wall) {
+        carSites[r.car - 1] = null;
+        runs.splice(i--, 1);
+      } else {
+        kept.push(c);
+      }
+    }
+  }
 
   // Blockers are the huts, in locale coordinates, which is the frame they were
   // laid out in — so they are axis-aligned boxes here for free, which is exactly
