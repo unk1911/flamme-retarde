@@ -182,8 +182,12 @@ const HAMMOCK = {
   // first push, 19.5 off the second in phase, 23.0 off the third, 29.5 off
   // the sixth — and from there 11 degrees again after twenty-five seconds.
   push: 38, pushEmpty: 1.4,
-  // How near you have to be, measured to the cloth: an arm and a lean.
-  reach: 1.35,
+  // How near you have to be, measured to the cloth. It was an arm and a lean,
+  // 1.35 m, and Misha, 27 Sep 2026: *"if i don't stand super close to
+  // hammock, my press results in a hose-spray, it really should be more
+  // generous and allow me to rock from further away and from more angles"*.
+  // A step and a lean: the hand still goes out to the cloth.
+  reach: 2.8,
   // ── when it is simulated ────────────────────────────────────────────────
   // Past this from the camera it is not stepped at all; nearer, it sleeps
   // once it has been still for `sleepAfter` seconds with nobody in it.
@@ -921,7 +925,9 @@ function buildHammock(scene, J) {
    * you and across the span. Answers the velocity it gave, or null if you
    * are out of reach.
    */
-  function push(x, z) {
+  /** `k` scales the shove — a held press adds to it a little every frame
+   * (see `hammockHold` in 90-app.js); `count` is false for those. */
+  function push(x, z, k = 1, count = true) {
     const n = nearest(x, z);
     if (!n || n.d > H.reach) return null;
     // Across the span, away from you.
@@ -937,7 +943,7 @@ function buildHammock(scene, J) {
       // way and never coming back, her rolled three quarters on to her side.
       // The impulse is hers (her mass is 96 % of the lot), spread as one
       // velocity over every body in it, so nothing moves against anything.
-      dv = H.push / (H.herMass + NU * NV * H.plateMass);
+      dv = k * H.push / (H.herMass + NU * NV * H.plateMass);
       net.kick(her, S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
       for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) {
         net.kick(S.plate[i][j], S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
@@ -945,7 +951,7 @@ function buildHammock(scene, J) {
       net.kick(S.gA, S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
       net.kick(S.gB, S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
     } else {
-      dv = H.pushEmpty;
+      dv = k * H.pushEmpty;
       for (let i = 0; i < NU; i++) {
         for (let j = 0; j < NV; j++) {
           const b = S.plate[i][j];
@@ -956,7 +962,7 @@ function buildHammock(scene, J) {
       }
     }
     rouse();
-    pushes++;
+    if (count) pushes++;
     return { dv: +(dv * sg).toFixed(3), at: [n.x, n.y, n.z] };
   }
   /** The nearest point of the cloth (or her) to (x, z): plate centres, horizontally. */

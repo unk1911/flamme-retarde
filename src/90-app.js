@@ -1246,7 +1246,28 @@ function hammockAim(any = false) {
   if (any) return n;
   const fw = camera.getWorldDirection(_pushF);
   _pushV.set(n.x - camera.position.x, n.y - camera.position.y, n.z - camera.position.z).normalize();
-  return fw.dot(_pushV) > 0.55 ? n : null;
+  // 0.2 and not 0.55: about 78 degrees either side of the crosshair rather
+  // than 57, so the cloth only has to be in front of you, not under the
+  // crosshair — "from more angles". And the reach is 2.8 m now (HAMMOCK).
+  return fw.dot(_pushV) > 0.2 ? n : null;
+}
+
+// AND HARDER THE LONGER YOU HOLD IT. Misha, 27 Sep 2026: *"if, i dunno press
+// and hold the mouse while doing it, it should rock *harder*... so i do want
+// her to occasionally fall out"*. The press is the shove it always was; held,
+// the hand stays on the cloth and keeps pushing — `HOLD.rate` of a shove a
+// second, from `HOLD.after` to `HOLD.max` — so a full hold is three shoves'
+// worth, across the span and away from you like the first. Let go and it stops.
+const HOLD = { after: 0.12, max: 0.8, rate: 2.5 };
+let holdT = -1;
+function hammockHold(dt, down) {
+  if (!down || pushT < 0) { holdT = -1; return; }
+  holdT = holdT < 0 ? 0 : holdT + dt;
+  if (holdT < HOLD.after || holdT > HOLD.max) return;
+  if (!hammockAim(true)) return;
+  const Y = ground.you;
+  const r = jadrija.hammock.push(Y.x, Y.z, HOLD.rate * dt, false);
+  if (r && jadrija.hamPushed) jadrija.hamPushed(r.dv);
 }
 /** Push it, if you can; the velocity it was given, or null. */
 function hammockPush(any = false) {
@@ -1265,6 +1286,8 @@ function hammockPush(any = false) {
 }
 function hammockPushTick(dt) {
   if (pushT < 0) { pushK = damp(pushK, 0, 8, dt); return; }
+  // Held: the palm stays out on the cloth — see `hammockHold`.
+  if (holdT >= 0 && holdT <= HOLD.max && pushT >= PUSH_HAND.out) { pushK = 1; return; }
   pushT += dt;
   if (pushT < PUSH_HAND.out) {
     const u = pushT / PUSH_HAND.out;
@@ -7389,6 +7412,7 @@ function tick(wall, draw) {
     // `hammockPush`. Decided on the frame the button goes down, like the reach.
     if (pressing && !reachWas) pressHam = !inKab && !!hammockPush();
     if (!pressing) pressHam = false;
+    hammockHold(dt, pressHam && pressing);
     // A probe cannot aim a crosshair to the degree; it can say what it meant.
     if (pressing && reachForce) { reachKind = reachForce[0]; cupSide = reachForce[1]; }
     if (pressing && !reachWas && reachKind === 'pet' && jadrija && jadrija.askShow) {
@@ -9416,6 +9440,16 @@ window.__fr = {
         return { at: [x, z], M: F.M };
       },
       push: () => hammockPush(true),
+      /** Debug: whether a press here, looking where the camera looks, would push. */
+      aim: () => !!hammockAim(false),
+      /** Debug: a held press — `secs` of `hammockHold` on top of a push. */
+      hold: (secs = 0.8) => {
+        const r = hammockPush(true);
+        if (!r) return null;
+        let t = 0;
+        const iv = setInterval(() => { t += 0.05; hammockHold(0.05, t <= secs); if (t > secs + 0.1) { hammockHold(0, false); clearInterval(iv); } }, 50);
+        return r;
+      },
       gps: () => {
         const H = jadrija && jadrija.hammock;
         if (!H) return null;

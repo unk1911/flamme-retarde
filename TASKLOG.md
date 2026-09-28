@@ -36,3 +36,4 @@ runs with `tools/shootmany.mjs`).
 | 2026-09-27 | Remove the diving tower's second slab (+ fulcrum move, board retune, found hard-coded board length) | lead | new | fix | 7 | ~30 | 13 | 1.535.4 |
 | 2026-09-27 | Rotate the diving station 90° CCW to face the kabine | lead | new | fix | 2 | ~15 | 3 | 1.535.5 |
 | 2026-09-27 | Swim line out past the tower + more board bounce (13 variant runs, 3 parallel batches) | lead | new | fix | 8 | ~20 | 17 | 1.535.6 |
+| 2026-09-27 | Hammock push: reach 2.8 m, wider aim, hold to rock harder | lead | new | feature | 6 | ~20 | 5 | 1.535.7 |

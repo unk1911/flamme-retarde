@@ -8,6 +8,28 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.7] — 2026-09-27
+
+### rock the hammock from further off, and harder when you hold
+
+Misha: *"if i don't stand super close to hammock, my press results in a
+hose-spray, it really should be more generous and allow me to rock from
+further away and from more angles, and also if, i dunno press and hold the
+mouse while doing it, it should rock *harder*"*.
+
+- **Reach:** 2.8 m to the cloth, up from 1.35.
+- **Aim:** the cloth has to be within about 78° of where you are looking,
+  up from 57°.
+  - **Measured:** a press pushes from 1.2, 2.0 and 2.6 m at 0, 45, 70 and
+    90° off the middle. At 3.2 m it is still the hose.
+- **Held:** the palm stays on the cloth and keeps pushing, 2.5 shoves a
+  second from 0.12 s to 0.8 s, so a full hold is three shoves' worth.
+  `push()` takes a scale (`k`) for it.
+  - **Empty hammock:** a tap swings it 24°, a hold 40°.
+  - **With Baye in:** repeated holds reach about 30°, where taps reach about
+    15–18°. No rescues.
+  - Her falling out, loosely, is the ragdoll's job and comes with it.
+
 ## [1.535.6] — 2026-09-27
 
 ### the swim line out past the tower, and a board with more bounce
