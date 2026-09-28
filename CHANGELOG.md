@@ -8,6 +8,81 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.542.2] — 2026-09-28
+
+### On the cot, every slap lands — bottom, back and thighs
+
+Misha, of 1.540.0: *"i like how it works now, but it seems like only about 25%
+of the spanks land, the others result in nothing. can u ... see that all the
+spanks land, on various parts of butt, lower back, even middle back, even
+thighs they should all land, really"*.
+
+**Why three presses in four did nothing.** This was measured with 130 aimed
+presses per pose, made through the real input path from five places round
+the cot. Before this build, 33 % landed with her lying flat and 38 % with her
+over the edge. On the middle of her back it was 1 in 30, and on a thigh 2 in
+30. A press was a contest of points, judged by their angle off the
+crosshair: her breasts, her hips, a point low on her front, her hair, her lip
+and the fullest point of each cheek. The nearest point won, but only if it was
+within 9°. Lying face down, all of those points are within a hand of one
+another as you look down at her:
+
+- **The middle of her back** went to the breast under it, so the hand reached
+  for a breast pressed into the mattress.
+- **The small of her back and the edges of her cheeks** went to a hip or to
+  the thigh stroke.
+- **A thigh** was more than 9° from every point, so it fell through to the
+  thumb, which on her front has no lip to go to.
+
+All three looked like nothing happening. The press also slapped on 4 in 20
+aims at the bare mattress beside her.
+
+**Now the press is tested against her body** (`cotAim`, 43-jadrija.js). It
+reuses the capsules the chains already lie on (CHAIN_BODY, measured off
+v2.0's mesh), each posed on its bone as she is drawn. The crosshair is traced
+as a ray into them, and the first one it enters is where the hand lands. A ray
+that passes within 3° (at least 4 cm) of one of them lands at the nearest
+point of that capsule.
+
+- Her arms are left out: a slap there lands on the flank behind them.
+- Her head and neck are included, so a press on her face or hair still meets
+  them first and is the thumb or the pet, as before.
+- Her back stops halfway up her shoulder blades. Her calves are not a slap.
+  The hollow of the knee counts as thigh.
+- It only applies while she lies on her front on the cot (`flatheld` or
+  `edgeHeld`). Every other pose, and face up, is unchanged.
+- It costs 0.19 ms per press.
+
+**What a slap does depends on where it lands** (`spank.at`):
+
+- **A cheek:** as before — the pelvis goes into the foam, both knees kick
+  and her head flinches.
+- **The small or middle of her back:** the push goes on the belly or chest
+  body, at 0.85 of the strength. Her head nods almost twice as much (14–16°
+  lying flat, against 8° for a cheek), and her knees get 0.3 of the kick.
+- **A thigh:** the push goes on that thigh, at 0.75 of the strength, with a
+  quarter of it through the seat. That knee kicks 1.3 times as hard (41–45°
+  lying flat) and the other knee barely moves.
+
+**The mark goes where the hand landed.** The two cheek flushes are now centred
+on the actual hit, and a warm flush drifts toward the new hit rather than
+jumping to it. Four more flushes cover the rest of her back and thighs (a
+uniform array of six in the skin shader). On a thigh the flush is under the
+stocking. Every landed press plays the sound and moans, and leaves its mark and
+its push, exactly as a cheek slap did. Her hands go back to her cheeks
+(the spread) only after a slap on them.
+
+**Fixed along the way:** the knee on the other side of her kicked harder than
+the one under the slapped cheek. Measured lying down, `side` +1 is the cheek
+over `legUR`, but the kick favoured `legLL`. The nearer knee now kicks harder.
+
+**Measured after the change** (130 presses per pose): flat 130/130 and over
+the edge 130/130. Aims at her head gave 10 of 10 pet or thumb, as before. Of
+20 aims at the bare mattress per pose, none slapped lying flat and 3 slapped
+over the edge; all three were within 3° of her hip. Twelve rapid presses 0.08
+s apart, mixing regions, all landed with no rescues, and physics stayed under
+6.4 ms in the worst frame.
+
 ## [1.542.1] — 2026-09-28
 
 ### The eFoil is gone
