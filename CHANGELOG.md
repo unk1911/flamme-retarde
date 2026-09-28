@@ -8,6 +8,104 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.541.0] — 2026-09-28
+
+### hosed off their chairs
+
+Misha: *"are these guys that sit at tables and are on their cellphones, u
+said they are now ragdolls? so if they are ragdolls, can i like, come up to
+them and when i spray them, can i wash them off from their chairs so they fall
+off on the ground...? later i wanna be able to do stuff like that, like blow
+them off from their e-scooters, bicycles (GTA VI style) ... so it looks
+natural and doesn't require careful orchestration beforehand"*, and then:
+*"yeah queue 'hose people off their chairs' as the next ragdoll feature"*.
+
+**Why nothing happened before.** The jet went straight through everybody at a
+café table. The bathers who react to the hose are `batherNear`'s six, and it
+only takes people with a face and a voice of their own (`castBlob`). The
+terrace is pinned to the skinned tier and has no cast. The 1.538.0 settle
+made the sitters ragdolls for 1.3 s, once and off screen, and after that they
+were a pose laid over a clip.
+
+**Now the jet pushes them** (`HOSE` and `sitterNear` / `sitterWet` in
+43-jadrija.js). There are four more guest slots for the four chair sitters
+nearest you, and 47-ground.js now hands a guest the jet's direction and where
+it came from. The push is `KNOCK.force` (150 N) along the jet. It is full to
+2 m, falls off to nothing at 10 m, and is summed as an impulse that leaks away
+over 1 s. When the sum reaches `KNOCK.tip` (80 N·s), that one person becomes a
+LIVE ragdoll (src/43-topple.js, new). It uses the same 43-ragdoll.js ragdoll,
+taken over from the figure exactly as drawn: clip, settle and solved hands. It
+collides with the same chair, table and floor the settle used, braces, and goes
+limp over 0.5 s. The water keeps pushing, at 1.6×, on whichever bodies are
+nearest the jet's line, for as long as it hits them. Nothing about which way
+they go is scripted.
+
+MEASURED, time from the first hit to going over, hose held on the chest:
+**0.70 s at 2.3 m, 0.75 s at 3 m, 0.93 s at 4 m, 1.28 s at 5 m, never from
+6.3 m.** At that range you soak them and they stay put. A 0.3 s squirt at 3 m
+reached 68 of the 80 N·s: a flinch (head round to you, and a gasp) and they
+stay seated. The first cut tipped at 70 N·s and was 66 N·s after one flick,
+which felt like an accident rather than a decision.
+
+**The chair goes over with them.** From the front the backrest held a sitter
+the way a wall would. MEASURED: 140 N·s square on the chest moved the pelvis
+0 mm, and they folded over their own lap. So a moulded chair is two welded
+bodies in the same net: the settle's seat box and backrest box. It has points
+on its feet, the seat's corners and the top of the backrest, because a box
+meets people but not the floor, and without the top points a chair tipped
+backwards sank through the terrace on its back. The terrace is one buffer, so
+the chair is taken out of it by folding its 216 vertices to a point (kept),
+and a copy of those same triangles is drawn on a mesh posed off the seat body
+(`hoseChair`). From the front, a sitter now tips back with the chair and lands
+with it on its back. From the side, they go off sideways with the chair coming
+over on top of them. MINI's mesh armchairs are not one piece and stay put.
+
+**Afterwards.** Once they are still on the ground (0.6 s under 0.18 m/s, or
+2.5 s dry) and face down, they go into `getup` from where they lie (Baye's
+hammock hand-over, `rag.groundFrame`, eased 0.75 s). If they are on their back,
+the bathers have no `situp` and Baye's does not transfer: her rest pose is up
+to 32° off theirs bone for bone, and her `getup`'s first frame up to 84°. So
+they roll themselves over: muscles aimed at all fours plus a 10 rad/s spin
+about the spine, up to three tries, the third the other way. That came to
+**12 of 12 face down**, where a bare spin managed 1 to 3 of 4. On their feet
+they turn to you and say one of the bump's recorded lines in the body's own
+voice ("yo! watch it!", "you kiddin' me with this?" …, and "again?
+seriously?" the second time). Then they walk 11 m off along the shore, away
+from you (`hamPath` around the furniture), and wait. **The seat stays empty
+and the chair stays on the floor** until they have been away 45 s and you are
+30 m from both the seat and them. Then they are back in the chair, the chair is
+back in the terrace, and their settle and hands are as before. MEASURED with a
+warp: back in the same x, z and yaw, and a second hosing works ("again?
+seriously?"). Somebody who never got off the chair (slumped, or over the back
+of it) is eased back into their clip instead (`reseat`).
+
+**Cost.** Nothing while nobody is down: one number a person being sprayed,
+and four extra probes a trace. A live person is a 14-body net from a pool per
+body kind, built on first use (0.4–0.6 ms), stepped at 1/90 s with at most 3
+steps a frame. MEASURED headless: 0.26–0.30 ms a step, so **one person down
+≈ 0.4 ms of a 60 Hz frame and four at once ≈ 1.6–1.8 ms** (2.3–3.2 ms a frame
+at the headless ~37 fps). The worst single frame was 3.6 ms, on a cold page. At
+most `KNOCK.cap` (4) at once; the fifth person you hose only gets wet. A
+divergence guard (the hammock's: too far, too fast, a socket open 6 cm) goes
+back to a snapshot and gives up to the get-up after three trips. **Rescues:
+0** in every run.
+
+**Kept.** The settle, the hands, the shop staff, cyclists and Baye's hammock
+are untouched. `rng` is untouched too: the positions hash of all 72 people
+who do not walk is identical to 1.539.9 (-725135705). 43-ragdoll.js is not
+edited. 43-avbd.js gains `setPoint` and `setBox` (a body re-measured),
+additively.
+
+**For the bicycles.** 43-topple.js documents the reuse API at the top:
+`makeToppler({ geoOf, event, chair })`, `push(fg, f, F, at, dt)`,
+`knock(fg, f, J, at)` (an impulse, live now: a crash), `draw` from the crowd's
+`step`, and a prop that goes over with the person. A rider is the same thing,
+with the bicycle as the prop and its velocity handed to `rag.enter`.
+
+Debug: `__fr.jad.raw().crowd.topple` → `stats()`, `list()`, `log()`,
+`sitters()`, `knock(seat, fx, fy, fz, h)`, `home(seat)`, `of(seat)`, `cfg()`.
+Hold the jet with `__fr.ground.jet(true)`.
+
 ## [1.540.0] — 2026-09-28
 
 ### On the cot, a slap has weight

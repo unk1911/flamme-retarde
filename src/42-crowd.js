@@ -1433,6 +1433,8 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
   // gets to them, and then eased into it over `SETTLE.fade` — somebody
   // settling back into a chair, if you happen to be looking.
   let settler = null;
+  // And whoever has been knocked off it (43-topple.js), handed in the same way.
+  let toppler = null;
   function sitLayer(fg, f, want, dt) {
     const S = fg.settled;
     let L = f.sitL;
@@ -1558,6 +1560,23 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
         f.state.prev = null;
       }
       fg.rebound = true;
+    }
+
+    // ── KNOCKED OFF, and not theirs to draw ─────────────────────────────────
+    //
+    // 1.540.0 — see 43-topple.js. Somebody the hose has taken off their chair
+    // is a ragdoll, and then a get-up, and for all of that the toppler places
+    // and poses the mesh and nothing below may: not the clip they wanted, not
+    // the settle, not the hands. A cue written on them meanwhile is dropped,
+    // for the reason the cue block gives. Once they are standing it hands them
+    // back (`draw` false) and they are drawn as whatever `fg.mode` says.
+    if (fg.topple && toppler) {
+      fg.cue = null;
+      if (toppler.draw(fg, f, dt)) {
+        fg.lag = 0;
+        f.mesh.visible = true;
+        return true;
+      }
     }
 
     // ── something somebody has asked them to do ──────────────────────────────
@@ -1768,6 +1787,8 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     drawn = n;
     // And whoever is waiting to sit down, for `SETTLE.budget` ms at most.
     if (settler) settler.tick(cam);
+    // The toppler's clock, which the hose's push leaks away against.
+    if (toppler) toppler.tick(dt);
   }
 
   return {
@@ -1775,6 +1796,9 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     /** Hand in the settler (43-settle.js); null takes it away. */
     setSettler: (s) => { settler = s || null; },
     get settler() { return settler; },
+    /** Hand in the toppler (43-topple.js); null takes it away. */
+    setToppler: (s) => { toppler = s || null; },
+    get toppler() { return toppler; },
     /**
      * Register every figure with the shadow map.
      *

@@ -7601,6 +7601,12 @@ async function buildJadrija(scene) {
   const MESH_DK = [0.152, 0.150, 0.152];
   const MESH_PAD = [0.365, 0.205, 0.190];
 
+  // Where each moulded chair's triangles are, by its seat's (t, s): which
+  // buffer and which run of vertices in it — so one can be taken out of the
+  // terrace and put back, when somebody is hosed off it and it goes over with
+  // them (`hoseChair`, 1.540.0). Nothing drawn changes for it.
+  const chairGeo = new Map();
+  const chairKey = (t, s) => t.toFixed(3) + ',' + s.toFixed(3);
   function terraceSet(t, s, y, ang, col, kind, shop) {
     const seat = [0.230, 0.235, 0.240];
     const R = seatRing(t, s, ang);
@@ -7655,12 +7661,14 @@ async function buildJadrija(scene) {
         if (dk) meshChair(P, y, MESH_DK, MESH_PAD);
         else meshChair(P, y, col || seat);
       } else {
+        const v0 = b.count();
         boxIn(P, -0.24, 0.24, -0.23, 0.23, y + 0.40, y + 0.46, col || seat);
         boxIn(P, -0.24, 0.24, 0.17, 0.23, y + 0.46, y + 0.86, col || seat);
         for (const [ot, os] of [[-0.19, -0.17], [0.19, -0.17], [-0.19, 0.17], [0.19, 0.17]]) {
           boxIn(P, ot - 0.022, ot + 0.022, os - 0.022, os + 0.022,
             y, y + 0.40, shade(col || seat, 0.8));
         }
+        chairGeo.set(chairKey(ct, cs), { bld: b, v0, v1: b.count(), pivot: P(0, 0, y + 0.43) });
       }
       // And the chair as a thing you cannot stand in.
       //
@@ -26047,7 +26055,9 @@ async function buildJadrija(scene) {
     }
     // `round`: the pedestal table's top is a disc, and a hand laid on it is
     // kept inside the disc rather than the box (`handPlan` in 42-crowd.js).
-    return { boxes, floor: 0, back: true, round: !!A.mesh };
+    // `chair`: the first two boxes are a moulded chair that can go over
+    // (43-topple.js) — MINI's mesh armchairs are not drawn as one piece.
+    return { boxes, floor: 0, back: true, round: !!A.mesh, chair: !A.mesh };
   }
 
   // Somebody halfway down every other ladder, which is the one place on this
@@ -31453,6 +31463,8 @@ async function buildJadrija(scene) {
   const upMesh = new THREE.Mesh(up.geo(), solidMaterial(0xffffff, {
     spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22, body: FACE,
   }));
+  // Which mesh a builder became, for a chair taken out of it (`chairGeo`).
+  const bldMesh = new Map([[deck, deckMesh], [up, upMesh]]);
   // The trees. A little of `up`'s bounce and not all of it: they stand on
   // gravel and needle litter, not on the white terrace, and the landscape's
   // own pines next to them have none — 0.10 keeps a trunk in the stand from
@@ -32412,6 +32424,10 @@ async function buildJadrija(scene) {
       // And everybody sitting sits down into what they are sitting on — see
       // 43-settle.js and `sitGeo`.
       crowds.skin.setSettler(makeSettler(sitGeo));
+      // And anybody hosed off it is a ragdoll against the same furniture —
+      // see 43-topple.js and `toppleEvent`.
+      crowds.skin.setToppler(makeToppler({ geoOf: sitGeo, event: (fg, w, i) => toppleEvent(fg, w, i),
+        chair: (fg, p, q) => hoseChair(fg, p, q) }));
     }
     // And the instanced pair as well, which used to be the *fallback* for a
     // payload with no blobs in it and is now the second tier of a crowd.
@@ -36865,7 +36881,7 @@ async function buildJadrija(scene) {
       // changes hands (`assign` in 42-crowd.js) without the bones knowing, so
       // an aim left standing is the next occupant sitting there holding
       // nothing at chest height for as long as they are on that mesh.
-      if (!fg || !fg.phone || !f.mesh.visible
+      if (!fg || !fg.phone || !f.mesh.visible || (fg.topple && fg.topple.phase !== 'wet')
         || dx * dx + dz * dz > PHONE.near * PHONE.near) {
         dropHold(f, arms[k]);
         continue;
@@ -37474,6 +37490,303 @@ async function buildJadrija(scene) {
     if (eyesOn) audio.yelp(kind, m);
     else audio.startle(kind, m);
     batherNewsQ = { kind, pose: b.pose, m };
+  }
+
+  // ── HOSED OFF THEIR CHAIRS (1.540.0) ──────────────────────────────────────
+  //
+  // Misha, 28 Sep 2026: *"can i like, come up to them and when i spray them,
+  // can i wash them off from their chairs so they fall off on the ground...?"*
+  // The ragdoll and its get-up are 43-topple.js; this is the half that knows
+  // what a café is: who is sitting where, the jet's push on them, what they
+  // say about it, and where they go after.
+  //
+  // THE CAFÉ SITTERS WERE NEVER GUESTS. `batherNear` takes only people with a
+  // face and a voice of their own (`castBlob`), and the terrace is pinned to
+  // the skinned tier and dealt no cast — so the jet went straight through
+  // everybody at a table. These are four more slots, the same shape: the four
+  // chair sitters nearest you, and the jet's own geometry picks which of them
+  // it hit.
+  const HOSE = {
+    guests: 4,
+    reach: 14,        // m: further than this, no slot — past the jet's push anyway
+    // Their hit box, sitting: a person in a chair from the deck to the top of
+    // the head (1.20 m is `BUMP.high.sit`), and on the ground, lying.
+    sitR: 0.34, sitH: 1.32, lieR: 0.45, lieH: 0.55,
+    // After the get-up: how long they glare at you, s; how far they walk off
+    // along the shore, m, and how fast, m/s; and when they come back — not
+    // before `away` s, and only with you `back` m from their seat and from them.
+    glare: 1.8, go: 11, walk: 1.15, away: 45, back: 30,
+    // What they say, getting up: the bump's recorded lines that fit being
+    // hosed off a chair, in the body's own voice. `again` if it has happened
+    // to them before.
+    lines: ['bump.kiddinme', 'bump.blind', 'bump.watchit', 'bump.easy'],
+  };
+  let nearS = { at: -1, list: [] };
+  const hoseFig = new Map();           // fg → the skinned figure drawing them
+  const hoseWho = { x: 0, z: 0 };
+  const hoseLog = [];
+
+  /** The four chair sitters nearest you, and the figure drawing each. */
+  function sitterNear() {
+    if (nearS.at === state.t) return nearS.list;
+    nearS.at = state.t;
+    nearS.list = [];
+    const skin = crowds.skin;
+    if (!skin || !skin.toppler || !skin.pairs) return nearS.list;
+    hoseFig.clear();
+    const out = [];
+    for (const [fg, f] of skin.pairs()) {
+      if (!fg || !f || !fg.sitAt || fg.slot >= 0) continue;
+      hoseFig.set(fg, f);
+      const X = fg.topple;
+      if (X && X.phase !== 'wet' && X.phase !== 'live') continue;
+      if (!f.mesh.visible && !(X && X.phase === 'live')) continue;
+      const dx = fg.x - hoseWho.x, dz = fg.z - hoseWho.z, d2 = dx * dx + dz * dz;
+      if (d2 > HOSE.reach * HOSE.reach) continue;
+      out.push([d2, fg]);
+    }
+    out.sort((a, b) => a[0] - b[0]);
+    nearS.list = out.slice(0, HOSE.guests).map((r) => r[1]);
+    return nearS.list;
+  }
+
+  /** Slot k's probe: in the chair, or wherever the ragdoll has got to. */
+  function sitterProbe(k) {
+    const fg = sitterNear()[k];
+    if (!fg) return null;
+    const T = crowds.skin.toppler;
+    if (fg.topple && fg.topple.phase === 'live') {
+      const p = T.where(fg);
+      if (!p) return null;
+      return { x: p[0], y: Math.min(p[1], fg.y + 0.4) - 0.15, z: p[2], r: HOSE.lieR, h: HOSE.lieH + 0.4, fg };
+    }
+    return { x: fg.x, y: fg.y, z: fg.z, r: HOSE.sitR, h: HOSE.sitH, fg };
+  }
+
+  /**
+   * Slot k hit: the jet's push on them, which is its direction times
+   * `KNOCK.force` and the falloff with how far it has come — handed to the
+   * toppler, which sums it and decides. `litres` is a frame of flow, so it
+   * is the frame's dt as well.
+   */
+  function sitterWet(k, litres, hit) {
+    const fg = sitterNear()[k];
+    const f = fg && hoseFig.get(fg);
+    if (!fg || !f || !hit) return;
+    const dt = litres / GROUND.flow;
+    const dir = hit.dir || [hit.x - hoseWho.x, 0, hit.z - hoseWho.z];
+    const from = hit.from || [hoseWho.x, hit.y, hoseWho.z];
+    const range = Math.hypot(hit.x - from[0], hit.y - from[1], hit.z - from[2]);
+    const fall = clamp((KNOCK.far - range) / (KNOCK.far - KNOCK.near), 0, 1);
+    const l = Math.hypot(dir[0], dir[1], dir[2]) || 1, F = KNOCK.force * fall / l;
+    // Along the jet's line through where it got to them — which, the catch
+    // being a fan a metre wide, is a point on that line and not on them.
+    crowds.skin.toppler.push(fg, f, [dir[0] * F, dir[1] * F, dir[2] * F], [hit.x, hit.y, hit.z], dt);
+  }
+
+  /** Which of the eight bodies is drawing them — their voice, whatever `fg.sex` drew. */
+  function hoseKind(fg) {
+    const f = hoseFig.get(fg);
+    if (!f || !wheelBlobs) return null;
+    const k = wheelBlobs.parsed.findIndex((p) => p === f.data || p.data === f.data);
+    return k >= 0 ? CAST_KIND[k] : null;
+  }
+
+  /** Their head round at `at` (anything with an x and a z), the bump's way. */
+  function hoseLook(fg, at) {
+    fg.lookOn = at;
+    if (!fg.bumping) {
+      fg.lookT = 0; fg.look = 1e-4; fg.lookY = 0;
+      fg.bumping = true;
+      looking.push(fg);
+    } else if (fg.lookT > BUMP.turn) fg.lookT = BUMP.turn;
+  }
+
+  /** What happens to them, told by the toppler — see `makeToppler`'s `event`. */
+  function toppleEvent(fg, what, info) {
+    const kind = hoseKind(fg);
+    const m = Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z);
+    hoseLog.push({ idx: fg.idx, seat: fg.seat, what, t: +crowdT.toFixed(2) });
+    if (hoseLog.length > 40) hoseLog.shift();
+    switch (what) {
+      case 'wet':
+        // A flinch: the head round to where it is coming from, and a gasp —
+        // unvoiced, they did not see it coming (`startle`, 80-audio.js).
+        hoseLook(fg, { x: hoseWho.x, z: hoseWho.z });
+        if (audio && audio.startle && kind) audio.startle(kind, m);
+        break;
+      case 'live':
+        if (audio && audio.yelp && kind) audio.yelp(kind, m);
+        break;
+      case 'down':
+        if (audio && audio.startle && kind) audio.startle(kind, m);
+        break;
+      case 'reseat':
+        // Never got off it: the chair, too, is where it was.
+        hoseChairBack(fg.topple);
+        break;
+      case 'up': {
+        // Standing where the get-up left them: a person again, standing, off
+        // the ragdoll's hands and the chair's.
+        const [t, s] = local(info.x, info.z);
+        const p = toWorld(t, s);
+        const H = fg.topple;
+        H.away = { t: 0, phase: 'glare', legs: null, leg: 0,
+          home: { t: fg.t, lane: fg.lane } };
+        fg.x = info.x; fg.z = info.z; fg.y = p[1];
+        fg.yaw = info.yaw;
+        fg.t = t; fg.lane = s; fg.off = 0;
+        fg.mode = 'stand';
+        fg.handGeo = null;
+        fg.handPlan = null;
+        hoseLook(fg, { x: hoseWho.x, z: hoseWho.z });
+        // And what they think of it, out loud, if nobody else on the shore is
+        // mid-sentence.
+        if (bumpCool <= 0 && !bumpSaid) {
+          const key = fg.hosedBefore ? 'bump.again'
+            : HOSE.lines[((fg.seed * 7919) | 0) % HOSE.lines.length];
+          if (!bumpBalloon) {
+            bumpBalloon = makeBalloon();
+            bumpBalloon.mesh.scale.setScalar(1.45);
+            scene.add(bumpBalloon.mesh);
+          }
+          const line = T(key);
+          const sex = (kind && BATHER_SEX[kind]) || fg.sex;
+          if (audio && audio.bark && BARK[key]) audio.bark(BARK[key], sex, m);
+          bumpBalloon.say(line);
+          bumpBalloon.said = line;
+          bumpSaid = { fg, t: 0 };
+          bumpCool = BUMP.cool;
+          fg.saidAt = bumpClock;
+        }
+        fg.hosedBefore = true;
+        break;
+      }
+      default: break;
+    }
+  }
+
+  /**
+   * Everybody the hose has had off their chair and who is on their feet
+   * again: a glare, a walk off along the shore away from you, and a wait;
+   * and back in their chair once you are well away from it (`HOSE.back`),
+   * which is the one moment nobody is watching it happen. Their seat stays
+   * empty until then.
+   */
+  function stepToppled(dt) {
+    const skin = crowds.skin;
+    if (!skin || !skin.toppler) return;
+    for (const fg of skin.figures) {
+      const H = fg.topple;
+      if (!H || H.phase !== 'away' || !H.away) continue;
+      const A = H.away;
+      A.t += dt;
+      if (A.phase === 'glare') {
+        fg.mode = 'stand';
+        if (A.t < HOSE.glare) continue;
+        // Off along the shore, away from whoever did it.
+        const [pt] = local(hoseWho.x, hoseWho.z);
+        const sg = fg.t >= pt ? 1 : -1;
+        const tt = fg.t + sg * HOSE.go, ts = fg.sitAt ? fg.sitAt.s - 2.8 : fg.lane;
+        A.legs = hamPath(fg.t, fg.lane, tt, ts) || [[tt, ts]];
+        A.leg = 0;
+        A.phase = 'walk';
+      }
+      if (A.phase === 'walk') {
+        const L = A.legs[A.leg];
+        if (!L) { A.phase = 'wait'; fg.mode = 'stand'; continue; }
+        const dT = L[0] - fg.t, dS = L[1] - fg.lane, d = Math.hypot(dT, dS);
+        const step = HOSE.walk * dt;
+        if (d <= step) { fg.t = L[0]; fg.lane = L[1]; A.leg++; } else { fg.t += dT / d * step; fg.lane += dS / d * step; }
+        const p = toWorld(fg.t, fg.lane);
+        const dx = p[0] - fg.x, dz = p[2] - fg.z;
+        if (dx * dx + dz * dz > 1e-8) {
+          let e = Math.atan2(-dz, dx) - fg.yaw;
+          while (e > Math.PI) e -= TAU;
+          while (e < -Math.PI) e += TAU;
+          fg.yaw += e * Math.min(1, dt * 6);
+        }
+        fg.x = p[0]; fg.y = p[1]; fg.z = p[2];
+        fg.mode = 'walk';
+        continue;
+      }
+      // Waiting — and home when nobody is looking.
+      fg.mode = 'stand';
+      const S = H.seat;
+      const far = (x, z) => Math.hypot(x - hoseWho.x, z - hoseWho.z) > HOSE.back
+        && Math.hypot(x - lastCam.x, z - lastCam.z) > HOSE.back;
+      if (A.t > HOSE.away && far(S.x, S.z) && far(fg.x, fg.z)) hoseHome(fg);
+    }
+  }
+
+  /**
+   * THE CHAIR GOES OVER WITH THEM. The terrace is one buffer, so the chair
+   * somebody is knocked off is taken out of it — its vertices folded to a
+   * point, and kept — and drawn instead as a copy of those same triangles on
+   * a mesh of its own, posed off the chair's body in the ragdoll's net
+   * (`chairOn` in 43-topple.js). It lies where it fell until they come back,
+   * and then the copy goes and the terrace has its chair back.
+   */
+  function hoseChair(fg, p, q) {
+    const H = fg.topple, A = fg.sitAt;
+    if (!H || !A) return;
+    let C = H.chairMesh;
+    if (!C) {
+      const G = chairGeo.get(chairKey(A.t, A.s));
+      const M = G && bldMesh.get(G.bld);
+      if (!M) { H.chairMesh = { none: true }; return; }
+      const src = M.geometry, pos = src.getAttribute('position');
+      const n = G.v1 - G.v0, pv = G.pivot;
+      const g = new THREE.BufferGeometry();
+      const cut = (name, sub) => {
+        const a = src.getAttribute(name);
+        const arr = a.array.slice(G.v0 * 3, G.v1 * 3);
+        if (sub) for (let i = 0; i < n; i++) { arr[3 * i] -= pv[0]; arr[3 * i + 1] -= pv[1]; arr[3 * i + 2] -= pv[2]; }
+        g.setAttribute(name, new THREE.Float32BufferAttribute(arr, 3));
+      };
+      cut('position', true); cut('normal', false); cut('aVCol', false);
+      g.computeBoundingSphere();
+      const mesh = new THREE.Mesh(g, M.material);
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      // And out of the terrace: folded to its own middle, the originals kept.
+      const keep = pos.array.slice(G.v0 * 3, G.v1 * 3);
+      for (let i = G.v0; i < G.v1; i++) pos.setXYZ(i, pv[0], pv[1], pv[2]);
+      pos.needsUpdate = true;
+      C = H.chairMesh = { mesh, G, M, keep };
+    }
+    if (C.none) return;
+    C.mesh.position.copy(p);
+    C.mesh.quaternion.copy(q);
+    C.mesh.updateMatrixWorld();
+  }
+  /** The terrace's chair back, and the copy gone. */
+  function hoseChairBack(H) {
+    const C = H && H.chairMesh;
+    if (!C || C.none) return;
+    const pos = C.M.geometry.getAttribute('position');
+    pos.array.set(C.keep, C.G.v0 * 3);
+    pos.needsUpdate = true;
+    scene.remove(C.mesh);
+    C.mesh.geometry.dispose();
+    H.chairMesh = null;
+  }
+
+  /** Back in their chair, as they were before any of it. */
+  function hoseHome(fg) {
+    const H = fg.topple;
+    if (!H) return;
+    hoseChairBack(H);
+    const S = H.seat, A = H.away;
+    fg.x = S.x; fg.y = S.y; fg.z = S.z; fg.yaw = S.yaw;
+    if (A && A.home) { fg.t = A.home.t; fg.lane = A.home.lane; }
+    fg.off = 0;
+    fg.mode = 'sit';
+    fg.handGeo = undefined;
+    fg.handPlan = null;
+    const f = hoseFig.get(fg);
+    if (crowds.skin && crowds.skin.toppler) crowds.skin.toppler.release(fg, f || null);
+    fg.topple = null;
   }
 
   /**
@@ -57060,6 +57373,8 @@ async function buildJadrija(scene) {
     // purpose, because that question really is about the viewer.
     const who = at || cam;
     const [pt, ps] = local(who.x, who.z);
+    hoseWho.x = who.x; hoseWho.z = who.z;
+    stepToppled(dt);
     stepPhones(cam);
     // The thing on the table with a motor in it — see SIGNAL. Here rather
     // than in her step, because it is scenery and carries on whether she is
@@ -57440,6 +57755,47 @@ async function buildJadrija(scene) {
         geo: (seat) => {
           const fg = crowds.skin && crowds.skin.figures.find((f) => f.seat === seat);
           return fg ? sitGeo(fg) : null;
+        },
+      },
+      /**
+       * Hosed off their chairs (43-topple.js, `HOSE` here): `stats()` — how
+       * many, the solve's ms, rescues, get-ups; `list()` who is down now;
+       * `log()` what happened to whom; `sitters()` the chair sitters near
+       * you, where and which way they face; `knock(seat, fx, fy, fz, h)` an
+       * impulse (N·s, world) at height h over their feet — live now;
+       * `home(seat)` back in the chair; `of(seat)` their state.
+       */
+      topple: {
+        stats: () => (crowds.skin && crowds.skin.toppler ? crowds.skin.toppler.stats() : null),
+        list: () => (crowds.skin && crowds.skin.toppler ? crowds.skin.toppler.list() : null),
+        cfg: () => ({ KNOCK, HOSE }),
+        log: () => hoseLog.slice(),
+        sitters: (r = 14) => (crowds.skin ? crowds.skin.pairs().filter(([fg, f]) => fg && f && fg.sitAt && fg.slot < 0
+          && Math.hypot(fg.x - hoseWho.x, fg.z - hoseWho.z) < r)
+          .map(([fg, f]) => ({ seat: fg.seat, idx: fg.idx, x: +fg.x.toFixed(2), y: +fg.y.toFixed(2), z: +fg.z.toFixed(2),
+            yaw: +fg.yaw.toFixed(3), t: +fg.t.toFixed(2), s: +fg.lane.toFixed(2), vis: f.mesh.visible, phone: fg.phone || 0,
+            mesh: !!fg.sitAt.mesh, phase: fg.topple ? fg.topple.phase : null,
+            d: +Math.hypot(fg.x - hoseWho.x, fg.z - hoseWho.z).toFixed(2) })) : null),
+        knock: (seat, fx, fy, fz, h = 1.0) => {
+          const pr = crowds.skin && crowds.skin.pairs().find(([fg]) => fg && fg.seat === seat && fg.slot < 0);
+          if (!pr) return null;
+          const [fg, f] = pr;
+          hoseFig.set(fg, f);
+          return crowds.skin.toppler.knock(fg, f, [fx, fy, fz], [fg.x, fg.y + h, fg.z]);
+        },
+        home: (seat) => {
+          const fg = crowds.skin && crowds.skin.figures.find((q) => q.seat === seat);
+          if (fg) hoseHome(fg);
+          return !!fg;
+        },
+        of: (seat) => {
+          const fg = crowds.skin && crowds.skin.figures.find((q) => q.seat === seat);
+          if (!fg) return null;
+          const X = fg.topple;
+          return { mode: fg.mode, x: +fg.x.toFixed(2), z: +fg.z.toFixed(2), yaw: +fg.yaw.toFixed(3),
+            phase: X ? X.phase : null, J: X ? +X.J.toFixed(1) : 0, t: X ? +X.t.toFixed(2) : 0,
+            landed: X ? X.landed : null, rolls: X ? X.rolls : 0, sp: X ? +(X.sp || 0).toFixed(2) : 0, dry: X ? +(X.dry || 0).toFixed(2) : 0, away: X && X.away ? X.away.phase : null,
+            where: X && crowds.skin.toppler.where(fg) ? crowds.skin.toppler.where(fg).map((v) => +v.toFixed(2)) : null };
         },
       },
       /**
@@ -59816,6 +60172,9 @@ async function buildJadrija(scene) {
     // which of the people near you it actually hit. See `batherProbe`.
     batherGuests: Array.from({ length: BATHER_GUESTS }, (_, k) => [
       () => batherProbe(k), () => batherWet(k)]),
+    // And the café sitters, who can be hosed off their chairs — see `HOSE`.
+    sitterGuests: Array.from({ length: HOSE.guests }, (_, k) => [
+      () => sitterProbe(k), (litres, hit) => sitterWet(k, litres, hit)]),
     radioProbe, radioWet,
     tvProbe, tvWet,
     /** The set on the table: where it is, what it is doing, and knock it on. */

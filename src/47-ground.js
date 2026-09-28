@@ -1397,7 +1397,12 @@ async function buildGround(scene, field) {
         bt = t; hit = { guest: g };
       }
       if (hit) {
-        return { x: x0 + (x - x0) * bt, y: y0 + (y - y0) * bt, z: z0 + (z - z0) * bt, ...hit };
+        // And which way the water was going when it got there, and how far it
+        // had come — what a guest needs to be PUSHED by it rather than only
+        // wetted (the café sitters, 1.540.0 — see 43-topple.js).
+        const sp = Math.hypot(vx, vy, vz) || 1;
+        return { x: x0 + (x - x0) * bt, y: y0 + (y - y0) * bt, z: z0 + (z - z0) * bt, ...hit,
+          dir: [vx / sp, vy / sp, vz / sp], from: [p[0], p[1], p[2]] };
       }
 
       const gy = field.walkY(x, z);
