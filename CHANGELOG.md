@@ -8,6 +8,78 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.536.0] — 2026-09-27
+
+### Baye in the hammock is a ragdoll: she sinks into it, sways with it, and a hard rocking throws her out
+
+Misha: *"when i rock the hammock too hard, she ends up falling out of it,
+and she falls off very stiffly, like a wooden doll ... is it possible to
+make her body like, super elastic, to groove with the hammock the way a real
+human lying down on it would do, and can AVBD equations be used to achieve
+that fluidity"*, and *"to have a ragdoll ... we can reuse it elsewheres ...
+i do want her to occasionally fall out i guess"*.
+
+- **A reusable active ragdoll** (`src/43-ragdoll.js`), built on `avbdNet`:
+  - **Bodies:** twelve capsule bodies on her bones: pelvis, belly, chest,
+    neck and head, and upper arms, forearms, thighs and shins. They are
+    sized from her own collision capsules (CHAIN_BODY), and their masses are
+    de Leva's for a woman, 55 kg in all.
+  - **Joints:** hard ball sockets.
+  - **Angles:** each socket also has a soft muscle drive toward a target
+    pose, damping, and joint limits in the bone's own axes. Knees and
+    elbows bend one way; spine, neck, hips and shoulders turn within boxes.
+  - **Tension:** one number sets how floppy or held she is.
+  - **Skin:** every bone of her skeleton is written from the bodies each
+    frame, so nothing animated fights the physics. The API (enter, drive,
+    tension, frame, write, groundFrame) is documented at the top of the
+    file.
+- **The new angle row in `avbdNet`** (`43-avbd.js`, note (h)):
+  - **Drive:** a spring toward a target rotation, at exactly the stiffness
+    asked for.
+  - **Damping:** an implicit angular-velocity term.
+  - **Limits:** one-sided rows on the rotation vector, the contact normal's
+    rule applied to an angle, with the log map's Jacobian. Their penalty has
+    a ceiling (`limK`), because rigid limits pulled the knee sockets 15–32 mm
+    apart against the cloth and the guard kept firing.
+  - **Also:** a pull-only soft string, and ragdoll sockets measured apart
+    from the cloth's.
+- **Lying:** once she is in, the ragdoll takes over from the one rigid body,
+  exactly where she is drawn. The `hamLie` clip keeps playing underneath as
+  the muscles' target, and her tension relaxes from 1 to 0.55 over 1.4 s. She
+  sinks into the sling instead of floating on it; her knees follow the
+  cloth's curve, and her arms and head give with the swing.
+- **Getting in and out are unchanged:** one body and the guide, as before.
+  - **Measured over 21 get-ins, each followed by "get out":**
+    - 21 of 21 lay in it.
+    - 21 of 21 got out and walked home, the pose eased from the ragdoll's
+      back to the clip over 0.45 s.
+- **Falling out:** a soft tether keeps her in the middle of the bed below a
+  45° swing. Past 45°, each swing may throw her over the rim near its top:
+  30% at 45°, certain by 65°. The ragdoll takes her to the ground, limp, and
+  she laughs it off.
+  - **In-phase 0.8 s holds:** she fell after 5–9, in 11 of 11 runs.
+  - **In-phase taps:** she fell after 5–13, in 9 of 9.
+  - **Ordinary rocking** (16 pushes at random times, peaks 23–36°): 0 falls
+    in 7 runs.
+  - **Guard:** no rescues and no bails in the last 18 runs.
+- **Getting up:**
+  - **On her front:** `getup`, from all fours.
+  - **On her back:** `situp`, then `getup`.
+  - **Where:** each starts clear of the bed, 0.95 m across the span, and her
+    pose is eased over the clip's first frame, so it reads as a scramble out
+    from under it.
+  - **The empty hammock is stilled** (4/s of air) from the moment she lands.
+    Before, it swung through her as she got up, and once it whipped to 73°
+    and tripped the guard.
+  - **Then:** she walks home, like any other way out.
+- **Cost:** 3.6 ms a frame for the hammock with her lying in it, against
+  2.4 ms in 1.535.7. Nothing extra when she is not in it.
+- **Debug:**
+  - `hamState().rag` and `.falls`;
+  - `hammock.stats().rag`, with tether, flings and speed;
+  - `hammock.fling(±1)`;
+  - `jad.raw().hamUpForce('up' | 'down' | null)`.
+
 ## [1.535.7] — 2026-09-27
 
 ### rock the hammock from further off, and harder when you hold

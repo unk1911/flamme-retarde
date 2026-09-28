@@ -219,6 +219,12 @@ const HAMMOCK = {
   // right: the hard joints open 0.1-0.5 mm lying, 2.4 mm at worst getting in;
   // the fastest thing in it is a pushed swing at about 2 m/s.
   snapStretch: 0.015, snapV: 12,
+  // And the ragdoll's own sockets (1.536.0), which are measured apart. Her
+  // skin is written from the bodies' turns and not their places, so a socket
+  // that opens does not open on the screen; what is wrong is a body gone, and
+  // a knee pulled 23 mm apart for a frame by the cloth — MEASURED once in
+  // fourteen get-ins, the moment she was handed to the ragdoll — is not that.
+  snapRag: 0.06,
   // How long the empty cloth is settled for at build, s — so the first time
   // anybody walks up to it, it is hanging and not falling.
   settle: 3.0,
@@ -260,6 +266,22 @@ const HAMMOCK = {
   relax: 0.7,
   // Creak: at each end of a swing this big (rad), louder with more.
   creakAt: 0.12,
+  // ── her as a ragdoll (1.536.0, 43-ragdoll.js) ─────────────────────────
+  // Out of it: her pelvis this far from the middle of every plate, m — see
+  // `herFell`.
+  fellAt: 0.40, underAt: 0.05,
+  // THE SLING'S HOLD ON THE RAGDOLL — see `ragHold`: a tether from the
+  // middle of the bed to her pelvis, `tetherSlack` m longer than it was when
+  // taken; the swing (rad) past which it lets go; and when it is taken
+  // again — the swing under `rearmBelow` rad for `rearm` s.
+  tetherSlack: 0.10, tetherK: 2500, fallSwing: 0.785, rearm: 1.5, rearmBelow: 0.12,
+  // AND OVER THE TOP — see `ragFling`: the chance each swing past
+  // `fallSwing` has of throwing her, rising to certain `flingSure` rad past
+  // it; and what it adds to her, m/s, on along the swing and up.
+  flingP: 0.3, flingSure: 0.35, flingV: 1.6, flingUp: 0.7,
+  // AND STILLED AS SHE GETS UP UNDER IT, 1/s of air on the empty cloth — see
+  // `calm`.
+  calm: 4.0,
 };
 
 /**
@@ -310,9 +332,13 @@ function hammockSim(o) {
   const half = Math.hypot(D / 2, drop) * H.curl;
   const rope = Math.max(H.ropeMin, half - H.bed / 2 - H.fan);
 
+  // Room for her ragdoll too (43-ragdoll.js), built into this net the first
+  // time she lies in it: RAG bodies, sockets and angles, and her capsules.
+  const RAG = 16;
   const net = avbdNet({
-    maxBodies: NU * NV + 3, maxJoints: 3 * ((NU - 1) * NV + NU * (NV - 1)) + 3 + NU * NV,
-    maxStrings: 2 * NV + 2 + NU * (NV - 2) + (NU - 2) * NV, maxPoints: NU * NV * 4, maxBoxes: NU * NV, maxCaps: 32, maxContacts: 900,
+    maxBodies: NU * NV + 3 + RAG, maxJoints: 3 * ((NU - 1) * NV + NU * (NV - 1)) + 3 + NU * NV + RAG,
+    maxStrings: 2 * NV + 2 + NU * (NV - 2) + (NU - 2) * NV + 2, maxPoints: NU * NV * 4, maxBoxes: NU * NV,
+    maxCaps: 32 + 40, maxContacts: 1400, maxAngles: RAG, limK: RAGDOLL.limK,
     pointsHitCaps: false,
     iterations: H.iterations, alpha: H.alpha, alphaContact: H.alphaContact, beta: H.beta,
     betaAng: H.betaAng, gamma: H.gamma, gravity: [0, -9.81, 0], drag: H.drag,
@@ -479,8 +505,8 @@ function hammockSim(o) {
     return vmax;
   }
   /** The empty cloth's extra air on or off — see HAMMOCK.hush. Her drag is her own. */
-  function hush(on) {
-    const d = on ? H.drag + H.hush : H.drag;
+  function hush(on, air = H.hush) {
+    const d = on ? H.drag + air : H.drag;
     for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) net.drag[plate[i][j]] = d;
     net.drag[gA] = d; net.drag[gB] = d;
   }
@@ -764,6 +790,7 @@ function buildHammock(scene, J) {
    * each capsule a solid of its volume at one density, 55 kg in all.
    */
   function herShape(list, twoFrom = Infinity) {
+    if (ragOn) return;                     // the ragdoll has its own shape
     let vol = 0, cx = 0, cy = 0, cz = 0;
     const w = [];
     for (const c of list) {
@@ -834,21 +861,25 @@ function buildHammock(scene, J) {
   /** Where the guide wants her mesh, and how hard; 0 and 0 lets her go. */
   function herGuide(mp, mq, kLin, kAng) {
     if (!herIn) return;
-    _hq.copy(mq);
-    _hv.set(com[0], com[1], com[2]).applyQuaternion(_hq);
-    net.setTarget(S.guide, mp.x + _hv.x, mp.y + _hv.y, mp.z + _hv.z, [mq.x, mq.y, mq.z, mq.w]);
-    net.setJointK(S.guide, kLin, kAng);
-    // Springs to the cloth while anything is guiding her; hard once nothing is.
-    net.softBody[her] = kLin > 0 || kAng > 0 ? 1 : 0;
-    // And the sling's hold on her, from the moment nothing else holds her —
-    // taken where she lies then, relative to the middle of the bed.
-    if (kLin > 0 || kAng > 0) { if (kept) { net.setJointK(S.keep, 0, 0); kept = false; } } else if (!kept) {
-      const m = S.plate[NU >> 1][NV >> 1];
-      _hq.set(Q[4 * m], Q[4 * m + 1], Q[4 * m + 2], Q[4 * m + 3]).invert();
-      _hv.set(P[3 * her] - P[3 * m], P[3 * her + 1] - P[3 * m + 1], P[3 * her + 2] - P[3 * m + 2]).applyQuaternion(_hq);
-      net.setTarget(S.keep, _hv.x, _hv.y, _hv.z);
-      net.setJointK(S.keep, H.keep, 0);
-      kept = true;
+    // The ragdoll is never guided: only the hand on the bed goes on easing
+    // off under it, below.
+    if (ragOn) { kLin = 0; kAng = 0; } else {
+      _hq.copy(mq);
+      _hv.set(com[0], com[1], com[2]).applyQuaternion(_hq);
+      net.setTarget(S.guide, mp.x + _hv.x, mp.y + _hv.y, mp.z + _hv.z, [mq.x, mq.y, mq.z, mq.w]);
+      net.setJointK(S.guide, kLin, kAng);
+      // Springs to the cloth while anything is guiding her; hard once nothing is.
+      net.softBody[her] = kLin > 0 || kAng > 0 ? 1 : 0;
+      // And the sling's hold on her, from the moment nothing else holds her —
+      // taken where she lies then, relative to the middle of the bed.
+      if (kLin > 0 || kAng > 0) { if (kept) { net.setJointK(S.keep, 0, 0); kept = false; } } else if (!kept) {
+        const m = S.plate[NU >> 1][NV >> 1];
+        _hq.set(Q[4 * m], Q[4 * m + 1], Q[4 * m + 2], Q[4 * m + 3]).invert();
+        _hv.set(P[3 * her] - P[3 * m], P[3 * her + 1] - P[3 * m + 1], P[3 * her + 2] - P[3 * m + 2]).applyQuaternion(_hq);
+        net.setTarget(S.keep, _hv.x, _hv.y, _hv.z);
+        net.setJointK(S.keep, H.keep, 0);
+        kept = true;
+      }
     }
     // And the cloth one-sided the whole time she is in it — (g) over
     // `avbdNet`. Not only while she is guided, which is what it was first,
@@ -875,7 +906,7 @@ function buildHammock(scene, J) {
     // whole bed carried under her (as far as `holdAcross` either side of
     // the middle). So the bed sags, folds along and takes her weight as it
     // likes, and only cannot swing away from her or fold shut across.
-    let hx = across(her);
+    let hx = across(ragOn ? rag.pelvis : her);
     hx = Math.max(-H.holdAcross, Math.min(H.holdAcross, hx));
     for (let k = 0; k < S.holds.length; k++) {
       const [b, j] = S.holds[k];
@@ -888,12 +919,14 @@ function buildHammock(scene, J) {
   /** Where her mesh is to be drawn: the body, less the centre of mass. */
   function herPose(outP, outQ) {
     if (!herIn) return false;
+    if (ragOn) { rag.frame(outP, outQ); return true; }
     outQ.set(Q[4 * her], Q[4 * her + 1], Q[4 * her + 2], Q[4 * her + 3]);
     _hv.set(com[0], com[1], com[2]).applyQuaternion(outQ);
     outP.set(P[3 * her] - _hv.x, P[3 * her + 1] - _hv.y, P[3 * her + 2] - _hv.z);
     return true;
   }
   function herLeave() {
+    if (ragOn) { ragHold(false); rag.leave(); ragOn = false; ragOut = false; }
     herIn = false;
     net.setJointK(S.guide, 0, 0);
     net.setJointK(S.keep, 0, 0); kept = false;
@@ -905,6 +938,177 @@ function buildHammock(scene, J) {
     forget();
   }
 
+  // ── her, as a ragdoll ───────────────────────────────────────────────────
+  //
+  // 1.536.0 — see 43-ragdoll.js. The one body above gets her in and out,
+  // where an animation is steering her and a rigid body is what a guide can
+  // steer; once she is lying in it she is handed to twelve bodies that the
+  // cloth can bend, and handed back to the one to get out. The ragdoll is
+  // built into this net the first time (`ragAttach`), because her figure
+  // does not exist yet when the hammock is hung.
+  let rag = null, ragOn = false, ragOut = false;
+  let ragKeep = -1, ragKept = false, ragCalm = 0, ragBreaks = 0;
+  function ragAttach(fig, caps) {
+    if (rag) return rag;
+    rag = ragdollBuild(net, fig, caps, { idBase: 40 });
+    ragKeep = net.addString(mid, [0, 0, 0], rag.pelvis, [0, 0, 0], 1, H.tetherK, true);
+    net.setString(ragKeep, null, null, false);
+    net.finish();
+    // The empty hammock the guard hangs back up (`putBack(restP, restQ)`)
+    // was measured before these bodies existed: give them an attitude.
+    for (const b of rag.bodies) { restQ[4 * b + 3] = 1; goodQ[4 * b + 3] = 1; }
+    return rag;
+  }
+  /** From her one body to the ragdoll, where her mesh is drawn now, moving as it moved. */
+  function ragEnter(fig, mp, mq) {
+    if (!rag || !herIn || ragOn) return false;
+    const o3 = 3 * her;
+    rag.enter(fig, mp, mq, [net.V[o3], net.V[o3 + 1], net.V[o3 + 2]], [net.W[o3], net.W[o3 + 1], net.W[o3 + 2]],
+      [P[o3], P[o3 + 1], P[o3 + 2]]);
+    net.setJointK(S.guide, 0, 0);
+    if (kept) { net.setJointK(S.keep, 0, 0); kept = false; }
+    net.softBody[her] = 0;
+    net.setLive(her, false);
+    for (const c of S.caps) net.cpOn[c] = 0;
+    ragOn = true; ragOut = false;
+    ragHold(true);
+    rouse();
+    forget();
+    return true;
+  }
+  /**
+   * THE SLING'S HOLD, AND WHEN IT LETS GO. MEASURED with nothing but the
+   * cloth, the ragdoll went over the rim on the third push, at 17 to 26
+   * degrees of swing — where the one body with `keep` never went at all.
+   * It is the same thing missing for the same reason: a real sling wraps
+   * whoever is in it, and a grid of plates holds her in a handful of
+   * contacts. `keep` itself was tried first on the pelvis, and MEASURED it
+   * pulled her THROUGH the bed at the fourth push: it holds her to a point
+   * in the middle plate's frame, a plate folds, and the point is under the
+   * cloth. So it is a tether from the middle of the bed to her pelvis,
+   * `tetherSlack` longer than it was when taken: it does nothing at all
+   * while she lies and swings in the cloth, and it stops her rolling away
+   * from the middle of it. And a SOFT one, `tetherK` N/m, pull only: hard
+   * (`avbdNet`'s rope) it put her through the bed too, one run in four —
+   * the bed dropped away from her at the top of a swing, the rope hauled
+   * her pelvis at the plate under her against a contact just as hard, and
+   * she tunnelled, and lay on the ground under the cloth tied to it. Soft,
+   * the cloth always wins.
+   *
+   * AND IT LETS GO PAST `fallSwing`, 45 degrees. It was to let go when it
+   * pulled hard (400 N) and that was chaos rather than a threshold:
+   * MEASURED, four taps in time dumped her at 28 degrees in one run, and
+   * fourteen held pushes in time took her to 52 degrees and she never left
+   * in another. Misha wanted a fall that a determined player can make and
+   * ordinary rocking never does, so the number is the swing: below 45 the
+   * sling holds her whatever she does in it; past it the hand is off, and
+   * the cloth and the ragdoll decide — which, MEASURED without the tether,
+   * is over the rim within a swing or two at that size, and never the same
+   * way twice. In-phase that is about seven held pushes, or seven taps.
+   * Taken again where she lies once the swing has been under `rearmBelow`
+   * for `rearm` s.
+   *
+   * EXCEPT THAT THE CLOTH NEVER DECIDED. That measurement was of a ragdoll
+   * whose limits were rigid, and fought the cloth; with them a ligament
+   * (RAGDOLL.limK) she lies so well in it that sixteen pushes in time, 58
+   * to 68 degrees, never put her out — eight runs, no tether past 45, not
+   * one fall. Which is true of a real hammock, and not what was asked for.
+   * So past `fallSwing` each swing, on its way up, may throw her (`ragFling`).
+   */
+  function ragHold(take) {
+    if (ragKeep < 0) return;
+    if (take) {
+      const b = rag.pelvis;
+      const d = Math.hypot(P[3 * b] - P[3 * mid], P[3 * b + 1] - P[3 * mid + 1], P[3 * b + 2] - P[3 * mid + 2]);
+      net.setString(ragKeep, null, d + H.tetherSlack, true);
+      ragKept = true; ragCalm = 0;
+    } else {
+      net.setString(ragKeep, null, null, false);
+      ragKept = false; ragCalm = 0;
+    }
+  }
+  let ragPull = 0, ragPullMax = 0, flingArmed = true, flings = 0;
+  /**
+   * THROWN OUT OF IT. On the way up a swing past `fallSwing` — once a
+   * swing, re-armed as it passes the bottom — a chance of `flingP`, rising to
+   * certain `flingSure` rad further, that she is thrown on over the rim: her
+   * whole body given `flingV` more along the way she is going and `flingUp`
+   * up, the moment before the swing turns, which is when a body that is not
+   * holding on leaves a swing. What happens next is the ragdoll's: over the
+   * rim head or feet first, a limb catching the cloth, face down or on her
+   * back — never the same fall twice.
+   */
+  function ragFling() {
+    const a = swingA, w = swingW;
+    if (Math.abs(a) < 0.5 * H.fallSwing) { flingArmed = true; return; }
+    if (!flingArmed || Math.abs(a) < H.fallSwing || a * w <= 0) return;
+    flingArmed = false;
+    const p = H.flingP + (1 - H.flingP) * Math.min(1, (Math.abs(a) - H.fallSwing) / H.flingSure);
+    if (Math.random() > p) return;
+    const sg = Math.sign(a);
+    rag.kick(S.ez[0] * sg * H.flingV, H.flingUp, S.ez[2] * sg * H.flingV);
+    flings++;
+  }
+  function ragHoldTick(dt) {
+    if (!ragOn || ragOut || ragKeep < 0) return;
+    ragFling();
+    if (ragKept) {
+      ragPull = net.sF[ragKeep];
+      ragPullMax = Math.max(ragPullMax, ragPull);
+      if (Math.abs(swingA) > H.fallSwing) { ragHold(false); ragBreaks++; }
+    } else {
+      ragPull = 0;
+      ragCalm = Math.abs(swingA) < H.rearmBelow ? ragCalm + dt : 0;
+      if (ragCalm > H.rearm) ragHold(true);
+    }
+  }
+  /**
+   * And back to the one body, for getting out: where the mesh is drawn, its
+   * shape the capsules of the pose she is in, moving as her pelvis is.
+   */
+  function ragToBody(mp, mq, list, twoFrom) {
+    if (!ragOn) return;
+    const pv = 3 * rag.pelvis;
+    const v = [net.V[pv], net.V[pv + 1], net.V[pv + 2]];
+    ragHold(false);
+    rag.leave();
+    ragOn = false; ragOut = false;
+    herIn = false;
+    herShape(list, twoFrom);
+    _hq.copy(mq);
+    _hv.set(com[0], com[1], com[2]).applyQuaternion(_hq);
+    net.setLive(her, true);
+    net.place(her, mp.x + _hv.x, mp.y + _hv.y, mp.z + _hv.z, [mq.x, mq.y, mq.z, mq.w]);
+    net.kick(her, v[0], v[1], v[2]);
+    herIn = true;
+    rouse();
+    forget();
+  }
+  /**
+   * Whether she has come out of the cloth: her pelvis further than `fellAt`
+   * from the middle of every plate. Lying in it, the nearest plate is a
+   * capsule's radius and the cloth's own sag away — 0.12 to 0.2 m.
+   */
+  function herFell() {
+    if (!ragOn) return false;
+    const b = rag.pelvis;
+    let d2 = Infinity;
+    for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) {
+      const p = S.plate[i][j];
+      const dx = P[3 * p] - P[3 * b], dy = P[3 * p + 1] - P[3 * b + 1], dz = P[3 * p + 2] - P[3 * b + 2];
+      d2 = Math.min(d2, dx * dx + dy * dy + dz * dz);
+    }
+    if (Math.sqrt(d2) > H.fellAt) return true;
+    // Or UNDER it: further from the line between the ties than the middle
+    // of the bed is. Lying in it she is 0.1 to 0.2 m nearer.
+    const off = (i) => {
+      const dx = P[3 * i] - tiesLine[0], dy = P[3 * i + 1] - tiesLine[1], dz = P[3 * i + 2] - tiesLine[2];
+      const u = dx * tiesLine[3] + dy * tiesLine[4] + dz * tiesLine[5];
+      return Math.hypot(dx - u * tiesLine[3], dy - u * tiesLine[4], dz - u * tiesLine[5]);
+    };
+    return off(b) > off(mid) + H.underAt;
+  }
+
   // ── the swing ───────────────────────────────────────────────────────────
   //
   // How far round the line between the ties the hammock is swung: the angle
@@ -914,7 +1118,7 @@ function buildHammock(scene, J) {
   let swingA = 0, swingW = 0, swingAWas = 0, swingPeak = 0, swingWas = 0;
   let creaks = 0, pushes = 0;
   function swingNow() {
-    const b = herIn ? her : mid;
+    const b = herIn && !ragOut ? (ragOn ? rag.pelvis : her) : mid;
     const dx = P[3 * b] - S.M[0], dy = P[3 * b + 1] - S.M[1], dz = P[3 * b + 2] - S.M[2];
     const across = dx * S.ez[0] + dz * S.ez[2];
     return Math.atan2(across, -dy);
@@ -934,7 +1138,7 @@ function buildHammock(scene, J) {
     const side = (x - S.M[0]) * S.ez[0] + (z - S.M[2]) * S.ez[2];
     const sg = side > 0 ? -1 : 1;
     let dv;
-    if (herIn) {
+    if (herIn && !ragOut) {
       // THE WHOLE HAMMOCK, HER AND THE CLOTH ALIKE, and not her alone. A
       // hand on somebody in a hammock pushes the sling they are in; the first
       // cut kicked her body and the cloth at four fifths of it, and MEASURED
@@ -944,7 +1148,8 @@ function buildHammock(scene, J) {
       // The impulse is hers (her mass is 96 % of the lot), spread as one
       // velocity over every body in it, so nothing moves against anything.
       dv = k * H.push / (H.herMass + NU * NV * H.plateMass);
-      net.kick(her, S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
+      if (ragOn) rag.kick(S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
+      else net.kick(her, S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
       for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) {
         net.kick(S.plate[i][j], S.ez[0] * dv * sg, 0, S.ez[2] * dv * sg);
       }
@@ -973,7 +1178,7 @@ function buildHammock(scene, J) {
       if (d < bd) { bd = d; best = { x: P[3 * b], y: P[3 * b + 1], z: P[3 * b + 2], d }; }
     };
     for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) test(S.plate[i][j]);
-    if (herIn) test(her);
+    if (herIn && !ragOut) test(ragOn ? rag.pelvis : her);
     return best;
   }
 
@@ -1039,7 +1244,15 @@ function buildHammock(scene, J) {
       if (V[3 * b] * V[3 * b] + V[3 * b + 1] * V[3 * b + 1] + V[3 * b + 2] * V[3 * b + 2] > H.snapV * H.snapV) { stats.why = 'fast ' + b; return false; }
     }
     net.measure();
-    if (net.stats.maxStretch >= H.snapStretch) { stats.why = 'open ' + net.stats.maxStretch.toFixed(4); return false; }
+    if (net.stats.maxStretch >= H.snapStretch) {
+      stats.why = 'open ' + net.stats.maxStretch.toFixed(4) + ' j' + net.stats.worstJ;
+      return false;
+    }
+    if (net.stats.maxLoose >= H.snapRag) {
+      const rj = rag ? rag.joints.find((j) => j[1] === net.stats.worstLoose) : null;
+      stats.why = 'rag ' + net.stats.maxLoose.toFixed(4) + ' ' + (rj ? rj[0] : '?');
+      return false;
+    }
     return true;
   };
   const putBack = (sp, sq) => {
@@ -1101,6 +1314,7 @@ function buildHammock(scene, J) {
     if (!n) return;
     simT += n * H.sub;
     if (!sane()) wrong(); else snapNow(n * H.sub);
+    ragHoldTick(n * H.sub);
     // The swing, and its creak at each end.
     swingAWas = swingA;
     swingA = swingNow();
@@ -1157,7 +1371,35 @@ function buildHammock(scene, J) {
     get asleep() { return asleep; },
     get far() { return far; },
     herEnter, herGuide, herShape, herPose, herLeave, push, nearest, marks,
+    ragAttach, ragEnter, ragToBody, herFell,
+    /** The ground under it — what the net stands her on when she falls out. */
+    floor: J.floor,
+    get rag() { return rag; },
+    get ragOn() { return ragOn; },
+    /** She is out of the cloth (true) — the swing and a push are the cloth's again. */
+    set ragOut(v) { ragOut = !!v; if (ragOut) ragHold(false); },
+    get ragOut() { return ragOut; },
     wake: () => rouse(),
+    /**
+     * STILLED, with her hand, as she gets up under it (`hamUpStart`). She
+     * lands under the bed and it goes on swinging 50 degrees either way,
+     * and MEASURED the cloth went through her from the moment she was up on
+     * her knees — she is out of the solve by then and nothing meets it. So
+     * the empty cloth takes `calm` of air until it is next woken, the hush's
+     * own switch: 50 degrees to 5 in a second and a half, while the get-up
+     * reaches out a hand in its lunge. From the moment she lands, not only
+     * from the get-up: MEASURED, the cloth she has just been thrown out of
+     * whips to 73 degrees, and one run in thirteen that opened a joint of it
+     * and the guard put her back half a second in the air.
+     */
+    calm: () => { if (!herIn || ragOut) { S.hush(true, H.calm); hushed = true; } },
+    /** Debug: throw her out of it now, along +ez (1) or −ez (−1). */
+    fling: (sg = 1) => {
+      if (!ragOn || ragOut) return false;
+      rag.kick(S.ez[0] * sg * 2.6, 1.2, S.ez[2] * sg * 2.6);
+      if (ragKept) ragHold(false);
+      return true;
+    },
     /** Debug: throw everything in it upward, to watch `wrong` catch it. */
     blowUp: (v = 40) => {
       for (let b = 0; b < net.nb; b++) if (net.live[b]) net.kick(b, 0, v * (0.5 + 0.5 * Math.sin(b * 7.1)), 0);
@@ -1174,6 +1416,7 @@ function buildHammock(scene, J) {
       // Her body without her arms first — the arms lie out over the rims —
       // and then all of her, which leaves `penWho` naming the worst of all.
       const depthBody = herIn ? net.depth(true) : null;
+      const hb = ragOn ? rag.pelvis : her;
       const depth = herIn ? net.depth() : null;
       const low = (() => {
         let y = Infinity;
@@ -1185,11 +1428,15 @@ function buildHammock(scene, J) {
         floor: +S.floorM.toFixed(3),
         low: +low.toFixed(3), sag: +(S.M[1] - low).toFixed(3), sagOfSpan: +((S.M[1] - low) / S.D).toFixed(3),
         seat: +(low - S.floorM).toFixed(3),
-        herIn, her: herIn ? [P[3 * her], P[3 * her + 1], P[3 * her + 2]].map((v) => +v.toFixed(3)) : null,
-        support: herIn ? +net.support(her).toFixed(1) : null,
+        herIn, her: herIn ? [P[3 * hb], P[3 * hb + 1], P[3 * hb + 2]].map((v) => +v.toFixed(3)) : null,
+        support: herIn ? +net.support(hb).toFixed(1) : null,
+        rag: rag ? { on: ragOn, out: ragOut, tens: +rag.tens.toFixed(2), speed: +rag.speed().toFixed(2),
+          fell: herFell(), kept: ragKept, flings, breaks: ragBreaks, pull: +ragPull.toFixed(0),
+          pullMax: +ragPullMax.toFixed(0) } : null,
         swing: +swingA.toFixed(3), swingDeg: +(swingA * 180 / Math.PI).toFixed(1),
         peakDeg: +(swingPeak * 180 / Math.PI).toFixed(1),
         stretchMm: +(net.stats.maxStretch * 1000).toFixed(2),
+        ragOpenMm: +((net.stats.maxLoose || 0) * 1000).toFixed(1),
         stringMm: +(net.stats.maxString * 1000).toFixed(2),
         penMm: depth == null ? null : +(depth * 1000).toFixed(1), penWho: net.stats.penWho,
         penBodyMm: depthBody == null ? null : +(depthBody * 1000).toFixed(1),
@@ -1199,7 +1446,7 @@ function buildHammock(scene, J) {
         frames: stats.frames, steps: stats.steps, asleep, hushed, creaks, pushes, rescues: stats.rescues, bails: stats.bails, why: stats.why, snaps: snaps.filter((q) => q.ok).length,
       };
     },
-    resetStats: () => { stats.msMax = 0; stats.msSum = 0; stats.frames = 0; net.stats.refused = 0; },
+    resetStats: () => { stats.msMax = 0; stats.msSum = 0; stats.frames = 0; net.stats.refused = 0; ragPullMax = 0; },
   };
   return { api, step };
 }
