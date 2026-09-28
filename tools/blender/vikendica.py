@@ -1764,15 +1764,22 @@ def outside_stair(kit):
             bars=3)
 
 
-def starlink(kit, px, py, top):
-    """The dish on the roof, at the east verge above the top of the stairs.
+def starlink(kit, head):
+    """The dish, on the south-east corner of the house, under the eave.
 
-    It was on the landing rail, which is where the arm and the panel were first
-    drawn and is not where it is: on the house it is bracketed to the roof
-    edge, a metre or so down the slope from the ridge, with the cable running
-    back down the gable wall to the balcony. `top` is the tile surface at that
-    point, so the same builder serves the roof as it stands and the roof over
-    the mezzanine, and the dish goes up with the ridge when you build one.
+    It was on the ridge, clamped to the east verge at the apex on a black mast,
+    and that is not where it is. Misha, 28 Sep: *"it's actually attached at
+    that corner of the house, with a tiny wire going into a little hole
+    through the house"* — the top of the east gable wall where it meets the
+    south eave, the corner beside the terrace and its awning. So it is a wall
+    mount: a plate screwed to the gable a little in from the corner, an arm
+    standing out past the verge, and a short pole up off the end of it, with
+    the dish on its own stem at the top — far enough out that the panel clears
+    the roof edge, which overhangs the gable by forty centimetres.
+
+    `head` is the wall head of whichever roof is on, so the same builder serves
+    the house as it stands and the raised walls under the mezzanine, and the
+    dish goes up sixty centimetres with them.
 
     It leans toward -y, which is the water: at this latitude the birds it wants
     are low in the southern sky, and a dish pointed at the hillside behind is
@@ -1786,33 +1793,34 @@ def starlink(kit, px, py, top):
     pale = (0.87, 0.88, 0.88)
     tilt = math.radians(36.0)
 
+    # The mount, in from the corner by a hand's width more than the dish is
+    # wide, so the panel ends up over the corner rather than past it.
+    py = Y0 + 0.55
+    px = X1 + 0.62                  # the pole: 20 cm clear of the verge
+    arm = head - 0.24               # the stand-off arm, under the verge soffit
+    top = head + 0.16               # the top of the pole, where the dish sits
+
     def lean(bm, verts, ox, oy, oz):
         c, s = math.cos(tilt), math.sin(tilt)
         for v in verts:
             x, y, z = v.co
             v.co = (ox + x, oy + y * c - z * s, oz + y * s + z * c)
 
-    # The bracket, lapped over the verge the way a roof mount is, and the short
-    # mast standing off it that everything else hangs on.
-    kit.span(black, px - 0.15, px + 0.26, py - 0.085, py + 0.085,
-             top - 0.19, top + 0.035, bev=0.006)
-    bm_cylinder(kit.bm(black, 0.002), px, py, top + 0.02, top + 0.30,
+    # The wall plate, the arm out from it, and the pole up off the end.
+    kit.span(black, X1, X1 + 0.018, py - 0.07, py + 0.07,
+             arm - 0.13, arm + 0.09, bev=0.004)
+    kit.span(black, X1 + 0.018, px + 0.025, py - 0.021, py + 0.021,
+             arm - 0.021, arm + 0.021, bev=0.004)
+    bm_cylinder(kit.bm(black, 0.002), px, py, arm - 0.10, top + 0.02,
                 0.022, 0.022, seg=10)
-    # And the cable, down the gable wall to the landing, which is the half of
-    # the installation you actually walk past.
-    bm_cylinder(kit.bm(black, 0.002), X1 - EXT / 2 - 0.05, py + 0.02,
-                F2 + 0.30, top - 0.12, 0.007, 0.007, seg=8)
 
-    # The arm used to start 28 cm up the lean, which is 28 cm above nothing:
-    # the mast stops at top + 0.30 and the arm began at roughly top + 0.49, so
-    # the dish hung in the air over a stub with a hand's width of sky between
-    # them. It now starts at the lean origin, where the mast is.
+    # The dish on its own stem, which is the Starlink's mast and is short.
     for name, colour, box in (
-            ("starlink_arm", black, (0, 0, 0.28, 0.048, 0.048, 0.56)),
-            ("starlink_dish", pale, (0, 0, 0.815, 0.305, 0.026, 0.510))):
+            ("starlink_arm", black, (0, 0, 0.15, 0.048, 0.048, 0.30)),
+            ("starlink_dish", pale, (0, 0, 0.555, 0.305, 0.026, 0.510))):
         bm = bmesh.new()
         vs = bm_box(bm, box[0], box[1], box[2], box[3], box[4], box[5])
-        lean(bm, vs, px, py, top + 0.26)
+        lean(bm, vs, px, py, top)
         ob = new_object(bm, name)
         bevel(ob, 0.010 if name.endswith("dish") else 0.004)
         kit.adopt(ob, colour)
@@ -1820,11 +1828,39 @@ def starlink(kit, px, py, top):
     # The back of the panel is the dark side, and it is the side you see from
     # the terrace, so it is worth the four triangles.
     bm = bmesh.new()
-    vs = bm_box(bm, 0, 0.016, 0.815, 0.290, 0.008, 0.492)
-    lean(bm, vs, px, py, top + 0.26)
+    vs = bm_box(bm, 0, 0.016, 0.555, 0.290, 0.008, 0.492)
+    lean(bm, vs, px, py, top)
     ob = new_object(bm, "starlink_back")
     bevel(ob, 0.004)
     kit.adopt(ob, black)
+
+    # And the wire, which is the other half of what he drew: out of the foot
+    # of the stem, down the pole, back along the underside of the arm, and
+    # then along the top of the gable wall tight under the verge to the
+    # corner — where it sags into a drip loop so the rain runs off the bottom
+    # of the loop instead of following the cable in, and comes back up into a
+    # hole through the wall with a grommet round it. Six millimetres, black.
+    hole = (X1, Y0 + 0.12, head - 0.12)
+    r = 0.0035
+    _tube(kit.bm(black, 0.0), [
+        (px - 0.030, py + 0.020, top - 0.02),
+        (px - 0.028, py + 0.020, arm + 0.02),
+        (px - 0.040, py + 0.012, arm - 0.028),
+        (X1 + 0.10, py + 0.010, arm - 0.028),
+        (X1 + 0.030, py + 0.004, arm - 0.02),
+        (X1 + 0.012, py - 0.04, head - 0.07),
+        (X1 + 0.012, hole[1] + 0.16, head - 0.06),
+        (X1 + 0.014, hole[1] + 0.06, head - 0.10),
+        (X1 + 0.016, hole[1] + 0.035, hole[2] - 0.08),
+        (X1 + 0.016, hole[1] - 0.005, hole[2] - 0.10),
+        (X1 + 0.016, hole[1] - 0.035, hole[2] - 0.06),
+        (X1 + 0.014, hole[1] - 0.020, hole[2] - 0.015),
+        (X1 + 0.012, hole[1], hole[2]),
+        (X1 - 0.03, hole[1], hole[2]),
+    ], r, seg=6)
+    # The grommet: a rubber collar proud of the render, and the hole inside it.
+    _tube(kit.bm(black, 0.0), [(X1 - 0.004, hole[1], hole[2]),
+                               (X1 + 0.009, hole[1], hole[2])], 0.011, seg=10)
 
 
 # --------------------------------------------------------------------------- #
@@ -4280,10 +4316,8 @@ def roof_now(kit):
     for y in (Y0 - ov, Y1 + ov):
         kit.span(WHITEGOODS, X0 - ov, X1 + ov, y - 0.03, y + 0.03,
                  HEAD - 0.10, HEAD + 0.02, bev=0.01)
-    # The dish, on the verge above the top of the stairs.
-    d = 0.85
-    starlink(kit, X1 + ov - 0.16, -d,
-             RIDGE_NOW + 0.14 - d * math.tan(PITCH_NOW))
+    # The dish, on the south-east corner under the eave.
+    starlink(kit, HEAD)
 
 
 def _slope(kit, colour, sgn, ridge, pitch, d0, d1, thick, x0, x1, lift=0.0):
@@ -4374,9 +4408,8 @@ def roof_loft(kit):
     # Two roof lights: one over the gallery, one over the double height.
     rooflight(kit, -1.60, 1.70)
     rooflight(kit, 1.40, -2.30)
-    # And the dish, which goes up with the ridge.
-    d = 0.85
-    starlink(kit, X1 + ov - 0.16, -d, RIDGE + 0.16 - d * math.tan(PITCH))
+    # And the dish, which goes up with the wall head.
+    starlink(kit, LOFT_HEAD)
 
     # ── the deck ────────────────────────────────────────────────────────────
     # Everything north of the living room's south third, so the ridge runs down

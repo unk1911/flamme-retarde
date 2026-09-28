@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.8] — 2026-09-28
+
+### The Starlink dish moves to the corner of the vikendica
+
+Misha: *"the starlink dish on the vikendica needs to be moved as shown in the
+image, it's actually attached at that corner of the house, with a tiny wire
+going into a little hole through the house as shown there."* It stood on a
+black mast clamped to the east verge up by the ridge. It is now on a wall
+mount at the south-east corner, the top of the east gable wall where it meets
+the south eave, next to the terrace and its awning (`starlink` in
+tools/blender/vikendica.py).
+
+- **The mount:** a black plate on the gable 55 cm in from the corner and
+  24 cm below the wall head. An arm stands out 62 cm to a short pole, 20 cm
+  clear of the roof's 40 cm verge overhang, and the dish sits on its own
+  short stem at the top, still leaning 36° toward the sea. The panel ends up
+  over the corner, above the eave line.
+- **The wire:** a 7 mm black cable runs down the pole, back along the
+  underside of the arm and along the top of the gable wall just under the
+  verge to the corner. It sags into a drip loop there and goes up into a
+  hole through the wall, with a grommet.
+- The old ridge bracket, mast and the cable down the gable to the landing
+  are gone. The loft roof gets the same mount at its raised wall head.
+  Only `vikendica_roof` and `vikendica_loft` changed. The shell blob is
+  byte-identical.
+
 ## [1.539.7] — 2026-09-28
 
 ### Bar bottles that are glass
