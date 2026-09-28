@@ -13358,6 +13358,300 @@ async function buildJadrija(scene) {
    */
   let konobaPad = null;
 
+  // ── THE KONOBA, SMOOTH ────────────────────────────────────────────────────
+  //
+  // Misha, 28 Sep 2026: *"maybe konoba objects more advanced, more
+  // triangles/polygons, the bottles there look too flat, too 2-dimensional,
+  // the parasols, just in general, looks too blocky.. should look more
+  // advanced, since other things becoming more advanced"*.
+  //
+  // He is right, and the reason is one thing and not twelve. Every solid in
+  // this shop was `boxTS`, `post` or `lathe`, and all three go through
+  // `propBuilder.tri`, which takes ONE normal off the winding of each
+  // triangle. That is right for a wall. On a parasol it turns twelve panels of
+  // cloth into twelve flat plates with a hard light change at every seam; on a
+  // stool leg it is a hexagonal pencil; on a thatch it is the edge of a plank.
+  // The bottles next door stopped looking fake the day they got normals of
+  // their own (1.539.7), and the ladders the day they became `tubeTS`
+  // (1.539.1). This is the same move for everything else under this roof.
+  //
+  // `knSurf` is the one primitive: a grid of world points, with each vertex's
+  // normal taken from its own neighbours — the grid's tangent along a row
+  // crossed with the tangent down a column — so the shading is the SURFACE's
+  // and not the facet's. Everything else here is a way of laying out a grid:
+  // `knLathe` turns a profile, `knRR` is a slab with rounded corners in plan
+  // and a rounded top edge. The winding of each triangle is set to agree with
+  // its vertex normals, because `up` draws both sides and flips the normal on
+  // a back face (`FACE`); a normal that disagrees with its triangle lights
+  // the wrong side.
+  //
+  // `knTex` is the one new buffer, and it exists because two materials here
+  // cannot be vertex colour at any triangle count: a woven rattan chair and a
+  // reed thatch. Both are a PATTERN at two centimetres and less — cane over
+  // cane, stem beside stem — and what reads as weave or as reed at four
+  // metres is the pattern and its relief, not the silhouette. So they carry a
+  // coordinate of their own (`aKn`: u, v in metres along the surface, and
+  // which of the two it is) and are printed in `KONOBA_WEAVE`, with the
+  // relief put into the normal. One draw call for both.
+  const knTex = (() => {
+    const pos = [], norm = [], col = [], kn = [];
+    const smooth = (P, N, C, K) => {
+      for (let i = 0; i < 3; i++) {
+        pos.push(P[i][0], P[i][1], P[i][2]);
+        norm.push(N[i][0], N[i][1], N[i][2]);
+        col.push(C[i][0], C[i][1], C[i][2]);
+        kn.push(K[i][0], K[i][1], K[i][2]);
+      }
+    };
+    const geo = () => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+      g.setAttribute('aVCol', new THREE.Float32BufferAttribute(col, 3));
+      g.setAttribute('aKn', new THREE.Float32BufferAttribute(kn, 3));
+      return g;
+    };
+    return { smooth, geo, count: () => pos.length / 3 };
+  })();
+  // The print for `knTex`, after `up`'s own two-sided flip. (No backticks in
+  // here: it is a template literal, and one in a comment ends it.)
+  //
+  // Kind 1 is rattan: a basket weave of 16 mm cells, each cane running
+  // across its cell and the next cell's running the other way, rounded in
+  // section, so the relief is over-under-over. Kind 2 is reed: stems 14 mm
+  // apart running along v, each its own tone and each broken into lengths.
+  // Both fade to their own mean as a cell shrinks under a pixel — which is
+  // what the bottles' print does and for the same reason — and both put their
+  // height into the normal by the surface-gradient method, off the screen
+  // derivatives, because there is no tangent frame to hand. Every derivative
+  // is taken out here in uniform control flow; the kind is picked by
+  // arithmetic, not by a branch.
+  const KONOBA_WEAVE = /* glsl */ `
+  float knK = vKn.z;
+  vec2 knQ = vKn.xy * 64.0;
+  vec2 knC = floor(knQ), knF = fract(knQ);
+  float knOdd = mod(knC.x + knC.y, 2.0);
+  float knAc = mix(knF.x, knF.y, knOdd);
+  float knAl = mix(knF.y, knF.x, knOdd);
+  float knWv = sin(3.14159 * knAc) * (0.72 + 0.28 * sin(3.14159 * knAl));
+  float knWf = smoothstep(0.35, 0.9, max(fwidth(knQ.x), fwidth(knQ.y)));
+  float knSx = vKn.x * 70.0;
+  float knId = floor(knSx);
+  float knHs = fract(sin(knId * 12.9898) * 43758.5453);
+  float knSt = sin(3.14159 * fract(knSx));
+  float knLv = fract(sin(knId * 4.1414 + floor(vKn.y * 2.5 + knHs * 7.0) * 7.77) * 9631.7);
+  float knRf = smoothstep(0.35, 0.9, fwidth(knSx));
+  float knIsW = step(0.5, knK) * step(knK, 1.5);
+  float knIsR = step(1.5, knK);
+  float knTone = mix(1.0, mix(0.58 + 0.48 * knWv, 0.855, knWf), knIsW)
+    * mix(1.0, mix((0.70 + 0.42 * knHs) * (0.60 + 0.40 * knSt) * (0.88 + 0.24 * knLv),
+      0.78, knRf), knIsR);
+  float knH = knIsW * knWv * (1.0 - knWf) * 0.0025
+    + knIsR * knSt * (1.0 - knRf) * 0.0030;
+  base *= knTone;
+  vec3 knDx = dFdx(vWorld), knDy = dFdy(vWorld);
+  float knHx = dFdx(knH), knHy = dFdy(knH);
+  vec3 knR1 = cross(knDy, n), knR2 = cross(n, knDx);
+  float knDet = dot(knDx, knR1);
+  vec3 knN = abs(knDet) * n - sign(knDet) * (knHx * knR1 + knHy * knR2);
+  if (dot(knN, knN) > 1e-24) n = normalize(knN);
+  `;
+
+  /**
+   * A smooth sheet through a grid of WORLD points, `G[row][col]`.
+   *
+   * `col` is one colour, or a function `(i, j)` of the vertex; `o.q(i, j)`
+   * instead colours a whole QUAD, which is how a stripe or a board keeps a
+   * hard edge while the light across it stays smooth. `o.wrap` closes the
+   * columns into a ring. `o.k(i, j)` sends the sheet to `knTex` with that
+   * vertex's `[u, v, kind]`.
+   *
+   * A vertex whose tangents vanish — the pole of a lathe, where every column
+   * meets — takes the mean of the row next to it, which for a pole is the axis.
+   *
+   * WHICH WAY IT FACES matters, although `up` draws both sides, because the
+   * shadow pass does not: it draws BACK faces only (see `casterMaterial` —
+   * the far side of a closed body is what goes in the map, so a lit skin
+   * cannot shadow itself). A solid whose triangles face inward puts its lit
+   * side in the map and wears its own shadow as a mosaic of texels, which is
+   * what the counter top did the first time this ran. So a solid says where
+   * its inside is — `o.out(i, j)` is a point inside, and every normal is
+   * turned away from it — and an open sheet says which way it must face so
+   * that its back is to the sun: `o.down` for anything overhead (a canopy, a
+   * roof), `o.out` with `o.inv` for a skirt that hangs (normals INTO the
+   * thing it hangs from).
+   */
+  function knSurf(G, col, o = {}) {
+    const R = G.length, C = G[0].length;
+    const sub = (a, c) => [a[0] - c[0], a[1] - c[1], a[2] - c[2]];
+    const cross = (a, c) => [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2],
+      a[0] * c[1] - a[1] * c[0]];
+    const N = [];
+    for (let i = 0; i < R; i++) {
+      const row = [];
+      const im = Math.max(0, i - 1), ip = Math.min(R - 1, i + 1);
+      for (let j = 0; j < C; j++) {
+        const jm = o.wrap ? (j - 1 + C) % C : Math.max(0, j - 1);
+        const jp = o.wrap ? (j + 1) % C : Math.min(C - 1, j + 1);
+        const n = cross(sub(G[i][jp], G[i][jm]), sub(G[ip][j], G[im][j]));
+        const l = Math.hypot(n[0], n[1], n[2]);
+        let v = l > 1e-12 ? [n[0] / l, n[1] / l, n[2] / l] : null;
+        if (v) {
+          let flip = false;
+          if (o.down) flip = v[1] > 0;
+          else if (o.out) {
+            const c = o.out(i, j), P = G[i][j];
+            const d = (P[0] - c[0]) * v[0] + (P[1] - c[1]) * v[1] + (P[2] - c[2]) * v[2];
+            flip = o.inv ? d > 0 : d < 0;
+          }
+          if (flip) v = [-v[0], -v[1], -v[2]];
+        }
+        row.push(v);
+      }
+      N.push(row);
+    }
+    for (let i = 0; i < R; i++) {
+      for (let j = 0; j < C; j++) {
+        if (N[i][j]) continue;
+        const nb = N[i > 0 && N[i - 1].some(Boolean) ? i - 1 : Math.min(R - 1, i + 1)];
+        const m = [0, 0, 0];
+        for (const v of nb) if (v) { m[0] += v[0]; m[1] += v[1]; m[2] += v[2]; }
+        const l = Math.hypot(m[0], m[1], m[2]) || 1;
+        N[i][j] = [m[0] / l, m[1] / l, m[2] / l];
+      }
+    }
+    const cv = typeof col === 'function' ? col : () => col;
+    const face = (A, B, D, ca, cb, cd, ka, kb, kd) => {
+      const g = cross(sub(B[0], A[0]), sub(D[0], A[0]));
+      const out = g[0] * (A[1][0] + B[1][0] + D[1][0]) + g[1] * (A[1][1] + B[1][1] + D[1][1])
+        + g[2] * (A[1][2] + B[1][2] + D[1][2]);
+      if (Math.abs(g[0]) + Math.abs(g[1]) + Math.abs(g[2]) < 1e-14) return;
+      const [P1, P2, c1, c2, k1, k2] = out >= 0 ? [B, D, cb, cd, kb, kd] : [D, B, cd, cb, kd, kb];
+      if (o.k) knTex.smooth([A[0], P1[0], P2[0]], [A[1], P1[1], P2[1]], [ca, c1, c2], [ka, k1, k2]);
+      else b.smooth(A[0], P1[0], P2[0], A[1], P1[1], P2[1], ca, c1, c2);
+    };
+    const lim = o.wrap ? C : C - 1;
+    for (let i = 0; i < R - 1; i++) {
+      for (let j = 0; j < lim; j++) {
+        const j1 = (j + 1) % C;
+        const a = [G[i][j], N[i][j]], q = [G[i][j1], N[i][j1]];
+        const c = [G[i + 1][j1], N[i + 1][j1]], d = [G[i + 1][j], N[i + 1][j]];
+        const qc = o.q ? o.q(i, j) : null;
+        const ca = qc || cv(i, j), cq = qc || cv(i, j1);
+        const cc = qc || cv(i + 1, j1), cd = qc || cv(i + 1, j);
+        const K = o.k || (() => null);
+        face(a, q, c, ca, cq, cc, K(i, j), K(i, j1), K(i + 1, j1));
+        face(a, c, d, ca, cc, cd, K(i, j), K(i + 1, j1), K(i + 1, j));
+      }
+    }
+  }
+
+  /**
+   * `lathe`, smooth. `prof` is `[y, r]` rings bottom to top, where `r` may be
+   * `[rt, rs]` for an oval and a third entry squares the section off (see
+   * `bottleProto`'s superellipse). A ring of radius 0 closes the end.
+   */
+  function knLathe(P, dt, ds, prof, col, sides = 20, o = {}) {
+    const G = prof.map(([y, r, n = 2]) => {
+      const rt = typeof r === 'number' ? r : r[0], rs = typeof r === 'number' ? r : r[1];
+      const row = [];
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * TAU, c = Math.cos(a), sn = Math.sin(a);
+        const k = n > 2.01 ? 1 / Math.pow(Math.pow(Math.abs(c), n)
+          + Math.pow(Math.abs(sn), n), 1 / n) : 1;
+        row.push(P(dt + c * rt * k, ds + sn * rs * k, y));
+      }
+      return row;
+    });
+    let ya = Infinity, yb = -Infinity;
+    for (const [y] of prof) { ya = Math.min(ya, y); yb = Math.max(yb, y); }
+    const mid = P(dt, ds, (ya + yb) / 2);
+    knSurf(G, col, { out: () => mid, ...o, wrap: true });
+  }
+
+  /** One flat triangle, wound to face `N`, into `b` or (with `k`) `knTex`. */
+  function knTri(A, B, C, N, col, k) {
+    const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2];
+    const vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
+    const d = (uy * vz - uz * vy) * N[0] + (uz * vx - ux * vz) * N[1] + (ux * vy - uy * vx) * N[2];
+    const [P1, P2] = d >= 0 ? [B, C] : [C, B];
+    if (k) knTex.smooth([A, P1, P2], [N, N, N], [col, col, col], [k, k, k]);
+    else b.tri(A, P1, P2, col);
+  }
+
+  /**
+   * A slab with rounded corners in plan (`cr`) and a rounded top edge (`er`),
+   * `u0..u1` by `v0..v1` through `P(u, v, y)` — a counter top, a seat, a
+   * cushion, a square steel post. The long edges are cut every 0.8 m so the
+   * slab follows the shore's bend like everything else (see `boxIn`).
+   * `o.k` sends the sides to `knTex` with kind `o.k`; `o.bottom` closes the
+   * underside, which on anything standing on the floor nobody sees.
+   */
+  function knRR(P, u0, u1, v0, v1, y0, y1, cr, er, col, topCol, o = {}) {
+    const uc = (u0 + u1) / 2, vc = (v0 + v1) / 2;
+    const hu = (u1 - u0) / 2, hv = (v1 - v0) / 2;
+    const c = Math.min(cr, hu, hv);
+    const NC = c > 0.03 ? 5 : 3;
+    const nU = Math.max(1, Math.ceil((2 * (hu - c)) / 0.8));
+    const nV = Math.max(1, Math.ceil((2 * (hv - c)) / 0.8));
+    const loop = (d) => {
+      const r = Math.max(c - d, 0), out = [];
+      const CO = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+      for (let k = 0; k < 4; k++) {
+        const [su, sv] = CO[k];
+        const cu = uc + su * (hu - c), cvv = vc + sv * (hv - c);
+        for (let i = 0; i <= NC; i++) {
+          const a = (k + i / NC) * (Math.PI / 2);
+          out.push([cu + Math.cos(a) * r, cvv + Math.sin(a) * r]);
+        }
+        const [nu, nv] = CO[(k + 1) % 4];
+        const nCu = uc + nu * (hu - c), nCv = vc + nv * (hv - c);
+        const a1 = (k + 1) * (Math.PI / 2);
+        const e0 = out[out.length - 1];
+        const e1 = [nCu + Math.cos(a1) * r, nCv + Math.sin(a1) * r];
+        const m = k % 2 === 0 ? nU : nV;
+        for (let i = 1; i < m; i++) {
+          out.push([e0[0] + (e1[0] - e0[0]) * (i / m), e0[1] + (e1[1] - e0[1]) * (i / m)]);
+        }
+      }
+      return out;
+    };
+    const rows = [[0, y0], [0, y1 - er]];
+    if (er > 0) {
+      for (let k = 1; k <= 4; k++) {
+        const a = (k / 4) * (Math.PI / 2);
+        rows.push([er * (1 - Math.cos(a)), y1 - er + er * Math.sin(a)]);
+      }
+    }
+    const L = rows.map(([d]) => loop(d));
+    const G = rows.map(([, y], i) => L[i].map(([u, v]) => P(u, v, y)));
+    const tc = topCol || col;
+    const rc = (i) => (i >= 2 && topCol ? topCol : col);
+    let kf = null;
+    if (o.k) {
+      const run = [0];
+      for (let j = 1; j < L[0].length; j++) {
+        run.push(run[j - 1] + Math.hypot(L[0][j][0] - L[0][j - 1][0], L[0][j][1] - L[0][j - 1][1]));
+      }
+      kf = (i, j) => [run[j], rows[i][1] - y0 + rows[i][0], o.k];
+    }
+    const mid = P(uc, vc, (y0 + y1) / 2);
+    knSurf(G, (i) => rc(i), { wrap: true, k: kf, out: () => mid });
+    const top = L[L.length - 1], ctr = P(uc, vc, y1);
+    for (let j = 0; j < top.length; j++) {
+      const A = P(top[j][0], top[j][1], y1);
+      const B = P(top[(j + 1) % top.length][0], top[(j + 1) % top.length][1], y1);
+      knTri(ctr, A, B, [0, 1, 0], tc, o.k ? [top[j][0] - u0, top[j][1] - v0, o.k] : null);
+    }
+    if (o.bottom) {
+      const bl = L[0], cb = P(uc, vc, y0);
+      for (let j = 0; j < bl.length; j++) {
+        knTri(cb, P(bl[j][0], bl[j][1], y0),
+          P(bl[(j + 1) % bl.length][0], bl[(j + 1) % bl.length][1], y0), [0, -1, 0], col);
+      }
+    }
+  }
+
   /**
    * One moulded bar stool, in the shore frame, facing the counter.
    *
@@ -13380,78 +13674,82 @@ async function buildJadrija(scene) {
     const knDk = shade(knC, 0.86);
     // 0.735 under a 1.08 counter is 0.345 of knee, which is bar height.
     const knSeat = bsY + 0.735, knTop = bsY + 0.781;
-    // Four legs, splayed. `frustumTS` joins two rectangles that differ in
-    // centre as well as in size, so a raked tapering leg is one call — the
-    // splay is the difference between a stool and four dowels and `post`
-    // cannot express it.
+    // ── and moulded, which is what it is ────────────────────────────────
+    //
+    // This stool was frustums and boxes: square legs, a square rail round
+    // them, a slab for a seat and a back of flat bars — which is a stool
+    // KNOCKED TOGETHER, and the one in 175856 is injection-moulded plastic:
+    // round tapering legs, a seat with its corners and edges radiused, and a
+    // perforated back whose frame is one continuous rounded bar. Rebuilt on
+    // `tubeTS` and `knRR`, same footprint, same heights, same colours, same
+    // collider. See "THE KONOBA, SMOOTH".
+    //
+    // Four legs, splayed and tapering, 39 mm at the floor to 31 at the seat,
+    // each on a black glide.
+    const knLeg = (ot, os, f) => [knT + ot * (0.205 - 0.045 * f),
+      knS + os * (0.198 - 0.042 * f), bsY + 0.004 + (knSeat - bsY - 0.004) * f];
     for (const [ot, os] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-      frustumTS(bsY + 0.004,
-        [knT + ot * 0.205, knS + os * 0.198, 0.019, 0.019], knSeat,
-        [knT + ot * 0.160, knS + os * 0.156, 0.016, 0.016], knDk);
+      tubeTS([0, 0.34, 0.67, 1].map((f) => knLeg(ot, os, f)),
+        (k) => 0.0195 - 0.0040 * (k / 3), knDk, 10, [1, 0, 0], 0.10);
+      const g = knLeg(ot, os, 0);
+      knLathe(W, g[0], g[1], [[bsY + 0.001, 0.0212], [bsY + 0.012, 0.0222],
+        [bsY + 0.017, 0.0200], [bsY + 0.017, 0]], [0.060, 0.058, 0.056], 10);
     }
     // The footrest, all four sides, taken at the offsets the legs actually
     // have at that height rather than at the ones they have at the floor.
-    // The two pairs sit 4 mm apart in height where they cross, which is
-    // cheaper than mitring them and keeps two horizontal faces off each
-    // other (rule 5).
+    // The two pairs sit 4 mm apart in height where they cross, which keeps
+    // two rungs out of each other's middles.
     for (const os of [-0.185, 0.185]) {
-      boxTS(knT - 0.191, knT + 0.191, knS + os - 0.011, knS + os + 0.011,
-        bsY + 0.213, bsY + 0.237, knDk);
+      tubeTS([[knT - 0.191, knS + os, bsY + 0.225],
+        [knT + 0.191, knS + os, bsY + 0.225]], 0.0115, knDk, 8);
     }
     for (const ot of [-0.191, 0.191]) {
-      boxTS(knT + ot - 0.011, knT + ot + 0.011, knS - 0.185, knS + 0.185,
-        bsY + 0.217, bsY + 0.241, knDk);
+      tubeTS([[knT + ot, knS - 0.185, bsY + 0.229],
+        [knT + ot, knS + 0.185, bsY + 0.229]], 0.0115, knDk, 8);
     }
-    boxTS(knT - 0.200, knT + 0.200, knS - 0.190, knS + 0.190,
-      knSeat, knTop, knC, shade(knC, 1.10));
-    // The back. `knBk` is its own sheared, bowed frame: `s` falls away
-    // with height (the rake) and comes forward at the ends (the tub), so
-    // every bar in the mesh follows the curve without any of them knowing
-    // about it.
+    // The seat: 50 mm corners in plan and a 16 mm roll on the top edge, which
+    // is the whole of what makes a moulding read as moulded.
+    knRR(W, knT - 0.200, knT + 0.200, knS - 0.190, knS + 0.190,
+      knSeat, knTop, 0.05, 0.016, knC, shade(knC, 1.06), { bottom: true });
+    // The back. `knBkS` is its own sheared, bowed frame, in (t, s, y): `s`
+    // falls away with height (the rake) and comes forward at the ends (the
+    // tub), so every bar in the mesh follows the curve without any of them
+    // knowing about it.
     const knHW = 0.185, knH = 0.375, knBow = 0.060;
-    const knBk = (dt, h, dv) => W(knT + dt,
+    const knBkS = (dt, h, dv) => [knT + dt,
       knS - 0.168 - 0.30 * h + knBow * (dt * dt) / (knHW * knHW) + (dv || 0),
-      knTop + h);
-    // Both windings on everything in the back, for `meshChair`'s reason: a
-    // mesh is one ply and you are meant to see the far side of it.
-    const knFace = (A, C, D, E, c) => {
-      b.quad(A, C, D, E, c);
-      b.quad(E, D, C, A, c);
-    };
-    for (const dt of [-(knHW - 0.020), knHW - 0.020]) {
-      for (let j = 0; j < 3; j++) {
-        const h0 = knH * (j / 3), h1 = knH * ((j + 1) / 3);
-        knFace(knBk(dt - 0.020, h0), knBk(dt + 0.020, h0),
-          knBk(dt + 0.020, h1), knBk(dt - 0.020, h1), knC);
+      knTop + h];
+    // The frame is ONE bar: up one side, round a corner, across the top —
+    // the part a hand goes on — and down the other. It starts 20 mm into the
+    // seat so neither end is an open tube.
+    {
+      const fr = [], ux = knHW - 0.022, top = knH - 0.024, rc = 0.045;
+      fr.push(knBkS(-ux, -0.020), knBkS(-ux, top * 0.5), knBkS(-ux, top - rc));
+      for (let k = 1; k < 4; k++) {
+        const a = (k / 4) * (Math.PI / 2);
+        fr.push(knBkS(-ux + rc * (1 - Math.cos(a)), top - rc + rc * Math.sin(a)));
       }
+      for (let k = 0; k <= 6; k++) fr.push(knBkS(-ux + rc + (2 * (ux - rc)) * (k / 6), top));
+      for (let k = 1; k < 4; k++) {
+        const a = (k / 4) * (Math.PI / 2);
+        fr.push(knBkS(ux - rc + rc * Math.sin(a), top - rc + rc * Math.cos(a)));
+      }
+      fr.push(knBkS(ux, top - rc), knBkS(ux, top * 0.5), knBkS(ux, -0.020));
+      tubeTS(fr, [0.013, 0.019], knC, 10, [0, 1, 0], 0.12);
     }
-    // The top rail, which is the thing a hand goes on and the one part of
-    // a mesh back that is solid.
-    for (let j = 0; j < 4; j++) {
-      const d0 = -knHW + 2 * knHW * (j / 4);
-      const d1 = -knHW + 2 * knHW * ((j + 1) / 4);
-      knFace(knBk(d0, knH - 0.048), knBk(d1, knH - 0.048),
-        knBk(d1, knH), knBk(d0, knH), knC);
-      b.quad(knBk(d0, knH), knBk(d1, knH),
-        knBk(d1, knH, -0.026), knBk(d0, knH, -0.026), shade(knC, 1.08));
-    }
-    // The mesh: uprights, then crossbars a centimetre behind them.
+    // The mesh: uprights, then crossbars a centimetre behind them, both
+    // round and both following the bow.
     for (let i = 1; i < 5; i++) {
       const u = -knHW + 2 * knHW * (i / 5);
-      for (let j = 0; j < 2; j++) {
-        const h0 = knH * (j / 2), h1 = knH * ((j + 1) / 2) - 0.048 * j;
-        knFace(knBk(u - 0.009, h0), knBk(u + 0.009, h0),
-          knBk(u + 0.009, h1), knBk(u - 0.009, h1), knDk);
-      }
+      tubeTS([knBkS(u, -0.010), knBkS(u, knH * 0.5), knBkS(u, knH - 0.036)],
+        0.0085, knDk, 6, [1, 0, 0], 0.08);
     }
     for (let i = 1; i < 4; i++) {
-      const h = (knH - 0.048) * (i / 4);
-      for (let j = 0; j < 3; j++) {
-        const d0 = -knHW + 2 * knHW * (j / 3);
-        const d1 = -knHW + 2 * knHW * ((j + 1) / 3);
-        knFace(knBk(d0, h - 0.009, -0.014), knBk(d1, h - 0.009, -0.014),
-          knBk(d1, h + 0.009, -0.014), knBk(d0, h + 0.009, -0.014), knDk);
+      const h = (knH - 0.048) * (i / 4), pts = [];
+      for (let k = 0; k <= 6; k++) {
+        pts.push(knBkS(-knHW + 0.024 + (2 * knHW - 0.048) * (k / 6), h, -0.012));
       }
+      tubeTS(pts, 0.0080, knDk, 6, [0, 0, 1], 0.08);
     }
     // The counter behind them blocks and the stools did not, so the one
     // business on this boardwalk with nothing to walk through had a row of
@@ -14239,54 +14537,88 @@ async function buildJadrija(scene) {
         const knR = 1.86, knHub = y0 + 2.44, knRim = y0 + 2.02;
         // The base is the wheel rim full of exposed aggregate that every
         // parasol on this coast stands in — see the note at the cafés'
-        // octagons, where it was photographed from two metres.
-        post(W, knPT, knPS, y0, y0 + 0.15, 0.42, [0.140, 0.128, 0.118], 12);
-        post(W, knPT, knPS, y0 + 0.02, y0 + 0.19, 0.360, [0.522, 0.494, 0.444], 12);
-        post(W, knPT, knPS, y0 + 0.10, knHub + 0.09, 0.043,
-          [0.225, 0.208, 0.185], 8);
+        // octagons, where it was photographed from two metres. Turned now,
+        // with the rim's lip and the concrete's crown, and a sleeve where the
+        // mast goes into it.
+        knLathe(W, knPT, knPS, [[y0 + 0.002, 0.405], [y0 + 0.012, 0.420],
+          [y0 + 0.138, 0.420], [y0 + 0.152, 0.404], [y0 + 0.152, 0.372]],
+        [0.140, 0.128, 0.118], 28);
+        knLathe(W, knPT, knPS, [[y0 + 0.150, 0.373], [y0 + 0.178, 0.364],
+          [y0 + 0.189, 0.310], [y0 + 0.192, 0.080], [y0 + 0.192, 0]],
+        [0.522, 0.494, 0.444], 28);
+        const knMAST = [0.225, 0.208, 0.185];
+        knLathe(W, knPT, knPS, [[y0 + 0.186, 0.046], [y0 + 0.285, 0.036],
+          [y0 + 0.300, 0.029]], knMAST, 14);
+        // The mast: a 48 mm tube, round, where it was a 86 mm octagon.
+        tubeTS([[knPT, knPS, y0 + 0.10], [knPT, knPS, y0 + 1.30],
+          [knPT, knPS, knHub + 0.02]], 0.024, knMAST, 14, [1, 0, 0], 0.16);
+        // The crank, a hand's height over the counter, which is how anybody
+        // ever gets a 3.7 m canopy up: a housing on the mast, an arm out to
+        // the side and a black handle on it.
+        knLathe(W, knPT, knPS, [[y0 + 1.235, 0.029], [y0 + 1.248, 0.040],
+          [y0 + 1.362, 0.040], [y0 + 1.375, 0.029]], knMAST, 16);
+        tubeTS([[knPT + 0.035, knPS, y0 + 1.318], [knPT + 0.105, knPS, y0 + 1.318],
+          [knPT + 0.122, knPS, y0 + 1.300], [knPT + 0.124, knPS, y0 + 1.280]],
+        0.0075, knMAST, 8, [0, 0, 1]);
+        knLathe(W, knPT + 0.124, knPS, [[y0 + 1.200, 0], [y0 + 1.206, 0.011],
+          [y0 + 1.270, 0.013], [y0 + 1.284, 0.008], [y0 + 1.285, 0]],
+        [0.050, 0.048, 0.046], 10);
         // Twelve panels, and the canopy is domed along a rib and sagged across
         // one, which is `parasol`'s finding and the whole of what says cloth
-        // over a frame. Both windings on every quad: you are standing under it.
-        const knSEG = 2, knCRS = 2;
+        // over a frame. It was drawn as 96 flat quads, both windings, and each
+        // took one normal: twelve plates with a light step at every seam. Now
+        // one smooth sheet, six columns to a panel and nine rings out, whose
+        // normals come off the sheet itself — so a rib is a soft crease the
+        // light rolls over and the sag between two is a real hollow. And the
+        // rim is pulled in between ribs by the chord of a twelve-gon, because
+        // cloth stretched between two spokes runs straight, not round.
+        const knSEG = 9, knPAN = 12, knCOL = 6;
         const knCan = (a, u, v) => {
-          const r = knR * u;
+          const r = knR * u * (1 - 0.034 * Math.sin(Math.PI * v) * u * u);
           const sag = 0.075 * Math.sin(Math.PI * v) * u * u;
           return W(knPT + Math.cos(a) * r, knPS + Math.sin(a) * r,
             knHub - (knHub - knRim) * Math.pow(u, 1.5) - sag);
         };
-        for (let i = 0; i < 12; i++) {
-          const a0 = (i / 12) * TAU, a1 = ((i + 1) / 12) * TAU;
-          for (let k = 0; k < knCRS; k++) {
-            const v0 = k / knCRS, v1 = (k + 1) / knCRS;
-            const A0 = a0 + (a1 - a0) * v0, A1 = a0 + (a1 - a0) * v1;
-            for (let j = 0; j < knSEG; j++) {
-              const u0 = j / knSEG, u1 = (j + 1) / knSEG;
-              const p00 = knCan(A0, u0, v0), p01 = knCan(A0, u1, v0);
-              const p11 = knCan(A1, u1, v1), p10 = knCan(A1, u0, v1);
-              b.quad(p00, p01, p11, p10, knYEL);
-              b.quad(p10, p11, p01, p00, knYEL);
-            }
+        const knColA = (j) => (j / (knPAN * knCOL)) * TAU;
+        const knColV = (j) => (j % knCOL) / knCOL;
+        {
+          const G = [];
+          for (let i = 0; i <= knSEG; i++) {
+            const u = 0.02 + 0.98 * Math.pow(i / knSEG, 0.85);
+            const row = [];
+            for (let j = 0; j < knPAN * knCOL; j++) row.push(knCan(knColA(j), u, knColV(j)));
+            G.push(row);
           }
-          // And the rib itself, which is the detail that separates this
-          // parasol from the cream ones on the promenade: theirs are cloth
-          // seams and these are black spokes you can count from ten metres.
-          // 25 mm under the cloth so the two never skim (rule 5).
-          // Built in the SHORE frame and handed to `W` like everything else.
-          // Offsetting the cloth's own world points sideways by `sin a`, `cos a`
-          // would be wrong by the 31° the shore runs off the x axis.
-          const knRp = (u, w, sgn) => W(
-            knPT + Math.cos(a0) * knR * u - Math.sin(a0) * w * sgn,
-            knPS + Math.sin(a0) * knR * u + Math.cos(a0) * w * sgn,
-            knHub - (knHub - knRim) * Math.pow(u, 1.5) - 0.025);
-          for (let j = 0; j < knSEG; j++) {
-            const u0 = Math.max(0.06, j / knSEG), u1 = (j + 1) / knSEG;
-            const w0 = 0.018 + 0.010 * u0, w1 = 0.018 + 0.010 * u1;
-            b.quad(knRp(u0, w0, -1), knRp(u1, w1, -1),
-              knRp(u1, w1, 1), knRp(u0, w0, 1), knRIB);
-            b.quad(knRp(u0, w0, 1), knRp(u1, w1, 1),
-              knRp(u1, w1, -1), knRp(u0, w0, -1), knRIB);
-          }
+          knSurf(G, knYEL, { wrap: true, down: true });
         }
+        // And the ribs, which are the detail that separates this parasol from
+        // the cream ones on the promenade: theirs are cloth seams and these
+        // are black spokes you can count from ten metres. Round now, 25 mm
+        // under the cloth so the two never skim (rule 5), and each held up by
+        // a stretcher from a runner on the mast, which is the other half of
+        // how a parasol is made and was not there at all.
+        // Built in the SHORE frame and handed to `W` like everything else.
+        // Offsetting the cloth's own world points sideways by `sin a`, `cos a`
+        // would be wrong by the 31° the shore runs off the x axis.
+        const knRun = knHub - 0.62;
+        knLathe(W, knPT, knPS, [[knRun - 0.055, 0.030], [knRun - 0.045, 0.040],
+          [knRun + 0.045, 0.040], [knRun + 0.055, 0.030]], knRIB, 16);
+        const knRibAt = (a, u, dy) => [knPT + Math.cos(a) * knR * u,
+          knPS + Math.sin(a) * knR * u,
+          knHub - (knHub - knRim) * Math.pow(u, 1.5) - dy];
+        for (let i = 0; i < knPAN; i++) {
+          const a = (i / knPAN) * TAU;
+          tubeTS([0.04, 0.25, 0.5, 0.75, 1.0].map((u) => knRibAt(a, u, 0.025)),
+            (k) => [0.0115 - 0.002 * (k / 4), 0.0085], knRIB, 8, [0, 0, 1], 0.10);
+          tubeTS([[knPT + Math.cos(a) * 0.042, knPS + Math.sin(a) * 0.042, knRun],
+            knRibAt(a, 0.40, 0.036)], 0.0065, knRIB, 6, [0, 0, 1], 0.08);
+        }
+        knLathe(W, knPT, knPS, [[knHub - 0.100, 0.028], [knHub - 0.080, 0.052],
+          [knHub - 0.030, 0.056], [knHub - 0.012, 0.030]], knRIB, 16);
+        // The finial, on the crown, which also closes the cloth round the mast.
+        knLathe(W, knPT, knPS, [[knHub - 0.010, 0.046], [knHub + 0.018, 0.046],
+          [knHub + 0.040, 0.030], [knHub + 0.072, 0.024], [knHub + 0.096, 0.012],
+          [knHub + 0.102, 0]], knMAST, 16);
         // The hem, which on this one is not a printed valance but the dark
         // border the cloth is edged with — a band of it under every rim point,
         // scalloped because the rim is.
@@ -14297,14 +14629,27 @@ async function buildJadrija(scene) {
         // with a yellow lining rather than as a yellow parasol with a dark
         // edge. The border in the frame is a border: dark against the cloth,
         // and made of the same cloth.
+        //
+        // A real valance now: two scallops to a panel, each a hanging arc 40
+        // mm deep at the cusps and 100 at the belly, flaring a centimetre out
+        // as it drops, on a sheet of its own so it hangs and does not fold.
         const knHEM = [0.150, 0.108, 0.038];
-        for (let i = 0; i < 24; i++) {
-          const p0 = knCan((i / 24) * TAU, 1, (i % 2) / 2);
-          const p1 = knCan(((i + 1) / 24) * TAU, 1, ((i + 1) % 2) / 2);
-          b.quad(p0, p1, [p1[0], p1[1] - 0.085, p1[2]],
-            [p0[0], p0[1] - 0.085, p0[2]], knHEM);
-          b.quad([p0[0], p0[1] - 0.085, p0[2]], [p1[0], p1[1] - 0.085, p1[2]],
-            p1, p0, knHEM);
+        {
+          const G = [[], [], []];
+          const HC = 12;
+          for (let j = 0; j < knPAN * HC; j++) {
+            const a = (j / (knPAN * HC)) * TAU, v = (j % HC) / HC;
+            const top = knCan(a, 1, v);
+            const drop = 0.040 + 0.060 * Math.sin(Math.PI * ((2 * v) % 1));
+            const r = knR * (1 - 0.034 * Math.sin(Math.PI * v));
+            for (let k = 0; k < 3; k++) {
+              const f = k / 2, fl = 0.012 * f * f;
+              const P2 = W(knPT + Math.cos(a) * (r + fl), knPS + Math.sin(a) * (r + fl), 0);
+              G[k].push([P2[0], top[1] - drop * f, P2[2]]);
+            }
+          }
+          const ax0 = W(knPT, knPS, knRim);
+          knSurf(G, knHEM, { wrap: true, out: () => ax0, inv: true });
         }
         furniture.push({ t: knPT, s: knPS, a: 0.42, c: 0.42, h: 0.19, y: y0 });
       }
@@ -14325,41 +14670,100 @@ async function buildJadrija(scene) {
       {
         const knFT = S.t0 + 1.95, knFS = S.s1 - 0.22;
         const knCASE = [0.572, 0.568, 0.552];
-        const knGLASS = [0.055, 0.068, 0.070];
         const knFront = knFS - 0.29;
         boxTS(knFT - 0.34, knFT + 0.34, knFS - 0.29, knFS + 0.29,
           y0, y0 + 0.09, [0.128, 0.126, 0.130]);
-        boxTS(knFT - 0.34, knFT + 0.34, knFS - 0.29, knFS + 0.29,
-          y0 + 0.09, y0 + 1.86, knCASE, shade(knCASE, 1.10));
-        // The door is ONE quad and not a box — one face of it is visible and
-        // rule 7 says that is one quad — 8 mm proud of the case so the white
-        // frame still shows round it.
-        b.quad(W(knFT - 0.29, knFront - 0.008, y0 + 0.30),
-          W(knFT + 0.29, knFront - 0.008, y0 + 0.30),
-          W(knFT + 0.29, knFront - 0.008, y0 + 1.50),
-          W(knFT - 0.29, knFront - 0.008, y0 + 1.50), knGLASS);
-        // Three shelves of bottles behind the glass. Reds and browns and one
-        // green, because a cooler at a Croatian beach bar is Coke, Coke, Coke,
-        // Ožujsko and a Jana — and at this size what carries is that there is
-        // colour and repetition behind the glass rather than a black panel.
-        const knBOT = [[0.400, 0.070, 0.075], [0.400, 0.070, 0.075],
-          [0.115, 0.180, 0.095], [0.330, 0.255, 0.090], [0.400, 0.070, 0.075],
-          [0.150, 0.310, 0.360]];
-        for (let sh = 0; sh < 3; sh++) {
-          const sy = y0 + 0.40 + sh * 0.36;
-          b.quad(W(knFT - 0.275, knFront - 0.014, sy - 0.020),
-            W(knFT + 0.275, knFront - 0.014, sy - 0.020),
-            W(knFT + 0.275, knFront - 0.014, sy),
-            W(knFT - 0.275, knFront - 0.014, sy), [0.480, 0.478, 0.470]);
-          for (let i = 0; i < 6; i++) {
-            const bt = knFT - 0.245 + i * 0.098;
-            const c = knBOT[(i + sh * 2) % knBOT.length];
-            b.quad(W(bt - 0.031, knFront - 0.014, sy),
-              W(bt + 0.031, knFront - 0.014, sy),
-              W(bt + 0.031, knFront - 0.014, sy + 0.235),
-              W(bt - 0.031, knFront - 0.014, sy + 0.235), c);
+        // ── A CABINET, AND NOT A BOX WITH A PICTURE ON IT ──────────────────
+        //
+        // What stood here was a solid white block with a dark quad on its face
+        // and eighteen coloured rectangles painted on that, 14 mm proud —
+        // "the bottles there look too flat, too 2-dimensional", and they were
+        // not flat-looking, they were flat. The 1.539.7 pass that made the
+        // other bars' bottles glass noted this cooler as not converted.
+        //
+        // So it is hollowed: a back, two sides, the header over the door and
+        // the compressor housing under it, and between them a lit white liner
+        // with four tiers of the same instanced glass bottles every other
+        // fridge on this boardwalk now stocks (see `bottleAt`) — two deep, so
+        // the back row shows between the necks of the front one the way a
+        // stocked fridge does. The door is its frame, its gasket and its
+        // handle; the pane itself is not drawn, because an opaque one hides
+        // exactly what this pass is for and a transparent one is a sorted
+        // draw call for 0.35 square metres.
+        const knC2 = shade(knCASE, 1.10);
+        boxTS(knFT - 0.34, knFT + 0.34, knFS + 0.25, knFS + 0.29,
+          y0 + 0.09, y0 + 1.86, knCASE, knC2);
+        for (const [a, c] of [[-0.34, -0.30], [0.30, 0.34]]) {
+          boxTS(knFT + a, knFT + c, knFS - 0.29, knFS + 0.25,
+            y0 + 0.09, y0 + 1.86, knCASE, knC2);
+        }
+        boxTS(knFT - 0.30, knFT + 0.30, knFS - 0.29, knFS + 0.25,
+          y0 + 1.52, y0 + 1.86, knCASE, knC2);
+        boxTS(knFT - 0.30, knFT + 0.30, knFS - 0.29, knFS + 0.25,
+          y0 + 0.09, y0 + 0.27, knCASE, shade(knCASE, 1.02));
+        // The compressor grille, the thing 175806 reads at rgb(76, 76, 77).
+        for (let k = 0; k < 5; k++) {
+          const gy = y0 + 0.125 + k * 0.024;
+          boxTS(knFT - 0.24, knFT + 0.24, knFront - 0.006, knFront + 0.002,
+            gy, gy + 0.011, [0.230, 0.230, 0.235]);
+        }
+        // The liner, a shade brighter than the case: it is lit from inside.
+        const knLIN = [0.820, 0.838, 0.850];
+        boxTS(knFT - 0.30, knFT + 0.30, knFS + 0.232, knFS + 0.25,
+          y0 + 0.27, y0 + 1.52, knLIN);
+        // Four tiers, and the fridge is stocked the way the others are — a run
+        // of one product, two to four across, then the next — off `jit`, so
+        // nothing here draws on `rng` (rule 4).
+        const knWIRE = [0.600, 0.606, 0.612];
+        for (let sh = 0; sh < 4; sh++) {
+          const sy = y0 + 0.27 + sh * 0.315;
+          const fy = sh ? sy + 0.010 : sy;
+          if (sh) {
+            boxTS(knFT - 0.30, knFT + 0.30, knFS - 0.25, knFS + 0.232,
+              sy, fy, knWIRE, shade(knWIRE, 1.08));
+            tubeTS([[knFT - 0.30, knFS - 0.248, fy + 0.026],
+              [knFT + 0.30, knFS - 0.248, fy + 0.026]], 0.0035, knWIRE, 6);
+          }
+          for (let row = 0; row < 2; row++) {
+            const bs = knFS - 0.185 + row * 0.130;
+            let run = 0, left = 0, br = null;
+            for (let i = 0; i < 8; i++) {
+              if (left === 0) {
+                const hr = jit(sh * 29 + row * 7 + run * 13, 661);
+                br = FRIDGE_BRANDS[(hr * FRIDGE_BRANDS.length) | 0];
+                left = 2 + ((jit(sh * 29 + row * 7 + run * 13, 662) * 3) | 0);
+                run++;
+              }
+              left--;
+              const h = jit(sh * 41 + row * 17 + i, 663);
+              // One gone out of the back row now and then, which is a fridge
+              // somebody has been buying from.
+              if (row === 1 && h < 0.12) continue;
+              const bt = knFT - 0.252 + i * 0.072 + (h - 0.5) * 0.006;
+              bottleAt(bt, bs + (h - 0.5) * 0.012, fy, br, h);
+            }
           }
         }
+        // The door: a frame round the opening, a dark gasket inside it and a
+        // steel pull down the free edge.
+        const knDOOR = shade(knCASE, 1.04), knGSK = [0.070, 0.070, 0.074];
+        const knDF0 = knFront - 0.026, knDF1 = knFront - 0.004;
+        boxTS(knFT - 0.338, knFT - 0.292, knDF0, knDF1, y0 + 0.255, y0 + 1.535,
+          knDOOR, shade(knDOOR, 1.06));
+        boxTS(knFT + 0.292, knFT + 0.338, knDF0, knDF1, y0 + 0.255, y0 + 1.535,
+          knDOOR, shade(knDOOR, 1.06));
+        boxTS(knFT - 0.292, knFT + 0.292, knDF0, knDF1, y0 + 1.490, y0 + 1.535,
+          knDOOR, shade(knDOOR, 1.06));
+        boxTS(knFT - 0.292, knFT + 0.292, knDF0, knDF1, y0 + 0.255, y0 + 0.305,
+          knDOOR, shade(knDOOR, 1.06));
+        for (const [a, c, e, f] of [[-0.292, -0.284, 0.305, 1.490],
+          [0.284, 0.292, 0.305, 1.490], [-0.284, 0.284, 1.482, 1.490],
+          [-0.284, 0.284, 0.305, 0.313]]) {
+          boxTS(knFT + a, knFT + c, knDF0 + 0.004, knDF1, y0 + e, y0 + f, knGSK);
+        }
+        tubeTS([[knFT + 0.315, knDF0, y0 + 0.62], [knFT + 0.315, knDF0 - 0.030, y0 + 0.66],
+          [knFT + 0.315, knDF0 - 0.032, y0 + 1.14], [knFT + 0.315, knDF0, y0 + 1.18]],
+        0.0085, [0.700, 0.706, 0.712], 8, [1, 0, 0], 0.30);
         // The header, and the point list runs DOWN in t. `brandBand` winds
         // `top[i] → top[i+1] → bot[i+1]`, so on a face at constant `s` the
         // normal comes out along `-(c - a) × Y`: a list that climbs in `t`
@@ -14385,28 +14789,57 @@ async function buildJadrija(scene) {
       // six metres of empty teal.
       {
         const knCY = y0 + 1.08, knCS = cs + 0.66;
-        const knGREEN = [0.105, 0.155, 0.085], knBROWN = [0.245, 0.130, 0.060];
         const knPALE = [0.720, 0.716, 0.700], knWH = [0.800, 0.796, 0.782];
         // Bottles, grouped the way an opened one gets put back down: three
-        // together and one apart.
-        for (const [bt, bc] of [[S.t0 + 3.15, knGREEN], [S.t0 + 3.33, knGREEN],
-          [S.t0 + 3.52, knBROWN], [S.t0 + 5.90, knGREEN]]) {
-          lathe(W, bt, knCS, [[knCY, 0.034], [knCY + 0.175, 0.034],
-            [knCY + 0.230, 0.014], [knCY + 0.295, 0.013]], bc, 8);
+        // together and one apart. They were eight-sided lathes in one flat
+        // green or brown; they are the 1.539.7 glass now — a local red and a
+        // Pošip in their own bottles, a brown-glass beer, and a green one on
+        // its own down the far end — with a fill level each.
+        for (const [bt, br, hh] of [[S.t0 + 3.15, BOTTLE_BRANDS[1], 0.31],
+          [S.t0 + 3.33, BOTTLE_BRANDS[2], 0.77], [S.t0 + 3.52, FRIDGE_BRANDS[3], 0.52],
+          [S.t0 + 5.90, FRIDGE_BRANDS[0], 0.13]]) {
+          bottleAt(bt, knCS, knCY, br, hh);
         }
+        // Tumblers, turned with a wall and a heavy base, so a glass is a glass
+        // from above as well as from the side — and in `knPALE`, which is
+        // what a clean glass on a teal top photographs as.
         for (const gt of [S.t0 + 3.78, S.t0 + 3.96, S.t0 + 5.66]) {
-          post(W, gt, knCS - 0.05, knCY, knCY + 0.128, 0.032, knPALE, 8);
+          knLathe(W, gt, knCS - 0.05, [[knCY + 0.001, 0], [knCY + 0.001, 0.029],
+            [knCY + 0.016, 0.031], [knCY + 0.128, 0.034], [knCY + 0.128, 0.0315],
+            [knCY + 0.022, 0.027], [knCY + 0.020, 0]], knPALE, 18);
         }
+        // Two espressos: saucer, cup, and the handle, which is what makes it a
+        // cup rather than a white cylinder.
         for (const ct2 of [S.t0 + 4.50, S.t0 + 4.76]) {
-          post(W, ct2, knCS - 0.02, knCY, knCY + 0.010, 0.058, knWH, 10);
-          post(W, ct2, knCS - 0.02, knCY + 0.010, knCY + 0.062, 0.036, knWH, 8);
+          const cs3 = knCS - 0.02;
+          knLathe(W, ct2, cs3, [[knCY + 0.001, 0], [knCY + 0.001, 0.036],
+            [knCY + 0.006, 0.050], [knCY + 0.011, 0.060], [knCY + 0.013, 0.058],
+            [knCY + 0.009, 0.034], [knCY + 0.010, 0]], knWH, 20);
+          knLathe(W, ct2, cs3, [[knCY + 0.009, 0], [knCY + 0.009, 0.020],
+            [knCY + 0.020, 0.030], [knCY + 0.056, 0.034], [knCY + 0.062, 0.035],
+            [knCY + 0.062, 0.031], [knCY + 0.030, 0.026], [knCY + 0.028, 0]],
+          knWH, 18);
+          tubeTS([[ct2 + 0.032, cs3, knCY + 0.050], [ct2 + 0.052, cs3, knCY + 0.048],
+            [ct2 + 0.055, cs3, knCY + 0.033], [ct2 + 0.031, cs3, knCY + 0.026]],
+          0.0045, knWH, 6, [0, 1, 0], 0.06);
         }
-        // The machine, which in 175856 is the one dark solid on the counter.
-        boxTS(S.t0 + 4.95, S.t0 + 5.31, knCS - 0.13, knCS + 0.13,
-          knCY, knCY + 0.32, [0.115, 0.112, 0.118], [0.145, 0.142, 0.148]);
+        // The machine, which in 175856 is the one dark solid on the counter —
+        // with its corners radiused, a drip tray and a group head, because a
+        // black box on a bar is a speaker.
+        {
+          const mT = S.t0 + 5.13, mDK = [0.115, 0.112, 0.118];
+          knRR(W, mT - 0.18, mT + 0.18, knCS - 0.13, knCS + 0.13, knCY, knCY + 0.32,
+            0.035, 0.020, mDK, [0.145, 0.142, 0.148]);
+          knRR(W, mT - 0.12, mT + 0.12, knCS - 0.175, knCS - 0.128, knCY, knCY + 0.018,
+            0.010, 0.004, [0.520, 0.526, 0.532], null);
+          knLathe(W, mT, knCS - 0.155, [[knCY + 0.205, 0.028], [knCY + 0.230, 0.034],
+            [knCY + 0.262, 0.034], [knCY + 0.262, 0]], [0.560, 0.566, 0.572], 14);
+          tubeTS([[mT + 0.02, knCS - 0.160, knCY + 0.225], [mT + 0.10, knCS - 0.185, knCY + 0.232]],
+            0.007, [0.050, 0.050, 0.052], 6);
+        }
         // and the napkin box beside it.
-        boxTS(S.t0 + 5.40, S.t0 + 5.58, knCS - 0.07, knCS + 0.07,
-          knCY, knCY + 0.115, knWH, shade(knWH, 1.08));
+        knRR(W, S.t0 + 5.40, S.t0 + 5.58, knCS - 0.07, knCS + 0.07,
+          knCY, knCY + 0.115, 0.012, 0.008, knWH, shade(knWH, 1.08));
       }
 
       // ── the bulb ─────────────────────────────────────────────────────────
@@ -14416,11 +14849,17 @@ async function buildJadrija(scene) {
       // yellow at 5:14 — and it is four quads and a lathe.
       {
         const knLT = S.t0 + 6.9, knLS = cs - 0.55;
-        post(W, knLT, knLS, y0 + 1.96, y0 + S.h, 0.006, [0.072, 0.068, 0.066], 4);
-        post(W, knLT, knLS, y0 + 1.960, y0 + 2.045, 0.028, [0.090, 0.085, 0.082], 8);
-        lathe(W, knLT, knLS, [[y0 + 1.855, 0.000], [y0 + 1.878, 0.030],
-          [y0 + 1.918, 0.034], [y0 + 1.948, 0.022], [y0 + 1.962, 0.014]],
-        [0.880, 0.862, 0.808], 8);
+        // Turned now: a braided flex, a bakelite holder with its collar, and
+        // a pear-shaped bulb with a neck, which eight flat sides was not.
+        tubeTS([[knLT, knLS, y0 + 2.04], [knLT, knLS, y0 + S.h + 0.04]], 0.0045,
+          [0.072, 0.068, 0.066], 6);
+        knLathe(W, knLT, knLS, [[y0 + 1.955, 0.022], [y0 + 1.962, 0.029],
+          [y0 + 2.000, 0.028], [y0 + 2.030, 0.024], [y0 + 2.046, 0.012],
+          [y0 + 2.050, 0]], [0.090, 0.085, 0.082], 16);
+        knLathe(W, knLT, knLS, [[y0 + 1.842, 0], [y0 + 1.846, 0.016],
+          [y0 + 1.858, 0.028], [y0 + 1.878, 0.034], [y0 + 1.900, 0.033],
+          [y0 + 1.924, 0.024], [y0 + 1.944, 0.015], [y0 + 1.962, 0.014]],
+        [0.880, 0.862, 0.808], 18);
       }
 
       // The concrete collar somebody poured round the pine that comes up
@@ -14428,8 +14867,11 @@ async function buildJadrija(scene) {
       // below: `pine` is fine to call from here — it is a declaration and it
       // hoists — but `greens` is a `const` a thousand lines further down and
       // reading it from here is the temporal dead zone all over again.
-      post(W, S.t1 - 1.6, S.s0 + 2.2, y0 - 0.05, y0 + 0.16, 0.62,
-        [0.520, 0.505, 0.470], 9);
+      // Poured, so its top edge is rounded off by the float, and a hand's
+      // width of lip round the trunk where the trowel stopped.
+      knLathe(W, S.t1 - 1.6, S.s0 + 2.2, [[y0 - 0.05, 0.620], [y0 + 0.125, 0.622],
+        [y0 + 0.150, 0.610], [y0 + 0.160, 0.585], [y0 + 0.160, 0.470],
+        [y0 + 0.150, 0.440], [y0 + 0.120, 0.425]], [0.520, 0.505, 0.470], 36);
 
       // ── the terrace, which had nothing on it at all ──────────────────────
       //
@@ -14463,22 +14905,104 @@ async function buildJadrija(scene) {
         const gy = knGround(wt, ws);
         const co = Math.cos(ang), sn = Math.sin(ang);
         const P = (u, v, yy) => W(wt + u * co - v * sn, ws + u * sn + v * co, yy);
-        for (const [u, v] of [[-0.24, -0.24], [0.24, -0.24], [-0.24, 0.24],
-          [0.24, 0.24]]) {
-          post(P, u, v, gy, gy + 0.36, 0.022, [0.115, 0.108, 0.100], 4);
+        for (const [u, v] of [[-0.23, -0.23], [0.23, -0.23], [-0.23, 0.23],
+          [0.23, 0.23]]) {
+          knLathe(P, u, v, [[gy + 0.001, 0.020], [gy + 0.012, 0.021],
+            [gy + 0.345, 0.016]], [0.115, 0.108, 0.100], 10);
         }
-        // The body is one woven box, which is what a rattan chair is: the
+        // The body is one woven shell, which is what a rattan chair is: the
         // frame is inside the weave and nothing of it shows but the legs.
-        boxIn(P, -0.28, 0.28, -0.28, 0.28, gy + 0.34, gy + 0.46,
-          WICK, shade(WICK, 1.22));
-        boxIn(P, -0.28, 0.28, 0.20, 0.28, gy + 0.46, gy + 0.92,
-          WICK, shade(WICK, 1.14));
-        for (const u of [-0.28, 0.28]) {
-          boxIn(P, u - 0.06, u + 0.06, -0.26, 0.26, gy + 0.46, gy + 0.64,
-            WICK, shade(WICK, 1.18));
+        //
+        // It was four boxes — a seat, a back and two arms — and it read as a
+        // crate with a cushion in it. What a rattan tub chair is, is ONE wall:
+        // it comes up out of the front of one arm, runs back, turns the
+        // corner in a wide radius rising as it goes, crosses the back and does
+        // the same down the other side, with a rolled top all the way along.
+        // So it is swept: a path round the seat in plan (the wall's centre
+        // line), a section rolled over the top, and the height taken from arm
+        // to back through the corner. The INSIDE is where the old one's was —
+        // 0.44 m between the arms, the back's face at 0.20 — because that is
+        // the space somebody sits in, and a wall laid 45 mm inside the old
+        // outer faces took three centimetres off each hip. Woven in `KONOBA_WEAVE` — the
+        // cane over-and-under and its relief — rather than painted.
+        const wkH = 0.045, wkRC = 0.125, wkAX = 0.265, wkCV = 0.12;
+        const wkBU = wkAX - wkRC, wkBV = wkCV + wkRC;
+        const path = [];
+        for (let k = 0; k <= 4; k++) path.push([-wkAX, -0.255 + (wkCV + 0.255) * (k / 4), -1, 0]);
+        for (let k = 1; k < 5; k++) {
+          const a = Math.PI - (k / 5) * (Math.PI / 2);
+          path.push([-wkBU + Math.cos(a) * wkRC, wkCV + Math.sin(a) * wkRC,
+            Math.cos(a), Math.sin(a)]);
         }
-        boxIn(P, -0.24, 0.24, -0.22, 0.20, gy + 0.46, gy + 0.53,
-          CUSH, shade(CUSH, 1.10));
+        for (let k = 0; k <= 4; k++) path.push([-wkBU + 2 * wkBU * (k / 4), wkBV, 0, 1]);
+        for (let k = 1; k < 5; k++) {
+          const a = Math.PI / 2 - (k / 5) * (Math.PI / 2);
+          path.push([wkBU + Math.cos(a) * wkRC, wkCV + Math.sin(a) * wkRC,
+            Math.cos(a), Math.sin(a)]);
+        }
+        for (let k = 0; k <= 4; k++) path.push([wkAX, wkCV - (wkCV + 0.255) * (k / 4), 1, 0]);
+        const run = [0];
+        for (let j = 1; j < path.length; j++) {
+          run.push(run[j - 1] + Math.hypot(path[j][0] - path[j - 1][0], path[j][1] - path[j - 1][1]));
+        }
+        const half = run[run.length - 1] / 2;
+        const wkTop = (j) => {
+          const d = half - Math.abs(run[j] - half);           // from the arm's front
+          const f = Math.min(1, Math.max(0, (d - 0.20) / 0.36));
+          return 0.64 + 0.27 * f * f * (3 - 2 * f)
+            + 0.012 * Math.max(0, 1 - Math.abs(run[j] - half) / 0.2);
+        };
+        const sect = (H) => {
+          const out = [[-wkH, 0.46], [-wkH, 0.34], [0, 0.338], [wkH, 0.34],
+            [wkH, (0.34 + H - wkH) / 2], [wkH, H - wkH]];
+          for (let k = 1; k < 6; k++) {
+            const a = (k / 6) * Math.PI;
+            out.push([wkH * Math.cos(a), H - wkH + wkH * Math.sin(a)]);
+          }
+          out.push([-wkH, H - wkH], [-wkH, (0.46 + H - wkH) / 2], [-wkH, 0.46]);
+          return out;
+        };
+        const SEC = path.map((_, j) => sect(wkTop(j)));
+        const G = [], KS = [];
+        for (let i = 0; i < SEC[0].length; i++) {
+          const row = [], kr = [];
+          for (let j = 0; j < path.length; j++) {
+            const [pu, pv, mu, mv] = path[j];
+            const [o, yy] = SEC[j][i];
+            row.push(P(pu + mu * o, pv + mv * o, gy + yy));
+            let sl = 0;
+            for (let q = 1; q <= i; q++) {
+              sl += Math.hypot(SEC[j][q][0] - SEC[j][q - 1][0], SEC[j][q][1] - SEC[j][q - 1][1]);
+            }
+            kr.push(sl);
+          }
+          G.push(row);
+          KS.push(kr);
+        }
+        // Divided by the weave's own mean, 0.855, so the chair averages the
+        // colour it always had and only gains the pattern.
+        const WKC = shade(WICK, 1 / 0.855);
+        knSurf(G, WKC, { k: (i, j) => [run[j], KS[i][j], 1],
+          out: (i, j) => P(path[j][0], path[j][1], gy + (0.34 + wkTop(j)) / 2) });
+        // The two arm fronts, closed off square to the arm.
+        for (const j of [0, path.length - 1]) {
+          const ring = SEC[j].map(([o, yy]) => P(path[j][0] + path[j][2] * o,
+            path[j][1] + path[j][3] * o, gy + yy));
+          const c = ring.reduce((m, q) => [m[0] + q[0] / ring.length, m[1] + q[1] / ring.length,
+            m[2] + q[2] / ring.length], [0, 0, 0]);
+          const fwd = P(path[j][0], path[j][1] - 1, 0), org = P(path[j][0], path[j][1], 0);
+          const fl = Math.hypot(fwd[0] - org[0], fwd[2] - org[2]) || 1;
+          const N = [(fwd[0] - org[0]) / fl, 0, (fwd[2] - org[2]) / fl];
+          for (let i = 0; i < ring.length - 1; i++) {
+            knTri(c, ring[i], ring[i + 1], N, WKC, [0.5 + 0.02 * i, 0.1, 1]);
+          }
+        }
+        // The seat under the cushion, woven too, between the arms.
+        knRR(P, -0.22, 0.22, -0.272, 0.20, gy + 0.34, gy + 0.46, 0.03, 0.02,
+          WKC, WKC, { k: 1 });
+        // And the cushion, with the puff a cushion has.
+        knRR(P, -0.216, 0.216, -0.255, 0.196, gy + 0.46, gy + 0.53, 0.055, 0.030,
+          CUSH, shade(CUSH, 1.06), { bottom: true });
         furniture.push({ t: wt, s: ws, a: 0.32, c: 0.32, h: 0.92, y: gy });
       };
       // A barrel poseur table with the livery round it. `1000150414` at 5:20
@@ -14501,13 +15025,22 @@ async function buildJadrija(scene) {
         // at all. Three other calls in the file have the same nine arguments
         // and the same silence — the two parasol bases' aggregate fill. They
         // are not this shop's and are left alone.
-        lathe(W, pt2, ps2, [
-          [gy + 0.004, 0.300], [gy + 1.000, 0.300],
-          [gy + 1.000, 0.400], [gy + 1.070, 0.400], [gy + 1.070, 0.000],
-        ], WH, 14);
+        //
+        // Smooth, 32 round where it was 14, and the top a moulded disc with its
+        // edges rolled, as a drum table's is. The drum and the top are two
+        // lathes so the corner under the overhang stays a corner.
+        knLathe(W, pt2, ps2, [[gy + 0.004, 0.300], [gy + 0.500, 0.300],
+          [gy + 0.992, 0.300]], WH, 32);
+        knLathe(W, pt2, ps2, [[gy + 0.990, 0.296], [gy + 0.998, 0.380],
+          [gy + 1.005, 0.398], [gy + 1.017, 0.403], [gy + 1.056, 0.403],
+          [gy + 1.065, 0.396], [gy + 1.070, 0.378], [gy + 1.070, 0]],
+        shade(WH, 1.04), 40);
+        // The band's ring doubled to 28, because a 14-gon at 0.305 dips to
+        // 0.297 between its points and the drum is round at 0.300 now: the
+        // print would have gone into the table at every chord.
         const ring = [];
-        for (let i = 0; i < 14; i++) {
-          const a2 = (i / 14) * TAU;
+        for (let i = 0; i < 28; i++) {
+          const a2 = (i / 28) * TAU;
           ring.push([pt2 + Math.cos(a2) * 0.305, ps2 + Math.sin(a2) * 0.305]);
         }
         brandRing('jamnica', ring, gy + 0.74, gy + 0.50);
@@ -14518,12 +15051,23 @@ async function buildJadrija(scene) {
       const DKT = [0.135, 0.128, 0.122];
       for (const [ct, cs2] of [[S.t0 + 2.6, S.s0 + 2.1], [S.t0 + 6.9, S.s0 + 1.5]]) {
         const gy = knGround(ct, cs2);
+        // Round steel legs on glides and an apron under the top, and the top
+        // itself with its corners and edges radiused — it was four square
+        // sticks and a slab.
         for (const [u, v] of [[-0.30, -0.30], [0.30, -0.30], [-0.30, 0.30],
           [0.30, 0.30]]) {
-          post(W, ct + u, cs2 + v, gy, gy + 0.72, 0.022, DKT, 4);
+          tubeTS([[ct + u, cs2 + v, gy + 0.012], [ct + u, cs2 + v, gy + 0.705]],
+            0.0175, DKT, 10, [1, 0, 0], 0.14);
+          knLathe(W, ct + u, cs2 + v, [[gy + 0.001, 0.019], [gy + 0.013, 0.020],
+            [gy + 0.016, 0.017], [gy + 0.016, 0]], [0.050, 0.048, 0.046], 10);
         }
-        boxTS(ct - 0.36, ct + 0.36, cs2 - 0.36, cs2 + 0.36, gy + 0.70, gy + 0.75,
-          DKT, shade(DKT, 1.35));
+        for (const [a, c, e, f] of [[-0.30, 0.30, -0.31, -0.29], [-0.30, 0.30, 0.29, 0.31],
+          [-0.31, -0.29, -0.29, 0.29], [0.29, 0.31, -0.29, 0.29]]) {
+          boxTS(ct + a, ct + c, cs2 + e, cs2 + f, gy + 0.64, gy + 0.698,
+            shade(DKT, 0.92));
+        }
+        knRR(W, ct - 0.36, ct + 0.36, cs2 - 0.36, cs2 + 0.36, gy + 0.70, gy + 0.75,
+          0.035, 0.010, DKT, shade(DKT, 1.35), { bottom: true });
         furniture.push({ t: ct, s: cs2, a: 0.40, c: 0.40, h: 0.75, y: gy });
         for (let q = 0; q < 2; q++) {
           const a2 = q * Math.PI + 0.6;
@@ -14547,19 +15091,26 @@ async function buildJadrija(scene) {
         const knGy = knGround(knTT, knTS);
         const knCHR = [0.560, 0.566, 0.574];
         const knTERR = [0.610, 0.590, 0.548];
-        lathe(W, knTT, knTS, [[knGy + 0.004, 0.245], [knGy + 0.028, 0.245],
-          [knGy + 0.046, 0.150]], [0.330, 0.332, 0.340], 12);
-        lathe(W, knTT, knTS, [[knGy + 0.040, 0.045], [knGy + 0.688, 0.045],
-          [knGy + 0.702, 0.092]], knCHR, 10);
-        lathe(W, knTT, knTS, [[knGy + 0.700, 0.340], [knGy + 0.716, 0.348],
-          [knGy + 0.734, 0.340], [knGy + 0.734, 0.000]], knTERR, 16);
+        // All of it turned smooth now, the foot a cast dome and the chrome a
+        // column with a flare under the top, which is what makes chrome read
+        // as chrome: a curve for the sky to run along.
+        knLathe(W, knTT, knTS, [[knGy + 0.004, 0.245], [knGy + 0.022, 0.247],
+          [knGy + 0.032, 0.232], [knGy + 0.046, 0.150], [knGy + 0.056, 0.060],
+          [knGy + 0.060, 0.044]], [0.330, 0.332, 0.340], 32);
+        knLathe(W, knTT, knTS, [[knGy + 0.050, 0.045], [knGy + 0.640, 0.045],
+          [knGy + 0.676, 0.058], [knGy + 0.694, 0.090], [knGy + 0.702, 0.094]],
+        knCHR, 18);
+        knLathe(W, knTT, knTS, [[knGy + 0.700, 0.332], [knGy + 0.704, 0.343],
+          [knGy + 0.712, 0.348], [knGy + 0.724, 0.347], [knGy + 0.731, 0.341],
+          [knGy + 0.734, 0.330], [knGy + 0.734, 0.000]], knTERR, 44);
         // The ashtray and the glass, because they are what the frame has on it
         // and a bare table is the same nothing the counter was.
-        lathe(W, knTT + 0.09, knTS - 0.05, [[knGy + 0.734, 0.060],
-          [knGy + 0.754, 0.066], [knGy + 0.748, 0.048]],
-        [0.470, 0.462, 0.446], 10);
-        post(W, knTT - 0.10, knTS + 0.07, knGy + 0.734, knGy + 0.858, 0.031,
-          [0.735, 0.730, 0.712], 8);
+        knLathe(W, knTT + 0.09, knTS - 0.05, [[knGy + 0.734, 0.060],
+          [knGy + 0.748, 0.066], [knGy + 0.754, 0.064], [knGy + 0.752, 0.050],
+          [knGy + 0.744, 0.046], [knGy + 0.744, 0]], [0.470, 0.462, 0.446], 18);
+        knLathe(W, knTT - 0.10, knTS + 0.07, [[knGy + 0.735, 0], [knGy + 0.735, 0.029],
+          [knGy + 0.750, 0.031], [knGy + 0.858, 0.034], [knGy + 0.858, 0.0315],
+          [knGy + 0.756, 0.027], [knGy + 0.754, 0]], [0.735, 0.730, 0.712], 18);
         furniture.push({ t: knTT, s: knTS, a: 0.36, c: 0.36, h: 0.74, y: knGy });
       }
       // And a surfboard stood against the end post. `slat` rakes a section in
@@ -14568,12 +15119,73 @@ async function buildJadrija(scene) {
       {
         const bt = S.t0 + 0.55, gy = knGround(bt, S.s0 + 0.6);
         const BOARD = [0.700, 0.696, 0.682];
-        bar(bt - 0.03, bt + 0.03,
-          slat(S.s0 + 0.70, gy + 1.05, 0.30, 2.24, 0.55), BOARD,
-          shade(BOARD, 1.08));
-        bar(bt - 0.032, bt + 0.032,
-          slat(S.s0 + 0.70, gy + 1.05, 0.30, 2.24, 0.075),
-          [0.145, 0.290, 0.470]);
+        const STRIPE = [0.145, 0.290, 0.470];
+        // IT WAS A PLANK: a 2.24 by 0.55 box 60 mm thick, square at both
+        // ends, with a second box through it for the stripe. A board is
+        // lofted, and what makes it one is three curves — the outline, which
+        // is widest a little behind the middle and runs to a round nose and
+        // a squash tail; the thickness, fullest under the chest and thin at
+        // both ends; and the rocker, which lifts the nose. The rails are
+        // rolled (a superellipse, flat deck and flat bottom), the stripe runs
+        // the length of the deck and the bottom, and there is a fin. Same
+        // lean, same foot, same collider.
+        const bCs = S.s0 + 0.70, bCy = gy + 1.05, bAng = 0.30, bLen = 2.24;
+        const ax = [Math.sin(bAng), Math.cos(bAng)], nm = [ax[1], -ax[0]];
+        const BP = (x, w, th) => {
+          const xf = x / bLen + 0.5;
+          const rk = 0.11 * Math.pow(Math.max(0, xf - 0.68) / 0.32, 2)
+            + 0.03 * Math.pow(Math.max(0, 0.22 - xf) / 0.22, 2);
+          return W(bt + th + rk, bCs + ax[0] * x + nm[0] * w, bCy + ax[1] * x + nm[1] * w);
+        };
+        const hwOf = (xf) => 0.275 * (xf < 0.45
+          ? 0.62 + 0.38 * Math.sin((Math.PI / 2) * (xf / 0.45))
+          : Math.sqrt(Math.max(0, 1 - Math.pow((xf - 0.45) / 0.55, 2))));
+        const htOf = (xf) => 0.031 * (0.42 + 0.58 * Math.sin(Math.PI * Math.min(1, Math.pow(xf, 0.9))));
+        const XS = [0, 0.02, 0.05, 0.10, 0.18, 0.28, 0.38, 0.48, 0.58, 0.67, 0.75,
+          0.82, 0.88, 0.925, 0.955, 0.975, 0.988, 0.996, 1];
+        const G = [];
+        for (const xf of XS) {
+          const hw = Math.max(hwOf(xf), 1e-4), ht = htOf(xf);
+          const sws = Math.min(0.0375, hw * 0.3);
+          const ws = [hw * 0.97, hw * 0.82, hw * 0.55, sws, 0, -sws, -hw * 0.55, -hw * 0.82, -hw * 0.97];
+          const thOf = (w) => ht * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(w) / hw, 4)), 0.25);
+          const x = (xf - 0.5) * bLen, row = [];
+          for (const w of ws) row.push(BP(x, w, thOf(w)));
+          row.push(BP(x, -hw, 0));
+          for (let k = ws.length - 1; k >= 0; k--) row.push(BP(x, ws[k], -0.85 * thOf(ws[k])));
+          row.push(BP(x, hw, 0));
+          G.push(row);
+        }
+        // Columns 3-5 are the deck's stripe and 13-15 the bottom's.
+        knSurf(G, BOARD, { wrap: true, out: (i) => BP((XS[i] - 0.5) * bLen, 0, 0),
+          q: (i, j) => ((j >= 3 && j < 5) || (j >= 13 && j < 15) ? STRIPE : BOARD) });
+        // The squash tail's flat end, closed.
+        {
+          const r0 = G[0], c = r0.reduce((m, q) => [m[0] + q[0] / r0.length,
+            m[1] + q[1] / r0.length, m[2] + q[2] / r0.length], [0, 0, 0]);
+          const e0 = BP(-bLen / 2, 0, 0), e1 = BP(-bLen / 2 + 0.05, 0, 0);
+          const el = Math.hypot(e0[0] - e1[0], e0[1] - e1[1], e0[2] - e1[2]);
+          const EN = [(e0[0] - e1[0]) / el, (e0[1] - e1[1]) / el, (e0[2] - e1[2]) / el];
+          for (let j = 0; j < r0.length; j++) {
+            knTri(c, r0[j], r0[(j + 1) % r0.length], EN, shade(BOARD, 0.92));
+          }
+        }
+        // And the fin, on the bottom near the tail: a raked blade 110 mm deep.
+        {
+          const FIN = [0.105, 0.118, 0.135];
+          const F = [[0.022, 0], [0.110, 0], [0.085, -0.030], [0.052, -0.098], [0.036, -0.104]];
+          const FP = (xf, d, sd) => BP((xf - 0.5) * bLen, sd, -0.85 * htOf(xf) + d);
+          for (const sd of [-0.004, 0.004]) {
+            for (let k = 1; k < F.length - 1; k++) {
+              b.tri(FP(F[0][0], F[0][1], sd), FP(F[k][0], F[k][1], sd),
+                FP(F[k + 1][0], F[k + 1][1], sd), FIN);
+            }
+          }
+          for (let k = 0; k < F.length - 1; k++) {
+            b.quad(FP(F[k][0], F[k][1], -0.004), FP(F[k + 1][0], F[k + 1][1], -0.004),
+              FP(F[k + 1][0], F[k + 1][1], 0.004), FP(F[k][0], F[k][1], 0.004), FIN);
+          }
+        }
         furniture.push({ t: bt, s: S.s0 + 0.7, a: 0.10, c: 0.35, h: 2.1,
           y: gy });
       }
@@ -15743,9 +16355,25 @@ async function buildJadrija(scene) {
         knRun(false, knL0 + 0.01, knL1 - 0.01, knK0, -1);
         knRun(false, knL0 + 0.01, knL1 - 0.01, knK1, 1);
       }
+      // The posts. 175856 has them square — 100 mm hollow steel painted the
+      // green the whole frame is — where they were hexagonal pencils; with
+      // the corners radiused the way a rolled section's are, each on a
+      // bolted base plate, and running up into the beams rather than
+      // stopping under a lid.
+      const knYd = knSet + S.h;             // the underside of the sheets
+      const knSTEEL = S.post;
       for (let t = S.t0; t <= S.t1 + 0.01; t += 3.0) {
-        post(W, t, S.s0 + 0.4, knSet, knSet + S.h, 0.075, S.post, 6);
-        post(W, t, S.s1 - 0.4, knSet, knSet + S.h, 0.075, S.post, 6);
+        for (const ps of [S.s0 + 0.4, S.s1 - 0.4]) {
+          knRR(W, t - 0.05, t + 0.05, ps - 0.05, ps + 0.05, knSet, knYd - 0.12,
+            0.012, 0, knSTEEL);
+          knRR(W, t - 0.11, t + 0.11, ps - 0.11, ps + 0.11, knFloor, knFloor + 0.012,
+            0.010, 0.003, shade(knSTEEL, 0.90));
+          for (const [bu, bv] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+            knLathe(W, t + bu * 0.078, ps + bv * 0.078, [[knFloor + 0.011, 0.013],
+              [knFloor + 0.020, 0.013], [knFloor + 0.024, 0.008], [knFloor + 0.025, 0]],
+            shade(knSTEEL, 0.80), 6);
+          }
+        }
       }
       // The roof is two layers, and it has to be, because 20260821_175856 shows
       // the two doing different jobs.
@@ -15783,34 +16411,63 @@ async function buildJadrija(scene) {
       // tone off `jit` of its index — 0.86 to 1.10, which is a wider spread
       // than it sounds because this is a light source rather than a colour.
       const AMBER = [0.760, 0.585, 0.165];
-      const BAT = [0.300, 0.232, 0.098];      // the batten, and the shadow of it
       {
         const a0 = S.t0 - 0.5, a1 = S.t1 + 0.5;
         const c0 = S.s0 - 0.5, c1 = S.s1 + 0.5;
         const n = Math.max(4, Math.round((a1 - a0) / 1.05));
         const w = (a1 - a0) / n;
+        // CORRUGATED, because translucent roofing is: each sheet was a 100 mm
+        // box, flat top and flat bottom, and a flat plane of one colour is
+        // the "blocky" in the ceiling. Eight waves to a sheet, 18 mm deep,
+        // running front to back the way the rain goes, as one smooth sheet —
+        // so the light from the terrace rolls along every ridge and the
+        // ceiling reads as ribbed plastic from anywhere under it. Same bays,
+        // same tone per bay off the same `jit`.
+        const knY = knYd + 0.05;
         for (let i = 0; i < n; i++) {
           const g = 0.86 + jit(i, 733 + (S.t0 | 0)) * 0.24;
-          boxTS(a0 + i * w + 0.020, a0 + (i + 1) * w - 0.020, c0, c1,
-            knSet + S.h, knSet + S.h + 0.10,
-            [AMBER[0] * g, AMBER[1] * g, AMBER[2] * g],
-            shade(AMBER, 0.9 * g));
-          // The batten over the joint, standing 30 mm below the sheets so it
-          // is a line you can see from underneath rather than a seam that is
-          // exactly coplanar with them — rule 5, on the one surface in this
-          // shop nobody can avoid looking at.
-          if (i) {
-            boxTS(a0 + i * w - 0.032, a0 + i * w + 0.032, c0, c1,
-              knSet + S.h - 0.030, knSet + S.h + 0.10, BAT, shade(BAT, 1.2));
+          const u0 = a0 + i * w + 0.012, u1 = a0 + (i + 1) * w - 0.012;
+          const NW = 8, NP = 4, G = [[], []];
+          for (let j = 0; j <= NW * NP; j++) {
+            const u = u0 + (u1 - u0) * (j / (NW * NP));
+            const yy = knY + 0.018 * Math.sin((j / NP) * TAU);
+            G[0].push(W(u, c0, yy));
+            G[1].push(W(u, c1, yy));
           }
+          knSurf(G, [AMBER[0] * g, AMBER[1] * g, AMBER[2] * g], { down: true });
         }
-        // And the purlins the sheets are screwed to, running the other way.
-        // Four of them, which is what a ten-metre span needs and what the
-        // ceiling wants in order to read as a structure rather than a lid.
+        // The frame they are laid on, and it is STEEL and green — 175856 has
+        // the whole structure in the posts' colour, where the battens and
+        // purlins here were brown boxes. Two main beams along the post lines,
+        // a cross beam over every pair of posts, four purlins across the
+        // span, a glazing bar under every joint and a fascia round the edge
+        // that the sheets' ends and the reed's underside stop against. Every
+        // member is `knRR` with its corners radiused, and none of them shares
+        // a face with another (rule 5): each sits a few centimetres lower
+        // than the one it crosses.
+        for (const ps of [S.s0 + 0.4, S.s1 - 0.4]) {
+          knRR(W, a0 + 0.05, a1 - 0.05, ps - 0.055, ps + 0.055, knYd - 0.200, knYd - 0.034,
+            0.010, 0.008, knSTEEL, null, { bottom: true });
+        }
+        for (let t = S.t0; t <= S.t1 + 0.01; t += 3.0) {
+          knRR(W, t - 0.050, t + 0.050, c0 + 0.05, c1 - 0.05, knYd - 0.180, knYd - 0.030,
+            0.010, 0.008, knSTEEL, null, { bottom: true });
+        }
         for (let k = 1; k < 5; k++) {
           const sPos = c0 + (c1 - c0) * (k / 5);
-          boxTS(a0, a1, sPos - 0.055, sPos + 0.055,
-            knSet + S.h - 0.075, knSet + S.h - 0.005, BAT, shade(BAT, 1.15));
+          knRR(W, a0 + 0.05, a1 - 0.05, sPos - 0.035, sPos + 0.035, knYd - 0.095,
+            knYd - 0.026, 0.008, 0.006, knSTEEL, null, { bottom: true });
+        }
+        for (let i = 1; i < n; i++) {
+          knRR(W, a0 + i * w - 0.026, a0 + i * w + 0.026, c0 + 0.05, c1 - 0.05,
+            knYd - 0.050, knYd + 0.028, 0.006, 0.005, knSTEEL, null, { bottom: true });
+        }
+        for (const [p0, p1, q0, q1] of [[a0 - 0.035, a1 + 0.035, c0 - 0.035, c0 + 0.02],
+          [a0 - 0.035, a1 + 0.035, c1 - 0.02, c1 + 0.035],
+          [a0 - 0.035, a0 + 0.02, c0 + 0.02, c1 - 0.02],
+          [a1 - 0.02, a1 + 0.035, c0 + 0.02, c1 - 0.02]]) {
+          knRR(W, p0, p1, q0, q1, knYd - 0.140, knYd + 0.085, 0.008, 0.008,
+            shade(knSTEEL, 1.04), null, { bottom: true });
         }
       }
       // ── and the reed itself, which was one flat box ──────────────────────
@@ -15846,49 +16503,123 @@ async function buildJadrija(scene) {
         const ra0 = S.t0 - 0.62, ra1 = S.t1 + 0.62;
         const rc0 = S.s0 - 0.62, rc1 = S.s1 + 0.62;
         const rY = knSet + S.h + 0.10;
-        // The courses. Thatch is laid in laps and each lap sits a little proud
-        // of the one behind it, so the top reads as bands rather than as a
-        // plane — the same reason the mole's deck is in bays and the kabine
-        // row is not one box.
+        // ── AND THE COURSES WERE PLANKS ───────────────────────────────────
+        //
+        // Sixteen boxes 0.72 m wide, alternately 22 mm proud, each one colour:
+        // from the promenade corner that is a slatted timber deck, and it is
+        // what Misha took it for — "looks too blocky". Thatch is not flat in
+        // any direction. Each course is a BUNDLE, rounded across and lumpy
+        // along, and the next one is laid over its tail, so the top is a run
+        // of soft ridges with a valley between each two — and the stems in
+        // it run across the courses, down the roof, as thousands of lines.
+        //
+        // So: each course is a smooth humped sheet, 0.72 m of hump laid 8 cm
+        // into the next so there is never daylight between two; the lump is
+        // `jit` per metre along; the valley is darker because less light
+        // gets into it. The stems are in `KONOBA_WEAVE`, printed across the
+        // course at 14 mm with a relief the sun catches. Same two reeds, same
+        // `jit` keys for which course is which.
         const nC = Math.max(6, Math.round((rc1 - rc0) / 0.72));
+        const nT = Math.ceil((ra1 - ra0) / 0.22);
+        const RD = 1 / 0.78;                 // the stem print's own mean
+        // A patch of weathering, a metre or so across, that runs over the
+        // joins between courses: value noise off `jit`. Photographed from the
+        // air the first cut still read as sixteen planks, because every course
+        // was one tone and dark in each valley — the same stripe the boxes
+        // made, rounded. A roof greys in patches where the pine drips and the
+        // sun sits, not in courses, so the tone and the grey/brown mix come
+        // off this, and a course's own tone and its valley are kept small.
+        const knVN = (x, y, key) => {
+          const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+          const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+          const a = jit(xi + yi * 57, key), c = jit(xi + 1 + yi * 57, key);
+          const d = jit(xi + (yi + 1) * 57, key), e = jit(xi + 1 + (yi + 1) * 57, key);
+          return a + (c - a) * sx + (d - a) * sy + (a - c - d + e) * sx * sy;
+        };
         for (let i = 0; i < nC; i++) {
-          const s0r = rc0 + (rc1 - rc0) * (i / nC);
-          const s1r = rc0 + (rc1 - rc0) * ((i + 1) / nC) + 0.06;
-          const g = 0.88 + jit(i + (S.t0 | 0), 811) * 0.26;
-          const base = jit(i * 3 + (S.t0 | 0), 812) < 0.34 ? REEDB : REEDA;
-          const cl = [base[0] * g, base[1] * g, base[2] * g];
-          boxTS(ra0, ra1, s0r, s1r, rY, rY + 0.26 + (i % 2) * 0.022,
-            cl, shade(cl, 1.14));
+          const s0r = rc0 + (rc1 - rc0) * (i / nC) - (i ? 0.04 : 0);
+          const s1r = rc0 + (rc1 - rc0) * ((i + 1) / nC) + (i < nC - 1 ? 0.04 : 0);
+          const g = 0.95 + jit(i + (S.t0 | 0), 811) * 0.10;
+          const grey = jit(i * 3 + (S.t0 | 0), 812) < 0.34 ? 0.35 : 0;
+          const G = [], C = [], K = [];
+          const FS = [0, 0.18, 0.40, 0.62, 0.82, 1];
+          for (const f of FS) {
+            const row = [], cr = [], kr = [];
+            const hump = Math.pow(Math.sin(Math.PI * f), 0.6);
+            const sp = s0r + (s1r - s0r) * f;
+            for (let j = 0; j <= nT; j++) {
+              const u = ra0 + (ra1 - ra0) * (j / nT);
+              const lump = (jit(j + i * 131, 820) - 0.5) * 0.024 * hump;
+              const yy = rY + 0.205 + 0.050 * hump + (i % 2) * 0.008 + lump;
+              row.push(W(u, sp, yy));
+              const w = Math.min(1, grey + 0.75 * knVN((u - ra0) / 1.3, (sp - rc0) / 1.1, 823));
+              const tone = g * (0.88 + 0.24 * knVN((u - ra0) / 0.9, (sp - rc0) / 0.8, 824))
+                * (0.95 + 0.10 * jit(j * 3 + i, 819)) * (0.86 + 0.14 * hump) * RD;
+              cr.push([(REEDA[0] + (REEDB[0] - REEDA[0]) * w) * tone,
+                (REEDA[1] + (REEDB[1] - REEDA[1]) * w) * tone,
+                (REEDA[2] + (REEDB[2] - REEDA[2]) * w) * tone]);
+              kr.push([u - ra0, (s1r - s0r) * f + i * 0.9, 2]);
+            }
+            G.push(row); C.push(cr); K.push(kr);
+          }
+          knSurf(G, (a, c) => C[a][c], { k: (a, c) => K[a][c], down: true });
+        }
+        // Under the overhang, the one place the reed's underside shows: a
+        // strip 0.12 m wide all round, outside the sheets so the two are never
+        // parallel planes a few centimetres apart over the same ground.
+        {
+          const a0 = S.t0 - 0.5, a1 = S.t1 + 0.5, c0 = S.s0 - 0.5, c1 = S.s1 + 0.5;
+          const UC = shade(REEDA, 0.62 * RD);
+          for (const [p0, p1, q0, q1] of [[ra0, ra1, rc0, c0 - 0.035], [ra0, ra1, c1 + 0.035, rc1],
+            [ra0, a0 - 0.035, c0 - 0.035, c1 + 0.035], [a1 + 0.035, ra1, c0 - 0.035, c1 + 0.035]]) {
+            const G = [[W(p0, q0, rY), W(p1, q0, rY)], [W(p0, q1, rY), W(p1, q1, rY)]];
+            knSurf(G, UC, { k: (a, c) => [c ? p1 - ra0 : p0 - ra0, a ? q1 - rc0 : q0 - rc0, 2],
+              down: true });
+          }
         }
         // The fringe. Every stem a different length and a different reach, all
-        // round the perimeter — 0.13 m apart, which is close enough that from
-        // the promenade it is one ragged edge and not a row of teeth.
+        // round the perimeter, and it is no longer a row of boxes 0.13 m apart
+        // but one skirt that rolls over the edge of the top course and hangs:
+        // a column every 50 mm, each its own length and its own flare off
+        // `jit`, and alternate columns cut short, so its bottom edge is the
+        // saw-tooth of stems that were never trimmed. It hangs from the top
+        // down past the reed's underside, which the boxes did not, so the eave
+        // is closed and there is no dark slot under the edge of the thatch.
+        const rMid = W((ra0 + ra1) / 2, (rc0 + rc1) / 2, rY + 0.10);
         const fringe = (along, aFrom, aTo, cAt, out) => {
-          const n = Math.max(2, Math.round(Math.abs(aTo - aFrom) / 0.13));
-          for (let i = 0; i < n; i++) {
+          const n = Math.max(2, Math.round(Math.abs(aTo - aFrom) / 0.05));
+          const G = [[], [], [], []], C = [[], [], [], []], K = [[], [], [], []];
+          const P2 = (u, c, yy) => (along ? W(u, c, yy) : W(c, u, yy));
+          for (let i = 0; i <= n; i++) {
             const k = i + (S.t0 | 0) * 7 + (out > 0 ? 400 : 0)
               + (along ? 0 : 900);
-            const u0 = aFrom + (aTo - aFrom) * (i / n);
-            const u1 = aFrom + (aTo - aFrom) * ((i + 0.82) / n);
-            const drop = 0.09 + jit(k, 815) * 0.29;
-            const reach = 0.03 + jit(k, 816) * 0.15;
-            const g = 0.80 + jit(k, 817) * 0.34;
+            const u = aFrom + (aTo - aFrom) * (i / n);
+            // Clumps and strays: a slow wander over five columns, which is a
+            // bundle hanging lower than its neighbours, and a fast one per
+            // column. An every-other-column tooth was tried first and read as
+            // a saw blade — a pattern, which is worse than no fringe at all.
+            const i5 = Math.floor(i / 5), f5 = (i % 5) / 5;
+            const sl = jit(i5 + k - i, 814) + (jit(i5 + 1 + k - i, 814) - jit(i5 + k - i, 814))
+              * f5 * f5 * (3 - 2 * f5);
+            const drop = 0.22 + 0.14 * sl + 0.12 * jit(k, 815) * jit(k, 813);
+            const reach = 0.03 + jit(k, 816) * 0.10;
+            const g = (0.80 + jit(k, 817) * 0.34) * RD;
             const base = jit(k, 818) < 0.34 ? REEDB : REEDA;
-            const cl = [base[0] * g, base[1] * g, base[2] * g];
-            const cA = cAt, cB = cAt + out * reach;
-            if (along) {
-              boxTS(u0, u1, Math.min(cA, cB), Math.max(cA, cB),
-                rY + 0.26 - drop, rY + 0.27, cl, shade(cl, 1.10));
-            } else {
-              boxTS(Math.min(cA, cB), Math.max(cA, cB), u0, u1,
-                rY + 0.26 - drop, rY + 0.27, cl, shade(cl, 1.10));
-            }
+            const rows = [[-0.10, rY + 0.205], [0, rY + 0.215],
+              [0.025 + reach * 0.35, rY + 0.13], [reach, rY + 0.26 - drop]];
+            rows.forEach(([o, yy], r) => {
+              G[r].push(P2(u, cAt + out * o, yy));
+              const tt = g * (r === 3 ? 0.86 : 1);
+              C[r].push([base[0] * tt, base[1] * tt, base[2] * tt]);
+              K[r].push([Math.abs(u - aFrom), rY + 0.26 - yy, 2]);
+            });
           }
+          knSurf(G, (a, c) => C[a][c], { k: (a, c) => K[a][c], out: () => rMid, inv: true });
         };
-        fringe(true, ra0, ra1, rc0, -1);
-        fringe(true, ra0, ra1, rc1, 1);
-        fringe(false, rc0, rc1, ra0, -1);
-        fringe(false, rc0, rc1, ra1, 1);
+        fringe(true, ra0 - 0.04, ra1 + 0.04, rc0, -1);
+        fringe(true, ra0 - 0.04, ra1 + 0.04, rc1, 1);
+        fringe(false, rc0 - 0.04, rc1 + 0.04, ra0, -1);
+        fringe(false, rc0 - 0.04, rc1 + 0.04, ra1, 1);
       }
       // The counter, an L round two sides, with its teal top.
       //
@@ -15897,12 +16628,61 @@ async function buildJadrija(scene) {
       // the return only — which is why the row of red and green stools reads
       // against it the way it does. Painted teal all the way down, the stools
       // sat on a wall of their own colour family and the counter had no base.
-      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6, knSet, knSet + 0.86,
-        [0.245, 0.075, 0.070]);
-      boxTS(S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6,
-        knSet + 0.86, knSet + 1.02, body);
-      boxTS(S.t0 + 1.1, S.t0 + 7.3, S.s1 - 1.5, S.s1 - 0.5,
-        knSet + 1.02, knSet + 1.08, shade(body, 1.2));
+      //
+      // And it is BOARDING, which a painted box is not: 115 mm boards with a
+      // shadow gap between each two and their own tone, down the front and
+      // round both ends, over a darker carcass that the gaps show. The teal
+      // top has its corners radiused and a rolled front edge, which is the
+      // edge every forearm on this terrace rests on, and there is a steel
+      // foot rail along the front on brackets into the stone course.
+      const knMAR = [0.245, 0.075, 0.070];
+      boxTS(S.t0 + 1.22, S.t0 + 7.18, S.s1 - 1.38, S.s1 - 0.6, knSet, knSet + 0.86,
+        shade(knMAR, 0.55));
+      {
+        const board = (u0, u1, face) => {
+          const k = Math.round(u0 * 37 + face * 1000);
+          const g = 0.90 + jit(k, 870) * 0.16;
+          const c = shade(knMAR, g), c2 = shade(knMAR, g * 1.06);
+          if (face === 0) {
+            boxTS(u0, u1, S.s1 - 1.40, S.s1 - 1.38, knSet, knSet + 0.86, c, c2);
+          } else {
+            const t = face < 0 ? S.t0 + 1.20 : S.t0 + 7.18;
+            boxTS(t, t + 0.02, u0, u1, knSet, knSet + 0.86, c, c2);
+          }
+        };
+        const NB = Math.round(6.0 / 0.123);
+        for (let k = 0; k < NB; k++) {
+          const u0 = S.t0 + 1.2 + 6.0 * (k / NB), u1 = S.t0 + 1.2 + 6.0 * ((k + 1) / NB);
+          board(u0 + 0.004, u1 - 0.004, 0);
+        }
+        for (const face of [-1, 1]) {
+          for (let k = 0; k < 6; k++) {
+            const v0 = S.s1 - 1.38 + 0.78 * (k / 6), v1 = S.s1 - 1.38 + 0.78 * ((k + 1) / 6);
+            board(v0 + 0.004, v1 - 0.004, face);
+          }
+        }
+      }
+      knRR(W, S.t0 + 1.2, S.t0 + 7.2, S.s1 - 1.4, S.s1 - 0.6, knSet + 0.86, knSet + 1.02,
+        0.02, 0.0, body);
+      knRR(W, S.t0 + 1.1, S.t0 + 7.3, S.s1 - 1.5, S.s1 - 0.5, knSet + 1.02, knSet + 1.08,
+        0.045, 0.024, shade(body, 1.2), null, { bottom: true });
+      {
+        const RAIL = [0.600, 0.585, 0.540];
+        const rs = S.s1 - 1.64, ry = knSet + 0.21;
+        tubeTS([[S.t0 + 1.35, rs, ry], [S.t0 + 3.2, rs, ry], [S.t0 + 5.1, rs, ry],
+          [S.t0 + 7.05, rs, ry]], 0.021, RAIL, 12, [0, 0, 1], 0.28);
+        for (const bt of [S.t0 + 1.35, S.t0 + 7.05]) {
+          knLathe(W, bt, rs, [[ry - 0.02, 0], [ry - 0.02, 0.021], [ry - 0.01, 0.024], [ry, 0.023]],
+            RAIL, 12);
+          knLathe(W, bt, rs, [[ry, 0.023], [ry + 0.01, 0.024], [ry + 0.02, 0.021], [ry + 0.02, 0]],
+            RAIL, 12);
+        }
+        for (let k = 0; k < 5; k++) {
+          const bt = S.t0 + 1.55 + k * 1.3;
+          tubeTS([[bt, rs, ry - 0.005], [bt, rs + 0.07, ry + 0.02], [bt, S.s1 - 1.46, ry + 0.035]],
+            0.009, RAIL, 8, [1, 0, 0], 0.2);
+        }
+      }
       runs.push({ t0: S.t0 + 1.1, t1: S.t0 + 7.3, s0: S.s1 - 1.5, s1: S.s1 - 0.5,
         y: knSet, h: 1.08 });
       shopExtras(S, knSet, knSet + S.h);
@@ -16647,6 +17427,18 @@ async function buildJadrija(scene) {
   // Every bottle the shops above put on a shelf or in a fridge, drawn at
   // once: see `bottleAt`.
   bottleLayers();
+  // And the konoba's woven and thatched surfaces, which the shops above put
+  // in `knTex`: `up`'s own material and two-sided flip, plus the print. It
+  // casts, with `up` — see the caster list — because the reed is the roof
+  // and a roof with no shadow under it is not one.
+  const knTexMesh = new THREE.Mesh(knTex.geo(), solidMaterial(0xffffff, {
+    spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22,
+    vdecl: 'attribute vec3 aKn;', decl: 'varying vec3 vKn;', vert: 'vKn = aKn;',
+    body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;' + KONOBA_WEAVE,
+  }));
+  knTexMesh.name = 'jad:konobaWeave';
+  knTexMesh.geometry.computeBoundingSphere();
+  scene.add(knTexMesh);
   // The three placements, all photographed. The hoarding beside Maslina, the
   // panel out on the plaza, and the pair at the west end by the cabins.
   // 349 / 33.2 was inside the sanitary block once that was built. East of
@@ -59105,7 +59897,7 @@ async function buildJadrija(scene) {
     // The feather flags cast as they stand: the shadow pass does not run the
     // wave, and a ripple of a few centimetres in a shadow is nothing anybody
     // could see.
-    casters: [upMesh, vilMesh, arborMesh, oliveMesh, stonesMesh, floraMesh, shrubMesh, hedgeMesh,
+    casters: [upMesh, knTexMesh, vilMesh, arborMesh, oliveMesh, stonesMesh, floraMesh, shrubMesh, hedgeMesh,
       ...rendMeshes.filter((m) => m !== kabRendMesh),
       ...featherMeshes],
     // The kabina's two rooms cast only while they are drawn — `dynamic`

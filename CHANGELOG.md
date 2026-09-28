@@ -8,6 +8,89 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.541.1] — 2026-09-28
+
+### The konoba, smooth
+
+Misha: *"maybe konoba objects more advanced, more triangles/polygons, the
+bottles there look too flat, too 2-dimensional, the parasols, just in
+general, looks too blocky.. should look more advanced, since other things
+becoming more advanced"*. The konoba is the beach bar beside the vikendica.
+
+**Why it looked blocky.** Every solid in the konoba was drawn with `boxTS`,
+`post` or `lathe`. All three give each triangle one flat normal. That is fine
+for a wall. On a parasol it turns twelve cloth panels into twelve flat plates
+with a hard light change at every seam. On a stool leg it gives a hexagonal
+pencil, and on the thatch the edge of a plank.
+
+**One new primitive: `knSurf`.** It builds a grid of world points whose
+normals come from the grid's own neighbours. `knLathe` (a smooth turned
+profile) and `knRR` (a slab with rounded corners in plan and a rounded top
+edge) are ways of laying out that grid. Each triangle's winding is made to
+agree with its normals. Solids face outward and overhead sheets face down.
+This matters because the shadow pass draws back faces only: the first run
+wore a mosaic of self-shadow on the counter top until the windings were
+fixed.
+
+**One new material, `KONOBA_WEAVE`**, on one new mesh (`knTex`). It prints
+two patterns that no amount of vertex colour can give: a 16 mm rattan basket
+weave, and reed stems at 14 mm. Both are drawn from their own surface
+coordinates, with the relief bumped into the normal. Both fade to their mean
+once a cell is smaller than a pixel. The vertex colours are divided by that
+mean, so each surface keeps its old average colour.
+
+- **Bottles.** The cooler used to be a solid block with 18 coloured
+  rectangles painted 14 mm in front of it. It is now hollow: back, sides,
+  header, compressor grille, a lit liner, and four tiers of the 1.539.7
+  instanced glass bottles, two rows deep. The fridge is stocked in runs of
+  one product, with the odd gap in the back row. The door is a frame, a
+  gasket and a steel pull. The counter bottles are that glass now too: a
+  red, a Pošip, a brown beer and a green beer. The tumblers have a wall and
+  a base, and the espresso cups have saucers and handles.
+- **Parasol** (the konoba's own; the promenade's cream parasols use a
+  different builder and are untouched). The canopy is one smooth sheet of
+  12 panels × 6 columns × 9 rings, domed along each rib and sagging between
+  ribs. The rim is pulled in by the chord of a twelve-gon. There is a
+  scalloped valance (two scallops per panel), round ribs, a runner with
+  stretchers, a hub and a finial. The mast is a 48 mm tube with a crank,
+  standing in a turned wheel-rim base.
+- **Roof.** The sixteen reed "planks" are now humped thatch bundles, each
+  laid 8 cm over the next. Tone and grey/brown come off metre-scale value
+  noise, so the courses no longer read as stripes. The ragged eave is one
+  hanging skirt with clumps and strays, where there was a row of boxes. The
+  underside shows in the overhang. The amber ceiling is corrugated sheets.
+  The frame is green steel, per 175856: square posts on bolted plates, two
+  main beams, cross beams, purlins, a glazing bar at every joint and a
+  fascia. None of these members shares a face with another.
+- **Counter.** Maroon boarding with shadow gaps over a dark carcass. The teal
+  top has radiused corners and a rolled front edge. There is a steel foot
+  rail on brackets into the stone course.
+- **Stools** (`barStool`, which MINI's three white stools share). The legs
+  are round tapering tubes on glides. The rungs are round, the seat is a
+  radiused moulding, and the back frame is one continuous bar with a round
+  mesh.
+- **Wicker chairs.** Each is one swept rattan tub wall: up an arm, round the
+  corner and across the back, with a rolled top. The seat is woven, the
+  cushion is puffed and the feet are turned. The inside is the same size as
+  before (0.44 m between the arms), because people sit in it.
+- **Tables, poseurs, side table, bulb, pine collar.** All smooth now. The
+  poseur's JAMNICA band ring went from 14 to 28 points so that it clears
+  the round drum.
+- **Surfboard.** Lofted, with outline, thickness and rocker curves, rolled
+  rails, the stripe on the deck and the bottom, a squash tail and a fin.
+
+Positions, footprints and colliders are unchanged. All 798 blockers hash to
+the same value before and after (1224756138), and so do the konoba's 24.
+The barman and everything near him are where they were. No new `rng` draws;
+every variation hashes on `jit`.
+
+**Cost, measured at the konoba:** +37k triangles in `up`, +17k in `knTex`,
+and +68 bottles (+29k triangles) added to the existing instanced layers.
+That is about +84k triangles on an 8.4 M frame (+1 %), and +1 draw call
+(plus its shadow proxy). Timed `renderer.render` over 20 frames on the 4090,
+before → after: bar 6.6 → 6.1 ms, parasol 4.5 → 4.6 ms, roof 9.9 → 9.7 ms,
+from the far end of the promenade 9.2 → 8.6 ms. All within noise.
+
 ## [1.541.0] — 2026-09-28
 
 ### hosed off their chairs
