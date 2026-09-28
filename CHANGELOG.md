@@ -8,6 +8,117 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.541.2] — 2026-09-28
+
+### Beach bar MINI, decluttered and smooth
+
+Misha, standing on MINI's terrace: *"note the clutter here, can u declutter
+the lawn chairs and stuff, make it cleaner, higher resolution?"*
+
+**What the clutter was.**
+
+- **The three yellow loungers were inside the café.** They stood at t 273.4,
+  274.9 and 276.4, s 13.6 and 12.9, skewed −0.22 to +0.14. That runs straight
+  through the two western café sets, whose tables are at s 13.8 and 14.6 with
+  chairs 0.72 m round them. One lounger ran under a table, one crossed the
+  terrace on a diagonal, and a woman's armchair stood with its legs either
+  side of a lounger rail. They had no collider, so you could walk through
+  them too.
+- **The spare-chair stack was inside the drinks fridge.** `terraceKit`'s
+  stack of grey monoblocs in the corner overlapped the `cooler` by 0.35 m in
+  t. It was also the only monobloc on the one terrace that seats nobody on a
+  monobloc.
+
+**What moved.**
+
+- **The loungers went to the bathing platform.** They are now a clean row
+  on the middle terrace (s 3.6–8.4), one step down from the promenade and
+  empty the whole width of MINI:
+  - three at 1.5 m centres, centred on the bar (t 276.5, 278.0, 279.5), at
+    s 6.4;
+  - square to the shore, backs to the bar and feet to the sea;
+  - 1.1 m clear of the riser;
+  - solid, with the bathing station's collider size, on their own floor.
+- **The spare-chair stack is gone at MINI.** It stays at every other terrace.
+- **Nothing else moved.** The four café sets, their seats and the four
+  people sitting in them are where they were. So are the standing man, the
+  barman, the trough, the tubs, the plinths and the ride-on car.
+
+**What got smoother.** Everything below goes into the existing `up` and
+`shrub` buffers, built from 1.539.11's smooth-normal primitives (`tubeTS`,
+`knSurf`, `knLathe`, `knRR`), with two new helpers:
+
+- `bendPath` turns a polyline's corners into bends, so a swept tube is bent
+  tubing rather than a mitre.
+- `barSweep` sweeps a section and caps it at both ends. It is a cheap way to
+  get a rolled edge on something long and thin.
+
+The items:
+
+- **Lounger** (`loungerMini`, used at MINI only):
+  - the frame is one white tube bent round the whole bed;
+  - the slats are rolled-edge, laid along the knee bend, 62 mm wide with
+    30 mm of daylight between them;
+  - it has a head pad, splayed legs on rubber shoes at the foot, and two
+    wheels at the head.
+- **Mesh armchair** (`meshChair`):
+  - one rounded seat-frame loop;
+  - the back posts and top rail are one bent bar;
+  - each arm is one bar bent down into the frame;
+  - the mesh is round strands;
+  - the legs are tapered, on glides;
+  - the pad's corners and top edge are rolled.
+
+  Every centre line is the old box's, so `sitGeo`'s boxes still fit and the
+  settle, the hands and the hose read the same chair.
+- **Pedestal table:**
+  - it is turned now: base, column with a collar, and a top with a bullnose
+    edge and an underside;
+  - the ribs are rounded in plan;
+  - it is the same 0.62 m disc at 0.690–0.722.
+- **Tubs** (`miniPlanter`, used at MINI only):
+  - a cast tub with a rolled foot, a tide band and a bent rim;
+  - the soil sits 25 mm down inside the rim.
+- **The shrub in the tubs.** Misha's "flat leaf cards orbiting a dark
+  sphere" was `floraLeafy`. It is now a clipped evergreen: `puff` lumps in
+  `shrub`, the trees' own material, as the lavender and the palisade mass
+  were in 1.537.0.
+- **Mast plinths.** These were the "blocky stacked stone walls". Each block
+  now has rounded arrises, and each is nudged a few mm and a hair off level
+  by `jit`.
+
+**Invariance.** No `rng` draw was added or removed.
+
+- **Blockers.** Every blocker outside MINI's patch (t 269.5–287,
+  s 4.5–18.5) is identical: hash `da4174f2`. The total goes from 798 to 800:
+  minus the chair stack at (272.75, 17.25), plus the three loungers at
+  (276.5 / 278.0 / 279.5, 6.365).
+- **People.** All 100 are unchanged, MINI's included: hash `497ce9bb` for
+  everyone outside the patch.
+- **Settle.** 19 done, 0 failed, before and after.
+- **Hose knock.** `crowd.topple.knock(4, …)` on MINI sitter seat 4 (t 280.95)
+  went live and reseated, with 0 bails.
+
+**Measured.** 1280×720 on the RTX 4090, GPU timer round every render call,
+two runs of three views each (his view, from the water, from the east):
+
+| | before | after |
+|---|---|---|
+| triangles per render | 8.54 M | 8.58 M (+38 k, +0.45 %) |
+| draw calls | 72 | 72 (none added) |
+| GPU median per render | 1.31–1.74 ms | 1.36–1.71 ms |
+
+The GPU difference is noise, within ±0.15 ms.
+
+**Seen, not fixed.** These are different causes, and fixing them would move
+seated people:
+
+- Caffe TRAMPULIN's second frontage (`tramp2`, t 469–475) fits four café
+  sets into 6 m. Neighbouring rings overlap there: chair colliders at
+  t 471.09/470.94 and 473.89/473.74.
+- There is an overlap between blockers at t 303–305, s 19.4–19.8, which is
+  the kiosk run west of H2O.
+
 ## [1.541.1] — 2026-09-28
 
 ### The konoba, smooth

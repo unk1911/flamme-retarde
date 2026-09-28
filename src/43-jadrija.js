@@ -6123,6 +6123,14 @@ async function buildJadrija(scene) {
       // walker has to go round them for no reason. 2.5 sets them just outside
       // the tables, which is where a terrace draws its own line.
       const ps = fs - 2.5;
+      // At beach bar MINI, where Misha stood beside one and asked for it
+      // cleaner and higher resolution, the same tub in the same place, cast
+      // rather than stacked — see `miniPlanter`.
+      if (S.key === 'mini') {
+        miniPlanter(pt, ps, y0, TUB, SOIL, key * 7 + i);
+        furniture.push({ t: pt, s: ps, a: 0.30, c: 0.30, h: 0.50, y: y0 });
+        continue;
+      }
       // A cast tub with a chamfer at the foot and a lip at the top. Square,
       // because the round ones on this coast are the municipality's and the
       // square ones belong to whoever swept the terrace this morning.
@@ -6166,7 +6174,14 @@ async function buildJadrija(scene) {
     }
 
     // ── and the spare chairs, stacked in the corner ─────────────────────────
-    {
+    //
+    // Not at beach bar MINI. Its corner is where the drinks fridge (`cooler`)
+    // stands, and the two were drawn into each other — a stack of grey
+    // monoblocs 0.26 m square half inside a glass-door cabinet, their
+    // colliders overlapping by 0.35 m in t. And they were monoblocs, on the
+    // one terrace on this shore that does not seat anybody on a monobloc.
+    // Misha, 28 Sep 2026, on this terrace: *"declutter ... and stuff"*.
+    if (S.key !== 'mini') {
       const ct = S.t0 + 0.75, cs = S.s0 - 0.75;
       const SEAT = [0.520, 0.512, 0.492];
       const n = 4 + ((jit(key, 780) * 3) | 0);
@@ -6192,6 +6207,60 @@ async function buildJadrija(scene) {
     }
   }
 
+
+  /**
+   * Beach bar MINI's two terrace tubs, and what grows in them.
+   *
+   * `terraceKit`'s tub is five boxes stacked, and in Misha's frame of this
+   * terrace (28 Sep 2026) it was a square of hard edges with, on top of it,
+   * the thing he called out by name — a dark core with leaf cards standing
+   * round it (`floraLeafy`), which from two metres is exactly that. So the tub
+   * is cast here, with its corners and its lip rounded (`knRR`, a bent rim of
+   * `tubeTS`), and the plant is a clipped evergreen drawn the way the lavender
+   * and the palisade mass were in 1.537.0: `puff` lumps in `shrub`, the
+   * trees' own material, so it has the same leaf tufts, the chewed outline
+   * and light through the edge as the pines over the terrace — one mass with
+   * a lit side and a dark side, not a ball with cards on it.
+   *
+   * Same footprint, same heights, same collider; `jit` only, so no draw off
+   * `rng` moves.
+   */
+  function miniPlanter(pt, ps, y0, TUB, SOIL, seed) {
+    const Wa = (u, v, yy) => W(u, v, yy);
+    // The foot, with its edge rolled; the tide mark, where the hose reaches
+    // every morning and the tub never quite dries; the body; the rim.
+    knRR(Wa, pt - 0.30, pt + 0.30, ps - 0.30, ps + 0.30, y0, y0 + 0.06, 0.04, 0.014,
+      shade(TUB, 0.88));
+    knRR(Wa, pt - 0.274, pt + 0.274, ps - 0.274, ps + 0.274, y0 + 0.05, y0 + 0.17,
+      0.03, 0, shade(TUB, 0.80));
+    knRR(Wa, pt - 0.270, pt + 0.270, ps - 0.270, ps + 0.270, y0 + 0.05, y0 + 0.47,
+      0.03, 0, TUB);
+    tubeTS(bendPath([[pt - 0.268, ps - 0.268, y0 + 0.468], [pt + 0.268, ps - 0.268, y0 + 0.468],
+      [pt + 0.268, ps + 0.268, y0 + 0.468], [pt - 0.268, ps + 0.268, y0 + 0.468]], 0.06, 4, true),
+    [0.030, 0.032], shade(TUB, 1.08), 10, [0, 0, 1], 0.10);
+    // The soil, 25 mm down inside the rim.
+    knRR(Wa, pt - 0.245, pt + 0.245, ps - 0.245, ps + 0.245, y0 + 0.42, y0 + 0.475,
+      0.02, 0, SOIL);
+    // The plant: one clipped mass and seven lumps where it has grown out
+    // since it was last cut.
+    const DK = [0.070, 0.128, 0.066], LT = [0.212, 0.338, 0.176];
+    const a0 = jit(seed, 770) * TAU, co = Math.cos(a0), sn = Math.sin(a0);
+    const P = (dt, ds, yy) => W(pt + dt * co - ds * sn, ps + dt * sn + ds * co, yy);
+    // Down on the soil and a hand wider than the tub, which is how a clipped
+    // plant sits in one: it has grown over the rim, it is not balanced on it.
+    const cy = y0 + 0.47 + 0.20;
+    const band = [y0 + 0.44, y0 + 1.02];
+    const was = b;
+    b = shrub;
+    puff(P, 0, 0, cy, 0.27, 0.33, DK, LT, band, 16, 7, 0.12, seed % 89);
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * TAU + jit(seed + k, 771) * 0.7;
+      const d = 0.15 + jit(seed + k, 772) * 0.08;
+      puff(P, Math.cos(a) * d, Math.sin(a) * d, cy + 0.04 + jit(seed + k, 773) * 0.12,
+        0.12, 0.15, DK, LT, band, 10, 5, 0.22, (seed + 11 * k) % 89);
+    }
+    b = was;
+  }
 
   /**
    * The things bolted to a wall, on the walls nobody had put anything on.
@@ -7455,65 +7524,70 @@ async function buildJadrija(scene) {
    * with the back at +ds, which is `terraceSet`'s convention and the reason
    * the frame handed in here is `face + PI/2`. See the note there.
    */
-  function meshChair(P, y, col, pad) {
+  function meshChair(P, y, col, pad, L) {
     const HW = 0.225, HD = 0.215;        // half across, half fore-and-aft
     const SEAT = y + 0.420;
     const bar = shade(col, 0.92);
     const dark = shade(col, 0.84);
-    // The seat frame: four rails round an open square.
-    boxIn(P, -HW, HW, -HD, -HD + 0.038, SEAT, SEAT + 0.038, col);
-    boxIn(P, -HW, HW, HD - 0.038, HD, SEAT, SEAT + 0.038, col);
-    boxIn(P, -HW, -HW + 0.038, -HD, HD, SEAT, SEAT + 0.038, col);
-    boxIn(P, HW - 0.038, HW, -HD, HD, SEAT, SEAT + 0.038, col);
+    // ── SMOOTH, 28 Sep 2026 ─────────────────────────────────────────────────
+    //
+    // Misha, standing on this terrace: *"can u declutter the lawn chairs and
+    // stuff, make it cleaner, higher resolution?"* This chair was thirty-two
+    // boxes and it read as thirty-two boxes: a seat frame of four square
+    // sticks butted at the corners, a back of flat bars standing off a flat
+    // rail, and arms that were a plank on a post. The thing in
+    // `20260823_111954` is ONE moulding — a rounded frame that runs round the
+    // seat, up the back and over the top without a corner anywhere, arms that
+    // are a bent bar, and a mesh of round strands. So it is swept tubes now
+    // (`tubeTS`, smooth normals, bent through `bendPath`), the same move the
+    // konoba's stools made in 1.539.11, and the pad is a cushion with its
+    // edges rolled (`knRR`).
+    //
+    // EVERY NUMBER IS THE OLD ONE. `sitGeo` reads this chair as boxes — the
+    // seat at 0.420 and its pad to 0.506, the back raked 0.155, the arms at
+    // 0.61–0.646 — and the settle (1.538.0), the hose (1.540.0) and the hands
+    // on the table (1.539.9) all lean on those boxes. The tubes are laid on
+    // the same centre lines the boxes had, so nobody's backside or elbow moves.
+    //
+    // `L` is `P` without the last step into the world — the chair's frame in
+    // (t, s, y) — because `tubeTS` sweeps in the shore frame.
+    const AX = (() => { const a = L(0, 0, 0), c = L(1, 0, 0); return [c[0] - a[0], c[1] - a[1], 0]; })();
+    const FA = (() => { const a = L(0, 0, 0), c = L(0, 1, 0); return [c[0] - a[0], c[1] - a[1], 0]; })();
+    const UP = [0, 0, 1];
+    const tube = (pts, r, c, sides, ref) => tubeTS(pts.map((p) => L(p[0], p[1], p[2])), r, c, sides, ref);
+    const STRAND = [0.0070, 0.0082];     // a mesh strand: round-ish, 15 mm
+    // The seat frame: one rounded loop, where it was four sticks.
+    const fr = 0.019;
+    tube(bendPath([[-HW + fr, -HD + fr, SEAT + fr], [HW - fr, -HD + fr, SEAT + fr],
+      [HW - fr, HD - fr, SEAT + fr], [-HW + fr, HD - fr, SEAT + fr]], 0.05, 4, true),
+    fr, col, 8, UP);
     // and the mesh across it, two layers crossing, both inside the frame's
-    // depth so the rails still read as rails.
+    // depth so the frame still reads as the frame.
     for (let i = 1; i < 5; i++) {
       const u = -HW + 2 * HW * (i / 5);
-      boxIn(P, u - 0.008, u + 0.008, -HD, HD, SEAT + 0.006, SEAT + 0.019, bar);
+      tube([[u, -HD + 0.028, SEAT + 0.0125], [u, HD - 0.028, SEAT + 0.0125]], STRAND, bar, 6, UP);
     }
     for (let i = 1; i < 5; i++) {
       const v = -HD + 2 * HD * (i / 5);
-      boxIn(P, -HW, HW, v - 0.008, v + 0.008, SEAT + 0.018, SEAT + 0.031, bar);
+      tube([[-HW + 0.028, v, SEAT + 0.0245], [HW - 0.028, v, SEAT + 0.0245]], STRAND, bar, 6, UP);
     }
-    // The back, raked, in its own sheared frame: `ds` grows with height so the
-    // panel leans away from the sitter instead of standing plumb.
+    // The back, raked: `ds` grows with height so the panel leans away from
+    // the sitter instead of standing plumb.
     const RAKE = 0.155;
-    const B = (dt, h, dv) => P(dt, HD - 0.019 + RAKE * h + (dv || 0), SEAT + 0.038 + h);
     const H = 0.415;
-    const post2 = (dt) => {
-      for (let k = 0; k < 4; k++) {
-        const h0 = H * (k / 4), h1 = H * ((k + 1) / 4);
-        const A = B(dt - 0.019, h0), C = B(dt + 0.019, h0);
-        const D = B(dt + 0.019, h1), E = B(dt - 0.019, h1);
-        b.quad(A, C, D, E, col);
-        b.quad(E, D, C, A, col);
-      }
-    };
-    post2(-HW + 0.019); post2(HW - 0.019);
-    // the top rail, which is the thing a hand goes on
-    for (let k = 0; k < 1; k++) {
-      const A = B(-HW, H), C = B(HW, H), D = B(HW, H, 0.030), E = B(-HW, H, 0.030);
-      b.quad(A, C, D, E, col);
-      const A2 = B(-HW, H - 0.042), C2 = B(HW, H - 0.042);
-      b.quad(A2, C2, C, A, col);
-      b.quad(E, D, B(HW, H - 0.042, 0.030), B(-HW, H - 0.042, 0.030), col);
-    }
+    const Bk = (dt, h, dv = 0) => [dt, HD - 0.019 + RAKE * h + dv, SEAT + 0.038 + h];
+    // Both posts and the top rail — the thing a hand goes on — as the one
+    // bent bar they are, rising out of the seat frame's back corners.
+    tube(bendPath([Bk(-HW + 0.019, -0.02), Bk(-HW + 0.019, H - 0.021),
+      Bk(HW - 0.019, H - 0.021), Bk(HW - 0.019, -0.02)], 0.07, 5), 0.019, col, 8, FA);
     // the mesh in the back: uprights, then crossbars over them
     for (let i = 1; i < 5; i++) {
       const u = -HW + 2 * HW * (i / 5);
-      for (let k = 0; k < 2; k++) {
-        const h0 = H * (k / 2), h1 = H * ((k + 1) / 2) - 0.001;
-        b.quad(B(u - 0.008, h0), B(u + 0.008, h0), B(u + 0.008, h1), B(u - 0.008, h1), bar);
-        b.quad(B(u - 0.008, h1, 0.013), B(u + 0.008, h1, 0.013),
-          B(u + 0.008, h0, 0.013), B(u - 0.008, h0, 0.013), bar);
-      }
+      tube([Bk(u, -0.01), Bk(u, H - 0.03)], STRAND, bar, 6, AX);
     }
     for (let i = 1; i < 4; i++) {
       const h = H * (i / 4);
-      b.quad(B(-HW, h - 0.008, 0.014), B(HW, h - 0.008, 0.014),
-        B(HW, h + 0.008, 0.014), B(-HW, h + 0.008, 0.014), bar);
-      b.quad(B(HW, h + 0.008, 0.026), B(-HW, h + 0.008, 0.026),
-        B(-HW, h - 0.008, 0.026), B(HW, h - 0.008, 0.026), bar);
+      tube([Bk(-HW + 0.03, h, 0.013), Bk(HW - 0.03, h, 0.013)], STRAND, bar, 6, UP);
     }
     // The cushion, on the ones that have one.
     //
@@ -7522,31 +7596,178 @@ async function buildJadrija(scene) {
     // a set somebody bought rather than as stacking chairs. It sits ON the
     // mesh, inset a hair so the seat frame still shows round it, and it is
     // 55 mm thick: a garden cushion is thin and this is the sort of number
-    // that reads as a mattress if it is guessed generously.
+    // that reads as a mattress if it is guessed generously. Its corners and
+    // its top edge are rolled now, which is what a sewn pad does and what a
+    // box never did.
     if (pad) {
-      boxIn(P, -HW + 0.022, HW - 0.022, -HD + 0.024, HD - 0.024,
-        SEAT + 0.031, SEAT + 0.086, pad, shade(pad, 1.14));
+      knRR(P, -HW + 0.022, HW - 0.022, -HD + 0.024, HD - 0.024,
+        SEAT + 0.031, SEAT + 0.086, 0.045, 0.022, pad, shade(pad, 1.10), { bottom: true });
     }
-    // The arms. Square section, and they are half of why this is not a
-    // monobloc: a moulded garden chair has none.
+    // The arms. They are half of why this is not a monobloc — a moulded
+    // garden chair has none — and each is one bar: out of the back post, along
+    // at elbow height, and bent down at the front into the seat frame.
     for (const sgn of [-1, 1]) {
       const u = sgn * (HW - 0.012);
-      boxIn(P, u - 0.021, u + 0.021, -HD + 0.02, HD - 0.01,
-        SEAT + 0.190, SEAT + 0.226, col);
-      // the front support down to the leg head
-      boxIn(P, u - 0.019, u + 0.019, -HD + 0.02, -HD + 0.056,
-        SEAT + 0.038, SEAT + 0.190, col);
+      tube(bendPath([[u, HD + 0.008, SEAT + 0.208], [u, -HD + 0.038, SEAT + 0.208],
+        [u, -HD + 0.038, SEAT + 0.030]], 0.055, 5), [0.021, 0.018], col, 10, AX);
     }
-    // Tapered round legs, splayed. `lathe` takes the lean in the profile, so
-    // each is one call rather than a stack of cones nobody can line up.
+    // Tapered round legs, splayed, each on a black glide.
     for (const [ot, os] of [[-HW + 0.03, -HD + 0.03], [HW - 0.03, -HD + 0.03],
       [-HW + 0.03, HD - 0.03], [HW - 0.03, HD - 0.03]]) {
       const lt = Math.sign(ot) * 0.035, ls = Math.sign(os) * 0.030;
-      lathe(P, ot, os, [
-        [y + 0.002, 0.0155, lt, ls],
-        [y + 0.16, 0.0185, lt * 0.55, ls * 0.55],
-        [SEAT + 0.030, 0.0215, 0, 0],
-      ], dark, 7);
+      tube([[ot + lt, os + ls, y + 0.010], [ot + lt * 0.55, os + ls * 0.55, y + 0.16],
+        [ot, os, SEAT + 0.030]], (k) => [0.0155, 0.0185, 0.0215][k], dark, 10, AX);
+      knLathe(P, ot + lt, os + ls, [[y + 0.001, 0.0165], [y + 0.010, 0.0175],
+        [y + 0.014, 0]], [0.062, 0.060, 0.058], 10);
+    }
+  }
+
+  /**
+   * A polyline with every interior corner replaced by a bend — a quadratic
+   * through the corner, `rad` along each leg from it, in `n` steps — so a tube
+   * swept along it is bent tubing and not two tubes meeting at a mitre.
+   * Points are any three numbers; `closed` joins the last to the first and
+   * repeats the first point at the end, and the seam then falls in the middle
+   * of a straight run where both sides of it have the same tangent.
+   * `rad` may be a list, one per point.
+   */
+  function bendPath(pts, rad, n = 4, closed = false) {
+    const N = pts.length, out = [];
+    for (let i = 0; i < N; i++) {
+      const P = pts[i];
+      if (!closed && (i === 0 || i === N - 1)) { out.push(P); continue; }
+      const A = pts[(i - 1 + N) % N], C = pts[(i + 1) % N];
+      const da = [A[0] - P[0], A[1] - P[1], A[2] - P[2]];
+      const dc = [C[0] - P[0], C[1] - P[1], C[2] - P[2]];
+      const la = Math.hypot(da[0], da[1], da[2]) || 1, lc = Math.hypot(dc[0], dc[1], dc[2]) || 1;
+      const r = Math.min(typeof rad === 'number' ? rad : rad[i], la * 0.49, lc * 0.49);
+      const p0 = [0, 1, 2].map((k) => P[k] + da[k] / la * r);
+      const p1 = [0, 1, 2].map((k) => P[k] + dc[k] / lc * r);
+      for (let k = 0; k <= n; k++) {
+        const f = k / n, a = (1 - f) * (1 - f), m = 2 * f * (1 - f), c = f * f;
+        out.push([0, 1, 2].map((q) => a * p0[q] + m * P[q] + c * p1[q]));
+      }
+    }
+    if (closed) out.push(out[0]);
+    return out;
+  }
+
+  /**
+   * A bar of section `sec` — `[v, w]` points round it, closed — swept
+   * straight from `u0` to `u1` through `M(u, v, w)`, smooth round the section
+   * and capped at both ends. A lounger slat, a rail with a rolled top: the
+   * cheap way to a rounded edge on something long and thin, at a fraction of
+   * what `knRR` spends on corners nobody sees.
+   */
+  function barSweep(M, u0, u1, sec, col) {
+    const G = [u0, u1].map((u) => sec.map(([v, w]) => M(u, v, w)));
+    let cv = 0, cw = 0;
+    for (const [v, w] of sec) { cv += v / sec.length; cw += w / sec.length; }
+    knSurf(G, col, { wrap: true, out: (i) => M(i ? u1 : u0, cv, cw) });
+    const O = M(0, cv, cw), E = M(1, cv, cw);
+    const du = [E[0] - O[0], E[1] - O[1], E[2] - O[2]];
+    const dl = Math.hypot(du[0], du[1], du[2]) || 1;
+    for (const [u, sg] of [[u0, -1], [u1, 1]]) {
+      const N = [sg * du[0] / dl, sg * du[1] / dl, sg * du[2] / dl];
+      const C = M(u, cv, cw);
+      for (let j = 0; j < sec.length; j++) {
+        const a = sec[j], c = sec[(j + 1) % sec.length];
+        knTri(C, M(u, a[0], a[1]), M(u, c[0], c[1]), N, col);
+      }
+    }
+  }
+
+  /**
+   * One of beach bar MINI's yellow sun loungers, drawn to be stood beside.
+   *
+   * `lounger` (below, with the bathing station's) is nine boxes and a parasol
+   * is a cone, and for forty of them seen along a beach that is the right
+   * amount of lounger. These three are the ones in front of a bar you walk up
+   * to, and Misha looked at them from two metres: *"make it cleaner, higher
+   * resolution"*. So the frame is one white tube bent round the whole bed —
+   * foot, both rails, the knee and the head — the slats are rolled-edged and
+   * laid along the bend with daylight between them, it runs on two wheels at
+   * the head end the way every stacking lounger on this coast does, and it
+   * has a pad for the head.
+   *
+   * Same frame convention as `lounger`: `ang` 0 puts the raised back inland,
+   * so whoever is on it faces the sea. Same footprint, near enough: 1.9 m by
+   * 0.64.
+   */
+  function loungerMini(t, s, y, ang, col) {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    const L = (dt, ds, yy) => [t + dt * c - ds * sn, s + dt * sn + ds * c, yy];
+    const P = (dt, ds, yy) => W(t + dt * c - ds * sn, s + dt * sn + ds * c, yy);
+    const FRAME = [0.740, 0.735, 0.720];
+    const TYRE = [0.090, 0.090, 0.095], HUB = [0.560, 0.560, 0.560];
+    const PAD = [0.760, 0.750, 0.720];
+    const AX = [c, sn, 0], UP = [0, 0, 1];
+    const RW = 0.30;                     // rail centre off the middle
+    // The rail's centre line, [ds, height]: flat from the foot to the knee,
+    // then bent up to about 36 degrees for the back.
+    const prof = bendPath([[-0.95, 0.330, 0], [0.40, 0.360, 0], [0.88, 0.715, 0]], 0.16, 6);
+    const segs = [];
+    let total = 0;
+    for (let i = 0; i < prof.length - 1; i++) {
+      const Lk = Math.hypot(prof[i + 1][0] - prof[i][0], prof[i + 1][1] - prof[i][1]);
+      segs.push(Lk); total += Lk;
+    }
+    // Position and unit tangent at arc length `d` along it.
+    const along = (d) => {
+      let k = 0;
+      while (k < segs.length - 1 && d > segs[k]) { d -= segs[k]; k++; }
+      const f = clamp(d / segs[k], 0, 1);
+      const A = prof[k], B = prof[k + 1];
+      return [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f,
+        (B[0] - A[0]) / segs[k], (B[1] - A[1]) / segs[k]];
+    };
+    // A frame lying on the bed at `d`: u across, v along it, w out of it.
+    const bed = (d, w0) => {
+      const [ds0, h0, tv, th] = along(d);
+      return (u, v, w) => P(u, ds0 + tv * v - th * (w + w0), y + h0 + th * v + tv * (w + w0));
+    };
+
+    // The frame: one loop of 34 mm tube, foot to head and back.
+    const K = (dt, ds, h) => [dt, ds, y + h];
+    tubeTS(bendPath([K(-RW, 0.88, 0.715), K(-RW, 0.40, 0.360), K(-RW, -0.95, 0.330),
+      K(RW, -0.95, 0.330), K(RW, 0.40, 0.360), K(RW, 0.88, 0.715)],
+    [0.05, 0.16, 0.07, 0.07, 0.16, 0.05], 6, true).map((p) => L(p[0], p[1], p[2])),
+    0.017, FRAME, 10, UP);
+    // The slats, rolled on top, 62 mm with 30 of daylight — the daylight is
+    // the whole reason a lounger reads as furniture and not as a plank.
+    const SLAT = [[-0.031, -0.008], [0.031, -0.008], [0.031, 0.003], [0.028, 0.008],
+      [0.022, 0.010], [-0.022, 0.010], [-0.028, 0.008], [-0.031, 0.003]];
+    for (let d = 0.07; d < total - 0.05; d += 0.092) {
+      barSweep(bed(d, 0.004), -RW + 0.017, RW - 0.017, SLAT, col);
+    }
+    // The head pad, strapped over the top of the back.
+    knRR(bed(total - 0.15, 0.012), -0.20, 0.20, -0.10, 0.10, 0, 0.045, 0.05, 0.020,
+      PAD, shade(PAD, 1.06));
+    // Two legs at the foot, splayed a little so it does not read as a table,
+    // on rubber shoes.
+    for (const sg of [-1, 1]) {
+      tubeTS([L(sg * RW, -0.80, y + 0.330), L(sg * (RW + 0.025), -0.86, y + 0.012)],
+        0.016, FRAME, 10, AX);
+      knLathe(P, sg * (RW + 0.025), -0.86, [[y + 0.001, 0.021], [y + 0.016, 0.021],
+        [y + 0.022, 0]], TYRE, 10);
+    }
+    // And two at the head, down to the wheels.
+    const WR = 0.068, WS = 0.36;
+    for (const sg of [-1, 1]) {
+      tubeTS([L(sg * RW, 0.30, y + 0.352), L(sg * RW, WS, y + WR)], 0.016, FRAME, 10, AX);
+      const wt = sg * (RW + 0.034);
+      const RING = [[-0.015, 0], [-0.015, 0.030], [-0.015, 0.046], [-0.013, 0.063],
+        [-0.007, WR], [0.007, WR], [0.013, 0.063], [0.015, 0.046], [0.015, 0.030], [0.015, 0]];
+      const G = RING.map(([x, r]) => {
+        const row = [];
+        for (let i = 0; i < 16; i++) {
+          const a = (i / 16) * TAU;
+          row.push(P(wt + x, WS + Math.cos(a) * r, y + WR + Math.sin(a) * r));
+        }
+        return row;
+      });
+      knSurf(G, (i) => (RING[i][1] < 0.04 ? HUB : TYRE),
+        { wrap: true, out: () => P(wt, WS, y + WR) });
     }
   }
 
@@ -7566,22 +7787,33 @@ async function buildJadrija(scene) {
     const BLACK = [0.108, 0.106, 0.110];
     const TOP = [0.138, 0.134, 0.132];
     const RIB = [0.086, 0.084, 0.088];
-    // The base: a low disc with a chamfer, and the ribs standing on it.
-    lathe(W, t, s, [[y + 0.004, 0.300], [y + 0.030, 0.300],
-      [y + 0.050, 0.245], [y + 0.062, 0.120]], BLACK, 14);
+    // Smooth, 28 Sep 2026 — see the note in `meshChair`. It was fourteen,
+    // ten and sixteen flat facets: a disc with a visible polygon for an edge
+    // and a column that was a hexagonal pencil. Turned now (`knLathe`, which
+    // takes its normals off the surface and not the facet), with the same
+    // radii and the same heights — the top is still the 0.62 m disc at
+    // 0.690–0.722 that `sitGeo` and the hands on it (1.539.9) are built on.
+    //
+    // The base: a low disc with its edge rolled and a chamfer up to the boss.
+    knLathe(W, t, s, [[y + 0.002, 0.294], [y + 0.008, 0.301], [y + 0.022, 0.302],
+      [y + 0.030, 0.294], [y + 0.044, 0.250], [y + 0.056, 0.160], [y + 0.062, 0.100],
+      [y + 0.066, 0.060], [y + 0.066, 0]], BLACK, 32);
+    // The ribs, standing on the chamfer — what makes the base read as cast
+    // rather than as a hockey puck. Rounded in plan.
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * TAU;
       const c = Math.cos(a), sn = Math.sin(a);
       const Q = (dt, ds, yy) => W(t + dt * c - ds * sn, s + dt * sn + ds * c, yy);
-      boxIn(Q, 0.085, 0.285, -0.014, 0.014, y + 0.028, y + 0.058, RIB);
+      knRR(Q, 0.085, 0.285, -0.014, 0.014, y + 0.028, y + 0.058, 0.012, 0, RIB);
     }
-    // The column, and a collar under the top.
-    lathe(W, t, s, [[y + 0.055, 0.052], [y + 0.660, 0.046],
-      [y + 0.690, 0.100]], BLACK, 10);
-    // The top: 0.62 m across, 0.030 thick, with a rolled edge.
-    lathe(W, t, s, [[y + 0.690, 0.310], [y + 0.706, 0.318],
-      [y + 0.722, 0.310]], TOP, 16);
-    lathe(W, t, s, [[y + 0.722, 0.310], [y + 0.722, 0]], TOP, 16);
+    // The column, flaring into a collar under the top.
+    knLathe(W, t, s, [[y + 0.055, 0.056], [y + 0.080, 0.049], [y + 0.620, 0.045],
+      [y + 0.645, 0.049], [y + 0.662, 0.078], [y + 0.678, 0.100], [y + 0.690, 0.104]],
+    BLACK, 20);
+    // The top: 0.62 m across, with a rounded bullnose edge and an underside.
+    knLathe(W, t, s, [[y + 0.688, 0.100], [y + 0.688, 0.292], [y + 0.690, 0.304],
+      [y + 0.695, 0.313], [y + 0.703, 0.318], [y + 0.712, 0.318], [y + 0.718, 0.314],
+      [y + 0.721, 0.306], [y + 0.722, 0.294], [y + 0.722, 0]], TOP, 40);
   }
 
   /**
@@ -7658,8 +7890,10 @@ async function buildJadrija(scene) {
         // `terraceSet` is called per set and an index would put the same chair
         // in the same corner of every set on the boardwalk.
         const dk = jit(((ct * 13 + cs * 29) * 8) | 0, 812) < 0.46;
-        if (dk) meshChair(P, y, MESH_DK, MESH_PAD);
-        else meshChair(P, y, col || seat);
+        // The same frame short of the world, for the chair's swept tubes.
+        const L = (dt, ds, yy) => [ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy];
+        if (dk) meshChair(P, y, MESH_DK, MESH_PAD, L);
+        else meshChair(P, y, col || seat, null, L);
       } else {
         const v0 = b.count();
         boxIn(P, -0.24, 0.24, -0.23, 0.23, y + 0.40, y + 0.46, col || seat);
@@ -15951,10 +16185,23 @@ async function buildJadrija(scene) {
             if (u1 <= u0) continue;
             const v0 = near ? -PL : PL - W2, v1 = near ? -PL + W2 : PL;
             const y0b = y + c * BH, y1b = y + (c + 1) * BH - 0.008;
-            if (along) boxTS(t + u0, t + u1, s + v0, s + v1, y0b, y1b, col,
-              shade(col, 1.08));
-            else boxTS(t + v0, t + v1, s + u0, s + u1, y0b, y1b, col,
-              shade(col, 1.08));
+            // CAST, NOT CUT. Misha, 28 Sep 2026, on this terrace: *"make it
+            // cleaner, higher resolution"* — and these were the "blocky
+            // stacked stone walls" in his frame: thirty-six sharp-edged boxes
+            // a plinth, every one of them square to the millimetre and set
+            // dead in line with its neighbour. A precast block has its arrises
+            // rounded off by the mould and by twenty summers of chairs being
+            // dragged over it, and no two in a stack sit exactly where the
+            // mason meant. So each is a slab with its corners and top edge
+            // rolled (`knRR`), nudged a few millimetres and a hair out of
+            // level off its own `jit`.
+            const jk = c * 17 + e * 5 + i + (t | 0);
+            const nt = (jit(jk, 641) - 0.5) * 0.008, ns = (jit(jk, 642) - 0.5) * 0.008;
+            const ny = (jit(jk, 643) - 0.5) * 0.004;
+            if (along) knRR(W, t + u0 + nt, t + u1 + nt, s + v0 + ns, s + v1 + ns,
+              y0b, y1b + ny, 0.014, 0.011, col, shade(col, 1.08));
+            else knRR(W, t + v0 + nt, t + v1 + nt, s + u0 + ns, s + u1 + ns,
+              y0b, y1b + ny, 0.014, 0.011, col, shade(col, 1.08));
           }
         }
       }
@@ -29637,9 +29884,37 @@ async function buildJadrija(scene) {
         const y0 = at((S.t0 + S.t1) * 0.5).deck;
         // Yellow sling deckchairs. Every frame of this terrace has them and
         // nothing else on the shore is that colour.
+        //
+        // ── AND NOT IN AMONG THE TABLES ─────────────────────────────────────
+        //
+        // Misha, 28 Sep 2026, standing on this terrace: *"note the clutter
+        // here, can u declutter the lawn chairs and stuff, make it cleaner"*.
+        // These three were laid at t 273.4, 274.9 and 276.4, s 13.6 and 12.9,
+        // at a skew of −0.22 to +0.14 — which is straight through the two
+        // western café sets, whose tables stand at s 13.8 and 14.6 with a ring
+        // of chairs 0.72 m round them. One lounger ran under a table and
+        // between its chairs, another crossed the terrace on the diagonal,
+        // and a woman sat in an armchair with its legs either side of a
+        // lounger rail. None of them had a collider, so you walked through
+        // them as well.
+        //
+        // A lounger is not café furniture. It goes where you lie in the sun
+        // looking at the water, which on this frontage is the middle terrace
+        // — the bathing platform one step down from the promenade, s 3.6 to
+        // 8.4, empty the whole width of MINI. So: three in a row, square to
+        // the shore at 1.5 m centres, centred on the bar, backs to the bar
+        // and feet to the sea, 1.1 m clear of the riser. Solid now (the
+        // bathing station's `solid(…, 0.32, 0.895, 0.7)`, on their own
+        // floor). Drawn by `loungerMini` rather than the station's `lounger`
+        // — see the note there.
+        //
+        // Nothing here draws on `rng`, so moving them moves nothing else.
         for (let k = 0; k < 3; k++) {
-          lounger(S.t0 + 1.4 + k * 1.5, S.s0 - 4.4 - (k % 2) * 0.7, y0,
-            -0.22 + k * 0.18, [0.680, 0.560, 0.075]);
+          const lt = (S.t0 + S.t1) * 0.5 + (k - 1) * 1.5;
+          const ls = JAD.mid - 2.0;
+          const ly = surfaceY(lt, ls);
+          loungerMini(lt, ls, ly, 0, [0.680, 0.560, 0.075]);
+          furniture.push({ t: lt, s: ls - 0.035, a: 0.34, c: 0.93, h: 0.72, y: ly });
         }
         for (let k = 0; k < 5; k++) {
           agave(S.t0 + 5.9 + k * 0.25, S.s0 - 3.6, y0 + 0.86,
