@@ -208,6 +208,15 @@ function rigSkeleton(rig) {
   // off the underside of its own thighs, because a heavy woman sits higher on
   // her thighs than a lean man and a figure told otherwise sits in the slab.
   f.sitY = rig.sitHip != null ? rig.sitHip : f.restY - 0.72;
+  // And how far a shin laid out along the ground falls from a level thigh to
+  // the heel, for the quay sitters (1.538.2 — see `legRestOf` in
+  // 43-settle.js). This rig has no ankle, so the knee's bind height stands in
+  // for the shin and the ankle over the ground is 3.9 % of stature (Drillis
+  // and Contini's table). About six degrees on every body.
+  const kn = rig.parts ? rig.parts.findIndex((p) => p.name === 'legLL') : -1;
+  const H = rig.height || 1.7;
+  const shin = kn >= 0 && rig.bind ? rig.bind[kn][1] - 0.039 * H : 0.43;
+  f.shinDrop = Math.asin(Math.max(0, Math.min(0.5, (f.sitY - 0.039 * H) / Math.max(0.2, shin))));
   return f;
 }
 
@@ -1207,6 +1216,12 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     // Sat down into their seat, or not sitting — see `sitLayer`.
     if (settler && fg.mode === 'sit') sitLayer(fg, f, want, dt);
     else if (f.sitL && f.sitL.on) { f.settle(null); f.sitL.on = false; f.sitL.who = null; }
+    // And a quay sitter's legs out along the concrete, over their quay clip
+    // and nothing else — see `legRestOf` in 43-settle.js. Written every time
+    // they are drawn, because the mesh outlives whoever is sitting on it.
+    const legs = fg.ground && fg.mode === 'sit' && QUAYED.includes(f.playing()) && f.legs
+      ? legRestFor(fg, f) : null;
+    if (legs || f.legsOn) { if (f.legs) f.legs(legs); f.legsOn = !!legs; }
     // The same head turn the instanced tier does in `pose`, and the same two
     // numbers written from outside — see the note there. `aim` is in figure
     // space, where +y is up, so an extra yaw about +y is exactly what
@@ -1491,6 +1506,17 @@ function makeCrowd(scene, bodies, cap) {
         const sr = 0.70 + fg.seed * 0.70;
         skel.legLL.rotation.z = -1.50 - dth + Math.sin(ph * 0.62 * sr) * 0.19;
         skel.legRL.rotation.z = -1.46 - dth + Math.sin(ph * 0.55 * sr + 2.1) * 0.17;
+        // EXCEPT ON THE QUAY, where nobody's shins hang over anything: the
+        // quay sitters sit side-on to the water on the flat of the lowest
+        // platform, and the pose above put both shins 0.3 m down into it —
+        // *"their legs should be on the cement"* (Misha, 28 Sep 2026). So
+        // their shins go on along the thighs and down to the heel
+        // (`shinDrop`), still: legs lying on concrete do not swing. The same
+        // legs the near tier lays out, from fifty metres.
+        if (fg.ground) {
+          skel.legLL.rotation.z = -skel.shinDrop;
+          skel.legRL.rotation.z = -skel.shinDrop;
+        }
         // The trunk rocks slowly over the hips, which is what you do when there
         // is nothing behind you to lean on.
         skel.torso.rotation.z = -0.14 + Math.sin(ph * 0.24 * sr) * 0.085;

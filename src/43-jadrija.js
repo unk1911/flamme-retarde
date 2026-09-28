@@ -22272,7 +22272,21 @@ async function buildJadrija(scene) {
       // Drawn before the call rather than inside it, because `surfaceY` wants
       // the offset and the order of the draws off `rng` is the beach layout.
       const bs = 5.0 + rng() * 4.0;
-      B(t, bs, surfaceY(t, bs), Math.PI + (rng() - 0.5) * 1.4, 'stand', 1);
+      const who = B(t, bs, surfaceY(t, bs), Math.PI + (rng() - 0.5) * 1.4, 'stand', 1);
+      // AND NOT HER. Misha, 28 Sep 2026, of a woman standing on the middle
+      // terrace at t 366.8 with the fish gable behind her: *"this one bather
+      // seems to have her right arm stuck in the cement ... just remove her
+      // completely."* The terrace's riser — the wall up to the deck, at
+      // `JAD.mid` — was 0.10 m behind her shoulder, and her arms go out further
+      // than that every time she stretches. She is the only person this
+      // stride puts within a hand's breadth of it.
+      //
+      // Still placed, and hidden (`b.hidden`), rather than never placed, for
+      // RULE 4: her draw here, her deal of a body (`castBlob`, round the shore
+      // in order of `t`) and every draw the casting loop takes for her are
+      // all still taken, so nobody else moves, changes body or changes
+      // colour. She is simply never drawn, never solid and never a target.
+      if (who && bs < JAD.mid && JAD.mid - bs < 0.25) who.hidden = true;
     }
   }
 
@@ -22285,6 +22299,13 @@ async function buildJadrija(scene) {
     // 0.55 m in, not 1.25: the thigh reaches about 0.43 m forward of the hip,
     // so this is where the knee lands on the lip of the quay and the shins
     // genuinely hang over the water rather than over more concrete.
+    //
+    // THEY NEVER DID. `ang` is a bearing off the shore's +t (`rigYaw`), so
+    // Math.PI faces them straight down the shore, side-on to the water, and
+    // their shins went down into the concrete in front of them — Misha, 28
+    // Sep 2026: *"their legs should be on the cement"*. Where and which way
+    // they sit is left alone (every draw, every position); their legs lie
+    // out along the slab instead. See `legRestOf` in 43-settle.js.
     if (r < 0.44) B(t, 0.55, y, Math.PI, 'sit', r < 0.10 ? 0.66 : 1);
     else if (r < 0.60) B(t, 2.2 + rng() * 1.4, y, rng() * TAU, 'stand', 1);
     else if (r < 0.70) B(t, -0.9, -0.55, Math.PI, 'wade', r < 0.655 ? 0.66 : 1);
@@ -25139,18 +25160,19 @@ async function buildJadrija(scene) {
     };
     const A = fg.sitAt;
     if (!A) {
-      // The quay: nothing but the concrete they sit on and the steps down in
-      // front of them. Every one of them is placed facing straight down the
-      // shore's −s (`B(t, 0.55, y, Math.PI, 'sit')`), so their own +x is −s
-      // and the ground under them is a profile in that one direction —
-      // `surfaceY` sampled every 2 cm and read back by the nearest, so a step
-      // stays a step. (THE LIP IS NOT AT s 0, which is what this assumed
-      // first: photographed from the side, the sitters are on the flat of
-      // the lowest platform with a step a shin's length in front of them.)
+      // The quay: nothing but the concrete they sit on. Every one of them is
+      // placed `B(t, 0.55, y, Math.PI, 'sit')`, and `ang` is a bearing off the
+      // shore's +t (`rigYaw`), so their own +x is −t — straight down the
+      // shore, side-on to the water — and the ground under them is a profile
+      // in that one direction: `surfaceY` sampled every 2 cm and read back by
+      // the nearest, so a step stays a step. (This read −s until 1.538.2,
+      // which is where the clip's hanging legs were meant to go. The profile
+      // was flat either way; see `legRestOf` in 43-settle.js for what being
+      // side-on to the water meant for their shins.)
       if (fg.mode !== 'sit') return null;
       const hs = fg.hscale || 1, x0 = -1.0, dx = 0.02, n = 131;
       const prof = new Float64Array(n);
-      for (let i = 0; i < n; i++) prof[i] = (surfaceY(fg.t, fg.lane - (x0 + i * dx) * hs) - fg.y) * k;
+      for (let i = 0; i < n; i++) prof[i] = (surfaceY(fg.t - (x0 + i * dx) * hs, fg.lane) - fg.y) * k;
       const floor = (x) => prof[Math.max(0, Math.min(n - 1, Math.round((x - x0) / dx)))];
       return { boxes, floor, back: false };
     }
@@ -35913,6 +35935,7 @@ async function buildJadrija(scene) {
     for (let i = 0; i < bathers.length; i++) {
       if (castBlob[i] < 0) continue;         // no face, no voice
       const b = bathers[i];
+      if (b.hidden) continue;                // not on the shore at all
       const dt = b.t - show.pt, ds = b.s - show.ps;
       const d2 = dt * dt + ds * ds;
       if (d2 > 26 * 26) continue;            // further than a branch throws
@@ -52397,6 +52420,10 @@ async function buildJadrija(scene) {
       seat: b.seat,
       // And the chair and table under them, for the settle — see `sitGeo`.
       sitAt: b.sitAt || null,
+      // Sitting on the concrete itself, which is every sitter not in a chair:
+      // the quay's. Their legs lie out along it on both tiers — see
+      // `legRestOf` in 43-settle.js and the `sit` case in 42-crowd.js.
+      ground: b.pose === 'sit' && !b.chair,
       seed: rng(),
       // The height jitter, off one draw and spent on both tiers below. It was
       // 0.94 to 1.07, which on the instanced rig's canonical 1.70 m is 1.60 m
@@ -52507,6 +52534,10 @@ async function buildJadrija(scene) {
     // copied over — `fg.phone` was left behind on the first cut and the
     // symptom was twelve people marked as holding one and nought drawn.
     if (b.phone) fg.phone = b.phone;
+    // Somebody taken off the shore (`b.hidden` — the woman against the
+    // riser at t 366.8): every draw above has been taken for her, and here
+    // she stops. No figure, no roving slot, no collider.
+    if (b.hidden) continue;
     C.figures.push(fg);
     if (roveOk) rove[fg.blob].push(fg);
     if (b.beat) walkers.push(fg);
