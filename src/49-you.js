@@ -967,17 +967,30 @@ async function buildYou(scene) {
   // does, hanging clear of the chest and catching a highlight off its own
   // curvature, and a painted one is a drawing of a necklace on a sternum.
   //
-  // A child of the figure and not of a bone. The hat needed the head bone
-  // because a head turns forty degrees to look at you; a chest in an idle
-  // moves a couple of millimetres, and a necklace that follows it exactly and
-  // one that does not are the same picture.
+  // Carried on her upper back bone, `spine03`, the way the hat is carried on
+  // the head — at the bone's head, turned by its turn since bind, with every
+  // number below still written in the bind pose. It used to be a child of the
+  // figure, on the argument that a chest in an idle moves a couple of
+  // millimetres and a necklace that follows it and one that does not are the
+  // same picture. True of an idle. Then she learned to crouch (1.539.4), the
+  // bow folds her back and chest forward and down by the best part of a
+  // quarter metre — and the cord stayed where a standing chest had been.
+  // Misha, 28 Sep: "when i (Chloe) crouch, the necklace doesn't seem to follow
+  // me it kinda sticks out weirdly" — two black lines in the air over her
+  // back, with the shells hanging off nothing.
+  //
+  // Not the neck bone, which the crouch turns the OTHER way to hold her head
+  // up: the cord lies on the base of the neck and the top of the chest, and
+  // both of those are `spine03`.
   //
   // The cord runs down from the nape, out round the collarbones, and meets
   // itself at a point 12 cm proud of the spine at bust height. Seven control
   // points and a Catmull-Rom through them, because the shape that matters is
   // the drape and a drape is a curve.
+  const chest = new THREE.Group();
+  mesh.add(chest);
   const chain = new THREE.Group();
-  mesh.add(chain);
+  chest.add(chain);
   chain.add(new THREE.Mesh(new THREE.TubeGeometry(
     new THREE.CatmullRomCurve3([
       new THREE.Vector3(-0.045, 1.495, -0.028),
@@ -1181,6 +1194,13 @@ async function buildYou(scene) {
   }
 
   const hi = fig.boneIndex('head');
+  // The necklace's bone, and where its head was in the bind pose — the offset
+  // that turns the cord's figure-space numbers into ones on the bone.
+  const ci = fig.boneIndex('spine03');
+  if (ci >= 0) {
+    const bt = fig.bindRest().bindT;
+    chain.position.set(-bt[ci * 3], -bt[ci * 3 + 1], -bt[ci * 3 + 2]);
+  }
   const at = new THREE.Vector3();
   const turn = new THREE.Quaternion();
   const dir = new THREE.Vector3();
@@ -1219,6 +1239,12 @@ async function buildYou(scene) {
       // the whole correction.
       fig.boneTurn(hi, turn);
       head.quaternion.copy(turn);
+    }
+    // The necklace, the same way and after the same `update` — so after the
+    // crouch, which 90-app.js has written into the pose by the time this runs.
+    if (ci >= 0) {
+      fig.boneAt(ci, chest.position);
+      fig.boneTurn(ci, chest.quaternion);
     }
     if (drive) {
       mesh.position.set(drive.at[0], drive.at[1], drive.at[2]);
@@ -1299,10 +1325,10 @@ async function buildYou(scene) {
       drive = o;
       mesh.visible = o.seen !== false;
       if (o.mask != null) { mask.visible = !!o.mask; hat.visible = !o.mask; }
-      // The cord comes off in the water, and that is a fix and not a costume
-      // note: it is a child of the figure rather than of a bone, hung for a
-      // body that is standing up, and on a swimmer it sails out sideways from
-      // the sternum like a length of wire. Nobody swims two hundred metres in
+      // The cord comes off in the water. That was a fix when it was a child
+      // of the figure rather than of a bone — on a swimmer it sailed out
+      // sideways from the sternum like a length of wire — and it rides her
+      // chest bone now, but it stays off: nobody swims two hundred metres in
       // a necklace either.
       chain.visible = !o.wet;
       if (o.clip && fig.playing() !== o.clip) {
