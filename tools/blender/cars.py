@@ -145,6 +145,35 @@ BOXC = (0.160, 0.165, 0.175)      # the roofbox, gloss charcoal
 RAILC = (0.240, 0.245, 0.255)     # roof rails, anodised
 SEAM = (0.300, 0.300, 0.300)      # a shut line: the paint, three times darker
 
+# ── the near tier (28 Sep, the second pass) ────────────────────────────────
+#
+# "Clearly better but still mid-detail, not photoreal" — and Misha: *"yes
+# improve cars more"*. Everything below is only in the NEAR blobs, the ones
+# drawn for a car within 40 m of the eye (see `build` and src/44-cars.js).
+#
+# The glass is the one that changes the most. A see-through pane is a byte of
+# data here and not a colour: the glass layer's shader reads the vertex colour
+# as how much light the pane lets through, so the windscreen and the front
+# door glass are nearly clear, as the law has them, and the rear side glass
+# and the backlight are the privacy tint every crossover leaves the factory
+# with. What you then see through them is the interior below.
+GLASSF = (0.640, 0.640, 0.640)    # transmits 64 %: windscreen, front doors
+GLASSR = (0.300, 0.300, 0.300)    # transmits 30 %: rear side glass, backlight
+CHROME = (0.860, 0.865, 0.875)    # badges, lug nuts, projector bowls
+LAMPIN = (0.500, 0.510, 0.530)    # the reflector a headlamp is, seen through its lens
+LED = (0.930, 0.935, 0.950)       # the daytime-running strip, unlit
+AMBER = (0.620, 0.330, 0.040)     # the indicator
+LENS = (0.030, 0.034, 0.040)      # a projector's lens, dark glass
+TAILHI = (0.640, 0.050, 0.040)    # the light bar across a tail lamp
+REVL = (0.700, 0.700, 0.710)      # the reversing lamp
+ROTOR = (0.360, 0.350, 0.340)     # a brake disc, machined and a bit rusty
+CALIPER = (0.120, 0.122, 0.130)   # the caliper over it, cast and painted
+LETTER = (0.125, 0.125, 0.130)    # the moulded lettering on a tyre wall
+SEAT = (0.040, 0.040, 0.044)      # cloth seats, charcoal
+DASH = (0.024, 0.024, 0.026)      # the dashboard, black soft-touch
+INK = (0.020, 0.020, 0.022)       # the characters on a plate
+HRRED = (0.620, 0.060, 0.050)     # the red squares of the šahovnica
+
 # Three blobs, not two. `body` is tinted per car; `gloss` is everything that
 # reflects like glass or polished metal — panes, lamp lenses, alloys, the gloss
 # black trim; `trim` is the matt remainder. They are three layers because they
@@ -168,6 +197,24 @@ BUCKETS = {
     "plate": (PLATE, False, "trim"),
     "eu": (EUBLUE, False, "trim"),
     "rail": (RAILC, True, "trim"),
+    # The near tier's own. `glass` in the blob column is a fourth blob, drawn
+    # transparent; everything else goes where its material says.
+    "glassF": (GLASSF, True, "glass"),
+    "glassR": (GLASSR, True, "glass"),
+    "chrome": (CHROME, True, "gloss"),
+    "lampin": (LAMPIN, True, "gloss"),
+    "led": (LED, True, "gloss"),
+    "amber": (AMBER, True, "gloss"),
+    "lens": (LENS, True, "gloss"),
+    "tailhi": (TAILHI, True, "gloss"),
+    "rev": (REVL, True, "gloss"),
+    "rotor": (ROTOR, False, "gloss"),
+    "caliper": (CALIPER, True, "trim"),
+    "letter": (LETTER, False, "trim"),
+    "seat": (SEAT, True, "trim"),
+    "dash": (DASH, True, "trim"),
+    "ink": (INK, False, "trim"),
+    "hrred": (HRRED, False, "trim"),
 }
 
 
@@ -200,11 +247,27 @@ def sill_at(spec, x):
     """
     lo, hi, span = spec["sill"], spec["arch"], spec["arch_span"]
     z = lo
-    for ax in spec["axles"]:
-        d = abs(x - ax)
-        if d < span:
-            u = 1.0 - (d / span) ** 2
-            z = max(z, lo + (hi - lo) * u)
+    if spec.get("cover_hem"):
+        for ax in spec["axles"]:
+            d = abs(x - ax)
+            if d < span:
+                u = 1.0 - (d / span) ** 2
+                z = max(z, lo + (hi - lo) * u)
+    else:
+        # A CIRCLE round the wheel, and down to the sill. It was a parabola
+        # lifting 0.3 m over a sill at 0.30-0.40, which is the ride height of
+        # nothing on a road: every car stood a hand too high, with daylight
+        # under a bumper where a real one has a shadow, and the arch was a
+        # shallow hump rather than a cut. Now the sills are at the ride height
+        # of the class (a supermini's rocker is ~0.20 m off the ground, not
+        # 0.30) and the arch is a round opening `arch_gap` clear of the tyre,
+        # coming straight down to the sill behind and ahead of it.
+        r = spec["wheel"][0]
+        R = r + spec.get("arch_gap", 0.040)
+        for ax in spec["axles"]:
+            d = abs(x - ax)
+            if d <= R + 1e-6:
+                z = max(z, r + math.sqrt(max(0.0, R * R - d * d)))
     for end, sign in ((spec["x1"], 1.0), (spec["x0"], -1.0)):
         d = (end - x) * sign
         if d < 0.34:
@@ -237,6 +300,17 @@ def station(spec, x):
         zb -= k * h * 0.09
         hw *= 1.0 - 0.20 * k
         hwb *= 1.0 - 0.20 * k
+    # The wheel-arch flare: the flank swells a little round each wheel and
+    # the belt does not, so the arch reads as a lip with a wheel tucked under
+    # it — the one cue that says a car has weight on its tyres. It was a
+    # straight-sided tub before, with the wheels inset under it like a toy's.
+    fl = spec.get("flare", 0.014)
+    if fl and not spec.get("cover_hem"):
+        R = spec["wheel"][0] * 1.55
+        for ax in spec["axles"]:
+            dd = abs(x - ax)
+            if dd < R:
+                hw += fl * 0.5 * (1.0 + math.cos(math.pi * dd / R))
     zw = zs + (zb - zs) * spec["waist"]
     return (x, zs, zw, zb, hw * spec["sill_frac"], hw, hwb)
 
@@ -294,10 +368,26 @@ def station_xs(spec):
     for dd in (0.004, 0.015, 0.035, 0.06, 0.09, 0.12):
         xs.add(x1 - dd * r / 0.14)
         xs.add(x0 + dd * r / 0.14)
-    for ax in spec["axles"]:
-        for d in (-1.0, -0.7, -0.4, 0.0, 0.4, 0.7, 1.0):
-            xs.add(round(ax + d * span, 4))
-    for dx in spec.get("doors", ()):
+    if spec.get("cover_hem"):
+        for ax in spec["axles"]:
+            for d in (-1.0, -0.7, -0.4, 0.0, 0.4, 0.7, 1.0):
+                xs.add(round(ax + d * span, 4))
+    else:
+        # The round arch wants its stations bunched where it is steep, at the
+        # sides, and a pair straddling the drop to the sill so the drop is a
+        # drop and not a ramp across one 120 mm face.
+        R = spec["wheel"][0] + spec.get("arch_gap", 0.040)
+        for ax in spec["axles"]:
+            for f in (0.0, 0.34, 0.60, 0.78, 0.90, 0.97, 1.0):
+                xs.add(round(ax + f * R, 4))
+                xs.add(round(ax - f * R, 4))
+            xs.add(round(ax + R + 0.010, 4))
+            xs.add(round(ax - R - 0.010, 4))
+    # And the bonnet's and the boot lid's, which had no pair of their own
+    # and so fell between two stations and were never drawn.
+    for dx in (*spec.get("doors", ()), spec.get("hood_x"), spec.get("deck_x")):
+        if dx is None or spec.get("plain"):
+            continue
         xs.add(dx - 0.006)
         xs.add(dx + 0.006)
     xs.update(spec.get("extra_x", ()))
@@ -354,7 +444,9 @@ def region(spec, x, uz, yf):
         side = ay > 0.93
         if (hlo + 0.34 * u <= uz <= hhi - 0.04 * u and ay >= hin + 0.25 * u
                 and (not side or u < 0.62)):
-            return "lamp"
+            # Near, the housing goes dark so what is inside it can be seen:
+            # the projector, the LED strip, the indicator (`build_lamps`).
+            return "lampin" if spec.get("_near") else "lamp"
     # Tail lamp: (length, lower edge, upper edge, inner edge)
     tl, tlo, thi, tin = spec.get("tail", (0.24, 0.30, 0.74, 0.46))
     d = x - x0
@@ -375,9 +467,10 @@ def region(spec, x, uz, yf):
             return "seam"
     # The bonnet's rear edge, across the deck in front of the windscreen, and
     # the tailgate's lower one across the back.
-    hx = spec.get("hood_x")
-    if hx is not None and abs(x - hx) < 0.0075 and uz >= 0.90:
-        return "seam"
+    for key in ("hood_x", "deck_x"):
+        hx = spec.get(key)
+        if hx is not None and abs(x - hx) < 0.0075 and uz >= 0.90:
+            return "seam"
     return None
 
 
@@ -434,15 +527,18 @@ class Sink:
                   (2, 6, 7, 3), (1, 5, 6, 2), (3, 7, 4, 0)):
             self.face(bucket, [c[i] for i in q])
 
-    def rbox(self, bucket, cx, cy, cz, sx, sy, sz, p=4.0, seg=8, rows=6):
+    def rbox(self, bucket, cx, cy, cz, sx, sy, sz, p=4.0, seg=8, rows=6, tilt=0.0):
         """A superellipsoid: a box with its edges rounded, by exponent ``p``.
 
         What every stood-off part of a car actually is — a mirror shell, a
         handle, a plate, a rail. At ``p`` 2 it is an ellipsoid; at 6 it is a
         box with a 5 mm radius on it, which is still enough to catch a light.
+        ``tilt`` leans it back about its own Y, top toward the tail: a seat
+        back, a headrest, a steering-wheel spoke.
         """
         e = 2.0 / p
         f = lambda v: math.copysign(abs(v) ** e, v)       # noqa: E731
+        ct, st_ = math.cos(tilt), math.sin(tilt)
         grid = []
         for j in range(rows + 1):
             v = -math.pi * 0.5 + math.pi * j / rows
@@ -450,9 +546,11 @@ class Sink:
             ring = []
             for i in range(seg):
                 u = TAU * i / seg
-                ring.append((cx + sx * 0.5 * cv * f(math.cos(u)),
+                dx = sx * 0.5 * cv * f(math.cos(u))
+                dz = sz * 0.5 * sv
+                ring.append((cx + dx * ct - dz * st_,
                              cy + sy * 0.5 * cv * f(math.sin(u)),
-                             cz + sz * 0.5 * sv))
+                             cz + dx * st_ + dz * ct))
             grid.append(ring)
         for j in range(rows):
             for i in range(seg):
@@ -695,6 +793,26 @@ def in_ranges(x, ranges):
     return any(a <= x <= b for a, b in ranges)
 
 
+def glass_bucket(spec, xm, rear=False):
+    """Which pane this is: one opaque glass far away, two tints near.
+
+    Far, every pane is the dark reflective glass of 1.539.0, because at forty
+    metres you cannot see into a car anyway. Near, it is the see-through pane
+    of the glass blob, and the tint depends on where it is: the windscreen and
+    the front door glass clear, everything behind the B-pillar the factory
+    privacy tint. Where the B-pillar is, is the first `pillars` entry; the old
+    three-door has none, and its one long window is clear to about the
+    middle, which is where its door ends.
+    """
+    if not spec.get("_near"):
+        return "glass"
+    if rear:
+        return "glassR"
+    pil = spec.get("pillars")
+    bx = (pil[0][0] + pil[0][1]) * 0.5 if pil else spec.get("b_x", -0.45)
+    return "glassF" if xm > bx else "glassR"
+
+
 def classify(spec, tag, xm, uz, yf, hm, zm, tab_ws, tab_bl):
     """Which bucket a strip of the shell comes out of."""
     if tag == "under" or uz <= -0.86:
@@ -715,12 +833,14 @@ def classify(spec, tag, xm, uz, yf, hm, zm, tab_ws, tab_bl):
         for a, b, bucket in spec.get("pillars", ()):
             if a <= xm <= b:
                 return bucket
-        return "glass" if in_ranges(xm, glass) else "paint"
+        return glass_bucket(spec, xm) if in_ranges(xm, glass) else "paint"
     if tag == "cant":
         return "paint"
     # The roof strips: glass over the windscreen and the backlight.
-    if tab_ws[0] <= xm <= tab_ws[1] or (tab_bl and tab_bl[0] <= xm <= tab_bl[1]):
-        return "glass"
+    if tab_ws[0] <= xm <= tab_ws[1]:
+        return "glassF" if spec.get("_near") else "glass"
+    if tab_bl and tab_bl[0] <= xm <= tab_bl[1]:
+        return glass_bucket(spec, xm, rear=True)
     return spec.get("roof_col", "paint")
 
 
@@ -892,6 +1012,195 @@ def build_wheels(spec, sink):
                                     (p1[0], sgn * yb, p1[1]), (p0[0], sgn * yb, p0[1])])
 
 
+def _spin(sink, cx, cz, sgn, prof, n, a0=0.0, a1=TAU, deform=None):
+    """A lathe about (cx, cz) over the arc a0..a1, with an optional deform.
+
+    ``prof`` is ``[(radius, y, bucket, w)]`` and the strip from point k to
+    k + 1 comes out of point k's bucket; ``w`` is how much of the tyre's
+    load bulge that point takes (see `_loaded`).
+    """
+    rings = []
+    for i in range(n + 1):
+        a = a0 + (a1 - a0) * i / n
+        c, s = math.cos(a), math.sin(a)
+        ring = []
+        for ra, ya, _bk, w in prof:
+            x, y, z = cx + c * ra, ya, cz + s * ra
+            if deform:
+                x, y, z = deform(a, w, x, y, z)
+            ring.append((x, sgn * y, z))
+        rings.append(ring)
+    for i in range(n):
+        A, B = rings[i], rings[i + 1]
+        for k in range(len(prof) - 1):
+            bk = prof[k][2]
+            if bk:
+                sink.face(bk, [A[k], B[k], B[k + 1], A[k + 1]])
+
+
+def _loaded(a, w, x, y, z):
+    """A tyre with a car on it: flat where it meets the ground, bulged above.
+
+    A lathed tyre is a perfect circle touching the ground at a point, which is
+    a tyre on a car on a lift. Loaded, the tread flattens into a patch about a
+    hand long and the wall bulges out a centimetre just above it. Both are here:
+    the bottom of the tyre is pressed down 8 mm into the ground plane and cut
+    flat there, which leaves a patch about 12 cm long, and a wall point within
+    about 35° of the bottom is pushed outward by up to 11 mm, by how much of
+    the wall it is (``w``).
+    """
+    if w < 0.0:
+        return x, y, z                   # the rim: steel does not flatten
+    b = max(0.0, -math.sin(a)) ** 9
+    y += 0.011 * w * b
+    z = max(0.0005, z - 0.008 * b)
+    return x, y, z
+
+
+def build_wheels_near(spec, sink):
+    """The wheels a car shows from two metres, and it shows them first.
+
+    What was missing from 1.539.0's wheel, in the order the eye finds it:
+    the tyre is loaded (`_loaded`) and not a hoop on a pin; its wall carries
+    two arcs of moulded lettering, a shade off the rubber, which is what makes
+    a black ring read as a tyre; the spokes have depth — a ridge down each,
+    sides running 50 mm back, and a dish, hub proud and rim end sunk; there are
+    lug nuts on the hub; and behind the spokes there is a BRAKE DISC with a
+    caliper over it, where there was a flat dark hole. Thirty-two sides.
+    """
+    r, hwid = spec["wheel"]
+    n = 32
+    rim_r = r * spec.get("rim_frac", 0.66)
+    style = spec.get("rim", "five")
+    rb = spec.get("rim_col", "rim")
+    sw = r - rim_r
+    for ax in spec["axles"]:
+        st = station(spec, ax)
+        outer = st[4] - 0.030
+        inner = outer - hwid * 2.0
+        for sgn in (1, -1):
+            _spin(sink, ax, r, sgn, [
+                (r * 0.975, inner + 0.010, "tyre", 0.0),
+                (r, inner + 0.035, "tyre", 0.0),
+                (r, outer - 0.035, "tyre", 0.2),
+                (r * 0.993, outer - 0.016, "wall", 0.5),
+                (r - 0.014, outer - 0.004, "wall", 0.8),
+                (r - sw * 0.28, outer + 0.004, "wall", 1.0),
+                (r - sw * 0.55, outer + 0.006, "wall", 1.0),
+                (r - sw * 0.80, outer + 0.003, "wall", 0.7),
+                (rim_r + 0.008, outer - 0.003, rb, -1.0),
+                (rim_r + 0.002, outer + 0.005, rb, -1.0),
+                (rim_r - 0.008, outer + 0.006, rb, -1.0),
+                (rim_r - 0.016, outer - 0.004, "disc", -1.0),
+                (rim_r - 0.020, outer - 0.030, "disc", -1.0),
+                (rim_r - 0.022, outer - 0.115, "under", -1.0),
+                (0.0, outer - 0.118, None, -1.0),
+            ], n, deform=_loaded)
+
+            # The lettering: two arcs, top and bottom, of raised cells 1.6 mm
+            # proud of the wall, the way a size and a load index are moulded.
+            # Blocks and not glyphs — at the distance anything reads, a tyre's
+            # lettering is a broken grey band, and that is what this is.
+            r1, r2 = r - sw * 0.30, r - sw * 0.52
+            yl = outer + 0.0078
+            for arc in (math.pi * 0.5, -math.pi * 0.5):
+                for k in range(15):
+                    if k in (4, 9):
+                        continue                          # word gaps
+                    a = arc - 0.42 + k * 0.058
+                    h = (k * 7 + int(arc > 0) * 3) % 5
+                    top = r2 + (r1 - r2) * (1.0 if h < 3 else 0.62)
+                    _spin(sink, ax, r, sgn, [
+                        (r2, yl, "letter", 1.0), (top, yl, None, 1.0)],
+                        1, a, a + 0.040, deform=_loaded)
+
+            face = outer - 0.008
+            back = outer - 0.058
+            rh, ro = r * 0.19, rim_r - 0.012
+            # The brake disc and its hat, and a caliper over the top at the
+            # back. It is what a spoked wheel is a window onto.
+            Rr = rim_r * 0.80
+            _spin(sink, ax, r, sgn, [
+                (0.0, outer - 0.052, "rotor", 0.0), (0.070, outer - 0.052, "rotor", 0.0),
+                (0.075, outer - 0.068, "rotor", 0.0), (Rr, outer - 0.068, "rotor", 0.0),
+                (Rr, outer - 0.094, None, 0.0)], 28)
+            ca = math.pi - 0.62
+            cprof = [(Rr - 0.055, outer - 0.060, "caliper", 0.0),
+                     (Rr + 0.014, outer - 0.060, "caliper", 0.0),
+                     (Rr + 0.014, outer - 0.104, "caliper", 0.0),
+                     (Rr - 0.055, outer - 0.104, "caliper", 0.0),
+                     (Rr - 0.055, outer - 0.060, None, 0.0)]
+            _spin(sink, ax, r, sgn, cprof, 5, ca - 0.36, ca + 0.36)
+            for ea in (ca - 0.36, ca + 0.36):
+                c, s = math.cos(ea), math.sin(ea)
+                sink.face("caliper", [(ax + c * p[0], sgn * p[1], r + s * p[0])
+                                      for p in cprof[:4]])
+
+            if style == "steel":
+                # The old car and the van: a pressed plastic trim over a steel
+                # wheel — a shallow dish, a raised ring, and eight dark vents.
+                _spin(sink, ax, r, sgn, [
+                    (ro, face - 0.006, rb, 0.0), (ro * 0.90, face + 0.006, rb, 0.0),
+                    (ro * 0.74, face + 0.010, rb, 0.0), (ro * 0.66, face + 0.006, rb, 0.0),
+                    (ro * 0.40, face + 0.014, rb, 0.0), (ro * 0.18, face + 0.020, "piano", 0.0),
+                    (0.0, face + 0.021, None, 0.0)], n)
+                for k in range(8):
+                    a = TAU * k / 8 + 0.2
+                    _spin(sink, ax, r, sgn, [
+                        (ro * 0.86, face + 0.0085, "under", 0.0),
+                        (ro * 0.76, face + 0.0105, None, 0.0)], 2, a, a + 0.30)
+                continue
+
+            count, wo, wh = {"five": (5, 0.052, 0.074), "split": (10, 0.022, 0.036),
+                             "multi": (7, 0.040, 0.060)}[style]
+            for k in range(count):
+                a = TAU * (k + 0.25) / count
+                if style == "split":
+                    a = TAU * ((k // 2) + 0.25) / (count // 2) + (0.075 if k % 2 else -0.075)
+                d = (math.cos(a), math.sin(a))
+                pp = (-d[1], d[0])
+                secs = []
+                # Hub, middle, rim: width, and the face's depth — the dish.
+                for t, wdt, fy in ((0.0, wh, face), (0.55, (wh + wo) * 0.5, face - 0.016),
+                                   (1.0, wo, face - 0.012)):
+                    rr = rh + (ro - rh) * t
+                    cx, cz = rr * d[0], rr * d[1]
+                    hw2 = wdt * 0.5
+                    # back-left, front-left, ridge, front-right, back-right
+                    secs.append([
+                        (ax + cx + pp[0] * hw2, sgn * back, r + cz + pp[1] * hw2),
+                        (ax + cx + pp[0] * hw2, sgn * fy, r + cz + pp[1] * hw2),
+                        (ax + cx, sgn * (fy + 0.004), r + cz),
+                        (ax + cx - pp[0] * hw2, sgn * fy, r + cz - pp[1] * hw2),
+                        (ax + cx - pp[0] * hw2, sgn * back, r + cz - pp[1] * hw2)])
+                for A, B in zip(secs, secs[1:]):
+                    for m in range(4):
+                        sink.face(rb, [A[m], B[m], B[m + 1], A[m + 1]])
+            # The hub, a centre cap with a ring round it, and the nuts.
+            _spin(sink, ax, r, sgn, [
+                (rh + 0.006, face - 0.006, rb, 0.0), (rh * 0.80, face + 0.004, rb, 0.0),
+                (rh * 0.46, face + 0.007, "chrome", 0.0), (rh * 0.40, face + 0.009, "piano", 0.0),
+                (0.0, face + 0.011, None, 0.0)], 20)
+            for k in range(5):
+                a = TAU * k / 5 + 0.3
+                cx, cz = ax + math.cos(a) * rh * 0.64, r + math.sin(a) * rh * 0.64
+                _spin(sink, cx, cz, sgn, [
+                    (0.0105, face + 0.004, "chrome", 0.0), (0.0105, face + 0.013, "chrome", 0.0),
+                    (0.006, face + 0.016, "chrome", 0.0), (0.0, face + 0.016, None, 0.0)], 6)
+        # The arch liners, as in the far tier.
+        rl = r + 0.045
+        for sgn in (1, -1):
+            ya, yb = outer + 0.020, inner - 0.030
+            m = 12
+            for i in range(m):
+                a0 = math.radians(-12 + 204 * i / m)
+                a1 = math.radians(-12 + 204 * (i + 1) / m)
+                p0 = (ax + math.cos(a0) * rl, r + math.sin(a0) * rl)
+                p1 = (ax + math.cos(a1) * rl, r + math.sin(a1) * rl)
+                sink.face("under", [(p0[0], sgn * ya, p0[1]), (p1[0], sgn * ya, p1[1]),
+                                    (p1[0], sgn * yb, p1[1]), (p0[0], sgn * yb, p0[1])])
+
+
 # ------------------------------------------------------------------- details --
 
 def build_details(spec, sink, tab):
@@ -908,7 +1217,12 @@ def build_details(spec, sink, tab):
         zc = zs + (zb - zs) * frac
         xp = end + sgn * 0.017
         sink.rbox("plate", xp, 0.0, zc, 0.010, 0.520, 0.112, p=6, rows=4)
-        sink.rbox("eu", xp + sgn * 0.001, -0.232, zc, 0.010, 0.050, 0.108, p=6, rows=4)
+        # The EU strip is at the plate's LEFT as you face it, which is -Y at
+        # the front and +Y at the back — it was at -Y on both, so every rear
+        # plate in the wood was a mirror image.
+        sink.rbox("eu", xp + sgn * 0.001, -0.232 * sgn, zc, 0.010, 0.050, 0.108, p=6, rows=4)
+        if spec.get("_near"):
+            plate_text(sink, spec, xp + sgn * 0.0058, zc, sgn)
 
     # Mirrors: a body-coloured shell on a black foot, at the front of the glass.
     mx = spec["mirror_x"]
@@ -955,7 +1269,8 @@ def build_details(spec, sink, tab):
         z0, z1 = zb + rg[0], zb + h - rg[1]
         xg = x0 - 0.012
         for side in (1, -1):
-            sink.rbox("glass", xg, side * (0.035 + rg[2] * 0.5), (z0 + z1) * 0.5,
+            sink.rbox(glass_bucket(spec, x0, rear=True), xg,
+                      side * (0.035 + rg[2] * 0.5), (z0 + z1) * 0.5,
                       0.012, rg[2], z1 - z0, p=10, seg=16, rows=6)
         zs = station(spec, x0)[1]
         sink.rbox("seam", xg, 0.0, (zs + zb + h) * 0.5, 0.010, 0.010,
@@ -965,6 +1280,364 @@ def build_details(spec, sink, tab):
     if sp:
         sx, sw, sz = sp
         sink.rbox("paint", sx, 0.0, sz, 0.20, sw * 2.0, 0.035, p=4)
+
+
+# ------------------------------------------------------------ the near tier --
+#
+# Everything from here to the cover is only in the near blobs. None of it
+# changes the silhouette, which is shared with the far tier (the body blob is
+# the same mesh at every distance); it is what is on, in and behind the panels.
+
+# A 5x7 face for the plates, the characters an HR plate needs and no more. A
+# Croatian plate is the town's two letters, the šahovnica, three or four
+# numerals, a dash and one or two letters: "ŠI 482-KM". Blocks, not a typeface —
+# at the distance a plate is read from, a plate reads as the blocks.
+FONT = {
+    "0": ("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
+    "1": ("00100", "01100", "00100", "00100", "00100", "00100", "01110"),
+    "2": ("01110", "10001", "00001", "00110", "01000", "10000", "11111"),
+    "3": ("11110", "00001", "00001", "01110", "00001", "00001", "11110"),
+    "4": ("00010", "00110", "01010", "10010", "11111", "00010", "00010"),
+    "5": ("11111", "10000", "11110", "00001", "00001", "10001", "01110"),
+    "6": ("00110", "01000", "10000", "11110", "10001", "10001", "01110"),
+    "7": ("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
+    "8": ("01110", "10001", "10001", "01110", "10001", "10001", "01110"),
+    "9": ("01110", "10001", "10001", "01111", "00001", "00010", "01100"),
+    "A": ("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
+    "B": ("11110", "10001", "10001", "11110", "10001", "10001", "11110"),
+    "D": ("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
+    "E": ("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
+    "G": ("01110", "10001", "10000", "10111", "10001", "10001", "01111"),
+    "I": ("01110", "00100", "00100", "00100", "00100", "00100", "01110"),
+    "K": ("10001", "10010", "10100", "11000", "10100", "10010", "10001"),
+    "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
+    "N": ("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
+    "P": ("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
+    "R": ("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
+    "S": ("01111", "10000", "10000", "01110", "00001", "00001", "11110"),
+    "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
+    "V": ("10001", "10001", "10001", "10001", "10001", "01010", "00100"),
+    "Z": ("11111", "00001", "00010", "00100", "01000", "10000", "11111"),
+    "-": ("00000", "00000", "00000", "11111", "00000", "00000", "00000"),
+}
+MINI = {"H": ("101", "101", "111", "101", "101"), "R": ("110", "101", "110", "101", "101")}
+
+
+def plate_text(sink, spec, xf, zc, sgn):
+    """An HR plate's face: the registration, the šahovnica, "HR" on the strip.
+
+    ``xf`` is just proud of the plate's face and ``sgn`` which way it faces.
+    Reading left to right is +Y at the front and −Y at the back, so a
+    coordinate along the line of text is ``y = sgn * r``. Runs of lit pixels in
+    a row are one quad each, which is most of why a plate is 200 triangles and
+    not 600.
+    """
+    text = spec.get("plate", "ŠI 482-KM")
+    pw_, ph = 0.0080, 0.0094
+    adv, sp_adv, shield = 0.050, 0.030, 0.034
+
+    def quad(bucket, r0, r1, z0, z1):
+        y0, y1 = sgn * r0, sgn * r1
+        sink.face(bucket, [(xf, y0, z0), (xf, y1, z0), (xf, y1, z1), (xf, y0, z1)])
+
+    width = 0.0
+    for ch in text:
+        width += sp_adv if ch == " " else adv
+    width += shield - sp_adv                 # the space after the town is the shield
+    r = 0.025 - width * 0.5
+    ztop = zc + 0.0300
+    first_space = True
+    for ch in text:
+        if ch == " ":
+            if first_space:
+                # The šahovnica: a shield of red and white squares, 3 by 4.
+                q = 0.0072
+                r0 = r + 0.004
+                for i in range(3):
+                    for j in range(4):
+                        if (i + j) % 2 == 0:
+                            quad("hrred", r0 + i * q, r0 + (i + 1) * q,
+                                 ztop - (j + 1) * q - 0.006, ztop - j * q - 0.006)
+                r += shield
+                first_space = False
+            else:
+                r += sp_adv
+            continue
+        glyph = FONT.get("S" if ch == "Š" else ch)
+        if glyph:
+            for row, bits in enumerate(glyph):
+                z1 = ztop - row * ph
+                c = 0
+                while c < 5:
+                    if bits[c] == "1":
+                        c0 = c
+                        while c < 5 and bits[c] == "1":
+                            c += 1
+                        quad("ink", r + c0 * pw_, r + c * pw_, z1 - ph, z1)
+                    else:
+                        c += 1
+            if ch == "Š":
+                # The caron: a small v over the S.
+                quad("ink", r + 1 * pw_, r + 2 * pw_, ztop + 0.009, ztop + 0.0165)
+                quad("ink", r + 3 * pw_, r + 4 * pw_, ztop + 0.009, ztop + 0.0165)
+                quad("ink", r + 2 * pw_, r + 3 * pw_, ztop + 0.003, ztop + 0.010)
+        r += adv
+    # "HR" in white on the blue strip, and the frame round the plate.
+    q = 0.0042
+    for k, ch in enumerate("HR"):
+        r0 = -0.2445 + k * 0.0155
+        for row, bits in enumerate(MINI[ch]):
+            for c, b in enumerate(bits):
+                if b == "1":
+                    quad("plate", r0 + c * q, r0 + (c + 1) * q,
+                         zc - 0.018 - (row + 1) * q, zc - 0.018 - row * q)
+    for r0, r1, z0, z1 in ((-0.207, 0.256, zc + 0.050, zc + 0.054),
+                           (-0.207, 0.256, zc - 0.054, zc - 0.050),
+                           (0.252, 0.256, zc - 0.054, zc + 0.054)):
+        quad("ink", r0, r1, z0, z1)
+
+
+def surf_pt(spec, tab, x, uzt):
+    """The point on the shell at station ``x`` and section height ``uz``, +Y side."""
+    pts, _st, _h = section(spec, x, tab)
+    for a, b in zip(pts, pts[1:]):
+        if a[4] == "under":
+            continue
+        if a[2] <= uzt <= b[2] and b[2] > a[2]:
+            t = (uzt - a[2]) / (b[2] - a[2])
+            return (x, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+    return None
+
+
+def surf_frame(spec, tab, x, uzt, end):
+    """``(point, outward normal, up-the-surface)`` on the shell, +Y side."""
+    p = surf_pt(spec, tab, x, uzt)
+    px = surf_pt(spec, tab, x - 0.010 * end, uzt)
+    pu = surf_pt(spec, tab, x, uzt + 0.030)
+    if not (p and px and pu):
+        return None
+    tx = [px[i] - p[i] for i in range(3)]
+    tu = [pu[i] - p[i] for i in range(3)]
+    n = [tx[1] * tu[2] - tx[2] * tu[1], tx[2] * tu[0] - tx[0] * tu[2],
+         tx[0] * tu[1] - tx[1] * tu[0]]
+    ln = math.sqrt(sum(v * v for v in n)) or 1.0
+    n = [v / ln for v in n]
+    if n[1] + 0.4 * end * n[0] < 0.0:
+        n = [-v for v in n]
+    lu = math.sqrt(sum(v * v for v in tu)) or 1.0
+    return p, n, [v / lu for v in tu]
+
+
+def ribbon(sink, bucket, spec, tab, samples, end, width, off=0.0025):
+    """A strip laid on the shell along ``[(x, uz)]``, both sides of the car."""
+    fr = [surf_frame(spec, tab, x, uz, end) for x, uz in samples]
+    fr = [f for f in fr if f]
+    for side in (1, -1):
+        rows = []
+        for p, n, u in fr:
+            c = [p[i] + n[i] * off for i in range(3)]
+            a = [c[i] - u[i] * width * 0.5 for i in range(3)]
+            b = [c[i] + u[i] * width * 0.5 for i in range(3)]
+            rows.append(((a[0], side * a[1], a[2]), (b[0], side * b[1], b[2])))
+        for A, B in zip(rows, rows[1:]):
+            sink.face(bucket, [A[0], B[0], B[1], A[1]])
+
+
+def disc(sink, c, n, prof, seg):
+    """A lathe about an arbitrary axis ``n`` through ``c``: ``[(radius, h, bucket)]``."""
+    a = [0.0, 0.0, 1.0] if abs(n[2]) < 0.9 else [1.0, 0.0, 0.0]
+    u = [n[1] * a[2] - n[2] * a[1], n[2] * a[0] - n[0] * a[2], n[0] * a[1] - n[1] * a[0]]
+    lu = math.sqrt(sum(v * v for v in u))
+    u = [v / lu for v in u]
+    v = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]]
+
+    def P(ra, h, t):
+        ct, st_ = math.cos(t), math.sin(t)
+        return tuple(c[i] + n[i] * h + (u[i] * ct + v[i] * st_) * ra for i in range(3))
+    for i in range(seg):
+        t0, t1 = TAU * i / seg, TAU * (i + 1) / seg
+        for (ra, ha, bk), (rb_, hb, _b) in zip(prof, prof[1:]):
+            if bk:
+                sink.face(bk, [P(ra, ha, t0), P(ra, ha, t1), P(rb_, hb, t1), P(rb_, hb, t0)])
+
+
+def build_lamps(spec, sink, tab):
+    """What is inside a lamp: the projector, the LED strip, the indicator.
+
+    1.539.0's lamps were regions of the loft in one chrome colour, which from
+    two metres is a bright sticker with nothing in it — and a lamp is the
+    thing a car's face is read by. Now the housing goes dark (`region`) and on
+    it, following the swept shape of each lamp (`ribbon`, which walks the
+    shell's own surface): a daytime-running LED strip along the lower edge,
+    unlit, which is how a parked car's strip looks — pale plastic; an amber
+    indicator along the top at the outer end; and a projector, a chrome bowl
+    with a dark lens in it, standing on the lamp's own normal. At the back, a
+    light bar across each tail lamp and a white reversing lamp under it.
+
+    The old three-door keeps its sealed-beam look: chrome reflector, a clear
+    lens, an amber corner.
+    """
+    x0, x1 = spec["x0"], spec["x1"]
+    hl, hlo, hhi, _hin = spec.get("head", (0.34, 0.20, 0.64, 0.42))
+    old = spec.get("old_lamps")
+
+    def along(d0, d1, k, frac, lo, hi, L):
+        out = []
+        for i in range(k):
+            d = d0 + (d1 - d0) * i / (k - 1)
+            u = d / L
+            a, b = lo(u), hi(u)
+            out.append((d, a + (b - a) * frac))
+        return out
+    lo = lambda u: hlo + 0.34 * u          # noqa: E731
+    hi = lambda u: hhi - 0.04 * u          # noqa: E731
+    if not old:
+        ribbon(sink, "led", spec, tab,
+               [(x1 - d, uz) for d, uz in along(0.006, hl * 0.60, 9, 0.16, lo, hi, hl)],
+               1.0, 0.013)
+        # And a gloss-black brow along the top, the housing's own edge, which
+        # is what outlines a modern lamp against the paint on a dark car.
+        ribbon(sink, "piano", spec, tab,
+               [(x1 - d, uz) for d, uz in along(0.004, hl * 0.66, 9, 0.95, lo, hi, hl)],
+               1.0, 0.014, off=0.0015)
+        f = surf_frame(spec, tab, x1 - hl * 0.16, (lo(0.16) + hi(0.16)) * 0.5 + 0.03, 1.0)
+        if f:
+            p, n, _u = f
+            for side in (1, -1):
+                c = (p[0], side * p[1], p[2])
+                nn = (n[0], side * n[1], n[2])
+                disc(sink, c, nn, [(0.031, 0.002, "chrome"), (0.024, 0.009, "lens"),
+                                   (0.012, 0.014, "lens"), (0.0, 0.0155, None)], 14)
+    ribbon(sink, "amber", spec, tab,
+           [(x1 - d, uz) for d, uz in along(hl * (0.34 if not old else 0.55),
+                                            hl * (0.60 if not old else 0.95), 5, 0.84, lo, hi, hl)],
+           1.0, 0.014 if not old else 0.030)
+
+    tl, tlo, thi, _tin = spec.get("tail", (0.24, 0.30, 0.74, 0.46))
+    tlo_ = lambda u: tlo + 0.22 * u        # noqa: E731
+    thi_ = lambda u: thi - 0.02 * u        # noqa: E731
+    ribbon(sink, "tailhi", spec, tab,
+           [(x0 + d, uz) for d, uz in along(0.006, tl * 0.92, 8, 0.62, tlo_, thi_, tl)],
+           -1.0, 0.016)
+    ribbon(sink, "rev", spec, tab,
+           [(x0 + d, uz) for d, uz in along(0.006, tl * 0.35, 4, 0.22, tlo_, thi_, tl)],
+           -1.0, 0.020)
+
+
+def build_near_details(spec, sink, tab):
+    """Grille, badges, wipers, the aerial — the small things that say "real"."""
+    x0, x1 = spec["x0"], spec["x1"]
+    st = station(spec, x1)
+    hw = st[5]
+
+    def zof(stn, uz):
+        return stn[2] + uz * ((stn[2] - stn[1]) if uz < 0 else (stn[3] - stn[2]))
+
+    # The grille: bars across the opening, standing just off the cap.
+    g = spec.get("grille", (0.11, -0.66, 0.16, 0.66))
+    gy = g[3] * hw * 0.90
+    bar = "chrome" if spec.get("old_lamps") else "piano"
+    nb = spec.get("grille_bars", 4)
+    for k in range(nb):
+        uz = g[1] + (g[2] - g[1]) * (k + 0.5) / nb
+        sink.rbox(bar, x1 + 0.013, 0.0, zof(st, uz), 0.010, gy * 2.0, 0.013, p=5, rows=4)
+    # A badge in the middle of the nose, and one on the tail above the plate.
+    sink.rbox("chrome", x1 + 0.020, 0.0, zof(st, g[2]) + 0.02, 0.012, 0.090, 0.052,
+              p=2.2, seg=14, rows=6)
+    stt = station(spec, x0)
+    zt = stt[1] + (stt[3] - stt[1]) * 0.44 + 0.105
+    sink.rbox("chrome", x0 - 0.016, 0.0, zt, 0.012, 0.080, 0.046, p=2.2, seg=14, rows=6)
+
+    gh = spec.get("gh")
+    if gh:
+        # Wipers, parked along the foot of the windscreen.
+        xw = gh[0][0] - 0.10
+        h, _tw = roof_at(tab, xw)
+        zwp = pw(spec["belt"], xw) + h + 0.010
+        for yc in (0.26, -0.22):
+            sink.rbox("dark", xw, yc, zwp, 0.016, 0.48, 0.011, p=4, seg=8, rows=4)
+        # The aerial: a fin at the back of the roof on the moderns, a whip on
+        # the old car's wing.
+        if spec.get("old_lamps"):
+            sink.rbox("dark", 0.78, 0.62, pw(spec["belt"], 0.78) + 0.30,
+                      0.006, 0.006, 0.60, p=2.0, seg=6, rows=2)
+        else:
+            xa = spec.get("fin_x", gh[-2][0] + 0.12)
+            ha, _ = roof_at(tab, xa)
+            za = pw(spec["belt"], xa) + ha + spec.get("crown", 0.040)
+            sink.rbox("piano", xa, 0.0, za + 0.022, 0.170, 0.055, 0.070, p=2.4, seg=10, rows=6)
+
+
+def build_interior(spec, sink, tab):
+    """Seats, headrests, a dashboard and a steering wheel — what the glass shows.
+
+    Seen through a clear windscreen, an empty cabin is the loudest thing a
+    model car can say: that it is a shell. This is the cheapest cabin that
+    reads as furnished — two front seats with headrests, a rear bench with
+    three, a dash with the binnacle over the wheel and a screen in the middle,
+    and the wheel itself on the LEFT, since this is Croatia. The inside of the
+    doors and the headliner are not geometry at all: they are the paint's back
+    faces, which the paint shader draws as trim (src/44-cars.js). The van has
+    a bulkhead behind the cab instead of a bench. Positions come off the axle
+    and the windscreen, so every body type sits its seats where its doors are.
+    """
+    gh = spec.get("gh")
+    if not gh:
+        return
+    xws = gh[0][0]
+    xf = spec["axles"][1] - 1.30
+    st = station(spec, xf)
+    zs, hwb = st[1], st[6]
+    zc = zs + 0.07 + 0.29                  # the top of the cushion
+    ys = hwb * 0.45
+    for y in (ys, -ys):
+        sink.rbox("seat", xf + 0.20, y, zc - 0.06, 0.50, 0.49, 0.13, p=3.0)
+        sink.rbox("seat", xf - 0.07, y, zc + 0.27, 0.13, 0.49, 0.58, p=3.0, tilt=0.30)
+        sink.rbox("seat", xf - 0.19, y, zc + 0.64, 0.09, 0.26, 0.17, p=3.0, tilt=0.20)
+    if spec.get("bulkhead"):
+        h, _ = roof_at(tab, xf - 0.36)
+        top = pw(spec["belt"], xf - 0.36) + h
+        sink.rbox("dash", xf - 0.36, 0.0, (zs + top) * 0.5, 0.030, hwb * 1.9,
+                  top - zs - 0.05, p=6, rows=4)
+    else:
+        xr = xf - spec.get("rear_gap", 0.82)
+        bw = (hwb - 0.13) * 2.0
+        sink.rbox("seat", xr + 0.20, 0.0, zc - 0.04, 0.48, bw, 0.13, p=3.0)
+        sink.rbox("seat", xr - 0.07, 0.0, zc + 0.26, 0.13, bw, 0.56, p=3.0, tilt=0.34)
+        for y in (hwb * 0.46, 0.0, -hwb * 0.46):
+            sink.rbox("seat", xr - 0.18, y, zc + 0.60, 0.08, 0.22, 0.14, p=3.0, tilt=0.30)
+    # The dashboard, kept under the windscreen: its top is set by how far the
+    # glass has risen at the dash's front edge, or it pokes through the pane.
+    xd = xws - 0.10
+    h, _ = roof_at(tab, xd)
+    zbd = pw(spec["belt"], xd)
+    top = zbd + min(0.07, 0.6 * h)
+    dl = 0.46
+    sink.rbox("dash", xd - dl * 0.5, 0.0, top - 0.13, dl, (hwb - 0.04) * 2.0, 0.26, p=3.2)
+    sink.rbox("dash", xd - dl + 0.08, ys, top + 0.015, 0.14, 0.30, 0.07, p=3.0)
+    sink.rbox("piano", xd - dl + 0.10, 0.0, top + 0.04, 0.02, 0.20, 0.12, p=5, rows=4)
+    # The wheel: a torus on a column raked 25 degrees back from upright.
+    cx, cz = xd - dl - 0.06, top - 0.02
+    tilt = math.radians(25.0)
+    nrm = (-math.cos(tilt), 0.0, math.sin(tilt))
+    up = (math.sin(tilt), 0.0, math.cos(tilt))
+    R, rt = 0.185, 0.017
+    rings = []
+    for i in range(17):
+        a = TAU * i / 16
+        c0 = (cx + up[0] * math.sin(a) * R, ys + math.cos(a) * R, cz + up[2] * math.sin(a) * R)
+        rd = (up[0] * math.sin(a), math.cos(a), up[2] * math.sin(a))
+        ring = []
+        for j in range(7):
+            b = TAU * j / 6
+            ring.append(tuple(c0[k] + (rd[k] * math.cos(b) + nrm[k] * math.sin(b)) * rt
+                              for k in range(3)))
+        rings.append(ring)
+    for i in range(16):
+        for j in range(6):
+            sink.face("dash", [rings[i][j], rings[i + 1][j], rings[i + 1][j + 1], rings[i][j + 1]])
+    sink.rbox("dash", cx + 0.01, ys, cz, 0.05, 0.12, 0.10, p=3.0, tilt=-tilt)
+    sink.rbox("dash", cx + 0.005, ys, cz - 0.01, 0.025, 0.34, 0.035, p=4.0, tilt=-tilt)
 
 
 # --------------------------------------------------------------------- cover --
@@ -1107,6 +1780,7 @@ def cover_spec(spec):
     out["arch_span"] = spec["arch_span"] * 1.6
     out["end_sill"] = sill + 0.130      # it does ride up over the bumpers
     out["waist"] = 0.52
+    out["cover_hem"] = True             # the old parabola: a hem, not an arch
     # Everything a cover hides.
     for k in ("gh", "rails", "roofbox", "mirror_x", "rocker", "recolour",
               "glass_panels"):
@@ -1130,7 +1804,7 @@ MODELS = [
         # a Croatian coast road in August.
         "x0": -1.915, "x1": 2.035, "axles": (-1.235, 1.235),
         "wheel": (0.295, 0.095), "arch_span": 0.42, "sill_frac": 0.945,
-        "sill": 0.300, "arch": 0.615, "end_sill": 0.440,
+        "sill": 0.200, "arch": 0.615, "end_sill": 0.300, "flare": 0.014,
         "waist": 0.58, "power": 3.2, "gh_power": 4.2, "seg": 16,
         "belt": [(2.035, 0.850), (1.680, 0.912), (1.050, 0.990),
                  (-0.800, 1.020), (-1.550, 1.000), (-1.915, 0.930)],
@@ -1151,7 +1825,7 @@ MODELS = [
         "doors": (0.820, -0.075, -0.850), "hood_x": 1.000,
         "glass": ((-0.990, 0.960),), "pillars": ((-0.125, -0.025, "piano"),),
         "spoiler": (-1.200, 0.560, 1.438),
-        "rim": "five",
+        "rim": "five", "plate": "ŠI 482-KM",
     },
     {
         "name": "crossover",
@@ -1160,7 +1834,7 @@ MODELS = [
         # 30 cm. The footage has several, white and silver, and one dark blue.
         "x0": -2.090, "x1": 2.160, "axles": (-1.300, 1.300),
         "wheel": (0.325, 0.100), "arch_span": 0.46, "sill_frac": 0.940,
-        "sill": 0.400, "arch": 0.720, "end_sill": 0.530,
+        "sill": 0.290, "arch": 0.720, "end_sill": 0.380, "flare": 0.022,
         "waist": 0.56, "power": 3.1, "gh_power": 4.2, "seg": 16,
         "belt": [(2.160, 0.950), (1.780, 1.015), (1.120, 1.090),
                  (-0.800, 1.120), (-1.700, 1.100), (-2.090, 1.020)],
@@ -1177,7 +1851,7 @@ MODELS = [
         # three things that make a small crossover not a tall hatchback.
         "doors": (0.860, -0.105, -0.900), "hood_x": 1.060,
         "glass": ((-1.140, 1.030),), "pillars": ((-0.160, -0.050, "piano"),),
-        "cladding": True, "rim": "split", "rim_col": "rimdk",
+        "cladding": True, "rim": "split", "rim_col": "rimdk", "plate": "ZG 731-EN",
         "spoiler": (-1.360, 0.600, 1.588),
     },
     {
@@ -1187,7 +1861,7 @@ MODELS = [
         # that separates an estate from a big hatchback at fifty metres.
         "x0": -2.320, "x1": 2.280, "axles": (-1.340, 1.340),
         "wheel": (0.315, 0.100), "arch_span": 0.44, "sill_frac": 0.945,
-        "sill": 0.320, "arch": 0.660, "end_sill": 0.460,
+        "sill": 0.215, "arch": 0.660, "end_sill": 0.310, "flare": 0.014,
         "waist": 0.58, "power": 3.3, "gh_power": 4.4, "seg": 16,
         "belt": [(2.280, 0.880), (1.900, 0.945), (1.180, 1.020),
                  (-0.800, 1.050), (-1.900, 1.040), (-2.320, 0.980)],
@@ -1206,7 +1880,7 @@ MODELS = [
         "doors": (0.900, -0.060, -0.940), "hood_x": 1.100,
         "glass": ((-1.975, 1.090),),
         "pillars": ((-0.110, -0.010, "piano"), (-1.060, -0.960, "piano")),
-        "rim": "multi",
+        "rim": "multi", "plate": "ST 569-BR",
     },
     {
         "name": "van",
@@ -1219,7 +1893,7 @@ MODELS = [
         # cab's; the rest of the flank above the belt is panel.
         "x0": -2.140, "x1": 2.260, "axles": (-1.380, 1.380),
         "wheel": (0.315, 0.105), "arch_span": 0.44, "sill_frac": 0.945,
-        "sill": 0.340, "arch": 0.690, "end_sill": 0.480,
+        "sill": 0.240, "arch": 0.690, "end_sill": 0.330, "flare": 0.010,
         "waist": 0.40, "power": 4.6, "gh_power": 3.6, "seg": 16,
         "belt": [(2.260, 0.930), (1.900, 1.000), (1.420, 1.050), (1.300, 1.062),
                  (-2.140, 1.075)],
@@ -1239,7 +1913,7 @@ MODELS = [
         "doors": (0.930, 0.080, -0.860), "hood_x": 1.380,
         "glass": ((0.110, 1.340),),
         "mirror_x": 1.180, "rocker": (1.150, -1.400),
-        "rim": "steel", "rim_col": "rimdk",
+        "rim": "steel", "rim_col": "rimdk", "plate": "ŠI 105-DV", "bulkhead": True,
     },
     {
         "name": "oldhatch",
@@ -1249,7 +1923,7 @@ MODELS = [
         # upright screen and one long side window instead of two.
         "x0": -1.760, "x1": 1.900, "axles": (-1.180, 1.180),
         "wheel": (0.275, 0.085), "arch_span": 0.40, "sill_frac": 0.955,
-        "sill": 0.300, "arch": 0.600, "end_sill": 0.420,
+        "sill": 0.200, "arch": 0.600, "end_sill": 0.290, "flare": 0.008,
         "waist": 0.60, "power": 4.4, "gh_power": 4.8, "seg": 16,
         "belt": [(1.900, 0.840), (1.600, 0.890), (1.020, 0.950),
                  (-0.700, 0.968), (-1.500, 0.958), (-1.760, 0.900)],
@@ -1268,6 +1942,35 @@ MODELS = [
         "grille": (0.08, -0.26, 0.60, 0.46),
         "doors": (0.780, -0.420), "hood_x": 0.930,
         "glass": ((-1.000, 0.910),), "rim": "steel",
+        "old_lamps": True, "grille_bars": 3, "plate": "ŠI 218-AK",
+    },
+    {
+        "name": "sedan",
+        # The three-box car the first five did not have, and the one Misha's
+        # list asked for by name (28 Sep). A compact saloon: the estate's
+        # footprint and wheels, a lower roof that comes down in a long
+        # backlight onto a BOOT DECK — which is the whole of what a sedan is
+        # from the side — and the boot lid's own shut line across it.
+        "x0": -2.300, "x1": 2.300, "axles": (-1.330, 1.370),
+        "wheel": (0.315, 0.100), "arch_span": 0.44, "sill_frac": 0.945,
+        "sill": 0.210, "arch": 0.660, "end_sill": 0.300, "flare": 0.016,
+        "waist": 0.58, "power": 3.4, "gh_power": 4.4, "seg": 16,
+        "belt": [(2.300, 0.860), (1.920, 0.930), (1.200, 1.000),
+                 (-0.800, 1.035), (-1.600, 1.050), (-2.300, 1.010)],
+        "hw": [(2.300, 0.736), (2.140, 0.832), (1.740, 0.878), (1.200, 0.890),
+               (0.000, 0.893), (-1.500, 0.893), (-2.140, 0.860), (-2.300, 0.750)],
+        "hwb": [(2.300, 0.660), (2.140, 0.762), (1.740, 0.822), (1.200, 0.848),
+                (0.000, 0.860), (-1.500, 0.858), (-2.140, 0.812), (-2.300, 0.690)],
+        "gh": [(1.080, None, 0.840, None), (0.300, 1.450, 0.848, 0.740),
+               (-0.640, 1.450, 0.845, 0.745), (-1.080, 1.390, 0.828, 0.700),
+               (-1.560, None, 0.780, None)],
+        # The backlight is the whole slope from the roof to the deck.
+        "bl": (-1.560, -0.700),
+        "mirror_x": 1.000, "rocker": (1.160, -1.160),
+        "doors": (0.890, -0.075, -0.930), "hood_x": 1.100, "deck_x": -1.600,
+        "glass": ((-1.300, 1.050),), "pillars": ((-0.125, -0.025, "piano"),),
+        "tail": (0.26, 0.30, 0.80, 0.40),
+        "rim": "multi", "plate": "RI 346-TP",
     },
 ]
 
@@ -1284,8 +1987,10 @@ MODELS.append(dict(
 
 # ---------------------------------------------------------------------- bake --
 
-def build_car(spec):
+def build_car(spec, near=False):
     spec = dict(spec)
+    if near:
+        spec["_near"] = True
     sink = Sink()
     if spec.get("cover"):
         # The cover, and then the car's own wheels standing under its hem.
@@ -1296,8 +2001,15 @@ def build_car(spec):
         build_wheels(spec, sink)
         return sink.objects()
     tab = build_shell(spec, sink)
-    build_wheels(spec, sink)
-    build_details(spec, sink, tab)
+    if near:
+        build_wheels_near(spec, sink)
+        build_details(spec, sink, tab)
+        build_lamps(spec, sink, tab)
+        build_near_details(spec, sink, tab)
+        build_interior(spec, sink, tab)
+    else:
+        build_wheels(spec, sink)
+        build_details(spec, sink, tab)
     return sink.objects()
 
 
@@ -1321,14 +2033,39 @@ def extents(spec):
         h = max(h, spec["roofbox"][4])
     elif spec.get("rails"):
         h = max(h, spec["rails"][3] + spec["rails"][4])
+    # And where the wheels touch, for the dark under each tyre (src/44-cars.js):
+    # the axles, the wheel radius, and how far out the middle of the tread is.
+    r, hwid = spec["wheel"]
+    tr = station(spec, spec["axles"][1])[4] - 0.030 - hwid
+    if not spec.get("cover_hem"):
+        hw += spec.get("flare", 0.014)
     return {"x0": round(spec["x0"], 3), "x1": round(spec["x1"], 3),
-            "hw": round(hw, 3), "h": round(h, 3)}
+            "hw": round(hw, 3), "h": round(h, 3),
+            "ax": [round(a, 3) for a in spec["axles"]], "r": round(r, 3),
+            "tr": round(tr, 3)}
 
 
 def build():
     preview = "--preview" in sys.argv
     meta = {}
     for spec in MODELS:
+        # The NEAR tier first, since the far one is exported last and is what
+        # the preview turns: gloss, trim and the see-through glass, for a car
+        # within 40 m. No body — the body is one mesh at every distance (the
+        # silhouette is the far tier's; everything the near tier adds is on,
+        # in or behind it), so it is baked once, below, and drawn once.
+        #
+        # Only with --near. Drawn, it cost 3.0-3.7 ms at the car park against
+        # 1.539.0's 0.5-1.2 (see CAR_NEAR_M in src/44-cars.js), so 1.542.2
+        # ships without it and the runtime falls back to the far tier.
+        if "--near" in sys.argv and not spec.get("cover"):
+            reset_scene()
+            near = build_car(spec, near=True)
+            for blob in ("gloss", "trim", "glass"):
+                items = [v for k, v in near.items() if BUCKETS[k][2] == blob]
+                if items:
+                    export(items, OUT / ("car_%s_n%s.fr3d.gz" % (spec["name"], blob)),
+                           note=spec["name"] + " near " + blob)
         reset_scene()
         parts = build_car(spec)
         body = [v for k, v in parts.items() if BUCKETS[k][2] == "body"]

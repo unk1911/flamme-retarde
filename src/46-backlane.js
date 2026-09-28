@@ -892,8 +892,20 @@ function buildBackLane(scene, jad, city) {
    */
   const carSites = [];
   {
+    // A third fewer here too (Misha, 28 Sep: *"decrease total numbers of cars
+    // by 33%"*), chosen the same way as the row behind the kabine — whole
+    // stretches off a slow wave, not every third bay (`carsToDrop`) — so the
+    // bays are listed first and parked second. Slot 126; the covered car
+    // behind its gate stays.
+    const bays = [];
     for (let t = LAYBY.t0 + 3.4; t < LAYBY.t1 - 2.4; t += 4.0) {
       if (jit(t | 0, 121) > 0.86) continue;
+      bays.push(t);
+    }
+    const drop = carsToDrop(bays,
+      bays.map((t) => carModelFor(jit(t | 0, 125)).key === 'covered'), (t) => jit(t | 0, 126));
+    for (const [k, t] of bays.entries()) {
+      if (drop.has(k)) continue;
       const model = carModelFor(jit(t | 0, 125));
       const size = carSize(model.key);
       const len = size.x1 - size.x0;
