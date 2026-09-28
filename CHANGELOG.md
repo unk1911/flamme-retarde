@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.538.2] — 2026-09-28
+
+### Chloe gets what Baye v2.0 got
+
+Misha: *"when i (chloe) go to change, and then click on 'B', and look at
+myself: i am missing nipples and pubic hair, we had the same problem with
+baye v2.0, can u add the same features to me (chloe)?"*
+
+Baye's fix was never a mesh or a separate asset. `tools/baye2_tex.py` paints
+the missing detail into her photographic skin in UV space, using the mesh's
+own UVs. It paints the pubic wedge, the soft cleft under it and the two
+areolae, each worked out at the 3D point on her body and composited into
+`baye2_skin.jpg`. Chloe was listed in that tool with `'pubic': False`,
+because in 1.471.0 she was in jeans from the hip down in every frame. The
+kabina changed that and the B camera made it visible.
+
+- **Same technique, same numbers.** `mh_chloe.obj` is the base mesh with
+  face targets only. Measured, her breast apex and midline mons surface are
+  within 0.2 mm of Baye's, so the rows, radii and positions are reused as
+  they are. She is now `'pubic': True` and gets the wedge, the cleft and the
+  areolae.
+- **Her colours, not Baye's.** A per-figure `paint` dict. The blue is dyed
+  in the shader and her brows are dark brown, so her pubic hair is a dark
+  blonde-brown (70, 52, 37), a shade lighter and warmer than Baye's. Her
+  areolae keep Baye's ratio to the skin around them. Her chest in the map is
+  (207, 161, 129) against Baye's (216, 172, 147), which gives (112, 68, 59).
+- **Dressed, none of it shows.** The garments replace the texture where they
+  are (`mix(base * vcol, vcol, cover)`), and the vest and jeans both cover
+  it fully. Checked front and three-quarter.
+- **Baye unchanged.** She has no `paint`, so she uses the module's colours.
+  Her `baye2_skin.jpg` regenerates byte-for-byte.
+
+Only `build/payload/chloe2_skin.jpg` and the tool changed. No shader, rig,
+face, hair, tattoo, necklace or clothing code was touched.
+
 ## [1.538.1] — 2026-09-28
 
 ### the olive, grown and leafed
