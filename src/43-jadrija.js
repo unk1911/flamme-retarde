@@ -1510,32 +1510,128 @@ async function buildJadrija(scene) {
   const LADDERS = [];
 
   /**
-   * A ladder: two galvanised uprights bent over the coping, and rungs. Half a
-   * dozen boxes, and the thing they buy is scale — you cannot look at a quay
-   * with a ladder on it and misjudge how high above the water you are.
+   * A round tube swept along `pts` in the shore frame, `[t, s, y]` each, with
+   * smooth normals — the sea ladders' tube.
+   *
+   * The same sweep as the skakaonica's pipes (`sweep`, below, "the two pipes,
+   * which ARE the ladder"), with two things that one did not need. The normals
+   * are the tube's own, not the facets': that ladder is seen from its deck and
+   * these are seen from a metre away by everyone who climbs out, and ten flat
+   * faces on a 48 mm tube is square tubing with the corners filed off. And the
+   * section may be an ellipse — `r` as `[across, up]` — with its first axis
+   * taken from `ref` rather than always along t, because a tread runs along t.
+   * `r` may also be a function of the point's index, which makes a flange.
+   * `shade` is a bright-above, dark-below on the vertex colour: the only
+   * brushed-steel this material can do is the sky on top of the tube.
+   */
+  function tubeTS(pts, r, col, sides = 10, ref = [1, 0, 0], shade = 0.16) {
+    const ring = [];
+    for (let k = 0; k < pts.length; k++) {
+      const a = pts[Math.max(0, k - 1)], c = pts[Math.min(pts.length - 1, k + 1)];
+      let tx = c[0] - a[0], ts = c[1] - a[1], ty = c[2] - a[2];
+      const tl = Math.hypot(tx, ts, ty) || 1; tx /= tl; ts /= tl; ty /= tl;
+      const dp = ref[0] * tx + ref[1] * ts + ref[2] * ty;
+      let ux = ref[0] - dp * tx, us = ref[1] - dp * ts, uy = ref[2] - dp * ty;
+      const ul = Math.hypot(ux, us, uy) || 1; ux /= ul; us /= ul; uy /= ul;
+      const vx = ts * uy - ty * us, vs = ty * ux - tx * uy, vy = tx * us - ts * ux;
+      const rk = typeof r === 'function' ? r(k) : r;
+      const ra = typeof rk === 'number' ? rk : rk[0], rb = typeof rk === 'number' ? rk : rk[1];
+      const p = pts[k], C = W(p[0], p[1], p[2]);
+      const row = [];
+      for (let i = 0; i < sides; i++) {
+        const q = (i / sides) * TAU, cq = Math.cos(q), sq = Math.sin(q);
+        const Q = W(p[0] + (ux * ra * cq + vx * rb * sq), p[1] + (us * ra * cq + vs * rb * sq),
+          p[2] + (uy * ra * cq + vy * rb * sq));
+        // The ellipse's normal is not its radius: (cos/a, sin/b), not (cos, sin).
+        const N = W(p[0] + (ux * cq / ra + vx * sq / rb) * 1e-3, p[1] + (us * cq / ra + vs * sq / rb) * 1e-3,
+          p[2] + (uy * cq / ra + vy * sq / rb) * 1e-3);
+        let nx = N[0] - C[0], ny = N[1] - C[1], nz = N[2] - C[2];
+        const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+        const g = 1 - shade + shade * 1.6 * Math.max(-0.4, ny);
+        row.push({ P: Q, N: [nx, ny, nz], c: [col[0] * g, col[1] * g, col[2] * g] });
+      }
+      ring.push(row);
+    }
+    const face = (A, B, D) => {
+      // Wound outward whichever way the shore frame turns (see `agaveTS`):
+      // the material flips any normal that faces away from the camera.
+      const ex = B.P[0] - A.P[0], ey = B.P[1] - A.P[1], ez = B.P[2] - A.P[2];
+      const fx = D.P[0] - A.P[0], fy = D.P[1] - A.P[1], fz = D.P[2] - A.P[2];
+      const gx = ey * fz - ez * fy, gy = ez * fx - ex * fz, gz = ex * fy - ey * fx;
+      const out = gx * (A.N[0] + B.N[0] + D.N[0]) + gy * (A.N[1] + B.N[1] + D.N[1])
+        + gz * (A.N[2] + B.N[2] + D.N[2]);
+      if (out >= 0) b.smooth(A.P, B.P, D.P, A.N, B.N, D.N, A.c, B.c, D.c);
+      else b.smooth(A.P, D.P, B.P, A.N, D.N, B.N, A.c, D.c, B.c);
+    };
+    for (let k = 0; k < ring.length - 1; k++) {
+      for (let i = 0; i < sides; i++) {
+        const i1 = (i + 1) % sides;
+        face(ring[k][i], ring[k][i1], ring[k + 1][i1]);
+        face(ring[k][i], ring[k + 1][i1], ring[k + 1][i]);
+      }
+    }
+  }
+
+  /**
+   * A ladder: two stainless handrails bent over the coping, and treads. The
+   * thing it buys is scale — you cannot look at a quay with a ladder on it
+   * and misjudge how high above the water you are.
    */
   function ladder(t) {
     LADDERS.push(t);
     const st = at(t), lip = st.lip;
-    const GALV = [0.60, 0.62, 0.63];
-    // The handrail arches *over* the coping and down the face, which is a
-    // different object from the one that was here.
+    // Misha, 28 Sep 2026: *"the ladder for going into the sea, make it
+    // prettier, right now looks too rigid."* It was eleven boxes: 70 mm square
+    // stiles with a mitred corner at each end of the top, and flat bars for
+    // rungs — welded square tubing, which nobody has bolted to a bathing quay
+    // since there were bathing quays. What IS bolted to them is a stainless
+    // pool ladder: one bent round tube a side, out of a flange in the deck, up,
+    // over the coping in two smooth bends, and down the face into the sea as
+    // the stile, with the treads between the stiles running on under the
+    // water. Same place, same 0.90 m rail, same 0.56 m between the tubes and
+    // the same stand-off from the face — the footprint `barreAt` measured the
+    // dancer against is the one that is here. Only the section changed.
     //
-    // What was here returned inland along the deck, as a lido's does. Every
-    // ladder in the survey is an inverted U: bolted to the concrete 0.42 m
-    // back from the edge, up to 0.90 m, over the lip, and down the seaward face
-    // to a metre under the water. Rail height measured at 0.94 m — 125 px
-    // against a 232 px bather — so the 0.92 that was already here is right and
-    // is the one number in this function that does not move.
+    // That footprint is the survey's, and still right: every ladder in it is
+    // an inverted U, bolted to the concrete 0.42 m back from the edge, up to
+    // 0.90 m, over the lip, and down the seaward face to a metre under the
+    // water. Rail height measured at 0.94 m — 125 px against a 232 px bather.
+    const STEEL = [0.70, 0.715, 0.725];
+    const R = 0.024;                     // a 48 mm tube, which is what they are
+    const S_IN = 0.42, S_OUT = -0.20;    // the deck leg's s, and the stile's
+    const TOPc = lip + 0.90 - R;         // the crown's centreline: rail top 0.90
+    const BEND = 0.19;                   // each bend's radius, in the tube's centre
+    const Y_END = -1.05;                 // a metre under: the last tread you can see is never the last
     for (const o of [-0.28, 0.28]) {
-      const a = t + o - 0.035, c = t + o + 0.035;
-      boxTS(a, c, 0.38, 0.46, lip, lip + 0.90, GALV);          // inland leg
-      boxTS(a, c, -0.24, 0.46, lip + 0.82, lip + 0.90, GALV);  // over the coping
-      boxTS(a, c, -0.24, -0.16, -1.05, lip + 0.90, GALV);      // and down
+      const tt = t + o;
+      const path = [[tt, S_IN, lip - 0.02], [tt, S_IN, TOPc - BEND]];
+      for (let k = 1; k <= 6; k++) {       // up and over, inland bend
+        const a = (k / 6) * (Math.PI / 2);
+        path.push([tt, S_IN - BEND + BEND * Math.cos(a), TOPc - BEND + BEND * Math.sin(a)]);
+      }
+      for (let k = 0; k <= 6; k++) {       // and down, seaward bend
+        const a = Math.PI / 2 + (k / 6) * (Math.PI / 2);
+        path.push([tt, S_OUT + BEND + BEND * Math.cos(a), TOPc - BEND + BEND * Math.sin(a)]);
+      }
+      path.push([tt, S_OUT, Y_END]);
+      tubeTS(path, R, STEEL, 10);
+      // The deck flange: a round escutcheon where the tube goes into the
+      // concrete, with a bevel up to it, because a tube that simply stops at a
+      // surface reads as sunk into mud.
+      tubeTS([[tt, S_IN, lip - 0.01], [tt, S_IN, lip + 0.010], [tt, S_IN, lip + 0.026]],
+        (k) => [0.060, 0.058, R + 0.004][k], STEEL, 10, [1, 0, 0], 0.10);
+      // And the stand-off that holds the stile off the face under the coping,
+      // on a round plate against the wall.
+      const yb = lip - 0.30;
+      tubeTS([[tt, S_OUT, yb], [tt, -0.012, yb]], 0.014, STEEL, 6, [1, 0, 0]);
+      tubeTS([[tt, -0.014, yb], [tt, 0.002, yb]], 0.042, STEEL, 8, [1, 0, 0], 0.10);
     }
-    for (let k = 0; k < 5; k++) {
-      const y = lip + 0.30 - k * 0.36;
-      boxTS(t - 0.30, t + 0.30, -0.23, -0.17, y - 0.03, y + 0.03, GALV);
+    // The treads: flat, 80 mm deep, rounded front and back, 0.28 m apart from
+    // just under the coping down to the end of the stiles. Swept along t, so
+    // their section's first axis is s.
+    for (let y = lip - 0.24; y > Y_END + 0.15; y -= 0.28) {
+      tubeTS([[t - 0.28 + R * 0.6, S_OUT + 0.012, y], [t + 0.28 - R * 0.6, S_OUT + 0.012, y]],
+        [0.040, 0.011], STEEL, 8, [0, 1, 0], 0.22);
     }
   }
 
