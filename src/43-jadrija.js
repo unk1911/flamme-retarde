@@ -563,6 +563,11 @@ async function buildJadrija(scene) {
   // stand behind the promenade has the same bark, the same needles and the
   // same dappled shadow as the wood behind it. One draw and one caster.
   const arbor = propBuilder();
+  // 1.537.1: and the olives, out of `arbor` into their own buffer, because
+  // they have their own material now — leaves drawn per pixel, silver
+  // undersides, a fissured grey bark (`oliveMaterial` in 45-trees.js). One
+  // more draw and one more caster.
+  const olives = propBuilder();
   // 1.536.0: the stone, the small plants and the grass, each in its own buffer
   // with its own surface from 46-flora.js — see the note there. `stones` is
   // every loose lump of limestone on the shore; `flora` the agaves and potted
@@ -21594,66 +21599,321 @@ async function buildJadrija(scene) {
     }
   }
 
-  /** An olive: a short trunk that forks low, and a silver-grey crown. */
+  /**
+   * An olive (1.537.1), grown rather than assembled.
+   *
+   * Misha, 27 Sep 2026, from the hammock looking over the lane wall at the one
+   * standing at t 441.6: *"some trees like this one still looks like crap ...
+   * but yeah the tall trees look amaze"*. It was a smooth grey tube with four
+   * straight sticks off the top, each ending under one of nine puffs up to
+   * 1.5 m across — a stick figure holding cabbages. The pines had been rebuilt
+   * twice (1.534.0, 1.537.0) and the olive had only been retuned, so it was
+   * the last tree on the shore still made of the old parts, and next to the
+   * new pines it showed.
+   *
+   * What an old olive on this coast is, from the ground up:
+   *
+   *   · A SHORT, FAT, TWISTED BOLE. Flared hard into the ground over the last
+   *     hand's breadth, with buttresses; not round but lobed and fluted, and
+   *     the lobes spiral up it — the grain of an olive winds. Here: a loft of
+   *     fourteen sides and ten rings, three harmonics of lobe turning 1.2 to
+   *     2.4 rad over its height, and a fourth, squared, that only exists in
+   *     the flare. The grooves are darker than the ridges in the vertex colour,
+   *     so the twist reads before the bark shader does anything.
+   *   · SPLIT LOW. Two or three stems leave the bole at a metre or so, leaning
+   *     out twenty to forty-five degrees from each other — the silhouette of
+   *     the species is that fork.
+   *   · CROOKED, TAPERING LIMBS, three levels of them. Each is a loft along a
+   *     curve that bends in a plane of its own and kinks a little at every
+   *     ring, with parallel-transported rings so nothing pinches; each forks
+   *     in two or three, and about half of them throw a side shoot from the
+   *     middle, so no two forks of the tree are alike. Radii fall by the
+   *     pipe rule (a fork's children share their parent's section), so the
+   *     tips are twigs and not broom handles.
+   *   · MANY SMALL CLUSTERS OF LEAF, hung along the last branches and at their
+   *     tips with a twig to each, and three over the middle so the crown is
+   *     not a ring round a hole: 36 to 95 of them, 67 on the average over the
+   *     29 olives, each 0.6 to 1.1 m across on a 4.6 m tree, where there were
+   *     nine of up to 1.8 m. With sky between them. What each cluster is MADE
+   *     of — narrow leaves, dark above and silver below — is per pixel: see
+   *     GLSL_OLIVE in 45-trees.js.
+   *
+   * The crown is kept where the old one was: from about 0.4 h up, out to about
+   * 0.55 h from the trunk. That is the open-crowned four metres the three in
+   * front of the vikendica were asked for, and nothing is lower than 1.55 m on
+   * any tree over 3.5 m, so walking under one is walking under it.
+   *
+   * RULE 4. `rng` is drawn exactly once here, for the facing, as it always
+   * was, and `olive` is called with the same rng-derived height at the same
+   * places. Everything else — the split, every bend and fork, every cluster —
+   * is `jit` off the tree's own station (`pineKey`), counted by `J`, so the
+   * beach downstream of the grove does not move by a centimetre. Nothing
+   * moved and no blocker changed: the bole is 0.29 m through the radius on a
+   * 4.6 m tree and about 0.41 m at the ground, so it is inside the 0.5 m
+   * `greens` blocker everywhere but the odd buttress at ankle height.
+   *
+   * About 5,100 triangles a tree where the old one was about 800, half wood
+   * and half leaf, all in one buffer, `olives`: see the CHANGELOG for 1.537.1
+   * for what that costs.
+   */
   function olive(t, s, y, h) {
-    // Into `arbor`, like the pine, and put back on the way out.
+    // Into `olives`, and put back on the way out.
     const bWas = b;
-    b = arbor;
+    b = olives;
     const P = facing(t, s, rng() * TAU);
-    // The wood, which was a pentagonal post with two square ones stood beside
-    // it at head height, not touching it and not touching the crown either.
-    // An olive's whole character below the leaves is a short fat bole that
-    // twists and splits into three or four limbs, each going out to a mass of
-    // leaf — so that is what is drawn: the bole as one `limb` with a lean off
-    // `jit`, and a limb from its top out towards each of the four outer
-    // lobes, ending under it. Grey and not warm, so the plate shader leaves
-    // it alone; the olive is not plated.
     const key = pineKey(t, s);
-    const BARK = [0.400, 0.360, 0.300];
-    const tt = (jit(key, 971) - 0.5) * 0.20 * h, ts = (jit(key, 972) - 0.5) * 0.20 * h;
-    limb(P, [[y - 0.05, 0.25, 0, 0], [y + h * 0.14, 0.19, tt * 0.3, ts * 0.5],
-      [y + h * 0.36, 0.16, tt, ts]], BARK, 8);
-    for (const i of [1, 2, 3, 4]) {
-      const [dx, dz, r, hy] = OLIVE_LOBES[i];
-      const ex = dx * h * 0.5 * 0.72, ez = dz * h * 0.5 * 0.72;
-      limb(P, [[y + h * 0.33, 0.10, tt, ts],
-        [y + h * (0.36 + (hy - 0.36) * 0.45), 0.075,
-          tt + (ex - tt) * 0.45, ts + (ez - ts) * 0.45 + (jit(key + i, 973) - 0.5) * 0.3],
-        [y + h * (hy - r * 0.55), 0.035, ex, ez]], BARK, 6);
+    let nj = 0;
+    const J = () => jit(key, 6000 + nj++);
+    const S = h / 4.6;
+    const BARK = [0.398, 0.376, 0.342];
+    const UP = [0, 1, 0];
+    const add = (a, c, k = 1) => [a[0] + c[0] * k, a[1] + c[1] * k, a[2] + c[2] * k];
+    const nrm = (a) => {
+      const L = Math.hypot(a[0], a[1], a[2]) || 1;
+      return [a[0] / L, a[1] / L, a[2] / L];
+    };
+    const crs = (a, c) => [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2],
+      a[0] * c[1] - a[1] * c[0]];
+    const dot = (a, c) => a[0] * c[0] + a[1] * c[1] + a[2] * c[2];
+    // Some direction square to d, at random.
+    const perp = (d) => {
+      const r = [J() - 0.5, J() - 0.5, J() - 0.5];
+      return nrm(add(r, d, -dot(r, d)));
+    };
+    const outOf = (p) => {
+      const L = Math.hypot(p[0], p[2]);
+      return L > 1e-3 ? [p[0] / L, 0, p[2] / L] : [1, 0, 0];
+    };
+    // Local x, height, z — height is world y, as `pine` and `puff` have it.
+    const Wp = (p) => P(p[0], p[2], p[1]);
+    const floorY = y + (h > 3.5 ? 1.55 : h * 0.42);
+    const clusters = [];
+
+    // ── the bole ──
+    const rb = 0.10 + 0.042 * h;
+    const hs = Math.max(0.55, h * (0.17 + 0.08 * J()));
+    const lx = (J() - 0.5) * 0.30 * S, lz = (J() - 0.5) * 0.30 * S;
+    const tw = (J() < 0.5 ? -1 : 1) * (1.2 + 1.2 * J());
+    const ph = [J() * TAU, J() * TAU, J() * TAU, J() * TAU];
+    {
+      const C = [], R = [];
+      const N = 10, top = hs - rb * 0.15;
+      for (let k = 0; k < N; k++) {
+        const u = k / (N - 1);
+        const z = -0.08 + (top + 0.08) * u;
+        const e = Math.pow(u, 1.5);
+        C.push([lx * e, y + z, lz * e]);
+        R.push(rb * (1 + 0.40 * Math.exp(-Math.max(z, 0) / 0.20)) * (1 - 0.12 * u));
+      }
+      // Closed over the top, in the crotch between the stems, where an open
+      // end showed as a flat saw cut.
+      C.push([lx, y + top + rb * 0.45, lz]);
+      R.push(R[N - 1] * 0.45);
+      oliveTube(Wp, C, R, 14, (k, a) => {
+        const u = k / (N - 1), z = C[k][1] - y;
+        const m = 1 + 0.15 * Math.sin(2 * a + ph[0] + tw * u)
+          + 0.10 * Math.sin(3 * a + ph[1] + tw * u)
+          + 0.06 * Math.sin(5 * a + ph[2] - tw * u)
+          + 0.20 * Math.exp(-Math.max(z, 0) / 0.30) * Math.max(0, Math.sin(4 * a + ph[3])) ** 2;
+        return m;
+      }, (k, a, m) => {
+        const z = C[k][1] - y;
+        const sh = Math.min(1.1, Math.max(0.45, 0.72 + (m - 1) * 1.6))
+          * (0.70 + 0.30 * Math.min(1, Math.max(0, z / 0.45)));
+        return [BARK[0] * sh, BARK[1] * sh, BARK[2] * sh];
+      });
     }
-    // Lobes with light between them, which is what makes an olive read as an
-    // olive: you can see the sky through the middle of one.
-    //
-    // It said so and it did not do it, for the same reason the pine did not.
-    // Five lobes of 0.33h, 0.24h, 0.23h, 0.21h and 0.20h come to 0.95h² of
-    // foliage over a crown that is 0.79h² — a hundred and twenty per cent, so
-    // there was no hole in it anywhere and the middle was double-covered. That
-    // is the tree standing over the promenade at t 230, and the olive plate in
-    // the complaint is an olive.
-    //
-    // Nine lobes, none of them more than 0.16h, spread out to the rim and over
-    // twice the height band the five sat in. 0.49h² over 0.83h², which is
-    // 58 %: from underneath that is four or five separate masses with daylight
-    // between them and two more behind, which is what an olive is. The three
-    // in front of the vikendica's terrace were asked for as "four metres and
-    // open-crowned, so from the terrace you are looking at the sea through a
-    // tree rather than at a tree" — this is the first version of them that is.
-    const band = [y + h * 0.34, y + h * 0.96];
-    const DK = [0.205, 0.240, 0.162], LT = [0.392, 0.448, 0.302];
-    const olC = OLIVE_LOBES;
-    for (let i = 0; i < olC.length; i++) {
-      const [dx, dz, r, hy] = olC[i];
-      puff(P, dx * h * 0.5, dz * h * 0.5, y + h * hy, h * r * 0.82, h * r,
-        DK, LT, band, 9, 4, 0.52, i + 3);
+
+    // ── the limbs ──
+    const SEGS = [0, 6, 5, 4], SIDES = [0, 10, 7, 5];
+    const grow = (lvl, p0, d0, len, r0) => {
+      const segs = SEGS[lvl];
+      const step = len / segs;
+      let d = d0, bv = perp(d0);
+      const beta = (0.20 + 0.45 * J()) / segs;
+      const C = [p0], R = [r0], D = [d0];
+      let p = p0;
+      for (let k = 1; k <= segs; k++) {
+        const u = k / segs;
+        d = nrm(add(d, bv, beta));
+        bv = nrm(add(bv, d, -dot(bv, d)));
+        d = nrm(add(d, perp(d), 0.08));
+        // Up for the first two levels, which is the light; out and a little
+        // down at the tips, which is the weight of the leaf.
+        const trop = lvl === 1 ? 0.06 : lvl === 2 ? 0.04 : 0.01 - 0.06 * u;
+        d = nrm(add(add(d, UP, trop), outOf(p), lvl === 3 ? 0.05 : 0.02));
+        p = add(p, d, step);
+        C.push(p); R.push(r0 * (1 - 0.40 * u)); D.push(d);
+      }
+      const rEnd = r0 * 0.60;
+      C.push(add(p, d, rEnd * 0.9)); R.push(rEnd * 0.35);
+      const lph = J() * TAU, ltw = (J() - 0.5) * 2;
+      const lob = lvl === 1 ? 0.09 : lvl === 2 ? 0.05 : 0;
+      oliveTube(Wp, C, R, SIDES[lvl], lob ? (k, a) => 1
+        + lob * Math.sin(2 * a + lph + ltw * k / segs)
+        + lob * 0.6 * Math.sin(3 * a - lph) : null, (k, a, m) => {
+        const sh = Math.min(1.1, Math.max(0.55, 0.80 + (m - 1) * 1.6)) * (1 + 0.06 * lvl);
+        return [BARK[0] * sh, BARK[1] * sh, BARK[2] * sh];
+      });
+      if (lvl < 3) {
+        const n = lvl === 1 ? (J() < 0.55 ? 3 : 2) : (J() < 0.40 ? 3 : 2);
+        const e1 = perp(d), e2 = crs(d, e1);
+        const phi0 = J() * TAU;
+        for (let i = 0; i < n; i++) {
+          const phi = phi0 + (i / n) * TAU + (J() - 0.5) * 0.8;
+          const th = (lvl === 1 ? 0.40 : 0.50) + 0.35 * J();
+          let cd = add(add([0, 0, 0], d, Math.cos(th)),
+            add(add([0, 0, 0], e1, Math.cos(phi)), e2, Math.sin(phi)), Math.sin(th));
+          cd = nrm(add(add(cd, outOf(p), 0.28), UP, lvl === 1 ? 0.10 : 0.04));
+          const cl = h * (lvl === 1 ? 0.23 + 0.07 * J() : 0.15 + 0.05 * J());
+          const cr = Math.max(rEnd * (n === 3 ? 0.66 : 0.76), 0.016);
+          grow(lvl + 1, add(p, cd, -cr * 0.8), cd, cl, cr);
+        }
+        // A side shoot off the middle now and then.
+        if (J() < 0.55) {
+          const k = Math.min(segs - 1, Math.max(1, Math.round((0.45 + 0.25 * J()) * segs)));
+          const sd = nrm(add(add(perp(D[k]), outOf(C[k]), 0.5), UP, 0.25));
+          grow(Math.min(lvl + 1, 3), C[k], sd, len * 0.55, Math.max(R[k] * 0.55, 0.016));
+        }
+        // And on a limb, a cluster hung from its outer half, which keeps the
+        // middle of the crown from being hollow.
+        if (lvl === 2 && J() < 0.80) {
+          const k = Math.max(1, Math.round(segs * (0.55 + 0.3 * J())));
+          const rc = S * (0.32 + 0.14 * J());
+          const c = add(add(C[k], perp(D[k]), rc * 0.9), UP, rc * 0.25);
+          clusters.push([c, rc, C[k]]);
+        }
+      } else {
+        // The leaves: one over the tip, and one or two strung back along the
+        // branch on short twigs of their own.
+        const rc = S * (0.34 + 0.18 * J());
+        clusters.push([add(p, d, rc * 0.35), rc, null]);
+        const m = J() < 0.5 ? 2 : 1;
+        for (let i = 0; i < m; i++) {
+          const k = Math.max(1, Math.round(segs * (0.35 + 0.4 * J())));
+          const rr = S * (0.30 + 0.16 * J());
+          const c = add(add(C[k], perp(D[k]), rr * 0.95), UP, -rr * 0.15);
+          clusters.push([c, rr, C[k]]);
+        }
+      }
+    };
+    const n0 = h < 3 ? 2 : (J() < 0.65 ? 3 : 2);
+    const a0 = J() * TAU;
+    for (let i = 0; i < n0; i++) {
+      const a = a0 + (i / n0) * TAU + (J() - 0.5) * 0.8;
+      const tilt = 0.45 + 0.35 * J();
+      const dh = [Math.cos(a), 0, Math.sin(a)];
+      const d = nrm([dh[0] * Math.sin(tilt), Math.cos(tilt), dh[2] * Math.sin(tilt)]);
+      // Started well down inside the bole, so the open end of the stem is
+      // buried in it and the crotch is a join and not a cut.
+      const p0 = [lx + dh[0] * rb * 0.12, y + hs - rb * 0.85, lz + dh[2] * rb * 0.12];
+      grow(1, p0, d, h * (0.25 + 0.06 * J()), rb * (n0 === 2 ? 0.74 : 0.63));
+    }
+
+    // And three over the middle, higher than the rest: without them the
+    // crown is a ring of limbs round a hole, which is the pine's old lesson
+    // (see the three over the middle in `pine`). Hung off the centroid of
+    // what grew, so they sit in this tree's crown and not the average one.
+    {
+      let mx = 0, mz = 0, top = -1e9;
+      for (const [c] of clusters) { mx += c[0]; mz += c[2]; top = Math.max(top, c[1]); }
+      mx /= clusters.length || 1; mz /= clusters.length || 1;
+      for (let i = 0; i < 3; i++) {
+        const a = J() * TAU, d = h * (0.05 + 0.10 * J());
+        const rc = S * (0.36 + 0.14 * J());
+        clusters.push([[mx + Math.cos(a) * d, top - rc * (0.3 + 0.9 * J()),
+          mz + Math.sin(a) * d], rc, null]);
+      }
+    }
+
+    // ── the leaves ──
+    // Grey-green, darker under the crown and lit over it across the whole
+    // tree, as before; each cluster a shade of its own. The silver is in the
+    // shader.
+    const band = [y + h * 0.36, y + h * 0.98];
+    const DK = [0.212, 0.242, 0.172], LT = [0.418, 0.458, 0.338];
+    for (let i = 0; i < clusters.length; i++) {
+      const [c, rc, from] = clusters[i];
+      const cy = Math.max(c[1], floorY + rc * 0.7);
+      const k = 0.86 + 0.28 * J();
+      const dk = DK.map((v) => v * k), lt = LT.map((v) => v * k);
+      if (from) {
+        limb(P, [[from[1], 0.013 * Math.max(S, 0.6), from[0], from[2]],
+          [cy, 0.006, c[0], c[2]]], BARK, 3);
+      }
+      puff(P, c[0], c[2], cy, rc * 0.66, rc * 1.08, dk, lt, band, 6, 3, 0.50,
+        (key % 97) + i * 3);
     }
     b = bWas;
   }
-  // Hoisted out of `olive` so its limbs can find the lobes they carry.
-  const OLIVE_LOBES = [[0.06, -0.08, 0.16, 0.80], [-0.68, 0.48, 0.15, 0.52],
-    [0.66, -0.42, 0.14, 0.48], [0.34, 0.66, 0.13, 0.72],
-    [-0.42, -0.62, 0.13, 0.62], [-0.14, 0.74, 0.12, 0.42],
-    [0.60, 0.26, 0.12, 0.64], [-0.60, -0.10, 0.11, 0.44],
-    [0.18, -0.72, 0.11, 0.56]];
+
+  /**
+   * A loft along a polyline of local points `C` (x, world y, z) with radii
+   * `R`, for the olive. Rings are parallel-transported down the curve, so a
+   * limb that starts upright and bends over does not pinch where `limb`'s
+   * up-or-east frame would flip. `lobe(k, a)` scales the radius round ring
+   * k (null for round), and `col(k, a, m)` colours each vertex given that
+   * scale. Normals are taken off the finished surface, so the lobes shade.
+   */
+  function oliveTube(Wp, C, R, sides, lobe, col) {
+    const n = C.length;
+    const T = C.map((c, k) => {
+      const a = C[Math.max(0, k - 1)], z = C[Math.min(n - 1, k + 1)];
+      const d = [z[0] - a[0], z[1] - a[1], z[2] - a[2]];
+      const L = Math.hypot(d[0], d[1], d[2]) || 1;
+      return [d[0] / L, d[1] / L, d[2] / L];
+    });
+    let U = Math.abs(T[0][0]) < 0.9 ? [1, 0, 0] : [0, 0, 1];
+    const P = [], Q = [], K = [];
+    for (let k = 0; k < n; k++) {
+      const t = T[k];
+      const dp = U[0] * t[0] + U[1] * t[1] + U[2] * t[2];
+      U = [U[0] - t[0] * dp, U[1] - t[1] * dp, U[2] - t[2] * dp];
+      const ul = Math.hypot(U[0], U[1], U[2]) || 1;
+      U = [U[0] / ul, U[1] / ul, U[2] / ul];
+      const V = [t[1] * U[2] - t[2] * U[1], t[2] * U[0] - t[0] * U[2], t[0] * U[1] - t[1] * U[0]];
+      const ring = [], cols = [];
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * TAU;
+        const m = lobe ? lobe(k, a) : 1;
+        const r = R[k] * m;
+        const ca = Math.cos(a) * r, sa = Math.sin(a) * r;
+        ring.push(Wp([C[k][0] + U[0] * ca + V[0] * sa, C[k][1] + U[1] * ca + V[1] * sa,
+          C[k][2] + U[2] * ca + V[2] * sa]));
+        cols.push(col(k, a, m));
+      }
+      P.push(ring); K.push(cols); Q.push(Wp(C[k]));
+    }
+    const N = P.map((ring, k) => ring.map((p, i) => {
+      const a = ring[(i + sides - 1) % sides], z = ring[(i + 1) % sides];
+      const lo = P[Math.max(0, k - 1)][i], hi = P[Math.min(n - 1, k + 1)][i];
+      const e = [z[0] - a[0], z[1] - a[1], z[2] - a[2]];
+      const f = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+      let c = [e[1] * f[2] - e[2] * f[1], e[2] * f[0] - e[0] * f[2], e[0] * f[1] - e[1] * f[0]];
+      const o = [p[0] - Q[k][0], p[1] - Q[k][1], p[2] - Q[k][2]];
+      if (c[0] * o[0] + c[1] * o[1] + c[2] * o[2] < 0) c = [-c[0], -c[1], -c[2]];
+      const L = Math.hypot(c[0], c[1], c[2]) || 1;
+      return [c[0] / L, c[1] / L, c[2] / L];
+    }));
+    const tri = (k0, i0, k1, i1, k2, i2) => {
+      const A = P[k0][i0], B = P[k1][i1], D = P[k2][i2];
+      const nA = N[k0][i0], nB = N[k1][i1], nD = N[k2][i2];
+      const g = [(B[1] - A[1]) * (D[2] - A[2]) - (B[2] - A[2]) * (D[1] - A[1]),
+        (B[2] - A[2]) * (D[0] - A[0]) - (B[0] - A[0]) * (D[2] - A[2]),
+        (B[0] - A[0]) * (D[1] - A[1]) - (B[1] - A[1]) * (D[0] - A[0])];
+      const s = g[0] * (nA[0] + nB[0] + nD[0]) + g[1] * (nA[1] + nB[1] + nD[1])
+        + g[2] * (nA[2] + nB[2] + nD[2]);
+      if (s >= 0) b.smooth(A, B, D, nA, nB, nD, K[k0][i0], K[k1][i1], K[k2][i2]);
+      else b.smooth(A, D, B, nA, nD, nB, K[k0][i0], K[k2][i2], K[k1][i1]);
+    };
+    for (let k = 0; k < n - 1; k++) {
+      for (let i = 0; i < sides; i++) {
+        const j = (i + 1) % sides;
+        tri(k, i, k, j, k + 1, j);
+        tri(k, i, k + 1, j, k + 1, i);
+      }
+    }
+  }
 
   const OLEANDER_GONE = true;
 
@@ -30130,6 +30390,11 @@ async function buildJadrija(scene) {
   const arborMesh = new THREE.Mesh(arbor.geo(),
     treeMaterial({ instanced: false, cut: true, emissive: 0.10 }));
   arborMesh.userData.tree = true;
+  // The olives — see `olive`. `tree` so they cast through the tuft-chewing
+  // depth program and throw a dappled shadow like the pines beside them.
+  const oliveMesh = new THREE.Mesh(olives.geo(), oliveMaterial());
+  oliveMesh.userData.tree = true;
+  oliveMesh.name = 'jad:olives';
   // 1.536.0: the stone, the agaves and pots, and the grass — see 46-flora.js.
   // Stones and agaves cast (the shared depth program: neither has anything to
   // discard); the grass does not, because a tuft's shadow is a smudge the size
@@ -30380,12 +30645,12 @@ async function buildJadrija(scene) {
     return m;
   });
   const kabRendMesh = rendMeshes[rends.findIndex((r) => r.out)] || null;
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh,
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, oliveMesh,
     stonesMesh, floraMesh, shrubMesh, hedgeMesh]) {
     m.frustumCulled = false;
   }
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, ...rendMeshes,
-    ...featherMeshes, stonesMesh, floraMesh, shrubMesh, hedgeMesh, ...grassMeshes]) {
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, oliveMesh,
+    ...rendMeshes, ...featherMeshes, stonesMesh, floraMesh, shrubMesh, hedgeMesh, ...grassMeshes]) {
     scene.add(m);
   }
 
@@ -56549,11 +56814,12 @@ async function buildJadrija(scene) {
     // until this pass and which is where a hundred metres of hut belongs: take
     // them out of the caster list and the rows stop throwing the long shadows
     // that are half of what the promenade looks like at seven in the evening.
-    meshes: [deckMesh, upMesh, vilMesh, arborMesh, ...rendMeshes, stonesMesh, floraMesh],
+    meshes: [deckMesh, upMesh, vilMesh, arborMesh, oliveMesh, ...rendMeshes, stonesMesh,
+      floraMesh],
     // The feather flags cast as they stand: the shadow pass does not run the
     // wave, and a ripple of a few centimetres in a shadow is nothing anybody
     // could see.
-    casters: [upMesh, vilMesh, arborMesh, stonesMesh, floraMesh, shrubMesh, hedgeMesh,
+    casters: [upMesh, vilMesh, arborMesh, oliveMesh, stonesMesh, floraMesh, shrubMesh, hedgeMesh,
       ...rendMeshes.filter((m) => m !== kabRendMesh),
       ...featherMeshes],
     // The kabina's two rooms cast only while they are drawn — `dynamic`

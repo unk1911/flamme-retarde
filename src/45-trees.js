@@ -1328,6 +1328,243 @@ function treeMaterial({ instanced = true, cut = false, emissive = 0, needles = t
   });
 }
 
+// ── the olive, leaf by leaf (1.537.1) ────────────────────────────────────────
+//
+// Misha, 27 Sep 2026, a frame from the hammock looking over the lane wall:
+// "great job on the vegetation/trees, but i notice some trees like this one
+// still looks like crap ... the tall trees look amaze". The tree was an
+// olive, and it was the last thing at Jadrija still drawn the way the pines
+// were drawn before 1.534.0: nine smooth puffs half a metre to a metre across
+// on four straight sticks, one flat grey-green, with the pine's value noise
+// on them. At grain 1 that noise's 0.75 m octave cuts a one-metre puff into
+// three or four soft lobes, and a soft-shaded lobe that size is a leaf of
+// lettuce — which is exactly what the frame showed: cabbages on poles, the
+// ragged rim reading as crumpled paper.
+//
+// What an olive's crown IS, held against any tree on the Dalmatian coast: a
+// great many small sprays of narrow leaves, five to eight centimetres by one
+// and a half, dark grey-green on top and SILVER underneath, the sprays hung
+// along crooked branches with daylight between them. The silver is the
+// species: a crown of leaves each showing one face or the other at random is
+// a two-tone speckle nothing else on this shore has, and in any breath of
+// wind it shimmers. None of that can be a polygon at the number of olives
+// here, so as with the needles it is drawn per pixel, and the geometry is
+// only the clusters (small puffs, 43-jadrija.js `olive`) and the wood.
+//
+//   · THE LEAVES. The nearest spray centre on a 3D cell grid (`folCell`, the
+//     needle tufts' own scatter, at 16 cm), seen face on, drawn as a twig
+//     with three opposite pairs of lanceolate leaves up it and one at the end
+//     — widest a third of the way out, pointed, one to four and a half wide,
+//     five to eight centimetres long. The first cut fanned eight leaves round
+//     a point at the golden angle, and looking up into the crown that was a
+//     tree full of hands: a palmate leaf is a horse chestnut, or worse, and
+//     not an olive. `oliveSpray` hands back which leaf, how far along it and
+//     how far across, so a leaf can have a midrib, its own tilt of the normal
+//     (the light breaks up leaf by leaf, which is what makes foliage read as
+//     foliage and not as a surface) and its own face: about a quarter show
+//     the silver side, over half seen from underneath, which is where the
+//     undersides face, and a spray in three is turned over whole.
+//   · RESOLVED OR NOT. A leaf is never drawn thinner than about a pixel: past
+//     four metres (a pixel of six millimetres at 720p) the leaves THICKEN
+//     rather than break up into sparks, so at ten metres a spray is a small
+//     herringbone of them, which is the speckle the real tree is at ten
+//     metres. The midrib and the tilted normal go at sixteen millimetres a
+//     pixel, and the silver comes halfway back towards the top face's colour
+//     between six and thirty — the first cut kept it at full strength and
+//     from the vikendica's terrace the three olives were in white blossom.
+//     Past five centimetres a pixel (about thirty metres) the value noise
+//     alone, at 2.2x the pine's grain, and a two-tone mottle; the octave that
+//     made the lettuce is gone with the grain.
+//   · THE OUTLINE AND THE HOLES. Close to, only leaves are drawn: everything
+//     between them is discarded, and what shows through is the far side of
+//     the cluster, the next cluster, or sky. Further out a pixel between
+//     sprays goes on the rim of a cluster or in a pocket of the tuft field,
+//     and elsewhere is the dark inside of the crown. Olive crowns are open —
+//     sky through them all over, not only at the edge — so this cuts deeper
+//     than the pine's.
+//
+// The wood has its own bark, too. The plate shader in `treeMaterial` is keyed
+// to PINEBARK's warmth and the olive was deliberately grey enough to miss it,
+// which left it the one trunk at Jadrija with nothing on it at all: a smooth
+// grey tube. An old olive's bark is grey and cut into small, twisted blocks by
+// fissures that follow the spiral of the grain — so `barkCell` again, on
+// three planes because olive limbs go every way, sheared so the cracks lean,
+// and a few pale lichen blotches.
+//
+// Its own material rather than a mode of `treeMaterial`: every pixel of this
+// mesh is olive, so nothing has to be told apart by colour, and the pines and
+// the landscape's instanced olives — approved and far away respectively —
+// are not recompiled or touched. It costs one draw and one caster.
+const GLSL_OLIVE = /* glsl */ `
+float olH(float a){ return fract(sin(a) * 43758.5453); }
+// One spray, seen face on: a twig with its leaves in opposite pairs up it and
+// one at the end, which is how an olive carries them. The first cut fanned
+// eight leaves round a point, and from underneath that is a hand — a palmate
+// leaf, horse chestnut or worse — not an olive. q is the offset from the
+// spray's centre on the screen in cell units, seed its own number, thick a
+// width added to every leaf so none is ever thinner than a pixel. x: signed
+// distance to the nearest leaf's edge (negative inside, cell units); y: that
+// leaf's own number, or -1 on the twig; z: how far along it, 0 at the stalk
+// and 1 at the tip; w: across it, -1 to 1.
+vec4 oliveSpray(vec2 q, float seed, float thick){
+  vec4 o = vec4(9.0, 0.0, 0.0, 0.0);
+  float ta = seed * 6.2831;
+  vec2 t = vec2(cos(ta), sin(ta));
+  vec2 tp = vec2(-t.y, t.x);
+  float bend = (olH(seed * 5.1) - 0.5) * 0.9;
+  for (int i = 0; i < 7; i++) {
+    float fi = float(i);
+    float h1 = olH(seed * 91.7 + fi * 37.13);
+    float h2 = olH(seed * 13.3 + fi * 11.71 + 5.0);
+    float side = mod(fi, 2.0) < 0.5 ? 1.0 : -1.0;
+    float pr = floor(fi * 0.5);
+    float s0 = -0.30 + pr * 0.20;
+    float a = i == 6 ? bend * 0.6 : side * (0.50 + 0.40 * h1) + bend * s0;
+    vec2 d = t * cos(a) + tp * sin(a);
+    vec2 r = q - (t * s0 + tp * bend * s0 * s0);
+    float L = i == 6 ? 0.36 : 0.30 + 0.18 * h2;
+    float u = dot(r, d) / L;
+    if (u < 0.0 || u > 1.0) continue;
+    float y = dot(r, vec2(-d.y, d.x));
+    float w = L * 0.12 * pow(sin(3.14159 * pow(u, 0.72)), 0.8) + thick;
+    float sd = abs(y) - w;
+    if (sd < o.x) o = vec4(sd, h1 * 0.61 + h2 * 0.39, u, y / w);
+  }
+  float tu = dot(q, t);
+  if (tu > -0.40 && tu < 0.32) {
+    float sdT = abs(dot(q, tp) - bend * tu * tu) - (0.009 + thick * 0.5);
+    if (sdT < 0.0 && sdT < o.x) o = vec4(sdT, -1.0, 0.0, 0.0);
+  }
+  return o;
+}
+`;
+
+const OLIVE_BODY = /* glsl */ `
+  base *= vVCol;
+  n = gl_FrontFacing ? n : -n;
+  float leaf = smoothstep(0.004, 0.020, vVCol.g - vVCol.r);
+  float folFp = length(fwidth(vWorld));
+  // ── the bark ──
+  float kB = (1.0 - leaf) * (1.0 - smoothstep(0.014, 0.055, folFp));
+  if (kB > 0.002) {
+    vec3 an = abs(normalize(vNormal));
+    vec3 wg = an / (an.x + an.y + an.z + 1e-4);
+    // The planes each face is parameterised by are the OTHER two axes (see
+    // the pine's plates), and the vertical one is sheared by height so the
+    // fissures lean with the twist of the grain.
+    // Cells 4 cm round and 20 tall: the blocks of an old olive's bark are
+    // long, and 4.5 by 12 was a crocodile.
+    vec3 cX = barkCell(vec2(vWorld.z * 25.0 + vWorld.y * 2.2, vWorld.y * 5.0));
+    vec3 cZ = barkCell(vec2(vWorld.x * 25.0 - vWorld.y * 2.2, vWorld.y * 5.0) + 19.7);
+    vec3 cY = barkCell(vec2(vWorld.x * 16.0, vWorld.z * 16.0) + 7.3);
+    float edge = cX.x * wg.x + cY.x * wg.y + cZ.x * wg.z;
+    float pid = wg.x > wg.z ? (wg.x > wg.y ? cX.y : cY.y) : (wg.z > wg.y ? cZ.y : cY.y);
+    // And the furrows the blocks sit in: long soft streaks up the stem,
+    // which is most of what the bark is from two metres.
+    float fw = folN(vec3(vWorld.x * 13.0, vWorld.y * 1.5 + vWorld.x * 3.0, vWorld.z * 13.0));
+    base *= 1.0 + kB * ((pid - 0.5) * 0.24 + (fw - 0.5) * 0.55
+      - 0.30 * (1.0 - smoothstep(0.0, 0.32, edge)));
+    base = mix(base, vec3(0.070, 0.064, 0.058) * vColor,
+      (1.0 - smoothstep(0.02, 0.09, edge)) * 0.62 * kB);
+    float lich = smoothstep(0.70, 0.84, folN(vWorld * 4.3 + 3.1));
+    base = mix(base, vec3(0.56, 0.57, 0.47) * vColor, lich * 0.40 * kB);
+  }
+  // ── the leaves ──
+  if (leaf > 0.0) {
+    vec3 V = normalize(uCamPos - vWorld);
+    float rim = 1.0 - abs(dot(normalize(vNormal), V));
+    float rimT = smoothstep(0.04, 0.55, rim);
+    float tuft = folTuft(vWorld * 2.2, folFp * 2.2);
+    float lum = dot(base, vec3(0.30, 0.55, 0.15));
+    // The underside is a pale felted grey-green, not white: past a few
+    // metres, where one leaf is a pixel or two, a white one is a speck of
+    // blossom and a crown of them is a tree in flower. So the silver comes
+    // down towards the mean of the two faces as the leaves go sub-pixel.
+    float silverK = mix(1.0, 0.55, smoothstep(0.006, 0.030, folFp));
+    vec3 silverC = mix(base, vec3(lum) * vec3(1.34, 1.44, 1.36), silverK);
+    // Paler and greyer than the pine beside it, which is how an olive grove
+    // reads from anywhere: a quarter of the way to its own grey.
+    vec3 topC = mix(base, vec3(lum), 0.25) * vec3(1.02, 1.08, 0.98);
+    // Far: the two-tone mottle and the value field's lift.
+    float mott = folN(vWorld * 17.0 + 2.7);
+    vec3 farC = mix(topC, silverC, smoothstep(0.52, 0.74, mott) * 0.55)
+      * mix(0.62, 1.28, clamp(tuft, 0.0, 1.0));
+    vec3 leafCol = farC;
+    float kSpray = 1.0 - smoothstep(0.026, 0.050, folFp);
+    float kLeaf = 1.0 - smoothstep(0.0065, 0.016, folFp);
+    float cut = 0.0;
+    if (kSpray > 0.0) {
+      vec4 cc = folCell(vWorld * 6.25);
+      vec3 Ux = normalize(cross(V, vec3(0.0, 1.0, 0.0)) + vec3(1e-4, 0.0, 0.0));
+      vec3 Wy = cross(Ux, V);
+      vec2 q = vec2(dot(cc.xyz, Ux), dot(cc.xyz, Wy));
+      // Depth thrown away is every pixel near some centre (see the needles):
+      // a centre well in front of or behind the surface gets a smaller spray.
+      float dz = abs(dot(cc.xyz, V));
+      q *= 1.0 + max(dz - 0.18, 0.0) * 2.2;
+      // A leaf is never drawn thinner than about a pixel: past four metres
+      // they thicken instead of breaking up into sparks, and by the time the
+      // spray is a few pixels across it is a herringbone of them.
+      float thick = max(folFp * 6.25 * 0.55 - 0.006, 0.0);
+      vec4 lf = oliveSpray(q, cc.w, thick);
+      float inL = lf.x < 0.0 ? 1.0 : 0.0;
+      // Some two in five show their undersides — more seen from under the
+      // crown, which is where the undersides face — and some whole sprays
+      // are turned over.
+      float silverSpray = step(0.70, fract(cc.w * 3.7));
+      float fromBelow = clamp(-V.y / 0.8, 0.0, 1.0);
+      float under = step(0.72 - 0.30 * fromBelow - 0.30 * silverSpray, fract(lf.y * 7.31));
+      vec3 lc = mix(topC * (0.80 + 0.40 * fract(lf.y * 3.17)), silverC * (0.88 + 0.22 * lf.z), under);
+      // The midrib, a thread of light down the middle of each.
+      lc *= 1.0 + 0.16 * kLeaf * (1.0 - smoothstep(0.0, 0.22, abs(lf.w))) * (1.0 - lf.z);
+      if (lf.y < 0.0) lc = vec3(0.20, 0.18, 0.15) * vColor;
+      // Outside every leaf: the inside of the crown, darker, where it is not
+      // cut away. Close to, it all is: only leaves are drawn.
+      leafCol = mix(leafCol, inL > 0.5 ? lc : topC * 0.40, kSpray);
+      float gap = (kLeaf > 0.5 || rimT > 0.20 || tuft < 0.42) ? 1.0 : 0.0;
+      cut = inL < 0.5 ? gap : 0.0;
+      if (inL > 0.5 && kLeaf > 0.5 && lf.y >= 0.0) {
+        // Each leaf its own tilt, so the light breaks up leaf by leaf; the
+        // tops are waxy and catch a highlight, the undersides are felt.
+        vec3 tl = vec3(olH(lf.y * 51.3), olH(lf.y * 77.9), olH(lf.y * 23.1)) - 0.5;
+        n = normalize(n + tl * 1.1);
+        spec = mix(0.10, 0.015, under);
+        env = 0.0;
+      }
+    }
+    // And far out, the value field chews the outline as the pine's does.
+    float kCut = 1.0 - smoothstep(0.08, 0.30, folFp);
+    float farCut = tuft < (0.12 + 0.70 * smoothstep(0.04, 0.60, rim)) * kCut ? 1.0 : 0.0;
+    cut = mix(farCut, cut, kSpray);
+    if (leaf > 0.5 && cut > 0.5) discard;
+    base = mix(base, leafCol, leaf);
+  }
+`;
+
+/**
+ * The olive's material — see the note above GLSL_OLIVE. The resort's olives
+ * only (`olives` in 43-jadrija.js); it casts with `treeCaster` like `arbor`.
+ */
+function oliveMaterial() {
+  return solidMaterial(0xffffff, {
+    instanced: false,
+    spec: 0.03,
+    specPower: 18,
+    emissive: 0.10,
+    side: THREE.DoubleSide,
+    decl: GLSL_FOLIAGE + GLSL_OLIVE,
+    uniforms: { uWind: U.uWind, uWindSpeed: U.uWindSpeed },
+    vdecl: GLSL_CROWN_WIND,
+    vert: `
+      {
+        float lf = smoothstep(0.004, 0.020, aVCol.g - aVCol.r);
+        if (lf > 0.0) p += crownWind(p, lf);
+      }`,
+    body: OLIVE_BODY,
+    lit: FOLIAGE_LIT,
+  });
+}
+
 function buildTrees(scene, fire) {
   const protos = { far: vegPrototypes(), near: vegNearPrototypes() };
   const T = VEG.tile;

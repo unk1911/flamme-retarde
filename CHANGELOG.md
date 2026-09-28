@@ -8,6 +8,129 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.537.1] — 2026-09-27
+
+### the olive, grown and leafed
+
+Misha, a frame from beside the hammock looking over the lane wall: *"great job
+on the vegetation/trees, but i notice some trees like this one still looks
+like crap, maybe can improve on it? but yeah the tall trees look amaze"*. The
+tree was the olive at t 441.6, s 35.2.
+
+**What was wrong.** The olive was the last tree at Jadrija still built from
+the old parts:
+
+- a smooth grey tube of a trunk, with four straight sticks off its top;
+- one smooth puff at the end of each stick, from 1.0 to 1.8 m across;
+- one flat grey-green over all of it;
+- the pine's tuft noise on top. At grain 1, its 0.75 m octave cut each puff
+  into three or four soft-shaded lobes, which is a lettuce. The chewed rim
+  read as crumpled paper.
+
+1.534.0 gave the olive a trunk and limbs, but kept the cabbages.
+
+**The tree** (`olive` and `oliveTube` in 43-jadrija.js). It is grown,
+where before it was assembled.
+
+- **The bole.** Short, fat and twisted:
+  - a loft of 14 sides and 10 rings, flared into the ground;
+  - three harmonics of lobe, turning 1.2 to 2.4 rad up its height, so the
+    fluting spirals the way an olive's grain does;
+  - buttresses that exist only in the flare;
+  - grooves darker than ridges in the vertex colour.
+- **The fork.** Two or three stems split from the bole at about a metre and
+  lean 26 to 46° apart. The top of the bole is closed in the crotch; left
+  open, it showed as a flat saw cut.
+- **The limbs.** Three levels of crooked, tapering limbs:
+  - each is a loft along a curve that bends in a plane of its own and kinks a
+    little at every ring;
+  - the rings are parallel-transported, so a limb that bends over does not
+    pinch;
+  - each limb forks in two or three, and about half of them throw a side
+    shoot;
+  - the radii fall by the pipe rule, so the tips are twigs.
+  - The first cut bent three times too hard, and the limbs ran along the
+    ground.
+- **The crown.** Leaf clusters hang along the last branches and at their
+  tips, each with a twig, plus three over the middle. That is 36 to 95
+  clusters a tree, 67 on average over the 29 olives. Each is 0.6 to 1.1 m
+  across on a 4.6 m tree, where the old tree had nine of 1.0 to 1.8 m. The
+  crown's footprint is where it was.
+
+**The leaves, per pixel** (`GLSL_OLIVE` and `OLIVE_BODY` in 45-trees.js,
+drawn with a new `oliveMaterial`).
+
+- **The sprays.** Each nearest spray centre on the needles' own 3D scatter
+  (`folCell`, at 16 cm) is drawn face on as a twig with three opposite pairs
+  of narrow leaves and one at the end. The leaves are pointed, 5 to 8 cm
+  long and one to four and a half wide.
+  - The first cut fanned eight leaves round a point. Looking up into the
+    crown, that was a tree full of palmate hands.
+- **Each leaf** has a midrib, its own tilt of the normal, a waxy highlight on
+  top and a felted silver underside.
+  - About a quarter show the underside, and over half do from below, which
+    is where the undersides face. One spray in three is turned over whole.
+- **Distance.**
+  - **Past about 4 m:** the leaves thicken to about a pixel instead of
+    breaking into sparks.
+  - **From 6 mm to 30 mm a pixel:** the silver comes halfway back towards the
+    top face's colour. At full strength, the vikendica's olives were in white
+    blossom from the terrace.
+  - **Past about 30 m:** value noise at 2.2x the pine's grain, with a two-tone
+    mottle.
+- **Openness.** Close to, only leaves are drawn and everything between them
+  is discarded. Further out, gaps go on the rims and in the pockets.
+- **Colour.** The leaf tops are a quarter of the way to grey, so an olive
+  reads paler than the pine beside it.
+- **Wind.** It sways with `GLSL_CROWN_WIND`, like the other crowns.
+- **Bark.** Grey fissured bark, with `barkCell` on three planes:
+  - blocks about 4 cm round and 20 cm up, sheared so they lean with the
+    twist;
+  - long furrow streaks up the stem;
+  - pale lichen blotches.
+  - At 4.5 by 12 cm it read as a crocodile.
+
+**A new buffer, `olives`.** The olives moved out of `arbor` into it, with
+their own material. That is one draw and one caster through `treeCaster`, so
+their shadow is dappled like the pines'.
+
+- The pines and the landscape's instanced trees were not recompiled or
+  touched.
+- Nothing is told apart by vertex colour: every pixel in this buffer is
+  olive.
+
+**Invariance.** `olive` still takes exactly one `rng` draw, for the facing,
+and every call site is unchanged. All the new variation is `jit` off
+`pineKey`. Checked on every build, identical to 1.537.0:
+
+- 821 blockers, hash `3c434842`, `greens` included;
+- 100 people, hash `9934dd35`;
+- the hammock frame at (−1923.174, 4.138, 443.162).
+
+**Measured.** 1280×720, RTX 4090, GPU timer queries round every render. The
+machine was shared: whole-frame before/after runs swung ±2 ms in both
+directions. So the cost was also measured in-page, by toggling the olive
+buffer's draw range (main pass and both cascades) every 20 frames, with about
+180 frames a side over two runs.
+
+| per frame | hammock view | olive close-up | under the crown | grove | vikendica | aerial |
+|---|---|---|---|---|---|---|
+| draw calls | 653 → 656 | 711 → 714 | 598 → 601 | 668 → 671 | 691 → 693 | 870 → 873 |
+| triangles, all passes | 19.89 → 20.27 M | 19.91 → 20.29 M | 19.65 → 20.03 M | 19.93 → 20.32 M | 19.81 → 20.19 M | 19.39 → 19.77 M |
+| GPU, olives on − off (median, two runs) | −0.11 / +0.21 ms | +0.01 / −0.12 | +0.03 / +0.17 | +0.15 / +0.07 | −0.31 / +0.40 | +0.57 / +0.41 |
+
+- **Triangles.** The buffer is 148 k triangles, about 5,100 a tree against
+  about 800 before, split roughly half wood and half leaf. That is 0.44 M
+  over the three passes, and +0.38 M net of the old olives.
+- **GPU.** The "off" side has no olives at all, old or new, so the GPU row is
+  an upper bound on the change. It sits within noise everywhere: at most
+  +0.6 ms, from the air.
+- **Main thread.** Render submission is unchanged within noise.
+
+Not changed: the palisade evergreen, the lavender and the ivy. They are
+shrubs drawn with the trees' material in 1.537.0, not puff-crowned trees,
+and none of them is in the hammock frame.
+
 ## [1.537.0] — 2026-09-27
 
 ### stone, grass and the small plants, at the distance you stand from them
