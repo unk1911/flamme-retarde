@@ -25135,19 +25135,16 @@ async function buildJadrija(scene) {
   // swim line: white floats on a rope at three-metre centres, thirty-eight
   // metres out, with one orange marker on it. Anything with a hull goes beyond
   // that or on the grass, and both are the boardwalk's job.
-  {
-    const FLOAT = [0.930, 0.925, 0.905], MARK = [0.870, 0.400, 0.130];
-    for (let t = 8; t < LEN - 8; t += 3.0) {
-      // The orange one keeps following `DIVE.t`, and it should. It used to sit
-      // *at* the platform, which stood two metres outside the line; the
-      // platform is now fifteen metres outside it, so what this marks is the
-      // place on the rope you cross to swim out to the skakaonica — which is
-      // what an odd-coloured float in a run of white ones is for.
-      const c = Math.abs(t - DIVE.t) < 1.6 ? MARK : FLOAT;
-      const r = c === MARK ? 0.22 : 0.06;
-      boxTS(t - r, t + r, -38 - r, -38 + r, -r, r, c);
-    }
-  }
+  //
+  // AND IT IS THE OTHER LINE NOW. Misha, 27 Sep 2026, circling them: *"those
+  // floats need to be a bit further out, like past the diving station, not
+  // between the pier and diving board ... and also make them look a bit more
+  // 'professional', further up north i think u have them looking more
+  // professional"*. This line was cubes, 0.12 m and one of 0.44, with no
+  // rope, 38 m out — inside the skakaonica, which stands 50-57 m out. The west
+  // bay's line — round floats on a sagging rope every 2.2 m, one in four
+  // orange, 64 m out — is the one that reads as a swim line, so it now runs
+  // the whole frontage (see "Two: the line of floats"), and this one is gone.
   void dinghy;
 
   // Green. Pines and olives go behind the back row where there is soil and where
@@ -26941,7 +26938,9 @@ async function buildJadrija(scene) {
       // Every 2.2 m, not every 7.4. A swim line reads as a dotted line because
       // the floats are close enough to make one; at seven metres apart and
       // seventy metres out each float is two pixels and there is no line.
-      for (let t = 24; t < 268; t += 2.2) {
+      // The whole frontage and not the west bay alone — see AND IT IS THE
+      // OTHER LINE NOW. 64 m out is 6.6 m past the back of the skakaonica.
+      for (let t = 24; t < LEN - 8; t += 2.2) {
         const wob = (jit(t | 0, 610) - 0.5) * 2.6;
         const st2 = s + wob;
         const BUOY = ((t / 2.2) | 0) % 4 === 0 ? [0.760, 0.330, 0.075]

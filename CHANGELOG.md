@@ -8,6 +8,32 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.535.6] — 2026-09-27
+
+### the swim line out past the tower, and a board with more bounce
+
+Misha: *"those floats need to be a bit further out, like past the diving
+station, not between the pier and diving board ... and also make them look a
+bit more 'professional', further up north i think u have them looking more
+professional"*, and *"can u make the elasticity of the diving board a bit
+more elastic so it would be more fun to bounce on it and do a much higher
+dive"*.
+
+- **The swim line.**
+  - **The old line is gone.** It was cubes (0.12 m white, one 0.44 m
+    orange) with no rope, 38 m out, inside the skakaonica.
+  - **The west bay's line now runs the whole frontage:** round floats on a
+    sagging rope every 2.2 m, one in four orange, 64 m out. That is 6.6 m
+    past the back of the tower.
+- **The bounce.** The board is not softer. Measured on the 3.80 m plank, EI
+  at 70 % gave lower takeoffs, and at 50 % and 35 % she never left it. What
+  changed is the stroke: her crouch, and the give on landing, go from 0.72 to
+  0.62. Her reach stays at 1.00, her straight leg.
+  - **Dives:** six parallel runs of the same pumping plan gave 6.8–7.7 m/s,
+    against 5.5. That is about 1.7–2× the height over the board.
+  - **The tip** now goes 0.64–0.68 m down, against 0.54.
+  - **No rescues.**
+
 ## [1.535.5] — 2026-09-27
 
 ### the diving station turned to face the kabine

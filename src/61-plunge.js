@@ -84,7 +84,9 @@ const PLUNGE = {
     // Pelvis over the soles, m — Chloe's own numbers off the rig: 0.928
     // standing straight in `idle`. Soft knees, the deep crouch a diver loads
     // from, and up on the toes with the arms thrown at the sky.
-    stand: 0.90, crouch: 0.72, reach: 1.00,
+    // A deeper crouch than the 0.72 this was first tuned at — see MORE
+    // BOUNCE over `absorb`.
+    stand: 0.90, crouch: 0.62, reach: 1.00,
     // The push: down into the crouch, then straightened on a curve that is
     // still accelerating when it stops — so the leg leaves at its fastest,
     // 2·ΔL/T = 3.5 m/s off a floor that does not move.
@@ -98,7 +100,21 @@ const PLUNGE = {
     // stalled at 3.3: this board is softer than a competition one and it
     // is the stroke that pumps it. Pressed late, a quarter second after
     // landing, the same board gives 0.7 to 2.4 and never builds.
-    absorb: 0.72, absorbT: 0.14, driveT: 0.16,
+    //
+    // MORE BOUNCE. Misha, 27 Sep 2026: *"can u make the elasticity of the
+    // diving board a bit more elastic so it would be more fun to bounce on it
+    // and do a much higher dive"*. Not a softer board: measured on the 3.80 m
+    // plank, EI at 70 % gave LOWER takeoffs (dive 4.5 m/s) and at 50 % and
+    // 35 % she never left it — a soft plank eats the push and comes back too
+    // slowly to throw anybody. And not a finer solve: 480 Hz halves the
+    // numerical damping and peaked at 8.5-9.9 m/s, but pumped erratically.
+    // What works is more stroke: the crouch and the give on landing from
+    // 0.72 to 0.62, the reach kept at 1.00 (Chloe's straight leg — at 1.05
+    // her feet would leave the plank before the board lets her go). Six
+    // parallel runs of the same pumping plan: dives of 6.8-7.7 m/s against
+    // 5.5, which is 1.7-2x the height over the board; the tip goes 0.64-0.68
+    // m down against 0.54; no rescues.
+    absorb: 0.62, absorbT: 0.14, driveT: 0.16,
     // A press this long before she lands counts from the landing. The press a
     // person makes for "bounce as I land" is always a little early.
     buffer: 0.22,
