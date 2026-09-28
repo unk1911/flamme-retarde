@@ -1619,6 +1619,29 @@ function avbdBall(o) {
 // Both are empty unless asked for (`maxWorldBoxes`, `maxCapPairs`), so the
 // hammock, the chain and the springboard step exactly as they did.
 //
+// (j) AND A MATTRESS: A WORLD BOX THAT GIVES (1.540.0, the cot in the kabina).
+// Misha, 28 Sep 2026: *"when we spank her when she is laying on her tummy ...
+// that the spank causes the body to move the way real physics would work? i
+// guess need to add AVBD to the cot itself and make her ragdoll?"*. A world
+// box of (i) is hard — a café seat — and a hard mattress is a table: the
+// slap stops dead on it, and nothing comes back. So a world box may be given
+// a STIFFNESS and a DAMPING (`setWorldBoxSoft`), N/m and N·s/m a contact:
+//
+//   THE SPRING at the stiffness asked for from the first iteration, the angle
+//   drive's rule in (h) and not the finite contact's ramp — a foam that is 3000
+//   N/m is 3000 N/m the step a hip lands on it, not after beta·|C| has climbed
+//   to it over a few steps, which on a 3 cm sink is a hip that goes in soft and
+//   comes out hard.
+//
+//   THE DAMPER in its implicit form, (h)'s again: a spring of d/h toward where
+//   the contact stood at the start of the step, so the force is k·C plus d
+//   times the approach speed and the Hessian carries k + d/h. Still push-only:
+//   a mattress coming back up pushes a body off it, and never holds it down,
+//   so a damper that would pull on the rebound is simply not there — which is
+//   what lets a slapped seat leave the sheet for a frame on a hard one.
+//
+// Unset (the default), a world box is (i)'s and nothing about the settle moves.
+//
 // NOT TAKEN: the box-box manifold, the broadphase (the only pair that matters
 // is cloth against her, and her bounding sphere is the broadphase), fracture.
 // ---------------------------------------------------------------------------
@@ -1726,6 +1749,8 @@ function avbdNet(o) {
   const NWB = o.maxWorldBoxes || 0;
   const wb = new Float64Array(7 * NWB);
   let nwb = 0;
+  // And what each one gives — see (j): N/m and N·s/m a contact; Infinity hard.
+  const wbK = new Float64Array(NWB).fill(Infinity), wbD = new Float64Array(NWB);
   // Capsule pairs — see (i): two capsule indices a pair.
   const NCPR = o.maxCapPairs || 0;
   const cpr = new Int32Array(2 * NCPR);
@@ -1737,6 +1762,8 @@ function avbdNet(o) {
   const cRA = new Float64Array(3 * NC), cRB = new Float64Array(3 * NC);
   const cBas = new Float64Array(9 * NC);
   const cC0 = new Float64Array(NC), cMu = new Float64Array(NC), cK = new Float64Array(NC);
+  // A contact's damper, N·s/m — nonzero only on a soft world box, (j).
+  const cD = new Float64Array(NC);
   const cPen = new Float64Array(3 * NC), cLam = new Float64Array(3 * NC);
   const cId = new Int32Array(NC), cFn = new Float64Array(NC);
   let nc = 0;
@@ -2199,8 +2226,11 @@ function avbdNet(o) {
     // A gap in full, a penetration forgiven — the ball's (b); a spring has
     // nothing to forgive.
     const c0 = cC0[c], soft = cK[c] !== Infinity;
+    // The damper of (j): d times how far the contact has closed this step, over h.
+    const fd = cD[c] > 0 ? cD[c] / hNow * cC[0] : 0;
     cC[0] += c0 > 0 || soft ? c0 : c0 * (1 - alpha);
     for (let r = 0; r < 3; r++) cF[r] = cPen[3 * c + r] * cC[r] + (soft ? 0 : cLam[3 * c + r]);
+    cF[0] += fd;
     if (cF[0] > 0) cF[0] = 0;
     cBound = -cF[0] * cMu[c];
     cFric = Math.sqrt(cF[1] * cF[1] + cF[2] * cF[2]);
@@ -2212,7 +2242,7 @@ function avbdNet(o) {
     const isA = cA[c] === i, sg = isA ? 1 : -1, bb = 9 * c;
     const J = isA ? jaA : jaB;
     for (let r = 0; r < 3; r++) {
-      const k = cPen[3 * c + r], f = cF[r];
+      const k = cPen[3 * c + r] + (r === 0 && cD[c] > 0 ? cD[c] / hNow : 0), f = cF[r];
       const nx = sg * cBas[bb + 3 * r], ny = sg * cBas[bb + 3 * r + 1], nz = sg * cBas[bb + 3 * r + 2];
       const qx = sg * J[3 * r], qy = sg * J[3 * r + 1], qz = sg * J[3 * r + 2];
       aL[0] += k * nx * nx; aL[1] += k * nx * ny; aL[2] += k * nx * nz;
@@ -2245,10 +2275,10 @@ function avbdNet(o) {
   }
 
   /** Record a contact; world points xA (on a) and xB (on b, or the world's). */
-  function addContact(id, a, b, nx, ny, nz, gap, xAx, xAy, xAz, xBx, xBy, xBz, mu, k) {
+  function addContact(id, a, b, nx, ny, nz, gap, xAx, xAy, xAz, xBx, xBy, xBz, mu, k, d = 0) {
     if (nc >= NC) { stats.lost++; return; }
     const c = nc++;
-    cA[c] = a; cB[c] = b; cId[c] = id; cMu[c] = mu; cK[c] = k; cFn[c] = 0;
+    cA[c] = a; cB[c] = b; cId[c] = id; cMu[c] = mu; cK[c] = k; cFn[c] = 0; cD[c] = d;
     unturn(a, xAx - P[3 * a], xAy - P[3 * a + 1], xAz - P[3 * a + 2], cRA, 3 * c);
     if (b >= 0) unturn(b, xBx - P[3 * b], xBy - P[3 * b + 1], xBz - P[3 * b + 2], cRB, 3 * c);
     else { cRB[3 * c] = xBx; cRB[3 * c + 1] = xBy; cRB[3 * c + 2] = xBz; }
@@ -2263,6 +2293,8 @@ function avbdNet(o) {
       cPen[3 * c + r] = f >= 0 ? Math.min(AVBD.penMax, k, Math.max(AVBD.penMin, pPen[3 * f + r] * o.gamma))
         : AVBD.penMin;
     }
+    // (j): a mattress is its stiffness from the first iteration.
+    if (d > 0) cPen[3 * c] = Math.min(AVBD.penMax, k);
   }
 
   // Each live body's reach for its capsules, and the capsules and points in
@@ -2492,7 +2524,7 @@ function avbdNet(o) {
         const qwx = qx * yc + qz * ys + cx, qwy = qy + cy, qwz = -qx * ys + qz * yc + cz;
         const swx = sx * yc + sz * ys + cx, swy = sy + cy, swz = -sx * ys + sz * yc + cz;
         addContact(id, b, -1, wnx, ny, wnz, gap, swx - wnx * rr, swy - ny * rr, swz - wnz * rr,
-          qwx, qwy, qwz, o.mu, softBody[b] ? o.capK : Infinity);
+          qwx, qwy, qwz, o.mu, wbK[k] < Infinity ? wbK[k] : softBody[b] ? o.capK : Infinity, wbD[k]);
       }
     }
     // Capsule pairs, body against body — see (i). The closest points of two
@@ -2886,6 +2918,11 @@ function avbdNet(o) {
     addAngle, setAngleFrame, setAngleTarget, setAngleK, setAngleLimits, setJointArms, setJointLoose,
     /** The world boxes — see (i): `a` seven numbers a box (centre, half extents, yaw), `n` of them. */
     setWorldBoxes: (a, n) => { nwb = Math.min(NWB, n); for (let k = 0; k < 7 * nwb; k++) wb[k] = a[k]; },
+    /**
+     * World box k given — see (j): `stiff` N/m and `damp` N·s/m a contact;
+     * `stiff` Infinity (or no call) is (i)'s hard box. Kept across `setWorldBoxes`.
+     */
+    setWorldBoxSoft: (k, stiff, damp = 0) => { wbK[k] = stiff > 0 ? stiff : Infinity; wbD[k] = stiff > 0 ? Math.max(0, damp) : 0; },
     /** The capsule pairs — see (i): `a` two capsule indices a pair, `n` of them. */
     setCapPairs: (a, n) => { ncpr = Math.min(NCPR, n); for (let k = 0; k < 2 * ncpr; k++) cpr[k] = a[k]; },
     /** Debug: angle m's rotation vector now, rad, in its joint frame. */
