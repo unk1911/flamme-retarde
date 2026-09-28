@@ -8,6 +8,60 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.540.0] — 2026-09-28
+
+### On the cot, a slap has weight
+
+Misha: *"in the kabine, baye when she lies on the cot, turns into ragdoll so
+for example, when we spank her when she is laying on her tummy with legs
+bouncing off the bed, that the spank causes the body to move the way real
+physics would work? i guess need to add AVBD to the cot itself and make her
+ragdoll?"*
+
+**She is the hammock's ragdoll while she lies on her front on the cot**
+(`flatheld`, and `edgeHeld` with her legs over the side; `COT_RAG` and
+`cotRagTick` in 43-jadrija.js). A small `avbdNet` of her own: pelvis, belly,
+chest, neck and head, both thighs and shins, their muscles pulled toward the
+pose she is holding, her hips on three soft springs to where the clip lays
+them. Her arms are not in it and ride her chest on the clip's own angles,
+because every hand on that cot is scored to something (the spread to her
+cheeks, a thumb at her mouth).
+
+**The cot gives.** A world box can now have a stiffness and a damper per
+contact ((j) in 43-avbd.js, `setWorldBoxSoft`). The spring is exact from the
+first iteration, and the damper is implicit and push-only. The mattress is
+2000 N/m and 15 N·s/m a contact, which comes to about 32 kN/m under her. The
+pillow is softer. The floor is hard for the legs that hang. A box with no
+softness set steps bit-identically to before (checked against HEAD's solver
+on the same scene), so the café settle does not move.
+
+**The slap** (`cotSpank`, called with the sound, the mark and the spread coin
+from a new `buttSlap` in 90-app.js) is an impulse on the pelvis body. It
+lands at the point of the cheek that was hit, goes down into the mattress, and
+pushes a little along her away from the hand. It is 10-13 N·s (the forearm
+behind the hand), and one in five is a hard one of 18. On her front, a normal
+one puts the seat 1.4 cm into the foam, which then sends it back 0.9 cm past
+where it lay. A hard one is 2.1 cm and 1.4 cm. A reflex kicks her knees:
+22-26 degrees on the slapped side for a normal slap and 46 for a hard one,
+with 0.6 of that on the other side and 0.6 again over the edge. Her head
+comes up off the pillow 8-14 degrees. Then she is back in the pose. Slaps
+stack (three in 0.6 s are one kick held up, not three past the knee's stop).
+Nothing can fling her: every slap has a cap, the seat has a speed ceiling,
+the joints have their limits, and the hammock's guard is here too. In every
+test run the guard never fired.
+
+**What is drawn is the give, not the ragdoll**, laid on the clip through
+`fig.settle` (41-skin.js now also hands back the clip under it). Her face,
+the aims, the breathing and every overlay go on as before. The give is
+measured against the pose held still, less its own resting part. It is only
+drawn from a slap until a second after it, then eased off, so lying still she
+is exactly the clip. Every bone was measured against the previous build and
+differs by 0.0 mm.
+
+Cost: 0.36 ms a frame on average (0.9 at most) while she lies on her front
+within 12 m of you. Nothing at all otherwise. Building the net the first time
+costs one frame of about 5 ms.
+
 ## [1.539.10] — 2026-09-28
 
 ### The konoba steps back from the vikendica, and the crowd stays out of its yard

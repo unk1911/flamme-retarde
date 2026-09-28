@@ -2066,6 +2066,11 @@ function skinnedFigure(data, opts = {}) {
     // 1.5 µs, MEASURED over three runs, on a 6 µs pose).
     // Nothing is simulated here, and nothing is allocated.
     const sl = st.settle;
+    // And what the clips said before it, if the caller hands buffers for it —
+    // manual's `clip`, below, for the same reason: Baye on the cot (1.540.0,
+    // `cotRag` in 43-jadrija.js) lays a ragdoll's give on top of the clip
+    // through this, and her ragdoll's muscles are aimed at the clip under it.
+    if (sl && sl.clip) { sl.clip.q.set(localQ); sl.clip.t.set(localT.subarray(0, 3)); }
     if (sl && sl.w > 0) {
       const w = Math.min(1, sl.w), d = sl.q;
       for (let i = 0; i < nb; i++) {

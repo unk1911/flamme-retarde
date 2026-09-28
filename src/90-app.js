@@ -1086,6 +1086,21 @@ function catmullC(Q, t) {
   return lerp(lerp(A1, A2, k[0], k[2]), lerp(A2, A3, k[1], k[3]), k[1], k[2]);
 }
 let buttSlaps = 0;              // debug: how many the click has actually played
+/**
+ * A slap on her backside, on the press — `side` +1 her left cheek; `k` N·s
+ * for a probe (see `cotSpank`). The sound; the mark it leaves (see
+ * `apprenticeSlap`), whether or not the sound was ready, because the hand
+ * landed either way; sometimes her hands going back to where it landed (see
+ * `slapped` in 43-jadrija.js, which decides whether this is one of those
+ * times); and, 1.540.0, its weight, when she is lying on her front on the cot
+ * — see `cotSpank`, which is the ragdoll's.
+ */
+function buttSlap(side, k = null) {
+  if (audio && audio.slap) buttSlaps += audio.slap() ? 1 : 0;
+  if (typeof apprenticeSlap === 'function') apprenticeSlap(side);
+  if (jadrija && jadrija.slapped) jadrija.slapped();
+  return !!(jadrija && jadrija.cotSpank && jadrija.cotSpank(side, camera.position, k));
+}
 let buttSide = 1;               // which cheek the crosshair picked, +1 her left
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
 let camTraceOn = false;       // debug: the camera, frame by frame — see camTrace
@@ -7768,18 +7783,8 @@ function tick(wall, draw) {
     if (pressing && !reachWas && reachKind === 'pet' && jadrija && jadrija.askShow) {
       jadrija.askShow('pet');
     }
-    if (pressing && !reachWas && reachKind === 'butt' && audio && audio.slap) {
-      buttSlaps += audio.slap() ? 1 : 0;
-    }
-    // And the mark it leaves — see `apprenticeSlap`. On the press whether or
-    // not the sound was ready: the hand landed either way.
-    if (pressing && !reachWas && reachKind === 'butt' && typeof apprenticeSlap === 'function') {
-      apprenticeSlap(reachForce && reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
-    }
-    // And sometimes her hands go back to where it landed — see `slapped` in
-    // 43-jadrija.js, which decides whether this is one of those times.
-    if (pressing && !reachWas && reachKind === 'butt' && jadrija && jadrija.slapped) {
-      jadrija.slapped();
+    if (pressing && !reachWas && reachKind === 'butt') {
+      buttSlap(reachForce && reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
     }
     reachWas = pressing;
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
@@ -10076,6 +10081,13 @@ window.__fr = {
     // `force` is false — and where it has got to. See `slapped` in
     // 43-jadrija.js.
     spreadNow: (force = true) => (jadrija && jadrija.slapped ? jadrija.slapped(force) : false),
+    /**
+     * Debug: a slap, the whole of it as the press does it — sound, mark, the
+     * coin for the spread, and on the cot its weight, `k` N·s (dealt if
+     * null). Whether the ragdoll took it; `cotRag()` is what it did.
+     */
+    spank: (side = 1, k = null) => buttSlap(side, k),
+    cotRag: () => (jadrija && jadrija.cotRag ? jadrija.cotRag() : null),
     spreadState: () => ({ ...(jadrija && jadrija.spreadState ? jadrija.spreadState() : {}),
       k: typeof apprenticeSpreadK === 'function' ? apprenticeSpreadK() : null }),
     /**

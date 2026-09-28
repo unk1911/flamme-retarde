@@ -35041,6 +35041,531 @@ async function buildJadrija(scene) {
     if (skinFig && skinFig.face) { skinFig.face.gape = 0; skinFig.face.laugh = 0; }
   }
 
+  // ── ON THE COT, AS A RAGDOLL ─────────────────────────────────────────────
+  //
+  // 1.540.0. Misha, 28 Sep 2026: *"in the kabine, baye when she lies on the
+  // cot, turns into ragdoll so for example, when we spank her when she is
+  // laying on her tummy with legs bouncing off the bed, that the spank causes
+  // the body to move the way real physics would work? i guess need to add
+  // AVBD to the cot itself and make her ragdoll?"*.
+  //
+  // WHILE SHE LIES ON HER FRONT ON IT (`flatheld`, and `edgeHeld` with her
+  // legs over the side) she is the hammock's ragdoll (43-ragdoll.js) in a
+  // small net of her own: eight bodies — pelvis, belly, chest, neck and head,
+  // both thighs and shins — whose muscles pull toward the clip that goes on
+  // playing under them, her hips held by three soft springs to where the clip
+  // lays them, and the cot under her: the mattress and the pillow as world
+  // boxes that GIVE, a spring and a damper a contact ((j) in 43-avbd.js), and
+  // the floor hard under the legs that hang. Her arms are not in it: they
+  // ride her chest on the clip's own angles, because every hand on this cot
+  // is scored to something — the spread to her cheeks, a thumb at her mouth —
+  // and a hand that the physics had let droop would miss it.
+  //
+  // WHAT IS DRAWN IS THE GIVE, NOT THE RAGDOLL. The bodies are written back
+  // into her skeleton through `fig.settle` (41-skin.js, the café sitters'
+  // door): a turn a bone ON the clip, so her face, her aims, the breathing and
+  // every overlay go on exactly as they were. And the turn is the ragdoll's
+  // difference from the clip LESS ITS OWN RESTING DIFFERENCE, `bias`, a slow
+  // average of it: a body of capsules on a flat box is not the mesh on the
+  // mattress (FLAT's chest is 5.8 cm into it, her breasts, and MEASURED lying
+  // still the foam has her knees 11 degrees further bent than the clip's),
+  // and all of that is the rest the physics finds and not anything that
+  // happened. Lying still she is the clip exactly (see `actOut`); slapped,
+  // she is the clip plus what the slap did.
+  //
+  // THE SLAP (`cotSpank`) is an impulse on the pelvis body, at the point of
+  // the cheek it landed on, down into the mattress and a little away from the
+  // hand: the seat goes in, the mattress sends it back, the belly and the
+  // chest take it up the spine, the head nods on the pillow, and a reflex
+  // kicks her knees — the shins come up off the bed (or swing, over the edge)
+  // and fall back on to it. Then the muscles have her back in the pose.
+  const COT_RAG = {
+    // The phases she is taken over in: on her front, held. And within `far` m
+    // of the camera — see `cotRagTick`.
+    phases: { flatheld: 1, edgeHeld: 1 }, far: 12,
+    // The net: 120 Hz, at most four steps a frame — a frame at 30 fps; one
+    // slower than that is physics lost, not a burst of it — and the settle's
+    // iteration count.
+    h: 1 / 120, maxSub: 4, iterations: 8,
+    // Muscle tone (RAGDOLL's `tension`). Lying flat nothing is held against
+    // gravity but a knee lifted off the bed; over the edge (`edgeHeld`) her
+    // hips hold both legs up off the floor, and at 0.8 a slap left a thigh
+    // 10 degrees off where it hung, caught on the mattress edge, for as long
+    // as the give was on her (MEASURED; `mu` below is the other half of it).
+    // At 1.4 it is 4-7 and on its way back when the give comes off (`calm`).
+    tension: 1.4,
+    // THE MATTRESS, a contact at a time: a capsule is one contact, and about
+    // sixteen of hers are on it lying face down, so 2000 N/m a contact is
+    // ~32 kN/m of her — her own weight would sink her 1.7 cm, a foam camp
+    // mattress 12 cm thick. The damper is a contact's too, and that is the
+    // catch: a shin carries seven capsules (the shin, two at the ankle, four
+    // on the foot), so every N·s/m here is seven on a shin. MEASURED at 60 the
+    // knee reflex below reached 3 degrees of a 34-degree kick — the foot was
+    // being held in the foam by its own damper — and at 15 it reaches 19 of
+    // 28, and the seat still comes back past where it lay once and is still.
+    mattress: { k: 2000, d: 15 },
+    // The pillow, softer: a head on feathers.
+    pillow: { k: 1000, d: 8 },
+    // The three springs on her hips, N/m each, to where the clip lays them.
+    // They are for where she lies and not for how she gives, so they are as
+    // soft as that allows: at 900 a slap on her left, on the edge, slid her
+    // 7-11 cm along it and left her there (MEASURED); at 1800 it is 2.
+    hold: 1800,
+    // Skin on a cotton sheet, which slides: at 0.6 the thighs over the edge
+    // stayed wherever a slap left them (see `tension`).
+    mu: 0.3,
+    // How far inside a box a new contact may still be made, m. The capsules
+    // are the skin to a centimetre and FLAT's chest is 5.8 cm into the
+    // mattress, so the default 3 cm would have left her chest with nothing
+    // under it at all.
+    deep: 0.10,
+    // The give's resting part (`bias`), its time constant, s: fast for the
+    // first `warmFor` while the bodies find their rest, slower after it, and
+    // held still for `calm` after every slap so a slap is never averaged into
+    // the rest it is measured from.
+    bias: { warm: 0.10, rest: 1.0 }, warmFor: 0.8, calm: 1.0,
+    // THE MUSCLES AIM AT THE CLIP HELD STILL — the clip eased to over `steady`
+    // s, not the clip. Both held poses breathe, and `edgeHeld` breathes with
+    // its hips: PRONE_EDGE_B takes each thigh 3 degrees one way and the other
+    // every 5.2 s. Aimed at that, the thighs followed it a beat late, or not
+    // at all where the mattress edge had them by friction, and the give
+    // measured against the clip was the breath: MEASURED, a thigh drawn 10
+    // degrees off and still going the second after a slap, because the rest
+    // it was measured from had been taken at another point of the breath.
+    // Aimed at the pose held still, the physics is at rest when she is, and
+    // the breath is the clip's, laid on top as everything else is.
+    steady: 3.0,
+    // AND DRAWN ONLY WHEN THERE IS A SLAP TO DRAW. The rest is not exact: the
+    // clip breathes (FLAT_B bends a knee 2 degrees every 4.8 s), the ragdoll
+    // follows it a beat late, and MEASURED against the build before this one
+    // the give lying still was up to 11 mm at a toe. So the give is laid on
+    // her over `actIn` s when a slap lands, and taken off over `actOut` once
+    // the slap's `calm` is over — lying still, she is the clip exactly, and
+    // the physics under her goes on, warm, for the next one. `fadeOut` is the
+    // give taken off when she leaves the pose with a slap still in her.
+    actIn: 0.04, actOut: 0.5, fadeOut: 0.3,
+    // THE SLAP, N·s, on the pelvis body (6.9 kg). The hand alone is 3-4 N·s
+    // (0.6 kg at 5-7 m/s), and MEASURED that is honest and invisible: 3.5 mm
+    // of seat, because a pelvis is jointed to 40 kg of the rest of her and
+    // the mattress is under all of it. A spank is the forearm behind the
+    // hand and the push through — about 1.8 kg at 6 m/s — and MEASURED at
+    // 11.5 N·s the seat goes 1.4 cm into the foam and comes back 0.9 past
+    // where it lay; a hard one (`hardP` of them, `hard`) 2.1 and 1.4. `cap`
+    // is the most any one can be; `fwd` how much of it goes along her, away
+    // from the hand; and however they stack, the seat is never sent into the
+    // mattress faster than `vMax` m/s, nor spun faster than `spin` rad/s.
+    spank: { J: [10, 13], hard: 18, hardP: 0.2, cap: 20, fwd: 0.35, vMax: 2.4, spin: 3 },
+    // The reflex: after `lag` s the knees flex by `deg` over `up`, hold, and
+    // let go over `down` — the slapped side's the more — and her head comes
+    // up off the pillow by `head` with them, a flinch. Degrees. And for as
+    // long as it lasts the knees pull `stiff` times as hard, because a reflex
+    // is a muscle firing and not a muscle at rest: MEASURED at rest tone, a
+    // 30-degree kick moved the knee 4.5, most of it spent lifting the shin out
+    // of the foam it lay in (the mattress already has that knee 11 degrees up
+    // lying still, and the kick is aimed from the clip's, not from there).
+    // Over the edge (`edgeHeld`) the knees kick `edge` of that: a hanging
+    // shin that flexes swings back under the cot, and at the whole of it the
+    // feet went in behind the side rail.
+    kick: { lag: 0.05, up: 0.12, hold: 0.08, down: 0.42, deg: [35, 55], other: 0.6, head: [7, 12], stiff: 3,
+      edge: 0.6 },
+    // The most the give may turn a bone, degrees, and shift her, m — a clamp
+    // that the physics never reaches unless something is wrong.
+    most: { pelvis: 20, spine02: 20, chest: 20, neck: 25, legUL: 30, legUR: 30, legLL: 75, legLR: 75 },
+    mostT: 0.09,
+    // The guard (the hammock's `sane`): a body faster than `v` m/s, the pelvis
+    // further than `far` m from where its springs pull it, or a socket open
+    // past `loose` m — and she is put back on the clip, at rest.
+    guard: { v: 5, far: 0.45, loose: 0.06 },
+  };
+  const COT_BODY = ['pelvis', 'spine02', 'chest', 'neck', 'legUL', 'legUR', 'legLL', 'legLR'];
+  let cotR = null;
+  // The settle handed to her figure: `q`/`t` the give, `clip` filled by the
+  // figure with the clip under it.
+  const cotL = { q: null, t: new Float32Array(3), w: 0, clip: null, on: false };
+  const cotStats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, rescues: 0, spanks: 0, enters: 0,
+    sinkMax: 0, sink: 0, why: null, whys: [], last: null };
+  const _ctV = new THREE.Vector3();
+  const _ctE = new Float64Array(4), _ctD = new Float64Array(4), _ctR = new Float64Array(4);
+
+  /** The net and her ragdoll in it, the first time she lies down on her front. */
+  function cotBuild(f) {
+    const caps = chainCapsules();
+    const net = avbdNet({
+      maxBodies: 16, maxJoints: 16, maxStrings: 3, maxPoints: 0, maxBoxes: 0, maxCaps: caps.length + 1,
+      maxContacts: 400, maxAngles: 16, maxWorldBoxes: 4, maxCapPairs: 48, limK: RAGDOLL.limK,
+      iterations: COT_RAG.iterations, alpha: 0.9, alphaContact: 0.9, beta: 1e5, betaAng: 100, gamma: 0.999,
+      gravity: [0, -9.81, 0], drag: RAGDOLL.drag, vMax: 4, wMax: 25, margin: 0.01, deep: COT_RAG.deep,
+      mu: COT_RAG.mu, floorMu: 0.8, capK: 30000,
+    });
+    const rag = ragdollBuild(net, f, caps, { idBase: 1 });
+    const holds = [0, 1, 2].map(() => net.addString(-1, [0, 0, 0], rag.pelvis, [0, 0, 0], 0, COT_RAG.hold));
+    net.finish();
+    for (const s of holds) net.setString(s, null, null, false);
+    // Each leg against the other, so a kick cannot put one shin through the other.
+    const by = new Map(rag.capsOf().map((c) => [c.bone, c.cp]));
+    const cp = (n) => by.get(n) || [];
+    const pairs = [];
+    const meet = (A, Bs) => { for (const a of cp(A)) for (const n of Bs) for (const b of cp(n)) pairs.push(a, b); };
+    meet('legUL', ['legUR', 'legLR']);
+    meet('legLL', ['legLR', 'legUR']);
+    net.setCapPairs(pairs, pairs.length / 2);
+    const nb = f.bones.length;
+    const R = { net, rag, holds, nb,
+      body: COT_BODY.map((n) => f.boneIndex(n)).filter((i) => i >= 0),
+      arms: ['armUL', 'armUR', 'armLL', 'armLR'].map((n) => rag.body(n)).filter((i) => i >= 0),
+      hip: ['legUL', 'legUR', 'spine02'].map((n) => f.boneIndex(n)),
+      legL: f.boneIndex('legLL'), legR: f.boneIndex('legLR'), neck: f.boneIndex('neck'),
+      // The knees' angles in the net, and the multiple of their tone they are at.
+      knees: rag.angles.filter(([n]) => /^legL/.test(n)).map(([, m]) => m), kneeK: 1,
+      most: new Float64Array(nb),
+      bias: new Float64Array(4 * nb), biasT: new Float64Array(3),
+      out: { q: new Float32Array(nb * 4), t: new Float32Array(3) },
+      tgt: { q: new Float32Array(nb * 4), t: new Float32Array(3) },
+      drv: new Float32Array(nb * 4),
+      fkW: new Float64Array(nb * 4), fkT: new Float64Array(nb * 3),
+      anchor: [new Float64Array(3), new Float64Array(3), new Float64Array(3)],
+      on: false, acc: 0, t: 0, calm: 0, kicks: [] };
+    for (const n of COT_BODY) {
+      const i = f.boneIndex(n);
+      if (i >= 0) R.most[i] = COT_RAG.most[n] * Math.PI / 180;
+    }
+    if (!cotL.q) {
+      cotL.q = new Float32Array(nb * 4);
+      for (let i = 0; i < nb; i++) cotL.q[4 * i + 3] = 1;
+      cotL.clip = { q: new Float32Array(nb * 4), t: new Float32Array(3) };
+    }
+    return R;
+  }
+
+  /** The cot, into the net: the mattress and the pillow that give, the floor that does not. */
+  function cotWorld(R) {
+    const c = kit.cot, top = c[2];
+    const cm = c[0], cms = c[1] + 0.10;
+    const st = at(cm), yaw = Math.atan2(-st.uz, st.ux);
+    const box = (t, s, y, hx, hy, hz) => { const w = toWorld(t, s); return [w[0], y, w[2], hx, hy, hz, yaw]; };
+    // Off the furniture in `kabinaKit`: the mattress 0.66 × 1.84 under a top
+    // at `cot[2]`, and its frame under it — 16 cm of box in all — and the
+    // pillow 0.09 on it at the inland end. Not down to the floor, though a
+    // box pushes a capsule out through its NEAREST face and a slab is a thing
+    // a hard enough blow goes through (on a test body, a 12 cm slab let a
+    // kick through to the floor): a seat would have to go 19 cm in for that
+    // here, and the hardest slap sinks it 2.5. And under the frame the cot is
+    // open, which is where `edgeHeld`'s shins tuck: MEASURED with the box to
+    // the floor, her knee kicked into its side and swung 45 degrees back and
+    // forth off it for two seconds.
+    const B = [...box(cm, cms, top - 0.08, 0.335, 0.08, 0.915),
+      ...box(cm, cms + 0.95 - 0.30, top + 0.045, 0.22, 0.045, 0.15)];
+    R.net.setWorldBoxes(B, 2);
+    R.net.setWorldBoxSoft(0, COT_RAG.mattress.k, COT_RAG.mattress.d);
+    R.net.setWorldBoxSoft(1, COT_RAG.pillow.k, COT_RAG.pillow.d);
+    const floorY = top - 0.44;
+    R.net.setFloor(() => floorY);
+  }
+
+  /** Where the pose held still lays her hips this frame, world, into R.anchor. */
+  function cotAnchors(R, f) {
+    ragdollFK(f, R.tgt.q, R.tgt.t, R.fkW, R.fkT);
+    const mP = f.mesh.position, mQ = f.mesh.quaternion;
+    R.hip.forEach((h, n) => {
+      if (h < 0) return;
+      _ctV.set(R.fkT[3 * h], R.fkT[3 * h + 1], R.fkT[3 * h + 2]).applyQuaternion(mQ).add(mP);
+      R.anchor[n][0] = _ctV.x; R.anchor[n][1] = _ctV.y; R.anchor[n][2] = _ctV.z;
+    });
+  }
+
+  /** On to the ragdoll, at rest in the clip's pose — or back on to it, after the guard. */
+  function cotEnter(f, again = false) {
+    if (!cotR) cotR = cotBuild(f);
+    const R = cotR, { net, rag } = R;
+    // The clip as it stands: what the figure handed over last frame if the
+    // give was already on her, and her local pose if it was not.
+    if (!cotL.on) {
+      const L = f.local();
+      cotL.clip.q.set(L.q); cotL.clip.t.set(L.t.subarray(0, 3));
+    }
+    cotWorld(R);
+    net.resetDuals();
+    R.tgt.q.set(cotL.clip.q); R.tgt.t.set(cotL.clip.t);
+    rag.enterPose(R.tgt.q, R.tgt.t, f.mesh.position, f.mesh.quaternion);
+    for (const b of R.arms) net.setLive(b, false);
+    rag.tension(COT_RAG.tension);
+    R.kneeK = 1;
+    rag.drive(R.tgt.q);
+    // The hips, held where the clip has them.
+    cotAnchors(R, f);
+    const pb = rag.pelvis, P = net.P, Q = net.Q;
+    const qi = [-Q[4 * pb], -Q[4 * pb + 1], -Q[4 * pb + 2], Q[4 * pb + 3]];
+    R.hip.forEach((h, n) => {
+      if (h < 0) return;
+      const w = R.anchor[n];
+      const d = [w[0] - P[3 * pb], w[1] - P[3 * pb + 1], w[2] - P[3 * pb + 2]];
+      const rb = [0, 0, 0];
+      qrotv(rb, 0, qi, 0, d, 0);
+      net.setString(R.holds[n], [w[0], w[1], w[2]], 0, true, rb);
+    });
+    R.bias.fill(0);
+    for (let i = 0; i < R.nb; i++) R.bias[4 * i + 3] = 1;
+    R.biasT.fill(0);
+    R.on = true; R.acc = 0; R.t = 0; R.calm = 0; R.kicks.length = 0;
+    if (!cotL.on) {
+      cotL.on = true;
+      cotL.w = 0;
+      for (let i = 0; i < R.nb; i++) { cotL.q[4 * i] = cotL.q[4 * i + 1] = cotL.q[4 * i + 2] = 0; cotL.q[4 * i + 3] = 1; }
+      cotL.t.fill(0);
+      f.settle(cotL);
+    }
+    if (!again) cotStats.enters++;
+    return true;
+  }
+
+  function cotLeave() {
+    const R = cotR;
+    if (!R || !R.on) return;
+    R.rag.leave();
+    for (const s of R.holds) R.net.setString(s, null, null, false);
+    R.on = false;
+  }
+
+  /** The guard — see `sane` in 43-hammock.js. */
+  function cotSane(R) {
+    const { net, rag } = R, P = net.P, V = net.V;
+    for (const b of rag.bodies) {
+      if (!net.live[b]) continue;
+      const o = 3 * b;
+      if (!(P[o] === P[o]) || !(P[o + 1] === P[o + 1]) || !(P[o + 2] === P[o + 2])) {
+        cotStats.why = 'nan ' + b;
+        return false;
+      }
+      if (V[o] * V[o] + V[o + 1] * V[o + 1] + V[o + 2] * V[o + 2] > COT_RAG.guard.v ** 2) {
+        cotStats.why = 'fast ' + b;
+        return false;
+      }
+    }
+    const pb = 3 * rag.pelvis, a = R.anchor[0], z = R.anchor[1];
+    const mx = (a[0] + z[0]) / 2, my = (a[1] + z[1]) / 2, mz = (a[2] + z[2]) / 2;
+    if (Math.hypot(P[pb] - mx, P[pb + 1] - my, P[pb + 2] - mz) > COT_RAG.guard.far) { cotStats.why = 'far'; return false; }
+    net.measure();
+    if (net.stats.maxLoose > COT_RAG.guard.loose) { cotStats.why = 'loose ' + net.stats.maxLoose.toFixed(3); return false; }
+    return true;
+  }
+
+  /** A knee's reflex this moment, rad: 0 to the peak and back — see COT_RAG.kick. */
+  function cotKickAt(k, t) {
+    const K = COT_RAG.kick;
+    let u = t - K.lag;
+    if (u <= 0) return 0;
+    if (u < K.up) { u /= K.up; return k * u * u * (3 - 2 * u); }
+    u -= K.up;
+    if (u < K.hold) return k;
+    u -= K.hold;
+    if (u < K.down) { u = 1 - u / K.down; return k * u * u * (3 - 2 * u); }
+    return 0;
+  }
+
+  /**
+   * Every frame, before her figure is posed: the net stepped toward the clip
+   * under it, and the give it makes laid on her. Nothing at all unless she
+   * is lying on her front on the cot, or fading out of it.
+   */
+  function cotRagTick(dt) {
+    const f = skinFig;
+    if (!f || !show) return;
+    // And only with somebody in reach of her: nobody slaps a woman from the
+    // promenade, and lying still she is drawn as the clip anyway (`actOut`),
+    // so from `far` m off the net is not stepped at all — and is warm again
+    // `warmFor` s after you come back in.
+    const fx = f.mesh.position.x - lastCam.x, fz = f.mesh.position.z - lastCam.z;
+    const want = !!(COT_RAG.phases[show.phase] && show.onBed && kit && kit.cot && !posed && !lickOn
+      && !(show.ham && show.ham.rag) && fx * fx + fz * fz < COT_RAG.far * COT_RAG.far);
+    if (!want) {
+      if (cotR && cotR.on) cotLeave();
+      if (cotL.on) {
+        cotL.w = Math.max(0, cotL.w - dt / COT_RAG.fadeOut);
+        if (cotL.w <= 0) { f.settle(null); cotL.on = false; }
+      }
+      return;
+    }
+    const t0 = performance.now();
+    if (!cotR || !cotR.on) cotEnter(f);
+    const R = cotR, { net, rag } = R;
+    R.t += dt;
+    R.calm = Math.max(0, R.calm - dt);
+    cotL.w = R.calm > 0 ? Math.min(1, cotL.w + dt / COT_RAG.actIn) : Math.max(0, cotL.w - dt / COT_RAG.actOut);
+    // The pose held still: the clip, eased to — see `steady`.
+    const ks = 1 - Math.exp(-dt / COT_RAG.steady), Tq = R.tgt.q, Cq = cotL.clip.q;
+    for (let o = 0; o < Tq.length; o += 4) {
+      const sg = Tq[o] * Cq[o] + Tq[o + 1] * Cq[o + 1] + Tq[o + 2] * Cq[o + 2] + Tq[o + 3] * Cq[o + 3] < 0 ? -1 : 1;
+      let l = 0;
+      for (let c = 0; c < 4; c++) { Tq[o + c] += (sg * Cq[o + c] - Tq[o + c]) * ks; l += Tq[o + c] * Tq[o + c]; }
+      l = 1 / (Math.sqrt(l) || 1);
+      for (let c = 0; c < 4; c++) Tq[o + c] *= l;
+    }
+    for (let k = 0; k < 3; k++) R.tgt.t[k] += (cotL.clip.t[k] - R.tgt.t[k]) * ks;
+    // The muscles, at it — and the reflex, if a slap has just landed: the
+    // most of any in flight, a joint at a time, so three quick slaps are one
+    // kick held up and not three stacked past the knee's stop.
+    R.drv.set(R.tgt.q);
+    const K = COT_RAG.kick, kickEnd = K.lag + K.up + K.hold + K.down;
+    let aL = 0, aR = 0, aH = 0;
+    for (let n = R.kicks.length - 1; n >= 0; n--) {
+      const Kn = R.kicks[n];
+      Kn.t += dt;
+      if (Kn.t > kickEnd) { R.kicks.splice(n, 1); continue; }
+      aL = Math.max(aL, cotKickAt(Kn.l, Kn.t));
+      aR = Math.max(aR, cotKickAt(Kn.r, Kn.t));
+      aH = Math.max(aH, cotKickAt(Kn.h, Kn.t));
+    }
+    // The knees at `stiff` times their tone while a kick is in flight.
+    const kk = R.kicks.length ? K.stiff : 1;
+    if (kk !== R.kneeK) {
+      R.kneeK = kk;
+      // RAGDOLL's own knee, and `tension`'s rule for its damping.
+      const D = RAGDOLL.bodies.find((b) => b.bone === 'legLL'), t = COT_RAG.tension * kk;
+      for (const m of R.knees) net.setAngleK(m, D.k * t, D.kd * Math.max(0.35, Math.sqrt(t)));
+    }
+    for (const [i, a] of [[R.legL, aL], [R.legR, aR], [R.neck, aH]]) {
+      if (i < 0 || !a) continue;
+      // `legL` +x is the knee, and the neck's +x is her head going back —
+      // up, on her front: a turn about the bone's own x, on its angle.
+      _ctR[0] = Math.sin(a / 2); _ctR[1] = 0; _ctR[2] = 0; _ctR[3] = Math.cos(a / 2);
+      avbdQMul(R.drv, 4 * i, _ctR, 0, _ctE, 0);
+      for (let c = 0; c < 4; c++) R.drv[4 * i + c] = _ctE[c];
+    }
+    rag.drive(R.drv);
+    cotAnchors(R, f);
+    R.hip.forEach((h, n) => { if (h >= 0) net.setString(R.holds[n], R.anchor[n]); });
+    // Fixed steps, at most `maxSub` a frame.
+    R.acc = Math.min(R.acc + dt, COT_RAG.maxSub * COT_RAG.h);
+    let n = 0;
+    while (R.acc >= COT_RAG.h - 1e-9 && n < COT_RAG.maxSub) {
+      net.step(COT_RAG.h); R.acc -= COT_RAG.h; n++; cotStats.steps++;
+    }
+    if (n && !cotSane(R)) {
+      cotStats.rescues++;
+      cotStats.whys.push(cotStats.why);
+      if (cotStats.whys.length > 8) cotStats.whys.shift();
+      cotEnter(f, true);
+    }
+    // The give: each body's bone off the pose held still, less its resting
+    // part — laid on the clip.
+    rag.write(R.out, f.mesh.position, f.mesh.quaternion, cotL.clip.q);
+    const tau = R.t < COT_RAG.warmFor ? COT_RAG.bias.warm : COT_RAG.bias.rest;
+    const kb = R.calm > 0 ? 0 : 1 - Math.exp(-dt / tau);
+    const C = R.tgt.q, O = R.out.q, Bq = R.bias;
+    for (const i of R.body) {
+      const o = 4 * i;
+      // e = held⁻¹·ragdoll, the near way round.
+      avbdQMul(C, o, O, o, _ctE, 0, true);
+      if (_ctE[3] < 0) for (let c = 0; c < 4; c++) _ctE[c] = -_ctE[c];
+      if (kb > 0) {
+        const s = (Bq[o] * _ctE[0] + Bq[o + 1] * _ctE[1] + Bq[o + 2] * _ctE[2] + Bq[o + 3] * _ctE[3]) < 0 ? -1 : 1;
+        let l = 0;
+        for (let c = 0; c < 4; c++) { Bq[o + c] += (s * _ctE[c] - Bq[o + c]) * kb; l += Bq[o + c] * Bq[o + c]; }
+        l = 1 / (Math.sqrt(l) || 1);
+        for (let c = 0; c < 4; c++) Bq[o + c] *= l;
+      }
+      // d = bias⁻¹·e: what is left of it once its rest is taken off.
+      avbdQMul(Bq, o, _ctE, 0, _ctD, 0, true);
+      if (_ctD[3] < 0) for (let c = 0; c < 4; c++) _ctD[c] = -_ctD[c];
+      const ang = 2 * Math.acos(Math.min(1, _ctD[3]));
+      if (ang > R.most[i]) {
+        const sn = Math.sin(ang / 2) || 1, k = Math.sin(R.most[i] / 2) / sn;
+        _ctD[0] *= k; _ctD[1] *= k; _ctD[2] *= k; _ctD[3] = Math.cos(R.most[i] / 2);
+      }
+      cotL.q[o] = _ctD[0]; cotL.q[o + 1] = _ctD[1]; cotL.q[o + 2] = _ctD[2]; cotL.q[o + 3] = _ctD[3];
+    }
+    let tl = 0;
+    for (let k = 0; k < 3; k++) {
+      const e = R.out.t[k] - R.tgt.t[k];
+      R.biasT[k] += (e - R.biasT[k]) * kb;
+      cotL.t[k] = e - R.biasT[k];
+      tl += cotL.t[k] * cotL.t[k];
+    }
+    tl = Math.sqrt(tl);
+    if (tl > COT_RAG.mostT) for (let k = 0; k < 3; k++) cotL.t[k] *= COT_RAG.mostT / tl;
+    // How far the seat is from where it rests, m — for a probe.
+    cotStats.sink = tl;
+    cotStats.sinkMax = Math.max(cotStats.sinkMax, tl);
+    const ms = performance.now() - t0;
+    cotStats.ms = ms; cotStats.msMax = Math.max(cotStats.msMax, ms);
+    cotStats.msSum += ms; cotStats.frames++;
+  }
+
+  /**
+   * A slap, on the cot — called with the rest of the slap from 90-app.js.
+   * `side` +1 her left cheek; `from` where the hand came from (the camera);
+   * `k` N·s, or dealt (see COT_RAG.spank). Whether it landed on the ragdoll.
+   */
+  function cotSpank(side = 1, from = null, k = null) {
+    const R = cotR;
+    if (!R || !R.on || !skinFig) return false;
+    const S = COT_RAG.spank, { net, rag } = R, pb = rag.pelvis;
+    const P = net.P, Q = net.Q;
+    // Where it landed: the fullest point of that cheek as she is drawn — the
+    // point the crosshair picked — or, without v2.0, over her pelvis.
+    let px = P[3 * pb], py = P[3 * pb + 1] + 0.08, pz = P[3 * pb + 2];
+    if (APPR.primary && appr && appr.mesh.visible) {
+      const bp = apprenticeButtBind(side);
+      if (bp) {
+        const w = bindPointAt(appr, bp, [['pelvis', 1]], _ctV);
+        px = w.x; py = w.y; pz = w.z;
+      }
+    }
+    const J = Math.min(S.cap, k != null ? +k
+      : Math.random() < S.hardP ? S.hard : S.J[0] + (S.J[1] - S.J[0]) * Math.random());
+    // Down into the mattress, and `fwd` of it along the way the hand was going.
+    let fx = 0, fz = 0;
+    if (from) {
+      fx = px - from.x; fz = pz - from.z;
+      const l = Math.hypot(fx, fz) || 1;
+      fx /= l; fz /= l;
+    }
+    let jx = fx * S.fwd, jy = -1, jz = fz * S.fwd;
+    const jl = Math.hypot(jx, jy, jz);
+    jx *= J / jl; jy *= J / jl; jz *= J / jl;
+    const m = net.mass[pb];
+    // Stacked, never into it faster than `vMax`: `sc` of this one lands.
+    const vy = net.V[3 * pb + 1], dvy0 = jy / m;
+    const sc = vy + dvy0 < -S.vMax ? Math.max(0, (-S.vMax - vy) / dvy0) : 1;
+    net.kick(pb, jx / m * sc, dvy0 * sc, jz / m * sc);
+    // And the turn it puts on the pelvis: I⁻¹ (r × J), in the body's frame.
+    const rx = px - P[3 * pb], ry = py - P[3 * pb + 1], rz = pz - P[3 * pb + 2];
+    const Lw = [(ry * jz - rz * jy) * sc, (rz * jx - rx * jz) * sc, (rx * jy - ry * jx) * sc];
+    const q = [Q[4 * pb], Q[4 * pb + 1], Q[4 * pb + 2], Q[4 * pb + 3]], qc = [-q[0], -q[1], -q[2], q[3]];
+    const Lb = [0, 0, 0];
+    qrotv(Lb, 0, qc, 0, Lw, 0);
+    const I = net.inert, o6 = 6 * pb;
+    // [a b c; b d e; c e g] — xx yy zz xy xz yz — inverted by its cofactors.
+    const a = I[o6], d = I[o6 + 1], g = I[o6 + 2], b = I[o6 + 3], c = I[o6 + 4], e = I[o6 + 5];
+    const A = d * g - e * e, Bc = c * e - b * g, Cc = b * e - c * d;
+    const det = a * A + b * Bc + c * Cc;
+    if (Math.abs(det) > 1e-12) {
+      const Dd = a * g - c * c, E = b * c - a * e, F = a * d - b * b;
+      const wb = [(A * Lb[0] + Bc * Lb[1] + Cc * Lb[2]) / det, (Bc * Lb[0] + Dd * Lb[1] + E * Lb[2]) / det,
+        (Cc * Lb[0] + E * Lb[1] + F * Lb[2]) / det];
+      const wl = Math.hypot(wb[0], wb[1], wb[2]);
+      if (wl > S.spin) for (let n = 0; n < 3; n++) wb[n] *= S.spin / wl;
+      const ww = [0, 0, 0];
+      qrotv(ww, 0, q, 0, wb, 0);
+      net.W[3 * pb] += ww[0]; net.W[3 * pb + 1] += ww[1]; net.W[3 * pb + 2] += ww[2];
+    }
+    // The reflex: both knees, the slapped side's the more, sized with the slap.
+    const K = COT_RAG.kick, u = clamp((J - S.J[0]) / (S.hard - S.J[0]), 0, 1);
+    const deg = (K.deg[0] + (K.deg[1] - K.deg[0]) * u) * (0.85 + 0.3 * Math.random()) * Math.PI / 180
+      * (show.phase === 'edgeHeld' ? K.edge : 1);
+    // +1 is her left.
+    const head = (K.head[0] + (K.head[1] - K.head[0]) * u) * Math.PI / 180;
+    R.kicks.push({ t: 0, l: deg * (side > 0 ? 1 : K.other), r: deg * (side > 0 ? K.other : 1), h: head });
+    if (R.kicks.length > 3) R.kicks.shift();
+    R.calm = COT_RAG.calm;
+    // Past the warm-up at once: a slap in its first second is still a slap.
+    if (R.t < COT_RAG.warmFor) R.t = COT_RAG.warmFor;
+    cotStats.spanks++;
+    cotStats.last = { J: +J.toFixed(2), dv: +(J * sc / m).toFixed(3), side,
+      kick: +(deg * 180 / Math.PI).toFixed(1) };
+    return true;
+  }
+
   /**
    * AND BACK TO HER LANE ON HER FEET. Misha, 27 Sep 2026: *"when i say 'get
    * out', she does get up, but then she just disappears/vanishes"*. She did
@@ -56573,6 +57098,8 @@ async function buildJadrija(scene) {
     // And her as a ragdoll written back into her skeleton, off the step just
     // taken and before her figure is posed — see `hamRagTick`.
     if (hammock && !posed && !lickOn) hamRagTick(dt);
+    // And her on the cot, the same way round — see `cotRagTick`.
+    cotRagTick(dt);
     if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
 
@@ -58864,6 +59391,47 @@ async function buildJadrija(scene) {
       show.spreadOn = 0;
       return true;
     },
+    /**
+     * And the slap's weight, on her on the cot — see `cotSpank`. Called with
+     * the rest of the slap by 90-app.js: `side` +1 her left, `from` the hand's
+     * side of her (the camera), `k` N·s for a probe (dealt otherwise).
+     */
+    cotSpank: (side, from, k) => cotSpank(side, from, k),
+    /**
+     * Debug: COT_RAG's numbers, merged — `cotTune({ kick: { deg: [40, 70] } })`
+     * — taking effect at the next time she is taken over (or now, for the
+     * slap and the reflex). Hands back the table.
+     */
+    cotTune: (o) => {
+      for (const [k, v] of Object.entries(o || {})) {
+        if (v && typeof v === 'object' && !Array.isArray(v) && COT_RAG[k]) Object.assign(COT_RAG[k], v);
+        else COT_RAG[k] = v;
+      }
+      if (cotR && cotR.on) cotLeave();
+      cotR = null;
+      return JSON.parse(JSON.stringify(COT_RAG));
+    },
+    /** Debug: the cot's ragdoll — on or not, its cost and what it has done. */
+    cotRag: () => ({ on: !!(cotR && cotR.on), w: +cotL.w.toFixed(3), ms: +cotStats.ms.toFixed(3),
+      msMax: +cotStats.msMax.toFixed(3), msAvg: +(cotStats.msSum / Math.max(1, cotStats.frames)).toFixed(3),
+      frames: cotStats.frames, steps: cotStats.steps, rescues: cotStats.rescues, why: cotStats.why, whys: cotStats.whys,
+      spanks: cotStats.spanks, enters: cotStats.enters, last: cotStats.last,
+      give: +cotStats.sink.toFixed(4), giveMax: +cotStats.sinkMax.toFixed(4),
+      contacts: cotR ? cotR.net.stats.contacts : 0,
+      loose: cotR && cotR.on ? +cotR.net.measure().maxLoose.toFixed(4) : null,
+      // The give a bone, degrees, and the seat's shift, m — what is drawn on the clip.
+      d: cotR && cotL.q ? Object.fromEntries(COT_BODY.map((n) => {
+        const i = skinFig.boneIndex(n);
+        return [n, i < 0 ? null : +(2 * Math.acos(Math.min(1, Math.abs(cotL.q[4 * i + 3]))) * 180 / Math.PI).toFixed(2)];
+      })) : null,
+      t: Array.from(cotL.t, (v) => +v.toFixed(4)),
+      // Each socket's angle now, degrees (x the swing forward / the knee),
+      // and the pelvis body in the world.
+      ang: cotR && cotR.on ? Object.fromEntries(cotR.rag.angles.filter(([n]) => !/^arm/.test(n))
+        .map(([n, m]) => [n, cotR.net.angleNow(m).map((v) => +(v * 180 / Math.PI).toFixed(1))])) : null,
+      pelvis: cotR && cotR.on ? Array.from(cotR.net.P.subarray(3 * cotR.rag.pelvis, 3 * cotR.rag.pelvis + 3),
+        (v) => +v.toFixed(4)) : null,
+      reset:() => { cotStats.msMax = 0; cotStats.sinkMax = 0; cotStats.msSum = 0; cotStats.frames = 0; } }),
     /** Debug: where the spread is — seconds into it, or null. */
     spreadState: () => (show ? { t: show.spread, on: show.spreadOn || 0,
       phase: show.phase } : null),
