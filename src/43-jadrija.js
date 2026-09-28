@@ -28481,8 +28481,20 @@ async function buildJadrija(scene) {
   // The two big ones are off to the sides. The three near the middle are
   // olives: four metres and open-crowned, so from the terrace you are looking
   // at the sea through a tree rather than at a tree.
-  for (const [dt, ds, tall] of [[-5.8, 9.0, 1], [6.0, 9.3, 1], [-3.0, 9.9, 0],
-                                [3.3, 10.1, 0], [0.4, 10.8, 0]]) {
+  //
+  // The olives were set out before the forecourt was, and the forecourt's end
+  // wall — the white rendered one with the gate in it — came down on them at
+  // z 9.95 to 10.15. Two had their boles in it: one 5 cm inside it at x −3.0,
+  // one standing in the render at x 3.3, and the third was 65 cm off its face.
+  // Misha: *"they need to stand a bit further away from the stone fence, right
+  // now they kinda blend with the stone fence."* A split bole against a
+  // pillar reads as one object; the stems went up through the cap line and the
+  // wall seemed to grow the tree. So all three stand out on the promenade now,
+  // the nearest 1.65 m off the wall's face, and staggered — a row at one
+  // offset would be a hedge line again. The gate's own corridor, x −2.25 to
+  // −1.07, is left clear all the way out. The two pines never touched it.
+  for (const [dt, ds, tall] of [[-5.8, 9.0, 1], [6.0, 9.3, 1], [-3.2, 11.9, 0],
+                                [3.1, 11.8, 0], [0.5, 12.6, 0]]) {
     const t = VIK.t + dt, s = VIK.s - ds;
     const y = surfaceY(t, s);
     if (tall) {

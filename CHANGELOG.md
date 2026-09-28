@@ -8,6 +8,44 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.6] — 2026-09-28
+
+### the olives step off the vikendica's wall
+
+Misha: *"the trees near Vikendica look so much nicer now, the only issue is
+they need to stand a bit further away from the stone fence, right now they
+kinda blend with the stone fence."*
+
+**What was wrong.** The three olives in front of the vikendica were set out
+off the terrace lip before the forecourt existed. The forecourt's end wall —
+white render, 1.3 m, the gate in it — then came down at z 9.95–10.15 in the
+house's frame, right on top of them:
+
+- the west olive's bole was 5 cm inside the wall, on the forecourt side;
+- the east one stood in the render itself, against the end pillar;
+- the middle one was 65 cm off the wall's face, on the promenade.
+
+A split bole against a pillar reads as one object. The stems went up through
+the cap line and the wall seemed to grow the tree.
+
+**The fix** (the planting list below the terrace pines, 43-jadrija.js). All
+three stand out on the promenade, staggered, with their `greens` blockers
+moved with them:
+
+| olive | was (dt, ds) | now (dt, ds) | clear of the wall face |
+| --- | --- | --- | --- |
+| west | −3.0, 9.9 | −3.2, 11.9 | 1.75 m (was in it) |
+| east | 3.3, 10.1 | 3.1, 11.8 | 1.65 m (was in it) |
+| middle | 0.4, 10.8 | 0.5, 12.6 | 2.45 m (was 0.65) |
+
+The staggered offsets keep them from reading as a hedge line. The gate's
+corridor (x −2.25 to −1.07) is clear all the way out. The promenade keeps at
+least 4.4 m seaward of them. The two framing pines, and the bed olive and
+oleanders inside the forecourt, did not move. No `rng` draw was added or
+reordered. Measured before and after: the 100 people and the other 795
+blockers hash identical. The only blocker within 2.2 m of a new trunk is the
+wall itself.
+
 ## [1.539.5] — 2026-09-28
 
 ### Chloe's necklace follows her into the crouch
