@@ -8,6 +8,76 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.541.2] — 2026-09-28
+
+### The parasols, smooth
+
+Misha said yes to *"give the cream parasols along the promenade the same
+smooth treatment the konoba's got"*. Every other parasol on the shore was
+still eight flat triangles from a point to an octagon, or four to a square,
+drawn twice, each with one normal.
+
+**One builder, `smoothParasol`.** It is the konoba's parasol from 1.541.1
+made general, built from the same `knSurf` / `knLathe` / `tubeTS` pieces:
+
+- **The cloth** is one sheet with normals taken from its own neighbours, so
+  a rib is a soft crease and the sag between two ribs is a real hollow.
+- **The rim** is a straight chord between two rib tips, because cloth
+  stretched between two spokes runs straight. The same builder therefore
+  makes round parasols (eight ribs, domed along each) and square ones (four
+  ribs to the corners, a tensioned sheet sagging a few centimetres at the
+  middle of each edge). Square ones stay square.
+- **The frame** is visible from below: round ribs under the cloth, a
+  stretcher from a runner on the pole to each rib, a hub, a finial, a round
+  pole, and a crank on the café and kiosk parasols.
+- **The printed valance** hangs from the cloth's own rim with the same drop
+  and the same brand as before. CORONA, YOUR AD HERE, OŽUJSKO, JANA and
+  JAMNICA all still print.
+
+**What changed where:**
+
+- **The cafés' cream octagons** (H2O and the slastičarnica, 2 CORONA and 2
+  YOUR AD HERE): smooth 8-rib canopy and crank. The wheel-rim base is now
+  turned (`wheelBase`), with the same rim, fill, crown and nut. The furled
+  version (after 17:00) is a gathered bundle with a strap.
+- **The kiosk's two square parasols** (CORONA and Ožujsko): four ribs, a
+  tensioned sheet, and a round cast plate base. The second, darker
+  underside copy has gone, because one sheet now lights correctly from both
+  sides.
+- **The tavern's crimson square** (Ožujsko): four ribs, the same pine-litter
+  patches from the same `jit` keys, and the pole through the poseur table
+  with a grommet.
+- **MINI's two taupe cantilevers** (JAMNICA): a domed square sheet with
+  ribs, stretchers and a runner on a stem under the arm. The flat square
+  crown is gone.
+- **MINI's furled Stella**: a gathered bundle, a turned base, a round pole
+  and a finial. The cuff is unchanged.
+- **The 11 hired beach parasols** (JANA): the same dome and sag they already
+  had, now one smooth sheet with a frame under it. They still take the same
+  single `rng()` draw.
+- **The 900 instanced parasols** (`parasolProto` in 37-props.js, including
+  the 12 orange and yellow ones on the Jadrija deck): smooth cloth, a chord
+  rim, 8 round ribs and a round pole. They cost about 510 triangles each,
+  up from 110. The cloth is two sheets 7 cm apart: the top faces up and the
+  lining faces down. With a single down-facing sheet, this layer's receiver
+  put shadow acne over the sunlit top. With a single up-facing sheet, the
+  parasol cast no shade.
+
+**Unchanged:** the konoba's own parasol is not rebuilt through the new
+builder, so its output is identical. Every parasol keeps its position,
+size, colour, rotation and collision. The blockers hash is identical (798
+blockers, 1224756138), and `rng` draws in 43-jadrija.js are unchanged.
+
+**Cost:** draw calls are identical at a café station, on a wide promenade
+shot and on the beach. There are about 395k more triangles (+4.6%), of which
+about 360k are the 900 instanced parasols. Render time is within noise
+(café 5.4 → 4.7 ms median, beach 8.1–8.7 → 7.4–8.0 ms, RTX 4090 under WSL).
+
+**Side effect:** the café octagons now cast their full shade on the paving.
+The flat canopy was wound the wrong way round for the shadow pass (the
+shore frame reverses handedness), so before this change only the valance
+and the pole cast a shadow.
+
 ## [1.541.1] — 2026-09-28
 
 ### The konoba, smooth

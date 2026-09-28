@@ -675,47 +675,126 @@ function carNearProto() {
  *     from the wrong 45° is two faces wide and looks like a plank.
  *
  * 110 triangles against the old twelve, instanced nine hundred times off one
- * draw. The stripe stays: gores alternate light and less light, which under the
- * per-instance colour is what makes a row of these read as a row rather than as
- * one long awning.
+ * draw (about 510 since 1.541.2 — see below). The stripe stays: gores
+ * alternate light and less light, which under the per-instance colour is what
+ * makes a row of these read as a row rather than as one long awning.
  */
 function parasolProto() {
   const b = propBuilder();
   const POLE = [0.55, 0.52, 0.48];
   const HUB = [0.42, 0.40, 0.38];
-  const RIBS = 8, N = RIBS * 2, R = 1.35;
-  // Rib line: hub, mid-span, rim. And how far the cloth bags below it between
-  // two ribs at each of those — nothing at the hub, where it is clamped.
-  const RING = [[0.00, 2.34, 0.000], [0.55, 2.13, 0.030], [1.00, 1.86, 0.090]];
-  const VAL = [0.105, 0.215];            // valance drop on a rib, and between two
-  const ang = (j) => (j / N) * TAU;
-  // `j` even is a rib, `j` odd is the slack between two of them.
-  const P = (j, ring) => {
-    const [f, y, sag] = RING[ring];
-    return [Math.cos(ang(j)) * R * f, y - (j % 2 ? sag : 0), Math.sin(ang(j)) * R * f];
+  const RIBS = 8, COL = 2, N = RIBS * COL, R = 1.35;
+  // ── AND SMOOTH, 28 Sep 2026 ──────────────────────────────────────────────
+  //
+  // Misha asked for the resort's own parasols to get the konoba's smooth
+  // treatment (src/43-jadrija.js, "THE PARASOLS, SMOOTH"), and six of these
+  // stand on the Jadrija deck among them — the orange and yellow ones — so
+  // they get it too, at a price nine hundred of them can pay. The same hub
+  // at 2.34, the same 2.13 at mid-span and 1.86 at the rim, the same bag
+  // between two ribs and the same valance swag; what changes is that the
+  // cloth is one sheet with each vertex's normal off its own neighbours, so
+  // a rib is a soft crease and not a light step, the rim runs a straight
+  // chord between two rib tips the way stretched cloth does, and there are
+  // eight round ribs under it and a round pole. About 510 triangles.
+  const yRib = (f) => 2.34 - 0.48 * Math.pow(f, 1.5);
+  const at = (f, j) => {
+    const r = Math.floor(j / COL) % RIBS, v = (j % COL) / COL;
+    const a0 = (r / RIBS) * TAU, a1 = ((r + 1) / RIBS) * TAU;
+    const x = Math.cos(a0) + (Math.cos(a1) - Math.cos(a0)) * v;
+    const z = Math.sin(a0) + (Math.sin(a1) - Math.sin(a0)) * v;
+    return [x * R * f, yRib(f) - 0.09 * Math.sin(Math.PI * v) * f * f, z * R * f];
   };
-  const gore = (j) => ((j >> 1) % 2 ? [1, 1, 1] : [0.845, 0.845, 0.845]);
-  for (let j = 0; j < N; j++) {
-    const k = (j + 1) % N, cl = gore(j);
-    b.tri([0, RING[0][1], 0], P(j, 1), P(k, 1), cl);
-    b.quad(P(j, 1), P(k, 1), P(k, 2), P(j, 2), cl);
-    // The valance, hung off the rim it follows. Deeper between the ribs, so the
-    // bottom edge swags where the rim already dips and the scallop doubles.
-    const d0 = VAL[j % 2], d1 = VAL[k % 2];
-    const r0 = P(j, 2), r1 = P(k, 2);
-    b.quad(r0, r1, [r1[0], r1[1] - d1, r1[2]], [r0[0], r0[1] - d0, r0[2]],
-      [cl[0] * 0.90, cl[1] * 0.90, cl[2] * 0.90]);
+  const sub = (a, c) => [a[0] - c[0], a[1] - c[1], a[2] - c[2]];
+  const cross = (a, c) => [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2],
+    a[0] * c[1] - a[1] * c[0]];
+  const unit = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  // One triangle, wound to agree with its vertex normals (the material flips
+  // a normal on a back face, so a winding that disagrees lights the far side).
+  const tri = (A, B, C, na, nb, nc, cl) => {
+    const g = cross(sub(B, A), sub(C, A));
+    const d = g[0] * (na[0] + nb[0] + nc[0]) + g[1] * (na[1] + nb[1] + nc[1])
+      + g[2] * (na[2] + nb[2] + nc[2]);
+    if (d >= 0) b.smooth(A, B, C, na, nb, nc, cl, cl, cl);
+    else b.smooth(A, C, B, na, nc, nb, cl, cl, cl);
+  };
+  // A grid of points, columns wrapped, normals off the neighbours and turned
+  // by `turn(n, p)`, one colour a quad.
+  const sheet = (G, turn, colQ) => {
+    const Rn = G.length, C = G[0].length;
+    const Nn = G.map((row, i) => row.map((p, j) => {
+      const n = unit(cross(sub(G[i][(j + 1) % C], G[i][(j - 1 + C) % C]),
+        sub(G[Math.min(Rn - 1, i + 1)][j], G[Math.max(0, i - 1)][j])));
+      return turn(n, p);
+    }));
+    for (let i = 0; i < Rn - 1; i++) {
+      for (let j = 0; j < C; j++) {
+        const k = (j + 1) % C, cl = colQ(i, j);
+        tri(G[i][j], G[i][k], G[i + 1][k], Nn[i][j], Nn[i][k], Nn[i + 1][k], cl);
+        tri(G[i][j], G[i + 1][k], G[i + 1][j], Nn[i][j], Nn[i + 1][k], Nn[i + 1][j], cl);
+      }
+    }
+  };
+  const gore = (j) => (Math.floor(j / COL) % 2 ? [1, 1, 1] : [0.845, 0.845, 0.845]);
+  // The cloth, and it is TWO sheets 15 mm apart, which is the one thing
+  // here 43's canopies do not need. The shadow pass draws back faces only
+  // (see `casterMaterial`), so a single sheet facing down — its back to the
+  // sun, the way 43 builds them — is what goes in the map, and on this
+  // layer's receiver the smooth normals let the sunlit top wear its own
+  // shadow as a mosaic of texels; the first cut did. Facing up it casts
+  // nothing and the shade under it goes. So the top faces up and is what
+  // you see from above, and a lining under it faces down, is what you see
+  // from below, and is the only one of the two in the map — 15 mm under
+  // the surface that is lit, which cannot then shadow itself.
+  const F = [0.03, 0.30, 0.55, 0.80, 1.0];
+  sheet(F.map((f) => Array.from({ length: N }, (_, j) => at(f, j))),
+    (n) => (n[1] < 0 ? [-n[0], -n[1], -n[2]] : n), (i, j) => gore(j));
+  sheet(F.map((f) => Array.from({ length: N }, (_, j) => {
+    const p = at(f, j);
+    return [p[0], p[1] - 0.070, p[2]];
+  })), (n) => (n[1] > 0 ? [-n[0], -n[1], -n[2]] : n), (i, j) => gore(j));
+  // The valance, hung off the rim, swagged deeper between the ribs than on
+  // them; normals out from the pole.
+  const VAL = [0.105, 0.215];
+  {
+    const top = Array.from({ length: N }, (_, j) => at(1, j));
+    const bot = top.map((p, j) => [p[0] * 1.01, p[1] - VAL[j % COL ? 1 : 0], p[2] * 1.01]);
+    sheet([top, bot], (n, p) => (n[0] * p[0] + n[2] * p[2] < 0 ? [-n[0], -n[1], -n[2]] : n),
+      (i, j) => gore(j).map((c) => c * 0.90));
   }
-  // Hub, finial, pole. The hub is what the ribs would be pinned to and the
-  // reason the apex is not a puncture in the cloth.
-  const ring = (j, r, y) => [Math.cos((j / 6) * TAU) * r, y, Math.sin((j / 6) * TAU) * r];
-  for (let j = 0; j < 6; j++) {
-    const k = (j + 1) % 6;
-    b.quad(ring(j, 0.072, 2.16), ring(k, 0.072, 2.16),
-      ring(k, 0.038, 2.31), ring(j, 0.038, 2.31), HUB);
-    b.tri([0, 2.42, 0], ring(j, 0.038, 2.31), ring(k, 0.038, 2.31), HUB);
-    b.quad(ring(j, 0.046, 0), ring(k, 0.046, 0),
-      ring(k, 0.046, 2.20), ring(j, 0.046, 2.20), POLE);
+  // Round things: a ring of `sides` round a vertical axis, or a tube along
+  // two points.
+  const lathe = (prof, sides, cl) => {
+    const G = prof.map(([y, r]) => Array.from({ length: sides }, (_, i) => {
+      const a = (i / sides) * TAU;
+      return [Math.cos(a) * r, y, Math.sin(a) * r];
+    }));
+    sheet(G, (n, p) => (n[0] * p[0] + n[2] * p[2] < 0 ? [-n[0], -n[1], -n[2]] : n), () => cl);
+  };
+  lathe([[0, 0.046], [2.20, 0.046]], 8, POLE);
+  lathe([[2.15, 0.030], [2.17, 0.072], [2.26, 0.060], [2.31, 0.038], [2.37, 0.030],
+    [2.42, 0.004]], 8, HUB);
+  // The ribs: four-sided, which at this size and with these normals is a
+  // round tube, just under the lining.
+  for (let r = 0; r < RIBS; r++) {
+    const a = (r / RIBS) * TAU, ca = Math.cos(a), sa = Math.sin(a);
+    const pts = [0.06, 0.55, 0.98].map((f) => [ca * R * f, yRib(f) - 0.086, sa * R * f]);
+    const G = pts.map((p, k) => {
+      const q = pts[Math.min(2, k + 1)], o = pts[Math.max(0, k - 1)];
+      const tng = unit(sub(q, o)), side = [-sa, 0, ca], up = unit(cross(side, tng));
+      return [0, 1, 2, 3].map((i) => {
+        const t = (i / 4) * TAU, c = Math.cos(t) * 0.011, s2 = Math.sin(t) * 0.011;
+        return [p[0] + side[0] * c + up[0] * s2, p[1] + side[1] * c + up[1] * s2,
+          p[2] + side[2] * c + up[2] * s2];
+      });
+    });
+    const T = G.map((row, k) => row.map((p) => [p[0] - pts[k][0], p[1] - pts[k][1], p[2] - pts[k][2]]));
+    for (let k = 0; k < 2; k++) {
+      for (let i = 0; i < 4; i++) {
+        const i1 = (i + 1) % 4;
+        tri(G[k][i], G[k][i1], G[k + 1][i1], unit(T[k][i]), unit(T[k][i1]), unit(T[k + 1][i1]), HUB);
+        tri(G[k][i], G[k + 1][i1], G[k + 1][i], unit(T[k][i]), unit(T[k + 1][i1]), unit(T[k + 1][i]), HUB);
+      }
+    }
   }
   return b.geo();
 }
