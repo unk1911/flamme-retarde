@@ -1605,6 +1605,8 @@ async function boot() {
     // guest per slot and not one per bather: there are four hundred and fifty
     // of them and `traceJet` reads every guest once a trace.
     for (const [probe, wet] of jadrija.batherGuests) ground.addGuest(probe, wet);
+    // And the café sitters, whom the jet PUSHES — see `HOSE` in 43-jadrija.js.
+    if (jadrija.sitterGuests) for (const [probe, wet] of jadrija.sitterGuests) ground.addGuest(probe, wet);
     // And the transistor set on the table in the kabina, which is a guest in
     // the same sense: something in the world the jet can land on that the hose
     // code has no business knowing anything else about.

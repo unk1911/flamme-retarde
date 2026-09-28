@@ -1820,6 +1820,9 @@ function avbdNet(o) {
     bxBody[k] = b; bxH[3 * k] = hx; bxH[3 * k + 1] = hy; bxH[3 * k + 2] = hz;
     return k;
   }
+  /** Move point p on its body, and resize box k — a body re-measured (43-topple.js's chair). */
+  function setPoint(p, x, y, z) { ptL[3 * p] = x; ptL[3 * p + 1] = y; ptL[3 * p + 2] = z; }
+  function setBox(k, hx, hy, hz) { bxH[3 * k] = hx; bxH[3 * k + 1] = hy; bxH[3 * k + 2] = hz; }
   function addCap(b, id) {
     const c = ncp++;
     cpBody[c] = b; cpId[c] = id; cpOn[c] = 1;
@@ -2876,7 +2879,7 @@ function avbdNet(o) {
   }
 
   return { P, Q, V, W, mass, inert, live, softBody, drag, stats, sF, sLen, cpOn, cpTwo,
-    addBody, addJoint, addString, setString, addPoint, addBox, addCap, setCap, finish,
+    addBody, addJoint, addString, setString, addPoint, addBox, addCap, setCap, finish, setPoint, setBox,
     setFloor: (fn) => { floor = fn; },
     setOneSided: (on, line) => {
       oneSided = !!on;
