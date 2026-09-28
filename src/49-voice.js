@@ -971,7 +971,7 @@ const voice = (() => {
    * adds shows up here as a missing key instead of silently becoming the
    * aeroplane.
    */
-  const AFOOT = { ground: 1, swim: 1, brod: 1, ride: 1, foil: 1 };
+  const AFOOT = { ground: 1, swim: 1, brod: 1, ride: 1 };
   const ELSEWHERE = {
     fly: 'you are in the aeroplane',
     crashing: 'you are going down',

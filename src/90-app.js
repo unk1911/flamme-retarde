@@ -149,7 +149,7 @@ function stepLens(dt) {
   // the grounds that there is nothing to do but look — and a passenger on a
   // nine-minute crossing is the strongest case in the game for exactly that.
   const want = (state.phase === 'ground' || state.phase === 'swim'
-    || state.phase === 'ride' || state.phase === 'foil'
+    || state.phase === 'ride'
     || state.phase === 'brod' || state.phase === 'plunge')
     && (keys.has('KeyZ') || TOUCH.glook) ? 1 : 0;
   zoom = damp(zoom, want, LENS.ease, dt);
@@ -423,7 +423,7 @@ addEventListener('keydown', (e) => {
   //
   // L and N because they were what was left. The board is nearly full: WASD,
   // the arrows, Space, Shift and Q move you; C cycles the camera, E is the
-  // door, F the foil, G the gear, K the kite, J and U are the two ways out of
+  // door, F the water, G the gear, K the kite, J and U are the two ways out of
   // an aeroplane, T the autopilot, X centres the stick, Z levels the wings, B
   // the third-person camera, R the race, V the vikendica, O the laptop, M the
   // settings, H the HUD, P and Escape the pause, and 0 and 9 the two back
@@ -472,8 +472,8 @@ addEventListener('keydown', (e) => {
   // of ten reports of "cannot exit water" were a pause nobody remembered
   // pressing.
   //
-  // The kite and the foil are in the water too — `inWater()` has always said
-  // so — and E means the same thing in both: put the gear away, then walk out.
+  // The kite is in the water too — `inWater()` has always said so — and E
+  // means the same thing there: put the gear away, then walk out.
   // And E at the foot of the skakaonica's ladder is up it, not ashore: the
   // one place in the sea where E has somewhere nearer to go. On the tower it
   // is the reminder that the way down is off the end.
@@ -665,14 +665,6 @@ addEventListener('keydown', (e) => {
     else if (state.phase === 'ride') dropKite();
     return;
   }
-  // F is the foil, both ways, on exactly the argument K is: one key, one idea,
-  // and you never have to remember which half of it you are in.
-  if (e.code === 'KeyF') {
-    e.preventDefault();
-    if (state.phase === 'ground') takeFoil();
-    else if (state.phase === 'foil') dropFoil();
-    return;
-  }
   if (e.code === 'KeyU' && state.phase === 'ground') { e.preventDefault(); launchOut(); return; }
   // Enter — the balcony rail and the trampoline — is answered in the one block
   // above, with the ordinary hop. It used to be answered here as well, and here
@@ -693,7 +685,7 @@ addEventListener('keydown', (e) => {
   // the board, or the tuck in the air. Held, it is read in the frame loop.
   if (e.code === 'Space' && state.phase === 'plunge' && plunge && !e.repeat) plunge.press();
   if (state.phase === 'ground' || state.phase === 'chute'
-    || state.phase === 'swim' || state.phase === 'foil'
+    || state.phase === 'swim'
     || state.phase === 'brod' || state.phase === 'plunge') {
     // On foot, or under a canopy, the aeroplane's controls are all meaningless
     // and several of them would quietly reconfigure an aircraft you are not
@@ -786,13 +778,6 @@ addEventListener('mousemove', (e) => {
   if (state.phase === 'ride') {
     const g = 0.0022 * flight.p.sens * (camera.fov / baseFov);
     ride.look(e.movementX * g, e.movementY * g);
-    return;
-  }
-  // Standing on a foil board, which is the same head on the same gain: the
-  // steering is on the keys here too, because it is a lean and not a look.
-  if (state.phase === 'foil') {
-    const g = 0.0022 * flight.p.sens * (camera.fov / baseFov);
-    foil.look(e.movementX * g, e.movementY * g);
     return;
   }
   // On the tower: her head in her own eyes, the orbit round her behind them.
@@ -1381,7 +1366,7 @@ function updateCamera(dt) {
 
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
-  mirror, mirrorP, swim, under, seabed, arms, mask, kites, ride, foil, chase, you,
+  mirror, mirrorP, swim, under, seabed, arms, mask, kites, ride, chase, you,
   brod, ao, backlane, backlaneCars, plunge;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
@@ -1476,7 +1461,6 @@ async function boot() {
   under = buildUnder(scene);
   seabed = buildBed(scene);
   ride = buildRide(scene);
-  foil = buildFoil(scene);
   brod = buildBrod(scene);
   chase = await buildChase(scene);
 
@@ -1940,7 +1924,6 @@ const HELP = [
     ['B', 'help.k.body'],
     ['U', 'help.k.up'],
     ['K', 'help.k.kite'],
-    ['F', 'help.k.foil'],
     ['E', 'help.k.in'],
     ['E', 'help.k.buy'],
     ['Y', 'help.k.drink'],
@@ -2333,14 +2316,12 @@ function leaveWater(was = state.phase) {
   // Leaving a mode that is not running is free — read them, they set a flag —
   // and hiding a hidden div is free. What is not free is a screen that has to
   // be told which of three overlays it is wearing.
-  const wet = was === 'swim' || was === 'ride' || was === 'foil' || was === 'plunge'
-    || (swim && swim.active) || (ride && ride.active) || (foil && foil.active);
+  const wet = was === 'swim' || was === 'ride' || was === 'plunge'
+    || (swim && swim.active) || (ride && ride.active);
   if (swim && swim.active) swim.leave();
   if (ride && ride.active) ride.leave();
-  if (foil && foil.active) foil.leave();
   $('swim-hud').hidden = true;
   $('ride-hud').hidden = true;
-  $('foil-hud').hidden = true;
   // The underwater tint is the one piece of this that is not a div you can
   // simply hide: `paintSwimHud` drives its opacity, and an element left at
   // 0.4 with `hidden` cleared by something downstream comes back blue.
@@ -2360,9 +2341,8 @@ function leaveWater(was = state.phase) {
  *
  * E on a keyboard and ASHORE under a thumb are the same door and now go
  * through the same function. They did not: the touch button called
- * `wadeAshore()` straight, which answers only in 'swim', so on the kite and
- * the foil — both of which draw the same control strip — the button was
- * furniture.
+ * `wadeAshore()` straight, which answers only in 'swim', so on the kite —
+ * which draws the same control strip — the button was furniture.
  */
 function goAshore() {
   if (!inWater()) return false;
@@ -2370,8 +2350,7 @@ function goAshore() {
   // on the key handler, above the pause guard.
   if (state.paused) setPaused(false);
   if (state.phase === 'ride') dropKite();
-  else if (state.phase === 'foil') dropFoil();
-  // Both of those hand you to the swim, which is where the walk out starts.
+  // That hands you to the swim, which is where the walk out starts.
   return state.phase === 'swim' ? wadeAshore() : false;
 }
 
@@ -2380,7 +2359,7 @@ function goAshore() {
 // the sea you go back into, and without it 9, 0, V and R did nothing at all
 // from the top of the ladder (MEASURED — 9 left her standing on the plank).
 const inWater = () => state.phase === 'swim' || state.phase === 'ride'
-  || state.phase === 'foil' || state.phase === 'plunge';
+  || state.phase === 'plunge';
 
 // Two rings of eight bearings: one at the near cascade's reach, one at the far
 // cascade's. `shoreAt` saturates at 400 m, so on its own it can promise that
@@ -3525,7 +3504,7 @@ function stepSwat(dt) {
  *   YOU ARE ON FOOT. `state.phase === 'ground'` and nothing else, which is one
  *   clause covering every way of not being: a cut that takes the camera off a
  *   Canadair on a drop run is not a scene, it is a crash. `lost`, `crashing`,
- *   `swim`, `ride`, `foil` and `brod` go with it for the same reason.
+ *   `swim`, `ride` and `brod` go with it for the same reason.
  *
  *   NOBODY ELSE OWNS THE CAMERA. `camOverride` is most of that list in one
  *   test — the walk-up, the computer, the race, the trampoline — with the fly
@@ -3866,7 +3845,7 @@ function checkPour(dt) {
   const b = jadrija && jadrija.bucketeer;
   if (!b) { pourWhy = 'noBucketeer'; return; }
   // ON FOOT, and this one clause is the Canadair guard and every other one at
-  // once: `fly`, `crashing`, `lost`, `swim`, `ride`, `foil` and `brod` are all
+  // once: `fly`, `crashing`, `lost`, `swim`, `ride` and `brod` are all
   // not-ground. A cut that hijacks the camera off a drop run over a fire is not
   // a scene, it is a crash.
   if (state.phase !== 'ground') { pourWhy = 'notAfoot'; return; }
@@ -5688,32 +5667,6 @@ function paintRideHud() {
 }
 
 /**
- * Speed, height off the water, and what the board is doing.
- *
- * Kilometres an hour rather than the kite's knots, and that is not an
- * inconsistency: a kite is a sail and everybody who rides one talks in knots,
- * and an eFoil is a vehicle with a battery in it and everybody who rides one
- * talks in kilometres an hour. The number on the screen should be the number
- * the person on the board would say.
- */
-function paintFoilHud() {
-  if (!foil || !foil.active) return;
-  $('fo-kmh').textContent = Math.round(foil.speed * 3.6);
-  const st = foil.state();
-  const el = $('fo-state');
-  el.textContent = st === 'flying' || st === 'high'
-    ? T('foil.up') + ' ' + (foil.air * 100).toFixed(0) + ' cm'
-    : T('foil.' + st);
-  el.classList.toggle('air', st === 'flying');
-  el.classList.toggle('stall', st === 'high' || st === 'down');
-  $('fo-thr').style.width = (foil.throttle * 100).toFixed(0) + '%';
-  $('fo-hint').innerHTML = st === 'down' ? T('foil.downHint')
-    : st === 'high' ? T('foil.highHint')
-      : st === 'hull' ? T('foil.pushHint')
-        : TK('foil.hint', 'foil.hintTouch');
-}
-
-/**
  * The passage, and what has just gone past.
  *
  * Minutes remaining rather than metres run, because a passenger's question is
@@ -6271,66 +6224,6 @@ function takeKite() {
 }
 
 /**
- * F — take a foil out.
- *
- * Same search as the kite's, and deliberately: you are standing on a beach
- * looking at water, and the mode wants a piece of it that is open and deep
- * enough for a mast. It wants more depth than a kite does — the wing is eighty
- * centimetres under the board — so it looks a little further out before it
- * agrees.
- */
-function takeFoil() {
-  if (state.phase !== 'ground' || !foil) return false;
-  const y = ground.you;
-  const fx = -Math.sin(y.yaw), fz = -Math.cos(y.yaw);
-  let got = null;
-  for (let a = 0; a <= 8 && !got; a++) {
-    const ang = (a === 0 ? 0 : (a % 2 ? 1 : -1) * Math.ceil(a / 2) * 0.42);
-    const c = Math.cos(ang), sn = Math.sin(ang);
-    const dx = fx * c - fz * sn, dz = fx * sn + fz * c;
-    for (let d = 14; d <= 80; d += 4) {
-      const x = y.x + dx * d, z = y.z + dz * d;
-      if (!isSea(x, z)) continue;
-      if (-groundAt(x, z) < 1.8) continue;
-      got = [x, z];
-      break;
-    }
-  }
-  if (!got || !foil.enter(got[0], got[1])) { toast(T('toast.noLaunch')); return false; }
-  ground.bail();
-  eject.reset();
-  state.phase = 'foil';
-  $('ground-hud').hidden = true;
-  $('hud').hidden = true;
-  $('chute-hud').hidden = true;
-  $('swim-hud').hidden = true;
-  $('ride-hud').hidden = true;
-  $('foil-hud').hidden = false;
-  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
-  if (!IS_TOUCH && !pointerLocked) grabPointer();
-  paintDeviceText();
-  toast(T('toast.onTheFoil'));
-  return true;
-}
-
-/** And stepping off it, which — like the kite — puts you in the sea. */
-function dropFoil(hard = false) {
-  if (state.phase !== 'foil' || !foil || !swim) return false;
-  const y = foil.you;
-  if (!swim.enter(y.x, y.z, y.yaw, hard ? 0.6 : -0.3)) return false;
-  foil.leave();
-  state.phase = 'swim';
-  $('foil-hud').hidden = true;
-  $('swim-hud').hidden = false;
-  if (IS_TOUCH) { $('touch').hidden = true; $('gtouch').hidden = true; $('stouch').hidden = false; }
-  if (audio) audio.plunge(hard ? 1.15 : 0.8);
-  wasUnder = false;
-  paintDeviceText();
-  toast(T(hard ? 'toast.foilDown' : 'toast.offTheFoil'));
-  return true;
-}
-
-/**
  * And putting it down, which puts you in the sea.
  *
  * Not back on the beach. Letting go of a bar in the middle of the channel does
@@ -6384,7 +6277,7 @@ function dropKite(hard = false) {
  * instead of as a panel that will not go away.
  */
 const MODE_HUDS = ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'chase-hud',
-  'ride-hud', 'foil-hud', 'brod-hud', 'under'];
+  'ride-hud', 'brod-hud', 'under'];
 
 /** Hide every one of them but `keep`, and stop whatever was driving them. */
 function clearModes(keep) {
@@ -7636,18 +7529,18 @@ function tick(wall, draw) {
   // quest would be a way of losing. Get off her and the fire is where you left
   // it — which is also the only honest thing to do with a clock you stopped.
   //
-  // AND IN THE WATER, AND ON THE BIKE, AND ON THE FOIL. Misha, 27 Sep 2026,
+  // AND IN THE WATER, AND ON THE BIKE. Misha, 27 Sep 2026,
   // at Jadrija: the "fire is out" screen came up anyway — *"but i don't care
   // about the fire at this point... ya know?"*. The recess only knew two ways
   // of being here, on foot and under the chute, and only the field itself,
   // which stops four metres out from the edge of the concrete. Swimming out
-  // to the diving tower was a way of leaving Jadrija; so was riding a bike
-  // or the foil. It is anywhere within a quarter of a kilometre of the place
+  // to the diving tower was a way of leaving Jadrija; so was riding a bike.
+  // It is anywhere within a quarter of a kilometre of the place
   // now, water included, however you are getting about — Rokići is forty
   // kilometres off, so nothing on the mission's own ground is inside that.
   const atJad = !!jadrija && jadrija.inField(camera.position.x, camera.position.z, 250);
   recess = (atJad && (state.phase === 'ground' || state.phase === 'chute'
-    || state.phase === 'swim' || state.phase === 'ride' || state.phase === 'foil'
+    || state.phase === 'swim' || state.phase === 'ride'
     || state.phase === 'plunge'))
     || state.phase === 'brod';
 
@@ -8112,7 +8005,7 @@ function tick(wall, draw) {
     updateMission(real);
   }
 
-  // On the tower. Its own phase, like the kite and the foil: the swim is
+  // On the tower. Its own phase, like the kite: the swim is
   // left behind at the foot of the ladder and picked up again at the splash.
   if (state.phase === 'plunge' && plunge) {
     if (eject.active) flyDerelict(dt);
@@ -8140,32 +8033,6 @@ function tick(wall, draw) {
     // the tower is let go of here.
     if (plunge.active) plunge.abort();
     plunge.tick(dt);
-  }
-
-  if (state.phase === 'foil') {
-    if (eject.active) flyDerelict(dt);
-    const out = foil.update(dt, {
-      // The trigger. Held rather than tapped, so W is "more" and S is "less"
-      // and letting go of both leaves it where you put it — which is what a
-      // hand throttle on a lanyard actually does and is the one control on the
-      // board that is not a lean.
-      fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
-        - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
-      side: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
-        - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + TOUCH.sx,
-      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight') || TOUCH.sfast,
-      // Trim. Weight back and the board comes up the mast, weight forward and
-      // it settles — the same two keys the swim uses for up and down, meaning
-      // the same two things.
-      up: keys.has('Space') || TOUCH.sup,
-      down: keys.has('KeyC') || keys.has('ControlLeft') || TOUCH.sdown,
-    });
-    if (out === 'aground') dropFoil(false);
-    else {
-      if (out === 'breach' && audio) audio.plunge(0.55);
-      paintFoilHud();
-    }
-    updateMission(real);
   }
 
   if (state.phase === 'brod') {
@@ -8334,7 +8201,6 @@ function tick(wall, draw) {
   if (camOverride) updateCamera(dt);
   else if (state.phase === 'ground') ground.pose(camera, bodyCam ? 3.10 : 0, dt);
   else if (state.phase === 'ride') ride.pose(camera);
-  else if (state.phase === 'foil') foil.pose(camera);
   // On her deck the pull-back is 59-brod.js's own number and that file drives
   // its own body — see `pose` and `driveBody` there. 3.10 is ground's figure
   // too, but it is kept where the reasoning for it lives.
@@ -8355,7 +8221,6 @@ function tick(wall, draw) {
   // After the pose, because the rig hangs off where you ended up rather than
   // off where you were.
   if (state.phase === 'ride') ride.draw();
-  if (state.phase === 'foil') foil.draw();
   // The one mode that is drawn when it is *not* running: she lies at the mole
   // whenever you are near enough to see her, which is what makes walking out
   // there something you do on purpose. See `idle` in 59-brod.js.
@@ -8732,10 +8597,7 @@ function tick(wall, draw) {
   // wall gets — the far end of this view is still four kilometres of town and
   // does not want its depth thrown away, and 0.38 is all it takes to clear a
   // pair of hands.
-  // And the foil board, which is under your own feet and a metre and a half
-  // long: at the standing clip its nose is inside the front plane and the
-  // board arrives as a shape that starts in mid-air.
-  const rideNear = state.phase === 'ride' || state.phase === 'foil' ? 0.72 : 0;
+  const rideNear = state.phase === 'ride' ? 0.72 : 0;
   // And a fifth, which is somebody else's face.
   //
   // People became solid on 22 Aug and the collider stops you with 0.54 m
@@ -8761,7 +8623,7 @@ function tick(wall, draw) {
   // the sea through the hole where the bulwark was. Every frame of it looks
   // like a camera that has left the boat, which is why it was read as one.
   //
-  // Same fault as the kite bar and the foil board and the same fix, and it is
+  // Same fault as the kite bar and the same fix, and it is
   // the fifth time this list has grown for the same reason: a mode that puts
   // something solid within arm's reach has to say so, because the clip does
   // not measure, it is told. 0.82 puts the plane at 0.26 m — enough to clear
@@ -8864,7 +8726,7 @@ function tick(wall, draw) {
     // mode in silence — and the kite mode is a Jadrija afternoon, not an
     // expedition. Capped rather than pinned: it still opens all the way up
     // when you carve back in along the terrace, it just stops going away.
-    const dk = state.phase === 'ride' || state.phase === 'foil' ? Math.min(d, 400) : d;
+    const dk = state.phase === 'ride' ? Math.min(d, 400) : d;
     audio.shore(dk + indoors * 2000, state.phase === 'fly');
     // And the birds sitting still in the pines behind the vikendica.
     //
@@ -9450,7 +9312,6 @@ window.__fr = {
     mask: mask ? mask.stats() : null,
     shadow: shadow ? shadow.stats() : null,
     ao: ao ? ao.stats() : null,
-    foil: foil && foil.active ? foil.stats() : null,
     kites: kites ? kites.stats() : null,
     props: props ? props.counts : null,
     birds: birds ? birds.stats() : null,
@@ -10357,35 +10218,6 @@ window.__fr = {
   maskRaw: () => mask,
   ao: (v) => { if (ao) ao.set(v); return ao ? ao.stats() : null; },
   aoDbg: (n, show, k) => { if (ao) ao.dbg(n, show, k); },
-  foil: {
-    stats: () => (foil ? foil.stats() : null),
-    raw: () => foil,
-    /** Put one in the water at a point, without needing a beach to start on. */
-    go: (x, z) => {
-      if (!foil || !foil.enter(x, z)) return null;
-      if (ground && ground.ok && state.phase === 'ground') ground.bail();
-      state.phase = 'foil';
-      for (const id of ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'ride-hud']) {
-        $(id).hidden = true;
-      }
-      $('foil-hud').hidden = false;
-      paintFoilHud();
-      return foil.stats();
-    },
-    /**
-     * Step the board without the frame loop. Software GL runs at a few frames
-     * a second, so a real-time settle advances almost no simulation at all and
-     * every timed check on this mode needs this instead.
-     */
-    tick: (secs, dtStep = 1 / 60, ctl = {}) => {
-      if (!foil || !foil.active) return null;
-      let out = null;
-      for (let t = 0; t < secs; t += dtStep) out = foil.update(dtStep, ctl) || out;
-      foil.draw();
-      paintFoilHud();
-      return { ...foil.stats(), out };
-    },
-  },
   brod: {
     stats: () => (brod ? brod.stats() : null),
     raw: () => brod,
@@ -10409,7 +10241,7 @@ window.__fr = {
       return brod.stats();
     },
     /**
-     * Step the voyage without the frame loop, for the same reason the foil has
+     * Step the voyage without the frame loop, for the same reason the kite has
      * one: software GL runs at a few frames a second and this passage is nine
      * and a half minutes long, so nothing about it can be checked in real time.
      */
@@ -10437,8 +10269,8 @@ window.__fr = {
         if (!brod.enter()) return null;
         if (ground && ground.ok && state.phase === 'ground') ground.bail();
         state.phase = 'brod';
-        for (const id of ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'ride-hud',
-          'foil-hud']) $(id).hidden = true;
+        for (const id of ['hud', 'ground-hud', 'chute-hud', 'swim-hud', 'ride-hud'])
+          $(id).hidden = true;
         $('brod-hud').hidden = false;
       }
       brod.seek(m);
@@ -11539,7 +11371,6 @@ window.__fr = {
     swim: swim && swim.active ? 1 : 0,
     mask: mask && mask.on ? 1 : 0,
     ride: ride && ride.active ? 1 : 0,
-    foil: foil && foil.active ? 1 : 0,
     brod: brod && brod.active ? 1 : 0,
     // The one that has been lying to everybody: what `ground.wet()` is
     // reporting right now, whether or not anybody has walked anywhere.
@@ -11547,7 +11378,7 @@ window.__fr = {
     vikWalk: vikWalk ? vikWalk.leg : -1,
     cut: chaseCut ? 1 : 0,
     cam: camOverride ? 1 : 0,
-    hud: ['hud', 'ground-hud', 'swim-hud', 'ride-hud', 'foil-hud', 'chase-hud',
+    hud: ['hud', 'ground-hud', 'swim-hud', 'ride-hud', 'chase-hud',
       'brod-hud', 'chute-hud', 'under', 'stouch']
       .filter((id) => $(id) && !$(id).hidden),
     at: [+camera.position.x.toFixed(1), +camera.position.y.toFixed(2),

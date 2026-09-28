@@ -3219,7 +3219,7 @@ function brodEnsign(cfg = null) {
 /**
  * The boat, the berth and the voyage.
  *
- * The same five verbs as the kite, the foil and the swim — `enter`, `leave`,
+ * The same five verbs as the kite and the swim — `enter`, `leave`,
  * `look`, `update`, `pose` — plus `draw`, and a sixth that none of the other
  * water modes needs: `idle`. She is **scenery when you are not on her**. A boat
  * that only exists once you are aboard is a boat nobody ever decides to board.
