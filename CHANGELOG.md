@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.539.1] — 2026-09-28
+
+### the riders hold the handlebars
+
+Misha: *"even the people riding the bicycles, their hands are not really
+'gripping' the handlebars ... their hands are rigidly sticking out, would be
+nice if they got a grip...."* His screenshot showed the woman on the red
+step-through. Her left hand hovered by the left grip with the fingers stiff
+and splayed. Her right hand was out in front of her belly, nowhere near the
+bar.
+
+**Why.** The solve only ever aimed the wrist, at a point 45 mm behind and
+30 mm over the middle of each grip. It never set the hand beyond the wrist. So
+each hand kept the frozen `idle`'s turn relative to the forearm, and pointed
+wherever the arm solve's shortest rotation left it: sideways, up, or across
+the stomach palm-up. The fingers were the idle's own flat plate.
+
+**Now the hand is solved first and the arm is fitted to it** (`wheelHand` and
+`wheelGripOf` in 43-jadrija.js), for all five riders, the three bicycles and
+the two scooters:
+
+1. **The hand's frame.** The knuckles point square to the grip's own axis
+   (the bicycle's is swept back, the scooter's is straight across). They
+   follow the line from the shoulder, levelled three-quarters of the way
+   towards horizontal. The thumb is on the inboard side and the palm is on top
+   of the rubber, facing down.
+2. **The wrist.** It goes where the grip's axis lies across the palm, 24 mm
+   behind the middle knuckle and a palm's thickness plus the rubber's radius
+   below the bone line. The hand length is each body's own, measured wrist to
+   knuckle off its bones.
+3. **The arm.** The same two-bone solve as before reaches that wrist, with
+   the elbows out and down.
+4. **The hand.** It is turned from wherever the arm left it to the frame in
+   (1).
+5. **The fingers and thumb.** The fingers fold 100° more at the knuckle over
+   the idle's 26°, which closes them over and round the front of the rubber.
+   The thumb comes under the grip at the bake's own closed-hand ratio. This
+   rig has one bone for all four fingers and one for the thumb, so the grip
+   is a fold at the knuckle and not a curl.
+
+The palm, curl and thumb axes are the bucketeer's measurements of this rig's
+hand off the bind mesh (`GRIP` in 45-bucketeer.js). Carried into each rider's
+idle by that hand's own bone turn, they agree with the riders' wrist, knuckle
+and thumb bone heads to 0.92–0.96 on all five bodies. The grips turn with the
+bar, so the hands turn with them.
+
+**Checked** on the ANGLE/D3D12 build, before and after from identical
+cameras: front three-quarter, side, from above the bar, and close on each
+hand, for all five riders. Also checked with the bars held at +29° and −29°,
+and over a riding sequence through an end-of-lane turn. The wrist lands on its
+solved point to 0 mm. The one exception is the heavy man at full lock, where
+the outside arm runs 2–4 mm short of its reach. Script time for the riders is
+unchanged (`wheelMs` 0.34–0.40 ms).
+
+Not changed: the riders' bodies, the machines, the lanes, the speeds, the
+lean, and every `rng` draw.
+
 ## [1.539.0] — 2026-09-28
 
 ### fewer cars in the wood, and better ones
