@@ -60,18 +60,39 @@ TARGET_H = 1.75
 # across that line to save ten lines of dict is how a build ends up needing
 # Blender to answer a question about a JPEG.
 #
-# Chloe does not get the wedge. She is in jeans from the hip down — painted,
-# in `src/49-you.js`, on thresholds measured off this same body — so it would
-# be under denim in every frame she is ever in.
+# Chloe did not get the wedge, on the argument that she is in jeans from the
+# hip down and it would be under denim in every frame she is ever in. That
+# stopped being true the day the kabina learned to take her clothes off, and
+# the B camera made it visible — Misha, 28 Sep 2026: *"when i (chloe) go to
+# change, and then click on 'B', and look at myself: i am missing nipples and
+# pubic hair, we had the same problem with baye v2.0, can u add the same
+# features to me (chloe)?"* So she gets the whole of what Baye gets: wedge,
+# cleft and areolae. Her body is the same vertices with face targets only, and
+# measured, her breast apex and midline mons surface sit within 0.2 mm of
+# Baye's, so every position below is hers too. Only the COLOURS are per
+# figure (`paint`), and the garments in `src/49-you.js` replace the texture
+# outright where they are (`mix(base * vcol, vcol, cover)`), so dressed none
+# of this shows.
 FIGURES = {
     'baye2': {'body': 'build/mh_base.obj', 'pubic': True,
               'tex': {'skin': 'darthfurby_caucasian_female',
                       'hair': 'elvs_unkempt_french_braid',
                       'hair2': 'o4saken_long01',
                       'leg':  'v0rt3x_stockings_black_fishnet_medium'}},
-    'chloe2': {'body': 'build/mh_bodies/mh_chloe.obj', 'pubic': False,
+    'chloe2': {'body': 'build/mh_bodies/mh_chloe.obj', 'pubic': True,
                'tex': {'skin': 'toigo_light_skin_female_freckles',
-                       'hair': 'cortu_short_messy_hair'}},
+                       'hair': 'cortu_short_messy_hair'},
+               # Her colours, not Baye's. The blue is a dye — the hairstyle
+               # asset ships blond and is dyed in the shader, and her brows
+               # are 0x2b2019 — so what grows there is her own: a dark
+               # blonde-brown, a shade warmer and lighter than Baye's PUBIC_P.
+               # The areolae are Baye's in proportion to the skin round them:
+               # AREOLA_P is (0.54, 0.42, 0.46) of Baye's chest there, and her
+               # chest is (207, 161, 129) against Baye's (216, 172, 147) —
+               # sampled off both maps in a ring just outside the disc.
+               'paint': {'pubic': (70.0, 52.0, 37.0),
+                         'areola': (112.0, 68.0, 59.0),
+                         'nipple': (100.0, 58.0, 51.0)}},
 }
 
 # (height, half-width) per row, in game metres, already through v1.0's 0.686
@@ -417,12 +438,16 @@ def main():
             ar, ni = raster_fn(size, vs, vts, faces, scale, drop, areola,
                                ((0.130, -0.110, 1.215), (0.180, 0.110, 1.295)))
             print('[baye2tex] areolae touch %d texels' % int((ar > 0.05).sum()))
+            # Per-figure colours where the figure has them; Baye has none and
+            # takes the module's, so her map is byte-for-byte what it was.
+            paint = spec.get('paint', {})
             al = (ar * AREOLA_MAX)[..., None]
-            a = a * (1.0 - al) + AREOLA_RGB * al
+            a = a * (1.0 - al) + np.array(paint.get('areola', AREOLA_RGB)) * al
             al = (ni * NIPPLE_MAX)[..., None]
-            a = a * (1.0 - al) + NIPPLE_RGB * al
+            a = a * (1.0 - al) + np.array(paint.get('nipple', NIPPLE_RGB)) * al
             alpha = (m * PUBIC_MAX * (0.45 + 0.75 * n)).clip(0.0, PUBIC_MAX)
-            a = a * (1.0 - alpha[..., None]) + PUBIC_RGB * alpha[..., None]
+            a = (a * (1.0 - alpha[..., None])
+                 + np.array(paint.get('pubic', PUBIC_RGB)) * alpha[..., None])
             dst = OUT / ('%s_skin.jpg' % name)
             Image.fromarray(a.round().clip(0, 255).astype(np.uint8)).save(
                 dst, quality=86, optimize=True)
