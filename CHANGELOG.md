@@ -8,6 +8,184 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.536.0] — 2026-09-27
+
+### stone, grass and the small plants, at the distance you stand from them
+
+Misha, after the trees in 1.534.0: *"look at how ugly the current rocks and
+the grass, etc, it would be nice to raise the number of polygons or
+whatever, to somehow make it look prettier to the eye ... take your time
+with this one"*. His frame was the verge behind the kabine where the anchor
+stands. Everything natural in it failed the same way:
+
+- A limestone lump was seven flat facets and a fan: 21 triangles, one colour
+  a face. A row of them along the parking edge read as igloos.
+- The fan palms were four flat triangles a frond on a black hexagonal stump.
+  From over the wall they were "potted plants whose leaves are big flat green
+  polygons".
+- The agave was eight flat triangles.
+- The tussocks were six-sided domes lying on the dust, which is the "flat
+  green hexagonal moss".
+- The pine wood behind them was a bare orange plane with trunks in it.
+
+All of these were the right call for a silhouette at thirty metres. None was
+built to be looked down at from 1.6 m.
+
+The kit is a new file, `src/46-flora.js`. It takes world points and knows
+nothing about the shore frame. 43-jadrija.js keeps every placement where it
+was and only changes what is drawn there.
+
+**Stone** (`floraRock`, `floraRockMat`). Held against `1000150386` and
+`_388`: a lump is rounded by weather, with a couple of broken flat faces and
+a dissolution hollow or two, and is widest at the ground.
+
+- **The shape.** A displaced icosphere:
+  - two octaves of shape noise, and a third for small irregularities;
+  - two to five cut planes pushed 96 % of the way back, which leaves flat
+    broken faces with arrises rounded by the shared normals;
+  - dimples for the hollows;
+  - the lower half squashed to a third, so it comes out of the dust instead
+    of sitting on it like a ball.
+- **Baked per vertex:**
+  - smooth normals;
+  - cavity darkening, from each vertex against the mean of its neighbours;
+  - ground occlusion and ground-coloured dust up the lower third;
+  - grey weathering patches and lichen blotches on the tops.
+- **Placing.** Each lump follows a ground plane fitted across its own width,
+  and whatever would be buried is not drawn.
+- **The surface shader:**
+  - a bump from value noise and its analytic gradient;
+  - dissolution pits at 11 per metre;
+  - grain.
+
+  All three fade by pixel footprint. The first cut took the bump off screen
+  derivatives, and that drew a dashed seam down every triangle edge. Pits at
+  26 per metre and 45 % dark read as black stitching.
+- **Bounce light.** An orange bounce off the dust lights the flanks. Without
+  it every shaded face took the sky's blue, and the verge was a row of ice.
+- **Everything that was a lump is now one of these, in the same place, size
+  and colour:**
+  - the parking-edge kerb, about 140 stones;
+  - the anchor bed and the fountain rock's bed;
+  - the agave rockeries;
+  - the grove floor's bedrock;
+  - the white chips in the dust track;
+  - the rubble at the foot of the wood-edge kerb;
+  - the armouring at the shingle join.
+- **Draw calls.** It is one draw and one caster.
+
+**Grass** (`floraTuft`, `floraMat`). Tufts of blades that taper, arch
+further from vertical as they rise, and go from green at the root to straw
+at the tip, with dead blades among them. Each blade's normal is leaned 70 %
+to vertical, so a tuft lights like the rough surface it is.
+
+- **Wind.** A shared function, `GLSL_FLORA_WIND`, sways them in the vertex
+  program: a gust travelling downwind, and a flutter at each tuft's own rate.
+  The motion goes as the square of the height up the blade.
+- **Where it went:**
+  - the anchor bed's tussocks;
+  - the grove floor's tufts, which now have five to nine smaller ones round
+    each pine;
+  - the weeds in the promenade's nosing joints.
+- **Draw calls.** Forty-metre chunks, frustum-culled, shrunk into the ground
+  from 34 m to 55 m.
+
+**The wood floor** (`floraLitter`). Pale stones, dead cones and tufts of dry
+grass on the needle floor, in 1.25 m cells round the eye out to 30 m, in
+three instanced draws.
+
+- **Deterministic.** Each cell's contents come from a hash of the cell,
+  cached, so the floor is the same every time you come back.
+- **Patchy.** A drift noise at about 11 m decides where the grass may be.
+- **Where it goes.** Only on the wood: open ground behind the lane wall that
+  `grove.at` calls wood. Nothing goes on the tarmac apron, the back lane,
+  OSM roads (binned segments), or inside any of the 821 blockers.
+- **Rebuilds.** One runs when you cross a cell. Measured walking 75 m of
+  wood: 0.3 ms median, 0.5 ms p90, and one cold build of about 10 ms on
+  arriving somewhere new.
+- **From the air** it switches off.
+
+**Plants.**
+
+- **Agaves** (`floraAgave`). The blades are lofted and closed: channelled on
+  top, keeled underneath, widest a fifth of the way up, with a dark spine on
+  the tip. Sixty triangles a blade.
+  - `agave` keeps its seventeen `rng` draws and the headings and heights they
+    gave, and gets a short inner ring off `jit`, so it is a rosette and not a
+    starfish.
+  - `agaveBig` keeps every number it had.
+- **Fan palms** (`floraFan`, `floraStump`). Nineteen folded segments a
+  frond, pleated alternately, splitting and drooping at the tips, on a
+  fibrous stump.
+- **Potted plants** (`floraLeafy`). A dark core under 40 to 96 leaves lying
+  over one another like scales, each folded on its midrib. They replace:
+  - the back-wall planters' domes;
+  - the shop pots;
+  - the terrace tubs' "bowling ball";
+  - the pizzeria's herb pockets.
+
+  The first cut pointed the leaves out from the stem, and a tub of those was
+  a hedgehog.
+- **Shrubs.** The lavender mounds, the evergreen mass behind the palisade
+  and the ivy are drawn with the trees' own material. They get the tufts,
+  the chewed outline and the light through the edge.
+  - `treeMaterial` has two new options. `needles: false`, because these are
+    green enough to pass the conifer test and came out as bushes of pine
+    stars. `grain`, which scales the tuft field finer: at grain 1 a lavender
+    bed was a bed of lettuce.
+  - The clipped hedge has its own buffer, without the chewed outline. With
+    it, the outline ate the block's flat faces into holes.
+- **Oleanders** stay gone (1.533.1).
+
+**Trees** (45-trees.js).
+
+- **Crown wind** (`GLSL_CROWN_WIND`). A gust wave, a slow sway and a
+  shiver, 5 to 8 cm at the default wind. It moves leaves only, grows with
+  height up the tree, and runs on the near layer and the resort's own trees.
+  - Measured by swapping the programs every 20 frames in one page: on every
+    tree it cost −0.1 ms at t 330 and +0.4 ms at the verge, which is noise.
+  - It is off on the far layer because a 5 cm sway on trees whose pixel is
+    bigger than that is invisible.
+- **From the air.** Upward crown faces seen from above (the eye more than
+  about ten degrees over them) take a third more light and a little yellow.
+  This answers the last pass's note that the far wood "barely changed from
+  the air — dark domes". It never touches the crown over your head.
+  - Two fifths turned the resort's own pines lime.
+  - Keying it off pixel footprint changed nothing from 40 m up.
+
+**Invariance.** No `rng` draw was added or removed. Checked on every build
+this pass, identical to 1.535.6:
+
+- all 821 blockers, `greens` included (hash `3c434842`);
+- all 100 people (hash `9934dd35`);
+- the hammock frame at (−1923.174, 4.138, 443.162).
+
+**Measured.** 1280×720, RTX 4090, GPU timer queries round every render. The
+machine was shared with other agents' Chromes the whole time, and
+whole-frame before/after runs swung by ±5 ms from run to run in both
+directions. So the cost was measured in-page instead, by toggling every new
+mesh and its shadow proxies every 20 frames. That is 26 meshes, with ~200
+frames on each side.
+
+| per frame | verge (his view) | prom t 330 | prom t 460 | wood | under the stand | aerial |
+|---|---|---|---|---|---|---|
+| draw calls | 788 → 815 | 717 → 738 | 641 → 658 | 774 → 801 | 783 → 809 | 845 → 871 |
+| triangles, all passes | 19.40 → 20.15 M | 19.20 → 19.83 M | 19.17 → 19.76 M | 19.42 → 20.22 M | 19.37 → 20.09 M | 16.62 → 17.33 M |
+| GPU, new meshes on − off (median, two runs) | +0.48 / +0.35 ms | +0.72 / −0.22 | +0.06 / +0.03 | +0.59 / +0.51 | +0.29 / +0.75 | +0.01 / −0.07 |
+
+The "off" side of that toggle does not have the old flat lumps, domes and
+agaves either. That makes it an upper bound on the change: 0 to 0.75 ms on
+this card, so expect perhaps 1.5 to 2 ms on a laptop GPU at the verge.
+
+- **Where the +0.7 M triangles are:**
+  - stone, 104 k, cast into both cascades;
+  - agaves, pots and palms, 104 k, also cast;
+  - shrubs and hedge, 13 k;
+  - grass chunks, 148 k, not cast and culled by chunk;
+  - the wood floor round the eye, 90 to 130 k, not cast.
+- **Main thread.** Render submission is unchanged within noise (3 to 5 ms
+  either side).
+
 ## [1.535.6] — 2026-09-27
 
 ### the swim line out past the tower, and a board with more bounce
