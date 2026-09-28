@@ -38,3 +38,4 @@ runs with `tools/shootmany.mjs`).
 | 2026-09-27 | Swim line out past the tower + more board bounce (13 variant runs, 3 parallel batches) | lead | new | fix | 8 | ~20 | 17 | 1.535.6 |
 | 2026-09-27 | Hammock push: reach 2.8 m, wider aim, hold to rock harder | lead | new | feature | 6 | ~20 | 5 | 1.535.7 |
 | 2026-09-27 | Active ragdoll for Baye in the hammock: angle rows in avbdNet, fall-out over the rim, get-up (build ~25, fall tuning ~30, guard/regressions ~25, verify ~15) | agent | new | feature | 95 | ~150 | ~86 | 1.536.0 |
+| 2026-09-27 | Flora pass: rocks, grass, agaves, fan palms, potted plants, shrubs, wood-floor litter, crown wind (1.537.0) | agent | new | asset | 190 | ~230 | 52 | 1.537.0 |

@@ -563,6 +563,23 @@ async function buildJadrija(scene) {
   // stand behind the promenade has the same bark, the same needles and the
   // same dappled shadow as the wood behind it. One draw and one caster.
   const arbor = propBuilder();
+  // 1.536.0: the stone, the small plants and the grass, each in its own buffer
+  // with its own surface from 46-flora.js — see the note there. `stones` is
+  // every loose lump of limestone on the shore; `flora` the agaves and potted
+  // plants; and the grass goes in chunks along the shore (`grassBuf`), so the
+  // chunks behind you are culled and the ones past 55 m have shrunk away.
+  const stones = propBuilder();
+  const flora = floraBuilder();
+  // And the broadleaved shrubs — hedge, the evergreen mass behind the
+  // palisade, the lavender, the ivy — drawn with the trees' own material so
+  // they have the same tufts, chewed outline and light through the edge as
+  // the pines over them (`treeMaterial`, needles off).
+  const shrub = propBuilder();
+  // And the clipped hedge, which is the same leaf without the chewed outline:
+  // a hedge is a solid block by design, and the outline erosion ate its flat
+  // faces into holes.
+  const hedge = propBuilder();
+  const grassBufs = new Map();
   // Maslina's two feather flags, which are NOT in `up` any more: each is its
   // own small buffer so its vertex program can move it. Filled where the flags
   // are built, made into meshes beside `upMesh` — see `FEATHER_WAVE`.
@@ -609,6 +626,74 @@ async function buildJadrija(scene) {
   let b = deck;
   const pt = (st, s, y) => [st.x + st.nx * s, y, st.z + st.nz * s];
   const W = (t, s, y) => pt(at(t), s, y);
+
+  // ── stone, grass and agave, placed in the shore frame ─────────────────────
+  // The three ways 43 hands a thing to 46-flora.js. Each takes (t, s) and the
+  // caller's own numbers, and none of them touches `rng` (rule 4).
+  /** The higher of the concrete and the hill, which is what a stone sits on. */
+  function floorY(t, s) {
+    const st = at(t);
+    return Math.max(surfaceY(t, s), groundAt(st.x + st.nx * s, st.z + st.nz * s));
+  }
+  /**
+   * The ground under a stone as a plane in world x and z, fitted across its
+   * own width. A lump that takes one height from its centre stands proud of
+   * the downhill side of any slope, and the dark gap under that side is the
+   * whole of what makes a stone look placed rather than lying there.
+   */
+  function floorPlane(t, s, r) {
+    const A = W(t - r, s, floorY(t - r, s)), B = W(t + r, s, floorY(t + r, s));
+    const C = W(t, s - r, floorY(t, s - r)), D = W(t, s + r, floorY(t, s + r));
+    const O = W(t, s, floorY(t, s));
+    const ax = B[0] - A[0], az = B[2] - A[2], ay = B[1] - A[1];
+    const bx = D[0] - C[0], bz = D[2] - C[2], by = D[1] - C[1];
+    const det = ax * bz - az * bx;
+    if (Math.abs(det) < 1e-6) return () => O[1];
+    const gx = (ay * bz - az * by) / det, gz = (ax * by - ay * bx) / det;
+    // Never above the centre by more than a finger on the uphill side: where
+    // the plane runs across a kerb it would lift half the stone into the air.
+    return (x, z) => Math.min(O[1] + gx * (x - O[0]) + gz * (z - O[2]), O[1] + r * 0.35);
+  }
+  /** A lump of limestone at (t, s): `r` across, `h` out of the ground. */
+  function rockTS(t, s, r, h, seed, o = {}) {
+    const g = floorPlane(t, s, r);
+    const P = W(t, s, 0);
+    // The seed is mixed with the place: several beds number their stones
+    // from nought, and two beds of the same nine stones is a pattern.
+    return floraRock(stones, P[0], g(P[0], P[2]), P[2],
+      { r, h, seed: seed * 1.37 + t * 0.731 + s * 1.913, ground: g, ...o });
+  }
+  /** Which grass buffer (t, s) goes in: forty metres of shore to a chunk. */
+  function grassBuf(t) {
+    const k = Math.floor(t / 40);
+    if (!grassBufs.has(k)) grassBufs.set(k, floraBuilder());
+    return grassBufs.get(k);
+  }
+  /** A tuft of grass at (t, s). */
+  function tuftTS(t, s, o) {
+    const P = W(t, s, 0);
+    floraTuft(grassBuf(t), P[0], floorY(t, s), P[2], o);
+  }
+  /** A leafy plant standing on (t, s, y): see `floraLeafy`. */
+  function leafyTS(t, s, y, o) {
+    const P = W(t, s, y);
+    floraLeafy(flora, P[0], P[1], P[2], { seed: t * 3.7 + s * 1.3, ...o });
+  }
+  /**
+   * An agave at (t, s, y). `leaves` in the shore frame — `a` an angle in the
+   * (t, s) plane, as `facing` takes it — and turned to world yaw here.
+   */
+  function agaveTS(t, s, y, leaves, col, seed) {
+    const O = W(t, s, y), E = W(t + 1, s, y);
+    const base = Math.atan2(E[2] - O[2], E[0] - O[0]);
+    // The shore frame is left-handed against world x/z (see `brandRing`), so
+    // an angle in (t, s) is a world yaw of the along-shore heading PLUS it
+    // only if s is to the left of t in world; test it rather than assume it.
+    const S = W(t, s + 1, y);
+    const sgn = Math.sign((S[0] - O[0]) * -Math.sin(base) + (S[2] - O[2]) * Math.cos(base)) || 1;
+    floraAgave(flora, O[0], O[1], O[2],
+      leaves.map((lf) => ({ ...lf, a: base + sgn * lf.a })), col, seed);
+  }
 
   /**
    * A box in the shore frame. Curvature over a two-metre hut is nothing, so the
@@ -5658,7 +5743,9 @@ async function buildJadrija(scene) {
     post(W, S.t1 - 0.12, S.s1 - 0.10, y0, top, 0.045, STEEL, 5);
     for (const t of [S.t0 + 0.35, S.t1 - 0.35]) {
       post(W, t, S.s0 - 0.75, y0, y0 + 0.42, 0.24, [0.415, 0.300, 0.230], 7);
-      dome(W, t, S.s0 - 0.75, y0 + 0.42, 0.34, 0.26, [0.180, 0.330, 0.165], 6);
+      // 1.536.0: leaves, not a dome — see `floraLeafy`.
+      leafyTS(t, S.s0 - 0.75, y0 + 0.38, { r: 0.27, h: 0.42, n: 64, leaf: 0.12,
+        col: [0.180, 0.330, 0.165] });
     }
   }
 
@@ -5875,19 +5962,12 @@ async function buildJadrija(scene) {
       // And what is in it: a clipped ball of something evergreen, drawn as
       // stubby blades rather than as a sphere, because a sphere of one green
       // on a terrace is a bowling ball on a stick.
-      const n = 15;
-      for (let k = 0; k < n; k++) {
-        const a = (k / n) * TAU + jit(key + i * 31, 700 + k) * 0.7;
-        const r = 0.10 + jit(key + i * 31, 720 + k) * 0.16;
-        const h = 0.30 + jit(key + i * 31, 740 + k) * 0.34;
-        const c = LEAF[(jit(key + i * 31, 760 + k) * LEAF.length) | 0];
-        const bt = pt + Math.cos(a) * r * 0.45, bs = ps + Math.sin(a) * r * 0.45;
-        b.tri(W(bt - 0.045, bs, y0 + 0.46), W(bt + 0.045, bs, y0 + 0.46),
-          W(bt + Math.cos(a) * r, bs + Math.sin(a) * r, y0 + 0.46 + h), c);
-        b.tri(W(bt, bs - 0.045, y0 + 0.46), W(bt, bs + 0.045, y0 + 0.46),
-          W(bt + Math.cos(a) * r * 0.7, bs + Math.sin(a) * r * 0.7,
-            y0 + 0.46 + h * 0.86), shade(c, 1.16));
-      }
+      //
+      // 1.536.0: and the stubby blades were still a bowling ball, only a spiky
+      // one. It is a crown of small leaves now (`floraLeafy`), in the shop's
+      // own green out of the three.
+      leafyTS(pt, ps, y0 + 0.44, { r: 0.30, h: 0.56, n: 96, leaf: 0.085,
+        col: LEAF[(jit(key + i * 31, 760) * LEAF.length) | 0], seed: key * 7 + i });
       furniture.push({ t: pt, s: ps, a: 0.30, c: 0.30, h: 0.50, y: y0 });
     }
 
@@ -10646,8 +10726,9 @@ async function buildJadrija(scene) {
         const yy = y0 + 0.46 + k * 0.24;
         boxTS(pt2 - 0.17, pt2 + 0.17, S.s0 - 0.38, S.s0 - 0.19, yy, yy + 0.14,
           PL, shade(PL, 1.10));
-        dome(W, pt2, S.s0 - 0.30, yy + 0.14, 0.13, 0.15,
-          [0.175, 0.315, 0.155], 6);
+        // 1.536.0: herbs, not a dome — small leaves, `floraLeafy`.
+        leafyTS(pt2, S.s0 - 0.30, yy + 0.11, { r: 0.14, h: 0.20, n: 40, leaf: 0.05,
+          col: [0.175, 0.315, 0.155], seed: k * 13 + pt2 });
       }
     }
 
@@ -16161,6 +16242,12 @@ async function buildJadrija(scene) {
     // top of a clipped hedge in August is not a straight line, it is a straight
     // line with a summer's growth standing out of it, and the domes are that
     // growth. Without them the whole run reads as a painted wall.
+    //
+    // 1.536.0: into `hedge`, so the block and its growth are leaf and not
+    // painted plaster: the tree material's tufts break the faces up. Not
+    // `shrub`: the chewed outline that suits a mound ate the block's flat
+    // faces into holes.
+    b = hedge;
     for (let a = t0; a < t1 - 0.01; a += 1.3) {
       const c = Math.min(a + 1.3, t1);
       const gy = gAt((a + c) * 0.5, sw + 1.1);
@@ -16380,6 +16467,8 @@ async function buildJadrija(scene) {
     // 1.10 m of horizontal radius keeps the leaf 0.45 m clear of the pales,
     // which is what `a_154` has — the fence in front, the mass behind and over
     // it, and daylight between the two.
+    // 1.536.0: the mass is `shrub`, the trees' material — see `shrub`.
+    b = shrub;
     for (let a = t0; a < t1 - 0.01; a += 1.05) {
       const c = Math.min(a + 1.05, t1);
       const key = (a * 5) | 0;
@@ -16586,10 +16675,15 @@ async function buildJadrija(scene) {
       const band = [y, y + vr * 2.3];
       // 0.40 of jag is a pillow. A lavender bush is a thousand woody stems
       // and what you see of it is the lumps, so the shape has to break.
+      // 1.536.0: the two mounds into `shrub`; the flowers stay where they
+      // were, because red is the bark test's colour in the trees' material.
+      const lavWas = b;
+      b = shrub;
       puff(P, 0, 0, y + vr * 1.05, vr, hr, DK, LT, band, 8, 4, 0.54, key % 89);
       puff(P, (jit(key, 714) - 0.5) * 0.6, (jit(key, 715) - 0.5) * 0.6,
         y + vr * (0.85 + jit(key, 716) * 0.5), vr * 0.72, hr * 0.74,
         DK, LT, band, 7, 4, 0.58, (key + 7) % 89);
+      b = lavWas;
       const tip = y + vr * 2.05;
       if (red) {
         // The red flowering thing at the near end of the bed in `a_174`. Not
@@ -16948,10 +17042,16 @@ async function buildJadrija(scene) {
     const LEAF = [0.348, 0.398, 0.262];
     const ROCK = [0.452, 0.440, 0.406];
     const N = 15;
+    // 1.536.0: the blades are `floraAgave` blades now (46-flora.js), lofted
+    // and closed, which is the channel and the keel this note asks for done
+    // as a solid rather than as two quads in a V. Every number below is the
+    // one it was: the golden-angle headings, the droop sequence, the reach,
+    // the arch and the widest point.
+    const leaves = [];
     for (let i = 0; i < N; i++) {
       const key = seed * 131 + i;
       const a = i * 2.3999632 + seed * 0.7;      // the golden angle, so no two
-      const co = Math.cos(a), sn = Math.sin(a);  // blades line up
+      // blades line up.
       // Upright at the crown, flat at the skirt, and continuous between: `u`
       // walks that sequence, and the golden angle keeps the two orders from
       // ever agreeing with each other.
@@ -16960,51 +17060,12 @@ async function buildJadrija(scene) {
       const L = r * (1.00 - 0.30 * u) * (0.88 + jit(key, 730) * 0.24);
       const reach = L * (0.30 + 0.68 * droop);
       const apex = L * (0.98 - 0.86 * droop);
-      const tipY = y0 + apex - L * 0.30 * droop;
-      const midY = y0 + L * (0.62 - 0.24 * droop);
+      const tipY = apex - L * 0.30 * droop;
+      const midY = L * (0.62 - 0.24 * droop);
       const wMax = L * (0.155 + jit(key, 731) * 0.045);
-      const g = 0.86 + jit(key, 732) * 0.28;
-      const top = [LEAF[0] * g, LEAF[1] * g, LEAF[2] * g];
-      const bot = shade(top, 0.74);
-      const SEG = 4;
-      // A quadratic through base -> control -> tip, which is the cheapest curve
-      // that both stands up and lies down.
-      const at2 = (p) => {
-        const q = 1 - p;
-        const d = 2 * q * p * (reach * 0.42) + p * p * reach;
-        const yy = q * q * y0 + 2 * q * p * midY + p * p * tipY;
-        return [d, yy];
-      };
-      let prev = at2(0), pw = wMax * 0.34, pf = 0;
-      for (let k = 1; k <= SEG; k++) {
-        const p = k / SEG;
-        const cur = at2(p);
-        // Widest a fifth of the way up and a point at the end.
-        const w = wMax * Math.pow(1 - p, 0.60) * (0.42 + 0.58 * Math.min(1, p * 4.5));
-        const fold = wMax * 0.30 * (1 - p);      // the channel's spine
-        const P0 = W(t + co * prev[0], s + sn * prev[0], prev[1]);
-        const P1 = W(t + co * cur[0], s + sn * cur[0], cur[1]);
-        const spine0 = [P0[0], P0[1] + pf, P0[2]];
-        const spine1 = [P1[0], P1[1] + fold, P1[2]];
-        for (const side of [-1, 1]) {
-          const E0 = W(t + co * prev[0] - sn * side * pw,
-            s + sn * prev[0] + co * side * pw, prev[1]);
-          const E1 = W(t + co * cur[0] - sn * side * w,
-            s + sn * cur[0] + co * side * w, cur[1]);
-          const col = side > 0 ? top : shade(top, 0.90);
-          if (side > 0) b.quad(spine0, spine1, E1, E0, col);
-          else b.quad(E0, E1, spine1, spine0, col);
-        }
-        prev = cur; pw = w; pf = fold;
-        if (k === SEG) {
-          // The spine on the point, which is the one dark mark on the plant.
-          void bot;
-          const T = W(t + co * (cur[0] + reach * 0.03),
-            s + sn * (cur[0] + reach * 0.03), cur[1] - L * 0.012);
-          b.tri(spine1, T, [P1[0], P1[1] - 0.012, P1[2]], [0.185, 0.168, 0.118]);
-        }
-      }
+      leaves.push({ a, reach, rise: tipY, mid: midY, w: wMax });
     }
+    agaveTS(t, s, y0, leaves, LEAF, seed * 7 + 1);
     // The rockery. Broken limestone heaped round the foot, no two the same and
     // none of them dressed — which is how every agave in the footage is planted.
     //
@@ -17018,21 +17079,20 @@ async function buildJadrija(scene) {
     // a heap under it. And 0.545 with the gain running to 1.22 puts them at
     // 0.66 against sand at about 0.60, so they were the brightest thing in the
     // frame. Wedges now, half buried, tight in, and darker than the ground.
+    //
+    // 1.536.0: and not wedges — `floraRock`s, in the same places at the same
+    // sizes and greys, broken (`flat` high) because a rockery is rubble.
     for (let k = 0; k < 14; k++) {
       const key = seed * 71 + k;
       const a = jit(key, 740) * TAU;
       const d = r * (0.30 + jit(key, 741) * 0.42);
       const rt = t + Math.cos(a) * d, rs = s + Math.sin(a) * d;
       const rr = 0.10 + jit(key, 742) * 0.14;
-      const gy = gAt(rt, rs) - 0.10 - jit(key, 747) * 0.06;
+      const sunk = 0.10 + jit(key, 747) * 0.06;
       const gg = 0.72 + jit(key, 743) * 0.44;
       const col = [ROCK[0] * gg, ROCK[1] * gg, ROCK[2] * gg];
-      frustumTS(gy, [rt, rs, rr, rr * (0.72 + jit(key, 748) * 0.40)],
-        gy + rr * (0.85 + jit(key, 744) * 0.75),
-        [rt + (jit(key, 745) - 0.5) * rr * 1.3,
-          rs + (jit(key, 746) - 0.5) * rr * 1.3,
-          rr * (0.18 + jit(key, 749) * 0.22), rr * 0.22],
-        col, shade(col, 1.10));
+      rockTS(rt, rs, rr * 1.05, Math.max(0.05, rr * (0.85 + jit(key, 744) * 0.75) - sunk),
+        key, { col, flat: 0.9 });
     }
     runs.push({ t0: t - r * 0.5, t1: t + r * 0.5, s0: s - r * 0.5,
       s1: s + r * 0.5, y: y0, h: r * 0.9 });
@@ -21689,21 +21749,35 @@ async function buildJadrija(scene) {
   }
 
   /** Agave: no trunk, no crown, just blades out of the ground in a rosette. */
+  //
+  // 1.536.0: the same seventeen draws in the same order, and the same eight
+  // blade headings and heights they always gave — only the blade is new. It
+  // was two flat triangles back to back, which beside the lane wall and on
+  // the verge read as green paper; it is a `floraAgave` blade now (46-flora.js):
+  // thick, channelled on top, keeled below, arching out and coming to a spine.
+  // A second, shorter ring inside the first is added off `jit`, because
+  // eight blades round an empty centre is a starfish and a rosette is packed
+  // to the middle.
   function agave(t, s, y, r) {
-    const P = facing(t, s, rng() * TAU);
+    const ang = rng() * TAU;
     const n = 8;
+    const leaves = [];
     for (let i = 0; i < n; i++) {
       const a = (i / n) * TAU + rng() * 0.3;
       const up2 = 0.55 + rng() * 0.75;
-      const c = Math.cos(a) * r, sn2 = Math.sin(a) * r;
-      const col = [0.400, 0.470, 0.360];
-      b.tri(P(-Math.sin(a) * r * 0.22, Math.cos(a) * r * 0.22, y),
-        P(Math.sin(a) * r * 0.22, -Math.cos(a) * r * 0.22, y),
-        P(c, sn2, y + r * up2), col);
-      b.tri(P(Math.sin(a) * r * 0.22, -Math.cos(a) * r * 0.22, y),
-        P(-Math.sin(a) * r * 0.22, Math.cos(a) * r * 0.22, y),
-        P(c, sn2, y + r * up2), col);
+      const rise = r * up2;
+      // The flatter a blade, the more it arches: an upright one is straight.
+      const arch = 1 - Math.min(1, up2 / 1.3);
+      leaves.push({ a: ang + a, reach: r, rise, mid: rise * (0.80 + 0.35 * arch),
+        w: r * 0.15 });
     }
+    const key = (t * 131 + s * 17) | 0;
+    for (let i = 0; i < 5; i++) {
+      const a = ang + (i / 5) * TAU + 0.4 + jit(key, 900 + i) * 0.4;
+      leaves.push({ a, reach: r * 0.32, rise: r * (1.0 + 0.3 * jit(key, 910 + i)),
+        mid: r * 0.72, w: r * 0.12 });
+    }
+    agaveTS(t, s, y, leaves, [0.400, 0.470, 0.360], key);
   }
 
   /**
@@ -21987,16 +22061,17 @@ async function buildJadrija(scene) {
         // present the same face. One `frustumS` per rock rather than a box:
         // a box has four parallel sides and reads as masonry however it is
         // coloured.
+        //
+        // 1.536.0: a `floraRock` rather than a tapered box — broken (`flat`
+        // at its highest, because these were quarried), rounded at the
+        // arrises by the sea, the same size, the same turn and the same grey.
         const ang = j1 * TAU;
-        const P2 = (dt, ds, yy) => {
-          const c = Math.cos(ang), sn = Math.sin(ang);
-          return W(t + dt * c - ds * sn, ss + dt * sn + ds * c, yy);
-        };
-        frustumS((dt, ds, yy) => P2(dt, ds, yy), -h2 * 0.5,
-          [0, y + h2 * 0.5, w2, d2],
-          h2 * 0.5, [(j2 - 0.5) * w2 * 0.7, y + h2 * 0.5 + (j0 - 0.5) * d2 * 0.6,
-            w2 * (0.42 + j0 * 0.34), d2 * (0.40 + j2 * 0.36)],
-          ROCK[((j2 * 89) | 0) % ROCK.length]);
+        const P2 = W(t, ss, 0);
+        floraRock(stones, P2[0], y + h2 * 0.12, P2[2], {
+          r: (w2 + d2) * 0.58, h: h2 * 0.88, yaw: ang, seed: k * 3.3 + 71,
+          flat: 1, pits: 0.4, col: ROCK[((j2 * 89) | 0) % ROCK.length],
+          dust: [0.470, 0.440, 0.380],
+        });
       }
     }
     // And the hire boats: kayaks and a pedalo, stacked on the bank at the top
@@ -22383,12 +22458,11 @@ async function buildJadrija(scene) {
         const rt = t + 0.3 + u * (SEG - 0.6);
         const rs = ks + 0.30 + jit((t * 5) | 0, 77 + k) * 0.55;
         const r = 0.085 + jit((t * 5) | 0, 80 + k) * 0.075;
-        const yy = surfaceY(rt, rs);
         // A frustum, not a box — rule 7, and the same lesson as the rip-rap.
-        frustumTS(yy, [rt, rs, r, r * 0.85],
-          yy + r * 1.25, [rt + (jit((t * 5) | 0, 83 + k) - 0.5) * 0.06,
-            rs + (jit((t * 5) | 0, 86 + k) - 0.5) * 0.06, r * 0.55, r * 0.45],
-          RUBBLE, shade(RUBBLE, 1.08));
+        // 1.536.0: and a stone, not a frustum: `floraRock`, same place, same
+        // size and colour, broken because this is rubble.
+        rockTS(rt, rs, r * 0.95, r * 1.1, t * 5 + k,
+          { col: RUBBLE, flat: 0.95, sub: r > 0.12 ? 2 : 1, pits: 0.3 });
       }
     }
     b = back9;
@@ -22637,44 +22711,27 @@ async function buildJadrija(scene) {
     };
 
     /**
-     * One lump of white limestone, faceted, sitting in the ground.
+     * One lump of white limestone, sitting in the ground.
      *
      * These were `dome`s, and a dome is the wrong solid: what is lying about
-     * at Jadrija is broken karst — angular plates with flat faces and hard
-     * arrises, photographed at arm's length in `1000150386` and `_387` and in
-     * a kerb line in `_362`. Seven corners at seven different radii, one
-     * course of quads and a fan, is 21 triangles and reads as stone; a dome
-     * of the same size is 21 triangles and reads as a bun.
+     * at Jadrija is broken karst, photographed at arm's length in
+     * `1000150386` and `_387` and in a kerb line in `_362`. So they became
+     * seven corners at seven radii, one course of quads and a fan — 21
+     * triangles, flat-shaded — and that read as stone from across the car
+     * park and, from standing height beside the parking edge, as a string of
+     * igloos: every facet one flat colour, every arris hard.
      *
-     * BURIED by a quarter of its height. Rule 5: a lump resting exactly on the
-     * ground plane shows its own base edge from the far side of the car park
-     * and z-fights with the surface at this distance from the origin.
+     * 1.536.0, Misha on that verge: *"look at how ugly the current rocks ...
+     * it would be nice to raise the number of polygons or whatever"*. It is a
+     * `floraRock` now (46-flora.js): rounded by weather, with a couple of
+     * broken flats and a hollow or two, lit with smooth normals and dusted at
+     * the foot, which is what `1000150386` shows. Same place, same colour,
+     * and the same height out of the ground — the buried share of the old
+     * lump (`bury`, a quarter by default) was never seen, so it is not drawn.
      */
     const limeLump = (lt, ls, r, h, seed, bury) => {
-      const ly = gAt2(lt, ls);
       const dig = bury == null ? 0.25 : bury;
-      // `k` shrinks the ring and `dy` lifts it, so the two rings are one
-      // expression and the seven radii below them are shared — which is what
-      // makes the arrises line up from the foot to the shoulder.
-      // 0.78 to 1.10 and not 0.66 to 1.10. At the wider spread the corners
-      // came out as spikes and seven of them together read as crumpled paper,
-      // which is the opposite failure to the dome and no better.
-      const P = (i, k, dy) => {
-        const a = ((i % 7) + 0.5) / 7 * TAU;
-        const rr = r * (0.78 + 0.32 * jit(i % 7, seed * 3 + 7)) * k;
-        return W(lt + Math.cos(a) * rr, ls + Math.sin(a) * rr,
-          ly - h * dig + dy);
-      };
-      for (let i = 0; i < 7; i++) {
-        b.quad(P(i, 1, 0), P(i + 1, 1, 0),
-          P(i + 1, 0.62, h * 0.72), P(i, 0.62, h * 0.72),
-          shade(LIME, 0.86 + jit(i, seed * 5 + 3) * 0.22));
-      }
-      const cap = W(lt + r * 0.10, ls - r * 0.08, ly - h * dig + h);
-      for (let i = 0; i < 7; i++) {
-        b.tri(P(i, 0.62, h * 0.72), P(i + 1, 0.62, h * 0.72), cap,
-          shade(LIME, 0.96 + jit(i, seed * 5 + 11) * 0.14));
-      }
+      rockTS(lt, ls, r * 0.96, h * (1 - dig) * 1.08, seed, { col: LIME });
     };
 
     /**
@@ -22694,44 +22751,31 @@ async function buildJadrija(scene) {
      * Drawn on both windings, the way `agave` is, because a fan is one sheet
      * and half of them face away from you.
      */
+    //
+    // 1.536.0: from over the wall these were Misha's "potted plants whose
+    // leaves are big flat green polygons": a black hexagonal prism for a
+    // trunk, and four flat triangles a frond. The stalks and fans are placed
+    // by exactly the numbers below; what is drawn at each is `floraFan` (the
+    // pleated fan, nineteen folded segments splitting at the tips) and the
+    // stump is `floraStump`, fibrous brown and a little shaggy, not a pot.
     const fanPalm = (lt, ls, r, seed) => {
       const ly = gAt2(lt, ls);
       const N = 9, ty = ly + 0.24;
-      post(W, lt, ls, ly - 0.12, ty, 0.14, PTRUNK, 6);
+      {
+        const O = W(lt, ls, ly - 0.12);
+        floraStump(flora, O[0], O[1], O[2], 0.15, 0.11, 0.36 + 0.12, PTRUNK, seed * 5);
+      }
       for (let i = 0; i < N; i++) {
         const a = (i / N) * TAU + jit(i, seed * 13 + 1) * 0.42;
-        // Elevation of the stalk, 20 to 62 deg. A clump with every stalk at
-        // the same angle is a parasol.
         const e = 0.35 + 0.73 * jit(i, seed * 13 + 5);
         const L = r * (0.40 + 0.16 * jit(i, seed * 13 + 9));
         const ca = Math.cos(a), sa = Math.sin(a);
-        const hub = [lt + ca * L * Math.cos(e), ls + sa * L * Math.cos(e),
-          ty + L * Math.sin(e)];
-        // The stalk: a thin blade rather than a bar, which is what a
-        // Chamaerops petiole is and costs two triangles instead of eight.
-        b.tri(W(lt - sa * 0.028, ls + ca * 0.028, ty),
-          W(lt + sa * 0.028, ls - ca * 0.028, ty),
-          W(hub[0], hub[1], hub[2]), shade(PTRUNK, 1.30));
-        b.tri(W(lt + sa * 0.028, ls - ca * 0.028, ty),
-          W(lt - sa * 0.028, ls + ca * 0.028, ty),
-          W(hub[0], hub[1], hub[2]), shade(PTRUNK, 1.30));
-        // The fan, as four segments swept 100 deg either side of the stalk
-        // and drooping at the edges the way a fan palm's does.
+        const hub = W(lt + ca * L * Math.cos(e), ls + sa * L * Math.cos(e),
+          ty + L * Math.sin(e));
         const R = r * (0.42 + 0.14 * jit(i, seed * 13 + 17));
-        const rim = (k) => {
-          const bta = (k / 4 - 0.5) * 1.75;
-          const cb = Math.cos(bta), sb = Math.sin(bta);
-          const ox = ca * Math.cos(e) * cb - sa * sb;
-          const oz = sa * Math.cos(e) * cb + ca * sb;
-          const oy = Math.sin(e) * cb - 0.34 * (1 - cb);
-          return W(hub[0] + ox * R, hub[1] + oz * R, hub[2] + oy * R);
-        };
-        const H = W(hub[0], hub[1], hub[2]);
-        for (let k = 0; k < 4; k++) {
-          const c = shade(PALMG, 0.88 + jit(k + i * 4, seed * 13 + 23) * 0.28);
-          b.tri(H, rim(k), rim(k + 1), c);
-          b.tri(H, rim(k + 1), rim(k), shade(c, 0.72));
-        }
+        floraFan(flora, W(lt + ca * 0.05, ls + sa * 0.05, ty), hub, R,
+          shade(PALMG, 0.94 + jit(i, seed * 13 + 23) * 0.14), shade(PTRUNK, 1.30),
+          seed * 17 + i);
       }
     };
 
@@ -22743,10 +22787,20 @@ async function buildJadrija(scene) {
      * colour, not a darker one — 0.383/0.331/0.297 against 0.318/0.352/0.238,
      * warm against cold, both read off `_353` in the same sun.
      */
+    //
+    // 1.536.0: the dome was not the right solid after all, not from 1.6 m.
+    // Seen down on from standing height a six-sided dome of one flat colour
+    // is a felt pad on the dust. It is a `floraTuft` now: the cushion as a
+    // dense clump of short blades, the dry grass as a looser, taller one, in
+    // the same two colours and the same place.
     const tussock = (lt, ls, r, seed) => {
-      const c = (seed % 2) ? DRYG : TUSS;
-      dome(W, lt, ls, gAt2(lt, ls) - 0.04, r * (0.52 + 0.24 * jit(seed, 87)),
-        r, shade(c, 0.92 + jit(seed, 89) * 0.20), 6);
+      const dryOne = seed % 2;
+      const g = 0.92 + jit(seed, 89) * 0.20;
+      tuftTS(lt, ls, {
+        r: r * 1.5, h: dryOne ? 0.30 + r * 0.9 : 0.16 + r * 0.55,
+        n: dryOne ? 36 : 60, seed: seed + lt * 0.37, col: shade(dryOne ? DRYG : TUSS, g),
+        dry: dryOne ? 0.75 : 0.12, wide: dryOne ? 0.008 : 0.012,
+      });
     };
 
     /**
@@ -23594,19 +23648,17 @@ async function buildJadrija(scene) {
           // those three survives a box. Each blade is a quad that comes to a
           // point, drawn twice so it does not vanish edge on, and the pair of
           // them costs less than the box did.
-          for (let n = 0; n < 4; n++) {
-            const q = seed + k * 13 + j * 4 + n;
-            const o = (jit(q, 165) - 0.5) * 0.13;
-            const so = sEdge - 0.020 - jit(q, 166) * 0.048;
-            const hh = 0.055 + jit(q, 167) * 0.105;
-            const lt = (jit(q, 168) - 0.5) * 0.10;
-            const ls = (jit(q, 169) - 0.5) * 0.07;
-            const A = W(wt + o - 0.011, so, wy);
-            const B = W(wt + o + 0.011, so, wy);
-            const T = W(wt + o + lt, so + ls, wy + hh);
-            b.quad(A, B, T, T, WEED);
-            b.quad(T, T, B, A, WEED);
-          }
+          //
+          // 1.536.0: and four flat quads was four flat quads. A small
+          // `floraTuft` now, rooted in the same joint at the same heights:
+          // ten tapering blades that arch and sway, green going to straw.
+          const q = seed + k * 13 + j * 4;
+          const so = sEdge - 0.020 - jit(q, 166) * 0.048;
+          const P = W(wt, so, 0);
+          floraTuft(grassBuf(wt), P[0], wy + 0.02, P[2], {
+            r: 0.07, h: 0.07 + jit(q, 167) * 0.11, n: 10, seed: q * 1.7,
+            col: WEED, dry: 0.3, wide: 0.006,
+          });
         }
         t = g1 + 0.05;
         k++;
@@ -24424,7 +24476,9 @@ async function buildJadrija(scene) {
         const pt2 = t + 1.17;
         boxTS(pt2 - 0.28, pt2 + 0.28, ws - 0.26, ws + 0.26, y + 0.92, y + 1.28,
           [0.470, 0.400, 0.330], [0.500, 0.428, 0.352]);
-        dome(W, pt2, ws, y + 1.28, 0.30, 0.30, [0.170, 0.330, 0.160], 6);
+        // 1.536.0: a plant, where there was a green dome: see `floraLeafy`.
+        leafyTS(pt2, ws, y + 1.24, { r: 0.30, h: 0.40, n: 70, leaf: 0.11,
+          col: [0.170, 0.330, 0.160] });
       }
     }
     // The playground: a fenced pad with a frame, a slide and a swing on it.
@@ -25905,11 +25959,11 @@ async function buildJadrija(scene) {
       for (let t = 215; t < LEN - 15; t += 1.35) {
         if (jit(t | 0, 55) > 0.62) continue;
         const s = s0 + jit(t * 3 | 0, 56) * (s1 - s0);
-        const y = surfaceY(t, s);
         const r = 0.055 + jit(t | 0, 57) * 0.055;
         const g = 0.760 + jit(t | 0, 58) * 0.110;
-        post(W, t + jit(t | 0, 59) * 0.6, s, y - r * 0.4, y + r * 0.9, r,
-          [g, g * 0.985, g * 0.930], 5);
+        // 1.536.0: a stone, not a pentagonal peg. Same place, size and grey.
+        rockTS(t + jit(t | 0, 59) * 0.6, s, r * 1.1, r * 0.8, t * 3,
+          { col: [g, g * 0.985, g * 0.930], sub: 1, pits: 0 });
       }
 
       // ── and the tarmac apron the dust gives out from ──────────────────
@@ -26411,6 +26465,8 @@ async function buildJadrija(scene) {
         const k = (t * 11) | 0;
         const r = 0.27 + jit(k, 34) * 0.15;
         const P = facing(t, WALL.s - 0.04, 0);
+        const ivyWas = b;
+        b = shrub;               // 1.536.0: the trees' material — see `shrub`
         // `puff` takes the VERTICAL radius before the horizontal one, and
         // getting that round the wrong way is what turned the first two
         // attempts into a row of Christmas trees: a creeper is flatter than it
@@ -26426,6 +26482,7 @@ async function buildJadrija(scene) {
             r * 0.40, r * 0.58, IDK, ILT, [y - 1.2, y + 0.2],
             5, 2, 0.38, k + 3 + d);
         }
+        b = ivyWas;
       }
     }
 
@@ -26616,12 +26673,30 @@ async function buildJadrija(scene) {
    * this off the shared `rng` stream — Rule 4 — and means it cannot move a
    * single parasol.
    */
+  //
+  // 1.536.0: and from standing height that was still a brown plane, only with
+  // pads on it. The domes were five-sided and one colour each, and Misha's
+  // frame of this floor is the one that has the "flat green hexagonal moss"
+  // in it. The two per tree are the same two in the same places — the bedrock
+  // is a flat `floraRock`, the tufts are `floraTuft`s — and each tree now also
+  // has the rest of what `_344` and `_349` show round a trunk: a scatter of
+  // smaller tufts, mostly dry, and a few fist-sized stones. Still clustered on
+  // the trees, still off `jit` of the tree's index, still clear of the
+  // hammock.
   {
-    const bWas = b;
-    b = groveBuf;
     const TUSS = [0.318, 0.352, 0.268];      // grey-green, the live tufts
     const DRYG = [0.462, 0.430, 0.298];      // and the dry khaki between them
     const ROCK = [0.560, 0.522, 0.442];      // limestone through the dust
+    // Not under the hammock, nor where she stands to get into it — under any
+    // of the first few pairs it may end up between, since which one she can
+    // walk to is only known once the whole shore is built (see `── THE
+    // HAMMOCK ──`). `jit` and not `rng`, so skipping one moves nothing else.
+    const underHammock = (t, ss) => hammockCands.slice(0, 6).some((H) => {
+      const ux = (H.B[0] - H.A[0]) / H.span, us = (H.B[1] - H.A[1]) / H.span;
+      const a = (t - H.A[0]) * ux + (ss - H.A[1]) * us;
+      const c = -(t - H.A[0]) * us + (ss - H.A[1]) * ux;
+      return a > 0.3 && a < H.span - 0.3 && Math.abs(c) < 1.6;
+    });
     let n = 0;
     greens.forEach((g, i) => {
       if (g[3] !== 9) return;                // pines only: olives are elsewhere
@@ -26631,36 +26706,54 @@ async function buildJadrija(scene) {
         const a2 = jit(i, 311 + k) * TAU;
         const r = 1.4 + jit(i, 331 + k) * 2.0;
         const t = gt + Math.cos(a2) * r, ss = gs + Math.sin(a2) * r;
-        // Not under the hammock, nor where she stands to get into it — under
-        // any of the first few pairs it may end up between, since which one
-        // she can walk to is only known once the whole shore is built (see
-        // `── THE HAMMOCK ──`). `jit` and not `rng`, so skipping one moves
-        // nothing else.
-        if (hammockCands.slice(0, 6).some((H) => {
-          const ux = (H.B[0] - H.A[0]) / H.span, us = (H.B[1] - H.A[1]) / H.span;
-          const a = (t - H.A[0]) * ux + (ss - H.A[1]) * us;
-          const c = -(t - H.A[0]) * us + (ss - H.A[1]) * ux;
-          return a > 0.3 && a < H.span - 0.3 && Math.abs(c) < 1.6;
-        })) continue;
-        const y = surfaceY(t, ss);
+        if (underHammock(t, ss)) continue;
         const w = jit(i, 351 + k);
         if (w < 0.34) {
           // Limestone. Wider than it is tall — this is bedrock showing, not a
           // boulder sitting on the dust, and the first cut had them as domes
           // half a metre proud which read as a field of molehills.
           const rr = 0.26 + jit(i, 371 + k) * 0.34;
-          dome(W, t, ss, y - 0.06, rr * 0.30, rr,
-            shade(ROCK, 0.92 + jit(i, 381 + k) * 0.16), 5);
+          rockTS(t, ss, rr, rr * 0.24, i * 3 + k,
+            { col: shade(ROCK, 0.98 + jit(i, 381 + k) * 0.16), flat: 1, pits: 0.8 });
         } else {
           const rr = 0.22 + jit(i, 391 + k) * 0.26;
-          dome(W, t, ss, y - 0.05, rr * (0.55 + jit(i, 401 + k) * 0.30), rr,
-            shade(w < 0.68 ? TUSS : DRYG, 0.90 + jit(i, 411 + k) * 0.22), 5);
+          const live = w < 0.68;
+          tuftTS(t, ss, {
+            r: rr * 1.4, h: 0.22 + rr * (0.55 + jit(i, 401 + k) * 0.40),
+            n: live ? 50 : 36, seed: i * 5 + k,
+            col: shade(live ? TUSS : DRYG, 0.90 + jit(i, 411 + k) * 0.22),
+            dry: live ? 0.15 : 0.8, wide: live ? 0.011 : 0.008,
+          });
+        }
+        n++;
+      }
+      // The rest of the floor round the trunk: five to nine small tufts on
+      // the drip line, most of them dry by August, and a couple of stones.
+      const extra = 5 + Math.floor(jit(i, 421) * 5);
+      for (let k = 0; k < extra; k++) {
+        const a2 = jit(i, 431 + k) * TAU;
+        const r = 0.9 + jit(i, 451 + k) * 3.6;
+        const t = gt + Math.cos(a2) * r, ss = gs + Math.sin(a2) * r;
+        if (underHammock(t, ss)) continue;
+        const q = jit(i, 471 + k);
+        if (q < 0.22) {
+          const rr = 0.07 + jit(i, 491 + k) * 0.10;
+          rockTS(t, ss, rr, rr * (0.45 + jit(i, 511 + k) * 0.4), i * 11 + k,
+            { col: shade(ROCK, 1.02 + jit(i, 531 + k) * 0.14), sub: 1, pits: 0 });
+        } else {
+          const rr = 0.10 + jit(i, 551 + k) * 0.16;
+          const live = q > 0.78;
+          tuftTS(t, ss, {
+            r: rr * 1.5, h: 0.14 + rr * 1.3, n: 16 + Math.floor(rr * 90),
+            seed: i * 13 + k + 400,
+            col: shade(live ? TUSS : DRYG, 0.88 + jit(i, 571 + k) * 0.24),
+            dry: live ? 0.25 : 0.85, wide: 0.007,
+          });
         }
         n++;
       }
     });
     groveFloor = n;
-    b = bWas;
   }
 
 
@@ -30037,6 +30130,30 @@ async function buildJadrija(scene) {
   const arborMesh = new THREE.Mesh(arbor.geo(),
     treeMaterial({ instanced: false, cut: true, emissive: 0.10 }));
   arborMesh.userData.tree = true;
+  // 1.536.0: the stone, the agaves and pots, and the grass — see 46-flora.js.
+  // Stones and agaves cast (the shared depth program: neither has anything to
+  // discard); the grass does not, because a tuft's shadow is a smudge the size
+  // of a shadow texel and the tuft already darkens its own roots.
+  const stonesMesh = new THREE.Mesh(stones.geo(), floraRockMat());
+  const shrubMesh = new THREE.Mesh(shrub.geo(),
+    treeMaterial({ instanced: false, cut: true, emissive: 0.10, needles: false, grain: 2.6 }));
+  shrubMesh.userData.tree = true;
+  const hedgeMesh = new THREE.Mesh(hedge.geo(),
+    treeMaterial({ instanced: false, cut: false, emissive: 0.10, needles: false, grain: 2.0 }));
+  hedgeMesh.name = 'jad:shrub';
+  const floraMesh = new THREE.Mesh(flora.geo(), floraMat());
+  stonesMesh.name = 'jad:stones';
+  floraMesh.name = 'jad:flora';
+  shrubMesh.name = 'jad:shrub';
+  const grassMat = floraMat({ fade: 55 });
+  const grassMeshes = [...grassBufs.values()].map((g) => {
+    const m = new THREE.Mesh(g.geo(), grassMat);
+    m.name = 'jad:grass';
+    m.geometry.computeBoundingSphere();
+    // The wind moves a tip a few centimetres; the sphere has to hold it.
+    m.geometry.boundingSphere.radius += 0.5;
+    return m;
+  });
   // Maslina's feather flags: `up`'s material with `FEATHER_WAVE` in its
   // vertex program, one material each because each carries its own pole. The
   // print hung in front of each is a plain `MeshBasicMaterial` off
@@ -30263,11 +30380,12 @@ async function buildJadrija(scene) {
     return m;
   });
   const kabRendMesh = rendMeshes[rends.findIndex((r) => r.out)] || null;
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh]) {
+  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh,
+    stonesMesh, floraMesh, shrubMesh, hedgeMesh]) {
     m.frustumCulled = false;
   }
   for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, ...rendMeshes,
-    ...featherMeshes]) {
+    ...featherMeshes, stonesMesh, floraMesh, shrubMesh, hedgeMesh, ...grassMeshes]) {
     scene.add(m);
   }
 
@@ -30525,6 +30643,88 @@ async function buildJadrija(scene) {
   const bucketeer = vik ? await buildBucketeer(scene, vik, walkY) : null;
   // And the flies that got up again and joined her. See src/45-zombie.js.
   const zombies = vik && bucketeer ? buildZombies(vik, bucketeer) : null;
+
+  // ── the floor of the wood, round the eye ──────────────────────────────────
+  // 1.536.0. Stones, cones and tufts of dry grass on the needle floor, placed
+  // in cells round wherever you are standing — see `floraLitter` in
+  // 46-flora.js. Built here, last, because what it needs to know is where
+  // the ground is open, and that is only known once every blocker is in.
+  const litter = (() => {
+    // The blockers, binned in (t, s): 821 of them, asked a few thousand times.
+    const BIN = 4, bins = new Map();
+    const bkey = (a, c) => (a + 2000) * 8192 + (c + 2000);
+    for (const bk of blockers) {
+      if (!(bk.a > 0) || !(bk.c > 0) || bk.kab) continue;
+      const e = (bk.rot ? Math.hypot(bk.a, bk.c) : Math.max(bk.a, bk.c)) + 0.3;
+      for (let a = Math.floor((bk.t - e) / BIN); a <= Math.floor((bk.t + e) / BIN); a++) {
+        for (let c = Math.floor((bk.s - e) / BIN); c <= Math.floor((bk.s + e) / BIN); c++) {
+          const k = bkey(a, c);
+          if (!bins.has(k)) bins.set(k, []);
+          bins.get(k).push(bk);
+        }
+      }
+    }
+    const blocked = (t, s) => {
+      const list = bins.get(bkey(Math.floor(t / BIN), Math.floor(s / BIN)));
+      if (!list) return false;
+      for (const bk of list) {
+        const c = bk.rot ? Math.cos(bk.rot) : 1, sn = bk.rot ? Math.sin(bk.rot) : 0;
+        const dt0 = t - bk.t, ds0 = s - bk.s;
+        const dt = dt0 * c + ds0 * sn, ds = -dt0 * sn + ds0 * c;
+        if (Math.abs(dt) < bk.a + 0.15 && Math.abs(ds) < bk.c + 0.15) return true;
+      }
+      return false;
+    };
+    // The roads through the wood, as segments binned in world metres. A tuft
+    // in the middle of the tarmac is the one thing worse than none.
+    const RB = 8, rbins = new Map();
+    const O0 = toWorld(-40, 60), O1 = toWorld(LEN + 40, 60);
+    const bx0 = Math.min(O0[0], O1[0]) - 260, bx1 = Math.max(O0[0], O1[0]) + 260;
+    const bz0 = Math.min(O0[2], O1[2]) - 260, bz1 = Math.max(O0[2], O1[2]) + 260;
+    for (const way of world.roads || []) {
+      const half = ROADS.width[clamp(way.r | 0, 1, 4)] * 0.5 + 0.7;
+      for (let i = 0; i < way.p.length - 1; i++) {
+        const [x0, z0] = way.p[i], [x1, z1] = way.p[i + 1];
+        if (Math.max(x0, x1) < bx0 || Math.min(x0, x1) > bx1
+          || Math.max(z0, z1) < bz0 || Math.min(z0, z1) > bz1) continue;
+        const seg = [x0, z0, x1, z1, half];
+        for (let a = Math.floor((Math.min(x0, x1) - half) / RB);
+          a <= Math.floor((Math.max(x0, x1) + half) / RB); a++) {
+          for (let c = Math.floor((Math.min(z0, z1) - half) / RB);
+            c <= Math.floor((Math.max(z0, z1) + half) / RB); c++) {
+            const k = bkey(a, c);
+            if (!rbins.has(k)) rbins.set(k, []);
+            rbins.get(k).push(seg);
+          }
+        }
+      }
+    }
+    const onRoad = (x, z) => {
+      const list = rbins.get(bkey(Math.floor(x / RB), Math.floor(z / RB)));
+      if (!list) return false;
+      for (const [x0, z0, x1, z1, half] of list) {
+        const ex = x1 - x0, ez = z1 - z0;
+        const u = clamp(((x - x0) * ex + (z - z0) * ez) / (ex * ex + ez * ez || 1), 0, 1);
+        const dx = x - (x0 + ex * u), dz = z - (z0 + ez * u);
+        if (dx * dx + dz * dz < half * half) return true;
+      }
+      return false;
+    };
+    return floraLitter(scene, {
+      accept(x, z) {
+        const [t, s] = local(x, z);
+        // Behind the lane wall only: in front of it is the resort.
+        if (s < WALL.s + 0.25) return null;
+        const g = grove.at(x, z);
+        if (!g || !(g.pine > 0) || isSea(x, z)) return null;
+        // The tarmac apron, and the back lane: made ground.
+        if (t > 212 && t < LEN - 12 && s > WALL.s + 1.4 && s < WALL.s + 5.4) return null;
+        if (t > 212 && t < 342 && s > 36.2 && s < 40.6) return null;
+        if (blocked(t, s) || onRoad(x, z)) return null;
+        return floorY(t, s);
+      },
+    });
+  })();
 
   // ── the cars in the wood ───────────────────────────────────────────────────
   // Placed by the loop far above, which is where the shore rules live; drawn
@@ -54696,6 +54896,7 @@ async function buildJadrija(scene) {
    * where somebody stops for a moment on a promenade needs to survive a reload.
    */
   function updateCrowd(dt, cam, at = null, dir = null) {
+    if (litter) litter.update(cam, groundAt(cam.x, cam.z));   // 1.536.0
     crowdT += dt;
     lastCam.x = cam.x; lastCam.z = cam.z;
     // The one skinned figure here is posed on the CPU — twenty-eight bones,
@@ -56332,6 +56533,8 @@ async function buildJadrija(scene) {
     // test needs somewhere to point the camera — but note this is the placement
     // and not the live position: anyone with a `beat` has been walking since.
     people: bathers,
+    /** The floor round the eye: how many tufts, stones and cones. */
+    litter: () => (litter ? litter.stats() : null),
     // Live, and by reference: 47-ground.js takes this array once, on retarget,
     // and reads it every frame from then on. Anything pushed into it is
     // something that is on fire on the promenade — see the fireballs above.
@@ -56346,11 +56549,12 @@ async function buildJadrija(scene) {
     // until this pass and which is where a hundred metres of hut belongs: take
     // them out of the caster list and the rows stop throwing the long shadows
     // that are half of what the promenade looks like at seven in the evening.
-    meshes: [deckMesh, upMesh, vilMesh, arborMesh, ...rendMeshes],
+    meshes: [deckMesh, upMesh, vilMesh, arborMesh, ...rendMeshes, stonesMesh, floraMesh],
     // The feather flags cast as they stand: the shadow pass does not run the
     // wave, and a ripple of a few centimetres in a shadow is nothing anybody
     // could see.
-    casters: [upMesh, vilMesh, arborMesh, ...rendMeshes.filter((m) => m !== kabRendMesh),
+    casters: [upMesh, vilMesh, arborMesh, stonesMesh, floraMesh, shrubMesh, hedgeMesh,
+      ...rendMeshes.filter((m) => m !== kabRendMesh),
       ...featherMeshes],
     // The kabina's two rooms cast only while they are drawn — `dynamic`
     // proxies follow their mesh's `visible`. The big room has to: nothing

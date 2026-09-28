@@ -936,12 +936,13 @@ vec3 barkCell(vec2 p){
  * fwidth under non-uniform control flow is undefined, and on the one GPU that
  * cares about it the result is a checkerboard of tufts along every edge.
  */
-function foliageBody(cut) {
+function foliageBody(cut, needles = true, grain = 1) {
   return /* glsl */ `
   float leaf = smoothstep(0.004, 0.020, vVCol.g - vVCol.r);
   float folFp = length(fwidth(vWorld));
   if (leaf > 0.0) {
-    float tuft = folTuft(vWorld, folFp);
+    float tuft = ${grain === 1 ? 'folTuft(vWorld, folFp)'
+      : `folTuft(vWorld * ${grain.toFixed(2)}, folFp * ${grain.toFixed(2)})`};
     float lift = mix(0.58, 1.40, clamp(tuft, 0.0, 1.0));
     float warm = smoothstep(0.60, 0.88, tuft);
     ${cut ? `
@@ -961,7 +962,8 @@ function foliageBody(cut) {
     // a bunch of grapes: a broadleaf's leaves are far below a pixel at any
     // distance you see its crown from, and the value noise is the right
     // answer for it all the way in.
-    float needle = smoothstep(0.20, 0.26, (vVCol.g - vVCol.r) / max(vVCol.g, 1e-3));
+    float needle = smoothstep(0.20, 0.26, (vVCol.g - vVCol.r) / max(vVCol.g, 1e-3))
+      * ${needles ? '1.0' : '0.0'};
     float kStar = (1.0 - smoothstep(0.030, 0.075, folFp)) * needle;
     if (kStar > 0.5) {
       // The tuft, seen face on: the offset to its centre flattened onto the
@@ -1022,8 +1024,58 @@ function foliageBody(cut) {
     // And the brightest caps towards the yellow on every sunlit tip in the
     // survey. Blue down and red up, so it is a warmer green and not a paler one.
     base *= mix(vec3(1.0), vec3(1.12, 1.07, 0.74), leaf * warm * 0.75);
+    // 1.536.0: and from the air. The note the last pass left was that the
+    // far wood "barely changed from the air — dark domes", and against the
+    // drone reel it is the TOPS that are wrong: seen from above a sunlit
+    // Aleppo canopy is a mid olive, yellowing on the crowns, with the dark
+    // in the gaps between them; the game's was one bottle green over the
+    // lot. So the upward faces of a crown seen from ABOVE — the eye looking
+    // down on it by more than about ten degrees, which is never the crown
+    // over your head and never the wood seen across the promenade — take
+    // a third more light and a little yellow (two fifths turned the
+    // resort's own brighter pines lime from forty metres). First cut keyed this off
+    // pixel footprint instead, and from forty metres up a crown's pixel is
+    // five centimetres: nothing changed where it was meant to.
+    float crownTop = smoothstep(0.30, 0.90, n.y);
+    vec3 eyeTo = uCamPos - vWorld;
+    float fromAbove = smoothstep(0.12, 0.45, eyeTo.y / max(length(eyeTo), 1e-3));
+    base *= mix(vec3(1.0), vec3(1.32, 1.26, 1.00), leaf * crownTop * fromAbove);
   }`;
 }
+
+/**
+ * The crowns in the wind (1.536.0).
+ *
+ * Every tree in the game stood dead still in a nine-metre lebić, and the
+ * grass at their feet now moves. What a crown does in a steady breeze is a
+ * slow lean and return with the gusts, the whole crown together, and a
+ * quicker shiver on top of it that differs from one bough to the next. So:
+ * a gust wave travelling downwind, a slow sway phased by where the crown
+ * is, and a small vertical shiver phased by height, together five to eight
+ * centimetres at the default wind. Leaves only — the vertex colour's leaf
+ * test, the same one the fragment uses — so a trunk stays planted and the
+ * crown moves over it. The shadow pass does not sway: the crowns' shadows
+ * are the far cascade's business and a few centimetres of lag in them is
+ * nothing anybody can see.
+ */
+const GLSL_CROWN_WIND = /* glsl */ `
+uniform vec2 uWind;
+uniform float uWindSpeed;
+uniform float uTime;
+vec3 crownWind(vec3 wp, float k){
+  if (k <= 0.0) return vec3(0.0);
+  float ws = clamp(uWindSpeed, 0.0, 22.0);
+  vec2 wd = normalize(uWind + vec2(1e-5));
+  vec2 q = mod(wp.xz, 512.0);
+  float along = dot(q, wd);
+  float gust = 0.6 + 0.4 * sin(along * 0.05 - uTime * (0.4 + ws * 0.03));
+  float sway = sin(uTime * 0.9 + dot(q, vec2(0.031, 0.027))) * 0.5
+    + sin(uTime * 2.3 + q.x * 0.21 + wp.y * 0.35) * 0.22;
+  float amp = (0.012 + 0.0045 * ws) * k;
+  vec2 d = wd * amp * (gust + sway);
+  return vec3(d.x, sin(uTime * 3.1 + q.y * 0.4 + wp.y * 1.3) * amp * 0.22, d.y);
+}
+`;
 
 /**
  * After the light: the sun through the crown. viewDir runs from the eye to
@@ -1126,7 +1178,20 @@ function treeCaster(shadow, instanced) {
  * whole draw, and the far layer is thirty-odd thousand trees a frame whose
  * outline is under a pixel of tuft at the distances it is drawn at anyway.
  */
-function treeMaterial({ instanced = true, cut = false, emissive = 0 } = {}) {
+/**
+ * `needles: false` (1.536.0) is for the broadleaved shrubs at Jadrija — the
+ * clipped hedge, the evergreen mass behind the palisade, the lavender, the
+ * ivy — which are green enough to pass the conifer test on colour alone and
+ * came out as bushes of pine stars. Everything else about the crown is theirs
+ * too: the tufts, the chewed outline, the light through the edge.
+ *
+ * `grain` scales the tuft field finer. A lavender mound is half a metre
+ * across and a tree's tufts are sized for a crown of eight: at grain 1 the
+ * 0.75 m octave cut each mound into three or four leaves the size of a hand,
+ * and a bed of lavender became a bed of lettuce.
+ */
+function treeMaterial({ instanced = true, cut = false, emissive = 0, needles = true,
+  grain = 1 } = {}) {
   return solidMaterial(0xffffff, {
     instanced,
     spec: 0.03,
@@ -1134,6 +1199,33 @@ function treeMaterial({ instanced = true, cut = false, emissive = 0 } = {}) {
     emissive,
     side: THREE.DoubleSide,
     decl: GLSL_FOLIAGE,
+    uniforms: { uWind: U.uWind, uWindSpeed: U.uWindSpeed },
+    vdecl: GLSL_CROWN_WIND,
+    // Instanced, p is the prototype's frame: the sway is found in the world
+    // and turned back, and grows with height up the tree so the lowest
+    // boughs barely move. The hand-planted trees are built in world metres.
+    //
+    // Not on the far layer. Measured, swapping the programs every twenty
+    // frames in one page: on all of them it cost -0.1 ms at t 330 and
+    // +0.4 at the verge, which is noise, so this is not about the budget —
+    // the far layer is trees whose pixel is bigger than a five-centimetre
+    // sway, and a vertex program that does nothing visible should not run.
+    // The near layer and the resort's own trees (`cut`, the ones close
+    // enough to have an outline) are where it shows.
+    vert: !cut ? '' : instanced ? `
+      {
+        float lf = smoothstep(0.004, 0.020, aVCol.g - aVCol.r);
+        if (lf > 0.0) {
+          vec3 wp = aInstPos + qrot(aInstRot, p * aInstScale);
+          float k = lf * smoothstep(0.5, 9.0, p.y * aInstScale.y);
+          vec3 d = crownWind(wp, k);
+          p += qrot(vec4(-aInstRot.xyz, aInstRot.w), d) / max(aInstScale, vec3(1e-3));
+        }
+      }` : `
+      {
+        float lf = smoothstep(0.004, 0.020, aVCol.g - aVCol.r);
+        if (lf > 0.0) p += crownWind(p, lf);
+      }`,
     // The prototype carries bark and leaf in its vertex colours; the per
     // instance colour is the individual's own tint and its charring.
     //
@@ -1231,7 +1323,7 @@ function treeMaterial({ instanced = true, cut = false, emissive = 0 } = {}) {
       '  base = mix(base, vec3(0.330, 0.120, 0.055) * vColor,',
       '             (1.0 - smoothstep(0.0, 0.035, edge)) * step(0.62, f) * 0.60 * plated);',
       '}',
-    ].join('\n  ') + '\n  ' + foliageBody(cut),
+    ].join('\n  ') + '\n  ' + foliageBody(cut, needles, grain),
     lit: FOLIAGE_LIT,
   });
 }
