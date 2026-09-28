@@ -43576,7 +43576,14 @@ async function buildJadrija(scene) {
     // once-clips are one to three seconds of her arriving somewhere and
     // interrupting those is the glitch `ASKABLE` exists to avoid.
     sitHeld: 1, bedKneel: 1, lotusHeld: 1, perchHeld: 1, fetalHeld: 1,
-    upsideHeld: 1, handHeld: 1 };
+    upsideHeld: 1, handHeld: 1,
+    // AND ON HER FRONT OVER THE EDGE, which was the one held pose left off.
+    // Misha, 28 Sep 2026, six requests in a row answered "yeah, putting them
+    // on" while she lay there: `edgeHeld` is `bedFor`, seven minutes, and a
+    // request made in it waited all seven. Measured over twenty starting
+    // poses, it was the only one that never took the headphones. It handles
+    // `getUp` exactly as `flatheld` does, which has always been on this list.
+    edgeHeld: 1 };
 
   /**
    * WHAT SHE CAN BE ASKED FOR. Every one of these is a number she already has
@@ -61749,6 +61756,8 @@ async function buildJadrija(scene) {
     /** Debug: where the spread is — seconds into it, or null. */
     spreadState: () => (show ? { t: show.spread, on: show.spreadOn || 0,
       phase: show.phase } : null),
+    /** Where a name actually goes — `wear:` from the bag is a handover. */
+    askRoad: (name) => askRoad(name),
     askShow: (rawName) => {
       // WHICH ROAD, decided here and once — see `askRoad`. Everything below
       // and everything in the dispatch reads the normalised name, so neither

@@ -8,6 +8,31 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.543.1] — 2026-09-28
+
+### She does what she says she is doing
+
+Misha: *"how come she is saying this, but not actually doing anything"* —
+"put on the headphones", "put the handcuffs on", "I put the ankle irons on",
+each answered *"yeah, I'm putting them on"*, and nothing moved.
+
+- **Face down over the cot edge (`edgeHeld`) now hears requests.** It was the
+  one held pose missing from `ASKABLE`, so anything asked there waited out
+  `bedFor`, seven minutes, and the next request overwrote it. Swept all
+  twenty starting poses headless with the headphones in the bag: it was the
+  only one that never took them; now it gets up and takes them in 22.8 s,
+  the same as every other lying pose.
+- **The panel names the road she actually takes.** "Put the cuffs on" with
+  the cuffs in your satchel is a handover — she comes to you — and the panel
+  said "over to the stool for it" while she walked the other way. It now
+  reads `askRoad` and says "coming to take it from you".
+- **Baye's voice service (server/baye/baye.py, deployed):** a sentence that
+  triggered nothing ("put the cups on now", "just put them out now?" — the
+  transcriber's words) is told so, and she says she did not catch it instead
+  of "yeah, putting the cuffs back on". And `wear:`/`doff:` get the same
+  "you are doing it now, say yes" line every other skill gets, so she no
+  longer guesses "already on, babe" with them still in the bag.
+
 ## [1.543.0] — 2026-09-28
 
 ### The vikendica, finished on the outside

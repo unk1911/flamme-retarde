@@ -3461,6 +3461,11 @@ KIND_NOUN = {
     "man_young_lean": "a young man", "man_old_heavy": "a heavy old man",
 }
 
+# The same four, named, for the line that says she is putting one on or taking
+# it off — see `build_talk_messages`.
+DON_NOUN = {"cuffs": "the diamond cuffs", "anklecuffs": "the ankle cuffs",
+            "headphones": "the headphones", "lovense": "the Lovense"}
+
 # What she has on, off the `wear` column in src/62-satchel.js — the same three
 # keys `WEAR_KEYS` is built from, said the way she would say them.
 WORN_NOUN = {
@@ -4224,6 +4229,33 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
                      "would say it. Do not refuse, do not tell them to do it "
                      "themselves, do not ask whether they are sure, and do "
                      "not describe it.")
+    elif does and does.split(":")[0] in ("wear", "doff") and who == "baye":
+        # AND THE THINGS SHE PUTS ON, which are not in `SKILLS` and so never
+        # got the line above: asked to put the headphones on, she guessed, and
+        # one guess of two was "already on, babe" with them still in the bag.
+        verb, _, key = does.partition(":")
+        what = DON_NOUN.get(key, "it").upper()
+        lines.append("")
+        ask = ("THEY HAVE ASKED YOU TO PUT ON " + what + ". It is not on "
+               "yet; you are reaching for it right now") if verb == "wear" \
+            else ("THEY HAVE ASKED YOU TO TAKE OFF " + what + ", and you are "
+                  "doing it right now")
+        lines.append(ask + ". So say yes, in one short line, and do not "
+                     "describe it.")
+    elif not does and who == "baye":
+        # AND NOTHING IS, WHEN NOTHING WAS ASKED. Misha, 28 Sep 2026: "put
+        # the cups on now" and "just put them out now?" matched no request —
+        # the transcriber's words, not his — and she answered "yeah, I'm
+        # putting the cuffs back on now" and "taking the cuffs off now, nice
+        # and easy" while standing still. The line above is what makes her say
+        # yes; without it she guessed yes anyway. So the other half is said.
+        lines.append("")
+        lines.append("Nothing they just said has set you doing anything new, "
+                     "and nothing has been put on or taken off you. Never say "
+                     "you are putting something on, taking something off, "
+                     "fetching something or going somewhere. "
+                     "If it sounded like they wanted that, say you did not "
+                     "catch what they want.")
     lines.append("")
     # The language `/hear` named — the classifier's for anything that is not
     # plain English — and the marker-word count only as the fallback it always

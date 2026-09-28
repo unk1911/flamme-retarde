@@ -651,9 +651,14 @@ const ears = (() => {
           // carries what she is fetching on the end of it —
           // `fetch.cream:stracciatella` — and the panel should say the
           // flavour rather than have a table entry per tray in the case.
-          const cut = name.indexOf(':');
-          const base = cut > 0 ? name.slice(0, cut) : name;
-          const what = cut > 0 ? name.slice(cut + 1) : '';
+          // AND THE ROAD IT TOOK, not the words: "put the cuffs on" with the
+          // cuffs still in your satchel is a handover — she comes to YOU —
+          // and the panel said "over to the stool" while she walked the
+          // other way. See `askRoad` in 43-jadrija.js.
+          const went = ok && J.askRoad ? J.askRoad(name) || name : name;
+          const cut = went.indexOf(':');
+          const base = cut > 0 ? went.slice(0, cut) : went;
+          const what = cut > 0 ? went.slice(cut + 1) : '';
           const label = (DOES[base] || base) + (what ? ' — ' + what : '');
           note('baye: ' + (ok ? label
             : (WHY[got] || 'cannot do that here')), ok ? 'did' : 'meta');
