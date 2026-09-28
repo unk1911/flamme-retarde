@@ -4430,6 +4430,307 @@ function clearJump() {
   }
 }
 
+/**
+ * HER CROUCH, which until 1.539.1 was the camera's alone.
+ *
+ * Misha, 28 Sep 2026: *"when i press 'B' to see me (Chloe) from external
+ * camera, and then press 'Shift' to crouch, Chloe doesn't actually crouch,
+ * just the camera lowers itself.. but I/Chloe should also crouch, for
+ * consistency."* Shift took the eye from 1.66 m to `GROUND.kneel` and nothing
+ * else — so in the third person she stood at full height with the lens at her
+ * chin, and in the vikendica's bathroom mirror, which hangs her off the
+ * camera by a standing eye, she was two-thirds of a metre into the floor.
+ *
+ * A SQUAT, SOLVED ON HER OWN LEGS. Nothing here is typed as a pose except
+ * three things a person chooses — how far the shins lean over the boots, how
+ * far the back bows, how far the chin comes back up — and the rest is
+ * whatever puts her eyes where the lens is. The lens goes down 0.66 m; the bow
+ * takes some of that (its share is measured through her own spine chain), and
+ * each thigh is then folded by exactly the angle that drops her hips the
+ * remainder with that shin lean. The thighs come out about level, which is a
+ * flat-footed full squat and what an eye a metre off the ground is on a woman
+ * her height.
+ *
+ * `aim` composes in FIGURE space, and all of these are one axis — +z, the
+ * rig's sagittal hinge; see the jump below for how that was learned — so they
+ * add down the chain. The thigh at +a and the knee at −(a + c) leave the shin
+ * leaning −c; the foot at +c then brings the boot back to exactly the clip's
+ * attitude, flat on the ground. The arms take the bow back and a little more,
+ * so they hang forward over her knees for balance instead of trailing along a
+ * back that has tipped.
+ *
+ * FEET PLANTED. Folding a leg about the hip moves the ankle up and forward of
+ * the pelvis, and the root is the pelvis — so she is lowered by the hips' drop
+ * and moved BACK by the ankles' travel, which leaves both boots where standing
+ * had them, the hips back over the heels and her head forward over her toes.
+ * Both legs are solved to the same drop rather than the same angle, because
+ * her idle stands one foot ahead of the other and the same angle on both
+ * would put one boot in the ground.
+ *
+ * The depth is solved on the idle clip's first frame, taken once off the clip
+ * itself (not off whatever she happens to be playing when Shift goes down,
+ * which mid-stride is a leg that is not a standing leg). Walking, each leg is
+ * then re-reached every frame against the walk as it is — see `crouchSolve`.
+ *
+ * Every state that is not on foot takes it straight back off (`clearCrouch`):
+ * the water, the tower, the boats and bikes, the chase cut — each of those
+ * drives her itself.
+ */
+const CROUCH_YOU = {
+  // rad the shins lean forward over the boots at the bottom. Flat-footed: an
+  // ankle takes about 35° before the heel has to come up, and 0.62 is that.
+  shin: 0.62,
+  // rad of forward bow, laid up the spine 0.45 / 0.33 / 0.22 as Baye's crouch
+  // at the plate lays hers (43-jadrija.js) — a back that bends, not a hinge.
+  bow: 0.55,
+  // rad the neck takes back, so she looks ahead and not at the ground between
+  // her boots. Less than the bow: a crouched head is carried slightly down.
+  chin: 0.40,
+  // rad forward on the upper arms beyond giving the bow back, and on the
+  // forearms: hands forward over the knees rather than trailing.
+  arm: 0.34, elbow: 0.55,
+  // rad each knee swings out about the line from hip to ankle — see
+  // `crouchLeg`.
+  splay: 0.30,
+  // How much of the walk's stride she takes crouched, and the clip is run
+  // faster by one over it so the ground still goes by at the same speed.
+  // With her hips 0.36 m up, the walk's full stride puts the trailing boot
+  // 0.39 m behind her and there is no leg that reaches it with the knee above
+  // the ground — MEASURED at 1.0 it was 0.12 m under the promenade. Half is a
+  // crouched shuffle, which is what a person does down there.
+  stride: 0.50,
+  // And the rate's ceiling crouched, over the walk's 2.4: at 1.36 m/s half a
+  // stride wants 2.96, and a shuffle is quick.
+  rate: 3.0,
+  // m the knee joint is kept off the ground: a kneecap's worth, and a little.
+  knee: 0.12,
+  // How much of the walk's arm swing she loses crouched — see `crouchSolve`.
+  swing: 0.65,
+};
+let crouchIdle = null, crouchPosed = false, crouchIdx = null;
+const CROUCH_BONES = ['legUL', 'legUR', 'legLL', 'legLR', 'footL', 'footR',
+  'spine01', 'spine02', 'spine03', 'neck', 'armUL', 'armUR', 'armLL', 'armLR'];
+const CROUCH_READ = ['legUL', 'legLL', 'footL', 'legUR', 'legLR', 'footR',
+  'spine01', 'spine02', 'spine03', 'neck', 'eyeR', 'armUL', 'armLL', 'armUR', 'armLR'];
+// Scratch for `crouchGeometry`, which runs every frame she is crouched.
+const _crS = { q: null, t: new Float32Array(3), wq: [], wt: [], lq: new THREE.Quaternion() };
+
+/**
+ * Her legs and spine as `clip` has them `t` s in, in figure space: each leg
+ * as hip-to-knee `t` and knee-to-ankle `s`, and the spine as five points up
+ * to her eye. Sampled off the clip and composed exactly as `update` does, so
+ * it is this frame's leg and not the last one — which matters mid-stride.
+ */
+function crouchGeometry(fig, clip, t) {
+  const nb = fig.bones.length, S = _crS;
+  if (!crouchIdx) {
+    crouchIdx = CROUCH_READ.map((n) => fig.boneIndex(n));
+    if (crouchIdx.some((i) => i < 0)) crouchIdx = [];
+  }
+  if (!crouchIdx.length) return null;
+  if (!S.q) {
+    S.q = new Float32Array(nb * 4);
+    for (let i = 0; i < nb; i++) { S.wq[i] = new THREE.Quaternion(); S.wt[i] = new THREE.Vector3(); }
+  }
+  if (!fig.sample(clip, t, S.q, S.t)) return null;
+  const { restT } = fig.rest();
+  for (let i = 0; i < nb; i++) {
+    const p = fig.bones[i].parent, q = S.q;
+    S.lq.set(q[i * 4], q[i * 4 + 1], q[i * 4 + 2], q[i * 4 + 3]);
+    if (p < 0) { S.wq[i].copy(S.lq); S.wt[i].set(S.t[0], S.t[1], S.t[2]); continue; }
+    S.wq[i].multiplyQuaternions(S.wq[p], S.lq);
+    S.wt[i].set(restT[i * 3], restT[i * 3 + 1], restT[i * 3 + 2])
+      .applyQuaternion(S.wq[p]).add(S.wt[p]);
+  }
+  const P = crouchIdx.map((i) => S.wt[i]);
+  const leg = (H, K, F) => ({ t: [K.x - H.x, K.y - H.y], s: [F.x - K.x, F.y - K.y],
+    z: F.z - H.z });
+  return {
+    L: leg(P[0], P[1], P[2]), R: leg(P[3], P[4], P[5]), hy: 0.5 * (P[0].y + P[3].y),
+    spine: [P[6], P[7], P[8], P[9], P[10]].map((v) => [v.x, v.y]),
+    // Each upper arm's pitch in the plane, shoulder to elbow.
+    armL: Math.atan2(P[12].y - P[11].y, P[12].x - P[11].x),
+    armR: Math.atan2(P[14].y - P[13].y, P[14].x - P[13].x),
+  };
+}
+
+// A turn of `v` about +z by `a`, in the sagittal plane: x forward, y up.
+const crRotX = (v, a) => v[0] * Math.cos(a) - v[1] * Math.sin(a);
+const crRotY = (v, a) => v[0] * Math.sin(a) + v[1] * Math.cos(a);
+
+/**
+ * The thigh fold that drops this leg's hip by `drop` with the shin leaning
+ * `c`. Bisected: the hip's height is monotone in the fold from straight down
+ * to well past level, and sixteen halvings are a tenth of a millimetre.
+ */
+function crouchFoldFor(L, c, drop) {
+  const y0 = L.t[1] + L.s[1], sy = crRotY(L.s, -c);
+  const hipDrop = (a) => crRotY(L.t, a) + sy - y0;
+  let lo = 0, hi = 2.4;
+  if (hipDrop(hi) <= drop) return hi;
+  for (let i = 0; i < 16; i++) {
+    const m = (lo + hi) * 0.5;
+    if (hipDrop(m) < drop) lo = m; else hi = m;
+  }
+  return (lo + hi) * 0.5;
+}
+
+/**
+ * One leg, two bones, in the sagittal plane: the thigh and shin turns (about
+ * +z, figure space) that put this ankle at `dx, dy` from the hip with the
+ * knee in front. Lengths are the leg's own as projected into the plane, which
+ * is what a turn about z preserves; out of reach, the leg goes straight.
+ */
+function crouchReach(L, dx, dy) {
+  const T = Math.hypot(L.t[0], L.t[1]), S = Math.hypot(L.s[0], L.s[1]);
+  const d = clamp(Math.hypot(dx, dy), Math.abs(T - S) + 1e-4, T + S - 1e-4);
+  const ph = Math.atan2(dy, dx);
+  const al = Math.acos(clamp((T * T + d * d - S * S) / (2 * T * d), -1, 1));
+  const th = ph + al;                              // + is the knee forward
+  const kx = T * Math.cos(th), ky = T * Math.sin(th);
+  const sh = Math.atan2(dy - ky, dx - kx);
+  return [th - Math.atan2(L.t[1], L.t[0]), sh - Math.atan2(L.s[1], L.s[0]), ky];
+}
+
+/**
+ * The whole crouch at depth `w`, 0..1, over `clip` at `t` s — or null
+ * standing. See above.
+ *
+ * The drop and the step back are the IDLE's, and fixed for a given depth:
+ * they are where her root goes, and a root that breathed with the stride
+ * would bob the whole of her. Each ankle is then put exactly where the clip
+ * has it NOW, lifted by the drop and moved forward by the step back — which
+ * in the world is exactly where the clip has it standing, because the root
+ * moved the other way by the same two numbers. So a planted boot stays as
+ * planted as the walk plants it, and a lifted one lifts by the walk's lift.
+ *
+ * FOLDING THE WALK DID NOT WORK and it is worth saying why. Laid on the walk,
+ * one fold for the whole cycle put the planted boot 86 mm into the promenade
+ * at the back of every step and lifted the other 0.34 m: with the thigh near
+ * level, the walk's ±0.3 rad of thigh swing is a knee going up and down, not
+ * forward and back. Re-solving the fold per leg per frame fixed the heights
+ * and left a stride a fifth as long, so at a crouched 1.36 m/s the boots
+ * skated forward at 0.9 m/s. Putting the ankle where the walk puts it — a
+ * two-bone reach per leg — is the answer to both, and it is also the idle's
+ * answer: standing still it lands on the fold above to the millimetre.
+ */
+function crouchSolve(w, clip, t) {
+  if (w < 0.003 || !you) return null;
+  if (!crouchIdle) crouchIdle = crouchGeometry(you.fig, 'idle', 0);
+  const G = crouchIdle;
+  if (!G) return null;
+  const C = CROUCH_YOU;
+  const c = C.shin * w, b = C.bow * w, ch = C.chin * w;
+  // Her eye through the bow: each segment of the chain turned by everything
+  // aimed at or above it. `aim` about −z is a turn by −angle about +z.
+  const P = G.spine;
+  const turns = [-0.45 * b, -0.78 * b, -b, -b + ch];
+  let ey = P[0][1];
+  for (let k = 0; k < 4; k++) {
+    ey += crRotY([P[k + 1][0] - P[k][0], P[k + 1][1] - P[k][1]], turns[k]);
+  }
+  const bowDrop = P[4][1] - ey;
+  // What the hips have to find: all of the lens's descent the bow did not.
+  const drop = Math.max(0, w * (GROUND.eye - GROUND.kneel) - bowDrop);
+  const ahead = (L, a) => crRotX(L.t, a) + crRotX(L.s, -c) - (L.t[0] + L.s[0]);
+  const back = 0.5 * (ahead(G.R, crouchFoldFor(G.R, c, drop))
+    + ahead(G.L, crouchFoldFor(G.L, c, drop)));
+  const N = (clip && clip !== 'idle' && crouchGeometry(you.fig, clip, t)) || G;
+  // The stride, shortened about where the idle stands each boot.
+  const k = 1 + (C.stride - 1) * w;
+  // THE KNEE STAYS OFF THE GROUND. The walk kicks the heel up behind her as
+  // each leg comes through, and with the hips down here an ankle that high
+  // and that far back is reached with the knee in the promenade — MEASURED,
+  // 70 mm under it at the back of every swing. A swinging boot is therefore
+  // drawn in toward where the idle stands it, an eighth at a time, until the
+  // knee clears `knee`; a planted boot never needs it (its knee is 0.3 m up
+  // and more), so nothing that is on the ground is moved.
+  const floor = C.knee - (N.hy - drop);
+  const leg = (L, I) => {
+    const ix = I.t[0] + I.s[0] + back, iy = I.t[1] + I.s[1] + drop;
+    const wx = ix + (L.t[0] + L.s[0] + back - ix) * k, wy = L.t[1] + L.s[1] + drop;
+    let dx = wx, dy = wy, r = crouchReach(L, dx, dy);
+    for (let j = 1; j <= 8 && r[2] < floor; j++) {
+      dx = wx + (ix - wx) * j / 8; dy = wy + (iy - wy) * j / 8;
+      r = crouchReach(L, dx, dy);
+    }
+    // The line the knee swings out about: hip to ankle, as reached.
+    return { a: r[0], n: r[1], u: [dx, dy, L.z] };
+  };
+  // The walk swings the arms as far as a standing stride does, and laid over
+  // arms already carried forward for balance that is a hand going up past
+  // her face on every step. So the swing is cut back to what a shuffle has:
+  // the clip's own departure from the idle arm, taken off in part.
+  const swL = (N.armL - G.armL) * C.swing * w, swR = (N.armR - G.armR) * C.swing * w;
+  return { w, b, ch, drop, back, L: leg(N.L, G.L), R: leg(N.R, G.R), swL, swR };
+}
+
+// Scratch for `crouchAims`.
+const _crA = new THREE.Quaternion(), _crB = new THREE.Quaternion(),
+  _crK = new THREE.Quaternion(), _crV = new THREE.Vector3(), _crZ = new THREE.Vector3(0, 0, 1);
+
+/** `aim` takes an axis and an angle; this hands it a whole turn. */
+function crouchAimQ(f, name, q) {
+  if (q.w < 0) q.set(-q.x, -q.y, -q.z, -q.w);
+  const ang = 2 * Math.acos(Math.min(1, q.w));
+  const s = Math.sqrt(Math.max(0, 1 - q.w * q.w));
+  if (ang < 1e-4 || s < 1e-6) { f.aim(name, 0, 0, 1, 0); return; }
+  f.aim(name, q.x / s, q.y / s, q.z / s, ang);
+}
+
+/**
+ * One leg: thigh turn `a` and shin turn `n` from `crouchReach`, the jump's
+ * hip `h` and knee `k` on top, and the knees let OUT. A squat with the knees
+ * together is a woman in a tight skirt perching; with them over the toes it
+ * is a squat. Swung about the line from her hip to her ankle, so the ankle —
+ * the one point that has to stay where it is — is on the axis and does not
+ * move at all, and the boot is then turned back by the whole of it and
+ * stands as flat and square as the clip had it.
+ */
+function crouchLeg(f, up, lo, ft, g, h, k, sv) {
+  _crV.set(g.u[0], g.u[1], g.u[2]).normalize();
+  _crK.setFromAxisAngle(_crV, sv);                     // the swivel
+  _crA.setFromAxisAngle(_crZ, g.a + h);
+  crouchAimQ(f, up, _crB.multiplyQuaternions(_crK, _crA));
+  _crA.setFromAxisAngle(_crZ, g.n - g.a - k);
+  _crB.multiplyQuaternions(_crK, _crA);
+  _crK.setFromAxisAngle(_crV, -sv);
+  crouchAimQ(f, lo, _crB.multiply(_crK));
+  _crA.setFromAxisAngle(_crZ, -g.n);
+  crouchAimQ(f, ft, _crA.multiply(_crK));
+}
+
+/**
+ * Write her legs, back and arms: the crouch `cr` with the jump's hip, knee
+ * and arm on top, which simply add because they are the same axis.
+ */
+function crouchAims(cr, hL, hR, kL, kR, aa) {
+  const f = you.fig, w = cr.w;
+  const nz = (v) => (Math.abs(v) < 1e-4 ? 0 : v);
+  // Figure left is −z, so her left knee goes out the other way round.
+  crouchLeg(f, 'legUL', 'legLL', 'footL', cr.L, hL, kL, -CROUCH_YOU.splay * w);
+  crouchLeg(f, 'legUR', 'legLR', 'footR', cr.R, hR, kR, CROUCH_YOU.splay * w);
+  f.aim('spine01', 0, 0, -1, nz(cr.b * 0.45));
+  f.aim('spine02', 0, 0, -1, nz(cr.b * 0.33));
+  f.aim('spine03', 0, 0, -1, nz(cr.b * 0.22));
+  f.aim('neck', 0, 0, 1, nz(cr.ch));
+  const arm = cr.b + CROUCH_YOU.arm * w;
+  f.aim('armUL', 0, 0, 1, nz(arm + aa - cr.swL));
+  f.aim('armUR', 0, 0, 1, nz(arm + aa - cr.swR));
+  f.aim('armLL', 0, 0, 1, nz(CROUCH_YOU.elbow * w));
+  f.aim('armLR', 0, 0, 1, nz(CROUCH_YOU.elbow * w));
+  crouchPosed = true;
+}
+
+/** Take the crouch back off her, once — see `clearJump` for why once. */
+function clearCrouch() {
+  if (!you) return;
+  you.lower(null);
+  if (!crouchPosed) return;
+  crouchPosed = false;
+  for (const b of CROUCH_BONES) you.fig.aim(b, 0, 0, 1, 0);
+}
+
 function poseSwimBody(dt) {
   if (!you) return;
   // The shot owns her while it is running, and it puts her on a jetty rather
@@ -4437,18 +4738,52 @@ function poseSwimBody(dt) {
   // particular, the tidy-up below, which would otherwise take her off the
   // boards on the first frame of the cut if the third person happened to be
   // on when R was pressed.
-  if (chaseCut) { clearJump(); return; }
+  if (chaseCut) { clearJump(); clearCrouch(); return; }
   // On the tower 61-plunge.js drives her, every bone of it. `_bodyHas` is
   // dropped so the swim, when she comes up, starts her where she is.
-  if (state.phase === 'plunge') { _bodyHas = false; return; }
+  if (state.phase === 'plunge') { clearCrouch(); _bodyHas = false; return; }
+  // Crouched on foot, whichever camera: the third person below drives her
+  // off it, and the first person's mirror hangs her off it through `lower`.
+  //
+  // Solved against the clip she is about to be drawn in, at the time she
+  // will be drawn at: the third person picks it here (and hands the same
+  // choice to `drive` below), the mirror leaves her in whatever she is in.
+  const onFoot = state.phase === 'ground' && ground && ground.ok;
+  let crClip = null, crSpeed = 1, cr = null;
+  if (onFoot) {
+    const g = ground.you, sp = Math.hypot(g.vx, g.vz);
+    if (bodyCam) {
+      crClip = sp > 0.35 ? 'walk' : 'idle';
+      // The walk clip is authored at about 0.92 m/s — 42-crowd.js measures it
+      // and says so — and this mode's top speed is 9.4, which is a tenfold
+      // range no cycle survives being stretched across. Clamped to 2.4, so a
+      // sprint is a fast walk and not a blur: past that the legs stop reading
+      // as legs, and what is actually wrong at 9.4 m/s is the 9.4.
+      //
+      // Crouched, her boots go where the walk's go on a stride shortened by
+      // `CROUCH_YOU.stride` (see `crouchSolve`), so the clip is run faster by
+      // the same factor to keep them planted, under a higher ceiling.
+      const k = 1 + (CROUCH_YOU.stride - 1) * g.low;
+      crSpeed = sp > 0.35 ? clamp(sp / (0.92 * k), 0.6,
+        2.4 + (CROUCH_YOU.rate - 2.4) * g.low) : 1;
+    } else {
+      crClip = you.fig.playing();
+      crSpeed = you.fig.state.speed || 1;
+    }
+    const st = you.fig.state;
+    const at = (you.fig.playing() === crClip ? st.curT : 0) + dt * crSpeed;
+    cr = crClip ? crouchSolve(g.low, crClip, at) : null;
+  }
+  if (!cr) clearCrouch();
   // On foot, which is the other half of this now. Kept in front of the swim
   // branch rather than folded into it: everything below is about a body in
   // water — how deep it floats, how far its root leads its eye when it is
   // prone, whether the necklace has come off — and none of that means
   // anything to somebody standing on concrete.
-  if (bodyCam && state.phase === 'ground' && ground && ground.ok) {
+  if (bodyCam && onFoot) {
     const g = ground.you;
     const sp = Math.hypot(g.vx, g.vz);
+    you.lower(null);
     // The jump. Edges first: `hop` is the height over the ground and it is
     // exactly zero when she is on it, so leaving and arriving are one
     // comparison each and neither needs a flag from the collider.
@@ -4485,19 +4820,25 @@ function poseSwimBody(dt) {
     // forward — and z does the same on both legs, so there is no mirror to
     // worry about either.
     const L = 1 + JUMP.split, R = 1 - JUMP.split;
-    you.fig.aim('legUL', 0, 0, 1, hp * L);
-    you.fig.aim('legUR', 0, 0, 1, hp * R);
-    // Negative, because the shin folds the heel back under a thigh that has
-    // just come forward. Same axis, opposite sense.
-    you.fig.aim('legLL', 0, 0, 1, -kn * L);
-    you.fig.aim('legLR', 0, 0, 1, -kn * R);
     const ar = air * JUMP.arm;
     const aa = ar < 0.01 ? 0 : ar;
+    // Negative on the knee, because the shin folds the heel back under a
+    // thigh that has just come forward. Same axis, opposite sense.
+    //
     // And the arms on the same axis, which carries the hand forward and up —
     // 0.27 m and 0.11 m at 0.6 rad. That is a swing; x was throwing them out
     // to the sides like a tightrope walker.
-    you.fig.aim('armUL', 0, 0, 1, aa);
-    you.fig.aim('armUR', 0, 0, 1, aa);
+    //
+    // All of it on top of the crouch, if she is in one — see `crouchAims`.
+    if (cr) crouchAims(cr, hp * L, hp * R, kn * L, kn * R, aa);
+    else {
+      you.fig.aim('legUL', 0, 0, 1, hp * L);
+      you.fig.aim('legUR', 0, 0, 1, hp * R);
+      you.fig.aim('legLL', 0, 0, 1, -kn * L);
+      you.fig.aim('legLR', 0, 0, 1, -kn * R);
+      you.fig.aim('armUL', 0, 0, 1, aa);
+      you.fig.aim('armUR', 0, 0, 1, aa);
+    }
     jumpPosed = hp > 0 || kn > 0 || aa > 0;
     // Her root is between her feet, so `at` is simply where she stands —
     // `g.y` is already the hopped height, which is why the eye is taken off it
@@ -4505,8 +4846,13 @@ function poseSwimBody(dt) {
     //
     // The yaw is the swim branch's, and for the same reason: the rig faces +X
     // and the walk carries the same quarter turn every other user of it does.
+    //
+    // Crouched, she goes down by her hips' drop and back along her facing by
+    // her ankles' travel, so her boots stay where they stood — `crouchSolve`.
+    const cd = cr ? cr.drop : 0, cb = cr ? cr.back : 0;
     you.drive({
-      at: [g.x, g.y - sq * JUMP.drop, g.z],
+      at: [g.x + Math.sin(g.yaw) * cb, g.y - cd - sq * JUMP.drop,
+        g.z + Math.cos(g.yaw) * cb],
       yaw: g.yaw + Math.PI / 2,
       // No pitch. Looking up does not lean a walking body back, it moves a
       // head — and the head is not what the camera is behind.
@@ -4518,19 +4864,23 @@ function poseSwimBody(dt) {
       // range is not a body: it is her front cut off by the 1.2 m plane and
       // the inside of her back showing through the hole.
       seen: ground.thirdD() > 0,
-      clip: sp > 0.35 ? 'walk' : 'idle',
-      // The walk clip is authored at about 0.92 m/s — 42-crowd.js measures it
-      // and says so — and this mode's top speed is 9.4, which is a tenfold
-      // range no cycle survives being stretched across. Clamped to 2.4, so a
-      // sprint is a fast walk and not a blur: past that the legs stop reading
-      // as legs, and what is actually wrong at 9.4 m/s is the 9.4.
-      speed: sp > 0.35 ? clamp(sp / 0.92, 0.6, 2.4) : 1,
+      clip: crClip,
+      // How fast, and why it is clamped: see `crSpeed` above.
+      speed: crSpeed,
       wet: false,
     });
     _bodyHas = true;
     return;
   }
   clearJump();
+  // First person on foot, crouched: nobody sees her but the mirror, which
+  // hangs her off the lens by a standing eye — so fold her the same way and
+  // say how far lower and further back her root is than that puts it.
+  if (cr) {
+    crouchAims(cr, 0, 0, 0, 0, 0);
+    you.lower({ dy: ground.you.y - cr.drop - (camera.position.y - GROUND.eye),
+      back: cr.back });
+  }
   if (!bodyCam || !swim.active) {
     if (_bodyHas) { you.drive(null); _bodyHas = false; }
     return;
@@ -9310,6 +9660,21 @@ window.__fr = {
       return o;
     },
     youFreeze: (v) => (you ? you.freeze(v) : null),
+    /**
+     * Shift, from a probe: `crouch(true)` down, `crouch(false)` up, nothing to
+     * read. `snap` skips the ease, so a still can be taken on the next frame.
+     * Answers the solve — see `crouchSolve`.
+     */
+    crouch: (v, snap = false) => {
+      if (!ground || !ground.you) return null;
+      const g = ground.you;
+      if (v != null) g.crouch = !!v;
+      if (snap) { g.low = g.crouch ? 1 : 0; g.eye = g.crouch ? GROUND.kneel : GROUND.eye; }
+      const cr = crouchSolve(g.low);
+      return { crouch: g.crouch, low: +g.low.toFixed(3), eye: +g.eye.toFixed(3),
+        solve: cr ? { aL: +cr.L.a.toFixed(3), aR: +cr.R.a.toFixed(3), nL: +cr.L.n.toFixed(3),
+          drop: +cr.drop.toFixed(3), back: +cr.back.toFixed(3) } : null };
+    },
     /** The threshold: where it thinks you are, and whether it is mid-cut. */
     dip: () => {
       const K = jadrija && jadrija.kabina;

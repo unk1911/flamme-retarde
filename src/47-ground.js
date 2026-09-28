@@ -380,6 +380,10 @@ async function buildGround(scene, field) {
     gait: 0, bob: 0,                 // where you are in the stride, and how much of it shows
     eye: GROUND.eye,                 // how tall you are standing right now — see `stoop`
     crouch: false,                   // on your knees — Shift, see 90-app.js
+    // How far into the crouch the BODY is, 0..1, eased at exactly the eye's
+    // two rates — so `crouchSolve` in 90-app.js folds her legs in step with
+    // the camera coming down, and her head is where the lens is.
+    low: 0,
     // The hop, and the ground under it. `y` is where your feet are and it has
     // always been read straight back out of `walkY` every tick, which is what
     // makes this a ground-follower with no way to leave the ground. `gy` is
@@ -1752,6 +1756,7 @@ async function buildGround(scene, field) {
     // height with its head outside.
     you.eye = damp(you.eye, you.crouch ? Math.min(GROUND.kneel, eyeAt(you.x, you.z, you.y))
       : eyeAt(you.x, you.z, you.y), you.crouch ? 6 : 9, dt);
+    you.low = damp(you.low, you.crouch ? 1 : 0, you.crouch ? 6 : 9, dt);
     gait(moved, dt, air);
     // Two boots at once, off `footstep` rather than a sound of its own — it is
     // a boot arriving and that is what the function is. Louder than a stride
