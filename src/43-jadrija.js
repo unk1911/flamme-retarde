@@ -25020,40 +25020,250 @@ async function buildJadrija(scene) {
     // hangs in a VERTICAL plane and `lathe` turns a profile about the vertical
     // — a hanging ring is the one round object on this shore that a solid of
     // revolution cannot make.
+    //
+    // 1.538.2, SMOOTH AND NOT FACETED. Misha: *"the lifesaver, can u make it
+    // look prettier, right now looks too geometric, there are several of
+    // these throughout the promenade."* It was sixteen flat segments on a
+    // square section — an octagon from ten metres — hung off a slab of a box
+    // on a seven-sided post, with the line wrapped round the post as four
+    // stacked washers. Everything here is `b.smooth` now: the ring is 32 by 8
+    // on an elliptical section (a real ring is fatter across its face than it
+    // is thick), the post is a turned tube with a rounded cap, and the normals
+    // are the smooth surface's own, so the light rolls round it instead of
+    // stepping. Same outside diameter (0.754 m), same centre, same post.
+    //
+    // What makes it read as the real thing and not a red-and-white doughnut
+    // is the rope: a grab line looped round the outside in four festoons, held
+    // at four points by small bands, and the throwing line hung in a coil on
+    // a peg on the land side of the post. The hook is a round bar through the
+    // hole with its end turned up, which is how the ring actually hangs — on
+    // its inner edge, not from a slab above it.
+    //
+    // Worn, because a ring on a south-facing promenade is: the red sun-faded
+    // toward salmon on the top of every surface, the white gone to cream, the
+    // underside a shade grubbier. All of it in the vertex colour, per station
+    // off `jit` (never `rng` — rule 4).
+    //
+    // About 2,000 triangles a station where there were about 390.
     for (let t = JAD.beachTo + 30; t < LEN - 24; t += 34) {
       const rs = JAD.lip + 0.95, y = surfaceY(t, rs);
       const POST = [0.775, 0.778, 0.770];
       const RED = [0.735, 0.135, 0.115];
-      const WHT = [0.895, 0.892, 0.878];
-      // The foot, the post and the hook arm that reaches out over the water.
-      post(W, t, rs, y, y + 0.06, 0.115, [0.520, 0.512, 0.495], 8);
-      post(W, t, rs, y + 0.04, y + 1.30, 0.042, POST, 7);
-      boxTS(t - 0.022, t + 0.022, rs - 0.24, rs + 0.02, y + 1.20, y + 1.26,
-        POST, shade(POST, 1.10));
-      // The ring itself: sixteen segments in four red and four white sectors,
-      // hanging from the arm in the plane of the shore.
-      const R = 0.325, r = 0.052, N = 16;
-      const cy = y + 1.20 - 0.055 - R, cs = rs - 0.20;
-      const pt = (a, ro, ds) =>
-        W(t + Math.cos(a) * ro, cs + ds, cy + Math.sin(a) * ro);
-      for (let k = 0; k < N; k++) {
-        const a0 = (k / N) * TAU, a1 = ((k + 1) / N) * TAU;
-        const col = ((k * 8 / N) | 0) % 2 ? RED : WHT;
-        const A0 = pt(a0, R - r, -r), B0 = pt(a0, R + r, -r);
-        const C0 = pt(a0, R + r, r), D0 = pt(a0, R - r, r);
-        const A1 = pt(a1, R - r, -r), B1 = pt(a1, R + r, -r);
-        const C1 = pt(a1, R + r, r), D1 = pt(a1, R - r, r);
-        b.quad(A0, A1, B1, B0, col);
-        b.quad(B0, B1, C1, C0, shade(col, 1.08));
-        b.quad(C0, C1, D1, D0, shade(col, 0.92));
-        b.quad(D0, D1, A1, A0, col);
+      const WHT = [0.880, 0.868, 0.832];
+      const ROPE = [0.835, 0.815, 0.735];
+      const FOOT = [0.520, 0.512, 0.495];
+      // The station's own frame: u along the shore, s across it (the same s
+      // as `W`), h up. Positions go through the raw frame exactly as `W` does;
+      // normals through the normalised one.
+      const st = at(t);
+      const uL = Math.hypot(st.ux, st.uz) || 1, nL = Math.hypot(st.nx, st.nz) || 1;
+      const P = (u, s, h) => [st.x + st.ux * u + st.nx * s, h, st.z + st.uz * u + st.nz * s];
+      const N = (nu, ns, nh) => {
+        const x = st.ux / uL * nu + st.nx / nL * ns, z = st.uz / uL * nu + st.nz / nL * ns;
+        const l = Math.hypot(x, nh, z) || 1;
+        return [x / l, nh / l, z / l];
+      };
+      // One smooth triangle, wound to agree with its normals (the frame's
+      // handedness is whatever the shore makes it).
+      const tri3 = (p, q, r, np, nq, nr, cp, cq, cr) => {
+        const ax = q[0] - p[0], ay = q[1] - p[1], az = q[2] - p[2];
+        const bx = r[0] - p[0], by = r[1] - p[1], bz = r[2] - p[2];
+        const cx = ay * bz - az * by, cy2 = az * bx - ax * bz, cz = ax * by - ay * bx;
+        const d = cx * (np[0] + nq[0] + nr[0]) + cy2 * (np[1] + nq[1] + nr[1])
+          + cz * (np[2] + nq[2] + nr[2]);
+        if (d >= 0) b.smooth(p, q, r, np, nq, nr, cp, cq, cr);
+        else b.smooth(p, r, q, np, nr, nq, cp, cr, cq);
+      };
+      // A grid of [pos, normal, colour] rows, quad by quad.
+      const grid = (G) => {
+        for (let i = 0; i < G.length - 1; i++) {
+          for (let j = 0; j < G[i].length - 1; j++) {
+            const A = G[i][j], B = G[i + 1][j], C = G[i + 1][j + 1], D = G[i][j + 1];
+            tri3(A[0], B[0], C[0], A[1], B[1], C[1], A[2], B[2], C[2]);
+            tri3(A[0], C[0], D[0], A[1], C[1], D[1], A[2], C[2], D[2]);
+          }
+        }
+      };
+      // Sun and dirt: faded where the surface faces the sky, grubby where it
+      // faces the ground. `fade` is how far this station's red has gone, and
+      // `pale` says whether this is the red at all — the white, the steel and
+      // the rope only bleach a touch, they do not go salmon.
+      const fade = 0.22 + 0.22 * jit(t, 611), grime = 0.05 + 0.05 * jit(t, 612);
+      const wear = (c, nh, pale) => {
+        const up2 = Math.max(0, nh), dn = Math.max(0, -nh);
+        const k = fade * up2 * pale;
+        const g = (1 - grime * dn) * (1 + 0.035 * up2 * (1 - pale));
+        return [(c[0] + (0.86 - c[0]) * k * 0.55) * g,
+          (c[1] + (0.52 - c[1]) * k) * g, (c[2] + (0.45 - c[2]) * k) * g];
+      };
+      // A turned solid about the vertical at (u 0, s ds): `prof` is [h, r]
+      // from the bottom up, smooth where two segments meet at under 50°,
+      // creased where they do not.
+      const turn = (ds, prof, col, sides) => {
+        const segN = [];
+        for (let k = 0; k < prof.length - 1; k++) {
+          const dh = prof[k + 1][0] - prof[k][0], dr = prof[k + 1][1] - prof[k][1];
+          const l = Math.hypot(dh, dr) || 1;
+          segN.push([dh / l, -dr / l]);          // (radial, up)
+        }
+        const nAt = (k, end) => {
+          const own = segN[k], nb = segN[end ? k + 1 : k - 1];
+          if (!nb || own[0] * nb[0] + own[1] * nb[1] < 0.64) return own;
+          const r = own[0] + nb[0], h = own[1] + nb[1], l = Math.hypot(r, h) || 1;
+          return [r / l, h / l];
+        };
+        for (let k = 0; k < prof.length - 1; k++) {
+          const rows = [];
+          for (const [idx, end] of [[k, false], [k + 1, true]]) {
+            const [h, r] = prof[idx], n = nAt(k, end), row = [];
+            for (let i = 0; i <= sides; i++) {
+              const a = (i / sides) * TAU, ca = Math.cos(a), sa = Math.sin(a);
+              row.push([P(ca * r, ds + sa * r, h), N(ca * n[0], sa * n[0], n[1]),
+                wear(col, n[1], 0)]);
+            }
+            rows.push(row);
+          }
+          grid(rows);
+        }
+      };
+      // A round tube along a path lying in a plane: `path` is [u, s, h]
+      // points, `bn` the plane's normal in the same frame.
+      const tube = (path, rad, sides, col, bn) => {
+        const rows = [];
+        for (let k = 0; k < path.length; k++) {
+          const a = path[Math.max(0, k - 1)], c = path[Math.min(path.length - 1, k + 1)];
+          let tu = c[0] - a[0], ts = c[1] - a[1], th = c[2] - a[2];
+          const tl = Math.hypot(tu, ts, th) || 1;
+          tu /= tl; ts /= tl; th /= tl;
+          // in-plane perpendicular = tangent x binormal
+          const pu = ts * bn[2] - th * bn[1], ps = th * bn[0] - tu * bn[2],
+            ph = tu * bn[1] - ts * bn[0];
+          const row = [];
+          for (let i = 0; i <= sides; i++) {
+            const q = (i / sides) * TAU, cq = Math.cos(q), sq = Math.sin(q);
+            const nu = pu * cq + bn[0] * sq, ns = ps * cq + bn[1] * sq,
+              nh = ph * cq + bn[2] * sq;
+            const p = path[k];
+            row.push([P(p[0] + nu * rad, p[1] + ns * rad, p[2] + nh * rad),
+              N(nu, ns, nh), wear(col, nh, 0)]);
+          }
+          rows.push(row);
+        }
+        grid(rows);
+      };
+
+      // ── the post ──
+      // A flanged foot plate, a collar, a round tube, a rounded cap. And a
+      // second collar where the hook comes out of it.
+      const R = 0.321, ra = 0.056, rd = 0.050;   // ring: centre line, half-width, half-depth
+      const cy = y + 0.82, cs = rs - 0.20;
+      const hookH = cy + R - ra - 0.017;         // the bar's centre, under the ring's inner edge
+      turn(rs, [[y, 0.118], [y + 0.009, 0.117], [y + 0.015, 0.108],
+        [y + 0.016, 0.060], [y + 0.052, 0.054], [y + 0.058, 0.043]], FOOT, 18);
+      turn(rs, [[y + 0.05, 0.042], [y + 1.272, 0.042], [y + 1.290, 0.036],
+        [y + 1.300, 0.022], [y + 1.303, 0]], POST, 14);
+      turn(rs, [[hookH - 0.034, 0.042], [hookH - 0.028, 0.050],
+        [hookH + 0.028, 0.050], [hookH + 0.034, 0.042]], POST, 14);
+      // ── the hook ──
+      // Straight out along s through the ring's hole, then turned up past its
+      // face so the ring cannot slide off the end.
+      {
+        const tip = cs - rd - 0.030, br = 0.028, path = [[0, rs - 0.03, hookH]];
+        for (let i = 0; i <= 5; i++) {
+          const a = (i / 5) * Math.PI * 0.5;
+          path.push([0, tip - Math.sin(a) * br, hookH + (1 - Math.cos(a)) * br]);
+        }
+        path.push([0, tip - br, hookH + br + 0.035]);
+        tube(path, 0.016, 8, POST, [1, 0, 0]);
+        const e = path[path.length - 1];
+        turn(e[1], [[e[2], 0.016], [e[2] + 0.008, 0.011], [e[2] + 0.011, 0]], POST, 8);
       }
-      // And the line, coiled on the post below it, which is the half of a life
-      // ring that actually gets somebody out.
-      for (let i = 0; i < 4; i++) {
-        lathe(W, t, rs + 0.03, [[y + 0.30 + i * 0.045, 0.075],
-          [y + 0.305 + i * 0.045, 0.088], [y + 0.335 + i * 0.045, 0.088],
-          [y + 0.340 + i * 0.045, 0.075]], [0.880, 0.860, 0.790], 9);
+
+      // ── the ring ──
+      // Eight sectors, red centred on the top, bottom and sides and white on
+      // the diagonals. The seam between two sectors is a row of duplicated
+      // vertices, so the colours meet on a line and not a smear, with a
+      // shade's dip on either side of it where the paint edges are.
+      const M = 32, K = 8;
+      const ringPt = (phi, th, sc = 1) => {
+        const ep = Math.cos(phi), eh = Math.sin(phi);
+        const ct = Math.cos(th), sn = Math.sin(th);
+        const rr = R + ra * ct * sc;
+        let nr = ct / ra, ns = sn / rd;
+        const l = Math.hypot(nr, ns) || 1;
+        nr /= l; ns /= l;
+        return [[ep * rr, cs + rd * sn * sc, cy + eh * rr], [ep * nr, ns, eh * nr]];
+      };
+      for (let j = 0; j < M; j++) {
+        const sector = Math.floor(((j + 0.5) / M * 8 + 0.5)) % 8;
+        const base = sector % 2 ? WHT : RED;
+        const rows = [];
+        for (const jj of [j, j + 1]) {
+          const phi = (jj / M) * TAU;
+          const seam = (jj % 4) === 2 ? 0.9 : 1;          // sector edges
+          const row = [];
+          for (let i = 0; i <= K; i++) {
+            const [p, n] = ringPt(phi, (i / K) * TAU);
+            const c = wear(base, n[2], sector % 2 ? 0 : 1);
+            row.push([P(p[0], p[1], p[2]), N(n[0], n[1], n[2]),
+              [c[0] * seam, c[1] * seam, c[2] * seam]]);
+          }
+          rows.push(row);
+        }
+        grid(rows);
+      }
+      // The four bands that hold the grab line, on the white diagonals.
+      for (let q = 0; q < 4; q++) {
+        const phi0 = TAU / 8 + q * TAU / 4, dp = 0.016 / R;
+        const rows = [];
+        for (const [o, sc] of [[-1, 0.98], [-0.6, 1.16], [0.6, 1.16], [1, 0.98]]) {
+          const row = [];
+          for (let i = 0; i <= K; i++) {
+            const [p, n] = ringPt(phi0 + o * dp, (i / K) * TAU, sc);
+            row.push([P(p[0], p[1], p[2]), N(n[0], n[1], n[2]),
+              wear(shade(ROPE, 0.92), n[2], 0)]);
+          }
+          rows.push(row);
+        }
+        grid(rows);
+      }
+      // The grab line: from band to band round the outside, lying on the
+      // ring where it runs over the top and hanging off it everywhere else —
+      // gravity down, then pushed back out to the ring's rim if that put it
+      // inside the rubber.
+      const rope = 0.0065, rim = R + ra + rope;
+      for (let q = 0; q < 4; q++) {
+        const phi0 = TAU / 8 + q * TAU / 4, path = [];
+        const sag = 0.030 + 0.012 * jit(t + q, 613);
+        for (let i = 0; i <= 10; i++) {
+          const f = i / 10, phi = phi0 + f * TAU / 4;
+          let pu = Math.cos(phi) * rim, ph = Math.sin(phi) * rim - sag * Math.sin(Math.PI * f);
+          const l = Math.hypot(pu, ph);
+          if (l < rim) { pu *= rim / l; ph *= rim / l; }
+          path.push([pu, cs, cy + ph]);
+        }
+        tube(path, rope, 5, ROPE, [0, 1, 0]);
+      }
+      // ── the throwing line ──
+      // Coiled and hung on a peg on the land side, which is where you take it
+      // from: three loose loops, none quite the size of the next.
+      {
+        const pegH = y + 0.78, pegS = rs + 0.042;
+        tube([[0, pegS - 0.01, pegH], [0, pegS + 0.045, pegH], [0, pegS + 0.060, pegH + 0.018]],
+          0.008, 6, POST, [1, 0, 0]);
+        for (let k = 0; k < 3; k++) {
+          const rx = 0.070 + 0.012 * k + 0.008 * jit(t + k, 614);
+          const ry = 0.170 + 0.020 * k + 0.020 * jit(t + k, 615);
+          const lean = (jit(t + k, 616) - 0.5) * 0.25, ds = pegS + 0.030 + 0.007 * k;
+          const path = [];
+          for (let i = 0; i <= 14; i++) {
+            const a = (i / 14) * TAU;
+            const lu = Math.sin(a) * rx, lh = -(1 - Math.cos(a)) * ry * 0.5;
+            path.push([lu * Math.cos(lean) - lh * Math.sin(lean), ds,
+              pegH + 0.008 + lu * Math.sin(lean) + lh * Math.cos(lean)]);
+          }
+          tube(path, 0.007, 5, shade(ROPE, 0.97 - 0.03 * k), [0, 1, 0]);
+        }
       }
       runs.push({ t0: t - 0.09, t1: t + 0.09, s0: rs - 0.09, s1: rs + 0.09,
         y, h: 1.30 });
