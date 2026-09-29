@@ -13971,6 +13971,177 @@ async function buildJadrija(scene) {
     return tex;
   }
 
+  // ── THE TISAK, TURNED (1.549.3) ─────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026: *"also the tisak: i think we have been putting it off
+  // for a long time, but it's still way too low-poly, it needs to look
+  // higher-poly"*. Every member of this kiosk was a `boxTS` — the frame, the
+  // ribs, the band, the window, the shutter, the counter, the door, the
+  // ladder and the cooler — so the shop that had had more photographs read
+  // for it than any other on the shore was the one that most looked like it
+  // was made of bricks.
+  //
+  // Nothing about WHERE anything is has changed: every extent below is the
+  // one the box had, and the notes in `tisakFront` still hold for them. What
+  // changed is the section. A steel kiosk is made of rolled and pressed
+  // profiles and every edge on it is a radius — the corner posts, the ribs on
+  // the panels, the fascia, the aluminium of the window and the door, the
+  // roller-shutter housing — and a radius is what catches the light along an
+  // edge, which is most of what tells a made thing from a box at ten metres.
+  // So the members are swept rounded rectangles (`tkBar`), the round things
+  // are turned (`spinTS`, `axLathe`, `knLathe`) or swept (`tubeTS`), and the
+  // slabs are `knRR`. Nothing here draws on `rng` (rule 4).
+
+  /**
+   * A straight member of ROUNDED-RECTANGLE section, from `A` to `B` in the
+   * shore frame (`[t, s, y]` each) — an aluminium extrusion, a pressed rib, a
+   * fascia, a ladder stile. `U` and `V` are the section's two axes as shore
+   * vectors, `hw` and `hd` the half-sizes along them and `r` the corner
+   * radius. Smooth normals through `knSurf`, so a radius is a radius and a
+   * flat face is flat; the ends are capped unless `o.caps` says otherwise
+   * (`false`, or `'a'` / `'b'` for one end). A run along the shore is cut
+   * every 0.45 m so it follows the bend (see `boxIn`); `o.sh` is the same
+   * sky-above, dark-below on the vertex colour `tubeTS` gives a tube.
+   */
+  function tkBar(A, B, U, V, hw, hd, r, col, o = {}) {
+    const D = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
+    const L = Math.hypot(D[0], D[1], D[2]) || 1;
+    const n = Math.max(1, Math.ceil(Math.abs(D[0]) / (o.cut || 0.45)));
+    const rr = Math.max(0.0015, Math.min(r, hw * 0.999, hd * 0.999));
+    const NC = o.nc || (rr > 0.018 ? 5 : 3);
+    const loop = [];
+    const CO = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+    for (let k = 0; k < 4; k++) {
+      const cx = CO[k][0] * (hw - rr), cy = CO[k][1] * (hd - rr);
+      for (let i = 0; i <= NC; i++) {
+        const a = (k + i / NC) * (Math.PI / 2);
+        loop.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, Math.cos(a), Math.sin(a)]);
+      }
+    }
+    const sh = o.sh ?? 0.10;
+    const cj = loop.map(([, , nx, ny]) => {
+      const g = 1 - sh + sh * 1.6 * Math.max(-0.4, U[2] * nx + V[2] * ny);
+      return [col[0] * g, col[1] * g, col[2] * g];
+    });
+    const G = [], C = [];
+    for (let i = 0; i <= n; i++) {
+      const f = i / n;
+      const c0 = A[0] + D[0] * f, c1 = A[1] + D[1] * f, c2 = A[2] + D[2] * f;
+      C.push(W(c0, c1, c2));
+      G.push(loop.map(([x, y]) => W(c0 + U[0] * x + V[0] * y,
+        c1 + U[1] * x + V[1] * y, c2 + U[2] * x + V[2] * y)));
+    }
+    knSurf(G, (i, j) => cj[j], { wrap: true, out: (i) => C[i] });
+    const caps = o.caps ?? true;
+    for (const [i, sg, e] of [[0, -1, A], [n, 1, B]]) {
+      if (!caps || (caps === 'a' && i) || (caps === 'b' && !i)) continue;
+      const Q = W(e[0] + (D[0] / L) * sg * 1e-3, e[1] + (D[1] / L) * sg * 1e-3,
+        e[2] + (D[2] / L) * sg * 1e-3);
+      const c = C[i];
+      let nx = Q[0] - c[0], ny = Q[1] - c[1], nz = Q[2] - c[2];
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      const N = [nx / nl, ny / nl, nz / nl];
+      const cc = o.cap || col;
+      for (let j = 0; j < loop.length; j++) {
+        knTri(c, G[i][j], G[i][(j + 1) % loop.length], N, cc);
+      }
+    }
+  }
+  // The three ways it is laid on this kiosk, which is every member on it: a
+  // run along the shore with its section in (s, y), a post standing up with
+  // its section in (t, s), and a run inland with its section in (t, y).
+  const tkT = (t0, t1, sc, yc, hs, hy, r, col, o) =>
+    tkBar([t0, sc, yc], [t1, sc, yc], [0, 1, 0], [0, 0, 1], hs, hy, r, col, o);
+  const tkY = (tc, sc, y0, y1, ht, hs, r, col, o) =>
+    tkBar([tc, sc, y0], [tc, sc, y1], [1, 0, 0], [0, 1, 0], ht, hs, r, col, o);
+  const tkS = (tc, s0, s1, yc, ht, hy, r, col, o) =>
+    tkBar([tc, s0, yc], [tc, s1, yc], [1, 0, 0], [0, 0, 1], ht, hy, r, col, o);
+  /**
+   * A flat printed disc on a face — a lemon, a leaf — as a lens rather than a
+   * plate: `C` its centre on the face, `ax` the face's outward normal as a
+   * shore vector, `ra` by `rb` its half-sizes (`ra` along `ref`), `h` how
+   * proud it stands at the crown. Starts 2 mm inside the face so no edge of
+   * it is ever coplanar with the face it is printed on (rule 5).
+   */
+  function tkLens(C, ax, ra, rb, h, col, ref = [1, 0, 0], sides = 16) {
+    axLathe([C[0] - ax[0] * 0.002, C[1] - ax[1] * 0.002, C[2] - ax[2] * 0.002], ax,
+      [[0, [ra, rb]], [h * 0.55, [ra * 0.94, rb * 0.94]],
+        [h * 0.9, [ra * 0.66, rb * 0.66]], [h, 0]],
+      col, sides, ref, { push: -0.5 });
+  }
+
+  /**
+   * A 240 litre wheelie bin standing at (bt, bs) with its handle and wheels to
+   * +s: a tapered tub with rounded corners (a squared lathe), the rim flange,
+   * a lid with a radiused edge and the handle along its back, and two real
+   * wheels on an axle. The Tisak's two bins were a box on a box with a lid
+   * box, on two six-sided posts standing on end for wheels.
+   */
+  function tkBin(bt, bs, y0, col, lid, lidTop) {
+    knLathe(W, bt, bs, [[y0 + 0.09, 0, 6], [y0 + 0.09, [0.235, 0.245], 6],
+      [y0 + 0.11, [0.250, 0.260], 6], [y0 + 0.97, [0.285, 0.295], 6],
+      [y0 + 0.975, [0.300, 0.310], 6], [y0 + 1.000, [0.300, 0.310], 6],
+      [y0 + 1.000, [0.280, 0.290], 6]], col, 28);
+    knRR(W, bt - 0.305, bt + 0.305, bs - 0.325, bs + 0.335, y0 + 0.995, y0 + 1.065,
+      0.05, 0.022, lid, lidTop, { bottom: true });
+    tubeTS([[bt - 0.26, bs + 0.345, y0 + 1.02], [bt + 0.26, bs + 0.345, y0 + 1.02]],
+      0.018, shade(lid, 0.90), 10);
+    const WP = [[-0.024, 0], [-0.024, 0.060], [-0.022, 0.080], [-0.014, 0.085],
+      [0.014, 0.085], [0.022, 0.080], [0.024, 0.060], [0.024, 0]];
+    for (const o of [-0.22, 0.22]) {
+      // Every ring's normal turned away from the wheel's own centre, so the
+      // two flat faces face out as well as the tread.
+      axLathe([bt + o, bs + 0.24, y0 + 0.085], [Math.sign(o), 0, 0], WP,
+        [0.085, 0.085, 0.088], 18, [0, 0, 1], { push: (i) => -WP[i][0] });
+    }
+    tubeTS([[bt - 0.25, bs + 0.24, y0 + 0.085], [bt + 0.25, bs + 0.24, y0 + 0.085]],
+      0.010, [0.300, 0.300, 0.305], 8);
+  }
+
+  /**
+   * The TISAK's roof: a pale capping with a radiused edge oversailing all
+   * round, a darker drip nose under it, a raised membrane inside the upstand,
+   * a mushroom vent, and the downpipe at the back corner.
+   *
+   * It oversails the FRONT further than the other three sides, 0.18 m, and
+   * that is forced: the livery fascia stands 0.145 m proud of the panels and
+   * its print 0.16, and a capping that stopped at the old 0.09 left the red
+   * sticking out from under the roof edge like a drawer left open.
+   */
+  function tisakRoof(S, y0, top) {
+    const R = S.roof;
+    const a = S.t0 - 0.12, c = S.t1 + 0.10, f = S.s0 - 0.18, k = S.s1 + 0.10;
+    // The drip nose, 12 mm wider than the capping and under it.
+    knRR(W, a - 0.012, c + 0.012, f - 0.012, k + 0.012, top - 0.030, top + 0.010,
+      0.10, 0.008, shade(R, 0.80), null, { bottom: true });
+    // The capping, with a 35 mm radius on its outer edge.
+    knRR(W, a, c, f, k, top + 0.004, top + 0.078, 0.09, 0.035, R, shade(R, 1.10),
+      { bottom: true });
+    // The membrane inside it, a shade down, with its own soft edge: from the
+    // promenade this is what makes the capping an upstand and not a lid.
+    knRR(W, a + 0.10, c - 0.10, f + 0.10, k - 0.10, top + 0.070, top + 0.090,
+      0.05, 0.012, shade(R, 0.90), shade(R, 0.93));
+    // A mushroom vent over the back half, turned.
+    spinTS((S.t0 + S.t1) * 0.5 + 0.55, (S.s0 + S.s1) * 0.5 + 0.35, [
+      [top + 0.085, 0.060], [top + 0.100, 0.060], [top + 0.105, 0.045],
+      [top + 0.200, 0.045], [top + 0.205, 0.105], [top + 0.222, 0.110],
+      [top + 0.250, 0.085], [top + 0.268, 0.030], [top + 0.272, 0],
+    ], shade(R, 0.96), 20);
+    // The downpipe, off the back-east corner of the capping and down the
+    // back wall beside the corner post to a shoe at the foot.
+    const pt = S.t1 - 0.24, ps = S.s1 + 0.088, yF = y0 + 0.02;
+    const PIPE = shade(R, 0.84);
+    tubeTS([[pt, k - 0.04, top + 0.03], [pt, k + 0.012, top - 0.03],
+      [pt, ps + 0.008, top - 0.09], [pt, ps, top - 0.15], [pt, ps, yF + 0.22],
+      [pt, ps + 0.02, yF + 0.13], [pt, ps + 0.09, yF + 0.07]], 0.034, PIPE, 12);
+    // Its three clips: a band round the pipe and a strap back to the wall.
+    for (const y of [top - 0.40, (top + yF) * 0.5, yF + 0.40]) {
+      spinTS(pt, ps, [[y - 0.014, 0], [y - 0.014, 0.039], [y + 0.014, 0.039],
+        [y + 0.014, 0]], shade(PIPE, 0.86), 14);
+      tkS(pt, S.s1 + 0.040, ps - 0.03, y, 0.010, 0.012, 0.004, shade(PIPE, 0.86));
+    }
+  }
+
   /**
    * The whole of the TISAK kiosk, off `1000150343` and `1000150414`.
    *
@@ -14057,8 +14228,25 @@ async function buildJadrija(scene) {
     // Battens 0.045 proud rather than grooves cut in: a groove is two extra
     // faces to say what one raised strip says, and a raised strip cannot be
     // lost by the depth test at this range.
-    const batten = (a, c, sA, sB, lo, hi) =>
-      boxTS(a, c, sA, sB, lo, hi, BATTEN, shade(BATTEN, 1.06));
+    //
+    // ROUNDED since 1.549.3: a pressed rib is a rolled edge, and its two
+    // radii are what the light runs along. Same extents as the boxes, and the
+    // front stays flat across all but its outer 14 mm, so the streaks and the
+    // grime behind it are still stopped by it (see the depth note below).
+    const batten = (a, c, sA, sB, lo, hi) => {
+      const hs = (sB - sA) / 2, sc = (sA + sB) / 2;
+      if (c - a > hi - lo) tkT(a, c, sc, (lo + hi) / 2, hs, (hi - lo) / 2, 0.014, BATTEN);
+      else tkY((a + c) / 2, sc, lo, hi, (c - a) / 2, hs, 0.014, BATTEN);
+    };
+    // The same rib on an END wall, whose face is at `tf` and turned `dir`
+    // (−1 the west end, +1 the east): along s when it is a rail, up when it
+    // is a stile.
+    const endRib = (tf, dir, sA, sB, lo, hi) => {
+      const tc = tf + dir * 0.0225;
+      if (sB - sA > hi - lo) tkS(tc, sA, sB, (lo + hi) / 2, 0.0225, (hi - lo) / 2, 0.014, BATTEN);
+      else tkBar([tc, (sA + sB) / 2, lo], [tc, (sA + sB) / 2, hi], [0, 1, 0], [1, 0, 0],
+        (sB - sA) / 2, 0.0225, 0.014, BATTEN);
+    };
     {
       const pa = S.t0, pc = gt;
       boxTS(pa + 0.03, pc - 0.03, S.s0 - 0.030, S.s0, y0 + 0.10, top - 0.36,
@@ -14073,12 +14261,50 @@ async function buildJadrija(scene) {
       for (const y of [y0 + 0.06, y0 + 1.34, top - 0.40]) {
         batten(pa, pc, S.s0 - 0.045, S.s0, y, y + 0.055);
       }
-      // The west end, two bays of the same.
-      for (const sv of [S.s0, S.s0 + 0.73, S.s0 + 1.46, S.s1]) {
-        boxTS(S.t0 - 0.045, S.t0, sv - 0.035, sv + 0.035, y0 + 0.06, top - 0.34,
-          BATTEN);
+      // The west end, two bays of the same — and, since 1.549.3, its rails
+      // as well: the stiles stood on a plain field with nothing across them.
+      for (const sv of [S.s0 + 0.73, S.s0 + 1.46]) {
+        endRib(S.t0, -1, sv - 0.035, sv + 0.035, y0 + 0.06, top - 0.34);
+      }
+      for (const y of [y0 + 0.06, y0 + 1.34, top - 0.40]) {
+        endRib(S.t0, -1, S.s0 + 0.05, S.s1 - 0.05, y, y + 0.055);
       }
       boxTS(S.t0 - 0.030, S.t0, S.s0, S.s1, y0 + 0.10, top - 0.36, PANEL);
+      // ── and the two faces nobody had built ────────────────────────────────
+      //
+      // The east end and the back were the bare body box — one khaki quad
+      // each, 2.2 m and 3.5 m of it — and the east end is the face you walk
+      // at coming along the promenade from the kabine. `1000150343` is taken
+      // from the back and the back is the same pressed grid as everything
+      // else, so the grid goes on both, less the staining, which is a thing
+      // the photograph has on the other face.
+      boxTS(S.t1, S.t1 + 0.030, S.s0 + 0.05, S.s1 - 0.05, y0 + 0.10, top - 0.36,
+        PANEL, shade(PANEL, 0.94));
+      for (const sv of [S.s0 + 0.73, S.s0 + 1.46]) {
+        endRib(S.t1, 1, sv - 0.035, sv + 0.035, y0 + 0.06, top - 0.34);
+      }
+      for (const y of [y0 + 0.06, y0 + 1.34, top - 0.40]) {
+        endRib(S.t1, 1, S.s0 + 0.05, S.s1 - 0.05, y, y + 0.055);
+      }
+      boxTS(S.t0 + 0.05, S.t1 - 0.05, S.s1, S.s1 + 0.030, y0 + 0.10, top - 0.36,
+        PANEL, shade(PANEL, 0.94));
+      for (let k = 1; k < 5; k++) {
+        const t = S.t0 + (S.t1 - S.t0) * (k / 5);
+        tkY(t, S.s1 + 0.0225, y0 + 0.06, top - 0.34, 0.035, 0.0225, 0.014, BATTEN);
+      }
+      for (const y of [y0 + 0.06, y0 + 1.34, top - 0.40]) {
+        tkT(S.t0 + 0.05, S.t1 - 0.05, S.s1 + 0.0225, y + 0.0275, 0.0225, 0.0275,
+          0.014, BATTEN);
+      }
+      // The four corner posts, which is what the box actually stands on: a
+      // 100 mm square steel section with a generous radius, full height from
+      // the base to the roof. They also take the four hard corners of the body
+      // box behind them, which were the most box-like thing on the building.
+      for (const [ct, cs] of [[S.t0, S.s0], [S.t1, S.s0], [S.t0, S.s1], [S.t1, S.s1]]) {
+        tkY(ct, cs, y0, top, 0.052, 0.052, 0.030, BATTEN);
+        // and its foot: a darker base plate the post is welded to.
+        tkY(ct, cs, y0, y0 + 0.05, 0.066, 0.066, 0.022, shade(BATTEN, 0.62));
+      }
 
       // ── the staining ──────────────────────────────────────────────────────
       //
@@ -14177,9 +14403,24 @@ async function buildJadrija(scene) {
     }
 
     // ── the livery strip ────────────────────────────────────────────────────
-    boxTS(S.t0 - 0.06, S.t1, S.s0 - 0.06, S.s0, bandLo, bandHi,
-      RED, shade(RED, 1.12));
-    boxTS(S.t0 - 0.06, S.t0, S.s0, S.s0 + 1.05, bandLo, bandHi, RED);
+    //
+    // A FASCIA WITH DEPTH since 1.549.3. It was a 60 mm red box with the
+    // printed strip floating 100 mm in front of it, which from any angle off
+    // square is a card held up in front of a plank. It is a pressed red
+    // fascia 145 mm deep now, radiused on its outer edges, and the print sits
+    // 15 mm off its face — near enough to be ON it from anywhere a person
+    // stands, far enough that the two are never one depth (rule 5). It is
+    // 25 mm taller than the print each way, so the print's corners are over
+    // flat face and not over the radius.
+    {
+      const yc = (bandLo + bandHi) * 0.5, hy = (bandHi - bandLo) * 0.5 + 0.022;
+      tkT(S.t0 - 0.085, S.t1 + 0.02, S.s0 - 0.0725, yc, 0.0725, hy, 0.022, RED);
+      tkS(S.t0 - 0.0425, S.s0 - 0.10, S.s0 + 1.05, yc, 0.0425, hy, 0.022,
+        shade(RED, 0.94));
+      // The drip lip along its top edge, where the roof capping meets it.
+      tkT(S.t0 - 0.095, S.t1 + 0.03, S.s0 - 0.0775, yc + hy + 0.006, 0.0775, 0.008,
+        0.006, shade(RED, 0.70));
+    }
     {
       const w = S.t1 - S.t0 + 0.06, hh = bandHi - bandLo;
       // Where the four bays of frame cross the vinyl, as fractions of the
@@ -14244,6 +14485,58 @@ async function buildJadrija(scene) {
       const dw = (S.t1 - 0.07) - (gt + 0.07), dh = (gHi - 0.06) - (gLo + 0.02);
       seaFacing(tisakDisplay(dw, dh), (gt + S.t1) * 0.5, S.s0 - 0.045,
         (gLo + 0.02 + gHi - 0.06) * 0.5, dw, dh, 'tisak:display');
+      // ── and the shelves it is printed on, in depth (1.549.3) ──────────────
+      //
+      // The print stays — a hundred and forty packets are still a texture —
+      // but the SHELF EDGES under every course are geometry now, 15 mm proud
+      // of it and laid exactly over the dark edges the canvas paints, with
+      // their price cards clipped to the front. Seen from anywhere but square
+      // on, that is the difference between a photograph of a shelf and a
+      // shelf: each edge throws a line of shadow and the packets sit back in
+      // the slot. The postcards are a real wire rack of raked cards over the
+      // painted ones. All of it off `tisakDisplay`'s own fractions and its own
+      // hash, so the two agree to the pixel (and neither draws on `rng`).
+      const u2t = (u) => gt + 0.07 + u * dw, v2y = (v) => (gHi - 0.06) - v * dh;
+      const hs = (n) => {
+        const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+        return x - Math.floor(x);
+      };
+      const EDGE = [0.070, 0.064, 0.058], CARD = [0.800, 0.785, 0.745];
+      const lip = (ua, ub, va, vb) => tkT(u2t(ua), u2t(ub), S.s0 - 0.0525,
+        (v2y(va) + v2y(vb)) * 0.5, 0.0075, (v2y(va) - v2y(vb)) * 0.5, 0.003, EDGE,
+        { nc: 2 });
+      const card = (u, v, uw) => boxTS(u2t(u), u2t(u + uw), S.s0 - 0.0645,
+        S.s0 - 0.0605, v2y(v + 0.026), v2y(v), CARD);
+      for (let r = 0; r < 7; r++) {
+        const yy = 0.14 + r * 0.098;
+        lip(0, 0.37, yy + 0.072, yy + 0.092);
+        for (let c = 0; c < 4; c++) card(0.026 + c * 0.086 + hs(r * 7 + c) * 0.018, yy + 0.074, 0.028);
+      }
+      for (let r = 0; r < 5; r++) {
+        const yy = 0.135 + r * 0.088 + 0.072;
+        lip(0.396, 0.560, yy, yy + 0.016);
+      }
+      lip(0.394, 0.570, 0.657, 0.673);
+      for (let c = 0; c < 3; c++) card(0.406 + c * 0.056, 0.660, 0.028);
+      // The postcard rack: two wire uprights, a wire lip under each card, and
+      // five cards raked back 0.35 rad, every one the same blue.
+      {
+        const WIRE = [0.740, 0.735, 0.715];
+        const ua = 0.580, ub = 0.696;
+        for (const u of [ua, ub]) {
+          tubeTS([[u2t(u), S.s0 - 0.060, v2y(0.16)], [u2t(u), S.s0 - 0.060, v2y(0.56)]],
+            0.003, WIRE, 6);
+        }
+        for (let k = 0; k < 5; k++) {
+          const v0 = 0.175 + k * 0.076, b6 = 0.74 + hs(k * 11 + 2) * 0.26;
+          const yc = (v2y(v0) + v2y(v0 + 0.062)) * 0.5, h = v2y(v0) - v2y(v0 + 0.062);
+          const col = [0.270 * b6, 0.480 * b6, 0.660 * b6];
+          bar(u2t(0.586), u2t(0.690), slat(S.s0 - 0.068, yc, 0.35, h, 0.004), col,
+            shade(col, 1.25));
+          tubeTS([[u2t(ua), S.s0 - 0.082, yc - h * 0.47], [u2t(ub), S.s0 - 0.082,
+            yc - h * 0.47]], 0.0028, WIRE, 6);
+        }
+      }
     }
     // The magazine rack: four tiers raked back off the vertical so each one
     // shows the top third of the cover below it, which is the whole reason a
@@ -14293,17 +14586,46 @@ async function buildJadrija(scene) {
           : k === 1 ? [0.245 * g6, 0.345 * g6, 0.585 * g6]
             : k === 2 ? [0.640 * g6, 0.235 * g6, 0.175 * g6]
               : [0.620 * g6, 0.545 * g6, 0.215 * g6];
-        bar(ta, ta + cw, slat(cs, cy, 0.50, 0.19 + rh(k * 5 + i + 3) * 0.035,
-          0.030), col, shade(col, 1.14));
+        // A STACK since 1.549.3 and not one 30 mm slab: the title behind
+        // standing a finger higher up the rake than the one in front, each
+        // 12 mm, and a pale masthead across the top of the front cover —
+        // which is what a rack of magazines is at any distance.
+        const len = 0.19 + rh(k * 5 + i + 3) * 0.035;
+        const AX = [Math.sin(0.50), Math.cos(0.50)], NM = [AX[1], -AX[0]];
+        const back = [0.40 + ((k + i) % 3) * 0.16, 0.34 + ((k * 2 + i) % 3) * 0.12,
+          0.30 + ((k + 2 * i) % 3) * 0.10];
+        bar(ta + 0.010, ta + cw - 0.004, slat(cs + NM[0] * 0.008 + AX[0] * 0.022,
+          cy + NM[1] * 0.008 + AX[1] * 0.022, 0.50, len, 0.012), back, shade(back, 1.12));
+        bar(ta, ta + cw, slat(cs - NM[0] * 0.006, cy - NM[1] * 0.006, 0.50, len * 0.94,
+          0.012), col, shade(col, 1.14));
+        const mh = len * 0.94 * 0.5 - 0.026;
+        bar(ta + 0.008, ta + cw - 0.008, slat(cs - NM[0] * 0.0135 + AX[0] * mh,
+          cy - NM[1] * 0.0135 + AX[1] * mh, 0.50, 0.034, 0.003),
+        [0.760, 0.748, 0.720]);
         ta += cw + 0.012 + rh(k * 5 + i + 2) * 0.030;
       }
-      // The wire tier itself, a hair below its magazines.
-      bar(rkA, rkB, slat(cs + 0.020, cy - 0.050, 0.50, 0.18, 0.012),
-        [0.585, 0.592, 0.585]);
+      // The wire tier itself, a hair below its magazines — round wire since
+      // 1.549.3: a lip along the front that the covers stand against, a rail
+      // at the foot and one at the head, and four ribs up the rake.
+      {
+        const WIRE = [0.585, 0.592, 0.585];
+        const AX = [Math.sin(0.50), Math.cos(0.50)];
+        const c0 = [cs + 0.020 - AX[0] * 0.09, cy - 0.050 - AX[1] * 0.09];
+        const c1 = [cs + 0.020 + AX[0] * 0.09, cy - 0.050 + AX[1] * 0.09];
+        for (const [ss, yy] of [c0, c1, [c0[0] - 0.010, c0[1] + 0.022]]) {
+          tubeTS([[rkA, ss, yy], [rkB, ss, yy]], 0.004, WIRE, 6);
+        }
+        for (let q = 0; q < 4; q++) {
+          const t = rkA + 0.02 + (rkB - rkA - 0.04) * (q / 3);
+          tubeTS([[t, c0[0] - 0.010, c0[1] + 0.022], [t, c0[0], c0[1]],
+            [t, c1[0], c1[1]]], 0.003, WIRE, 6);
+        }
+      }
     }
     for (const t of [rkA, rkB]) {
-      post(W, t, S.s0 - 0.075, gLo + 0.06, gLo + 1.06, 0.011,
-        [0.585, 0.592, 0.585], 4);
+      spinTS(t, S.s0 - 0.075, [[gLo + 0.06, 0.018], [gLo + 0.072, 0.018],
+        [gLo + 0.080, 0.011], [gLo + 1.06, 0.011], [gLo + 1.066, 0.007],
+        [gLo + 1.068, 0]], [0.585, 0.592, 0.585], 10);
     }
     // ── the snack bags, and they were a stripe in the wrong place ───────────
     //
@@ -14337,7 +14659,7 @@ async function buildJadrija(scene) {
       for (let r = 0; r < 3; r++) {
         const ry = gHi - 0.14 - r * 0.29;
         // The rail the row hangs off, dark, and the bags under it.
-        boxTS(ra, rb, S.s0 - 0.070, S.s0 - 0.058, ry, ry + 0.016,
+        tkT(ra, rb, S.s0 - 0.064, ry + 0.008, 0.006, 0.008, 0.004,
           [0.155, 0.150, 0.145]);
         let ta = ra + 0.015;
         let i = 0;
@@ -14347,9 +14669,17 @@ async function buildJadrija(scene) {
           const col = (i + r) % 3 === 0 ? [0.680 * g6, 0.235 * g6, 0.155 * g6]
             : (i + r) % 3 === 1 ? [0.690 * g6, 0.520 * g6, 0.145 * g6]
               : [0.560 * g6, 0.245 * g6, 0.215 * g6];
-          boxTS(ta, ta + bw * 0.86, S.s0 - 0.088, S.s0 - 0.072,
-            ry - 0.115 - hz(r * 17 + i + 5) * 0.020, ry,
-            col, shade(col, 1.10));
+          // A PILLOW since 1.549.3: a bag is crimped flat top and bottom and
+          // blown full of air between, and a box of the same size is a brick
+          // of crisps. Turned with a squared section, 32 mm at the belly.
+          {
+            const yb = ry - 0.115 - hz(r * 17 + i + 5) * 0.020, hw = bw * 0.43;
+            const ym = (yb + ry) * 0.5;
+            knLathe(W, ta + hw, S.s0 - 0.080, [[yb, [hw, 0.003], 5],
+              [yb + 0.016, [hw * 0.99, 0.011], 5], [ym, [hw * 0.96, 0.016], 5],
+              [ry - 0.018, [hw * 0.985, 0.010], 5], [ry, [hw, 0.003], 5]],
+            (i2) => (i2 >= 3 ? shade(col, 1.10) : col), 12);
+          }
           ta += bw;
           i++;
         }
@@ -14361,23 +14691,67 @@ async function buildJadrija(scene) {
     // shelf growing out of a door.
     {
       const LEDGE = shade(body, 1.12);
-      boxTS(gt - 0.04, S.t1 - 0.20, S.s0 - 0.30, S.s0 - 0.12, gLo - 0.07, gLo,
-        LEDGE, shade(LEDGE, 1.08));
+      // A slab with a radiused nosing (1.549.3), its top 5 mm under the
+      // cill's so the two never share a face (rule 5) — the cill reads as the
+      // upstand at the back of the shelf, which is what it is.
+      knRR(W, gt - 0.04, S.t1 - 0.20, S.s0 - 0.30, S.s0 - 0.12, gLo - 0.075,
+        gLo - 0.005, 0.025, 0.020, LEDGE, shade(LEDGE, 1.08), { bottom: true });
+      // and the two pressed brackets under it, which is what holds a shelf
+      // 0.18 m out from a steel wall.
+      for (const bt of [gt + 0.10, S.t1 - 0.40]) {
+        bar(bt - 0.010, bt + 0.010, [[S.s0 - 0.125, gLo - 0.26],
+          [S.s0 - 0.125, gLo - 0.075], [S.s0 - 0.27, gLo - 0.075],
+          [S.s0 - 0.27, gLo - 0.095]], shade(LEDGE, 0.80));
+      }
       // Two stacks of newspapers lying flat on it, which is where a kiosk puts
       // them and is the one thing on the counter that is the shop's own trade.
-      for (const [nt, nh] of [[gt + 0.10, 0.055], [gt + 0.46, 0.038]]) {
-        boxTS(nt, nt + 0.30, S.s0 - 0.27, S.s0 - 0.15, gLo, gLo + nh,
-          [0.545, 0.535, 0.505], [0.640, 0.630, 0.600]);
+      // As STACKS since 1.549.3 — bundles of a few papers each, every bundle a
+      // shade off the one under it and knocked a centimetre out of square,
+      // off an index hash and not `rng` (rule 4).
+      const nj = (n) => {
+        const x = Math.sin(n * 17.133 + 4.71) * 24634.63;
+        return x - Math.floor(x);
+      };
+      for (const [nt, nh, q] of [[gt + 0.10, 0.055, 0], [gt + 0.46, 0.038, 1]]) {
+        const layers = q ? 3 : 4;
+        let y = gLo - 0.005;
+        for (let l = 0; l < layers; l++) {
+          const dh = nh / layers, jt = (nj(q * 9 + l) - 0.5) * 0.020;
+          const js = (nj(q * 9 + l + 4) - 0.5) * 0.014;
+          const g6 = 0.94 + nj(q * 9 + l + 7) * 0.10;
+          const col = [0.545 * g6, 0.535 * g6, 0.505 * g6];
+          knRR(W, nt + jt, nt + 0.30 + jt, S.s0 - 0.27 + js, S.s0 - 0.15 + js,
+            y, y + dh - 0.001, 0.006, 0.004, col, [0.640 * g6, 0.630 * g6, 0.600 * g6]);
+          y += dh;
+        }
       }
     }
     // The frame: two jambs, a head and a cill, and nothing across the glass.
     // A clean shop window is invisible and what reads is its edges — see the
     // note over the gelato case's glazing, which is the same call.
+    //
+    // EXTRUSIONS since 1.549.3: the same four members at the same sizes, but
+    // each an aluminium section with 12 mm radii, a glazing bead stepped in
+    // behind it round the daylight opening, and the black EPDM gasket
+    // between the bead and the (undrawn) glass — which at ten metres is the
+    // thin dark line round the pane that says there IS a pane.
     for (const t of [gt, S.t1 - 0.05]) {
-      boxTS(t - 0.05, t + 0.05, S.s0 - 0.13, S.s0 - 0.09, gLo - 0.32, gHi, ALU);
+      tkY(t, S.s0 - 0.11, gLo - 0.32, gHi, 0.05, 0.02, 0.012, ALU);
     }
-    boxTS(gt, S.t1, S.s0 - 0.13, S.s0 - 0.09, gHi - 0.06, gHi, ALU);
-    boxTS(gt, S.t1, S.s0 - 0.14, S.s0 - 0.08, gLo - 0.06, gLo, ALU);
+    tkT(gt - 0.05, S.t1, S.s0 - 0.11, gHi - 0.03, 0.02, 0.03, 0.012, ALU);
+    tkT(gt - 0.05, S.t1, S.s0 - 0.11, gLo - 0.03, 0.03, 0.03, 0.014, ALU);
+    {
+      const BEAD = shade(ALU, 0.90), GASK = [0.050, 0.050, 0.052];
+      const ia = gt + 0.05, ic = S.t1 - 0.10, ib = gLo, ih = gHi - 0.06;
+      for (const [t, d] of [[ia, 1], [ic, -1]]) {
+        tkY(t + d * 0.012, S.s0 - 0.094, ib, ih, 0.012, 0.010, 0.005, BEAD);
+        tkY(t + d * 0.027, S.s0 - 0.101, ib + 0.01, ih - 0.01, 0.004, 0.005, 0.002, GASK);
+      }
+      for (const [y, d] of [[ib, 1], [ih, -1]]) {
+        tkT(ia, ic, S.s0 - 0.094, y + d * 0.012, 0.010, 0.012, 0.005, BEAD);
+        tkT(ia + 0.02, ic - 0.02, S.s0 - 0.101, y + d * 0.027, 0.005, 0.004, 0.002, GASK);
+      }
+    }
     // Below the cill the front is sheet, not glass — and it is not a BLANK
     // sheet, which is what 1.20 m by 0.60 of flat khaki was. In `1000150414`
     // at 04:26 the counter apron is a run of pressed panels with a frame
@@ -14392,12 +14766,12 @@ async function buildJadrija(scene) {
     boxTS(gt + 0.05, S.t1 - 0.05, S.s0 - 0.022, S.s0, y0 + 0.06, gLo - 0.04,
       shade(body, 0.80));
     for (const t of [gt + 0.05, gt + 0.63, S.t1 - 0.05]) {
-      boxTS(t - 0.028, t + 0.028, S.s0 - 0.048, S.s0, y0 + 0.06, gLo - 0.04,
-        shade(body, 1.02), shade(body, 1.10));
+      tkY(t, S.s0 - 0.024, y0 + 0.06, gLo - 0.04, 0.028, 0.024, 0.012,
+        shade(body, 1.02));
     }
     for (const [yA, yB] of [[y0 + 0.06, y0 + 0.16], [gLo - 0.11, gLo - 0.04]]) {
-      boxTS(gt + 0.05, S.t1 - 0.05, S.s0 - 0.048, S.s0, yA, yB,
-        shade(body, 1.02), shade(body, 1.10));
+      tkT(gt + 0.05, S.t1 - 0.05, S.s0 - 0.024, (yA + yB) / 2, 0.024, (yB - yA) / 2,
+        0.012, shade(body, 1.02));
     }
 
     // ── the shutter box over it, and the strip light under that ─────────────
@@ -14416,12 +14790,37 @@ async function buildJadrija(scene) {
     {
       const bLo = gHi, bHi = top - 0.47;
       const CASE = shade(body, 1.24);
-      boxTS(gt - 0.05, S.t1, S.s0 - 0.15, S.s0 - 0.06, bLo, bHi,
-        CASE, shade(CASE, 1.08));
-      for (let k = 0; k < 3; k++) {
-        const ry = bLo + 0.035 + k * ((bHi - bLo - 0.07) / 3);
-        boxTS(gt - 0.04, S.t1 - 0.01, S.s0 - 0.158, S.s0 - 0.150,
-          ry, ry + 0.012, shade(CASE, 0.78));
+      // A roller housing with a 35 mm radius on its two outer edges (1.549.3),
+      // and on its face the curtain's own slats — seven ridges on a 30 mm
+      // pitch where there were three flat strips. The ridges stop short of
+      // the poster either side rather than running under it: a sheet of
+      // paper on a ribbed face is what rule 5 is about.
+      tkT(gt - 0.05, S.t1, S.s0 - 0.105, (bLo + bHi) * 0.5, 0.045, (bHi - bLo) * 0.5,
+        0.035, CASE);
+      {
+        const pn = S.t1 - 0.30;
+        const nR = 7, ya = bLo + 0.045, yb = bHi - 0.045;
+        for (let k = 0; k < nR; k++) {
+          const ry = ya + (yb - ya) * (k / (nR - 1));
+          const onPoster = ry > bLo + 0.035 && ry < bLo + 0.135;
+          for (const [ra, rc] of onPoster
+            ? [[gt - 0.035, pn - 0.095], [pn + 0.095, S.t1 - 0.012]]
+            : [[gt - 0.035, S.t1 - 0.012]]) {
+            tkT(ra, rc, S.s0 - 0.1535, ry, 0.0045, 0.0055, 0.003, shade(CASE, 0.84));
+          }
+        }
+        // The curtain's bottom bar just showing under the housing, and its
+        // two pull loops — the shutter is up, not missing.
+        tkT(gt, S.t1 - 0.02, S.s0 - 0.148, bLo - 0.018, 0.012, 0.016, 0.008,
+          shade(CASE, 0.92));
+        for (const lt of [gt + 0.30, S.t1 - 0.46]) {
+          tubeTS([[lt - 0.035, S.s0 - 0.152, bLo - 0.030],
+            [lt - 0.035, S.s0 - 0.160, bLo - 0.058],
+            [lt - 0.022, S.s0 - 0.162, bLo - 0.068],
+            [lt + 0.022, S.s0 - 0.162, bLo - 0.068],
+            [lt + 0.035, S.s0 - 0.160, bLo - 0.058],
+            [lt + 0.035, S.s0 - 0.152, bLo - 0.030]], 0.0045, [0.300, 0.300, 0.300], 8);
+        }
       }
       // The strip light along the underside, which is the reason anything in
       // the window is lit at all and is why the display behind reads as a lit
@@ -14497,24 +14896,51 @@ async function buildJadrija(scene) {
       // The canopy. `col` is the underside and `topCol` the top, and they are
       // 0.60 apart: from the promenade you are under this thing and what you
       // see of it is the dark side.
-      bar(at0, at1, [[sOut, top - 0.11], [sIn, top - 0.01],
-        [sIn, top + 0.03], [sOut, top - 0.07]], shade(AWN, 0.60), AWN);
+      //
+      // CLOTH since 1.549.3, not a plank: the same two surfaces 40 mm apart at
+      // the wall and the bar, but each a sheet that sags 35 mm between them
+      // and ripples a few millimetres across the width, which is what a
+      // canvas under tension between a wall rail and a front bar does. Both
+      // face down (`knSurf`'s `down`), so their backs are to the sun and the
+      // shadow pass sees them the way it saw the slab.
+      {
+        const nT = Math.max(2, Math.ceil((at1 - at0) / 0.18)), nS = 10;
+        const sheet = (dy, col) => {
+          const G = [];
+          for (let i = 0; i <= nT; i++) {
+            const t = at0 + (at1 - at0) * (i / nT);
+            const row = [];
+            for (let j = 0; j <= nS; j++) {
+              const u = j / nS, s = sIn + (sOut - sIn) * u;
+              const ripple = 0.006 * Math.sin(t * 6.4 + 0.7) * Math.sin(Math.PI * u);
+              row.push(W(t, s, top + 0.03 + dy - 0.10 * u
+                - 0.035 * Math.sin(Math.PI * u) + ripple));
+            }
+            G.push(row);
+          }
+          knSurf(G, col, { down: true });
+        };
+        sheet(0, AWN);
+        sheet(-0.040, shade(AWN, 0.60));
+      }
       // The two end cheeks, which is what closes a fixed canopy off and what
-      // stops it reading as a plank lying on the air.
-      for (const [ca, cc] of [[at0 - 0.03, at0 + 0.01], [at1 - 0.01, at1 + 0.03]]) {
-        bar(ca, cc, [[S.s0 - 1.44, top - 0.47], [sIn, top - 0.01],
-          [sIn, top + 0.03], [S.s0 - 1.44, top - 0.43]], shade(AWN, 0.74));
+      // stops it reading as a plank lying on the air. Round-edged strips.
+      for (const ct of [at0 - 0.01, at1 + 0.01]) {
+        const A = [ct, S.s0 - 1.44, top - 0.45], B = [ct, sIn, top + 0.01];
+        const ds = B[1] - A[1], dy = B[2] - A[2], dl = Math.hypot(ds, dy);
+        tkBar(A, B, [1, 0, 0], [0, -dy / dl, ds / dl], 0.02, 0.02, 0.009,
+          shade(AWN, 0.74));
       }
       // The cream batten along the front bar, then the fascia hanging off it,
       // then the brighter hem along its bottom edge — every one of them set to
       // OVERLAP its neighbour rather than to meet it, because two members that
       // meet exactly on this shore meet in the depth buffer as well (rule 5).
-      boxTS(at0, at1, S.s0 - 1.40, S.s0 - 1.30, top - 0.19, top - 0.05,
-        BATT, shade(BATT, 1.10));
-      boxTS(at0, at1, S.s0 - 1.44, S.s0 - 1.36, top - 0.47, top - 0.17,
-        AWN, shade(AWN, 1.08));
-      boxTS(at0 - 0.01, at1 + 0.01, S.s0 - 1.46, S.s0 - 1.375,
-        top - 0.505, top - 0.455, shade(AWN, 1.26));
+      // Rounded extrusions since 1.549.3, the bar with the biggest radius
+      // because it is the roller the cloth comes off.
+      tkT(at0, at1, S.s0 - 1.35, top - 0.12, 0.05, 0.07, 0.035, BATT);
+      tkT(at0, at1, S.s0 - 1.40, top - 0.32, 0.04, 0.15, 0.012, AWN);
+      tkT(at0 - 0.01, at1 + 0.01, S.s0 - 1.4175, top - 0.48, 0.0425, 0.025, 0.014,
+        shade(AWN, 1.26));
       seaFacing(tisakAwnBand(at1 - at0, 0.30), (at0 + at1) * 0.5, S.s0 - 1.475,
         top - 0.32, at1 - at0, 0.30, 'tisak:awning');
     }
@@ -14538,11 +14964,26 @@ async function buildJadrija(scene) {
     // head measured down to `gLo + 1.12` a leaf hung off it is 1.78 m, which is
     // a door you duck under; 2.00 is a door.
     const dLo = y0 + 0.04, dHi = y0 + 2.00;
-    boxTS(da, dj, dS0, dS0 + 0.075, dLo, dHi, ALU);
-    boxTS(da, dj, dS1 - 0.075, dS1, dLo, dHi, ALU);
-    boxTS(da, dj, dS0, dS1, dHi - 0.075, dHi, ALU);
-    boxTS(da, dj, dS0, dS1, dLo, dLo + 0.075, ALU);
-    boxTS(da, dj, dS0, dS1, y0 + 0.44, y0 + 0.52, ALU);
+    // The frame members as aluminium sections with 10 mm radii (1.549.3):
+    // the panels between them stay flush, so the radius on every member is
+    // a groove round every panel — which is what a framed leaf looks like
+    // and a slab with lines on it does not.
+    const dc = (da + dj) * 0.5, dh = (dj - da) * 0.5;
+    const stile = (sc, hs) => tkBar([dc, sc, dLo], [dc, sc, dHi], [0, 1, 0], [1, 0, 0],
+      hs, dh, 0.010, ALU);
+    stile(dS0 + 0.0375, 0.0375);
+    stile(dS1 - 0.0375, 0.0375);
+    tkS(dc, dS0 + 0.07, dS1 - 0.07, dHi - 0.0375, dh, 0.0375, 0.010, ALU);
+    tkS(dc, dS0 + 0.07, dS1 - 0.07, dLo + 0.0375, dh, 0.0375, 0.010, ALU);
+    tkS(dc, dS0 + 0.07, dS1 - 0.07, y0 + 0.48, dh, 0.04, 0.010, ALU);
+    // The three hinges on the hinge edge, which the leaf has always been
+    // hung from and nothing showed: a knuckle each, turned, with its pin.
+    for (const hy of [dLo + 0.22, y0 + 1.05, dHi - 0.30]) {
+      spinTS(dj + 0.006, dS1 - 0.006, [[hy - 0.062, 0], [hy - 0.062, 0.006],
+        [hy - 0.055, 0.006], [hy - 0.055, 0.012], [hy + 0.055, 0.012],
+        [hy + 0.055, 0.006], [hy + 0.062, 0.006], [hy + 0.062, 0]],
+      shade(ALU, 0.80), 14);
+    }
     // AND THE LEAF IS NOT GLAZED. The upper panel was `GLASS` at 0.062/0.075/
     // 0.088, so the one object in this shop with paper all over it drew as a
     // black slab — and in `1000150343` the leaf is the PALEST thing in that
@@ -14560,7 +15001,8 @@ async function buildJadrija(scene) {
     for (const [pa, pb] of [[dS0 + 0.070, S.s0 - 0.480], [S.s0 - 0.440, dS1 - 0.070]]) {
       boxTS(da, dj, pa, pb, dLo + 0.070, y0 + 0.45, LEAF2, shade(LEAF2, 1.06));
     }
-    boxTS(da, dj, S.s0 - 0.485, S.s0 - 0.435, dLo + 0.070, y0 + 0.45, ALU);
+    tkBar([dc, S.s0 - 0.46, dLo + 0.07], [dc, S.s0 - 0.46, y0 + 0.45], [0, 1, 0], [1, 0, 0],
+      0.025, dh, 0.008, ALU);
     boxTS(da, dj, dS0 + 0.070, dS1 - 0.070, y0 + 0.51, dHi - 0.070,
       LEAF2, shade(LEAF2, 1.06));
     furniture.push({ t: dj, s: S.s0 - 0.45, a: 0.06, c: 0.42, h: 2.0, y: y0 });
@@ -14617,10 +15059,23 @@ async function buildJadrija(scene) {
     // The lever handle, on the free edge — the leaf is hinged at `dS1`, hard
     // against the jamb, and swings out to `dS0`. 0.83 m, which is where the
     // frame has it at 436 px to the metre and is where a handle is.
-    boxTS(da - 0.014, da - 0.004, S.s0 - 0.815, S.s0 - 0.735, y0 + 0.78,
-      y0 + 0.88, [0.545, 0.552, 0.550]);
-    boxTS(da - 0.034, da - 0.014, S.s0 - 0.800, S.s0 - 0.760, y0 + 0.815,
-      y0 + 0.845, [0.640, 0.648, 0.655]);
+    //
+    // Turned since 1.549.3, and on both faces of the leaf: a radiused back
+    // plate, a rose, and a round lever that turns back toward the hinge,
+    // where there were two boxes on one face.
+    {
+      const PL = [0.545, 0.552, 0.550], LV = [0.640, 0.648, 0.655];
+      const hs = S.s0 - 0.775, hy = y0 + 0.83;
+      for (const [f, d] of [[da, -1], [dj, 1]]) {
+        tkBar([f + d * 0.006, hs, hy - 0.05], [f + d * 0.006, hs, hy + 0.05],
+          [0, 1, 0], [1, 0, 0], 0.030, 0.006, 0.005, PL);
+        axLathe([f + d * 0.011, hs, hy], [d, 0, 0], [[0, 0.021], [0.006, 0.020],
+          [0.011, 0.013], [0.014, 0.010]], LV, 16, [0, 0, 1], { push: -0.3 });
+        tubeTS([[f + d * 0.020, hs, hy], [f + d * 0.046, hs, hy],
+          [f + d * 0.058, hs + 0.012, hy], [f + d * 0.060, hs + 0.050, hy - 0.001],
+          [f + d * 0.058, hs + 0.105, hy - 0.004]], 0.0085, LV, 10);
+      }
+    }
     // And the two timber battens screwed across the foot of it, which are the
     // reason this door reads as a working door on a shop somebody repairs
     // rather than as a shop-fitter's leaf. Bare pine against the white, 0.16
@@ -14658,15 +15113,8 @@ async function buildJadrija(scene) {
     {
       const bt = S.t0 - 0.62, bs = S.s0 + 1.30;
       const GREEN = [0.145, 0.245, 0.135];
-      boxTS(bt - 0.29, bt + 0.29, bs - 0.30, bs + 0.30, y0 + 0.20, y0 + 1.00,
-        GREEN, shade(GREEN, 1.14));
-      boxTS(bt - 0.25, bt + 0.25, bs - 0.26, bs + 0.26, y0 + 0.09, y0 + 0.22,
-        shade(GREEN, 0.70));
-      boxTS(bt - 0.30, bt + 0.30, bs - 0.32, bs + 0.32, y0 + 0.98, y0 + 1.07,
-        shade(GREEN, 1.24), shade(GREEN, 1.30));
-      for (const o of [-0.22, 0.22]) {
-        post(W, bt + o, bs + 0.24, y0, y0 + 0.09, 0.075, [0.085, 0.085, 0.088], 6);
-      }
+      // Moulded since 1.549.3 — see `tkBin`.
+      tkBin(bt, bs, y0, GREEN, shade(GREEN, 1.24), shade(GREEN, 1.30));
       furniture.push({ t: bt, s: bs, a: 0.32, c: 0.34, h: 1.07, y: y0 });
     }
     // The freezer, which is not a chiller with a glass door and never was.
@@ -14740,8 +15188,26 @@ async function buildJadrija(scene) {
       const LEAF = [0.245, 0.470, 0.230];
       const CAB = [0.665, 0.662, 0.650];
       const hw = 0.34, hd = 0.30, hh = 1.99;
-      boxTS(ct - hw, ct + hw, cs - hd, cs + hd, y0, y0 + hh,
-        WRAP, shade(WRAP, 1.10));
+      // A ROUNDED CABINET since 1.549.3 — 35 mm corners in plan, a 30 mm
+      // radius round the top — standing 40 mm up on four levelling feet over
+      // a dark recessed plinth, which is what a fridge is and a box is not.
+      knRR(W, ct - hw, ct + hw, cs - hd, cs + hd, y0 + 0.045, y0 + hh, 0.035, 0.030,
+        WRAP, shade(WRAP, 1.10), { bottom: true });
+      boxTS(ct - hw + 0.04, ct + hw - 0.04, cs - hd + 0.04, cs + hd - 0.04, y0,
+        y0 + 0.06, [0.070, 0.070, 0.072]);
+      for (const [ft, fs] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        spinTS(ct + ft * (hw - 0.07), cs + fs * (hd - 0.07), [[y0, 0.024], [y0 + 0.012, 0.024],
+          [y0 + 0.016, 0.009], [y0 + 0.050, 0.009], [y0 + 0.050, 0]],
+        [0.160, 0.160, 0.165], 12);
+      }
+      // The door's seal, the black gasket round the front a hand's breadth
+      // in from every edge: the line that says the front is a door.
+      {
+        const GS = [0.090, 0.090, 0.094], sf = cs - hd - 0.002;
+        const ga = ct - hw + 0.030, gc = ct + hw - 0.030, gb = y0 + 0.235, gh = y0 + hh - 0.035;
+        for (const t of [ga, gc]) tkY(t, sf, gb, gh, 0.006, 0.004, 0.003, GS);
+        for (const y of [gb, gh]) tkT(ga, gc, sf, y, 0.004, 0.006, 0.003, GS);
+      }
       // The lemons and the leaves, on the front and on both returns, because a
       // wrap is printed all the way round.
       //
@@ -14756,11 +15222,13 @@ async function buildJadrija(scene) {
       // square it replaced. The pair is 16 mm apart in depth and not the 3 mm
       // that reads the same on paper: parallel faces three millimetres apart
       // two kilometres out are one face (rule 5).
+      //
+      // And since 1.549.3 they are LENSES, which is what the octagon was
+      // standing in for: an oval 1.0 by 0.72 of its radius, 9 mm proud at the
+      // crown and turned, so the light rolls over it. `b` is where the old
+      // pair's face was, 18 mm out; the lens sits on the cabinet face itself.
       const lemon = (a, b, c, r) => {
-        boxTS(a - r, a + r, b, b + 0.008, c - r * 0.50, c + r * 0.50,
-          LEM, shade(LEM, 1.08));
-        boxTS(a - r * 0.725, a + r * 0.725, b - 0.008, b + 0.004,
-          c - r * 0.675, c + r * 0.675, LEM, shade(LEM, 1.08));
+        tkLens([a, cs - hd, c], [0, -1, 0], r, r * 0.72, 0.009, LEM, [1, 0, 0.18]);
       };
       // Re-laid over the corrected face. The old five were spread over 0.90 m
       // of width and 1.00 m of height at radii up to 0.17; on a face 0.68 wide
@@ -14776,25 +15244,35 @@ async function buildJadrija(scene) {
       // The two on the returns, which is the same cross turned through ninety
       // degrees, so `lemon` cannot draw them.
       for (const [ls, ly, r] of [[cs - 0.14, 1.40, 0.12], [cs + 0.12, 0.80, 0.10]]) {
-        for (const [tf, dr] of [[ct - hw - 0.018, 1], [ct + hw + 0.010, -1]]) {
-          boxTS(tf, tf + 0.008, ls - r, ls + r,
-            y0 + ly - r * 0.50, y0 + ly + r * 0.50, LEM, shade(LEM, 1.08));
-          boxTS(tf - 0.008 * dr, tf + 0.004 + 0.004 * dr,
-            ls - r * 0.725, ls + r * 0.725,
-            y0 + ly - r * 0.675, y0 + ly + r * 0.675, LEM, shade(LEM, 1.08));
+        for (const d of [-1, 1]) {
+          tkLens([ct + d * hw, ls, y0 + ly], [d, 0, 0], r, r * 0.72, 0.009, LEM,
+            [0, 1, 0.18]);
         }
       }
+      // The leaves between them, as leaves: a pointed lens laid at a slant.
       for (const [lt, ly] of [[ct - 0.24, 1.34], [ct + 0.16, 1.04],
         [ct - 0.10, 0.62], [ct + 0.22, 0.28]]) {
-        boxTS(lt - 0.062, lt + 0.062, cs - hd - 0.014, cs - hd - 0.009,
-          y0 + ly, y0 + ly + 0.050, LEAF);
+        tkLens([lt, cs - hd, y0 + ly + 0.025], [0, -1, 0], 0.066, 0.024, 0.005, LEAF,
+          [1, 0, 0.45], 12);
       }
       // The D-handle down the right-hand edge of the door in `_343`, at the
       // height a handle is on a two-metre cabinet rather than on a 1.46 m one.
       // Right-hand in that frame is the edge AWAY from the kiosk, and with the
       // cabinet moved to the west end that is the low-t edge.
-      boxTS(ct - hw + 0.070, ct - hw + 0.115, cs - hd - 0.060, cs - hd - 0.020,
-        y0 + 0.95, y0 + 1.35, [0.640, 0.648, 0.655]);
+      //
+      // A real D now (1.549.3): a chrome bar on two standoffs, swept, with a
+      // round foot plate at each end.
+      {
+        const HC = [0.640, 0.648, 0.655], htc = ct - hw + 0.0925, f = cs - hd;
+        tubeTS([[htc, f + 0.004, y0 + 0.97], [htc, f - 0.030, y0 + 0.975],
+          [htc, f - 0.044, y0 + 0.995], [htc, f - 0.046, y0 + 1.03],
+          [htc, f - 0.046, y0 + 1.29], [htc, f - 0.044, y0 + 1.325],
+          [htc, f - 0.030, y0 + 1.345], [htc, f + 0.004, y0 + 1.35]], 0.011, HC, 12);
+        for (const y of [y0 + 0.97, y0 + 1.35]) {
+          axLathe([htc, f + 0.001, y], [0, -1, 0], [[0, 0.019], [0.004, 0.018],
+            [0.007, 0.012], [0.008, 0]], HC, 14, [1, 0, 0], { push: -0.3 });
+        }
+      }
       // The name across the middle, on all four sides, because a wrap is
       // printed all the way round and this one is seen from three of them.
       // A centimetre proud of the cabinet, and it has to be. Written flush,
@@ -14803,20 +15281,40 @@ async function buildJadrija(scene) {
       // it, so the loudest object in the frame after the red band shipped as
       // a blank green box. The Jamnica poseur has stood its ring 5 mm off its
       // own drum since the day it was built; this one did not.
-      const wo = 0.012;
-      brandRing('jana', [[ct - hw - wo, cs - hd - wo], [ct + hw + wo, cs - hd - wo],
-        [ct + hw + wo, cs + hd + wo], [ct - hw - wo, cs + hd + wo]],
-      y0 + 1.28, y0 + 0.98);
+      //
+      // Round the cabinet's rounded corners since 1.549.3, at the same 12 mm:
+      // a square ring round a radiused box stands 26 mm off it at every
+      // corner, which is a sleeve and not a print. Same turn, same start.
+      const wo = 0.012, cr = 0.035;
+      {
+        const ring = [];
+        for (const [su, sv, a0] of [[-1, -1, Math.PI], [1, -1, 1.5 * Math.PI],
+          [1, 1, 0], [-1, 1, 0.5 * Math.PI]]) {
+          for (let q = 0; q <= 4; q++) {
+            const a = a0 + (q / 4) * (Math.PI / 2);
+            ring.push([ct + su * (hw - cr) + Math.cos(a) * (cr + wo),
+              cs + sv * (hd - cr) + Math.sin(a) * (cr + wo)]);
+          }
+        }
+        brandRing('jana', ring, y0 + 1.28, y0 + 0.98);
+      }
       // The grille along the foot, and the lid. Three louvres and not one white
       // slab: in `c343_jana` it is a stack of pressed slots, and a slab there
       // reads as a skirting board rather than as the place the heat comes out.
-      for (let k = 0; k < 3; k++) {
-        boxTS(ct - hw + 0.06, ct + hw - 0.06, cs - hd - 0.016, cs - hd + 0.006,
-          y0 + 0.06 + k * 0.052, y0 + 0.095 + k * 0.052,
-          [0.700, 0.700, 0.692], [0.560, 0.560, 0.552]);
+      //
+      // Since 1.549.3 the slots are slots: a dark recess across the foot of
+      // the front and five radiused louvres across it, each tipped down.
+      boxTS(ct - hw + 0.05, ct + hw - 0.05, cs - hd - 0.007, cs - hd + 0.010,
+        y0 + 0.065, y0 + 0.215, [0.055, 0.055, 0.058]);
+      for (let k = 0; k < 5; k++) {
+        const ly = y0 + 0.085 + k * 0.028;
+        tkBar([ct - hw + 0.055, cs - hd - 0.008, ly], [ct + hw - 0.055, cs - hd - 0.008, ly],
+          [0, Math.cos(0.5), -Math.sin(0.5)], [0, Math.sin(0.5), Math.cos(0.5)],
+          0.009, 0.003, 0.0025, [0.700, 0.700, 0.692], { nc: 2 });
       }
-      boxTS(ct - hw - 0.02, ct + hw + 0.02, cs - hd - 0.02, cs + hd + 0.02,
-        y0 + hh, y0 + hh + 0.055, CAB, shade(CAB, 1.10));
+      knRR(W, ct - hw - 0.02, ct + hw + 0.02, cs - hd - 0.02, cs + hd + 0.02,
+        y0 + hh - 0.004, y0 + hh + 0.055, 0.050, 0.022, CAB, shade(CAB, 1.10),
+        { bottom: true });
       furniture.push({ t: ct, s: cs, a: 0.38, c: 0.34, h: hh, y: y0 });
       // ── the second printed leaf ──────────────────────────────────────────
       //
@@ -14835,14 +15333,14 @@ async function buildJadrija(scene) {
       // it is given backwards on the way to the world, so a ring that stayed
       // in its old order would print on the inside of the panel.
       const lt2 = ct + hw + 0.05;
-      boxTS(lt2 - 0.005, lt2 + 0.055, cs - 0.34, cs + 0.26, y0, y0 + hh,
-        WRAP, shade(WRAP, 1.10));
+      // A door leaf with a 15 mm radius on every edge (1.549.3) and its own
+      // gasket rim, and the lemons on it lenses like the cabinet's.
+      tkBar([lt2 + 0.025, cs - 0.04, y0 + 0.02], [lt2 + 0.025, cs - 0.04, y0 + hh],
+        [0, 1, 0], [1, 0, 0], 0.30, 0.030, 0.015, WRAP);
       for (const [ls, ly, r] of [[cs - 0.14, 1.48, 0.12], [cs + 0.06, 0.86, 0.11],
         [cs - 0.18, 0.40, 0.09]]) {
-        boxTS(lt2 + 0.062, lt2 + 0.070, ls - r, ls + r,
-          y0 + ly - r * 0.50, y0 + ly + r * 0.50, LEM, shade(LEM, 1.08));
-        boxTS(lt2 + 0.066, lt2 + 0.078, ls - r * 0.725, ls + r * 0.725,
-          y0 + ly - r * 0.675, y0 + ly + r * 0.675, LEM, shade(LEM, 1.08));
+        tkLens([lt2 + 0.055, ls, y0 + ly], [1, 0, 0], r, r * 0.72, 0.009, LEM,
+          [0, 1, 0.18]);
       }
       brandRing('jana', [[lt2 + 0.070, cs + 0.272], [lt2 - 0.020, cs + 0.272],
         [lt2 - 0.020, cs - 0.352], [lt2 + 0.070, cs - 0.352]],
@@ -15018,31 +15516,72 @@ async function buildJadrija(scene) {
     {
       const lt = gt - 0.10, ls = S.s0 - 0.84, pf = y0 + 1.06;
       // The two front stiles, raked a little, and the two rear legs raked a
-      // lot — which between them is what an A-frame is. `slat` for both,
-      // because a leg that leans is exactly the thing `boxTS` cannot express.
+      // lot — which between them is what an A-frame is. Same centres, rakes
+      // and lengths as the `slat` bars they were; since 1.549.3 each is an
+      // aluminium section with 8 mm radii and a black rubber shoe on its foot.
+      const SHOE = [0.085, 0.085, 0.090];
+      const legAt = (o, cs, cy, a, long, hw, hd, col) => {
+        const AX = [0, Math.sin(a), Math.cos(a)], NM = [0, Math.cos(a), -Math.sin(a)];
+        const h = long / 2;
+        const A = [lt + o, cs - AX[1] * h, cy - AX[2] * h];
+        const B = [lt + o, cs + AX[1] * h, cy + AX[2] * h];
+        tkBar(A, B, [1, 0, 0], NM, hw, hd, 0.008, col);
+        tkBar(A, [A[0], A[1] + AX[1] * 0.065, A[2] + AX[2] * 0.065], [1, 0, 0], NM,
+          hw + 0.005, hd + 0.005, 0.010, SHOE);
+      };
       for (const o of [-0.26, 0.26]) {
-        bar(lt + o - 0.022, lt + o + 0.022,
-          slat(ls - 0.06, y0 + 0.53, 0.113, 1.070, 0.046), GALV);
-        bar(lt + o - 0.020, lt + o + 0.020,
-          slat(ls + 0.27, y0 + 0.53, 0.409, 1.156, 0.042), shade(GALV, 0.94));
+        legAt(o, ls - 0.06, y0 + 0.53, 0.113, 1.070, 0.022, 0.023, GALV);
+        legAt(o, ls + 0.27, y0 + 0.53, 0.409, 1.156, 0.020, 0.021, shade(GALV, 0.94));
+        // The spreader strap that stops the two opening past their stance,
+        // on the outside of each pair at knee height.
+        const y = y0 + 0.48, dy = y - (y0 + 0.53);
+        const sf = ls - 0.06 + dy * Math.tan(0.113), sr = ls + 0.27 + dy * Math.tan(0.409);
+        tkS(lt + o + Math.sign(o) * 0.029, sf, sr, y, 0.004, 0.013, 0.003,
+          shade(GALV, 0.82));
+      }
+      // The rear legs' cross brace, a round tube.
+      {
+        const y = y0 + 0.28, sr = ls + 0.27 + (y - y0 - 0.53) * Math.tan(0.409);
+        tubeTS([[lt - 0.26, sr, y], [lt + 0.26, sr, y]], 0.011, shade(GALV, 0.94), 10);
       }
       // Four treads up the front and the platform on top, each one further back
-      // than the last by the rake of the stile it is fixed to.
+      // than the last by the rake of the stile it is fixed to — pressed
+      // treads with radiused nosings and three anti-slip ribs along each.
       for (let k = 0; k < 4; k++) {
         const ty = y0 + 0.21 * (k + 1);
         const ts2 = ls - 0.12 + (ty - y0) * 0.114;
-        boxTS(lt - 0.24, lt + 0.24, ts2 - 0.055, ts2 + 0.055, ty, ty + 0.028,
+        tkT(lt - 0.24, lt + 0.24, ts2, ty + 0.014, 0.055, 0.014, 0.007,
           shade(GALV, 1.06));
+        for (const d of [-0.030, 0, 0.030]) {
+          tkT(lt - 0.225, lt + 0.225, ts2 + d, ty + 0.0295, 0.0045, 0.0035, 0.002,
+            shade(GALV, 0.96), { nc: 2 });
+        }
       }
-      boxTS(lt - 0.27, lt + 0.27, ls - 0.09, ls + 0.09, pf, pf + 0.034,
-        shade(GALV, 1.10), shade(GALV, 1.16));
-      // The handle. Two uprights and a rail, and not the single bent tube the
-      // frame has: a hoop is a swept profile and this is three prisms.
-      for (const o of [-0.22, 0.22]) {
-        post(W, lt + o, ls + 0.02, pf, pf + 0.86, 0.017, GALV, 4);
+      knRR(W, lt - 0.27, lt + 0.27, ls - 0.09, ls + 0.09, pf, pf + 0.034, 0.020, 0.009,
+        shade(GALV, 1.10), shade(GALV, 1.16), { bottom: true });
+      for (let k = 0; k < 5; k++) {
+        tkT(lt - 0.25, lt + 0.25, ls - 0.066 + k * 0.033, pf + 0.0355, 0.0045, 0.0035,
+          0.002, shade(GALV, 1.00), { nc: 2 });
       }
-      boxTS(lt - 0.24, lt + 0.24, ls - 0.005, ls + 0.045, pf + 0.83, pf + 0.87,
-        GALV);
+      // The handle, and it IS the single bent tube the frame has now: up from
+      // the platform, round two 70 mm bends and across — swept, where it was
+      // two prisms and a box.
+      {
+        const hs = ls + 0.02, R = 0.07, hx = 0.22, hTop = pf + 0.86;
+        const P = [[lt - hx, hs, pf - 0.01], [lt - hx, hs, hTop - R]];
+        for (let q = 1; q <= 5; q++) {
+          const a = Math.PI - (q / 6) * (Math.PI / 2);
+          P.push([lt - hx + R + Math.cos(a) * R, hs, hTop - R + Math.sin(a) * R]);
+        }
+        P.push([lt - hx + R, hs, hTop]);
+        P.push([lt + hx - R, hs, hTop]);
+        for (let q = 1; q <= 5; q++) {
+          const a = Math.PI / 2 - (q / 6) * (Math.PI / 2);
+          P.push([lt + hx - R + Math.cos(a) * R, hs, hTop - R + Math.sin(a) * R]);
+        }
+        P.push([lt + hx, hs, hTop - R], [lt + hx, hs, pf - 0.01]);
+        tubeTS(P, 0.0165, GALV, 12);
+      }
       furniture.push({ t: lt, s: ls, a: 0.30, c: 0.36, h: pf + 0.87 - y0, y: y0 });
     }
     // And the beer-tent set on the gravel in front, the same folding trestle
@@ -15274,12 +15813,14 @@ async function buildJadrija(scene) {
     // lids, which is `1000150343`'s reading of the two lids anyway.
     {
       const bt = S.t0 - 1.65, bs = S.s0 + 1.30;
-      boxTS(bt - 0.29, bt + 0.29, bs - 0.30, bs + 0.30, y0 + 0.20, y0 + 1.00,
-        shade(BIN, 0.88), shade(BIN, 1.02));
-      boxTS(bt - 0.30, bt + 0.30, bs - 0.32, bs + 0.32, y0 + 0.98, y0 + 1.07,
-        shade(BIN, 1.10), shade(BIN, 1.16));
-      boxTS(bt - 0.22, bt + 0.20, bs - 0.24, bs + 0.18, y0 + 1.05, y0 + 1.34,
-        SACK, shade(SACK, 1.9));
+      // Moulded since 1.549.3 (`tkBin`), and the sack is a sack: a bag
+      // slumped on the lid, bellied at the foot and gathered to a knot.
+      tkBin(bt, bs, y0, shade(BIN, 0.88), shade(BIN, 1.10), shade(BIN, 1.16));
+      knLathe(W, bt - 0.01, bs - 0.03, [[y0 + 1.064, 0, 3], [y0 + 1.064, [0.19, 0.18], 3],
+        [y0 + 1.10, [0.225, 0.215], 3], [y0 + 1.17, [0.215, 0.205], 3],
+        [y0 + 1.25, [0.16, 0.15], 3], [y0 + 1.30, [0.06, 0.055]],
+        [y0 + 1.325, [0.028, 0.028]], [y0 + 1.36, [0.040, 0.030]], [y0 + 1.375, 0]],
+      (i) => (i >= 4 ? shade(SACK, 1.9) : i >= 2 ? shade(SACK, 1.4) : SACK), 18);
       furniture.push({ t: bt, s: bs, a: 0.32, c: 0.34, h: 1.34, y: y0 });
     }
 
@@ -19133,11 +19674,9 @@ async function buildJadrija(scene) {
       }
     } else if (S.metal) {
       // A flat roof with a pale capping that oversails all round, which is
-      // what a steel kiosk has and a pitched one is not.
-      boxTS(S.t0 - 0.09, S.t1 + 0.09, S.s0 - 0.09, S.s1 + 0.09,
-        top, top + 0.055, S.roof, shade(S.roof, 1.10));
-      boxTS(S.t0 - 0.11, S.t1 + 0.11, S.s0 - 0.11, S.s1 + 0.11,
-        top + 0.045, top + 0.085, shade(S.roof, 0.86));
+      // what a steel kiosk has and a pitched one is not. Two slabs until
+      // 1.549.3; turned with the rest of the kiosk now — see `tisakRoof`.
+      tisakRoof(S, y0, top);
     } else if (S.container) {
       // A container has a FLAT top with a rail round it, and the roof — with
       // the framed panel that stands over it — is drawn with the rest of the

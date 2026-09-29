@@ -8,6 +8,68 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.2] — 2026-09-29
+
+### The Tisak, turned: rounded steel, a fascia with depth, a real ladder
+
+Misha: *"also the tisak: i think we have been putting it off for a long
+time, but it's still way too low-poly, it needs to look higher-poly"*. Every
+member of the kiosk was a `boxTS`: the frame, the ribs, the band, the window,
+the shutter, the counter, the door, the step ladder and the Jana cooler. So
+the shop with more photographs read for it than any other on the shore looked
+most like it was made of bricks.
+
+Where everything stands is unchanged: same footprint, extents, colours and
+sign canvases (`tisakBand`, `tisakAwnBand`, `tisakDisplay`), and every note in
+`tisakFront` still holds. What changed is the section. The members are now
+swept rounded rectangles (the new `tkBar`, with `tkT`/`tkY`/`tkS` for its
+three orientations), round parts are turned or swept (`spinTS`, `axLathe`,
+`knLathe`, `tubeTS`), and slabs are `knRR`. Everything is in the buffers the
+kiosk already drew into, so there are no new draw calls. Checked against
+`1000150343` and `1000150414` at 04:24–04:27.
+
+- **Body:** 100 mm corner posts with a 30 mm radius on base plates; the
+  pressed ribs rounded (14 mm), and the face stays flat, so the streaks still
+  stop at them. The **east end and the back**, which were bare body box, are
+  now panelled like the rest. The west end gets its rails.
+- **Roof** (`tisakRoof`): a capping with a 35 mm rounded edge on a darker
+  drip nose, a raised membrane, a mushroom vent, and a downpipe with three
+  clips down the back corner. It oversails the front by 0.18 m so the
+  deeper fascia sits under it.
+- **Livery fascia:** a 145 mm pressed red box with radiused edges and a drip
+  lip, where it was 60 mm with the print floating 100 mm off it. The print
+  now sits 15 mm off its face.
+- **Window:** jambs, head and cill are aluminium extrusions (12 mm radii),
+  with a glazing bead and a black gasket round the daylight opening. Glass is
+  still edges only, as elsewhere. **Roller shutter:** a radiused housing with
+  seven slat ridges broken round the poster, the curtain's bottom bar and two
+  pull loops. **Counter:** a `knRR` ledge with a rounded nosing on two
+  pressed brackets, and the newspapers as knocked-about bundles.
+- **Display:** the shelf edges of the tobacco gantry, the sweets and the
+  lighters are geometry 15 mm proud of the print, with their price cards. The
+  postcards are a wire rack of five raked cards. Magazines are two-title
+  stacks with a masthead, on round-wire tiers with turned posts. Crisp bags
+  are pillows (squared lathe, crimped ends) on round rails.
+- **Door:** radiused frame members with flush panels, three turned hinge
+  knuckles, and a back plate, rose and round lever on both faces.
+- **Awning:** the canopy is two cloth sheets that sag 35 mm and ripple, and
+  the roller bar, fascia, hem and cheeks are rounded extrusions.
+- **Step ladder:** radiused stiles and rear legs with rubber shoes, spreader
+  straps, a round cross brace, pressed treads and platform with anti-slip
+  ribs, and the grab handle as the single bent tube the photograph has.
+- **Jana cooler:** a rounded cabinet on four levelling feet over a dark
+  plinth, a door gasket, a swept chrome D-handle on round foot plates, a
+  louvred compressor grille, and a rounded lid. The lemons and leaves are
+  lenses, not two-box octagons. The printed band now follows the rounded
+  corners, and the second leaf is radiused.
+- **Wheelie bins** (`tkBin`, both of them): tapered moulded tubs, a lidded
+  rim, a handle, and real wheels on an axle. The sack on the second one is a
+  sack.
+
+`jadrija.tris` 898,332 → 922,316 (+23,984). Blockers 792 and their hash,
+people 100 and their hash, and the census are all unchanged. There are no
+console errors, and the ASKABLE prompt at the counter still works. Nothing
+draws on `rng`.
 ## [1.550.1] — 2026-09-29
 
 ### Hosed off the mole
