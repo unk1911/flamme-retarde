@@ -6136,6 +6136,41 @@ async function buildJadrija(scene) {
     return out;
   }
 
+  /**
+   * Chairs taken off a terrace, as `[table, seat]` indices into
+   * `terraceTables(S)` and its `seats` — the table still stands, the seat is
+   * still in the list (so every pass that walks it walks it the same), and
+   * `terraceSet` does not draw the chair or its blocker there, and nobody
+   * sitting in it is ever kept for the cast.
+   *
+   * Beach bar MINI, 29 Sep 2026. Misha on its terrace: *"further de-clutter
+   * in front of beach bar Mini: remove a few extra chairs"*. Twelve mesh
+   * armchairs round four tables and four people in them, which is eight empty
+   * chairs across a terrace six metres deep. Five of the eight go, and only
+   * empty ones: the seaward chair of the west table (the woman at it keeps
+   * hers, and one beside her), and at the two tables nobody is at, the
+   * seaward and the west chair of each — which leaves each of them the one
+   * chair on the shop side, looking out to sea, rather than a bare table.
+   * The full east-middle table keeps all three.
+   *
+   * WHICH WERE EMPTY was measured, not assumed. A seat is empty for one of
+   * three reasons — `rng() < 0.34`, `B`'s turnout, or a sitter placed there
+   * and then thinned out of the cast — and the third is why the sitters'
+   * pass still places somebody on a gone chair and marks them `ghost`
+   * rather than skipping it (see the note there). Every person on the shore
+   * is where they were before, all hundred of them, checked by diffing the
+   * placements; and a ghost is never kept, so nobody can end up sitting on
+   * air if the cast ever changes.
+   *
+   * A declaration with its table inside it, and not a `const` beside it,
+   * because the shops are built from line 2600 and a `const` this far down
+   * is still in its temporal dead zone then (see `shopPlanting`'s note).
+   */
+  function chairGone(key, k, j) {
+    const CHAIRS_GONE = { mini: ['0,0', '1,0', '1,2', '3,0', '3,2'] };
+    return !!(CHAIRS_GONE[key] && CHAIRS_GONE[key].includes(k + ',' + j));
+  }
+
   function terraceSeats(S) {
     const out = [];
     for (const tab of terraceTables(S)) {
@@ -9054,11 +9089,13 @@ async function buildJadrija(scene) {
   // went over without its seat would leave the seat standing on the terrace.
   const chairGeo = new Map();
   const chairKey = (t, s) => t.toFixed(3) + ',' + s.toFixed(3);
-  function terraceSet(t, s, y, ang, col, kind, shop) {
+  function terraceSet(t, s, y, ang, col, kind, shop, tab = -1) {
     const seat = [0.230, 0.235, 0.240];
     const R = seatRing(t, s, ang);
     const style = CAFE_STYLE[shop] || 'steel';
-    for (const [ct, cs, face] of R.seats) {
+    for (const [j, [ct, cs, face]] of R.seats.entries()) {
+      // Taken off the terrace — see `chairGone`.
+      if (chairGone(shop, tab, j)) continue;
       // Each chair in its own frame, and that is the change. `boxTS` is
       // axis-aligned in (t, s) and cannot be anything else, so a chair built
       // with it has its back on the inland side whatever the set is doing —
@@ -17568,20 +17605,20 @@ async function buildJadrija(scene) {
         barStool(mnL0 + 0.80 + k * ((mnL1 - mnL0 - 1.6) / 2), S.s0 - 0.86,
           y0, MNWHT);
       }
-      // The planter on legs. What grows in it is planted in `shopPlanting`,
-      // and so are the yellow deckchairs.
-      const pt = S.t0 + 6.4, ps = S.s0 - 3.6;
-      for (const [ot, os] of [[-0.62, -0.22], [0.62, -0.22], [-0.62, 0.22], [0.62, 0.22]]) {
-        post(W, pt + ot, ps + os, y0, y0 + 0.52, 0.045, TIMB, 5);
-      }
-      boxTS(pt - 0.72, pt + 0.72, ps - 0.30, ps + 0.30, y0 + 0.52, y0 + 0.86,
-        TIMB, [0.300, 0.255, 0.190]);
-      boxTS(pt - 0.66, pt + 0.66, ps - 0.25, ps + 0.25, y0 + 0.84, y0 + 0.88,
-        [0.230, 0.330, 0.180]);
-      // A metre and a half of timber trough at hip height, and a planter is the
-      // one piece of café furniture that is there precisely to be walked round.
-      furniture.push({ t: pt, s: ps, a: 0.70, c: 0.28, h: 0.88, y: y0 });
-      // And the diagonal timber lattice that screens the far end of it.
+      // ── NO PLANTER ON LEGS ──────────────────────────────────────────────
+      //
+      // There was one here, at `t0 + 6.4, s0 − 3.6`: a metre and a half of
+      // dark timber trough at hip height on four legs, green on top, with
+      // five small agaves in it — standing in the middle of the terrace,
+      // square in front of the counter. Misha, 29 Sep 2026, on this terrace:
+      // *"dunno about that bed of green plants thingie, maybe just get rid of
+      // that to declutter the space a bit"*. Gone, with its blocker (792 →
+      // 791 of them on its own) and its planting — see `shopPlanting`, which
+      // still draws the agaves' seventeen `rng` calls apiece and throws them
+      // away (rule 4). The two terrace tubs at the seaward corners
+      // (`miniPlanter`) are a different object, asked for, and stay.
+      //
+      // And the diagonal timber lattice that screens the far end of the counter.
       for (let k = 0; k < 9; k++) {
         const a = S.t1 - 0.4 - k * 0.24;
         b.quad(W(a, S.s0 - 0.35, y0 + 0.10), W(a + 0.10, S.s0 - 0.35, y0 + 0.10),
@@ -19505,7 +19542,7 @@ async function buildJadrija(scene) {
           mesh ? [0.735, 0.733, 0.720]
             : k % 3 === 0 ? [0.190, 0.200, 0.210] : [0.560, 0.548, 0.512],
           mesh ? 'mesh' : undefined,
-          S.key);
+          S.key, k);
       }
     }
     // Except at beach bar MINI, whose shade is a different object entirely and
@@ -28534,40 +28571,175 @@ async function buildJadrija(scene) {
       const cy = surfaceY(ct, cs);
       const ang = 0.7;
       const co = Math.cos(ang), sn = Math.sin(ang);
-      const P = (dt, ds, yy) => W(ct + dt * co - ds * sn, cs + dt * sn + ds * co, yy);
-      // A wheel: a short cylinder about an axis running across the car.
-      const wheel = (dt, ds, r, hw) => {
-        for (let i = 0; i < 7; i++) {
-          const a0 = (i / 7) * TAU, a1 = ((i + 1) / 7) * TAU;
-          const A = P(dt - hw, ds + Math.cos(a0) * r, cy + r + Math.sin(a0) * r);
-          const B = P(dt - hw, ds + Math.cos(a1) * r, cy + r + Math.sin(a1) * r);
-          const C = P(dt + hw, ds + Math.cos(a1) * r, cy + r + Math.sin(a1) * r);
-          const D = P(dt + hw, ds + Math.cos(a0) * r, cy + r + Math.sin(a0) * r);
-          b.quad(A, B, C, D, BLK);
-          b.tri(P(dt + hw, ds, cy + r), D, C, BLK);
-          b.tri(P(dt - hw, ds, cy + r), B, A, BLK);
-        }
+      // ── MOULDED, NOT BOXED ──────────────────────────────────────────────
+      //
+      // Misha, 29 Sep 2026, on MINI's terrace: *"upgrade that lo-poly
+      // children's toy on the ground to be higher-poly"*. It was five boxes,
+      // six five-sided sticks and four seven-sided drums — 232 triangles, and
+      // at two metres it read as a crate on bricks. A ride-on is blow-moulded
+      // plastic: nothing on it has a corner, the wheels are fat hollow tyres
+      // on a hub, and the handle is one bent tube. Same place, same heading,
+      // same footprint, same heights and the same three colours; only the
+      // section changed. Built the way `bicycle` builds a bicycle — turned
+      // parts with the profile's own normals (`spinIn`), swept tubes
+      // (`tubeTS`) and radiused slabs (`knRR`) — into the same buffer, so no
+      // draw call more: 10 260 triangles, four tenths of them the tyres.
+      // Nothing here draws on `rng`.
+      //
+      // `L` is the car's own frame in the shore's — `dt` across it, `ds`
+      // along it with the front at −ds and the handle at +ds, `y` up — and
+      // `P` the same point in the world.
+      const L = (dt, ds, yy) => [ct + dt * co - ds * sn, cs + dt * sn + ds * co, yy];
+      const P = (dt, ds, yy) => W(...L(dt, ds, yy));
+      const ALG = [-sn, co, 0], ACR = [co, sn, 0];
+      // A turned part about any axis in the car's frame: `o` its centre,
+      // `ax` the axis and `ux` a unit vector square to it, both in (dt, ds, y).
+      const spin = (o, ax, ux, prof, col, sides, sh, crease) => {
+        const vx = [ax[1] * ux[2] - ax[2] * ux[1], ax[2] * ux[0] - ax[0] * ux[2],
+          ax[0] * ux[1] - ax[1] * ux[0]];
+        spinIn((x, y, w) => P(o[0] + ux[0] * x + vx[0] * y + ax[0] * w,
+          o[1] + ux[1] * x + vx[1] * y + ax[1] * w, o[2] + ux[2] * x + vx[2] * y + ax[2] * w),
+        prof, col, sides, [1, 1], sh, crease);
       };
-      // Big wheels, and out at the body's own width. They were 0.072 and inset
-      // and the thing read as a market barrow: what says ride-on is that the
+      // A closed ring section wound round `rc` — a tyre, a steering wheel's
+      // rim — as a `spin` profile, `[w, r]`. `hw`/`hh` the section's half
+      // width and half height, `n` how square it is (1 an ellipse), and the
+      // seam on the inside of the ring, where nobody looks.
+      const ringProf = (rc, hw, hh, n, N, groove = 0) => {
+        const out = [];
+        for (let i = 0; i <= N; i++) {
+          const f = Math.PI + (i / N) * TAU, sf = Math.sin(f), cf = Math.cos(f);
+          let r = rc + hh * Math.sign(cf) * Math.pow(Math.abs(cf), n);
+          // The tread: every other ring across the crown pressed in, which
+          // the smooth normals turn into ribs round the tyre.
+          if (groove && cf > 0.45 && i % 2 === 1) r -= groove;
+          out.push([hw * Math.sign(sf) * Math.pow(Math.abs(sf), n), r]);
+        }
+        return out;
+      };
+      const tube = (pts, r, col, sides = 12, ref = ALG) =>
+        tubeTS(pts.map((p) => L(p[0], p[1], p[2])), r, col, sides, ref, 0.14);
+      const GREY = [0.420, 0.415, 0.405];
+
+      // ── the wheels ────────────────────────────────────────────────────
+      //
+      // Big, and out at the body's own width. They were 0.072 and inset and
+      // the thing read as a market barrow: what says ride-on is that the
       // wheels are a third of the height of it and stand outside the tub.
-      for (const [dt, ds] of [[-0.163, -0.190], [0.163, -0.190],
-        [-0.163, 0.200], [0.163, 0.200]]) wheel(dt, ds, 0.092, 0.034);
-      // The tub, and the sill line round it that every one of these has.
-      boxIn(P, -0.150, 0.150, -0.290, 0.290, cy + 0.100, cy + 0.285, RED);
-      boxIn(P, -0.163, 0.163, -0.275, 0.275, cy + 0.250, cy + 0.285, YEL);
-      // A seat back, and the roof on four pillars over it.
-      boxIn(P, -0.130, 0.130, 0.150, 0.190, cy + 0.285, cy + 0.410, RED);
+      // 0.092 m to the crown as before; a squared-off hollow tyre 54 mm wide
+      // with a ribbed crown, and a yellow hub filling it, domed on the
+      // outside with a cap nut in the middle.
+      const RW = 0.092, TH = 0.022, TW = 0.027;
+      for (const [dt, ds] of [[-0.170, -0.190], [0.170, -0.190],
+        [-0.170, 0.200], [0.170, 0.200]]) {
+        const o = [dt, ds, cy + RW], ax = [Math.sign(dt), 0, 0], ux = [0, 1, 0];
+        spin(o, ax, ux, ringProf(RW - TH, TW, TH, 0.55, 18, 0.0016), BLK, 28, 0.10, 0.2);
+        spin(o, ax, ux, [[-0.020, 0], [-0.020, 0.050], [0.012, 0.050], [0.019, 0.047],
+          [0.024, 0.040], [0.027, 0.030], [0.029, 0.021], [0.029, 0.016],
+          [0.026, 0.0145], [0.026, 0]], YEL, 24, 0.12, 0.6);
+        spin(o, ax, ux, [[0.025, 0.012], [0.031, 0.0115], [0.034, 0.008],
+          [0.0355, 0.004], [0.036, 0]], GREY, 12, 0.10, 0.6);
+      }
+      // The axles, steel rod across under the tub from hub to hub.
+      for (const ds of [-0.190, 0.200]) {
+        tube([[-0.160, ds, cy + RW], [0.160, ds, cy + RW]], 0.0075, GREY, 8, [0, 0, 1]);
+      }
+
+      // ── the tub ───────────────────────────────────────────────────────
+      //
+      // One moulding, rounded in plan and along the top, and the yellow
+      // bumper strip round it that every one of these has — a round rail
+      // wrapped round the tub at the sill, following its corners.
+      knRR(P, -0.150, 0.150, -0.290, 0.290, cy + 0.100, cy + 0.285, 0.075, 0.035,
+        RED, null, { bottom: true });
+      {
+        const HU = 0.157, HV = 0.297, CR = 0.082, NC = 7, loop = [];
+        const CO = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+        for (let k = 0; k < 4; k++) {
+          const [su, sv] = CO[k];
+          for (let i = 0; i <= NC; i++) {
+            const a = (k + i / NC) * (Math.PI / 2);
+            loop.push([su * (HU - CR) + Math.cos(a) * CR, sv * (HV - CR) + Math.sin(a) * CR,
+              cy + 0.258]);
+          }
+        }
+        loop.push(loop[0], loop[1]);
+        tube(loop, 0.0165, YEL, 10, [0, 0, 1]);
+      }
+      // The bonnet, a yellow moulding over the front of the cockpit, and the
+      // two headlamps set into the nose under it.
+      knRR(P, -0.128, 0.128, -0.282, -0.140, cy + 0.270, cy + 0.335, 0.055, 0.030, YEL);
+      for (const dt of [-0.064, 0.064]) {
+        spin([dt, -0.284, cy + 0.205], [0, -1, 0], [1, 0, 0],
+          [[-0.010, 0.029], [0.000, 0.030], [0.004, 0.029], [0.006, 0.026], [0.006, 0.022],
+            [0.004, 0.021]], YEL, 16, 0.10, 0.6);
+        spin([dt, -0.284, cy + 0.205], [0, -1, 0], [1, 0, 0],
+          [[0.000, 0.022], [0.006, 0.020], [0.010, 0.014], [0.012, 0.007], [0.0125, 0]],
+          [0.800, 0.780, 0.660], 16, 0.08, 0.6);
+      }
+      // The steering wheel over the bonnet, raked back at the seat: a column
+      // out of the dash, a round rim, one spoke across it and a boss.
+      {
+        const A = [0, 0.55, 0.835], la = Math.hypot(A[1], A[2]);
+        const ax = [0, A[1] / la, A[2] / la], ux = [1, 0, 0];
+        const O = [0, -0.118, cy + 0.395];
+        tube([[0, -0.170, cy + 0.315], [0, -0.144, cy + 0.355], [O[0], O[1], O[2]]],
+          0.0095, BLK, 10, ACR);
+        spin(O, ax, ux, ringProf(0.052, 0.0085, 0.0085, 1, 10), YEL, 26, 0.10, 0.2);
+        tube([[-0.050, O[1], O[2]], [0.050, O[1], O[2]]], 0.0065, YEL, 8, [0, 0, 1]);
+        spin([O[0] + ax[0] * 0.004, O[1] + ax[1] * 0.004, O[2] + ax[2] * 0.004], ax, ux,
+          [[-0.006, 0.020], [0.004, 0.020], [0.009, 0.016], [0.012, 0.009], [0.013, 0]],
+          RED, 20, 0.10, 0.6);
+      }
+      // The seat and its back, which are one moulding with the tub in the
+      // real thing and are two rounded pads here, the seat a shade darker
+      // for being down in the cockpit.
+      knRR(P, -0.112, 0.112, -0.010, 0.150, cy + 0.270, cy + 0.318, 0.035, 0.020,
+        shade(RED, 0.82));
+      knRR(P, -0.126, 0.126, 0.144, 0.196, cy + 0.270, cy + 0.440, 0.026, 0.024, RED);
+
+      // ── the roof on four pillars ──────────────────────────────────────
       for (const [dt, ds] of [[-0.145, -0.215], [0.145, -0.215],
         [-0.145, 0.230], [0.145, 0.230]]) {
-        post(P, dt, ds, cy + 0.285, cy + 0.470, 0.017, RED, 5);
+        tube([[dt, ds, cy + 0.262], [dt, ds, cy + 0.370], [dt, ds, cy + 0.480]],
+          (k) => [0.0185, 0.0170, 0.0160][k], RED, 12);
       }
-      boxIn(P, -0.175, 0.175, -0.265, 0.270, cy + 0.470, cy + 0.508, YEL);
-      // The push handle over the tail, which is what makes it a toddler's and
-      // not a toy.
-      post(P, -0.118, 0.290, cy + 0.285, cy + 0.640, 0.014, YEL, 5);
-      post(P, 0.118, 0.290, cy + 0.285, cy + 0.640, 0.014, YEL, 5);
-      boxIn(P, -0.132, 0.132, 0.276, 0.304, cy + 0.640, cy + 0.668, YEL);
+      // Its underside closed: the roof is at a child's eye height, and
+      // everybody standing near it sees the top, but a camera a stride away
+      // at the level of the terrace sees under it.
+      knRR(P, -0.175, 0.175, -0.265, 0.270, cy + 0.466, cy + 0.508, 0.070, 0.019,
+        YEL, null, { bottom: true });
+
+      // ── the push handle ───────────────────────────────────────────────
+      //
+      // Over the tail, which is what makes it a toddler's and not a toy: one
+      // yellow tube bent into a U out of two sockets on the tail, and a red
+      // foam grip along the top of it.
+      {
+        const HS = 0.304, HX = 0.118, HT = cy + 0.650, BR = 0.040;
+        const path = [[-HX, HS - 0.012, cy + 0.215], [-HX, HS, cy + 0.300], [-HX, HS, HT - BR]];
+        for (let i = 1; i <= 6; i++) {
+          const a = Math.PI - (i / 6) * (Math.PI / 2);
+          path.push([-HX + BR + Math.cos(a) * BR, HS, HT - BR + Math.sin(a) * BR]);
+        }
+        path.push([0, HS, HT]);
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 2 - (i / 6) * (Math.PI / 2);
+          path.push([HX - BR + Math.cos(a) * BR, HS, HT - BR + Math.sin(a) * BR]);
+        }
+        path.push([HX, HS, HT - BR], [HX, HS, cy + 0.300], [HX, HS - 0.012, cy + 0.215]);
+        tube(path, 0.0135, YEL, 12);
+        // The grip, eased at both ends where it stops on the bar.
+        const GR = [0.0145, 0.0180, 0.0190, 0.0190, 0.0190, 0.0190, 0.0180, 0.0145];
+        tube(GR.map((_, i) => [-0.072 + (i / (GR.length - 1)) * 0.144, HS, HT]),
+          (k) => GR[k], shade(RED, 0.9), 14, [0, 0, 1]);
+        // And the two sockets the handle stands in, moulded on to the tail.
+        for (const dt of [-HX, HX]) {
+          spin([dt, HS, cy + 0.225], [0, 0, 1], [1, 0, 0],
+            [[0, 0], [0, 0.021], [0.006, 0.024], [0.055, 0.023], [0.062, 0.019],
+              [0.064, 0.0138]], YEL, 18, 0.12, 0.6);
+        }
+      }
       runs.push({ t0: ct - 0.4, t1: ct + 0.4, s0: cs - 0.4, s1: cs + 0.4,
         y: cy, h: 0.30 });
     }
@@ -29964,12 +30136,23 @@ async function buildJadrija(scene) {
   // — so the draws off `rng` below are the draws they always were (rule 4).
   let chair = 0;
   for (const S of SHOPS) {
-    for (const tab of terraceTables(S)) {
-      for (const [t, s2, face] of tab.seats) {
+    for (const [ti, tab] of terraceTables(S).entries()) {
+      for (const [j, [t, s2, face]] of tab.seats.entries()) {
         if (rng() < 0.34) continue;
         const who = B(t - 0.07 * Math.cos(face), s2 - 0.07 * Math.sin(face),
           at(t).deck, face, 'sit', 1);
         if (who) {
+          // A chair that is not there (`chairGone`) is still sat in HERE, and
+          // that is on purpose. Everybody placed is a candidate for the cast,
+          // and the cast is thinned to `CAST` by a stride over each pose's
+          // list (`spread`, below) — so one sitter fewer in that list moves
+          // which hundred are kept, all along the shore, with not one `rng`
+          // draw changed. (The first cut skipped these seats, draws and all,
+          // and the census came out a different crowd on four terraces.)
+          // So they are placed as they always were, marked `ghost`, and the
+          // thinning passes over a ghost rather than keep it. None of the
+          // five is kept today in any case — which is how they were chosen.
+          if (chairGone(S.key, ti, j)) who.ghost = true;
           who.chair = true; who.seat = chair++;
           who.sitAt = { t, s: s2, face, ct: tab.ct, cs: tab.cs, ang: tab.ang, mesh: S.key === 'mini',
             // The parlour's marble tables are round (`cafeTable`, 1.542.2).
@@ -30239,7 +30422,8 @@ async function buildJadrija(scene) {
       for (const g of pool) {
         if (keep.length >= CAST) break;
         const b = g.shift();
-        if (b) keep.push(b);
+        // Never somebody sitting on a chair that is not there — see `ghost`.
+        if (b && !b.ghost) keep.push(b);
       }
     }
     bathers.length = 0;
@@ -33909,7 +34093,6 @@ async function buildJadrija(scene) {
         greens.push([S.t1 - 1.6, S.s0 + 2.2, 0.55, 9]);
       }
       if (S.key === 'mini') {
-        const y0 = at((S.t0 + S.t1) * 0.5).deck;
         // Yellow sling deckchairs. Every frame of this terrace has them and
         // nothing else on the shore is that colour.
         //
@@ -33944,10 +34127,13 @@ async function buildJadrija(scene) {
           loungerMini(lt, ls, ly, 0, [0.680, 0.560, 0.075]);
           furniture.push({ t: lt, s: ls - 0.035, a: 0.34, c: 0.93, h: 0.72, y: ly });
         }
-        for (let k = 0; k < 5; k++) {
-          agave(S.t0 + 5.9 + k * 0.25, S.s0 - 3.6, y0 + 0.86,
-            0.13 + jit(k, 140) * 0.06);
-        }
+        // The five agaves that grew in the planter on legs, which is gone
+        // (29 Sep 2026 — see the note where it stood in `shopExtras`). Each
+        // `agave` drew seventeen times on `rng` — a heading and eight blades
+        // at two apiece — so the eighty-five draws are still made here and
+        // thrown away, and everything placed after this stays where it was
+        // (rule 4).
+        for (let k = 0; k < 5 * 17; k++) rng();
       }
     }
     b = back10;
