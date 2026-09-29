@@ -8,6 +8,74 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.3] — 2026-09-29
+
+### The green kiosk, turned, and nothing growing out of the stones round it
+
+Misha, on the plaza in front of the green drinks kiosk at t 290–293: *"can u
+make this business higher polygons: it looks too low-poly. and also those
+weird plants/shrubs that have grown *into* the stones/fence looks weird,
+probably just remove those plants/shrubs"*.
+
+Every piece of `greenKiosk` / `greenBack` / `twinGableRoof` was a box. Same
+footprint, colours and positions; now (new helpers `gkSpin`, `gkRod`, `gkBar`,
+`gkCrate`, `gkBin`, `gkPost` beside it):
+
+- **Body:** a round-cornered slab on a plinth, a steel post up each corner;
+  oval battens up the end walls; head and cill rails swept round the front
+  corners and stopped at the frames.
+- **Window and door:** frames are bent tube loops, open in the middle. The
+  pane used to stand 3 cm INSIDE a solid frame box and the lit doorway 1 cm
+  behind the dark one, so both rendered as flat dark-green panels. Now the
+  window shows its shelves (cartons and half-round bottles) and the doorway
+  its pale interior, chest fridge and carton, as the note over them always
+  said. The open leaf is a rounded slab with glazing, three hinges and a
+  lever each side.
+- **Hoods:** one curved clear sheet each on the old arc, rolled front edge,
+  wall flashing, needle drift, and wrought-iron brackets (a scroll off the
+  wall, a stay to the outer edge, a top arm under the sheet). They were four
+  flat slats, which from the plaza read as a white rack.
+- **Roof:** standing seams down all four slopes, round ridge caps, closed
+  sheet edges, barge boards up every rake, the pale board across the front,
+  fascias with round gutters on both outer eaves, a downpipe off each down
+  the end walls, a valley gutter spouting out the back, and a turned flue
+  with flashing and a rain cap on legs.
+- **Crates (29 front, 11 back):** open moulded trays with frame rims,
+  through hand-holes, ribs and foot bands on both long sides, stacked with a
+  centimetre or two of jitter; the top crate of every stack full of bottles
+  (glass and cap by brand; the black crates carry empties). The yard's
+  version closed its "open" top with a solid rim slab.
+- **Keg** turned with chimes, rolling rings and spear; **wheelie bins**
+  lofted round-cornered with lid, lip, grip, handle bar, ribs, foot and
+  turned wheels; **guard rail** one bent tube with a mid rail and flanges;
+  **yellow barrier** and **crowd barrier** in round tube; the **back door**
+  a panelled leaf with a stand-off bar handle; the **lamp** a bulkhead.
+- **The slatted crate** that stood plumb half a metre off the front (a
+  ladder, and it ran into the open door leaf) now leans against the east end
+  wall: two rounded rails, five slats.
+- **Generic kit off:** `shopKit` and the generic body gave this shop a
+  serving counter that ran across the door at knee height, a mullion, a
+  cill and a lightbox panel for an opening it hasn't got, two menu boards, a
+  condenser standing through the twin roof, a downpipe inside the body, and
+  two potted shrubs. `twinGable` skips all of it; the threshold is kept.
+
+**The plants.** The two potted shrubs (from `shopKit`) grew into the guard
+rail and the crates; gone. The verge's oats and fennel rooted a hand's width
+off any blocker, so fennel stood up through the rubble pier caps and oats
+through the barriers. `GREEN_CLEAR` (t 282–301, s 16–31.5): inside it nothing
+wild roots within 1.2 m of a blocker. The verge is `floraHash`, so no draws.
+One olive of the grove stood with its bole 0.3 m into the end of a pier (the
+lane wall is built after the stand). It is PUSHED 0.72 m seaward, to s 27.88,
+the stand's own rule for obstacles. Its `rng` draw is untouched and its
+blocker moves with it. The ivy on the rendered wall east of t 300 is left
+alone: it is a creeper on its wall by design (b_181), not into stone or
+fence.
+
+Measured: `jadrija.tris` 898,332 → 939,532 (+41,200; most of it the crates
+and their bottles). Blockers 792, unchanged, and diffed one by one: 791
+identical and in order, and the one that differs is the olive, s 28.60 →
+27.88. People 100, census, cars 13 and riders 5 unchanged. No console
+errors.
 ## [1.550.2] — 2026-09-29
 
 ### The Tisak, turned: rounded steel, a fascia with depth, a real ladder

@@ -12758,7 +12758,232 @@ async function buildJadrija(scene) {
    * frame has a great deal more and almost none of it is the building: this is
    * where the drink for this end of the boardwalk is kept, and what you
    * actually see is a wall of crates.
+   *
+   * ── TURNED, 29 Sep 2026 ─────────────────────────────────────────────────────
+   *
+   * Misha, on the plaza in front of it: *"can u make this business higher
+   * polygons: it looks too low-poly"*. Every piece of it was a box: a body
+   * with knife corners, battens and rails that were square sticks, two door
+   * hoods that were four flat slats each, a guard rail of square bars on
+   * hexagonal posts, a keg that was a ten-sided prism, two wheelie bins that
+   * were a box with a slab on top, a "slatted crate" that read as a ladder,
+   * and twenty-nine crates that were solid coloured bricks with a dark lid.
+   * The body is a rounded slab now with a steel post up each corner; the
+   * battens, rails, frames and brackets are swept tube; the crates are open
+   * moulded trays (the same build `shopBack`'s yard got the same day, with
+   * ribs on BOTH long sides and the hand-holes cut through), the top one of
+   * each stack full of bottles; the keg, bins, barrier and flue are turned.
+   *
+   * And the generic kit is off it. `shopKit` and the generic body gave this
+   * shop a serving counter, a mullion, a cill and a dark lightbox panel for an
+   * opening it does not have — the counter ran straight across the door at
+   * knee height — two menu boards, a condenser standing through its roof, a
+   * downpipe INSIDE the body and two potted shrubs, which grew into the
+   * guard rail and the crates. None of that is in the frame; `twinGable`
+   * skips it, and the threshold, the flue and two real downpipes are drawn
+   * here and in `twinGableRoof` instead.
+   *
+   * Every position is the old one, and so is every `furniture` entry: the
+   * stacks, keg, bins and barriers block exactly where they did. No `rng`.
    */
+
+  /**
+   * The ground round the green kiosk where nothing wild grows against a solid.
+   *
+   * Misha, same visit: *"those weird plants/shrubs that have grown into the
+   * stones/fence looks weird, probably just remove those"*. The verge grows on
+   * every OPEN cell of its grid and lets a plant root a hand's width off a
+   * blocker — which is right for a tussock at the foot of a wall and wrong
+   * for oats and fennel, whose heads are half a metre across: here fennel
+   * stood up through the caps of the rubble piers and oats through the
+   * barriers and the crates' feet. Inside this box nothing roots within `r`
+   * metres of a blocker (`verge.field` reads it) — 0.9 left a fennel whose
+   * crown still leant on a pier cap — and outside it the verge is what it
+   * was. The verge is `floraHash` of its cell, so this moves no `rng` draw.
+   */
+  const GREEN_CLEAR = { t0: 282, t1: 301, s0: 16, s1: 31.5, r: 1.2 };
+
+  /** A rounded-rectangle section, `[v, w]` round it, for `barSweep`. */
+  function gkSec(hv, hw, r, n = 3) {
+    const out = [];
+    const rr = Math.min(r, hv, hw);
+    const C = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+    for (let k = 0; k < 4; k++) {
+      const cv = C[k][0] * (hv - rr), cw = C[k][1] * (hw - rr);
+      for (let i = 0; i <= n; i++) {
+        const a = (k + i / n) * (Math.PI / 2);
+        out.push([cv + Math.cos(a) * rr, cw + Math.sin(a) * rr]);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * `spinIn` about any axis in the shore frame: `A` is the axis origin as
+   * `[t, s, y]`, `d` its direction, and `prof` is `[w, r]` along it in metres.
+   * `sec` squashes the section, its first axis the one nearest vertical (or,
+   * for an upright axis, along t).
+   */
+  function gkSpin(A, d, prof, col, sides = 12, sec = [1, 1], sh = 0.12, crease = 0.5) {
+    const L = Math.hypot(d[0], d[1], d[2]) || 1;
+    const a = [d[0] / L, d[1] / L, d[2] / L];
+    const ref = Math.abs(a[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+    const dp = ref[0] * a[0] + ref[1] * a[1] + ref[2] * a[2];
+    let U = [ref[0] - dp * a[0], ref[1] - dp * a[1], ref[2] - dp * a[2]];
+    const ul = Math.hypot(U[0], U[1], U[2]) || 1;
+    U = [U[0] / ul, U[1] / ul, U[2] / ul];
+    const V = [a[1] * U[2] - a[2] * U[1], a[2] * U[0] - a[0] * U[2], a[0] * U[1] - a[1] * U[0]];
+    spinIn((x, y, w) => W(A[0] + a[0] * w + U[0] * x + V[0] * y,
+      A[1] + a[1] * w + U[1] * x + V[1] * y, A[2] + a[2] * w + U[2] * x + V[2] * y),
+    prof, col, sides, sec, sh, crease);
+  }
+
+  /** A round rod from A to B, shore `[t, s, y]`, its two ends eased shut. */
+  function gkRod(A, B, r, col, sides = 12, sec = [1, 1]) {
+    const L = Math.hypot(B[0] - A[0], B[1] - A[1], B[2] - A[2]);
+    if (!(L > 1e-4)) return;
+    const e = Math.min(r * 0.35, L * 0.25);
+    gkSpin(A, [B[0] - A[0], B[1] - A[1], B[2] - A[2]],
+      [[0, 0], [0.0005, r * 0.74], [e, r], [L - e, r], [L - 0.0005, r * 0.74], [L, 0]],
+      col, sides, sec, 0.12, 0.35);
+  }
+
+  /**
+   * A straight bar of rounded-rectangle section from A to B (shore `[t, s, y]`):
+   * `hv` its half-size along `V`, which must be square to B − A, and `hw`
+   * across the other way. A board with its arrises eased.
+   */
+  function gkBar(A, B, V, hv, hw, r, col) {
+    const D = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
+    const L = Math.hypot(D[0], D[1], D[2]) || 1;
+    const d = [D[0] / L, D[1] / L, D[2] / L];
+    const X = [d[1] * V[2] - d[2] * V[1], d[2] * V[0] - d[0] * V[2], d[0] * V[1] - d[1] * V[0]];
+    barSweep((u, v, w) => W(A[0] + D[0] * u + V[0] * v + X[0] * w,
+      A[1] + D[1] * u + V[1] * v + X[1] * w, A[2] + D[2] * u + V[2] * v + X[2] * w),
+    0, 1, gkSec(hv, hw, r), col);
+  }
+
+  /**
+   * A bottle crate, `shopBack`'s moulded tray made whole: 13 mm walls on a
+   * floor, a rim that is a FRAME (the yard's was a solid slab, a lid on an
+   * "open" crate), the hand-hole in each short end cut right through, ribs
+   * and a foot band down both long sides, and — `fill` — twenty bottles
+   * standing in it, necks and caps up to the rim, which is what the top of a
+   * full stack is. `fill` is `{ glass, cap }`; a cap of null is the empties.
+   */
+  function gkCrate(ta, tc, sa, sc, ya, yb, c, fill) {
+    const w = 0.013, dk = shade(c, 0.78), lt = shade(c, 1.10), hi = shade(c, 0.92);
+    const sm = (sa + sc) * 0.5;
+    // The floor, and the grid moulded into it.
+    boxTS(ta + w, tc - w, sa + w, sc - w, ya + 0.004, ya + 0.020, dk);
+    // The long walls, stopping under the rim.
+    boxTS(ta, tc, sa, sa + w, ya, yb - 0.030, c, lt);
+    boxTS(ta, tc, sc - w, sc, ya, yb - 0.030, c, lt);
+    // The short ends, in four pieces round the hand-hole.
+    const h0 = yb - 0.108, h1 = yb - 0.062, hs = 0.072;
+    for (const [e0, e1] of [[ta, ta + w], [tc - w, tc]]) {
+      boxTS(e0, e1, sa + w, sc - w, ya, h0, c, lt);
+      boxTS(e0, e1, sa + w, sm - hs, h0, h1, c, lt);
+      boxTS(e0, e1, sm + hs, sc - w, h0, h1, c, lt);
+      boxTS(e0, e1, sa + w, sc - w, h1, yb - 0.030, c, lt);
+    }
+    // The rim: four bars standing 6 mm proud all round.
+    const R = 0.006, rw = 0.024, ry = yb - 0.032;
+    boxTS(ta - R, tc + R, sa - R, sa - R + rw, ry, yb, hi, lt);
+    boxTS(ta - R, tc + R, sc + R - rw, sc + R, ry, yb, hi, lt);
+    boxTS(ta - R, ta - R + rw, sa - R + rw, sc + R - rw, ry, yb, hi, lt);
+    boxTS(tc + R - rw, tc + R, sa - R + rw, sc + R - rw, ry, yb, hi, lt);
+    // Ribs down both long sides, and the foot band under them.
+    for (const [f0, f1] of [[sa - 0.008, sa], [sc, sc + 0.008]]) {
+      for (let r = 1; r < 5; r++) {
+        const tr = ta + (tc - ta) * r / 5;
+        boxTS(tr - 0.009, tr + 0.009, f0, f1, ya + 0.030, ry, dk);
+      }
+      boxTS(ta + 0.012, tc - 0.012, f0, f1, ya, ya + 0.028, dk);
+    }
+    if (!fill) return;
+    // Twenty bottles, five by four: the shoulder, the neck, the cap.
+    const pt = (tc - ta - 2 * w) / 5, ps = (sc - sa - 2 * w) / 4;
+    for (let i = 0; i < 5; i++) {
+      for (let k = 0; k < 4; k++) {
+        const bt = ta + w + pt * (i + 0.5), bs = sa + w + ps * (k + 0.5);
+        spinTS(bt, bs, [[yb - 0.112, 0.028], [yb - 0.062, 0.026], [yb - 0.036, 0.0135],
+          [yb - 0.006, 0.0125], [yb - 0.006, 0]], fill.glass, 6, 0.10, 0.5);
+        if (fill.cap) {
+          spinTS(bt, bs, [[yb - 0.008, 0.0145], [yb + 0.007, 0.0135], [yb + 0.007, 0]],
+            fill.cap, 6, 0.10, 0.5);
+        }
+      }
+    }
+  }
+
+  /**
+   * A wheelie bin standing at (bt, bs) on `gy`, its wheels on the +s side:
+   * a tapered tub with its corners rounded, lofted smooth; a lid overhanging
+   * on three sides with a lip and a grip; the handle bar it hinges on; ribs
+   * down the front; the foot; and two turned wheels on an axle. `shopBack`'s
+   * bin, laid out on this one's old footprint.
+   */
+  function gkBin(bt, bs, gy, col) {
+    const dk = shade(col, 0.80), dd = shade(col, 0.66);
+    const loop = (ht, hs, r, sc, y) => {
+      const out = [];
+      const C = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+      for (let k = 0; k < 4; k++) {
+        const cu = bt + C[k][0] * (ht - r), cv = sc + C[k][1] * (hs - r);
+        for (let i = 0; i <= 4; i++) {
+          const a = (k + i / 4) * (Math.PI / 2);
+          out.push(W(cu + Math.cos(a) * r, cv + Math.sin(a) * r, y));
+        }
+      }
+      return out;
+    };
+    const mid = W(bt, bs, gy + 0.55);
+    knSurf([loop(0.250, 0.262, 0.05, bs + 0.010, gy + 0.10),
+      loop(0.262, 0.274, 0.055, bs + 0.008, gy + 0.16),
+      loop(0.298, 0.303, 0.06, bs - 0.004, gy + 0.95),
+      loop(0.304, 0.309, 0.06, bs - 0.006, gy + 1.00)], col, { wrap: true, out: () => mid });
+    knRR(W, bt - 0.25, bt + 0.25, bs - 0.252, bs + 0.272, gy + 0.08, gy + 0.105, 0.05, 0,
+      dd, dd, { bottom: true });
+    // Ribs down the front, following its lean.
+    for (const o of [-0.16, 0, 0.16]) {
+      gkRod([bt + o, bs - 0.262, gy + 0.20], [bt + o, bs - 0.302, gy + 0.92], 0.013, dk, 6);
+    }
+    // The lid, a shade DOWN from the body and overhanging it — see the note
+    // that was here: a lighter lid flush with the sides is a bright band.
+    knRR(W, bt - 0.31, bt + 0.31, bs - 0.34, bs + 0.34, gy + 1.00, gy + 1.075, 0.05, 0.022,
+      shade(col, 0.80), shade(col, 0.92), { bottom: true });
+    knRR(W, bt - 0.30, bt + 0.30, bs - 0.345, bs - 0.318, gy + 0.965, gy + 1.03, 0.01, 0.006,
+      shade(col, 0.76), null, { bottom: true });
+    gkRod([bt - 0.12, bs - 0.360, gy + 0.99], [bt + 0.12, bs - 0.360, gy + 0.99], 0.014,
+      shade(col, 0.70), 8);
+    // The handle bar at the back, which the lid hinges round, on two lugs.
+    gkRod([bt - 0.30, bs + 0.33, gy + 1.035], [bt + 0.30, bs + 0.33, gy + 1.035], 0.020, dk, 10);
+    for (const o of [-0.20, 0.20]) {
+      boxTS(bt + o - 0.03, bt + o + 0.03, bs + 0.29, bs + 0.33, gy + 0.96, gy + 1.03, dk);
+    }
+    // The foot at the front.
+    knRR(W, bt - 0.20, bt + 0.20, bs - 0.285, bs - 0.205, gy, gy + 0.10, 0.02, 0.01, dd, null,
+      { bottom: true });
+    // Two wheels on an axle: tyre and hub turned in one, facing out.
+    gkRod([bt - 0.27, bs + 0.24, gy + 0.105], [bt + 0.27, bs + 0.24, gy + 0.105], 0.012,
+      [0.200, 0.200, 0.205], 8);
+    for (const sg of [-1, 1]) {
+      gkSpin([bt + sg * 0.235, bs + 0.24, gy + 0.105], [sg, 0, 0], [[0, 0], [0.001, 0.074],
+        [0.008, 0.100], [0.060, 0.100], [0.067, 0.074], [0.067, 0.050], [0.074, 0.046],
+        [0.076, 0]], [0.060, 0.060, 0.064], 18, [1, 1], 0.10, 0.4);
+    }
+  }
+
+  /**
+   * A steel post turned on a flange, `r` round, from `y0` to `y1`, with its
+   * top eased. The barrier's, the guard rail's.
+   */
+  function gkPost(t, s, y0, y1, r, col, sides = 14) {
+    spinTS(t, s, [[y0 - 0.02, r * 1.9], [y0 + 0.010, r * 1.9], [y0 + 0.016, r * 1.25],
+      [y0 + 0.030, r], [y1 - 0.012, r], [y1, r * 0.78], [y1 + 0.004, 0]], col, sides, 0.12, 0.5);
+  }
+
   /**
    * The green kiosk's back, which was three metres of unbroken green.
    *
@@ -12781,26 +13006,44 @@ async function buildJadrija(scene) {
     const DKG = [0.062, 0.148, 0.075];
     const WHITE = [0.660, 0.655, 0.630];
     const GLASS2 = [0.072, 0.088, 0.082];
+    const HANDLE = [0.085, 0.085, 0.090];
     const dt = S.t0 + 1.28, wt = S.t0 + 2.42;
 
     // The door: a white leaf in a dark green surround, and the surround is
-    // what makes it a door rather than a white rectangle on a green wall.
-    boxTS(dt - 0.52, dt + 0.52, back, back + 0.08, y0, y0 + 2.16,
-      DKG, shade(DKG, 1.30));
-    boxTS(dt - 0.44, dt + 0.44, back + 0.05, back + 0.11, y0 + 0.03, y0 + 2.08,
+    // what makes it a door rather than a white rectangle on a green wall. A
+    // bent tube now, round-cornered at the head, standing on the step.
+    tubeTS(bendPath([[dt - 0.47, back + 0.030, y0 + 0.01], [dt - 0.47, back + 0.030, y0 + 2.11],
+      [dt + 0.47, back + 0.030, y0 + 2.11], [dt + 0.47, back + 0.030, y0 + 0.01]], 0.07, 4),
+    [0.036, 0.052], DKG, 10, [0, 1, 0], 0.12);
+    knRR(W, dt - 0.41, dt + 0.41, back + 0.004, back + 0.046, y0 + 0.03, y0 + 2.05, 0.02, 0.012,
       WHITE, shade(WHITE, 1.06));
-    // The handle, which is a full-height bar and not a knob.
-    boxTS(dt + 0.30, dt + 0.36, back + 0.11, back + 0.15, y0 + 0.86, y0 + 1.52,
-      [0.085, 0.085, 0.090]);
-    // The window beside it.
-    boxTS(wt - 0.36, wt + 0.36, back, back + 0.07, y0 + 0.98, y0 + 1.82,
-      DKG, shade(DKG, 1.30));
-    // The pane stands PROUD of its own frame. Written inside it — glass at
-    // back+0.04 in a frame that reaches back+0.07 — the frame is in front of
-    // it from every angle the wall is seen from and the window rendered as a
-    // flat dark-green rectangle: a shutter, not a window.
-    boxTS(wt - 0.29, wt + 0.29, back + 0.070, back + 0.086, y0 + 1.04,
-      y0 + 1.76, GLASS2);
+    // A kick plate, and two shallow raised panels above it.
+    boxTS(dt - 0.37, dt + 0.37, back + 0.046, back + 0.052, y0 + 0.06, y0 + 0.30,
+      shade(WHITE, 0.86));
+    for (const [pa, pb] of [[y0 + 0.40, y0 + 1.12], [y0 + 1.24, y0 + 1.94]]) {
+      knRR(W, dt - 0.32, dt + 0.32, back + 0.044, back + 0.054, pa, pb, 0.02, 0.004,
+        shade(WHITE, 1.03), shade(WHITE, 1.08));
+    }
+    // The handle, which is a full-height bar and not a knob, on two standoffs.
+    gkRod([dt + 0.33, back + 0.105, y0 + 0.86], [dt + 0.33, back + 0.105, y0 + 1.52], 0.016,
+      HANDLE, 10);
+    for (const hy of [y0 + 0.92, y0 + 1.46]) {
+      gkRod([dt + 0.33, back + 0.044, hy], [dt + 0.33, back + 0.100, hy], 0.009, HANDLE, 8);
+    }
+    for (const hy of [y0 + 0.22, y0 + 1.02, y0 + 1.82]) {
+      gkRod([dt - 0.415, back + 0.050, hy], [dt - 0.415, back + 0.050, hy + 0.10], 0.012,
+        [0.300, 0.300, 0.300], 8);
+    }
+    // The window beside it: the frame a tube loop, the pane inside it, and a
+    // sill under both.
+    tubeTS(bendPath([[wt - 0.32, back + 0.028, y0 + 1.02], [wt + 0.32, back + 0.028, y0 + 1.02],
+      [wt + 0.32, back + 0.028, y0 + 1.78], [wt - 0.32, back + 0.028, y0 + 1.78]], 0.05, 3, true),
+    [0.034, 0.046], DKG, 10, [0, 1, 0], 0.12);
+    boxTS(wt - 0.29, wt + 0.29, back + 0.004, back + 0.014, y0 + 1.04, y0 + 1.76, GLASS2);
+    gkRod([wt - 0.29, back + 0.018, y0 + 1.40], [wt + 0.29, back + 0.018, y0 + 1.40], 0.014,
+      DKG, 8);
+    knRR(W, wt - 0.40, wt + 0.40, back - 0.005, back + 0.10, y0 + 0.92, y0 + 0.97, 0.015, 0.012,
+      shade(S.body, 1.10), shade(S.body, 1.18), { bottom: true });
 
     // NO hoods, and the frame has two. This kiosk is 2.4 m to the eaves and
     // its own roof slab already oversails the back by more than the hoods
@@ -12811,25 +13054,31 @@ async function buildJadrija(scene) {
     // own canopies. The lamp, which sits in the same band, is set into the
     // wall rather than standing off it for the same reason.
     //
-    // The lamp on the wall over the door.
-    boxTS(dt - 0.62, dt - 0.48, back + 0.04, back + 0.18, y0 + 2.36, y0 + 2.48,
-      [0.620, 0.610, 0.575], [0.680, 0.672, 0.640]);
+    // The lamp on the wall over the door: a bulkhead, a plate and an opal
+    // lens turned on it, oval, looking out along +s.
+    {
+      const lt = dt - 0.55, ly = y0 + 2.42;
+      gkSpin([lt, back, ly], [0, 1, 0], [[0, 0], [0.001, 0.078], [0.020, 0.078],
+        [0.024, 0]], [0.400, 0.396, 0.385], 16, [0.78, 1]);
+      gkSpin([lt, back + 0.018, ly], [0, 1, 0], [[0, 0.060], [0.035, 0.057],
+        [0.062, 0.042], [0.078, 0.020], [0.082, 0]], [0.660, 0.652, 0.618], 16, [0.78, 1], 0.08);
+    }
 
     // The crates, stacked against the green west of the door. Pepsi blue, and
-    // the tops are dark whatever the crate is, which is the note the front's
-    // stacks already carry.
+    // open now: see `gkCrate`. The top one of each is full.
     {
       const PEP = [0.085, 0.180, 0.440];
-      const TOPS2 = [0.085, 0.082, 0.072];
+      let n = 0;
       for (const [ct, cs, hi] of [[S.t0 + 0.32, back + 0.30, 6],
         [S.t0 + 0.72, back + 0.26, 5]]) {
         const gy = surfaceY(ct, cs);
         for (let k = 0; k < hi; k++) {
           const yy = gy + k * 0.268;
-          boxTS(ct - 0.185, ct + 0.185, cs - 0.140, cs + 0.140, yy, yy + 0.235,
-            PEP, TOPS2);
-          boxTS(ct - 0.190, ct + 0.190, cs - 0.145, cs + 0.145,
-            yy + 0.230, yy + 0.262, shade(PEP, 1.26), TOPS2);
+          const ot = (jit(n, 941) - 0.5) * 0.030, os = (jit(n, 942) - 0.5) * 0.020;
+          gkCrate(ct - 0.185 + ot, ct + 0.185 + ot, cs - 0.140 + os, cs + 0.140 + os,
+            yy, yy + 0.262, PEP, k === hi - 1
+              ? { glass: [0.420, 0.470, 0.470], cap: [0.150, 0.260, 0.560] } : null);
+          n++;
         }
         furniture.push({ t: ct, s: cs, a: 0.22, c: 0.18, h: hi * 0.268, y: gy });
       }
@@ -12839,6 +13088,10 @@ async function buildJadrija(scene) {
     // 1.1 m and leans; the first cut of this ran 1.25 m along the wall with
     // an 0.86 m rake and came out a pale lattice the size of the building, so
     // the numbers here are the object's own and not a guess at its footprint.
+    //
+    // Galvanised TUBE: a frame bent round at the corners, nine infill bars,
+    // the legs carried down through it to two flat feet, and the hook and eye
+    // it couples to its neighbour with.
     {
       const GALV3 = [0.585, 0.598, 0.605];
       // PAST the east corner, not against the back: the wall is three metres
@@ -12846,21 +13099,25 @@ async function buildJadrija(scene) {
       // leaning anywhere on it lands on the glass — which is exactly where the
       // first one landed.
       const bt = S.t1 + 0.58, bs = back + 0.16, gy = surfaceY(bt, bs);
-      for (const yy of [gy + 0.10, gy + 1.00]) {
-        boxTS(bt - 0.52, bt + 0.52, bs, bs + 0.05, yy, yy + 0.05,
-          GALV3, shade(GALV3, 1.10));
-      }
-      for (let i = 0; i < 5; i++) {
-        const ct = bt - 0.44 + i * 0.22;
-        boxTS(ct - 0.014, ct + 0.014, bs + 0.008, bs + 0.042,
-          gy + 0.08, gy + 1.06, GALV3);
+      const fs = bs + 0.025;
+      tubeTS(bendPath([[bt - 0.52, fs, gy + 0.10], [bt + 0.52, fs, gy + 0.10],
+        [bt + 0.52, fs, gy + 1.05], [bt - 0.52, fs, gy + 1.05]], 0.08, 4, true),
+      0.021, GALV3, 10, [0, 1, 0], 0.16);
+      for (let i = 0; i < 9; i++) {
+        const ct = bt - 0.40 + i * 0.10;
+        tubeTS([[ct, fs, gy + 0.11], [ct, fs, gy + 1.04]], 0.008, GALV3, 6, [0, 1, 0], 0.12);
       }
       // The feet, which are what a crowd barrier stands on and the only
-      // reason it is not a hurdle.
+      // reason it is not a hurdle, and the legs down into them.
       for (const o of [-0.48, 0.48]) {
-        boxTS(bt + o - 0.03, bt + o + 0.03, bs - 0.16, bs + 0.22,
-          gy, gy + 0.045, shade(GALV3, 0.86));
+        gkRod([bt + o, fs, gy + 0.03], [bt + o, fs, gy + 0.12], 0.018, GALV3, 10);
+        knRR(W, bt + o - 0.028, bt + o + 0.028, bs - 0.16, bs + 0.22, gy, gy + 0.035,
+          0.012, 0.008, shade(GALV3, 0.86), null, { bottom: true });
       }
+      tubeTS(bendPath([[bt + 0.52, fs, gy + 0.90], [bt + 0.60, fs, gy + 0.90],
+        [bt + 0.60, fs, gy + 0.80]], 0.03, 3), 0.008, GALV3, 6, [0, 1, 0], 0.12);
+      tubeTS(bendPath([[bt - 0.52, fs, gy + 0.30], [bt - 0.60, fs, gy + 0.30],
+        [bt - 0.60, fs, gy + 0.40]], 0.03, 3), 0.008, GALV3, 6, [0, 1, 0], 0.12);
       furniture.push({ t: bt, s: bs, a: 0.55, c: 0.22, h: 1.10, y: gy });
     }
   }
@@ -12890,6 +13147,14 @@ async function buildJadrija(scene) {
    * light — apron 115/109/99, sheet 114/146/160 — it is 0.99/1.34/1.62 of it,
    * because a painted steel sheet laid nearly flat under a Dalmatian sky is
    * mostly reflecting that sky. The kiosk carried a warm neutral grey.
+   *
+   * 29 Sep 2026, with the rest of the kiosk (see `greenKiosk`): standing
+   * seams down every slope, a round ridge cap on each ridge, the sheet's cut
+   * edges closed, barge boards up every rake and the pale board across the
+   * front, round gutters on dark fascias along the two outer eaves with a
+   * downpipe off each down the end walls, a gutter in the valley that spouts
+   * out of the back, and the flue — which was a hexagonal stick standing on
+   * the slope — a turned pipe with its flashing and a rain cap on legs.
    */
   function twinGableRoof(S, y0, top, body) {
     const OV = 0.14;                 // barge and eaves overhang
@@ -12897,6 +13162,10 @@ async function buildJadrija(scene) {
     const RISE = 0.27;               // ridge over eaves — 20° on a 1.5 m half
     const SHEET = [0.505, 0.528, 0.545];
     const UND = shade(SHEET, 0.60);
+    const EDGE = shade(SHEET, 0.80);
+    const TRIM = [0.520, 0.518, 0.500];
+    const GUT = [0.470, 0.472, 0.468];
+    const FASC = [0.145, 0.150, 0.152];
     const sa = S.s0 - OV, sb = S.s1 + OV;
     const tm = (S.t0 + S.t1) * 0.5;
     for (const [ta, tc] of [[S.t0 - OV, tm], [tm, S.t1 + OV]]) {
@@ -12911,7 +13180,24 @@ async function buildJadrija(scene) {
           SHEET);
         b.quad(W(x0, sb, ya - TH), W(x1, sb, yb - TH),
           W(x1, sa, yb - TH), W(x0, sa, ya - TH), UND);
+        // The sheet's cut ends over the two gables, which were open: from
+        // the promenade the roof was two cards with a gap between them.
+        b.quad(W(x0, sa, ya - TH), W(x1, sa, yb - TH), W(x1, sa, yb), W(x0, sa, ya), EDGE);
+        b.quad(W(x0, sb, ya), W(x1, sb, yb), W(x1, sb, yb - TH), W(x0, sb, ya - TH), EDGE);
+        // Standing seams, ridge to eave, every 0.33 m.
+        for (let sv = sa + 0.17; sv < sb - 0.08; sv += 0.33) {
+          tubeTS([[x0, sv, ya + 0.004], [x1, sv, yb + 0.004]], 0.011, shade(SHEET, 1.07),
+            6, [0, 1, 0], 0.10);
+        }
+        // The barge board up each rake, under the sheet's end, front and back.
+        for (const [gs, o] of [[sa, 1], [sb, -1]]) {
+          gkBar([x0, gs + o * 0.018, ya - TH - 0.050], [x1, gs + o * 0.018, yb - TH - 0.050],
+            [0, 1, 0], 0.016, 0.052, 0.010, TRIM);
+        }
       }
+      // A round ridge cap down each ridge.
+      gkRod([tr, sa - 0.012, top + RISE + 0.006], [tr, sb + 0.012, top + RISE + 0.006], 0.052,
+        shade(SHEET, 1.10), 14, [0.52, 1]);
       // The green gable infill, in the wall planes rather than the barge's,
       // so the sheet oversails it the way the frame has it. Drawn both ways
       // round: it is one triangle of sheet steel with a face on each side and
@@ -12923,12 +13209,54 @@ async function buildJadrija(scene) {
         b.tri(C, B, A, shade(body, 0.94));
       }
     }
-    // The fascia along the two outer eaves and down the valley, which is the
-    // dark line under the sheet in the frame and the only thing that stops a
-    // pale roof reading as a card folded over the walls.
-    const FASC = [0.145, 0.150, 0.152];
-    for (const ft of [S.t0 - OV, tm, S.t1 + OV]) {
-      boxTS(ft - 0.030, ft + 0.030, sa, sb, top - TH - 0.055, top - TH, FASC);
+    // The outer eaves: the sheet's edge closed, the dark fascia under it —
+    // the dark line under the sheet in the frame and the only thing that
+    // stops a pale roof reading as a card folded over the walls — and a
+    // round gutter hung on it.
+    for (const [te, o] of [[S.t0 - OV, -1], [S.t1 + OV, 1]]) {
+      b.quad(W(te, sa, top), W(te, sb, top), W(te, sb, top - TH), W(te, sa, top - TH), EDGE);
+      gkBar([te - o * 0.022, sa, top - TH - 0.045], [te - o * 0.022, sb, top - TH - 0.045],
+        [1, 0, 0], 0.020, 0.045, 0.008, FASC);
+      gkRod([te + o * 0.045, sa + 0.02, top - TH - 0.035], [te + o * 0.045, sb - 0.02,
+        top - TH - 0.035], 0.048, GUT, 14, [0.80, 1]);
+      // And the downpipe off its back end, bent in to the end wall and down
+      // it to a shoe over the plaza. The generic kit's was a five-sided post
+      // standing INSIDE the body.
+      const tw = o < 0 ? S.t0 - 0.07 : S.t1 + 0.07, sp = S.s1 - 0.10;
+      tubeTS(bendPath([[te + o * 0.045, sp + 0.04, top - TH - 0.06],
+        [te + o * 0.045, sp + 0.04, top - TH - 0.16], [tw, sp, top - 0.40],
+        [tw, sp, y0 + 0.18], [tw + o * 0.16, sp, y0 + 0.07]], 0.08, 5),
+      0.036, GUT, 14, [0, 1, 0], 0.12);
+      for (const cy of [y0 + 0.80, y0 + 1.70]) {
+        gkRod([tw, sp, cy - 0.02], [tw, sp, cy + 0.02], 0.043, shade(GUT, 0.86), 14);
+        gkRod([tw, sp, cy], [tw - o * 0.07, sp, cy], 0.010, shade(GUT, 0.86), 6);
+      }
+    }
+    // The valley gutter down the join, and the spout it empties by at the
+    // back.
+    gkRod([tm, sa - 0.01, top + 0.010], [tm, sb + 0.02, top + 0.010], 0.060, shade(GUT, 0.80),
+      14, [0.35, 1]);
+    gkRod([tm, sb, top + 0.005], [tm, sb + 0.18, top - 0.035], 0.028, GUT, 12);
+    // The pale board across the front at the wall head, under the two gables.
+    gkBar([S.t0 - 0.12, S.s0 - 0.040, top - 0.055], [S.t1 + 0.12, S.s0 - 0.040, top - 0.055],
+      [0, 1, 0], 0.036, 0.055, 0.012, TRIM);
+    // THE FLUE, where the generic kit stood its stick: off the east slope of
+    // the west unit, so its foot is where that slope is.
+    {
+      const ft = S.t0 + 1.1, fs = S.s1 - 0.9;
+      const tr0 = (S.t0 - OV + tm) * 0.5;
+      const yr = top + RISE * (tm - ft) / (tm - tr0);
+      const FL = [0.320, 0.316, 0.305];
+      spinTS(ft, fs, [[yr - 0.06, 0.130], [yr - 0.01, 0.124], [yr + 0.03, 0.086],
+        [yr + 0.06, 0.063], [yr + 0.07, 0.056], [top + 0.62, 0.056], [top + 0.624, 0.046],
+        [top + 0.60, 0]], FL, 16, 0.12, 0.5);
+      spinTS(ft, fs, [[top + 0.660, 0], [top + 0.660, 0.118], [top + 0.668, 0.124],
+        [top + 0.725, 0.030], [top + 0.730, 0]], FL, 16, 0.12, 0.5);
+      for (let k = 0; k < 3; k++) {
+        const a = k * TAU / 3 + 0.4;
+        gkRod([ft + Math.cos(a) * 0.050, fs + Math.sin(a) * 0.050, top + 0.600],
+          [ft + Math.cos(a) * 0.062, fs + Math.sin(a) * 0.062, top + 0.664], 0.006, FL, 5);
+      }
     }
   }
 
@@ -12946,16 +13274,26 @@ async function buildJadrija(scene) {
     // so the two openings on this elevation were the darkest thing on the
     // building when in life they are the brightest. Between them they are
     // 2.4 m of a 3 m frontage: the shop was a black band with a roof on it.
+    //
+    // (And until 29 Sep neither was seen: the pane stood 3 cm INSIDE a solid
+    // frame box, and the lit doorway 1 cm behind the dark one, so both
+    // openings rendered as flat dark-green panels. Frames are tube loops now,
+    // open in the middle, and everything through them is in front of the
+    // wall it is painted on.)
     const GLASS = [0.205, 0.212, 0.198];
     const YEL = [0.720, 0.560, 0.075];
+    const RL = shade(body, 0.80);
+    const wt = S.t0 + 0.95, dt = S.t1 - 0.78;
 
-    // ── the cladding, which is sheet with standing joints ───────────────────
-    for (let t = S.t0 + 0.5; t < S.t1 - 0.2; t += 0.72) {
-      boxTS(t - 0.030, t + 0.030, S.s0 - 0.20, S.s0 - 0.15, y0 + 0.05,
-        top - 0.05, shade(body, 0.82));
+    // ── the body: a rounded slab on a plinth, a steel post up each corner ──
+    knRR(W, S.t0, S.t1, S.s0, S.s1, y0, top, 0.05, 0, body, shade(body, 0.9));
+    knRR(W, S.t0 - 0.022, S.t1 + 0.022, S.s0 - 0.022, S.s1 + 0.022, y0 - 0.02, y0 + 0.11,
+      0.07, 0.012, shade(body, 0.82), shade(body, 0.90));
+    for (const [ct, cs] of [[S.t0, S.s0], [S.t1, S.s0], [S.t0, S.s1], [S.t1, S.s1]]) {
+      const it = ct === S.t0 ? 0.034 : -0.034, is = cs === S.s0 ? 0.034 : -0.034;
+      gkRod([ct + it, cs + is, y0 + 0.09], [ct + it, cs + is, top - 0.005], 0.046, RL, 12);
     }
-    boxTS(S.t0, S.t1, S.s0 - 0.19, S.s0 - 0.15, y0 + 0.05, y0 + 0.11,
-      shade(body, 0.82));
+
     // ── AND EACH PANEL IS IN A RAISED FRAME, ON EVERY FACE ─────────────────
     //
     // Vertical joints alone is not what `1000150342` has. Opened at source
@@ -12966,59 +13304,69 @@ async function buildJadrija(scene) {
     // only surface texture the building has and it is what tells you this is
     // bolted sheet steel and not a rendered hut with a colour on it.
     //
-    // And it was on the FRONT ONLY. Both ends were plain green rectangles,
-    // which is the elevation you meet first walking the promenade: the frame
-    // is taken at the kiosk's own corner and reads the west end and the long
-    // face in the same view. The back is left to `greenBack`, which has a
-    // door, a window and six courses of Pepsi crates on it already.
-    {
-      const RL = shade(body, 0.80);
-      const hRail = top - 0.34, cRail = y0 + 0.22;
-      // The head and cill rails on the front, standing 5 mm and 15 mm off the
-      // battens' own two faces rather than flush with either: two members
-      // crossing with a face in the same plane is rule 5 once per crossing,
-      // and there are four crossings on this elevation alone.
-      for (const ry of [hRail, cRail]) {
-        boxTS(S.t0 + 0.04, S.t1 - 0.04, S.s0 - 0.185, S.s0 - 0.145,
-          ry, ry + 0.055, RL, shade(body, 0.92));
-      }
-      // The ends. A batten every 0.74 m in s, plus the same two rails, set
-      // 0.05 m proud of the wall and buried 0.02 m into it — a frame that
-      // stops exactly at the wall plane shares a face with it.
-      for (const [tf, o] of [[S.t0, -1], [S.t1, 1]]) {
-        const fa = tf + o * 0.05, fb = tf - o * 0.02;
-        const ta = Math.min(fa, fb), tb = Math.max(fa, fb);
-        for (let sv = S.s0 + 0.74; sv < S.s1 - 0.1; sv += 0.74) {
-          boxTS(ta, tb, sv - 0.030, sv + 0.030, y0 + 0.05, top - 0.05, RL);
-        }
-        for (const ry of [hRail, cRail]) {
-          const ra = tf + o * 0.042, rb = tf - o * 0.018;
-          boxTS(Math.min(ra, rb), Math.max(ra, rb), S.s0 + 0.04, S.s1 - 0.04,
-            ry, ry + 0.055, RL, shade(body, 0.92));
-        }
+    // Swept now: an oval batten up each joint on the two ends, and the head
+    // and cill rails bent round the front corners and stopped at the window
+    // and door frames. The back is left to `greenBack`, which has a door, a
+    // window and six courses of Pepsi crates on it already.
+    for (const [tf, o] of [[S.t0, -1], [S.t1, 1]]) {
+      for (let sv = S.s0 + 0.74; sv < S.s1 - 0.1; sv += 0.74) {
+        gkRod([tf + o * 0.010, sv, y0 + 0.11], [tf + o * 0.010, sv, top - 0.04], 0.030, RL, 10,
+          [0.74, 1]);
       }
     }
-    // The barge board at the gable: pale, and the only pale thing on it.
-    boxTS(S.t0 - 0.12, S.t1 + 0.12, S.s0 - 0.22, S.s0 - 0.14, top - 0.11, top,
-      [0.520, 0.518, 0.500], [0.548, 0.546, 0.530]);
+    {
+      const d = 0.015, hR = top - 0.32, cR = y0 + 0.24, sEnd = S.s1 - 0.28;
+      const rail = (pts) => tubeTS(bendPath(pts, 0.07, 4), [0.026, 0.017], RL, 8,
+        [0, 0, 1], 0.14);
+      rail([[S.t0 - d, sEnd, hR], [S.t0 - d, S.s0 - d, hR], [S.t0 + 0.27, S.s0 - d, hR]]);
+      rail([[S.t1 - 0.23, S.s0 - d, hR], [S.t1 + d, S.s0 - d, hR], [S.t1 + d, sEnd, hR]]);
+      rail([[S.t0 - d, sEnd, cR], [S.t0 - d, S.s0 - d, cR], [dt - 0.53, S.s0 - d, cR]]);
+      rail([[dt + 0.53, S.s0 - d, cR], [S.t1 + d, S.s0 - d, cR], [S.t1 + d, sEnd, cR]]);
+    }
 
     // ── the window and the door, each under its own arched canopy ──────────
-    const wt = S.t0 + 0.95, dt = S.t1 - 0.78;
+    //
     // The window: a big pane in a heavy dark green frame, with the shelves of
-    // the store behind it just readable.
-    boxTS(wt - 0.62, wt + 0.62, S.s0 - 0.27, S.s0 - 0.19, y0 + 0.86, y0 + 2.02,
-      DK, shade(DK, 1.30));
-    boxTS(wt - 0.53, wt + 0.53, S.s0 - 0.24, S.s0 - 0.21, y0 + 0.94, y0 + 1.94,
-      GLASS);
-    for (let k = 0; k < 3; k++) {
-      const sy = y0 + 1.02 + k * 0.32;
-      boxTS(wt - 0.48, wt + 0.48, S.s0 - 0.232, S.s0 - 0.222, sy, sy + 0.11,
-        [0.400, 0.396, 0.372], [0.445, 0.440, 0.412]);
+    // the store behind it just readable. The frame is a bent tube, the pane
+    // sits in it on the wall, and the shelves carry what a kiosk shelf does —
+    // cartons and bottles, in relief against the glass.
+    const FR = (pts, closed) => tubeTS(bendPath(pts, 0.06, 3, closed), [0.036, 0.050], DK, 10,
+      [0, 1, 0], 0.12);
+    FR([[wt - 0.58, S.s0 - 0.030, y0 + 0.90], [wt + 0.58, S.s0 - 0.030, y0 + 0.90],
+      [wt + 0.58, S.s0 - 0.030, y0 + 1.98], [wt - 0.58, S.s0 - 0.030, y0 + 1.98]], true);
+    boxTS(wt - 0.56, wt + 0.56, S.s0 - 0.016, S.s0 - 0.006, y0 + 0.92, y0 + 1.96, GLASS);
+    knRR(W, wt - 0.66, wt + 0.66, S.s0 - 0.13, S.s0 + 0.005, y0 + 0.80, y0 + 0.855, 0.015,
+      0.012, shade(body, 1.10), shade(body, 1.18), { bottom: true });
+    {
+      const GOOD = [[0.560, 0.300, 0.130], [0.235, 0.380, 0.520],
+        [0.545, 0.520, 0.430], [0.480, 0.170, 0.145], [0.400, 0.470, 0.235]];
+      for (let r = 0; r < 3; r++) {
+        const sy = y0 + 1.02 + r * 0.32;
+        boxTS(wt - 0.50, wt + 0.50, S.s0 - 0.030, S.s0 - 0.016, sy, sy + 0.020,
+          [0.400, 0.396, 0.372], [0.445, 0.440, 0.412]);
+        for (let i = 0; i < 7; i++) {
+          const ct = wt - 0.43 + i * 0.143;
+          const col = GOOD[(i * 3 + r) % GOOD.length];
+          const g = 0.82 + ((i * 5 + r * 3) % 4) * 0.08;
+          const c = [col[0] * g, col[1] * g, col[2] * g];
+          // A third of them cartons, squat — tall narrow ones in a row read
+          // as a bookcase — and the rest bottles.
+          if ((i * 4 + r * 3) % 3 === 0) {
+            boxTS(ct - 0.058, ct + 0.058, S.s0 - 0.040, S.s0 - 0.016, sy + 0.020,
+              sy + 0.020 + 0.085 + 0.03 * ((i + r) % 3), c, shade(col, 1.14));
+          } else {
+            // A bottle, half-round against the glass.
+            spinIn((x, yy, w) => W(ct + x, S.s0 - 0.016 + yy, w), [[sy + 0.021, 0],
+              [sy + 0.021, 0.030], [sy + 0.150, 0.030], [sy + 0.185, 0.016],
+              [sy + 0.230, 0.012], [sy + 0.236, 0]], c, 8, [1, 0.45], 0.10, 0.5);
+          }
+        }
+      }
     }
     // The doorway, and the leaf standing open on to the step.
-    boxTS(dt - 0.52, dt + 0.52, S.s0 - 0.26, S.s0 - 0.19, y0, y0 + 2.10,
-      DK, shade(DK, 1.30));
-    boxTS(dt - 0.42, dt + 0.42, S.s0 - 0.22, S.s0 - 0.14, y0 + 0.02, y0 + 2.00,
+    FR([[dt - 0.47, S.s0 - 0.030, y0 + 0.01], [dt - 0.47, S.s0 - 0.030, y0 + 2.06],
+      [dt + 0.47, S.s0 - 0.030, y0 + 2.06], [dt + 0.47, S.s0 - 0.030, y0 + 0.01]], false);
+    boxTS(dt - 0.42, dt + 0.42, S.s0 - 0.010, S.s0 - 0.004, y0 + 0.02, y0 + 2.01,
       [0.048, 0.052, 0.046]);
     // ── AND WHAT IS THROUGH IT ─────────────────────────────────────────────
     //
@@ -13030,19 +13378,34 @@ async function buildJadrija(scene) {
     // a chest fridge standing against it and a carton on the floor, all of it
     // three or four times the value of the doorway's own shadow.
     //
-    // Layered inland of the opening's back face at s0−0.14 with 10 mm between
-    // each, because rule 5 and because at 2.4 m tall these are the four
-    // largest parallel planes in the building.
-    boxTS(dt - 0.38, dt + 0.38, S.s0 - 0.130, S.s0 - 0.120, y0 + 0.04,
-      y0 + 1.96, [0.470, 0.462, 0.430]);
-    boxTS(dt - 0.30, dt + 0.02, S.s0 - 0.115, S.s0 - 0.105, y0 + 0.06,
-      y0 + 0.92, [0.620, 0.615, 0.590], [0.650, 0.646, 0.622]);
-    boxTS(dt + 0.10, dt + 0.34, S.s0 - 0.115, S.s0 - 0.105, y0 + 0.06,
-      y0 + 0.34, [0.545, 0.470, 0.320]);
-    boxTS(dt + 0.44, dt + 0.49, S.s0 - 0.96, S.s0 - 0.20, y0 + 0.02, y0 + 2.00,
-      DK, shade(DK, 1.24));
-    boxTS(dt + 0.452, dt + 0.482, S.s0 - 0.90, S.s0 - 0.28, y0 + 0.50,
-      y0 + 1.86, GLASS);
+    // In relief on the wall inside the frame, with a dark reveal down both
+    // jambs and across the head so the pale wall reads as further in.
+    boxTS(dt - 0.34, dt + 0.34, S.s0 - 0.016, S.s0 - 0.010, y0 + 0.04, y0 + 1.90,
+      [0.470, 0.462, 0.430]);
+    knRR(W, dt - 0.30, dt + 0.02, S.s0 - 0.075, S.s0 - 0.016, y0 + 0.06, y0 + 0.86, 0.02,
+      0.015, [0.620, 0.615, 0.590], [0.650, 0.646, 0.622]);
+    boxTS(dt - 0.28, dt + 0.00, S.s0 - 0.077, S.s0 - 0.073, y0 + 0.74, y0 + 0.76,
+      [0.300, 0.300, 0.300]);
+    knRR(W, dt + 0.10, dt + 0.34, S.s0 - 0.060, S.s0 - 0.016, y0 + 0.06, y0 + 0.34, 0.01,
+      0.008, [0.545, 0.470, 0.320], [0.585, 0.508, 0.350]);
+    // The leaf, swung right back: a rounded slab of dark green with its
+    // glazing on both faces, three hinges on the jamb and a lever each side.
+    {
+      const la = dt + 0.435, lc = dt + 0.485, ls0 = S.s0 - 0.92, ls1 = S.s0 - 0.08;
+      knRR(W, la, lc, ls0, ls1, y0 + 0.075, y0 + 2.00, 0.012, 0.010, DK, shade(DK, 1.24),
+        { bottom: true });
+      boxTS(la - 0.004, la + 0.002, ls0 + 0.08, ls1 - 0.08, y0 + 0.52, y0 + 1.86, GLASS);
+      boxTS(lc - 0.002, lc + 0.004, ls0 + 0.08, ls1 - 0.08, y0 + 0.52, y0 + 1.86, GLASS);
+      for (const hy of [y0 + 0.24, y0 + 1.04, y0 + 1.82]) {
+        gkRod([dt + 0.46, S.s0 - 0.072, hy], [dt + 0.46, S.s0 - 0.072, hy + 0.10], 0.014,
+          IRON, 8);
+      }
+      const hs = ls0 + 0.07, hy = y0 + 1.02;
+      for (const [f, o] of [[la, -1], [lc, 1]]) {
+        tubeTS(bendPath([[f, hs, hy], [f + o * 0.045, hs, hy], [f + o * 0.045, hs + 0.12, hy]],
+          0.02, 3), 0.009, [0.560, 0.556, 0.540], 8, [0, 0, 1], 0.14);
+      }
+    }
     // ── THE TWO DOOR HOODS, AND THEY ARE GLASS ON IRON ─────────────────────
     //
     // "Wrought iron scrolled up into a shallow arch with a sheet over them" is
@@ -13065,46 +13428,92 @@ async function buildJadrija(scene) {
     // on a shop three metres across: the two hoods overlapped by 0.11 m and
     // read as one continuous ribbon across the whole frontage. The frame has
     // them separate, with a clear hand's breadth of green between.
+    //
+    // 29 Sep: the sheet was four flat slats stepping out and down, which from
+    // the plaza read as a rack of white rails. It is ONE curved sheet now,
+    // on the same arc — out 0.72 m from the wall and falling 0.30 as the
+    // square of the distance — with a rolled front edge, a flashing along the
+    // wall, and brackets that are what the frame calls them: a scroll off the
+    // wall at the foot, a stay sweeping up to the sheet's outer edge, and a
+    // top arm along its underside.
     for (const [ct, cw] of [[wt, 0.52], [dt, 0.48]]) {
       const hy = y0 + 2.16;
       const SH = [0.545, 0.556, 0.562];
-      // The arc: four courses stepping out from the wall and falling away, the
-      // fall going as the square so the profile is a curve and not a ramp.
-      for (let k = 0; k < 4; k++) {
-        const sOut = S.s0 - 0.28 - k * 0.115;
-        const yy = hy + 0.10 - ((k + 1) / 4) * ((k + 1) / 4) * 0.30;
-        boxTS(ct - cw, ct + cw, sOut - 0.115, sOut, yy, yy + 0.022,
-          SH, shade(SH, 1.14));
+      const arc = (u) => [S.s0 - 0.012 - u * 0.72, hy + 0.10 - u * u * 0.30];
+      const US = [0, 0.14, 0.28, 0.42, 0.56, 0.70, 0.84, 1];
+      knSurf([ct - cw, ct + cw].map((tt) => US.map((u) => {
+        const [s, y] = arc(u);
+        return W(tt, s, y);
+      })), SH, { down: true });
+      {
+        const [s1e, y1e] = arc(1), [s0e, y0e] = arc(0);
+        gkRod([ct - cw, s1e, y1e - 0.004], [ct + cw, s1e, y1e - 0.004], 0.012,
+          shade(SH, 1.08), 10);
+        gkRod([ct - cw - 0.01, s0e, y0e + 0.008], [ct + cw + 0.01, s0e, y0e + 0.008], 0.016,
+          shade(SH, 0.90), 10);
+        for (const te of [ct - cw, ct + cw]) {
+          tubeTS(US.map((u) => { const [s, y] = arc(u); return [te, s, y]; }), 0.007,
+            shade(SH, 1.04), 6, [1, 0, 0], 0.10);
+        }
       }
       // The needle drift along the back of it, which is the detail that says
       // this canopy has been up since the spring. Under the pines all four
       // frames of this end of the shore have it on every horizontal surface.
-      boxTS(ct - cw + 0.06, ct + cw - 0.06, S.s0 - 0.30, S.s0 - 0.19,
-        hy + 0.122, hy + 0.150, [0.300, 0.222, 0.150]);
-      // The two brackets, and they are the only black on it: a stem on the
-      // wall and a stay raking out under the sheet's far end.
+      {
+        const [ds, dy] = arc(0.08);
+        gkRod([ct - cw + 0.07, ds, dy + 0.006], [ct + cw - 0.07, ds, dy + 0.006], 0.040,
+          [0.300, 0.222, 0.150], 10, [0.22, 1]);
+      }
+      // The two brackets, and they are the only black on it.
       for (const o of [-cw + 0.05, cw - 0.05]) {
-        boxTS(ct + o - 0.020, ct + o + 0.020, S.s0 - 0.30, S.s0 - 0.20,
-          hy - 0.34, hy + 0.11, IRON);
-        b.quad(W(ct + o - 0.018, S.s0 - 0.235, hy - 0.34),
-          W(ct + o - 0.018, S.s0 - 0.70, hy - 0.03),
-          W(ct + o + 0.018, S.s0 - 0.70, hy - 0.03),
-          W(ct + o + 0.018, S.s0 - 0.235, hy - 0.34), IRON);
-        b.quad(W(ct + o + 0.018, S.s0 - 0.235, hy - 0.34),
-          W(ct + o + 0.018, S.s0 - 0.70, hy - 0.03),
-          W(ct + o - 0.018, S.s0 - 0.70, hy - 0.03),
-          W(ct + o - 0.018, S.s0 - 0.235, hy - 0.34), IRON);
+        const tt = ct + o;
+        const P = (x, y) => [tt, S.s0 - x, y];
+        // The stay: up off the wall and out to the sheet's outer edge.
+        const s0p = [0.012, hy - 0.36], cp = [0.030, hy - 0.02];
+        const e = arc(0.90);
+        const ep = [S.s0 - e[0], e[1] - 0.011];
+        const pts = [];
+        // The scroll at its foot, wound in to a curl and out into the stay.
+        const cx = s0p[0] + 0.045;
+        for (let k = 0; k <= 10; k++) {
+          const th = -1.75 * Math.PI * (1 - k / 10);
+          const r = 0.045 * (1 - 0.6 * (-th) / (1.75 * Math.PI));
+          pts.push(P(cx - Math.cos(th) * r, s0p[1] + Math.sin(th) * r));
+        }
+        for (let k = 1; k <= 10; k++) {
+          const u = k / 10, a = (1 - u) * (1 - u), m = 2 * u * (1 - u), c = u * u;
+          pts.push(P(a * s0p[0] + m * cp[0] + c * ep[0], a * s0p[1] + m * cp[1] + c * ep[1]));
+        }
+        tubeTS(pts, 0.010, IRON, 6, [1, 0, 0], 0.10);
+        // The top arm, along the underside of the sheet.
+        tubeTS([0.02, 0.18, 0.36, 0.54, 0.72, 0.90].map((u) => {
+          const [s, y] = arc(u);
+          return [tt, s, y - 0.011];
+        }), 0.009, IRON, 6, [1, 0, 0], 0.10);
+        // And the plate it is all bolted to.
+        knRR(W, tt - 0.022, tt + 0.022, S.s0 - 0.010, S.s0 + 0.002, hy - 0.42, hy + 0.12,
+          0.008, 0.004, IRON);
       }
     }
     // The guard rail across the window, which is what stops anybody stepping
-    // off the step into the crates.
-    for (const o of [-0.68, 0.0, 0.68]) {
-      post(W, wt + o, S.s0 - 0.72, y0, y0 + 0.92, 0.024, IRON, 5);
+    // off the step into the crates: one tube bent over into both end posts,
+    // a mid rail, a middle post, and a flange under each foot.
+    {
+      const gs = S.s0 - 0.72;
+      tubeTS(bendPath([[wt - 0.68, gs, y0 + 0.01], [wt - 0.68, gs, y0 + 0.90],
+        [wt + 0.68, gs, y0 + 0.90], [wt + 0.68, gs, y0 + 0.01]], 0.12, 6), 0.024, IRON, 12,
+      [0, 1, 0], 0.16);
+      gkRod([wt, gs, y0 + 0.01], [wt, gs, y0 + 0.90], 0.022, IRON, 12);
+      gkRod([wt - 0.68, gs, y0 + 0.50], [wt + 0.68, gs, y0 + 0.50], 0.019, IRON, 10);
+      for (const o of [-0.68, 0, 0.68]) {
+        spinTS(wt + o, gs, [[y0 - 0.01, 0.060], [y0 + 0.010, 0.060], [y0 + 0.014, 0.034],
+          [y0 + 0.030, 0.026], [y0 + 0.031, 0]], IRON, 14, 0.12, 0.5);
+      }
     }
-    for (const yy of [y0 + 0.86, y0 + 0.50]) {
-      boxTS(wt - 0.70, wt + 0.70, S.s0 - 0.745, S.s0 - 0.695, yy, yy + 0.045,
-        IRON);
-    }
+    // The threshold, a boot-worn strip of a different concrete — the generic
+    // kit's, with its edges eased.
+    knRR(W, S.t0 + 0.3, S.t1 - 0.3, S.s0 - 0.55, S.s0 - 0.04, y0 - 0.01, y0 + 0.06, 0.04,
+      0.016, CONC[2], CONC[0]);
 
     // ── the crates, which are most of what this place looks like ───────────
     //
@@ -13112,15 +13521,24 @@ async function buildJadrija(scene) {
     // Pepsi blue, Jamnica blue, Heineken green, and the black bottle crates
     // that carry the empties back. A crate is 0.40 by 0.30 by 0.28, stacked
     // four and five high against the wall and out into the track.
+    //
+    // Open trays now (`gkCrate`), each a centimetre or two off the one under
+    // it — a stack somebody built, not a column — and the top of every stack
+    // full: brown glass under gold caps in the Ozujsko, green in the Heineken
+    // and the Jamnica, clear under blue in the Pepsi, and the black ones
+    // carrying their empties with no caps at all.
     {
       const CR = [
         [0.585, 0.455, 0.080], [0.085, 0.180, 0.440], [0.125, 0.235, 0.475],
         [0.075, 0.215, 0.115], [0.058, 0.058, 0.062], [0.455, 0.452, 0.440],
       ];
-      // What a full crate shows from above is twenty-four bottle tops, which
-      // is dark whatever the crate is. Without it a stack is a column of
-      // coloured bricks and reads as toy.
-      const TOPS = [0.085, 0.082, 0.072];
+      const BROWN = [0.300, 0.165, 0.060], GREEN = [0.110, 0.280, 0.130];
+      const CLEAR = [0.420, 0.470, 0.470];
+      const FILL = [
+        { glass: BROWN, cap: [0.700, 0.560, 0.120] }, { glass: CLEAR, cap: [0.150, 0.260, 0.560] },
+        { glass: GREEN, cap: [0.120, 0.300, 0.520] }, { glass: GREEN, cap: [0.600, 0.090, 0.075] },
+        { glass: BROWN, cap: null }, { glass: CLEAR, cap: [0.620, 0.620, 0.600] },
+      ];
       const stacks = [
         [S.t0 - 1.65, S.s0 - 0.95, 4], [S.t0 - 1.20, S.s0 - 1.35, 5],
         [S.t0 - 0.62, S.s0 - 1.02, 3], [S.t0 + 0.10, S.s0 - 1.55, 5],
@@ -13131,58 +13549,62 @@ async function buildJadrija(scene) {
       for (const [ct, cs, hi] of stacks) {
         const gy = surfaceY(ct, cs);
         for (let k = 0; k < hi; k++) {
-          const col = CR[(n * 3 + k * 2) % CR.length];
+          const ci = (n * 3 + k * 2) % CR.length;
           const yy = gy + k * 0.268;
-          boxTS(ct - 0.185, ct + 0.185, cs - 0.140, cs + 0.140, yy, yy + 0.235,
-            col, TOPS);
-          // The lip, which is what makes a stack of crates read as crates and
-          // not as a column of coloured bricks.
-          boxTS(ct - 0.190, ct + 0.190, cs - 0.145, cs + 0.145,
-            yy + 0.230, yy + 0.262, shade(col, 1.26), TOPS);
+          const ot = (jit(n, 931) - 0.5) * 0.030, os = (jit(n, 932) - 0.5) * 0.022;
+          gkCrate(ct - 0.185 + ot, ct + 0.185 + ot, cs - 0.140 + os, cs + 0.140 + os,
+            yy, yy + 0.262, CR[ci], k === hi - 1 ? FILL[ci] : null);
           n++;
         }
         furniture.push({ t: ct, s: cs, a: 0.22, c: 0.18, h: hi * 0.268, y: gy });
       }
     }
-    // The keg, on its side of the crates.
+    // The keg, on its side of the crates: turned, with its two chimes, the
+    // two rolling rings round its middle, a dished top and the spear.
     {
       const kt = S.t0 - 0.95, ks = S.s0 - 1.95, gy = surfaceY(kt, ks);
       const STEEL2 = [0.545, 0.552, 0.560];
-      post(W, kt, ks, gy, gy + 0.58, 0.21, STEEL2, 10);
-      post(W, kt, ks, gy + 0.56, gy + 0.62, 0.17, shade(STEEL2, 0.86), 10);
+      spinTS(kt, ks, [[gy + 0.000, 0.182], [gy + 0.006, 0.196], [gy + 0.070, 0.198],
+        [gy + 0.078, 0.188], [gy + 0.092, 0.200], [gy + 0.150, 0.205], [gy + 0.162, 0.212],
+        [gy + 0.176, 0.205], [gy + 0.300, 0.206], [gy + 0.424, 0.205], [gy + 0.436, 0.212],
+        [gy + 0.448, 0.205], [gy + 0.505, 0.200], [gy + 0.520, 0.188], [gy + 0.530, 0.198],
+        [gy + 0.612, 0.198], [gy + 0.620, 0.186], [gy + 0.612, 0.172], [gy + 0.578, 0.160],
+        [gy + 0.570, 0.060], [gy + 0.570, 0]], STEEL2, 28, 0.12, 0.55);
+      spinTS(kt, ks, [[gy + 0.568, 0.046], [gy + 0.602, 0.046], [gy + 0.606, 0.052],
+        [gy + 0.622, 0.052], [gy + 0.630, 0.036], [gy + 0.630, 0]], shade(STEEL2, 0.72), 16,
+      0.12, 0.5);
       furniture.push({ t: kt, s: ks, a: 0.23, c: 0.23, h: 0.62, y: gy });
     }
-    // Two wheelie bins on the dirt at the east end, and a slatted timber crate
-    // leaning on the wall by the door.
+    // Two wheelie bins on the dirt at the east end — see `gkBin` — and a
+    // slatted timber crate leaning on the end wall.
     {
       const GREENB = [0.135, 0.215, 0.125];
       for (const [bt, bs] of [[S.t1 + 0.85, S.s0 - 1.45], [S.t1 + 1.55, S.s0 - 1.30]]) {
         const gy = surfaceY(bt, bs);
-        boxTS(bt - 0.29, bt + 0.29, bs - 0.30, bs + 0.30, gy + 0.20, gy + 1.00,
-          GREENB, shade(GREENB, 1.16));
-        boxTS(bt - 0.25, bt + 0.25, bs - 0.26, bs + 0.26, gy + 0.09, gy + 0.22,
-          shade(GREENB, 0.70));
-        // The lid is a shade DOWN from the body and overhangs it, not up. A
-        // lighter lid flush with the sides is not a lid, it is a green box
-        // with a bright band round the top of it, which is what the first cut
-        // of these looked like from three metres.
-        boxTS(bt - 0.31, bt + 0.31, bs - 0.34, bs + 0.34, gy + 1.00, gy + 1.09,
-          shade(GREENB, 0.80), shade(GREENB, 0.92));
-        for (const o of [-0.22, 0.22]) {
-          post(W, bt + o, bs + 0.24, gy, gy + 0.09, 0.075, IRON, 6);
-        }
+        gkBin(bt, bs, gy, GREENB);
         furniture.push({ t: bt, s: bs, a: 0.32, c: 0.34, h: 1.07, y: gy });
       }
+      // It stood half a metre off the front wall on two plumb uprights, which
+      // is a ladder, and its slats ran into the open door leaf. LEANING now,
+      // as the note always said: feet out on the plaza, top against the east
+      // end wall between two battens, two rounded rails and five slats.
       const TIMB2 = [0.330, 0.245, 0.165];
-      const lt = S.t1 - 0.05, ls = S.s0 - 0.55, gy = surfaceY(lt, ls);
-      for (let k = 0; k < 5; k++) {
-        boxTS(lt - 0.26, lt + 0.26, ls - 0.09 - k * 0.02, ls - 0.03 - k * 0.02,
-          gy + 0.10 + k * 0.22, gy + 0.20 + k * 0.22, TIMB2,
-          shade(TIMB2, 1.12));
+      const la = S.s0 + 0.14, lc = S.s0 + 0.58;
+      const tf = S.t1 + 0.56, tw = S.t1 + 0.030;
+      const gy = surfaceY(tf, (la + lc) * 0.5), yt = y0 + 1.22;
+      const at = (u) => [tf + (tw - tf) * u, gy + 0.01 + (yt - gy - 0.01) * u];
+      const [ta0, ya0] = at(0), [ta1, ya1] = at(1);
+      const dl = Math.hypot(ta1 - ta0, ya1 - ya0);
+      const X = [(ya1 - ya0) / dl, 0, -(ta1 - ta0) / dl];   // square to it, off the wall
+      for (const sr of [la, lc]) {
+        gkBar([ta0, sr, ya0], [ta1, sr, ya1], [0, 1, 0], 0.022, 0.028, 0.008, TIMB2);
       }
-      for (const o of [-0.24, 0.24]) {
-        boxTS(lt + o - 0.03, lt + o + 0.03, ls - 0.20, ls - 0.02, gy,
-          gy + 1.20, TIMB2);
+      for (let k = 0; k < 5; k++) {
+        const [tk, yk] = at(0.10 + k * 0.19);
+        const o = 0.028 + 0.010;
+        gkBar([tk + X[0] * o, la - 0.035, yk + X[2] * o], [tk + X[0] * o, lc + 0.035, yk + X[2] * o],
+          [(ta1 - ta0) / dl, 0, (ya1 - ya0) / dl], 0.050, 0.010, 0.006,
+          shade(TIMB2, 1.04 + 0.05 * (k % 2)));
       }
     }
 
@@ -13199,12 +13621,11 @@ async function buildJadrija(scene) {
       const bs2 = S.s1 + 2.20;
       for (const [ba, bc] of [[S.t0 - 6.4, S.t0 - 3.3], [S.t0 - 3.1, S.t0 - 1.6]]) {
         const gy = surfaceY((ba + bc) * 0.5, bs2);
-        boxTS(ba, bc, bs2 - 0.05, bs2 + 0.05, gy + 0.80, gy + 0.90, YEL,
-          shade(YEL, 1.16));
-        post(W, bc, bs2, gy, gy + 0.92, 0.055, YEL, 6);
+        gkRod([ba, bs2, gy + 0.85], [bc, bs2, gy + 0.85], 0.050, YEL, 16);
+        gkPost(bc, bs2, gy, gy + 0.92, 0.055, YEL);
       }
       const gy2 = surfaceY(S.t0 - 3.2, bs2);
-      post(W, S.t0 - 3.2, bs2, gy2, gy2 + 0.95, 0.060, YEL, 6);
+      gkPost(S.t0 - 3.2, bs2, gy2, gy2 + 0.95, 0.060, YEL);
       furniture.push({ t: S.t0 - 3.2, s: bs2, a: 0.07, c: 0.07, h: 0.95,
         y: gy2 });
     }
@@ -19504,7 +19925,8 @@ async function buildJadrija(scene) {
     // shop's own body was drawn in front of him. See the note over `boxIn`
     // and the one over `SHOP_STAFF`. 1.5 m is the mullion spacing, and it
     // leaves 5 mm of sagitta on this radius.
-    boxTS(S.t0, S.t1, S.s0, S.s1, y0, top, body, shade(body, 0.9), 1.5);
+    // Not the green kiosk's: `greenKiosk` lays its own, round-cornered.
+    if (!S.twinGable) boxTS(S.t0, S.t1, S.s0, S.s1, y0, top, body, shade(body, 0.9), 1.5);
     // The serving front: a dark backing panel behind the opening, which is the
     // whole trick — a bright interior behind a shaded front reads as a lightbox
     // and nothing else about the shop can recover from it.
@@ -19523,7 +19945,9 @@ async function buildJadrija(scene) {
     // degrees: Maslina's opening is not a hole two thirds as wide as the shop
     // with a lightbox behind it, it is a glazed shopfront the WHOLE length with
     // a hatch slid open across the middle of it. See `maslinaFront`.
-    if (!S.metal && !S.solid && !S.container) {
+    // Nor the green kiosk, which has a window and a door and no serving
+    // hole: its cill ran across the doorway at knee height.
+    if (!S.metal && !S.solid && !S.container && !S.twinGable) {
       boxTS(oa, oc, S.s0 - 0.02, S.s0 + 0.10, y0 + 0.95, top - 0.35,
         [0.045, 0.041, 0.038]);
       boxTS(oa, oc, S.s0 - 0.10, S.s0 + 0.04, y0 + 0.86, y0 + 0.98,
@@ -20060,7 +20484,11 @@ async function buildJadrija(scene) {
     // boards on the wall and no planted pots. What stands outside Maslina in
     // `1000150414` is two cream louvred bin cabinets and a shrub bed, and
     // what is behind its glass is a hot cabinet and a case of pastry.
-    if (!S.metal && !S.container) {
+    // Nor on the green kiosk: its counter crossed the door, its condenser
+    // stood through the twin roof, its downpipe was inside the body and its
+    // two potted shrubs grew into the guard rail and the crates. What it
+    // does have of the kit is drawn in `greenKiosk` and `twinGableRoof`.
+    if (!S.metal && !S.container && !S.twinGable) {
       shopKit(S, y0, top, awn > 0 ? S.s0 - awn : null);
     }
     shopExtras(S, y0, top);
@@ -31846,6 +32274,17 @@ async function buildJadrija(scene) {
         && s > PLAY.s0 - 1.5 && s < PLAY.s1 + 1.5) continue;
       if (t > SAN.t0 - 1.5 && t < SAN.t1 + 1.5
         && s > SAN.s0 - 1.5 && s < SAN.s1 + 1.5) continue;
+      // Nor out of the rubble piers behind the green kiosk. The lane wall is
+      // built after this loop (its line is s 29.2, 0.32 either side with the
+      // coping — `WALL`, not yet declared here), so the stand never knew it
+      // was there, and one olive by the kiosk had its bole 0.3 m into the end
+      // of a pier: Misha, 29 Sep, *"plants/shrubs that have grown into the
+      // stones"*. PUSHED, by the rule above, a metre clear on whichever side
+      // it stood — no draw moves, and the blocker goes with it. Only here:
+      // what the piers do to the rest of the stand is not what was asked.
+      if (t > GREEN_CLEAR.t0 && t < GREEN_CLEAR.t1 && Math.abs(s - 29.2) < 1.1) {
+        s = s < 29.2 ? 29.2 - 1.32 : 29.2 + 1.32;
+      }
       // Not through the vikendica, which stands out here now and is 6.8 by 7.7
       // of the strip these were planted along.
       if (Math.hypot(t - VIK.t, s - VIK.s) < 8.5) continue;
@@ -38335,6 +38774,12 @@ async function buildJadrija(scene) {
         if (!G) build();
         const j = cellAt(x, z);
         if (j < 0 || G.M[j] !== OPEN) return null;
+        // Clear of every solid round the green kiosk — see GREEN_CLEAR.
+        if (G.DW[j] < GREEN_CLEAR.r * 6) {
+          const [t, s] = local(x, z);
+          if (t > GREEN_CLEAR.t0 && t < GREEN_CLEAR.t1 && s > GREEN_CLEAR.s0
+            && s < GREEN_CLEAR.s1) return null;
+        }
         return { edge: G.DE[j] / 6, wall: G.DW[j] / 6, trod: G.DW[j] < 27 && pinch(j, 9) };
       },
       height(x, z) {
