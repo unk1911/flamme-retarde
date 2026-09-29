@@ -8,6 +8,83 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.546.0] — 2026-09-29
+
+### The bead curtain bends
+
+Misha, looking at a WebGPU particle-fluid demo, asked whether any of it
+would do for *"that dolphin beads doorway to the kabine"*. The fluid would
+not help. It is WebGPU-only and the wrong thing anyway. The particles would,
+because particles are what a bead curtain is made of.
+
+**Before.** Every one of the 45 strands was a rigid pendulum with two angles,
+a spring and a damper. A strand you touched swung away from you, all 1.90 m
+of it, like a door on a hinge. She walked through a curtain that got out of
+her way and never touched her shoulders.
+
+**Now** (`beadCurtain` in `src/43-jadrija.js`). Each strand is a chain of 14
+links of point masses, 630 nodes in all, solved follow-the-leader (Müller et
+al. 2012) with its velocity correction. The solver has:
+
+- a little bending stiffness, so it curves over a shoulder instead of kinking;
+- the old `link` coupling, so a shove still runs across the curtain as a wave;
+- an edge-to-edge limit, so neighbouring strands don't pile into one ribbon.
+
+**Why not AVBD.** A chain with one fixed end and a free end is the case where
+a single top-down sweep is exactly inextensible. There is nothing left to
+iterate and nothing that can blow up. 43-avbd.js exists for the other case,
+a chain pinned at both ends between her wrists, and says so. Six hundred
+rigid bodies with 6x6 solves would pay for a problem this curtain doesn't
+have.
+
+**What it collides with:**
+
+- **You**, in either camera. Your body is ten capsules laid out off the
+  walker: chest, shoulders, head, hips, arms, thighs and shins. The legs and
+  arms swing on your stride. The first cut had still legs, and the middle
+  strand hooked under the hips and rode 1.4 m into the room.
+- **Her**, off her own bones, using the same CHAIN_BODY capsules as the cuffs,
+  the ball and the ragdolls. There are four extra capsules to fill the
+  grooves between her paired trunk capsules and at her nape. Those hollows
+  caught the middle strand and carried it across the room. The curtain is now
+  stepped after her pose (`beadsTick`), so it pushes against the body that is
+  drawn and not the one from a frame ago.
+- **The dog**, as one capsule.
+- **The jambs and the head of the door frame.**
+
+Contacts have Coulomb friction. A strand pulled taut round a body loses its
+friction and may stretch 10 % before it pulls itself free. With that rule,
+strands drape over her shoulder, slide off, and swing back.
+
+**At rest it is the old curtain, exactly.** The draught still swings the old
+rigid pendulum. The chains are simulated in its frame: they get the force
+that makes the swinging straight line an exact solution, and drag relative to
+it. Once every node has stayed within 5 mm of that line for 0.6 s, the solver
+sleeps and the old pendulum is drawn. Checked against 1.545.1 after 20 s
+untouched: the same angle to five places (0.01283 rad), strands straight to
+0.02 mm, and anchors identical.
+
+The printed dolphin still goes across the strands, and it follows the bent
+chains. Each tile is kept face-on as its strand swings sideways. The rattle
+is driven by the chains' movement, measured the way the old angular rate
+was. `din` goes from 0.30 to 0.20, because her crossings now measure 0.29 in
+and 0.34 out, and at 0.30 they clattered only half the time.
+
+**Measured** (RTX 4090, headless):
+
+- **Cost:** the solver itself, 0.12 ms a frame at 60 fps with her standing in
+  the doorway (35 capsules), 0.23 ms at 30 fps, and 0.12 ms for you. With
+  nobody touching it, 0.02 ms, which is the old curtain's cost. Past 26 m,
+  and once settled, nothing.
+- **Deepest node inside a body:** 8 mm (her upper arm, walking in), 16 mm
+  (walking out) and 22 mm (your shoulder, while a strand is taut). Otherwise
+  0 to 2 mm.
+- **Settle:** asleep 5 s after the last body leaves, every node within 5 mm
+  of rest when it snaps.
+
+**Unchanged.** 792 blockers (hash identical), the hammock frame at
+(−1923.174, 4.138, 443.162), and the rest of the kabina.
+
 ## [1.545.1] — 2026-09-28
 
 ### The cars' near tier ships, as a kit
