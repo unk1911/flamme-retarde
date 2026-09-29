@@ -36846,10 +36846,99 @@ async function buildJadrija(scene) {
   // chest take it up the spine, the head nods on the pillow, and a reflex
   // kicks her knees — the shins come up off the bed (or swing, over the edge)
   // and fall back on to it. Then the muscles have her back in the pose.
+  //
+  // AND IN EVERY OTHER POSE ON IT. Misha, 28 Sep 2026: *"the stomach down
+  // legs off bed are already amaze, but should be able to do the same ragdoll
+  // thing whether she is up down, sideways, any which way"*. Nothing in the
+  // net was about her front: the muscles aim at whatever clip is playing, the
+  // three springs hold her hips wherever it lays them, and the mattress and
+  // the pillow push back on whatever capsule is on them — her back and her
+  // heels lying on her back, a shoulder and a hip on her side, her seat
+  // sitting, her knees and shins kneeling, her shoulders and her head upside
+  // down. So every held pose on the cot is taken over the same way (`poses`
+  // below), and what differs is only what a slap is there: where the hand can
+  // reach (`reg`), which way it goes in, and what reflex it sets off.
+  //
+  // WHICH WAY IT GOES IN. On her front a slap is down and a little along her,
+  // as it always was. Anywhere else it is along the hand's own line, from
+  // your eye to where it landed: from above on to a thigh lying on her back,
+  // across into the upper hip lying on her side, forward into her seat from
+  // behind as she kneels. That is the one direction that is right in every
+  // pose, because it is the one the hand was actually moving in.
+  //
+  // WHAT HOLDS HER is the same three things in every pose: the springs on her
+  // hips, her muscles at `tension`, and the cot under her — the springs set
+  // wider off her front (`spread`, below), which is the one thing that had to
+  // change. With it, lying still after her first seconds in a pose the give
+  // stays under 3.5 degrees undrawn in all nine and nothing is ever drawn
+  // (see `actOut`): the trunk over a seat is 20 kg a quarter of a metre up,
+  // 49 N·m a radian of lean, and her spine is 308 at this tone; her legs
+  // straight up over her shoulders are 45 against the hip's 112. No wall is
+  // added for `perchHeld` or `upsideHeld`: since 1.513.0 the cot stands
+  // 0.60 m off the side wall and neither pose has it behind her. Her arms are
+  // still not in the net (see above) — and upside down that is the one thing
+  // that is not the real support: the elbows that prop her back ride her
+  // chest, so it is her shoulders on the foam and the springs that carry her
+  // there. Where her hands are ON something, they are kept on it
+  // (`cotHands`).
   const COT_RAG = {
-    // The phases she is taken over in: on her front, held. And within `far` m
-    // of the camera — see `cotRagTick`.
-    phases: { flatheld: 1, edgeHeld: 1 }, far: 12,
+    // The phases she is taken over in: every one she holds on the cot (see
+    // `poses`). And within `far` m of the camera — see `cotRagTick`.
+    phases: { flatheld: 1, edgeHeld: 1, cradle: 1, sideL: 1, sideR: 1, fetalHeld: 1,
+      sitHeld: 1, lotusHeld: 1, perchHeld: 1, bedKneel: 1, upsideHeld: 1 }, far: 12,
+    // EACH POSE, AND WHAT A SLAP IS IN IT. `lie` is which way up she is — on
+    // her `front` the slap is the one it always was (down, and `fwd` along);
+    // on any other it goes in along the hand's line. `reg` is where on her the
+    // hand can land (see `cotAim`): what is not listed is not a slap, and the
+    // press goes on to whatever else is under the crosshair — the thumb, the
+    // breast, the hip, the stroke — exactly as before. `knee` scales the
+    // knees' reflex and `head` the flinch, signed: the neck's +x is her head
+    // going back, which on her front is up off the pillow and on her back is
+    // into it, so there a flinch is −x, the chin coming in.
+    //
+    // Kneeling (`bedKneel`, the `kept` clip) her shins are what she is on, and
+    // a kick would only drive them into the foam or lift her off them; cross-
+    // legged they are crossed under her, and a kick drives one into the other.
+    // So there the reflex is the head and the rest is the slap's own push.
+    // Upside down the head carries her and does not flinch.
+    // A hip is a slap only on her side, where it is the top of her: lying on
+    // her back the hip is the hand that holds it (`hips` in 90-app.js).
+    //
+    // `spread`: her hips held by the same three springs, but at points that
+    // many times further out from her pelvis than the heads of her thighs and
+    // belly they are measured off — the same pull on where she is, and that
+    // many squared the hold on which way her pelvis faces. Face down it does
+    // not matter, the whole front of her pelvis is on the foam. Off her front
+    // it is what she sits and kneels and balances on, two round capsules on a
+    // flat box, and the springs 9 cm apart were ~20 N·m a radian: MEASURED at
+    // 1, lying still, sitting her pelvis rolled to the 20-degree clamp and
+    // back over two seconds, upside down it did it every breath, kneeling it
+    // wandered 14 — none of it drawn (see `actOut`), all of it drawn the
+    // moment a slap landed on it. At 3, from the fourth second on, nothing
+    // off the clip by more than 3 degrees in any of the nine (see CHANGELOG
+    // 1.544.0 for the table). And `warm`, s: the first seconds of a pose off
+    // her front are her settling into the foam (sitting cross-legged, 41
+    // degrees of it), so the rest the give is measured from follows it
+    // quickly for longer than it does face down.
+    poses: {
+      flatheld: { lie: 'front', knee: 1, head: 1, reg: { butt: 1, back: 1, thigh: 1 } },
+      // Over the edge the knees kick 0.6 of it: a hanging shin that flexes
+      // swings back under the cot, and at the whole of it the feet went in
+      // behind the side rail.
+      edgeHeld: { lie: 'front', knee: 0.6, head: 1, reg: { butt: 1, back: 1, thigh: 1 } },
+      cradle: { lie: 'back', spread: 3, warm: 2.5, knee: 0.8, head: -0.7, reg: { thigh: 1 } },
+      sideL: { lie: 'side', spread: 3, warm: 2.5, once: 1,
+        knee: 0.7, head: -0.6, reg: { butt: 1, hip: 1, back: 1, thigh: 1 } },
+      sideR: { lie: 'side', spread: 3, warm: 2.5, once: 1,
+        knee: 0.7, head: -0.6, reg: { butt: 1, hip: 1, back: 1, thigh: 1 } },
+      fetalHeld: { lie: 'side', spread: 3, warm: 2.5,
+        knee: 0.4, head: -0.6, reg: { butt: 1, hip: 1, back: 1, thigh: 1 } },
+      sitHeld: { lie: 'seat', spread: 3, warm: 2.5, knee: 0.7, head: -0.5, reg: { back: 1, thigh: 1 } },
+      lotusHeld: { lie: 'seat', spread: 3, warm: 2.5, knee: 0, head: -0.5, reg: { back: 1, thigh: 1 } },
+      perchHeld: { lie: 'seat', spread: 3, warm: 2.5, knee: 0.6, head: -0.5, reg: { back: 1, thigh: 1 } },
+      bedKneel: { lie: 'knees', spread: 3, warm: 2.5, knee: 0, head: 0.8, reg: { butt: 1, back: 1, thigh: 1 } },
+      upsideHeld: { lie: 'shoulders', spread: 3, warm: 2.5, knee: 0.5, head: 0, reg: { butt: 1, back: 1, thigh: 1 } },
+    },
     // The net: 120 Hz, at most four steps a frame — a frame at 30 fps; one
     // slower than that is physics lost, not a burst of it — and the settle's
     // iteration count.
@@ -36933,10 +37022,13 @@ async function buildJadrija(scene) {
       // (of the full kick), `head` the flinch. On the back the chest goes
       // into the foam and the head nods more, the legs hardly; on a thigh
       // that leg kicks the more and the seat barely moves.
+      // A hip, on her side, is the pelvis taken from above it: the whole of
+      // the slap, and a smaller reflex than the cheek's.
       at: {
         butt: { J: 1, seat: 0, knee: 1, other: 0.6, head: 1 },
         back: { J: 0.85, seat: 0, knee: 0.3, other: 0.3, head: 1.8 },
         thigh: { J: 0.75, seat: 0.25, knee: 1.3, other: 0.25, head: 0.6 },
+        hip: { J: 1, seat: 0, knee: 0.8, other: 0.4, head: 0.8 },
       },
     },
     // WHERE ON HER A PRESS LANDS — see `cotAim`. A ray that passes within
@@ -36949,7 +37041,12 @@ async function buildJadrija(scene) {
     // The back of a leg is a thigh down to `knee`, the hollow behind it
     // included; below that is her calf. `seat` is the height her pelvis
     // capsules stop being the cheeks and start being the small of her back.
-    aim: { snap: 0.04, snapK: 0.055, reach: 3, top: 1.38, knee: 0.42, seat: 0.97 },
+    // Off her front (see `cotAim`), which face of her it is, as the skin's
+    // way out against the capsule's line, 0..1 of the radius: her back and
+    // bottom past `face` of it toward −x, a hip past `side` of it outward, a
+    // thigh anywhere but more than `inner` of it toward the other leg.
+    aim: { snap: 0.04, snapK: 0.055, reach: 3, top: 1.38, knee: 0.42, seat: 0.97,
+      face: 0.35, side: 0.6, inner: 0.35 },
     // The reflex: after `lag` s the knees flex by `deg` over `up`, hold, and
     // let go over `down` — the slapped side's the more — and her head comes
     // up off the pillow by `head` with them, a flinch. Degrees. And for as
@@ -36958,11 +37055,15 @@ async function buildJadrija(scene) {
     // 30-degree kick moved the knee 4.5, most of it spent lifting the shin out
     // of the foam it lay in (the mattress already has that knee 11 degrees up
     // lying still, and the kick is aimed from the clip's, not from there).
-    // Over the edge (`edgeHeld`) the knees kick `edge` of that: a hanging
-    // shin that flexes swings back under the cot, and at the whole of it the
-    // feet went in behind the side rail.
-    kick: { lag: 0.05, up: 0.12, hold: 0.08, down: 0.42, deg: [35, 55], other: 0.6, head: [7, 12], stiff: 3,
-      edge: 0.6 },
+    // Each pose scales the knees and the flinch by its own `knee` and `head`.
+    kick: { lag: 0.05, up: 0.12, hold: 0.08, down: 0.42, deg: [35, 55], other: 0.6, head: [7, 12], stiff: 3 },
+    // Her hands kept on what they are on, off her front (see `cotHands`): a
+    // palm within `on` m of her skin is on it — `hair` m more on her head,
+    // which is hair before it is skull: behind her head against the wall her
+    // palms are 9.8 cm off the capsule (MEASURED) and holding it — within
+    // `mat` m of the top of the mattress is on that, and the elbow and the
+    // shoulder that keep it there turn at most `most` degrees each.
+    hands: { on: 0.06, mat: 0.07, most: 12, hair: 0.05 },
     // The most the give may turn a bone, degrees, and shift her, m — a clamp
     // that the physics never reaches unless something is wrong.
     most: { pelvis: 20, spine02: 20, chest: 20, neck: 25, legUL: 30, legUR: 30, legLL: 75, legLR: 75 },
@@ -36982,7 +37083,7 @@ async function buildJadrija(scene) {
   const _ctV = new THREE.Vector3();
   const _ctE = new Float64Array(4), _ctD = new Float64Array(4), _ctR = new Float64Array(4);
 
-  /** The net and her ragdoll in it, the first time she lies down on her front. */
+  /** The net and her ragdoll in it, the first time she holds a pose on the cot. */
   function cotBuild(f) {
     const caps = chainCapsules();
     const net = avbdNet({
@@ -37008,7 +37109,15 @@ async function buildJadrija(scene) {
     const R = { net, rag, holds, nb,
       body: COT_BODY.map((n) => f.boneIndex(n)).filter((i) => i >= 0),
       arms: ['armUL', 'armUR', 'armLL', 'armLR'].map((n) => rag.body(n)).filter((i) => i >= 0),
-      hip: ['legUL', 'legUR', 'spine02'].map((n) => f.boneIndex(n)),
+      hip: ['legUL', 'legUR', 'spine02'].map((n) => f.boneIndex(n)), pel: f.boneIndex('pelvis'), spread: 1,
+      // Each side's upper arm, hand and fingers (`cotHands`), and the pose
+      // run forward twice a frame for it: the clip, and the clip with the give.
+      hands: [['armUL', 'armLL', 'handL', 'fingersL'], ['armUR', 'armLR', 'handR', 'fingersR']]
+        .map((s) => s.map((n) => f.boneIndex(n))).filter((s) => s.every((i) => i >= 0)),
+      held: [null, null], heldBy: [null, null], headB: f.boneIndex('head'),
+      hW0: new Float64Array(nb * 4), hT0: new Float64Array(nb * 3),
+      hW1: new Float64Array(nb * 4), hT1: new Float64Array(nb * 3),
+      hQ: new Float32Array(nb * 4), hT: new Float32Array(3),
       legL: f.boneIndex('legLL'), legR: f.boneIndex('legLR'), neck: f.boneIndex('neck'),
       // The knees' angles in the net, and the multiple of their tone they are at.
       knees: rag.angles.filter(([n]) => /^legL/.test(n)).map(([, m]) => m), kneeK: 1,
@@ -37057,13 +37166,25 @@ async function buildJadrija(scene) {
     R.net.setFloor(() => floorY);
   }
 
-  /** Where the pose held still lays her hips this frame, world, into R.anchor. */
+  /**
+   * Where the pose held still lays her hips this frame, world, into R.anchor:
+   * the heads of her thighs and of her belly — or, `R.spread` > 1, the same
+   * three points that many times further out from her pelvis's own (see
+   * `spread`).
+   */
   function cotAnchors(R, f) {
     ragdollFK(f, R.tgt.q, R.tgt.t, R.fkW, R.fkT);
-    const mP = f.mesh.position, mQ = f.mesh.quaternion;
+    const mP = f.mesh.position, mQ = f.mesh.quaternion, s = R.spread, c = 3 * R.pel;
     R.hip.forEach((h, n) => {
       if (h < 0) return;
-      _ctV.set(R.fkT[3 * h], R.fkT[3 * h + 1], R.fkT[3 * h + 2]).applyQuaternion(mQ).add(mP);
+      const T = R.fkT;
+      // (At 1, the heads themselves, to the last bit: face down is exactly
+      // what it was before `spread` existed.)
+      if (s === 1) _ctV.set(T[3 * h], T[3 * h + 1], T[3 * h + 2]).applyQuaternion(mQ).add(mP);
+      else {
+        _ctV.set(T[c] + (T[3 * h] - T[c]) * s, T[c + 1] + (T[3 * h + 1] - T[c + 1]) * s,
+          T[c + 2] + (T[3 * h + 2] - T[c + 2]) * s).applyQuaternion(mQ).add(mP);
+      }
       R.anchor[n][0] = _ctV.x; R.anchor[n][1] = _ctV.y; R.anchor[n][2] = _ctV.z;
     });
   }
@@ -37079,6 +37200,11 @@ async function buildJadrija(scene) {
       cotL.clip.q.set(L.q); cotL.clip.t.set(L.t.subarray(0, 3));
     }
     cotWorld(R);
+    // The pose she is in, and how wide her hips are held for it (`spread`).
+    const pose = COT_RAG.poses[show.phase] || COT_RAG.poses.flatheld;
+    R.phase = show.phase;
+    R.spread = pose.spread || 1;
+    R.warmFor = pose.warm || COT_RAG.warmFor;
     net.resetDuals();
     R.tgt.q.set(cotL.clip.q); R.tgt.t.set(cotL.clip.t);
     rag.enterPose(R.tgt.q, R.tgt.t, f.mesh.position, f.mesh.quaternion);
@@ -37160,7 +37286,7 @@ async function buildJadrija(scene) {
   /**
    * Every frame, before her figure is posed: the net stepped toward the clip
    * under it, and the give it makes laid on her. Nothing at all unless she
-   * is lying on her front on the cot, or fading out of it.
+   * holds a pose on the cot (`poses`), or is fading out of one.
    */
   function cotRagTick(dt) {
     const f = skinFig;
@@ -37170,8 +37296,21 @@ async function buildJadrija(scene) {
     // so from `far` m off the net is not stepped at all — and is warm again
     // `warmFor` s after you come back in.
     const fx = f.mesh.position.x - lastCam.x, fz = f.mesh.position.z - lastCam.z;
+    // And not while a pose is still arriving in its own phase: `sideL` and
+    // `sideR` ARE the roll on to that side, a once-clip that holds its last
+    // frame (`once` in `poses`). Taken over at the start of it, the net was
+    // dragged through a 90-degree roll by its springs a beat behind the clip
+    // and slid 20 cm across the mattress doing it (MEASURED), and the give
+    // it measured was the lag. It takes her over on the frame the roll ends.
+    const pose = COT_RAG.poses[show.phase], st = f.state;
+    const arriving = !!(pose && pose.once && st.cur && st.cur.name === show.phase
+      && st.curT < st.cur.dur - 1e-4);
+    // And from one held pose straight into another with a slap still on her,
+    // the give fades out (`fadeOut`) before she is taken over in the new one,
+    // rather than snapping off in a frame.
+    const switching = !!(cotR && cotR.phase !== show.phase && cotL.on && cotL.w > 0);
     const want = !!(COT_RAG.phases[show.phase] && show.onBed && kit && kit.cot && !posed && !lickOn
-      && !(show.ham && show.ham.rag) && fx * fx + fz * fz < COT_RAG.far * COT_RAG.far);
+      && !(show.ham && show.ham.rag) && fx * fx + fz * fz < COT_RAG.far * COT_RAG.far) && !arriving && !switching;
     if (!want) {
       if (cotR && cotR.on) cotLeave();
       if (cotL.on) {
@@ -37181,7 +37320,8 @@ async function buildJadrija(scene) {
       return;
     }
     const t0 = performance.now();
-    if (!cotR || !cotR.on) cotEnter(f);
+    // Taken over afresh in a new pose, even one straight from another.
+    if (!cotR || !cotR.on || cotR.phase !== show.phase) cotEnter(f);
     const R = cotR, { net, rag } = R;
     R.t += dt;
     R.calm = Math.max(0, R.calm - dt);
@@ -37208,7 +37348,9 @@ async function buildJadrija(scene) {
       if (Kn.t > kickEnd) { R.kicks.splice(n, 1); continue; }
       aL = Math.max(aL, cotKickAt(Kn.l, Kn.t));
       aR = Math.max(aR, cotKickAt(Kn.r, Kn.t));
-      aH = Math.max(aH, cotKickAt(Kn.h, Kn.t));
+      // The flinch is signed (see `poses`' `head`): the most of it either way.
+      const h = cotKickAt(Kn.h, Kn.t);
+      if (Math.abs(h) > Math.abs(aH)) aH = h;
     }
     // The knees at `stiff` times their tone while a kick is in flight.
     const kk = R.kicks.length ? K.stiff : 1;
@@ -37244,7 +37386,7 @@ async function buildJadrija(scene) {
     // The give: each body's bone off the pose held still, less its resting
     // part — laid on the clip.
     rag.write(R.out, f.mesh.position, f.mesh.quaternion, cotL.clip.q);
-    const tau = R.t < COT_RAG.warmFor ? COT_RAG.bias.warm : COT_RAG.bias.rest;
+    const tau = R.t < R.warmFor ? COT_RAG.bias.warm : COT_RAG.bias.rest;
     const kb = R.calm > 0 ? 0 : 1 - Math.exp(-dt / tau);
     const C = R.tgt.q, O = R.out.q, Bq = R.bias;
     for (const i of R.body) {
@@ -37281,9 +37423,148 @@ async function buildJadrija(scene) {
     // How far the seat is from where it rests, m — for a probe.
     cotStats.sink = tl;
     cotStats.sinkMax = Math.max(cotStats.sinkMax, tl);
+    // And her hands kept on whatever they are on — see `cotHands`.
+    cotHands(R, f, COT_RAG.poses[R.phase]);
     const ms = performance.now() - t0;
     cotStats.ms = ms; cotStats.msMax = Math.max(cotStats.msMax, ms);
     cotStats.msSum += ms; cotStats.frames++;
+  }
+
+  /**
+   * AND HER HANDS ON WHATEVER THEY ARE ON, while a give is drawn, off her
+   * front. Her arms are not in the net (see the note over COT_RAG): they ride
+   * her chest on the clip's own angles, which face down is the whole of it —
+   * her hands lie beside her, or go to her cheeks on the spread, and that has
+   * never been touched here. Every other pose on the cot has hands ON
+   * something: on her knees cross-legged, planted on the mattress sitting up,
+   * holding her legs up on her back, behind her head against the wall,
+   * propping her back upside down. Riding the chest, a hand on a knee the
+   * slap has just moved stays where the knee was: MEASURED cross-legged, a
+   * thigh slap left her right hand 44 mm off her knee at the worst of it, and
+   * sitting up a slap on her thigh took both hands 24 mm through and off the
+   * mattress they lean on.
+   *
+   * So each frame the give is drawn, each hand is asked what it is on in the
+   * clip — the nearest of her own capsules (not her arms, not her chest they
+   * hang from) within `hands.on` of her palm, or else the mattress, if her
+   * palm is within `hands.mat` of its top — and the upper arm is swung about
+   * the shoulder so the palm is back on that: on the same point of that bone
+   * as it moves with the give, or on the same point of the mattress, which
+   * does not move. A swing and not a reach: the elbow keeps its angle, so the
+   * palm lands on the line to where it belongs and not along it, and at a
+   * give of a few centimetres that is a millimetre or two. At most `hands.most`
+   * degrees, a bound the give never gets near.
+   */
+  const _hdA = new THREE.Vector3();
+  const _hdS = new Float64Array(4), _hdE = new Float64Array(4), _hdP = new Float64Array(3);
+  const _hdX = new Float64Array(3), _hdY = new Float64Array(3), _hdU = new Float64Array(3), _hdQ = new Float64Array(4);
+  function cotHands(R, f, pose) {
+    const q = cotL.q;
+    for (const [iU, iL] of R.hands) {
+      for (const o of [4 * iU, 4 * iL]) { q[o] = q[o + 1] = q[o + 2] = 0; q[o + 3] = 1; }
+    }
+    R.held[0] = R.held[1] = null;
+    if (!pose || pose.lie === 'front' || cotL.w <= 0) return;
+    const G = COT_RAG.hands, BR = f.bindRest(), C = cotL.clip, caps = chainCapsules();
+    // The clip, run forward; and the clip with the give on it, run forward.
+    ragdollFK(f, C.q, C.t, R.hW0, R.hT0);
+    R.hQ.set(C.q);
+    for (const i of R.body) avbdQMul(C.q, 4 * i, q, 4 * i, R.hQ, 4 * i);
+    for (let k = 0; k < 3; k++) R.hT[k] = C.t[k] + cotL.t[k];
+    ragdollFK(f, R.hQ, R.hT, R.hW1, R.hT1);
+    const W0 = R.hW0, T0 = R.hT0, W1 = R.hW1, T1 = R.hT1;
+    // A bind point on bone b, posed by (W, T), into out.
+    const at = (W, T, b, x, out) => {
+      avbdQMul(W, 4 * b, BR.bindQ, 4 * b, _hdE, 0, false, true);
+      _hdU[0] = x[0] - BR.bindT[3 * b]; _hdU[1] = x[1] - BR.bindT[3 * b + 1]; _hdU[2] = x[2] - BR.bindT[3 * b + 2];
+      qrotv(out, 0, _hdE, 0, _hdU, 0);
+      out[0] += T[3 * b]; out[1] += T[3 * b + 1]; out[2] += T[3 * b + 2];
+    };
+    const mQ = f.mesh.quaternion, mP = f.mesh.position, top = kit.cot[2];
+    R.hands.forEach(([iU, iL, iH, iF], s) => {
+      // Her palm, half way from her wrist to her knuckles: in the clip, and drawn.
+      const p0 = [(T0[3 * iH] + T0[3 * iF]) / 2, (T0[3 * iH + 1] + T0[3 * iF + 1]) / 2, (T0[3 * iH + 2] + T0[3 * iF + 2]) / 2];
+      const p1 = [(T1[3 * iH] + T1[3 * iF]) / 2, (T1[3 * iH + 1] + T1[3 * iF + 1]) / 2, (T1[3 * iH + 2] + T1[3 * iF + 2]) / 2];
+      // What it is on, in the clip.
+      let best = null, gap = G.on, gMin = Infinity;
+      for (const c of caps) {
+        if (c.only || /^(arm|hand|finger|thumb|clavicle|chest)/.test(f.bones[c.bone].name)) continue;
+        at(W0, T0, c.bone, c.a, _hdX); at(W0, T0, c.bone, c.e, _hdY);
+        const ex = _hdY[0] - _hdX[0], ey = _hdY[1] - _hdX[1], ez = _hdY[2] - _hdX[2];
+        const ee = ex * ex + ey * ey + ez * ez;
+        const u = ee > 0 ? clamp(((p0[0] - _hdX[0]) * ex + (p0[1] - _hdX[1]) * ey + (p0[2] - _hdX[2]) * ez) / ee, 0, 1) : 0;
+        const g = Math.hypot(p0[0] - _hdX[0] - ex * u, p0[1] - _hdX[1] - ey * u, p0[2] - _hdX[2] - ez * u)
+          - (c.r0 + (c.r1 - c.r0) * u) - (c.bone === R.headB ? G.hair : 0);
+        if (g < gap) { gap = g; best = c.bone; }
+        if (g < gMin) gMin = g;
+      }
+      // Where it belongs now: the same point of that bone, drawn — or where it was.
+      const tg = [p0[0], p0[1], p0[2]];
+      const hy = _hdA.set(p0[0], p0[1], p0[2]).applyQuaternion(mQ).add(mP).y - top;
+      if (best != null) {
+        const b = best;
+        _hdU[0] = p0[0] - T0[3 * b]; _hdU[1] = p0[1] - T0[3 * b + 1]; _hdU[2] = p0[2] - T0[3 * b + 2];
+        _hdE[0] = -W0[4 * b]; _hdE[1] = -W0[4 * b + 1]; _hdE[2] = -W0[4 * b + 2]; _hdE[3] = W0[4 * b + 3];
+        qrotv(_hdP, 0, _hdE, 0, _hdU, 0);
+        qrotv(_hdX, 0, W1, 4 * b, _hdP, 0);
+        tg[0] = T1[3 * b] + _hdX[0]; tg[1] = T1[3 * b + 1] + _hdX[1]; tg[2] = T1[3 * b + 2] + _hdX[2];
+        R.held[s] = f.bones[b].name;
+      } else if (hy < G.mat) {
+        R.held[s] = 'mattress';
+      }
+      // For a probe: how near her skin and the mattress top that palm was.
+      R.heldBy[s] = [+gMin.toFixed(3), +hy.toFixed(3)];
+      if (!R.held[s]) return;
+      // THE ELBOW FIRST: opened or closed about its own hinge until the palm
+      // is as far from her shoulder as where it belongs — a knee pressed
+      // down and away from her by a slap is further off than her arm was
+      // bent for, and no swing of the shoulder reaches it.
+      const sh = 3 * iU, el = 3 * iL;
+      const ax = T1[el] - T1[sh], ay = T1[el + 1] - T1[sh + 1], az = T1[el + 2] - T1[sh + 2];
+      let fx = p1[0] - T1[el], fy = p1[1] - T1[el + 1], fz = p1[2] - T1[el + 2];
+      const A = Math.hypot(ax, ay, az), B = Math.hypot(fx, fy, fz);
+      const want = clamp(Math.hypot(tg[0] - T1[sh], tg[1] - T1[sh + 1], tg[2] - T1[sh + 2]),
+        Math.abs(A - B) + 1e-3, A + B - 1e-3);
+      const nx = ay * fz - az * fy, ny = az * fx - ax * fz, nz = ax * fy - ay * fx, nl = Math.hypot(nx, ny, nz);
+      _hdE[0] = 0; _hdE[1] = 0; _hdE[2] = 0; _hdE[3] = 1;
+      if (A > 1e-4 && B > 1e-4 && nl > 1e-6) {
+        const cNow = Math.hypot(p1[0] - T1[sh], p1[1] - T1[sh + 1], p1[2] - T1[sh + 2]);
+        // The inside angle at the elbow, now and wanted; turning the forearm
+        // about n = upper × fore by +φ closes it by φ.
+        const inNow = Math.acos(clamp((A * A + B * B - cNow * cNow) / (2 * A * B), -1, 1));
+        const inWant = Math.acos(clamp((A * A + B * B - want * want) / (2 * A * B), -1, 1));
+        const phi = clamp(inNow - inWant, -G.most * Math.PI / 180, G.most * Math.PI / 180);
+        const sn = Math.sin(phi / 2) / nl;
+        _hdE[0] = nx * sn; _hdE[1] = ny * sn; _hdE[2] = nz * sn; _hdE[3] = Math.cos(phi / 2);
+        _hdU[0] = fx; _hdU[1] = fy; _hdU[2] = fz;
+        qrotv(_hdX, 0, _hdE, 0, _hdU, 0);
+        fx = _hdX[0]; fy = _hdX[1]; fz = _hdX[2];
+        // In the forearm's own frame: d = W⁻¹·F·W.
+        avbdQMul(W1, 4 * iL, _hdE, 0, _hdQ, 0, true);
+        const oL = 4 * iL;
+        avbdQMul(_hdQ, 0, W1, oL, q, oL);
+      }
+      // THEN THE SHOULDER: the whole arm swung about it so the palm — where
+      // the elbow has just put it — lies on the line to where it belongs.
+      const ux = T1[el] + fx - T1[sh], uy = T1[el + 1] + fy - T1[sh + 1], uz = T1[el + 2] + fz - T1[sh + 2];
+      const vx = tg[0] - T1[sh], vy = tg[1] - T1[sh + 1], vz = tg[2] - T1[sh + 2];
+      _hdS[0] = uy * vz - uz * vy; _hdS[1] = uz * vx - ux * vz; _hdS[2] = ux * vy - uy * vx;
+      _hdS[3] = Math.hypot(ux, uy, uz) * Math.hypot(vx, vy, vz) + ux * vx + uy * vy + uz * vz;
+      const l = Math.hypot(_hdS[0], _hdS[1], _hdS[2], _hdS[3]);
+      if (!(l > 1e-9)) return;
+      for (let k = 0; k < 4; k++) _hdS[k] /= l;
+      const ang = 2 * Math.acos(Math.min(1, Math.abs(_hdS[3]))), most = G.most * Math.PI / 180;
+      if (ang > most) {
+        const k = Math.sin(most / 2) / (Math.sin(ang / 2) || 1);
+        _hdS[0] *= k; _hdS[1] *= k; _hdS[2] *= k; _hdS[3] = Math.sign(_hdS[3] || 1) * Math.cos(most / 2);
+      }
+      // In the upper arm's own frame, which is how the settle lays it on:
+      // d = W⁻¹·S·W, so that W·d = S·W — and the forearm's, above, rides it.
+      avbdQMul(W1, 4 * iU, _hdS, 0, _hdE, 0, true);
+      avbdQMul(_hdE, 0, W1, 4 * iU, _hdS, 0);
+      const o = 4 * iU;
+      q[o] = _hdS[0]; q[o + 1] = _hdS[1]; q[o + 2] = _hdS[2]; q[o + 3] = _hdS[3];
+    });
   }
 
   /**
@@ -37353,7 +37634,10 @@ async function buildJadrija(scene) {
     }
     const J = Math.min(S.cap, k != null ? +k
       : Math.random() < S.hardP ? S.hard : S.J[0] + (S.J[1] - S.J[0]) * Math.random());
-    // Down into the mattress, and `fwd` of it along the way the hand was going.
+    // On her front: down into the mattress, and `fwd` of it along the way the
+    // hand was going. In any other pose: along the hand's line, from where it
+    // came from to where it landed (see `poses`) — or down, from nowhere.
+    const pose = COT_RAG.poses[show.phase] || COT_RAG.poses.flatheld;
     let fx = 0, fz = 0;
     if (from) {
       fx = px - from.x; fz = pz - from.z;
@@ -37362,7 +37646,10 @@ async function buildJadrija(scene) {
     }
     const Jb = J * A.J;
     let jx = fx * S.fwd, jy = -1, jz = fz * S.fwd;
-    const jl = Math.hypot(jx, jy, jz);
+    if (pose.lie !== 'front' && from && from.y != null) {
+      jx = px - from.x; jy = py - from.y; jz = pz - from.z;
+    }
+    const jl = Math.hypot(jx, jy, jz) || 1;
     jx /= jl; jy /= jl; jz /= jl;
     const sc = cotImpulse(b, [px, py, pz], jx * Jb, jy * Jb, jz * Jb);
     // And the seat's share of a slap that landed elsewhere, straight through
@@ -37374,19 +37661,21 @@ async function buildJadrija(scene) {
     // point is 4.7 cm off the right thigh's line and 18.5 off the left's).
     // Through 1.542.0 a cheek kicked the knee across from it the more.
     const K = COT_RAG.kick, u = clamp((J - S.J[0]) / (S.hard - S.J[0]), 0, 1);
+    // And both scaled by the pose's own (see `poses`), the flinch signed.
     const deg = (K.deg[0] + (K.deg[1] - K.deg[0]) * u) * (0.85 + 0.3 * Math.random()) * Math.PI / 180
-      * (show.phase === 'edgeHeld' ? K.edge : 1);
-    const head = (K.head[0] + (K.head[1] - K.head[0]) * u) * Math.PI / 180 * A.head;
+      * pose.knee;
+    const head = (K.head[0] + (K.head[1] - K.head[0]) * u) * Math.PI / 180 * A.head * pose.head;
     const nearR = hit && hit.leg ? hit.leg === 'R' : side > 0;
     const kn = deg * A.knee, ko = deg * A.other;
     R.kicks.push({ t: 0, l: nearR ? ko : kn, r: nearR ? kn : ko, h: head });
     if (R.kicks.length > 3) R.kicks.shift();
     R.calm = COT_RAG.calm;
     // Past the warm-up at once: a slap in its first second is still a slap.
-    if (R.t < COT_RAG.warmFor) R.t = COT_RAG.warmFor;
+    if (R.t < R.warmFor) R.t = R.warmFor;
     cotStats.spanks++;
     cotStats.last = { J: +Jb.toFixed(2), dv: +(Jb * sc / net.mass[b]).toFixed(3), side, reg,
-      bone: hit ? hit.bone : 'pelvis', kick: +(kn * 180 / Math.PI).toFixed(1) };
+      bone: hit ? hit.bone : 'pelvis', kick: +(kn * 180 / Math.PI).toFixed(1), phase: show.phase,
+      dir: [+jx.toFixed(2), +jy.toFixed(2), +jz.toFixed(2)] };
     return true;
   }
 
@@ -37429,6 +37718,13 @@ async function buildJadrija(scene) {
    * when she is lying there and it is not her back, her bottom or a thigh —
    * so the two cheeks' points are not asked after it (see 90-app.js) — and
    * null when she is not lying on her front on the cot.
+   *
+   * AND IN EVERY OTHER POSE SHE HOLDS ON IT (COT_RAG.poses), the same test
+   * against the same body, with `reg` 'hip' besides, and one difference in
+   * what it answers: where it is not a slap it is null and not a miss, so a
+   * press on her breast, her belly, her face or the inside of her thigh is
+   * the cup, the hip, the stroke or the thumb it has always been. Only on
+   * her front is all of her that you can see a slap.
    */
   const _caA = new THREE.Vector3(), _caB = new THREE.Vector3(), _caQ = new THREE.Quaternion();
   const _caMI = new THREE.Matrix4();
@@ -37505,10 +37801,36 @@ async function buildJadrija(scene) {
     // above `top` are not a slap; the top of the back of a thigh, under the
     // fold, is the cheek.
     let reg = null;
-    if (s.nm === 'pelvis') reg = bp.y < G.seat ? 'butt' : 'back';
-    else if (s.nm === 'spine02' || (s.nm === 'chest' && bp.y <= G.top)) reg = 'back';
-    else if (/^leg[UL]/.test(s.nm) && bp.y >= G.knee) reg = bp.y > APPR.buttY[0] && bp.x < 0 ? 'butt' : 'thigh';
-    if (!reg) return { miss: true, bone: s.nm, y: +bp.y.toFixed(3) };
+    const pose = COT_RAG.poses[show.phase] || COT_RAG.poses.flatheld;
+    if (pose.lie === 'front') {
+      if (s.nm === 'pelvis') reg = bp.y < G.seat ? 'butt' : 'back';
+      else if (s.nm === 'spine02' || (s.nm === 'chest' && bp.y <= G.top)) reg = 'back';
+      else if (/^leg[UL]/.test(s.nm) && bp.y >= G.knee) reg = bp.y > APPR.buttY[0] && bp.x < 0 ? 'butt' : 'thigh';
+      if (!reg) return { miss: true, bone: s.nm, y: +bp.y.toFixed(3) };
+    } else {
+      // ANY OTHER WAY UP, her front can be under the hand as well as her
+      // back, so it is which FACE of her it is and not only which part:
+      // the way the skin faces there, off the capsule's own line at that
+      // point (bind frame, +x her front, +z her right). Her back, her
+      // bottom and the small of it face −x; a hip faces out to its own side;
+      // a thigh is a slap anywhere but its inner face, which is the stroke's
+      // (`hips().low` in 90-app.js). Her front — breasts, belly, the fold of
+      // her hips — is not a slap, and neither is anything her pose does not
+      // list (`poses`' `reg`): null, and the press is whatever it was before.
+      const u = r[1], c = s.c, rad = c.r0 + (c.r1 - c.r0) * u || 1;
+      const nx = (bp.x - (c.a[0] + (c.e[0] - c.a[0]) * u)) / rad;
+      const az = c.a[2] + (c.e[2] - c.a[2]) * u, nz = (bp.z - az) / rad;
+      const out = (az >= 0 ? 1 : -1) * nz;
+      if (s.nm === 'pelvis') {
+        if (out > G.side && pose.reg.hip) reg = 'hip';
+        else if (nx < -G.face) reg = bp.y < G.seat ? 'butt' : 'back';
+      } else if (s.nm === 'spine02' || (s.nm === 'chest' && bp.y <= G.top)) {
+        if (nx < -G.face) reg = 'back';
+      } else if (/^legU/.test(s.nm) && bp.y >= G.knee && out > -G.inner) {
+        reg = bp.y > APPR.buttY[0] && bp.x < 0 ? 'butt' : 'thigh';
+      }
+      if (!reg || !pose.reg[reg]) return null;
+    }
     // The body it goes on: the pelvis for a cheek, wherever on it; the belly
     // for the small of her back, even where that is the top of the pelvis's
     // capsules — on the pelvis, above its middle, it rocked her seat and
@@ -37516,7 +37838,7 @@ async function buildJadrija(scene) {
     // not the back; and the thigh's body for the hollow of a knee too, since
     // the shin under it is a third of the weight.
     return { reg, side: bp.z > 0 ? 1 : -1, leg: bp.z > 0 ? 'R' : 'L',
-      bone: reg === 'butt' ? 'pelvis' : reg === 'thigh' ? 'legU' + (bp.z > 0 ? 'R' : 'L')
+      bone: reg === 'butt' || reg === 'hip' ? 'pelvis' : reg === 'thigh' ? 'legU' + (bp.z > 0 ? 'R' : 'L')
         : s.nm === 'pelvis' ? 'spine02' : s.nm,
       x: w.x, y: w.y, z: w.z, bind: [bp.x, bp.y, bp.z], snap: !hitIn, t: +best.t.toFixed(3) };
   }
@@ -61737,6 +62059,8 @@ async function buildJadrija(scene) {
       msMax: +cotStats.msMax.toFixed(3), msAvg: +(cotStats.msSum / Math.max(1, cotStats.frames)).toFixed(3),
       frames: cotStats.frames, steps: cotStats.steps, rescues: cotStats.rescues, why: cotStats.why, whys: cotStats.whys,
       spanks: cotStats.spanks, enters: cotStats.enters, last: cotStats.last,
+      // What each hand is kept on while a give is drawn (`cotHands`).
+      held: cotR ? cotR.held.slice() : null, heldBy: cotR ? cotR.heldBy.slice() : null,
       give: +cotStats.sink.toFixed(4), giveMax: +cotStats.sinkMax.toFixed(4),
       contacts: cotR ? cotR.net.stats.contacts : 0,
       loose: cotR && cotR.on ? +cotR.net.measure().maxLoose.toFixed(4) : null,

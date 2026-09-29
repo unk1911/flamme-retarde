@@ -8,6 +8,111 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.544.0] — 2026-09-28
+
+### On the cot, a ragdoll in every pose she holds
+
+Misha: *"the stomach down legs off bed are already amaze, but should be able
+to do the same ragdoll thing whether she is up down, sideways, any which
+way"*. The cot's AVBD ragdoll (1.540.0, `COT_RAG` in 43-jadrija.js) now takes
+her over in all eleven poses she holds on it, not just the two face down: on
+her back (`cradle`, legs up or `supine`), on either side (`sideL`, `sideR`),
+curled (`fetalHeld`), sitting (`sitHeld`), cross-legged (`lotusHeld`), perched
+on the edge (`perchHeld`), kneeling up (`bedKneel`, the `kept` clip) and
+upside down on her shoulders (`upsideHeld`). Same eight bodies, same
+mattress and pillow, same muscles aimed at the clip. Lying still she is
+still the clip exactly, because nothing is drawn until a slap lands.
+
+- **Where a slap lands, per pose** (`poses[..].reg`, `cotAim`). It's the
+  same ray-against-her-capsules test, but off her front it also asks which
+  way the skin faces: her back and bottom face −x, a hip faces out, a thigh
+  counts anywhere except its inner face. Anything not listed for the pose
+  returns null rather than a miss, so the breast, belly, inner thigh
+  (the stroke), mouth and hair are still the cup, stroke, thumb and pet.
+  On her back only the thighs are a slap; the hip there stays the hip grab.
+  On her side the upper hip, bottom, back and thighs; sitting, the thighs
+  and back; kneeling or upside down, the bottom, back and thighs.
+- **Which way it goes in.** Face down it's unchanged (down, plus 0.35 along
+  the hand's way). In every other pose it goes along the hand's own line,
+  from the eye to where it landed.
+- **The reflex, per pose** (`knee`, `head`). The knee kick is scaled by pose
+  (0 kneeling and cross-legged, where the shins are what she's on or are
+  crossed under her). The flinch is signed: on her back or side the chin
+  comes in rather than the head going back, and upside down the head
+  carries her, so there's no flinch.
+- **Her hips held wider off her front** (`spread` 3). Sitting, kneeling or
+  balanced on her shoulders, the three hip springs 9 cm apart gave only
+  about 20 N·m/rad against her pelvis turning. MEASURED lying still at
+  spread 1: sitting, her pelvis rolled to the 20° clamp and back over two
+  seconds; upside down it did that every breath, with 62 mm of give;
+  kneeling it wandered 14°. None of it was drawn until a slap landed on
+  top of it. At 3 it's under 3.5° in every pose once she has settled. Face
+  down the anchors are the bone heads, bit for bit as before.
+- **Her hands kept on what they are on** (`cotHands`, new). Her arms still
+  ride her chest, but when a give is drawn, off her front, each palm that
+  is on her own skin (within 6 cm, plus 5 cm of hair on her head) or on the
+  mattress (within 7 cm) is put back there. The elbow bends or opens about
+  its hinge, then the shoulder swings. MEASURED worst frame of a slap, palm
+  off the point it rests on:
+
+  | pose | held on | before | after |
+  |---|---|---|---|
+  | `cradle` (legs held up) | both thighs | 31 / 50 mm | 2.5 / 3.1 mm |
+  | `upsideHeld` | her back | 1 / 1 | 0 / 0 |
+  | `sideL` | upper thigh | 13.5 | 0.1 |
+  | `sideR` | upper thigh | 13.5 | 0.2 |
+  | `fetalHeld` | head / shin | 18 / 12.6 | 0 / 9.4 |
+  | `perchHeld` | behind her head | 32 / 33 | 9.9 / 9.8 |
+  | `lotusHeld` | both knees | 23 / 52 | 11.5 / 37 |
+
+  Cross-legged her arms are straight to her knees (0.522 m of a 0.525 m
+  reach, MEASURED), so a knee pushed away from her can't be followed without
+  her leaning. That's the one pose left with a real miss. Face down this
+  isn't applied: her hands lie free or go to her cheeks on the spread,
+  exactly as before.
+- **The side rolls are taken over when they land** (`once`). `sideL`/`sideR`
+  are once-clips that ARE the roll. Taken over at its start, the net was
+  dragged 90° by its springs and slid 20 cm across the mattress.
+- **Settling gets longer** (`warm` 2.5 s). The first seconds of a pose off
+  her front are her settling into the foam (cross-legged, 41° of it), so the
+  resting part of the give tracks it quickly for longer.
+- From one held pose straight into another with a slap still on her, the
+  give fades out before the new pose is taken over.
+
+**MEASURED, 11.5 N·s slap (a hard 14 in the shots), eye 1.62 m off the floor
+at the walkway.** Rest is the undrawn give lying still, 3–7 s into the pose.
+It's drawn only after a slap, so what's on screen lying still is the clip,
+0.000:
+
+| pose | rest (undrawn) | seat give | biggest turns | back to the clip |
+|---|---|---|---|---|
+| `flatheld` | 1.6° | 2.9 cm | shin 32°, neck 8.7° | 1.1–1.3 s |
+| `edgeHeld` | 6.2° | 1.3 cm | shin 14°, pelvis 4° | 1.4 s |
+| `cradle` | 1.8° | 1.6–2.1 cm | shin 34–40°, pelvis 3.6° | 1.4 s |
+| `sideL` / `sideR` | 2.1° / 0.8° | 1.4–2.3 cm | shin 26–35°, pelvis 5.8° | 1.2–1.3 s |
+| `fetalHeld` | 0.15° | 1.1–1.8 cm | shin 23°, neck 11° | 0.9–1.1 s |
+| `sitHeld` | 3.4° | 1.4–2.1 cm | shin 19°, neck 9° | 1.2–1.3 s |
+| `lotusHeld` | 1.7° | 1.2–3.2 cm | shin 14–21°, pelvis 7° | 1.1–1.5 s |
+| `perchHeld` | 1.4° | 1.8–2.7 cm | shin 21°, thigh 13° | 1.2–1.4 s |
+| `bedKneel` | 2.5° | 1.4–2.1 cm | neck 12.6°, spine 3.4° | 1.2–1.3 s |
+| `upsideHeld` | 0.5° | 1.5–2.1 cm | shin 23–27°, thigh 10° | 1.0–1.4 s |
+
+**Face down, unchanged.** With the same `Math.random` seed and the same probe,
+flatheld and edgeHeld give the same numbers to the last digit as 1.543.2.
+For the later edgeHeld slaps, every run of either build lands in one of two
+variants. They differ by up to 2° on a thigh, and 1.543.2 lands in both
+(5 of 7 seeded runs A, 2 B). Each variant from this build matches that
+variant from 1.543.2 to the last digit.
+
+**Cost.** `cotRag().msAvg` over a whole pose with six slaps, one job alone
+on the RTX 4090 laptop: 0.22–0.34 ms a frame in the new poses, against
+0.28–0.35 face down (0.28–0.34 on 1.543.2). The first frame of a takeover is
+3–5 ms, as it was.
+
+**Unchanged.** The hammock frame at (−1923.174, 4.138, 443.162), 792 blockers,
+the café settle 19 done / 0 failed at the ?jadrija spawn (the same on 1.543.2),
+and a hose knock on sitter 24 live with 0 rescues and 0 bails.
+
 ## [1.543.2] — 2026-09-28
 
 ### 2.7 MB lighter: the old swimmers stay out of the page
