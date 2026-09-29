@@ -6088,6 +6088,425 @@ async function buildJadrija(scene) {
     return out;
   }
 
+  // ── the things on the floor, drawn as the things ──────────────────────────
+  //
+  // Misha, 29 Sep 2026, standing on the concrete in front of the vikendica
+  // and looking down: *"in front of vikendica, there's all this low-poly crap,
+  // i don't even know what these geometric shapes are.. either remove them or
+  // render them with more poly so they resemble some real objects"*.
+  //
+  // He was right that nobody could have told what they were. Every object in
+  // his frame was one or two boxes: a towel was three flat quads, a "folded"
+  // towel was two slabs in two DIFFERENT colours (so it read as a red mat on a
+  // green mat), a bag was a crate with a lid, and a pair of sandals was two
+  // soles laid END TO END — the pair was offset ±9 cm along the sole's own
+  // 25 cm length, so the two soles overlapped into one 43 cm bar with two dark
+  // straps on it, which is the "white-and-dark striped bar" in his screenshot.
+  // Nothing about any of it was a shape a person owns.
+  //
+  // So these draw the things. They take a frame `F(dx, dz, y) → [t, s, y]` in
+  // the shore's own coordinates (see `tsFrame`), which is what `tubeTS` wants
+  // for straps and handles, and they go through `W` for everything else. The
+  // cloth and the bags are smooth-shaded grids — `skinGrid` — because a towel
+  // is the one object whose whole identity is that it is soft, and flat facets
+  // on it are what made it a slab. The colour is PER CELL and not per vertex,
+  // so a woven stripe has a hard edge on the grid line put there for it,
+  // rather than smearing across the cell next to it.
+  //
+  // None of this draws on `rng`. Every variation is `jit` off the key the
+  // caller already had (rule 4), and every placement is the caller's own.
+
+  /** A frame in the (t, s) plane: `dx` along `ang`, `dz` across it. */
+  function tsFrame(t0, s0, ang) {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    return (dx, dz, yy) => [t0 + dx * c - dz * sn, s0 + dx * sn + dz * c, yy];
+  }
+  /** `F` moved to (ox, oz) inside itself and turned by `ang`. */
+  function subFrame(F, ox, oz, ang) {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    return (dx, dz, yy) => F(ox + dx * c - dz * sn, oz + dx * sn + dz * c, yy);
+  }
+  /** `F`, into the world. */
+  function wF(F) {
+    return (dx, dz, yy) => { const p = F(dx, dz, yy); return W(p[0], p[1], p[2]); };
+  }
+
+  /**
+   * One smooth triangle, wound to agree with its own normals — `tubeTS`'s
+   * `face`, out here because the cloth needs it too. The material is
+   * double-sided and flips the normal of a back face (`FACE`), so a smooth
+   * triangle wound against its normals comes out lit from underneath.
+   */
+  function smFace(A, B, D) {
+    const ex = B.P[0] - A.P[0], ey = B.P[1] - A.P[1], ez = B.P[2] - A.P[2];
+    const fx = D.P[0] - A.P[0], fy = D.P[1] - A.P[1], fz = D.P[2] - A.P[2];
+    const gx = ey * fz - ez * fy, gy = ez * fx - ex * fz, gz = ex * fy - ey * fx;
+    const out = gx * (A.N[0] + B.N[0] + D.N[0]) + gy * (A.N[1] + B.N[1] + D.N[1])
+      + gz * (A.N[2] + B.N[2] + D.N[2]);
+    if (out >= 0) b.smooth(A.P, B.P, D.P, A.N, B.N, D.N, A.c, B.c, D.c);
+    else b.smooth(A.P, D.P, B.P, A.N, D.N, B.N, A.c, D.c, B.c);
+  }
+
+  /**
+   * A smooth sheet through a grid of world points, `G[j][i]`. Normals are
+   * central differences across the grid — so they are the SHEET's normals,
+   * with every rumple in them — turned to agree with `hint(p)`. `wrap` closes
+   * each row on itself (a bag's walls). `cellCol(j, i)` colours the cell whose
+   * low corner is (j, i), whole, so a stripe ends on a grid line.
+   */
+  function skinGrid(G, wrap, cellCol, hint) {
+    const nj = G.length, ni = G[0].length;
+    const N = G.map((row, j) => row.map((p, i) => {
+      const iA = wrap ? (i - 1 + ni) % ni : Math.max(0, i - 1);
+      const iB = wrap ? (i + 1) % ni : Math.min(ni - 1, i + 1);
+      const a = G[j][iB], a0 = G[j][iA];
+      const c = G[Math.min(nj - 1, j + 1)][i], c0 = G[Math.max(0, j - 1)][i];
+      const ux = a[0] - a0[0], uy = a[1] - a0[1], uz = a[2] - a0[2];
+      const vx = c[0] - c0[0], vy = c[1] - c0[1], vz = c[2] - c0[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const h = hint(p);
+      if (nx * h[0] + ny * h[1] + nz * h[2] < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      const L = Math.hypot(nx, ny, nz) || 1;
+      return [nx / L, ny / L, nz / L];
+    }));
+    const cells = wrap ? ni : ni - 1;
+    for (let j = 0; j < nj - 1; j++) {
+      for (let i = 0; i < cells; i++) {
+        const i1 = (i + 1) % ni, col = cellCol(j, i);
+        const v = (jj, ii) => ({ P: G[jj][ii], N: N[jj][ii], c: col });
+        smFace(v(j, i), v(j, i1), v(j + 1, i1));
+        smFace(v(j, i), v(j + 1, i1), v(j + 1, i));
+      }
+    }
+  }
+  function upHint() { return [0, 1, 0]; }
+  /** The cream thread of a towel's band, and of a bag's. */
+  function clothCream() { return [0.860, 0.845, 0.800]; }
+
+  /**
+   * The height of the ground AS DRAWN at (t, s), which is not `surfaceY`.
+   *
+   * `ribbon` lays each band as quads between stations cut every 3.6 m along
+   * and two courses across, with heights asked only at the corners; on the
+   * beach the levels follow the hill (`midOf` and friends are a max against
+   * the terrain), so between the corners the drawn floor is a CHORD of the
+   * curve `surfaceY` describes. Measured with a ray down at three of the
+   * pitch towels at t 100: the sand stands 37 to 58 mm above `surfaceY`, and
+   * a towel laid on `surfaceY` at 12 mm was a pink triangle poking out of
+   * it. This walks the same stations, the same cuts and the same diagonal
+   * `ribbon` does and answers the triangle's own height. Past the paving it
+   * hands back to `surfaceY`.
+   */
+  function floorUnder(t, s) {
+    const B = s < 0 ? null : s < JAD.lip ? [0, JAD.lip, lipOf, 1]
+      : s < JAD.mid ? [JAD.lip, JAD.mid, midOf, 2] : s < PAVE ? [JAD.mid, PAVE, deckOf, 2] : null;
+    if (!B || t <= ST[0].t || t >= ST[ST.length - 1].t) return surfaceY(t, s);
+    const [s0, s1, yOf, nS] = B;
+    let i = 0;
+    while (i < ST.length - 2 && ST[i + 1].t < t) i++;
+    const a = ST[i], c = ST[i + 1];
+    const nT = Math.max(1, Math.round((c.t - a.t) / 3.6));
+    const f = ((t - a.t) / (c.t - a.t)) * nT, j = Math.min(nT - 1, Math.floor(f));
+    const A = nT === 1 ? a : at(a.t + (c.t - a.t) * (j / nT));
+    const C = nT === 1 ? c : at(a.t + (c.t - a.t) * ((j + 1) / nT));
+    const g = ((s - s0) / (s1 - s0)) * nS, k = Math.min(nS - 1, Math.floor(g));
+    const u = s0 + (s1 - s0) * (k / nS), v = s0 + (s1 - s0) * ((k + 1) / nS);
+    const x = f - j, y = g - k;
+    const ha = yOf(A, u), hb = yOf(C, u), hc = yOf(C, v), hd = yOf(A, v);
+    // `b.quad(a, b, c, d)` is triangles (a, b, c) and (a, c, d): the
+    // diagonal runs from (A, u) to (C, v).
+    return x >= y ? ha + (hb - ha) * x + (hc - hb) * y : ha + (hc - hd) * x + (hd - ha) * y;
+  }
+
+  /**
+   * A beach towel lying on the concrete: `hw` across (dx), `hl` along (dz).
+   *
+   * What makes one read as a towel at three metres, in the order it matters:
+   *
+   *   the WEAVE — a towel is striped or bordered, and a plain rectangle of one
+   *   colour is a mat. One of three patterns off the key: bands across both
+   *   ends (the hotel towel), broad stripes down the length (the beach towel),
+   *   or a border all round;
+   *
+   *   the EDGE — rounded corners (6 cm), and a hem that droops to the slab
+   *   while the middle stands 14 mm proud of it, with a skirt down to the
+   *   concrete so it has a thickness from the side and never floats;
+   *
+   *   the RUCKS — three soft ridges off the key, each an elongated bump 20 to
+   *   50 cm long and up to 17 mm high, which is a towel somebody lay on and
+   *   got up from;
+   *
+   *   and in four of ten, a CORNER TURNED OVER, reflected across a diagonal
+   *   crease and lying on top of itself a towel's thickness up. That is the
+   *   single cue that says cloth rather than board, because board does not
+   *   fold.
+   *
+   * 6 across by 8 to 12 along — the pattern's breaks are the grid — and the
+   * skirt: 150 to 240 triangles, against the six the three flat panels were.
+   */
+  function beachTowel(F, y, hw, hl, col, key, o = {}) {
+    const style = ((jit(key, 901) * 3) | 0) % 3;
+    // The thread the pattern is woven in: cream or a darker shade of the
+    // towel's own colour — and on a white one, where both of those vanish
+    // into it, a navy.
+    const pale = Math.min(col[0], col[1], col[2]) > 0.55;
+    const band = pale ? [0.170, 0.250, 0.450]
+      : jit(key, 902) < 0.5 ? clothCream() : shade(col, 0.60);
+    const lift = 0.014, edge = 0.006, rR = 0.06;
+    // Where two towels on one pitch overlap, the one on top is decided here
+    // rather than by the depth buffer, a few millimetres at a time.
+    const stack = jit(key, 960) * 0.006;
+    const rum = o.rumple ?? 1;
+    // Grid lines across (u) and along (v), in −1…1, with the pattern's own
+    // breaks added so every stripe ends on one.
+    const us = style === 2 ? [-1, -0.86, -0.45, 0, 0.45, 0.86, 1]
+      : [-1, -2 / 3, -1 / 3, 0, 1 / 3, 2 / 3, 1];
+    const vs = style === 0 ? [-1, -0.9, -0.84, -0.76, -0.7, -0.35, 0, 0.35, 0.7, 0.76, 0.84, 0.9, 1]
+      : style === 2 ? [-1, -0.92, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 0.92, 1]
+        : [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1];
+    const cellCol = (uc, vc) => {
+      const av = Math.abs(vc), au = Math.abs(uc);
+      if (style === 0) {
+        if (av > 0.90) return shade(col, 1.04);
+        if (av > 0.84) return band;
+        if (av > 0.76) return col;
+        if (av > 0.70) return band;
+        return col;
+      }
+      if (style === 1) return ((uc + 1) * 3 | 0) % 2 ? band : col;
+      return au > 0.86 || av > 0.92 ? band : col;
+    };
+    // The rucks: elongated bumps, in metres, off the key.
+    const R = [];
+    for (let k = 0; k < 3; k++) {
+      const ang = jit(key, 922 + k) * Math.PI;
+      R.push({ x: (jit(key, 910 + k) - 0.5) * 1.5 * hw, z: (jit(key, 913 + k) - 0.5) * 1.5 * hl,
+        L: 0.10 + jit(key, 916 + k) * 0.16, Wd: 0.045 + jit(key, 925 + k) * 0.035,
+        amp: (0.005 + jit(key, 919 + k) * 0.012) * rum, c: Math.cos(ang), s: Math.sin(ang) });
+    }
+    const hAt = (x, z) => {
+      const e = Math.min(hw - Math.abs(x), hl - Math.abs(z));
+      const f = Math.max(0, Math.min(1, e / 0.06));
+      const fall = f * f * (3 - 2 * f);
+      let bump = 0;
+      for (const r of R) {
+        const dx = x - r.x, dz = z - r.z;
+        const pa = dx * r.c + dz * r.s, pc = -dx * r.s + dz * r.c;
+        bump += r.amp * Math.exp(-(pa * pa) / (r.L * r.L) - (pc * pc) / (r.Wd * r.Wd));
+      }
+      return stack + edge + (lift - edge + bump) * fall;
+    };
+    // The turned corner.
+    const fold = jit(key, 905) < 0.4;
+    const fsx = jit(key, 906) < 0.5 ? -1 : 1, fsz = jit(key, 908) < 0.5 ? -1 : 1;
+    const fc = (hw + hl) / Math.SQRT2 - (0.14 + jit(key, 907) * 0.12);
+    const past = (x, z) => (fold ? (x * fsx + z * fsz) / Math.SQRT2 - fc : -1);
+    const G = [], top = [], bot = [];
+    for (let j = 0; j < vs.length; j++) {
+      const row = [], trow = [], brow = [];
+      for (let i = 0; i < us.length; i++) {
+        let x = us[i] * hw, z = vs[j] * hl;
+        // Rounded corners: the square corner of the grid mapped onto a
+        // quarter circle of radius `rR`.
+        const cx = Math.abs(x) - (hw - rR), cz = Math.abs(z) - (hl - rR);
+        if (cx > 0 && cz > 0) {
+          const k = Math.max(cx, cz) / Math.hypot(cx, cz);
+          x = Math.sign(x) * (hw - rR + cx * k); z = Math.sign(z) * (hl - rR + cz * k);
+        }
+        let h = hAt(x, z);
+        const d = past(x, z);
+        if (d > 0) {
+          x -= 2 * d * fsx / Math.SQRT2; z -= 2 * d * fsz / Math.SQRT2;
+          // On top of itself: the towel under it, a towel's thickness, and a
+          // little more toward the tip, which never lies quite flat.
+          h = hAt(x, z) + 0.010 + d * 0.05;
+        }
+        // On the shingle the floor is not a plane, and a towel laid at one
+        // height is a towel half under the beach (the pitches were: a pink
+        // triangle of one poking out of the sand). `o.floor` lays each vertex
+        // on the ground under it instead.
+        const q = F(x, z, 0), yb = o.floor ? o.floor(q[0], q[1]) : y;
+        row.push(W(q[0], q[1], yb + h)); trow.push(yb + h); brow.push(yb);
+      }
+      G.push(row); top.push(trow); bot.push(brow);
+    }
+    skinGrid(G, false, (j, i) => {
+      const uc = (us[i] + us[i + 1]) / 2, vc = (vs[j] + vs[j + 1]) / 2;
+      const c = cellCol(uc, vc);
+      return past(uc * hw, vc * hl) > 0 ? shade(c, 0.86) : c;
+    }, upHint);
+    // The skirt: the hem, 8 mm deep or down to the slab, whichever is less,
+    // round the whole outline — including the turned flap, which is the one
+    // place the thickness shows.
+    const ring = [];
+    const nI = us.length - 1, nJ = vs.length - 1;
+    for (let i = 0; i < nI; i++) ring.push([0, i]);
+    for (let j = 0; j < nJ; j++) ring.push([j, nI]);
+    for (let i = nI; i > 0; i--) ring.push([nJ, i]);
+    for (let j = nJ; j > 0; j--) ring.push([j, 0]);
+    for (let k = 0; k < ring.length; k++) {
+      const [ja, ia] = ring[k], [jb, ib] = ring[(k + 1) % ring.length];
+      const A = G[ja][ia], B = G[jb][ib];
+      const ya = Math.max(bot[ja][ia] + 0.0008, top[ja][ia] - 0.008);
+      const yb = Math.max(bot[jb][ib] + 0.0008, top[jb][ib] - 0.008);
+      const vc = (vs[ja] + vs[jb]) / 2, uc = (us[ia] + us[ib]) / 2;
+      b.quad(A, B, [B[0], yb, B[2]], [A[0], ya, A[2]], shade(cellCol(uc, vc), 0.78));
+    }
+  }
+
+  /**
+   * A towel folded into a pad: `hw` by `hl`, `H` tall, standing on `y0`. A
+   * pillow of cloth, flat on top and rolling off at every edge — the edges
+   * darker, because that is where the layers are and the light does not get
+   * in — with the pattern's band across it.
+   */
+  function foldedTowel(F, y0, hw, hl, H, col, key) {
+    const P = wF(F);
+    const band = jit(key, 902) < 0.5 ? clothCream() : shade(col, 0.60);
+    const ws = [-1, -0.92, -0.7, -0.3, 0.3, 0.7, 0.92, 1];
+    const prof = (w) => Math.pow(Math.max(0, 1 - Math.pow(Math.abs(w), 6)), 0.28);
+    const tilt = (jit(key, 931) - 0.5) * 0.010;
+    const G = ws.map((v) => ws.map((u) =>
+      P(u * hw, v * hl, y0 + 0.001 + (H + tilt * u) * prof(u) * prof(v))));
+    skinGrid(G, false, (j, i) => {
+      const uc = (ws[i] + ws[i + 1]) / 2, vc = (ws[j] + ws[j + 1]) / 2;
+      if (Math.abs(uc) > 0.85 || Math.abs(vc) > 0.85) return shade(col, 0.80);
+      return Math.abs(vc) < 0.3 ? band : col;
+    }, upHint);
+  }
+
+  /**
+   * A flip-flop (`kind` 0) or a slide (`kind` 1), lying on `y`.
+   *
+   * The sole is a FOOT, not a rectangle: nine stations heel to toe, with the
+   * inner (medial) edge nearly straight and the outer one bowed out at the
+   * ball, a waist at the arch, a rounded heel, and the toe carried over to the
+   * big-toe side. `side` puts the big toe on +dz or −dz, which is what makes
+   * two of them a pair rather than two of the same one. A shallow dish in
+   * the footbed, 14 mm of foam for a flip-flop and 20 for a slide, and a
+   * darker edge where the foam is cut.
+   *
+   * The strap is a tube, which is what it is: for a flip-flop the thong — a
+   * post between the first two toes and two arms that arch up over where the
+   * instep was and come down to the sole's edges behind the ball; for a slide
+   * one broad band arched across the forefoot. 25.0 cm long, 8.5 wide at the
+   * ball: an adult 40.
+   */
+  function sandal(F, y, side, kind, soleCol, strapCol) {
+    const P = wF(F);
+    const HL = 0.125, th = kind ? 0.020 : 0.014;
+    const T = [-1, -0.93, -0.76, -0.44, -0.06, 0.32, 0.62, 0.85, 1];
+    const WM = [0.012, 0.026, 0.031, 0.029, 0.025, 0.039, 0.043, 0.037, 0.017];
+    const WL = [0.012, 0.026, 0.031, 0.031, 0.033, 0.039, 0.035, 0.024, 0.008];
+    const FR = [0, 0.34, 0.66, 1];
+    const zAt = (j, f) => side * (-WL[j] + f * (WL[j] + WM[j]));
+    const G = T.map((t, j) => FR.map((f) => {
+      const dish = 0.0022 * Math.sin(Math.PI * f) * (j > 0 && j < T.length - 1 ? 1 : 0);
+      return P(t * HL, zAt(j, f), y + th - dish);
+    }));
+    const topCol = shade(soleCol, 1.05);
+    skinGrid(G, false, () => topCol, upHint);
+    // The cut edge of the foam, round the outline.
+    const edgeCol = shade(soleCol, 0.74);
+    const y0 = y + 0.0012;
+    const down = (p) => [p[0], y0, p[2]];
+    for (let j = 0; j < T.length - 1; j++) {
+      for (const i of [0, FR.length - 1]) {
+        const A = G[j][i], B = G[j + 1][i];
+        b.quad(A, B, down(B), down(A), edgeCol);
+      }
+    }
+    for (const j of [0, T.length - 1]) {
+      for (let i = 0; i < FR.length - 1; i++) {
+        const A = G[j][i], B = G[j][i + 1];
+        b.quad(A, B, down(B), down(A), edgeCol);
+      }
+    }
+    const yt = y + th;
+    if (kind === 0) {
+      // The thong: a post at 62 % of the length, between the first two toes,
+      // and the two arms back to the edges just behind the ball.
+      const px = 0.078, pz = side * 0.011;
+      const tip = [px, pz, yt + 0.011];
+      tubeTS([F(px, pz, yt - 0.002), F(tip[0], tip[1], tip[2])], 0.0042, strapCol, 4);
+      for (const za of [side * 0.030, -side * 0.034]) {
+        const pts = [[px, pz, yt + 0.011], [0.054, pz + 0.40 * (za - pz), yt + 0.024],
+          [0.024, pz + 0.82 * (za - pz), yt + 0.020], [-0.004, za, yt + 0.002]];
+        tubeTS(pts.map((q) => F(q[0], q[1], q[2])), 0.0048, strapCol, 4);
+      }
+    } else {
+      // The band: across the forefoot, 6 cm wide and 3.5 mm thick, arched
+      // 32 mm over the footbed where the instep goes.
+      const bx = 0.030, zl = -side * 0.036, zm = side * 0.034;
+      const pts = [];
+      for (let k = 0; k <= 4; k++) {
+        const a = (k / 4) * Math.PI;
+        pts.push(F(bx, zl + (zm - zl) * (1 - Math.cos(a)) / 2, yt + 0.001 + 0.032 * Math.sin(a)));
+      }
+      const o = F(0, 0, 0), e = F(1, 0, 0);
+      tubeTS(pts, [0.030, 0.0035], strapCol, 6, [e[0] - o[0], e[1] - o[1], 0]);
+    }
+  }
+
+  /**
+   * A pair of them, side by side, big toes inward, each turned out a little
+   * the way feet step out of them — and one in four with the second kicked
+   * off a hand's width and turned, because that is how most pairs at the
+   * top of a ladder actually lie.
+   */
+  function sandalPair(F, y, kind, soleCol, strapCol, key) {
+    const stag = (jit(key, 941) - 0.5) * 0.06;
+    const kick = jit(key, 942) < 0.25;
+    sandal(subFrame(F, -stag, -0.058, -0.10), y, 1, kind, soleCol, strapCol);
+    sandal(subFrame(F, stag + (kick ? 0.06 : 0), 0.058 + (kick ? 0.07 : 0),
+      0.10 + (kick ? (jit(key, 943) - 0.5) * 1.8 : 0)), y, -1, kind, soleCol, strapCol);
+  }
+
+  /**
+   * A beach bag, put down: `hw` by `hd` and `h` tall.
+   *
+   * A soft body in five rings of twelve — a rounded rectangle at every height
+   * (a superellipse, n 4), full at the bottom where the weight is, pinched
+   * across the mouth at the top, and slumped a few centimetres to one side
+   * because nothing in it is stiff. The mouth is open and dark inside. Two
+   * handles stand up off the long sides, which is what a bag that has just
+   * been put down does. One in two has a band round it in cream.
+   */
+  function beachBag(F, y, hw, hd, h, col, strapCol, key) {
+    const P = wF(F);
+    const FH = [0.006, 0.12, 0.45, 0.80, 1.0];
+    const AX = [0.90, 1.0, 1.0, 0.97, 0.90], AZ = [0.78, 1.0, 0.98, 0.80, 0.40];
+    const sl = (jit(key, 951) - 0.5) * 0.06, n = 12;
+    const sp = (c) => Math.sign(c) * Math.pow(Math.abs(c), 0.5);
+    const G = FH.map((f, j) => {
+      const row = [];
+      for (let i = 0; i < n; i++) {
+        const a = ((i + 0.5) / n) * TAU, ca = Math.cos(a), sa = Math.sin(a);
+        // The mouth sags between the handles.
+        const sag = j === FH.length - 1 ? 0.035 * (1 - ca * ca) : 0;
+        row.push(P(hw * AX[j] * sp(ca) + sl * f * f, hd * AZ[j] * sp(sa), y + h * f - sag));
+      }
+      return row;
+    });
+    const banded = jit(key, 930) < 0.5;
+    const C0 = F(0, 0, 0), mid = W(C0[0], C0[1], y + h * 0.5);
+    skinGrid(G, true, (j) => (banded && j === 2 ? clothCream() : (j === 0 ? shade(col, 0.8) : col)),
+      (p) => [p[0] - mid[0], 0, p[2] - mid[2]]);
+    // The inside, dark.
+    const top = G[FH.length - 1], inner = P(sl, 0, y + h * 0.82);
+    for (let i = 0; i < n; i++) b.tri(top[i], top[(i + 1) % n], inner, shade(col, 0.30));
+    // The handles.
+    const yt = y + h - 0.010, az = hd * AZ[FH.length - 1];
+    for (const sz of [-1, 1]) {
+      const pts = [];
+      for (let k = 0; k <= 4; k++) {
+        const u = k / 4, s2 = Math.sin(Math.PI * u);
+        pts.push(F(-0.55 * hw + 1.1 * hw * u + sl, sz * (az + 0.018 * s2), yt + 0.090 * s2));
+      }
+      tubeTS(pts, 0.0065, strapCol, 5);
+    }
+  }
+
   /**
    * What people leave on the concrete.
    *
@@ -6095,9 +6514,11 @@ async function buildJadrija(scene) {
    * a sandal and you get comments. One photograph has flip-flops, slides, a
    * child's sandals, a towel, a hi-vis top and a pair of goggles within two
    * metres of a single lamp foot, and that is the ordinary state of a bathing
-   * station in August. It is also the cheapest thing in this file: four
-   * prototypes at forty triangles each, scattered where people actually stop —
-   * the foot of a ladder, the foot of a lamp, the edge of a towel.
+   * station in August. It was also the cheapest thing in this file — four
+   * prototypes at forty triangles each — and on 29 Sep 2026 Misha stood over
+   * a heap of them and could not name one. They are drawn by the builders
+   * above now (`sandalPair`, `beachTowel`, `foldedTowel`, `beachBag`); what
+   * goes where, and in which colour, is exactly what it was.
    */
   function clutter(t, s, y, n, seed) {
     // A local frame, rather than `facing`.
@@ -6105,12 +6526,9 @@ async function buildJadrija(scene) {
     // `facing` is a `const` arrow declared four hundred lines below the two
     // places this is called from, so reaching for it here is the temporal dead
     // zone and the whole resort fails to build — with the only symptom being a
-    // page that never finishes loading. Six lines of the same arithmetic is
-    // cheaper than moving a declaration everything else already depends on.
-    const frame = (ct, cs, ang) => (dt, ds, yy) => {
-      const c = Math.cos(ang), sn = Math.sin(ang);
-      return W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
-    };
+    // page that never finishes loading. `tsFrame` is a function declaration,
+    // which is hoisted, and hands back shore coordinates rather than world
+    // ones because the straps are `tubeTS`.
     const SAND = [[0.520, 0.180, 0.190], [0.130, 0.200, 0.400],
       [0.700, 0.640, 0.180], [0.180, 0.190, 0.200], [0.820, 0.780, 0.740]];
     const TOWEL = [[0.620, 0.180, 0.200], [0.180, 0.420, 0.620],
@@ -6120,29 +6538,25 @@ async function buildJadrija(scene) {
       const ct = t + (j0 - 0.5) * 2.6, cs = s + (j1 - 0.5) * 2.0;
       const a = j2 * TAU;
       const kind = ((j2 * 97) | 0) % 4;
+      const F = tsFrame(ct, cs, a);
       if (kind === 0 || kind === 1) {
-        // A sandal: a sole and a strap, and always a pair a little apart.
-        for (const o of [-0.09, 0.09]) {
-          const P = frame(ct + o * Math.cos(a), cs + o * Math.sin(a), a);
-          boxIn(P, -0.125, 0.125, -0.042, 0.042, y + 0.002, y + 0.026,
-            SAND[((j0 * 53) | 0) % SAND.length]);
-          boxIn(P, -0.02, 0.055, -0.045, 0.045, y + 0.026, y + 0.038,
-            SAND[((j1 * 31) | 0) % SAND.length]);
-        }
+        // A pair: flip-flops on kind 0, slides on kind 1. The pair used to be
+        // offset ±9 cm ALONG the sole, which overlapped two 25 cm soles into
+        // one 43 cm bar; side by side is what a pair is.
+        sandalPair(F, y, kind, SAND[((j0 * 53) | 0) % SAND.length],
+          SAND[((j1 * 31) | 0) % SAND.length], seed + k);
       } else if (kind === 2) {
-        // A towel, dropped rather than laid: folded over on itself.
-        const P = frame(ct, cs, a);
-        boxIn(P, -0.34, 0.34, -0.22, 0.22, y + 0.002, y + 0.030,
-          TOWEL[((j0 * 71) | 0) % TOWEL.length]);
-        boxIn(P, -0.30, 0.10, -0.18, 0.18, y + 0.030, y + 0.052,
-          TOWEL[((j1 * 41) | 0) % TOWEL.length]);
+        // A towel dropped rather than laid, rucked up, and a second one folded
+        // into a pad on top of it — which is what the green slab with the red
+        // slab on it was trying to be.
+        beachTowel(F, y, 0.34, 0.22, TOWEL[((j0 * 71) | 0) % TOWEL.length],
+          seed + k, { rumple: 1.8 });
+        foldedTowel(subFrame(F, -0.10, 0, (j1 - 0.5) * 0.3), y + 0.012, 0.19, 0.16,
+          0.034, TOWEL[((j1 * 41) | 0) % TOWEL.length], seed + k + 7);
       } else {
-        // A bag, slumped, with a strap over it.
-        const P = frame(ct, cs, a);
-        boxIn(P, -0.20, 0.20, -0.13, 0.13, y + 0.002, y + 0.24,
-          SAND[((j1 * 67) | 0) % SAND.length]);
-        boxIn(P, -0.06, 0.06, -0.15, 0.15, y + 0.24, y + 0.28,
-          [0.140, 0.140, 0.145]);
+        // A bag, slumped, handles up.
+        beachBag(F, y, 0.20, 0.13, 0.22, SAND[((j1 * 67) | 0) % SAND.length],
+          [0.140, 0.140, 0.145], seed + k);
       }
     }
   }
@@ -31008,21 +31422,18 @@ async function buildJadrija(scene) {
       const y = surfaceY(t, s);
       const ang = (jit(k, 202) - 0.5) * 0.5;
       const col = TOWEL[((jit(k, 203) * 97) | 0) % TOWEL.length];
-      // Three panels at slightly different heights and widths, so it lies on
-      // the slab like cloth rather than like a mat somebody cut out.
+      // It was three flat panels at slightly different heights, "so it lies on
+      // the slab like cloth" — and from a metre and a half, which is where
+      // Misha looked at one on 29 Sep 2026, it was a pale sheet of card. Now
+      // `beachTowel`: the same 0.68 by 1.28 m on the same spot, soft, hemmed,
+      // rucked and patterned. Still in `deck`, which receives and never casts.
+      // Flat at `y`, as it was, and not draped on `floorUnder`: the concrete
+      // is flat across a band, and where one of these crosses a terrace riser
+      // (the one at t 223.8 does, at s 3.6) draping it stood half the towel up
+      // the face of the step like a towel hung on a wall.
       b = deck;
-      for (let i = 0; i < 3; i++) {
-        const ds = -0.62 + i * 0.42;
-        const wob = (jit(k, 210 + i) - 0.5) * 0.10;
-        const P = facing(t, s, ang);
-        const q = (dt, ds2, yy) => P(dt, ds2, yy);
-        const hw = 0.34 + wob;
-        b.quad(q(-hw, ds, y + 0.012 + wob * 0.05),
-          q(hw, ds, y + 0.012 - wob * 0.05),
-          q(hw, ds + 0.44, y + 0.012 + wob * 0.04),
-          q(-hw, ds + 0.44, y + 0.012 - wob * 0.04),
-          i === 1 ? col : shade(col, 0.92));
-      }
+      beachTowel(subFrame(tsFrame(t, s, ang), 0, 0.02, 0), y,
+        0.34 + (jit(k, 211) - 0.5) * 0.04, 0.64, col, k * 3 + 17);
       b = up;
       // And what is on it. Somebody on four out of ten, their bag on the rest.
       if (jit(k, 204) < 0.42) {
@@ -31092,20 +31503,15 @@ async function buildJadrija(scene) {
             q(sg * 0.23, 0.30, cy + 0.62), q(sg * 0.23, -0.20, cy + 0.60), CHFR);
         }
       };
-      // A towel, three panels of it, laid flat and wrinkled. The same
-      // construction the concrete run uses — it is right and it is cheap.
+      // A towel, laid on the shingle. The same construction the concrete run
+      // uses — which is `beachTowel` now, and not three flat panels.
       const towel = (tt, ts, ty, ang, col, key) => {
-        const P = facing(tt, ts, ang);
-        for (let i = 0; i < 3; i++) {
-          const ds = -0.62 + i * 0.42;
-          const wob = (jit(key + i, 271) - 0.5) * 0.10;
-          const hw = 0.34 + wob;
-          b.quad(P(-hw, ds, ty + 0.012 + wob * 0.05),
-            P(hw, ds, ty + 0.012 - wob * 0.05),
-            P(hw, ds + 0.44, ty + 0.012 + wob * 0.04),
-            P(-hw, ds + 0.44, ty + 0.012 - wob * 0.04),
-            i === 1 ? col : shade(col, 0.92));
-        }
+        beachTowel(subFrame(tsFrame(tt, ts, ang), 0, 0.02, 0), ty,
+          0.34 + (jit(key, 271) - 0.5) * 0.04, 0.64, col, key,
+          // Laid on the drawn sand, and over the 10 cm steps the beach keeps
+          // between its levels — but no further: a towel across a real riser
+          // does not climb the wall of it.
+          { floor: (t2, s2) => Math.min(floorUnder(t2, s2), ty + 0.12) });
       };
       // 6.2 m between pitches and seven in ten of them taken, which comes out
       // at one group every nine metres of shore. The first cut was 9.4 and
@@ -31144,10 +31550,9 @@ async function buildJadrija(scene) {
           const bs = cs - 0.8 - jit(k, 337) * 0.7;
           const by = surfaceY(bt, bs);
           const bc = BAG[((jit(k, 338) * 97) | 0) % BAG.length];
-          boxTS(bt - 0.22, bt + 0.22, bs - 0.15, bs + 0.15, by, by + 0.26,
-            bc, shade(bc, 1.18));
-          boxTS(bt - 0.06, bt + 0.06, bs - 0.13, bs + 0.13, by + 0.26,
-            by + 0.31, shade(bc, 0.7));
+          // A crate with a lid, until 29 Sep 2026; `beachBag` since.
+          beachBag(tsFrame(bt, bs, 0), Math.max(by, floorUnder(bt, bs)), 0.22, 0.15, 0.24, bc,
+            shade(bc, 0.7), k * 7 + 3);
         }
       }
     }
@@ -31226,25 +31631,46 @@ async function buildJadrija(scene) {
       // The pocket: a shallow dish of shadow, which is what you actually see.
       // Sized to the ring and not to the eye: at 0.60 by 0.52 the pocket read
       // as a black square with a small ring lying in the middle of it.
-      b.quad(W(t - 0.22, s - 0.20, y + 0.004), W(t + 0.22, s - 0.20, y + 0.004),
-        W(t + 0.22, s + 0.20, y + 0.004), W(t - 0.22, s + 0.20, y + 0.004),
-        [0.268, 0.250, 0.228]);
-      b = up;
-      // The ring, eight chords of rusted iron lying in it.
-      const RUST = [0.230, 0.140, 0.092];
-      for (let i = 0; i < 8; i++) {
-        const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-        const R = 0.175, w = 0.030;
-        const p = (a, rr, yy) => W(t + Math.cos(a) * rr, s + Math.sin(a) * rr, yy);
-        b.quad(p(a0, R - w, y + 0.012), p(a1, R - w, y + 0.012),
-          p(a1, R + w, y + 0.012), p(a0, R + w, y + 0.012),
-          i % 2 ? RUST : [0.280, 0.175, 0.110]);
-        b.quad(p(a1, R + w, y + 0.012), p(a0, R + w, y + 0.012),
-          p(a0, R + w, y - 0.020), p(a1, R + w, y - 0.020), [0.170, 0.105, 0.070]);
+      //
+      // And round, since 29 Sep 2026. Misha, over one of these by the
+      // vikendica's ladder: *"i don't even know what these geometric shapes
+      // are"* — and there was no telling. The ring was eight flat chords 6 cm
+      // wide, an octagonal brown washer on a grey square with a brown brick at
+      // one side. What is actually cast into this quay is an iron ring, round
+      // bar, lying in a round recess and shackled through an eye on a plate:
+      // so a round pocket with a lighter chamfer to its lip, the ring as a
+      // torus of 30 mm bar (sixteen stations, six sides, smooth), lifted a
+      // little on the side where it runs through the eye, and the eye itself —
+      // a half-loop of bar standing on its plate, with the ring passing under
+      // it. The same place, the same 0.35 m ring, the same rust.
+      const PK = [0.268, 0.250, 0.228];
+      const pk = (a, rr, yy) => W(t + Math.cos(a) * rr, s + Math.sin(a) * rr, yy);
+      for (let i = 0; i < 16; i++) {
+        const a0 = (i / 16) * TAU, a1 = ((i + 1) / 16) * TAU;
+        b.tri(W(t, s, y + 0.004), pk(a0, 0.225, y + 0.004), pk(a1, 0.225, y + 0.004), PK);
+        b.quad(pk(a0, 0.225, y + 0.004), pk(a0, 0.255, y + 0.003),
+          pk(a1, 0.255, y + 0.003), pk(a1, 0.225, y + 0.004), [0.330, 0.312, 0.286]);
       }
-      // And the staple it is shackled to, at the inland side of the pocket.
-      boxTS(t - 0.06, t + 0.06, s + 0.20, s + 0.28, y - 0.02, y + 0.05,
-        [0.200, 0.125, 0.085]);
+      b = up;
+      const RUST = [0.230, 0.140, 0.092];
+      const ring = [];
+      for (let i = 0; i <= 16; i++) {
+        const a = (i / 16) * TAU;
+        ring.push([t + Math.cos(a) * 0.175, s + Math.sin(a) * 0.175,
+          y + 0.019 + 0.006 * Math.max(0, Math.sin(a))]);
+      }
+      tubeTS(ring, 0.015, RUST, 6, [0, 0, 1], 0.22);
+      // The eye: a plate on the inland lip and a half-loop of bar over the
+      // ring where it runs along t, in the plane across it.
+      const EYE = [0.200, 0.125, 0.085];
+      boxTS(t - 0.05, t + 0.05, s + 0.135, s + 0.225, y, y + 0.010, EYE,
+        [0.225, 0.142, 0.096]);
+      const eye = [];
+      for (let i = 0; i <= 6; i++) {
+        const a = (i / 6) * Math.PI;
+        eye.push([t, s + 0.175 + Math.cos(a) * 0.034, y + 0.006 + Math.sin(a) * 0.048]);
+      }
+      tubeTS(eye, 0.010, EYE, 5, [1, 0, 0], 0.22);
       b = deck;
     }
     b = up;
