@@ -8,6 +8,110 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.549.0] — 2026-09-29
+
+### The mole, full: the same hundred people, moved to where he can see them
+
+Misha, from the vikendica's upper terrace: *"in the real view from vikendica,
+there's a lot more bathers and kids jumping off that pier there, right now
+it's just an empty concrete slab ... maybe u can re-locate them to inhabit the
+space in front of the vikendica more and populate that concrete pier with
+bathers laying on their towels, many of the women bathers have their tops
+either fully off or partially off. some wear sunglasses, some reads books ...
+do not increase the # of bathers"*. And then: *"perhaps re-use the dive of
+the diver ... so the pier divers execute the same type of dive?"*
+
+**Measured first.** Of the hundred people on the shore, none was on the mole
+(t 252.5–263.5, s 0.4 to −42). The survey has it full: 20260821_175838 counts
+nineteen on it — groups on towels near the head, towels laid along it, two
+standing at the edge, a boy running for the water; 20260821_175752 has the
+other mole's flank with a girl on the ladder and eight heads in the water;
+1000149597 at 250 s is two women on towels straight on the concrete, one in
+sunglasses.
+
+**Who moved (`MOLE_LIFE`, `moleCast`).** Twenty-five of the hundred, taken off
+the finished list just before the crowd is cast: the standing, sitting and
+lying bathers (seaward of the promenade, not walking a beat, not in a café
+chair, not staff) farthest along the shore from the vikendica, one in five of
+them left where they were. Five from the north end of the sand beach, nine
+from round and past the last cafés (t 311–412), eleven from the far
+south-east end (t 440–550). Twenty-two go to places on the mole and the lip in front of
+the house; three become jumpers. `people` is still 100; the far ends keep a
+few (the lounger sunbathers at t 68 and 200, the people standing at t 136,
+190 and 448, and every walker).
+
+**RULE 4 held, and checked.** Nothing draws on `rng`: the places are literals
+and `jit`, the people are picked by where they already are, and they are moved
+after `castBlob` has dealt everyone a body in order of `t` and after
+everything else that read their placement. Diffed person by person against
+1.548.6: exactly those 25 records change, every body and sex is identical,
+blockers 792 with the same hash, census 446/333/86/27, hammock at
+(−1923.174, 4.138, 443.162), the two smokers still at H2O (t 312.8) and the
+slastičarnica (t 332.9), 15 chair sitters, settle failures 0 (settled
+sitters in view from t 300: 24 against 22 — the settle runs on every seated
+figure the near tier is drawing, and the mole's sitters are now among them;
+the café chairs are the same 15).
+
+**On the mole.** Eight on towels along its length (heads both ways, in two
+loose rows, never across it) — three on their fronts; four sitting on the
+edge of the west flank (the side the house looks at), two on the head and two
+on the east flank with their legs over the water; two reading on towels; two
+standing. In front of the house, two on the lip with their legs over the edge
+and one standing. Every towel is `beachTowel` (1.72 × 0.78 m), and most have
+a pair of sandals or a bag beside them. The flank ladders and the flag pole are
+kept clear, and so are the jumpers' run-ups.
+
+- **Legs over the water, at last.** A sitter on an edge (`b.edge`) keeps the
+  quay clip's hanging shins instead of having them laid on the concrete — and
+  sits 0.36 m in from the arris (0.27 for a child), not the quay's 0.55, at
+  which the knee stopped 12 cm short and the shins went into the mole.
+- **On their fronts, on both tiers.** The far tier already laid a quarter of
+  the beach face down; the near tier had no clip for it. `proneClip` makes
+  `prone` from `sunbathe` on each body at parse time — root turned over about
+  the long axis, the back's small bends reversed, knees bent so the shins stand
+  in the air (20260821_175413) — and `fg.prone` tells both tiers the same.
+- **Books**, four of them. A prone reader has an open paperback on the
+  concrete in front of her; a sitting reader holds one open in her lap between
+  her hands, turned to her face (`MOLE_PROPS`).
+- **Sunglasses** on seven, on the near tier: two dark lenses, bridge and arms,
+  built in the head's bind frame off each body's measured eyes and carried by
+  `boneAt`/`boneTurn`.
+
+**Tops off, and undone — adult women only, by body.** `TOPS_KINDS`
+(42-crowd.js) is the three adult women; both tiers ask it of the body they are
+actually drawing, so no place can take a child's swimsuit off. No texture was
+added: the v2 body is whole under its swimwear, so on the near tier the `wear`
+shader simply does not draw the top — its atlas tile on a bikini, everything
+over the waist on a one-piece (rolled down) — or, for a top UNDONE on somebody
+lying on her front, only the half of it behind the chest. The far tier draws
+the torso's swimwear in her skin colour (the shirt channel at −1). Of the ten
+women on the mole: two topless, two with the top undone, one older woman with
+her one-piece rolled down, five unchanged; the three in front of the house are
+unchanged. Cost: a uniform, a vec4 and five
+lines of shader; nothing in the payload.
+
+**The jumpers — his dive (`JUMP`).** A girl and a boy off the west flank and a
+man off the east, looping: stand at the mark, the solved `dive` (four steps,
+hurdle, drive, the 182° header), tread, `swim` round to the flank's ladder,
+`ladder` up, walk back, turn, wait. Nothing new was baked. The children get the
+man's clips retargeted to their own skeletons (`jumpClips`: each bone's turn
+away from its rest carried across, root travel scaled by pelvis height, 0.63
+for the girl). The mole is not a springboard, so: the root is lifted by the
+board's own `flex` until takeoff (feet stay on the concrete); between takeoff
+and entry the figure is eased down from the deck to the clip's water plane and
+the flight plays 1.5× (a 1.5 m drop, not 2.7); a child goes in 0.6 m further
+out, or she slid down the face of the mole; and the climb starts at the frame
+where only 0.72 m of the 2.64 m ladder is left. Splash (`bodySplash`) and the
+plunge sound, faded out by 70 m.
+
+**Cost.** From the vikendica terrace (his view), 1280×720 on this machine,
+main-thread time per frame 7.9 ms against 7.8 ms before (three 5 s runs each,
+machine quiet), frame interval 16.7–19.2 ms against 19.6–20.4 (vsync and
+noise). Measured again with other agents' runs loading the machine, 10.1–12.5
+after against 15.0–16.7 before: noise either way, no cost that shows. The three jumpers
+are three skinned figures with their own draws and shadows; the props are
+drawn only for near-tier people within 80 m who have them. File +49 KB, all
+code.
 ## [1.548.8] — 2026-09-29
 
 ### The riders' e-scooters, built as e-scooters
