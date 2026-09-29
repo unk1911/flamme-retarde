@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.2] — 2026-09-29
+
+### The lamp columns and the litter bins, turned
+
+Misha, on the promenade by the mole with the flag in the frame: *"the trash
+can and the lamp-posts, are too low-poly, can u make them more advanced with
+more triangles/polygons?"* The bin was three open prisms (nine flats of
+aggregate, nine of steel, a seven-sided red puck in mid-air over the
+opening); the column was a 150 mm square box with a second box across the
+top for the arm and a third hung under it for the lantern.
+
+**New helper, `spinIn` / `spinTS`** (next to `tubeTS`): a turned solid whose
+normals are the PROFILE's, averaged across a ring unless it turns harder than
+a crease. `tubeTS` with a radius per ring is smooth round the axis but lights
+a cap or a flange top like the side of a pipe; this does ends, rims and
+noses properly, stands up or lies along any axis, and squashes to an
+ellipse.
+
+**The promenade column** (8 of them, same place, 4.80 m, 0.90 m reach, same
+black): a base plate with four anchor nuts, a door section with the service
+hatch, a bead, a shaft tapering 84 → 60 mm that swings over a 0.32 m bend into
+the arm (one smooth sweep), a joint collar, a clamp and end cap on the arm,
+and a luminaire: a lozenge shell 0.58 × 0.236 m with a refractor bowl
+hanging out of it. The bowl is still the `lampGlow` mesh, so it is still the
+grey-by-day, sodium-by-night glass, and it reaches top − 0.225 as the old box
+did.
+
+**The litter bin** (6, beside the precast benches; same 0.27 m, 0.99 m, same
+three colours, same blocker): a washed-aggregate drum on a recessed foot with
+one shallow band, a stainless collar rolled over the lip, a black liner and
+the bag's bottom inside, and the red as the ashtray it was — a pressed cup
+with a rolled lip and a dark grille, on a cross of stainless strap.
+
+**The short lane lamp with the globe** (6), in the same pass: a cast foot
+that steps into the pole, a fitter and gallery, and a round opal globe where
+it was two nine-sided domes.
+
+MEASURED: 1 564 + 256 glass triangles a column (was 36 + 12), 1 328 a bin
+(50), 778 a globe lamp (134). `__fr.stats().jadrija.tris` 643 304 → 667 060
+(+23 756; the glass is on `lampGlow`, which that count leaves out: +1 952
+more). No draw call added. Blockers 792 with the hash unchanged, people 100,
+hammock at (-1923.174, 4.138, 443.162).
 ## [1.548.1] — 2026-09-29
 
 ### The beach showers, turned
