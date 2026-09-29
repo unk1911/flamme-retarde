@@ -773,6 +773,56 @@ function apprenticeHair(down) {
   h2.visible = !!down;
 }
 
+/**
+ * WHERE A HAND TAKES HOLD OF HER HAIR, from behind — 1.544.0, `PULL_RAG` in
+ * 43-jadrija.js. Off the chains her hair is hanging on this frame (see
+ * `v5Drape`), the one straight behind her head: `s` its root, which is on her
+ * scalp at the back of her head, and `g` the point down it that the hand
+ * closes on — `arc` metres of hair below the root, which on the braid is the
+ * braid where it leaves her head and on loose hair a handful at her nape.
+ * World metres, and which style it is. Null before she is drawn.
+ */
+function apprenticeHairGrab(arc) {
+  const D = apprDrape;
+  if (!appr || !D) return null;
+  const H = D.parts.find((h) => h.part.visible);
+  if (!H) return null;
+  // The chain nearest straight behind her that has hair on it.
+  let k = -1;
+  for (let d = 0; d <= H.K / 2 && k < 0; d++) {
+    for (const s of [H.K / 2 + d, H.K / 2 - d]) {
+      const kk = ((s % H.K) + H.K) % H.K;
+      if (H.alive[kk]) { k = kk; break; }
+    }
+  }
+  if (k < 0) return null;
+  const a = arc[H.name] != null ? arc[H.name] : arc.hair;
+  const c0 = k * H.N, n = H.n;
+  let j = 1, run = 0;
+  while (j < H.N - 1 && run + H.L[c0 + j] < a) { run += H.L[c0 + j]; j++; }
+  const u = Math.min(1, (a - run) / Math.max(H.L[c0 + j], 1e-6));
+  const M = appr.mesh.matrixWorld;
+  const at = (c) => new THREE.Vector3(n[c * 3], n[c * 3 + 1], n[c * 3 + 2]);
+  const g = at(c0 + j - 1).lerp(at(c0 + j), u).applyMatrix4(M);
+  const s = at(c0).applyMatrix4(M);
+  return { g, s, style: H.name, chain: k };
+}
+
+/**
+ * The fist in her hair: a world point and how shut it is (0 lets go), or
+ * null — see `drape.grip` in `v5Drape`. Answers how taut the hair to it was
+ * drawn LAST frame (`taut`, 1 a straight line), how far the hair that
+ * reaches it ends from it (`sag`, m) and at which node (`j`).
+ */
+function apprenticeHairGrip(p, w = 1) {
+  const D = apprDrape;
+  if (!D) return null;
+  if (!p || !(w > 0)) { D.grip = null; return null; }
+  if (!D.grip) D.grip = { x: 0, y: 0, z: 0, w: 0 };
+  D.grip.x = p.x; D.grip.y = p.y; D.grip.z = p.z; D.grip.w = w;
+  return { taut: D.gripTaut, sag: D.gripSag, j: D.gripJ, n: D.gripN };
+}
+
 /** Where she is and which way she is facing, in world metres. */
 function apprenticeAt() {
   if (!appr) return null;

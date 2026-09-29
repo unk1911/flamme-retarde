@@ -37873,6 +37873,597 @@ async function buildJadrija(scene) {
     return true;
   }
 
+  // ── HER HAIR, PULLED FROM BEHIND ─────────────────────────────────────────
+  //
+  // 1.544.0. Misha, 28 Sep 2026: *"if in the kabine she has her back to us,
+  // and cross-hairs goes for the hair, instead of petting her (like from the
+  // front), it should pull on the hair, and should invoke all those AVBD and
+  // physics ragdoll stuffs"*.
+  //
+  // THE SAME PRESS AS THE PET, decided the same way (the crosshair nearest
+  // her hair — see the gate in 90-app.js), and then one more question: is her
+  // back to you (`pullBack`) — the front of her chest turned away from your
+  // eye. Not the slap's own test, which is the same question asked of her
+  // hips: the cheeks against the hips, LEVEL. Standing that is 22 cm of
+  // answer; lying on her front the cheeks are straight above the hips and
+  // there is none — MEASURED on `flatheld`, 4.5 cm level against 21.7 up,
+  // and from beside the cot, looking down on her back, it said "in front of
+  // her"; on all fours 2.2 against 22. Her chest's front, in three
+  // dimensions, is down into the mattress there, and away from you standing
+  // behind her, on her knees or on all fours: −0.82 to −1.00 in all of them.
+  // Not her face either: lying on her front her head is turned on the pillow,
+  // and from one side of the cot you are looking at her cheek.
+  //
+  // YOUR HAND closes on her hair — the braid where it leaves her head if it
+  // is up, a handful at her nape if it is down (`apprenticeHairGrab`) — and
+  // draws back toward your shoulder. THE HAIR runs from her scalp to your
+  // fist, straight and at its own length, and on out of the fist
+  // (`drape.grip` in `v5Drape`, 41-skin.js). And SHE is the hammock's
+  // ragdoll (43-ragdoll.js) in a small net of her own, the cot's pattern
+  // (`cotRagTick`): her trunk and head as four bodies — pelvis, belly, chest,
+  // neck and head — whose muscles pull toward the pose she is in, her pelvis
+  // held where that pose has it, and the hair a spring from your fist to
+  // the back of her skull. The pull tips her head back, the neck and the
+  // upper spine go after it, her chest lifts — and lying on her front it
+  // lifts her shoulders off the mattress — and her hips stay where they are,
+  // because the pelvis is held and the legs are not in the net at all. Let
+  // go and the muscles have her back in the pose.
+  //
+  // MEASURED at 70 N held (110 at the yank), head against the pose: standing
+  // with her back to you 25-29 degrees back (37-38 at the yank), her chest
+  // 14-15 up, braid or hair down alike; bent over (`twerk`) 23 and 14; on her knees
+  // (`kept`) 15 and 11; on all fours her head up 9.6 cm and the top of her
+  // back 6.9; lying on her front on the cot (`flatheld`) her head 11 cm off
+  // the pillow and the top of her back 6.8 cm off the mattress, over the
+  // edge (`edgeHeld`) 7.2 and 5.9. Let go, she is back within a degree and
+  // 5 mm of the pose in 0.37-0.47 s, through one overshoot of 5 degrees at
+  // the most. 0.36-0.55 ms a frame while a hand is in her hair; none while
+  // not.
+  //
+  // WHAT IS DRAWN IS THE GIVE, again: each body's bone off the pose, laid on
+  // her through `fig.tug` (41-skin.js), the settle's layer a second time, so
+  // it goes on over the cot's own give when she is lying on it and her face,
+  // her aims and every overlay carry on underneath. There is no gravity in
+  // this net: the clip already carries her weight — standing, bent over or
+  // lying — and what the net adds is the pull and nothing else, so it starts
+  // at rest EXACTLY on the pose, and nothing has to be averaged off it as the
+  // cot's `bias` is. When no hand is in her hair it is not stepped at all,
+  // and the layer is off.
+  const PULL_RAG = {
+    // Her back to you: the cosine between the way the front of her chest
+    // points and the way you are from it, under this.
+    back: -0.15,
+    // The net, at the cot's rate: 120 Hz, at most four steps a frame.
+    h: 1 / 120, maxSub: 4, iterations: 8,
+    // Muscle tone, RAGDOLL's own table times this — and each of the three
+    // joints the pull goes through times its own `tone`, and every damper
+    // times `damp`.
+    tension: 1.0, tone: { spine02: 1, chest: 1, neck: 1 }, damp: 3,
+    // HER HIPS ARE HELD, not sprung: her pelvis is jointed to where the pose
+    // has it, place and attitude, hard (a world joint with its angle lock —
+    // `setTarget`, moved every frame with the pose). The cot's three springs
+    // on the hips were tried first, at 6000 N/m each, and MEASURED they were
+    // a hinge: three points within a hand of each other hold a place and
+    // hardly an attitude, and the whole of her above them rocked on them at
+    // 1.3 s a swing, ±1.5 degrees of head for four seconds after the hand let
+    // go. Her legs are the other half of "planted" and are not in the net.
+    // THE PULL. Your hand goes back toward your shoulder (`down` m under your
+    // eye) by `draw` m over `drawT` s from where it closed, as hard as it
+    // takes up to a force, N, the arm's: `yank` at first — up over `rise` s,
+    // held `peak`, down over `fall` — and `hold` from then on, for as long as
+    // the button is. The arm is a spring of `arm` N/m on the hair — its give,
+    // not the hair's: the hair is drawn at its own length from her scalp to
+    // your fist whatever the spring is doing. MEASURED with the spring stiff
+    // (3000 N/m, a 3.7 cm stretch at the yank), the string went slack every
+    // time her head came toward the hand, the force ran 0, 76, 0, 58 N from
+    // one frame to the next and her head nodded on it; soft, a head moving 5
+    // cm changes the pull by 15 per cent and it is one steady pull.
+    F: { yank: 110, hold: 70, rise: 0.10, peak: 0.12, fall: 0.40 }, arm: 900,
+    draw: 0.26, drawT: 0.18, down: 0.25, outOf: 0.7,
+    // Where the hand takes hold: this much hair below the root of the chain
+    // behind her head (see `apprenticeHairGrab`), m, by style — the braid, and
+    // her hair down.
+    grab: { hair: 0.10, hair2: 0.07 },
+    // The muscles aim at the pose eased to over `steady` s, the cot's reason
+    // (its `steady`): a pose that breathes is not a pull.
+    steady: 1.5,
+    // Let go: the net runs on until every drawn bone is within `ang` degrees
+    // of the pose and every body under `v` m/s for `still` s (or `most` s have
+    // passed), and the give is then taken off over `out` s — by then it is
+    // under half a degree, which nobody sees go.
+    after: { ang: 0.5, v: 0.03, still: 0.25, most: 4.0, out: 0.25 },
+    // The most the give may turn a bone, degrees — a clamp the physics does
+    // not reach unless something is wrong.
+    most: { spine02: 25, chest: 25, neck: 50 },
+    // How far past the pose she is in a joint's stop may be, where the pose
+    // is already past RAGDOLL's — see `pullEnter`. Degrees.
+    lim: 10,
+    // The guard: a body faster than `v`, the pelvis further than `far` from
+    // where it is held, a socket open past `loose` — and she is let go.
+    guard: { v: 6, far: 0.25, loose: 0.06 },
+    // Her face: the petting's heavy eyelids (`face.pet`), her lips parted a
+    // little wider than for the petting, and a gasp on the grab — the
+    // unvoiced startle, because she did not see it coming (see `startle` in
+    // 80-audio.js).
+    face: { pet: 1, gape: 0.36, in: 9, out: 2.5 },
+  };
+  // The bones whose give is drawn. The pelvis is in the net and not here.
+  const PULL_BODY = ['spine02', 'chest', 'neck'];
+  let pullR = null;
+  const pullL = { q: null, t: new Float32Array(3), w: 0, clip: null, on: false };
+  // The hand: `on` while it holds, `t` since it closed, `rel` since it let go.
+  const pull = { on: false, t: 0, rel: 0, still: 0, len: 0, style: null,
+    sB: new Float64Array(3), gB: new Float64Array(3),
+    eye: new THREE.Vector3(), T: new THREE.Vector3(), S: new THREE.Vector3(), G: new THREE.Vector3(),
+    // The fist as drawn: the hair's length from her scalp toward the spring's end.
+    P: new THREE.Vector3(),
+    F: 0, grip: 0 };
+  const pullStats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, grabs: 0, rescues: 0, why: null,
+    pitch: 0, pitchMax: 0, chest: 0, chestMax: 0, hip: 0, hipMax: 0, F: 0, Fmax: 0, back: null, relAt: null,
+    hair: null };
+  const _plA = new THREE.Vector3(), _plB = new THREE.Vector3(), _plQ = new THREE.Quaternion();
+  const _plM = new THREE.Matrix4(), _plV = new THREE.Vector3();
+  const _plE = new Float64Array(4), _plD = new Float64Array(4);
+
+  /** The net and her ragdoll in it, the first time her hair is pulled. */
+  function pullBuild(f) {
+    const caps = chainCapsules();
+    const net = avbdNet({
+      maxBodies: 16, maxJoints: 16, maxStrings: 4, maxPoints: 0, maxBoxes: 0, maxCaps: caps.length + 1,
+      maxContacts: 8, maxAngles: 16, maxWorldBoxes: 0, maxCapPairs: 0, limK: RAGDOLL.limK,
+      iterations: PULL_RAG.iterations, alpha: 0.9, alphaContact: 0.9, beta: 1e5, betaAng: 100, gamma: 0.999,
+      gravity: [0, 0, 0], drag: RAGDOLL.drag, vMax: 4, wMax: 25, margin: 0.01, deep: 0.03,
+      mu: 0.3, floorMu: 0.8, capK: 30000,
+    });
+    const rag = ragdollBuild(net, f, caps, { idBase: 1 });
+    const hipJ = net.addJoint(-1, [0, 0, 0], rag.pelvis, [0, 0, 0], Infinity, Infinity, 1);
+    const head = rag.body('neck');
+    // A spring that only pulls: hair does not push.
+    const hair = net.addString(-1, [0, 0, 0], head, [0, 0, 0], 0, PULL_RAG.arm, true);
+    net.finish();
+    net.setJointK(hipJ, 0, 0);
+    net.setString(hair, null, null, false);
+    const nb = f.bones.length;
+    const R = { net, rag, hipJ, hair, head, nb, pb: f.boneIndex('pelvis'),
+      hipOff: new Float64Array(3), hipQ: new Float64Array(4), anchorP: new Float64Array(3),
+      anchorQ: new Float64Array(4),
+      body: PULL_BODY.map((n) => f.boneIndex(n)).filter((i) => i >= 0),
+      // In the net and not drawn, or not in the net at all: the arms ride her
+      // chest and the legs her pelvis, on the clip's own angles.
+      dead: ['armUL', 'armUR', 'armLL', 'armLR', 'legUL', 'legUR', 'legLL', 'legLR']
+        .map((n) => rag.body(n)).filter((i) => i >= 0),
+      hb: f.boneIndex('head'), cb: f.boneIndex('chest'), nk: f.boneIndex('neck'),
+      most: new Float64Array(nb),
+      out: { q: new Float32Array(nb * 4), t: new Float32Array(3) },
+      tgt: { q: new Float32Array(nb * 4), t: new Float32Array(3) },
+      fkW: new Float64Array(nb * 4), fkT: new Float64Array(nb * 3),
+      fkW2: new Float64Array(nb * 4), fkT2: new Float64Array(nb * 3),
+      dq: new Float32Array(nb * 4),
+      rb: [0, 0, 0], on: false, acc: 0, t: 0 };
+    for (const n of PULL_BODY) {
+      const i = f.boneIndex(n);
+      if (i >= 0) R.most[i] = PULL_RAG.most[n] * Math.PI / 180;
+    }
+    if (!pullL.q) {
+      pullL.q = new Float32Array(nb * 4);
+      for (let i = 0; i < nb; i++) pullL.q[4 * i + 3] = 1;
+      pullL.clip = { q: new Float32Array(nb * 4), t: new Float32Array(3) };
+    }
+    return R;
+  }
+
+  /**
+   * A bind-space point on bone `b` of the pose (fkW, fkT — see `ragdollFK`),
+   * world metres, into `out`: head + (turn · bindQ⁻¹)(p − bindHead).
+   */
+  function pullAt(f, W, T, b, p, out) {
+    const BR = f.bindRest();
+    avbdQMul(W, 4 * b, BR.bindQ, 4 * b, _plE, 0, false, true);
+    _plQ.set(_plE[0], _plE[1], _plE[2], _plE[3]);
+    out.set(p[0] - BR.bindT[3 * b], p[1] - BR.bindT[3 * b + 1], p[2] - BR.bindT[3 * b + 2]).applyQuaternion(_plQ);
+    out.x += T[3 * b]; out.y += T[3 * b + 1]; out.z += T[3 * b + 2];
+    return out.applyQuaternion(f.mesh.quaternion).add(f.mesh.position);
+  }
+
+  /** A world point into bone `b`'s bind frame as she is drawn, into `out3`. */
+  function pullToBind(f, b, w, out3) {
+    _plM.copy(f.mesh.matrixWorld).invert();
+    _plA.copy(w).applyMatrix4(_plM);
+    f.boneAt(b, _plB);
+    f.boneTurn(b, _plQ).invert();
+    _plA.sub(_plB).applyQuaternion(_plQ);
+    const BT = f.bindRest().bindT;
+    out3[0] = _plA.x + BT[3 * b]; out3[1] = _plA.y + BT[3 * b + 1]; out3[2] = _plA.z + BT[3 * b + 2];
+  }
+
+  /**
+   * The pose held still, FK'd into fkW/fkT, and where it has her pelvis's
+   * body this frame, world — place (R.anchorP) and attitude (R.anchorQ) —
+   * off the body's offset from the bone, taken when she went in (`pullEnter`).
+   */
+  const _plT = new Float64Array(4), _plMq = new Float64Array(4);
+  function pullAnchors(R, f) {
+    ragdollFK(f, R.tgt.q, R.tgt.t, R.fkW, R.fkT);
+    const b = R.pb, BR = f.bindRest(), mQ = f.mesh.quaternion;
+    avbdQMul(R.fkW, 4 * b, BR.bindQ, 4 * b, _plT, 0, false, true);
+    qrotv(_plD, 0, _plT, 0, R.hipOff, 0);
+    _plV.set(R.fkT[3 * b] + _plD[0], R.fkT[3 * b + 1] + _plD[1], R.fkT[3 * b + 2] + _plD[2])
+      .applyQuaternion(mQ).add(f.mesh.position);
+    R.anchorP[0] = _plV.x; R.anchorP[1] = _plV.y; R.anchorP[2] = _plV.z;
+    _plMq[0] = mQ.x; _plMq[1] = mQ.y; _plMq[2] = mQ.z; _plMq[3] = mQ.w;
+    avbdQMul(_plMq, 0, _plT, 0, R.anchorQ, 0);
+    avbdQMul(R.anchorQ, 0, R.hipQ, 0, R.anchorQ, 0);
+  }
+
+  /**
+   * Can her hair be pulled now: in the kabina, drawn as v2.0, and not in
+   * anything else's hands. A frame held by a probe (`posed`) is allowed —
+   * it is how the pull is photographed from the side, with her held where
+   * she stood rather than turning to keep her back to the camera.
+   */
+  function pullOk() {
+    return !!(show && skinFig && sheIsIn() && APPR.primary && appr && appr.mesh.visible
+      && !lickOn && !(show.ham && show.ham.rag));
+  }
+
+  /**
+   * Her back to `eye` (world): the front of her chest turned away from it —
+   * see the note. Also the number, for a probe: the cosine, −1 dead behind.
+   */
+  function pullBack(eye, raw = false) {
+    if (!skinFig) return raw ? null : false;
+    const f = skinFig, h = f.boneIndex('chest');
+    if (h < 0) return raw ? null : false;
+    f.mesh.updateMatrixWorld();
+    f.boneAt(h, _plA).applyMatrix4(f.mesh.matrixWorld);
+    _plB.set(1, 0, 0).applyQuaternion(f.boneTurn(h, _plQ)).applyQuaternion(f.mesh.quaternion).normalize();
+    _plV.set(eye.x - _plA.x, eye.y - _plA.y, eye.z - _plA.z).normalize();
+    const c = _plB.dot(_plV);
+    return raw ? c : c < PULL_RAG.back;
+  }
+
+  /** Where the hand closes on her hair, and which way the hair runs from there to her scalp. */
+  function pullGrabAt() {
+    if (!pullOk()) return null;
+    const g = apprenticeHairGrab(PULL_RAG.grab);
+    if (!g) return null;
+    const d = _plV.copy(g.s).sub(g.g).normalize();
+    return { x: g.g.x, y: g.g.y, z: g.g.z, hx: d.x, hy: d.y, hz: d.z, style: g.style };
+  }
+
+  /** Into the net, at rest on the pose she is drawn in. */
+  function pullEnter(f) {
+    const t0 = performance.now();
+    if (!pullR) { pullR = pullBuild(f); pullStats.buildMs = performance.now() - t0; }
+    const R = pullR, { net, rag } = R;
+    if (!pullL.on) {
+      const L = f.local();
+      pullL.clip.q.set(L.q); pullL.clip.t.set(L.t.subarray(0, 3));
+    }
+    net.resetDuals();
+    R.tgt.q.set(pullL.clip.q); R.tgt.t.set(pullL.clip.t);
+    rag.enterPose(R.tgt.q, R.tgt.t, f.mesh.position, f.mesh.quaternion);
+    for (const b of R.dead) net.setLive(b, false);
+    rag.tension(PULL_RAG.tension);
+    // Each joint's own share of the tone — see `tone`.
+    for (const [nm, m] of rag.angles) {
+      const k = PULL_RAG.tone[nm];
+      if (k == null) continue;
+      const D = RAGDOLL.bodies.find((d) => d.bone === nm), t = PULL_RAG.tension * k;
+      if (D) net.setAngleK(m, D.k * t, D.kd * Math.max(0.35, Math.sqrt(t)) * PULL_RAG.damp);
+    }
+    // EVERY STOP TAKES IN THE POSE SHE IS IN. RAGDOLL's table is anatomy,
+    // and a clip is not always inside it: MEASURED on `edgeHeld`, her head
+    // was pushed 16 degrees down off the pose in the first tenth of a second
+    // with nothing pulling, and stayed there after the hand let go — the
+    // clip holds her neck past the table's stop, and a stop is a hard row.
+    // (The cot's net has the same stops, and its `bias` averages them out.)
+    // So each stop is widened to the pose plus `lim` degrees wherever the
+    // pose is beyond it: at rest nothing is pushed, and a pull still meets a
+    // stop a little way past where she already was.
+    const tab = ragdollTable(), mg = PULL_RAG.lim * Math.PI / 180;
+    for (const [nm, m] of rag.angles) {
+      const D = tab.find((d) => d.bone === nm);
+      if (!D || !D.lo) continue;
+      const ph = net.angleNow(m), lo = [0, 0, 0], hi = [0, 0, 0];
+      for (let k = 0; k < 3; k++) {
+        lo[k] = Math.min(D.lo[k] * Math.PI / 180, ph[k] - mg);
+        hi[k] = Math.max(D.hi[k] * Math.PI / 180, ph[k] + mg);
+      }
+      net.setAngleLimits(m, lo, hi);
+    }
+    // Her pelvis's body off its bone, as the ragdoll has just put it there:
+    // offset = turn⁻¹·(mesh⁻¹·P − head), attitude = turn⁻¹·mesh⁻¹·Q.
+    ragdollFK(f, R.tgt.q, R.tgt.t, R.fkW, R.fkT);
+    const pb = rag.pelvis, P = net.P, Q = net.Q, b = R.pb, BR = f.bindRest();
+    avbdQMul(R.fkW, 4 * b, BR.bindQ, 4 * b, _plT, 0, false, true);
+    _plM.copy(f.mesh.matrixWorld).invert();
+    _plV.set(P[3 * pb], P[3 * pb + 1], P[3 * pb + 2]).applyMatrix4(_plM);
+    _plE[0] = _plV.x - R.fkT[3 * b]; _plE[1] = _plV.y - R.fkT[3 * b + 1]; _plE[2] = _plV.z - R.fkT[3 * b + 2];
+    _plT[0] = -_plT[0]; _plT[1] = -_plT[1]; _plT[2] = -_plT[2];
+    qrotv(R.hipOff, 0, _plT, 0, _plE, 0);
+    const mQ = f.mesh.quaternion;
+    _plMq[0] = -mQ.x; _plMq[1] = -mQ.y; _plMq[2] = -mQ.z; _plMq[3] = mQ.w;
+    avbdQMul(_plT, 0, _plMq, 0, R.hipQ, 0);
+    avbdQMul(R.hipQ, 0, Q, 4 * pb, R.hipQ, 0);
+    pullAnchors(R, f);
+    net.setJointK(R.hipJ, Infinity, Infinity);
+    net.setTarget(R.hipJ, R.anchorP[0], R.anchorP[1], R.anchorP[2], R.anchorQ);
+    net.setString(R.hair, null, null, false);
+    R.on = true; R.acc = 0; R.t = 0;
+    if (!pullL.on) {
+      pullL.on = true;
+      for (let i = 0; i < R.nb; i++) { pullL.q[4 * i] = pullL.q[4 * i + 1] = pullL.q[4 * i + 2] = 0; pullL.q[4 * i + 3] = 1; }
+      pullL.t.fill(0);
+      f.tug(pullL);
+    }
+    pullL.w = 1;
+    pullStats.enterMs = performance.now() - t0;
+  }
+
+  function pullLeave() {
+    const R = pullR;
+    if (!R || !R.on) return;
+    R.rag.leave();
+    R.net.setJointK(R.hipJ, 0, 0);
+    R.net.setString(R.hair, null, null, false);
+    R.on = false;
+  }
+
+  /**
+   * The hand closes (`on`) or lets go. `eye` is where you are — the pull
+   * goes back toward your shoulder under it. Whether it took hold.
+   */
+  function hairPull(on, eye) {
+    if (!on) {
+      if (!pull.on) return false;
+      pull.on = false; pull.rel = 0; pull.still = 0;
+      if (pullR && pullR.on) pullR.net.setString(pullR.hair, null, null, false);
+      pullStats.relAt = 0; pullStats.back = null;
+      return true;
+    }
+    if (pull.on) { if (eye) pull.eye.copy(eye); return true; }
+    if (!pullOk() || !eye) return false;
+    const f = skinFig, hb = f.boneIndex('head');
+    const g = apprenticeHairGrab(PULL_RAG.grab);
+    if (!g || hb < 0) return false;
+    pull.eye.copy(eye);
+    pull.style = g.style;
+    pullToBind(f, hb, g.s, pull.sB);
+    pullToBind(f, hb, g.g, pull.gB);
+    pull.len = g.g.distanceTo(g.s);
+    // Into the net at rest on the pose — unless it is still on her from the
+    // last pull, springing back, when the hand takes hold of her where she
+    // is: going in afresh would put her back on the pose in one frame.
+    if (!pullR || !pullR.on) pullEnter(f);
+    const R = pullR, { net } = R, P = net.P, Q = net.Q, b = R.head;
+    // The back of her skull on the head's body: where it is drawn, which is
+    // where the net has it (to `gap`, under a centimetre).
+    pull.S.copy(g.s);
+    const qi = [-Q[4 * b], -Q[4 * b + 1], -Q[4 * b + 2], Q[4 * b + 3]];
+    const d = [pull.S.x - P[3 * b], pull.S.y - P[3 * b + 1], pull.S.z - P[3 * b + 2]];
+    qrotv(R.rb, 0, qi, 0, d, 0);
+    pull.T.copy(g.g);
+    pull.P.copy(pull.T);
+    net.setString(R.hair, [pull.T.x, pull.T.y, pull.T.z], pull.len, true, R.rb);
+    pull.on = true; pull.t = 0; pull.rel = 0; pull.F = 0;
+    pullStats.grabs++; pullStats.pitchMax = 0; pullStats.chestMax = 0; pullStats.hipMax = 0; pullStats.Fmax = 0;
+    pullStats.back = null; pullStats.relAt = null; pullStats.riseMax = 0; pullStats.riseNMax = 0;
+    // The gasp, on the grab.
+    if (audio && audio.startle && state.phase !== 'intro') {
+      audio.startle('woman_young_slim', Math.hypot(eye.x - f.mesh.position.x, eye.z - f.mesh.position.z));
+    }
+    return true;
+  }
+
+  /** The arm's force this moment, N — see PULL_RAG.F. */
+  function pullForce(t) {
+    const F = PULL_RAG.F;
+    let u = 0;
+    if (t < F.rise) { u = t / F.rise; u = u * u * (3 - 2 * u); } else if (t < F.rise + F.peak) u = 1;
+    else if (t < F.rise + F.peak + F.fall) { u = 1 - (t - F.rise - F.peak) / F.fall; u = u * u * (3 - 2 * u); }
+    const up = Math.min(1, t / F.rise);
+    return (F.hold * up) + (F.yank - F.hold) * u;
+  }
+
+  /** The guard — see `cotSane`. */
+  function pullSane(R) {
+    const { net, rag } = R, P = net.P, V = net.V;
+    for (const b of rag.bodies) {
+      if (!net.live[b]) continue;
+      const o = 3 * b;
+      if (!(P[o] === P[o]) || !(P[o + 1] === P[o + 1]) || !(P[o + 2] === P[o + 2])) { pullStats.why = 'nan ' + b; return false; }
+      if (V[o] * V[o] + V[o + 1] * V[o + 1] + V[o + 2] * V[o + 2] > PULL_RAG.guard.v ** 2) { pullStats.why = 'fast ' + b; return false; }
+    }
+    const pb = 3 * rag.pelvis, a = R.anchorP;
+    if (Math.hypot(P[pb] - a[0], P[pb + 1] - a[1], P[pb + 2] - a[2]) > PULL_RAG.guard.far) {
+      pullStats.why = 'far'; return false;
+    }
+    net.measure();
+    if (net.stats.maxLoose > PULL_RAG.guard.loose) { pullStats.why = 'loose ' + net.stats.maxLoose.toFixed(3); return false; }
+    return true;
+  }
+
+  /** Bone `b`'s forward (+x of her bind frame) in the pose (W), figure space, into `out`. */
+  function pullFwd(f, W, b, out) {
+    avbdQMul(W, 4 * b, f.bindRest().bindQ, 4 * b, _plE, 0, false, true);
+    return out.set(1, 0, 0).applyQuaternion(_plQ.set(_plE[0], _plE[1], _plE[2], _plE[3]));
+  }
+  /** Degrees `b` is turned off the pose held still, + when it has come up (head back). */
+  function pullPitch(f, R, b) {
+    pullFwd(f, R.fkW, b, _plA);
+    pullFwd(f, R.fkW2, b, _plB);
+    const a = Math.acos(clamp(_plA.dot(_plB), -1, 1)) * 180 / Math.PI;
+    return _plB.y >= _plA.y ? a : -a;
+  }
+
+  /**
+   * Every frame, before her figure is posed (after the cot's): the net
+   * stepped with the hair in your hand, and the give laid on her. Nothing at
+   * all — not a comparison — unless a hand is in her hair or has just let go.
+   */
+  function pullTick(dt) {
+    if (show && show.pullFace) {
+      show.pullFace = damp(show.pullFace, pull.on ? 1 : 0, pull.on ? PULL_RAG.face.in : PULL_RAG.face.out, dt);
+      if (show.pullFace < 0.002 && !pull.on) show.pullFace = 0;
+    } else if (show && pull.on) show.pullFace = 0.001;
+    if (!pullL.on) { apprenticeHairGrip(null); return; }
+    const f = skinFig;
+    const t0 = performance.now();
+    if (!f || !pullOk()) { if (pull.on) hairPull(false); pullLeave(); }
+    const R = pullR;
+    if (!R || !R.on) {
+      pullL.w = Math.max(0, pullL.w - dt / PULL_RAG.after.out);
+      if (pullL.w <= 0) { if (f) f.tug(null); pullL.on = false; }
+      pull.grip = Math.max(0, pull.grip - dt / 0.15);
+      apprenticeHairGrip(pull.grip > 0 ? pull.P : null, pull.grip);
+      return;
+    }
+    const { net, rag } = R;
+    R.t += dt;
+    // The pose held still: the clip, eased to — see `steady`.
+    const ks = 1 - Math.exp(-dt / PULL_RAG.steady), Tq = R.tgt.q, Cq = pullL.clip.q;
+    for (let o = 0; o < Tq.length; o += 4) {
+      const sg = Tq[o] * Cq[o] + Tq[o + 1] * Cq[o + 1] + Tq[o + 2] * Cq[o + 2] + Tq[o + 3] * Cq[o + 3] < 0 ? -1 : 1;
+      let l = 0;
+      for (let c = 0; c < 4; c++) { Tq[o + c] += (sg * Cq[o + c] - Tq[o + c]) * ks; l += Tq[o + c] * Tq[o + c]; }
+      l = 1 / (Math.sqrt(l) || 1);
+      for (let c = 0; c < 4; c++) Tq[o + c] *= l;
+    }
+    for (let k = 0; k < 3; k++) R.tgt.t[k] += (pullL.clip.t[k] - R.tgt.t[k]) * ks;
+    rag.drive(R.tgt.q);
+    pullAnchors(R, f);
+    net.setTarget(R.hipJ, R.anchorP[0], R.anchorP[1], R.anchorP[2], R.anchorQ);
+    // THE HAND. Where it closed, riding the pose; drawn back toward your
+    // shoulder; and the string's end at it — or, if that is more than the arm
+    // pulls with, as far along the way to it as the force allows.
+    const P = net.P, Q = net.Q, b = R.head;
+    if (pull.on) {
+      pull.t += dt;
+      pull.grip = 1;
+      pullAt(f, R.fkW, R.fkT, R.hb, pull.gB, pull.G);
+      // Toward your shoulder, and out of her back by `outOf` of that: lying
+      // on her front, from beside the cot, your shoulder alone is as much
+      // sideways as up and drags her head across the pillow — the hand of
+      // someone pulling hair lifts it.
+      _plV.set(pull.eye.x, pull.eye.y - PULL_RAG.down, pull.eye.z).sub(pull.G).normalize();
+      pullFwd(f, R.fkW, R.cb, _plB).applyQuaternion(f.mesh.quaternion);
+      _plV.addScaledVector(_plB, -PULL_RAG.outOf).normalize();
+      // From where it closed to the hair's length out of her scalp along that
+      // way, and `draw` on: the hair taken up, then her head drawn. Measured
+      // from the grab alone, the draw was spent on the slack wherever the
+      // hair did not already run toward you — lying on her front the braid
+      // falls off her head on to the mattress, 16 cm under her scalp, and the
+      // hand's whole draw brought it level with her scalp: 22 N, and her head
+      // 4 cm off the pillow (MEASURED).
+      pullAt(f, R.fkW, R.fkT, R.hb, pull.sB, _plA);
+      _plA.addScaledVector(_plV, pull.len + PULL_RAG.draw);
+      _plA.lerp(pull.G, 1 - smoothstep(0, 1, pull.t / PULL_RAG.drawT));
+      // Her scalp, on the net's head.
+      _plE[0] = R.rb[0]; _plE[1] = R.rb[1]; _plE[2] = R.rb[2];
+      qrotv(_plD, 0, Q, 4 * b, _plE, 0);
+      pull.S.set(P[3 * b] + _plD[0], P[3 * b + 1] + _plD[1], P[3 * b + 2] + _plD[2]);
+      // As hard as the arm pulls toward where the hand is going, and no
+      // harder than the arm can.
+      const k = PULL_RAG.arm;
+      _plB.copy(_plA).sub(pull.S);
+      const L = _plB.length();
+      if (L <= pull.len) pull.T.copy(_plA);
+      else {
+        const F = Math.min(k * (L - pull.len), pullForce(pull.t));
+        pull.T.copy(pull.S).addScaledVector(_plB, (pull.len + F / k) / L);
+      }
+      net.setString(R.hair, [pull.T.x, pull.T.y, pull.T.z]);
+    }
+    R.acc = Math.min(R.acc + dt, PULL_RAG.maxSub * PULL_RAG.h);
+    let n = 0;
+    while (R.acc >= PULL_RAG.h - 1e-9 && n < PULL_RAG.maxSub) {
+      net.step(PULL_RAG.h); R.acc -= PULL_RAG.h; n++; pullStats.steps++;
+    }
+    if (n && !pullSane(R)) {
+      pullStats.rescues++;
+      if (pull.on) hairPull(false);
+      pullLeave();
+      pullL.w = 0;
+      return;
+    }
+    // The give: each drawn body's bone off the pose held still, laid on the clip.
+    rag.write(R.out, f.mesh.position, f.mesh.quaternion, pullL.clip.q);
+    const C = R.tgt.q, O = R.out.q;
+    let worst = 0;
+    for (const i of R.body) {
+      const o = 4 * i;
+      avbdQMul(C, o, O, o, _plE, 0, true);
+      if (_plE[3] < 0) for (let c = 0; c < 4; c++) _plE[c] = -_plE[c];
+      const ang = 2 * Math.acos(Math.min(1, _plE[3]));
+      if (ang > R.most[i]) {
+        const sn = Math.sin(ang / 2) || 1, k = Math.sin(R.most[i] / 2) / sn;
+        _plE[0] *= k; _plE[1] *= k; _plE[2] *= k; _plE[3] = Math.cos(R.most[i] / 2);
+      }
+      worst = Math.max(worst, Math.min(ang, R.most[i]));
+      pullL.q[o] = _plE[0]; pullL.q[o + 1] = _plE[1]; pullL.q[o + 2] = _plE[2]; pullL.q[o + 3] = _plE[3];
+    }
+    // Her hips planted: no shift of the root.
+    pullL.t.fill(0);
+    // What it did, for a probe: her head and her chest off the pose as DRAWN
+    // — the pose held still with the give laid on it, against the pose held
+    // still — degrees, + up; how far her pelvis is off where it is held (it
+    // is not drawn); and the force in the hair.
+    R.dq.set(R.tgt.q);
+    for (const i of R.body) avbdQMul(R.dq, 4 * i, pullL.q, 4 * i, R.dq, 4 * i);
+    ragdollFK(f, R.dq, R.tgt.t, R.fkW2, R.fkT2);
+    pullStats.pitch = pullPitch(f, R, R.hb);
+    pullStats.chest = pullPitch(f, R, R.cb);
+    // And how far up her head and the top of her back (the neck's root)
+    // have come, m — lying on her front, the lift off the mattress.
+    const mQ = f.mesh.quaternion;
+    for (const [b2, k] of [[R.hb, 'rise'], [R.nk, 'riseN']]) {
+      _plA.set(R.fkT2[3 * b2] - R.fkT[3 * b2], R.fkT2[3 * b2 + 1] - R.fkT[3 * b2 + 1],
+        R.fkT2[3 * b2 + 2] - R.fkT[3 * b2 + 2]).applyQuaternion(mQ);
+      pullStats[k] = _plA.y;
+      pullStats[k + 'Max'] = Math.max(pullStats[k + 'Max'] || 0, _plA.y);
+      pullStats[k + 'D'] = _plA.length();
+    }
+    const pb = 3 * rag.pelvis, a0 = R.anchorP;
+    pullStats.hip = Math.hypot(P[pb] - a0[0], P[pb + 1] - a0[1], P[pb + 2] - a0[2]);
+    pullStats.pitchMax = Math.max(pullStats.pitchMax, pullStats.pitch);
+    pullStats.chestMax = Math.max(pullStats.chestMax, pullStats.chest);
+    if (pull.on) {
+      _plE[0] = R.rb[0]; _plE[1] = R.rb[1]; _plE[2] = R.rb[2];
+      qrotv(_plD, 0, Q, 4 * b, _plE, 0);
+      pull.S.set(P[3 * b] + _plD[0], P[3 * b + 1] + _plD[1], P[3 * b + 2] + _plD[2]);
+      const L = pull.T.distanceTo(pull.S);
+      pull.F = Math.max(0, L - pull.len) * PULL_RAG.arm;
+      // The net's scalp against the drawn one, m: the give is the net's, so
+      // anything here is a clamp (`most`) or a bone the give leaves out.
+      pullStats.gap = pullAt(f, R.fkW2, R.fkT2, R.hb, pull.sB, _plA).distanceTo(pull.S);
+      // The fist: the hair's own length off her scalp, toward the spring's end.
+      if (L > pull.len) pull.P.copy(pull.S).lerp(pull.T, pull.len / L);
+      else pull.P.copy(pull.T);
+      pullStats.F = pull.F; pullStats.Fmax = Math.max(pullStats.Fmax, pull.F);
+      pullStats.hipMax = Math.max(pullStats.hipMax, pullStats.hip);
+    } else {
+      pull.F = 0; pullStats.F = 0;
+      // Let go: back in the pose? Spring-back is the first time her head is
+      // within a degree and 5 mm of it; the net is left once she is still
+      // there.
+      pull.rel += dt;
+      pullStats.relAt = pull.rel;
+      if (pullStats.back == null && Math.abs(pullStats.pitch) < 1 && (pullStats.riseD || 0) < 0.005) {
+        pullStats.back = pull.rel;
+      }
+      const A = PULL_RAG.after;
+      pull.still = worst * 180 / Math.PI < A.ang && rag.speed() < A.v ? pull.still + dt : 0;
+      if (pull.still >= A.still || pull.rel > A.most) pullLeave();
+      pull.grip = Math.max(0, pull.grip - dt / 0.15);
+    }
+    // The hair to the fist — see `drape.grip` in 41-skin.js.
+    pullStats.hair = apprenticeHairGrip(pull.grip > 0 ? pull.P : null, pull.grip);
+    const ms = performance.now() - t0;
+    pullStats.ms = ms; pullStats.msMax = Math.max(pullStats.msMax, ms);
+    pullStats.msSum += ms; pullStats.frames++;
+  }
+
   // ── THE SLOW LICK, the half of it that happens to her ─────────────────────
   //
   // Misha, 25 Sep 2026: *"he runs toward either Baye or toward the player,
@@ -45454,7 +46045,10 @@ async function buildJadrija(scene) {
         // Your hand on her breast: her eyelids heavy and her lips a little
         // apart, like the petting, a touch less.
         show.cupK = damp(show.cupK || 0, (show.cupTouch || 0) > 0.9 ? 1 : 0, 3, dt);
-        f.face.pet = Math.max(show.petK, SHOW.cupFace * show.cupK);
+        // And her hair pulled from behind: the same heavy eyelids — see
+        // PULL_RAG.face.
+        f.face.pet = Math.max(show.petK, SHOW.cupFace * show.cupK,
+          PULL_RAG.face.pet * (show.pullFace || 0));
         // And while your hand is on her she looks up at you, lips parted.
         // Misha, 24 Sep: *"she should also look up while being petted and
         // look at me (Chloe) and part lips, which she already knows how to
@@ -45472,7 +46066,7 @@ async function buildJadrija(scene) {
         show.buzzFace = damp(show.buzzFace || 0, show.buzzNod || 0, SHOW.buzzRate, dt);
         f.face.buzz = show.buzzFace;
         f.face.gape = Math.max(talk, show.mouthW, SHOW.petGape * (show.petK || 0),
-          SHOW.cupGape * (show.cupK || 0),
+          SHOW.cupGape * (show.cupK || 0), PULL_RAG.face.gape * (show.pullFace || 0),
           SHOW.buzzGape * show.buzzFace,
           show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
         // Both gated on `gape` rather than on `fill` alone, so everything in
@@ -59695,6 +60289,8 @@ async function buildJadrija(scene) {
     if (hammock && !posed && !lickOn) hamRagTick(dt);
     // And her on the cot, the same way round — see `cotRagTick`.
     cotRagTick(dt);
+    // And her hair in your hand, over either — see `pullTick`.
+    pullTick(dt);
     if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
 
@@ -61088,6 +61684,80 @@ async function buildJadrija(scene) {
       return [p, [p[0] - 0.10, p[1] - 0.12, 0], [p[0] - 0.04, p[1] - 0.06, 0.08],
         [p[0] - 0.04, p[1] - 0.06, -0.08]]
         .map((q) => bindPointAt(appr, q, [['head', 1]], new THREE.Vector3()));
+    },
+    /**
+     * HER HAIR, PULLED FROM BEHIND — see PULL_RAG. `hairBack(eye)`: is her
+     * back to you (the press on her hair is then the pull and not the pet);
+     * `raw` the cosine instead. `hairGrab()`: where the hand closes on her
+     * hair, and the way the hair runs from there to her scalp, world — or
+     * null. `hairPull(on, eye)`: the hand closes (true, with where you are)
+     * or lets go; called every frame with `on` while it holds, to keep `eye`
+     * current. `hairPullAt()`: the fist, world, and how shut it is, while it
+     * holds or lets go — null otherwise.
+     */
+    hairBack: (eye, raw = false) => (pullOk() ? pullBack(eye, raw) : raw ? null : false),
+    hairGrab: () => pullGrabAt(),
+    /** Debug: her head, world, and the way her face points — to stand a probe behind or beside it. */
+    headFrame: () => {
+      if (!skinFig) return null;
+      const f = skinFig, h = f.boneIndex('head');
+      f.mesh.updateMatrixWorld();
+      const p = f.boneAt(h, new THREE.Vector3()).applyMatrix4(f.mesh.matrixWorld);
+      const d = new THREE.Vector3(1, 0, 0).applyQuaternion(f.boneTurn(h, new THREE.Quaternion()))
+        .applyQuaternion(f.mesh.quaternion).normalize();
+      // And the way along her, pelvis to neck, level — for lying down.
+      const a = f.boneAt(f.boneIndex('pelvis'), new THREE.Vector3()).applyMatrix4(f.mesh.matrixWorld);
+      const n = f.boneAt(f.boneIndex('neck'), new THREE.Vector3()).applyMatrix4(f.mesh.matrixWorld);
+      const l = Math.hypot(n.x - a.x, n.z - a.z) || 1;
+      return { x: p.x, y: p.y, z: p.z, fx: d.x, fy: d.y, fz: d.z, ax: (n.x - a.x) / l, az: (n.z - a.z) / l,
+        nx: n.x, ny: n.y, nz: n.z };
+    },
+    hairPull: (on, eye) => hairPull(!!on, eye || null),
+    hairPullAt: () => {
+      if (!(pull.grip > 0)) return null;
+      const d = _plV.copy(pull.S).sub(pull.P);
+      const l = d.length() || 1;
+      return { x: pull.P.x, y: pull.P.y, z: pull.P.z, grip: pull.grip, on: pull.on,
+        hx: d.x / l, hy: d.y / l, hz: d.z / l };
+    },
+    /** Debug: what the pull is doing — see `pullTick` — and what it has done. */
+    pullRag: () => ({ on: !!(pullR && pullR.on), layer: pullL.on, w: +pullL.w.toFixed(3), holding: pull.on,
+      t: +pull.t.toFixed(2), style: pull.style, len: +pull.len.toFixed(3),
+      F: +pullStats.F.toFixed(1), Fmax: +pullStats.Fmax.toFixed(1),
+      pitch: +pullStats.pitch.toFixed(2), pitchMax: +pullStats.pitchMax.toFixed(2),
+      chest: +pullStats.chest.toFixed(2), chestMax: +pullStats.chestMax.toFixed(2),
+      rise: +((pullStats.rise || 0) * 1000).toFixed(1), riseMax: +((pullStats.riseMax || 0) * 1000).toFixed(1),
+      moved: +((pullStats.riseD || 0) * 1000).toFixed(1), gap: +((pullStats.gap || 0) * 1000).toFixed(1),
+      riseN: +((pullStats.riseN || 0) * 1000).toFixed(1), riseNMax: +((pullStats.riseNMax || 0) * 1000).toFixed(1),
+      hip: +(pullStats.hip * 1000).toFixed(1), hipMax: +(pullStats.hipMax * 1000).toFixed(1),
+      back: pullStats.back == null ? null : +pullStats.back.toFixed(2),
+      rel: pullStats.relAt == null ? null : +pullStats.relAt.toFixed(2),
+      hair: pullStats.hair ? { taut: pullStats.hair.taut == null ? null : +pullStats.hair.taut.toFixed(3),
+        sag: pullStats.hair.sag == null ? null : +(pullStats.hair.sag * 1000).toFixed(1), j: pullStats.hair.j } : null,
+      fist: pull.grip > 0 ? [+pull.P.x.toFixed(3), +pull.P.y.toFixed(3), +pull.P.z.toFixed(3)] : null,
+      simT: pullR ? +pullR.t.toFixed(3) : 0,
+      scalp: [+pull.S.x.toFixed(3), +pull.S.y.toFixed(3), +pull.S.z.toFixed(3)],
+      grab: [+pull.G.x.toFixed(3), +pull.G.y.toFixed(3), +pull.G.z.toFixed(3)],
+      spring: [+pull.T.x.toFixed(3), +pull.T.y.toFixed(3), +pull.T.z.toFixed(3)],
+      eye: [+pull.eye.x.toFixed(3), +pull.eye.y.toFixed(3), +pull.eye.z.toFixed(3)],
+      face: show ? +(show.pullFace || 0).toFixed(3) : null,
+      ms: +pullStats.ms.toFixed(3), msMax: +pullStats.msMax.toFixed(3),
+      msAvg: +(pullStats.msSum / Math.max(1, pullStats.frames)).toFixed(3), frames: pullStats.frames,
+      steps: pullStats.steps, grabs: pullStats.grabs, rescues: pullStats.rescues, why: pullStats.why,
+      buildMs: pullStats.buildMs == null ? null : +pullStats.buildMs.toFixed(2),
+      enterMs: pullStats.enterMs == null ? null : +pullStats.enterMs.toFixed(2) }),
+    /** Debug: PULL_RAG's numbers, merged (a nested table merges); the next grab takes them. */
+    pullTune: (o) => {
+      for (const [k, v] of Object.entries(o || {})) {
+        if (v && typeof v === 'object' && !Array.isArray(v) && PULL_RAG[k]) Object.assign(PULL_RAG[k], v);
+        else PULL_RAG[k] = v;
+      }
+      if (pull.on) hairPull(false);
+      pullLeave();
+      if (pullL.on && skinFig) skinFig.tug(null);
+      pullL.on = false;
+      pullR = null;
+      return JSON.parse(JSON.stringify(PULL_RAG));
     },
     /**
      * Her two breasts, world metres, and which way her chest faces — for your

@@ -1027,6 +1027,11 @@ let thumbK = 0, thumbAt = null;
 // And your hand on her head — "pet her". Same shape as the thumb: `petK` how
 // far out, `petAt` the last place the top of her hair was.
 let petK = 0, petAt = null;
+// And your hand in her hair from behind — the pull (1.544.0, PULL_RAG in
+// 43-jadrija.js). `hairK` how far out the hand is, `hairAt` where it is going
+// (the hair where it closes, then the fist as it draws back), `hairHeld`
+// whether it has closed.
+let hairK = 0, hairAt = null, hairHeld = false;
 // And your hand on her breast — see the gate. `reachKind` is decided on the
 // press; `cupSide` is which of the two.
 let cupK = 0, cupAt = null, reachKind = 'thumb', reachWas = false, cupSide = 0, pressHam = false;
@@ -1108,6 +1113,8 @@ const THIGH_OFF = 0.030;
 const cupOff = () => (reachKind === 'thigh' && cupAt && cupAt.off != null ? THIGH_OFF + cupAt.off : CUP_OFF);
 const PET_STAND = 0.50;      // m, eye to crown, horizontally, where you stop
 const PET_REACH = 0.95;      // and how close the hand comes up from
+const HAIR_STAND = 0.42;     // m, level, her hair to your eye, where you stop behind her
+const HAIR_REACH = 0.90;     // and how close the hand goes out from
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
 const THUMB_D = 1.8;         // how far off her lip the button means the thumb
 const THUMB_STAND = 0.45;    // and where you stop, eye to lip
@@ -7616,10 +7623,17 @@ function tick(wall, draw) {
       buttHit = null;
       if (brs) {
         const fw = camera.getWorldDirection(_thumbF);
+        // Her back to you — see her hair, below.
+        const herBack = !!(jadrija.hairBack && jadrija.hairBack(camera.position));
         // Near a breast, and nearer it than her mouth: the mouth keeps the
-        // thumb whenever it is the thing you are looking at.
+        // thumb whenever it is the thing you are looking at — from in front
+        // of her. From behind, her mouth is on the far side of her head and
+        // straight down the same line as the back of it: MEASURED aimed at
+        // her crown from 0.6 m behind her, the lip won and the press was the
+        // thumb, walking you round to her face. With her back to you it is
+        // not in the contest.
         let best = Math.cos(CUP_AIM_R);
-        if (lip) {
+        if (lip && !herBack) {
           best = Math.max(best, fw.dot(_thumbV.set(lip.x - camera.position.x,
             lip.y - camera.position.y, lip.z - camera.position.z).normalize()));
         }
@@ -7701,6 +7715,13 @@ function tick(wall, draw) {
         if (bk && bk.miss) { if (reachKind === 'butt') reachKind = 'thumb'; } else if (bk) {
           reachKind = 'butt'; buttSide = bk.side; buttHit = bk;
         }
+        // AND HER HAIR FROM BEHIND IS NOT THE PET. Misha, 28 Sep 2026: *"if
+        // in the kabine she has her back to us, and cross-hairs goes for the
+        // hair, instead of petting her (like from the front), it should pull
+        // on the hair"*. The same press on the same points, and one question
+        // more: is her face turned away from you — see `pullBack` in
+        // 43-jadrija.js, and PULL_RAG for all of what follows.
+        if (reachKind === 'pet' && herBack) reachKind = 'pull';
       }
     }
     // THE HAMMOCK, outside: a press with the cloth in front of you and within
@@ -7903,6 +7924,61 @@ function tick(wall, draw) {
     const petting = !!petNow0 && petD < PET_REACH;
     petK = damp(petK, petting ? 1 : 0, petting ? 3.5 : 6, dt);
     if (jadrija && jadrija.petTouch) jadrija.petTouch(petK);
+    // HER HAIR, FROM BEHIND. While the button is held: the hand goes out to
+    // where it will close on her hair (stepping you in to it if it is out of
+    // reach, the petting's walk), closes once it is there — and from then on
+    // it is `hairPull` in 43-jadrija.js that says where the fist is, drawn
+    // back toward you with her head coming after it. Let go and it opens.
+    const hairWant = pressing && reachKind === 'pull' && jadrija && jadrija.hairGrab;
+    let hairNow = null;
+    if (hairWant) {
+      hairNow = hairHeld && jadrija.hairPullAt ? jadrija.hairPullAt() : jadrija.hairGrab();
+      if (hairNow) hairAt = hairNow;
+    }
+    const hairD = hairNow ? Math.hypot(hairNow.x - camera.position.x,
+      hairNow.y - camera.position.y, hairNow.z - camera.position.z) : Infinity;
+    if (hairNow && !hairHeld && ground.you && ground.confine && !(reachForce && reachForce[2])) {
+      const Y = ground.you;
+      // Behind her head, on your own side of it, an arm's length back.
+      let fx = camera.position.x - hairNow.x, fz = camera.position.z - hairNow.z;
+      const fh = Math.hypot(fx, fz) || 1;
+      fx /= fh; fz /= fh;
+      // Nearer the lower her head is — on her knees, on all fours, lying on
+      // the cot — the petting's rule: you step in over her to reach down.
+      const st = HAIR_STAND - 0.25 * clamp(camera.position.y - hairNow.y - 0.2, 0, 0.6);
+      const gx = hairNow.x + fx * st, gz = hairNow.z + fz * st;
+      const mx = gx - Y.x, mz = gz - Y.z, md = Math.hypot(mx, mz);
+      if (md > settleGap(hairK) && fh > st) {
+        const step = Math.min(md, THUMB_WALK * dt);
+        const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
+        Y.x = nx; Y.z = nz;
+      }
+      const hd = Math.hypot(hairNow.x - camera.position.x, hairNow.z - camera.position.z);
+      const wantYaw = Math.atan2(camera.position.x - hairNow.x, camera.position.z - hairNow.z);
+      const wantPitch = Math.atan2(hairNow.y - camera.position.y, Math.max(hd, 0.05));
+      let dy = wantYaw - Y.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      Y.yaw += dy * (1 - Math.exp(-6 * dt)) * settleTurn(hairK);
+      Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-6 * dt)) * settleTurn(hairK);
+    }
+    // And a head well below your eye is further off than an arm and still
+    // within one: you bend down to it (the arm leans in — see 60-arms.js).
+    const hairReach = !!hairNow && (hairHeld
+      || hairD < HAIR_REACH + clamp(camera.position.y - hairNow.y - 0.3, 0, 0.8));
+    hairK = damp(hairK, hairReach ? 1 : 0, hairReach ? 5.0 : 7, dt);
+    // Closed once the hand is there; held on for as long as the button is.
+    if (hairWant && !hairHeld && hairK > 0.92 && jadrija.hairPull) {
+      hairHeld = !!jadrija.hairPull(true, camera.position);
+    } else if (hairWant && hairHeld) jadrija.hairPull(true, camera.position);
+    if (!hairWant && hairHeld) {
+      if (jadrija && jadrija.hairPull) jadrija.hairPull(false);
+      hairHeld = false;
+    }
+    // Letting go, the hand opens where the fist was and comes away from there.
+    if (!hairWant && hairAt && jadrija && jadrija.hairPullAt) {
+      const lg = jadrija.hairPullAt();
+      if (lg) hairAt = lg;
+    }
     ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear && !pressHam);
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
@@ -8309,6 +8385,11 @@ function tick(wall, draw) {
             palm: reachKind === 'thigh' && cupAt.along ? [-cupAt.fx, -cupAt.fy, -cupAt.fz] : null } }
         : state.phase === 'ground' && petK > 0.01 && petAt
           ? { reach: { x: petAt.x, y: petAt.y, z: petAt.z, k: petK, kind: 'pet' } }
+        // Your fist in her hair, from behind — see `hairPull`. `grip` how
+        // shut it is, `hair` the way the hair runs from it to her scalp.
+        : state.phase === 'ground' && hairK > 0.01 && hairAt
+          ? { reach: { x: hairAt.x, y: hairAt.y, z: hairAt.z, k: hairK, kind: 'pull',
+            grip: hairAt.grip || 0, hair: [hairAt.hx, hairAt.hy, hairAt.hz] } }
         : (state.phase === 'ride' ? ride : swim),
       camera);
   }
@@ -8691,7 +8772,7 @@ function tick(wall, draw) {
   }
   // And the near plane held while a hand is out: it tracks her body and she
   // sways, and a projection that changes every frame is the room wobbling.
-  if (thumbK > 0.3 || cupK > 0.3 || petK > 0.3) wantNear = camera.near;
+  if (thumbK > 0.3 || cupK > 0.3 || petK > 0.3 || hairK > 0.3) wantNear = camera.near;
   // And a seventh, the Slow Doodle, who is the one body `nearBody` could
   // never see. Misha, 27 Sep 2026: *"the game allows me to get too close to
   // the slow doodle and the result is i see/slice through his head into his
@@ -9962,6 +10043,10 @@ window.__fr = {
     thumbReach: () => (jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null),
     petReach: () => (jadrija && jadrija.petReach ? jadrija.petReach() : null),
     petK: () => +petK.toFixed(3),
+    /** Debug: your hand in her hair from behind — how far out, whether it has closed, where it is. */
+    hairK: () => ({ k: +hairK.toFixed(3), held: hairHeld, kind: reachKind,
+      at: hairAt ? [+hairAt.x.toFixed(3), +hairAt.y.toFixed(3), +hairAt.z.toFixed(3)] : null,
+      miss: arms && arms.probe ? arms.probe()[1].missMm : null }),
     cupK: () => ({ k: +cupK.toFixed(3), kind: reachKind, side: cupSide,
       y: cupAt ? +cupAt.y.toFixed(3) : null, t: +thighT.toFixed(2),
       // The thigh stroke: where the palm is aimed on her, world, and how far

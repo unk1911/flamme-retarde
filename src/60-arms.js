@@ -1197,6 +1197,9 @@ function buildArms() {
     palm: [0.0, 0.0, -1.0], flex: 0.10 };
   const PET_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.15, -0.30, -0.94],
     palm: [0.0, -1.0, 0.0], flex: 0.10 };
+  // And the fist in her hair from behind: the elbow down and out. The rest
+  // of the hand's lie is the hair's own — see the end of `updateReach`.
+  const PULL_AIM = { pole: [0.55, -0.80, 0.10], flex: 0.10, thumb: 1 };
 
   /**
    * `reach` is {x, y, z, k} — her lip in world metres, and 0..1 of the way
@@ -1223,7 +1226,13 @@ function buildArms() {
     // The thumb, or the flat of the hand on her head — `kind` says which.
     const pet = reach.kind === 'pet', cup = reach.kind === 'cup';
     const thigh = reach.kind === 'thigh', hip = reach.kind === 'hip' || thigh;
-    if (pet) setHandPose(a.pose, HAND_POSE.pet);
+    // Her hair from behind (1.544.0): open on the way out, shutting into the
+    // fist as it closes on her hair — `grip`, eased here so the fingers take a
+    // tenth of a second to close and not a frame.
+    const pull = reach.kind === 'pull';
+    a.pullG = pull ? (a.pullG || 0) + ((reach.grip || 0) - (a.pullG || 0)) * (1 - Math.exp(-14 * dt)) : 0;
+    if (pull) setHandPose(a.pose, HAND_POSE.pet, HAND_POSE.fist, a.pullG);
+    else if (pet) setHandPose(a.pose, HAND_POSE.pet);
     else if (thigh && reach.along) setHandPose(a.pose, HAND_POSE.stroke);
     else if (cup || hip) setHandPose(a.pose, HAND_POSE.cup);
     else thumbDigits(a);
@@ -1243,7 +1252,9 @@ function buildArms() {
     const need = _p1.length() - THUMB_REACH;
     // Petting a head below you, you bend over it: more lean than a thumb gets.
     // And bending right down for her thigh, which is a metre below your eye.
-    const lean = thigh ? 0.95 : pet || hip ? PET_LEAN : THUMB_LEAN;
+    // And down to her hair when her head is low — on her knees, on all
+    // fours, on the cot — as far as for her thigh.
+    const lean = thigh || pull ? 0.95 : pet || hip ? PET_LEAN : THUMB_LEAN;
     if (need > 0) body.position.copy(_p1.normalize().multiplyScalar(Math.min(need, lean)));
     else body.position.set(0, 0, 0);
 
@@ -1290,6 +1301,27 @@ function buildArms() {
       const sh = s0.multiplyScalar(ARMS.upper * 0.97).add(E);
       body.position.set(sh.x - S[0], sh.y - S[1], sh.z - S[2]).multiplyScalar(k);
       P = [E.x - (sh.x + _tt.x) * 0.5, E.y - (sh.y + _tt.y) * 0.5, E.z - (sh.z + _tt.z) * 0.5];
+    }
+    // THE FIST IN HER HAIR. The hair runs THROUGH it — in at the thumb from
+    // her head, out past the little finger as the tail that hangs — so it is
+    // the tunnel across the palm that is laid along the hair, the kite bar's
+    // rule (see `twistTo`): the tunnel runs from where the tail leaves the
+    // fist (straight down) to where the hair goes in (toward her scalp),
+    // and the forearm is turned about itself to suit. That is a hammer grip
+    // on a rope, thumb up: laid along the hair to her scalp alone, the
+    // tunnel pointed nearly down your line of sight and what you saw was the
+    // end of your own fist, a ring round a braid. The point that lands on
+    // the hair is the hole in the fist (GRIP_OFF), shading in from the middle
+    // of the open palm as the hand shuts.
+    if (pull && reach.hair) {
+      _qr.copy(root.quaternion).invert();
+      const h = _v3a.fromArray(reach.hair).normalize().add(_v3b.set(0, 1, 0)).applyQuaternion(_qr).normalize();
+      const u = a.pullG;
+      placeHand(a, _tt.x, _tt.y, _tt.z, PULL_AIM.pole[0], PULL_AIM.pole[1], PULL_AIM.pole[2],
+        PALM_OFF.x + (GRIP_OFF.x - PALM_OFF.x) * u, PALM_OFF.y + (GRIP_OFF.y - PALM_OFF.y) * u,
+        PALM_OFF.z + (GRIP_OFF.z - PALM_OFF.z) * u, h.x * PULL_AIM.thumb, h.y * PULL_AIM.thumb,
+        h.z * PULL_AIM.thumb, PULL_AIM.flex, true);
+      return;
     }
     placeHand(a, _tt.x, _tt.y, _tt.z, P[0], P[1], P[2],
       OFF.x, OFF.y, OFF.z, N[0], N[1], N[2], AIM.flex, false, G);
