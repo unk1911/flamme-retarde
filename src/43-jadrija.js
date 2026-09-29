@@ -37861,6 +37861,9 @@ async function buildJadrija(scene) {
         const p = parsed[CAST_KIND.indexOf(k)];
         if (src && p) jumpClips(src, p);
       }
+      // And everybody else the water, without the dive: the mole's edge
+      // sitters, hosed in, tread, swim and climb out on these (`DUNK`).
+      for (const p of parsed) if (src && p !== src) jumpClips(src, p, ['tread', 'swim', 'ladder']);
     }
     // One way to make a figure off one of these blobs, for the crowd, the
     // riders and the boat alike. A v2 figure needs uniforms of its own — it
@@ -38006,8 +38009,12 @@ async function buildJadrija(scene) {
       crowds.skin.setSettler(makeSettler(sitGeo));
       // And anybody hosed off it is a ragdoll against the same furniture —
       // see 43-topple.js and `toppleEvent`.
-      crowds.skin.setToppler(makeToppler({ geoOf: sitGeo, event: (fg, w, i) => toppleEvent(fg, w, i),
-        chair: (fg, p, q) => hoseChair(fg, p, q) }));
+      // And off the mole's edge into the sea — `DUNK`: their own geometry,
+      // their own events, and the swim, which the toppler hands back to draw.
+      crowds.skin.setToppler(makeToppler({ geoOf: (fg) => (fg.edge ? edgeGeo(fg) : sitGeo(fg)),
+        event: (fg, w, i) => (fg.edge ? dunkEvent(fg, w, i) : toppleEvent(fg, w, i)),
+        chair: (fg, p, q) => hoseChair(fg, p, q),
+        draw: (fg, f, dt) => (fg.edge ? dunkDraw(fg, f, dt) : false) }));
     }
     // And the instanced pair as well, which used to be the *fallback* for a
     // payload with no blobs in it and is now the second tier of a crowd.
@@ -38381,12 +38388,12 @@ async function buildJadrija(scene) {
    * and a turn away from rest means the same thing on each — which is why the
    * children's `sitquay` and his are the same sit at two sizes.
    */
-  function jumpClips(src, dst) {
+  function jumpClips(src, dst, names = ['dive', 'tread', 'swim', 'ladder']) {
     const nb = src.bones.length;
-    if (dst.bones.length !== nb || dst.clips.dive) return;
+    if (dst.bones.length !== nb || dst.clips[names[0]]) return;
     for (let i = 0; i < nb; i++) if (src.bones[i].name !== dst.bones[i].name) return;
     const k = dst.bones[0].t[1] / src.bones[0].t[1];
-    for (const name of ['dive', 'tread', 'swim', 'ladder']) {
+    for (const name of names) {
       const c = src.clips[name];
       if (!c) continue;
       const quat = new Int16Array(c.quat.length);
@@ -45053,6 +45060,19 @@ async function buildJadrija(scene) {
     const bi = list[k];
     if (bi == null) return null;
     const b = bathers[bi];
+    // Off the mole's edge (`DUNK`): wherever the ragdoll has got to while it
+    // is one, nothing while they are in the sea, and standing where they
+    // stand once they are out.
+    const eg = b.edge ? edgeFg(bi) : null;
+    const X = eg && eg.topple;
+    if (X && X.phase !== 'wet') {
+      if (X.phase === 'live') {
+        const q = crowds.skin.toppler.where(eg);
+        return q ? { x: q[0], y: q[1] - 0.4, z: q[2], r: HOSE.lieR, h: HOSE.lieH + 0.4, bi } : null;
+      }
+      if (X.phase === 'away') return { x: eg.x, y: eg.y, z: eg.z, r: 0.42 * (b.k || 1), h: 1.72 * (b.k || 1), bi };
+      return null;
+    }
     const p = toWorld(b.t, b.s);
     const tall = b.pose === 'lie' ? 0.34 : b.pose === 'sit' ? 0.95 : 1.72;
     const wide = b.pose === 'lie' ? 0.80 : 0.42;
@@ -45068,12 +45088,15 @@ async function buildJadrija(scene) {
   let batherNewsQ = null;
   function batherNews() { const v = batherNewsQ; batherNewsQ = null; return v; }
 
-  function batherWet(k) {
+  function batherWet(k, litres, hit) {
     if (!CAST_KIND || !castBlob) return;
     const list = batherNear();
     const bi = list[k];
     if (bi == null) return;
     const b = bathers[bi];
+    // On the mole's edge the water pushes as well as soaks — see `DUNK`.
+    const eg = b.edge ? edgeFg(bi) : null;
+    if (eg && litres) dunkWet(eg, litres, hit);
     if (b.soak > 0) { b.soak = 1.6; return; }
     b.soak = 1.6;
     const kind = CAST_KIND[castBlob[bi]] || null;
@@ -45106,6 +45129,9 @@ async function buildJadrija(scene) {
       : b.pose === 'sit' ? (jit(bi, 917) < 0.25 ? 0 : 1) : 1;
     if (eyesOn) audio.yelp(kind, m);
     else audio.startle(kind, m);
+    // Somebody on the edge who may be about to go in: what they say waits a
+    // moment, so that it is about the sea if they do (`DUNK.newsHold`).
+    if (eg && eg.mode === 'sit' && !eg.dunk) { dunkHold = { q: { kind, pose: b.pose, m }, at: crowdT }; return; }
     batherNewsQ = { kind, pose: b.pose, m };
   }
 
@@ -45416,6 +45442,704 @@ async function buildJadrija(scene) {
     const f = hoseFig.get(fg);
     if (crowds.skin && crowds.skin.toppler) crowds.skin.toppler.release(fg, f || null);
     fg.topple = null;
+  }
+
+  // ── HOSED OFF THE MOLE (1.550.0) ──────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026, of the people sitting along the mole's edge with their
+  // legs over the water: *"since we are in the business of hosing folks off,
+  // i think it would be funny if we could hose off some of these bathers that
+  // are sitting along the mole here ... hose them off so they fall off into the
+  // water, swearing in croatian and what not"*.
+  //
+  // The café's ragdoll (43-topple.js), against a mole instead of a chair. The
+  // edge sitters (`fg.edge`, the mole's flanks and head and the lip in front
+  // of the vikendica) are already bather guests — they have a face and a
+  // voice — so the jet that soaks them now also PUSHES them, through the same
+  // toppler, summed toward the same tip. What they are against (`edgeGeo`) is
+  // the concrete up to the arris and nothing past it: a floor that drops away
+  // to well under the sea there, and the mole as a box, so a thigh lies on the
+  // arris and a heel swinging back meets the wall rather than climbing it.
+  //
+  // THE WATER IS WHERE THE RAGDOLL ENDS. The moment the pelvis reaches the
+  // surface the ragdoll is handed off (`handOff`) into the diver's clips on
+  // their own skeleton (`jumpClips`, now for all eight): under for a second,
+  // up treading water, a swear, a swim round to the nearest ladder on their
+  // side of the mole — the flank's, or the quay's — the climb, a glare at
+  // you, a walk back to their spot, and they sit down again once you are well
+  // away from it, the café's rule (`HOSE.back`). Hosed from the front (from
+  // the sea), they go back on to the concrete, get up the café's way and do
+  // the same walk.
+  //
+  // WHAT THEY SAY is Croatian and it is theirs, not a service's: a word as
+  // they go over and a swear when they come up, in a balloon over their head
+  // (`DUNK.lines`, written for this — Šibenik is ikavian, so "čovik",
+  // "virovat", "lita", "bija"), and the gasp and the yelp the bathers already
+  // had. The spoken line is the voice service's, as every bather's is, told
+  // they have just been hosed into the sea (`DUNK.news`) — it asks for it in
+  // Croatian once baye.py carries `BATHER_DUNK` (server/baye/baye.py).
+  const DUNK = {
+    // Easing the ragdoll's last pose off into the tread, s; how long they are
+    // under before they come up, and how deep the plunge carries them, m.
+    fade: 0.55, under: 1.25, dip: 0.75,
+    // At least this far out from the face they come up, m — a body that went
+    // in brushing the wall treads water off it, not in it.
+    clear: 0.85,
+    // Treading water, swearing, before they strike out, s.
+    tread: 1.9,
+    // Speeds, m/s (the jumpers': a child's are times sqrt(k)).
+    swim: 0.85, walk: 1.05,
+    // Up on the concrete: glare at you, s; then back to their spot.
+    glare: 1.6,
+    // And the quay's ladders that count as theirs: within this many metres of
+    // the mole along the shore.
+    quayReach: 28,
+    // Too far for any of this to be worth doing (m, you to them): they are
+    // put back where they were, as the café's are when you have gone.
+    gone: 90,
+    // The one nudge, N·s, at the tip: the hose from behind or the side, and
+    // they lurch out over the water rather than fold over their own knees —
+    // somebody sitting on an edge who is hit in the back leans away from it.
+    // Along the jet's level, plus out off the edge; nothing from the front.
+    lurch: 38, lurchOut: 22,
+    // What the voice service is told happened, off a fixed string (baye.py
+    // matches it, see `BATHER_DUNK` there).
+    news: 'they have just hosed you off the mole into the sea',
+    // Held this long after a first soak on the edge, s, so that the line is
+    // about the sea if they go in, and about the water if they do not.
+    newsHold: 2.0,
+    lines: {
+      // Going over.
+      over: {
+        k: ['Mamaaa!', 'Aaaaa!', 'Tataaa!'],
+        wo: ['Isuse!', 'Ajme meni!', 'Majko Božja!'],
+        mo: ['Ajme!', 'Jebote!', 'Ma šta…?!'],
+        f: ['Ajme!', 'Joj, joj, joj!', 'Ne, ne, NE!', 'Majko mila!'],
+        m: ['Ajme!', 'Jebote!', 'Ne, ne, NE!', 'Pazi!'],
+      },
+      // Coming up.
+      up: {
+        k: ['Nije fer!', 'Opet! Opet!', 'Reći ću tati!', 'Hladno je!', 'Idiote!'],
+        wo: ['Sram te bilo!', 'Nemaš ti matere?!', 'Majku ti tvoju!',
+          'Isuse Bože, šta je ovo?!', 'Ne mogu virovat!', 'Dabogda te kanader pokupija!'],
+        mo: ['Pička ti materina!', 'Koji kurac?!', 'Jebo te pas!', 'Pa jesi ti normalan?!',
+          'Šezdeset lita dolazin vode!', 'Ma šta mi radiš, dite?!'],
+        f: ['Jebem ti…!', 'Pa jesi ti normalan?!', 'Idiote!', 'Majku ti…',
+          'Kretenu jedan!', 'Ma je li tebi dobro?!', 'Sad sam sva mokra…', 'Koji kurac?!'],
+        m: ['Jebem ti…!', 'Koji kurac?!', 'Pa jesi ti normalan?!', 'Idiote jedan!',
+          'Majku ti tvoju!', 'Ma šta radiš, jebote?!', 'Kretenu!', 'Sad sam sav mokar…',
+          'Ma daj, bre!', 'Dabogda te kanader pokupija!'],
+      },
+      // Out, and glaring at you.
+      out: {
+        k: ['Idemo opet!', 'Mama, jesi vidila?!', 'Reći ću tati!'],
+        wo: ['Reći ću tvojoj materi!', 'Sram te bilo!', 'Ajme meni, moja leđa…'],
+        mo: ['Ajme meni, moja leđa…', 'Vidit ćeš ti svoga boga!', 'U moje vrime toga nije bilo!'],
+        f: ['Sad sam sva mokra…', 'Zovem policiju!', 'Vidit ćeš ti!', 'Mobitel mi je bija u torbi… srića!'],
+        m: ['Sad sam sav mokar…', 'Mobitel mi je bija u džepu!', 'Vidit ćeš ti svoga boga!',
+          'Znam ja di ti živiš!'],
+      },
+    },
+  };
+  const dunked = new Set();       // everybody the mole has in hand, whatever phase
+  const dunkLog = [];
+  let dunkHold = null;            // a first soak's news, held — see `DUNK.newsHold`
+  let dunkBalloon = null, dunkSaid = null;
+  const dunkNext = {};            // each pool's turn, so a line does not come round twice running
+  const _dv = new THREE.Vector3();
+
+  /**
+   * THE SEA AS IT IS DRAWN, at a world point — for somebody treading water in
+   * it. `seaHeightAt` (59-swim.js) is the Gerstner sum from before the sea
+   * shader grew its wave groups and turned its directional spread round, and
+   * the two now disagree by up to half a metre: MEASURED on the first swimmer
+   * off the mole, riding it put him treading with his knees out of the water.
+   * This is `seaWave` in 25-sea.js, term for term — the same six directions,
+   * the groups' phase and envelope, the steepness cap, the inversion of the
+   * horizontal map, and the lattice's fade from 70 m of the eye — for the
+   * swimmers here and nothing else (the diver and the jumpers ride the old
+   * one, and that is theirs to change).
+   */
+  const DSEA = { lens: [78.0, 46.0, 27.0, 15.0, 8.5, 4.6], amps: [0.78, 1.0, 0.60, 0.34, 0.19, 0.105],
+    qs: [0.35, 0.55, 0.72, 0.85, 0.90, 0.90], d: [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]] };
+  function dunkSea(x, z) {
+    if (typeof U === 'undefined' || !U.uWind || !U.uTime) return seaAt(x, z);
+    const w = U.uWind.value;
+    const wl = Math.hypot(w.x + 1e-4, w.y + 1e-4) || 1, wx = (w.x + 1e-4) / wl, wy = (w.y + 1e-4) / wl;
+    const ax = -wy, ay = wx;
+    const set = (i, x2, y2) => { const l = Math.hypot(x2, y2) || 1; DSEA.d[i][0] = x2 / l; DSEA.d[i][1] = y2 / l; };
+    set(0, wx + ax * 0.34, wy + ay * 0.34); set(1, wx, wy); set(2, wx - ax * 0.30, wy - ay * 0.30);
+    set(3, wx + ax * 0.62, wy + ay * 0.62); set(4, wx - ax * 0.86, wy - ay * 0.86); set(5, ax + wx * 0.25, ay + wy * 0.25);
+    const ws = typeof SEA !== 'undefined' && SEA.waveScale != null ? SEA.waveScale : 1;
+    const amp = 0.34 * ws * (0.45 + 0.055 * (U.uWindSpeed ? U.uWindSpeed.value : 9.5));
+    const t = U.uTime.value;
+    const near = 1 - smoothstep(70, 240, Math.hypot(x - lastCam.x, z - lastCam.z));
+    if (near <= 0) return 0;
+    let px = x, pz = z, h = 0;
+    for (let it = 0; it < 3; it++) {
+      const g1 = Math.sin(px * 0.01310 + pz * 0.00870 + t * 0.103);
+      const g2 = Math.sin(-px * 0.00710 + pz * 0.01130 - t * 0.079);
+      let dx = 0, dz = 0;
+      h = 0;
+      for (let i = 0; i < 6; i++) {
+        const k = TAU / DSEA.lens[i], c = Math.sqrt(9.81 / k), d = DSEA.d[i];
+        const fr = (i * 0.37 + 0.19) % 1;
+        const env = g1 + (g2 - g1) * fr;
+        const a = amp * DSEA.amps[i] * (1 + 0.34 * env);
+        const q = Math.min(DSEA.qs[i], 0.92 / Math.max(k * a, 1e-4));
+        const ph = (d[0] * px + d[1] * pz) * k + t * c * k * 0.42
+          + (g1 * (0.6 + 0.50 * i) + g2 * (1.1 - 0.13 * i)) * 0.75;
+        const sn = Math.sin(ph), cs = Math.cos(ph);
+        h += a * sn;
+        dx += d[0] * q * a * cs;
+        dz += d[1] * q * a * cs;
+      }
+      if (it < 2) { px = x - dx * near; pz = z - dz * near; }
+    }
+    return h * near;
+  }
+
+  /** Whose words: a child, the old woman, the old man, or by sex. */
+  function dunkWho(fg) {
+    const kind = dunkKind(fg);
+    if (kind && /child/.test(kind)) return 'k';
+    if (kind === 'woman_old') return 'wo';
+    if (kind === 'man_old_heavy') return 'mo';
+    return (kind && BATHER_SEX[kind]) || fg.sex || 'm';
+  }
+  /** Which of the eight bodies — the blob they are dealt, for the voice. */
+  function dunkKind(fg) {
+    return fg.blob >= 0 && CAST_KIND ? CAST_KIND[fg.blob] : null;
+  }
+  function dunkLine(fg, when) {
+    const pool = DUNK.lines[when][dunkWho(fg)] || DUNK.lines[when].m;
+    const key = when + dunkWho(fg);
+    const n = dunkNext[key] == null ? ((fg.seed * 7919) | 0) : dunkNext[key] + 1;
+    dunkNext[key] = n;
+    return pool[n % pool.length];
+  }
+  /** A balloon over their head for a while — their own, not the bump's. */
+  function dunkSay(fg, text, dur = 2.6) {
+    if (!dunkBalloon) {
+      dunkBalloon = makeBalloon();
+      dunkBalloon.mesh.scale.setScalar(1.45);
+      scene.add(dunkBalloon.mesh);
+    }
+    dunkBalloon.say(text);
+    dunkBalloon.said = text;
+    dunkSaid = { fg, t: 0, dur };
+    dunkLog.push({ idx: fg.idx, said: text, t: +crowdT.toFixed(2) });
+    if (dunkLog.length > 60) dunkLog.shift();
+  }
+
+  /** The skinned figure drawing somebody roving, or null. */
+  function dunkFig(fg) {
+    const skin = crowds.skin;
+    if (!skin || !fg || !(fg.slot >= 0)) return null;
+    for (const [g, f] of skin.pairs()) if (g === fg) return f;
+    return null;
+  }
+  // Everybody on an edge, by casting index — the jet's guests are bathers and
+  // the ragdoll is a figure, and this is the way from one to the other.
+  let edgeByIdx = null;
+  function edgeFg(bi) {
+    if (!edgeByIdx) {
+      edgeByIdx = new Map();
+      for (const k in crowds) for (const fg of crowds[k].figures) if (fg.edge) edgeByIdx.set(fg.idx, fg);
+    }
+    return edgeByIdx.get(bi) || null;
+  }
+  /** Whether this body can do any of it: the diver's clips, on their skeleton. */
+  const dunkable = (f) => !!(DV && f && f.clips && f.clips.includes('tread')
+    && f.clips.includes('swim') && f.clips.includes('ladder'));
+
+  /** The deck at (t, s): the mole's top, the quay, or null for the sea. */
+  function dunkDeckY(t, s) {
+    if (t >= JET.t - JET.w && t <= JET.t + JET.w && s >= -JET.out && s <= 0.4) return JET.top;
+    return s >= 0 ? standY(t, s) : null;
+  }
+
+  /**
+   * Which edge they are on and how far in from it: the mole's west (`w`) or
+   * east (`e`) flank, its head (`h`), or the quay's lip (`q`) — and the out
+   * direction in (t, s).
+   */
+  function edgeOf(fg) {
+    if (fg.edgeOf) return fg.edgeOf;
+    const t = fg.t, s = fg.lane, W0 = JET.t - JET.w, E0 = JET.t + JET.w;
+    let E;
+    if (t >= W0 - 0.1 && t <= E0 + 0.1 && s < 0.4) {
+      const c = [['w', t - W0, [-1, 0]], ['e', E0 - t, [1, 0]], ['h', s + JET.out, [0, -1]]];
+      c.sort((a2, b2) => a2[1] - b2[1]);
+      E = { at: c[0][0], d: c[0][1], out: c[0][2] };
+    } else {
+      E = { at: 'q', d: s, out: [0, -1] };
+    }
+    E.side = E.at === 'w' ? -1 : E.at === 'e' ? 1 : E.at === 'h' ? Math.sign(t - JET.t) || -1
+      : t < JET.t ? -1 : 1;
+    fg.edgeOf = E;
+    return E;
+  }
+
+  /**
+   * What an edge sitter is against, in their figure's frame (`sitGeo`'s
+   * shape): the concrete, flat, out to the arris `d` in front of the hip, and
+   * nothing past it — the floor drops to three metres under the sea, where
+   * the ragdoll never gets, because it stops being one at the surface.
+   */
+  function edgeGeo(fg) {
+    const E = edgeOf(fg), k = 1 / (fg.hscale || 1);
+    const xe = E.d * k;
+    const low = (dunkSea(fg.x, fg.z) - 3 - fg.y) * k;
+    // And the mole as a box whose top is 5 mm under the deck, so the floor is
+    // what anybody lies on and the box is only its face and its arris.
+    const hx = 1.2 * k, hy = 1.2 * k, hz = 2.5 * k;
+    const boxes = [xe - hx, -hy - 0.005 * k, 0, hx, hy, hz, 0];
+    return { boxes, floor: (x) => (x < xe ? 0 : low), back: false, edge: true };
+  }
+
+  /**
+   * The ladders that are theirs: the flank's on their side of the mole, and
+   * the quay's on their side of it and within `DUNK.quayReach`. Each as where
+   * its rungs are, its out direction, and the deck it climbs to.
+   */
+  function dunkLadders(E, t0) {
+    const out = [];
+    for (const [face, s0, side] of MOLE_LADDERS) {
+      if (E.at === 'q' || (E.at !== 'h' && side !== E.side)) continue;
+      out.push({ q: false, side, t: face + side * 0.20, s: s0, face, out: [side, 0], top: JET.top });
+    }
+    if (E.at !== 'h') {
+      for (const t of LADDERS) {
+        if (Math.abs(t - JET.t) > JET.w + DUNK.quayReach) continue;
+        if (E.side < 0 ? t > JET.t - JET.w - 0.6 : t < JET.t + JET.w + 0.6) continue;
+        out.push({ q: true, side: E.side, t, s: -0.20, face: 0, out: [0, -1], top: at(t).lip });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * The swim, in (t, s): from where they came up to the foot of a ladder,
+   * round the corner of the head if the ladder is on a flank and they are off
+   * the end. Returns the ladder it chose and the way there, nearest first.
+   */
+  function dunkRoute(fg, from, k) {
+    const E = edgeOf(fg);
+    const [t0, s0] = local(from[0], from[2]);
+    const off = 0.35 * k;
+    let best = null;
+    for (const L of dunkLadders(E, t0)) {
+      const A = [L.t + L.out[0] * off, L.s + L.out[1] * off];
+      // Come at it along the wall from the side they are coming from.
+      const along = L.q ? Math.sign(t0 - L.t) || 1 : Math.sign(s0 - L.s) || 1;
+      const B = L.q ? [A[0] + along * 1.6, A[1] - 0.9] : [A[0] + L.side * 0.9, A[1] + along * 1.6];
+      const P = [[t0, s0]];
+      // Off the head and bound for a flank: round the corner first.
+      if (!L.q && s0 < -JET.out + 0.2) P.push([JET.t + L.side * (JET.w + 1.3), -JET.out - 1.3]);
+      P.push(B, A);
+      let len = 0;
+      for (let i = 1; i < P.length; i++) len += Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]);
+      if (!best || len < best.len) best = { L, P, len };
+    }
+    if (!best) return null;
+    best.path = best.P.map(([t, s], i) => (i === 0 ? from.slice() : W(t, s, 0)));
+    return best;
+  }
+
+  /** The walk back from the top of the ladder to beside their spot, in (t, s). */
+  function dunkWalkBack(fg, L, fromTS) {
+    const E = edgeOf(fg), S = fg.topple.home;
+    const st = [S.t - E.out[0] * 0.9, S.lane - E.out[1] * 0.9];
+    const P = [fromTS];
+    if (L && !L.q) {
+      P.push([L.face - L.side * 1.1, L.s + (E.at === 'h' ? -0.4 : 0.9)]);
+      if (E.at !== 'h') P.push([L.face - L.side * 1.1, st[1]]);
+    } else if (L && L.q) {
+      P.push([L.t, 1.1]);
+      if (E.at !== 'q') {
+        const tIn = JET.t + E.side * (JET.w - 1.1);
+        P.push([tIn, 1.1], [tIn, st[1]]);
+      }
+    }
+    P.push(st);
+    return P;
+  }
+  function dunkY(t, s) {
+    const y = dunkDeckY(t, s);
+    return y == null ? standY(t, s) : y;
+  }
+
+  /**
+   * The jet on an edge sitter: its push, into the toppler — `sitterWet`'s,
+   * for somebody on the concrete instead of a chair. And at the tip, the one
+   * lurch out over the water (`DUNK.lurch`).
+   */
+  function dunkWet(fg, litres, hit) {
+    const T = crowds.skin && crowds.skin.toppler;
+    if (!T || !hit || fg.mode !== 'sit' || fg.dunk) return;
+    const X = fg.topple;
+    if (X && X.phase !== 'wet' && X.phase !== 'live') return;
+    const f = dunkFig(fg);
+    if (!dunkable(f)) return;
+    const dt = litres / GROUND.flow;
+    const dir = hit.dir || [hit.x - hoseWho.x, 0, hit.z - hoseWho.z];
+    const from = hit.from || [hoseWho.x, hit.y, hoseWho.z];
+    const range = Math.hypot(hit.x - from[0], hit.y - from[1], hit.z - from[2]);
+    const fall = clamp((KNOCK.far - range) / (KNOCK.far - KNOCK.near), 0, 1);
+    const l = Math.hypot(dir[0], dir[1], dir[2]) || 1, F = KNOCK.force * fall / l;
+    hoseFig.set(fg, f);
+    const ph = T.push(fg, f, [dir[0] * F, dir[1] * F, dir[2] * F], [hit.x, hit.y, hit.z], dt);
+    if (ph === 'live' && fg.topple && !fg.topple.lurched) {
+      fg.topple.lurched = true;
+      // Out: the figure's +x, which is over the water.
+      const ox = Math.cos(fg.yaw), oz = -Math.sin(fg.yaw);
+      const hl = Math.hypot(dir[0], dir[2]) || 1, hx = dir[0] / hl, hz = dir[2] / hl;
+      const along = hx * ox + hz * oz;
+      if (along > -0.35) {
+        const J = [hx * DUNK.lurch + ox * DUNK.lurchOut, 0, hz * DUNK.lurch + oz * DUNK.lurchOut];
+        T.knock(fg, f, J, [fg.x, fg.y + 0.45 * (fg.hscale || 1), fg.z]);
+      }
+    }
+  }
+
+  /** What the toppler tells us about an edge sitter — `toppleEvent`'s other half. */
+  function dunkEvent(fg, what, info) {
+    const kind = dunkKind(fg);
+    const m = Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z);
+    hoseLog.push({ idx: fg.idx, edge: true, what, t: +crowdT.toFixed(2) });
+    if (hoseLog.length > 40) hoseLog.shift();
+    const X = fg.topple;
+    if (X && !X.home) X.home = { t: fg.t, lane: fg.lane };
+    switch (what) {
+      case 'wet':
+        hoseLook(fg, { x: hoseWho.x, z: hoseWho.z });
+        break;
+      case 'live':
+        dunked.add(fg);
+        if (audio && audio.yelp && kind) audio.yelp(kind, m);
+        dunkSay(fg, dunkLine(fg, 'over'), 1.4);
+        // The line they will say, when they have the breath for it: the sea,
+        // not the soak — see `DUNK.newsHold`.
+        dunkHold = null;
+        if (kind) batherNewsQ = { kind, pose: 'sit', m, news: DUNK.news };
+        break;
+      case 'down':
+        // Sitting on the concrete is already down by the toppler's measure,
+        // so the landing that counts is a later one.
+        if (X && X.t > 0.3 && audio && audio.startle && kind) audio.startle(kind, m);
+        break;
+      case 'up': {
+        // Back on the concrete from the front — the café's get-up — and the
+        // same walk back as out of the sea.
+        const [t, s] = local(info.x, info.z);
+        dunkAway(fg, [info.x, dunkY(t, s), info.z], info.yaw, null);
+        break;
+      }
+      default: break;
+    }
+  }
+
+  /**
+   * Standing on the concrete again, wherever that is: a person the crowd
+   * draws, glaring at you, and then walking back to beside their spot.
+   */
+  function dunkAway(fg, p, yaw, L) {
+    const X = fg.topple;
+    if (!X) return;
+    const [t, s] = local(p[0], p[2]);
+    fg.x = p[0]; fg.y = p[1]; fg.z = p[2];
+    fg.yaw = yaw;
+    fg.t = t; fg.lane = s; fg.off = 0;
+    fg.mode = 'stand';
+    fg.handGeo = null;
+    fg.handPlan = null;
+    X.phase = 'away';
+    X.away = { t: 0, phase: 'glare', legs: dunkWalkBack(fg, L, [t, s]), leg: 1 };
+    fg.dunk = null;
+    hoseLook(fg, { x: hoseWho.x, z: hoseWho.z });
+    dunkSay(fg, dunkLine(fg, 'out'), 2.4);
+    fg.hosedBefore = true;
+  }
+
+  /** Back where they sat, as they were before any of it. */
+  function dunkHome(fg) {
+    const X = fg.topple;
+    if (X) {
+      const S = X.seat;
+      fg.x = S.x; fg.y = S.y; fg.z = S.z; fg.yaw = S.yaw;
+      if (X.home) { fg.t = X.home.t; fg.lane = X.home.lane; }
+    }
+    fg.off = 0;
+    fg.mode = 'sit';
+    fg.handGeo = undefined;
+    fg.handPlan = null;
+    fg.dunk = null;
+    const f = dunkFig(fg);
+    if (crowds.skin && crowds.skin.toppler) crowds.skin.toppler.release(fg, f);
+    fg.topple = null;
+    dunked.delete(fg);
+    if (dunkSaid && dunkSaid.fg === fg) { dunkSaid = null; if (dunkBalloon) dunkBalloon.mesh.visible = false; }
+  }
+
+  /**
+   * Into the sea: off the ragdoll (`handOff`) at the surface into a frame
+   * where they tread water, with a splash where they went in.
+   */
+  function dunkEnter(fg, f, p) {
+    const T = crowds.skin.toppler, k = (f.data && f.data.jumpK) || 1, hs = fg.hscale || 1;
+    const sea = dunkSea(p[0], p[2]);
+    // The jumpers' tread (`jumpStep`), in this body's clip units and drawn
+    // at their stature.
+    const tread = k * hs * (DV.dive.end_root[1] - DV.tread_root[2] - DV.dive.water + TREAD_LIFT);
+    // Clear of the wall: how far out of the face the pelvis is, and the rest
+    // of `DUNK.clear` to drift out by while they are under.
+    const ox = Math.cos(fg.yaw), oz = -Math.sin(fg.yaw);
+    const E = edgeOf(fg);
+    const outNow = (p[0] - fg.x) * ox + (p[2] - fg.z) * oz - E.d;
+    const drift = Math.max(0, DUNK.clear - outNow);
+    const at0 = { x: p[0], y: sea + tread, z: p[2], yaw: fg.yaw };
+    if (!T.handOff(fg, f, 'swim', at0)) return false;
+    fg.dunk = { mode: 'under', t: 0, x: p[0], z: p[2], yaw: fg.yaw, tread, k,
+      ox, oz, drift, fade: DUNK.fade, pelvisY: f.bones[0].t[1],
+      route: null, seg: 0, cur: null };
+    f.play('tread', { fade: 0, keepRoot: true });
+    f.state.speed = 1;
+    if (bodySplash) bodySplash.at(p[0], sea, p[2], 0.9 + 0.5 * k, 1.3 * k, ox, oz);
+    const dq = Math.hypot(lastCam.x - p[0], lastCam.z - p[2]);
+    if (dq < 70 && audio && audio.plunge) audio.plunge(0.8 * k * (1 - dq / 70));
+    return true;
+  }
+
+  /** Whether a ladder has somebody on it: one of these, or a jumper. */
+  function dunkBusy(fg, L) {
+    for (const g of dunked) {
+      const D = g !== fg && g.dunk;
+      if (D && D.mode === 'ladder' && D.route && D.route.L.t === L.t && D.route.L.s === L.s) return true;
+    }
+    if (!L.q) {
+      for (const J of MOLE_LIFE.jumpers) {
+        if (J.st && J.st.mode === 'ladder' && J.lane && J.lane.side === L.side) return true;
+      }
+    }
+    return false;
+  }
+  const dunkPlace = (f, x, y, z, yaw, hs) => {
+    f.mesh.position.set(x, y, z);
+    f.mesh.rotation.set(0, yaw, 0);
+    f.mesh.scale.setScalar(hs);
+    f.mesh.updateMatrixWorld();
+  };
+  /** Along a polyline at `v`, turning toward where it goes; true at the end. */
+  function dunkPath(D, dt, v, turn) {
+    const P = D.route.path;
+    let left = v * dt;
+    while (left > 0 && D.seg < P.length - 1) {
+      const a2 = D.cur || P[D.seg], b2 = P[D.seg + 1];
+      const dx = b2[0] - a2[0], dz = b2[2] - a2[2], d = Math.hypot(dx, dz);
+      if (d <= left) { D.cur = b2.slice(); left -= d; D.seg++; continue; }
+      D.cur = [a2[0] + dx / d * left, a2[1], a2[2] + dz / d * left];
+      left = 0;
+    }
+    const c = D.cur, b2 = P[Math.min(D.seg + 1, P.length - 1)];
+    if (Math.hypot(b2[0] - c[0], b2[2] - c[2]) > 0.05) {
+      const want = diveYaw(b2[0] - c[0], b2[2] - c[2]);
+      const d = ((want - D.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      D.yaw += Math.max(-turn * dt, Math.min(turn * dt, d));
+    }
+    return D.seg >= P.length - 1;
+  }
+
+  /**
+   * Every frame of the sea, from the crowd's `step` through the toppler
+   * (`o.draw`): under, treading, the swim, the ladder. True while this draws
+   * them; false once they are on the concrete and the crowd's again.
+   */
+  function dunkDraw(fg, f, dt) {
+    const X = fg.topple, D = fg.dunk;
+    if (!X || X.phase !== 'swim' || !D) return false;
+    const h = Math.min(Math.max(dt, 0), 0.05), hs = fg.hscale || 1, k = D.k;
+    D.t += h;
+    // The ragdoll's last pose, eased off into whatever the clip is doing.
+    if (D.fade > 0 && X.pose) {
+      D.fade = Math.max(0, D.fade - h);
+      const u = D.fade / DUNK.fade;
+      X.pose.w = u * u * (3 - 2 * u);
+      if (D.fade <= 0) f.manual(null);
+    }
+    if (D.mode === 'under' || D.mode === 'tread') {
+      // Down with the plunge and up again, drifting clear of the wall.
+      const u = Math.min(1, D.t / DUNK.under);
+      const dip = D.mode === 'under' ? -DUNK.dip * Math.sin(Math.PI * u) : 0;
+      const dr = D.drift * smoothstep(0, DUNK.under, D.t);
+      const x = D.x + D.ox * dr, z = D.z + D.oz * dr;
+      if (D.mode === 'tread') {
+        // Round to face whoever did it.
+        const want = diveYaw(hoseWho.x - x, hoseWho.z - z);
+        const d = ((want - D.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+        D.yaw += Math.max(-1.6 * h, Math.min(1.6 * h, d));
+      }
+      dunkPlace(f, x, dunkSea(x, z) + D.tread + dip, z, D.yaw, hs);
+      fg.x = x; fg.z = z;
+      if (D.mode === 'under' && D.t >= DUNK.under) {
+        D.mode = 'tread'; D.t = 0;
+        // Up, and the breath back first — a gasp — and then the words.
+        const kind = dunkKind(fg);
+        const m = Math.hypot(x - lastCam.x, z - lastCam.z);
+        if (audio && audio.startle && kind) audio.startle(kind, m);
+        dunkSay(fg, dunkLine(fg, 'up'), 3.0);
+      } else if (D.mode === 'tread' && D.t >= DUNK.tread) {
+        const from = [x, dunkSea(x, z) + D.tread, z];
+        D.route = dunkRoute(fg, from, k);
+        if (!D.route) { dunkHome(fg); return false; }
+        D.seg = 0; D.cur = from; D.y0 = from[1];
+        f.play('swim', { fade: 0.5 });
+        f.state.speed = 1;
+        D.mode = 'swim'; D.t = 0;
+      }
+    } else if (D.mode === 'swim') {
+      const ySwim = (0.08 * k - D.pelvisY - DV.swim_root[2] * k) * hs;
+      const e = smoothstep(0, 0.8, D.t);
+      const done = dunkPath(D, h, DUNK.swim * Math.sqrt(k), 1.6);
+      const c = D.cur;
+      dunkPlace(f, c[0], D.y0 + (ySwim + dunkSea(c[0], c[2]) - D.y0) * e, c[2], D.yaw, hs);
+      fg.x = c[0]; fg.z = c[2];
+      if (done && dunkBusy(fg, D.route.L)) {
+        // Somebody on it already — another of these, or a jumper on the
+        // flank's: back off a metre and tread water until it is free.
+        f.play('tread', { fade: 0.5, keepRoot: true });
+        D.q0 = c.slice(); D.qoff = f.mesh.position.y - dunkSea(c[0], c[2]);
+        D.mode = 'queue'; D.t = 0;
+      } else if (done) {
+        // Up the ladder from the rung with the deck's height of it left —
+        // the jumpers' climb (`jumpStep`), to whichever deck this one is.
+        const L = D.route.L;
+        const face = W(L.t, L.s, 0), back = W(L.t - L.out[0], L.s - L.out[1], 0);
+        D.yaw = diveYaw(back[0] - face[0], back[2] - face[2]);
+        const yL = L.top - DV.ladder.deck * k * hs;
+        D.ladder = [face[0], yL, face[2]];
+        dunkPlace(f, face[0], yL, face[2], D.yaw, hs);
+        f.play('ladder', { fade: 0.6, keepRoot: true });
+        f.state.speed = 1;
+        const c2 = f.data.clips.ladder, want = c2.root[1] + (DV.ladder.deck * k - L.top / hs);
+        let f0 = 0;
+        while (f0 < c2.nf - 1 && c2.root[f0 * 3 + 1] < want) f0++;
+        f.state.curT = f0 / Math.max(1, c2.nf - 1) * c2.dur;
+        fg.x = face[0]; fg.z = face[2];
+        D.mode = 'ladder'; D.t = 0;
+      }
+    } else if (D.mode === 'queue') {
+      const L = D.route.L, u = smoothstep(0, 1.5, D.t);
+      const o = W(L.t + L.out[0] * 1.0, L.s + L.out[1] * 1.0, 0), a2 = W(L.t, L.s, 0);
+      const x = D.q0[0] + (o[0] - a2[0]) * u, z = D.q0[2] + (o[2] - a2[2]) * u;
+      dunkPlace(f, x, dunkSea(x, z) + D.tread * u + (1 - u) * D.qoff, z, D.yaw, hs);
+      fg.x = x; fg.z = z;
+      if (D.t > 1.5 && !dunkBusy(fg, L)) {
+        // Free: the last metre in again, and up.
+        const from = [x, dunkSea(x, z) + D.tread, z];
+        D.route.path = [from, D.q0.slice()];
+        D.seg = 0; D.cur = from; D.y0 = from[1];
+        f.play('swim', { fade: 0.4 });
+        D.mode = 'swim'; D.t = 0;
+      }
+    } else if (D.mode === 'ladder') {
+      dunkPlace(f, D.ladder[0], D.ladder[1], D.ladder[2], D.yaw, hs);
+      if (f.state.curT >= DV.ladder.dur - 0.02) {
+        const er = DV.ladder.end_root, L = D.route.L;
+        const s0 = diveFrom(D.ladder, D.yaw, er[0] * k * hs, L.top - D.ladder[1]);
+        dunkPlace(f, s0[0], s0[1], s0[2], D.yaw, hs);
+        // Standing, and the crowd's from here: a looping clip under them, or
+        // it would wait on the climb's last frame for ever (`midBiz`).
+        f.play('idle', { fade: 0.3 });
+        f.update(0);
+        dunkAway(fg, s0, D.yaw, L);
+        return true;
+      }
+    }
+    f.update(h);
+    return true;
+  }
+
+  /**
+   * Once a frame, from `updateCrowd`: the ragdolls reaching the sea, the
+   * walks back, the sit down again, the balloon, and the held news.
+   */
+  function stepDunk(dt, cam) {
+    const T = crowds.skin && crowds.skin.toppler;
+    if (dunkHold && crowdT - dunkHold.at > DUNK.newsHold) {
+      if (!batherNewsQ) batherNewsQ = dunkHold.q;
+      dunkHold = null;
+    }
+    if (T && dunked.size) {
+      for (const fg of dunked) {
+        const X = fg.topple;
+        if (!X) { dunked.delete(fg); continue; }
+        const dYou = Math.hypot(fg.x - hoseWho.x, fg.z - hoseWho.z);
+        if (X.phase === 'live') {
+          const p = T.where(fg);
+          const f = dunkFig(fg);
+          if (p && f && p[1] < dunkSea(p[0], p[2]) + 0.22) dunkEnter(fg, f, p);
+          continue;
+        }
+        if (X.phase === 'swim') {
+          // Gone out of range mid-swim: back where they were.
+          if (dYou > DUNK.gone || !(fg.slot >= 0)) dunkHome(fg);
+          continue;
+        }
+        if (X.phase !== 'away' || !X.away) continue;
+        const A = X.away;
+        A.t += dt;
+        if (A.phase === 'glare') {
+          fg.mode = 'stand';
+          if (A.t >= DUNK.glare) { A.phase = 'walk'; A.t = 0; }
+          continue;
+        }
+        if (A.phase === 'walk') {
+          const L = A.legs[A.leg];
+          if (!L) { A.phase = 'wait'; A.t = 0; fg.mode = 'stand'; continue; }
+          const dT = L[0] - fg.t, dS = L[1] - fg.lane, d = Math.hypot(dT, dS);
+          const step = DUNK.walk * dt;
+          if (d <= step) { fg.t = L[0]; fg.lane = L[1]; A.leg++; } else { fg.t += dT / d * step; fg.lane += dS / d * step; }
+          const p = toWorld(fg.t, fg.lane);
+          const dx = p[0] - fg.x, dz = p[2] - fg.z;
+          if (dx * dx + dz * dz > 1e-8) {
+            let e = Math.atan2(-dz, dx) - fg.yaw;
+            while (e > Math.PI) e -= TAU;
+            while (e < -Math.PI) e += TAU;
+            fg.yaw += e * Math.min(1, dt * 6);
+          }
+          fg.x = p[0]; fg.y = dunkY(fg.t, fg.lane); fg.z = p[2];
+          fg.mode = 'walk';
+          continue;
+        }
+        // Standing beside their spot, dripping — and back down on it when
+        // nobody is looking, the café's rule.
+        fg.mode = 'stand';
+        const S = X.seat;
+        // Turned the way they sat, out to sea, waiting to sit back down.
+        let e = S.yaw - fg.yaw;
+        while (e > Math.PI) e -= TAU;
+        while (e < -Math.PI) e += TAU;
+        fg.yaw += e * Math.min(1, dt * 1.5);
+        const far = (x, z) => Math.hypot(x - hoseWho.x, z - hoseWho.z) > HOSE.back
+          && Math.hypot(x - lastCam.x, z - lastCam.z) > HOSE.back;
+        if ((A.t > HOSE.away * 0.5 && far(S.x, S.z) && far(fg.x, fg.z)) || dYou > DUNK.gone) dunkHome(fg);
+      }
+    }
+    // The balloon: over their head, whatever they are doing.
+    if (dunkSaid) {
+      dunkSaid.t += dt;
+      const fg = dunkSaid.fg, f = dunkFig(fg);
+      if (dunkSaid.t > dunkSaid.dur || !f) {
+        dunkBalloon.mesh.visible = false; dunkSaid = null;
+      } else {
+        f.boneAt(f.boneIndex('head'), _dv);
+        _dv.applyMatrix4(f.mesh.matrixWorld);
+        dunkBalloon.mesh.position.set(_dv.x, _dv.y + 0.42, _dv.z);
+        dunkBalloon.mesh.rotation.y = Math.atan2(cam.x - _dv.x, cam.z - _dv.z);
+        dunkBalloon.mesh.visible = true;
+      }
+    }
   }
 
   /**
@@ -61963,6 +62687,8 @@ async function buildJadrija(scene) {
       // the vikendica — see `MOLE_LIFE`), where there IS water for the shins
       // to hang over and the clip gets to do what it was solved for.
       ground: b.pose === 'sit' && !b.chair && !b.edge,
+      // And that one, who can be hosed off it into the sea (`DUNK`).
+      edge: b.pose === 'sit' && !!b.edge,
       seed: rng(),
       // The height jitter, off one draw and spent on both tiers below. It was
       // 0.94 to 1.07, which on the instanced rig's canonical 1.70 m is 1.60 m
@@ -62194,7 +62920,10 @@ async function buildJadrija(scene) {
       for (const fg of list) {
         const dx = fg.x - cam.x, dz = fg.z - cam.z;
         // Sitting tenants pay eight metres less rent. See `ROVE.hold`.
-        fg.rank = Math.sqrt(dx * dx + dz * dz) - (fg.slot >= 0 ? ROVE.hold : 0);
+        fg.rank = Math.sqrt(dx * dx + dz * dz) - (fg.slot >= 0 ? ROVE.hold : 0)
+          // And nobody the hose has in hand is let go of mid-fall or mid-swim
+          // (`DUNK`): the ragdoll and the swim are on THIS mesh.
+          - (fg.topple && fg.topple.phase !== 'wet' ? 1e4 : 0);
       }
       list.sort((a2, b2) => a2.rank - b2.rank);
       const n = Math.min(js.length, list.length);
@@ -65470,6 +66199,7 @@ async function buildJadrija(scene) {
     const [pt, ps] = local(who.x, who.z);
     hoseWho.x = who.x; hoseWho.z = who.z;
     stepToppled(dt);
+    stepDunk(dt, cam);
     stepPhones(cam);
     stepMoleProps(cam);
     // The thing on the table with a motor in it — see SIGNAL. Here rather
@@ -65913,6 +66643,46 @@ async function buildJadrija(scene) {
           if (fg) hoseHome(fg);
           return !!fg;
         },
+        /**
+         * Off the mole (`DUNK`): `edge()` everybody on an edge — who, where,
+         * which edge, which figure, what phase and what the swim is doing;
+         * `dunk(idx, fx, fy, fz, h)` an impulse (N·s, world) at h over their
+         * seat, live now, as `knock`; `dunkHome(idx)` back where they sat;
+         * `said()` what they have said.
+         */
+        edge: () => (edgeFg(-1), [...edgeByIdx.values()]).map((fg) => {
+          const X = fg.topple, D = fg.dunk, E = edgeOf(fg), f = dunkFig(fg);
+          return { idx: fg.idx, kind: dunkKind(fg), at: E.at, d: +E.d.toFixed(2), t: +fg.t.toFixed(2), s: +fg.lane.toFixed(2),
+            x: +fg.x.toFixed(2), y: +fg.y.toFixed(2), z: +fg.z.toFixed(2), yaw: +fg.yaw.toFixed(3),
+            hs: +(fg.hscale || 1).toFixed(3), slot: fg.slot, fig: !!f, can: dunkable(f), mode: fg.mode,
+            phase: X ? X.phase : null, J: X ? +X.J.toFixed(1) : 0, dunk: D ? D.mode : null,
+            away: X && X.away ? X.away.phase : null,
+            where: X && X.phase === 'live' && crowds.skin.toppler.where(fg)
+              ? crowds.skin.toppler.where(fg).map((v) => +v.toFixed(2)) : null,
+            mesh: f ? f.mesh.position.toArray().map((v) => +v.toFixed(2)) : null,
+            clip: f ? f.playing() : null,
+            // Head and pelvis over the sea under them, m — treading is head
+            // and neck out.
+            sea: f ? (() => {
+              const hy = f.boneAt(f.boneIndex('head'), new THREE.Vector3()).applyMatrix4(f.mesh.matrixWorld);
+              const py = f.boneAt(f.boneIndex('pelvis'), new THREE.Vector3()).applyMatrix4(f.mesh.matrixWorld);
+              const w = dunkSea(hy.x, hy.z);
+              return [+(hy.y - w).toFixed(2), +(py.y - w).toFixed(2), +(seaAt(hy.x, hy.z) - w).toFixed(2)];
+            })() : null,
+            ladder: D && D.route ? [D.route.L.q ? 'quay' : 'mole', +D.route.L.t.toFixed(1), +D.route.len.toFixed(1)] : null };
+        }),
+        dunk: (idx, fx, fy, fz, h = 0.5) => {
+          const fg = edgeFg(idx), f = fg && dunkFig(fg);
+          if (!fg || !f || !dunkable(f)) return null;
+          hoseFig.set(fg, f);
+          const T = crowds.skin.toppler;
+          if (!fg.topple) T.push(fg, f, [0, 0, 0], [fg.x, fg.y, fg.z], 0);
+          const ok = T.knock(fg, f, [fx, fy, fz], [fg.x, fg.y + h, fg.z]);
+          if (ok && fg.topple) fg.topple.lurched = true;
+          return ok;
+        },
+        dunkHome: (idx) => { const fg = edgeFg(idx); if (fg) dunkHome(fg); return !!fg; },
+        said: () => dunkLog.slice(),
         of: (seat) => {
           const fg = crowds.skin && crowds.skin.figures.find((q) => q.seat === seat);
           if (!fg) return null;
@@ -67735,7 +68505,7 @@ async function buildJadrija(scene) {
       const n = batherNews();
       if (!n || !show || show.pt == null) return null;
       return { m: n.m, kind: n.kind, pose: n.pose,
-        news: 'they have just turned a fire hose on you',
+        news: n.news || 'they have just turned a fire hose on you',
         spot: voiceSpot() };
     },
     /**
@@ -68432,7 +69202,7 @@ async function buildJadrija(scene) {
     // Six slots rather than one function, so the jet's own geometry picks
     // which of the people near you it actually hit. See `batherProbe`.
     batherGuests: Array.from({ length: BATHER_GUESTS }, (_, k) => [
-      () => batherProbe(k), () => batherWet(k)]),
+      () => batherProbe(k), (litres, hit) => batherWet(k, litres, hit)]),
     // And the café sitters, who can be hosed off their chairs — see `HOSE`.
     sitterGuests: Array.from({ length: HOSE.guests }, (_, k) => [
       () => sitterProbe(k), (litres, hit) => sitterWet(k, litres, hit)]),

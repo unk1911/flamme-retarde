@@ -11527,6 +11527,10 @@ window.__fr = {
   setPos: (x, y, z) => flight.reset(x, z, 0, y),
   place: (x, y, z, yaw) => { flight.reset(x, z, yaw ?? 0, y); },
   cam: (i) => { camMode = i % CAMS.length; },
+  /** Debug: a fixed eye [x, y, z, lookX, lookY, lookZ] over whatever mode you
+   *  are in (the screenshot tool's `camOverride`); null gives it back. The
+   *  walker and the hose carry on where they are. */
+  eye: (a) => { camOverride = a ? a.slice(0, 6) : null; },
   /**
    * Pin the world's clock to a fixed step, for filming. 0 puts it back.
    *

@@ -2767,6 +2767,31 @@ BATHER_TOPIC = (
 ADULT_TOPIC = {"crypto", "world", "local", "money", "politics"}
 BATHER_CHILD = {"girl_child", "boy_child"}
 
+# HOSED OFF THE MOLE, and the one bather line that is not in English.
+#
+# Misha, 29 Sep 2026: hose the people sitting on the mole's edge "so they fall
+# off into the water, swearing in croatian and what not". The game does the
+# fall, the splash, the swim to a ladder and a Croatian swear in a balloon on
+# its own (`DUNK` in 43-jadrija.js); what reaches here is the event, off one
+# fixed string in the client, and when it is this one the drawn subject is
+# replaced by the sea and the language by Croatian — nobody swears in their
+# second language, and being knocked into the Adriatic by a stranger is not a
+# moment for a topic. The argument above for English (a reply the player
+# cannot read is a line spent on nothing) does not hold for a curse: the
+# register is the whole content, and the balloon over their head says it too.
+BATHER_DUNK = "they have just hosed you off the mole into the sea"
+BATHER_DUNK_STEER = (
+    "being knocked clean off the edge of the mole into the sea a second ago, "
+    "and coming up spluttering. THIS LINE IS IN CROATIAN, whatever language "
+    "the player speaks, and that overrides the language rule above: swear the "
+    "way people on this coast actually swear — jebote, majku ti, koji kurac, "
+    "pa jesi ti normalan, idiote, or your own — Dalmatian, and ikavian if it "
+    "comes naturally (čovik, virovat, di, bija). Four to eight words. No "
+    "English, no translation, no explanation.")
+BATHER_DUNK_CHILD = ("But you are a small child, so no swearing: you shriek, "
+                     "or you threaten to tell your mother or father, in "
+                     "Croatian.")
+
 
 def bather_topic(world: dict):
     """Draw one subject, out of the ones this beach can actually supply."""
@@ -3725,7 +3750,12 @@ def build_messages(ctx: dict, world: dict) -> list:
     # the same reason the word cap is down here: this is the position that
     # binds. Put up with the rest of the context it was one bullet among
     # fifteen and the model went back to the water every time.
-    if who == "bather":
+    if who == "bather" and ctx.get("event") == BATHER_DUNK:
+        lines.append(f"TALK ABOUT: {BATHER_DUNK_STEER}")
+        if ctx.get("kind") in BATHER_CHILD:
+            lines.append(BATHER_DUNK_CHILD)
+        lines.append("")
+    elif who == "bather":
         key, _, _, steer = bather_topic(world)
         lines.append(f"TALK ABOUT: {steer}")
         if key in ADULT_TOPIC and ctx.get("kind") in BATHER_CHILD:
