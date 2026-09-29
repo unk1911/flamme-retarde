@@ -1755,6 +1755,10 @@ const PAIL = {
   out: [0.140, 0.300, 0.650],
   in: [0.095, 0.215, 0.500],
   wire: [0.560, 0.575, 0.590],
+  // The sleeve on the bail where the fist goes — 1.548.3, see `bailCurve`.
+  // The one new colour on it: a grey a shade under the wire's, because the
+  // wire in sun renders near-white and a grip in the same grey is not there.
+  grip: [0.340, 0.350, 0.370],
   // Three per cent of value between the inside and the outside, which is the
   // note `_vessel` leaves: ambient here is hemispheric on the normal alone, so
   // an inner wall and an outer wall of one albedo render identically and the
@@ -2454,6 +2458,136 @@ function pailLathe(b, prof, col, sides = 16) {
   }
 }
 
+/**
+ * `pailLathe`, turned and smooth-shaded: one run of a profile, `[y, r]` rings,
+ * into a `propBuilder` through its `smooth`.
+ *
+ * Misha, 29 Sep 2026: *"the bucket, and especially the bucket handle, looks
+ * too low-poly, since this bucket (and the handle) figures into the game can u
+ * make it higher resolution?"* — and his picture, looking down into it on the
+ * bathroom tiles, is sixteen flat facets round a rim he is standing over.
+ * Sixteen sides was never the fault on its own; FLAT was. `propBuilder.tri`
+ * takes one normal off the winding, so every facet of a cone lights as its own
+ * plank, and more of them is only more planks. This gives each ring the
+ * normal of the SURFACE — the profile's tangent turned a right angle, averaged
+ * across the two segments that meet at it — and at 48 sides the outline is
+ * round to a pixel at the range he looks from.
+ *
+ * The normal is (−dy, dr) in the profile plane, which is exactly the side
+ * `pailLathe`'s winding faces: its quad a, a+1, b+1, b has (b−a)×(c−a) ≈
+ * ẑ × (dr, dy) at the seam. It HAS to match, because the pail's material is
+ * double-sided and turns the normal round on a back face (`wet` below) — a
+ * smooth normal on the wrong side of its own triangle is a pail lit from
+ * inside. A run starts and ends on its own segment's normal, so a crease — the
+ * foot, the lip, the colour change at the rim — is two runs butted together.
+ * `place` maps a point (and a normal) somewhere other than the pail's own
+ * axis, which is how the lugs are turned on theirs.
+ */
+function pailTurn(b, prof, col, sides = 48, place = null) {
+  const n = prof.length, N = [];
+  const seg = (k) => {
+    const dr = prof[k + 1][1] - prof[k][1], dy = prof[k + 1][0] - prof[k][0];
+    const L = Math.hypot(dr, dy) || 1;
+    return [-dy / L, dr / L];
+  };
+  for (let k = 0; k < n; k++) {
+    const a = k > 0 ? seg(k - 1) : null, c = k < n - 1 ? seg(k) : null;
+    const s = a && c ? [a[0] + c[0], a[1] + c[1]] : (a || c);
+    const L = Math.hypot(s[0], s[1]) || 1;
+    N.push([s[0] / L, s[1] / L]);
+  }
+  const P = (k, i) => {
+    const t = (i % sides / sides) * Math.PI * 2, cs = Math.cos(t), sn = Math.sin(t);
+    const [y, r] = prof[k], [nr, ny] = N[k];
+    const p = [cs * r, y, sn * r], q = [cs * nr, ny, sn * nr];
+    return place ? [place(p), place(q)] : [p, q];
+  };
+  for (let k = 0; k < n - 1; k++) {
+    if (prof[k][1] <= 0 && prof[k + 1][1] <= 0) continue;
+    for (let i = 0; i < sides; i++) {
+      const [a, na] = P(k, i), [bb, nb] = P(k, i + 1);
+      const [c, nc] = P(k + 1, i + 1), [d, nd] = P(k + 1, i);
+      if (prof[k][1] > 0) b.smooth(a, bb, c, na, nb, nc, col, col, col);
+      if (prof[k + 1][1] > 0) b.smooth(a, c, d, na, nc, nd, col, col, col);
+    }
+  }
+}
+
+/**
+ * The bail's centre line, in the bail's own frame (x the pin, y up), by arc
+ * parameter `u`, 0 at one lug over the apex to 1 at the other.
+ *
+ * Until 1.548.3 this was a plain half ellipse — R = rim less 4 mm across, H =
+ * `PAIL.bail` tall — and it still is, exactly, from u = 0.40 to 0.60, which
+ * is where the fist is: `grip()` measures her crook onto u = 0.500 and the
+ * carry hangs the pail off `PAIL.bail` straight above the pin, and neither
+ * moves by a hundredth of a millimetre. What changed is the rest of it, for
+ * two reasons, both measured.
+ *
+ * The ellipse came down at R, 141 mm off the axis — which is INSIDE the wall
+ * there (141.65) — and it only ever looked hooked on because its end was
+ * buried in a box. A real bail comes down OUTSIDE its lug and turns in
+ * through it. And it went THROUGH THE PAIL on every pour: the pail rolls
+ * under the bail about the pin, and a point of the arc at (x, y) comes past
+ * the lip when y cos φ is the lip's height, 35 mm, at a distance from the
+ * pail's axis of √(x² + y² − 0.035²) — which has to beat the lip's 147 mm
+ * and the wire's 4, so |P| ≥ 155 mm. The ellipse is 141 at the lug and only
+ * reaches 155 at u = 0.36; photographed mid-pour (1.548.2, `go('tip')`, 0.9 s)
+ * that is a row of grey wire slivers standing out of the blue wall. Flared
+ * by `flare` out to u = `from`, and eased back onto the ellipse by `to` on a
+ * smoothstep, every point clears it — R is 155.8 mm at u = 0.25 where 151.9
+ * is needed, 150.3 at 0.30 for 149.2, 146.0 at 0.33 for 145.7. Which is also
+ * a leg 157 mm out, down the outside of a 152 mm ear.
+ */
+const BAIL_SHAPE = { R: PAIL.rRim - 0.004, flare: 0.016, from: 0.22, to: 0.40 };
+function bailCurve(u, out) {
+  const S = BAIL_SHAPE, a = Math.PI * u;
+  const t = Math.min(1, Math.max(0, (Math.min(u, 1 - u) - S.from) / (S.to - S.from)));
+  const R = S.R + S.flare * (1 - t * t * (3 - 2 * t));
+  out[0] = Math.cos(a) * R; out[1] = Math.sin(a) * PAIL.bail; out[2] = 0;
+  return out;
+}
+
+/**
+ * A round wire along a polyline in the z = 0 plane, smooth-shaded, into a
+ * `propBuilder`. `pts` are `[x, y, radius]`; the frame is the plane's own —
+ * the tangent, ẑ, and ẑ × tangent — which is exact for a curve that never
+ * leaves its plane and a bail never does. Wound outward: at θ = 0 the quad's
+ * (b−a)×(d−a) is ẑ × t, the ring's own normal there. `cap` closes each end
+ * with a fan, for the sleeve's shoulders; the wire's own ends are down holes.
+ */
+function wireSweep(b, pts, sides, col, cap = false) {
+  const T = pts.map((p, k) => {
+    const q0 = pts[Math.max(0, k - 1)], q1 = pts[Math.min(pts.length - 1, k + 1)];
+    const tx = q1[0] - q0[0], ty = q1[1] - q0[1], L = Math.hypot(tx, ty) || 1;
+    return [tx / L, ty / L];
+  });
+  const ring = (k, i) => {
+    const th = (i % sides / sides) * Math.PI * 2, c = Math.cos(th), s = Math.sin(th);
+    const [tx, ty] = T[k], nx = -ty, ny = tx;       // ẑ × t
+    const nrm = [c * nx, c * ny, s];
+    const r = pts[k][2];
+    return [[pts[k][0] + r * nrm[0], pts[k][1] + r * nrm[1], r * nrm[2]], nrm];
+  };
+  for (let k = 0; k < pts.length - 1; k++) {
+    for (let i = 0; i < sides; i++) {
+      const [a, na] = ring(k, i), [bb, nb] = ring(k, i + 1);
+      const [c, nc] = ring(k + 1, i + 1), [d, nd] = ring(k + 1, i);
+      b.smooth(a, bb, c, na, nb, nc, col, col, col);
+      b.smooth(a, c, d, na, nc, nd, col, col, col);
+    }
+  }
+  if (!cap) return;
+  for (const [k, sgn] of [[0, -1], [pts.length - 1, 1]]) {
+    const o = [pts[k][0], pts[k][1], 0], nn = [T[k][0] * sgn, T[k][1] * sgn, 0];
+    for (let i = 0; i < sides; i++) {
+      const p = ring(k, i)[0], q = ring(k, i + 1)[0];
+      if (sgn > 0) b.smooth(o, p, q, nn, nn, nn, col, col, col);
+      else b.smooth(o, q, p, nn, nn, nn, col, col, col);
+    }
+  }
+}
+
 
 /**
  * Stand her up at the vikendica and hand back the loop.
@@ -2727,47 +2861,145 @@ function buildBucketeerOn(fig, scene, vik, walkY) {
   const pailBuf = propBuilder();
   {
     const e = PAIL.ear, r0 = PAIL.rBase, r1 = PAIL.rRim, W = PAIL.wall;
-    const y0 = -e, y1 = PAIL.h - e;
-    // Outside, base to rim, then over the rolled edge and back down the
-    // inside. It is one profile and not three meshes: the inside of a bucket
-    // is not detail, it is the object — rule 8 in vikendica.py, and the only
-    // view anybody will ever have of one is looking down into it.
-    pailLathe(pailBuf, [[y0, 0], [y0, r0], [y1, r1]], PAIL.out);
-    pailLathe(pailBuf, [[y1, r1], [y1 + 0.008, r1 - W * 0.4],
-      [y1, r1 - W]], PAIL.out);
-    pailLathe(pailBuf, [[y1, r1 - W], [y0 + W * 1.6, r0 - W],
-      [y0 + W * 1.6, 0]], PAIL.in);
-    // The two lugs the bail hangs in, at the pin height, which is why the pin
-    // height is where it is.
+    const y0 = -e, y1 = PAIL.h - e, O = PAIL.out, I = PAIL.in;
+    // ── TURNED, 1.548.3 ──
+    //
+    // Misha, 29 Sep 2026: *"the bucket, and especially the bucket handle,
+    // looks too low-poly"*. It was three flat-shaded sixteen-sided lathes — a
+    // cone, a pitched ridge for a rim and a cone back down the inside — with
+    // two 28 × 55 mm boxes stuck on for lugs, and from where he stands, over
+    // it, that is a hexadecagon with two bricks on it. Now it is a moulded
+    // pail: the same cone, the same mouth and the same inside, at 48 sides and
+    // shaded off the surface (`pailTurn`), with what a moulded one has — a
+    // rolled lip, two stiffening rings, a recessed base on a foot ring, a
+    // rounded floor inside, and two turned ears with the hole the bail goes in.
+    //
+    // EVERY NUMBER THE POUR READS IS WHERE IT WAS. The outside is still `rw`,
+    // rBase at the base to rRim at y1; the inside is still the line from
+    // rRim − wall at the rim to rBase − wall on a floor 1.6 walls up, which is
+    // what `PAIL_IN` and the water's radius (`pailLevel`) are taken off; the
+    // lip the water goes over is still y1 at rLip, 133 mm. The rings and the
+    // lip stand 2 and 2.5 mm proud of that line and the old ridge stood 8 mm
+    // over it, so nothing the stream or the spill measure has moved.
+    const rw = (y) => r0 + (r1 - r0) * (y - y0) / PAIL.h;
+    const yF = y0 + W * 1.6;
+    const ri = (y) => r1 - W + (r0 - r1) * (y1 - y) / (y1 - yF);
+    // Underneath: a panel 7 mm up, and the foot ring it stands on. A bucket
+    // does not stand on its whole base, it stands on a rim round it, and the
+    // step is what puts a line of shadow under it on the tiles.
+    pailTurn(pailBuf, [[y0 + 0.007, 0], [y0 + 0.007, r0 - 0.020]], O);
+    pailTurn(pailBuf, [[y0 + 0.007, r0 - 0.020], [y0 + 0.0045, r0 - 0.0168],
+      [y0 + 0.0012, r0 - 0.0140], [y0, r0 - 0.0110]], O);
+    // Then the foot, round the heel and up the wall in one smooth run, with
+    // the two stiffening rings on the way — one a third of the way up, one
+    // under the ears — and the lip's underside where it ends.
+    const wall = [[y0, r0 - 0.0110], [y0, r0 - 0.0060],
+      [y0 + 0.0014, r0 - 0.0018], [y0 + 0.0050, rw(y0 + 0.0050)]];
+    for (const yc of [y0 + 0.090, -0.036]) {
+      wall.push([yc - 0.005, rw(yc - 0.005)], [yc - 0.002, rw(yc - 0.002) + 0.0022],
+        [yc + 0.002, rw(yc + 0.002) + 0.0022], [yc + 0.005, rw(yc + 0.005)]);
+    }
+    // The rolled lip: a 14 × 10 mm bead, outermost at rRim + 2 mm, top at
+    // y1 + 4, its inside face exactly on rLip. The wall runs into its
+    // underside at −0.9 rad, which is where the ellipse crosses `rw`, and the
+    // crease there is the shadow line under a lip.
+    const lip = (p) => [y1 - 0.001 + 0.005 * Math.sin(p), 0.140 + 0.007 * Math.cos(p)];
+    wall.push(lip(-0.9));
+    pailTurn(pailBuf, wall, O);
+    const bead = [];
+    for (let i = 0; i <= 10; i++) bead.push(lip(-0.9 + (Math.PI + 0.9) * i / 10));
+    pailTurn(pailBuf, bead, O);
+    // And down the inside, onto a floor with a 5 mm fillet round it — 5 and
+    // not more, because `PAIL_IN.base` puts the last of the water 3.6 mm off
+    // that floor and a rounder corner would have it through the wall there.
+    const inner = [lip(Math.PI)];
+    const fc = [yF + 0.005, ri(yF + 0.005) - 0.005];
+    for (let i = 0; i <= 3; i++) {
+      const p = -Math.PI / 2 * i / 3;
+      inner.push([fc[0] + 0.005 * Math.sin(p), fc[1] + 0.005 * Math.cos(p)]);
+    }
+    inner.push([yF, 0]);
+    pailTurn(pailBuf, inner, I);
+    // The ears, at the pin, on the pin's own axis: a 25 mm boss standing 10 mm
+    // off the wall, a rounded shoulder, a flat face, and a 9.4 mm hole 7 mm
+    // deep for an 8 mm wire. Turned about x by handing `pailTurn` a rotation
+    // (its y becomes ±x), which carries the normals with it. A rib above and
+    // below ties each one into the wall, the way the moulding does it.
     for (const s of [1, -1]) {
-      pailBuf.box(s * (r1 - 0.004), -0.004, 0, 0.028, 0.055, 0.020, PAIL.out);
+      const place = (p) => [s * p[1], -s * p[0], p[2]];
+      pailTurn(pailBuf, [[0.134, 0.0125], [0.1470, 0.0125], [0.1497, 0.0117],
+        [0.1513, 0.0098], [0.1518, 0.0075]], O, 20, place);
+      pailTurn(pailBuf, [[0.1518, 0.0075], [0.1518, 0.0047]], O, 20, place);
+      pailTurn(pailBuf, [[0.1518, 0.0047], [0.1450, 0.0047]], I, 20, place);
+      pailTurn(pailBuf, [[0.1450, 0.0047], [0.1450, 0]], I, 20, place);
+      for (const [ya, yb, xb] of [[-0.004, -0.031, 0.1425], [0.004, 0.031, 0.1455]]) {
+        const t = 0.0025;
+        const A = (z) => [s * 0.136, ya, z], B = (z) => [s * 0.150, ya, z];
+        const C = (z) => [s * xb, yb, z], D = (z) => [s * 0.136, yb, z];
+        pailBuf.quad(A(t), B(t), C(t), D(t), O);
+        pailBuf.quad(A(-t), D(-t), C(-t), B(-t), O);
+        pailBuf.quad(B(t), B(-t), C(-t), C(t), O);
+      }
     }
   }
   const pailGeo = pailBuf.geo();
   const bailBuf = propBuilder();
   {
-    // Wire, as eleven short prisms round a half circle. A bail is 4 mm of
-    // galvanised rod and at 4 mm nothing about its cross-section is visible,
-    // so it is square and there are no rings.
     // 8 mm of wire and not the 4 a domestic bucket has. Measured against the
     // screen rather than against the bucket: at the range you ever see this —
     // three metres, in a shot where the pail is sixty pixels — 4 mm is one
     // pixel and it is a bucket with no handle, hanging off nothing. A builder's
     // bail is this heavy anyway.
-    const R = PAIL.rRim - 0.004, H = PAIL.bail, N = 11, T = 0.008;
-    const pt = (u) => {
-      const a = Math.PI * u;
-      return [Math.cos(a) * R, Math.sin(a) * H, 0];
+    //
+    // ── ROUND, 1.548.3 ──
+    //
+    // It was eleven axis-aligned boxes, each the bounding box of its own
+    // chord, on the argument that nobody can see the cross-section of 8 mm of
+    // wire. From three metres, no. From over the bucket, which is where he
+    // was, it is a staircase of white bricks round the arc — the thing he
+    // called out first. So: a round wire swept along `bailCurve` (10 sides,
+    // 48 steps over the arc), down OUTSIDE each ear and turned in through its
+    // hole on a 7.5 mm bend, and a 15 mm grey sleeve over the middle quarter
+    // for the fist. The sleeve is the middle quarter because the fist is at
+    // u = 0.500 and a hand is 8 cm across, 0.18 of u; the flare in
+    // `bailCurve` is off by u = 0.40 and moves the sleeve's first centimetre
+    // by a third of a millimetre.
+    //
+    // The sleeve is 15 mm and not the 25 of a real one because her crook is
+    // solved ONTO THE WIRE'S CENTRE LINE (`grip().crook`, 0.7 mm) and her
+    // fingers close round 8 mm; a fatter sleeve is a sleeve through her hand.
+    const WR = 0.004, SIDES = 10, H = PAIL.bail;
+    const yS = 0.0075, uS = Math.asin(yS / H) / Math.PI;
+    const g0 = 0.375, g1 = 0.625, GR = 0.0075, sh = 0.012;
+    const q = [0, 0, 0];
+    const at = (u, r) => { bailCurve(u, q); return [q[0], q[1], r]; };
+    // One leg, from inside its hole to where the wire goes into the sleeve.
+    // `bailCurve(uS)` is yS up, so the bend's last point IS the arc's first.
+    const leg = (s) => {
+      const u0 = s > 0 ? uS : 1 - uS, u1 = s > 0 ? g0 + 0.005 : g1 - 0.005;
+      const xs = bailCurve(u0, q)[0], cx = xs - s * yS;
+      const pts = [[s * 0.1455, 0, WR]];
+      for (let i = 0; i < 4; i++) {
+        const p = -Math.PI / 2 + Math.PI / 2 * i / 4;
+        pts.push([cx + s * yS * Math.cos(p), yS + yS * Math.sin(p), WR]);
+      }
+      for (let i = 0; i <= 18; i++) pts.push(at(u0 + (u1 - u0) * i / 18, WR));
+      return s > 0 ? pts : pts.reverse();
     };
-    for (let i = 0; i < N; i++) {
-      const p = pt(i / N), q = pt((i + 1) / N);
-      // `propBuilder.box` is axis-aligned, so each segment is the bounding box
-      // of its own chord. At 5.5 mm the difference between that and a rotated
-      // prism is a fifth of a millimetre, the boxes overlap at every joint, and
-      // there is no cross-section on a bail anybody can see anyway.
-      bailBuf.box((p[0] + q[0]) * 0.5, (p[1] + q[1]) * 0.5, 0,
-        Math.abs(q[0] - p[0]) + T, Math.abs(q[1] - p[1]) + T, T, PAIL.wire);
-    }
+    wireSweep(bailBuf, leg(1), SIDES, PAIL.wire);
+    wireSweep(bailBuf, leg(-1), SIDES, PAIL.wire);
+    // The sleeve: a round shoulder at each end down to just over the wire.
+    const rs = (u) => {
+      const d = Math.min(u - g0, g1 - u);
+      if (d >= sh) return GR;
+      const k = 1 - d / sh;
+      return WR + 0.0008 + (GR - WR - 0.0008) * Math.sqrt(Math.max(0, 1 - k * k));
+    };
+    const us = [];
+    for (let i = 0; i <= 4; i++) us.push(g0 + sh * i / 4);
+    for (let i = 1; i < 16; i++) us.push(g0 + sh + (g1 - g0 - 2 * sh) * i / 16);
+    for (let i = 4; i >= 0; i--) us.push(g1 - sh * i / 4);
+    wireSweep(bailBuf, us.map((u) => at(u, rs(u))), 14, PAIL.grip, true);
   }
   const bail = new THREE.Mesh(bailBuf.geo(), null);
 
@@ -2810,7 +3042,9 @@ function buildBucketeerOn(fig, scene, vik, walkY) {
   // horizontal surface instead of by whatever is under the floor.
   const waterBuf = propBuilder();
   {
-    const N = 16;
+    // 48 and not 16 since 1.548.3, to sit in a 48-sided wall: a hexadecagon
+    // inside a round wall is a gap of 2.5 mm at every edge's middle.
+    const N = 48;
     const rim = (i) => {
       const a = (i % N / N) * Math.PI * 2;
       return [Math.cos(a), 0, Math.sin(a)];
@@ -3072,16 +3306,19 @@ function buildBucketeerOn(fig, scene, vik, walkY) {
    * A point on the bail wire, in world, by arc parameter.
    *
    * `u` runs 0 to 1 from one lug over the apex to the other, which is exactly
-   * the parameter the eleven prisms of the bail are built on — see `pt` in the
-   * bail's own block, and the two numbers here are its R and H. The arc is
+   * the parameter the bail's wire is swept along — `bailCurve`, the one the
+   * mesh is built off, so the wire this measures is the wire that is drawn
+   * (until 1.548.3 it was the eleven boxes' ellipse, typed out a second time
+   * here; the middle of it, where any hand ever is, is unchanged). The arc is
    * rolled by whatever `bail.rotation.x` is doing (a set-down bucket lies its
    * handle over) and then carried by the group, which is a child of the scene
    * and not of her, so its local matrix IS its world one and this needs no
    * `updateMatrixWorld` to be current.
    */
+  const bailQ = [0, 0, 0];
   function bailPoint(u, out) {
-    const a = Math.PI * u;
-    out.set(Math.cos(a) * (PAIL.rRim - 0.004), Math.sin(a) * PAIL.bail, 0);
+    bailCurve(u, bailQ);
+    out.set(bailQ[0], bailQ[1], 0);
     out.applyAxisAngle(gX, bail.rotation.x);
     out.applyQuaternion(kanta.quaternion).add(kanta.position);
     return out;

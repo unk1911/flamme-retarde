@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.4] — 2026-09-29
+
+### The Bucketeer's pail and its bail, turned
+
+Misha, looking down into it on the bathroom tiles: *"the bucket, and
+especially the bucket handle, looks too low-poly, since this bucket (and the
+handle) figures into the game can u make it higher resolution?"* The pail was
+three flat-shaded sixteen-sided lathes with two 28 × 55 mm boxes for lugs;
+the bail was eleven axis-aligned boxes round a half ellipse, which from
+above is a staircase of white bricks.
+
+**New helpers in 45-bucketeer.js**: `pailTurn` (a lathe into `propBuilder`
+with the profile's own normals, averaged at each ring; a crease is two runs,
+and a `place` rotation turns one about another axis), `wireSweep` (a round
+smooth tube along a planar polyline, capped if asked), and `bailCurve`, the
+bail's centre line, which the mesh and `bailPoint` now share.
+
+**The pail**, same cone, same mouth, same inside: 48 sides, a recessed base
+on a foot ring, two stiffening rings, a rolled 14 × 10 mm lip whose inside
+face is exactly `PAIL_IN.rLip`, a 5 mm fillet round the inside floor, and two
+turned ears on the pin axis with a 9.4 mm hole and a rib above and below.
+The water disc went 16 → 48 sides to sit in the round wall.
+
+**The bail**: 8 mm wire, 10 sides, down the OUTSIDE of each ear and turned
+in through its hole on a 7.5 mm bend, with a 15 mm grey sleeve over the
+middle quarter under the fist. `bailCurve` is the old ellipse exactly from
+u = 0.40 to 0.60 and flared 16 mm at the ends, which also fixes an old one:
+the ellipse was 141 mm off the axis at the lug, inside the 141.65 mm wall,
+and mid-pour it came out through the side of the pail as a row of grey
+slivers. Flared, every point clears the lip at every roll.
+
+The fly's pails (`zombieBucket`, 10 → 16 sides, bail 3 × 8 → 4 × 14) and the
+close-up's (`miniBucket`, 22 → 40, bail 5 × 18 → 8 × 36) came along.
+
+MEASURED: pail 184 → 3 424 triangles, bail 132 → 1 620, water 16 → 48 (one
+pail in the game). Pin, lugs and apex unchanged: lugs in world
+(−2086.2445, 6.5058, 357.3837) / (−2086.0983, 6.4284, 357.1553) and apex
+(−2086.145, 6.619, 357.2349) carrying, identical to 1.548.2; bail geometry top
+0.1655 = 0.158 apex + 7.5 mm sleeve, hook ends at x = ±0.1455 on the pin axis
+inside ±0.1518 ears. `grip()` carrying: crook 0.7 mm, tip 85.8, palm 0.7, atU
+0.500, as before; the held pour frame identical. Blockers 792, people 100,
+`jadrija.tris` 671 536, hammock at (−1923.174, 4.138, 443.162).
 ## [1.548.3] — 2026-09-29
 
 ### The scooters behind MINI, and the piers in front of them

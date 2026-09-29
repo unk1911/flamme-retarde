@@ -1638,7 +1638,6 @@ async function buildJadrija(scene) {
   }
 
   /**
-<<<<<<< HEAD
    * A turned solid with the PROFILE's normals: `prof` is `[w, r]` rings along
    * an axis, and `F(x, y, w)` puts a point of the section plane at `w` into the
    * world — so the axis can stand up, or lie along the shore, or point out to
@@ -1712,7 +1711,8 @@ async function buildJadrija(scene) {
   /** `spinIn` standing up at (t, s): `prof` is `[y, r]` in metres. */
   const spinTS = (t, s, prof, col, sides, sh, crease) =>
     spinIn((x, y, w) => W(t + x, s + y, w), prof, col, sides, [1, 1], sh, crease);
-=======
+
+  /**
    * A solid of revolution about ANY axis, smooth — `knLathe` stood on its
    * side, or pointed at the sky.
    *
@@ -1756,7 +1756,6 @@ async function buildJadrija(scene) {
       : (i) => at(prof[i][0] + push(i), 0, 0, 0);
     knSurf(G, col, { wrap: true, out });
   }
->>>>>>> worktree-agent-ae9deb483889d6d74
 
   /**
    * A ladder: two stainless handrails bent over the coping, and treads. The

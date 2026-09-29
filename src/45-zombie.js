@@ -194,17 +194,20 @@ function zombieBucket(mats) {
   const B = MINIB;
   const hang = new THREE.Group();
   hang.rotation.order = 'YXZ';   // yaw, then round the nose — see the close-up's
-  const bailG = new THREE.TorusGeometry(mm(B.rRim + 0.05), mm(0.12), 3, 8, Math.PI);
+  // 4 × 14 and 16 sides since 1.548.3 (they were 3 × 8 and 10): the fly's
+  // pail is a few pixels in the room, so this is only its outline catching up
+  // with the close-up's and the Bucketeer's, at under 300 triangles a pail.
+  const bailG = new THREE.TorusGeometry(mm(B.rRim + 0.05), mm(0.12), 4, 14, Math.PI);
   bailG.scale(1, B.bail / (B.rRim + 0.05), 1);
   bailG.translate(0, -mm(B.bail), 0);
   hang.add(new THREE.Mesh(bailG, mats.wire));
   const pin = new THREE.Group();
   pin.position.y = -mm(B.bail);
   hang.add(pin);
-  const g = new THREE.CylinderGeometry(mm(B.rRim), mm(B.rBase), mm(B.h), 10, 1, false);
+  const g = new THREE.CylinderGeometry(mm(B.rRim), mm(B.rBase), mm(B.h), 16, 1, false);
   g.translate(0, mm(B.h / 2 - B.ear), 0);
   pin.add(new THREE.Mesh(g, mats.out));
-  const w = new THREE.CircleGeometry(mm(B.rRim - 0.12), 10);
+  const w = new THREE.CircleGeometry(mm(B.rRim - 0.12), 16);
   w.rotateX(-Math.PI / 2);
   const water = new THREE.Mesh(w, mats.water);
   water.position.y = mm(B.h - B.ear - 0.35);
