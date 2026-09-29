@@ -46,7 +46,8 @@ from mathutils import Matrix
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools' / 'blender'))
 from frskin import MAX_INFLUENCES, bake_action, rest_locals  # noqa: E402
-import gzip  # noqa: E402
+sys.path.insert(0, str(ROOT / 'tools'))
+from fr3d_q import save_skin  # noqa: E402
 import struct  # noqa: E402
 
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
@@ -303,9 +304,8 @@ def main():
             parts.append(struct.pack('<3f', *rt))
             for q in quats:
                 parts.append(struct.pack('<4h', *q))
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(OUT, 'wb', compresslevel=9) as f:
-        f.write(b''.join(parts))
+    # Written PACKED, as v9: `save_skin` in tools/fr3d_q.py.
+    save_skin(OUT, b''.join(parts))
     log('%s  %d verts  %d tris (body %d, mane %d)  %d bones  %.0f KB gz'
         % (OUT.name, nv, ni // 3, len(tri['body']) // 3, len(tri['hair']) // 3,
            len(rest), OUT.stat().st_size / 1024))

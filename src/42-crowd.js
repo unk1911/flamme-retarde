@@ -253,6 +253,9 @@ function rigSkeleton(rig) {
  *     u16 len, JSON meta
  *     f32 pos[nv*3]  i8 nrm[nv*3]  u8 tint[nv*4]  u8 bone[nv*4]  u16 idx[ni]
  *
+ * (v10, what ships since 1.550.5, is the same with the positions and index
+ * packed — see the note in the reader and tools/fr3d_q.py.)
+ *
  * `parts` is the same table `rigSkeleton` has always read — names, parents
  * and pivots — and `bind` is where each joint stands in the bind pose, which
  * is the inverse every joint matrix is written against in `flush`.
@@ -263,7 +266,9 @@ function readFR3DCrowd(buf) {
     dv.getUint8(2), dv.getUint8(3));
   if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
   const version = dv.getUint32(4, true);
-  if (version !== 6) throw new Error('fr3d crowd body needs version 6, got ' + version);
+  if (version !== 6 && version !== 10) {
+    throw new Error('fr3d crowd body needs version 6 or 10, got ' + version);
+  }
   const nv = dv.getUint32(8, true);
   const ni = dv.getUint32(12, true);
   const height = dv.getFloat32(16, true);
@@ -285,11 +290,45 @@ function readFR3DCrowd(buf) {
   const meta = JSON.parse(dec.decode(new Uint8Array(buf, o, ml))); o += ml;
   // Copies, once, at load: the table above is variable-length, so nothing
   // after it lands on the alignment a typed-array view needs.
-  const pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+  //
+  // v10 is v6 PACKED (tools/fr3d_q.py): a position box, then the positions
+  // as zigzag uint16 deltas across it (per axis, low bytes then high — v7's
+  // runs), then the same normal, tint and bone bytes, then the index as
+  // zigzag uint16 deltas. 0.013 mm on the tallest body; nothing else moves.
+  let pos, idx;
+  if (version === 10) {
+    const b = new Uint8Array(buf);
+    const lo = [0, 1, 2].map((k) => dv.getFloat32(o + k * 4, true));
+    const hi = [0, 1, 2].map((k) => dv.getFloat32(o + 12 + k * 4, true));
+    o += 24;
+    pos = new Float32Array(nv * 3);
+    for (let k = 0; k < 3; k++, o += nv * 2) {
+      const s = (hi[k] - lo[k]) / 65535;
+      let acc = 0;
+      for (let i = 0; i < nv; i++) {
+        const u = b[o + i] | (b[o + nv + i] << 8);
+        acc = (acc + ((u >>> 1) ^ -(u & 1))) & 0xffff;
+        pos[i * 3 + k] = lo[k] + acc * s;
+      }
+    }
+  } else {
+    pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+  }
   const nrm = new Int8Array(buf.slice(o, o + nv * 3)); o += nv * 3;
   const tint = new Uint8Array(buf.slice(o, o + nv * 4)); o += nv * 4;
   const bone = new Uint8Array(buf.slice(o, o + nv * 4)); o += nv * 4;
-  const idx = new Uint16Array(buf.slice(o, o + ni * 2));
+  if (version === 10) {
+    const b = new Uint8Array(buf, o, ni * 2);
+    idx = new Uint16Array(ni);
+    let acc = 0;
+    for (let i = 0; i < ni; i++) {
+      const u = b[i] | (b[ni + i] << 8);
+      acc = (acc + ((u >>> 1) ^ -(u & 1))) & 0xffff;
+      idx[i] = acc;
+    }
+  } else {
+    idx = new Uint16Array(buf.slice(o, o + ni * 2));
+  }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
