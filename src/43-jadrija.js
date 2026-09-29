@@ -21167,32 +21167,116 @@ async function buildJadrija(scene) {
   // printed tiles on forty-odd strings, with a dolphin across them, which is
   // sold on every second stall between here and Split.
   //
-  // Every strand is a rigid pendulum hung off the head of the opening, and that
-  // is the whole model: two angles, an angular rate each, a spring that is
-  // gravity and a damper that is the string. What makes it read as a *curtain*
-  // rather than as forty independent pendulums is `link` — each strand pulls on
-  // the two beside it, so a shove in the middle runs outward as a wave and the
-  // whole thing settles together. Walking through drives the strands you are
-  // touching toward *your* speed rather than adding an impulse, which is the
-  // difference between parting a curtain and detonating one; it also makes the
-  // result the same at 15 fps and 144.
+  // ── EVERY STRAND IS A CHAIN NOW ─────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026, looking at a WebGPU particle-fluid demo and asking
+  // whether any of it would do for "that dolphin beads doorway to the kabine".
+  // Not the fluid, which is WebGPU-only and the wrong thing — but the particles
+  // are exactly the right thing, and they are what a bead curtain is made of.
+  //
+  // Until 1.546.0 every strand was a RIGID pendulum: two angles, a spring that
+  // was gravity, a damper that was the string, and `link` pulling each strand
+  // toward the two beside it. It read well at a distance and it could not do
+  // the one thing a bead curtain does that nothing else in a doorway does: a
+  // body goes into it and the strands *go round the body*. A rigid rod is
+  // swung by whoever touches it, all 1.90 m of it at once, so she walked
+  // through a curtain that swung away from her like forty doors on hinges and
+  // never touched her shoulders on the way.
+  //
+  // Now each strand is fourteen links of point masses, hung off the head of the
+  // opening, and it bends. What moves them:
+  //
+  //   GRAVITY, and the chain's own inextensibility, solved follow-the-leader
+  //   (Müller, Kim and Chentanez, "Fast Simulation of Inextensible Hair and
+  //   Fur", 2012): each node, from the top down, is put back at one link's
+  //   length from the node above it. For a chain with ONE fixed end and a
+  //   free one, that is exact in a single sweep — no iterations, no stretch,
+  //   nothing to go unstable — and its velocity correction (`ftl`) puts back
+  //   the mass the sweep takes out of the lower links. That is why this is
+  //   not AVBD. The wrist chain in 43-avbd.js is pinned at BOTH ends, which
+  //   is the case a follow-the-leader sweep cannot do and an augmented
+  //   Lagrangian can; 43-avbd.js says so in as many words. A curtain strand
+  //   is the other case, and six hundred rigid bodies with 6x6 block solves
+  //   would be paying for a hard problem this curtain does not have.
+  //
+  //   A LITTLE BENDING (`bend`), because these are strings of plastic tiles
+  //   and a string of plastic tiles is not a thread: it drapes over a shoulder
+  //   in a curve, not in a kink.
+  //
+  //   THE BODIES, as capsules: yours (a torso, shoulders, head, hips, arms and
+  //   legs laid out off the walker), hers off her own bones — the same
+  //   CHAIN_BODY capsules the cuff chain, the ball and the ragdolls use — and
+  //   the dog's. Pushed out along the capsule's normal, with Coulomb friction
+  //   against the body's own motion, so a strand lying across her shoulder is
+  //   carried a little and then slides off, which is the whole of the look.
+  //
+  //   THE FRAME: the two jambs and the head of the opening, 10 cm of wall
+  //   either side of the strands, so an edge strand pushed sideways stops at
+  //   the concrete instead of going through it.
+  //
+  //   `link`, which is kept: each strand's swing through the doorway still
+  //   pulls on its neighbours', so a shove runs outward as a wave and the
+  //   thing settles as one curtain and not forty strings. And neighbouring
+  //   strands cannot pass through each other edge to edge (`sep`), which is
+  //   what stops a dozen of them piling into one ribbon at a hip.
+  //
+  // AND THE CALM CURTAIN IS THE OLD ONE, EXACTLY. The draught (`stir`) still
+  // swings the old rigid pendulum — one angle for the whole curtain, its old
+  // spring and its old damper — and the chains are simulated in the frame of
+  // that pendulum: the draught is handed to them as the force that makes the
+  // swinging straight line an exact solution (gravity tilted by the angle,
+  // plus the line's own angular acceleration down its length), and the drag
+  // acts on each node's speed RELATIVE to that line. So an untouched chain
+  // tracks the old pendulum to a fraction of a millimetre, a touched one
+  // relaxes back onto it, and once every node has been within 5 mm of it for
+  // `restFor` the chains are dropped and the old pendulum is simply drawn —
+  // which costs what the curtain always cost, and looks exactly as it always
+  // did. The solver only runs while something is in it or it is still moving.
+
   const BEAD = {
     wide: 0.021,           // m, one strand across
     drop: 1.90,            // m, how far it hangs from the head of the opening
-    seg: 14,               // segments down a strand, for the swing
+    seg: 14,               // links down a strand — the chain, and its drawing
     rows: 76,              // tiles down a strand, for the canvas
     px: 8,                 // and how many pixels each of those gets
-    swing: 1.05,           // rad, the furthest a strand will be thrown
+    // ── the calm curtain: the rigid pendulum it always was ──────────────────
     spring: 24.0,          // rad/s² per rad of tilt — this is gravity
     damp: 2.1,             // and this is the string
-    link: 12.0,            // how hard a strand pulls on the two beside it
-    reach: 0.36,           // m either side of you that a strand is pushed
-    grip: 16.0,            // how fast a strand you are touching takes your speed
-    push: 0.9,             // rad/s per m/s of you
     // A doorway is a hole between a hot terrace and a cold room, so there is
     // always a little air going through it. Small — this is what stops the
     // thing reading as a painted board when nobody has touched it for a while.
     stir: 0.020,
+    // ── the chains ──────────────────────────────────────────────────────────
+    step: 1 / 50,          // s, the longest substep: one at 60 fps, two at 30
+    // 1/s, air on a node moving against the calm curtain. 2.0 is the old
+    // damper's decay rate (half of 2.1) and it is chosen to be: a curtain
+    // that took longer to settle than it used to would be the one visible
+    // change in how it moves when nobody is looking closely.
+    drag: 2.0,
+    // Of each node's curvature taken out per substep. 0 is thread; 0.3 lets
+    // a strand lie over a shoulder in a curve about a hand across.
+    bend: 0.30,
+    link: 12.0,            // 1/s², a strand's swing pulling on its neighbours'
+    ftl: 0.90,             // the follow-the-leader velocity correction
+    give: 0.10,            // how far a link stretches round a body — see `lead`
+    // Plastic on skin and on cotton. Measured by eye against a real one is
+    // not a measurement, so this is the number that looked right: at 0.30 a
+    // strand over her shoulder is carried a hand's width and then slides.
+    // 0.45 was the first number, and it held strands in every hollow of a body
+    // for a metre after the body had gone through; 0.30 lets them go.
+    mu: 0.30,
+    r: 0.012,              // m, a node's own radius against a body: a tile's
+                           // half-thickness and a little of its bevel
+    sep: 0.016,            // m, two neighbours' tiles edge to edge, closest
+    thick: 0.020,          // and how far apart through the doorway before
+                           // they are free to overlap instead
+    vmax: 6.0,             // m/s, a node, ever — a teleport is not a push
+    // m of air round the curtain that a body has to be inside before the
+    // chains are woken. A capsule's own radius is on top of it.
+    wake: 0.25,
+    // Back to calm once every node is within `rest` of the old pendulum and
+    // moving within `restV` of it, for `restFor` without a break.
+    rest: 0.005, restV: 0.02, restFor: 0.6,
     // rad/s of mean movement that counts as a rattle. 0.55 was set by eye and
     // it sat too near the top of what a crossing makes. Measured through the
     // solver: a walk at 3.4 m/s dead through the middle of the doorway peaks at
@@ -21203,7 +21287,19 @@ async function buildJadrija(scene) {
     // plainly still swinging. 0.30 is under the quiet half of a crossing and
     // still six times the 0.04 the draught alone reaches, which is the gap the
     // number has to sit in.
-    din: 0.30,
+    //
+    // Those were the rigid pendulums' rates. The chains' (`rate` in `step`)
+    // are the same quantity — a node's speed against the calm curtain over its
+    // depth, which for a rigid swing IS the angular rate — and measured again
+    // for 1.546.0 they land almost where the old ones did: 3.4 m/s dead
+    // centre peaks at 1.12 (was 1.07), 0.7 m off centre 0.67 (was 0.59), and
+    // a walk at 1.4 m/s 0.43. What moved is HER: she used to be a point that
+    // dragged the strands she stood on toward her speed, and now she is a
+    // body the strands go round, which is quieter — 0.29 walking in and 0.34
+    // walking out, measured, so at 0.30 she went through a curtain that
+    // clattered half the time. 0.20 is under both, and five times the 0.04
+    // the draught reaches on its own.
+    din: 0.20,
   };
 
   /**
@@ -21324,13 +21420,25 @@ async function buildJadrija(scene) {
    * forty-five strands of fifteen rows is 1 350 vertices, which is less than a
    * single parasol and is not worth a shader. It is *not* a blocker and never
    * will be — the point of the thing is that you walk through it.
+   *
+   * What steps it is in three parts, and the order is the API:
+   *
+   *   `you(x, y, z, dt)`   your feet, world frame, once a frame you are on foot
+   *   `cap(id, ...)`       every other body's capsules, world frame
+   *   `step(...)`          and then the frame itself, which uses them up
    */
   function beadCurtain(K) {
     const span = K.dj * 2;
     const n = Math.max(8, Math.round(span / 0.032));
     const gap = span / n;
     const hw = BEAD.wide * 0.5;
-    const seg = BEAD.seg;
+    const seg = BEAD.seg, m = seg + 1, N = n * m;
+    const ell = BEAD.drop / seg;
+    const GRAV = 9.81;
+    // Not Math.hypot, which V8 does not inline and which was being called
+    // eight times a node a frame. Measured with her walking in, the same
+    // frames: 0.40 ms a frame for the curtain with it, 0.28 without.
+    const len3 = (x, y, z) => Math.sqrt(x * x + y * y + z * z);
     // One station for the whole curtain. The doorway is 1.45 m of a shore
     // traced in 4 m steps, so the frame does not turn measurably across it and
     // asking `at()` for it 765 times a frame would be 765 binary searches to
@@ -21340,14 +21448,25 @@ async function buildJadrija(scene) {
     // off the frame, not off the render.
     const yTop = K.floor + KAB.head - 0.035;
     const sHang = K.face + 0.075;
+    // The doorway's own frame, which is where the chains live: `a` across the
+    // opening from its middle (t - K.dc), `b` through it from the line the
+    // strands hang on (s - sHang), and `y` the world's. `write` goes one way
+    // and these two come back, and they are the exact inverse of it — `at()`'s
+    // normal is lerped and not renormalised (see the note on `at`), so the
+    // frame is inverted as the 2x2 it is rather than assumed orthonormal.
+    const det = st.ux * st.nz - st.nx * st.uz;
+    const toA = (x, z) => ((x - st.x) * st.nz - (z - st.z) * st.nx) / det;
+    const toB = (x, z) => (st.ux * (z - st.z) - st.uz * (x - st.x)) / det - sHang;
 
-    const nv = n * (seg + 1) * 2;
+    const nv = n * m * 2;
     const pos = new Float32Array(nv * 3);
     const nrm = new Float32Array(nv * 3);
     const uvs = new Float32Array(nv * 2);
     const idx = new Uint16Array(n * seg * 6);
     // Seaward, because that is the side anybody looks at it from and a 21 mm
-    // ribbon has no business claiming a normal of its own.
+    // ribbon has no business claiming a normal of its own. Kept when it bends,
+    // for the same reason: a strand that lit differently the moment it was
+    // touched would be a strand announcing that it had become a simulation.
     for (let v = 0; v < nv; v++) {
       nrm[v * 3] = -st.nx; nrm[v * 3 + 1] = 0.16; nrm[v * 3 + 2] = -st.nz;
     }
@@ -21355,12 +21474,12 @@ async function buildJadrija(scene) {
     for (let i = 0; i < n; i++) {
       const u0 = i / n, u1 = (i + 1) / n;
       for (let j = 0; j <= seg; j++) {
-        const v = (i * (seg + 1) + j) * 2;
+        const v = (i * m + j) * 2;
         uvs[v * 2] = u0; uvs[v * 2 + 1] = 1 - j / seg;
         uvs[v * 2 + 2] = u1; uvs[v * 2 + 3] = 1 - j / seg;
       }
       for (let j = 0; j < seg; j++) {
-        const a = (i * (seg + 1) + j) * 2;
+        const a = (i * m + j) * 2;
         idx[k++] = a; idx[k++] = a + 1; idx[k++] = a + 3;
         idx[k++] = a; idx[k++] = a + 3; idx[k++] = a + 2;
       }
@@ -21391,33 +21510,93 @@ async function buildJadrija(scene) {
     mesh.frustumCulled = false;
     scene.add(mesh);
 
-    const angS = new Float32Array(n);      // swing through the doorway
-    const angT = new Float32Array(n);      // and sideways along it
-    const velS = new Float32Array(n);
-    const velT = new Float32Array(n);
-    const tmp = new Float32Array(n);
-    // Where each thing that can part this curtain was standing last frame,
-    // keyed by what it is. It used to be one pair of numbers, because the
-    // player was the only mover the solver had ever been given — so the beads
-    // hung dead still while she walked in to pour a drink and the dog trotted
-    // out under them. A doorway does not care who is coming through it.
-    const prev = new Map();
-    let cool = 0, phase = 0;
+    // ── the state ────────────────────────────────────────────────────────────
+    //
+    // Every node of every strand, strand-major, three numbers each in the
+    // doorway's frame: where it is (X), how fast it is going (V), where the
+    // substep found it (X0) and what the follow-the-leader sweeps moved it by
+    // (D). Node 0 of each strand is its knot on the rail and never moves.
+    const X = new Float32Array(N * 3), V = new Float32Array(N * 3);
+    const X0 = new Float32Array(N * 3), D = new Float32Array(N * 3);
+    const dev = new Float32Array(N);
+    // Which strands the last substep found pulled taut round a body — see
+    // `lead` — and which therefore slide on it with no friction at all.
+    const taut = new Uint8Array(n);
+    const head = new Float64Array(n);
+    for (let i = 0; i < n; i++) head[i] = -K.dj + gap * (i + 0.5);
+    const Lj = new Float64Array(m);
+    let sumL = 0;
+    for (let j = 0; j < m; j++) { Lj[j] = ell * j; sumL += Lj[j]; }
+    // The calm curtain at depth j — where (Pb, Py) and how fast (Qb, Qy) —
+    // for the one angle every untouched strand shares.
+    const Pb = new Float64Array(m), Py = new Float64Array(m);
+    const Qb = new Float64Array(m), Qy = new Float64Array(m);
+    // That angle: the old rigid pendulum, whole, with the draught on it.
+    let ang = 0, angV = 0, angA = 0, phase = 0;
+    let calm = true, still = 0, cool = 0, din = 0;
+    // How far the chains reach, for the wake test: [a0, a1, b0, b1].
+    const reach = [-K.dj, K.dj, -0.05, 0.05];
+    const meas = { ms: 0, pen: 0, dev: 0, vdev: 0, woke: 0, live: 0, touch: 0, at: null, stretch: 0 };
+    let measure = false;
+
+    function pose(A, AV) {
+      const s = Math.sin(A), c = Math.cos(A);
+      for (let j = 0; j < m; j++) {
+        Pb[j] = Lj[j] * s; Py[j] = yTop - Lj[j] * c;
+        Qb[j] = Lj[j] * c * AV; Qy[j] = Lj[j] * s * AV;
+      }
+    }
+    /** Every chain laid on the calm curtain, moving with it. */
+    function lay() {
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < m; j++) {
+          const o = (i * m + j) * 3;
+          X[o] = head[i]; X[o + 1] = Pb[j]; X[o + 2] = Py[j];
+          V[o] = 0; V[o + 1] = Qb[j]; V[o + 2] = Qy[j];
+        }
+      }
+      reach[0] = -K.dj; reach[1] = K.dj;
+      reach[2] = Math.min(0, Pb[seg]); reach[3] = Math.max(0, Pb[seg]);
+    }
+    /**
+     * The draught, and the old curtain's answer to it, a frame at a time —
+     * the same two lines, the same order and the same clamp as the rigid
+     * pendulums had, so that at rest nothing about it has changed.
+     */
+    function draught(h) {
+      phase += h;
+      const air = BEAD.stir * Math.sin(phase * 1.7);
+      angA = -BEAD.spring * Math.sin(ang - air) - BEAD.damp * angV;
+      angV += angA * h;
+      ang = clamp(ang + angV * h, -1.05, 1.05);
+    }
+    pose(0, 0);
+    lay();
 
     function write() {
+      const ux = st.ux, uz = st.uz, nx = st.nx, nz = st.nz;
       let o = 0;
       for (let i = 0; i < n; i++) {
-        const t0 = K.dc - K.dj + gap * (i + 0.5);
-        const sa = Math.sin(angS[i]), ca = Math.cos(angS[i]);
-        const sb = Math.sin(angT[i]), cb = Math.cos(angT[i]);
+        const base = i * m * 3;
         for (let j = 0; j <= seg; j++) {
-          const L = BEAD.drop * (j / seg);
-          const bt = t0 + L * sb - K.dc, bs = sHang + L * sa;
-          const x = st.x + st.ux * bt + st.nx * bs;
-          const z = st.z + st.uz * bt + st.nz * bs;
-          const y = yTop - L * ca * cb;
-          pos[o] = x - st.ux * hw; pos[o + 1] = y; pos[o + 2] = z - st.uz * hw;
-          pos[o + 3] = x + st.ux * hw; pos[o + 4] = y; pos[o + 5] = z + st.uz * hw;
+          const p = base + j * 3;
+          const lo = base + (j > 0 ? j - 1 : 0) * 3, hi = base + (j < seg ? j + 1 : seg) * 3;
+          // Along the strand here, and across it: the doorway's own `a` with
+          // whatever of it lies along the strand taken out, so a strand swung
+          // sideways stays a ribbon and does not turn edge-on and vanish. At
+          // rest the strand has no `a` in it at all and this is exactly the
+          // ±hw along the doorway that it always was.
+          let ta = X[hi] - X[lo], tb = X[hi + 1] - X[lo + 1], ty = X[hi + 2] - X[lo + 2];
+          const tl = len3(ta, tb, ty) || 1;
+          ta /= tl; tb /= tl; ty /= tl;
+          let wa = 1 - ta * ta, wb = -ta * tb, wy = -ta * ty;
+          const wk = hw / (len3(wa, wb, wy) || 1);
+          wa *= wk; wb *= wk; wy *= wk;
+          const a = X[p], b = X[p + 1] + sHang, y = X[p + 2];
+          const x = st.x + ux * a + nx * b, z = st.z + uz * a + nz * b;
+          const dx = ux * wa + nx * wb, dz = uz * wa + nz * wb;
+          pos[o] = x - dx; pos[o + 1] = y - wy; pos[o + 2] = z - dz;
+          pos[o + 3] = x + dx; pos[o + 4] = y + wy; pos[o + 5] = z + dz;
           o += 6;
         }
       }
@@ -21425,58 +21604,402 @@ async function buildJadrija(scene) {
     }
     write();
 
+    // ── the bodies ───────────────────────────────────────────────────────────
+    //
+    // Capsules, in the doorway's frame, handed in each frame and used up by
+    // `step`. Two ends and a radius at each; `id` says whose, so that where
+    // it was LAST frame can be found — which is what sweeps it through the
+    // substeps and gives the friction a speed to drag against. A capsule that
+    // has jumped more than 0.6 m since is a teleport (the door's own cut, or
+    // a probe) and is taken to have always been where it is now.
+    const CAPS = 48, IDS = 64;
+    const C = new Float64Array(CAPS * 8);       // a0 b0 y0 a1 b1 y1 r0 r1
+    const Cw = new Float64Array(CAPS * 6);      // where it was last frame
+    const Cs = new Float64Array(CAPS * 6);      // where it is this substep
+    const Cv = new Float64Array(CAPS * 6);      // and how fast its ends go
+    const Cx = new Float64Array(CAPS * 6);      // swept box, radius and all
+    const Cid = new Int16Array(CAPS);
+    const use = new Int16Array(CAPS), near = new Int16Array(CAPS);
+    const seen = new Float64Array(IDS * 6), seenAt = new Int32Array(IDS).fill(-9);
+    let nc = 0, frame = 0;
+    const benchC = new Float64Array(CAPS * 8), benchId = new Int16Array(CAPS);
+    let benchN = 0, benchNu = 0;
+
+    function capAB(id, a0, b0, y0, a1, b1, y1, r0, r1) {
+      if (nc >= CAPS || id < 0 || id >= IDS) return;
+      const o = nc * 8;
+      C[o] = a0; C[o + 1] = b0; C[o + 2] = y0;
+      C[o + 3] = a1; C[o + 4] = b1; C[o + 5] = y1;
+      C[o + 6] = r0; C[o + 7] = r1;
+      Cid[nc++] = id;
+    }
+    /** A capsule in the world frame — hers, the dog's. */
+    function cap(id, x0, y0, z0, x1, y1, z1, r0, r1) {
+      capAB(id, toA(x0, z0), toB(x0, z0), y0, toA(x1, z1), toB(x1, z1), y1, r0, r1);
+    }
+
     /**
-     * One mover against the curtain: the crossing, and the contact while it is
-     * standing in the strands.
+     * You, as far as a bead curtain can tell: laid out off the walker's feet
+     * and the way you are going, because the walker is a point and the only
+     * body anybody has ever given you is the one the third person draws —
+     * which this file cannot see and does not need to. [side, fwd, up] at
+     * each end in metres, then the two radii. Proportioned on Chloe: her eye
+     * is `you.eye`, 1.62, which puts the crown at about 1.72.
+     *
+     * The shoulders are their own capsule across the body, and they are the
+     * point of it: a strand that comes down on a round torso slides straight
+     * off it, and a strand that comes down on a shoulder stays there.
+     *
+     * AND THE LEGS WALK. The first cut had two still legs 3 cm apart under a
+     * hip capsule wider than they were, and a strand that went in between
+     * them was hooked in the pocket under the hips and carried 1.4 m into the
+     * room — measured, strand 22 of 45, the one dead in the middle, which is
+     * the one everybody walks into. Real legs scissor: one goes through the
+     * curtain ahead of the other and the strand between them is kicked off
+     * the back one. So the thighs are as full as the hips at the top, and
+     * thigh, shin and arm swing on a stride of 1.4 m, off the ground covered.
+     * `sw` is how much of each end swings: [fwd at the top, fwd at the foot].
+     */
+    const YOU = [
+      [0, -0.02, 1.02, 0, -0.02, 1.33, 0.14, 0.14, 0, 0],             // chest, belly
+      [-0.16, -0.03, 1.41, 0.16, -0.03, 1.41, 0.065, 0.065, 0, 0],    // the shoulders
+      [0, 0, 1.60, 0, 0, 1.62, 0.100, 0.100, 0, 0],                   // head
+      [-0.06, 0, 0.93, 0.06, 0, 0.93, 0.125, 0.125, 0, 0],            // hips
+      [-0.21, -0.02, 1.36, -0.23, 0.02, 0.80, 0.050, 0.040, 0, -0.14],  // arms,
+      [0.21, -0.02, 1.36, 0.23, 0.02, 0.80, 0.050, 0.040, 0, 0.14],     // against the legs
+      [-0.085, 0, 0.90, -0.09, 0, 0.48, 0.095, 0.060, 0, 0.17],       // thighs
+      [0.085, 0, 0.90, 0.09, 0, 0.48, 0.095, 0.060, 0, -0.17],
+      [-0.09, 0, 0.48, -0.10, 0, 0.08, 0.058, 0.040, 0.17, 0.30],     // shins
+      [0.09, 0, 0.48, 0.10, 0, 0.08, 0.058, 0.040, -0.17, -0.30],
+    ];
+    const youWas = [NaN, NaN];
+    const youFwd = [0, 1];
+    let youStride = 0, youSwing = 0;
+    function you(x, y, z, dt) {
+      const a = toA(x, z), b = toB(x, z);
+      // Which way you are facing is which way you are going, eased; standing
+      // still it stays whatever it was, and it starts facing into the room,
+      // shoulders along the doorway, which is how anybody goes through one.
+      let sp = 0;
+      if (youWas[0] === youWas[0] && dt > 0) {
+        const va = (a - youWas[0]) / dt, vb = (b - youWas[1]) / dt;
+        sp = Math.hypot(va, vb);
+        if (sp > 0.25 && sp < 12) {
+          const e = Math.min(1, dt * 8);
+          const fa = youFwd[0] + (va / sp - youFwd[0]) * e;
+          const fb = youFwd[1] + (vb / sp - youFwd[1]) * e;
+          const fl = Math.hypot(fa, fb) || 1;
+          youFwd[0] = fa / fl; youFwd[1] = fb / fl;
+          youStride += sp * dt * Math.PI / 0.70;
+        } else if (sp >= 12) sp = 0;
+      }
+      youWas[0] = a; youWas[1] = b;
+      // The legs come to a stand over a quarter of a second, not on the spot.
+      youSwing += ((sp > 0.25 ? 1 : 0) - youSwing) * Math.min(1, dt * 4);
+      // Nowhere near: nothing to add, and not worth ten capsules of work.
+      if (Math.abs(a) > K.dj + 1.5 || Math.abs(b) > 1.8) return;
+      const fa = youFwd[0], fb = youFwd[1], ra = fb, rb = -fa;
+      const k = Math.sin(youStride) * youSwing;
+      for (let q = 0; q < YOU.length; q++) {
+        const c = YOU[q];
+        const f0 = c[1] + c[8] * k, f1 = c[4] + c[9] * k;
+        capAB(q, a + c[0] * ra + f0 * fa, b + c[0] * rb + f0 * fb, y + c[2],
+          a + c[3] * ra + f1 * fa, b + c[3] * rb + f1 * fb, y + c[5], c[6], c[7]);
+      }
+    }
+
+    // ── the solver ───────────────────────────────────────────────────────────
+
+    /** Forces, then a step of every free node, remembering where it began. */
+    function integrate(sh, A) {
+      // The draught's force, for the calm curtain to be an exact trajectory:
+      // gravity tilted onto the line, and the line's own swing down its length.
+      const ff = GRAV * Math.tan(A);
+      for (let i = 0; i < n; i++) {
+        for (let j = 1; j < m; j++) {
+          const q = i * m + j;
+          dev[q] = X[q * 3 + 1] - Pb[j];
+        }
+      }
+      const dr = BEAD.drag, lk = BEAD.link, vmax = BEAD.vmax;
+      for (let i = 0; i < n; i++) {
+        for (let j = 1; j < m; j++) {
+          const q = i * m + j, o = q * 3;
+          const l = i > 0 ? dev[q - m] : dev[q];
+          const r = i < n - 1 ? dev[q + m] : dev[q];
+          V[o] += -dr * V[o] * sh;
+          V[o + 1] += (ff + Lj[j] * angA + lk * (l + r - 2 * dev[q])
+            - dr * (V[o + 1] - Qb[j])) * sh;
+          V[o + 2] += (-GRAV - dr * (V[o + 2] - Qy[j])) * sh;
+          const sp = len3(V[o], V[o + 1], V[o + 2]);
+          if (sp > vmax) { const f = vmax / sp; V[o] *= f; V[o + 1] *= f; V[o + 2] *= f; }
+          X0[o] = X[o]; X0[o + 1] = X[o + 1]; X0[o + 2] = X[o + 2];
+          X[o] += V[o] * sh; X[o + 1] += V[o + 1] * sh; X[o + 2] += V[o + 2] * sh;
+        }
+      }
+    }
+
+    /** A little of every node's curvature taken out, so it bends and not kinks. */
+    function bend() {
+      const kb = BEAD.bend;
+      for (let i = 0; i < n; i++) {
+        const base = i * m * 3;
+        for (let j = 1; j < seg; j++) {
+          const o = base + j * 3;
+          for (let c = 0; c < 3; c++) {
+            const cc = (X[o - 3 + c] + X[o + 3 + c] - 2 * X[o + c]) * kb;
+            X[o + c] += cc * 0.5;
+            if (j > 1) X[o - 3 + c] -= cc * 0.25;
+            X[o + 3 + c] -= cc * 0.25;
+          }
+        }
+      }
+    }
+
+    // The wall the strands hang in, in `b`: from the seaward face to the inner
+    // one, KAB.wall of concrete with the strands 7.5 cm into it.
+    const W0 = K.face - sHang, W1 = K.face + KAB.wall - sHang, WM = (W0 + W1) * 0.5;
+    const headY = K.floor + KAB.head;
+
+    /**
+     * Every node out of every body near it, then out of the frame and off the
+     * floor. `nu` capsules are in `near`; `sh` is the substep, for friction.
+     */
+    function collide(nu, sh) {
+      const R = BEAD.r, dj = K.dj - R;
+      for (let i = 0; i < n; i++) {
+        const base = i * m * 3;
+        const mu = taut[i] ? 0 : BEAD.mu;
+        // Which bodies reach this strand at all: its own box against theirs.
+        let na = 0;
+        if (nu) {
+          let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+          for (let j = 1; j < m; j++) {
+            const o = base + j * 3;
+            if (X[o] < a0) a0 = X[o]; if (X[o] > a1) a1 = X[o];
+            if (X[o + 1] < b0) b0 = X[o + 1]; if (X[o + 1] > b1) b1 = X[o + 1];
+          }
+          for (let u = 0; u < nu; u++) {
+            const c6 = near[u] * 6;
+            if (Cx[c6] > a1 + R || Cx[c6 + 1] < a0 - R
+              || Cx[c6 + 2] > b1 + R || Cx[c6 + 3] < b0 - R) continue;
+            use[na++] = near[u];
+          }
+        }
+        for (let j = 1; j < m; j++) {
+          const o = base + j * 3;
+          let xa = X[o], xb = X[o + 1], xy = X[o + 2];
+          for (let u = 0; u < na; u++) {
+            const c = use[u], c6 = c * 6, c8 = c * 8;
+            if (xa < Cx[c6] - R || xa > Cx[c6 + 1] + R || xb < Cx[c6 + 2] - R
+              || xb > Cx[c6 + 3] + R || xy < Cx[c6 + 4] - R || xy > Cx[c6 + 5] + R) continue;
+            const pa = Cs[c6], pb = Cs[c6 + 1], py = Cs[c6 + 2];
+            const da = Cs[c6 + 3] - pa, db = Cs[c6 + 4] - pb, dy = Cs[c6 + 5] - py;
+            const L2 = da * da + db * db + dy * dy;
+            let t = L2 > 1e-10 ? ((xa - pa) * da + (xb - pb) * db + (xy - py) * dy) / L2 : 0;
+            t = t < 0 ? 0 : t > 1 ? 1 : t;
+            const qa = pa + da * t, qb = pb + db * t, qy = py + dy * t;
+            const rr = C[c8 + 6] + (C[c8 + 7] - C[c8 + 6]) * t + R;
+            let ea = xa - qa, eb = xb - qb, ey = xy - qy;
+            const e2 = ea * ea + eb * eb + ey * ey;
+            if (e2 >= rr * rr) continue;
+            let e = Math.sqrt(e2);
+            // Dead on the axis, which a body walking straight through a node
+            // can do: out the way the body is going, which is where it would
+            // have been pushed a frame ago.
+            if (e < 1e-6) {
+              const vb = Cv[c6 + 1] + (Cv[c6 + 4] - Cv[c6 + 1]) * t;
+              ea = 0; eb = vb >= 0 ? 1 : -1; ey = 0; e = 1;
+            } else { ea /= e; eb /= e; ey /= e; }
+            const pen = rr - (e2 < 1e-12 ? 0 : Math.sqrt(e2));
+            xa += ea * pen; xb += eb * pen; xy += ey * pen;
+            // Friction: what the node has moved this substep against what the
+            // body has, across the contact, taken out up to mu of the push.
+            const va = Cv[c6] + (Cv[c6 + 3] - Cv[c6]) * t;
+            const vb = Cv[c6 + 1] + (Cv[c6 + 4] - Cv[c6 + 1]) * t;
+            const vy = Cv[c6 + 2] + (Cv[c6 + 5] - Cv[c6 + 2]) * t;
+            const ra = xa - X0[o] - va * sh, rb = xb - X0[o + 1] - vb * sh,
+              ry = xy - X0[o + 2] - vy * sh;
+            const rn = ra * ea + rb * eb + ry * ey;
+            const sa = ra - ea * rn, sb = rb - eb * rn, sy = ry - ey * rn;
+            const sl = len3(sa, sb, sy);
+            if (sl > 1e-9) {
+              const f = Math.min(1, mu * pen / sl);
+              xa -= sa * f; xb -= sb * f; xy -= sy * f;
+            }
+            meas.touch++;
+          }
+          // The frame. Only inside the wall's own depth: either side of it a
+          // strand is in the room or on the terrace and free to swing wide.
+          if (xb > W0 - R && xb < W1 + R) {
+            const outB = xb < WM ? xb - (W0 - R) : (W1 + R) - xb;
+            const over = Math.abs(xa) - dj;
+            if (over > 0) {
+              if (over < outB) xa = xa < 0 ? -dj : dj;
+              else xb = xb < WM ? W0 - R : W1 + R;
+            }
+            const up = xy - (headY - R);
+            if (up > 0 && xb > W0 - R && xb < W1 + R) {
+              if (up < outB) xy = headY - R;
+              else xb = xb < WM ? W0 - R : W1 + R;
+            }
+          }
+          if (xy < K.floor + R) xy = K.floor + R;
+          X[o] = xa; X[o + 1] = xb; X[o + 2] = xy;
+        }
+      }
+    }
+
+    /**
+     * Neighbours' tiles may not pass through each other edge to edge — only
+     * the same link of two strands side by side, and only while they are
+     * level with each other through the doorway, because a strand that has
+     * been swung past its neighbour is free to hang in front of it.
+     */
+    function separate() {
+      const sep = BEAD.sep, th = BEAD.thick, hy = ell * 0.5;
+      for (let j = 1; j < m; j++) {
+        for (let i = 0; i < n - 1; i++) {
+          const o = (i * m + j) * 3, q = o + m * 3;
+          const da = X[q] - X[o];
+          if (da >= sep || da < -sep) continue;
+          if (Math.abs(X[q + 1] - X[o + 1]) > th || Math.abs(X[q + 2] - X[o + 2]) > hy) continue;
+          const c = Math.min(0.01, (sep - da) * 0.5);
+          X[o] -= c; X[q] += c;
+        }
+      }
+    }
+
+    /**
+     * Follow the leader: every link back to its length, from the top down.
+     *
+     * `give` is how far past its length a link is let stretch before it is
+     * pulled back, and it is 0 everywhere but the last sweep of a substep.
+     * That one comes AFTER the bodies, and it is the answer to two opposite
+     * faults. With the sweep last, a node pushed out of her was pulled
+     * straight back in by the strand above it — 5 cm deep in the first
+     * measurement. With the bodies last, a strand caught in a hollow (between
+     * her arm and her side, under a hip) was simply stretched to follow her:
+     * one was carried a metre and a half across the room and let go like a
+     * whip. So the bodies win until a link is 10 % over, and past that the
+     * strand wins and pulls itself out of whatever it was caught in — which
+     * is what a strand does. (6 % left her upper arm 20 mm inside a taut
+     * strand walking in; 10 % leaves 8 mm, and a tile 10 % long is not a
+     * thing anybody can see for the half second it lasts.)
+     *
+     * AND A STRAND THAT HAS COME TAUT LOSES ITS FRICTION (`taut`) until it is
+     * slack again. The stretch alone left three strands strung straight from the
+     * head of the door to her shoulder while she walked to the stool, 1.5 m
+     * across the room: taut is exactly when the pressure on a hollow is
+     * highest, so friction off that pressure held them hardest just when a
+     * real strand slips. Once taut, it slides round her and off.
+     */
+    function lead(give = 0) {
+      const top = ell * (1 + give);
+      for (let i = 0; i < n; i++) {
+        const base = i * m * 3;
+        if (give) taut[i] = 0;
+        for (let j = 1; j < m; j++) {
+          const o = base + j * 3, p = o - 3;
+          const ea = X[o] - X[p], eb = X[o + 1] - X[p + 1], ey = X[o + 2] - X[p + 2];
+          const e = len3(ea, eb, ey);
+          if (give) { if (e <= top) continue; taut[i] = 1; }
+          let na, nb, ny;
+          if (e > 1e-9) {
+            const f = (give ? top : ell) / e;
+            na = X[p] + ea * f; nb = X[p + 1] + eb * f; ny = X[p + 2] + ey * f;
+          } else { na = X[p]; nb = X[p + 1]; ny = X[p + 2] - ell; }
+          D[o] += na - X[o]; D[o + 1] += nb - X[o + 1]; D[o + 2] += ny - X[o + 2];
+          X[o] = na; X[o + 1] = nb; X[o + 2] = ny;
+        }
+      }
+    }
+
+    /**
+     * The velocities, off where the nodes ended up — and the sweep's own
+     * correction put back (Müller's `-s d(i+1)/h`), without which the lower
+     * links of every strand behave as if they weighed nothing.
+     */
+    function speeds(sh) {
+      const s = BEAD.ftl / sh, ih = 1 / sh, vmax = BEAD.vmax;
+      for (let i = 0; i < n; i++) {
+        const base = i * m * 3;
+        for (let j = 1; j < m; j++) {
+          const o = base + j * 3, b = j < seg ? o + 3 : -1;
+          let va = (X[o] - X0[o]) * ih, vb = (X[o + 1] - X0[o + 1]) * ih,
+            vy = (X[o + 2] - X0[o + 2]) * ih;
+          if (b >= 0) { va -= D[b] * s; vb -= D[b + 1] * s; vy -= D[b + 2] * s; }
+          const sp = len3(va, vb, vy);
+          if (sp > vmax) { const f = vmax / sp; va *= f; vb *= f; vy *= f; }
+          V[o] = va; V[o + 1] = vb; V[o + 2] = vy;
+        }
+      }
+      D.fill(0);
+    }
+
+    /** How far inside any body the deepest node is now — the test's number. */
+    function residual() {
+      let worst = 0;
+      for (let u = 0; u < nc; u++) {
+        const c8 = u * 8;
+        const pa = C[c8], pb = C[c8 + 1], py = C[c8 + 2];
+        const da = C[c8 + 3] - pa, db = C[c8 + 4] - pb, dy = C[c8 + 5] - py;
+        const L2 = da * da + db * db + dy * dy;
+        for (let q = 0; q < N; q++) {
+          if (q % m === 0) continue;
+          const o = q * 3;
+          let t = L2 > 1e-10 ? ((X[o] - pa) * da + (X[o + 1] - pb) * db + (X[o + 2] - py) * dy) / L2 : 0;
+          t = t < 0 ? 0 : t > 1 ? 1 : t;
+          const e = len3(X[o] - pa - da * t, X[o + 1] - pb - db * t, X[o + 2] - py - dy * t);
+          const pen = C[c8 + 6] + (C[c8 + 7] - C[c8 + 6]) * t - e;
+          if (pen > worst) {
+            worst = pen;
+            if (pen > meas.pen) meas.at = [Cid[u], (q / m) | 0, q % m, +(X[o + 2] - K.floor).toFixed(3)];
+          }
+        }
+      }
+      return worst;
+    }
+
+    // ── the sound, and who went through ─────────────────────────────────────
+    //
+    // Where each thing that can part this curtain was standing last frame,
+    // keyed by what it is. It used to be one pair of numbers, because the
+    // player was the only mover the solver had ever been given — so the beads
+    // hung dead still while she walked in to pour a drink and the dog trotted
+    // out under them. A doorway does not care who is coming through it.
+    const prev = new Map();
+
+    /**
+     * One mover's crossing, for the ear.
+     *
+     * The strands themselves are moved by bodies now and by nothing else; what
+     * is left here is the one event contact cannot be trusted to sound: the
+     * CROSSING. The doorway is a *cut* — crossing the wall plane at K.face
+     * fades the screen and stands you at K.standIn, 2.4 m inside — so walking
+     * in you are in the strands for a fifth of a second of fade and then
+     * somewhere else, and the loud middle of the crossing, the part where a
+     * hundred beads leave the frame at once, never happens in the solver to be
+     * heard. So test the *segment* moved along this frame rather than where it
+     * ended, the way the threshold upstairs does. Walking out, that segment is
+     * a real 6 cm step through the strands; walking in, it is the teleport,
+     * which straddles them just the same. One test catches both.
      *
      * `who` is a key and nothing more. It says whose last position this one is
      * a step from, so that two things in the doorway at the same time — you on
      * your way out and the dog on his way in — cannot read each other's stride
      * as their own and produce one impossible six-metre step between them.
      *
-     * `y` is world height, or `null` for "do not ask". Only one mover here has
-     * ever needed asking, and the gate below says why.
+     * `y` is world height, or `null` for "do not ask". It is a test for "on
+     * the ground here" against "over the top of the row" — a Canadair
+     * overhead is at (t, s) zero from this doorway too — and she and the dog
+     * pass `null` because neither of them can leave the ground.
      */
     function part(who, t, s, y, h) {
       const p = prev.get(who);
       const wasT = p ? p[0] : null, wasS = p ? p[1] : null;
       if (p) { p[0] = t; p[1] = s; } else prev.set(who, [t, s]);
-      // In the doorway, vertically. This is not a fit — it is a test for "on
-      // the ground here" against "over the top of the row", and the two are
-      // tens of metres apart, so it is drawn wide on purpose. A walker's eye is
-      // 1.62 m up a 1.98 m opening, and the ground in front of the kabine is
-      // not level with their floor; a gate cut close to the head of the opening
-      // would turn a slope of a foot into silence.
-      //
-      // She and the dog pass `null`, and it is not laziness: the gate exists so
-      // that a Canadair overhead, which is at (t, s) zero from this doorway
-      // too, does not part a bead curtain from four hundred feet. Neither of
-      // them can leave the ground.
       const inHole = y == null || (y < yTop + 1.2 && y > yTop - 3.4);
-
-      /**
-       * The crossing itself.
-       *
-       * Contact above is a *contact* model and it was the whole model, which
-       * left the one moment anybody would call "going through the beads" with
-       * no sound of its own at all. Two things conspire in that. The tail is
-       * driven off the mean angular rate across forty-five strands, and a
-       * walker is a point 0.72 m wide against a doorway 1.45 m wide, so half
-       * the curtain never moves and the mean is diluted by the half that does
-       * not — which is why the threshold above had to come down. And the
-       * doorway is a *cut*: crossing the wall
-       * plane at s = K.face fades the screen and stands you at K.standIn, 2.4 m
-       * inside — so on the way in you get within seven centimetres of the
-       * strands and are then taken away from them, and the loud middle of the
-       * crossing, the part where a hundred beads leave the frame at once, never
-       * happens in the solver to be heard.
-       *
-       * So test the *segment* you moved along this frame rather than where you
-       * ended it, the same way the threshold upstairs does. Walking out, that
-       * segment is a real 6 cm step through the strands; walking in, it is the
-       * teleport, which straddles them just the same. One test catches both,
-       * and it never needs to know that the cut exists.
-       */
       if (inHole && wasS != null && (wasS - sHang) * (s - sHang) < 0) {
         const u = (sHang - wasS) / (s - wasS);
         const tx = wasT + (t - wasT) * u;           // where across the doorway
@@ -21491,97 +22014,236 @@ async function buildJadrija(scene) {
           // panned off it — which is right whoever went through, because it is
           // a property of the door and not of the ear.
           if (audio) audio.beadShove(hard, dx);
-          // And give the strands the shove as well, not only the ear. Without
-          // this the tail after walking *in* is whatever eight frames of
-          // approach managed to build before the cut took you, which is
-          // nothing — and the curtain you look back at through the doorway is
-          // hanging still one second after you parted it.
-          for (let i = 0; i < n; i++) {
-            const t0 = K.dc - K.dj + gap * (i + 0.5);
-            const dd = Math.abs(tx - t0);
-            if (dd >= BEAD.reach * 2.2) continue;
-            const w = 1 - dd / (BEAD.reach * 2.2);
-            velS[i] += Math.sign(s - wasS) * 3.4 * hard * w * w;
-          }
           cool = 0.10;
         }
-      }
-
-      // And the contact, for as long as it is against the strands. Half a metre
-      // either side of them, which is a shoulder and an arm.
-      if (!inHole || s <= sHang - 0.55 || s >= sHang + 0.55) return;
-      const vs = wasS == null ? 0 : (s - wasS) / h;
-      const vt = wasT == null ? 0 : (t - wasT) / h;
-      for (let i = 0; i < n; i++) {
-        const t0 = K.dc - K.dj + gap * (i + 0.5);
-        const dd = Math.abs(t - t0);
-        if (dd >= BEAD.reach) continue;
-        // Driven toward your speed while you are against it, rather than
-        // kicked once per frame — which is both what contact does and the
-        // only way the result does not depend on the frame rate.
-        const w = Math.min(1, (1 - dd / BEAD.reach) * 1.6) * Math.min(1, h * BEAD.grip);
-        velS[i] += (clamp(vs, -5, 5) * BEAD.push - velS[i]) * w;
-        velT[i] += (clamp(vt, -5, 5) * BEAD.push * 0.5 - velT[i]) * w;
       }
     }
 
     /**
      * @param t,s    where you are, in the resort's frame
      * @param d      how far away you are, for the sound and for the gate
-     * @param y      and how high, world frame — or null for "do not ask",
-     *               which is what the debug hook passes: it drives the curtain
-     *               with no camera at all
-     * @param others everything else that can part it this frame: triples of
-     *               `[key, t, s]`, ground-bound, so they carry no height
+     * @param y      and how high, world frame — or null for "do not ask"
+     * @param others everything else that can go through it this frame, for
+     *               the crossing sound: triples of `[key, t, s]`
      *
-     * `d` is measured flat, in (t, s), because everything else here is: it is
-     * the gate on the solver and the range on the sound and neither wants a
-     * height in it.
-     *
-     * The gate stays on YOU and not on the movers, deliberately. Past 26 m the
-     * doorway is a hand's width of screen and nothing that happens in it is
-     * worth forty-five strands of solver a frame — so if she walks in while you
-     * are at the far end of the promenade, the curtain neither swings nor
-     * sounds, and there is nobody there to know it. `prev` is cleared with it,
-     * because a segment measured across that gap is not a step anybody took.
+     * The gate stays on YOU, deliberately. Past 26 m the doorway is a hand's
+     * width of screen and nothing that happens in it is worth forty-five
+     * strands of solver a frame — so if she walks in while you are at the far
+     * end of the promenade, the curtain neither swings nor sounds, and there
+     * is nobody there to know it. A curtain already moving when you leave is
+     * let finish (a few seconds, and then it is asleep); a calm one costs
+     * nothing at all out there, which is what it cost before.
      */
     function step(t, s, d, dt, y = null, others = null) {
-      if (d > 26) { prev.clear(); return 0; }
+      let T0 = performance.now();
       const h = Math.min(dt, 0.05);
-      part('you', t, s, y, h);
-      if (others) for (const o of others) part(o[0], o[1], o[2], null, h);
-      phase += h;
-      const air = BEAD.stir * Math.sin(phase * 1.7);
-      let din = 0;
-      for (let i = 0; i < n; i++) tmp[i] = angS[i];
-      for (let i = 0; i < n; i++) {
-        const l = i > 0 ? tmp[i - 1] : tmp[i];
-        const r = i < n - 1 ? tmp[i + 1] : tmp[i];
-        velS[i] += (-BEAD.spring * Math.sin(angS[i] - air)
-          - BEAD.damp * velS[i] + BEAD.link * (l + r - 2 * tmp[i])) * h;
-        velT[i] += (-BEAD.spring * Math.sin(angT[i]) - BEAD.damp * velT[i]) * h;
-        angS[i] = clamp(angS[i] + velS[i] * h, -BEAD.swing, BEAD.swing);
-        angT[i] = clamp(angT[i] + velT[i] * h, -BEAD.swing * 0.4, BEAD.swing * 0.4);
-        din += Math.abs(velS[i]) + Math.abs(velT[i]);
+      frame++;
+      const far = d > 26;
+      if (far) { prev.clear(); nc = 0; if (calm) { meas.ms = 0; return 0; } }
+      else {
+        part('you', t, s, y, h);
+        if (others) for (const o of others) part(o[0], o[1], o[2], null, h);
       }
-      din /= n;
-      write();
+      const aWas = ang, vWas = angV;
+      draught(h);
+
+      // The bodies: where each was last frame, how fast it is going, and the
+      // box it sweeps. Only those whose box reaches the chains go any further.
+      const wk = BEAD.wake;
+      let nu = 0;
+      for (let c = 0; c < nc; c++) {
+        const id = Cid[c], c8 = c * 8, c6 = c * 6, s6 = id * 6;
+        let jump = seenAt[id] !== frame - 1;
+        if (!jump) {
+          for (let e = 0; e < 6; e += 3) {
+            if (len3(C[c8 + e] - seen[s6 + e], C[c8 + e + 1] - seen[s6 + e + 1],
+              C[c8 + e + 2] - seen[s6 + e + 2]) > 0.6) jump = true;
+          }
+        }
+        for (let e = 0; e < 6; e++) {
+          Cw[c6 + e] = jump ? C[c8 + e] : seen[s6 + e];
+          Cv[c6 + e] = (C[c8 + e] - Cw[c6 + e]) / h;
+          seen[s6 + e] = C[c8 + e];
+        }
+        seenAt[id] = frame;
+        const r = Math.max(C[c8 + 6], C[c8 + 7]);
+        Cx[c6] = Math.min(C[c8], C[c8 + 3], Cw[c6], Cw[c6 + 3]) - r;
+        Cx[c6 + 1] = Math.max(C[c8], C[c8 + 3], Cw[c6], Cw[c6 + 3]) + r;
+        Cx[c6 + 2] = Math.min(C[c8 + 1], C[c8 + 4], Cw[c6 + 1], Cw[c6 + 4]) - r;
+        Cx[c6 + 3] = Math.max(C[c8 + 1], C[c8 + 4], Cw[c6 + 1], Cw[c6 + 4]) + r;
+        Cx[c6 + 4] = Math.min(C[c8 + 2], C[c8 + 5], Cw[c6 + 2], Cw[c6 + 5]) - r;
+        Cx[c6 + 5] = Math.max(C[c8 + 2], C[c8 + 5], Cw[c6 + 2], Cw[c6 + 5]) + r;
+        if (Cx[c6] > reach[1] + wk || Cx[c6 + 1] < reach[0] - wk
+          || Cx[c6 + 2] > reach[3] + wk || Cx[c6 + 3] < reach[2] - wk
+          || Cx[c6 + 4] > yTop + wk || Cx[c6 + 5] < yTop - BEAD.drop - wk) continue;
+        near[nu++] = c;
+      }
+      meas.live = nu;
+      // For `bench`: the busiest set of bodies seen while measuring.
+
+      if (calm && !nu) {
+        // Nobody in it: the old curtain, exactly, and nothing else.
+        pose(ang, angV);
+        lay();
+        write();
+        din = Math.abs(angV);
+      } else {
+        if (calm) { calm = false; meas.woke++; }
+        const ns = Math.max(1, Math.ceil(h / BEAD.step - 1e-6)), sh = h / ns;
+        meas.touch = 0;
+        for (let k = 0; k < ns; k++) {
+          const f = (k + 1) / ns;
+          const A = aWas + (ang - aWas) * f, AV = vWas + (angV - vWas) * f;
+          pose(A, AV);
+          for (let u = 0; u < nu; u++) {
+            const c6 = near[u] * 6, c8 = near[u] * 8;
+            for (let e = 0; e < 6; e++) Cs[c6 + e] = Cw[c6 + e] + (C[c8 + e] - Cw[c6 + e]) * f;
+          }
+          integrate(sh, A);
+          bend();
+          for (let it = 0; it < 2; it++) {
+            lead();
+            separate();
+            collide(nu, sh);
+          }
+          lead(BEAD.give);
+          speeds(sh);
+        }
+        // How far off the calm curtain it is, how fast it is moving against
+        // it, and how far the chains reach — for the rattle, the settle and
+        // the next frame's wake test. The speeds are the last substep's own
+        // displacement, not V: V carries the sweep's correction, which along
+        // a hanging strand is a standing term that is not movement.
+        let dmax = 0, vmx = 0, rate = 0;
+        let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+        const ih = ns / h;
+        for (let i = 0; i < n; i++) {
+          let sw = 0;
+          for (let j = 1; j < m; j++) {
+            const o = (i * m + j) * 3;
+            const ea = X[o] - head[i], eb = X[o + 1] - Pb[j], ey = X[o + 2] - Py[j];
+            const e = len3(ea, eb, ey);
+            if (e > dmax) dmax = e;
+            if (measure) {
+              const lk = len3(X[o] - X[o - 3], X[o + 1] - X[o - 2], X[o + 2] - X[o - 1]) / ell - 1;
+              if (lk > meas.stretch) meas.stretch = lk;
+            }
+            const w = len3((X[o] - X0[o]) * ih, (X[o + 1] - X0[o + 1]) * ih - Qb[j],
+              (X[o + 2] - X0[o + 2]) * ih - Qy[j]);
+            if (w > vmx) vmx = w;
+            sw += w;
+            if (X[o] < a0) a0 = X[o]; if (X[o] > a1) a1 = X[o];
+            if (X[o + 1] < b0) b0 = X[o + 1]; if (X[o + 1] > b1) b1 = X[o + 1];
+          }
+          // A node's speed against the calm curtain over its depth, summed
+          // down the strand: for a strand swinging rigid that is exactly its
+          // angular rate, which is the number `din` was always measured in.
+          rate += sw / sumL;
+        }
+        reach[0] = a0; reach[1] = a1; reach[2] = b0; reach[3] = b1;
+        din = Math.abs(angV) + rate / n;
+        meas.dev = dmax; meas.vdev = vmx;
+        // Not counted in `ms`: it is the test's ruler, not the curtain.
+        if (measure) {
+          const T1 = performance.now();
+          meas.pen = Math.max(meas.pen, residual());
+          T0 += performance.now() - T1;
+        }
+        if (nu || dmax > BEAD.rest || vmx > BEAD.restV) still = 0;
+        else still += h;
+        if (still >= BEAD.restFor) {
+          // Home. Every node is within five millimetres of where the calm
+          // curtain has it, so it is put there and the solver goes to sleep.
+          calm = true; still = 0;
+          pose(ang, angV);
+          lay();
+        }
+        write();
+      }
+      // For `bench`: the bodies of the frame that touched it most.
+      if (measure && !calm && meas.touch >= benchNu) {
+        benchNu = meas.touch; benchN = nc;
+        benchC.set(C.subarray(0, nc * 8)); benchId.set(Cid.subarray(0, nc));
+      }
+      nc = 0;
       // The sound is the *movement*, not the crossing: a curtain someone has
       // walked through goes on clattering for a couple of seconds after they
       // have gone, and that tail is most of what the noise is for.
       cool = Math.max(0, cool - h);
-      if (audio && din > BEAD.din && cool <= 0) {
+      if (!far && audio && din > BEAD.din && cool <= 0) {
         // Over 2.6 nothing a crossing produced could ask for more than 0.4 of
         // this sound; over 1.3 the loud part of one asks for all of it and the
         // dying part still tapers, which is the shape it wanted all along.
         audio.rattle(Math.min(1, din / 1.3), d);
         cool = 0.16 + 0.22 * Math.random();
       }
+      meas.ms = performance.now() - T0;
       return din;
     }
 
-    return { mesh, step, strands: n, gap, at: [K.dc, sHang],
-      swing: () => +Math.max(...Array.from(angS, Math.abs)).toFixed(3) };
+    return { mesh, step, you, cap, strands: n, gap, at: [K.dc, sHang], sHang,
+      /** The furthest any strand's foot is off the calm curtain, as an angle. */
+      swing: () => {
+        let w = 0;
+        for (let i = 0; i < n; i++) {
+          const o = (i * m + seg) * 3;
+          w = Math.max(w, len3(X[o] - head[i], X[o + 1] - Pb[seg], X[o + 2] - Py[seg]));
+        }
+        return +(w / BEAD.drop).toFixed(3);
+      },
+      calm: () => calm,
+      stats: () => ({ calm, ms: +meas.ms.toFixed(3), dev: +meas.dev.toFixed(4),
+        vdev: +meas.vdev.toFixed(4), pen: +meas.pen.toFixed(4), live: meas.live,
+        touch: meas.touch, woke: meas.woke, din: +din.toFixed(3), penAt: meas.at,
+        stretch: +meas.stretch.toFixed(4),
+        ang: +ang.toFixed(4) }),
+      measure: (on) => { measure = !!on; meas.pen = 0; meas.stretch = 0; benchN = 0; benchNu = 0; },
+      /**
+       * The solver's own price, measured over `k` frames rather than one:
+       * `performance.now` is a tenth of a millisecond coarse, which is the
+       * whole of what is being measured. The bodies are the busiest set seen
+       * since `measure(true)`, held still — somebody standing in the doorway.
+       */
+      bench: (k = 300, dt = 1 / 60) => {
+        if (!benchN) return null;
+        const was = measure;
+        measure = false;
+        const T = performance.now();
+        for (let q = 0; q < k; q++) {
+          nc = 0;
+          for (let c = 0; c < benchN; c++) {
+            const o = c * 8;
+            capAB(benchId[c], benchC[o], benchC[o + 1], benchC[o + 2], benchC[o + 3],
+              benchC[o + 4], benchC[o + 5], benchC[o + 6], benchC[o + 7]);
+          }
+          step(K.dc, sHang, 0, dt);
+        }
+        measure = was;
+        return { caps: benchN, ms: +((performance.now() - T) / k).toFixed(4), touch: meas.touch };
+      },
+      /**
+       * The node furthest off the calm curtain, in the doorway's frame: `a`
+       * across, `b` through, `y` above the floor.
+       */
+      worst: () => {
+        let w = -1, wi = 0, wj = 0;
+        for (let i = 0; i < n; i++) {
+          for (let j = 1; j < m; j++) {
+            const o = (i * m + j) * 3;
+            const e = len3(X[o] - head[i], X[o + 1] - Pb[j], X[o + 2] - Py[j]);
+            if (e > w) { w = e; wi = i; wj = j; }
+          }
+        }
+        const o = (wi * m + wj) * 3;
+        return { i: wi, j: wj, dev: +w.toFixed(3), a: +X[o].toFixed(3),
+          b: +X[o + 1].toFixed(3), y: +(X[o + 2] - K.floor).toFixed(3) };
+      },
+      /** Node j of strand i, world frame — for a probe to compare with a body. */
+      node: (i, j) => {
+        const o = (i * m + j) * 3, b = X[o + 1] + sHang;
+        return [st.x + st.ux * X[o] + st.nx * b, X[o + 2], st.z + st.uz * X[o] + st.nz * b];
+      },
+    };
   }
   const beads = special ? beadCurtain(special) : null;
 
@@ -32442,32 +33104,126 @@ async function buildJadrija(scene) {
     return best[0];
   }
 
+  /**
+   * The bead curtain's frame: everybody who can walk into it, as capsules,
+   * and then the step.
+   *
+   * AFTER HER POSE, which is why this is not in `stepKabina` any more. The
+   * strands are pushed by bodies now (see `beadCurtain`), and her body is her
+   * bones — and `stepKabina` runs before `stepShow` has placed her this frame.
+   * Stepped there, the curtain was pushed by where she was a frame ago, and a
+   * figure walking a metre a second is 1.7 cm ahead of that at the leading
+   * edge: strands drawn a finger's depth inside her chest.
+   *
+   * `walker` is your feet on foot and null otherwise — the camera is not a
+   * body — and `beadYou` stands in for it when a probe has set it.
+   *
+   * Everything else in this resort that can go through that door is listed
+   * for the crossing's sound. Both of them walk the same three marks at
+   * t = K.dc — `moveDog`'s legs and hers — so both cross the strands square
+   * on, and both used to do it in silence with the curtain hanging dead still
+   * behind them. Built fresh each frame because it is at most two entries and
+   * never survives one.
+   */
+  let beadYou = null;
+  const _bcP = new THREE.Vector3(), _bcV = new THREE.Vector3(), _bcQ = new THREE.Quaternion();
+  const _bcW = new Float64Array(31 * 6);
+  let _bcFill = null;
+  const beadSt = special ? at(special.dc) : null;
+  function beadsTick(dt, pt, ps, camY, walker) {
+    if (!beads || !special) return;
+    const K = special;
+    const d = Math.hypot(pt - K.dc, ps - beads.sHang);
+    const with_ = [];
+    const herOn = skinFig && show && (skinFig.mesh.visible
+      || (APPR.primary && appr && appr.mesh.visible));
+    if (herOn) with_.push(['her', show.t, show.s]);
+    const dogOn = dog && dog.mesh.visible;
+    if (dogOn) with_.push(['dog', dog.at[0], dog.at[1]]);
+    if (d <= 26) {
+      if (beadYou) {
+        const w = W(beadYou[0], beadYou[1], K.floor);
+        beads.you(w[0], w[1], w[2], dt);
+      } else if (walker) beads.you(walker.x, walker.y, walker.z, dt);
+      // Her, off her own bones: CHAIN_BODY's capsules — the ones the cuff
+      // chain, the ball and both ragdolls are pushed by — as `ballCaps` puts
+      // them in the world. Only near the doorway, where one of them can reach.
+      if (herOn && Math.abs(show.t - K.dc) < K.dj + 1.0
+        && Math.abs(show.s - beads.sHang) < 1.5) {
+        skinFig.mesh.updateMatrixWorld();
+        const caps = chainCapsules(), M = skinFig.mesh.matrixWorld;
+        for (let k = 0; k < caps.length && k < 31; k++) {
+          const cp = caps[k];
+          skinFig.boneAt(cp.bone, _bcP);
+          skinFig.boneTurn(cp.bone, _bcQ);
+          _bcV.set(cp.a[0] - cp.head.x, cp.a[1] - cp.head.y, cp.a[2] - cp.head.z)
+            .applyQuaternion(_bcQ).add(_bcP).applyMatrix4(M);
+          const ax = _bcV.x, ay = _bcV.y, az = _bcV.z;
+          _bcV.set(cp.e[0] - cp.head.x, cp.e[1] - cp.head.y, cp.e[2] - cp.head.z)
+            .applyQuaternion(_bcQ).add(_bcP).applyMatrix4(M);
+          beads.cap(20 + k, ax, ay, az, _bcV.x, _bcV.y, _bcV.z, cp.r0, cp.r1);
+          const o = k * 6;
+          _bcW[o] = ax; _bcW[o + 1] = ay; _bcW[o + 2] = az;
+          _bcW[o + 3] = _bcV.x; _bcW[o + 4] = _bcV.y; _bcW[o + 5] = _bcV.z;
+        }
+        // AND THE HOLLOWS FILLED. Her trunk is three PAIRS of capsules side
+        // by side — pelvis, belly, chest — and between each pair is a groove
+        // down her front and her back, 5.4 cm deep at the top of the chest.
+        // A strand dead in the middle of the doorway, which is where she
+        // walks, fell into it and was carried across the room in it. So each
+        // pair gets a third capsule down the middle, the same radii: it is
+        // flush with the pair in front and behind and adds nothing at the
+        // sides. And the same for the nape, where the skull sits forward of
+        // a neck half its width and her hair fills the step between them —
+        // a strand over her head went into that hollow and hung there by it.
+        if (!_bcFill) {
+          _bcFill = [];
+          for (const nm of ['pelvis', 'spine02', 'chest']) {
+            const two = [];
+            caps.forEach((c, k) => { if (c.name === nm && k < 31) two.push(k); });
+            if (two.length === 2) _bcFill.push(two);
+          }
+          const hd = caps.findIndex((c) => c.name === 'head'), nk = caps.findIndex((c) => c.name === 'neck');
+          _bcFill.nape = hd >= 0 && hd < 31 && nk >= 0 && nk < 31 ? [hd, nk] : null;
+        }
+        _bcFill.forEach(([p, q], f) => {
+          const P = p * 6, Q = q * 6;
+          beads.cap(51 + f, (_bcW[P] + _bcW[Q]) * 0.5, (_bcW[P + 1] + _bcW[Q + 1]) * 0.5,
+            (_bcW[P + 2] + _bcW[Q + 2]) * 0.5, (_bcW[P + 3] + _bcW[Q + 3]) * 0.5,
+            (_bcW[P + 4] + _bcW[Q + 4]) * 0.5, (_bcW[P + 5] + _bcW[Q + 5]) * 0.5,
+            caps[p].r0, caps[p].r1);
+        });
+        if (_bcFill.nape) {
+          // From the middle of her skull to the root of her neck, as thick as
+          // the skull at the top and as her hair at the bottom.
+          const H = _bcFill.nape[0] * 6, Nk = _bcFill.nape[1] * 6;
+          beads.cap(55, _bcW[H], _bcW[H + 1], _bcW[H + 2], _bcW[Nk], _bcW[Nk + 1], _bcW[Nk + 2],
+            caps[_bcFill.nape[0]].r0 * 0.95, 0.075);
+        }
+      }
+      // The dog: a pug is a barrel 45 cm long on legs, and he goes through
+      // the door square on, so one capsule through the doorway at his chest.
+      if (dogOn && Math.abs(dog.at[0] - K.dc) < K.dj + 1.0
+        && Math.abs(dog.at[1] - beads.sHang) < 1.5) {
+        const p = dog.mesh.position, nx = beadSt.nx * 0.18, nz = beadSt.nz * 0.18;
+        beads.cap(60, p.x - nx, p.y + 0.26, p.z - nz, p.x + nx, p.y + 0.26, p.z + nz, 0.13, 0.13);
+      }
+    }
+    beads.step(pt, ps, d, dt, camY, with_);
+  }
+
   function stepKabina(pt, ps, dt, camY) {
     if (!kit || !special) return;
     const K = special;
-    // Before the near gate, and with its own: the curtain is the one thing in
-    // this room you can hear and see from the promenade, and it is still moving
-    // for a second or two after you have gone through and stopped being near.
-    if (beads) {
-      // There is a curtain in this doorway, so have the sound of one ready.
-      // Every frame, and it costs a Set lookup: `sampleLoad` remembers what it
-      // has been asked for, and asking before the audio context exists is a
-      // no-op it does not remember — which is what makes this safe to call from
-      // the first frame of the locale rather than from some event.
-      if (audio && audio.beadWarm) audio.beadWarm();
-      // Everything else in this resort that can go through that door. Both of
-      // them walk the same three marks at t = K.dc — `moveDog`'s legs and hers
-      // — so both cross the strands square on, and both used to do it in
-      // silence with the curtain hanging dead still behind them. Built fresh
-      // each frame because it is at most two entries and never survives one.
-      const with_ = [];
-      if (show && skinFig && skinFig.mesh.visible) {
-        with_.push(['her', show.t, show.s]);
-      }
-      if (dog && dog.mesh.visible) with_.push(['dog', dog.at[0], dog.at[1]]);
-      beads.step(pt, ps,
-        Math.hypot(pt - K.dc, ps - (K.face + 0.075)), dt, camY, with_);
-    }
+    // The curtain is stepped from `beadsTick`, after she has been posed this
+    // frame — see there. Only its sound is readied here.
+    //
+    // There is a curtain in this doorway, so have the sound of one ready.
+    // Every frame, and it costs a Set lookup: `sampleLoad` remembers what it
+    // has been asked for, and asking before the audio context exists is a
+    // no-op it does not remember — which is what makes this safe to call from
+    // the first frame of the locale rather than from some event.
+    if (beads && audio && audio.beadWarm) audio.beadWarm();
     // Kept outside the near gate below, because a radio you can hear from the
     // promenade is most of what makes anybody walk over and look through the
     // door. Only the *aiming* is confined to the room.
@@ -60884,6 +61640,8 @@ async function buildJadrija(scene) {
         }
       }
     }
+    // The bead curtain, now that she is where she is drawn — see `beadsTick`.
+    beadsTick(dt, pt, ps, who.y, at);
     // Outside the range gate above, because a ball that is already in the air
     // when you turn and run has to come down and light something whether or not
     // she is still close enough to be posed.
@@ -62059,7 +62817,10 @@ async function buildJadrija(scene) {
           wheel: 'cartwheel', flip: 'flip',
           // The barre. `toBar` is the walk there and shares the walk's clip;
           // `ballet` is the fifteen seconds themselves.
-          toBar: 'walk', ballet: 'ballet', offBar: 'walk' }[phase]
+          toBar: 'walk', ballet: 'ballet', offBar: 'walk',
+          // In and out through the kabina's door, on the walk — for a probe
+          // that wants her in the bead curtain without a whole visit first.
+          come: 'walk', leave: 'walk' }[phase]
           || 'idle', { fade: 0 });
         // And the latch, for every phase that is downstream of it. Set rather
         // than eased, for the reason `shorn` above exists.
@@ -63779,12 +64540,29 @@ async function buildJadrija(scene) {
       strands: beads.strands, gap: +beads.gap.toFixed(4),
       at: beads.at.map((v) => +v.toFixed(2)), swing: beads.swing(),
       tris: beads.mesh.geometry.index.count / 3,
+      // The solver's own read-out: `calm` is asleep on the old pendulum,
+      // `dev`/`vdev` how far off it the worst node is (m, m/s), `pen` the
+      // deepest any node has been left inside a body since `measure(true)`,
+      // `ms` the last step, `live` how many capsules reached it.
+      stats: () => beads.stats(),
+      measure: (on) => beads.measure(on),
+      node: (i, j) => beads.node(i, j).map((v) => +v.toFixed(4)),
+      worst: () => beads.worst(),
+      bench: (k, dt) => beads.bench(k, dt),
       // Walk somebody through it without a camera. A headless page renders at
       // about a frame a second and `camera.position` is written once a frame,
       // so twenty steps of a crossing driven from a test all arrive at the same
       // place and the curtain never moves. Nothing in the game calls this.
-      walk: (t, s, dt) => beads.step(t, s,
-        Math.hypot(t - beads.at[0], s - beads.at[1]), dt),
+      // A body now: yours, feet on the kabina's floor at (t, s).
+      walk: (t, s, dt) => {
+        const w = W(t, s, special.floor);
+        beads.you(w[0], w[1], w[2], dt);
+        return beads.step(t, s, Math.hypot(t - beads.at[0], s - beads.at[1]), dt);
+      },
+      // Or leave a body of yours standing at (t, s) — null to clear — for the
+      // world's own step to push the curtain with, `__fr.jad.step` included,
+      // which has no walker of its own.
+      you: (t, s) => { beadYou = t == null ? null : [t, s]; return beadYou; },
     },
     board: () => board && {
       at: board.at.map((v) => +v.toFixed(2)),
