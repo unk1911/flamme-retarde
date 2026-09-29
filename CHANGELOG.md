@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.549.3] — 2026-09-29
+
+### Beach bar MINI's terrace, decluttered; the push car, moulded
+
+Misha, standing on the terrace facing the counter: *"can u also further
+de-clutter in front of beach bar Mini: remove a few extra chairs, upgrade that
+lo-poly children's toy on the ground to be higher-poly, also dunno about that
+bed of green plants thingie, maybe just get rid of that to declutter the space
+a bit."*
+
+- **The planter on legs is gone:** the metre-and-a-half timber trough at hip
+  height with five agaves in it, standing square in front of the counter —
+  mesh, blocker and planting. The agaves' 85 `rng` draws (17 apiece) are
+  still made and thrown away, so nothing after them moves (rule 4). The two
+  terrace tubs at the seaward corners (`miniPlanter`) are a different object
+  and stay.
+- **Five empty chairs are gone** (of twelve, with four people in them): the
+  seaward chair of the west table, and the seaward and west chairs of the two
+  tables nobody was at, which leaves each of those one chair on the shop side
+  looking out to sea rather than a bare table. The full table keeps all
+  three. New `chairGone(shop, table, seat)` — `terraceSet` skips the chair and
+  its blocker. The sitters' pass still places the would-be sitter on a gone
+  chair and marks them `ghost`, and the cast thinning passes over a ghost:
+  skipping the seat outright (the first cut) changed nothing on `rng` and
+  still gave a different crowd on four terraces, because the cast is thinned
+  by a stride over each pose's list and one sitter fewer in that list moves
+  which hundred are kept. Now every one of the hundred is where they were
+  (placements diffed, identical).
+- **The toddler push car, moulded:** it was five boxes, six five-sided sticks
+  and four seven-sided drums (232 triangles). Now a radiused tub (`knRR`)
+  with a yellow bumper rail wrapped round its sill, a yellow bonnet with two
+  turned headlamps, a raked steering wheel on a column, a seat and seat back,
+  four tapered round pillars under a radiused roof closed underneath, a
+  one-piece bent-tube push handle with a red foam grip in two moulded
+  sockets, and four squared hollow tyres with a ribbed crown on domed yellow
+  hubs with cap nuts, on steel axles — `spinIn`/`tubeTS`/`knRR`, in the same
+  buffer. 10,260 triangles. Same place, heading, footprint, heights, colours
+  and collider.
+
+Blockers 792 → 786 (five chairs and the planter). People 100, the café
+sitters and their settle unchanged. `jadrija.tris` 898,332 → 901,380.
+
 ## [1.549.2] — 2026-09-29
 
 ### The tableware, turned: glasses, bottles, cups, cutlery
