@@ -8744,6 +8744,447 @@ async function buildJadrija(scene) {
   }
 
 
+  // ── THE TABLEWARE, TURNED ────────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026: *"for the utensils, little bottles, coffee cups, etc,
+  // on tables ... all that silverware and cups and forks and spoons and
+  // whatever is on tables, is also too low-poly, needs higher-poly"*. His
+  // frame was MINI's terrace from a step away: a nine-sided water bottle whose
+  // label was a lathe 0.5 mm INSIDE the bottle (so it only showed where the
+  // two nonagons happened to cross), a nine-sided tumbler whose "drink" was a
+  // second cylinder poking out through the glass low down, and a card that was
+  // two quads and two slivers. Every one of them one flat colour per facet.
+  //
+  // What these are now is what they are: turned with the profile's own normals
+  // (`spinTS`, 1.548.2), smooth round the axis and creased only where the
+  // object has an edge. A tumbler has a wall 1.9 mm thick, a 12 mm base with
+  // a rounded foot, a half-round rim, and the drink in it as its own surface,
+  // climbing the wall at the meniscus — and because this builder's glass is an
+  // opaque pale solid, the wall below the drink line takes the drink's colour
+  // half-way, which is what a full glass looks like from a metre and is the
+  // thing the old poke-through was accidentally doing. A cup has a foot ring, a
+  // belly, a rolled lip and a handle loop swept as a tube; its saucer has a
+  // well, and the spoon lies on the saucer tilted to its slope. Cutlery is
+  // steel a millimetre and a half thick: tines, a blade with a spine, a bowl
+  // that is a real dish.
+  //
+  // WHAT IT COSTS, measured (`b.count()` round each call, 1.548.6): a tumbler
+  // with its drink 404 triangles (ice 12 a cube, a floating slice 84, a wheel
+  // on the rim 140), the water bottle 656 and its cap 168, the ashtray 352 with
+  // its stub, the card 40, a coupe 476 and a scoop 182, an espresso 1,176
+  // (saucer 342, cup 590, spoon 244), the sugar 360, a place setting 496
+  // (napkin 96, fork 228, knife 172), the napkin holder 536. The twenty
+  // terrace tables come to 33,472 — 1,674 a table, from about 30 — and with
+  // the bars' cups, glasses and stemware the shore went from 732,835 to
+  // 790,704. All of it in the buffers the terraces and counters already draw:
+  // not one draw call more.
+  //
+  // RULE 4: none of it draws on `rng`. Every choice is `jit` off the table's
+  // own key, on salts 630 and up that nothing else here uses.
+
+  /** `a` toward `c` by `k`. */
+  function twMix(a, c, k) {
+    return [a[0] + (c[0] - a[0]) * k, a[1] + (c[1] - a[1]) * k, a[2] + (c[2] - a[2]) * k];
+  }
+
+  /**
+   * A small frame in the shore's own coordinates: origin `o` = `[t, s, y]`,
+   * `U` along the thing, `V` across it, and the third axis `U × V` turned to
+   * point up. Returns `(u, v, w) → [t, s, y]` — hand it to `W` for the world.
+   * Tableware is centimetres across, so the shore's bend is nothing inside it.
+   */
+  function twFrame(o, U, V) {
+    let N = [U[1] * V[2] - U[2] * V[1], U[2] * V[0] - U[0] * V[2], U[0] * V[1] - U[1] * V[0]];
+    const l = Math.hypot(N[0], N[1], N[2]) || 1;
+    N = N.map((x) => x / l * (N[2] < 0 ? -1 : 1));
+    return (u, v, w) => [o[0] + u * U[0] + v * V[0] + w * N[0],
+      o[1] + u * U[1] + v * V[1] + w * N[1], o[2] + u * U[2] + v * V[2] + w * N[2]];
+  }
+  /** Level, at `[t, s, y]`, looking along the shore heading `h`. */
+  function twLevel(t, s, y, h) {
+    const c = Math.cos(h), sn = Math.sin(h);
+    return twFrame([t, s, y], [c, sn, 0], [-sn, c, 0]);
+  }
+
+  /**
+   * A flat convex outline `pts` = `[[u, v], …]` extruded from `w0` to `w1` in
+   * frame `L`: a card's leaf. Flat-shaded on purpose — it is a sheet with
+   * square edges — and wound by `knTri` so each face's back is to the sun.
+   */
+  function twPlate(L, pts, w0, w1, col, topCol) {
+    const n = pts.length;
+    const lo = pts.map(([u, v]) => W(...L(u, v, w0)));
+    const hi = pts.map(([u, v]) => W(...L(u, v, w1)));
+    let cu = 0, cv = 0;
+    for (const [u, v] of pts) { cu += u / n; cv += v / n; }
+    const c0 = W(...L(cu, cv, w0)), c1 = W(...L(cu, cv, w1));
+    const up = [c1[0] - c0[0], c1[1] - c0[1], c1[2] - c0[2]];
+    for (let i = 1; i < n - 1; i++) {
+      knTri(hi[0], hi[i], hi[i + 1], up, topCol || col);
+      knTri(lo[0], lo[i], lo[i + 1], [-up[0], -up[1], -up[2]], col);
+    }
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const N = [(lo[i][0] + hi[j][0]) / 2 - (c0[0] + c1[0]) / 2,
+        (lo[i][1] + hi[j][1]) / 2 - (c0[1] + c1[1]) / 2,
+        (lo[i][2] + hi[j][2]) / 2 - (c0[2] + c1[2]) / 2];
+      knTri(lo[i], lo[j], hi[j], N, col);
+      knTri(lo[i], hi[j], hi[i], N, col);
+    }
+  }
+
+  /** `r` at height `h` along a profile of `[h, r]` rising in `h`. */
+  function twAt(prof, h) {
+    if (h <= prof[0][0]) return prof[0][1];
+    for (let k = 0; k < prof.length - 1; k++) {
+      if (h <= prof[k + 1][0]) {
+        const u = (h - prof[k][0]) / Math.max(1e-9, prof[k + 1][0] - prof[k][0]);
+        return prof[k][1] + (prof[k + 1][1] - prof[k][1]) * u;
+      }
+    }
+    return prof[prof.length - 1][1];
+  }
+
+  /**
+   * A tumbler standing at shore (t, s) on a surface at `y`.
+   *
+   * `o.lvl` is the drink's height above `y` (0 is an empty glass), `o.drink`
+   * its colour and `o.top` the colour of its surface if that is not the drink
+   * (a head of foam). The wall below the drink line is the glass taken half-way
+   * to the drink, and above it the glass — a hard line, which is right: the
+   * liquid's edge is the one crisp thing you see through a glass. `o.h`,
+   * `o.r0`, `o.r1` and `o.col` make it some other tumbler.
+   */
+  function twTumbler(t, s, y, o = {}) {
+    const G = o.col || [0.660, 0.700, 0.720];
+    const H = o.h || 0.112, R0 = o.r0 || 0.031, R1 = o.r1 || 0.033, SD = 16;
+    const BASE = 0.012 * H / 0.112, WALL = 0.0019, yr = H - WALL * 0.5;
+    const rO = (h) => R0 + (R1 - R0) * Math.max(0, h - BASE) / (yr - BASE);
+    const rI = (h) => rO(h) - WALL;
+    // The heavy base, its foot eased where it meets the table.
+    spinTS(t, s, [[y, 0], [y, R0 - 0.0025], [y + 0.0008, R0 - 0.0008],
+      [y + 0.0028, R0 - 0.0001], [y + BASE, rO(BASE)]], G, SD, 0.10);
+    // The rim, a half-round over the wall's own thickness.
+    const rim = [];
+    for (let k = 0; k <= 4; k++) {
+      const a = (k / 4) * Math.PI;
+      rim.push([y + yr + Math.sin(a) * WALL * 0.5,
+        rO(yr) - WALL * 0.5 + Math.cos(a) * WALL * 0.5]);
+    }
+    const lv = o.lvl || 0;
+    if (lv > 0) {
+      const L = y + lv, ri = rI(lv) - 0.0002;
+      spinTS(t, s, [[y + BASE, rO(BASE)], [L, rO(lv)]], twMix(G, o.drink, 0.55), SD, 0.10);
+      spinTS(t, s, [[L, rO(lv)], ...rim, [L - 0.002, rI(lv - 0.002)]], G, SD, 0.10);
+      // The surface, climbing the last 1.2 mm up the wall: the meniscus.
+      spinTS(t, s, [[L + 0.0012, ri], [L + 0.0003, ri - 0.0016], [L, ri - 0.005], [L, 0]],
+        o.top || shade(o.drink, 1.10), SD, 0.06);
+    } else {
+      spinTS(t, s, [[y + BASE, rO(BASE)], ...rim, [y + BASE + 0.004, rI(BASE + 0.004)],
+        [y + BASE + 0.0012, rI(BASE) - 0.0035], [y + BASE + 0.001, rI(BASE) - 0.012],
+        [y + BASE + 0.001, 0]], G, SD, 0.10);
+    }
+    return { r: rI, H };
+  }
+
+  /** An ice cube half out of a drink whose surface is at `L`. */
+  function twIce(t, s, L, a, col) {
+    const c = Math.cos(a), sn = Math.sin(a), h = 0.0085;
+    const P = (u, v, yy) => W(t + u * c - v * sn, s + u * sn + v * c, yy);
+    boxIn(P, -h, h, -h, h, L - 0.011, L + 0.0045, col, shade(col, 1.08));
+  }
+
+  /** A citrus wheel floating flat on a surface at `L`: rind, pith, flesh. */
+  function twFloatSlice(t, s, L, rind, flesh) {
+    spinTS(t, s, [[L - 0.0010, 0.0196], [L + 0.0022, 0.0200]], rind, 12, 0.06);
+    spinTS(t, s, [[L + 0.0022, 0.0200], [L + 0.0026, 0.0178]], [0.930, 0.910, 0.780], 12, 0.06);
+    spinTS(t, s, [[L + 0.0026, 0.0178], [L + 0.0029, 0.0080], [L + 0.0030, 0]], flesh, 12, 0.06);
+  }
+
+  /**
+   * A citrus wheel slit to the centre and pushed on to a rim: at shore
+   * (t, s, y) is the rim point, `a` the heading out from the glass's axis.
+   * The wheel stands in the plane of the glass's radius, so its axis runs
+   * round the rim.
+   */
+  function twRimSlice(t, s, y, a, rind, flesh) {
+    const ax = [-Math.sin(a), Math.cos(a), 0];
+    const prof = [[-0.0022, 0], [-0.0022, 0.0205], [-0.0014, 0.0228], [0, 0.0235],
+      [0.0014, 0.0228], [0.0022, 0.0205], [0.0022, 0]];
+    axLathe([t, s, y], ax, prof, (i) => (i >= 2 && i <= 4 ? rind : flesh), 14,
+      [0, 0, 1], { push: (i) => (i <= 1 ? 0.5 : i >= 5 ? -0.5 : 0) });
+  }
+
+  /**
+   * The table's bottle of still water, PET: a push-up base, the body with its
+   * blue label band and a white stripe printed on it, the shoulder, the neck
+   * with its support ring, and an open mouth — the cap is on the table beside
+   * it (`twCapDown`). 208 mm tall and 72 across, as it was.
+   */
+  function twWater(t, s, y) {
+    const BW = [0.760, 0.800, 0.820], BL = [0.180, 0.420, 0.640], SD = 16;
+    spinTS(t, s, [[y, 0], [y, 0.0300], [y + 0.0045, 0.0348], [y + 0.0120, 0.0360]], BW, SD, 0.10);
+    spinTS(t, s, [[y + 0.0120, 0.0360], [y + 0.0122, 0.0364], [y + 0.0748, 0.0364],
+      [y + 0.0750, 0.0360]], BL, SD, 0.08);
+    spinTS(t, s, [[y + 0.0400, 0.03655], [y + 0.0460, 0.03655]], [0.900, 0.915, 0.925], SD, 0.08);
+    spinTS(t, s, [[y + 0.0750, 0.0360], [y + 0.1360, 0.0360], [y + 0.1470, 0.0350],
+      [y + 0.1580, 0.0315], [y + 0.1670, 0.0258], [y + 0.1750, 0.0198], [y + 0.1810, 0.0160],
+      [y + 0.1845, 0.0150], [y + 0.1852, 0.0176], [y + 0.1872, 0.0176], [y + 0.1880, 0.0150],
+      [y + 0.2060, 0.0145], [y + 0.2075, 0.0138], [y + 0.2075, 0.0122], [y + 0.2000, 0.0120]],
+    BW, SD, 0.10);
+  }
+
+  /** A screw cap put down on its top, open side up. */
+  function twCapDown(t, s, y, col) {
+    spinTS(t, s, [[y, 0], [y, 0.0135], [y + 0.0008, 0.0145], [y + 0.0115, 0.0145],
+      [y + 0.0125, 0.0140], [y + 0.0125, 0.0128], [y + 0.0035, 0.0126], [y + 0.0030, 0]],
+    col, 14, 0.10);
+  }
+
+  /**
+   * A pressed-foil ashtray: a sloping skirt, a rim rolled over, and a flat
+   * floor — and on `butt` a stubbed-out filter lying in it.
+   */
+  function twAshtray(t, s, y, butt, a) {
+    const FOIL = [0.620, 0.612, 0.585];
+    spinTS(t, s, [[y, 0], [y, 0.0500], [y + 0.0015, 0.0525], [y + 0.0130, 0.0585],
+      [y + 0.0150, 0.0600], [y + 0.0166, 0.0603], [y + 0.0172, 0.0594], [y + 0.0165, 0.0582],
+      [y + 0.0055, 0.0495], [y + 0.0040, 0.0470], [y + 0.0040, 0]], FOIL, 18, 0.10);
+    if (!butt) return;
+    // 32 mm of it left: the paper, the filter, and the burnt end.
+    const c = Math.cos(a), sn = Math.sin(a);
+    const A = [t + c * 0.010, s + sn * 0.010, y + 0.0078];
+    const ax = [c * 0.97, sn * 0.97, 0.24];
+    // Each colour change is two rings a tenth of a millimetre apart, so the
+    // paper does not fade into the filter over the length of it.
+    axLathe(A, ax, [[0, 0], [0.0004, 0.0036], [0.0030, 0.0038], [0.0031, 0.0038],
+      [0.0200, 0.0038], [0.0201, 0.0039], [0.0320, 0.0039], [0.0324, 0.0035], [0.0324, 0]],
+    (i) => (i <= 2 ? [0.200, 0.190, 0.180] : i <= 4 ? [0.880, 0.870, 0.850] : [0.780, 0.520, 0.260]),
+    8, [0, 0, 1], { push: (i) => (i === 0 ? 0.5 : i === 8 ? -0.5 : 0) });
+  }
+
+  /**
+   * The folded tent card, from the table's frame `Ls(dt, ds, yy) → [t, s, y]`:
+   * two leaves of 0.8 mm board meeting in a ridge, each with the shop's
+   * coloured head band and three lines of print on its outer face.
+   */
+  function twCard(Ls, y, accent, hk) {
+    const CARD = [0.880, 0.865, 0.820], INK = [0.320, 0.315, 0.310];
+    const HW = 0.045, FOOT = 0.024, TOP = 0.085, TH = 0.0008;
+    const len = Math.hypot(FOOT, TOP);
+    for (const o of [-1, 1]) {
+      const ed = -o * FOOT / len, ey = TOP / len;
+      const nd = o * TOP / len, ny = FOOT / len;
+      const L = (u, v, w) => Ls(u, o * FOOT + ed * v + nd * w, y + ey * v + ny * w);
+      twPlate(L, [[-HW, 0], [HW, 0], [HW, len - 0.0004], [-HW, len - 0.0004]], 0, TH,
+        shade(CARD, 0.86), CARD);
+      const A0 = W(...L(0, 0, TH)), A1 = W(...L(0, 0, TH + 0.001));
+      const N = [A1[0] - A0[0], A1[1] - A0[1], A1[2] - A0[2]];
+      const q = (u0, u1, v0, v1, col) => {
+        const A = W(...L(u0, v0, TH + 0.0002)), B = W(...L(u1, v0, TH + 0.0002));
+        const C = W(...L(u1, v1, TH + 0.0002)), D = W(...L(u0, v1, TH + 0.0002));
+        knTri(A, B, C, N, col);
+        knTri(A, C, D, N, col);
+      };
+      q(-0.037, 0.037, len * 0.66, len * 0.83, accent);
+      for (let k = 0; k < 3; k++) {
+        const v = len * (0.50 - k * 0.12);
+        const wd = 0.034 + jit(hk + k * 3 + (o > 0 ? 11 : 0), 639) * 0.032;
+        q(-0.033, -0.033 + wd, v, v + 0.0032, INK);
+      }
+    }
+  }
+
+  /**
+   * A china saucer (scale `k`) on a surface at `y`: foot, underside, a rim
+   * rolled over, and a well for the cup. Returns the height of its top
+   * surface above `y` at radius `r`, for whatever is laid on it.
+   */
+  function twSaucer(t, s, y, k = 1, col = [0.800, 0.796, 0.782]) {
+    const p = (h, r) => [y + h * k, r * k];
+    spinTS(t, s, [p(0, 0.0330), p(0.0035, 0.0360), p(0.0105, 0.0575), p(0.0118, 0.0595),
+      p(0.0130, 0.0606), p(0.0137, 0.0603), p(0.0137, 0.0592), p(0.0128, 0.0575),
+      p(0.0082, 0.0405), p(0.0068, 0.0330), p(0.0068, 0)], col, 18, 0.10);
+    const TOP = [[0, 0.0068], [0.0330, 0.0068], [0.0405, 0.0082], [0.0575, 0.0128],
+      [0.0600, 0.0137]].map(([r, h]) => [r * k, h * k]);
+    return (r) => twAt(TOP, r);
+  }
+
+  /**
+   * A china cup (scale `k`, 1 is a 65 mm espresso cup) standing on `y`, its
+   * handle out along shore heading `hd`: foot ring, belly, a lip rolled over
+   * the wall, and the handle a loop swept as a tube. `o.lvl` fills it that
+   * far with coffee under a crema; `o.col` is the china.
+   */
+  function twCup(t, s, y, hd, k = 1, o = {}) {
+    const C = o.col || [0.800, 0.796, 0.782], SD = 16, WALL = 0.0022;
+    const OUT = [[0, 0], [0, 0.0165], [0.0007, 0.0192], [0.0030, 0.0212], [0.0100, 0.0258],
+      [0.0220, 0.0297], [0.0360, 0.0320], [0.0450, 0.0326]];
+    const p = (h, r) => [y + h * k, r * k];
+    const prof = OUT.map(([h, r]) => p(h, r));
+    for (let j = 1; j <= 4; j++) {
+      const a = (j / 4) * Math.PI;
+      prof.push(p(0.0450 + Math.sin(a) * WALL * 0.5, 0.0326 - WALL * 0.5 + Math.cos(a) * WALL * 0.5));
+    }
+    const rIn = (h) => twAt(OUT, h) - WALL;
+    const lv = o.lvl || 0;
+    if (lv > 0) {
+      prof.push(p(lv - 0.002, rIn(lv - 0.002)));
+      spinTS(t, s, prof, C, SD, 0.10);
+      const ri = rIn(lv) - 0.0002;
+      spinTS(t, s, [p(lv + 0.0007, ri), p(lv + 0.0001, ri - 0.0030)], [0.520, 0.360, 0.200], SD, 0.05);
+      spinTS(t, s, [p(lv + 0.0001, ri - 0.0030), p(lv, 0)], [0.400, 0.240, 0.110], SD, 0.05);
+    } else {
+      prof.push(p(0.0360, 0.0298), p(0.0200, 0.0255), p(0.0085, 0.0180), p(0.0060, 0.0080), p(0.0058, 0));
+      spinTS(t, s, prof, C, SD, 0.10);
+    }
+    // The handle: a D of 6 x 4.4 mm section, both ends buried in the wall.
+    const c = Math.cos(hd), sn = Math.sin(hd);
+    const H = [[0.0300, 0.0345], [0.0345, 0.0368], [0.0405, 0.0362], [0.0448, 0.0330],
+      [0.0462, 0.0282], [0.0445, 0.0228], [0.0400, 0.0185], [0.0340, 0.0160], [0.0255, 0.0142]];
+    tubeTS(H.map(([r, h]) => [t + c * r * k, s + sn * r * k, y + h * k]),
+      [0.0030 * k, 0.0022 * k], C, 8, [-sn, c, 0], 0.10);
+  }
+
+  /**
+   * An espresso served: `twSaucer`, `twCup` in its well with coffee `lvl`
+   * up it and the handle out along `hd`, and the spoon on the saucer beside
+   * the cup, parallel to the handle — along a chord 36 mm out, bowl first,
+   * tilted to the saucer's slope there, with the handle lifted to ride up it
+   * and over the rim. `col` is the china.
+   */
+  function twEspresso(t, s, y, hd, lvl, col = [0.800, 0.796, 0.782]) {
+    const top = twSaucer(t, s, y, 1, col);
+    twCup(t, s, y + 0.0066, hd, 1, { lvl, col });
+    const c2 = Math.cos(hd), s2 = Math.sin(hd), SL = 0.26;
+    const off = 0.036, u0 = -0.040;
+    const rOf = (u) => Math.hypot(u0 + u, off);
+    const yb = top(rOf(0.014)) + 0.0004;
+    const L = twFrame([t + c2 * u0 - s2 * off, s + s2 * u0 + c2 * off, y + yb],
+      [c2, s2, 0], [-s2 / Math.hypot(1, SL), c2 / Math.hypot(1, SL), SL / Math.hypot(1, SL)]);
+    twSpoon(L, 0.105, 0.028, 0.018, [0.720, 0.726, 0.732],
+      (u) => Math.max(0, (rOf(u) < 0.0605 ? top(rOf(u)) : 0.0140) - yb));
+  }
+
+  /**
+   * A spoon lying in frame `L`, bowl tip at u = 0 and handle out along +u to
+   * `len`; `bl` × `bw` is the bowl. The bowl is a real dish — a turned shell
+   * on an elliptical section, rim and all — and the handle a flat tube that
+   * rises off the bowl at the neck and lies down again. `lift(u)` raises the
+   * handle where it rests on something higher than the bowl does.
+   */
+  function twSpoon(L, len, bl, bw, col, lift = () => 0) {
+    const R = bl / 2, D = 0.0050 * bl / 0.028;
+    spinIn((x, y, w) => W(...L(R + x, y, w)), [[0.0002, 0], [0.0006, 0.35 * R],
+      [D * 0.42, 0.70 * R], [D * 0.78, 0.92 * R], [D, R], [D + 0.0005, 0.985 * R],
+      [D + 0.0002, 0.955 * R], [D * 0.76, 0.86 * R], [D * 0.48, 0.62 * R], [D * 0.34, 0]],
+    col, 10, [1, bw / bl], 0.18);
+    const U = [bl - 0.0015, bl + 0.004, bl + 0.014, bl + (len - bl) * 0.45,
+      len - 0.018, len - 0.006, len - 0.0015, len];
+    const HW = [0.0017, 0.0019, 0.0023, 0.0034, 0.0049, 0.0050, 0.0036, 0.0008];
+    const HH = [D * 0.95, D + 0.0003, D * 0.80, 0.0016, 0.0011, 0.0010, 0.0010, 0.0010];
+    const pts = U.map((u, i) => L(u, 0, HH[i] + lift(u)));
+    const a = L(0, 0, 0), b2 = L(0, 1, 0);
+    tubeTS(pts, (i) => [HW[i], 0.0008], col, 6, [b2[0] - a[0], b2[1] - a[1], b2[2] - a[2]], 0.18);
+  }
+
+  /**
+   * A table fork lying in frame `L`, tines' tips at u = 0: four tines curving
+   * up off the table, the palm, a raised neck, and a flat handle that widens
+   * to a rounded end at u = 0.19.
+   */
+  function twFork(L, col) {
+    const a = L(0, 0, 0), b2 = L(0, 1, 0);
+    const ref = [b2[0] - a[0], b2[1] - a[1], b2[2] - a[2]];
+    const U = [0.0338, 0.0400, 0.0500, 0.0600, 0.0700, 0.0850, 0.1100, 0.1400, 0.1650,
+      0.1800, 0.1870, 0.1900];
+    const HW = [0.0105, 0.0110, 0.0086, 0.0046, 0.0032, 0.0034, 0.0045, 0.0058, 0.0066,
+      0.0064, 0.0050, 0.0012];
+    const HH = [0.0019, 0.0017, 0.0016, 0.0022, 0.0034, 0.0038, 0.0030, 0.0021, 0.0015,
+      0.0012, 0.0011, 0.0011];
+    tubeTS(U.map((u, i) => L(u, 0, HH[i])), (i) => [HW[i], i === 0 ? 0.0004 : 0.0009],
+      col, 6, ref, 0.18);
+    for (const v of [-0.0081, -0.0027, 0.0027, 0.0081]) {
+      tubeTS([[0.0400, 0.0017], [0.0200, 0.0023], [0.0060, 0.0033], [0.0000, 0.0040]]
+        .map(([u, h]) => L(u, v, h)), (i) => [[0.0014, 0.0012, 0.0010, 0.0003][i], 0.0008],
+      col, 4, ref, 0.18);
+    }
+  }
+
+  /**
+   * A table knife lying in frame `L`, tip at u = 0: a blade with a straight
+   * spine along +v and the edge curving up to meet it at the tip, a bolster,
+   * and a round handle 0.10 long.
+   */
+  function twKnife(L, col) {
+    const a = L(0, 0, 0), b2 = L(0, 1, 0);
+    const ref = [b2[0] - a[0], b2[1] - a[1], b2[2] - a[2]];
+    const SP = 0.0045;
+    const BU = [0.0000, 0.0100, 0.0300, 0.0600, 0.0950, 0.1100];
+    const BW = [0.0006, 0.0050, 0.0080, 0.0088, 0.0090, 0.0060];
+    tubeTS(BU.map((u, i) => L(u, SP - BW[i], 0.0009)), (i) => [BW[i], 0.0007], col, 6, ref, 0.18);
+    const HU = [0.1080, 0.1180, 0.1250, 0.1500, 0.1900, 0.2080, 0.2140, 0.2155];
+    const HWd = [0.0035, 0.0040, 0.0048, 0.0058, 0.0066, 0.0062, 0.0045, 0.0010];
+    const HT = [0.0030, 0.0034, 0.0040, 0.0046, 0.0050, 0.0048, 0.0036, 0.0010];
+    tubeTS(HU.map((u, i) => L(u, 0, Math.max(HT[i], 0.0030) + 0.0003)), (i) => [HWd[i], HT[i]],
+      col, 8, ref, 0.18);
+  }
+
+  /** A sugar pourer: glass with the sugar showing white through it, and a steel cap with its flap. */
+  function twSugar(t, s, y, hd) {
+    const G = [0.660, 0.700, 0.720], SUG = twMix(G, [0.940, 0.930, 0.910], 0.70);
+    const ST = [0.700, 0.706, 0.712];
+    spinTS(t, s, [[y, 0], [y, 0.0240], [y + 0.0020, 0.0262], [y + 0.0080, 0.0270],
+      [y + 0.0520, 0.0270]], SUG, 14, 0.10);
+    spinTS(t, s, [[y + 0.0520, 0.0270], [y + 0.0780, 0.0270], [y + 0.0830, 0.0255],
+      [y + 0.0850, 0.0232]], G, 14, 0.10);
+    spinTS(t, s, [[y + 0.0835, 0.0240], [y + 0.0842, 0.0252], [y + 0.0940, 0.0252],
+      [y + 0.0990, 0.0225], [y + 0.1040, 0.0160], [y + 0.1065, 0.0080], [y + 0.1070, 0]],
+    ST, 14, 0.14);
+    const c = Math.cos(hd), sn = Math.sin(hd);
+    tubeTS([[t + c * 0.004, s + sn * 0.004, y + 0.1045], [t + c * 0.016, s + sn * 0.016, y + 0.1085],
+      [t + c * 0.026, s + sn * 0.026, y + 0.1110]], [0.0055, 0.0030], ST, 6, [-sn, c, 0], 0.14);
+  }
+
+  /** A folded paper napkin in frame `L`, `u0..u1` by `v0..v1`, with its top flap folded back. */
+  function twNapkin(L, u0, u1, v0, v1, col) {
+    const P = (u, v, yy) => W(...L(u, v, yy));
+    knRR(P, u0, u1, v0, v1, 0, 0.0016, 0.004, 0, shade(col, 0.94), col);
+    knRR(P, u0 + 0.002, u1 - 0.002, v0 + 0.002, v0 + (v1 - v0) * 0.88, 0.0014, 0.0030,
+      0.004, 0, shade(col, 0.96), col);
+  }
+
+  /** A steel napkin holder: base, two cheeks, and the paper stack between them. */
+  function twNapkinHolder(L) {
+    const P = (u, v, yy) => W(...L(u, v, yy));
+    const ST = [0.700, 0.706, 0.712];
+    knRR(P, -0.055, 0.055, -0.030, 0.030, 0, 0.004, 0.008, 0.0015, shade(ST, 0.92), ST);
+    for (const v of [-0.026, 0.022]) {
+      knRR(P, -0.050, 0.050, v, v + 0.004, 0.003, 0.070, 0.002, 0.0012, ST, ST);
+    }
+    knRR(P, -0.047, 0.047, -0.022, 0.022, 0.004, 0.080, 0.001, 0, [0.860, 0.855, 0.835],
+      [0.920, 0.915, 0.900]);
+  }
+
+  /**
+   * The ice-cream coupe: a foot, a stem, and a wide shallow bowl with a wall
+   * and a rim, turned. Its inside stops under the scoops, which fill it.
+   */
+  function twCoupe(t, s, y, G) {
+    spinTS(t, s, [[y, 0], [y, 0.0290], [y + 0.0015, 0.0300], [y + 0.0045, 0.0285],
+      [y + 0.0075, 0.0120], [y + 0.0100, 0.0075], [y + 0.0280, 0.0070], [y + 0.0320, 0.0095],
+      [y + 0.0360, 0.0175], [y + 0.0430, 0.0290], [y + 0.0520, 0.0380], [y + 0.0605, 0.0435],
+      [y + 0.0618, 0.0440], [y + 0.0625, 0.0432], [y + 0.0617, 0.0424], [y + 0.0520, 0.0362],
+      [y + 0.0450, 0.0285], [y + 0.0410, 0.0150], [y + 0.0400, 0]], G, 14, 0.10);
+  }
+
+  /** A scoop, its base at `y0` in the bowl: the rolled lip the scoop leaves, and the dome. */
+  function twScoop(t, s, y0, col) {
+    spinTS(t, s, [[y0 - 0.004, 0.0170], [y0, 0.0212], [y0 + 0.0040, 0.0226],
+      [y0 + 0.0100, 0.0220], [y0 + 0.0160, 0.0192], [y0 + 0.0210, 0.0138],
+      [y0 + 0.0238, 0.0068], [y0 + 0.0247, 0]], col, 14, 0.14, 0.3);
+  }
+
   /**
    * What is on a café table at four in the afternoon.
    *
@@ -8753,13 +9194,27 @@ async function buildJadrija(scene) {
    * the ice-cream errand is set here — and it is also, from a low pass, forty
    * white discs in a row.
    *
-   * Nothing here is invented and nothing here is worth modelling on its own:
-   * two glasses, a bottle of water with the cap left off it, a foil ashtray,
-   * and the little folded card every one of these places stands on its tables.
-   * Thirty triangles a table and four hundred over the whole boardwalk, which
-   * against 523 000 is nothing at all.
+   * Nothing here is invented: two glasses, a bottle of water with the cap
+   * left off it, a foil ashtray, and the little folded card every one of these
+   * places stands on its tables — and since 1.548.6, which turned all of it
+   * (see THE TABLEWARE, TURNED above), what each kind of place adds: an
+   * espresso on its saucer and a sugar pourer at the bars and cafés, and at
+   * Trampulin, the one of them that is a bistro, a napkin with a knife and
+   * fork on it and the holder the napkins came out of.
    *
    * A quarter of the tables are cleared, because a quarter of them are.
+   *
+   * WHERE THINGS GO. The old draws put two glasses anywhere in a 0.28 by
+   * 0.24 box, whatever else was on the table, and about one table in three
+   * had a glass standing IN the bottle or the card. Everything now claims a
+   * circle as it is put down — the fixed things first (card, bottle, cap,
+   * ashtray), then the coupes, then the glasses — and a glass whose drawn
+   * spot is taken goes to the first free one of ten hashed spots instead.
+   * What is new this pass (the coffee, the sugar, the place setting, the
+   * holder) goes only in the three GAPS between the chairs, and only where
+   * there is room: the gaps are also where the sitters' hands are not
+   * (1.539.9 lays a palm in front of each shoulder, on the chair's own line),
+   * so nothing added lands under a hand.
    */
   function tableTop(ct, cs, ty, ang, shop) {
     const key = ((ct * 7.3) | 0) * 13 + ((cs * 5.1) | 0);
@@ -8767,11 +9222,47 @@ async function buildJadrija(scene) {
     // Its own frame, turned with the set, so the card faces the same way the
     // chairs do rather than square to the shore.
     const a = ang + Math.PI * 0.5, c = Math.cos(a), sn = Math.sin(a);
-    const P = (dt, ds, yy) => W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
     const at2 = (dt, ds) => [ct + dt * c - ds * sn, cs + dt * sn + ds * c];
+    const Ls = (dt, ds, yy) => [...at2(dt, ds), yy];
     const GLASS = [0.660, 0.700, 0.720];
     const JUICE = [[0.760, 0.330, 0.090], [0.700, 0.120, 0.140],
       [0.820, 0.700, 0.240], [0.180, 0.230, 0.190]];
+    const STEEL = [0.720, 0.726, 0.732];
+
+    // What is on the table, as circles [dt, ds, r] in its frame.
+    const busy = [];
+    const room = (dt, ds, r) => Math.hypot(dt, ds) + r <= 0.285
+      && busy.every(([x, y, q]) => Math.hypot(dt - x, ds - y) >= r + q + 0.004);
+    // The gaps between the chairs, as angles in this frame: `seatRing` puts
+    // the chairs at `ang` + (−1.30, 0.79, 2.88), which here is that minus a
+    // right angle, and these are halfway between each pair.
+    const GAPS = [-1.825, 2.36, 0.265];
+    const inGap = (rad, pref) => {
+      for (const d of [0.20, 0.15, 0.24, 0.10]) {
+        for (let g = 0; g < 3; g++) {
+          const q = GAPS[(g + pref) % 3];
+          const x = Math.cos(q) * d, y = Math.sin(q) * d;
+          if (room(x, y, rad)) return [x, y, q];
+        }
+      }
+      return null;
+    };
+    const hasBottle = jit(key, 617) < 0.60, hasTray = jit(key, 618) < 0.45;
+    const hasCard = jit(key, 619) < 0.55;
+    if (hasCard) busy.push([-0.030, 0, 0.026], [0, 0, 0.026], [0.030, 0, 0.026]);
+    if (hasBottle) busy.push([0.17, 0.06, 0.037], [0.24, -0.02, 0.015]);
+    if (hasTray) busy.push([-0.18, 0.13, 0.061]);
+    // Put down at (dt, ds) if that is clear, else at the first clear hashed
+    // spot; null if the table has no room left for it.
+    const place = (dt, ds, r, hk) => {
+      if (room(dt, ds, r)) { busy.push([dt, ds, r]); return [dt, ds]; }
+      for (let m = 0; m < 10; m++) {
+        const q = jit(hk + m * 3, 632) * TAU, d = 0.06 + jit(hk + m * 3, 633) * 0.18;
+        const x = Math.cos(q) * d, y = Math.sin(q) * d;
+        if (room(x, y, r)) { busy.push([x, y, r]); return [x, y]; }
+      }
+      return null;
+    };
 
     // ── and at the slasticarnica, what people are actually eating ──────────
     //
@@ -8790,106 +9281,163 @@ async function buildJadrija(scene) {
       const FLAV = GELATO.back.concat(GELATO.front);
       const cups = 1 + ((jit(key, 621) * 2) | 0);
       for (let i = 0; i < cups; i++) {
-        const dt = -0.13 + jit(key + i * 9, 622) * 0.26;
-        const ds = -0.11 + jit(key + i * 9, 623) * 0.22;
+        const spot = place(-0.13 + jit(key + i * 9, 622) * 0.26,
+          -0.11 + jit(key + i * 9, 623) * 0.22, 0.045, key + i * 9 + 1);
+        if (!spot) continue;
+        const [dt, ds] = spot;
         const [ut, us] = at2(dt, ds);
         // The bowl: a foot, a short stem and a wide shallow cup, which is what
         // a coppa is and is not the tall sundae glass of the English seaside.
-        lathe(W, ut, us, [
-          [ty + 0.000, 0.000], [ty + 0.000, 0.030], [ty + 0.006, 0.028],
-          [ty + 0.008, 0.008], [ty + 0.030, 0.008], [ty + 0.034, 0.020],
-          [ty + 0.050, 0.038], [ty + 0.062, 0.044],
-          // and back down the inside, or a bowl is a lump. See `kit.fills`.
-          [ty + 0.060, 0.041], [ty + 0.036, 0.019], [ty + 0.032, 0.010],
-        ], GLASS, 10);
+        twCoupe(ut, us, ty, GLASS);
         // Two scoops, sitting proud of the rim and slightly apart, which is
         // how they land and not how they are drawn on a menu.
         for (let k = 0; k < 2; k++) {
           const f = FLAV[(jit(key + i * 9 + k * 3, 624) * FLAV.length) | 0];
           const [st, ss] = at2(dt + (k ? 0.016 : -0.016), ds + (k ? -0.011 : 0.011));
-          // `dome` takes the HEIGHT before the radius, which is worth
-          // saying out loud: swapped, a scoop comes out 60 mm across
-          // in an 88 mm bowl and hangs over both sides of it.
-          dome(W, st, ss, ty + 0.048, 0.024, 0.021, f.col, 9);
+          // 24 mm high and 22 across, as the two `dome`s were — in an 88 mm
+          // bowl, which is why the height is not the radius.
+          twScoop(st, ss, ty + 0.048, f.col);
         }
         // The spoon: the long flat-bowled one every one of these places has,
-        // standing out of the scoops at whatever angle it was pushed in.
+        // standing out of the scoops at whatever angle it was pushed in. A
+        // flat handle that widens to a paddle at the top and closes there.
         {
           const sa = jit(key + i * 9, 625) * Math.PI * 2;
           const lean = 0.052;
-          const [p0t, p0s] = at2(dt + Math.cos(sa) * 0.004,
-            ds + Math.sin(sa) * 0.004);
-          const [p1t, p1s] = at2(dt + Math.cos(sa) * lean,
-            ds + Math.sin(sa) * lean);
-          const A = W(p0t, p0s, ty + 0.044), B = W(p1t, p1s, ty + 0.128);
-          const w = 0.006;
-          b.quad([A[0] - w, A[1], A[2]], [A[0] + w, A[1], A[2]],
-            [B[0] + w, B[1], B[2]], [B[0] - w, B[1], B[2]],
-            [0.72, 0.73, 0.74]);
+          const [p0t, p0s] = at2(dt + Math.cos(sa) * 0.004, ds + Math.sin(sa) * 0.004);
+          const [p1t, p1s] = at2(dt + Math.cos(sa) * lean, ds + Math.sin(sa) * lean);
+          const pts = [0, 0.3, 0.6, 0.85, 0.96, 1].map((u) =>
+            [p0t + (p1t - p0t) * u, p0s + (p1s - p0s) * u, ty + 0.044 + 0.084 * u]);
+          const across = [-(p1s - p0s), p1t - p0t, 0];
+          tubeTS(pts, (k) => [[0.0022, 0.0024, 0.0028, 0.0040, 0.0036, 0.0006][k], 0.0008],
+            [0.72, 0.73, 0.74], 6, across, 0.18);
         }
-        // And a wafer in one bowl in two, the flat rolled kind.
+        // And a wafer in one bowl in two, the flat rolled kind, pushed in
+        // leaning outward: a rolled tube with its spiral end open.
         if (jit(key + i * 9, 626) < 0.5) {
           const wa = jit(key + i * 9, 627) * Math.PI * 2;
-          const [w0t, w0s] = at2(dt + Math.cos(wa) * 0.010,
-            ds + Math.sin(wa) * 0.010);
-          const [w1t, w1s] = at2(dt + Math.cos(wa) * 0.055,
-            ds + Math.sin(wa) * 0.055);
-          post(W, (w0t + w1t) * 0.5, (w0s + w1s) * 0.5,
-            ty + 0.050, ty + 0.112, 0.006, [0.780, 0.660, 0.430], 5);
+          const [w0t, w0s] = at2(dt + Math.cos(wa) * 0.012, ds + Math.sin(wa) * 0.012);
+          const [w1t, w1s] = at2(dt + Math.cos(wa) * 0.030, ds + Math.sin(wa) * 0.030);
+          axLathe([w0t, w0s, ty + 0.050], [w1t - w0t, w1s - w0s, 0.062],
+            [[0, 0.0060], [0.0630, 0.0060], [0.0636, 0.0052], [0.0636, 0.0040], [0.0610, 0.0038]],
+            (k) => (k >= 2 ? [0.700, 0.560, 0.330] : [0.780, 0.660, 0.430]), 10, [0, 0, 1],
+            { push: (k) => (k >= 2 ? -0.5 : 0) });
         }
       }
     }
     // One or two glasses, wherever the hands that put them down left them.
     const n = 1 + ((jit(key, 611) * 2) | 0);
     for (let i = 0; i < n; i++) {
-      const dt = -0.14 + jit(key + i * 5, 612) * 0.28;
-      const ds = -0.12 + jit(key + i * 5, 613) * 0.24;
-      const [gt, gs] = at2(dt, ds);
-      lathe(W, gt, gs, [[ty, 0.000], [ty, 0.031], [ty + 0.012, 0.031],
-        [ty + 0.014, 0.028], [ty + 0.105, 0.033], [ty + 0.112, 0.033]],
-        GLASS, 9);
-      // And what is left in it, which is the only part with any colour.
+      const spot = place(-0.14 + jit(key + i * 5, 612) * 0.28,
+        -0.12 + jit(key + i * 5, 613) * 0.24, 0.034, key + i * 5 + 2);
+      if (!spot) continue;
+      const [gt, gs] = at2(spot[0], spot[1]);
+      // And what is left in it, which is the only part with any colour. What
+      // it is decides what is in it with it: the orange one is a spritz with
+      // a wheel of orange on the rim, the yellow one is beer with its head,
+      // the dark one cola with a slice of lemon, and the red one is on ice.
       if (jit(key + i * 5, 614) < 0.72) {
-        const j = JUICE[(jit(key + i, 615) * JUICE.length) | 0];
-        lathe(W, gt, gs, [[ty + 0.016, 0.000], [ty + 0.016, 0.030],
-          [ty + 0.030 + jit(key + i, 616) * 0.050, 0.031]], j, 9);
+        const ji = (jit(key + i, 615) * JUICE.length) | 0, j = JUICE[ji];
+        const lv = 0.030 + jit(key + i, 616) * 0.050;
+        const hk = key * 7 + i * 13;
+        const G = twTumbler(gt, gs, ty, { lvl: lv, drink: j,
+          top: ji === 2 ? [0.920, 0.890, 0.800] : null });
+        const L = ty + lv, rr = G.r(lv);
+        if (ji === 0 || ji === 1 || ji === 3) {
+          const ICE = twMix([0.830, 0.860, 0.870], j, 0.25);
+          for (let k = 0; k < 2; k++) {
+            const q = jit(hk + k, 634) * TAU, d = rr - 0.013;
+            twIce(gt + Math.cos(q + k * 2.6) * d, gs + Math.sin(q + k * 2.6) * d, L,
+              jit(hk + k, 635) * TAU, ICE);
+          }
+        }
+        if (ji === 0) {
+          const q = jit(hk, 636) * TAU;
+          twRimSlice(gt + Math.cos(q) * (rr + 0.001), gs + Math.sin(q) * (rr + 0.001),
+            ty + 0.106, q, [0.930, 0.480, 0.070], [0.960, 0.640, 0.230]);
+        } else if (ji === 3) {
+          const q = jit(hk, 637) * TAU;
+          twFloatSlice(gt + Math.cos(q) * 0.006, gs + Math.sin(q) * 0.006, L,
+            [0.900, 0.800, 0.180], [0.930, 0.860, 0.380]);
+        }
+      } else {
+        twTumbler(gt, gs, ty);
       }
     }
     // A bottle of water, on three tables in five, with its cap beside it.
-    if (jit(key, 617) < 0.60) {
+    if (hasBottle) {
       const [bt, bs] = at2(0.17, 0.06);
-      lathe(W, bt, bs, [[ty, 0.000], [ty, 0.036], [ty + 0.140, 0.036],
-        [ty + 0.175, 0.017], [ty + 0.205, 0.015], [ty + 0.208, 0.015]],
-        [0.760, 0.800, 0.820], 9);
-      lathe(W, bt, bs, [[ty + 0.010, 0.0355], [ty + 0.075, 0.0355]],
-        [0.180, 0.420, 0.640], 9);
+      twWater(bt, bs, ty);
       const [kt, ks] = at2(0.24, -0.02);
-      lathe(W, kt, ks, [[ty, 0.000], [ty, 0.014], [ty + 0.013, 0.014]],
-        [0.180, 0.420, 0.640], 7);
+      twCapDown(kt, ks, ty, [0.180, 0.420, 0.640]);
     }
     // A foil ashtray, on the half of them that is out of the wind.
-    if (jit(key, 618) < 0.45) {
+    if (hasTray) {
       const [tt, ts] = at2(-0.18, 0.13);
-      lathe(W, tt, ts, [[ty, 0.000], [ty, 0.052], [ty + 0.016, 0.060],
-        [ty + 0.017, 0.056], [ty + 0.004, 0.048], [ty + 0.004, 0.000]],
-        [0.620, 0.612, 0.585], 8);
+      twAshtray(tt, ts, ty, jit(key, 638) < 0.5, a + jit(key, 631) * TAU);
     }
     // And the folded card, which is the one thing on the table that is the
     // shop's rather than the customer's. Two leaves at a shallow angle, so it
-    // stands up from either side.
-    if (jit(key, 619) < 0.55) {
-      const CARD = [0.880, 0.865, 0.820];
-      for (const o of [-1, 1]) {
-        boxIn(P, -0.045, 0.045, o * 0.006 - 0.001, o * 0.006 + 0.001,
-          ty, ty + 0.001, CARD);
+    // stands up from either side, printed in the shop's colour.
+    if (hasCard) {
+      const ACCENT = { mini: [0.120, 0.120, 0.130], h2o: [0.100, 0.330, 0.580],
+        slast: [0.820, 0.420, 0.560], tramp2: [0.560, 0.130, 0.100] };
+      twCard(Ls, ty, ACCENT[shop] || [0.180, 0.300, 0.200], key);
+    }
+
+    // ── what each kind of place adds ────────────────────────────────────────
+    const cafe = shop !== 'slast';
+    // An espresso on its saucer, the spoon on the saucer beside the cup and
+    // parallel to the handle, on half the bars' tables.
+    if (cafe && jit(key, 640) < 0.5) {
+      const g = inGap(0.062, (jit(key, 641) * 3) | 0);
+      if (g) {
+        busy.push([g[0], g[1], 0.062]);
+        const [xt, xs] = at2(g[0], g[1]);
+        // The handle to the right of whoever the gap faces, give or take.
+        const hd = a + g[2] + Math.PI * 0.5 + (jit(key, 642) - 0.5) * 0.8;
+        twEspresso(xt, xs, ty, hd, 0.022 + jit(key, 643) * 0.012);
       }
-      for (const o of [-1, 1]) {
-        const A = P(-0.045, o * 0.024, ty);
-        const B = P(0.045, o * 0.024, ty);
-        const C = P(0.045, 0.0, ty + 0.085);
-        const D = P(-0.045, 0.0, ty + 0.085);
-        b.quad(...(o > 0 ? [A, B, C, D] : [D, C, B, A]),
-          o > 0 ? CARD : shade(CARD, 0.86));
+    }
+    // A sugar pourer, on a third of them.
+    if (cafe && jit(key, 644) < 0.35) {
+      const g = inGap(0.030, (jit(key, 645) * 3) | 0);
+      if (g) {
+        busy.push([g[0], g[1], 0.030]);
+        const [xt, xs] = at2(g[0], g[1]);
+        twSugar(xt, xs, ty, a + g[2] + Math.PI + (jit(key, 646) - 0.5) * 1.2);
+      }
+    }
+    // At Trampulin, which is the Paris bistro under a reed roof and serves
+    // food: a paper napkin with a knife and fork on it, laid along the gap's
+    // arc rather than across it, and the steel holder the napkins came out of.
+    // (The PIZZERIA would be the other place for these, and it has no
+    // terrace: `shopKit` seats only the frontages with an awning.)
+    if (shop === 'tramp2' && jit(key, 647) < 0.60) {
+      for (let g0 = 0; g0 < 3; g0++) {
+        const q = GAPS[(g0 + ((jit(key, 648) * 3) | 0)) % 3], d = 0.20;
+        const tq = [-Math.sin(q), Math.cos(q)];
+        const cx = Math.cos(q) * d, cy = Math.sin(q) * d;
+        const fits = [-0.065, 0, 0.065].every((k) => room(cx + tq[0] * k, cy + tq[1] * k, 0.058));
+        if (!fits) continue;
+        for (const k of [-0.065, 0, 0.065]) busy.push([cx + tq[0] * k, cy + tq[1] * k, 0.058]);
+        const [nt, ns] = at2(cx, cy);
+        const L = twLevel(nt, ns, ty, a + q + Math.PI * 0.5);
+        // Red paper, Trampulin's, and not white: steel on a white napkin
+        // from a metre and a half is one pale rectangle, and the whole point
+        // of the setting is the knife and fork on it.
+        twNapkin(L, -0.095, 0.095, -0.055, 0.055, [0.600, 0.150, 0.120]);
+        const top = 0.0030;
+        twFork(twLevel(...L(-0.092, -0.022, top), a + q + Math.PI * 0.5), STEEL);
+        twKnife(twLevel(...L(-0.098, 0.020, top), a + q + Math.PI * 0.5), STEEL);
+        break;
+      }
+    }
+    if (shop === 'tramp2' && jit(key, 649) < 0.45) {
+      const spot = place(0.02, -0.10, 0.058, key + 5);
+      if (spot) {
+        const [ht, hs] = at2(spot[0], spot[1]);
+        twNapkinHolder(twLevel(ht, hs, ty, a));
       }
     }
   }
@@ -10795,18 +11343,43 @@ async function buildJadrija(scene) {
     // band round it, standing on the pan deck.
     for (let i = 0; i < 2; i++) {
       const ct = ca + 0.13 + i * 0.19, cs = S.s0 - 1.16 + i * 0.16;
-      post(W, ct, cs, y0 + 1.06, y0 + 1.38, 0.043, [0.640, 0.545, 0.400], 8);
+      // Turned (1.548.6): the bottom cup's taper from its base, then the rim
+      // of every cup nested in it as a bead every 24 mm, and the top one open
+      // with its lip rolled and its inside going down. The printed bands are
+      // rings now and not square boxes round a round stack.
+      const KRAFT = [0.640, 0.545, 0.400], yb = y0 + 1.06;
+      const prof = [[yb, 0], [yb, 0.0300], [yb + 0.0015, 0.0310], [yb + 0.0900, 0.0428]];
+      for (let m = 0; m < 10; m++) {
+        const h = yb + 0.0900 + m * 0.024;
+        prof.push([h + 0.0020, 0.0445], [h + 0.0045, 0.0430]);
+      }
+      const yt = y0 + 1.38;
+      prof.push([yt - 0.0030, 0.0430], [yt - 0.0008, 0.0446], [yt, 0.0438], [yt - 0.0010, 0.0424],
+        [yt - 0.0400, 0.0370], [yt - 0.0420, 0]);
+      spinTS(ct, cs, prof, KRAFT, 16, 0.10);
       for (let k = 0; k < 3; k++) {
-        boxTS(ct - 0.045, ct + 0.045, cs - 0.045, cs + 0.045,
-          y0 + 1.13 + k * 0.10, y0 + 1.15 + k * 0.10, [0.300, 0.420, 0.310]);
+        const y1 = y0 + 1.13 + k * 0.10;
+        spinTS(ct, cs, [[y1, 0.0448], [y1 + 0.020, 0.0448]], [0.300, 0.420, 0.310], 16, 0.08);
       }
     }
     // And the glass coupes at the right-hand end, stacked upside down. Bottom
     // of two frames, under the pans, and the only clear thing in the case.
     for (let i = 0; i < 2; i++) {
       const ct = cc - 0.14 - i * 0.20, cs = S.s0 - 1.18 + i * 0.18;
-      post(W, ct, cs, y0 + 1.06, y0 + 1.24, 0.072, [0.660, 0.700, 0.700], 8);
-      post(W, ct, cs, y0 + 1.24, y0 + 1.28, 0.086, [0.700, 0.740, 0.740], 8);
+      // Turned (1.548.6): the bowls nested rim over rim, a bead for each, and
+      // the top one's foot uppermost — its stem, and the wide disc of the foot
+      // with an edge on it, which is the 0.086 the second post was.
+      const yb = y0 + 1.06, CG = [0.660, 0.700, 0.700];
+      const prof = [[yb + 0.002, 0.0700], [yb, 0.0718], [yb + 0.003, 0.0724]];
+      for (let m = 1; m <= 5; m++) {
+        const h = yb + m * 0.030;
+        prof.push([h - 0.004, 0.0712 - m * 0.0008], [h - 0.001, 0.0722 - m * 0.0008],
+          [h + 0.002, 0.0716 - m * 0.0008]);
+      }
+      prof.push([yb + 0.1720, 0.0640], [yb + 0.1780, 0.0400], [yb + 0.1810, 0.0140],
+        [yb + 0.1840, 0.0100], [yb + 0.2080, 0.0095], [yb + 0.2120, 0.0300],
+        [yb + 0.2150, 0.0830], [yb + 0.2175, 0.0860], [yb + 0.2200, 0.0820], [yb + 0.2205, 0]);
+      spinTS(ct, cs, prof, CG, 20, 0.10);
     }
     // There is wrapped stock at the back of the case in one frame — pale bags
     // with something dark in them, behind and above the back row — and it is
@@ -11395,26 +11968,28 @@ async function buildJadrija(scene) {
         // shelf's 16 mm glass rather than on top of it — rule 5, on the one
         // adjacency in this run where two faces are parallel.
         if (si === 0 && ct < COFF[1] + 0.45) {
+          // Turned since 1.548.6 (see THE TABLEWARE, TURNED): a saucer with
+          // its well, 0.8 of the terrace's, and the cup in it with a rolled
+          // lip and its handle — out to the room, give or take, which is how
+          // they get put back. 0.5 mm into the shelf's glass, not 3: the
+          // saucer's foot is a ring, and a ring has no face to fight with it.
           const CHINA = [0.775, 0.768, 0.750];
-          lathe(W, ct, cs, [
-            [ys + 0.013, 0.047],        // the saucer, buried in the shelf
-            [ys + 0.020, 0.049],
-            [ys + 0.024, 0.030],
-            [ys + 0.026, 0.023],        // and the cup standing in its well
-            [ys + 0.034, 0.026],
-            [ys + 0.058, 0.030],
-            [ys + 0.062, 0.028],
-          ], CHINA, 8);
+          const room = Math.atan2(Math.sign(sF - sB) || 1, 0);
+          twSaucer(ct, cs, ys + 0.0155, 0.8, CHINA);
+          twCup(ct, cs, ys + 0.0155 + 0.0068 * 0.8 - 0.0002,
+            room + (jit(i + si * 31, 650) - 0.5) * 1.4, 0.9, { col: CHINA });
           continue;
         }
-        lathe(W, ct, cs, [
-          [ys + 0.017, 0.037],          // the rim, standing on the glass
-          [ys + 0.052, 0.031],
-          [ys + 0.068, 0.009],          // where the bowl closes on to the stem
-          [ys + 0.112, 0.008],          // the stem
-          [ys + 0.119, 0.027],          // and the foot, uppermost
-          [ys + 0.124, 0.024],
-        ], SGLASS, 8);
+        // The stemware, turned: the rim a bead on the glass, the bowl's
+        // shoulder, the stem, and the foot with its edge — uppermost.
+        spinTS(ct, cs, [
+          [ys + 0.0160, 0.0352], [ys + 0.0158, 0.0362], [ys + 0.0166, 0.0370],
+          [ys + 0.0220, 0.0366], [ys + 0.0350, 0.0346], [ys + 0.0470, 0.0322],
+          [ys + 0.0560, 0.0284], [ys + 0.0630, 0.0195], [ys + 0.0670, 0.0110],
+          [ys + 0.0710, 0.0082], [ys + 0.1100, 0.0074], [ys + 0.1140, 0.0102],
+          [ys + 0.1170, 0.0200], [ys + 0.1195, 0.0266], [ys + 0.1215, 0.0272],
+          [ys + 0.1235, 0.0256], [ys + 0.1240, 0],
+        ], SGLASS, 12, 0.10);
       }
     });
     // The boxed stock along the middle shelf, which was five painted
@@ -11545,12 +12120,10 @@ async function buildJadrija(scene) {
         yc + 0.38, yc + 0.415, STEEL, BRIGHT);
       for (let i = 0; i < 4; i++) {
         const ct = mt0 + 0.10 + i * 0.115;
-        lathe(W, ct, S.s0 - 0.215, [
-          [yc + 0.405, 0.024],        // buried 0.01 in the warmer's plate
-          [yc + 0.428, 0.027],
-          [yc + 0.462, 0.031],
-          [yc + 0.470, 0.029],
-        ], CHINA, 8);
+        // Turned (1.548.6): the terrace's cup at 1.05, empty, handles out
+        // over the front of the machine at whatever angle they went down.
+        twCup(ct, S.s0 - 0.215, yc + 0.4148, -Math.PI * 0.5 + (jit(i, 651) - 0.5) * 1.6,
+          1.05, { col: CHINA });
       }
       // The two groups, hanging under the body's front overhang, each with a
       // portafilter locked into it. The handle is the thing that says espresso
@@ -16031,24 +16604,17 @@ async function buildJadrija(scene) {
         // from above as well as from the side — and in `knPALE`, which is
         // what a clean glass on a teal top photographs as.
         for (const gt of [S.t0 + 3.78, S.t0 + 3.96, S.t0 + 5.66]) {
-          knLathe(W, gt, knCS - 0.05, [[knCY + 0.001, 0], [knCY + 0.001, 0.029],
-            [knCY + 0.016, 0.031], [knCY + 0.128, 0.034], [knCY + 0.128, 0.0315],
-            [knCY + 0.022, 0.027], [knCY + 0.020, 0]], knPALE, 18);
+          // `twTumbler` since 1.548.6, the same glass as the terraces' drawn
+          // 128 mm tall: `knLathe` faced the inside wall outward.
+          twTumbler(gt, knCS - 0.05, knCY + 0.001, { col: knPALE, h: 0.127, r0: 0.031, r1: 0.034 });
         }
         // Two espressos: saucer, cup, and the handle, which is what makes it a
-        // cup rather than a white cylinder.
+        // cup rather than a white cylinder — and since 1.548.6 the terraces'
+        // `twEspresso`, coffee, crema and the spoon on the saucer, handles out
+        // to the +t side where these two always had them.
         for (const ct2 of [S.t0 + 4.50, S.t0 + 4.76]) {
-          const cs3 = knCS - 0.02;
-          knLathe(W, ct2, cs3, [[knCY + 0.001, 0], [knCY + 0.001, 0.036],
-            [knCY + 0.006, 0.050], [knCY + 0.011, 0.060], [knCY + 0.013, 0.058],
-            [knCY + 0.009, 0.034], [knCY + 0.010, 0]], knWH, 20);
-          knLathe(W, ct2, cs3, [[knCY + 0.009, 0], [knCY + 0.009, 0.020],
-            [knCY + 0.020, 0.030], [knCY + 0.056, 0.034], [knCY + 0.062, 0.035],
-            [knCY + 0.062, 0.031], [knCY + 0.030, 0.026], [knCY + 0.028, 0]],
-          knWH, 18);
-          tubeTS([[ct2 + 0.032, cs3, knCY + 0.050], [ct2 + 0.052, cs3, knCY + 0.048],
-            [ct2 + 0.055, cs3, knCY + 0.033], [ct2 + 0.031, cs3, knCY + 0.026]],
-          0.0045, knWH, 6, [0, 1, 0], 0.06);
+          twEspresso(ct2, knCS - 0.02, knCY + 0.001, 0.12 * (ct2 > S.t0 + 4.6 ? -1 : 1),
+            0.026, knWH);
         }
         // The machine, which in 175856 is the one dark solid on the counter —
         // with its corners radiused, a drip tray and a group head, because a
@@ -16335,9 +16901,8 @@ async function buildJadrija(scene) {
         knLathe(W, knTT + 0.09, knTS - 0.05, [[knGy + 0.734, 0.060],
           [knGy + 0.748, 0.066], [knGy + 0.754, 0.064], [knGy + 0.752, 0.050],
           [knGy + 0.744, 0.046], [knGy + 0.744, 0]], [0.470, 0.462, 0.446], 18);
-        knLathe(W, knTT - 0.10, knTS + 0.07, [[knGy + 0.735, 0], [knGy + 0.735, 0.029],
-          [knGy + 0.750, 0.031], [knGy + 0.858, 0.034], [knGy + 0.858, 0.0315],
-          [knGy + 0.756, 0.027], [knGy + 0.754, 0]], [0.735, 0.730, 0.712], 18);
+        twTumbler(knTT - 0.10, knTS + 0.07, knGy + 0.735,
+          { col: [0.735, 0.730, 0.712], h: 0.123, r0: 0.031, r1: 0.034 });
         furniture.push({ t: knTT, s: knTS, a: 0.36, c: 0.36, h: 0.74, y: knGy });
       }
       // And a surfboard stood against the end post. `slat` rakes a section in
@@ -16549,22 +17114,34 @@ async function buildJadrija(scene) {
         if (k === 0) {
           // The bowls, three of them nested and each a little narrower than
           // the one under it, which is what a stack of bowls is.
+          // Turned (1.548.6): each a real bowl — foot ring, the curve out to a
+          // rolled rim, and its inside, which the top one shows.
           for (let j = 0; j < 3; j++) {
-            post(W, mnWT, mnWS, y0 + 1.53 + j * 0.048,
-              y0 + 1.575 + j * 0.048, 0.092 - j * 0.007,
-              j % 2 ? shade(MNWARE, 0.92) : MNWARE, 9);
+            const yb = y0 + 1.53 + j * 0.048, r = 0.092 - j * 0.007;
+            spinTS(mnWT, mnWS, [[yb, 0], [yb, 0.50 * r], [yb + 0.004, 0.53 * r],
+              [yb + 0.007, 0.58 * r], [yb + 0.016, 0.80 * r], [yb + 0.030, 0.94 * r],
+              [yb + 0.044, r], [yb + 0.0455, 0.995 * r], [yb + 0.0450, 0.975 * r],
+              [yb + 0.030, 0.915 * r], [yb + 0.013, 0.70 * r], [yb + 0.009, 0]],
+            j % 2 ? shade(MNWARE, 0.92) : MNWARE, 22, 0.10);
           }
         } else if (k === 1) {
           boxTS(mnWT - 0.085, mnWT + 0.085, mnWS - 0.065, mnWS + 0.065,
             y0 + 1.53, y0 + 1.735,
             [0.560, 0.430, 0.280], [0.600, 0.470, 0.315]);
         } else if (k === 2) {
-          post(W, mnWT, mnWS, y0 + 1.53, y0 + 1.715, 0.070,
-            [0.640, 0.630, 0.585], 8);
-          post(W, mnWT, mnWS, y0 + 1.705, y0 + 1.755, 0.056,
-            [0.330, 0.330, 0.320], 8);
+          // The jar, turned: a shoulder and a neck under the lid, and the lid
+          // with its skirt and a knob, where two eight-sided posts were.
+          const yb = y0 + 1.53;
+          spinTS(mnWT, mnWS, [[yb, 0], [yb, 0.066], [yb + 0.004, 0.070], [yb + 0.150, 0.070],
+            [yb + 0.166, 0.064], [yb + 0.176, 0.055], [yb + 0.185, 0.053]],
+          [0.640, 0.630, 0.585], 22, 0.10);
+          spinTS(mnWT, mnWS, [[yb + 0.175, 0.056], [yb + 0.1775, 0.0585], [yb + 0.2060, 0.0585],
+            [yb + 0.2110, 0.0555], [yb + 0.2130, 0.0300], [yb + 0.2140, 0.0140],
+            [yb + 0.2230, 0.0130], [yb + 0.2250, 0.0100], [yb + 0.2250, 0]],
+          [0.330, 0.330, 0.320], 22, 0.12);
         } else {
-          post(W, mnWT, mnWS, y0 + 1.53, y0 + 1.625, 0.055, MNWARE, 8);
+          // And the cup: the terraces' `twCup` at 1.7, a mug, handle out.
+          twCup(mnWT, mnWS, y0 + 1.53, -Math.PI * 0.5 + 0.6, 1.7, { col: MNWARE });
         }
       }
       // The stools, and they are the konoba's — see `barStool`. Three of them,
