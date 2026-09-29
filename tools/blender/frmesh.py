@@ -382,6 +382,45 @@ def export(parts, path: Path, note=""):
     _write(path, blob, ni, nv, note)
 
 
+def export_q(parts, path: Path, note=""):
+    """The same mesh as `export`, as a QUANTISED .fr3d v3 blob.
+
+    v1 writes every position and every normal as three float32s, and gzip can
+    do almost nothing with a float's low mantissa bytes, which are noise. So a
+    v1 blob is most of its raw size even compressed: measured on the cars'
+    near tier (28 Sep), 1.14 MB of html for six models. v3 writes the position
+    as three uint16s across the bounding box the header already carries — on a
+    five-metre car that is a step of 0.08 mm, a thousandth of a pixel from two
+    metres — the normal as three int8s (a step of 0.45 degrees, which a lit
+    surface cannot show), and the index as uint16 when there are fewer than
+    65 536 vertices, as there always are here. `readFR3D` in
+    src/48-landmarks.js expands it back to floats on load, so nothing
+    downstream of the reader knows the difference.
+
+    The layout keeps every array aligned: 40 bytes of header, 6 per vertex of
+    position, 3 of normal, 3 of colour — 12 per vertex in all — so the index
+    lands on a multiple of four whichever width it is.
+    """
+    pos, nrm, col, idx = gather(parts)
+    nv, ni = len(pos) // 3, len(idx)
+    lo = [min(pos[k::3]) for k in range(3)]
+    hi = [max(pos[k::3]) for k in range(3)]
+    head = struct.pack("<4sIII6f", MAGIC, 3, nv, ni, *lo, *hi)
+    qp = []
+    for i, v in enumerate(pos):
+        k = i % 3
+        span = hi[k] - lo[k]
+        qp.append(0 if span <= 0 else int(round((v - lo[k]) / span * 65535.0)))
+    qn = [max(-127, min(127, int(round(v * 127.0)))) for v in nrm]
+    wide = nv >= 65536
+    blob = (head
+            + struct.pack("<%dH" % (nv * 3), *qp)
+            + struct.pack("<%db" % (nv * 3), *qn)
+            + bytes(col)
+            + struct.pack("<%d%s" % (ni, "I" if wide else "H"), *idx))
+    _write(path, blob, ni, nv, note)
+
+
 def export_rig(parts, path: Path, note=""):
     """Write an articulated model as one gzipped .fr3d **v2** blob.
 
