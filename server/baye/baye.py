@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.48.1"
+VERSION = "1.48.2"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -3232,6 +3232,31 @@ BATHER_CHILD = {"girl_child", "boy_child"}
 # ones; the child table no longer draws them first-hand at all.
 ADULT_TOPIC = {"crypto", "world", "croatia", "us", "town", "eu", "home"}
 
+# HOSED OFF THE MOLE, and the one bather line that is not in English.
+#
+# Misha, 29 Sep 2026: hose the people sitting on the mole's edge "so they fall
+# off into the water, swearing in croatian and what not". The game does the
+# fall, the splash, the swim to a ladder and a Croatian swear in a balloon on
+# its own (`DUNK` in 43-jadrija.js); what reaches here is the event, off one
+# fixed string in the client, and when it is this one the drawn subject is
+# replaced by the sea and the language by Croatian — nobody swears in their
+# second language, and being knocked into the Adriatic by a stranger is not a
+# moment for a topic. The argument above for English (a reply the player
+# cannot read is a line spent on nothing) does not hold for a curse: the
+# register is the whole content, and the balloon over their head says it too.
+BATHER_DUNK = "they have just hosed you off the mole into the sea"
+BATHER_DUNK_STEER = (
+    "being knocked clean off the edge of the mole into the sea a second ago, "
+    "and coming up spluttering. THIS LINE IS IN CROATIAN, whatever language "
+    "the player speaks, and that overrides the language rule above: swear the "
+    "way people on this coast actually swear — jebote, majku ti, koji kurac, "
+    "pa jesi ti normalan, idiote, or your own — Dalmatian, and ikavian if it "
+    "comes naturally (čovik, virovat, di, bija). Four to eight words. No "
+    "English in the line itself, and no explanation")
+BATHER_DUNK_CHILD = ("But you are a small child, so no swearing: you shriek, "
+                     "or you threaten to tell your mother or father, in "
+                     "Croatian.")
+
 
 def _feed_have(world: dict) -> dict:
     news = world.get("news") or {}
@@ -4297,6 +4322,9 @@ def build_bather_messages(ctx: dict, world: dict, topic=None):
     kind = ctx.get("kind") if ctx.get("kind") in BATHER_WHO else None
     v = bather_voice(kind or "", ctx.get("pid"))
     key, steer, seed, feed = topic or bather_topic(world, v["audience"])
+    dunk = ctx.get("event") == BATHER_DUNK
+    if dunk:
+        feed = None
     lines = ["Right now:"]
     if kind:
         lines.append(f"- YOU ARE {BATHER_WHO[kind]}. You are {v['where']}.")
@@ -4334,8 +4362,21 @@ def build_bather_messages(ctx: dict, world: dict, topic=None):
         lines.append("You have already said these — do not repeat or echo them:")
         lines += [f'- "{s}"' for s in ctx["said"]]
     lines.append("")
-    lines.append("JUST NOW: a stranger with a fire hose splashed you, "
-                 "mid-sentence.")
+    # Knocked off the mole (1.550.1): the sea replaces the drawn subject and
+    # Croatian replaces the person's language — the argument is over
+    # `BATHER_DUNK`. The gloss below still follows, so a player who reads
+    # English is told what they were called.
+    if dunk:
+        v = dict(v, lang="Croatian")
+        key, seed, feed = "dunk", None, None
+        steer = BATHER_DUNK_STEER + (
+            ". " + BATHER_DUNK_CHILD.rstrip(".") if kind in BATHER_CHILD
+            else "")
+        lines.append("JUST NOW: a stranger with a fire hose knocked you off "
+                     "the mole into the sea.")
+    else:
+        lines.append("JUST NOW: a stranger with a fire hose splashed you, "
+                     "mid-sentence.")
     if v["lang"] == "Croatian":
         reg = ("the way people in Šibenik talk" if v["register"] == "Šibenik"
                else "the way people from Zagreb talk")

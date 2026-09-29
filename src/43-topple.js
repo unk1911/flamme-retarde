@@ -68,6 +68,12 @@
 //   T.live(fg)                 the phase, or null.
 //   T.where(fg)                the pelvis in the world while it is a ragdoll.
 //   T.stats(), T.list(), T.release(fg, f), T.cfg()
+//   T.handOff(fg, f, phase, at)  off the ragdoll mid-flight into a phase of the
+//                              caller's (the mole's swimmers, 1.550.0): the
+//                              pose written into `at` ({x, y, z, yaw} world)
+//                              and left on at full weight; `o.draw(fg, f, dt)`
+//                              draws every frame of a phase this file does
+//                              not know.
 //
 // And a prop that goes over with them — here the café chair, which is what
 // "tips back with the chair" needed: from the front the backrest held a
@@ -585,7 +591,10 @@ function makeToppler(o) {
     X.pose.w = 1;
     // Where that is in the world.
     const wp = toWorld(fg, [g[0], g[1], g[2]], [0, 0, 0]);
-    X.up = { x: wp[0], y: wp[1], z: wp[2], yaw: fg.yaw + g[3], fade: KNOCK.upFade * (bailed || rag.faceUp() > 0 ? 1.6 : 1) };
+    X.up = { x: wp[0], y: wp[1], z: wp[2], yaw: fg.yaw + g[3], fade: KNOCK.upFade * (bailed || rag.faceUp() > 0 ? 1.6 : 1),
+      // Drawn at their own stature: the ground frame is in figure units, so
+      // somebody who is not 1 (the mole's, 1.550.0) is placed at it.
+      k: fg.hscale || 1 };
     X.up.fade0 = X.up.fade;
     free(fg);
     f.play(clip, { fade: 0, next: 'idle' });
@@ -655,13 +664,38 @@ function makeToppler(o) {
         return false;
       }
       default:
-        return false;
+        // A phase the caller made (`handOff`): theirs to draw, if they say so.
+        return o.draw ? !!o.draw(fg, f, dt) : false;
     }
   }
-  function placeUp(f, X) { placeAt(f, X.up.x, X.up.y, X.up.z, X.up.yaw, 1); }
+  function placeUp(f, X) { placeAt(f, X.up.x, X.up.y, X.up.z, X.up.yaw, X.up.k || 1); }
+
+  /**
+   * OFF THE RAGDOLL AND INTO THE CALLER'S HANDS, mid-flight — the mole's sea
+   * (1.550.0, `DUNK` in 43-jadrija.js): somebody hosed off the edge is a
+   * ragdoll until they reach the water, and a swimmer from there, which is
+   * nothing this file knows how to draw. The ragdoll's pose is written into
+   * the frame the caller will draw them in (`at`, world, with their yaw) and
+   * left on the figure at full weight (`fg.topple.pose`, `w` 1) for the
+   * caller to ease off; the net is freed; the phase is the caller's name for
+   * it, and `draw` hands every frame of it to `o.draw`.
+   */
+  const _hw = [0, 0, 0];
+  function handOff(fg, f, phase, at) {
+    const X = fg && fg.topple;
+    if (!X || X.phase !== 'live' || !X.slot) return false;
+    toFig(fg, [at.x, at.y, at.z], _hw);
+    _P.set(_hw[0], _hw[1], _hw[2]);
+    _Q.setFromAxisAngle(_Y, at.yaw - fg.yaw);
+    X.slot.rag.write(X.pose, _P, _Q, X.pose.clip.q);
+    X.pose.w = 1;
+    free(fg);
+    X.phase = phase;
+    return true;
+  }
 
   return {
-    push, knock, draw,
+    push, knock, draw, handOff,
     /** The world clock the leak is measured on — once a frame, from the crowd. */
     tick(dt) {
       clock += dt;

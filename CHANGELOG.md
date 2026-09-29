@@ -8,6 +8,86 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.1] — 2026-09-29
+
+### Hosed off the mole
+
+Misha, of the people sitting along the mole's edge with their legs over the
+water: *"since we are in the business of hosing folks off, i think it would be
+funny if we could hose off some of these bathers that are sitting along the
+mole here ... hose them off so they fall off into the water, swearing in
+croatian and what not"*.
+
+**The jet pushes them now.** The nine edge sitters (`fg.edge`: the mole's two
+flanks and its head, and the lip in front of the vikendica) were already
+bather guests — they yelp and the voice service answers for them — and the
+guest's wet now also hands the jet's push to the café's toppler
+(43-topple.js), summed toward the same 80 N·s tip. What they are against
+(`edgeGeo`) is the concrete up to the arris and nothing past it: a floor that
+drops to 3 m under the sea there, and the mole as a box whose top is 5 mm under
+the deck, so a thigh lies on the arris and a heel swinging back meets the wall
+rather than climbing it. At the tip, one lurch (`DUNK.lurch`, 38 N·s along the
+jet's level plus 22 out over the water) — somebody on an edge hit in the back
+leans away from it — and never from the front. MEASURED, hose held from 3 m
+behind: over the edge 0.95 s after the first hit, in the water 0.5 s later;
+from 3 m to the side, over sideways. From the front (a knock off the sea) they
+go back on to the concrete and get up the café's way.
+
+**The ragdoll ends at the surface.** New in 43-topple.js, additively:
+`handOff(fg, f, phase, at)` writes the ragdoll's pose into the frame the caller
+will draw them in and frees the net, and `draw` hands any phase it does not
+know to `o.draw`. From there it is the diver's clips on their own skeleton —
+`jumpClips` now retargets `tread`, `swim` and `ladder` on to all eight bodies,
+not only the two children: under for 1.25 s with a splash (`bodySplash`, the
+plunge), up treading water and turned to face you, a swim to the nearest ladder
+on their side of the mole (the flank's, or the quay's within 28 m, round the
+head's corner if they went in off the end), the climb played from the rung with
+the deck's height of it left (the jumpers' trick, to whichever deck), a glare,
+and a walk back to beside their spot. They sit back down the café's way: once
+you and the camera are 30 m from both. Two for one ladder queue a metre out,
+treading water, and so does anybody arriving while a jumper is on the flank's.
+
+**The sea as it is drawn.** `seaHeightAt` (59-swim.js) is the Gerstner sum
+from before the sea shader grew its wave groups and turned its directional
+spread round; MEASURED on the first swimmer, the two disagreed by 0.43 m and he
+trod water with his knees out of it. `dunkSea` in 43-jadrija.js is `seaWave`
+term for term (the six directions, the groups' phase and envelope, the
+steepness cap, the inversion, the fade from 70 m of the eye); with it a treading
+head is 0.41–0.49 m over the surface, pelvis 0.09–0.18 under. It is used by the
+swimmers here only — the diver and the jumpers still ride the old one.
+
+**What they say, in Croatian.** In a balloon over their head, their own and
+not the bump's, written for this and dealt by who they are — a child, the old
+woman, the old man, a woman, a man (gender agreement included: "sav mokar" /
+"sva mokra"), Šibenik ikavian where it fits: a word going over ("Ajme!",
+"Jebote!", "Majko Božja!", "Tataaa!"), a swear coming up with the gasp ("Pa
+jesi ti normalan?!", "Koji kurac?!", "Pička ti materina!", "Nemaš ti
+matere?!", "Dabogda te kanader pokupija!", "Šezdeset lita dolazin vode!",
+the children "Nije fer!" and "Reći ću tati!"), and one on the way out ("Ajme
+meni, moja leđa…", "Mobitel mi je bija u džepu!", "Znam ja di ti živiš!").
+The live voice line is told `they have just hosed you off the mole into the
+sea` instead of the soak, the first soak's news held 2 s so that it is about
+the sea if they go in; server/baye/baye.py matches that string (`BATHER_DUNK`)
+and asks for the line in Croatian, a swear, four to eight words, and no
+swearing from the children. **The server change is not deployed**; until it
+is, the spoken line is the usual English one with the event in its context.
+
+**Cost.** Nothing with nobody in the water: an empty set a frame. The fall is
+the café's ragdoll (0.23–0.25 ms a step, at most three a frame, about a
+second); the swim, the queue, the climb and the walk measured together at
+about 1 ms of main thread over 3 s with three people in the water — under
+0.02 ms a frame — plus the figure updates the crowd would do anyway. Somebody
+in the sea keeps their roving slot until they are back on the concrete.
+
+**Kept.** Rule 4: nothing draws on `rng`; people 100, blockers 792, and the
+blockers' and the placed people's hashes identical to 1.549.2. The café
+sitters still go over, roll and get up (knocked from the side: three rolls, the get-up, and away).
+The jumpers, the diver and every other bather are untouched; the other mole
+people get wet and answer as before. Debug: `__fr.jad.raw().crowd.topple` →
+`edge()`, `dunk(idx, fx, fy, fz, h)`, `dunkHome(idx)`, `said()`; and
+`__fr.eye([x, y, z, lx, ly, lz])` pins a camera over any mode (null gives it
+back), which is how these were photographed.
+
 ## [1.550.0] — 2026-09-29
 
 ### Hosed off their wheels — and then it's your bicycle
