@@ -65,7 +65,6 @@ the day a second garment wanted taking off was the day its one `shed` counter
 became a table, and that the version number was there so that day would be a
 clean break. This is that day.
 """
-import gzip
 import struct
 import sys
 from pathlib import Path
@@ -75,6 +74,8 @@ from mathutils import Matrix, Vector  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import human_mh as H  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from fr3d_q import save_skin  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKS = ROOT / 'build' / 'mh_assets'
@@ -552,9 +553,10 @@ def write_blob(buf, rest, baked, path, label='baye2'):
             for q in quats:
                 parts.append(struct.pack('<4h', *q))
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(path, 'wb', compresslevel=9) as f:
-        f.write(b''.join(parts))
+    # Written PACKED, as v9 — quantised positions, 16-bit octahedral normals,
+    # fixed-point UVs, delta-coded index and clips: `save_skin` in
+    # tools/fr3d_q.py, the same function that converted the shipped blobs.
+    save_skin(path, b''.join(parts))
     print('[%s] %s  %d verts  %d tris  %d parts  %d bones  %d clips  %.0f KB gz'
           % (label, path.name, nv, ni // 3, len(buf.groups), len(rest),
              len(baked), path.stat().st_size / 1024))

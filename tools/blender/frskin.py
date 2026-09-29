@@ -56,13 +56,16 @@ build is deterministic.
 
 from __future__ import annotations
 
-import gzip
 import math
 import struct
+import sys
 from pathlib import Path
 
 import bpy  # type: ignore
 from mathutils import Euler, Matrix, Quaternion, Vector  # type: ignore
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from fr3d_q import save_skin  # noqa: E402
 
 # Blender is Z-up, three.js is Y-up: (bx, by, bz) -> (bx, bz, -by). The same
 # conversion frmesh.py's docstring names, as a matrix, because a skeleton has to
@@ -282,7 +285,8 @@ def rest_local_of(rig, bname):
 
 def write_skin(path: Path, pos, nrm, cols, bidx, bwgt, idx, rest, baked,
                shed=0, note=""):
-    """Write the v4 blob: mesh, skeleton, clips.
+    """Write the v4 blob: mesh, skeleton, clips — packed to v8 on the way out
+    (`save_skin`, tools/fr3d_q.py).
 
     Fixed-size arrays first and the variable-length tables last, so the loader
     can take views straight on to the decompressed buffer for everything large
@@ -325,10 +329,9 @@ def write_skin(path: Path, pos, nrm, cols, bidx, bwgt, idx, rest, baked,
             for q in quats:
                 parts.append(struct.pack("<4h", *q))
 
-    blob = b"".join(parts)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(path, "wb", compresslevel=9) as f:
-        f.write(blob)
+    # Written PACKED, as v8: `save_skin` in tools/fr3d_q.py, the same function
+    # that converted the shipped blobs, so a rebake lands on the same bytes.
+    save_skin(path, b"".join(parts))
     print("[skin] %s  %d verts  %d tris  %d bones  %d clips  %d bytes gz  %s"
           % (path.name, nv, ni // 3, len(rest), len(baked),
              path.stat().st_size, note))

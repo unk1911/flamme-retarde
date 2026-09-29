@@ -3688,7 +3688,6 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
 
     baked = [_bake_clip(rest, c) for c in clips]
 
-    import gzip
     import struct
     nv, ni = len(pos) // 3, len(idx)
     xs, ys, zs = pos[0::3], pos[1::3], pos[2::3]
@@ -3729,10 +3728,11 @@ def export_skin(body, rig, path, clips, tris=26000, J=None, post=True,
             for q in quats:
                 parts.append(struct.pack("<4h", *q))
 
-    blob = b"".join(parts)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(path, "wb", compresslevel=9) as f:
-        f.write(blob)
+    # Written PACKED, as v8: `save_skin` in tools/fr3d_q.py, the same function
+    # that converted the shipped blobs, so a rebake lands on the same bytes.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from fr3d_q import save_skin
+    save_skin(path, b"".join(parts))
     print("[mh] skin %s  %d verts  %d tris  %d bones  %d clips  %d bytes gz"
           % (path.name, nv, ni // 3, len(rest), len(baked), path.stat().st_size))
     for c in baked:

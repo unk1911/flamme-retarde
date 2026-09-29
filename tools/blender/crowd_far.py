@@ -106,6 +106,8 @@ from mathutils.kdtree import KDTree  # type: ignore
 
 ROOT = Path(__file__).resolve().parents[2]
 PAY = ROOT / 'build' / 'payload'
+sys.path.insert(0, str(ROOT / 'tools'))
+from fr3d_q import pack_crowd, unpack_skin  # noqa: E402
 
 # The eight, in the runtime's casting order — `BATHER_CAST` in 42-crowd.js.
 CAST = ['woman_young_slim', 'man_old_heavy', 'girl_child', 'man_young_fit',
@@ -183,7 +185,9 @@ KIND = {'skin': 0, 'suit': 1, 'hair': 2, 'literal': 3}
 
 def read_v5(path):
     """build/payload/bather2_*.fr3d.gz — see `write_blob` in baye2.py."""
-    b = gzip.open(path).read()
+    # Shipped PACKED (v9) since 1.550.5; `unpack_skin` hands back the v5
+    # layout below, with the values the game decodes.
+    b = unpack_skin(gzip.open(path).read())
     _m, ver, nv, ni = struct.unpack_from('<4sIII', b, 0)
     if ver != 5:
         sys.exit('[crowd_far] %s is v%d, want v5' % (path.name, ver))
@@ -677,8 +681,10 @@ def one(kind, T2):
     buf = io.BytesIO()
     # mtime 0, for the reason `_write` in frmesh.py gives: an unchanged bake
     # must be an unchanged payload, byte for byte.
+    # And PACKED, as v10: `pack_crowd` in tools/fr3d_q.py, the function that
+    # converted the shipped bodies.
     with gzip.GzipFile(fileobj=buf, mode='wb', compresslevel=9, mtime=0) as gz:
-        gz.write(blob)
+        gz.write(pack_crowd(blob))
     path.write_bytes(buf.getvalue())
     print('[crowd_far]   %s  %d verts  %d tris  top %.3f  sitHip %.3f  %.0f KB'
           % (path.name, nvo, nio // 3, top, sit_hip, len(buf.getvalue()) / 1024))

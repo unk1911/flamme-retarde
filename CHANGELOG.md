@@ -8,6 +8,65 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.5] — 2026-09-29
+
+### The people, packed: 7.4 MB off the page, and nobody looks any different
+
+After 1.550.4 the skinned figures were the largest thing left on the page —
+Baye, Chloe, the bucketeer, the doodle, the eight bathers, the painted pair,
+the cat and the dog, 11.2 MB of gzip with every position, normal and UV a
+float32. Misha, on packing them: *"ok go ahead, assign it to an agent with
+16-bit normals"* — on the condition that no character looks worse.
+
+- **fr3d v8 and v9** are v4 and v5 packed (`pack_skin` in tools/fr3d_q.py,
+  `readSkinPacked` in src/41-skin.js). Positions uint16 across the header's
+  box, as v7. Normals **octahedral, two int16s** — sixteen bits a component,
+  not v7's int8, which is what Misha asked for — decoded to a unit normal;
+  the vertex shader normalises after skinning anyway. UVs as 16.16 fixed
+  point, so every whole and half tile boundary the bathers' shader tests
+  (`u > 2`, `u > 4`, `floor(u * n)`) stays exact. Bone indices, weights,
+  part tables, skeleton and clips carry the same numbers; the index and each
+  clip's quaternion channels are stored as zigzag deltas in byte runs.
+- **v10** is the crowd's far bodies (v6) and **v11** the rigid rigs (v2: the
+  Canadair, the ground crew), the same two moves — positions across a box,
+  index as deltas, the rigs' normals octahedral; the crowd's int8 normals
+  are left exactly as they were.
+- **Every exporter writes the new formats through the same function**:
+  `save_skin` from `write_skin` (frskin.py), `export_skin` (human_mh.py),
+  `write_blob` (baye2.py, so Baye, Chloe, the bucketeer and the bathers) and
+  slowdoodle/fr3d.py; `pack_crowd` from crowd_far.py; `pack_rig` from
+  `export_rig`. Rebakes of the doodle, the dog, the cat and the ground crew
+  came out byte-identical to the converted files, and `write_blob` driven on
+  the shipped arrays reproduced baye2, chloe2, bucketeer2 and two bathers to
+  the byte. crowd_far.py and pinch_solve.py read skins through
+  `unpack_skin`.
+- **Measured against the floats.** The page's own reader, run on every
+  blob: positions within 0.014 mm on every person (0.22 mm across the
+  Canadair's 29 m), normals within 0.004 deg, UVs within 7.6e-6 — 0.012 of
+  a texel on the widest atlas. Tables, bones, weights, index and all 49 of
+  Baye's clips identical. HEAD's readers and the new ones give identical
+  output on the old blobs, and the Python decoder matches the page bit for
+  bit.
+- **Photographed.** In one page load with the world paused, each figure built
+  from the packed blob and from HEAD's float blob through the game's own
+  constructors and options, in the same pose (mid-stride), same light, same
+  camera: face, three-quarter face and body, sixteen figures. The same float
+  blob built twice differs by 0 pixels, so everything that moved is the
+  data. What moved is pixels on triangle edges and alpha-cut hair flipping
+  sides — 99.9th percentile 0–3/255, 19 to 1 390 pixels over 2/255 in a
+  1280 × 800 close-up — and fewer, by 2.4 to 12 times, than drawing the
+  same float figure 0.05 mm to one side. At Jadrija the GPU already rounds
+  every world position to 0.12 mm. int8 normals, the control, would have
+  shaded 7 000–93 000 pixels a shot one or two levels off; with the 16-bit
+  ones 510–19 800 pixels differ at all, on the same edges and hair. The far bodies close up and the Canadair
+  the same: edges only, less than moving them a hair.
+- **The page: 44.95 → 37.51 MB; gzipped over the wire 29.8 → 24.2 MB.**
+  People 100, blockers 786, census, Jadrija tris, Baye's 88 978 tris and 49
+  clips all unchanged; no console errors; a walking bather mid-stride looks
+  the same in both builds. `chloe2_arm.frhd` stays as it was: it is already
+  quantised (16-bit positions and UVs, int8 normals) and only its layout
+  would change.
+
 ## [1.550.4] — 2026-09-29
 
 ### The page, 6.4 MB lighter: the beds at 48 kbps, half a firestarter, and packed meshes

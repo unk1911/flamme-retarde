@@ -445,7 +445,8 @@ def export_p(parts, path: Path, note=""):
 
 
 def export_rig(parts, path: Path, note=""):
-    """Write an articulated model as one gzipped .fr3d **v2** blob.
+    """Write an articulated model as one gzipped .fr3d **v2** blob — built as
+    v2 and packed to v11 on the way out (tools/fr3d_q.py).
 
     `parts` is a list of dicts, parents before children::
 
@@ -513,4 +514,9 @@ def export_rig(parts, path: Path, note=""):
             + struct.pack("<%df" % (nv * 3), *nrm)
             + bytes(col)
             + struct.pack("<%dI" % ni, *idx))
-    _write(path, blob, ni, nv, "%s, %d parts" % (note, len(table)))
+    # Written PACKED, as v11: `pack_rig` in tools/fr3d_q.py, the function that
+    # converted the shipped rigs, so a rebake lands on the same bytes.
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from fr3d_q import pack_rig  # noqa: E402
+    _write(path, pack_rig(blob), ni, nv, "%s, %d parts" % (note, len(table)))

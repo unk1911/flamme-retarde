@@ -240,7 +240,9 @@ function readFR3DRig(buf) {
     dv.getUint8(2), dv.getUint8(3));
   if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
   const version = dv.getUint32(4, true);
-  if (version !== 2) throw new Error('fr3d rig needs version 2, got ' + version);
+  if (version !== 2 && version !== 11) {
+    throw new Error('fr3d rig needs version 2 or 11, got ' + version);
+  }
   const nv = dv.getUint32(8, true);
   const ni = dv.getUint32(12, true);
 
@@ -265,10 +267,62 @@ function readFR3DRig(buf) {
   // The parts table is variable-length, so the float blocks land on whatever
   // offset it happens to end on — and a Float32Array view has to be 4-byte
   // aligned. One copy each, once, at load.
-  const pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
-  const nrm = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
-  const col = new Uint8Array(buf, o, nv * 3); o += nv * 3;
-  const idx = new Uint32Array(buf.slice(o, o + ni * 4));
+  let pos, nrm, col, idx;
+  if (version === 11) {
+    // v2 PACKED (tools/fr3d_q.py): a box round the stored positions, the
+    // positions as v7's uint16 runs across it, the normals octahedral in two
+    // int16 runs (as the skins, `readSkinPacked`), the colours as v2, the
+    // index as v7's. 0.22 mm on the Canadair's 29 m and under 0.01 deg.
+    const b = new Uint8Array(buf);
+    const lo = [0, 1, 2].map((k) => dv.getFloat32(o + k * 4, true));
+    const hi = [0, 1, 2].map((k) => dv.getFloat32(o + 12 + k * 4, true));
+    o += 24;
+    pos = new Float32Array(nv * 3);
+    for (let k = 0; k < 3; k++, o += nv * 2) {
+      const s = (hi[k] - lo[k]) / 65535;
+      let acc = 0;
+      for (let i = 0; i < nv; i++) {
+        const u = b[o + i] | (b[o + nv + i] << 8);
+        acc = (acc + ((u >>> 1) ^ -(u & 1))) & 0xffff;
+        pos[i * 3 + k] = lo[k] + acc * s;
+      }
+    }
+    const oct = new Int16Array(nv * 2);
+    for (let k = 0; k < 2; k++, o += nv * 2) {
+      let acc = 0;
+      for (let i = 0; i < nv; i++) {
+        const u = b[o + i] | (b[o + nv + i] << 8);
+        acc = (acc + ((u >>> 1) ^ -(u & 1))) & 0xffff;
+        oct[i * 2 + k] = acc;
+      }
+    }
+    nrm = new Float32Array(nv * 3);
+    for (let i = 0; i < nv; i++) {
+      let x = oct[i * 2] / 32767, y = oct[i * 2 + 1] / 32767;
+      const z = 1 - Math.abs(x) - Math.abs(y);
+      if (z < 0) {
+        const tx = (1 - Math.abs(y)) * (x >= 0 ? 1 : -1);
+        y = (1 - Math.abs(x)) * (y >= 0 ? 1 : -1);
+        x = tx;
+      }
+      const l = Math.sqrt(x * x + y * y + z * z);
+      nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
+    }
+    col = new Uint8Array(buf, o, nv * 3); o += nv * 3;
+    idx = new Uint32Array(ni);
+    let acc = 0;
+    for (let i = 0; i < ni; i++) {
+      const u = (b[o + i] | (b[o + ni + i] << 8) | (b[o + 2 * ni + i] << 16)
+        | (b[o + 3 * ni + i] << 24)) >>> 0;
+      acc = (acc + ((u >>> 1) ^ -(u & 1))) >>> 0;
+      idx[i] = acc;
+    }
+  } else {
+    pos = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+    nrm = new Float32Array(buf.slice(o, o + nv * 12)); o += nv * 12;
+    col = new Uint8Array(buf, o, nv * 3); o += nv * 3;
+    idx = new Uint32Array(buf.slice(o, o + ni * 4));
+  }
 
   for (const p of table) {
     const g = new THREE.BufferGeometry();

@@ -47,6 +47,8 @@ from scipy.optimize import minimize
 from scipy.spatial.transform import Rotation as R
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tools'))
+from fr3d_q import unpack_skin  # noqa: E402
 BLOB = ROOT / 'build' / 'payload' / 'baye2.fr3d.gz'
 # Fetched by tools/blender/human_mh.py (`fetch`), and not in the repo.
 OBJ = Path(os.environ.get('MH_OBJ', ROOT / 'build' / 'mh_base.obj'))
@@ -72,7 +74,8 @@ def q_rot(q, v):
 
 def load(path):
     """Mesh, weights and skeleton of a v4/v5 .fr3d skin (see readFR3DSkin)."""
-    buf = gzip.open(path).read()
+    # v8/v9 (packed, as shipped) back to the v4/v5 layout read below.
+    buf = unpack_skin(gzip.open(path).read())
     ver, nv, ni = struct.unpack_from('<III', buf, 4)
     o = 44
     pos = np.frombuffer(buf, np.float32, nv*3, o).reshape(-1, 3); o += nv*12
