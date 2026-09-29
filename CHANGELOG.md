@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.549.2] — 2026-09-29
+
+### The tableware, turned: glasses, bottles, cups, cutlery
+
+Misha: *"for the utensils, little bottles, coffee cups, etc, on tables ...
+all that silverware and cups and forks and spoons and whatever is on tables,
+is also too low-poly, needs higher-poly"*, with a frame of MINI's terrace from
+a step away. What he was looking at: a nine-sided water bottle whose blue
+label was a lathe 0.5 mm INSIDE the bottle, a nine-sided tumbler whose drink
+was a second cylinder poking out through the glass, and a card of two quads.
+
+Everything on a table or a bar counter is now turned with `spinTS` (profile
+normals, creased only at real edges) or swept with `tubeTS`, in the buffers
+those terraces and counters already draw — no draw call more. New builders
+beside `tableTop` in 43-jadrija.js (`twTumbler`, `twWater`, `twCapDown`,
+`twAshtray`, `twCard`, `twSaucer`, `twCup`, `twEspresso`, `twSpoon`, `twFork`,
+`twKnife`, `twSugar`, `twNapkin`, `twNapkinHolder`, `twCoupe`, `twScoop`).
+
+- **Tumblers:** a 1.9 mm wall, a 12 mm base with an eased foot, a half-round
+  rim, and the drink as its own surface with a meniscus. The wall below the
+  drink line takes the drink's colour half-way, so a full glass still reads
+  as full. The spritz gets a wheel of orange on the rim and ice, cola a lemon
+  slice and ice, the red one ice, the yellow one a head of foam. 404 tris.
+- **Water bottle:** PET with a push-up base, the blue label band (now
+  actually outside the bottle) with a white stripe, shoulder, neck and support
+  ring, open mouth; the blue cap upside down beside it. 656 + 168.
+- **Ashtray:** pressed foil with a rolled rim; half have a stub in them. 352.
+- **Card:** two 0.8 mm leaves with the shop's coloured head band and three
+  printed lines on each face. 40.
+- **Coupes** (slastičarnica): foot, stem, a bowl with a wall and a rim; the
+  scoops turned (182 each); the long spoon a flat handle with a paddle; the
+  wafer a rolled tube leaning out. 476 the glass.
+- **New on the tables, only in the gaps between chairs, where the 1.539.9
+  hands never go:** an espresso on its saucer with crema and a spoon on the
+  saucer tilted to its slope, on half the bars' tables (1,176); a sugar pourer
+  on a third (360); at Trampulin, the bistro, a red paper napkin with a fork
+  (tines, palm, raised neck) and a knife (spine, bolster, round handle) on it
+  (496), and a steel napkin holder (536). The pizzeria would be the other
+  home for cutlery, and it has no terrace.
+- **Placement:** every item claims a circle; a glass whose hashed spot was
+  already taken (by the card, the bottle, the ashtray or the other glass —
+  about one table in three) moves to the first free one of ten hashed spots.
+- **Bars:** the slastičarnica back bar's cups on saucers (handles to the
+  room) and its stemware, the cups on its espresso machine's warmer, the
+  konoba's two espressos (now `twEspresso`) and three tumblers, the glass on
+  the konoba's stone table, the gelato case's paper-cup stacks and coupe
+  stacks, and MINI's shelf of bowls, jar and mug.
+
+Measured: the twenty terrace tables 33,472 tris (1,674 a table, from about
+30); `jadrija.tris` 732,835 → 790,704 (+57,869) before the merge of 1.549.0.
+Frame time at his table (RTX 4090 laptop, GPU timer, three runs each):
+15.1–15.3 ms before, 15.3–17.3 after; on the H2O/slastičarnica terrace
+18.8–24.5 before, 20.2–22.0 after — inside the run-to-run noise. Blockers 792
+with the same hash, people 100, café settle queue unchanged, hands on tables
+the same (3 on the table, 22 on the thigh at the first snapshot), hammock at
+(−1923.174, 4.138, 443.162). No `rng` draw added; all variation is `jit` on
+salts 630–651.
 ## [1.549.1] — 2026-09-29
 
 ### The Staropramen rack goes to MINI's wall, and its bicycles are bicycles
