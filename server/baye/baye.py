@@ -50,6 +50,7 @@ when its mtime moves, so rotating a key there rotates it here without a deploy.
 """
 
 import base64
+import calendar
 import json
 import os
 import random
@@ -66,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.47.0"
+VERSION = "1.48.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -2179,6 +2180,123 @@ def transcribe(audio: bytes, ctype: str) -> str:
     return (r.json().get("text") or "").strip()
 
 
+# ── the news, and what one headline is ───────────────────────────────────────
+#
+# Three slots, each a query, each in Croatian — see the 29 Sep note in `_news`.
+# The third field says whether the slot is the TOWN, which is the only one
+# with a second test on it.
+NEWS_SLOTS = (
+    ("local", {"q": "Šibenik", "search_lang": "hr", "count": 20}, True),
+    ("national", {"q": "Hrvatska vijesti", "search_lang": "hr", "count": 20},
+     False),
+    ("world", {"q": "svijet", "search_lang": "hr", "count": 20},
+     False),
+)
+NEWS_KEEP = 12          # per slot, which is what `/world` hands the page
+NEWS_ENOUGH = 4         # fewer than this off the last day and it asks the week
+# A place on this coast in the title makes a story the town's. Stems, because
+# Croatian declines its place names: Šibenika, Šibeniku, Vodicama, Zlarinu.
+NEWS_LOCAL_RE = re.compile(
+    r"šiben|jadrij|zlarin|prvić|krapanj|vodic|brodaric|zablać|srim|tisn|"
+    r"primošten|skradin|drniš|pirovac|rogoznic|murter|žirj|kaprij|"
+    r"nacionaln\w* park\w* krk|slapov\w* krk", re.I)
+NEWS_LOCAL_HOSTS = {"sibenskikanal.hr", "sibenik.in", "sibenskiportal.hr",
+                    "si-sport.hr", "sibenik.hr", "sibenski.hr"}
+# What the TV prints as the source, where Brave's own `profile.name` is a
+# lower-cased hostname. Everything else keeps Brave's name.
+NEWS_SRC = {
+    "sibenskikanal.hr": "Šibenski kanal", "sibenik.in": "Šibenik.in",
+    "sibenskiportal.hr": "Šibenski portal", "si-sport.hr": "Šibenski sport",
+    "slobodnadalmacija.hr": "Slobodna Dalmacija", "vijesti.hrt.hr": "HRT",
+    "sport.hrt.hr": "HRT", "n1info.hr": "N1", "jutarnji.hr": "Jutarnji list",
+    "vecernji.hr": "Večernji list", "index.hr": "Index.hr",
+    "dnevnik.hr": "Dnevnik.hr", "gol.dnevnik.hr": "Gol.hr",
+    "tportal.hr": "tportal", "24sata.hr": "24sata", "telegram.hr": "Telegram",
+    "dalmatinskiportal.hr": "Dalmatinski portal", "morski.hr": "Morski.hr",
+    "rtl.hr": "RTL", "gradonacelnik.hr": "Gradonačelnik.hr",
+    "dalmacijadanas.hr": "Dalmacija Danas", "hina.hr": "Hina",
+    "net.hr": "Net.hr", "novilist.hr": "Novi list",
+}
+
+
+def _fold(s: str) -> str:
+    """Lower case, no diacritics, letters and digits only — for comparing."""
+    s = unicodedata.normalize("NFKD", s or "")
+    return re.sub(r"[^a-z0-9]", "", "".join(
+        c for c in s if not unicodedata.combining(c)).lower())
+
+
+def news_title(title: str, src: str, host: str) -> str:
+    """A headline without the outlet's name stapled to either end of it.
+
+    Brave returns titles as the page's <title>, so they arrive as "… - HRT",
+    "Jutarnji list - …", "… | tportal" and, from N1, "… - Vijesti iz
+    Hrvatske, regije i svijeta - N1 info". Only an END segment is ever cut,
+    and only when it reads as the outlet, so a dash inside a headline stays.
+    """
+    keys = {k for k in (_fold(src), _fold(host.split(".")[-2] if host and
+                                           "." in host else host)) if k}
+
+    def label(seg):
+        f = _fold(seg)
+        return bool(f) and (any(k in f or f in k for k in keys)
+                            or f.startswith("vijestiizhrvatske"))
+    t = re.sub(r"\s+", " ", title or "").strip()
+    for _ in range(3):
+        m = re.match(r"^(.*\S)\s+[|\-–]\s+([^|\-–]{1,60})$", t)
+        if m and label(m.group(2)):
+            t = m.group(1)
+            continue
+        m = re.match(r"^([^|\-–]{1,40})\s+[|\-–]\s+(\S.*)$", t)
+        if m and label(m.group(1)):
+            t = m.group(2)
+            continue
+        break
+    return t.strip()
+
+
+def news_shape(items: list, local: bool = False) -> list:
+    """Brave's results -> [{t, src, ts}], Croatian outlets only, newest
+    first, no two the same. `ts` is epoch seconds, or None."""
+    out, seen = [], set()
+    for i in items or []:
+        if not isinstance(i, dict) or not i.get("title"):
+            continue
+        host = ((i.get("meta_url") or {}).get("hostname") or "").lower()
+        host = host[4:] if host.startswith("www.") else host
+        if not host.endswith(".hr"):
+            continue
+        src = NEWS_SRC.get(host) or (i.get("profile") or {}).get("name") or host
+        t = news_title(i["title"], src, host)
+        if local and host not in NEWS_LOCAL_HOSTS \
+                and not NEWS_LOCAL_RE.search(t):
+            continue
+        k = _fold(t)[:48]
+        if len(t) < 12 or k in seen:
+            continue
+        seen.add(k)
+        ts = None
+        pa = i.get("page_age")
+        if isinstance(pa, str):
+            try:
+                # Brave's `page_age` is UTC with no zone on it — checked
+                # against its own "2 hours ago" on 29 Sep.
+                ts = calendar.timegm(time.strptime(pa[:19],
+                                                   "%Y-%m-%dT%H:%M:%S"))
+            except ValueError:
+                ts = None
+        out.append({"t": t[:180], "src": str(src)[:40], "ts": ts})
+    out.sort(key=lambda x: -(x["ts"] or 0))
+    return out
+
+
+def news_titles(items) -> list:
+    """Just the words, whichever shape a slot is in — a list of strings from
+    before 29 Sep, or of {t, src, ts} after it."""
+    return [(x.get("t") if isinstance(x, dict) else x)[:120]
+            for x in (items or []) if x and (not isinstance(x, dict) or x.get("t"))]
+
+
 # ── the world outside the game ───────────────────────────────────────────────
 class World:
     """Weather, money and news, on three different clocks, fetched off-thread.
@@ -2239,13 +2357,24 @@ class World:
         return {k: v for k, v in out.items() if v is not None}
 
     def _crypto(self):
-        r = requests.get("https://api.coingecko.com/api/v3/simple/price",
-                         params={"ids": "bitcoin,ethereum,litecoin,dogecoin",
-                                 "vs_currencies": "usd,eur",
-                                 "include_24hr_change": "true"},
-                         timeout=12)
-        r.raise_for_status()
-        d = r.json()
+        # COINGECKO STOPPED ANSWERING on 29 Sep 2026: the keyless endpoint
+        # returns 403 to this box (the journal has it from 02:38 at least), and
+        # the feed only looked alive because the last good answer was still in
+        # memory — the restart for 1.48.0 dropped it and the phones and the
+        # crypto topic went quiet. Coinbase's exchange answers the same four
+        # coins without a key, and the vikendica's TV already reads it from
+        # the page, so it is the fallback rather than a second source to
+        # reconcile: CoinGecko first while it answers, Coinbase when it won't.
+        try:
+            r = requests.get("https://api.coingecko.com/api/v3/simple/price",
+                             params={"ids": "bitcoin,ethereum,litecoin,dogecoin",
+                                     "vs_currencies": "usd,eur",
+                                     "include_24hr_change": "true"},
+                             timeout=12)
+            r.raise_for_status()
+            d = r.json()
+        except (requests.RequestException, ValueError):
+            d = self._coinbase()
         out = {}
         # Litecoin joined the two on 4 Sep 2026 because the phones on the
         # beach show three coins and she only ever mentioned one. It is the
@@ -2282,6 +2411,35 @@ class World:
                              "chg24": round(d[key].get("usd_24h_change", 0), 2)}
         return out
 
+    def _coinbase(self):
+        """CoinGecko's shape, from Coinbase Exchange's 24 h stats: the change
+        is `last` against `open`, which is what 24 h change means there too;
+        the euro is the dollar at Coinbase's own rate. Raises if nothing
+        came back, so `tick` logs it the way it logged CoinGecko."""
+        eur = None
+        try:
+            eur = float(requests.get(
+                "https://api.coinbase.com/v2/exchange-rates",
+                params={"currency": "USD"}, timeout=12,
+            ).json()["data"]["rates"]["EUR"])
+        except (requests.RequestException, ValueError, KeyError, TypeError):
+            pass
+        d = {}
+        for key, sym in (("bitcoin", "BTC"), ("ethereum", "ETH"),
+                         ("litecoin", "LTC"), ("dogecoin", "DOGE")):
+            try:
+                st = requests.get(
+                    f"https://api.exchange.coinbase.com/products/{sym}-USD/stats",
+                    timeout=12).json()
+                last, op = float(st["last"]), float(st["open"])
+            except (requests.RequestException, ValueError, KeyError, TypeError):
+                continue
+            d[key] = {"usd": last, "eur": last * eur if eur else 0,
+                      "usd_24h_change": (last / op - 1) * 100 if op else 0}
+        if not d:
+            raise requests.RequestException("coingecko and coinbase both failed")
+        return d
+
     def _news(self):
         key = CFG.get("BRAVE_API_KEY")
         if not key:
@@ -2314,28 +2472,59 @@ class World:
         # Slobodna Dalmacija, Dalmacija Danas and a Šibenik street story. The
         # language was always the part that mattered — nobody publishes
         # Croatian local news in English anyway.
-        for nth, (slot, params) in enumerate((
-            ("world", {"q": "world news today", "count": 4}),
-            ("local", {"q": "Šibenik Dalmacija vijesti", "count": 4,
-                       "search_lang": "hr"}),
-        )):
-            if nth:
-                time.sleep(1.2)
-            try:
-                r = requests.get("https://api.search.brave.com/res/v1/news/search",
-                                 headers=head, params=params, timeout=12)
-                if r.status_code == 422:      # some plans have no news index
-                    time.sleep(1.2)           # …and the retry is a request too
-                    r = requests.get("https://api.search.brave.com/res/v1/web/search",
-                                     headers=head, params=params, timeout=12)
-                    items = (r.json().get("web", {}) or {}).get("results", [])
-                else:
-                    items = r.json().get("results", [])
-                heads = [i.get("title", "")[:120] for i in items if i.get("title")]
-                if heads:
-                    out[slot] = heads[:4]
-            except (requests.RequestException, ValueError):
-                continue
+        #
+        # ── AND ON 29 SEP: THREE SLOTS, FRESH, AND KEPT WHOLE ────────────────
+        #
+        # Misha: *"the stories on the TV in the vikendica ... are either fake
+        # or stuck on some old news stories from months ago, can u make sure
+        # the TV shows stories from *actual* more current local
+        # sibenik/jadrija/croatian news?"*. The TV's were fake — baked, see
+        # `HEAD` in 44-vikendica.js — because `/world` never sent a headline
+        # to the page at all. And these were at risk of being old: with no
+        # `freshness` Brave ranks on relevance, and relevance is happy with
+        # March.
+        #
+        # So: `freshness=pd` (the last day) and, where a slot comes back thin
+        # — a quiet Tuesday in Šibenik — one retry at `pw`. Three slots, all
+        # in Croatian from Croatian outlets: the town, the country, the world
+        # as Croatian papers report it. Every item keeps its source and its
+        # time, because a headline with no date is exactly the "stuck on
+        # months ago" he saw, and the TV prints both.
+        #
+        # THE FILTER IS THE TLD, measured on 29 Sep against the live API.
+        # `search_lang=hr` still returns Spanish travel pieces that mention
+        # Šibenik, a Bosnian portal, and a Serbian-language copy network
+        # posing as a Croatian one; restricting to `.hr` hosts removes all of
+        # those and nothing a Croatian reader would call Croatian news. The
+        # town slot additionally needs a place on this coast in the title or
+        # a Šibenik outlet — "Šibenik" as a query also matches a football
+        # report that mentions a Šibenik-born defender.
+        #
+        # THE RATE LIMIT, re-read off the response headers the same day: this
+        # key's plan answers `x-ratelimit-limit: 50, 0` — fifty a second and
+        # no monthly cap — so the 1 req/s note above is history. The sleeps
+        # stay: they cost nothing on a background thread and the next plan
+        # may be the free one again.
+        first = True
+        for slot, params, local in NEWS_SLOTS:
+            got = []
+            for fresh in ("pd", "pw"):
+                if not first:
+                    time.sleep(1.2)
+                first = False
+                try:
+                    r = requests.get(
+                        "https://api.search.brave.com/res/v1/news/search",
+                        headers=head, params=dict(params, freshness=fresh),
+                        timeout=12)
+                    items = r.json().get("results", []) if r.ok else []
+                except (requests.RequestException, ValueError):
+                    items = []
+                got = news_shape(items, local)
+                if len(got) >= NEWS_ENOUGH:
+                    break
+            if got:
+                out[slot] = got[:NEWS_KEEP]
         return out or None
 
     def tick(self):
@@ -2607,79 +2796,122 @@ HOW YOU SAY IT:
 # saying a word of Croatian was natural, so the persona now says how OFTEN
 # rather than only whether, and the examples show the rate instead of stating
 # it. Two people in a row opening with "joj" is a stammer, not a beach.
+#
+# ══ AND ON 29 SEP IT STOPPED BEING A REPLY AT ALL ═══════════════════════════
+#
+# Misha: *"i think we need to have more croatian speech and less english
+# speech, and maybe reduce the amount of speech about crypto and more about
+# current events, local politics, in croatia, politics in u.s., europe, maybe
+# some climate change stuff, it has to be like, a lot of different stuff, it
+# has to also feel kinda organic u know, like not forced... like people also
+# sometimes bullshitting about some completely irrelevant stuff involving their
+# lives that u overhear"*, and then, sharper: *"de-emphasize the fire and
+# getting splashed ... really just random useless chatter involving people's
+# lives u know like: 'man, the traffic coming here from zagreb was just
+# brutal'... hyper-localized useless croatian chatter to set the mood right"*.
+#
+# WHAT HE HEARD WAS EVERY LINE AIMED AT HIM. The persona above this one said
+# "what a stranger says is short, startled, and about you", and the examples
+# were quips — every one of them had a punchline, and eight quips in a row is
+# a stand-up set, not a beach. So the register is turned round: the hose is
+# only why we can hear this person just now. What we hear is the conversation
+# they were already having with whoever they came with, overheard in the
+# middle, mostly about nothing — the A1 at Lučko, the clutch, the in-laws on
+# Saturday. `BATHER_WITH` is who that is, drawn per line, and it is the single
+# cheapest thing that makes a line sound overheard: a sentence said TO
+# somebody in particular cannot also be a quip at the player.
+#
+# AND THE LANGUAGE IS NOW DRAWN, per person, not left to the model. Three in
+# four people on this beach are locals and speak Croatian; the rest are
+# visitors and speak English. See `bather_voice` for the numbers and why they
+# hang off the person rather than the line. The old note over `BATHER_VOICE`
+# said Croatian was "a line spent on nothing" because nothing could translate
+# it — that is answered by the gloss: a Croatian line comes back with a plain
+# English (or French) subtitle beside it, which the player reads and the voice
+# never says.
 PERSONA_BATHER = """You are one of the people on the beach at Jadrija, near
-Sibenik, on the Dalmatian coast, in the summer of 2026. It is hot, the cicadas
-are deafening, and there is a fire somewhere inland.
+Sibenik, on the Dalmatian coast, late in the summer of 2026. It is hot and the
+cicadas are deafening.
 
-A moment ago a stranger turned a fire hose on you. You are soaked. That is WHY
-you are speaking. It is not necessarily what you are speaking ABOUT.
+You are NOT talking to the player. You were in the middle of a conversation
+with somebody — the context says who — and a stranger walking past with a
+fire hose has just splashed you. That splash is only the reason anybody can
+hear you right now. What comes out of your mouth is what a passer-by would
+OVERHEAR: a fragment of the conversation you were already having.
 
-TEN WORDS AT THE ABSOLUTE MOST. Nobody makes a speech with water running off
-their chin. Ten is the CEILING and not the target — four or five is a better
-line than nine. However many sentences that is, and often two or three very
-short ones, because that is what surprise sounds like.
+TEN WORDS AT THE ABSOLUTE MOST, and five or six is better. A fragment, not a
+speech.
 
-THE WATER IS THE DOORBELL. It is what made you turn round and open your mouth.
-It is not automatically the subject, and a beach where eight strangers in a row
-all say some version of "you got me wet" is a beach with one line on it. Every
-time you speak you are given a line marked TALK ABOUT, and THAT is the subject:
-sometimes the water, more often whatever you were already chewing over out here
-in the heat — what things cost, what the news said this morning, what a coin is
-doing, the smoke over the hill. When the subject is not the water, you may
-glance at it in a word or ignore it completely. Never answer both at length.
-There is no room, and the pivot is the joke: soaked, and still going on about
-the ferry.
+IT IS OVERHEARD, NOT PERFORMED. That is the whole register:
+- Start in the middle. The person you are with knows what came before, so the
+  line does not explain itself.
+- Talk to the person you are with. "You" in your line is them, never the
+  stranger with the hose.
+- Usually NO punchline. Most of what people say on a beach is a complaint, a
+  detail, a question, a half thought. Useless chatter about their own lives.
+  If a line is funny it is by accident.
+- It can trail off, answer a question we never heard, repeat a word.
+- Say the specific small thing. Lucko and the tunnel, not "the traffic". The
+  clutch, not "car problems". Tuesday, not "soon".
 
-THIS IS THE LENGTH AND THE REGISTER. Say things this size:
-  Joj! Again, again!
-  Ma daj, my book!
-  I was dry a second ago.
-  Sixty years I've come here. Never that.
-  Six euro for a sunbed. Robbery, in daylight.
-  Bitcoin's down again. So is my mood.
-  My brother-in-law bought ethereum. He's very quiet lately.
-  They rename a country. My ferry's still late.
-  Smoke again. Same hill, same silence from the council.
-  You and the news. Both relentless today.
-  Doge. My nephew won't shut up about doge.
-  Well. I'm awake now.
-Those show you the size and the tone. They are not a script: never say one of
-them back word for word. If one of them happens to be about the same thing you
-have been asked to talk about, that is a coincidence and not permission — it
-makes copying it worse, not better. Say your own.
+THE SPLASH: only when TALK ABOUT says so do you talk about the water. Otherwise
+you may yelp one word at it first, ej or ajme, or hey in English, but most
+people ignore it completely and carry straight on. Never more than one word.
 
-WHO YOU ARE arrives in the context and it decides everything about how you
-sound. A small child is delighted or wailing, never witty, and has no view of
-their own about money or politics — a child talking about ethereum is wrong,
-and a child repeating what their father said about ethereum, slightly wrong, is
-right. A young woman is withering. A young man is up for it. An old woman is
-scandalised. A heavy old man is unimpressed and slow about it. Play the person
-you are given.
+THIS IS THE SIZE AND THE SOUND. Locals, in Croatian, the way people here talk:
+  I onda ona meni kaže, a di su ti papiri?
+  Nije on loš. Samo ne zna stat kad triba.
+  Rekla san mu, ne kupuj bili auto.
+  Ajde, di san stala? A da, frizerka.
+  U subotu ne mogu, krstitke su.
+  Tri puta san zvala. Tri puta!
+  E, a jesi čula za Vesninu malu?
+  Ma pusti ga, on je uvik taki bija.
+  Nisan ja to reka, to je ona rekla.
+  Stari, to ti je sto eura minimalno.
+  Ma isto sranje, drugo pakiranje.
+  Kaj ti bum rekla, fakat ne znam.
+  Ej! Ma dobro. Kažen ti, neće se oni složit.
+And visitors, in English:
+  So Kevin's not coming. Typical Kevin.
+  No, the other place. With the blue chairs.
+  She said Thursday. I swear she said Thursday.
+  I'm not saying it's a bad idea. It's a bad idea.
+  Remind me to text my brother. Tonight.
+THE EXAMPLES ARE ABOUT NOTHING ON PURPOSE. They show how people sound, not
+what they talk about; the subject is in TALK ABOUT, every time.
+Those show the size and the sound. They are NOT a script: never say one back
+word for word, and if one happens to be about your subject that makes copying
+it worse. Say your own.
 
-HOW YOU SAY IT:
-- Say the thing marked TALK ABOUT. If it is the water, react to the water,
-  because that is what just happened.
-- YOU ARE NOT A NEWSREADER. Nobody on a beach recites a headline. You have an
-  opinion about it, or a complaint that runs off the back of it, or you are
-  entirely unimpressed by it. If the only way you can fit a subject into ten
-  words is to announce it, you have picked the wrong half: say the part that is
-  about YOU.
-- Never read a number out like a screen. A price or a temperature you may
-  mention once and in words — "bitcoin's down", "four euro for a coffee", "the
-  sea's like soup". No figures to the cent, no percentages, no decimals.
-- Names are the joke and are allowed: bitcoin, doge, the ferry, the council,
-  the price of everything. One of them, never a list.
-- Croatian coast, so a word of Croatian is natural if the player's language is
-  English — "joj", "ma daj", "hvala lijepa". At most one, and NOT every time:
-  roughly one line in three has one and the rest have none. Two people in a row
-  opening with "joj" is one person with a stammer rather than a beach.
-- No dash and no semicolon in the line you say. A soaked stranger does not
-  build a compound sentence.
-- No emoji, no asterisks, no stage directions, no quotation marks, no names.
-- Never explain the game, never offer help, never ask what they need.
-- Do not describe yourself in the third person and do not say what kind of
-  person you are. You simply are one.
-- English unless the context says the player's language is Croatian or French.
+LANGUAGE is given in the context and it is not yours to change.
+- CROATIAN means spoken Croatian of this coast, not a textbook. A Sibenik
+  local says di, šta, lito, cili, mliko, reka, san for sam, ka for kao — some
+  of them, not all in one line. A weekender from Zagreb says kaj, bum, fakat,
+  ful, and the standard ije. Colloquial words are welcome but one at most in a
+  line: ajme, ma daj, bome, pusti to, ma ne, ajde, e, stari, ženo, brate,
+  jebote (rarely). Never ča, that is the islands.
+- ENGLISH means you are a visitor, from where the context says. Plain spoken
+  English. You know Croatia as a visitor does — the prices, the old town,
+  Krka, the heat, your host, the ferry — never its politics.
+
+WHO YOU ARE arrives in the context and it decides how you sound. A small child
+is excited or whining or bickering with a sibling, and has no views of their
+own about money or politics. A child repeating a parent about the government,
+and getting it slightly wrong, is right. Old people are slow and certain.
+Young people are quick and bored. Play the person you are given.
+
+RULES:
+- No dash, no semicolon, no emoji, no asterisks, no stage directions, no
+  quotation marks, no name tag at the start.
+- Never read a number out like a screen. A price or a temperature once, in
+  words, roughly.
+- Parties by name are fine: HDZ, SDP, Most, Možemo. A politician by name only
+  if a headline in the context names them, or the American president.
+  Friends and family by first name are fine and natural.
+- Never recite a headline. Say what you make of it, in passing.
+- Never explain anything, never offer help, never address the stranger.
+- Never repeat something you have already said.
 """
 
 # WHAT A BATHER TALKS ABOUT, AND WHY IT IS DRAWN HERE RATHER THAN ASKED FOR.
@@ -2715,7 +2947,8 @@ HOW YOU SAY IT:
 # rather than a hope, it is tunable by moving a number, and it is MEASURABLE —
 # the distribution below is what was actually sampled, not what was asked for.
 #
-# THE WEIGHTS. The soak is a third, which is the whole of the brief: it is the
+# THE WEIGHTS, AS THEY WERE ON 8 SEP — see the 29 Sep note under this one for
+# what they are now. The soak is a third, which is the whole of the brief: it is the
 # doorbell, so it should steer the line about as often as a doorbell decides
 # what you say when you open the door. The rest is a spread across the things
 # somebody on that concrete in August has actually got on their mind, and it is
@@ -2727,56 +2960,451 @@ HOW YOU SAY IT:
 # anyway: `random.choices` normalises whatever weights it is handed, so a
 # service with no Brave key simply redistributes the twenty-one points of
 # headlines over the other seven subjects and nobody has to notice.
-BATHER_TOPIC = (
-    # key, weight, the world slot it needs, and what is on your mind
-    ("soak", 34, None,
-     "the water. They have just soaked you and that is the whole line."),
-    ("crypto", 12, "crypto",
-     "one of the coins above, and only one of them. Somebody on this beach is "
-     "in it, and it is going well or it is going badly. In words, never as a "
-     "figure."),
-    ("world", 12, "news.world",
-     "one of the world headlines above. Not the headline — what you make of "
-     "it, or what it means for you, here, with wet hair. Never read it out."),
-    ("heat", 10, "weather",
-     "the heat, or the sea, or the wind. You have been out in it since "
-     "morning and you have a view about it."),
-    ("local", 9, "news.local",
-     "one of the local Dalmatian headlines above. This is your coast, so it "
-     "is personal and slightly aggrieved."),
-    ("money", 7, None,
-     "what things cost here now. The coffee, the parking, what they ask for "
-     "an umbrella in August."),
-    ("politics", 7, None,
-     "politics. Not a party and not a name you would have to explain — just "
-     "how sick of the lot of them you are, or how much better you would do "
-     "it."),
-    ("fire", 5, None,
-     "the fire inland. It has been burning over that hill for days and you "
-     "have your own theory about whose fault it is."),
-    ("ferry", 4, None,
-     "getting home. The ferry, the bus, the crowd, the road out of here."),
+#
+# ── 29 SEP 2026: THE TABLE, REWEIGHTED, AND WHAT CHANGED IN ITS SHAPE ────────
+#
+# The drawing is kept, for every reason above. Three things about it changed.
+#
+# 1. THERE ARE THREE TABLES, NOT ONE. A local, a visitor and a child do not
+#    have the same things on their minds, and one table with a "but you are a
+#    child" rider bolted on was the old way of pretending they did. A visitor
+#    talking about HDZ is as wrong as a nine-year-old talking about ethereum,
+#    and the fix is the same: do not draw it for them.
+#
+# 2. EVERY SUBJECT CARRIES A BAG OF SEEDS, and one seed is drawn with it. "Your
+#    own life" is not a subject a model can do anything varied with — handed
+#    it eight times it writes the same mother-in-law eight times. Handed "the
+#    jam at the Lučko toll on the drive down" it writes that, and the next
+#    person gets the fig tree. The seeds are written in English because they
+#    are instructions; the person says them in whatever language they speak.
+#    Every seed is a thing that is true of this coast — no invented hotel, no
+#    invented mayor — which is RULE 12 held at the level of a topic.
+#
+# 3. THE FEEDS COLOUR AND NO LONGER DOMINATE. A headline is shown only with a
+#    subject it could belong to, and only about one time in three even then
+#    (`FEED_P`). The live coins reach the prompt only when the drawn subject
+#    is the coins. So a context stops being a heap of shiny things for the
+#    model to pick the shiniest of, which was the whole failure the draw was
+#    invented to stop, one layer further in.
+#
+# THE WEIGHTS, as asked. The splash and the fire, which were 34 and 5, are 6
+# and 1: he asked for both to be cut hard, and the splash still gets its one
+# word through the persona on any line that wants it. Crypto is 12 down to 3,
+# "a rare treat". Everyday life — his "hyper-localized useless croatian
+# chatter", the A1 and the clutch — is the biggest single share at 38, and
+# Croatian politics and American politics, the two he named, are the next two
+# at 14 and 10.
+BATHER_LOCAL = (
+    # key, weight, the world slot it needs (or may be coloured by), steer, seeds
+    ("life", 38, None,
+     "your own life. Useless everyday chatter, nothing to do with anybody "
+     "else on this beach. Specifically",
+     ("the drive down from Zagreb on the A1, the jam at the Lučko toll",
+      "the Sveti Rok tunnel, one lane closed, forty minutes standing still",
+      "the traffic on the cesta into Šibenik, the queue at the exit and the "
+      "bridge",
+      "parking at Jadrija, full by nine, the car left under the pines",
+      "missing the boat to Zlarin or Prvić, the next one in two hours",
+      "where to get fresh fish, the ribarnica in town or the man with the "
+      "boat",
+      "what the konoba charged for a plate of fried srdele",
+      "the crowds in Vodice or Tisno, the young ones out till five",
+      "the neighbour renting her apartments to Germans who complain",
+      "a cousin's wedding in Split, four hundred guests, what to put in the "
+      "envelope",
+      "grandma's fig tree, the figs all ripe at once and the wasps",
+      "the car's clutch going, and what the mechanic said",
+      "the kids' summer, bored, on their phones, a resit in maths",
+      "work back in Zagreb, the boss calling on holiday, back on Monday",
+      "the in-laws coming on Saturday and the cooking for it",
+      "the air conditioning in the vikendica packing in last night",
+      "the water tank at the vikendica running low",
+      "the neighbour's dog barking all night",
+      "a sore knee, and the wait for the physio",
+      "a diet started on Monday and already over",
+      "a date last night that talked only about himself",
+      "the roof leaking and no builder free till autumn",
+      "who is bringing the grill tonight, and the charcoal",
+      "gossip from work, a colleague on sick leave all August",
+      "the washing machine, dead, mid-cycle",
+      "the family olive grove and the harvest in October",
+      "the boat's outboard that will not start",
+      "the neighbour drilling at seven in the morning",
+      "a daughter's new boyfriend from Split",
+      "papers for grandfather's land, with eleven cousins to sign",
+      "the tiger mosquitoes, eaten alive on the terrace",
+      "the mother who phones every hour to ask if you have eaten",
+      "a sunburn from falling asleep on the mole",
+      "the barbecue at the neighbours' last night that went on till three",
+      "the wasps' nest under the vikendica roof",
+      "tomatoes in the garden and nobody to water them",
+     )),
+    ("croatia", 14, "news.national",
+     "Croatian politics and the state of the country, the way people "
+     "grumble about it on a beach",
+     ("HDZ in power forever and the opposition unable to agree on lunch",
+      "somebody's cousin who got a job through the party",
+      "prices since the euro came in, everything rounded up",
+      "working it out in kuna, still, out of habit",
+      "the tourist tax and who actually gets the money",
+      "rents in Šibenik, every flat on Airbnb, where young people are "
+      "supposed to live",
+      "young people leaving for Ireland and Germany, a whole class gone",
+      "waiting months for a specialist, or paying privately tomorrow",
+      "pensions that do not cover the electricity bill",
+      "the capped-price list in the shops and what is actually on it",
+      "the politicians on television every evening, all the same",
+      "the new tax on holiday apartments",
+      "a road finished just before an election",
+     )),
+    ("us", 10, "news.world",
+     "American politics, the way Croatians follow it, from a long way off, "
+     "with opinions",
+     ("the American president on the news again every evening",
+      "the tariffs, and whether any of it lands here",
+      "the American elections in November and what they will change",
+      "a cousin in Chicago who argues about it all on Facebook",
+      "America and NATO and what it means for Europe",
+      "how Americans can pay that much for a doctor",
+      "whatever the Americans have done this week, and a shrug",
+     )),
+    ("town", 9, "news.local",
+     "Šibenik and the coast here, the town's own business",
+     ("the cruise ship in, and the old town full to the walls",
+      "a new hotel going up on the coast and nobody asked anybody",
+      "the water pressure dropping every August",
+      "what the city charges for parking now",
+      "the concerts at the fortress this summer",
+      "the fishermen saying there is no fish any more",
+      "the bura that never came this year, or the jugo that did",
+      "the roadworks in town that start every June",
+      "forty euros for a ticket to Krka now",
+      "the Riva and who is sitting on it",
+     )),
+    ("climate", 7, "weather",
+     "the heat, the sea and the weather this year, which is not like it was",
+     ("the sea warmer than anybody can remember, a record again",
+      "tropical nights, nobody has slept since July",
+      "no rain since June and the garden dead",
+      "jellyfish back in the bay",
+      "blue crabs turning up in the Adriatic now",
+      "the air conditioning running all night and the bill after",
+      "summers getting longer every year",
+     )),
+    ("football", 5, None,
+     "football",
+     ("Hajduk and Dinamo, the eternal grievance",
+      "Hajduk selling their best player again",
+      "the national team at the World Cup in America, up at three for it",
+      "Modrić still playing at forty",
+      "HNK Šibenik, suffering as usual",
+     )),
+    ("eu", 4, "news.world",
+     "Europe, Brussels and the neighbours, as seen from a towel",
+     ("the caps they glued onto the bottles",
+      "EU money and the signs on every new road",
+      "no border at Bregana any more, straight through",
+      "the Germans having less money to spend this year",
+      "the war and what it did to the price of everything",
+     )),
+    ("soak", 6, None,
+     "the water. It has just hit you mid-sentence. React the way a person "
+     "does, to the one you are with rather than to the stranger. For "
+     "example",
+     ("it was freezing",
+      "your phone or your book or your cigarettes",
+      "it was actually lovely in this heat",
+      "who on earth does that",
+      "you had only just got dry",
+     )),
+    ("crypto", 3, "crypto",
+     "one of the coins, in passing. Somebody you know is in it",
+     ("a nephew who put his savings in",
+      "a colleague who will not stop talking about it",
+      "the one who bought at the top",
+     )),
+    ("world", 2, "news.world",
+     "one of the world headlines above, in passing, and what it has to do "
+     "with you, which is nothing",
+     ("",)),
+    ("fire", 1, None,
+     "the smoke inland, briefly. Every summer the same",
+     ("",)),
 )
 
-# The five that a small child has no opinion of their own about. Constraint
-# four, and it is the one that keeps the eight sounding like eight people: a
-# nine-year-old holding forth on ethereum is a bug, and a nine-year-old
-# repeating his father on ethereum and getting it slightly wrong is the single
-# funniest thing this whole feature can do. So the subject is not withheld from
-# the children — it is handed to them second-hand.
-ADULT_TOPIC = {"crypto", "world", "local", "money", "politics"}
+# Visitors. English speakers, and they talk about their holiday and their own
+# lives; their politics is home's, never Zagreb's.
+BATHER_TOURIST = (
+    ("life", 38, None,
+     "your own life and your holiday, useless chatter. Specifically",
+     ("the flight home being moved, again",
+      "the host who only takes cash",
+      "work emails you promised not to read",
+      "the rental car and the scrape on its door",
+      "a sunburn from the first day",
+      "somebody in your group who is always late",
+      "the burek from the bakery this morning",
+      "the ćevapi last night, and ordering them wrong",
+      "trying to say hvala properly",
+      "the kids refusing to wear sunscreen",
+      "the apartment's wifi",
+      "where to eat tonight that is not full",
+      "somebody's ex, turning up in the group chat",
+     )),
+    ("holiday", 23, None,
+     "Croatia, as a visitor sees it",
+     ("forty euros each to see the waterfalls at Krka",
+      "the old town full of a cruise ship",
+      "the fortress up the hill and the stairs",
+      "the Game of Thrones walking tour in the old town",
+      "the ferry to the islands and the queue for it",
+      "prices, higher than you were told",
+      "everyone here speaking better English than you",
+      "the locals swimming in the sea till October",
+     )),
+    ("home", 10, "news.world",
+     "politics at home, from far away",
+     ("the elections back home in November",
+      "the news from home that you are trying not to read",
+      "rents at home, worse than here",
+      "everyone here asking you about your president",
+     )),
+    ("climate", 8, "weather",
+     "the heat, which is more than you packed for",
+     ("it was never this hot here before, they say",
+      "the sea warmer than the bath at home",
+      "the smoke you could see from the plane",
+     )),
+    ("soak", 10, None,
+     "the water. It has just hit you mid-sentence. React to the one you "
+     "are with, not the stranger. For example",
+     ("it was freezing", "your phone", "it was actually nice",
+      "people here are mad")),
+    ("world", 5, "news.world",
+     "one of the world headlines above, in passing", ("",)),
+    ("crypto", 3, "crypto",
+     "one of the coins, in passing, because somebody in your group is in it",
+     ("",)),
+    ("fire", 1, None, "the smoke inland, briefly", ("",)),
+)
+
+# Children, of either kind. Mostly their own world. A grown-up subject is
+# drawn only second-hand — see `secondhand` — which is the old ADULT_TOPIC
+# rule turned into a row of its own.
+BATHER_CHILD_T = (
+    ("kid", 64, None,
+     "your own world, like any child at the sea. Specifically",
+     ("a crab under a rock",
+      "a jellyfish, and who is scared of it",
+      "the ice cream you were promised",
+      "a brother or sister who started it",
+      "who can swim further",
+      "the tablet you are not allowed today",
+      "school starting and not wanting it to",
+      "grandma's figs",
+      "diving off the mole",
+      "a sea urchin and your foot",
+      "a friend from the beach you met today",
+      "the car journey here and who was sick",
+     )),
+    ("secondhand", 14, None,
+     "something a grown-up said at breakfast, repeated and slightly wrong. "
+     "It was about",
+     ("the prices", "the government", "the Americans", "the traffic from "
+      "Zagreb", "bitcoin", "the sea getting hot", "the neighbour's tenants")),
+    ("soak", 16, None,
+     "the water. You are soaked. Delighted or furious, you are a child",
+     ("",)),
+    ("plane", 6, None,
+     "the yellow aeroplane that scoops water out of the sea",
+     ("",)),
+)
+
+# How often a headline is shown with a subject that could use one. One in
+# three: often enough that the live news is audibly there, rarely enough that
+# the beach is not a news bulletin.
+FEED_P = 0.35
+
+# The subjects that need their feed. Every other feed slot is optional colour.
+FEED_NEEDED = {"crypto", "world"}
 BATHER_CHILD = {"girl_child", "boy_child"}
+# Kept for anything that still wants to know which subjects are grown-up
+# ones; the child table no longer draws them first-hand at all.
+ADULT_TOPIC = {"crypto", "world", "croatia", "us", "town", "eu", "home"}
 
 
-def bather_topic(world: dict):
-    """Draw one subject, out of the ones this beach can actually supply."""
+def _feed_have(world: dict) -> dict:
     news = world.get("news") or {}
-    have = {"weather": bool(world.get("weather")),
+    return {"weather": bool(world.get("weather")),
             "crypto": bool(world.get("crypto")),
             "news.world": bool(news.get("world")),
+            "news.national": bool(news.get("national")),
             "news.local": bool(news.get("local"))}
-    pool = [t for t in BATHER_TOPIC if t[2] is None or have.get(t[2])]
-    return random.choices(pool, weights=[t[1] for t in pool])[0]
+
+
+def bather_topic(world: dict, audience: str = "local"):
+    """Draw one subject and one seed, out of what this beach can supply.
+
+    Returns (key, steer, seed, feed) — `feed` is the world slot to show with
+    it, or None. A subject whose feed is REQUIRED and empty is dropped from
+    the draw; one whose feed is only colour is kept and simply goes without.
+    """
+    table = {"tourist": BATHER_TOURIST, "child": BATHER_CHILD_T}.get(
+        audience, BATHER_LOCAL)
+    have = _feed_have(world)
+    pool = [t for t in table
+            if not (t[0] in FEED_NEEDED and t[2] and not have.get(t[2]))]
+    key, _, slot, steer, seeds = random.choices(
+        pool, weights=[t[1] for t in pool])[0]
+    seed = random.choice(seeds)
+    feed = None
+    if slot and have.get(slot):
+        if key in FEED_NEEDED or random.random() < FEED_P:
+            feed = slot
+    return key, steer, seed, feed
+
+
+# ── who they are with, which is what makes a line overheard ─────────────────
+# Drawn per line, not per person: the same woman can be on the phone to her
+# sister and then turn back to her husband. A line said TO somebody named is a
+# line that cannot also be a quip at the player — which is the whole of the
+# 29 Sep brief in one field.
+BATHER_WITH = {
+    "woman_old": ("your friend from the next umbrella", "your husband, who "
+                  "is not listening", "your sister, on the phone", "your "
+                  "neighbour from the building", "your granddaughter"),
+    "man_old_heavy": ("your old friend on the next chair", "your wife",
+                      "a man you play briskula with", "your son, on the "
+                      "phone", "your brother-in-law"),
+    "woman_young_slim": ("your best friend", "your sister", "your "
+                         "boyfriend", "a friend from work", "your mother, on "
+                         "the phone"),
+    "woman_young_full": ("your best friend", "your cousin", "your "
+                         "boyfriend", "your flatmate", "your mother, on the "
+                         "phone"),
+    "man_young_fit": ("your mate", "your girlfriend", "your cousin", "a "
+                      "friend from football", "your brother, on the phone"),
+    "man_young_lean": ("your mate", "your girlfriend", "your flatmate",
+                       "a friend from work", "your dad, on the phone"),
+    "girl_child": ("your little brother", "your mum", "your cousin", "a girl "
+                   "you met on the beach today", "your grandma"),
+    "boy_child": ("your sister", "your dad", "your cousin", "a boy you met "
+                  "on the beach today", "your grandpa"),
+}
+BATHER_WITH_TOURIST = ("your partner", "the friend you came with", "your "
+                       "sister", "somebody at home, on the phone")
+
+
+# ── which language, and it hangs off the PERSON ─────────────────────────────
+#
+# THREE IN FOUR IN CROATIAN, and the number is a picture of the beach rather
+# than a taste. Jadrija is a locals' beach — Šibenik families and the Zagreb
+# people who have had vikendice on the peninsula for fifty years — with
+# visitors in it rather than the other way round; the resort at Solaris down
+# the coast is where the tourists are. And the minority that is English is
+# there for the second reason too: a player who reads no Croatian still gets
+# one line in four in words they know, on top of the gloss.
+#
+# PER KIND, because the voices decide it. `woman_old` and `man_old_heavy` are
+# Balkanika and Fran, the account's only two Croatian voices, so they are
+# ALWAYS Croatian — an English line would be the Croatian voice doing an
+# accent it was never measured for. The children are Croatian four times in
+# five: a Šibenik kid is what a child at Jadrija is. The four young adults are
+# three in five, which is where the visitors come from.
+#
+# That lands at 0.75 overall for an even spread of the eight kinds
+# ((2 × 1.0 + 2 × 0.8 + 4 × 0.6) / 8), and `tools/bather_harness.py` prints the
+# share as sampled.
+#
+# PER PERSON AND NOT PER LINE. The page sends `pid`, which bather this is, and
+# the choice is a hash of it: the same woman is Croatian every time you hose
+# her, and the American stays American. Drawn per line, one figure would
+# answer in two languages a minute apart. With no `pid` (an old page) it is a
+# fresh draw, which is what every line was before.
+#
+# THE VISITORS ARE AMERICAN OR IRISH, and that is the voices again rather than
+# a preference. Of the six English voices five are labelled `american` and one
+# `irish` (Niamh) — enumerated off /v1/voices on 29 Sep. A German or a Czech
+# visitor in an American voice is a worse lie than an American one, so they
+# appear in the lines as the people the visitors are WITH, not as speakers.
+BATHER_HR_SHARE = {"woman_old": 1.0, "man_old_heavy": 1.0,
+                   "girl_child": 0.8, "boy_child": 0.8}
+BATHER_HR_DEFAULT = 0.6
+
+# Where a Croatian speaker is from, which decides the register the persona
+# asks for. Šibenik most of the time; the Zagreb weekenders are the rest, and
+# Fran — labelled `accent: zagreb` — is the most natural of them.
+LOCAL_FROM = (
+    ("a local, from Šibenik", "Šibenik", 0.62),
+    ("a weekender from Zagreb, at the family vikendica on the peninsula for "
+     "the summer", "Zagreb", 0.30),
+    ("from Drniš, inland, down at the sea for the day", "Šibenik", 0.08),
+)
+TOURIST_FROM = {
+    "woman_young_full": ("from Dublin", "from Galway", "from Cork"),
+}
+TOURIST_FROM_DEFAULT = ("from Chicago", "from Boston", "from Ohio",
+                        "from Texas", "from New Jersey",
+                        "from Seattle, travelling with a Czech boyfriend",
+                        "from Denver, here with German friends")
+
+
+def _mix(pid: int, salt: int) -> float:
+    """A stable 0..1 for (person, question). Pure, so a person keeps it."""
+    x = (pid * 2654435761 + salt * 40503 + 0x9E3779B9) & 0xFFFFFFFF
+    x ^= x >> 15
+    x = (x * 2246822519) & 0xFFFFFFFF
+    x ^= x >> 13
+    x = (x * 3266489917) & 0xFFFFFFFF
+    x ^= x >> 16
+    return x / 4294967296.0
+
+
+def bather_voice(kind: str, pid=None) -> dict:
+    """Which language this person speaks, where they are from, and who
+    they are. Stable per `pid`; a fresh draw without one."""
+    r = (lambda salt: _mix(pid, salt)) if isinstance(pid, int) \
+        else (lambda salt: random.random())
+    child = kind in BATHER_CHILD
+    hr = r(1) < BATHER_HR_SHARE.get(kind, BATHER_HR_DEFAULT)
+    if hr:
+        u, acc = r(2), 0.0
+        where, reg = LOCAL_FROM[0][0], LOCAL_FROM[0][1]
+        for text, register, w in LOCAL_FROM:
+            acc += w
+            if u < acc:
+                where, reg = text, register
+                break
+        # A child is from wherever their family is, said simply.
+        if child:
+            where = ("from Šibenik" if reg == "Šibenik"
+                     else "from Zagreb, at the family vikendica for the summer")
+        return {"lang": "Croatian", "where": where, "register": reg,
+                "audience": "child" if child else "local"}
+    pool = TOURIST_FROM.get(kind, TOURIST_FROM_DEFAULT)
+    where = pool[int(r(3) * len(pool)) % len(pool)]
+    if child:
+        where = "on holiday " + where.split(",")[0]
+    return {"lang": "English", "where": "a visitor " + where,
+            "register": None, "audience": "child" if child else "tourist"}
+
+
+GLOSS_LANG = {"en": "English", "fr": "French"}
+# The marker a gloss follows. Two characters nobody says out loud, on a line
+# of their own; `split_gloss` takes it apart and only the first half is
+# spoken.
+GLOSS_MARK = ">>"
+
+
+def split_gloss(text: str):
+    """'Croatian line >> English gloss' -> ('Croatian line', 'English gloss')."""
+    if GLOSS_MARK not in (text or ""):
+        return (text or "").strip(), None
+    line, _, gloss = text.partition(GLOSS_MARK)
+    line = line.strip().strip('"').strip("'").strip()
+    gloss = gloss.replace(GLOSS_MARK, " ").strip().strip('"').strip("'")
+    gloss = re.sub(r"^\(|\)$", "", gloss).strip()
+    return line, (gloss[:160] or None)
 
 
 # A day's move in WORDS, because every one of the three personas forbids saying
@@ -2860,6 +3488,24 @@ COIN_NAME = {"btc": "bitcoin", "eth": "ethereum", "ltc": "litecoin",
 # library and specifically `chat15`. Fran and Balkanika speaking English here
 # will carry whatever accent they have, and that is the authenticity this
 # change actually buys on the live path.
+#
+# ── AND ON 29 SEP IT DID CHANGE ──────────────────────────────────────────────
+#
+# Misha: *"i think we need to have more croatian speech and less english
+# speech"*. The objection above was the missing subtitle, and that is what was
+# built: a Croatian line comes back with a gloss in the player's language,
+# which `caption` in 49-voice.js puts under it and ElevenLabs never sees. So
+# three bathers in four now speak Croatian — see `bather_voice`.
+#
+# WHAT IS STILL ROUGH, said here because it is the voices and nothing in this
+# file can fix it: the six young and child voices are American, Irish and one
+# labelled Hindi, and a young local speaking Croatian in them carries that
+# accent. Turbo v2.5 reads Croatian from any voice, so it is intelligible — it
+# is not native. The fix is voices, not prompt: the shared library lists young
+# `language: hr` voices (Maja, Ana, Lara; Martin, Karlo, Marko — enumerated
+# 29 Sep), and adding them to the account is Misha's call, not this file's.
+# When they exist, a second id per young kind — Croatian lines in the hr voice,
+# English in the current one — is a two-line change in `voice_for`.
 BATHER_VOICE = {
     "girl_child":       ("6nGWYkWm4p3WN2Es5h1E", 1.20),  # Tiara, young female
     "boy_child":        ("bIHbv24MWmeRgasZH58o", 1.20),  # Will, young male
@@ -3584,6 +4230,13 @@ def clean_context(raw: dict) -> dict:
         # anyway.
         "kind": clamp_str(g("kind"), 24),
         "doing": clamp_str(g("doing"), 12),
+        # WHICH bather, as the page's index into its own list — a number and
+        # nothing else. It only ever seeds `bather_voice`, so the worst a
+        # modified client can do is pick which of the languages and home
+        # towns this person has, which it could already get by hosing
+        # somebody else.
+        "pid": (lambda v: int(v) if v is not None else None)(
+            clamp_num(g("pid"), 0, 4095)),
         # 48 AND NOT 16, AND THIS HAS BEEN WRONG SINCE THE SERVICE SHIPPED.
         # `context` in 49-voice.js sends one of exactly three phases and all
         # three are longer than sixteen characters, so the clamp cut every one
@@ -3621,8 +4274,93 @@ def clean_context(raw: dict) -> dict:
     return {k: v for k, v in out.items() if v not in (None, [], "")}
 
 
+BATHER_DOING = {"lie": "lying on a towel", "sit": "sitting on the concrete",
+                "wade": "standing in the shallows",
+                "walk": "walking along the shore",
+                "stand": "standing on the beach"}
+
+
+def build_bather_messages(ctx: dict, world: dict, topic=None):
+    """A bather's prompt, and what was decided for it.
+
+    ITS OWN FUNCTION since 29 Sep, because almost nothing in `build_messages`
+    is true of a bather any more. That context describes the PLAYER — where
+    they have been, how near, what they are flying — for speakers who talk to
+    the player. A bather now talks to whoever they came with and is only
+    overheard, so the player's whereabouts are noise that pulls the line back
+    towards "you with the hose", and the world block is shown only where the
+    drawn subject can use it (see `FEED_P`).
+
+    Returns (messages, meta); `meta` is the language, the subject and whether
+    a gloss was asked for, for the log line and for `/line`'s reply.
+    """
+    kind = ctx.get("kind") if ctx.get("kind") in BATHER_WHO else None
+    v = bather_voice(kind or "", ctx.get("pid"))
+    key, steer, seed, feed = topic or bather_topic(world, v["audience"])
+    lines = ["Right now:"]
+    if kind:
+        lines.append(f"- YOU ARE {BATHER_WHO[kind]}. You are {v['where']}.")
+        doing = BATHER_DOING.get(ctx.get("doing"))
+        if doing:
+            lines.append(f"- you were {doing} until a second ago")
+        withs = (BATHER_WITH_TOURIST if v["audience"] == "tourist"
+                 else BATHER_WITH.get(kind, BATHER_WITH_TOURIST))
+        lines.append(f"- you are talking with {random.choice(withs)}")
+    if "spot" in ctx:
+        lines.append(f"- you are {ctx['spot']}")
+    if "hour" in ctx:
+        lines.append(f"- local time about {int(ctx['hour']):02d}:00")
+    # The one feed this subject may be coloured by, if the draw gave it one.
+    if feed == "weather":
+        w = world.get("weather") or {}
+        bits = [f"{lbl} {w[k]}°C" for k, lbl in (("air_c", "air"),
+                                                  ("sea_c", "sea")) if k in w]
+        if bits:
+            lines.append("- real weather at Jadrija: " + ", ".join(bits))
+    elif feed == "crypto":
+        c = world.get("crypto") or {}
+        coins = [f"{COIN_NAME[k]} ({chg_words(c[k]['chg24'])} today)"
+                 for k in ("btc", "eth", "ltc", "doge") if c.get(k)]
+        if coins:
+            lines.append("- the coins today: " + ", ".join(coins))
+    elif feed and feed.startswith("news."):
+        n = world.get("news") or {}
+        heads = news_titles(n.get(feed[5:]))[:4]
+        if heads:
+            lines.append("- today's headlines, which you may glance at in "
+                         "passing or ignore: " + " / ".join(heads))
+    if ctx.get("said"):
+        lines.append("")
+        lines.append("You have already said these — do not repeat or echo them:")
+        lines += [f'- "{s}"' for s in ctx["said"]]
+    lines.append("")
+    lines.append("JUST NOW: a stranger with a fire hose splashed you, "
+                 "mid-sentence.")
+    if v["lang"] == "Croatian":
+        reg = ("the way people in Šibenik talk" if v["register"] == "Šibenik"
+               else "the way people from Zagreb talk")
+        lines.append(f"LANGUAGE: Croatian, {reg}.")
+    else:
+        lines.append("LANGUAGE: English. You are a visitor.")
+    lines.append(f"TALK ABOUT: {steer}" + (f": {seed}." if seed else "."))
+    lines.append("")
+    lines.append(f"Say one overheard line now. At most {WORD_CAP['bather']} "
+                 "words, and fewer is better.")
+    gloss = None
+    if v["lang"] == "Croatian" and ctx.get("lang") != "hr":
+        gloss = GLOSS_LANG.get(ctx.get("lang") or "en", "English")
+        lines.append(f"Then, after {GLOSS_MARK}, the same line in plain "
+                     f"{gloss}, for a subtitle.")
+    meta = {"lang": v["lang"], "where": v["where"], "topic": key,
+            "seed": seed, "feed": feed, "gloss": gloss}
+    return ([{"role": "system", "content": PERSONA_BATHER},
+             {"role": "user", "content": "\n".join(lines)}], meta)
+
+
 def build_messages(ctx: dict, world: dict) -> list:
     who = ctx.get("who", "baye")
+    if who == "bather":
+        return build_bather_messages(ctx, world)[0]
     lines = ["Right now:"]
     if ctx.get("ask") == "time" and "hour" in ctx:
         # The exact minute, and it is the GAME's clock — the sun they are
@@ -3635,13 +4373,6 @@ def build_messages(ctx: dict, world: dict) -> list:
                      "twist on it.")
     if ctx.get("event"):
         lines.append(f"- JUST NOW: {ctx['event']}")
-    if ctx.get("who") == "bather" and ctx.get("kind") in BATHER_WHO:
-        lines.append(f"- YOU ARE {BATHER_WHO[ctx['kind']]}")
-        doing = {"lie": "lying on a towel", "sit": "sitting on the concrete",
-                 "wade": "standing in the shallows", "walk": "walking along the shore",
-                 "stand": "standing on the beach"}.get(ctx.get("doing"))
-        if doing:
-            lines.append(f"- you were {doing} until a second ago")
     if "place" in ctx:
         lines.append(f"- they are at {ctx['place']}")
     if "spot" in ctx:
@@ -3698,9 +4429,11 @@ def build_messages(ctx: dict, world: dict) -> list:
         lines.append("- the coins, and how each has moved today: "
                      + ", ".join(coins))
     n = world.get("news") or {}
-    for slot, label in (("local", "local headlines"), ("world", "world headlines")):
+    for slot, label in (("local", "local headlines"),
+                        ("national", "Croatian headlines"),
+                        ("world", "world headlines")):
         if n.get(slot):
-            lines.append(f"- {label}: " + " / ".join(n[slot][:3]))
+            lines.append(f"- {label}: " + " / ".join(news_titles(n[slot])[:3]))
 
     if ctx.get("said"):
         lines.append("")
@@ -3725,14 +4458,6 @@ def build_messages(ctx: dict, world: dict) -> list:
     # the same reason the word cap is down here: this is the position that
     # binds. Put up with the rest of the context it was one bullet among
     # fifteen and the model went back to the water every time.
-    if who == "bather":
-        key, _, _, steer = bather_topic(world)
-        lines.append(f"TALK ABOUT: {steer}")
-        if key in ADULT_TOPIC and ctx.get("kind") in BATHER_CHILD:
-            lines.append("But you are a small child and you do not really "
-                         "understand it. You are repeating what a grown-up "
-                         "said about it, and getting it a bit wrong.")
-        lines.append("")
 
     # ── AND WHAT SHE FOUND, if she has just walked back from somewhere ──
     r = ctx.get("recon")
@@ -4190,7 +4915,8 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
     # is the one that is waited for.
     for slot, label in (("world", "world headlines"), ("local", "local headlines")):
         if n.get(slot):
-            known.append(f"- {label}: " + " / ".join(h[:100] for h in n[slot][:2]))
+            known.append(f"- {label}: "
+                         + " / ".join(h[:100] for h in news_titles(n[slot])[:2]))
     if known:
         lines.append("ONLY IF THEY ASK, things you have heard today:")
         lines += known
@@ -4520,8 +5246,16 @@ class Handler(BaseHTTPRequestHandler):
             if not self._user():
                 return self._send(401, {"ok": False, "error": "not signed in"})
             w = WORLD.snapshot()
-            return self._send(200, {"ok": True, "crypto": w.get("crypto") or {},
-                                    "weather": w.get("weather") or {}})
+            # AND THE NEWS, since 29 Sep — the vikendica's TV reads it. There
+            # used to be a second `/world` branch further down that sent the
+            # whole snapshot, news included; this one answered first, so that
+            # one never ran and the page never saw a headline. It is gone.
+            n = w.get("news") or {}
+            return self._send(200, {
+                "ok": True, "crypto": w.get("crypto") or {},
+                "weather": w.get("weather") or {},
+                "news": {k: [x for x in v if isinstance(x, dict)][:NEWS_KEEP]
+                         for k, v in n.items() if isinstance(v, list)}})
         if path in ("/baye/health", "/health"):
             return self._send(200, {"ok": True, "service": "baye",
                                     "version": VERSION, "talk": True,
@@ -4532,8 +5266,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(401, {"ok": False, "error": "not signed in"})
         if path in ("/baye/whoami", "/whoami"):
             return self._send(200, {"ok": True, "user": user})
-        if path in ("/baye/world", "/world"):
-            return self._send(200, {"ok": True, "world": WORLD.snapshot()})
         return self._send(404, {"ok": False, "error": "no such route"})
 
     def do_POST(self):
@@ -4590,8 +5322,14 @@ class Handler(BaseHTTPRequestHandler):
                 ctx["asked"], ctx["asked_lang"] = got
         world = WORLD.snapshot()
         fast = who in FAST_WHO
+        meta = None
         try:
-            msgs = build_messages(ctx, world)
+            # A bather's prompt comes with what was decided for it — the
+            # language, the subject, whether a subtitle gloss was asked for.
+            if who == "bather":
+                msgs, meta = build_bather_messages(ctx, world)
+            else:
+                msgs = build_messages(ctx, world)
             # A recon report is the one line on this route that is not one
             # line: she has walked up the beach and back and has a list to
             # hand over, so it gets the conversation's own ceiling instead of
@@ -4605,6 +5343,14 @@ class Handler(BaseHTTPRequestHandler):
                 text, usage = ask_model(msgs, fast, words=cap)
             if not text:
                 return self._send(502, {"ok": False, "error": "empty line"})
+            # The gloss is read, never spoken: only the line before the mark
+            # goes to ElevenLabs. Split whether or not one was asked for, so
+            # a model that volunteers a translation does not get it read out.
+            text, gloss = split_gloss(text)
+            if not text:
+                return self._send(502, {"ok": False, "error": "empty line"})
+            if not (meta and meta.get("gloss")):
+                gloss = None
             vid, rate = voice_for(ctx)
             audio = speak(text, vid, fast)
         except Exception as e:                                # noqa: BLE001
@@ -4616,11 +5362,15 @@ class Handler(BaseHTTPRequestHandler):
               f"{'/' + ctx['kind'] if ctx.get('kind') else ''}"
               f"{' fast' if fast else ''} {ms}ms "
               f"{usage.get('total_tokens', 0)}tok "
-              f"{len(audio)}B :: {text}", flush=True)
-        return self._send(200, {
-            "ok": True, "text": text, "ms": ms, "rate": rate,
-            "audio": "data:audio/mpeg;base64," + base64.b64encode(audio).decode(),
-        })
+              f"{len(audio)}B"
+              + (f" [{meta['lang'][:2]}/{meta['topic']}]" if meta else "")
+              + f" :: {text}" + (f" >> {gloss}" if gloss else ""), flush=True)
+        out = {"ok": True, "text": text, "ms": ms, "rate": rate,
+               "audio": "data:audio/mpeg;base64,"
+                        + base64.b64encode(audio).decode()}
+        if gloss:
+            out["gloss"] = gloss
+        return self._send(200, out)
 
 
 def _hear(self):

@@ -8,6 +8,111 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.549.4] — 2026-09-29
+
+### The beach talks Croatian, about its own life; the TV shows today's news
+
+Misha: *"i think we need to have more croatian speech and less english
+speech, and maybe reduce the amount of speech about crypto and more about
+current events, local politics, in croatia, politics in u.s., europe ... it
+has to also feel kinda organic u know, like not forced... like people also
+sometimes bullshitting about some completely irrelevant stuff involving their
+lives that u overhear"*, then *"de-emphasize the fire and getting splashed
+... hyper-localized useless croatian chatter to set the mood right"*. And
+separately: *"the stories on the TV in the vikendica ... are either fake or
+stuck on some old news stories from months ago"*.
+
+Voice (`server/baye/baye.py` 1.48.0, which needs redeploying on mpcn0):
+
+- **Overheard, not aimed at you.** A hosed bather used to answer the player
+  with a quip. Now the hose is only why you can hear them. What you hear is a
+  piece of the conversation they were already having with whoever they came
+  with. That person is drawn for each line: a husband who is not listening,
+  a sister on the phone, a mate, grandma. `PERSONA_BATHER` is rewritten
+  around that. Its examples are about nothing on purpose, so they show how
+  people sound and never what to talk about.
+- **Three in four speak Croatian.** Language is decided per person (`pid`,
+  the bather's index, hashed), not per line, so the same woman is Croatian
+  every time.
+  - The two old kinds, Balkanika and Fran (the only Croatian voices), always
+    speak Croatian.
+  - Children speak Croatian 80 % of the time.
+  - Young adults speak Croatian 60 % of the time. The rest are American or
+    Irish visitors, because those are the English voices available.
+  - Measured over the hundred pids: 76.0 %.
+  - Locals are from Šibenik (ikavian: di, lito, san, reka), Zagreb
+    weekenders (kaj, bum, fakat), or from Drniš.
+- **A gloss.** A Croatian line comes back with a translation in the player's
+  language, shown in italics under the subtitle and never spoken. It is not
+  sent when the game is in Croatian.
+- **The topics, redrawn.** There are three tables (local, visitor, child)
+  instead of one. Every topic carries a bag of specific seeds, and one seed
+  is drawn with it: the Lučko toll, the Sveti Rok tunnel, the boat to
+  Zlarin, the neighbour's Germans, the clutch, the eleven cousins and
+  grandfather's land. Locals, sampled over 10 000 draws:
+
+  | topic | share |
+  |---|---|
+  | everyday life | 38 % |
+  | Croatian politics | 14 % |
+  | US politics | 10 % |
+  | Šibenik and the town | 9 % |
+  | climate and the sea | 7 % |
+  | splash | 6 % |
+  | football | 5 % |
+  | EU | 4 % |
+  | crypto | 3 % |
+  | world headline | 2 % |
+  | fire | 1 % |
+
+  Visitors: life 38, holiday 23, splash 10, home politics 10, climate 8,
+  world 5, crypto 3, fire 1. Children: their own world 64, splash 16, a
+  grown-up topic repeated wrongly 14, the yellow plane 6. Before, soak was
+  34, crypto 12, fire 5.
+- **News only colours a line.** A headline reaches the prompt only with a
+  topic it could belong to, and then only about one time in three. The
+  coins reach it only when the topic is crypto.
+- **The news feed: three slots, current, and kept whole.**
+  - Brave `freshness=pd`, retried at `pw` when a slot comes back thin.
+  - The slots are Šibenik, Croatia and the world, all in Croatian from
+    `.hr` outlets. That filter drops the Spanish travel pieces, the Bosnian
+    portal and the Serbian-language copy network the Croatian query also
+    returns.
+  - Each item keeps its title (with the outlet's name cut off either end),
+    its source and its time.
+- **`/world` sends the news.** A second `/world` branch that included it
+  could never run, because the first answered. It is gone.
+
+Game:
+
+- **The vikendica TV shows real news** when you are signed in. It asks
+  `/world` once, then every twenty minutes.
+  - Headlines rotate local first, then national and world, in caps.
+  - The subline is the outlet and how long ago, for example "HRT · prije
+    2 h".
+  - The type steps down from 40 to 25 px so a fifteen-word headline fits,
+    with an ellipsis only past that.
+  - The crawl carries the national and world headlines.
+  - Signed out or offline, it shows the baked set as before.
+- The bather's hose event now sends `pid`, and `caption` shows the gloss.
+
+Tested:
+
+- Headless: the TV screen as a PNG, baked and with the live feed, plus a
+  15-word headline; the TV in the room; the subtitle with a gloss. No
+  console errors. `__fr.stats()` people 100, blockers 792.
+- `tools/bather_harness.py` (new) prints the topic and language tables and
+  sample prompts. It also generates real lines with the model, without
+  speech, and fetches the news live or shapes it from a fixture.
+- 84 lines were generated over three passes. Two fixes came out of that:
+  the examples were changed after lines copied them word for word, and
+  "Oi" was cut after it opened a third of the English lines.
+- **Crypto fallback (voice service 1.48.1):** CoinGecko's keyless API answers
+  this server 403 since 29 Sep; the feed only looked alive on a cached answer,
+  which the 1.48.0 restart dropped. `_coinbase` rebuilds the same shape from
+  Coinbase Exchange's 24 h stats when CoinGecko refuses, and the health check
+  lists crypto, news and weather again.
+
 ## [1.549.3] — 2026-09-29
 
 ### Beach bar MINI's terrace, decluttered; the push car, moulded

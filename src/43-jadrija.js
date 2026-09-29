@@ -45292,7 +45292,10 @@ async function buildJadrija(scene) {
       : b.pose === 'sit' ? (jit(bi, 917) < 0.25 ? 0 : 1) : 1;
     if (eyesOn) audio.yelp(kind, m);
     else audio.startle(kind, m);
-    batherNewsQ = { kind, pose: b.pose, m };
+    // `pid` is which of them, so the voice service can keep a person's
+    // language and home town the same every time -- `bather_voice` in
+    // server/baye/baye.py.
+    batherNewsQ = { kind, pose: b.pose, m, pid: bi };
   }
 
   // ── HOSED OFF THEIR CHAIRS (1.540.0) ──────────────────────────────────────
@@ -67920,7 +67923,7 @@ async function buildJadrija(scene) {
     batherGap: () => {
       const n = batherNews();
       if (!n || !show || show.pt == null) return null;
-      return { m: n.m, kind: n.kind, pose: n.pose,
+      return { m: n.m, kind: n.kind, pose: n.pose, pid: n.pid,
         news: 'they have just turned a fire hose on you',
         spot: voiceSpot() };
     },
