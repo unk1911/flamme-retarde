@@ -409,6 +409,9 @@ async function buildGround(scene, field) {
   }
 
   let active = false;
+  // Somebody's machine under you (1.550.0): `{ step(dt, you, inp), eye }`,
+  // handed in by 90-app.js off `jadrija.steal.take`. See `walk`.
+  let mount = null;
   let stranded = false;              // walked in under a canopy, not out of a door
   let armed = false;                 // has the spot fire been called
   let seeded = false;                // have the first flames appeared
@@ -1581,7 +1584,8 @@ async function buildGround(scene, field) {
     // it, which is the difference between panning a scope and swinging it.
     const lens = Math.pow(LENS.min / baseFov, zoom);
     const turn = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
-    if (turn) you.yaw -= turn * GROUND.turn * lens * dt;
+    // On somebody's machine the arrows steer it, in `mount.step` below.
+    if (turn && !mount) you.yaw -= turn * GROUND.turn * lens * dt;
 
     // And up and down tilt, but only through the lens.
     //
@@ -1605,48 +1609,69 @@ async function buildGround(scene, field) {
         -1.35, 1.05);
     }
 
-    const fx = -Math.sin(you.yaw), fz = -Math.cos(you.yaw);
-    // Right is forward rotated a quarter turn clockwise about the vertical:
-    // forward (-sin, -cos) -> right (cos, -sin). This was the negative of that,
-    // which is the *left* vector — so D strafed left, A strafed right, and every
-    // sideways control in the mode was mirrored.
-    const rx = Math.cos(you.yaw), rz = -Math.sin(you.yaw);
-    let ix = 0, iz = 0;
-    // W and S are always a leg. The arrows are a leg by however much the lens
-    // has not taken — see the tilt above — so at full zoom they stop walking
-    // you entirely, which is right: nobody walks anywhere while looking down a
-    // scope, and a step at 11° is a lurch across the whole frame.
-    if (keys.has('KeyW')) iz += 1;
-    if (keys.has('KeyS')) iz -= 1;
-    if (keys.has('ArrowUp')) iz += 1 - zoom;
-    if (keys.has('ArrowDown')) iz -= 1 - zoom;
-    if (keys.has('KeyD')) ix += 1;
-    if (keys.has('KeyA')) ix -= 1;
-    ix += TOUCH.gx || 0; iz += TOUCH.gy || 0;
-    const m = Math.hypot(ix, iz);
-    if (m > 1) { ix /= m; iz /= m; }
+    // ON A MACHINE (1.550.0 — somebody's bicycle or e-scooter, taken off them
+    // at Jadrija; see `THEFT` in 43-jadrija.js). The keys are a throttle, a
+    // brake and a bar rather than a pair of legs, and what they come to is a
+    // velocity along the way the machine points — `mount.step` turns you and
+    // says what it is. Everything after this is the walk's: the people, the
+    // walls, the ground under the tyres.
+    let fx, fz, rx, rz, ix = 0, iz = 0, m, wx, wz;
+    if (mount) {
+      you.crouch = false;
+      const gy = TOUCH.gy || 0, gx = TOUCH.gx || 0;
+      const v = mount.step(dt, you, {
+        fwd: keys.has('KeyW') || keys.has('ArrowUp') || gy > 0.3,
+        back: keys.has('KeyS') || keys.has('ArrowDown') || gy < -0.3,
+        steer: clamp((keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0)
+          - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + gx, -1, 1),
+        sprint: keys.has('KeyQ') || !!TOUCH.grun,
+      });
+      wx = v[0]; wz = v[1];
+      you.vx = wx; you.vz = wz;
+      m = 1;
+    } else {
+      fx = -Math.sin(you.yaw); fz = -Math.cos(you.yaw);
+      // Right is forward rotated a quarter turn clockwise about the vertical:
+      // forward (-sin, -cos) -> right (cos, -sin). This was the negative of that,
+      // which is the *left* vector — so D strafed left, A strafed right, and every
+      // sideways control in the mode was mirrored.
+      rx = Math.cos(you.yaw); rz = -Math.sin(you.yaw);
+      // W and S are always a leg. The arrows are a leg by however much the lens
+      // has not taken — see the tilt above — so at full zoom they stop walking
+      // you entirely, which is right: nobody walks anywhere while looking down a
+      // scope, and a step at 11° is a lurch across the whole frame.
+      if (keys.has('KeyW')) iz += 1;
+      if (keys.has('KeyS')) iz -= 1;
+      if (keys.has('ArrowUp')) iz += 1 - zoom;
+      if (keys.has('ArrowDown')) iz -= 1 - zoom;
+      if (keys.has('KeyD')) ix += 1;
+      if (keys.has('KeyA')) ix -= 1;
+      ix += TOUCH.gx || 0; iz += TOUCH.gy || 0;
+      m = Math.hypot(ix, iz);
+      if (m > 1) { ix /= m; iz /= m; }
 
-    // Shift, where it has always been and where a hand expects it. It briefly
-    // was not: when the escape charge arrived it took Shift and pushed the run
-    // onto Q, which was the wrong way round — the charge fires once in a
-    // session and the run is held down for four hundred metres of promenade,
-    // so the one that should have moved was the rare one. It did, to U.
-    //
-    // Q still runs. Nobody has to unlearn a key that costs a boolean to keep.
-    // AND SHIFT IS THE CROUCH NOW (24 Sep 2026), so the run is Q alone; and
-    // crouched you shuffle, whatever you are holding.
-    let top = (keys.has('KeyQ') || TOUCH.grun) ? GROUND.run : GROUND.walk;
-    if (you.crouch) top = GROUND.walk * GROUND.crouchPace;
-    // Indoors you walk, and you walk slowly. A 4 m room crossed in a second is
-    // a room you cannot look at. See `GROUND.indoorPace`.
-    if (field.tightTS) {
-      const [ct, cs] = field.local(you.x, you.z);
-      if (field.tightTS(ct, cs)) top *= GROUND.indoorPace;
+      // Shift, where it has always been and where a hand expects it. It briefly
+      // was not: when the escape charge arrived it took Shift and pushed the run
+      // onto Q, which was the wrong way round — the charge fires once in a
+      // session and the run is held down for four hundred metres of promenade,
+      // so the one that should have moved was the rare one. It did, to U.
+      //
+      // Q still runs. Nobody has to unlearn a key that costs a boolean to keep.
+      // AND SHIFT IS THE CROUCH NOW (24 Sep 2026), so the run is Q alone; and
+      // crouched you shuffle, whatever you are holding.
+      let top = (keys.has('KeyQ') || TOUCH.grun) ? GROUND.run : GROUND.walk;
+      if (you.crouch) top = GROUND.walk * GROUND.crouchPace;
+      // Indoors you walk, and you walk slowly. A 4 m room crossed in a second is
+      // a room you cannot look at. See `GROUND.indoorPace`.
+      if (field.tightTS) {
+        const [ct, cs] = field.local(you.x, you.z);
+        if (field.tightTS(ct, cs)) top *= GROUND.indoorPace;
+      }
+      wx = (fx * iz + rx * ix) * top;
+      wz = (fz * iz + rz * ix) * top;
+      you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
+      you.vz = damp(you.vz, wz, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
     }
-    const wx = (fx * iz + rx * ix) * top;
-    const wz = (fz * iz + rz * ix) * top;
-    you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
-    you.vz = damp(you.vz, wz, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
 
     wet = null;
     const tx = you.x + you.vx * dt, tz = you.z + you.vz * dt;
@@ -1699,7 +1724,10 @@ async function buildGround(scene, field) {
     if (hit && !wet && field.brink && field.brink(you.x, you.z)) {
       // nothing: a refused step here is an edge you stop at, not a shore you
       // walk into.
-    } else if (hit && !wet) {
+    } else if (hit && !wet && !mount) {
+      // (Not on a machine: nobody rides one into the sea by accident, and
+      // the swim has no way of leaving it on the shore.)
+      //
       // Off `wx, wz` — where the keys are asking to go — and not off velocity,
       // which by the second frame against a barrier is zero and stays there.
       // Marched rather than sampled at one distance: the barrier is a metre
@@ -1760,9 +1788,11 @@ async function buildGround(scene, field) {
     // cap in pose() is what stops a teleport arriving on the deck at full
     // height with its head outside.
     you.eye = damp(you.eye, you.crouch ? Math.min(GROUND.kneel, eyeAt(you.x, you.z, you.y))
-      : eyeAt(you.x, you.z, you.y), you.crouch ? 6 : 9, dt);
+      : eyeAt(you.x, you.z, you.y) + (mount ? mount.eye : 0), you.crouch ? 6 : 9, dt);
     you.low = damp(you.low, you.crouch ? 1 : 0, you.crouch ? 6 : 9, dt);
-    gait(moved, dt, air);
+    // No footfalls on a machine, and no bob: the tyres take the ground.
+    if (!mount) gait(moved, dt, air);
+    else you.bob = damp(you.bob, 0, 7, dt);
     // Two boots at once, off `footstep` rather than a sound of its own — it is
     // a boot arriving and that is what the function is. Louder than a stride
     // and by how fast you came in, so the step down off a bench is a step and
@@ -2160,6 +2190,7 @@ async function buildGround(scene, field) {
   function bail() {
     if (!active) return false;
     active = false;
+    mount = null;
     you.spraying = false;
     you.vx = you.vz = 0;
     you.jet = 0;
@@ -2169,6 +2200,7 @@ async function buildGround(scene, field) {
   function leave() {
     if (!canBoard()) return false;
     active = false;
+    mount = null;
     you.spraying = false;
     state.phase = 'fly';
     return true;
@@ -2529,6 +2561,9 @@ async function buildGround(scene, field) {
     nozzle,
     /** How far the third person got behind her last frame; 0 is first. */
     thirdD: () => thirdD,
+    /** On a machine, or off it (null) — see `walk`. */
+    mount: (m) => { mount = m || null; if (!mount) you.bob = 0; return !!mount; },
+    mounted: () => mount,
     retarget, dropIn, stepTo, addGuest,
     /**
      * How much clear air there is between your eye and the nearest person,

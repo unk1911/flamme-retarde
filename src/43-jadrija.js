@@ -62611,7 +62611,8 @@ async function buildJadrija(scene) {
     // Read at run time only: `wheelers` is declared further down this file,
     // and nothing calls this until the collider does, after the build.
     for (const r of wheelers) {
-      if (!r.fig.mesh.visible || r.t < t - band - 1.5 || r.t > t + band + 1.5) continue;
+      // Not one lying on the promenade, or the one you are on (1.550.0).
+      if (r.gone || !r.fig.mesh.visible || r.t < t - band - 1.5 || r.t > t + band + 1.5) continue;
       const hx = Math.cos(r.yaw), hz = -Math.sin(r.yaw), hl = r.bike ? 0.55 : 0.30;
       pushBody(r.x + hx * hl, r.z + hz * hl, 0.34, r.y, r.y + 1.85, 'rider', r.i);
       pushBody(r.x - hx * hl, r.z - hz * hl, 0.34, r.y, r.y + 1.85, 'rider', r.i);
@@ -64571,6 +64572,116 @@ async function buildJadrija(scene) {
     fig.aim(A.thumb, _whV.x, _whV.y, _whV.z, K.oppose);
   }
 
+  /**
+   * A body fitted to a machine: where the figure's own origin sits in the
+   * machine's frame (`F`), the lean, and each arm and leg's rest and goal —
+   * everything `wheelPose` needs, off the frozen `idle` (`R`, `wheelRest`).
+   * `seatGiven` is a saddle already built, for somebody who did not set it
+   * (1.550.0: you, on a bicycle you have just taken off its owner); null sets
+   * it for this body. `i` is only a seed for which foot a scooter is ridden
+   * with — a hash, not the resort's `rng` (rule 4).
+   */
+  function wheelFit(fig, bike, R, seatGiven, i) {
+    const sdL = Math.sign(R.legUL.z) || -1, sdR = -sdL;
+    const hip = _wkA.copy(R.legUL).add(R.legUR).multiplyScalar(0.5);
+    const leg = (R.legLL.distanceTo(R.legUL) + R.footL.distanceTo(R.legLL)
+      + R.legLR.distanceTo(R.legUR) + R.footR.distanceTo(R.legLR)) * 0.5;
+    const arm = (R.armLL.distanceTo(R.armUL) + R.handL.distanceTo(R.armLL)
+      + R.armLR.distanceTo(R.armUR) + R.handR.distanceTo(R.armLR)) * 0.5;
+    // Where the figure's own origin sits in the machine's frame.
+    const F = new THREE.Vector3();
+    let seatY = 0;
+    let grip, gripW, deck = 0;
+    if (bike) {
+      // THE SADDLE IS SET FOR THE RIDER, the way anybody sets one: at the
+      // bottom of the stroke the leg is nearly straight. Found by bisection
+      // along a 72 degree seat tube, with the hip joint 0.09 m over the
+      // saddle top and a touch forward of the seat post, and the ankle
+      // 0.085 m over a pedal at bottom dead centre.
+      const K = WHEEL_BIKE;
+      const ankX = K.bb[0] - 0.075, ankY = K.bb[1] - WHEELS.crank + 0.085;
+      if (seatGiven != null) seatY = seatGiven;
+      else {
+        let lo = 0.60, hi = 1.20;
+        for (let n = 0; n < 24; n++) {
+          const y = (lo + hi) * 0.5;
+          const hx = K.bb[0] - (y - K.bb[1]) * K.seatK + 0.05, hy = y + 0.09;
+          if (Math.hypot(hx - ankX, hy - ankY) < leg * 0.95) lo = y; else hi = y;
+        }
+        seatY = lo;
+      }
+      F.set(K.bb[0] - (seatY - K.bb[1]) * K.seatK + 0.05 - hip.x,
+        seatY + 0.09 - hip.y, -hip.z);
+      grip = K.bar; gripW = K.grip;
+    } else {
+      // Standing on the deck, a little down into the knees, hips over the
+      // gap between the feet.
+      const K = WHEEL_SCOOT;
+      deck = K.deck;
+      F.set(-hip.x, deck - 0.035, -hip.z);
+      grip = K.bar; gripW = K.grip;
+    }
+    // The lean: the least that brings both wrists within 0.93 of an arm's
+    // length of their grips. A city bicycle is ridden nearly upright and a
+    // scooter completely, so this comes out small, and it is solved rather
+    // than typed because the eight bodies are 1.24 to 1.84 m.
+    const P0 = R.spine01;
+    const wrist = (sd) => _wkB.set(grip[0] - 0.045 - F.x, grip[1] + 0.03 - F.y,
+      sd * gripW - F.z);
+    const reach = (th) => {
+      _wkQ.setFromAxisAngle(_wkZ, -th);
+      let worst = 0;
+      for (const [S, sd] of [[R.armUL, sdL], [R.armUR, sdR]]) {
+        const sh = _wkC.copy(S).sub(P0).applyQuaternion(_wkQ).add(P0);
+        worst = Math.max(worst, sh.distanceTo(wrist(sd)));
+      }
+      return worst;
+    };
+    let lean = bike ? 0.10 : 0.0;
+    for (let n = 0; n < 30 && lean < 0.6 && reach(lean) > arm * 0.93; n++) lean += 0.02;
+    // The arms, leaned once and kept: the lean does not change.
+    _wkQ.setFromAxisAngle(_wkZ, -lean);
+    const leaned = (p) => p.clone().sub(P0).applyQuaternion(_wkQ).add(P0);
+    const arms = [
+      { sd: sdL, u: 'armUL', l: 'armLL', S: leaned(R.armUL), E: leaned(R.armLL), W: leaned(R.handL) },
+      { sd: sdR, u: 'armUR', l: 'armLR', S: leaned(R.armUR), E: leaned(R.armLR), W: leaned(R.handR) },
+    ];
+    // `w0` is the same wrist in the machine's own frame, with the bar
+    // straight: the steering turns it about the head tube's axis in
+    // `wheelPose`, and the hand follows the grip round.
+    for (const A of arms) { A.goal = wrist(A.sd).clone(); A.w0 = A.goal.clone().add(F); }
+    // AND THE HAND ITSELF, which nothing had asked about. See `wheelHand`.
+    // Null if the rig has no finger bones, and then the wrist is aimed at
+    // the grip as it always was.
+    const hands = wheelGripOf(fig, bike);
+    if (hands) for (const A of arms) Object.assign(A, hands[A.sd]);
+    const legs = [
+      { sd: sdL, u: 'legUL', l: 'legLL', f: 'footL', H: R.legUL, K: R.legLL, A: R.footL, T: R.toeL },
+      { sd: sdR, u: 'legUR', l: 'legLR', f: 'footR', H: R.legUR, K: R.legLR, A: R.footR, T: R.toeR },
+    ];
+    // A scooter is ridden one foot ahead of the other, and which foot is
+    // the rider's own.
+    const front = jit(i, 9312) < 0.5 ? 0 : 1;
+    for (let n = 0; n < 2; n++) {
+      const L = legs[n];
+      L.ankleY = L.A.y;
+      L.toe = L.T.clone().sub(L.A);
+      if (!bike) {
+        const fx = n === front ? 0.15 : -0.17;
+        L.goal = new THREE.Vector3(fx - 0.06 - F.x, deck + L.ankleY - F.y,
+          L.sd * 0.062 - F.z);
+        // The back foot turns out across the deck, the front one points
+        // down it.
+        L.dir = n === front ? new THREE.Vector3(1, -0.03, 0).normalize()
+          : new THREE.Vector3(0.80, -0.03, L.sd * 0.60).normalize();
+      } else {
+        L.goal = new THREE.Vector3();
+        L.dir = new THREE.Vector3(1, -0.22, 0).normalize();
+      }
+    }
+    return { F, arms, legs, lean, seatY };
+  }
+
   const wheelers = [];
   let wheelTris = 0, wheelMachineTris = 0, wheelMachineLoTris = 0, wheelDraws = 0;
   // The grid the lanes are planned on, and the length of `blockers` it was
@@ -64603,100 +64714,7 @@ async function buildJadrija(scene) {
       if (!R) return;
       fig.mesh.frustumCulled = false;
       const bike = c.on === 'bike';
-      const sdL = Math.sign(R.legUL.z) || -1, sdR = -sdL;
-      const hip = _wkA.copy(R.legUL).add(R.legUR).multiplyScalar(0.5);
-      const leg = (R.legLL.distanceTo(R.legUL) + R.footL.distanceTo(R.legLL)
-        + R.legLR.distanceTo(R.legUR) + R.footR.distanceTo(R.legLR)) * 0.5;
-      const arm = (R.armLL.distanceTo(R.armUL) + R.handL.distanceTo(R.armLL)
-        + R.armLR.distanceTo(R.armUR) + R.handR.distanceTo(R.armLR)) * 0.5;
-      // Where the figure's own origin sits in the machine's frame.
-      const F = new THREE.Vector3();
-      let seatY = 0;
-      let grip, gripW, deck = 0;
-      if (bike) {
-        // THE SADDLE IS SET FOR THE RIDER, the way anybody sets one: at the
-        // bottom of the stroke the leg is nearly straight. Found by bisection
-        // along a 72 degree seat tube, with the hip joint 0.09 m over the
-        // saddle top and a touch forward of the seat post, and the ankle
-        // 0.085 m over a pedal at bottom dead centre.
-        const K = WHEEL_BIKE;
-        const ankX = K.bb[0] - 0.075, ankY = K.bb[1] - WHEELS.crank + 0.085;
-        let lo = 0.60, hi = 1.20;
-        for (let n = 0; n < 24; n++) {
-          const y = (lo + hi) * 0.5;
-          const hx = K.bb[0] - (y - K.bb[1]) * K.seatK + 0.05, hy = y + 0.09;
-          if (Math.hypot(hx - ankX, hy - ankY) < leg * 0.95) lo = y; else hi = y;
-        }
-        seatY = lo;
-        F.set(K.bb[0] - (seatY - K.bb[1]) * K.seatK + 0.05 - hip.x,
-          seatY + 0.09 - hip.y, -hip.z);
-        grip = K.bar; gripW = K.grip;
-      } else {
-        // Standing on the deck, a little down into the knees, hips over the
-        // gap between the feet.
-        const K = WHEEL_SCOOT;
-        deck = K.deck;
-        F.set(-hip.x, deck - 0.035, -hip.z);
-        grip = K.bar; gripW = K.grip;
-      }
-      // The lean: the least that brings both wrists within 0.93 of an arm's
-      // length of their grips. A city bicycle is ridden nearly upright and a
-      // scooter completely, so this comes out small, and it is solved rather
-      // than typed because the eight bodies are 1.24 to 1.84 m.
-      const P0 = R.spine01;
-      const wrist = (sd) => _wkB.set(grip[0] - 0.045 - F.x, grip[1] + 0.03 - F.y,
-        sd * gripW - F.z);
-      const reach = (th) => {
-        _wkQ.setFromAxisAngle(_wkZ, -th);
-        let worst = 0;
-        for (const [S, sd] of [[R.armUL, sdL], [R.armUR, sdR]]) {
-          const sh = _wkC.copy(S).sub(P0).applyQuaternion(_wkQ).add(P0);
-          worst = Math.max(worst, sh.distanceTo(wrist(sd)));
-        }
-        return worst;
-      };
-      let lean = bike ? 0.10 : 0.0;
-      for (let n = 0; n < 30 && lean < 0.6 && reach(lean) > arm * 0.93; n++) lean += 0.02;
-      // The arms, leaned once and kept: the lean does not change.
-      _wkQ.setFromAxisAngle(_wkZ, -lean);
-      const leaned = (p) => p.clone().sub(P0).applyQuaternion(_wkQ).add(P0);
-      const arms = [
-        { sd: sdL, u: 'armUL', l: 'armLL', S: leaned(R.armUL), E: leaned(R.armLL), W: leaned(R.handL) },
-        { sd: sdR, u: 'armUR', l: 'armLR', S: leaned(R.armUR), E: leaned(R.armLR), W: leaned(R.handR) },
-      ];
-      // `w0` is the same wrist in the machine's own frame, with the bar
-      // straight: the steering turns it about the head tube's axis in
-      // `wheelPose`, and the hand follows the grip round.
-      for (const A of arms) { A.goal = wrist(A.sd).clone(); A.w0 = A.goal.clone().add(F); }
-      // AND THE HAND ITSELF, which nothing had asked about. See `wheelHand`.
-      // Null if the rig has no finger bones, and then the wrist is aimed at
-      // the grip as it always was.
-      const hands = wheelGripOf(fig, bike);
-      if (hands) for (const A of arms) Object.assign(A, hands[A.sd]);
-      const legs = [
-        { sd: sdL, u: 'legUL', l: 'legLL', f: 'footL', H: R.legUL, K: R.legLL, A: R.footL, T: R.toeL },
-        { sd: sdR, u: 'legUR', l: 'legLR', f: 'footR', H: R.legUR, K: R.legLR, A: R.footR, T: R.toeR },
-      ];
-      // A scooter is ridden one foot ahead of the other, and which foot is
-      // the rider's own.
-      const front = jit(i, 9312) < 0.5 ? 0 : 1;
-      for (let n = 0; n < 2; n++) {
-        const L = legs[n];
-        L.ankleY = L.A.y;
-        L.toe = L.T.clone().sub(L.A);
-        if (!bike) {
-          const fx = n === front ? 0.15 : -0.17;
-          L.goal = new THREE.Vector3(fx - 0.06 - F.x, deck + L.ankleY - F.y,
-            L.sd * 0.062 - F.z);
-          // The back foot turns out across the deck, the front one points
-          // down it.
-          L.dir = n === front ? new THREE.Vector3(1, -0.03, 0).normalize()
-            : new THREE.Vector3(0.80, -0.03, L.sd * 0.60).normalize();
-        } else {
-          L.goal = new THREE.Vector3();
-          L.dir = new THREE.Vector3(1, -0.22, 0).normalize();
-        }
-      }
+      const { F, arms, legs, lean, seatY } = wheelFit(fig, bike, R, null, i);
       const paint = WHEEL_PAINT[c.on][c.paint % WHEEL_PAINT[c.on].length];
       const kit = { ...(c.kit || {}), low: !!c.low, basket: !!c.basket };
       const g = bike ? wheelBike(seatY, paint, kit, false) : wheelScoot(paint, false);
@@ -65019,6 +65037,13 @@ async function buildJadrija(scene) {
     }
     if (show && skinFig && skinFig.mesh.visible && show.t > tLo && show.t < tHi) {
       push(show.t, show.s, WHEELS.clearBaye);
+    }
+    // And whoever has been hosed off theirs and is on their feet — see
+    // `stepVictim`. They are nobody's crowd, so nothing else knows they are
+    // there. (Their machine is below, with the riders: it is still one.)
+    for (const o of wheelers) {
+      const p = o.gone && o.theft && o.theft.vic ? o.pf : null;
+      if (p && p.t > tLo && p.t < tHi) push(p.t, p.s, WHEELS.clear);
     }
     // You, but only if you are down here: `who` is the camera when there is
     // nobody on foot, and a Canadair over the promenade is not in the lane.
@@ -65466,6 +65491,26 @@ async function buildJadrija(scene) {
     if (r.crank) r.crank.visible = on;
     r.fig.mesh.visible = on;
     if (!on) return;
+    wheelMachine(r, d2);
+    r.fig.mesh.position.copy(r.F).applyMatrix4(r.veh.matrixWorld);
+    r.fig.mesh.rotation.set(r.roll, r.yaw, r.pitch, 'YZX');
+    r.fig.mesh.updateMatrixWorld();
+    const every = d2 < WHEELS.poseNear * WHEELS.poseNear ? 1
+      : d2 < WHEELS.poseMid * WHEELS.poseMid ? 3 : 8;
+    if (r.posed && every > 1 && (wheelFrame + r.i) % every) return;
+    wheelPose(r);
+    r.fig.update(0);
+    r.posed = true;
+  }
+
+  /**
+   * The machine alone, off `r.x/y/z`, `yaw/pitch/roll`, `phase`, `steerA`
+   * and `dist`: its frame, the crank, the bar, the pedals, the wheels and the
+   * far copy. `d2` is its distance from the camera, squared. Split out of
+   * `wheelDraw` in 1.550.0 so that a machine with nobody on it — lying where
+   * its rider was hosed off it, or under you — is drawn by the same lines.
+   */
+  function wheelMachine(r, d2) {
     r.veh.position.set(r.x, r.y, r.z);
     // `YZX`: yaw, then pitch along the deck, then the lean about the machine's
     // own length — which is the only order in which a lean stays a lean on a
@@ -65506,15 +65551,6 @@ async function buildJadrija(scene) {
     // nothing in precision.
     for (const W of r.wheels) W.m.rotation.z = -(r.dist % W.circ) / W.R;
     r.veh.updateMatrixWorld(true);
-    r.fig.mesh.position.copy(r.F).applyMatrix4(r.veh.matrixWorld);
-    r.fig.mesh.rotation.set(r.roll, r.yaw, r.pitch, 'YZX');
-    r.fig.mesh.updateMatrixWorld();
-    const every = d2 < WHEELS.poseNear * WHEELS.poseNear ? 1
-      : d2 < WHEELS.poseMid * WHEELS.poseMid ? 3 : 8;
-    if (r.posed && every > 1 && (wheelFrame + r.i) % every) return;
-    wheelPose(r);
-    r.fig.update(0);
-    r.posed = true;
   }
 
   // What a step costs, in milliseconds, smoothed. For the stats and nothing else.
@@ -65524,9 +65560,760 @@ async function buildJadrija(scene) {
     const t0 = performance.now();
     if (wheelPlanAt !== blockers.length) wheelPlan();
     wheelFrame++;
-    for (const r of wheelers) wheelMove(r, wheelHold ? 0 : dt, who, pt, ps);
-    for (const r of wheelers) { wheelPlace(r, dt); wheelDraw(r, dt, cam); }
+    // Not the ones who have been hosed off: their machines and their bodies
+    // are `stepTheft`'s until they are riding again.
+    for (const r of wheelers) if (!r.gone) wheelMove(r, wheelHold ? 0 : dt, who, pt, ps);
+    for (const r of wheelers) if (!r.gone) { wheelPlace(r, dt); wheelDraw(r, dt, cam); }
+    stepTheft(dt, cam);
     wheelMs += (performance.now() - t0 - wheelMs) * 0.02;
+  }
+
+  // ── HOSED OFF THEIR WHEELS (1.550.0) ──────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026: *"i like how the physics of hosing people off their
+  // chairs works ... the same could be applied to hosing people off their
+  // bicycles and scooters (GTA V style), and then essentially taking over the
+  // operation of their scooter or bicycle while they grumble about it but
+  // ultimately walk away somewhere not being able to do much about the brazen
+  // act."*
+  //
+  // Three halves, and each is somebody else's machinery reused:
+  //
+  //   THE FALL. A rider is a jet guest (`riderGuests`, like the café's
+  //   `sitterGuests`), and the jet's push goes to a toppler of their own
+  //   (`makeToppler`, 43-topple.js) — the café's sum-past-a-tip, a little
+  //   easier (`THEFT.easier`: nobody is less stable than somebody balanced on
+  //   two wheels), and past it a live ragdoll taken over at the speed the
+  //   machine was doing (`wheelOffGeo`'s `v`). The machine does not ride the
+  //   ragdoll's net the way the café chair does — a frame between the knees
+  //   is a box inside two capsules on the first step — it TUMBLES on its own:
+  //   an inverted pendulum about its tyres, over to the side the water came
+  //   from, on to its bar end and a pedal (`THEFT.rest`, and `wheelLift` for
+  //   how high that holds it), rolling on while it goes and sliding to a stop
+  //   once it is down, the wheels spinning on after it has.
+  //
+  //   YOU, ON IT. E beside a machine lying there is yours: your body fitted to
+  //   it by the riders' own fit (`wheelFit`, the saddle left where its owner
+  //   set it), posed every frame by the riders' own solve (`wheelPose`), and
+  //   the ground walker handed a mount (`ground.mount`) that turns W, S, A and
+  //   D into a machine's speed and heading instead of a walk — `rideStep`,
+  //   leaned into the turns by the same atan(v·ω/g) the riders lean by. E
+  //   again and you step off and it goes over where it is.
+  //
+  //   THEM. The get-up is the toppler's; after it they are this file's
+  //   (`stepVictim`): a glare and a recorded line, and then, if you have
+  //   taken it, a few quick steps after you, a wave and a line of their own
+  //   (`steal.*` in 02-i18n.js — balloon only, there is no recording of
+  //   them), "fuhgeddaboudit" (which there is), and a walk off down the
+  //   shore. If you have left it lying they go and pick it up and ride on —
+  //   and if it is somewhere they will not go, they come back on it later
+  //   when nobody is looking, as the café's do.
+  //
+  // RULE 4: nothing here draws on `rng`. Which way a machine falls when the
+  // water hit it square, and which line gets said, is `jit` off the rider's
+  // index and a counter.
+  const THEFT = {
+    // Jet slots: the riders nearest you, and no slot past `reach` m.
+    guests: 3, reach: 16,
+    // Their hit box on the machine, and lying.
+    hitR: 0.45, hitH: 1.9, lieR: 0.50, lieH: 0.60,
+    // The jet's push on somebody on two wheels, against the café's on
+    // somebody in a chair (`KNOCK.force`). 1.5 brings the tip-over at 3 m
+    // from 0.94 s of water to about 0.55 s — a rider is over while a sitter
+    // is still spluttering, which is the difference being on a saddle makes.
+    easier: 1.5,
+    // THE MACHINE GOING OVER. Height of its centre of mass, m (the pendulum
+    // is g/h); how fast it starts over, rad/s, off the jet; where it comes to
+    // rest on its side, rad of roll — on the bar end and the low pedal for a
+    // bicycle, the bar end and the deck's edge for a scooter, which both come
+    // out at about 80 degrees; how much of a hard landing comes back as a
+    // bounce; the deceleration rolling on its tyres while it tips, m/s², and
+    // sliding on its side once it is down (a friction of about half); the
+    // jet's own shove on it, m/s; and how fast wheels spinning in the air run
+    // down, 1/s.
+    comH: 0.55, tip: 1.2, rest: 1.40, bounce: 0.22, rollDec: 0.7, mu: 4.9,
+    shove: 0.8, spinDown: 0.55,
+    // E: how near its middle you have to be, m.
+    take: 2.1,
+    // YOU, RIDING. m/s at the top, with Q, m/s² to get there and to stop,
+    // what it loses coasting, reverse (walked backwards astride it), rad/s of
+    // turn at a standstill (shuffled round) and at most, how the turn opens up
+    // with speed (rad/s per m/s), and how much the eye goes up on it.
+    // A city bicycle on a promenade: 6.2 m/s pedalled, 8.4 pedalled hard. An
+    // e-scooter: 6.9 (25 km/h, the legal cap) and nothing more with Q, but it
+    // gets there quicker because it has a motor.
+    bike: { top: 6.2, sprint: 8.4, accel: 1.9, brake: 4.6, coast: 0.22, back: 0.7,
+      turnStill: 0.9, turn: 1.9, turnK: 0.9, eye: 0.14 },
+    scoot: { top: 6.9, sprint: 6.9, accel: 2.6, brake: 4.2, coast: 0.35, back: 0.6,
+      turnStill: 0.9, turn: 2.1, turnK: 1.0, eye: 0.16 },
+    // THEM. How long they glare, s; how fast and how long they come after you
+    // and how far off you have to be for them not to bother, m; how long the
+    // wave and the shrug take; how far they walk off and how fast; how fast
+    // they go and fetch it, from how far, and not while you are within
+    // `guard` m of it; how long picking it up takes; and when they come back
+    // regardless — not before `away` s, and only with you and the camera
+    // `back` m from both them and it.
+    glare: 1.7, chaseV: 2.3, chaseFor: 3.0, chaseFar: 16, plead: 2.4, shrug: 1.9,
+    go: 13, walk: 1.2, fetchV: 1.25, fetchR: 45, guard: 6, lift: 0.9, away: 40, back: 32,
+    // How long a line stays up, s.
+    say: 2.8,
+    // Getting up, in their own recorded voice.
+    up: ['bump.kiddinme', 'bump.blind', 'bump.again', 'bump.righthere', 'bump.walkin'],
+    // Balloons. `mine` when they see you take it, `pleadLines` with the wave,
+    // `walk` walking off, `back` when they have it again.
+    mine: { bike: 'steal.mine.bike', scoot: 'steal.mine.scoot' },
+    pleadLines: ['steal.hose', 'steal.cops', 'steal.five', 'steal.helmet', 'steal.mama', 'steal.bell', 'steal.rent'],
+    walkLine: 'steal.walk', backLine: 'steal.back',
+  };
+  const theftLog = [];
+  const theftStats = { knocked: 0, taken: 0, dropped: 0, fetched: 0, homed: 0, said: 0, ms: 0, msMax: 0, geoMs: 0 };
+  // The riders' own toppler: their own pool of nets, their own cap
+  // (`KNOCK.cap`), stepped from `stepTheft` rather than from a crowd's draw.
+  const riderT = wheelers.length ? makeToppler({ geoOf: wheelOffGeo, event: (fg, w, i) => riderEvent(fg, w, i) }) : null;
+  // Each rider's person, as the toppler sees one — where they are, which way
+  // they face — and, after the get-up, as the balloon and `stepVictim` do.
+  for (const r of wheelers) {
+    r.gone = false; r.theft = null; r.falls = 0; r.jetDir = null;
+    r.pf = { idx: 1000 + r.i, seat: -1 - r.i, rider: r, x: 0, y: 0, z: 0, yaw: 0, hscale: 1, scale: 1,
+      mode: 'stand', topple: null, t: 0, s: 0, sex: BATHER_SEX[r.c.who] || 'm' };
+  }
+  // You, on somebody's machine: see `stealTake`.
+  let rideMe = null;
+
+  /**
+   * What a rider is against, in their figure's frame (43-topple.js's
+   * `geoOf`): the deck as a height field, the blockers round them as boxes,
+   * and the speed they were doing. The deck is sampled once, here, on a grid
+   * — 0.3 m, ten metres along the way they were going and five either side —
+   * off a linear map from the figure's frame to the shore's, because the
+   * ragdoll asks for the floor under every point every step and `local` is a
+   * search along the whole shore.
+   */
+  function wheelOffGeo(fg) {
+    const r = fg.rider;
+    if (!r) return null;
+    const g0 = performance.now();
+    const cy = Math.cos(fg.yaw), sy = Math.sin(fg.yaw);
+    const wx = (x, z) => fg.x + x * cy + z * sy, wz = (x, z) => fg.z - x * sy + z * cy;
+    const [t0, s0] = local(fg.x, fg.z);
+    const [t1, s1] = local(wx(1, 0), wz(1, 0)), [t2, s2] = local(wx(0, 1), wz(0, 1));
+    const G = { x0: -3.0, z0: -5.1, d: 0.3, nx: 35, nz: 35 };
+    const h = new Float32Array(G.nx * G.nz);
+    for (let i = 0; i < G.nx; i++) {
+      const x = G.x0 + i * G.d;
+      for (let j = 0; j < G.nz; j++) {
+        const z = G.z0 + j * G.d;
+        h[i * G.nz + j] = standY(t0 + (t1 - t0) * x + (t2 - t0) * z, s0 + (s1 - s0) * x + (s2 - s0) * z) - fg.y;
+      }
+    }
+    const floor = (x, z) => h[clamp(Math.round((x - G.x0) / G.d), 0, G.nx - 1) * G.nz
+      + clamp(Math.round((z - G.z0) / G.d), 0, G.nz - 1)];
+    // The blockers within a few metres: benches, bins, planters, poles. The
+    // net has room for eight.
+    const near = [];
+    for (const b of blockers) {
+      if (b.off || b.y0 != null || !(b.a >= 0) || !(b.c >= 0) || !(b.h >= 0.12)) continue;
+      const d = Math.hypot(b.t - t0, b.s - s0);
+      if (d < 6.5) near.push([d, b]);
+    }
+    near.sort((a, b) => a[0] - b[0]);
+    const boxes = [];
+    for (const [, b] of near.slice(0, 8)) {
+      const p = toWorld(b.t, b.s);
+      const base = b.y > 0 ? b.y : p[1];
+      const rot = b.rot || 0;
+      const q = toWorld(b.t + Math.cos(rot) * 0.5, b.s + Math.sin(rot) * 0.5);
+      const wyaw = Math.atan2(-(q[2] - p[2]), q[0] - p[0]);
+      const dx = p[0] - fg.x, dz = p[2] - fg.z;
+      boxes.push(dx * cy - dz * sy, base + b.h / 2 - fg.y, dx * sy + dz * cy, b.a, b.h / 2, b.c, wyaw - fg.yaw);
+    }
+    theftStats.geoMs = Math.max(theftStats.geoMs, performance.now() - g0);
+    return { boxes, floor, v: [Math.max(0, r.v), 0, 0] };
+  }
+
+  /** Where each machine's extremities are, in its own frame — what it lands on. */
+  function wheelHull(r) {
+    if (r.hull) return r.hull;
+    const P = [];
+    const both = (x, y, z) => { P.push([x, y, z], [x, y, -z]); };
+    if (r.bike) {
+      const K = WHEEL_BIKE;
+      both(K.bar[0] - 0.03, K.bar[1], K.grip + 0.03);
+      for (const sg of [-1, 1]) both(K.bb[0], K.bb[1] + sg * WHEELS.crank, K.arm + 0.05);
+      both(K.bb[0] - (r.seatY - K.bb[1]) * K.seatK, r.seatY + 0.05, 0.09);
+    } else {
+      const K = WHEEL_SCOOT;
+      both(K.bar[0], K.bar[1], K.grip + 0.03);
+      for (const x of K.deckX) both(x, K.deck, K.deckW);
+    }
+    for (const W of r.wheels) {
+      for (let n = 0; n < 8; n++) {
+        const a = n / 8 * TAU;
+        both(W.x + Math.cos(a) * W.R, W.y + Math.sin(a) * W.R, 0.025);
+      }
+    }
+    return (r.hull = P);
+  }
+  /** How far a machine rolled `roll` over stands its middle off the deck: its lowest point on it. */
+  function wheelLift(r, roll) {
+    const c = Math.cos(roll), s = Math.sin(roll);
+    let lo = 0;
+    for (const p of wheelHull(r)) lo = Math.min(lo, p[1] * c - p[2] * s);
+    return -lo;
+  }
+
+  /** The machine let go of: rolling on at the speed it was doing, going over. */
+  function machineFall(r, v, spinUp) {
+    const Th = r.theft;
+    const d = r.jetDir || [0, 0, 0];
+    // The jet's push across the machine, +z being its local right: the water
+    // takes the top of it the way it is going. Square on, a coin off the index.
+    const side = d[0] * Math.sin(r.yaw) + d[2] * Math.cos(r.yaw);
+    const sg = Math.abs(side) > 0.08 ? Math.sign(side)
+      : Math.abs(r.roll) > 0.03 ? Math.sign(r.roll) : (jit(r.i * 7 + r.falls, 9331) < 0.5 ? -1 : 1);
+    const fx = Math.cos(r.yaw), fz = -Math.sin(r.yaw);
+    Th.M = { x: r.x, y: r.y, z: r.z, yaw: r.yaw, roll: r.roll, w: sg * (spinUp == null ? THEFT.tip : spinUp),
+      vx: fx * v + d[0] * THEFT.shove, vz: fz * v + d[2] * THEFT.shove,
+      yw: (jit(r.i * 5 + r.falls, 9332) - 0.5) * 1.4, spin: Math.max(0, v), down: false, still: false,
+      t: r.t, s: r.s, bumps: 0 };
+    r.falls++;
+  }
+
+  /** One frame of a machine nobody is on. */
+  function machineStep(r, dt) {
+    const M = r.theft.M;
+    if (!M || M.still) return;
+    if (!M.down) {
+      M.w += (9.81 / THEFT.comH) * Math.sin(M.roll) * dt;
+      M.roll += M.w * dt;
+      if (Math.abs(M.roll) >= THEFT.rest) {
+        M.roll = Math.sign(M.roll) * THEFT.rest;
+        if (Math.abs(M.w) > 1.2 && M.bumps < 2) {
+          M.w = -M.w * THEFT.bounce; M.bumps++;
+        } else { M.w = 0; M.down = true; }
+        // Metal on concrete, the first time it lands and less for a bounce.
+        if (M.bumps < 3 && audio && audio.rattle) {
+          audio.rattle(M.bumps ? 0.45 : 1, Math.hypot(M.x - lastCam.x, M.z - lastCam.z));
+          if (M.down) M.bumps = 3;
+        }
+      }
+    }
+    const sp = Math.hypot(M.vx, M.vz);
+    const onSide = M.down || Math.abs(M.roll) > 1.0;
+    const dec = (onSide ? THEFT.mu : THEFT.rollDec) * dt;
+    if (sp <= dec) { M.vx = 0; M.vz = 0; } else { const k = 1 - dec / sp; M.vx *= k; M.vz *= k; }
+    M.x += M.vx * dt; M.z += M.vz * dt;
+    M.yaw += M.yw * dt * (onSide ? 1 : 0.25);
+    M.yw *= Math.exp(-2.5 * dt);
+    if (!onSide) M.spin = sp; else M.spin *= Math.exp(-THEFT.spinDown * dt);
+    r.dist += M.spin * dt;
+    // The bar flops over to the side it went.
+    if (r.bike) r.steerA += (Math.sign(M.roll) * 0.45 - r.steerA) * Math.min(1, dt * 4);
+    const [t, s] = local(M.x, M.z);
+    M.t = t; M.s = s;
+    M.y = standY(t, s) + wheelLift(r, M.roll);
+    if (M.down && sp < 0.02 && Math.abs(M.yw) < 0.03 && M.spin < 0.05) M.still = true;
+  }
+
+  /** Draw a machine nobody is riding, off its tumble. */
+  function machineDraw(r, cam) {
+    const M = r.theft.M;
+    r.x = M.x; r.y = M.y; r.z = M.z; r.yaw = M.yaw; r.roll = M.roll; r.pitch = 0;
+    // Once it has stopped, where it is stops changing.
+    if (!M.still || !M.shored) { wheelShore(r, M.t, M.s); M.shored = M.still; }
+    const dx = r.x - cam.x, dz = r.z - cam.z, d2 = dx * dx + dz * dz;
+    const on = d2 < WHEELS.far * WHEELS.far;
+    r.veh.visible = on;
+    if (r.crank) r.crank.visible = on;
+    if (on) wheelMachine(r, d2);
+  }
+
+  /**
+   * Where a machine that is not being ridden down its lane is, for everybody
+   * who steers round riders: the others (`wheelSee` reads `t`, `s`, `v`,
+   * `seg`) and the walkers (`fT`..`bS`). Stopped, on the lane, as far as they
+   * are concerned — a bicycle lying across the promenade is the obstacle it
+   * looks like.
+   */
+  function wheelShore(r, t, s) {
+    r.t = t; r.s = s; r.v = 0; r.seg = 'lane';
+    const hx = Math.cos(r.yaw), hz = -Math.sin(r.yaw), hl = r.bike ? 0.55 : 0.40;
+    const f = local(r.x + hx * hl, r.z + hz * hl), b = local(r.x - hx * hl, r.z - hz * hl);
+    r.fT = f[0]; r.fS = f[1]; r.bT = b[0]; r.bS = b[1];
+  }
+
+  // ── the jet's guests ──
+  let riderNearAt = -1;
+  const riderNearL = [];
+  /** The riders nearest you — on their machines, or live on the ground. */
+  function riderNear() {
+    if (riderNearAt === wheelFrame) return riderNearL;
+    riderNearAt = wheelFrame;
+    riderNearL.length = 0;
+    if (!riderT) return riderNearL;
+    const out = [];
+    for (const r of wheelers) {
+      if (rideMe && rideMe.r === r) continue;
+      const ph = riderT.live(r.pf);
+      if (r.gone ? ph !== 'live' : !r.fig.mesh.visible) continue;
+      const d2 = (r.x - hoseWho.x) ** 2 + (r.z - hoseWho.z) ** 2;
+      if (d2 > THEFT.reach * THEFT.reach) continue;
+      out.push([d2, r]);
+    }
+    out.sort((a, b) => a[0] - b[0]);
+    for (const [, r] of out.slice(0, THEFT.guests)) riderNearL.push(r);
+    return riderNearL;
+  }
+  function riderProbe(k) {
+    const r = riderNear()[k];
+    if (!r) return null;
+    if (r.gone) {
+      const p = riderT.where(r.pf);
+      if (!p) return null;
+      return { x: p[0], y: Math.min(p[1], r.pf.y + 0.4) - 0.15, z: p[2], r: THEFT.lieR, h: THEFT.lieH + 0.4, fg: r.pf };
+    }
+    return { x: r.x, y: r.y, z: r.z, r: THEFT.hitR, h: THEFT.hitH, fg: r.pf };
+  }
+  /** The jet on rider k: `sitterWet`'s push, `THEFT.easier` of it. */
+  function riderWet(k, litres, hit) {
+    const r = riderNear()[k];
+    if (!r || !hit || !riderT) return;
+    const pf = r.pf;
+    // Taken over from the figure where it is drawn this frame.
+    if (!r.gone) {
+      pf.x = r.fig.mesh.position.x; pf.y = r.fig.mesh.position.y; pf.z = r.fig.mesh.position.z;
+      pf.yaw = r.yaw;
+    }
+    const dt = litres / GROUND.flow;
+    const dir = hit.dir || [hit.x - hoseWho.x, 0, hit.z - hoseWho.z];
+    const from = hit.from || [hoseWho.x, hit.y, hoseWho.z];
+    const range = Math.hypot(hit.x - from[0], hit.y - from[1], hit.z - from[2]);
+    const fall = clamp((KNOCK.far - range) / (KNOCK.far - KNOCK.near), 0, 1);
+    const l = Math.hypot(dir[0], dir[1], dir[2]) || 1, F = KNOCK.force * THEFT.easier * fall / l;
+    r.jetDir = [dir[0] / l, dir[1] / l, dir[2] / l];
+    riderT.push(pf, r.fig, [dir[0] * F, dir[1] * F, dir[2] * F], [hit.x, hit.y, hit.z], dt);
+  }
+
+  /** What happens to them, told by their toppler. */
+  function riderEvent(fg, what, info) {
+    const r = fg.rider, kind = r.c.who;
+    const m = Math.hypot(fg.x - lastCam.x, fg.z - lastCam.z);
+    theftLog.push({ i: r.i, who: kind, what, t: +crowdT.toFixed(2) });
+    if (theftLog.length > 60) theftLog.shift();
+    switch (what) {
+      case 'wet':
+        if (audio && audio.startle) audio.startle(kind, m);
+        break;
+      case 'live': {
+        // Off the machine. Nothing aimed survives it — the legs were on the
+        // pedals by `aim`, which a manual pose hides and a get-up would
+        // bring back.
+        for (const b of r.fig.bones) r.fig.aim(b.name, 0, 1, 0, 0);
+        r.gone = true;
+        r.theft = { phase: 'down', M: null, vic: null, pel: null, robbed: false };
+        machineFall(r, r.v);
+        theftStats.knocked++;
+        if (audio && audio.yelp) audio.yelp(kind, m);
+        break;
+      }
+      case 'down':
+        if (audio && audio.startle) audio.startle(kind, m);
+        break;
+      case 'reseat': {
+        // Never reached the ground — over a bench, on the machine. Stood up
+        // where the ragdoll's pelvis last was, which is a snap, and rare.
+        const p = r.theft && r.theft.pel;
+        riderT.release(fg, r.fig);
+        victimStart(r, p ? p[0] : fg.x, p ? p[2] : fg.z, fg.yaw);
+        break;
+      }
+      case 'up':
+        riderT.release(fg, r.fig);
+        victimStart(r, info.x, info.z, info.yaw);
+        break;
+      default: break;
+    }
+  }
+
+  // ── them, after ──
+  function victimStart(r, x, z, yaw) {
+    const pf = r.pf;
+    pf.x = x; pf.z = z; pf.yaw = yaw;
+    const [t, s] = local(x, z);
+    pf.t = t; pf.s = s; pf.y = standY(t, s);
+    pf.mode = 'stand';
+    r.theft.vic = { phase: 'glare', t: 0, n: 0, chased: false, to: null, walkSaid: false };
+    r.fig.play('idle', { fade: 0.2 });
+    r.fig.state.speed = 1;
+    vicSay(r, THEFT.up[(r.i * 3 + r.falls) % THEFT.up.length], true);
+  }
+
+  /** A line over their head: recorded if there is a recording, else a balloon and a yelp. */
+  function vicSay(r, key, voiced) {
+    const pf = r.pf;
+    const m = Math.hypot(pf.x - lastCam.x, pf.z - lastCam.z);
+    if (!bumpBalloon) {
+      bumpBalloon = makeBalloon();
+      bumpBalloon.mesh.scale.setScalar(1.45);
+      scene.add(bumpBalloon.mesh);
+    }
+    const line = T(key);
+    if (voiced && audio && audio.bark && BARK[key]) audio.bark(BARK[key], pf.sex, m);
+    else if (audio && audio.yelp) audio.yelp(r.c.who, m);
+    bumpBalloon.say(line);
+    bumpBalloon.said = line;
+    bumpSaid = { fg: pf, t: 0, dur: THEFT.say };
+    bumpCool = BUMP.cool;
+    theftStats.said++;
+    theftLog.push({ i: r.i, who: r.c.who, what: 'say', key, t: +crowdT.toFixed(2) });
+    if (theftLog.length > 60) theftLog.shift();
+  }
+
+  /** Whether they would go and get it: lying, not under you, not far, and on the promenade. */
+  function canFetch(r) {
+    const Th = r.theft, M = Th && Th.M, pf = r.pf;
+    if (!M || Th.phase === 'you' || !M.down || !r.lanes) return false;
+    if (Math.hypot(M.x - pf.x, M.z - pf.z) > THEFT.fetchR) return false;
+    if (M.s < WHEELS.band[0] - 1.5 || M.s > WHEELS.band[1] + 1.5) return false;
+    if (M.t < r.lanes.tA - 4 || M.t > r.lanes.tB + 4) return false;
+    return Math.hypot(M.x - hoseWho.x, M.z - hoseWho.z) > THEFT.guard;
+  }
+
+  function vicGo(r, phase) {
+    const V = r.theft.vic, fig = r.fig, pf = r.pf;
+    V.phase = phase; V.t = 0;
+    const kind = r.bike ? 'bike' : 'scoot';
+    if (phase === 'chase') {
+      V.chased = true;
+      vicSay(r, THEFT.mine[kind], false);
+    } else if (phase === 'plead') {
+      if (fig.clips.includes('wave')) fig.play('wave', { fade: 0.25, next: 'idle' });
+      fig.state.speed = 1;
+      // Not the bell off a scooter, nor the rental off a bicycle.
+      const pool = THEFT.pleadLines.filter((k) => !(r.bike ? k === 'steal.rent' : k === 'steal.bell'));
+      vicSay(r, pool[Math.floor(jit(r.i * 13 + V.n++ + r.falls * 3, 9333) * pool.length) % pool.length], false);
+    } else if (phase === 'shrug') {
+      vicSay(r, 'bump.fuhged', true);
+    } else if (phase === 'walk') {
+      // Off down the shore, away from you, on the inland side of the lanes.
+      const [pt] = local(hoseWho.x, hoseWho.z);
+      const sg = pf.t >= pt ? 1 : -1;
+      const w = toWorld(clamp(pf.t + sg * THEFT.go, 2, LEN - 2), clamp(pf.s, 10.5, 16.5));
+      V.to = { x: w[0], z: w[2] };
+    }
+  }
+
+  /** One frame of somebody who has been knocked off: see `THEFT` for the story. */
+  function stepVictim(r, dt, cam) {
+    const Th = r.theft, V = Th.vic, pf = r.pf, fig = r.fig, M = Th.M;
+    V.t += dt;
+    const mine = Th.phase === 'you';
+    const dY = Math.hypot(hoseWho.x - pf.x, hoseWho.z - pf.z);
+    let to = null, speed = 0, face = null;
+    switch (V.phase) {
+      case 'glare':
+        face = hoseWho;
+        if (V.t > THEFT.glare) vicGo(r, mine ? 'chase' : canFetch(r) ? 'fetch' : 'walk');
+        break;
+      case 'chase':
+        face = hoseWho;
+        if (dY > 2.2) { to = hoseWho; speed = THEFT.chaseV; }
+        if (V.t > THEFT.chaseFor || dY > THEFT.chaseFar) vicGo(r, 'plead');
+        break;
+      case 'plead':
+        face = hoseWho;
+        if (V.t > THEFT.plead) vicGo(r, 'shrug');
+        break;
+      case 'shrug':
+        face = hoseWho;
+        if (V.t > THEFT.shrug) vicGo(r, 'walk');
+        break;
+      case 'walk':
+        to = V.to; speed = THEFT.walk;
+        if (V.chased && !V.walkSaid && V.t > 2.6) { V.walkSaid = true; vicSay(r, THEFT.walkLine, false); }
+        if (Math.hypot(V.to.x - pf.x, V.to.z - pf.z) < 0.3) vicGo(r, 'wait');
+        else if (mine && !V.chased && dY < 12) vicGo(r, 'chase');
+        else if (!mine && V.t > 1.5 && canFetch(r)) vicGo(r, 'fetch');
+        break;
+      case 'fetch': {
+        if (mine) { vicGo(r, V.chased ? 'walk' : 'chase'); break; }
+        if (!canFetch(r)) { vicGo(r, 'wait'); break; }
+        // To its side, not into it.
+        const ox = -Math.sin(M.yaw) * 0.55, oz = -Math.cos(M.yaw) * 0.55;
+        to = { x: M.x + ox, z: M.z + oz }; speed = THEFT.fetchV;
+        if (Math.hypot(to.x - pf.x, to.z - pf.z) < 0.35) vicGo(r, 'lift');
+        break;
+      }
+      case 'lift':
+        face = M;
+        // Stood back up: the roll eased out, held off the deck by what it
+        // rests on until it is upright on its tyres.
+        M.roll *= Math.exp(-dt * 4.5);
+        M.y = standY(M.t, M.s) + wheelLift(r, M.roll);
+        if (r.bike) r.steerA *= Math.exp(-dt * 4);
+        M.shored = false;
+        if (V.t > THEFT.lift) { theftStats.fetched++; remount(r, false); vicSay(r, THEFT.backLine, false); return; }
+        break;
+      default: {
+        // 'wait': stood where the walk ended. Back for it if it can be got;
+        // back on it anyway, later, if nobody is looking.
+        if (mine && !V.chased && dY < 12) { vicGo(r, 'chase'); break; }
+        if (!mine && canFetch(r)) { vicGo(r, 'fetch'); break; }
+        const far = (x, z) => Math.hypot(x - hoseWho.x, z - hoseWho.z) > THEFT.back
+          && Math.hypot(x - cam.x, z - cam.z) > THEFT.back;
+        if (!mine && V.t > THEFT.away && far(pf.x, pf.z) && (!M || far(M.x, M.z))) {
+          theftStats.homed++; remount(r, true); return;
+        }
+      }
+    }
+    // Walking.
+    let moving = false;
+    if (to && speed > 0) {
+      const dx = to.x - pf.x, dz = to.z - pf.z, d = Math.hypot(dx, dz);
+      const st = Math.min(d, speed * dt);
+      if (d > 1e-3 && st > 1e-4) {
+        pf.x += dx / d * st; pf.z += dz / d * st; moving = true;
+        if (!face) face = to;
+      }
+    }
+    if (face) {
+      const dx = face.x - pf.x, dz = face.z - pf.z;
+      if (dx * dx + dz * dz > 0.04) {
+        let e = Math.atan2(-dz, dx) - pf.yaw;
+        e -= Math.round(e / TAU) * TAU;
+        pf.yaw += e * Math.min(1, dt * 5);
+      }
+    }
+    if (moving) {
+      const [t, s] = local(pf.x, pf.z);
+      pf.t = t; pf.s = s; pf.y = standY(t, s);
+    }
+    // The clip: walking, or whatever standing is doing (a wave plays out).
+    const now = fig.playing();
+    if (moving) {
+      if (now !== 'walk') fig.play('walk', { fade: 0.25 });
+      fig.state.speed = clamp(speed / 0.92, 0.6, 2.4);
+    } else if (now === 'walk') {
+      fig.play('idle', { fade: 0.3 });
+      fig.state.speed = 1;
+    }
+    const dx = pf.x - cam.x, dz = pf.z - cam.z;
+    const on = dx * dx + dz * dz < WHEELS.far * WHEELS.far;
+    fig.mesh.visible = on;
+    if (!on) return;
+    fig.mesh.position.set(pf.x, pf.y, pf.z);
+    fig.mesh.rotation.set(0, pf.yaw, 0);
+    fig.mesh.scale.setScalar(1);
+    fig.mesh.updateMatrixWorld();
+    fig.update(dt);
+  }
+
+  /**
+   * Back on it and riding. `onLane` — from nowhere, on their lane where they
+   * are standing, which is for when nobody is looking; otherwise off the
+   * machine where it stands, pointing the way it points, and back on to the
+   * lane from there as a rider drifting back to it.
+   */
+  function remount(r, onLane) {
+    const Th = r.theft, M = Th.M, pf = r.pf, fig = r.fig, L = r.lanes;
+    if (riderT) riderT.release(pf, fig);
+    for (const b of fig.bones) fig.aim(b.name, 0, 1, 0, 0);
+    fig.play('idle', { fade: 0, from: 1.1 + jit(r.i, 9311) * 2 });
+    fig.state.speed = 0;
+    fig.update(0);
+    if (onLane || !M) {
+      r.t = clamp(pf.t, L.tA + 1, L.tB - 1);
+      r.off = 0;
+      r.placed = false;
+    } else {
+      const [t, s] = local(M.x, M.z);
+      const st = at(t);
+      r.dir = Math.cos(M.yaw) * st.ux - Math.sin(M.yaw) * st.uz >= 0 ? 1 : -1;
+      r.t = clamp(t, L.tA, L.tB);
+      r.off = clamp(s - wheelAt(r.dir > 0 ? L.E : L.W, r.t), -WHEELS.wide, WHEELS.wide);
+      r.x = M.x; r.z = M.z; r.yaw = M.yaw;
+      r.placed = true;
+    }
+    r.seg = 'lane'; r.offV = 0; r.v = 0; r.roll = 0; r.pitch = 0; r.yawRate = 0; r.steerA = 0;
+    r.gone = false; r.theft = null; r.posed = false; r.jetDir = null;
+    pf.topple = null;
+    theftLog.push({ i: r.i, who: r.c.who, what: onLane ? 'home' : 'fetched', t: +crowdT.toFixed(2) });
+  }
+
+  /**
+   * Everybody knocked off: the ragdoll or the get-up (their toppler), then
+   * `stepVictim`; and their machine, tumbling and then lying there, unless it
+   * is under you (`stealPose` draws that).
+   */
+  function stepTheft(dt, cam) {
+    if (!riderT) return;
+    const t0 = performance.now();
+    riderT.tick(dt);
+    for (const r of wheelers) {
+      if (!r.gone) continue;
+      const Th = r.theft;
+      if (Th.phase !== 'you') {
+        if (!Th.vic || Th.vic.phase !== 'lift') machineStep(r, dt);
+        machineDraw(r, cam);
+      }
+      const pf = r.pf;
+      if (pf.topple) {
+        if (riderT.live(pf) === 'live') Th.pel = riderT.where(pf);
+        if (riderT.draw(pf, r.fig, dt)) r.fig.mesh.visible = true;
+      } else if (Th.vic) stepVictim(r, dt, cam);
+      // Remounted in there: it is a rider again from the next frame.
+    }
+    const ms = performance.now() - t0;
+    theftStats.ms += (ms - theftStats.ms) * 0.05;
+    theftStats.msMax = Math.max(theftStats.msMax, ms);
+  }
+
+  // ── you, on it ──
+
+  /** A machine lying within reach of (x, z) that E would take, or null. */
+  function stealOffer(x, z) {
+    if (rideMe || !riderT) return null;
+    let best = null, bd = THEFT.take;
+    for (const r of wheelers) {
+      const Th = r.theft;
+      if (!r.gone || !Th || !Th.M || Th.phase === 'you' || !Th.M.down) continue;
+      if (Th.vic && Th.vic.phase === 'lift') continue;
+      const d = Math.hypot(Th.M.x - x, Th.M.z - z);
+      if (d < bd) { bd = d; best = r; }
+    }
+    return best ? { i: best.i, kind: best.bike ? 'bike' : 'scoot', who: best.c.who, d: +bd.toFixed(2) } : null;
+  }
+
+  /**
+   * Take machine `i`, for the walker `g` (47-ground.js's `you`) with the body
+   * `body` (49-you.js). Stands you on it, facing the way it lies, fits her to
+   * it, and returns the mount the walker rides on — `ground.mount`.
+   */
+  function stealTake(i, g, body) {
+    const r = wheelers[i];
+    if (!r || !r.theft || !r.theft.M || rideMe) return null;
+    const fig = body.fig, M = r.theft.M;
+    for (const b of fig.bones) fig.aim(b.name, 0, 1, 0, 0);
+    // (`play` answers false for the clip already playing, which is fine: any
+    // frame of standing is a rest to fit from.)
+    if (!fig.clips.includes('idle')) return null;
+    fig.play('idle', { fade: 0, from: 1.1 });
+    fig.state.speed = 0;
+    fig.update(0);
+    const R = wheelRest(fig);
+    if (!R) { fig.state.speed = 1; return null; }
+    const fit = wheelFit(fig, r.bike, R, r.bike ? r.seatY : null, 77);
+    rideMe = { r, fig, F: fit.F, lean: fit.lean, legs: fit.legs, arms: fit.arms, bike: r.bike, steer: r.steer,
+      i: 7, look: 0, clock: 0, phase: r.phase, steerA: 0, v: 0, yr: 0, roll: 0, rate: 0,
+      lastYaw: M.yaw - Math.PI / 2, last: { x: M.x, z: M.z } };
+    r.theft.phase = 'you';
+    r.theft.robbed = true;
+    // Picked up and stood on, where it lay, pointing the way it points.
+    g.x = M.x; g.z = M.z; g.vx = 0; g.vz = 0;
+    g.yaw = M.yaw - Math.PI / 2;
+    theftStats.taken++;
+    theftLog.push({ i: r.i, who: r.c.who, what: 'taken', t: +crowdT.toFixed(2) });
+    const K = r.bike ? THEFT.bike : THEFT.scoot;
+    return { kind: r.bike ? 'bike' : 'scoot', eye: K.eye, step: rideStep };
+  }
+
+  /**
+   * The walker's velocity for this step, and its heading — the mount's half
+   * of `walk` in 47-ground.js. `inp` is { fwd, back, steer (−1..1, right
+   * positive), sprint }.
+   */
+  function rideStep(dt, g, inp) {
+    const R = rideMe;
+    if (!R) return [0, 0];
+    const K = R.bike ? THEFT.bike : THEFT.scoot;
+    const fx = -Math.sin(g.yaw), fz = -Math.cos(g.yaw);
+    // What the last step left of it along the machine: a wall takes it.
+    let v = g.vx * fx + g.vz * fz;
+    if (inp.fwd) {
+      const want = inp.sprint ? K.sprint : K.top;
+      v += clamp(want - v, -K.brake * dt, K.accel * dt * (v < 0 ? 3 : 1));
+    } else if (inp.back) {
+      v = v > 0.05 ? Math.max(0, v - K.brake * dt) : Math.max(-K.back, v - K.back * 2 * dt);
+    } else v -= Math.sign(v) * Math.min(Math.abs(v), K.coast * dt);
+    const sp = Math.abs(v);
+    // The turn opens up with speed, and closes a little again at the top of
+    // it — nobody takes a promenade corner at eight metres a second on a
+    // bar's full lock.
+    const most = Math.min(K.turn, K.turnStill + sp * K.turnK) * (1 - 0.3 * sat((sp - 3) / 5));
+    R.yr += (-inp.steer * most - R.yr) * Math.min(1, dt * 7);
+    g.yaw += R.yr * dt;
+    if (R.bike && inp.fwd && v > 0.3) R.phase += v * dt / WHEELS.circ * WHEELS.gear * TAU;
+    R.v = v;
+    return [fx * v, fz * v];
+  }
+
+  /**
+   * Draw it under you, and her on it: the machine where the walker `g` is,
+   * leaned by the turn it is making (whoever is making it — the mouse turns
+   * you as well as the keys), and her posed by `wheelPose`. Returns where her
+   * figure goes and how it is turned, for `you.drive` — or `{ drop: true }`
+   * if you have gone somewhere a machine did not come with you (a back door,
+   * a teleport).
+   */
+  function stealPose(g, dt, cam) {
+    const R = rideMe;
+    if (!R) return null;
+    const r = R.r;
+    if (Math.hypot(g.x - R.last.x, g.z - R.last.z) > 6) return { drop: true };
+    R.last.x = g.x; R.last.z = g.z;
+    let dy = g.yaw - R.lastYaw;
+    dy -= Math.round(dy / TAU) * TAU;
+    R.lastYaw = g.yaw;
+    if (dt > 0) R.rate += (dy / dt - R.rate) * Math.min(1, dt * 5);
+    const v = R.v;
+    R.roll += (clamp(-Math.atan(v * R.rate / 9.81), -0.5, 0.5) - R.roll) * Math.min(1, dt * 5);
+    if (R.bike) {
+      const want = Math.abs(v) > 0.4 ? clamp(Math.atan(WHEEL_BIKE.axle * 2 * R.rate / v) / BK_COS, -0.5, 0.5)
+        : clamp(R.rate * 0.4, -0.35, 0.35);
+      R.steerA += (want - R.steerA) * Math.min(1, dt * 6);
+    }
+    R.clock += dt;
+    r.dist += v * dt;
+    r.x = g.x; r.y = g.y; r.z = g.z;
+    r.yaw = g.yaw + Math.PI / 2; r.roll = R.roll; r.pitch = 0;
+    r.steerA = R.steerA; r.phase = R.phase;
+    r.veh.visible = true;
+    if (r.crank) r.crank.visible = true;
+    const dx = r.x - cam.x, dz = r.z - cam.z;
+    wheelMachine(r, dx * dx + dz * dz);
+    const [t, s] = local(r.x, r.z);
+    wheelShore(r, t, s);
+    wheelPose(R);
+    const at3 = R.F.clone().applyMatrix4(r.veh.matrixWorld);
+    return { at: [at3.x, at3.y, at3.z], quat: r.veh.quaternion.clone(), yaw: r.yaw };
+  }
+
+  /**
+   * Off it. The machine stays where it is and goes over, at whatever it was
+   * doing — step off at speed and it carries on without you. You step off to
+   * its left, unless `stay` (you have been taken somewhere and it has not).
+   */
+  function stealDrop(g, body, stay) {
+    const R = rideMe;
+    if (!R) return false;
+    rideMe = null;
+    const r = R.r;
+    for (const b of R.fig.bones) R.fig.aim(b.name, 0, 1, 0, 0);
+    R.fig.state.speed = 1;
+    r.jetDir = null;
+    machineFall(r, R.v, 0.35 + Math.abs(R.roll));
+    // It goes over away from where you got off.
+    r.theft.M.w = Math.abs(r.theft.M.w);
+    r.theft.M.spin = Math.abs(R.v);
+    r.theft.phase = 'down';
+    if (!stay && g) {
+      g.x += -Math.sin(r.yaw) * 0.6;
+      g.z += -Math.cos(r.yaw) * 0.6;
+      g.vx *= 0.3; g.vz *= 0.3;
+    }
+    theftStats.dropped++;
+    theftLog.push({ i: r.i, who: r.c.who, what: 'dropped', t: +crowdT.toFixed(2) });
+    return true;
   }
 
   // ── the flag on the front ───────────────────────────────────────────────
@@ -68625,6 +69412,24 @@ async function buildJadrija(scene) {
     // And the café sitters, who can be hosed off their chairs — see `HOSE`.
     sitterGuests: Array.from({ length: HOSE.guests }, (_, k) => [
       () => sitterProbe(k), (litres, hit) => sitterWet(k, litres, hit)]),
+    // And the riders, who can be hosed off their machines — see `THEFT`.
+    riderGuests: Array.from({ length: THEFT.guests }, (_, k) => [
+      () => riderProbe(k), (litres, hit) => riderWet(k, litres, hit)]),
+    /**
+     * Their machines, for 90-app.js (1.550.0): `offer(x, z)` — one lying
+     * within reach of you, for the prompt and for E; `take(i, g, body)` —
+     * yours, and the mount for `ground.mount`; `pose(g, dt, cam)` — it under
+     * you and her on it, for `you.drive`; `drop(g, body, stay)` — off it;
+     * `riding()` — which, or null.
+     */
+    steal: {
+      offer: (x, z) => stealOffer(x, z),
+      take: (i, g, body) => stealTake(i, g, body),
+      pose: (g, dt, cam) => stealPose(g, dt, cam),
+      drop: (g, body, stay) => stealDrop(g, body, stay),
+      riding: () => (rideMe ? { i: rideMe.r.i, kind: rideMe.bike ? 'bike' : 'scoot', v: +rideMe.v.toFixed(2),
+        roll: +rideMe.roll.toFixed(3), steer: +rideMe.steerA.toFixed(3) } : null),
+    },
     radioProbe, radioWet,
     tvProbe, tvWet,
     /** The set on the table: where it is, what it is doing, and knock it on. */
@@ -68841,6 +69646,47 @@ async function buildJadrija(scene) {
         }
         return out;
       },
+    },
+    /**
+     * Hosed off their wheels (1.550.0, `THEFT`): `stats()` — how many
+     * knocked, taken, fetched back, sent home, lines said, the step's ms, and
+     * the riders' toppler's own; `list()` — each rider, gone or not, where the
+     * machine and the person are and what they are doing; `log()`;
+     * `knock(i, side, v)` — rider i over NOW, the jet coming from their left
+     * (side −1) or right (+1), at speed `v` if given; `cfg()`.
+     */
+    theft: {
+      stats: () => ({ ...theftStats, ms: +theftStats.ms.toFixed(3), msMax: +theftStats.msMax.toFixed(3),
+        geoMs: +theftStats.geoMs.toFixed(3),
+        wheelMs: +wheelMs.toFixed(3), gone: wheelers.filter((r) => r.gone).length,
+        riding: rideMe ? rideMe.r.i : null, topple: riderT ? riderT.stats() : null }),
+      list: () => wheelers.map((r) => {
+        const Th = r.theft, M = Th && Th.M, V = Th && Th.vic, pf = r.pf;
+        return { i: r.i, who: r.c.who, on: r.c.on, gone: r.gone, phase: Th ? Th.phase : null,
+          topple: riderT ? riderT.live(pf) : null, J: pf.topple ? +pf.topple.J.toFixed(1) : 0,
+          vic: V ? V.phase : null, vicT: V ? +V.t.toFixed(2) : null,
+          at: V ? [+pf.x.toFixed(2), +pf.y.toFixed(2), +pf.z.toFixed(2)] : null,
+          pel: riderT && riderT.where(pf) ? riderT.where(pf).map((v) => +v.toFixed(2)) : null,
+          M: M ? { x: +M.x.toFixed(2), y: +M.y.toFixed(3), z: +M.z.toFixed(2), roll: +M.roll.toFixed(3),
+            yaw: +M.yaw.toFixed(3), sp: +Math.hypot(M.vx, M.vz).toFixed(2), down: M.down, still: M.still,
+            t: +M.t.toFixed(2), s: +M.s.toFixed(2) } : null,
+          x: +r.x.toFixed(2), z: +r.z.toFixed(2), yaw: +r.yaw.toFixed(3), v: +r.v.toFixed(2), t: +r.t.toFixed(2),
+          s: +r.s.toFixed(2) };
+      }),
+      log: () => theftLog.slice(),
+      knock: (i, side = 1, v = null) => {
+        const r = wheelers[i];
+        if (!r || r.gone || !riderT) return null;
+        if (v != null) r.v = v;
+        const pf = r.pf;
+        pf.x = r.fig.mesh.position.x; pf.y = r.fig.mesh.position.y; pf.z = r.fig.mesh.position.z;
+        pf.yaw = r.yaw;
+        // A shove across the machine, from `side`, at the chest.
+        const sx = Math.sin(r.yaw) * -side, sz = Math.cos(r.yaw) * -side;
+        r.jetDir = [sx, 0, sz];
+        return riderT.knock(pf, r.fig, [sx * 90, 10, sz * 90], [pf.x, pf.y + 1.3, pf.z]);
+      },
+      cfg: () => THEFT,
     },
     /** For the shadow pass in src/90-app.js. */
     carMeshes: cars.meshes(),

@@ -43,7 +43,9 @@ is a real footprint.
 
 **On foot**, and on the boat: mouse looks, `W A S D` walks, `shift` runs, `Z`
 holds a zoom, `B` is third person, `E` climbs back in — or boards the boat at
-the head of the Jadrija mole. **Under the canopy**: the mouse steers, where you
+the head of the Jadrija mole. Hose a rider off a bicycle or an e-scooter on
+the promenade and `E` beside it takes it: `W` pedals (`Q` harder), `S` brakes,
+`A D` steer, and `E` again gets you off and leaves it lying there. **Under the canopy**: the mouse steers, where you
 look is where you go.
 
 The autopilot is a *fly me to the job* button, not an autoplayer. Pause really

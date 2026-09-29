@@ -524,6 +524,9 @@ addEventListener('keydown', (e) => {
     // On this side of it there are two doors left: the boat, if you are stood
     // at the head of the mole with her alongside, and the aeroplane.
     if (inWater()) return;
+    // AND ON TO SOMEBODY'S MACHINE, or off it — see `rideKey`. First, because
+    // on one E means nothing else, and next to one lying there it means that.
+    if (rideKey()) return;
     // AND A THIRD, which is a hatch. E is the interact key and a counter is
     // the one place on this shore where standing in front of something means
     // being served at it: you cannot be at the Tisak's window and at the
@@ -643,7 +646,9 @@ addEventListener('keydown', (e) => {
   // hose for as long as the bar stayed down. Cleared on the way up.
   if (e.code === 'Enter' || e.code === 'NumpadEnter'
     || (e.code === 'Space' && runHeld() && fwdHeld())) {
-    if (state.phase === 'ground' && ground && ground.ok && !state.paused) {
+    // Not on a bicycle, where Q and W are pedalling hard and Space is still
+    // the hose — see `rideKey`.
+    if (state.phase === 'ground' && ground && ground.ok && !state.paused && !riding()) {
       e.preventDefault();
       if (e.code === 'Space') spaceLeapt = true;
       jumpOut(); return;
@@ -1619,6 +1624,8 @@ async function boot() {
     for (const [probe, wet] of jadrija.batherGuests) ground.addGuest(probe, wet);
     // And the café sitters, whom the jet PUSHES — see `HOSE` in 43-jadrija.js.
     if (jadrija.sitterGuests) for (const [probe, wet] of jadrija.sitterGuests) ground.addGuest(probe, wet);
+    // And the riders, off their bicycles and scooters — see `THEFT` there.
+    if (jadrija.riderGuests) for (const [probe, wet] of jadrija.riderGuests) ground.addGuest(probe, wet);
     // And the transistor set on the table in the kabina, which is a guest in
     // the same sense: something in the world the jet can land on that the hose
     // code has no business knowing anything else about.
@@ -1939,6 +1946,7 @@ const HELP = [
     ['K', 'help.k.kite'],
     ['E', 'help.k.in'],
     ['E', 'help.k.buy'],
+    ['E', 'help.k.steal'],
     ['Y', 'help.k.drink'],
     [';', 'help.k.lick'],
     [', .', 'help.k.menu'],
@@ -4756,6 +4764,9 @@ function poseSwimBody(dt) {
   // On the tower 61-plunge.js drives her, every bone of it. `_bodyHas` is
   // dropped so the swim, when she comes up, starts her where she is.
   if (state.phase === 'plunge') { clearCrouch(); _bodyHas = false; return; }
+  // On somebody's machine: the machine under her and her on it, whichever
+  // camera — see `rideBody`.
+  if (rideBody(dt)) return;
   // Crouched on foot, whichever camera: the third person below drives her
   // off it, and the first person's mirror hangs her off it through `lower`.
   //
@@ -5426,6 +5437,8 @@ function bounceOut() {
  * answered, which is what a probe wants to read.
  */
 function jumpOut() {
+  // Not off a bicycle. E is the way off it.
+  if (riding()) return '';
   if (bounceOut()) return 'tramp';
   if (hopOut()) return 'balcony';
   return ground.hop() ? 'jump' : '';
@@ -6800,7 +6813,9 @@ function updateGroundHUD(dt) {
   // is a mile away on principle rather than by luck.
   else if (brod && brod.canBoard(ground.you.x, ground.you.z)) {
     hint = TK('brod.board', 'brod.boardTouch');
-  } else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
+  } else if (riding()) hint = T('steal.ride.' + riding().kind);
+  else if (stealNear()) hint = T('steal.take.' + stealNear().kind);
+  else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
   $('gh-hint').textContent = hint;
   $('gh-hint').className = urgent ? 'urgent' : '';
 
@@ -7181,6 +7196,74 @@ function buyAt(key) {
 function buyHere() {
   if (!counterNow()) return false;
   buyAt(null);
+  return true;
+}
+
+/**
+ * ── SOMEBODY ELSE'S BICYCLE (1.550.0) ──
+ *
+ * Hose a rider off a bicycle or an e-scooter at Jadrija and the machine lies
+ * there; E beside it and it is yours, E on it and you step off and it goes
+ * over where it is. The machine, the riding and the owner's opinion of all
+ * this are `THEFT` in 43-jadrija.js; this is the key, the line on the screen
+ * that names it, and her on it (`rideBody`). The third person comes on when
+ * you get on — a bicycle is a thing you watch yourself ride — and goes back
+ * to what it was when you get off.
+ */
+let rideCam = null;
+function riding() {
+  return jadrija && jadrija.steal ? jadrija.steal.riding() : null;
+}
+/** A machine lying within reach of you, or null. */
+function stealNear() {
+  if (state.phase !== 'ground' || !ground || !ground.ok || camOverride || !jadrija || !jadrija.steal) return null;
+  return jadrija.steal.offer(ground.you.x, ground.you.z);
+}
+/** E: on to one, or off the one you are on. Answers whether it was either. */
+function rideKey() {
+  if (!jadrija || !jadrija.steal || state.phase !== 'ground' || !ground || !ground.ok) return false;
+  if (riding()) { rideOff(false); return true; }
+  const o = stealNear();
+  if (!o || !you) return false;
+  const m = jadrija.steal.take(o.i, ground.you, you);
+  if (!m) return false;
+  clearJump();
+  clearCrouch();
+  ground.you.crouch = false;
+  ground.mount(m);
+  rideCam = bodyCam;
+  if (!bodyCam) { bodyCam = true; syncBodyBtn(); }
+  toast(T('steal.took.' + m.kind));
+  return true;
+}
+/** Off it: `stay` when you have been taken somewhere it has not come. */
+function rideOff(stay) {
+  if (jadrija && jadrija.steal) jadrija.steal.drop(ground ? ground.you : null, you, stay);
+  if (ground && ground.mount) ground.mount(null);
+  if (rideCam === false) { bodyCam = false; syncBodyBtn(); }
+  rideCam = null;
+}
+/**
+ * Her on it, from `poseSwimBody`: true when she is riding and has been
+ * posed. Anything that has taken you off the promenade — a back door, the
+ * sea, the aeroplane — takes you off the machine first, and it stays where
+ * you left it.
+ */
+function rideBody(dt) {
+  if (!riding()) return false;
+  if (state.phase !== 'ground' || !ground || !ground.ok || !ground.active || !ground.mounted()) {
+    rideOff(true);
+    return false;
+  }
+  const P = jadrija.steal.pose(ground.you, dt, camera.position);
+  if (!P || P.drop) { rideOff(true); return false; }
+  if (!bodyCam) {
+    if (_bodyHas) { you.drive(null); _bodyHas = false; }
+    return true;
+  }
+  you.drive({ at: P.at, quat: P.quat, yaw: P.yaw, pitch: 0, seen: ground.thirdD() > 0,
+    clip: 'idle', speed: 0, wet: false });
+  _bodyHas = true;
   return true;
 }
 
@@ -8554,8 +8637,9 @@ function tick(wall, draw) {
   // Which room it was, held while the latch is held so a doorway does not
   // change the exposure on the way through it.
   if (raw > 0.62) darkWant = vikIn > kabIn ? 0.34 : 1;
-  crossThreshold(dt, afoot);
-  crossChanging(afoot);
+  // Nobody rides a bicycle into a changing cubicle or through a hut door.
+  crossThreshold(dt, afoot && !riding());
+  crossChanging(afoot && !riding());
   // Held wherever the crossing put it while the screen is dark, so the light
   // in the room is already the room's light when it comes back up. Watching a
   // 0.3 s exposure ramp *after* a cut is watching the cut not have worked.
@@ -9614,6 +9698,13 @@ window.__fr = {
     you: () => (you ? you.stats() : null),
     youRaw: () => you,
     youShow: (v) => (you ? you.show(v) : null),
+    /**
+     * E beside a hosed-off rider's machine, or on one (1.550.0): what it did,
+     * what is in reach, and what you are on. See `rideKey`.
+     */
+    rideKey: () => ({ did: rideKey(), near: stealNear(), riding: riding() }),
+    ride: () => ({ near: stealNear(), riding: riding(), body: bodyCam,
+      mounted: !!(ground && ground.mounted && ground.mounted()) }),
     /**
      * Re-lathe her beanie without a rebuild.
      *
