@@ -1230,6 +1230,9 @@ function buildBackLane(scene, jad, city) {
   // array once on retarget and reads it every frame afterwards, so anything
   // pushed here is a wall from the moment it is pushed.
   for (const r of runs) jad.blockers.push(r);
+  // And its floor into the verge's made ground (1.546.0), so nothing grows on
+  // the carriageway — only along it. See `── the verge, round the eye ──`.
+  if (jad.verge && jad.verge.made) jad.verge.made(floorMesh.geometry);
 
   return {
     meshes: [floorMesh, upMesh],

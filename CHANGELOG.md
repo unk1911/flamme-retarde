@@ -8,6 +8,110 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.546.0] — 2026-09-29
+
+### The August verge
+
+Misha showed FABOTANIC's browser plant generator and asked what we could
+borrow for our own vegetation; the answer was its "Wild Field" mix, and his
+reply was *"sure let's try that to see if it would spruce things up"*. The
+mix is borrowed as an idea from FABOTANIC's Wild Field; nothing of its
+output is used. Every plant here is this repo's own procedural code, and the
+mix is the one a Dalmatian roadside and pine-wood edge actually has at the
+end of August.
+
+**The plants** (`floraVerge` and five builders in `src/46-flora.js`):
+
+- **Seed-head grasses**: a clump of sixteen golden culms, arching. Each is
+  wild oat (a panicle of hanging spikelets on pedicels), false brome (five
+  narrow spikelets held along the top) or hare's-tail (a cream ovoid on a
+  short stem), with dry leaves at the foot. A fifth are still unripe.
+- **Bleached tussocks**: 46 blades of straw, old grey and a little live
+  grey-green in the heart. Nearly half lie over one way, trodden or blown
+  flat, and those nearest the made edge are squashed flatter again.
+- **Wild fennel**, 1.0–1.7 m: three to five glaucous stems, a stem in three
+  or four last year's grey-brown, each with a terminal umbel and three to
+  five branches ending in smaller ones. An umbel is 16 rays up to a flat
+  top, each carrying an umbellet, in flower, going over or gone to seed.
+  The leaves are thread-fine, in pairs off a rachis, low down.
+- **Thistles**: a flat rosette of lobed, spiny grey-green leaves, and on
+  most two or three stiff stems forking into a rounded candelabra of 20 to
+  40 heads, each with a star of bracts. By colour they are Eryngium
+  (amethyst blue, or the grey field eryngo), golden Carlina and purple
+  thistle. The first cut, one stem and four heads, read as a blue bead on a
+  stick.
+- **Immortelle (smilje)**: a low cushion of 300 silver needle leaves round
+  a dark lumpy core, with two dozen flowering stems above it carrying flat
+  mustard clusters. A third of them are going over to rust. The first cut
+  was a pale teal egg on the dust. Sage and rosemary were tried as the same
+  cushion re-coloured and dropped on sight. A sage does not flower in
+  August, and leaf-coloured discs on stems read as grey lollipops.
+
+Nothing is green but a fennel leaf and a few live blades. The palette is
+straw, silver-grey and dusty olive, with yellow, blue and violet accents.
+The accent (umbels, heads, clusters) is flagged in the vertex colour and
+coloured per instance (`aInstSuit`), so one prototype is four thistles and
+three stages of fennel.
+
+**Where** (`── the verge, round the eye ──` in `src/43-jadrija.js`). The
+shore is rasterised once at 0.5 m into made ground, walls, rocks and
+kept-clear cells. Made ground is every upward face of the ground buffer,
+the back lane's floor (handed in by `src/46-backlane.js`), the roads, the
+compounds and the vikendica's plot. Walls are every walk blocker. Rocks are
+every `rockTS` lump. Kept clear are the hammock's band and everybody placed
+in the wood. Two chamfer distance transforms give each open cell its
+distance to an edge and to a wall.
+
+- The ground buffer also paints the **bare dust** behind the rows in three
+  oranges (4 800 m² between s 33 and 41). Measured off the buffer, those
+  three are the only upward faces with green under 0.78 of red, so they
+  count as open ground and not paving.
+- Plants are thickest a few hands to a metre off an edge and gone by 3 m.
+  A 12 m band of dust with an edge down each side had come out as one hay
+  meadow at a 4 m falloff. Fennel and smilje also gather at wall feet and
+  round rocks, and a little of everything is out in the open.
+- **Doors, gates and gaps** are open cells with a wall on both sides within
+  2 m along one of four axes, and nothing grows there. The same test at
+  4.5 m finds a **walk**, such as the alley between the two rows of huts,
+  and there only what hugs a wall foot is left.
+- Each species has its own patch noise, so the verge comes in drifts, not
+  as a seed packet.
+- The grid is built while the page loads, once the lane is in (85 ms), and
+  nothing is drawn before then. Nothing takes an `rng()` draw.
+
+**Tiers.** One buffer per species, built as [far only][shared][near only]
+and drawn twice by draw range. Within 17 m (±1.5 m per plant, hashed) every
+blade, spikelet, ray and umbellet is real geometry. Past that the far tier
+has every other culm again at 2.5× the width, fourteen wide tussock blades,
+one disc per umbel and per smilje cluster, and feathers for fennel leaves.
+It shrinks away by 44 m. Those widths and disc sizes were set against the
+near tier at 15 m, side by side: the first far tier was half a verge, and
+its fennel discs a third too yellow.
+
+**Wind.** `floraWind` is taken at the plant's root, so a 1.5 m fennel stem
+does not kink where it crosses a cell of the gust-phase hash. On top is a
+per-vertex flutter that is continuous in position. The fennel's lever is
+0.55 of its height and the tussock's is its blade length, so the fennel
+leans and the tussock shivers.
+
+**Cost**, in ms per frame:
+
+- **Per draw** (a GPU timer round each of the 10 verge draws, 120 frames):
+  0.28 at the densest place, the playground verge, and 0.16–0.24 at the
+  other five.
+- **Whole frame**, on − off in the same page, 10 alternated 30-frame
+  blocks: GPU +0.08 / +0.29 / +0.30 at three places, inside the ±1 ms a
+  block of noise from the other agents on the GPU. CPU render submit
+  +0.0–0.1.
+- **Rebuild** when the eye crosses a 2 m cell, over a 320 m walk: median
+  0.5 (first visit), 0.3 (cached), worst 9.1.
+
+The page grows by 64.9 KB (+21.2 KB gzipped), comments included.
+
+Blockers 792 with an unchanged hash, people 100 (unchanged hash), census
+446/333/86/27, café settle 22/0 with the rest velocity bit-identical, and
+the hammock at (−1923.17, 4.14, 443.16): all identical to 1.545.1.
+
 ## [1.545.1] — 2026-09-28
 
 ### The cars' near tier ships, as a kit
