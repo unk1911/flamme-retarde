@@ -7353,7 +7353,7 @@ async function buildJadrija(scene) {
     boxTS(S.t0 - 0.2, S.t1 + 0.2, back + 0.04, back + 0.16, top - 0.14, top - 0.02,
       GREY, shade(GREY, 1.08));
     for (const dt of [0.5, len - 0.5]) {
-      post(W, S.t0 + dt, back + 0.10, y0, top - 0.12, 0.045, GREY, 6);
+      post(W, S.t0 + dt, back + 0.10, y0, top - 0.12, 0.045, GREY, 14);
       // The shoe at the bottom, kicked out over a concrete splash pad.
       boxTS(S.t0 + dt - 0.07, S.t0 + dt + 0.07, back + 0.10, back + 0.34,
         y0 + 0.02, y0 + 0.16, GREY);
@@ -7434,39 +7434,119 @@ async function buildJadrija(scene) {
     // What is standing in the yard. Crates go in a stack against the wall,
     // the bin goes where it can be wheeled out, and the gas is in a pair by
     // the door with a chain round it.
+    //
+    // ── ROUNDER, 29 Sep 2026 ────────────────────────────────────────────────
+    //
+    // Misha, standing in the lane behind the slastičarnica: *"enhance the
+    // objects, add more polygons, like for the gas canisters and stuff"*. At
+    // four metres every one of these was the box it was built from: five
+    // crates that were five solid bricks with a band round the top, a bin
+    // that was a tapered block on two hexagonal wheels, gas bottles turned on
+    // twelve flat facets, and hexagonal downpipes. What follows is the same
+    // stack, bin and pair, standing where they stood — every position below
+    // is the old one, and `runs` at the end is untouched — drawn as the
+    // things they are.
     const CRATE = [[0.560, 0.230, 0.130], [0.130, 0.290, 0.480],
       [0.180, 0.400, 0.200], [0.520, 0.480, 0.180]];
     const tb = S.t0 + len * 0.44;
+    // A bottle crate is a moulded tray with WALLS: an open box of 12 mm
+    // sides on a ribbed floor, a hand-hole in each short end, and ribs down
+    // the outside of the long sides where the moulding is stiffened. Stacked,
+    // each one sits down into the rim of the one below, which is why the
+    // stack is five of them and not a column.
+    const crate = (t0c, t1c, sa, sb, ya, yb, c) => {
+      const dk = shade(c, 0.78), lt = shade(c, 1.10), w = 0.014;
+      boxTS(t0c, t1c, sa, sb, ya, ya + 0.018, dk);                 // floor
+      boxTS(t0c, t1c, sa, sa + w, ya, yb, c, lt);                  // long walls
+      boxTS(t0c, t1c, sb - w, sb, ya, yb, c, lt);
+      boxTS(t0c, t0c + w, sa + w, sb - w, ya, yb, c, lt);          // short ends
+      boxTS(t1c - w, t1c, sa + w, sb - w, ya, yb, c, lt);
+      // The rim, a lip standing 6 mm proud all round.
+      boxTS(t0c - 0.006, t1c + 0.006, sa - 0.006, sb + 0.006, yb - 0.035, yb,
+        shade(c, 0.90), lt);
+      // The hand-holes, a dark slot on the outside of each short end.
+      for (const tt of [t0c - 0.002, t1c + 0.002]) {
+        boxTS(tt - 0.004, tt + 0.004, (sa + sb) / 2 - 0.08, (sa + sb) / 2 + 0.08,
+          yb - 0.095, yb - 0.055, [0.030, 0.030, 0.032]);
+      }
+      // Ribs down the long side you see, and a foot band under them.
+      for (let r = 1; r < 5; r++) {
+        const tr = t0c + (t1c - t0c) * r / 5;
+        boxTS(tr - 0.009, tr + 0.009, sb, sb + 0.010, ya + 0.02, yb - 0.04, dk);
+      }
+      boxTS(t0c + 0.01, t1c - 0.01, sb, sb + 0.010, ya, ya + 0.03, dk);
+      // Inside the top one: the floor's grid, which is what you look down on.
+      for (let r = 1; r < 4; r++) {
+        const tr = t0c + (t1c - t0c) * r / 4;
+        boxTS(tr - 0.005, tr + 0.005, sa + w, sb - w, ya + 0.018, ya + 0.05, dk);
+      }
+    };
     for (let i = 0; i < 5; i++) {
       const c = CRATE[((jit(key, 70 + i) * 97) | 0) % CRATE.length];
       const off = (jit(key, 80 + i) - 0.5) * 0.14;
       const yy = y0 + i * 0.31;
-      boxTS(tb - 0.28 + off, tb + 0.28 + off, back + 0.14, back + 0.66,
-        yy, yy + 0.29, c, shade(c, 1.10));
-      // The stacking rim, which is what stops a crate reading as a brick.
-      boxTS(tb - 0.29 + off, tb + 0.29 + off, back + 0.13, back + 0.67,
-        yy + 0.25, yy + 0.29, shade(c, 0.86));
+      crate(tb - 0.28 + off, tb + 0.28 + off, back + 0.14, back + 0.66,
+        yy, yy + 0.29, c);
     }
-    // The wheelie bin: a tapered body, a lid with a lip, and two wheels.
+    // The wheelie bin: a tapered body with its corners taken off, a lid that
+    // overhangs on three sides and hinges at the back, the handle bar the
+    // hinge is on, ribs down the front, a foot at the front and two real
+    // wheels on an axle at the back — which is the side against the wall,
+    // because that is how one is pushed back into its corner.
     const tn = S.t0 + len * 0.44 + 0.98;
+    const BIN = [0.150, 0.230, 0.165], BINL = [0.170, 0.255, 0.185];
+    const BIND = [0.115, 0.185, 0.130];
     frustumTS(y0 + 0.10, [tn, back + 0.62, 0.32, 0.28],
-      y0 + 1.06, [tn, back + 0.58, 0.36, 0.32],
-      [0.150, 0.230, 0.165], [0.170, 0.255, 0.185]);
-    boxTS(tn - 0.38, tn + 0.38, back + 0.24, back + 0.94, y0 + 1.06, y0 + 1.16,
-      [0.115, 0.185, 0.130], [0.135, 0.210, 0.150]);
-    for (const o of [-0.28, 0.28]) {
-      post(W, tn + o, back + 0.34, y0, y0 + 0.11, 0.055, [0.075, 0.075, 0.080], 6);
+      y0 + 1.06, [tn, back + 0.58, 0.36, 0.32], BIN, BINL);
+    // The corners, a round column in each, so the block reads as moulded.
+    for (const [ct, cs] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      tubeTS([[tn + ct * 0.315, back + 0.62 + cs * 0.275, y0 + 0.10],
+        [tn + ct * 0.355, back + 0.58 + cs * 0.315, y0 + 1.05]], 0.030, BIN, 8,
+      [1, 0, 0], 0.10);
+    }
+    // Ribs down the front face, following its lean.
+    for (const o of [-0.18, 0, 0.18]) {
+      tubeTS([[tn + o, back + 0.90, y0 + 0.18], [tn + o, back + 0.905, y0 + 0.96]],
+        0.013, BIND, 6, [1, 0, 0], 0.10);
+    }
+    // The lid: a slab with a lip down its front, and the grip under it.
+    boxTS(tn - 0.38, tn + 0.38, back + 0.24, back + 0.94, y0 + 1.06, y0 + 1.13,
+      BIND, [0.135, 0.210, 0.150]);
+    boxTS(tn - 0.38, tn + 0.38, back + 0.92, back + 0.95, y0 + 1.00, y0 + 1.13,
+      BIND);
+    boxTS(tn - 0.12, tn + 0.12, back + 0.95, back + 0.99, y0 + 1.02, y0 + 1.06,
+      [0.090, 0.140, 0.100]);
+    // The handle bar at the back, which the lid hinges round.
+    tubeTS([[tn - 0.34, back + 0.22, y0 + 1.08], [tn + 0.34, back + 0.22, y0 + 1.08]],
+      0.020, BIND, 10, [0, 0, 1], 0.10);
+    // The front foot it stands on when it is not being wheeled.
+    boxTS(tn - 0.22, tn + 0.22, back + 0.84, back + 0.92, y0, y0 + 0.11, BIND);
+    // Two wheels on an axle: a tyre, a hub, a cap.
+    tubeTS([[tn - 0.36, back + 0.34, y0 + 0.11], [tn + 0.36, back + 0.34, y0 + 0.11]],
+      0.012, [0.200, 0.200, 0.205], 8, [0, 0, 1], 0.10);
+    for (const o of [-0.30, 0.30]) {
+      const sgn = Math.sign(o);
+      tubeTS([[tn + o - 0.03, back + 0.34, y0 + 0.11],
+        [tn + o + 0.03, back + 0.34, y0 + 0.11]],
+      0.105, [0.060, 0.060, 0.064], 18, [0, 0, 1], 0.12);
+      tubeTS([[tn + o + sgn * 0.030, back + 0.34, y0 + 0.11],
+        [tn + o + sgn * 0.034, back + 0.34, y0 + 0.11]],
+      0.060, [0.300, 0.300, 0.300], 14, [0, 0, 1], 0.08);
     }
     // Two gas bottles by the door, and the bar across them.
     //
     // They were an 8-sided post with a smaller post sat on top, and at three
     // metres — which is where you pass them — an octagon at r 0.16 shows every
     // corner and the pair read as two red boxes. A bottle is a cylinder and a
-    // shoulder, and the shoulder is most of the silhouette. `lathe` turns a
-    // profile, which is what this actually is: a rolled foot standing proud of
-    // the barrel, the barrel, the shoulder coming over, a neck, and the guard
-    // collar with the valve down inside it.
+    // shoulder, and the shoulder is most of the silhouette. The profile is
+    // turned: a rolled foot standing proud of the barrel, the barrel with
+    // its weld seam, the shoulder coming over, a neck, and the guard collar
+    // with the valve down inside it. 29 Sep 2026: turned SMOOTH now (`tubeTS`
+    // with a radius per ring, 28 round), where it was `lathe` on twelve flat
+    // facets that showed as twelve stripes of light down every bottle.
     const GAS = [0.560, 0.180, 0.095];
+    const turn = (tg, gs, prof, col, sides, sh = 0.10) => tubeTS(
+      prof.map(([y]) => [tg, gs, y]), (k) => prof[k][1], col, sides, [1, 0, 0], sh);
     for (let i = 0; i < 2; i++) {
       const tg = td - 0.72 - i * 0.36, gs = back + 0.34;
       // SQUAT. The first turned version came out as a wine bottle: a barrel
@@ -7474,29 +7554,52 @@ async function buildJadrija(scene) {
       // across another 0.16. A 10 kg butane bottle is about as tall in the
       // barrel as it is wide, and the shoulder turns HARD — that hard turn is
       // what says gas bottle rather than flask.
-      lathe(W, tg, gs, [
-        [y0, 0.000], [y0, 0.142],
-        [y0 + 0.028, 0.158], [y0 + 0.070, 0.152],   // the rolled foot
-        [y0 + 0.340, 0.155], [y0 + 0.392, 0.150],
-        [y0 + 0.436, 0.128], [y0 + 0.472, 0.094],   // and over it comes
-        [y0 + 0.498, 0.058], [y0 + 0.512, 0.040],
+      turn(tg, gs, [
+        [y0 + 0.002, 0.142], [y0 + 0.014, 0.156], [y0 + 0.030, 0.158],
+        [y0 + 0.052, 0.156], [y0 + 0.066, 0.150],               // the rolled foot
+        [y0 + 0.076, 0.152], [y0 + 0.200, 0.155],
+        [y0 + 0.206, 0.158], [y0 + 0.212, 0.155],               // the weld seam
+        [y0 + 0.340, 0.155], [y0 + 0.380, 0.152], [y0 + 0.412, 0.142],
+        [y0 + 0.436, 0.128], [y0 + 0.456, 0.112], [y0 + 0.472, 0.094],
+        [y0 + 0.488, 0.074], [y0 + 0.498, 0.058], [y0 + 0.512, 0.040],
         [y0 + 0.545, 0.040],
-      ], GAS, 12);
-      // The guard collar. Open top and bottom and only a shade off the bottle,
-      // so it reads as a collar standing off the shoulder with the valve down
-      // inside it — at near-black it was a bottle cap.
-      lathe(W, tg, gs, [
-        [y0 + 0.470, 0.078], [y0 + 0.610, 0.082],
-        [y0 + 0.610, 0.064], [y0 + 0.470, 0.060],
-      ], shade(GAS, 0.86), 12);
-      // The valve, brass, down inside the collar where it belongs.
-      lathe(W, tg, gs, [
-        [y0 + 0.540, 0.026], [y0 + 0.575, 0.026],
-        [y0 + 0.588, 0.036], [y0 + 0.600, 0.019], [y0 + 0.600, 0.000],
-      ], [0.470, 0.395, 0.170], 8);
+      ], GAS, 28);
+      // The guard collar: an outside and an inside, and a rolled rim at the
+      // top, so it reads as a collar standing off the shoulder with the valve
+      // down inside it. Two hand-holes are cut in it, dark, across the pair.
+      turn(tg, gs, [[y0 + 0.470, 0.078], [y0 + 0.590, 0.082], [y0 + 0.604, 0.086],
+        [y0 + 0.612, 0.080]], shade(GAS, 0.86), 24);
+      turn(tg, gs, [[y0 + 0.612, 0.072], [y0 + 0.480, 0.066]],
+        shade(GAS, 0.55), 20, 0.02);
+      for (const o of [-1, 1]) {
+        boxTS(tg + o * 0.058 - 0.022, tg + o * 0.058 + 0.022,
+          gs - 0.083, gs + 0.083, y0 + 0.555, y0 + 0.585, [0.100, 0.040, 0.025]);
+      }
+      // The valve, brass, down inside the collar where it belongs, with its
+      // handwheel and the outlet.
+      turn(tg, gs, [[y0 + 0.512, 0.026], [y0 + 0.560, 0.026], [y0 + 0.566, 0.030]],
+        [0.470, 0.395, 0.170], 14);
+      turn(tg, gs, [[y0 + 0.574, 0.036], [y0 + 0.586, 0.038], [y0 + 0.594, 0.030]],
+        [0.100, 0.100, 0.105], 16);
+      tubeTS([[tg, gs, y0 + 0.550], [tg, gs + 0.050, y0 + 0.550]], 0.010,
+        [0.470, 0.395, 0.170], 8, [1, 0, 0], 0.10);
+      // And on the one nearer the door, the regulator and the black hose into
+      // the wall, which is why the pair is standing where it is.
+      if (i === 0) {
+        tubeTS([[tg, gs + 0.050, y0 + 0.550], [tg, gs + 0.080, y0 + 0.560]], 0.022,
+          [0.520, 0.520, 0.520], 12, [1, 0, 0], 0.10);
+        tubeTS([[tg, gs + 0.090, y0 + 0.565], [tg + 0.06, gs + 0.10, y0 + 0.70],
+          [tg + 0.20, gs - 0.10, y0 + 0.80], [tg + 0.34, back + 0.03, y0 + 0.78]],
+        0.009, [0.045, 0.045, 0.048], 8, [0, 0, 1], 0.10);
+      }
     }
-    boxTS(td - 1.16, td - 0.56, back + 0.18, back + 0.22, y0 + 0.46, y0 + 0.52,
-      STEEL);
+    // The bar across them, round now, on two brackets out of the wall.
+    tubeTS([[td - 1.16, back + 0.20, y0 + 0.49], [td - 0.56, back + 0.20, y0 + 0.49]],
+      0.012, STEEL, 10, [0, 0, 1], 0.10);
+    for (const tt of [td - 1.14, td - 0.58]) {
+      boxTS(tt - 0.015, tt + 0.015, back + 0.02, back + 0.22, y0 + 0.475, y0 + 0.505,
+        STEEL);
+    }
 
     runs.push({ t0: S.t0 - 0.2, t1: S.t1 + 0.2, s0: back, s1: back + 1.0,
       y: y0, h: 1.3 });
@@ -30160,7 +30263,16 @@ async function buildJadrija(scene) {
       // creeper is one continuous mass with lumps in it, so the puffs have to
       // overlap by more than half.
       for (let t = ia; t < ic; t += 0.28) {
-        if (gap(t)) continue;
+        // ON A BAY THAT IS THERE. The wall is laid in `step` bays and a bay
+        // with either end in a gap is left out whole, so a puff that only asked
+        // `gap` of its own t grew on the coping of a bay that was never built:
+        // Misha, 29 Sep 2026, behind the slastičarnica — *"remove that weird
+        // floating shrubbery"*. It was this ivy, a metre up in the air either
+        // side of the delivery opening, on nothing. `jit` only, so no draw
+        // moves.
+        const tb0 = 300 + Math.floor((t - 300) / step) * step;
+        const tb1 = Math.min(tb0 + step, LEN - 14);
+        if (gap(tb0) || gap(tb1) || tb0 >= LEN - 14) continue;
         const y = yAt(t) + WALL.h + WALL.cap;
         const k = (t * 11) | 0;
         const r = 0.27 + jit(k, 34) * 0.15;

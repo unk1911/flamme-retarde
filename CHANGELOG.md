@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.547.1] — 2026-09-29
+
+### The yard behind the shops, rounder; and the ivy on no wall
+
+Misha, behind the slastičarnica: *"enhance the objects, add more polygons,
+like for the gas canisters and stuff. and also remove that weird floating
+shrubbery"*.
+
+**The floating shrubbery was the lane wall's ivy.** The wall at s 29.2 is laid
+in 2.4 m bays, and a bay with either end in a gap is left out whole; the ivy
+asked `gap` only of each 0.28 m puff. So either side of the delivery opening
+opposite the back door (t 330.75–335.15) the wall was gone and its ivy was
+still on the coping, a metre up on nothing — ray-cast to `jad:shrub` at t 330
+and 335.5, s 29. The ivy now asks the same bay question the wall does. Hashes
+only, no `rng`: blockers 792, nothing else moves.
+
+**The yard (`shopBack`, so every shop's back, not only this one)** — same
+positions, same `runs`:
+- gas bottles turned SMOOTH (`tubeTS` with a radius per ring, 28 round,
+  where they were `lathe` on 12 flat facets), with a weld seam, a guard
+  collar with a rolled rim, an inside and hand-holes, a valve with its
+  handwheel and outlet, and on the one by the door a regulator and a black
+  hose into the wall; the bar across them round, on two brackets;
+- crates are open moulded trays — 12 mm walls, a ribbed floor you see into
+  in the top one, a proud rim, a hand-hole in each end, ribs down the side;
+- the wheelie bin has rounded corners, ribs down the front, a lid with a
+  front lip and a grip, the hinge bar, a front foot, and wheels (18 round)
+  with hubs on an axle;
+- downpipes 14-sided where they were hexagonal.
+
 ## [1.547.0] — 2026-09-29
 
 ### The bead curtain bends
