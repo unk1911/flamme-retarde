@@ -31604,6 +31604,14 @@ async function buildJadrija(scene) {
       // In two loose rows down the east half, bodies along the mole, heads
       // both ways, which is 20260821_175838: nobody lies across a mole, and
       // nobody lies in a grid.
+      //
+      // WHAT IS KEPT CLEAR, and why every number below is where it is. The
+      // west flank from s -24 to the head is the children's: they run at the
+      // edge there, go in, and come out up the flank's own ladder at s -39.3
+      // (`MOLE_LADDERS`). The east flank round s -33.5 is the man's, who goes
+      // in off it and comes out up the other one. And the flag pole
+      // (`MOLE_FLAG`, t 258.6, s -39.3, on the centre line) has nobody and
+      // no towel within a couple of metres of it.
       const LIE = [
         // t, s, bearing (head -> feet), prone, top, shades, book
         [259.1, -7.6, -Math.PI / 2, false, 1, true, false],
@@ -31613,7 +31621,7 @@ async function buildJadrija(scene) {
         [258.9, -22.3, -Math.PI / 2, false, 1, false, false],
         [261.2, -28.6, Math.PI / 2, false, 1, true, false],
         [257.6, -31.4, -Math.PI / 2, false, 0, false, false],
-        [260.3, -35.6, Math.PI / 2, true, 0, true, false],
+        [257.2, -35.6, Math.PI / 2, true, 0, true, false],
       ];
       LIE.forEach(([t, s, ang, prone, topOff, shades, book], i) => {
         const a = ang + (jit(i, 5101) - 0.5) * 0.22;
@@ -31625,37 +31633,40 @@ async function buildJadrija(scene) {
       // puts both hands half way down the thighs — where a paperback is.
       spot({ t: 260.4, s: -24.6, y: top, ang: Math.PI - 0.35, pose: 'sit',
         ground: true, book: true, shades: true, towel: true, who: 'f' });
-      spot({ t: 258.3, s: -38.3, y: top, ang: -Math.PI / 2 + 0.4, pose: 'sit',
+      spot({ t: 256.4, s: -20.8, y: top, ang: -Math.PI / 2 + 0.4, pose: 'sit',
         ground: true, book: true, towel: true, who: '*' });
       // On the edge with their legs over the water: the one thing the quay
       // clip was solved for and, on the promenade, never got to do (see
-      // `legRestOf`). 0.55 m in from the arris, which is where the quay
-      // sitters' note puts the knee on the lip. The west flank faces the
-      // vikendica, and nothing sits on it between s -3 and -18 because that
-      // is the jumpers' run and the water they go into.
-      for (const [s, who] of [[-20.6, 'k'], [-26.4, 'm'], [-33.1, '*'], [-38.9, 'm']]) {
-        spot({ t: W0 + 0.55, s, y: top, ang: Math.PI, pose: 'sit', edge: true,
+      // `legRestOf`). The hip 0.36 m in from the arris — 0.27 for a child —
+      // which puts the back of the knee on it: at the quay sitters' 0.55 the
+      // knee was 12 cm short of the edge and the shins went down into the
+      // mole, photographed from the water. The west flank faces the
+      // vikendica, and nothing sits on it past s -21, because that is the
+      // children's run and the water they go into.
+      const IN = { k: 0.27, m: 0.36, '*': 0.36 };
+      for (const [s, who] of [[-7.0, 'k'], [-11.5, 'm'], [-15.8, '*'], [-20.2, 'm']]) {
+        spot({ t: W0 + IN[who], s, y: top, ang: Math.PI, pose: 'sit', edge: true,
           shades: jit(s * 10 | 0, 5102) < 0.35, who });
       }
       for (const [t, who] of [[254.6, 'm'], [260.9, '*']]) {
-        spot({ t, s: HEAD + 0.55, y: top, ang: -Math.PI / 2, pose: 'sit',
+        spot({ t, s: HEAD + IN[who], y: top, ang: -Math.PI / 2, pose: 'sit',
           edge: true, who });
       }
       for (const [s, who] of [[-9.4, 'm'], [-24.9, '*']]) {
-        spot({ t: E0 - 0.55, s, y: top, ang: 0, pose: 'sit', edge: true, who });
+        spot({ t: E0 - IN[who], s, y: top, ang: 0, pose: 'sit', edge: true, who });
       }
       // Two on their feet: one at the head of the jumpers' run, watching
       // them go in, and one out towards the head.
       spot({ t: 257.9, s: -19.2, y: top, ang: Math.PI + 0.5, pose: 'stand',
         shades: true, who: 'm' });
-      spot({ t: 262.1, s: -32.3, y: top, ang: Math.PI * 0.8, pose: 'stand',
+      spot({ t: 262.7, s: -16.4, y: top, ang: Math.PI * 0.8, pose: 'stand',
         who: '*' });
       // And the quay in front of the vikendica, which is the other half of
       // what he can see from its terrace: two on the lip with their legs
       // over, and one standing at the edge. Clear of the ladder at t 247 and
       // of the lip from there to the mole, which is the jumpers' way back.
       for (const t of [237.9, 241.4]) {
-        spot({ t, s: 0.55, y: null, ang: -Math.PI / 2, pose: 'sit', edge: true,
+        spot({ t, s: 0.36, y: null, ang: -Math.PI / 2, pose: 'sit', edge: true,
           who: '*' });
       }
       spot({ t: 243.9, s: 1.3, y: null, ang: -Math.PI / 2 + 0.6, pose: 'stand',
@@ -36335,6 +36346,17 @@ async function buildJadrija(scene) {
       parsed.push(skin);
       CAST_KIND.push(BATHER_CAST[i]);
     });
+    // Two kinds of clip made here rather than baked, both for the mole
+    // (`MOLE_LIFE`), and both before a single figure is made off these
+    // parses so that every figure's `clips` list carries them.
+    for (const p of parsed) proneClip(p);
+    {
+      const src = parsed[CAST_KIND.indexOf('man_young_fit')];
+      for (const k of ['girl_child', 'boy_child']) {
+        const p = parsed[CAST_KIND.indexOf(k)];
+        if (src && p) jumpClips(src, p);
+      }
+    }
     // One way to make a figure off one of these blobs, for the crowd, the
     // riders and the boat alike. A v2 figure needs uniforms of its own — it
     // is dyed per person — so it cannot be built off one shared option set
@@ -36793,6 +36815,349 @@ async function buildJadrija(scene) {
     }
     f.update(h);
     m.userData.diveMode = DIVE_MODE_CODE[dv.mode] || 0;
+  }
+
+  // ── off the mole: the jumpers ──────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026: *"little kids jumping down"* off the mole; and then,
+  // the same day: *"perhaps re-use the dive of the diver we worked on a few
+  // days ago, that dives off the diving board, so the pier divers execute the
+  // same type of dive? maybe that will save on some time/effort"*.
+  //
+  // So it is HIS dive — the solved one above, `dive` / `tread` / `swim` /
+  // `ladder` out of tools/blender/dive.py and `PAYLOAD.dive` — played by three
+  // of the hundred (`MOLE_LIFE.jumpers`): a girl and a boy off the west flank,
+  // the side the vikendica looks at, and a man off the east. Nothing new was
+  // baked. What is different about a mole is handled here, in four numbers:
+  //
+  //   SCALE. The clips are the man's. The children get them retargeted on to
+  //   their own skeletons (`jumpClips`): every bone's turn away from its own
+  //   rest pose carried across, and the root's travel scaled by the ratio of
+  //   the two pelvises — 0.63 for the girl — so a child takes the man's four
+  //   steps and hurdle at a child's length. Every distance `PAYLOAD.dive`
+  //   gives is scaled by the same `k` below.
+  //
+  //   NO BOARD. The clip rides the plank down 0.41 m and back; the concrete
+  //   does not move, so the root is lifted by exactly the board's own
+  //   deflection (`flex`, frame by frame) until he leaves it — the feet stay
+  //   on the mole and the hurdle, the crouch and the drive are untouched.
+  //
+  //   NO HEIGHT. The clip leaves a board 2.745 m over the water and the mole
+  //   is 0.72 m over it. So he takes off from the deck and the whole figure
+  //   is eased down on to the clip's own water plane between takeoff and the
+  //   moment his hands meet it, and the flight is played half as fast again
+  //   (`FLY`) — a fall of about a metre and a quarter takes about 0.5 s, not
+  //   the clip's 0.8. The turn is conserved: he still goes in head first at
+  //   182 degrees, which is what a running header off a mole is.
+  //
+  //   A LOWER LADDER. The mole's flank ladders (`MOLE_LADDERS`) climb 0.72 m,
+  //   not 2.64; the climb is played from the frame where the rest of it is
+  //   exactly that much, with his hands already on the rungs.
+  //
+  // The swim round to the ladder, the tread and the walk back are the diver's
+  // own code, with the mole's points in it.
+  const JUMP = {
+    // Where each goes in: the flank (−1 west, +1 east) and how far out.
+    lanes: { girl_child: [-1, -28.2], boy_child: [-1, -33.4], man_young_fit: [1, -33.2] },
+    FLY: 1.5,                 // clip rate from takeoff to entry
+    out: 0.6,                 // m further out a child goes in (see the dive)
+    walk: 1.0, swim: 0.80,    // m/s, the man's; a child's are times sqrt(k)
+    wait: [2.5, 7.0],         // s at the edge before the next go
+  };
+  // The board's takeoff frame: the last frame he is on it. `flex` rings on
+  // after he has left and none of that is his.
+  const JUMP_TO = DV ? Math.round((DV.dive.entry_t - DV.dive.stats.flight) * DV.fps) : 0;
+
+  /**
+   * A figure's pose in `name` at `T`, retargeted from the man's skeleton on
+   * to `dst`'s: `q_dst = rest_dst · rest_src⁻¹ · q_src` per bone, and the
+   * root's travel scaled pelvis to pelvis. The bones are the same thirty in
+   * the same order on all eight (`armature()` in human_mh.py builds them all),
+   * and a turn away from rest means the same thing on each — which is why the
+   * children's `sitquay` and his are the same sit at two sizes.
+   */
+  function jumpClips(src, dst) {
+    const nb = src.bones.length;
+    if (dst.bones.length !== nb || dst.clips.dive) return;
+    for (let i = 0; i < nb; i++) if (src.bones[i].name !== dst.bones[i].name) return;
+    const k = dst.bones[0].t[1] / src.bones[0].t[1];
+    for (const name of ['dive', 'tread', 'swim', 'ladder']) {
+      const c = src.clips[name];
+      if (!c) continue;
+      const quat = new Int16Array(c.quat.length);
+      for (let f = 0; f < c.nf; f++) {
+        for (let i = 0; i < nb; i++) {
+          const o = (f * nb + i) * 4;
+          const q = [c.quat[o] / 32767, c.quat[o + 1] / 32767,
+            c.quat[o + 2] / 32767, c.quat[o + 3] / 32767];
+          const rs = src.bones[i].q, rd = dst.bones[i].q;
+          const d = qMul4([-rs[0], -rs[1], -rs[2], rs[3]], q);
+          const r = qMul4(rd, d);
+          const l = Math.hypot(r[0], r[1], r[2], r[3]) || 1;
+          for (let j = 0; j < 4; j++) quat[o + j] = Math.round(r[j] / l * 32767);
+        }
+      }
+      const root = new Float32Array(c.root.length);
+      for (let j = 0; j < root.length; j++) root[j] = c.root[j] * k;
+      dst.clips[name] = { name, dur: c.dur, nf: c.nf, loop: c.loop, root, quat };
+    }
+    dst.jumpK = k;
+  }
+  function qMul4(a, b) {
+    return [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+      a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+      a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+      a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+  }
+
+  /**
+   * `prone`: `sunbathe` turned over, on this body.
+   *
+   * The far tier has had people on their fronts since the survey said a
+   * quarter of the beach is (see the `lie` case in 42-crowd.js); the near tier
+   * never did, and nobody asked it to until the mole — where the undone top
+   * is only a thing at all on somebody lying on her front. So it is made
+   * here, per body, off the face-up clip: the root turned half round the
+   * body's long axis (figure x, which the lie's tip has made head to heel),
+   * so the front is on the towel and the head is where it was; the small
+   * bends of the back and the neck reversed, so that what lifted her
+   * shoulders off the towel face up now lifts them face down instead of
+   * pressing her chest into it; and both knees bent up off the towel, the
+   * shins in the air, which is 20260821_175413 — the one figure on a towel
+   * in the whole survey that was photographed close, and she is lying
+   * exactly so.
+   */
+  function proneClip(p) {
+    const c = p.clips.sunbathe;
+    if (!c || p.clips.prone) return;
+    const nb = p.bones.length;
+    const id = (n) => p.bones.findIndex((b) => b.name === n);
+    const back = ['spine01', 'spine02', 'spine03', 'chest', 'neck', 'head'].map(id);
+    const knee = { [id('legLL')]: 1.35, [id('legLR')]: 0.95 };
+    const quat = new Int16Array(c.quat.length);
+    for (let f = 0; f < c.nf; f++) {
+      for (let i = 0; i < nb; i++) {
+        const o = (f * nb + i) * 4;
+        let q = [c.quat[o] / 32767, c.quat[o + 1] / 32767,
+          c.quat[o + 2] / 32767, c.quat[o + 3] / 32767];
+        const r = p.bones[i].q;
+        if (i === 0) {
+          q = [q[3], -q[2], q[1], -q[0]];          // Rx(pi) · q, figure space
+        } else if (back.includes(i)) {
+          const d = qMul4([-r[0], -r[1], -r[2], r[3]], q);
+          q = qMul4(r, [-d[0], -d[1], -d[2], d[3]]);
+        } else if (knee[i] != null) {
+          const a = knee[i] + Math.sin(f / c.nf * TAU) * 0.08 * (i % 2 ? 1 : -1);
+          q = qMul4(r, [Math.sin(a / 2), 0, 0, Math.cos(a / 2)]);
+        }
+        for (let j = 0; j < 4; j++) quat[o + j] = Math.round(q[j] * 32767);
+      }
+    }
+    p.clips.prone = { name: 'prone', dur: c.dur, nf: c.nf, loop: c.loop,
+      root: c.root.slice(), quat };
+  }
+
+  /** A shore point, in the world, at height y. */
+  const jw = (t, s, y) => { const p = W(t, s, y); return [p[0], p[1], p[2]]; };
+
+  function jumpPlace(J, pos, yaw) {
+    J.fig.mesh.position.set(pos[0], pos[1], pos[2]);
+    J.fig.mesh.rotation.set(0, yaw, 0);
+  }
+  function jumpPlay(J, name, fade, keepRoot = false) {
+    if (!J.fig.clips.includes(name)) return false;
+    J.fig.play(name, { fade, keepRoot });
+    J.fig.state.speed = 1;
+    return true;
+  }
+  function jumpSet(J, mode) { J.st.mode = mode; J.st.t = 0; }
+  /** Everything about a jumper that follows from where the lane is. */
+  function jumpLane(J) {
+    const [side, s] = JUMP.lanes[J.kind];
+    const k = J.k, face = JET.t + side * JET.w;
+    const L = MOLE_LADDERS.find((m) => m[2] === side) || [face, -39.3, side];
+    const out = diveYaw(...(() => { const a = jw(face, s, 0), b2 = jw(face + side, s, 0);
+      return [b2[0] - a[0], b2[2] - a[2]]; })());
+    const xTip = DV.dive.x_tip * k;
+    J.lane = {
+      side, s, face, out, inn: out + Math.PI,
+      // The clip's origin: his tip lands on the arris.
+      origin: jw(face - side * xTip, s, JET.top),
+      // The climb: the rungs' line, 0.20 off the face like every ladder here.
+      ladder: jw(face + side * 0.20, L[1], 0), ls: L[1],
+    };
+    return J.lane;
+  }
+  /** The swim from where he came up to the foot of his ladder. */
+  function jumpToLadder(J, from) {
+    const { side, face, ls } = J.lane, k = J.k;
+    // To 0.35 m off the rungs, where the diver's own swim ends.
+    const off = 0.20 + 0.35 * k;
+    return [from, jw(face + side * (off + 0.9), ls + 1.6, 0),
+      jw(face + side * off, ls, 0)];
+  }
+  /** The walk from the top of his ladder back to his mark. */
+  function jumpToMark(J, from) {
+    const { side, face, s, ls } = J.lane, k = J.k;
+    const xTip = DV.dive.x_tip * k;
+    return [from, jw(face - side * 1.1, ls + 0.9, JET.top),
+      jw(face - side * (xTip + 0.9), s - 1.4, JET.top), J.lane.origin];
+  }
+  function jumpPath(J, dt, v, turnRate, onPos) {
+    const S = J.st, P = S.path;
+    let left = v * dt;
+    while (left > 0 && S.seg < P.length - 1) {
+      const a = P[S.seg], b2 = P[S.seg + 1];
+      const cur = S.cur || a;
+      const dx = b2[0] - cur[0], dz = b2[2] - cur[2], d = Math.hypot(dx, dz);
+      if (d <= left) { S.cur = b2; left -= d; S.seg++; continue; }
+      S.cur = [cur[0] + dx / d * left, cur[1] + (b2[1] - cur[1]) * left / d, cur[2] + dz / d * left];
+      left = 0;
+    }
+    const c = S.cur, b2 = P[Math.min(S.seg + 1, P.length - 1)];
+    if (Math.hypot(b2[0] - c[0], b2[2] - c[2]) > 0.05) {
+      const want = diveYaw(b2[0] - c[0], b2[2] - c[2]);
+      const d = ((want - S.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      S.yaw += Math.max(-turnRate * dt, Math.min(turnRate * dt, d));
+    }
+    onPos(c);
+    return S.seg >= P.length - 1;
+  }
+  const seaAt = (x, z) => (typeof seaHeightAt === 'function' ? seaHeightAt(x, z) : 0);
+
+  function jumpStep(J, dt, cam) {
+    const f = J.fig, m = f.mesh, S = J.st, k = J.k;
+    const o = J.lane.origin;
+    const dCam = Math.hypot(cam.x - o[0], cam.z - o[2]);
+    if (dCam > 320) {
+      if (S.mode !== 'off') { m.visible = false; jumpSet(J, 'off'); }
+      return;
+    }
+    const h = Math.min(Math.max(dt, 0), 0.05);
+    if (S.mode === 'off') {
+      // Dressed as the person the crowd made of them (`b.fg`, kept for this
+      // in the casting loop), once — nobody else is ever drawn by it.
+      if (!J.dressed && bathers[J.i].fg && f.dress) { f.dress(bathers[J.i].fg); J.dressed = true; }
+      S.yaw = J.lane.out; S.cur = o;
+      jumpPlace(J, o, S.yaw); jumpPlay(J, 'idle', 0); jumpSet(J, 'wait');
+      // Staggered by who they are, so the three never go together.
+      S.next = 1.0 + J.n * 3.3 + jit(J.i, 5120) * 2.0;
+    }
+    S.t += h;
+    m.visible = true;
+    const Yv = -DV.dive.water * k;           // his board's height over his water
+    if (S.mode === 'wait') {
+      if (S.t >= S.next) {
+        S.yaw = J.lane.out;
+        jumpPlace(J, o, S.yaw);
+        jumpPlay(J, 'dive', 0.3);
+        S.splash = false;
+        jumpSet(J, 'dive');
+      }
+    } else if (S.mode === 'dive') {
+      const T = f.state.curT;
+      const fr = Math.min(DV.dive.flex.length - 1, Math.max(0, Math.round(T * DV.fps)));
+      const Tto = JUMP_TO / DV.fps, Te = DV.dive.entry_t;
+      f.state.speed = T >= Tto && T < Te ? JUMP.FLY : 1;
+      let y = Yv + (JET.top - Yv) * (1 - smoothstep(Tto, Te, T));
+      if (fr <= JUMP_TO) y -= DV.dive.flex[fr] * k;
+      // A child's flight is carried a little further out than his clip
+      // scaled down: at k 0.63 the hands went in 0.77 m off the wall and
+      // the whole girl, vertical, was sliding down the face of the mole in
+      // the frame before she hit the water. `JUMP.out` is what a running
+      // child actually clears it by.
+      const fw = J.out * smoothstep(Tto, Te, T);
+      const oo = diveFrom(o, S.yaw, fw, 0);
+      if (T >= Te - 0.06) {
+        const p = diveFrom(o, S.yaw, DV.dive.end_root[0] * k + J.out, 0);
+        y += (seaAt(p[0], p[2]) + TREAD_LIFT * k) * smoothstep(Te, Te + 1.2, T);
+        if (!S.splash) {
+          S.splash = true;
+          const q = diveFrom(o, S.yaw, DV.dive.entry_x * k + J.out, 0);
+          const ux = Math.cos(S.yaw), uz = -Math.sin(S.yaw);
+          if (bodySplash) bodySplash.at(q[0], seaAt(q[0], q[2]), q[2], 0.45 + 0.7 * k, 1.2 * k, ux, uz);
+          const dq = Math.hypot(cam.x - q[0], cam.z - q[2]);
+          if (dq < 70 && typeof audio !== 'undefined' && audio && audio.plunge) {
+            audio.plunge(0.85 * k * (1 - dq / 70));
+          }
+        }
+      }
+      jumpPlace(J, [oo[0], y, oo[2]], S.yaw);
+      if (T >= DV.dive.dur - 0.02) {
+        const er = DV.dive.end_root, tr = DV.tread_root;
+        const c = diveFrom(o, S.yaw, (er[0] - tr[0]) * k + J.out, 0);
+        S.treadY = Yv + (er[1] - tr[2]) * k + TREAD_LIFT * k;
+        S.cur = [c[0], S.treadY + seaAt(c[0], c[2]), c[2]];
+        jumpPlace(J, S.cur, S.yaw);
+        jumpPlay(J, 'tread', 0.2, true);
+        jumpSet(J, 'tread');
+      }
+    } else if (S.mode === 'tread') {
+      const c = S.cur;
+      S.cur = [c[0], S.treadY + seaAt(c[0], c[2]), c[2]];
+      jumpPlace(J, S.cur, S.yaw);
+      if (S.t > 1.1) {
+        S.path = jumpToLadder(J, S.cur); S.seg = 0;
+        S.swimY0 = S.cur[1];
+        jumpPlay(J, 'swim', 0.5);
+        jumpSet(J, 'swim');
+      }
+    } else if (S.mode === 'swim') {
+      const ySwim = 0.08 * k - J.pelvisY - DV.swim_root[2] * k;
+      const e = smoothstep(0, 0.8, S.t);
+      const done = jumpPath(J, h, JUMP.swim * Math.sqrt(k), 1.6, (c) => {
+        jumpPlace(J, [c[0], S.swimY0 + (ySwim + seaAt(c[0], c[2]) - S.swimY0) * e, c[2]], S.yaw);
+      });
+      if (done) {
+        // Up his ladder from the rung where there is 0.72 m of it left.
+        S.yaw = J.lane.inn;
+        const yL = JET.top - DV.ladder.deck * k;
+        const L = [J.lane.ladder[0], yL, J.lane.ladder[2]];
+        S.ladder = L;
+        jumpPlace(J, L, S.yaw);
+        jumpPlay(J, 'ladder', 0.6, true);
+        // The frame where the root is as far above its first frame as the
+        // skakaonica's climb is higher than this one, so that from there on
+        // he climbs 0.72 m and starts it exactly as deep in the water as
+        // the whole clip does.
+        const c = f.data.clips.ladder, want = c.root[1] + (DV.ladder.deck * k - JET.top);
+        let f0 = 0;
+        while (f0 < c.nf - 1 && c.root[f0 * 3 + 1] < want) f0++;
+        f.state.curT = f0 / Math.max(1, c.nf - 1) * c.dur;
+        jumpSet(J, 'ladder');
+      }
+    } else if (S.mode === 'ladder') {
+      if (f.state.curT >= DV.ladder.dur - 0.02) {
+        const er = DV.ladder.end_root;
+        const s0 = diveFrom(S.ladder, S.yaw, er[0] * k, JET.top - S.ladder[1]);
+        S.path = jumpToMark(J, s0); S.seg = 0; S.cur = s0;
+        jumpPlace(J, s0, S.yaw);
+        jumpPlay(J, 'walk', 0.35, true);
+        jumpSet(J, 'walk');
+      }
+    } else if (S.mode === 'walk') {
+      const v = JUMP.walk * Math.sqrt(k);
+      f.state.speed = v / (WALK_NATIVE * k);
+      const done = jumpPath(J, h, v, 2.4, (c) => jumpPlace(J, c, S.yaw));
+      if (done) { jumpPlay(J, 'idle', 0.4); jumpSet(J, 'turn'); }
+    } else if (S.mode === 'turn') {
+      const d = ((J.lane.out - S.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      S.yaw += Math.max(-2.0 * h, Math.min(2.0 * h, d));
+      jumpPlace(J, S.cur, S.yaw);
+      if (Math.abs(d) < 0.01 && S.t > 0.5) {
+        S.loops++;
+        jumpSet(J, 'wait');
+        S.next = JUMP.wait[0] + Math.random() * (JUMP.wait[1] - JUMP.wait[0]);
+      }
+    }
+    // Posed at the crowd's own ladder of rates: every frame near, and the
+    // way out past the head of the mole is not worth thirty bones a frame.
+    J.acc = (J.acc || 0) + h;
+    if (dCam < 60 || J.acc > 1 / 15) { f.update(J.acc); J.acc = 0; }
+  }
+  function jumpersStep(dt, cam) {
+    if (!DV) return;
+    for (const J of MOLE_LIFE.jumpers) if (J.fig) jumpStep(J, dt, cam);
   }
 
   /**
@@ -42012,6 +42377,139 @@ async function buildJadrija(scene) {
    * glass after the case has been turned, so the hold means the same thing
    * from every bearing and not just from the one it was tuned at.
    */
+  // ── sunglasses and paperbacks (`MOLE_PROPS`) ───────────────────────────────
+  //
+  // "some wear sunglasses, some reads books" — Misha, 29 Sep 2026, of the
+  // mole. On the near tier only: a pair of sunglasses is 14 cm across and at
+  // the distance the far tier draws from it is less than a pixel. Both are
+  // children of the figure's own mesh, so they are in its figure space and
+  // go wherever the roving slot goes; both are hidden the moment the person
+  // the slot is drawing is not somebody who has them.
+  //
+  // SUNGLASSES ride the head bone. Built in the head's BIND frame off this
+  // body's own measured eyes (`bather2Eyes`), then carried by `boneAt` and
+  // `boneTurn` — a rigid attachment, which is what a pair of glasses is. Two
+  // dark lenses 5.4 cm by 3.8 standing 1.4 cm proud of the eyes, a bridge,
+  // and the arms back to the ears.
+  //
+  // A PAPERBACK sits between the hands of somebody sitting on a towel with
+  // their legs out (`sitquay` with its legs laid, see `legRestOf`): the clip
+  // rests both hands half way down the thighs, which is where a book open in
+  // the lap is held, and it is turned to face the head. The prone readers'
+  // books are on their towels and are scenery — see the mole's towels.
+  const MOLE_PROPS = { near: 80 };
+  const propMat = {
+    dark: new THREE.MeshBasicMaterial({ color: 0x0b0c0f, side: THREE.DoubleSide }),
+    page: new THREE.MeshBasicMaterial({ color: 0xe6e1d4, side: THREE.DoubleSide }),
+  };
+  function shadesGeo(f) {
+    const data = f.data;
+    if (data.shadesGeo) return data.shadesGeo;
+    const hi = f.boneIndex('head');
+    const bt = f.bindRest().bindT;
+    const H = new THREE.Vector3(bt[hi * 3], bt[hi * 3 + 1], bt[hi * 3 + 2]);
+    const E = data.geo.getAttribute('uv') ? bather2Eyes(data) : null;
+    const pos = [];
+    const quad = (a, b, c, d) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+    if (E && E.l.y > -50) {
+      const eyeY = (E.l.y + E.r.y) / 2, eyeX = (E.l.x + E.r.x) / 2 + 0.014;
+      for (const e of [E.l, E.r]) {
+        const cz = e.z;
+        const N = 10;
+        for (let i = 0; i < N; i++) {
+          const a0 = (i / N) * TAU, a1 = ((i + 1) / N) * TAU;
+          const p = (a) => [eyeX, eyeY + Math.sin(a) * 0.019 - 0.004, cz + Math.cos(a) * 0.027];
+          quad([eyeX, eyeY - 0.004, cz], p(a0), p(a1), p(a1));
+        }
+      }
+      const zl = E.l.z, zr = E.r.z, zo = Math.max(Math.abs(zl), Math.abs(zr)) + 0.030;
+      const sz = Math.sign(zl) || 1;
+      // The bridge and the top bar, and each arm back to the ear.
+      quad([eyeX, eyeY + 0.012, zr], [eyeX, eyeY + 0.012, zl],
+        [eyeX, eyeY + 0.017, zl], [eyeX, eyeY + 0.017, zr]);
+      for (const s of [sz, -sz]) {
+        quad([eyeX, eyeY + 0.010, s * zo], [eyeX - 0.10, eyeY + 0.004, s * zo],
+          [eyeX - 0.10, eyeY + 0.010, s * zo], [eyeX, eyeY + 0.016, s * zo]);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    const arr = new Float32Array(pos);
+    for (let i = 0; i < arr.length; i += 3) { arr[i] -= H.x; arr[i + 1] -= H.y; arr[i + 2] -= H.z; }
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    data.shadesGeo = g;
+    return g;
+  }
+  let bookGeo = null;
+  function makeBook() {
+    if (!bookGeo) {
+      // Two leaves in a shallow V, and the cover behind them a little wider.
+      const pos = [];
+      const quad = (a, b, c, d) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+      quad([-0.135, -0.095, 0.018], [0, -0.095, 0], [0, 0.095, 0], [-0.135, 0.095, 0.018]);
+      quad([0, -0.095, 0], [0.135, -0.095, 0.018], [0.135, 0.095, 0.018], [0, 0.095, 0]);
+      bookGeo = [new THREE.BufferGeometry(), new THREE.BufferGeometry()];
+      bookGeo[0].setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+      const cov = [];
+      const q2 = (a, b, c, d) => cov.push(...a, ...b, ...c, ...a, ...c, ...d);
+      q2([-0.142, -0.1, 0.012], [0, -0.1, -0.006], [0, 0.1, -0.006], [-0.142, 0.1, 0.012]);
+      q2([0, -0.1, -0.006], [0.142, -0.1, 0.012], [0.142, 0.1, 0.012], [0, 0.1, -0.006]);
+      bookGeo[1].setAttribute('position', new THREE.BufferAttribute(new Float32Array(cov), 3));
+    }
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(bookGeo[0], propMat.page));
+    const cm = new THREE.MeshBasicMaterial({ color: 0x8a2a24, side: THREE.DoubleSide });
+    g.add(new THREE.Mesh(bookGeo[1], cm));
+    g.cover = cm;
+    return g;
+  }
+  const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3();
+  const _pq = new THREE.Quaternion(), _pm = new THREE.Matrix4();
+  const _px = new THREE.Vector3(), _py = new THREE.Vector3(), _pz = new THREE.Vector3();
+  const BOOK_COVERS = [0x8a2a24, 0x1f3f6e, 0x2d6b4a, 0xc9a227, 0x5b2d6e, 0xd8d2c4];
+  function stepMoleProps(cam) {
+    const skin = crowds.skin;
+    if (!skin || !skin.pairs) return;
+    for (const [fg, f] of skin.pairs()) {
+      if (!f) continue;
+      const P = f.moleProps || (f.moleProps = {});
+      const near = fg && f.mesh.visible
+        && Math.hypot(f.mesh.position.x - cam.x, f.mesh.position.z - cam.z) < MOLE_PROPS.near;
+      const wantShades = near && fg.shades;
+      const wantBook = near && fg.book && fg.mode === 'sit';
+      if (wantShades && !P.shades) {
+        P.shades = new THREE.Mesh(shadesGeo(f), propMat.dark);
+        P.shades.frustumCulled = false;
+        f.mesh.add(P.shades);
+      }
+      if (P.shades) P.shades.visible = !!wantShades;
+      if (wantShades) {
+        const hi = f.boneIndex('head');
+        f.boneAt(hi, P.shades.position);
+        f.boneTurn(hi, P.shades.quaternion);
+      }
+      if (wantBook && !P.book) {
+        P.book = makeBook();
+        f.mesh.add(P.book);
+      }
+      if (P.book) P.book.visible = !!wantBook;
+      if (wantBook) {
+        P.book.cover.color.setHex(BOOK_COVERS[(fg.idx | 0) % BOOK_COVERS.length]);
+        f.boneAt(f.boneIndex('handL'), _pa);
+        f.boneAt(f.boneIndex('handR'), _pb);
+        f.boneAt(f.boneIndex('head'), _pc);
+        const mid = _pa.clone().add(_pb).multiplyScalar(0.5);
+        mid.y += 0.05;
+        _px.subVectors(_pb, _pa).normalize();
+        _pz.subVectors(_pc, mid).normalize();
+        _py.crossVectors(_pz, _px).normalize();
+        _px.crossVectors(_py, _pz).normalize();
+        _pm.makeBasis(_px, _py, _pz);
+        P.book.position.copy(mid);
+        P.book.quaternion.setFromRotationMatrix(_pm);
+      }
+    }
+  }
+
   function stepPhones(cam) {
     const skin = crowds.skin;
     if (!skin || !skin.pairs) return;
@@ -59706,17 +60204,21 @@ async function buildJadrija(scene) {
     const cls = (k) => (!k ? null : /child/.test(k) ? 'k' : BATHER_SEX[k]);
     // Standing, sitting or lying about, on their own, and a body to be
     // drawn with — not walking a beat (their draws differ, see `wait`), not
-    // in a café chair, not behind a counter, not already taken off.
+    // in a café chair, not behind a counter, not already taken off. And
+    // BATHING: seaward of the promenade (`JAD.deck`), which is where the
+    // towels, the loungers and the lip are. Inland of it is somebody on
+    // their way somewhere — the two children queueing at the gelato
+    // counter were the first boy this found, and they are that scene's.
     const free = (b, i) => !b.beat && !b.chair && !b.staff && !b.hidden
       && (b.pose === 'stand' || b.pose === 'sit' || b.pose === 'lie')
-      && castBlob[i] >= 0;
+      && b.s < JAD.deck && castBlob[i] >= 0;
     const far = [];
     for (let i = 0; i < bathers.length; i++) {
       const b = bathers[i];
       if (!free(b, i)) continue;
       const d = Math.abs(b.t - VIK.t);
-      // Anybody within eighty metres is already somebody he can see.
-      if (d > 80) far.push([d, i]);
+      // Anybody within sixty metres is already somebody he can see.
+      if (d > 60) far.push([d, i]);
     }
     far.sort((a2, c) => c[0] - a2[0] || a2[1] - c[1]);
     const taken = new Set();
@@ -59729,16 +60231,35 @@ async function buildJadrija(scene) {
       if (!hit) continue;
       const i = hit[1], b = bathers[i];
       taken.add(i);
-      MOLE_LIFE.jumpers.push({ i, kind: want, from: [b.t, b.s, b.pose] });
+      const J = { i, kind: want, from: [+b.t.toFixed(1), +b.s.toFixed(2), b.pose],
+        n: MOLE_LIFE.jumpers.length, st: { mode: 'off', t: 0, loops: 0 } };
+      MOLE_LIFE.jumpers.push(J);
       b.hidden = true;
       b.jump = MOLE_LIFE.jumpers.length;
+      // A figure of their own, as the diver has: a crowd slot can be handed
+      // to somebody else mid-air, and the far tier cannot dive.
+      const ki = CAST_KIND.indexOf(want);
+      if (DV && wheelBlobs && ki >= 0 && wheelBlobs.parsed[ki].clips.dive) {
+        J.fig = wheelBlobs.make(ki);
+        J.fig.mesh.name = 'jadrija-jumper';
+        J.fig.mesh.visible = false;
+        scene.add(J.fig.mesh);
+        J.k = wheelBlobs.parsed[ki].jumpK || 1;
+        J.out = J.k < 0.9 ? JUMP.out : 0;
+        J.pelvisY = J.fig.bones[0].t[1];
+        jumpLane(J);
+        // Where they stand when they are anywhere, for anything that counts.
+        b.t = JET.t + J.lane.side * (JET.w - DV.dive.x_tip * J.k);
+        b.s = J.lane.s; b.y = JET.top;
+      }
     }
     // Then everybody else, farthest first, one in five left where they are
-    // so that neither end of the beach is emptied, and twenty at most: the
-    // mole in 175838 has nineteen on it and the jumpers are three more.
+    // so that neither end of the beach is emptied, and twenty-two at most:
+    // the mole in 175838 has nineteen on it, and three of these go on the
+    // quay in front of the house.
     const movers = [];
     for (const [, i] of far) {
-      if (movers.length >= Math.min(20, MOLE_LIFE.spots.length)) break;
+      if (movers.length >= Math.min(22, MOLE_LIFE.spots.length)) break;
       if (taken.has(i) || jit(i, 5110) < 0.2) continue;
       movers.push(i);
       taken.add(i);
@@ -63172,6 +63693,7 @@ async function buildJadrija(scene) {
     hoseWho.x = who.x; hoseWho.z = who.z;
     stepToppled(dt);
     stepPhones(cam);
+    stepMoleProps(cam);
     // The thing on the table with a motor in it — see SIGNAL. Here rather
     // than in her step, because it is scenery and carries on whether she is
     // being posed this frame or not.
@@ -63186,6 +63708,8 @@ async function buildJadrija(scene) {
     // The diving board and its reserved figure are their own little scene
     // interaction; step them regardless of the crowd's distance tier.
     diveStep(dt, cam);
+    // And off the mole, the same dive three times over — see JUMP.
+    jumpersStep(dt, cam);
 
     // Unconditional, and carries its own gate inside instead. The balloon work
     // is two subtractions and a hypot and wants no gate at all; the pose is
@@ -63534,6 +64058,7 @@ async function buildJadrija(scene) {
         jumpers: MOLE_LIFE.jumpers.map((J) => ({ i: J.i, kind: J.kind, from: J.from,
           mode: J.st ? J.st.mode : null, loops: J.st ? J.st.loops : 0,
           clip: J.fig ? J.fig.playing() : null,
+          T: J.fig ? +J.fig.state.curT.toFixed(2) : null,
           at: J.fig ? J.fig.mesh.position.toArray().map((v) => +v.toFixed(2)) : null,
           water: J.st && J.fig ? +(J.fig.mesh.position.y
             - (typeof seaHeightAt === 'function'
@@ -63885,6 +64410,7 @@ async function buildJadrija(scene) {
         if (doodle) out.push(doodle.fig.cast(shadow, { near: true }));
         if (ball) out.push(...shadow.castTree(ball.mesh, { dynamic: true, near: true }));
         if (diveFigure) out.push(diveFigure.cast(shadow, { near: true }));
+        for (const J of MOLE_LIFE.jumpers) if (J.fig) out.push(J.fig.cast(shadow, { near: true }));
         if (diveBoard) out.push(...shadow.castTree(diveBoard, { dynamic: true, near: true }));
         return out;
       },
