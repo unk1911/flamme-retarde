@@ -574,6 +574,8 @@ async function buildJadrija(scene) {
   // plants; and the grass goes in chunks along the shore (`grassBuf`), so the
   // chunks behind you are culled and the ones past 55 m have shrunk away.
   const stones = propBuilder();
+  // Every `rockTS` lump as [x, z, r], for the verge (1.546.0).
+  const rockSites = [];
   const flora = floraBuilder();
   // And the broadleaved shrubs — hedge, the evergreen mass behind the
   // palisade, the lavender, the ivy — drawn with the trees' own material so
@@ -663,6 +665,9 @@ async function buildJadrija(scene) {
   function rockTS(t, s, r, h, seed, o = {}) {
     const g = floorPlane(t, s, r);
     const P = W(t, s, 0);
+    // Where it is, for the verge, which grows round the foot of anything a
+    // mower cannot get at — see `── the verge, round the eye ──`.
+    rockSites.push([P[0], P[2], r]);
     // The seed is mixed with the place: several beds number their stones
     // from nought, and two beds of the same nine stones is a pattern.
     return floraRock(stones, P[0], g(P[0], P[2]), P[2],
@@ -34753,6 +34758,308 @@ async function buildJadrija(scene) {
     });
   })();
 
+  // ── the verge, round the eye ──────────────────────────────────────────────
+  // 1.546.0. Misha, 29 Sep 2026, of FABOTANIC's "Wild Field" mix: *"sure
+  // let's try that to see if it would spruce things up"*. The plants and the
+  // mix are `floraVerge` in 46-flora.js; this is where they may grow, and the
+  // answer is where they grow on every Dalmatian roadside in August: on the
+  // strip where the made ground stops. Off the paving, off the lanes and the
+  // tracks, out of the sea, out of every doorway and gate — and thickest in
+  // the first metre or two beyond the edge of any of them, and at the foot of
+  // anything standing that a mower or a car cannot get at: walls, kerb blocks,
+  // rocks.
+  //
+  // So what 46 is handed is two distances, and the whole of the placement is
+  // how they are measured. The shore is rasterised once, at half a metre, in
+  // world x and z, into five kinds of cell:
+  //
+  //   MADE    every upward face in the ground buffer (the concrete, the
+  //           terraces, the worn track, the kabina floors) but the bare
+  //           dust it also paints, the back lane's own floor, which
+  //           46-backlane.js hands in, the roads through the wood, the
+  //           three compounds and the vikendica's plot;
+  //   WALL    every walk blocker, rotated, in the shore frame;
+  //   ROCK    every `rockTS` lump;
+  //   KEEP    kept clear and nothing else: the hammock's band and a circle
+  //           round everybody placed out in the wood;
+  //   OPEN    the rest.
+  //
+  // and two chamfer distance transforms over it: to anything but OPEN and
+  // KEEP (the `edge`) and to WALL and ROCK alone (the `wall`). A doorway or a
+  // gate is an open cell with WALL on both sides of it within two metres
+  // along one of four axes, and nothing grows there — the gap between two
+  // parked cars is the same test and the same answer. Within four and a half
+  // it is a walk, and only the foot of a wall keeps anything.
+  //
+  // Built when the back lane hands its floor in, not here, because the lane
+  // and its blockers go in after this file has returned (46-backlane.js
+  // pushes into `blockers` by reference) and a grid taken now would have none
+  // of them. None of it touches `rng` (rule 4): the grid is geometry that is
+  // already built, and the plants are `floraHash` of their cell.
+  const vergeFloors = [deckMesh.geometry];
+  const verge = (() => {
+    const C = 0.5;                       // metres a cell
+    const OPEN = 0, MADE = 1, WALL = 2, KEEP = 3, ROCK = 4;
+    const RANK = [0, 2, 4, 1, 3];        // which kind wins a cell two claim
+    let G = null;
+    function build() {
+      const tb = performance.now();
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (let t = -32; t <= LEN + 32; t += 4) {
+        for (const s of [JAD.deck - 3, 30, 55, 86]) {
+          const w = toWorld(t, s);
+          x0 = Math.min(x0, w[0]); x1 = Math.max(x1, w[0]);
+          z0 = Math.min(z0, w[2]); z1 = Math.max(z1, w[2]);
+        }
+      }
+      const nx = Math.ceil((x1 - x0) / C) + 1, nz = Math.ceil((z1 - z0) / C) + 1, N = nx * nz;
+      const M = new Uint8Array(N);
+      const set = (i, v) => { if (RANK[v] > RANK[M[i]]) M[i] = v; };
+      // A convex polygon in world (x, z), filled by cell centre, a row at a
+      // time: each row's span is where the edges cross it. (Tested cell by
+      // cell over its box, a road segment running diagonally for a hundred
+      // metres was forty thousand tests, and the roads alone took 30 ms.)
+      const fill = (P, v) => {
+        let b0 = Infinity, b1 = -Infinity;
+        for (const p of P) { b0 = Math.min(b0, p[1]); b1 = Math.max(b1, p[1]); }
+        const k0 = Math.max(0, Math.ceil((b0 - z0) / C - 0.5)), k1 = Math.min(nz - 1, Math.floor((b1 - z0) / C - 0.5));
+        for (let k = k0; k <= k1; k++) {
+          const pz = z0 + (k + 0.5) * C;
+          let xa = Infinity, xb = -Infinity;
+          for (let e = 0; e < P.length; e++) {
+            const A = P[e], B = P[(e + 1) % P.length];
+            if ((A[1] <= pz) === (B[1] <= pz)) continue;
+            const x = A[0] + (B[0] - A[0]) * (pz - A[1]) / (B[1] - A[1]);
+            if (x < xa) xa = x;
+            if (x > xb) xb = x;
+          }
+          if (!(xb >= xa)) continue;
+          const i0 = Math.max(0, Math.ceil((xa - x0) / C - 0.5)), i1 = Math.min(nx - 1, Math.floor((xb - x0) / C - 0.5));
+          for (let i = i0; i <= i1; i++) set(k * nx + i, v);
+        }
+      };
+      // And a triangle, the same, without the arrays: fifty thousand of them.
+      const tri = (ax, az, bx, bz, cx, cz, v) => {
+        const i0 = Math.max(0, Math.floor((Math.min(ax, bx, cx) - x0) / C));
+        const i1 = Math.min(nx - 1, Math.floor((Math.max(ax, bx, cx) - x0) / C));
+        const k0 = Math.max(0, Math.floor((Math.min(az, bz, cz) - z0) / C));
+        const k1 = Math.min(nz - 1, Math.floor((Math.max(az, bz, cz) - z0) / C));
+        const area = (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
+        if (Math.abs(area) < 1e-9) return;
+        const sg = area > 0 ? 1 : -1;
+        for (let k = k0; k <= k1; k++) {
+          const pz = z0 + (k + 0.5) * C;
+          for (let i = i0; i <= i1; i++) {
+            const px = x0 + (i + 0.5) * C;
+            if (sg * ((bx - ax) * (pz - az) - (bz - az) * (px - ax)) < 0) continue;
+            if (sg * ((cx - bx) * (pz - bz) - (cz - bz) * (px - bx)) < 0) continue;
+            if (sg * ((ax - cx) * (pz - cz) - (az - cz) * (px - cx)) < 0) continue;
+            const j = k * nx + i;
+            if (RANK[v] > RANK[M[j]]) M[j] = v;
+          }
+        }
+      };
+      const disc = (x, z, r, v) => {
+        const i0 = Math.max(0, Math.floor((x - r - x0) / C)), i1 = Math.min(nx - 1, Math.floor((x + r - x0) / C));
+        const k0 = Math.max(0, Math.floor((z - r - z0) / C)), k1 = Math.min(nz - 1, Math.floor((z + r - z0) / C));
+        for (let k = k0; k <= k1; k++) {
+          for (let i = i0; i <= i1; i++) {
+            const dx = x0 + (i + 0.5) * C - x, dz = z0 + (k + 0.5) * C - z;
+            if (dx * dx + dz * dz <= r * r) set(k * nx + i, v);
+          }
+        }
+      };
+      // A (t, s) rectangle, in pieces along t so it follows the shore's bend.
+      const rectTS = (ta, tb2, sa, sb, v) => {
+        for (let t = ta; t < tb2; t += 4) {
+          const t2 = Math.min(tb2, t + 4);
+          const p = [toWorld(t, sa), toWorld(t2, sa), toWorld(t2, sb), toWorld(t, sb)];
+          fill(p.map((w) => [w[0], w[2]]), v);
+        }
+      };
+      // MADE: every face in the ground buffers that looks up — except the
+      // bare ground, which the ground buffer draws too. Behind the rows it
+      // lays the dust out to s 44 in three oranges (0.51/0.36/0.25,
+      // 0.54/0.38/0.26, 0.57/0.40/0.28, 4 800 m² between s 33 and 41), and
+      // that is exactly the ground a verge is: measured off the buffer,
+      // every other upward face in it has green at least 0.85 of red (the
+      // concrete is grey, the worn track 0.90) and those three have 0.70.
+      for (const geo of vergeFloors) {
+        const A = geo.attributes.position.array;
+        const VC = geo.attributes.aVCol ? geo.attributes.aVCol.array : null;
+        for (let j = 0; j < A.length; j += 9) {
+          if (VC && VC[j] > 0.40 && VC[j + 1] < VC[j] * 0.78) continue;
+          const ux = A[j + 3] - A[j], uy = A[j + 4] - A[j + 1], uz = A[j + 5] - A[j + 2];
+          const vx = A[j + 6] - A[j], vy = A[j + 7] - A[j + 1], vz = A[j + 8] - A[j + 2];
+          const ny = uz * vx - ux * vz;
+          const nl = Math.hypot(uy * vz - uz * vy, ny, ux * vy - uy * vx);
+          if (!(nl > 1e-9) || Math.abs(ny) / nl < 0.35) continue;
+          tri(A[j], A[j + 2], A[j + 3], A[j + 5], A[j + 6], A[j + 8], MADE);
+        }
+      }
+      // The roads through the wood.
+      for (const way of world.roads || []) {
+        const half = ROADS.width[clamp(way.r | 0, 1, 4)] * 0.5 + 0.3;
+        for (let i = 0; i < way.p.length - 1; i++) {
+          const [ax, az] = way.p[i], [bx, bz] = way.p[i + 1];
+          if (Math.max(ax, bx) < x0 - half || Math.min(ax, bx) > x1 + half
+            || Math.max(az, bz) < z0 - half || Math.min(az, bz) > z1 + half) continue;
+          const L2 = Math.hypot(bx - ax, bz - az) || 1;
+          const px = -(bz - az) / L2 * half, pz = (bx - ax) / L2 * half;
+          const ex = (bx - ax) / L2 * half, ez = (bz - az) / L2 * half;
+          fill([[ax - ex + px, az - ez + pz], [bx + ex + px, bz + ez + pz],
+            [bx + ex - px, bz + ez - pz], [ax - ex - px, az - ez - pz]], MADE);
+        }
+      }
+      // The compounds.
+      for (const K of [PLAY, SAN, TRAMP]) rectTS(K.t0 - 0.3, K.t1 + 0.3, K.s0 - 0.3, K.s1 + 0.3, MADE);
+      // The vikendica's plot is `vik.tight`, which is a box in its own frame,
+      // and its frame is the shore's shifted and with s turned round
+      // (`toHouse` in 44-vikendica.js): x = t - VIK.t, z = VIK.s - s.
+      if (vik) rectTS(VIK.t - 5.2, VIK.t + 6.2, VIK.s - 7.6, VIK.s + 5.6, MADE);
+      // WALL: every walk blocker, turned by its own `rot` in the shore frame.
+      for (const bk of blockers) {
+        if (!(bk.a > 0) || !(bk.c > 0)) continue;
+        const c = bk.rot ? Math.cos(bk.rot) : 1, sn = bk.rot ? Math.sin(bk.rot) : 0;
+        const P = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => {
+          const dt = u * bk.a, ds = v * bk.c;
+          const w = toWorld(bk.t + dt * c - ds * sn, bk.s + dt * sn + ds * c);
+          return [w[0], w[2]];
+        });
+        fill(P, WALL);
+      }
+      for (const [x, z, r] of rockSites) disc(x, z, r * 0.85, ROCK);
+      // KEEP: the hammock's band, and whoever was put down in the wood.
+      for (const Hm of hammockCands.slice(0, 6)) {
+        const ux = (Hm.B[0] - Hm.A[0]) / Hm.span, us = (Hm.B[1] - Hm.A[1]) / Hm.span;
+        const P = [[0, -1.8], [Hm.span, -1.8], [Hm.span, 1.8], [0, 1.8]].map(([a, cc]) => {
+          const w = toWorld(Hm.A[0] + ux * a - us * cc, Hm.A[1] + us * a + ux * cc);
+          return [w[0], w[2]];
+        });
+        fill(P, KEEP);
+      }
+      for (const b of bathers) {
+        if (!(b.s > JAD.back - 4)) continue;
+        const w = toWorld(b.t, b.s);
+        disc(w[0], w[2], 1.0, KEEP);
+      }
+      // Closed, twice: a cell centre that falls in the hairline between two
+      // quads of the same pavement is not open ground, and the first grid
+      // grew fennel out of the lay-by through exactly those. An open cell
+      // with five of its eight neighbours made is made.
+      const NB8 = [-nx - 1, -nx, -nx + 1, -1, 1, nx - 1, nx, nx + 1];
+      for (let pass = 0; pass < 2; pass++) {
+        const fix = [];
+        for (let k = 1; k < nz - 1; k++) {
+          for (let i = 1; i < nx - 1; i++) {
+            const j = k * nx + i;
+            if (M[j] !== OPEN) continue;
+            // Five of eight needs one of the four sides; most cells have none.
+            const l = M[j - 1], r = M[j + 1], u = M[j - nx], d = M[j + nx];
+            if (!(l === MADE || l === WALL || r === MADE || r === WALL || u === MADE || u === WALL
+              || d === MADE || d === WALL)) continue;
+            let m = 0;
+            for (let q = 0; q < 8 && m < 5; q++) {
+              const w = M[j + NB8[q]];
+              if (w === MADE || w === WALL) m++;
+            }
+            if (m >= 5) fix.push(j);
+          }
+        }
+        for (const j of fix) M[j] = MADE;
+      }
+      // The two distances, chamfer 3-4, in thirds of a cell, to 42 m.
+      // The border row and column are left alone: the box is walked with a
+      // margin, and skipping them keeps every bounds test out of the loop.
+      const dist = (src) => {
+        const D = new Uint8Array(N);
+        for (let i = 0; i < N; i++) D[i] = src[M[i]] ? 0 : 255;
+        for (let k = 1; k < nz - 1; k++) {
+          for (let j = k * nx + 1, e = k * nx + nx - 1; j < e; j++) {
+            let v = D[j];
+            if (!v) continue;
+            let w = D[j - 1] + 3; if (w < v) v = w;
+            w = D[j - nx] + 3; if (w < v) v = w;
+            w = D[j - nx - 1] + 4; if (w < v) v = w;
+            w = D[j - nx + 1] + 4; if (w < v) v = w;
+            D[j] = v;
+          }
+        }
+        for (let k = nz - 2; k > 0; k--) {
+          for (let j = k * nx + nx - 2, e = k * nx; j > e; j--) {
+            let v = D[j];
+            if (!v) continue;
+            let w = D[j + 1] + 3; if (w < v) v = w;
+            w = D[j + nx] + 3; if (w < v) v = w;
+            w = D[j + nx + 1] + 4; if (w < v) v = w;
+            w = D[j + nx - 1] + 4; if (w < v) v = w;
+            D[j] = v;
+          }
+        }
+        return D;
+      };
+      const DE = dist([0, 1, 1, 0, 1]), DW = dist([0, 0, 1, 0, 1]);
+      G = { x0, z0, nx, nz, M, DE, DW, ms: performance.now() - tb };
+    }
+    const cellAt = (x, z) => {
+      const i = Math.floor((x - G.x0) / C), k = Math.floor((z - G.z0) / C);
+      return i < 0 || k < 0 || i >= G.nx || k >= G.nz ? -1 : k * G.nx + i;
+    };
+    /**
+     * Open, with WALL on both sides of it along some axis, within `r` cells
+     * of it each way. Two metres is a door, a gate or the gap between two
+     * parked cars, and nothing grows there. Four and a half is a walk — the
+     * alley between the two rows of huts, which the first grid grew as a
+     * hay meadow — and there only what hugs a wall foot is left. (Four and
+     * a half and not three, the alley's half width: the axes are world x
+     * and z, and the shore runs 31 degrees off them.)
+     */
+    const pinch = (j, r) => {
+      const i = j % G.nx, k = (j - i) / G.nx;
+      for (const [di, dk, n] of [[1, 0, r], [0, 1, r], [1, 1, Math.round(r * 0.72)], [1, -1, Math.round(r * 0.72)]]) {
+        let a = false, b = false;
+        for (let m = 1; m <= n && !(a && b); m++) {
+          const ia = i + di * m, ka = k + dk * m, ib = i - di * m, kb = k - dk * m;
+          if (!a && ia >= 0 && ia < G.nx && ka >= 0 && ka < G.nz && G.M[ka * G.nx + ia] === WALL) a = true;
+          if (!b && ib >= 0 && ib < G.nx && kb >= 0 && kb < G.nz && G.M[kb * G.nx + ib] === WALL) b = true;
+        }
+        if (a && b) return true;
+      }
+      return false;
+    };
+    const kit = floraVerge(scene, {
+      field(x, z) {
+        if (!G) build();
+        const j = cellAt(x, z);
+        if (j < 0 || G.M[j] !== OPEN) return null;
+        return { edge: G.DE[j] / 6, wall: G.DW[j] / 6, trod: G.DW[j] < 27 && pinch(j, 9) };
+      },
+      height(x, z) {
+        const j = cellAt(x, z);
+        if (j < 0 || (G.DW[j] < 15 && pinch(j, 4))) return null;
+        const [t, s] = local(x, z);
+        if (s < JAD.deck + 0.5 || s > 84 || t < -30 || t > LEN + 30 || isSea(x, z)) return null;
+        const y = floorY(t, s);
+        // The beach, and the foot of the quay: nothing grows in the splash.
+        return y > 0.5 ? y : null;
+      },
+    });
+    /**
+     * The back lane's floor, from 46-backlane.js — the last thing the grid
+     * waits for, since the lane's blockers have gone in by then. So the grid
+     * is built here, while the page is still loading: 85 ms measured, which
+     * as a first frame at the resort was a visible hitch.
+     */
+    kit.made = (geo) => { vergeFloors.push(geo); kit.reset(); build(); kit.armed = true; };
+    // Not drawn until then: a frame at the resort before the lane is in
+    // would build the grid twice, once without it.
+    kit.armed = false;
+    /** The grid, for a probe: kinds, and how long it took. */
+    kit.grid = () => (G ? { nx: G.nx, nz: G.nz, x0: G.x0, z0: G.z0, ms: +G.ms.toFixed(1),
+      M: G.M, DE: G.DE, DW: G.DW } : null);
+    return kit;
+  })();
+
   // ── the cars in the wood ───────────────────────────────────────────────────
   // Placed by the loop far above, which is where the shore rules live; drawn
   // here, because inflating five pairs of blobs is the async half of the job
@@ -61617,6 +61924,7 @@ async function buildJadrija(scene) {
    */
   function updateCrowd(dt, cam, at = null, dir = null) {
     if (litter) litter.update(cam, groundAt(cam.x, cam.z));   // 1.536.0
+    if (verge && verge.armed) verge.update(cam, groundAt(cam.x, cam.z));   // 1.546.0
     crowdT += dt;
     lastCam.x = cam.x; lastCam.z = cam.z;
     // The one skinned figure here is posed on the CPU — twenty-eight bones,
@@ -63435,6 +63743,8 @@ async function buildJadrija(scene) {
     people: bathers,
     /** The floor round the eye: how many tufts, stones and cones. */
     litter: () => (litter ? litter.stats() : null),
+    /** The August verge round the eye (46-flora.js): its layers, stats and grid. */
+    verge,
     // Live, and by reference: 47-ground.js takes this array once, on retarget,
     // and reads it every frame from then on. Anything pushed into it is
     // something that is on fire on the promenade — see the fireballs above.

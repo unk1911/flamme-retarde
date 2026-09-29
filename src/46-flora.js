@@ -33,7 +33,10 @@
 //   floraLeafy     a potted plant as a crown of real leaves;
 //   floraMat       the surface the last four share, with the wind in it;
 //   floraLitter    the wood floor round the eye: stones, cones and dry
-//                  grass in cells, instanced, gone by thirty metres.
+//                  grass in cells, instanced, gone by thirty metres;
+//   floraVerge     the August verge round the eye: seed-head grasses,
+//                  bleached tussocks, wild fennel, thistles and immortelle,
+//                  where the made ground stops, in two tiers.
 // -----------------------------------------------------------------------------
 
 /** A hash in [0, 1) off two numbers. Never the resort's `rng`. */
@@ -1146,5 +1149,976 @@ function floraLitter(scene, { accept, cell = 1.25, radius = 30, maxTufts = 2400,
     },
     stats: () => ({ tufts: L.tuft.n, stones: L.stone.n, cones: L.cone.n, cells: cache.size,
       builds, lastMs: +lastMs.toFixed(2), worstMs: +worstMs.toFixed(2) }),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// The August verge.
+//
+// Misha, 29 Sep 2026, after looking at FABOTANIC's "Wild Field" mix: *"sure
+// let's try that to see if it would spruce things up"*. What was borrowed is
+// the IDEA of a mix — a handful of species that belong together, scattered
+// together — and nothing else: every blade below is this file's own code.
+//
+// The mix is the one a Dalmatian roadside and the edge of a pine wood actually
+// have at the end of August, and it is not a lawn. It is:
+//
+//   SEED-HEAD GRASSES, gone gold: wild oats (Avena) with their panicles of
+//   hanging spikelets, false brome (Brachypodium) with a few narrow spikelets
+//   held along the top of the stem, and hare's-tail (Lagurus), a cream puff
+//   on a short stem;
+//   BLEACHED TUSSOCKS, the colour of straw and some of them half flattened,
+//   because a verge is where people step off the lane;
+//   WILD FENNEL, a metre and a half of glaucous stems, the leaves a haze of
+//   threads, flat yellow umbels going brown;
+//   THISTLES: a flat grey-green rosette of spiny leaves and a few stiff stems
+//   branching into small round heads — Eryngium, silvery-blue or grey, and
+//   the odd golden Carlina or purple thistle;
+//   IMMORTELLE — smilje, Helichrysum italicum — low silver mounds with flat
+//   mustard-yellow clusters on them, which is the smell of the place.
+//
+// Sage and rosemary were on the list as "if cheap", and they were cheap —
+// the smilje mound with its accent put to the leaf colour — and they were
+// dropped on sight: a sage does not flower in August, and the cushion's
+// flowering stems with leaf-coloured discs on them read as a plant with
+// grey lollipops on it, not as sage.
+//
+// The palette is straw, silver-grey and dusty olive with small yellow and
+// violet accents. The one thing it must never be is green.
+//
+// WHERE, which is 43-jadrija.js's business and not this file's: `field` says
+// how far a point is from made ground and from anything standing, and the
+// mix follows that. A verge is the strip where the made ground stops — the
+// sprays and the mowers stop there too, and it is the only open, sunny,
+// undisturbed ground in a swept pine wood — so almost everything here is in
+// the first three metres off an edge, a kerb, a wall foot or a rock, and
+// very little is out in the needle floor, which `floraLitter` has already.
+//
+// HOW, which is this file's. The same cells round the eye as `floraLitter`,
+// each a pure function of the cell. Five prototypes, one per species, each a
+// `floraBuilder` buffer built in three parts in this order:
+//
+//   [ far only ][ shared ][ near only ]
+//
+// and each drawn twice from the same buffer, by draw range: the NEAR mesh
+// draws shared + near-only (every blade, spikelet, ray and umbellet as real
+// geometry), the FAR mesh draws far-only + shared (the stems, and a single
+// disc where the near tier has an umbel of thirteen rays). Each plant is in
+// one or the other by its distance from the eye, handed over at `swap`
+// metres with a per-plant jitter of a metre and a half either way so the
+// hand-over is not a ring, and the far tier shrinks away by `far`. So what
+// is drawn is bounded by two discs round the eye wherever you stand, and a
+// plant costs its full geometry only inside the first.
+//
+// The wind is `floraWind`, taken at the plant's root rather than at each
+// vertex: a fennel stem is a metre and a half tall and a per-vertex gust
+// phase would put a kink in it wherever it crosses a cell of the phase hash.
+// A small per-vertex flutter on top, continuous in position, keeps the heads
+// alive. The lever (aSway) is written per species: a fennel's is a little
+// over half its height, a tussock's is its blade length, so the fennel
+// leans and the tussock shivers.
+//
+// The accent — umbels, thistle heads, immortelle clusters — is flagged in the
+// vertex colour as a negative shade and takes its colour from the instance
+// (`aInstSuit`, which the crowd uses for swimwear and nothing here does), so
+// one thistle prototype is blue Eryngium, grey Eryngium, golden Carlina and a
+// purple thistle, and one fennel is in flower, going over or gone to seed.
+// -----------------------------------------------------------------------------
+
+const _fv = {
+  n: (a) => { const L = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / L, a[1] / L, a[2] / L]; },
+  x: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  add: (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k],
+  mix: (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k],
+  mul: (a, k) => [a[0] * k, a[1] * k, a[2] * k],
+};
+/** The accent flag: a vertex colour of minus this shade takes the instance's accent. */
+const FV_ACC = (k) => [-k, -k, -k];
+
+/**
+ * A flat strip along a polyline: a culm, a blade, a rachis. `W` is the half
+ * width at each point (nought at a tip, which makes the last span one
+ * triangle), `A` the across direction, one for the strip or one per point.
+ * The normal is the face's own leaned `up` of the way to straight up, as the
+ * tufts do, and for the same reason.
+ */
+function fvStrip(fb, P, W, C, S, A, up = 0.65) {
+  const V = P.map((p, k) => {
+    const a = P[Math.min(k + 1, P.length - 1)], b = P[Math.max(k - 1, 0)];
+    const t = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+    const ac = Array.isArray(A[0]) ? A[k] : A;
+    let n = _fv.x(t, ac);
+    if (n[1] < 0) n = [-n[0], -n[1], -n[2]];
+    n = _fv.n(n);
+    n = _fv.n([n[0] * (1 - up), n[1] * (1 - up) + up, n[2] * (1 - up)]);
+    const w = W[k];
+    return { l: _fv.add(p, ac, -w), r: _fv.add(p, ac, w), p, n, c: C[k], s: S[k], w };
+  });
+  for (let k = 0; k < V.length - 1; k++) {
+    const A0 = V[k], B = V[k + 1];
+    if (B.w <= 0) {
+      fb.smooth(A0.l, A0.r, B.p, A0.n, A0.n, B.n, A0.c, A0.c, B.c, A0.s, A0.s, B.s);
+    } else {
+      fb.smooth(A0.l, A0.r, B.r, A0.n, A0.n, B.n, A0.c, A0.c, B.c, A0.s, A0.s, B.s);
+      fb.smooth(A0.l, B.r, B.l, A0.n, B.n, B.n, A0.c, B.c, B.c, A0.s, B.s, B.s);
+    }
+  }
+}
+
+/** A needle: one triangle from `a` out along `dir`. Fennel threads, immortelle leaves, spines. */
+function fvNeedle(fb, a, dir, len, w, across, c0, c1, s0, s1) {
+  const tip = _fv.add(a, dir, len);
+  let n = _fv.x(dir, across);
+  if (n[1] < 0) n = [-n[0], -n[1], -n[2]];
+  n = _fv.n([n[0] * 0.4, n[1] * 0.4 + 0.6, n[2] * 0.4]);
+  fb.smooth(_fv.add(a, across, -w), _fv.add(a, across, w), tip, n, n, n, c0, c0, c1, s0, s0, s1);
+}
+
+/**
+ * A stem: a polyline lofted as a prism of `sides` faces, radius `R` at each
+ * point, smooth radial normals. Three sides is a round stem at anything past
+ * arm's length and a third of the cost of eight.
+ */
+function fvStem(fb, P, R, C, S, sides = 3) {
+  const e = P[P.length - 1];
+  const d = _fv.n([e[0] - P[0][0], e[1] - P[0][1], e[2] - P[0][2]]);
+  const ref = Math.abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const rings = P.map((p, k) => {
+    const a = P[Math.min(k + 1, P.length - 1)], b = P[Math.max(k - 1, 0)];
+    const t = _fv.n([a[0] - b[0], a[1] - b[1], a[2] - b[2]]);
+    const u = _fv.n(_fv.x(t, ref)), v = _fv.x(t, u);
+    const ring = [];
+    for (let i = 0; i < sides; i++) {
+      const an = (i / sides) * TAU;
+      const nn = [u[0] * Math.cos(an) + v[0] * Math.sin(an), u[1] * Math.cos(an) + v[1] * Math.sin(an),
+        u[2] * Math.cos(an) + v[2] * Math.sin(an)];
+      ring.push({ p: _fv.add(p, nn, R[k]), n: nn });
+    }
+    return ring;
+  });
+  for (let k = 0; k < P.length - 1; k++) {
+    for (let i = 0; i < sides; i++) {
+      const j = (i + 1) % sides;
+      const A = rings[k][i], B = rings[k][j], Cc = rings[k + 1][j], D = rings[k + 1][i];
+      fb.smooth(A.p, B.p, Cc.p, A.n, B.n, Cc.n, C[k], C[k], C[k + 1], S[k], S[k], S[k + 1]);
+      fb.smooth(A.p, Cc.p, D.p, A.n, Cc.n, D.n, C[k], C[k + 1], C[k + 1], S[k], S[k + 1], S[k + 1]);
+    }
+  }
+}
+
+/** A flat disc facing `up`, its centre raised `h`: an umbellet, a flower cluster. */
+function fvDisc(fb, c, up, r, sides, h, col, sw, rot = 0) {
+  const u = _fv.n(_fv.x(up, Math.abs(up[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), v = _fv.x(up, u);
+  const top = _fv.add(c, up, h);
+  const n = _fv.n(_fv.add(up, [0, 1, 0], 0.5));
+  const rim = (a) => [c[0] + (u[0] * Math.cos(a) + v[0] * Math.sin(a)) * r,
+    c[1] + (u[1] * Math.cos(a) + v[1] * Math.sin(a)) * r,
+    c[2] + (u[2] * Math.cos(a) + v[2] * Math.sin(a)) * r];
+  for (let i = 0; i < sides; i++) {
+    const p0 = rim(rot + (i / sides) * TAU), p1 = rim(rot + ((i + 1) / sides) * TAU);
+    fb.smooth(top, p0, p1, n, n, n, col, col, col, sw, sw, sw);
+  }
+}
+
+/** A small ovoid along `ax`: a spikelet, a hare's-tail, a thistle head. Eight faces. */
+function fvOvoid(fb, c, ax, rx, ry, col, sw, colTip = col) {
+  const a = _fv.n(ax);
+  const u = _fv.n(_fv.x(a, Math.abs(a[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), v = _fv.x(a, u);
+  const T = _fv.add(c, a, ry), B = _fv.add(c, a, -ry);
+  const R = [_fv.add(c, u, rx), _fv.add(c, v, rx), _fv.add(c, u, -rx), _fv.add(c, v, -rx)];
+  const RN = [u, v, _fv.mul(u, -1), _fv.mul(v, -1)];
+  const na = _fv.mul(a, -1);
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    fb.smooth(T, R[i], R[j], a, RN[i], RN[j], colTip, col, col, sw, sw, sw);
+    fb.smooth(B, R[j], R[i], na, RN[j], RN[i], col, col, col, sw, sw, sw);
+  }
+}
+
+/** A point `u` of the way along a polyline, and the way it is heading there. */
+function fvAlong(P, u) {
+  const f = clamp(u, 0, 1) * (P.length - 1);
+  const k = Math.min(P.length - 2, Math.floor(f));
+  const p = _fv.mix(P[k], P[k + 1], f - k);
+  return { p, d: _fv.n([P[k + 1][0] - P[k][0], P[k + 1][1] - P[k][1], P[k + 1][2] - P[k][2]]) };
+}
+
+/** Three builders, far-only / shared / near-only, and the one buffer they make. */
+function fvProto() { return { F: floraBuilder(), S: floraBuilder(), N: floraBuilder() }; }
+function fvGeo(pr) {
+  const parts = [pr.F.geo(), pr.S.geo(), pr.N.geo()];
+  const g = new THREE.BufferGeometry();
+  for (const [name, size] of [['position', 3], ['normal', 3], ['aVCol', 3], ['aSway', 1]]) {
+    const n = parts.reduce((a, p) => a + p.attributes[name].array.length, 0);
+    const out = new Float32Array(n);
+    let o = 0;
+    for (const p of parts) { out.set(p.attributes[name].array, o); o += p.attributes[name].array.length; }
+    g.setAttribute(name, new THREE.BufferAttribute(out, size));
+  }
+  const f0 = pr.F.count(), f1 = f0 + pr.S.count(), all = f1 + pr.N.count();
+  for (const p of parts) p.dispose();
+  return { g, f0, f1, all };
+}
+
+/**
+ * Wild oats, false brome and hare's-tail: one clump of culms out of a crown,
+ * `o.h` tall, with a few dry leaves at its foot.
+ *
+ * Far, every other culm is drawn again two and a half times as wide, and
+ * carries a single ovoid where the near one has a panicle of hanging
+ * spikelets: past twenty metres the panicle is two pixels and its
+ * silhouette is all that is left of it.
+ */
+function vergeOats(pr, o = {}) {
+  const H = (k) => floraHash((o.seed || 1) * 3.07 + 0.4, k);
+  const n = o.n || 16, h = o.h || 0.80;
+  const BASE = [0.380, 0.330, 0.228], STRAW = [0.700, 0.600, 0.382], PALE = [0.800, 0.720, 0.520];
+  const UNRIPE = [0.560, 0.560, 0.365], CREAM = [0.860, 0.820, 0.690];
+  for (let j = 0; j < n; j++) {
+    const q = (k) => H(100 + j * 13 + k);
+    const shared = j % 2 === 0;           // drawn far as well, see below
+    const az = j * 2.3999632 + H(1) * TAU;
+    const outer = Math.sqrt(q(1));
+    const bx = Math.cos(az) * 0.045 * outer, bz = Math.sin(az) * 0.045 * outer;
+    const phi = az + (q(2) - 0.5) * 0.8;
+    const cph = Math.cos(phi), sph = Math.sin(phi);
+    const lean = 0.04 + 0.22 * outer + 0.08 * q(3);
+    const curl = 0.10 + 0.45 * q(4);
+    const kind = q(6) < 0.58 ? 0 : q(6) < 0.84 ? 1 : 2;       // avena, brachypodium, lagurus
+    const L = h * (0.72 + 0.40 * q(5)) * (1.06 - 0.20 * outer) * (kind === 2 ? 0.50 : 1);
+    const ripe = q(7) < 0.8;
+    const mid = ripe ? STRAW : UNRIPE, top = ripe ? PALE : _fv.mix(UNRIPE, PALE, 0.4);
+    const K = 5;
+    const P = [[bx, -0.02, bz]];
+    let x = bx, y = -0.02, z = bz;
+    for (let k = 1; k <= K; k++) {
+      const th = lean + curl * Math.pow(k / K, 1.8), st = L / K;
+      x += Math.sin(th) * cph * st; y += Math.cos(th) * st; z += Math.sin(th) * sph * st;
+      P.push([x, y, z]);
+    }
+    const sw = P.map((p) => Math.max(0, p[1]) + 0.3 * Math.hypot(p[0] - bx, p[2] - bz));
+    // Across the culm: horizontal, turning a little up its length so no culm
+    // is edge-on to you from end to end.
+    const A = P.map((_, k) => { const a = phi + (k / K) * 1.2; return [-Math.sin(a), 0, Math.cos(a)]; });
+    const CC = P.map((_, k) => (k / K < 0.4 ? _fv.mix(BASE, mid, k / K / 0.4) : _fv.mix(mid, top, (k / K - 0.4) / 0.6)));
+    fvStrip(pr.N, P, P.map((_, k) => 0.0019 - 0.0008 * (k / K)), CC, sw, A, 0.55);
+    // Far, every other culm again at two and a half times the width: half
+    // the culms and the same coverage, which is what is left of a clump of
+    // hairlines at twenty metres. Sharing the near culms instead halved it,
+    // and the far verge came out as half a verge.
+    if (shared) fvStrip(pr.F, P, P.map((_, k) => (0.0019 - 0.0008 * (k / K)) * 2.5), CC, sw, A, 0.55);
+    const tip = P[K], swT = sw[K] * 1.1;
+    const dir = _fv.n([P[K][0] - P[K - 1][0], P[K][1] - P[K - 1][1], P[K][2] - P[K - 1][2]]);
+    const out = [cph, 0, sph];
+    if (kind === 2) {
+      // Hare's-tail: a soft ovoid on the end, cream. Cheap enough to share.
+      fvOvoid(pr.N, _fv.add(tip, dir, 0.014), dir, 0.0085, 0.020, CREAM, swT, [0.93, 0.90, 0.80]);
+      if (shared) fvOvoid(pr.F, _fv.add(tip, dir, 0.016), dir, 0.012, 0.024, CREAM, swT);
+      continue;
+    }
+    if (kind === 0) {
+      // Wild oat: three whorls of pedicels and a tip, each hanging a spikelet.
+      for (let w = 0; w < 4; w++) {
+        const at = fvAlong(P, 0.80 + w * 0.066);
+        const np = w === 3 ? 1 : 2;
+        for (let pp = 0; pp < np; pp++) {
+          const a = phi + w * 2.1 + pp * Math.PI + (q(20 + w * 2 + pp) - 0.5);
+          const od = _fv.n([Math.cos(a) * 0.8 + at.d[0] * 0.3, -0.35 + at.d[1] * 0.3, Math.sin(a) * 0.8 + at.d[2] * 0.3]);
+          const pl = 0.035 + 0.035 * q(30 + w * 2 + pp) * (1 - w * 0.2);
+          const across = [-Math.sin(a), 0, Math.cos(a)];
+          fvNeedle(pr.N, at.p, od, pl, 0.0007, across, mid, top, swT, swT);
+          const hb = _fv.add(at.p, od, pl);
+          const hx = _fv.n([od[0] * 0.3, -0.95, od[2] * 0.3]);
+          fvOvoid(pr.N, _fv.add(hb, hx, 0.011), hx, 0.0036, 0.012, top, swT * 1.1, PALE);
+        }
+      }
+      if (shared) {
+        const at = fvAlong(P, 0.84);
+        const hx = _fv.n([out[0] * 0.35, -0.9, out[2] * 0.35]);
+        fvOvoid(pr.F, _fv.add(_fv.add(at.p, out, 0.03), hx, 0.02), hx, 0.009, 0.034, top, swT);
+      }
+    } else {
+      // False brome: five narrow spikelets held along the top, nodding.
+      for (let k = 0; k < 5; k++) {
+        const at = fvAlong(P, 0.80 + k * 0.045);
+        const side = k % 2 ? 1 : -1;
+        const ax = _fv.n(_fv.add(at.d, A[K], side * 0.35));
+        fvOvoid(pr.N, _fv.add(at.p, ax, 0.015), ax, 0.003, 0.016, top, swT, PALE);
+      }
+      if (shared) {
+        const at = fvAlong(P, 0.9);
+        fvOvoid(pr.F, at.p, at.d, 0.006, 0.07, top, swT);
+      }
+    }
+  }
+  // The dry leaves at the foot of the clump, half of them far as well.
+  for (let j = 0; j < 10; j++) {
+    const q = (k) => H(400 + j * 7 + k);
+    const a = j * 2.3999632 + q(1);
+    const L = 0.12 + 0.12 * q(2), lean = 0.5 + 0.5 * q(3);
+    const P = [[0, -0.02, 0]];
+    let x = 0, y = -0.02, z = 0;
+    for (let k = 1; k <= 3; k++) {
+      const th = lean + 0.7 * Math.pow(k / 3, 1.5), st = L / 3;
+      x += Math.sin(th) * Math.cos(a) * st; y += Math.cos(th) * st; z += Math.sin(th) * Math.sin(a) * st;
+      P.push([x, Math.max(y, 0.004), z]);
+    }
+    const W = j % 2 ? [0.0035, 0.003, 0.002, 0] : [0.007, 0.006, 0.004, 0];
+    fvStrip(j % 2 ? pr.N : pr.S, P, W, [BASE, STRAW, STRAW, PALE],
+      P.map((p) => p[1] + 0.2 * Math.hypot(p[0], p[2])), [-Math.sin(a), 0, Math.cos(a)], 0.6);
+  }
+}
+
+/**
+ * A bleached tussock, `o.flat` of its blades lying over one way: trodden, or
+ * blown flat by the bura and never stood up again. A few live grey-green
+ * blades in the heart of it; the rest is straw and the grey of last year's.
+ * The far tier is fourteen wide blades, the same mass at twenty metres.
+ */
+function vergeTussock(pr, o = {}) {
+  const H = (k) => floraHash((o.seed || 1) * 1.93 + 0.8, k);
+  const n = o.n || 46, h = o.h || 0.34, r = o.r || 0.14, flat = o.flat != null ? o.flat : 0.45;
+  const ROOT = [0.360, 0.316, 0.226], BLEACH = [0.745, 0.685, 0.525], STRAW = [0.650, 0.575, 0.400];
+  const OLD = [0.540, 0.500, 0.415], LIVE = [0.430, 0.455, 0.325];
+  const phiF = H(9) * TAU;
+  const blade = (B, j, wide, K, far) => {
+    const q = (k) => H(100 + j * 11 + k + (far ? 3000 : 0));
+    const a0 = j * 2.3999632 + H(1) * TAU;
+    const rb = r * 0.40 * Math.sqrt(q(1));
+    const bx = Math.cos(a0) * rb, bz = Math.sin(a0) * rb;
+    const lying = q(8) < flat;
+    const live = !lying && q(9) < 0.14;
+    const phi = lying ? phiF + (q(2) - 0.5) * 1.5 : a0 + (q(2) - 0.5) * 1.1;
+    const outer = Math.sqrt(q(1));
+    const lean = lying ? 0.65 + 0.45 * q(3) : 0.08 + 0.50 * outer + 0.30 * q(3);
+    const curl = lying ? 0.55 + 0.55 * q(4) : 0.25 + 0.80 * q(4);
+    const L = h * (0.55 + 0.55 * q(5)) * (live ? 0.7 : lying ? 1.15 : 1.0);
+    const tipC = live ? LIVE : q(6) < 0.55 ? BLEACH : q(6) < 0.8 ? STRAW : OLD;
+    const P = [[bx, -0.03, bz]];
+    let x = bx, y = -0.03, z = bz;
+    for (let k = 1; k <= K; k++) {
+      const th = lean + curl * Math.pow(k / K, 1.5), st = L / K;
+      x += Math.sin(th) * Math.cos(phi) * st; y += Math.cos(th) * st; z += Math.sin(th) * Math.sin(phi) * st;
+      P.push([x, Math.max(y, 0.006 + 0.004 * k), z]);
+    }
+    const tw = (q(7) - 0.5) * 0.9;
+    const A = [-Math.sin(phi) * Math.cos(tw), Math.sin(tw) * 0.3, Math.cos(phi) * Math.cos(tw)];
+    const w0 = wide * (0.7 + 0.6 * q(10));
+    fvStrip(B, P, P.map((_, k) => (k === K ? 0 : w0 * Math.pow(1 - k / K, 0.8))),
+      P.map((_, k) => _fv.mix(ROOT, tipC, Math.pow(k / K, 0.7))),
+      P.map((p) => Math.max(0, p[1]) + 0.3 * Math.hypot(p[0] - bx, p[2] - bz)), A, 0.7);
+  };
+  for (let j = 0; j < n; j++) blade(pr.N, j, 0.0075, 3, false);
+  for (let j = 0; j < 14; j++) blade(pr.F, j, 0.024, 2, true);
+}
+
+/**
+ * Wild fennel, `o.h` tall: three to five stems out of one crown, each with a
+ * terminal umbel and two or three side branches ending in smaller ones, and
+ * the leaves — thread-fine, three and four times divided — low down, where
+ * August has left any. A stem in three or four is last year's, grey-brown
+ * and leafless, standing among the new ones, which is how a clump looks.
+ *
+ * An umbel near is thirteen rays up and out to a flat top, each carrying an
+ * umbellet; far, it is one disc. A leaf near is a rachis with threads off it
+ * in pairs; far, a narrow feather of the same colour. The stems are shared.
+ */
+function vergeFennel(pr, o = {}) {
+  const H = (k) => floraHash((o.seed || 1) * 2.41 + 0.2, k);
+  const h = o.h || 1.45;
+  const STEM = [0.455, 0.490, 0.335], DRY = [0.520, 0.445, 0.310], FOOT = [0.330, 0.310, 0.220];
+  const FOL = [0.405, 0.465, 0.285], FOLD = [0.525, 0.460, 0.305], RAY = [0.560, 0.560, 0.330];
+  const lev = (p) => Math.max(0, p[1]) * 0.55;
+  const umbel = (c, dir, R, dead, sw, k0) => {
+    const up = _fv.n(_fv.add(dir, [0, 1, 0], 1.2));
+    const u = _fv.n(_fv.x(up, [1, 0, 0])), v = _fv.x(up, u);
+    const shade = dead ? 0.62 : 0.92 + 0.12 * H(k0);
+    for (let r = 0; r < 16; r++) {
+      const inner = r >= 11;
+      const a = inner ? ((r - 11) / 5) * TAU + 0.4 : (r / 11) * TAU + (H(k0 + r) - 0.5) * 0.3;
+      const rr = inner ? 0.45 : 0.92 + 0.12 * H(k0 + 20 + r);
+      const lift = R * (inner ? 0.42 : 0.30);
+      const e = [c[0] + (u[0] * Math.cos(a) + v[0] * Math.sin(a)) * R * rr + up[0] * lift,
+        c[1] + (u[1] * Math.cos(a) + v[1] * Math.sin(a)) * R * rr + up[1] * lift,
+        c[2] + (u[2] * Math.cos(a) + v[2] * Math.sin(a)) * R * rr + up[2] * lift];
+      const d = [e[0] - c[0], e[1] - c[1], e[2] - c[2]];
+      const len = Math.hypot(d[0], d[1], d[2]);
+      fvNeedle(pr.N, c, _fv.n(d), len, 0.0011, _fv.n(_fv.x(d, up)), dead ? DRY : RAY, dead ? DRY : RAY, sw, sw * 1.05);
+      fvDisc(pr.N, e, up, R * (inner ? 0.14 : 0.17), 5, R * 0.05, FV_ACC(shade * (0.9 + 0.2 * H(k0 + 40 + r))),
+        sw * 1.05, a);
+    }
+    // Smaller and darker than the umbel it stands for: thirteen umbellets
+    // with dark gaps between them, set side by side with this at fifteen
+    // metres, read a third less yellow than one full disc of the same size.
+    fvDisc(pr.F, _fv.add(c, up, R * 0.32), up, R * 0.78, 7, R * 0.18, FV_ACC(shade * 0.88), sw * 1.05);
+  };
+  const leaf = (base, az, len, el, dry, sw0, k0) => {
+    const P = [base];
+    let p = base;
+    for (let k = 1; k <= 4; k++) {
+      const th = el + 0.35 * Math.pow(k / 4, 1.6);
+      const st = len / 4;
+      p = [p[0] + Math.sin(th) * Math.cos(az) * st, Math.max(0.01, p[1] + Math.cos(th) * st), p[2] + Math.sin(th) * Math.sin(az) * st];
+      P.push(p);
+    }
+    const side = [-Math.sin(az), 0, Math.cos(az)];
+    const col = dry ? FOLD : FOL;
+    const sw = P.map((pp) => Math.max(sw0, lev(pp)) * 1.1);
+    fvStrip(pr.N, P, [0.0012, 0.0010, 0.0008, 0.0006, 0], P.map(() => col), sw, side, 0.5);
+    for (let k = 0; k < 4; k++) {
+      const at = fvAlong(P, (k + 0.5) / 4);
+      for (const sd of [-1, 1]) {
+        for (let t = 0; t < 4; t++) {
+          const q = H(k0 + k * 17 + t * 5 + (sd > 0 ? 3 : 0));
+          const d = _fv.n([side[0] * sd * 0.8 + at.d[0] * (0.1 + 0.3 * t), (q - 0.5) * 1.1 + 0.1,
+            side[2] * sd * 0.8 + at.d[2] * (0.1 + 0.3 * t)]);
+          const ln = (0.105 - 0.016 * k) * (0.7 + 0.5 * q);
+          const cc = _fv.mul(col, 0.9 + 0.2 * q);
+          fvNeedle(pr.N, at.p, d, ln, 0.0010, _fv.n(_fv.x(d, [0, 1, 0])), cc, cc, sw[k], sw[k] * 1.1);
+        }
+      }
+    }
+    // Far: the same leaf as a narrow feather.
+    fvStrip(pr.F, P, [0.012, 0.030, 0.034, 0.022, 0], P.map((_, k) => _fv.mul(col, 0.88 + 0.03 * k)), sw, side, 0.6);
+  };
+  const m = 3 + Math.floor(H(1) * 2.99);
+  for (let i = 0; i < m; i++) {
+    const q = (k) => H(100 + i * 31 + k);
+    const dead = i > 0 && q(1) < 0.3;
+    const az = i * 2.3999632 + H(2) * TAU;
+    const lean = 0.03 + 0.16 * q(2), bend = (q(3) - 0.5) * 0.16;
+    const L = h * (dead ? 0.85 + 0.25 * q(4) : 0.72 + 0.32 * q(4));
+    const K = 6;
+    const P = [[Math.cos(az) * 0.03, -0.03, Math.sin(az) * 0.03]];
+    let x = P[0][0], y = -0.03, z = P[0][2];
+    for (let k = 1; k <= K; k++) {
+      const th = lean + bend * (k / K) * (k / K), st = L / K;
+      x += Math.sin(th) * Math.cos(az) * st; y += Math.cos(th) * st; z += Math.sin(th) * Math.sin(az) * st;
+      P.push([x, y, z]);
+    }
+    const col = dead ? DRY : STEM;
+    fvStem(pr.S, P, P.map((_, k) => 0.0085 * (h / 1.45) * (1 - 0.6 * k / K)),
+      P.map((_, k) => _fv.mix(FOOT, col, Math.min(1, k / 2))), P.map(lev), 3);
+    const tip = P[K];
+    const td = _fv.n([P[K][0] - P[K - 1][0], P[K][1] - P[K - 1][1], P[K][2] - P[K - 1][2]]);
+    umbel(tip, td, 0.105 * (0.8 + 0.4 * q(5)) * (h / 1.45), dead, lev(tip), 500 + i * 60);
+    const nb = 3 + Math.floor(q(6) * 2.99);
+    for (let b = 0; b < nb; b++) {
+      const u0 = 0.42 + 0.44 * (b / nb) + 0.05 * q(40 + b * 8);
+      const at = fvAlong(P, u0);
+      const ba = az + (b % 2 ? Math.PI : 0) + (q(41 + b * 8) - 0.5) * 1.3;
+      const el = 0.55 + 0.25 * q(42 + b * 8);
+      const Lb = h * (0.14 + 0.12 * q(43 + b * 8)) * (1.15 - 0.5 * u0);
+      const PB = [at.p];
+      let pb = at.p;
+      for (let k = 1; k <= 3; k++) {
+        const th = el * (1 - 0.25 * k / 3), st = Lb / 3;
+        pb = [pb[0] + Math.sin(th) * Math.cos(ba) * st, pb[1] + Math.cos(th) * st, pb[2] + Math.sin(th) * Math.sin(ba) * st];
+        PB.push(pb);
+      }
+      fvStem(pr.S, PB, PB.map((_, k) => 0.0040 * (h / 1.45) * (1 - 0.4 * k / 3)), PB.map(() => col), PB.map(lev), 3);
+      const bd = _fv.n([PB[3][0] - PB[2][0], PB[3][1] - PB[2][1], PB[3][2] - PB[2][2]]);
+      umbel(PB[3], bd, 0.078 * (0.8 + 0.4 * q(44 + b * 8)) * (h / 1.45), dead || q(45 + b * 8) < 0.2, lev(PB[3]),
+        900 + i * 90 + b * 30);
+    }
+    if (!dead) {
+      for (let l = 0; l < 4; l++) {
+        const u0 = 0.08 + 0.13 * l + 0.05 * q(90 + l * 6);
+        const at = fvAlong(P, u0);
+        leaf(at.p, az + l * 2.2 + q(91 + l * 6), h * (0.20 + 0.08 * q(92 + l * 6)) * (1 - 0.5 * u0), 0.75 + 0.2 * q(93 + l * 6),
+          q(94 + l * 6) < 0.35, lev(at.p), 1500 + i * 200 + l * 60);
+      }
+    }
+  }
+  // The basal leaves, low and mostly dried.
+  for (let l = 0; l < 4; l++) {
+    leaf([0, 0.02, 0], l * 1.57 + H(3), h * 0.26 * (0.8 + 0.4 * H(4 + l)), 1.05 + 0.2 * H(8 + l), H(12 + l) < 0.7,
+      0, 3000 + l * 60);
+  }
+}
+
+/**
+ * A thistle: a flat rosette of spiny grey-green leaves, and — on most — two
+ * or three stiff stems branching at the top into a rounded candelabra of
+ * small heads, each with a star of spiny bracts under it. That is Eryngium,
+ * the field eryngo and the Dalmatian amethyst one, told apart by the accent
+ * colour; Carlina and a purple thistle the same way, which at a metre and a
+ * half is a liberty and past five is not.
+ *
+ * The first cut was one stem with four heads over a pale star, and at eye
+ * height it read as a blue bead on a stick. What makes an eryngo is that it
+ * is a BUSH of heads — a stem forks into four, each of those into three —
+ * so there are twenty to forty of them, and the whole plant is a grey-blue
+ * cloud half a metre across standing over the dry grass.
+ */
+function vergeThistle(pr, o = {}) {
+  const H = (k) => floraHash((o.seed || 1) * 1.71 + 0.6, k);
+  const h = o.h || 0.55;
+  const LEAF = [0.395, 0.415, 0.325], VEIN = [0.580, 0.585, 0.490], SPINE = [0.690, 0.650, 0.490];
+  const STEM = [0.540, 0.555, 0.470], FOOT = [0.360, 0.340, 0.260];
+  const lev = (p) => Math.max(0, p[1]) * 0.8;
+  // The rosette: nine lobed leaves lying on the ground.
+  for (let i = 0; i < 9; i++) {
+    const q = (k) => H(100 + i * 13 + k);
+    const az = i * 2.3999632 + H(1) * TAU;
+    const len = 0.12 + 0.10 * q(1), lift = 0.02 + 0.04 * q(2);
+    const ca = Math.cos(az), sa = Math.sin(az);
+    const side = [-sa, 0, ca];
+    const P = [0, 0.25, 0.5, 0.75, 1].map((u) => [ca * len * u, 0.006 + lift * Math.sin(u * Math.PI) * 0.9, sa * len * u]);
+    const W = [0.006, 0.026, 0.030, 0.018, 0];
+    fvStrip(pr.N, P, W, [FOOT, LEAF, _fv.mix(LEAF, VEIN, 0.35), LEAF, SPINE], P.map(() => 0.02), side, 0.45);
+    for (let k = 1; k <= 3; k++) {
+      for (const sd of [-1, 1]) {
+        const e = _fv.add(P[k], side, sd * W[k]), e2 = _fv.add(P[k + 1], side, sd * W[k + 1] * 0.6);
+        const sp = [e[0] + side[0] * sd * 0.026 + ca * 0.014, e[1] + 0.010, e[2] + side[2] * sd * 0.026 + sa * 0.014];
+        fvNeedle(pr.N, _fv.mix(e, e2, 0.5), _fv.n([sp[0] - e[0], sp[1] - e[1], sp[2] - e[2]]), 0.030, 0.010,
+          [ca, 0, sa], LEAF, SPINE, 0.02, 0.02);
+      }
+    }
+    // Far: a diamond per leaf, for six of the nine.
+    if (i < 6) fvStrip(pr.F, [P[0], P[2], P[4]], [0.004, 0.036, 0], [FOOT, LEAF, LEAF], [0.02, 0.02, 0.02], side, 0.45);
+  }
+  const ns = H(2) < 0.12 ? 0 : 2 + Math.floor(H(3) * 1.99);
+  const head = (c, ax, sw, k0, s = 1) => {
+    const sh = 0.86 + 0.24 * H(k0);
+    fvOvoid(pr.S, c, ax, 0.010 * s, 0.013 * s, FV_ACC(sh), sw, FV_ACC(sh * 1.12));
+    const up = _fv.n(ax);
+    const u = _fv.n(_fv.x(up, Math.abs(up[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0])), v = _fv.x(up, u);
+    for (let b = 0; b < 6; b++) {
+      const a = (b / 6) * TAU + H(k0 + b);
+      const d = _fv.n([u[0] * Math.cos(a) + v[0] * Math.sin(a) - up[0] * 0.45, u[1] * Math.cos(a) + v[1] * Math.sin(a) - up[1] * 0.45,
+        u[2] * Math.cos(a) + v[2] * Math.sin(a) - up[2] * 0.45]);
+      fvNeedle(pr.N, _fv.add(c, up, -0.006 * s), d, (0.022 + 0.010 * H(k0 + 10 + b)) * s, 0.0035 * s, _fv.n(_fv.x(d, up)),
+        FV_ACC(sh * 0.80), FV_ACC(sh * 1.02), sw, sw);
+    }
+  };
+  // A branch from `a` heading `az` at `el` off the vertical, `L` long; it
+  // bends back up towards its tip and carries a head there.
+  const branch = (a, az, el, L, r0, B, k0) => {
+    const P = [a];
+    for (let k = 1; k <= 2; k++) {
+      const th = el * (1 - 0.35 * k / 2), st = L / 2;
+      const p = P[k - 1];
+      P.push([p[0] + Math.sin(th) * Math.cos(az) * st, p[1] + Math.cos(th) * st, p[2] + Math.sin(th) * Math.sin(az) * st]);
+    }
+    fvStem(B, P, [r0, r0 * 0.85, r0 * 0.7], [STEM, STEM, STEM], P.map(lev), 3);
+    const d = _fv.n([P[2][0] - P[1][0], P[2][1] - P[1][1], P[2][2] - P[1][2]]);
+    return { tip: P[2], mid: P[1], d };
+  };
+  for (let i = 0; i < ns; i++) {
+    const q = (k) => H(300 + i * 41 + k);
+    const az = i * 2.3999632 + H(4) * TAU;
+    const lean = 0.06 + 0.18 * q(1);
+    const L = h * (0.45 + 0.20 * q(2));
+    const P = [0, 1, 2, 3].map((k) => [Math.sin(lean) * Math.cos(az) * L * k / 3 + Math.cos(az) * 0.025,
+      -0.02 + Math.cos(lean) * L * k / 3, Math.sin(lean) * Math.sin(az) * L * k / 3 + Math.sin(az) * 0.025]);
+    fvStem(pr.S, P, [0.0055, 0.0046, 0.0038, 0.0032], [FOOT, STEM, STEM, STEM], P.map(lev), 3);
+    // Spiny leaves clasping the stem, near only.
+    for (let k = 0; k < 2; k++) {
+      const at = fvAlong(P, 0.30 + 0.35 * k);
+      for (const sd of [-1, 1]) {
+        const a = az + Math.PI * 0.5 * sd + k;
+        const d = _fv.n([Math.cos(a), 0.55, Math.sin(a)]);
+        fvNeedle(pr.N, at.p, d, 0.050, 0.011, _fv.n(_fv.x(d, [0, 1, 0])), LEAF, SPINE, lev(at.p), lev(at.p) * 1.1);
+      }
+    }
+    const top = P[3];
+    head(top, [0, 1, 0], lev(top), 600 + i * 90, 1.15);
+    // Four branches, and each forks again into two short twigs.
+    for (let b = 0; b < 4; b++) {
+      const ba = az + (b / 4) * TAU + (q(5 + b) - 0.5) * 0.7;
+      const br = branch(top, ba, 0.55 + 0.35 * q(9 + b), h * 0.26 * (0.75 + 0.5 * q(13 + b)), 0.0028, pr.S, 0);
+      head(br.tip, _fv.n(_fv.add(br.d, [0, 1, 0], 1.5)), lev(br.tip), 700 + i * 90 + b * 17);
+      for (let t = 0; t < 2; t++) {
+        const ta = ba + (t ? 0.9 : -0.9) + (q(17 + b * 2 + t) - 0.5) * 0.5;
+        const tw = branch(br.mid, ta, 0.5 + 0.3 * q(25 + b * 2 + t), h * 0.13 * (0.7 + 0.6 * q(33 + b * 2 + t)), 0.0018,
+          t ? pr.N : pr.S, 0);
+        head(tw.tip, _fv.n(_fv.add(tw.d, [0, 1, 0], 1.5)), lev(tw.tip), 800 + i * 90 + b * 17 + t * 7, 0.85);
+      }
+    }
+  }
+}
+
+/**
+ * Immortelle — smilje — as a low cushion: a lumpy dark core so it is never
+ * see-through, a coat of a couple of hundred silver needle leaves standing
+ * out of it so the outline is fine and broken rather than a ball, and two
+ * dozen flowering stems above it, each with a flat cluster of small mustard
+ * heads. Far, the core, half the leaves and one disc a cluster. A third of
+ * them are going over, the clusters gone to rust.
+ *
+ * The first cut was the core and forty shoots, and the shoots were too fine
+ * to break its silhouette: at a metre it was a pale teal egg on the dust.
+ * Smilje is not smooth anywhere; it is a mass of needles.
+ */
+function vergeMound(pr, o = {}) {
+  const H = (k) => floraHash((o.seed || 1) * 2.93 + 0.1, k);
+  const R = o.r || 0.26, Hh = o.h || 0.34;
+  const SILV = [0.680, 0.665, 0.545], DEEP = [0.290, 0.282, 0.215], WOOD = [0.400, 0.350, 0.270];
+  const lev = (p) => Math.max(0, p[1]) * 0.9;
+  const no = (o.seed || 1) * 3.7;
+  // The core: a lumpy squat ellipsoid, flattened underneath, mottled.
+  const ico = floraIco(1);
+  const cy = Hh * 0.28;
+  const lump = (d) => 0.80 + 0.30 * floraNoise3(d[0] * 1.8 + no, d[1] * 1.8, d[2] * 1.8);
+  const P = ico.v.map((d) => {
+    const k = lump(d);
+    return [d[0] * R * 0.60 * k, cy + (d[1] < 0 ? d[1] * 0.45 : d[1]) * Hh * 0.52 * k, d[2] * R * 0.60 * k];
+  });
+  const N = ico.v.map((d) => _fv.n([d[0], d[1] * 1.2 + 0.3, d[2]]));
+  const C = ico.v.map((d, i) => _fv.mul(_fv.mix(DEEP, SILV, 0.15 + 0.35 * sat(d[1] + 0.2)), 0.80 + 0.35 * floraHash(i + no, 7)));
+  for (const [a, b, c] of ico.f) {
+    if (P[a][1] < -0.01 && P[b][1] < -0.01 && P[c][1] < -0.01) continue;
+    pr.S.smooth(P[a], P[b], P[c], N[a], N[b], N[c], C[a], C[b], C[c], lev(P[a]) * 0.3, lev(P[b]) * 0.3, lev(P[c]) * 0.3);
+  }
+  const dome = (el, az, k) => {
+    const d = [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+    const kk = k * lump(d);
+    return [d[0] * R * 0.60 * kk, cy + d[1] * Hh * 0.52 * kk, d[2] * R * 0.60 * kk];
+  };
+  // The coat of needles, on a golden spiral over the upper part of the dome.
+  const NL = 300;
+  for (let i = 0; i < NL; i++) {
+    const q = (k) => H(100 + i * 7 + k);
+    const u = (i + 0.5) / NL;
+    const el = -0.25 + Math.asin(u) * 1.15;
+    const az = i * 2.3999632 + q(1) * 0.4;
+    const b = dome(el, az, 0.85);
+    const out = [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+    const d = _fv.n([out[0] * 0.8 + (q(2) - 0.5) * 0.7, out[1] * 0.8 + 0.45, out[2] * 0.8 + (q(3) - 0.5) * 0.7]);
+    const cc = _fv.mul(SILV, 0.78 + 0.34 * q(4));
+    fvNeedle(i % 2 ? pr.N : pr.S, b, d, (0.070 + 0.045 * q(5)) * (R / 0.26), 0.0060, _fv.n(_fv.x(d, [0, 1, 0])),
+      _fv.mul(cc, 0.75), cc, lev(b), lev(b) * 1.15);
+  }
+  // The flowering stems and their clusters.
+  for (let i = 0; i < 24; i++) {
+    const q = (k) => H(900 + i * 19 + k);
+    const az = i * 2.3999632 + H(2) * TAU;
+    const el = 0.80 + 0.65 * q(1);
+    const b0 = dome(el, az, 0.6);
+    const e = dome(el, az, 1.25);
+    e[1] += 0.05 + 0.09 * q(3);
+    const P2 = [b0, _fv.mix(b0, e, 0.55), e];
+    fvStrip(pr.N, P2, [0.0020, 0.0016, 0.0012], [WOOD, SILV, SILV], P2.map(lev), [-Math.sin(az), 0, Math.cos(az)], 0.5);
+    const sh = 0.86 + 0.24 * q(4);
+    for (let k = 0; k < 5; k++) {
+      const a = az + k * 1.3 + q(5 + k);
+      const rr = k === 0 ? 0 : 0.014 + 0.006 * q(10 + k);
+      const c = [e[0] + Math.cos(a) * rr, e[1] + (q(15 + k) - 0.6) * 0.010, e[2] + Math.sin(a) * rr];
+      fvDisc(pr.N, c, [0, 1, 0], 0.009 + 0.005 * q(20 + k), 5, 0.005, FV_ACC(sh * (0.90 + 0.18 * q(25 + k))), lev(c) * 1.1, a);
+    }
+    fvDisc(pr.F, e, [0, 1, 0], 0.030, 6, 0.008, FV_ACC(sh), lev(e));
+  }
+}
+
+/**
+ * The material for the verge: `floraMat`'s surface, the accent, and the
+ * tier. `tier` 0 is near, drawn inside each plant's hand-over distance; 1
+ * is far, drawn outside it and shrunk away between 0.72 and 1 of `far`. The
+ * hand-over is `swap` metres, jittered per plant by `aInstHair.x`.
+ */
+function floraVergeMat({ tier = 0, swap = 17, far = 44 } = {}) {
+  return solidMaterial(0xffffff, {
+    spec: 0.05, specPower: 14, emissive: 0.10,
+    side: THREE.DoubleSide,
+    instanced: true,
+    uniforms: { uWind: U.uWind, uWindSpeed: U.uWindSpeed, uVergeSwap: { value: swap },
+      uVergeFar: { value: far } },
+    vdecl: `attribute float aSway;
+uniform vec2 uWind;
+uniform float uWindSpeed;
+uniform float uTime;
+uniform vec3 uCamPos;
+uniform float uVergeSwap;
+uniform float uVergeFar;
+${GLSL_FLORA_WIND}`,
+    vert: `
+      {
+        float lever = aSway * aInstScale.y;
+        vec3 d = floraWind(aInstPos, lever, 1.0);
+        // The flutter: a few millimetres a metre of lever, continuous in
+        // position, so a spikelet and its neighbour do not move as one.
+        float fl = sin(uTime * (5.0 + aInstHair.x * 3.0) + dot(p, vec3(23.0, 11.0, 17.0)))
+          * (0.004 + 0.0012 * clamp(uWindSpeed, 0.0, 22.0)) * lever;
+        d.x += fl; d.z += fl * 0.6;
+        p += qrot(vec4(-aInstRot.xyz, aInstRot.w), d) / max(aInstScale, vec3(1e-3));
+        float dc = distance(aInstPos.xz, uCamPos.xz);
+        float sw = uVergeSwap + (aInstHair.x - 0.5) * 3.0;
+        ${tier === 0 ? 'if (dc > sw) p = vec3(0.0);'
+    : 'if (dc <= sw) p = vec3(0.0); else p *= 1.0 - smoothstep(uVergeFar * 0.72, uVergeFar, dc);'}
+      }
+    `,
+    body: 'if (vVCol.r < 0.0) base = vSuit * -vVCol.r; else base *= vVCol;',
+    lit: `
+    {
+      float into = pow(max(dot(viewDir, uSunDir), 0.0), 4.0);
+      col += base * uSunColor * uSunI * INV_PI * into * (0.3 + 0.7 * sh) * 0.40;
+    }`,
+  });
+}
+
+/** The five species, in the order the layers are drawn. */
+const VERGE_KINDS = ['oats', 'tussock', 'fennel', 'thistle', 'mound'];
+
+/**
+ * The verge round the eye. `field(x, z)` is 43-jadrija.js's answer to "what
+ * is this ground": null where nothing may grow (made ground, a wall, a
+ * doorway, the sea), or { edge, wall, trod } — metres to the nearest made
+ * ground or standing thing, to the nearest standing thing alone, and
+ * whether this is a walk between two walls. `height(x, z)` is the ground
+ * there, or null after all. The mix is decided here, off those and a patch
+ * noise a species; the places are decided there.
+ */
+function floraVerge(scene, { field, height, cell = 2, swap = 17, far = 44, caps = {} } = {}) {
+  const t0 = performance.now();
+  const B = {
+    oats: fvProto(), tussock: fvProto(), fennel: fvProto(), thistle: fvProto(), mound: fvProto(),
+  };
+  vergeOats(B.oats, { seed: 3.3, n: 16, h: 0.80 });
+  vergeTussock(B.tussock, { seed: 5.1, n: 46, h: 0.34, r: 0.15, flat: 0.45 });
+  vergeFennel(B.fennel, { seed: 2.2, h: 1.45 });
+  vergeThistle(B.thistle, { seed: 4.4, h: 0.55 });
+  vergeMound(B.mound, { seed: 6.6, r: 0.26, h: 0.34 });
+  const CAP = { oats: 1600, tussock: 1400, fennel: 160, thistle: 500, mound: 600, ...caps };
+  const matN = floraVergeMat({ tier: 0, swap, far }), matF = floraVergeMat({ tier: 1, swap, far });
+  const L = {};
+  const tris = {};
+  for (const kind of VERGE_KINDS) {
+    const { g, f0, f1, all } = fvGeo(B[kind]);
+    tris[kind] = [(all - f0) / 3, f1 / 3];
+    const mk = (range0, range1, cap, mat, name) => {
+      const geo = new THREE.InstancedBufferGeometry();
+      for (const k of Object.keys(g.attributes)) geo.setAttribute(k, g.attributes[k]);
+      const A = {
+        pos: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+        rot: new THREE.InstancedBufferAttribute(new Float32Array(cap * 4), 4),
+        scale: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+        col: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+        acc: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+        hash: new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3),
+      };
+      for (const [n, a] of [['aInstPos', A.pos], ['aInstRot', A.rot], ['aInstScale', A.scale],
+        ['aInstColor', A.col], ['aInstSuit', A.acc], ['aInstHair', A.hash]]) {
+        a.setUsage(THREE.DynamicDrawUsage);
+        geo.setAttribute(n, a);
+      }
+      geo.setDrawRange(range0, range1 - range0);
+      geo.instanceCount = 0;
+      geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.frustumCulled = false;
+      mesh.visible = false;
+      mesh.name = name;
+      scene.add(mesh);
+      return { mesh, geo, A, cap, n: 0 };
+    };
+    L[kind] = {
+      near: mk(f0, all, CAP[kind], matN, 'flora:verge:' + kind),
+      far: mk(0, f1, CAP[kind] * 3, matF, 'flora:verge:' + kind + ':far'),
+    };
+  }
+  const buildMs = performance.now() - t0;
+
+  // ── the mix ────────────────────────────────────────────────────────────────
+  // Plants a square metre at the heart of a patch on the best of the verge.
+  // A patch is a drift of one species about eight metres across, each on its
+  // own noise, which is what a verge is: oats here, a run of fennel there,
+  // immortelle where the rock comes through — never the five of them evenly
+  // stirred together, which reads as a seed packet.
+  const PEAK = { oats: 2.0, tussock: 1.3, fennel: 0.16, thistle: 0.22, mound: 0.30 };
+  const patch = (ki, x, z) => {
+    const o = ki * 37.1;
+    return sat((floraNoise3(x * 0.13 + o, 1.5 + o, z * 0.13) - 0.36) / 0.30);
+  };
+  const density = (ki, f, x, z) => {
+    // The verge proper: nothing on the made edge itself, the most from a
+    // few hands to a metre out, gone by three. It was gone by four, and a
+    // twelve-metre band of dust with an edge down each side came out as one
+    // meadow; a verge is a strip, and the ground past it stays bare.
+    const e = f.edge;
+    const vg = sat((e - 0.10) / 0.30) * (1 - smoothstep(0.9, 3.0, e));
+    const open = smoothstep(2.5, 6.0, e);
+    const wall = (1 - smoothstep(0.7, 2.4, f.wall)) * sat((f.wall - 0.25) / 0.3);
+    const pt = patch(ki, x, z);
+    // A walk between two walls keeps only what hugs the foot of one.
+    const tk = f.trod ? 1 - smoothstep(0.35, 0.9, f.wall) : 1;
+    switch (VERGE_KINDS[ki]) {
+      case 'oats': return tk * PEAK.oats * (vg * pt + 0.03 * open * pt);
+      case 'tussock': return tk * PEAK.tussock * (vg * (0.25 + 0.75 * pt) + 0.05 * open * pt);
+      case 'fennel': return f.trod ? 0 : PEAK.fennel * (Math.max(vg * 0.6, wall) * pt + 0.02 * open);
+      case 'thistle': return tk * PEAK.thistle * (vg * (0.3 + 0.7 * pt) + 0.06 * open * pt);
+      default: return tk * PEAK.mound * (Math.max(vg, wall * 0.8) * pt + 0.03 * open * pt);
+    }
+  };
+  // How far off the made edge a plant's root has to be, so a fennel's crown
+  // is not in the kerb and a tussock may just lip over it.
+  const MIN_EDGE = { oats: 0.12, tussock: 0.10, fennel: 0.40, thistle: 0.22, mound: 0.30 };
+
+  const cache = new Map();
+  let cellsMade = 0;
+  const itemsOf = (i, k) => {
+    const key = (i + 40000) * 80000 + (k + 40000);
+    let it = cache.get(key);
+    if (it !== undefined) return it;
+    it = [];
+    const cx = (i + 0.5) * cell, cz = (k + 0.5) * cell;
+    const seed = i * 5.17 + k * 9.31 + 0.7;
+    // A cell whose centre is on made ground can still have an edge in it,
+    // so its four quarters are asked before it is given up on.
+    let fc = field(cx, cz);
+    if (!fc) {
+      for (const [ox, oz] of [[-0.25, -0.25], [0.25, -0.25], [-0.25, 0.25], [0.25, 0.25]]) {
+        fc = field(cx + ox * cell, cz + oz * cell);
+        if (fc) break;
+      }
+    }
+    if (fc) {
+      VERGE_KINDS.forEach((kind, ki) => {
+        const d = density(ki, fc, cx, cz) * cell * cell;
+        if (d <= 0.001) return;
+        const n = Math.floor(d) + (floraHash(seed, ki * 97 + 1) < d - Math.floor(d) ? 1 : 0);
+        for (let j = 0; j < n; j++) {
+          const hk = (m) => floraHash(seed + j * 1.37, ki * 97 + m);
+          const x = cx + (hk(2) - 0.5) * cell, z = cz + (hk(3) - 0.5) * cell;
+          const fp = field(x, z);
+          if (!fp || fp.edge < MIN_EDGE[kind]) continue;
+          // Thinned again at the point itself, so a drift's edge is soft and
+          // not the cell's square.
+          if (hk(4) * PEAK[kind] > density(ki, fp, x, z) * 1.6 + 0.02) continue;
+          const y = height(x, z);
+          if (y == null) continue;
+          it.push({ kind, x, y, z, yaw: hk(5) * TAU, a: hk(6), b: hk(7), c: hk(8), sw: hk(9), e: fp.edge });
+        }
+      });
+    }
+    cellsMade++;
+    if (cache.size > 60000) cache.clear();
+    cache.set(key, it);
+    return it;
+  };
+
+  // What each species looks like as an instance: size, tint, and accent.
+  const THISTLE_ACC = [[0.420, 0.490, 0.700], [0.620, 0.640, 0.540], [0.740, 0.620, 0.360], [0.520, 0.300, 0.500]];
+  const FENNEL_ACC = [[0.820, 0.680, 0.150], [0.640, 0.590, 0.230], [0.470, 0.370, 0.210]];
+  const dress = (o) => {
+    const { a, b, c } = o;
+    switch (o.kind) {
+      case 'oats': {
+        const s = 0.70 + 0.55 * a, g = 0.92 + 0.16 * b;
+        return { s: [s * (0.9 + 0.2 * c), s * (0.85 + 0.3 * b), s * (0.9 + 0.2 * c)],
+          col: [g * 1.02, g, g * (0.94 + 0.08 * c)], acc: [0, 0, 0] };
+      }
+      case 'tussock': {
+        // Trodden flatter the nearer it is to the made edge.
+        const fl = sat(1.2 - o.e * 0.5) * 0.5 + 0.3 * c;
+        const s = 0.65 + 0.65 * a, g = 0.90 + 0.18 * b;
+        return { s: [s * (1 + 0.3 * fl), s * (1 - 0.45 * fl), s * (1 + 0.3 * fl)],
+          col: [g, g * 0.99, g * (0.95 + 0.08 * c)], acc: [0, 0, 0] };
+      }
+      case 'fennel': {
+        const s = 0.70 + 0.45 * a, g = 0.94 + 0.10 * c;
+        return { s: [s, s, s], col: [g, g, g], acc: FENNEL_ACC[b < 0.5 ? 0 : b < 0.78 ? 1 : 2] };
+      }
+      case 'thistle': {
+        const s = 0.70 + 0.55 * a, g = 0.92 + 0.14 * c;
+        return { s: [s, s * (0.85 + 0.3 * c), s], col: [g, g, g],
+          acc: THISTLE_ACC[b < 0.45 ? 0 : b < 0.75 ? 1 : b < 0.9 ? 2 : 3] };
+      }
+      default: {
+        // Smilje in flower, and a third of them going over to rust.
+        const s = 0.60 + 0.65 * a;
+        const over = b > 0.66 ? 1 : 0;
+        return { s: [s * (1.0 + 0.2 * c), s * (0.8 + 0.3 * c), s * (1.0 + 0.2 * c)], col: [1.0, 1.0, 0.98],
+          acc: over ? [0.600, 0.440, 0.200] : [0.760 - 0.1 * c, 0.590 - 0.06 * c, 0.150 + 0.04 * c] };
+      }
+    }
+  };
+
+  let ci = null, ck = null, lastMs = 0, worstMs = 0, builds = 0, enabled = true;
+  const R = Math.ceil((far + cell) / cell);
+  const nearR = swap + 1.5 + cell * 1.5, farR0 = swap - 1.5 - cell * 1.5;
+  const cp = { x: 0, z: 0 };
+  function put(l, o, dr) {
+    if (l.n >= l.cap) return;
+    const n = l.n++;
+    const P = l.A.pos.array, Q = l.A.rot.array;
+    P[n * 3] = o.x; P[n * 3 + 1] = o.y; P[n * 3 + 2] = o.z;
+    const hy = o.yaw * 0.5;
+    Q[n * 4] = 0; Q[n * 4 + 1] = Math.sin(hy); Q[n * 4 + 2] = 0; Q[n * 4 + 3] = Math.cos(hy);
+    l.A.scale.array.set(dr.s, n * 3);
+    l.A.col.array.set(dr.col, n * 3);
+    l.A.acc.array.set(dr.acc, n * 3);
+    l.A.hash.array[n * 3] = o.sw;
+  }
+  const layers = () => VERGE_KINDS.flatMap((k) => [L[k].near, L[k].far]);
+  function rebuild() {
+    const ts = performance.now();
+    for (const l of layers()) l.n = 0;
+    for (let di = -R; di <= R; di++) {
+      for (let dk = -R; dk <= R; dk++) {
+        if (di * di + dk * dk > R * R) continue;
+        for (const o of itemsOf(ci + di, ck + dk)) {
+          const d = Math.hypot(o.x - cp.x, o.z - cp.z);
+          if (d > far + cell) continue;
+          const dr = dress(o);
+          if (d < nearR) put(L[o.kind].near, o, dr);
+          if (d > farR0) put(L[o.kind].far, o, dr);
+        }
+      }
+    }
+    for (const l of layers()) {
+      l.geo.instanceCount = l.n;
+      l.mesh.visible = enabled && l.n > 0;
+      for (const a of Object.values(l.A)) {
+        a.needsUpdate = true;
+        a.clearUpdateRanges();
+        a.addUpdateRange(0, l.n * a.itemSize);
+      }
+    }
+    lastMs = performance.now() - ts;
+    worstMs = Math.max(worstMs, lastMs);
+    builds++;
+  }
+
+  return {
+    meshes: () => layers().map((l) => l.mesh),
+    /** Call once a frame with the eye. `ground` is the height under it. */
+    update(cam, ground) {
+      // From the air there is nothing here to see, and nothing to spend on.
+      const on = enabled && cam.y - ground < 40;
+      for (const l of layers()) l.mesh.visible = on && l.n > 0;
+      if (!on) return;
+      const i = Math.floor(cam.x / cell), k = Math.floor(cam.z / cell);
+      if (i === ci && k === ck) return;
+      ci = i; ck = k;
+      cp.x = (i + 0.5) * cell; cp.z = (k + 0.5) * cell;
+      rebuild();
+    },
+    /** Forget every cell: the ground under them has changed. */
+    reset() { cache.clear(); ci = ck = null; },
+    /** Off and on, for an A/B in the same page. */
+    enable(v) {
+      enabled = !!v;
+      for (const l of layers()) l.mesh.visible = enabled && l.n > 0;
+    },
+    /** Every plant in the cells made so far, for a probe to map. */
+    items: () => [...cache.values()].flat(),
+    /** The nearest plant of a kind to (x, z) among the cells made so far: for a probe. */
+    find(kind, x, z) {
+      let best = null, bd = Infinity;
+      for (const it of cache.values()) {
+        for (const o of it) {
+          const d = Math.hypot(o.x - x, o.z - z);
+          if (o.kind === kind && d < bd) { bd = d; best = o; }
+        }
+      }
+      return best && { x: best.x, y: best.y, z: best.z, d: bd, e: best.e };
+    },
+    stats: () => {
+      const n = {};
+      for (const kind of VERGE_KINDS) n[kind] = [L[kind].near.n, L[kind].far.n];
+      return { n, tris, cells: cache.size, cellsMade, builds, buildMs: +buildMs.toFixed(1),
+        lastMs: +lastMs.toFixed(2), worstMs: +worstMs.toFixed(2) };
+    },
   };
 }
