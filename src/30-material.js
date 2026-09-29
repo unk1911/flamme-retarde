@@ -187,7 +187,12 @@ void main(){
     // the bake thinned out of either shows the right thing behind it. One
     // byte, two ranges: 0 to 127 is swimwear, 128 to 255 is hair.
     float ua = floor(aTint.a * 255.0 + 0.5);
-    float uSuit = ua < 127.5 ? ua / 127.0 : 0.0;
+    // Bare: the fourth channel at -1 (see 'flush' in 42-crowd.js) takes
+    // the swimwear off the torso joint, and what was swimwear is her skin,
+    // shaded as the swimwear was — and the skin the bake painted under it
+    // stays skin rather than taking the suit's colour.
+    bool bare = aInstShirt.w < -0.5 && floor(aBone.x * 255.0 + 0.5) == 1.0;
+    float uSuit = ua < 127.5 && !bare ? ua / 127.0 : 0.0;
     float uHair = ua > 127.5 ? (ua - 128.0) / 127.0 : 0.0;
     vec3 c = kind < 0.5
       ? mix(mix(aInstColor * sh, aInstSuit * uCrowdCap.y, uSuit),
@@ -195,7 +200,8 @@ void main(){
       : kind < 1.5 ? aInstSuit * sh
       : kind < 2.5 ? aInstHair * sh
       : sh;
-    vColor = shirt ? aInstShirt.rgb : c;
+    vColor = shirt ? aInstShirt.rgb
+      : bare && kind > 0.5 && kind < 1.5 ? aInstColor * sh : c;
     vSuit = aInstSuit;
     vHair = aInstHair;
   }

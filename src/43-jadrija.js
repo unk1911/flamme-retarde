@@ -30985,6 +30985,52 @@ async function buildJadrija(scene) {
   }
 
 
+  // ── the mole, full ─────────────────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026, from the vikendica's upper terrace: *"in the real view
+  // from vikendica, there's a lot more bathers and kids jumping off that pier
+  // there, right now it's just an empty concrete slab, but in real life it's
+  // seething with life, little kids jumping down, i see u have a lot of
+  // bathers more up north, maybe u can re-locate them to inhabit the space in
+  // front of the vikendica more and populate that concrete pier with bathers
+  // laying on their towels ... do not increase the # of bathers"*.
+  //
+  // MEASURED FIRST. Of the hundred people on this shore not one was on the
+  // mole — t 252.5 to 263.5, s 0.4 to -42 — and the nearest static figure to
+  // it was a woman standing on the middle terrace eleven metres away. The
+  // survey has the same object full: 20260821_175838 looks down it at ten to
+  // six and counts nineteen people on it — groups sitting on towels near the
+  // head, towels laid out along it and not across it, two standing at the
+  // edge, a boy in red trunks running for the water; 20260821_175752 has
+  // the other mole's flank with a girl on the ladder and eight heads in the
+  // water off it; 1000149597 at 250 s is two women on towels laid straight
+  // on the concrete, one of them in sunglasses. People on a mole are at its
+  // edges and on towels, in twos and threes, and in the water beside it.
+  //
+  // WHO MOVES, AND WHY IT IS THEM. Nobody is added (`people` stays 100 —
+  // the count is a runtime cost, not a file-size one, but he asked for the
+  // same hundred and it is the same hundred). The people who go are the
+  // ones standing, sitting and lying furthest along the shore from the
+  // vikendica — the far end of the sand beach and the two hundred metres
+  // past the last café — because from the house those are the people
+  // nobody can see. They are taken off the finished list, farthest first,
+  // with about one in five left where they were so that neither end of the
+  // beach is emptied. See `moleCast`, which runs just before the crowd is
+  // cast.
+  //
+  // RULE 4. Nothing in this is drawn off `rng`. The places are literals and
+  // `jit`; the people are picked by where they already are; and they are
+  // moved AFTER `castBlob` has dealt everybody a body round the shore in
+  // order of `t` and after every other thing that read their placement, so
+  // not one body, colour, gait, parasol or hut changes — only where these
+  // people are.
+  //
+  // Three of them are not in the crowd at all any more: the jumpers, who
+  // are drawn by figures of their own (`MOLE_JUMP`), because the instanced
+  // tier cannot play a dive. They are still among the hundred, hidden from
+  // the crowd the way the woman against the riser at t 366.8 is.
+  const MOLE_LIFE = { spots: [], movers: [], jumpers: [] };
+
   // ── towels, cones, flags, bicycles ─────────────────────────────────────────
   //
   // Four small things the survey keeps showing and the shore did not have.
@@ -31030,6 +31076,151 @@ async function buildJadrija(scene) {
       } else {
         clutter(t + 0.5, s + 0.55, y, 2, k * 5 + 3);
       }
+    }
+
+    // ── AND THE MOLE, WHICH HAD NOBODY ON IT ─────────────────────────────────
+    //
+    // The places `MOLE_LIFE` is about (see the note over it): where each
+    // person the mole is given will lie, sit or stand, and the towels and the
+    // books that are theirs. Laid out here because the towels are geometry
+    // and this is where towels are built; FILLED four thousand lines down,
+    // just before the crowd is cast, because who goes where is decided off
+    // the finished list of people and that list is not finished yet.
+    //
+    // Nothing here draws off `rng`: every number is a literal or a `jit`,
+    // for the reason the rest of this block gives.
+    {
+      const top = JET.top;
+      const W0 = JET.t - JET.w, E0 = JET.t + JET.w, HEAD = -JET.out;
+      const spot = (o) => { MOLE_LIFE.spots.push(o); return o; };
+      // Along the mole, a person lying down has their soles at (t, s) and
+      // their head `LIE_LEN` behind them against `ang` — the anchor the `lie`
+      // pose is written against (see the note over the lounger sunbathers).
+      const LIE_LEN = 1.62;
+      // Lying, and the half of them that tell the story: tops off and
+      // undone are ADULT WOMEN ONLY and that is enforced by body, not here —
+      // see `TOPS_KINDS` in 42-crowd.js. What these say is what this place
+      // is FOR if whoever is dealt it can wear it; a man dealt a `top: 1`
+      // spot is simply a man sunbathing.
+      //
+      // In two loose rows down the east half, bodies along the mole, heads
+      // both ways, which is 20260821_175838: nobody lies across a mole, and
+      // nobody lies in a grid.
+      const LIE = [
+        // t, s, bearing (head -> feet), prone, top, shades, book
+        [259.1, -7.6, -Math.PI / 2, false, 1, true, false],
+        [261.3, -11.8, Math.PI / 2, true, 2, false, true],
+        [259.6, -14.2, -Math.PI / 2, false, 0, true, false],
+        [261.6, -19.4, Math.PI / 2, true, 2, false, true],
+        [258.9, -22.3, -Math.PI / 2, false, 1, false, false],
+        [261.2, -28.6, Math.PI / 2, false, 1, true, false],
+        [257.6, -31.4, -Math.PI / 2, false, 0, false, false],
+        [260.3, -35.6, Math.PI / 2, true, 0, true, false],
+      ];
+      LIE.forEach(([t, s, ang, prone, topOff, shades, book], i) => {
+        const a = ang + (jit(i, 5101) - 0.5) * 0.22;
+        spot({ t, s, y: top + 0.06, ang: a, pose: 'lie', prone, top: topOff,
+          shades, book, towel: true, who: topOff ? 'f' : '*' });
+      });
+      // Sitting on a towel with the legs out along it, and reading. The
+      // quay clip with its legs laid on the concrete (`legRestOf`), which
+      // puts both hands half way down the thighs — where a paperback is.
+      spot({ t: 260.4, s: -24.6, y: top, ang: Math.PI - 0.35, pose: 'sit',
+        ground: true, book: true, shades: true, towel: true, who: 'f' });
+      spot({ t: 258.3, s: -38.3, y: top, ang: -Math.PI / 2 + 0.4, pose: 'sit',
+        ground: true, book: true, towel: true, who: '*' });
+      // On the edge with their legs over the water: the one thing the quay
+      // clip was solved for and, on the promenade, never got to do (see
+      // `legRestOf`). 0.55 m in from the arris, which is where the quay
+      // sitters' note puts the knee on the lip. The west flank faces the
+      // vikendica, and nothing sits on it between s -3 and -18 because that
+      // is the jumpers' run and the water they go into.
+      for (const [s, who] of [[-20.6, 'k'], [-26.4, 'm'], [-33.1, '*'], [-38.9, 'm']]) {
+        spot({ t: W0 + 0.55, s, y: top, ang: Math.PI, pose: 'sit', edge: true,
+          shades: jit(s * 10 | 0, 5102) < 0.35, who });
+      }
+      for (const [t, who] of [[254.6, 'm'], [260.9, '*']]) {
+        spot({ t, s: HEAD + 0.55, y: top, ang: -Math.PI / 2, pose: 'sit',
+          edge: true, who });
+      }
+      for (const [s, who] of [[-9.4, 'm'], [-24.9, '*']]) {
+        spot({ t: E0 - 0.55, s, y: top, ang: 0, pose: 'sit', edge: true, who });
+      }
+      // Two on their feet: one at the head of the jumpers' run, watching
+      // them go in, and one out towards the head.
+      spot({ t: 257.9, s: -19.2, y: top, ang: Math.PI + 0.5, pose: 'stand',
+        shades: true, who: 'm' });
+      spot({ t: 262.1, s: -32.3, y: top, ang: Math.PI * 0.8, pose: 'stand',
+        who: '*' });
+      // And the quay in front of the vikendica, which is the other half of
+      // what he can see from its terrace: two on the lip with their legs
+      // over, and one standing at the edge. Clear of the ladder at t 247 and
+      // of the lip from there to the mole, which is the jumpers' way back.
+      for (const t of [237.9, 241.4]) {
+        spot({ t, s: 0.55, y: null, ang: -Math.PI / 2, pose: 'sit', edge: true,
+          who: '*' });
+      }
+      spot({ t: 243.9, s: 1.3, y: null, ang: -Math.PI / 2 + 0.6, pose: 'stand',
+        who: '*' });
+
+      // The towels, in the survey's colours and then some: a mole is where
+      // everybody's towel is out at once, and every one of them in every
+      // frame is striped. 1.72 m by 0.78, which is a beach towel, in three
+      // panels so it lies like cloth, with a band across each end.
+      const MT = [[0.600, 0.180, 0.160], [0.155, 0.330, 0.560],
+        [0.700, 0.640, 0.240], [0.190, 0.460, 0.350], [0.660, 0.400, 0.520],
+        [0.860, 0.470, 0.180], [0.120, 0.520, 0.620], [0.520, 0.200, 0.420],
+        [0.900, 0.860, 0.780]];
+      b = deck;
+      MOLE_LIFE.spots.forEach((o, i) => {
+        if (!o.towel) return;
+        const col = MT[((jit(i, 5103) * 97) | 0) % MT.length];
+        const band = MT[((jit(i, 5104) * 89 + 3) | 0) % MT.length];
+        const y = o.y - (o.pose === 'lie' ? 0.06 : 0) + 0.012;
+        // Centred under the body: soles at the spot, head LIE_LEN back.
+        const c = Math.cos(o.ang), sn = Math.sin(o.ang);
+        const mid = o.pose === 'lie' ? -0.74 : 0.10;
+        const ct = o.t + c * mid, cs = o.s + sn * mid;
+        // `facing` runs its local ds along (-sin, cos) of its angle, so an
+        // angle a quarter turn on from the body's bearing lays the length of
+        // the towel along the body.
+        const P = facing(ct, cs, o.ang + Math.PI / 2);
+        const HL = 0.86, HW = 0.39;
+        for (let p = 0; p < 3; p++) {
+          const d0 = -HL + p * (2 * HL / 3), d1 = d0 + 2 * HL / 3;
+          const wob = (jit(i * 3 + p, 5105) - 0.5) * 0.05;
+          b.quad(P(-HW, d0, y + wob * 0.1), P(HW, d0, y - wob * 0.1),
+            P(HW, d1, y + wob * 0.1), P(-HW, d1, y - wob * 0.1),
+            p === 1 ? col : shade(col, 0.93));
+        }
+        for (const e of [-1, 1]) {
+          const d0 = e * (HL - 0.16), d1 = e * (HL - 0.08);
+          b.quad(P(-HW, d0, y + 0.002), P(HW, d0, y + 0.002),
+            P(HW, d1, y + 0.002), P(-HW, d1, y + 0.002), band);
+        }
+        // A book, open and face down or face up, at the head end: a
+        // sunbather on her front reads with the book on the towel in front
+        // of her, which is the one way to read lying down that anybody on a
+        // concrete mole actually does. For a sitter the book is in her hands
+        // instead — see `MOLE_PROPS`.
+        if (o.book && o.pose === 'lie') {
+          const bt = o.t - c * (LIE_LEN + 0.30), bs = o.s - sn * (LIE_LEN + 0.30);
+          const Q = facing(bt, bs, o.ang + Math.PI / 2);
+          const cov = MT[((jit(i, 5106) * 83 + 5) | 0) % MT.length];
+          const yb = y + 0.004;
+          b.quad(Q(-0.16, -0.115, yb), Q(0.16, -0.115, yb), Q(0.16, 0.115, yb),
+            Q(-0.16, 0.115, yb), shade(cov, 0.7));
+          // Two pages, each tipped up from the spine, which reads as open
+          // from the vikendica and as a book from anywhere nearer.
+          // Wound the same way round as the towel under them (x rising), so
+          // both leaves face the sky.
+          for (const [xa, xb, ya, yc] of [[-0.148, 0, 0.030, 0.018], [0, 0.148, 0.018, 0.030]]) {
+            b.quad(Q(xa, -0.105, yb + ya), Q(xb, -0.105, yb + yc),
+              Q(xb, 0.105, yb + yc), Q(xa, 0.105, yb + ya), [0.905, 0.885, 0.830]);
+          }
+        }
+      });
+      b = up;
     }
 
 
@@ -59038,6 +59229,101 @@ async function buildJadrija(scene) {
     youN++;
   }
 
+  // ── out on to the mole (`MOLE_LIFE`) ───────────────────────────────────────
+  //
+  // Here, and nowhere earlier, because this is the last moment before the
+  // crowd is cast off the list and the first at which the list is final:
+  // the shop staff, the gelato queue and the sunbathers on the concrete
+  // towels have all been appended, `castBlob` has dealt every one of them a
+  // body in order of where they WERE (so moving them now re-deals nobody),
+  // and everything between the placement and here that looked at where
+  // anybody stood has already looked. Moving somebody is changing six fields
+  // on their record; every draw the casting loop below takes for them it
+  // still takes, in the same order.
+  function moleCast() {
+    if (!castBlob || !CAST_KIND || !MOLE_LIFE.spots.length) return;
+    const kindOf = (i) => (castBlob[i] >= 0 ? CAST_KIND[castBlob[i]] : null);
+    const cls = (k) => (!k ? null : /child/.test(k) ? 'k' : BATHER_SEX[k]);
+    // Standing, sitting or lying about, on their own, and a body to be
+    // drawn with — not walking a beat (their draws differ, see `wait`), not
+    // in a café chair, not behind a counter, not already taken off.
+    const free = (b, i) => !b.beat && !b.chair && !b.staff && !b.hidden
+      && (b.pose === 'stand' || b.pose === 'sit' || b.pose === 'lie')
+      && castBlob[i] >= 0;
+    const far = [];
+    for (let i = 0; i < bathers.length; i++) {
+      const b = bathers[i];
+      if (!free(b, i)) continue;
+      const d = Math.abs(b.t - VIK.t);
+      // Anybody within eighty metres is already somebody he can see.
+      if (d > 80) far.push([d, i]);
+    }
+    far.sort((a2, c) => c[0] - a2[0] || a2[1] - c[1]);
+    const taken = new Set();
+    // The jumpers first: the farthest girl, the farthest boy and the
+    // farthest man who is the diver's own body (`man_young_fit` carries the
+    // dive, the tread, the swim and the ladder natively; the two children get
+    // his clips retargeted — see `jumpClips`).
+    for (const want of ['girl_child', 'boy_child', 'man_young_fit']) {
+      const hit = far.find(([, i]) => !taken.has(i) && kindOf(i) === want);
+      if (!hit) continue;
+      const i = hit[1], b = bathers[i];
+      taken.add(i);
+      MOLE_LIFE.jumpers.push({ i, kind: want, from: [b.t, b.s, b.pose] });
+      b.hidden = true;
+      b.jump = MOLE_LIFE.jumpers.length;
+    }
+    // Then everybody else, farthest first, one in five left where they are
+    // so that neither end of the beach is emptied, and twenty at most: the
+    // mole in 175838 has nineteen on it and the jumpers are three more.
+    const movers = [];
+    for (const [, i] of far) {
+      if (movers.length >= Math.min(20, MOLE_LIFE.spots.length)) break;
+      if (taken.has(i) || jit(i, 5110) < 0.2) continue;
+      movers.push(i);
+      taken.add(i);
+    }
+    // Who goes where. A place that says who it is for (`'f'`, `'m'`, `'k'`)
+    // takes the farthest person of that kind still unplaced; then the
+    // places that do not mind; then whoever is left, anywhere left.
+    const left = movers.slice();
+    const put = (o, i) => { o.idx = i; left.splice(left.indexOf(i), 1); };
+    for (const o of MOLE_LIFE.spots) {
+      if (o.who === '*') continue;
+      const i = left.find((j) => cls(kindOf(j)) === o.who);
+      if (i != null) put(o, i);
+    }
+    for (const pass of [0, 1]) {
+      for (const o of MOLE_LIFE.spots) {
+        if (o.idx != null || (pass === 0 && o.who !== '*')) continue;
+        if (!left.length) break;
+        put(o, left[0]);
+      }
+    }
+    for (const o of MOLE_LIFE.spots) {
+      if (o.idx == null) continue;
+      const b = bathers[o.idx];
+      MOLE_LIFE.movers.push({ i: o.idx, kind: kindOf(o.idx),
+        from: [+b.t.toFixed(1), +b.s.toFixed(2), b.pose], to: [o.t, o.s, o.pose] });
+      b.t = o.t; b.s = o.s; b.ang = o.ang; b.pose = o.pose;
+      b.y = o.y != null ? o.y
+        : onMoleY(o.t, o.s) ? JET.top
+          : o.pose === 'sit' ? surfaceY(o.t, 1.4) : standY(o.t, o.s);
+      // The things this place comes with. `top` and `shades` and `book` are
+      // read by the two tiers and by `MOLE_PROPS`; `edge` is what keeps a
+      // sitter's legs over the water instead of laid on the concrete; and a
+      // phone is put down, because nobody on a towel with a paperback is
+      // also on a call.
+      b.edge = !!o.edge;
+      b.prone = o.pose === 'lie' ? !!o.prone : undefined;
+      b.top = o.top || 0;
+      b.shades = !!o.shades;
+      b.book = !!o.book;
+      if (o.pose !== 'sit' || o.book) b.phone = 0;
+    }
+  }
+  moleCast();
+
   const walkers = [];
   // Everybody the static blocker list does not hold — see `bodies` below.
   const soft = [];
@@ -59180,7 +59466,11 @@ async function buildJadrija(scene) {
       // Sitting on the concrete itself, which is every sitter not in a chair:
       // the quay's. Their legs lie out along it on both tiers — see
       // `legRestOf` in 43-settle.js and the `sit` case in 42-crowd.js.
-      ground: b.pose === 'sit' && !b.chair,
+      //
+      // Except on an edge (`b.edge`, the mole's flanks and the lip in front of
+      // the vikendica — see `MOLE_LIFE`), where there IS water for the shins
+      // to hang over and the clip gets to do what it was solved for.
+      ground: b.pose === 'sit' && !b.chair && !b.edge,
       seed: rng(),
       // The height jitter, off one draw and spent on both tiers below. It was
       // 0.94 to 1.07, which on the instanced rig's canonical 1.70 m is 1.60 m
@@ -59294,9 +59584,22 @@ async function buildJadrija(scene) {
     // And the counter a server's hands are solved against, for the same
     // reason. See `staffAt` and `COUNTER`.
     if (b.counter) fg.counter = b.counter;
+    // And what the mole gave them (`moleCast`): which way up they lie, the
+    // top, the sunglasses, the book. Copied rather than read off `b` for
+    // the reason the phone is. None of it is a draw.
+    if (b.prone != null) fg.prone = b.prone;
+    if (b.top) fg.top = b.top;
+    if (b.shades) fg.shades = true;
+    if (b.book) fg.book = true;
     // Somebody taken off the shore (`b.hidden` — the woman against the
     // riser at t 366.8): every draw above has been taken for her, and here
     // she stops. No figure, no roving slot, no collider.
+    //
+    // A jumper is hidden from the crowd too, and keeps the record the crowd
+    // made of them — their skin, their swimsuit, their hair — so that the
+    // figure of their own that draws them (`MOLE_JUMP`) is dressed as the
+    // same person.
+    if (b.jump) b.fg = fg;
     if (b.hidden) continue;
     C.figures.push(fg);
     if (roveOk) rove[fg.blob].push(fg);
@@ -62708,6 +63011,24 @@ async function buildJadrija(scene) {
     crowd: {
       people: bathers.length,
       walkers: walkers.length,
+      /**
+       * The mole (`MOLE_LIFE`): who was moved from where to which place, the
+       * places nobody filled, and the jumpers — who, where, and what each is
+       * doing this frame. For a probe; nothing reads it.
+       */
+      mole: () => ({
+        spots: MOLE_LIFE.spots.length,
+        empty: MOLE_LIFE.spots.filter((o) => o.idx == null)
+          .map((o) => [o.t, o.s, o.pose]),
+        movers: MOLE_LIFE.movers,
+        jumpers: MOLE_LIFE.jumpers.map((J) => ({ i: J.i, kind: J.kind, from: J.from,
+          mode: J.st ? J.st.mode : null, loops: J.st ? J.st.loops : 0,
+          clip: J.fig ? J.fig.playing() : null,
+          at: J.fig ? J.fig.mesh.position.toArray().map((v) => +v.toFixed(2)) : null,
+          water: J.st && J.fig ? +(J.fig.mesh.position.y
+            - (typeof seaHeightAt === 'function'
+              ? seaHeightAt(J.fig.mesh.position.x, J.fig.mesh.position.z) : 0)).toFixed(2) : null })),
+      }),
       rigs: Object.keys(crowds),
       get drawn() {
         return Object.values(crowds).reduce((a, c) => a + c.drawn, 0);
