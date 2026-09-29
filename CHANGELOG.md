@@ -8,6 +8,92 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.546.0] — 2026-09-29
+
+### Two smokers at Jadrija, and the smoke off them
+
+Misha, looking at the "Vortex Plume" of dgreenheck's threejs-particle-fluids:
+*"maybe the smoke spreading could be one of the bathers smoking a
+cigarette"*. That repo is WebGPU with a compute-shader fluid solver, so none
+of it can be used here. What makes its plume read is buoyancy that dies,
+laminar flow breaking into swirls, and light scattering through the smoke.
+All three are cheap without a grid.
+
+**Who, and where.** Two café sitters smoke. One is the young woman at the
+first chair at **Caffee bar H2O** (t 312.8, s 17.8, under the awning by the
+fridge). The other is the young man leaning on his table at the
+**slastičarnica** next door (t 332.9, s 18.2, under the Corona parasol).
+`dealSmokers` picks the first grown-up with a free right hand at each
+terrace. A free hand means no phone, because a phone owns the same arm. The
+grown-up test is a *body* test. Every chair is placed at `k` 1 whichever of
+the eight bodies it is drawn with, and the first cut put a cigarette in the
+hand of a child at the slastičarnica. A body under 1.45 m now never smokes.
+beach bar MINI was tried first and dropped: its terrace is so crowded that
+the smoker could not be seen from anywhere.
+
+**The drag** (`stepSmokers`, 43-jadrija.js). This is `holdPhone`'s two-bone
+solve, moved from the ear to the mouth and back.
+
+- **The cigarette is read off the fingers**, from the palette about to be
+  drawn. It is 84 × 7.8 mm, with filter, paper, ash and coal, held between
+  the index and middle fingers. It cannot come away from the hand.
+- **The hand is solved as a frame.** Two directions define it: the way the
+  gripping fingers point, and the cigarette's axis. At the lips the wrist is
+  worked back from where the filter must be, 6 mm inside the lips.
+- **The lips are measured off each body's mesh.** The head bone sits at
+  nose height, so the lips are 34 mm under the most forward midline vertex,
+  scaled with the body. They are turned with the head, so a sitter bowed over
+  a table takes the cigarette to where their mouth actually is.
+- **The timing.** Every 20–40 s, jittered per person, the hand comes up
+  (0.85 s), holds at the lips (1.5 s) and comes down (1.0 s). The first drag
+  comes 4–14 s after you arrive. The coal goes from dull red to orange-yellow
+  in a third of a second and dies back over 1.3 s. The exhale starts 0.3 s
+  after the hand leaves the mouth and lasts 1.5 s.
+- **Measured.** The filter is 6.4 mm from the lip point at every held frame,
+  against 6 mm asked for. The fingers stay at least 17 mm clear of the nose
+  tip.
+
+**The smoke** (new `src/43-smoke.js`). Everything is one instanced draw.
+Particles are sorted back to front on the CPU with an insertion sort and
+drawn with plain alpha blending, from a pool of 224 (about 150 live with
+both smokers in view).
+
+- **Motion.** Buoyancy decays as the smoke cools (0.42 m/s², e-folding
+  1.1 s). A two-octave analytic curl field, divergence-free, ramps in with
+  age, so the wisp is a straight thread for its first ~15 cm and then curls.
+  The drift is 3.1 % of the true wind, with the flag's own gusts and wander:
+  the flag's surface share multiplied by a terrace's lee.
+- **The thread.** Young wisp particles are laid along their screen-space
+  motion and stretched over the gap to the next one. The first cut was a
+  string of six beads over the coal.
+- **Light.** Each sprite is lit by the sun with a Henyey–Greenstein phase
+  (g 0.6), shadowed through the scene's shadow map, and filled from sky and
+  ground. The side-stream wisp is blue-grey and the exhale is white-grey. In
+  the first cut, against an 18.6 h sun, the exhale was an opaque white ball;
+  it is now held to 2.6× isotropic.
+- **Soft edges without a depth buffer.** The world renders in one pass
+  straight into the AO target, and has no depth texture at all with AO off,
+  so sprites fade analytically instead. They fade against two spheres per
+  smoker (face and skull), measured along each pixel's ray, and against an
+  awning height. Sprite edges come from a baked, mipmapped noise sprite that
+  is exactly zero before the quad's edge.
+
+**Cost** (RTX 4090 laptop, both smokers in view): `stepSmokers` is
+0.09–0.16 ms a frame, of which the smoke simulation is 0.05–0.09 ms. The
+frame time is 20.2 ms with the smokers on and 21.6 ms with them off
+(`smokeCfg().near = 0`), which is noise. Out of range it costs 0.008 ms, the
+two clocks and a distance test, and it draws nothing. Nothing is simulated
+or drawn past 30 m.
+
+**Unchanged:** 792 blockers, 100 people, census, café settle 21 done / 0
+failed, hammock frame (−1923.174, 4.138, 443.162). The smoker's right arm is
+left alone by the crowd's hand rest (`handsPose`) the way a phone holder's
+is, and they greet with the left.
+
+**Probe:** `__fr.jad.raw().smokers()` gives who, phase, ember, the lip gap
+and nose clearance, particle count and ms. `smokeNow(n)` forces a drag.
+`smokeCfg()` gives the live numbers.
+
 ## [1.545.1] — 2026-09-28
 
 ### The cars' near tier ships, as a kit
