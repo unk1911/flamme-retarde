@@ -1638,6 +1638,81 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * A turned solid with the PROFILE's normals: `prof` is `[w, r]` rings along
+   * an axis, and `F(x, y, w)` puts a point of the section plane at `w` into the
+   * world — so the axis can stand up, or lie along the shore, or point out to
+   * sea. `sec` squashes the section to an ellipse, and `r` is then a scale on
+   * it rather than metres.
+   *
+   * `tubeTS` with a radius per ring (the gas bottles, 1.547.1) is smooth round
+   * the axis but not along it: its normals are perpendicular to the path, so a
+   * cap, a flange top or the nose of a lamp housing is lit as if it were the
+   * side of a pipe. These are the normals the profile actually has — from
+   * `(dw, -dr)` per segment, averaged across a ring where the profile turns by
+   * less than `crease` (a cosine) and kept apart where it turns harder, so a
+   * rolled rim is soft and the edge of a flange plate is an edge. A ring of
+   * zero radius closes the end with triangles, and its normal is the axis.
+   *
+   * `F` has to be rigid (the shore frame is, over a metre); the winding is
+   * `tubeTS`'s, checked against the normals, so either handedness of `F` works.
+   */
+  function spinIn(F, prof, col, sides = 20, sec = [1, 1], sh = 0.12, crease = 0.5) {
+    const n = prof.length, [ea, eb] = sec;
+    const seg = [];
+    for (let k = 0; k < n - 1; k++) {
+      const dr = prof[k + 1][1] - prof[k][1], dw = prof[k + 1][0] - prof[k][0];
+      const L = Math.hypot(dr, dw) || 1;
+      seg.push([dw / L, -dr / L]);
+    }
+    const endN = (k, e) => {
+      const m = seg[k], j = e ? k + 1 : k - 1;
+      if (j < 0 || j >= n - 1) return m;
+      const o = seg[j];
+      if (m[0] * o[0] + m[1] * o[1] < crease) return m;
+      const x = m[0] + o[0], y = m[1] + o[1], L = Math.hypot(x, y) || 1;
+      return [x / L, y / L];
+    };
+    const row = (k, m) => {
+      const out = [], [w, r] = prof[k];
+      for (let i = 0; i < sides; i++) {
+        const q = (i / sides) * TAU, c = Math.cos(q), s = Math.sin(q);
+        const x = r * ea * c, y = r * eb * s;
+        const P = F(x, y, w);
+        // The ellipse's own normal: (b cos, a sin) round it, a·b along it.
+        let nx = eb * c * m[0], ny = ea * s * m[0], nw = ea * eb * m[1];
+        const L = Math.hypot(nx, ny, nw) || 1;
+        nx /= L; ny /= L; nw /= L;
+        const Q = F(x + nx * 1e-3, y + ny * 1e-3, w + nw * 1e-3);
+        let X = Q[0] - P[0], Y = Q[1] - P[1], Z = Q[2] - P[2];
+        const M = Math.hypot(X, Y, Z) || 1; X /= M; Y /= M; Z /= M;
+        const g = 1 - sh + sh * 1.6 * Math.max(-0.4, Y);
+        out.push({ P, N: [X, Y, Z], c: [col[0] * g, col[1] * g, col[2] * g] });
+      }
+      return out;
+    };
+    const face = (A, B, D) => {
+      const ex = B.P[0] - A.P[0], ey = B.P[1] - A.P[1], ez = B.P[2] - A.P[2];
+      const fx = D.P[0] - A.P[0], fy = D.P[1] - A.P[1], fz = D.P[2] - A.P[2];
+      const gx = ey * fz - ez * fy, gy = ez * fx - ex * fz, gz = ex * fy - ey * fx;
+      const out = gx * (A.N[0] + B.N[0] + D.N[0]) + gy * (A.N[1] + B.N[1] + D.N[1])
+        + gz * (A.N[2] + B.N[2] + D.N[2]);
+      if (out >= 0) b.smooth(A.P, B.P, D.P, A.N, B.N, D.N, A.c, B.c, D.c);
+      else b.smooth(A.P, D.P, B.P, A.N, D.N, B.N, A.c, D.c, B.c);
+    };
+    for (let k = 0; k < n - 1; k++) {
+      const R0 = row(k, endN(k, 0)), R1 = row(k + 1, endN(k, 1));
+      for (let i = 0; i < sides; i++) {
+        const i1 = (i + 1) % sides;
+        if (prof[k][1] > 0) face(R0[i], R0[i1], R1[i1]);
+        if (prof[k + 1][1] > 0) face(R0[i], R1[i1], R1[i]);
+      }
+    }
+  }
+  /** `spinIn` standing up at (t, s): `prof` is `[y, r]` in metres. */
+  const spinTS = (t, s, prof, col, sides, sh, crease) =>
+    spinIn((x, y, w) => W(t + x, s + y, w), prof, col, sides, [1, 1], sh, crease);
+
+  /**
    * A ladder: two stainless handrails bent over the coping, and treads. The
    * thing it buys is scale — you cannot look at a quay with a ladder on it
    * and misjudge how high above the water you are.
@@ -23680,8 +23755,86 @@ async function buildJadrija(scene) {
     if (t < JAD.beachTo + 4) continue;
     const y = surfaceY(t, LAMP.s), top = y + LAMP.post;
     clutter(t + 1.1, LAMP.s - 1.4, y, 3, (t | 0) * 7 + 1);
-    boxTS(t - 0.075, t + 0.075, LAMP.s - 0.075, LAMP.s + 0.075, y, top,
-      [0.190, 0.186, 0.178]);
+    // ── TURNED, AND NOT SAWN ──────────────────────────────────────────────
+    //
+    // Misha, 29 Sep 2026, over the frame by the mole with the flag in it:
+    // *"the trash can and the lamp-posts, are too low-poly, can u make them
+    // more advanced with more triangles/polygons?"* The column was one 150 mm
+    // square box 4.8 m tall, the arm a second box laid across the top of it,
+    // and the lantern a third box hung under that — thirty-six triangles, and
+    // at two to five metres, which is where you pass every one of them, it
+    // read as three planks of black timber nailed together.
+    //
+    // A promenade column is spun steel: a base plate bolted down to the
+    // footing, a thicker door section at the bottom with the service hatch in
+    // it, a bead, then a tapered shaft that swings over in one bend into the
+    // arm, and a luminaire on the end that is a cast shell with a bowl of
+    // diffuser under it. That, at the same place, the same 4.80 m to the top
+    // of the arm, the same 0.90 m of reach and the same black. The lantern's
+    // footprint is the old box's to a centimetre, so the glass the night
+    // lights is where it was and the same size seen from below.
+    //
+    // MEASURED: 1 564 triangles a column and 256 of glass on `lampGlow`, where
+    // it was 36 and 12; eight columns, no draw call added — every part is in
+    // the two builders it was in before. See CHANGELOG 1.548.1 for the totals.
+    const C = [0.190, 0.186, 0.178];
+    const S = LAMP.s, RB = 0.32, yA = top - 0.05, yB = yA - RB;
+    // The foot: base plate with a chamfered edge, a fillet up into the door
+    // section, and the bead where the shaft is let into it.
+    spinTS(t, S, [
+      [y + 0.002, 0.165], [y + 0.020, 0.165], [y + 0.027, 0.158],
+      [y + 0.027, 0.116], [y + 0.036, 0.104], [y + 0.070, 0.097],
+      [y + 0.540, 0.091], [y + 0.552, 0.098], [y + 0.576, 0.098],
+      [y + 0.592, 0.082],
+    ], C, 20, 0.12);
+    // Four anchor nuts on the plate, and the stud through each. Hex nuts are
+    // six flats, so `lathe` on six sides is the right tool and not a shortcut.
+    for (let k = 0; k < 4; k++) {
+      const a = (k + 0.5) * Math.PI * 0.5;
+      const bt0 = Math.cos(a) * 0.137, bs0 = Math.sin(a) * 0.137;
+      lathe(W, t + bt0, S + bs0, [[y + 0.027, 0.017], [y + 0.045, 0.017],
+        [y + 0.045, 0.008], [y + 0.058, 0.008], [y + 0.058, 0]], shade(C, 1.25), 6);
+    }
+    // The service hatch, on the side the walk is.
+    boxTS(t - 0.032, t + 0.032, S + 0.080, S + 0.094, y + 0.16, y + 0.40,
+      shade(C, 1.18));
+    // The shaft and the arm in one sweep: up, over a 0.32 m bend, and out
+    // level to the lantern, tapering all the way — 84 mm at the door section
+    // to 60 at the bend and 43 at the lantern.
+    {
+      const path = [[t, S, y + 0.56], [t, S, yB]];
+      const rad = [0.084, 0.060];
+      for (let k = 1; k <= 8; k++) {
+        const a = (k / 8) * Math.PI * 0.5;
+        path.push([t, S - RB + RB * Math.cos(a), yB + RB * Math.sin(a)]);
+        rad.push(0.060 - 0.014 * (k / 8));
+      }
+      path.push([t, S - LAMP.arm + 0.30, yA]);
+      rad.push(0.043);
+      tubeTS(path, (k) => rad[k], C, 16, [1, 0, 0], 0.12);
+    }
+    // The joint collar, a hand under the bend where the arm spigot is sleeved
+    // into the shaft. Stepped at both ends, so it is a collar and not a bulge.
+    spinTS(t, S, [[yB - 0.17, 0.059], [yB - 0.166, 0.071], [yB - 0.090, 0.071],
+      [yB - 0.086, 0.059]], C, 16, 0.12);
+    // The arm's end, over the back of the lantern: a clamp ring and a cap.
+    {
+      const ae = S - LAMP.arm + 0.30;
+      const Fa = (s0) => (x, yy, w) => W(t + x, s0 - w, yA + yy);
+      spinIn(Fa(ae + 0.16), [[0, 0.043], [0.003, 0.052], [0.052, 0.052],
+        [0.055, 0.043]], C, 16, [1, 1], 0.12);
+      spinIn(Fa(ae), [[0, 0.043], [0.010, 0.040], [0.020, 0.031],
+        [0.026, 0.017], [0.028, 0]], C, 16, [1, 1], 0.12);
+    }
+    // The lantern: a flattened lozenge, 0.58 m long, 0.236 across and 88 mm
+    // deep, rounded off at both ends — the old box's own extents, t ±0.11 and
+    // s from arm − 0.20 to arm + 0.35, give or take a centimetre. Its top is
+    // tangent to the underside of the arm.
+    spinIn((x, yy, w) => W(t + x, S - LAMP.arm + 0.37 - w, top - 0.135 + yy), [
+      [0, 0], [0.006, 0.50], [0.020, 0.78], [0.050, 0.93], [0.100, 0.99],
+      [0.160, 1.0], [0.400, 1.0], [0.480, 0.96], [0.530, 0.86],
+      [0.560, 0.68], [0.575, 0.42], [0.580, 0],
+    ], [0.620, 0.612, 0.586], 20, [0.118, 0.044], 0.16, 0.2);
     // AND YOU CANNOT WALK THROUGH IT. Twenty-one of these down the promenade
     // and not one of them registered a collider — every other thing standing on
     // this concrete does, benches and bins through `furniture` and trees
@@ -23697,26 +23850,24 @@ async function buildJadrija(scene) {
     // walks at a mast until something stops her and then slides down it is the
     // thing the report was about"). At 0.22 it reads 0.311 and she goes round.
     solid(t, LAMP.s, 0.22, 0.22, LAMP.post);
-    // The arm, cranked seaward over the promenade.
-    boxTS(t - 0.045, t + 0.045, LAMP.s - LAMP.arm, LAMP.s, top - 0.09, top,
-      [0.190, 0.186, 0.178]);
-    boxTS(t - 0.11, t + 0.11, LAMP.s - LAMP.arm - 0.20, LAMP.s - LAMP.arm + 0.35,
-      top - 0.18, top - 0.09,
-      [0.620, 0.612, 0.586], [0.215, 0.210, 0.202]);
-    // The glass, on its own buffer. Set a hair proud of the lantern's
-    // underside so the two never argue about the z-buffer.
+    // The glass, on its own buffer.
     {
       const keepB = b;
       b = lampGlow;
-      // 50 mm deep and inset, not a 20 mm plate on the underside. A lantern
-      // seen from directly below is its whole glass; seen from along the
-      // promenade at eye height — which is how a walker sees every one of them
-      // except the one over his head — it is the SIDES of that glass, and a
-      // 20 mm edge is two pixels at forty metres. Inset 15 mm inside the
-      // housing so all four sides show under its rim.
-      boxTS(t - 0.095, t + 0.095,
-        LAMP.s - LAMP.arm - 0.175, LAMP.s - LAMP.arm + 0.325,
-        top - 0.225, top - 0.175, [1, 1, 1]);
+      // Deep, not a plate on the underside. A lantern seen from directly below
+      // is its whole glass; seen from along the promenade at eye height —
+      // which is how a walker sees every one of them except the one over his
+      // head — it is the SIDES of that glass, and a 20 mm edge is two pixels
+      // at forty metres. So it is a refractor bowl: a lozenge 0.47 long and
+      // 0.17 across, its top tucked up inside the shell and its widest girth
+      // hanging below it, down to top − 0.225, which is where the old 50 mm
+      // box's bottom was. It comes out of the shell at about − 0.163 and 80 mm
+      // off the centreline — so the lit band is visible from the side, round
+      // the whole bowl, and the shell's rim closes over it.
+      spinIn((x, yy, w) => W(t + x, S - LAMP.arm + 0.31 - w, top - 0.175 + yy), [
+        [0, 0], [0.010, 0.55], [0.035, 0.85], [0.080, 0.98], [0.140, 1.0],
+        [0.340, 1.0], [0.400, 0.97], [0.440, 0.85], [0.465, 0.55], [0.475, 0],
+      ], [1, 1, 1], 16, [0.085, 0.050], 0, 0.2);
       b = keepB;
     }
   }
@@ -28087,9 +28238,48 @@ async function buildJadrija(scene) {
         y, h: 0.49 });
       // A bin within three metres of every bench, which is where they are.
       const bt = t + 3.9;
-      post(W, bt, sb, y, y + 0.86, 0.25, AGG, 9);
-      post(W, bt, sb, y + 0.86, y + 0.94, 0.27, STAIN, 9);
-      post(W, bt, sb, y + 0.94, y + 0.99, 0.10, [0.480, 0.120, 0.110], 7);
+      // It was three open prisms: nine flats of aggregate, nine of steel and
+      // a seven-sided red puck hung in mid-air over the opening, with no top
+      // to any of them and nothing inside — the first thing in Misha's frame
+      // of 29 Sep ("the trash can ... too low-poly"), two metres from the eye.
+      //
+      // Turned now, and every part of it is a part. A precast drum of washed
+      // aggregate on a recessed foot, with one shallow band round it; a
+      // stainless collar that rolls over the lip and down inside; a black
+      // liner hanging in the opening; and the red as what it always was on
+      // these, the ashtray — a pressed cup on a cross of stainless strap,
+      // standing proud of the rim so the lid of it is at the old 0.99. Same
+      // 0.27 m radius, same height, same three colours, same blocker.
+      const RED = [0.480, 0.120, 0.110];
+      spinTS(bt, sb, [
+        [y + 0.000, 0.214], [y + 0.034, 0.214],                   // the foot, set in
+        [y + 0.034, 0.240], [y + 0.048, 0.250],                   // chamfer out
+        [y + 0.380, 0.252], [y + 0.386, 0.246], [y + 0.420, 0.246],
+        [y + 0.426, 0.253],                                       // the band
+        [y + 0.838, 0.256], [y + 0.852, 0.250],                   // chamfer in
+      ], AGG, 24, 0.10, 0.97);
+      spinTS(bt, sb, [
+        [y + 0.846, 0.249], [y + 0.852, 0.262], [y + 0.920, 0.266],
+        [y + 0.932, 0.270], [y + 0.942, 0.266], [y + 0.946, 0.256],
+        [y + 0.942, 0.246], [y + 0.925, 0.242], [y + 0.880, 0.241],
+      ], STAIN, 24, 0.18, 0.3);
+      // The liner, and the bottom of the bag where it hangs.
+      spinTS(bt, sb, [[y + 0.925, 0.241], [y + 0.900, 0.236], [y + 0.640, 0.228],
+        [y + 0.600, 0.150], [y + 0.585, 0]], [0.060, 0.062, 0.064], 24, 0.05, 0.3);
+      // The strap, two bars across the mouth.
+      for (const [dt0, ds0] of [[1, 0], [0, 1]]) {
+        tubeTS([[bt - dt0 * 0.243, sb - ds0 * 0.243, y + 0.928],
+          [bt + dt0 * 0.243, sb + ds0 * 0.243, y + 0.928]], [0.014, 0.006],
+        STAIN, 6, [ds0, dt0, 0], 0.18);
+      }
+      // The cup: a pressed bowl with a rolled lip, and the dark grille in it.
+      spinTS(bt, sb, [
+        [y + 0.922, 0], [y + 0.922, 0.060], [y + 0.930, 0.086],
+        [y + 0.972, 0.100], [y + 0.984, 0.102], [y + 0.990, 0.097],
+        [y + 0.986, 0.090], [y + 0.970, 0.085],
+      ], RED, 20, 0.12, 0.3);
+      spinTS(bt, sb, [[y + 0.970, 0.085], [y + 0.968, 0.030], [y + 0.968, 0]],
+        [0.150, 0.140, 0.130], 20, 0.04);
       runs.push({ t0: bt - 0.3, t1: bt + 0.3, s0: sb - 0.3, s1: sb + 0.3,
         y, h: 0.99 });
       clutter(t - 3.6, sb - 1.1, y, 2, (t | 0) * 13 + 5);
@@ -30310,14 +30500,31 @@ async function buildJadrija(scene) {
       if (gap(t)) continue;
       const s = WALL.s + 1.15;
       const y = surfaceY(t, s);
-      post(W, t, s, y, y + 0.16, 0.115, [0.300, 0.302, 0.298], 8);
-      post(W, t, s, y + 0.16, y + 2.92, 0.052, [0.300, 0.302, 0.298], 7);
-      // A sphere is two hemispheres, and a negative height on `dome` is the
-      // bottom one.
-      const gy = y + 3.12;
-      dome(W, t, s, gy, 0.20, 0.20, [0.760, 0.752, 0.720], 9);
-      dome(W, t, s, gy, -0.20, 0.20, [0.700, 0.694, 0.668], 9);
-      post(W, t, s, y + 2.92, gy, 0.055, [0.300, 0.302, 0.298], 7);
+      // Turned, 29 Sep 2026, in the same pass as the tall column and for the
+      // same complaint: it was an eight-sided stub, a seven-sided pole and two
+      // nine-sided domes, which is a pencil with a golf ball on it. Now a cast
+      // foot that swells and steps into the pole, a pole with a little taper,
+      // a fitter at the top with a gallery ring the globe sits in, and a globe
+      // that is round. The same 3.32 m, the same grey, the same white — lighter
+      // over the top of the globe than under it, as the two domes were.
+      const G = [0.300, 0.302, 0.298], gy = y + 3.12;
+      spinTS(t, s, [
+        [y + 0.002, 0.120], [y + 0.018, 0.120], [y + 0.026, 0.110],
+        [y + 0.090, 0.098], [y + 0.140, 0.082], [y + 0.158, 0.070],
+        [y + 0.166, 0.060], [y + 0.174, 0.054], [y + 2.860, 0.047],
+        [y + 2.866, 0.058], [y + 2.910, 0.060], [y + 2.918, 0.076],
+        [y + 2.934, 0.076], [y + 2.938, 0.060],
+      ], G, 14, 0.12, 0.4);
+      // The globe, opal: from the gallery (r 0.070 on a 0.20 sphere) round to
+      // the pole.
+      const gp = [];
+      const a0 = Math.asin(0.070 / 0.20);
+      for (let k = 0; k <= 12; k++) {
+        const a = a0 + (Math.PI - a0) * (k / 12);
+        gp.push([gy - 0.20 * Math.cos(a), k === 12 ? 0 : 0.20 * Math.sin(a)]);
+      }
+      spinIn((x, yy, w) => W(t + x, s + yy, w), gp, [0.735, 0.728, 0.697], 18,
+        [1, 1], 0.05, 0.3);
     }
   }
 
