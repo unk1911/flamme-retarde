@@ -8,6 +8,33 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.5] — 2026-09-29
+
+### The lifeguard flags go out on the mole and fly; a ladder down each flank
+
+Misha: *"this pole with the red and yellow flags, it's in the wrong spot, it
+should be on that concrete mole ... closer to the water, the whole point is
+it shows the conditions of the sea"*, with a frame from the end of the mole
+drawn on, and *"there should be 2 ladders to go into the sea ... one on each
+side of the mole"*, *"the flags should flap in the wind, like our other
+flags"*, and *"there's also an extra ladder in a weird spot that need to be
+removed"* — all four placed by coordinates he read off the console.
+
+- **The flags** (`MOLE_FLAG`): the pole is at t 258.6, s −39.3, on the centre
+  line of the mole 2.7 m short of its end, 5.4 m tall. Each flag is the
+  Croatian flag's particle cloth (`brodEnsign`) flown plain — a new `cfg.body`
+  in 59-brod.js gives it one colour — yellow over red, 0.9 × 0.58 m, stepped
+  every frame beside the shore flag. The six static panels on the column at
+  the mole's root, under the konoba's thatch, are gone.
+- **The ladders** (`MOLE_LADDERS`): the quay's stainless pool ladder, turned
+  through a right angle — `ladder(t, M)` now takes a mapping — bolted to the
+  deck at s −39.3 and down each flank face into the sea.
+- **The stray ladder**: the quay's 11 m rhythm put one at t 258, exactly
+  where the mole comes ashore, going down the face into the mole's own
+  concrete. Quay ladders now skip the mole's root (`onMoleT`). No `rng` is
+  involved, so nothing else moved: blockers 792 and both hashes, people 100,
+  cars, hammock and café settle unchanged.
+
 ## [1.548.4] — 2026-09-29
 
 ### The Bucketeer's pail and its bail, turned

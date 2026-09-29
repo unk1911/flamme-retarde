@@ -1762,9 +1762,20 @@ async function buildJadrija(scene) {
    * thing it buys is scale — you cannot look at a quay with a ladder on it
    * and misjudge how high above the water you are.
    */
-  function ladder(t) {
-    LADDERS.push(t);
-    const st = at(t), lip = st.lip;
+  // The real `tubeTS`, for `ladder` to hand its mapped points to.
+  const tubeTSq = (...a) => tubeTS(...a);
+  function ladder(t, M = null) {
+    // `M` stands the same ladder somewhere that is not the quay: `M.lip` the
+    // deck it is bolted to, and `M.p` / `M.d` carry a point and a direction
+    // from the ladder's own frame (t across it, s inland of the face, y up) to
+    // the shore's. The mole's two flanks are the one use — see MOLE_LADDERS.
+    // Only the quay's go into LADDERS, which is the dancer's barre and the
+    // bathers' way out, and both of those are measured along the quay.
+    if (!M) LADDERS.push(t);
+    const lip = M ? M.lip : at(t).lip;
+    const P = M ? M.p : (q) => q, D = M ? M.d : (v) => v;
+    const tubeTS = (pts, r, col, sides, ref = [1, 0, 0], sh) =>
+      tubeTSq(pts.map(P), r, col, sides, D(ref), sh);
     // Misha, 28 Sep 2026: *"the ladder for going into the sea, make it
     // prettier, right now looks too rigid."* It was eleven boxes: 70 mm square
     // stiles with a mitred corner at each end of the top, and flat bars for
@@ -22623,6 +22634,24 @@ async function buildJadrija(scene) {
   const PLAZA = { t0: 344, t1: 400, out: 34, bay: 4.5 };
 
   const onMoleT = (t) => t > JET.t - JET.w - 0.6 && t < JET.t + JET.w + 0.6;
+  // ── and a ladder down each flank of the mole ──────────────────────────────
+  //
+  // Misha, 29 Sep 2026, drawing on a frame from the end of it: *"there should
+  // be 2 ladders to go into the sea, as i drew them, one on each side of the
+  // mole, that's how some folks get in"* — one either side of where the
+  // flags now stand, 39 m out, where the water is deep. The quay's own
+  // stainless pool ladder (`ladder`), turned through a right angle: its `t`
+  // runs along the mole and its `s` out of the flank face.
+  const MOLE_LADDERS = [];
+  for (const side of [-1, 1]) {
+    const s0 = -39.3, face = JET.t + side * JET.w;
+    ladder(0, {
+      lip: JET.top,
+      p: (q) => [face - side * q[1], s0 + q[0], q[2]],
+      d: (v) => [-side * v[1], v[0], v[2]],
+    });
+    MOLE_LADDERS.push([face, s0, side]);
+  }
   // Two ranges, and they are deliberately different.
   //
   // `onMoleY` is where the mole's *deck* is, for `walkY`. `onMoleWalk` is where
@@ -24006,8 +24035,15 @@ async function buildJadrija(scene) {
     // up in, bolted to a quay; where the shingle runs in you simply walk out,
     // and there is not one in any frame of the west end.
     if (t < JAD.beachTo + 8) continue;
-    ladder(t);
-    if (((t / 11) | 0) % 3 === 0) ladder(t + 1.4);
+    // AND NOT WHERE THE MOLE COMES ASHORE. Misha, 29 Sep 2026, of the one at
+    // t 258: *"there's also an extra ladder in a weird spot that need to be
+    // removed"*. The quay's rhythm put it exactly on the mole's root, where
+    // there is no water to climb out of — it went down the face into the
+    // mole's own concrete. The mole has its own pair now, on its flanks (see
+    // MOLE_LADDERS). Nothing drawn here is from `rng`, so skipping it moves
+    // nothing else.
+    if (!onMoleT(t)) ladder(t);
+    if (((t / 11) | 0) % 3 === 0 && !onMoleT(t + 1.4)) ladder(t + 1.4);
     // And what got left at the top of it. The foot of a ladder is where people
     // take things off, which is why it is the densest small mess on the shore.
     if (jit(t | 0, 11) < 0.62) {
@@ -31642,34 +31678,8 @@ async function buildJadrija(scene) {
       }
     }
 
-    // The flags on the quay column at the root of the mole. Lifeguard yellow
-    // and scarlet, the pair that is up on every frame of the survey, held out
-    // by the wind that is always across this channel.
-    {
-      const ft = JET.t - JET.w - 3.2, fs = JAD.mid + 1.2;
-      const y = surfaceY(ft, fs);
-      post(W, ft, fs, y, y + 0.14, 0.13, [0.300, 0.302, 0.298], 8);
-      post(W, ft, fs, y + 0.14, y + 5.40, 0.048, [0.560, 0.556, 0.540], 7);
-      const FLAG = [[0.720, 0.600, 0.090], [0.620, 0.115, 0.095]];
-      for (let f = 0; f < 2; f++) {
-        const y0f = y + 4.70 - f * 1.15;
-        // Six panels, each a little further out and a little lower, which is
-        // what a flag in a steady breeze does and what a single quad cannot.
-        for (let i = 0; i < 6; i++) {
-          const a0 = i / 6, a1 = (i + 1) / 6;
-          const w0 = 0.90 * a0, w1 = 0.90 * a1;
-          const sag = (u) => -Math.sin(u * 2.2) * 0.13;
-          b.quad(W(ft + 0.05, fs - w0, y0f + sag(a0)),
-            W(ft + 0.05, fs - w1, y0f + sag(a1)),
-            W(ft + 0.05, fs - w1, y0f - 0.58 + sag(a1) * 0.6),
-            W(ft + 0.05, fs - w0, y0f - 0.58 + sag(a0) * 0.6),
-            i % 2 ? FLAG[f] : shade(FLAG[f], 0.90));
-        }
-      }
-    }
-
-
-
+    // The lifeguard flags that stood here, on a column at the root of the
+    // mole, are out at the end of it now and fly — see MOLE_FLAGS.
 
     // ── what is set into the quay, and what is out in front of it ────────────
     //
@@ -62775,6 +62785,55 @@ async function buildJadrija(scene) {
     furniture.push({ t: F.t, s: F.s, a: 0.2, c: 0.2, h: F.h, y: gy });
   }
 
+  // ── and the lifeguard flags, out on the mole ─────────────────────────────
+  //
+  // Misha, 29 Sep 2026: *"this pole with the red and yellow flags, it's in the
+  // wrong spot, it should be on that concrete mole ... closer to the water,
+  // the whole point is it shows the conditions of the sea"* — and *"the flags
+  // should flap in the wind, like our other flags"*. They stood on a column
+  // at the ROOT of the mole, under the konoba's thatch, as six flat panels
+  // each set in a fixed droop. Now the pole is where he put it, 39 m out on
+  // the centre line of the deck, and each flag is the Croatian flag's own
+  // cloth (`brodEnsign`, the Brod's ensign) flown plain: yellow over red, as
+  // the survey has them, 0.9 m by 0.58.
+  const MOLE_FLAG = { t: 258.6, s: -39.3, h: 5.4, r: 0.048 };
+  const moleFlags = [];
+  {
+    const F = MOLE_FLAG;
+    const gy = JET.top;
+    const foot = W(F.t, F.s, gy);
+    const pole = new THREE.Object3D();
+    pole.position.set(foot[0], foot[1], foot[2]);
+    pole.rotation.y = Math.PI - state.windDir;
+    pole.updateMatrixWorld(true);
+    const mat = solidMaterial(0xdcdcd6, { spec: 0.35, specPower: 40 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(F.r * 0.75, F.r, F.h, 12), mat);
+    shaft.position.set(foot[0], foot[1] + F.h * 0.5, foot[2]);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(F.r * 1.4, 12, 8), mat);
+    cap.position.set(foot[0], foot[1] + F.h + F.r * 0.9, foot[2]);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(F.r * 2.8, F.r * 3.2, 0.14, 14),
+      solidMaterial(0x7a7b78, { spec: 0.2, specPower: 30 }));
+    base.position.set(foot[0], foot[1] + 0.07, foot[2]);
+    for (const m of [shaft, cap, base]) { m.name = 'moleflag:pole'; scene.add(m); }
+    const off = F.r * 0.8 + 0.03;
+    const COL = [[0.720, 0.600, 0.090], [0.620, 0.115, 0.095]];
+    for (let f = 0; f < 2; f++) {
+      const c = COL[f].map((v) => v.toFixed(3)).join(', ');
+      const flag = brodEnsign({
+        name: 'moleflag:cloth',
+        E: { fly: 0.90, hoist: 0.58, near: 300 },
+        head: new THREE.Vector3(-off, F.h - 0.70 - f * 1.15, 0),
+        mastF: off,
+        mastR: F.r * 0.8 + 0.01,
+        body: 'n = gl_FrontFacing ? n : -n; base = vec3(' + c + ');',
+      });
+      flag.pole = pole;
+      scene.add(flag.mesh);
+      moleFlags.push(flag);
+    }
+    furniture.push({ t: F.t, s: F.s, a: 0.2, c: 0.2, h: F.h, y: gy });
+  }
+
   /**
    * Walk the walkers, then pose everybody.
    *
@@ -62852,6 +62911,7 @@ async function buildJadrija(scene) {
     // And her hair in your hand, over either — see `pullTick`.
     pullTick(dt);
     if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
+    for (const f of moleFlags) f.step(dt, f.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
 
     if (skinFig) {
