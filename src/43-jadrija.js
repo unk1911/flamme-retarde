@@ -28098,29 +28098,233 @@ async function buildJadrija(scene) {
     // Two beach showers. A cobalt post with two roses, and a mint screen beside
     // it — both of them photographed, and both of them the only saturated
     // colour on this stretch of concrete.
+    //
+    // Misha, 29 Sep 2026: *"the outdoor showers in front of maslina and
+    // elsewhere if they exist, also look too primitive. need more polygons
+    // for them."* There are two, and they were eleven flat-shaded prisms
+    // apiece: an eight-sided post, two roses that were a square bar with a
+    // square block hung off the end, a 6 cm stainless tile for a base, a mint
+    // slab 8 cm thick on two six-sided stubs, and a gooseneck that was a box.
+    // In his screenshot, from four metres, every corner shows and the two
+    // roses read as door handles.
+    //
+    // What stands on a Dalmatian promenade is a turned thing: a round column
+    // bolted down through a flange onto a small precast pad with a drain in
+    // it, chromed arms out of a tee collar bent down into a dish rose, a push
+    // valve at hand height, a foot tap down by the ankles, and the screen a
+    // sheet of compact laminate — 30 mm, corners radiused, the dark core
+    // showing at the edge — clamped to two round posts. So that is what this
+    // is. Every NUMBER that places it is the one it shipped with: the same t
+    // (beachTo + 46 and jetty + 96) and s (mid + 1.0), the 2.20 m column at
+    // r 0.055, the roses 0.34 m out with their faces at 1.31 and 1.53, the
+    // screen 1.6 by 1.8 m from 0.30 to 2.10 at t + 1.5 inside its old
+    // s + 0.30..0.38, the gooseneck over it out to s − 0.02. The two `runs`
+    // are untouched, so the blockers hash is the old one.
+    //
+    // ONE change of placement, to the roses' headings only: they were one
+    // directly above the other, so the upper one rained onto the lower one's
+    // arm. Swung 22° either side of seaward, the tips still 0.34 m out.
+    //
+    // AND THE WEST ONE STANDS ON THE KONOBA'S TERRACE. It was put at 251
+    // when the konoba stood elsewhere (see `keep`), and the konoba's raised
+    // floor — 117 to 287 mm over the deck, `konobaFloor` — now runs under it,
+    // so the old post and the screen's legs simply went into the paving at
+    // the deck's height, which nobody saw while there was nothing at the foot
+    // to see. A flange and a pad would have been buried, or the pad hung off
+    // the kerb. So a shower inside `konobaPad` is built off the terrace's
+    // level and gets no pad of its own: the terrace is the pad.
+    //
+    // Smooth throughout — `knLathe` for anything turned about the vertical,
+    // `tubeTS` for pipe — and no `rng()` draw, so nothing east of here moves.
+    const CHROME = [0.640, 0.648, 0.640];
+    // The pad's precast. 0.545 grey, the plinth's family, rendered near-white
+    // against the deck around it: the pad is in `up`, which carries the 0.22
+    // bounce the deck's own buffer does not, so a flat top in `up` reads a
+    // good fifth brighter than the same number on the ground. Taken down and
+    // warmed until it sits in the deck as a slightly paler slab.
+    const PAD = [0.430, 0.405, 0.360];
+    const turnV = (tg, gs, prof, col, sides) => knLathe(W, tg, gs, prof, col, sides);
     for (const t of [JAD.beachTo + 46, JAD.jetty + 96]) {
       const ss = JAD.mid + 1.0, y = surfaceY(t, ss);
-      post(W, t, ss, y, y + 2.20, 0.055, COBALT, 8);
-      for (const hh of [1.40, 1.62]) {
-        boxTS(t - 0.045, t + 0.045, ss - 0.34, ss - 0.02, y + hh, y + hh + 0.05,
-          [0.640, 0.648, 0.640]);
-        post(W, t, ss - 0.34, y + hh - 0.09, y + hh, 0.055, [0.640, 0.648, 0.640], 7);
+      const K = konobaPad;
+      const onTerrace = !!K && t > K.t0 && t + 2.4 < K.t1 && ss > K.s0 && ss < K.s1;
+      const yb = onTerrace ? K.y : y;          // what the feet of it stand on
+      // The shore frame's inland direction in world, for the flat faces that
+      // need an outward normal handed to them (`knTri`).
+      const O = W(t, ss, y), Sd = W(t, ss + 1, y);
+      const SN = [Sd[0] - O[0], 0, Sd[2] - O[2]];
+      const UP = [0, 1, 0], DN = [0, -1, 0];
+      // In-plan polar about the column: heading `a` is 0 seaward (−s) and
+      // positive towards +t, which is the screen's side.
+      const ps = (a, r) => [t + Math.sin(a) * r, ss - Math.cos(a) * r];
+
+      // The pad: 1.1 by 1.0 m of precast, 2 cm proud, corners radiused in
+      // plan, the dark of where the roses have been running all day, and a
+      // stainless drain grate at the seaward edge of the wet.
+      if (!onTerrace) {
+        knRR(W, t - 0.55, t + 0.55, ss - 0.80, ss + 0.20, y - 0.03, y + 0.02, 0.07, 0,
+          PAD, shade(PAD, 1.04));
+        const ws = ss - 0.36, M = 18, yw = y + 0.023, WET = shade(PAD, 0.66);
+        const C = W(t, ws, yw);
+        const q = (a) => {
+          const r = 1 + 0.10 * Math.sin(a * 3 + t) + 0.06 * Math.sin(a * 5 + 1.3);
+          return W(t + Math.sin(a) * 0.40 * r, ws - Math.cos(a) * 0.34 * r, yw);
+        };
+        for (let k = 0; k < M; k++) knTri(C, q((k / M) * TAU), q(((k + 1) / M) * TAU), UP, WET);
+        const gt = t + 0.05, gs = ss - 0.58, yg = y + 0.028, SLOT = [0.06, 0.06, 0.06];
+        boxTS(gt - 0.11, gt + 0.11, gs - 0.11, gs + 0.11, y + 0.018, y + 0.027, STAIN,
+          shade(STAIN, 1.10));
+        for (let i = -3; i <= 3; i++) {
+          const u = gt + i * 0.028;
+          knTri(W(u - 0.008, gs - 0.085, yg), W(u + 0.008, gs - 0.085, yg),
+            W(u + 0.008, gs + 0.085, yg), UP, SLOT);
+          knTri(W(u - 0.008, gs - 0.085, yg), W(u + 0.008, gs + 0.085, yg),
+            W(u - 0.008, gs + 0.085, yg), UP, SLOT);
+        }
       }
-      boxTS(t - 0.06, t + 0.06, ss - 0.10, ss + 0.10, y, y + 0.06, STAIN);
+      const y0 = onTerrace ? yb - 0.02 : y;   // the pad's face is y + 0.02
+
+      // The column: a stainless flange with four bolts, the cobalt tube, a
+      // domed cap.
+      turnV(t, ss, [[y0 + 0.018, 0], [y0 + 0.018, 0.104], [y0 + 0.028, 0.108],
+        [y0 + 0.038, 0.094], [y0 + 0.048, 0.066], [y0 + 0.068, 0.058]], STAIN, 18);
+      for (let k = 0; k < 4; k++) {
+        const [bt, bs] = ps(Math.PI / 4 + k * Math.PI / 2, 0.084);
+        turnV(bt, bs, [[y0 + 0.030, 0.012], [y0 + 0.043, 0.012], [y0 + 0.046, 0]],
+          shade(STAIN, 0.9), 6);
+      }
+      turnV(t, ss, [[y0 + 0.050, 0.055], [y + 2.150, 0.055], [y + 2.178, 0.047],
+        [y + 2.196, 0.024], [y + 2.200, 0]], COBALT, 20);
+
+      // The two roses. Each comes out of a stainless tee collar on the column,
+      // runs out level and turns down through a 6 cm bend into the rose — a
+      // turned dish, 13 cm across, its face drilled in two rings and a centre.
+      for (const [hh, a] of [[1.40, -0.38], [1.62, 0.38]]) {
+        const yA = y + hh + 0.025, yF = y + hh - 0.09, BR = 0.06;
+        turnV(t, ss, [[yA - 0.032, 0.058], [yA - 0.026, 0.063], [yA + 0.026, 0.063],
+          [yA + 0.032, 0.058]], STAIN, 14);
+        const path = [];
+        for (const r of [0.03, 0.074, 0.080]) {
+          const [pt, pp] = ps(a, r); path.push([pt, pp, yA]);
+        }
+        for (let k = 0; k <= 4; k++) {
+          const f = (k / 4) * (Math.PI / 2);
+          const [pt, pp] = ps(a, 0.34 - BR + BR * Math.sin(f));
+          path.push([pt, pp, yA - BR + BR * Math.cos(f)]);
+        }
+        { const [pt, pp] = ps(a, 0.34); path.push([pt, pp, yF + 0.050]); }
+        tubeTS(path, (k) => (k < 2 ? 0.023 : 0.016), CHROME, 8,
+          [Math.cos(a), Math.sin(a), 0], 0.18);
+        const [rt, rs] = ps(a, 0.34);
+        turnV(rt, rs, [[yF, 0], [yF, 0.058], [yF + 0.008, 0.066], [yF + 0.020, 0.059],
+          [yF + 0.036, 0.030], [yF + 0.060, 0.019], [yF + 0.061, 0]], CHROME, 14);
+        // The face, drilled: a centre and rings of 7 and 13.
+        const HOLE = [0.10, 0.11, 0.12], yh = yF - 0.0012, d = 0.0045;
+        for (const [n, rr] of [[1, 0], [7, 0.023], [13, 0.044]]) {
+          for (let i = 0; i < n; i++) {
+            const qq = (i / n) * TAU + rr * 20;
+            const ht = rt + Math.cos(qq) * rr, hs = rs + Math.sin(qq) * rr;
+            knTri(W(ht - d, hs - d, yh), W(ht + d, hs - d, yh), W(ht + d, hs + d, yh), DN, HOLE);
+            knTri(W(ht - d, hs - d, yh), W(ht + d, hs + d, yh), W(ht - d, hs + d, yh), DN, HOLE);
+          }
+        }
+      }
+
+      // The push valve at hand height, seaward, where you lean on it with the
+      // other hand already in your hair: a chrome body, a rim, a domed button.
+      // And the foot tap by the ankles, turned away towards −t so the sandy
+      // foot is not under the rose: its own smaller button over a stubby
+      // spout that bends down.
+      const valve = (a, yv, k0) => {
+        const pts = [], R = [];
+        for (const [r, rad] of [[0.040, 0.026], [0.082, 0.026], [0.086, 0.029],
+          [0.094, 0.028], [0.100, 0.019], [0.108, 0.014], [0.112, 0.0005]]) {
+          const [pt, pp] = ps(a, r * k0 + 0.055 * (1 - k0)); pts.push([pt, pp, yv]); R.push(rad * k0);
+        }
+        tubeTS(pts, (k) => R[k], CHROME, 10, [0, 0, 1], 0.20);
+      };
+      valve(0, y + 1.05, 1);
+      valve(-0.9, y + 0.62, 0.8);
+      {
+        const a = -0.9, yS = y + 0.46, sp = [];
+        for (const r of [0.04, 0.070, 0.074, 0.082]) {
+          const [pt, pp] = ps(a, r); sp.push([pt, pp, yS]);
+        }
+        for (let k = 1; k <= 3; k++) {
+          const f = (k / 3) * (Math.PI / 2);
+          const [pt, pp] = ps(a, 0.082 + 0.03 * Math.sin(f));
+          sp.push([pt, pp, yS - 0.03 + 0.03 * Math.cos(f)]);
+        }
+        { const [pt, pp] = ps(a, 0.112); sp.push([pt, pp, yS - 0.052]); }
+        tubeTS(sp, (k) => (k < 2 ? 0.020 : k === sp.length - 1 ? 0.013 : 0.011),
+          CHROME, 10, [Math.cos(a), Math.sin(a), 0], 0.18);
+      }
+
       // The post itself, which was drawn and not blocked while the mint screen
       // beside it was blocked — so the one saturated upright on three hundred
       // metres of concrete was the one you could stand inside.
       runs.push({ t0: t - 0.07, t1: t + 0.07, s0: ss - 0.07, s1: ss + 0.07,
         y, h: 2.20 });
-      // The screen: a panel on two legs, a gooseneck over the top of it.
-      const st2 = t + 1.5;
-      boxTS(st2 - 0.80, st2 + 0.80, ss + 0.30, ss + 0.38, y + 0.30, y + 2.10,
-        MINT, shade(MINT, 1.08));
-      for (const o of [-0.72, 0.72]) {
-        post(W, st2 + o, ss + 0.34, y, y + 0.34, 0.045, STAIN, 6);
+
+      // The screen: a 30 mm panel on a 7 cm corner radius, two round posts
+      // behind it, and a gooseneck over the top of it. The panel's faces are
+      // at s + 0.325 and 0.355 and the posts' backs at s + 0.412, all inside
+      // the run below.
+      const st2 = t + 1.5, sA = ss + 0.325, sB = ss + 0.355, sP = ss + 0.388;
+      {
+        const p0 = y + 0.30, p1 = y + 2.10, h0 = st2 - 0.80, h1 = st2 + 0.80, rc = 0.07;
+        const L = [];
+        const CO = [[h1 - rc, p1 - rc, 0], [h0 + rc, p1 - rc, 1], [h0 + rc, p0 + rc, 2],
+          [h1 - rc, p0 + rc, 3]];
+        for (const [cu, cv, q] of CO) {
+          for (let i = 0; i <= 5; i++) {
+            const f = (q + i / 5) * (Math.PI / 2);
+            L.push([cu + Math.cos(f) * rc, cv + Math.sin(f) * rc]);
+          }
+        }
+        const mid = W(st2, (sA + sB) / 2, (p0 + p1) / 2);
+        knSurf([L.map(([u, v]) => W(u, sA, v)), L.map(([u, v]) => W(u, sB, v))],
+          shade(MINT, 0.55), { wrap: true, out: () => mid });
+        const cA = W(st2, sA, (p0 + p1) / 2), cB = W(st2, sB, (p0 + p1) / 2);
+        const NA = [-SN[0], 0, -SN[2]];
+        for (let j = 0; j < L.length; j++) {
+          const [u0, v0] = L[j], [u1, v1] = L[(j + 1) % L.length];
+          knTri(cA, W(u0, sA, v0), W(u1, sA, v1), NA, MINT);
+          knTri(cB, W(u0, sB, v0), W(u1, sB, v1), SN, shade(MINT, 0.96));
+        }
       }
-      post(W, st2, ss + 0.34, y + 2.10, y + 2.24, 0.04, STAIN, 6);
-      boxTS(st2 - 0.04, st2 + 0.04, ss - 0.02, ss + 0.34, y + 2.20, y + 2.24, STAIN);
+      for (const o of [-0.72, 0.72]) {
+        const pt = st2 + o;
+        turnV(pt, sP, [[yb + 0.004, 0.056], [yb + 0.014, 0.056], [yb + 0.024, 0.034],
+          [yb + 0.032, 0]], STAIN, 12);
+        turnV(pt, sP, [[yb + 0.030, 0.024], [y + 1.998, 0.024], [y + 2.012, 0.012],
+          [y + 2.014, 0]], STAIN, 12);
+        // Two clamps a post, each a band and a short round stand-off into
+        // the back of the panel.
+        for (const yc of [y + 0.48, y + 1.90]) {
+          turnV(pt, sP, [[yc - 0.026, 0.029], [yc + 0.026, 0.029]], shade(STAIN, 0.92), 12);
+          tubeTS([[pt, sP - 0.015, yc], [pt, sB - 0.004, yc]], 0.012, STAIN, 8,
+            [1, 0, 0], 0.18);
+        }
+      }
+      // The gooseneck: up out of the panel's top edge, over in one bend and
+      // down through a second into a small rose over the seaward side.
+      {
+        const gy = y + 2.18, gp = [[st2, ss + 0.34, y + 2.06], [st2, ss + 0.34, gy - 0.07]];
+        for (let k = 1; k <= 3; k++) {
+          const f = (k / 3) * (Math.PI / 2);
+          gp.push([st2, ss + 0.27 + 0.07 * Math.cos(f), gy - 0.07 + 0.07 * Math.sin(f)]);
+        }
+        for (let k = 0; k <= 3; k++) {
+          const g = Math.PI / 2 + (k / 3) * (Math.PI / 2);
+          gp.push([st2, ss + 0.03 + 0.05 * Math.cos(g), gy - 0.05 + 0.05 * Math.sin(g)]);
+        }
+        gp.push([st2, ss - 0.02, gy - 0.075]);
+        tubeTS(gp, 0.015, STAIN, 10, [1, 0, 0], 0.18);
+        const yR = gy - 0.115;
+        turnV(st2, ss - 0.02, [[yR, 0], [yR, 0.040], [yR + 0.008, 0.045],
+          [yR + 0.022, 0.028], [yR + 0.046, 0.016], [yR + 0.047, 0]], CHROME, 12);
+      }
       runs.push({ t0: st2 - 0.85, t1: st2 + 0.85, s0: ss + 0.26, s1: ss + 0.42,
         y, h: 2.10 });
     }
