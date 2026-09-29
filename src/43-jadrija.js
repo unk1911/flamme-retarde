@@ -32084,39 +32084,43 @@ async function buildJadrija(scene) {
         who: '*' });
 
       // The towels, in the survey's colours and then some: a mole is where
-      // everybody's towel is out at once, and every one of them in every
-      // frame is striped. 1.72 m by 0.78, which is a beach towel, in three
-      // panels so it lies like cloth, with a band across each end.
+      // everybody's towel is out at once. `beachTowel` (soft, hemmed,
+      // rucked, striped or banded or bordered off its key), 1.72 m by 0.78,
+      // which is a beach towel, laid under the body; and by most of them the
+      // other things a person brings out on to a mole and puts down beside
+      // them — a pair of flip-flops or slides, or a bag.
       const MT = [[0.600, 0.180, 0.160], [0.155, 0.330, 0.560],
         [0.700, 0.640, 0.240], [0.190, 0.460, 0.350], [0.660, 0.400, 0.520],
         [0.860, 0.470, 0.180], [0.120, 0.520, 0.620], [0.520, 0.200, 0.420],
         [0.900, 0.860, 0.780]];
-      b = deck;
+      const KIT = [[0.520, 0.180, 0.190], [0.130, 0.200, 0.400],
+        [0.850, 0.830, 0.780], [0.180, 0.180, 0.190], [0.250, 0.520, 0.600]];
       MOLE_LIFE.spots.forEach((o, i) => {
         if (!o.towel) return;
         const col = MT[((jit(i, 5103) * 97) | 0) % MT.length];
-        const band = MT[((jit(i, 5104) * 89 + 3) | 0) % MT.length];
-        const y = o.y - (o.pose === 'lie' ? 0.06 : 0) + 0.012;
+        const y = o.y - (o.pose === 'lie' ? 0.06 : 0);
         // Centred under the body: soles at the spot, head LIE_LEN back.
         const c = Math.cos(o.ang), sn = Math.sin(o.ang);
         const mid = o.pose === 'lie' ? -0.74 : 0.10;
         const ct = o.t + c * mid, cs = o.s + sn * mid;
-        // `facing` runs its local ds along (-sin, cos) of its angle, so an
-        // angle a quarter turn on from the body's bearing lays the length of
-        // the towel along the body.
-        const P = facing(ct, cs, o.ang + Math.PI / 2);
-        const HL = 0.86, HW = 0.39;
-        for (let p = 0; p < 3; p++) {
-          const d0 = -HL + p * (2 * HL / 3), d1 = d0 + 2 * HL / 3;
-          const wob = (jit(i * 3 + p, 5105) - 0.5) * 0.05;
-          b.quad(P(-HW, d0, y + wob * 0.1), P(HW, d0, y - wob * 0.1),
-            P(HW, d1, y + wob * 0.1), P(-HW, d1, y - wob * 0.1),
-            p === 1 ? col : shade(col, 0.93));
-        }
-        for (const e of [-1, 1]) {
-          const d0 = e * (HL - 0.16), d1 = e * (HL - 0.08);
-          b.quad(P(-HW, d0, y + 0.002), P(HW, d0, y + 0.002),
-            P(HW, d1, y + 0.002), P(-HW, d1, y + 0.002), band);
+        // `tsFrame` runs `dz` along (-sin, cos) of its angle, so a quarter
+        // turn back from the body's bearing lays the towel's length along it.
+        const F = tsFrame(ct, cs, o.ang - Math.PI / 2);
+        b = deck;
+        beachTowel(F, y, 0.39, 0.86, col, 5200 + i * 7);
+        b = up;
+        // Beside it and off the towel: sandals by the feet, or a bag by the
+        // head.
+        const kit = jit(i, 5107);
+        const side = 0.62 * (jit(i, 5108) < 0.5 ? -1 : 1);
+        if (kit < 0.55) {
+          const G = subFrame(F, side, o.pose === 'lie' ? 0.62 : -0.5, (jit(i, 5109) - 0.5) * 0.8);
+          sandalPair(G, y, kit < 0.3 ? 0 : 1, KIT[((jit(i, 5111) * 53) | 0) % KIT.length],
+            KIT[((jit(i, 5112) * 31) | 0) % KIT.length], 5300 + i);
+        } else if (kit < 0.85) {
+          const G = subFrame(F, side, o.pose === 'lie' ? -0.55 : 0.4, (jit(i, 5109) - 0.5) * 1.2);
+          beachBag(G, y, 0.20, 0.13, 0.22, KIT[((jit(i, 5113) * 67) | 0) % KIT.length],
+            [0.140, 0.140, 0.145], 5400 + i);
         }
         // A book, open and face down or face up, at the head end: a
         // sunbather on her front reads with the book on the towel in front
@@ -42815,8 +42819,10 @@ async function buildJadrija(scene) {
   // SUNGLASSES ride the head bone. Built in the head's BIND frame off this
   // body's own measured eyes (`bather2Eyes`), then carried by `boneAt` and
   // `boneTurn` — a rigid attachment, which is what a pair of glasses is. Two
-  // dark lenses 5.4 cm by 3.8 standing 1.4 cm proud of the eyes, a bridge,
-  // and the arms back to the ears.
+  // dark lenses 5.4 cm by 3.8, a bridge, and the arms back to the ears. The
+  // lenses stand 3 cm forward of the eyeball centres and not 1.4: the brow
+  // and the cheek are proud of the eye, and at 1.4 they cut both lenses into
+  // two black crescents, photographed at a metre.
   //
   // A PAPERBACK sits between the hands of somebody sitting on a towel with
   // their legs out (`sitquay` with its legs laid, see `legRestOf`): the clip
@@ -42838,7 +42844,7 @@ async function buildJadrija(scene) {
     const pos = [];
     const quad = (a, b, c, d) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
     if (E && E.l.y > -50) {
-      const eyeY = (E.l.y + E.r.y) / 2, eyeX = (E.l.x + E.r.x) / 2 + 0.014;
+      const eyeY = (E.l.y + E.r.y) / 2, eyeX = (E.l.x + E.r.x) / 2 + 0.030;
       for (const e of [E.l, E.r]) {
         const cz = e.z;
         const N = 10;
@@ -42848,7 +42854,7 @@ async function buildJadrija(scene) {
           quad([eyeX, eyeY - 0.004, cz], p(a0), p(a1), p(a1));
         }
       }
-      const zl = E.l.z, zr = E.r.z, zo = Math.max(Math.abs(zl), Math.abs(zr)) + 0.030;
+      const zl = E.l.z, zr = E.r.z, zo = Math.max(Math.abs(zl), Math.abs(zr)) + 0.044;
       const sz = Math.sign(zl) || 1;
       // The bridge and the top bar, and each arm back to the ear.
       quad([eyeX, eyeY + 0.012, zr], [eyeX, eyeY + 0.012, zl],
@@ -60700,8 +60706,12 @@ async function buildJadrija(scene) {
       const i = left.find((j) => cls(kindOf(j)) === o.who);
       if (i != null) put(o, i);
     }
+    // Nearest the house first, so that if there are fewer people than
+    // places the ones left empty are the ones he cannot see.
+    const byNear = MOLE_LIFE.spots.slice().sort((a2, c) =>
+      Math.hypot(a2.t - VIK.t, a2.s - VIK.s) - Math.hypot(c.t - VIK.t, c.s - VIK.s));
     for (const pass of [0, 1]) {
-      for (const o of MOLE_LIFE.spots) {
+      for (const o of byNear) {
         if (o.idx != null || (pass === 0 && o.who !== '*')) continue;
         if (!left.length) break;
         put(o, left[0]);

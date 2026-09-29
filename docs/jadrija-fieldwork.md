@@ -107,6 +107,17 @@ Past the kabine the peninsula has a **new promenade** — a bright near-white
 slab plaza on a wide expansion grid, rows of cream parasols, timber picnic
 benches, young pines in square tree pits, a bar, and the kiosk.
 
+**The moles are where people are.** `20260821_175838` looks down the main
+one at ten to six and counts nineteen on it: groups sitting on towels near
+the head, towels laid along it rather than across it, two standing at the
+edge, a boy in red trunks running for the water. `20260821_175752` has the
+flank of the other one with a girl climbing its ladder, eight heads in the
+water beside it and people standing at its edge looking in. `1000149597` at
+250 s is two women on towels laid straight on the concrete, one of them in
+sunglasses, with their things beside them. People on a mole sit at its edges
+and lie on towels in twos and threes; the children are in the water off it
+and on the ladder. See `MOLE_LIFE` in `src/43-jadrija.js`.
+
 ## The shop
 
 **Slastičarnica Jadrija, 1974.** Sladoled 2,50 € a kugla, cones 1,00 €, caffè
