@@ -5,8 +5,10 @@
 
 Writes, for each of five body types, ``build/payload/car_<name>.fr3d.gz``,
 ``car_<name>_gloss.fr3d.gz`` and ``car_<name>_trim.fr3d.gz``, plus one sidecar
-``build/payload/cars.json`` holding the extents. ``build.py`` inlines all three
-kinds; the ``.json`` goes in verbatim, so ``PAYLOAD.cars`` is a plain object the
+``build/payload/cars.json`` holding the extents. And the near KIT (see
+``NEAR_GLOSS``): ``car_<name>_nglass`` and ``car_<name>_ndet`` per body type
+and one ``car_wheel_<key>`` per wheel, quantised (``export_q``). ``build.py``
+inlines all of them; the ``.json`` goes in verbatim, so ``PAYLOAD.cars`` is a plain object the
 shore build can read **synchronously** — which it has to, because the walk
 blockers are pushed hundreds of lines before any blob is inflated.
 
@@ -111,7 +113,7 @@ import bpy  # type: ignore
 
 sys.path.append(str(Path(__file__).resolve().parent))
 
-from frmesh import TAU, export, new_object, reset_scene  # noqa: E402
+from frmesh import TAU, export, export_q, new_object, reset_scene  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[2] / "build" / "payload"
 
@@ -215,7 +217,47 @@ BUCKETS = {
     "dash": (DASH, True, "trim"),
     "ink": (INK, False, "trim"),
     "hrred": (HRRED, False, "trim"),
+    "screen": (PIANO, False, "trim"),     # the dash's screen: gloss black, but in the cabin
 }
+
+# ── the near KIT (28 Sep, third pass) ──────────────────────────────────────
+#
+# The near tier of the second pass was a second copy of everything that is not
+# paint — the shell's glass, lamps, plastics and underside, the plates, the
+# mirrors — rebaked with more in it, and swapped for the far one at 40 m. It
+# was 1.14 MB of page and too many draws, and it did not ship. What ships is
+# the near tier as a KIT: only what the far tier does not already have, drawn
+# ON TOP of the far tier, which is now drawn at every distance.
+#
+#   car_<name>_nglass   the see-through panes, as before;
+#   car_<name>_ndet     the cabin, the lamp inserts, the plate lettering, the
+#                       grille bars, badges, wipers and aerial;
+#   car_wheel_<key>     ONE near wheel, at the origin, drawn four times a car
+#                       and shared by every body type that runs the same wheel.
+#
+# The far tier's opaque glass and its wheels are the two things the kit
+# REPLACES rather than adds to; src/44-cars.js takes them out of the far
+# layers in the vertex stage, for the cars inside the kit's radius.
+#
+# Every part of the kit is drawn by ONE material, not three (gloss, trim and
+# the cabin were three layers, which is three draws a model), so the class of
+# a surface rides in the low bits of its baked colour: the blue byte odd for
+# gloss — glass-like or metal, see CAR_NEAR_GLSL — and the green byte odd for
+# the cabin, which is lit by what comes through the glass. One step in 255
+# of colour cannot be seen; a missing or wrong class would be.
+NEAR_GLOSS = {"rim", "rimdk", "chrome", "lampin", "led", "amber", "lens", "tailhi",
+              "rev", "rotor", "piano", "box", "glass", "lamp", "tail"}
+NEAR_CABIN = {"seat", "dash", "screen"}
+
+
+def classed(bucket, colour):
+    """``colour`` nudged by at most 1/255 so its low bits carry the class."""
+    b8 = [min(255, max(0, int(v * 255 + 0.5))) for v in colour]
+    want = (0, 1 if bucket in NEAR_CABIN else 0, 1 if bucket in NEAR_GLOSS else 0)
+    for k in (1, 2):
+        if b8[k] % 2 != want[k]:
+            b8[k] += 1 if b8[k] < 255 else -1
+    return tuple(v / 255.0 for v in b8)
 
 
 # ------------------------------------------------------------------- profile --
@@ -1069,124 +1111,12 @@ def build_wheels_near(spec, sink):
     caliper over it, where there was a flat dark hole. Thirty-two sides.
     """
     r, hwid = spec["wheel"]
-    n = 32
-    rim_r = r * spec.get("rim_frac", 0.66)
-    style = spec.get("rim", "five")
-    rb = spec.get("rim_col", "rim")
-    sw = r - rim_r
     for ax in spec["axles"]:
         st = station(spec, ax)
         outer = st[4] - 0.030
         inner = outer - hwid * 2.0
         for sgn in (1, -1):
-            _spin(sink, ax, r, sgn, [
-                (r * 0.975, inner + 0.010, "tyre", 0.0),
-                (r, inner + 0.035, "tyre", 0.0),
-                (r, outer - 0.035, "tyre", 0.2),
-                (r * 0.993, outer - 0.016, "wall", 0.5),
-                (r - 0.014, outer - 0.004, "wall", 0.8),
-                (r - sw * 0.28, outer + 0.004, "wall", 1.0),
-                (r - sw * 0.55, outer + 0.006, "wall", 1.0),
-                (r - sw * 0.80, outer + 0.003, "wall", 0.7),
-                (rim_r + 0.008, outer - 0.003, rb, -1.0),
-                (rim_r + 0.002, outer + 0.005, rb, -1.0),
-                (rim_r - 0.008, outer + 0.006, rb, -1.0),
-                (rim_r - 0.016, outer - 0.004, "disc", -1.0),
-                (rim_r - 0.020, outer - 0.030, "disc", -1.0),
-                (rim_r - 0.022, outer - 0.115, "under", -1.0),
-                (0.0, outer - 0.118, None, -1.0),
-            ], n, deform=_loaded)
-
-            # The lettering: two arcs, top and bottom, of raised cells 1.6 mm
-            # proud of the wall, the way a size and a load index are moulded.
-            # Blocks and not glyphs — at the distance anything reads, a tyre's
-            # lettering is a broken grey band, and that is what this is.
-            r1, r2 = r - sw * 0.30, r - sw * 0.52
-            yl = outer + 0.0078
-            for arc in (math.pi * 0.5, -math.pi * 0.5):
-                for k in range(15):
-                    if k in (4, 9):
-                        continue                          # word gaps
-                    a = arc - 0.42 + k * 0.058
-                    h = (k * 7 + int(arc > 0) * 3) % 5
-                    top = r2 + (r1 - r2) * (1.0 if h < 3 else 0.62)
-                    _spin(sink, ax, r, sgn, [
-                        (r2, yl, "letter", 1.0), (top, yl, None, 1.0)],
-                        1, a, a + 0.040, deform=_loaded)
-
-            face = outer - 0.008
-            back = outer - 0.058
-            rh, ro = r * 0.19, rim_r - 0.012
-            # The brake disc and its hat, and a caliper over the top at the
-            # back. It is what a spoked wheel is a window onto.
-            Rr = rim_r * 0.80
-            _spin(sink, ax, r, sgn, [
-                (0.0, outer - 0.052, "rotor", 0.0), (0.070, outer - 0.052, "rotor", 0.0),
-                (0.075, outer - 0.068, "rotor", 0.0), (Rr, outer - 0.068, "rotor", 0.0),
-                (Rr, outer - 0.094, None, 0.0)], 28)
-            ca = math.pi - 0.62
-            cprof = [(Rr - 0.055, outer - 0.060, "caliper", 0.0),
-                     (Rr + 0.014, outer - 0.060, "caliper", 0.0),
-                     (Rr + 0.014, outer - 0.104, "caliper", 0.0),
-                     (Rr - 0.055, outer - 0.104, "caliper", 0.0),
-                     (Rr - 0.055, outer - 0.060, None, 0.0)]
-            _spin(sink, ax, r, sgn, cprof, 5, ca - 0.36, ca + 0.36)
-            for ea in (ca - 0.36, ca + 0.36):
-                c, s = math.cos(ea), math.sin(ea)
-                sink.face("caliper", [(ax + c * p[0], sgn * p[1], r + s * p[0])
-                                      for p in cprof[:4]])
-
-            if style == "steel":
-                # The old car and the van: a pressed plastic trim over a steel
-                # wheel — a shallow dish, a raised ring, and eight dark vents.
-                _spin(sink, ax, r, sgn, [
-                    (ro, face - 0.006, rb, 0.0), (ro * 0.90, face + 0.006, rb, 0.0),
-                    (ro * 0.74, face + 0.010, rb, 0.0), (ro * 0.66, face + 0.006, rb, 0.0),
-                    (ro * 0.40, face + 0.014, rb, 0.0), (ro * 0.18, face + 0.020, "piano", 0.0),
-                    (0.0, face + 0.021, None, 0.0)], n)
-                for k in range(8):
-                    a = TAU * k / 8 + 0.2
-                    _spin(sink, ax, r, sgn, [
-                        (ro * 0.86, face + 0.0085, "under", 0.0),
-                        (ro * 0.76, face + 0.0105, None, 0.0)], 2, a, a + 0.30)
-                continue
-
-            count, wo, wh = {"five": (5, 0.052, 0.074), "split": (10, 0.022, 0.036),
-                             "multi": (7, 0.040, 0.060)}[style]
-            for k in range(count):
-                a = TAU * (k + 0.25) / count
-                if style == "split":
-                    a = TAU * ((k // 2) + 0.25) / (count // 2) + (0.075 if k % 2 else -0.075)
-                d = (math.cos(a), math.sin(a))
-                pp = (-d[1], d[0])
-                secs = []
-                # Hub, middle, rim: width, and the face's depth — the dish.
-                for t, wdt, fy in ((0.0, wh, face), (0.55, (wh + wo) * 0.5, face - 0.016),
-                                   (1.0, wo, face - 0.012)):
-                    rr = rh + (ro - rh) * t
-                    cx, cz = rr * d[0], rr * d[1]
-                    hw2 = wdt * 0.5
-                    # back-left, front-left, ridge, front-right, back-right
-                    secs.append([
-                        (ax + cx + pp[0] * hw2, sgn * back, r + cz + pp[1] * hw2),
-                        (ax + cx + pp[0] * hw2, sgn * fy, r + cz + pp[1] * hw2),
-                        (ax + cx, sgn * (fy + 0.004), r + cz),
-                        (ax + cx - pp[0] * hw2, sgn * fy, r + cz - pp[1] * hw2),
-                        (ax + cx - pp[0] * hw2, sgn * back, r + cz - pp[1] * hw2)])
-                for A, B in zip(secs, secs[1:]):
-                    for m in range(4):
-                        sink.face(rb, [A[m], B[m], B[m + 1], A[m + 1]])
-            # The hub, a centre cap with a ring round it, and the nuts.
-            _spin(sink, ax, r, sgn, [
-                (rh + 0.006, face - 0.006, rb, 0.0), (rh * 0.80, face + 0.004, rb, 0.0),
-                (rh * 0.46, face + 0.007, "chrome", 0.0), (rh * 0.40, face + 0.009, "piano", 0.0),
-                (0.0, face + 0.011, None, 0.0)], 20)
-            for k in range(5):
-                a = TAU * k / 5 + 0.3
-                cx, cz = ax + math.cos(a) * rh * 0.64, r + math.sin(a) * rh * 0.64
-                _spin(sink, cx, cz, sgn, [
-                    (0.0105, face + 0.004, "chrome", 0.0), (0.0105, face + 0.013, "chrome", 0.0),
-                    (0.006, face + 0.016, "chrome", 0.0), (0.0, face + 0.016, None, 0.0)], 6)
+            near_wheel(sink, spec, ax, outer, sgn)
         # The arch liners, as in the far tier.
         rl = r + 0.045
         for sgn in (1, -1):
@@ -1199,6 +1129,131 @@ def build_wheels_near(spec, sink):
                 p1 = (ax + math.cos(a1) * rl, r + math.sin(a1) * rl)
                 sink.face("under", [(p0[0], sgn * ya, p0[1]), (p1[0], sgn * ya, p1[1]),
                                     (p1[0], sgn * yb, p1[1]), (p0[0], sgn * yb, p0[1])])
+
+
+def near_wheel(sink, spec, ax, outer, sgn):
+    """One near wheel: its axle at ``ax``, its outer face at ``sgn * outer``.
+
+    Out of `build_wheels_near` on 28 Sep so the same wheel can be baked ONCE,
+    at the origin, and drawn four times a car (see `wheel_key` and the near
+    kit in `build`): a car's four wheels were four copies of 20 KB of
+    geometry each, and the near tier's wheels were most of its payload.
+    """
+    r, hwid = spec["wheel"]
+    n = 32
+    rim_r = r * spec.get("rim_frac", 0.66)
+    style = spec.get("rim", "five")
+    rb = spec.get("rim_col", "rim")
+    sw = r - rim_r
+    inner = outer - hwid * 2.0
+    _spin(sink, ax, r, sgn, [
+        (r * 0.975, inner + 0.010, "tyre", 0.0),
+        (r, inner + 0.035, "tyre", 0.0),
+        (r, outer - 0.035, "tyre", 0.2),
+        (r * 0.993, outer - 0.016, "wall", 0.5),
+        (r - 0.014, outer - 0.004, "wall", 0.8),
+        (r - sw * 0.28, outer + 0.004, "wall", 1.0),
+        (r - sw * 0.55, outer + 0.006, "wall", 1.0),
+        (r - sw * 0.80, outer + 0.003, "wall", 0.7),
+        (rim_r + 0.008, outer - 0.003, rb, -1.0),
+        (rim_r + 0.002, outer + 0.005, rb, -1.0),
+        (rim_r - 0.008, outer + 0.006, rb, -1.0),
+        (rim_r - 0.016, outer - 0.004, "disc", -1.0),
+        (rim_r - 0.020, outer - 0.030, "disc", -1.0),
+        (rim_r - 0.022, outer - 0.115, "under", -1.0),
+        (0.0, outer - 0.118, None, -1.0),
+    ], n, deform=_loaded)
+
+    # The lettering: two arcs, top and bottom, of raised cells 1.6 mm
+    # proud of the wall, the way a size and a load index are moulded.
+    # Blocks and not glyphs — at the distance anything reads, a tyre's
+    # lettering is a broken grey band, and that is what this is.
+    r1, r2 = r - sw * 0.30, r - sw * 0.52
+    yl = outer + 0.0078
+    for arc in (math.pi * 0.5, -math.pi * 0.5):
+        for k in range(15):
+            if k in (4, 9):
+                continue                          # word gaps
+            a = arc - 0.42 + k * 0.058
+            h = (k * 7 + int(arc > 0) * 3) % 5
+            top = r2 + (r1 - r2) * (1.0 if h < 3 else 0.62)
+            _spin(sink, ax, r, sgn, [
+                (r2, yl, "letter", 1.0), (top, yl, None, 1.0)],
+                1, a, a + 0.040, deform=_loaded)
+
+    face = outer - 0.008
+    back = outer - 0.058
+    rh, ro = r * 0.19, rim_r - 0.012
+    # The brake disc and its hat, and a caliper over the top at the
+    # back. It is what a spoked wheel is a window onto.
+    Rr = rim_r * 0.80
+    _spin(sink, ax, r, sgn, [
+        (0.0, outer - 0.052, "rotor", 0.0), (0.070, outer - 0.052, "rotor", 0.0),
+        (0.075, outer - 0.068, "rotor", 0.0), (Rr, outer - 0.068, "rotor", 0.0),
+        (Rr, outer - 0.094, None, 0.0)], 28)
+    ca = math.pi - 0.62
+    cprof = [(Rr - 0.055, outer - 0.060, "caliper", 0.0),
+             (Rr + 0.014, outer - 0.060, "caliper", 0.0),
+             (Rr + 0.014, outer - 0.104, "caliper", 0.0),
+             (Rr - 0.055, outer - 0.104, "caliper", 0.0),
+             (Rr - 0.055, outer - 0.060, None, 0.0)]
+    _spin(sink, ax, r, sgn, cprof, 5, ca - 0.36, ca + 0.36)
+    for ea in (ca - 0.36, ca + 0.36):
+        c, s = math.cos(ea), math.sin(ea)
+        sink.face("caliper", [(ax + c * p[0], sgn * p[1], r + s * p[0])
+                              for p in cprof[:4]])
+
+    if style == "steel":
+        # The old car and the van: a pressed plastic trim over a steel
+        # wheel — a shallow dish, a raised ring, and eight dark vents.
+        _spin(sink, ax, r, sgn, [
+            (ro, face - 0.006, rb, 0.0), (ro * 0.90, face + 0.006, rb, 0.0),
+            (ro * 0.74, face + 0.010, rb, 0.0), (ro * 0.66, face + 0.006, rb, 0.0),
+            (ro * 0.40, face + 0.014, rb, 0.0), (ro * 0.18, face + 0.020, "piano", 0.0),
+            (0.0, face + 0.021, None, 0.0)], n)
+        for k in range(8):
+            a = TAU * k / 8 + 0.2
+            _spin(sink, ax, r, sgn, [
+                (ro * 0.86, face + 0.0085, "under", 0.0),
+                (ro * 0.76, face + 0.0105, None, 0.0)], 2, a, a + 0.30)
+        return
+
+    count, wo, wh = {"five": (5, 0.052, 0.074), "split": (10, 0.022, 0.036),
+                     "multi": (7, 0.040, 0.060)}[style]
+    for k in range(count):
+        a = TAU * (k + 0.25) / count
+        if style == "split":
+            a = TAU * ((k // 2) + 0.25) / (count // 2) + (0.075 if k % 2 else -0.075)
+        d = (math.cos(a), math.sin(a))
+        pp = (-d[1], d[0])
+        secs = []
+        # Hub, middle, rim: width, and the face's depth — the dish.
+        for t, wdt, fy in ((0.0, wh, face), (0.55, (wh + wo) * 0.5, face - 0.016),
+                           (1.0, wo, face - 0.012)):
+            rr = rh + (ro - rh) * t
+            cx, cz = rr * d[0], rr * d[1]
+            hw2 = wdt * 0.5
+            # back-left, front-left, ridge, front-right, back-right
+            secs.append([
+                (ax + cx + pp[0] * hw2, sgn * back, r + cz + pp[1] * hw2),
+                (ax + cx + pp[0] * hw2, sgn * fy, r + cz + pp[1] * hw2),
+                (ax + cx, sgn * (fy + 0.004), r + cz),
+                (ax + cx - pp[0] * hw2, sgn * fy, r + cz - pp[1] * hw2),
+                (ax + cx - pp[0] * hw2, sgn * back, r + cz - pp[1] * hw2)])
+        for A, B in zip(secs, secs[1:]):
+            for m in range(4):
+                sink.face(rb, [A[m], B[m], B[m + 1], A[m + 1]])
+    # The hub, a centre cap with a ring round it, and the nuts.
+    _spin(sink, ax, r, sgn, [
+        (rh + 0.006, face - 0.006, rb, 0.0), (rh * 0.80, face + 0.004, rb, 0.0),
+        (rh * 0.46, face + 0.007, "chrome", 0.0), (rh * 0.40, face + 0.009, "piano", 0.0),
+        (0.0, face + 0.011, None, 0.0)], 20)
+    for k in range(5):
+        a = TAU * k / 5 + 0.3
+        cx, cz = ax + math.cos(a) * rh * 0.64, r + math.sin(a) * rh * 0.64
+        _spin(sink, cx, cz, sgn, [
+            (0.0105, face + 0.004, "chrome", 0.0), (0.0105, face + 0.013, "chrome", 0.0),
+            (0.006, face + 0.016, "chrome", 0.0), (0.0, face + 0.016, None, 0.0)], 6)
 
 
 # ------------------------------------------------------------------- details --
@@ -1615,7 +1670,7 @@ def build_interior(spec, sink, tab):
     dl = 0.46
     sink.rbox("dash", xd - dl * 0.5, 0.0, top - 0.13, dl, (hwb - 0.04) * 2.0, 0.26, p=3.2)
     sink.rbox("dash", xd - dl + 0.08, ys, top + 0.015, 0.14, 0.30, 0.07, p=3.0)
-    sink.rbox("piano", xd - dl + 0.10, 0.0, top + 0.04, 0.02, 0.20, 0.12, p=5, rows=4)
+    sink.rbox("screen", xd - dl + 0.10, 0.0, top + 0.04, 0.02, 0.20, 0.12, p=5, rows=4)
     # The wheel: a torus on a column raked 25 degrees back from upright.
     cx, cz = xd - dl - 0.06, top - 0.02
     tilt = math.radians(25.0)
@@ -1988,6 +2043,8 @@ MODELS.append(dict(
 # ---------------------------------------------------------------------- bake --
 
 def build_car(spec, near=False):
+    """Every part of one car. ``near`` is the second pass's whole near model —
+    what the kit is cut from, and no longer exported as it stands."""
     spec = dict(spec)
     if near:
         spec["_near"] = True
@@ -2011,6 +2068,58 @@ def build_car(spec, near=False):
         build_wheels(spec, sink)
         build_details(spec, sink, tab)
     return sink.objects()
+
+
+def wheel_key(spec):
+    """Which shared near wheel a body type runs: style, finish and size.
+
+    Every body type that runs the same wheel draws the same blob — the estate
+    and the saloon share one — and a new body type on an existing wheel costs
+    nothing. The size is in the key because the wheel is baked at its size and
+    not scaled: the load bulge and the lettering are millimetres, and a scale
+    would stretch them.
+    """
+    r, hwid = spec["wheel"]
+    return "%s_%s_%d_%d" % (spec.get("rim", "five"), spec.get("rim_col", "rim"),
+                            round(r * 1000), round(hwid * 1000))
+
+
+def near_plates(spec, sink):
+    """The lettering on both plates, where `build_details` puts the plates."""
+    for end, sgn, frac in ((spec["x1"], 1.0, 0.27), (spec["x0"], -1.0, 0.44)):
+        st = station(spec, end)
+        zc = st[1] + (st[3] - st[1]) * frac
+        plate_text(sink, spec, end + sgn * 0.017 + sgn * 0.0058, zc, sgn)
+
+
+def near_kit(spec):
+    """The near kit for one body type: ``{"nglass": items, "ndet": items}``.
+
+    See NEAR_GLOSS above for what the kit is. The glass is the shell's own
+    panes (and the van's two back-door windows) cut the near way, into the
+    clear front and the privacy rear; nothing else of the shell is kept,
+    because the far tier draws all of it at every distance now.
+    """
+    spec = dict(spec, _near=True)
+    g = Sink()
+    tab = build_shell(spec, g)
+    build_details(spec, g, tab)
+    d = Sink()
+    build_lamps(spec, d, tab)
+    build_near_details(spec, d, tab)
+    build_interior(spec, d, tab)
+    near_plates(spec, d)
+    out = {"nglass": [v for k, v in g.objects().items() if BUCKETS[k][2] == "glass"]}
+    out["ndet"] = [(ob, classed(k, c)) for k, (ob, c) in d.objects().items()]
+    return out
+
+
+def near_wheel_items(spec):
+    """One near wheel at the origin: axle on x = 0, outer face on the plane
+    z = 0 (three's axes), tread on the ground. src/44-cars.js places four."""
+    s = Sink()
+    near_wheel(s, spec, 0.0, 0.0, 1)
+    return [(ob, classed(k, c)) for k, (ob, c) in s.objects().items()]
 
 
 def extents(spec):
@@ -2039,33 +2148,40 @@ def extents(spec):
     tr = station(spec, spec["axles"][1])[4] - 0.030 - hwid
     if not spec.get("cover_hem"):
         hw += spec.get("flare", 0.014)
-    return {"x0": round(spec["x0"], 3), "x1": round(spec["x1"], 3),
-            "hw": round(hw, 3), "h": round(h, 3),
-            "ax": [round(a, 3) for a in spec["axles"]], "r": round(r, 3),
-            "tr": round(tr, 3)}
+    out = {"x0": round(spec["x0"], 3), "x1": round(spec["x1"], 3),
+           "hw": round(hw, 3), "h": round(h, 3),
+           "ax": [round(a, 3) for a in spec["axles"]], "r": round(r, 3),
+           "tr": round(tr, 3)}
+    # And, for a body type with a near kit, the wheel it runs and where each
+    # axle's outer face is — which is where src/44-cars.js stands the shared
+    # near wheel, and the space it clears the far wheel out of.
+    if not spec.get("cover"):
+        out["wheel"] = wheel_key(spec)
+        out["wo"] = [round(station(spec, a)[4] - 0.030, 4) for a in spec["axles"]]
+        out["wd"] = round(hwid * 2.0, 4)
+    return out
 
 
 def build():
     preview = "--preview" in sys.argv
     meta = {}
+    wheels = set()
     for spec in MODELS:
-        # The NEAR tier first, since the far one is exported last and is what
-        # the preview turns: gloss, trim and the see-through glass, for a car
-        # within 40 m. No body — the body is one mesh at every distance (the
-        # silhouette is the far tier's; everything the near tier adds is on,
-        # in or behind it), so it is baked once, below, and drawn once.
-        #
-        # Only with --near. Drawn, it cost 3.0-3.7 ms at the car park against
-        # 1.539.0's 0.5-1.2 (see CAR_NEAR_M in src/44-cars.js), so 1.542.2
-        # ships without it and the runtime falls back to the far tier.
-        if "--near" in sys.argv and not spec.get("cover"):
+        # The near KIT (see NEAR_GLOSS): glass and cabin-and-details per body
+        # type, and one wheel per wheel, quantised (`export_q`). Written
+        # first, since the far tier is exported last and is what the preview
+        # turns.
+        if not spec.get("cover"):
             reset_scene()
-            near = build_car(spec, near=True)
-            for blob in ("gloss", "trim", "glass"):
-                items = [v for k, v in near.items() if BUCKETS[k][2] == blob]
-                if items:
-                    export(items, OUT / ("car_%s_n%s.fr3d.gz" % (spec["name"], blob)),
-                           note=spec["name"] + " near " + blob)
+            for blob, items in near_kit(spec).items():
+                export_q(items, OUT / ("car_%s_%s.fr3d.gz" % (spec["name"], blob)),
+                         note=spec["name"] + " near " + blob)
+            wk = wheel_key(spec)
+            if wk not in wheels:
+                wheels.add(wk)
+                reset_scene()
+                export_q(near_wheel_items(spec), OUT / ("car_wheel_%s.fr3d.gz" % wk),
+                         note="near wheel " + wk)
         reset_scene()
         parts = build_car(spec)
         body = [v for k, v in parts.items() if BUCKETS[k][2] == "body"]

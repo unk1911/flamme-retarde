@@ -8,6 +8,100 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.543.4] — 2026-09-28
+
+### The cars' near tier ships, as a kit
+
+Misha: *"i guess the cars were half-finished, can u finish off that one?"*
+1.542.3 built a near tier for the cars inside 40 m and left it out, because
+it cost too much: see-through glass with a cabin behind it, loaded and
+lettered tyres, brake discs and lug nuts, lamps with something in them, a
+readable HR plate, grille bars, badges, wipers and an aerial. It ships now,
+and the page grows by a quarter of what it would have.
+
+**Where the cost was.** Two new measurements, both in the page. A timer
+query round each car draw puts the second pass's near tier at 0.2 ms of
+actual GPU time at the car park. Toggling it synchronously, render plus
+readback, 200 pairs, puts its whole cost at about 0.4 ms. The difference is
+draws. The near tier was a second copy of everything that is not paint (the
+shell's glass, lamps, plastics and underside, the plates, the mirrors, four
+wheels), swapped in at 40 m. That made three more layers per model: 21 more
+meshes, which still bind and upload even when empty. It was also 1.14 MB of
+page, mostly float32 mantissas that gzip cannot shrink.
+
+**The kit** (`src/44-cars.js`, `tools/blender/cars.py`):
+
+- **The far tier is drawn at every distance.** The near tier is a kit on
+  top of it, holding only what the far tier does not have. The far tier
+  gives up two things to the kit inside 30 m: its opaque glass and its
+  wheels. They are dropped in the vertex stage (`CAR_FAR_VERT`, collapsed
+  to a point, not discarded). Both sides test the car's own position, so
+  there is never a frame with both wheels or neither. Nothing else changes
+  at the line, so the silhouette is the same mesh on both sides of it.
+- **Two layers per body type:** the glass (`_nglass`) and everything else
+  (`_ndet`: cabin, lamp inserts, plate lettering, grille bars, badges,
+  wipers, aerial). The second is one material, `CAR_KIT_GLSL`, not three.
+  Each surface's finish is carried in the low bits of its baked colour
+  (`classed`): the blue byte is odd for gloss, the green byte odd for the
+  cabin. That is 1/255 of colour.
+- **One wheel per wheel, not four per car.** Each wheel is baked once at
+  the origin, stood at each axle end at load, and shared between body types
+  that run it (the estate and the saloon share one). There are five, 74 KB
+  gzipped in all. 1.542.3 had 480 KB of wheels.
+- **Kit layers are hidden while nobody is near.** An empty layer is not
+  free. At the promenade the kit draws nothing and binds nothing.
+- **The glass is one pass** (`forceSinglePass`), not three.js's
+  back-then-front two. The paint's five soft-shadow taps now run on the
+  outside of a panel only. The back faces are the door trim seen through
+  the glass, and those taps had put the paint's own draw time up by a fifth.
+- **Quantised blobs.** A new .fr3d v3 stores positions as uint16 across the
+  header's box (0.08 mm on a car), normals as int8 and the index as uint16.
+  `export_q` writes it and `readFR3D` expands it back to floats on load. It
+  is used for the kit only; the far blobs are untouched.
+- `cars.json` gains `wheel`, `wo` and `wd` per body type: which wheel, and
+  where each axle's outer face is.
+
+The kit radius is 30 m, down from 40. The kit's own detail reads from 15 m.
+The cabin through 30–64 % glass under the pines is a couple of dark pixels
+at 30 m.
+
+**Cost.** The cars' own cost is the on − off median in ms per frame,
+measured in the same session with the other agents' runs sharing the GPU.
+There are three measures. AB is 1.542.3's method: 30-frame blocks, 10
+alternated, 6 runs per build, median of the runs, with the range in
+brackets. SB is synchronous and paired: render plus a one-pixel readback,
+200 pairs, 3 runs, trimmed mean. Per-draw is a timer round each car draw,
+GPU only.
+
+| | car park AB | promenade AB | car park SB | promenade SB | car park per-draw | promenade per-draw |
+|---|---|---|---|---|---|---|
+| far only (1.543.3) | 0.90 [−0.19–2.27] | 0.76 [0.28–1.74] | 0.50 | 0.53 | 0.27 | 0.21 |
+| 1.542.3's near tier, as baked | — | — | 0.94–1.05 | 0.65–0.75 | 0.41–0.46 | 0.18 |
+| **the kit (this release)** | **1.14 [0.80–3.13]** | **0.85 [0.59–1.34]** | **0.78** | **0.59** | **0.33** | **0.19** |
+
+That is +0.24 / +0.09 ms by AB, +0.27 / +0.07 by SB, and +0.06 / −0.02 of
+GPU time. All are inside the +0.5 budget. AB on this machine swings ±1 ms
+from block to block, which is why the other two exist.
+
+**Looks.** Close-ups (2–10 m) and mid shots (8–35 m) of the crossover, the
+old three-door, the saloon, the estate and the back lane's superminis match
+1.542.3's near tier. Two differences, both improvements. The headlamp
+housing stays the far tier's chrome reflector, with the inserts on it. And
+the grey band that 1.542.3's near shell painted across every nose is gone:
+the `lampin` region leaked onto the ladder cap, which only strips `lamp`
+and `tail`. Kit on against forced off from one camera: nothing moves but
+the glass, the wheels' detail and the kit's own parts. With the kit forced
+off, the far tier is pixel-identical to 1.543.3 on the cars. One known
+edge: on the first frame after a teleport into the car park, the kit layers
+are shown a frame late.
+
+**Size:** 50.49 → 50.80 MB (+326,100 bytes, +0.31 MB). The kit is 235 KB
+gzipped: glass 26 KB, cabin and details 136 KB, wheels 74 KB. 1.542.3's
+near blobs were 899 KB. The far blobs, the bodies and the covered car are
+byte-identical, and the kit rebakes byte-identical. The walk blockers
+(792), their hash, the 13 + 3 cars, the hammock `[437.4, 34.2, 441.6,
+32.1]` and the café settle (19/0, the same as 1.543.3's) are unchanged.
+
 ## [1.543.3] — 2026-09-28
 
 ### The shutter iron goes back on the shutters

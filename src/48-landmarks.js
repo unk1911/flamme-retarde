@@ -107,6 +107,7 @@ function readFR3D(buf) {
   if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
   const nv = dv.getUint32(8, true);
   const ni = dv.getUint32(12, true);
+  if (dv.getUint32(4, true) === 3) return readFR3Dq(buf, dv, nv, ni);
 
   let o = 40;                                    // 4 magic + 3 u32 + 6 f32
   const pos = new Float32Array(buf, o, nv * 3); o += nv * 12;
@@ -116,6 +117,42 @@ function readFR3D(buf) {
   // array view has to be aligned — so this one is a copy.
   const idx = new Uint32Array(buf.slice(o, o + ni * 4));
 
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3, true));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * The quantised .fr3d, v3 (`export_q` in tools/blender/frmesh.py): positions
+ * as uint16 across the header's bounding box, normals as int8, the index as
+ * uint16 under 65 536 vertices. Expanded straight back to floats here, so a
+ * v3 geometry is a v1 geometry to everything that uses it. It exists for the
+ * size of the page: a v1 blob is mostly float mantissa, which gzip cannot
+ * shrink, and the cars' near tier was 1.14 MB of html as v1 (28 Sep).
+ */
+function readFR3Dq(buf, dv, nv, ni) {
+  const lo = [0, 1, 2].map((k) => dv.getFloat32(16 + k * 4, true));
+  const hi = [0, 1, 2].map((k) => dv.getFloat32(28 + k * 4, true));
+  let o = 40;
+  const qp = new Uint16Array(buf, o, nv * 3); o += nv * 6;
+  const qn = new Int8Array(buf, o, nv * 3); o += nv * 3;
+  const col = new Uint8Array(buf, o, nv * 3); o += nv * 3;
+  const idx = nv < 65536 ? new Uint16Array(buf, o, ni) : new Uint32Array(buf, o, ni);
+  const pos = new Float32Array(nv * 3);
+  const nrm = new Float32Array(nv * 3);
+  for (let i = 0; i < nv * 3; i++) {
+    const k = i % 3;
+    pos[i] = lo[k] + (qp[i] / 65535) * (hi[k] - lo[k]);
+  }
+  for (let i = 0; i < nv; i++) {
+    const x = qn[i * 3], y = qn[i * 3 + 1], z = qn[i * 3 + 2];
+    const l = Math.hypot(x, y, z) || 1;
+    nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
+  }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));

@@ -2,14 +2,15 @@
  * The cars parked in the wood behind Jadrija.
  *
  * The geometry is baked by `tools/blender/cars.py` — six body types and a
- * covered car, a body blob each and then two tiers of the rest (see "two
- * tiers" below) — and everything in this file is about getting them onto the
+ * covered car, a body blob each, the far tier of the rest, and a near kit (see
+ * "two tiers" below) — and everything in this file is about getting them onto the
  * ground facing the right way. The shore build in `src/43-jadrija.js` decides
  * *where* each one stands, because that is a question about the shore: which
  * bands of `t` are clear of the shops, how far inland a car can be before it is
  * standing in somebody's front room, and where the playground railing is. This
  * file decides what model turns up, what colour it is painted, and how the
- * whole row gets drawn: three calls a model, and one more for the dark under
+ * whole row gets drawn: three calls a model, two more for a model with a car
+ * inside the kit's 30 m and one per near wheel, and one for the dark under
  * every car.
  *
  * ── three layers per model ────────────────────────────────────────────────
@@ -60,14 +61,13 @@
  * triangles and none of it shows from sixty. So there are two tiers, and the
  * body is in neither: it is one mesh at every distance, drawn for every car
  * within `CAR_DRAW_M`, so the silhouette never pops. What changes at
- * `CAR_NEAR_M` is everything on, in and behind it — the far tier's gloss and
- * trim (1.539.0's: opaque glass, 24-sided wheels) give way to the near tier's
- * gloss, trim and see-through glass. Six draws for a model that has cars on
- * both sides of the line, four or three for one that does not.
+ * `CAR_KIT_M` is everything on, in and behind it.
  *
- * In 1.542.2 the near tier is baked-but-not-shipped: it cost too much GPU at
- * the car park (see `CAR_NEAR_M`), so every car is the far tier at every
- * distance, with the new bodies, materials and contact shadows.
+ * In 1.542.2 the near tier was baked-but-not-shipped: drawn as a second copy
+ * of everything but the paint, swapped in at 40 m, it cost too much at the car
+ * park and was 1.14 MB of page. In 1.543.4 it ships as a KIT on top of the far
+ * tier, which is now drawn at every distance — see "the kit" over
+ * `buildJadrijaCars` for what is in it, what it replaces, and what it cost.
  */
 
 const CAR_PAINT = {
@@ -307,7 +307,12 @@ const CAR_PAINT_BODY = `
   // The inside of the doors, dark, and the headliner, pale.
   if (cIn > 0.5) base = n.y < -0.5 ? vec3(0.17, 0.165, 0.155) : vec3(0.036, 0.036, 0.040);
 `;
-const CAR_PAINT_GLSL = CAR_SOFT_GLSL + CAR_ENV_GLSL + `
+// The five taps are for the OUTSIDE of a panel. Its back face is the door
+// trim and the headliner, seen only through the kit's glass (28 Sep), where a
+// canopy's blocks cannot be told from the cabin's own dark — and a timer round
+// each draw put the paint's cost up by a fifth at the car park the day the
+// glass went clear, which was those taps on the inside of every door.
+const CAR_PAINT_GLSL = '  if (cIn < 0.5) {' + CAR_SOFT_GLSL + '  }\n' + CAR_ENV_GLSL + `
   float cMt = vSuit.x * (1.0 - cIn);
   float cK = (1.0 - cIn) * (1.0 - 0.85 * cD) * (1.0 - 0.60 * vSuit.z);
   // The flop, on the colour and not on the coat's reflection.
@@ -338,22 +343,17 @@ const CAR_GLOSS_TAIL = `
 const CAR_GLOSS_GLSL = CAR_SOFT_GLSL + CAR_ENV_GLSL + CAR_GLOSS_TAIL;
 
 /**
- * The matt trim — tyres, plastics, plates — and, in the near tier, the cabin.
+ * The matt trim — tyres, plastics, plates.
  *
- * The cabin is lit by what comes through the glass, and a car's glass is a
- * small part of its surface: inside, the sky light is a third of what it is
- * on the bonnet. The seats and the dash cannot be told from a tyre by their
- * colour, so they are told by where they are — inside the body's own box,
- * above the floor and below the roof, in the car's frame. The sun needs no
- * help: the roof already shades the seats in the shadow map.
+ * It lit the cabin too, in the second pass, telling the seats from a tyre by
+ * where they stood — inside the body's own box. The cabin is the kit's now and
+ * says what it is in its own colour (`CAR_KIT_GLSL`), and nothing of the far
+ * trim stands in that box, so the test went with it.
  */
 const CAR_TRIM_GLSL = CAR_ENV_GLSL + `
-  float cIn = step(abs(vLocal.z), 0.66) * step(0.38, vLocal.y) * step(vLocal.y, 1.36)
-    * step(abs(vLocal.x), 1.60);
-  col -= base * ambientAt(n, uAmbSky, uAmbGround, uAmbI) * INV_PI * 2.2 * cAo * 0.62 * cIn;
   // Rubber and plastic: a little of the sky at a grazing angle, no more.
   float cF = 0.03 + 0.25 * pow(1.0 - cNV, 5.0);
-  col += cE * cF * cOcc * (1.0 - cIn) * 0.6;
+  col += cE * cF * cOcc * 0.6;
 `;
 
 /**
@@ -377,6 +377,79 @@ const CAR_GLASS_GLSL = CAR_ENV_GLSL + `
 `;
 
 /**
+ * The near KIT's one material (28 Sep, third pass) — see "the kit" below.
+ *
+ * The second pass drew the near tier as three layers a model, gloss, trim and
+ * glass, because they are three materials; that was three draws a model on
+ * top of the far tier's, and draws, not pixels, were where its cost went
+ * (measured with a timer round each draw: the near tier's own GPU time at the
+ * car park was 0.2 ms, and the page paid three times that). So everything of
+ * the kit that is not glass is ONE layer and one material, and a surface says
+ * which finish it is in the low bits of its baked colour (`classed` in
+ * tools/blender/cars.py): the blue byte odd for gloss — the chrome, the
+ * lenses, the alloys, the rotor — the green byte odd for the cabin, which is
+ * lit by what comes through the glass. The finishes are the second pass's,
+ * unchanged: `CAR_GLOSS_TAIL`, the trim's matt lobe and grazing sheen, and the
+ * cabin's third of the sky. None of it takes the paint's five shadow taps.
+ */
+const CAR_KIT_BODY = 'base *= vVCol;\n  n = gl_FrontFacing ? n : -n;\n  env = 0.0;\n'
+  + '  vec3 kCl = floor(vVCol * 255.0 + 0.5);\n'
+  + '  float kG = mod(kCl.b, 2.0);\n'
+  + '  float kC = mod(kCl.g, 2.0);\n'
+  + '  spec = 0.10 * kG;';
+const CAR_KIT_GLSL = CAR_ENV_GLSL + `
+  // The cabin sees a third of the sky the bonnet does.
+  col -= base * ambientAt(n, uAmbSky, uAmbGround, uAmbI) * INV_PI * 2.2 * cAo * 0.62 * kC;
+  // Rubber and plastic: the trim's own broad lobe (the base lobe above is the
+  // gloss's, and is zero here for the trim), and a little sky at a grazing angle.
+  col += uSunColor * pow(max(dot(n, hv), 0.0), 18.0) * 0.08 * sh * (1.0 - kG);
+  vec3 kT = col + cE * (0.03 + 0.25 * pow(1.0 - cNV, 5.0)) * cOcc * (1.0 - kC) * 0.6;
+  float cM = smoothstep(0.30, 0.55, max(max(vVCol.r, vVCol.g), vVCol.b));
+  float cF0 = mix(0.09, 0.60, cM);
+  float cF = cF0 + (1.0 - cF0) * pow(1.0 - cNV, 5.0);
+  vec3 cTint = mix(vec3(1.0), base / max(max(base.r, base.g), max(base.b, 1e-3)), cM);
+  vec3 kGl = col * (1.0 - cF * (1.0 - cM) * 0.9) + cE * cF * cTint * cOcc
+    + uSunColor * cSun * 3.0;
+  col = mix(kT, kGl, kG);
+`;
+
+/**
+ * Where the kit starts, in the VERTEX stage, and the far tier gives way.
+ *
+ * `uCarKit` is the radius. A car inside it draws the kit and, in the far
+ * layers, loses the two things the kit replaces — the opaque glass (its baked
+ * colour, 7/9/11 in bytes, is the glass's alone) and the four wheels (the
+ * space round each axle, out of `aInstSuit` = the axles' x and the wheel's
+ * radius and `aInstHair` = the wheels' lateral span and whether this car has
+ * a kit at all; the covered car has not). A car outside it draws neither kit
+ * nor hole. Both sides take the same test on the same number — the car's own
+ * position, which on a kit layer rides in `aInstSuit` because a wheel's
+ * `aInstPos` is the wheel's — so there is never a frame with both the far
+ * wheel and the near one, or neither. What is cut is collapsed to a point,
+ * which the rasteriser drops, rather than discarded, which would cost the
+ * whole layer its early depth test.
+ */
+const CAR_KIT_VDECL = 'uniform vec3 uCamPos;\nuniform float uCarKit;';
+const CAR_FAR_VERT = `
+  if (aInstHair.z > 0.5) {
+    vec2 cD = aInstPos.xz - uCamPos.xz;
+    if (dot(cD, cD) < uCarKit * uCarKit) {
+      vec3 cB = floor(aVCol * 255.0 + 0.5);
+      float cGl = step(abs(cB.r - 7.0) + abs(cB.g - 9.0) + abs(cB.b - 11.0), 0.5);
+      float cWx = min(abs(p.x - aInstSuit.x), abs(p.x - aInstSuit.y));
+      float cAz = abs(p.z);
+      float cWh = step(length(vec2(cWx, p.y - aInstSuit.z)), aInstSuit.z + 0.006)
+        * step(aInstHair.x, cAz) * step(cAz, aInstHair.y);
+      if (cGl + cWh > 0.5) p = vec3(0.0);
+    }
+  }
+`;
+const CAR_KIT_VERT = `
+  vec2 cD = aInstSuit.xz - uCamPos.xz;
+  if (dot(cD, cD) >= uCarKit * uCarKit) p = vec3(0.0);
+`;
+
+/**
  * Draw only the cars within a band of distance from the camera.
  *
  * One layer holds every car of a model from one end of the shore to the
@@ -387,30 +460,40 @@ const CAR_GLASS_GLSL = CAR_ENV_GLSL + `
  * and a wood. So each layer keeps its full instance list aside and, when the
  * set within range changes, packs just those to the front and draws that
  * many. The camera is `U.uCamPos`, which is the eye in every pass — the
- * shadow pass included, so a car does not lose its shadow before itself, and
- * so both tiers agree, in every pass, on which side of `CAR_NEAR_M` a car is.
+ * shadow pass included, so a car does not lose its shadow before itself.
  *
- * `r0`/`r1` are the band: [0, 130) for the body, [40, 130) for the far tier
- * and [0, 40) for the near one, so a car is handed from tier to tier and
- * never drawn by both.
+ * `r0`/`r1` are the band: [0, 130) for the body and the far tier. The kit's
+ * layers pass `by`, the attribute that holds the CAR's position (a wheel's own
+ * is a metre off it), and are cut a few metres wide of `CAR_KIT_M` — the
+ * exact cut is the vertex stage's (`CAR_KIT_VERT`), so this list only has to
+ * be a superset of it, and a frame late is harmless. A kit layer is also
+ * HIDDEN while its list is empty, which a far layer never is inside 130 m:
+ * an empty layer still costs its program, its uniforms and its buffers every
+ * frame, and at the promenade that was eighteen of them for nothing. A hidden
+ * mesh gets no `onBeforeRender`, so a kit layer's step is not hung on its own
+ * mesh but returned, and `buildJadrijaCars` runs it off the bodies'.
  */
 const CAR_DRAW_M = 130;
-// The near tier is BUILT AND OFF. Measured by toggling the cars on and off in
-// one page, alternated (28 Sep, other agents sharing the GPU): 1.539.0's row
-// cost 0.5-1.2 ms at the car park; this one with the near tier drawn cost
-// 3.0-3.7 ms, and with it not drawn about what 1.539.0 did. So the near blobs
-// are not in the payload (`cars.py --near` bakes them), `buildJadrijaCars`
-// finds none, and the far tier draws every car all the way in. Baking them is
-// all it takes to turn it back on.
-const CAR_NEAR_M = 40;
-function nearOnly(L, n, r0 = 0, r1 = CAR_DRAW_M) {
+// The near KIT's radius (see "the kit" in `buildJadrijaCars`).
+//
+// The second pass drew its near tier to 40 m and it did not ship: it was
+// measured at 3.0-3.7 ms against 1.0-2.6 for the far tier alone. The kit is
+// drawn to 30 m. Nearly all of what it adds reads from under fifteen — plate
+// lettering, lug nuts, a tyre's moulding, the LED strip in a lamp — and what
+// reads further, the cabin through the glass, is behind a pane that is 30 %
+// and 64 % transmissive and under a pine canopy: at thirty metres a seat back
+// is two pixels of a dark window. The band only decides how many cars pay for
+// the kit, not how many draws it is, which is set by how many body types have
+// a car inside it.
+const CAR_KIT_M = 30;
+function nearOnly(L, n, r0 = 0, r1 = CAR_DRAW_M, by = null) {
   const attrs = Object.entries(L.geo.attributes)
     .filter(([, a]) => a.isInstancedBufferAttribute).map(([, a]) => a);
-  const posA = L.geo.attributes.aInstPos;
+  const posA = L.geo.attributes[by || 'aInstPos'];
   const full = attrs.map((a) => a.array.slice(0, n * a.itemSize));
   const pos = full[attrs.indexOf(posA)];
   let key = -1, pending = -1;
-  L.mesh.onBeforeRender = () => {
+  const step = () => {
     // A rewrite reaches the GPU at the start of the NEXT render call, so the
     // new count waits for it; until then this draws a prefix of the old list.
     if (pending >= 0) { L.geo.instanceCount = pending; pending = -1; }
@@ -436,31 +519,36 @@ function nearOnly(L, n, r0 = 0, r1 = CAR_DRAW_M) {
     });
     pending = idx.length;
     L.geo.instanceCount = Math.min(L.geo.instanceCount, idx.length);
+    if (by) L.mesh.visible = idx.length > 0;
   };
+  if (!by) L.mesh.onBeforeRender = step;
+  return step;
 }
 let carMats = null;
+const CAR_KIT_U = { value: CAR_KIT_M };
 /** One material per finish, shared by every model and both car parks. */
 function carMaterials() {
   if (carMats) return carMats;
-  const mk = (lit, spec, specPower, coat, body) => solidMaterial(0xffffff, {
+  const mk = (lit, spec, specPower, coat, body, vert) => solidMaterial(0xffffff, {
     instanced: true, spec, specPower, side: THREE.DoubleSide,
     // env 0: the default sky mirror is off, and the one in `lit` replaces it.
     body: body || 'base *= vVCol;\n  n = gl_FrontFacing ? n : -n;\n  env = 0.0;',
-    uniforms: { uCoat: { value: coat } },
+    uniforms: { uCoat: { value: coat }, uCarKit: CAR_KIT_U },
     decl: 'uniform float uCoat;',
+    ...(vert ? { vert, vdecl: CAR_KIT_VDECL } : {}),
     lit,
   });
   carMats = {
     paint: mk(CAR_PAINT_GLSL, 0.10, 60, 0.95, CAR_PAINT_BODY),
-    gloss: mk(CAR_GLOSS_GLSL, 0.10, 90, 1.0),
-    // The near tier's gloss is rims, lamps and chrome — small, busy, and not
-    // where the canopy's blocks would show — so it goes without the five taps.
-    glossN: mk(CAR_ENV_GLSL + CAR_GLOSS_TAIL, 0.10, 90, 1.0),
+    gloss: mk(CAR_GLOSS_GLSL, 0.10, 90, 1.0, null, CAR_FAR_VERT),
     // The trim keeps a lobe of its own, turned down from the 0.34 everything
     // used to share: 0.08 at 18 is rubber and textured plastic.
-    trim: mk(CAR_TRIM_GLSL, 0.08, 18, 0.0),
+    trim: mk(CAR_TRIM_GLSL, 0.08, 18, 0.0, null, CAR_FAR_VERT),
+    // The kit: everything near that is not glass, in one draw (see
+    // CAR_KIT_GLSL). Its base lobe is the gloss's; the trim's is in `lit`.
+    kit: mk(CAR_KIT_GLSL, 0.10, 90, 1.0, CAR_KIT_BODY, CAR_KIT_VERT),
     glass: mk(CAR_GLASS_GLSL, 0.0, 90, 1.0,
-      'n = gl_FrontFacing ? n : -n;\n  env = 0.0;\n  spec = 0.0;'),
+      'n = gl_FrontFacing ? n : -n;\n  env = 0.0;\n  spec = 0.0;', CAR_KIT_VERT),
   };
   const g = carMats.glass;
   g.transparent = true;
@@ -468,6 +556,12 @@ function carMaterials() {
   g.blending = THREE.CustomBlending;
   g.blendSrc = THREE.OneFactor;
   g.blendDst = THREE.OneMinusSrcAlphaFactor;
+  // One pass, not three.js's two. A transparent double-sided material is
+  // drawn back faces first and then front, which is a second draw a model for
+  // what is two panes of tint over each other: summed the other way round
+  // they differ by one reflection times the other pane's alpha, a level or
+  // two out of 255 on a window, and the draw is a draw.
+  g.forceSinglePass = true;
   return carMats;
 }
 
@@ -499,18 +593,49 @@ function carFinish(s, model) {
  * `sites` is what the shore build collected: `{ x, y, z, yaw, pitch, roll,
  * model, tint }` per car, already in world space, turned to face the water and
  * tilted to sit on the slope it stands on. Per model, instanced layers over
- * the same list: the paint for every car in range, and then the gloss and the
- * trim of whichever tier the car is in, and the near tier's glass — one layer
- * per material (`carMaterials`), each with a real bounding sphere over the
- * instances that ended up in it, rather than `propLayer`'s 1e9 one, so the
+ * the same list: the paint, the gloss and the trim for every car in range, and
+ * the near kit's glass and the rest of the kit for the cars inside
+ * `CAR_KIT_M`; and one layer per near WHEEL, over every car that runs it. One
+ * layer per material (`carMaterials`), each with a real bounding sphere over
+ * the instances that ended up in it, rather than `propLayer`'s 1e9 one, so the
  * whole car park culls as a unit the moment you are looking the other way.
+ *
+ * ── the kit (28 Sep, third pass) ──────────────────────────────────────────
+ *
+ * *"I guess the cars were half-finished, can u finish off that one?"* (Misha,
+ * 28 Sep). The second pass had built a near tier and left it out, on cost.
+ * It was a second copy of every part of a car that is not paint — the shell's
+ * glass, lamps, plastics and underside, the plates, the mirrors, four wheels —
+ * swapped for the far one at 40 m: three more layers a model and 1.14 MB of
+ * page. Two measurements said where that went. A timer round each draw put
+ * the near tier's own GPU time at the car park at 0.2 ms; toggling it in the
+ * page, synchronously and paired 200 times, put its whole cost at 0.4 ms. The
+ * difference is the draws, and the draws were the thing to cut.
+ *
+ * So the far tier is drawn at EVERY distance now, and the near tier is a kit
+ * drawn on top of it, holding only what the far tier has not got: the see-
+ * through glass (one layer, transparent), and one layer of everything else —
+ * the cabin, the lamp inserts, the plate lettering, the grille bars, badges,
+ * wipers and aerial — in one material (`CAR_KIT_GLSL`). The far tier gives up
+ * its opaque glass and its wheels to the kit inside `CAR_KIT_M`, in the vertex
+ * stage (`CAR_FAR_VERT`), and nothing else, so the silhouette is the same mesh
+ * on both sides of the line. The wheels are one blob per WHEEL, not four per
+ * car: baked once at the origin and stood at each axle end here, and shared by
+ * every body type that runs it (the estate and the saloon run the same one).
+ * Two draws a model with a car inside 30 m, and one per wheel; none otherwise.
  */
 async function buildJadrijaCars(scene, sites) {
   const layers = [];
   let tris = 0, trisNear = 0;
   const counts = {};
   const _q = new THREE.Quaternion();
+  const _q2 = new THREE.Quaternion();
   const _e = new THREE.Euler();
+  const _v = new THREE.Vector3();
+  const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+  // The kit layers' steps (see `nearOnly`), run off every body layer's.
+  const kitSteps = [];
+  const wheels = new Map();
 
   const blob = async (key) => {
     const b64 = typeof PAYLOAD !== 'undefined' ? PAYLOAD[key] : null;
@@ -523,6 +648,52 @@ async function buildJadrijaCars(scene, sites) {
     }
   };
 
+  // One instanced layer over `items`: `{ pos, q, color, suit, hair }` each,
+  // world space. The bounding sphere is over the positions, grown by the
+  // geometry's own radius.
+  const layer = (geo, items, fin, name) => {
+    const L = propLayer(scene, geo, items.length, { spec: 0.08, specPower: 18 });
+    if (fin) {
+      L.mesh.material.dispose();
+      L.mesh.material = carMaterials()[fin];
+    }
+    const suit = items[0].suit
+      ? new THREE.InstancedBufferAttribute(new Float32Array(items.length * 3), 3) : null;
+    const hair = items[0].hair
+      ? new THREE.InstancedBufferAttribute(new Float32Array(items.length * 3), 3) : null;
+    if (suit) L.geo.setAttribute('aInstSuit', suit);
+    if (hair) L.geo.setAttribute('aInstHair', hair);
+    const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    items.forEach((it, i) => {
+      L.aPos.array.set(it.pos, i * 3);
+      L.aRot.array.set([it.q.x, it.q.y, it.q.z, it.q.w], i * 4);
+      L.aScale.array.set([1, 1, 1], i * 3);
+      L.aColor.array.set(it.color, i * 3);
+      if (suit) suit.array.set(it.suit, i * 3);
+      if (hair) hair.array.set(it.hair, i * 3);
+      for (let k = 0; k < 3; k++) {
+        lo[k] = Math.min(lo[k], it.pos[k]);
+        hi[k] = Math.max(hi[k], it.pos[k]);
+      }
+    });
+    for (const a of [L.aPos, L.aRot, L.aScale, L.aColor, suit, hair]) if (a) a.needsUpdate = true;
+    L.geo.instanceCount = items.length;
+    // A real bounding sphere, and frustum culling switched back on. The
+    // instance positions are world positions and the layer's mesh carries no
+    // transform, so the sphere is simply the box round them grown by the
+    // model's own radius. Left at `propLayer`'s 1e9 default the row is drawn
+    // on every frame of the game, including the ones spent over the channel
+    // with the resort three kilometres behind the aeroplane.
+    L.geo.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3((lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5, (lo[2] + hi[2]) * 0.5),
+      Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 0.5
+        + (geo.boundingSphere ? geo.boundingSphere.radius : 3));
+    L.mesh.frustumCulled = true;
+    L.mesh.name = name;
+    layers.push(L);
+    return L;
+  };
+
   for (const model of CAR_MODELS) {
     const mine = sites.filter((s) => s.model === model.key);
     counts[model.key] = mine.length;
@@ -530,104 +701,104 @@ async function buildJadrijaCars(scene, sites) {
 
     // The body and the far tier, all three or none: a body with no trim is a
     // car with no wheels, and one with no gloss is a car with no glass —
-    // worse than the boxes before. The near tier is all-or-nothing on its
-    // own; without it the far tier simply draws all the way in, which is
-    // 1.539.0 exactly, and the covered car has no near tier at all.
+    // worse than the boxes before. The kit is all-or-nothing on its own;
+    // without it the far tier draws every car all the way in, which is
+    // 1.542.3 exactly, and the covered car has no kit at all.
     const base = 'car_' + model.key;
     const far = { body: await blob(base + '_fr3d'), gloss: await blob(base + '_gloss_fr3d'),
       trim: await blob(base + '_trim_fr3d') };
     if (!far.body || !far.gloss || !far.trim) { console.warn('no car payload:', base); continue; }
-    const near = { ngloss: await blob(base + '_ngloss_fr3d'), ntrim: await blob(base + '_ntrim_fr3d'),
-      nglass: await blob(base + '_nglass_fr3d') };
-    const hasNear = !!(near.ngloss && near.ntrim && near.nglass);
+    const sz = carSize(model.key);
+    const kit = sz.wheel && sz.wo ? { glass: await blob(base + '_nglass_fr3d'),
+      det: await blob(base + '_ndet_fr3d') } : null;
+    let wheel = null;
+    if (kit && kit.glass && kit.det) {
+      const wk = 'car_wheel_' + sz.wheel;
+      if (!wheels.has(wk)) {
+        const g = await blob(wk + '_fr3d');
+        wheels.set(wk, g ? { geo: g, items: [] } : null);
+      }
+      wheel = wheels.get(wk);
+    }
+    const hasKit = !!wheel;
     const finish = mine.map((s) => carFinish(s, model));
 
-    const plan = [['body', far.body, 0], ['gloss', far.gloss, hasNear ? 1 : 0],
-      ['trim', far.trim, hasNear ? 1 : 0]];
-    if (hasNear) {
-      plan.push(['ngloss', near.ngloss, 2], ['ntrim', near.ntrim, 2], ['nglass', near.nglass, 2]);
-    }
-    for (const [half, geo, tier] of plan) {
-      const t = (geo.index.count / 3) * mine.length;
-      if (tier !== 2) tris += t;
-      if (tier !== 1) trisNear += t;
-      const L = propLayer(scene, geo, mine.length, { spec: 0.08, specPower: 18 });
-      const fin = half === 'body' ? (model.matte ? null : 'paint')
-        : half === 'gloss' ? 'gloss' : half === 'ngloss' ? 'glossN'
-          : half === 'nglass' ? 'glass' : 'trim';
-      if (fin) {
-        L.mesh.material.dispose();
-        L.mesh.material = carMaterials()[fin];
-      }
-      if (fin === 'glass') L.mesh.renderOrder = 3;
-      // The finish, per car, on the paint only. `aInstSuit` is the crowd's
-      // second colour and every other instanced layer leaves it unset; the
-      // paint reads it as (metallic, dust, sun-bleach).
-      let aSuit = null;
-      if (half === 'body') {
-        aSuit = new THREE.InstancedBufferAttribute(new Float32Array(mine.length * 3), 3);
-        aSuit.setUsage(THREE.DynamicDrawUsage);
-        L.geo.setAttribute('aInstSuit', aSuit);
-      }
-      // The index used to be set here, because `propLayer` copied position,
-      // normal and aVCol and stopped — every prototype it was written for comes
-      // out of `propBuilder.geo()`, a raw triangle soup with no index at all,
-      // whereas `readFR3D` deduplicates its vertices and keeps the triangles
-      // entirely in the index buffer. Handing that over without the index draws
-      // the vertex array in storage order, three at a time, which is not a car
-      // with a fault in it but a heap of flat shards lying on the ground.
-      //
-      // `propLayer` carries the index itself now, on 23 Aug, so this is gone
-      // rather than duplicated. The note stays because the failure is silent
-      // and the next indexed prototype would have found it the same way.
-      let lo = [1e9, 1e9, 1e9];
-      let hi = [-1e9, -1e9, -1e9];
-      mine.forEach((s, i) => {
-        // Roll about the model's X, pitch about its Z — see the shore build.
-        _e.set(s.roll || 0, s.yaw, s.pitch || 0, 'YXZ');
-        _q.setFromEuler(_e);
-        L.aPos.array[i * 3] = s.x;
-        L.aPos.array[i * 3 + 1] = s.y;
-        L.aPos.array[i * 3 + 2] = s.z;
-        L.aRot.array[i * 4] = _q.x; L.aRot.array[i * 4 + 1] = _q.y;
-        L.aRot.array[i * 4 + 2] = _q.z; L.aRot.array[i * 4 + 3] = _q.w;
-        L.aScale.array[i * 3] = 1; L.aScale.array[i * 3 + 1] = 1;
-        L.aScale.array[i * 3 + 2] = 1;
-        // Only the paint is tinted. That is the whole point of the others
-        // being layers of their own: 1.0 through the multiply leaves the baked
-        // colours exactly as Blender wrote them.
-        const c = half === 'body' ? s.tint : [1, 1, 1];
-        L.aColor.array[i * 3] = c[0]; L.aColor.array[i * 3 + 1] = c[1];
-        L.aColor.array[i * 3 + 2] = c[2];
-        if (aSuit) aSuit.array.set(finish[i], i * 3);
-        for (let k = 0; k < 3; k++) {
-          const v = [s.x, s.y, s.z][k];
-          if (v < lo[k]) lo[k] = v;
-          if (v > hi[k]) hi[k] = v;
-        }
-      });
-      for (const a of [L.aPos, L.aRot, L.aScale, L.aColor, aSuit]) if (a) a.needsUpdate = true;
-      L.geo.instanceCount = mine.length;
-
-      // A real bounding sphere, and frustum culling switched back on. The
-      // instance positions are world positions and the layer's mesh carries no
-      // transform, so the sphere is simply the box round them grown by the
-      // model's own radius. Left at `propLayer`'s 1e9 default the row is drawn
-      // on every frame of the game, including the ones spent over the channel
-      // with the resort three kilometres behind the aeroplane.
-      const c = new THREE.Vector3((lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5,
-        (lo[2] + hi[2]) * 0.5);
-      const span = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 0.5;
-      L.geo.boundingSphere = new THREE.Sphere(c,
-        span + (geo.boundingSphere ? geo.boundingSphere.radius : 3));
-      L.mesh.frustumCulled = true;
-      if (tier === 2) nearOnly(L, mine.length, 0, CAR_NEAR_M);
-      else nearOnly(L, mine.length, tier === 1 ? CAR_NEAR_M : 0);
+    // Per car: where it stands, and what the far layers need to know to clear
+    // the kit's space (`CAR_FAR_VERT`): the axles and the wheel's radius, the
+    // wheels' lateral span, and whether it has a kit.
+    const wo = sz.wo || [0, 0];
+    const span = [Math.min(wo[0], wo[1]) - (sz.wd || 0) - 0.012, Math.max(wo[0], wo[1]) + 0.03];
+    const cars = mine.map((s) => {
+      // Roll about the model's X, pitch about its Z — see the shore build.
+      _e.set(s.roll || 0, s.yaw, s.pitch || 0, 'YXZ');
+      return { pos: [s.x, s.y, s.z], q: new THREE.Quaternion().setFromEuler(_e) };
+    });
+    const ax = sz.ax || CAR_FALLBACK.ax;
+    const plan = [['body', far.body, model.matte ? null : 'paint'],
+      ['gloss', far.gloss, 'gloss'], ['trim', far.trim, 'trim']];
+    for (const [half, geo, fin] of plan) {
+      // Only the paint is tinted. That is the whole point of the others
+      // being layers of their own: 1.0 through the multiply leaves the baked
+      // colours exactly as Blender wrote them. The finish, per car, on the
+      // paint only: `aInstSuit` is the crowd's second colour, and the paint
+      // reads it as (metallic, dust, sun-bleach).
+      const items = cars.map((c, i) => ({
+        pos: c.pos, q: c.q,
+        color: half === 'body' ? mine[i].tint : [1, 1, 1],
+        suit: half === 'body' ? finish[i] : [ax[0], ax[1], hasKit ? sz.r : -1],
+        hair: half === 'body' ? null : [span[0], span[1], hasKit ? 1 : 0],
+      }));
+      const L = layer(geo, items, fin, base + '_' + half);
+      tris += (geo.index.count / 3) * mine.length;
+      trisNear += (geo.index.count / 3) * mine.length;
+      nearOnly(L, mine.length);
       L.half = half;
-      L.mesh.name = 'car_' + model.key + '_' + half;
-      layers.push(L);
+      if (half === 'body') {
+        // The kit's steps ride on the bodies', which are drawn whenever any
+        // car of theirs is — see `nearOnly`.
+        const own = L.mesh.onBeforeRender;
+        L.mesh.onBeforeRender = () => { own(); for (const f of kitSteps) f(); };
+      }
+    }
+    if (!hasKit) continue;
+
+    // The kit: the glass, and everything else in one layer. `aInstSuit` is
+    // the car's own position, which is what the vertex stage cuts on.
+    const kitItems = cars.map((c) => ({ pos: c.pos, q: c.q, color: [1, 1, 1], suit: c.pos }));
+    for (const [half, geo, fin] of [['nglass', kit.glass, 'glass'], ['ndet', kit.det, 'kit']]) {
+      const L = layer(geo, kitItems, fin, base + '_' + half);
+      if (fin === 'glass') L.mesh.renderOrder = 3;
+      trisNear += (geo.index.count / 3) * mine.length;
+      kitSteps.push(nearOnly(L, mine.length, 0, CAR_KIT_M + 4, 'aInstSuit'));
+      L.half = half;
+    }
+    // And its four wheels, onto the shared wheel's list. The wheel is baked
+    // with its axle on x = 0 and its outer face on z = 0, running inboard
+    // toward +z: that is the right-hand wheel as it stands (model z = -Y in
+    // Blender), so the right-hand pair goes on as they are at z = -outer, and
+    // the left-hand pair turned half round about the vertical, which puts the
+    // outer face out and the tread still on the ground, at z = +outer.
+    for (const c of cars) {
+      for (let k = 0; k < 2; k++) {
+        for (const side of [1, -1]) {
+          _v.set(ax[k], 0, -side * wo[k]).applyQuaternion(c.q);
+          _q2.copy(c.q);
+          if (side < 0) _q2.multiply(flip);
+          wheel.items.push({ pos: [c.pos[0] + _v.x, c.pos[1] + _v.y, c.pos[2] + _v.z],
+            q: _q2.clone(), color: [1, 1, 1], suit: c.pos });
+        }
+      }
     }
   }
+  for (const [wk, w] of wheels) {
+    if (!w || !w.items.length) continue;
+    const L = layer(w.geo, w.items, 'kit', wk);
+    trisNear += (w.geo.index.count / 3) * w.items.length;
+    kitSteps.push(nearOnly(L, w.items.length, 0, CAR_KIT_M + 4, 'aInstSuit'));
+    L.half = 'wheel';
+  }
+  // Nothing of the kit is drawn until a body has had its first look round.
+  for (const L of layers) if (L.half === 'nglass' || L.half === 'ndet' || L.half === 'wheel') L.mesh.visible = false;
 
   // ── the dark under every car ────────────────────────────────────────────
   // What made the last row look parked on glass was not the wheels, which
@@ -705,11 +876,13 @@ async function buildJadrijaCars(scene, sites) {
      * For the shadow pass in src/90-app.js — instanced, near cascade only. Not
      * the gloss layers: glass lets the sun through, so the cabin of a real
      * car throws a lighter shadow than its body, and a rim is inside its tyre.
-     * Nor the near tier's glass, for the same reason. The body and both
-     * tiers' trim, each of which draws only the cars in its own band.
+     * Nor the kit: the far trim's wheels are cut out of the MAIN pass only
+     * (the depth pass has its own vertex program), so every car keeps its
+     * far wheels' shadow at every distance, and a seat or a lug nut under a
+     * roof has no shadow anyone could see. The body and the far trim.
      */
-    meshes: () => layers.filter((L) => L.half === 'body' || L.half === 'trim'
-      || L.half === 'ntrim').map((L) => L.mesh),
+    meshes: () => layers.filter((L) => L.half === 'body' || L.half === 'trim')
+      .map((L) => L.mesh),
     count: sites.length,
     counts,
     tris,
