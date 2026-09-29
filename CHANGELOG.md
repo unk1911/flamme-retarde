@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.6] — 2026-09-29
+
+### What is on the floor, drawn as the things
+
+Misha, looking down at the concrete in front of the vikendica: *"there's all
+this low-poly crap, i don't even know what these geometric shapes are.. either
+remove them or render them with more poly so they resemble some real
+objects"*. Every one of them was a box or a flat quad, and three of them were
+not even the right box:
+
+- the **white-and-dark striped bar** and the **blue-and-dark one** were pairs
+  of sandals — offset ±9 cm ALONG a 25 cm sole, so the two soles overlapped
+  end to end into one 43 cm bar with two straps across it; the **small dark
+  three-block thing** and the **little yellow/blue box** were more of them;
+- the **green slab with the red slab on it** was "a towel folded over on
+  itself" — two slabs, coloured from two different picks;
+- the **white sheet** and the **flat coloured rectangles** further off were
+  towels: three flat panels each;
+- the **yellow box with the dark lid** was a bag;
+- the **octagonal brown ring with the dark centre** by the edge is a
+  mooring ring: eight flat chords 6 cm wide in a square pocket, with a
+  brown brick for the eye.
+
+All of them are real objects now, from new builders next to `clutter`
+(`tsFrame`, `skinGrid`, `beachTowel`, `foldedTowel`, `sandal` /
+`sandalPair`, `beachBag`) that the bathers-on-towels work can reuse. Nothing
+moved: every placement, footprint, colour and `jit` key is the caller's own,
+and no `rng` draw was added, removed or moved.
+
+**Towels** (134): smooth-shaded cloth with 6 cm rounded corners, a hem that
+droops to the slab and a skirt down to it, three rucks off the key, one of
+three weaves (bands across the ends, broad stripes down the length, or a
+border all round — navy on a white towel), and in four of ten a corner
+turned over on itself. **The dropped towel** is a rucked hand towel with a
+second one folded into a soft pad on top. **Sandals** (84 pairs) are
+foot-shaped soles — nine stations, a straight inner edge, a waist, a round
+heel, a dished footbed, a cut foam edge — side by side with the big toes
+inward and turned out a little, one pair in four with a shoe kicked off:
+flip-flops with a round-tube thong, slides with a broad arched band.
+**Bags** (42) are soft superellipse bodies, slumped, pinched at an open dark
+mouth, with two standing handles and a cream band on half of them.
+**Mooring rings** (21) are a round pocket with a chamfered lip, a torus of
+30 mm bar, and an eye on a plate that the ring runs through.
+
+And the **beach pitch towels**, which were buried: the sand west of
+`beachTo` is drawn as chords between `ribbon`'s corners and stands 37 to
+58 mm above `surfaceY` (measured with a ray down at three towels at t 100),
+so a towel laid on `surfaceY` at 12 mm showed as a triangle poking out of the
+shingle. New `floorUnder(t, s)` answers the drawn triangle's own height, and
+the beach towels and bags are laid on it (towels clamped to 12 cm of drape,
+so one across a real riser does not climb the wall).
+
+MEASURED: 179 triangles a towel (was 6), 98 a folded towel (24), 287 a pair of
+sandals (48), 188 a bag (24), about 310 a mooring ring (46).
+`__fr.stats().jadrija.tris` 671 536 → 730 262 (+58 726). No draw call
+added. Blockers 792 with the hash unchanged, people 100, hammock ties at
+4.138.
 ## [1.548.5] — 2026-09-29
 
 ### The lifeguard flags go out on the mole and fly; a ladder down each flank
