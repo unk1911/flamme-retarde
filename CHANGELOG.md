@@ -8,6 +8,21 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.7] — 2026-09-29
+
+### No houses on the open sea
+
+Misha, on the end of the Jadrija mole looking north-west toward Prvić: *"there
+are all these houses and stuff appearing out of the water ... just remove all
+those distant houses"*. The OSM footprints include the villages of islands the
+terrain heightmap does not carry, and footprints past its 13 km square, which
+`gridIndex` clamps to the edge's sea level; both were drawn as villages
+standing on water. `buildCity` now skips a building whose centre is past the
+square (159) or is sea more than 50 m from any waterline (678): the margin
+keeps real waterfront buildings the coarse cover grid calls sea. Skipped after
+each building's four `rng` draws, so every other building keeps its colours.
+12 977 → 12 100 built; the count is in `__fr.stats().city.skipped`.
+
 ## [1.548.6] — 2026-09-29
 
 ### What is on the floor, drawn as the things

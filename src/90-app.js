@@ -9379,7 +9379,7 @@ window.__fr = {
     trees: trees ? trees.stats() : null,
     landmarks: landmarks ? landmarks.list.length + '/' + LANDMARKS.length : null,
     city: city ? {
-      built: city.built, tris: city.tris, tagged: city.tagged,
+      built: city.built, skipped: city.skipped, tris: city.tris, tagged: city.tagged,
       forms: city.forms && { gable: city.forms[0], hip: city.forms[1], flat: city.forms[2],
         pyramid: city.forms[3], skillion: city.forms[4], round: city.forms[5] },
     } : null,

@@ -20,6 +20,8 @@ const CITY = {
 };
 
 /** Roof forms, as OSM codes them. `b.s` is absent when OSM does not say. */
+/** What `buildCity` left out, and why — see NOT ON NOTHING. */
+const CITY_SKIP = { out: 0, sea: 0 };
 const ROOF = { GABLE: 0, HIP: 1, FLAT: 2, PYRAMID: 3, SKILLION: 4, ROUND: 5 };
 
 /**
@@ -164,6 +166,21 @@ function buildCity(scene) {
     const rv = 1 + (rng() - 0.5) * 0.28 * spread;
     const wcol = wallCol0.map((c) => c * wv);
     const rcol = roofCol0.map((c) => c * rv);
+
+    // ── NOT ON NOTHING ─────────────────────────────────────────────────────
+    //
+    // Misha, 29 Sep 2026, on the end of the Jadrija mole looking north-west:
+    // *"there are all these houses and stuff appearing out of the water ...
+    // just remove all those distant houses"*. They were OSM footprints past
+    // the edge of the terrain — the heightmap is CONFIG.world square and
+    // `gridIndex` clamps to its edge, so a building outside it was stood on
+    // the edge's sea level and drawn as a village floating on open water,
+    // with no land anywhere under it. Skipped AFTER this building's four
+    // `rng` draws above, so every other building keeps its colours.
+    // (And one inside the square whose middle is open sea is the same fault
+    // in miniature: nothing is ever built on the water.)
+    if (Math.abs(cx) > HALF - 30 || Math.abs(cz) > HALF - 30) { CITY_SKIP.out++; continue; }
+    if (isSea(cx, cz) && gy < 0.3 && shoreAt(cx, cz) > 50) { CITY_SKIP.sea++; continue; }
 
     const eave = Math.max(CITY.eaveMin, b.h);
     const top = base + eave;
@@ -419,7 +436,7 @@ function buildCity(scene) {
   const roofs = mk(roofPos, roofNorm, roofCol, roofMat);
 
   return {
-    walls, roofs, built, tagged, forms, obbs,
+    walls, roofs, built, tagged, forms, obbs, skipped: { ...CITY_SKIP },
     tris: (wallPos.length + roofPos.length) / 9,
   };
 }
