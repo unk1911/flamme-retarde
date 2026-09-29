@@ -8,6 +8,58 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.9] — 2026-09-29
+
+### The Staropramen rack goes to MINI's wall, and its bicycles are bicycles
+
+Misha: *"can u also relocate the STAROPRAMEN ad board with the parked bicycles
+(which are too low-poly btw, would be nice to make them higher poly)"*, from
+where it stood in the alley between the two rows of kabine (t 484.5) to where
+he was standing, world (−2057.97, 4.73, 381.46), which is t 267.8, s 17.0 on
+the flags in front of beach bar MINI.
+
+- **Where it went**: not on his exact spot, which is the middle of the
+  promenade flags, but on the wall beside it. MINI's west end (t 272) is blank
+  corrugated wall with 2.9 m of it on the flags between the bar's corner
+  (s 18.0) and the edge of the flags (s 21.1). The panel runs along that wall
+  from s 18.7 to 21.0, its print facing west down the flags (toward the konoba
+  and the mole, the way he was looking). The bicycles stand noses-in to
+  t 269.9. That leaves 2.6 m clear to the end of the stone bench, so the way
+  from the lane to the sea stays open. The alley is clear. The walk blocker
+  moved with it and now covers the parked bicycles as well as the comb.
+- **`bicycle()`** (43-jadrija.js, beside `moped`) replaces the inline parked
+  bikes. Every tube is a smooth `tubeTS`. The tyres are round-section tori on
+  rims with a well, and each wheel has a flanged hub with 32 (24 on the
+  child's) laced, crossed spokes. The chain is a closed tube worked out from
+  the two tangents between chainring and sprocket. It also has a spider,
+  cranks and pedals, a lofted saddle on rails, and bent bars with grips,
+  levers and a bell. Three kinds:
+  - **The town bicycle**, step-through or diamond frame: ribbed tyres, a
+    quill, swept-back bars, full mudguards on stays, a chain guard, a lamp,
+    a sprung leather saddle, a folded stand, and a wire basket at the front
+    or on a rear carrier.
+  - **The mountain bike**: 32 knobs a row on black rims, a suspension fork
+    with its brace carried over the tyre, a disc and caliper, a cassette and
+    derailleur, a sloping top tube, a flat bar and a bottle in its cage.
+  - **The child's 20-inch**.
+
+  The slots are 0.62 m apart (was 0.52), because real bars are 0.58 m across.
+  Paint and crank angles come off `jit`, never `rng`. The measured triangle
+  counts: 10,478 step-through, 10,292 town, 11,032 mountain, 8,528 child's
+  (about 140 each before).
+- **The rack** is now round galvanised tube. It stands on two posts, each
+  turned from its bolted base plate to a domed cap, with clamps out to a
+  radiused extruded frame round the print. It keeps the steel case 0.10 m
+  behind the print. The comb has two ground rails on end runners, and each
+  slot is a pair of bent hoops 96 mm apart. The print sits at 1.00 m (was
+  0.96) so the new grips and the front basket stay below it. The rack is
+  5,012 triangles (was about 200).
+- jadrija tris 791,561 → 836,115 (+44,554). Blockers 792, hash −1931522060 →
+  2111515350 (only the rack's own box moved). People 100, the cars hash, the
+  hammock rest (−1923.17, 4.14, 443.16), the settle count (20/0) and the
+  riders' plan (forced 0) are unchanged. The riders' `wheelers` code is not
+  touched.
+
 ## [1.548.8] — 2026-09-29
 
 ### The riders' e-scooters, built as e-scooters
