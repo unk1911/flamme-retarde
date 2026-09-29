@@ -859,27 +859,46 @@ def louvred(kit, axis, at, a0, a1, z0, z1, open_to=1, slats=None,
     # reveal side of the wall, and the gap between leaf and render bridged by
     # the pintle's own arm. Black, forged, and the only dark thing on a white
     # elevation apart from the glass.
-    face = at - w * t                                   # the visible face
+    #
+    # Every depth below is an OFFSET from `at`, because that is what
+    # `_face_span` takes: its d0/d1 are added to `at`. 1.543.0 handed it
+    # absolute coordinates (the face at `at - w*t`, the render at `wall`), so
+    # each piece of iron went out at about `2*at` instead of `at`. The leaves
+    # stand at |at| = 3.49 (east and west) and 3.965 (north and south), so the
+    # hinges, pintles and hooks of every shuttered window and the terrace door
+    # hung in the air 3.5 to 4.0 m outside the wall they belong to, on all
+    # four sides. From anywhere near the house they projected straight onto
+    # the render behind them — under the verge, across the blank east gable,
+    # beside the stair — and never onto a shutter.
+    face = -w * t                                       # the visible face
+    rend = wall - at                                    # the render, ~0.10 off
     sgn = 1.0 if hinge > (a0 + a1) / 2 else -1.0       # toward the hinge
-    gap0, gap1 = sorted((at + w * t, wall))
+    # A 26 cm strap, but never past the free edge: the prizemlje bathroom's
+    # leaves are 25 cm wide, and a strap longer than its leaf is a black stub
+    # sticking out into thin air on the far side.
+    strap = min(0.26, (a1 - a0) - 0.05)
     for zc in (z0 + 0.20, z1 - 0.20):
-        kit.span(HARDWARE, *_face_span(axis, at, *sorted((hinge - sgn * 0.26,
+        kit.span(HARDWARE, *_face_span(axis, at, *sorted((hinge - sgn * strap,
                                                           hinge + sgn * 0.006)),
                                        zc - 0.016, zc + 0.016,
                                        *sorted((face, face - w * 0.004))),
                  bev=0.002)
         kit.span(HARDWARE, *_face_span(axis, at, hinge - 0.010, hinge + 0.010,
                                        zc - 0.040, zc + 0.040,
-                                       *sorted((face - w * 0.004,
-                                                gap1 if w > 0 else gap0))),
+                                       *sorted((face - w * 0.004, rend))),
                  bev=0.002)
-    # The hook, at the free edge, low: an eye on the leaf and a bar back to
-    # the render, with the turned-up end that stops the wind lifting it off.
+    # The hook, at the free edge, low: a bar from the render past the edge of
+    # the leaf, with the turned-up end over its face that stops the wind lifting
+    # it off. The bar used to stop at the leaf's back face, so the tip in front
+    # of it was a separate 12 mm lump with the thickness of the leaf between
+    # them; now it runs through to the tip and the two read as one hook.
     free = a0 if sgn > 0 else a1
     zh = z0 + min(0.32, (z1 - z0) * 0.3)
     kit.span(HARDWARE, *_face_span(axis, at, free - sgn * 0.004 - 0.006,
                                    free - sgn * 0.004 + 0.006, zh - 0.006,
-                                   zh + 0.006, gap0 - 0.004, gap1), bev=0.0)
+                                   zh + 0.006,
+                                   *sorted((rend, face - w * 0.012))),
+             bev=0.0)
     kit.span(HARDWARE, *_face_span(axis, at, free - sgn * 0.004 - 0.006,
                                    free - sgn * 0.004 + 0.006, zh, zh + 0.030,
                                    *sorted((face, face - w * 0.012))), bev=0.0)
