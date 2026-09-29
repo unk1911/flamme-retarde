@@ -8,6 +8,41 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.543.3] — 2026-09-28
+
+### The shutter iron goes back on the shutters
+
+Misha: *"what are those weird black thingies around the Vikendica: is that a
+job half-finished or what?"* Since 1.543.0, short black bars had been hanging
+round the house: under the east verge, across the blank east gable, beside the
+stair, over the garden and the terrace, and never next to a shutter. They
+were the shutters' own hardware (strap hinges, pintles and hold-back hooks),
+all 22 leaves' worth, 3.5 to 4.0 m outside the walls they belong to.
+
+`louvred` builds every piece through `_face_span(axis, at, …, d0, d1)`, whose
+depths are **offsets from `at`**. The hardware passed it absolute ones: the
+leaf's face at `at - w*t` and the render at `wall`. Each piece landed at about
+`2*at` instead of `at`. The leaves stand at |at| = 3.49 m on the gables and
+3.965 m on the long walls, so the iron hung out over the stair, the yard and
+the sea side, and from anywhere near the house it projected onto the render
+behind it. The depths are now offsets: the strap sits on the leaf's face, the
+pintle runs from the strap to the render, and the hook runs from the render to
+a turned-up tip on the face, past the free edge. The hook used to stop at the
+back of the leaf, which left its tip as a separate lump. The straps are also
+capped at the leaf's width less 5 cm. The prizemlje bathroom's leaves are
+25 cm wide, and a 26 cm strap stuck out past the free edge.
+
+**Checked** on the baked blob, not by eye alone. Before the fix, the
+hardware was 2.1 to 4.1 m outside the wall faces. After it, every one of the
+2244 hardware faces lies inside its own leaf's box, grown 12 mm in the plane
+of the leaf and 13 cm back to the render. Shot at eye height from all eight
+sides, plus a close-up of each of the eleven shuttered openings, before and
+after.
+
+Only `vikendica_shell` changed: +844 bytes gzipped, +1.1 KB html. The roof,
+loft, glass, sheer and ware blobs rebaked byte-identical. The plan sidecar is
+byte-identical, and the blockers hash is unchanged (8602 chars, 1571414864).
+
 ## [1.543.2] — 2026-09-28
 
 ### 2.7 MB lighter: the old swimmers stay out of the page
