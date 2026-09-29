@@ -540,6 +540,25 @@ const BATHER_SEX = {
 };
 
 /**
+ * The bodies whose swimsuit top may come off, or be undone — and nobody else.
+ *
+ * Misha, 29 Sep 2026, of the mole: *"many of the women bathers have their
+ * tops either fully off or partially off"*, which is what a Croatian bathing
+ * station is and what 43-jadrija.js now places (`top` in `MOLE_LIFE`).
+ *
+ * A LIST OF BODIES, NOT OF PLACES, and that is the whole of why it is here.
+ * A place on the mole says "whoever lies here has her top off", and the
+ * people dealt those places are whoever the shore's casting put there — it
+ * is not the placement's job to know who that is, and it must not be the
+ * placement that keeps a child's swimsuit on. Every tier that draws a top
+ * off asks THIS set, by the body it is actually drawing: the near tier in
+ * `fig.dress` (42-bathers2.js), the far tier in `flush` below. The three
+ * adult women and nobody else; the two children are not on it and cannot
+ * be put on it by anything a place says.
+ */
+const TOPS_KINDS = new Set(['woman_young_slim', 'woman_young_full', 'woman_old']);
+
+/**
  * What each of the eight has on, and what colour they are.
  *
  * Read off `SUITS` in tools/blender/bathers_mh.py, which is where they are
@@ -1363,6 +1382,10 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     // `lie` was ruled out of the skinned tier altogether in 43-jadrija.js and
     // the eleven of them could never be promoted however close you stood.
     if (fg.mode === 'lie') {
+      // On her front if the place she was put says so (`fg.prone`, the
+      // mole), which is `prone` — made from `sunbathe` on this body when
+      // the blobs are parsed, see `proneClip` in 43-jadrija.js.
+      if (fg.prone && f.clips && f.clips.includes('prone')) return 'prone';
       return f.clips && f.clips.includes('sunbathe') ? 'sunbathe' : 'idle';
     }
     if (fg.mode !== 'sit') return CLIP[fg.mode] || 'idle';
@@ -2330,7 +2353,9 @@ function makeCrowd(scene, bodies, cap) {
         // (0,1,0) to (−cos y, 0, sin y), which is exactly where Ry(y)·Rz(+π/2)
         // takes it — the same head, in the same place, on the same towel — and
         // it takes the body's front (1,0,0) to (0,−1,0), which is the ground.
-        const prone = h1 > 0.74;
+        // Unless the place says which (`fg.prone`, the mole's towels), and
+        // then the near tier says the same — see `wantClip`.
+        const prone = fg.prone != null ? !!fg.prone : h1 > 0.74;
         tip = prone ? -Math.PI / 2 : Math.PI / 2;
         spin = prone ? Math.PI : 0;
 
@@ -2916,7 +2941,16 @@ function makeCrowd(scene, bodies, cap) {
       L.aShirt.array[r * 4] = sh ? sh[0] : 0;
       L.aShirt.array[r * 4 + 1] = sh ? sh[1] : 0;
       L.aShirt.array[r * 4 + 2] = sh ? sh[2] : 0;
-      L.aShirt.array[r * 4 + 3] = sh ? 1 : 0;
+      // And the other thing the trunk can be told: bare. `fg.top` 1 is a top
+      // taken off, and the same fourth channel carries it as −1 — the
+      // swimwear the bake bound to the torso joint is drawn in her own skin
+      // colour, which on a bikini is the top and on a one-piece is a suit
+      // rolled down to the waist. Asked of THIS layer's body and nothing
+      // else (`TOPS_KINDS`), so a child is never drawn so whatever `fg`
+      // says. `top` 2 — undone, lying on her front — is not drawn here: from
+      // the distance this tier draws at it is the same back either way.
+      L.aShirt.array[r * 4 + 3] = sh ? 1
+        : fg.top === 1 && TOPS_KINDS.has(L.body.kind) ? -1 : 0;
       n++;
     }
     for (const L of layers) {

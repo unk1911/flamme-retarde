@@ -132,6 +132,56 @@ function bather2Eyes(data) {
 }
 
 /**
+ * Where this blob's swimsuit top is, measured once per blob: `[tiles, hasTop,
+ * cutY, backX]` for the `wear` shader's `uTopCut`.
+ *
+ * Misha, 29 Sep 2026: *"many of the women bathers have their tops either
+ * fully off or partially off"*. Nothing new is drawn for it and no texture is
+ * added. The body under the swimwear is whole — tools/blender/bathers_v2.py
+ * does not cut it out under the garments the way baye2.py does with a
+ * `.mhclo`'s `delete_verts` — so a top taken off is the top's fragments not
+ * drawn, and what shows is the skin that was always there.
+ *
+ * WHICH fragments is the only question, and the bake answers it: the
+ * swimwear is packed into the atlas one garment to a tile, hair first
+ * (`garment(... u_band=True)`), so on a body with a separate top the top is
+ * tile 1 exactly. The one-piece has no top to take off; it is rolled down
+ * instead, which is everything of it above the waist — 42 per cent of the
+ * way up the suit from the crotch to the straps, which on this body is the
+ * line between the ribs and the hip. `backX` is half way between the back of
+ * the top and the front of it, for a top UNDONE: the band and the back
+ * straps gone and the cups left under her, which is what somebody lying on
+ * her front with the clasp open looks like from anywhere you can see her.
+ */
+function bather2TopCut(data, kind) {
+  if (data.topCut) return data.topCut;
+  const T = bather2Table();
+  const spec = T && T.bathers[kind];
+  const n = (T && T.lum && T.lum['n_' + kind]) || 2;
+  const hasTop = !!(spec && spec.top);
+  const grp = (data.groups || []).find((g) => g.name === 'wear');
+  const pos = data.geo.getAttribute('position');
+  const uv = data.geo.getAttribute('uv');
+  const idx = data.geo.getIndex();
+  let y0 = 1e9, y1 = -1e9, x0 = 1e9, x1 = -1e9;
+  if (grp && uv && idx) {
+    for (let k = grp.start; k < grp.start + grp.count; k++) {
+      const v = idx.getX(k);
+      const tile = Math.floor(uv.getX(v) * n);
+      if (tile < 1) continue;                       // the hair
+      if (hasTop && tile !== 1) continue;           // the bottoms
+      const x = pos.getX(v), y = pos.getY(v);
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+    }
+  }
+  const ok = y1 > y0;
+  data.topCut = [n, hasTop ? 1 : 0, ok ? y0 + (y1 - y0) * 0.42 : 1e3,
+    ok ? (x0 + x1) * 0.5 : -1e3];
+  return data.topCut;
+}
+
+/**
  * One v2 bather figure, on a parsed blob, with uniforms of its own.
  *
  * Fresh uniform objects per call and not a shared option set: forty-eight
@@ -143,6 +193,10 @@ function bather2Figure(data, kind) {
   const spec = T && T.bathers[kind];
   const eyes = bather2Eyes(data);
   const skinU = { value: null };
+  // The top: 0 on, 1 off, 2 undone. See `bather2TopCut`, and `TOPS_KINDS`
+  // in 42-crowd.js for who it can ever be anything but 0 on.
+  const topU = { value: 0 };
+  const cut = bather2TopCut(data, kind);
   const hairDye = { value: new THREE.Color(0.3, 0.2, 0.1) };
   const suitDye = { value: new THREE.Color(0.14, 0.3, 0.56) };
   // Each half's own mean luminance, so a dye lands on its colour whether the
@@ -205,12 +259,24 @@ function bather2Figure(data, kind) {
           uHairDye: hairDye, uSuitDye: suitDye,
           uLum: { value: new THREE.Vector2(L('hair', 0.3), L('suit', 0.4)) },
           uSplit: { value: split },
+          uTop: topU,
+          uTopCut: { value: new THREE.Vector4(cut[0], cut[1], cut[2], cut[3]) },
         },
         decl: 'uniform sampler2D uWear;\nuniform vec3 uHairDye;\n'
-          + 'uniform vec3 uSuitDye;\nuniform vec2 uLum;\nuniform float uSplit;',
+          + 'uniform vec3 uSuitDye;\nuniform vec2 uLum;\nuniform float uSplit;\n'
+          + 'uniform float uTop;\nuniform vec4 uTopCut;',
         body: 'vec4 tc = texture2D(uWear, vUv);\n'
           + 'if (tc.a < 0.5) discard;\n'
           + 'bool isHair = vUv.x < uSplit;\n'
+          // The top, off or undone (`bather2TopCut`): its tile on a bikini,
+          // everything over the waist on a one-piece; and undone is only the
+          // half of it behind `backX`.
+          + 'if (!isHair && uTop > 0.5) {\n'
+          + '  float tile = floor(vUv.x * uTopCut.x);\n'
+          + '  bool isTop = uTopCut.y > 0.5 ? (tile > 0.5 && tile < 1.5)'
+          + ' : vLocal.y > uTopCut.z;\n'
+          + '  if (isTop && (uTop < 1.5 || vLocal.x < uTopCut.w)) discard;\n'
+          + '}\n'
           + 'float tl = dot(tc.rgb, vec3(0.299, 0.587, 0.114));\n'
           + 'float lm = isHair ? uLum.x : uLum.y;\n'
           + 'base = (isHair ? uHairDye : uSuitDye)'
@@ -231,6 +297,8 @@ function bather2Figure(data, kind) {
   fig.dress = (fg) => {
     const p = bather2Pick(kind, fg);
     if (!p) return;
+    // By BODY, and never by what `fg` asks: see `TOPS_KINDS`.
+    topU.value = TOPS_KINDS.has(kind) ? (fg.top | 0) : 0;
     skinU.value = bather2Tex('bskin_' + p.skin);
     hairDye.value.setRGB(p.hair[0], p.hair[1], p.hair[2]);
     suitDye.value.setRGB(p.suit[0], p.suit[1], p.suit[2]);
