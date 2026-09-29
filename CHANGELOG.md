@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.6] — 2026-09-29
+
+### The Tisak, pressed: the front is the front, TISAK is back, and there is a shop behind the window
+
+Misha: *"the TISAK still looks like crap ... and it lost the "TISAK" sign..
+make it higher-poly, make it look like a real TISAK"*. 1.549.3 rounded every
+edge and fixed nothing that read as wrong, because none of it was about edges.
+
+- **Why the sign vanished.** The livery strip was a flat 3.56 m
+  `seaFacing` plane 15 mm off a fascia laid through `W` in 0.45 m pieces, and
+  `seaFacing` yaws its plane off `at(t)`'s interpolated normal. Measured off
+  1.550.4, the fascia face ran from 31 mm in FRONT of the plane at t 305.3 to
+  34 mm behind it at t 308: everything west of about t 306.4 — the whole of
+  TISAK — was inside the red box. The 100 mm standoff it had before 1.549.3
+  was hiding the same yaw. Nothing printed on the kiosk is a flat plane now:
+  every print is a sheet laid through `W` (`tkSheet`), lit (`tkPrintMat`),
+  so it bends with the steel under it and darkens at dusk with it.
+- **The front was the back.** The plaza elevation carried `_343`'s panelled
+  land side on its western two thirds and `_414`'s counter on 1.3 m of it.
+  It is `_414` now, checked against the pan at 04:22.5-04:26.4: the Jana
+  cooler flush in front of the west bay under the end of the awning, the
+  serving window the rest of the length in a thin aluminium frame (open over
+  the counter, glazed over its east third), a pale ledge with the papers on
+  it, four framed khaki panels under it, the shutter box and strip light, and
+  a full-length red awning with a white piping bar and a sun-faded valance
+  with **TISAK** in white on its left-hand end and the chips and CENTAR at
+  its right. A **Ledo** chest freezer stands outside the east end.
+- **The panels are where `_343` has them**: the back, both ends. Each face
+  is a weathered skin (`tkSkin`: every panel its own bronze, run-off streaks
+  from each head, splash at the foot, a few dents) with the frame 45 mm proud
+  and a pressed lip 14 mm proud inside every panel. The top of every upper
+  panel is printed red, bay by bay, crossed by the frame: TISAK at the east
+  end of the back and `www.tisak.hr` / `0800 666 770` at the west, TISAK on
+  the east end, the freephone number over the door on the west end.
+- **A shop behind the window.** The generic body box is off for this kiosk;
+  it is a shell with a floor, linings, a ceiling and a tube. Behind the
+  glass, in depth: a raked magazine rack and two shelves of magazines, the
+  sweets stand with the lighters and the till at the hatch, a postcard
+  column, three rails of crisp pillows, the blue chest freezer with a towel
+  over it, and a free-standing gantry of packets 1.2 m back.
+- **The door moved** to the west end, where `_343` has it, 0.66 m wide so
+  the open leaf clears the pallet; the west end also has a glazed window
+  with magazines behind it. **The step ladder** moved beside the west corner
+  (both frames); it stood on paving the pan shows clear.
+- **The Jana wrap is on the flat.** It was a `brandRing` whose repeat put a
+  join on a corner (JAN on the front, NA on the return). It is one printed
+  sheet on the cabinet's door now (`tkJanaPrint`: Jana, the Ice Tea leaf,
+  SAMO opušteno!, the bottle, lemons and leaves, Jana), on a white cabinet.
+  The second printed leaf is gone; the pan has one Jana face.
+- The downpipe moved to the back's west corner: at the east it stood down
+  the I of TISAK.
+
+`jadrija.tris` 966,564 → 981,666 (+15,102). Blockers 786 (the door and
+ladder colliders moved, the Jana leaf's went and the Ledo's came, so the
+hash changes), people 100, no console errors, the buy prompt unchanged. No
+`rng` draws touched.
+
 ## [1.550.5] — 2026-09-29
 
 ### The people, packed: 7.4 MB off the page, and nobody looks any different
