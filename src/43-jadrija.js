@@ -61124,98 +61124,29 @@ async function buildJadrija(scene) {
     scoot: [[0.092, 0.092, 0.100], [0.540, 0.556, 0.560]],
   };
 
-  /** A four-sided tube between two points, in a vehicle's own frame. */
-  function wheelTube(b, A, B, r, col) {
-    const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
-    const L = Math.hypot(dx, dy, dz) || 1;
-    const d = [dx / L, dy / L, dz / L];
-    // Across the machine, unless the tube already runs across it.
-    const w = Math.abs(d[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
-    let u = [d[1] * w[2] - d[2] * w[1], d[2] * w[0] - d[0] * w[2],
-      d[0] * w[1] - d[1] * w[0]];
-    const lu = Math.hypot(u[0], u[1], u[2]) || 1;
-    u = [u[0] / lu * r, u[1] / lu * r, u[2] / lu * r];
-    const v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2],
-      d[0] * u[1] - d[1] * u[0]];
-    const P = (Q, a, c) => [Q[0] + u[0] * a + v[0] * c, Q[1] + u[1] * a + v[1] * c,
-      Q[2] + u[2] * a + v[2] * c];
-    const ring = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
-    for (let k = 0; k < 4; k++) {
-      const [a0, c0] = ring[k], [a1, c1] = ring[(k + 1) % 4];
-      b.quad(P(A, a0, c0), P(B, a0, c0), P(B, a1, c1), P(A, a1, c1),
-        k % 2 ? col : shade(col, 1.14));
-    }
-  }
-
-  /**
-   * A wheel standing in the machine's own plane: tread, two sidewalls, a flat
-   * rim and a hub. `spokes` draws three diameters across it, which is what
-   * makes a 0.68 m ring read as a bicycle wheel rather than as a hoop; a
-   * scooter's small wheel is solid, so it gets a disc instead.
-   *
-   * Drawn about `cx, cy` because the chainring is drawn about the bottom
-   * bracket; a road wheel is built about nought and carried to its axle by
-   * `wheelDisc`, so that it can be turned.
-   *
-   * THE SCOOTERS' ONLY, since 1.531.0. The bicycles' wheels, chainring and
-   * everything else are `bikeWheel` and `wheelBike` below; the spoked branch
-   * here is kept because it costs nothing and a spoked scooter hub is one
-   * line away.
-   */
-  function wheelRim(b, cx, cy, R, w, tyre, rim, spokes) {
-    const N = 14, Ri = R - 0.042, Rr = R - 0.070;
-    const p = (a, r, z) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r, z];
-    for (let j = 0; j < N; j++) {
-      const a0 = j / N * TAU, a1 = (j + 1) / N * TAU;
-      b.quad(p(a0, R, -w), p(a1, R, -w), p(a1, R, w), p(a0, R, w), tyre);
-      b.quad(p(a0, Ri, -w), p(a1, Ri, -w), p(a1, R, -w), p(a0, R, -w), tyre);
-      b.quad(p(a0, R, w), p(a1, R, w), p(a1, Ri, w), p(a0, Ri, w), tyre);
-      if (spokes) {
-        b.quad(p(a0, Rr, 0), p(a1, Rr, 0), p(a1, Ri, 0), p(a0, Ri, 0), rim);
-      } else {
-        b.tri(p(a0, Ri, 0), p(a1, Ri, 0), [cx, cy, 0], rim);
-      }
-    }
-    if (spokes) {
-      for (let k = 0; k < 3; k++) {
-        const a = k / 3 * Math.PI + 0.3, e = 0.004;
-        const c = Math.cos(a), s = Math.sin(a);
-        b.quad([cx + c * Rr - s * e, cy + s * Rr + c * e, 0],
-          [cx - c * Rr - s * e, cy - s * Rr + c * e, 0],
-          [cx - c * Rr + s * e, cy - s * Rr - c * e, 0],
-          [cx + c * Rr + s * e, cy + s * Rr - c * e, 0], rim);
-      }
-    }
-    b.box(cx, cy, 0, 0.05, 0.05, w * 2 + 0.03, rim);
-  }
-
-  /**
-   * A road wheel as a thing of its own: the rim built about the origin, and
-   * where its axle sits in the machine.
-   *
-   * A WHEEL IS NOT PART OF THE FRAME. It was — both wheels were welded into
-   * the same triangle soup as the down tube, and three spokes that never
-   * moved on a bicycle doing 4.6 m/s is the one thing on this promenade that
-   * reads as a toy on a rail. The cranks were already out on their own node
-   * for exactly this reason; the wheels are out for the same one, and they
-   * turn off the distance the machine has covered and nothing else. Rolling
-   * without slipping is the whole of it: the angle is the arc length over the
-   * radius, so a wheel stops when the rider stops, crawls through a turn, and
-   * a 0.10 m scooter wheel goes round three and a bit times for every turn of
-   * a 0.34 m bicycle one without either of them being told a rate.
-   */
-  function wheelDisc(x, y, R, w, tyre, rim, spokes) {
-    const b = propBuilder();
-    wheelRim(b, 0, 0, R, w, tyre, rim, spokes);
-    return { geo: b.geo(), tris: b.count() / 3, x, y, R };
-  }
+  // A WHEEL IS NOT PART OF THE FRAME. It was — both wheels were welded into
+  // the same triangle soup as the down tube, and three spokes that never
+  // moved on a bicycle doing 4.6 m/s is the one thing on this promenade that
+  // reads as a toy on a rail. The cranks were already out on their own node
+  // for exactly this reason; the wheels are out for the same one, and they
+  // turn off the distance the machine has covered and nothing else. Rolling
+  // without slipping is the whole of it: the angle is the arc length over the
+  // radius, so a wheel stops when the rider stops, crawls through a turn, and
+  // a 0.10 m scooter wheel goes round three and a bit times for every turn of
+  // a 0.34 m bicycle one without either of them being told a rate.
+  //
+  // (`wheelTube`, `wheelRim` and `wheelDisc` — the four-sided tube and the
+  // 14-gon wheel both machines were first built from — went with the
+  // scooter's rebuild in 1.548.7; nothing used them after it. The bicycle's
+  // own builders are `bikeSweep`, `bikeGrid` and `bikeWheel` below, and the
+  // scooter's `scSpin` and `scootWheel` after them.)
 
   // ── the bicycle, built as a bicycle ─────────────────────────────────────────
   //
   // Misha, 27 Sep 2026, from in front of a rider on the promenade: *"right now,
   // the bicycles are too 'simplistic', would be nice to have more complex
   // structure for bicycle."* He was right, and the screenshot said exactly how:
-  // the frame was square box beams (`wheelTube` is a FOUR-sided tube, flat
+  // the frame was square box beams (`wheelTube` was a FOUR-sided tube, flat
   // shaded, alternate faces lightened, which is a box), the bar was three
   // straight grey sticks with black box grips, the pedals were black bricks
   // welded to the cranks so they tumbled with them, the wheels were 14-gon rings
@@ -61947,39 +61878,374 @@ async function buildJadrija(scene) {
     };
   }
 
+  // ── the e-scooter, built as one ─────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026, from beside the young man on the dark one: *"i love
+  // the e-scooters' physics, but they are too low-poly, can u make them
+  // higher-poly, like u did with the bicycles?"* His screenshot said how. The
+  // stem was a four-sided `wheelTube` — a square beam, flat shaded, alternate
+  // faces lightened — and so was the bar; the deck was one box and the rear
+  // fender a second, flatter one; the "lamp" was a white matchbox on the
+  // stem; and the wheels were `wheelDisc`, a 14-gon ring of tyre round a flat
+  // hub disc with a box through the middle for an axle. 104 triangles of body
+  // and 110 a wheel. From the two metres he was standing at, it was a scooter
+  // drawn with a ruler.
+  //
+  // What it is now: the commuter scooter every rental fleet and every second
+  // Xiaomi on the Adriatic is — a round stem tapering up from a folding joint
+  // with its hinge and latch lever, a headlamp on a band clamp, a T-bar with
+  // ribbed rubber grips, a brake lever under the left hand and a thumb
+  // throttle under the right, a bell, a dashboard pod with a screen and four
+  // battery LEDs (and nothing written: rule 12); a deck with rounded corners,
+  // a grip-tape top inset from a painted rim, a bellied underside and red side
+  // reflectors; a curved front neck over the tyre into the head tube; a fork
+  // with its crown; mudguards hugging both wheels; a tail lamp under the rear
+  // one; the rear brake calliper; and the kickstand folded up under the left
+  // of the deck. Every round thing is turned with `spinIn`, the profile-normal
+  // lathe the bins and lamps and showers went round on (1.548.3), borrowed
+  // through `scSpin` below because it writes into whichever builder `b` is;
+  // the tubes are `bikeSweep` and the mudguards `bikeGuard`, the bicycle's
+  // own. The wheels are pneumatic 8.5-inch: a round-section tyre with a
+  // moulded tread band on a rim with its flanges — the FRONT one a hub motor,
+  // the shell and its two covers and bolts, the BACK one five alloy spokes and
+  // a drilled brake disc.
+  //
+  // THE PHYSICS HE LIKES IS UNTOUCHED, because none of it is in here. What the
+  // riders are solved to is `WHEEL_SCOOT` — the deck top at 0.155, the grips'
+  // middles at (0.36, 1.10, ±0.21) with 17 mm of rubber for the fingers to
+  // wrap (`WHEEL_HAND.rad`), the axles at (−0.44, 0.10) and (0.45, 0.11) and
+  // their radii — and all of those are the same numbers they were, MEASURED
+  // off the built geometry before and after (see the CHANGELOG, 1.548.7). The
+  // wheels are still their own nodes at their own axles turned by distance
+  // over radius in `wheelDraw`, and a scooter still has no steering node: its
+  // bar is fixed to the deck, as a scooter's nearly is at 5 m/s.
+  //
+  // AND A FAR COPY, as the bicycles have: the same builder with `lo` set, on
+  // eight-sided lathes and sixteen-segment tyres with no tread, bolts, cables,
+  // lever blades or drilled holes, swapped past `WHEELS.lod`.
+  const WHEEL_SCOOT = {
+    deck: 0.155, bar: [0.36, 1.10], grip: 0.21,
+    // The axles, [x, radius]: 200 mm and 220 mm wheels, back and front.
+    rear: [-0.44, 0.10], front: [0.45, 0.11],
+    // The steering column's axis, which is the line the stem was always drawn
+    // on — from (0.42, 0.21) up to the middle of the bar.
+    col: [0.42, 0.21],
+    // The deck, in plan: from behind the front foot's toes to a centimetre
+    // clear of the back tyre, 160 mm wide, with 45 mm corners.
+    deckX: [-0.33, 0.30], deckW: 0.080, deckR: 0.045,
+  };
+  // What an e-scooter is made of that is not its paint.
+  const SC = {
+    tyre: BK.tyre, rim: [0.300, 0.305, 0.310], dark: [0.080, 0.080, 0.085],
+    rubber: BK.rubber, tape: [0.048, 0.048, 0.050], steel: BK.steel,
+    chrome: BK.chrome, lens: BK.lens, red: BK.red,
+    screen: [0.040, 0.060, 0.075], led: [0.520, 0.780, 0.950],
+  };
+
   /**
-   * An e-scooter, in the same frame: a low deck, two small solid wheels, a
-   * stem raked back to a bar at about a metre. Dark, with nothing written on
-   * it.
-   *
-   * Its wheels come off `wheelDisc`, which the bicycles' used to, and turn the
-   * same way as theirs, and because they are solid discs of one colour almost none of that
-   * shows. They are out on their own nodes anyway: a wheel that is nailed to
-   * the deck is wrong whether or not anybody can see it, and the day one of
-   * these gets a spoked hub it would be wrong visibly.
+   * `spinIn` into a vehicle's builder, about the axis `A` through `C`, in the
+   * machine's own frame. `spinIn` writes into the shore's current `b`, so `b`
+   * is lent for the call and given back — the way the kabine lend it.
+   * `o.ref` pins the section's first axis (for `o.sec`, an oval section).
+   * `o.sh` is the bright-above shading; nought on anything that turns, whose
+   * top does not stay on top.
    */
-  const WHEEL_SCOOT = { deck: 0.155, bar: [0.36, 1.10], grip: 0.21 };
-  function wheelScoot(col) {
-    const b = propBuilder();
-    const K = WHEEL_SCOOT;
-    const TYRE = [0.055, 0.055, 0.058], HUB = [0.300, 0.305, 0.310];
-    const DARK = [0.080, 0.080, 0.085];
-    const wheels = [wheelDisc(-0.44, 0.10, 0.10, 0.026, TYRE, HUB, false),
-      wheelDisc(0.45, 0.11, 0.11, 0.026, TYRE, HUB, false)];
-    b.box(-0.03, K.deck - 0.035, 0, 0.74, 0.07, 0.17, col, [0.120, 0.120, 0.125]);
-    b.box(-0.45, 0.215, 0, 0.22, 0.015, 0.075, col);
-    wheelTube(b, [0.30, 0.12, 0], [0.42, 0.21, 0], 0.030, col);
-    wheelTube(b, [0.42, 0.21, 0], [K.bar[0], K.bar[1], 0], 0.021, col);
-    for (const z of [-0.03, 0.03]) wheelTube(b, [0.42, 0.21, z], [0.45, 0.11, z], 0.010, col);
-    wheelTube(b, [K.bar[0], K.bar[1], -K.grip - 0.04], [K.bar[0], K.bar[1], K.grip + 0.04], 0.012, col);
-    for (const s of [-1, 1]) {
-      wheelTube(b, [K.bar[0], K.bar[1], s * (K.grip - 0.05)], [K.bar[0], K.bar[1], s * (K.grip + 0.05)], 0.017, DARK);
+  function scSpin(into, C, A, prof, col, sides, o = {}) {
+    const a = bkNorm(A);
+    const ref = o.ref || (Math.abs(a[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]);
+    const U = bkNorm(bkAdd(ref, a, -bkDot(ref, a))), V = bkCross(a, U);
+    const F = (x, y, w) => [C[0] + U[0] * x + V[0] * y + a[0] * w,
+      C[1] + U[1] * x + V[1] * y + a[1] * w, C[2] + U[2] * x + V[2] * y + a[2] * w];
+    const keep = b;
+    b = into;
+    try {
+      spinIn(F, prof, col, sides, o.sec || [1, 1], o.sh ?? 0.10, o.crease ?? 0.5);
+    } finally {
+      b = keep;
     }
-    b.box(K.bar[0] + 0.01, K.bar[1] + 0.025, 0, 0.06, 0.02, 0.07, DARK);
-    b.box(0.385, 0.90, 0, 0.03, 0.045, 0.055, [0.820, 0.820, 0.780]);
-    let wt = 0;
-    for (const W of wheels) wt += W.tris;
-    return { geo: b.geo(), crank: null, wheels, tris: b.count() / 3 + wt };
+  }
+
+  // Both scooters' wheels are the same, so they are built once a level of
+  // detail and shared, as the bicycles' are.
+  const scootWheelCache = new Map();
+
+  /**
+   * An e-scooter's wheel about its own axle, in the machine's plane: an 8.5
+   * inch pneumatic tyre — 21 mm of section height, 52 mm wide, its outermost
+   * tread at exactly the wheel's radius so that it stands on the ground where
+   * the old disc did — with a moulded band of transverse grooves, which is
+   * also what shows it turning. The front is the hub motor: the rim and the
+   * motor's shell are one casting, with a domed cover and six bolts each side.
+   * The back has five alloy spokes to a hub and a drilled disc on the left.
+   * Nothing on either is shaded bright-above, because the top does not stay
+   * on top.
+   */
+  function scootWheel(front, lo) {
+    const key = (front ? 'f' : 'r') + (lo ? 'l' : '');
+    if (scootWheelCache.has(key)) return scootWheelCache.get(key);
+    const sb = propBuilder();
+    const R = front ? WHEEL_SCOOT.front[1] : WHEEL_SCOOT.rear[1];
+    const ty = 0.021, tz = 0.026, Rt = R - ty, Rf = R - 0.029;
+    const AR = lo ? 16 : 48, SEC = lo ? 4 : 10, SD = lo ? 10 : 32;
+    const Z = [0, 0, 0], AX = [0, 0, 1];
+    // The tyre: a round section from bead to bead, and the tread band on its
+    // crown — every third row sunk 1.8 mm and darker.
+    {
+      const G = [];
+      const groove = (i, j) => !lo && i % 3 === 0 && j > SEC * 0.3 && j < SEC * 0.7;
+      for (let i = 0; i < AR; i++) {
+        const a = i / AR * TAU, c = Math.cos(a), s = Math.sin(a), row = [];
+        for (let j = 0; j <= SEC; j++) {
+          const p = -0.66 * Math.PI + 1.32 * Math.PI * j / SEC;
+          const rr = Rt + Math.cos(p) * ty - (groove(i, j) ? 0.0018 : 0);
+          row.push([c * rr, s * rr, Math.sin(p) * tz]);
+        }
+        G.push(row);
+      }
+      const dk = shade(SC.tyre, 0.55);
+      bikeGrid(sb, G, (i, j) => (groove(i, j) ? dk : SC.tyre), { closedI: true, out: (i, j, p) => {
+        const a = i / AR * TAU;
+        return [p[0] - Math.cos(a) * Rt, p[1] - Math.sin(a) * Rt, p[2]];
+      } });
+    }
+    const spin = (prof, col, o = {}) => scSpin(sb, Z, AX, prof, col, o.sides || SD, { sh: 0, ...o });
+    if (front) {
+      // The motor's shell and the rim, one piece: a flanged rim over the bead,
+      // stepping down on each face to the covers.
+      spin([[-0.025, 0], [-0.025, 0.060], [-0.0235, 0.064], [-0.0235, Rf - 0.004],
+        [-0.0215, Rf + 0.001], [0.0215, Rf + 0.001], [0.0235, Rf - 0.004], [0.0235, 0.064],
+        [0.025, 0.060], [0.025, 0]], SC.rim);
+      const cov = shade(SC.dark, 1.5);
+      spin([[-0.029, 0], [-0.029, 0.018], [-0.0285, 0.036], [-0.027, 0.050], [-0.0245, 0.057]], cov);
+      spin([[0.0245, 0.057], [0.027, 0.050], [0.0285, 0.036], [0.029, 0.018], [0.029, 0]], cov);
+      spin([[-0.037, 0], [-0.037, 0.0085], [-0.028, 0.0085]], SC.steel, { sides: 6 });
+      spin([[0.028, 0.0085], [0.037, 0.0085], [0.037, 0]], SC.steel, { sides: 6 });
+      if (!lo) {
+        for (let k = 0; k < 6; k++) {
+          const a = k / 6 * TAU + 0.3;
+          for (const s of [-1, 1]) {
+            sb.box(Math.cos(a) * 0.043, Math.sin(a) * 0.043, s * 0.0285, 0.0065, 0.0065, 0.004, SC.steel);
+          }
+        }
+      }
+    } else {
+      // The rim: flanges over the bead, a bed inside, open to the spokes.
+      spin([[0.0215, Rf + 0.001], [0.0235, Rf - 0.004], [0.020, Rf - 0.012], [0.012, Rf - 0.015],
+        [-0.012, Rf - 0.015], [-0.020, Rf - 0.012], [-0.0235, Rf - 0.004], [-0.0215, Rf + 0.001]], SC.rim);
+      // The hub, and five spokes swept a little forward, as cast ones are.
+      spin([[-0.034, 0], [-0.034, 0.009], [-0.030, 0.012], [-0.026, 0.020], [0.026, 0.020],
+        [0.030, 0.012], [0.034, 0.009], [0.034, 0]], shade(SC.rim, 0.85), { sides: lo ? 8 : 20 });
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * TAU;
+        const P = (r, da) => [Math.cos(a + da) * r, Math.sin(a + da) * r, 0];
+        bikeSweep(sb, [P(0.016, 0), P(0.037, 0.10), P(Rf - 0.013, 0.17)],
+          (i) => [0.0078, 0.0062, 0.0068][i], SC.rim, { sides: lo ? 4 : 8 });
+      }
+      // The disc, 110 mm, on the left, on a five-arm carrier off the hub.
+      spin([[-0.0375, 0.055], [-0.0345, 0.055], [-0.0345, 0.034], [-0.0375, 0.034], [-0.0375, 0.055]],
+        SC.chrome, { sides: lo ? 12 : 36 });
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * TAU + 0.63;
+        bikeSweep(sb, [[Math.cos(a) * 0.016, Math.sin(a) * 0.016, -0.030],
+          [Math.cos(a) * 0.037, Math.sin(a) * 0.037, -0.036]], 0.0038, SC.dark, { sides: lo ? 3 : 6 });
+      }
+      if (!lo) {
+        for (let k = 0; k < 12; k++) {
+          const a = k / 12 * TAU;
+          sb.box(Math.cos(a) * 0.0455, Math.sin(a) * 0.0455, -0.0376, 0.0048, 0.0048, 0.001, shade(SC.dark, 0.6));
+        }
+      }
+    }
+    const out = { geo: sb.geo(), tris: sb.count() / 3 };
+    scootWheelCache.set(key, out);
+    return out;
+  }
+
+  /**
+   * An e-scooter, in the bicycle's frame: +x forward, +y up, +z to the
+   * rider's right, the origin on the ground under the middle. See the note
+   * above `WHEEL_SCOOT`. `lo` builds the far copy. The wheels come back as
+   * their own geometries, rear first, to be hung on nodes at their axles.
+   */
+  function wheelScoot(col, lo) {
+    const sb = propBuilder();
+    const K = WHEEL_SCOOT;
+    const SD = lo ? 8 : 20, TS = lo ? 5 : 12;
+    const seg = (n) => (lo ? Math.max(2, n >> 1) : n);
+    const DARK = SC.dark, GREY = shade(SC.dark, 2.2), under = shade(col, 0.72);
+    const spin = (C, A, prof, c, o = {}) => scSpin(sb, C, A, prof, c, o.sides || SD, o);
+    const tube = (pts, r, c, o = {}) => bikeSweep(sb, pts, r, c, { sides: TS, ...o });
+    // The column: `t` metres up its axis from (0.42, 0.21), `fwd` ahead of it.
+    const B0 = [K.col[0], K.col[1], 0];
+    const A = bkNorm([K.bar[0] - B0[0], K.bar[1] - B0[1], 0]);
+    const FWD = [A[1], -A[0], 0];
+    const colAt = (t, fwd = 0, z = 0) => [B0[0] + A[0] * t + FWD[0] * fwd,
+      B0[1] + A[1] * t + FWD[1] * fwd, z];
+    const [RX, RR] = K.rear, [FX, FR] = K.front;
+
+    // ── the deck ──
+    // Rings of a rounded rectangle in plan, inset `d`, from the grip tape's
+    // edge down the rolled rim and the side to the underside; tape on top,
+    // a shallow belly underneath.
+    {
+      const [X0, X1] = K.deckX, HW = K.deckW, RC = K.deckR, n = lo ? 2 : 6;
+      const loop = (d) => {
+        const out = [], r = RC - d;
+        for (const [cx, cz, a0] of [[X1 - RC, HW - RC, 0], [X0 + RC, HW - RC, Math.PI / 2],
+          [X0 + RC, RC - HW, Math.PI], [X1 - RC, RC - HW, Math.PI * 1.5]]) {
+          for (let k = 0; k <= n; k++) {
+            const a = a0 + Math.PI / 2 * k / n;
+            out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]);
+          }
+        }
+        return out;
+      };
+      const rows = lo
+        ? [[0.008, K.deck], [0, K.deck - 0.006], [0, 0.106], [0.012, 0.096]]
+        : [[0.012, K.deck], [0.004, K.deck - 0.002], [0, K.deck - 0.008], [0, 0.112],
+          [0.005, 0.101], [0.016, 0.096]];
+      const G = rows.map(([d, y]) => loop(d).map(([x, z]) => [x, y, z]));
+      const cx = (X0 + X1) / 2;
+      bikeGrid(sb, G, (i) => (i >= rows.length - 2 ? under : col), { closedJ: true,
+        out: (i, j, p) => [p[0] - cx, 0, p[2]] });
+      bikeFan(sb, G[0], [cx, K.deck, 0], [0, 1, 0], SC.tape);
+      bikeFan(sb, G[G.length - 1], [cx, 0.093, 0], [0, -1, 0], under);
+      if (!lo) {
+        for (const s of [-1, 1]) sb.box(X0 + 0.07, 0.128, s * (HW + 0.0006), 0.045, 0.009, 0.0015, SC.red);
+      }
+    }
+
+    // ── the neck, the head tube, the fork and the front mudguard ──
+    // The neck comes up out of the deck and over the back of the front tyre
+    // into the head tube; the column's axis runs down through the wheel, so
+    // nothing can come up it from below.
+    {
+      const pts = bkBez([[0.17, 0.118, 0], [0.30, 0.118, 0], [0.335, 0.205, 0], colAt(0.075, -0.022)], seg(12));
+      tube(pts, (i) => 0.031 - 0.004 * i / (pts.length - 1), col, { sides: lo ? 6 : 14 });
+    }
+    spin(B0, A, [[0.030, 0], [0.030, 0.024], [0.036, 0.030], [0.046, 0.028], [0.150, 0.028],
+      [0.156, 0.031], [0.166, 0.031], [0.170, 0]], col);
+    // The crown, across the machine, and the two legs down to the axle.
+    spin(colAt(0.035), [0, 0, 1], [[-0.056, 0], [-0.056, 0.011], [0.056, 0.011], [0.056, 0]], col,
+      { sides: lo ? 6 : 12 });
+    for (const s of [-1, 1]) {
+      tube([colAt(0.035, 0.004, s * 0.047), [FX, FR, s * 0.047]], (i) => (i ? 0.0095 : 0.012), col, { caps: true });
+      spin([FX, FR, 0], [0, 0, s], [[0.052, 0], [0.052, 0.009], [0.060, 0.009], [0.060, 0]], SC.steel, { sides: 6 });
+    }
+    bikeGuard(sb, FX, FR, 0.30, 2.00, FR + 0.017, 0.030, col, lo);
+
+    // ── the folding joint ──
+    // A block round the column above the headset, a hinge knuckle across its
+    // front, and the latch lever lying up the stem with its safety ring.
+    spin(B0, A, lo
+      ? [[0.168, 0], [0.168, 0.028], [0.250, 0.028], [0.254, 0]]
+      : [[0.168, 0], [0.168, 0.026], [0.172, 0.030], [0.203, 0.030], [0.205, 0.0275],
+        [0.208, 0.030], [0.244, 0.030], [0.250, 0.025], [0.254, 0]], DARK);
+    spin(colAt(0.205, 0.030), [0, 0, 1], [[-0.024, 0], [-0.024, 0.010], [0.024, 0.010], [0.024, 0]], DARK,
+      { sides: lo ? 6 : 12 });
+    const lever = bkBez([colAt(0.212, 0.036), colAt(0.245, 0.041), colAt(0.29, 0.031)], seg(6));
+    tube(lever, (i) => 0.0068 - 0.0015 * i / (lever.length - 1), GREY, { caps: true, sides: lo ? 4 : 8 });
+    if (!lo) {
+      const c = colAt(0.205, 0.047), ring = [];
+      for (let k = 0; k < 12; k++) {
+        const q = k / 12 * TAU;
+        ring.push(bkAdd(bkAdd(c, A, Math.sin(q) * 0.011 - 0.011), [0, 0, 1], Math.cos(q) * 0.011));
+      }
+      tube(ring, 0.0022, SC.steel, { closed: true, bi: FWD, sides: 5 });
+    }
+
+    // ── the stem, the headlamp ──
+    // Round, 45 mm at the joint and 37 at the top, with a collar under the bar.
+    spin(B0, A, [[0.25, 0], [0.25, 0.0205], [0.256, 0.0225], [0.30, 0.0222], [0.80, 0.0190],
+      [0.855, 0.0186], [0.862, 0.0200], [0.874, 0.0200], [0.878, 0]], col, { sides: lo ? 8 : 16 });
+    {
+      const L = colAt(0.72, 0.012), D = bkNorm([1, -0.10, 0]);
+      spin(B0, A, [[0.705, 0], [0.705, 0.0215], [0.735, 0.0215], [0.735, 0]], DARK, { sides: lo ? 6 : 14 });
+      spin(L, D, [[0, 0], [0, 0.014], [0.008, 0.019], [0.026, 0.021], [0.030, 0.021], [0.030, 0]], DARK);
+      spin(L, D, [[0.0295, 0], [0.0295, 0.0175], [0.0315, 0.0170], [0.0330, 0.012], [0.0336, 0]], SC.lens, { sh: 0 });
+    }
+
+    // ── the bar, the grips, the controls ──
+    const BAR = [K.bar[0], K.bar[1], 0];
+    tube([[BAR[0], BAR[1], -0.262], [BAR[0], BAR[1], 0.262]], 0.0112, col, { caps: true });
+    spin(BAR, [0, 0, 1], [[-0.036, 0], [-0.036, 0.0165], [-0.032, 0.0185], [0.032, 0.0185],
+      [0.036, 0.0165], [0.036, 0]], DARK, { sides: lo ? 8 : 16 });
+    // The rubber: a flange inboard, ribs, a flared end. 17 mm where the
+    // fingers close round it, the radius `WHEEL_HAND` folds them to.
+    const gp = [[0.156, 0], [0.156, 0.0195], [0.162, 0.0195], [0.1645, 0.0172]];
+    if (!lo) for (let w = 0.172; w < 0.250; w += 0.008) gp.push([w, 0.0170], [w + 0.004, 0.0177]);
+    gp.push([0.254, 0.0176], [0.259, 0.0188], [0.264, 0.0182], [0.266, 0.012], [0.2665, 0]);
+    for (const s of [-1, 1]) {
+      spin(BAR, [0, 0, s], gp, SC.rubber, { sides: lo ? 8 : 16 });
+      // A clamp inboard of each grip: the brake lever's on the left, the
+      // throttle's on the right.
+      spin(BAR, [0, 0, s], [[0.138, 0], [0.138, 0.0165], [0.153, 0.0165], [0.153, 0]], DARK, { sides: lo ? 6 : 12 });
+    }
+    // The brake lever, under and ahead of the left hand's fingers.
+    tube([[BAR[0] + 0.012, BAR[1] - 0.002, -0.146], [BAR[0] + 0.035, BAR[1] - 0.008, -0.146]], 0.0075, DARK, { caps: true });
+    if (!lo) {
+      tube(bkBez([[BAR[0] + 0.035, BAR[1] - 0.008, -0.146], [BAR[0] + 0.058, BAR[1] - 0.012, -0.178],
+        [BAR[0] + 0.052, BAR[1] - 0.018, -0.245]], 8), (i) => 0.0050 - 0.0012 * i / 8, GREY, { caps: true, sides: 6 });
+    }
+    // The thumb throttle, under the right hand's thumb.
+    sb.box(BAR[0] + 0.030, BAR[1] - 0.024, 0.140, 0.012, 0.026, 0.022, DARK);
+    // The dashboard: an oval pod on the stem's top, a screen and four battery
+    // LEDs on it. Nothing written.
+    spin([BAR[0] - 0.008, BAR[1] + 0.021, 0], [0, 0, 1], [[-0.052, 0], [-0.051, 0.55], [-0.048, 0.85],
+      [-0.042, 1], [0.042, 1], [0.048, 0.85], [0.051, 0.55], [0.052, 0]], DARK,
+    { sec: [0.036, 0.019], ref: [1, 0, 0], sides: lo ? 10 : 20 });
+    {
+      const y = BAR[1] + 0.0405, x0 = BAR[0] - 0.022, x1 = BAR[0] + 0.006;
+      sb.quad([x0, y, -0.024], [x1, y, -0.024], [x1, y, 0.024], [x0, y, 0.024], SC.screen);
+      if (!lo) for (let k = 0; k < 4; k++) sb.box(BAR[0] - 0.004, y + 0.0006, -0.012 + k * 0.008, 0.004, 0.001, 0.005, SC.led);
+    }
+    if (!lo) {
+      // A bell on the left of the bar, inboard of the lever.
+      spin([BAR[0], BAR[1] + 0.0112, -0.118], [0, 1, 0], [[0, 0], [0, 0.020], [0.004, 0.0215],
+        [0.011, 0.019], [0.017, 0.011], [0.020, 0]], SC.chrome, { sides: 14, sh: 0.14 });
+      sb.box(BAR[0] + 0.016, BAR[1] + 0.012, -0.118, 0.014, 0.004, 0.006, DARK);
+      // The cables: brake and throttle, forward in a loop and down the front
+      // of the stem into the joint, and the motor's up the right fork leg.
+      for (const s of [-1, 1]) {
+        const top = bkBez([[BAR[0] + 0.030, BAR[1] - 0.012, s * 0.140], [BAR[0] + 0.12, BAR[1] - 0.07, s * 0.10],
+          bkAdd(colAt(0.78, 0.05), [0, 0, s * 0.012]), bkAdd(colAt(0.66, 0.022), [0, 0, s * 0.007])], 12);
+        const run = [0.60, 0.50, 0.40, 0.31].map((t, k) => bkAdd(colAt(t, 0.025 + 0.002 * (k % 2)), [0, 0, s * 0.007]));
+        tube([...top, ...run, bkAdd(colAt(0.25, 0.022), [0, 0, s * 0.006])], 0.0028, DARK, { sides: 5 });
+      }
+      tube(bkBez([[FX + 0.002, FR + 0.008, 0.056], [FX - 0.006, FR + 0.07, 0.058], colAt(0.045, 0.018, 0.024)], 8),
+        0.0034, DARK, { sides: 5 });
+    }
+
+    // ── the back: dropouts, the calliper, the mudguard and its lamp ──
+    for (const s of [-1, 1]) {
+      tube([[-0.30, 0.112, s * 0.050], [-0.37, 0.106, s * 0.050], [RX, RR, s * 0.050]],
+        (i) => [0.014, 0.012, 0.010][i], under, { caps: true });
+      spin([RX, RR, 0], [0, 0, s], [[0.036, 0], [0.036, 0.0095], [0.060, 0.0095], [0.060, 0]], SC.steel, { sides: 6 });
+      // A stay from the axle to the mudguard's edge, outside the disc.
+      tube([[RX - 0.004, RR + 0.008, s * 0.050], [RX + Math.cos(2.2) * (RR + 0.012), RR + Math.sin(2.2) * (RR + 0.012), s * 0.040]],
+        0.0036, SC.steel, { sides: lo ? 3 : 5, caps: true });
+    }
+    sb.box(-0.393, 0.131, -0.036, 0.026, 0.020, 0.016, DARK);
+    sb.box(-0.384, 0.119, -0.046, 0.020, 0.018, 0.006, DARK);
+    bikeGuard(sb, RX, RR, 0.42, 2.85, RR + 0.019, 0.037, col, lo);
+    sb.box(-0.540, 0.145, 0, 0.012, 0.030, 0.020, DARK);
+    spin([-0.542, 0.118, 0], [-1, 0, 0], [[0, 0], [0, 0.013], [0.008, 0.014], [0.008, 0]], DARK, { sides: lo ? 6 : 14 });
+    spin([-0.542, 0.118, 0], [-1, 0, 0], [[0.0075, 0], [0.0075, 0.012], [0.0105, 0.010], [0.012, 0]], SC.red,
+      { sides: lo ? 6 : 14, sh: 0 });
+
+    // ── the kickstand, folded up under the left of the deck ──
+    sb.box(0.060, 0.092, -0.068, 0.030, 0.012, 0.016, DARK);
+    tube([[0.055, 0.088, -0.074], [-0.140, 0.084, -0.078]], (i) => (i ? 0.0055 : 0.0068), GREY,
+      { caps: true, sides: lo ? 4 : 8 });
+    sb.box(-0.145, 0.083, -0.080, 0.020, 0.008, 0.016, SC.rubber);
+
+    const wR = scootWheel(false, lo), wF = scootWheel(true, lo);
+    return {
+      geo: sb.geo(), crank: null,
+      wheels: [{ geo: wR.geo, tris: wR.tris, x: RX, y: RR, R: RR, front: false },
+        { geo: wF.geo, tris: wF.tris, x: FX, y: FR, R: FR, front: true }],
+      tris: sb.count() / 3 + wR.tris + wF.tris,
+    };
   }
 
   // Scratch, because a solve runs a few times a frame per rider.
@@ -62335,9 +62601,10 @@ async function buildJadrija(scene) {
       }
       const paint = WHEEL_PAINT[c.on][c.paint % WHEEL_PAINT[c.on].length];
       const kit = { ...(c.kit || {}), low: !!c.low, basket: !!c.basket };
-      const g = bike ? wheelBike(seatY, paint, kit, false) : wheelScoot(paint);
-      // The far copy of the same bicycle, swapped in past `WHEELS.lod`.
-      const gLo = bike ? wheelBike(seatY, paint, kit, true) : null;
+      const g = bike ? wheelBike(seatY, paint, kit, false) : wheelScoot(paint, false);
+      // The far copy of the same machine, swapped in past `WHEELS.lod` — the
+      // scooters have one too since 1.548.7.
+      const gLo = bike ? wheelBike(seatY, paint, kit, true) : wheelScoot(paint, true);
       const veh = new THREE.Mesh(g.geo, mat);
       veh.name = 'wheels:' + c.who;
       scene.add(veh);

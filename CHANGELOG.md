@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.8] — 2026-09-29
+
+### The riders' e-scooters, built as e-scooters
+
+Misha: *"i love the e-scooters' physics, but they are too low-poly, can u make
+them higher-poly, like u did with the bicycles?"* — from two metres off the
+young man on the dark one. The stem and bar were four-sided `wheelTube` beams,
+the deck and the rear fender two boxes, the headlamp a white matchbox and the
+wheels 14-gon rings round a flat disc: 104 triangles of body, 110 a wheel.
+
+- **`wheelScoot`, rebuilt** (43-jadrija.js): a round stem tapering from 45 to
+  37 mm off a folding joint with its hinge knuckle, latch lever and safety
+  ring; a headlamp on a band clamp; a T-bar with ribbed rubber grips, a brake
+  lever under the left hand, a thumb throttle under the right, a bell, and a
+  dashboard pod with a screen and four battery LEDs (nothing written); a deck
+  with 45 mm corners, grip tape inset from a painted rim, a bellied underside
+  and red side reflectors; a neck curving up over the front tyre into the head
+  tube; a fork and crown; mudguards bent round both wheels; a tail lamp; the
+  rear calliper, dropouts and stays; the kickstand folded under the deck.
+  Round things are turned with `spinIn` (lent the scooter's builder by a new
+  `scSpin`), tubes are `bikeSweep`, guards `bikeGuard`. Same two paints.
+- **`scootWheel`**: 8.5-inch pneumatic tyres of round section with a tread
+  band of transverse grooves (which is also what shows them turning); the
+  front a hub motor — rim-and-shell casting, domed covers, six bolts a side;
+  the back five alloy spokes and a drilled 110 mm disc. Shared by both
+  scooters, cached per level of detail.
+- **A far copy**, as the bicycles have: eight-sided lathes, 16-segment tyres,
+  no tread, bolts, cables, blades or holes — swapped past `WHEELS.lod`.
+  Scooters used to have none.
+- `wheelTube`, `wheelRim` and `wheelDisc` are gone; nothing used them after.
+
+MEASURED. Per scooter, near: 6,102 body + 2,300 rear wheel + 2,100 front =
+**10,502** triangles (was 324); far: 1,670 + 570 + 464 = **2,704**. Riders'
+`machineTris` 25,496 → 45,852, `machineTrisFar` 8,842 → 14,250 (it now counts
+the scooters' far copies too), draws 27 → 27, `ms` 0.12–0.13 → 0.12–0.15.
+The bicycles were already the 1.531.0 builder (about 8,300 a bicycle) and are
+unchanged. Everything the riders are solved to is the same: deck top 0.155,
+grip middles (0.36, 1.10, ±0.21) with 17 mm rubber, axles (−0.44, 0.10) R 0.10
+and (0.45, 0.11) R 0.11 with the tread's outermost point at exactly R, and
+both scooter riders' hands, fingers, ankles and toes identical to the
+millimetre before and after. Riders 5, planAt 792, forced 0; blockers 792
+with an unchanged hash; people 100; hammock rest (−1923.174, 4.138,
+443.162); a café sitter knocked over still goes down and gets up.
 ## [1.548.7] — 2026-09-29
 
 ### No houses on the open sea
