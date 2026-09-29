@@ -108,6 +108,7 @@ function readFR3D(buf) {
   const nv = dv.getUint32(8, true);
   const ni = dv.getUint32(12, true);
   if (dv.getUint32(4, true) === 3) return readFR3Dq(buf, dv, nv, ni);
+  if (dv.getUint32(4, true) === 7) return readFR3Dp(buf, dv, nv, ni);
 
   let o = 40;                                    // 4 magic + 3 u32 + 6 f32
   const pos = new Float32Array(buf, o, nv * 3); o += nv * 12;
@@ -152,6 +153,64 @@ function readFR3Dq(buf, dv, nv, ni) {
     const x = qn[i * 3], y = qn[i * 3 + 1], z = qn[i * 3 + 2];
     const l = Math.hypot(x, y, z) || 1;
     nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3, true));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * The packed .fr3d, v7 (tools/fr3d_q.py, `export_p` in frmesh.py): v3's
+ * uint16 positions, int8 normals and index, laid out so gzip can see them.
+ * Positions are per-axis zigzag deltas from the vertex before (mod 65 536) as
+ * a run of low bytes and a run of high bytes; normals and colours one run per
+ * axis; the index zigzag deltas from the index before (mod 2^32), four byte
+ * runs, lowest first. Not a bit of precision differs from v3 — it exists
+ * because v3's index was noise to gzip and it is not noise: the exporter emits
+ * vertices in triangle order, so almost every index is the last one plus one.
+ * Measured on the vikendica shell, 29 Sep: index 825 KB of gzip as v3, 16 as
+ * v7; positions 1 006 against 356.
+ */
+function readFR3Dp(buf, dv, nv, ni) {
+  const lo = [0, 1, 2].map((k) => dv.getFloat32(16 + k * 4, true));
+  const hi = [0, 1, 2].map((k) => dv.getFloat32(28 + k * 4, true));
+  const b = new Uint8Array(buf);
+  let o = 40;
+  const pos = new Float32Array(nv * 3);
+  const nrm = new Float32Array(nv * 3);
+  const col = new Uint8Array(nv * 3);
+  for (let k = 0; k < 3; k++) {
+    const s = (hi[k] - lo[k]) / 65535, l0 = lo[k];
+    let acc = 0;
+    for (let i = 0; i < nv; i++) {
+      const u = b[o + i] | (b[o + nv + i] << 8);
+      acc = (acc + ((u >>> 1) ^ -(u & 1))) & 0xffff;
+      pos[i * 3 + k] = l0 + acc * s;
+    }
+    o += nv * 2;
+  }
+  for (let k = 0; k < 3; k++, o += nv) {
+    for (let i = 0; i < nv; i++) nrm[i * 3 + k] = (b[o + i] << 24) >> 24;
+  }
+  for (let i = 0; i < nv; i++) {
+    const x = nrm[i * 3], y = nrm[i * 3 + 1], z = nrm[i * 3 + 2];
+    const l = Math.hypot(x, y, z) || 1;
+    nrm[i * 3] = x / l; nrm[i * 3 + 1] = y / l; nrm[i * 3 + 2] = z / l;
+  }
+  for (let k = 0; k < 3; k++, o += nv) {
+    for (let i = 0; i < nv; i++) col[i * 3 + k] = b[o + i];
+  }
+  const idx = nv < 65536 ? new Uint16Array(ni) : new Uint32Array(ni);
+  let acc = 0;
+  for (let i = 0; i < ni; i++) {
+    const u = (b[o + i] | (b[o + ni + i] << 8) | (b[o + 2 * ni + i] << 16)
+      | (b[o + 3 * ni + i] << 24)) >>> 0;
+    acc = (acc + ((u >>> 1) ^ -(u & 1))) >>> 0;
+    idx[i] = acc;
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));

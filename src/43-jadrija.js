@@ -47904,7 +47904,14 @@ async function buildJadrija(scene) {
     // It is a long time to be on fire. That is the point: `castEvery` and
     // `boastEvery` below both had to be re-thought around it, and the answer
     // in both cases was to spread out rather than to do more.
-    blazeFor: 106.3,
+    //
+    // AND THEN HALF OF IT, 29 Sep 2026. Misha, trimming the page: "the
+    // firestarter song -- i think u can cut its length in half, i don't think
+    // we need the full thing". The cue is now the lead-in and sixteen of the
+    // phrases, 55.39508 s (see `CUES` in tools/cut_field.py), which is 54.630
+    // s of game time; off that the same 1.10 lead and 0.45 fade leave 53.08,
+    // and 52.8 keeps the same three tenths in hand.
+    blazeFor: 52.8,
     // And five with the branch on her ends it, which is the loop closing: the
     // water started this and the water is what stops it. Not instant, because
     // instant would mean the whole sequence could be cancelled by a player who

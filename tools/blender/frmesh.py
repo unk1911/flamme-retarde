@@ -421,6 +421,29 @@ def export_q(parts, path: Path, note=""):
     _write(path, blob, ni, nv, note)
 
 
+def export_p(parts, path: Path, note=""):
+    """The same mesh as `export_q`, as a PACKED .fr3d v7 blob.
+
+    The same uint16 positions, int8 normals and index as v3, rearranged so
+    gzip can see them: deltas instead of values, and a run per byte instead of
+    bytes interleaved. Not a bit of precision differs. On the vikendica shell
+    (29 Sep) that was 1 888 KB of gzip as v3 and 425 as v7, because v3's index
+    was 825 KB of what gzip took for noise and is really "the last one plus
+    one" 659 562 times. The layout, and the one implementation of it, is in
+    tools/fr3d_q.py; `readFR3Dp` in src/48-landmarks.js reads it.
+    """
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from fr3d_q import pack_v7, quantise  # noqa: E402
+    pos, nrm, col, idx = gather(parts)
+    nv, ni = len(pos) // 3, len(idx)
+    lo = [min(pos[k::3]) for k in range(3)]
+    hi = [max(pos[k::3]) for k in range(3)]
+    qp = quantise(pos, lo, hi)
+    qn = [max(-127, min(127, int(round(v * 127.0)))) for v in nrm]
+    _write(path, pack_v7(nv, ni, lo, hi, qp, qn, bytes(col), idx), ni, nv, note)
+
+
 def export_rig(parts, path: Path, note=""):
     """Write an articulated model as one gzipped .fr3d **v2** blob.
 

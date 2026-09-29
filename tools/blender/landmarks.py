@@ -28,7 +28,7 @@ from frmesh import (  # noqa: E402
     ASPHALT, CONCRETE, DARKMETAL, GLASS, GOLD, LEAD, STONE, STONE_DARK, TAU,
     TILE, TRIM, WHITE,
     bevel, bm_arc_wall, bm_barrel, bm_box, bm_cylinder, bm_dome, bm_hip_roof,
-    bm_prism, bm_ring, export, new_object, reset_scene,
+    bm_prism, bm_ring, export_p, new_object, reset_scene,
 )
 
 OUT = Path(__file__).resolve().parents[2] / "build" / "payload"
@@ -587,7 +587,7 @@ def main():
             for c in ob.users_collection:
                 c.objects.unlink(ob)
             coll.objects.link(ob)
-        export(parts, OUT / ("%s.fr3d.gz" % name), note)
+        export_p(parts, OUT / ("%s.fr3d.gz" % name), note)
     BLEND.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND))
     print("  saved %s" % BLEND)

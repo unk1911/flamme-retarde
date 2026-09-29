@@ -7,7 +7,7 @@ Writes, for each of five body types, ``build/payload/car_<name>.fr3d.gz``,
 ``car_<name>_gloss.fr3d.gz`` and ``car_<name>_trim.fr3d.gz``, plus one sidecar
 ``build/payload/cars.json`` holding the extents. And the near KIT (see
 ``NEAR_GLOSS``): ``car_<name>_nglass`` and ``car_<name>_ndet`` per body type
-and one ``car_wheel_<key>`` per wheel, quantised (``export_q``). ``build.py``
+and one ``car_wheel_<key>`` per wheel, quantised (``export_p``). ``build.py``
 inlines all of them; the ``.json`` goes in verbatim, so ``PAYLOAD.cars`` is a plain object the
 shore build can read **synchronously** — which it has to, because the walk
 blockers are pushed hundreds of lines before any blob is inflated.
@@ -113,7 +113,7 @@ import bpy  # type: ignore
 
 sys.path.append(str(Path(__file__).resolve().parent))
 
-from frmesh import TAU, export, export_q, new_object, reset_scene  # noqa: E402
+from frmesh import TAU, export, export_p, new_object, reset_scene  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[2] / "build" / "payload"
 
@@ -2168,27 +2168,27 @@ def build():
     wheels = set()
     for spec in MODELS:
         # The near KIT (see NEAR_GLOSS): glass and cabin-and-details per body
-        # type, and one wheel per wheel, quantised (`export_q`). Written
+        # type, and one wheel per wheel, quantised (`export_p`). Written
         # first, since the far tier is exported last and is what the preview
         # turns.
         if not spec.get("cover"):
             reset_scene()
             for blob, items in near_kit(spec).items():
-                export_q(items, OUT / ("car_%s_%s.fr3d.gz" % (spec["name"], blob)),
+                export_p(items, OUT / ("car_%s_%s.fr3d.gz" % (spec["name"], blob)),
                          note=spec["name"] + " near " + blob)
             wk = wheel_key(spec)
             if wk not in wheels:
                 wheels.add(wk)
                 reset_scene()
-                export_q(near_wheel_items(spec), OUT / ("car_wheel_%s.fr3d.gz" % wk),
+                export_p(near_wheel_items(spec), OUT / ("car_wheel_%s.fr3d.gz" % wk),
                          note="near wheel " + wk)
         reset_scene()
         parts = build_car(spec)
         body = [v for k, v in parts.items() if BUCKETS[k][2] == "body"]
         gloss = [v for k, v in parts.items() if BUCKETS[k][2] == "gloss"]
         trim = [v for k, v in parts.items() if BUCKETS[k][2] == "trim"]
-        export(body, OUT / ("car_%s.fr3d.gz" % spec["name"]), note=spec["name"])
-        export(trim, OUT / ("car_%s_trim.fr3d.gz" % spec["name"]),
+        export_p(body, OUT / ("car_%s.fr3d.gz" % spec["name"]), note=spec["name"])
+        export_p(trim, OUT / ("car_%s_trim.fr3d.gz" % spec["name"]),
                note=spec["name"] + " trim")
         # The covered car has nothing that shines; it still gets a blob, so
         # every model is the same three and the loader has no special case.
@@ -2196,7 +2196,7 @@ def build():
             sink = Sink()
             sink.rbox("piano", 0.0, 0.0, -1.0, 0.01, 0.01, 0.01, seg=4, rows=2)
             gloss = list(sink.objects().values())
-        export(gloss, OUT / ("car_%s_gloss.fr3d.gz" % spec["name"]),
+        export_p(gloss, OUT / ("car_%s_gloss.fr3d.gz" % spec["name"]),
                note=spec["name"] + " gloss")
         meta[spec["name"]] = extents(spec)
         e = meta[spec["name"]]

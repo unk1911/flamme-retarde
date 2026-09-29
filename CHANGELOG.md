@@ -8,6 +8,48 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.4] — 2026-09-29
+
+### The page, 6.4 MB lighter: the beds at 48 kbps, half a firestarter, and packed meshes
+
+Misha, at 51.4 MB: *"is there anything in there that can be trimmed? can u
+tell me what uses up the most of it"*. Where it went: 20.4 MB of meshes, 9.3
+of audio, 8.5 of code (about 5 of it comments), 7.2 of terrain, 4.5 of other
+images. Stripping the comments from the shipped page was offered and turned
+down — *"i want to have the comments in the src/"* — so they ship as before.
+
+- **The five field beds at 48 kbps** (`shore`, `lapping`, `wood`, `kabine`,
+  `cicadas`; they were 64–96). Each was re-cut from its own window at 64, 56
+  and 48 and read in third-octave bands against its WAV, counting the bands
+  within 30 dB of the loudest: against 96 kbps the worst audible band moved
+  0.1–0.4 dB at 48, on every bed. What the bands cannot see is the swirl LAME
+  puts on noise at low rates, so that is an ear's call; going back is one
+  number per bed in `BEDS` (tools/cut_field.py). 1 421 KB off the payload.
+- **The firestarter, halved** — *"i think u can cut its length in half, i
+  don't think we need the full thing"*. Half on the record's own grid: the
+  lead-in and sixteen of the thirty-two phrases, 55.39508 s, still closing on
+  a phrase; 1 072 KB to 542. `SHOW.blazeFor` 106.3 → 52.8 s by the same sum
+  as before. Its make-up reads back +4.47 dB against the +4.49 `FIRE` carries.
+  The window's peak is now -0.4 dBFS before the encoder (-1.3 decoded), a
+  tenth over the tool's -0.5 line: it reports, nothing clips.
+- **Packed meshes, fr3d v7.** Quantising the v1 blobs to v3 took the
+  vikendica shell only from 2 365 KB to 1 888, because its index (659 562
+  uint32s) was 825 KB that gzip read as noise. It is not noise: almost every
+  index is the last one plus one. v7 is v3's exact numbers laid out as deltas,
+  one byte-run per byte — the index is 16 KB, the positions 356 instead of
+  1 006, and the shell 425 KB in all. All 50 v1/v3 blobs (the vikendica, the
+  cars' far tier and near kit, the five landmarks) are v7 now:
+  `tools/fr3d_q.py` converts, `readFR3Dp` in src/48-landmarks.js reads,
+  `export_p` in tools/blender/frmesh.py writes (vikendica.py, cars.py and
+  landmarks.py call it), and a fresh Blender bake of the landmarks came out
+  byte-identical to the converted files. Every blob was decoded back and
+  compared with its v3 arrays: 50 of 50 exact. Precision from v1: 0.29 mm on
+  the vikendica, 6 mm along the 390 m bridge.
+- **The page: 51.39 → 44.95 MB; gzipped over the wire 33.9 → 29.8.**
+  Blockers 786 + hash, people 100, hammock, settle 22/0, jadrija tris 966 564
+  and car tris 121 824 / 235 128 all unchanged; the vikendica inside and out
+  and the bridge photographed against 1.550.3 (the bridge pixel-identical).
+
 ## [1.550.3] — 2026-09-29
 
 ### The green kiosk, turned, and nothing growing out of the stones round it

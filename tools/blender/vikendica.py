@@ -46,7 +46,7 @@ import bpy  # type: ignore
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from frmesh import (  # noqa: E402
     TAU, _ring_pts, bevel, bm_ball, bm_box, bm_cylinder, bm_hip_roof, bm_loft,
-    bm_prism, export, new_object, reset_scene,
+    bm_prism, export_p, new_object, reset_scene,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -5451,14 +5451,14 @@ def main():
             sub = [p for p in parts if p[1] == col]
             parts = [p for p in parts if p[1] != col]
             if sub:
-                export(sub, OUT / ("vikendica_%s_%s.fr3d.gz" % (name, tag)), why)
+                export_p(sub, OUT / ("vikendica_%s_%s.fr3d.gz" % (name, tag)), why)
         coll = bpy.data.collections.new(name)
         bpy.context.scene.collection.children.link(coll)
         for ob, _ in parts:
             for c in ob.users_collection:
                 c.objects.unlink(ob)
             coll.objects.link(ob)
-        export(parts, OUT / ("vikendica_%s.fr3d.gz" % name), note)
+        export_p(parts, OUT / ("vikendica_%s.fr3d.gz" % name), note)
 
     p = OUT / "vikendica_plan.json"
     p.write_text(json.dumps(plan_json(), separators=(",", ":")))

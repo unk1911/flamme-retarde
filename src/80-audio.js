@@ -2567,8 +2567,8 @@ function buildAudio() {
    * gives back in minutes, and minutes are what a bed is short of.
    *
    * There is a seventh clip in the payload and it is not one of these. The
-   * firestarter cue, 109.7 s at 1 072 KB, comes out of the same tool by a
-   * different door — `cut_cue` rather than `cut` — because it is played once
+   * firestarter cue, 109.7 s at 1 072 KB (55.4 s at 542 since 29 Sep),
+   * comes out of the same tool by a different door — `cut_cue` rather than `cut` — because it is played once
    * under a moment and stopped, and nothing about seams, insets or the length
    * search applies to a thing with no join in it. It is also the only clip
    * here that is not a place: see `FIRE` and the note over `cut_cue`. It is on

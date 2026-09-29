@@ -232,22 +232,36 @@ FILES = {
 # was and a third of the bytes go. That is what pays for the longer window:
 # the search lands on 117.5 s and 919 KB, where 24.5 s at 96 kbps was 288, so
 # 4.8 times the tape costs 3.2 times the file.
+# 48 kbps FOR THE FIVE BEDS, 29 Sep 2026, and it is the page paying for it.
+# Misha, at 51.4 MB: "is there anything in there that can be trimmed?" Each bed
+# was re-cut from the same window at 64, 56 and 48 kbps and read in third-
+# octave bands against its own WAV, counting only the bands within 30 dB of the
+# loudest (below that it is the high-pass floor, where a thousandth of a dB of
+# level is ten dB of ratio). Against 96 kbps the worst audible band moved by
+# 0.1 to 0.4 dB at 48 on every bed: shore -0.54 @ 1.3 kHz, lapping -0.55 @
+# 500 Hz, wood -0.43 @ 5 kHz, kabine -0.50 @ 160 Hz, cicadas -0.50 @ 4 kHz,
+# with the whole-file level -0.40 to -0.49 at every bitrate including 96 (the
+# decoder's, not the rate's). What bands do not see is the swirl LAME can put
+# on noise at low rates, and five beds of surf, pines and cicadas are all
+# noise — so that part is an ear's call, and going back is this one number.
+# 1 421 KB off the payload, 1.85 MB off the page. `boat` (64 at 16 kHz) and
+# `radio` (48 at 16) were already there. The firestarter is not a bed.
 BEDS = [
     dict(key='shore',   src=11, window=(0.8, 131.6), length=(112.0, 128.0),
-         rate=22050, kbps=64, hp=(3, 180), lp=None,  rms=-28.16,
+         rate=22050, kbps=48, hp=(3, 180), lp=None,  rms=-28.16,
          what='the waterfront, 21 Aug'),
     dict(key='cicadas', src=2, window=(0.3, 12.2), length=(9.5, 11.5),
-         rate=24000, kbps=96, hp=(8, 1900), lp=(2, 10500), rms=-25.17,
+         rate=24000, kbps=48, hp=(8, 1900), lp=(2, 10500), rms=-25.17,
          what='the hillside, 12 Aug'),
     dict(key='wood',    src=6, window=(2.0, 92.0), length=(52.0, 76.0),
-         rate=24000, kbps=96, hp=(6, 2400), lp=(2, 10500), rms=-25.23,
+         rate=24000, kbps=48, hp=(6, 2400), lp=(2, 10500), rms=-25.23,
          what='inside the pines, 17 Aug'),
     # THE ONLY BED WITH A `notch`, and the reason `notch` exists. See the long
     # note above `filt`: this take has a machine in it, the machine was taken
     # out with a 180 Hz high-pass, and the high-pass took the sea's bottom with
     # it. Three stopbands and a 45 Hz corner take the machine and leave the sea.
     dict(key='lapping', src=4, window=(0.6, 72.4), length=(52.0, 70.0),
-         rate=22050, kbps=96, hp=(2, 45),  lp=None,  rms=-23.98,
+         rate=22050, kbps=48, hp=(2, 45),  lp=None,  rms=-23.98,
          notch=[(120.49, 1.35), (132.75, 1.45), (149.78, 1.65)],
          what='the pier, 16 Aug'),
     dict(key='boat',    src=5, window=(1.0, 119.0), length=(34.0, 44.0),
@@ -290,7 +304,7 @@ BEDS = [
     # hundred people at forty metres and this is four people at two, so the two
     # of them divide by position the way the sea and the pines already do.
     dict(key='kabine',  src=8, window=(1.0, 62.0), length=(38.0, 56.0),
-         rate=22050, kbps=96, hp=(3, 180), lp=(2, 10500), rms=-28.16,
+         rate=22050, kbps=48, hp=(3, 180), lp=(2, 10500), rms=-28.16,
          what='along the rows, 23 Aug'),
     dict(key='radio',   src=7, window=(2.2, 41.3), length=(26.4, 37.8),
          rate=16000, kbps=48, hp=(2, 60),  lp=None,  rms=-18.94,
@@ -500,7 +514,13 @@ BEDS = [
 # over. The read-back below is still done and still reported: it is what tells
 # that end what the file it is scaling actually decodes at.
 CUES = [
-    dict(key='firestarter', src=9, at=7.38755, sec=109.67476,
+    # HALF OF IT, 29 Sep 2026. Misha, trimming the page: "the firestarter
+    # song -- i think u can cut its length in half, i don't think we need the
+    # full thing". Half on the record's own grid, not half the seconds: the
+    # 1.1154 s lead-in and sixteen of the thirty-two eight-beat phrases
+    # (109.67476 - 1.1154) / 32 = 3.392480 s each, so the clip still closes on
+    # a phrase. `SHOW.blazeFor` in 43-jadrija.js is set off this number.
+    dict(key='firestarter', src=9, at=7.38755, sec=55.39508,
          rate=24000, kbps=80, hp=(2, 70), lp=None, rms=-18.13,
          target=-14.23, makeup=4.49, what='the turn, 24 Aug'),
     dict(key='dove', src=10, at=3.90, sec=1.32,
