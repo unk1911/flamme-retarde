@@ -1638,6 +1638,51 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * A solid of revolution about ANY axis, smooth — `knLathe` stood on its
+   * side, or pointed at the sky.
+   *
+   * `knLathe` turns about the vertical, which is right for a bottle and a
+   * tank and wrong for everything that goes round on an axle or looks at a
+   * satellite: a wheel's axis runs across the machine, a dish's runs up at
+   * the Clarke belt. `C` is the centre in the shore frame `[t, s, y]`, `ax`
+   * the axis as a shore vector, and `prof` is `[z, r]` rings along it, where
+   * `r` may be `[ra, rb]` for an oval with `ra` along `ref`. A ring of radius
+   * 0 closes the end.
+   *
+   * Which way the skin faces is `o.push`: every ring's normals are turned
+   * away from the point `push` metres along the axis from that ring's own
+   * centre — so −0.5 faces a disc along +ax, +0.5 faces it back, and 0 is a
+   * plain barrel facing outward. `push` may be a function of the ring, for a
+   * profile that comes round from one face to the other (a dish, a rim). A
+   * torus has no axis point to face away from, so `o.core` = `[z, rc]` names
+   * the circle it is wound round instead.
+   */
+  function axLathe(C, ax, prof, col, sides = 20, ref = [0, 0, 1], o = {}) {
+    const al = Math.hypot(ax[0], ax[1], ax[2]) || 1;
+    const A = [ax[0] / al, ax[1] / al, ax[2] / al];
+    const dp = ref[0] * A[0] + ref[1] * A[1] + ref[2] * A[2];
+    let U = [ref[0] - dp * A[0], ref[1] - dp * A[1], ref[2] - dp * A[2]];
+    const ul = Math.hypot(U[0], U[1], U[2]) || 1;
+    U = [U[0] / ul, U[1] / ul, U[2] / ul];
+    const V = [A[1] * U[2] - A[2] * U[1], A[2] * U[0] - A[0] * U[2], A[0] * U[1] - A[1] * U[0]];
+    const at = (z, ra, rb, j) => {
+      const q = (j / sides) * TAU, c = Math.cos(q) * ra, s = Math.sin(q) * rb;
+      return W(C[0] + A[0] * z + U[0] * c + V[0] * s, C[1] + A[1] * z + U[1] * c + V[1] * s,
+        C[2] + A[2] * z + U[2] * c + V[2] * s);
+    };
+    const G = prof.map(([z, r]) => {
+      const ra = typeof r === 'number' ? r : r[0], rb = typeof r === 'number' ? r : r[1];
+      const row = [];
+      for (let j = 0; j < sides; j++) row.push(at(z, ra, rb, j));
+      return row;
+    });
+    const push = typeof o.push === 'function' ? o.push : () => o.push || 0;
+    const out = o.core ? (i, j) => at(o.core[0], o.core[1], o.core[1], j)
+      : (i) => at(prof[i][0] + push(i), 0, 0, 0);
+    knSurf(G, col, { wrap: true, out });
+  }
+
+  /**
    * A ladder: two stainless handrails bent over the coping, and treads. The
    * thing it buys is scale — you cannot look at a quay with a ladder on it
    * and misjudge how high above the water you are.
@@ -7204,21 +7249,92 @@ async function buildJadrija(scene) {
       boxTS(wt - 0.62, wt + 0.62, ws - 0.62, ws + 0.62, ry + 0.30, ry + 0.38,
         [0.360, 0.366, 0.360]);
       const TANK = jit(key, 322) < 0.5 ? [0.140, 0.175, 0.230] : [0.115, 0.115, 0.125];
-      post(W, wt, ws, ry + 0.38, ry + 1.46, 0.56, TANK, 10);
-      post(W, wt, ws, ry + 1.46, ry + 1.58, 0.20, shade(TANK, 1.25), 8);
-      post(W, wt, ws + 0.60, ry + 0.10, ry + 0.44, 0.035, [0.520, 0.516, 0.500], 5);
+      // ── ROUND, 29 Sep 2026 ──────────────────────────────────────────────
+      //
+      // Misha's frame from the lane has this tank on MINI's roof against the
+      // sky, and it was a ten-sided prism with an eight-sided one on top — a
+      // black box. What stands on every flat roof on this coast is a
+      // roto-moulded polyethylene tank: a barrel with the hoops moulded into
+      // it every hand's breadth to stiffen the wall, a shoulder that rolls
+      // over into a shallow dome, a screw lid on a raised neck, and the
+      // pipework at its foot. Turned smooth now (`knLathe`, 22 round), on the
+      // same stand, at the same 1.12 m across and the same 1.58 m to the top
+      // of the lid.
+      const R0 = 0.56;
+      const prof = [[ry + 0.380, 0.50], [ry + 0.392, 0.545], [ry + 0.412, R0]];
+      for (let k = 0; k < 6; k++) {
+        const yk = ry + 0.50 + k * 0.155;
+        prof.push([yk - 0.030, R0], [yk - 0.012, R0 + 0.014], [yk + 0.012, R0 + 0.014],
+          [yk + 0.030, R0]);
+      }
+      prof.push([ry + 1.390, R0 - 0.004], [ry + 1.425, R0 - 0.022], [ry + 1.455, R0 - 0.065],
+        [ry + 1.480, 0.42], [ry + 1.497, 0.33], [ry + 1.508, 0.24], [ry + 1.512, 0.215]);
+      knLathe(W, wt, ws, prof, TANK, 22);
+      // The neck and the lid: a collar, then the cap with its grip ribs.
+      knLathe(W, wt, ws, [[ry + 1.505, 0.205], [ry + 1.535, 0.205], [ry + 1.540, 0.214],
+        [ry + 1.572, 0.214], [ry + 1.580, 0.200], [ry + 1.582, 0]], shade(TANK, 1.25), 22);
+      for (let k = 0; k < 12; k++) {
+        const q = (k / 12) * TAU;
+        boxTS(wt + Math.cos(q) * 0.214 - 0.009, wt + Math.cos(q) * 0.214 + 0.009,
+          ws + Math.sin(q) * 0.214 - 0.009, ws + Math.sin(q) * 0.214 + 0.009,
+          ry + 1.542, ry + 1.570, shade(TANK, 1.15));
+      }
+      // The outlet: a stub out of the foot, a brass ball valve, and the pipe
+      // bending down into the roof where the post used to stand for it.
+      const PIPE = [0.520, 0.516, 0.500];
+      tubeTS([[wt, ws + 0.50, ry + 0.46], [wt, ws + 0.60, ry + 0.46]], 0.028, TANK, 12,
+        [0, 0, 1]);
+      tubeTS(bendPath([[wt, ws + 0.60, ry + 0.46], [wt, ws + 0.68, ry + 0.46],
+        [wt, ws + 0.68, ry + 0.02]], 0.06, 5), 0.022, PIPE, 12, [1, 0, 0]);
+      knLathe(W, wt, ws + 0.645, [[ry + 0.425, 0], [ry + 0.428, 0.034], [ry + 0.492, 0.034],
+        [ry + 0.495, 0]], [0.520, 0.430, 0.200], 12);
+      tubeTS([[wt, ws + 0.645, ry + 0.49], [wt, ws + 0.645, ry + 0.53]], 0.007,
+        [0.520, 0.430, 0.200], 6, [1, 0, 0]);
+      boxTS(wt - 0.012, wt + 0.012, ws + 0.645, ws + 0.735, ry + 0.525, ry + 0.540,
+        [0.600, 0.090, 0.060]);
     }
 
     // A dish on a short cranked post, pointed the way every dish on this coast
     // is pointed, and an aerial beside it.
+    //
+    // 29 Sep 2026: and a DISH. It was a four-sided frustum — a tilted tray —
+    // on five-sided posts, and against the sky in Misha's frame it was a
+    // white plate on a stick. An offset dish is a shallow paraboloid, 0.64 m
+    // across, pressed with a rolled rim, on a bracket off the back of it;
+    // and the one thing that says "satellite" from any distance is the arm
+    // coming out from under its lower lip to the LNB, which hangs in front of
+    // it at the focus. The mast, the crank and the place are the old ones,
+    // the dish stands where the tray did and faces the way it faced — out
+    // over −s, and up at 32°, toward the arc of the sky the Hotbird and the
+    // Astra birds are in from 44° north.
     const dt = S.t1 - 1.5, ds = S.s1 - 0.9;
-    post(W, dt, ds, ry, ry + 0.86, 0.035, [0.420, 0.424, 0.420], 5);
-    post(W, dt, ds - 0.22, ry + 0.80, ry + 0.86, 0.035, [0.420, 0.424, 0.420], 5);
-    frustumTS(ry + 0.78, [dt, ds - 0.34, 0.30, 0.06],
-      ry + 0.96, [dt, ds - 0.44, 0.34, 0.10],
-      [0.680, 0.676, 0.660], [0.700, 0.696, 0.680]);
-    post(W, dt, ds - 0.46, ry + 0.86, ry + 0.92, 0.04, [0.300, 0.300, 0.310], 5);
-    post(W, dt - 0.8, ds, ry, ry + 1.70, 0.022, [0.360, 0.362, 0.360], 4);
+    const MAST = [0.420, 0.424, 0.420], DISH = [0.690, 0.686, 0.670];
+    tubeTS([[dt, ds, ry], [dt, ds, ry + 0.86]], 0.030, MAST, 12, [1, 0, 0]);
+    boxTS(dt - 0.10, dt + 0.10, ds - 0.10, ds + 0.10, ry, ry + 0.012, MAST);
+    tubeTS(bendPath([[dt, ds, ry + 0.84], [dt, ds - 0.22, ry + 0.84],
+      [dt, ds - 0.355, ry + 0.866]], 0.04, 4), 0.022, MAST, 10);
+    {
+      const el = 0.56, AXD = [0, -Math.cos(el), Math.sin(el)];
+      const C = [dt, ds - 0.37, ry + 0.87];
+      const f = 0.38, z = (r) => r * r / (4 * f);
+      const RS = [0, 0.07, 0.14, 0.21, 0.27, 0.31];
+      // Front (concave, toward the focus), the rolled rim, and the back.
+      const front = RS.map((r) => [z(r), [r, r * 0.94]]);
+      const back = RS.slice().reverse().map((r) => [z(r) - 0.008, [r, r * 0.94]]);
+      axLathe(C, AXD, front, DISH, 22, [0, 0, 1], { push: -0.5 });
+      axLathe(C, AXD, [[z(0.31), [0.31, 0.291]], [z(0.31) - 0.002, [0.318, 0.299]],
+        [z(0.31) - 0.009, [0.314, 0.295]], [z(0.31) - 0.008, [0.31, 0.291]]], DISH, 22);
+      axLathe(C, AXD, back, shade(DISH, 0.92), 22, [0, 0, 1], { push: 0.5 });
+      // The arm, from under the lower lip out to the focus, and the LNB on it.
+      const up = [0, Math.sin(el), Math.cos(el)];
+      const lip = C.map((x, i) => x - up[i] * 0.29 + AXD[i] * z(0.29));
+      const foc = C.map((x, i) => x + AXD[i] * f);
+      tubeTS([lip, foc.map((x, i) => x - up[i] * 0.05 - AXD[i] * 0.02)], 0.011, MAST, 8);
+      axLathe(foc, AXD, [[-0.08, 0], [-0.078, 0.024], [-0.02, 0.024], [-0.015, 0.030],
+        [0.015, 0.030], [0.020, 0.024], [0.024, 0]], [0.760, 0.756, 0.740], 14);
+    }
+    tubeTS([[dt - 0.8, ds, ry], [dt - 0.8, ds, ry + 1.70]], 0.020, [0.360, 0.362, 0.360],
+      8, [1, 0, 0]);
     for (let i = 0; i < 5; i++) {
       boxTS(dt - 0.82, dt - 0.78, ds - 0.26 + i * 0.02, ds + 0.26 - i * 0.02,
         ry + 1.10 + i * 0.13, ry + 1.13 + i * 0.13, [0.360, 0.362, 0.360]);
@@ -16721,22 +16837,15 @@ async function buildJadrija(scene) {
         // seat and a bar: at the four metres this is ever seen from, a scooter
         // is a dark low mass with two black discs under it and a blue helmet
         // on the seat, and the helmet is the part you actually notice.
+        //
+        // 29 Sep 2026: `moped` now, the same machine as the pair behind MINI
+        // — see the note there — without the top box, which this one never
+        // had, and with the helmet turned smooth on the seat. Nose to +t as
+        // before, on the same spot and the same collider.
         const st2 = bt + 0.35, ss2 = bs - 0.85, gy2 = surfaceY(st2, ss2);
-        const DK2 = [0.085, 0.085, 0.092];
         const BODY2 = [0.135, 0.170, 0.255];
-        for (const o of [-0.62, 0.58]) {
-          post(W, st2 + o, ss2, gy2 + 0.02, gy2 + 0.06, 0.27, DK2, 12);
-        }
-        boxTS(st2 - 0.52, st2 + 0.30, ss2 - 0.11, ss2 + 0.11, gy2 + 0.34,
-          gy2 + 0.62, BODY2, shade(BODY2, 1.18));
-        boxTS(st2 - 0.34, st2 + 0.14, ss2 - 0.13, ss2 + 0.13, gy2 + 0.62,
-          gy2 + 0.72, DK2, shade(DK2, 1.30));
-        boxTS(st2 + 0.24, st2 + 0.46, ss2 - 0.09, ss2 + 0.09, gy2 + 0.52,
-          gy2 + 1.04, BODY2);
-        boxTS(st2 + 0.34, st2 + 0.44, ss2 - 0.24, ss2 + 0.24, gy2 + 1.00,
-          gy2 + 1.06, DK2);
         const HELM = [0.115, 0.230, 0.485];
-        dome(W, st2 - 0.10, ss2, gy2 + 0.72, 0.20, 0.14, HELM, 7);
+        moped(st2, ss2, 0, BODY2, { y: gy2, box: false, helmet: HELM });
         furniture.push({ t: st2, s: ss2, a: 0.68, c: 0.24, h: 1.06, y: gy2 });
         // And the barrier tape across the lane end, which is the loudest thing
         // in the frame and is two posts and a stripe.
@@ -30292,44 +30401,119 @@ async function buildJadrija(scene) {
     // So the run is rubble piers west of 300 and rendered wall east of it, and
     // the join is where the businesses start, which is where the resort stops
     // being an approach and starts being a promenade.
+    //
+    // ── LAID, 29 Sep 2026 ───────────────────────────────────────────────────
+    //
+    // Misha, from the lane behind MINI, in the same breath as the scooters:
+    // *"same, add polygons"* — and the two piers either side of the gap were
+    // in the front of his frame. Forty stones a pier, each a four-sided
+    // frustum stood proud of a dark core at a random height: from three
+    // metres, a grey block with a handful of pale cubes stuck to it, a third
+    // of its face bare, and a dressed cap that was one sharp box.
+    //
+    // A field wall is not stones ON a wall. It is stones, laid in rough
+    // courses, touching, with the mortar or the chinking only in the joints
+    // between them. So each face is laid now: courses of 0.14 to 0.26 m, and
+    // in each course stones of 0.18 to 0.46 m end to end with a joint of 10
+    // to 26 mm, bedded into the core so no edge stands clear of it. Each is
+    // a cushion — an irregular rounded outline, eight points each pulled in
+    // by up to 10 per cent, swelling to its face, smooth-lit through
+    // `knSurf` — and most of them sit nearly flush, because the reach is
+    // squared (4 mm to 54 mm, and half of them under 17 mm): a waller keeps
+    // a face fair, and the few that stand proud are the ones that catch the
+    // light. The ends are laid too, which is the face you see through the
+    // gaps. The core's colour is the mortar's now, and a little lighter than
+    // the shadow it had to stand in for when it was most of the face.
+    //
+    // Every number that places a pier — where, how long, how high, the cap's
+    // oversail and thickness — is the old one, and so is `runs`. `jit` only:
+    // this is built after the beach and takes nothing off `rng`.
+    const pierStone = (M, xc, yc, hx, hy, proud, seed, col) => {
+      const NP = 8, rot = (jit(seed, 75) - 0.5) * 0.30;
+      const pw = 2.3 + jit(seed, 77) * 1.3;
+      const rr = [];
+      for (let j = 0; j < NP; j++) rr.push(0.90 + jit(seed * 7 + j, 76) * 0.10);
+      const ring = (k, d) => {
+        const row = [];
+        for (let j = 0; j < NP; j++) {
+          const q = rot + (j / NP) * TAU, cq = Math.cos(q), sq = Math.sin(q);
+          const kk = 1 / Math.pow(Math.pow(Math.abs(cq), pw) + Math.pow(Math.abs(sq), pw), 1 / pw);
+          const m = M(xc + cq * kk * hx * rr[j] * k, yc + sq * kk * hy * rr[j] * k, d);
+          row.push(W(m[0], m[1], m[2]));
+        }
+        return row;
+      };
+      const o = M(xc, yc, -0.25);
+      knSurf([ring(1.04, -0.02), ring(0.97, proud * 0.6), ring(0.64, proud),
+        ring(0, proud + 0.004)], col, { wrap: true, out: () => W(o[0], o[1], o[2]) });
+    };
+    // One face laid in courses: `x0..x1` along it, from `bot` to `top`, with
+    // `gl(x)` the ground, under which nothing is laid that would not show.
+    const pierFace = (M, x0, x1, bot, top, gl, sd) => {
+      let yb = bot, row = 0;
+      while (yb < top - 0.05) {
+        let ch = 0.14 + jit(sd + row, 66) * 0.12;
+        if (top - (yb + ch) < 0.10) ch = top - yb;
+        let x = x0, k = 0;
+        // A course starts on a half stone every other time, so no joint runs
+        // up through two courses.
+        let first = row % 2 ? 0.45 : 1;
+        while (x < x1 - 0.04) {
+          const key = sd + row * 37 + k * 5;
+          let len = (0.18 + jit(key, 67) * 0.28) * first;
+          first = 1;
+          if (x1 - (x + len) < 0.14) len = x1 - x;
+          const jt = 0.005 + jit(key, 68) * 0.008;
+          // Not every stone is the full height of its course: a waller packs
+          // a thin one with a pinner, and it sits a little high or low.
+          const hy = (ch / 2 - jt * 0.9) * (0.80 + jit(key, 74) * 0.20);
+          const xc = x + len / 2, yc = yb + ch / 2 + (jit(key, 73) - 0.5) * (ch - 2 * hy + 0.012);
+          if (yc + hy > gl(xc) + 0.015) {
+            const g = 0.70 + jit(key, 64) * 0.40, w = (jit(key, 65) - 0.5) * 0.08;
+            const pr = 0.004 + Math.pow(jit(key, 69), 2) * 0.05;
+            pierStone(M, xc, yc, len / 2 - jt, hy, pr, key,
+              [0.575 * g * (1 + w), 0.556 * g, 0.508 * g * (1 - w)]);
+          }
+          x += len; k++;
+        }
+        yb += ch; row++;
+      }
+    };
     for (let t = 216; t < 299; t += 3.5) {
       const a = t, c = t + 2.0;
       if (gap(a) || gap(c)) continue;
       const y0 = yAt(a), y1 = yAt(c);
       const h = 0.82 + jit(t | 0, 60) * 0.10;
-      // The core, which is only ever seen through the gaps between the stones.
-      // Dark, because what shows between the stones is mortar in shadow and
-      // not more wall: at 0.47 the gaps read as the same surface and the whole
-      // pier came out a flat grey band.
-      const core = [0.330, 0.315, 0.288];
+      // The core, which is the mortar in the joints. Dark, because a joint is
+      // a shadow: at 0.47 the gaps read as the same surface as the stones.
+      const core = [0.385, 0.370, 0.338];
       boxTS(a, c, WALL.s - 0.16, WALL.s + 0.16, y0 - 0.30,
         Math.max(y0, y1) + h - 0.02, core, shade(core, 1.06));
-      // The rubble. Every stone turned on its own axis and none of them the
-      // same size — a course of identical blocks is masonry, and this is a
-      // field wall somebody built out of what was lying there.
-      for (let k = 0; k < 40; k++) {
-        const u = jit(t * 7 + k, 61);
-        const st2 = a + 0.10 + u * (c - a - 0.20);
-        const face = k % 2 ? WALL.s + 0.14 : WALL.s - 0.14;
-        // 0.055 m of relief is nothing at three metres. A rubble wall stands
-        // a hand's breadth proud of its own mortar.
-        const out = k % 2 ? 0.105 : -0.105;
-        const yy = y0 - 0.22 + jit(t * 7 + k, 62) * (h + 0.18);
-        const r = 0.105 + jit(t * 7 + k, 63) * 0.095;
-        const g = 0.78 + jit(t * 7 + k, 64) * 0.44;
-        // A frustum, not a box: a box has four parallel sides and reads as
-        // brick however it is coloured. Same lesson as the rip-rap.
-        frustumTS(yy, [st2, face + out * 0.30, r * 0.92, 0.075],
-          yy + r * 1.4, [st2 + (jit(t * 7 + k, 65) - 0.5) * 0.07,
-            face + out, r * 0.70, 0.085],
-          [0.575 * g, 0.556 * g, 0.508 * g],
-          [0.605 * g, 0.586 * g, 0.535 * g]);
-      }
-      // The dressed cap, oversailing both faces, which is the one straight
-      // line on the whole thing.
       const cy = Math.max(y0, y1) + h;
-      boxTS(a - 0.08, c + 0.08, WALL.s - 0.29, WALL.s + 0.29, cy - 0.04,
-        cy + 0.11, [0.585, 0.566, 0.518], [0.625, 0.606, 0.556]);
+      const top = cy - 0.04, bot = Math.min(y0, y1) - 0.16;
+      const gl = (u) => y0 + (y1 - y0) * (u - a) / (c - a);
+      const sd = ((t * 10) | 0) * 1000;
+      for (const side of [-1, 1]) {
+        const fs = WALL.s + side * 0.16;
+        pierFace((x, y, d) => [x, fs + side * d, y], a + 0.012, c - 0.012,
+          bot, top, gl, sd + (side > 0 ? 400 : 0));
+        // And the end, square to the run.
+        const et = side < 0 ? a : c;
+        pierFace((x, y, d) => [et + side * d, x, y], WALL.s - 0.148, WALL.s + 0.148,
+          bot, top, () => (side < 0 ? y0 : y1), sd + (side > 0 ? 800 : 600));
+      }
+      // The cap: two dressed slabs butted on a joint, each with its arrises
+      // eased, a hair off one another in height and in tone — which is what
+      // makes it a coping somebody set rather than one extruded bar. Their
+      // oversail and thickness are the old box's.
+      const cm = a + (c - a) * (0.36 + jit(t | 0, 70) * 0.28);
+      for (const [p0, p1, k] of [[a - 0.08, cm - 0.004, 0], [cm + 0.004, c + 0.08, 1]]) {
+        const g = 0.96 + jit((t | 0) * 3 + k, 71) * 0.08;
+        const dy = (jit((t | 0) * 3 + k, 72) - 0.5) * 0.012;
+        knRR(W, p0, p1, WALL.s - 0.29, WALL.s + 0.29, cy - 0.04 + dy, cy + 0.11 + dy,
+          0.03, 0.028, [0.585 * g, 0.566 * g, 0.518 * g],
+          [0.625 * g, 0.606 * g, 0.556 * g], { bottom: true });
+      }
       runs.push({ t0: a, t1: c, s0: WALL.s - 0.32, s1: WALL.s + 0.32,
         y: y0, h });
     }
@@ -30775,6 +30959,284 @@ async function buildJadrija(scene) {
       }
     });
     groveFloor = n;
+  }
+
+  /**
+   * A parked step-through scooter, built as one.
+   *
+   * ── THE MOPEDS, 29 Sep 2026 ─────────────────────────────────────────────
+   *
+   * Misha, from the lane behind MINI, after the bins, the lamps, the showers
+   * and the shop yards had all gone round: *"same, add polygons, especially
+   * that 'bicycle' there looks too low-poly"*. His inverted commas are fair.
+   * The pair behind the bar were nine boxes each on two rings of ten flat
+   * chords — a leg shield that was a plank on its end, a seat that was a
+   * brick, a mirror that was a stick with a matchbox on it — and from the
+   * lane, where the whole of what you see is their silhouette against the
+   * render, that reads as a wire bicycle with luggage on it before it reads
+   * as anything with an engine.
+   *
+   * What makes a step-through legible is that it is MOULDED: the leg shield
+   * bellies forward over the front wheel and narrows up into the headset,
+   * the rear body is one rounded cowl swelling over the engine and tucking
+   * in at the tail, the seat is a padded loaf stepped for a passenger, and
+   * none of it has a corner. So every panel here is a loft — superellipse
+   * sections through `knSurf`, smooth-lit, ends rounded off by quarter
+   * circles — and everything that goes round goes round on its axle
+   * (`axLathe`): a real tyre of round section on a pressed-steel rim with
+   * its hub boss, a brake disc, a headlamp with a bezel, and the oval glass
+   * in the mirrors. The rest is what a scooter parked on its centre stand
+   * shows you: a telescopic fork under a mudguard that hugs the wheel, the
+   * engine casing and swingarm down the left, the silencer and the spring of
+   * the rear shock down the right, bars with grips and levers, two mirrors,
+   * a grab rail, a top box, a tail lamp and a plate.
+   *
+   * EVERY NUMBER THE OLD ONE HAD IS KEPT: wheels of 0.21 m at +0.66 and
+   * −0.60 along the machine, the floor at 0.30, the seat at 0.78, the bars
+   * at a metre, the box at 0.78–1.06, 0.19 either side of the centre line,
+   * and the caller's colour. The collider is the caller's and untouched.
+   *
+   * Written in the machine's own axes — `u` along it with the front wheel at
+   * +u, `v` across it, `y` up from where it stands — through `F` into the
+   * shore frame, so it stands at any `yaw` and the tube and lathe builders
+   * that sweep in the shore frame get their points already turned.
+   * `o.box` false leaves the top box off; `o.helmet` is a colour for the
+   * helmet left on the seat. 6,964 triangles with the top box, 6,466
+   * without it and with the helmet — measured, against about 150 before.
+   */
+  function moped(mt, ms, yaw, body, o = {}) {
+    const gy = o.y ?? surfaceY(mt, ms);
+    const c = Math.cos(yaw), sn = Math.sin(yaw);
+    const F = (u, v, y) => [mt + u * c - v * sn, ms + u * sn + v * c, gy + y];
+    const P = (u, v, y) => W(mt + u * c - v * sn, ms + u * sn + v * c, gy + y);
+    const ALONG = [c, sn, 0], ACROSS = [-sn, c, 0], UP = [0, 0, 1];
+    // `boxIn` puts its top face at the world height it is handed, not through
+    // `P`, so its boxes get the ground added here and a frame without it.
+    const PA = (u, v, y) => W(mt + u * c - v * sn, ms + u * sn + v * c, y);
+    const box = (u0, u1, v0, v1, y0, y1, col, top) =>
+      boxIn(PA, u0, u1, v0, v1, gy + y0, gy + y1, col, top);
+    const TYRE = [0.085, 0.085, 0.092];
+    const DARK = [0.130, 0.130, 0.140];
+    const CHROME = [0.620, 0.630, 0.645];
+    const RIM = [0.500, 0.505, 0.515];
+    const SEAT = [0.072, 0.070, 0.068];
+    const GRIP = [0.060, 0.060, 0.063];
+    const ENG = [0.340, 0.342, 0.350];
+    const RED = [0.520, 0.075, 0.060];
+    const tube = (pts, r, col, sides = 10, ref = UP, sh = 0.12) =>
+      tubeTS(pts.map((p) => F(p[0], p[1], p[2])), r, col, sides, ref, sh);
+    // A loft: rings of `[u, v, y, e1, e2, n]`, each a superellipse of power
+    // `n` spanned by the two half-axes `e1` and `e2` about its centre, and
+    // closed at both ends by `cap`, which rounds an end off in a quarter
+    // circle `D` long instead of leaving a flat lid or an open tube.
+    const cap = (r, D) => [[0.50, 0.866], [0.85, 0.527], [1, 0]].map(([f, k]) => [
+      r[0] + D[0] * f, r[1] + D[1] * f, r[2] + D[2] * f,
+      r[3].map((x) => x * k), r[4].map((x) => x * k), r[5]]);
+    const loft = (rings, col, sides, D0, D1) => {
+      const all = [...(D0 ? cap(rings[0], D0).reverse() : []), ...rings,
+        ...(D1 ? cap(rings[rings.length - 1], D1) : [])];
+      const G = all.map(([u, v, y, e1, e2, n = 2]) => {
+        const row = [];
+        for (let j = 0; j < sides; j++) {
+          const q = (j / sides) * TAU, cq = Math.cos(q), sq = Math.sin(q);
+          const k = n > 2.01 ? 1 / Math.pow(Math.pow(Math.abs(cq), n)
+            + Math.pow(Math.abs(sq), n), 1 / n) : 1;
+          const a = cq * k, bq = sq * k;
+          row.push(P(u + e1[0] * a + e2[0] * bq, v + e1[1] * a + e2[1] * bq,
+            y + e1[2] * a + e2[2] * bq));
+        }
+        return row;
+      });
+      knSurf(G, col, { wrap: true, out: (i) => P(all[i][0], all[i][1], all[i][2]) });
+    };
+    // Sections square to the machine (`RU`), lying flat (`RY`), and square
+    // to its width (`RV`).
+    const RU = (u, y, hw, hh, n = 2.6, v = 0) => [u, v, y, [0, hw, 0], [0, 0, hh], n];
+    const RY = (y, u, hd, hw, n = 2.6, v = 0) => [u, v, y, [hd, 0, 0], [0, hw, 0], n];
+    const RV = (v, u, y, hd, hh, n = 2.4) => [u, v, y, [hd, 0, 0], [0, 0, hh], n];
+    const AX = 0.21;                                  // axle height = R
+
+    // ── the wheels ──────────────────────────────────────────────────────────
+    // A 3.50-10: a tyre of round section 92 mm across on a pressed-steel rim
+    // with a dished centre and a hub boss, which is what reads as a wheel and
+    // not a hoop from the lane. The torus's seam is on its inside, where the
+    // rim hides it.
+    for (const [u0, front] of [[0.66, true], [-0.60, false]]) {
+      const C = F(u0, 0, AX);
+      const Rc = 0.166, tw = 0.046, th = 0.044, TS = 8;
+      const prof = [];
+      for (let i = 0; i <= TS; i++) {
+        const f = Math.PI + (i / TS) * TAU, sf = Math.sin(f);
+        prof.push([tw * Math.sign(sf) * Math.pow(Math.abs(sf), 0.75),
+          Rc + th * Math.cos(f)]);
+      }
+      axLathe(C, ACROSS, prof, TYRE, 20, UP, { core: [0, Rc] });
+      for (const sg of [-1, 1]) {
+        axLathe(C, ACROSS, [[sg * 0.040, 0.128], [sg * 0.036, 0.119],
+          [sg * 0.026, 0.106], [sg * 0.019, 0.080], [sg * 0.023, 0.054],
+          [sg * 0.034, 0.042], [sg * 0.040, 0.026], [sg * 0.043, 0]],
+        RIM, 16, UP, { push: -sg * 0.5 });
+      }
+      if (front) {
+        // The disc, on the side away from the engine, and its caliper.
+        for (const [z, p] of [[-0.052, 0.5], [-0.057, -0.5]]) {
+          axLathe(C, ACROSS, [[z, 0.098], [z, 0.052]], [0.470, 0.470, 0.478],
+            18, UP, { push: p });
+        }
+        box(u0 - 0.13, u0 - 0.07, -0.072, -0.040, AX + 0.02, AX + 0.10,
+          DARK);
+        // The fork: two legs, lowers and stanchions, up the steering axis
+        // into the leg shield, which is where every scooter's goes.
+        for (const sg of [-1, 1]) {
+          tube([[u0, sg * 0.060, AX], [u0 - 0.052, sg * 0.058, AX + 0.15]], 0.021,
+            DARK, 10, ALONG);
+          tube([[u0 - 0.052, sg * 0.058, AX + 0.15], [u0 - 0.100, sg * 0.056, AX + 0.29]],
+            0.015, CHROME, 10, ALONG);
+        }
+        box(u0 - 0.13, u0 - 0.08, -0.07, 0.07, AX + 0.26, AX + 0.31, DARK);
+        tube([[u0 - 0.105, 0, AX + 0.29], [u0 - 0.160, 0, AX + 0.45]], 0.022, DARK,
+          10, ALONG);
+        // The mudguard, hugging the wheel from low at the front round over
+        // the top: a shallow shell 72 mm either side of the tread.
+        const rings = [];
+        for (let i = 0; i <= 12; i++) {
+          const a = 0.30 + (2.55 - 0.30) * (i / 12), ca = Math.cos(a), sa = Math.sin(a);
+          rings.push([u0 + ca * 0.246, 0, AX + sa * 0.246, [0, 0.072, 0],
+            [ca * 0.016, 0, sa * 0.016], 4]);
+        }
+        const t0 = [Math.sin(0.30) * 0.02, 0, -Math.cos(0.30) * 0.02];
+        const t1 = [-Math.sin(2.55) * 0.02, 0, Math.cos(2.55) * 0.02];
+        loft(rings, body, 14, t0, t1);
+      }
+    }
+
+    // ── the leg shield and the headset ──────────────────────────────────────
+    // One loft from the floor to the bars: narrow in depth where it meets the
+    // floor behind the front wheel, bellying forward over the mudguard where
+    // the steering column runs inside it, and narrowing to the headset.
+    loft([
+      RY(0.26, 0.385, 0.050, 0.186), RY(0.34, 0.390, 0.055, 0.206),
+      RY(0.46, 0.420, 0.084, 0.212), RY(0.60, 0.444, 0.098, 0.210),
+      RY(0.78, 0.438, 0.084, 0.194), RY(0.90, 0.428, 0.068, 0.160),
+      RY(0.97, 0.420, 0.054, 0.112),
+    ], body, 20, [0, 0, -0.02], [-0.004, 0, 0.04]);
+    // The chrome strip down the middle of the front, on the surface.
+    tube([[0.506, 0, 0.47], [0.534, 0, 0.53], [0.546, 0, 0.62], [0.526, 0, 0.78],
+      [0.499, 0, 0.90]], 0.010, CHROME, 8, ACROSS);
+    // The handlebar cover, a pod across the top of the column.
+    loft([RV(-0.20, 0.405, 1.022, 0.046, 0.034), RV(-0.14, 0.408, 1.027, 0.072, 0.050),
+      RV(0, 0.412, 1.032, 0.086, 0.058), RV(0.14, 0.408, 1.027, 0.072, 0.050),
+      RV(0.20, 0.405, 1.022, 0.046, 0.034)], body, 16, [0, -0.02, 0], [0, 0.02, 0]);
+    // The speedometer under its glass, and the headlamp in its bezel.
+    box(0.370, 0.440, -0.065, 0.065, 1.079, 1.092, [0.050, 0.058, 0.066]);
+    axLathe(F(0.492, 0, 1.030), ALONG, [[-0.012, 0.058], [0.004, 0.058], [0.008, 0.051]],
+      CHROME, 20);
+    axLathe(F(0.492, 0, 1.030), ALONG, [[0.000, 0.051], [0.009, 0.046], [0.014, 0.032],
+      [0.016, 0]], [0.820, 0.815, 0.775], 20, UP, { push: -0.5 });
+    for (const sg of [-1, 1]) {
+      // The bar, its grip and end weight, and the lever in front of the grip.
+      tube([[0.408, sg * 0.170, 1.034], [0.398, sg * 0.240, 1.038],
+        [0.386, sg * 0.332, 1.043]], 0.011, CHROME, 10);
+      tube([[0.396, sg * 0.228, 1.038], [0.386, sg * 0.332, 1.043]], 0.018, GRIP, 12);
+      tube([[0.386, sg * 0.330, 1.043], [0.385, sg * 0.345, 1.043]], 0.019, CHROME, 10);
+      tube([[0.412, sg * 0.205, 1.046], [0.436, sg * 0.255, 1.050],
+        [0.440, sg * 0.318, 1.046]], 0.006, CHROME, 6);
+      // The mirror: a stalk out of the pod and an oval head with its glass
+      // turned to the rider.
+      tube([[0.405, sg * 0.160, 1.070], [0.408, sg * 0.205, 1.170],
+        [0.404, sg * 0.250, 1.232]], 0.008, CHROME, 8, ALONG);
+      loft([RU(0.414, 1.250, 0.058, 0.036, 2.4, sg * 0.282),
+        RU(0.398, 1.250, 0.058, 0.036, 2.4, sg * 0.282)], DARK, 16,
+      [0.008, 0, 0], [-0.006, 0, 0]);
+      axLathe(F(0.391, sg * 0.282, 1.250), ALONG.map((x) => -x),
+        [[0, [0.028, 0.049]], [0.0015, 0]], [0.400, 0.450, 0.500], 16, UP,
+        { push: -0.5 });
+    }
+
+    // ── the floor, the rear body, the seat ──────────────────────────────────
+    knRR(P, -0.20, 0.365, -0.190, 0.190, 0.245, 0.310, 0.07, 0.022, body,
+      DARK, { bottom: true });
+    for (let k = 0; k < 5; k++) {
+      const v = -0.13 + k * 0.065;
+      box(-0.17, 0.33, v - 0.011, v + 0.011, 0.305, 0.318, GRIP);
+    }
+    // The cowl: up out of the floor, swelling over the engine, and in at the
+    // tail, with its bottom edge riding clear over the rear tyre.
+    loft([
+      RU(-0.08, 0.450, 0.150, 0.140), RU(-0.18, 0.500, 0.186, 0.172),
+      RU(-0.34, 0.540, 0.200, 0.172), RU(-0.50, 0.578, 0.200, 0.140),
+      RU(-0.65, 0.600, 0.184, 0.114), RU(-0.76, 0.614, 0.150, 0.086),
+      RU(-0.83, 0.624, 0.096, 0.056),
+    ], body, 20, [0.05, 0, -0.02], [-0.035, 0, 0]);
+    // The seat, a padded loaf with the passenger's half stepped up, stopping
+    // where the carrier starts.
+    loft([
+      RU(-0.07, 0.692, 0.085, 0.026, 3), RU(-0.13, 0.712, 0.146, 0.054, 3),
+      RU(-0.26, 0.722, 0.164, 0.060, 3), RU(-0.38, 0.730, 0.162, 0.060, 3),
+      RU(-0.46, 0.742, 0.150, 0.056, 3), RU(-0.50, 0.738, 0.110, 0.040, 3),
+    ], SEAT, 18, [0.02, 0, 0], [-0.02, 0, 0]);
+    // The tail lamp, the plate under it on its hanger, and the grab rail.
+    box(-0.866, -0.800, -0.080, 0.080, 0.598, 0.642, RED);
+    tube([[-0.80, 0, 0.56], [-0.845, 0, 0.51]], 0.012, DARK, 8, ALONG);
+    box(-0.855, -0.845, -0.095, 0.095, 0.400, 0.510, [0.700, 0.700, 0.690]);
+    box(-0.857, -0.847, -0.095, -0.072, 0.400, 0.510, [0.110, 0.200, 0.480]);
+    tube(bendPath([[-0.44, 0.168, 0.762], [-0.80, 0.150, 0.772], [-0.85, 0, 0.774],
+      [-0.80, -0.150, 0.772], [-0.44, -0.168, 0.762]], 0.08, 4), 0.013, DARK, 10);
+
+    // ── what is underneath ──────────────────────────────────────────────────
+    // The engine casing and swingarm down the left, carrying the back wheel.
+    loft([
+      RU(-0.64, 0.215, 0.030, 0.052, 2.4, 0.105), RU(-0.52, 0.226, 0.042, 0.082, 2.4, 0.105),
+      RU(-0.36, 0.246, 0.050, 0.106, 2.4, 0.105), RU(-0.20, 0.264, 0.050, 0.094, 2.4, 0.105),
+      RU(-0.11, 0.270, 0.040, 0.064, 2.4, 0.105),
+    ], ENG, 14, [0.03, 0, 0], [-0.03, 0, 0]);
+    // The silencer down the right, its header out of the engine and a
+    // chrome tailpipe off the end.
+    const MP = [[-0.12, -0.08, 0.20], [-0.27, -0.125, 0.225], [-0.40, -0.150, 0.275],
+      [-0.55, -0.152, 0.305], [-0.70, -0.150, 0.332], [-0.76, -0.150, 0.343]];
+    const MR = [0.017, 0.022, 0.050, 0.056, 0.052, 0.034];
+    tube(MP, (k) => MR[k], [0.180, 0.180, 0.188], 14);
+    tube([[-0.745, -0.150, 0.340], [-0.800, -0.150, 0.351]], 0.016, CHROME, 10);
+    // The rear shock: a damper inside a spring — the spring is a tube whose
+    // radius comes and goes, which is a coil at any distance you can be from it.
+    const s0 = [-0.600, -0.090, AX + 0.010], s1 = [-0.470, -0.118, 0.500];
+    const SP = [];
+    for (let k = 0; k <= 16; k++) {
+      const f = 0.12 + 0.76 * k / 16;
+      SP.push(s0.map((x, i) => x + (s1[i] - x) * f));
+    }
+    tube([s0, s1], 0.011, CHROME, 8, ALONG);
+    tube(SP, (k) => (k % 2 ? 0.020 : 0.027), [0.520, 0.120, 0.080], 10, ALONG);
+    // The centre stand it is standing on, both feet down.
+    tube(bendPath([[-0.14, 0.180, 0.262], [-0.25, 0.180, 0.016], [-0.25, -0.180, 0.016],
+      [-0.14, -0.180, 0.262]], 0.05, 4), 0.013, DARK, 8, ALONG);
+
+    // ── what is on it ───────────────────────────────────────────────────────
+    if (o.box !== false) {
+      // The top box on its carrier plate, the lid's seam round it and the
+      // red reflector on the back.
+      //
+      // Behind the seat and over the tail, where a carrier puts it: the old
+      // box stood on the passenger's half of the seat. Same size, 0.08 m aft.
+      for (const sg of [-1, 1]) {
+        tube([[-0.58, sg * 0.10, 0.700], [-0.58, sg * 0.10, 0.782]], 0.012, DARK, 8, ALONG);
+      }
+      box(-0.79, -0.47, -0.12, 0.12, 0.775, 0.795, DARK);
+      // The shell and its lid, the lid 6 mm proud all round so the seam
+      // between them is a shadow line and not a painted one.
+      const BX = [0.080, 0.080, 0.086];
+      loft([RU(-0.45, 0.870, 0.176, 0.086, 3.4), RU(-0.49, 0.872, 0.186, 0.094, 3.4),
+        RU(-0.75, 0.872, 0.186, 0.094, 3.4), RU(-0.79, 0.870, 0.176, 0.086, 3.4)],
+      BX, 20, [0.03, 0, 0], [-0.03, 0, 0]);
+      loft([RU(-0.446, 0.976, 0.182, 0.082, 3.4), RU(-0.486, 0.978, 0.192, 0.086, 3.4),
+        RU(-0.754, 0.978, 0.192, 0.086, 3.4), RU(-0.794, 0.976, 0.182, 0.082, 3.4)],
+      shade(BX, 1.15), 20, [0.03, 0, 0], [-0.03, 0, 0]);
+      box(-0.832, -0.818, -0.090, 0.090, 0.890, 0.925, RED);
+    }
+    if (o.helmet) {
+      knLathe(P, -0.30, 0, [[0.772, 0.120], [0.790, 0.148], [0.850, 0.158],
+        [0.912, 0.145], [0.960, 0.112], [0.992, 0.068], [1.006, 0]], o.helmet, 18);
+    }
   }
 
 
@@ -31471,41 +31933,29 @@ async function buildJadrija(scene) {
     // the feet, a leg shield standing up in front of it, a seat over the rear
     // wheel and a box behind that. The silhouette is the leg shield and the box;
     // everything else could be a bicycle.
+    //
+    // Built by `moped` since 29 Sep 2026, which is where the note on what one
+    // is made of now lives. The collider is this one's and has not moved.
     const scooter = (mt, ms, yaw, body) => {
       const y = surfaceY(mt, ms);
-      const P = facing(mt, ms, yaw);
-      const TYRE = [0.085, 0.085, 0.092];
-      const DARK = [0.130, 0.130, 0.140];
-      const CHROME = [0.620, 0.630, 0.645];
-      // The wheels, as rings of chords — the same trick the bicycles use, and
-      // for the same reason: a box with a dark colour on it is not a wheel.
-      for (const [wu, R] of [[0.66, 0.21], [-0.60, 0.21]]) {
-        for (let j = 0; j < 10; j++) {
-          const a0 = (j / 10) * TAU, a1 = ((j + 1) / 10) * TAU;
-          const q = (a, o) => P(wu + Math.cos(a) * R, o,
-            y + R + Math.sin(a) * R);
-          b.quad(q(a0, -0.055), q(a1, -0.055), q(a1, 0.055), q(a0, 0.055), TYRE);
-        }
-      }
-      // Floor, leg shield, seat, rear body, top box.
-      boxIn(P, -0.30, 0.34, -0.20, 0.20, y + 0.30, y + 0.36, DARK);
-      boxIn(P, 0.34, 0.50, -0.21, 0.21, y + 0.30, y + 0.96, body,
-        shade(body, 1.08));
-      boxIn(P, -0.62, -0.10, -0.19, 0.19, y + 0.40, y + 0.66, body,
-        shade(body, 1.05));
-      boxIn(P, -0.56, -0.02, -0.17, 0.17, y + 0.66, y + 0.78, DARK);
-      boxIn(P, -0.72, -0.34, -0.19, 0.19, y + 0.78, y + 1.06, DARK,
-        shade(DARK, 1.3));
-      // Bars and a mirror on a stalk, which is the only thing up at eye height.
-      boxIn(P, 0.40, 0.48, -0.30, 0.30, y + 0.98, y + 1.04, CHROME);
-      boxIn(P, 0.42, 0.46, 0.24, 0.30, y + 1.04, y + 1.22, CHROME);
-      boxIn(P, 0.38, 0.50, 0.22, 0.34, y + 1.20, y + 1.28, DARK);
+      moped(mt, ms, yaw, body);
       runs.push({ t0: mt - 0.9, t1: mt + 0.9, s0: ms - 0.5, s1: ms + 0.5,
         y, h: 1.05 });
     };
     // The two behind the bar, nose-in to the hedge as the photograph has them.
-    scooter(281.4, 25.9, 0.16, [0.155, 0.160, 0.175]);
-    scooter(282.5, 26.0, 0.10, [0.125, 0.115, 0.120]);
+    //
+    // AND NOW THEY ARE. They were written at a turn of 0.16 and 0.10, and
+    // `facing` at a turn near nought sends the machine's length along the
+    // shore — so the pair stood side-on to MINI's back wall, 1.1 m apart on
+    // centres and 1.5 m long each, and the front of one was parked 0.4 m
+    // inside the tail of the other. As nine boxes on two rings nobody could
+    // tell where one ended; as two scooters it is a pile-up. The Trampulin
+    // one below has always been written the way this note meant, −1.42,
+    // which is a quarter turn less 0.15: nose to −s, toward the wall. These
+    // two take the same quarter turn and keep their own skews, their own
+    // places and their own colliders.
+    scooter(281.4, 25.9, 0.16 - Math.PI / 2, [0.155, 0.160, 0.175]);
+    scooter(282.5, 26.0, 0.10 - Math.PI / 2, [0.125, 0.115, 0.120]);
     // And the third, at Trampulin, by the cabinets. b_106.
     scooter(477.2, 24.3, -1.42, [0.330, 0.320, 0.325]);
     b = back11;
