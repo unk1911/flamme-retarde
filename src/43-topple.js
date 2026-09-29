@@ -51,7 +51,9 @@
 //       `geoOf(fg)` — what they are against, in THEIR FIGURE'S frame:
 //       `{ boxes: [cx, cy, cz, hx, hy, hz, yaw, …], floor }`, the floor a
 //       height or a function of (x, z) — `sitGeo`'s shape (43-jadrija.js), so
-//       the settle's answer is this one's. `event(fg, what, info)` is told
+//       the settle's answer is this one's; and `v` (m/s, figure frame) if they
+//       were already moving — `wheelOffGeo`'s, off a bicycle or a scooter
+//       (1.550.0). `event(fg, what, info)` is told
 //       'wet' (first push of a spell), 'live', 'down' (landed), 'up' (standing,
 //       `info` = { x, y, z, yaw } world), 'reseat', 'bail' (the guard gave up).
 //   T.push(fg, f, F, at, dt)   a force F (N, world [x, y, z]) this frame, along
@@ -348,7 +350,10 @@ function makeToppler(o) {
     const fy = g.floor;
     X.floor = typeof fy === 'function' ? fy : () => fy;
     net.setFloor(X.floor);
-    rag.enter(f, O, I);
+    // Moving already, if the caller says so — `g.v` (m/s) and `g.w` (rad/s,
+    // about `g.c`), figure frame: a rider taken over at the speed their
+    // machine was doing (1.550.0), which is most of what makes it a crash.
+    rag.enter(f, O, I, g.v || null, g.v ? g.w || [0, 0, 0] : null, g.v ? g.c || [0, 0, 0] : null);
     for (const b of rag.bodies) net.drag[b] = KNOCK.drag;
     const nb = f.bones.length;
     X.pose = { q: new Float32Array(nb * 4), t: new Float32Array(3), w: 1,

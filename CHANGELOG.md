@@ -8,6 +8,75 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.0] — 2026-09-29
+
+### Hosed off their wheels — and then it's your bicycle
+
+Misha: *"i like how the physics of hosing people off their chairs works ...
+the same could be applied to hosing people off their bicycles and scooters
+(GTA V style), and then essentially taking over the operation of their
+scooter or bicycle while they grumble about it but ultimately walk away
+somewhere not being able to do much about the brazen act."*
+
+`THEFT` in 43-jadrija.js, on the café's machinery (1.540.0) wherever it fits.
+
+- **The fall.** The five promenade riders are jet guests (`riderGuests`, three
+  slots, the nearest within 16 m), pushing a toppler of their own
+  (`makeToppler`, 43-topple.js) — the café's sum-past-a-tip, 1.5 times the
+  push, because nobody is less stable than somebody on two wheels: over in
+  about half a second of water at 3 m. Past it they are a live ragdoll taken
+  over **at the speed they were riding** (`geoOf` may now hand the toppler a
+  velocity, passed to `rag.enter`), against the deck sampled on a 0.3 m grid
+  round them and the eight nearest benches, bins and poles as boxes. The
+  get-up, the roll-over and the guard are the café's, unchanged.
+- **The machine goes over on its own**, not in the ragdoll's net (a top tube
+  between two thigh capsules is an overlap on the first step): an inverted
+  pendulum about its tyres, over to the side the water was going, a bounce,
+  resting at 80 degrees on its bar end and a pedal (a bicycle) or the deck's
+  edge (a scooter) — its lift off the deck is the lowest of its extremities
+  at that roll — rolling on while it tips, sliding to a stop on its side, the
+  wheels spinning on after, the bar flopping over, a rattle when it lands.
+  Everybody who steers round riders steers round it lying there.
+- **E beside it** (a prompt says so, `[E] take the bicycle` / `the
+  e-scooter`) and it is yours. Your body is fitted to it by the riders' own
+  fit (`wheelFit`, split out of the riders' build; the saddle stays where its
+  owner set it) and posed every frame by the riders' own solve (`wheelPose`:
+  pedalling, hands on the grips, the bar turning), and the ground walker
+  rides a mount (`ground.mount`) instead of walking: **W** pedals / throttle,
+  **Q** pedals harder (a bicycle 6.2 → 8.4 m/s; an e-scooter 6.9, its legal
+  25 km/h, and Q does nothing), **S** brakes and then walks it backwards,
+  **A D** (or the arrows) steer — the turn opens up with speed and closes a
+  little at the top of it — and the mouse still turns you. Leaned into turns
+  by the riders' atan(v·ω/g), no footsteps, the eye up by the saddle. The
+  third person comes on when you get on and goes back to what it was when you
+  get off. **E again** and you step off to the left and it goes over where it
+  is, at whatever it was doing. A back door or a teleport while riding drops
+  it where you were. No jumping off it with Enter; Space is still the hose.
+- **Them.** Up off the ground, a glare and one of the bump's recorded lines
+  ("hey — i'm walkin' here!"). If you have taken it: a few quick steps after
+  you and *"hey! HEY! that's MY bike!"*, then a wave and one of seven new
+  lines (*"somebody call the cops! ...nobody? great."*, *"i'm tellin' my
+  mother."*, *"that's a rental! it's on MY card!"*, *"you didn't even ring the
+  bell!"* ...), a recorded *"fuhgeddaboudit"*, and off down the shore away
+  from you — *"great. i'll walk. i love walkin'."* The new lines are balloons
+  over a yelp (nobody recorded them), in English, Croatian and French. If you
+  leave it lying they walk back to it, stand it up and ride on (*"and don't
+  come back!"*); if it is somewhere they would not go (off the promenade, or
+  you are standing over it), they come back on it later, on their lane, when
+  you and the camera are 32 m from both them and it — the café's rule.
+- **Keys:** E (take / get off — E is already the interact key; see the help
+  sheet), W/Q/S/A/D while riding. `__fr.jad.raw().theft` (`stats`, `list`,
+  `log`, `knock(i, side, v)`, `cfg`), `__fr.jad.ride()` and
+  `__fr.jad.rideKey()` for probes.
+
+Measured (headless, RTX 4090 laptop): one rider down 0.65 ms a frame, four
+2.2 ms (a ragdoll step 0.25–0.31 ms, at most three a frame each), the frame a
+rider goes over +0.7 ms for the deck grid, the worst frame 5.8 ms with three
+knocked in the same frame; nothing while nobody is down. At most
+`KNOCK.cap` (4) down at once. Café sitters still topple exactly as on
+1.549.2 (same three knocks: live → down → up, no rescues or bails);
+riders 5, people 100, blockers 792; no `rng` draws added.
+
 ## [1.549.2] — 2026-09-29
 
 ### The tableware, turned: glasses, bottles, cups, cutlery

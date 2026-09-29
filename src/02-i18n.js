@@ -317,6 +317,27 @@ const STRINGS = {
     'bump.again': 'again? seriously?',
     'bump.kiddinme': "you kiddin' me with this?",
 
+    // Hosed off their wheels, and then robbed of them (1.550.0, `THEFT` in
+    // 43-jadrija.js). Balloons only — nobody recorded these, so the voice
+    // under them is a yelp. The same Brooklyn as the bump's.
+    'steal.mine.bike': "hey! HEY! that's MY bike!",
+    'steal.mine.scoot': "hey! that's MY scooter, lady!",
+    'steal.hose': 'first you hose me, then you take my wheels?!',
+    'steal.cops': 'somebody call the cops! ...nobody? great.',
+    'steal.five': 'bring it back by five!',
+    'steal.helmet': 'at least wear a helmet!',
+    'steal.mama': "i'm tellin' my mother.",
+    'steal.bell': "you didn't even ring the bell!",
+    'steal.rent': "that's a rental! it's on MY card!",
+    'steal.walk': "great. i'll walk. i love walkin'.",
+    'steal.back': "and don't come back!",
+    'steal.take.bike': '[E] take the bicycle',
+    'steal.take.scoot': '[E] take the e-scooter',
+    'steal.took.bike': "It's yours now. W pedals, Q harder, S brakes, A D steer, E gets off.",
+    'steal.took.scoot': "It's yours now. W throttle, S brakes, A D steer, E gets off.",
+    'steal.ride.bike': 'W pedal · Q harder · S brake · A D steer · E off',
+    'steal.ride.scoot': 'W go · S brake · A D steer · E off',
+
     // The gameplay recorder — src/92-clip.js. No <b> in the two toasts, unlike
     // most of the strings around here that name a key: `toast()` sets
     // textContent, so markup in a toast is printed rather than rendered. (Two
@@ -408,6 +429,7 @@ const STRINGS = {
     'help.k.mic': 'talk to them — the microphone, and you keep the controls',
     'shop.short': 'not enough on you',
     'help.k.buy': 'buy — at a counter',
+    'help.k.steal': 'take a bicycle or scooter you hosed its rider off — and off it again',
     'help.k.drink': 'a swig of what you bought',
     'beer.none': 'no beer on you',
     'beer.done': 'empty',
@@ -809,6 +831,24 @@ const STRINGS = {
     'bump.again': 'opet? ozbiljno?',
     'bump.kiddinme': 'zezaš me?',
 
+    'steal.mine.bike': 'ej! EJ! to je MOJ bicikl!',
+    'steal.mine.scoot': 'ej! to je MOJ romobil, gospođo!',
+    'steal.hose': 'prvo me poliješ, a onda mi uzmeš kotače?!',
+    'steal.cops': 'zovite policiju! ...nitko? super.',
+    'steal.five': 'da si ga vratila do pet!',
+    'steal.helmet': 'barem stavi kacigu!',
+    'steal.mama': 'reći ću mami.',
+    'steal.bell': 'nisi ni zazvonila!',
+    'steal.rent': 'to je iznajmljeno! na MOJU karticu!',
+    'steal.walk': 'super. idem pješke. obožavam hodat.',
+    'steal.back': 'i da se nisi vratila!',
+    'steal.take.bike': '[E] uzmi bicikl',
+    'steal.take.scoot': '[E] uzmi romobil',
+    'steal.took.bike': 'Sad je tvoj. W pedalira, Q jače, S koči, A D skreće, E silaziš.',
+    'steal.took.scoot': 'Sad je tvoj. W gas, S koči, A D skreće, E silaziš.',
+    'steal.ride.bike': 'W pedaliraj · Q jače · S koči · A D skreni · E siđi',
+    'steal.ride.scoot': 'W gas · S koči · A D skreni · E siđi',
+
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'snima',
     'clip.rec.full': 'puno',
@@ -892,6 +932,7 @@ const STRINGS = {
     'help.k.mic': 'govori im — mikrofon, kontrole ostaju tvoje',
     'shop.short': 'nemaš dovoljno',
     'help.k.buy': 'kupi — na šalteru',
+    'help.k.steal': 'uzmi bicikl ili romobil s kojeg si polila vozača — i siđi s njega',
     'help.k.drink': 'gutljaj',
     'beer.none': 'nemaš pivo',
     'beer.done': 'prazno',
@@ -1248,6 +1289,24 @@ const STRINGS = {
     'bump.again': 'encore ? sérieux ?',
     'bump.kiddinme': 'tu te fous de moi ?',
 
+    'steal.mine.bike': 'hé ! HÉ ! c\'est MON vélo !',
+    'steal.mine.scoot': 'hé ! c\'est MA trottinette, madame !',
+    'steal.hose': 'd\'abord tu m\'arroses, et tu me piques mes roues ?!',
+    'steal.cops': 'appelez la police ! ...personne ? super.',
+    'steal.five': 'tu me le ramènes avant cinq heures !',
+    'steal.helmet': 'mets au moins un casque !',
+    'steal.mama': 'je vais le dire à ma mère.',
+    'steal.bell': 't\'as même pas sonné !',
+    'steal.rent': 'c\'est une location ! sur MA carte !',
+    'steal.walk': 'génial. je marche. j\'adore marcher.',
+    'steal.back': 'et reviens pas !',
+    'steal.take.bike': '[E] prendre le vélo',
+    'steal.take.scoot': '[E] prendre la trottinette',
+    'steal.took.bike': 'Il est à toi. W pédale, Q plus fort, S freine, A D tournent, E pour descendre.',
+    'steal.took.scoot': 'Elle est à toi. W accélère, S freine, A D tournent, E pour descendre.',
+    'steal.ride.bike': 'W pédaler · Q plus fort · S freiner · A D tourner · E descendre',
+    'steal.ride.scoot': 'W avancer · S freiner · A D tourner · E descendre',
+
     // the gameplay recorder — src/92-clip.js
     'clip.rec': 'rec',
     'clip.rec.full': 'plein',
@@ -1333,6 +1392,7 @@ const STRINGS = {
     'help.k.mic': 'parlez-leur — le micro, et vous gardez les commandes',
     'shop.short': "pas assez sur vous",
     'help.k.buy': 'acheter — au comptoir',
+    'help.k.steal': 'prendre le vélo ou la trottinette dont tu as arrosé le conducteur — et en descendre',
     'help.k.drink': 'une gorgée',
     'beer.none': "pas de bière sur vous",
     'beer.done': 'vide',
