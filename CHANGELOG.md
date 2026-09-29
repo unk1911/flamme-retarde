@@ -8,6 +8,136 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.5] — 2026-09-29
+
+### The lifeguard flags go out on the mole and fly; a ladder down each flank
+
+Misha: *"this pole with the red and yellow flags, it's in the wrong spot, it
+should be on that concrete mole ... closer to the water, the whole point is
+it shows the conditions of the sea"*, with a frame from the end of the mole
+drawn on, and *"there should be 2 ladders to go into the sea ... one on each
+side of the mole"*, *"the flags should flap in the wind, like our other
+flags"*, and *"there's also an extra ladder in a weird spot that need to be
+removed"* — all four placed by coordinates he read off the console.
+
+- **The flags** (`MOLE_FLAG`): the pole is at t 258.6, s −39.3, on the centre
+  line of the mole 2.7 m short of its end, 5.4 m tall. Each flag is the
+  Croatian flag's particle cloth (`brodEnsign`) flown plain — a new `cfg.body`
+  in 59-brod.js gives it one colour — yellow over red, 0.9 × 0.58 m, stepped
+  every frame beside the shore flag. The six static panels on the column at
+  the mole's root, under the konoba's thatch, are gone.
+- **The ladders** (`MOLE_LADDERS`): the quay's stainless pool ladder, turned
+  through a right angle — `ladder(t, M)` now takes a mapping — bolted to the
+  deck at s −39.3 and down each flank face into the sea.
+- **The stray ladder**: the quay's 11 m rhythm put one at t 258, exactly
+  where the mole comes ashore, going down the face into the mole's own
+  concrete. Quay ladders now skip the mole's root (`onMoleT`). No `rng` is
+  involved, so nothing else moved: blockers 792 and both hashes, people 100,
+  cars, hammock and café settle unchanged.
+
+## [1.548.4] — 2026-09-29
+
+### The Bucketeer's pail and its bail, turned
+
+Misha, looking down into it on the bathroom tiles: *"the bucket, and
+especially the bucket handle, looks too low-poly, since this bucket (and the
+handle) figures into the game can u make it higher resolution?"* The pail was
+three flat-shaded sixteen-sided lathes with two 28 × 55 mm boxes for lugs;
+the bail was eleven axis-aligned boxes round a half ellipse, which from
+above is a staircase of white bricks.
+
+**New helpers in 45-bucketeer.js**: `pailTurn` (a lathe into `propBuilder`
+with the profile's own normals, averaged at each ring; a crease is two runs,
+and a `place` rotation turns one about another axis), `wireSweep` (a round
+smooth tube along a planar polyline, capped if asked), and `bailCurve`, the
+bail's centre line, which the mesh and `bailPoint` now share.
+
+**The pail**, same cone, same mouth, same inside: 48 sides, a recessed base
+on a foot ring, two stiffening rings, a rolled 14 × 10 mm lip whose inside
+face is exactly `PAIL_IN.rLip`, a 5 mm fillet round the inside floor, and two
+turned ears on the pin axis with a 9.4 mm hole and a rib above and below.
+The water disc went 16 → 48 sides to sit in the round wall.
+
+**The bail**: 8 mm wire, 10 sides, down the OUTSIDE of each ear and turned
+in through its hole on a 7.5 mm bend, with a 15 mm grey sleeve over the
+middle quarter under the fist. `bailCurve` is the old ellipse exactly from
+u = 0.40 to 0.60 and flared 16 mm at the ends, which also fixes an old one:
+the ellipse was 141 mm off the axis at the lug, inside the 141.65 mm wall,
+and mid-pour it came out through the side of the pail as a row of grey
+slivers. Flared, every point clears the lip at every roll.
+
+The fly's pails (`zombieBucket`, 10 → 16 sides, bail 3 × 8 → 4 × 14) and the
+close-up's (`miniBucket`, 22 → 40, bail 5 × 18 → 8 × 36) came along.
+
+MEASURED: pail 184 → 3 424 triangles, bail 132 → 1 620, water 16 → 48 (one
+pail in the game). Pin, lugs and apex unchanged: lugs in world
+(−2086.2445, 6.5058, 357.3837) / (−2086.0983, 6.4284, 357.1553) and apex
+(−2086.145, 6.619, 357.2349) carrying, identical to 1.548.2; bail geometry top
+0.1655 = 0.158 apex + 7.5 mm sleeve, hook ends at x = ±0.1455 on the pin axis
+inside ±0.1518 ears. `grip()` carrying: crook 0.7 mm, tip 85.8, palm 0.7, atU
+0.500, as before; the held pour frame identical. Blockers 792, people 100,
+`jadrija.tris` 671 536, hammock at (−1923.174, 4.138, 443.162).
+## [1.548.3] — 2026-09-29
+
+### The scooters behind MINI, and the piers in front of them
+
+Misha, from the lane behind MINI: *"same, add polygons, especially that
+'bicycle' there looks too low-poly"*. The "bicycle" was the pair of parked
+step-through scooters against MINI's back wall: nine flat boxes each on two
+rings of ten flat chords, which from the lane read as a wire bicycle with
+luggage on it.
+
+- **`moped()`, a new builder, one scooter built as one.** Every panel is a
+  smooth loft of superellipse sections (`knSurf`) with rounded ends: a leg
+  shield that bellies forward over the front wheel and narrows into the
+  headset, a handlebar pod, a floor with rubber strips, a rear cowl that
+  swells over the engine, a stepped padded seat, a top box with its lid
+  seam. What goes round is turned about its own axle with the new
+  `axLathe`: tyres of round section on pressed-steel rims with hub bosses,
+  a front brake disc and caliper, a headlamp in a chrome bezel, oval mirror
+  glass. Plus a telescopic fork under a mudguard that hugs the wheel, the
+  engine casing and swingarm, the silencer and tailpipe, a sprung rear
+  shock, bars with grips, end weights and levers, two mirrors on stalks,
+  a grab rail and carrier, a tail lamp and a Croatian plate, all on a
+  centre stand. Wheel positions and size, floor, seat, bar and box heights
+  and the caller's colours are the old ones. **6,964 tris** a machine with
+  the top box (was about 150); **6,466** for the `tramp2` one with a helmet
+  and no box.
+- All four parked scooters use it: the pair behind MINI, the one by the
+  Trampulin cabinets, and the one against the `tramp2` cabinets (its blue
+  helmet, now smooth, kept on the seat; no top box, as before).
+- **The pair behind MINI are nose-in now, as their note always said.** They
+  were written at a turn of 0.16 and 0.10, which `facing` lays along the
+  shore, so they stood side-on to the wall, 1.1 m apart and 1.5 m long, with
+  one parked 0.4 m inside the other. They take the quarter turn the
+  Trampulin one (−1.42) always had, keeping their skews, their places and
+  their colliders.
+- **The dry-stone piers west of t 300** (the two either side of the gap in
+  his frame, and the other six): the forty frustums stuck on a dark core
+  are gone. Each face and each end is laid in rough courses, 0.14–0.26 m,
+  of stones 0.18–0.46 m long touching with 10–26 mm joints, each a smooth
+  irregular cushion bedded into the mortar, most nearly flush and a few up
+  to 54 mm proud, varied in size, height, tone and warmth. The cap is two
+  dressed slabs on a joint with eased arrises, a hair apart in level and
+  tone. Positions, heights, cap oversail and `runs` are the old ones.
+  **3,203 tris** a pier (was about 500).
+- **Rooftop water tanks** (the four box-shop roofs that carry one): a roto-moulded tank turned smooth,
+  six moulded hoops, a shoulder into a dome, a screw lid with grip ribs,
+  and an outlet stub with a brass ball valve and a pipe bent down into the
+  roof; same stand, diameter and height. **Satellite dishes** (five roofs): a
+  real offset paraboloid 0.64 m across with a rolled rim, on a bent crank
+  off the mast, with the arm from under its lip to the LNB at the focus;
+  same place and aim. About **2,110** tris a tank and **860** for the dish
+  and masts.
+
+**Unchanged:** 792 blockers with the same hash, 100 people, riders 5
+(machineTris 25,496; the riders' bicycles and e-scooters are a separate,
+already detailed builder and share nothing with these), the hammock frame
+at (−1923.17, 4.14, 443.16). No `rng()` draws: the stones are `jit` only.
+
+**Cost**: `jadrija.tris` 647,780 → 708,269 (+60,489: scooters +26.8k,
+piers +21.6k, tanks and dishes +12.1k).
+
 ## [1.548.2] — 2026-09-29
 
 ### The lamp columns and the litter bins, turned

@@ -2949,7 +2949,9 @@ function brodEnsign(cfg = null) {
     Math.hypot(E.fly, E.hoist) * 1.05);
   const mesh = new THREE.Mesh(geo, solidMaterial(0xffffff, {
     spec: 0.06, specPower: 18, side: THREE.DoubleSide, vcol: false,
-    body: ENSIGN_GLSL, lit: ENSIGN_LIT,
+    // `cfg.body` flies a plain cloth instead of the tricolour — the lifeguard
+    // flags on the Jadrija mole (43-jadrija.js, MOLE_FLAGS).
+    body: cfg && cfg.body ? cfg.body : ENSIGN_GLSL, lit: ENSIGN_LIT,
   }));
   mesh.name = cfg && cfg.name ? cfg.name : 'brod:ensign';
 
