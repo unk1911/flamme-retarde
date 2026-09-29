@@ -806,6 +806,12 @@ html.touch #swim-hud { bottom: calc(7.4rem + var(--wrap)); }
   text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 14px rgba(0, 0, 0, .8);
 }
 #saying[hidden] { display: none; }
+/* The translation under a Croatian line — see `caption` in 49-voice.js. Its
+   own line, smaller and dimmer: the line is what was said, this is a note. */
+#saying .gloss {
+  display: block; font-size: .88em; font-style: italic;
+  color: #cdbfaa; line-height: 1.5; margin-top: .1em;
+}
 
 /* The shop counter you are standing at — see `paintCounter` in 90-app.js.
    Above the subtitle rather than below it: she can be talking to you while you

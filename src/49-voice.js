@@ -488,7 +488,7 @@ const voice = (() => {
    * a seven-second line — the caption outran the voice, which is the one thing
    * a subtitle must never do. `ask` starts the clock when playback resolves.
    */
-  function caption(text, lead) {
+  function caption(text, lead, gloss) {
     const el = $('saying');
     if (!el) return;
     // WHO IS TALKING HAS TO BE ON THE LINE, and only once there were two of
@@ -498,6 +498,18 @@ const voice = (() => {
     // is nothing at all. Hers stays bare, because a subtitle that says who is
     // speaking when only one thing speaks is a system message; his is led.
     el.textContent = text ? (lead || '') + text : '';
+    // AND WHAT IT MEANS, under it, when it was said in Croatian to a player
+    // who is not reading the game in Croatian. Misha, 29 Sep 2026: *"more
+    // croatian speech and less english speech"* -- three bathers in four now
+    // speak Croatian, and the service sends a gloss in the player's language
+    // alongside, which is read here and never spoken. A child node rather
+    // than a second element, so it comes and goes with the line it glosses.
+    if (text && gloss) {
+      const g = document.createElement('span');
+      g.className = 'gloss';
+      g.textContent = gloss;
+      el.appendChild(g);
+    }
     el.hidden = !text;
     capT = text ? 1e9 : 0;
   }
@@ -526,7 +538,8 @@ const voice = (() => {
         body: JSON.stringify(sp.pend
           ? Object.assign(context(sp, gap), { event: sp.pend },
             sp.pendGap && sp.pendGap.kind
-              ? { kind: sp.pendGap.kind, doing: sp.pendGap.pose } : null)
+              ? { kind: sp.pendGap.kind, doing: sp.pendGap.pose,
+                pid: sp.pendGap.pid } : null)
           : context(sp, gap)),
       });
       const d = await r.json().catch(() => null);
@@ -560,7 +573,7 @@ const voice = (() => {
       sp.pend = null; sp.pendGap = null;
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
-      caption(d.text, lead);
+      caption(d.text, lead, d.gloss);
       // Which errand she was on when she said it -- see `VOICE.gapBucket`.
       const bk = !!(gap && gap.bucket);
       sp.nextAt = clock

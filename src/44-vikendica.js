@@ -404,6 +404,116 @@ async function buildVikendica(scene, field) {
     let page = 0, wet = 0, t0 = 0, last = 0, ask = 0, busy = false, headI = 0;
     let liveAt = 0;
 
+    // ── AND THE NEWS IS REAL WHEN IT CAN BE ─────────────────────────────────
+    //
+    // Misha, 29 Sep 2026: *"the btc, ltc prices are current but the news
+    // stories are either fake or stuck on some old news stories from months
+    // ago, can u make sure the TV shows stories from *actual* more current
+    // local sibenik/jadrija/croatian news?"*. They were fake: `HEAD` above is
+    // this world's sixth of August, written by hand, and it was all the set
+    // ever showed, because `/baye/world` never sent a headline to the page.
+    //
+    // It does now — three slots off Brave News, the last day's, Croatian
+    // outlets only, each with its source and its time (`_news` in
+    // server/baye/baye.py). With a session the set asks once and then every
+    // twenty minutes, which is how often the service refreshes anyway, and
+    // shows those: the town first, then the country and the world in turn,
+    // and the subline is the outlet and how long ago, worked out when it is
+    // drawn so "prije 2 h" is still true an hour later. Signed out or offline
+    // the baked sixth of August stands, which is the fiction the rest of the
+    // room is in and was never claiming to be today's.
+    let news = null;            // [{ t, src, ts }] in the order they are shown
+    let newsCrawl = null;
+    let newsAt = -1e12;         // Date.now() of the last ask
+    let newsBusy = false;
+    const NEWS = { every: 20 * 60e3, retry: 5 * 60e3, keep: 12 };
+
+    function newsAsk() {
+      if (newsBusy || typeof fetch !== 'function') return;
+      if (typeof AUTH === 'undefined' || !AUTH.baye) return;
+      const now = Date.now();
+      if (now - newsAt < (news ? NEWS.every : NEWS.retry)) return;
+      newsAt = now;
+      newsBusy = true;
+      fetch(AUTH.baye + '/world', { credentials: 'same-origin' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (d && d.ok) newsTake(d.news); })
+        .catch(() => {})
+        .then(() => { newsBusy = false; });
+    }
+
+    /** Local first, then national and world in turn: L N L W N L W … */
+    function newsTake(n) {
+      if (!n) return;
+      const pick = (k) => (Array.isArray(n[k]) ? n[k] : [])
+        .filter((x) => x && typeof x.t === 'string' && x.t.length > 8);
+      const q = { L: pick('local'), N: pick('national'), W: pick('world') };
+      const out = [];
+      const seen = new Set();
+      const ORDER = 'LNLWN';
+      for (let i = 0; out.length < NEWS.keep && (q.L.length || q.N.length
+        || q.W.length); i++) {
+        const k = ORDER[i % ORDER.length];
+        const x = q[k].shift() || q.L.shift() || q.N.shift() || q.W.shift();
+        if (!x) break;
+        const key = x.t.toLowerCase().slice(0, 40);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ t: x.t, src: String(x.src || ''), ts: +x.ts || 0 });
+      }
+      if (!out.length) return;
+      news = out;
+      headI = 0;
+      // The crawl carries what the big line is not showing right now: the
+      // rest of the country and the world, short.
+      const rest = pick('national').concat(pick('world')).slice(0, 8)
+        .map((x) => x.t.toUpperCase());
+      newsCrawl = rest.length ? rest.join('   ·   ') + '   ·   ' : null;
+    }
+
+    /** "prije 2 h", off the story's own time and the clock on the wall. */
+    function newsAgo(ts) {
+      if (!ts) return '';
+      const m = Math.max(0, (Date.now() / 1000 - ts) / 60);
+      if (m < 2) return 'upravo';
+      if (m < 60) return 'prije ' + Math.round(m) + ' min';
+      const h = m / 60;
+      if (h < 24) return 'prije ' + Math.round(h) + ' h';
+      const d = Math.round(h / 24);
+      return d <= 1 ? 'jučer' : 'prije ' + d + ' dana';
+    }
+
+    /**
+     * The headline, in the biggest type that fits the space the baked ones
+     * had. A baked headline is three or four words and a real one is often
+     * fifteen, so the size steps down before the line count runs out, and
+     * only past the smallest does it lose its tail to an ellipsis.
+     */
+    function headFit(text, top, bottom) {
+      const W = TV.w - 60;
+      for (const [px, gap] of [[40, 46], [34, 40], [29, 34], [25, 30]]) {
+        g.font = face(px, 'bold');
+        const lines = [];
+        let line = '';
+        for (const wd of text.split(' ')) {
+          const test = line ? line + ' ' + wd : wd;
+          if (g.measureText(test).width > W && line) { lines.push(line); line = wd; } else line = test;
+        }
+        if (line) lines.push(line);
+        const room = Math.floor((bottom - top) / gap) + 1;
+        if (lines.length <= room || px === 25) {
+          if (lines.length > room) {
+            lines.length = room;
+            let l = lines[room - 1];
+            while (l.length > 1 && g.measureText(l + '…').width > W) l = l.slice(0, -1);
+            lines[room - 1] = l.replace(/[\s,.:;–-]+$/, '') + '…';
+          }
+          return { lines, gap };
+        }
+      }
+      return { lines: [text], gap: 46 };
+    }
+
     /** One step of the walk, which is what keeps the numbers moving. */
     function step(t) {
       for (const s of STRIP) {
@@ -479,9 +589,10 @@ async function buildVikendica(scene, field) {
       g.beginPath(); g.rect(96, y, TV.w - 96, 44); g.clip();
       g.font = face(17, 'bold');
       g.fillStyle = '#1a1206'; g.textAlign = 'left';
-      const w = g.measureText(CRAWL).width;
+      const text = newsCrawl || CRAWL;
+      const w = g.measureText(text).width;
       let x = 104 - ((t * 74) % w);
-      while (x < TV.w) { g.fillText(CRAWL, x, y + 28); x += w; }
+      while (x < TV.w) { g.fillText(text, x, y + 28); x += w; }
       g.restore();
     }
 
@@ -514,19 +625,22 @@ async function buildVikendica(scene, field) {
 
       // The headline, which is the biggest thing on the screen because on a
       // channel like this it always is.
-      const h = HEAD[headI % HEAD.length];
+      const live = news && news.length ? news[headI % news.length] : null;
+      const h = live
+        ? [live.t.toUpperCase(),
+          [live.src, newsAgo(live.ts)].filter(Boolean).join(' · ')]
+        : HEAD[headI % HEAD.length];
       g.fillStyle = '#e8eef7';
-      g.font = face(40, 'bold'); g.textAlign = 'left';
-      // Wrapped by hand, because two lines of 40 px is the whole design.
-      const words = h[0].split(' ');
-      let line = '', y = 168;
-      for (const wd of words) {
-        const test = line ? line + ' ' + wd : wd;
-        if (g.measureText(test).width > TV.w - 60 && line) {
-          g.fillText(line, 30, y); y += 46; line = wd;
-        } else line = test;
+      g.textAlign = 'left';
+      // Wrapped by hand, because two lines of 40 px is the whole design --
+      // and stepped down when a real headline is longer than that. The
+      // bottom is the subline's floor: the lamp sits at TV.h - 118.
+      const fit = headFit(h[0], 168, 360);
+      let y = 168;
+      for (let i = 0; i < fit.lines.length; i++) {
+        if (i) y += fit.gap;
+        g.fillText(fit.lines[i], 30, y);
       }
-      g.fillText(line, 30, y);
       g.fillStyle = '#93a5bd';
       g.font = face(20, '');
       g.fillText(h[1], 30, y + 40);
@@ -608,6 +722,7 @@ async function buildVikendica(scene, field) {
         last = now;
         if (wet > 0) wet -= 1 / TV.fps;
         if (t - (this._ask || 0) > TV.every) { this._ask = t; fetchOne(); }
+        newsAsk();
         if (page === 0 && t - (this._head || 0) > TV.hold) {
           this._head = t; headI++;
         }
@@ -624,6 +739,16 @@ async function buildVikendica(scene, field) {
       },
       page: () => page,
       live: () => Date.now() - liveAt < 180000,
+      /** What the news page is showing, for a probe: live or baked, and the
+       *  line up now. `feed` hands it a `/world` news object directly, so a
+       *  headless check can draw real-shaped headlines without a session. */
+      news: () => ({ live: !!news, n: news ? news.length : 0,
+        head: news && news.length ? news[headI % news.length].t
+          : HEAD[headI % HEAD.length][0] }),
+      feed: (n) => { newsTake(n); paint(Date.now()); },
+      /** The screen as a PNG data URL, so a probe can look at the picture
+       *  itself rather than at a photograph of the room it is in. */
+      png: () => { paint(Date.now()); return cv.toDataURL('image/png'); },
     };
   })();
 
@@ -3011,6 +3136,9 @@ async function buildVikendica(scene, field) {
       knock: () => tv.knock(),
       page: () => tv.page(),
       live: () => tv.live(),
+      news: () => tv.news(),
+      feed: (n) => tv.feed(n),
+      png: () => tv.png(),
     },
     /** 'now' | 'loft' — which roof is on. The rooms below do not change. */
     roof(which) {
