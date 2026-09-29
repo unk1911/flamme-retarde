@@ -1931,7 +1931,10 @@ function miniBucket(stage, MB) {
   // twirl is one number, the angle round the foot, whatever way it is facing.
   hang.rotation.order = 'YXZ';
   const r = B.rRim + 0.05;
-  const bailG = new THREE.TorusGeometry(mm(r), mm(B.wire), 5, 18, Math.PI);
+  // Rounder since 1.548.3, with the Bucketeer's own pail (see `pailTurn` in
+  // src/45-bucketeer.js): the close-up is a macro lens and this bail is a
+  // third of the frame, so 5 × 18 was a pentagonal wire round an octadecagon.
+  const bailG = new THREE.TorusGeometry(mm(r), mm(B.wire), 8, 36, Math.PI);
   bailG.scale(1, B.bail / r, 1);
   bailG.translate(0, -mm(B.bail), 0);
   hang.add(new THREE.Mesh(bailG, MB.wire));
@@ -1941,27 +1944,27 @@ function miniBucket(stage, MB) {
   const yb = -B.ear, yr = B.h - B.ear;
   const lathe = (r0, r1, y0, y1, mat) => {
     const g = new THREE.LatheGeometry([new THREE.Vector2(mm(r0), mm(y0)),
-      new THREE.Vector2(mm(r1), mm(y1))], 22);
+      new THREE.Vector2(mm(r1), mm(y1))], 40);
     pin.add(new THREE.Mesh(g, mat));
   };
   lathe(B.rBase, B.rRim, yb, yr, MB.out);
   lathe(B.rBase - B.wall, B.rRim - B.wall, yb + B.wall, yr, MB.in);
-  const baseG = new THREE.CircleGeometry(mm(B.rBase), 22);
+  const baseG = new THREE.CircleGeometry(mm(B.rBase), 40);
   baseG.rotateX(-Math.PI / 2);
   const base = new THREE.Mesh(baseG, MB.base);
   base.position.y = mm(yb);
   pin.add(base);
-  const rimG = new THREE.TorusGeometry(mm(B.rRim - B.wall / 2), mm(0.07), 5, 22);
+  const rimG = new THREE.TorusGeometry(mm(B.rRim - B.wall / 2), mm(0.07), 8, 40);
   rimG.rotateX(Math.PI / 2);
   const rim = new THREE.Mesh(rimG, MB.out);
   rim.position.y = mm(yr);
   pin.add(rim);
   for (const s of [-1, 1]) {
-    const lug = new THREE.Mesh(new THREE.SphereGeometry(mm(0.14), 8, 6), MB.out);
+    const lug = new THREE.Mesh(new THREE.SphereGeometry(mm(0.14), 12, 8), MB.out);
     lug.position.set(s * mm(B.rRim), 0, 0);
     pin.add(lug);
   }
-  const waterG = new THREE.CircleGeometry(1, 22);
+  const waterG = new THREE.CircleGeometry(1, 40);
   waterG.rotateX(-Math.PI / 2);
   const water = new THREE.Mesh(waterG, MB.water);
   pin.add(water);
