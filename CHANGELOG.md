@@ -8,6 +8,67 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.3] — 2026-09-29
+
+### The scooters behind MINI, and the piers in front of them
+
+Misha, from the lane behind MINI: *"same, add polygons, especially that
+'bicycle' there looks too low-poly"*. The "bicycle" was the pair of parked
+step-through scooters against MINI's back wall: nine flat boxes each on two
+rings of ten flat chords, which from the lane read as a wire bicycle with
+luggage on it.
+
+- **`moped()`, a new builder, one scooter built as one.** Every panel is a
+  smooth loft of superellipse sections (`knSurf`) with rounded ends: a leg
+  shield that bellies forward over the front wheel and narrows into the
+  headset, a handlebar pod, a floor with rubber strips, a rear cowl that
+  swells over the engine, a stepped padded seat, a top box with its lid
+  seam. What goes round is turned about its own axle with the new
+  `axLathe`: tyres of round section on pressed-steel rims with hub bosses,
+  a front brake disc and caliper, a headlamp in a chrome bezel, oval mirror
+  glass. Plus a telescopic fork under a mudguard that hugs the wheel, the
+  engine casing and swingarm, the silencer and tailpipe, a sprung rear
+  shock, bars with grips, end weights and levers, two mirrors on stalks,
+  a grab rail and carrier, a tail lamp and a Croatian plate, all on a
+  centre stand. Wheel positions and size, floor, seat, bar and box heights
+  and the caller's colours are the old ones. **6,964 tris** a machine with
+  the top box (was about 150); **6,466** for the `tramp2` one with a helmet
+  and no box.
+- All four parked scooters use it: the pair behind MINI, the one by the
+  Trampulin cabinets, and the one against the `tramp2` cabinets (its blue
+  helmet, now smooth, kept on the seat; no top box, as before).
+- **The pair behind MINI are nose-in now, as their note always said.** They
+  were written at a turn of 0.16 and 0.10, which `facing` lays along the
+  shore, so they stood side-on to the wall, 1.1 m apart and 1.5 m long, with
+  one parked 0.4 m inside the other. They take the quarter turn the
+  Trampulin one (−1.42) always had, keeping their skews, their places and
+  their colliders.
+- **The dry-stone piers west of t 300** (the two either side of the gap in
+  his frame, and the other six): the forty frustums stuck on a dark core
+  are gone. Each face and each end is laid in rough courses, 0.14–0.26 m,
+  of stones 0.18–0.46 m long touching with 10–26 mm joints, each a smooth
+  irregular cushion bedded into the mortar, most nearly flush and a few up
+  to 54 mm proud, varied in size, height, tone and warmth. The cap is two
+  dressed slabs on a joint with eased arrises, a hair apart in level and
+  tone. Positions, heights, cap oversail and `runs` are the old ones.
+  **3,203 tris** a pier (was about 500).
+- **Rooftop water tanks** (the four box-shop roofs that carry one): a roto-moulded tank turned smooth,
+  six moulded hoops, a shoulder into a dome, a screw lid with grip ribs,
+  and an outlet stub with a brass ball valve and a pipe bent down into the
+  roof; same stand, diameter and height. **Satellite dishes** (five roofs): a
+  real offset paraboloid 0.64 m across with a rolled rim, on a bent crank
+  off the mast, with the arm from under its lip to the LNB at the focus;
+  same place and aim. About **2,110** tris a tank and **860** for the dish
+  and masts.
+
+**Unchanged:** 792 blockers with the same hash, 100 people, riders 5
+(machineTris 25,496; the riders' bicycles and e-scooters are a separate,
+already detailed builder and share nothing with these), the hammock frame
+at (−1923.17, 4.14, 443.16). No `rng()` draws: the stones are `jit` only.
+
+**Cost**: `jadrija.tris` 647,780 → 708,269 (+60,489: scooters +26.8k,
+piers +21.6k, tanks and dishes +12.1k).
+
 ## [1.548.2] — 2026-09-29
 
 ### The lamp columns and the litter bins, turned
