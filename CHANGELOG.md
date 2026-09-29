@@ -8,6 +8,97 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.544.0] — 2026-09-28
+
+### Her hair, pulled from behind
+
+Misha: *"if in the kabine she has her back to us, and cross-hairs goes for
+the hair, instead of petting her (like from the front), it should pull on the
+hair, and should invoke all those AVBD and physics ragdoll stuffs"*.
+
+The press on her hair is the same press as before. If her back is to you, it
+is now a pull instead of the pet. From the front nothing changed: it is still
+the pet.
+
+**Her back to you** (`pullBack`) is tested on the front of her chest, in
+three dimensions. It is not the slap's test. That one compares the cheeks
+with the hips on the level, and lying on her front it has nothing to go on:
+on `flatheld` the offset measured 4.5 cm level against 21.7 cm up, and from
+beside the cot it answered "in front of her". The chest cosine measured
+−0.82 to −1.00 in every pose where she faces away. From behind, her lip is
+also taken out of the crosshair contest. It lies straight down the same line
+as the back of her head, and aimed at her crown from 0.6 m behind, the lip
+won, so the press became the thumb and walked you round to her face.
+
+**Your hand** goes out to her hair and shuts into a fist on it. If her hair
+is up, the fist closes on the braid where it leaves her head. If it is down,
+it takes a handful at her nape. You step in and bend down to reach it when
+her head is low. The fist is a hammer grip, thumb up, so the hair runs
+through the tunnel of the fist. Laid straight along the hair, the tunnel
+pointed down your line of sight and all you saw was the end of your own fist.
+
+**Her hair** runs straight from her scalp to your fist, at its own length,
+and hangs on out of the fist. This is a fist added to the v2.0 drape
+(`drape.grip` in `v5Drape`): the chain straight behind her head takes all of
+it, the chains at 45° take 0.61, and her sides take none. The measured
+tautness is 1.00, meaning a straight line.
+
+**Her body** is the hammock's ragdoll, in a net of its own (`PULL_RAG`,
+following the cot's pattern). Pelvis, belly, chest, and neck-and-head are
+the four bodies. Their muscles aim at the pose, and her pelvis is held hard
+where the pose has it. The hair is a spring from your arm to the back of her
+skull. The difference from the pose goes through a new layer, `fig.tug`,
+which is the settle's layer a second time. It stacks on top of the cot
+ragdoll's own give, so lying on her front both nets run at once. The net has
+no gravity, because the clip already carries her weight, so at rest she is
+exactly on the pose. When nobody is pulling, the net is not stepped and the
+layer is off.
+
+Your arm pulls toward your shoulder and out of her back, 110 N at the yank
+and 70 N held, drawing 26 cm beyond the hair's length. Measured:
+
+| Pose | Head | Chest / back |
+|---|---|---|
+| Standing, braid | 25° back (37° at the yank) | 14° |
+| Standing, hair down | 29° back (38° at the yank) | 15° |
+| Bent over (`twerk`) | 23° back | 14° |
+| On her knees (`kept`) | 15° back | 11° |
+| On all fours | up 9.6 cm | top of her back up 6.9 cm |
+| Face down on the cot (`flatheld`) | 11 cm off the pillow | top of her back 6.8 cm off the mattress |
+| Face down, legs over the edge (`edgeHeld`) | up 7.2 cm | top of her back up 5.9 cm |
+
+When you let go, she is back within 1° and 5 mm of the pose in 0.37–0.47 s,
+with one overshoot of 5° at most.
+
+**Her face**: the petting's heavy eyelids, her lips parted wider than for
+the petting, and an unvoiced gasp on the grab (`startle`).
+
+Four things were measured and fixed on the way:
+
+- The first hips were three springs, as on the cot. They acted as a hinge:
+  her upper body rocked at 1.3 s a swing for four seconds after the pull.
+  Her hips are now a hard world joint with an angle lock.
+- A stiff hair spring went slack every time her head came in, so the force
+  jumped between 0 and 76 N from frame to frame. The arm is now a soft
+  spring, and the hair is drawn at its own length whatever the spring does.
+- On `edgeHeld` her head sank 16° with nothing pulling, because the clip
+  holds her neck past RAGDOLL's stop. Every stop now takes in the pose she
+  is in, plus 10°.
+- Lying down, the braid falls on to the mattress 16 cm under her scalp. With
+  the draw measured from where the hand closed, the draw was spent on that
+  slack and her head lifted only 4 cm. The draw is now measured from the
+  hair's length out of her scalp.
+
+**Cost**: 0.36–0.55 ms a frame while pulling, measured headless. The net
+builds in 0.5–0.9 ms on the first grab. Nothing is spent when nobody is
+pulling. Probes: `__fr.jad.raw().hairPull(on, eye)`, `pullRag()`,
+`pullTune()`, `hairBack(eye, raw)`, `hairGrab()`, `headFrame()`; and
+`__fr.jad.hairK()`.
+
+Unchanged, checked against 1.543.3 on the same probe: the pet from the
+front, the cot slap (12 N·s, dv 1.745 m/s, no rescues), blockers 792, the
+hammock frame (−1923.17, 4.14, 443.16) and the café settle 21/0.
+
 ## [1.543.3] — 2026-09-28
 
 ### The shutter iron goes back on the shutters

@@ -2085,6 +2085,32 @@ function skinnedFigure(data, opts = {}) {
       }
       localT[0] += sl.t[0] * w; localT[1] += sl.t[1] * w; localT[2] += sl.t[2] * w;
     }
+    // ── and then a TUG, over the settle ────────────────────────────────────
+    //
+    // 1.544.0: Baye's hair pulled from behind (`PULL_RAG` in 43-jadrija.js).
+    // The same layer as the settle, a second time, for a second ragdoll that
+    // can be on her at the same moment as the first: lying on her front on
+    // the cot the cot's net writes the settle, and a hand in her hair lifts
+    // her shoulders off the mattress on top of whatever that net has her
+    // doing. Its `clip` is what the clips AND the settle said, so the pull's
+    // muscles aim at the pose she is drawn in without it. Off (`tug(null)`)
+    // it is one comparison a frame.
+    const tg = st.tug;
+    if (tg && tg.clip) { tg.clip.q.set(localQ); tg.clip.t.set(localT.subarray(0, 3)); }
+    if (tg && tg.w > 0) {
+      const w = Math.min(1, tg.w), d = tg.q;
+      for (let i = 0; i < nb; i++) {
+        const o = i * 4;
+        if (w >= 1) qmul(localQ, o, localQ, o, d, o);
+        else {
+          tmp[0] = d[o] * w; tmp[1] = d[o + 1] * w; tmp[2] = d[o + 2] * w; tmp[3] = 1 + (d[o + 3] - 1) * w;
+          const l = Math.hypot(tmp[0], tmp[1], tmp[2], tmp[3]) || 1;
+          tmp[0] /= l; tmp[1] /= l; tmp[2] /= l; tmp[3] /= l;
+          qmul(localQ, o, localQ, o, tmp, 0);
+        }
+      }
+      localT[0] += tg.t[0] * w; localT[1] += tg.t[1] * w; localT[2] += tg.t[2] * w;
+    }
 
     // ── and then the poser, over all of it ────────────────────────────────
     //
@@ -2435,6 +2461,8 @@ function skinnedFigure(data, opts = {}) {
      * layer in `update`. `settle(null)` takes it off.
      */
     settle: (L) => { st.settle = L || null; },
+    /** The same again, over the settle: a hair pull (43-jadrija.js, PULL_RAG). */
+    tug: (L) => { st.tug = L || null; },
     /**
      * Legs laid on the floor, over any clip (`legRest` above): `{ w, at,
      * child, side, heel, calf, spread, lean, splay }`, or null for the clip's.
@@ -2648,6 +2676,12 @@ const V5_DRAPE = {
   // further its chain has been moved: all of it under moved[0] (metres,
   // plus 5 cm a radian of turn), none of it past moved[1].
   skin: 0.010, moved: [0.01, 0.05],
+  // A fist in it (1.544.0, see `drape.grip` in `v5Drape`): a chain takes the
+  // fist by how far round behind her it hangs — the cosine of its bearing
+  // from straight behind, from `from` (nothing) to 1 (all of it), to `pow`.
+  // At 0.25 the chain behind her takes all of it, the two at 45° 0.61 and
+  // the two at her sides none.
+  grip: { from: 0.25, pow: 1 },
 };
 
 /**
@@ -3197,6 +3231,7 @@ function v5DrapeSetup(fig) {
 
 // Scratch for the solve, so a frame allocates nothing.
 const _drQ = new THREE.Quaternion();
+const _drM = new THREE.Matrix4(), _drG = new THREE.Vector3();
 const _drV = new Float32Array(16);
 
 /** v rotated by the unit quaternion q[qi..], into out[o..]. */
@@ -3289,6 +3324,27 @@ function v5Drape(fig, drape) {
     }
   }
 
+  // ── A FIST IN IT ─────────────────────────────────────────────────────────
+  //
+  // 1.544.0 — Baye's hair pulled from behind (`PULL_RAG` in 43-jadrija.js,
+  // set here by `apprenticeHairGrip`). `drape.grip` is a world point, your
+  // fist, and `w`, how shut it is: the chains at the back of her head run
+  // from the root STRAIGHT at the fist as far as their own length reaches it
+  // (`j0` below, per chain), and the rest of each hangs on out of the fist as
+  // it would out of anything — so the hair between her scalp and your hand is
+  // a taut sheaf at full length, not a lock the hand has gone through. The
+  // chain at the middle of her back takes all of it, the two either side
+  // `side` of it (a handful is gathered from across the back of the head),
+  // and the ones round the front none: a braid is one chain there anyway.
+  const gr = drape.grip;
+  let gOn = 0, gX = 0, gY = 0, gZ = 0;
+  if (gr && gr.w > 0.001) {
+    gOn = Math.min(1, gr.w);
+    _drM.copy(fig.mesh.matrixWorld).invert();
+    _drG.set(gr.x, gr.y, gr.z).applyMatrix4(_drM);
+    gX = _drG.x; gY = _drG.y; gZ = _drG.z;
+    drape.gripN = 0; drape.gripSag = 0;
+  }
   for (const H of drape.parts) {
     if (!H.part.visible && !H.force) continue;
     const { K, N, bind, wb, ww, A, n, ra, data } = H;
@@ -3320,6 +3376,21 @@ function v5Drape(fig, drape) {
       let gx = D.bias * sd * lfx, gy = -1 + D.bias * sd * lfy, gz = D.bias * sd * lfz;
       const gl = Math.hypot(gx, gy, gz);
       gx /= gl; gy /= gl; gz /= gl;
+      // The fist: how much of this chain it has (by the chain's bearing round
+      // her neck — k = K/2 is straight behind her), and how far down the chain
+      // the hair that reaches it goes: the first node whose length from the
+      // root is the root's distance to the fist.
+      let gk = 0, j0 = 0;
+      if (gOn) {
+        const cb = -Math.cos(2 * Math.PI * k / K);
+        gk = gOn * Math.min(1, Math.max(0, (cb - D.grip.from) / (1 - D.grip.from))) ** D.grip.pow;
+        if (gk > 0.001) {
+          const reach = Math.hypot(gX - n[c0 * 3], gY - n[c0 * 3 + 1], gZ - n[c0 * 3 + 2]);
+          let arc = 0;
+          j0 = N - 1;
+          for (let j = 1; j < N; j++) { arc += H.L[c0 + j]; if (arc >= reach) { j0 = j; break; } }
+        } else gk = 0;
+      }
       for (let j = 1; j < N; j++) {
         const c = c0 + j;
         let ax = A[c * 3] - A[c * 3 - 3], ay = A[c * 3 + 1] - A[c * 3 - 2], az = A[c * 3 + 2] - A[c * 3 - 1];
@@ -3348,6 +3419,18 @@ function v5Drape(fig, drape) {
           dz = az * cp + (kx * ay - ky * ax) * sp;
         }
         const px = n[c * 3 - 3], py = n[c * 3 - 2], pz = n[c * 3 - 1];
+        // Up to the fist, turned from wherever it was going to hang toward
+        // the fist, by as much of the fist as this chain has.
+        if (gk > 0 && j <= j0) {
+          let tx = gX - px, ty = gY - py, tz = gZ - pz;
+          const tl = Math.hypot(tx, ty, tz);
+          if (tl > 1e-5) {
+            tx /= tl; ty /= tl; tz /= tl;
+            dx += (tx - dx) * gk; dy += (ty - dy) * gk; dz += (tz - dz) * gk;
+            const dl = Math.hypot(dx, dy, dz) || 1;
+            dx /= dl; dy /= dl; dz /= dl;
+          }
+        }
         let x = px + len * dx, y = py + len * dy, z = pz + len * dz;
         const Ax = A[c * 3], Ay = A[c * 3 + 1], Az = A[c * 3 + 2];
         const fl = Math.min(floor + th, Ay);
@@ -3368,6 +3451,19 @@ function v5Drape(fig, drape) {
           x = px + ex / el * len; y = py + ey / el * len; z = pz + ez / el * len;
         }
         n[c * 3] = x; n[c * 3 + 1] = y; n[c * 3 + 2] = z;
+      }
+      // For a probe: how taut the most-gripped chain is — its root to the node
+      // at the fist, straight, over the length of hair between them (1 is a
+      // string pulled tight) — and how far that node is from the fist, m.
+      if (gk > 0.5 && gk >= drape.gripN) {
+        const cj = c0 + j0;
+        let arc = 0;
+        for (let j = 1; j <= j0; j++) arc += H.L[c0 + j];
+        drape.gripN = gk;
+        drape.gripTaut = Math.hypot(n[cj * 3] - n[c0 * 3], n[cj * 3 + 1] - n[c0 * 3 + 1], n[cj * 3 + 2] - n[c0 * 3 + 2])
+          / Math.max(arc, 1e-6);
+        drape.gripSag = Math.hypot(n[cj * 3] - gX, n[cj * 3 + 1] - gY, n[cj * 3 + 2] - gZ);
+        drape.gripJ = j0;
       }
       // The moves, in her head's bind frame.
       data[c0 * 12] = 0; data[c0 * 12 + 1] = 0; data[c0 * 12 + 2] = 0; data[c0 * 12 + 3] = 1;
