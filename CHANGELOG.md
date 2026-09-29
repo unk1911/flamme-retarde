@@ -8,6 +8,49 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.548.1] — 2026-09-29
+
+### The beach showers, turned
+
+Misha: *"the outdoor showers in front of maslina and elsewhere if they
+exist, also look too primitive. need more polygons for them."* There are
+two, at t 251 and 354, and each was eleven flat-shaded prisms: an
+eight-sided post, two "roses" that were a square bar with a block on the end
+(from four metres they read as door handles), a stainless tile for a base, a
+mint slab 8 cm thick on two stubs, and a gooseneck made of a box.
+
+Rebuilt as the thing itself, smooth-shaded throughout (`knLathe` for what is
+turned, `tubeTS` for pipe):
+
+- **The column**: round cobalt tube on a stainless flange with four hex
+  bolts, a domed cap.
+- **The roses**: each out of a stainless tee collar, level and then down
+  through a 6 cm bend into a turned dish rose 13 cm across, its face drilled
+  (a centre and rings of 7 and 13). Swung 22° either side of seaward, where
+  they had been one directly above the other.
+- **A push valve** at 1.05 m, and **a foot tap** at the ankles with its own
+  button, turned away from the roses.
+- **The pad**: 1.1 × 1.0 m of precast with radiused corners, a dark wet
+  patch under the roses and a slotted stainless drain grate.
+- **The screen**: a 30 mm compact-laminate panel with 7 cm corner radii and
+  the dark core showing at the edge, clamped (two clamps a post, round
+  stand-offs) to two round posts on foot flanges; the gooseneck is a bent
+  tube over the top into a small rose.
+
+**The west shower stands on the konoba's terrace.** It was placed when the
+konoba stood elsewhere, and the raised floor (`konobaFloor`, 117–287 mm over
+the deck) now runs under it, so its post and screen legs went into the
+paving and a pad would have been buried or hung off the kerb. A shower
+inside `konobaPad` is now built off the terrace level and gets no pad.
+
+**Placement unchanged**: the same t and s, column height and radius, rose
+heights and reach, screen size and height, and both `runs`. **Unchanged:**
+792 blockers with the same hash, 100 people, the hammock frame at
+(−1923.174, 4.138, 443.162). No `rng()` draws.
+
+**Cost**: `jadrija.tris` 643,304 → 647,780 (+4,476 for the pair, about
+2.4k for the east shower and 2.3k for the padless west one).
+
 ## [1.548.0] — 2026-09-29
 
 ### The August verge
