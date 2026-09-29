@@ -6144,6 +6144,425 @@ async function buildJadrija(scene) {
     return out;
   }
 
+  // ── the things on the floor, drawn as the things ──────────────────────────
+  //
+  // Misha, 29 Sep 2026, standing on the concrete in front of the vikendica
+  // and looking down: *"in front of vikendica, there's all this low-poly crap,
+  // i don't even know what these geometric shapes are.. either remove them or
+  // render them with more poly so they resemble some real objects"*.
+  //
+  // He was right that nobody could have told what they were. Every object in
+  // his frame was one or two boxes: a towel was three flat quads, a "folded"
+  // towel was two slabs in two DIFFERENT colours (so it read as a red mat on a
+  // green mat), a bag was a crate with a lid, and a pair of sandals was two
+  // soles laid END TO END — the pair was offset ±9 cm along the sole's own
+  // 25 cm length, so the two soles overlapped into one 43 cm bar with two dark
+  // straps on it, which is the "white-and-dark striped bar" in his screenshot.
+  // Nothing about any of it was a shape a person owns.
+  //
+  // So these draw the things. They take a frame `F(dx, dz, y) → [t, s, y]` in
+  // the shore's own coordinates (see `tsFrame`), which is what `tubeTS` wants
+  // for straps and handles, and they go through `W` for everything else. The
+  // cloth and the bags are smooth-shaded grids — `skinGrid` — because a towel
+  // is the one object whose whole identity is that it is soft, and flat facets
+  // on it are what made it a slab. The colour is PER CELL and not per vertex,
+  // so a woven stripe has a hard edge on the grid line put there for it,
+  // rather than smearing across the cell next to it.
+  //
+  // None of this draws on `rng`. Every variation is `jit` off the key the
+  // caller already had (rule 4), and every placement is the caller's own.
+
+  /** A frame in the (t, s) plane: `dx` along `ang`, `dz` across it. */
+  function tsFrame(t0, s0, ang) {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    return (dx, dz, yy) => [t0 + dx * c - dz * sn, s0 + dx * sn + dz * c, yy];
+  }
+  /** `F` moved to (ox, oz) inside itself and turned by `ang`. */
+  function subFrame(F, ox, oz, ang) {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    return (dx, dz, yy) => F(ox + dx * c - dz * sn, oz + dx * sn + dz * c, yy);
+  }
+  /** `F`, into the world. */
+  function wF(F) {
+    return (dx, dz, yy) => { const p = F(dx, dz, yy); return W(p[0], p[1], p[2]); };
+  }
+
+  /**
+   * One smooth triangle, wound to agree with its own normals — `tubeTS`'s
+   * `face`, out here because the cloth needs it too. The material is
+   * double-sided and flips the normal of a back face (`FACE`), so a smooth
+   * triangle wound against its normals comes out lit from underneath.
+   */
+  function smFace(A, B, D) {
+    const ex = B.P[0] - A.P[0], ey = B.P[1] - A.P[1], ez = B.P[2] - A.P[2];
+    const fx = D.P[0] - A.P[0], fy = D.P[1] - A.P[1], fz = D.P[2] - A.P[2];
+    const gx = ey * fz - ez * fy, gy = ez * fx - ex * fz, gz = ex * fy - ey * fx;
+    const out = gx * (A.N[0] + B.N[0] + D.N[0]) + gy * (A.N[1] + B.N[1] + D.N[1])
+      + gz * (A.N[2] + B.N[2] + D.N[2]);
+    if (out >= 0) b.smooth(A.P, B.P, D.P, A.N, B.N, D.N, A.c, B.c, D.c);
+    else b.smooth(A.P, D.P, B.P, A.N, D.N, B.N, A.c, D.c, B.c);
+  }
+
+  /**
+   * A smooth sheet through a grid of world points, `G[j][i]`. Normals are
+   * central differences across the grid — so they are the SHEET's normals,
+   * with every rumple in them — turned to agree with `hint(p)`. `wrap` closes
+   * each row on itself (a bag's walls). `cellCol(j, i)` colours the cell whose
+   * low corner is (j, i), whole, so a stripe ends on a grid line.
+   */
+  function skinGrid(G, wrap, cellCol, hint) {
+    const nj = G.length, ni = G[0].length;
+    const N = G.map((row, j) => row.map((p, i) => {
+      const iA = wrap ? (i - 1 + ni) % ni : Math.max(0, i - 1);
+      const iB = wrap ? (i + 1) % ni : Math.min(ni - 1, i + 1);
+      const a = G[j][iB], a0 = G[j][iA];
+      const c = G[Math.min(nj - 1, j + 1)][i], c0 = G[Math.max(0, j - 1)][i];
+      const ux = a[0] - a0[0], uy = a[1] - a0[1], uz = a[2] - a0[2];
+      const vx = c[0] - c0[0], vy = c[1] - c0[1], vz = c[2] - c0[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const h = hint(p);
+      if (nx * h[0] + ny * h[1] + nz * h[2] < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      const L = Math.hypot(nx, ny, nz) || 1;
+      return [nx / L, ny / L, nz / L];
+    }));
+    const cells = wrap ? ni : ni - 1;
+    for (let j = 0; j < nj - 1; j++) {
+      for (let i = 0; i < cells; i++) {
+        const i1 = (i + 1) % ni, col = cellCol(j, i);
+        const v = (jj, ii) => ({ P: G[jj][ii], N: N[jj][ii], c: col });
+        smFace(v(j, i), v(j, i1), v(j + 1, i1));
+        smFace(v(j, i), v(j + 1, i1), v(j + 1, i));
+      }
+    }
+  }
+  function upHint() { return [0, 1, 0]; }
+  /** The cream thread of a towel's band, and of a bag's. */
+  function clothCream() { return [0.860, 0.845, 0.800]; }
+
+  /**
+   * The height of the ground AS DRAWN at (t, s), which is not `surfaceY`.
+   *
+   * `ribbon` lays each band as quads between stations cut every 3.6 m along
+   * and two courses across, with heights asked only at the corners; on the
+   * beach the levels follow the hill (`midOf` and friends are a max against
+   * the terrain), so between the corners the drawn floor is a CHORD of the
+   * curve `surfaceY` describes. Measured with a ray down at three of the
+   * pitch towels at t 100: the sand stands 37 to 58 mm above `surfaceY`, and
+   * a towel laid on `surfaceY` at 12 mm was a pink triangle poking out of
+   * it. This walks the same stations, the same cuts and the same diagonal
+   * `ribbon` does and answers the triangle's own height. Past the paving it
+   * hands back to `surfaceY`.
+   */
+  function floorUnder(t, s) {
+    const B = s < 0 ? null : s < JAD.lip ? [0, JAD.lip, lipOf, 1]
+      : s < JAD.mid ? [JAD.lip, JAD.mid, midOf, 2] : s < PAVE ? [JAD.mid, PAVE, deckOf, 2] : null;
+    if (!B || t <= ST[0].t || t >= ST[ST.length - 1].t) return surfaceY(t, s);
+    const [s0, s1, yOf, nS] = B;
+    let i = 0;
+    while (i < ST.length - 2 && ST[i + 1].t < t) i++;
+    const a = ST[i], c = ST[i + 1];
+    const nT = Math.max(1, Math.round((c.t - a.t) / 3.6));
+    const f = ((t - a.t) / (c.t - a.t)) * nT, j = Math.min(nT - 1, Math.floor(f));
+    const A = nT === 1 ? a : at(a.t + (c.t - a.t) * (j / nT));
+    const C = nT === 1 ? c : at(a.t + (c.t - a.t) * ((j + 1) / nT));
+    const g = ((s - s0) / (s1 - s0)) * nS, k = Math.min(nS - 1, Math.floor(g));
+    const u = s0 + (s1 - s0) * (k / nS), v = s0 + (s1 - s0) * ((k + 1) / nS);
+    const x = f - j, y = g - k;
+    const ha = yOf(A, u), hb = yOf(C, u), hc = yOf(C, v), hd = yOf(A, v);
+    // `b.quad(a, b, c, d)` is triangles (a, b, c) and (a, c, d): the
+    // diagonal runs from (A, u) to (C, v).
+    return x >= y ? ha + (hb - ha) * x + (hc - hb) * y : ha + (hc - hd) * x + (hd - ha) * y;
+  }
+
+  /**
+   * A beach towel lying on the concrete: `hw` across (dx), `hl` along (dz).
+   *
+   * What makes one read as a towel at three metres, in the order it matters:
+   *
+   *   the WEAVE — a towel is striped or bordered, and a plain rectangle of one
+   *   colour is a mat. One of three patterns off the key: bands across both
+   *   ends (the hotel towel), broad stripes down the length (the beach towel),
+   *   or a border all round;
+   *
+   *   the EDGE — rounded corners (6 cm), and a hem that droops to the slab
+   *   while the middle stands 14 mm proud of it, with a skirt down to the
+   *   concrete so it has a thickness from the side and never floats;
+   *
+   *   the RUCKS — three soft ridges off the key, each an elongated bump 20 to
+   *   50 cm long and up to 17 mm high, which is a towel somebody lay on and
+   *   got up from;
+   *
+   *   and in four of ten, a CORNER TURNED OVER, reflected across a diagonal
+   *   crease and lying on top of itself a towel's thickness up. That is the
+   *   single cue that says cloth rather than board, because board does not
+   *   fold.
+   *
+   * 6 across by 8 to 12 along — the pattern's breaks are the grid — and the
+   * skirt: 150 to 240 triangles, against the six the three flat panels were.
+   */
+  function beachTowel(F, y, hw, hl, col, key, o = {}) {
+    const style = ((jit(key, 901) * 3) | 0) % 3;
+    // The thread the pattern is woven in: cream or a darker shade of the
+    // towel's own colour — and on a white one, where both of those vanish
+    // into it, a navy.
+    const pale = Math.min(col[0], col[1], col[2]) > 0.55;
+    const band = pale ? [0.170, 0.250, 0.450]
+      : jit(key, 902) < 0.5 ? clothCream() : shade(col, 0.60);
+    const lift = 0.014, edge = 0.006, rR = 0.06;
+    // Where two towels on one pitch overlap, the one on top is decided here
+    // rather than by the depth buffer, a few millimetres at a time.
+    const stack = jit(key, 960) * 0.006;
+    const rum = o.rumple ?? 1;
+    // Grid lines across (u) and along (v), in −1…1, with the pattern's own
+    // breaks added so every stripe ends on one.
+    const us = style === 2 ? [-1, -0.86, -0.45, 0, 0.45, 0.86, 1]
+      : [-1, -2 / 3, -1 / 3, 0, 1 / 3, 2 / 3, 1];
+    const vs = style === 0 ? [-1, -0.9, -0.84, -0.76, -0.7, -0.35, 0, 0.35, 0.7, 0.76, 0.84, 0.9, 1]
+      : style === 2 ? [-1, -0.92, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 0.92, 1]
+        : [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1];
+    const cellCol = (uc, vc) => {
+      const av = Math.abs(vc), au = Math.abs(uc);
+      if (style === 0) {
+        if (av > 0.90) return shade(col, 1.04);
+        if (av > 0.84) return band;
+        if (av > 0.76) return col;
+        if (av > 0.70) return band;
+        return col;
+      }
+      if (style === 1) return ((uc + 1) * 3 | 0) % 2 ? band : col;
+      return au > 0.86 || av > 0.92 ? band : col;
+    };
+    // The rucks: elongated bumps, in metres, off the key.
+    const R = [];
+    for (let k = 0; k < 3; k++) {
+      const ang = jit(key, 922 + k) * Math.PI;
+      R.push({ x: (jit(key, 910 + k) - 0.5) * 1.5 * hw, z: (jit(key, 913 + k) - 0.5) * 1.5 * hl,
+        L: 0.10 + jit(key, 916 + k) * 0.16, Wd: 0.045 + jit(key, 925 + k) * 0.035,
+        amp: (0.005 + jit(key, 919 + k) * 0.012) * rum, c: Math.cos(ang), s: Math.sin(ang) });
+    }
+    const hAt = (x, z) => {
+      const e = Math.min(hw - Math.abs(x), hl - Math.abs(z));
+      const f = Math.max(0, Math.min(1, e / 0.06));
+      const fall = f * f * (3 - 2 * f);
+      let bump = 0;
+      for (const r of R) {
+        const dx = x - r.x, dz = z - r.z;
+        const pa = dx * r.c + dz * r.s, pc = -dx * r.s + dz * r.c;
+        bump += r.amp * Math.exp(-(pa * pa) / (r.L * r.L) - (pc * pc) / (r.Wd * r.Wd));
+      }
+      return stack + edge + (lift - edge + bump) * fall;
+    };
+    // The turned corner.
+    const fold = jit(key, 905) < 0.4;
+    const fsx = jit(key, 906) < 0.5 ? -1 : 1, fsz = jit(key, 908) < 0.5 ? -1 : 1;
+    const fc = (hw + hl) / Math.SQRT2 - (0.14 + jit(key, 907) * 0.12);
+    const past = (x, z) => (fold ? (x * fsx + z * fsz) / Math.SQRT2 - fc : -1);
+    const G = [], top = [], bot = [];
+    for (let j = 0; j < vs.length; j++) {
+      const row = [], trow = [], brow = [];
+      for (let i = 0; i < us.length; i++) {
+        let x = us[i] * hw, z = vs[j] * hl;
+        // Rounded corners: the square corner of the grid mapped onto a
+        // quarter circle of radius `rR`.
+        const cx = Math.abs(x) - (hw - rR), cz = Math.abs(z) - (hl - rR);
+        if (cx > 0 && cz > 0) {
+          const k = Math.max(cx, cz) / Math.hypot(cx, cz);
+          x = Math.sign(x) * (hw - rR + cx * k); z = Math.sign(z) * (hl - rR + cz * k);
+        }
+        let h = hAt(x, z);
+        const d = past(x, z);
+        if (d > 0) {
+          x -= 2 * d * fsx / Math.SQRT2; z -= 2 * d * fsz / Math.SQRT2;
+          // On top of itself: the towel under it, a towel's thickness, and a
+          // little more toward the tip, which never lies quite flat.
+          h = hAt(x, z) + 0.010 + d * 0.05;
+        }
+        // On the shingle the floor is not a plane, and a towel laid at one
+        // height is a towel half under the beach (the pitches were: a pink
+        // triangle of one poking out of the sand). `o.floor` lays each vertex
+        // on the ground under it instead.
+        const q = F(x, z, 0), yb = o.floor ? o.floor(q[0], q[1]) : y;
+        row.push(W(q[0], q[1], yb + h)); trow.push(yb + h); brow.push(yb);
+      }
+      G.push(row); top.push(trow); bot.push(brow);
+    }
+    skinGrid(G, false, (j, i) => {
+      const uc = (us[i] + us[i + 1]) / 2, vc = (vs[j] + vs[j + 1]) / 2;
+      const c = cellCol(uc, vc);
+      return past(uc * hw, vc * hl) > 0 ? shade(c, 0.86) : c;
+    }, upHint);
+    // The skirt: the hem, 8 mm deep or down to the slab, whichever is less,
+    // round the whole outline — including the turned flap, which is the one
+    // place the thickness shows.
+    const ring = [];
+    const nI = us.length - 1, nJ = vs.length - 1;
+    for (let i = 0; i < nI; i++) ring.push([0, i]);
+    for (let j = 0; j < nJ; j++) ring.push([j, nI]);
+    for (let i = nI; i > 0; i--) ring.push([nJ, i]);
+    for (let j = nJ; j > 0; j--) ring.push([j, 0]);
+    for (let k = 0; k < ring.length; k++) {
+      const [ja, ia] = ring[k], [jb, ib] = ring[(k + 1) % ring.length];
+      const A = G[ja][ia], B = G[jb][ib];
+      const ya = Math.max(bot[ja][ia] + 0.0008, top[ja][ia] - 0.008);
+      const yb = Math.max(bot[jb][ib] + 0.0008, top[jb][ib] - 0.008);
+      const vc = (vs[ja] + vs[jb]) / 2, uc = (us[ia] + us[ib]) / 2;
+      b.quad(A, B, [B[0], yb, B[2]], [A[0], ya, A[2]], shade(cellCol(uc, vc), 0.78));
+    }
+  }
+
+  /**
+   * A towel folded into a pad: `hw` by `hl`, `H` tall, standing on `y0`. A
+   * pillow of cloth, flat on top and rolling off at every edge — the edges
+   * darker, because that is where the layers are and the light does not get
+   * in — with the pattern's band across it.
+   */
+  function foldedTowel(F, y0, hw, hl, H, col, key) {
+    const P = wF(F);
+    const band = jit(key, 902) < 0.5 ? clothCream() : shade(col, 0.60);
+    const ws = [-1, -0.92, -0.7, -0.3, 0.3, 0.7, 0.92, 1];
+    const prof = (w) => Math.pow(Math.max(0, 1 - Math.pow(Math.abs(w), 6)), 0.28);
+    const tilt = (jit(key, 931) - 0.5) * 0.010;
+    const G = ws.map((v) => ws.map((u) =>
+      P(u * hw, v * hl, y0 + 0.001 + (H + tilt * u) * prof(u) * prof(v))));
+    skinGrid(G, false, (j, i) => {
+      const uc = (ws[i] + ws[i + 1]) / 2, vc = (ws[j] + ws[j + 1]) / 2;
+      if (Math.abs(uc) > 0.85 || Math.abs(vc) > 0.85) return shade(col, 0.80);
+      return Math.abs(vc) < 0.3 ? band : col;
+    }, upHint);
+  }
+
+  /**
+   * A flip-flop (`kind` 0) or a slide (`kind` 1), lying on `y`.
+   *
+   * The sole is a FOOT, not a rectangle: nine stations heel to toe, with the
+   * inner (medial) edge nearly straight and the outer one bowed out at the
+   * ball, a waist at the arch, a rounded heel, and the toe carried over to the
+   * big-toe side. `side` puts the big toe on +dz or −dz, which is what makes
+   * two of them a pair rather than two of the same one. A shallow dish in
+   * the footbed, 14 mm of foam for a flip-flop and 20 for a slide, and a
+   * darker edge where the foam is cut.
+   *
+   * The strap is a tube, which is what it is: for a flip-flop the thong — a
+   * post between the first two toes and two arms that arch up over where the
+   * instep was and come down to the sole's edges behind the ball; for a slide
+   * one broad band arched across the forefoot. 25.0 cm long, 8.5 wide at the
+   * ball: an adult 40.
+   */
+  function sandal(F, y, side, kind, soleCol, strapCol) {
+    const P = wF(F);
+    const HL = 0.125, th = kind ? 0.020 : 0.014;
+    const T = [-1, -0.93, -0.76, -0.44, -0.06, 0.32, 0.62, 0.85, 1];
+    const WM = [0.012, 0.026, 0.031, 0.029, 0.025, 0.039, 0.043, 0.037, 0.017];
+    const WL = [0.012, 0.026, 0.031, 0.031, 0.033, 0.039, 0.035, 0.024, 0.008];
+    const FR = [0, 0.34, 0.66, 1];
+    const zAt = (j, f) => side * (-WL[j] + f * (WL[j] + WM[j]));
+    const G = T.map((t, j) => FR.map((f) => {
+      const dish = 0.0022 * Math.sin(Math.PI * f) * (j > 0 && j < T.length - 1 ? 1 : 0);
+      return P(t * HL, zAt(j, f), y + th - dish);
+    }));
+    const topCol = shade(soleCol, 1.05);
+    skinGrid(G, false, () => topCol, upHint);
+    // The cut edge of the foam, round the outline.
+    const edgeCol = shade(soleCol, 0.74);
+    const y0 = y + 0.0012;
+    const down = (p) => [p[0], y0, p[2]];
+    for (let j = 0; j < T.length - 1; j++) {
+      for (const i of [0, FR.length - 1]) {
+        const A = G[j][i], B = G[j + 1][i];
+        b.quad(A, B, down(B), down(A), edgeCol);
+      }
+    }
+    for (const j of [0, T.length - 1]) {
+      for (let i = 0; i < FR.length - 1; i++) {
+        const A = G[j][i], B = G[j][i + 1];
+        b.quad(A, B, down(B), down(A), edgeCol);
+      }
+    }
+    const yt = y + th;
+    if (kind === 0) {
+      // The thong: a post at 62 % of the length, between the first two toes,
+      // and the two arms back to the edges just behind the ball.
+      const px = 0.078, pz = side * 0.011;
+      const tip = [px, pz, yt + 0.011];
+      tubeTS([F(px, pz, yt - 0.002), F(tip[0], tip[1], tip[2])], 0.0042, strapCol, 4);
+      for (const za of [side * 0.030, -side * 0.034]) {
+        const pts = [[px, pz, yt + 0.011], [0.054, pz + 0.40 * (za - pz), yt + 0.024],
+          [0.024, pz + 0.82 * (za - pz), yt + 0.020], [-0.004, za, yt + 0.002]];
+        tubeTS(pts.map((q) => F(q[0], q[1], q[2])), 0.0048, strapCol, 4);
+      }
+    } else {
+      // The band: across the forefoot, 6 cm wide and 3.5 mm thick, arched
+      // 32 mm over the footbed where the instep goes.
+      const bx = 0.030, zl = -side * 0.036, zm = side * 0.034;
+      const pts = [];
+      for (let k = 0; k <= 4; k++) {
+        const a = (k / 4) * Math.PI;
+        pts.push(F(bx, zl + (zm - zl) * (1 - Math.cos(a)) / 2, yt + 0.001 + 0.032 * Math.sin(a)));
+      }
+      const o = F(0, 0, 0), e = F(1, 0, 0);
+      tubeTS(pts, [0.030, 0.0035], strapCol, 6, [e[0] - o[0], e[1] - o[1], 0]);
+    }
+  }
+
+  /**
+   * A pair of them, side by side, big toes inward, each turned out a little
+   * the way feet step out of them — and one in four with the second kicked
+   * off a hand's width and turned, because that is how most pairs at the
+   * top of a ladder actually lie.
+   */
+  function sandalPair(F, y, kind, soleCol, strapCol, key) {
+    const stag = (jit(key, 941) - 0.5) * 0.06;
+    const kick = jit(key, 942) < 0.25;
+    sandal(subFrame(F, -stag, -0.058, -0.10), y, 1, kind, soleCol, strapCol);
+    sandal(subFrame(F, stag + (kick ? 0.06 : 0), 0.058 + (kick ? 0.07 : 0),
+      0.10 + (kick ? (jit(key, 943) - 0.5) * 1.8 : 0)), y, -1, kind, soleCol, strapCol);
+  }
+
+  /**
+   * A beach bag, put down: `hw` by `hd` and `h` tall.
+   *
+   * A soft body in five rings of twelve — a rounded rectangle at every height
+   * (a superellipse, n 4), full at the bottom where the weight is, pinched
+   * across the mouth at the top, and slumped a few centimetres to one side
+   * because nothing in it is stiff. The mouth is open and dark inside. Two
+   * handles stand up off the long sides, which is what a bag that has just
+   * been put down does. One in two has a band round it in cream.
+   */
+  function beachBag(F, y, hw, hd, h, col, strapCol, key) {
+    const P = wF(F);
+    const FH = [0.006, 0.12, 0.45, 0.80, 1.0];
+    const AX = [0.90, 1.0, 1.0, 0.97, 0.90], AZ = [0.78, 1.0, 0.98, 0.80, 0.40];
+    const sl = (jit(key, 951) - 0.5) * 0.06, n = 12;
+    const sp = (c) => Math.sign(c) * Math.pow(Math.abs(c), 0.5);
+    const G = FH.map((f, j) => {
+      const row = [];
+      for (let i = 0; i < n; i++) {
+        const a = ((i + 0.5) / n) * TAU, ca = Math.cos(a), sa = Math.sin(a);
+        // The mouth sags between the handles.
+        const sag = j === FH.length - 1 ? 0.035 * (1 - ca * ca) : 0;
+        row.push(P(hw * AX[j] * sp(ca) + sl * f * f, hd * AZ[j] * sp(sa), y + h * f - sag));
+      }
+      return row;
+    });
+    const banded = jit(key, 930) < 0.5;
+    const C0 = F(0, 0, 0), mid = W(C0[0], C0[1], y + h * 0.5);
+    skinGrid(G, true, (j) => (banded && j === 2 ? clothCream() : (j === 0 ? shade(col, 0.8) : col)),
+      (p) => [p[0] - mid[0], 0, p[2] - mid[2]]);
+    // The inside, dark.
+    const top = G[FH.length - 1], inner = P(sl, 0, y + h * 0.82);
+    for (let i = 0; i < n; i++) b.tri(top[i], top[(i + 1) % n], inner, shade(col, 0.30));
+    // The handles.
+    const yt = y + h - 0.010, az = hd * AZ[FH.length - 1];
+    for (const sz of [-1, 1]) {
+      const pts = [];
+      for (let k = 0; k <= 4; k++) {
+        const u = k / 4, s2 = Math.sin(Math.PI * u);
+        pts.push(F(-0.55 * hw + 1.1 * hw * u + sl, sz * (az + 0.018 * s2), yt + 0.090 * s2));
+      }
+      tubeTS(pts, 0.0065, strapCol, 5);
+    }
+  }
+
   /**
    * What people leave on the concrete.
    *
@@ -6151,9 +6570,11 @@ async function buildJadrija(scene) {
    * a sandal and you get comments. One photograph has flip-flops, slides, a
    * child's sandals, a towel, a hi-vis top and a pair of goggles within two
    * metres of a single lamp foot, and that is the ordinary state of a bathing
-   * station in August. It is also the cheapest thing in this file: four
-   * prototypes at forty triangles each, scattered where people actually stop —
-   * the foot of a ladder, the foot of a lamp, the edge of a towel.
+   * station in August. It was also the cheapest thing in this file — four
+   * prototypes at forty triangles each — and on 29 Sep 2026 Misha stood over
+   * a heap of them and could not name one. They are drawn by the builders
+   * above now (`sandalPair`, `beachTowel`, `foldedTowel`, `beachBag`); what
+   * goes where, and in which colour, is exactly what it was.
    */
   function clutter(t, s, y, n, seed) {
     // A local frame, rather than `facing`.
@@ -6161,12 +6582,9 @@ async function buildJadrija(scene) {
     // `facing` is a `const` arrow declared four hundred lines below the two
     // places this is called from, so reaching for it here is the temporal dead
     // zone and the whole resort fails to build — with the only symptom being a
-    // page that never finishes loading. Six lines of the same arithmetic is
-    // cheaper than moving a declaration everything else already depends on.
-    const frame = (ct, cs, ang) => (dt, ds, yy) => {
-      const c = Math.cos(ang), sn = Math.sin(ang);
-      return W(ct + dt * c - ds * sn, cs + dt * sn + ds * c, yy);
-    };
+    // page that never finishes loading. `tsFrame` is a function declaration,
+    // which is hoisted, and hands back shore coordinates rather than world
+    // ones because the straps are `tubeTS`.
     const SAND = [[0.520, 0.180, 0.190], [0.130, 0.200, 0.400],
       [0.700, 0.640, 0.180], [0.180, 0.190, 0.200], [0.820, 0.780, 0.740]];
     const TOWEL = [[0.620, 0.180, 0.200], [0.180, 0.420, 0.620],
@@ -6176,29 +6594,25 @@ async function buildJadrija(scene) {
       const ct = t + (j0 - 0.5) * 2.6, cs = s + (j1 - 0.5) * 2.0;
       const a = j2 * TAU;
       const kind = ((j2 * 97) | 0) % 4;
+      const F = tsFrame(ct, cs, a);
       if (kind === 0 || kind === 1) {
-        // A sandal: a sole and a strap, and always a pair a little apart.
-        for (const o of [-0.09, 0.09]) {
-          const P = frame(ct + o * Math.cos(a), cs + o * Math.sin(a), a);
-          boxIn(P, -0.125, 0.125, -0.042, 0.042, y + 0.002, y + 0.026,
-            SAND[((j0 * 53) | 0) % SAND.length]);
-          boxIn(P, -0.02, 0.055, -0.045, 0.045, y + 0.026, y + 0.038,
-            SAND[((j1 * 31) | 0) % SAND.length]);
-        }
+        // A pair: flip-flops on kind 0, slides on kind 1. The pair used to be
+        // offset ±9 cm ALONG the sole, which overlapped two 25 cm soles into
+        // one 43 cm bar; side by side is what a pair is.
+        sandalPair(F, y, kind, SAND[((j0 * 53) | 0) % SAND.length],
+          SAND[((j1 * 31) | 0) % SAND.length], seed + k);
       } else if (kind === 2) {
-        // A towel, dropped rather than laid: folded over on itself.
-        const P = frame(ct, cs, a);
-        boxIn(P, -0.34, 0.34, -0.22, 0.22, y + 0.002, y + 0.030,
-          TOWEL[((j0 * 71) | 0) % TOWEL.length]);
-        boxIn(P, -0.30, 0.10, -0.18, 0.18, y + 0.030, y + 0.052,
-          TOWEL[((j1 * 41) | 0) % TOWEL.length]);
+        // A towel dropped rather than laid, rucked up, and a second one folded
+        // into a pad on top of it — which is what the green slab with the red
+        // slab on it was trying to be.
+        beachTowel(F, y, 0.34, 0.22, TOWEL[((j0 * 71) | 0) % TOWEL.length],
+          seed + k, { rumple: 1.8 });
+        foldedTowel(subFrame(F, -0.10, 0, (j1 - 0.5) * 0.3), y + 0.012, 0.19, 0.16,
+          0.034, TOWEL[((j1 * 41) | 0) % TOWEL.length], seed + k + 7);
       } else {
-        // A bag, slumped, with a strap over it.
-        const P = frame(ct, cs, a);
-        boxIn(P, -0.20, 0.20, -0.13, 0.13, y + 0.002, y + 0.24,
-          SAND[((j1 * 67) | 0) % SAND.length]);
-        boxIn(P, -0.06, 0.06, -0.15, 0.15, y + 0.24, y + 0.28,
-          [0.140, 0.140, 0.145]);
+        // A bag, slumped, handles up.
+        beachBag(F, y, 0.20, 0.13, 0.22, SAND[((j1 * 67) | 0) % SAND.length],
+          [0.140, 0.140, 0.145], seed + k);
       }
     }
   }
@@ -32060,6 +32474,52 @@ async function buildJadrija(scene) {
   }
 
 
+  // ── the mole, full ─────────────────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026, from the vikendica's upper terrace: *"in the real view
+  // from vikendica, there's a lot more bathers and kids jumping off that pier
+  // there, right now it's just an empty concrete slab, but in real life it's
+  // seething with life, little kids jumping down, i see u have a lot of
+  // bathers more up north, maybe u can re-locate them to inhabit the space in
+  // front of the vikendica more and populate that concrete pier with bathers
+  // laying on their towels ... do not increase the # of bathers"*.
+  //
+  // MEASURED FIRST. Of the hundred people on this shore not one was on the
+  // mole — t 252.5 to 263.5, s 0.4 to -42 — and the nearest static figure to
+  // it was a woman standing on the middle terrace eleven metres away. The
+  // survey has the same object full: 20260821_175838 looks down it at ten to
+  // six and counts nineteen people on it — groups sitting on towels near the
+  // head, towels laid out along it and not across it, two standing at the
+  // edge, a boy in red trunks running for the water; 20260821_175752 has
+  // the other mole's flank with a girl on the ladder and eight heads in the
+  // water off it; 1000149597 at 250 s is two women on towels laid straight
+  // on the concrete, one of them in sunglasses. People on a mole are at its
+  // edges and on towels, in twos and threes, and in the water beside it.
+  //
+  // WHO MOVES, AND WHY IT IS THEM. Nobody is added (`people` stays 100 —
+  // the count is a runtime cost, not a file-size one, but he asked for the
+  // same hundred and it is the same hundred). The people who go are the
+  // ones standing, sitting and lying furthest along the shore from the
+  // vikendica — the far end of the sand beach and the two hundred metres
+  // past the last café — because from the house those are the people
+  // nobody can see. They are taken off the finished list, farthest first,
+  // with about one in five left where they were so that neither end of the
+  // beach is emptied. See `moleCast`, which runs just before the crowd is
+  // cast.
+  //
+  // RULE 4. Nothing in this is drawn off `rng`. The places are literals and
+  // `jit`; the people are picked by where they already are; and they are
+  // moved AFTER `castBlob` has dealt everybody a body round the shore in
+  // order of `t` and after every other thing that read their placement, so
+  // not one body, colour, gait, parasol or hut changes — only where these
+  // people are.
+  //
+  // Three of them are not in the crowd at all any more: the jumpers, who
+  // are drawn by figures of their own (`MOLE_JUMP`), because the instanced
+  // tier cannot play a dive. They are still among the hundred, hidden from
+  // the crowd the way the woman against the riser at t 366.8 is.
+  const MOLE_LIFE = { spots: [], movers: [], jumpers: [] };
+
   // ── towels, cones, flags, bicycles ─────────────────────────────────────────
   //
   // Four small things the survey keeps showing and the shore did not have.
@@ -32083,21 +32543,18 @@ async function buildJadrija(scene) {
       const y = surfaceY(t, s);
       const ang = (jit(k, 202) - 0.5) * 0.5;
       const col = TOWEL[((jit(k, 203) * 97) | 0) % TOWEL.length];
-      // Three panels at slightly different heights and widths, so it lies on
-      // the slab like cloth rather than like a mat somebody cut out.
+      // It was three flat panels at slightly different heights, "so it lies on
+      // the slab like cloth" — and from a metre and a half, which is where
+      // Misha looked at one on 29 Sep 2026, it was a pale sheet of card. Now
+      // `beachTowel`: the same 0.68 by 1.28 m on the same spot, soft, hemmed,
+      // rucked and patterned. Still in `deck`, which receives and never casts.
+      // Flat at `y`, as it was, and not draped on `floorUnder`: the concrete
+      // is flat across a band, and where one of these crosses a terrace riser
+      // (the one at t 223.8 does, at s 3.6) draping it stood half the towel up
+      // the face of the step like a towel hung on a wall.
       b = deck;
-      for (let i = 0; i < 3; i++) {
-        const ds = -0.62 + i * 0.42;
-        const wob = (jit(k, 210 + i) - 0.5) * 0.10;
-        const P = facing(t, s, ang);
-        const q = (dt, ds2, yy) => P(dt, ds2, yy);
-        const hw = 0.34 + wob;
-        b.quad(q(-hw, ds, y + 0.012 + wob * 0.05),
-          q(hw, ds, y + 0.012 - wob * 0.05),
-          q(hw, ds + 0.44, y + 0.012 + wob * 0.04),
-          q(-hw, ds + 0.44, y + 0.012 - wob * 0.04),
-          i === 1 ? col : shade(col, 0.92));
-      }
+      beachTowel(subFrame(tsFrame(t, s, ang), 0, 0.02, 0), y,
+        0.34 + (jit(k, 211) - 0.5) * 0.04, 0.64, col, k * 3 + 17);
       b = up;
       // And what is on it. Somebody on four out of ten, their bag on the rest.
       if (jit(k, 204) < 0.42) {
@@ -32105,6 +32562,166 @@ async function buildJadrija(scene) {
       } else {
         clutter(t + 0.5, s + 0.55, y, 2, k * 5 + 3);
       }
+    }
+
+    // ── AND THE MOLE, WHICH HAD NOBODY ON IT ─────────────────────────────────
+    //
+    // The places `MOLE_LIFE` is about (see the note over it): where each
+    // person the mole is given will lie, sit or stand, and the towels and the
+    // books that are theirs. Laid out here because the towels are geometry
+    // and this is where towels are built; FILLED four thousand lines down,
+    // just before the crowd is cast, because who goes where is decided off
+    // the finished list of people and that list is not finished yet.
+    //
+    // Nothing here draws off `rng`: every number is a literal or a `jit`,
+    // for the reason the rest of this block gives.
+    {
+      const top = JET.top;
+      const W0 = JET.t - JET.w, E0 = JET.t + JET.w, HEAD = -JET.out;
+      const spot = (o) => { MOLE_LIFE.spots.push(o); return o; };
+      // Along the mole, a person lying down has their soles at (t, s) and
+      // their head `LIE_LEN` behind them against `ang` — the anchor the `lie`
+      // pose is written against (see the note over the lounger sunbathers).
+      const LIE_LEN = 1.62;
+      // Lying, and the half of them that tell the story: tops off and
+      // undone are ADULT WOMEN ONLY and that is enforced by body, not here —
+      // see `TOPS_KINDS` in 42-crowd.js. What these say is what this place
+      // is FOR if whoever is dealt it can wear it; a man dealt a `top: 1`
+      // spot is simply a man sunbathing.
+      //
+      // In two loose rows down the east half, bodies along the mole, heads
+      // both ways, which is 20260821_175838: nobody lies across a mole, and
+      // nobody lies in a grid.
+      //
+      // WHAT IS KEPT CLEAR, and why every number below is where it is. The
+      // west flank from s -24 to the head is the children's: they run at the
+      // edge there, go in, and come out up the flank's own ladder at s -39.3
+      // (`MOLE_LADDERS`). The east flank round s -33.5 is the man's, who goes
+      // in off it and comes out up the other one. And the flag pole
+      // (`MOLE_FLAG`, t 258.6, s -39.3, on the centre line) has nobody and
+      // no towel within a couple of metres of it.
+      const LIE = [
+        // t, s, bearing (head -> feet), prone, top, shades, book
+        [259.1, -7.6, -Math.PI / 2, false, 1, true, false],
+        [261.3, -11.8, Math.PI / 2, true, 2, false, true],
+        [259.6, -14.2, -Math.PI / 2, false, 0, true, false],
+        [261.6, -19.4, Math.PI / 2, true, 2, false, true],
+        [258.9, -22.3, -Math.PI / 2, false, 1, false, false],
+        [261.2, -28.6, Math.PI / 2, false, 1, true, false],
+        [257.6, -31.4, -Math.PI / 2, false, 0, false, false],
+        [257.2, -35.6, Math.PI / 2, true, 0, true, false],
+      ];
+      LIE.forEach(([t, s, ang, prone, topOff, shades, book], i) => {
+        const a = ang + (jit(i, 5101) - 0.5) * 0.22;
+        spot({ t, s, y: top + 0.06, ang: a, pose: 'lie', prone, top: topOff,
+          shades, book, towel: true, who: topOff ? 'f' : '*' });
+      });
+      // Sitting on a towel with the legs out along it, and reading. The
+      // quay clip with its legs laid on the concrete (`legRestOf`), which
+      // puts both hands half way down the thighs — where a paperback is.
+      spot({ t: 260.4, s: -24.6, y: top, ang: Math.PI - 0.35, pose: 'sit',
+        ground: true, book: true, shades: true, towel: true, who: 'f' });
+      spot({ t: 256.4, s: -20.8, y: top, ang: -Math.PI / 2 + 0.4, pose: 'sit',
+        ground: true, book: true, towel: true, who: '*' });
+      // On the edge with their legs over the water: the one thing the quay
+      // clip was solved for and, on the promenade, never got to do (see
+      // `legRestOf`). The hip 0.36 m in from the arris — 0.27 for a child —
+      // which puts the back of the knee on it: at the quay sitters' 0.55 the
+      // knee was 12 cm short of the edge and the shins went down into the
+      // mole, photographed from the water. The west flank faces the
+      // vikendica, and nothing sits on it past s -21, because that is the
+      // children's run and the water they go into.
+      const IN = { k: 0.27, m: 0.36, '*': 0.36 };
+      for (const [s, who] of [[-7.0, 'k'], [-11.5, 'm'], [-15.8, '*'], [-20.2, 'm']]) {
+        spot({ t: W0 + IN[who], s, y: top, ang: Math.PI, pose: 'sit', edge: true,
+          shades: jit(s * 10 | 0, 5102) < 0.35, who });
+      }
+      for (const [t, who] of [[254.6, 'm'], [260.9, '*']]) {
+        spot({ t, s: HEAD + IN[who], y: top, ang: -Math.PI / 2, pose: 'sit',
+          edge: true, who });
+      }
+      for (const [s, who] of [[-9.4, 'm'], [-24.9, '*']]) {
+        spot({ t: E0 - IN[who], s, y: top, ang: 0, pose: 'sit', edge: true, who });
+      }
+      // Two on their feet: one at the head of the jumpers' run, watching
+      // them go in, and one out towards the head.
+      spot({ t: 257.9, s: -19.2, y: top, ang: Math.PI + 0.5, pose: 'stand',
+        shades: true, who: 'm' });
+      spot({ t: 262.7, s: -16.4, y: top, ang: Math.PI * 0.8, pose: 'stand',
+        who: '*' });
+      // And the quay in front of the vikendica, which is the other half of
+      // what he can see from its terrace: two on the lip with their legs
+      // over, and one standing at the edge. Clear of the ladder at t 247 and
+      // of the lip from there to the mole, which is the jumpers' way back.
+      for (const t of [237.9, 241.4]) {
+        spot({ t, s: 0.36, y: null, ang: -Math.PI / 2, pose: 'sit', edge: true,
+          who: '*' });
+      }
+      spot({ t: 243.9, s: 1.3, y: null, ang: -Math.PI / 2 + 0.6, pose: 'stand',
+        who: '*' });
+
+      // The towels, in the survey's colours and then some: a mole is where
+      // everybody's towel is out at once. `beachTowel` (soft, hemmed,
+      // rucked, striped or banded or bordered off its key), 1.72 m by 0.78,
+      // which is a beach towel, laid under the body; and by most of them the
+      // other things a person brings out on to a mole and puts down beside
+      // them — a pair of flip-flops or slides, or a bag.
+      const MT = [[0.600, 0.180, 0.160], [0.155, 0.330, 0.560],
+        [0.700, 0.640, 0.240], [0.190, 0.460, 0.350], [0.660, 0.400, 0.520],
+        [0.860, 0.470, 0.180], [0.120, 0.520, 0.620], [0.520, 0.200, 0.420],
+        [0.900, 0.860, 0.780]];
+      const KIT = [[0.520, 0.180, 0.190], [0.130, 0.200, 0.400],
+        [0.850, 0.830, 0.780], [0.180, 0.180, 0.190], [0.250, 0.520, 0.600]];
+      MOLE_LIFE.spots.forEach((o, i) => {
+        if (!o.towel) return;
+        const col = MT[((jit(i, 5103) * 97) | 0) % MT.length];
+        const y = o.y - (o.pose === 'lie' ? 0.06 : 0);
+        // Centred under the body: soles at the spot, head LIE_LEN back.
+        const c = Math.cos(o.ang), sn = Math.sin(o.ang);
+        const mid = o.pose === 'lie' ? -0.74 : 0.10;
+        const ct = o.t + c * mid, cs = o.s + sn * mid;
+        // `tsFrame` runs `dz` along (-sin, cos) of its angle, so a quarter
+        // turn back from the body's bearing lays the towel's length along it.
+        const F = tsFrame(ct, cs, o.ang - Math.PI / 2);
+        b = deck;
+        beachTowel(F, y, 0.39, 0.86, col, 5200 + i * 7);
+        b = up;
+        // Beside it and off the towel: sandals by the feet, or a bag by the
+        // head.
+        const kit = jit(i, 5107);
+        const side = 0.62 * (jit(i, 5108) < 0.5 ? -1 : 1);
+        if (kit < 0.55) {
+          const G = subFrame(F, side, o.pose === 'lie' ? 0.62 : -0.5, (jit(i, 5109) - 0.5) * 0.8);
+          sandalPair(G, y, kit < 0.3 ? 0 : 1, KIT[((jit(i, 5111) * 53) | 0) % KIT.length],
+            KIT[((jit(i, 5112) * 31) | 0) % KIT.length], 5300 + i);
+        } else if (kit < 0.85) {
+          const G = subFrame(F, side, o.pose === 'lie' ? -0.55 : 0.4, (jit(i, 5109) - 0.5) * 1.2);
+          beachBag(G, y, 0.20, 0.13, 0.22, KIT[((jit(i, 5113) * 67) | 0) % KIT.length],
+            [0.140, 0.140, 0.145], 5400 + i);
+        }
+        // A book, open and face down or face up, at the head end: a
+        // sunbather on her front reads with the book on the towel in front
+        // of her, which is the one way to read lying down that anybody on a
+        // concrete mole actually does. For a sitter the book is in her hands
+        // instead — see `MOLE_PROPS`.
+        if (o.book && o.pose === 'lie') {
+          const bt = o.t - c * (LIE_LEN + 0.30), bs = o.s - sn * (LIE_LEN + 0.30);
+          const Q = facing(bt, bs, o.ang + Math.PI / 2);
+          const cov = MT[((jit(i, 5106) * 83 + 5) | 0) % MT.length];
+          const yb = y + 0.004;
+          b.quad(Q(-0.16, -0.115, yb), Q(0.16, -0.115, yb), Q(0.16, 0.115, yb),
+            Q(-0.16, 0.115, yb), shade(cov, 0.7));
+          // Two pages, each tipped up from the spine, which reads as open
+          // from the vikendica and as a book from anywhere nearer.
+          // Wound the same way round as the towel under them (x rising), so
+          // both leaves face the sky.
+          for (const [xa, xb, ya, yc] of [[-0.148, 0, 0.030, 0.018], [0, 0.148, 0.018, 0.030]]) {
+            b.quad(Q(xa, -0.105, yb + ya), Q(xb, -0.105, yb + yc),
+              Q(xb, 0.105, yb + yc), Q(xa, 0.105, yb + ya), [0.905, 0.885, 0.830]);
+          }
+        }
+      });
+      b = up;
     }
 
 
@@ -32167,20 +32784,15 @@ async function buildJadrija(scene) {
             q(sg * 0.23, 0.30, cy + 0.62), q(sg * 0.23, -0.20, cy + 0.60), CHFR);
         }
       };
-      // A towel, three panels of it, laid flat and wrinkled. The same
-      // construction the concrete run uses — it is right and it is cheap.
+      // A towel, laid on the shingle. The same construction the concrete run
+      // uses — which is `beachTowel` now, and not three flat panels.
       const towel = (tt, ts, ty, ang, col, key) => {
-        const P = facing(tt, ts, ang);
-        for (let i = 0; i < 3; i++) {
-          const ds = -0.62 + i * 0.42;
-          const wob = (jit(key + i, 271) - 0.5) * 0.10;
-          const hw = 0.34 + wob;
-          b.quad(P(-hw, ds, ty + 0.012 + wob * 0.05),
-            P(hw, ds, ty + 0.012 - wob * 0.05),
-            P(hw, ds + 0.44, ty + 0.012 + wob * 0.04),
-            P(-hw, ds + 0.44, ty + 0.012 - wob * 0.04),
-            i === 1 ? col : shade(col, 0.92));
-        }
+        beachTowel(subFrame(tsFrame(tt, ts, ang), 0, 0.02, 0), ty,
+          0.34 + (jit(key, 271) - 0.5) * 0.04, 0.64, col, key,
+          // Laid on the drawn sand, and over the 10 cm steps the beach keeps
+          // between its levels — but no further: a towel across a real riser
+          // does not climb the wall of it.
+          { floor: (t2, s2) => Math.min(floorUnder(t2, s2), ty + 0.12) });
       };
       // 6.2 m between pitches and seven in ten of them taken, which comes out
       // at one group every nine metres of shore. The first cut was 9.4 and
@@ -32219,10 +32831,9 @@ async function buildJadrija(scene) {
           const bs = cs - 0.8 - jit(k, 337) * 0.7;
           const by = surfaceY(bt, bs);
           const bc = BAG[((jit(k, 338) * 97) | 0) % BAG.length];
-          boxTS(bt - 0.22, bt + 0.22, bs - 0.15, bs + 0.15, by, by + 0.26,
-            bc, shade(bc, 1.18));
-          boxTS(bt - 0.06, bt + 0.06, bs - 0.13, bs + 0.13, by + 0.26,
-            by + 0.31, shade(bc, 0.7));
+          // A crate with a lid, until 29 Sep 2026; `beachBag` since.
+          beachBag(tsFrame(bt, bs, 0), Math.max(by, floorUnder(bt, bs)), 0.22, 0.15, 0.24, bc,
+            shade(bc, 0.7), k * 7 + 3);
         }
       }
     }
@@ -32275,25 +32886,46 @@ async function buildJadrija(scene) {
       // The pocket: a shallow dish of shadow, which is what you actually see.
       // Sized to the ring and not to the eye: at 0.60 by 0.52 the pocket read
       // as a black square with a small ring lying in the middle of it.
-      b.quad(W(t - 0.22, s - 0.20, y + 0.004), W(t + 0.22, s - 0.20, y + 0.004),
-        W(t + 0.22, s + 0.20, y + 0.004), W(t - 0.22, s + 0.20, y + 0.004),
-        [0.268, 0.250, 0.228]);
-      b = up;
-      // The ring, eight chords of rusted iron lying in it.
-      const RUST = [0.230, 0.140, 0.092];
-      for (let i = 0; i < 8; i++) {
-        const a0 = (i / 8) * TAU, a1 = ((i + 1) / 8) * TAU;
-        const R = 0.175, w = 0.030;
-        const p = (a, rr, yy) => W(t + Math.cos(a) * rr, s + Math.sin(a) * rr, yy);
-        b.quad(p(a0, R - w, y + 0.012), p(a1, R - w, y + 0.012),
-          p(a1, R + w, y + 0.012), p(a0, R + w, y + 0.012),
-          i % 2 ? RUST : [0.280, 0.175, 0.110]);
-        b.quad(p(a1, R + w, y + 0.012), p(a0, R + w, y + 0.012),
-          p(a0, R + w, y - 0.020), p(a1, R + w, y - 0.020), [0.170, 0.105, 0.070]);
+      //
+      // And round, since 29 Sep 2026. Misha, over one of these by the
+      // vikendica's ladder: *"i don't even know what these geometric shapes
+      // are"* — and there was no telling. The ring was eight flat chords 6 cm
+      // wide, an octagonal brown washer on a grey square with a brown brick at
+      // one side. What is actually cast into this quay is an iron ring, round
+      // bar, lying in a round recess and shackled through an eye on a plate:
+      // so a round pocket with a lighter chamfer to its lip, the ring as a
+      // torus of 30 mm bar (sixteen stations, six sides, smooth), lifted a
+      // little on the side where it runs through the eye, and the eye itself —
+      // a half-loop of bar standing on its plate, with the ring passing under
+      // it. The same place, the same 0.35 m ring, the same rust.
+      const PK = [0.268, 0.250, 0.228];
+      const pk = (a, rr, yy) => W(t + Math.cos(a) * rr, s + Math.sin(a) * rr, yy);
+      for (let i = 0; i < 16; i++) {
+        const a0 = (i / 16) * TAU, a1 = ((i + 1) / 16) * TAU;
+        b.tri(W(t, s, y + 0.004), pk(a0, 0.225, y + 0.004), pk(a1, 0.225, y + 0.004), PK);
+        b.quad(pk(a0, 0.225, y + 0.004), pk(a0, 0.255, y + 0.003),
+          pk(a1, 0.255, y + 0.003), pk(a1, 0.225, y + 0.004), [0.330, 0.312, 0.286]);
       }
-      // And the staple it is shackled to, at the inland side of the pocket.
-      boxTS(t - 0.06, t + 0.06, s + 0.20, s + 0.28, y - 0.02, y + 0.05,
-        [0.200, 0.125, 0.085]);
+      b = up;
+      const RUST = [0.230, 0.140, 0.092];
+      const ring = [];
+      for (let i = 0; i <= 16; i++) {
+        const a = (i / 16) * TAU;
+        ring.push([t + Math.cos(a) * 0.175, s + Math.sin(a) * 0.175,
+          y + 0.019 + 0.006 * Math.max(0, Math.sin(a))]);
+      }
+      tubeTS(ring, 0.015, RUST, 6, [0, 0, 1], 0.22);
+      // The eye: a plate on the inland lip and a half-loop of bar over the
+      // ring where it runs along t, in the plane across it.
+      const EYE = [0.200, 0.125, 0.085];
+      boxTS(t - 0.05, t + 0.05, s + 0.135, s + 0.225, y, y + 0.010, EYE,
+        [0.225, 0.142, 0.096]);
+      const eye = [];
+      for (let i = 0; i <= 6; i++) {
+        const a = (i / 6) * Math.PI;
+        eye.push([t, s + 0.175 + Math.cos(a) * 0.034, y + 0.006 + Math.sin(a) * 0.048]);
+      }
+      tubeTS(eye, 0.010, EYE, 5, [1, 0, 0], 0.22);
       b = deck;
     }
     b = up;
@@ -36721,6 +37353,17 @@ async function buildJadrija(scene) {
       parsed.push(skin);
       CAST_KIND.push(BATHER_CAST[i]);
     });
+    // Two kinds of clip made here rather than baked, both for the mole
+    // (`MOLE_LIFE`), and both before a single figure is made off these
+    // parses so that every figure's `clips` list carries them.
+    for (const p of parsed) proneClip(p);
+    {
+      const src = parsed[CAST_KIND.indexOf('man_young_fit')];
+      for (const k of ['girl_child', 'boy_child']) {
+        const p = parsed[CAST_KIND.indexOf(k)];
+        if (src && p) jumpClips(src, p);
+      }
+    }
     // One way to make a figure off one of these blobs, for the crowd, the
     // riders and the boat alike. A v2 figure needs uniforms of its own — it
     // is dyed per person — so it cannot be built off one shared option set
@@ -37179,6 +37822,349 @@ async function buildJadrija(scene) {
     }
     f.update(h);
     m.userData.diveMode = DIVE_MODE_CODE[dv.mode] || 0;
+  }
+
+  // ── off the mole: the jumpers ──────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026: *"little kids jumping down"* off the mole; and then,
+  // the same day: *"perhaps re-use the dive of the diver we worked on a few
+  // days ago, that dives off the diving board, so the pier divers execute the
+  // same type of dive? maybe that will save on some time/effort"*.
+  //
+  // So it is HIS dive — the solved one above, `dive` / `tread` / `swim` /
+  // `ladder` out of tools/blender/dive.py and `PAYLOAD.dive` — played by three
+  // of the hundred (`MOLE_LIFE.jumpers`): a girl and a boy off the west flank,
+  // the side the vikendica looks at, and a man off the east. Nothing new was
+  // baked. What is different about a mole is handled here, in four numbers:
+  //
+  //   SCALE. The clips are the man's. The children get them retargeted on to
+  //   their own skeletons (`jumpClips`): every bone's turn away from its own
+  //   rest pose carried across, and the root's travel scaled by the ratio of
+  //   the two pelvises — 0.63 for the girl — so a child takes the man's four
+  //   steps and hurdle at a child's length. Every distance `PAYLOAD.dive`
+  //   gives is scaled by the same `k` below.
+  //
+  //   NO BOARD. The clip rides the plank down 0.41 m and back; the concrete
+  //   does not move, so the root is lifted by exactly the board's own
+  //   deflection (`flex`, frame by frame) until he leaves it — the feet stay
+  //   on the mole and the hurdle, the crouch and the drive are untouched.
+  //
+  //   NO HEIGHT. The clip leaves a board 2.745 m over the water and the mole
+  //   is 0.72 m over it. So he takes off from the deck and the whole figure
+  //   is eased down on to the clip's own water plane between takeoff and the
+  //   moment his hands meet it, and the flight is played half as fast again
+  //   (`FLY`) — a fall of about a metre and a quarter takes about 0.5 s, not
+  //   the clip's 0.8. The turn is conserved: he still goes in head first at
+  //   182 degrees, which is what a running header off a mole is.
+  //
+  //   A LOWER LADDER. The mole's flank ladders (`MOLE_LADDERS`) climb 0.72 m,
+  //   not 2.64; the climb is played from the frame where the rest of it is
+  //   exactly that much, with his hands already on the rungs.
+  //
+  // The swim round to the ladder, the tread and the walk back are the diver's
+  // own code, with the mole's points in it.
+  const JUMP = {
+    // Where each goes in: the flank (−1 west, +1 east) and how far out.
+    lanes: { girl_child: [-1, -28.2], boy_child: [-1, -33.4], man_young_fit: [1, -33.2] },
+    FLY: 1.5,                 // clip rate from takeoff to entry
+    out: 0.6,                 // m further out a child goes in (see the dive)
+    walk: 1.0, swim: 0.80,    // m/s, the man's; a child's are times sqrt(k)
+    wait: [2.5, 7.0],         // s at the edge before the next go
+  };
+  // The board's takeoff frame: the last frame he is on it. `flex` rings on
+  // after he has left and none of that is his.
+  const JUMP_TO = DV ? Math.round((DV.dive.entry_t - DV.dive.stats.flight) * DV.fps) : 0;
+
+  /**
+   * A figure's pose in `name` at `T`, retargeted from the man's skeleton on
+   * to `dst`'s: `q_dst = rest_dst · rest_src⁻¹ · q_src` per bone, and the
+   * root's travel scaled pelvis to pelvis. The bones are the same thirty in
+   * the same order on all eight (`armature()` in human_mh.py builds them all),
+   * and a turn away from rest means the same thing on each — which is why the
+   * children's `sitquay` and his are the same sit at two sizes.
+   */
+  function jumpClips(src, dst) {
+    const nb = src.bones.length;
+    if (dst.bones.length !== nb || dst.clips.dive) return;
+    for (let i = 0; i < nb; i++) if (src.bones[i].name !== dst.bones[i].name) return;
+    const k = dst.bones[0].t[1] / src.bones[0].t[1];
+    for (const name of ['dive', 'tread', 'swim', 'ladder']) {
+      const c = src.clips[name];
+      if (!c) continue;
+      const quat = new Int16Array(c.quat.length);
+      for (let f = 0; f < c.nf; f++) {
+        for (let i = 0; i < nb; i++) {
+          const o = (f * nb + i) * 4;
+          const q = [c.quat[o] / 32767, c.quat[o + 1] / 32767,
+            c.quat[o + 2] / 32767, c.quat[o + 3] / 32767];
+          const rs = src.bones[i].q, rd = dst.bones[i].q;
+          const d = qMul4([-rs[0], -rs[1], -rs[2], rs[3]], q);
+          const r = qMul4(rd, d);
+          const l = Math.hypot(r[0], r[1], r[2], r[3]) || 1;
+          for (let j = 0; j < 4; j++) quat[o + j] = Math.round(r[j] / l * 32767);
+        }
+      }
+      const root = new Float32Array(c.root.length);
+      for (let j = 0; j < root.length; j++) root[j] = c.root[j] * k;
+      dst.clips[name] = { name, dur: c.dur, nf: c.nf, loop: c.loop, root, quat };
+    }
+    dst.jumpK = k;
+  }
+  function qMul4(a, b) {
+    return [a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+      a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+      a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+      a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]];
+  }
+
+  /**
+   * `prone`: `sunbathe` turned over, on this body.
+   *
+   * The far tier has had people on their fronts since the survey said a
+   * quarter of the beach is (see the `lie` case in 42-crowd.js); the near tier
+   * never did, and nobody asked it to until the mole — where the undone top
+   * is only a thing at all on somebody lying on her front. So it is made
+   * here, per body, off the face-up clip: the root turned half round the
+   * body's long axis (figure x, which the lie's tip has made head to heel),
+   * so the front is on the towel and the head is where it was; the small
+   * bends of the back and the neck reversed, so that what lifted her
+   * shoulders off the towel face up now lifts them face down instead of
+   * pressing her chest into it; and both knees bent up off the towel, the
+   * shins in the air, which is 20260821_175413 — the one figure on a towel
+   * in the whole survey that was photographed close, and she is lying
+   * exactly so.
+   */
+  function proneClip(p) {
+    const c = p.clips.sunbathe;
+    if (!c || p.clips.prone) return;
+    const nb = p.bones.length;
+    const id = (n) => p.bones.findIndex((b) => b.name === n);
+    const back = ['spine01', 'spine02', 'spine03', 'chest', 'neck', 'head'].map(id);
+    const knee = { [id('legLL')]: 1.35, [id('legLR')]: 0.95 };
+    const quat = new Int16Array(c.quat.length);
+    for (let f = 0; f < c.nf; f++) {
+      for (let i = 0; i < nb; i++) {
+        const o = (f * nb + i) * 4;
+        let q = [c.quat[o] / 32767, c.quat[o + 1] / 32767,
+          c.quat[o + 2] / 32767, c.quat[o + 3] / 32767];
+        const r = p.bones[i].q;
+        if (i === 0) {
+          q = [q[3], -q[2], q[1], -q[0]];          // Rx(pi) · q, figure space
+        } else if (back.includes(i)) {
+          const d = qMul4([-r[0], -r[1], -r[2], r[3]], q);
+          q = qMul4(r, [-d[0], -d[1], -d[2], d[3]]);
+        } else if (knee[i] != null) {
+          const a = knee[i] + Math.sin(f / c.nf * TAU) * 0.08 * (i % 2 ? 1 : -1);
+          q = qMul4(r, [Math.sin(a / 2), 0, 0, Math.cos(a / 2)]);
+        }
+        for (let j = 0; j < 4; j++) quat[o + j] = Math.round(q[j] * 32767);
+      }
+    }
+    p.clips.prone = { name: 'prone', dur: c.dur, nf: c.nf, loop: c.loop,
+      root: c.root.slice(), quat };
+  }
+
+  /** A shore point, in the world, at height y. */
+  const jw = (t, s, y) => { const p = W(t, s, y); return [p[0], p[1], p[2]]; };
+
+  function jumpPlace(J, pos, yaw) {
+    J.fig.mesh.position.set(pos[0], pos[1], pos[2]);
+    J.fig.mesh.rotation.set(0, yaw, 0);
+  }
+  function jumpPlay(J, name, fade, keepRoot = false) {
+    if (!J.fig.clips.includes(name)) return false;
+    J.fig.play(name, { fade, keepRoot });
+    J.fig.state.speed = 1;
+    return true;
+  }
+  function jumpSet(J, mode) { J.st.mode = mode; J.st.t = 0; }
+  /** Everything about a jumper that follows from where the lane is. */
+  function jumpLane(J) {
+    const [side, s] = JUMP.lanes[J.kind];
+    const k = J.k, face = JET.t + side * JET.w;
+    const L = MOLE_LADDERS.find((m) => m[2] === side) || [face, -39.3, side];
+    const out = diveYaw(...(() => { const a = jw(face, s, 0), b2 = jw(face + side, s, 0);
+      return [b2[0] - a[0], b2[2] - a[2]]; })());
+    const xTip = DV.dive.x_tip * k;
+    J.lane = {
+      side, s, face, out, inn: out + Math.PI,
+      // The clip's origin: his tip lands on the arris.
+      origin: jw(face - side * xTip, s, JET.top),
+      // The climb: the rungs' line, 0.20 off the face like every ladder here.
+      ladder: jw(face + side * 0.20, L[1], 0), ls: L[1],
+    };
+    return J.lane;
+  }
+  /** The swim from where he came up to the foot of his ladder. */
+  function jumpToLadder(J, from) {
+    const { side, face, ls } = J.lane, k = J.k;
+    // To 0.35 m off the rungs, where the diver's own swim ends.
+    const off = 0.20 + 0.35 * k;
+    return [from, jw(face + side * (off + 0.9), ls + 1.6, 0),
+      jw(face + side * off, ls, 0)];
+  }
+  /** The walk from the top of his ladder back to his mark. */
+  function jumpToMark(J, from) {
+    const { side, face, s, ls } = J.lane, k = J.k;
+    const xTip = DV.dive.x_tip * k;
+    return [from, jw(face - side * 1.1, ls + 0.9, JET.top),
+      jw(face - side * (xTip + 0.9), s - 1.4, JET.top), J.lane.origin];
+  }
+  function jumpPath(J, dt, v, turnRate, onPos) {
+    const S = J.st, P = S.path;
+    let left = v * dt;
+    while (left > 0 && S.seg < P.length - 1) {
+      const a = P[S.seg], b2 = P[S.seg + 1];
+      const cur = S.cur || a;
+      const dx = b2[0] - cur[0], dz = b2[2] - cur[2], d = Math.hypot(dx, dz);
+      if (d <= left) { S.cur = b2; left -= d; S.seg++; continue; }
+      S.cur = [cur[0] + dx / d * left, cur[1] + (b2[1] - cur[1]) * left / d, cur[2] + dz / d * left];
+      left = 0;
+    }
+    const c = S.cur, b2 = P[Math.min(S.seg + 1, P.length - 1)];
+    if (Math.hypot(b2[0] - c[0], b2[2] - c[2]) > 0.05) {
+      const want = diveYaw(b2[0] - c[0], b2[2] - c[2]);
+      const d = ((want - S.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      S.yaw += Math.max(-turnRate * dt, Math.min(turnRate * dt, d));
+    }
+    onPos(c);
+    return S.seg >= P.length - 1;
+  }
+  const seaAt = (x, z) => (typeof seaHeightAt === 'function' ? seaHeightAt(x, z) : 0);
+
+  function jumpStep(J, dt, cam) {
+    const f = J.fig, m = f.mesh, S = J.st, k = J.k;
+    const o = J.lane.origin;
+    const dCam = Math.hypot(cam.x - o[0], cam.z - o[2]);
+    if (dCam > 320) {
+      if (S.mode !== 'off') { m.visible = false; jumpSet(J, 'off'); }
+      return;
+    }
+    const h = Math.min(Math.max(dt, 0), 0.05);
+    if (S.mode === 'off') {
+      // Dressed as the person the crowd made of them (`b.fg`, kept for this
+      // in the casting loop), once — nobody else is ever drawn by it.
+      if (!J.dressed && bathers[J.i].fg && f.dress) { f.dress(bathers[J.i].fg); J.dressed = true; }
+      S.yaw = J.lane.out; S.cur = o;
+      jumpPlace(J, o, S.yaw); jumpPlay(J, 'idle', 0); jumpSet(J, 'wait');
+      // Staggered by who they are, so the three never go together.
+      S.next = 1.0 + J.n * 3.3 + jit(J.i, 5120) * 2.0;
+    }
+    S.t += h;
+    m.visible = true;
+    const Yv = -DV.dive.water * k;           // his board's height over his water
+    if (S.mode === 'wait') {
+      if (S.t >= S.next) {
+        S.yaw = J.lane.out;
+        jumpPlace(J, o, S.yaw);
+        jumpPlay(J, 'dive', 0.3);
+        S.splash = false;
+        jumpSet(J, 'dive');
+      }
+    } else if (S.mode === 'dive') {
+      const T = f.state.curT;
+      const fr = Math.min(DV.dive.flex.length - 1, Math.max(0, Math.round(T * DV.fps)));
+      const Tto = JUMP_TO / DV.fps, Te = DV.dive.entry_t;
+      f.state.speed = T >= Tto && T < Te ? JUMP.FLY : 1;
+      let y = Yv + (JET.top - Yv) * (1 - smoothstep(Tto, Te, T));
+      if (fr <= JUMP_TO) y -= DV.dive.flex[fr] * k;
+      // A child's flight is carried a little further out than his clip
+      // scaled down: at k 0.63 the hands went in 0.77 m off the wall and
+      // the whole girl, vertical, was sliding down the face of the mole in
+      // the frame before she hit the water. `JUMP.out` is what a running
+      // child actually clears it by.
+      const fw = J.out * smoothstep(Tto, Te, T);
+      const oo = diveFrom(o, S.yaw, fw, 0);
+      if (T >= Te - 0.06) {
+        const p = diveFrom(o, S.yaw, DV.dive.end_root[0] * k + J.out, 0);
+        y += (seaAt(p[0], p[2]) + TREAD_LIFT * k) * smoothstep(Te, Te + 1.2, T);
+        if (!S.splash) {
+          S.splash = true;
+          const q = diveFrom(o, S.yaw, DV.dive.entry_x * k + J.out, 0);
+          const ux = Math.cos(S.yaw), uz = -Math.sin(S.yaw);
+          if (bodySplash) bodySplash.at(q[0], seaAt(q[0], q[2]), q[2], 0.45 + 0.7 * k, 1.2 * k, ux, uz);
+          const dq = Math.hypot(cam.x - q[0], cam.z - q[2]);
+          if (dq < 70 && typeof audio !== 'undefined' && audio && audio.plunge) {
+            audio.plunge(0.85 * k * (1 - dq / 70));
+          }
+        }
+      }
+      jumpPlace(J, [oo[0], y, oo[2]], S.yaw);
+      if (T >= DV.dive.dur - 0.02) {
+        const er = DV.dive.end_root, tr = DV.tread_root;
+        const c = diveFrom(o, S.yaw, (er[0] - tr[0]) * k + J.out, 0);
+        S.treadY = Yv + (er[1] - tr[2]) * k + TREAD_LIFT * k;
+        S.cur = [c[0], S.treadY + seaAt(c[0], c[2]), c[2]];
+        jumpPlace(J, S.cur, S.yaw);
+        jumpPlay(J, 'tread', 0.2, true);
+        jumpSet(J, 'tread');
+      }
+    } else if (S.mode === 'tread') {
+      const c = S.cur;
+      S.cur = [c[0], S.treadY + seaAt(c[0], c[2]), c[2]];
+      jumpPlace(J, S.cur, S.yaw);
+      if (S.t > 1.1) {
+        S.path = jumpToLadder(J, S.cur); S.seg = 0;
+        S.swimY0 = S.cur[1];
+        jumpPlay(J, 'swim', 0.5);
+        jumpSet(J, 'swim');
+      }
+    } else if (S.mode === 'swim') {
+      const ySwim = 0.08 * k - J.pelvisY - DV.swim_root[2] * k;
+      const e = smoothstep(0, 0.8, S.t);
+      const done = jumpPath(J, h, JUMP.swim * Math.sqrt(k), 1.6, (c) => {
+        jumpPlace(J, [c[0], S.swimY0 + (ySwim + seaAt(c[0], c[2]) - S.swimY0) * e, c[2]], S.yaw);
+      });
+      if (done) {
+        // Up his ladder from the rung where there is 0.72 m of it left.
+        S.yaw = J.lane.inn;
+        const yL = JET.top - DV.ladder.deck * k;
+        const L = [J.lane.ladder[0], yL, J.lane.ladder[2]];
+        S.ladder = L;
+        jumpPlace(J, L, S.yaw);
+        jumpPlay(J, 'ladder', 0.6, true);
+        // The frame where the root is as far above its first frame as the
+        // skakaonica's climb is higher than this one, so that from there on
+        // he climbs 0.72 m and starts it exactly as deep in the water as
+        // the whole clip does.
+        const c = f.data.clips.ladder, want = c.root[1] + (DV.ladder.deck * k - JET.top);
+        let f0 = 0;
+        while (f0 < c.nf - 1 && c.root[f0 * 3 + 1] < want) f0++;
+        f.state.curT = f0 / Math.max(1, c.nf - 1) * c.dur;
+        jumpSet(J, 'ladder');
+      }
+    } else if (S.mode === 'ladder') {
+      if (f.state.curT >= DV.ladder.dur - 0.02) {
+        const er = DV.ladder.end_root;
+        const s0 = diveFrom(S.ladder, S.yaw, er[0] * k, JET.top - S.ladder[1]);
+        S.path = jumpToMark(J, s0); S.seg = 0; S.cur = s0;
+        jumpPlace(J, s0, S.yaw);
+        jumpPlay(J, 'walk', 0.35, true);
+        jumpSet(J, 'walk');
+      }
+    } else if (S.mode === 'walk') {
+      const v = JUMP.walk * Math.sqrt(k);
+      f.state.speed = v / (WALK_NATIVE * k);
+      const done = jumpPath(J, h, v, 2.4, (c) => jumpPlace(J, c, S.yaw));
+      if (done) { jumpPlay(J, 'idle', 0.4); jumpSet(J, 'turn'); }
+    } else if (S.mode === 'turn') {
+      const d = ((J.lane.out - S.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+      S.yaw += Math.max(-2.0 * h, Math.min(2.0 * h, d));
+      jumpPlace(J, S.cur, S.yaw);
+      if (Math.abs(d) < 0.01 && S.t > 0.5) {
+        S.loops++;
+        jumpSet(J, 'wait');
+        S.next = JUMP.wait[0] + Math.random() * (JUMP.wait[1] - JUMP.wait[0]);
+      }
+    }
+    // Posed at the crowd's own ladder of rates: every frame near, and the
+    // way out past the head of the mole is not worth thirty bones a frame.
+    J.acc = (J.acc || 0) + h;
+    if (dCam < 60 || J.acc > 1 / 15) { f.update(J.acc); J.acc = 0; }
+  }
+  function jumpersStep(dt, cam) {
+    if (!DV) return;
+    for (const J of MOLE_LIFE.jumpers) if (J.fig) jumpStep(J, dt, cam);
   }
 
   /**
@@ -42398,6 +43384,141 @@ async function buildJadrija(scene) {
    * glass after the case has been turned, so the hold means the same thing
    * from every bearing and not just from the one it was tuned at.
    */
+  // ── sunglasses and paperbacks (`MOLE_PROPS`) ───────────────────────────────
+  //
+  // "some wear sunglasses, some reads books" — Misha, 29 Sep 2026, of the
+  // mole. On the near tier only: a pair of sunglasses is 14 cm across and at
+  // the distance the far tier draws from it is less than a pixel. Both are
+  // children of the figure's own mesh, so they are in its figure space and
+  // go wherever the roving slot goes; both are hidden the moment the person
+  // the slot is drawing is not somebody who has them.
+  //
+  // SUNGLASSES ride the head bone. Built in the head's BIND frame off this
+  // body's own measured eyes (`bather2Eyes`), then carried by `boneAt` and
+  // `boneTurn` — a rigid attachment, which is what a pair of glasses is. Two
+  // dark lenses 5.4 cm by 3.8, a bridge, and the arms back to the ears. The
+  // lenses stand 3 cm forward of the eyeball centres and not 1.4: the brow
+  // and the cheek are proud of the eye, and at 1.4 they cut both lenses into
+  // two black crescents, photographed at a metre.
+  //
+  // A PAPERBACK sits between the hands of somebody sitting on a towel with
+  // their legs out (`sitquay` with its legs laid, see `legRestOf`): the clip
+  // rests both hands half way down the thighs, which is where a book open in
+  // the lap is held, and it is turned to face the head. The prone readers'
+  // books are on their towels and are scenery — see the mole's towels.
+  const MOLE_PROPS = { near: 80 };
+  const propMat = {
+    dark: new THREE.MeshBasicMaterial({ color: 0x0b0c0f, side: THREE.DoubleSide }),
+    page: new THREE.MeshBasicMaterial({ color: 0xe6e1d4, side: THREE.DoubleSide }),
+  };
+  function shadesGeo(f) {
+    const data = f.data;
+    if (data.shadesGeo) return data.shadesGeo;
+    const hi = f.boneIndex('head');
+    const bt = f.bindRest().bindT;
+    const H = new THREE.Vector3(bt[hi * 3], bt[hi * 3 + 1], bt[hi * 3 + 2]);
+    const E = data.geo.getAttribute('uv') ? bather2Eyes(data) : null;
+    const pos = [];
+    const quad = (a, b, c, d) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+    if (E && E.l.y > -50) {
+      const eyeY = (E.l.y + E.r.y) / 2, eyeX = (E.l.x + E.r.x) / 2 + 0.030;
+      for (const e of [E.l, E.r]) {
+        const cz = e.z;
+        const N = 10;
+        for (let i = 0; i < N; i++) {
+          const a0 = (i / N) * TAU, a1 = ((i + 1) / N) * TAU;
+          const p = (a) => [eyeX, eyeY + Math.sin(a) * 0.019 - 0.004, cz + Math.cos(a) * 0.027];
+          quad([eyeX, eyeY - 0.004, cz], p(a0), p(a1), p(a1));
+        }
+      }
+      const zl = E.l.z, zr = E.r.z, zo = Math.max(Math.abs(zl), Math.abs(zr)) + 0.044;
+      const sz = Math.sign(zl) || 1;
+      // The bridge and the top bar, and each arm back to the ear.
+      quad([eyeX, eyeY + 0.012, zr], [eyeX, eyeY + 0.012, zl],
+        [eyeX, eyeY + 0.017, zl], [eyeX, eyeY + 0.017, zr]);
+      for (const s of [sz, -sz]) {
+        quad([eyeX, eyeY + 0.010, s * zo], [eyeX - 0.10, eyeY + 0.004, s * zo],
+          [eyeX - 0.10, eyeY + 0.010, s * zo], [eyeX, eyeY + 0.016, s * zo]);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    const arr = new Float32Array(pos);
+    for (let i = 0; i < arr.length; i += 3) { arr[i] -= H.x; arr[i + 1] -= H.y; arr[i + 2] -= H.z; }
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    data.shadesGeo = g;
+    return g;
+  }
+  let bookGeo = null;
+  function makeBook() {
+    if (!bookGeo) {
+      // Two leaves in a shallow V, and the cover behind them a little wider.
+      const pos = [];
+      const quad = (a, b, c, d) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+      quad([-0.135, -0.095, 0.018], [0, -0.095, 0], [0, 0.095, 0], [-0.135, 0.095, 0.018]);
+      quad([0, -0.095, 0], [0.135, -0.095, 0.018], [0.135, 0.095, 0.018], [0, 0.095, 0]);
+      bookGeo = [new THREE.BufferGeometry(), new THREE.BufferGeometry()];
+      bookGeo[0].setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+      const cov = [];
+      const q2 = (a, b, c, d) => cov.push(...a, ...b, ...c, ...a, ...c, ...d);
+      q2([-0.142, -0.1, 0.012], [0, -0.1, -0.006], [0, 0.1, -0.006], [-0.142, 0.1, 0.012]);
+      q2([0, -0.1, -0.006], [0.142, -0.1, 0.012], [0.142, 0.1, 0.012], [0, 0.1, -0.006]);
+      bookGeo[1].setAttribute('position', new THREE.BufferAttribute(new Float32Array(cov), 3));
+    }
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(bookGeo[0], propMat.page));
+    const cm = new THREE.MeshBasicMaterial({ color: 0x8a2a24, side: THREE.DoubleSide });
+    g.add(new THREE.Mesh(bookGeo[1], cm));
+    g.cover = cm;
+    return g;
+  }
+  const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3();
+  const _pq = new THREE.Quaternion(), _pm = new THREE.Matrix4();
+  const _px = new THREE.Vector3(), _py = new THREE.Vector3(), _pz = new THREE.Vector3();
+  const BOOK_COVERS = [0x8a2a24, 0x1f3f6e, 0x2d6b4a, 0xc9a227, 0x5b2d6e, 0xd8d2c4];
+  function stepMoleProps(cam) {
+    const skin = crowds.skin;
+    if (!skin || !skin.pairs) return;
+    for (const [fg, f] of skin.pairs()) {
+      if (!f) continue;
+      const P = f.moleProps || (f.moleProps = {});
+      const near = fg && f.mesh.visible
+        && Math.hypot(f.mesh.position.x - cam.x, f.mesh.position.z - cam.z) < MOLE_PROPS.near;
+      const wantShades = near && fg.shades;
+      const wantBook = near && fg.book && fg.mode === 'sit';
+      if (wantShades && !P.shades) {
+        P.shades = new THREE.Mesh(shadesGeo(f), propMat.dark);
+        P.shades.frustumCulled = false;
+        f.mesh.add(P.shades);
+      }
+      if (P.shades) P.shades.visible = !!wantShades;
+      if (wantShades) {
+        const hi = f.boneIndex('head');
+        f.boneAt(hi, P.shades.position);
+        f.boneTurn(hi, P.shades.quaternion);
+      }
+      if (wantBook && !P.book) {
+        P.book = makeBook();
+        f.mesh.add(P.book);
+      }
+      if (P.book) P.book.visible = !!wantBook;
+      if (wantBook) {
+        P.book.cover.color.setHex(BOOK_COVERS[(fg.idx | 0) % BOOK_COVERS.length]);
+        f.boneAt(f.boneIndex('handL'), _pa);
+        f.boneAt(f.boneIndex('handR'), _pb);
+        f.boneAt(f.boneIndex('head'), _pc);
+        const mid = _pa.clone().add(_pb).multiplyScalar(0.5);
+        mid.y += 0.05;
+        _px.subVectors(_pb, _pa).normalize();
+        _pz.subVectors(_pc, mid).normalize();
+        _py.crossVectors(_pz, _px).normalize();
+        _px.crossVectors(_py, _pz).normalize();
+        _pm.makeBasis(_px, _py, _pz);
+        P.book.position.copy(mid);
+        P.book.quaternion.setFromRotationMatrix(_pm);
+      }
+    }
+  }
+
   function stepPhones(cam) {
     const skin = crowds.skin;
     if (!skin || !skin.pairs) return;
@@ -60075,6 +61196,128 @@ async function buildJadrija(scene) {
     youN++;
   }
 
+  // ── out on to the mole (`MOLE_LIFE`) ───────────────────────────────────────
+  //
+  // Here, and nowhere earlier, because this is the last moment before the
+  // crowd is cast off the list and the first at which the list is final:
+  // the shop staff, the gelato queue and the sunbathers on the concrete
+  // towels have all been appended, `castBlob` has dealt every one of them a
+  // body in order of where they WERE (so moving them now re-deals nobody),
+  // and everything between the placement and here that looked at where
+  // anybody stood has already looked. Moving somebody is changing six fields
+  // on their record; every draw the casting loop below takes for them it
+  // still takes, in the same order.
+  function moleCast() {
+    if (!castBlob || !CAST_KIND || !MOLE_LIFE.spots.length) return;
+    const kindOf = (i) => (castBlob[i] >= 0 ? CAST_KIND[castBlob[i]] : null);
+    const cls = (k) => (!k ? null : /child/.test(k) ? 'k' : BATHER_SEX[k]);
+    // Standing, sitting or lying about, on their own, and a body to be
+    // drawn with — not walking a beat (their draws differ, see `wait`), not
+    // in a café chair, not behind a counter, not already taken off. And
+    // BATHING: seaward of the promenade (`JAD.deck`), which is where the
+    // towels, the loungers and the lip are. Inland of it is somebody on
+    // their way somewhere — the two children queueing at the gelato
+    // counter were the first boy this found, and they are that scene's.
+    const free = (b, i) => !b.beat && !b.chair && !b.staff && !b.hidden
+      && (b.pose === 'stand' || b.pose === 'sit' || b.pose === 'lie')
+      && b.s < JAD.deck && castBlob[i] >= 0;
+    const far = [];
+    for (let i = 0; i < bathers.length; i++) {
+      const b = bathers[i];
+      if (!free(b, i)) continue;
+      const d = Math.abs(b.t - VIK.t);
+      // Anybody within sixty metres is already somebody he can see.
+      if (d > 60) far.push([d, i]);
+    }
+    far.sort((a2, c) => c[0] - a2[0] || a2[1] - c[1]);
+    const taken = new Set();
+    // The jumpers first: the farthest girl, the farthest boy and the
+    // farthest man who is the diver's own body (`man_young_fit` carries the
+    // dive, the tread, the swim and the ladder natively; the two children get
+    // his clips retargeted — see `jumpClips`).
+    for (const want of ['girl_child', 'boy_child', 'man_young_fit']) {
+      const hit = far.find(([, i]) => !taken.has(i) && kindOf(i) === want);
+      if (!hit) continue;
+      const i = hit[1], b = bathers[i];
+      taken.add(i);
+      const J = { i, kind: want, from: [+b.t.toFixed(1), +b.s.toFixed(2), b.pose],
+        n: MOLE_LIFE.jumpers.length, st: { mode: 'off', t: 0, loops: 0 } };
+      MOLE_LIFE.jumpers.push(J);
+      b.hidden = true;
+      b.jump = MOLE_LIFE.jumpers.length;
+      // A figure of their own, as the diver has: a crowd slot can be handed
+      // to somebody else mid-air, and the far tier cannot dive.
+      const ki = CAST_KIND.indexOf(want);
+      if (DV && wheelBlobs && ki >= 0 && wheelBlobs.parsed[ki].clips.dive) {
+        J.fig = wheelBlobs.make(ki);
+        J.fig.mesh.name = 'jadrija-jumper';
+        J.fig.mesh.visible = false;
+        scene.add(J.fig.mesh);
+        J.k = wheelBlobs.parsed[ki].jumpK || 1;
+        J.out = J.k < 0.9 ? JUMP.out : 0;
+        J.pelvisY = J.fig.bones[0].t[1];
+        jumpLane(J);
+        // Where they stand when they are anywhere, for anything that counts.
+        b.t = JET.t + J.lane.side * (JET.w - DV.dive.x_tip * J.k);
+        b.s = J.lane.s; b.y = JET.top;
+      }
+    }
+    // Then everybody else, farthest first, one in five left where they are
+    // so that neither end of the beach is emptied, and twenty-two at most:
+    // the mole in 175838 has nineteen on it, and three of these go on the
+    // quay in front of the house.
+    const movers = [];
+    for (const [, i] of far) {
+      if (movers.length >= Math.min(22, MOLE_LIFE.spots.length)) break;
+      if (taken.has(i) || jit(i, 5110) < 0.2) continue;
+      movers.push(i);
+      taken.add(i);
+    }
+    // Who goes where. A place that says who it is for (`'f'`, `'m'`, `'k'`)
+    // takes the farthest person of that kind still unplaced; then the
+    // places that do not mind; then whoever is left, anywhere left.
+    const left = movers.slice();
+    const put = (o, i) => { o.idx = i; left.splice(left.indexOf(i), 1); };
+    for (const o of MOLE_LIFE.spots) {
+      if (o.who === '*') continue;
+      const i = left.find((j) => cls(kindOf(j)) === o.who);
+      if (i != null) put(o, i);
+    }
+    // Nearest the house first, so that if there are fewer people than
+    // places the ones left empty are the ones he cannot see.
+    const byNear = MOLE_LIFE.spots.slice().sort((a2, c) =>
+      Math.hypot(a2.t - VIK.t, a2.s - VIK.s) - Math.hypot(c.t - VIK.t, c.s - VIK.s));
+    for (const pass of [0, 1]) {
+      for (const o of byNear) {
+        if (o.idx != null || (pass === 0 && o.who !== '*')) continue;
+        if (!left.length) break;
+        put(o, left[0]);
+      }
+    }
+    for (const o of MOLE_LIFE.spots) {
+      if (o.idx == null) continue;
+      const b = bathers[o.idx];
+      MOLE_LIFE.movers.push({ i: o.idx, kind: kindOf(o.idx),
+        from: [+b.t.toFixed(1), +b.s.toFixed(2), b.pose], to: [o.t, o.s, o.pose] });
+      b.t = o.t; b.s = o.s; b.ang = o.ang; b.pose = o.pose;
+      b.y = o.y != null ? o.y
+        : onMoleY(o.t, o.s) ? JET.top
+          : o.pose === 'sit' ? surfaceY(o.t, 1.4) : standY(o.t, o.s);
+      // The things this place comes with. `top` and `shades` and `book` are
+      // read by the two tiers and by `MOLE_PROPS`; `edge` is what keeps a
+      // sitter's legs over the water instead of laid on the concrete; and a
+      // phone is put down, because nobody on a towel with a paperback is
+      // also on a call.
+      b.edge = !!o.edge;
+      b.prone = o.pose === 'lie' ? !!o.prone : undefined;
+      b.top = o.top || 0;
+      b.shades = !!o.shades;
+      b.book = !!o.book;
+      if (o.pose !== 'sit' || o.book) b.phone = 0;
+    }
+  }
+  moleCast();
+
   const walkers = [];
   // Everybody the static blocker list does not hold — see `bodies` below.
   const soft = [];
@@ -60217,7 +61460,11 @@ async function buildJadrija(scene) {
       // Sitting on the concrete itself, which is every sitter not in a chair:
       // the quay's. Their legs lie out along it on both tiers — see
       // `legRestOf` in 43-settle.js and the `sit` case in 42-crowd.js.
-      ground: b.pose === 'sit' && !b.chair,
+      //
+      // Except on an edge (`b.edge`, the mole's flanks and the lip in front of
+      // the vikendica — see `MOLE_LIFE`), where there IS water for the shins
+      // to hang over and the clip gets to do what it was solved for.
+      ground: b.pose === 'sit' && !b.chair && !b.edge,
       seed: rng(),
       // The height jitter, off one draw and spent on both tiers below. It was
       // 0.94 to 1.07, which on the instanced rig's canonical 1.70 m is 1.60 m
@@ -60331,9 +61578,22 @@ async function buildJadrija(scene) {
     // And the counter a server's hands are solved against, for the same
     // reason. See `staffAt` and `COUNTER`.
     if (b.counter) fg.counter = b.counter;
+    // And what the mole gave them (`moleCast`): which way up they lie, the
+    // top, the sunglasses, the book. Copied rather than read off `b` for
+    // the reason the phone is. None of it is a draw.
+    if (b.prone != null) fg.prone = b.prone;
+    if (b.top) fg.top = b.top;
+    if (b.shades) fg.shades = true;
+    if (b.book) fg.book = true;
     // Somebody taken off the shore (`b.hidden` — the woman against the
     // riser at t 366.8): every draw above has been taken for her, and here
     // she stops. No figure, no roving slot, no collider.
+    //
+    // A jumper is hidden from the crowd too, and keeps the record the crowd
+    // made of them — their skin, their swimsuit, their hair — so that the
+    // figure of their own that draws them (`MOLE_JUMP`) is dressed as the
+    // same person.
+    if (b.jump) b.fg = fg;
     if (b.hidden) continue;
     C.figures.push(fg);
     if (roveOk) rove[fg.blob].push(fg);
@@ -61275,98 +62535,29 @@ async function buildJadrija(scene) {
     scoot: [[0.092, 0.092, 0.100], [0.540, 0.556, 0.560]],
   };
 
-  /** A four-sided tube between two points, in a vehicle's own frame. */
-  function wheelTube(b, A, B, r, col) {
-    const dx = B[0] - A[0], dy = B[1] - A[1], dz = B[2] - A[2];
-    const L = Math.hypot(dx, dy, dz) || 1;
-    const d = [dx / L, dy / L, dz / L];
-    // Across the machine, unless the tube already runs across it.
-    const w = Math.abs(d[2]) > 0.9 ? [0, 1, 0] : [0, 0, 1];
-    let u = [d[1] * w[2] - d[2] * w[1], d[2] * w[0] - d[0] * w[2],
-      d[0] * w[1] - d[1] * w[0]];
-    const lu = Math.hypot(u[0], u[1], u[2]) || 1;
-    u = [u[0] / lu * r, u[1] / lu * r, u[2] / lu * r];
-    const v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2],
-      d[0] * u[1] - d[1] * u[0]];
-    const P = (Q, a, c) => [Q[0] + u[0] * a + v[0] * c, Q[1] + u[1] * a + v[1] * c,
-      Q[2] + u[2] * a + v[2] * c];
-    const ring = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
-    for (let k = 0; k < 4; k++) {
-      const [a0, c0] = ring[k], [a1, c1] = ring[(k + 1) % 4];
-      b.quad(P(A, a0, c0), P(B, a0, c0), P(B, a1, c1), P(A, a1, c1),
-        k % 2 ? col : shade(col, 1.14));
-    }
-  }
-
-  /**
-   * A wheel standing in the machine's own plane: tread, two sidewalls, a flat
-   * rim and a hub. `spokes` draws three diameters across it, which is what
-   * makes a 0.68 m ring read as a bicycle wheel rather than as a hoop; a
-   * scooter's small wheel is solid, so it gets a disc instead.
-   *
-   * Drawn about `cx, cy` because the chainring is drawn about the bottom
-   * bracket; a road wheel is built about nought and carried to its axle by
-   * `wheelDisc`, so that it can be turned.
-   *
-   * THE SCOOTERS' ONLY, since 1.531.0. The bicycles' wheels, chainring and
-   * everything else are `bikeWheel` and `wheelBike` below; the spoked branch
-   * here is kept because it costs nothing and a spoked scooter hub is one
-   * line away.
-   */
-  function wheelRim(b, cx, cy, R, w, tyre, rim, spokes) {
-    const N = 14, Ri = R - 0.042, Rr = R - 0.070;
-    const p = (a, r, z) => [cx + Math.cos(a) * r, cy + Math.sin(a) * r, z];
-    for (let j = 0; j < N; j++) {
-      const a0 = j / N * TAU, a1 = (j + 1) / N * TAU;
-      b.quad(p(a0, R, -w), p(a1, R, -w), p(a1, R, w), p(a0, R, w), tyre);
-      b.quad(p(a0, Ri, -w), p(a1, Ri, -w), p(a1, R, -w), p(a0, R, -w), tyre);
-      b.quad(p(a0, R, w), p(a1, R, w), p(a1, Ri, w), p(a0, Ri, w), tyre);
-      if (spokes) {
-        b.quad(p(a0, Rr, 0), p(a1, Rr, 0), p(a1, Ri, 0), p(a0, Ri, 0), rim);
-      } else {
-        b.tri(p(a0, Ri, 0), p(a1, Ri, 0), [cx, cy, 0], rim);
-      }
-    }
-    if (spokes) {
-      for (let k = 0; k < 3; k++) {
-        const a = k / 3 * Math.PI + 0.3, e = 0.004;
-        const c = Math.cos(a), s = Math.sin(a);
-        b.quad([cx + c * Rr - s * e, cy + s * Rr + c * e, 0],
-          [cx - c * Rr - s * e, cy - s * Rr + c * e, 0],
-          [cx - c * Rr + s * e, cy - s * Rr - c * e, 0],
-          [cx + c * Rr + s * e, cy + s * Rr - c * e, 0], rim);
-      }
-    }
-    b.box(cx, cy, 0, 0.05, 0.05, w * 2 + 0.03, rim);
-  }
-
-  /**
-   * A road wheel as a thing of its own: the rim built about the origin, and
-   * where its axle sits in the machine.
-   *
-   * A WHEEL IS NOT PART OF THE FRAME. It was — both wheels were welded into
-   * the same triangle soup as the down tube, and three spokes that never
-   * moved on a bicycle doing 4.6 m/s is the one thing on this promenade that
-   * reads as a toy on a rail. The cranks were already out on their own node
-   * for exactly this reason; the wheels are out for the same one, and they
-   * turn off the distance the machine has covered and nothing else. Rolling
-   * without slipping is the whole of it: the angle is the arc length over the
-   * radius, so a wheel stops when the rider stops, crawls through a turn, and
-   * a 0.10 m scooter wheel goes round three and a bit times for every turn of
-   * a 0.34 m bicycle one without either of them being told a rate.
-   */
-  function wheelDisc(x, y, R, w, tyre, rim, spokes) {
-    const b = propBuilder();
-    wheelRim(b, 0, 0, R, w, tyre, rim, spokes);
-    return { geo: b.geo(), tris: b.count() / 3, x, y, R };
-  }
+  // A WHEEL IS NOT PART OF THE FRAME. It was — both wheels were welded into
+  // the same triangle soup as the down tube, and three spokes that never
+  // moved on a bicycle doing 4.6 m/s is the one thing on this promenade that
+  // reads as a toy on a rail. The cranks were already out on their own node
+  // for exactly this reason; the wheels are out for the same one, and they
+  // turn off the distance the machine has covered and nothing else. Rolling
+  // without slipping is the whole of it: the angle is the arc length over the
+  // radius, so a wheel stops when the rider stops, crawls through a turn, and
+  // a 0.10 m scooter wheel goes round three and a bit times for every turn of
+  // a 0.34 m bicycle one without either of them being told a rate.
+  //
+  // (`wheelTube`, `wheelRim` and `wheelDisc` — the four-sided tube and the
+  // 14-gon wheel both machines were first built from — went with the
+  // scooter's rebuild in 1.548.7; nothing used them after it. The bicycle's
+  // own builders are `bikeSweep`, `bikeGrid` and `bikeWheel` below, and the
+  // scooter's `scSpin` and `scootWheel` after them.)
 
   // ── the bicycle, built as a bicycle ─────────────────────────────────────────
   //
   // Misha, 27 Sep 2026, from in front of a rider on the promenade: *"right now,
   // the bicycles are too 'simplistic', would be nice to have more complex
   // structure for bicycle."* He was right, and the screenshot said exactly how:
-  // the frame was square box beams (`wheelTube` is a FOUR-sided tube, flat
+  // the frame was square box beams (`wheelTube` was a FOUR-sided tube, flat
   // shaded, alternate faces lightened, which is a box), the bar was three
   // straight grey sticks with black box grips, the pedals were black bricks
   // welded to the cranks so they tumbled with them, the wheels were 14-gon rings
@@ -62098,39 +63289,374 @@ async function buildJadrija(scene) {
     };
   }
 
+  // ── the e-scooter, built as one ─────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026, from beside the young man on the dark one: *"i love
+  // the e-scooters' physics, but they are too low-poly, can u make them
+  // higher-poly, like u did with the bicycles?"* His screenshot said how. The
+  // stem was a four-sided `wheelTube` — a square beam, flat shaded, alternate
+  // faces lightened — and so was the bar; the deck was one box and the rear
+  // fender a second, flatter one; the "lamp" was a white matchbox on the
+  // stem; and the wheels were `wheelDisc`, a 14-gon ring of tyre round a flat
+  // hub disc with a box through the middle for an axle. 104 triangles of body
+  // and 110 a wheel. From the two metres he was standing at, it was a scooter
+  // drawn with a ruler.
+  //
+  // What it is now: the commuter scooter every rental fleet and every second
+  // Xiaomi on the Adriatic is — a round stem tapering up from a folding joint
+  // with its hinge and latch lever, a headlamp on a band clamp, a T-bar with
+  // ribbed rubber grips, a brake lever under the left hand and a thumb
+  // throttle under the right, a bell, a dashboard pod with a screen and four
+  // battery LEDs (and nothing written: rule 12); a deck with rounded corners,
+  // a grip-tape top inset from a painted rim, a bellied underside and red side
+  // reflectors; a curved front neck over the tyre into the head tube; a fork
+  // with its crown; mudguards hugging both wheels; a tail lamp under the rear
+  // one; the rear brake calliper; and the kickstand folded up under the left
+  // of the deck. Every round thing is turned with `spinIn`, the profile-normal
+  // lathe the bins and lamps and showers went round on (1.548.3), borrowed
+  // through `scSpin` below because it writes into whichever builder `b` is;
+  // the tubes are `bikeSweep` and the mudguards `bikeGuard`, the bicycle's
+  // own. The wheels are pneumatic 8.5-inch: a round-section tyre with a
+  // moulded tread band on a rim with its flanges — the FRONT one a hub motor,
+  // the shell and its two covers and bolts, the BACK one five alloy spokes and
+  // a drilled brake disc.
+  //
+  // THE PHYSICS HE LIKES IS UNTOUCHED, because none of it is in here. What the
+  // riders are solved to is `WHEEL_SCOOT` — the deck top at 0.155, the grips'
+  // middles at (0.36, 1.10, ±0.21) with 17 mm of rubber for the fingers to
+  // wrap (`WHEEL_HAND.rad`), the axles at (−0.44, 0.10) and (0.45, 0.11) and
+  // their radii — and all of those are the same numbers they were, MEASURED
+  // off the built geometry before and after (see the CHANGELOG, 1.548.7). The
+  // wheels are still their own nodes at their own axles turned by distance
+  // over radius in `wheelDraw`, and a scooter still has no steering node: its
+  // bar is fixed to the deck, as a scooter's nearly is at 5 m/s.
+  //
+  // AND A FAR COPY, as the bicycles have: the same builder with `lo` set, on
+  // eight-sided lathes and sixteen-segment tyres with no tread, bolts, cables,
+  // lever blades or drilled holes, swapped past `WHEELS.lod`.
+  const WHEEL_SCOOT = {
+    deck: 0.155, bar: [0.36, 1.10], grip: 0.21,
+    // The axles, [x, radius]: 200 mm and 220 mm wheels, back and front.
+    rear: [-0.44, 0.10], front: [0.45, 0.11],
+    // The steering column's axis, which is the line the stem was always drawn
+    // on — from (0.42, 0.21) up to the middle of the bar.
+    col: [0.42, 0.21],
+    // The deck, in plan: from behind the front foot's toes to a centimetre
+    // clear of the back tyre, 160 mm wide, with 45 mm corners.
+    deckX: [-0.33, 0.30], deckW: 0.080, deckR: 0.045,
+  };
+  // What an e-scooter is made of that is not its paint.
+  const SC = {
+    tyre: BK.tyre, rim: [0.300, 0.305, 0.310], dark: [0.080, 0.080, 0.085],
+    rubber: BK.rubber, tape: [0.048, 0.048, 0.050], steel: BK.steel,
+    chrome: BK.chrome, lens: BK.lens, red: BK.red,
+    screen: [0.040, 0.060, 0.075], led: [0.520, 0.780, 0.950],
+  };
+
   /**
-   * An e-scooter, in the same frame: a low deck, two small solid wheels, a
-   * stem raked back to a bar at about a metre. Dark, with nothing written on
-   * it.
-   *
-   * Its wheels come off `wheelDisc`, which the bicycles' used to, and turn the
-   * same way as theirs, and because they are solid discs of one colour almost none of that
-   * shows. They are out on their own nodes anyway: a wheel that is nailed to
-   * the deck is wrong whether or not anybody can see it, and the day one of
-   * these gets a spoked hub it would be wrong visibly.
+   * `spinIn` into a vehicle's builder, about the axis `A` through `C`, in the
+   * machine's own frame. `spinIn` writes into the shore's current `b`, so `b`
+   * is lent for the call and given back — the way the kabine lend it.
+   * `o.ref` pins the section's first axis (for `o.sec`, an oval section).
+   * `o.sh` is the bright-above shading; nought on anything that turns, whose
+   * top does not stay on top.
    */
-  const WHEEL_SCOOT = { deck: 0.155, bar: [0.36, 1.10], grip: 0.21 };
-  function wheelScoot(col) {
-    const b = propBuilder();
-    const K = WHEEL_SCOOT;
-    const TYRE = [0.055, 0.055, 0.058], HUB = [0.300, 0.305, 0.310];
-    const DARK = [0.080, 0.080, 0.085];
-    const wheels = [wheelDisc(-0.44, 0.10, 0.10, 0.026, TYRE, HUB, false),
-      wheelDisc(0.45, 0.11, 0.11, 0.026, TYRE, HUB, false)];
-    b.box(-0.03, K.deck - 0.035, 0, 0.74, 0.07, 0.17, col, [0.120, 0.120, 0.125]);
-    b.box(-0.45, 0.215, 0, 0.22, 0.015, 0.075, col);
-    wheelTube(b, [0.30, 0.12, 0], [0.42, 0.21, 0], 0.030, col);
-    wheelTube(b, [0.42, 0.21, 0], [K.bar[0], K.bar[1], 0], 0.021, col);
-    for (const z of [-0.03, 0.03]) wheelTube(b, [0.42, 0.21, z], [0.45, 0.11, z], 0.010, col);
-    wheelTube(b, [K.bar[0], K.bar[1], -K.grip - 0.04], [K.bar[0], K.bar[1], K.grip + 0.04], 0.012, col);
-    for (const s of [-1, 1]) {
-      wheelTube(b, [K.bar[0], K.bar[1], s * (K.grip - 0.05)], [K.bar[0], K.bar[1], s * (K.grip + 0.05)], 0.017, DARK);
+  function scSpin(into, C, A, prof, col, sides, o = {}) {
+    const a = bkNorm(A);
+    const ref = o.ref || (Math.abs(a[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]);
+    const U = bkNorm(bkAdd(ref, a, -bkDot(ref, a))), V = bkCross(a, U);
+    const F = (x, y, w) => [C[0] + U[0] * x + V[0] * y + a[0] * w,
+      C[1] + U[1] * x + V[1] * y + a[1] * w, C[2] + U[2] * x + V[2] * y + a[2] * w];
+    const keep = b;
+    b = into;
+    try {
+      spinIn(F, prof, col, sides, o.sec || [1, 1], o.sh ?? 0.10, o.crease ?? 0.5);
+    } finally {
+      b = keep;
     }
-    b.box(K.bar[0] + 0.01, K.bar[1] + 0.025, 0, 0.06, 0.02, 0.07, DARK);
-    b.box(0.385, 0.90, 0, 0.03, 0.045, 0.055, [0.820, 0.820, 0.780]);
-    let wt = 0;
-    for (const W of wheels) wt += W.tris;
-    return { geo: b.geo(), crank: null, wheels, tris: b.count() / 3 + wt };
+  }
+
+  // Both scooters' wheels are the same, so they are built once a level of
+  // detail and shared, as the bicycles' are.
+  const scootWheelCache = new Map();
+
+  /**
+   * An e-scooter's wheel about its own axle, in the machine's plane: an 8.5
+   * inch pneumatic tyre — 21 mm of section height, 52 mm wide, its outermost
+   * tread at exactly the wheel's radius so that it stands on the ground where
+   * the old disc did — with a moulded band of transverse grooves, which is
+   * also what shows it turning. The front is the hub motor: the rim and the
+   * motor's shell are one casting, with a domed cover and six bolts each side.
+   * The back has five alloy spokes to a hub and a drilled disc on the left.
+   * Nothing on either is shaded bright-above, because the top does not stay
+   * on top.
+   */
+  function scootWheel(front, lo) {
+    const key = (front ? 'f' : 'r') + (lo ? 'l' : '');
+    if (scootWheelCache.has(key)) return scootWheelCache.get(key);
+    const sb = propBuilder();
+    const R = front ? WHEEL_SCOOT.front[1] : WHEEL_SCOOT.rear[1];
+    const ty = 0.021, tz = 0.026, Rt = R - ty, Rf = R - 0.029;
+    const AR = lo ? 16 : 48, SEC = lo ? 4 : 10, SD = lo ? 10 : 32;
+    const Z = [0, 0, 0], AX = [0, 0, 1];
+    // The tyre: a round section from bead to bead, and the tread band on its
+    // crown — every third row sunk 1.8 mm and darker.
+    {
+      const G = [];
+      const groove = (i, j) => !lo && i % 3 === 0 && j > SEC * 0.3 && j < SEC * 0.7;
+      for (let i = 0; i < AR; i++) {
+        const a = i / AR * TAU, c = Math.cos(a), s = Math.sin(a), row = [];
+        for (let j = 0; j <= SEC; j++) {
+          const p = -0.66 * Math.PI + 1.32 * Math.PI * j / SEC;
+          const rr = Rt + Math.cos(p) * ty - (groove(i, j) ? 0.0018 : 0);
+          row.push([c * rr, s * rr, Math.sin(p) * tz]);
+        }
+        G.push(row);
+      }
+      const dk = shade(SC.tyre, 0.55);
+      bikeGrid(sb, G, (i, j) => (groove(i, j) ? dk : SC.tyre), { closedI: true, out: (i, j, p) => {
+        const a = i / AR * TAU;
+        return [p[0] - Math.cos(a) * Rt, p[1] - Math.sin(a) * Rt, p[2]];
+      } });
+    }
+    const spin = (prof, col, o = {}) => scSpin(sb, Z, AX, prof, col, o.sides || SD, { sh: 0, ...o });
+    if (front) {
+      // The motor's shell and the rim, one piece: a flanged rim over the bead,
+      // stepping down on each face to the covers.
+      spin([[-0.025, 0], [-0.025, 0.060], [-0.0235, 0.064], [-0.0235, Rf - 0.004],
+        [-0.0215, Rf + 0.001], [0.0215, Rf + 0.001], [0.0235, Rf - 0.004], [0.0235, 0.064],
+        [0.025, 0.060], [0.025, 0]], SC.rim);
+      const cov = shade(SC.dark, 1.5);
+      spin([[-0.029, 0], [-0.029, 0.018], [-0.0285, 0.036], [-0.027, 0.050], [-0.0245, 0.057]], cov);
+      spin([[0.0245, 0.057], [0.027, 0.050], [0.0285, 0.036], [0.029, 0.018], [0.029, 0]], cov);
+      spin([[-0.037, 0], [-0.037, 0.0085], [-0.028, 0.0085]], SC.steel, { sides: 6 });
+      spin([[0.028, 0.0085], [0.037, 0.0085], [0.037, 0]], SC.steel, { sides: 6 });
+      if (!lo) {
+        for (let k = 0; k < 6; k++) {
+          const a = k / 6 * TAU + 0.3;
+          for (const s of [-1, 1]) {
+            sb.box(Math.cos(a) * 0.043, Math.sin(a) * 0.043, s * 0.0285, 0.0065, 0.0065, 0.004, SC.steel);
+          }
+        }
+      }
+    } else {
+      // The rim: flanges over the bead, a bed inside, open to the spokes.
+      spin([[0.0215, Rf + 0.001], [0.0235, Rf - 0.004], [0.020, Rf - 0.012], [0.012, Rf - 0.015],
+        [-0.012, Rf - 0.015], [-0.020, Rf - 0.012], [-0.0235, Rf - 0.004], [-0.0215, Rf + 0.001]], SC.rim);
+      // The hub, and five spokes swept a little forward, as cast ones are.
+      spin([[-0.034, 0], [-0.034, 0.009], [-0.030, 0.012], [-0.026, 0.020], [0.026, 0.020],
+        [0.030, 0.012], [0.034, 0.009], [0.034, 0]], shade(SC.rim, 0.85), { sides: lo ? 8 : 20 });
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * TAU;
+        const P = (r, da) => [Math.cos(a + da) * r, Math.sin(a + da) * r, 0];
+        bikeSweep(sb, [P(0.016, 0), P(0.037, 0.10), P(Rf - 0.013, 0.17)],
+          (i) => [0.0078, 0.0062, 0.0068][i], SC.rim, { sides: lo ? 4 : 8 });
+      }
+      // The disc, 110 mm, on the left, on a five-arm carrier off the hub.
+      spin([[-0.0375, 0.055], [-0.0345, 0.055], [-0.0345, 0.034], [-0.0375, 0.034], [-0.0375, 0.055]],
+        SC.chrome, { sides: lo ? 12 : 36 });
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * TAU + 0.63;
+        bikeSweep(sb, [[Math.cos(a) * 0.016, Math.sin(a) * 0.016, -0.030],
+          [Math.cos(a) * 0.037, Math.sin(a) * 0.037, -0.036]], 0.0038, SC.dark, { sides: lo ? 3 : 6 });
+      }
+      if (!lo) {
+        for (let k = 0; k < 12; k++) {
+          const a = k / 12 * TAU;
+          sb.box(Math.cos(a) * 0.0455, Math.sin(a) * 0.0455, -0.0376, 0.0048, 0.0048, 0.001, shade(SC.dark, 0.6));
+        }
+      }
+    }
+    const out = { geo: sb.geo(), tris: sb.count() / 3 };
+    scootWheelCache.set(key, out);
+    return out;
+  }
+
+  /**
+   * An e-scooter, in the bicycle's frame: +x forward, +y up, +z to the
+   * rider's right, the origin on the ground under the middle. See the note
+   * above `WHEEL_SCOOT`. `lo` builds the far copy. The wheels come back as
+   * their own geometries, rear first, to be hung on nodes at their axles.
+   */
+  function wheelScoot(col, lo) {
+    const sb = propBuilder();
+    const K = WHEEL_SCOOT;
+    const SD = lo ? 8 : 20, TS = lo ? 5 : 12;
+    const seg = (n) => (lo ? Math.max(2, n >> 1) : n);
+    const DARK = SC.dark, GREY = shade(SC.dark, 2.2), under = shade(col, 0.72);
+    const spin = (C, A, prof, c, o = {}) => scSpin(sb, C, A, prof, c, o.sides || SD, o);
+    const tube = (pts, r, c, o = {}) => bikeSweep(sb, pts, r, c, { sides: TS, ...o });
+    // The column: `t` metres up its axis from (0.42, 0.21), `fwd` ahead of it.
+    const B0 = [K.col[0], K.col[1], 0];
+    const A = bkNorm([K.bar[0] - B0[0], K.bar[1] - B0[1], 0]);
+    const FWD = [A[1], -A[0], 0];
+    const colAt = (t, fwd = 0, z = 0) => [B0[0] + A[0] * t + FWD[0] * fwd,
+      B0[1] + A[1] * t + FWD[1] * fwd, z];
+    const [RX, RR] = K.rear, [FX, FR] = K.front;
+
+    // ── the deck ──
+    // Rings of a rounded rectangle in plan, inset `d`, from the grip tape's
+    // edge down the rolled rim and the side to the underside; tape on top,
+    // a shallow belly underneath.
+    {
+      const [X0, X1] = K.deckX, HW = K.deckW, RC = K.deckR, n = lo ? 2 : 6;
+      const loop = (d) => {
+        const out = [], r = RC - d;
+        for (const [cx, cz, a0] of [[X1 - RC, HW - RC, 0], [X0 + RC, HW - RC, Math.PI / 2],
+          [X0 + RC, RC - HW, Math.PI], [X1 - RC, RC - HW, Math.PI * 1.5]]) {
+          for (let k = 0; k <= n; k++) {
+            const a = a0 + Math.PI / 2 * k / n;
+            out.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]);
+          }
+        }
+        return out;
+      };
+      const rows = lo
+        ? [[0.008, K.deck], [0, K.deck - 0.006], [0, 0.106], [0.012, 0.096]]
+        : [[0.012, K.deck], [0.004, K.deck - 0.002], [0, K.deck - 0.008], [0, 0.112],
+          [0.005, 0.101], [0.016, 0.096]];
+      const G = rows.map(([d, y]) => loop(d).map(([x, z]) => [x, y, z]));
+      const cx = (X0 + X1) / 2;
+      bikeGrid(sb, G, (i) => (i >= rows.length - 2 ? under : col), { closedJ: true,
+        out: (i, j, p) => [p[0] - cx, 0, p[2]] });
+      bikeFan(sb, G[0], [cx, K.deck, 0], [0, 1, 0], SC.tape);
+      bikeFan(sb, G[G.length - 1], [cx, 0.093, 0], [0, -1, 0], under);
+      if (!lo) {
+        for (const s of [-1, 1]) sb.box(X0 + 0.07, 0.128, s * (HW + 0.0006), 0.045, 0.009, 0.0015, SC.red);
+      }
+    }
+
+    // ── the neck, the head tube, the fork and the front mudguard ──
+    // The neck comes up out of the deck and over the back of the front tyre
+    // into the head tube; the column's axis runs down through the wheel, so
+    // nothing can come up it from below.
+    {
+      const pts = bkBez([[0.17, 0.118, 0], [0.30, 0.118, 0], [0.335, 0.205, 0], colAt(0.075, -0.022)], seg(12));
+      tube(pts, (i) => 0.031 - 0.004 * i / (pts.length - 1), col, { sides: lo ? 6 : 14 });
+    }
+    spin(B0, A, [[0.030, 0], [0.030, 0.024], [0.036, 0.030], [0.046, 0.028], [0.150, 0.028],
+      [0.156, 0.031], [0.166, 0.031], [0.170, 0]], col);
+    // The crown, across the machine, and the two legs down to the axle.
+    spin(colAt(0.035), [0, 0, 1], [[-0.056, 0], [-0.056, 0.011], [0.056, 0.011], [0.056, 0]], col,
+      { sides: lo ? 6 : 12 });
+    for (const s of [-1, 1]) {
+      tube([colAt(0.035, 0.004, s * 0.047), [FX, FR, s * 0.047]], (i) => (i ? 0.0095 : 0.012), col, { caps: true });
+      spin([FX, FR, 0], [0, 0, s], [[0.052, 0], [0.052, 0.009], [0.060, 0.009], [0.060, 0]], SC.steel, { sides: 6 });
+    }
+    bikeGuard(sb, FX, FR, 0.30, 2.00, FR + 0.017, 0.030, col, lo);
+
+    // ── the folding joint ──
+    // A block round the column above the headset, a hinge knuckle across its
+    // front, and the latch lever lying up the stem with its safety ring.
+    spin(B0, A, lo
+      ? [[0.168, 0], [0.168, 0.028], [0.250, 0.028], [0.254, 0]]
+      : [[0.168, 0], [0.168, 0.026], [0.172, 0.030], [0.203, 0.030], [0.205, 0.0275],
+        [0.208, 0.030], [0.244, 0.030], [0.250, 0.025], [0.254, 0]], DARK);
+    spin(colAt(0.205, 0.030), [0, 0, 1], [[-0.024, 0], [-0.024, 0.010], [0.024, 0.010], [0.024, 0]], DARK,
+      { sides: lo ? 6 : 12 });
+    const lever = bkBez([colAt(0.212, 0.036), colAt(0.245, 0.041), colAt(0.29, 0.031)], seg(6));
+    tube(lever, (i) => 0.0068 - 0.0015 * i / (lever.length - 1), GREY, { caps: true, sides: lo ? 4 : 8 });
+    if (!lo) {
+      const c = colAt(0.205, 0.047), ring = [];
+      for (let k = 0; k < 12; k++) {
+        const q = k / 12 * TAU;
+        ring.push(bkAdd(bkAdd(c, A, Math.sin(q) * 0.011 - 0.011), [0, 0, 1], Math.cos(q) * 0.011));
+      }
+      tube(ring, 0.0022, SC.steel, { closed: true, bi: FWD, sides: 5 });
+    }
+
+    // ── the stem, the headlamp ──
+    // Round, 45 mm at the joint and 37 at the top, with a collar under the bar.
+    spin(B0, A, [[0.25, 0], [0.25, 0.0205], [0.256, 0.0225], [0.30, 0.0222], [0.80, 0.0190],
+      [0.855, 0.0186], [0.862, 0.0200], [0.874, 0.0200], [0.878, 0]], col, { sides: lo ? 8 : 16 });
+    {
+      const L = colAt(0.72, 0.012), D = bkNorm([1, -0.10, 0]);
+      spin(B0, A, [[0.705, 0], [0.705, 0.0215], [0.735, 0.0215], [0.735, 0]], DARK, { sides: lo ? 6 : 14 });
+      spin(L, D, [[0, 0], [0, 0.014], [0.008, 0.019], [0.026, 0.021], [0.030, 0.021], [0.030, 0]], DARK);
+      spin(L, D, [[0.0295, 0], [0.0295, 0.0175], [0.0315, 0.0170], [0.0330, 0.012], [0.0336, 0]], SC.lens, { sh: 0 });
+    }
+
+    // ── the bar, the grips, the controls ──
+    const BAR = [K.bar[0], K.bar[1], 0];
+    tube([[BAR[0], BAR[1], -0.262], [BAR[0], BAR[1], 0.262]], 0.0112, col, { caps: true });
+    spin(BAR, [0, 0, 1], [[-0.036, 0], [-0.036, 0.0165], [-0.032, 0.0185], [0.032, 0.0185],
+      [0.036, 0.0165], [0.036, 0]], DARK, { sides: lo ? 8 : 16 });
+    // The rubber: a flange inboard, ribs, a flared end. 17 mm where the
+    // fingers close round it, the radius `WHEEL_HAND` folds them to.
+    const gp = [[0.156, 0], [0.156, 0.0195], [0.162, 0.0195], [0.1645, 0.0172]];
+    if (!lo) for (let w = 0.172; w < 0.250; w += 0.008) gp.push([w, 0.0170], [w + 0.004, 0.0177]);
+    gp.push([0.254, 0.0176], [0.259, 0.0188], [0.264, 0.0182], [0.266, 0.012], [0.2665, 0]);
+    for (const s of [-1, 1]) {
+      spin(BAR, [0, 0, s], gp, SC.rubber, { sides: lo ? 8 : 16 });
+      // A clamp inboard of each grip: the brake lever's on the left, the
+      // throttle's on the right.
+      spin(BAR, [0, 0, s], [[0.138, 0], [0.138, 0.0165], [0.153, 0.0165], [0.153, 0]], DARK, { sides: lo ? 6 : 12 });
+    }
+    // The brake lever, under and ahead of the left hand's fingers.
+    tube([[BAR[0] + 0.012, BAR[1] - 0.002, -0.146], [BAR[0] + 0.035, BAR[1] - 0.008, -0.146]], 0.0075, DARK, { caps: true });
+    if (!lo) {
+      tube(bkBez([[BAR[0] + 0.035, BAR[1] - 0.008, -0.146], [BAR[0] + 0.058, BAR[1] - 0.012, -0.178],
+        [BAR[0] + 0.052, BAR[1] - 0.018, -0.245]], 8), (i) => 0.0050 - 0.0012 * i / 8, GREY, { caps: true, sides: 6 });
+    }
+    // The thumb throttle, under the right hand's thumb.
+    sb.box(BAR[0] + 0.030, BAR[1] - 0.024, 0.140, 0.012, 0.026, 0.022, DARK);
+    // The dashboard: an oval pod on the stem's top, a screen and four battery
+    // LEDs on it. Nothing written.
+    spin([BAR[0] - 0.008, BAR[1] + 0.021, 0], [0, 0, 1], [[-0.052, 0], [-0.051, 0.55], [-0.048, 0.85],
+      [-0.042, 1], [0.042, 1], [0.048, 0.85], [0.051, 0.55], [0.052, 0]], DARK,
+    { sec: [0.036, 0.019], ref: [1, 0, 0], sides: lo ? 10 : 20 });
+    {
+      const y = BAR[1] + 0.0405, x0 = BAR[0] - 0.022, x1 = BAR[0] + 0.006;
+      sb.quad([x0, y, -0.024], [x1, y, -0.024], [x1, y, 0.024], [x0, y, 0.024], SC.screen);
+      if (!lo) for (let k = 0; k < 4; k++) sb.box(BAR[0] - 0.004, y + 0.0006, -0.012 + k * 0.008, 0.004, 0.001, 0.005, SC.led);
+    }
+    if (!lo) {
+      // A bell on the left of the bar, inboard of the lever.
+      spin([BAR[0], BAR[1] + 0.0112, -0.118], [0, 1, 0], [[0, 0], [0, 0.020], [0.004, 0.0215],
+        [0.011, 0.019], [0.017, 0.011], [0.020, 0]], SC.chrome, { sides: 14, sh: 0.14 });
+      sb.box(BAR[0] + 0.016, BAR[1] + 0.012, -0.118, 0.014, 0.004, 0.006, DARK);
+      // The cables: brake and throttle, forward in a loop and down the front
+      // of the stem into the joint, and the motor's up the right fork leg.
+      for (const s of [-1, 1]) {
+        const top = bkBez([[BAR[0] + 0.030, BAR[1] - 0.012, s * 0.140], [BAR[0] + 0.12, BAR[1] - 0.07, s * 0.10],
+          bkAdd(colAt(0.78, 0.05), [0, 0, s * 0.012]), bkAdd(colAt(0.66, 0.022), [0, 0, s * 0.007])], 12);
+        const run = [0.60, 0.50, 0.40, 0.31].map((t, k) => bkAdd(colAt(t, 0.025 + 0.002 * (k % 2)), [0, 0, s * 0.007]));
+        tube([...top, ...run, bkAdd(colAt(0.25, 0.022), [0, 0, s * 0.006])], 0.0028, DARK, { sides: 5 });
+      }
+      tube(bkBez([[FX + 0.002, FR + 0.008, 0.056], [FX - 0.006, FR + 0.07, 0.058], colAt(0.045, 0.018, 0.024)], 8),
+        0.0034, DARK, { sides: 5 });
+    }
+
+    // ── the back: dropouts, the calliper, the mudguard and its lamp ──
+    for (const s of [-1, 1]) {
+      tube([[-0.30, 0.112, s * 0.050], [-0.37, 0.106, s * 0.050], [RX, RR, s * 0.050]],
+        (i) => [0.014, 0.012, 0.010][i], under, { caps: true });
+      spin([RX, RR, 0], [0, 0, s], [[0.036, 0], [0.036, 0.0095], [0.060, 0.0095], [0.060, 0]], SC.steel, { sides: 6 });
+      // A stay from the axle to the mudguard's edge, outside the disc.
+      tube([[RX - 0.004, RR + 0.008, s * 0.050], [RX + Math.cos(2.2) * (RR + 0.012), RR + Math.sin(2.2) * (RR + 0.012), s * 0.040]],
+        0.0036, SC.steel, { sides: lo ? 3 : 5, caps: true });
+    }
+    sb.box(-0.393, 0.131, -0.036, 0.026, 0.020, 0.016, DARK);
+    sb.box(-0.384, 0.119, -0.046, 0.020, 0.018, 0.006, DARK);
+    bikeGuard(sb, RX, RR, 0.42, 2.85, RR + 0.019, 0.037, col, lo);
+    sb.box(-0.540, 0.145, 0, 0.012, 0.030, 0.020, DARK);
+    spin([-0.542, 0.118, 0], [-1, 0, 0], [[0, 0], [0, 0.013], [0.008, 0.014], [0.008, 0]], DARK, { sides: lo ? 6 : 14 });
+    spin([-0.542, 0.118, 0], [-1, 0, 0], [[0.0075, 0], [0.0075, 0.012], [0.0105, 0.010], [0.012, 0]], SC.red,
+      { sides: lo ? 6 : 14, sh: 0 });
+
+    // ── the kickstand, folded up under the left of the deck ──
+    sb.box(0.060, 0.092, -0.068, 0.030, 0.012, 0.016, DARK);
+    tube([[0.055, 0.088, -0.074], [-0.140, 0.084, -0.078]], (i) => (i ? 0.0055 : 0.0068), GREY,
+      { caps: true, sides: lo ? 4 : 8 });
+    sb.box(-0.145, 0.083, -0.080, 0.020, 0.008, 0.016, SC.rubber);
+
+    const wR = scootWheel(false, lo), wF = scootWheel(true, lo);
+    return {
+      geo: sb.geo(), crank: null,
+      wheels: [{ geo: wR.geo, tris: wR.tris, x: RX, y: RR, R: RR, front: false },
+        { geo: wF.geo, tris: wF.tris, x: FX, y: FR, R: FR, front: true }],
+      tris: sb.count() / 3 + wR.tris + wF.tris,
+    };
   }
 
   // Scratch, because a solve runs a few times a frame per rider.
@@ -62486,9 +64012,10 @@ async function buildJadrija(scene) {
       }
       const paint = WHEEL_PAINT[c.on][c.paint % WHEEL_PAINT[c.on].length];
       const kit = { ...(c.kit || {}), low: !!c.low, basket: !!c.basket };
-      const g = bike ? wheelBike(seatY, paint, kit, false) : wheelScoot(paint);
-      // The far copy of the same bicycle, swapped in past `WHEELS.lod`.
-      const gLo = bike ? wheelBike(seatY, paint, kit, true) : null;
+      const g = bike ? wheelBike(seatY, paint, kit, false) : wheelScoot(paint, false);
+      // The far copy of the same machine, swapped in past `WHEELS.lod` — the
+      // scooters have one too since 1.548.7.
+      const gLo = bike ? wheelBike(seatY, paint, kit, true) : wheelScoot(paint, true);
       const veh = new THREE.Mesh(g.geo, mat);
       veh.name = 'wheels:' + c.who;
       scene.add(veh);
@@ -63446,6 +64973,7 @@ async function buildJadrija(scene) {
     hoseWho.x = who.x; hoseWho.z = who.z;
     stepToppled(dt);
     stepPhones(cam);
+    stepMoleProps(cam);
     // The thing on the table with a motor in it — see SIGNAL. Here rather
     // than in her step, because it is scenery and carries on whether she is
     // being posed this frame or not.
@@ -63460,6 +64988,8 @@ async function buildJadrija(scene) {
     // The diving board and its reserved figure are their own little scene
     // interaction; step them regardless of the crowd's distance tier.
     diveStep(dt, cam);
+    // And off the mole, the same dive three times over — see JUMP.
+    jumpersStep(dt, cam);
 
     // Unconditional, and carries its own gate inside instead. The balloon work
     // is two subtractions and a hypot and wants no gate at all; the pose is
@@ -63795,6 +65325,25 @@ async function buildJadrija(scene) {
     crowd: {
       people: bathers.length,
       walkers: walkers.length,
+      /**
+       * The mole (`MOLE_LIFE`): who was moved from where to which place, the
+       * places nobody filled, and the jumpers — who, where, and what each is
+       * doing this frame. For a probe; nothing reads it.
+       */
+      mole: () => ({
+        spots: MOLE_LIFE.spots.length,
+        empty: MOLE_LIFE.spots.filter((o) => o.idx == null)
+          .map((o) => [o.t, o.s, o.pose]),
+        movers: MOLE_LIFE.movers,
+        jumpers: MOLE_LIFE.jumpers.map((J) => ({ i: J.i, kind: J.kind, from: J.from,
+          mode: J.st ? J.st.mode : null, loops: J.st ? J.st.loops : 0,
+          clip: J.fig ? J.fig.playing() : null,
+          T: J.fig ? +J.fig.state.curT.toFixed(2) : null,
+          at: J.fig ? J.fig.mesh.position.toArray().map((v) => +v.toFixed(2)) : null,
+          water: J.st && J.fig ? +(J.fig.mesh.position.y
+            - (typeof seaHeightAt === 'function'
+              ? seaHeightAt(J.fig.mesh.position.x, J.fig.mesh.position.z) : 0)).toFixed(2) : null })),
+      }),
       rigs: Object.keys(crowds),
       get drawn() {
         return Object.values(crowds).reduce((a, c) => a + c.drawn, 0);
@@ -64141,6 +65690,7 @@ async function buildJadrija(scene) {
         if (doodle) out.push(doodle.fig.cast(shadow, { near: true }));
         if (ball) out.push(...shadow.castTree(ball.mesh, { dynamic: true, near: true }));
         if (diveFigure) out.push(diveFigure.cast(shadow, { near: true }));
+        for (const J of MOLE_LIFE.jumpers) if (J.fig) out.push(J.fig.cast(shadow, { near: true }));
         if (diveBoard) out.push(...shadow.castTree(diveBoard, { dynamic: true, near: true }));
         return out;
       },

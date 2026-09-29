@@ -8,6 +8,225 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.549.0] — 2026-09-29
+
+### The mole, full: the same hundred people, moved to where he can see them
+
+Misha, from the vikendica's upper terrace: *"in the real view from vikendica,
+there's a lot more bathers and kids jumping off that pier there, right now
+it's just an empty concrete slab ... maybe u can re-locate them to inhabit the
+space in front of the vikendica more and populate that concrete pier with
+bathers laying on their towels, many of the women bathers have their tops
+either fully off or partially off. some wear sunglasses, some reads books ...
+do not increase the # of bathers"*. And then: *"perhaps re-use the dive of
+the diver ... so the pier divers execute the same type of dive?"*
+
+**Measured first.** Of the hundred people on the shore, none was on the mole
+(t 252.5–263.5, s 0.4 to −42). The survey has it full: 20260821_175838 counts
+nineteen on it — groups on towels near the head, towels laid along it, two
+standing at the edge, a boy running for the water; 20260821_175752 has the
+other mole's flank with a girl on the ladder and eight heads in the water;
+1000149597 at 250 s is two women on towels straight on the concrete, one in
+sunglasses.
+
+**Who moved (`MOLE_LIFE`, `moleCast`).** Twenty-five of the hundred, taken off
+the finished list just before the crowd is cast: the standing, sitting and
+lying bathers (seaward of the promenade, not walking a beat, not in a café
+chair, not staff) farthest along the shore from the vikendica, one in five of
+them left where they were. Five from the north end of the sand beach, nine
+from round and past the last cafés (t 311–412), eleven from the far
+south-east end (t 440–550). Twenty-two go to places on the mole and the lip in front of
+the house; three become jumpers. `people` is still 100; the far ends keep a
+few (the lounger sunbathers at t 68 and 200, the people standing at t 136,
+190 and 448, and every walker).
+
+**RULE 4 held, and checked.** Nothing draws on `rng`: the places are literals
+and `jit`, the people are picked by where they already are, and they are moved
+after `castBlob` has dealt everyone a body in order of `t` and after
+everything else that read their placement. Diffed person by person against
+1.548.6: exactly those 25 records change, every body and sex is identical,
+blockers 792 with the same hash, census 446/333/86/27, hammock at
+(−1923.174, 4.138, 443.162), the two smokers still at H2O (t 312.8) and the
+slastičarnica (t 332.9), 15 chair sitters, settle failures 0 (settled
+sitters in view from t 300: 24 against 22 — the settle runs on every seated
+figure the near tier is drawing, and the mole's sitters are now among them;
+the café chairs are the same 15).
+
+**On the mole.** Eight on towels along its length (heads both ways, in two
+loose rows, never across it) — three on their fronts; four sitting on the
+edge of the west flank (the side the house looks at), two on the head and two
+on the east flank with their legs over the water; two reading on towels; two
+standing. In front of the house, two on the lip with their legs over the edge
+and one standing. Every towel is `beachTowel` (1.72 × 0.78 m), and most have
+a pair of sandals or a bag beside them. The flank ladders and the flag pole are
+kept clear, and so are the jumpers' run-ups.
+
+- **Legs over the water, at last.** A sitter on an edge (`b.edge`) keeps the
+  quay clip's hanging shins instead of having them laid on the concrete — and
+  sits 0.36 m in from the arris (0.27 for a child), not the quay's 0.55, at
+  which the knee stopped 12 cm short and the shins went into the mole.
+- **On their fronts, on both tiers.** The far tier already laid a quarter of
+  the beach face down; the near tier had no clip for it. `proneClip` makes
+  `prone` from `sunbathe` on each body at parse time — root turned over about
+  the long axis, the back's small bends reversed, knees bent so the shins stand
+  in the air (20260821_175413) — and `fg.prone` tells both tiers the same.
+- **Books**, four of them. A prone reader has an open paperback on the
+  concrete in front of her; a sitting reader holds one open in her lap between
+  her hands, turned to her face (`MOLE_PROPS`).
+- **Sunglasses** on seven, on the near tier: two dark lenses, bridge and arms,
+  built in the head's bind frame off each body's measured eyes and carried by
+  `boneAt`/`boneTurn`.
+
+**Tops off, and undone — adult women only, by body.** `TOPS_KINDS`
+(42-crowd.js) is the three adult women; both tiers ask it of the body they are
+actually drawing, so no place can take a child's swimsuit off. No texture was
+added: the v2 body is whole under its swimwear, so on the near tier the `wear`
+shader simply does not draw the top — its atlas tile on a bikini, everything
+over the waist on a one-piece (rolled down) — or, for a top UNDONE on somebody
+lying on her front, only the half of it behind the chest. The far tier draws
+the torso's swimwear in her skin colour (the shirt channel at −1). Of the ten
+women on the mole: two topless, two with the top undone, one older woman with
+her one-piece rolled down, five unchanged; the three in front of the house are
+unchanged. Cost: a uniform, a vec4 and five
+lines of shader; nothing in the payload.
+
+**The jumpers — his dive (`JUMP`).** A girl and a boy off the west flank and a
+man off the east, looping: stand at the mark, the solved `dive` (four steps,
+hurdle, drive, the 182° header), tread, `swim` round to the flank's ladder,
+`ladder` up, walk back, turn, wait. Nothing new was baked. The children get the
+man's clips retargeted to their own skeletons (`jumpClips`: each bone's turn
+away from its rest carried across, root travel scaled by pelvis height, 0.63
+for the girl). The mole is not a springboard, so: the root is lifted by the
+board's own `flex` until takeoff (feet stay on the concrete); between takeoff
+and entry the figure is eased down from the deck to the clip's water plane and
+the flight plays 1.5× (a 1.5 m drop, not 2.7); a child goes in 0.6 m further
+out, or she slid down the face of the mole; and the climb starts at the frame
+where only 0.72 m of the 2.64 m ladder is left. Splash (`bodySplash`) and the
+plunge sound, faded out by 70 m.
+
+**Cost.** From the vikendica terrace (his view), 1280×720 on this machine,
+main-thread time per frame 7.9 ms against 7.8 ms before (three 5 s runs each,
+machine quiet), frame interval 16.7–19.2 ms against 19.6–20.4 (vsync and
+noise). Measured again with other agents' runs loading the machine, 10.1–12.5
+after against 15.0–16.7 before: noise either way, no cost that shows. The three jumpers
+are three skinned figures with their own draws and shadows; the props are
+drawn only for near-tier people within 80 m who have them. File +49 KB, all
+code.
+## [1.548.8] — 2026-09-29
+
+### The riders' e-scooters, built as e-scooters
+
+Misha: *"i love the e-scooters' physics, but they are too low-poly, can u make
+them higher-poly, like u did with the bicycles?"* — from two metres off the
+young man on the dark one. The stem and bar were four-sided `wheelTube` beams,
+the deck and the rear fender two boxes, the headlamp a white matchbox and the
+wheels 14-gon rings round a flat disc: 104 triangles of body, 110 a wheel.
+
+- **`wheelScoot`, rebuilt** (43-jadrija.js): a round stem tapering from 45 to
+  37 mm off a folding joint with its hinge knuckle, latch lever and safety
+  ring; a headlamp on a band clamp; a T-bar with ribbed rubber grips, a brake
+  lever under the left hand, a thumb throttle under the right, a bell, and a
+  dashboard pod with a screen and four battery LEDs (nothing written); a deck
+  with 45 mm corners, grip tape inset from a painted rim, a bellied underside
+  and red side reflectors; a neck curving up over the front tyre into the head
+  tube; a fork and crown; mudguards bent round both wheels; a tail lamp; the
+  rear calliper, dropouts and stays; the kickstand folded under the deck.
+  Round things are turned with `spinIn` (lent the scooter's builder by a new
+  `scSpin`), tubes are `bikeSweep`, guards `bikeGuard`. Same two paints.
+- **`scootWheel`**: 8.5-inch pneumatic tyres of round section with a tread
+  band of transverse grooves (which is also what shows them turning); the
+  front a hub motor — rim-and-shell casting, domed covers, six bolts a side;
+  the back five alloy spokes and a drilled 110 mm disc. Shared by both
+  scooters, cached per level of detail.
+- **A far copy**, as the bicycles have: eight-sided lathes, 16-segment tyres,
+  no tread, bolts, cables, blades or holes — swapped past `WHEELS.lod`.
+  Scooters used to have none.
+- `wheelTube`, `wheelRim` and `wheelDisc` are gone; nothing used them after.
+
+MEASURED. Per scooter, near: 6,102 body + 2,300 rear wheel + 2,100 front =
+**10,502** triangles (was 324); far: 1,670 + 570 + 464 = **2,704**. Riders'
+`machineTris` 25,496 → 45,852, `machineTrisFar` 8,842 → 14,250 (it now counts
+the scooters' far copies too), draws 27 → 27, `ms` 0.12–0.13 → 0.12–0.15.
+The bicycles were already the 1.531.0 builder (about 8,300 a bicycle) and are
+unchanged. Everything the riders are solved to is the same: deck top 0.155,
+grip middles (0.36, 1.10, ±0.21) with 17 mm rubber, axles (−0.44, 0.10) R 0.10
+and (0.45, 0.11) R 0.11 with the tread's outermost point at exactly R, and
+both scooter riders' hands, fingers, ankles and toes identical to the
+millimetre before and after. Riders 5, planAt 792, forced 0; blockers 792
+with an unchanged hash; people 100; hammock rest (−1923.174, 4.138,
+443.162); a café sitter knocked over still goes down and gets up.
+## [1.548.7] — 2026-09-29
+
+### No houses on the open sea
+
+Misha, on the end of the Jadrija mole looking north-west toward Prvić: *"there
+are all these houses and stuff appearing out of the water ... just remove all
+those distant houses"*. The OSM footprints include the villages of islands the
+terrain heightmap does not carry, and footprints past its 13 km square, which
+`gridIndex` clamps to the edge's sea level; both were drawn as villages
+standing on water. `buildCity` now skips a building whose centre is past the
+square (159) or is sea more than 50 m from any waterline (678): the margin
+keeps real waterfront buildings the coarse cover grid calls sea. Skipped after
+each building's four `rng` draws, so every other building keeps its colours.
+12 977 → 12 100 built; the count is in `__fr.stats().city.skipped`.
+
+## [1.548.6] — 2026-09-29
+
+### What is on the floor, drawn as the things
+
+Misha, looking down at the concrete in front of the vikendica: *"there's all
+this low-poly crap, i don't even know what these geometric shapes are.. either
+remove them or render them with more poly so they resemble some real
+objects"*. Every one of them was a box or a flat quad, and three of them were
+not even the right box:
+
+- the **white-and-dark striped bar** and the **blue-and-dark one** were pairs
+  of sandals — offset ±9 cm ALONG a 25 cm sole, so the two soles overlapped
+  end to end into one 43 cm bar with two straps across it; the **small dark
+  three-block thing** and the **little yellow/blue box** were more of them;
+- the **green slab with the red slab on it** was "a towel folded over on
+  itself" — two slabs, coloured from two different picks;
+- the **white sheet** and the **flat coloured rectangles** further off were
+  towels: three flat panels each;
+- the **yellow box with the dark lid** was a bag;
+- the **octagonal brown ring with the dark centre** by the edge is a
+  mooring ring: eight flat chords 6 cm wide in a square pocket, with a
+  brown brick for the eye.
+
+All of them are real objects now, from new builders next to `clutter`
+(`tsFrame`, `skinGrid`, `beachTowel`, `foldedTowel`, `sandal` /
+`sandalPair`, `beachBag`) that the bathers-on-towels work can reuse. Nothing
+moved: every placement, footprint, colour and `jit` key is the caller's own,
+and no `rng` draw was added, removed or moved.
+
+**Towels** (134): smooth-shaded cloth with 6 cm rounded corners, a hem that
+droops to the slab and a skirt down to it, three rucks off the key, one of
+three weaves (bands across the ends, broad stripes down the length, or a
+border all round — navy on a white towel), and in four of ten a corner
+turned over on itself. **The dropped towel** is a rucked hand towel with a
+second one folded into a soft pad on top. **Sandals** (84 pairs) are
+foot-shaped soles — nine stations, a straight inner edge, a waist, a round
+heel, a dished footbed, a cut foam edge — side by side with the big toes
+inward and turned out a little, one pair in four with a shoe kicked off:
+flip-flops with a round-tube thong, slides with a broad arched band.
+**Bags** (42) are soft superellipse bodies, slumped, pinched at an open dark
+mouth, with two standing handles and a cream band on half of them.
+**Mooring rings** (21) are a round pocket with a chamfered lip, a torus of
+30 mm bar, and an eye on a plate that the ring runs through.
+
+And the **beach pitch towels**, which were buried: the sand west of
+`beachTo` is drawn as chords between `ribbon`'s corners and stands 37 to
+58 mm above `surfaceY` (measured with a ray down at three towels at t 100),
+so a towel laid on `surfaceY` at 12 mm showed as a triangle poking out of the
+shingle. New `floorUnder(t, s)` answers the drawn triangle's own height, and
+the beach towels and bags are laid on it (towels clamped to 12 cm of drape,
+so one across a real riser does not climb the wall).
+
+MEASURED: 179 triangles a towel (was 6), 98 a folded towel (24), 287 a pair of
+sandals (48), 188 a bag (24), about 310 a mooring ring (46).
+`__fr.stats().jadrija.tris` 671 536 → 730 262 (+58 726). No draw call
+added. Blockers 792 with the hash unchanged, people 100, hammock ties at
+4.138.
 ## [1.548.5] — 2026-09-29
 
 ### The lifeguard flags go out on the mole and fly; a ladder down each flank
