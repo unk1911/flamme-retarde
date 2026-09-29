@@ -27673,7 +27673,9 @@ async function buildJadrija(scene) {
           who.chair = true; who.seat = chair++;
           who.sitAt = { t, s: s2, face, ct: tab.ct, cs: tab.cs, ang: tab.ang, mesh: S.key === 'mini',
             // The parlour's marble tables are round (`cafeTable`, 1.542.2).
-            round: CAFE_STYLE[S.key] === 'parlour' };
+            round: CAFE_STYLE[S.key] === 'parlour',
+            // Whose terrace, which the smokers are dealt by (`SMOKE.at`).
+            shop: S.key };
         }
       }
     }
@@ -33916,6 +33918,68 @@ async function buildJadrija(scene) {
   // It is what carries a bather's age and sex to the voice service.
   let CAST_KIND = null;
 
+  // ── THE SMOKERS ─────────────────────────────────────────────────────────
+  //
+  // Misha, 29 Sep 2026, over the "Vortex Plume" of dgreenheck's
+  // threejs-particle-fluids: *"maybe the smoke spreading could be one of the
+  // bathers smoking a cigarette"*. So two of the café sitters smoke: the
+  // first grown-up with a free right hand at Caffee bar H2O, and the first at
+  // the slastičarnica next door (see `dealSmokers`). The smoke is
+  // 43-smoke.js; the person — the arm, the cigarette, the drag — is
+  // `stepSmokers`.
+  //
+  // Up here with `PHONE`, which is where anything the crowd's async parse
+  // might one day read has to be declared — see the note under this.
+  const SMOKE = {
+    at: ['h2o', 'slast'],
+    // Metres from the camera inside which the arm is solved, the cigarette is
+    // drawn and the smoke is simulated and drawn. Outside it the arm is the
+    // clip's and nothing else is done at all. At 30 m a cigarette is under a
+    // pixel wide and a wisp is three.
+    near: 30,
+    // Seconds between drags, a person's own spread either way; the first
+    // comes sooner, so walking up to a terrace is not thirty seconds of
+    // somebody holding a cigarette and doing nothing with it.
+    every: [20, 40], first: [4, 14],
+    // The drag: hand up, held at the lips, hand down. The exhale starts this
+    // long after the hand leaves the mouth, and lasts this long.
+    up: 0.85, hold: 1.5, down: 1.0, exhale: [0.30, 1.5],
+    // The cigarette, metres: a king size is 84 mm by 7.8, 24 mm of it filter.
+    // `out` is how far the filter end stands proud of the fingers' middle on
+    // the palm side, which is the length a person puts between their lips and
+    // their own knuckles; `grip` is where along the fingers it is held, as a
+    // fraction of the fingers past the knuckle (between the first joints of
+    // the index and middle fingers), and `side` how far toward the thumb the
+    // gap between those two fingers is from the middle of the knuckle line.
+    cig: { len: 0.084, r: 0.0039, filt: 0.024, ash: 0.004, out: 0.036 },
+    grip: 0.34, side: 0.011,
+    // The fingers' own fold about the knuckles, radians — a loose V round
+    // the paper, and not the flat plate the bind pose has.
+    curl: 0.55,
+    // Where the hand is at rest and at the lips. `wrist` is from the right
+    // shoulder in fractions of the arm (`L`, shoulder to wrist), figure space:
+    // forward, up, out to the right. `g` is the way the gripping fingers
+    // point and `e` the cigarette's axis, filter-ward — so at rest the lit end
+    // points forward, out and a little up, and at the lips the paper comes in
+    // from the right and a little in front. `pole` is where the elbow falls:
+    // at rest down, back and out against the ribs; lifted, out to the side.
+    //
+    // The lips' frame is the HEAD's (bind figure space, turned with the head
+    // bone), because a person bowed over a table takes the cigarette to where
+    // their mouth has gone, not to where it would be sitting up.
+    rest: { wrist: [0.36, -0.30, 0.12], g: [0.55, 0.80, -0.20], e: [-0.35, -0.35, -0.87],
+      pole: [-0.35, -1.0, 0.45] },
+    lips: { g: [0.10, 0.99, 0.08], e: [-0.40, -0.02, -0.92], pole: [0.30, -1.0, 0.50],
+      // How far inside the lip line the filter end goes.
+      in: 0.006 },
+    // How much of the true wind reaches smoke at a café table: the flag's
+    // surface share (0.26, 59-brod.js) times a terrace's lee under its awning
+    // (0.12) — about 0.3 m/s on the channel's 9, a drift and not a gale.
+    air: 0.031,
+    // The ember: at rest, and drawn on.
+    ember: { rest: 0.30, drag: 1.0, rise: 0.35, fall: 1.3 },
+  };
+
   // UP HERE AND NOT DOWN WITH `stepPhones`, and it is the temporal dead zone
   // again — the same trap `terraceSet` records four hundred lines further up.
   // The loop that decides who is on their phone runs inside the crowd's async
@@ -34054,6 +34118,7 @@ async function buildJadrija(scene) {
       if (jit(i, 9137) >= PHONE.share) continue;
       b.phone = jit(i, 9138) < 0.25 ? 2 : 1;
     }
+
     // ── who is who, and which mesh a slot has to be ────────────────────────
     //
     // A roving slot cannot be pointed at just anybody. The slot *is* a mesh —
@@ -40231,6 +40296,464 @@ async function buildJadrija(scene) {
     if (_rB.lengthSq() > 1e-6) {
       f.aim('fingersR', _rB.x, _rB.y, _rB.z, GRIP.curl);
     }
+  }
+
+  // ── the smokers, posed and drawn ──────────────────────────────────────────
+  //
+  // `holdPhone`'s solve with the target taken to the mouth and back. What is
+  // different is only what the hand is holding and that the target MOVES:
+  //
+  //   THE CIGARETTE IS PLACED OFF THE FINGERS, NOT THE FINGERS OFF IT. The
+  //   phone is billboarded and the hand chases it; a cigarette is held by the
+  //   hand and goes where the fingers go. So each frame it is read back off
+  //   the palette the renderer is about to draw — the fingers bone's turn and
+  //   head, and the hand's knuckle line — and it cannot separate from the
+  //   hand whatever the solve did.
+  //
+  //   THE HAND IS SOLVED AS A FRAME, not pointed. The phone's third turn points
+  //   the knuckles at the case and leaves the roll to `rollHand`; here the
+  //   whole hand is put into a frame built from two directions that mean
+  //   something — the way the gripping fingers point, and the cigarette's axis
+  //   — and the wrist is worked BACK from where the filter has to be. At the
+  //   lips that is the one number that matters: the filter end, between them.
+  //
+  //   AND IT IS SOLVED BETWEEN TWO FRAMES. Rest and lips are each a wrist and
+  //   a frame; the drag is a slerp between the two frames and a lerp between
+  //   the two wrists, eased, with the elbow's pole swung from against the ribs
+  //   out to the side. The measurement guard is `holdPhone`'s and for the same
+  //   reason — `aim` is a delta, `boneAt` reports the result — and it is keyed
+  //   on the measurement alone: when the palette has not been rebuilt it still
+  //   carries the deltas that were in force when it was, so re-solving against
+  //   it would take off the wrong ones. Inside `SMOKE.near` the pose ladder
+  //   rebuilds these figures every frame (POSE_NEAR is 45 m), so in practice
+  //   the guard never skips.
+  //
+  // RUN AFTER THE FLUSH, not before it with the phones. The cigarette is read
+  // off the palette the flush has just built — the one about to be drawn — and
+  // the aims laid here go into the next one. Before the flush the cigarette
+  // would be drawn off last frame's hand.
+  let smoke = null;                     // the particle pool (43-smoke.js)
+  const smokeRecs = [];                 // by `pairs()` index, like `arms`
+  const cigs = [];                      // the drawn cigarettes, by smoker
+  let smokers = null;                   // every smoker's figure record
+  let smokeMs = 0;
+  const smokeStat = { gap: -1, nose: -1, holds: 0 };
+  const _sS = new THREE.Vector3(), _sE = new THREE.Vector3(), _sW = new THREE.Vector3();
+  const _sK = new THREE.Vector3(), _sT = new THREE.Vector3(), _sV = new THREE.Vector3();
+  const _sP = new THREE.Vector3(), _sL = new THREE.Vector3(), _sN = new THREE.Vector3();
+  const _sU = new THREE.Vector3(), _sF = new THREE.Vector3(), _sG = new THREE.Vector3();
+  const _sD = new THREE.Vector3(), _sC = new THREE.Vector3(), _sX = new THREE.Vector3();
+  const _sM = new THREE.Vector3(), _sH = new THREE.Vector3(), _sO = new THREE.Vector3();
+  const _sWr = new THREE.Vector3(), _sWm = new THREE.Vector3();
+  const _sA = new THREE.Quaternion(), _sB = new THREE.Quaternion(), _sQ = new THREE.Quaternion();
+  const _sR = new THREE.Quaternion(), _sQr = new THREE.Quaternion(), _sQm = new THREE.Quaternion();
+  const _sQh = new THREE.Quaternion(), _sQw = new THREE.Quaternion(), _sHc = new THREE.Quaternion();
+  const _sMa = new THREE.Matrix4(), _sMb = new THREE.Matrix4();
+  const _sY = new THREE.Vector3(0, 1, 0), _sX1 = new THREE.Vector3(1, 0, 0);
+  const smooth01 = (x) => { const u = Math.min(1, Math.max(0, x)); return u * u * (3 - 2 * u); };
+  const lerpR = (r, u) => r[0] + (r[1] - r[0]) * u;
+
+  /**
+   * What a smoker's body needs that the rig does not say: the right hand's
+   * bind frame (`handBody` in 42-crowd.js) and where the LIPS are, off the
+   * head bone, in the bind pose.
+   *
+   * MEASURED OFF THE MESH, because no bone is at the mouth. The head bone sits
+   * at the height of the nose tip, three or four centimetres behind the face
+   * (all eight bodies: nose 0.10–0.14 m forward of it and within 7 cm of level).
+   * So: the nose is the most forward head vertex near the midline; the lips
+   * are 34 mm under it for a 1.70 m adult, scaled with the body, and as far
+   * forward as the midline profile actually reaches at that height. Printed
+   * for all eight before it was written: under the nose the profile steps back
+   * 2 to 3 cm to the lips on every one, which is the face this is placing a
+   * filter against.
+   *
+   * And two spheres for the smoke to fade against (see 43-smoke.js): the lower
+   * face, with the lips on its surface, and the skull behind the nose.
+   * Cached on the parse; null if the rig has no fingers.
+   */
+  function smokeBody(f) {
+    const data = f.data;
+    if (data.smokeBody !== undefined) return data.smokeBody;
+    data.smokeBody = null;
+    const H = handBody(f);
+    const ih = f.boneIndex('head');
+    if (!H || ih < 0) return null;
+    const T = f.bindRest().bindT;
+    const hx = T[3 * ih], hy = T[3 * ih + 1], hz = T[3 * ih + 2];
+    const pos = data.geo.getAttribute('position').array;
+    const bi = data.geo.getAttribute('aBoneIdx').array, bw = data.geo.getAttribute('aBoneWt').array;
+    const mid = [];
+    let nx = -1, ny = 0;
+    for (let v = 0, nv = pos.length / 3; v < nv; v++) {
+      let best = 0;
+      for (let q = 1; q < 4; q++) if (bw[4 * v + q] > bw[4 * v + best]) best = q;
+      if (bi[4 * v + best] !== ih) continue;
+      const x = pos[3 * v] - hx, y = pos[3 * v + 1] - hy, z = pos[3 * v + 2] - hz;
+      if (Math.abs(z) > 0.02) continue;
+      mid.push(x, y, Math.abs(z));
+      if (y > -0.04 && y < 0.08 && x > nx) { nx = x; ny = y; }
+    }
+    if (nx < 0) return null;
+    const s = skinHeight(data) / 1.70;
+    const my = ny - 0.034 * s;
+    let mx = -1;
+    for (let i = 0; i < mid.length; i += 3) {
+      if (mid[i + 2] < 0.015 && Math.abs(mid[i + 1] - my) < 0.010 && mid[i] > mx) mx = mid[i];
+    }
+    if (mx < 0 || mx > nx) mx = nx - 0.026 * s;
+    const out = {
+      H: H.R, ih, s,
+      lips: new THREE.Vector3(mx, my, 0),
+      nose: new THREE.Vector3(nx, ny, 0),
+      face: new THREE.Vector4(mx - 0.050 * s, my + 0.012 * s, 0, 0.052 * s),
+      skull: new THREE.Vector4(nx - 0.100 * s, ny + 0.045 * s, 0, 0.085 * s),
+    };
+    data.smokeBody = out;
+    return out;
+  }
+
+  /** A hand frame `(d, n)` built from the fingers' way `g` and the paper's axis
+   *  `e`, with the fingers folded `a` about the knuckles — and the turn from the
+   *  bind hand to it, into `q`. See the note over `stepSmokers` for why a
+   *  frame and not a direction. */
+  function smokeFrame(H, g, e, a, d, n, c, q) {
+    e.addScaledVector(g, -e.dot(g)).normalize();
+    const ca = Math.cos(a), sa = Math.sin(a);
+    // The fingers are the hand turned `a` about c = d × n toward the palm, so
+    // the hand is the fingers turned back: d = g cos a − e sin a, n = e cos a
+    // + g sin a.
+    d.copy(g).multiplyScalar(ca).addScaledVector(e, -sa);
+    n.copy(e).multiplyScalar(ca).addScaledVector(g, sa);
+    c.crossVectors(d, n);
+    _sMa.makeBasis(d, n, c);
+    _sMb.makeBasis(H.d, H.n, _sO.crossVectors(H.d, H.n));
+    _sMa.multiply(_sMb.transpose());
+    return q.setFromRotationMatrix(_sMa);
+  }
+
+  /**
+   * WHO SMOKES: at each terrace in `SMOKE.at`, the first person seated there
+   * in placement order whose right hand is free — not on a phone, which owns
+   * the same arm — and who is a grown-up.
+   *
+   * THAT LAST TEST IS A BODY TEST AND NOT A PLACEMENT ONE, and it was found
+   * the hard way. The chair sitters are the pinned half of the skinned tier,
+   * bound to the eight bodies round-robin (`SKIN_SEATED`), and their `k` says
+   * nothing about which body they got: every chair on the shore is placed at
+   * `k` 1. The first cut dealt the smokers off the bathers at build and put a
+   * cigarette in the hand of a ten-year-old girl in a yellow dress at the
+   * slastičarnica. So this is dealt here, once, against the figure each one
+   * is actually drawn as — and a body under `CHILD_H`'s 1.45 m never smokes.
+   *
+   * By rule rather than by hash, so "where is the smoker" is a sentence; no
+   * draw of anything (Rule 4). `fg.smoke` is which smoker, from 1.
+   */
+  function dealSmokers(skin) {
+    smokers = [];
+    const pinned = skin.pairs().filter(([fg]) => fg && fg.sitAt)
+      .sort((a2, b2) => a2[0].idx - b2[0].idx);
+    SMOKE.at.forEach((key, j) => {
+      const pr = pinned.find(([fg, f]) => fg.sitAt.shop === key && !fg.phone && !fg.smoke
+        && skinHeight(f.data) * (f.mesh.scale.y || 1) >= 1.45);
+      if (pr) { pr[0].smoke = j + 1; smokers.push(pr[0]); }
+    });
+  }
+
+  /** The smoking clock, for everybody, near or not: a few comparisons. */
+  function smokeClock(fg, dt) {
+    let m = fg.smk;
+    if (!m) {
+      m = fg.smk = { phase: 'rest', pt: 0, wait: lerpR(SMOKE.first, jit(fg.idx | 0, 9161)),
+        ember: SMOKE.ember.rest, exh: -1, ex: 0, n: 0, u: 0, emW: 0, emP: 0 };
+    }
+    m.pt += dt;
+    if (m.phase === 'rest') {
+      m.wait -= dt;
+      if (m.wait <= 0) { m.phase = 'up'; m.pt = 0; }
+    } else if (m.phase === 'up' && m.pt >= SMOKE.up) {
+      m.phase = 'hold'; m.pt = 0;
+    } else if (m.phase === 'hold' && m.pt >= SMOKE.hold) {
+      m.phase = 'down'; m.pt = 0; m.exh = SMOKE.exhale[0];
+    } else if (m.phase === 'down' && m.pt >= SMOKE.down) {
+      m.phase = 'rest'; m.pt = 0; m.n++;
+      m.wait = lerpR(SMOKE.every, jit((fg.idx | 0) * 31 + m.n, 9163));
+    }
+    if (m.exh >= 0) {
+      m.exh -= dt;
+      if (m.exh < 0) { m.exh = -1; m.ex = SMOKE.exhale[1]; }
+    }
+    if (m.ex > 0) m.ex = Math.max(0, m.ex - dt);
+    m.u = m.phase === 'up' ? smooth01(m.pt / SMOKE.up)
+      : m.phase === 'hold' ? 1
+        : m.phase === 'down' ? 1 - smooth01(m.pt / SMOKE.down) : 0;
+    // Drawn on, the coal brightens in a third of a second; let be, it dies
+    // back over a second and more.
+    const E = SMOKE.ember;
+    m.ember += ((m.phase === 'hold' ? E.drag : E.rest) - m.ember)
+      * (1 - Math.exp(-dt / (m.phase === 'hold' ? E.rise : E.fall)));
+    return m;
+  }
+
+  /** Take the solve back off an arm. */
+  function dropSmoke(f, rec) {
+    if (!rec || !rec.on) return;
+    rec.on = false;
+    rec.qa.identity(); rec.qb.identity(); rec.qc.identity();
+    f.aim('armUR', 0, 1, 0, 0);
+    f.aim('armLR', 0, 1, 0, 0);
+    f.aim('handR', 0, 1, 0, 0);
+    f.aim('fingersR', 0, 1, 0, 0);
+  }
+
+  /** One cigarette: filter, paper, a grey of ash and the coal, along +y from
+   *  the filter end — so its group is placed at the lips' end and turned. */
+  function makeCig() {
+    const C = SMOKE.cig, g = new THREE.Group();
+    const cyl = (r0, r1, h, y, mat) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, h, 10, 1), mat);
+      m.position.y = y + h * 0.5;
+      g.add(m);
+      return m;
+    };
+    const paper = C.len - C.filt - C.ash - 0.0015;
+    cyl(C.r, C.r, C.filt, 0, solidMaterial(0xc98a4e, { spec: 0.05, specPower: 12 }));
+    cyl(C.r, C.r, paper, C.filt, solidMaterial(0xf1eee6, { spec: 0.06, specPower: 16 }));
+    cyl(C.r, C.r * 0.97, C.ash, C.filt + paper, solidMaterial(0x6b6661, { spec: 0.02 }));
+    const coal = new THREE.MeshBasicMaterial({ color: 0xff5010 });
+    cyl(C.r * 0.97, C.r * 0.80, 0.0015, C.len - 0.0015, coal);
+    g.name = 'cigarette';
+    g.visible = false;
+    scene.add(g);
+    return { g, coal };
+  }
+
+  /**
+   * Every smoker: their clock always, and inside `SMOKE.near` their arm, the
+   * cigarette in their fingers, and the smoke off it. Nothing else anywhere
+   * else — the pool is emptied and hidden the moment nobody is in range.
+   */
+  function stepSmokers(dt, cam) {
+    const skin = crowds.skin;
+    if (!skin || !skin.pairs) return;
+    const t0 = performance.now();
+    if (!smokers) dealSmokers(skin);
+    for (const fg of smokers) smokeClock(fg, dt);
+    const pairs = skin.pairs();
+    const near2 = SMOKE.near * SMOKE.near;
+    let any = false;
+    const seen = [false, false, false];
+    for (let k = 0; k < pairs.length; k++) {
+      const fg = pairs[k][0], f = pairs[k][1];
+      let rec = smokeRecs[k];
+      const dx = f.mesh.position.x - cam.x, dz = f.mesh.position.z - cam.z;
+      if (!fg || !fg.smoke || !f.mesh.visible || (fg.topple && fg.topple.phase !== 'wet')
+        || dx * dx + dz * dz > near2) {
+        dropSmoke(f, rec);
+        continue;
+      }
+      const B = smokeBody(f);
+      if (!B) continue;
+      if (!rec) {
+        rec = smokeRecs[k] = { on: false, id: -1, qa: new THREE.Quaternion(),
+          qb: new THREE.Quaternion(), qc: new THREE.Quaternion(),
+          ex: 0, ey: 0, ez: 0, wx: 0, wy: 0, wz: 0, kx: 0 };
+      }
+      const m = fg.smk;
+      if (!smoke) smoke = makeCigSmoke(scene);
+      const n = fg.smoke;
+      if (!cigs[n]) cigs[n] = makeCig();
+      // Only off a palette that already carries the solve. On the first frame
+      // in range the hand is still the clip's — in a lap, on a table — and a
+      // cigarette read off it is one frame of a cigarette in the wrong place.
+      const was = rec.on && rec.id === fg.idx;
+      if (was && smokeLight(f, B, fg, m, cigs[n], n, dt)) { any = true; seen[n] = true; }
+      smokeArm(f, B, rec, fg, m);
+    }
+    for (let n = 1; n < cigs.length; n++) {
+      if (cigs[n] && !seen[n]) cigs[n].g.visible = false;
+      if (smoke && !seen[n]) {
+        smoke.occ[2 * (n - 1)].w = 0;
+        smoke.occ[2 * (n - 1) + 1].w = 0;
+      }
+    }
+    if (smoke) {
+      if (any || smoke.live) {
+        // The air at the table: `SMOKE.air` of the true wind, with the gusts
+        // on it and the flag's own slow wander on the bearing (59-brod.js).
+        const tt = state.t;
+        const w = state.windSpeed * (0.8 + 0.4 * state.gust) * SMOKE.air;
+        const wd = state.windDir + 0.35 * Math.sin(tt * 0.071) * Math.sin(tt * 0.029 + 1.3);
+        if (any) smoke.step(dt, Math.cos(wd) * w, Math.sin(wd) * w, cam);
+        else smoke.clear();
+      }
+    }
+    smokeMs += (performance.now() - t0 - smokeMs) * 0.05;
+  }
+
+  /**
+   * The cigarette where the fingers are in the palette about to be drawn, the
+   * coal's glow, the soft spheres, and the smoke off it — the wisp from the
+   * coal and the exhale from the lips. True if it was drawn.
+   */
+  function smokeLight(f, B, fg, m, cig, n, dt) {
+    const H = B.H, C = SMOKE.cig;
+    const W = f.boneAt(H.ih, _sW), K = f.boneAt(H.if, _sK);
+    if (W.distanceToSquared(K) < 1e-6) return false;
+    const Qf = f.boneTurn(H.if, _sQ), Qh = f.boneTurn(H.ih, _sR);
+    const g = _sG.copy(H.d).applyQuaternion(Qf);
+    const e = _sF.copy(H.n).applyQuaternion(Qf);
+    const c = _sC.copy(H.c).applyQuaternion(Qh);
+    const k = 1 / (f.mesh.scale.x || 1);
+    // The grip, in figure space, and then the world.
+    const grip = _sP.copy(K).addScaledVector(g, SMOKE.grip * H.fl).addScaledVector(c, SMOKE.side * k);
+    // For the probe: the paper's axis and the fingers' way as the palette
+    // has them, in the figure's frame — what the solve was asked for.
+    m.eF = [e.x, e.y, e.z].map((v) => +v.toFixed(2));
+    m.gF = [g.x, g.y, g.z].map((v) => +v.toFixed(2));
+    const Mw = f.mesh.matrixWorld;
+    grip.applyMatrix4(Mw);
+    Mw.decompose(_sO, _sQw, _sX);
+    e.applyQuaternion(_sQw).normalize();
+    // The filter end, and the coal.
+    const F = _sT.copy(grip).addScaledVector(e, C.out);
+    const tip = _sV.copy(F).addScaledVector(e, -C.len);
+    cig.g.position.copy(F);
+    cig.g.quaternion.setFromUnitVectors(_sY, _sU.copy(e).negate());
+    cig.g.visible = true;
+    // The coal: a dull red at rest, drawn up to orange-yellow and several
+    // times as bright, with the flicker of a thing that is actually burning.
+    const tt = state.t;
+    const fl = 0.88 + 0.12 * Math.sin(tt * 13.1 + n * 2.1) * Math.sin(tt * 7.3 + n);
+    const u = m.ember, b = (0.6 + 3.4 * u * u) * fl;
+    cig.coal.color.setRGB((0.55 + 0.45 * u) * b, (0.05 + 0.40 * u * u) * b, (0.01 + 0.08 * u * u) * b);
+    // The lips and the head, in the world, for the smoke and the measurement.
+    const Qhd = f.boneTurn(B.ih, _sQh);
+    const hp = f.boneAt(B.ih, _sH);
+    const lips = _sM.copy(B.lips).applyQuaternion(Qhd).add(hp).applyMatrix4(Mw);
+    const fwd = _sD.copy(_sX1).applyQuaternion(Qhd).applyQuaternion(_sQw).normalize();
+    // The spheres: in figure space off the head, then the world; the radius
+    // scales with the figure.
+    const sc = f.mesh.scale.x || 1;
+    for (let j = 0; j < 2; j++) {
+      const s4 = j ? B.skull : B.face, o = smoke.occ[2 * (n - 1) + j];
+      _sL.set(s4.x, s4.y, s4.z).applyQuaternion(Qhd).add(hp).applyMatrix4(Mw);
+      o.set(_sL.x, _sL.y, _sL.z, s4.w * sc);
+    }
+    // How close the filter came to the lips, at the lips — the whole of
+    // whether the drag reads — and how close the fingers came to the nose.
+    if (m.phase === 'hold' && m.pt > 0.1) {
+      const gap = F.distanceTo(lips);
+      smokeStat.gap = Math.max(smokeStat.gap, gap);
+      smokeStat.holds++;
+      const nose = _sN.copy(B.nose).applyQuaternion(Qhd).add(hp).applyMatrix4(Mw);
+      // The fingers as a segment from the knuckles, `fl` long.
+      const K0 = _sL.copy(K).applyMatrix4(Mw);
+      _sU.copy(g).applyQuaternion(_sQw).normalize();
+      const along = Math.max(0, Math.min(H.fl * sc, _sO.copy(nose).sub(K0).dot(_sU)));
+      const dn = K0.addScaledVector(_sU, along).distanceTo(nose) - 0.009;
+      smokeStat.nose = smokeStat.nose < 0 ? dn : Math.min(smokeStat.nose, dn);
+    }
+    // THE SMOKE. An awning is about 2.3 m over a terrace floor.
+    const ceil = fg.y + 2.3;
+    const W1 = CIG_SMOKE.wisp, P1 = CIG_SMOKE.puff;
+    // The wisp, all the time — thinner while it is being drawn on, when the
+    // air is going through the coal rather than up off it.
+    m.emW += dt * W1.rate * (m.phase === 'hold' ? 0.5 : 1);
+    while (m.emW >= 1) {
+      m.emW -= 1;
+      const j = smoke.rnd;
+      smoke.emit(0, tip.x + (j() - 0.5) * 0.002, tip.y + 0.002, tip.z + (j() - 0.5) * 0.002,
+        (j() - 0.5) * 0.02, W1.v0 * (0.8 + 0.4 * j()), (j() - 0.5) * 0.02, ceil);
+    }
+    // The exhale: a hump, in and out over its length, forward out of the
+    // mouth and a little down, as a relaxed breath out is.
+    if (m.ex > 0) {
+      const v = 1 - m.ex / SMOKE.exhale[1];
+      const env = Math.sin(Math.PI * Math.min(1, v * 1.15));
+      m.emP += dt * P1.rate * env;
+      _sO.copy(fwd).setY(fwd.y - 0.30).normalize();
+      while (m.emP >= 1) {
+        m.emP -= 1;
+        const j = smoke.rnd;
+        const sp = P1.v0 * (0.55 + 0.6 * env) * (0.8 + 0.4 * j());
+        smoke.emit(1, lips.x + fwd.x * 0.012, lips.y + fwd.y * 0.012 - 0.004, lips.z + fwd.z * 0.012,
+          _sO.x * sp + (j() - 0.5) * P1.spread, _sO.y * sp + (j() - 0.5) * P1.spread * 0.6,
+          _sO.z * sp + (j() - 0.5) * P1.spread, ceil);
+      }
+    } else {
+      m.emP = 0;
+    }
+    return true;
+  }
+
+  /** The arm: rest or lips or between, solved for the next palette. */
+  function smokeArm(f, B, rec, fg, m) {
+    const H = B.H;
+    const S = f.boneAt(H.iu, _sS), E = f.boneAt(H.il, _sE), W = f.boneAt(H.ih, _sW);
+    const K = f.boneAt(H.if, _sK);
+    const Lu = E.distanceTo(S), Lf = W.distanceTo(E), L = Lu + Lf;
+    if (Lu < 0.05 || Lf < 0.05) return;
+    // The measurement guard — see the note over this section.
+    if (rec.on && rec.id === fg.idx
+      && E.x === rec.ex && E.y === rec.ey && E.z === rec.ez
+      && W.x === rec.wx && W.y === rec.wy && W.z === rec.wz && K.x === rec.kx) return;
+    // The clip under the last solve: `measured = qc · qb · qa · clip`.
+    const ia = _sA.copy(rec.qa).invert(), ib = _sB.copy(rec.qb).invert();
+    const uc = _sU.copy(E).sub(S).applyQuaternion(ia).normalize();
+    const fc = _sD.copy(W).sub(E).applyQuaternion(ib).applyQuaternion(ia).normalize();
+    const Hclip = _sHc.copy(ia).multiply(ib).multiply(_sQ.copy(rec.qc).invert())
+      .multiply(f.boneTurn(H.ih, _sR));
+    const k = 1 / (f.mesh.scale.x || 1);
+    const C = SMOKE.cig, a = SMOKE.curl;
+    // AT REST: the wrist off the shoulder, the frame in the figure's own axes.
+    const R = SMOKE.rest;
+    _sWr.set(S.x + R.wrist[0] * L, S.y + R.wrist[1] * L, S.z + R.wrist[2] * L);
+    smokeFrame(H, _sG.set(...R.g).normalize(), _sF.set(...R.e).normalize(), a,
+      _sN, _sL, _sC, _sQr);
+    // AT THE LIPS: the frame is the head's, and the wrist is worked back from
+    // the filter — the lips, `in` along the paper — through the grip.
+    const Qhd = f.boneTurn(B.ih, _sQh);
+    const Lp = SMOKE.lips;
+    const g = _sG.set(...Lp.g).applyQuaternion(Qhd).normalize();
+    const e = _sF.set(...Lp.e).applyQuaternion(Qhd).normalize();
+    smokeFrame(H, g, e, a, _sN, _sL, _sC, _sQm);
+    const F = _sV.copy(B.lips).applyQuaternion(Qhd).add(f.boneAt(B.ih, _sH))
+      .addScaledVector(e, Lp.in * k);
+    _sWm.copy(F).addScaledVector(e, -C.out * k).addScaledVector(_sC, -SMOKE.side * k)
+      .addScaledVector(g, -SMOKE.grip * H.fl).addScaledVector(_sN, -H.len);
+    // Between, eased — and bowed forward on the way, so the hand comes up in
+    // front of the chest rather than grazing it.
+    const u = m.u;
+    const T = _sT.copy(_sWr).lerp(_sWm, u).addScaledVector(_sX1, 0.05 * Math.sin(Math.PI * u));
+    const Q = _sQr.slerp(_sQm, u);
+    // Two bones, `holdPhone`'s way: elbow by the cosine rule, off the pole.
+    const v = _sP.copy(T).sub(S);
+    const d = Math.min(Math.max(v.length(), Math.abs(Lu - Lf) + 1e-3), L - 1e-3);
+    v.normalize();
+    T.copy(S).addScaledVector(v, d);
+    const ae = (d * d + Lu * Lu - Lf * Lf) / (2 * d);
+    const h = Math.sqrt(Math.max(0, Lu * Lu - ae * ae));
+    const p = _sO.set(...R.pole).normalize().lerp(_sM.set(...Lp.pole).normalize(), u);
+    p.addScaledVector(v, -p.dot(v));
+    if (p.lengthSq() < 1e-6) p.set(v.y, -v.x, 0);
+    p.normalize();
+    const el = _sM.copy(S).addScaledVector(v, ae).addScaledVector(p, h);
+    rec.qa.setFromUnitVectors(uc, _sX.copy(el).sub(S).normalize());
+    rec.qb.setFromUnitVectors(fc.applyQuaternion(rec.qa), _sX.copy(T).sub(el).normalize());
+    // The hand into its frame: whatever the clip and the two new arm turns
+    // leave it at, turned the rest of the way.
+    rec.qc.copy(Q).multiply(_sA.copy(rec.qb).multiply(rec.qa).multiply(Hclip).invert());
+    aimQ(f, 'armUR', rec.qa);
+    aimQ(f, 'armLR', rec.qb);
+    aimQ(f, 'handR', rec.qc);
+    // The fingers folded round the paper, about the knuckle line as it now is.
+    _sX.set(0, 0, 0).crossVectors(H.d, H.n).applyQuaternion(Q);
+    f.aim('fingersR', _sX.x, _sX.y, _sX.z, a);
+    rec.on = true;
+    rec.id = fg.idx;
+    rec.ex = E.x; rec.ey = E.y; rec.ez = E.z;
+    rec.wx = W.x; rec.wy = W.y; rec.wz = W.z; rec.kx = K.x;
   }
 
   // ── the bathers, as things the jet can hit and things that answer ─────────
@@ -60560,6 +61083,9 @@ async function buildJadrija(scene) {
     stepCast(dt, cam);
 
     for (const k in crowds) crowds[k].flush(crowdT, cam);
+    // The smokers, off the palettes the flush has just built — see the note
+    // over `stepSmokers` for why after it and not beside the phones.
+    stepSmokers(dt, cam);
     // The Bucketeer, who carries her own range gate for the same reason Baye's
     // is here rather than inside her stepper.
     // `who` and `dir`, not `cam`. She had the bug the note at the top of this
@@ -62516,6 +63042,51 @@ async function buildJadrija(scene) {
     /** How many people are on a phone, how many are drawn, and what the
      *  screens are showing — which is the only way to tell a live quote from
      *  the baked one without walking up to somebody. */
+    /**
+     * The smokers (`SMOKE`): who and where, what each is doing, and the two
+     * numbers the drag is judged on — `gap`, the worst distance between the
+     * filter end and the lips while it is between them (the filter is aimed
+     * `SMOKE.lips.in` inside them, so ~0.006 is exact), and `nose`, the
+     * closest the fingers came to the nose tip, less a finger's half-width
+     * (negative would be a finger through it). `reset` clears the two.
+     */
+    smokers: (reset) => {
+      if (reset) { smokeStat.gap = -1; smokeStat.nose = -1; smokeStat.holds = 0; }
+      const pairs = crowds.skin ? crowds.skin.pairs() : [];
+      return {
+        who: (smokers || []).map((fg) => {
+          const pr = pairs.find(([p]) => p === fg);
+          const m = fg.smk, n = fg.smoke;
+          return { n, i: fg.idx, shop: fg.sitAt.shop, t: +fg.t.toFixed(1), s: +fg.lane.toFixed(1),
+            h: pr ? +(skinHeight(pr[1].data) * (pr[1].mesh.scale.y || 1)).toFixed(2) : null,
+            drawn: !!(pr && cigs[n] && cigs[n].g.visible),
+            phase: m ? m.phase : null, u: m ? +m.u.toFixed(2) : null,
+            ember: m ? +m.ember.toFixed(2) : null, exhale: m ? +m.ex.toFixed(2) : null,
+            e: m ? m.eF : null, g: m ? m.gF : null,
+            next: m && m.phase === 'rest' ? +m.wait.toFixed(1) : 0,
+            // Which way they face, as a world direction (three.js turns local
+            // +x to (cos, 0, −sin)), and where the mouth is — for a camera.
+            face: pr ? [+Math.cos(pr[0].yaw).toFixed(3), +(-Math.sin(pr[0].yaw)).toFixed(3)] : null,
+            cig: pr && cigs[n] ? cigs[n].g.position.toArray().map((v) => +v.toFixed(3)) : null };
+        }),
+        gap: +smokeStat.gap.toFixed(4), nose: +smokeStat.nose.toFixed(4), holds: smokeStat.holds,
+        smoke: smoke ? smoke.stats() : null, ms: +smokeMs.toFixed(3),
+        // Where the sun is, so a probe can stand with it behind the smoke.
+        sun: U.uSunDir.value.toArray().map((v) => +v.toFixed(3)),
+      };
+    },
+    /** The numbers, live — `smokeCfg().near = 0` turns the whole thing off
+     *  for an A/B, which is how the cost in the changelog was taken. */
+    smokeCfg: () => SMOKE,
+    /** Take a drag now: smoker `n` (1 or 2), or all of them. */
+    smokeNow: (n) => {
+      let k = 0;
+      for (const fg of smokers || []) {
+        if (n && fg.smoke !== n) continue;
+        if (fg.smk && fg.smk.phase === 'rest') { fg.smk.wait = 0; k++; }
+      }
+      return k;
+    },
     phones: () => ({
       holders: bathers.filter((b) => b.phone).length,
       looking: bathers.filter((b) => b.phone === 1).length,
