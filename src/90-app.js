@@ -1078,7 +1078,8 @@ let buttSlaps = 0;              // debug: how many the click has actually played
  * landed either way; sometimes her hands going back to where it landed (see
  * `slapped` in 43-jadrija.js, which decides whether this is one of those
  * times); and, 1.540.0, its weight, when she is lying on her front on the cot
- * — see `cotSpank`, which is the ragdoll's.
+ * — see `cotSpank`, which is the ragdoll's — and since 1.544.0 in whatever
+ * pose she holds on it.
  */
 function buttSlap(side, k = null, hit = null) {
   if (audio && audio.slap) buttSlaps += audio.slap() ? 1 : 0;
@@ -7690,6 +7691,12 @@ function tick(wall, draw) {
         // her face is right behind the small of her back, seen from her
         // feet). And off her it is not the slap, however near a cheek's
         // point it passed: the mattress beside her took one in five before.
+        //
+        // AND IN EVERY OTHER POSE ON THE COT (1.544.0): the same test, and it
+        // is the slap where her pose lists it — a thigh on her back, a hip on
+        // her side, her bottom kneeling up — and null anywhere else, so her
+        // breast, her belly, the inside of her thigh and her mouth are the
+        // cup, the stroke and the thumb exactly as they were.
         const bk = jadrija.cotAim ? jadrija.cotAim(camera.position, fw) : null;
         if (bk && bk.miss) { if (reachKind === 'butt') reachKind = 'thumb'; } else if (bk) {
           reachKind = 'butt'; buttSide = bk.side; buttHit = bk;
