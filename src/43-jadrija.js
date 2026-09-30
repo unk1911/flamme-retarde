@@ -15259,7 +15259,9 @@ async function buildJadrija(scene) {
     const GALV = [0.585, 0.598, 0.605];
     const FRAME = shade(body, 1.10);
     const LIP = shade(body, 1.32);
-    const LINING = [0.330, 0.318, 0.295];
+    // Pale, since 1.550.8: a kiosk is lined in white laminate, and the dark
+    // lining was most of why the window read as a cave.
+    const LINING = [0.480, 0.468, 0.440];
     const T0 = S.t0, T1 = S.t1, S0 = S.s0, S1 = S.s1;
     const hz = (n) => {
       const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
@@ -15911,7 +15913,46 @@ async function buildJadrija(scene) {
         spinTS(bt, cs, prof, c, 14);
       }
     }
-    TKG.done('tisak:goods', 0.14);
+    // WHAT HANGS IN THE OPEN WINDOW (1.550.8). The pan at 04:25.8 has the
+    // head of the window busy as well as its shelves: clip strips of gum and
+    // lighter cards hanging over the counter, and inflatables hung on the
+    // rail over the magazines. Two strips in the middle bay, clear of the
+    // till, and two swim rings in front of the magazine shelves, both behind
+    // the header row and clear of the rack and the shelves by 0.07 m or more.
+    {
+      const CLIP = [0.82, 0.82, 0.80];
+      for (const [k, st] of [[0, rkB + 0.18], [1, rkB + 0.42]]) {
+        const ss = S0 + 0.20, yT = gHi - 0.165, n = 5 + k;
+        boxTS(st - 0.022, st + 0.022, ss, ss + 0.003, yT - 0.10 * n - 0.03, yT, CLIP);
+        tubeTS([[st, ss + 0.0015, yT], [st, ss + 0.0015, gHi - 0.01]], 0.0022,
+          [0.30, 0.30, 0.30], 5);
+        for (let i = 0; i < n; i++) {
+          const yb = yT - 0.10 * (i + 1) + 0.008, sw = (hz(k * 7 + i + 1200) - 0.5) * 0.006;
+          const fs = ss - 0.0015;
+          TKG.quad([st - 0.034 + sw, fs, yb], [st + 0.034 + sw, fs, yb],
+            [st + 0.034, fs, yb + 0.085], [st - 0.034, fs, yb + 0.085],
+            TKG.cell('pack', Math.floor(hz(k * 11 + i + 1210) * 16)));
+        }
+      }
+      for (const [rt, rs, drop, col] of [[rkA + 0.20, S0 + 0.30, 0.19, [0.92, 0.42, 0.08]],
+        [rkA + 0.48, S0 + 0.29, 0.25, [0.14, 0.46, 0.86]]]) {
+        const R = 0.115, yc = gHi - drop - R;
+        const ring = [];
+        for (let q = 0; q <= 20; q++) {
+          const an = (q / 20) * TAU;
+          ring.push([rt + Math.sin(an) * R, rs, yc + Math.cos(an) * R]);
+        }
+        tubeTS(ring, 0.032, col, 10);
+        // Its white valve patch and the string it hangs on.
+        spinTS(rt + R * 0.70, rs - 0.024, [[yc - R * 0.70 - 0.012, 0.012],
+          [yc - R * 0.70 + 0.012, 0.012], [yc - R * 0.70 + 0.013, 0]], [0.90, 0.90, 0.88], 8);
+        tubeTS([[rt, rs, yc + R + 0.03], [rt, rs, gHi - 0.01]], 0.0022, [0.85, 0.85, 0.82], 5);
+      }
+    }
+    // BRIGHTER BEHIND THE GLASS (1.550.8): 0.14 was a shop with the lights
+    // off. The pan's interior is lit by its own tubes and reads nearly as
+    // bright as the promenade; the goods carry more of their own light now.
+    TKG.done('tisak:goods', 0.24);
 
     // ── outside it: the Ledo freezer ────────────────────────────────────────
     //
@@ -16227,7 +16268,14 @@ async function buildJadrija(scene) {
       // sides in `_414` are the cabinet's own white.
       const WRAP = [0.700, 0.708, 0.680];
       const CAB = [0.665, 0.662, 0.650];
-      const hw = 0.29, hd = 0.30, hh = 1.99;
+      // AND 2.15 M TALL (1.550.8), not 1.99. The face in `_414` is 3.7 to 1,
+      // and 1.550.7 took the width from that ratio against the 1.99 m read
+      // off `_343`; the width is the number the frame settles (0.58, the
+      // common size) and 0.58 × 3.7 is 2.15. It is also what the pan shows at
+      // 04:25.8 (`front_265.8s`): the cabinet's head is tucked up behind the
+      // valance, TISAK printed straight over it, where at 1.99 a strip of
+      // white lid showed under the hem from anywhere on the promenade.
+      const hw = 0.29, hd = 0.30, hh = 2.15;
       // A ROUNDED CABINET since 1.549.3 — 35 mm corners in plan, a 30 mm
       // radius round the top — standing 40 mm up on four levelling feet over
       // a dark recessed plinth, which is what a fridge is and a box is not.
@@ -16413,42 +16461,27 @@ async function buildJadrija(scene) {
         crank: gy + 1.25 });
       furniture.push({ t: pt2, s: ps2, a: 0.34, c: 0.34, h: 0.13, y: gy });
     }
-    // Two garden benches under the shade, timber slats on a dark frame with a
-    // pale cushion on each, which is what the two people in the frame are
-    // sitting on. They follow the CORONA: the whole reason they are anywhere
-    // is that they are UNDER it, and left in front of the counter with the
-    // parasol moved past the door end they would have been two benches in the
-    // sun with the shade five metres away. Same two offsets, same two angles,
-    // hung off the mast — and they follow it west with it, for the same
-    // reason they followed it east in 1.340.0.
-    for (const [bt, bs, ang] of [
-      [S.t0 - 2.15, S.s0 - 2.50, 0.0], [S.t0 - 0.60, S.s0 - 2.20, 0.5],
-    ]) {
-      const gy = surfaceY(bt, bs);
-      const co = Math.cos(ang), sn = Math.sin(ang);
-      const P = (u, v, yy) => W(bt + u * co - v * sn, bs + u * sn + v * co, yy);
-      const FRAME = [0.155, 0.140, 0.125];
-      const SLAT = [0.365, 0.255, 0.170];
-      const CUSH = [0.500, 0.545, 0.545];
-      for (const u of [-0.72, 0.72]) {
-        for (const v of [-0.22, 0.22]) {
-          post(P, u, v, gy, gy + 0.42, 0.026, FRAME, 4);
-        }
-        boxIn(P, u - 0.03, u + 0.03, -0.24, 0.24, gy + 0.40, gy + 0.46, FRAME);
-        post(P, u, 0.22, gy + 0.42, gy + 0.92, 0.026, FRAME, 4);
-      }
-      for (let k = 0; k < 3; k++) {
-        boxIn(P, -0.78, 0.78, -0.24 + k * 0.17, -0.24 + k * 0.17 + 0.13,
-          gy + 0.44, gy + 0.47, SLAT, shade(SLAT, 1.12));
-      }
-      for (let k = 0; k < 3; k++) {
-        boxIn(P, -0.78, 0.78, 0.20, 0.25,
-          gy + 0.52 + k * 0.14, gy + 0.63 + k * 0.14, SLAT, shade(SLAT, 1.12));
-      }
-      boxIn(P, -0.74, 0.74, -0.22, 0.18, gy + 0.47, gy + 0.55,
-        CUSH, shade(CUSH, 1.12));
-      furniture.push({ t: bt, s: bs, a: 0.82, c: 0.42, h: 0.92, y: gy });
-    }
+    // ONE bench under the shade, and it is the resort's own (1.550.8).
+    //
+    // There were two garden benches here, timber slats on a dark frame with a
+    // pale cushion on each, hung off the CORONA mast at `t0 − 2.15` and
+    // `t0 − 0.60`. Misha, 30 Sep 2026, looking at them from the plaza: *"fix
+    // this defect with the parasol pole going through a bench ... maybe get rid
+    // of one of the benches"*. Both were wrong, and measurably. The first ran
+    // t0 − 2.93 to t0 − 1.37 along its seat, and the mast stands at t0 − 1.45,
+    // s0 − 2.60 — 0.10 m inside the seat's s span, so the pole came up through
+    // the slats. The second was turned 0.5 rad and its west corner reached
+    // t0 − 1.40, s0 − 2.57: on the mast's foot plate, and through the end of
+    // the first bench.
+    //
+    // So one bench, and not a one-off drawn here: `parkBench`, the resort's
+    // municipal pattern (green cast-iron ends, green slats), so it is upgraded
+    // with every other bench on the shore. It faces the water with its back to
+    // the beer-tent set, west of the mast: its east end is 0.21 m clear of the
+    // 0.30 m foot plate and 0.47 m clear of the pole, and its back is 0.40 m
+    // clear of the set's seaward bench. Half of it is under the CORONA's cloth.
+    // Nothing here draws on `rng` (rule 4); one bench's collider went with it.
+    parkBench(S.t0 - 2.70, S.s0 - 2.62);
     // The step ladder, which is the one object in the frame that says the shop
     // is being worked in rather than looked at.
     //
@@ -16461,80 +16494,80 @@ async function buildJadrija(scene) {
     // ladder and a standing A-frame are different shapes at any distance, and
     // this one is the shape with a hoop on top.
     {
-      // MOVED TO THE WEST END (1.550.5), which is where both frames have it:
-      // `_343` standing open in front of the west window and `_414` at 04:25.8
-      // beside the west corner. It stood in front of the counter, where the
-      // pan has clear paving. Clear of the trestles leaning on the west end
-      // (their foot is at s0 + 0.36) and of the beer-tent set (t0 − 0.85).
-      const lt = S.t0 - 0.55, ls = S.s0 - 0.35, pf = y0 + 1.06;
-      // The two front stiles, raked a little, and the two rear legs raked a
-      // lot — which between them is what an A-frame is. Same centres, rakes
-      // and lengths as the `slat` bars they were; since 1.549.3 each is an
-      // aluminium section with 8 mm radii and a black rubber shoe on its foot.
+      // FOLDED AND LEANING ON THE WEST END (1.550.8). The pan at 04:25.8
+      // (`front_265.8s`) has it shut: stiles, rear legs and platform folded
+      // flat into one tall silver stack leaning on the kiosk's west end, just
+      // behind the Jana cabinet, with the grab hoop resting on the corner.
+      // 1.550.5 stood it open on the paving beside the corner, which is
+      // `_343`, taken from the land side at another hour; seen from the
+      // promenade, which is where everybody sees it from, the pan wins.
+      //
+      // Same members as the open one — the two front stiles, the rear legs,
+      // four treads, the platform, the bent-tube hoop — in the ladder's own
+      // plane, leaning 0.135 rad (7.7 degrees) off plumb: `AX` up the stiles,
+      // `NM` square to them toward the wall, the width along `s`. The feet
+      // stand 0.36 m out from the end, the hoop rests 9 mm off the corner
+      // frame, and the width runs s0 − 0.24 to s0 + 0.32: clear of the
+      // trestles stacked behind it (their nearest edge is at s0 + 0.36).
+      const tf = S.t0 - 0.36, lc = S.s0 + 0.04, a = 0.135;
+      const sa = Math.sin(a), ca = Math.cos(a);
+      const AXL = [sa, 0, ca], NM = [ca, 0, -sa];
+      const at2 = (l, x, off) => [tf + sa * l + ca * off, lc + x, y0 + ca * l - sa * off];
       const SHOE = [0.085, 0.085, 0.090];
-      const legAt = (o, cs, cy, a, long, hw, hd, col) => {
-        const AX = [0, Math.sin(a), Math.cos(a)], NM = [0, Math.cos(a), -Math.sin(a)];
-        const h = long / 2;
-        const A = [lt + o, cs - AX[1] * h, cy - AX[2] * h];
-        const B = [lt + o, cs + AX[1] * h, cy + AX[2] * h];
-        tkBar(A, B, [1, 0, 0], NM, hw, hd, 0.008, col);
-        tkBar(A, [A[0], A[1] + AX[1] * 0.065, A[2] + AX[2] * 0.065], [1, 0, 0], NM,
-          hw + 0.005, hd + 0.005, 0.010, SHOE);
-      };
-      for (const o of [-0.26, 0.26]) {
-        legAt(o, ls - 0.06, y0 + 0.53, 0.113, 1.070, 0.022, 0.023, GALV);
-        legAt(o, ls + 0.27, y0 + 0.53, 0.409, 1.156, 0.020, 0.021, shade(GALV, 0.94));
-        // The spreader strap that stops the two opening past their stance,
-        // on the outside of each pair at knee height.
-        const y = y0 + 0.48, dy = y - (y0 + 0.53);
-        const sf = ls - 0.06 + dy * Math.tan(0.113), sr = ls + 0.27 + dy * Math.tan(0.409);
-        tkS(lt + o + Math.sign(o) * 0.029, sf, sr, y, 0.004, 0.013, 0.003,
-          shade(GALV, 0.82));
+      const alongL = (x, off, l0, l1, hw, hd, col) =>
+        tkBar(at2(l0, x, off), at2(l1, x, off), [0, 1, 0], NM, hw, hd, 0.008, col);
+      for (const x of [-0.26, 0.26]) {
+        alongL(x, 0, 0.0, 1.07, 0.022, 0.023, GALV);
+        alongL(x, 0, 0.0, 0.065, 0.027, 0.028, SHOE);
+        // The rear leg, folded flat behind its stile and outside it.
+        const xr = x * (0.285 / 0.26);
+        alongL(xr, 0.048, 0.012, 1.07, 0.020, 0.021, shade(GALV, 0.94));
+        alongL(xr, 0.048, 0.012, 0.077, 0.025, 0.026, SHOE);
+        // The spreader strap, folded down along the rear leg.
+        tkBar(at2(0.46, xr + Math.sign(x) * 0.029, 0.048), at2(0.84, xr + Math.sign(x) * 0.029, 0.048),
+          [0, 1, 0], NM, 0.004, 0.013, 0.003, shade(GALV, 0.82));
       }
-      // The rear legs' cross brace, a round tube.
-      {
-        const y = y0 + 0.28, sr = ls + 0.27 + (y - y0 - 0.53) * Math.tan(0.409);
-        tubeTS([[lt - 0.26, sr, y], [lt + 0.26, sr, y]], 0.011, shade(GALV, 0.94), 10);
-      }
-      // Four treads up the front and the platform on top, each one further back
-      // than the last by the rake of the stile it is fixed to — pressed
-      // treads with radiused nosings and three anti-slip ribs along each.
+      // The rear legs' cross brace.
+      tubeTS([at2(0.26, -0.285, 0.048), at2(0.26, 0.285, 0.048)], 0.011, shade(GALV, 0.94), 10);
+      // Four treads, fixed to the front stiles and so still near level: each
+      // runs from the stile back toward the wall, pressed, with three ribs.
       for (let k = 0; k < 4; k++) {
-        const ty = y0 + 0.21 * (k + 1);
-        const ts2 = ls - 0.12 + (ty - y0) * 0.114;
-        tkT(lt - 0.24, lt + 0.24, ts2, ty + 0.014, 0.055, 0.014, 0.007,
-          shade(GALV, 1.06));
+        const l = 0.21 * (k + 1) / Math.cos(0.113);
+        const [pt, , py] = at2(l, 0, 0);
+        const tc = pt + 0.050;
+        tkBar([tc, lc - 0.24, py + 0.014], [tc, lc + 0.24, py + 0.014], [1, 0, 0], [0, 0, 1],
+          0.055, 0.014, 0.007, shade(GALV, 1.06));
         for (const d of [-0.030, 0, 0.030]) {
-          tkT(lt - 0.225, lt + 0.225, ts2 + d, ty + 0.0295, 0.0045, 0.0035, 0.002,
-            shade(GALV, 0.96), { nc: 2 });
+          tkBar([tc + d, lc - 0.225, py + 0.0295], [tc + d, lc + 0.225, py + 0.0295],
+            [1, 0, 0], [0, 0, 1], 0.0045, 0.0035, 0.002, shade(GALV, 0.96), { nc: 2 });
         }
       }
-      knRR(W, lt - 0.27, lt + 0.27, ls - 0.09, ls + 0.09, pf, pf + 0.034, 0.020, 0.009,
-        shade(GALV, 1.10), shade(GALV, 1.16), { bottom: true });
+      // The platform, folded up flat against the hoop, and its ribs.
+      tkBar(at2(0.99, 0, 0.078), at2(1.24, 0, 0.078), [0, 1, 0], NM, 0.27, 0.017, 0.009,
+        shade(GALV, 1.10));
       for (let k = 0; k < 5; k++) {
-        tkT(lt - 0.25, lt + 0.25, ls - 0.066 + k * 0.033, pf + 0.0355, 0.0045, 0.0035,
-          0.002, shade(GALV, 1.00), { nc: 2 });
+        const l = 1.005 + k * 0.055;
+        tkBar(at2(l, -0.25, 0.058), at2(l, 0.25, 0.058), AXL, NM, 0.0045, 0.0035, 0.002,
+          shade(GALV, 1.00), { nc: 2 });
       }
-      // The handle, and it IS the single bent tube the frame has now: up from
-      // the platform, round two 70 mm bends and across — swept, where it was
-      // two prisms and a box.
+      // The hoop: one bent tube, up from the stile heads, round two 70 mm
+      // bends and across, resting on the corner.
       {
-        const hs = ls + 0.02, R = 0.07, hx = 0.22, hTop = pf + 0.86;
-        const P = [[lt - hx, hs, pf - 0.01], [lt - hx, hs, hTop - R]];
+        const R = 0.07, hx = 0.22, lTop = 1.93, off = 0.02;
+        const P = [at2(0.98, -hx, off), at2(lTop - R, -hx, off)];
         for (let q = 1; q <= 5; q++) {
-          const a = Math.PI - (q / 6) * (Math.PI / 2);
-          P.push([lt - hx + R + Math.cos(a) * R, hs, hTop - R + Math.sin(a) * R]);
+          const an = Math.PI - (q / 6) * (Math.PI / 2);
+          P.push(at2(lTop - R + Math.sin(an) * R, -hx + R + Math.cos(an) * R, off));
         }
-        P.push([lt - hx + R, hs, hTop]);
-        P.push([lt + hx - R, hs, hTop]);
+        P.push(at2(lTop, -hx + R, off), at2(lTop, hx - R, off));
         for (let q = 1; q <= 5; q++) {
-          const a = Math.PI / 2 - (q / 6) * (Math.PI / 2);
-          P.push([lt + hx - R + Math.cos(a) * R, hs, hTop - R + Math.sin(a) * R]);
+          const an = Math.PI / 2 - (q / 6) * (Math.PI / 2);
+          P.push(at2(lTop - R + Math.sin(an) * R, hx - R + Math.cos(an) * R, off));
         }
-        P.push([lt + hx, hs, hTop - R], [lt + hx, hs, pf - 0.01]);
+        P.push(at2(lTop - R, hx, off), at2(0.98, hx, off));
         tubeTS(P, 0.0165, GALV, 12);
       }
-      furniture.push({ t: lt, s: ls, a: 0.30, c: 0.36, h: pf + 0.87 - y0, y: y0 });
+      furniture.push({ t: S.t0 - 0.22, s: lc, a: 0.16, c: 0.30, h: 1.93, y: y0 });
     }
     // And the beer-tent set on the gravel in front, the same folding trestle
     // and two loose benches that stand at the tavern — see the note there for
@@ -21913,99 +21946,280 @@ async function buildJadrija(scene) {
    */
   function freeLibrary(lt, ls) {
     const gy = surfaceY(lt, ls);
-    const TIMB3 = [0.330, 0.212, 0.118];
-    const DARKW2 = [0.215, 0.135, 0.078];
-    const LEG2 = [0.085, 0.082, 0.080];
-    const GALV2 = [0.560, 0.566, 0.570];
+    // REBUILT FROM `_367` AT FULL SIZE (1.550.8). Misha, 30 Sep 2026: *"spruce
+    // up those multi-coloured jadrija mailbox thingies"*. They are not
+    // mailboxes — see above: it is one book box, shut, with six kabina doors
+    // painted on its drop-front — but he is right that it read as a mailbox
+    // bank. It was a stained box, a flat front and a canvas on an UNLIT plane
+    // in front of it: six flat coloured rectangles glowing on a white card.
+    // Opened at 4000 px the thing is made, and made by hand:
+    //
+    //  - the front is THREE white-painted planks laid horizontally, with the
+    //    joints open, nail holes along them and the paint worn through to the
+    //    grain at the arrises;
+    //  - the doors are ROUTED into them and then painted: every louvre blade
+    //    is a cut with a shadow on its upper lip and a light edge under it,
+    //    the green one's boards are vertical cuts, the second blue one's are
+    //    wavy, the first blue and the yellow are plain panels in a routed
+    //    frame; each transom is a routed lozenge in the door's own colour;
+    //    each handle a black dash;
+    //  - a rust run down the white from the hasp at the top;
+    //  - the carcass is boards stained near-black-brown, vertical on the ends
+    //    and horizontal on the back, on two square black steel posts; the lid
+    //    is a plank raked back over a fascia board with a drip, both darker.
+    //
+    // The painting is lit now (`tkPrintMat` through `tkSheet`), so it takes
+    // the pines' shade and the evening like the wood round it, and it lies
+    // 1.5 mm in front of the planks rather than on a card.
+    //
+    // Same footprint, same collider, same bench beside it; no `rng` (rule 4).
+    const STAIN = [0.190, 0.122, 0.074];
+    const STAIN2 = [0.235, 0.152, 0.090];
+    const LID = [0.120, 0.090, 0.066];
+    const STEEL = [0.052, 0.052, 0.055];
+    const RUSTY = [0.360, 0.300, 0.250];
+    const WHITE = [0.700, 0.700, 0.675];
     const HW = 0.76, HD = 0.22;
-    // The two legs, and they are set in from the ends the way the frame has
-    // them rather than under the corners.
+    const yB = gy + 0.56, yF = gy + 1.44, yK = gy + 1.50;       // floor, front head, back head
+    const headAt = (s) => yF + (yK - yF) * (s - (ls - HD)) / (2 * HD);
+    const lh = (n) => {
+      const x = Math.sin(n * 91.345 + 7.77) * 39113.13;
+      return x - Math.floor(x);
+    };
+    // The posts: 60 mm square steel, eased, capped, from under the gravel to
+    // the box's floor, and on up the inside of the back.
     for (const o of [-0.52, 0.52]) {
-      boxTS(lt + o - 0.035, lt + o + 0.035, ls - 0.035, ls + 0.035,
-        gy, gy + 0.60, LEG2);
+      knRR(W, lt + o - 0.030, lt + o + 0.030, ls + HD - 0.085, ls + HD - 0.025,
+        gy - 0.06, yK - 0.10, 0.008, 0.004, STEEL, shade(STEEL, 1.4));
     }
-    // The carcass, and it is one box now rather than a chest with an open bay
-    // over it: shut, the whole front from the legs to the lid is the painted
-    // board.
-    boxTS(lt - HW, lt + HW, ls - HD, ls + HD, gy + 0.56, gy + 1.44,
-      TIMB3, shade(TIMB3, 1.14));
-    // The drop-front itself, a hair proud of the carcass so that the painting
-    // never shares a plane with the box behind it.
-    boxTS(lt - HW + 0.02, lt + HW - 0.02, ls - HD - 0.024, ls - HD + 0.002,
-      gy + 0.58, gy + 1.42, shade(TIMB3, 1.10), shade(TIMB3, 1.18));
-    // The hasp at the top, which is the only ironmongery you can see with it
-    // shut — the two long strap hinges are on the inside face and that is why
-    // `_368` shows bare pine with hinges on it and no paint whatever.
-    boxTS(lt - 0.055, lt + 0.055, ls - HD - 0.036, ls - HD - 0.022,
-      gy + 1.34, gy + 1.44, GALV2);
+    // The floor and its bearer.
+    knRR(W, lt - HW, lt + HW, ls - HD, ls + HD, yB, yB + 0.024, 0.004, 0.003,
+      STAIN, shade(STAIN, 1.10), { bottom: true });
+    boxTS(lt - HW + 0.03, lt + HW - 0.03, ls + HD - 0.10, ls + HD - 0.02, yB - 0.05, yB,
+      shade(STAIN, 0.85));
+    // The back: four boards on edge, open joints.
+    {
+      const n = 4, h = (yK - yB - 0.024) / n;
+      for (let k = 0; k < n; k++) {
+        const g = 0.90 + 0.20 * lh(k + 1);
+        boxTS(lt - HW, lt + HW, ls + HD - 0.020, ls + HD, yB + 0.024 + k * h + 0.0015,
+          yB + 0.024 + (k + 1) * h - 0.0015, shade(STAIN2, g), shade(STAIN2, g * 1.1));
+      }
+      // The dark inside behind the joints.
+      boxTS(lt - HW + 0.02, lt + HW - 0.02, ls + HD - 0.030, ls + HD - 0.020, yB + 0.02,
+        yK - 0.01, [0.06, 0.05, 0.04]);
+    }
+    // The ends: three boards each, standing, cut to the rake of the lid.
+    for (const [ta, tb] of [[lt - HW, lt - HW + 0.022], [lt + HW - 0.022, lt + HW]]) {
+      for (let j = 0; j < 3; j++) {
+        const s0 = ls - HD + (2 * HD / 3) * j + 0.0015, s1 = ls - HD + (2 * HD / 3) * (j + 1) - 0.0015;
+        const g = 0.88 + 0.24 * lh(ta * 3 + j);
+        bar(ta, tb, [[s0, yB], [s1, yB], [s1, headAt(s1)], [s0, headAt(s0)]],
+          shade(STAIN2, g), shade(STAIN2, g * 1.15));
+      }
+      const tin = ta < lt ? tb : ta;
+      boxTS(Math.min(tin, tin + (ta < lt ? 0.008 : -0.008)), Math.max(tin, tin + (ta < lt ? 0.008 : -0.008)),
+        ls - HD + 0.01, ls + HD - 0.02, yB + 0.02, yF - 0.01, [0.06, 0.05, 0.04]);
+    }
+    // The drop-front: three planks between the ends, the joints open 3 mm,
+    // standing 4 mm proud of the carcass edge.
+    const fa = lt - HW + 0.022, fb = lt + HW - 0.022, f0 = ls - HD - 0.004;
+    const pyA = yB + 0.025, pyB = yF - 0.010;
+    {
+      const ph = (pyB - pyA) / 3;
+      for (let k = 0; k < 3; k++) {
+        knRR(W, fa, fb, f0, f0 + 0.020, pyA + k * ph + 0.0015, pyA + (k + 1) * ph - 0.0015,
+          0.002, 0.003, WHITE, shade(WHITE, 1.04), { bottom: true });
+      }
+      boxTS(fa + 0.02, fb - 0.02, f0 + 0.020, f0 + 0.026, pyA, pyB, [0.05, 0.045, 0.04]);
+    }
     /**
-     * The painting: six kabina doors on a white ground.
+     * The painting, on a lit sheet 1.5 mm in front of the planks.
      *
-     * A canvas rather than geometry, for `panelSign`'s own reason — a louvred
-     * door 0.20 m wide is forty blades, and forty blades in triangles is a
-     * thousand of them for something that is two pixels a blade at the range
-     * anybody sees this from.
-     *
-     * COLOURS are read off `_367` and DIVIDED BY THE WHITE BOARD BESIDE THEM.
-     * The board is in the shade of the pines there — measured 157/172/191,
-     * which is skylight and is bluer than it is red — so the raw door values
-     * are all cold, and every one of them comes out wrong if it is used as
-     * paint. White paint is about 0.85, so the ratios against the board times
-     * 0.85 are the pigments: orange 0.92/0.51/0.33, blue 0.14/0.51/0.84, red
-     * 0.90/0.31/0.35, green 0.33/0.62/0.27, the second blue 0.06/0.39/0.71,
-     * yellow 0.92/0.77/0.21.
-     *
-     * All of it then goes 12 % under, board included, because `panelSign` uses
-     * an UNLIT material: a white board at its own albedo is lighter than every
-     * lit surface round it and reads as a lightbox rather than as paint.
+     * COLOURS are read off `_367` and divided by the white board beside them,
+     * as before: the board is in the pines' shade there (157/172/191, skylight),
+     * so every raw value is cold. Against white paint at 0.85 the pigments are
+     * orange 0.92/0.51/0.33, blue 0.14/0.51/0.84, red 0.90/0.31/0.35, green
+     * 0.33/0.62/0.27, the second blue 0.06/0.39/0.71, yellow 0.92/0.77/0.21.
+     * They were taken down 12 % while the card was unlit, so it would not
+     * glow like a lightbox. Lit, and in the pines' shade, that cut came out
+     * as a board of dull earth colours, so they are at full strength here
+     * with a little light of their own (1.550.8).
      */
-    panelSign(lt, ls - HD - 0.040, gy + 1.00, HW * 2 - 0.06, 0.82, (g, C) => {
-      const w = C.width, h = C.height;
-      g.fillStyle = '#c0beb6'; g.fillRect(0, 0, w, h);
-      // The boards the panel is made of, showing through the paint: five
-      // horizontal joints, barely there. `_367` has them across the white.
-      g.fillStyle = 'rgba(120,114,102,0.30)';
-      for (let k = 1; k < 6; k++) g.fillRect(0, (h * k / 6) | 0, w, 1.5);
-      // orange, blue, red, green, blue, yellow — left to right, in that order.
-      const DOOR = ['#cf7349', '#1f73bd', '#cc464f', '#4b8c3d', '#0e589f',
-        '#d0ad30'];
-      const M = w * 0.031;                     // margin at the ends
-      const dw = (w - M * 2) / 6 * 0.82;       // door, against a 0.18 gap
-      const pitch = (w - M * 2 - dw) / 5;
-      const dy0 = h * 0.27, dh = h * 0.52;
-      for (let i = 0; i < 6; i++) {
-        const x = M + i * pitch;
-        g.fillStyle = DOOR[i];
-        // The transom light over the door, in the door's own colour, which is
-        // what the kabine themselves have and is why this reads as a picture
-        // of them rather than as six coloured rectangles.
-        g.fillRect(x + dw * 0.10, h * 0.10, dw * 0.80, h * 0.055);
-        g.fillRect(x, dy0, dw, dh);
-        // The blades. Horizontal on five of them and VERTICAL on the green
-        // one, which is planked rather than louvred — the one asymmetry in
-        // the row and the thing that stops it reading as a pattern.
-        g.fillStyle = 'rgba(0,0,0,0.16)';
-        if (i === 3) {
-          for (let k = 1; k * 5 < dw; k++) {
-            g.fillRect(x + k * 5, dy0 + 2, 1.6, dh - 4);
-          }
-        } else {
-          for (let k = 1; k * 5 < dh; k++) {
-            g.fillRect(x + 2, dy0 + k * 5, dw - 4, 1.6);
+    {
+      const w = fb - fa, h = pyB - pyA, PX = 720;
+      const C = document.createElement('canvas');
+      C.width = Math.round(w * PX); C.height = Math.round(h * PX);
+      const g = C.getContext('2d');
+      const CW = C.width, CH = C.height;
+      const WHITEP = [0.790, 0.788, 0.760];
+      g.fillStyle = tkCss(WHITEP); g.fillRect(0, 0, CW, CH);
+      // The grain under the paint, running along each plank, and the paint
+      // thinner in streaks where the brush ran out.
+      for (let i = 0; i < 420; i++) {
+        const y = lh(i + 10) * CH, x = lh(i + 11) * CW * 0.9, len = 40 + lh(i + 12) * 260;
+        const d = lh(i + 13) < 0.5 ? 0.93 : 1.03;
+        g.fillStyle = tkCss(WHITEP.map((c) => c * d), 0.55);
+        g.fillRect(x, y, len, 1 + lh(i + 14) * 1.5);
+      }
+      // The joints: a dark line and a lit lip under it.
+      for (const f of [1 / 3, 2 / 3]) {
+        const y = CH * (1 - f);
+        g.fillStyle = tkCss([0.08, 0.07, 0.06]); g.fillRect(0, y - 2, CW, 3.5);
+        g.fillStyle = tkCss([0.40, 0.39, 0.37], 0.6); g.fillRect(0, y + 1.5, CW, 2);
+      }
+      // Nail holes, in pairs at the ends and the middle of each plank.
+      g.fillStyle = tkCss([0.10, 0.09, 0.08], 0.85);
+      for (let k = 0; k < 3; k++) {
+        const yc = CH * (1 - (k + 0.5) / 3);
+        for (const x of [0.012, 0.50, 0.988]) {
+          for (const dy of [-0.07, 0.07]) {
+            g.beginPath();
+            g.arc(CW * x + (lh(k * 9 + x * 50) - 0.5) * 6, yc + CH * dy, 2.2, 0, TAU);
+            g.fill();
           }
         }
-        // The handle: a black dash at hand height. Two pixels, and without it
-        // these are panels rather than doors.
-        g.fillStyle = 'rgba(20,18,16,0.85)';
-        g.fillRect(x + dw * 0.52, dy0 + dh * 0.56, dw * 0.30, 2.6);
       }
-    });
-    // The lid: one plank, oversailing all round and raked back, dark with the
-    // weather on it.
-    bar(lt - HW - 0.08, lt + HW + 0.08,
-      [[ls - HD - 0.10, gy + 1.42], [ls + HD + 0.08, gy + 1.50],
-        [ls + HD + 0.08, gy + 1.56], [ls - HD - 0.10, gy + 1.48]],
-      DARKW2, shade(DARKW2, 1.20));
+      // Wear at the arrises: the grain grey through the white, along the top
+      // and the bottom edges and round each joint.
+      for (let i = 0; i < 160; i++) {
+        const edge = [0, CH / 3, 2 * CH / 3, CH][Math.floor(lh(i + 300) * 4)];
+        const x = lh(i + 301) * CW, y = edge + (lh(i + 302) - 0.5) * 10;
+        g.fillStyle = tkCss([0.42, 0.37, 0.30], 0.5 + 0.4 * lh(i + 303));
+        g.fillRect(x, y, 2 + lh(i + 304) * 14, 1.5 + lh(i + 305) * 2.5);
+      }
+      // The doors.
+      const DOOR = [[0.810, 0.450, 0.290], [0.125, 0.450, 0.740], [0.790, 0.275, 0.310],
+        [0.290, 0.545, 0.240], [0.055, 0.345, 0.625], [0.810, 0.680, 0.185]];
+      const KIND = ['louvre', 'plain', 'louvre', 'boards', 'wavy', 'plain'];
+      const M = CW * 0.07, dw = (CW - M * 2) / 6 * 0.74;
+      const pitch = (CW - M * 2 - dw) / 5;
+      const dy0 = CH * 0.25, dh = CH * 0.62;
+      // A routed cut: a shadow on the upper and left lips, light on the lower
+      // and right — the sun is overhead and the cut is 3 mm deep.
+      const cutH = (x0, x1, y, col) => {
+        g.fillStyle = tkCss(shade(col, 0.42)); g.fillRect(x0, y - 1.6, x1 - x0, 2.2);
+        g.fillStyle = tkCss(col.map((c) => Math.min(1, c * 1.25 + 0.06))); g.fillRect(x0, y + 0.6, x1 - x0, 1.6);
+      };
+      const cutV = (x, y0, y1, col) => {
+        g.fillStyle = tkCss(shade(col, 0.45)); g.fillRect(x - 1.4, y0, 2.0, y1 - y0);
+        g.fillStyle = tkCss(col.map((c) => Math.min(1, c * 1.22 + 0.05))); g.fillRect(x + 0.6, y0, 1.4, y1 - y0);
+      };
+      const frame = (x, y, fw, fh, col, ins) => {
+        cutH(x + ins, x + fw - ins, y + ins, col);
+        cutH(x + ins, x + fw - ins, y + fh - ins, col);
+        cutV(x + ins, y + ins, y + fh - ins, col);
+        cutV(x + fw - ins, y + ins, y + fh - ins, col);
+      };
+      const rrect = (x, y, fw, fh, r) => {
+        g.beginPath();
+        g.moveTo(x + r, y); g.lineTo(x + fw - r, y); g.quadraticCurveTo(x + fw, y, x + fw, y + r);
+        g.lineTo(x + fw, y + fh - r); g.quadraticCurveTo(x + fw, y + fh, x + fw - r, y + fh);
+        g.lineTo(x + r, y + fh); g.quadraticCurveTo(x, y + fh, x, y + fh - r);
+        g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y);
+        g.closePath();
+      };
+      for (let i = 0; i < 6; i++) {
+        const col = DOOR[i].map((c) => Math.min(1, c * 1.04));
+        const x = M + i * pitch, y = dy0 + (lh(i + 40) - 0.5) * 6;
+        // The outline cut first, as a dark rim a hair outside the paint.
+        g.fillStyle = tkCss(shade(col, 0.35), 0.8);
+        rrect(x - 2, y - 2, dw + 4, dh + 4, 5); g.fill();
+        g.fillStyle = tkCss(col); rrect(x, y, dw, dh, 4); g.fill();
+        // A lighter wash down the lit side of each, and paint thinner at the
+        // foot where the rain splashes it.
+        const gr = g.createLinearGradient(x, 0, x + dw, 0);
+        gr.addColorStop(0, tkCss(col.map((c) => Math.min(1, c * 1.10)), 0.5));
+        gr.addColorStop(1, tkCss(shade(col, 0.90), 0.5));
+        g.fillStyle = gr; rrect(x, y, dw, dh, 4); g.fill();
+        const ins = dw * 0.07;
+        frame(x, y, dw, dh, col, ins);
+        const kind = KIND[i];
+        if (kind === 'louvre') {
+          for (let yy = y + ins + 9; yy < y + dh - ins - 5; yy += 8.5) {
+            cutH(x + ins + 3, x + dw - ins - 3, yy + (lh(i * 50 + yy) - 0.5) * 1.5, col);
+          }
+        } else if (kind === 'boards') {
+          for (let xx = x + ins + 7; xx < x + dw - ins - 4; xx += 7.5) {
+            cutV(xx + (lh(i * 50 + xx) - 0.5) * 1.2, y + ins + 3, y + dh - ins - 3, col);
+          }
+        } else if (kind === 'wavy') {
+          for (let yy = y + ins + 9; yy < y + dh - ins - 5; yy += 9) {
+            for (const [dd, c2, th] of [[-1.2, shade(col, 0.42), 2.0], [1.2, col.map((c) => Math.min(1, c * 1.25 + 0.06)), 1.4]]) {
+              g.strokeStyle = tkCss(c2); g.lineWidth = th;
+              g.beginPath();
+              for (let xx = x + ins + 3; xx <= x + dw - ins - 3; xx += 3) {
+                const wy = yy + dd + Math.sin((xx - x) * 0.20 + yy * 0.3) * 1.8;
+                if (xx === x + ins + 3) g.moveTo(xx, wy); else g.lineTo(xx, wy);
+              }
+              g.stroke();
+            }
+          }
+        } else {
+          frame(x, y, dw, dh, col, ins * 2.2);
+        }
+        // The transom: a routed lozenge in the same colour.
+        const tw = dw * 0.86, th = CH * 0.07, tx = x + (dw - tw) / 2, ty = CH * 0.095;
+        g.fillStyle = tkCss(shade(col, 0.35), 0.8); rrect(tx - 2, ty - 2, tw + 4, th + 4, 6); g.fill();
+        g.fillStyle = tkCss(col); rrect(tx, ty, tw, th, 5); g.fill();
+        cutH(tx + 4, tx + tw - 4, ty + 3, col);
+        // The handle, and where the paint has gone round it.
+        g.fillStyle = tkCss([0.035, 0.032, 0.030]);
+        g.save(); g.translate(x + dw * 0.70, y + dh * (0.52 + (lh(i + 60) - 0.5) * 0.10));
+        g.rotate((lh(i + 61) - 0.5) * 0.35); g.fillRect(-dw * 0.13, -2.2, dw * 0.26, 4.4); g.restore();
+        // Chips off the edge of the paint.
+        for (let k = 0; k < 7; k++) {
+          const ex = lh(i * 20 + k) < 0.5 ? x + lh(i * 20 + k + 1) * dw : (lh(i * 20 + k + 2) < 0.5 ? x : x + dw);
+          const ey = lh(i * 20 + k) < 0.5 ? (lh(i * 20 + k + 3) < 0.5 ? y : y + dh) : y + lh(i * 20 + k + 4) * dh;
+          g.fillStyle = tkCss(WHITEP); g.fillRect(ex - 2, ey - 2, 2 + lh(i * 20 + k + 5) * 4, 2 + lh(i * 20 + k + 6) * 3);
+        }
+      }
+      // The rust run from the hasp, down the top plank.
+      {
+        const x = CW * 0.5;
+        const gr = g.createLinearGradient(0, 0, 0, CH * 0.30);
+        gr.addColorStop(0, tkCss([0.42, 0.22, 0.10], 0.75));
+        gr.addColorStop(1, tkCss([0.55, 0.36, 0.20], 0));
+        g.fillStyle = gr;
+        for (let k = 0; k < 5; k++) {
+          const xx = x - 9 + lh(k + 90) * 18, ww = 2 + lh(k + 91) * 5;
+          g.fillRect(xx, 0, ww, CH * (0.12 + lh(k + 92) * 0.16));
+        }
+      }
+      // Grime along the foot of the board, off the ground.
+      {
+        const gr = g.createLinearGradient(0, CH * 0.82, 0, CH);
+        gr.addColorStop(0, tkCss([0.40, 0.36, 0.30], 0));
+        gr.addColorStop(1, tkCss([0.40, 0.36, 0.30], 0.45));
+        g.fillStyle = gr; g.fillRect(0, CH * 0.82, CW, CH * 0.18);
+      }
+      const tex = new THREE.CanvasTexture(C);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      tkSheet(tkPrintMat(tex, { spec: 0.08, emissive: 0.10 }),
+        (u, v) => W(fa + w * u, f0 - 0.0015, pyA + h * v), [[0, 1, 0, 1]], 0.4, 'library:front');
+    }
+    // The lid: a plank raked back and oversailing, on a fascia board with a
+    // drip under its front edge.
+    bar(lt - HW - 0.07, lt + HW + 0.07,
+      [[ls - HD - 0.075, yF + 0.005], [ls + HD + 0.06, yK + 0.005],
+        [ls + HD + 0.06, yK + 0.040], [ls - HD - 0.075, yF + 0.040]],
+      LID, shade(LID, 1.25));
+    knRR(W, lt - HW - 0.07, lt + HW + 0.07, ls - HD - 0.075, ls - HD - 0.050,
+      yF - 0.040, yF + 0.006, 0.004, 0.004, shade(LID, 1.10), shade(LID, 1.2));
+    boxTS(lt - HW - 0.07, lt + HW + 0.07, ls - HD - 0.050, ls - HD - 0.006, yF - 0.010, yF + 0.005,
+      shade(LID, 0.8));
+    // The hasp: a strap over the fascia and down the top plank, its eye
+    // over the staple, and the staple through it.
+    knRR(W, lt - 0.020, lt + 0.020, ls - HD - 0.087, ls - HD - 0.078, yF - 0.035, yF + 0.030,
+      0.004, 0.002, RUSTY, shade(RUSTY, 1.1));
+    knRR(W, lt - 0.018, lt + 0.018, ls - HD - 0.014, ls - HD - 0.007, yF - 0.150, yF - 0.030,
+      0.004, 0.002, RUSTY, shade(RUSTY, 1.1));
+    boxTS(lt - 0.018, lt + 0.018, ls - HD - 0.078, ls - HD - 0.014, yF - 0.040, yF - 0.030,
+      shade(RUSTY, 0.9));
+    tubeTS([[lt - 0.010, ls - HD - 0.006, yF - 0.118], [lt - 0.010, ls - HD - 0.030, yF - 0.118],
+      [lt, ls - HD - 0.036, yF - 0.118], [lt + 0.010, ls - HD - 0.030, yF - 0.118],
+      [lt + 0.010, ls - HD - 0.006, yF - 0.118]], 0.0035, [0.30, 0.24, 0.20], 6);
     furniture.push({ t: lt, s: ls, a: 0.82, c: 0.30, h: 1.56, y: gy });
     parkBench(lt + 1.55, ls);
   }
@@ -33560,48 +33774,189 @@ async function buildJadrija(scene) {
     // Ivy over the wall. b_181 has a whole green wall of it behind the
     // Slasticarnica's terrace — creeper grown right over a rendered wall and
     // hanging past the coping — and it is the only large soft mass anywhere on
-    // this side of the resort. Two runs, because a creeper is a plant and not
+    // this side of the resort. Three runs, because a creeper is a plant and not
     // a treatment: it is where somebody planted one and nowhere else.
-    for (const [ia, ic] of [[300.5, 311.0], [326.0, 339.0], [404.0, 413.5]]) {
-      const IDK = [0.062, 0.130, 0.058], ILT = [0.170, 0.320, 0.145];
-      // Stepped at 0.28 m with radii of 0.34-0.54, which is the whole of
-      // whether this reads as creeper or as a row of Christmas trees. The
-      // first cut stepped at 0.62 with r 0.24 and every puff stood alone: a
-      // creeper is one continuous mass with lumps in it, so the puffs have to
-      // overlap by more than half.
-      for (let t = ia; t < ic; t += 0.28) {
-        // ON A BAY THAT IS THERE. The wall is laid in `step` bays and a bay
-        // with either end in a gap is left out whole, so a puff that only asked
-        // `gap` of its own t grew on the coping of a bay that was never built:
-        // Misha, 29 Sep 2026, behind the slastičarnica — *"remove that weird
-        // floating shrubbery"*. It was this ivy, a metre up in the air either
-        // side of the delivery opening, on nothing. `jit` only, so no draw
-        // moves.
+    //
+    // LEAVES, NOT PUFFS (1.550.8). Misha, 30 Sep 2026, of the run behind the
+    // Tisak: *"this defective row of shrubberies that somehow ended up
+    // *inside* the wall"*. It had. Each lump was a `puff` centred 0.04 m
+    // seaward of the wall's CENTRE line — 0.095 m inside the render — and the
+    // two courses down the face were ellipsoids 0.12 m out with a 0.16-0.31 m
+    // horizontal radius, so four fifths of every one was inside the wall and
+    // what showed was a flat dark disc stuck on the plaster; the lump on the
+    // coping was half under the cap, which read as a hedge sunk into it. A
+    // creeper is the opposite of a lump: a thin coat of leaves each standing
+    // off the surface on its own stalk, over woody stems that cling to it.
+    //
+    // So that is what is built, into `flora` (grass and potted leaves, the
+    // same lit-through material): on the coping a mat of leaves lying on the
+    // cap and spilling over its seaward arris; down the cap's front, a drape;
+    // and down the face tongues of leaves hanging from the coping to a
+    // depth that wanders along the run (a slow wave and a quick one, never a
+    // straight hem), every leaf 18-63 mm off the render, tipped down and
+    // turned out to the light and overlapping the one below like shingles,
+    // paler and smaller toward the growing tips; and through them the brown
+    // stems, 6 mm off the plaster. An ivy leaf is a five-point fan here —
+    // a tip, two lobes, two basal lobes, the midrib raised — on a stalk.
+    // The same bays are tested as before (`tb0`/`tb1` against `gap`), so
+    // nothing grows on a bay that was never built, and only `jit` is spent —
+    // no draw moves (rule 4).
+    {
+      const IVY = [0.068, 0.148, 0.056], IVYL = [0.160, 0.285, 0.110];
+      const STEM = [0.285, 0.232, 0.168];
+      const UP = [0, 1, 0];
+      const nrm = (v) => {
+        const l = Math.hypot(v[0], v[1], v[2]) || 1;
+        return [v[0] / l, v[1] / l, v[2] / l];
+      };
+      const crs = (a, c) => [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2],
+        a[0] * c[1] - a[1] * c[0]];
+      const mad = (p, v, k) => [p[0] + v[0] * k, p[1] + v[1] * k, p[2] + v[2] * k];
+      const lin = (...ts) => {
+        const o = [0, 0, 0];
+        for (let i = 0; i < ts.length; i += 2) {
+          o[0] += ts[i][0] * ts[i + 1]; o[1] += ts[i][1] * ts[i + 1]; o[2] += ts[i][2] * ts[i + 1];
+        }
+        return o;
+      };
+      // `A` made square to `N`, so the leaf lies in its own plane.
+      const orth = (a, n) => {
+        const d = a[0] * n[0] + a[1] * n[1] + a[2] * n[2];
+        return nrm([a[0] - n[0] * d, a[1] - n[1] * d, a[2] - n[2] * d]);
+      };
+      // The outline, in leaf lengths: tip, lobe, sinus, basal lobe, each side.
+      const OUT = [[1.00, 0], [0.54, 0.44], [0.41, 0.19], [0.08, 0.37],
+        [0.08, -0.37], [0.41, -0.19], [0.54, -0.44]];
+      const leaf = (O, N, A, sz, col, stalk) => {
+        const S = crs(N, A);
+        const C = lin(O, 1, A, sz * 0.40, N, sz * 0.07);
+        const cC = [col[0] * 1.18 + 0.01, col[1] * 1.14 + 0.01, col[2] * 1.12];
+        const P = OUT.map(([a, c]) => {
+          const p = lin(O, 1, A, sz * a, S, sz * c, N, -sz * 0.10 * (a - 0.4) * (a - 0.4));
+          const out = nrm(lin(A, a - 0.40, S, c));
+          return { p, n: nrm(mad(N, out, 0.35)), sw: 0.04 + 0.10 * a };
+        });
+        for (let i = 0; i < P.length; i++) {
+          const p = P[i], q = P[(i + 1) % P.length];
+          const e = i === 3 ? 0.80 : 0.92;
+          flora.smooth(C, p.p, q.p, N, p.n, q.n, cC, shade(col, e), shade(col, e), 0.05, p.sw, q.sw);
+        }
+        // The stalk, from the stem to the base of the blade.
+        if (stalk) {
+          const b0 = lin(O, 1, A, sz * 0.08);
+          flora.smooth(stalk, mad(b0, S, 0.004), mad(b0, S, -0.004), N, N, N,
+            shade(col, 0.70), shade(col, 0.80), shade(col, 0.80), 0, 0.05, 0.05);
+        }
+      };
+      // A stem: a three-sided tube through `pts`, radius `r`.
+      const stem = (pts, r) => {
+        const rings = pts.map((p, i) => {
+          const q = pts[Math.min(i + 1, pts.length - 1)], o = pts[Math.max(i - 1, 0)];
+          const D = nrm([q[0] - o[0], q[1] - o[1], q[2] - o[2]]);
+          const U = orth(Math.abs(D[1]) > 0.9 ? [1, 0, 0] : UP, D), V = crs(D, U);
+          return [0, 1, 2].map((k) => {
+            const a = (k / 3) * TAU;
+            const n = lin(U, Math.cos(a), V, Math.sin(a));
+            return { p: mad(p, n, r * (1 - 0.3 * i / pts.length)), n };
+          });
+        });
+        for (let i = 0; i + 1 < rings.length; i++) {
+          for (let k = 0; k < 3; k++) {
+            const a = rings[i][k], b2 = rings[i][(k + 1) % 3];
+            const c = rings[i + 1][(k + 1) % 3], d = rings[i + 1][k];
+            flora.smooth(a.p, b2.p, c.p, a.n, b2.n, c.n, STEM, STEM, STEM);
+            flora.smooth(a.p, c.p, d.p, a.n, c.n, d.n, STEM, STEM, STEM);
+          }
+        }
+      };
+      const FACE = WALL.s - WALL.w;                         // the seaward render
+      const CA = WALL.s - WALL.w - WALL.capOut;             // the cap's seaward face
+      const CB = WALL.s + WALL.w + WALL.capOut;             // and its inland one
+      const baseAt = (t) => {
         const tb0 = 300 + Math.floor((t - 300) / step) * step;
         const tb1 = Math.min(tb0 + step, LEN - 14);
-        if (gap(tb0) || gap(tb1) || tb0 >= LEN - 14) continue;
-        const y = yAt(t) + WALL.h + WALL.cap;
-        const k = (t * 11) | 0;
-        const r = 0.27 + jit(k, 34) * 0.15;
-        const P = facing(t, WALL.s - 0.04, 0);
-        const ivyWas = b;
-        b = shrub;               // 1.536.0: the trees' material — see `shrub`
-        // `puff` takes the VERTICAL radius before the horizontal one, and
-        // getting that round the wrong way is what turned the first two
-        // attempts into a row of Christmas trees: a creeper is flatter than it
-        // is wide by a factor of three, so ry is a third of r and not double.
-        puff(P, 0, (jit(k, 35) - 0.5) * 0.26, y + r * 0.10,
-          r * 0.40, r * 1.30, IDK, ILT, [y - 1.0, y + r * 0.6],
-          6, 2, 0.42, k);
-        // And down the seaward face, in two courses, which is the half you
-        // see from the promenade.
-        for (let d = 0; d < 2; d++) {
-          const drop = 0.24 + d * 0.30 + jit(k, 36 + d) * 0.18;
-          puff(P, (jit(k, 38 + d) - 0.5) * 0.30, -0.12, y - drop,
-            r * 0.40, r * 0.58, IDK, ILT, [y - 1.2, y + 0.2],
-            5, 2, 0.38, k + 3 + d);
+        if (gap(tb0) || gap(tb1) || tb0 >= LEN - 14) return null;
+        const y0 = yAt(tb0), y1 = yAt(tb1);
+        return y0 + (y1 - y0) * (t - tb0) / (tb1 - tb0);
+      };
+      for (const [ia, ic] of [[300.5, 311.0], [326.0, 339.0], [404.0, 413.5]]) {
+        for (let t = ia; t < ic; t += 0.065) {
+          const yb = baseAt(t);
+          if (yb == null) continue;
+          const k = Math.round(t * 1000);
+          const yCB = yb + WALL.h, yCT = yCB + WALL.cap;
+          const p0 = W(t, WALL.s, yb);
+          const Et = nrm(lin(W(t + 0.5, WALL.s, yb), 1, p0, -1));
+          const Es = nrm(lin(W(t, WALL.s + 0.5, yb), 1, p0, -1));
+          const OUTW = [-Es[0], -Es[1], -Es[2]];
+          // Thinning out over the last 0.9 m of a run, both ends.
+          const edge = Math.max(0, Math.min(1, (t - ia) / 0.9, (ic - t) / 0.9));
+          const wave = 0.50 + 0.30 * Math.sin(t * 1.7 + ia) + 0.18 * Math.sin(t * 4.3 + 1.1)
+            + (jit(k, 1301) - 0.5) * 0.20;
+          const depth = Math.max(0.05, Math.min(WALL.h - 0.05, (0.08 + 0.78 * wave) * edge));
+          const J = (i, s) => jit(k * 13 + i, s);
+          // The mat on the coping.
+          const nTop = 2 + Math.round(4 * edge);
+          for (let i = 0; i < nTop; i++) {
+            const u = (i + J(i, 1302)) / nTop;
+            const s = CA - 0.03 + (CB + 0.02 - CA + 0.03) * u;
+            const tt = t + (J(i, 1304) - 0.5) * 0.06;
+            const O = W(tt, s, yCT + 0.010 + J(i, 1303) * 0.045);
+            let N, A;
+            if (s < CA + 0.05) {
+              // Over the arris: turned out and tipped down the front.
+              N = nrm(lin(UP, 0.8, OUTW, 0.7, Et, J(i, 1305) - 0.5));
+              A = orth(lin(OUTW, 0.6, UP, -0.8, Et, (J(i, 1306) - 0.5) * 0.8), N);
+            } else {
+              N = nrm(lin(UP, 1, Et, (J(i, 1305) - 0.5) * 0.8, Es, (J(i, 1307) - 0.5) * 0.8));
+              const ph = J(i, 1306) * TAU;
+              A = orth(lin(Et, Math.cos(ph), Es, Math.sin(ph)), N);
+            }
+            const g = 0.82 + 0.36 * J(i, 1308);
+            leaf(O, N, A, 0.080 + 0.035 * J(i, 1309), shade(IVY, g), null);
+          }
+          // The drape down the front of the cap.
+          if (edge > 0.2 && J(7, 1310) < 0.85) {
+            const tt = t + (J(7, 1311) - 0.5) * 0.05;
+            const yy = yCB + 0.02 + J(7, 1312) * (WALL.cap - 0.02);
+            const O = W(tt, CA - 0.015 - J(7, 1313) * 0.03, yy);
+            const N = nrm(lin(OUTW, 1, UP, 0.5, Et, J(7, 1314) - 0.5));
+            const A = orth(lin(UP, -1, Et, (J(7, 1315) - 0.5) * 1.2), N);
+            leaf(O, N, A, 0.085 + 0.03 * J(7, 1316), shade(IVY, 0.85 + 0.3 * J(7, 1317)), null);
+          }
+          // Down the face, in rows, thinning to the tongue's hem.
+          let row = 0;
+          for (let y = yCB - 0.035; y > yCB - depth; y -= 0.062, row++) {
+            const r = (yCB - y) / depth;
+            const pk = r < 0.65 ? 0.92 : 0.92 - (r - 0.65) * 2.2;
+            if (J(20 + row, 1318) > pk) continue;
+            const tt = t + (J(20 + row, 1319) - 0.5) * 0.05;
+            const yy = y + (J(20 + row, 1320) - 0.5) * 0.04;
+            const stand = 0.018 + J(20 + row, 1321) * 0.045;
+            const O = W(tt, FACE - stand, yy);
+            const N = nrm(lin(OUTW, 1, UP, 0.25 + 0.6 * J(20 + row, 1329),
+              Et, (J(20 + row, 1322) - 0.5) * 1.2));
+            const A = orth(lin(UP, -1, Et, (J(20 + row, 1323) - 0.5) * 2.2, OUTW, 0.2), N);
+            const young = r * r * J(20 + row, 1324);
+            const g = 0.72 + 0.50 * J(20 + row, 1325);
+            const col = [lerp(IVY[0], IVYL[0], young) * g, lerp(IVY[1], IVYL[1], young) * g,
+              lerp(IVY[2], IVYL[2], young) * g];
+            leaf(O, N, A, (0.078 + 0.036 * J(20 + row, 1326)) * (1 - 0.30 * r), col,
+              W(tt, FACE - 0.006, yy + 0.025));
+          }
+          // A stem every so often: over the cap from the inland side, down its
+          // front and down the face, wandering, three quarters of the tongue.
+          if (edge > 0.5 && jit(k, 1327) < 0.10) {
+            const pts = [W(t, CB - 0.10, yCT + 0.008), W(t, CA + 0.02, yCT + 0.008),
+              W(t, CA - 0.007, yCT - 0.01), W(t, CA - 0.007, yCB + 0.01), W(t, FACE - 0.006, yCB - 0.02)];
+            let tt = t;
+            for (let y = yCB - 0.10; y > yCB - depth * 0.80; y -= 0.09) {
+              tt += (jit(Math.round(y * 100) + k, 1328) - 0.5) * 0.07;
+              pts.push(W(tt, FACE - 0.006, y));
+            }
+            if (pts.length > 5) stem(pts, 0.007);
+          }
         }
-        b = ivyWas;
       }
     }
 

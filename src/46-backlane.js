@@ -325,10 +325,6 @@ const LANE_COL = {
   // yellow-green the shutters are painted. Mixed at 0.082,0.128,0.098 — the
   // shutter colour — it came out as more foliage.
   steel: [0.1226, 0.1765, 0.1577],
-  // Vine, over the pergola. Dark underneath and sunlit on top, which is the
-  // whole of why a leaf mass reads as one.
-  vineDk: [0.088, 0.176, 0.084],
-  vineLt: [0.268, 0.412, 0.176],
   // The worn dust of the apron itself, where the tyres have taken the needles
   // off. The resort's own track is drawn in these; the same four, because it is
   // the same dirt.
@@ -362,6 +358,9 @@ function buildBackLane(scene, jad, city) {
   // the fence is a line of floating black bars at seven in the evening.
   const floor = propBuilder();
   const up = propBuilder();
+  // The vine over the pergola (1.550.8): leaves, in the grass's own lit and
+  // wind-stirred material — see `floraBuilder` and the pergola below.
+  const vine = floraBuilder();
   let b = floor;
 
   // The shore frame, from the locale rather than from a second copy of it.
@@ -416,47 +415,6 @@ function buildBackLane(scene, jad, city) {
     }
     const cap = ring.map(([tt, ss]) => P(tt, ss, y1));
     for (let k = 1; k < n - 1; k++) b.tri(cap[0], cap[k], cap[k + 1], col);
-  }
-
-  /**
-   * A knocked-about ellipsoid of leaf, with soft normals.
-   *
-   * Written flat in world space rather than in the shore frame, because a vine
-   * is a lump and not a length of anything — and because `smooth` wants a
-   * normal the un-dented ellipsoid would have had, which is cheapest to take
-   * where the ellipsoid is round.
-   */
-  function leaf(cx, cy, cz, rx, ry, rz, key, nu = 8, nv = 5) {
-    const V = [];
-    for (let j = 0; j <= nv; j++) {
-      const ph = (j / nv) * Math.PI;
-      const row = [];
-      for (let i = 0; i <= nu; i++) {
-        const th = (i / nu) * TAU;
-        const sx = Math.sin(ph) * Math.cos(th);
-        const sy = Math.cos(ph);
-        const sz = Math.sin(ph) * Math.sin(th);
-        // The dent, and it is per-vertex rather than per-face: a vine read from
-        // the lane is an outline, and an outline is what the dents are for.
-        const d = 0.74 + jit(key * 61 + j * 13 + (i % nu), 341) * 0.52;
-        const lit = sat(sy * 0.5 + 0.5);
-        row.push({
-          p: [cx + sx * rx * d, cy + sy * ry * d, cz + sz * rz * d],
-          n: [sx, sy, sz],
-          c: [lerp(LANE_COL.vineDk[0], LANE_COL.vineLt[0], lit),
-            lerp(LANE_COL.vineDk[1], LANE_COL.vineLt[1], lit),
-            lerp(LANE_COL.vineDk[2], LANE_COL.vineLt[2], lit)],
-        });
-      }
-      V.push(row);
-    }
-    for (let j = 0; j < nv; j++) {
-      for (let i = 0; i < nu; i++) {
-        const A = V[j][i], B2 = V[j][i + 1], C = V[j + 1][i + 1], D = V[j + 1][i];
-        b.smooth(A.p, B2.p, C.p, A.n, B2.n, C.n, A.c, B2.c, C.c);
-        b.smooth(A.p, C.p, D.p, A.n, C.n, D.n, A.c, C.c, D.c);
-      }
-    }
   }
 
   // Everything that stands up and is bigger than a bollard, for `confine`.
@@ -843,33 +801,218 @@ function buildBackLane(scene, jad, city) {
         gY((P0 + P1) * 0.5, ss) + beam + 0.010,
         gY((P0 + P1) * 0.5, ss) + beam + 0.026, shade(ST, 0.8));
     }
-    // And the vine. A run of overlapping lumps rather than one slab, because a
-    // grapevine grown over a frame is thick where it was tied and thin where it
-    // was not — a slab reads as an awning, which is what the first cut was.
-    for (let tt = P0 - 0.2; tt < P1 + 0.3; tt += 0.72) {
-      for (let ss = SA - 0.1; ss < SB + 0.2; ss += 0.76) {
-        const key = ((tt * 5) | 0) * 31 + ((ss * 5) | 0);
-        // One lump in six is missing, and that is the difference between a
-        // vine and a hedge laid on a frame. A grapevine trained over wire is
-        // thick where it was tied and bare where it was not, and it is the
-        // holes that let you see the steel and the sky through it — with the
-        // mat closed the whole thing read as an awning somebody bought.
-        if (jit(key, 351) > 0.84) continue;
-        // Flatter than it was, too: 0.20 of half-height on a 0.60 lump gave a
-        // ceiling of green boulders. A vine over wire is a LAYER.
-        const y = gY(tt, ss) + beam + 0.055 + jit(key, 345) * 0.10;
-        const w = jad.toWorld(tt + (jit(key, 346) - 0.5) * 0.26,
-          ss + (jit(key, 347) - 0.5) * 0.26);
-        leaf(w[0], y, w[2], 0.52 + jit(key, 348) * 0.20,
-          0.125 + jit(key, 349) * 0.065, 0.52 + jit(key, 350) * 0.20, key);
+    // And the vine — LEAVES, since 1.550.8.
+    //
+    // It was a mat of `leaf` lumps, 0.5-0.7 m knobbly ellipsoids in two tones
+    // laid over the wire, and two more hung off the seaward edge on nothing.
+    // Misha, 30 Sep 2026: *"remove this ugly canopy of "old trees" they look
+    // like crap compared to our new procedurally generated trees"* — and the
+    // two hanging ones were the "floating lollipops". The frame is right
+    // (`a_012`, `a_015`: green steel, wire, a grapevine over it), the vine was
+    // not. So it is a vine now, into its own `floraBuilder` with the grass and
+    // potted plants' material (lit through, stirring in the wind):
+    //
+    //  - two trunks, gnarled and twisting up the two seaward legs from the
+    //    ground, and at the beam a cordon along each long side;
+    //  - canes along every wire, wandering off it and back;
+    //  - grape leaves, palmate, five-lobed, 0.11-0.19 m, lying on the wire
+    //    in a patchy layer (a slow noise sets how thick, so there are holes
+    //    and sky where the vine is thin, which is what `_012` has), a second
+    //    thinner layer hanging under the wire, and shoots trailing off the
+    //    seaward edge with leaves along them;
+    //  - bunches under it, green going purple, the end of August.
+    //
+    // Only `jit`, on slots 362-383, nothing drawn from `rng` (rule 4).
+    {
+      const V = vine;
+      const TRUNK = [0.300, 0.250, 0.195];
+      const CANE = [0.360, 0.300, 0.210];
+      const LEAF = [0.195, 0.330, 0.110], LEAFY = [0.330, 0.360, 0.130];
+      const UP = [0, 1, 0];
+      const nrm = (v) => {
+        const l = Math.hypot(v[0], v[1], v[2]) || 1;
+        return [v[0] / l, v[1] / l, v[2] / l];
+      };
+      const crs = (a, c) => [a[1] * c[2] - a[2] * c[1], a[2] * c[0] - a[0] * c[2],
+        a[0] * c[1] - a[1] * c[0]];
+      const lin = (...ts) => {
+        const o = [0, 0, 0];
+        for (let i = 0; i < ts.length; i += 2) {
+          o[0] += ts[i][0] * ts[i + 1]; o[1] += ts[i][1] * ts[i + 1]; o[2] += ts[i][2] * ts[i + 1];
+        }
+        return o;
+      };
+      const orth = (a, n) => {
+        const d = a[0] * n[0] + a[1] * n[1] + a[2] * n[2];
+        return nrm([a[0] - n[0] * d, a[1] - n[1] * d, a[2] - n[2] * d]);
+      };
+      const sh = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+      // A woody tube through `pts` (world), radius r0 at the first point to r1
+      // at the last, `n` sides.
+      const wood = (pts, r0, r1, col, n = 5, sway = 0) => {
+        const rings = pts.map((p, i) => {
+          const q = pts[Math.min(i + 1, pts.length - 1)], o = pts[Math.max(i - 1, 0)];
+          const D = nrm([q[0] - o[0], q[1] - o[1], q[2] - o[2]]);
+          const U = orth(Math.abs(D[1]) > 0.9 ? [1, 0, 0] : UP, D), W2 = crs(D, U);
+          const r = r0 + (r1 - r0) * (i / Math.max(1, pts.length - 1));
+          return Array.from({ length: n }, (_, k) => {
+            const a = (k / n) * TAU;
+            const nn = lin(U, Math.cos(a), W2, Math.sin(a));
+            return { p: lin(p, 1, nn, r), n: nn, c: sh(col, 0.80 + 0.30 * Math.max(0, nn[1])) };
+          });
+        });
+        for (let i = 0; i + 1 < rings.length; i++) {
+          const sa = sway * i / rings.length, sb = sway * (i + 1) / rings.length;
+          for (let k = 0; k < n; k++) {
+            const a = rings[i][k], b2 = rings[i][(k + 1) % n];
+            const c = rings[i + 1][(k + 1) % n], d = rings[i + 1][k];
+            V.smooth(a.p, b2.p, c.p, a.n, b2.n, c.n, a.c, b2.c, c.c, sa, sa, sb);
+            V.smooth(a.p, c.p, d.p, a.n, c.n, d.n, a.c, c.c, d.c, sa, sb, sb);
+          }
+        }
+      };
+      // A grape leaf: tip, two sinuses and two lobes a side, fanned from a
+      // raised centre, on its stalk from `stalk` (world) if given.
+      const OUT = [[1.00, 0], [0.60, 0.17], [0.72, 0.47], [0.38, 0.30], [0.26, 0.54],
+        [0.26, -0.54], [0.38, -0.30], [0.72, -0.47], [0.60, -0.17]];
+      const vleaf = (O, N, A, sz, col, stalk, sw) => {
+        const S = crs(N, A);
+        const C = lin(O, 1, A, sz * 0.42, N, sz * 0.06);
+        const cC = [col[0] * 1.12 + 0.02, col[1] * 1.10 + 0.02, col[2] * 1.05];
+        const P = OUT.map(([a, c]) => ({
+          p: lin(O, 1, A, sz * a, S, sz * c, N, -sz * 0.12 * ((a - 0.42) ** 2 + c * c)),
+          n: nrm(lin(N, 1, A, (a - 0.42) * 0.4, S, c * 0.4)),
+          s: sw * (0.6 + 0.4 * a),
+        }));
+        for (let i = 0; i < P.length; i++) {
+          const p = P[i], q = P[(i + 1) % P.length];
+          V.smooth(C, p.p, q.p, N, p.n, q.n, cC, sh(col, 0.90), sh(col, 0.90), sw * 0.6, p.s, q.s);
+        }
+        if (stalk) {
+          const b0 = lin(O, 1, A, sz * 0.10);
+          V.smooth(stalk, lin(b0, 1, S, 0.005), lin(b0, 1, S, -0.005), N, N, N,
+            sh(CANE, 0.9), sh(col, 0.8), sh(col, 0.8), sw * 0.3, sw * 0.5, sw * 0.5);
+        }
+      };
+      const topY = (tt, ss) => gY(tt, ss) + beam + 0.026;
+      const Et = nrm(lin(P((P0 + P1) * 0.5 + 0.5, SA, 0), 1, P((P0 + P1) * 0.5 - 0.5, SA, 0), -1));
+      const Es = nrm(lin(P((P0 + P1) * 0.5, SA + 0.5, 0), 1, P((P0 + P1) * 0.5, SA - 0.5, 0), -1));
+      // The trunks, up the two seaward legs, twisting round them.
+      for (const [tt, k0] of [[P0, 0], [P1, 1]]) {
+        const pts = [];
+        const g0 = gY(tt, SA - 0.14), yTop = topY(tt, SA);
+        for (let i = 0; i <= 14; i++) {
+          const f = i / 14;
+          const a = f * 3.6 + k0 * 2.0;
+          const rr = 0.085 + 0.035 * Math.sin(f * 7 + k0);
+          const y = g0 - 0.05 + (yTop - 0.02 - g0) * f;
+          pts.push(P(tt + Math.cos(a) * rr, SA + Math.sin(a) * rr - 0.02 * (1 - f), y));
+        }
+        wood(pts, 0.042, 0.024, TRUNK, 6);
+        // The cordons, both ways along the seaward beam and one inland along
+        // the cross-beam, lying on the steel.
+        const dir = k0 ? -1 : 1;
+        const cord = (s0, s1, steps, ax) => {
+          const q = [pts[pts.length - 1]];
+          for (let i = 1; i <= steps; i++) {
+            const f = i / steps;
+            const w = (jit(k0 * 31 + i + (ax ? 7 : 0), 362) - 0.5) * 0.06;
+            q.push(ax
+              ? P(tt + w, s0 + (s1 - s0) * f, topY(tt, s0 + (s1 - s0) * f) + 0.02 + w * 0.3)
+              : P(tt + dir * (s1 - s0) * f, SA + w, topY(tt + dir * (s1 - s0) * f, SA) + 0.02));
+          }
+          wood(q, 0.024, 0.012, TRUNK, 5);
+        };
+        cord(0, (P1 - P0) * 0.55, 10, false);
+        cord(SA, SB - 0.3, 8, true);
       }
-    }
-    // Two shoots hanging off the seaward edge, which is the detail that says
-    // the thing is alive and not a canopy somebody bought.
-    for (const [tt, ss, d] of [[P0 + 1.4, SA - 0.15, 0.55], [P1 - 2.1, SA - 0.2, 0.85]]) {
-      const w = jad.toWorld(tt, ss);
-      leaf(w[0], gY(tt, ss) + beam - d, w[2], 0.30, 0.34, 0.26,
-        ((tt * 7) | 0) + 11);
+      // The canes, along each wire and wandering off it.
+      for (let kw = 1; kw < 6; kw++) {
+        const ss = SA + (SB - SA) * (kw / 6);
+        let tt = P0 + 0.1, q = [];
+        while (tt < P1 - 0.1) {
+          const j = jit(kw * 97 + ((tt * 10) | 0), 363);
+          if (j < 0.18 && q.length > 3) { wood(q, 0.010, 0.006, CANE, 4, 0.05); q = []; }
+          q.push(P(tt, ss + (jit(kw * 97 + ((tt * 10) | 0), 364) - 0.5) * 0.14,
+            topY(tt, ss) + 0.012 + jit(kw * 91 + ((tt * 10) | 0), 365) * 0.03));
+          tt += 0.35;
+        }
+        if (q.length > 1) wood(q, 0.010, 0.006, CANE, 4, 0.05);
+      }
+      // The leaves. How thick the vine is here: a slow noise and the edges.
+      const thick = (tt, ss) => {
+        const a = Math.sin(tt * 1.15 + 0.7) * Math.sin(ss * 1.9 + 2.1);
+        const b = Math.sin(tt * 2.9 + ss * 1.3 + 4.0);
+        return 0.74 + 0.24 * a + 0.12 * b;
+      };
+      let key = 0;
+      for (let tt = P0 - 0.25; tt < P1 + 0.25; tt += 0.10) {
+        for (let ss = SA - 0.22; ss < SB + 0.2; ss += 0.10) {
+          key++;
+          const J = (s2) => jit(key, s2);
+          // Outside the frame the vine is thinner — it is overhang, not mat.
+          const out = Math.max(0, P0 - tt, tt - P1, SA - ss, ss - SB) / 0.25;
+          if (J(366) > thick(tt, ss) * (1 - out * 0.7)) continue;
+          const t2 = tt + (J(367) - 0.5) * 0.10, s2 = ss + (J(368) - 0.5) * 0.10;
+          const under = J(369) < 0.22;
+          const y = under ? topY(t2, s2) - 0.04 - J(370) * 0.16
+            : topY(t2, s2) + 0.02 + J(370) * J(370) * 0.22;
+          const O = P(t2, s2, y);
+          const ph = J(371) * TAU;
+          const N = under
+            ? nrm(lin(UP, 0.35, Et, Math.cos(ph), Es, Math.sin(ph)))
+            : nrm(lin(UP, 1, Et, (J(372) - 0.5) * 0.9, Es, (J(373) - 0.5) * 0.9));
+          const A = under ? orth(lin(UP, -1, Et, Math.cos(ph) * 0.3), N)
+            : orth(lin(Et, Math.cos(ph), Es, Math.sin(ph)), N);
+          const yel = J(374) < 0.12 ? 0.6 : J(374) * 0.25;
+          const g = 0.82 + 0.34 * J(375);
+          const col = [lerp(LEAF[0], LEAFY[0], yel) * g, lerp(LEAF[1], LEAFY[1], yel) * g,
+            lerp(LEAF[2], LEAFY[2], yel) * g];
+          vleaf(O, N, A, 0.10 + 0.07 * J(376), col, lin(O, 1, A, -0.04, N, -0.025), 0.22);
+        }
+      }
+      // The shoots trailing off the seaward edge, with their leaves.
+      for (let i = 0; i < 9; i++) {
+        const tt = P0 + 0.5 + (P1 - P0 - 1.0) * ((i + jit(i, 377)) / 9);
+        const L = 0.35 + jit(i, 378) * 0.65;
+        const q = [];
+        for (let k = 0; k <= 6; k++) {
+          const f = k / 6;
+          q.push(P(tt + Math.sin(f * 3 + i) * 0.05, SA - 0.10 - 0.18 * Math.sin(f * 1.4),
+            topY(tt, SA) + 0.02 - L * f * f * 0.9 - f * 0.05));
+        }
+        wood(q, 0.008, 0.004, CANE, 4, 0.25);
+        for (let k = 1; k <= 6; k++) {
+          const pp = q[k];
+          const ph = jit(i * 7 + k, 379) * TAU;
+          const N = nrm(lin(Es, -0.8, UP, 0.4, Et, Math.cos(ph) * 0.6));
+          const A = orth(lin(UP, -1, Et, Math.sin(ph) * 0.5), N);
+          vleaf(lin(pp, 1, N, 0.02), N, A, 0.09 + 0.05 * jit(i * 7 + k, 378), sh(LEAF, 1.10), pp,
+            0.35);
+        }
+      }
+      // The bunches, under the wire over the middle of the bay.
+      for (let i = 0; i < 10; i++) {
+        const tt = P0 + 0.6 + (P1 - P0 - 1.2) * jit(i, 380);
+        const ss = SA + 0.4 + (SB - SA - 0.8) * jit(i, 381);
+        const ripe = jit(i, 382);
+        const BER = ripe > 0.45 ? [0.20, 0.10, 0.22] : [0.45, 0.52, 0.22];
+        const yT = topY(tt, ss) - 0.03;
+        wood([P(tt, ss, yT + 0.03), P(tt, ss, yT - 0.02)], 0.004, 0.003, CANE, 3);
+        for (let k = 0; k < 16; k++) {
+          const f = k / 16, rr = 0.055 * (1 - f * 0.8);
+          const a = k * 2.3999632;
+          const c = P(tt + Math.cos(a) * rr, ss + Math.sin(a) * rr, yT - 0.03 - f * 0.17);
+          const r = 0.017;
+          const pts = [[r, 0, 0], [-r, 0, 0], [0, r, 0], [0, -r, 0], [0, 0, r], [0, 0, -r]];
+          const F = [[0, 2, 4], [2, 1, 4], [1, 3, 4], [3, 0, 4], [2, 0, 5], [1, 2, 5], [3, 1, 5], [0, 3, 5]];
+          const bc = sh(BER, 0.85 + 0.3 * jit(i * 16 + k, 383));
+          for (const [x, y, z] of F) {
+            const pa = lin(c, 1, pts[x], 1), pb = lin(c, 1, pts[y], 1), pc = lin(c, 1, pts[z], 1);
+            V.smooth(pa, pb, pc, nrm(pts[x]), nrm(pts[y]), nrm(pts[z]), bc, bc, bc, 0.04, 0.04, 0.04);
+          }
+        }
+      }
     }
     b = back;
   }
@@ -1158,7 +1301,9 @@ function buildBackLane(scene, jad, city) {
     spec: 0.06, specPower: 20, side: THREE.DoubleSide, emissive: 0.07,
     body: FACE,
   }));
-  for (const m of [floorMesh, upMesh]) {
+  const vineMesh = new THREE.Mesh(vine.geo(), floraMat());
+  vineMesh.name = 'backlane:vine';
+  for (const m of [floorMesh, upMesh, vineMesh]) {
     m.geometry.computeBoundingSphere();
     scene.add(m);
   }
@@ -1235,10 +1380,10 @@ function buildBackLane(scene, jad, city) {
   if (jad.verge && jad.verge.made) jad.verge.made(floorMesh.geometry);
 
   return {
-    meshes: [floorMesh, upMesh],
-    casters: [upMesh],
+    meshes: [floorMesh, upMesh, vineMesh],
+    casters: [upMesh, vineMesh],
     sites: carSites,
-    tris: (floor.count() + up.count()) / 3,
+    tris: (floor.count() + up.count() + vine.count()) / 3,
     blockers: runs.length,
     dressed,
   };
