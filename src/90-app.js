@@ -2075,11 +2075,23 @@ async function boot() {
       shadow.cast(m, m.userData.tree ? { material: treeCaster(shadow, false) } : {});
     }
   }
-  if (jadrija) for (const m of jadrija.castersLive || []) shadow.cast(m, { dynamic: true });
+  // Each also into the kabina pendant's own map (1.552.1) — see `lampAdd`.
+  if (jadrija) for (const m of jadrija.castersLive || []) shadow.lampAdd(shadow.cast(m, { dynamic: true }));
   // The skinned figure brings her own depth material, because her shape lives
   // in a bone palette that the two shared ones know nothing about. Near
   // cascade: she is 1.75 m and the far map cannot draw anything under two.
-  if (jadrija && jadrija.figure && jadrija.figureCasts !== false) jadrija.figure.cast(shadow);
+  if (jadrija && jadrija.figure && jadrija.figureCasts !== false) {
+    shadow.lampAdd(jadrija.figure.cast(shadow));
+  }
+  // v2.0 is the one drawn when she is primary, and she casts no sun shadow
+  // (see BAYE in 46-apprentice.js) — but under the kabina's pendant a body
+  // with no shadow is a body pasted on the floor. Into the lamp's map only:
+  // her sun proxy is taken straight back out of the cascades (1.552.1).
+  if (jadrija && jadrija.figureCasts === false && appr && appr.cast) {
+    const px = appr.cast(shadow);
+    if (px && px.parent) px.parent.remove(px);
+    shadow.lampAdd(px);
+  }
   // The same for the Bucketeer, plus the bucket — which is not skinned and is
   // the one thing she is carrying that a missing shadow would show up on,
   // because half of her loop is spent standing on a sunlit porch with it.
@@ -9577,6 +9589,8 @@ function tick(wall, draw) {
     : eject.active ? eject.pos : flight.p.pos, camera.position);
   shadow.syncMoving();
   if (draw) shadow.render(renderer);
+  // The kabina's pendant, while its room is lit — nothing otherwise.
+  if (draw) shadow.lampRender(renderer);
 
   // The mix: your own engines, and only your own engines.
   //

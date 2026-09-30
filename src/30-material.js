@@ -286,6 +286,133 @@ vec3 hairLobes(vec3 tan, vec3 n, vec3 v, vec3 l, vec3 tint, float amt){
 }
 `;
 
+/**
+ * ── THE LIGHTS IN A ROOM ─────────────────────────────────────────────────────
+ *
+ * 1.552.1. Everything above is a sun and a sky, which is the whole of the
+ * light on a beach and none of it in a hut with one door. The kabina was lit
+ * the only way this renderer could light it: the daylight ambient, a flat
+ * 0.22 of bounce on every board, and the exposure pulled down to make it dark
+ * — so the room was the same dim olive in every corner, and nothing in it
+ * stood on anything.
+ *
+ * Three lights, confined to the room's own box (see uRoomOn in 00-core.js):
+ *
+ *   0  the pendant over the tabouret. A bulb under an enamel cone throws
+ *      a cone, so it is a spot pointing straight down, with a soft edge
+ *      where the shade cuts it off at about 56 degrees, and it is the one
+ *      with a shadow map — drawn from the bulb by 06-shadow.js out of the
+ *      room, her and what is on the table.
+ *   1  a candle on the shelf. No map: the one thing it could shadow that
+ *      matters is the plank it stands on, which is a rectangle, so that is
+ *      solved here — a ray from the flame down past the plank is either
+ *      through the wood or not.
+ *   2  the television, which lights what is in front of the tube and
+ *      nothing behind it.
+ *
+ * Wrapped a little (the 0.15 on n.l), because a room lit by one bulb is
+ * mostly lit by that bulb off the walls, and a hard terminator on a body at
+ * two metres from a 60 W lamp is a studio, not a hut. uRoomFill is the rest
+ * of that: warm bounce, flat, in the room only.
+ *
+ * (NO BACKTICKS IN HERE — this is a template literal.)
+ */
+const GLSL_ROOM = /* glsl */ `
+uniform float uRoomOn;
+uniform vec3 uRoomC;
+uniform vec4 uRoomAx;
+uniform vec4 uRoomH;
+uniform vec3 uRoomFill;
+uniform vec4 uLampP[3];
+uniform vec4 uLampC[3];
+uniform vec4 uLampD;
+uniform vec4 uShelf;
+uniform float uShelfY;
+uniform sampler2D uLampMap;
+uniform mat4 uLampMat;
+uniform vec3 uLampNF;
+
+vec3 roomLocal(vec3 p){
+  vec2 d = p.xz - uRoomC.xz;
+  return vec3(dot(d, uRoomAx.xy), p.y - uRoomC.y, dot(d, uRoomAx.zw));
+}
+/** 1 inside the room's box, 0 a hand's width outside it. */
+float roomMask(vec3 q){
+  float mt = 1.0 - smoothstep(uRoomH.x - 0.02, uRoomH.x + 0.12, abs(q.x));
+  float ms = 1.0 - smoothstep(uRoomH.y - 0.02, uRoomH.y + 0.12, abs(q.z));
+  float my = 1.0 - smoothstep(uRoomH.z, uRoomH.z + 0.15, q.y);
+  return mt * ms * my * step(-0.3, q.y);
+}
+float lampLin(float d){
+  return 2.0 * uLampNF.x * uLampNF.y
+    / (uLampNF.y + uLampNF.x - (d * 2.0 - 1.0) * (uLampNF.y - uLampNF.x));
+}
+/** The pendant's map: 3x3 PCF, compared in metres along the lamp's axis. */
+float lampShadow(vec3 p, vec3 n, vec3 l){
+  // Pushed off the surface toward the light and along its normal, which is
+  // what lets every caster here be drawn both sides: a wall is in the map
+  // at its own depth, and this is how it does not shadow itself.
+  vec3 q = p + n * 0.022 + l * 0.012;
+  vec4 sp = uLampMat * vec4(q, 1.0);
+  if (sp.w <= 0.0) return 1.0;
+  vec3 uv = sp.xyz / sp.w * 0.5 + 0.5;
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || uv.z > 1.0) return 1.0;
+  float zr = lampLin(uv.z) - 0.018;
+  // 4x4 at 2.2 texels: a bulb six centimetres across a metre over the
+  // table puts a few centimetres of penumbra on the floor, and a 3x3 at one
+  // texel was a disc cut out with scissors.
+  float sum = 0.0;
+  for (int j = 0; j < 4; j++){
+    for (int i = 0; i < 4; i++){
+      vec2 o = (vec2(float(i), float(j)) - 1.5) * uLampNF.z * 2.2;
+      float d = unpackDepth(texture2D(uLampMap, uv.xy + o));
+      sum += zr <= lampLin(d) ? 1.0 : 0.0;
+    }
+  }
+  return sum / 16.0;
+}
+/** The shelf's plank between the candle and a point under it: 0 in its shadow. */
+float plankShadow(vec3 q, vec3 lq){
+  if (q.y >= uShelfY - 0.002) return 1.0;
+  float k = (uShelfY - lq.y) / (q.y - lq.y);
+  vec2 h = mix(lq.xz, q.xz, k);
+  float e = min(min(h.x - uShelf.x, uShelf.y - h.x), min(h.y - uShelf.z, uShelf.w - h.y));
+  return smoothstep(-0.015, 0.015, -e);
+}
+vec3 roomLights(vec3 p, vec3 n, vec3 base, vec3 viewDir, float spec){
+  vec3 q = roomLocal(p);
+  float m = roomMask(q);
+  if (m <= 0.0) return vec3(0.0);
+  vec3 acc = base * uRoomFill;
+  for (int k = 0; k < 3; k++){
+    vec4 P = uLampP[k];
+    if (P.w <= 0.0) continue;
+    vec3 L = P.xyz - p;
+    float d = length(L);
+    vec3 l = L / max(d, 1e-4);
+    float att = 1.0 / (1.0 + (d * d) / (P.w * P.w)) * (1.0 - smoothstep(P.w * 3.0, P.w * 4.0, d));
+    float ndl = max((dot(n, l) + 0.15) / 1.15, 0.0);
+    float kind = uLampC[k].w;
+    float g = 1.0;
+    if (kind < 0.5) {
+      // The cone the shade lets out, and nothing within a hand of the bulb:
+      // that is the shade itself, and its inside glows on its own.
+      g = smoothstep(0.40, 0.66, l.y) * smoothstep(0.14, 0.20, d);
+      if (g > 0.0 && ndl > 0.0) g *= lampShadow(p, n, l);
+    } else if (kind < 1.5) {
+      g = plankShadow(q, roomLocal(P.xyz));
+    } else {
+      g = smoothstep(-0.05, 0.6, dot(-l, uLampD.xyz));
+    }
+    vec3 c = uLampC[k].rgb * att * g;
+    acc += base * c * ndl;
+    vec3 hv = normalize(l - viewDir);
+    acc += c * pow(max(dot(n, hv), 0.0), 28.0) * spec * 1.5 * step(0.0, dot(n, l));
+  }
+  return acc * m;
+}
+`;
+
 function solidFragment(body = '', decl = '', lit = '') {
   return /* glsl */ `
 precision highp float;
@@ -318,6 +445,7 @@ ${GLSL_HAZE}
 ${GLSL_WATER}
 ${GLSL_SHADOW}
 ${GLSL_HAIR}
+${GLSL_ROOM}
 
 void main(){
   vec3 n = normalize(vNormal);
@@ -347,8 +475,12 @@ void main(){
   float ndl = max(dot(n, uSunDir), 0.0);
   float sh = shadowAt(vWorld);
 
+  // Inside a lit room the daylight that gets in is scaled by uRoomH.w, and
+  // so is the flat bounce every emissive surface carries — see GLSL_ROOM.
+  float roomK = 1.0;
+  if (uRoomOn > 0.5) roomK = mix(1.0, uRoomH.w, roomMask(roomLocal(vWorld)));
   vec3 col = base * uSunColor * uSunI * ndl * sh * INV_PI;
-  col += base * ambientAt(n, uAmbSky, uAmbGround, uAmbI) * INV_PI * 2.2;
+  col += base * ambientAt(n, uAmbSky, uAmbGround, uAmbI) * INV_PI * 2.2 * roomK;
 
   vec3 hv = normalize(uSunDir - viewDir);
   col += uSunColor * pow(max(dot(n, hv), 0.0), uSpecPower) * spec * sh;
@@ -358,7 +490,8 @@ void main(){
   vec3 r = reflect(viewDir, n);
   col += skyColor(normalize(r), false) * (env < 0.0 ? spec : env) * 0.35;
 
-  col += base * uEmissive;
+  col += base * uEmissive * roomK;
+  if (uRoomOn > 0.5) col += roomLights(vWorld, n, base, viewDir, spec);
 
   // ── AND ANYTHING WHOSE LIGHT IS NOT THIS LIGHT ───────────────────────────
   //
@@ -399,7 +532,7 @@ function solidMaterial(color, opts = {}) {
     ...(opts.defines ? { defines: opts.defines } : {}),
     uniforms: {
       ...shareLight(), ...shareHaze(), ...shareTerrain(), ...shareShadow(),
-      ...shareWater(),
+      ...shareWater(), ...shareRoom(),
       uCamPos: U.uCamPos,
       uBase: { value: new THREE.Color(color) },
       uSpecPower: { value: opts.specPower ?? 42 },

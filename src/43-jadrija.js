@@ -37305,6 +37305,8 @@ async function buildJadrija(scene) {
    */
   function kabinaKit(K) {
     const f = K.floor, dc = K.dc;
+    // Where the room's own lights are, for `roomLightInit` (1.552.1).
+    let shelfAt = null, candleAt = null, pendAt = null;
     const along = (d) => dc + d * KAB.grow, back = (d) => K.s0 + d * KAB.grow;
     const tv = tvPanel(), radio = radioPanel();
 
@@ -37341,64 +37343,249 @@ async function buildJadrija(scene) {
       h: 0.5, y: f });
 
     // ── the television, on its stand against the back wall ──
+    //
+    // REBUILT 1.552.1. Misha, 30 Sep 2026: *"make the objects like the shelf
+    // with whatever is on that shelf, and perhaps the TV stand and what not,
+    // give it higher polygon count and shadows so the inside looks more
+    // immersive/atmospheric"*. What stood here was a box on four sticks with
+    // a box on it, and everything that makes a 1960s set one — the bezel, the
+    // knobs, the grille — was PRINTED on a flat card on its front. From the
+    // doorway that passed. From the bed it was a photograph of a television
+    // glued to a crate.
+    //
+    // So the set is a set: a walnut cabinet lofted from rounded sections,
+    // deep at the front and tapering to the hood the tube's neck lives in; a
+    // cream bezel rolled over the edge of a glass that BULGES, on a sphere of
+    // 1.2 m, which is the face of a 1960s tube; two knobs turned and standing
+    // proud; a grille of brass slats over cloth; four feet; and the rabbit
+    // ears on a proper base, each rod in three telescoped sections. The canvas
+    // is still the picture and nothing else is — `tvPanel` paints the whole
+    // card as it always did, and the glass only takes the tube out of it.
+    //
+    // (The picture used to sit five centimetres proud of the wood for the
+    // depth buffer's sake — see the poster's note. The glass here is 25 to
+    // 50 mm behind the bezel lip at every point, which is the same rule by
+    // construction: nothing on this shore may be nearly co-planar.)
     const vt = along(-1.10), vs = K.s1 - 0.40;     // 0.40 off the back wall
-    for (const o of [[-0.31, -0.15], [0.31, -0.15], [-0.31, 0.15], [0.31, 0.15]]) {
-      post(facing(vt + o[0], vs + o[1], 0), 0, 0, f, f + 0.50, 0.028, KIT.dark, 5);
-    }
-    frustum(W, f + 0.50, [vt, vs, 0.380, 0.210],
-      f + 0.55, [vt, vs, 0.380, 0.210], KIT.wood, KIT.woodT);
-    boxTS(vt - 0.36, vt + 0.36, vs - 0.19, vs + 0.19, f + 0.16, f + 0.24, KIT.dark);
-    // The set. Splayed legs, a cabinet that tucks in at both ends, and the
-    // front is the canvas — see `tvPanel`.
-    const gy = f + 0.55;
-    for (const o of [[-0.19, -0.14], [0.19, -0.14], [-0.19, 0.14], [0.19, 0.14]]) {
-      frustum(W, gy, [vt + o[0], vs + o[1], 0.016, 0.016],
-        gy + 0.11, [vt + o[0] * 0.82, vs + o[1] * 0.82, 0.013, 0.013], KIT.dark);
-    }
-    frustum(W, gy + 0.10, [vt, vs, 0.222, 0.176],
-      gy + 0.15, [vt, vs, 0.248, 0.196], KIT.wood);
-    frustum(W, gy + 0.15, [vt, vs, 0.248, 0.196],
-      gy + 0.47, [vt, vs, 0.248, 0.196], KIT.wood);
-    frustum(W, gy + 0.47, [vt, vs, 0.248, 0.196],
-      gy + 0.52, [vt, vs, 0.220, 0.170], KIT.wood, KIT.woodT);
-    // The picture stands 5 cm proud of the cabinet, with a moulded surround
-    // filling the gap — and that separation is the whole point of it.
-    //
-    // It used to sit two millimetres in front of the wood, which is what a
-    // photograph of a television measures and what a depth buffer cannot tell
-    // apart. What you got was a clean brown bar down the middle of the picture:
-    // not a wobble and not a shimmer, a hard-edged strip where the cabinet's
-    // own front face won the rounding and the tube lost it. It read as an
-    // object standing in the room, and it was hunted as one.
-    //
-    // Same lesson as the shop signs and as the poster below, which says it
-    // outright: at this distance from the world origin two millimetres is not
-    // a standoff, it is a coin toss. Nothing on this shore may be nearly
-    // co-planar with anything else — and a set whose bezel is proud of its
-    // cabinet is what these actually look like anyway.
-    const PR = 0.050;
-    for (const [ta, tc, ya, yc] of [
-      [vt - 0.248, vt - 0.226, gy + 0.10, gy + 0.52],
-      [vt + 0.226, vt + 0.248, gy + 0.10, gy + 0.52],
-      [vt - 0.248, vt + 0.248, gy + 0.50, gy + 0.52],
-      [vt - 0.248, vt + 0.248, gy + 0.10, gy + 0.12],
-    ]) {
-      boxTS(ta, tc, vs - 0.196 - PR, vs - 0.196, ya, yc, KIT.wood, KIT.woodT);
-    }
+
+    // ── its stand: a small table, turned legs, a shelf under it ──
+    const TT = f + 0.55;                           // the top of the top
     {
-      const p = W(vt, vs - 0.196 - PR - 0.002, gy + 0.31);
+      knRR(W, vt - 0.38, vt + 0.38, vs - 0.21, vs + 0.21, TT - 0.030, TT,
+        0.035, 0.012, KIT.wood, KIT.woodT, { bottom: true });
+      // The apron under the top, which is what stops four legs being four
+      // sticks: rails between them, set in from the edge.
+      for (const sg of [-1, 1]) {
+        boxTS(vt - 0.31, vt + 0.31, vs + sg * 0.15 - 0.009, vs + sg * 0.15 + 0.009,
+          TT - 0.105, TT - 0.030, KIT.dark);
+        boxTS(vt + sg * 0.31 - 0.009, vt + sg * 0.31 + 0.009, vs - 0.15, vs + 0.15,
+          TT - 0.105, TT - 0.030, KIT.dark);
+      }
+      // Turned and a touch splayed, like the tabouret's: a collar under the
+      // apron, a bead, the taper, and a small foot.
+      const LEGP = [[0.000, 0.0125], [0.020, 0.0150], [0.034, 0.0120], [0.120, 0.0135],
+        [0.300, 0.0170], [0.380, 0.0185], [0.395, 0.0215], [0.410, 0.0185],
+        [0.425, 0.0200], [TT - f - 0.030, 0.0200]];
+      const H = TT - f - 0.030;
+      for (const [ot, os] of [[-0.31, -0.15], [0.31, -0.15], [-0.31, 0.15], [0.31, 0.15]]) {
+        const spl = 0.05 * Math.sign(ot), sps = 0.04 * Math.sign(os);
+        lathe(W, vt + ot, vs + os, LEGP.map(([h, r]) => [f + h, r,
+          spl * (1 - h / H), sps * (1 - h / H)]), KIT.dark, 10);
+      }
+      // The shelf under it, and the stack of old Arena and Glorija that has
+      // been on it since whoever bought the set.
+      knRR(W, vt - 0.335, vt + 0.335, vs - 0.170, vs + 0.170, f + 0.150, f + 0.168,
+        0.015, 0.005, KIT.wood, KIT.woodT, { bottom: true });
+      const MAGS = [[0.700, 0.210, 0.170], [0.820, 0.780, 0.640], [0.180, 0.330, 0.560],
+        [0.860, 0.700, 0.210]];
+      for (let i = 0; i < 4; i++) {
+        const y0 = f + 0.168 + i * 0.0072;
+        knRR(facing(vt - 0.12 + i * 0.012, vs + 0.01 - i * 0.008, 0.10 - i * 0.09 + (i & 1) * 0.12),
+          -0.105, 0.105, -0.140, 0.140, y0, y0 + 0.0064, 0.004, 0.0015,
+          [0.760, 0.740, 0.690], MAGS[i]);
+      }
+    }
+    // ── the doily ──
+    // Crocheted, scalloped, oval, under the set — the one thing every
+    // television in every rented room on this coast has stood on.
+    const DOY = TT + 0.0035;
+    {
+      const LACE = [0.800, 0.785, 0.735], HOLE = [0.520, 0.470, 0.400];
+      const N = 96, rt0 = 0.300, rs0 = 0.185;
+      const R = (a) => 1 + 0.045 * Math.abs(Math.sin(a * 12));
+      const rim = [];
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * TAU, k = R(a);
+        rim.push([vt + Math.cos(a) * rt0 * k, vs - 0.02 + Math.sin(a) * rs0 * k]);
+      }
+      const ctr = W(vt, vs - 0.02, DOY);
+      for (let i = 0; i < N; i++) {
+        const A = rim[i], B = rim[(i + 1) % N];
+        knTri(ctr, W(A[0], A[1], DOY), W(B[0], B[1], DOY), [0, 1, 0], LACE);
+        b.quad(W(A[0], A[1], TT + 0.0005), W(B[0], B[1], TT + 0.0005),
+          W(B[0], B[1], DOY), W(A[0], A[1], DOY), shade(LACE, 0.85));
+      }
+      // Two rings of the open work, which at a metre is what reads as lace:
+      // small dark lozenges a millimetre and a half proud.
+      for (const [rk, n] of [[0.80, 36], [0.55, 24]]) {
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU, da = 0.35 / n * TAU;
+          const P4 = [[rk - 0.05, a], [rk, a - da], [rk + 0.05, a], [rk, a + da]]
+            .map(([r, th]) => W(vt + Math.cos(th) * rt0 * r, vs - 0.02 + Math.sin(th) * rs0 * r,
+              DOY + 0.0015));
+          b.quad(P4[0], P4[1], P4[2], P4[3], HOLE);
+        }
+      }
+    }
+
+    // ── the set ──
+    // Its own frame: x across (+t, your right as you face it), y up off the
+    // doily, z out of the front toward you (−s).
+    const gy = DOY;
+    const tvF = (x, y, z) => W(vt + x, vs - z, gy + y);
+    const TVW = [0.300, 0.172, 0.088], TVW2 = [0.345, 0.205, 0.108];
+    const BEZ = [0.800, 0.765, 0.650], BRASS = [0.640, 0.510, 0.270];
+    /** A rounded rectangle about (0, cy), as [x, y] points — the same count for any size. */
+    const rrRing = (hw, hh, r, cy, NC = 6) => {
+      const out = [];
+      for (const [sx, sy, a0] of [[1, 1, 0], [-1, 1, 0.5], [-1, -1, 1], [1, -1, 1.5]]) {
+        for (let i = 0; i <= NC; i++) {
+          const a = (a0 + (i / NC) * 0.5) * Math.PI;
+          out.push([sx * (hw - r) + Math.cos(a) * r, cy + sy * (hh - r) + Math.sin(a) * r]);
+        }
+      }
+      return out;
+    };
+    // The cabinet, back to front: the hood the neck lives in, the shoulder,
+    // the body, and a rolled front edge.
+    const CAB = [
+      [-0.215, 0.130, 0.120, 0.050, 0.335],
+      [-0.200, 0.150, 0.140, 0.055, 0.335],
+      [-0.120, 0.205, 0.190, 0.060, 0.315],
+      [-0.040, 0.245, 0.225, 0.066, 0.297],
+      [0.000, 0.255, 0.235, 0.070, 0.295],
+      [0.170, 0.255, 0.235, 0.070, 0.295],
+      [0.182, 0.252, 0.232, 0.068, 0.295],
+      [0.190, 0.244, 0.224, 0.062, 0.295],
+    ];
+    const cabMid = tvF(0, 0.30, 0.0);
+    knSurf(CAB.map(([z, hw, hh, r, cy]) => rrRing(hw, hh, r, cy).map(([x, y]) => tvF(x, y, z))),
+      (i) => (i >= 6 ? TVW2 : TVW), { wrap: true, out: () => cabMid });
+    {
+      const back = rrRing(0.130, 0.120, 0.050, 0.335), c = tvF(0, 0.335, -0.215);
+      const nb = [c[0] - tvF(0, 0.335, -0.214)[0], 0, c[2] - tvF(0, 0.335, -0.214)[2]];
+      for (let j = 0; j < back.length; j++) {
+        const A = back[j], B = back[(j + 1) % back.length];
+        knTri(c, tvF(A[0], A[1], -0.215), tvF(B[0], B[1], -0.215), nb, TVW);
+      }
+    }
+    // The front: the face of the cabinet between its rolled edge and the
+    // bezel, which is where the controls go.
+    const SCY = 0.345;                                   // the tube's middle
+    knSurf([rrRing(0.244, 0.224, 0.062, 0.295), rrRing(0.225, 0.162, 0.075, SCY)]
+      .map((ring) => ring.map(([x, y]) => tvF(x, y, 0.190))), TVW2,
+    { wrap: true, out: () => cabMid });
+    // The bezel, rolled over the edge of the glass and down a throat behind it.
+    const bezMid = tvF(0, SCY, 0.10);
+    knSurf([[0.225, 0.162, 0.075, 0.190], [0.219, 0.156, 0.071, 0.1975],
+      [0.208, 0.145, 0.064, 0.1995], [0.199, 0.136, 0.056, 0.1935], [0.196, 0.133, 0.054, 0.1650]]
+      .map(([hw, hh, r, z]) => rrRing(hw, hh, r, SCY).map(([x, y]) => tvF(x, y, z))), BEZ,
+    { wrap: true, out: () => bezMid });
+    // The glass. `tvPanel` still paints the whole card; this takes only the
+    // tube out of it (x 34..478, y 26..330 of 512 by 448), on a face that
+    // bulges 25 mm at its middle.
+    {
+      const HX = 0.1995, HY = 0.1365, NXg = 24, NYg = 16, RB = 1.2;
+      const pos = [], uv = [], idx = [];
+      for (let j = 0; j <= NYg; j++) {
+        for (let i = 0; i <= NXg; i++) {
+          const x = -HX + (2 * HX) * (i / NXg), y = -HY + (2 * HY) * (j / NYg);
+          pos.push(x, y, 0.1925 - (x * x + y * y) / (2 * RB));
+          uv.push((34 + (i / NXg) * 444) / 512, 1 - (26 + (1 - j / NYg) * 304) / 448);
+        }
+      }
+      for (let j = 0; j < NYg; j++) {
+        for (let i = 0; i < NXg; i++) {
+          const a = j * (NXg + 1) + i, c = a + NXg + 1;
+          idx.push(a, a + 1, c + 1, a, c + 1, c);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      tv.mesh.geometry.dispose();
+      tv.mesh.geometry = g;
+      const p = W(vt, vs, gy + SCY);
       tv.mesh.position.set(p[0], p[1], p[2]);
       const st = at(vt);
       tv.mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
       scene.add(tv.mesh);
       kabInOnly.push(tv.mesh);
     }
-    // Rabbit ears: a chromed base and two rods in a V, which is the one detail
-    // that dates the thing from across a dark room.
-    dome(facing(vt, vs, 0), 0, 0, gy + 0.52, 0.055, 0.075, KIT.chrome, 8);
-    for (const o of [-1, 1]) {
-      frustum(W, gy + 0.56, [vt + o * 0.02, vs, 0.008, 0.008],
-        gy + 1.02, [vt + o * 0.34, vs + 0.10, 0.005, 0.005], KIT.chrome);
+    // The controls, under the tube: a grille of brass slats over dark cloth,
+    // and a knob either side of it.
+    {
+      const zf = 0.190, F = (u, v, w) => tvF(u, v, zf + w);
+      knRR(F, -0.118, 0.118, 0.092, 0.166, 0.000, 0.006, 0.016, 0.003,
+        [0.150, 0.118, 0.090], [0.150, 0.118, 0.090]);
+      const map = (x, z, y) => tvF(x, y, z);
+      for (let i = 0; i < 13; i++) {
+        const x = -0.100 + i * (0.200 / 12);
+        tubeTS([[x, zf + 0.0072, 0.098], [x, zf + 0.0072, 0.160]], [0.0028, 0.0016],
+          BRASS, 6, [1, 0, 0], 0.16, map);
+      }
+      tubeTS([[-0.118, zf + 0.0065, 0.092], [0.118, zf + 0.0065, 0.092]], 0.0030, BRASS, 6,
+        [0, 0, 1], 0.16, map);
+      tubeTS([[-0.118, zf + 0.0065, 0.166], [0.118, zf + 0.0065, 0.166]], 0.0030, BRASS, 6,
+        [0, 0, 1], 0.16, map);
+      for (const kx of [-0.182, 0.182]) {
+        const KF = (x, y, w) => tvF(kx + x, 0.128 + y, zf + w);
+        spinIn(KF, [[0.000, 0.0265], [0.0020, 0.0270], [0.0035, 0.0240], [0.0035, 0.0220]],
+          BRASS, 24, [1, 1], 0.10);
+        spinIn(KF, [[0.0030, 0.0212], [0.0060, 0.0218], [0.0170, 0.0200], [0.0215, 0.0175],
+          [0.0240, 0.0120], [0.0248, 0.0000]], BEZ, 24, [1, 1], 0.12);
+        // The pointer: a groove down the face, as a dark bar across it.
+        tubeTS([[kx, zf + 0.0252, 0.128], [kx, zf + 0.0245, 0.128 + 0.012]], 0.0016,
+          [0.25, 0.20, 0.14], 5, [1, 0, 0], 0.1, map);
+      }
+    }
+    // Four feet, turned, standing on the doily.
+    for (const [x, z] of [[-0.19, -0.10], [0.19, -0.10], [-0.19, 0.13], [0.19, 0.13]]) {
+      lathe((dt, ds, y) => tvF(dt, y, -ds), x, -z,
+        [[0, 0.013], [0.012, 0.015], [0.030, 0.012], [0.062, 0.018]], KIT.dark, 10);
+    }
+    // Rabbit ears: a turned bakelite base with a chrome ball joint, and two
+    // rods in a V, each three sections telescoped out of the one below with
+    // a collar at every joint and a ball on the tip. The one detail that
+    // dates the thing from across a dark room.
+    {
+      const az = 0.030, ay = 0.527;
+      const [bt0, bs0] = [vt, vs - az];
+      spinTS(bt0, bs0, [[gy + ay - 0.004, 0.058], [gy + ay + 0.004, 0.060],
+        [gy + ay + 0.012, 0.055], [gy + ay + 0.026, 0.036], [gy + ay + 0.034, 0.022],
+        [gy + ay + 0.040, 0.000]], [0.120, 0.100, 0.090], 28, 0.10);
+      for (const sg of [-1, 1]) {
+        const j = [bt0 + sg * 0.014, bs0, gy + ay + 0.040];
+        spinTS(j[0], j[1], [[j[2] - 0.008, 0.0], [j[2] - 0.006, 0.0070], [j[2], 0.0095],
+          [j[2] + 0.006, 0.0070], [j[2] + 0.008, 0.0]], KIT.chrome, 12, 0.14);
+        const d = [sg * 0.600, 0.200, 0.775];
+        const dl = Math.hypot(d[0], d[1], d[2]);
+        d[0] /= dl; d[1] /= dl; d[2] /= dl;
+        let a = 0;
+        for (const [L, r] of [[0.175, 0.0048], [0.165, 0.0036], [0.155, 0.0026]]) {
+          const A = [j[0] + d[0] * a, j[1] + d[1] * a, j[2] + d[2] * a];
+          const B = [j[0] + d[0] * (a + L), j[1] + d[1] * (a + L), j[2] + d[2] * (a + L)];
+          tubeTS([A, B], r, KIT.chrome, 8, [0, 1, 0], 0.22);
+          tubeTS([[B[0] - d[0] * 0.008, B[1] - d[1] * 0.008, B[2] - d[2] * 0.008], B],
+            r + 0.0011, KIT.chrome, 8, [0, 1, 0], 0.22);
+          a += L - 0.012;
+        }
+        const T = [j[0] + d[0] * (a + 0.012), j[1] + d[1] * (a + 0.012), j[2] + d[2] * (a + 0.012)];
+        spinTS(T[0], T[1], [[T[2] - 0.0055, 0], [T[2] - 0.004, 0.004], [T[2], 0.0056],
+          [T[2] + 0.004, 0.004], [T[2] + 0.0055, 0]], KIT.chrome, 10, 0.14);
+      }
     }
 
     // ── the tabouret, and the Pelješac on it ──
@@ -38068,36 +38255,87 @@ async function buildJadrija(scene) {
         [0.110, 0.104, 0.098]);
       lathe(W, lt, ls, [[K.top - 0.012, 0.045], [K.top - 0.045, 0.040],
         [K.top - 0.050, 0.012]], [0.400, 0.392, 0.375], 10);
-      // The shade: a cone, wide side down, with the enamel rim a shade lighter.
-      lathe(W, lt, ls, [[ly + 0.030, 0.026], [ly + 0.020, 0.030],
-        [ly - 0.110, 0.135], [ly - 0.118, 0.135]], ENAM, 12);
+      // The shade: a cone, wide side down, with a rolled rim, and white
+      // enamel inside it (1.552.1: it was twelve flat sides and no inside).
+      spinTS(lt, ls, [[ly + 0.032, 0.0], [ly + 0.034, 0.018], [ly + 0.028, 0.026],
+        [ly + 0.016, 0.032], [ly - 0.040, 0.082], [ly - 0.100, 0.128], [ly - 0.112, 0.136],
+        [ly - 0.118, 0.137], [ly - 0.121, 0.133]], ENAM, 32, 0.12);
+      // The lamp holder, and the bulb, which is lit: it is the room's light
+      // now (see GLSL_ROOM in 30-material.js), so it has to be a thing that
+      // glows and not only a place light comes from.
+      spinTS(lt, ls, [[ly + 0.012, 0.016], [ly - 0.020, 0.016], [ly - 0.024, 0.012]],
+        [0.200, 0.180, 0.160], 12, 0.1);
+      // The inside of the shade is lit by it too, and nothing in the room's
+      // lighting can say so — a surface two centimetres from the bulb is
+      // inside its own shadow map's near plane — so it glows on its own,
+      // the colour of warm enamel with a 60 W bulb in it.
+      {
+        const inner = new THREE.Mesh(new THREE.LatheGeometry([[0.129, -0.114], [0.122, -0.100],
+          [0.077, -0.040], [0.030, 0.010], [0.001, 0.020]].map(([r, y]) => new THREE.Vector2(r, y)), 32),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(0.78, 0.66, 0.50), side: THREE.DoubleSide }));
+        const ip = W(lt, ls, ly);
+        inner.position.set(ip[0], ip[1], ip[2]);
+        scene.add(inner);
+        kabInOnly.push(inner);
+      }
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.030, 18, 12),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.86, 0.62) }));
+      bulb.scale.set(1, 1.25, 1);
+      const bp = W(lt, ls, ly - 0.056);
+      bulb.position.set(bp[0], bp[1], bp[2]);
+      scene.add(bulb);
+      kabInOnly.push(bulb);
+      pendAt = [lt, ls, ly - 0.06];
     }
 
     // ── the radio, on a small table against the near wall ──
     const rt = K.t0 + 0.39, rs = back(2.60);       // 0.39 off the west wall
-    for (const o of [[-0.16, -0.12], [0.16, -0.12], [-0.16, 0.12], [0.16, 0.12]]) {
-      post(facing(rt + o[0], rs + o[1], 0), 0, 0, f, f + 0.58, 0.020, KIT.dark, 5);
+    // Turned legs and a top with a rounded edge, and the set itself with its
+    // corners rounded, a carry handle that is a bent bar and a telescopic
+    // aerial — 1.552.1; it was five boxes and a stick.
+    {
+      const LEGR = [[0.000, 0.0110], [0.018, 0.0135], [0.030, 0.0110], [0.300, 0.0150],
+        [0.480, 0.0165], [0.500, 0.0195], [0.515, 0.0170], [0.585, 0.0170]];
+      for (const o of [[-0.16, -0.12], [0.16, -0.12], [-0.16, 0.12], [0.16, 0.12]]) {
+        lathe(W, rt + o[0], rs + o[1], LEGR.map(([h, r]) => [f + h, r,
+          0.025 * Math.sign(o[0]) * (1 - h / 0.585), 0.020 * Math.sign(o[1]) * (1 - h / 0.585)]),
+        KIT.dark, 10);
+      }
+      knRR(W, rt - 0.200, rt + 0.200, rs - 0.160, rs + 0.160, f + 0.585, f + 0.620,
+        0.030, 0.010, KIT.wood, KIT.woodT, { bottom: true });
     }
-    frustum(W, f + 0.58, [rt, rs, 0.200, 0.160],
-      f + 0.62, [rt, rs, 0.200, 0.160], KIT.wood, KIT.woodT);
     const ry = f + 0.62;
-    frustum(W, ry, [rt, rs, 0.150, 0.070], ry + 0.02, [rt, rs, 0.158, 0.076], KIT.gold);
-    frustum(W, ry + 0.02, [rt, rs, 0.158, 0.076],
-      ry + 0.17, [rt, rs, 0.158, 0.076], KIT.blue);
-    frustum(W, ry + 0.17, [rt, rs, 0.158, 0.076],
-      ry + 0.20, [rt, rs, 0.138, 0.060], KIT.blue, KIT.blue);
+    knRR(W, rt - 0.150, rt + 0.150, rs - 0.070, rs + 0.070, ry, ry + 0.020, 0.010, 0.005,
+      KIT.gold, KIT.gold, { bottom: true });
+    knRR(W, rt - 0.158, rt + 0.158, rs - 0.076, rs + 0.076, ry + 0.018, ry + 0.200, 0.008,
+      0.020, KIT.blue, KIT.blue);
     // The carry handle over the top, and the aerial, which on these folds down
     // and is never folded down.
-    for (const o of [-1, 1]) {
-      frustum(W, ry + 0.19, [rt + o * 0.075, rs, 0.010, 0.010],
-        ry + 0.255, [rt + o * 0.062, rs, 0.009, 0.009], KIT.gold);
-    }
-    boxTS(rt - 0.072, rt + 0.072, rs - 0.009, rs + 0.009,
-      ry + 0.248, ry + 0.264, KIT.gold);
-    frustum(W, ry + 0.19, [rt - 0.140, rs + 0.02, 0.006, 0.006],
-      ry + 0.46, [rt - 0.170, rs + 0.05, 0.003, 0.003], KIT.chrome);
     {
-      const p = W(rt, rs - 0.0765, ry + 0.095);
+      const hp = [];
+      for (let i = 0; i <= 12; i++) {
+        const a = (i / 12) * Math.PI;
+        hp.push([rt - Math.cos(a) * 0.080, rs, ry + 0.192 + Math.sin(a) * 0.062]);
+      }
+      tubeTS(hp, [0.0075, 0.0060], KIT.gold, 10, [0, 1, 0], 0.16);
+      for (const sg of [-1, 1]) {
+        spinTS(rt + sg * 0.080, rs, [[ry + 0.196, 0.012], [ry + 0.206, 0.012],
+          [ry + 0.210, 0.0]], KIT.gold, 12, 0.12);
+      }
+      const A0 = [rt - 0.140, rs + 0.02, ry + 0.198];
+      const d = [-0.110, 0.110, 0.988];
+      let a = 0;
+      for (const [L, r] of [[0.105, 0.0040], [0.095, 0.0030], [0.085, 0.0022]]) {
+        const A = [A0[0] + d[0] * a, A0[1] + d[1] * a, A0[2] + d[2] * a];
+        const B = [A0[0] + d[0] * (a + L), A0[1] + d[1] * (a + L), A0[2] + d[2] * (a + L)];
+        tubeTS([A, B], r, KIT.chrome, 8, [0, 1, 0], 0.22);
+        a += L - 0.010;
+      }
+    }
+    {
+      // Three millimetres proud of the set's face, which is flat now to the
+      // edge of the dial — at half a millimetre the two argued (1.552.1).
+      const p = W(rt, rs - 0.0790, ry + 0.095);
       radio.mesh.position.set(p[0], p[1], p[2]);
       const st = at(rt);
       radio.mesh.rotation.y = Math.atan2(-st.nx, -st.nz);
@@ -38159,14 +38397,95 @@ async function buildJadrija(scene) {
     // the rest, and every one of them is the sort of thing that turns a set
     // dressed for one shot into somewhere people keep their stuff.
     {
-      const MAT = [0.395, 0.335, 0.205];
-      const RED2 = [0.475, 0.095, 0.080];
-      const PALE = [0.680, 0.672, 0.640];
-      // The mat, just inside the door, and it is the one thing in here you
-      // stand on. Two millimetres proud of the floor is a coin toss at this
-      // distance from the origin — 12 is not.
-      boxTS(dc - 0.62, dc + 0.62, K.face + 0.55, K.face + 1.45,
-        f + 0.004, f + 0.016, MAT, shade(MAT, 1.14));
+      // The rug, just inside the door, and it is the one thing in here you
+      // stand on. A rag rug in stripes with a fringe at each end, which is
+      // what is on the floor of every one of these (1.552.1 — it was a flat
+      // slab whose top was the tiles' own height, and it came out as a
+      // shimmer of both).
+      {
+        const R0 = K.face + 0.55, R1 = K.face + 1.35, ry0 = f + JAD.tile + 0.0015;
+        const STR = [[0.440, 0.200, 0.160], [0.600, 0.540, 0.420], [0.200, 0.280, 0.360],
+          [0.600, 0.540, 0.420], [0.380, 0.400, 0.290], [0.600, 0.540, 0.420]];
+        const n = 15, w = 1.24 / n;
+        for (let i = 0; i < n; i++) {
+          const ta = dc - 0.62 + i * w, h = 0.010 + 0.003 * jit(i, 471);
+          const c = STR[i % STR.length], k = 0.92 + 0.14 * jit(i, 472);
+          knRR(W, ta + 0.002, ta + w - 0.002, R0, R1, ry0, ry0 + h, 0.004, 0.004,
+            [c[0] * k, c[1] * k, c[2] * k], [c[0] * k * 1.06, c[1] * k * 1.06, c[2] * k * 1.06]);
+        }
+        const FR = [0.740, 0.680, 0.560];
+        for (const [sa, sg] of [[R0, -1], [R1, 1]]) {
+          for (let i = 0; i < 24; i++) {
+            const ta = dc - 0.60 + i * (1.20 / 23) + 0.006 * (jit(i, 473 + sg) - 0.5);
+            const L = 0.045 + 0.020 * jit(i, 475 + sg), sk = 0.012 * (jit(i, 477 + sg) - 0.5);
+            tubeTS([[ta, sa, ry0 + 0.004], [ta + sk * 0.5, sa + sg * L * 0.5, ry0 + 0.0022],
+              [ta + sk, sa + sg * L, ry0 + 0.0018]], 0.0020, FR, 5, [0, 0, 1], 0.1);
+          }
+        }
+      }
+      // A pair of flip-flops, kicked off beside it, and one of them on its
+      // side the way one always is.
+      {
+        const SOLE = [0.140, 0.200, 0.380], SOLT = [0.235, 0.300, 0.520], STRAP = [0.780, 0.770, 0.740];
+        const L = 0.255;
+        const hwOf = (u) => {
+          // Heel, arch, ball, toe: the half-width along the foot.
+          const k = [[0, 0.020], [0.06, 0.034], [0.22, 0.036], [0.42, 0.029],
+            [0.66, 0.044], [0.84, 0.045], [0.95, 0.034], [1.0, 0.012]];
+          for (let i = 1; i < k.length; i++) {
+            if (u <= k[i][0]) {
+              const a = k[i - 1], c = k[i], q = (u - a[0]) / (c[0] - a[0]);
+              return a[1] + (c[1] - a[1]) * (0.5 - 0.5 * Math.cos(q * Math.PI));
+            }
+          }
+          return 0.012;
+        };
+        const outline = [];
+        for (let i = 0; i <= 20; i++) outline.push([i / 20, 1]);
+        for (let i = 20; i >= 0; i--) outline.push([i / 20, -1]);
+        const flop = (P) => {
+          const pts = outline.map(([u, sg]) => [(u - 0.5) * L, sg * hwOf(u)]);
+          const TH = 0.014;
+          const tri = THREE.ShapeUtils.triangulateShape(pts.map(([x, y]) => new THREE.Vector2(x, y)), []);
+          for (const [i, j, k] of tri) {
+            b.tri(P(...pts[i], TH), P(...pts[j], TH), P(...pts[k], TH), SOLT);
+            b.tri(P(...pts[k], 0), P(...pts[j], 0), P(...pts[i], 0), SOLE);
+          }
+          for (let i = 0; i < pts.length; i++) {
+            const A = pts[i], B = pts[(i + 1) % pts.length];
+            b.quad(P(...A, 0), P(...B, 0), P(...B, TH), P(...A, TH), SOLE);
+          }
+          // The thong: a post between the toes and two straps back to the
+          // sides of the arch.
+          const toe = [(0.80 - 0.5) * L, 0];
+          for (const sg of [-1, 1]) {
+            const side = [(0.50 - 0.5) * L, sg * (hwOf(0.50) - 0.004)];
+            const pp = [];
+            for (let i = 0; i <= 8; i++) {
+              const q = i / 8;
+              pp.push([toe[0] + (side[0] - toe[0]) * q, toe[1] + (side[1] - toe[1]) * q,
+                TH + 0.004 + 0.030 * Math.sin(q * Math.PI * 0.92)]);
+            }
+            tubeTS(pp, [0.0065, 0.0022], STRAP, 6, [0, 0, 1], 0.12, (x, y, z) => P(x, y, z));
+          }
+        };
+        const ft = dc + 0.86, fs = K.face + 0.78, fy = f + JAD.tile + 0.001;
+        // Flat, toe to the door.
+        {
+          const a = -Math.PI / 2 + 0.22, c = Math.cos(a), sn = Math.sin(a);
+          flop((x, y, z) => W(ft + x * c - y * sn, fs + x * sn + y * c, fy + z));
+        }
+        // And its pair, tipped over on to its outside edge against the other.
+        {
+          const a = -Math.PI / 2 - 0.35, c = Math.cos(a), sn = Math.sin(a);
+          const tilt = 1.25, ct = Math.cos(tilt), stl = Math.sin(tilt);
+          const o = [ft + 0.13, fs + 0.05];
+          flop((x, y, z) => {
+            const yy = y * ct - z * stl, zz = y * stl + z * ct + 0.045;
+            return W(o[0] + x * c - yy * sn, o[1] + x * sn + yy * c, fy + zz);
+          });
+        }
+      }
       // THE SUN LOUNGER IS NOT HERE, and that is deliberate.
       //
       // It was: folded and stood on end against the back wall, a steel frame
@@ -38187,36 +38506,220 @@ async function buildJadrija(scene) {
       // red cooler in the kabine is unnecessary, needs to be ditched". Same
       // shelf as the lounger above. It was the loudest colour in a dark room
       // and was doing nothing but being red on the floor.
-      // The shelf, high on the back wall, on two brackets, with a bag on it.
+      //
+      // ── the shelf, high on the back wall ──
+      //
+      // REBUILT 1.552.1, the second half of the same note. It was a plank on
+      // two blocks with a bag on it — and the plank stood 0.26 m OFF the wall
+      // it was supposed to be fixed to, which is what `K.s1 - 0.26` had been
+      // in the small room's frame and never was again. Now: a plank with a
+      // rolled front edge ON the boards, on two cut brackets, and what is on a
+      // shelf in a hut on this beach — towels folded for the next swim, the
+      // sun cream, a candle for when the power goes, the photograph of the
+      // same bay forty summers ago, the džezva and two cups, and shells.
+      //
+      // THE CANDLE IS LIT, and it is one of the room's lights — see
+      // GLSL_ROOM in 30-material.js. The plank is solved as its shadow there.
       {
-        const sy = f + 1.62, sb = K.s1 - 0.26;
-        boxTS(dc - 0.66, dc + 0.66, sb - 0.26, sb, sy, sy + 0.035,
-          KIT.wood, KIT.woodT);
-        for (const o of [-0.54, 0.54]) {
-          boxTS(dc + o - 0.022, dc + o + 0.022, sb - 0.22, sb,
-            sy - 0.16, sy, KIT.dark);
+        const SW = K.s1 - 0.002, sy = f + 1.60, YT = sy + 0.032;
+        const ST0 = dc - 0.70, ST1 = dc + 0.70, SD = 0.26, sI = SW - 0.12;
+        shelfAt = { t0: ST0, t1: ST1, s0: SW - SD, s1: SW, y: YT };
+        knRR(W, ST0, ST1, SW - SD, SW, sy, YT, 0.012, 0.009, KIT.wood, KIT.woodT,
+          { bottom: true });
+        // The brackets: a board cut to a scooped profile, one each end.
+        const BR = [[0.000, 0.000], [0.215, 0.000], [0.215, -0.022]];
+        for (let i = 0; i <= 12; i++) {
+          const a = (i / 12) * Math.PI * 0.5;
+          BR.push([0.215 - 0.187 * Math.sin(a), -0.022 - 0.158 * (1 - Math.cos(a))]);
         }
-        const BAG = [0.330, 0.300, 0.255];
-        frustum(W, sy + 0.035, [dc + 0.18, sb - 0.13, 0.190, 0.105],
-          sy + 0.27, [dc + 0.18, sb - 0.13, 0.155, 0.085], BAG,
-          shade(BAG, 1.12));
-        boxTS(dc + 0.10, dc + 0.26, sb - 0.14, sb - 0.12, sy + 0.26,
-          sy + 0.38, shade(BAG, 0.82));
+        BR.push([0.000, -0.180]);
+        const tri = THREE.ShapeUtils.triangulateShape(BR.map(([x, y]) => new THREE.Vector2(x, y)), []);
+        for (const bt0 of [dc - 0.54, dc + 0.54]) {
+          const P = (d, y, e) => W(bt0 + e, SW - d, sy + y);
+          for (const e of [-0.013, 0.013]) {
+            for (const [i, j, k] of tri) b.tri(P(...BR[i], e), P(...BR[j], e), P(...BR[k], e), KIT.dark);
+          }
+          for (let i = 0; i < BR.length; i++) {
+            const A = BR[i], B = BR[(i + 1) % BR.length];
+            b.quad(P(...A, -0.013), P(...B, -0.013), P(...B, 0.013), P(...A, 0.013),
+              shade(KIT.dark, 1.08));
+          }
+        }
+        // Two folded towels, the top one a little askew.
+        const TW1 = [0.760, 0.745, 0.700], TW2 = [0.760, 0.340, 0.270];
+        knRR(facing(dc - 0.50, sI, 0.05), -0.110, 0.110, -0.085, 0.085, YT, YT + 0.042,
+          0.022, 0.018, TW1, TW1);
+        knRR(facing(dc - 0.50, sI, 0.05), -0.112, 0.112, -0.020, 0.012, YT + 0.004, YT + 0.040,
+          0.004, 0.004, [0.180, 0.330, 0.520], [0.180, 0.330, 0.520]);
+        knRR(facing(dc - 0.495, sI + 0.005, -0.07), -0.100, 0.100, -0.080, 0.080, YT + 0.042,
+          YT + 0.080, 0.020, 0.017, TW2, TW2);
+        knRR(facing(dc - 0.495, sI + 0.005, -0.07), -0.102, 0.102, 0.020, 0.040, YT + 0.046,
+          YT + 0.076, 0.004, 0.004, TW1, TW1);
+        // The sun cream, stood on its cap because that is how it is kept.
+        {
+          const t0 = dc - 0.30, s0 = sI + 0.03;
+          const F = (x, y, w) => W(t0 + x, s0 + y, YT + w);
+          spinIn(F, [[0.000, 0.0], [0.000, 0.0200], [0.003, 0.0215], [0.026, 0.0215],
+            [0.028, 0.0190]], [0.860, 0.850, 0.820], 20, [1, 0.62], 0.10);
+          spinIn(F, [[0.028, 0.0205], [0.034, 0.0290], [0.050, 0.0330], [0.140, 0.0335],
+            [0.152, 0.0300], [0.158, 0.0200], [0.160, 0.0]], [0.880, 0.460, 0.110], 20, [1, 0.62], 0.12);
+          spinIn(F, [[0.070, 0.0341], [0.125, 0.0341]], [0.930, 0.820, 0.430], 20, [1, 0.62], 0.10);
+        }
+        // The candle, on a brass dish. See `candleAt`.
+        {
+          const t0 = dc - 0.13, s0 = sI + 0.01;
+          const BRS = [0.640, 0.500, 0.250], WAX = [0.930, 0.880, 0.760];
+          spinTS(t0, s0, [[YT, 0.0], [YT, 0.050], [YT + 0.004, 0.053], [YT + 0.009, 0.051],
+            [YT + 0.010, 0.022], [YT + 0.028, 0.018], [YT + 0.032, 0.021], [YT + 0.034, 0.0]],
+          BRS, 24, 0.14);
+          spinTS(t0, s0, [[YT + 0.030, 0.0180], [YT + 0.118, 0.0180], [YT + 0.123, 0.0165],
+            [YT + 0.121, 0.0100], [YT + 0.119, 0.0]], WAX, 18, 0.08);
+          // Two runs of wax down its side.
+          for (const [a, L] of [[0.6, 0.040], [2.9, 0.026]]) {
+            const x = Math.cos(a) * 0.0183, y = Math.sin(a) * 0.0183;
+            tubeTS([[t0 + x, s0 + y, YT + 0.121], [t0 + x * 1.03, s0 + y * 1.03, YT + 0.121 - L * 0.6],
+              [t0 + x, s0 + y, YT + 0.121 - L]], (k) => [0.0036, 0.0036, 0.0026][k], WAX, 6,
+            [0, 0, 1], 0.08);
+          }
+          post(W, t0, s0, YT + 0.119, YT + 0.131, 0.0012, [0.08, 0.06, 0.05], 5);
+          candleAt = [t0, s0, YT + 0.140];
+        }
+        // The photograph: the same bay, a long time ago, leaning on the wall.
+        {
+          const pt0 = dc + 0.07, tl = 0.21, ct = Math.cos(tl), st2 = Math.sin(tl);
+          const P = (u, v, w) => W(pt0 + u, SW - 0.050 + v * st2 - w * ct, YT + v * ct + w * st2);
+          const FRM = [0.230, 0.150, 0.085];
+          knRR(P, -0.068, 0.068, 0.0, 0.175, 0.0, 0.013, 0.006, 0.003, FRM, FRM);
+          const q = (u0, u1, v0, v1, col) => b.quad(P(u0, v0, 0.0145), P(u1, v0, 0.0145),
+            P(u1, v1, 0.0145), P(u0, v1, 0.0145), col);
+          // Faded, as a print on a shelf by the sea is: sky, the channel, the
+          // far shore, the beach, and a sail.
+          q(-0.052, 0.052, 0.104, 0.158, [0.600, 0.680, 0.720]);
+          q(-0.052, 0.052, 0.062, 0.104, [0.200, 0.380, 0.470]);
+          q(-0.052, 0.052, 0.018, 0.062, [0.760, 0.700, 0.560]);
+          const isl = [[-0.052, 0.104], [-0.030, 0.113], [-0.012, 0.118], [0.004, 0.110],
+            [0.020, 0.106], [0.052, 0.104]];
+          for (let i = 0; i < isl.length - 1; i++) {
+            b.quad(P(isl[i][0], 0.104, 0.0150), P(isl[i + 1][0], 0.104, 0.0150),
+              P(isl[i + 1][0], isl[i + 1][1], 0.0150), P(isl[i][0], isl[i][1], 0.0150),
+              [0.360, 0.420, 0.380]);
+          }
+          b.tri(P(0.018, 0.084, 0.0152), P(0.034, 0.084, 0.0152), P(0.024, 0.104, 0.0152),
+            [0.900, 0.890, 0.850]);
+          // The mount between the frame and the print.
+          q(-0.058, 0.058, 0.010, 0.018, [0.820, 0.800, 0.740]);
+          q(-0.058, 0.058, 0.158, 0.166, [0.820, 0.800, 0.740]);
+          q(-0.058, -0.052, 0.018, 0.158, [0.820, 0.800, 0.740]);
+          q(0.052, 0.058, 0.018, 0.158, [0.820, 0.800, 0.740]);
+        }
+        // The džezva, copper and tinned inside, with its long handle out
+        // toward you, and two cups on saucers.
+        {
+          const t0 = dc + 0.27, s0 = sI + 0.02;
+          const CU = [0.640, 0.340, 0.170], TIN = [0.600, 0.600, 0.580];
+          spinTS(t0, s0, [[YT, 0.0], [YT, 0.034], [YT + 0.004, 0.037], [YT + 0.030, 0.036],
+            [YT + 0.058, 0.029], [YT + 0.074, 0.026], [YT + 0.086, 0.030], [YT + 0.092, 0.032],
+            [YT + 0.093, 0.0305]], CU, 24, 0.14);
+          spinTS(t0, s0, [[YT + 0.093, 0.0305], [YT + 0.088, 0.028], [YT + 0.074, 0.0235],
+            [YT + 0.058, 0.0265], [YT + 0.020, 0.033], [YT + 0.006, 0.0]], TIN, 24, 0.08);
+          // A pouring lip, pinched out on the side away from the handle.
+          tubeTS([[t0 + 0.024, s0 + 0.018, YT + 0.091], [t0 + 0.030, s0 + 0.024, YT + 0.094]],
+            0.0030, CU, 6, [0, 0, 1], 0.12);
+          const hA = [t0 - 0.004, s0 - 0.034, YT + 0.068];
+          tubeTS([hA, [t0 - 0.012, s0 - 0.070, YT + 0.080]], 0.0045, [0.600, 0.480, 0.250], 8,
+            [0, 0, 1], 0.14);
+          tubeTS([[t0 - 0.012, s0 - 0.066, YT + 0.079], [t0 - 0.028, s0 - 0.150, YT + 0.104],
+            [t0 - 0.030, s0 - 0.158, YT + 0.106]], (k) => [0.0062, 0.0068, 0.0055][k],
+          [0.160, 0.095, 0.050], 10, [0, 0, 1], 0.14);
+          twSaucer(dc + 0.39, SW - 0.075, YT, 0.78);
+          twCup(dc + 0.39, SW - 0.075, YT + 0.0066 * 0.78, -0.6, 0.78);
+          twSaucer(dc + 0.42, SW - 0.185, YT, 0.78);
+          twCup(dc + 0.42, SW - 0.185, YT + 0.0066 * 0.78, 2.3, 0.78);
+        }
+        // Shells: a top shell with its spiral, and a scallop face up.
+        {
+          const t0 = dc + 0.56, s0 = sI + 0.05;
+          const SHL = [0.860, 0.740, 0.640], SPR = [0.560, 0.380, 0.300];
+          const prof = [[YT, 0.0], [YT, 0.030], [YT + 0.006, 0.0325], [YT + 0.016, 0.031],
+            [YT + 0.032, 0.023], [YT + 0.048, 0.014], [YT + 0.062, 0.006], [YT + 0.068, 0.0]];
+          spinTS(t0, s0, prof, SHL, 22, 0.14);
+          const rAt = (y) => {
+            for (let i = 1; i < prof.length; i++) {
+              if (y <= prof[i][0]) {
+                const a = prof[i - 1], c = prof[i];
+                return a[1] + (c[1] - a[1]) * (y - a[0]) / Math.max(1e-6, c[0] - a[0]);
+              }
+            }
+            return 0;
+          };
+          const hel = [];
+          for (let i = 0; i <= 70; i++) {
+            const u = i / 70, y = YT + 0.008 + 0.054 * u, a = u * TAU * 4.2;
+            const r = rAt(y) + 0.0008;
+            hel.push([t0 + Math.cos(a) * r, s0 + Math.sin(a) * r, y]);
+          }
+          tubeTS(hel, 0.0021, SPR, 6, [0, 0, 1], 0.10);
+          // The scallop: ribs fanned from the hinge, domed, lying on the wood.
+          const c0 = [dc + 0.62, SW - 0.200], hd = -2.0, R = 0.050, NR = 8, NA = 25;
+          const G = [];
+          for (let i = 0; i <= NR; i++) {
+            const row = [], rr = (i / NR) * R;
+            for (let j = 0; j <= NA; j++) {
+              const th = hd + (j / NA - 0.5) * 2.1;
+              const rib = 0.0016 * Math.abs(Math.sin((j / NA) * Math.PI * 9));
+              const h = 0.012 * Math.sqrt(Math.max(0, 1 - (rr / R) ** 2)) + rib * (rr / R);
+              row.push(W(c0[0] + Math.cos(th) * rr, c0[1] + Math.sin(th) * rr, YT + 0.0015 + h));
+            }
+            G.push(row);
+          }
+          knSurf(G, (i, j) => ((j >> 1) % 2 ? SHL : shade(SHL, 0.86)), { down: false,
+            out: () => W(c0[0], c0[1], YT - 0.05) });
+        }
       }
       // The towel on a hook, on the near wall where you would actually hang
       // one: striped, because every towel in every one of these frames is.
+      // DRAPED now (1.552.1) — gathered on the hook and falling open, with the
+      // folds a cloth has — where it was four boxes in a stack.
       {
         // Back against the east wall's lining, which is where the cot is.
         const ht = K.t1 - 0.005, hs = back(2.20), hy = f + 1.58;
-        boxTS(ht - 0.05, ht, hs - 0.03, hs + 0.03, hy, hy + 0.05,
-          [0.155, 0.150, 0.148]);
-        const BANDS = [[0.620, 0.235, 0.145], [0.700, 0.688, 0.640],
-          [0.185, 0.360, 0.520], [0.700, 0.688, 0.640]];
-        for (let i = 0; i < 4; i++) {
-          boxTS(ht - 0.028, ht - 0.008, hs - 0.19, hs + 0.19,
-            hy - 0.16 - i * 0.17, hy - 0.01 - i * 0.17,
-            BANDS[i], shade(BANDS[i], 1.12));
+        const HOOK = [0.600, 0.480, 0.240];
+        spinIn((x, y, w) => W(ht - w, hs + x, hy + 0.02 + y), [[0.0, 0.020], [0.006, 0.020],
+          [0.008, 0.012], [0.008, 0.0]], HOOK, 16, [1, 1], 0.12);
+        tubeTS([[ht, hs, hy + 0.02], [ht - 0.040, hs, hy + 0.02], [ht - 0.058, hs, hy + 0.035],
+          [ht - 0.060, hs, hy + 0.055]], 0.0045, HOOK, 8, [0, 1, 0], 0.16);
+        const CRM = [0.700, 0.688, 0.640], TEAL = [0.180, 0.420, 0.470], CORAL = [0.640, 0.300, 0.220];
+        const BANDS = [CRM, TEAL, CRM, CORAL, CORAL, CRM, TEAL, CRM, CRM, TEAL, CRM, CORAL, CORAL,
+          CRM, TEAL, CRM];
+        const NU = 16, NV = 32, HT = 0.62, HW = 0.23;
+        const G = [];
+        for (let i = 0; i <= NV; i++) {
+          const v = i / NV, row = [];
+          for (let j = 0; j <= NU; j++) {
+            const u = j / NU * 2 - 1;
+            const spread = 0.42 + 0.58 * Math.min(1, v * 3.0);
+            const d = 0.050 - 0.030 * Math.min(1, v * 1.6) + 0.013 * Math.sin(u * 7.5 + v * 2.0)
+              * Math.min(1, v * 4);
+            // And a hem that is not a ruler: the corners hang lower than the
+            // middle, and the whole edge waves with the folds.
+            const hem = i === NV ? 0.018 * u * u + 0.008 * Math.sin(u * 7.5) : 0;
+            row.push(W(ht - d, hs + u * HW * spread, hy + 0.035 - v * HT - 0.02 * (1 - Math.abs(u))
+              * Math.min(1, v * 5) - hem));
+          }
+          G.push(row);
         }
+        knSurf(G, (i) => BANDS[Math.min(BANDS.length - 1, Math.floor((i / NV) * BANDS.length))],
+          { out: () => W(ht + 0.5, hs, hy - 0.3) });
+        // And the straw hat on a second hook, further along.
+        const hs2 = hs + 0.62;
+        tubeTS([[ht, hs2, hy + 0.10], [ht - 0.045, hs2, hy + 0.10], [ht - 0.060, hs2, hy + 0.118]],
+          0.0045, HOOK, 8, [0, 1, 0], 0.16);
+        const STRAW = [0.800, 0.680, 0.440], RIB = [0.300, 0.110, 0.090];
+        const HF = (x, y, w) => W(ht - 0.006 - w, hs2 + x, hy - 0.05 + y);
+        spinIn(HF, [[0.004, 0.100], [0.002, 0.160], [0.004, 0.188], [0.009, 0.194],
+          [0.014, 0.188], [0.016, 0.150], [0.018, 0.102], [0.024, 0.098], [0.070, 0.092],
+          [0.092, 0.080], [0.103, 0.056], [0.108, 0.020], [0.109, 0.0]], STRAW, 32, [1, 1], 0.12, 0.3);
+        spinIn(HF, [[0.019, 0.1005], [0.042, 0.0975]], RIB, 32, [1, 1], 0.08);
       }
     }
 
@@ -38233,7 +38736,11 @@ async function buildJadrija(scene) {
       // And where the tube is, for the same reason. A hair narrower than the
       // cabinet, so that a jet clipping the corner of the wood does not count
       // as changing the channel.
-      screen: [vt, vs - 0.10, gy + 0.31, 0.24, 0.40],
+      screen: [vt, vs - 0.10, gy + 0.145, 0.24, 0.40],
+      // The room's own lights (1.552.1) — see `roomLightInit`. The glow is
+      // taken a hand's width in front of the middle of the tube.
+      lights: { pend: pendAt, candle: candleAt, shelf: shelfAt,
+        tv: [vt, vs - 0.30, gy + 0.345] },
       // Where the bottle lives when nobody is holding it — see LAY, which is
       // where all five spots on this top are set out together. Not the middle
       // of the seat any more: the middle is 0.45 m from where she stands now,
@@ -38771,8 +39278,96 @@ async function buildJadrija(scene) {
     beads.step(pt, ps, d, dt, camY, with_);
   }
 
+  /**
+   * ── THE ROOM'S OWN LIGHT ──────────────────────────────────────────────────
+   *
+   * 1.552.1, Misha, 30 Sep 2026: *"... and shadows so the inside looks more
+   * immersive/atmospheric"*. The room had a pendant that lit nothing — "it is
+   * not a real light, nothing in this game is" — and a flat 0.22 of bounce
+   * on every board, so the one room in the game you stand still in was the
+   * same dim olive in every corner and nothing in it stood on anything.
+   *
+   * Now it has three, all in GLSL_ROOM (30-material.js) and confined to the
+   * big room's box: the pendant, warm, straight down, with its own shadow
+   * map (06-shadow.js); the candle on the shelf; and the glow off the tube.
+   * The daylight that gets in through the one door is cut to `amb` of what
+   * it was, which is what makes the lights read as the light.
+   *
+   * Numbers set once here, off `kit.lights`, and the two that move — the
+   * candle's flicker and the tube's colour — every frame in `roomLightTick`.
+   */
+  const ROOM = {
+    pend: 1.4, pendR: 2.2, pendC: [1.00, 0.90, 0.78],
+    candle: 1.10, candleR: 0.60, candleC: [1.00, 0.64, 0.32],
+    tv: 0.60, tvR: 0.70,
+    amb: 0.60, fill: [0.085, 0.068, 0.050],
+  };
+  let roomFlame = null, roomT = 0;
+  function roomLightInit() {
+    if (!kit || !kit.lights || !special || !kit.lights.pend) return;
+    const Q = special.big, L = kit.lights;
+    const tm = (Q.t0 + Q.t1) * 0.5, sm = (Q.s0 + Q.s1) * 0.5;
+    const c = toWorld(tm, sm), ct = toWorld(tm + 1, sm), cs = toWorld(tm, sm + 1);
+    let ux = ct[0] - c[0], uz = ct[2] - c[2];
+    const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul;
+    let vx = cs[0] - c[0], vz = cs[2] - c[2];
+    const vl = Math.hypot(vx, vz) || 1; vx /= vl; vz /= vl;
+    U.uRoomC.value.set(c[0], special.floor, c[2]);
+    U.uRoomAx.value.set(ux, uz, vx, vz);
+    U.uRoomH.value.set((Q.t1 - Q.t0) * 0.5, (Q.s1 - Q.s0) * 0.5, Q.top - special.floor, ROOM.amb);
+    U.uRoomFill.value.setRGB(...ROOM.fill);
+    const loc = (t, s) => {
+      const w = toWorld(t, s), dx = w[0] - c[0], dz = w[2] - c[2];
+      return [dx * ux + dz * uz, dx * vx + dz * vz];
+    };
+    const put = (i, tsy, r, col, k, kind) => {
+      const w = W(tsy[0], tsy[1], tsy[2]);
+      U.uLampP.value[i].set(w[0], w[1], w[2], r);
+      U.uLampC.value[i].set(col[0] * k, col[1] * k, col[2] * k, kind);
+    };
+    put(0, L.pend, ROOM.pendR, ROOM.pendC, ROOM.pend, 0);
+    if (L.candle) put(1, L.candle, ROOM.candleR, ROOM.candleC, ROOM.candle, 1);
+    if (L.tv) put(2, L.tv, ROOM.tvR, [0.35, 0.95, 0.65], ROOM.tv, 2);
+    U.uLampD.value.set(-vx, 0, -vz, 0);
+    if (L.shelf) {
+      const Sh = L.shelf, A = loc(Sh.t0, Sh.s0), B = loc(Sh.t1, Sh.s1);
+      U.uShelf.value.set(Math.min(A[0], B[0]), Math.max(A[0], B[0]),
+        Math.min(A[1], B[1]), Math.max(A[1], B[1]));
+      U.uShelfY.value = Sh.y;
+    }
+    // The flame: a lit teardrop over the wick, which `roomLightTick` keeps
+    // moving. The light itself is uLampP[1], just above it.
+    if (L.candle) {
+      roomFlame = new THREE.Mesh(new THREE.SphereGeometry(0.0062, 12, 8),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.80, 0.42) }));
+      const p = W(L.candle[0], L.candle[1], L.candle[2] - 0.001);
+      roomFlame.position.set(p[0], p[1], p[2]);
+      roomFlame.scale.set(1, 2.6, 1);
+      roomFlame.visible = false;
+      scene.add(roomFlame);
+      kabInOnly.push(roomFlame);
+    }
+  }
+  /** The candle breathes, and the tube is green with a price or grey with snow. */
+  function roomLightTick(dt) {
+    if (!(U.uRoomOn.value > 0.5) || !kit || !kit.lights) return;
+    roomT += dt;
+    const k = 0.84 + 0.08 * Math.sin(roomT * 9.3) + 0.05 * Math.sin(roomT * 23.1 + 1.3)
+      + 0.03 * Math.sin(roomT * 3.1);
+    const C = ROOM.candleC, q = ROOM.candle * k;
+    U.uLampC.value[1].set(C[0] * q, C[1] * q, C[2] * q, 1);
+    if (roomFlame) {
+      roomFlame.scale.set(1 + 0.12 * Math.sin(roomT * 13.7), 2.6 * (0.86 + 0.5 * (k - 0.84)), 1);
+    }
+    const on = tvNow() != null;
+    const g = on ? ROOM.tv : ROOM.tv * (1.5 + 0.5 * Math.sin(roomT * 31.0) * Math.sin(roomT * 7.3));
+    const tc = on ? [0.35, 0.95, 0.65] : [0.62, 0.68, 0.78];
+    U.uLampC.value[2].set(tc[0] * g, tc[1] * g, tc[2] * g, 2);
+  }
+
   function stepKabina(pt, ps, dt, camY) {
     if (!kit || !special) return;
+    roomLightTick(dt);
     const K = special;
     // The curtain is stepped from `beadsTick`, after she has been posed this
     // frame — see there. Only its sound is readied here.
@@ -38829,6 +39424,7 @@ async function buildJadrija(scene) {
     b = kabIn;
     kit = kabinaKit({ ...special, ...special.big });
     b = keep;
+    roomLightInit();
     for (let i = nF; i < furniture.length; i++) {
       furniture[i].kab = 'in';
       furniture[i].off = true;
@@ -40239,6 +40835,46 @@ async function buildJadrija(scene) {
   // of them. None of it touches `rng` (rule 4): the grid is geometry that is
   // already built, and the plants are `floraHash` of their cell.
   const vergeFloors = [deckMesh.geometry];
+  /**
+   * ── AND NOTHING GROWS IN A ROOM ────────────────────────────────────────
+   *
+   * Misha, 30 Sep 2026, a screenshot of the kabina with wild fennel and oats
+   * standing in the far corner: *"fix up / remove the grass that somehow
+   * landed inside the kabine"*.
+   *
+   * It landed there because the room you are in is not on the map the verge
+   * reads. The grid above rasterises the ground buffers, the blockers and
+   * the rocks — all of them things that are there from the promenade — and
+   * the big room (`KAB.grow`) is the one place on this shore that is only
+   * there once you are in it. It is 5.80 by 7.35 m about the doorway, so
+   * its back two metres stand in the alley behind the row: open ground, a
+   * walk between two walls, exactly where a verge keeps what hugs the foot
+   * of one. Thirty-three plants were under its tiles, and the oats and the
+   * fennel are tall enough to come up through them.
+   *
+   * Not MADE in the grid, which would strip the alley for the half of the
+   * game you spend outside looking at it. A hole in what is DRAWN, for as
+   * long as the big room is: the room's own box, a wall's width over, on a
+   * frame linearised once about its middle (the shore frame is rigid over
+   * seven metres and `local` is a scan of thirty stations). No `rng` here
+   * (rule 4) and no cell is re-made: the same plants go back the frame you
+   * step out.
+   */
+  let vergeHoleIn = false, vergeBox = null;
+  const vergeHole = (x, z) => {
+    if (!special || !special.inside) return false;
+    if (!vergeBox) {
+      const Q = special.big, tm = (Q.t0 + Q.t1) * 0.5, sm = (special.face + Q.s1) * 0.5;
+      const c = toWorld(tm, sm), a = local(c[0], c[2]);
+      const bx = local(c[0] + 1, c[2]), bz = local(c[0], c[2] + 1);
+      vergeBox = { x: c[0], z: c[2], t: a[0], s: a[1],
+        J: [bx[0] - a[0], bx[1] - a[1], bz[0] - a[0], bz[1] - a[1]],
+        ht: (Q.t1 - Q.t0) * 0.5 + 0.35, hs: (Q.s1 - special.face) * 0.5 + 0.35 };
+    }
+    const B = vergeBox, dx = x - B.x, dz = z - B.z;
+    const dt = dx * B.J[0] + dz * B.J[2], ds = dx * B.J[1] + dz * B.J[3];
+    return Math.abs(dt) < B.ht && Math.abs(ds) < B.hs;
+  };
   const verge = (() => {
     const C = 0.5;                       // metres a cell
     const OPEN = 0, MADE = 1, WALL = 2, KEEP = 3, ROCK = 4;
@@ -40470,6 +41106,7 @@ async function buildJadrija(scene) {
       return false;
     };
     const kit = floraVerge(scene, {
+      hole: vergeHole,
       field(x, z) {
         if (!G) build();
         const j = cellAt(x, z);
@@ -50130,6 +50767,8 @@ async function buildJadrija(scene) {
     kabInMesh.visible = inside;
     for (const m of kabInOnly) m.visible = inside;
     for (const bk of blockers) if (bk.kab) bk.off = (bk.kab === 'in') !== inside;
+    // And its lights, which are the big room's and nobody else's (1.552.1).
+    U.uRoomOn.value = inside && kit && kit.lights && kit.lights.pend ? 1 : 0;
   }
 
   function kabinaInside(x, z) {
@@ -70034,7 +70673,13 @@ async function buildJadrija(scene) {
    */
   function updateCrowd(dt, cam, at = null, dir = null) {
     if (litter) litter.update(cam, groundAt(cam.x, cam.z));   // 1.536.0
-    if (verge && verge.armed) verge.update(cam, groundAt(cam.x, cam.z));   // 1.546.0
+    if (verge && verge.armed) {
+      // The big room in or out (1.552.1): lay the layers again without the
+      // plants under its floor, or with them — see `vergeHole`.
+      const hi = !!(special && special.inside);
+      if (hi !== vergeHoleIn) { vergeHoleIn = hi; verge.refresh(); }
+      verge.update(cam, groundAt(cam.x, cam.z));   // 1.546.0
+    }
     crowdT += dt;
     lastCam.x = cam.x; lastCam.z = cam.z;
     // The one skinned figure here is posed on the CPU — twenty-eight bones,

@@ -1869,7 +1869,7 @@ const VERGE_KINDS = ['oats', 'tussock', 'fennel', 'thistle', 'mound'];
  * there, or null after all. The mix is decided here, off those and a patch
  * noise a species; the places are decided there.
  */
-function floraVerge(scene, { field, height, cell = 2, swap = 17, far = 44, caps = {} } = {}) {
+function floraVerge(scene, { field, height, hole = null, cell = 2, swap = 17, far = 44, caps = {} } = {}) {
   const t0 = performance.now();
   const B = {
     oats: fvProto(), tussock: fvProto(), fennel: fvProto(), thistle: fvProto(), mound: fvProto(),
@@ -2060,6 +2060,13 @@ function floraVerge(scene, { field, height, cell = 2, swap = 17, far = 44, caps 
         for (const o of itemsOf(ci + di, ck + dk)) {
           const d = Math.hypot(o.x - cp.x, o.z - cp.z);
           if (d > far + cell) continue;
+          // A room you are standing in that is not where the ground says
+          // it is (1.552.1): the kabina's big room is swapped in over the
+          // alley behind the row, and the verge under it came up through
+          // its tiles. Asked here, at the draw, and not in `itemsOf`: the
+          // plants are the same plants either way, and only whether they
+          // are drawn changes when the room does.
+          if (hole && hole(o.x, o.z)) continue;
           const dr = dress(o);
           if (d < nearR) put(L[o.kind].near, o, dr);
           if (d > farR0) put(L[o.kind].far, o, dr);
@@ -2096,6 +2103,8 @@ function floraVerge(scene, { field, height, cell = 2, swap = 17, far = 44, caps 
     },
     /** Forget every cell: the ground under them has changed. */
     reset() { cache.clear(); ci = ck = null; },
+    /** Lay the layers again from the cells already made: `hole` has changed. */
+    refresh() { ci = ck = null; },
     /** Off and on, for an A/B in the same page. */
     enable(v) {
       enabled = !!v;

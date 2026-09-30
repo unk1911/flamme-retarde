@@ -470,9 +470,81 @@ function buildShadow(renderer) {
     }
   }
 
+  // ── the pendant's own map (1.552.1) ────────────────────────────────────
+  //
+  // A third map, and not a cascade: a perspective camera at the bulb of the
+  // lamp over the kabina's tabouret, looking straight down through the cone
+  // its shade throws (see GLSL_ROOM in 30-material.js). Drawn only while
+  // that room is lit — `uRoomOn` — and only from what is in the room: the
+  // room's own buffer and her. Mirrors of their sun proxies, so each costs a
+  // draw call and no memory, and both sides of every face go in, because the
+  // room is seen from inside and a wall drawn back-face-first from inside a
+  // box is no wall at all. The receiver takes the acne that costs back off
+  // with a normal offset.
+  //
+  // 1024 over 128 degrees is about 4 mm a texel under the lamp and 3 cm at
+  // the far end of the floor it reaches, which is soft enough to be a lamp.
+  const lampRes = IS_SMALL ? 512 : 1024;
+  const lampT = newTarget(lampRes);
+  const lampCam = new THREE.PerspectiveCamera(128, 1, 0.05, 9);
+  const lampScene = new THREE.Scene();
+  lampScene.matrixAutoUpdate = false;
+  const lampList = [];
+  const lampMats = new Map();
+  U.uLampMap.value = lampT.texture;
+  U.uLampNF.value.set(lampCam.near, lampCam.far, 1 / lampRes);
+  /** Draw this sun proxy into the pendant's map too, both sides. */
+  function lampAdd(proxy) {
+    if (!proxy) return null;
+    const src = proxy.material;
+    let m = lampMats.get(src);
+    if (!m) {
+      // The same program and the SAME uniforms object — a bone palette is
+      // a texture that the figure re-uploads every frame, and a clone of it
+      // would be a copy that never hears about that.
+      m = new THREE.ShaderMaterial({ uniforms: src.uniforms, vertexShader: src.vertexShader,
+        fragmentShader: src.fragmentShader, side: THREE.DoubleSide });
+      lampMats.set(src, m);
+    }
+    const px = new THREE.Mesh(proxy.geometry, m);
+    px.frustumCulled = false;
+    px.matrixAutoUpdate = false;
+    lampScene.add(px);
+    lampList.push({ src: proxy, px });
+    return px;
+  }
+  let lampDraws = 0;
+  const _cc = new THREE.Color();
+  function lampRender(renderer) {
+    if (!(U.uRoomOn.value > 0.5) || !lampList.length) return;
+    const P = U.uLampP.value[0];
+    if (!(P.w > 0)) return;
+    lampCam.position.set(P.x, P.y, P.z);
+    lampCam.up.set(1, 0, 0);
+    lampCam.lookAt(P.x, P.y - 1, P.z);
+    lampCam.updateMatrixWorld(true);
+    lampCam.updateProjectionMatrix();
+    U.uLampMat.value.multiplyMatrices(lampCam.projectionMatrix, lampCam.matrixWorldInverse);
+    for (const o of lampList) {
+      o.px.visible = o.src.visible;
+      o.px.matrix.copy(o.src.matrix);
+      o.px.matrixWorldNeedsUpdate = true;
+    }
+    const prevTarget = renderer.getRenderTarget();
+    renderer.getClearColor(_cc);
+    const prevA = renderer.getClearAlpha();
+    renderer.setClearColor(0xffffff, 1);
+    renderer.setRenderTarget(lampT);
+    renderer.clear(true, true, false);
+    renderer.render(lampScene, lampCam);
+    renderer.setRenderTarget(prevTarget);
+    renderer.setClearColor(_cc, prevA);
+    lampDraws++;
+  }
+
   return {
     target, cam, targetN, camN, scene, update, render, set, casterMaterial,
-    cast, castTree, syncMoving,
+    cast, castTree, syncMoving, lampAdd, lampRender, lampT, lampCam,
     casters: () => world.children.length + nearOnly.children.length
       + always.children.length,
     stats: () => ({
@@ -482,6 +554,8 @@ function buildShadow(renderer) {
       near: nearOnly.children.length,
       hero: always.children.length,
       res: [res, resN],
+      lamp: { on: U.uRoomOn.value > 0.5 ? 1 : 0, casters: lampList.length, draws: lampDraws,
+        res: lampRes },
     }),
   };
 }
