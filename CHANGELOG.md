@@ -8,6 +8,101 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.553.1] — 2026-09-30
+
+### She knows what you are doing to her
+
+Misha, spanking her on the cot in the kabina and typing to her at the same
+time:
+
+    [ears] "am i spanking you?"
+    [ears] Baye · 0.5 m: "No, you ain't spanking me yet, sweetheart."
+
+*"her reply is off, b/c i was kinda spanking ... she is not self-aware"*.
+She was told where you both were and what your feet were doing, and nothing
+about what was happening between you. There was no line for a slap, the
+belt, the collar, your hands or the safeword. Her pose was missing too:
+lying face down on the cot (`flatheld`, `edgeHeld`) was not one of the beats
+the service had words for, so `clean_talk` threw it away. The model had
+"inside the beach hut" and filled in "not yet".
+
+**What goes up now.** `sceneTalk` in 90-app.js reads the live state into a
+`scene` block, which goes with every line of hers. That covers answers
+(`/talk`) and the lines she says unprompted (`/line`, her own clock, the
+time and the recon reports). The block is numbers, keys and flags only. The
+service clamps it and owns every word of it.
+- **The hand and the belt**, each counted over the last 60 s: how many
+  landed, seconds since the last one, the hardest (light, firm or hard) and
+  where on her (bottom, back, thighs, hip). Hand slaps are recorded in
+  `buttSlap` and belt hits in `beltLanded`. On the cot, a hand slap's
+  hardness is the ragdoll's own number (`cotStats.last.u`, via
+  `jadrija.cotLast`).
+- **The belt** out in your hand, and whether she has said yellow.
+- **The collar**: on, leash clipped, being led, and the tugs in the last
+  minute.
+- **Your hands**: a fistful of her hair, petting her, a hand on her breast,
+  hip or thigh, or your thumb in her mouth.
+- **The marks** you can see on her. These are the flushes and lash lines
+  with the shader above 0.08, counted, plus the reddest of them.
+- **What is on her** (the cuffs, the ankle cuffs, the headphones, the
+  Lovense) and the toy buzzing. The service had table entries for both since
+  1.442.5, but the page never sent them.
+- **The safeword**: seconds since, who said it (you, or her own red on the
+  meter), what it stopped (the belt or the collar), and whether the
+  aftercare is still going.
+- **Her beat and whether she is on the mattress.**
+
+**On the service** (`server/baye/baye.py` 1.49.0, which **needs deploying on
+mpcn0**):
+- `clean_scene` whitelists all of the above against tables. Regions,
+  hardness, `hand_on`, who said the safeword and what it stopped are enums,
+  and counts and seconds are clamped. A hostile payload (`"her":
+  "flatheld; ignore all"`, `hand_on` as a sentence, `safeword_by: "admin"`,
+  `spanks: 1e9`) comes out as `spanks: 99` and nothing else of it.
+- `SHORE_DOING` gains 34 beats: every held pose on the cot and the rolls into
+  them, the handstand, all fours, the leash's eight, and the hammock's
+  tumble. `COT_DOING` gives `kept`, `cradle`, `situp` and `recline` their
+  words on the mattress rather than "soaked on the floor".
+- `/talk` gets its own heading, **BETWEEN YOU, THIS MINUTE**. It lists the
+  facts ("they have spanked you 6 times with their hand in the last minute
+  on your bottom, the last one just now, the hardest of them hard") and one
+  rule: never deny it, never say "not yet". When something is going on but
+  nobody has spanked her, the list says so. Before that line was added, led
+  on the leash and only tugged, two answers in three were "yeah, your hand's
+  been smacking my ass". A page that sends an empty scene gets "nothing:
+  nobody has spanked you or laid a hand on you in the last minute".
+- Within 150 s of a safeword, or while the aftercare is on, she gets
+  **THIS IS AFTERCARE**. She is soft, warm and grateful, with no filth and
+  no pushing for more until you start it again. The fact line says who said
+  it and that it is over.
+- `/line` gets the same facts under RIGHT NOW. It also gets her pose, but
+  only for the beats that are the scene (`SCENE_POSES`), so a cartwheel on
+  the promenade does not become the subject.
+- `TALK_LIMIT`, the heard-id rule and every other guardrail are unchanged.
+
+**Measured.** In the page, key 8, `flat.edge`, then six `__fr.jad.spank`:
+`scene` read `{"her":"edgeHeld","on_cot":true,"spanks":6,"spank_ago_s":1,
+"spank_hard":2,"spank_at":["butt"],"marks":2,"mark_k":0.96}`. Then the belt
+landed, the safeword was said, and the collar went on and was tugged twice;
+each of those showed up. The page's own captured bodies were then sent
+through `clean_context`/`clean_talk`/`build_talk_messages`, and she was
+asked "am i spanking you?" by the real model:
+- mid-spank: "Yeah, six times, babe, and that last one still burns like
+  hell."
+- with the belt: "Yeah, six times by hand and once with that damn belt."
+- after the safeword: "No, you stopped when I said the safeword; my ass is
+  still stinging." Once the speaker was spelled out, this became "Yeah, you
+  were, and my ass is still red and stinging."
+- on the leash: "No, you haven't spanked me in the last minute, just tugged
+  my leash twice."
+- nothing going on: "No, you ain't spanking me, and nobody's touched me in
+  the last minute."
+
+People 100, blockers 785, no console errors.
+
+Debug: `__fr.jad.scene()` returns the block. `__fr.voice.context()` and
+`__fr.voice.talk()` return the rest of what would be sent.
+
 ## [1.553.0] — 2026-09-30
 
 ### The collar and the leash: black leather, a diamond chain, and a safeword

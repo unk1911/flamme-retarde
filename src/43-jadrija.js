@@ -45373,7 +45373,7 @@ async function buildJadrija(scene) {
     // Past the warm-up at once: a slap in its first second is still a slap.
     if (R.t < R.warmFor) R.t = R.warmFor;
     cotStats.spanks++;
-    cotStats.last = { J: +Jb.toFixed(2), dv: +(Jb * sc / net.mass[b]).toFixed(3), side, reg,
+    cotStats.last = { J: +Jb.toFixed(2), u: +u.toFixed(2), dv: +(Jb * sc / net.mass[b]).toFixed(3), side, reg,
       bone: hit ? hit.bone : 'pelvis', kick: +(kn * 180 / Math.PI).toFixed(1), phase: show.phase,
       belt: !!tune,
       dir: [+jx.toFixed(2), +jy.toFixed(2), +jz.toFixed(2)] };
@@ -74313,6 +74313,21 @@ async function buildJadrija(scene) {
     cotSpank: (side, from, k, hit) => cotSpank(side, from, k, hit),
     /** The belt's world — her capsules, the cot — and a lash on her: see `beltWorld`, `beltHit`. */
     beltWorld: () => beltWorld(),
+    /**
+     * The last slap's weight on her on the cot — `u` 0..1 how hard, as the
+     * reflex reads it — for `sceneTalk` in 90-app.js. The whole `cotRag()`
+     * readout is a probe's and builds forty numbers; the voice wants one.
+     */
+    cotLast: () => cotStats.last,
+    /**
+     * HER SIDE OF WHAT THE TWO OF YOU ARE DOING, for her voice — see
+     * `sceneTalk` in 90-app.js, which adds your side. `her` is the beat she is
+     * on (a key the service has words for in `SHORE_DOING`), `on_cot` whether
+     * she is on the mattress in it, `worn` what is on her (`WEAR_KEYS`), and
+     * `buzz` the toy going this second.
+     */
+    sceneHer: () => (show ? { her: show.phase, on_cot: !!show.onBed, worn: Object.keys(worn),
+      buzz: !!signals.lovense } : null),
     /**
      * The collar and the leash (1.553.0) — see `── THE COLLAR AND THE LEASH ──`.
      * `leashState` a frame's worth for 90-app.js; `leashOff(safe)` takes it

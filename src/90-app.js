@@ -1159,7 +1159,12 @@ function buttSlap(side, k = null, hit = null) {
   // that landed on them.
   if (typeof apprenticeSlap === 'function') apprenticeSlap(side, hit ? hit.bind : null, hit ? hit.reg : 'butt');
   if (jadrija && jadrija.slapped && (!hit || hit.reg === 'butt')) jadrija.slapped();
-  return !!(jadrija && jadrija.cotSpank && jadrija.cotSpank(side, camera.position, k, hit));
+  const on = !!(jadrija && jadrija.cotSpank && jadrija.cotSpank(side, camera.position, k, hit));
+  // And for her voice (`sceneTalk`): on the cot the ragdoll dealt its weight
+  // and says how hard; standing it was a smack with no number, a firm one.
+  const last = on && jadrija.cotLast ? jadrija.cotLast() : null;
+  sceneHit('hand', last && last.u >= 0.6 ? 2 : 1, hit ? hit.reg : 'butt');
+  return on;
 }
 let buttSide = 1;               // which cheek the crosshair picked, +1 her left
 let buttHit = null;             // and where on her, on the cot — see `cotAim`
@@ -1614,6 +1619,7 @@ function beltSafeword(who) {
   if (audio && audio.herHush) audio.herHush('safe');
   if (!beltActive()) return 'not out';
   beltLog.safe[who]++;
+  sceneSafe(who, 'belt');
   beltSay(who === 'her' ? 'red' : 'heard', true);
   beltLock = who === 'her' ? BELT_HAND.lock : BELT_HAND.lockYou;
   beltHeat = 0; beltYellow = false;
@@ -1655,6 +1661,7 @@ function beltLanded(h) {
   }
   if (r.landed) beltLog.landed++;
   if (r.crack) beltLog.lashes++; else beltLog.pats++;
+  sceneHit('belt', !r.crack ? 0 : u >= 0.5 ? 2 : 1, r.reg);
   // The meter, and what she makes of it.
   beltHeat += r.crack ? 0.2 + r.u : 0.03;
   if (beltHeat > BELT_HAND.red) { beltSafeword('her'); return; }
@@ -2054,6 +2061,98 @@ function collarActive() { const s = collarState(); return !!(s && s.on); }
 /** Whether she is on the end of it and following — the press is a tug then. */
 function collarLeading() { const s = collarState(); return !!(s && s.on && s.clipped && s.mode === 'lead'); }
 
+// ── WHAT THE TWO OF YOU ARE DOING, for her voice ────────────────────────────
+//
+// 1.553.1. Misha, 30 Sep 2026, in the middle of spanking her on the cot:
+//
+//   [ears] "am i spanking you?"
+//   [ears] Baye · 0.5 m: "No, you ain't spanking me yet, sweetheart."
+//
+// Nothing the voice was sent said so. `/talk` carried where you were, what
+// your feet were doing and which beat of her routine she was on — and not the
+// slap, the belt, the collar, your hand on her or the safeword, so the model
+// had "inside the beach hut" and improvised "not yet". This is that half, read
+// off the live state, and it goes up with every line of hers (`context` in
+// 49-voice.js), the ones she volunteers as well as the answers.
+//
+// NUMBERS AND KEYS, NEVER WORDS — the rule the whole service stands on: the
+// page sends claims, and `clean_scene` in server/baye/baye.py clamps them and
+// owns every word she is told. The slaps are kept as they land (`sceneHit`,
+// from `buttSlap` and `beltLanded`), the tugs and the safeword likewise; the
+// rest is what is true this frame.
+const SCENE = {
+  window: 60,           // s: "in the last minute" is what a hit counts in
+  keep: 48,             // most hits remembered, all told
+  safeFor: 600,         // s a safeword is still worth telling her about
+  markK: 0.08,          // a flush or a lash this strong is a mark you can see
+};
+// Each hit [t s, 'hand'|'belt', hard 0 light / 1 firm / 2 hard, region].
+const sceneLog = { hits: [], tugs: [], safe: null };
+const sceneNow = () => performance.now() / 1000;
+/** A slap or a lash that landed on her — `reg` 'butt' | 'back' | 'thigh' | 'hip'. */
+function sceneHit(tool, hard, reg) {
+  sceneLog.hits.push([sceneNow(), tool, hard, reg || 'butt']);
+  if (sceneLog.hits.length > SCENE.keep) sceneLog.hits.shift();
+}
+/** The safeword, said — `who` 'you' | 'her', `of` 'belt' | 'collar'. */
+function sceneSafe(who, of) { sceneLog.safe = { t: sceneNow(), who, of }; }
+
+/**
+ * Everything happening between you and her this second, as the keys
+ * `clean_scene` accepts. Absent keys are things that are not happening; the
+ * server prints no line for them.
+ */
+function sceneTalk() {
+  const now = sceneNow(), o = {};
+  const her = jadrija && jadrija.sceneHer ? jadrija.sceneHer() : null;
+  if (her) Object.assign(o, her);
+  if (o.worn && !o.worn.length) delete o.worn;
+  if (!o.buzz) delete o.buzz;
+  if (!o.on_cot) delete o.on_cot;
+  // The hand and the belt, each: how many in the last minute, the last one's
+  // seconds, the hardest, and where on her — most-hit first.
+  for (const [tool, key, n] of [['hand', 'spank', 'spanks'], ['belt', 'lash', 'lashes']]) {
+    const H = sceneLog.hits.filter((h) => h[1] === tool && now - h[0] <= SCENE.window);
+    if (!H.length) continue;
+    o[n] = H.length;
+    o[key + '_ago_s'] = Math.round(now - H[H.length - 1][0]);
+    o[key + '_hard'] = Math.max(...H.map((h) => h[2]));
+    const by = {};
+    for (const h of H) by[h[3]] = (by[h[3]] || 0) + 1;
+    o[key + '_at'] = Object.keys(by).sort((a, b) => by[b] - by[a]);
+  }
+  if (beltInHand()) o.belt_out = true;
+  if (beltYellow && beltActive()) o.belt_yellow = true;
+  const L = collarState();
+  if (L && L.on) {
+    o.collar_on = true;
+    if (L.clipped) o.leashed = true;
+    if (L.clipped && L.mode === 'lead') o.leading = true;
+  }
+  const T = sceneLog.tugs.filter((t) => now - t <= SCENE.window);
+  if (T.length) { o.tugs = T.length; o.tug_ago_s = Math.round(now - T[T.length - 1]); }
+  // Your hands on her, this second.
+  if (hairHeld) o.hair_pull = true;
+  else if (petK > 0.5) o.petting = true;
+  if (cupK > 0.5 && (reachKind === 'cup' || reachKind === 'hip' || reachKind === 'thigh')) {
+    o.hand_on = reachKind === 'cup' ? 'breast' : reachKind;
+  } else if (thumbK > 0.5 && reachKind === 'thumb') o.hand_on = 'mouth';
+  // The marks on her skin, off the shader's own numbers: how many you can
+  // see, and the reddest of them.
+  const M = [...(typeof apprenticeSlapState === 'function' ? apprenticeSlapState() : []),
+    ...(typeof apprenticeLashState === 'function' ? apprenticeLashState() : [])]
+    .map((m) => m.k).filter((k) => k >= SCENE.markK);
+  if (M.length) { o.marks = M.length; o.mark_k = +Math.max(...M).toFixed(2); }
+  const S = sceneLog.safe;
+  if (S && now - S.t <= SCENE.safeFor) {
+    o.safeword_ago_s = Math.round(now - S.t);
+    o.safeword_by = S.who;
+    o.safeword_of = S.of;
+  }
+  if (beltAfter || colAfter) o.aftercare = true;
+  return o;
+}
+
 /** A line of hers, captioned: from `COLLAR_SAY[kind]`, or nothing if she spoke a moment ago. */
 function collarSay(kind, force = false) {
   const L = COLLAR_SAY[kind];
@@ -2078,6 +2177,7 @@ function collarCmd(what) {
   if (what === 'collar.stop') {
     if (!collarActive()) return 'not on';
     colLog.safe++;
+    sceneSafe('you', 'collar');
     jadrija.leashOff('you');
     colYank = null; colPressed = false;
     colLock = COLLAR.lock;
@@ -2134,6 +2234,8 @@ function collarTug(u) {
   colYank = { t: 0, u, dir: _coA.clone(), D, landed: false,
     step: Math.min(Y.step, Math.max(0, want - D)), stepped: 0 };
   colLog.tugs++;
+  sceneLog.tugs.push(sceneNow());
+  if (sceneLog.tugs.length > SCENE.keep) sceneLog.tugs.shift();
   return true;
 }
 
@@ -11492,6 +11594,8 @@ window.__fr = {
      * null). Whether the ragdoll took it; `cotRag()` is what it did.
      */
     spank: (side = 1, k = null) => buttSlap(side, k),
+    /** What her voice is told the two of you are doing — see `sceneTalk`. */
+    scene: () => sceneTalk(),
     cotRag: () => (jadrija && jadrija.cotRag ? jadrija.cotRag() : null),
     spreadState: () => ({ ...(jadrija && jadrija.spreadState ? jadrija.spreadState() : {}),
       k: typeof apprenticeSpreadK === 'function' ? apprenticeSpreadK() : null }),
