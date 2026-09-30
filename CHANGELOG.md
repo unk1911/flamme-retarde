@@ -8,6 +8,59 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.7] — 2026-09-30
+
+### The Tisak, stocked: a newsstand is read by its print, and the awning is cloth
+
+Misha, after 1.550.6: *"maybe see if u can make it even better"*. Set beside
+`1000150414` at 04:25.8, what was left between the game and the kiosk was
+what it sells. The places behind the glass were right and the things in them
+were bricks — every magazine a coloured slab with a white stripe, every bag a
+coloured pillow, every packet a coloured box, in rows as even as a chart.
+
+- **One atlas of goods, drawn at load** (`tkGoodsAtlas`, 1024 square):
+  sixteen magazine covers, four front pages, sixteen sea-view postcards,
+  eight crisp bags, sixteen wrappers and cigarette packs, and four header
+  cards. Every title, headline and brand is invented (OTOK, KUHINJA, MALI
+  JUNAK, JADRANSKI LIST, KRCKO, HRSKI...) — the repository is public and the
+  real mastheads belong to other people; the front pages lead with the fire.
+  All of it is laid by `tkGoods` as one mesh and one draw.
+- **Behind the window**: covers on the raked rack and the two shelves (each
+  shelf magazine at its own lean and height), wrappers and packs on the
+  gantry and the sweets stand, a ragged row of header cards and product
+  boxes across the head of the open window (SREĆKE, BONOVI ZA MOBITEL,
+  SUVENIRI, SLADOLED, where the frame has its own), a postcard spinner turned
+  off square, crisp bags that bulge, pinch at the crimps, hang skew and come
+  in two sizes, two dozen lighters in a tray, a printed beach towel draped
+  over the freezer lid and down its front, and sun cream and beach balls on
+  a shelf behind it. The papers on the ledge show their front pages.
+- **The awning is cloth.** The canopy fell 0.135 m over its 1.30 m throw, so
+  from the promenade it was edge-on and invisible; it rises 0.4 m now, which
+  is what `_414` shows of it, sags, carries six long creases and is faded in
+  blotches, off a roller case at the wall head. The valance was an 80 mm red
+  beam with a bar along its foot: it is a printed sheet of folds now,
+  deepening toward a hem that wanders, with a plain lining behind, hung off
+  a slim white piping bar. Its print lost the regular flutes (a pattern the
+  cloth does not have) for sun-fade patches and soft creases, and **TISAK**
+  is the heavy italic of the frame with a lighter edge.
+- **The Jana cooler** is 0.58 m wide, not 0.68 — the face in `_414` is 3.7 to
+  1 — with its east side where it was. The print is redrawn to the frame's
+  proportions (one enormous bottle: the name and leaf, the yellow cap with
+  `¡SAMO opušteno!`, the amber body, the label, the tea with the lemon slices
+  and the ice) and runs edge to edge and down to the plinth; the grille and
+  the D-handle, read off `_343`, are gone for the small latch `_414` has on
+  the east edge. Stickers and a rating plate on the west side, and the mains
+  lead to the kiosk.
+- **The counter apron** is a paler beige and cleaner than the back and the
+  ends (`tkSkin` takes a grime factor).
+
+`jadrija.tris` 981,666 → 982,744 (+1,078); the textured `tisak:*` meshes,
+which `jadrija.tris` does not count, 100 → 3,268 (+3,168). Canvas textures
++4.9 MB of RGBA (the atlas 4 MB, the towel 0.25, the Jana 300×1107, the
+valance 1907×168), all drawn at runtime; the page grew 39 KB. Blockers 786
+(the cooler's collider narrowed with it), people 100, no console errors, the
+buy prompt unchanged. No `rng` draws touched.
+
 ## [1.550.6] — 2026-09-29
 
 ### The Tisak, pressed: the front is the front, TISAK is back, and there is a shop behind the window
