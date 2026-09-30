@@ -8,6 +8,112 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.552.1] — 2026-09-30
+
+### The belt, heard: his unbuckle, his crack, and her gasps
+
+Misha: *"the belt stuff i think it's generally good but just missing the
+audio. so when she takes out the belt, (i.e,. when '\' is pressed), it should
+use/alternate between these unbuckle sounds: sp-unbuckle-0.mp3,
+sp-unbuckle-1.mp3. and when belt lands, should alternate between several
+sounds: belt-whp-0.mp3, belt-whp-1.mp3, belt-whp-2.mp3. and a second or two
+later, her reaction, in addition to the existing ones, should also add these
+ones: sp-gasp-[0-5].mp3."*
+
+**What plays when.**
+- **`\` (the belt out):** an unbuckle, 0 and 1 in turn. It is placed so the
+  clip's clink (its loudest 10 ms) lands 0.1 s after your fist closes on the
+  buckle. The recorded clink landed 0–50 ms from where it was asked for in
+  every run.
+- **Belt back:** the other direction's own turn of the same two, at 0.45 gain
+  against 0.55. Its clink lands halfway through `buckle`, faster after a
+  safeword. Out and back each keep their own rotation. With one shared, a
+  take-out and a put-back per cycle meant every take-out was the same clip.
+- **The belt snapped straight on** (leaving the room, third person): any
+  buckle sound still to come is cut (`beltQuiet`).
+- **A crack:** one of the three strokes, never the same one twice running.
+  Gain is 0.5 to 1.0, and a lowpass runs from 5 kHz to open (Q −3.01 dB),
+  with how hard it landed past the crack. So a lighter blow is duller as well
+  as quieter.
+- **A pat** keeps the soft synthesized sound, and the swing keeps its
+  synthesized swish.
+
+**Replace, not layer.** Measured at its peak, a recorded stroke is nearly
+all 1.2–16 kHz (the leather's edge), with a 400–1200 Hz body and a 100 ms
+decay. That is the crack itself, so it replaces the synthesized one, which
+now plays only until the clips have decoded. The recordings have no whoosh
+in them, so the swish stays.
+
+**Her answer.** Each registered lash now gets ONE of four things
+(`beltReact`, `BELT_REACT`):
+- a line (the captions, as before), her moan, a gasp a second or two later,
+  or nothing;
+- a crack at the lightest: line 32 %, moan 32 %, gasp 19 %, nothing 16 %;
+- a crack at the hardest: line 29 %, moan 14 %, gasp 51 %, nothing 6 %;
+- a pat: line 50 %, gasp 10 % (short and quiet), nothing 40 %;
+- whatever she did last time counts half.
+
+The gasps:
+- They come 1.0–2.0 s after the hit, sooner the harder (MEASURED 1.04–1.89 s
+  over 16 gasps).
+- The five short ones never repeat back to back.
+- gasp-5 (four breaths, 3.7 s) is only for hits past 0.8 of the way to the
+  top, one time in three, and not again for four gasps.
+
+**One voice.** The moans (the hand slap's too) and the gasps share one slot,
+`herStart`:
+- What is sounding fades over 80 ms and the next starts as the fade ends.
+- A gasp still waiting for its second is dropped by the next blow's answer.
+- A line of hers (any of them: a crack's, the yellow, "not there") fades
+  whatever of hers is sounding and drops what is waiting.
+- The safeword, either of you, does the same over 0.25 s (`herHush`), so no
+  gasp ever follows a "crvena".
+
+**The clips** (`tools/cut_belt.py`, new; sources in `assets/audio/`). All
+eleven were stereo only in name: L/R correlates 0.996–1.000 and the side is
+27–39 dB under the mid, so they are folded to mono.
+- **Whp.** Each file has two or three strokes about a second apart. Played
+  whole, one landing would be followed by one or two more that nothing did,
+  so each is cut to its cleanest stroke (0.16–0.23 s).
+  - Highpassed at 120 Hz, fourth order and causal. In whp-0, 20–60 Hz arrives
+    as a −10 dBFS pulse 40 ms before the snap: the strap's wind on the
+    microphone.
+  - Levelled to the same loudest 10 ms, −12.5 dBFS, against the slap's
+    −10.4.
+  - 32 kHz and 64 kbps, because 11–16 kHz is −15 dB of a stroke's energy.
+- **Unbuckles.** Highpassed at 150 Hz, trimmed, and matched on their clinks
+  (unbuckle-1 came 6 dB under). 32 kHz and 64 kbps.
+- **Gasps.** Trimmed like the moans, with a trailing island (the next take's
+  first 20 ms) dropped. Levelled to the moans' −18 dBFS voiced RMS. 24 kHz
+  and 48 kbps: read back in bands, every band up to 11 kHz is within 0.6 dB
+  of the source.
+- Every clip was read back in bands against its source, within 1.6 dB
+  wherever it matters (`--check`).
+- No decoded peak passes −0.9 dBFS, and every edge is faded.
+- A rerun is byte-identical.
+
+**Cost.** 66.4 KB of mp3, which is +102 KB on the page (104 909 bytes, to 38.04 MB) with the
+base64 and the code.
+
+**Rough.**
+- Several gasps are clipped in the source (gasp-4 has 3015 samples at full
+  scale), and a clip cannot be undone.
+- Every gasp begins at full voice on its first sample, because the files were
+  cut into the breath. An 8 ms fade stops the click, but not the abruptness.
+
+**Unchanged:** the hand slap (its clip and its moan after), the strap, the
+heat meter and both safewords, the captions' own `sayGap`. Headless, over
+six runs of the final build (71 swings: 46 cracks, 11 pats, 16 gasps, five
+safewords):
+- nothing overlapped;
+- nothing of hers started after a safeword;
+- every clip decoded;
+- no console errors.
+
+Debug: `__fr.audio.raw().beltSfxLog()` (every belt sound and every sound of
+hers, in context seconds, with gain and whether it was faded or dropped),
+`beltHave()`, `gaspCount()`; `__fr.belt.stats().log.react`.
+
 ## [1.552.0] — 2026-09-30
 
 ### The belt: out of her jeans, a metre of AVBD leather, and a safeword

@@ -151,6 +151,10 @@ are applied live and none of it is baked in.
 [`tools/cut_slap.py`](tools/cut_slap.py), [`tools/cut_kiss.py`](tools/cut_kiss.py) and
 [`tools/cut_moan.py`](tools/cut_moan.py).
 
+**The belt and her gasps** — the belt's crack, its unbuckling and her gasps
+after it, recorded by me, no third-party terms; cut by
+[`tools/cut_belt.py`](tools/cut_belt.py).
+
 **The birds** — eight species, seven of them other people's recordings:
 
 | clip | species | source | recordist | licence |

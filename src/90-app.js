@@ -1417,7 +1417,8 @@ const _bF = new THREE.Vector3(), _bR = new THREE.Vector3(), _bU = new THREE.Vect
 const _bf = new THREE.Vector3(), _br = new THREE.Vector3(), _bD = new THREE.Vector3(), _bZ = new THREE.Vector3();
 const _bY = new THREE.Vector3(), _bM = new THREE.Matrix4();
 const beltLog = { out: 0, back: 0, swings: 0, lashes: 0, pats: 0, off: 0, landed: 0, yellow: 0,
-  safe: { you: 0, her: 0 }, said: [], hits: [], after: null, last: null };
+  safe: { you: 0, her: 0 }, said: [], hits: [], after: null, last: null,
+  react: { line: 0, moan: 0, gasp: 0, none: 0 } };
 
 let beltEye = null;              // debug: the eye held where it was — see `__fr.belt.freeze`
 const _bO = new THREE.Vector3();
@@ -1499,6 +1500,7 @@ function beltPlace() {
 
 /** Straight back on, no gesture — leaving the room, the third person, a cut. */
 function beltSnap() {
+  if (audio && audio.beltQuiet) audio.beltQuiet();
   if (belt) belt.hide();
   if (you && you.belt) you.belt(1);
   beltPh = 'off'; beltK = 0; beltGrip = 0; beltT = 0; beltPressed = false;
@@ -1528,6 +1530,9 @@ function beltCmd(what) {
   }
   if (audio && audio.slapWarm) audio.slapWarm();
   beltPh = 'reach'; beltT = 0; beltGrip = 0; beltFast = false;
+  // The unbuckle (1.552.1, his recording): its clink as the fist, closed on
+  // the buckle at the end of `reach`, pulls — a tenth of a second into `draw`.
+  if (audio && audio.beltBuckle) audio.beltBuckle(BELT_HAND.reach + 0.1);
   beltLog.out++;
   return 'out';
 }
@@ -1551,6 +1556,10 @@ function beltStow(fast) {
  * hair and she thanks you (`beltAfter`).
  */
 function beltSafeword(who) {
+  // Nothing of hers still to come — no gasp a second after a red, even one
+  // asked for just before the belt went back in — and a moan that is
+  // sounding, gone in a quarter of a second.
+  if (audio && audio.herHush) audio.herHush('safe');
   if (!beltActive()) return 'not out';
   beltLog.safe[who]++;
   beltSay(who === 'her' ? 'red' : 'heard', true);
@@ -1580,14 +1589,16 @@ function beltSay(kind, force = false) {
 function beltLanded(h) {
   const r = jadrija && jadrija.beltHit ? jadrija.beltHit(h, camera.position) : null;
   const k = clamp((h.v - BELT.hit.pat) / (BELT.hit.top - BELT.hit.pat), 0, 1);
-  if (audio && audio.beltCrack) audio.beltCrack(k, h.v >= BELT.hit.crack);
+  // How hard past the crack, 0..1 — what the recorded crack and her answer scale with.
+  const u = clamp((h.v - BELT.hit.crack) / (BELT.hit.top - BELT.hit.crack), 0, 1);
+  if (audio && audio.beltCrack) audio.beltCrack(k, h.v >= BELT.hit.crack, u);
   beltLog.last = r;
   if (!r) return;
   beltLog.hits.push([beltLog.swings, r.reg || 'off:' + r.part, +h.v.toFixed(1)]);
   if (beltLog.hits.length > 64) beltLog.hits.shift();
   if (!r.reg) {
     beltLog.off++;
-    if (h.v >= BELT.hit.crack) beltSay('off');
+    if (h.v >= BELT.hit.crack && beltSay('off') && audio && audio.herHush) audio.herHush('line');
     return;
   }
   if (r.landed) beltLog.landed++;
@@ -1598,9 +1609,52 @@ function beltLanded(h) {
   if (beltHeat > BELT_HAND.yellow && !beltYellow) {
     beltYellow = true; beltLog.yellow++;
     beltSay('yellow', true);
+    if (audio && audio.herHush) audio.herHush('line');
     return;
   }
-  if (Math.random() < 0.5) beltSay(r.crack ? 'crack' : 'pat');
+  beltReact(r.crack, u);
+}
+
+/**
+ * HER ANSWER to a lash that landed where it should: ONE of a line (captioned,
+ * `BELT_SAY`), her moan straight after it, a gasp a second or two later
+ * (Misha's, 1.552.1 — `audio.herGasp`), or nothing, drawn by `BELT_REACT`'s
+ * weights at the lightest crack and the hardest (`u`), so the harder it is
+ * the likelier the gasp. Whatever she did last time counts `again` as much,
+ * so it does not settle into a pattern. One of the four and never two: a
+ * gasp is her voice and so is a line. Any line of hers here — this one, the
+ * yellow, "not there" — drops a gasp still waiting from the blow before and
+ * fades a moan still sounding (`herHush('line')`). A pat is a line or
+ * nothing, and one time in ten a short, quiet gasp.
+ */
+const BELT_REACT = {
+  pat: { line: [1, 1], moan: [0, 0], gasp: [0.2, 0.2], none: [0.8, 0.8] },
+  crack: { line: [1, 1], moan: [1, 0.5], gasp: [0.6, 1.8], none: [0.5, 0.2] },
+  again: 0.5,
+};
+let beltReactLast = null;
+function beltReact(crack, u) {
+  const W = BELT_REACT[crack ? 'crack' : 'pat'];
+  const canSay = beltClock - beltSaidAt >= BELT_SAY.sayGap;
+  const kinds = ['line', 'moan', 'gasp', 'none'];
+  const w = kinds.map((kd) => {
+    let v = W[kd][0] + (W[kd][1] - W[kd][0]) * (crack ? u : 0);
+    if (kd === 'line' && !canSay) v = 0;
+    if (kd === beltReactLast && kd !== 'none') v *= BELT_REACT.again;
+    return v;
+  });
+  let x = Math.random() * w.reduce((a, b) => a + b, 0), pick = 'none';
+  for (let i = 0; i < kinds.length; i++) if ((x -= w[i]) < 0) { pick = kinds[i]; break; }
+  let did = false;
+  if (pick === 'line') {
+    did = !!beltSay(crack ? 'crack' : 'pat');
+    if (did && audio && audio.herHush) audio.herHush('line');
+  } else if (pick === 'moan') did = !!(audio && audio.herMoan && audio.herMoan());
+  else if (pick === 'gasp') did = !!(audio && audio.herGasp && audio.herGasp(crack ? u : 0, !crack));
+  if (!did) pick = 'none';
+  beltReactLast = pick;
+  beltLog.react[pick]++;
+  return pick;
 }
 
 /** The press, with the belt in your hand: down, winding up; up, the swing. */
@@ -1809,6 +1863,8 @@ function beltHandTick(dt) {
     if (beltT >= H.toWaist * fast) {
       beltPh = 'feed'; beltT = 0;
       beltExit.copy(beltPoint(H.feed, new THREE.Vector3(), true));
+      // The buckle done up: the unbuckle clips in their own turn, the clink halfway through `buckle`.
+      if (audio && audio.beltBuckle) audio.beltBuckle((H.feedIn + H.buckle * 0.5) * fast, true);
     }
   } else if (beltPh === 'feed') {
     beltAt.copy(waist);
@@ -1854,7 +1910,8 @@ function beltStats() {
     msMax: s ? +s.msMax.toFixed(3) : 0, steps: s ? s.steps : 0, contacts: s ? s.contacts : 0,
     onHer: s ? s.onHer : 0, tip: s ? +s.tip.toFixed(2) : 0, vMax: s ? +s.vMax.toFixed(2) : 0,
     rescues: s ? s.rescues : 0, strap: s ? s.last : null,
-    log: { ...beltLog, safe: { ...beltLog.safe }, said: beltLog.said.slice(), hits: beltLog.hits.slice() } };
+    log: { ...beltLog, safe: { ...beltLog.safe }, said: beltLog.said.slice(), hits: beltLog.hits.slice(),
+      react: { ...beltLog.react } } };
 }
 const THUMB_WALK = 1.3;      // m/s you step in at
 let camMode = 0;

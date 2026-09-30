@@ -55,6 +55,16 @@ The owner's own recordings (Misha, supplied 25 Sep 2026 as `mo-0.mp3` ..
 to sit together and faded by `tools/cut_moan.py` (`build/payload/moan0..2.mp3`);
 the tool's note lists what it changes.
 
+## `whp_belt-whp-0..2.mp3`, `unbuckle_sp-unbuckle-0..1.mp3` and `gasp_sp-gasp-0..5.mp3`
+
+The owner's own recordings (Misha, supplied 30 Sep 2026 as `belt-whp-0.mp3` ..
+`belt-whp-2.mp3`, `sp-unbuckle-0.mp3`, `sp-unbuckle-1.mp3` and `sp-gasp-0.mp3`
+.. `sp-gasp-5.mp3`), so no third-party terms. Folded to mono, each whp cut to
+one of its strokes and highpassed, the unbuckles trimmed and matched, the
+gasps trimmed and levelled with the moans' rule, by `tools/cut_belt.py`
+(`build/payload/belt_whp0..2.mp3`, `belt_unbuckle0..1.mp3`, `gasp0..5.mp3`);
+the tool's note lists what it changes.
+
 ## Everything else
 
 Every other sound in this game is synthesised at runtime in `src/80-audio.js`

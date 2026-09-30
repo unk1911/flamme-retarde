@@ -865,6 +865,9 @@ function buildAudio() {
   function slapWarm() {
     if (!slapBuf) sampleLoad('slap', (b) => { slapBuf = b; });
     moanWarm();
+    // And the belt's, for the same reason: she is in the room, and the first
+    // unbuckle should not be the silent one that asks for it.
+    beltWarm();
   }
   function slap() {
     if (!ctx || !bed) return false;
@@ -887,32 +890,90 @@ function buildAudio() {
 
   // ── the belt ─────────────────────────────────────────────────────────────────
   /**
-   * 1.552.0 — BELT in 43-belt.js. Made here and not recorded: a strap on skin
-   * is a very short bright snap (the leather's edge), the smack of the flat of
-   * it under that, and a little of the body — each a filtered noise burst,
-   * brighter and louder with `k`, 0..1 of how fast it came in. Under the crack
-   * (`crack` false) it was laid on her and not swung: a soft low pat and no
-   * snap at all. And after a crack, one time in two, her answer — the slap's
-   * own moans, one at a time as they always are.
+   * 1.552.0 — BELT in 43-belt.js; 1.552.1 — Misha's own recordings of it.
+   *
+   * *"when belt lands, should alternate between several sounds: belt-whp-0.mp3,
+   * belt-whp-1.mp3, belt-whp-2.mp3"* — one stroke cut out of each (each file
+   * has two or three; see `tools/cut_belt.py`), and the three turned in
+   * rotation, never the same one twice running. A stroke is a snap in 1.2-16
+   * kHz with a body at 400-1200 Hz — the crack itself, so it REPLACES the
+   * synthesised one, which is kept only for the moment before the clips have
+   * decoded. How hard is `u`, 0..1 from the crack up to the hardest
+   * (BELT.hit): -6 dB and a lowpass at 5 kHz at the crack, open and full at
+   * the top — a lighter blow is a duller one, not only a quieter one.
+   *
+   * Under the crack (`crack` false) it was laid on her and not swung, and
+   * stays the soft low synthesised pat: a whip's crack under a pat was never
+   * going to be the right sound at any level. The swing's swish stays
+   * synthesised too; the recordings have no whoosh in them, only the strap's
+   * wind on the microphone under 120 Hz, which the cut takes out.
+   *
+   * Her answer is not in here any more: `beltReact` in 90-app.js picks ONE
+   * of a line, her moan, a gasp or nothing, and asks for it (`herMoan`,
+   * `herGasp` below), and a line fades whatever of hers is sounding
+   * (`herHush`).
    *
    * Lowpass Q in decibels (see `webaudio-q`): −3.01 is Butterworth.
    */
-  function beltCrack(k = 0.5, crack = true) {
+  const BELT_SFX = {
+    whp: { lp: [5000, 16000], gain: [0.5, 1.0], send: 0.20 },
+    // Out of the jeans and back in: at your waist, a small metal thing.
+    unbuckle: { gain: 0.55, back: 0.45, send: 0.12 },
+  };
+  const whpBufs = [null, null, null], unbBufs = [null, null];
+  let whpLast = -1, buckleNow = null;
+  // Out and back each keep their own turn: sharing one, a take-out and a
+  // put-back a cycle, every take-out was the same clip (MEASURED, 1.552.1).
+  const unbLast = { out: -1, back: -1 };
+  // What played, when (context seconds) and how loud — for a probe; see `beltSfxLog`.
+  const sfxLog = [];
+  function sfxNote(e) { sfxLog.push(e); if (sfxLog.length > 200) sfxLog.shift(); return e; }
+  function beltWarm() {
+    whpBufs.forEach((b, i) => { if (!b) sampleLoad('belt_whp' + i, (d) => { whpBufs[i] = d; }); });
+    unbBufs.forEach((b, i) => { if (!b) sampleLoad('belt_unbuckle' + i, (d) => { unbBufs[i] = d; }); });
+    gaspWarm();
+  }
+  function beltCrack(k = 0.5, crack = true, u = null) {
     if (!ctx || !bed) return false;
     const t0 = ctx.currentTime;
     k = Math.max(0, Math.min(1, k));
     if (!crack) {
       burst({ freq: 380, q: -3.01, type: 'lowpass', dur: 0.08, gain: 0.06 + 0.06 * k, at: t0, dest: bed });
       burst({ freq: 1300, q: 0.9, dur: 0.035, gain: 0.012 + 0.012 * k, at: t0, dest: bed });
+      sfxNote({ what: 'pat', at: +t0.toFixed(3), gain: +(0.06 + 0.06 * k).toFixed(3) });
       return true;
     }
-    const g = 0.12 + 0.22 * k;
-    burst({ freq: 2800 + 1600 * k, q: 0.9, dur: 0.024, gain: g, at: t0, dest: bed });
-    burst({ freq: 950, q: 0.8, dur: 0.06 + 0.035 * k, gain: g * 0.75, sweep: 0.55, at: t0 + 0.002, dest: bed });
-    burst({ freq: 240, q: -3.01, type: 'lowpass', dur: 0.09, gain: g * 0.45, at: t0, dest: bed });
-    if (verbSend) burst({ freq: 1800, q: 0.7, dur: 0.05, gain: g * 0.18, at: t0, dest: verbSend });
     beltCracks++;
-    if (Math.random() < 0.5) moan(t0 + 0.18);
+    u = Math.max(0, Math.min(1, u == null ? k : u));
+    const ready = [0, 1, 2].filter((i) => whpBufs[i] && i !== whpLast);
+    if (!ready.length) {
+      beltWarm();
+      const g = 0.12 + 0.22 * k;
+      burst({ freq: 2800 + 1600 * k, q: 0.9, dur: 0.024, gain: g, at: t0, dest: bed });
+      burst({ freq: 950, q: 0.8, dur: 0.06 + 0.035 * k, gain: g * 0.75, sweep: 0.55, at: t0 + 0.002, dest: bed });
+      burst({ freq: 240, q: -3.01, type: 'lowpass', dur: 0.09, gain: g * 0.45, at: t0, dest: bed });
+      if (verbSend) burst({ freq: 1800, q: 0.7, dur: 0.05, gain: g * 0.18, at: t0, dest: verbSend });
+      sfxNote({ what: 'crack-synth', at: +t0.toFixed(3), gain: +g.toFixed(3) });
+      return true;
+    }
+    const i = ready[Math.floor(Math.random() * ready.length)];
+    whpLast = i;
+    const W = BELT_SFX.whp;
+    const src = ctx.createBufferSource();
+    src.buffer = whpBufs[i];
+    // Not the same strap twice.
+    src.playbackRate.value = 0.96 + Math.random() * 0.08;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = W.lp[0] * Math.pow(W.lp[1] / W.lp[0], u);
+    lp.Q.value = -3.01;
+    const g = ctx.createGain();
+    g.gain.value = W.gain[0] + (W.gain[1] - W.gain[0]) * u;
+    src.connect(lp).connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = W.send; g.connect(w).connect(verbSend); }
+    src.start(t0);
+    sfxNote({ what: 'whp' + i, at: +t0.toFixed(3), gain: +g.gain.value.toFixed(3),
+      lp: Math.round(lp.frequency.value), u: +u.toFixed(2) });
     return true;
   }
   /** The swish of a swing through the air, `k` 0..1 how hard. */
@@ -923,6 +984,136 @@ function buildAudio() {
     return true;
   }
   let beltCracks = 0;
+  // Where in a clip its clink is: the middle of its loudest 10 ms, s. Once a buffer.
+  const clinkAt = new WeakMap();
+  function clinkOf(buf) {
+    let c = clinkAt.get(buf);
+    if (c != null) return c;
+    const d = buf.getChannelData(0), w = Math.max(1, Math.round(buf.sampleRate * 0.01));
+    let best = -1;
+    c = 0;
+    for (let a = 0; a + w <= d.length; a += w) {
+      let s = 0;
+      for (let j = a; j < a + w; j++) s += d[j] * d[j];
+      if (s > best) { best = s; c = (a + w / 2) / buf.sampleRate; }
+    }
+    clinkAt.set(buf, c);
+    return c;
+  }
+  /**
+   * *"when she takes out the belt, (i.e,. when '\' is pressed), it should
+   * use/alternate between these unbuckle sounds: sp-unbuckle-0.mp3,
+   * sp-unbuckle-1.mp3"*. The two in turn, placed so the clip's clink — its
+   * loudest 10 ms, 0.42 and 0.48 s in — lands `lands` s from now: 90-app.js
+   * asks for the moment the fist has closed on the buckle and pulls. `back`
+   * is the same sound the other way, on the buckle-up at the end of feeding
+   * it in, a shade quieter.
+   */
+  function beltBuckle(lands = 0, back = false) {
+    if (!ctx || !bed) return false;
+    const way = back ? 'back' : 'out';
+    const ready = [0, 1].filter((i) => unbBufs[i] && i !== unbLast[way]);
+    if (!ready.length) { beltWarm(); return false; }
+    const i = ready[Math.floor(Math.random() * ready.length)];
+    unbLast[way] = i;
+    const U = BELT_SFX.unbuckle, buf = unbBufs[i];
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const rate = 0.97 + Math.random() * 0.06;
+    src.playbackRate.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = back ? U.back : U.gain;
+    src.connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = U.send; g.connect(w).connect(verbSend); }
+    const t0 = ctx.currentTime, at = t0 + Math.max(0, lands - clinkOf(buf) / rate);
+    src.start(at);
+    const me = { src, g, at };
+    buckleNow = me;
+    src.onended = () => { if (buckleNow === me) buckleNow = null; };
+    sfxNote({ what: (back ? 'buckle' : 'unbuckle') + i, at: +at.toFixed(3),
+      clink: +(at + clinkOf(buf) / rate).toFixed(3), asked: +(t0 + lands).toFixed(3), gain: g.gain.value });
+    return true;
+  }
+  /** The belt snapped straight back on (leaving the room, a cut): no buckle to hear. */
+  function beltQuiet() {
+    if (!ctx || !buckleNow) return;
+    const { src, g } = buckleNow, t = ctx.currentTime;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(0, t);
+    try { src.stop(t + 0.01); } catch (e) { /* already ended */ }
+    buckleNow = null;
+    sfxNote({ what: 'buckle-quiet', at: +t.toFixed(3) });
+  }
+
+  // ── her voice: the moans and the gasps, one at a time ─────────────────────────
+  /**
+   * Everything she makes a sound with goes through `herStart`, and she has
+   * one voice: whatever of hers is sounding when the next begins is faded out
+   * over `HER.fade` and the next starts as that ends, so no two of hers ever
+   * overlap; and whatever was asked for and has not begun yet — a gasp
+   * waiting its second — is dropped, because the newer blow is what she is
+   * answering now. `herHush` is the safeword's, and a line's: nothing of hers
+   * still to come, and what is sounding gone in a quarter of a second.
+   */
+  const HER = { fade: 0.08, hush: 0.25 };
+  let herNow = null;
+  function herCut(o, t, fade) {
+    const now = ctx.currentTime;
+    if (o.at > now + 0.005) {
+      // Never begun: it never will.
+      o.g.gain.cancelScheduledValues(now);
+      o.g.gain.setValueAtTime(0, now);
+      try { o.src.stop(now); } catch (e) { /* already stopped */ }
+      o.log.end = o.log.at; o.log.cut = 'dropped';
+      return;
+    }
+    o.g.gain.cancelScheduledValues(t);
+    o.g.gain.setValueAtTime(o.gv, t);
+    o.g.gain.linearRampToValueAtTime(0, t + fade);
+    try { o.src.stop(t + fade + 0.01); } catch (e) { /* already ended */ }
+    o.log.end = Math.min(o.log.end, +(t + fade).toFixed(3)); o.log.cut = 'faded';
+  }
+  function herStart(buf, at, gain, what, send = 0.15) {
+    const now = ctx.currentTime;
+    at = Math.max(at, now);
+    const o = herNow;
+    if (o && o.log.end > now) {
+      if (o.at > now + 0.005) herCut(o, now, 0);
+      else if (o.log.end > at - HER.fade) {
+        const f0 = Math.max(now, at - HER.fade);
+        herCut(o, f0, HER.fade);
+        at = f0 + HER.fade;
+      }
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(bed);
+    if (verbSend) { const w = ctx.createGain(); w.gain.value = send; g.connect(w).connect(verbSend); }
+    src.start(at);
+    const log = sfxNote({ what, her: true, asked: +now.toFixed(3), at: +at.toFixed(3),
+      end: +(at + buf.duration).toFixed(3), gain: +gain.toFixed(3) });
+    const me = { src, g, at, gv: gain, log };
+    herNow = me;
+    src.onended = () => { if (herNow === me) herNow = null; };
+    return me;
+  }
+  /**
+   * Nothing of hers still to come, and what is sounding faded out over
+   * `HER.hush`. `why` is 'safe' (the safeword, either of you) or 'line' (she
+   * is saying something, and a caption is her voice too); 'pending' drops
+   * only what has not begun.
+   */
+  function herHush(why = 'safe') {
+    if (!ctx || !herNow) return false;
+    const o = herNow, now = ctx.currentTime, pending = o.at > now + 0.005;
+    if (!pending && why === 'pending') return false;
+    herCut(o, now, pending ? 0 : HER.hush);
+    herNow = null;
+    sfxNote({ what: why === 'safe' ? 'hush' : 'hush-' + why, at: +now.toFixed(3) });
+    return true;
+  }
 
   // ── her moan, after it ───────────────────────────────────────────────────────
   /**
@@ -931,10 +1122,11 @@ function buildAudio() {
    * mo-2.mp3"* — cut and levelled by `tools/cut_moan.py`. One of the three at
    * random, never the same one twice running. One at a time: a slap while she
    * is still answering the last one fades that out as the new one starts,
-   * rather than stacking her voice on itself (mo-0 alone is ten seconds).
+   * rather than stacking her voice on itself (mo-0 alone is ten seconds) —
+   * which is now `herStart`'s, and holds for her gasps too.
    */
   const moanBufs = [null, null, null];
-  let moanLast = -1, moanNow = null, moanPlayed = 0;
+  let moanLast = -1, moanPlayed = 0;
   function moanWarm() {
     moanBufs.forEach((b, i) => { if (!b) sampleLoad('moan' + i, (d) => { moanBufs[i] = d; }); });
   }
@@ -943,24 +1135,51 @@ function buildAudio() {
     if (!ready.length) { moanWarm(); return false; }
     const i = ready[Math.floor(Math.random() * ready.length)];
     moanLast = i;
-    if (moanNow) {
-      const { src: o, g: og } = moanNow;
-      og.gain.cancelScheduledValues(at);
-      og.gain.setValueAtTime(og.gain.value, at);
-      og.gain.linearRampToValueAtTime(0, at + 0.08);
-      try { o.stop(at + 0.1); } catch (e) { /* already ended */ }
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = moanBufs[i];
-    const g = ctx.createGain();
-    g.gain.value = 0.75;
-    src.connect(g).connect(bed);
-    if (verbSend) { const w = ctx.createGain(); w.gain.value = 0.15; g.connect(w).connect(verbSend); }
-    src.start(at);
-    const me = { src, g, i };
-    moanNow = me;
-    src.onended = () => { if (moanNow === me) moanNow = null; };
+    herStart(moanBufs[i], at, 0.75, 'moan' + i);
     moanPlayed++;
+    return true;
+  }
+  /** Her moan straight after a lash, as the slap's comes straight after the slap. */
+  function herMoan() { return !!ctx && !!bed && moan(ctx.currentTime + 0.18); }
+
+  // ── her gasp, a second or two after ──────────────────────────────────────────
+  /**
+   * Misha, 30 Sep 2026: *"and a second or two later, her reaction, in
+   * addition to the existing ones, should also add these ones:
+   * sp-gasp-[0-5].mp3"* — cut and levelled with the moans' own rule by
+   * `tools/cut_belt.py`. Five short ones (0.7-0.9 s), turned at random and
+   * never the same twice running; and gasp-5, four breaths over 3.7 s, which
+   * is for the hardest (`u` past `longAt`) and even then one time in three,
+   * and not again for `longGap` gasps after. `after` s from now: 1-2, the
+   * harder the sooner — the sting arriving. `soft` is a pat's: a short one,
+   * quieter.
+   */
+  const GASP = { n: 6, long: 5, longAt: 0.8, longP: 0.35, longGap: 4, delay: [1.0, 2.0],
+    gain: [0.62, 0.78], soft: 0.5 };
+  const gaspBufs = new Array(GASP.n).fill(null);
+  let gaspLast = -1, gaspSince = GASP.longGap, gaspPlayed = 0;
+  function gaspWarm() {
+    gaspBufs.forEach((b, i) => { if (!b) sampleLoad('gasp' + i, (d) => { gaspBufs[i] = d; }); });
+  }
+  function herGasp(u = 0.5, soft = false, after = null) {
+    if (!ctx || !bed) return false;
+    u = Math.max(0, Math.min(1, u));
+    let i = -1;
+    if (!soft && u >= GASP.longAt && gaspSince >= GASP.longGap && gaspBufs[GASP.long]
+      && Math.random() < GASP.longP) i = GASP.long;
+    if (i < 0) {
+      const ready = [];
+      for (let j = 0; j < GASP.n; j++) if (j !== GASP.long && gaspBufs[j] && j !== gaspLast) ready.push(j);
+      if (!ready.length) { gaspWarm(); return false; }
+      i = ready[Math.floor(Math.random() * ready.length)];
+    }
+    gaspLast = i;
+    gaspSince = i === GASP.long ? 0 : gaspSince + 1;
+    const D = GASP.delay;
+    const d = after != null ? after : D[0] + (D[1] - D[0]) * (0.5 * (1 - u) + 0.5 * Math.random());
+    const gain = soft ? GASP.soft : GASP.gain[0] + (GASP.gain[1] - GASP.gain[0]) * u;
+    herStart(gaspBufs[i], ctx.currentTime + d, gain, 'gasp' + i);
+    gaspPlayed++;
     return true;
   }
 
@@ -7809,6 +8028,12 @@ function buildAudio() {
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle, creak,
     beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, beltCrack, beltSwish,
+    beltBuckle, beltQuiet, beltWarm, herMoan, herGasp, herHush,
+    /** Debug: what the belt and her voice played, context seconds — see `sfxNote`. */
+    beltSfxLog: () => sfxLog.map((e) => ({ ...e })),
+    beltHave: () => ({ whp: whpBufs.map((b) => !!b), unbuckle: unbBufs.map((b) => !!b),
+      gasp: gaspBufs.map((b) => !!b), moan: moanBufs.map((b) => !!b), now: ctx ? +ctx.currentTime.toFixed(3) : null }),
+    gaspCount: () => ({ n: gaspPlayed, last: gaspLast }),
     beltCount: () => beltCracks, moanCount: () => ({ n: moanPlayed, last: moanLast }), noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     // The slow lick's slots — see `── the slow lick ──` above.
     doodleSlurp, lickLaugh, lickLaughStop, lickWarm,
