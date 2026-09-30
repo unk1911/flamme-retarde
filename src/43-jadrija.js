@@ -1589,7 +1589,7 @@ async function buildJadrija(scene) {
    * `shade` is a bright-above, dark-below on the vertex colour: the only
    * brushed-steel this material can do is the sky on top of the tube.
    */
-  function tubeTS(pts, r, col, sides = 10, ref = [1, 0, 0], shade = 0.16) {
+  function tubeTS(pts, r, col, sides = 10, ref = [1, 0, 0], shade = 0.16, map = W) {
     const ring = [];
     for (let k = 0; k < pts.length; k++) {
       const a = pts[Math.max(0, k - 1)], c = pts[Math.min(pts.length - 1, k + 1)];
@@ -1601,14 +1601,14 @@ async function buildJadrija(scene) {
       const vx = ts * uy - ty * us, vs = ty * ux - tx * uy, vy = tx * us - ts * ux;
       const rk = typeof r === 'function' ? r(k) : r;
       const ra = typeof rk === 'number' ? rk : rk[0], rb = typeof rk === 'number' ? rk : rk[1];
-      const p = pts[k], C = W(p[0], p[1], p[2]);
+      const p = pts[k], C = map(p[0], p[1], p[2]);
       const row = [];
       for (let i = 0; i < sides; i++) {
         const q = (i / sides) * TAU, cq = Math.cos(q), sq = Math.sin(q);
-        const Q = W(p[0] + (ux * ra * cq + vx * rb * sq), p[1] + (us * ra * cq + vs * rb * sq),
+        const Q = map(p[0] + (ux * ra * cq + vx * rb * sq), p[1] + (us * ra * cq + vs * rb * sq),
           p[2] + (uy * ra * cq + vy * rb * sq));
         // The ellipse's normal is not its radius: (cos/a, sin/b), not (cos, sin).
-        const N = W(p[0] + (ux * cq / ra + vx * sq / rb) * 1e-3, p[1] + (us * cq / ra + vs * sq / rb) * 1e-3,
+        const N = map(p[0] + (ux * cq / ra + vx * sq / rb) * 1e-3, p[1] + (us * cq / ra + vs * sq / rb) * 1e-3,
           p[2] + (uy * cq / ra + vy * sq / rb) * 1e-3);
         let nx = N[0] - C[0], ny = N[1] - C[1], nz = N[2] - C[2];
         const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
@@ -2186,14 +2186,225 @@ async function buildJadrija(scene) {
    * The thing that makes these read is that the door is *behind* the wall
    * plane, not painted on it: the opening is a reveal 60 mm deep, the leaf
    * hangs at the back of it, and what you actually see from down the row is a
-   * coloured rectangle with a hard shadow up one side of it. Two styles, both
-   * off the reference: louvred, which is most of them, and planked, which is
-   * the rest. Louvres are horizontal slats at alternating depth — `boxTS`
-   * cannot lean, and a slat that cannot lean has to sell itself on the shadow
-   * between it and the one below.
+   * coloured rectangle with a hard shadow up one side of it. It was two styles
+   * of flat boxes, louvred and planked; it is five built ones now — see
+   * `── THE JOINERY, IN ITS OWN FRAME ──` just below.
    */
   const DOORW = 0.90, DOORH = 1.98;
   const REVEAL = 0.09;             // how deep the opening is cut into the render
+  /**
+   * ── THE JOINERY, IN ITS OWN FRAME ──────────────────────────────────────────
+   *
+   * Misha, 30 Sep 2026, over a screenshot of the row: *"spruce up by adding
+   * more polygons to the kabine-doors ... i feel like they could look
+   * higher-resolution/better"*. They could. Every door on the row was a stack
+   * of `boxTS` slabs — a leaf, two stiles, twelve flat slats or five flat
+   * boards — every hinge a black rectangle, every frame a 6 mm band of paint
+   * on the render, every transom three bars. From the promenade that is a row
+   * of coloured stickers with horizontal banding, which is what he saw.
+   *
+   * Set beside the kabine pan (`1000150414`, 0:20 to 0:40 and the close
+   * frames at 1:00, 1:08, 1:40 to 2:28) a door on this shore is one of five
+   * things, and they are not five colours of one thing:
+   *
+   *   louvred    0:24's coral leaf, 0:38's two oranges and the red: a frame
+   *              of stiles and rails with thirty-odd blades between them,
+   *              each blade tipped down to shed the rain, so what you see is
+   *              a stack of sloping bands with a shadow under every nose.
+   *   boarded    0:34's two greens and the blue: stiles, a lock rail and
+   *              narrow tongue-and-groove boards in the two panels, with a
+   *              V at every joint.
+   *   sheet      0:24's yellow and blue, 0:38's navy and grey, 2:04-2:12's
+   *              greens: a steel sheet on an angle frame, folded at the
+   *              edges, oil-canned, riveted, a lever handle on a long plate.
+   *   panelled   0:34's red: stiles, three rails and a muntin with raised
+   *              fields.
+   *   ledged     1:00, the old green one: four or five wide boards of
+   *              different widths with gaps between them, a rail across the
+   *              head, the paint gone to grey timber down every arris.
+   *
+   * Everything below is drawn in the opening's own frame, `jFrame`: x along
+   * the row from the middle of the door (mirrored by `hand`, for the leaves
+   * that fold the other way), y up from the floor, and z INTO the wall from
+   * the render face, so a negative z stands proud of it. `boxTS` cannot
+   * chamfer, lean or curve, and every one of those five needs at least one of
+   * the three. So there are four small tools: `cbox`, a block with its front
+   * arrises chamfered (the chamfer is where edge wear goes); `vquad`, a flat
+   * quad with a colour per corner (the shadow under a louvre nose); `gsurf`,
+   * a smooth grid (grain down a board, oil-canning in a sheet, folds in a
+   * curtain); and `plate`, a flat convex outline with thickness (a strap
+   * hinge, a hasp). The round things — knuckles, pins, knobs, bars — are
+   * `spinIn` and `tubeTS`, which the rest of the resort already uses.
+   *
+   * Still one buffer and one draw: this is baked into `up` with the rest of
+   * the joinery, per bay, because the bays are laid along a curved shore and
+   * an instanced door would have to be the same shape at every bay, which on
+   * the bend it is not (rule 9b).
+   */
+  const jFrame = (dc, front, floor, hand = 1) => {
+    // RIGID, and that is the point of it. `W` is a lerp between shore stations
+    // and kinks at every one; a door is flat. Across a station a chord and the
+    // shore frame disagree by the sagitta — at the tip of the spit (t 482.4,
+    // a 23.7 degree kink) by 87 mm over one opening — and the first cut of
+    // this, drawn through `W` piece by piece, had its boards and its sheet
+    // following a kink while its body, one chord, stood out through the middle
+    // of the leaf. So the whole door is laid on the chord of its own opening
+    // at the render face — the same chord `frontSkin`'s head panel and the
+    // dark backing are — with x scaled to the opening (the frame squeezes t on
+    // the bend, and the hole is that wide), and z and y square to it.
+    const A = W(dc - DOORW * 0.5, front, 0), B = W(dc + DOORW * 0.5, front, 0);
+    const ux = (B[0] - A[0]) / DOORW, uz = (B[2] - A[2]) / DOORW;
+    const ul = Math.hypot(ux, uz) || 1;
+    const C = W(dc, front + 1, 0), D = W(dc, front, 0);
+    let nx = -uz / ul, nz = ux / ul;
+    if (nx * (C[0] - D[0]) + nz * (C[2] - D[2]) < 0) { nx = -nx; nz = -nz; }
+    const ox = (A[0] + B[0]) * 0.5, oz = (A[2] + B[2]) * 0.5;
+    // y absolute here, from the floor in `P`.
+    const Q = (x, z, y) => [ox + ux * hand * x + nx * z, y, oz + uz * hand * x + nz * z];
+    const P = (x, z, y) => Q(x, z, floor + y);
+    return {
+      P, Q,
+      // Points for `tube`, which are the frame's own.
+      T: (x, z, y) => [x, z, y],
+      tube: (pts, r, col, sides, ref) => tubeTS(pts, r, col, sides, ref, 0.16, P),
+      // A plain box. Through `boxIn` with the height left ABSOLUTE, because
+      // `boxIn` lifts its corners to `y1` itself rather than asking its
+      // mapping — a mapping that adds the floor gets its bottom at the floor
+      // and its top at `y1` above sea level.
+      box: (x0, x1, z0, z1, y0, y1, col, top) => boxIn(Q, x0, x1, z0, z1,
+        floor + y0, floor + y1, col, top),
+    };
+  };
+  const mix3 = (a, c, k) => [a[0] + (c[0] - a[0]) * k, a[1] + (c[1] - a[1]) * k,
+    a[2] + (c[2] - a[2]) * k];
+  /** A flat quad with its own colour at each corner. */
+  function vquad(A, B, C, D, ca, cb, cc, cd) {
+    const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2];
+    const vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const L = Math.hypot(nx, ny, nz) || 1, N = [nx / L, ny / L, nz / L];
+    b.smooth(A, B, C, N, N, N, ca, cb, cc);
+    b.smooth(A, C, D, N, N, N, ca, cc, cd);
+  }
+  /**
+   * A block whose seaward face (at `z0`) is inset `c` all round, with four
+   * chamfers out to the full section `cz` deeper (`c` again if not given), and
+   * its sides back to `z1`. No back: it always stands on something. `sides`
+   * is a mask of which sides to draw — 1 bottom, 2 +x, 4 top, 8 -x — because
+   * a rail's ends are inside the stiles it runs between and drawing them is
+   * two coincident faces per joint. `ec` colours the chamfers, which is where
+   * the paint goes first.
+   */
+  function cbox(F, x0, x1, y0, y1, z0, z1, c, col, ec, sides = 15, cz) {
+    const P = F.P, zc = z0 + (cz ?? c);
+    const X = [x0, x1, x1, x0], Y = [y0, y0, y1, y1];
+    const f = [P(x0 + c, z0, y0 + c), P(x1 - c, z0, y0 + c), P(x1 - c, z0, y1 - c),
+      P(x0 + c, z0, y1 - c)];
+    const r = X.map((x, i) => P(x, zc, Y[i]));
+    b.quad(f[0], f[1], f[2], f[3], col);
+    const e = ec || col;
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) % 4;
+      b.quad(r[i], r[j], f[j], f[i], e);
+      if ((sides >> i) & 1 && z1 > zc) {
+        b.quad(P(X[i], z1, Y[i]), P(X[j], z1, Y[j]), r[j], r[i], col);
+      }
+    }
+  }
+  /**
+   * A smooth grid: `at(u, v)` is the point, `colAt(u, v)` its colour, and the
+   * normals are the grid's own, taken across the neighbours, so a board's
+   * grain, a sheet's dents and a curtain's folds shade as one surface and not
+   * as facets. The winding follows the normal (`FACE` flips by facing).
+   */
+  function gsurf(nx, ny, at, colAt) {
+    const V = [], C = [];
+    for (let j = 0; j <= ny; j++) {
+      for (let i = 0; i <= nx; i++) {
+        V.push(at(i / nx, j / ny));
+        C.push(colAt(i / nx, j / ny));
+      }
+    }
+    const id = (i, j) => j * (nx + 1) + i;
+    const N = V.map((_, n) => {
+      const i = n % (nx + 1), j = (n / (nx + 1)) | 0;
+      const A = V[id(Math.max(0, i - 1), j)], B = V[id(Math.min(nx, i + 1), j)];
+      const Cc = V[id(i, Math.max(0, j - 1))], D = V[id(i, Math.min(ny, j + 1))];
+      const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2];
+      const vx = D[0] - Cc[0], vy = D[1] - Cc[1], vz = D[2] - Cc[2];
+      const qx = uy * vz - uz * vy, qy = uz * vx - ux * vz, qz = ux * vy - uy * vx;
+      const L = Math.hypot(qx, qy, qz) || 1;
+      return [qx / L, qy / L, qz / L];
+    });
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const a = id(i, j), q = id(i + 1, j), c = id(i + 1, j + 1), d = id(i, j + 1);
+        b.smooth(V[a], V[q], V[c], N[a], N[q], N[c], C[a], C[q], C[c]);
+        b.smooth(V[a], V[c], V[d], N[a], N[c], N[d], C[a], C[c], C[d]);
+      }
+    }
+  }
+  /** `gsurf` on a flat rectangle at depth `z`, with an optional `dz(u, v)`. */
+  const gface = (F, x0, x1, y0, y1, z, nx, ny, colAt, dz) => gsurf(nx, ny,
+    (u, v) => F.P(x0 + (x1 - x0) * u, z + (dz ? dz(u, v) : 0), y0 + (y1 - y0) * v),
+    colAt);
+  /** A flat convex outline `[x, y][]` from `z0` back to `z1`. */
+  function plate(F, pts, z0, z1, col) {
+    const Fr = pts.map(([x, y]) => F.P(x, z0, y)), Bk = pts.map(([x, y]) => F.P(x, z1, y));
+    for (let i = 1; i < pts.length - 1; i++) b.tri(Fr[0], Fr[i], Fr[i + 1], col);
+    const sc = shade(col, 0.86);
+    for (let i = 0; i < pts.length; i++) {
+      const j = (i + 1) % pts.length;
+      b.quad(Fr[i], Fr[j], Bk[j], Bk[i], sc);
+    }
+  }
+  /** A bolt or rivet head: four facets to a point, `r` across the base. */
+  function stud(F, x, y, z, r, col) {
+    const A = F.P(x - r, z, y - r), B = F.P(x + r, z, y - r);
+    const C = F.P(x + r, z, y + r), D = F.P(x - r, z, y + r), E = F.P(x, z - r * 0.8, y);
+    b.tri(A, B, E, shade(col, 0.85)); b.tri(B, C, E, col);
+    b.tri(C, D, E, shade(col, 1.18)); b.tri(D, A, E, col);
+  }
+  /**
+   * A round thing standing along -z out of the leaf at (x, y) — a rose, a
+   * knob, a cylinder: `prof` is `[out, r]` from the face `z`.
+   */
+  const outward = (F, x, y, z, prof, col, sides = 8) =>
+    spinIn((u, v, w) => F.P(x + u, z - w, y + v), prof, col, sides, [1, 1], 0.14, 0.3);
+  /** And standing up at (x, z): `prof` is `[y, r]`. */
+  const upright = (F, x, z, prof, col, sides = 8) =>
+    spinIn((u, v, w) => F.P(x + u, z + v, w), prof, col, sides, [1, 1], 0.14, 0.3);
+
+  // Where a shut leaf hangs and how the opening is lined. The jamb lining
+  // stands 30 mm into the opening each side, so the leaf is that much
+  // narrower than the hole; its face is 30 mm behind the render, with the
+  // casing standing 19 mm proud of it — 49 mm of shadow line down the jamb.
+  const LIN = 0.030;
+  const LEAFZ = 0.030;
+  const LEAFH = DOORW * 0.5 - LIN - 0.004;
+  // And the sill, a concrete step 22 mm high that the leaf closes down onto.
+  const SILL = 0.022;
+  const SILLC = [0.395, 0.380, 0.352], SILLTOP = [0.470, 0.455, 0.425];
+  // What shows where the paint has gone off an old plank door: grey timber,
+  // not primer. `1:00` in the pan, measured off the arrises of the green leaf.
+  const TIMBER = [0.455, 0.420, 0.365];
+  // The lip of a chip: the coat's edge over the primer, a hairline of shadow.
+  const PRIMLIP = [0.285, 0.296, 0.305];
+  const DS = { LOUVRE: 0, BOARD: 1, SHEET: 2, PANEL: 3, LEDGE: 4 };
+  /**
+   * Which of the five a leaf is. The old two-to-one louvred-to-planked split
+   * off the bay index still decides the first cut — so a leaf that was
+   * louvred is louvred, sheet or panelled and one that was planked is boarded
+   * or ledged — and `jit` decides the rest (rule 4). What comes out over the
+   * block is about three in ten louvred, a quarter sheet steel, a quarter
+   * boarded, one in seven panelled and one in fourteen ledged, which is the
+   * mix 0:20 to 0:40 shows.
+   */
+  const doorStyle = (key, louvred) => {
+    const r = jit(key, 951);
+    if (louvred) return r < 0.46 ? DS.LOUVRE : r < 0.80 ? DS.SHEET : DS.PANEL;
+    return r < 0.72 ? DS.BOARD : DS.LEDGE;
+  };
   /**
    * What the sea has done to the paint, worked out once for a whole leaf.
    *
@@ -2306,10 +2517,9 @@ async function buildJadrija(scene) {
     const mx = 0.16 + 0.22 * rst;
     return [chips, stains,
       [col[0] + (RUSTY[0] - col[0]) * mx, col[1] + (RUSTY[1] - col[1]) * mx,
-        col[2] + (RUSTY[2] - col[2]) * mx]];
+        col[2] + (RUSTY[2] - col[2]) * mx], loss];
   }
-  function door(dc, front, floor, col, louvred, key, faceAt, hand = 1) {
-    const h = DOORW * 0.5;
+  function door(dc, front, floor, col, louvred, key, faceAt, hand = 1, style) {
     // No hole is cut here — `frontSkin` did that, and it is why any of this is
     // visible at all. The first version of this drew the leaf at `front + 0.04`
     // inside a wall that ran from `front` to the back of the hut, which is to
@@ -2321,80 +2531,237 @@ async function buildJadrija(scene) {
     // the render and passes the face it comes to rest on, so that an open bay's
     // leaf is built, weathered and fitted out by this function rather than by a
     // second copy of it that would drift away from it.
-    const face = faceAt == null ? front + 0.045 : faceAt;
-    const [chips, stains, rust] = doorWear(dc, floor, col, key | 0, hand);
+    const F = jFrame(dc, front, floor, hand);
+    const h = LEAFH;
+    const zf = (faceAt == null ? front + LEAFZ : faceAt) - front;
+    const st = style ?? doorStyle(key | 0, louvred);
+    const [chips, stains, rust, loss] = doorWear(dc, floor, col, key | 0, hand);
+    // What is under the paint, and how far the arrises have gone to it. The
+    // edges of a leaf lose their coat first — a hand, a bag, the next door's
+    // leaf — so a door that has lost a fifth of its face has lost most of its
+    // arrises, and even a sound one shows a little.
+    const sub = st === DS.LEDGE ? TIMBER : PRIMER;
+    const ec = mix3(col, sub, Math.min(0.62,
+      0.08 + loss * 2.6 + (st === DS.LEDGE ? 0.22 : 0)));
+    // Shut, the leaf closes onto the sill; folded open, it hangs clear.
+    const Y0 = faceAt == null ? SILL + 0.006 : 0.012, Y1 = DOORH - 0.012;
     /**
      * Lay whatever has failed on the element that was just drawn.
      *
-     * `sf` is that element's OWN seaward face, and every chip goes 3 mm proud
-     * of it rather than all of them going on one plane out in front of the
-     * leaf. A louvred door has its odd slats at `face - 0.019` and its even
-     * ones at `face - 0.009`; one flake plane would sit flat on half of them
-     * and hang a centimetre off the other half, which is a floating card the
-     * moment you look along the row instead of at it.
+     * `zOf` is that element's OWN seaward face — a depth, or a function of
+     * height for a surface that leans (a louvre blade) — and every chip goes
+     * 2.5 mm proud of it rather than all of them going on one plane out in
+     * front of the leaf. It is the wrong way round physically — paint comes
+     * off, so the primer is BEHIND the coat — and it is under the eye at any
+     * distance you can get to one of these, and it keeps the depth test
+     * unambiguous (rule 5); `plaster`'s render patch has shipped with the same
+     * compromise since it went in.
      *
-     * Proud rather than sunk, and it is the wrong way round physically — paint
-     * comes off, so the primer is BEHIND the coat, not in front of it. Three
-     * millimetres is under the eye at any distance you can get to one of these
-     * and it makes the depth test unambiguous, which is what rule 5 asks for.
-     * `plaster`'s render patch has shipped with the same compromise since it
-     * went in.
+     * The relief is the lip. A chip bigger than a fingernail gets a hairline of
+     * shadow along its top edge, which is what the edge of a 0.3 mm coat does
+     * to a low sun on the primer under it, and it is the difference between a
+     * flake and a white sticker.
      */
-    const wearOn = (a0, a1, b0, b1, sf) => {
+    const wearOn = (x0, x1, y0l, y1l, zOf) => {
+      const b0 = floor + y0l, b1 = floor + y1l;
+      const S = typeof zOf === 'function'
+        ? (y) => zOf(y - floor) - 0.0025 : () => zOf - 0.0025;
+      // The rectangles are in (t, y), off `doorWear`; the leaf is in the
+      // door's own frame, so they are taken into its x first.
       for (let i = 0; i < chips.length + stains.length; i++) {
         const from = i < chips.length;
         const r = from ? chips[i] : stains[i - chips.length];
-        const t0 = Math.max(a0, r[0]), t1 = Math.min(a1, r[1]);
+        const e0 = hand * (r[0] - dc), e1 = hand * (r[1] - dc);
+        const t0 = Math.max(x0, Math.min(e0, e1)), t1 = Math.min(x1, Math.max(e0, e1));
         const y0 = Math.max(b0, r[2]), y1 = Math.min(b1, r[3]);
         if (t1 - t0 < 0.004 || y1 - y0 < 0.004) continue;
-        // ONE quad and not a `boxTS`, which is six of them for a patch that
-        // has exactly one visible face. A hundred doors carrying a hundred
-        // chips each is the difference between 35 000 triangles on this block
-        // and 210 000. The winding is `boxIn`'s own seaward face, copied so
-        // the normals match every other wall on this shore.
-        b.quad(W(t0, sf, y0), W(t1, sf, y0), W(t1, sf, y1), W(t0, sf, y1),
-          from ? PRIMER : rust);
+        // ONE quad (two with a lip) and not a `boxTS`, which is six of them for
+        // a patch that has exactly one visible face. A hundred doors carrying a
+        // hundred chips each is the difference between 35 000 triangles on
+        // this block and 210 000.
+        const base = from ? sub : rust;
+        if (from && y1 - y0 > 0.022 && t1 - t0 > 0.018) {
+          const yl = y1 - Math.min(0.006, (y1 - y0) * 0.2);
+          b.quad(F.Q(t0, S(y0), y0), F.Q(t1, S(y0), y0), F.Q(t1, S(yl), yl), F.Q(t0, S(yl), yl),
+            base);
+          b.quad(F.Q(t0, S(yl), yl), F.Q(t1, S(yl), yl), F.Q(t1, S(y1), y1), F.Q(t0, S(y1), y1),
+            sub === TIMBER ? shade(TIMBER, 0.55) : PRIMLIP);
+        } else {
+          b.quad(F.Q(t0, S(y0), y0), F.Q(t1, S(y0), y0), F.Q(t1, S(y1), y1), F.Q(t0, S(y1), y1),
+            base);
+        }
       }
     };
-    boxTS(dc - h + 0.012, dc + h - 0.012, face, face + 0.032,
-      floor + 0.010, floor + DOORH - 0.010, shade(col, 0.90));
-    // Stiles up both edges, standing a little proud of whatever fills between
-    // them. Every real one of these has them and they are what stops a louvred
-    // door reading as a radiator.
-    for (const o of [-1, 1]) {
-      const s0 = dc + o * (h - 0.012) - o * 0.075, s1 = dc + o * (h - 0.012);
-      boxTS(Math.min(s0, s1), Math.max(s0, s1),
-        face - 0.014, face + 0.032, floor + 0.010, floor + DOORH - 0.010, col);
-      wearOn(Math.min(s0, s1), Math.max(s0, s1),
-        floor + 0.010, floor + DOORH - 0.010, face - 0.014);
-    }
-    if (louvred) {
-      const n = 12, y0 = floor + 0.08, y1 = floor + DOORH - 0.08;
-      const sp = (y1 - y0) / n;
-      for (let i = 0; i < n; i++) {
-        const y = y0 + i * sp;
-        // Alternating depth, and alternating tone with it: the near edge of a
-        // slat catches the sun and the throat under it does not.
-        const sf = face - (i % 2 ? 0.019 : 0.009);
-        boxTS(dc - h + 0.082, dc + h - 0.082, sf, face,
-          y + 0.004, y + sp - 0.010, shade(col, i % 2 ? 1.08 : 0.84));
-        wearOn(dc - h + 0.082, dc + h - 0.082, y + 0.004, y + sp - 0.010, sf);
+    // Grain: a tone per vertex column, so it runs down a board as streaks and
+    // not across it, and a little darker at the foot where the splash is.
+    const grain = (bi, amp) => (u, v) => {
+      const g = jit(key * 7 + bi * 13 + Math.round(u * 4), 961);
+      const g2 = jit(key * 3 + bi * 29 + Math.round(u * 4) * 31 + Math.round(v * 12), 962);
+      return shade(col, (1 - amp) + amp * (1.6 * g + 0.4 * g2) * (0.93 + 0.07 * v));
+    };
+    // The body of the leaf, behind everything on it. Dark, because what shows
+    // of it is the bottom of a groove or the gap between two boards.
+    const zBody = st === DS.LOUVRE ? zf + 0.030 : st === DS.PANEL ? zf + 0.022 : zf + 0.012;
+    F.box(-h, h, zBody, zf + 0.040, Y0, Y1, shade(col, 0.50));
+    // Stiles and rails: the same member, a chamfered block standing 8 mm proud
+    // of the leaf face. Rails run between the stiles, so their ends are not
+    // drawn (they would be two coincident faces at every joint).
+    const zs = zf - 0.008, zb = zf + 0.030;
+    const stile = (x0, x1) => {
+      cbox(F, x0, x1, Y0, Y1, zs, zb, 0.005, col, ec, 15);
+      wearOn(x0 + 0.005, x1 - 0.005, Y0, Y1, zs);
+    };
+    const rail = (sw, y0, y1) => {
+      cbox(F, -h + sw, h - sw, y0, y1, zs + 0.002, zb, 0.005, col, ec, 5);
+      wearOn(-h + sw, h - sw, y0 + 0.005, y1 - 0.005, zs + 0.002);
+    };
+
+    if (st === DS.LOUVRE) {
+      // Thirty-odd blades between the rails, each tipped down to the front:
+      // a 11 mm nose, then the blade's top face rising 40 mm as it goes 30 mm
+      // back into the leaf. Each blade's top runs up behind the next one's
+      // nose, so there is no see-through, and it is darkened toward the back
+      // because that is where the nose above shades it. That gradient is the
+      // whole of what a louvre looks like at ten metres — a stack of bands
+      // with a dark line under every one.
+      const SW = 0.078, TR = 0.090, BR = 0.150;
+      stile(-h, -h + SW); stile(h - SW, h);
+      rail(SW, Y1 - TR, Y1); rail(SW, Y0, Y0 + BR);
+      const mid = jit(key, 952) < 0.5;
+      if (mid) rail(SW, 0.93, 1.03);
+      const runs = mid ? [[Y0 + BR, 0.93], [1.03, Y1 - TR]] : [[Y0 + BR, Y1 - TR]];
+      const zn = zf - 0.003, rise = 0.040, deep = 0.029;
+      const cN = shade(col, 0.93), cF = shade(col, 1.07), cB = shade(col, 0.44);
+      const x0 = -h + SW, x1 = h - SW;
+      for (const [ya, yb] of runs) {
+        const n = Math.max(1, Math.round((yb - ya) / 0.050)), p = (yb - ya) / n;
+        for (let i = 0; i < n; i++) {
+          const y = ya + i * p, yn = y + 0.011;
+          vquad(F.P(x0, zn, y), F.P(x1, zn, y), F.P(x1, zn, yn), F.P(x0, zn, yn),
+            cN, cN, cN, cN);
+          vquad(F.P(x0, zn, yn), F.P(x1, zn, yn), F.P(x1, zn + deep, yn + rise),
+            F.P(x0, zn + deep, yn + rise), cF, cF, cB, cB);
+          wearOn(x0, x1, y, yn, zn);
+          wearOn(x0, x1, yn, y + p, (yy) => zn + (yy - yn) * (deep / rise));
+        }
+      }
+    } else if (st === DS.BOARD) {
+      // Framed and boarded: stiles, a head rail, a lock rail and a bottom rail,
+      // and six or seven tongue-and-groove boards in each of the two panels,
+      // set 12 mm back, with a V at every joint. The V is two chamfers meeting,
+      // and it is what makes a board a board rather than a stripe.
+      const SW = 0.092, TR = 0.105, BR = 0.185, L0 = 0.84, L1 = 1.02;
+      stile(-h, -h + SW); stile(h - SW, h);
+      rail(SW, Y1 - TR, Y1); rail(SW, Y0, Y0 + BR); rail(SW, L0, L1);
+      const nB = 6 + (jit(key, 953) < 0.5 ? 1 : 0);
+      const x0 = -h + SW, bw = (2 * (h - SW)) / nB, zp = zf + 0.004, v = 0.006;
+      const cV = shade(col, 0.80);
+      for (const [ya, yb] of [[Y0 + BR, L0], [L1, Y1 - TR]]) {
+        for (let i = 0; i < nB; i++) {
+          const a = x0 + i * bw, c = a + bw;
+          gface(F, a + v, c - v, ya, yb, zp, 2, 4, grain(i + (ya > 1 ? 9 : 0), 0.06));
+          vquad(F.P(a, zp + v, ya), F.P(a + v, zp, ya), F.P(a + v, zp, yb),
+            F.P(a, zp + v, yb), cV, cV, cV, cV);
+          vquad(F.P(c - v, zp, ya), F.P(c, zp + v, ya), F.P(c, zp + v, yb),
+            F.P(c - v, zp, yb), cV, cV, cV, cV);
+          wearOn(a + v, c - v, ya, yb, zp);
+        }
+      }
+    } else if (st === DS.SHEET) {
+      // A steel sheet on an angle frame. The frame shows as a 34 mm folded
+      // return round the edge; the sheet inside it is not flat — nothing this
+      // size in thin steel is — and the oil-canning is what the low sun finds.
+      // Rivets up the stiles and across the head, the foot and the hidden
+      // brace behind the lock.
+      const E = 0.034;
+      cbox(F, -h, -h + E, Y0, Y1, zf - 0.006, zb, 0.004, col, ec, 15);
+      cbox(F, h - E, h, Y0, Y1, zf - 0.006, zb, 0.004, col, ec, 15);
+      cbox(F, -h + E, h - E, Y1 - E, Y1, zf - 0.005, zb, 0.004, col, ec, 5);
+      cbox(F, -h + E, h - E, Y0, Y0 + E + 0.02, zf - 0.005, zb, 0.004, col, ec, 5);
+      const p1 = jit(key, 954) * TAU, p2 = jit(key, 955) * TAU;
+      const dz = (u, v) => 0.0015 * (Math.sin(u * 3.3 + p1) * Math.sin(v * 7.1 + p2)
+        + 0.5 * Math.sin(u * 8.7 + v * 4.3 + p2));
+      gface(F, -h + E, h - E, Y0 + E + 0.02, Y1 - E, zf, 4, 10,
+        (u, v) => shade(col, 0.96 + 0.07 * jit(key * 5 + Math.round(u * 4) * 11
+          + Math.round(v * 10), 956)), dz);
+      wearOn(-h + E, h - E, Y0 + E + 0.02, Y1 - E, zf - 0.0012);
+      wearOn(-h, -h + E, Y0, Y1, zf - 0.006);
+      wearOn(h - E, h, Y0, Y1, zf - 0.006);
+      // A pressed rib across it on some, the brace showing through.
+      if (jit(key, 957) < 0.5) {
+        for (const y of [0.70, 1.38]) {
+          cbox(F, -h + E, h - E, y - 0.011, y + 0.011, zf - 0.004, zf + 0.002, 0.004,
+            shade(col, 1.02), ec, 5);
+        }
+      }
+      const RV = shade(col, 0.92);
+      for (let y = Y0 + 0.10; y < Y1 - 0.05; y += 0.235) {
+        stud(F, -h + E * 0.5, y, zf - 0.006, 0.0045, RV);
+        stud(F, h - E * 0.5, y, zf - 0.006, 0.0045, RV);
+      }
+      for (let x = -h + 0.12; x < h - 0.08; x += 0.19) {
+        stud(F, x, Y1 - E * 0.5, zf - 0.005, 0.0045, RV);
+        stud(F, x, 1.00, zf - 0.0015, 0.0045, RV);
+      }
+    } else if (st === DS.PANEL) {
+      // Six raised fields in a frame of stiles, three rails and a muntin:
+      // each field a 28 mm bevel rising 9 mm off its ground. It is the one
+      // style here that is joinery rather than carpentry, and it is the one
+      // whose paint 0:34 shows going worst — the fields hold water on their
+      // bevels.
+      const SW = 0.100, TR = 0.105, BR = 0.200, M = 0.040;
+      stile(-h, -h + SW); stile(h - SW, h);
+      const R1 = [0.78, 0.94], R2 = [1.36, 1.46];
+      rail(SW, Y1 - TR, Y1); rail(SW, Y0, Y0 + BR); rail(SW, ...R1); rail(SW, ...R2);
+      const ground = shade(col, 0.86);
+      for (const [ya, yb] of [[Y0 + BR, R1[0]], [R1[1], R2[0]], [R2[1], Y1 - TR]]) {
+        cbox(F, -M, M, ya, yb, zs + 0.002, zb, 0.005, col, ec, 10);
+        for (const [pa, pb] of [[-h + SW, -M], [M, h - SW]]) {
+          b.quad(F.P(pa, zf + 0.011, ya), F.P(pb, zf + 0.011, ya),
+            F.P(pb, zf + 0.011, yb), F.P(pa, zf + 0.011, yb), ground);
+          cbox(F, pa + 0.013, pb - 0.013, ya + 0.013, yb - 0.013, zf - 0.001, zf + 0.011,
+            0.028, col, shade(col, 0.97), 0, 0.009);
+          wearOn(pa + 0.041, pb - 0.041, ya + 0.041, yb - 0.041, zf - 0.001);
+        }
       }
     } else {
-      // Planked: five boards up the leaf with a seam between each, and two
-      // ledges across them, which is how a door like this is actually made.
-      const n = 5, sp = (DOORW - 0.164) / n;
+      // Ledged: four or five boards of whatever width the timber came in, a
+      // few millimetres apart, not quite flush with each other and not quite
+      // the same length at the foot, where the end grain has rotted back. A
+      // head rail and a foot rail across the front, clench-nailed, standing
+      // proud. 1:00 in the pan, which is this door exactly.
+      const n = 4 + (jit(key, 958) < 0.5 ? 1 : 0), gap = 0.005;
+      const ws = [];
+      for (let i = 0; i < n; i++) ws.push(0.7 + 0.6 * jit(key * 5 + i, 959));
+      const sum = ws.reduce((p, q) => p + q, 0), span = 2 * h - gap * (n - 1);
+      const cV = shade(col, 0.72);
+      let x = -h;
       for (let i = 0; i < n; i++) {
-        const x = dc - h + 0.082 + i * sp;
-        boxTS(x + 0.006, x + sp - 0.006, face - 0.012, face,
-          floor + 0.045, floor + DOORH - 0.045, shade(col, i % 2 ? 1.05 : 0.95));
-        wearOn(x + 0.006, x + sp - 0.006,
-          floor + 0.045, floor + DOORH - 0.045, face - 0.012);
+        const a = x, c = x + (ws[i] / sum) * span;
+        x = c + gap;
+        const zz = zf - 0.004 + 0.004 * (jit(key * 5 + i, 960) - 0.5);
+        const yb0 = Y0 + 0.035 * Math.pow(jit(key * 5 + i, 963), 2);
+        const v = 0.006;
+        gface(F, a + v, c - v, yb0, Y1, zz, 2, 6, grain(i, 0.13));
+        vquad(F.P(a, zz + v, yb0), F.P(a + v, zz, yb0), F.P(a + v, zz, Y1),
+          F.P(a, zz + v, Y1), ec, ec, ec, ec);
+        vquad(F.P(c - v, zz, yb0), F.P(c, zz + v, yb0), F.P(c, zz + v, Y1),
+          F.P(c - v, zz, Y1), ec, ec, ec, ec);
+        // the board's edge, seen down the gap
+        vquad(F.P(a, zz + v, yb0), F.P(a, zf + 0.012, yb0), F.P(a, zf + 0.012, Y1),
+          F.P(a, zz + v, Y1), cV, cV, cV, cV);
+        vquad(F.P(c, zz + v, yb0), F.P(c, zf + 0.012, yb0), F.P(c, zf + 0.012, Y1),
+          F.P(c, zz + v, Y1), cV, cV, cV, cV);
+        wearOn(a + v, c - v, yb0, Y1, zz);
       }
-      for (const y of [floor + 0.34, floor + DOORH - 0.42]) {
-        boxTS(dc - h + 0.075, dc + h - 0.075, face - 0.019, face - 0.010,
-          y, y + 0.105, shade(col, 1.10));
-        wearOn(dc - h + 0.075, dc + h - 0.075, y, y + 0.105, face - 0.019);
+      const NAIL = [0.120, 0.105, 0.095];
+      for (const [ya, yb] of [[Y1 - 0.135, Y1 - 0.015], [Y0 + 0.14, Y0 + 0.25]]) {
+        cbox(F, -h + 0.004, h - 0.004, ya, yb, zf - 0.028, zf - 0.004, 0.007, col, ec, 15);
+        wearOn(-h + 0.01, h - 0.01, ya + 0.007, yb - 0.007, zf - 0.028);
+        for (let xx = -h + 0.07; xx < h - 0.04; xx += 0.17) {
+          stud(F, xx, (ya + yb) * 0.5 + 0.02, zf - 0.028, 0.004, NAIL);
+          stud(F, xx + 0.03, (ya + yb) * 0.5 - 0.025, zf - 0.028, 0.004, NAIL);
+        }
       }
     }
   }
@@ -2870,112 +3237,218 @@ async function buildJadrija(scene) {
       [0.300, 0.262, 0.220]],
   ];
   const OPENOFF = 0.075;           // the folded leaf's back, off the render
-  function openDoor(dc, front, floor, col, kind, key, louvred, room) {
-    const h = DOORW * 0.5;
-    // The leaf, flat on the render one full leaf-width along from its own jamb,
-    // and built by the same function that builds the eighty shut ones.
-    const lt = dc + room * (h + DOORW * 0.5);
+  function openDoor(dc, front, floor, col, kind, key, louvred, room, style) {
+    // The leaf, flat on the render just past its own casing, and built by the
+    // same function that builds the eighty shut ones — hinges toward the
+    // opening, so its knuckles are at the jamb it swung from.
+    const lt = dc + room * (DOORW * 0.5 + 0.012 + LEAFH);
     const fs = front - OPENOFF - 0.032;
-    door(lt, front, floor, col, louvred, key, fs, room);
+    door(lt, front, floor, col, louvred, key, fs, room, style);
     // Hinges, hasp and staple — and no padlock, which is what `doorKit` does
     // when it is handed no key. The hut is standing open: the lock came off it
     // and went into somebody's bag, and a padlock shut through the hasp of an
     // open door is the one thing on this leaf that would read as a mistake.
-    doorKit(lt, front, floor, h, fs - front, undefined, room);
-    // And what is hanging in the hole. Six ribbons across 0.88 m, or four wide
-    // bands if it is cloth, and the difference between them is only the width:
-    // the strips are cut narrow and a curtain is not.
-    const pal = HANGCOL[kind % HANGCOL.length];
-    const hs = front + 0.055;
-    if (kind % HANGCOL.length === 2) {
-      // The blind runs the other way.
-      const n = 14, y0b = floor + 0.05, y1b = floor + DOORH - 0.16;
+    doorKit(lt, front, floor, LEAFH, fs - front, undefined, room, style);
+    // ── AND WHAT IS HANGING IN THE HOLE ─────────────────────────────────────
+    //
+    // It was four or seven flat boxes, which is a curtain drawn by somebody who
+    // has never seen one: a curtain is the one thing in the doorway that is
+    // not flat. 0:24's maroon one and 1:36's grey sheet hang in folds that
+    // deepen toward the hem; 1:44's ribbons each hang on their own, a little
+    // twisted, a little short, and move apart at the bottom; 0:34's striped
+    // one is a stripe per fold. So each is a surface now, on a rod between the
+    // linings: the cloth a fold every ten centimetres, deeper at the foot and
+    // darker in the valleys, and sometimes pushed along the rod to one side;
+    // the ribbons each a strip of their own with a sway and a twist; the blind
+    // a stack of round canes on two cords.
+    const F = jFrame(dc, front, floor);
+    const kd = kind % HANGCOL.length, pal = HANGCOL[kd];
+    const hc = DOORW * 0.5 - LIN;
+    const zr = 0.052, yr = DOORH - 0.045;
+    F.tube([F.T(-hc - 0.004, zr, yr), F.T(hc + 0.004, zr, yr)], 0.0065,
+      [0.300, 0.290, 0.270], 6, [0, 0, 1]);
+    if (kd === 2) {
+      // The blind runs the other way: canes, round, on two cords.
+      const n = 34, ya = 0.085, yb = yr - 0.020, p = (yb - ya) / n;
       for (let i = 0; i < n; i++) {
-        const y = y0b + i * ((y1b - y0b) / n);
-        boxTS(dc - h + 0.020, dc + h - 0.020, hs, hs + 0.012,
-          y, y + (y1b - y0b) / n - 0.008, pal[i % pal.length]);
+        const y = ya + (i + 0.5) * p;
+        F.tube([F.T(-hc + 0.012, zr + 0.002, y), F.T(hc - 0.012, zr + 0.002, y)],
+          [p * 0.47, 0.0045], shade(pal[i % pal.length], 0.95 + 0.1 * jit(key + i, 974)),
+          6, [0, 0, 1]);
+      }
+      const CORD = [0.320, 0.300, 0.260];
+      for (const x of [-hc * 0.55, hc * 0.55]) {
+        vquad(F.P(x - 0.002, zr - 0.006, ya), F.P(x + 0.002, zr - 0.006, ya),
+          F.P(x + 0.002, zr - 0.006, yr), F.P(x - 0.002, zr - 0.006, yr),
+          CORD, CORD, CORD, CORD);
+      }
+    } else if (kd === 0) {
+      // Ribbons: thirteen strips, each hung on its own, a little short, a
+      // little twisted, and swinging apart toward the bottom, where nothing
+      // holds them — a strip curtain never hangs level.
+      const n = 13, w = (2 * hc - 0.008) / n;
+      for (let i = 0; i < n; i++) {
+        const x = -hc + 0.004 + i * w, q = key * 11 + i;
+        const len = DOORH - 0.13 - 0.06 * jit(q, 975);
+        const sx = (jit(q, 976) - 0.5) * 0.036, sz = (jit(q, 977) - 0.5) * 0.028;
+        const tw = (jit(q, 978) - 0.5) * 0.045;
+        const zz = zr + 0.003 + (i % 2 ? 0.004 : -0.002);
+        const c = pal[(i + (key % 4)) % pal.length];
+        // Cut a little narrower than the pitch, so the dark of the hut shows
+        // down between them and each reads as a strip and not as a stripe.
+        gsurf(1, 5, (u, v) => F.P(x + 0.002 + u * (w - 0.006) + sx * v * v,
+          zz + sz * v * v + (u - 0.5) * tw * v, yr - 0.008 - v * len),
+        (u, v) => shade(c, 1.04 - 0.10 * v));
       }
     } else {
-      const n = kind % HANGCOL.length === 0 ? 7 : 4;
-      const w = (DOORW - 0.04) / n;
-      for (let i = 0; i < n; i++) {
-        const x = dc - h + 0.020 + i * w;
-        // Hung slightly short and slightly uneven, because a strip curtain
-        // never hangs level and a straight bottom edge is the one thing that
-        // makes this read as a painted panel.
-        const drop = DOORH - 0.16 - 0.035 * ((i * 5) % 3);
-        boxTS(x + 0.004, x + w - 0.004, hs, hs + 0.010,
-          floor + DOORH - 0.06 - drop, floor + DOORH - 0.06,
-          pal[i % pal.length], shade(pal[i % pal.length], 1.14));
+      // Cloth: a fold every ten centimetres, gathered on the rod and deepening
+      // toward the hem, which is not level either. A third of them are pushed
+      // along the rod, and then the folds close up.
+      const cf = jit(key, 979) < 0.35 ? 0.70 : 1.0;
+      const cov = (2 * hc - 0.008) * cf;
+      const xa = jit(key, 980) < 0.5 ? -hc + 0.004 : hc - 0.004 - cov;
+      const lam = 0.105 * (0.8 + 0.2 * cf), ph = jit(key, 981) * TAU;
+      const len = DOORH - 0.10 - 0.04 * jit(key, 982);
+      const A0 = 0.009, A1 = 0.020;
+      const amp = (v) => A0 + (A1 - A0) * v;
+      const wav = (x, v) => Math.sin(((x - xa) / lam) * TAU + ph + 0.8 * v * Math.sin(x * 11 + ph));
+      const zOf = (x, v) => zr + 0.004 + amp(v) * wav(x, v);
+      const yOf = (x, v) => yr - 0.010 - v * (len + 0.015 * v * Math.sin(x * 23 + ph));
+      // A stripe per panel for the striped cotton, a width of cloth for the
+      // plain one — its four near-identical maroons are a cloth faded unevenly.
+      const sw = kd === 3 ? 0.052 : 0.13;
+      const np = Math.ceil(cov / sw - 1e-6);
+      for (let p = 0; p < np; p++) {
+        const p0 = xa + p * sw, p1 = Math.min(xa + cov, p0 + sw);
+        const nx = Math.max(2, Math.round(((p1 - p0) / lam) * 8));
+        const c = pal[p % pal.length];
+        gsurf(nx, 6, (u, v) => {
+          const x = p0 + (p1 - p0) * u;
+          return F.P(x, zOf(x, v), yOf(x, v));
+        }, (u, v) => shade(c, 0.86 - 0.14 * wav(p0 + (p1 - p0) * u, v)));
       }
     }
   }
 
   /**
-   * The architrave, and the reason the door is a hole and not a sticker: a band
-   * of paint on the render round the opening, in the door's own colour. Whoever
-   * painted the door had the tin open and did the frame with it. It is also the
-   * only thing tying the door to the vent above it.
+   * The frame, and the reason the door is a hole and not a sticker: a casing
+   * round the opening in the door's own colour — whoever painted the door had
+   * the tin open and did the frame with it — and, since 1.550.8, a real one:
+   * 58 mm of chamfered timber standing 19 mm proud of the render, with a
+   * lining down each side of the reveal and a concrete sill across the foot
+   * that the leaf closes onto. 0:24 and 0:34 have every door framed like this
+   * and the frame is often better painted than the door.
+   *
+   * `key` is passed for the row's bays and not for the special kabina, and it
+   * is what turns the lining and the sill on: the one you walk through has its
+   * own reveal (`kabina`), and a sill in it would be a step drawn across a
+   * doorway the walk does not know about.
    */
-  function surround(dc, front, floor, col, half, head) {
-    const m = 0.055;
-    for (const o of [-1, 1]) {
-      boxTS(dc + o * half, dc + o * (half + m), front - 0.007, front - 0.001,
-        floor, head + m, shade(col, 0.92));
-    }
-    boxTS(dc - half - m, dc + half + m, front - 0.007, front - 0.001,
-      head, head + m, shade(col, 0.92));
+  function surround(dc, front, floor, col, half, head, key) {
+    const F = jFrame(dc, front, floor);
+    const m = 0.058, z0 = -0.019, c = 0.006;
+    const tone = shade(col, 0.92);
+    const lined = key !== undefined;
+    const ec = lined ? mix3(tone, PRIMER, 0.10 + 0.35 * jit(key, 985)) : tone;
+    const Hy = head - floor, yb = lined ? SILL - 0.003 : 0;
+    // Jambs full height, the head between them: a butt joint, which is what a
+    // painted casing is, and the V the two chamfers make at it is the joint.
+    cbox(F, -half - m, -half, yb, Hy + m, z0, 0.004, c, tone, ec, 10);
+    cbox(F, half, half + m, yb, Hy + m, z0, 0.004, c, tone, ec, 10);
+    cbox(F, -half, half, Hy, Hy + m, z0, 0.004, c, tone, ec, 5);
+    if (!lined) return;
+    const lin = shade(col, 0.78);
+    F.box(-half - 0.004, -half + LIN, 0.0, REVEAL - 0.006, SILL - 0.004, OPENH, lin);
+    F.box(half - LIN, half + 0.004, 0.0, REVEAL - 0.006, SILL - 0.004, OPENH, lin);
+    F.box(-half - 0.035, half + 0.035, -0.058, REVEAL - 0.006, -0.015, SILL,
+      SILLC, SILLTOP);
   }
 
   /**
-   * The vent over the door. Every kabina on this shore has one and it is the
-   * detail that says *changing hut* rather than *shed*: a slot the width of the
-   * door, a painted frame round it, and a few bars across it. Behind the bars
-   * is the same nothing the door has behind it.
+   * The transom over the door. Every kabina on this shore has one and it is
+   * the detail that says *changing hut* rather than *shed*: a light the width
+   * of the door, a painted frame round it, and something in it. Behind that is
+   * the same nothing the door has behind it.
+   *
+   * Survey/4: "the transom is glazed or meshed and framed in the door's
+   * colour. 0:39 is the clearest: every door has a small horizontal light
+   * over it, the frame painted with the door and the pane dark or wire." So it
+   * is three, dealt off the bay index and not off `rng`: bars, a light, and
+   * wire. Since 1.550.8 the frame is chamfered and stands proud with a sill a
+   * little prouder; the bars are round, three to five of them and sometimes a
+   * flat tie across; the light is a pane in a bead with the sky in its top
+   * half and grime at its foot, or painted over (0:24, the red one); and the
+   * wire is wire — a 20 mm square mesh, or a 50 mm diamond (0:24, the blue
+   * one) — in front of a dark void. Low contrast on purpose: at ten metres a
+   * fine mesh is a grey haze, and a bright one is a moiré.
    */
   const VENTH = 0.235;
-  function vent(dc, front, y0, w, col, style = 0) {
-    const h = w * 0.5, hh = VENTH;
-    // Frame: a lintel over and a sill under, in the door's colour.
-    for (const [a0, a1] of [[y0 - 0.045, y0], [y0 + hh, y0 + hh + 0.045]]) {
-      boxTS(dc - h - 0.045, dc + h + 0.045, front - 0.030, front - 0.001, a0, a1,
-        shade(col, 0.88));
-    }
-    for (const o of [-1, 1]) {
-      boxTS(dc + o * h, dc + o * (h + 0.045), front - 0.030, front - 0.001,
-        y0, y0 + hh, shade(col, 0.88));
-    }
-    // And what is in it, which was three bits of bar on every hut on the beach.
-    //
-    // Survey/4: "the transom is glazed or meshed and framed in the door's
-    // colour. 0:39 is the clearest: every door has a small horizontal light
-    // over it, the frame painted with the door and the pane dark or wire. The
-    // model draws this and draws it as a slot with three bars, which is right
-    // for HALF of them." So it is three now, dealt off the bay index and not
-    // off `rng`: three bars, a dark pane, and chicken wire, which is a grid
-    // fine enough that at five metres it is a grey haze with a frame round it.
-    const GRILLE = [0.255, 0.245, 0.230];
+  function vent(dc, front, y0, w, col, style = 0, key = 0) {
+    const F = jFrame(dc, front, 0);
+    const h = w * 0.5, hh = VENTH, m = 0.045, c = 0.006;
+    const fc = shade(col, 0.88), ec = mix3(fc, PRIMER, 0.08 + 0.25 * jit(key, 986));
+    cbox(F, -h - m, h + m, y0 + hh, y0 + hh + m - 0.002, -0.030, 0.002, c, fc, ec, 15);
+    cbox(F, -h - m - 0.006, h + m + 0.006, y0 - m, y0, -0.036, 0.002, c, fc, ec, 15);
+    cbox(F, -h - m, -h, y0, y0 + hh, -0.030, 0.002, c, fc, ec, 10);
+    cbox(F, h, h + m, y0, y0 + hh, -0.030, 0.002, c, fc, ec, 10);
+    const IRONV = [0.240, 0.230, 0.215];
     if (style === 1) {
-      boxTS(dc - h, dc + h, front - 0.004, front + 0.010, y0, y0 + hh,
-        [0.055, 0.058, 0.062], [0.075, 0.080, 0.086]);
-    } else if (style === 2) {
-      boxTS(dc - h, dc + h, front + 0.002, front + 0.012, y0, y0 + hh,
-        [0.048, 0.046, 0.044]);
-      for (let i = 1; i <= 9; i++) {
-        const x = dc - h + (w * i) / 10;
-        boxTS(x - 0.005, x + 0.005, front - 0.004, front + 0.004, y0, y0 + hh,
-          GRILLE);
+      const bead = shade(col, 0.80), bw = 0.016;
+      cbox(F, -h, h, y0, y0 + bw, 0.004, 0.024, 0.003, bead, null, 4);
+      cbox(F, -h, h, y0 + hh - bw, y0 + hh, 0.004, 0.024, 0.003, bead, null, 1);
+      cbox(F, -h, -h + bw, y0 + bw, y0 + hh - bw, 0.004, 0.024, 0.003, bead, null, 2);
+      cbox(F, h - bw, h, y0 + bw, y0 + hh - bw, 0.004, 0.024, 0.003, bead, null, 8);
+      const x0 = -h + bw, x1 = h - bw, ya = y0 + bw, yb = y0 + hh - bw;
+      if (jit(key, 987) < 0.22) {
+        // Painted over, with the same tin.
+        gface(F, x0, x1, ya, yb, 0.014, 3, 1,
+          (u) => shade(col, 0.70 + 0.12 * jit(key * 3 + Math.round(u * 3), 988)));
+      } else {
+        const GT = [0.215, 0.240, 0.275], GB = [0.045, 0.048, 0.052];
+        const GG = [0.110, 0.102, 0.088];
+        gface(F, x0, x1, ya, yb, 0.014, 3, 2, (u, v) => (v < 0.25 ? GG
+          : v < 0.75 ? mix3(GB, GT, 0.12 + 0.20 * u) : mix3(GB, GT, 0.55 + 0.35 * u)));
       }
-      for (let j = 1; j <= 2; j++) {
-        const yy = y0 + (hh * j) / 3;
-        boxTS(dc - h, dc + h, front - 0.004, front + 0.004,
-          yy - 0.005, yy + 0.005, GRILLE);
+    } else if (style === 2) {
+      const DARK = [0.040, 0.038, 0.036], WIRE = [0.180, 0.178, 0.168];
+      b.quad(F.P(-h, 0.018, y0), F.P(h, 0.018, y0), F.P(h, 0.018, y0 + hh),
+        F.P(-h, 0.018, y0 + hh), DARK);
+      if (jit(key, 989) < 0.35) {
+        const pitch = 0.050, r = 0.0014;
+        for (const sg of [-1, 1]) {
+          const z = sg > 0 ? 0.008 : 0.0065;
+          for (let cx = -h - hh; cx < h + hh; cx += pitch) {
+            const X = (y) => cx + sg * (y - y0);
+            const ya = y0 + sg * (-h - cx), yb2 = y0 + sg * (h - cx);
+            const lo = Math.max(y0, Math.min(ya, yb2)), hi = Math.min(y0 + hh, Math.max(ya, yb2));
+            if (hi - lo < 0.005) continue;
+            vquad(F.P(X(lo) - r, z, lo), F.P(X(lo) + r, z, lo), F.P(X(hi) + r, z, hi),
+              F.P(X(hi) - r, z, hi), WIRE, WIRE, WIRE, WIRE);
+          }
+        }
+      } else {
+        const r = 0.0012, nX = Math.round((2 * h) / 0.020), nY = Math.round(hh / 0.020);
+        for (let i = 1; i < nX; i++) {
+          const x = -h + (2 * h * i) / nX;
+          b.quad(F.P(x - r, 0.008, y0), F.P(x + r, 0.008, y0), F.P(x + r, 0.008, y0 + hh),
+            F.P(x - r, 0.008, y0 + hh), WIRE);
+        }
+        for (let j = 1; j < nY; j++) {
+          const y = y0 + (hh * j) / nY;
+          b.quad(F.P(-h, 0.006, y - r), F.P(h, 0.006, y - r), F.P(h, 0.006, y + r),
+            F.P(-h, 0.006, y + r), WIRE);
+        }
       }
     } else {
-      for (let i = 1; i <= 3; i++) {
-        const x = dc - h + (w * i) / 4;
-        boxTS(x - 0.011, x + 0.011, front - 0.008, front + 0.012, y0, y0 + hh,
-          GRILLE);
+      const nb = 3 + Math.floor(jit(key, 971) * 3);
+      const bc = jit(key, 972) < 0.5 ? shade(col, 0.78) : IRONV;
+      for (let i = 1; i <= nb; i++) {
+        const x = -h + (2 * h * i) / (nb + 1);
+        upright(F, x, 0.006, [[y0 - 0.012, 0.0075], [y0 + hh + 0.012, 0.0075]], bc, 6);
+      }
+      if (jit(key, 973) < 0.45) {
+        cbox(F, -h, h, y0 + hh * 0.5 - 0.010, y0 + hh * 0.5 + 0.010, -0.004, 0.002, 0.0015,
+          bc, null, 5);
       }
     }
   }
@@ -3087,10 +3560,11 @@ async function buildJadrija(scene) {
   const PANE1 = [0.658, 0.695, 0.744];
   const PANE2 = [0.470, 0.474, 0.428];
   function steelDoor(dc, front, floor, key) {
-    const h = DOORW * 0.5;
+    // Between the linings and down onto the sill, like every leaf since 1.550.8.
+    const h = LEAFH;
     const face = front + 0.045;
     const S = 0.055;                 // stile and rail: 55 mm of angle section
-    const y0 = floor + 0.010, y1 = floor + DOORH - 0.010;
+    const y0 = floor + SILL + 0.006, y1 = floor + DOORH - 0.012;
     const mid = floor + 0.770;       // the middle rail, 40 mm either side of it
     const kick = y0 + 0.100;         // the bottom rail
     // The glass goes in first and the sections lie over it, overlapping by
@@ -3173,28 +3647,35 @@ async function buildJadrija(scene) {
       floor + 0.930, floor + 0.968, [0.080, 0.076, 0.072]);
   }
 
-  /** A white PVC door: one leaf, two mouldings, no louvres and no paint. */
-  function pvcDoor(dc, front, floor) {
-    const h = DOORW * 0.5;
+  /**
+   * A white PVC door: one leaf, two mouldings, no louvres and no paint. Since
+   * 1.550.8 the leaf has the rounded arrises a PVC leaf is extruded with, the
+   * mouldings are raised fields with their bevels, and it has what f112 has:
+   * three barrel hinges and a lever on a long plate with the lock under it.
+   */
+  function pvcDoor(dc, front, floor, key = 0) {
+    const F = jFrame(dc, front, floor);
+    const h = LEAFH;
     const WHITEP = [0.665, 0.668, 0.668];
-    const face = front + 0.045;
-    boxTS(dc - h + 0.012, dc + h - 0.012, face, face + 0.032,
-      floor + 0.010, floor + DOORH - 0.010, WHITEP, shade(WHITEP, 1.06));
+    const zf = LEAFZ + 0.010;
+    const Y0 = SILL + 0.006, Y1 = DOORH - 0.012;
+    cbox(F, -h, h, Y0, Y1, zf, zf + 0.050, 0.008, WHITEP, shade(WHITEP, 1.05), 15);
     // The mouldings, which are the only relief on one of these. TWO, not one:
     // f68 and the right-hand leaf of f65 are both a tall panel with a short one
     // under it and a rail between, and that rail is the only line across a leaf
     // that is otherwise a blank white slab — take it away and the door reads as
     // a sheet of paper stuck in the hole. f24 does have a single panel, so this
     // is the commoner of the two and not the only one.
-    boxTS(dc - h + 0.10, dc + h - 0.10, face - 0.010, face,
-      floor + 0.545, floor + DOORH - 0.16, shade(WHITEP, 1.10),
-      shade(WHITEP, 1.14));
-    boxTS(dc - h + 0.10, dc + h - 0.10, face - 0.010, face,
-      floor + 0.16, floor + 0.445, shade(WHITEP, 1.10),
-      shade(WHITEP, 1.14));
-    // A brushed handle, and it is a lever rather than a hasp.
-    boxTS(dc + h - 0.24, dc + h - 0.10, face - 0.030, face - 0.012,
-      floor + 1.02, floor + 1.06, [0.545, 0.548, 0.545]);
+    for (const [ya, yb] of [[0.545, DOORH - 0.16], [0.16, 0.445]]) {
+      cbox(F, -h + 0.088, h - 0.088, ya, yb, zf - 0.009, zf + 0.002, 0.016,
+        shade(WHITEP, 1.08), shade(WHITEP, 1.14), 0, 0.009);
+    }
+    const MET = [0.545, 0.548, 0.545];
+    for (const y of [0.24, 1.02, 1.80]) {
+      upright(F, -h - 0.004, zf - 0.006, [[y - 0.002, 0], [y - 0.002, 0.009],
+        [y + 0.100, 0.009], [y + 0.102, 0]], MET, 8);
+    }
+    lever(F, h - 0.070, 1.04, zf, MET);
   }
 
   /**
@@ -3225,16 +3706,27 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * The ironmongery. Three boxes and a plate, and the reason a door in this row
-   * stops being a dark rectangle painted on a wall: hinges give it a side it
-   * opens from, and a hasp gives it an owner who locks it.
+   * The ironmongery, and the reason a door in this row stops being a painted
+   * rectangle: hinges give it a side it opens from, a hasp gives it an owner
+   * who locks it, and a lever says somebody once fitted a proper lock.
    *
-   * `depth` is how far back in the reveal the leaf hangs, so the hardware lands
-   * on the door rather than floating in front of the wall.
+   * `depth` is where the leaf's face is, from `front`, so the hardware lands on
+   * the door rather than floating in front of the wall. `style` is the leaf's
+   * (`DS`), because what is screwed to a door depends on what the door is:
+   * strap hinges across a boarded or ledged leaf, butts on a framed one; a
+   * lever on a long plate on the sheet, boarded and panelled ones (0:24's
+   * yellow and blue, 0:34's greens, 2:12), a turned knob on the old ledged one
+   * (1:00). `-2` is the special kabina, which has no leaf at all: it keeps the
+   * two pintles its leaf hung on and the staple its lock went through.
    *
    * `key` is the bay's own index. Pass it and the door gets a padlock; leave it
-   * out and it does not, which is how the one hut you can walk into keeps its
-   * hasp without a lock hanging on a doorway that has no leaf in it.
+   * out and it does not, which is how an open leaf keeps its hasp without a
+   * lock hanging on a door that is standing open.
+   *
+   * Every piece is round where it is round now — knuckle, pin, staple,
+   * shackle, rose, lever, knob — and mounted INTO whatever it is on, never on
+   * its face: a plate whose back is exactly the stile's face is two coplanar
+   * quads 2 km from the origin (rule 5).
    */
   // Brass and satin steel, near enough half and half over the frames that show
   // a lock at all. Kept out here because `doorKit` runs once a bay.
@@ -3245,57 +3737,115 @@ async function buildJadrija(scene) {
   // hangs on is a wider hasp.
   const LOCKB = [[0.360, 0.298, 0.148], [0.445, 0.450, 0.458]];
   const SHACK = [0.400, 0.408, 0.416];
-  function doorKit(dc, front, floor, half, depth, key, hand = 1) {
-    const IRON = [0.190, 0.178, 0.166];
-    const f = front + depth;
-    // `hand` mirrors the lot, for the leaves `openDoor` folds back the other
-    // way along the row: the hinges belong on the stile nearest the opening
-    // whichever side of it the leaf came to rest. `boxTS` wants its t range in
-    // order and a mirrored offset arrives out of order, which is what `T` is
-    // for and why these are not four literals any more.
-    const T = (d0, d1) => [Math.min(dc + hand * d0, dc + hand * d1),
-      Math.max(dc + hand * d0, dc + hand * d1)];
-    for (const y of [floor + 0.42, floor + 1.62]) {
-      const [g0, g1] = T(-half + 0.03, -half + 0.20);
-      boxTS(g0, g1, f - 0.021, f - 0.004, y, y + 0.075, IRON);
+  // A lever's metal: satin aluminium, or brass gone brown.
+  const LEVERC = [[0.500, 0.502, 0.498], [0.400, 0.330, 0.170]];
+  /** A lever handle on a long backplate at (x, y), the plate's back at `zb`. */
+  function lever(F, x, y, zb, col) {
+    const zp = zb - 0.007;
+    cbox(F, x - 0.021, x + 0.021, y - 0.125, y + 0.085, zp, zb + 0.002, 0.003,
+      col, shade(col, 1.12), 15);
+    outward(F, x, y, zp, [[-0.002, 0.012], [0.006, 0.012], [0.010, 0.0085],
+      [0.020, 0.0075]], col, 8);
+    // Out of the rose and turned toward the hinges, the end dropped a little.
+    F.tube([F.T(x, zp - 0.018, y), F.T(x - 0.004, zp - 0.028, y),
+      F.T(x - 0.020, zp - 0.034, y), F.T(x - 0.070, zp - 0.036, y),
+      F.T(x - 0.121, zp - 0.033, y - 0.004)], 0.0065, col, 6, [0, 0, 1]);
+    const KH = [0.030, 0.028, 0.026];
+    vquad(F.P(x - 0.004, zp - 0.002, y - 0.100), F.P(x + 0.004, zp - 0.002, y - 0.100),
+      F.P(x + 0.004, zp - 0.002, y - 0.078), F.P(x - 0.004, zp - 0.002, y - 0.078),
+      KH, KH, KH, KH);
+  }
+  function doorKit(dc, front, floor, half, depth, key, hand = 1, style = -1) {
+    const F = jFrame(dc, front, floor, hand);
+    const IRON = [0.150, 0.141, 0.132];
+    const zf = depth;
+    const bare = style === -2;
+    // The face the kit is screwed to: the stiles, the sheet's folded edge, the
+    // boards of a ledged door.
+    const zk = bare ? zf : style === DS.SHEET || style === DS.LEDGE ? zf - 0.006
+      : zf - 0.008;
+    const strap = style === DS.BOARD || style === DS.LEDGE;
+    for (const y of [0.42, 1.62]) {
+      if (bare) {
+        // The pintle: a plate let into the jamb with the pin standing up out
+        // of it, the half of a hinge that stays when the leaf comes off.
+        cbox(F, -half - 0.004, -half + 0.014, y + 0.010, y + 0.070, zf - 0.030,
+          zf - 0.004, 0.002, IRON, null, 15);
+        upright(F, -half + 0.009, zf - 0.017, [[y + 0.068, 0.0055], [y + 0.104, 0.0055],
+          [y + 0.107, 0]], IRON, 6);
+        continue;
+      }
+      // The knuckle, at the leaf's hanging edge, with its pin's head standing
+      // proud of the top.
+      upright(F, -half - 0.006, zk - 0.004, [[y - 0.004, 0], [y - 0.004, 0.0105],
+        [y + 0.084, 0.0105], [y + 0.084, 0.006], [y + 0.096, 0.006], [y + 0.099, 0]],
+      IRON, 8);
+      if (strap) {
+        // A strap, tapering to a rounded tongue, three bolts through it.
+        const L = 0.29 + 0.06 * jit(Math.round(dc * 10) + y * 7, 966);
+        plate(F, [[-half, y + 0.004], [-half + L, y + 0.021], [-half + L + 0.019, y + 0.033],
+          [-half + L, y + 0.045], [-half, y + 0.062]], zk - 0.005, zk + 0.004, IRON);
+        for (const bx of [0.045, 0.14, L - 0.02]) {
+          stud(F, -half + bx, y + 0.033, zk - 0.005, 0.0055, shade(IRON, 1.25));
+        }
+      } else {
+        // A butt's leaf, the one that shows, on the stile.
+        cbox(F, -half - 0.002, -half + 0.036, y, y + 0.082, zk - 0.0045, zk + 0.004,
+          0.0015, IRON, shade(IRON, 1.3), 15);
+      }
     }
-    // Hasp and staple on the swinging side, at the height a hand finds it.
-    const [p0, p1] = T(half - 0.20, half - 0.05);
-    boxTS(p0, p1, f - 0.024, f - 0.004, floor + 1.00, floor + 1.07, IRON);
-    const [q0, q1] = T(half - 0.13, half - 0.09);
-    boxTS(q0, q1, f - 0.061, f - 0.022, floor + 0.99, floor + 1.09, IRON);
+    if (bare) {
+      // And the staple, on the other jamb, with nothing through it.
+      F.tube([F.T(half + 0.002, zf - 0.015, 0.99), F.T(half - 0.018, zf - 0.015, 0.99),
+        F.T(half - 0.025, zf - 0.015, 1.01), F.T(half - 0.018, zf - 0.015, 1.03),
+        F.T(half + 0.002, zf - 0.015, 1.03)], 0.0035, IRON, 6, [0, 1, 0]);
+      return;
+    }
+    const hk = key ?? Math.round(dc * 10);
+    const lev = (style === DS.SHEET || style === DS.PANEL || style === DS.BOARD)
+      && jit(hk, 964) < 0.72;
+    if (lev) lever(F, half - 0.062, 1.02, zk, LEVERC[jit(hk, 965) < 0.62 ? 0 : 1]);
+    if (style === DS.LEDGE) {
+      outward(F, half - 0.080, 1.02, zk + 0.002, [[0, 0.006], [0.012, 0.006],
+        [0.016, 0.014], [0.025, 0.016], [0.031, 0.011], [0.034, 0]], [0.300, 0.262, 0.170], 8);
+    }
+    // Hasp and staple on the swinging side, at the height a hand finds it —
+    // or above the lever where there is one. The hasp is a slotted strap
+    // hinged on a little knuckle, lying over the staple; the staple is a loop
+    // standing out through its slot.
+    const hy = lev ? 1.24 : 1.00;
+    const hx0 = half - 0.215, sx = half - 0.105;
+    spinIn((u, v, w) => F.P(w, zk - 0.007 + u, hy + 0.030 + v),
+      [[hx0 - 0.004, 0], [hx0 - 0.004, 0.0065], [hx0 + 0.030, 0.0065], [hx0 + 0.030, 0]],
+      IRON, 6, [1, 1], 0.14, 0.3);
+    plate(F, [[hx0 + 0.030, hy + 0.012], [half - 0.058, hy + 0.012], [half - 0.045, hy + 0.030],
+      [half - 0.058, hy + 0.048], [hx0 + 0.030, hy + 0.048]], zk - 0.011, zk + 0.002, IRON);
+    F.tube([F.T(sx, zk + 0.002, hy + 0.016), F.T(sx, zk - 0.020, hy + 0.016),
+      F.T(sx, zk - 0.028, hy + 0.030), F.T(sx, zk - 0.020, hy + 0.044),
+      F.T(sx, zk + 0.002, hy + 0.044)], 0.0035, IRON, 6, [1, 0, 0]);
     // ── AND THE LOCK THAT GOES THROUGH IT ────────────────────────────────────
     //
-    // The hasp and the staple were drawn and the padlock never was, which is a
-    // hasp standing open on eighty shut huts: the fitting whose entire purpose
-    // is to hold a lock, holding nothing. f42 has the real one — a body hanging
-    // BELOW the staple with the shackle up through it, so what reads at two
-    // metres is not the ironmongery on the leaf but a small bright block
-    // floating clear of it against the dark of the reveal.
+    // f42 has the real one — a body hanging BELOW the staple with the shackle
+    // up through it, so what reads at two metres is not the ironmongery on the
+    // leaf but a small bright block floating clear of it against the dark of
+    // the reveal. 52 by 64 by 22 mm: a 40 mm padlock is what is actually on
+    // these doors, and this is drawn at the big end of the range on purpose,
+    // because below about 45 mm the body is under a pixel across at two metres.
     //
-    // 54 by 68 by 24 mm. A 40 mm padlock is what is actually on these doors and
-    // at 54 mm this is drawn at the big end of the range on purpose: below about
-    // 45 mm the body is under a pixel across at two metres and all the shape
-    // buys you is a darker speck on the hasp.
+    // The shackle is a round U in the plane of the door, threaded through the
+    // staple's loop — which is the whole of what makes it read as locked.
     if (key === undefined) return;
     // One shut door in eight has none — an owner who took his lock away with
     // him. Off `jit` and the bay index, so it is fixed for the life of the seed
     // and costs the beach no draw of `rng`.
     if (jit(key, 918) < 0.13) return;
-    const px = dc + hand * (half - 0.110);   // the staple's own centre
-    const py = floor + 0.898;
     const body = LOCKB[jit(key, 917) < 0.5 ? 0 : 1];
-    boxTS(px - 0.027, px + 0.027, f - 0.072, f - 0.048, py, py + 0.068,
-      body, shade(body, 1.14));
-    // The shackle, 6 mm clear of the staple's face so it reads as passing in
-    // front of it rather than being swallowed by it — the staple here is one
-    // solid box and a shackle drawn inside its span would simply vanish.
-    for (const o of [-1, 1]) {
-      boxTS(px + o * 0.018 - 0.006, px + o * 0.018 + 0.006, f - 0.068, f - 0.054,
-        py + 0.058, py + 0.154, SHACK);
-    }
-    boxTS(px - 0.024, px + 0.024, f - 0.068, f - 0.054,
-      py + 0.142, py + 0.154, SHACK);
+    const py = hy - 0.018, sz = zk - 0.016;
+    F.tube([[-0.015, py], [-0.015, hy + 0.012], [-0.011, hy + 0.026], [0, hy + 0.032],
+      [0.011, hy + 0.026], [0.015, hy + 0.012], [0.015, py]].map(([x, y]) =>
+      F.T(sx + x, sz, y)), 0.0042, SHACK, 6, [0, 1, 0]);
+    cbox(F, sx - 0.026, sx + 0.026, py - 0.064, py, zk - 0.027, zk - 0.005, 0.005,
+      body, shade(body, 1.15), 15);
   }
 
   /**
@@ -3693,6 +4243,11 @@ async function buildJadrija(scene) {
       const railCol = steel ? shade(OXIDE, 0.86)
         : pvc ? [0.605, 0.608, 0.608] : shade(col, 0.86);
       const trimCol = steel ? OXIDE : pvc ? [0.640, 0.642, 0.642] : col;
+      // The leaf's style (`DS`), dealt off the same wear key and the same
+      // louvred-or-planked split the leaves always had, so an open bay's
+      // folded leaf and a shut one are dealt alike.
+      const lv = (k * 5 + (t0 | 0)) % 3 !== 0, wk = k * 31 + (t0 | 0) * 7;
+      const ds = doorStyle(wk, lv);
       if (steel) {
         steelDoor(dc, front, fl, key);
       } else if (oIx === 0) {
@@ -3702,29 +4257,33 @@ async function buildJadrija(scene) {
         // style and the wear key are the same expressions the shut doors below
         // use, so an open bay's leaf is dealt out of the bay index exactly as
         // its neighbours' are — see `openDoor`.
-        openDoor(dc, front, fl, col, (k * 3 + (t0 | 0)) % 4,
-          k * 31 + (t0 | 0) * 7, (k * 5 + (t0 | 0)) % 3 !== 0,
-          k < n - 1 ? 1 : -1);
+        // What hangs in it is dealt off `jit` now. It was `(k * 3 + t0) % 4`,
+        // and an open bay is one where `(k * 7 + t0 * 3) % 6` is nought, which
+        // forces `k + t0` even and so the kind even: every open door on the
+        // beach had ribbons or a blind in it, and the cloth and the striped
+        // cotton — 0:24's maroon one, 1:36's grey sheet — were never drawn.
+        openDoor(dc, front, fl, col, Math.floor(jit(wk, 990) * 4), wk, lv,
+          k < n - 1 ? 1 : -1, ds);
       } else if (pvc) {
         // A PVC bay has no hasp: the whole of the improvement is that somebody
         // replaced the joinery, and a painted hasp on a PVC leaf would undo it.
-        // The lever and the euro cylinder are on the leaf, in `pvcDoor`.
-        pvcDoor(dc, front, fl);
+        // The lever and its lock are on the leaf, in `pvcDoor`.
+        pvcDoor(dc, front, fl, key);
       } else {
-        door(dc, front, fl, col, (k * 5 + (t0 | 0)) % 3 !== 0,
-          k * 31 + (t0 | 0) * 7);
-        doorKit(dc, front, fl, DOORW * 0.5, 0.045, key);
+        door(dc, front, fl, col, lv, wk, undefined, 1, ds);
+        doorKit(dc, front, fl, LEAFH, LEAFZ, key, 1, ds);
       }
       // The rail between the door head and the vent, filling the last of the
       // opening. Painted with the door, because it was — and when the door came
       // out in favour of PVC the frame went with it, which is why this follows
       // `pvc` and not `stone`. f24 is the clearest: a peach wall, a grey lintel
       // and every millimetre of joinery in it white.
-      boxTS(dc - DOORW * 0.5, dc + DOORW * 0.5, front + 0.010, front + REVEAL,
-        fl + DOORH, fl + OPENH - VENTH, railCol);
+      // Between the linings, chamfered, its soffit over the leaf's head.
+      cbox(jFrame(dc, front, fl), -DOORW * 0.5 + LIN, DOORW * 0.5 - LIN, DOORH,
+        OPENH - VENTH, 0.012, REVEAL, 0.006, railCol, shade(railCol, 1.08), 5);
       vent(dc, front, fl + OPENH - VENTH, DOORW - 0.06, trimCol,
-        (k * 5 + (t0 | 0) * 3) % 3);
-      surround(dc, front, fl, trimCol, DOORW * 0.5, fl + OPENH + 0.045);
+        (k * 5 + (t0 | 0) * 3) % 3, key);
+      surround(dc, front, fl, trimCol, DOORW * 0.5, fl + OPENH + 0.045, key);
       // And a line of washing across one shut bay in nine.
       if (oIx !== 0 && (k * 4 + (t0 | 0)) % 9 === 0) {
         clothesline(a, c, front, fl, k + (t0 | 0));
@@ -4047,7 +4606,7 @@ async function buildJadrija(scene) {
       plaster(a + i * JAD.cabW, front, floor, eave, wash, i * 3 + (a | 0), dc, dj);
     }
     b = up;
-    doorKit(dc, front, floor, dj, 0.040);
+    doorKit(dc, front, floor, dj, 0.040, undefined, 1, -2);
     vent(dc, front, floor + 2.10, KAB.door * 0.62, col);
     surround(dc, front, floor, col, dj, floor + 2.38);
 

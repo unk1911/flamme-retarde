@@ -8,6 +8,61 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.10] — 2026-09-30
+
+### The kabine doors, built: five kinds of door, real ironmongery, a frame with depth
+
+Misha, over a screenshot of the row: *"spruce up by adding more polygons to
+the kabine-doors ... i feel like they could look higher-resolution/better"*.
+Every door was a stack of flat `boxTS` slabs — twelve flat slats or five flat
+boards, black rectangles for hinges, a 6 mm band of paint for a frame, three
+bars in the transom — which from the promenade is a row of stickers with
+horizontal banding. Set beside `1000150414` (0:20–0:40 for the rows, 1:00,
+1:08, 1:36–1:44 and 2:04–2:28 close), a door here is one of five things:
+
+- **Five styles** (`doorStyle`, off the old louvred/planked split plus `jit`,
+  no `rng`): **louvred** — thirty-odd blades tipped to shed rain, each a nose
+  and a rising top shaded dark under the next nose; **boarded** — stiles,
+  three rails and tongue-and-groove boards with a V at every joint and grain
+  down each board; **sheet** — a steel sheet on a folded angle frame,
+  oil-canned, riveted, sometimes with pressed ribs; **panelled** — six raised
+  fields with 28 mm bevels, a muntin and three rails; **ledged** — four or
+  five boards of uneven width with gaps, rotted short at the foot, a head and
+  foot rail clench-nailed across, paint gone to grey timber at the arrises.
+- **Paint wear**: every member chamfered, with the chamfers mixed toward
+  primer (or timber) by how far the door has gone; chips now sit 2.5 mm proud
+  of the member they are on (they were coplanar with it) and the bigger ones
+  carry a hairline lip of shadow along their top edge.
+- **Ironmongery** (`doorKit`): round knuckles with pin heads; tapered strap
+  hinges with three bolts on boarded and ledged leaves, butt leaves on the
+  rest; a hasp on its own knuckle over a round staple; the padlock's shackle a
+  round U threaded through the staple; a lever on a long backplate with a
+  keyhole on most sheet, boarded and panelled doors; a turned knob on the
+  ledged ones. The special kabina keeps its two pintles and its staple.
+- **Frame**: a 58 mm chamfered casing 19 mm proud (was a 6 mm paint band),
+  jamb linings down the reveal, a concrete sill the leaf closes onto, and a
+  chamfered transom rail.
+- **Transom**: a chamfered frame with a prouder sill; round bars (three to
+  five, sometimes a flat tie), a glazed light in a bead with sky in its top
+  and grime at its foot or painted over, or real wire — a 20 mm square mesh
+  or a 50 mm diamond — in front of a dark void, low contrast so it hazes.
+- **Open doors**: the folded leaf is the same built door; the curtain hangs
+  on a rod — cloth in folds that deepen to a crooked hem, darker in the
+  valleys, sometimes pushed along the rod; ribbons each on their own with a
+  sway and a twist and the dark showing between; the blind in round canes on
+  two cords. The kind is now dealt off `jit`: `(k * 3 + t0) % 4` on an open
+  bay was always even, so the cloth and striped curtains were never drawn.
+- **PVC**: rounded leaf, bevelled fields, three barrel hinges, a lever.
+- Every door is laid on a **rigid frame** (`jFrame`), the chord of its own
+  opening: through `W` piece by piece the sheet followed a shore-station kink
+  while the leaf's body, one chord, stood out through it.
+- `tubeTS` takes an optional mapping (default `W`), so tubes can be drawn in
+  a door's own frame.
+
+jadrija.tris 982,744 -> 1,036,301 (+53,557, about 460 a bay over 115 bays;
+one buffer, no new draw calls). Blockers 786, people 100, no console errors;
+the special kabina walked into from `standOut` and by the `8` skip, both
+landing `inRoom` exactly as before.
 ## [1.550.9] — 2026-09-30
 
 ### The benches, spruced up, and the half-bench at the kabine gable gone
