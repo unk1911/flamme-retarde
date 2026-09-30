@@ -539,6 +539,30 @@ const U = {
   // and the branch is on a uniform so the whole warp takes it together. See
   // the three modes in 06-shadow.js.
   uShadowOn: { value: new THREE.Vector2(1, 1) },
+  // ── the lights in a room (1.552.1) ──
+  // The kabina's big room has three sources of its own — the pendant over the
+  // tabouret (a spot, straight down, with a shadow map of its own), a candle
+  // on the shelf and the glow off the television — and a box they are
+  // confined to, so a light in a hut does not come out through its walls.
+  // `uRoomOn` is 0 everywhere else and every surface skips the lot on one
+  // uniform branch. See `roomLights` in 30-material.js and `lamp` in
+  // 06-shadow.js.
+  uRoomOn: { value: 0 },
+  uRoomC: { value: new THREE.Vector3() },
+  // The room's own axes in world x and z: (t.x, t.z, s.x, s.z).
+  uRoomAx: { value: new THREE.Vector4(1, 0, 0, 1) },
+  // Half the room along t and s, its height, and what the daylight that
+  // gets in here is scaled by.
+  uRoomH: { value: new THREE.Vector4(1, 1, 3, 1) },
+  uRoomFill: { value: new THREE.Color(0, 0, 0) },
+  uLampP: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
+  uLampC: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
+  uLampD: { value: new THREE.Vector4(0, 0, 1, 0) },
+  uShelf: { value: new THREE.Vector4() },
+  uShelfY: { value: 0 },
+  uLampMap: { value: null },
+  uLampMat: { value: new THREE.Matrix4() },
+  uLampNF: { value: new THREE.Vector3(0.05, 9, 1 / 1024) },
   // The needle floor at Jadrija: (centre x, centre z, half-length along the
   // shore, half-width across it), and the shore's own direction as (cos, sin).
   // Written once by 43-jadrija.js when the locale is built; zero until then,
@@ -575,6 +599,13 @@ const shareShadow = () => ({
   uShadowMap: U.uShadowMap, uShadowMat: U.uShadowMat, uShadowTexel: U.uShadowTexel,
   uShadowMapN: U.uShadowMapN, uShadowMatN: U.uShadowMatN,
   uShadowTexelN: U.uShadowTexelN, uShadowOn: U.uShadowOn,
+});
+/** The room lights, for `solidMaterial` — see `uRoomOn`. */
+const shareRoom = () => ({
+  uRoomOn: U.uRoomOn, uRoomC: U.uRoomC, uRoomAx: U.uRoomAx, uRoomH: U.uRoomH,
+  uRoomFill: U.uRoomFill, uLampP: U.uLampP, uLampC: U.uLampC, uLampD: U.uLampD,
+  uShelf: U.uShelf, uShelfY: U.uShelfY, uLampMap: U.uLampMap, uLampMat: U.uLampMat,
+  uLampNF: U.uLampNF,
 });
 
 // -------------------------------------------------------------- game state ---

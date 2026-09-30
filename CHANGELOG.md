@@ -8,6 +8,117 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.552.2] — 2026-09-30
+
+### The kabina, dressed and lit: no weeds, a real television, a shelf with things on it, and a lamp that throws a shadow
+
+Misha, with a screenshot of the inside of the kabina: *"fix up / remove the
+grass that somehow landed inside the kabine, and while u at it, also make the
+objects like the shelf with whatever is on that shelf, and perhaps the TV
+stand and what not, give it higher polygon count and shadows so the inside
+looks more immersive/atmospheric"*.
+
+**Why there was grass in the room.** The room you walk into is not the hut
+you see from outside. It is the old room scaled by √2 about the doorway
+(`KAB.grow`, 1.513.0), 5.80 by 7.35 m, and swapped in at the bottom of the
+door's dip. Its back two metres stand in the alley behind the row. The verge
+(1.546.0) places plants off a grid of what is on the ground from outside: the
+ground buffers, the blockers and the rocks. The big room is on none of those,
+because it only exists while you are in it. To the verge, that part of the
+floor was the alley: open ground at the foot of a wall, where a verge is
+thickest. Thirty-three plants were under its tiles, and the oats and wild
+fennel were tall enough to come up through them.
+
+- **The fix is a hole in what is drawn, not in the grid.** `floraVerge` takes
+  a `hole(x, z)` and skips those plants when it lays out the layers.
+  43-jadrija.js answers the hole with the big room's box plus a wall's width,
+  and only while the big room is the one drawn (`vergeHole`, `refresh()` on
+  the swap). Nothing is re-seeded and no `rng` draw moves (rule 4).
+- Marking the room as made ground would have stripped the alley for the
+  whole of the game you spend outside. It is unchanged: the same plant counts
+  per species before and after, and screenshots of the alley from both ends
+  match.
+- The vikendica never had the leak, because its plot is made ground in the
+  grid. Checked, and it is clean.
+
+**The television**, which was a box on a box with its bezel, knobs and
+grille printed on a flat card:
+- a walnut cabinet lofted from rounded sections, deep at the front and
+  tapering to the hood the tube's neck lives in;
+- a cream bezel rolled over the glass and down a throat behind it;
+- glass that bulges on a 1.2 m sphere. The canvas still paints the whole
+  card, the glass takes only the tube out of it, and the live Coinbase price
+  and the channel knob are untouched;
+- two turned knobs with brass skirts and a pointer, and a grille of
+  thirteen brass slats over dark cloth;
+- four turned feet, and rabbit ears on a bakelite base with chrome ball
+  joints, each rod in three telescoped sections with collars and a ball tip.
+
+**Its stand** is a small table now:
+- a top with a rounded edge, an apron, turned and splayed legs, and a
+  shelf underneath with a stack of old magazines on it;
+- a scalloped crocheted doily under the set, with two rings of open work.
+
+**The shelf** was a plank on two blocks with a canvas bag on it, and the
+plank stood 0.26 m *off* the wall it was meant to be fixed to (the
+small-room offset, never rescaled). It is now on the boards:
+- a plank with a rolled front edge on two cut, scooped brackets;
+- two folded towels, the top one askew;
+- sun cream stood on its cap;
+- a lit candle on a brass dish, with wax runs;
+- a framed photograph of the bay leaning on the wall;
+- a copper džezva, tinned inside, with its long handle, and two cups on
+  saucers (the tableware builders' `twCup` and `twSaucer`);
+- a top shell with its spiral, and a ribbed scallop.
+
+**And the rest of the room:**
+- The striped towel on the east wall was four boxes. It is a draped cloth
+  now, gathered on a brass hook, with folds and a hem that waves.
+- A straw hat hangs on a second hook beside it.
+- The door mat was a slab at the tiles' own height and shimmered with them.
+  It is a striped rag rug with a fringe at each end, held clear of the tiles.
+- A pair of flip-flops sits by the rug, one tipped on its side.
+- The radio table has turned legs and a rounded top. The set has rounded
+  corners, a bent-bar carry handle and a telescopic aerial, and its dial
+  panel stands 3 mm proud of the face instead of 0.5 mm.
+- The pendant shade is a 32-sided spun cone with a rolled rim. It has a lamp
+  holder and a lit bulb, and its enamel inside glows.
+
+**The light.** The room was lit by the daylight ambient, a flat 0.22 of
+bounce on every board, and an exposure pulled down to make it dark. It came
+out the same dim olive in every corner. It now has three lights of its own
+(`GLSL_ROOM` in 30-material.js), confined to the big room's box, so nothing
+comes out through its walls:
+- **The pendant over the tabouret.** A warm spot straight down, cut off
+  softly where the shade stops it, with **its own shadow map** (06-shadow.js
+  `lampAdd`/`lampRender`). The map is drawn from the bulb at 1024² over 128°,
+  from the room's buffer and from Baye, only while the room is lit. The
+  receiver uses a normal offset and a comparison in metres, and 4×4 PCF for
+  a bulb's penumbra. The tabouret, the glass and Baye all cast. v2.0 still
+  casts no sun shadow: her proxy goes into the lamp's map only.
+- **The candle on the shelf.** It flickers. Its only shadow that matters is
+  the plank it stands on, and that is solved analytically as a rectangle.
+- **The glow off the tube.** Green with a price, grey and flickering with
+  snow, and only in front of the screen.
+
+Inside the box, the daylight that gets in is cut to 0.60 and the flat bounce
+with it, and a warm fill stands in for the light off the walls. Every
+`solidMaterial` gets the lights (Baye too), behind one uniform branch that
+is off everywhere else.
+
+**Measured.**
+- The room's buffer went from 4,352 to 23,060 triangles. With the glass,
+  bulb, shade and flame meshes that is about +20k in all.
+  `jadrija.tris` is unchanged at 1,098,387, because the big room is its own
+  buffer.
+- Frame time inside the kabina (rAF to GPU completion, forced with a
+  `readPixels`, RTX 4090 laptop, 1280×720): 27.7 → 27.9 ms p50 facing the
+  TV wall, 27.8 → 28.2 to 29.7 facing the cot, which is inside the run-to-run
+  noise. 60 fps both ways.
+- People 100, blockers 785, no console errors. Key 8 in, the lights off
+  again outside and back on at the next 8. The Lovense spot on the tabouret
+  is unmoved.
+
 ## [1.552.1] — 2026-09-30
 
 ### The belt, heard: his unbuckle, his crack, and her gasps
