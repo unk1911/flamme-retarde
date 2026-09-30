@@ -114,6 +114,11 @@ after its index runs, every other byte where it was. The layout is over
 `MORPH_STEP` below and the why in tools/face_morphs.py. `save_skin(...,
 morph=)` writes one; `strip_morphs` gives back the exact v9; `unpack_skin`
 strips it on the way, so the tools that parse skins do not need to know.
+
+1.551.1 changed no byte of the layout. The bathers' blobs carry eleven
+targets now (the blink's in-betweens) and different geometry round the eyes
+and in the mouth (tools/face_parts.py), written through the same
+`pack_skin` / `add_morphs` path; the reader takes any number of targets.
 """
 
 import gzip, io, struct, sys

@@ -66,3 +66,17 @@ not are both in the table above:
 | one-piece (dyed red at runtime) | mindfront_f_one-piece_swimsuit_01 | CC-BY 4.0 | Mindfront |
 | brows | mindfront_eyebrows_09 | CC0 | Mindfront |
 | lashes | mindfront_eyelashes_04 | CC0 | Mindfront |
+
+## Faces: lids, teeth and tongue (1.551.1)
+
+Every bather's lids are MakeHuman's own base-mesh faces round the eye, and its
+teeth, gums and tongue are MakeHuman's system proxies, cut and collapsed by
+`tools/blender/teeth_lo.py` into `tools/face/mouth_lo.obj` and fitted to each
+body through their `.mhclo` by `tools/face_parts.py`.
+
+| part | asset | licence | author |
+| --- | --- | --- | --- |
+| lids | the hm08 base mesh | CC0 | makehuman_system |
+| teeth and gums | teeth_base | CC0 | makehuman_system (Data Collection AB, Joel Palmius, Jonas Hauquier) |
+| tongue | tongue01 | CC0 | makehuman_system (Data Collection AB, Joel Palmius, Jonas Hauquier) |
+| expressions | default skeleton, default_weights.mhw, face-poseunits | CC0 | makehuman_system |

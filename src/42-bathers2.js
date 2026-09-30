@@ -49,6 +49,64 @@ function bather2Tex(key) {
 }
 
 /**
+ * The lash line and the socket (1.551.1), off PAYLOAD.bather2_face — written
+ * by tools/face_parts.py from MakeHuman's lid margin, which is one edge loop
+ * in the UV layout every bather shares. The margin loops are drawn once into
+ * a small mask over their UV box, upper lid dark and lower lid lighter, and
+ * the skin shader darkens by it: the line a shut eye is, and the lashes
+ * along an open one. `socket` is the UV box of the fold behind the lids, its
+ * own island in MakeHuman's map, which in a renderer with no occlusion was
+ * lit like a cheek and showed as a bright rim between two shut lids.
+ */
+let BATHER2_LASH = null;
+function bather2Lash() {
+  if (BATHER2_LASH) return BATHER2_LASH;
+  const F = typeof PAYLOAD !== 'undefined' ? PAYLOAD.bather2_face : null;
+  const far = new THREE.Vector4(9, 9, 9, 9);
+  BATHER2_LASH = { tex: null, box: new THREE.Vector4(9, 9, 1e-3, 1e-3), s0: far, s1: far.clone() };
+  if (!F || typeof document === 'undefined') return BATHER2_LASH;
+  const L = FACE2.lash;
+  const pts = F.lash.flat();
+  const pad = 0.004;
+  const u0 = Math.min(...pts.map((p) => p[0])) - pad, u1 = Math.max(...pts.map((p) => p[0])) + pad;
+  const v0 = Math.min(...pts.map((p) => p[1])) - pad, v1 = Math.max(...pts.map((p) => p[1])) + pad;
+  const W = 128, H = 512;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, W, H);
+  g.filter = 'blur(' + L.blur + 'px)';
+  g.lineCap = 'round';
+  const X = (u) => (u - u0) / (u1 - u0) * W, Y = (v) => (1 - (v - v0) / (v1 - v0)) * H;
+  const perUv = H / (v1 - v0);
+  for (const loop of F.lash) {
+    for (let k = 0; k < loop.length; k++) {
+      const a = loop[k], b = loop[(k + 1) % loop.length];
+      const up = Math.min(a[2], b[2]) >= 1;
+      g.strokeStyle = 'rgb(' + Math.round(255 * (up ? 1 : L.low)) + ',0,0)';
+      g.lineWidth = Math.max(1, (up ? L.wUp : L.wLow) * perUv);
+      g.beginPath();
+      g.moveTo(X(a[0]), Y(a[1]));
+      g.lineTo(X(b[0]), Y(b[1]));
+      g.stroke();
+    }
+  }
+  const t = new THREE.CanvasTexture(cv);
+  // A mask, not a colour: no sRGB decode on it (see the note on canvas
+  // textures in 41-skin.js), and no mips — it is sampled inside a branch.
+  t.colorSpace = THREE.NoColorSpace;
+  t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+  t.needsUpdate = true;
+  BATHER2_LASH.tex = t;
+  BATHER2_LASH.box.set(u0, v0, u1 - u0, v1 - v0);
+  BATHER2_LASH.s0 = new THREE.Vector4(...F.socket[0]);
+  BATHER2_LASH.s1 = new THREE.Vector4(...F.socket[1]);
+  return BATHER2_LASH;
+}
+
+/**
  * The palettes a figure is dressed from when nobody has said who it is — a
  * rider, a passenger, a figure on its first frame. The crowd re-dresses every
  * figure as the person it is drawing the moment it draws them.
@@ -189,6 +247,44 @@ function bather2Thin(data) {
 }
 
 /**
+ * Where the skin creases and rubs, 0 to 1 a vertex, for the skin's warmth
+ * (`SKIN.warm`, 1.551.1): the shoulders, elbows, knees and knuckles — the
+ * vertices a joint's two bones share, most where they share it evenly.
+ * Measured once per blob off its own weights and set on the geometry as
+ * `aWarm`; nothing of it is in the file.
+ */
+function bather2Warm(data) {
+  const g = data.geo;
+  if (g.getAttribute('aWarm')) return;
+  const bi = g.getAttribute('aBoneIdx'), bw = g.getAttribute('aBoneWt');
+  const B = (n) => data.bones.findIndex((b) => b.name === n);
+  const pairs = [];
+  for (const s of ['L', 'R']) {
+    pairs.push([B('clavicle' + s), B('armU' + s), 0.8], [B('armU' + s), B('armL' + s), 1],
+      [B('legU' + s), B('legL' + s), 1], [B('hand' + s), B('fingers' + s), 1],
+      [B('hand' + s), B('thumb' + s), 0.7]);
+  }
+  const sc = bi.normalized ? 255 : 1, sw = bw.normalized ? 1 : 1 / 255;
+  const out = new Float32Array(bi.count);
+  const get = (a, i, k) => (k === 0 ? a.getX(i) : k === 1 ? a.getY(i) : k === 2 ? a.getZ(i) : a.getW(i));
+  const wOf = (i, b) => {
+    let w = 0;
+    for (let k = 0; k < 4; k++) if (Math.round(get(bi, i, k) * sc) === b) w += get(bw, i, k) * sw;
+    return w;
+  };
+  for (let i = 0; i < bi.count; i++) {
+    let m = 0;
+    for (const [a, b, k] of pairs) {
+      if (a < 0 || b < 0) continue;
+      const wa = wOf(i, a), wb = wOf(i, b);
+      if (wa > 0 && wb > 0) m = Math.max(m, Math.min(1, 4 * wa * wb) * k);
+    }
+    out[i] = m;
+  }
+  g.setAttribute('aWarm', new THREE.BufferAttribute(out, 1));
+}
+
+/**
  * Where this blob's swimsuit top is, measured once per blob: `[tiles, hasTop,
  * cutY, backX]` for the `wear` shader's `uTopCut`.
  *
@@ -251,6 +347,8 @@ function bather2Figure(data, kind) {
   const eyes = bather2Eyes(data);
   const mouth = bather2Mouth(data);
   const thin = bather2Thin(data);
+  const lashM = bather2Lash();
+  bather2Warm(data);
   // How wet this person is, 0 to 1 — hosed, dunked, drying off. Written by
   // `bather2Face` below.
   const wetU = { value: 0 };
@@ -281,11 +379,13 @@ function bather2Figure(data, kind) {
       uSkin: skinU,
       uEyeL: { value: eyes.l }, uEyeR: { value: eyes.r },
       uMouth: { value: mouth },
+      uLash: { value: lashM.tex || skinPoreTex() }, uLashBox: { value: lashM.box },
+      uSock0: { value: lashM.s0 }, uSock1: { value: lashM.s1 },
       uEar: { value: thin.ear }, uThinB: { value: thin.fing },
       ...skinUniforms(wetU),
       ...mU,
     },
-    vdecl: (M ? morphDecl(M.nt) : '') + '\nuniform vec4 uEar;\nuniform vec4 uThinB;\n',
+    vdecl: (M ? morphDecl(M.nt) : '') + '\nuniform vec4 uEar;\nuniform vec4 uThinB;\nattribute float aWarm;\n',
     // vShut: how shut THIS side's lid is, for the eyeball under it (below).
     // The export faces +x, so z is across the face, and MakeHuman's left
     // (shutL) is the blob's negative z — see to_blob in tools/face_morphs.py.
@@ -294,6 +394,7 @@ function bather2Figure(data, kind) {
       : '  vShut = 0.0;\n')
       // The thin parts, for the skin's back light: the fingers and thumbs by
       // bone, the ear by where it is in the bind pose (`bather2Thin`).
+      + '  vWarm = aWarm;\n'
       + '  {\n'
       + '    float tb = floor(aBoneIdx.x * 255.0 + 0.5);\n'
       + '    vec4 td = abs(vec4(tb) - uThinB);\n'
@@ -302,7 +403,7 @@ function bather2Figure(data, kind) {
       + '    vThin = max(fing, 1.0 - smoothstep(uEar.w * 0.45, uEar.w, length(eq)));\n'
       + '  }\n',
     decl: 'uniform sampler2D uSkin;\nuniform vec3 uEyeL;\nuniform vec3 uEyeR;\n'
-      + 'uniform vec3 uMouth;\nvarying float vShut;' + SKIN_DECL,
+      + 'uniform vec3 uMouth;\nvarying float vShut;\nuniform sampler2D uLash;\nuniform vec4 uLashBox;\nuniform vec4 uSock0;\nuniform vec4 uSock1;\nvarying float vWarm;' + SKIN_DECL,
     lit: SKIN_LIT,
     body: SKIN_PREP + `
       // Sampled before the branch and not inside it: a texture read in
@@ -311,21 +412,25 @@ function bather2Figure(data, kind) {
       // the clamped edge, which the branch then throws away.
       vec3 sk = texture2D(uSkin, vUv).rgb;
       if (vUv.x > 4.0) {
-        // The inside of a mouth (bather2Mouth). Teeth across the front,
-        // tongue and throat behind them, and all of it in the shade of the
-        // lips: there is no occlusion in this renderer, so without the
-        // darkening an open mouth faced into the sun lights up like a lamp.
-        // No sky in it either — env 0 — which is what made it lavender.
+        // The inside of a mouth (bather2Mouth). Since 1.551.1 it is
+        // MakeHuman's own teeth, gums and tongue (tools/face_parts.py), and
+        // v says which a fragment is: 0.25 a tooth, 0.5 gum, 0.75 tongue.
+        // All of it in the shade of the lips: there is no occlusion in this
+        // renderer, so without the darkening an open mouth faced into the
+        // sun lights up like a lamp. No sky in it either — env 0 — which is
+        // what made it lavender.
         float dep = uMouth.x - vLocal.x;
-        float bite = abs(vLocal.y - uMouth.y);
-        float tooth = (1.0 - smoothstep(0.007, 0.011, dep))
-          * (1.0 - smoothstep(0.010, 0.014, bite));
         // The teeth warmer and brighter than a tooth is, on purpose: the sun
-        // never reaches them, so what lights them is the sky alone, and under
-        // a blue sky an honest ivory comes out the grey-green of a gum shield.
-        base = mix(vec3(0.42, 0.13, 0.13), vec3(0.92, 0.84, 0.70), tooth);
-        base *= mix(1.0, 0.12, smoothstep(0.004, 0.035, dep));
-        spec = 0.10 * tooth;
+        // seldom reaches them, so what lights them is mostly the sky, and
+        // under a blue sky an honest ivory comes out the grey-green of a gum
+        // shield. At the biting edge, where there is enamel and no dentine
+        // behind it, a tooth is greyer and a little translucent.
+        float edge = 1.0 - smoothstep(0.0012, 0.0040, abs(vLocal.y - uMouth.y));
+        vec3 tooth = mix(vec3(0.93, 0.87, 0.76), vec3(0.70, 0.72, 0.74), 0.5 * edge);
+        base = vUv.y < 0.375 ? tooth
+          : vUv.y < 0.625 ? vec3(0.72, 0.31, 0.32) : vec3(0.64, 0.28, 0.28);
+        base *= mix(1.0, 0.10, smoothstep(0.003, 0.030, dep));
+        spec = vUv.y < 0.375 ? 0.22 : 0.08;
         env = 0.0;
       } else if (vUv.x > 2.0) {
         // The iris, drawn in bind space off the measured eye centre — the
@@ -363,6 +468,26 @@ function bather2Figure(data, kind) {
         float nose = (1.0 - smoothstep(0.18, 0.32, az)) * smoothstep(-0.06, -0.04, q.y)
           * (1.0 - smoothstep(0.0, 0.02, q.y)) * smoothstep(0.0, 0.012, q.x);
         skOil = max(fore, nose);
+        // The detail of the skin, more on the face than on a back
+        // (SKIN.detailBody), and warmer where it creases (bather2Warm) and
+        // on the thin parts the light comes through.
+        skDetail = mix(skDetail, 1.0, 1.0 - smoothstep(0.07, 0.12, length(q)));
+        base *= mix(vec3(1.0), vec3(${SKIN.warm.join(', ')}), clamp(vWarm + 0.5 * vThin, 0.0, 1.0));
+        // The eye (1.551.1, bather2Lash): the fold behind the lids in the
+        // shade the lids and the eyeball would give it, and the lash line
+        // along the margin. Both only near an eye, off the UV that every
+        // bather shares with MakeHuman.
+        if (min(distance(vLocal, uEyeL), distance(vLocal, uEyeR)) < 0.6 * es) {
+          if (vUv.x < 0.2 && ((vUv.x > uSock0.x && vUv.x < uSock0.z && vUv.y > uSock0.y && vUv.y < uSock0.w)
+              || (vUv.x > uSock1.x && vUv.x < uSock1.z && vUv.y > uSock1.y && vUv.y < uSock1.w))) {
+            base *= vec3(0.34, 0.24, 0.22);
+          }
+          vec2 lq = (vUv - uLashBox.xy) / uLashBox.zw;
+          if (lq.x > 0.0 && lq.x < 1.0 && lq.y > 0.0 && lq.y < 1.0) {
+            float la = texture2D(uLash, lq).r * ${FACE2.lash.k.toFixed(2)};
+            base = mix(base, vec3(${FACE2.lash.col.map((c) => c.toFixed(3)).join(', ')}), la);
+          }
+        }
         ${SKIN_ON}
       }
     `,
@@ -491,13 +616,21 @@ const FACE2 = {
   // How fast an expression goes on and comes off, 1/s. A flinch is fast; a
   // scowl fading is slow.
   on: 16, off: 4.5,
+  // The lash line (`bather2Lash`): widths in UV (MakeHuman's face is about
+  // 0.00125 of a unit to the millimetre round the eye, so about 1.3 mm on the
+  // upper lid and 0.9 on the lower), the lower lid's strength, the blur in
+  // mask pixels, and the colour it darkens to.
+  lash: { wUp: 0.0016, wLow: 0.0011, low: 0.6, blur: 1.5, col: [0.045, 0.034, 0.030], k: 0.9 },
   // What each mood is made of, in the nine targets' own terms.
   // No lower lid in it: the upper one is already shut, and raising the lower
   // past it crossed the two into points. `smile` carries the cheeks up.
   // And `wide` no further than 0.45: pulled past about 0.8 the corners of a
   // child's mouth go back behind the ends of her teeth, which then show
   // through the cheek, and at 0.6 with the jaw down a young man's lower
-  // incisors come through his lower lip.
+  // incisors come through his lower lip. With MakeHuman's own teeth in
+  // (1.551.1) it is the same line — past 0.5 the lower lip rolls back over
+  // the lower teeth — so `wideMax` holds it whatever the moods add up to.
+  wideMax: 0.45,
   hose: { shutL: 1, shutR: 1, squint: 0.2, smile: 0.35, scowl: 0.85, wide: 0.45, jaw: 0.35 },
   scowl: { scowl: 0.95, wide: 0.12, squint: 0.25 },
   smile: { smile: 0.85, squint: 0.25 },
@@ -511,6 +644,22 @@ const FACE2 = {
     stand: { squint: 0.35, scowl: 0.08 } },
 };
 let FACE2_T = 0;
+
+/**
+ * The blink's in-betweens (1.551.1; `LID_MID` in tools/face_morphs.py). A lid
+ * closes on an arc and a morph moves in a straight line, so half way down a
+ * linear blink is a couple of millimetres inside the eyeball. `midL`/`midR`
+ * are what the lid really is at half, less half of the whole blink, and they
+ * weigh 4 t (1 - t) of their side's shut: none open, none shut, all at half.
+ * A body baked before them has no `midL`, and this does nothing.
+ */
+function faceMids(m) {
+  const at = m.at;
+  if (at.midL === undefined) return;
+  const k = (x) => { const t = x < 0 ? 0 : x > 1 ? 1 : x; return 4 * t * (1 - t); };
+  m.w[at.midL] = k(m.w[at.shutL]);
+  m.w[at.midR] = k(m.w[at.shutR]);
+}
 
 /**
  * Ask a person's face for something, for `secs`: 'hose', 'scowl', 'talk',
@@ -667,6 +816,8 @@ function bather2Face(f, fg, dt, d2) {
   // close, and a blink in the middle of a squint is still a blink.
   const sh = Math.max(m.w[at.shutL], m.w[at.shutR]);
   m.w[at.squint] *= 1 - 0.85 * sh * sh;
+  if (m.w[at.wide] > FACE2.wideMax) m.w[at.wide] = FACE2.wideMax;
+  faceMids(m);
   for (let i = 0; i < nt; i++) if (m.w[i] > 0.002) any = true;
   m.on.value = any ? 1 : 0;
 }
