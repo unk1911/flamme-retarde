@@ -741,7 +741,10 @@ canvas.addEventListener('click', () => {
   // iOS throws up a permission bar over the top of the game.
   if (!IS_TOUCH && (state.phase === 'fly' || state.phase === 'ground'
     || state.phase === 'chute' || state.phase === 'swim'
-    || state.phase === 'brod' || state.phase === 'plunge') && !pointerLocked
+    || state.phase === 'brod' || state.phase === 'plunge'
+    // On a bike or a scooter too, which looks with the mouse like the rest
+    // and was the one place a freed mouse could not be clicked back.
+    || state.phase === 'ride') && !pointerLocked
     && !(typeof poser !== 'undefined' && poser.on)) grabPointer();
 });
 document.addEventListener('pointerlockchange', () => {
@@ -770,7 +773,11 @@ document.addEventListener('pointerlockchange', () => {
   // game just opened for them. "Sometimes" is whether the lock was held at
   // the moment — after a settings panel or a sign-in sheet it is not, and
   // then `I` behaved.
-  if (had && !pointerLocked && $('panel').hidden && !comp && !ears.open()
+  //
+  // And the right button's release (`freeMouse`), which is the fourth.
+  const ours = mouseFreeing;
+  mouseFreeing = false;
+  if (had && !pointerLocked && !ours && $('panel').hidden && !comp && !ears.open()
     && !(typeof poser !== 'undefined' && poser.on)) {
     setPaused(true);
   }
@@ -846,9 +853,42 @@ addEventListener('mousedown', (e) => { if (pointerLocked && e.button === 0) mous
 // `kabinaPoke` in 43-jadrija.js. Taken on the frame, not in the handler, so it
 // is answered from the same camera the picture was drawn with.
 let rightClick = false;
-addEventListener('mousedown', (e) => { if (pointerLocked && e.button === 2) rightClick = true; });
-// And no browser menu over the game while you are playing it.
-addEventListener('contextmenu', (e) => { if (pointerLocked) e.preventDefault(); });
+// AND EVERYWHERE ELSE IT LETS GO OF THE MOUSE. Misha, 30 Sep 2026: *"if i'm
+// pointing at nothing in particular, to use right-mouse button as equivalent
+// of pressing Escape-Escape ... free-up the mouse from moving/looking around,
+// and to use it to maybe close the Ears dialog box"*. What Escape-Escape
+// actually does in Chrome: the first is the browser's, which drops the lock,
+// and `pointerlockchange` pauses; the second reaches `escPause` and unpauses,
+// and its `grabPointer` is refused because an Escape is not a user gesture.
+// So the end state is the world running with the cursor out — and this goes
+// straight there, without the pause card flashing up in between. The radio
+// and the TV keep the button when they are what you are pointing at: in the
+// kabina the decision is made on the frame, by `kabinaPoke` itself (a miss
+// is a free); anywhere else there is nothing else for it to mean. A click on
+// the canvas takes the mouse back, as it always has, and that click is not a
+// drop or a spray: the mousedown above only counts while the lock is held.
+let mouseFreeing = false;      // a release that is ours — `pointerlockchange` must not pause on it
+let mouseFreedAt = -1e9;       // and when, for the context menu below
+let rightLast = null;          // debug: what the last right-click did — 'free', 'radio', 'tv'
+function freeMouse() {
+  if (document.pointerLockElement !== canvas) return false;
+  mouseFreeing = true;
+  mouseFreedAt = performance.now();
+  document.exitPointerLock?.();
+  return true;
+}
+addEventListener('mousedown', (e) => {
+  if (!pointerLocked || e.button !== 2) return;
+  if (state.phase === 'ground') rightClick = true;
+  else if (freeMouse()) rightLast = 'free';
+});
+// And no browser menu over the game — while you are playing it, anywhere on
+// the canvas, and for a moment after a right-click let go: Windows sends the
+// menu on the button's release, by which time the lock is already gone.
+addEventListener('contextmenu', (e) => {
+  if (pointerLocked || e.target === canvas
+    || performance.now() - mouseFreedAt < 1500) e.preventDefault();
+});
 addEventListener('mouseup', (e) => { if (e.button === 0) mouseDrop = false; });
 
 function readKeys(dt) {
@@ -2588,6 +2628,7 @@ const HELP = [
   ['help.g.any', [
     ['P · ESC', 'help.k.pause'],
     ['ESC ESC', 'help.k.silent'],
+    ['RIGHT CLICK', 'help.k.free'],
     ['N', 'help.k.voice'],
     ['i', 'help.k.ears'],
     ['SHIFT + I', 'help.k.mic'],
@@ -8285,9 +8326,10 @@ function tick(wall, draw) {
       && jadrija.kabina.inside(camera.position.x, camera.position.z) > 0.5);
     if (rightClick) {
       rightClick = false;
-      if (inKab && jadrija.kabinaPoke) {
-        jadrija.kabinaPoke(camera.position, camera.getWorldDirection(_thumbF));
-      }
+      const hit = inKab && jadrija.kabinaPoke
+        ? jadrija.kabinaPoke(camera.position, camera.getWorldDirection(_thumbF)) : null;
+      // Pointing at nothing it answers to: let go of the mouse. See `freeMouse`.
+      rightLast = hit || (freeMouse() ? 'free' : null);
     }
     const lip = jadrija && jadrija.thumbReach ? jadrija.thumbReach() : null;
     const lipD = lip ? Math.hypot(lip.x - camera.position.x,
@@ -10910,6 +10952,8 @@ window.__fr = {
     handsV2: () => (jadrija && jadrija.handsV2 ? jadrija.handsV2() : null),
     hips: () => (jadrija && jadrija.hips ? jadrija.hips() : null),
     kabinaTargets: () => (jadrija && jadrija.kabinaTargets ? jadrija.kabinaTargets() : null),
+    /** Debug: what the last real right-click did — 'free', 'radio', 'tv', or null. */
+    rightLast: () => rightLast,
     /** Debug: a right-click, as if the mouse had done it. */
     poke: () => (jadrija && jadrija.kabinaPoke
       ? jadrija.kabinaPoke(camera.position, camera.getWorldDirection(new THREE.Vector3())) : null),

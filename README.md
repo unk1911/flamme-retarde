@@ -39,6 +39,7 @@ is a real footprint.
 | `J` | **e[J]ect** — the seat, the canopy, and the aeroplane is gone |
 | `0` | **skip straight to Rokići, on foot** |
 | `P` / `Esc` | **pause** — the fire stops too |
+| right click | **let go of the mouse** — the game keeps running and the cursor is yours, for the ears panel or anything else; click the picture to take it back. In the kabina, pointed at the radio or the TV, it changes the station instead |
 | `H` | hide the HUD · `L` record a `.webm` |
 
 **On foot**, and on the boat: mouse looks, `W A S D` walks, `shift` runs, `Z`

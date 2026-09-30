@@ -8,6 +8,54 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.552.4] — 2026-09-30
+
+### The right button lets go of the mouse
+
+Misha: *"if i'm pointing at nothing in particular, to use right-mouse button
+as equivalent of pressing Escape-Escape, which in effect, allow me to
+disengage/free-up the mouse from moving/looking around, and to use it to
+maybe close the Ears dialog box or do something else"*.
+
+**What Escape-Escape does.** In Chrome the first Escape is the browser's own:
+it drops the pointer lock and never reaches the page. `pointerlockchange`
+then pauses the game and shows the card. The second Escape reaches `escPause`,
+which unpauses. Its `grabPointer` is refused, because an Escape key does not
+count as a user gesture. So you end up with the game running and the cursor
+free, after the pause card has flashed up once.
+
+- **The right button goes straight there.** No pause and no card. The
+  release is marked as ours (`freeMouse`, `mouseFreeing`), so
+  `pointerlockchange` does not read it as the player looking away. That is
+  the same exemption the settings panel, the laptop and the ears already
+  have.
+- **The radio and the TV keep the button.** In the kabina the click is still
+  decided on the frame by `kabinaPoke`, the same ray and the same 3 m reach
+  as before. A hit changes the station as it always did, and only a miss
+  frees the mouse. Nothing else in the game used the right button, so on
+  foot outside the kabina, in the aeroplane, under the canopy, in the water,
+  on the boat, on a bike and on the tower it always frees.
+- **Taking it back** is a click on the picture, as after Escape. That click
+  does not drop or spray: the left-button handler only counts a press while
+  the lock is held, and the lock arrives on the `click`, after the press and
+  release.
+- **No browser menu.** It is now suppressed anywhere on the canvas, and for
+  1.5 s after a release anywhere at all. Windows sends `contextmenu` on the
+  button's *release*, and by then the lock is already gone.
+- **The bike and the scooter** (`ride`) were missing from the list of places
+  where a click on the canvas takes the mouse back. After Escape on a bike
+  there was no way to get it back short of getting off. It is on the list now.
+- On the help sheet (`RIGHT CLICK`, under *anywhere*) and in the README.
+
+Tested headless with the pointer-lock API stubbed and the real handlers
+driven. Right-click frees the mouse on foot and in flight with no pause.
+Aimed at the radio it moves the band from -1 to 0 and keeps the lock. Aimed
+at the TV from 0.8 m it moves the channel from 0 to 1 and keeps the lock.
+From 3.9 m the TV is out of reach and the click frees the mouse. Turned away
+from both, it frees. With the lock freed, the ears panel's × is the topmost
+element under its own centre and closes the panel. The browser-Escape path
+still pauses as before. No console errors.
+
 ## [1.552.3] — 2026-09-30
 
 ### The front mudguard is a front one: short ahead of the fork, long behind it
