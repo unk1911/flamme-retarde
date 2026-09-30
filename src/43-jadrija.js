@@ -45679,6 +45679,971 @@ async function buildJadrija(scene) {
     pullStats.msSum += ms; pullStats.frames++;
   }
 
+  // ── THE COLLAR AND THE LEASH ─────────────────────────────────────────────
+  //
+  // 1.553.0. Misha, 30 Sep 2026: *"putting on the black collar with a diamond
+  // leash/chain, which we can pull ... reuse the position where she's either
+  // 'kneeling' or 'on all fours' ... basically we need to be able to yank the
+  // collar around and lead her, even outside kabine, perhaps to the back where
+  // the hammock is. should also be possible to later take off the collar"*.
+  //
+  // It is the belt's kind of scene — two adults playing, and the design says
+  // so — and it has the belt's safeword: "red" / "crvena" / "stop" takes the
+  // collar off at once, whoever is holding the other end (90-app.js).
+  //
+  // WHAT HAPPENS TO HER, as phases of her own (`LEASH_PH`), which `stepShow`
+  // hands to `leashStep` before any of the room's, the hose's or the dice's
+  // rules can see them — nothing out there knows what to do with a woman on a
+  // leash, and every one of them would stand her up:
+  //
+  //   leashCome   she comes to you (the walk) and turns to face you;
+  //   leashKneel  down on her knees in front of you (`submit`);
+  //   leashPut    kneeling up (`kept`) while your hands put it on her — the
+  //               strap laid round her neck from the buckle, buckled, and the
+  //               leash clipped to the ring at her throat (LEASH_ON.put);
+  //   leashDown   on to all fours: the `kneel` clip from where it has her on
+  //               her knees (`kneelFrom`), not from standing;
+  //   leashFours  on all fours, facing where the leash goes, still;
+  //   leashCrawl  following: the crawl, on your trail at the leash's length;
+  //   leashRise   up off her hands (`getup`), for the hammock or the end;
+  //   leashOff    standing, facing you, while it comes off (`offing`).
+  //
+  // FOLLOWING IS YOUR TRAIL AND NOT A STRAIGHT LINE. Where you walked is
+  // somewhere a body fits — through the kabina's door, round the end of the
+  // row, between the parked cars in the pines — so she crawls the points you
+  // left (`trail`), a quarter metre apart, and keeps her collar about a metre
+  // from your feet (`follow`), faster the further behind she falls. Her own
+  // collider (`showClear`) keeps her out of the blockers on the way, the same
+  // push-out every other walk of hers takes.
+  //
+  // THE DOOR is the kabina's two rooms (`KAB.grow`): you are cut from one to
+  // the other at the bottom of the dip, and so is she — `leashDoor`, called
+  // from the same moment in 90-app.js, puts her a stride behind where the cut
+  // put you, in the doorway going out or in the big room coming in, facing
+  // you, with the trail begun again.
+  //
+  // A TUG lands in two places: her head and chest, which a partial ragdoll
+  // pulls toward your hand by the collar ring (`leashRag*`, the hair pull's
+  // net with the spring moved from her scalp to her throat), and her hands
+  // and knees, which lurch toward you and plant again (`lurch`, `stumble`).
+  // She never falls over: her hips are held in the net, and the lurch is a
+  // few quick steps of the crawl, not a push.
+  const LEASH_PH = { leashCome: 1, leashKneel: 1, leashPut: 1, leashDown: 1, leashFours: 1,
+    leashCrawl: 1, leashRise: 1, leashOff: 1 };
+  const COLLAR_FIT = {
+    // Where on her neck: this far from the head of `neck` to the head of
+    // `head` (0.114 m of bone), and the middle of her neck that far behind
+    // the bone's own line, m — `chainFit().limbs['neck>head']` puts the flesh's
+    // middle 10 to 22 mm behind it in each third.
+    at: 0.18, back: 0.002,
+    // The bore, [out of her throat, across], m. NOT the neck bone's numbers:
+    // `chainFit` measures the flesh weighted to `neck`, which on v2.0 is a
+    // strip down the front of her throat, and a strap sized off it (56 by
+    // 58 mm, 0.36 of the way up) went in under her jaw and out of sight
+    // everywhere but the buckle — photographed from three sides. Her neck
+    // leans forward of its bone and her throat stands 7-8 cm in front of it
+    // at this height, so the strap is an oval that long, and it was fitted
+    // by eye against her drawn mesh from the side, the front and behind
+    // (`collarRefit`), in the kneel and on all fours: snug on her throat and
+    // the sides, the braid lying over it at the back.
+    bore: [0.075, 0.069],
+  };
+  const LEASH_ON = {
+    // How far in front of you she kneels to be collared, m.
+    stand: 0.52,
+    // The putting on, s into `leashPut`: your hand at her neck; the strap
+    // laid round it; the buckle done; the leash clipped; and down she goes.
+    put: { wrap: [0.55, 1.35], buckle: 1.60, clip: 2.20, end: 2.95 },
+    // And off, s into `offing`: unclipped, unbuckled, the strap drawn off,
+    // done. A safeword runs it `fast` times as quick.
+    off: { unclip: 0.55, unbuckle: 1.10, unwrap: [1.20, 1.80], end: 2.40, fast: 2.2 },
+    // Seconds into the `kneel` clip at which she is on her knees — where it
+    // takes over from kneeling up. And the fade into it.
+    kneelFrom: 0.58, kneelFade: 0.45,
+    // FOLLOWING: her ring this far from your feet (m, level) when she is
+    // settled; crawling from `start` past it and stopping inside `stop`;
+    // `k` 1/s from the gap to her pace, up to `max` m/s; eased at `accel`.
+    follow: 0.95, start: 0.14, stop: 0.04, k: 5.0, max: 1.85, accel: 5.0,
+    // The crawl clip covers 1.05 m in 1.1 s (SHOW.crawl), so its clock is her
+    // pace over this, within `rate`.
+    clipV: 0.955, rate: [0.45, 2.0],
+    // The trail: a point every `step` m you walk; she drops each one inside
+    // `reach` of her; never more than `most` of them.
+    trail: { step: 0.25, reach: 0.40, most: 80 },
+    // A TUG: toward you at `v` m/s (u 0..1 how hard), gone over `tau` s, never
+    // closer to your feet than `near`; past `stumbleAt` a few quick steps of
+    // the crawl (`stumble` s, at `stumbleRate`) — her hands catching her.
+    lurch: { v: [0.35, 1.5], tau: 0.16, near: 0.55, stumbleAt: 0.30, stumble: [0.30, 0.60], stumbleRate: 1.9 },
+    // After she is let off it into the hammock, how long before a phase that
+    // is not the hammock's is her back on the leash.
+    freeGrace: 1.5,
+    // Once it is off, seconds she stays standing with you: after "take it
+    // off", and after a safeword (the aftercare — your hand in her hair).
+    care: [1.2, 4.5],
+  };
+  // The state of it all. `collar` is how much of the strap is round her neck
+  // (0..1), `buckled` and `clipped` the other two things it takes; `mode`
+  // 'lead' while she is on the leash and following, 'free' while it is on her
+  // and she is doing something else (the hammock).
+  const leash = { on: false, collar: 0, buckled: false, clipped: false, mode: null,
+    putT: 0, offing: null, after: null, safe: null, trail: [], freeT: 0,
+    pullF: 0, pullDir: new THREE.Vector3(0, 1, 0), lurchV: 0, lurchT: 0, lurchS: 0, stumble: 0,
+    careT: 0, headW: new THREE.Vector3(), ragHold: 0,
+    rehang: false, ringTS: [0, 0], swing: -1.4, v: 0, said: null,
+    ringW: new THREE.Vector3(), neckW: new THREE.Vector3(), buckleW: new THREE.Vector3(),
+    leftW: new THREE.Vector3(), rightW: new THREE.Vector3(), fwdW: new THREE.Vector3(),
+    stats: { ms: 0, msMax: 0, msSum: 0, frames: 0, tugs: 0, lurchMax: 0, stumbles: 0, doors: 0,
+      trail: 0, crawlV: 0, gap: 0, recapture: 0 } };
+  let collarKit = null;
+  const _clA = new THREE.Vector3(), _clB = new THREE.Vector3(), _clQ = new THREE.Quaternion();
+  const _clM = new THREE.Matrix4();
+
+  /** The collar, built the first time it goes on, on her figure: see COLLAR_FIT. */
+  function collarKitBuild() {
+    if (collarKit || !skinFig) return collarKit;
+    const H = bindHeadsOf(skinFig);
+    const nb = skinFig.boneIndex('neck'), hb = skinFig.boneIndex('head');
+    if (nb < 0 || hb < 0) return null;
+    const A = H.T[nb], B = H.T[hb];
+    const axis = B.clone().sub(A).normalize();
+    const c = A.clone().lerp(B, COLLAR_FIT.at);
+    c.x += COLLAR_FIT.back;
+    const K = collarBuild(COLLAR_FIT.bore);
+    // Leaning with her neck: the strap's +y along the bone.
+    const align = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    collarKit = { K, nb, center: c, head: A.clone(), align, turn: new THREE.Quaternion() };
+    K.group.visible = false;
+    skinFig.mesh.add(K.group);
+    return collarKit;
+  }
+
+  /**
+   * Her collar where her neck is, every frame after she is posed, and the
+   * points your hands and the leash need, world: the ring's clasp (`ringW`),
+   * the front of the strap (`neckW`), the buckle (`buckleW`), either side of
+   * her neck (`leftW`, `rightW`) and which way her throat faces (`fwdW`).
+   */
+  function collarPlace(dt) {
+    const L = leash;
+    if (!L.on && L.collar <= 0) { if (collarKit) collarKit.K.group.visible = false; return; }
+    const ck = collarKitBuild();
+    if (!ck) return;
+    const { K } = ck, f = skinFig;
+    f.boneAt(ck.nb, _clA);
+    f.boneTurn(ck.nb, ck.turn);
+    _clB.copy(ck.center).sub(ck.head).applyQuaternion(ck.turn).add(_clA);
+    K.group.position.copy(_clB);
+    K.group.quaternion.copy(ck.turn).multiply(ck.align);
+    K.group.visible = L.collar > 0;
+    K.wrap(L.collar);
+    K.buckle.visible = L.buckled;
+    K.dPivot.visible = L.collar >= 1;
+    f.mesh.updateMatrixWorld();
+    K.group.updateMatrixWorld(true);
+    // The D swings on its bar toward the leash: the first link's run, in the
+    // collar's frame, as an angle about the bar — out of her throat is 0,
+    // hanging is −π/2, and it cannot go back through her neck. Eased: a ring
+    // is a little weight on a pin.
+    let want = -1.35;
+    if (L.clipped && L.dirW) {
+      _clQ.copy(K.group.getWorldQuaternion(_clQ)).invert();
+      _clA.copy(L.dirW).applyQuaternion(_clQ);
+      want = clamp(Math.atan2(_clA.y, Math.max(_clA.x, -0.2)), -1.55, 1.1);
+    }
+    L.swing += (want - L.swing) * (1 - Math.exp(-12 * dt));
+    K.swing(L.swing);
+    K.D.updateMatrixWorld(true);
+    K.tipWorld(L.ringW);
+    const G = COLLAR_GEO, bx = COLLAR_FIT.bore[0], bz = COLLAR_FIT.bore[1];
+    L.neckW.set(bx + G.thick + 0.004, 0, 0).applyMatrix4(K.group.matrixWorld);
+    const ba = G.buckle;
+    L.buckleW.set(Math.cos(ba) * (bx + 0.03), 0, -Math.sin(ba) * (bz + 0.03)).applyMatrix4(K.group.matrixWorld);
+    L.leftW.set(0.01, 0, -(bz + 0.035)).applyMatrix4(K.group.matrixWorld);
+    L.rightW.set(0.01, 0, bz + 0.035).applyMatrix4(K.group.matrixWorld);
+    L.fwdW.set(1, 0, 0).applyQuaternion(K.group.getWorldQuaternion(_clQ));
+    const ts = local(L.ringW.x, L.ringW.z);
+    L.ringTS[0] = ts[0]; L.ringTS[1] = ts[1];
+  }
+
+  /**
+   * How her drawn mesh sits in the strap: every vertex of Baye v2.0 in the
+   * band's height, in the bind pose, against the bore — by sector round her
+   * neck, the furthest any of them is out from the middle, and how far that
+   * is inside (−) or clear of (+) the strap's inside face, mm. Nothing in the
+   * game calls it; `__fr.jad.collarFit()`.
+   */
+  function collarFit(at = null, back = null, lim = 0.11) {
+    const ck = collarKitBuild();
+    const f = APPR.primary && appr ? appr : skinFig;
+    if (!ck || !f) return null;
+    const g = f.mesh.geometry, pos = g.getAttribute('position');
+    const inv = ck.align.clone().invert();
+    const half = COLLAR_GEO.wide / 2, [bx, bz] = COLLAR_FIT.bore;
+    // A trial height: the same neck, the strap `at` along it and `back` of it.
+    const center = at == null ? ck.center : (() => {
+      const H = bindHeadsOf(skinFig);
+      const c = H.T[ck.nb].clone().lerp(H.T[skinFig.boneIndex('head')], at);
+      c.x += back == null ? COLLAR_FIT.back : back;
+      return c;
+    })();
+    const Nq = 16, radii = Array.from({ length: Nq }, () => []);
+    const N = 16, far = new Array(N).fill(0), gap = new Array(N).fill(Infinity);
+    const p = new THREE.Vector3();
+    let n = 0;
+    // Only her neck's own skin: the vertices whose heaviest bone is `neck`
+    // (the jaw, the shoulders and the hair are weighted elsewhere).
+    const bi = g.getAttribute('aBoneIdx'), bw = g.getAttribute('aBoneWt');
+    const nbI = skinFig.boneIndex('neck');
+    for (let v = 0; v < pos.count; v++) {
+      if (bi && bw) {
+        let best = -1, bwt = 0;
+        for (let q = 0; q < 4; q++) {
+          const wq = bw.getComponent(v, q);
+          if (wq > bwt) { bwt = wq; best = Math.round(bi.getComponent(v, q) * (bi.normalized ? 255 : 1)); }
+        }
+        if (best !== nbI) continue;
+      }
+      p.fromBufferAttribute(pos, v).sub(center).applyQuaternion(inv);
+      if (Math.abs(p.y) > half) continue;
+      const rad = Math.hypot(p.x, p.z);
+      if (rad > lim) continue;        // her shoulders and her hair, not her neck
+      const r = Math.hypot(p.x / bx, p.z / bz);
+      const a = Math.atan2(-p.z, p.x);
+      const k = ((Math.floor((a + Math.PI) / (2 * Math.PI) * N) % N) + N) % N;
+      n++;
+      radii[k].push(rad);
+      if (r > far[k]) far[k] = r;
+      // mm of clearance: the ellipse's radius along this direction minus hers.
+      const er = rad / r;
+      gap[k] = Math.min(gap[k], (er - rad) * 1000);
+    }
+    const pc = (a, q) => { if (!a.length) return null; a.sort((x, y) => x - y); return +(a[Math.min(a.length - 1, Math.floor(q * a.length))] * 1000).toFixed(1); };
+    return { n, bore: COLLAR_FIT.bore, center: center.toArray().map((x) => +x.toFixed(4)), sectors: far.map((r, k) => ({
+      deg: Math.round(-180 + (k + 0.5) * 360 / N), r: +r.toFixed(3),
+      clearMm: Number.isFinite(gap[k]) ? +gap[k].toFixed(1) : null,
+      mm: [pc(radii[k], 0.5), pc(radii[k], 0.9), pc(radii[k], 1)] })) };
+  }
+
+  // ── ITS PARTIAL RAGDOLL — the hair pull's net, pulled by the collar ─────
+  const LEASH_RAG = {
+    h: 1 / 120, maxSub: 4, iterations: 8,
+    // Her muscles: RAGDOLL's own, times `tone` a joint, dampers times `damp`.
+    // A little softer than the hair's: a collar pulls the whole of her neck
+    // and it is the upper back that gives.
+    tension: 1.0, tone: { spine02: 0.9, chest: 0.9, neck: 0.8 }, damp: 4,
+    // The spring on the ring, N/m — the give in your arm, as the hair's `arm`.
+    arm: 800,
+    // The most the give may turn a bone, degrees; a stop the pose is past.
+    most: { spine02: 20, chest: 24, neck: 40 }, lim: 10,
+    after: { ang: 0.5, v: 0.03, still: 0.25, most: 2.0, out: 0.25 },
+    guard: { v: 6, far: 0.25, loose: 0.06 },
+  };
+  let lrR = null;
+  const lrL = { q: null, t: new Float32Array(3), w: 0, clip: null, on: false };
+  const lrStats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, enters: 0, rescues: 0, why: null,
+    F: 0, Fmax: 0, pitch: 0, pitchMax: 0, chest: 0, chestMax: 0, headD: 0, headDMax: 0 };
+  const lrS = new THREE.Vector3(), lrT = new THREE.Vector3();
+  const _lrDQ = new THREE.Quaternion(), _lrQI = new THREE.Quaternion(), _lrQ = new THREE.Quaternion();
+  const _lrV = new THREE.Vector3();
+
+  function leashRagBuild(f) {
+    const caps = chainCapsules();
+    const net = avbdNet({
+      maxBodies: 16, maxJoints: 16, maxStrings: 4, maxPoints: 0, maxBoxes: 0, maxCaps: caps.length + 1,
+      maxContacts: 8, maxAngles: 16, maxWorldBoxes: 0, maxCapPairs: 0, limK: RAGDOLL.limK,
+      iterations: LEASH_RAG.iterations, alpha: 0.9, alphaContact: 0.9, beta: 1e5, betaAng: 100, gamma: 0.999,
+      gravity: [0, 0, 0], drag: RAGDOLL.drag, vMax: 4, wMax: 25, margin: 0.01, deep: 0.03,
+      mu: 0.3, floorMu: 0.8, capK: 30000,
+    });
+    const rag = ragdollBuild(net, f, caps, { idBase: 1 });
+    const hipJ = net.addJoint(-1, [0, 0, 0], rag.pelvis, [0, 0, 0], Infinity, Infinity, 1);
+    const head = rag.body('neck');
+    const str = net.addString(-1, [0, 0, 0], head, [0, 0, 0], 0, LEASH_RAG.arm, true);
+    net.finish();
+    net.setJointK(hipJ, 0, 0);
+    net.setString(str, null, null, false);
+    const nb = f.bones.length;
+    const R = { net, rag, hipJ, str, head, nb, pb: f.boneIndex('pelvis'),
+      hipOff: new Float64Array(3), hipQ: new Float64Array(4), anchorP: new Float64Array(3),
+      anchorQ: new Float64Array(4),
+      body: PULL_BODY.map((n) => f.boneIndex(n)).filter((i) => i >= 0),
+      dead: ['armUL', 'armUR', 'armLL', 'armLR', 'legUL', 'legUR', 'legLL', 'legLR']
+        .map((n) => rag.body(n)).filter((i) => i >= 0),
+      hb: f.boneIndex('head'), cb: f.boneIndex('chest'), nk: f.boneIndex('neck'),
+      most: new Float64Array(nb),
+      out: { q: new Float32Array(nb * 4), t: new Float32Array(3) },
+      tgt: { q: new Float32Array(nb * 4), t: new Float32Array(3) },
+      fkW: new Float64Array(nb * 4), fkT: new Float64Array(nb * 3),
+      fkW2: new Float64Array(nb * 4), fkT2: new Float64Array(nb * 3),
+      dq: new Float32Array(nb * 4),
+      rb: [0, 0, 0], on: false, acc: 0, t: 0, still: 0, rel: 0 };
+    for (const n of PULL_BODY) {
+      const i = f.boneIndex(n);
+      if (i >= 0) R.most[i] = LEASH_RAG.most[n] * Math.PI / 180;
+    }
+    if (!lrL.q) {
+      lrL.q = new Float32Array(nb * 4);
+      for (let i = 0; i < nb; i++) lrL.q[4 * i + 3] = 1;
+      lrL.clip = { q: new Float32Array(nb * 4), t: new Float32Array(3) };
+    }
+    return R;
+  }
+
+  /** Into the net at rest on the pose she is drawn in, the spring on her ring. */
+  function leashRagEnter(f) {
+    if (!lrR) lrR = leashRagBuild(f);
+    const R = lrR, { net, rag } = R;
+    if (!lrL.on) {
+      const L0 = f.local();
+      lrL.clip.q.set(L0.q); lrL.clip.t.set(L0.t.subarray(0, 3));
+    }
+    net.resetDuals();
+    R.tgt.q.set(lrL.clip.q); R.tgt.t.set(lrL.clip.t);
+    rag.enterPose(R.tgt.q, R.tgt.t, f.mesh.position, f.mesh.quaternion);
+    for (const b of R.dead) net.setLive(b, false);
+    rag.tension(LEASH_RAG.tension);
+    for (const [nm, m] of rag.angles) {
+      const k = LEASH_RAG.tone[nm];
+      if (k == null) continue;
+      const D = RAGDOLL.bodies.find((d) => d.bone === nm), t = LEASH_RAG.tension * k;
+      if (D) net.setAngleK(m, D.k * t, D.kd * Math.max(0.35, Math.sqrt(t)) * LEASH_RAG.damp);
+    }
+    // Every stop takes in the pose she is in — see `pullEnter`.
+    const tab = ragdollTable(), mg = LEASH_RAG.lim * Math.PI / 180;
+    for (const [nm, m] of rag.angles) {
+      const D = tab.find((d) => d.bone === nm);
+      if (!D || !D.lo) continue;
+      const ph = net.angleNow(m), lo = [0, 0, 0], hi = [0, 0, 0];
+      for (let k = 0; k < 3; k++) {
+        lo[k] = Math.min(D.lo[k] * Math.PI / 180, ph[k] - mg);
+        hi[k] = Math.max(D.hi[k] * Math.PI / 180, ph[k] + mg);
+      }
+      net.setAngleLimits(m, lo, hi);
+    }
+    // Her pelvis's body off its bone — `pullEnter`'s arithmetic, as is.
+    ragdollFK(f, R.tgt.q, R.tgt.t, R.fkW, R.fkT);
+    const pb = rag.pelvis, P = net.P, Q = net.Q, b = R.pb, BR = f.bindRest();
+    avbdQMul(R.fkW, 4 * b, BR.bindQ, 4 * b, _plT, 0, false, true);
+    _plM.copy(f.mesh.matrixWorld).invert();
+    _plV.set(P[3 * pb], P[3 * pb + 1], P[3 * pb + 2]).applyMatrix4(_plM);
+    _plE[0] = _plV.x - R.fkT[3 * b]; _plE[1] = _plV.y - R.fkT[3 * b + 1]; _plE[2] = _plV.z - R.fkT[3 * b + 2];
+    _plT[0] = -_plT[0]; _plT[1] = -_plT[1]; _plT[2] = -_plT[2];
+    qrotv(R.hipOff, 0, _plT, 0, _plE, 0);
+    const mQ = f.mesh.quaternion;
+    _plMq[0] = -mQ.x; _plMq[1] = -mQ.y; _plMq[2] = -mQ.z; _plMq[3] = mQ.w;
+    avbdQMul(_plT, 0, _plMq, 0, R.hipQ, 0);
+    avbdQMul(R.hipQ, 0, Q, 4 * pb, R.hipQ, 0);
+    pullAnchors(R, f);
+    net.setJointK(R.hipJ, Infinity, Infinity);
+    net.setTarget(R.hipJ, R.anchorP[0], R.anchorP[1], R.anchorP[2], R.anchorQ);
+    // The ring on the net's neck body, where it is drawn.
+    const hb = R.head;
+    const qi = [-Q[4 * hb], -Q[4 * hb + 1], -Q[4 * hb + 2], Q[4 * hb + 3]];
+    const d = [leash.ringW.x - P[3 * hb], leash.ringW.y - P[3 * hb + 1], leash.ringW.z - P[3 * hb + 2]];
+    qrotv(R.rb, 0, qi, 0, d, 0);
+    net.setString(R.str, [leash.ringW.x, leash.ringW.y, leash.ringW.z], 0, true, R.rb);
+    R.on = true; R.acc = 0; R.t = 0; R.still = 0; R.rel = 0; R.mQ = null;
+    if (!lrL.on) {
+      lrL.on = true;
+      for (let i = 0; i < R.nb; i++) { lrL.q[4 * i] = lrL.q[4 * i + 1] = lrL.q[4 * i + 2] = 0; lrL.q[4 * i + 3] = 1; }
+      lrL.t.fill(0);
+      f.tug(lrL);
+    }
+    lrL.w = 1;
+    lrStats.enters++;
+  }
+
+  function leashRagLeave() {
+    const R = lrR;
+    if (!R || !R.on) return;
+    R.rag.leave();
+    R.net.setJointK(R.hipJ, 0, 0);
+    R.net.setString(R.str, null, null, false);
+    R.on = false;
+  }
+
+  function leashRagSane(R) {
+    const { net, rag } = R, P = net.P, V = net.V, G = LEASH_RAG.guard;
+    for (const b of rag.bodies) {
+      if (!net.live[b]) continue;
+      const o = 3 * b;
+      if (!(P[o] === P[o]) || !(P[o + 1] === P[o + 1]) || !(P[o + 2] === P[o + 2])) { lrStats.why = 'nan ' + b; return false; }
+      if (V[o] * V[o] + V[o + 1] * V[o + 1] + V[o + 2] * V[o + 2] > G.v * G.v) { lrStats.why = 'fast ' + b; return false; }
+    }
+    const pb = 3 * rag.pelvis, a = R.anchorP;
+    if (Math.hypot(P[pb] - a[0], P[pb + 1] - a[1], P[pb + 2] - a[2]) > G.far) { lrStats.why = 'far'; return false; }
+    net.measure();
+    if (net.stats.maxLoose > G.loose) { lrStats.why = 'loose ' + net.stats.maxLoose.toFixed(3); return false; }
+    return true;
+  }
+
+  /**
+   * Every frame, before her figure is posed: the net stepped with the pull
+   * the leash has on her ring (`leash.pullF` N along `pullDir`, from
+   * 90-app.js), and the give laid on her. Nothing at all while nothing pulls
+   * and she has settled — and never while a hand is in her hair, whose net
+   * this is a second copy of and whose layer (`fig.tug`) is the same one.
+   */
+  function leashRagTick(dt) {
+    const L = leash;
+    if (L.ragHold > 0) { L.ragHold--; return; }
+    const F = L.clipped ? L.pullF : 0;
+    if (!lrL.on && F < 1) return;
+    const f = skinFig;
+    if (!f || pullL.on || !show || HAM_SIM[show.phase] || (cotR && cotR.on)) {
+      leashRagLeave();
+      if (lrL.on) { lrL.w = 0; if (f && !pullL.on) f.tug(null); lrL.on = false; }
+      return;
+    }
+    const t0 = performance.now();
+    if (F >= 1 && (!lrR || !lrR.on)) leashRagEnter(f);
+    const R = lrR;
+    if (!R || !R.on) {
+      lrL.w = Math.max(0, lrL.w - dt / LEASH_RAG.after.out);
+      if (lrL.w <= 0) { f.tug(null); lrL.on = false; }
+      return;
+    }
+    const { net, rag } = R;
+    R.t += dt;
+    // THE NET RIDES HER FRAME. The hair's net is for a woman kneeling still;
+    // this one is on a woman crawling at a metre and a half a second and
+    // turning corners, and in the world's frame her chest and head were left
+    // behind by every turn — 40 to 75 degrees behind her hips, all of it
+    // drawn as give (MEASURED, 100 ms samples round the kabina). So each tick
+    // every body is carried rigidly by however her mesh moved since the last
+    // one, velocities turned with it, and what is left for the solve is the
+    // pull and nothing else.
+    {
+      const mp = f.mesh.position, mq = f.mesh.quaternion;
+      if (R.mQ) {
+        _lrDQ.copy(mq).multiply(_lrQI.copy(R.mQ).invert());
+        const P = net.P, Q = net.Q, V = net.V, W = net.W;
+        for (const b of rag.bodies) {
+          if (!net.live[b]) continue;
+          const o = 3 * b;
+          _lrV.set(P[o] - R.mP.x, P[o + 1] - R.mP.y, P[o + 2] - R.mP.z).applyQuaternion(_lrDQ).add(mp);
+          P[o] = _lrV.x; P[o + 1] = _lrV.y; P[o + 2] = _lrV.z;
+          _lrV.set(V[o], V[o + 1], V[o + 2]).applyQuaternion(_lrDQ);
+          V[o] = _lrV.x; V[o + 1] = _lrV.y; V[o + 2] = _lrV.z;
+          _lrV.set(W[o], W[o + 1], W[o + 2]).applyQuaternion(_lrDQ);
+          W[o] = _lrV.x; W[o + 1] = _lrV.y; W[o + 2] = _lrV.z;
+          _lrQ.set(Q[4 * b], Q[4 * b + 1], Q[4 * b + 2], Q[4 * b + 3]).premultiply(_lrDQ);
+          Q[4 * b] = _lrQ.x; Q[4 * b + 1] = _lrQ.y; Q[4 * b + 2] = _lrQ.z; Q[4 * b + 3] = _lrQ.w;
+        }
+      } else { R.mQ = new THREE.Quaternion(); R.mP = new THREE.Vector3(); }
+      R.mP.copy(mp); R.mQ.copy(mq);
+    }
+    // The pose held still: the clip, eased to — the hair's `steady`.
+    const ks = 1 - Math.exp(-dt / PULL_RAG.steady), Tq = R.tgt.q, Cq = lrL.clip.q;
+    for (let o = 0; o < Tq.length; o += 4) {
+      const sg = Tq[o] * Cq[o] + Tq[o + 1] * Cq[o + 1] + Tq[o + 2] * Cq[o + 2] + Tq[o + 3] * Cq[o + 3] < 0 ? -1 : 1;
+      let l = 0;
+      for (let c = 0; c < 4; c++) { Tq[o + c] += (sg * Cq[o + c] - Tq[o + c]) * ks; l += Tq[o + c] * Tq[o + c]; }
+      l = 1 / (Math.sqrt(l) || 1);
+      for (let c = 0; c < 4; c++) Tq[o + c] *= l;
+    }
+    for (let k = 0; k < 3; k++) R.tgt.t[k] += (lrL.clip.t[k] - R.tgt.t[k]) * ks;
+    rag.drive(R.tgt.q);
+    pullAnchors(R, f);
+    net.setTarget(R.hipJ, R.anchorP[0], R.anchorP[1], R.anchorP[2], R.anchorQ);
+    // The ring on the net, and the spring's end F/k past it along the pull:
+    // a spring of rest length nought that far stretched pulls with F.
+    const P = net.P, Q = net.Q, b = R.head;
+    _plE[0] = R.rb[0]; _plE[1] = R.rb[1]; _plE[2] = R.rb[2];
+    qrotv(_plD, 0, Q, 4 * b, _plE, 0);
+    lrS.set(P[3 * b] + _plD[0], P[3 * b + 1] + _plD[1], P[3 * b + 2] + _plD[2]);
+    if (F >= 1) {
+      lrT.copy(lrS).addScaledVector(L.pullDir, F / LEASH_RAG.arm);
+      net.setString(R.str, [lrT.x, lrT.y, lrT.z], 0, true);
+      R.rel = 0; R.still = 0;
+    } else net.setString(R.str, null, null, false);
+    R.acc = Math.min(R.acc + dt, LEASH_RAG.maxSub * LEASH_RAG.h);
+    let n = 0;
+    while (R.acc >= LEASH_RAG.h - 1e-9 && n < LEASH_RAG.maxSub) {
+      net.step(LEASH_RAG.h); R.acc -= LEASH_RAG.h; n++; lrStats.steps++;
+    }
+    if (n && !leashRagSane(R)) {
+      lrStats.rescues++;
+      leashRagLeave();
+      lrL.w = 0;
+      return;
+    }
+    rag.write(R.out, f.mesh.position, f.mesh.quaternion, lrL.clip.q);
+    const C = R.tgt.q, O = R.out.q;
+    let worst = 0;
+    for (const i of R.body) {
+      const o = 4 * i;
+      avbdQMul(C, o, O, o, _plE, 0, true);
+      if (_plE[3] < 0) for (let c = 0; c < 4; c++) _plE[c] = -_plE[c];
+      const ang = 2 * Math.acos(Math.min(1, _plE[3]));
+      if (ang > R.most[i]) {
+        const sn = Math.sin(ang / 2) || 1, k = Math.sin(R.most[i] / 2) / sn;
+        _plE[0] *= k; _plE[1] *= k; _plE[2] *= k; _plE[3] = Math.cos(R.most[i] / 2);
+      }
+      worst = Math.max(worst, Math.min(ang, R.most[i]));
+      lrL.q[o] = _plE[0]; lrL.q[o + 1] = _plE[1]; lrL.q[o + 2] = _plE[2]; lrL.q[o + 3] = _plE[3];
+    }
+    lrL.t.fill(0);
+    // What it did, for a probe: her head and chest off the pose, degrees, +
+    // up; and how far her head has gone, m.
+    R.dq.set(R.tgt.q);
+    for (const i of R.body) avbdQMul(R.dq, 4 * i, lrL.q, 4 * i, R.dq, 4 * i);
+    ragdollFK(f, R.dq, R.tgt.t, R.fkW2, R.fkT2);
+    lrStats.pitch = pullPitch(f, R, R.hb);
+    lrStats.chest = pullPitch(f, R, R.cb);
+    lrStats.pitchMax = Math.max(lrStats.pitchMax, Math.abs(lrStats.pitch));
+    lrStats.chestMax = Math.max(lrStats.chestMax, Math.abs(lrStats.chest));
+    _plA.set(R.fkT2[3 * R.hb] - R.fkT[3 * R.hb], R.fkT2[3 * R.hb + 1] - R.fkT[3 * R.hb + 1],
+      R.fkT2[3 * R.hb + 2] - R.fkT[3 * R.hb + 2]);
+    lrStats.headD = _plA.length();
+    lrStats.headDMax = Math.max(lrStats.headDMax, lrStats.headD);
+    lrStats.F = F; lrStats.Fmax = Math.max(lrStats.Fmax, F);
+    if (F < 1) {
+      R.rel += dt;
+      const A = LEASH_RAG.after;
+      R.still = worst * 180 / Math.PI < A.ang && rag.speed() < A.v ? R.still + dt : 0;
+      if (R.still >= A.still || R.rel > A.most) leashRagLeave();
+    }
+    const ms = performance.now() - t0;
+    lrStats.ms = ms; lrStats.msMax = Math.max(lrStats.msMax, ms); lrStats.msSum += ms; lrStats.frames++;
+  }
+
+  // ── THE LEASH IN HER STATE MACHINE ────────────────────────────────────────
+
+  /** A new collaring, from the ask: everything back to the start. */
+  function leashBegin() {
+    const L = leash;
+    L.on = true; L.collar = 0; L.buckled = false; L.clipped = false; L.mode = 'put';
+    L.putT = 0; L.offing = null; L.after = null; L.safe = null; L.trail.length = 0;
+    L.pullF = 0; L.lurchV = 0; L.stumble = 0; L.v = 0; L.said = null; L.swing = -1.35; L.careT = 0;
+    L.come = null;
+  }
+
+  /** All of it off her, now — the end of `offing`, or a reset. */
+  function leashClear() {
+    const L = leash;
+    L.on = false; L.collar = 0; L.buckled = false; L.clipped = false; L.mode = null;
+    L.offing = null; L.after = null; L.trail.length = 0; L.pullF = 0; L.lurchV = 0; L.stumble = 0;
+    if (collarKit) collarKit.K.group.visible = false;
+    // The ask that started it is over — the room may have her again.
+    if (show) show.byAsk = 0;
+  }
+
+  /** On all fours, still: the `kneel` clip held on its last frame. */
+  function leashHoldFours(f, fade = 0.30) {
+    const dur = f.clipDur ? f.clipDur('kneel') : 1.15;
+    f.play('kneel', { fade, from: Math.max(0, dur - 0.02) });
+  }
+
+  /**
+   * One of her leash phases, from `stepShow`, before anything else of that
+   * function sees it. `go` is its own; answers true (always — nothing past it
+   * is to run for these phases but the placement).
+   */
+  function leashStep(dt, pt, ps, done, go) {
+    const L = leash, f = skinFig, S = f.state, O = LEASH_ON;
+    const t0 = performance.now();
+    L.freeT = 0;
+    // WHAT SHE IS ASKED ON THE LEASH. The hammock is the one thing she is let
+    // off it for: up off her hands, and the ask handed on to the dispatch the
+    // moment she is standing (`leashRise`, `after`). Anything else waits for
+    // the collar to come off — and says so, rather than being eaten.
+    if (show.ask && L.mode === 'lead' && show.phase !== 'leashRise') {
+      const a = show.ask;
+      show.ask = null;
+      if (a === 'hammock') {
+        const why = askWhy('hammock');
+        if (!why) { show.did = 'hammock'; L.after = 'hammock'; go('leashRise', 'getup', 0.32); }
+        else { show.why = why; show.did = null; }
+      } else { show.why = 'leashed'; show.did = null; }
+    }
+    // The pull, out of her frame into the shore's, and the lurch it makes.
+    if (L.lurchV > 0.01) {
+      const dx = pt - L.ringTS[0], dz = ps - L.ringTS[1], gap = Math.hypot(dx, dz);
+      const v = gap > O.lurch.near ? L.lurchV : 0;
+      show.t += L.lurchT * v * dt; show.s += L.lurchS * v * dt;
+      L.lurchV *= Math.exp(-dt / O.lurch.tau);
+    } else L.lurchV = 0;
+    if (L.stumble > 0) L.stumble = Math.max(0, L.stumble - dt);
+    const face = () => { show.want = Math.atan2(ps - show.s, pt - show.t); };
+    switch (show.phase) {
+      case 'leashCome': {
+        // To a spot `stand` in front of you, on the line from you to her —
+        // by a way through if there is anything between (`hamPath`, found
+        // again when you have moved on by more than a stride): asked for
+        // from the hammock with her back on the promenade, a straight line
+        // is two rows of huts, and she gave up against the first and knelt
+        // on the promenade nineteen metres from you (MEASURED).
+        const dx = show.t - pt, dz = show.s - ps, dl = Math.hypot(dx, dz) || 1;
+        const mt = pt + dx / dl * O.stand, ms = ps + dz / dl * O.stand;
+        const J = L.come || (L.come = { legs: null, at: [0, 0], leg: 0 });
+        if (!J.legs || Math.hypot(J.at[0] - mt, J.at[1] - ms) > 1.2) {
+          J.legs = dl > 2.5 ? (hamPath(show.t, show.s, mt, ms) || [[mt, ms]]) : [[mt, ms]];
+          J.at[0] = mt; J.at[1] = ms; J.leg = 0;
+        }
+        J.legs[J.legs.length - 1] = [mt, ms];
+        const last = J.leg >= J.legs.length - 1;
+        const g = J.legs[Math.min(J.leg, J.legs.length - 1)];
+        const dist = showTo(g[0], g[1], dt, last ? 0.8 : 1.1);
+        if (!last && dist < 0.45) J.leg++;
+        if (last && (dist < 0.16 || (dl < O.stand + 0.35 && show.tmr > 12))) {
+          L.come = null;
+          go('leashKneel', 'submit', 0.35); face();
+        } else if (show.tmr > 40) {
+          // No way to you: it does not go on, and she says why.
+          L.come = null;
+          leashClear();
+          show.why = 'noway';
+          leashRelease(go);
+        }
+        break;
+      }
+      case 'leashKneel':
+        face();
+        if (done) { go('leashPut', 'kept', 0.30); L.putT = 0; }
+        break;
+      case 'leashPut': {
+        face();
+        const P = O.put;
+        L.putT += dt;
+        L.collar = sat((L.putT - P.wrap[0]) / (P.wrap[1] - P.wrap[0]));
+        if (L.putT >= P.buckle) L.buckled = true;
+        if (L.putT >= P.clip && !L.clipped) { L.clipped = true; L.said = 'on'; }
+        if (L.putT >= P.end) {
+          L.mode = 'lead';
+          go('leashDown', null);
+          f.play('kneel', { fade: O.kneelFade, from: O.kneelFrom });
+          L.trail.length = 0;
+        }
+        break;
+      }
+      case 'leashDown':
+        face();
+        if (S.cur && S.curT >= S.cur.dur - 0.03) go('leashFours', null);
+        break;
+      case 'leashFours':
+      case 'leashCrawl': {
+        // THE TRAIL: where you walked, a point every quarter metre.
+        const T = L.trail, lastP = T[T.length - 1];
+        if (!lastP || Math.hypot(pt - lastP[0], ps - lastP[1]) > O.trail.step) {
+          T.push([pt, ps]);
+          if (T.length > O.trail.most) T.shift();
+        }
+        // Drop what she has reached, and what is behind her on the way to
+        // you — a point further from you than her collar is already past.
+        const gap = Math.hypot(pt - L.ringTS[0], ps - L.ringTS[1]);
+        while (T.length > 1 && (Math.hypot(T[0][0] - show.t, T[0][1] - show.s) < O.trail.reach
+          || Math.hypot(T[0][0] - pt, T[0][1] - ps) > gap + 0.8)) T.shift();
+        L.stats.trail = T.length; L.stats.gap = gap;
+        const goal = T.length > 1 ? T[0] : [pt, ps];
+        const want = gap > O.follow + (show.phase === 'leashCrawl' ? O.stop : O.start)
+          ? Math.min(O.max, (gap - O.follow) * O.k) : 0;
+        L.v = damp(L.v, want, O.accel, dt);
+        if (show.phase === 'leashFours') {
+          face();
+          if (L.v > 0.08 || L.stumble > 0) {
+            go('leashCrawl', 'crawl', 0.22);
+          }
+          break;
+        }
+        // Crawling: along the trail, turning as a body on its hands turns —
+        // slower while she is still pointed away from where she is going.
+        show.want = Math.atan2(goal[1] - show.s, goal[0] - show.t);
+        let err = show.want - show.ang;
+        while (err > Math.PI) err -= TAU;
+        while (err < -Math.PI) err += TAU;
+        const turnK = Math.max(0.15, Math.cos(Math.min(Math.abs(err), Math.PI / 2)));
+        const v = L.v * turnK;
+        show.t += Math.cos(show.ang) * v * dt;
+        show.s += Math.sin(show.ang) * v * dt;
+        showClear();
+        L.stats.crawlV = v;
+        // The crawl's clock off her pace — and quick, while she is catching
+        // herself after a tug.
+        S.speed = L.stumble > 0 ? O.lurch.stumbleRate
+          : clamp(Math.max(v, L.lurchV) / O.clipV, O.rate[0], O.rate[1]);
+        if (L.v < 0.05 && L.stumble <= 0 && L.lurchV < 0.05) {
+          go('leashFours', null);
+          leashHoldFours(f, 0.28);
+        }
+        break;
+      }
+      case 'leashRise':
+        face();
+        if (done) {
+          if (L.after === 'hammock' && L.on) {
+            // Off the leash for it, and straight on to the hammock's own
+            // road — the dispatch's branch for 'hammock', as it is: the mark,
+            // the way there (`hamRoute`), `hamGo`. Not by handing the ask
+            // back to the dispatch, which only hears it from a phase it may
+            // be entered from — and the ones that are, out here, are `play`
+            // and `home`, which clamp her to her lane (see `leashRelease`).
+            L.mode = 'free'; L.freeT = 0; L.after = null;
+            const mk = hamMark();
+            const legs = mk ? hamRoute(mk) : null;
+            if (mk && legs) {
+              show.job = { name: 'hammock', t: mk.t, s: mk.s, since: 0, leg: 0, legs,
+                best: null, stall: 0, replan: 0 };
+              show.ham = { mark: mk, t: 0, enter: false, laugh: 0, pushedAt: -9, alone: 0 };
+              show.stuck = null;
+              show.queue.length = 0;
+              L.said = 'ham';
+              go('hamGo', 'walk', 0.32);
+            } else { show.why = 'noway'; L.mode = 'lead'; go('leashDown', 'kneel', 0.35); }
+          } else {
+            go('leashOff', 'idle', 0.30);
+            if (L.on && !L.offing) L.offing = { t: 0, fast: !!L.safe, ready: !!L.safe };
+          }
+        }
+        break;
+      case 'leashOff': {
+        // Up on her feet and a step to you, near enough for your hands at
+        // her neck — `stand` in front of you — and only then does it come
+        // off (`offing` waits for `ready`), unless it is a safeword.
+        if (!L.on) {
+          // Off: standing with you a moment (`care`), and then her own.
+          face();
+          show.vel = 0;
+          if (f.playing() !== 'idle') f.play('idle', { fade: 0.3 });
+          L.careT -= dt;
+          if (L.careT <= 0) leashRelease(go);
+          break;
+        }
+        const dx = show.t - pt, dz = show.s - ps, dl = Math.hypot(dx, dz) || 1;
+        const want = O.stand + 0.25;
+        if (L.offing && !L.offing.ready && !L.offing.fast && dl > want + 0.12 && show.tmr < 3) {
+          const dist = showTo(pt + dx / dl * want, ps + dz / dl * want, dt, 0.6);
+          if (dist < 0.12) L.offing.ready = true;
+        } else {
+          if (L.offing) L.offing.ready = true;
+          show.vel = 0;
+          if (f.playing() !== 'idle') f.play('idle', { fade: 0.3 });
+        }
+        face();
+        break;
+      }
+    }
+    show.gait = null;
+    const ms = performance.now() - t0;
+    L.stats.ms = ms; L.stats.msMax = Math.max(L.stats.msMax, ms); L.stats.msSum += ms; L.stats.frames++;
+    return true;
+  }
+
+  /**
+   * Every frame, from `stepShow` ahead of the phases: the collar coming off
+   * (`offing`), whatever she is doing; and her put back on the leash when
+   * she is let off it for the hammock and is out of it again.
+   */
+  function leashTick(dt, go) {
+    const L = leash;
+    L.stats.ms = 0;
+    if (!L.on) return;
+    if (L.offing) {
+      const O = LEASH_ON.off, o = L.offing;
+      // Standing for it, it waits until she has stepped to you — see `leashOff`.
+      if (show.phase === 'leashOff' && !o.ready && !o.fast) return;
+      if (show.phase === 'leashRise' && !o.fast && L.clipped) return;
+      o.t += dt * (o.fast ? O.fast : 1);
+      if (o.t >= O.unclip && L.clipped) { L.clipped = false; L.said = L.safe ? null : 'off'; }
+      if (o.t >= O.unbuckle) L.buckled = false;
+      if (o.t >= O.unwrap[0]) L.collar = Math.min(L.collar, 1 - sat((o.t - O.unwrap[0]) / (O.unwrap[1] - O.unwrap[0])));
+      if (o.t >= O.end) {
+        // And a moment more of her standing with you once it is off — a
+        // goodbye, or after a safeword the aftercare (90-app.js) — before
+        // she is her own again: see `leashOff`.
+        L.careT = L.safe && L.safe !== 'away' ? LEASH_ON.care[1] : LEASH_ON.care[0];
+        leashClear(); L.stats.offs = (L.stats.offs || 0) + 1;
+      }
+      return;
+    }
+    if (L.mode === 'free') {
+      L.freeT += dt;
+      const inHam = HAM[show.phase] && show.phase !== 'hamBack';
+      if (!inHam && (show.phase === 'hamBack' || L.freeT > LEASH_ON.freeGrace) && !LEASH_PH[show.phase]) {
+        // Back on the leash: down on all fours where she stands.
+        L.mode = 'lead'; L.trail.length = 0; L.stats.recapture++;
+        show.job = null; show.ham = null;
+        go('leashDown', 'kneel', 0.35);
+      }
+    }
+  }
+
+  /**
+   * "Take it off" (or the safeword, `safe` who said it). Answers a word:
+   * 'off', 'not on', 'busy'.
+   */
+  function leashOffAsk(safe = null) {
+    const L = leash;
+    if (!L.on) return 'not on';
+    if (L.offing) { if (safe) { L.offing.fast = true; L.safe = safe; } return 'off'; }
+    L.safe = safe;
+    const p = show ? show.phase : null;
+    // On her hands or knees: up first, then it comes off — see `leashRise`.
+    if (p === 'leashFours' || p === 'leashCrawl' || p === 'leashDown' || p === 'leashPut' || p === 'leashKneel') {
+      L.after = 'off';
+      // Not yet clipped, or a safeword: straight off while she gets up.
+      if (safe || !L.clipped) L.offing = { t: 0, fast: !!safe };
+      goNow('leashRise', 'getup', 0.32);
+      return 'off';
+    }
+    if (p === 'leashCome' || p === 'leashRise') {
+      L.offing = { t: 0, fast: true };
+      if (p === 'leashCome') goNow(sheIsIn() ? 'dwell' : 'home', 'idle', 0.3);
+      return 'off';
+    }
+    // Anywhere else (the hammock): off where she is.
+    L.offing = { t: 0, fast: !!safe };
+    return 'off';
+  }
+  /**
+   * Her own again, where she stands: in the kabina the room's `dwell`, and
+   * anywhere else `home` — which, with you there, is her playing near you.
+   * NOT `dwell` out here: its rule is the kabina's, and it walked her from
+   * the hammock back to the kabina door through two rows of huts (MEASURED,
+   * the first time the collar came off outside).
+   */
+  function leashRelease(go) {
+    if (sheIsIn()) { go('dwell', 'idle', 0.35); return; }
+    // AND OFF HER LANE — the pines, the alley — BACK TO IT BY A WAY THROUGH,
+    // the hammock's own road home (`hamHome`, `hamBack`). `home` there is
+    // `play`, whose `showMove` clamps to her lane and put her on the
+    // promenade eighteen metres away in one frame (MEASURED: taken off at the
+    // hammock, s 33.8, and the next frame she was at s 15.4).
+    if (show.s > SHOW.lane[1] + 0.3) {
+      const goal = [show.t, LANE_S()];
+      const legs = hamPath(show.t, show.s, goal[0], goal[1]) || [goal];
+      show.job = { name: 'hamBack', t: goal[0], s: goal[1], since: 0, leg: 0, legs, best: null, stall: 0 };
+      go('hamBack', 'walk', 0.36);
+      return;
+    }
+    go('home', 'walk', 0.36);
+  }
+  // A `go` from outside `stepShow`, for the two asks that arrive between frames.
+  function goNow(phase, clip, fade) {
+    if (!show || !skinFig) return;
+    skinFig.state.speed = 1;
+    if (clip) skinFig.play(clip, { fade });
+    show.gait = null; show.stall = 0; show.phase = phase; show.tmr = 0; show.said = 0;
+  }
+
+  /**
+   * THE DOOR, from 90-app.js at the bottom of the dip that has just put you
+   * in the other room: her a stride behind you, facing you, and her trail
+   * begun again. `inside` is the room you are now in.
+   */
+  function leashDoor(inside) {
+    const L = leash;
+    if (!L.on || !L.clipped || L.mode !== 'lead' || !special || !show) return false;
+    const K = special;
+    if (inside) {
+      const sIn = special.big.s0 + 2.35 * KAB.grow;
+      show.t = K.dc; show.s = sIn - 1.25; show.ang = show.want = Math.PI / 2;
+    } else {
+      show.t = K.dc; show.s = K.face + 0.30; show.ang = show.want = -Math.PI / 2;
+    }
+    show.rate = 0; show.vel = 0;
+    L.trail.length = 0; L.v = 0; L.lurchV = 0;
+    L.rehang = true;
+    leashRagLeave();
+    // And no ragdoll for a couple of frames: it would be entered where her
+    // mesh still is — the room she has just left, `stepShow` not having run
+    // yet — and pulled across it by its hips (MEASURED: the guard's 'far').
+    L.ragHold = 3;
+    L.stats.doors++;
+    return true;
+  }
+
+  /**
+   * YOU WENT SOMEWHERE, rather than walked there — a skip key, a cut that is
+   * not the kabina's door: her a stride behind wherever you are now (`x`,
+   * `z` world, `yaw` your heading), facing you, rather than the leash
+   * dragging you back across the resort to her.
+   */
+  function leashSnap(x, z, yaw) {
+    const L = leash;
+    if (!L.on || !L.clipped || L.mode !== 'lead' || !show) return false;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    const [t, s] = local(x - fx * 1.15, z - fz * 1.15);
+    const [pt, ps] = local(x, z);
+    show.t = t; show.s = s;
+    show.ang = show.want = Math.atan2(ps - s, pt - t);
+    show.rate = 0; show.vel = 0;
+    showClear();
+    L.trail.length = 0; L.v = 0; L.lurchV = 0; L.rehang = true;
+    leashRagLeave();
+    L.ragHold = 3;
+    L.stats.snaps = (L.stats.snaps || 0) + 1;
+    return true;
+  }
+
+  /** A tug from 90-app.js: `u` 0..1 how hard, `dir` the pull's way, world. */
+  function leashTug(u, dir) {
+    const L = leash;
+    if (!L.on || !L.clipped || L.mode !== 'lead') return false;
+    const O = LEASH_ON.lurch;
+    const a = local(L.ringW.x, L.ringW.z), b = local(L.ringW.x + dir.x, L.ringW.z + dir.z);
+    let dt0 = b[0] - a[0], ds0 = b[1] - a[1];
+    const l = Math.hypot(dt0, ds0);
+    if (l < 1e-4) return false;
+    dt0 /= l; ds0 /= l;
+    L.lurchT = dt0; L.lurchS = ds0;
+    L.lurchV = Math.max(L.lurchV, O.v[0] + (O.v[1] - O.v[0]) * u);
+    if (u > O.stumbleAt) { L.stumble = O.stumble[0] + (O.stumble[1] - O.stumble[0]) * u; L.stats.stumbles++; }
+    L.stats.tugs++;
+    L.stats.lurchMax = Math.max(L.stats.lurchMax, L.lurchV);
+    return true;
+  }
+
+  /**
+   * The leash's world for the chain: her capsules (every one CHAIN_BODY
+   * has, where she is drawn), and the mask of the ones round her neck, head
+   * and chest the links next to the ring let alone (LEASH.free).
+   */
+  let _lwCaps = null, _lwNear = 0;
+  function leashWorld() {
+    const out = { caps: null, n: 0, near: 0 };
+    if (!skinFig || !show) return out;
+    const caps = chainCapsules();
+    if (!_lwCaps || _lwCaps.length !== 8 * caps.length) {
+      _lwCaps = new Float64Array(8 * caps.length);
+      _lwNear = 0;
+      for (let k = 0; k < caps.length; k++) {
+        const nm = skinFig.bones[caps[k].bone].name;
+        if (nm === 'neck' || nm === 'head' || nm === 'chest') _lwNear |= 1 << k;
+      }
+    }
+    skinFig.mesh.updateMatrixWorld();
+    const M = skinFig.mesh.matrixWorld;
+    for (let k = 0; k < caps.length; k++) {
+      const cp = caps[k];
+      skinFig.boneAt(cp.bone, _bwP);
+      skinFig.boneTurn(cp.bone, _bwQ);
+      for (let e = 0; e < 2; e++) {
+        const p = e ? cp.e : cp.a;
+        _bwV.set(p[0] - cp.head.x, p[1] - cp.head.y, p[2] - cp.head.z).applyQuaternion(_bwQ).add(_bwP).applyMatrix4(M);
+        _lwCaps[8 * k + 3 * e] = _bwV.x; _lwCaps[8 * k + 3 * e + 1] = _bwV.y; _lwCaps[8 * k + 3 * e + 2] = _bwV.z;
+      }
+      _lwCaps[8 * k + 6] = cp.r0; _lwCaps[8 * k + 7] = cp.r1;
+    }
+    out.caps = _lwCaps; out.n = caps.length; out.near = _lwNear;
+    return out;
+  }
+
+  /** What 90-app.js needs of it, a frame. */
+  function leashState() {
+    const L = leash;
+    if (!show) return null;
+    if (skinFig) {
+      const hb = skinFig.boneIndex('head');
+      if (hb >= 0) skinFig.boneAt(hb, L.headW).applyMatrix4(skinFig.mesh.matrixWorld);
+    }
+    return { on: L.on, phase: show.phase, mode: L.mode, collar: L.collar, buckled: L.buckled,
+      care: L.careT > 0 && show.phase === 'leashOff', head: L.headW, safe: L.safe,
+      clipped: L.clipped, putT: L.putT, offT: L.offing ? L.offing.t : null, fast: L.offing ? L.offing.fast : false,
+      ring: L.ringW, neck: L.neckW, buckle: L.buckleW, left: L.leftW, right: L.rightW, fwd: L.fwdW,
+      feetY: skinFig ? skinFig.mesh.position.y : 0, rehang: L.rehang, said: L.said };
+  }
+
   // ── THE SLOW LICK, the half of it that happens to her ─────────────────────
   //
   // Misha, 25 Sep 2026: *"he runs toward either Baye or toward the player,
@@ -53014,7 +53979,7 @@ async function buildJadrija(scene) {
   const askLog = [];
   const ON_FEET = { wine: 1, coke: 1, give: 1, wear: 1, kiss: 1, hug: 1,
     fours: 1, handstand: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
-    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1, hammock: 1,
+    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1, hammock: 1, collar: 1,
     'hair.down': 1, 'hair.up': 1, 'fetch.cream': 1,
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
     'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1 };
@@ -53068,7 +54033,7 @@ async function buildJadrija(scene) {
   // back as an offer of the thing she is already wearing. See `doff_of` in
   // server/baye/baye.py, which now answers `doff:<key>`.
   const SHE_CAN = { line: 1, reset: 1, doff: 1, wine: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
-    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1,
+    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1, collar: 1,
     /**
      * AND THE HAMMOCK, in and out. Misha, 27 Sep 2026: *"I can sorta swing
      * baye on it"*. An errand to the pines behind the kabine and two clips —
@@ -53447,6 +54412,13 @@ async function buildJadrija(scene) {
    */
   function askWhy(name) {
     if (!show) return 'gone';
+    if (name === 'collar') {
+      // THE COLLAR — once is enough, and not from the water or the hammock.
+      if (leash.on) return leash.offing ? 'collaroff' : 'collared';
+      if (HAM[show.phase]) return 'inhammock';
+      if (show.phase === 'swim' || (show.dip || 0) > 0) return 'swimming';
+      return null;
+    }
     if (name === 'hammock') {
       if (!hammock) return 'nohammock';
       // In it, or on her way — asked again it is the same request.
@@ -54314,8 +55286,22 @@ async function buildJadrija(scene) {
       show.goMark = null; show.goNext = null;
       show.bumped = 0; show.buzzNod = 0; show.buzzBlink = 0;
       if (skinFig) hugArms(skinFig, 0);
+      if (leash.on) { leashClear(); leashRagLeave(); }
       go('dwell', 'idle', 0.35);
     }
+
+    // ── ON THE LEASH ─────────────────────────────────────────────────────
+    //
+    // Her leash phases (`LEASH_PH`) are hers alone, and run here, ahead of
+    // every rule below — the room walking her in, the hose, the dice, the
+    // dispatch — none of which knows what a woman on a leash is doing and all
+    // of which would stand her up. `leashStep` moves her and picks her clip;
+    // the placement after the switch puts her where it says. `leashTick` is
+    // the collar coming off, whatever she is doing, and her put back on the
+    // leash when she is out of the hammock she was let off it for.
+    leashTick(dt, go);
+    leashSkip: {
+    if (LEASH_PH[show.phase] && leashStep(dt, pt, ps, done, go)) break leashSkip;
 
     // The two set pieces, each with the setting-up its entry needs, so that the
     // dice below and the routine above can both start one without either
@@ -55358,6 +56344,14 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('toBar', 'walk', 0.32);
         } else show.did = null;      // no ladder to hold: she cannot, honestly
+      } else if (name === 'collar') {
+        // THE COLLAR — see `── THE COLLAR AND THE LEASH ──`. She comes to you
+        // and goes down on her knees for it; the rest is `leashStep`.
+        leashBegin();
+        show.queue.length = 0;
+        show.byAsk = 1;
+        show.job = null;
+        go('leashCome', 'walk', 0.32);
       } else if (name === 'hammock') {
         // TO THE HAMMOCK: the mark in front of it on the near side, and the
         // way there through the huts and the cars — `hamPath`, which `askWhy`
@@ -57844,6 +58838,7 @@ async function buildJadrija(scene) {
         break;
       }
     }
+    }   // ── leashSkip: see `leashStep` ──
 
     // ── the gait against the ground ───────────────────────────────────────
     //
@@ -70104,6 +71099,8 @@ async function buildJadrija(scene) {
     cotRagTick(dt);
     // And her hair in your hand, over either — see `pullTick`.
     pullTick(dt);
+    // And her collar pulled by the leash — see `leashRagTick`.
+    leashRagTick(dt);
     if (shoreFlag) shoreFlag.step(dt, shoreFlag.pole, 0, cam);
     for (const f of moleFlags) f.step(dt, f.pole, 0, cam);
     stepKabina(pt, ps, dt, who.y);
@@ -70154,6 +71151,9 @@ async function buildJadrija(scene) {
         // After both, because it reads the bones the step above has just
         // solved and it has to run on the held frame as well as the live one.
         placeHorns(dt);
+        // And the collar on her neck, now that the neck is where it is drawn
+        // — see `collarPlace`.
+        collarPlace(dt);
         // And the apprentice, LAST, for the same two reasons and one more.
         // She wears the leader's finished palette — every `aim` stepShow laid
         // on after the clip, the arms held wide, the hand at the stool — and
@@ -72658,6 +73658,45 @@ async function buildJadrija(scene) {
     cotSpank: (side, from, k, hit) => cotSpank(side, from, k, hit),
     /** The belt's world — her capsules, the cot — and a lash on her: see `beltWorld`, `beltHit`. */
     beltWorld: () => beltWorld(),
+    /**
+     * The collar and the leash (1.553.0) — see `── THE COLLAR AND THE LEASH ──`.
+     * `leashState` a frame's worth for 90-app.js; `leashOff(safe)` takes it
+     * off; `leashPull(F, dir, first)` the pull on her ring this frame and
+     * the first link's run; `leashTug(u, dir)` a yank; `leashDoor(inside)`
+     * the kabina's cut; `leashWorld` her capsules for the chain.
+     */
+    leashState: () => leashState(),
+    leashOff: (safe) => leashOffAsk(safe || null),
+    leashPull: (F, dir, first) => {
+      leash.pullF = F > 0 ? F : 0;
+      if (dir) leash.pullDir.copy(dir);
+      if (first) (leash.dirW || (leash.dirW = new THREE.Vector3())).copy(first);
+    },
+    leashTug: (u, dir) => leashTug(u, dir),
+    leashDoor: (inside) => leashDoor(inside),
+    leashSnap: (x, z, yaw) => leashSnap(x, z, yaw),
+    leashWorld: () => leashWorld(),
+    leashRehung: () => { leash.rehang = false; },
+    leashSaid: () => { const s = leash.said; leash.said = null; return s; },
+    leashRag: () => ({ ...lrStats, on: !!(lrR && lrR.on), layer: lrL.on, w: +lrL.w.toFixed(2) }),
+    leashRagReset: () => { lrStats.msMax = 0; lrStats.Fmax = 0; lrStats.pitchMax = 0; lrStats.chestMax = 0; lrStats.headDMax = 0; },
+    leashInfo: () => ({ ...leash.stats, on: leash.on, mode: leash.mode, phase: show ? show.phase : null,
+      collar: leash.collar, buckled: leash.buckled, clipped: leash.clipped, trailN: leash.trail.length,
+      v: +leash.v.toFixed(2), lurchV: +leash.lurchV.toFixed(2), stumble: +leash.stumble.toFixed(2),
+      ringTS: leash.ringTS.map((x) => +x.toFixed(2)), her: show ? [+show.t.toFixed(2), +show.s.toFixed(2)] : null,
+      offing: leash.offing ? +leash.offing.t.toFixed(2) : null, after: leash.after, safe: leash.safe,
+      ring: [+leash.ringW.x.toFixed(3), +leash.ringW.y.toFixed(3), +leash.ringW.z.toFixed(3)],
+      swing: +leash.swing.toFixed(2),
+      center: collarKit ? collarKit.K.group.getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(3)) : null }),
+    /** This frame's cost on her side, ms: her leash phase, and her ragdoll if it ran. */
+    leashMs: () => leash.stats.ms + (lrR && lrR.on ? lrStats.ms : 0),
+    collarFit: (at, back, lim) => collarFit(at, back, lim),
+    /** Debug: COLLAR_FIT changed and the collar built again to it. */
+    collarRefit: (o) => {
+      Object.assign(COLLAR_FIT, o || {});
+      if (collarKit) { collarKit.K.group.removeFromParent(); collarKit = null; }
+      return { ...COLLAR_FIT };
+    },
     beltHit: (h, from) => beltHit(h, from),
     /**
      * Where on her back, her bottom or a thigh the crosshair is — the ray from

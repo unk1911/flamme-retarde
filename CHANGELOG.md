@@ -8,6 +8,188 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.553.0] — 2026-09-30
+
+### The collar and the leash: black leather, a diamond chain, and a safeword
+
+Misha: *"assign a new additional play mode, of putting on the black collar
+with a diamond leash/chain, which we can pull, this could use those AVBD
+physics for the chain and yanking motion ... reuse the position where she's
+either 'kneeling' or 'on all fours' ... maybe also add some cool ragdoll stuff
+so it looks realistic, basically we need to be able to yank the collar around
+and lead her, even outside kabine, perhaps to the back where the hammock is.
+should also be possible to later take off the collar as well."*
+
+**What it is.** The belt's kind of scene: two adults playing, and it says so.
+She takes it laughing (`COLLAR_SAY`: "Hehe. Sad sam tvoja.", "Vodi me,
+ljubavi.", "Ah! Hehe, jaka si.", captioned with the gloss in your language),
+and the belt's safeword ends it at once: **"red" / "crvena" / "stop"** takes
+the collar straight off, and then comes the aftercare.
+
+**Controls.**
+- `=`, or type or say "collar" / "ogrlica" / "stavi joj ogrlicu" / "leash
+  her". It works anywhere on foot at Jadrija, in the kabina or out on the
+  beach, first or third person. She comes to you, finding a way round the
+  huts if she has to, and kneels up in front of you. You crouch, and your
+  right hand puts it on: the strap is laid round her neck from the buckle
+  (drawn as it goes round), buckled, and then the leash is clipped to the
+  D-ring at her throat. She goes down on all fours.
+- Walk, and she follows you on all fours at the leash's length. While you
+  lead her you walk at a lead's pace (1.45 m/s), and the leash holds you if
+  you get ahead of her (`you.tether` in 47-ground.js, 1.3 m from her ring to
+  your feet).
+- **The click is a tug.** Hold it to pull harder (0.5 s for a full one). If
+  the mouse is moving while you hold it, that counts too (`flick`). Let go
+  and your hand draws back along the leash until the chain is taut and past
+  it. With a lot of slack you take a step back with it. From a click to the
+  hardest, the pull on her ring is 45-165 N.
+- "Get in the hammock", said at the hammock, lets her off the leash and into
+  it. The chain stays clipped between your hand and her collar while she
+  lies there, and clicks push the hammock as they always did. When she gets
+  out ("get out"), she is back on all fours on the end of it. Anything else
+  asked while she is on the leash is answered "she is on the leash" (`why`
+  'leashed').
+- `=` again, or "take off the collar" / "skini ogrlicu" / "collar off" /
+  "unclip her". She gets up and steps to you, and your hands unclip the
+  leash, undo the buckle and draw the strap off. She says a line ("Hvala ti.
+  Opet sutra?") and stays with you a moment. Then she is her own again: the
+  room's `dwell` in the kabina, otherwise home to her lane by a way through
+  (`leashRelease`).
+- On the help sheet. The spoken words are `collar.on` / `collar.off` in the
+  service's INTENTS, and need `server/baye/baye.py` redeployed.
+
+**The safeword.** "Red" said while the collar is on sends the belt's
+`belt.stop` to the collar:
+- It comes off at 2.2 times the speed, while she gets up.
+- She answers with the belt's "Okej. Dođi ovamo.".
+- Then the aftercare, out of doors as well as in the kabina. She stands with
+  you for 4.5 s, and your hand goes into her hair, slowly round (the room's
+  petting is the kabina's only, so this is your own hand, `colAfter`). She
+  says "Mm... hvala ti."
+- It will not go on again for 3 s.
+
+**The belt and the collar are one hand.** The leash and the belt are both
+held in your right hand:
+- The belt will not come out while the leash is in it (`belt.collar`, "the
+  leash is in that hand").
+- The collar will not go on while the belt is out (`collar.belt`).
+- "Red" ends whichever of them is on.
+
+**Leaving.** Leaving the ground with it on (the sea, a bicycle, the boat)
+unclips it and takes the collar off. A skip key, which puts you somewhere
+rather than walking you there, puts her a stride behind you (`leashSnap`).
+
+**The collar** (`collarBuild`, new src/43-leash.js).
+- A black leather strap 28 mm wide and 5.8 mm thick, with rounded edges.
+  Pale stitching 3.4 mm in from each edge is drawn in the shader, with a
+  little grain.
+- A silver buckle with its prong and keeper on her left, the strap's tail
+  through it, and a D-ring on a bar at her throat. The D-ring swings toward
+  wherever the leash runs (it hangs when the leash is slack).
+- It rides her `neck` bone.
+- It was fitted against her drawn mesh from the front, the side and behind,
+  kneeling and on all fours. The first fit was sized from `chainFit`'s neck
+  numbers: 56 × 58 mm, 0.36 of the way up the bone. It sank under her jaw.
+  v2.0's neck-weighted skin is a strip down her throat, and her throat
+  stands 7-8 cm in front of the bone. It is now an oval 75 × 69 mm at 0.18
+  of the neck, `COLLAR_FIT`. `__fr.collar.fit(at, back)` measures her neck
+  in the strap's band at a height; `__fr.jad.raw().collarRefit` rebuilds it
+  to trial numbers.
+
+**The leash** (`leashChain`, 43-leash.js). It is 1.50 m of chain: 56
+plated links at 27 mm, drawn 30 mm long so they overlap, each carrying a
+brilliant-cut stone. The loop in your fist and the clasp at the ring are the
+same look.
+- **The physics is the cuff chain's solver, `avbdChainOwn`, unchanged.** It
+  was built for exactly this: rigid links with both end joints on world
+  points that move. Here those are the ring on her collar and your fist.
+  - Her 31 capsules and a floor are what it lies on. The four links at the
+    ring leave her neck, head and chest alone (`free`).
+  - Past 97.5 % of its length the joints give (`tautK`).
+  - A chain caught round her (8 cm of summed stretch for 0.2 s) is hung
+    afresh (`slip`). The first yank from in front of her stretched it round
+    her far side in a loop of parted links, photographed. Your hand's reach
+    is shortened by whatever the chain has had to go round her.
+- **The sparkle** is in the shader. Each facet is its own stone, chosen from
+  its normal, so it flashes as the link turns, in its own colour of fire, and
+  twinkles a little over time. There are three lights: the sun, a lamp
+  overhead with no shadow (the kabina has no sun in it, and a sun-only
+  sparkle was a grey chain there), and a glint along the line of sight.
+- It is solved only while it is clipped on.
+
+**What she does** (`leashStep` and its phases, 43-jadrija.js).
+- Her leash phases are hers alone. `stepShow` runs them ahead of every other
+  rule in it (the room walking her in, the hose, the dice, the dispatch)
+  through a labeled block, `leashSkip`. The placement after the switch still
+  puts her where they say. (No declaration in the block is read after it;
+  checked by script.)
+- The poses are her existing clips, not new ones:
+  - `submit` down to her knees;
+  - `kept` kneeling up for the collar;
+  - `kneel` from 0.58 s (where it has her on her knees) on to all fours;
+  - its last frame held for still;
+  - `crawl` to follow, its clock off her pace;
+  - `getup` to stand.
+- **Following is your trail, not a line.** She crawls the points you left,
+  a quarter metre apart, through the kabina's door, round the end of the
+  row and between the parked cars in the pines. Her own collider
+  (`showClear`) keeps her out of the blockers, and she keeps her collar
+  about a metre from your feet. She is quicker the further behind she falls,
+  up to 1.85 m/s, and slower while she is still turning.
+- **The door.** The kabina is two rooms swapped at the bottom of the door's
+  dip (`KAB.grow`). At that same moment `leashDoor` puts her a stride behind
+  where the cut put you, facing you, and starts the trail again: in the
+  doorway going out, and in the big room coming in. The chain is hung again
+  and her ragdoll held off for three frames. Without the hold, it was
+  entered where her mesh still was, in the room she had just left, and the
+  guard caught it (MEASURED).
+- **A tug lands in two places.**
+  - Her head and chest go through a partial ragdoll: the hair pull's net
+    (`leashRag*`, the 1.544.0 net with its spring moved from her scalp to
+    the ring at her throat), with her hips held. Tugs at 45-165 N lurch her
+    head 26-36° toward you and her chest 8-11°, and she is back on the pose
+    in about 0.6 s.
+  - Her hands and knees lurch toward you (`lurch`, 0.35-1.5 m/s), and past
+    a third of full strength she catches herself with a few quick steps of
+    the crawl (`stumble`, at 1.9 times its rate). She never falls over.
+  - **The net rides her frame.** In the world frame, every corner she
+    crawled round left her chest and head 40-75° behind her hips, all of it
+    drawn as give (MEASURED, 100 ms samples round the kabina). So each tick
+    it is carried rigidly by however her mesh moved, and the solve is the
+    pull and nothing else. After that, tugs on a walk round the room gave no
+    spikes and no rescues.
+  - A steady lean on the leash as you walk ahead of her was tried and is
+    not in. It kept the ragdoll on for the whole of a walk.
+
+**Solver: no change.** `src/43-avbd.js` and `src/43-belt.js` are byte for
+byte HEAD's. A side-by-side run of HEAD's solver and this tree's gives the
+same hash (`0cd54e9f25568b3a`) for two scenes:
+- a 600-step wrist chain between two moving ends against a moving capsule
+  and a floor;
+- a 900-step belt strap: a moving attitude-locked world joint, angles with
+  drive and limits, a string, world capsules with closing speeds, a soft
+  world box and a floor.
+
+In the game after the change:
+- the wrist cuffs' chain hangs and lies as before;
+- the hand spank lands (`cotSpank`, 0 rescues);
+- a belt swing lands (a lash, 0 rescues);
+- the kabina door and key 8 work;
+- `__fr.stats()` people 100, blockers 785;
+- no console errors.
+
+**Cost.** Nothing until it is clipped on. The chain is 0.33-0.40 ms a frame
+(120 Hz, up to 4 steps, 8 iterations). With her leash phase, your hand and
+the ragdoll while it is on, the whole thing averages 0.49-0.65 ms a frame in
+the kabina and 0.45-0.50 ms outside along the row and in the pines. The worst
+frame is about 4 ms: the door's cut, where the chain is hung again and
+settled for 20 steps.
+
+Debug: `__fr.collar`: `cmd`, `key`, `tug(u)`, `press`, `walk(pts, pitch,
+limit, back)`, `face`, `stats`, `links`, `measure`, `onFloor`, `fit`, `info`,
+`hand`, `tune`, `reset`. Also `__fr.stats().collar` and `__fr.jad.raw()`'s
+`leashState` / `leashInfo` / `leashRag` / `collarFit` / `collarRefit`.
+
 ## [1.552.0] — 2026-09-30
 
 ### The belt: out of her jeans, a metre of AVBD leather, and a safeword

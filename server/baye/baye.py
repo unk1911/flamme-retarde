@@ -448,6 +448,17 @@ INTENTS = [
     ("belt.back", [r"\b(belt|remen\w*|pojas\w*|ceinture)\b",
                    r"\b(back|on|away|natrag|nazad|vrati\w*|stavi\w*|remets?)\b"]),
     ("belt.out", [r"\b(belt|remen\w*|pojas\w*|ceinture)\b"]),
+    # ── AND THE COLLAR AND THE LEASH ────────────────────────────────────
+    #
+    # Misha, 30 Sep 2026 (1.553.0, COLLAR in src/90-app.js): the black collar
+    # on her with the diamond leash clipped to it, and off again. The page
+    # matches the TYPED line itself (`collarWords` in src/49-ears.js); these
+    # are for the spoken one. Taking it off names the collar too, and wins
+    # over putting it on (see `intents_of`). Its safeword is the belt's
+    # `belt.stop` above — the page sends "red" to whichever of them is on.
+    ("collar.off", [r"\b(collar|ogrlic\w*|povod\w*|leash|collier|laisse)\b",
+                    r"\b(off|remove|unclip\w*|unleash\w*|skini\w*|skin\w*|makni\w*|otkop\w*|enl[eè]ve\w*|retire\w*|d[eé]tache\w*)\b"]),
+    ("collar.on", [r"\b(collar|ogrlic\w*|povod\w*|leash|collier|laisse)\b"]),
 ]
 
 
@@ -1785,6 +1796,9 @@ def intents_of(text: str) -> list:
     # "Put the belt back on" names the belt too, and it is one command.
     if "belt.back" in out and "belt.out" in out:
         out.remove("belt.out")
+    # And "take the collar off" is one command, the off.
+    if "collar.off" in out and "collar.on" in out:
+        out.remove("collar.on")
     # And "lick the ball" is about the ball: one thing for him at a time, and
     # the one with the noun in it.
     if "doodle.ball" in out and "doodle.lick" in out:
