@@ -801,6 +801,10 @@ addEventListener('mousemove', (e) => {
     // and it is the field of view that decides how many pixels a radian is.
     const g = 0.0020 * flight.p.sens * (camera.fov / baseFov);
     ground.look(e.movementX * g, e.movementY * g);
+    // A tug being held: which way the mouse goes is which way it is yanked
+    // (COLLAR.yank.flickY) — counted in pixels, not pitch, so it still reads
+    // looking straight down at her, where the pitch is at its stop.
+    if (colPressed) colMouseY += e.movementY;
     return;
   }
   // On a board it is a head and nothing else. Steering is on the keys, which
@@ -1333,6 +1337,19 @@ function hammockAim(any = false) {
   // than 57, so the cloth only has to be in front of you, not under the
   // crosshair — "from more angles". And the reach is 2.8 m now (HAMMOCK).
   return fw.dot(_pushV) > 0.2 ? n : null;
+}
+
+/**
+ * The crosshair on the hammock itself, not merely the hammock in front of
+ * you (1.554.0): with her in it on the leash, a press aimed at the cloth is
+ * the push, and anywhere else a tug — see the press, `collarTuggable`.
+ */
+function hammockOnAim() {
+  const n = hammockAim(true);
+  if (!n) return false;
+  const fw = camera.getWorldDirection(_pushF);
+  _pushV.set(n.x - camera.position.x, n.y - camera.position.y, n.z - camera.position.z).normalize();
+  return fw.dot(_pushV) > 0.9;
 }
 
 // AND HARDER THE LONGER YOU HOLD IT. Misha, 27 Sep 2026: *"if, i dunno press
@@ -1999,6 +2016,16 @@ function beltStats() {
 // is back on all fours on the end of it. `=` again, or "take off the collar"
 // / "skini ogrlicu", and she gets up and your hands take it off.
 //
+// AND WHICH WAY (1.554.0). A firm tug (held a quarter second, or flicked)
+// with the mouse moved UP while it is held brings her up a step — all fours
+// to her knees, her knees to her feet, and from her knees or feet beside the
+// cot, on to it; moved DOWN, down a step (`flickY`). A firm pull toward the
+// cot takes her there from anywhere near it. On the cot a tug lifts her head
+// and shoulders to you (her side's `cotTug`), up is her knees on it, down her
+// front, and a firm pull from a step back has her off it. In the hammock a
+// tug swings it to you, and a firm one has her out. The words are the same
+// steps: "kneel", "stand up", "on all fours", "on the cot" (49-ears.js).
+//
 // THE BELT AND THE COLLAR ARE ONE HAND. The belt is held in your right hand
 // and so is the leash: the belt will not come out while the leash is in it
 // (`belt.collar`), and the collar will not go on while the belt is out
@@ -2018,7 +2045,13 @@ const COLLAR = {
   // A tug with more slack in it than `most` of an arm steps you back by the
   // rest, up to `step`.
   yank: { full: 0.50, flick: 5.0, up: 0.35, taut: 0.985, past: 0.07, more: 0.10, most: 0.65, step: 0.45,
-    rise: 0.07, peak: 0.10, fall: 0.38, arm: 1500, F: [45, 165] },
+    rise: 0.07, peak: 0.10, fall: 0.38, arm: 1500, F: [45, 165],
+    // UP OR DOWN (1.554.0): the mouse moved this many pixels up (or down)
+    // while the button is held is a yank that way — `flickY`; and the hand
+    // is drawn that much more up (`upY`), or down (`downY`), with it. How
+    // FIRM it has to be to move her pose is her side's (LEASH_POSE.firm):
+    // held a quarter second, or flicked.
+    flickY: 30, upY: 1.1, downY: 0.55 },
   // Walking with her on it: your pace, m/s, and the leash's reach from her
   // ring to your feet, level, m — past it you are held.
   pace: 1.45, tether: 1.30,
@@ -2034,6 +2067,11 @@ const COLLAR_SAY = {
   yank: [['Ah! Hehe, jaka si.', 'yank0'], ['Joj! Dobro, dobro.', 'yank1'], ['Uh! ...Još jednom.', 'yank2']],
   lead: [['Kamo me vodiš?', 'lead0'], ['Hehe, svi nas gledaju.', 'lead1'], ['Mm, sporije, ljubavi.', 'lead2']],
   ham: [['Mreža? Može.', 'ham0']],
+  // 1.554.0: a yank that moves her — up on her knees or her feet, down, on
+  // to the cot.
+  up: [['Mm, dobro, dobro.', 'up0'], ['Evo me, hehe.', 'up1'], ['Gore? Kako želiš.', 'up2']],
+  down: [['Dolje? Hehe, dobro.', 'down0'], ['Mm... polako.', 'down1']],
+  cot: [['Na krevet? Mm.', 'cot0'], ['Hehe, znam kamo me vodiš.', 'cot1']],
   off: [['Hvala ti. Opet sutra?', 'off0'], ['Mm... bilo je lijepo.', 'off1']],
   sayGap: 1.6,
 };
@@ -2043,7 +2081,8 @@ const colAt = new THREE.Vector3(), colHand = new THREE.Vector3(), colHold = new 
 const colDir = new THREE.Vector3(0, -1, 0), colPull = new THREE.Vector3(), colFirst = new THREE.Vector3();
 const _coA = new THREE.Vector3(), _coB = new THREE.Vector3(), _coC = new THREE.Vector3();
 let colPressed = false, colHeld = 0, colFlick = 0, colYawWas = null;
-let colYank = null;              // { t, u, dir, D, landed }
+let colMouseY = 0;               // the mouse's travel up (−) or down (+) while the tug is held, px
+let colYank = null;              // { t, u, dir, D, landed, gest }
 let colLock = 0, colClock = 0, colSaidAt = -9, colLeadNext = 16, colAfter = null;
 let colArm = 0;                  // the third person's right arm swung by a tug, rad
 let colWalk = null;              // debug: a walk for a probe — see `__fr.collar.walk`
@@ -2052,14 +2091,24 @@ let colKnelt = null;             // crouched for the putting on, and whether you
 let colAfterK = 0;               // the aftercare's hand in her hair, 0..1
 const colAfterAt = new THREE.Vector3();
 const colLog = { asked: 0, on: 0, off: 0, tugs: 0, landed: 0, Fmax: 0, safe: 0, said: [], why: null,
-  held: 0, tetherHits: 0 };
+  held: 0, tetherHits: 0, did: null, dids: {}, lastPress: null, poses: 0 };
 
 /** The leash as her side of it stands, or null. */
 const collarState = () => (jadrija && jadrija.leashState ? jadrija.leashState() : null);
 /** Whether the collar is on her at all — for "stop" meaning it, and for the belt. */
 function collarActive() { const s = collarState(); return !!(s && s.on); }
-/** Whether she is on the end of it and following — the press is a tug then. */
-function collarLeading() { const s = collarState(); return !!(s && s.on && s.clipped && s.mode === 'lead'); }
+/**
+ * Whether the press is a tug (1.554.0): clipped on, and not while it is going
+ * on or coming off — on all fours, on her knees, on her feet, on the cot and
+ * in the hammock alike. Through 1.553.0 this was 'following on all fours' only, which is
+ * why the leash did nothing to her anywhere but following on all fours.
+ */
+function collarTuggable() {
+  const s = collarState();
+  return !!(s && s.on && s.clipped && s.offT == null
+    && (s.mode === 'lead' || s.mode === 'cot' || s.mode === 'free')
+    && s.phase !== 'leashCome' && s.phase !== 'leashKneel' && s.phase !== 'leashPut');
+}
 
 // ── WHAT THE TWO OF YOU ARE DOING, for her voice ────────────────────────────
 //
@@ -2191,6 +2240,16 @@ function collarCmd(what) {
     if (got === 'off') colLog.off++;
     return got;
   }
+  // HER POSE ON IT, SAID (1.554.0): "stand up", "kneel", "on all fours",
+  // "on the cot" while it is on her — the words for what a firm yank does
+  // (see `leashTug` in 43-jadrija.js). 'posed', or why not.
+  const POSE = { 'collar.stand': 'stand', 'collar.kneel': 'kneel', 'collar.fours': 'fours', 'collar.cot': 'cot' };
+  if (POSE[what]) {
+    if (!collarActive()) return 'not on';
+    const got = jadrija && jadrija.leashPose ? jadrija.leashPose(POSE[what]) : 'not on';
+    if (got === 'ok') { colLog.poses++; return 'posed'; }
+    return got;
+  }
   // On.
   if (state.phase !== 'ground' || !ground || !ground.ok || !jadrija || !jadrija.askShow) return 'ground';
   if (typeof beltActive === 'function' && beltActive()) return 'belt';
@@ -2204,11 +2263,15 @@ function collarCmd(what) {
   return typeof got === 'string' ? got : 'nobody';
 }
 
-/** The press, with her on the leash: down winds a tug up, up lets it go. */
+/**
+ * The press, with her on the leash: down winds a tug up, up lets it go. And
+ * WHICH WAY (1.554.0): the mouse moved up while it is held is a yank up —
+ * which, firm, brings her up a step — and down is down (`flickY`).
+ */
 function collarPress(down) {
   if (down) {
-    if (!collarLeading()) return;
-    colPressed = true; colHeld = 0; colFlick = 0;
+    if (!collarTuggable()) return;
+    colPressed = true; colHeld = 0; colFlick = 0; colMouseY = 0;
     colYawWas = ground && ground.you ? ground.you.yaw : null;
     return;
   }
@@ -2216,26 +2279,33 @@ function collarPress(down) {
   colPressed = false;
   const Y = COLLAR.yank;
   const u = clamp(0.25 + 0.75 * Math.min(1, colHeld / Y.full) + colFlick / Y.flick, 0.2, 1);
-  collarTug(u);
+  const gest = colMouseY < -Y.flickY ? 'up' : colMouseY > Y.flickY ? 'down' : null;
+  colLog.lastPress = { u: +u.toFixed(2), held: +colHeld.toFixed(2), mouseY: Math.round(colMouseY), gest };
+  collarTug(u, gest);
 }
 
-/** A tug of `u` (0..1): see COLLAR.yank. The draw is decided against the leash as it hangs now. */
-function collarTug(u) {
+/**
+ * A tug of `u` (0..1), and `gest` 'up' / 'down' / null: see COLLAR.yank. The
+ * draw is decided against the leash as it hangs now — and drawn up or down
+ * with the gesture, so the pull on her ring goes that way too.
+ */
+function collarTug(u, gest = null) {
   const s = collarState();
-  if (!s || !s.clipped || s.mode !== 'lead') return false;
+  if (!s || !s.clipped || !(s.mode === 'lead' || s.mode === 'cot' || s.mode === 'free')) return false;
   const Y = COLLAR.yank, len = LEASH.len;
   _coA.subVectors(colHand, s.ring);
   const span = _coA.length() || 1;
   _coA.multiplyScalar(1 / span);
-  _coA.y += Y.up;
+  _coA.y += gest === 'up' ? Y.upY : gest === 'down' ? -Y.downY : Y.up;
   _coA.normalize();
   const want = Math.max(0.10, len * Y.taut - span) + Y.past + Y.more * u;
   const D = Math.min(Y.most, want);
-  colYank = { t: 0, u, dir: _coA.clone(), D, landed: false,
+  colYank = { t: 0, u, gest, dir: _coA.clone(), D, landed: false,
     step: Math.min(Y.step, Math.max(0, want - D)), stepped: 0 };
   colLog.tugs++;
   sceneLog.tugs.push(sceneNow());
   if (sceneLog.tugs.length > SCENE.keep) sceneLog.tugs.shift();
+  if (gest) colLog[gest] = (colLog[gest] || 0) + 1;
   return true;
 }
 
@@ -2328,7 +2398,7 @@ function collarHandTickIn(dt) {
   }
   // AND A JUMP rather than a walk (the skip keys): her a stride behind you
   // wherever you have landed, not the leash dragging you back to her.
-  if (s && s.clipped && s.mode === 'lead' && Yg && state.phase === 'ground'
+  if (s && s.clipped && (s.mode === 'lead' || s.mode === 'cot') && Yg && state.phase === 'ground'
     && Math.hypot(Yg.x - s.ring.x, Yg.z - s.ring.z) > COLLAR.tether + 2.5 && jadrija.leashSnap) {
     jadrija.leashSnap(Yg.x, Yg.z, Yg.yaw);
     Yg.tether = null;
@@ -2411,8 +2481,8 @@ function collarHandTickIn(dt) {
   } else if (s.clipped) {
     k = 1; grip = 1;
   }
-  // A TUG, while she is on it and following.
-  if (s.clipped && s.mode === 'lead') {
+  // A TUG, while she is on it — in every pose (1.554.0, `collarTuggable`).
+  if (s.clipped && s.offT == null && (s.mode === 'lead' || s.mode === 'cot' || s.mode === 'free')) {
     if (colPressed) {
       colHeld += dt;
       if (colYawWas != null && Yg) {
@@ -2463,7 +2533,7 @@ function collarHandTickIn(dt) {
   // The leash's own reach, and your pace, while it is clipped on.
   if (Yg) {
     if (s.clipped && s.ring) {
-      Yg.tether = { x: s.ring.x, z: s.ring.z, r: COLLAR.tether + (s.mode === 'free' ? 0.25 : 0) };
+      Yg.tether = { x: s.ring.x, z: s.ring.z, r: COLLAR.tether + (s.mode === 'free' || s.mode === 'cot' ? 0.25 : 0) };
       Yg.lead = s.mode === 'lead' ? COLLAR.pace : 0;
     } else { Yg.tether = null; Yg.lead = 0; }
   }
@@ -2528,7 +2598,7 @@ function collarSimTickIn(dt) {
   const hand = span > reach ? _coB.copy(s.ring).addScaledVector(_coA, reach / span) : colHand;
   const w = jadrija.leashWorld();
   const floor = Math.min(s.feetY, ground && ground.you ? ground.you.y : s.feetY);
-  leashC.step(dt, s.ring, hand, w.caps || new Float64Array(8), w.n, w.near, floor);
+  leashC.step(dt, s.ring, hand, w.caps || new Float64Array(8), w.n, w.near, floor, w.boxes, w.nb || 0);
   // THE PULL ON HER RING: a tug's draw past taut against your arm, up to the
   // tug's strength; or, walked out ahead of her, the leash leaning her on.
   colPull.copy(_coA).multiplyScalar(1 / span);
@@ -2545,8 +2615,14 @@ function collarSimTickIn(dt) {
     if (F > 20 && !colYank.landed) {
       colYank.landed = true;
       colLog.landed++;
-      jadrija.leashTug(colYank.u, colPull);
-      collarSay(colYank.u > 0.6 ? 'yank' : 'tug');
+      const did = jadrija.leashTug(colYank.u, colPull, colYank.gest);
+      colLog.did = did;
+      if (did) colLog.dids[did] = (colLog.dids[did] || 0) + 1;
+      // Her line: for the step it asked of her if it was one (1.554.0), and
+      // otherwise the tug's.
+      const step = { up: 'up', down: 'down', cot: 'cot', cotKnees: 'up', cotFlat: 'down', offCot: 'up',
+        hamOut: 'up' }[did];
+      collarSay(step || (colYank.u > 0.6 ? 'yank' : 'tug'), !!step);
     }
   }
   // AND ONLY A TUG. A steady lean on the leash as you walk ahead of her was
@@ -2562,7 +2638,7 @@ function collarSimTickIn(dt) {
   // And now and then, following you about outside, a word.
   const inKab = jadrija.kabina && jadrija.kabina.inside
     && jadrija.kabina.inside(ground.you.x, ground.you.z) > 0.5;
-  if (s.mode === 'lead' && s.phase === 'leashCrawl' && !inKab) {
+  if (s.mode === 'lead' && (s.phase === 'leashCrawl' || s.phase === 'leashWalk') && !inKab) {
     colLeadNext -= dt;
     if (colLeadNext <= 0) {
       colLeadNext = COLLAR.every[0] + Math.random() * (COLLAR.every[1] - COLLAR.every[0]);
@@ -3246,6 +3322,7 @@ const HELP = [
     ['[', 'help.k.ball'],
     ['\\', 'help.k.belt'],
     ['=', 'help.k.collar'],
+    ['CLICK + ↑ / ↓', 'help.k.yank'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -9108,11 +9185,22 @@ function tick(wall, draw) {
       if (pressing && !reachWas) { reachKind = 'belt'; beltPress(true); }
       if (!pressing && reachWas && reachKind === 'belt') beltPress(false);
     }
-    // THE LEASH, with her on the end of it and following: the press is a tug
-    // and nothing else — not the hose, not the hammock, not a reach. Down
-    // winds it up, up lets it go. See `collarPress`.
-    if (collarLeading()) {
-      if (pressing && !reachWas) { reachKind = 'leash'; collarPress(true); }
+    // THE LEASH, with her on the end of it: the press is a tug and nothing
+    // else — not the hose, not a reach. Down winds it up, up lets it go. See
+    // `collarPress`. IN EVERY POSE (1.554.0, `collarTuggable`), with two
+    // presses left as they were, because they are the OTHER hand's: on the
+    // cot, a press on her back, her bottom or a thigh (`cotAim`) is the hand
+    // spank — the leash stays in your right, the slap is your left; and at
+    // the hammock with the cloth in front of you and in reach, a press is
+    // the push it always was — the crosshair ON the cloth, which beside her
+    // in it is the one thing that tells the two apart (`hammockOnAim`). (The
+    // belt is still not to be had while the leash is in the hand the belt
+    // would be in: `belt.collar`.)
+    if (collarTuggable()) {
+      const s0 = pressing && !reachWas ? collarState() : null;
+      const other = s0 && ((s0.mode === 'cot' && reachKind === 'butt' && buttHit)
+        || (s0.mode === 'free' && !inKab && hammockOnAim()));
+      if (pressing && !reachWas && !other) { reachKind = 'leash'; collarPress(true); }
       if (!pressing && reachWas && reachKind === 'leash') collarPress(false);
     } else if (reachKind === 'leash' && !pressing) { reachKind = null; collarPress(false); }
     // THE HAMMOCK, outside: a press with the cloth in front of you and within
@@ -13163,7 +13251,12 @@ window.__fr = {
   collar: {
     cmd: (what) => collarCmd(what),
     key: () => collarCmd('collar.key'),
-    tug: (u = 0.6) => collarTug(u),
+    tug: (u = 0.6, gest = null) => collarTug(u, gest),
+    /** A firm yank flicked up / down (1.554.0) — the press's own path, `u` how hard. */
+    yankUp: (u = 0.8) => collarTug(u, 'up'),
+    yankDown: (u = 0.8) => collarTug(u, 'down'),
+    /** A pose asked for in words: 'stand' | 'kneel' | 'fours' | 'cot'. */
+    pose: (p) => collarCmd('collar.' + p),
     press: (on) => { collarPress(!!on); return colPressed; },
     walk: (pts, pitch = null, limit = 60, back = false) => {
       keys.delete('KeyW'); keys.delete('KeyS');

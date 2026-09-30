@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.49.0"
+VERSION = "1.49.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4182,6 +4182,16 @@ SHORE_DOING = {
                   "them",
     "leashRise": "getting up off all fours with the collar still on",
     "leashOff": "standing in front of them while they take the collar off you",
+    # 1.554.0's leash poses, the up and down steps a yank now makes.
+    "leashUp": "pulled up off all fours on to your knees by the leash",
+    "leashSit": "sinking back on to your heels on the end of their leash",
+    "leashKnelt": "kneeling up in front of them on the end of their leash, "
+                  "facing them",
+    "leashStandUp": "pulled up from your knees on to your feet by the leash",
+    "leashStand": "standing in front of them on the end of their leash, "
+                  "facing them",
+    "leashWalk": "walking behind them on your feet on the end of their leash",
+    "leashToCot": "being led over to the cot on the end of their leash",
     "hamUp": "getting up after tumbling out of the hammock",
     "hamFall": "tumbling out of the hammock",
     "hamBack": "walking back down through the pines from the hammock",

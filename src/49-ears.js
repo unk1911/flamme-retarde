@@ -893,6 +893,7 @@ const ears = (() => {
     leashed: 'she is on the leash — take the collar off first, or ask for the hammock',
     collared: 'she is already wearing it',
     collaroff: 'it is coming off',
+    nocot: 'the cot is in the kabina — lead her in there first',
   };
 
   /**
@@ -920,6 +921,16 @@ const ears = (() => {
   function collarWords(text) {
     const t = String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[.!?,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+    // HER POSE ON IT (1.554.0), and only while it is on her — otherwise these
+    // are the words they always were, and go on to her. "stand up", "kneel",
+    // "on all fours", "on the cot"; "ustani", "klekni", "na sve cetiri", "na
+    // krevet"; "debout", "a genoux", "a quatre pattes", "sur le lit".
+    if (typeof collarActive === 'function' && collarActive()) {
+      if (/^((stand|get)( up)?|on your feet|up|ustani( se)?|digni se|na noge|gore|debout|leve[- ]toi)$/.test(t)) return 'collar.stand';
+      if (/^(kneel( down| up)?|on your knees|(get )?(down )?on (your|her) knees|klekni( se)?|na koljena|(a|mets[- ]toi a) genoux)$/.test(t)) return 'collar.kneel';
+      if (/^((get )?(down )?on (all|your) fours|(all )?fours|down|na sve (cetiri|4)|cetveronoske|dolje|a quatre pattes)$/.test(t)) return 'collar.fours';
+      if (/^((get )?(up )?(on|onto|to) the (cot|bed)|(the )?(cot|bed)|(na|u) krevet|na lezaj|sur le lit|au lit)$/.test(t)) return 'collar.cot';
+    }
     if (/^((take |get |pull )?(the |her |your )?collar off( her)?|(take |get )off (the |her )?collar|remove (the |her )?collar|unclip( her| the leash)?|unleash( her)?|(skini|makni|otkopcaj) (joj )?(ogrlicu|povodac)|ogrlica dolje|(enleve|retire) (le |son |ton )?collier)$/.test(t)) return 'collar.off';
     if (/^((put )?(the |a |her |your )?collar( on)?( her)?|put (the |a |her )?collar on( her)?|put on (the |a |her )?collar|collar her|leash( her)?|(put |clip )(the |a |her )?leash on( her)?|(stavi |daj )?(joj )?(ogrlic[au]|povodac)|(mets? (lui )?)?(le |un |son )?collier|(la |en )?laisse)$/.test(t)) return 'collar.on';
     return null;
@@ -934,13 +945,16 @@ const ears = (() => {
       act('collar.stop');
       if (!(typeof beltActive === 'function' && beltActive())) return;
     }
-    if (name === 'collar.on' || name === 'collar.off' || name === 'collar.stop') {
+    if (name === 'collar.on' || name === 'collar.off' || name === 'collar.stop'
+      || name === 'collar.stand' || name === 'collar.kneel' || name === 'collar.fours' || name === 'collar.cot') {
       const got = typeof collarCmd === 'function' ? collarCmd(name) : 'nothing';
-      const ok = got === 'asked' || got === 'off' || got === 'stopped';
+      const ok = got === 'asked' || got === 'off' || got === 'stopped' || got === 'posed';
       note('collar: ' + (got === 'asked' ? 'she comes to you, and kneels for it'
         : got === 'off' ? 'it comes off her'
           : got === 'stopped' ? 'red — the collar comes straight off'
-            : typeof T === 'function' ? T('collar.' + got) : got), ok ? 'did' : 'meta');
+            : got === 'posed' ? { 'collar.stand': 'up on her feet, on the leash', 'collar.kneel': 'on her knees, on the leash',
+              'collar.fours': 'down on all fours, on the leash', 'collar.cot': 'to the cot, on the leash' }[name]
+              : WHY[got] || (typeof T === 'function' ? T('collar.' + got) : got)), ok ? 'did' : 'meta');
       return;
     }
     // The belt — `beltCmd` in 90-app.js, and what it answered.
