@@ -8,6 +8,65 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.8] — 2026-09-30
+
+### The Tisak plaza, the ivy, the vine and the book box: four things that were lumps or were in each other
+
+Misha, after 1.550.7: *"the tisak looks MUCH better, maybe spruce it up just a
+little bit more and fix this defect with the parasol pole going through a
+bench ... fix up this defective row of shrubberies that somehow ended up
+*inside* the wall ... remove this ugly canopy of "old trees" ... and spruce up
+those multi-coloured jadrija mailbox thingies"*.
+
+- **One bench under the CORONA, and it is `parkBench`.** The two garden
+  benches hung off the mast were measurably in things: the first ran
+  t0 − 2.93 to t0 − 1.37 along its seat with the mast at t0 − 1.45, s0 − 2.60,
+  0.10 m inside its s span; the second, turned 0.5 rad, put its west corner on
+  the mast's foot plate and through the end of the first. One is gone and the
+  other is the resort's standard green bench (`parkBench`, the one the bench
+  upgrade reaches), at t0 − 2.70, s0 − 2.62: facing the water, 0.21 m clear of
+  the foot plate, 0.47 m clear of the pole, 0.40 m clear of the beer-tent set.
+- **The Tisak, a little further along the pan (`front_265.8s`).** The step
+  ladder is folded and leaning on the west end behind the Jana, hoop on the
+  corner, where it stood open on the paving. The Jana is 2.15 m (0.58 × the
+  frame's 3.7 : 1) and its head is tucked behind the valance. Behind the window
+  the lining is pale and the goods carry more light (emissive 0.14 → 0.24),
+  and there is more hanging in it: two clip strips of printed packs over the
+  counter and two swim rings over the magazines.
+- **The ivy on the white wall is ivy.** Each lump was a `puff` centred 0.095 m
+  inside the render, so four fifths of it was in the wall and what showed was
+  a flat dark disc; the one on the coping was half under the cap. Now it is
+  leaves into `flora`: a five-point ivy leaf on a stalk, 18-63 mm off the
+  plaster, tipped down and turned out, overlapping like shingles; a mat on the
+  coping spilling over the arris; a drape down the cap's front; tongues down
+  the face to a wandering hem, paler and smaller at the growing tips; and
+  brown stems clinging 6 mm off the render. Same three runs, same bay test.
+- **The pergola over the lay-by is a grapevine** (`src/46-backlane.js`). The
+  "old trees" were its vine: 0.5-0.7 m knobbly ellipsoids on the wire and two
+  more hanging off the edge on nothing (the "lollipops"). The frame is
+  `a_012` / `a_015` and stays; on it now, in its own `floraBuilder` with the
+  grass's lit-through, wind-stirred material: two gnarled trunks twisting up
+  the seaward legs, cordons along the beams, canes wandering along the wires,
+  palmate grape leaves in a patchy layer over the wire and a thinner one under
+  it, nine shoots trailing off the seaward edge, and ten bunches going purple.
+  `leaf` and the two vine colours are gone.
+- **The book box (the "mailbox thingies")** is `_367` at full size: three
+  white planks with open joints, nail holes and worn arrises; the six kabina
+  doors routed in and painted (louvres cut with a shadow over each blade,
+  vertical boards on the green, wavy cuts on the second blue, framed panels on
+  the plain two, a routed transom over each, black handles, chipped edges); a
+  rust run from the hasp; a carcass of stained boards, vertical on the ends
+  and horizontal on the back; a raked lid on a fascia with a drip; square
+  black posts. The painting is lit (`tkPrintMat` on `tkSheet`) instead of an
+  unlit card, at full pigment.
+
+`jadrija.tris` 982,744 → 984,712 (+1,968: ladder, bench, book box, window
+clutter, less the ivy puffs); the non-instanced `flora` buffers +25.6k (the
+ivy leaves); `backlane.tris` 26,707 → 51,647 (the vine, 30,540 in
+`backlane:vine`, which casts). Blockers 786 → 785: the removed bench's
+collider; the ladder keeps one collider, moved with it. People 100, no
+console errors. No `rng` draws touched.
+
 ## [1.550.7] — 2026-09-30
 
 ### The Tisak, stocked: a newsstand is read by its print, and the awning is cloth
