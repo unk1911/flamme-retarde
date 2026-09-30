@@ -432,6 +432,22 @@ INTENTS = [
     ("doodle.ball", [r"\bplay\w*\b", r"\bfetch\b"]),
     ("doodle.ball", [r"\b(fetch\w*|donesi|rapporte\w*|va chercher)\b",
                      r"\b(doodle|dudl\w*|slow doodle|good boy)\b"]),
+    # ── AND YOUR BELT, IN THE KABINA ────────────────────────────────────
+    #
+    # Misha, 30 Sep 2026 (1.552.0, BELT_HAND in src/90-app.js): the belt out
+    # of your jeans and into your hand, and back — and its SAFEWORD, "red",
+    # which ends it whoever says it. The page matches the TYPED line itself
+    # before anything is sent (`beltWords` in src/49-ears.js), so "red" works
+    # signed out and offline; these are for the spoken one. The safeword is
+    # the whole sentence and nothing else — "red", "crvena", "stop",
+    # "safeword", "rouge" — and the page drops it again when there is no belt
+    # out, so a bare "stop" said to her in any other moment is still a thing
+    # said to her. "Back"/"on" with the noun is putting it back, and wins
+    # over taking it out (see `intents_of`).
+    ("belt.stop", [r"^\W*(red|crvena|crveno|rouge|safe\s?word|stop(\s+it)?|stani|dosta|enough|arr[eê]te)\W*$"]),
+    ("belt.back", [r"\b(belt|remen\w*|pojas\w*|ceinture)\b",
+                   r"\b(back|on|away|natrag|nazad|vrati\w*|stavi\w*|remets?)\b"]),
+    ("belt.out", [r"\b(belt|remen\w*|pojas\w*|ceinture)\b"]),
 ]
 
 
@@ -1766,6 +1782,9 @@ def intents_of(text: str) -> list:
     # in it wants the one with the toothbrush in it.
     if "fly.brush" in out and "fly.dance" in out:
         out.remove("fly.dance")
+    # "Put the belt back on" names the belt too, and it is one command.
+    if "belt.back" in out and "belt.out" in out:
+        out.remove("belt.out")
     # And "lick the ball" is about the ball: one thing for him at a time, and
     # the one with the noun in it.
     if "doodle.ball" in out and "doodle.lick" in out:

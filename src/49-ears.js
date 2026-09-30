@@ -506,6 +506,22 @@ const ears = (() => {
    * here. What differs is two headers and what the panel calls it.
    */
   async function send(blob, secs, typed = false) {
+    // THE BELT, AND ITS SAFEWORD, ARE MATCHED HERE — 1.552.0, BELT_HAND in
+    // 90-app.js. Before the sign-in and before anything is sent anywhere,
+    // because "red" has to work every time: signed out, offline, with the
+    // service slow. Only the typed line (a spoken one is transcribed on the
+    // service, which knows the same words: `belt.*` in INTENTS). And "stop"
+    // is the belt's only while the belt is out — otherwise it is a thing you
+    // said, and goes on as it always did.
+    if (typed) {
+      const bw = beltWords(blob);
+      if (bw && (bw !== 'belt.stop' || (typeof beltActive === 'function' && beltActive()))) {
+        note('“' + blob + '”  typed · here  → ' + bw, 'heard');
+        act(bw);
+        draw();
+        return;
+      }
+    }
     // AND IT SAYS WHY, rather than swallowing the line. On a keyboard this
     // was invisible — you can see the badge and you know whether you signed
     // in — and on a phone it is the whole feature failing silently: you tap
@@ -575,6 +591,11 @@ const ears = (() => {
         + ' · ' + d.ms + ' ms'
         + (lang ? ' · ' + lang : '')
         + (d.intents && d.intents.length ? '  → ' + d.intents.join(', ') : ''), 'heard');
+      // "Stop" is the belt's safeword only while there is a belt out (see
+      // `beltWords`); otherwise it is a sentence, and goes on to her.
+      if (d.intents && d.intents.length && !(typeof beltActive === 'function' && beltActive())) {
+        d.intents = d.intents.filter((n) => n !== 'belt.stop');
+      }
       // A command, and that is the whole of it — commands outrank conversation.
       if (d.intents && d.intents.length) {
         for (const it of d.intents) act(it, d.lang);
@@ -857,8 +878,34 @@ const ears = (() => {
     noway: 'she cannot find a way through to it from here',
   };
 
+  /**
+   * The belt's words, typed — see the note in `send`. English, Croatian and
+   * French, the whole line and nothing else: "belt", "remen", "take out your
+   * belt"; "belt back", "put the belt back on", "vrati remen"; and the
+   * safeword — "red", "crvena", "stop", "safeword", "rouge". Diacritics and
+   * a closing mark or two are forgiven.
+   */
+  function beltWords(text) {
+    const t = String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[.!?,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/^(red|crvena|crveno|rouge|safe ?word|stop( it)?|stani|dosta|enough|arrete)$/.test(t)) return 'belt.stop';
+    if (/^((put |do )?(the |your |my )?belt (back|back on|on|away|up)|put (the |your |my )?belt back( on)?|vrati (remen|pojas)|(remen|pojas) (natrag|nazad)|stavi remen|remets? (la |ta )?ceinture)$/.test(t)) return 'belt.back';
+    if (/^((take |get |pull )?(out )?(the |your |my )?belt( out| off)?|(izvadi |skini |uzmi )?(remen|pojas)|(enleve |sors )?(la |ta )?ceinture)$/.test(t)) return 'belt.out';
+    return null;
+  }
+
   /** Do a command. Every one reports back to the panel, including "nobody". */
   async function act(name, lang = null) {
+    // The belt — `beltCmd` in 90-app.js, and what it answered.
+    if (name === 'belt.out' || name === 'belt.back' || name === 'belt.stop') {
+      const got = typeof beltCmd === 'function' ? beltCmd(name) : 'nothing';
+      const ok = got === 'out' || got === 'back' || got === 'stopped';
+      note('belt: ' + (got === 'out' ? 'out of the loops and into your hand'
+        : got === 'back' ? 'back into the loops'
+          : got === 'stopped' ? 'red — it stops, and goes back on'
+            : typeof T === 'function' ? T('belt.' + got) : got), ok ? 'did' : 'meta');
+      return;
+    }
     if (name === 'fly.drop') {
       const Z = typeof jadrija !== 'undefined' && jadrija && jadrija.zombies;
       if (!Z || !Z.count()) { note('fly: there is no fly in the movement to hear you', 'meta'); return; }

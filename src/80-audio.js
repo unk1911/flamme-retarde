@@ -885,6 +885,45 @@ function buildAudio() {
     return true;
   }
 
+  // ── the belt ─────────────────────────────────────────────────────────────────
+  /**
+   * 1.552.0 — BELT in 43-belt.js. Made here and not recorded: a strap on skin
+   * is a very short bright snap (the leather's edge), the smack of the flat of
+   * it under that, and a little of the body — each a filtered noise burst,
+   * brighter and louder with `k`, 0..1 of how fast it came in. Under the crack
+   * (`crack` false) it was laid on her and not swung: a soft low pat and no
+   * snap at all. And after a crack, one time in two, her answer — the slap's
+   * own moans, one at a time as they always are.
+   *
+   * Lowpass Q in decibels (see `webaudio-q`): −3.01 is Butterworth.
+   */
+  function beltCrack(k = 0.5, crack = true) {
+    if (!ctx || !bed) return false;
+    const t0 = ctx.currentTime;
+    k = Math.max(0, Math.min(1, k));
+    if (!crack) {
+      burst({ freq: 380, q: -3.01, type: 'lowpass', dur: 0.08, gain: 0.06 + 0.06 * k, at: t0, dest: bed });
+      burst({ freq: 1300, q: 0.9, dur: 0.035, gain: 0.012 + 0.012 * k, at: t0, dest: bed });
+      return true;
+    }
+    const g = 0.12 + 0.22 * k;
+    burst({ freq: 2800 + 1600 * k, q: 0.9, dur: 0.024, gain: g, at: t0, dest: bed });
+    burst({ freq: 950, q: 0.8, dur: 0.06 + 0.035 * k, gain: g * 0.75, sweep: 0.55, at: t0 + 0.002, dest: bed });
+    burst({ freq: 240, q: -3.01, type: 'lowpass', dur: 0.09, gain: g * 0.45, at: t0, dest: bed });
+    if (verbSend) burst({ freq: 1800, q: 0.7, dur: 0.05, gain: g * 0.18, at: t0, dest: verbSend });
+    beltCracks++;
+    if (Math.random() < 0.5) moan(t0 + 0.18);
+    return true;
+  }
+  /** The swish of a swing through the air, `k` 0..1 how hard. */
+  function beltSwish(k = 0.5) {
+    if (!ctx || !bed) return false;
+    burst({ freq: 1500 + 700 * k, q: 1.4, dur: 0.16 + 0.06 * k, gain: 0.012 + 0.03 * k, sweep: 0.35,
+      at: ctx.currentTime + 0.05, dest: bed });
+    return true;
+  }
+  let beltCracks = 0;
+
   // ── her moan, after it ───────────────────────────────────────────────────────
   /**
    * Misha, 25 Sep 2026: *"after the slap audio is played, the next sound that
@@ -7769,7 +7808,8 @@ function buildAudio() {
   }
 
   return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle, creak,
-    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, moanCount: () => ({ n: moanPlayed, last: moanLast }), noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
+    beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, beltCrack, beltSwish,
+    beltCount: () => beltCracks, moanCount: () => ({ n: moanPlayed, last: moanLast }), noises, noiseWarm, noiseStop, noiseNow, canopy, boots, meow, horn, yelp, startle, hum, zombieHum, zombieSong, voiceLevel, swig, lick, kiss, kissWarm, kissCount: () => kissPlayed, buzz, brushRun, siteRun, mutter, pourSfx, pourWarm, fly,
     // The slow lick's slots — see `── the slow lick ──` above.
     doodleSlurp, lickLaugh, lickLaughStop, lickWarm,
     lickCount: () => ({ slurps, have: Object.keys(lickBufs),
