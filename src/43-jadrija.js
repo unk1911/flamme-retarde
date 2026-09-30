@@ -14126,6 +14126,9 @@ async function buildJadrija(scene) {
     const X = (u) => CW * u, Y = (m) => CH * (1 - m / o.h);
     const B = o.base;
     const GRIME = [0.055, 0.045, 0.030];
+    // How dirty: 1 for the back and the ends; the counter apron, which is
+    // wiped and sheltered by the awning, is cleaner (1.550.7).
+    const GA = o.grime ?? 1;
     const rows = [[0, Math.min(o.mid, o.h)], [Math.min(o.mid, o.h), o.h]];
     for (let i = 0; i < o.bays.length - 1; i++) {
       for (let r = 0; r < 2; r++) {
@@ -14151,14 +14154,14 @@ async function buildJadrija(scene) {
           const sw = CW * (0.0025 + 0.018 * h2 * h2);
           const len = (yF - yT) * (0.25 + 0.75 * h3);
           const sg = g.createLinearGradient(0, yT, 0, yT + len);
-          sg.addColorStop(0, tkCss(GRIME, 0.30 + 0.35 * h2));
+          sg.addColorStop(0, tkCss(GRIME, (0.30 + 0.35 * h2) * GA));
           sg.addColorStop(1, tkCss(GRIME, 0));
           g.fillStyle = sg;
           g.fillRect(sx - sw / 2, yT, sw, len);
         }
         // The line under the head of each panel where the water sits.
         const hg = g.createLinearGradient(0, yT, 0, yT + CH * 0.06);
-        hg.addColorStop(0, tkCss(GRIME, 0.45));
+        hg.addColorStop(0, tkCss(GRIME, 0.45 * GA));
         hg.addColorStop(1, tkCss(GRIME, 0));
         g.fillStyle = hg;
         g.fillRect(x0, yT, x1 - x0, CH * 0.06);
@@ -14178,7 +14181,7 @@ async function buildJadrija(scene) {
     // The splash along the foot, which every face has.
     const fg = g.createLinearGradient(0, Y(0.42), 0, Y(0));
     fg.addColorStop(0, tkCss(GRIME, 0));
-    fg.addColorStop(1, tkCss(GRIME, 0.55));
+    fg.addColorStop(1, tkCss(GRIME, 0.55 * GA));
     g.fillStyle = fg;
     g.fillRect(0, Y(0.42), CW, Y(0) - Y(0.42));
     // The red, bay by bay, and whatever is printed on it.
@@ -14243,51 +14246,133 @@ async function buildJadrija(scene) {
    */
   function tkAwnPrint(w, h) {
     const C = document.createElement('canvas');
-    C.height = 128;
-    C.width = Math.min(2048, Math.max(128, Math.round(128 * w / h)));
+    C.height = 168;
+    C.width = Math.min(2048, Math.max(128, Math.round(168 * w / h)));
     const g = C.getContext('2d');
     const CW = C.width, CH = C.height;
-    // Sun-faded: in the frame the valance is a salmon red beside the deeper
-    // red of the canopy over it.
-    g.fillStyle = tkCss([0.680, 0.130, 0.100]);
+    const hz = (n) => {
+      const x = Math.sin(n * 45.164 + 7.31) * 31718.927;
+      return x - Math.floor(x);
+    };
+    // CLOTH, NOT STEEL (1.550.7). The flutes that were here — a dark-light-
+    // dark stripe every 0.19 m — are what a pressed fascia has, and a regular
+    // pattern on a thing that has none is worse than a plain one. `_414` at
+    // 04:25.8 is acrylic canvas fifteen summers old: a salmon red where the
+    // sun has had it, deeper in the folds and under the piping, blotched, with
+    // a few soft creases running down it from the bar. The folds themselves
+    // are geometry (see the awning in `tisakFront`); this is only the dye.
+    g.fillStyle = tkCss([0.740, 0.190, 0.160]);
     g.fillRect(0, 0, CW, CH);
-    // The flutes a folding-arm valance drops in, one every 0.19 m, and a
-    // faint bleach down the middle of each where the sun has had it.
-    const n = Math.max(3, Math.round(w / 0.19));
-    for (let k = 0; k < n; k++) {
-      const x = CW * (k / n), dx = CW / n;
-      const fl = g.createLinearGradient(x, 0, x + dx, 0);
-      fl.addColorStop(0, tkCss([0.30, 0.03, 0.02], 0.30));
-      fl.addColorStop(0.5, tkCss([0.80, 0.40, 0.35], 0.10));
-      fl.addColorStop(1, tkCss([0.30, 0.03, 0.02], 0.22));
-      g.fillStyle = fl;
-      g.fillRect(x, 0, dx, CH);
+    // Big soft fade patches, paler toward the middle of each.
+    for (let k = 0; k < Math.round(CW / 90); k++) {
+      const x = CW * hz(k * 3 + 1), y = CH * (0.2 + 0.7 * hz(k * 3 + 2));
+      const r = CH * (0.6 + 1.4 * hz(k * 3 + 3));
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      const pale = hz(k * 7 + 5) > 0.45;
+      gr.addColorStop(0, pale ? tkCss([0.860, 0.380, 0.330], 0.22) : tkCss([0.420, 0.050, 0.040], 0.20));
+      gr.addColorStop(1, tkCss([0.7, 0.14, 0.11], 0));
+      g.fillStyle = gr;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
     }
-    // A hem line top and bottom, stitched.
-    g.fillStyle = tkCss([0.36, 0.04, 0.03], 0.55);
-    g.fillRect(0, CH * 0.05, CW, CH * 0.025);
-    g.fillRect(0, CH * 0.92, CW, CH * 0.025);
-    const INK = tkCss([0.820, 0.805, 0.770]);
-    // TISAK: in `_414` at 04:25.8 the word fills most of the valance's depth
-    // and starts about half a depth in from the end; about three cap heights
-    // wide, the same condensed bold `_343` has on the steel.
-    tkPress(g, 'TISAK', CH * 0.50, CH * 0.84, CH * 0.74, CH * 2.25, '800', INK);
+    // Creases: faint pale-over-dark pairs, mostly down, a few diagonal.
+    for (let k = 0; k < Math.round(CW / 70); k++) {
+      const x = CW * hz(k * 5 + 11), len = CH * (0.25 + 0.7 * hz(k * 5 + 12));
+      const y = CH * 0.08 + (CH * 0.9 - len) * hz(k * 5 + 13);
+      const dx = (hz(k * 5 + 14) - 0.5) * CH * 0.5;
+      g.lineWidth = 3 + 4 * hz(k * 5 + 15);
+      g.strokeStyle = tkCss([0.360, 0.040, 0.030], 0.12);
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + dx * 0.6, y + len * 0.5, x + dx, y + len); g.stroke();
+      g.strokeStyle = tkCss([0.900, 0.500, 0.450], 0.10);
+      g.beginPath(); g.moveTo(x + 5, y); g.quadraticCurveTo(x + 5 + dx * 0.6, y + len * 0.5, x + 5 + dx, y + len); g.stroke();
+    }
+    // The shade under the piping bar, and the hem, stitched, at the foot.
+    {
+      const gr = g.createLinearGradient(0, 0, 0, CH * 0.22);
+      gr.addColorStop(0, tkCss([0.25, 0.02, 0.02], 0.40));
+      gr.addColorStop(1, tkCss([0.25, 0.02, 0.02], 0));
+      g.fillStyle = gr;
+      g.fillRect(0, 0, CW, CH * 0.22);
+    }
+    g.fillStyle = tkCss([0.420, 0.050, 0.040], 0.55);
+    g.fillRect(0, CH * 0.93, CW, CH * 0.07);
+    g.fillStyle = tkCss([0.880, 0.520, 0.470], 0.45);
+    for (let x = 4; x < CW; x += 9) g.fillRect(x, CH * 0.915, 5, 2);
+    const INK = tkCss([0.860, 0.830, 0.800]);
+    // TISAK: a heavy italic in `_414`, its white gone a little pink and a
+    // little grey, a hair of lighter edge round it where the ink sits proud.
+    // Cap height 0.43 of the valance, starting 0.4 of a depth in from the
+    // end, two depths wide.
+    {
+      const px = CH * 0.62;
+      g.font = `900 ${Math.round(px)}px "Helvetica Neue", Arial, sans-serif`;
+      const k = (CH * 2.05) / Math.max(1, g.measureText('TISAK').width);
+      g.save();
+      g.translate(CH * 0.42, CH * 0.73);
+      g.transform(k, 0, -0.20, 1, 0, 0);
+      g.lineJoin = 'round';
+      g.lineWidth = CH * 0.030;
+      g.strokeStyle = tkCss([0.930, 0.900, 0.880], 0.75);
+      g.strokeText('TISAK', 0, 0);
+      g.fillStyle = INK;
+      g.fillText('TISAK', 0, 0);
+      g.restore();
+    }
     // The chips and CENTAR, right-hand end.
     const CHIP = [[0.800, 0.380, 0.045], [0.820, 0.440, 0.050], [0.720, 0.090, 0.060],
       [0.800, 0.260, 0.200], [0.860, 0.560, 0.030]];
     const cw = CH * 0.20, x0 = CW - CH * 2.55;
     for (let k = 0; k < 5; k++) {
       g.fillStyle = tkCss(CHIP[k]);
-      g.fillRect(x0 + k * cw * 1.15, CH * 0.17, cw, CH * 0.22);
+      g.fillRect(x0 + k * cw * 1.15, CH * 0.20, cw, CH * 0.20);
     }
-    tkPress(g, 'CENTAR', x0, CH * 0.78, CH * 0.30, CH * 1.18, '700', INK);
+    tkPress(g, 'CENTAR', x0, CH * 0.76, CH * 0.28, CH * 1.18, '700', INK);
     g.fillStyle = tkCss([0.820, 0.805, 0.770], 0.70);
-    g.fillRect(x0 + CH * 1.30, CH * 0.57, CH * 0.85, CH * 0.20);
+    g.fillRect(x0 + CH * 1.30, CH * 0.57, CH * 0.85, CH * 0.18);
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     return tex;
   }
+
+  /**
+   * The beach towel over the freezer in the window: `_414` at 04:25.8 has a
+   * blue one with white on it, thrown over the lid and hanging down the
+   * front. A blue ground, white wave bands and two white fish, 256 square.
+   */
+  function tkTowelPrint() {
+    const C = document.createElement('canvas');
+    C.width = 256; C.height = 256;
+    const g = C.getContext('2d');
+    g.fillStyle = tkCss([0.060, 0.260, 0.620]);
+    g.fillRect(0, 0, 256, 256);
+    g.strokeStyle = tkCss([0.880, 0.900, 0.920]);
+    g.lineWidth = 7;
+    for (let k = 0; k < 4; k++) {
+      g.beginPath();
+      for (let x = 0; x <= 256; x += 8) {
+        const y = 30 + k * 64 + Math.sin(x * 0.07 + k) * 8;
+        if (x) g.lineTo(x, y); else g.moveTo(x, y);
+      }
+      g.stroke();
+    }
+    const fish = (x, y, s, dir) => {
+      g.save(); g.translate(x, y); g.scale(dir * s, s);
+      g.fillStyle = tkCss([0.900, 0.910, 0.920]);
+      g.beginPath(); g.ellipse(0, 0, 34, 12, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.moveTo(28, 0); g.lineTo(50, -14); g.lineTo(50, 14); g.fill();
+      g.beginPath(); g.moveTo(-4, -10); g.lineTo(8, -26); g.lineTo(14, -10); g.fill();
+      g.fillStyle = tkCss([0.700, 0.080, 0.080]);
+      g.beginPath(); g.ellipse(-22, -2, 3, 3, 0, 0, Math.PI * 2); g.fill();
+      g.restore();
+    };
+    fish(90, 70, 1.2, 1);
+    fish(170, 190, 1.0, -1);
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  }
+
 
   /**
    * The Jana Ice Tea wrap, as a print on ONE FLAT FACE.
@@ -14298,123 +14383,197 @@ async function buildJadrija(scene) {
    * does not do that; the wrap in `_414` at 04:25.8 is artwork laid out for
    * the front face, and the lettering stays on the flat.
    *
-   * What the frame has, top to bottom on the front: `Jana` in red, a green
-   * leaf with `Ice Tea` on it in white, a yellow lemon splash with
-   * `SAMO opušteno!` in green, the tall amber bottle with lemons and leaves
-   * round it, and `Jana` again at the foot. Every colour here is in this file's linear units and
-   * goes through `tkCss`, because the cream ground is near white and hides
-   * the canvas gamma, and the red and the green do not.
+   * REDRAWN TO THE FRAME (1.550.7). 1.550.6 had the right words in the wrong
+   * proportions: a small bottle in a lot of cream, with lemons dotted down the
+   * free side like buttons. Opened at full size, `_414` at 04:25.8 is one
+   * enormous bottle that IS the artwork, measured as fractions of the print
+   * from the top: `Jana` in red to 0.10 and the green leaf with `Ice Tea`
+   * on it to 0.17; the bottle's yellow cap from 0.19 to 0.35 with
+   * `SAMO opušteno!` on it in green and a dark red seal over it; a white
+   * ring at 0.36; the amber shoulder and body to 0.55; the white label with
+   * `Jana` and a second leaf to 0.67; and below that the glass full of tea —
+   * orange, with two big lemon slices, a half lemon at the foot, leaves and
+   * ice down the right. The bottle is left of centre and fills two thirds of
+   * the width; loose leaves float to its right. Every colour here is in this
+   * file's linear units and goes through `tkCss` (the canvas-gamma note).
    */
   function tkJanaPrint(w, h) {
-    const PX = 520;
+    const PX = 600;
     const C = document.createElement('canvas');
     C.width = Math.round(w * PX);
     C.height = Math.round(h * PX);
     const g = C.getContext('2d');
     const CW = C.width, CH = C.height;
-    const CREAM = [0.760, 0.775, 0.700], RED = [0.640, 0.055, 0.050];
-    const GREEN = [0.150, 0.400, 0.080], LEM = [0.820, 0.690, 0.080];
-    const LEM_L = [0.880, 0.830, 0.420], AMBER = [0.520, 0.200, 0.030];
-    g.fillStyle = tkCss(CREAM);
-    g.fillRect(0, 0, CW, CH);
+    const X = (f) => CW * f, Y = (f) => CH * f;
+    const CREAM = [0.790, 0.800, 0.735], RED = [0.640, 0.030, 0.055];
+    const GREEN = [0.110, 0.380, 0.060], GREEN_L = [0.300, 0.620, 0.120];
+    const LEM = [0.900, 0.700, 0.040], LEM_L = [0.960, 0.880, 0.360];
+    const AMBER = [0.380, 0.110, 0.012], AMBER_L = [0.720, 0.300, 0.040];
+    const TEA = [0.880, 0.420, 0.030];
+    const css = tkCss;
     const ell = (x, y, rx, ry, rot, col) => {
-      g.fillStyle = tkCss(col);
+      g.fillStyle = css(col);
       g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); g.fill();
     };
-    const leafAt = (x, y, r, rot) => {
-      ell(x, y, r, r * 0.38, rot, GREEN);
-      g.strokeStyle = tkCss([0.35, 0.60, 0.20]);
-      g.lineWidth = Math.max(1, r * 0.06);
-      g.beginPath();
-      g.moveTo(x - Math.cos(rot) * r * 0.9, y - Math.sin(rot) * r * 0.9);
-      g.lineTo(x + Math.cos(rot) * r * 0.9, y + Math.sin(rot) * r * 0.9);
-      g.stroke();
-    };
-    const lemonAt = (x, y, r, rot) => {
-      ell(x, y, r, r * 0.74, rot, LEM);
-      ell(x - r * 0.25, y - r * 0.22, r * 0.45, r * 0.25, rot, LEM_L);
-      ell(x + Math.cos(rot) * r * 0.98, y + Math.sin(rot) * r * 0.98, r * 0.12, r * 0.09, rot, [0.60, 0.52, 0.05]);
-    };
-    const jana = (y, hgt) => {
-      g.font = `italic 800 ${Math.round(hgt)}px "Helvetica Neue", Arial, sans-serif`;
-      const k = Math.min(1, (CW * 0.84) / g.measureText('Jana').width);
-      g.save();
-      g.translate(CW * 0.5, y);
-      g.scale(k, 1);
-      g.textAlign = 'center';
-      g.fillStyle = tkCss(RED);
-      g.fillText('Jana', 0, 0);
-      g.restore();
-    };
-    // The name and the leaf with Ice Tea on it.
-    jana(CH * 0.085, CW * 0.36);
-    const ly = CH * 0.135;
-    ell(CW * 0.52, ly, CW * 0.36, CW * 0.085, -0.10, GREEN);
-    g.save();
-    g.translate(CW * 0.52, ly + CW * 0.035);
-    g.rotate(-0.10);
-    g.font = `italic 700 ${Math.round(CW * 0.10)}px "Helvetica Neue", Arial, sans-serif`;
-    g.textAlign = 'center';
-    g.fillStyle = tkCss([0.86, 0.87, 0.82]);
-    g.fillText('Ice Tea', 0, 0);
-    g.restore();
-    // SAMO opušteno! on a lemon splash.
-    const sy = CH * 0.235;
-    ell(CW * 0.45, sy, CW * 0.34, CW * 0.19, -0.12, LEM);
-    ell(CW * 0.40, sy - CW * 0.07, CW * 0.20, CW * 0.06, -0.12, LEM_L);
-    g.save();
-    g.translate(CW * 0.45, sy);
-    g.rotate(-0.12);
-    g.textAlign = 'center';
-    g.fillStyle = tkCss([0.090, 0.260, 0.060]);
-    g.font = `800 ${Math.round(CW * 0.095)}px "Helvetica Neue", Arial, sans-serif`;
-    g.fillText('SAMO', 0, -CW * 0.015);
-    g.font = `italic 700 ${Math.round(CW * 0.085)}px "Helvetica Neue", Arial, sans-serif`;
-    g.fillText('opušteno!', 0, CW * 0.085);
-    g.restore();
+    // Ground: cream, a hint of mint toward the foot.
     {
-      // The bottle: an amber body with a shoulder and a neck, a yellow label
-      // with the name on it, and a green cap.
-      const bx = CW * 0.40, bw = CW * 0.25, b0 = CH * 0.36, b1 = CH * 0.90;
-      g.fillStyle = tkCss(AMBER);
-      g.beginPath();
-      g.moveTo(bx - bw * 0.30, b0);
-      g.lineTo(bx + bw * 0.30, b0);
-      g.quadraticCurveTo(bx + bw * 0.34, b0 + CH * 0.05, bx + bw, b0 + CH * 0.12);
-      g.lineTo(bx + bw, b1 - CH * 0.02);
-      g.quadraticCurveTo(bx + bw, b1, bx + bw * 0.8, b1);
-      g.lineTo(bx - bw * 0.8, b1);
-      g.quadraticCurveTo(bx - bw, b1, bx - bw, b1 - CH * 0.02);
-      g.lineTo(bx - bw, b0 + CH * 0.12);
-      g.quadraticCurveTo(bx - bw * 0.34, b0 + CH * 0.05, bx - bw * 0.30, b0);
-      g.fill();
-      g.fillStyle = tkCss([0.700, 0.360, 0.060], 0.6);
-      g.fillRect(bx - bw * 0.72, b0 + CH * 0.14, bw * 0.22, b1 - b0 - CH * 0.18);
-      g.fillStyle = tkCss(GREEN);
-      g.fillRect(bx - bw * 0.32, b0 - CH * 0.025, bw * 0.64, CH * 0.03);
-      g.fillStyle = tkCss(LEM);
-      g.fillRect(bx - bw, b0 + CH * 0.24, bw * 2, CH * 0.16);
+      const gr = g.createLinearGradient(0, 0, 0, CH);
+      gr.addColorStop(0, css(CREAM));
+      gr.addColorStop(1, css([0.740, 0.790, 0.700]));
+      g.fillStyle = gr;
+      g.fillRect(0, 0, CW, CH);
+    }
+    const leaf = (x, y, len, rot, col = GREEN_L, rib = true) => {
       g.save();
-      g.translate(bx, b0 + CH * 0.345);
+      g.translate(x, y); g.rotate(rot);
+      g.fillStyle = css(col);
+      g.beginPath();
+      g.moveTo(-len * 0.5, 0);
+      g.quadraticCurveTo(0, -len * 0.30, len * 0.5, 0);
+      g.quadraticCurveTo(0, len * 0.30, -len * 0.5, 0);
+      g.fill();
+      if (rib) {
+        g.strokeStyle = css([0.60, 0.80, 0.40]);
+        g.lineWidth = Math.max(1, len * 0.025);
+        g.beginPath(); g.moveTo(-len * 0.45, 0); g.lineTo(len * 0.45, 0); g.stroke();
+      }
+      g.restore();
+    };
+    const janaWord = (cx, y, wide, px) => {
+      g.font = `italic 800 ${Math.round(px)}px "Helvetica Neue", Arial, sans-serif`;
+      const k = wide / Math.max(1, g.measureText('Jana').width);
+      g.save();
+      g.translate(cx, y); g.scale(k, 1);
       g.textAlign = 'center';
-      g.fillStyle = tkCss(RED);
-      g.font = `italic 800 ${Math.round(bw * 0.62)}px "Helvetica Neue", Arial, sans-serif`;
+      g.fillStyle = css(RED);
       g.fillText('Jana', 0, 0);
       g.restore();
-      // Lemons and leaves round it, off to the free side of the face.
-      lemonAt(CW * 0.80, CH * 0.44, CW * 0.14, 0.4);
-      lemonAt(CW * 0.82, CH * 0.66, CW * 0.12, -0.3);
-      lemonAt(CW * 0.76, CH * 0.84, CW * 0.13, 0.2);
-      leafAt(CW * 0.84, CH * 0.55, CW * 0.12, -0.9);
-      leafAt(CW * 0.70, CH * 0.75, CW * 0.10, 0.8);
-      leafAt(CW * 0.12, CH * 0.40, CW * 0.10, 1.1);
-      jana(CH * 0.975, CW * 0.26);
+    };
+    const iceTea = (cx, cy, len, rot) => {
+      leaf(cx, cy, len, rot, GREEN, false);
+      g.save();
+      g.translate(cx, cy); g.rotate(rot); g.translate(0, len * 0.08);
+      g.font = `italic 700 ${Math.round(len * 0.24)}px "Helvetica Neue", Arial, sans-serif`;
+      g.textAlign = 'center';
+      g.fillStyle = css([0.93, 0.95, 0.88]);
+      g.fillText('Ice Tea', 0, 0);
+      g.restore();
+    };
+    // The name and the leaf.
+    janaWord(X(0.42), Y(0.092), X(0.74), Y(0.07));
+    iceTea(X(0.46), Y(0.137), X(0.80), -0.10);
+    // Loose leaves round the cap.
+    leaf(X(0.05), Y(0.30), X(0.20), 1.25, GREEN);
+    leaf(X(0.86), Y(0.25), X(0.26), -0.55);
+    leaf(X(0.83), Y(0.315), X(0.28), 0.35, GREEN);
+    const bx = X(0.38);                       // the bottle's axis
+    const bw = X(0.34);                       // its half-width at the body
+    // The cap: dark red seal, then the big yellow cap with the line on it.
+    g.fillStyle = css([0.420, 0.040, 0.030]);
+    g.fillRect(bx - bw * 0.78, Y(0.185), bw * 1.56, Y(0.022));
+    {
+      const gr = g.createLinearGradient(bx - bw, 0, bx + bw, 0);
+      gr.addColorStop(0, css([0.800, 0.580, 0.020]));
+      gr.addColorStop(0.35, css(LEM_L));
+      gr.addColorStop(1, css(LEM));
+      g.fillStyle = gr;
+      g.beginPath();
+      g.roundRect(bx - bw * 0.86, Y(0.205), bw * 1.72, Y(0.125), X(0.06));
+      g.fill();
+    }
+    g.fillStyle = css([0.940, 0.900, 0.600]);
+    g.fillRect(bx - bw * 0.62, Y(0.325), bw * 1.24, Y(0.030));
+    g.save();
+    g.translate(bx, Y(0.262)); g.rotate(-0.06);
+    g.textAlign = 'center';
+    g.fillStyle = css([0.080, 0.300, 0.060]);
+    g.font = `800 ${Math.round(X(0.13))}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText('¡SAMO', 0, 0);
+    g.font = `italic 700 ${Math.round(X(0.12))}px "Helvetica Neue", Arial, sans-serif`;
+    g.fillText('opušteno!', 0, X(0.13));
+    g.restore();
+    // The white ring under the cap, then the shoulder and the amber body.
+    g.fillStyle = css([0.900, 0.905, 0.880]);
+    g.fillRect(bx - bw * 0.64, Y(0.352), bw * 1.28, Y(0.028));
+    const body = (y0, y1, col0, col1) => {
+      const gr = g.createLinearGradient(bx - bw, 0, bx + bw, 0);
+      gr.addColorStop(0, css(col0));
+      gr.addColorStop(0.28, css(col1));
+      gr.addColorStop(0.42, css(col1));
+      gr.addColorStop(1, css(col0));
+      g.fillStyle = gr;
+      g.fillRect(bx - bw, y0, bw * 2, y1 - y0);
+    };
+    {
+      const gr = g.createLinearGradient(bx - bw, 0, bx + bw, 0);
+      gr.addColorStop(0, css(AMBER));
+      gr.addColorStop(0.30, css(AMBER_L));
+      gr.addColorStop(1, css(AMBER));
+      g.fillStyle = gr;
+      g.beginPath();
+      g.moveTo(bx - bw * 0.64, Y(0.378));
+      g.lineTo(bx + bw * 0.64, Y(0.378));
+      g.bezierCurveTo(bx + bw * 0.70, Y(0.40), bx + bw, Y(0.40), bx + bw, Y(0.44));
+      g.lineTo(bx + bw, Y(0.555));
+      g.lineTo(bx - bw, Y(0.555));
+      g.lineTo(bx - bw, Y(0.44));
+      g.bezierCurveTo(bx - bw, Y(0.40), bx - bw * 0.70, Y(0.40), bx - bw * 0.64, Y(0.378));
+      g.fill();
+    }
+    // Highlights down the glass: a broad soft one and a sharp one.
+    g.fillStyle = css([0.950, 0.700, 0.350], 0.35);
+    g.fillRect(bx - bw * 0.62, Y(0.42), bw * 0.22, Y(0.13));
+    g.fillStyle = css([1.0, 0.95, 0.85], 0.55);
+    g.fillRect(bx + bw * 0.55, Y(0.43), bw * 0.07, Y(0.11));
+    // The label.
+    g.fillStyle = css([0.905, 0.905, 0.880]);
+    g.fillRect(bx - bw, Y(0.555), bw * 2, Y(0.115));
+    janaWord(bx - bw * 0.05, Y(0.607), bw * 1.55, Y(0.055));
+    iceTea(bx + bw * 0.05, Y(0.640), bw * 1.50, -0.12);
+    // The tea below it: orange glass, darker at the edges.
+    body(Y(0.670), Y(0.985), [0.620, 0.200, 0.020], TEA);
+    g.fillStyle = css([0.620, 0.200, 0.020]);
+    g.beginPath(); g.roundRect(bx - bw, Y(0.975), bw * 2, Y(0.02), X(0.04)); g.fill();
+    // Lemon slices, the pith ring, the segments.
+    const slice = (x, y, r, rot) => {
+      ell(x, y, r, r * 0.92, rot, [0.980, 0.780, 0.060]);
+      ell(x, y, r * 0.90, r * 0.83, rot, [0.980, 0.960, 0.820]);
+      ell(x, y, r * 0.80, r * 0.74, rot, [0.990, 0.820, 0.140]);
+      g.strokeStyle = css([0.980, 0.950, 0.780]);
+      g.lineWidth = Math.max(1, r * 0.05);
+      for (let k = 0; k < 9; k++) {
+        const a = rot + (k / 9) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x + Math.cos(a) * r * 0.80, y + Math.sin(a) * r * 0.74);
+        g.stroke();
+      }
+      ell(x, y, r * 0.10, r * 0.09, rot, [0.980, 0.960, 0.820]);
+    };
+    slice(bx + bw * 0.30, Y(0.715), X(0.17), 0.2);
+    slice(bx - bw * 0.62, Y(0.775), X(0.10), -0.3);
+    leaf(bx + bw * 0.55, Y(0.765), X(0.22), -0.7, GREEN);
+    leaf(bx - bw * 0.10, Y(0.82), X(0.20), 0.5);
+    slice(bx - bw * 0.35, Y(0.905), X(0.24), 0.0);
+    // Ice down the right, and the bubbles.
+    for (let k = 0; k < 4; k++) {
+      const x = X(0.78) + (k % 2) * X(0.07), y = Y(0.76 + k * 0.055);
+      g.fillStyle = css([0.920, 0.930, 0.900], 0.55);
+      g.beginPath(); g.roundRect(x - X(0.09), y - X(0.09), X(0.18), X(0.18), X(0.03)); g.fill();
+      g.fillStyle = css([1, 1, 1], 0.7);
+      g.fillRect(x - X(0.07), y - X(0.07), X(0.04), X(0.10));
+    }
+    for (let k = 0; k < 26; k++) {
+      const h1 = Math.sin(k * 12.9898) * 43758.5453, h2 = Math.sin(k * 78.233) * 43758.5453;
+      const fx = h1 - Math.floor(h1), fy = h2 - Math.floor(h2);
+      ell(bx - bw + fx * bw * 2, Y(0.69 + fy * 0.28), X(0.012), X(0.012), 0, [0.990, 0.900, 0.600]);
     }
     const tex = new THREE.CanvasTexture(C);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     return tex;
   }
+
 
   /**
    * The Ledo chest's print, off `1000150414` at 04:22.5 and 04:25.8: a blue
@@ -14476,6 +14635,400 @@ async function buildJadrija(scene) {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     return tex;
+  }
+
+  // ── THE TISAK, STOCKED (1.550.7) ────────────────────────────────────────
+  //
+  // Misha, 30 Sep 2026, after 1.550.6: *"maybe see if u can make it even
+  // better"*. Set beside `1000150414` at 04:25.8, what was left between the
+  // game and the kiosk was what it sells. In the frame the window is a wall
+  // of printed things — magazine covers, the papers' mastheads, a spinner of
+  // sea views, crisp bags on rails, bars and lighters and toys — and in the
+  // game it was the same places filled with plain coloured bricks, tidy as a
+  // spreadsheet. A newsstand is read by its print, not by its shelving.
+  //
+  // So everything behind the glass that has a face now has a printed one,
+  // out of ONE atlas (`tkGoodsAtlas`, 1024 square) drawn here at load: sixteen
+  // magazine covers, four front pages, sixteen postcards, eight crisp bags,
+  // sixteen small packs and four header cards. Every title, headline and
+  // brand on it is invented — this repository is public (see the note on
+  // redistributable assets), and the real mastheads in the frame belong to
+  // other people. The TISAK, Jana and Ledo marks the game already carries
+  // stay as they are. All of it is laid as faces of `tkGoods`, one mesh and
+  // one draw for the lot, and every variation is an index hash (rule 4).
+
+  /**
+   * The goods atlas. Cells are addressed by kind and index through `cell`,
+   * which hands back `[u0, u1, v0, v1]` inset by a texel and a half so that a
+   * mip level never bleeds one cover into the next.
+   *
+   *   mag   16 covers, 128 x 176 px, two rows of eight
+   *   news   4 front pages, 256 x 160
+   *   card  16 postcards, 128 x 84
+   *   bag    8 crisp bags, 128 x 160
+   *   hdr    4 header cards, 256 x 64
+   *   pack  16 small packs, 64 x 120 (bars, gum, cigarettes)
+   */
+  function tkGoodsAtlas() {
+    const N = 1024;
+    const C = document.createElement('canvas');
+    C.width = N; C.height = N;
+    const g = C.getContext('2d');
+    const hz = (n) => {
+      const x = Math.sin(n * 91.3458 + 17.717) * 47453.5453;
+      return x - Math.floor(x);
+    };
+    const css = tkCss;
+    const FONT = '"Helvetica Neue", Arial, sans-serif';
+    const font = (px, w = '800', it = false) => { g.font = `${it ? 'italic ' : ''}${w} ${Math.round(px)}px ${FONT}`; };
+    // Text squeezed to a width, the way a masthead is set.
+    const fit = (text, x, y, px, wide, col, w = '800', align = 'left', it = false) => {
+      font(px, w, it);
+      const m = g.measureText(text).width;
+      const k = Math.min(1.25, wide / Math.max(1, m));
+      g.save();
+      g.translate(align === 'center' ? x - (m * k) / 2 : x, y);
+      g.scale(k, 1);
+      g.fillStyle = col;
+      g.textAlign = 'left';
+      g.fillText(text, 0, 0);
+      g.restore();
+    };
+    const rect = (x, y, w, h, c) => { g.fillStyle = css(c); g.fillRect(x, y, w, h); };
+    const ell = (x, y, rx, ry, c, rot = 0) => {
+      g.fillStyle = typeof c === 'string' ? c : css(c);
+      g.beginPath(); g.ellipse(x, y, Math.max(0.5, rx), Math.max(0.5, ry), rot, 0, Math.PI * 2); g.fill();
+    };
+    const grad = (x, y, w, h, c0, c1) => {
+      const gr = g.createLinearGradient(x, y, x, y + h);
+      gr.addColorStop(0, css(c0)); gr.addColorStop(1, css(c1));
+      g.fillStyle = gr; g.fillRect(x, y, w, h);
+    };
+    // Grey lines that read as body text at any distance a kiosk is seen from.
+    const lines = (x, y, w, h, n, c = [0.30, 0.30, 0.30]) => {
+      for (let i = 0; i < n; i++) {
+        const lw = w * (0.55 + 0.45 * hz(x * 3 + y * 7 + i));
+        rect(x, y + (h / n) * i, lw, Math.max(1, (h / n) * 0.45), c);
+      }
+    };
+    // Three little pictures a cover or a card can carry, all shapes.
+    const face = (x, y, w, h, k) => {
+      const SK = [[0.78, 0.52, 0.38], [0.62, 0.38, 0.26], [0.84, 0.62, 0.50]][k % 3];
+      const HR = [[0.08, 0.05, 0.03], [0.55, 0.35, 0.12], [0.80, 0.66, 0.36]][(k + 1) % 3];
+      ell(x + w * 0.5, y + h * 1.02, w * 0.50, h * 0.36, [0.20 + 0.5 * hz(k), 0.18, 0.30 + 0.4 * hz(k + 1)]);
+      ell(x + w * 0.5, y + h * 0.45, w * 0.30, h * 0.36, HR);
+      ell(x + w * 0.5, y + h * 0.50, w * 0.22, h * 0.28, SK);
+      ell(x + w * 0.5, y + h * 0.84, w * 0.09, h * 0.10, SK);
+      ell(x + w * 0.42, y + h * 0.47, w * 0.03, h * 0.02, [0.05, 0.05, 0.06]);
+      ell(x + w * 0.58, y + h * 0.47, w * 0.03, h * 0.02, [0.05, 0.05, 0.06]);
+      ell(x + w * 0.5, y + h * 0.63, w * 0.07, h * 0.02, [0.55, 0.12, 0.12]);
+    };
+    const seaView = (x, y, w, h, k) => {
+      // Sky, the far islands, the sea, a shore with pines, sometimes a town.
+      grad(x, y, w, h * 0.5, [0.20 + 0.10 * hz(k), 0.45, 0.85], [0.70, 0.82, 0.92]);
+      const hy = y + h * (0.40 + 0.12 * hz(k + 3));
+      g.fillStyle = css([0.40, 0.52, 0.55]);
+      g.beginPath(); g.moveTo(x, hy);
+      for (let i = 0; i <= 6; i++) g.lineTo(x + (w * i) / 6, hy - h * 0.06 * hz(k * 7 + i));
+      g.lineTo(x + w, hy); g.fill();
+      const SEA = hz(k + 5) > 0.5 ? [0.03, 0.35, 0.55] : [0.02, 0.42, 0.52];
+      grad(x, hy, w, y + h - hy, SEA, [0.05, 0.55, 0.60]);
+      // A few white sparkle strokes on the water.
+      for (let i = 0; i < 6; i++) {
+        rect(x + w * hz(k * 13 + i), hy + (y + h - hy) * (0.2 + 0.6 * hz(k * 17 + i)),
+          w * 0.08, 1, [0.9, 0.95, 1.0]);
+      }
+      if (hz(k + 9) > 0.35) {
+        // The near shore on one side, with pines on it.
+        const L = hz(k + 11) > 0.5;
+        const sx = L ? x : x + w * 0.55, sw = w * 0.45;
+        g.fillStyle = css([0.60, 0.55, 0.45]);
+        g.beginPath(); g.moveTo(sx, y + h);
+        g.lineTo(L ? sx : sx + sw, hy - h * 0.10); g.lineTo(L ? sx + sw : sx, y + h); g.fill();
+        for (let i = 0; i < 4; i++) {
+          const px = sx + sw * (L ? 0.1 + 0.18 * i : 0.9 - 0.18 * i);
+          ell(px, hy - h * (0.02 + 0.05 * hz(k + i)), w * 0.07, h * 0.08, [0.06, 0.20, 0.06]);
+        }
+        if (hz(k + 13) > 0.5) {
+          // A white town with a campanile.
+          for (let i = 0; i < 5; i++) {
+            rect(sx + sw * (0.15 + 0.14 * i), hy + h * 0.02, sw * 0.12, h * 0.08,
+              [0.88, 0.84, 0.76]);
+            rect(sx + sw * (0.15 + 0.14 * i), hy + h * 0.02, sw * 0.12, h * 0.02,
+              [0.60, 0.22, 0.10]);
+          }
+          rect(sx + sw * 0.5, hy - h * 0.14, sw * 0.07, h * 0.24, [0.90, 0.86, 0.78]);
+        }
+      }
+    };
+    const food = (x, y, w, h, k) => {
+      rect(x, y, w, h, [0.72, 0.55, 0.35]);
+      ell(x + w * 0.5, y + h * 0.55, w * 0.42, h * 0.36, [0.90, 0.90, 0.88]);
+      for (let i = 0; i < 7; i++) {
+        const c = [[0.70, 0.10, 0.05], [0.20, 0.50, 0.10], [0.85, 0.60, 0.10], [0.50, 0.25, 0.10]][(i + k) % 4];
+        ell(x + w * (0.30 + 0.40 * hz(k * 5 + i)), y + h * (0.40 + 0.30 * hz(k * 9 + i)),
+          w * 0.08, h * 0.06, c);
+      }
+    };
+
+    // ── magazines ─────────────────────────────────────────────────────────
+    const MAG = [
+      ['OTOK', 'LJETO NA JADRANU', 'sea'], ['ZVIJEZDE', 'EKSKLUZIVNO', 'face'],
+      ['KUHINJA', '100 RECEPATA', 'food'], ['KRIŽALJKE', 'ZA PLAŽU', 'grid'],
+      ['DOM i VRT', 'Moj mali vrt', 'garden'], ['MOTOR', 'TEST: 12 AUTA', 'car'],
+      ['MODA', 'Trendovi ljeta', 'face'], ['PUTOVANJA', 'Najljepše uvale', 'sea'],
+      ['ZDRAVLJE', 'Kako preživjeti vrućine', 'face'], ['MALI JUNAK', 'poster!', 'kids'],
+      ['SPORT', 'VELIKO FINALE', 'sport'], ['TV TJEDAN', 'Sve serije', 'face'],
+      ['SUDOKU', '250 zadataka', 'grid'], ['RIBOLOV', 'Lov na zubaca', 'sea'],
+      ['POVIJEST', 'Tajne tvrđava', 'fort'], ['GLAMUR', 'Vjenčanje godine', 'face'],
+    ];
+    const MG = [[0.72, 0.06, 0.08], [0.05, 0.20, 0.55], [0.85, 0.75, 0.05], [0.08, 0.08, 0.08],
+      [0.10, 0.45, 0.20], [0.70, 0.20, 0.55], [0.90, 0.40, 0.05], [0.85, 0.85, 0.85]];
+    for (let i = 0; i < 16; i++) {
+      const x = (i % 8) * 128, y = Math.floor(i / 8) * 176, w = 128, h = 176;
+      const [title, line, pic] = MAG[i];
+      const M = MG[(i * 3 + 1) % MG.length];
+      const dark = M[0] + M[1] + M[2] < 1.2;
+      g.save();
+      g.beginPath(); g.rect(x, y, w, h); g.clip();
+      // The picture, most of the cover.
+      if (pic === 'sea') seaView(x, y + 30, w, h - 30, i);
+      else if (pic === 'face') {
+        grad(x, y, w, h, [0.3 + 0.5 * hz(i), 0.3 + 0.4 * hz(i + 1), 0.4 + 0.5 * hz(i + 2)],
+          [0.9, 0.85, 0.8]);
+        face(x + w * 0.1, y + 36, w * 0.8, h * 0.62, i);
+      } else if (pic === 'food') food(x, y + 30, w, h - 30, i);
+      else if (pic === 'grid') {
+        rect(x, y, w, h, [0.92, 0.90, 0.84]);
+        for (let a = 0; a < 9; a++) {
+          for (let b = 0; b < 11; b++) {
+            rect(x + 10 + a * 12, y + 42 + b * 12, 11, 11,
+              hz(i * 100 + a * 11 + b) > 0.8 ? [0.05, 0.05, 0.05] : [0.98, 0.98, 0.96]);
+          }
+        }
+        ell(x + w * 0.78, y + h * 0.80, 22, 22, [0.90, 0.10, 0.10]);
+      } else if (pic === 'garden') {
+        grad(x, y, w, h, [0.55, 0.78, 0.90], [0.20, 0.50, 0.12]);
+        for (let a = 0; a < 14; a++) {
+          ell(x + w * hz(i + a), y + h * (0.5 + 0.45 * hz(i * 3 + a)), 9, 9,
+            [[0.9, 0.2, 0.3], [0.95, 0.8, 0.1], [0.9, 0.9, 0.9]][a % 3]);
+        }
+      } else if (pic === 'car') {
+        grad(x, y, w, h, [0.30, 0.32, 0.36], [0.70, 0.70, 0.72]);
+        g.fillStyle = css([0.75, 0.05, 0.05]);
+        g.beginPath(); g.roundRect(x + 10, y + 100, w - 20, 34, 12); g.fill();
+        g.beginPath(); g.roundRect(x + 32, y + 82, w - 64, 28, 10); g.fill();
+        ell(x + 34, y + 136, 12, 12, [0.05, 0.05, 0.05]);
+        ell(x + w - 34, y + 136, 12, 12, [0.05, 0.05, 0.05]);
+      } else if (pic === 'kids') {
+        rect(x, y, w, h, [0.95, 0.80, 0.05]);
+        ell(x + w * 0.5, y + h * 0.58, 40, 44, [0.10, 0.45, 0.85]);
+        ell(x + w * 0.42, y + h * 0.52, 9, 11, [1, 1, 1]);
+        ell(x + w * 0.58, y + h * 0.52, 9, 11, [1, 1, 1]);
+        ell(x + w * 0.5, y + h * 0.66, 16, 7, [0.85, 0.10, 0.10]);
+      } else if (pic === 'sport') {
+        grad(x, y, w, h, [0.10, 0.40, 0.10], [0.20, 0.60, 0.20]);
+        ell(x + w * 0.5, y + h * 0.6, 26, 26, [0.95, 0.95, 0.95]);
+        for (let a = 0; a < 5; a++) ell(x + w * 0.5 + 12 * Math.cos(a * 1.26), y + h * 0.6 + 12 * Math.sin(a * 1.26), 5, 5, [0.05, 0.05, 0.05]);
+      } else {
+        grad(x, y, w, h, [0.75, 0.55, 0.35], [0.45, 0.30, 0.20]);
+        rect(x + 20, y + 80, 88, 70, [0.62, 0.58, 0.50]);
+        for (let a = 0; a < 6; a++) rect(x + 20 + a * 16, y + 70, 9, 12, [0.62, 0.58, 0.50]);
+      }
+      // The masthead: a band, or the title straight on the picture.
+      const band = hz(i + 40) > 0.45;
+      if (band) rect(x, y, w, 34, M);
+      fit(title, x + w / 2, y + 28, 30, w - 12,
+        band ? (dark ? css([0.95, 0.95, 0.95]) : css([0.05, 0.05, 0.08])) : css(M),
+        '900', 'center');
+      // Cover lines: one big, two small, in the colours covers use.
+      const ly = y + h * (0.70 + 0.1 * hz(i + 7));
+      rect(x + 6, ly - 15, w * (0.55 + 0.35 * hz(i + 8)), 19, hz(i + 9) > 0.5 ? [0.85, 0.05, 0.05] : [0.98, 0.85, 0.05]);
+      fit(line, x + 9, ly, 15, w * (0.50 + 0.33 * hz(i + 8)), css([1, 1, 1]), '800');
+      fit('+ ' + ['POKLON', 'NOVO', 'SAMO 2 €', 'VELIKI TEST'][i % 4], x + 8, y + h - 10, 12, 58,
+        css([1, 1, 1]), '700');
+      rect(x + w - 26, y + h - 22, 20, 16, [1, 1, 1]);
+      for (let a = 0; a < 8; a++) rect(x + w - 24 + a * 2, y + h - 20, 1, 12, [0, 0, 0]);
+      g.restore();
+    }
+
+    // ── the papers: the top half of a front page ─────────────────────────
+    const NEWS = [
+      ['JADRANSKI LIST', 'VATRA NAD ŠIBENIKOM', [0.05, 0.20, 0.55]],
+      ['DNEVNI GLASNIK', 'KANADERI CIJELI DAN U ZRAKU', [0.75, 0.05, 0.05]],
+      ['ŠIBENSKI TJEDNIK', 'Ljeto rekorda na Jadriji', [0.05, 0.05, 0.05]],
+      ['SPORTSKE NOVINE', 'VELIKA POBJEDA!', [0.10, 0.45, 0.15]],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const x = i * 256, y = 352, w = 256, h = 160;
+      const [name, head, M] = NEWS[i];
+      rect(x, y, w, h, [0.82, 0.81, 0.77]);
+      if (i === 1 || i === 3) rect(x, y, w, 40, M);
+      fit(name, x + w / 2, y + 32, 32, w - 20, i === 1 || i === 3 ? css([0.98, 0.98, 0.96]) : css(M), '900', 'center');
+      rect(x + 8, y + 42, w - 16, 2, [0.1, 0.1, 0.1]);
+      fit(head, x + 8, y + 72, 26, w - 16, css([0.04, 0.04, 0.04]), '900');
+      // A photo and columns.
+      if (i === 0 || i === 1) {
+        grad(x + 8, y + 82, 130, 72, [0.85, 0.45, 0.10], [0.35, 0.20, 0.12]);
+        ell(x + 70, y + 100, 40, 14, [0.55, 0.50, 0.48]);
+      } else if (i === 2) seaView(x + 8, y + 82, 130, 72, 30 + i);
+      else face(x + 8, y + 82, 130, 72, 7);
+      for (let c = 0; c < 3; c++) lines(x + 146 + c * 36, y + 84, 32, 70, 12);
+    }
+
+    // ── postcards ─────────────────────────────────────────────────────────
+    const PLACE = ['Šibenik', 'Jadrija', 'Hrvatska', 'Pozdrav iz Šibenika', 'Krka', 'Dalmacija',
+      'Šibenik', 'Jadrija', 'Zlarin', 'Hrvatska', 'Šibenik', 'Kornati', 'Jadrija', 'Prvić',
+      'Dalmacija', 'Šibenik'];
+    for (let i = 0; i < 16; i++) {
+      const x = (i % 8) * 128, y = 512 + Math.floor(i / 8) * 84, w = 128, h = 84;
+      g.save();
+      g.beginPath(); g.rect(x, y, w, h); g.clip();
+      if (i % 5 === 3) {
+        // The four-view collage every rack has one of.
+        for (let q = 0; q < 4; q++) seaView(x + (q % 2) * 64, y + Math.floor(q / 2) * 42, 63, 41, i * 4 + q);
+      } else seaView(x, y, w, h, i + 50);
+      g.lineWidth = 3;
+      g.strokeStyle = css([0.95, 0.95, 0.93]);
+      g.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+      fit(PLACE[i], x + 8, y + h - 10, 17, Math.min(w - 16, 14 + PLACE[i].length * 8),
+        css([0.98, 0.95, 0.20]), '900', 'left', true);
+      g.restore();
+    }
+
+    // ── crisp bags ────────────────────────────────────────────────────────
+    const BAG = [['KRCKO', 'paprika', [0.78, 0.06, 0.05]], ['HRSKI', 'slani', [0.10, 0.25, 0.70]],
+      ['KRCKO', 'sir', [0.95, 0.72, 0.05]], ['ČIPSI', 'luk', [0.10, 0.50, 0.15]],
+      ['HRSKI', 'ljuti', [0.10, 0.08, 0.08]], ['FLIPS', 'kikiriki', [0.95, 0.45, 0.05]],
+      ['KRCKO', 'original', [0.65, 0.10, 0.45]], ['ČIPSI', 'more sol', [0.20, 0.60, 0.80]]];
+    for (let i = 0; i < 8; i++) {
+      const x = i * 128, y = 680, w = 128, h = 160;
+      const [brand, taste, M] = BAG[i];
+      grad(x, y, w, h, M, [M[0] * 0.6, M[1] * 0.6, M[2] * 0.6]);
+      // The crimped seals top and bottom, which are silver inside.
+      rect(x, y, w, 12, [0.75, 0.75, 0.72]);
+      rect(x, y + h - 12, w, 12, [0.75, 0.75, 0.72]);
+      for (let a = 0; a < 16; a++) {
+        rect(x + a * 8, y, 3, 12, [0.45, 0.45, 0.42]);
+        rect(x + a * 8, y + h - 12, 3, 12, [0.45, 0.45, 0.42]);
+      }
+      // The brand in a swoosh.
+      ell(x + w / 2, y + 44, 56, 24, [0.98, 0.95, 0.85], -0.12);
+      fit(brand, x + w / 2, y + 56, 34, 96, css(M[0] + M[1] + M[2] > 1.4 ? [0.70, 0.05, 0.05] : M), '900', 'center', true);
+      // The chips themselves, a heap of gold ovals.
+      for (let a = 0; a < 9; a++) {
+        ell(x + w * (0.25 + 0.5 * hz(i * 20 + a)), y + h * (0.58 + 0.20 * hz(i * 30 + a)),
+          18, 11, [0.92, 0.70 + 0.12 * hz(a), 0.20], (hz(a + i) - 0.5) * 1.5);
+      }
+      fit(taste, x + w / 2, y + h - 22, 18, 80, css([1, 1, 1]), '800', 'center', true);
+    }
+
+    // ── header cards across the top of the window ─────────────────────────
+    const HDR = [['SREĆKE', [0.95, 0.80, 0.05], [0.60, 0.05, 0.05]],
+      ['BONOVI ZA MOBITEL', [0.95, 0.95, 0.93], [0.10, 0.10, 0.12]],
+      ['SUVENIRI', [0.05, 0.30, 0.65], [0.98, 0.98, 0.96]],
+      ['SLADOLED', [0.80, 0.08, 0.08], [0.98, 0.98, 0.96]]];
+    for (let i = 0; i < 4; i++) {
+      const x = i * 256, y = 840, w = 256, h = 64;
+      rect(x, y, w, h, HDR[i][1]);
+      rect(x, y, w, 4, [0.3, 0.3, 0.3]);
+      fit(HDR[i][0], x + w / 2, y + 44, 36, w - 30, css(HDR[i][2]), '900', 'center');
+    }
+
+    // ── small packs: bars, gum, cigarettes ────────────────────────────────
+    const PK = [[0.35, 0.10, 0.45], [0.80, 0.05, 0.05], [0.05, 0.25, 0.65], [0.90, 0.75, 0.05],
+      [0.10, 0.50, 0.20], [0.90, 0.90, 0.88], [0.35, 0.20, 0.10], [0.95, 0.45, 0.05]];
+    const PKN = ['ČOKO', 'MENTA', 'KEKS', 'BANANA', 'ŽVAKE', 'MLIJEKO', 'LJEŠNJAK', 'KARAMELA'];
+    for (let i = 0; i < 16; i++) {
+      const x = i * 64, y = 904, w = 64, h = 120;
+      if (i < 8) {
+        // A bar or a gum pack: a colour, a band, a name across it.
+        const M = PK[i];
+        grad(x, y, w, h, M, [M[0] * 0.75, M[1] * 0.75, M[2] * 0.75]);
+        rect(x + w * 0.24, y + 8, w * 0.52, h - 16, i % 2 ? [0.95, 0.95, 0.92] : [0.95, 0.80, 0.10]);
+        g.save();
+        g.translate(x + w * 0.5, y + h * 0.5);
+        g.rotate(-Math.PI / 2);
+        fit(PKN[i], 0, 8, 24, h * 0.78, css(M), '900', 'center');
+        g.restore();
+      } else {
+        // Cigarettes: a white or grey or red-topped pack with the black
+        // warning panel over its lower half.
+        const top = [[0.90, 0.90, 0.88], [0.70, 0.05, 0.05], [0.10, 0.20, 0.50], [0.75, 0.72, 0.65]][i % 4];
+        rect(x, y, w, h, [0.88, 0.87, 0.84]);
+        rect(x, y, w, h * 0.30, top);
+        rect(x + 6, y + h * 0.36, w - 12, 12, [0.25, 0.25, 0.28]);
+        rect(x, y + h * 0.55, w, h * 0.45, [0.06, 0.06, 0.06]);
+        font(9, '800');
+        g.fillStyle = css([0.95, 0.95, 0.95]);
+        g.textAlign = 'center';
+        g.fillText('PUŠENJE', x + w / 2, y + h * 0.72);
+        g.fillText('UBIJA', x + w / 2, y + h * 0.84);
+      }
+    }
+    const tex = new THREE.CanvasTexture(C);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+    const px = (x, y, w, h) => {
+      const e = 1.5;
+      return [(x + e) / N, (x + w - e) / N, 1 - (y + h - e) / N, 1 - (y + e) / N];
+    };
+    const cell = (kind, i) => {
+      if (kind === 'mag') { i %= 16; return px((i % 8) * 128, Math.floor(i / 8) * 176, 128, 176); }
+      if (kind === 'news') { i %= 4; return px(i * 256, 352, 256, 160); }
+      if (kind === 'card') { i %= 16; return px((i % 8) * 128, 512 + Math.floor(i / 8) * 84, 128, 84); }
+      if (kind === 'bag') { i %= 8; return px(i * 128, 680, 128, 160); }
+      if (kind === 'hdr') { i %= 4; return px(i * 256, 840, 256, 64); }
+      i %= 16; return px(i * 64, 904, 64, 120);
+    };
+    return { tex, cell };
+  }
+
+  /**
+   * One mesh of printed goods off `tkGoodsAtlas`. `quad(A, B, C, D, uv)`
+   * takes four shore-frame points `[t, s, y]` — foot-left, foot-right,
+   * head-right, head-left as the face is READ — and a cell. `grid(P, nu, nv,
+   * uv)` lays a bulged face (a crisp bag) through `P(u, v)` with smooth
+   * normals. `done()` makes the mesh.
+   */
+  function tkGoods(atlas) {
+    const pos = [], uv = [], idx = [];
+    const vert = (p, u, v) => {
+      const w = W(p[0], p[1], p[2]);
+      pos.push(w[0], w[1], w[2]); uv.push(u, v);
+      return pos.length / 3 - 1;
+    };
+    const quad = (A, B, C, D, c) => {
+      const a = vert(A, c[0], c[2]), b2 = vert(B, c[1], c[2]),
+        cc = vert(C, c[1], c[3]), d = vert(D, c[0], c[3]);
+      idx.push(a, b2, cc, a, cc, d);
+    };
+    const grid = (P, nu, nv, c) => {
+      const base = pos.length / 3;
+      for (let j = 0; j <= nv; j++) {
+        for (let i = 0; i <= nu; i++) {
+          vert(P(i / nu, j / nv), c[0] + (c[1] - c[0]) * (i / nu), c[2] + (c[3] - c[2]) * (j / nv));
+        }
+      }
+      for (let j = 0; j < nv; j++) {
+        for (let i = 0; i < nu; i++) {
+          const a = base + j * (nu + 1) + i;
+          idx.push(a, a + 1, a + nu + 2, a, a + nu + 2, a + nu + 1);
+        }
+      }
+    };
+    const done = (name, emissive = 0.10) => {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, tkPrintMat(atlas.tex, { emissive, spec: 0.10 }));
+      mesh.name = name;
+      scene.add(mesh);
+      return mesh;
+    };
+    return { quad, grid, done, cell: atlas.cell };
   }
 
   // ── THE TISAK, TURNED (1.549.3) ─────────────────────────────────────────
@@ -14727,6 +15280,8 @@ async function buildJadrija(scene) {
     const wA = T0 + 0.80, wC = T1 - 0.06;
     const wG = wA + (wC - wA) * 0.64;
     const INK = tkCss([0.820, 0.805, 0.770]);
+    // Everything printed that is for sale, one mesh (see `tkGoods`).
+    const TKG = tkGoods(tkGoodsAtlas());
 
     // ── a panelled face ─────────────────────────────────────────────────────
     //
@@ -14753,7 +15308,7 @@ async function buildJadrija(scene) {
       // piece under and over each.
       const bays = [0, ...F.stiles.map(toU).sort((p, q) => p - q), 1];
       const tex = tkSkin({ w: L, h: H, bays, mid: RAILS[1] - F.yLo, band: F.band ? BAND : 0,
-        print: F.print, seed: F.seed, base: body });
+        print: F.print, seed: F.seed, base: F.base || body, grime: F.grime });
       const hu = holes.map(([ha, hc, hl, hh2]) => [Math.min(toU(ha), toU(hc)),
         Math.max(toU(ha), toU(hc)), (hl - F.yLo) / H, (hh2 - F.yLo) / H])
         .sort((p, q) => p[0] - q[0]);
@@ -14865,10 +15420,11 @@ async function buildJadrija(scene) {
           const cw = 0.16 + hz(k * 13 + i) * 0.06;
           const c6 = [[0.66, 0.60, 0.52], [0.26, 0.36, 0.60], [0.64, 0.24, 0.18],
             [0.62, 0.55, 0.22], [0.30, 0.50, 0.38]][(k * 2 + i) % 5];
-          boxTS(tt - 0.004, tt + 0.008, s, Math.min(s + cw, WIN[1] - 0.02), y, y + 0.27,
-            c6, shade(c6, 1.1));
-          boxTS(tt - 0.010, tt - 0.004, s + 0.01, Math.min(s + cw, WIN[1] - 0.02) - 0.01,
-            y + 0.20, y + 0.25, [0.80, 0.79, 0.76]);
+          const se = Math.min(s + cw, WIN[1] - 0.02), ft = tt - 0.0055;
+          boxTS(tt - 0.004, tt + 0.008, s, se, y, y + 0.27, c6, shade(c6, 1.1));
+          // Its cover, read from the west: left is inland (1.550.7).
+          TKG.quad([ft, se, y + 0.003], [ft, s, y + 0.003], [ft, s, y + 0.267],
+            [ft, se, y + 0.267], TKG.cell('mag', 5 + k * 3 + i * 7));
           s += cw + 0.012;
           i++;
         }
@@ -14929,7 +15485,7 @@ async function buildJadrija(scene) {
     face({ ax: 't', fix: S0, dir: -1, a0: wA - 0.05, a1: T1, rd: 1, postA: false, postB: true,
       stiles: [1, 2, 3].map((k) => wA + (wC - wA) * k / 4),
       rails: [y0 + 0.07, gLo - 0.07], yLo, yHi: gLo - 0.03,
-      band: false, seed: 11, name: 'tisak:apron' });
+      band: false, seed: 11, name: 'tisak:apron', base: [0.640, 0.570, 0.440], grime: 0.40 });
     boxTS(T0 + 0.05, T1 - 0.05, S0 + 0.03, S0 + 0.06, y0, gLo - 0.03, LINING, null, 0.45);
     boxTS(T0 + 0.05, wA - 0.06, S0 + 0.03, S0 + 0.06, gLo - 0.03, bLo, LINING);
     // The window frame: aluminium, 12 mm radii, a jamb at each end, a head
@@ -14969,6 +15525,9 @@ async function buildJadrija(scene) {
         const x = Math.sin(n * 17.133 + 4.71) * 24634.63;
         return x - Math.floor(x);
       };
+      // Each bundle's top copy is the front page, masthead away from you as
+      // it is laid out for the customer (1.550.7): the bundles are 0.19 m
+      // deep now, the fold of a real paper, where they were a 0.12 m strip.
       for (const [nt, nh, q] of [[wA + 0.06, 0.055, 0], [wA + 0.42, 0.038, 1],
         [wA + 1.02, 0.047, 2]]) {
         const layers = 3 + (q % 2 ? 0 : 1);
@@ -14978,13 +15537,16 @@ async function buildJadrija(scene) {
           const js = (nj(q * 9 + l + 4) - 0.5) * 0.014;
           const g6 = 0.94 + nj(q * 9 + l + 7) * 0.10;
           const col = [0.545 * g6, 0.535 * g6, 0.505 * g6];
-          knRR(W, nt + jt, nt + 0.30 + jt, S0 - 0.25 + js, S0 - 0.13 + js,
+          knRR(W, nt + jt, nt + 0.30 + jt, S0 - 0.26 + js, S0 - 0.07 + js,
             y, y + dh - 0.001, 0.006, 0.004, col, [0.640 * g6, 0.630 * g6, 0.600 * g6]);
           y += dh;
         }
-        // and the masthead of the top one: a dark title bar across the fold.
-        boxTS(nt + 0.02, nt + 0.28, S0 - 0.24, S0 - 0.205, y, y + 0.002,
-          [0.18, 0.20, 0.30]);
+        const jt = (nj(q * 9 + layers - 1) - 0.5) * 0.020;
+        const js = (nj(q * 9 + layers + 3) - 0.5) * 0.014;
+        const yt = y + 0.0015;
+        TKG.quad([nt + jt + 0.004, S0 - 0.256 + js, yt], [nt + jt + 0.296, S0 - 0.256 + js, yt],
+          [nt + jt + 0.296, S0 - 0.074 + js, yt], [nt + jt + 0.004, S0 - 0.074 + js, yt],
+          TKG.cell('news', q + 1));
       }
     }
     // The shutter box over the window — 1.549.3's roller housing, its seven
@@ -15032,7 +15594,18 @@ async function buildJadrija(scene) {
     // at counter height, the rack and the rails stand at the front of it, and
     // the gantry is a free-standing unit 1.2 m back with the seller's floor
     // in front of it, lit by the tube.
-    const goods = (ta, tb, sa, sb, y, hA, hB, pal, seed) => {
+    //
+    // PRINTED SINCE 1.550.7. The places were right and the things in them were
+    // bricks: every magazine a coloured slab with a white stripe, every bag a
+    // coloured pillow, every packet a coloured box, in rows as even as a
+    // chart. Each now carries its face off `tkGoodsAtlas` — covers, mastheads,
+    // sea views, bag graphics, wrappers, warning panels — and the rows are
+    // broken up: the header cards across the head of the open window, a
+    // spinner of postcards turned off square, bags that bulge and hang at
+    // their own angles, lighters by the tray, the towel draped over the
+    // freezer lid and down its front, and the sun cream and the beach balls on
+    // the shelf behind it.
+    const goods = (ta, tb, sa, sb, y, hA, hB, pal, seed, print) => {
       let t = ta, i = 0;
       while (t < tb - 0.025) {
         const w = Math.min(tb - t, 0.030 + hz(seed + i * 3) * 0.060);
@@ -15041,6 +15614,12 @@ async function buildJadrija(scene) {
         const col = pal[Math.floor(hz(seed + i * 7 + 5) * pal.length) % pal.length];
         const k = 0.86 + 0.26 * hz(seed + i * 5 + 4);
         boxTS(t, t + w - 0.004, sa, sa + d, y, y + h, shade(col, k), shade(col, k * 1.10));
+        if (print) {
+          const fs = sa - 0.0015;
+          TKG.quad([t + 0.001, fs, y + 0.002], [t + w - 0.005, fs, y + 0.002],
+            [t + w - 0.005, fs, y + h - 0.002], [t + 0.001, fs, y + h - 0.002],
+            TKG.cell('pack', print(i)));
+        }
         t += w;
         i++;
       }
@@ -15068,6 +15647,8 @@ async function buildJadrija(scene) {
     };
     // The gantry: a free-standing unit behind the seller, uprights, a plinth,
     // six shelves of packets and sweets, and its brand header along the top.
+    // Two rows in three are cigarettes, white and grey and red-topped packs
+    // with the black warning panel; the third is bars and gum.
     {
       const ga = wA + 0.02, gb = wC - 0.02, sa = S0 + 1.18, sb = S0 + 1.48;
       boxTS(ga, gb, sa, sb, y0 + 0.04, y0 + 0.86, [0.230, 0.205, 0.180],
@@ -15078,9 +15659,11 @@ async function buildJadrija(scene) {
       boxTS(ga, gb, sb, sb + 0.02, y0 + 0.86, top - 0.12, [0.16, 0.15, 0.14], null, 0.45);
       for (let r = 0; r < 6; r++) {
         const y = y0 + 0.88 + r * 0.235;
+        const sweet = r % 3 === 1;
         shelf(ga, gb, sa, sb, y, 10, r * 9);
-        goods(ga + 0.02, gb - 0.02, sa + 0.02, sb - 0.02, y, 0.085, r > 3 ? 0.17 : 0.11,
-          r % 3 === 1 ? SWEETS : PACKS, r * 101 + 7);
+        goods(ga + 0.02, gb - 0.02, sa + 0.02, sb - 0.02, y, sweet ? 0.085 : 0.090,
+          r > 3 ? 0.17 : (sweet ? 0.11 : 0.10), sweet ? SWEETS : PACKS, r * 101 + 7,
+          (i) => (sweet ? 0 : 8) + Math.floor(hz(r * 31 + i * 5 + 900) * 8));
       }
       for (let c = 0; c < 6; c++) {
         const b6 = 0.78 + hz(c * 13) * 0.22;
@@ -15090,9 +15673,34 @@ async function buildJadrija(scene) {
           top - 0.14, col);
       }
     }
-    // The west third: magazines. A raked rack of four tiers at the front of
+    // The header cards across the head of the open window, which `_414` has
+    // as a ragged row of boards and boxes over the goods — a card for
+    // scratch cards, one for phone top-ups, one for souvenirs, one for ice
+    // cream, with plain product boxes stood between them.
+    {
+      const hs = S0 + 0.13, yb = gHi - 0.155;
+      let t = wA + 0.03, i = 0;
+      while (t < wG - 0.20) {
+        if (i % 2 === 0) {
+          const w = Math.min(wG - 0.06 - t, 0.30 + hz(i + 820) * 0.10);
+          const h = w * 0.25;
+          boxTS(t, t + w, hs, hs + 0.006, yb, yb + h, [0.30, 0.30, 0.30]);
+          TKG.quad([t + 0.002, hs - 0.0015, yb + 0.002], [t + w - 0.002, hs - 0.0015, yb + 0.002],
+            [t + w - 0.002, hs - 0.0015, yb + h - 0.002], [t + 0.002, hs - 0.0015, yb + h - 0.002],
+            TKG.cell('hdr', i / 2));
+          t += w + 0.015;
+        } else {
+          const w = 0.07 + hz(i + 830) * 0.08, h = 0.06 + hz(i + 831) * 0.05;
+          const col = [[0.80, 0.62, 0.10], [0.14, 0.13, 0.12], [0.70, 0.10, 0.08]][Math.floor(hz(i + 832) * 3)];
+          boxTS(t, t + w, hs, hs + 0.10, yb, yb + h, col, shade(col, 1.1));
+          t += w + 0.012;
+        }
+        i++;
+      }
+    }
+    // The west third: magazines. A raked rack of two tiers at the front of
     // the base — 1.549.3's tiers, turned inside out — and two shelves of them
-    // standing above it against a board.
+    // standing above it against a board. Each has its cover now.
     const rkA = wA + 0.05, rkB = wA + 0.70;
     const rh = (n) => {
       const x = Math.sin(n * 8.7411 + 41.113) * 17311.77;
@@ -15114,10 +15722,10 @@ async function buildJadrija(scene) {
           cy + NM[1] * 0.008 + AX[1] * 0.022, 0.50, len, 0.012), back, shade(back, 1.12));
         bar(ta, ta + cw, slat(cs - NM[0] * 0.006, cy - NM[1] * 0.006, 0.50, len * 0.94,
           0.012), col, shade(col, 1.14));
-        const mh = len * 0.94 * 0.5 - 0.026;
-        bar(ta + 0.008, ta + cw - 0.008, slat(cs - NM[0] * 0.0135 + AX[0] * mh,
-          cy - NM[1] * 0.0135 + AX[1] * mh, 0.50, 0.034, 0.003),
-        [0.760, 0.748, 0.720]);
+        const fs = cs - NM[0] * 0.0135, fy = cy - NM[1] * 0.0135, hl = len * 0.47;
+        TKG.quad([ta, fs - AX[0] * hl, fy - AX[1] * hl], [ta + cw, fs - AX[0] * hl, fy - AX[1] * hl],
+          [ta + cw, fs + AX[0] * hl, fy + AX[1] * hl], [ta, fs + AX[0] * hl, fy + AX[1] * hl],
+          TKG.cell('mag', k * 4 + i + Math.floor(rh(k + i * 3 + 11) * 3) * 5));
         ta += cw + 0.012 + rh(k * 5 + i + 2) * 0.030;
       }
       const WIRE = [0.585, 0.592, 0.585];
@@ -15141,11 +15749,19 @@ async function buildJadrija(scene) {
         let t = rkA, i = 0;
         while (t < rkB - 0.10) {
           const cw = 0.15 + hz(r * 31 + i) * 0.07;
+          const te = Math.min(t + cw, rkB);
           const col = shade(MAGS[(r * 2 + i * 3) % MAGS.length], 0.85 + hz(r * 7 + i) * 0.25);
-          bar(t, Math.min(t + cw, rkB), slat(sa + 0.06, y + 0.13, 0.18, 0.26, 0.010),
-            col, shade(col, 1.12));
-          bar(t + 0.01, Math.min(t + cw, rkB) - 0.01, slat(sa + 0.043, y + 0.23, 0.18, 0.04,
-            0.003), [0.78, 0.77, 0.74]);
+          // Each leans at its own angle and stands its own height.
+          const ang = 0.12 + hz(r * 31 + i + 700) * 0.12;
+          const ln = 0.24 + hz(r * 31 + i + 701) * 0.04;
+          const cy = y + 0.005 + ln * 0.5 * Math.cos(ang);
+          const cs = sa + 0.06;
+          bar(t, te, slat(cs, cy, ang, ln, 0.010), col, shade(col, 1.12));
+          const NM = [Math.cos(ang), -Math.sin(ang)], AX = [Math.sin(ang), Math.cos(ang)];
+          const fs = cs - NM[0] * 0.0065, fy = cy - NM[1] * 0.0065, hl = ln * 0.5;
+          TKG.quad([t, fs - AX[0] * hl, fy - AX[1] * hl], [te, fs - AX[0] * hl, fy - AX[1] * hl],
+            [te, fs + AX[0] * hl, fy + AX[1] * hl], [t, fs + AX[0] * hl, fy + AX[1] * hl],
+            TKG.cell('mag', [7, 2, 13, 9, 4, 14, 6, 0, 12, 5, 10, 3, 15, 8][(r * 5 + i * 3) % 14]));
           t += cw + 0.01;
           i++;
         }
@@ -15159,13 +15775,24 @@ async function buildJadrija(scene) {
         const y = gLo - 0.03 + k * 0.085, sa = S0 + 0.10 + k * 0.10;
         boxTS(ha, hb - 0.30, sa, S0 + 0.44, gLo - 0.03, y + 0.02, [0.16, 0.15, 0.14],
           [0.26, 0.24, 0.22]);
-        goods(ha + 0.01, hb - 0.31, sa + 0.01, sa + 0.08, y + 0.02, 0.05, 0.10, SWEETS, k * 71 + 3);
+        goods(ha + 0.01, hb - 0.31, sa + 0.01, sa + 0.08, y + 0.02, 0.05, 0.10, SWEETS, k * 71 + 3,
+          (i) => Math.floor(hz(k * 13 + i * 3 + 950) * 8));
       }
+      // The lighters: a tray of them, two dozen in no order, each its own
+      // colour with the steel hood on top.
       const LT = [[0.10, 0.62, 0.20], [0.80, 0.18, 0.45], [0.12, 0.45, 0.78],
-        [0.85, 0.40, 0.08], [0.88, 0.75, 0.10]];
-      for (let i = 0; i < 12; i++) {
-        const lt = ha + 0.02 + i * 0.030;
-        boxTS(lt, lt + 0.022, S0 + 0.05, S0 + 0.065, gLo - 0.03, gLo + 0.05, LT[i % 5]);
+        [0.85, 0.40, 0.08], [0.88, 0.75, 0.10], [0.60, 0.10, 0.60], [0.05, 0.05, 0.06],
+        [0.85, 0.85, 0.85]];
+      boxTS(ha + 0.01, ha + 0.52, S0 + 0.045, S0 + 0.075, gLo - 0.03, gLo - 0.015,
+        [0.10, 0.10, 0.11]);
+      for (let i = 0; i < 24; i++) {
+        const lt = ha + 0.02 + i * 0.0205;
+        const lh = 0.070 + hz(i + 960) * 0.008;
+        const ls = S0 + 0.050 + hz(i + 961) * 0.006;
+        const c = LT[Math.floor(hz(i + 962) * LT.length)];
+        boxTS(lt, lt + 0.016, ls, ls + 0.010, gLo - 0.015, gLo - 0.015 + lh, c, shade(c, 1.15));
+        boxTS(lt + 0.001, lt + 0.015, ls + 0.001, ls + 0.009, gLo - 0.015 + lh,
+          gLo - 0.003 + lh, [0.62, 0.63, 0.64]);
       }
       const tt = hb - 0.15;
       knRR(W, tt - 0.12, tt + 0.12, S0 + 0.12, S0 + 0.36, gLo - 0.03, gLo + 0.07, 0.015, 0.010,
@@ -15177,58 +15804,114 @@ async function buildJadrija(scene) {
         [0.10, 0.10, 0.11], [0.12, 0.12, 0.13]);
       boxTS(tt - 0.03, tt + 0.13, S0 + 0.266, S0 + 0.27, gLo + 0.21, gLo + 0.32, [0.20, 0.30, 0.34]);
     }
-    // The glazed third: the postcard column at its west edge, three rails of
-    // crisps across the rest, and the chest freezer along its foot.
+    // The glazed third: the postcard spinner at its west edge, three rails
+    // of crisps across the rest, and the chest freezer along its foot.
     {
       const pa = wG + 0.05, pb = wC - 0.05;
       const WIRE = [0.740, 0.735, 0.715];
-      const ua = pa, ub = pa + 0.15;
-      for (const t of [ua, ub]) {
-        tubeTS([[t, S0 + 0.30, gLo + 0.14], [t, S0 + 0.30, gHi - 0.06]], 0.003, WIRE, 6);
+      // The spinner: a pole, and two faces of pockets turned off square, so
+      // the column reads as a rack that turns — the way `_414` catches it,
+      // edge-on enough that the cards stack like tiles.
+      {
+        const pc = pa + 0.10, ps = S0 + 0.34;
+        tubeTS([[pc, ps, gLo - 0.03], [pc, ps, gHi - 0.03]], 0.008, WIRE, 8);
+        spinTS(pc, ps, [[gHi - 0.03, 0.03], [gHi - 0.02, 0.03], [gHi - 0.01, 0]], WIRE, 10);
+        for (const [f, phi] of [[0, 0.42], [1, 0.42 - Math.PI / 2]]) {
+          const n = [Math.sin(phi), -Math.cos(phi)], tg = [Math.cos(phi), Math.sin(phi)];
+          for (let k = 0; k < 6; k++) {
+            const yc = gLo + 0.20 + k * 0.128;
+            const C = [pc + n[0] * 0.080, ps + n[1] * 0.080];
+            const hw = 0.074, lean = 0.014;
+            const P = (a, dy, back) => [C[0] + tg[0] * a - n[0] * back, C[1] + tg[1] * a - n[1] * back, yc + dy];
+            TKG.quad(P(-hw, -0.050, 0), P(hw, -0.050, 0), P(hw, 0.050, lean), P(-hw, 0.050, lean),
+              TKG.cell('card', f * 7 + k * 3 + Math.floor(hz(f * 11 + k + 980) * 3)));
+            const w0 = P(-hw - 0.004, -0.052, -0.004), w1 = P(hw + 0.004, -0.052, -0.004);
+            tubeTS([w0, w1], 0.0025, WIRE, 5);
+          }
+        }
       }
-      for (let k = 0; k < 6; k++) {
-        const yc = gLo + 0.26 + k * 0.125, b6 = 0.74 + hz(k * 11 + 2) * 0.26;
-        const col = [0.270 * b6, 0.480 * b6, 0.660 * b6];
-        bar(ua + 0.01, ub - 0.01, slat(S0 + 0.29, yc, 0.35, 0.10, 0.004), col, shade(col, 1.25));
-        boxTS(ua + 0.01, ub - 0.01, S0 + 0.268, S0 + 0.272, yc + 0.02, yc + 0.045,
-          [0.80, 0.86, 0.92]);
-        tubeTS([[ua, S0 + 0.278, yc - 0.047], [ub, S0 + 0.278, yc - 0.047]], 0.0028, WIRE, 6);
-      }
-      const ra = ub + 0.04, rb = pb;
+      const ra = pa + 0.19, rb = pb;
       for (let r = 0; r < 3; r++) {
-        const ry = gHi - 0.10 - r * 0.24;
+        const ry = gHi - 0.09 - r * 0.215;
         tkT(ra, rb, S0 + 0.12, ry + 0.008, 0.006, 0.008, 0.004, [0.155, 0.150, 0.145]);
-        let ta = ra + 0.015;
-        let i = 0;
-        while (ta < rb - 0.075) {
-          const bw = 0.075 + hz(r * 17 + i + 400) * 0.030;
-          const g6 = 0.82 + ((i + r) % 3) * 0.09;
-          const col = (i + r) % 3 === 0 ? [0.680 * g6, 0.235 * g6, 0.155 * g6]
-            : (i + r) % 3 === 1 ? [0.690 * g6, 0.520 * g6, 0.145 * g6]
-              : [0.560 * g6, 0.245 * g6, 0.215 * g6];
-          const yb = ry - 0.115 - hz(r * 17 + i + 405) * 0.020, hw = bw * 0.43;
-          const ym = (yb + ry) * 0.5;
-          knLathe(W, ta + hw, S0 + 0.14, [[yb, [hw, 0.003], 5],
-            [yb + 0.016, [hw * 0.99, 0.011], 5], [ym, [hw * 0.96, 0.016], 5],
-            [ry - 0.018, [hw * 0.985, 0.010], 5], [ry, [hw, 0.003], 5]],
-          (i2) => (i2 >= 3 ? shade(col, 1.10) : col), 12);
-          boxTS(ta + hw - 0.018, ta + hw + 0.018, S0 + 0.112, S0 + 0.116, ry - 0.030,
+        let ta = ra + 0.010;
+        let i = 0, last = -1;
+        while (ta < rb - 0.080) {
+          // Family bags and small ones on the same rail, as a rail has them.
+          const big = hz(r * 17 + i + 401) > 0.62;
+          const bw = big ? 0.125 + hz(r * 17 + i + 400) * 0.025 : 0.075 + hz(r * 17 + i + 400) * 0.025;
+          const yb = ry - bw * 1.45 - hz(r * 17 + i + 405) * 0.025;
+          let q = Math.floor(hz(r * 17 + i + 410) * 8);
+          if (q === last) q = (q + 3) % 8;
+          last = q;
+          // A bag: puffed toward you, pinched at the crimps, hanging a little
+          // skew on its clip.
+          const sc = S0 + 0.145, skew = (hz(r * 17 + i + 415) - 0.5) * 0.03;
+          const tilt = (hz(r * 17 + i + 416) - 0.5) * 0.02;
+          TKG.grid((u, v) => {
+            const pinch = 0.90 + 0.10 * Math.sin(Math.PI * v);
+            const bul = 0.024 * Math.pow(Math.sin(Math.PI * u), 0.7) * Math.pow(Math.sin(Math.PI * v), 0.6);
+            return [ta + bw * 0.5 + (u - 0.5) * bw * pinch + tilt * (1 - v),
+              sc - bul + (u - 0.5) * skew, yb + (ry - 0.004 - yb) * v];
+          }, 4, 5, TKG.cell('bag', q));
+          boxTS(ta + bw * 0.5 - 0.018, ta + bw * 0.5 + 0.018, S0 + 0.112, S0 + 0.116, ry - 0.030,
             ry - 0.008, CARD);
-          ta += bw;
+          ta += bw * (0.86 + 0.10 * hz(r * 17 + i + 420));
           i++;
         }
       }
-      // The freezer: pale blue, a darker foot, its sliding lid, and the towel
-      // over half of it, which is the one thing in the window not for sale.
+      // The freezer: pale blue, a darker foot, its sliding lid.
       knRR(W, ra - 0.02, pb, S0 + 0.06, S0 + 0.62, gLo - 0.03, gLo + 0.13, 0.03, 0.02,
         [0.520, 0.680, 0.780], [0.600, 0.740, 0.820]);
       boxTS(ra + 0.02, pb - 0.04, S0 + 0.10, S0 + 0.58, gLo + 0.13, gLo + 0.14,
         [0.30, 0.52, 0.70], [0.42, 0.62, 0.78]);
       knRR(W, ra + 0.04, ra + 0.45, S0 + 0.08, S0 + 0.60, gLo + 0.14, gLo + 0.155, 0.02, 0.006,
         [0.18, 0.40, 0.72], [0.22, 0.46, 0.78]);
-      boxTS(ra + 0.10, ra + 0.30, S0 + 0.16, S0 + 0.30, gLo + 0.155, gLo + 0.158,
-        [0.82, 0.82, 0.84]);
+      // And the towel, which is the one thing in the window not for sale:
+      // thrown over the lid and hanging down the front in folds, a little
+      // askew, to the freezer's foot.
+      {
+        const TW = tkGoods({ tex: tkTowelPrint(), cell: () => [0, 1, 0, 1] });
+        const t0 = ra + 0.08, t1 = ra + 0.58, LF = 0.14, LL = 0.36;
+        TW.grid((u, v) => {
+          const d = v * (LF + LL);
+          const fold = 0.009 * Math.sin(u * 19.0 + 1.3) + 0.005 * Math.sin(u * 41.0 + 0.4);
+          const t = t0 + (t1 - t0) * u + v * 0.05;
+          if (d < LF) {
+            const f = 1 - d / LF;
+            return [t, S0 + 0.050 - Math.max(0, fold) * (0.4 + 0.6 * f),
+              gLo + 0.155 - (LF - d) + 0.018 * Math.sin(u * 7.0 + 2.0) * f];
+          }
+          const e = d - LF;
+          return [t, S0 + 0.050 + e, gLo + 0.160 + 0.005 * Math.abs(Math.sin(u * 23.0 + e * 9.0))];
+        }, 16, 12, [0, 1, 0, 1]);
+        TW.done('tisak:towel', 0.08);
+      }
+      // The shelf behind the freezer, showing over its lid: sun cream in
+      // its tall bottles, and two beach balls.
+      boxTS(ra - 0.02, pb, S0 + 0.64, S0 + 0.86, y0 + 0.04, gLo + 0.17,
+        [0.14, 0.13, 0.12], [0.24, 0.22, 0.20], 0.45);
+      const SUN = [[0.90, 0.45, 0.05], [0.85, 0.85, 0.82], [0.10, 0.35, 0.75], [0.92, 0.78, 0.10],
+        [0.85, 0.20, 0.10], [0.20, 0.60, 0.70]];
+      for (let i = 0; i < 6; i++) {
+        const bt = ra + 0.04 + i * 0.058 + hz(i + 990) * 0.01, bh = 0.13 + hz(i + 991) * 0.07;
+        const yb = gLo + 0.17, c = SUN[i];
+        knLathe(W, bt, S0 + 0.70 + hz(i + 992) * 0.04, [[yb, [0.022, 0.014]], [yb + bh * 0.85, [0.022, 0.014]],
+          [yb + bh * 0.95, [0.012, 0.010]], [yb + bh, 0]], c, 10);
+        spinTS(bt, S0 + 0.70 + hz(i + 992) * 0.04, [[yb + bh * 0.93, 0.011], [yb + bh + 0.025, 0.011],
+          [yb + bh + 0.026, 0]], i % 2 ? [0.95, 0.95, 0.93] : [0.10, 0.10, 0.12], 8);
+      }
+      for (const [bt, c] of [[pb - 0.22, [0.85, 0.12, 0.10]], [pb - 0.09, [0.95, 0.80, 0.10]]]) {
+        const r = 0.065, cs = S0 + 0.76, yb = gLo + 0.17;
+        const prof = [];
+        for (let k = 0; k <= 8; k++) {
+          const a = -Math.PI / 2 + (k / 8) * Math.PI;
+          prof.push([yb + r + Math.sin(a) * r, Math.max(0, Math.cos(a) * r)]);
+        }
+        spinTS(bt, cs, prof, c, 14);
+      }
     }
+    TKG.done('tisak:goods', 0.14);
 
     // ── outside it: the Ledo freezer ────────────────────────────────────────
     //
@@ -15266,57 +15949,106 @@ async function buildJadrija(scene) {
     }
     // ── the red awning ──────────────────────────────────────────────────────
     //
-    // Off `1000150414` at 04:24-04:28: the canopy, a cream batten on the front
-    // bar and a red fascia off it with the mark printed on it, the length of
-    // the frontage. The numbers are 1.549.3's — a 0.30 m fascia, a 1.30 m
-    // throw, the cloth sagging 35 mm between wall and bar — and its extent is
-    // the frontage now, not the eastern 2.05 m of it: from the west corner
-    // post (the CORONA's canopy edge is 7 cm clear of the cheek there) to
-    // 0.14 m past the east one.
+    // Off `1000150414` at 04:24-04:28: the canopy, a white piping bar on the
+    // front and a red valance off it with the mark printed on it, the length
+    // of the frontage, from the west corner post (the CORONA's canopy edge is
+    // 7 cm clear of the cheek there) to 0.14 m past the east one.
+    //
+    // FABRIC, NOT A BOX (1.550.7). 1.550.6 had the canopy nearly flat — it fell
+    // 0.135 m over its 1.30 m throw, so from the promenade it was edge-on and
+    // invisible — and the valance a rigid 80 mm red beam with a bar along its
+    // foot. In `_414` the canopy is a steep red slope you see the top of from
+    // the promenade (0.4 m of rise over the throw, measured against the
+    // valance's own depth at 04:25.8), sagging between the arms and creased,
+    // on a slim white piping bar; the valance is cloth hanging off that bar,
+    // folded, a little uneven at the hem, faded to salmon, and nothing holds
+    // its foot. So the canopy is a sheet with its sag and its creases in the
+    // geometry and its fading in the vertex colour, and the valance is a
+    // printed sheet of folds (`tkAwnPrint` on it, a plain lining behind).
     {
-      const AWN = [0.545, 0.090, 0.075];
-      const BATT = [0.640, 0.575, 0.500];
+      const AWN = [0.560, 0.085, 0.072];
+      const PIPE = [0.760, 0.745, 0.715];
       const at0 = T0 - 0.06, at1 = T1 + 0.14;
-      const sIn = S0 - 0.02, sOut = S0 - 1.32;
+      const sIn = S0 - 0.02, sOut = S0 - 1.37;
+      const yIn = top + 0.32, yOut = top - 0.098;
+      const ah = (n) => {
+        const x = Math.sin(n * 23.917 + 3.3) * 15731.743;
+        return x - Math.floor(x);
+      };
+      // A few long creases across the canopy, each a shallow trough running
+      // from the bar toward the wall at its own angle.
+      const CR = [0, 1, 2, 3, 4, 5].map((k) => [at0 + (at1 - at0) * (0.08 + 0.84 * ah(k)),
+        (ah(k + 10) - 0.5) * 0.9, 0.004 + 0.006 * ah(k + 20)]);
+      const creased = (t, u) => {
+        let d = 0;
+        for (const [ct, sl, dep] of CR) {
+          const x = (t - ct - sl * u) / 0.05;
+          d += dep * Math.exp(-x * x);
+        }
+        return d;
+      };
       {
-        const nT = Math.max(2, Math.ceil((at1 - at0) / 0.18)), nS = 10;
-        const sheet = (dy, col) => {
+        const nT = Math.max(2, Math.ceil((at1 - at0) / 0.10)), nS = 12;
+        const sheet = (dy, k) => {
           const G = [];
           for (let i = 0; i <= nT; i++) {
             const t = at0 + (at1 - at0) * (i / nT);
             const row = [];
             for (let j = 0; j <= nS; j++) {
               const u = j / nS, s = sIn + (sOut - sIn) * u;
-              const ripple = 0.006 * Math.sin(t * 6.4 + 0.7) * Math.sin(Math.PI * u);
-              row.push(W(t, s, top + 0.03 + dy - 0.10 * u
-                - 0.035 * Math.sin(Math.PI * u) + ripple));
+              // Sag between the wall and the bar, deepest a third of the way
+              // out; a slow belly between the two arms; the creases.
+              const sag = 0.035 * Math.sin(Math.PI * u) * (0.75 + 0.25 * Math.sin(Math.PI * (t - at0) / (at1 - at0)));
+              row.push(W(t, s, yIn + (yOut - yIn) * u - sag - creased(t, u) * Math.sin(Math.PI * u) + dy));
             }
             G.push(row);
           }
-          knSurf(G, col, { down: true });
+          // Sun-faded in blotches, paler toward the bar where it gets the most.
+          knSurf(G, (i, j) => {
+            const f = 0.90 + 0.14 * ah(Math.floor(i / 3) * 7 + Math.floor(j / 4) * 13)
+              + 0.06 * (j / nS);
+            return [AWN[0] * f * k, AWN[1] * f * (1 + 0.5 * (j / nS)) * k,
+              AWN[2] * f * (1 + 0.5 * (j / nS)) * k];
+          }, { down: true });
         };
-        sheet(0, AWN);
-        sheet(-0.040, shade(AWN, 0.60));
+        sheet(0, 1.0);
+        sheet(-0.012, 0.62);
       }
+      // The case the roller lives in, along the wall head over the capping.
+      tkT(at0, at1, S0 - 0.07, top + 0.21, 0.065, 0.13, 0.035, shade(PIPE, 0.92));
       for (const ct of [at0 - 0.01, at1 + 0.01]) {
-        const A = [ct, S0 - 1.44, top - 0.45], B = [ct, sIn, top + 0.01];
+        const A = [ct, S0 - 1.40, top - 0.43], B = [ct, sIn, top + 0.10];
         const ds = B[1] - A[1], dy = B[2] - A[2], dl = Math.hypot(ds, dy);
-        tkBar(A, B, [1, 0, 0], [0, -dy / dl, ds / dl], 0.02, 0.02, 0.009,
-          shade(AWN, 0.74));
+        tkBar(A, B, [1, 0, 0], [0, -dy / dl, ds / dl], 0.018, 0.018, 0.008,
+          [0.62, 0.61, 0.59]);
       }
-      // The white piping bar the valance hangs from, brought forward to the
-      // valance's own face so it reads as the pale line `_414` has between
-      // the canopy and the print.
-      tkT(at0, at1, S0 - 1.393, top - 0.11, 0.052, 0.06, 0.030, BATT);
-      tkT(at0, at1, S0 - 1.40, top - 0.32, 0.04, 0.15, 0.012, AWN);
-      tkT(at0 - 0.01, at1 + 0.01, S0 - 1.4175, top - 0.48, 0.0425, 0.025, 0.014,
-        shade(AWN, 1.26));
-      // The print, 12 mm off the fascia's face and inside its radii, laid
-      // through `W` so it bends with the fascia under it.
-      const pa = at0 + 0.015, pb = at1 - 0.015, py0 = top - 0.455, py1 = top - 0.185;
-      tkSheet(tkPrintMat(tkAwnPrint(pb - pa, py1 - py0), { emissive: 0.08 }),
-        (u, v) => W(pa + (pb - pa) * u, S0 - 1.452, py0 + (py1 - py0) * v),
-        [[0, 1, 0, 1]], 0.25, 'tisak:awning');
+      // The white piping bar: slim, round-edged, where the cloth turns down.
+      tkT(at0 - 0.005, at1 + 0.005, S0 - 1.385, top - 0.125, 0.032, 0.029, 0.022, PIPE);
+      // The valance: a sheet of folds hanging off the bar. Folds deepen
+      // toward the free hem; the hem itself wanders a centimetre.
+      const va = at0 + 0.005, vb = at1 - 0.005, vy1 = top - 0.145, vy0 = top - 0.470;
+      const VS = S0 - 1.400;
+      const valance = (u, v, off) => {
+        const t = va + (vb - va) * u;
+        const free = 1 - v;                                   // 0 at the bar, 1 at the hem
+        const fold = 0.0045 * Math.sin(t * 27.0 + 0.8) + 0.0030 * Math.sin(t * 61.0 + 2.1)
+          + 0.0060 * Math.sin(t * 3.7 + 0.2);
+        const hem = 0.008 * Math.sin(t * 5.3 + 1.0) + 0.004 * Math.sin(t * 13.1);
+        const y = vy1 + (vy0 + hem * free - vy1) * (1 - v);
+        return [t, VS - fold * (0.35 + 0.65 * free) + off, y];
+      };
+      const VN = Math.ceil((vb - va) / 0.025);
+      const VT = tkGoods({ tex: tkAwnPrint(vb - va, vy1 - vy0), cell: () => [0, 1, 0, 1] });
+      VT.grid((u, v) => valance(u, v, 0), VN, 5, [0, 1, 0, 1]);
+      VT.done('tisak:awning', 0.08);
+      // The lining behind it, plain, facing the shop.
+      const GL = [];
+      for (let i = 0; i <= VN; i++) {
+        const row = [];
+        for (let j = 0; j <= 5; j++) row.push(W(...valance(i / VN, j / 5, 0.006)));
+        GL.push(row);
+      }
+      knSurf(GL, shade(AWN, 0.70), { out: () => W((va + vb) * 0.5, S0 - 3.0, top - 0.3) });
     }
     // ── the door, standing open at the west end ─────────────────────────────
     //
@@ -15483,12 +16215,19 @@ async function buildJadrija(scene) {
       // counter ledge and its west side in line with the corner post, and the
       // serving window starts at its east side. It stood 0.42 m past the end
       // of the box, which is where `_343` seemed to put it from the land side.
-      const ct = S.t0 + 0.43, cs = S.s0 - 0.38;
+      //
+      // AND IT IS 0.58 M WIDE (1.550.7), not 0.68. Square on in `_414` at
+      // 04:25.8 the face measures 320 px by 1240 at full size with its west
+      // side showing at about 18 degrees, so 3.7 to 1 true: on a 1.99 m
+      // cabinet that is 0.54 m, and 0.58 is the common size it most likely is.
+      // Its east side stays where it was, against the start of the window;
+      // the 0.10 m it gave up is corner post and west bay.
+      const ct = S.t0 + 0.48, cs = S.s0 - 0.38;
       // White enamel: the print is on the front only (see below), and the
       // sides in `_414` are the cabinet's own white.
       const WRAP = [0.700, 0.708, 0.680];
       const CAB = [0.665, 0.662, 0.650];
-      const hw = 0.34, hd = 0.30, hh = 1.99;
+      const hw = 0.29, hd = 0.30, hh = 1.99;
       // A ROUNDED CABINET since 1.549.3 — 35 mm corners in plan, a 30 mm
       // radius round the top — standing 40 mm up on four levelling feet over
       // a dark recessed plinth, which is what a fridge is and a box is not.
@@ -15505,7 +16244,7 @@ async function buildJadrija(scene) {
       // in from every edge: the line that says the front is a door.
       {
         const GS = [0.090, 0.090, 0.094], sf = cs - hd - 0.002;
-        const ga = ct - hw + 0.030, gc = ct + hw - 0.030, gb = y0 + 0.235, gh = y0 + hh - 0.035;
+        const ga = ct - hw + 0.022, gc = ct + hw - 0.022, gb = y0 + 0.062, gh = y0 + hh - 0.030;
         for (const t of [ga, gc]) tkY(t, sf, gb, gh, 0.006, 0.004, 0.003, GS);
         for (const y of [gb, gh]) tkT(ga, gc, sf, y, 0.004, 0.006, 0.003, GS);
       }
@@ -15516,48 +16255,51 @@ async function buildJadrija(scene) {
       // `_414` is artwork laid out for the front face — `tkJanaPrint` — and
       // the sides are plain white, which is what the frame has of them.
       {
-        const pa = ct - hw + 0.042, pb = ct + hw - 0.042;
-        const py0 = y0 + 0.247, py1 = y0 + hh - 0.047, ps = cs - hd - 0.005;
+        // Near edge to edge in `_414`: a white margin of 3 cm down the hinge
+        // side and 5 down the latch side, 7 cm of white head, and the print
+        // runs on down to the plinth — the grille that stood across the foot
+        // of the door is not in that frame.
+        const pa = ct - hw + 0.030, pb = ct + hw - 0.050;
+        const py0 = y0 + 0.075, py1 = y0 + hh - 0.070, ps = cs - hd - 0.005;
         tkSheet(tkPrintMat(tkJanaPrint(pb - pa, py1 - py0), { emissive: 0.07 }),
           (u, v) => W(pa + (pb - pa) * u, ps, py0 + (py1 - py0) * v), [[0, 1, 0, 1]], 0.3,
           'tisak:jana');
       }
-      // The D-handle down the right-hand edge of the door in `_343`, at the
-      // height a handle is on a two-metre cabinet rather than on a 1.46 m one.
-      // Right-hand in that frame is the edge AWAY from the kiosk, and with the
-      // cabinet moved to the west end that is the low-t edge.
-      //
-      // A real D now (1.549.3): a chrome bar on two standoffs, swept, with a
-      // round foot plate at each end.
+      // No D-handle and no grille (1.550.7). Face on in `_414` the door has
+      // a small grey latch in the white margin down its EAST edge at half
+      // height and nothing else on it; the handle and the louvres were read
+      // off `_343`, which sees this cabinet from behind and to the side.
       {
-        const HC = [0.640, 0.648, 0.655], htc = ct - hw + 0.0925, f = cs - hd;
-        tubeTS([[htc, f + 0.004, y0 + 0.97], [htc, f - 0.030, y0 + 0.975],
-          [htc, f - 0.044, y0 + 0.995], [htc, f - 0.046, y0 + 1.03],
-          [htc, f - 0.046, y0 + 1.29], [htc, f - 0.044, y0 + 1.325],
-          [htc, f - 0.030, y0 + 1.345], [htc, f + 0.004, y0 + 1.35]], 0.011, HC, 12);
-        for (const y of [y0 + 0.97, y0 + 1.35]) {
-          axLathe([htc, f + 0.001, y], [0, -1, 0], [[0, 0.019], [0.004, 0.018],
-            [0.007, 0.012], [0.008, 0]], HC, 14, [1, 0, 0], { push: -0.3 });
-        }
+        const f = cs - hd;
+        knRR(W, ct + hw - 0.044, ct + hw - 0.012, f - 0.014, f + 0.004, y0 + 0.98, y0 + 1.10,
+          0.006, 0.004, [0.560, 0.565, 0.570], [0.620, 0.625, 0.630]);
+        boxTS(ct + hw - 0.036, ct + hw - 0.020, f - 0.018, f - 0.014, y0 + 1.02, y0 + 1.06,
+          [0.200, 0.200, 0.205]);
       }
-      // The grille along the foot, and the lid. Three louvres and not one white
-      // slab: in `c343_jana` it is a stack of pressed slots, and a slab there
-      // reads as a skirting board rather than as the place the heat comes out.
-      //
-      // Since 1.549.3 the slots are slots: a dark recess across the foot of
-      // the front and five radiused louvres across it, each tipped down.
-      boxTS(ct - hw + 0.05, ct + hw - 0.05, cs - hd - 0.007, cs - hd + 0.010,
-        y0 + 0.065, y0 + 0.215, [0.055, 0.055, 0.058]);
-      for (let k = 0; k < 5; k++) {
-        const ly = y0 + 0.085 + k * 0.028;
-        tkBar([ct - hw + 0.055, cs - hd - 0.008, ly], [ct + hw - 0.055, cs - hd - 0.008, ly],
-          [0, Math.cos(0.5), -Math.sin(0.5)], [0, Math.sin(0.5), Math.cos(0.5)],
-          0.009, 0.003, 0.0025, [0.700, 0.700, 0.692], { nc: 2 });
+      // What the west side carries: the rating plate and two stickers,
+      // faded, and the mains lead out of the top corner to the kiosk.
+      {
+        const sw = ct - hw - 0.0025;
+        for (const [sa, sb, ya, yb, c] of [
+          [cs - 0.14, cs - 0.02, 1.30, 1.40, [0.780, 0.775, 0.750]],
+          [cs + 0.04, cs + 0.13, 1.06, 1.13, [0.120, 0.300, 0.620]],
+          [cs - 0.20, cs - 0.13, 0.62, 0.66, [0.720, 0.140, 0.100]],
+          [cs + 0.10, cs + 0.22, 0.30, 0.36, [0.700, 0.700, 0.690]],
+        ]) boxTS(sw - 0.002, sw + 0.001, sa, sb, y0 + ya, y0 + yb, c);
+        for (let k = 0; k < 9; k++) {
+          boxTS(sw - 0.0035, sw - 0.002, cs - 0.13 + k * 0.009, cs - 0.126 + k * 0.009,
+            y0 + 1.315, y0 + 1.345, [0.05, 0.05, 0.05]);
+        }
+        tubeTS([[ct - hw + 0.08, cs + hd - 0.04, y0 + hh + 0.05],
+          [ct - hw + 0.03, cs + hd - 0.01, y0 + hh + 0.09],
+          [ct - hw - 0.01, cs + hd + 0.02, y0 + hh + 0.07],
+          [S.t0 + 0.12, S.s0 - 0.03, y0 + hh + 0.02],
+          [S.t0 + 0.12, S.s0 - 0.012, y0 + hh + 0.16]], 0.0055, [0.050, 0.050, 0.055], 6);
       }
       knRR(W, ct - hw - 0.02, ct + hw + 0.02, cs - hd - 0.02, cs + hd + 0.02,
         y0 + hh - 0.004, y0 + hh + 0.055, 0.050, 0.022, CAB, shade(CAB, 1.10),
         { bottom: true });
-      furniture.push({ t: ct, s: cs, a: 0.38, c: 0.34, h: hh, y: y0 });
+      furniture.push({ t: ct, s: cs, a: hw + 0.04, c: 0.34, h: hh, y: y0 });
     }
     // The two square parasols. `1000150343` has a big white one with CORONA on
     // its valance and a golden Ožujsko one beyond it, and square is the read:
