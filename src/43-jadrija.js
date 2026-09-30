@@ -35759,8 +35759,10 @@ async function buildJadrija(scene) {
     const GW = G.tw + 0.014;
     if (!mtb) {
       // Mudguards: a strip over each tyre, wide, 18 mm clear of the tread,
-      // held by a pair of stays to the dropouts.
-      for (const [u0, a0, a1, ae] of [[0, 0.20, 3.75, 3.45], [RA[0], 1.05, 3.55, 3.15]]) {
+      // held by a pair of stays to the dropouts. The front one starts 42
+      // degrees ahead of the top and not at 0.20, nearly axle height in front,
+      // which was a rear guard's wrap on the front wheel (see `wheelBike`).
+      for (const [u0, a0, a1, ae] of [[0, 0.84, 3.75, 3.45], [RA[0], 1.05, 3.55, 3.15]]) {
         const gr = R + 0.020, pts = [];
         for (let k = 0; k <= 16; k++) {
           const a = a0 + (a1 - a0) * k / 16;
@@ -68134,9 +68136,17 @@ async function buildJadrija(scene) {
       bikeGrid(f, G, BK.chrome, { closedJ: true, out: (i, j, q) => bkSub(q, [base[0], base[1] - 0.004, base[2]]) });
       f.box(base[0] + 0.01, base[1] - 0.006, base[2] - 0.022, 0.012, 0.006, 0.02, BK.dark);
     }
-    bikeGuard(f, FA[0], FA[1], -0.06, 3.56, R + 0.022, 0.029, guardCol, lo);
+    // THE FRONT GUARD IS NOT THE BACK ONE. It ran from −0.06 — axle height,
+    // in front of the tyre — over the top and down behind: the rear guard's
+    // long wrap put on the front wheel, so the nose of the bicycle read as its
+    // tail (Misha, 30 Sep: "otherwise it doesn't look like the front of the
+    // bike but like the back of it"). A front guard is short ahead of the
+    // fork, 42 degrees past the top, and long behind it, down towards the
+    // frame, where the wheel throws the wet. Its stays go to the forward end
+    // now, from the axle up and ahead at 54 degrees.
+    bikeGuard(f, FA[0], FA[1], 0.84, 3.56, R + 0.022, 0.029, guardCol, lo);
     for (const s of [-1, 1]) {
-      const a = 0.12, e = [FA[0] + Math.cos(a) * (R + 0.012), FA[1] + Math.sin(a) * (R + 0.012), s * 0.026];
+      const a = 0.95, e = [FA[0] + Math.cos(a) * (R + 0.012), FA[1] + Math.sin(a) * (R + 0.012), s * 0.026];
       tube(f, [e, [FA[0] + 0.005, FA[1] + 0.006, s * 0.056]], 0.0028, BK.steel, { sides: 4 });
     }
     if (st.basket) {

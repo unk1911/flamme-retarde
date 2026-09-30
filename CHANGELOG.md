@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.552.3] — 2026-09-30
+
+### The front mudguard is a front one: short ahead of the fork, long behind it
+
+Misha, with a screenshot of the red step-through lying on its side and an X
+on the front guard's nose: *"where i have the X, that part is extra, u know
+what i mean? otherwise it doesn't look like the front of the bike but like
+the back of it..."*
+
+**He was right.** The riders' front guard (`wheelBike`) ran from −0.06 rad,
+which is axle height in front of the tyre, over the top and down behind. That
+is the rear guard's long wrap put on the front wheel, and it reads as a tail.
+The parked bicycles in the Staropramen rack (`bicycle`) had the same fault in
+their own builder: their front guard started at 0.20 rad, only a few degrees
+higher.
+
+- On a real city bicycle the front guard stops a short way past the fork
+  crown and runs long behind, down towards the frame, where the wheel throws
+  the wet. Both builders now start it at 0.84 rad, 42 degrees ahead of the
+  top. The trailing ends are unchanged (3.56 on the riders' bikes, 3.75 on
+  the rack's).
+- The riders' front stays used to meet the guard at axle height in front,
+  where there is no guard any more. They now meet it near its new front end,
+  running up from the axle and ahead at 54 degrees. The rack bikes' stays
+  were always behind the fork and are unchanged.
+- Same change on every guarded bicycle: all three riders' bicycles and the
+  stealable ones (one builder), and the step-through, child's and town
+  bicycles in the rack. The mountain bike has no guards. The rear guards, the
+  basket and its stays to the axle, the lamps, the rear reflector and the
+  scooters' guards are untouched. There is nothing rear-only on the front end.
+- No `rng` draw moves (rule 4). People 100, blockers 785, no console errors.
+
 ## [1.552.2] — 2026-09-30
 
 ### The kabina, dressed and lit: no weeds, a real television, a shelf with things on it, and a lamp that throws a shadow
