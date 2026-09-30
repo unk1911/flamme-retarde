@@ -1642,6 +1642,40 @@ function avbdBall(o) {
 //
 // Unset (the default), a world box is (i)'s and nothing about the settle moves.
 //
+// (k) AND A STRAP IN A HAND (1.552.0, the belt — BELT in 43-belt.js). Misha,
+// 30 Sep 2026: *"in kabine when spanking. I (chloe) take out my belt and
+// spank baye with it, also could probably reuse the AVBD physics for it"*. A
+// metre of leather as twenty flat links, jointed end to end, the buckle end
+// held and the other free. Three things it needs that nothing before did:
+//
+//   A MOVING HAND. A world joint's anchor is where the hand is, and the hand
+//   swings at six metres a second. Stabilised the reference's way — C0 taken
+//   with the anchor already moved — the joint forgives `alpha` of the hand's
+//   own motion every step and the strap trails a steady lag of d/(1 − alpha),
+//   twenty steps' worth. So a joint whose target is set `moving` takes C0
+//   against where its anchor WAS at the start of the step, and evaluates
+//   every iteration against where it IS: the chain's kinematic ends, (1)
+//   above, for a world joint of the net. Position and attitude both.
+//
+//   HER, WHERE SHE IS, AS THE WORLD. Kinematic capsules (`setWorldCaps`) —
+//   the cuff chain's body shapes, for the net: nothing in the strap's solve
+//   moves them, and a strap capsule meets one at the closest pair of their
+//   two axes, the capsule pairs' test, with body B the world. Her ragdoll is
+//   not pushed from here: a hit is read off these contacts (`worldCapHits`)
+//   and handed to her own net as an impulse, the way the hand's slap is.
+//
+//   HOW FAST IT CAME IN. Each of those contacts carries the speed the strap
+//   was closing on her at when it was made (`cVn`), off the link's velocity
+//   at the start of the step — after the step the contact has already
+//   stopped it — so "how hard did that land" is a number the solver knows
+//   and not a guess.
+//
+// The bend is the ragdoll's angles, (h), untouched: a soft drive toward
+// straight and hard limits edgewise and in twist, which is how leather bends.
+// All three are empty unless asked for (`maxWorldCaps`, and `setTarget`'s
+// `moving`), so the hammock, the cot, the settle, the springboard, the
+// bucketeer's yoke and the chair step exactly as they did.
+//
 // NOT TAKEN: the box-box manifold, the broadphase (the only pair that matters
 // is cloth against her, and her bounding sphere is the broadphase), fracture.
 // ---------------------------------------------------------------------------
@@ -1688,6 +1722,10 @@ function avbdNet(o) {
   // Measured apart from the rest by `measure` — a ragdoll's sockets, whose
   // gap is never drawn (her skin is written from the bodies' turns).
   const jLoose = new Uint8Array(NJ);
+  // A world joint whose anchor moves under it (k): where the anchor and its
+  // attitude were at the start of the step, which is what C0 is taken with.
+  const jKin = new Uint8Array(NJ);
+  const jRA0 = new Float64Array(3 * NJ), jQW0 = new Float64Array(4 * NJ);
   let nj = 0;
 
   // ── strings ───────────────────────────────────────────────────────────
@@ -1755,6 +1793,12 @@ function avbdNet(o) {
   const NCPR = o.maxCapPairs || 0;
   const cpr = new Int32Array(2 * NCPR);
   let ncpr = 0;
+  // World capsules — see (k): two ends and a radius at each, eight a capsule,
+  // in the world, kinematic.
+  const NWC = o.maxWorldCaps || 0;
+  const wcap = new Float64Array(8 * NWC);
+  let nwc = 0;
+  const WC_ID0 = (o.maxPoints + o.maxCaps + (o.maxBoxes || 0) + NWB + NCPR);
 
   // ── contacts, made every step ────────────────────────────────────────
   const NC = o.maxContacts;
@@ -1764,6 +1808,9 @@ function avbdNet(o) {
   const cC0 = new Float64Array(NC), cMu = new Float64Array(NC), cK = new Float64Array(NC);
   // A contact's damper, N·s/m — nonzero only on a soft world box, (j).
   const cD = new Float64Array(NC);
+  // How fast A was closing on a world capsule when the contact was made,
+  // m/s — (k); nought on every other contact.
+  const cVn = new Float64Array(NC), cWc = new Int32Array(NC);
   const cPen = new Float64Array(3 * NC), cLam = new Float64Array(3 * NC);
   const cId = new Int32Array(NC), cFn = new Float64Array(NC);
   let nc = 0;
@@ -2281,7 +2328,7 @@ function avbdNet(o) {
   function addContact(id, a, b, nx, ny, nz, gap, xAx, xAy, xAz, xBx, xBy, xBz, mu, k, d = 0) {
     if (nc >= NC) { stats.lost++; return; }
     const c = nc++;
-    cA[c] = a; cB[c] = b; cId[c] = id; cMu[c] = mu; cK[c] = k; cFn[c] = 0; cD[c] = d;
+    cA[c] = a; cB[c] = b; cId[c] = id; cMu[c] = mu; cK[c] = k; cFn[c] = 0; cD[c] = d; cVn[c] = 0; cWc[c] = 0;
     unturn(a, xAx - P[3 * a], xAy - P[3 * a + 1], xAz - P[3 * a + 2], cRA, 3 * c);
     if (b >= 0) unturn(b, xBx - P[3 * b], xBy - P[3 * b + 1], xBz - P[3 * b + 2], cRB, 3 * c);
     else { cRB[3 * c] = xBx; cRB[3 * c + 1] = xBy; cRB[3 * c + 2] = xBz; }
@@ -2567,6 +2614,63 @@ function avbdNet(o) {
       addContact(id, a, b, nx, ny, nz, gap, px - nx * ra, py - ny * ra, pz - nz * ra,
         qx + nx * rb, qy + ny * rb, qz + nz * rb, o.mu, softBody[a] || softBody[b] ? o.capK : Infinity);
     }
+    // Capsules against the world's kinematic capsules — see (k). The same
+    // closest pair of two segments, body B the world; and the speed A was
+    // coming in at, off its velocity at the start of the step.
+    for (let w = 0; w < nwc; w++) {
+      const o8 = 8 * w;
+      const q0x = wcap[o8], q0y = wcap[o8 + 1], q0z = wcap[o8 + 2];
+      const d2x = wcap[o8 + 3] - q0x, d2y = wcap[o8 + 4] - q0y, d2z = wcap[o8 + 5] - q0z;
+      const wr0 = wcap[o8 + 6], wr1 = wcap[o8 + 7];
+      const E = d2x * d2x + d2y * d2y + d2z * d2z;
+      const wR = Math.max(wr0, wr1) + margin + 0.5 * Math.sqrt(E);
+      const wmx = q0x + d2x * 0.5, wmy = q0y + d2y * 0.5, wmz = q0z + d2z * 0.5;
+      for (let c1 = 0; c1 < ncp; c1++) {
+        const a = cpBody[c1];
+        if (!cpOn[c1] || !live[a]) continue;
+        const ex = wmx - bsX[a], ey = wmy - bsY[a], ez = wmz - bsZ[a], lim = bsR[a] + wR;
+        if (ex * ex + ey * ey + ez * ez > lim * lim) continue;
+        const p0x = capW[6 * c1], p0y = capW[6 * c1 + 1], p0z = capW[6 * c1 + 2];
+        const d1x = capW[6 * c1 + 3] - p0x, d1y = capW[6 * c1 + 4] - p0y, d1z = capW[6 * c1 + 5] - p0z;
+        const rx = p0x - q0x, ry = p0y - q0y, rz = p0z - q0z;
+        const A = d1x * d1x + d1y * d1y + d1z * d1z;
+        const Fv = d2x * rx + d2y * ry + d2z * rz;
+        const cl = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+        let s = 0, t = 0;
+        if (A <= 1e-12 && E <= 1e-12) { s = 0; t = 0; } else if (A <= 1e-12) { t = cl(Fv / E); } else {
+          const Cv = d1x * rx + d1y * ry + d1z * rz;
+          if (E <= 1e-12) { s = cl(-Cv / A); } else {
+            const Bv = d1x * d2x + d1y * d2y + d1z * d2z, den = A * E - Bv * Bv;
+            s = den > 1e-12 ? cl((Bv * Fv - Cv * E) / den) : 0;
+            t = (Bv * s + Fv) / E;
+            if (t < 0) { t = 0; s = cl(-Cv / A); } else if (t > 1) { t = 1; s = cl((Bv - Cv) / A); }
+          }
+        }
+        const px = p0x + d1x * s, py = p0y + d1y * s, pz = p0z + d1z * s;
+        const qx = q0x + d2x * t, qy = q0y + d2y * t, qz = q0z + d2z * t;
+        const ra = cpR0[c1] + (cpR1[c1] - cpR0[c1]) * s, rb = wr0 + (wr1 - wr0) * t;
+        let nx = px - qx, ny = py - qy, nz = pz - qz;
+        const d = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (d < 1e-7 || d - ra - rb > margin) continue;
+        nx /= d; ny /= d; nz /= d;
+        const gap = d - ra - rb;
+        const id = (WC_ID0 + w) * 128 + 2 + cpId[c1];
+        if (gap < -o.deep && prevSlot(id) < 0) { stats.refused++; continue; }
+        const xAx = px - nx * ra, xAy = py - ny * ra, xAz = pz - nz * ra;
+        const had = nc;
+        addContact(id, a, -1, nx, ny, nz, gap, xAx, xAy, xAz,
+          qx + nx * rb, qy + ny * rb, qz + nz * rb, o.mu, o.worldCapK || Infinity);
+        if (nc > had) {
+          // v·n at the contact point, v = V + W × r: negative is closing.
+          const lx = xAx - P[3 * a], ly = xAy - P[3 * a + 1], lz = xAz - P[3 * a + 2];
+          const wx = W[3 * a], wy = W[3 * a + 1], wz = W[3 * a + 2];
+          const vx = V[3 * a] + wy * lz - wz * ly, vy = V[3 * a + 1] + wz * lx - wx * lz,
+            vz = V[3 * a + 2] + wx * ly - wy * lx;
+          cVn[had] = -(vx * nx + vy * ny + vz * nz);
+          cWc[had] = w + 1;
+        }
+      }
+    }
     // Who touches what, this step.
     conFill.fill(0);
     for (let c = 0; c < nc; c++) { conFill[cA[c]]++; if (cB[c] >= 0) conFill[cB[c]]++; }
@@ -2589,6 +2693,8 @@ function avbdNet(o) {
     // Joints and strings: C at x-, and the warm start (Eq. 19).
     for (let k = 0; k < nj; k++) {
       if (!jOn[k] || !ok(jA[k]) || !live[jB[k]]) continue;
+      // A moving anchor's C0 is against where it was — see (k).
+      if (jKin[k]) swapAnchor(k);
       jointEval(k);
       const capL = Math.min(AVBD.penMax, jKL[k]);
       for (let r = 0; r < 3; r++) {
@@ -2607,6 +2713,7 @@ function avbdNet(o) {
           jPA[q] = Math.min(capA, Math.max(AVBD.penMin, jPA[q] * o.gamma));
         }
       }
+      if (jKin[k]) swapAnchor(k);
     }
     for (let s = 0; s < ns; s++) {
       if (!sOn[s] || !ok(sA[s]) || !live[sB[s]]) continue;
@@ -2761,8 +2868,20 @@ function avbdNet(o) {
       if (w > o.wMax) { wx *= o.wMax / w; wy *= o.wMax / w; wz *= o.wMax / w; }
       W[p] = wx; W[p + 1] = wy; W[p + 2] = wz;
     }
+    // A moving anchor has arrived — see (k): the next step starts from here.
+    for (let k = 0; k < nj; k++) {
+      if (!jKin[k]) continue;
+      jRA0[3 * k] = jRA[3 * k]; jRA0[3 * k + 1] = jRA[3 * k + 1]; jRA0[3 * k + 2] = jRA[3 * k + 2];
+      for (let r = 0; r < 4; r++) jQW0[4 * k + r] = jQW[4 * k + r];
+    }
     stats.steps++;
     stats.ms = performance.now() - t0;
+  }
+
+  /** Joint k's world anchor and attitude swapped with where they were — (k). */
+  function swapAnchor(k) {
+    for (let r = 0; r < 3; r++) { const v = jRA[3 * k + r]; jRA[3 * k + r] = jRA0[3 * k + r]; jRA0[3 * k + r] = v; }
+    for (let r = 0; r < 4; r++) { const v = jQW[4 * k + r]; jQW[4 * k + r] = jQW0[4 * k + r]; jQW0[4 * k + r] = v; }
   }
 
   // ── reading it, and moving it ────────────────────────────────────────
@@ -2852,10 +2971,21 @@ function avbdNet(o) {
     if (q) { Q[4 * i] = q[0]; Q[4 * i + 1] = q[1]; Q[4 * i + 2] = q[2]; Q[4 * i + 3] = q[3]; }
     V.fill(0, 3 * i, 3 * i + 3); W.fill(0, 3 * i, 3 * i + 3); VP.fill(0, 3 * i, 3 * i + 3);
   }
-  /** Where a world-anchored joint's world end is to be, and its attitude. */
-  function setTarget(k, px, py, pz, q) {
+  /**
+   * Where a world-anchored joint's world end is to be, and its attitude.
+   * `moving` (k): the anchor is carried there over the next step, and C0 is
+   * taken against where it was — for a hand that swings. The first moving
+   * call, and any call without it, is a placement: no motion to forgive.
+   */
+  function setTarget(k, px, py, pz, q, moving = false) {
     jRA[3 * k] = px; jRA[3 * k + 1] = py; jRA[3 * k + 2] = pz;
     if (q) { jQW[4 * k] = q[0]; jQW[4 * k + 1] = q[1]; jQW[4 * k + 2] = q[2]; jQW[4 * k + 3] = q[3]; }
+    if (moving && jKin[k]) return;
+    jKin[k] = moving ? 1 : 0;
+    if (moving) {
+      jRA0[3 * k] = px; jRA0[3 * k + 1] = py; jRA0[3 * k + 2] = pz;
+      for (let r = 0; r < 4; r++) jQW0[4 * k + r] = jQW[4 * k + r];
+    }
   }
   /** Joint k measured apart (`stats.maxLoose`) — see `jLoose`. */
   function setJointLoose(k, on) { jLoose[k] = on ? 1 : 0; }
@@ -2926,6 +3056,21 @@ function avbdNet(o) {
      * `stiff` Infinity (or no call) is (i)'s hard box. Kept across `setWorldBoxes`.
      */
     setWorldBoxSoft: (k, stiff, damp = 0) => { wbK[k] = stiff > 0 ? stiff : Infinity; wbD[k] = stiff > 0 ? Math.max(0, damp) : 0; },
+    /** The world's kinematic capsules — see (k): `a` eight numbers a capsule (ends, radii), `n` of them. */
+    setWorldCaps: (a, n) => { nwc = Math.min(NWC, n); for (let k = 0; k < 8 * nwc; k++) wcap[k] = a[k]; },
+    /**
+     * Every contact with a world capsule as it stands after the last step — (k):
+     * `cb(body, capsule, x, y, z, nx, ny, nz, vIn, fn)`, the point on the
+     * capsule's skin, the normal out of it, the speed the body was closing at
+     * this step (m/s, off its velocity at the start of it), and the push.
+     */
+    worldCapHits: (cb) => {
+      for (let c = 0; c < nc; c++) {
+        if (!cWc[c]) continue;
+        cb(cA[c], cWc[c] - 1, cRB[3 * c], cRB[3 * c + 1], cRB[3 * c + 2],
+          cBas[9 * c], cBas[9 * c + 1], cBas[9 * c + 2], cVn[c], cFn[c]);
+      }
+    },
     /** The capsule pairs — see (i): `a` two capsule indices a pair, `n` of them. */
     setCapPairs: (a, n) => { ncpr = Math.min(NCPR, n); for (let k = 0; k < 2 * ncpr; k++) cpr[k] = a[k]; },
     /** Debug: angle m's rotation vector now, rad, in its joint frame. */

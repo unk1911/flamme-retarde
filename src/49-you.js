@@ -262,6 +262,9 @@ async function buildYou(scene) {
   // does not, because the change happens behind a screen with the picture
   // faded to black and there is nothing to see it move.
   const uSwim = { value: 0 };
+  // Her belt, 0..1 of it still round her waist — 1 worn, 0 in her hand. See
+  // `belt` below, and BELT in 43-belt.js for the one she takes out.
+  const uBelt = { value: 1 };
 
   // HER OWN MESH, and not the one Baye and the race swimmer are built from.
   //
@@ -334,12 +337,13 @@ async function buildYou(scene) {
     // their blink from `v5Blink` on the part that owns the eyeball instead.
     face: !V2,
     ...(V2 ? { parts: look.parts } : {}),
-    uniforms: V2 ? { uSwim, uSkin: { value: v5Tex('chloe2_skin') } } : { uSwim },
+    uniforms: V2 ? { uSwim, uBelt, uSkin: { value: v5Tex('chloe2_skin') } } : { uSwim, uBelt },
     // Declared out here because the body is spliced into main() and GLSL ES 1.0
     // will not take a function inside a function. Everything below is used by
     // the sleeve and the print and by nothing else on this figure.
     decl: (V2 ? 'uniform sampler2D uSkin;\n' : '') + `
       uniform float uSwim;
+      uniform float uBelt;
       float youHash(vec3 p) {
         return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
       }
@@ -624,6 +628,38 @@ async function buildYou(scene) {
             smoothstep(0.026, 0.030, ly) * (1.0 - smoothstep(0.033, 0.038, ly)));
           vcol = mix(vcol, lea, boot);
           cover = max(cover, boot);
+        }
+
+        // ---- the belt
+        //
+        // 1.552.0: the one she takes out in the kabina (BELT, 43-belt.js).
+        // Three centimetres of brown leather through the loops of the jeans,
+        // just under the tank's hem, a brass frame at the front. uBelt is how
+        // much of it is still round her: pulled out by the buckle, it leaves
+        // the loops from the front round her right side and out of the back,
+        // so what is left is an arc from her left hip, going.
+        float bearing = atan(vLocal.z, vLocal.x);
+        float round01 = fract(bearing / 6.2831853 + 1.0);
+        float band = dressed * limb * uBelt
+          * smoothstep(0.958, 0.962, ly) * (1.0 - smoothstep(0.992, 0.996, ly))
+          * (1.0 - smoothstep(uBelt - 0.01, uBelt, round01));
+        if (band > 0.002) {
+          vec3 bl = vec3(0.235, 0.120, 0.058);
+          bl = mix(bl, vec3(0.120, 0.058, 0.030),
+            smoothstep(0.0025, 0.0005, min(ly - 0.960, 0.994 - ly)));
+          bl *= 0.85 + 0.3 * youFbm(vLocal * 60.0);
+          // The loops of the jeans over it, four of them.
+          float loops = 1.0 - smoothstep(0.005, 0.007, 0.12 *
+            min(min(abs(bearing - 1.15), abs(bearing + 1.15)),
+                min(abs(bearing - 2.45), abs(bearing + 2.45))));
+          bl = mix(bl, ${rgb(YOU.denim)}, loops * 0.9);
+          // The buckle: a brass frame on her front with the leather in it.
+          float bx = abs(bearing) * 0.12, by = abs(ly - 0.977);
+          float frame = (1.0 - smoothstep(0.022, 0.024, bx)) * (1.0 - smoothstep(0.018, 0.020, by))
+            * (1.0 - (1.0 - smoothstep(0.016, 0.018, bx)) * (1.0 - smoothstep(0.012, 0.014, by)));
+          bl = mix(bl, ${rgb(YOU.buckle)} * 1.25, frame * uBelt);
+          vcol = mix(vcol, bl, band);
+          cover = max(cover, band);
         }
       }
 
@@ -1302,6 +1338,8 @@ async function buildYou(scene) {
      * `setDressed` in 90-app.js calls the pair.
      */
     swim: (v) => { uSwim.value = v ? 1 : 0; return uSwim.value; },
+    /** How much of her belt is round her waist, 0..1 — see the belt in the body shader. */
+    belt: (k) => { if (k != null) uBelt.value = Math.max(0, Math.min(1, k)); return uBelt.value; },
     freeze: (v) => { frozen = !!v; return frozen; },
     /** Crouched in the mirror: `{ dy, back }` off a standing eye, or null. */
     lower: (o) => { low = o || null; },

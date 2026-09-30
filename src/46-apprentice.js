@@ -234,6 +234,98 @@ const SLAP_DECL = '\nuniform vec4 uSlap[' + SLAP_N + '];\nuniform float uSlapK['
 const SLAP_FRAG = '{ float sm = 0.0;\n'
   + '  for (int i = 0; i < ' + SLAP_N + '; i++) sm += slapMark(uSlap[i], uSlapK[i]);\n'
   + '  base *= mix(vec3(1.0), vec3(1.0, uSlapTint), min(sm, 1.0)); }\n';
+// ── and the mark a belt leaves ──────────────────────────────────────────────
+//
+// 1.552.0 — BELT in 43-belt.js. A strap does not leave a hand's round flush: it
+// leaves a line, the width of the leather, where the leather lay on her — and
+// the edges of it more than the middle, which is where a flat strap bites. The
+// same tint as the slap's, fainter, and fading on the slap's own half minute.
+//
+// A lash is a segment in her BIND frame (`vLocal`) with the strap's width
+// across it and the way out of her skin: `a` its start (w its length), `u`
+// along it (w half its width), `w` across it (w its strength). The line is the
+// chord between the two furthest points the strap touched — which over a
+// round cheek runs inside her by a centimetre or two — so what is marked is
+// the band of skin within half a width of the PLANE the strap bent in, over
+// the chord and out along the skin's own normal, and nothing more than a few
+// centimetres under it: not the far side of her.
+const LASH_N = 6;
+const apprLashU = {
+  uLashA: { value: Array.from({ length: LASH_N }, () => new THREE.Vector4(0, -99, 0, 0)) },
+  uLashU: { value: Array.from({ length: LASH_N }, () => new THREE.Vector4(1, 0, 0, 0.012)) },
+  uLashW: { value: Array.from({ length: LASH_N }, () => new THREE.Vector4(0, 0, 1, 0)) },
+};
+// (No backticks in the GLSL below — it goes inside a template literal.)
+const LASH_DECL = '\nuniform vec4 uLashA[' + LASH_N + '];\nuniform vec4 uLashU[' + LASH_N + '];\nuniform vec4 uLashW[' + LASH_N + '];\n'
+  + 'float lashMark(vec4 a, vec4 u, vec4 w){\n'
+  + '  if (w.w < 0.002) return 0.0;\n'
+  + '  vec3 d = vLocal - a.xyz;\n'
+  + '  float t = dot(d, u.xyz);\n'
+  + '  float r = abs(dot(d, w.xyz)) / max(u.w, 1e-3);\n'
+  + '  float h = dot(d, cross(w.xyz, u.xyz));\n'
+  + '  float along = smoothstep(-0.015, 0.01, t) * (1.0 - smoothstep(a.w - 0.01, a.w + 0.015, t));\n'
+  // Edges more than the middle, and nothing past the width.
+  + '  float across = (1.0 - smoothstep(0.80, 1.0, r)) * (0.55 + 0.45 * smoothstep(0.35, 0.85, r));\n'
+  + '  float near = smoothstep(-0.055, -0.03, h) * (1.0 - smoothstep(0.06, 0.09, h));\n'
+  + '  return w.w * along * across * near;\n'
+  + '}\n';
+const LASH_FRAG = '{ float lm = 0.0;\n'
+  + '  for (int i = 0; i < ' + LASH_N + '; i++) lm += lashMark(uLashA[i], uLashU[i], uLashW[i]);\n'
+  + '  base *= mix(vec3(1.0), vec3(1.0, uSlapTint), min(lm, 1.0)); }\n';
+// Per lash: how strong it is and heading for. The strength itself is uLashW's w.
+const apprLashes = Array.from({ length: LASH_N }, () => ({ k: 0, want: 0, n: 0 }));
+
+/**
+ * A lash of the belt: `a` and `b` the two ends of the line it landed along,
+ * `nrm` the way out of her skin there and `dir` the strap's own run (for a
+ * lash too short to have a direction of its own) — all in her BIND frame —
+ * and `k` 0..1 how hard. On a warm lash along the same line it adds to it;
+ * otherwise it takes the coolest.
+ */
+function apprenticeLash(a, b, nrm, dir, k) {
+  if (!appr) return false;
+  const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b);
+  const mid = A.clone().add(Bv).multiplyScalar(0.5);
+  const u = Bv.clone().sub(A);
+  let len = u.length();
+  if (len < 0.05) {
+    u.set(...dir);
+    if (u.lengthSq() < 1e-8) u.set(0, 1, 0);
+    len = 0.08;
+  }
+  u.normalize();
+  const n = new THREE.Vector3(...nrm);
+  n.addScaledVector(u, -n.dot(u));
+  if (n.lengthSq() < 1e-8) return false;
+  n.normalize();
+  // w = u × n, so that w × u is n: the shader's "out of her".
+  const w = new THREE.Vector3().crossVectors(u, n);
+  const start = mid.clone().addScaledVector(u, -len / 2);
+  let i = -1, cool = Infinity, ic = 0;
+  for (let j = 0; j < LASH_N; j++) {
+    const L = apprLashes[j], la = apprLashU.uLashA.value[j], lu = apprLashU.uLashU.value[j];
+    const lm = new THREE.Vector3(la.x, la.y, la.z).addScaledVector(new THREE.Vector3(lu.x, lu.y, lu.z), la.w / 2);
+    if (L.k >= 0.01 && lm.distanceTo(mid) < 0.03 && Math.abs(lu.x * u.x + lu.y * u.y + lu.z * u.z) > 0.85) i = j;
+    if (L.want < cool) { cool = L.want; ic = j; }
+  }
+  if (i < 0) { i = ic; apprLashes[i].k = 0; }
+  apprLashU.uLashA.value[i].set(start.x, start.y, start.z, len);
+  apprLashU.uLashU.value[i].set(u.x, u.y, u.z, BELT.width * 0.5);
+  apprLashU.uLashW.value[i].set(w.x, w.y, w.z, apprLashes[i].k);
+  apprLashes[i].want = Math.min(1, apprLashes[i].want + k);
+  apprLashes[i].n++;
+  return true;
+}
+
+/** Debug: each lash — strength, how many, where (bind) and how long. */
+function apprenticeLashState() {
+  return apprLashes.map((L, i) => {
+    const a = apprLashU.uLashA.value[i];
+    return { k: +L.k.toFixed(3), n: L.n, at: a.y > -90 ? [+a.x.toFixed(3), +a.y.toFixed(3), +a.z.toFixed(3)] : null,
+      len: +a.w.toFixed(3) };
+  });
+}
+
 // ── her cheeks, parted ──────────────────────────────────────────────────────
 //
 // Misha, 25 Sep 2026: *"after the butt slap can she sometimes spread her butt
@@ -322,6 +414,15 @@ function apprSlapStep(dt) {
     apprSlapU.uSlap.value[i].w = s.r;
     apprSlapU.uSlapK.value[i] = s.k;
   }
+  // And the belt's lashes, on the same clock.
+  for (let i = 0; i < LASH_N; i++) {
+    const L = apprLashes[i];
+    if (L.want <= 0 && L.k <= 0) continue;
+    L.want *= fade;
+    L.k += (L.want - L.k) * rise;
+    if (L.k < 0.002 && L.want < 0.002) { L.k = 0; L.want = 0; }
+    apprLashU.uLashW.value[i].w = L.k;
+  }
 }
 
 /** Debug: each flush — spread (m), strength, how many slaps, and where (bind). */
@@ -355,13 +456,13 @@ async function loadApprentice() {
   const fig = await loadSkinHands('baye2_fr3d', {
     spec: 0.10, specPower: 26, vcol: false,
     uniforms: { uSkin: { value: v5Tex('baye2_skin') }, ...look.jaw.uniforms,
-      ...look.lid.uniforms, ...apprSlapU, ...apprSpreadU },
-    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl + SLAP_DECL
+      ...look.lid.uniforms, ...apprSlapU, ...apprLashU, ...apprSpreadU },
+    decl: 'uniform sampler2D uSkin;' + look.jaw.decl + look.lid.decl + SLAP_DECL + LASH_DECL
       + '\nuniform float uSpread;\n',
     vdecl: look.jaw.vdecl,
     // The whole of what makes her a different figure: one texture lookup —
     // and the inside of her mouth, and wherever she has been slapped.
-    body: 'base = texture2D(uSkin, vUv).rgb;' + SLAP_FRAG + look.jaw.frag,
+    body: 'base = texture2D(uSkin, vUv).rgb;' + SLAP_FRAG + LASH_FRAG + look.jaw.frag,
     // And a mouth that opens when the leader's does — see `jaw` in v5Parts.
     // Her eyelids, which close for real — see LID_VERT — and then her jaw.
     // And her cheeks, when her hands part them — see SPREAD_VERT.

@@ -579,6 +579,16 @@ addEventListener('keydown', (e) => {
     if (got.toast) toast(T(got.toast));
     return;
   }
+  // \ — your belt, in the kabina: out of the loops and into your hand, or
+  // back in. See `beltCmd`. The last mark under that hand, next to the two
+  // brackets that are the other things you carry; checked: 'Backslash'
+  // appeared nowhere in src/. Below the pause guard: it acts on the world.
+  if (e.code === 'Backslash') {
+    e.preventDefault();
+    const got = beltCmd('belt.key');
+    if (got !== 'out' && got !== 'back') toast(T('belt.' + got));
+    return;
+  }
   // And the menu at a counter. Two keys rather than one, so that E means buy
   // and only buy: a key that cycled AND bought is a key that buys the wrong
   // thing the moment you press it once too often.
@@ -1316,6 +1326,536 @@ function hammockPushTick(dt) {
   pushK = Math.max(0, 1 - u);
   if (u >= 1) pushT = -1;
 }
+
+// ── THE BELT, IN YOUR HAND ───────────────────────────────────────────────────
+//
+// Misha, 30 Sep 2026: *"would be cool if in kabine when spanking. I (chloe)
+// take out my belt and spank baye with it, also could probably reuse the AVBD
+// physics for it"*. The strap is 43-belt.js and where it lands on her is
+// `beltHit` in 43-jadrija.js; this is your hand and the game round it.
+//
+// WHAT IT IS, AND WHAT IT IS NOT. Two adults in a private room, playing, and
+// the design says so at every turn: she takes it laughing and asking for more
+// (`BELT_SAY`); a lazy swing is a pat and not a blow; nothing it does leaves
+// more than the hand's own faint flush, gone in half a minute; and there is a
+// SAFEWORD, "crvena" — red — which ends it at once, whoever says it. You say
+// it by typing or saying "red" / "crvena" / "stop" (the typed line is matched
+// here, before anything is sent anywhere, so it works signed out and offline).
+// SHE says it when it is too much: hard lashes close together heat a meter
+// (`beltHeat`), at `yellow` she tells you to ease off, and past `red` she
+// calls it. Either way the belt goes straight back on, the swing that was
+// coming does not come, your hand goes to her hair (her `pet`, the room's
+// own tenderness), and she thanks you for it. After her red it stays on for
+// `lock` seconds whatever you ask.
+//
+// THE HAND: `\` or "belt" / "remen" and your right hand goes down to the
+// buckle at your waist, draws the belt out of the loops — laid along a curve
+// from your fist to where it leaves your jeans, and taken off her by the
+// same amount in the body shader (`you.belt`) — and holds it by the buckle
+// with the strap hanging, a physical strap from then on. The press is a
+// swing: held, your hand winds up over your shoulder, and let go it comes
+// down on the crosshair, faster the longer you wound it (`charge`), so a
+// quick click is a lazy one. `\` again, or "belt back", feeds it back in.
+// First person and in the kabina only: anywhere else it is simply back on.
+const BELT_HAND = {
+  // Your hand holding it, in the eye's frame (right, up, forward, m): low on
+  // the right, in view.
+  hold: [0.18, -0.17, 0.45],
+  // The buckle at your waist and the loop on your left hip it goes back in
+  // through, in your LEVEL frame (right, up, forward) — your waist does not
+  // look down when you do.
+  waist: [0.03, -0.66, 0.15], feed: [-0.13, -0.66, 0.08],
+  // Seconds: to the buckle, drawing it out; and to the waist again, feeding it
+  // back, buckling. `fast` of each when it is a safeword.
+  reach: 0.35, draw: 0.85, toWaist: 0.35, feedIn: 0.75, buckle: 0.30, fast: 0.6,
+  // The swing: up to the wind-up; the strike, `strike[0]` s at no charge to
+  // `strike[1]` wound right up (`full` s of holding); through, and back.
+  windUp: 0.30, strike: [0.80, 0.17], full: 0.55, through: 0.12, back: 0.45,
+  // THE SWING'S PLANE (`beltPlan`): your shoulder, right of the eye and
+  // under it (m); how far out along the line from it to what you aimed at the
+  // hand stops — a strap's reach short of it, `strapReach`; the path's last
+  // `over` m straight down that line, and before it the wind-up, `windBack`
+  // further back (level) and `windUp2` up.
+  shoulder: [0.18, -0.22], reachOut: [0.12, 0.62], strapReach: 0.95,
+  windBack: 0.22, windUp2: 0.30, over: 0.36, overUp: 0.0,
+  // THE METER: each crack adds 0.2 + u (u 0..1 how hard, BELT.hit), a pat
+  // next to nothing, and it cools over `cool` s. `yellow` and `red`: the
+  // hardest a second apart is red on the third, an ordinary full swing on
+  // the fourth; half-strength ones at any pace never get past yellow.
+  cool: 3.0, yellow: 1.3, red: 2.2,
+  // After her red, seconds before the belt will come out again; after yours.
+  lock: 20, lockYou: 3,
+  // The aftercare lying on her front: how long, the hand's round (m, s), and
+  // how far over her skin its target is (m — the pet's is her hair's crown).
+  rub: { secs: 4.5, r: 0.03, period: 1.6, off: 0.035 },
+};
+// What she says, in her Croatian, and what it means (i18n `belt.g.*` — the
+// gloss, which is empty in Croatian). One line in two, never closer than
+// `sayGap` s, a pat or a crack; the rest are always said.
+const BELT_SAY = {
+  pat: [['Hehe. To je sve?', 'pat0'], ['Mm, škakljivo.', 'pat1'], ['Jače, ne bojim se.', 'pat2']],
+  crack: [['Ah! ...Opet.', 'crack0'], ['Mmh. Još jednom.', 'crack1'], ['Uh! Hehe, zločesta.', 'crack2'],
+    ['Joj, to je dobro.', 'crack3'], ['Opet!', 'crack4'], ['Hehe. Svidjelo mi se.', 'crack5']],
+  off: [['Hej! Ne tamo, hehe.', 'off0']],
+  yellow: [['Žuta. Polako, ljubavi.', 'yellow0']],
+  red: [['Crvena.', 'red0']],
+  heard: [['Okej. Dođi ovamo.', 'heard0']],
+  after: [['Mm... hvala ti.', 'after0'], ['Hvala ti, ljubavi.', 'after1']],
+  sayGap: 1.4,
+};
+let belt = null;                 // the strap, built the first time it comes out
+let beltPh = 'off';              // off | reach | draw | hold | wind | strike | through | back | toWaist | feed | buckle
+let beltT = 0, beltK = 0, beltGrip = 0, beltCharge = 0, beltHeld = 0;
+let beltHeat = 0, beltYellow = false, beltLock = 0, beltSaidAt = -9, beltClock = 0;
+let beltFast = false, beltAfter = null, beltPressed = false;
+let beltRubK = 0;                // the aftercare's hand on her, 0..1 — see `beltHandTick`
+const beltRubAt = new THREE.Vector3();
+const beltAt = new THREE.Vector3(), beltQ = new THREE.Quaternion();
+const beltFrom = new THREE.Vector3(), beltDirFrom = new THREE.Vector3(), beltDirTo = new THREE.Vector3();
+const beltTo = new THREE.Vector3(), beltAim = new THREE.Vector3(), beltExit = new THREE.Vector3();
+const _bF = new THREE.Vector3(), _bR = new THREE.Vector3(), _bU = new THREE.Vector3();
+const _bf = new THREE.Vector3(), _br = new THREE.Vector3(), _bD = new THREE.Vector3(), _bZ = new THREE.Vector3();
+const _bY = new THREE.Vector3(), _bM = new THREE.Matrix4();
+const beltLog = { out: 0, back: 0, swings: 0, lashes: 0, pats: 0, off: 0, landed: 0, yellow: 0,
+  safe: { you: 0, her: 0 }, said: [], hits: [], after: null, last: null };
+
+let beltEye = null;              // debug: the eye held where it was — see `__fr.belt.freeze`
+const _bO = new THREE.Vector3();
+/** The eye's frame (`_bF`/`_bR`/`_bU`) and the level one (`_bf`/`_br`); the eye in `_bO`. */
+function beltFrames() {
+  if (beltEye) { _bO.fromArray(beltEye, 0); _bF.fromArray(beltEye, 3); } else {
+    _bO.copy(camera.position);
+    camera.getWorldDirection(_bF);
+  }
+  _bR.crossVectors(_bF, _bU.set(0, 1, 0)).normalize();
+  _bU.crossVectors(_bR, _bF).normalize();
+  _bf.set(_bF.x, 0, _bF.z).normalize();
+  _br.set(-_bf.z, 0, _bf.x);
+}
+/** A point in the eye's frame, or (`level`) in the level one, into `out`. */
+function beltPoint(o, out, level = false) {
+  const O = _bO;
+  if (level) return out.set(O.x + _br.x * o[0] + _bf.x * o[2], O.y + o[1], O.z + _br.z * o[0] + _bf.z * o[2]);
+  return out.copy(O).addScaledVector(_bR, o[0]).addScaledVector(_bU, o[1]).addScaledVector(_bF, o[2]);
+}
+/**
+ * The fist's attitude for a strap leaving it along `dir`, its width across
+ * `across` (your right, unless a swing says otherwise). A strap bends only
+ * through its thickness — edgewise it is held — so a swing must have the
+ * width square to the plane it swings in, or it cannot bend in that plane
+ * and goes wide: see `beltPlan`.
+ */
+function beltAttitude(dir, out, across = _bR) {
+  _bD.copy(dir).normalize();
+  _bZ.copy(across).addScaledVector(_bD, -across.dot(_bD));
+  if (_bZ.lengthSq() < 1e-6) _bZ.set(0, 0, 1);
+  _bZ.normalize();
+  _bY.crossVectors(_bZ, _bD);
+  _bM.makeBasis(_bD, _bY, _bZ);
+  return out.setFromRotationMatrix(_bM);
+}
+// (`smooth01`, the clamped smoothstep, is 44-corpse.js's.)
+
+/**
+ * A curve of length `len` from `a` to `b`, hanging between them — a quadratic
+ * with its middle let down until it is that long — as [x, y, z] points.
+ */
+function beltSag(a, b, len, n = 16) {
+  const d = a.distanceTo(b);
+  const pt = (sag) => {
+    const out = [];
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - sag, mz = (a.z + b.z) / 2;
+    for (let k = 0; k <= n; k++) {
+      const u = k / n, v = 1 - u;
+      out.push([v * v * a.x + 2 * u * v * mx + u * u * b.x, v * v * a.y + 2 * u * v * my + u * u * b.y,
+        v * v * a.z + 2 * u * v * mz + u * u * b.z]);
+    }
+    return out;
+  };
+  const lenOf = (P) => { let L = 0; for (let k = 1; k < P.length; k++) L += Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1], P[k][2] - P[k - 1][2]); return L; };
+  if (len <= d + 1e-4) {
+    const u = len / Math.max(d, 1e-6);
+    return [[a.x, a.y, a.z], [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, a.z + (b.z - a.z) * u]];
+  }
+  let lo = 0, hi = 2 * len;
+  for (let it = 0; it < 24; it++) { const m = (lo + hi) / 2; if (lenOf(pt(m)) < len) lo = m; else hi = m; }
+  return pt((lo + hi) / 2);
+}
+
+/** Whether the belt is in your hand (and so the press is a swing). */
+const beltInHand = () => beltPh === 'hold' || beltPh === 'wind' || beltPh === 'strike'
+  || beltPh === 'through' || beltPh === 'back';
+/** Whether it is out at all — for "stop" meaning the belt and not something else. */
+const beltActive = () => beltPh !== 'off';
+
+/** Where you can have it out: on foot, first person, in the kabina, with her. */
+function beltPlace() {
+  if (state.phase !== 'ground' || !ground || !ground.ok || !jadrija || !jadrija.kabina) return 'kabina';
+  if (bodyCam) return 'first';
+  // Where YOU are, not the camera — see `personAt`.
+  if (!(jadrija.kabina.inside && jadrija.kabina.inside(ground.you.x, ground.you.z) > 0.5)) return 'kabina';
+  return null;
+}
+
+/** Straight back on, no gesture — leaving the room, the third person, a cut. */
+function beltSnap() {
+  if (belt) belt.hide();
+  if (you && you.belt) you.belt(1);
+  beltPh = 'off'; beltK = 0; beltGrip = 0; beltT = 0; beltPressed = false;
+}
+
+/**
+ * "belt", "belt back", "red" — and the key. Answers what happened, a word:
+ * 'out', 'back', 'stopped', or why not ('kabina', 'first', 'later', 'busy', 'not out').
+ */
+function beltCmd(what) {
+  if (what === 'belt.stop') return beltSafeword('you');
+  if (what === 'belt.back') {
+    if (!beltInHand()) return beltPh === 'off' ? 'not out' : 'busy';
+    beltStow(false);
+    return 'back';
+  }
+  // Out, or the key pressed with it already out: back.
+  if (what === 'belt.key' && beltInHand()) { beltStow(false); return 'back'; }
+  if (what === 'belt.out' && beltInHand()) return 'already';
+  if (beltPh !== 'off') return 'busy';
+  const why = beltPlace();
+  if (why) return why;
+  if (beltLock > 0) return 'later';
+  if (!belt) {
+    belt = beltStrap(scene);
+    belt.onHit = beltLanded;
+  }
+  if (audio && audio.slapWarm) audio.slapWarm();
+  beltPh = 'reach'; beltT = 0; beltGrip = 0; beltFast = false;
+  beltLog.out++;
+  return 'out';
+}
+
+/** Back into the loops: to the waist, fed in, buckled. `fast` for a safeword. */
+function beltStow(fast) {
+  if (!beltActive() || beltPh === 'reach' || beltPh === 'toWaist' || beltPh === 'feed' || beltPh === 'buckle') {
+    if (beltPh === 'reach' || beltPh === 'draw') { beltSnap(); }
+    return;
+  }
+  beltFast = !!fast;
+  beltPh = 'toWaist'; beltT = 0;
+  beltFrom.copy(beltAt);
+  beltPressed = false;
+  beltLog.back++;
+}
+
+/**
+ * THE SAFEWORD. `who` 'you' or 'her'. Ends it now: whatever swing was coming
+ * does not come, the belt goes back on, and when it is on your hand goes to her
+ * hair and she thanks you (`beltAfter`).
+ */
+function beltSafeword(who) {
+  if (!beltActive()) return 'not out';
+  beltLog.safe[who]++;
+  beltSay(who === 'her' ? 'red' : 'heard', true);
+  beltLock = who === 'her' ? BELT_HAND.lock : BELT_HAND.lockYou;
+  beltHeat = 0; beltYellow = false;
+  if (beltPh === 'reach' || beltPh === 'draw') beltSnap();
+  else beltStow(true);
+  beltAfter = { t: 0, who, how: null, said: false };
+  return 'stopped';
+}
+
+/** A line of hers, captioned: from `BELT_SAY[kind]`, or nothing if she spoke a moment ago (`force` says it anyway). */
+function beltSay(kind, force = false) {
+  const L = BELT_SAY[kind];
+  if (!L || !L.length) return null;
+  if (!force && beltClock - beltSaidAt < BELT_SAY.sayGap) return null;
+  const [text, id] = L[Math.floor(Math.random() * L.length)];
+  beltSaidAt = beltClock;
+  const gloss = T('belt.g.' + id);
+  if (voice && voice.sub) voice.sub(text, 2.6, gloss && gloss !== 'belt.g.' + id ? gloss : '');
+  beltLog.said.push(text);
+  if (beltLog.said.length > 12) beltLog.said.shift();
+  return text;
+}
+
+/** The strap says it landed on her — see `onHit` in 43-belt.js. */
+function beltLanded(h) {
+  const r = jadrija && jadrija.beltHit ? jadrija.beltHit(h, camera.position) : null;
+  const k = clamp((h.v - BELT.hit.pat) / (BELT.hit.top - BELT.hit.pat), 0, 1);
+  if (audio && audio.beltCrack) audio.beltCrack(k, h.v >= BELT.hit.crack);
+  beltLog.last = r;
+  if (!r) return;
+  beltLog.hits.push([beltLog.swings, r.reg || 'off:' + r.part, +h.v.toFixed(1)]);
+  if (beltLog.hits.length > 64) beltLog.hits.shift();
+  if (!r.reg) {
+    beltLog.off++;
+    if (h.v >= BELT.hit.crack) beltSay('off');
+    return;
+  }
+  if (r.landed) beltLog.landed++;
+  if (r.crack) beltLog.lashes++; else beltLog.pats++;
+  // The meter, and what she makes of it.
+  beltHeat += r.crack ? 0.2 + r.u : 0.03;
+  if (beltHeat > BELT_HAND.red) { beltSafeword('her'); return; }
+  if (beltHeat > BELT_HAND.yellow && !beltYellow) {
+    beltYellow = true; beltLog.yellow++;
+    beltSay('yellow', true);
+    return;
+  }
+  if (Math.random() < 0.5) beltSay(r.crack ? 'crack' : 'pat');
+}
+
+/** The press, with the belt in your hand: down, winding up; up, the swing. */
+function beltPress(down) {
+  if (down) {
+    if (!(beltPh === 'hold' || beltPh === 'back' || beltPh === 'through')) return;
+    beltPh = 'wind'; beltT = 0; beltHeld = 0; beltPressed = true;
+    beltFrom.copy(beltAt);
+    beltPlan();
+    return;
+  }
+  if (beltPh !== 'wind' || !beltPressed) return;
+  beltPressed = false;
+  beltStrike();
+}
+
+/**
+ * THE SWING'S PLANE. What makes a strap land where it was aimed is that the
+ * hand moves in the plane it is to land in: it unrolls along the way it was
+ * going, and anything across that is where it goes wide (MEASURED, a swing
+ * from over the eye's right to the middle of the view landed on her far
+ * thigh, her shoulder or nothing in six of eight). So the whole swing is in
+ * the upright plane through your right shoulder and the point aimed at: the
+ * wind-up above and behind the stop, the stop a strap's reach short of her
+ * along that line, and the path between them over the top.
+ */
+function beltPlan() {
+  beltFrames();
+  const O = _bO;
+  const hit = jadrija && jadrija.cotAim ? jadrija.cotAim(O, _bF) : null;
+  if (hit && !hit.miss) beltAim.set(hit.x, hit.y, hit.z);
+  else if (beltAimAtButt && jadrija && jadrija.butt && jadrija.butt()) {
+    const b = jadrija.butt();
+    beltAim.set((b[0].x + b[1].x) / 2, (b[0].y + b[1].y) / 2, (b[0].z + b[1].z) / 2);
+  } else beltAim.copy(O).addScaledVector(_bF, 1.3);
+  const H = BELT_HAND;
+  // The shoulder: right of the eye and under it.
+  _bY.set(O.x + _br.x * H.shoulder[0], O.y + H.shoulder[1], O.z + _br.z * H.shoulder[0]);
+  _bD.subVectors(beltAim, _bY);
+  const d = _bD.length();
+  _bD.multiplyScalar(1 / Math.max(d, 1e-6));
+  beltTo.copy(_bY).addScaledVector(_bD, clamp(d - H.strapReach, H.reachOut[0], H.reachOut[1]));
+  // Back, level, from the stop toward you.
+  _bZ.set(-_bD.x, 0, -_bD.z);
+  if (_bZ.lengthSq() < 1e-6) _bZ.set(-_bf.x, 0, -_bf.z);
+  _bZ.normalize();
+  beltBack.copy(_bZ);
+  // Square to the swing: the strap's width lies across it.
+  beltAcross.set(-_bZ.z, 0, _bZ.x);
+  // The last of the path is straight down that line, so the strap unrolls
+  // along it and its tongue arrives where the line meets her.
+  beltTop.copy(beltTo).addScaledVector(_bD, -H.over);
+  beltTop.y += H.overUp;
+  beltWind.copy(beltTop).addScaledVector(_bZ, H.windBack);
+  beltWind.y += H.windUp2;
+}
+function beltStrike() {
+  beltPlan();
+  beltCharge = clamp(beltHeld / BELT_HAND.full, 0, 1);
+  beltFrom.copy(beltAt);
+  beltPh = 'strike'; beltT = 0;
+  beltLog.swings++;
+  if (belt && BELT.guide > 0) belt.aim([beltAim.x, beltAim.y, beltAim.z]);
+  if (audio && audio.beltSwish) audio.beltSwish(0.3 + 0.7 * beltCharge);
+}
+const beltWind = new THREE.Vector3(), beltTop = new THREE.Vector3(), beltBack = new THREE.Vector3();
+const beltAcross = new THREE.Vector3(1, 0, 0);
+let beltAimAtButt = false;       // debug: a probe's swing goes for her bottom, crosshair or not
+let beltLetGo = -1;              // debug: a probe's press, let go after this long held
+let beltRehang = false;          // debug: hang the strap afresh at the hand (after a teleport)
+
+/**
+ * Once a frame, before the arms are posed: where your hand is and which way
+ * the strap leaves it, and the strap laid, when it is being drawn or fed.
+ */
+function beltHandTick(dt) {
+  beltClock += dt;
+  if (beltLock > 0) beltLock -= dt;
+  beltHeat *= Math.exp(-dt / BELT_HAND.cool);
+  if (beltHeat < 0.6) beltYellow = false;
+  // THE AFTERCARE: once it is back on, your hand goes to her, and she thanks
+  // you. Lying on her front, you kneel by the cot (the crouch, Shift's) and
+  // lay the flat of your hand on her bottom where it stung, slowly round
+  // (`rub`, BELT_HAND.rub) — the petting of her hair cannot reach a head on
+  // a pillow from a standing eye (its reach is 0.95 m and hers is 1.1 down),
+  // and standing, a hand on her bottom is an arm straight down the view.
+  // Any other way, "pet her", which is the room's own.
+  let rubbing = false;
+  if (beltAfter && beltPh === 'off') {
+    beltAfter.t += dt;
+    if (!beltAfter.how && beltAfter.t > 0.15) {
+      const sh = jadrija && jadrija.show ? jadrija.show() : null;
+      const prone = !!(sh && (sh.phase === 'flatheld' || sh.phase === 'edgeHeld'));
+      beltAfter.how = prone && jadrija.butt && jadrija.butt() ? 'rub' : 'pet';
+      if (beltAfter.how === 'pet' && jadrija && jadrija.askShow) jadrija.askShow('pet');
+      if (beltAfter.how === 'rub' && ground && ground.you) {
+        beltAfter.knelt = !!ground.you.crouch;
+        ground.you.crouch = true;
+      }
+      beltLog.after = beltAfter.how;
+    }
+    if (beltAfter.how === 'rub' && beltAfter.t < BELT_HAND.rub.secs) {
+      const b = jadrija.butt ? jadrija.butt() : null;
+      if (b) {
+        rubbing = true;
+        // Over the cheek on your side of her, round and round a little.
+        const O = camera.position;
+        const d0 = Math.hypot(b[0].x - O.x, b[0].z - O.z), d1 = Math.hypot(b[1].x - O.x, b[1].z - O.z);
+        const c = d0 < d1 ? b[0] : b[1];
+        const R = BELT_HAND.rub, w = beltAfter.t * Math.PI * 2 / R.period;
+        _bD.set(c.x - O.x, 0, c.z - O.z).normalize();
+        beltRubAt.set(c.x + _bD.x * R.r * Math.cos(w) - _bD.z * R.r * Math.sin(w), c.y + R.off,
+          c.z + _bD.z * R.r * Math.cos(w) + _bD.x * R.r * Math.sin(w));
+        // And your eyes on her, gently.
+        if (ground && ground.you) {
+          const Y = ground.you, hd = Math.hypot(c.x - O.x, c.z - O.z);
+          const want = Math.atan2(c.y - O.y, Math.max(hd, 0.05));
+          Y.pitch += (want - Y.pitch) * (1 - Math.exp(-3 * dt));
+        }
+      }
+    } else if (beltAfter.how === 'rub' && !beltAfter.rose && beltAfter.t >= BELT_HAND.rub.secs) {
+      // Up again, unless you were kneeling before it.
+      beltAfter.rose = true;
+      if (ground && ground.you && !beltAfter.knelt) ground.you.crouch = false;
+    }
+    if (!beltAfter.said && beltAfter.t > 1.6) { beltAfter.said = true; beltSay('after', true); }
+    if (beltAfter.t > BELT_HAND.rub.secs + 0.5) beltAfter = null;
+  }
+  beltRubK = damp(beltRubK, rubbing ? 1 : 0, rubbing ? 3.0 : 5, dt);
+  if (beltPh === 'off') { beltK = damp(beltK, 0, 8, dt); return; }
+  if (beltPlace()) { beltSnap(); return; }
+  beltFrames();
+  beltT += dt;
+  const H = BELT_HAND, L = BELT.len;
+  const fast = beltFast ? H.fast : 1;
+  const hold = beltPoint(H.hold, _bY.set(0, 0, 0).clone());
+  const holdDir = _bD.copy(_bU).multiplyScalar(-1).addScaledVector(_bF, 0.25).normalize().clone();
+  const waist = beltPoint(H.waist, new THREE.Vector3(), true);
+  let dir = holdDir;
+  if (beltPh === 'reach') {
+    beltK = smooth01(beltT / H.reach);
+    beltGrip = smooth01((beltT - H.reach * 0.6) / (H.reach * 0.4));
+    beltAt.copy(waist);
+    dir = _bD.set(-_br.x, 0, -_br.z).clone();
+    if (beltT >= H.reach) { beltPh = 'draw'; beltT = 0; beltExit.copy(waist); }
+  } else if (beltPh === 'draw') {
+    beltK = 1; beltGrip = 1;
+    const u = smooth01(beltT / H.draw);
+    // Out and up to the side, then in to where you hold it.
+    const mid = waist.clone().addScaledVector(_bR, 0.30).addScaledVector(_bU, 0.12);
+    if (u < 0.5) beltAt.lerpVectors(waist, mid, smooth01(u * 2)); else beltAt.lerpVectors(mid, hold, smooth01(u * 2 - 1));
+    const out = L * smooth01(beltT / (H.draw * 0.9));
+    belt.lay(beltSag(beltAt, beltExit, out), out, [_bR.x, _bR.y, _bR.z], dt);
+    if (you && you.belt) you.belt(1 - out / L);
+    if (beltT >= H.draw) {
+      if (you && you.belt) you.belt(0);
+      beltAttitude(beltAt.clone().sub(beltExit).multiplyScalar(-1), beltQ);
+      belt.release(beltAt, beltQ);
+      beltPh = 'hold'; beltT = 0;
+    }
+  } else if (beltPh === 'hold') {
+    beltK = 1; beltGrip = 1;
+    beltAt.copy(hold);
+  } else if (beltPh === 'wind') {
+    beltHeld += dt;
+    if (beltLetGo >= 0 && beltHeld >= beltLetGo) { beltLetGo = -1; beltPress(false); }
+    if (beltPh === 'wind') {
+      beltAt.lerpVectors(beltFrom, beltWind, smooth01(beltT / H.windUp));
+      // The strap back over your shoulder, the way it will come forward.
+      dir = beltBack.clone().multiplyScalar(0.7).add(new THREE.Vector3(0, 0.7, 0)).normalize()
+        .lerp(holdDir, 1 - smooth01(beltT / H.windUp)).normalize();
+    }
+    // Held right up: the swing goes on its own — nobody holds a wind-up for ever.
+    if (beltHeld > H.full + 0.6) { beltPressed = false; beltStrike(); }
+  } else if (beltPh === 'strike') {
+    // A click and not a hold is a lazy swing, most of a second from over
+    // your shoulder to her — and lands as a pat (BELT.hit).
+    const dur = H.strike[0] + (H.strike[1] - H.strike[0]) * Math.pow(beltCharge, 0.7);
+    const u = clamp(beltT / dur, 0, 1);
+    // Over the top and down, accelerating all the way: fastest as it arrives.
+    // A quadratic from where the hand is through `beltTop` to the stop.
+    const w = u * u, a = (1 - w) * (1 - w), b = 2 * w * (1 - w), c = w * w;
+    beltAt.set(a * beltFrom.x + b * beltTop.x + c * beltTo.x, a * beltFrom.y + b * beltTop.y + c * beltTo.y,
+      a * beltFrom.z + b * beltTop.z + c * beltTo.z);
+    const back = beltBack.clone().multiplyScalar(0.7).add(new THREE.Vector3(0, 0.7, 0)).normalize();
+    const at = new THREE.Vector3().subVectors(beltAim, beltTo).normalize();
+    // And the wrist turns over late, which is the crack.
+    dir = back.lerp(at, u * u * u).normalize();
+    if (u >= 1) { beltPh = 'through'; beltT = 0; beltFrom.copy(beltAt); }
+  } else if (beltPh === 'through') {
+    const u = smooth01(beltT / H.through);
+    const to = beltTo.clone().addScaledVector(_bD.subVectors(beltAim, _bO).normalize(), 0.08)
+      .add(new THREE.Vector3(0, -0.16, 0));
+    beltAt.lerpVectors(beltFrom, to, u);
+    dir = new THREE.Vector3().subVectors(beltAim, beltTo).normalize().lerp(new THREE.Vector3(0, -1, 0), u).normalize();
+    if (beltT >= H.through) { beltPh = 'back'; beltT = 0; beltFrom.copy(beltAt); }
+  } else if (beltPh === 'back') {
+    const u = smooth01(beltT / H.back);
+    beltAt.lerpVectors(beltFrom, hold, u);
+    dir = new THREE.Vector3(0, -1, 0).lerp(holdDir, u).normalize();
+    if (beltT >= H.back) { beltPh = 'hold'; beltT = 0; }
+    if (belt && belt.aiming && beltT > 0.15) belt.aim(null);
+  } else if (beltPh === 'toWaist') {
+    const u = smooth01(beltT / (H.toWaist * fast));
+    beltAt.lerpVectors(beltFrom, waist, u);
+    if (beltT >= H.toWaist * fast) {
+      beltPh = 'feed'; beltT = 0;
+      beltExit.copy(beltPoint(H.feed, new THREE.Vector3(), true));
+    }
+  } else if (beltPh === 'feed') {
+    beltAt.copy(waist);
+    const T = H.feedIn * fast, u = smooth01(beltT / T);
+    const out = L * (1 - u);
+    beltExit.copy(beltPoint(H.feed, new THREE.Vector3(), true));
+    belt.lay(beltSag(beltAt, beltExit, Math.max(out, 0.001)), out, [_bR.x, _bR.y, _bR.z], dt,
+      clamp(beltT / 0.15, 0.2, 1));
+    if (you && you.belt) you.belt(1 - out / L);
+    if (beltT >= T) { beltPh = 'buckle'; beltT = 0; belt.hide(); if (you && you.belt) you.belt(1); }
+  } else if (beltPh === 'buckle') {
+    beltAt.copy(waist);
+    beltK = 1 - smooth01(beltT / (H.buckle * fast));
+    beltGrip = beltK;
+    if (beltT >= H.buckle * fast) { beltPh = 'off'; beltK = 0; beltGrip = 0; }
+  }
+  if (belt) belt.setDrag(beltPh === 'wind' ? BELT.windDrag : BELT.drag);
+  const swinging = beltPh === 'wind' || beltPh === 'strike' || beltPh === 'through';
+  beltAttitude(dir, beltQ, swinging ? beltAcross : _bR);
+}
+
+/** Once a frame, after she is posed: the strap solved against her and the cot. */
+function beltSimTick(dt) {
+  if (!belt || belt.mode !== 'sim') return;
+  if (beltRehang) {
+    beltRehang = false;
+    // Back toward you and level: a strap hung straight down from a hand
+    // that has just been put over her would start inside her, and a contact
+    // found that deep is refused (`deep`) — it would hang through her.
+    belt.hang(beltAt, beltQ, [-_bf.x, 0.1, -_bf.z], [_bR.x, _bR.y, _bR.z]);
+  }
+  const w = jadrija && jadrija.beltWorld ? jadrija.beltWorld() : { caps: null, n: 0, boxes: null, nb: 0 };
+  const floor = ground && ground.you ? ground.you.y : _bO.y - 1.66;
+  belt.world(w.caps || [], w.n, w.boxes, w.nb, floor);
+  belt.step(dt, beltAt, beltQ);
+}
+
+function beltStats() {
+  const s = belt ? belt.stats : null;
+  return { ph: beltPh, k: +beltK.toFixed(2), mode: belt ? belt.mode : 'none',
+    heat: +beltHeat.toFixed(2), lock: +Math.max(0, beltLock).toFixed(1), charge: +beltCharge.toFixed(2),
+    ms: s ? +s.ms.toFixed(3) : 0, msAvg: s ? +(s.msSum / Math.max(1, s.frames)).toFixed(3) : 0,
+    msMax: s ? +s.msMax.toFixed(3) : 0, steps: s ? s.steps : 0, contacts: s ? s.contacts : 0,
+    onHer: s ? s.onHer : 0, tip: s ? +s.tip.toFixed(2) : 0, vMax: s ? +s.vMax.toFixed(2) : 0,
+    rescues: s ? s.rescues : 0, strap: s ? s.last : null,
+    log: { ...beltLog, safe: { ...beltLog.safe }, said: beltLog.said.slice(), hits: beltLog.hits.slice() } };
+}
 const THUMB_WALK = 1.3;      // m/s you step in at
 let camMode = 0;
 const camPos = new THREE.Vector3();
@@ -1956,6 +2496,7 @@ const HELP = [
     ["'", 'help.k.bag'],
     [']', 'help.k.cell'],
     ['[', 'help.k.ball'],
+    ['\\', 'help.k.belt'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -7807,6 +8348,13 @@ function tick(wall, draw) {
         if (reachKind === 'pet' && herBack) reachKind = 'pull';
       }
     }
+    // THE BELT, when it is in your hand: the press is the swing and nothing
+    // else — not the thumb, not a cup, not the hand's own slap. Down winds it
+    // up, up lets it go. See `beltPress`.
+    if (beltInHand()) {
+      if (pressing && !reachWas) { reachKind = 'belt'; beltPress(true); }
+      if (!pressing && reachWas && reachKind === 'belt') beltPress(false);
+    }
     // THE HAMMOCK, outside: a press with the cloth in front of you and within
     // an arm is a shove and not the branch, for the whole of the press — see
     // `hammockPush`. Decided on the frame the button goes down, like the reach.
@@ -8446,7 +8994,18 @@ function tick(wall, draw) {
     // pair of arms drawn over the top of it is a pair of arms in the sky.
     ballThrowTick(dt);
     hammockPushTick(dt);
+    beltHandTick(dt);
     arms.update(dt, chaseCut || bodyCam ? null
+      // The belt — see `beltHandTick`. A fist round the buckle, the strap
+      // hanging out of the bottom of it; ahead of everything, because while
+      // it is in your hand that hand is not free for anything else.
+      : state.phase === 'ground' && beltK > 0.01 && !beltEye
+        ? { reach: { x: beltAt.x, y: beltAt.y, z: beltAt.z, k: beltK, kind: 'pull', grip: beltGrip,
+          hair: [_bf.x, 0, _bf.z] } }
+      // And after a safeword, the flat of your hand on her where it stung —
+      // the petting hand, palm down (see `beltHandTick`).
+      : state.phase === 'ground' && beltRubK > 0.01
+        ? { reach: { x: beltRubAt.x, y: beltRubAt.y, z: beltRubAt.z, k: beltRubK, kind: 'pet' } }
       // The throw — see `ballThrowTick`. The cupped hand, because it has a
       // ball in it; ahead of the others, because it is over in half a second.
       : state.phase === 'ground' && throwK > 0.01
@@ -8520,6 +9079,8 @@ function tick(wall, draw) {
       state.phase === 'ground' && ground && ground.ok
         ? { x: ground.you.x, y: ground.you.y, z: ground.you.z } : null,
       camera.getWorldDirection(_look));
+    // The strap, against her as she has just been posed — see `beltSimTick`.
+    beltSimTick(dt);
   }
   rail.update(dt);
   sea.update(camera);
@@ -9456,6 +10017,100 @@ window.__fr = {
   build: BUILD,
   /** What this machine's GL will do. `?gl` puts the same thing on the screen. */
   gl: () => glReport(),
+  /**
+   * Debug: the belt — see `beltCmd` and 43-belt.js. `cmd('belt.out' |
+   * 'belt.back' | 'belt.stop')` as the typed line does it; `swing(charge)`
+   * a press held for `charge` of a full wind-up and let go (`butt` aims it at
+   * her bottom whatever the crosshair says); `look(side, d, pitch)` stands you
+   * beside the cot at her hip looking down at her; `stats()`, `links()`.
+   */
+  belt: {
+    cmd: (what) => beltCmd(what),
+    key: () => beltCmd('belt.key'),
+    swing: (charge = 1, butt = true) => {
+      if (!beltInHand()) return 'not in hand';
+      beltAimAtButt = !!butt;
+      beltPress(true);
+      // Held for that long and let go, by the frame clock — as a finger would.
+      beltLetGo = Math.max(0.02, clamp(charge, 0, 1) * BELT_HAND.full);
+      return beltPh;
+    },
+    /** Wind it up and hold it there, for a photograph. */
+    wind: () => { if (!beltInHand()) return 'not in hand'; beltPress(true); return beltPh; },
+    stats: () => beltStats(),
+    /** How many of the strap's contacts are on her after the last step. */
+    onHerNow: () => (belt ? belt.stats.onHer : 0),
+    /**
+     * Hold the eye the hand is laid off where it is now (true), or let it
+     * follow the camera again — for photographing the strap from somewhere
+     * else with `__fr.look`. The drawn arm is left out while it is held: it
+     * hangs off the camera, and the camera is then somewhere else.
+     */
+    freeze: (on = true) => {
+      if (!on) { beltEye = null; return null; }
+      const f = camera.getWorldDirection(new THREE.Vector3());
+      beltEye = [camera.position.x, camera.position.y, camera.position.z, f.x, f.y, f.z];
+      return beltEye.map((v) => +v.toFixed(3));
+    },
+    /** Debug: the tip against her bottom, sampled for `ms` after a swing — closest approach, m. */
+    trace: async (ms = 900, every = 15) => {
+      const out = [];
+      const t0 = performance.now();
+      while (performance.now() - t0 < ms) {
+        const b = jadrija && jadrija.butt ? jadrija.butt() : null, e = belt ? belt.ends() : null;
+        if (b && e) {
+          const mx = (b[0].x + b[1].x) / 2, my = (b[0].y + b[1].y) / 2, mz = (b[0].z + b[1].z) / 2;
+          out.push([Math.round(performance.now() - t0), beltPh, +Math.hypot(e.tip[0] - mx, e.tip[1] - my, e.tip[2] - mz).toFixed(3),
+            +(e.tip[1] - my).toFixed(3), belt.stats.onHer, +belt.stats.tip.toFixed(1)]);
+        }
+        await new Promise((r) => setTimeout(r, every));
+      }
+      return out;
+    },
+    /** Debug: the same, a paused world stepped `frames` film frames — every link's nearest to her bottom. */
+    traceFilm: async (frames = 60) => {
+      const out = [];
+      for (let f = 0; f < frames; f++) {
+        await __fr.filmStep();
+        const b = jadrija && jadrija.butt ? jadrija.butt() : null;
+        if (!b || !belt) continue;
+        const mx = (b[0].x + b[1].x) / 2, my = (b[0].y + b[1].y) / 2, mz = (b[0].z + b[1].z) / 2;
+        let best = 9, bi = -1;
+        belt.links().forEach((p, i) => { const d = Math.hypot(p[0] - mx, p[1] - my, p[2] - mz); if (d < best) { best = d; bi = i; } });
+        const e = belt.ends();
+        out.push([f, beltPh, +best.toFixed(3), bi, +(e.tip[1] - my).toFixed(3), belt.stats.onHer, +belt.stats.tip.toFixed(1),
+          +beltAt.distanceTo(new THREE.Vector3(mx, my, mz)).toFixed(2)]);
+      }
+      return out;
+    },
+    links: () => (belt ? belt.links().map((p) => p.map((v) => +v.toFixed(3))) : null),
+    ends: () => (belt ? belt.ends() : null),
+    heat: (v) => { if (v != null) beltHeat = +v; return beltHeat; },
+    lock: (v) => { if (v != null) beltLock = +v; return beltLock; },
+    /** BELT_HAND's numbers, merged — `hand({ hold: [0.05, -0.35, 0.55] })`. */
+    hand: (o) => Object.assign(BELT_HAND, o || {}),
+    lashes: () => (typeof apprenticeLashState === 'function' ? apprenticeLashState() : null),
+    tune: (o) => { for (const [k, v] of Object.entries(o || {})) { if (v && typeof v === 'object' && !Array.isArray(v) && BELT[k]) Object.assign(BELT[k], v); else BELT[k] = v; } return BELT; },
+    look: (side = 1, d = 0.55, pitch = -0.75, along = 0) => {
+      const b = jadrija && jadrija.butt ? jadrija.butt() : null;
+      const w = jadrija && jadrija.beltWorld ? jadrija.beltWorld() : null;
+      if (!b || !w || !w.boxes) return null;
+      const mx = (b[0].x + b[1].x) / 2, mz = (b[0].z + b[1].z) / 2;
+      const yaw = w.boxes[6], cx = w.boxes[0], cz = w.boxes[2], hx = w.boxes[3];
+      // The mattress's own axes, world: local x = wx·c − wz·s and z = wx·s +
+      // wz·c (see the world boxes in 43-avbd.js), so its x is (c, −s) and
+      // its z, along the cot, (s, c).
+      const ax = Math.cos(yaw), az = -Math.sin(yaw);
+      const ux = Math.sin(yaw), uz = Math.cos(yaw);
+      const off = (mx - cx) * ax + (mz - cz) * az;
+      const s0 = side > 0 ? 1 : -1;
+      const px = mx + ax * (s0 * (hx + d) - off) + ux * along, pz = mz + az * (s0 * (hx + d) - off) + uz * along;
+      ground.put(px, pz, Math.atan2(px - mx, pz - mz), pitch);
+      // A teleport is not a swing: hang the strap afresh where the hand is next.
+      beltRehang = true;
+      return [+px.toFixed(2), +pz.toFixed(2)];
+    },
+  },
   stats: () => ({
     build: BUILD.v + ' (' + BUILD.date + ')',
     fps: Math.round(state.fps), burning: fire ? fire.burningCount() : 0,
@@ -9506,6 +10161,7 @@ window.__fr = {
     seabed: seabed ? seabed.stats() : null,
     ride: ride && ride.active ? { ...ride.stats(), point: ride.point() } : null,
     arms: arms ? arms.stats() : null,
+    belt: beltStats(),
     mask: mask ? mask.stats() : null,
     shadow: shadow ? shadow.stats() : null,
     ao: ao ? ao.stats() : null,

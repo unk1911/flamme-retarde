@@ -8,6 +8,141 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.552.0] — 2026-09-30
+
+### The belt: out of her jeans, a metre of AVBD leather, and a safeword
+
+Misha: *"would be cool if in kabine when spanking. I (chloe) take out my belt
+and spank baye with it, also could probably reuse the AVBD physics for it"*.
+
+**What it is.** It is two adults playing in a private room, and the design
+says so throughout:
+
+- Baye takes it laughing and asking for more (`BELT_SAY`: "Opet!", "Mmh. Još
+  jednom.", "Hehe. To je sve?", captioned with the gloss in your language).
+- A lazy swing lands as a pat.
+- The only mark is the hand's kind: faint, and gone in half a minute.
+- **There is a safeword, "crvena" (red), and it ends the scene at once,
+  whoever says it.**
+
+**Controls.**
+- `\` (next to `[` and `]`), or type or say "belt" / "remen", in the kabina,
+  in first person. Your hand goes to your buckle and draws the belt out of
+  the loops. It is laid along a curve from your fist to where it leaves your
+  jeans, and it comes off Chloe's painted waist by the same amount (a new
+  leather band with a brass buckle, `uBelt` in 49-you.js). Then you hold it
+  by the buckle with the strap hanging.
+- The click is the swing. Hold it to wind up over your shoulder, and let go
+  to bring it down on the crosshair (the hand slap's own aim test,
+  `cotAim`). A longer hold gives a harder swing. A click that is not held is
+  a slow swing that lands as a pat.
+- `\` again, or "belt back", feeds it back in and buckles it.
+- The typed line is matched in the page before anything is sent anywhere
+  (`beltWords` in 49-ears.js), so "red" works signed out and offline. "stop"
+  counts as the safeword only while the belt is out. The spoken versions are
+  `belt.out` / `belt.back` / `belt.stop` in the service's INTENTS, and need
+  `server/baye/baye.py` redeployed.
+- It is on the help sheet.
+
+**The safeword.**
+- You say "red" / "crvena" / "stop": she answers "Okej. Dođi ovamo."
+- She says it herself when it is too much. Hard lashes close together heat
+  a meter (`beltHeat`, a crack adds 0.2 + how hard, and it cools over 3 s).
+  At 1.3 she says "Žuta. Polako, ljubavi." (yellow, easy). Past 2.2 she says
+  "Crvena." That takes three of the hardest a second apart, or four ordinary
+  full swings. Half-strength lashes at any pace never get past yellow.
+- Either way, any swing on its way is cancelled and the belt is fed straight
+  back in, faster than usual.
+- Then comes the aftercare. You kneel by the cot and lay the flat of your
+  hand on her bottom where it stung, slowly round, for 4.5 s, and she says
+  "Mm... hvala ti." If she is not lying on her front, you pet her hair
+  instead.
+- After her red, the belt stays on for 20 s whatever you ask ("not now —
+  she said red"). After yours, it stays on for 3 s.
+
+**The strap** (`beltStrap`, new src/43-belt.js). It is an `avbdNet` of 20
+flat links: 1.02 m × 34 mm × 4.2 mm, 140 g.
+- The buckle end is held by a world joint that is your fist, with position
+  and attitude. The tongue end is free.
+- Between each pair of links is a ragdoll angle, (h): a soft drive toward
+  straight (0.30 N·m/rad, which is worn veg-tan's EI over a link) and hard
+  limits edgewise (±0.08) and in twist (±0.55). So it curls over her the way
+  a strap does and never folds sideways.
+- It meets her 31 body capsules (the ones the cuff chains lie on), the
+  mattress and the pillow as boxes, and the floor.
+- It is drawn as a ribbon of 41 sections with burnished edges, punched holes
+  near the tongue and a brass frame.
+- **A hit is only where a link actually meets her.** The first link to close
+  on her faster than 1.2 m/s opens a lash. The rest of the strap landing in
+  the next 70 ms (the wrap) is the same lash. Where it landed is the hardest
+  contact of its first 20 ms on skin that takes a spank (her bottom, back,
+  a thigh, a hip). A strap across her arm and her bottom has landed on her
+  bottom.
+- Under 4 m/s it is a pat. Above that, the impulse on her ragdoll is 0.8-7
+  N·s through `cotSpank`, which now takes the belt's own reflex tuning
+  (0.55 of the kick, 1.15 of the flinch). The hand's slap is 10-13 N·s.
+- The mark is a line (`apprenticeLash`, six slots in 46-apprentice.js). It
+  covers the band of skin within the strap's half-width of the plane it bent
+  in, over the chord between its two furthest contacts, with the edges
+  stronger than the middle. It uses the slap's tint and fade.
+- The sound is synthesized (`audio.beltCrack`): a snap, a smack and a thump,
+  brighter with speed, and a swish on every swing. A pat is a soft low
+  sound. After half the cracks you hear one of her slap moans.
+- Anywhere on her that is not for spanking, the lash has no weight and
+  leaves no mark, and she says "Hej! Ne tamo, hehe."
+
+**Making it land where it is aimed** (MEASURED; 12 swings from round the cot
+plus 6 in quick succession):
+- The first cut landed where aimed in 2 of 8 swings. The others hit her far
+  thigh, her shoulder, her arms lying at her sides, or missed.
+- The fixes:
+  - The whole swing is in the upright plane through your right shoulder and
+    the aim point. The last 36 cm of the hand's path runs down that line,
+    and the hand stops a strap's reach short of it, so the strap unrolls
+    along it.
+  - The fist turns the strap's width square to that plane. It can only bend
+    through its thickness, so a strap turned edgewise to its swing went
+    wide.
+  - Wound up, the strap gets 5/s of air (`windDrag`), so it settles behind
+    you. Without this, quick swings started from wherever the last one had
+    left it.
+  - The steps catch up with a slow frame (up to 12 a frame). At ~25 fps
+    headless, 8 a frame was a strap swung twice as fast as asked, and it
+    landed on her arm every time.
+  - A soft spring (0.4 N/m, pull only) steers the tongue toward the aim point
+    from the top of the swing until it lands. That is the wrist.
+- After the fixes, 18 of 18 landed on her bottom, back, a hip or a thigh.
+- In real time in the room, standing close to her shoulders, it can still
+  catch her arm.
+
+**The solver** ((k) in 43-avbd.js). Three opt-in additions to `avbdNet`:
+- `setTarget(k, …, moving)`: a world joint whose anchor moves takes C0
+  against where it was at the start of the step, the chain's kinematic ends
+  for the net. Stabilised the old way, a hand at 6 m/s trailed a steady lag
+  of d/(1 − alpha).
+- `setWorldCaps`: kinematic world capsules, met at the closest pair of
+  segments.
+- `worldCapHits`: each world-capsule contact with the closing speed the
+  solver measured off the link at the start of the step.
+
+**Checked bit for bit.** The cuff chain (`avbdChain`) is untouched. A 600-step
+wrist-chain scene, and a 900-step net with every older feature (hard, finite
+and angle-locked world joints with a moving target, angles with drive, damping
+and limits, strings, points, boxes, capsules, hard and soft world boxes, pairs,
+a floor), hash identically on HEAD's solver and this one. In the game the
+wrist chain reads 0.29 ms, stretch 0.12 mm, and no penetration.
+
+**Cost.** Nothing until the belt is out. While it is out, about 0.8 ms a
+frame on average (4-5 steps at 240 Hz, 10 iterations), with a worst frame of
+3.5-4.4 ms (the first after a hang). The guard never fired.
+
+**Unchanged:** the hand spank (a slap is still 10-18 N·s, `belt: false` in
+`cotRag().last`), the cot ragdoll (no rescues in any run), the cuff chain,
+the reaches, the kabina door and key 8.
+
+Debug: `__fr.belt` — `cmd`, `key`, `swing(charge)`, `wind`, `look(side, d,
+pitch, along)`, `freeze`, `stats`, `lashes`, `heat`, `lock`, `hand`, `tune`,
+`trace`, `traceFilm`, `onHerNow`; `__fr.stats().belt`.
 ## [1.551.1] — 2026-09-30
 
 ### Lids, eyeballs and teeth at close-up resolution; skin that is not stone

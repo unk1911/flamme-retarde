@@ -1117,6 +1117,12 @@ const voice = (() => {
         : (ELSEWHERE[state.phase] || 'you are not on your feet'),
     }),
     report,
+    /**
+     * A line of hers on the subtitle, with no voice under it, for `secs` —
+     * the belt's (BELT_SAY in 90-app.js), which are hers in the room and not
+     * a call to the service. `gloss` what it means, as a service line has.
+     */
+    sub: (text, secs = 3, gloss = '') => { caption(text, null, gloss || null); capT = text ? secs : 0; },
     /** Whose line is in the air right now, or null — see `play`. */
     saying: () => sayingKey,
     /** Which bather (casting index) that line is, when it is a bather's. */

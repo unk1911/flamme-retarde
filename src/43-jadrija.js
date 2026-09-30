@@ -44192,6 +44192,19 @@ async function buildJadrija(scene) {
 
   /** The cot, into the net: the mattress and the pillow that give, the floor that does not. */
   function cotWorld(R) {
+    const B = cotBoxes();
+    R.net.setWorldBoxes(B, 2);
+    R.net.setWorldBoxSoft(0, COT_RAG.mattress.k, COT_RAG.mattress.d);
+    R.net.setWorldBoxSoft(1, COT_RAG.pillow.k, COT_RAG.pillow.d);
+    const floorY = kit.cot[2] - 0.44;
+    R.net.setFloor(() => floorY);
+  }
+
+  /**
+   * The mattress and the pillow as two world boxes, seven numbers each (centre,
+   * half extents, yaw) — for her net (`cotWorld`) and for the belt's (`beltWorld`).
+   */
+  function cotBoxes() {
     const c = kit.cot, top = c[2];
     const cm = c[0], cms = c[1] + 0.10;
     const st = at(cm), yaw = Math.atan2(-st.uz, st.ux);
@@ -44206,13 +44219,8 @@ async function buildJadrija(scene) {
     // open, which is where `edgeHeld`'s shins tuck: MEASURED with the box to
     // the floor, her knee kicked into its side and swung 45 degrees back and
     // forth off it for two seconds.
-    const B = [...box(cm, cms, top - 0.08, 0.335, 0.08, 0.915),
+    return [...box(cm, cms, top - 0.08, 0.335, 0.08, 0.915),
       ...box(cm, cms + 0.95 - 0.30, top + 0.045, 0.22, 0.045, 0.15)];
-    R.net.setWorldBoxes(B, 2);
-    R.net.setWorldBoxSoft(0, COT_RAG.mattress.k, COT_RAG.mattress.d);
-    R.net.setWorldBoxSoft(1, COT_RAG.pillow.k, COT_RAG.pillow.d);
-    const floorY = top - 0.44;
-    R.net.setFloor(() => floorY);
   }
 
   /**
@@ -44660,7 +44668,7 @@ async function buildJadrija(scene) {
    * (see COT_RAG.spank); `hit` where on her it landed (`cotAim`), or null for
    * the cheek. Whether it landed on the ragdoll.
    */
-  function cotSpank(side = 1, from = null, k = null, hit = null) {
+  function cotSpank(side = 1, from = null, k = null, hit = null, tune = null) {
     const R = cotR;
     if (!R || !R.on || !skinFig) return false;
     const S = COT_RAG.spank, { net, rag } = R, pb = rag.pelvis;
@@ -44709,11 +44717,15 @@ async function buildJadrija(scene) {
     // bind +z, which is `legUR`'s side (MEASURED lying flat: that cheek's
     // point is 4.7 cm off the right thigh's line and 18.5 off the left's).
     // Through 1.542.0 a cheek kicked the knee across from it the more.
-    const K = COT_RAG.kick, u = clamp((J - S.J[0]) / (S.hard - S.J[0]), 0, 1);
+    // (`tune`, 1.552.0: the belt's — BELT_ON_HER — which says how hard it was
+    // itself, and scales the reflex and the flinch: a strap is lighter than a
+    // hand and sharper, and the sting is most of it.)
+    const K = COT_RAG.kick, u = tune ? clamp(tune.u, 0, 1) : clamp((J - S.J[0]) / (S.hard - S.J[0]), 0, 1);
     // And both scaled by the pose's own (see `poses`), the flinch signed.
     const deg = (K.deg[0] + (K.deg[1] - K.deg[0]) * u) * (0.85 + 0.3 * Math.random()) * Math.PI / 180
-      * pose.knee;
-    const head = (K.head[0] + (K.head[1] - K.head[0]) * u) * Math.PI / 180 * A.head * pose.head;
+      * pose.knee * (tune ? tune.kick : 1);
+    const head = (K.head[0] + (K.head[1] - K.head[0]) * u) * Math.PI / 180 * A.head * pose.head
+      * (tune ? tune.head : 1);
     const nearR = hit && hit.leg ? hit.leg === 'R' : side > 0;
     const kn = deg * A.knee, ko = deg * A.other;
     R.kicks.push({ t: 0, l: nearR ? ko : kn, r: nearR ? kn : ko, h: head });
@@ -44724,6 +44736,7 @@ async function buildJadrija(scene) {
     cotStats.spanks++;
     cotStats.last = { J: +Jb.toFixed(2), dv: +(Jb * sc / net.mass[b]).toFixed(3), side, reg,
       bone: hit ? hit.bone : 'pelvis', kick: +(kn * 180 / Math.PI).toFixed(1), phase: show.phase,
+      belt: !!tune,
       dir: [+jx.toFixed(2), +jy.toFixed(2), +jz.toFixed(2)] };
     return true;
   }
@@ -44890,6 +44903,159 @@ async function buildJadrija(scene) {
       bone: reg === 'butt' || reg === 'hip' ? 'pelvis' : reg === 'thigh' ? 'legU' + (bp.z > 0 ? 'R' : 'L')
         : s.nm === 'pelvis' ? 'spine02' : s.nm,
       x: w.x, y: w.y, z: w.z, bind: [bp.x, bp.y, bp.z], snap: !hitIn, t: +best.t.toFixed(3) };
+  }
+
+  // ── THE BELT, ON HER ─────────────────────────────────────────────────────
+  //
+  // 1.552.0 — BELT in 43-belt.js, and the hand that swings it in 90-app.js.
+  // The strap meets her as her own capsules, the nineteen the cuff chains lie
+  // on (`beltWorld`), and tells this file where a lash landed (`beltHit`):
+  // which of her that is, by the same faces the slap reads off the cot
+  // (`cotAim`), whatever pose she is in and on the cot or off it; its weight
+  // on her ragdoll through `cotSpank`, lighter and sharper than a hand; and
+  // the line it leaves (`apprenticeLash`). A lash that lands anywhere that is
+  // not a spank — her front, her head, her arms, her feet — is no weight and
+  // no mark: `off`, and her answer to it is 90-app.js's.
+  const BELT_ON_HER = {
+    // The reflex and the flinch, of a hand's at the same `u`: a strap's sting
+    // is sharp and small.
+    kick: 0.55, head: 1.15,
+  };
+  const _bwV = new THREE.Vector3(), _bwP = new THREE.Vector3(), _bwQ = new THREE.Quaternion();
+  const _bwMI = new THREE.Matrix4(), _bwMQ = new THREE.Quaternion();
+  let _bwCaps = null;
+  /**
+   * Her body and the cot, for the strap: `caps` eight numbers a capsule (both
+   * ends, world, and the radius at each) in `chainCapsules` order, `n` of
+   * them (0 when she is not in the room); the mattress and the pillow as
+   * world boxes when there is a cot; and whether she is on it.
+   */
+  function beltWorld() {
+    const out = { caps: null, n: 0, boxes: null, nb: 0, onCot: !!(cotR && cotR.on) };
+    if (kit && kit.cot) { out.boxes = cotBoxes(); out.nb = 2; }
+    if (!skinFig || !show || !sheIsIn() || !skinFig.mesh.visible && !(APPR.primary && appr && appr.mesh.visible)) return out;
+    const caps = chainCapsules();
+    if (!_bwCaps || _bwCaps.length !== 8 * caps.length) _bwCaps = new Float64Array(8 * caps.length);
+    skinFig.mesh.updateMatrixWorld();
+    const M = skinFig.mesh.matrixWorld;
+    for (let k = 0; k < caps.length; k++) {
+      const cp = caps[k];
+      skinFig.boneAt(cp.bone, _bwP);
+      skinFig.boneTurn(cp.bone, _bwQ);
+      for (let e = 0; e < 2; e++) {
+        const p = e ? cp.e : cp.a;
+        _bwV.set(p[0] - cp.head.x, p[1] - cp.head.y, p[2] - cp.head.z).applyQuaternion(_bwQ).add(_bwP).applyMatrix4(M);
+        _bwCaps[8 * k + 3 * e] = _bwV.x; _bwCaps[8 * k + 3 * e + 1] = _bwV.y; _bwCaps[8 * k + 3 * e + 2] = _bwV.z;
+      }
+      _bwCaps[8 * k + 6] = cp.r0; _bwCaps[8 * k + 7] = cp.r1;
+    }
+    out.caps = _bwCaps; out.n = caps.length;
+    return out;
+  }
+
+  /** A world point (and a world direction, `dir`) into her bind frame off capsule `c`'s bone. */
+  function beltBind(c, p, dir = null) {
+    const f = skinFig;
+    _bwMI.copy(f.mesh.matrixWorld).invert();
+    f.boneAt(c.bone, _bwP);
+    f.boneTurn(c.bone, _bwQ).invert();
+    const bp = _bwV.set(p[0], p[1], p[2]).applyMatrix4(_bwMI).sub(_bwP).applyQuaternion(_bwQ).add(c.head);
+    const out = [bp.x, bp.y, bp.z];
+    if (dir) {
+      f.mesh.getWorldQuaternion(_bwMQ).invert();
+      const d = _bwV.set(dir[0], dir[1], dir[2]).applyQuaternion(_bwMQ).applyQuaternion(_bwQ);
+      out.push(d.x, d.y, d.z);
+    }
+    return out;
+  }
+
+  /**
+   * Which of her a point is, for the belt: 'butt', 'back', 'thigh', 'hip' or
+   * null — the faces `cotAim` reads off the cot in every pose but her front
+   * (`c` the capsule, `bp` the point in her bind frame), all of them allowed.
+   */
+  function beltRegion(c, bp) {
+    const G = COT_RAG.aim, nm = skinFig.bones[c.bone].name;
+    const ex = c.e[0] - c.a[0], ey = c.e[1] - c.a[1], ez = c.e[2] - c.a[2];
+    const ee = ex * ex + ey * ey + ez * ez;
+    const u = ee > 0 ? clamp(((bp[0] - c.a[0]) * ex + (bp[1] - c.a[1]) * ey + (bp[2] - c.a[2]) * ez) / ee, 0, 1) : 0;
+    const rad = c.r0 + (c.r1 - c.r0) * u || 1;
+    const nx = (bp[0] - (c.a[0] + ex * u)) / rad;
+    const az = c.a[2] + ez * u, nz = (bp[2] - az) / rad;
+    const out = (az >= 0 ? 1 : -1) * nz;
+    if (nm === 'pelvis') {
+      if (out > G.side) return 'hip';
+      if (nx < -G.face) return bp[1] < G.seat ? 'butt' : 'back';
+    } else if (nm === 'spine02' || (nm === 'chest' && bp[1] <= G.top)) {
+      if (nx < -G.face) return 'back';
+    } else if (/^legU/.test(nm) && bp[1] >= G.knee && out > -G.inner) {
+      return bp[1] > APPR.buttY[0] && bp[0] < 0 ? 'butt' : 'thigh';
+    }
+    return null;
+  }
+
+  /**
+   * A lash has landed — from 90-app.js, with the strap's own account of it
+   * (`onHit` in 43-belt.js): `h.v` how fast it came in, `h.at` and `h.cap`
+   * where and on which capsule, `h.n` out of her there, `h.a`/`h.b` the two
+   * ends of the line it lay along, `h.dir` the strap's run. `from` is where
+   * you are. What it was: { reg (null: not a spank), crack, u, J, landed }.
+   */
+  function beltHit(h, from) {
+    const caps = chainCapsules();
+    if (!skinFig) return null;
+    // WHAT IT LANDED ON: of what it touched as it arrived (`h.land` s), the
+    // hardest on skin that takes a spank — so a strap that comes down across
+    // her arm lying at her side and her bottom beside it has landed on her
+    // bottom, as it would be told — and only if none of it did, the hardest
+    // of it, which is a lash on something that is not for spanking.
+    if (h.pts) {
+      let best = null, bestAny = null;
+      for (const p of h.pts) {
+        if (p[8] > h.land) continue;
+        const cc = caps[p[3]];
+        if (!cc) continue;
+        if (!bestAny || p[7] > bestAny[7]) bestAny = p;
+        const rg = beltRegion(cc, beltBind(cc, p));
+        if (rg && (!best || p[7] > best[7])) best = p;
+      }
+      const pick = best || bestAny;
+      if (pick) { h.at = [pick[0], pick[1], pick[2]]; h.cap = pick[3]; h.n = [pick[4], pick[5], pick[6]]; h.link = pick[9]; }
+    }
+    const c = caps[h.cap];
+    if (!c) return null;
+    const BH = BELT.hit;
+    const u = clamp((h.v - BH.pat) / (BH.top - BH.pat), 0, 1);
+    const crack = h.v >= BH.crack;
+    const bp = beltBind(c, h.at, h.n);
+    const reg = beltRegion(c, bp);
+    const res = { reg, crack, u: +u.toFixed(3), v: +h.v.toFixed(2), J: 0, landed: false,
+      part: skinFig.bones[c.bone].name, mark: 0 };
+    if (!reg) return res;
+    // Its weight: a cheek's on the pelvis, the small of her back's on her
+    // belly, a thigh's on that thigh — `cotAim`'s bodies.
+    const side = bp[2] > 0 ? 1 : -1;
+    const nm = res.part;
+    const bone = reg === 'butt' || reg === 'hip' ? 'pelvis' : reg === 'thigh' ? 'legU' + (side > 0 ? 'R' : 'L')
+      : nm === 'pelvis' ? 'spine02' : nm;
+    const J = BH.J[0] + (BH.J[1] - BH.J[0]) * u;
+    res.J = +J.toFixed(2);
+    if (cotR && cotR.on) {
+      // In along the lash: from a point out along her skin's normal.
+      const o = { x: h.at[0] + h.n[0], y: h.at[1] + h.n[1], z: h.at[2] + h.n[2] };
+      res.landed = cotSpank(side, o, J,
+        { reg, side, leg: side > 0 ? 'R' : 'L', bone, x: h.at[0], y: h.at[1], z: h.at[2] },
+        { u, kick: BELT_ON_HER.kick, head: BELT_ON_HER.head });
+    }
+    // The line, faint for a pat and stronger with the crack.
+    const mk = crack ? BH.mark[0] + (BH.mark[1] - BH.mark[0]) * u : BH.mark[0] * 0.5;
+    if (typeof apprenticeLash === 'function' && APPR.primary && appr) {
+      const ca = caps[h.a[3]] || c, cb = caps[h.b[3]] || c;
+      const A = beltBind(ca, h.a), Bp = beltBind(cb, h.b);
+      const dd = h.dir ? beltBind(c, h.at, h.dir).slice(3) : [0, 1, 0];
+      if (apprenticeLash(A, Bp, bp.slice(3), dd, mk)) res.mark = +mk.toFixed(3);
+    }
+    return res;
   }
 
   /**
@@ -72490,6 +72656,9 @@ async function buildJadrija(scene) {
      * where on her it landed (`cotAim`), or null for the cheek.
      */
     cotSpank: (side, from, k, hit) => cotSpank(side, from, k, hit),
+    /** The belt's world — her capsules, the cot — and a lash on her: see `beltWorld`, `beltHit`. */
+    beltWorld: () => beltWorld(),
+    beltHit: (h, from) => beltHit(h, from),
     /**
      * Where on her back, her bottom or a thigh the crosshair is — the ray from
      * `o` along `d` — while she lies on her front on the cot; or null. See
