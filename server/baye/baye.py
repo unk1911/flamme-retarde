@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.48.4"
+VERSION = "1.49.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4140,7 +4140,71 @@ SHORE_DOING = {
     "creep": "coming across the beach hut floor to them on your knees",
     "rise": "getting up off the floor of the beach hut",
     "leave": "walking out of the beach hut",
+    # ── AND THE COT, THE KNEEL AND THE LEASH (1.49.0) ──────────────────────
+    #
+    # None of these were here, and `clean_talk` throws away a beat it has no
+    # words for — so lying face down on the cot being spanked, she was told
+    # nothing at all about where she was, and "am I spanking you?" got "not
+    # yet". Misha, 30 Sep 2026. Every held pose on the cot (`COT_RAG.phases`
+    # in src/43-jadrija.js), the rolls into them, and the leash's own beats.
+    "flat": "rolling over on to your front on the cot in the beach hut",
+    "flatheld": "lying face down on the cot in the beach hut",
+    "flatEdge": "rolling on to your front across the edge of the cot",
+    "edgeHeld": "lying face down across the edge of the cot in the beach hut, "
+                "hips on the edge and your legs hanging down to the floor",
+    "unroll": "rolling back over on the cot",
+    "sideL": "lying on your side on the cot in the beach hut",
+    "sideR": "lying on your side on the cot in the beach hut",
+    "fetal": "curling up on your side on the cot",
+    "fetalHeld": "curled up on your side on the cot in the beach hut",
+    "sit": "sitting up on the cot",
+    "sitHeld": "sitting on the cot with your legs out in front of you",
+    "bedSit": "getting up on to your knees on the cot",
+    "bedKneel": "kneeling up on the cot in the beach hut",
+    "lotus": "settling cross-legged on the cot",
+    "lotusHeld": "sitting cross-legged on the cot in the beach hut",
+    "perch": "sitting back against the wall on the cot",
+    "perchHeld": "sitting on the cot with your back against the wall, legs "
+                 "apart",
+    "upside": "going upside down on the cot",
+    "upsideHeld": "upside down on the cot, shoulders on the mattress and legs "
+                  "up the wall",
+    "handGo": "going over to the wall to do a handstand",
+    "handstand": "kicking up into a handstand against the wall",
+    "handHeld": "holding a handstand against the wall",
+    "fours": "on all fours on the floor",
+    "leashCome": "coming over to them to be collared",
+    "leashKneel": "going down on your knees in front of them",
+    "leashPut": "kneeling up in front of them while they put the collar on you",
+    "leashDown": "going down on all fours on the end of their leash",
+    "leashFours": "on all fours on the end of their leash",
+    "leashCrawl": "crawling on all fours on the end of their leash, following "
+                  "them",
+    "leashRise": "getting up off all fours with the collar still on",
+    "leashOff": "standing in front of them while they take the collar off you",
+    "hamUp": "getting up after tumbling out of the hammock",
+    "hamFall": "tumbling out of the hammock",
+    "hamBack": "walking back down through the pines from the hammock",
 }
+# THE SAME BEAT, ON THE MATTRESS. `kept`, `cradle`, `situp` and `recline` are
+# the hose's floor poses in `SHORE_DOING` — soaked, on the boards — and the
+# very same clips hold her on the cot when she was asked on to it. The page
+# says which (`on_cot`, see `clean_scene`), and the words follow.
+COT_DOING = {
+    "kept": "kneeling up on the cot in the beach hut",
+    "cradle": "lying on your back on the cot in the beach hut",
+    "recline": "lying back on the cot in the beach hut",
+    "situp": "sitting up on the cot in the beach hut",
+}
+# And which of her beats are a scene, for the lines she volunteers: those
+# print her pose (see `build_messages`) where a cartwheel on the promenade
+# does not, because "do not narrate" is the unprompted persona's rule and a
+# woman lying face down being spanked is not a thing she can not know.
+SCENE_POSES = set(COT_DOING) | {
+    k for k in SHORE_DOING
+    if k.startswith(("leash", "flat", "edge", "side", "fetal", "sit", "bed",
+                     "lotus", "perch", "upside", "hand", "ham"))
+} | {"fours", "unroll", "submit", "creep", "untie"}
 # The player, off `state.phase` and the walker in 49-voice.js.
 YOU_DOING = {
     "hose": "holding a fire hose with the water on",
@@ -4255,6 +4319,209 @@ def clamp_num(v, lo, hi):
     return round(max(lo, min(hi, v)), 2)
 
 
+# ── what the two of you are doing ────────────────────────────────────────────
+#
+# 1.49.0. Misha, 30 Sep 2026, spanking her on the cot in the beach hut:
+#
+#   [ears] "am i spanking you?"
+#   [ears] Baye · 0.5 m: "No, you ain't spanking me yet, sweetheart."
+#
+# Nothing she was told said so. She had where they were, what their feet were
+# doing and — when it was one of the few in `SHORE_DOING` — which beat of her
+# routine she was on, and not one word about the slap, the belt, the collar,
+# their hands on her or the safeword. `sceneTalk` in src/90-app.js now sends
+# that, as `scene`, with every line of hers: answers AND the ones she
+# volunteers, so neither can contradict what is on the screen.
+#
+# The same discipline as everything else on this path: counts, seconds, keys
+# off these tables, and flags. The words are all here.
+SCENE_REG = {"butt": "your bottom", "back": "your back",
+             "thigh": "your thighs", "hip": "your hip"}
+SCENE_HARD = ("light", "firm", "hard")
+SCENE_HAND = {"breast": "their hand is on your breast",
+              "hip": "their hand is on your hip",
+              "thigh": "their hand is stroking up the inside of your thigh",
+              "mouth": "their thumb is in your mouth"}
+SCENE_SAFE_BY = {"you", "her"}      # the player, or her own red
+SCENE_SAFE_OF = {"belt": "the belt", "collar": "the collar and leash"}
+# How long after a safeword she is still in the aftercare, s. Past it the line
+# says it happened and nothing more.
+SCENE_CARE_S = 150
+
+
+def _regs(v):
+    v = v if isinstance(v, list) else []
+    out = []
+    for x in v[:4]:
+        x = clamp_str(x, 8)
+        if x in SCENE_REG and x not in out:
+            out.append(x)
+    return out
+
+
+def clean_scene(raw) -> dict:
+    """`scene` off the page — see `sceneTalk` in src/90-app.js. Numbers in a
+    range, keys off the tables above, flags as flags; anything else is gone."""
+    if not isinstance(raw, dict):
+        return {}
+    g = raw.get
+    worn = g("worn") if isinstance(g("worn"), list) else []
+    who_safe = clamp_str(g("safeword_by"), 4)
+    of_safe = clamp_str(g("safeword_of"), 8)
+    hand_on = clamp_str(g("hand_on"), 8)
+    her = clamp_str(g("her"), 10)
+    out = {
+        "her": her if her in SHORE_DOING else None,
+        "on_cot": bool(g("on_cot")) or None,
+        "worn": [k for k in (clamp_str(x, 12) for x in worn[:4]) if k in WEAR_KEYS],
+        "buzz": bool(g("buzz")) or None,
+        "spanks": clamp_num(g("spanks"), 0, 99),
+        "spank_ago_s": clamp_num(g("spank_ago_s"), 0, 600),
+        "spank_hard": clamp_num(g("spank_hard"), 0, 2),
+        "spank_at": _regs(g("spank_at")),
+        "lashes": clamp_num(g("lashes"), 0, 99),
+        "lash_ago_s": clamp_num(g("lash_ago_s"), 0, 600),
+        "lash_hard": clamp_num(g("lash_hard"), 0, 2),
+        "lash_at": _regs(g("lash_at")),
+        "belt_out": bool(g("belt_out")) or None,
+        "belt_yellow": bool(g("belt_yellow")) or None,
+        "collar_on": bool(g("collar_on")) or None,
+        "leashed": bool(g("leashed")) or None,
+        "leading": bool(g("leading")) or None,
+        "tugs": clamp_num(g("tugs"), 0, 99),
+        "tug_ago_s": clamp_num(g("tug_ago_s"), 0, 600),
+        "hair_pull": bool(g("hair_pull")) or None,
+        "petting": bool(g("petting")) or None,
+        "hand_on": hand_on if hand_on in SCENE_HAND else None,
+        "marks": clamp_num(g("marks"), 0, 20),
+        "mark_k": clamp_num(g("mark_k"), 0, 1),
+        "safeword_ago_s": clamp_num(g("safeword_ago_s"), 0, 3600),
+        "safeword_by": who_safe if who_safe in SCENE_SAFE_BY else None,
+        "safeword_of": of_safe if of_safe in SCENE_SAFE_OF else None,
+        "aftercare": bool(g("aftercare")) or None,
+    }
+    # A count with no count is nothing, and a lead with no leash is no lead.
+    for k in ("spanks", "lashes", "tugs", "marks"):
+        if out[k] is not None:
+            out[k] = int(out[k])
+            if out[k] <= 0:
+                out[k] = None
+    for k in ("spank_hard", "lash_hard"):
+        if out[k] is not None:
+            out[k] = int(round(out[k]))
+    if not out["collar_on"]:
+        out["leashed"] = out["leading"] = None
+    if not out["leashed"]:
+        out["leading"] = None
+    return {k: v for k, v in out.items() if v not in (None, [], "")}
+
+
+def _times(n: int) -> str:
+    return "once" if n == 1 else "twice" if n == 2 else f"{n} times"
+
+
+def _since(s: float) -> str:
+    s = float(s)
+    if s < 3:
+        return "just now"
+    if s < 15:
+        return f"{int(round(s))} seconds ago"
+    return ago(s)
+
+
+def _and(xs: list) -> str:
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+
+def scene_lines(s: dict):
+    """What is happening between them and her, as plain facts in her words,
+    and — when a safeword is recent — how to be about it. Returns
+    `(facts, tone)`; both empty when nothing is going on."""
+    facts, tone = [], []
+    if not s:
+        return facts, tone
+    for key, n_key, tool in (("spank", "spanks", "with their hand"),
+                             ("lash", "lashes", "with their belt")):
+        n = s.get(n_key)
+        if not n:
+            continue
+        line = f"they have spanked you {_times(n)} {tool} in the last minute"
+        if s.get(key + "_at"):
+            line += " on " + _and([SCENE_REG[r] for r in s[key + "_at"]])
+        if s.get(key + "_ago_s") is not None:
+            line += f", the last one {_since(s[key + '_ago_s'])}"
+        if s.get(key + "_hard") is not None:
+            h = SCENE_HARD[s[key + "_hard"]]
+            line += f", a {h} one" if n == 1 else f", the hardest of them {h}"
+        facts.append(line)
+    if s.get("belt_out"):
+        facts.append("they have taken their belt off and are holding it by "
+                     "the buckle, the strap hanging, ready to use on you")
+    if s.get("belt_yellow"):
+        facts.append("you said yellow a moment ago: it is a lot, and you want "
+                     "it slower, not stopped")
+    if s.get("collar_on"):
+        line = "you are wearing their black leather collar"
+        if s.get("leashed"):
+            line += ", with the diamond chain leash clipped to its ring"
+            line += (" and they are leading you by it" if s.get("leading")
+                     else " and they are holding the other end")
+        facts.append(line)
+    if s.get("tugs"):
+        facts.append(f"they have tugged your leash {_times(s['tugs'])} in the "
+                     f"last minute, the last one {_since(s.get('tug_ago_s', 0))}")
+    for k in s.get("worn") or []:
+        facts.append(WORN_NOUN[k])
+    if s.get("buzz"):
+        facts.append("the Lovense they put on you is going, this second")
+    if s.get("hair_pull"):
+        facts.append("they have a fistful of your hair from behind and are "
+                     "pulling your head back by it")
+    if s.get("petting"):
+        facts.append("they are stroking your hair, this second")
+    if s.get("hand_on"):
+        facts.append(SCENE_HAND[s["hand_on"]] + ", this second")
+    if s.get("marks"):
+        k = s.get("mark_k") or 0
+        look = ("faintly pink" if k < 0.25 else "pink and warm" if k < 0.6
+                else "red and stinging")
+        where = ("in one place" if s["marks"] == 1
+                 else "in a couple of places" if s["marks"] <= 3
+                 else "all over")
+        facts.append(f"your skin is {look} {where} where they have been "
+                     "spanking you")
+    a = s.get("safeword_ago_s")
+    if a is not None:
+        of = SCENE_SAFE_OF.get(s.get("safeword_of"), "it")
+        by = ("you said the safeword yourself" if s.get("safeword_by") == "her"
+              else "they said the safeword themselves, not you,")
+        # Over, if nothing has landed since — and a hit before it is history.
+        last = min([s[k] for k in ("spank_ago_s", "lash_ago_s") if k in s]
+                   or [1e9])
+        facts.append(f"{by} {_since(a)} and {of} stopped at once"
+                     + (": it is over, nobody is spanking you now"
+                        if last >= a else ""))
+        if a <= SCENE_CARE_S or s.get("aftercare"):
+            tone.append("THIS IS AFTERCARE. The safeword was said a moment "
+                        "ago and it ended the play, as it should. Be soft and "
+                        "close with them: warm, a bit breathless, grateful, "
+                        "glad of them, happy it was good. No teasing for "
+                        "more, no filth, no pushing to start again. If they "
+                        "ask how you are, say you are fine and say it kindly. "
+                        "Only if THEY start it again do you follow them back.")
+    elif s.get("aftercare"):
+        tone.append("It has just ended and their hand is on you: be soft and "
+                    "warm with them, not filthy.")
+    # AND WHAT IS NOT HAPPENING, when something else is. Measured on the
+    # first run of the leash case: led on all fours, tugged three times and
+    # never slapped, asked "am I spanking you?", two answers in three were
+    # "yeah, your hand's been smacking my ass". A list of true things read
+    # under "never deny any of this" is taken as licence for its neighbours.
+    if facts and not (s.get("spanks") or s.get("lashes")):
+        facts.append("nobody has spanked you in the last minute")
+    return facts, tone
+
+
 def clean_context(raw: dict) -> dict:
     """Take only what we recognise, in the range we expect.
 
@@ -4328,6 +4595,10 @@ def clean_context(raw: dict) -> dict:
         "seen": [s for s in (clamp_str(x, 32) for x in seen[:12]) if s],
         "said": [s for s in (clamp_str(x, 120) for x in
                              (raw.get("said") or [])[:6]) if s],
+        # What the two of you are doing — shore Baye's alone, see
+        # `clean_scene`. Here and not in `clean_talk` so that `/line` has it
+        # too: a line she volunteers mid-scene must not contradict it either.
+        "scene": (clean_scene(g("scene")) or None) if who == "baye" else None,
     }
     return {k: v for k, v in out.items() if v not in (None, [], "")}
 
@@ -4453,6 +4724,22 @@ def build_messages(ctx: dict, world: dict) -> list:
         lines.append(f"- RIGHT NOW you are {ctx['spot']}")
     if ctx.get("alone"):
         lines.append("- the two of you are alone in there")
+    # AND WHAT THE TWO OF YOU ARE DOING, when anything is — see `scene_lines`.
+    # The unprompted line had the same blindness as the answer: face down on
+    # the cot mid-spank, all it knew was that the door was shut. Her pose only
+    # for the beats that ARE the scene (`SCENE_POSES`), so a cartwheel on the
+    # promenade does not become the subject of every line.
+    sc = ctx.get("scene") or {}
+    ph = sc.get("her")
+    if ph in SCENE_POSES:
+        lines.append(f"- RIGHT NOW you are "
+                     f"{(sc.get('on_cot') and COT_DOING.get(ph)) or SHORE_DOING[ph]}")
+    scene, tone = scene_lines(sc)
+    lines += [f"- RIGHT NOW {x}" for x in scene]
+    if scene:
+        lines.append("- whatever you say must fit all of that: never contradict "
+                     "it or talk as if it were not happening")
+    lines += [f"- {x}" for x in tone]
     if "phase" in ctx:
         lines.append(f"- they are {ctx['phase']}")
     if "hour" in ctx:
@@ -4798,7 +5085,9 @@ def talk_facts(who: str, ctx: dict, t: dict, world: dict):
     else:
         phase = t.get("her")
         if phase in SHORE_DOING:
-            her.append(f"you are {SHORE_DOING[phase]}")
+            # On the mattress, the words for the mattress — see `COT_DOING`.
+            cot = (ctx.get("scene") or {}).get("on_cot")
+            her.append(f"you are {(cot and COT_DOING.get(phase)) or SHORE_DOING[phase]}")
         if t.get("with_you"):
             her.append("you have been following them about, on purpose")
         if t.get("turned"):
@@ -4960,6 +5249,27 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
     if them:
         lines.append("THEM:")
         lines += [f"- {x}" for x in them]
+    # WHAT THE TWO OF YOU ARE DOING — see `scene_lines`. Its own heading, and
+    # the rule for it said once under it, because it is the part of the prompt
+    # a question about "us" is answered from and "not yet" was the one answer
+    # it could not be allowed to get.
+    scene, tone = scene_lines(ctx.get("scene") if who == "baye" else None)
+    if scene:
+        lines.append("BETWEEN YOU, THIS MINUTE (all true, you can feel all of "
+                     "it, and you are into it):")
+        lines += [f"- {x}" for x in scene]
+        lines.append("- if they ask about any of this, it is happening: say "
+                     "so, in your own words, playful and in character. Never "
+                     "deny it, never say not yet or not now about something "
+                     "listed here")
+    elif who == "baye" and ctx.get("scene"):
+        # A page that sent `scene` and nothing in it is saying so: the other
+        # half of the same truth, and what makes "am I spanking you?" asked
+        # with both hands empty a "no" that is also true.
+        lines.append("BETWEEN YOU, THIS MINUTE: nothing — nobody has spanked "
+                     "you or laid a hand on you in the last minute")
+    for x in tone:
+        lines.append(x)
     lines.append("THE WORLD:")
     if "hour" in ctx:
         h = int(ctx["hour"]) % 24

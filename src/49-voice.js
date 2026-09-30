@@ -480,6 +480,15 @@ const voice = (() => {
       const worst = Math.max(state.burning, state.burnt, 1);
       c.fire = Math.max(1, Math.min(100, Math.round(100 * state.burning / worst)));
     }
+    // AND WHAT THE TWO OF YOU ARE DOING, which is shore Baye's alone — the
+    // slaps, the belt, the collar, your hands, the safeword. See `sceneTalk`
+    // in 90-app.js. Here and not in `talkState`, so a line she volunteers in
+    // the middle of it knows as much as an answer does: asked "am i spanking
+    // you?" on the cot she said "not yet", because nothing up here said so.
+    if (sp.key === 'baye' && !(gap && gap.bucket)) {
+      const sc = at(() => (typeof sceneTalk === 'function' ? sceneTalk() : null));
+      if (sc) c.scene = sc;
+    }
     return c;
   }
 
