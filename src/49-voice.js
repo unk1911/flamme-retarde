@@ -368,11 +368,14 @@ const voice = (() => {
    * have to know it is her, or the shore Baye mouths the cat's lines from
    * thirty metres away.
    */
-  let sayingKey = null;
-  async function play(key, d) {
+  let sayingKey = null, sayingPid = null;
+  async function play(key, d, pid = null) {
     sayingKey = key;
+    // And WHICH bather, for the one voice that is many people: their mouth
+    // moves with it (`bather2Face` in 42-bathers2.js) and nobody else's does.
+    sayingPid = pid;
     try { return await audio.voice(d.audio, 2.1, d.rate || 1); }
-    finally { if (sayingKey === key) sayingKey = null; }
+    finally { if (sayingKey === key) { sayingKey = null; sayingPid = null; } }
   }
 
   /** Where you actually are, in the world's metres — feet first, eye second. */
@@ -570,6 +573,7 @@ const voice = (() => {
       // The subtitle's lead, for a speaker whose name depends on WHO was hit.
       const lead = sp.lead
         || (sp.pendGap && BATHER_LEAD[sp.pendGap.kind]) || null;
+      const pid = sp.pendGap && sp.pendGap.pid != null ? sp.pendGap.pid : null;
       sp.pend = null; sp.pendGap = null;
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
@@ -586,7 +590,7 @@ const voice = (() => {
       // in which case her own next thought is not what anybody is waiting to
       // hear — see `cutIn`.
       if (!mine(tok)) return;
-      await play(sp.key, d);
+      await play(sp.key, d, pid);
       // They have stopped. NOW the subtitle gets its few seconds and goes.
       capT = sp.cfg.hold;
     } catch (e) {
@@ -1115,6 +1119,8 @@ const voice = (() => {
     report,
     /** Whose line is in the air right now, or null — see `play`. */
     saying: () => sayingKey,
+    /** Which bather (casting index) that line is, when it is a bather's. */
+    sayingPid: () => sayingPid,
     /** For a probe: exactly the state `/talk` would be sent right now, for
      *  the Bucketeer (`true`) or shore Baye. */
     talkState: (buck) => talkState(!!buck),

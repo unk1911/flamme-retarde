@@ -8,6 +8,110 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.551.0] — 2026-09-30
+
+### Faces and skin: the bathers blink, grimace, talk, smile and squint, and their skin is lit like skin
+
+Misha, after a promo for a paid Blender add-on (whose assets could not ship in
+a public repo anyway): could our people be "even more human" — *"sure let's
+try those 2 things on a separate agent, the expressions and then the skin
+shader i think it would add to the realism"*.
+
+**Expressions.** The eight bathers had no face past their paint: no blink, a
+mouth that never moved when a line came out of it, and a woman hosed off a
+café chair took it with her phone face.
+
+- **From MakeHuman's own face rig, not typed.** Its `default` skeleton has
+  ~60 face bones and `face-poseunits.bvh` is sixty FACS-like units on them
+  (LeftUpperLidClosed, JawDrop, MouthLeftPullUp, …), all CC0.
+  `tools/face_morphs.py` poses that rig on the very body each bather was made
+  from (`build/mh_bodies`), skins it with MakeHuman's weights and keeps the
+  displacement: nine targets — shutL, shutR, jaw, smile, scowl, squint, wide,
+  kiss, brows — on 850–910 head vertices a body. On to the decimated body
+  through the UVs the collapse carried: each vertex is located inside a base
+  triangle in UV space and takes its barycentric mix (12–22 of ~1 450 per
+  body land outside every triangle and take the nearest). The first cut
+  matched nearest vertices in 3D and drove the inside of a child's lip out
+  through the corners of her mouth.
+- **Scowl and brows are baked off the lids.** The page adds displacements
+  where MakeHuman composes rotations, and BrowDown plus a shut lid carried the
+  lid behind the eyeball — two black holes on the old man, eyes screwed shut
+  and scowling. They now give way wherever a blink moves a vertex; the squint
+  (the lower lid) gives way at runtime as the upper one closes.
+- **fr3d v12** = a v9 with a morph block spliced in after the index, every
+  other byte where it was (clips stay last, so dive.py-style splices still
+  work). `save_skin(..., morph=)` writes it and `bathers_v2.py` calls it, so
+  a rebake lands on the converted bytes (checked: re-running the conversion
+  is byte-identical; `pack_skin(unpack_skin(v9)) == v9`). `unpack_skin`
+  strips it for the Python tools. **+74 KB gzip for all eight.**
+- **In the vertex shader, before the skinning** (`morphVert`, 41-skin.js), so
+  an expression rides every clip. A per-BODY float texture (position and
+  normal delta per target; the normal deltas are the mesh's own normals
+  recomputed under each target, less the same at rest) and per-FIGURE
+  weights; unrolled with constant indices, and skipped outright when a face
+  is at rest or further than 26 m.
+- **When** (`bather2Face`, 42-bathers2.js; moods live on the PERSON, so a
+  scowl follows whoever was hosed, not the mesh slot):
+  - *blinking* always: irregular gaps (1.4 s plus a skewed roll up to 6.5 s),
+    one in six a double, the two lids 14 ms apart; closing 70 ms, opening 160;
+  - *hosed* — sprayed, a ragdoll, dunked: eyes screwed shut, the cheeks up,
+    the brow down, the mouth pulled wide and open; half of it while getting up;
+  - *scowl* while they glare and walk off, while they swear (the hose line,
+    the dunk, a bump, the theft), for a few seconds after;
+  - *talking*: chatter turns (the line's own length for a scripted one), every
+    balloon line, and a voice-service line from the bather who is actually
+    speaking (`voice.sayingPid`) — off `audio.voiceLevel()` where the meter
+    reads, a syllable envelope where it cannot; vowels alternate wide / kiss;
+  - *chatting*: on each turn somebody may smile (23 %) or laugh (7 %);
+  - *sun*: squint by how much they FACE it, eyes shut on a towel on their back
+    — and nobody at a café table, which are all under an awning.
+- **The inside of a mouth** is drawn now that it can be seen: teeth across the
+  front (warm, because only the sky lights them), tongue and throat behind,
+  darker with depth, no sky mirror in it. A shut lid's eyeball goes to lash
+  dark, so the gap a decimated lid leaves reads as lashes.
+- `__fr.jad.raw().crowd.faces(r)`: every drawn bather within r m, their nine
+  weights, moods, blinks and wetness.
+- Baye, Chloe and the bucketeer already blink (`v5Blink`) and Baye's jaw
+  already follows her voice; they are unchanged.
+
+**Skin** (`SKIN` in 41-skin.js; the bathers opt in — the heroes' bodies are
+built by their own callers and are not touched in this release):
+
+- **The terminator, per channel**: Lambert convolved with a box of half-width
+  w (red 0.50, green 0.24, blue 0.14), so the edge of a shadow goes warm and
+  soft, and only there. Two cuts were measured wrong first: plain wrap added
+  red over the whole of a face at noon (r/g on the old man's cheek 1.36 →
+  1.59), and cut off at n.l = 0 it drew facet-shaped patches. Its shadow is
+  sampled 6 cm toward the sun, because past the terminator the shadow map
+  only knows the head is in its own way, in blocks.
+- **Ears and fingers** glow red with the sun behind them (`vThin`: the ear
+  found off the bind pose, the finger and thumb bones).
+- **Its own highlight**: Fresnel (F0 0.028), rough everywhere (Blinn 16) and
+  oily on the T-zone (42), found off the eye centres so it fits a child; the
+  sky as a floor plus a grazing sheen, in place of the old flat mirror that
+  laid a grey sheen on foreheads.
+- **Pores**: a 256² tiling normal map made at load (dimples and two families
+  of creases, mulberry32), on a tangent frame from screen derivatives,
+  faded out by 8 m and not computed past it.
+- **Wet**: hosed, knocked over or dunked, darker (×0.74) and glossy (Blinn
+  160, sky sheen ×4), drying over 15–150 s.
+- Measured on a cheek patch, HEAD → now: noon r/g +0.02 to +0.09 and 3–6
+  levels brighter; 18:00 within 1–3 levels; 22:00 within 1. At night the
+  resort's lamps do not reach any figure material in this renderer (ambient
+  only), so the skin is neutral there.
+
+**Cost.** Page 39.32 → 39.45 MB (+138 KB: 99 KB of morphs, the rest code).
+On a crowded promenade view at 16:00 (71 bathers drawn, 8.8 M tris), the
+median render with the bathers shown minus hidden, readPixels-synced, 3 × 120
+frames a run: HEAD 1.47–1.83 ms, now 1.53–2.17 ms — a tenth of a
+millisecond, inside the run-to-run noise. People 100, blockers 786, no console
+errors; a café sitter knocked off reads wet 1.0 and grimacing, then scowling
+as they walk off.
+
+**Known.** At the magnification of a close-up the lid line of a fully shut
+eye is ragged (the decimated lids), and `wide` past about 0.8 shows the ends
+of a child's teeth through her cheek, so nothing asks for more than 0.45.
+Scowl is subtle. Pores are only visible within a couple of metres.
 ## [1.550.10] — 2026-09-30
 
 ### The kabine doors, built: five kinds of door, real ironmongery, a frame with depth

@@ -37,6 +37,9 @@ build/*.blend
 # a second. What survives is build/payload/bather_*.fr3d.gz.
 build/mh_targets/
 build/mh_bodies/
+# And MakeHuman's face rig — skeleton, weights and pose units, CC0 — that
+# tools/face_morphs.py fetches to bake the bathers' expressions.
+build/mh_face/
 
 # Screenshots and scratch output from tools/shoot.mjs
 shots/

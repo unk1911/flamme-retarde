@@ -512,7 +512,7 @@ def decimate(verts, tris, target, label):
 
 # ── the v5 blob ──────────────────────────────────────────────────────────── #
 
-def write_blob(buf, rest, baked, path, label='baye2'):
+def write_blob(buf, rest, baked, path, label='baye2', morph=None):
     nv, ni = len(buf.pos) // 3, len(buf.idx)
     xs, ys, zs = buf.pos[0::3], buf.pos[1::3], buf.pos[2::3]
     # v5 = v4 plus a UV array and a table of named parts. v4's single `shed`
@@ -556,7 +556,8 @@ def write_blob(buf, rest, baked, path, label='baye2'):
     # Written PACKED, as v9 — quantised positions, 16-bit octahedral normals,
     # fixed-point UVs, delta-coded index and clips: `save_skin` in
     # tools/fr3d_q.py, the same function that converted the shipped blobs.
-    save_skin(path, b''.join(parts))
+    # `morph`: the bathers' faces, spliced on as v12 — see tools/face_morphs.py.
+    save_skin(path, b''.join(parts), morph)
     print('[%s] %s  %d verts  %d tris  %d parts  %d bones  %d clips  %.0f KB gz'
           % (label, path.name, nv, ni // 3, len(buf.groups), len(rest),
              len(baked), path.stat().st_size / 1024))

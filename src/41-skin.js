@@ -66,14 +66,18 @@ function readFR3DSkin(buf) {
     dv.getUint8(2), dv.getUint8(3));
   if (magic !== 'FR3D') throw new Error('not an fr3d blob: ' + magic);
   const version = dv.getUint32(4, true);
-  if (version !== 4 && version !== 5 && version !== 8 && version !== 9) {
-    throw new Error('fr3d skin needs version 4, 5, 8 or 9, got ' + version);
+  if (version !== 4 && version !== 5 && version !== 8 && version !== 9 && version !== 12) {
+    throw new Error('fr3d skin needs version 4, 5, 8, 9 or 12, got ' + version);
   }
   // v8 and v9 are v4 and v5 PACKED (tools/fr3d_q.py) — the same header, the
   // same tables, the same clips, with the vertex arrays quantised and laid
   // out so gzip can see them. See `readSkinPacked` below.
+  //
+  // v12 is a v9 with a MORPH BLOCK after the index: the bathers' faces,
+  // baked off MakeHuman's face rig by tools/face_morphs.py. See
+  // `readSkinMorphs` below; nothing else in the file differs from a v9.
   const packed = version >= 8;
-  const v5 = version === 5 || version === 9;
+  const v5 = version === 5 || version === 9 || version === 12;
   const nv = dv.getUint32(8, true);
   const ni = dv.getUint32(12, true);
   // v4: how many indices at the *end* of the buffer are the hip wrap — the one
@@ -83,9 +87,10 @@ function readFR3DSkin(buf) {
   const shed = v5 ? 0 : dv.getUint32(40, true);
 
   let o = 44;
-  let pos, nrm, uvs, col, bidx, bwgt, idx;
+  let pos, nrm, uvs, col, bidx, bwgt, idx, morphs = null;
   if (packed) {
     ({ pos, nrm, uvs, col, bidx, bwgt, idx, o } = readSkinPacked(buf, dv, nv, ni, v5));
+    if (version === 12) ({ morphs, o } = readSkinMorphs(buf, dv, o));
   } else {
     pos = new Float32Array(buf, o, nv * 3); o += nv * 12;
     nrm = new Float32Array(buf, o, nv * 3); o += nv * 12;
@@ -205,7 +210,402 @@ function readFR3DSkin(buf) {
   // a somersault leaves it — and a figure that pops out of existence when she
   // reaches up is worse than one that is occasionally drawn off screen.
   g.boundingSphere.radius *= 1.9;
-  return { geo: g, bones, clips, nv, tris: ni / 3, ni, shed, groups, version };
+  // Which row of the morph texture each vertex reads, or -1 for the ninety
+  // per cent of the body no expression touches. One float a vertex, and the
+  // shader's whole test for "is this face". See `skinMorphTex`.
+  if (morphs) {
+    const row = new Float32Array(nv).fill(-1);
+    for (let k = 0; k < morphs.nm; k++) row[morphs.idx[k]] = k;
+    g.setAttribute('aMorph', new THREE.BufferAttribute(row, 1));
+  }
+  return { geo: g, bones, clips, nv, tris: ni / 3, ni, shed, groups, version, morphs };
+}
+
+/**
+ * A v12's morph block: the expressions tools/face_morphs.py baked off
+ * MakeHuman's face rig, as displacements of the bind pose.
+ *
+ *   u32 nt, u32 nm             targets, and the vertices any of them move
+ *   nt x (u16 len, name)
+ *   nm zigzag u32 deltas       those vertices, ascending, four byte runs
+ *   nt x 3 x nm int16          per target, per axis: zigzag deltas, low bytes
+ *                              then high, in 2^-16 m (0.015 mm)
+ *
+ * Out comes `{ names, nt, nm, idx, d }`, `d` being nt * nm * 3 metres.
+ */
+function readSkinMorphs(buf, dv, o) {
+  const b = new Uint8Array(buf);
+  const nt = dv.getUint32(o, true), nm = dv.getUint32(o + 4, true);
+  o += 8;
+  const names = [];
+  const dec = new TextDecoder();
+  for (let t = 0; t < nt; t++) {
+    const len = dv.getUint16(o, true); o += 2;
+    names.push(dec.decode(new Uint8Array(buf, o, len))); o += len;
+  }
+  const idx = new Uint32Array(nm);
+  let acc = 0;
+  for (let i = 0; i < nm; i++) {
+    const u = (b[o + i] | (b[o + nm + i] << 8) | (b[o + 2 * nm + i] << 16)
+      | (b[o + 3 * nm + i] << 24)) >>> 0;
+    acc = (acc + ((u >>> 1) ^ -(u & 1))) >>> 0;
+    idx[i] = acc;
+  }
+  o += nm * 4;
+  const d = new Float32Array(nt * nm * 3);
+  for (let t = 0; t < nt; t++) {
+    for (let k = 0; k < 3; k++) {
+      let a = 0;
+      for (let i = 0; i < nm; i++) {
+        const u = b[o + i] | (b[o + nm + i] << 8);
+        a = (a + ((u >>> 1) ^ -(u & 1))) & 0xffff;
+        d[(t * nm + i) * 3 + k] = (a << 16 >> 16) / 65536;
+      }
+      o += nm * 2;
+    }
+  }
+  return { morphs: { names, nt, nm, idx, d }, o };
+}
+
+/**
+ * The morphs on the GPU: one float texture per BODY, shared by every figure
+ * drawn with it, two texels per target per moved vertex — the position's
+ * displacement and the normal's.
+ *
+ * The normals are not in the file, because they do not have to be: a shut lid
+ * faces the way the lid's own triangles face once they have moved, so each
+ * target's normals are the mesh's own, recomputed over the triangles that
+ * touch a moved vertex, less the same recomputation at rest. A difference of
+ * two things computed identically, so a seam or a decimator's odd triangle
+ * cancels out of it rather than being baked in. Without it a closed lid is lit
+ * as the open eye was — a flat, bright shape across the eyeball.
+ *
+ * Built once per body on first use, a few milliseconds: about 2 500 triangles
+ * of the 12 000 touch the face.
+ */
+function skinMorphTex(data) {
+  const M = data.morphs;
+  if (!M) return null;
+  if (M.tex) return M.tex;
+  const { nt, nm, idx, d } = M;
+  const g = data.geo;
+  const pos = g.attributes.position.array;
+  const ix = g.index.array;
+  const row = g.attributes.aMorph.array;
+  const tris = [];
+  for (let i = 0; i + 2 < ix.length; i += 3) {
+    if (row[ix[i]] >= 0 || row[ix[i + 1]] >= 0 || row[ix[i + 2]] >= 0) {
+      tris.push(ix[i], ix[i + 1], ix[i + 2]);
+    }
+  }
+  // Every vertex those triangles reach, moved or not, gets a slot of scratch.
+  const slot = new Map();
+  for (const v of tris) if (!slot.has(v)) slot.set(v, slot.size);
+  const P = new Float32Array(slot.size * 3);
+  const N = new Float32Array(slot.size * 3);
+  const normalsOf = (t, out) => {
+    for (const [v, k] of slot) {
+      const r = row[v];
+      const o = t < 0 || r < 0 ? -1 : (t * nm + r) * 3;
+      P[k * 3] = pos[v * 3] + (o < 0 ? 0 : d[o]);
+      P[k * 3 + 1] = pos[v * 3 + 1] + (o < 0 ? 0 : d[o + 1]);
+      P[k * 3 + 2] = pos[v * 3 + 2] + (o < 0 ? 0 : d[o + 2]);
+    }
+    N.fill(0);
+    for (let i = 0; i < tris.length; i += 3) {
+      const a = slot.get(tris[i]) * 3, b = slot.get(tris[i + 1]) * 3, c = slot.get(tris[i + 2]) * 3;
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2];
+      const vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      for (const k of [a, b, c]) { N[k] += nx; N[k + 1] += ny; N[k + 2] += nz; }
+    }
+    for (let i = 0; i < nm; i++) {
+      const k = slot.get(idx[i]);
+      if (k === undefined) { out[i * 3] = out[i * 3 + 1] = out[i * 3 + 2] = 0; continue; }
+      const l = Math.hypot(N[k * 3], N[k * 3 + 1], N[k * 3 + 2]) || 1;
+      out[i * 3] = N[k * 3] / l; out[i * 3 + 1] = N[k * 3 + 1] / l; out[i * 3 + 2] = N[k * 3 + 2] / l;
+    }
+  };
+  const rest = new Float32Array(nm * 3), moved = new Float32Array(nm * 3);
+  normalsOf(-1, rest);
+  const W = nt * 2;
+  const tex = new Float32Array(W * nm * 4);
+  for (let t = 0; t < nt; t++) {
+    normalsOf(t, moved);
+    for (let i = 0; i < nm; i++) {
+      const o = (i * W + t * 2) * 4, q = (t * nm + i) * 3;
+      tex[o] = d[q]; tex[o + 1] = d[q + 1]; tex[o + 2] = d[q + 2];
+      const moves = d[q] !== 0 || d[q + 1] !== 0 || d[q + 2] !== 0;
+      for (let k = 0; k < 3; k++) tex[o + 4 + k] = moves ? moved[i * 3 + k] - rest[i * 3 + k] : 0;
+    }
+  }
+  const dt = new THREE.DataTexture(tex, W, nm, THREE.RGBAFormat, THREE.FloatType);
+  dt.minFilter = THREE.NearestFilter;
+  dt.magFilter = THREE.NearestFilter;
+  dt.generateMipmaps = false;
+  dt.needsUpdate = true;
+  M.tex = dt;
+  M.dim = new THREE.Vector2(W, nm);
+  return dt;
+}
+
+// -----------------------------------------------------------------------------
+// SKIN THAT IS SKIN. Misha, 30 Sep 2026, the second of the two things he
+// approved after the add-on promo: "the skin shader i think it would add to
+// the realism".
+//
+// Until now a bather's skin was lit like a painted wall with a little gloss on
+// it: Lambert, a Blinn-Phong dot at one fixed sharpness, a flat sky mirror at
+// 3 per cent. Four things were missing, and each is a few lines here:
+//
+//   the terminator   Light that goes into skin comes out again a few
+//                    millimetres away, and the red survives the trip best —
+//                    which is why the edge of the shadow on a face is warm
+//                    and soft rather than a grey line. Lambert throws away
+//                    everything past n.l = 0; WRAP lighting gives back the
+//                    part of it just past the edge, red-shifted.
+//   thin parts       An ear or the fingers with the sun behind them glow red.
+//                    `vThin` marks them (per caller: bones for fingers, the
+//                    ear off the bind pose), and a view-toward-the-sun term
+//                    lights them from behind.
+//   the highlight    Not one sharpness everywhere: the T-zone — forehead and
+//                    nose — is oily and takes a tighter, brighter highlight;
+//                    everywhere else is rough. And a Fresnel on it, so skin
+//                    goes to a soft sheen at grazing angles, which is most of
+//                    the difference between a person in low sun and a doll.
+//   pores            A tiling normal map made here at load (`skinPoreTex`),
+//                    laid on through a tangent frame taken off the screen
+//                    derivatives (there are no tangents in the blob), faded out
+//                    by eight metres so it can never become a pattern.
+//
+// And WET, which the game already knows about someone — hosed, dunked:
+// darker (water in the surface scatters less light back out), and glossy.
+//
+// A caller opts in with `SKIN_DECL` (and `vThin` written in its vertex
+// program), runs `SKIN_PREP` at the top of its body — the derivatives are
+// taken there, outside any branch — runs `SKIN_ON` in the fragments that are
+// skin, and passes `SKIN_LIT` as `lit`. Only the bathers do so far.
+// -----------------------------------------------------------------------------
+
+const SKIN = {
+  // The terminator, PER CHANNEL. Lambert convolved with a box of half-width
+  // w in n.l — (n.l + w)^2 / 4w inside |n.l| < w, Lambert outside — which is
+  // the cheapest honest model of light entering on the lit side and leaving
+  // just past the edge: continuous, local to the terminator, never below
+  // Lambert, w/4 over it exactly on the edge, and nothing at all by w either
+  // side. Red widest, then green, blue hardly (scattering in skin runs about
+  // 3.7 / 1.4 / 1.0 mm mean free path, R/G/B), so the edge of a shadow on a
+  // face goes warm and soft, on both sides of it.
+  //
+  // Two cuts before this one, both measured wrong. Wrap as (n.l + w)/(1 + w)
+  // added light everywhere short of face-on to the sun, and at noon — most of
+  // a face at n.l 0.2 to 0.4 under a high sun — laid red over all of it
+  // (r/g on the old man's cheek 1.36 to 1.59). Cut off at n.l = 0 it jumped
+  // by w/(1 + w) across the terminator, and within a triangle that line is
+  // straight, so it drew hard-edged, facet-shaped patches of glow.
+  wrap: [0.50, 0.24, 0.14], sssGain: 1.0, sssReach: 0.06,
+  // Back light through an ear, a fingertip: the same red, narrower.
+  thru: [1.0, 0.30, 0.16], thruGain: 0.45, thruPow: 4.0,
+  // Blinn exponents rough / oily / wet, and skin's F0 (IOR 1.4).
+  rough: 16.0, oily: 42.0, wetPow: 160.0, f0: 0.028,
+  // The sky: a floor under everything, which is what the old flat 3 per cent
+  // mirror was and without which the faces measured 3 to 5 levels darker at
+  // 18:00; and at grazing, Fresnel on top — dry, and wet.
+  skyFloor: [0.032, 0.05], sheen: [0.16, 0.70],
+  // Pores: tiles per UV unit (MakeHuman's atlas is about a metre of face per
+  // unit, so 1.8 cm a tile), how hard, and where they fade.
+  poreRep: 55.0, pore: 0.85, poreFade: [1.5, 8.0],
+  // Wet: albedo multiplier.
+  wetDark: 0.74,
+};
+
+/**
+ * The pore map: a 256² tiling normal map, generated once. Dimples of a few
+ * sizes scattered on a torus (so the tile has no seam), over two families of
+ * the fine creases skin carries everywhere. Deterministic — mulberry32, never
+ * the shore's `rng` (rule 4) — and a DataTexture rather than a canvas, so
+ * there is no sRGB decode on it to square it.
+ */
+let SKIN_PORE = null;
+function skinPoreTex() {
+  if (SKIN_PORE) return SKIN_PORE;
+  const N = 256;
+  const h = new Float32Array(N * N);
+  const r = mulberry32(90210);
+  const wrap = (v) => ((v % N) + N) % N;
+  // Pores: sunken, a pixel or two across (0.07 mm a pixel at 55 tiles).
+  for (let k = 0; k < 2600; k++) {
+    const cx = r() * N, cy = r() * N;
+    const rad = 0.9 + r() * r() * 2.2, dep = 0.6 + r() * 0.8;
+    const R = Math.ceil(rad * 2.5);
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const x = Math.floor(cx) + dx, y = Math.floor(cy) + dy;
+        const d2 = ((x - cx) ** 2 + (y - cy) ** 2) / (rad * rad);
+        if (d2 < 6) h[wrap(y) * N + wrap(x)] -= dep * Math.exp(-d2);
+      }
+    }
+  }
+  // Creases: two families of long shallow grooves, crossing. The angle is
+  // picked so each family closes on the torus (a whole number of wraps).
+  for (const [ux, uy, n, dep] of [[1, 2, 34, 0.35], [2, -1, 30, 0.30]]) {
+    const l = Math.hypot(ux, uy);
+    for (let k = 0; k < n; k++) {
+      const c = r() * N * l, ph = r() * 6.283;
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const across = (-x * uy + y * ux);
+          const d = ((across - c) % (N * l) + N * l) % (N * l);
+          const dd = Math.min(d, N * l - d) / l;
+          if (dd < 2.5) {
+            const along = (x * ux + y * uy) / (N * l) * 6.283;
+            h[y * N + x] -= dep * Math.exp(-dd * dd) * (0.6 + 0.4 * Math.sin(along * 3 + ph));
+          }
+        }
+      }
+    }
+  }
+  const px = new Uint8Array(N * N * 4);
+  const k = 0.55;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const gx = (h[y * N + wrap(x + 1)] - h[y * N + wrap(x - 1)]) * k;
+      const gy = (h[wrap(y + 1) * N + x] - h[wrap(y - 1) * N + x]) * k;
+      const l = Math.hypot(gx, gy, 1);
+      const o = (y * N + x) * 4;
+      px[o] = Math.round((-gx / l * 0.5 + 0.5) * 255);
+      px[o + 1] = Math.round((-gy / l * 0.5 + 0.5) * 255);
+      px[o + 2] = Math.round((1 / l * 0.5 + 0.5) * 255);
+      px[o + 3] = 255;
+    }
+  }
+  const t = new THREE.DataTexture(px, N, N, THREE.RGBAFormat);
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 4;
+  t.needsUpdate = true;
+  SKIN_PORE = t;
+  return t;
+}
+
+/** The uniforms a skin caller needs; `wet` is the caller's own { value }. */
+function skinUniforms(wet) {
+  return { uPore: { value: skinPoreTex() }, uWet: wet };
+}
+
+// (No backticks inside the four below: they are GLSL in template literals.)
+// DECL goes into both programs (`decl` does), so it holds nothing a vertex
+// shader cannot have — the derivatives are in PREP, which is fragment only.
+const SKIN_DECL = `
+uniform sampler2D uPore;
+uniform float uWet;
+varying float vThin;
+`;
+
+/**
+ * At the top of the body, before any branch: the derivatives the detail
+ * normal needs are undefined in divergent control flow. Declares skinK (0 —
+ * SKIN_ON sets it where the fragment is skin), skOil (the caller's T-zone,
+ * 0 unless it says) and skN, the normal with the pores on — laid on through
+ * a tangent frame built from the screen derivatives of the world position
+ * and the UV (the blob carries no tangents).
+ */
+const SKIN_PREP = `
+  float skinK = 0.0;
+  float skOil = 0.0;
+  float skDist = length(vWorld - uCamPos);
+  vec3 skN = n;
+  // Past the fade nothing is computed at all — most of a crowd is further
+  // off than this. The derivatives are then taken inside a branch, which is
+  // undefined only for the 2x2 quads straddling eight metres, where the
+  // fade has already taken the detail to nothing.
+  if (skDist < ${SKIN.poreFade[1].toFixed(1)}) {
+    vec2 skUv = vUv * ${SKIN.poreRep.toFixed(1)};
+    vec3 skT = texture2D(uPore, skUv).xyz * 2.0 - 1.0;
+    vec3 dp1 = dFdx(vWorld), dp2 = dFdy(vWorld);
+    vec2 du1 = dFdx(skUv), du2 = dFdy(skUv);
+    vec3 p2 = cross(dp2, n), p1 = cross(n, dp1);
+    vec3 tT = p2 * du1.x + p1 * du2.x;
+    vec3 tB = p2 * du1.y + p1 * du2.y;
+    float im = inversesqrt(max(max(dot(tT, tT), dot(tB, tB)), 1e-24));
+    vec3 d = normalize(tT * im * skT.x + tB * im * skT.y + n * max(skT.z, 0.2));
+    float fade = ${SKIN.pore.toFixed(2)} * (1.0 - smoothstep(${SKIN.poreFade[0].toFixed(1)}, ${SKIN.poreFade[1].toFixed(1)}, skDist));
+    skN = normalize(mix(n, d, fade));
+  }
+`;
+
+/**
+ * Inside the caller's skin branch: pores on, wet dark, the Blinn-Phong lobe
+ * off (SKIN_LIT has its own), and the sky mirror turned into the skin's —
+ * a floor, and Fresnel on top of it — by setting its weight rather than
+ * adding a second one: the sky is not cheap and every skin fragment on the
+ * beach would be paying for it twice. (solidFragment weights it by 0.35.)
+ */
+const SKIN_ON = `
+    skinK = 1.0;
+    n = skN;
+    base *= mix(1.0, ${SKIN.wetDark.toFixed(2)}, uWet);
+    spec = 0.0;
+    {
+      float fv = pow(1.0 - max(dot(n, normalize(uCamPos - vWorld)), 0.0), 5.0) * ${(1 - SKIN.f0).toFixed(3)};
+      env = (mix(${SKIN.skyFloor[0].toFixed(3)}, ${SKIN.skyFloor[1].toFixed(3)}, uWet)
+        + fv * mix(${SKIN.sheen[0].toFixed(2)}, ${SKIN.sheen[1].toFixed(2)}, uWet)) / 0.35;
+    }
+`;
+
+const SKIN_LIT = `
+  if (skinK > 0.5) {
+    vec3 skV = -viewDir;
+    float skNL = dot(n, uSunDir);
+    vec3 skWr = vec3(${SKIN.wrap.map((w) => w.toFixed(2)).join(', ')});
+    vec3 skX = vec3(0.0);
+    if (abs(skNL) < ${Math.max(...SKIN.wrap).toFixed(2)}) {
+      vec3 q = clamp(vec3(skNL) + skWr, vec3(0.0), 2.0 * skWr);
+      vec3 dC = mix(q * q / (4.0 * skWr), vec3(skNL), step(skWr, vec3(skNL)));
+      // Whether the light scattering round this edge is itself in the sun:
+      // tested a few centimetres toward the sun, because on the far side of
+      // a terminator the shadow map only knows the head is in the way of
+      // itself, and says so in blocks.
+      skX = max(dC - vec3(max(skNL, 0.0)), 0.0) * shadowAt(vWorld + uSunDir * ${SKIN.sssReach.toFixed(3)});
+    }
+    col += base * skX * uSunColor * uSunI * INV_PI * ${SKIN.sssGain.toFixed(2)};
+    float skBack = pow(clamp(dot(viewDir, uSunDir), 0.0, 1.0), ${SKIN.thruPow.toFixed(1)});
+    col += base * vec3(${SKIN.thru.join(', ')}) * uSunColor * uSunI * INV_PI
+      * skBack * vThin * mix(0.4, 1.0, sh) * ${SKIN.thruGain.toFixed(2)};
+    float skPw = mix(mix(${SKIN.rough.toFixed(1)}, ${SKIN.oily.toFixed(1)}, skOil), ${SKIN.wetPow.toFixed(1)}, uWet);
+    vec3 skH = normalize(uSunDir + skV);
+    float skF = ${SKIN.f0} + (1.0 - ${SKIN.f0}) * pow(1.0 - max(dot(skV, skH), 0.0), 5.0);
+    float skD = (skPw + 8.0) * 0.0397887 * pow(max(dot(n, skH), 0.0), skPw);
+    col += uSunColor * uSunI * skF * skD * max(skNL, 0.0) * sh
+      * mix(mix(0.55, 1.0, skOil), 1.6, uWet);
+  }
+`;
+
+/**
+ * The vertex program's half of it, for `n` targets, on the bind pose before
+ * the skinning — so an expression rides every clip. Unrolled with constant
+ * indices: dynamic indexing of a uniform array in a vertex program is the
+ * exact thing a Snapdragon got wrong in the note at the top of this file.
+ * Nothing but a compare for the 90 per cent of vertices below the chin, and
+ * nothing at all while the face is at rest (`uMorphOn`).
+ */
+function morphDecl(n) {
+  return '\nattribute float aMorph;\nuniform sampler2D uMorphTex;\nuniform vec2 uMorphDim;\n'
+    + 'uniform float uMorphOn;\nuniform float uMorphW[' + n + '];\n';
+}
+function morphVert(n) {
+  let g = '\n  if (uMorphOn > 0.5 && aMorph > -0.5) {\n'
+    + '    float mr = (aMorph + 0.5) / uMorphDim.y;\n';
+  for (let t = 0; t < n; t++) {
+    g += '    if (uMorphW[' + t + '] > 0.002) {\n'
+      + '      p += uMorphW[' + t + '] * texture2D(uMorphTex, vec2(' + (2 * t + 0.5).toFixed(1) + ' / uMorphDim.x, mr)).xyz;\n'
+      + '      n += uMorphW[' + t + '] * texture2D(uMorphTex, vec2(' + (2 * t + 1.5).toFixed(1) + ' / uMorphDim.x, mr)).xyz;\n'
+      + '    }\n';
+  }
+  return g + '  }\n';
 }
 
 /**

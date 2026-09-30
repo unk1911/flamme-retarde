@@ -1595,6 +1595,11 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
       f.dress(fg);
       f.dressedFor = fg;
     }
+    // Their face — a blink, a grimace, a mouth that moves when they talk.
+    // Here, above the toppler, because being hosed off a chair is the one
+    // time a face matters most and the toppler returns before anything below.
+    // See `bather2Face` in 42-bathers2.js; it does nothing past `FACE2.near`.
+    if (f.morph) bather2Face(f, fg, dt, d2);
     if (fg.rebind) {
       fg.rebind = false;
       f.aim('head', 0, 1, 0, 0);
@@ -1834,6 +1839,7 @@ function makeSkinCrowd(scene, figs, cap, rove = 0) {
     const dt = last < 0 ? 0 : Math.min(0.1, Math.max(0, t - last));
     last = t;
     frame++;
+    faceClock(dt);
     let n = 0;
     const maxSq = CROWD.poseM * CROWD.poseM;
     const nearSq = POSE_NEAR * POSE_NEAR, midSq = POSE_MID * POSE_MID;
