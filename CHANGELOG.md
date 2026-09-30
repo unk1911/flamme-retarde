@@ -8,6 +8,71 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.550.8] — 2026-09-30
+
+### The benches, spruced up, and the half-bench at the kabine gable gone
+
+Misha: *"…and spruce up the bench next to it* [the green one beside the
+painted library box], *and just spruce up all the various benches, also
+remove that ugly half-bench located here"*, with the camera at world
+(−1964.1, 4.38, 456.1) — t 387.8, s 18.6 on the promenade.
+
+**The half-bench was the kabine-gable bench** (survey item 14), 6.8 m in
+front of that camera: one blond seat board and two back slats on slim black
+castings. It was built with `ang` π/2, which turns a bench's back to −t, so
+it stood with its SEAT against the gull gable and showed the promenade two
+boards on black sticks — half a bench, from the only side it was ever seen
+from. Removed; it had no collider and drew no `rng`, so nothing moved with
+it. The drum planter beside it stays, and so does `member`, which its twigs
+use.
+
+**A bench kit** (`bkFrame`, `bkBoard`, `bkTube`, `bkBolt(s)`, `bkScroll`,
+`bkCap`, `bkPad`, `bkTone`), laid on the file's smooth kit (`knSurf`,
+`tubeTS`, `axLathe`, `knRR`). A board is a rounded-arris section with a 6 mm
+chamfer at both ends and the end grain a stop darker, toned per board off
+`jit` (a value and a warm/cool shift) with a streak along it; a bench end is
+flat bar swept through `bendPath`; each slat carries a domed coach bolt into
+each frame. Every bench on the shore is built from it now:
+
+- **Promenade bench** (`BENCH`, 13): the four-prism iron end is one casting —
+  a front leg, a rail set to the slats' undersides with its nose turned down,
+  a sabre rear leg carried up the rake behind the back slats as the standard
+  they bolt to, ending in a crook, a ring in the corner under the seat, two
+  cast pads — and a round tie-bar low at the back. The per-board colour was
+  `(i * 7) % 5`, the same five shades in the same order on every bench.
+- **Green park bench** (`parkBench`, 4, one beside the library): the note
+  counted five seat slats and a scrolled arm and the code drew three slats
+  and no arm. Now five slats, three in a back raked 0.19 rad, cast ends with
+  a front leg rising into a crowned arm that ends in a forward scroll, a
+  standard behind the back, a seat rail, pads, a tie-bar.
+- **Garden bench under the Tisak's CORONA** (`gardenBench`, 2): welded tube
+  ends, rails and a stretcher, glides, rounded bolted slats, and the cushion
+  a soft block with rolled edges. The Tisak's loop body is now one call.
+- **Beer-tent sets** (`bkBeerSet`, the tavern's two and the Tisak's one,
+  which had been written out twice): four-board table tops with a hairline,
+  rounded benches, U-frames of 22 mm tube with the X in flat strap, shoes.
+- **Trampulin's pergola bench**: three rounded slats with daylight between
+  them, bolted to welded inverted-U trestles every 1.8 m, one stretcher down
+  the length; the slats are ringed every 0.8 m so the 6 m run follows the
+  shore's bend with its legs.
+- **Precast plinth benches** (6): the slab's arrises rounded (`knRR`), a
+  shadow gap at its foot, and the inset five bolted slats on spacers where
+  it was one brown slab.
+- **Sawn limestone blocks**: arrises pencil-rounded, 12 mm.
+
+Every seat height, depth, footprint and collider is the old number; nobody
+sits on any of these (`sitGeo` is the café chairs and the quay), and the
+settle is unchanged — 22 done, 0 failed, 0 waiting on both builds at the same
+moment. Not instanced, on purpose: the shore is two merged buffers and
+instancing saves memory and build time, not the triangles drawn.
+
+**Checked.** `jadrija.tris` 982,744 → 1,043,662 (+60,918: promenade 13 ×
+2,852, park 4 × 2,752, garden 2 × 1,872, beer sets 3 × 1,464, Trampulin
+1,418, plinths 6 × 1,092, stones 1,336 in all; the first cut was +79,790
+before the pads went from rounded blocks to boxes). Blockers 786 and their
+hash identical, people 100, census unchanged, no console errors. Rule 4:
+nothing here draws on `rng`.
+
 ## [1.550.7] — 2026-09-30
 
 ### The Tisak, stocked: a newsstand is read by its print, and the awning is cloth

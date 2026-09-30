@@ -16424,30 +16424,10 @@ async function buildJadrija(scene) {
     for (const [bt, bs, ang] of [
       [S.t0 - 2.15, S.s0 - 2.50, 0.0], [S.t0 - 0.60, S.s0 - 2.20, 0.5],
     ]) {
-      const gy = surfaceY(bt, bs);
-      const co = Math.cos(ang), sn = Math.sin(ang);
-      const P = (u, v, yy) => W(bt + u * co - v * sn, bs + u * sn + v * co, yy);
-      const FRAME = [0.155, 0.140, 0.125];
-      const SLAT = [0.365, 0.255, 0.170];
-      const CUSH = [0.500, 0.545, 0.545];
-      for (const u of [-0.72, 0.72]) {
-        for (const v of [-0.22, 0.22]) {
-          post(P, u, v, gy, gy + 0.42, 0.026, FRAME, 4);
-        }
-        boxIn(P, u - 0.03, u + 0.03, -0.24, 0.24, gy + 0.40, gy + 0.46, FRAME);
-        post(P, u, 0.22, gy + 0.42, gy + 0.92, 0.026, FRAME, 4);
-      }
-      for (let k = 0; k < 3; k++) {
-        boxIn(P, -0.78, 0.78, -0.24 + k * 0.17, -0.24 + k * 0.17 + 0.13,
-          gy + 0.44, gy + 0.47, SLAT, shade(SLAT, 1.12));
-      }
-      for (let k = 0; k < 3; k++) {
-        boxIn(P, -0.78, 0.78, 0.20, 0.25,
-          gy + 0.52 + k * 0.14, gy + 0.63 + k * 0.14, SLAT, shade(SLAT, 1.12));
-      }
-      boxIn(P, -0.74, 0.74, -0.22, 0.18, gy + 0.47, gy + 0.55,
-        CUSH, shade(CUSH, 1.12));
-      furniture.push({ t: bt, s: bs, a: 0.82, c: 0.42, h: 0.92, y: gy });
+      // Built by `gardenBench` (the bench kit, 1.550.8): welded tube ends,
+      // rounded bolted slats, a soft cushion — the same numbers as the boxes,
+      // and the same collider, which it pushes.
+      gardenBench(bt, bs, ang);
     }
     // The step ladder, which is the one object in the frame that says the shop
     // is being worked in rather than looked at.
@@ -16538,9 +16518,8 @@ async function buildJadrija(scene) {
     }
     // And the beer-tent set on the gravel in front, the same folding trestle
     // and two loose benches that stand at the tavern — see the note there for
-    // what a Bierzeltgarnitur is and why it is not a picnic table. Written out
-    // again rather than shared because the tavern's is a closure inside its
-    // own block, and one of the two would have to move to reach the other.
+    // what a Bierzeltgarnitur is and why it is not a picnic table. Shared
+    // now: both are `bkBeerSet` in the bench kit (1.550.8).
     {
       // AND NOT IN FRONT OF THE COUNTER. It was pitched at the middle of the
       // frontage, 2.55 m out — a two-metre table across the one elevation this
@@ -16554,21 +16533,7 @@ async function buildJadrija(scene) {
       const WTOP = [0.508, 0.316, 0.222];
       const LEG = [0.098, 0.096, 0.100];
       const gy = surfaceY(bt, bs);
-      boxTS(bt - 1.00, bt + 1.00, bs - 0.25, bs + 0.25, gy + 0.755, gy + 0.800,
-        WOOD, WTOP);
-      for (const v of [-0.56, 0.56]) {
-        boxTS(bt - 1.00, bt + 1.00, bs + v - 0.123, bs + v + 0.123,
-          gy + 0.470, gy + 0.508, WOOD, WTOP);
-      }
-      for (const u of [-0.78, 0.78]) {
-        for (const v of [-0.22, 0.22]) {
-          post(W, bt + u, bs + v, gy, gy + 0.755, 0.022, LEG, 4);
-        }
-        for (const v of [-0.56, 0.56]) {
-          post(W, bt + u, bs + v - 0.10, gy, gy + 0.470, 0.020, LEG, 4);
-          post(W, bt + u, bs + v + 0.10, gy, gy + 0.470, 0.020, LEG, 4);
-        }
-      }
+      bkBeerSet(bt, bs, 0, 1.00, WOOD, WTOP, LEG);
       furniture.push({ t: bt, s: bs, a: 1.05, c: 0.75, h: 0.80, y: gy });
     }
     tisakYard(S, y0);
@@ -20840,10 +20805,35 @@ async function buildJadrija(scene) {
       // slatted timber bench on a dark green frame, running the width of the
       // terrace and stopping at the render pier, not a plank crossing two
       // buildings' worth of promenade.
-      boxTS(S.t0, S.t1, fs - 0.35, fs - 0.05, y0 + 0.44, y0 + 0.50, S.bench);
-      for (let t = S.t0 + 0.5; t <= S.t1 - 0.49; t += 1.8) {
-        boxTS(t - 0.04, t + 0.04, fs - 0.32, fs - 0.08, y0, y0 + 0.44,
-          [0.075, 0.230, 0.140]);
+      //
+      // Built with the bench kit (1.550.8), and it is now what that frame has
+      // rather than a plank on four fins: three rounded slats with a gap
+      // between them, bolted down, on welded trestles of green tube — an
+      // inverted U every 1.8 m on plastic feet — tied by one stretcher that
+      // runs the whole length and follows the shore's bend with the slats.
+      // The slats' top is still 0.50 and their edges still `fs − 0.35` and
+      // `fs − 0.05`, so the collider below still fits it exactly.
+      {
+        const F = bkFrame(0, fs - 0.20);       // u is `t` itself
+        const GRN = [0.075, 0.230, 0.140];
+        const legs = [];
+        for (let t = S.t0 + 0.5; t <= S.t1 - 0.49; t += 1.8) legs.push(t);
+        for (let k = 0; k < 3; k++) {
+          const v = -0.10 + k * 0.10;
+          bkBoard(F, S.t0, S.t1, v, y0 + 0.4825, 0, 0.088, 0.035,
+            bkTone(S.bench, S.t0 * 3.3 + k, 0.14),
+            { cut: 0.8, streak: 0.90 + 0.16 * jit(S.t0 + k, 911) });
+          bkBolts(F, legs, v, y0 + 0.4825, 0, 0.035, shade(GRN, 0.7));
+        }
+        for (const t of legs) {
+          bkTube(F, bendPath([[t, -0.108, y0 + 0.008], [t, -0.122, y0 + 0.448],
+            [t, 0.122, y0 + 0.448], [t, 0.108, y0 + 0.008]], 0.035, 3), 0.016, GRN, 8);
+          for (const v of [-0.108, 0.108]) bkPad(F, t, v, y0, 0.020, 0.020, 0.016, [0.05, 0.05, 0.05]);
+        }
+        bkTube(F, legs.map((t) => [t, 0, y0 + 0.13]), 0.012, GRN, 8, [0, 0, 1]);
+        for (const t of legs) {
+          bkTube(F, [[t, -0.108, y0 + 0.13], [t, 0.108, y0 + 0.13]], 0.010, GRN, 6);
+        }
       }
       // The collider, which now matches the plank exactly — it was already
       // clipped to the frontage while the drawing ran eighteen metres, because
@@ -22028,30 +22018,77 @@ async function buildJadrija(scene) {
    * shore and stands in a run every 33 m: that one is a bent iron end frame in
    * a lighter green with slats you can see the sea through. Two patterns in
    * one resort is what a place that has been added to for a century looks
-   * like, which is the same argument the black kabine-gable bench ships under.
+   * like.
    *
    * Placements, like the library's: none of the four frames carries GPS.
+   *
+   * SPRUCED UP (Misha, 30 Sep 2026: *"spruce up the bench next to it"*, the
+   * one beside the library). It was two iron plates, two posts and six
+   * boxes — three seat slats where the note above counts five, and the
+   * scrolled arm it describes was never drawn. Now it is what the note says:
+   * five rounded, bolted, green-painted slats in the seat and three in a back
+   * raked 0.19 rad, on cast ends swept as flat bar — a front leg that rises
+   * into the arm, the arm ending in a scroll that curls forward and down, a
+   * rail under the seat, and a rear leg that carries on up behind the back
+   * slats as the standard they are bolted to — on cast pads, tied by a round
+   * bar low at the back. The same 1.40 m by 0.50, the seat still 0.47 at its
+   * front and the back still 0.92, the same collider.
    */
   function parkBench(bt2, bs2) {
     const gy2 = surfaceY(bt2, bs2);
     const IRONG = [0.075, 0.185, 0.115];
     const SLAT2 = [0.235, 0.390, 0.230];
-    for (const o of [-0.62, 0.62]) {
-      boxTS(bt2 + o - 0.035, bt2 + o + 0.035, bs2 - 0.26, bs2 + 0.24,
-        gy2, gy2 + 0.44, IRONG);
-      boxTS(bt2 + o - 0.030, bt2 + o + 0.030, bs2 + 0.16, bs2 + 0.24,
-        gy2 + 0.44, gy2 + 0.92, IRONG);
+    const BOLT = shade(IRONG, 1.12);
+    const F = bkFrame(bt2, bs2);
+    const key = bt2 * 3.71 + bs2 * 1.93;
+    const uE = 0.62, RB = [0.020, 0.027];
+    // The seat: five 62 mm slats, 12 mm apart, falling 20 mm to the back.
+    const FALL = 0.020, TH = 0.028, tilt = Math.atan2(FALL, 0.36);
+    for (let k = 0; k < 5; k++) {
+      const v = -0.204 + k * 0.074, f = (v + 0.235) / 0.36;
+      const cy = gy2 + 0.470 - FALL * f - TH / 2;
+      bkBoard(F, -0.70, 0.70, v, cy, -tilt, 0.062, TH, bkTone(SLAT2, key + k, 0.07),
+        { r: 0.008, streak: 0.95 + 0.08 * jit(key + k, 907), endCol: shade(SLAT2, 0.80) });
+      bkBolts(F, [-uE, uE], v, cy, -tilt, TH, BOLT);
     }
+    // The standard, [v, h] at `l` along it, and the back slats in front of it.
+    const RK = 0.19, cr = Math.cos(RK), sr = Math.sin(RK);
+    const std = (l, off = 0) => [0.140 + sr * l - off * cr, 0.440 + cr * l + off * sr];
+    const L1 = (0.910 - 0.440) / cr;
     for (let k = 0; k < 3; k++) {
-      boxTS(bt2 - 0.70, bt2 + 0.70, bs2 - 0.24 + k * 0.16,
-        bs2 - 0.24 + k * 0.16 + 0.12, gy2 + 0.42, gy2 + 0.47,
-        SLAT2, shade(SLAT2, 1.16));
+      const [v, h] = std(0.17 + k * 0.13, 0.034);
+      bkBoard(F, -0.70, 0.70, v, gy2 + h, Math.PI / 2 - RK, 0.085, 0.024,
+        bkTone(SLAT2, key + 7 + k, 0.07),
+        { r: 0.008, streak: 0.95 + 0.08 * jit(key + k, 908), endCol: shade(SLAT2, 0.80) });
+      bkBolts(F, [-uE, uE], v, gy2 + h, Math.PI / 2 - RK, 0.024, BOLT);
     }
-    for (let k = 0; k < 3; k++) {
-      boxTS(bt2 - 0.70, bt2 + 0.70, bs2 + 0.17, bs2 + 0.22,
-        gy2 + 0.52 + k * 0.14, gy2 + 0.63 + k * 0.14,
-        SLAT2, shade(SLAT2, 1.16));
+    for (const u of [-uE, uE]) {
+      const at = ([v, h]) => [u, v, gy2 + h];
+      // Rear leg and standard, one casting to the top of the back.
+      const top = std(L1);
+      bkTube(F, bendPath([[0.215, 0.012], [0.172, 0.22], std(0), std(L1 * 0.5), top].map(at),
+        0.07, 4), RB, IRONG, 8);
+      bkCap(F, at(top), at(std(L1 - 0.02)), 0.027, IRONG);
+      // Front leg, rising into the arm.
+      bkTube(F, bendPath([[-0.235, 0.012], [-0.224, 0.22], [-0.212, 0.46], [-0.205, 0.648]].map(at),
+        0.06, 3), RB, IRONG, 8);
+      // The arm, from over the front leg back into the standard, a little
+      // crowned so it is not a ruler.
+      const aB = std((0.660 - 0.440) / cr);
+      bkTube(F, bendPath([[-0.236, 0.664], [-0.02, 0.676], [aB[0], aB[1]]].map(at), 0.08, 4),
+        [0.021, 0.022], IRONG, 8);
+      // Its scroll: in at the front of the arm and curled forward and down.
+      bkScroll(F, u, -0.238, 0.628, 0.036, 0.011, 1.15, Math.PI / 2, 1, [0.019, 0.015], IRONG);
+      // The rail under the seat, at the slats' undersides.
+      bkTube(F, bendPath([[-0.232, 0.412], [-0.215, 0.421], [0.148, 0.401]].map(at), 0.03, 3),
+        [0.020, 0.019], IRONG, 8);
+      bkCap(F, at([-0.232, 0.412]), at([-0.215, 0.421]), 0.021, IRONG);
+      // Cast pads.
+      bkPad(F, u, -0.235, gy2, 0.026, 0.040, 0.020, shade(IRONG, 0.85));
+      bkPad(F, u, 0.215, gy2, 0.026, 0.040, 0.020, shade(IRONG, 0.85));
     }
+    // A round tie-bar between the two ends, low at the back.
+    bkTube(F, [[-uE, 0.180, gy2 + 0.21], [uE, 0.180, gy2 + 0.21]], 0.010, IRONG, 8, [0, 0, 1]);
     furniture.push({ t: bt2, s: bs2, a: 0.74, c: 0.30, h: 0.92, y: gy2 });
   }
   // The other three, in the strip behind the huts, and WHERE they go is
@@ -26582,6 +26619,253 @@ async function buildJadrija(scene) {
     }
   }
 
+  // ── the bench kit ──────────────────────────────────────────────────────────
+  /**
+   * Misha, 30 Sep 2026: *"spruce up the bench next to it, and just spruce up
+   * all the various benches"*. Every bench on this shore was boxes: a slat was
+   * a square prism with one flat colour on all six faces, a cast-iron end was
+   * a plate, and a folding table's leg was a four-sided post. From a metre
+   * away, which is where you meet a bench, that is a diagram of one.
+   *
+   * These are the parts every bench here is now built from, and the rest of
+   * the file's smooth kit (`knSurf`, `tubeTS`, `axLathe`, `knRR`) does the
+   * work:
+   *
+   *  - `bkBoard`: a timber board with its arrises rounded, a 6 mm chamfer at
+   *    both ends and the END GRAIN a stop darker — the three things that say
+   *    sawn and planed wood rather than a painted stick. 96 triangles.
+   *  - `bkTube`: a bent bar or tube through a bench's own frame, handed to
+   *    `tubeTS`. An elliptical section is a flat bar, which is what a cast or
+   *    welded bench end actually is.
+   *  - `bkBolt`: the domed head of a coach bolt, 18 triangles, where each slat
+   *    meets the frame. Nothing else says a bench was put together.
+   *  - `bkTone`: per-board colour off `jit`, never `rng` (rule 4). A tone and
+   *    a small warm/cool shift, because timber boards cut from different
+   *    trees differ in hue as well as in value.
+   *
+   * NOT INSTANCED, and that is a measured choice rather than an omission. The
+   * shore is two merged buffers and a bench is a few thousand triangles of
+   * one: an `InstancedMesh` would need its own copy of the shore material and
+   * its uniforms, and would still draw every triangle it has. What instancing
+   * saves is memory and build time, not fill, and neither is the constraint.
+   * The frames here are laid in the shore frame like everything else, so a
+   * bench on a slope stands on it.
+   */
+  /** A bench's own axes: `u` along it, `v` front (−) to back (+), `y` absolute. */
+  function bkFrame(t, s, ang = 0) {
+    const c = Math.cos(ang), sn = Math.sin(ang);
+    const L = (u, v, y) => [t + u * c - v * sn, s + u * sn + v * c, y];
+    const P = (u, v, y) => W(t + u * c - v * sn, s + u * sn + v * c, y);
+    return { L, P, AX: [c, sn, 0], ACR: [-sn, c, 0] };
+  }
+  /** One board's colour: `jit`-toned and shifted a touch warm or cool. */
+  function bkTone(col, key, amt = 0.12) {
+    const k = 1 - amt * 0.5 + amt * jit(key, 901);
+    const h = (jit(key, 902) - 0.5) * amt * 0.7;
+    return [col[0] * k * (1 + h), col[1] * k, col[2] * k * (1 - h)];
+  }
+  /**
+   * A board along `u` from `u0` to `u1`, its section centred on `(v, y)` and
+   * turned `ang` in the (v, y) plane — 0 lies flat, face up; π/2 − rake is a
+   * back slat leaning `rake` off the vertical. `w` across the face, `th`
+   * through it. `o.r` the arris radius, `o.e` the end chamfer, `o.top` a
+   * colour for the upper face (the sides shade into it), `o.cut` a ring every
+   * so many metres so a long board follows the shore's bend, and `o.streak`
+   * a tone for the far half so no board is one flat colour end to end.
+   */
+  function bkBoard(F, u0, u1, v, y, ang, w, th, col, o = {}) {
+    const r = Math.max(0.0015, Math.min(o.r ?? 0.007, w * 0.45, th * 0.45));
+    const e = Math.min(o.e ?? 0.006, (u1 - u0) * 0.2, th * 0.4);
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const at = (u, a, q) => F.P(u, v + a * ca - q * sa, y + a * sa + q * ca);
+    const sec = (hw, ht) => {
+      const rr = Math.min(r, hw * 0.9, ht * 0.9), out = [];
+      const CO = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+      for (let k = 0; k < 4; k++) {
+        const cx = CO[k][0] * (hw - rr), cy = CO[k][1] * (ht - rr);
+        for (let i = 0; i <= 2; i++) {
+          const q = (k + i / 2) * Math.PI / 2;
+          out.push([cx + Math.cos(q) * rr, cy + Math.sin(q) * rr]);
+        }
+      }
+      return out;
+    };
+    const full = sec(w / 2, th / 2), end = sec(w / 2 - e, th / 2 - e * 0.7);
+    const us = [u0, u0 + e];
+    const nc = o.cut ? Math.max(1, Math.round((u1 - u0 - 2 * e) / o.cut)) : 1;
+    for (let k = 1; k < nc; k++) us.push(u0 + e + (u1 - u0 - 2 * e) * (k / nc));
+    us.push(u1 - e, u1);
+    const last = us.length - 1;
+    const G = us.map((u, i) => (i === 0 || i === last ? end : full).map(([a, q]) => at(u, a, q)));
+    const endCol = o.endCol || shade(col, 0.70);
+    const far = shade(col, o.streak ?? 1);
+    const top = o.top || null;
+    const cv = (i, j) => {
+      if (i === 0 || i === last) return endCol;
+      const f = (us[i] - u0) / (u1 - u0);
+      const c = f < 0.5 ? col : [col[0] + (far[0] - col[0]) * (f - 0.5) * 2,
+        col[1] + (far[1] - col[1]) * (f - 0.5) * 2, col[2] + (far[2] - col[2]) * (f - 0.5) * 2];
+      if (top && j < 6) return [top[0] * c[0] / col[0], top[1] * c[1] / col[1], top[2] * c[2] / col[2]];
+      return c;
+    };
+    knSurf(G, cv, { wrap: true, out: (i) => at(us[i], 0, 0) });
+    for (const [i, sg] of [[0, -1], [last, 1]]) {
+      const C = at(us[i], 0, 0), D = at(us[i] + sg, 0, 0);
+      const dl = Math.hypot(D[0] - C[0], D[1] - C[1], D[2] - C[2]) || 1;
+      const N = [(D[0] - C[0]) / dl, (D[1] - C[1]) / dl, (D[2] - C[2]) / dl];
+      const R = G[i];
+      for (let j = 0; j < R.length; j++) knTri(C, R[j], R[(j + 1) % R.length], N, endCol);
+    }
+  }
+  /** A bent bar through `[u, v, y]` points of `F`: `r` a radius or `[along ref, across]`. */
+  function bkTube(F, pts, r, col, sides = 8, ref = null, sh = 0.16) {
+    tubeTS(pts.map(([u, v, y]) => F.L(u, v, y)), r, col, sides, ref || F.AX, sh);
+  }
+  /** A coach bolt's dome at `(u, v, y)`, standing along `n` = `[dv, dy]`. */
+  function bkBolt(F, u, v, y, n, col) {
+    const C = F.L(u, v, y);
+    const ax = [F.ACR[0] * n[0], F.ACR[1] * n[0], n[1]];
+    axLathe(C, ax, [[-0.0015, 0.0092], [0.0030, 0.0074], [0.0050, 0]], col, 6, F.AX,
+      { push: -0.5 });
+  }
+  /** A slat's bolts, one over each frame, on the face that `ang` turns up. */
+  function bkBolts(F, us, v, y, ang, th, col) {
+    const n = [-Math.sin(ang), Math.cos(ang)];
+    for (const u of us) bkBolt(F, u, v + n[0] * th * 0.5, y + n[1] * th * 0.5, n, col);
+  }
+  /** A spiral scroll in the (v, y) plane at `u`: the curl on a cast arm or foot. */
+  function bkScroll(F, u, cv, cy, r0, r1, turns, a0, dir, rr, col) {
+    const n = Math.max(6, Math.round(turns * 14)), pts = [];
+    for (let k = 0; k <= n; k++) {
+      const f = k / n, a = a0 + dir * f * turns * TAU, r = r0 + (r1 - r0) * f;
+      pts.push([u, cv + Math.cos(a) * r, cy + Math.sin(a) * r]);
+    }
+    bkTube(F, pts, rr, col, 6);
+  }
+  /**
+   * A rounded cap on the open end of a `bkTube` — `tubeTS` sweeps a skin and
+   * leaves both ends open, and the end of a bar at seat height is looked into.
+   * `p` the end, `q` a point a little way back along the bar.
+   */
+  function bkCap(F, p, q, r, col) {
+    const A = F.L(p[0], p[1], p[2]), B = F.L(q[0], q[1], q[2]);
+    const ax = [A[0] - B[0], A[1] - B[1], A[2] - B[2]];
+    const ref = Math.abs(ax[2]) > 0.8 * Math.hypot(ax[0], ax[1], ax[2]) ? F.AX : [0, 0, 1];
+    axLathe(A, ax, [[-0.002, r], [r * 0.45, r * 0.82], [r * 0.8, 0]], col, 8, ref, { push: -0.5 });
+  }
+  /**
+   * A cast or rubber foot pad under a leg: a low block, a stop darker on its
+   * sides than its top. A block and not a rounded one: it is at the ground in
+   * the leg's own shadow, and rounding it cost 176 triangles a foot — two
+   * thousand on one beer set — for an edge nobody sees.
+   */
+  function bkPad(F, u, v, y, hu, hv, h, col) {
+    boxIn(F.P, u - hu, u + hu, v - hv, v + hv, y - 0.004, y + h, shade(col, 0.85), col);
+  }
+
+  /**
+   * The garden bench under the Tisak's CORONA: timber slats on a dark welded
+   * frame with a pale cushion on the seat, which is what the two people in
+   * `1000150343` are sitting on. It was four-sided posts, boxes for rails and
+   * a box for the cushion. Now each end is one bent tube of 32 mm steel — a
+   * front leg, the seat rail and a back post raked a little — with a rear leg
+   * welded into it; the ends are tied by a rail under the front and the back
+   * of the seat and a stretcher low down; the slats are rounded and bolted,
+   * and the cushion is a soft block with rolled edges. `u` along, `v` front
+   * to back, turned `ang`: the same 1.56 m by 0.48, seat 0.47, cushion to
+   * 0.55, back to 0.92, and the same collider.
+   */
+  function gardenBench(bt, bs, ang) {
+    const gy = surfaceY(bt, bs);
+    const F = bkFrame(bt, bs, ang);
+    const FRAME = [0.155, 0.140, 0.125];
+    const SLAT = [0.365, 0.255, 0.170];
+    const CUSH = [0.500, 0.545, 0.545];
+    const key = bt * 2.91 + bs * 4.07 + ang;
+    const RF = 0.016, uE = 0.72;
+    for (const u of [-uE, uE]) {
+      const at = ([v, h]) => [u, v, gy + h];
+      // One bent tube: front foot, up, back along under the seat, up the back.
+      const path = [[-0.22, 0.010], [-0.22, 0.425], [0.20, 0.425], [0.215, 0.60], [0.235, 0.905]];
+      bkTube(F, bendPath(path.map(at), 0.045, 4), RF, FRAME, 8);
+      bkCap(F, at([0.235, 0.905]), at([0.233, 0.88]), RF, FRAME);
+      // The rear leg, welded in under the back corner.
+      bkTube(F, [at([0.22, 0.010]), at([0.205, 0.425])], RF, FRAME, 8);
+      // Plastic glides under all four feet.
+      for (const v of [-0.22, 0.22]) {
+        knLathe(F.P, u, v, [[gy, 0.018], [gy + 0.012, 0.020], [gy + 0.016, 0.016]],
+          [0.060, 0.058, 0.056], 8);
+      }
+    }
+    // Rails along the bench under the front and back of the seat, and a
+    // stretcher low down at the back.
+    for (const [v, h] of [[-0.22, 0.425], [0.205, 0.425], [0.215, 0.12]]) {
+      bkTube(F, [[-uE, v, gy + h], [uE, v, gy + h]], h > 0.2 ? 0.013 : 0.011, FRAME, 8, [0, 0, 1]);
+    }
+    // The seat: three slats, 130 mm with 40 between, bolted to the rails.
+    for (let k = 0; k < 3; k++) {
+      const v = -0.175 + k * 0.17;
+      bkBoard(F, -0.78, 0.78, v, gy + 0.455, 0, 0.13, 0.030, bkTone(SLAT, key + k, 0.14),
+        { r: 0.008, streak: 0.92 + 0.12 * jit(key + k, 909) });
+      bkBolts(F, [-uE, uE], v, gy + 0.455, 0, 0.030, FRAME);
+    }
+    // The back: three slats on the raked posts, bolted through the front.
+    const RK = Math.atan2(0.020, 0.30);
+    for (let k = 0; k < 3; k++) {
+      const h = 0.575 + k * 0.14, v = 0.215 + (h - 0.60) * (0.020 / 0.30) - 0.030;
+      bkBoard(F, -0.78, 0.78, v, gy + h, Math.PI / 2 - RK, 0.11, 0.024,
+        bkTone(SLAT, key + 5 + k, 0.14), { r: 0.007, streak: 0.92 + 0.12 * jit(key + k, 910) });
+      bkBolts(F, [-uE, uE], v, gy + h, Math.PI / 2 - RK, 0.024, FRAME);
+    }
+    // The cushion, with its edges rolled and its top a shade lighter.
+    knRR(F.P, -0.74, 0.74, -0.22, 0.18, gy + 0.470, gy + 0.550, 0.045, 0.030,
+      CUSH, shade(CUSH, 1.12), { bottom: true });
+    furniture.push({ t: bt, s: bs, a: 0.82, c: 0.42, h: 0.92, y: gy });
+  }
+
+  /**
+   * The beer-tent set — a Bierzeltgarnitur: a folding trestle table and two
+   * loose benches, varnished pine on black folding steel, every leg frame
+   * crossed by an X. It was written out twice, the tavern's as a closure and
+   * the Tisak's inline, and both are this now.
+   *
+   * `HL` is half the length. The table is 0.50 m across, its top at 0.80;
+   * the benches 0.246 m and 0.508, 0.56 m either side of it — the old numbers
+   * exactly, so the colliders round both sets did not move. The table top is
+   * four glued boards with a hairline between them, which is how the real
+   * ones are made and what a panel of one colour is not.
+   */
+  function bkBeerSet(bt, bsv, ang, HL, WOOD, WTOP, LEG) {
+    const F = bkFrame(bt, bsv, ang);
+    const gy = surfaceY(bt, bsv);
+    const key = bt * 7.31 + bsv * 3.17;
+    for (let k = 0; k < 4; k++) {
+      const v = -0.25 + 0.0625 + k * 0.125;
+      bkBoard(F, -HL, HL, v, gy + 0.7825, 0, 0.1235, 0.035, bkTone(WOOD, key + k, 0.08),
+        { r: 0.004, top: bkTone(WTOP, key + k, 0.08), streak: 0.94 + 0.1 * jit(key + k, 903) });
+    }
+    for (const v of [-0.560, 0.560]) {
+      bkBoard(F, -HL, HL, v, gy + 0.489, 0, 0.246, 0.038, bkTone(WOOD, key + v * 9, 0.08),
+        { r: 0.009, top: bkTone(WTOP, key + v * 9, 0.08), streak: 0.95 + 0.08 * jit(key + v, 904) });
+    }
+    // One folding leg frame: a U of 22 mm tube, a rail under the top, and
+    // the X of flat strap.
+    const frame = (u, v0, v1, top) => {
+      const yt = gy + top - 0.040;
+      bkTube(F, bendPath([[u, v0, gy + 0.004], [u, v0, yt], [u, v1, yt], [u, v1, gy + 0.004]],
+        0.035, 3), 0.011, LEG, 6);
+      for (const [va, vb] of [[v0, v1], [v1, v0]]) {
+        bkTube(F, [[u, va, gy + 0.050], [u, vb, yt - 0.030]], [0.004, 0.011], LEG, 4);
+      }
+      // The black plastic shoes the U stands in.
+      for (const v of [v0, v1]) bkPad(F, u, v, gy, 0.016, 0.022, 0.018, [0.050, 0.050, 0.052]);
+    };
+    for (const u of [-(HL - 0.24), HL - 0.24]) frame(u, -0.225, 0.225, 0.745);
+    for (const v of [-0.560, 0.560]) {
+      for (const u of [-(HL - 0.30), HL - 0.30]) frame(u, v - 0.105, v + 0.105, 0.470);
+    }
+  }
+
   // ── benches ────────────────────────────────────────────────────────────────
   /**
    * Along the back of the promenade, facing the water.
@@ -26625,57 +26909,88 @@ async function buildJadrija(scene) {
     const y = Math.max(surfaceY(t, sF), surfaceY(t, sF + B.depth + 0.10));
     const sB = sF + B.depth;                 // where the back springs from
     const IRON = [0.196, 0.204, 0.196];      // weathered dark green, not black
+    const WOOD = [0.520, 0.400, 0.280];
+    const BOLT = [0.140, 0.142, 0.138];
     const half = B.len / 2;
+    // The bench's own frame (see `bkFrame`): `v` inland from the seat's front.
+    const F = bkFrame(t, sF);
+    const key = t * 5.113;
+    const uE = half - B.iron;                  // the planes of the two castings
+    const D = B.depth;
 
     // The seat, falling 35 mm over its depth. Each slat is laid flat but the
     // run of them is tilted, so the fall is in where they sit rather than in
-    // each board being a wedge — which is how a real one is built.
-    const tilt = Math.atan2(B.fall, B.depth);
+    // each board being a wedge — which is how a real one is built. Rounded
+    // arrises, chamfered ends with the grain showing, a coach bolt into each
+    // casting, and a tone per board off `jit` — timber left in this much sun
+    // does not come out of the weather all one shade, and the old `(i * 7) % 5`
+    // was the same five shades in the same order on every bench on the shore.
+    const tilt = Math.atan2(B.fall, D);
     for (let i = 0; i < B.seats; i++) {
       const f = (i + 0.5) / B.seats;
-      const cs = sF + f * B.depth;
+      const v = f * D;
       const cy = y + B.seatY - f * B.fall - B.thick / 2;
-      // A little colour per board. Timber left in this much sun does not come
-      // out of the weather all one shade, and identical slats read as a print.
-      const k = 0.94 + 0.12 * ((i * 7) % 5) / 4;
-      bar(t - half, t + half,
-        slat(cs, cy, tilt + Math.PI / 2, B.slat, B.thick),
-        [0.520 * k, 0.400 * k, 0.280 * k]);
+      bkBoard(F, -half, half, v, cy, -tilt, B.slat, B.thick, bkTone(WOOD, key + i, 0.16),
+        { streak: 0.90 + 0.16 * jit(key + i, 905) });
+      bkBolts(F, [-uE, uE], v, cy, -tilt, B.thick, BOLT);
     }
 
     // The back. Springs from just behind the seat and leans away from the sea.
     const cr = Math.cos(B.rake), sr = Math.sin(B.rake);
     const y0b = y + B.seatY - B.fall + 0.06;
     const run = (y + B.backTop - y0b) / cr;    // length along the lean
+    const bang = Math.PI / 2 - B.rake;
     for (let i = 0; i < B.backs; i++) {
       const f = (i + 0.5) / B.backs;
-      const cs = sB - 0.04 + sr * run * f;
+      const v = D - 0.04 + sr * run * f;
       const cy = y0b + cr * run * f;
-      const k = 0.94 + 0.12 * ((i * 3) % 5) / 4;
-      bar(t - half, t + half, slat(cs, cy, B.rake, B.slat, B.thick),
-        [0.520 * k, 0.400 * k, 0.280 * k]);
+      bkBoard(F, -half, half, v, cy, bang, B.slat, B.thick, bkTone(WOOD, key + 10 + i, 0.16),
+        { streak: 0.90 + 0.16 * jit(key + i, 906) });
+      bkBolts(F, [-uE, uE], v, cy, bang, B.thick, BOLT);
     }
 
-    // The end frames. One piece each: a foot on the ground, a front leg, and a
-    // rear leg that carries on past the seat to become the back support — which
-    // is what an iron bench end actually is, and why it needs no armrest to
-    // look finished.
-    for (const o of [-half + B.iron, half - B.iron]) {
-      const t0 = t + o - B.iron / 2, t1 = t + o + B.iron / 2;
-      // The foot: a runner front to back, so it stands on the concrete rather
-      // than balancing on two points.
-      bar(t0, t1, rect(sF + 0.02, sB + 0.10, y, y + 0.045), IRON);
+    // The end castings. One piece each, as before — a foot, a front leg, a
+    // rail under the seat, and a rear leg that carries on up the lean to
+    // carry the back — but CAST now: a flat bar 42 mm through and 44 across,
+    // bent through `bendPath` and swept by `tubeTS`, where it was four
+    // prisms butted together. The rear leg is a sabre that sweeps back to its
+    // foot, the standard ends in a crook, the corner under the front of the
+    // seat carries a ring, and it stands on two cast pads. The standard runs
+    // BEHIND the back slats, which are bolted to it, and the rail under the
+    // seat is set to the slats' own undersides.
+    const RB = [B.iron / 2, 0.022];
+    const lean = (f, off) => [D - 0.04 + sr * run * f + off * cr, y0b - y + cr * run * f - off * sr];
+    for (const u of [-uE, uE]) {
+      const at = ([v, h]) => [u, v, y + h];
+      // Rear leg and standard.
+      const S0 = lean(-0.25, 0.038), S1 = lean(0.5, 0.038), S2 = lean(1.02, 0.038);
+      bkTube(F, bendPath([[0.515, 0.012], [0.47, 0.20], S0, S1, S2,
+        [S2[0] + 0.030, S2[1] + 0.004], [S2[0] + 0.046, S2[1] - 0.022]].map(at),
+      [0.07, 0.10, 0.08, 0.02, 0.02, 0.012, 0.01], 3), RB, IRON, 8);
       // Front leg, very slightly splayed out toward the sea as it comes down.
-      bar(t0, t1, [[sF + 0.055, y + 0.03], [sF + 0.125, y + 0.03],
-        [sF + 0.105, y + B.seatY], [sF + 0.035, y + B.seatY]], IRON);
-      // Rear leg, carried on up into the back at the same lean.
-      const topS = sB - 0.04 + sr * run, topY = y + B.backTop;
-      bar(t0, t1, [[sB + 0.005, y + 0.03], [sB + 0.075, y + 0.03],
-        [topS + 0.038, topY], [topS - 0.032, topY]], IRON);
-      // And the rail the seat slats land on, tying the two legs together.
-      bar(t0, t1, slat((sF + sB) / 2, y + B.seatY - B.fall / 2 - 0.055,
-        tilt + Math.PI / 2, B.depth + 0.06, 0.05), IRON);
+      bkTube(F, bendPath([[0.095, 0.012], [0.082, 0.25], [0.072, 0.392]].map(at), 0.05, 3),
+        RB, IRON, 8);
+      // The rail the seat lands on, with its nose turned down in front.
+      bkTube(F, bendPath([[-0.028, 0.366], [0.0, 0.384], [0.072, 0.392], [S0[0], S0[1]]].map(at),
+        0.03, 3), [B.iron / 2, 0.019], IRON, 8);
+      // Caps on the two open ends, the nose and the crook.
+      bkCap(F, at([-0.028, 0.366]), at([0.0, 0.384]), 0.021, IRON);
+      bkCap(F, at([S2[0] + 0.046, S2[1] - 0.022]), at([S2[0] + 0.036, S2[1] - 0.006]), 0.022, IRON);
+      // The ring in the corner, touching the leg and the rail.
+      const ring = [];
+      for (let k = 0; k <= 16; k++) {
+        const a = (k / 16) * TAU;
+        ring.push(at([0.146 + Math.cos(a) * 0.058, 0.318 + Math.sin(a) * 0.058]));
+      }
+      bkTube(F, ring, [0.013, 0.010], IRON, 6);
+      // The pads it stands on.
+      bkPad(F, u, 0.095, y, 0.028, 0.045, 0.022, shade(IRON, 0.9));
+      bkPad(F, u, 0.515, y, 0.028, 0.040, 0.022, shade(IRON, 0.9));
     }
+    // And a round tie-bar between the two castings, low at the back, which is
+    // what stops a cast bench racking and the one thing that says the two ends
+    // are one bench seen from the end of it.
+    bkTube(F, [[-uE, 0.47, y + 0.20], [uE, 0.47, y + 0.20]], 0.010, IRON, 8, [0, 0, 1]);
     // Front of the seat to the back of the foot runner, which is the whole of
     // what your shins would meet.
     solid(t, (sF + sB + 0.10) / 2, half, (B.depth + 0.10) / 2, 0.9);
@@ -26841,7 +27156,10 @@ async function buildJadrija(scene) {
         // 13 m shopfront needed cutting; a bench does not, and the number is
         // here so nobody has to re-derive it if these ever get longer.
         boxTS(a, c, BS - HW, BS + HW, hi - 0.06, hi + FOOTH, shade(FOOT, g));
-        boxTS(a, c, BS - HW, BS + HW, hi + FOOTH - 0.004, hi + H,
+        // The sawn body with its arrises pencil-rounded (bench kit, 1.550.8):
+        // a saw leaves a knife edge and the first summer of trousers takes it
+        // off, and a 12 mm roll is what catches the light along the top.
+        knRR(W, a, c, BS - HW, BS + HW, hi + FOOTH - 0.004, hi + H, 0.012, 0.012,
           shade(SAWN, g), shade(SAWNTOP, g));
       }
       // Solid, and deliberately NOT in `standY`, which is the question the
@@ -29673,46 +29991,23 @@ async function buildJadrija(scene) {
     b = back11;
   }
 
-  // ── the municipal bench at the kabine gable ────────────────────────────────
+  // ── the kabine gable, where a bench was ─────────────────────────────────────
   //
-  // Survey item 14, and like 8, 10 and 12 the catalogue is wrong once you open
-  // the frame. It has "pale timber slats — four in the seat, three in the back
-  // — on black cast-iron scroll ends with a curved arm". `b_114` and `b_119`
-  // are this bench from four metres and from twelve, both unobstructed:
-  //
-  //   * the back has **two** slats, a narrow one over a wide one;
-  //   * the seat is **one wide board**, not four slats — the top surface has
-  //     no gap line anywhere along it;
-  //   * and there is **no arm at all**. The end is a single slim casting: a
-  //     foot, a leg, and a standard that leans back off the seat and finishes
-  //     in a small crook. What the item calls a curved arm is that crook,
-  //     which carries the back and is at shoulder height, not elbow.
-  //
-  // It is a different bench from the one already in this file. `BENCH` above
-  // is the promenade pattern — five seat slats, four back slats, a bent green
-  // iron end frame — and it stands in a run every 33 m. This is one bench, in
-  // black, of a much lighter build, and it stands against the west gable of
-  // the kabine block with a bin beside it. Two municipal patterns in one
-  // resort is exactly what a place that has been added to for a century looks
-  // like, and it is the reason this is worth its own object rather than a
-  // parameter on the other.
-  //
-  // The timber is a pale blond, masked out of `b_119` at 0.734/0.645/0.509 —
-  // warm but barely saturated, which is softwood under fresh clear varnish and
-  // not the orange of the tavern's benches. It goes in a little under that
-  // because the sample is a sunlit face and this has to hold up in shade.
+  // THE BENCH IS GONE (Misha, 30 Sep 2026: *"remove that ugly half-bench
+  // located here"*, standing at t 387.8, s 18.6 on the promenade — this was
+  // the bench in that view, 6.8 m off). It was survey item 14, `b_114` and
+  // `b_119`: one wide seat board and a narrow and a wide back slat on slim
+  // black castings, against the west gable of the kabine block. As drawn it
+  // stood with its SEAT to the wall — `ang` π/2 turns the bench's +v, its
+  // back, to −t, which is away from the gable at 396 and not against it — so
+  // from the promenade all anybody saw was two blond boards on black sticks
+  // in front of the gull: half a bench, from the one side it was ever seen
+  // from. It had no collider and drew nothing from `rng`, so nothing else on
+  // the shore moves with it; the drum planter beside it stays, and so does
+  // `member`, which its twigs are drawn with.
   {
     const backB = b;
     b = up;
-    // Blue pulled down past the measurement, and this is the SECOND time
-    // tonight: the tavern's beer sets needed the same and for the same reason.
-    // A warm timber set at its measured separation photographs washed out
-    // under this scene's ambient — the beer sets came out salmon and this came
-    // out cream — so red-minus-blue goes from the sampled 0.225 to 0.272
-    // before it reads as blond varnished pine rather than as painted board.
-    const WOOD = [0.700, 0.606, 0.428];
-    const WTOP = [0.752, 0.656, 0.470];
-    const IRON = [0.128, 0.120, 0.118];
     /**
      * One member of the casting: a box between two points in the end's own
      * (across, up) plane, `w` thick along the bench.
@@ -29738,52 +30033,6 @@ async function buildJadrija(scene) {
       b.quad(B0, B1, B2, B3, col);
       b.quad(A3, A2, A1, A0, col);
     };
-    const gableBench = (bt, bsv, ang) => {
-      const co = Math.cos(ang), sn = Math.sin(ang);
-      const P = (u, v, yy) =>
-        W(bt + u * co - v * sn, bsv + u * sn + v * co, yy);
-      const gy = surfaceY(bt, bsv);
-      const HL = 0.925;                       // 1.85 m along
-      // The seat: one board, 0.30 deep, falling 20 mm to the back.
-      boxIn(P, -HL, HL, -0.150, 0.150, gy + 0.398, gy + 0.440, WOOD, WTOP);
-      // The back: a wide slat then a narrow one, both leaning 0.26 rad.
-      const rake = 0.26, cr = Math.cos(rake), sr = Math.sin(rake);
-      for (const [h, wid] of [[0.215, 0.105], [0.400, 0.058]]) {
-        const cv = 0.170 + sr * h, cy = gy + 0.470 + cr * h;
-        // Laid in the rake, so the boards are parallel to the lean rather than
-        // standing plumb inside it.
-        member(P, 0, cv - sr * wid * 0.5, cy - cr * wid * 0.5,
-          cv + sr * wid * 0.5, cy + cr * wid * 0.5, HL * 2, 0.030, WOOD);
-      }
-      // The two castings.
-      for (const u of [-HL + 0.055, HL - 0.055]) {
-        // Each leg in two lengths with a swell between them, and the two of
-        // them tied under the seat. The first cut ran one thin member from
-        // the foot to the seat and the end came out as two black sticks: a
-        // casting is not a rod, and what says so at ten metres is that it
-        // changes section on the way up and that the frame is one piece.
-        member(P, u, -0.175, gy + 0.008, -0.150, gy + 0.175, 0.052, 0.046, IRON);
-        member(P, u, -0.150, gy + 0.175, -0.130, gy + 0.398, 0.044, 0.038, IRON);
-        member(P, u, -0.152, gy + 0.150, -0.148, gy + 0.205, 0.066, 0.062, IRON);
-        member(P, u, 0.150, gy + 0.008, 0.132, gy + 0.175, 0.052, 0.046, IRON);
-        member(P, u, 0.132, gy + 0.175, 0.108, gy + 0.398, 0.044, 0.038, IRON);
-        member(P, u, 0.134, gy + 0.150, 0.130, gy + 0.205, 0.066, 0.062, IRON);
-        // The tie under the seat that makes it one frame.
-        member(P, u, -0.132, gy + 0.352, 0.110, gy + 0.352, 0.038, 0.032, IRON);
-        // The foot pads, which is what stops it reading as a plank on wires.
-        member(P, u, -0.205, gy + 0.006, -0.145, gy + 0.006, 0.070, 0.028, IRON);
-        member(P, u, 0.120, gy + 0.006, 0.180, gy + 0.006, 0.070, 0.028, IRON);
-        // The standard, leaning back off the seat, and the crook on the end of
-        // it that the back slats bolt to.
-        member(P, u, 0.108, gy + 0.398, 0.290, gy + 0.905, 0.042, 0.038, IRON);
-        member(P, u, 0.290, gy + 0.905, 0.222, gy + 0.955, 0.042, 0.034, IRON);
-      }
-    };
-    // Against the west gable of the kabine block, which is where `b_114` has
-    // it: the rows run t 396-557, so the wall is at 396 and the bench stands
-    // half a metre off it with its back to it, looking down the promenade.
-    // `s` puts it on the middle of the block's own depth.
-    gableBench(394.6, JAD.rowA + JAD.cabD * 0.5, Math.PI * 0.5);
 
     // ── and the drum beside it ───────────────────────────────────────────────
     //
@@ -30826,44 +31075,11 @@ async function buildJadrija(scene) {
       const WTOP = [0.508, 0.316, 0.222];
       const LEG = [0.098, 0.096, 0.100];
       const HL = 1.10;                       // half of a 2.2 m set
-      const beerSet = (bt, bsv, ang) => {
-        const co = Math.cos(ang), sn = Math.sin(ang);
-        const P = (u, v, yy) =>
-          W(bt + u * co - v * sn, bsv + u * sn + v * co, yy);
-        const gy = surfaceY(bt, bsv);
-        boxIn(P, -HL, HL, -0.25, 0.25, gy + 0.755, gy + 0.800, WOOD, WTOP);
-        for (const v of [-0.560, 0.560]) {
-          boxIn(P, -HL, HL, v - 0.123, v + 0.123,
-            gy + 0.470, gy + 0.508, WOOD, WTOP);
-        }
-        /**
-         * One folding leg frame: two uprights, a rail under the top, and the
-         * X. The X is emitted as two ribbons with BOTH windings rather than
-         * as boxes — at 16 mm of steel seen from five metres a box is eight
-         * triangles to say what two say, and a single-sided quad is a brace
-         * that vanishes when you walk round the table.
-         */
-        const frame = (u, v0, v1, top) => {
-          for (const v of [v0, v1]) post(P, u, v, gy, gy + top, 0.020, LEG, 4);
-          boxIn(P, u - 0.020, u + 0.020, v0, v1,
-            gy + top - 0.075, gy + top - 0.035, LEG, LEG);
-          const wq = 0.014;
-          for (const [va, vb] of [[v0, v1], [v1, v0]]) {
-            const A0 = P(u - wq, va, gy + 0.045);
-            const A1 = P(u + wq, va, gy + 0.045);
-            const B0 = P(u - wq, vb, gy + top - 0.075);
-            const B1 = P(u + wq, vb, gy + top - 0.075);
-            b.quad(A0, A1, B1, B0, LEG);
-            b.quad(B0, B1, A1, A0, LEG);
-          }
-        };
-        for (const u of [-0.86, 0.86]) frame(u, -0.235, 0.235, 0.755);
-        for (const v of [-0.560, 0.560]) {
-          for (const u of [-0.80, 0.80]) {
-            frame(u, v - 0.112, v + 0.112, 0.470);
-          }
-        }
-      };
+      // `bkBeerSet` in the bench kit (1.550.8): boards with rounded arrises,
+      // chamfered ends and a hairline between the four of the table top, on
+      // U-frames of 22 mm tube with the X in flat strap and plastic shoes.
+      // Same tops at the same heights, so nothing round them moved.
+      const beerSet = (bt, bsv, ang) => bkBeerSet(bt, bsv, ang, HL, WOOD, WTOP, LEG);
       // Two of them, west of the parasol and under the trees, which is where
       // `b_071` has them. Angles differ by a few degrees because nobody
       // squares up a folding table on gravel.
@@ -31040,10 +31256,25 @@ async function buildJadrija(scene) {
       // rather than as a bench — which is exactly how it was reported.
       if (Math.abs(t - VIK.t) < 12) continue;
       const sb = JAD.mid + 2.6, y = surfaceY(t, sb);
-      boxTS(t - 3.0, t + 3.0, sb - 0.30, sb + 0.30, y, y + 0.45, PLINTH,
-        shade(PLINTH, 1.06));
-      boxTS(t + 0.9, t + 2.9, sb - 0.27, sb + 0.27, y + 0.45, y + 0.49, SLAT,
-        shade(SLAT, 1.12));
+      // Bench kit (1.550.8). The casting keeps its footprint and height but
+      // loses its knife edges — a precast unit comes out of the mould with
+      // its arrises rounded, and it stands on a shadow gap rather than
+      // growing out of the flags. The inset is five rounded slats on 6 mm
+      // spacers with a bolt through each at three places, where it was one
+      // brown slab laid on the top.
+      knRR(W, t - 3.0, t + 3.0, sb - 0.30, sb + 0.30, y + 0.030, y + 0.45, 0.030, 0.020,
+        PLINTH, shade(PLINTH, 1.06));
+      boxTS(t - 2.975, t + 2.975, sb - 0.275, sb + 0.275, y - 0.02, y + 0.034,
+        shade(PLINTH, 0.60));
+      {
+        const F = bkFrame(t, sb);
+        for (let k = 0; k < 5; k++) {
+          const v = -0.22 + k * 0.11;
+          bkBoard(F, 0.9, 2.9, v, y + 0.473, 0, 0.098, 0.034, bkTone(SLAT, t * 1.7 + k, 0.16),
+            { streak: 0.90 + 0.16 * jit(t + k, 912) });
+          bkBolts(F, [1.0, 1.9, 2.8], v, y + 0.473, 0, 0.034, [0.20, 0.20, 0.19]);
+        }
+      }
       runs.push({ t0: t - 3.0, t1: t + 3.0, s0: sb - 0.30, s1: sb + 0.30,
         y, h: 0.49 });
       // A bin within three metres of every bench, which is where they are.
