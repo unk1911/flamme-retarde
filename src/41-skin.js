@@ -407,14 +407,35 @@ const SKIN = {
   // Back light through an ear, a fingertip: the same red, narrower.
   thru: [1.0, 0.30, 0.16], thruGain: 0.45, thruPow: 4.0,
   // Blinn exponents rough / oily / wet, and skin's F0 (IOR 1.4).
-  rough: 16.0, oily: 42.0, wetPow: 160.0, f0: 0.028,
+  //
+  // 1.551.1, Misha over a close-up of a bare back and shoulder: *"it looks a
+  // little bit too 'marbelish', more like the surface of a stone and less
+  // like a human skin"*. It did: one sharp lobe everywhere, fed a strong
+  // pore normal, so every bump on a shoulder was its own glint — polished
+  // stucco. Now the dry lobe is BROAD (Blinn 9, about GGX roughness 0.55)
+  // and weak, and sees the pores only faintly (`poreSpec`); a second,
+  // tighter lobe is the oil, and only on the T-zone; the diffuse and the sky
+  // sheen see no pores at all, only the smooth surface. Wet keeps its shine.
+  rough: 9.0, roughGain: 0.40, oily: 44.0, oilyGain: 0.30, wetPow: 160.0, f0: 0.028,
+  // How much of the pore normal each lobe sees (times `skDetail`).
+  poreSpec: [0.35, 0.70, 0.15],
   // The sky: a floor under everything, which is what the old flat 3 per cent
   // mirror was and without which the faces measured 3 to 5 levels darker at
   // 18:00; and at grazing, Fresnel on top — dry, and wet.
-  skyFloor: [0.032, 0.05], sheen: [0.16, 0.70],
+  // Wet still shines, but short of the white-and-sky-blue mirror a whole wet
+  // back was at noon looking toward the sun (1.551.0's 0.05 / 0.70 and a
+  // lobe at 1.6).
+  skyFloor: [0.032, 0.040], sheen: [0.16, 0.35], wetGain: 0.55,
   // Pores: tiles per UV unit (MakeHuman's atlas is about a metre of face per
-  // unit, so 1.8 cm a tile), how hard, and where they fade.
-  poreRep: 55.0, pore: 0.85, poreFade: [1.5, 8.0],
+  // unit, so 1.2 cm a tile), how hard, and where they fade. Finer, softer and
+  // gone sooner than 1.551.0's 55 / 0.85 / 8 m, which read as orange peel;
+  // and by region (`skDetail`, the caller's): 0.45 on the body, 1 on the face.
+  poreRep: 85.0, pore: 0.55, poreFade: [0.8, 4.0], detailBody: 0.45,
+  // Living skin is not one colour: a faint mottle at a few centimetres and at
+  // a couple (off the bind-space position, which has no seams), and warmer,
+  // redder where it creases and rubs — the shoulders, elbows, knees and
+  // knuckles (`vWarm`, the caller's).
+  mottle: [18.0, 55.0, 0.07], warm: [1.07, 0.965, 0.94],
   // Wet: albedo multiplier.
   wetDark: 0.74,
 };
@@ -516,6 +537,7 @@ varying float vThin;
 const SKIN_PREP = `
   float skinK = 0.0;
   float skOil = 0.0;
+  float skDetail = ${SKIN.detailBody.toFixed(2)};
   float skDist = length(vWorld - uCamPos);
   vec3 skN = n;
   // Past the fade nothing is computed at all — most of a crowd is further
@@ -546,7 +568,15 @@ const SKIN_PREP = `
  */
 const SKIN_ON = `
     skinK = 1.0;
-    n = skN;
+    // The pores stay OFF the normal the diffuse and the sky see (n); only
+    // the highlights in SKIN_LIT look at them, each lobe by how much.
+    skN = normalize(mix(n, skN, skDetail));
+    if (skDist < ${SKIN.poreFade[1].toFixed(1)}) {
+      float skM = 0.6 * (vnoise2(vLocal.xy * ${SKIN.mottle[0].toFixed(1)}) + vnoise2(vLocal.zy * ${SKIN.mottle[0].toFixed(1)} + 17.0))
+        + 0.4 * (vnoise2(vLocal.xy * ${SKIN.mottle[1].toFixed(1)} + 5.0) + vnoise2(vLocal.zy * ${SKIN.mottle[1].toFixed(1)} + 31.0)) - 1.0;
+      skM *= 1.0 - smoothstep(${SKIN.poreFade[0].toFixed(1)}, ${SKIN.poreFade[1].toFixed(1)}, skDist);
+      base *= 1.0 + ${SKIN.mottle[2].toFixed(2)} * skM * vec3(1.0, 1.25, 1.35);
+    }
     base *= mix(1.0, ${SKIN.wetDark.toFixed(2)}, uWet);
     spec = 0.0;
     {
@@ -575,12 +605,20 @@ const SKIN_LIT = `
     float skBack = pow(clamp(dot(viewDir, uSunDir), 0.0, 1.0), ${SKIN.thruPow.toFixed(1)});
     col += base * vec3(${SKIN.thru.join(', ')}) * uSunColor * uSunI * INV_PI
       * skBack * vThin * mix(0.4, 1.0, sh) * ${SKIN.thruGain.toFixed(2)};
-    float skPw = mix(mix(${SKIN.rough.toFixed(1)}, ${SKIN.oily.toFixed(1)}, skOil), ${SKIN.wetPow.toFixed(1)}, uWet);
     vec3 skH = normalize(uSunDir + skV);
     float skF = ${SKIN.f0} + (1.0 - ${SKIN.f0}) * pow(1.0 - max(dot(skV, skH), 0.0), 5.0);
-    float skD = (skPw + 8.0) * 0.0397887 * pow(max(dot(n, skH), 0.0), skPw);
-    col += uSunColor * uSunI * skF * skD * max(skNL, 0.0) * sh
-      * mix(mix(0.55, 1.0, skOil), 1.6, uWet);
+    float skL = uSunI * skF * max(skNL, 0.0) * sh;
+    // Dry: broad and soft, the pores barely in it. Oil: tighter, on the
+    // T-zone only. Wet: a film of water, sharp and bright, over pores it
+    // mostly fills.
+    vec3 skNd = normalize(mix(n, skN, ${SKIN.poreSpec[0].toFixed(2)}));
+    vec3 skNo = normalize(mix(n, skN, ${SKIN.poreSpec[1].toFixed(2)}));
+    vec3 skNw = normalize(mix(n, skN, ${SKIN.poreSpec[2].toFixed(2)}));
+    float skDd = ${((SKIN.rough + 8) * 0.0397887).toFixed(4)} * pow(max(dot(skNd, skH), 0.0), ${SKIN.rough.toFixed(1)});
+    float skDo = ${((SKIN.oily + 8) * 0.0397887).toFixed(4)} * pow(max(dot(skNo, skH), 0.0), ${SKIN.oily.toFixed(1)});
+    float skDw = ${((SKIN.wetPow + 8) * 0.0397887).toFixed(4)} * pow(max(dot(skNw, skH), 0.0), ${SKIN.wetPow.toFixed(1)});
+    float skS = skDd * ${SKIN.roughGain.toFixed(2)} + skDo * ${SKIN.oilyGain.toFixed(2)} * skOil;
+    col += uSunColor * skL * mix(skS, skDw * ${SKIN.wetGain.toFixed(2)}, uWet);
   }
 `;
 

@@ -70,6 +70,25 @@ copied undecimated, so they take their helper's nearest vertex outright.
 The transform from MakeHuman's decimetres to the blob's metres is measured,
 not assumed, off the eyeballs, which both sides carry vertex for vertex.
 
+── 1.551.1: the lids, the eyeballs and the teeth ───────────────────────────────
+
+Before any of this, `with_morphs` runs tools/face_parts.py on the blob:
+MakeHuman's own lid faces stitched in round each eye, a smooth eyeball, and
+MakeHuman's teeth, gums and tongue in place of the helpers (a blob it has
+already done passes through, so re-running the conversion writes the same
+bytes). Then three things about the blink, measured here:
+
+  - `lid_closure`: how much of UpperLidClosed shuts THIS face — 0.85 on the
+    old man, whose lid otherwise came down through the lower one, 1.05 to
+    1.25 on the children, whose lids stopped short;
+  - `LID_PUSH`: the lid pushed off the eyeball by a tenth of how far it
+    travels, so a closing upper lid rides over the lower one;
+  - `LID_MID`: two more targets, midL and midR, the in-between of each lid
+    (what it is at half, less half of the whole), which the page weighs
+    4 t (1 - t) — so it follows its arc and not the chord through the eye.
+
+Eleven targets now; the nine keep their indices.
+
 ── the format: v12 ─────────────────────────────────────────────────────────────
 
 v12 is v9 with a MORPH BLOCK inserted after the index runs, before the part
@@ -139,7 +158,30 @@ TARGETS = [
     ("kiss",   {"LipsKiss": 1.0}),
     ("brows",  {"LeftInnerBrowUp": 1.0, "RightInnerBrowUp": 1.0,
                 "LeftOuterBrowUp": 0.7, "RightOuterBrowUp": 0.7}),
+    # 1.551.1: the blink's in-betweens, one a side (LID_MID). Last, so the
+    # nine above keep their indices.
+    ("midL",   {}),
+    ("midR",   {}),
 ]
+# A LID IS A ROTATION AND A MORPH IS A STRAIGHT LINE. Blended linearly, a
+# blink's margin travels the chord of its arc and at half way is a couple of
+# millimetres inside the eyeball, which then shows through the lid. So each
+# side carries an in-between: the lid as MakeHuman really has it at half of
+# the blink, less half of the whole blink. The page weighs it 4 t (1 - t)
+# (`faceMids` in src/42-bathers2.js): nothing shut or open, all of it at half.
+LID_MID = True
+# And off the eyeball: each lid vertex is pushed out from the eye's centre by
+# this fraction of the distance the blink moves it (about a millimetre at the
+# margin), so a closing upper lid rides OVER the lower one rather than
+# through it — on the heavy old faces the lower lid stands proud of where
+# MakeHuman's lid comes down, and the two cut into each other in a zigzag.
+LID_PUSH = 0.10
+# How much of UpperLidClosed shuts an eye is not 1 on every face: on a child
+# the lid stops short and a slit of eyeball stays open; on the old man it
+# comes down past the lower lid. `lid_closure` finds it per face: the least
+# amount, on a grid, at which no ray from in front reaches the eyeball.
+LID_CLOSE_GRID = (0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3)
+LID_CLOSE_OPEN = 0.002
 # A vertex a blink moves this far (m) belongs to the lid, and these targets
 # leave it alone — see the note in `morphs_for`.
 LID_OWN = 0.002
@@ -367,6 +409,71 @@ def dir_to_blob(d, s):
     return np.stack([d[..., 2] * s, d[..., 1] * s, -d[..., 0] * s], -1)
 
 
+def _uncovered(vs, T, c, r, n=48):
+    """The share of rays from in front (MakeHuman's -z) over an eyeball that
+    reach it before any of the triangles T."""
+    X, Y = np.meshgrid(np.linspace(c[0] - r, c[0] + r, n), np.linspace(c[1] - r, c[1] + r, n))
+    X, Y = X.ravel(), Y.ravel()
+    hit = (X - c[0]) ** 2 + (Y - c[1]) ** 2 < r * r * 0.98
+    X, Y = X[hit], Y[hit]
+    zs = c[2] + np.sqrt(r * r - (X - c[0]) ** 2 - (Y - c[1]) ** 2)
+    a, b, cc = vs[T[:, 0]], vs[T[:, 1]], vs[T[:, 2]]
+    e1, e2 = b - a, cc - a
+    den = e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]
+    ok = np.abs(den) > 1e-12
+    a, e1, e2, den = a[ok], e1[ok], e2[ok], den[ok]
+    blocked = np.zeros(len(X), bool)
+    for i in range(0, len(X), 256):
+        px = X[i:i + 256, None] - a[None, :, 0]
+        py = Y[i:i + 256, None] - a[None, :, 1]
+        u = (px * e2[None, :, 1] - py * e2[None, :, 0]) / den
+        v = (e1[None, :, 0] * py - e1[None, :, 1] * px) / den
+        z = a[None, :, 2] + u * e1[None, :, 2] + v * e2[None, :, 2]
+        blocked[i:i + 256] = ((u >= 0) & (v >= 0) & (u + v <= 1) & (z > zs[i:i + 256, None])).any(1)
+    return 1 - blocked.mean()
+
+
+def lid_closure(rig, vs, groups):
+    """{"L": a, "R": a}: the amount of each side's shut (TARGETS) that closes
+    that eye on this body — see LID_CLOSE_GRID."""
+    body = np.array([(f[0], f[k], f[k + 1]) for f in groups["body"] for k in range(1, len(f) - 1)])
+    cen = vs[body].mean(1)
+    out = {}
+    for side, helper in (("L", "helper-l-eye"), ("R", "helper-r-eye")):
+        ev = vs[np.array(sorted({v for f in groups[helper] for v in f}))]
+        c = ev.mean(0)
+        r = np.linalg.norm(ev - c, axis=1).mean()
+        T = body[np.linalg.norm(cen - c, axis=1) < 2.2 * r]
+        mix = dict(TARGETS)["shut" + side]
+        best = None
+        for a in LID_CLOSE_GRID:
+            u = _uncovered(rig.deform(vs, {k: v * a for k, v in mix.items()}), T, c, r)
+            if best is None or u < best[1] - 1e-9:
+                best = (a, u)
+            if u <= LID_CLOSE_OPEN:
+                best = (a, u)
+                break
+        out[side] = best[0]
+    return out
+
+
+def eye_transform(pos, uv, vs, gv):
+    """MakeHuman's decimetres -> the blob's metres, (scale, drop), measured
+    off the two eyeballs' CENTRES — the mean of each one's vertices, on both
+    sides. Centres and not extents, because since 1.551.1 the blob's
+    eyeballs are tools/face_parts.py's smooth balls, a shade smaller than the
+    helper they replace, about the same centre."""
+    eye = (uv[:, 0] >= 2) & (uv[:, 0] < 3)
+    bl = pos[eye & (pos[:, 2] < 0)].mean(0)       # MakeHuman's left is -z
+    br = pos[eye & (pos[:, 2] >= 0)].mean(0)
+    ml, mr = vs[gv["helper-l-eye"]].mean(0), vs[gv["helper-r-eye"]].mean(0)
+    s = (br[2] - bl[2]) / (ml[0] - mr[0])
+    drop = (bl[1] + br[1]) / 2 - (ml[1] + mr[1]) / 2 * s
+    err = max(np.abs(to_blob(ml, s, drop) - bl).max(), np.abs(to_blob(mr, s, drop) - br).max())
+    assert err < 0.0005, "eyeballs do not line up: %.4f m" % err
+    return s, drop
+
+
 def _near(pts, q, k=1):
     """The k nearest of `pts` to each row of `q`: (dist, index), brute force.
     Numpy and nothing else, because this also runs inside Blender (a rebake
@@ -386,16 +493,12 @@ def morphs_for(name, packed, rig, verbose=False):
     vs, groups, vts, corners = read_obj(bodies_dir() / ("mh_%s.obj" % name), uvs=True)
     gv = {g: np.array(sorted({v for f in fs for v in f})) for g, fs in groups.items()}
 
-    # The transform, off the eyeballs: undecimated on both sides.
+    # The transform, off the eyeballs (`eye_transform`).
     eye = (uv[:, 0] >= 2) & (uv[:, 0] < 3)
     mouth = uv[:, 0] >= 4
     hel = np.concatenate([gv["helper-l-eye"], gv["helper-r-eye"]])
-    mh = vs[hel]
-    s = np.ptp(pos[eye][:, 2]) / np.ptp(mh[:, 0])
-    drop = pos[eye][:, 1].mean() - mh[:, 1].mean() * s
-    fit = to_blob(mh, s, drop)
-    err = _near(fit, pos[eye])[0]
-    assert err.max() < 0.0005, "eyeballs do not line up: %.4f m" % err.max()
+    s, drop = eye_transform(pos, uv, vs, gv)
+    fit = to_blob(vs[hel], s, drop)
     teeth_i = np.concatenate([gv["helper-upper-teeth"], gv["helper-lower-teeth"],
                               gv["helper-tongue"]])
     teeth_b = to_blob(vs[teeth_i], s, drop)
@@ -466,14 +569,53 @@ def morphs_for(name, packed, rig, verbose=False):
     if verbose:
         print("  %d head vertices, %d not inside a UV triangle" % (len(head), miss))
 
-    names, deltas = [], []
-    for tname, mix in TARGETS:
-        posed = rig.deform(vs, mix)
-        dmh = posed - vs
+    # How far each lid has to come down on THIS face (`lid_closure`), and
+    # the eyes' centres in the blob for the push (MakeHuman's left is -z).
+    close = lid_closure(rig, vs, groups)
+    if verbose:
+        print("  lids close at L %.2f R %.2f of MakeHuman's shut" % (close["L"], close["R"]))
+    ecen = {"L": pos[eye & (pos[:, 2] < 0)].mean(0), "R": pos[eye & (pos[:, 2] >= 0)].mean(0)}
+
+    # MakeHuman's teeth and tongue (tools/face_parts.py, since 1.551.1) ride
+    # the base mesh through their .mhclo, nine weighted base vertices each:
+    # their displacement is exactly those vertices', in the order face_parts
+    # appended them. A blob still on the helper teeth (v = 0.5 throughout)
+    # keeps the nearest helper vertex, as above.
+    mouth_i = np.nonzero(mouth)[0]
+    MB = None
+    if len(mouth_i) and np.any(np.abs(uv[mouth_i, 1] - 0.5) > 1e-6):
+        import face_parts as FP
+        MB = FP.mouth_binding({"vs": vs})
+        assert len(MB["pos"]) == len(mouth_i), "mouth: %d in the blob, %d in mouth_lo.obj" % (
+            len(mouth_i), len(MB["pos"]))
+
+    def bake(mix):
+        dmh = rig.deform(vs, mix) - vs
         d = np.zeros((nv, 3))
         m = V[:, 0] >= 0
-        mix3 = (W[m, :, None] * dmh[np.maximum(V[m], 0)]).sum(1)
-        d[m] = dir_to_blob(mix3, s)
+        d[m] = dir_to_blob((W[m, :, None] * dmh[np.maximum(V[m], 0)]).sum(1), s)
+        if MB is not None:
+            d[mouth_i] = dir_to_blob((MB["wts"][:, :, None] * dmh[MB["refs"]]).sum(1), s)
+        return d
+
+    def lid(side, a):
+        """A lid at `a` of this face's closure, pushed off the eyeball in
+        proportion to how far each vertex travels (`LID_PUSH`)."""
+        d = bake({k: v * a * close[side] for k, v in dict(TARGETS)["shut" + side].items()})
+        rad = pos - ecen[side]
+        rad /= np.maximum(np.linalg.norm(rad, axis=1, keepdims=True), 1e-9)
+        return d + LID_PUSH * np.linalg.norm(d, axis=1, keepdims=True) * rad
+
+    names, deltas = [], []
+    for tname, mix in TARGETS:
+        if tname in ("shutL", "shutR"):
+            d = lid(tname[-1], 1.0)
+        elif tname in ("midL", "midR"):
+            # The in-between: what the lid really is half way down, less half
+            # of the whole blink — see LID_MID.
+            d = lid(tname[-1], 0.5) - 0.5 * lid(tname[-1], 1.0)
+        else:
+            d = bake(mix)
         names.append(tname)
         deltas.append(d)
     # OFF THE LIDS for everything that is not a blink. MakeHuman composes its
@@ -534,8 +676,13 @@ def read_morphs(packed: bytes):
 
 
 def with_morphs(name, packed: bytes, rig=None, verbose=False) -> bytes:
-    """What `save_skin` calls for a bather: its packed v9 -> v12."""
+    """What `save_skin` calls for a bather: its packed v9 -> v12. First the
+    lids, eyeballs and teeth at a close-up's resolution (tools/face_parts.py,
+    which leaves a blob it has already done alone), then the expressions,
+    measured on that."""
+    import face_parts as FP
     rig = rig or FaceRig()
+    packed = FP.refine(name, packed, verbose)
     return add_morphs(packed, morph_block(*morphs_for(name, packed, rig, verbose)))
 
 
@@ -543,6 +690,10 @@ def main(argv):
     check = "--check" in argv
     only = [a for a in argv if not a.startswith("--")]
     rig = FaceRig()
+    import face_parts as FP
+    marks = FP.face_marks()
+    if not check:
+        FP.write_marks(marks, PAYLOAD / "bather2_face.json")
     for p in sorted(PAYLOAD.glob("bather2_*.fr3d.gz")):
         name = p.name[len("bather2_"):-len(".fr3d.gz")]
         if only and name not in only:

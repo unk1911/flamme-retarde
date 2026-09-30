@@ -8,6 +8,104 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.551.1] — 2026-09-30
+
+### Lids, eyeballs and teeth at close-up resolution; skin that is not stone
+
+Misha, on the polish pass after 1.551.0: *"sure do eyelids and teeth"*. And,
+over a close-up of a bather's bare back and shoulder: *"i love the new skin
+on the bathers, but one criticism is: it looks a little bit too 'marbelish',
+more like the surface of a stone and less like a human skin"*.
+
+**Lids.** A shut eye had a torn lid line: the body is Blender's collapse
+decimator's 7 000 triangles, and it left about a dozen vertices on an upper
+lid that MakeHuman models with seventy. `tools/face_parts.py` (new) now cuts
+the decimated shell out round each eye (1.35 eyeball radii) and puts
+MakeHuman's own faces back — both lids, the canthi, the front of the fold —
+zipped to the cut by angle round the eye; about 550 triangles an eye for the
+160 it replaces. Every one of them is a MakeHuman vertex, so the morph
+transfer lands it on the face rig's own displacement (to 0.06 mm).
+
+- **How far a lid comes down is measured per face** (`lid_closure` in
+  tools/face_morphs.py): the least amount of MakeHuman's UpperLidClosed at
+  which no ray from in front reaches the eyeball. It is 0.85 on the old man
+  and the fit young man, whose lids otherwise came down through the lower
+  ones in a zigzag, and 1.05–1.25 on the children, whose eyes stayed open a
+  slit.
+- **Off the eyeball**: each lid vertex is pushed out from the eye's centre by
+  a tenth of the distance it travels (about a millimetre at the margin), so a
+  closing upper lid rides over the lower one rather than through it.
+- **The in-betweens**: a lid closes on an arc and a morph moves on the chord,
+  so half way down it was inside the eyeball. Two more targets, `midL` and
+  `midR` — the lid as it really is at half, less half of the whole blink —
+  weighed 4 t (1 − t) by `faceMids` (42-bathers2.js). Eleven targets now; the
+  nine keep their indices.
+- **The eyeball** was MakeHuman's `helper-*-eye`, a fitting volume of 35
+  quads a shade larger than the eye, and its facets came through the skin at
+  the corners. It is a smooth ball now, the size of MakeHuman's own eye (0.96
+  of the helper), about the same centre.
+- **The lash line** (`bather2Lash`): the lid margin, one edge loop in the UV
+  layout every bather shares, written to `PAYLOAD.bather2_face` and drawn
+  once into a 128 × 512 mask; the skin darkens along it, 1.3 mm on the upper
+  lid, 0.9 lighter on the lower. A shut eye is a clean dark line; an open
+  one has lashes. The fold behind the lids, its own island in the map, was
+  lit like a cheek and showed as a bright rim between two shut lids; it is in
+  shade now.
+
+**Teeth.** The mouth had MakeHuman's helper teeth — fitting volumes, a smooth
+band each — so an open mouth showed a flat beige slab. Now it has
+MakeHuman's `teeth_base` and `tongue01` (CC0), fitted to each body through
+their `.mhclo`: the twenty front teeth, gums and tongue, collapsed once by
+`tools/blender/teeth_lo.py` into `tools/face/mouth_lo.obj` (430 + 259 + 150
+triangles, against the helpers' 640). Each vertex binds, piece to piece, to
+the full asset and so to nine base vertices, whose displacement it takes
+exactly — the lower teeth go with the jaw. (Bound to the nearest triangle
+alone, the upper incisors caught the lower teeth behind them and were drawn
+down into fangs.) The shader reads which part a fragment is off its UV:
+ivory teeth, greyer and a little translucent at the biting edge, pink gums, a
+darker tongue, all darker toward the back. `wide` is now held at 0.45 at
+runtime (`FACE2.wideMax`): past about 0.5 with the jaw open, the lower lip
+rolls back over the lower teeth, with these teeth as with the old ones.
+
+**Skin** (`SKIN` in 41-skin.js). It read as polished stucco: one sharp lobe
+everywhere, fed a strong pore normal, so every bump on a shoulder glinted,
+and in shade the pores were in the diffuse and the sky sheen too.
+
+- The pore normal is off the diffuse and the sky sheen altogether; only the
+  highlights see it, each lobe by how much (0.35 dry, 0.7 oil, 0.15 wet).
+  Finer (85 tiles a UV unit), softer (0.55) and gone by 4 m instead of 8,
+  and by region: 0.45 on the body, full on the face.
+- The dry lobe is broad and weak (Blinn 9, about GGX roughness 0.55, gain
+  0.4); a second, tighter lobe (Blinn 44) is the oil, on the T-zone only.
+- A faint mottle at a few centimetres and at a couple, off the bind-space
+  position (no UV seams), and warmer and redder where skin creases and rubs
+  — shoulders, elbows, knees, knuckles — found off each blob's own bone
+  weights at load (`bather2Warm`, nothing added to the file).
+- Wet still shines, but a whole wet back seen toward the noon sun was a
+  white-and-sky-blue mirror; the wet lobe is 0.55 of what it was and the wet
+  sky sheen 0.35.
+
+**Format.** fr3d v12 unchanged, byte for byte in layout; the bathers' blobs
+carry the new geometry and eleven targets through the same `pack_skin` /
+`add_morphs` path. `with_morphs` runs `face_parts.refine` first, and a blob
+it has already done passes through, so re-running `tools/face_morphs.py` on
+the payload writes identical bytes (checked, all eight); a conversion from
+1.551.0's payload is deterministic (checked).
+
+**Cost.** Page 39.57 → 39.69 MB (+123 KB: +83 KB gzip of blobs for all
+eight, the rest code). On the crowded promenade view at 16:00 (71 bathers,
+8.96 M tris), the bathers' render cost (shown minus hidden, readPixels-
+synced, 3 × 120 frames), two runs each: HEAD 2.47 / 1.80 ms, now
+1.93 / 1.67 ms — no measurable change. People 100, blockers 785, no console
+errors.
+
+**Known.** The teeth are 22 triangles each and read faceted in an extreme
+close-up, and the lower ones mostly stay behind the lower lip, as MakeHuman
+seats them. With `wide` past 0.5 (nothing asks for that now) the lower teeth
+still show through the lower lip. The fit young man's screwed-shut, scowling
+face keeps the crease over the inner brow it had in 1.551.0 (outside the
+new lid patch). The skin's mottle is deliberately faint.
+
 ## [1.551.0] — 2026-09-30
 
 ### Faces and skin: the bathers blink, grimace, talk, smile and squint, and their skin is lit like skin
