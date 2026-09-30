@@ -589,6 +589,16 @@ addEventListener('keydown', (e) => {
     if (got !== 'out' && got !== 'back') toast(T('belt.' + got));
     return;
   }
+  // = — the collar and the leash: on her, or off her again. See `collarCmd`.
+  // Next to the belt's key and the brackets: the things you carry. Checked
+  // before taking it: 'Equal' appeared nowhere in src/. Below the pause
+  // guard: it acts on the world.
+  if (e.code === 'Equal') {
+    e.preventDefault();
+    const got = collarCmd('collar.key');
+    if (got !== 'asked' && got !== 'off') toast(T('collar.' + got));
+    return;
+  }
   // And the menu at a counter. Two keys rather than one, so that E means buy
   // and only buy: a key that cycled AND bought is a key that buys the wrong
   // thing the moment you press it once too often.
@@ -1561,6 +1571,8 @@ function beltCmd(what) {
   if (what === 'belt.key' && beltInHand()) { beltStow(false); return 'back'; }
   if (what === 'belt.out' && beltInHand()) return 'already';
   if (beltPh !== 'off') return 'busy';
+  // The leash is in that hand — see COLLAR.
+  if (typeof collarActive === 'function' && collarActive()) return 'collar';
   const why = beltPlace();
   if (why) return why;
   if (beltLock > 0) return 'later';
@@ -1953,6 +1965,531 @@ function beltStats() {
     log: { ...beltLog, safe: { ...beltLog.safe }, said: beltLog.said.slice(), hits: beltLog.hits.slice(),
       react: { ...beltLog.react } } };
 }
+
+// ── THE COLLAR AND THE LEASH, IN YOUR HAND ───────────────────────────────────
+//
+// 1.553.0. Misha, 30 Sep 2026: *"putting on the black collar with a diamond
+// leash/chain, which we can pull ... we need to be able to yank the collar
+// around and lead her, even outside kabine, perhaps to the back where the
+// hammock is. should also be possible to later take off the collar"*. The
+// chain and the collar are 43-leash.js; what she does on the end of it is
+// `leashStep` in 43-jadrija.js; this is your hand and the game round it.
+//
+// THE BELT'S KIND OF SCENE, and the belt's rules: two adults playing; she
+// takes it laughing (`COLLAR_SAY`); and the SAFEWORD — "red" / "crvena" /
+// "stop" — takes the collar off at once, fast, and then comes the aftercare
+// (the belt's own lines and your hand in her hair).
+//
+// THE CONTROLS: `=` or "collar" / "ogrlica" and she comes to you, kneels up,
+// and your hands put it on her — the strap round her neck from the buckle,
+// buckled, the leash clipped to the ring at her throat — and she goes down
+// on all fours. Walk, and she follows on your trail at the leash's length
+// (you walk at a lead's pace, and the leash holds you if you get ahead of
+// her: `tether`). The click is a tug: held, it winds up, and let go your
+// hand draws back until the chain is taut and past it — harder the longer
+// you held it, and harder again if the mouse was moving (`flick`). "Get in
+// the hammock" at the hammock lets her off the leash into it; out of it she
+// is back on all fours on the end of it. `=` again, or "take off the collar"
+// / "skini ogrlicu", and she gets up and your hands take it off.
+//
+// THE BELT AND THE COLLAR ARE ONE HAND. The belt is held in your right hand
+// and so is the leash: the belt will not come out while the leash is in it
+// (`belt.collar`), and the collar will not go on while the belt is out
+// (`collar.belt`). The safeword ends whichever of them is on.
+const COLLAR = {
+  // The loop in your fist while you lead her: at your right hip, in your LEVEL
+  // frame (right, up from the eye, forward) — a lead is held low, and your
+  // hip does not look down when you do.
+  hold: [0.20, -0.62, 0.26],
+  // A TUG. Held, it winds up over `full` s (a click is a quarter of one);
+  // `flick` rad/s of the mouse turning you while it is held is another whole
+  // one. The hand draws back along the leash (and `up` of that upward) until
+  // the chain is at `taut` of its length and `past` beyond it (plus `more`
+  // times how hard); the draw takes `rise` s, is held `peak`, goes back over
+  // `fall`. Against your arm (`arm` N/m) the draw past taut is the force on
+  // her ring, up to `F` N from a click to the hardest.
+  // A tug with more slack in it than `most` of an arm steps you back by the
+  // rest, up to `step`.
+  yank: { full: 0.50, flick: 5.0, up: 0.35, taut: 0.985, past: 0.07, more: 0.10, most: 0.65, step: 0.45,
+    rise: 0.07, peak: 0.10, fall: 0.38, arm: 1500, F: [45, 165] },
+  // Walking with her on it: your pace, m/s, and the leash's reach from her
+  // ring to your feet, level, m — past it you are held.
+  pace: 1.45, tether: 1.30,
+  // After a safeword, seconds before the collar will go on again.
+  lock: 3,
+  // Her lines while she follows, outside, one in `every` s at the most.
+  every: [14, 26],
+};
+// What she says, in her Croatian, and what it means (i18n `collar.g.*`).
+const COLLAR_SAY = {
+  on: [['Mm. Lijepo mi stoji?', 'on0'], ['Hehe. Sad sam tvoja.', 'on1'], ['Vodi me, ljubavi.', 'on2']],
+  tug: [['Hej! Polako, hehe.', 'tug0'], ['Idem, idem!', 'tug1'], ['Mm, zločesta.', 'tug2']],
+  yank: [['Ah! Hehe, jaka si.', 'yank0'], ['Joj! Dobro, dobro.', 'yank1'], ['Uh! ...Još jednom.', 'yank2']],
+  lead: [['Kamo me vodiš?', 'lead0'], ['Hehe, svi nas gledaju.', 'lead1'], ['Mm, sporije, ljubavi.', 'lead2']],
+  ham: [['Mreža? Može.', 'ham0']],
+  off: [['Hvala ti. Opet sutra?', 'off0'], ['Mm... bilo je lijepo.', 'off1']],
+  sayGap: 1.6,
+};
+let leashC = null;               // the chain, built the first time it is clipped on
+let colK = 0, colGrip = 0;       // your hand on it: how far out, how shut
+const colAt = new THREE.Vector3(), colHand = new THREE.Vector3(), colHold = new THREE.Vector3();
+const colDir = new THREE.Vector3(0, -1, 0), colPull = new THREE.Vector3(), colFirst = new THREE.Vector3();
+const _coA = new THREE.Vector3(), _coB = new THREE.Vector3(), _coC = new THREE.Vector3();
+let colPressed = false, colHeld = 0, colFlick = 0, colYawWas = null;
+let colYank = null;              // { t, u, dir, D, landed }
+let colLock = 0, colClock = 0, colSaidAt = -9, colLeadNext = 16, colAfter = null;
+let colArm = 0;                  // the third person's right arm swung by a tug, rad
+let colWalk = null;              // debug: a walk for a probe — see `__fr.collar.walk`
+let colHandBone = -1;
+let colKnelt = null;             // crouched for the putting on, and whether you already were
+let colAfterK = 0;               // the aftercare's hand in her hair, 0..1
+const colAfterAt = new THREE.Vector3();
+const colLog = { asked: 0, on: 0, off: 0, tugs: 0, landed: 0, Fmax: 0, safe: 0, said: [], why: null,
+  held: 0, tetherHits: 0 };
+
+/** The leash as her side of it stands, or null. */
+const collarState = () => (jadrija && jadrija.leashState ? jadrija.leashState() : null);
+/** Whether the collar is on her at all — for "stop" meaning it, and for the belt. */
+function collarActive() { const s = collarState(); return !!(s && s.on); }
+/** Whether she is on the end of it and following — the press is a tug then. */
+function collarLeading() { const s = collarState(); return !!(s && s.on && s.clipped && s.mode === 'lead'); }
+
+/** A line of hers, captioned: from `COLLAR_SAY[kind]`, or nothing if she spoke a moment ago. */
+function collarSay(kind, force = false) {
+  const L = COLLAR_SAY[kind];
+  if (!L || !L.length) return null;
+  if (!force && colClock - colSaidAt < COLLAR_SAY.sayGap) return null;
+  const [text, id] = L[Math.floor(Math.random() * L.length)];
+  colSaidAt = colClock;
+  const gloss = T('collar.g.' + id);
+  if (voice && voice.sub) voice.sub(text, 2.6, gloss && gloss !== 'collar.g.' + id ? gloss : '');
+  colLog.said.push(text);
+  if (colLog.said.length > 12) colLog.said.shift();
+  return text;
+}
+
+/**
+ * "collar", "take off the collar", "red" — and the key. Answers a word:
+ * 'asked', 'off', 'stopped', or why not ('ground', 'belt', 'later', 'far',
+ * 'collared', 'inhammock', 'swimming', 'not on', 'nobody').
+ */
+function collarCmd(what) {
+  if (what === 'collar.key') what = collarActive() ? 'collar.off' : 'collar.on';
+  if (what === 'collar.stop') {
+    if (!collarActive()) return 'not on';
+    colLog.safe++;
+    jadrija.leashOff('you');
+    colYank = null; colPressed = false;
+    colLock = COLLAR.lock;
+    // She heard it, and it is the belt's line: "Okay. Come here."
+    if (typeof beltSay === 'function') beltSay('heard', true);
+    colAfter = { t: 0, said: false };
+    return 'stopped';
+  }
+  if (what === 'collar.off') {
+    const got = jadrija && jadrija.leashOff ? jadrija.leashOff(null) : 'not on';
+    if (got === 'off') colLog.off++;
+    return got;
+  }
+  // On.
+  if (state.phase !== 'ground' || !ground || !ground.ok || !jadrija || !jadrija.askShow) return 'ground';
+  if (typeof beltActive === 'function' && beltActive()) return 'belt';
+  if (colLock > 0) return 'later';
+  const sh = jadrija.show ? jadrija.show() : null;
+  if (!sh) return 'nobody';
+  const w = jadrija.toWorld(sh.t, sh.s);
+  if (Math.hypot(w[0] - ground.you.x, w[2] - ground.you.z) > 25) return 'far';
+  const got = jadrija.askShow('collar');
+  if (got === true) { colLog.asked++; return 'asked'; }
+  return typeof got === 'string' ? got : 'nobody';
+}
+
+/** The press, with her on the leash: down winds a tug up, up lets it go. */
+function collarPress(down) {
+  if (down) {
+    if (!collarLeading()) return;
+    colPressed = true; colHeld = 0; colFlick = 0;
+    colYawWas = ground && ground.you ? ground.you.yaw : null;
+    return;
+  }
+  if (!colPressed) return;
+  colPressed = false;
+  const Y = COLLAR.yank;
+  const u = clamp(0.25 + 0.75 * Math.min(1, colHeld / Y.full) + colFlick / Y.flick, 0.2, 1);
+  collarTug(u);
+}
+
+/** A tug of `u` (0..1): see COLLAR.yank. The draw is decided against the leash as it hangs now. */
+function collarTug(u) {
+  const s = collarState();
+  if (!s || !s.clipped || s.mode !== 'lead') return false;
+  const Y = COLLAR.yank, len = LEASH.len;
+  _coA.subVectors(colHand, s.ring);
+  const span = _coA.length() || 1;
+  _coA.multiplyScalar(1 / span);
+  _coA.y += Y.up;
+  _coA.normalize();
+  const want = Math.max(0.10, len * Y.taut - span) + Y.past + Y.more * u;
+  const D = Math.min(Y.most, want);
+  colYank = { t: 0, u, dir: _coA.clone(), D, landed: false,
+    step: Math.min(Y.step, Math.max(0, want - D)), stepped: 0 };
+  colLog.tugs++;
+  return true;
+}
+
+/** How far out along the tug your hand is at `t`, 0..1. */
+function collarDraw(t) {
+  const Y = COLLAR.yank;
+  if (t < Y.rise) { const v = t / Y.rise; return v * v * (3 - 2 * v); }
+  if (t < Y.rise + Y.peak) return 1;
+  if (t < Y.rise + Y.peak + Y.fall) { const v = 1 - (t - Y.rise - Y.peak) / Y.fall; return v * v * (3 - 2 * v); }
+  return 0;
+}
+
+/**
+ * Once a frame, before the arms are posed: where your hand is — at her neck
+ * while it goes on or comes off, at your hip holding the loop while you
+ * lead her, drawn back in a tug — and the walk of a probe.
+ */
+function collarHandTick(dt) {
+  const t0 = performance.now();
+  collarHandTickIn(dt);
+  colMs.hand = performance.now() - t0;
+}
+function collarHandTickIn(dt) {
+  colClock += dt;
+  if (colLock > 0) colLock -= dt;
+  // A probe's walk: steer at the next point and hold W — see `__fr.collar.walk`.
+  if (colWalk && ground && ground.you && jadrija) {
+    const W = colWalk, Y = ground.you;
+    const p = W.pts[W.i];
+    const w = jadrija.toWorld(p[0], p[1]);
+    const dx = w[0] - Y.x, dz = w[2] - Y.z, dl = Math.hypot(dx, dz);
+    const key = W.back ? 'KeyS' : 'KeyW';
+    if (dl < (W.i === W.pts.length - 1 ? 0.35 : 0.6)) {
+      W.i++;
+      if (W.i >= W.pts.length) { keys.delete(key); colWalk = null; }
+    } else {
+      // Facing the point, or — `back` — facing away from it and walking
+      // backwards, which is how you watch her follow you.
+      const want = W.back ? Math.atan2(dx, dz) : Math.atan2(-dx, -dz);
+      let dy = want - Y.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      Y.yaw += dy * (1 - Math.exp(-8 * dt));
+      if (W.pitch != null) Y.pitch = W.pitch;
+      keys.add(key);
+    }
+    if (colWalk) colWalk.t += dt;
+    if (colWalk && colWalk.t > colWalk.limit) { keys.delete(key); colWalk = null; }
+  }
+  // THE AFTERCARE, after a safeword: the belt's — she is up and standing
+  // with you (her `care` in 43-jadrija.js), your hand in her hair, slowly
+  // round, and her thanks. Your own hand and not the room's petting, which
+  // is the kabina's alone (`petReach`): a safeword out by the hammock is
+  // owed the same. A step in to her if she is out of reach.
+  let caring = false;
+  if (colAfter) {
+    colAfter.t += dt;
+    const s2 = collarState(), Y = ground && ground.you;
+    if (s2 && s2.care && s2.head && Y && colAfter.t > 0.35) {
+      caring = true;
+      const hx = s2.head.x - Y.x, hz = s2.head.z - Y.z, hd = Math.hypot(hx, hz) || 1;
+      const w = colAfter.t * Math.PI * 2 / 1.7;
+      colAfterAt.set(s2.head.x - hx / hd * (0.03 + 0.03 * Math.cos(w)), s2.head.y + 0.10 + 0.012 * Math.sin(w),
+        s2.head.z - hz / hd * (0.03 + 0.03 * Math.cos(w)));
+      if (hd > 0.62 && ground.confine) {
+        const step = Math.min(hd - 0.62, THUMB_WALK * dt);
+        const [nx, nz] = ground.confine(Y.x + hx / hd * step, Y.z + hz / hd * step);
+        Y.x = nx; Y.z = nz;
+      }
+      if (!bodyCam && !camOverride) {
+        const O = camera.position;
+        const wantYaw = Math.atan2(O.x - s2.head.x, O.z - s2.head.z);
+        let dy = wantYaw - Y.yaw;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        Y.yaw += dy * (1 - Math.exp(-4 * dt));
+        const wantPitch = Math.atan2(s2.head.y - 0.12 - O.y, Math.max(hd, 0.05));
+        Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-4 * dt));
+      }
+    }
+    if (caring && !colAfter.said && colAfter.t > 1.8) { colAfter.said = true; if (typeof beltSay === 'function') beltSay('after', true); }
+    if (colAfter.t > 7) colAfter = null;
+  }
+  colAfterK = damp(colAfterK, caring ? 1 : 0, caring ? 3 : 5, dt);
+  const s = collarState();
+  const Yg = ground && ground.you;
+  // OFF THE BEACH WITH IT IN YOUR HAND — into the sea, on to a bicycle, the
+  // boat, the aeroplane: the leash is let go and the collar comes off her,
+  // quickly, rather than her crawling after you into any of those.
+  if (s && s.on && s.clipped && state.phase !== 'ground' && !s.offT && jadrija.leashOff) {
+    jadrija.leashOff('away');
+  }
+  // AND A JUMP rather than a walk (the skip keys): her a stride behind you
+  // wherever you have landed, not the leash dragging you back to her.
+  if (s && s.clipped && s.mode === 'lead' && Yg && state.phase === 'ground'
+    && Math.hypot(Yg.x - s.ring.x, Yg.z - s.ring.z) > COLLAR.tether + 2.5 && jadrija.leashSnap) {
+    jadrija.leashSnap(Yg.x, Yg.z, Yg.yaw);
+    Yg.tether = null;
+  }
+  if (!s || !s.on || state.phase !== 'ground') {
+    colK = damp(colK, 0, 8, dt); colGrip = damp(colGrip, 0, 8, dt);
+    colYank = null; colPressed = false; colArm = 0;
+    if (Yg) { Yg.tether = null; Yg.lead = 0; }
+    if (colKnelt && Yg) { if (!colKnelt.was) Yg.crouch = false; colKnelt = null; }
+    return;
+  }
+  // Her words, when her side says something happened.
+  const said = jadrija.leashSaid ? jadrija.leashSaid() : null;
+  if (said === 'on') { colLog.on++; collarSay('on', true); }
+  if (said === 'off') collarSay('off', true);
+  if (said === 'ham') collarSay('ham', true);
+  // DOWN TO HER, while it goes on: she kneels up a hand's width in front of
+  // you, and from a standing eye her neck is past your arm's reach (0.82 m
+  // from the shoulder against 0.56 of arm, MEASURED) — so you crouch, Shift's
+  // own, and stand again once it is clipped. And as she goes down on all
+  // fours her head comes forward half a metre, so you step back with the
+  // loop in your hand while she does, and she is not left at your boots.
+  const kneelNow = s.phase === 'leashKneel' || s.phase === 'leashPut';
+  if (Yg) {
+    if (kneelNow && !colKnelt) { colKnelt = { was: !!Yg.crouch }; Yg.crouch = true; }
+    else if (!kneelNow && colKnelt) { if (!colKnelt.was) Yg.crouch = false; colKnelt = null; }
+    if (s.phase === 'leashDown' && ground.confine) {
+      const dx = Yg.x - s.ring.x, dz = Yg.z - s.ring.z, dl = Math.hypot(dx, dz);
+      if (dl < 0.85 && dl > 1e-3) {
+        const step = Math.min(0.85 - dl, 0.9 * dt);
+        const [nx, nz] = ground.confine(Yg.x + dx / dl * step, Yg.z + dz / dl * step);
+        Yg.x = nx; Yg.z = nz;
+      }
+    }
+  }
+  // YOUR EYES ON HER NECK while it goes on and comes off: she comes to you,
+  // and a collar is put on somebody you are looking at — from wherever you
+  // were facing when you asked, the view turns on to her (the thumb's rule).
+  const looking = s.phase === 'leashKneel' || s.phase === 'leashPut'
+    || (s.phase === 'leashCome' && s.neck.distanceToSquared(camera.position) < 2.2 * 2.2)
+    || (s.offT != null && !s.fast && s.offT < 2.0);
+  if (looking && Yg && !bodyCam && !camOverride) {
+    const O = camera.position, hd = Math.hypot(s.neck.x - O.x, s.neck.z - O.z);
+    const wantYaw = Math.atan2(O.x - s.neck.x, O.z - s.neck.z);
+    let dy = wantYaw - Yg.yaw;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    Yg.yaw += dy * (1 - Math.exp(-4 * dt));
+    const wantPitch = Math.atan2(s.neck.y - O.y, Math.max(hd, 0.05));
+    Yg.pitch += (wantPitch - Yg.pitch) * (1 - Math.exp(-4 * dt));
+  }
+  beltFrames();
+  const hold = beltPoint(COLLAR.hold, colHold, true);
+  let target = hold, k = 0, grip = 0;
+  // THE PUTTING ON: your hand to her neck on the side the strap starts
+  // (her left, which is your right as you face her), round the front with
+  // it, back to the buckle, and to the ring for the clip — see LEASH_ON.put.
+  const path = (t, ks) => {
+    let i = 1;
+    while (i < ks.length - 1 && ks[i][0] < t) i++;
+    const [t0, a] = ks[i - 1], [t1, b] = ks[i];
+    const u = smooth01((t - t0) / Math.max(1e-3, t1 - t0));
+    return _coB.copy(a).lerp(b, u);
+  };
+  const out = (p, d = 0.035) => _coC.copy(p).addScaledVector(s.fwd, d).clone();
+  if (s.phase === 'leashPut') {
+    const P = [[0, hold.clone()], [0.50, out(s.left, 0.01)], [0.95, out(s.neck, 0.02)], [1.30, out(s.right, 0.01)],
+      [1.62, out(s.buckle, 0.0)], [2.18, out(s.ring, 0.02)], [2.85, hold.clone()]];
+    target = path(s.putT, P);
+    k = smooth01(s.putT / 0.35) * (1 - smooth01((s.putT - 2.45) / 0.45));
+    grip = 0.55;
+    if (s.clipped) { grip = 1; k = Math.max(k, 1); target = s.putT >= 2.85 ? hold : target; }
+  } else if (s.offT != null && !s.fast) {
+    // AND OFF: the clip at the ring, the buckle, the strap drawn round and
+    // away — see LEASH_ON.off.
+    const P = [[0, hold.clone()], [0.50, out(s.ring, 0.02)], [1.05, out(s.buckle, 0.0)],
+      [1.45, out(s.neck, 0.02)], [1.80, out(s.right, 0.02)], [2.40, hold.clone()]];
+    target = path(s.offT, P);
+    k = smooth01(s.offT / 0.3) * (1 - smooth01((s.offT - 2.0) / 0.4));
+    grip = 0.55;
+  } else if (s.clipped) {
+    k = 1; grip = 1;
+  }
+  // A TUG, while she is on it and following.
+  if (s.clipped && s.mode === 'lead') {
+    if (colPressed) {
+      colHeld += dt;
+      if (colYawWas != null && Yg) {
+        let dy = Yg.yaw - colYawWas;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        colFlick = Math.max(colFlick, Math.abs(dy) / Math.max(dt, 1e-3));
+        colYawWas = Yg.yaw;
+      }
+      colLog.held = +colHeld.toFixed(2);
+      // Held right up, it goes on its own.
+      if (colHeld > COLLAR.yank.full + 0.6) collarPress(false);
+    }
+    if (colYank) {
+      colYank.t += dt;
+      const e = collarDraw(colYank.t);
+      target = _coA.copy(hold).addScaledVector(colYank.dir, colYank.D * e).clone();
+      // A SLACK LEASH TAKES A STEP: her at your boots, the chain has more
+      // slack than an arm can draw (0.72 m of span against 1.48, MEASURED on
+      // all fours at your feet), so you step back with the tug by what the
+      // arm is short of — the lean a yank is made with.
+      const Y = COLLAR.yank;
+      if (colYank.step > 0 && colYank.t < Y.rise + Y.peak && Yg && ground.confine) {
+        const want = colYank.step * Math.min(1, colYank.t / (Y.rise + Y.peak));
+        const d = want - colYank.stepped;
+        if (d > 0) {
+          const hx = colYank.dir.x, hz = colYank.dir.z, hl = Math.hypot(hx, hz) || 1;
+          const [nx, nz] = ground.confine(Yg.x + hx / hl * d, Yg.z + hz / hl * d);
+          Yg.x = nx; Yg.z = nz;
+          colYank.stepped = want;
+        }
+      }
+      if (colYank.t > Y.rise + Y.peak + Y.fall) colYank = null;
+    }
+  } else { colYank = null; colPressed = false; }
+  colAt.copy(target);
+  colK = damp(colK, k, 10, dt);
+  colGrip = damp(colGrip, grip, 12, dt);
+  // Which way the chain leaves your fist: toward her.
+  if (s.clipped) colDir.subVectors(s.ring, colAt).normalize();
+  // The third person has no arms of its own to send: the leash is in her
+  // right hand wherever her walk has it, and a tug swings that arm.
+  const e = colYank ? collarDraw(colYank.t) * colYank.D : 0;
+  if (bodyCam && s.clipped) {
+    const fx = -Math.sin(Yg.yaw), fz = -Math.cos(Yg.yaw);
+    const along = colYank ? colYank.dir.x * fx + colYank.dir.z * fz : 0;
+    colArm = clamp(along * e * 2.4, -0.9, 0.9);
+  } else colArm = 0;
+  // The leash's own reach, and your pace, while it is clipped on.
+  if (Yg) {
+    if (s.clipped && s.ring) {
+      Yg.tether = { x: s.ring.x, z: s.ring.z, r: COLLAR.tether + (s.mode === 'free' ? 0.25 : 0) };
+      Yg.lead = s.mode === 'lead' ? COLLAR.pace : 0;
+    } else { Yg.tether = null; Yg.lead = 0; }
+  }
+}
+
+/** Her right hand in the third person, world, into `out` — or null. */
+function collarThirdHand(out) {
+  if (!you || !you.fig || !you.mesh) return null;
+  if (colHandBone < 0) colHandBone = you.fig.boneIndex('handR');
+  if (colHandBone < 0) return null;
+  you.mesh.updateMatrixWorld();
+  you.fig.boneAt(colHandBone, out).applyMatrix4(you.mesh.matrixWorld);
+  out.y -= 0.035;
+  return out;
+}
+
+/**
+ * Once a frame, after she is posed: the chain between her ring and your
+ * hand, solved against her; the pull on her ring off how far your hand is
+ * past the chain's length; and a tug's lurch the moment it comes taut.
+ */
+function collarSimTick(dt) {
+  const t0 = performance.now();
+  collarSimTickIn(dt);
+  // The whole of it this frame, your side and hers: the hand, the chain, the
+  // pull, and her leash phase, collar and ragdoll (43-jadrija.js's timers).
+  const live = !!(jadrija && jadrija.leashMs && (leashC && leashC.on || colK > 0.01));
+  const ms = performance.now() - t0 + colMs.hand + (live ? jadrija.leashMs() : 0);
+  if (live) { colMs.n++; colMs.sum += ms; colMs.max = Math.max(colMs.max, ms); colMs.last = ms; }
+}
+const colMs = { hand: 0, n: 0, sum: 0, max: 0, last: 0 };
+function collarSimTickIn(dt) {
+  const s = collarState();
+  if (!s || !s.clipped || state.phase !== 'ground') {
+    if (leashC && leashC.on) leashC.hide();
+    if (jadrija && jadrija.leashPull) jadrija.leashPull(0);
+    return;
+  }
+  if (!leashC) leashC = leashChain(scene);
+  if (s.rehang) { leashC.rehang(); jadrija.leashRehung(); }
+  // Your hand: the fist, or her right hand in the third person.
+  // In the third person the hand is her right hand where her walk has it,
+  // and a tug is that arm swung (`colArm`) and the loop drawn along with it
+  // the rest of the way — her arm cannot reach back as far as the first
+  // person's draws it.
+  if (bodyCam) {
+    if (!collarThirdHand(colHand)) colHand.copy(colAt);
+    else if (colYank) colHand.addScaledVector(colYank.dir, colYank.D * collarDraw(colYank.t) * 0.8);
+  } else colHand.copy(colAt);
+  colHand.addScaledVector(colDir, 0.02);
+  // The chain's reach from the ring: your hand past it is held at it, and
+  // how far past is the draw against your arm.
+  // Less whatever the chain has had to go round her to get here: wrapped
+  // over her shoulder it is that much shorter, and your hand is held that
+  // much nearer — or the tug stretches it round her in a loop of parted
+  // links (PHOTOGRAPHED; see LEASH.slip, which is the backstop).
+  const len = LEASH.len;
+  const reach = len * COLLAR.yank.taut - Math.max(0, (leashC ? leashC.stats.stretchSum : 0) - 0.01);
+  _coA.subVectors(colHand, s.ring);
+  const span = _coA.length() || 1e-6;
+  const past = Math.max(0, span - reach);
+  const hand = span > reach ? _coB.copy(s.ring).addScaledVector(_coA, reach / span) : colHand;
+  const w = jadrija.leashWorld();
+  const floor = Math.min(s.feetY, ground && ground.you ? ground.you.y : s.feetY);
+  leashC.step(dt, s.ring, hand, w.caps || new Float64Array(8), w.n, w.near, floor);
+  // THE PULL ON HER RING: a tug's draw past taut against your arm, up to the
+  // tug's strength; or, walked out ahead of her, the leash leaning her on.
+  colPull.copy(_coA).multiplyScalar(1 / span);
+  let F = 0;
+  if (colYank) {
+    // As hard as the tug is, once the chain is taut — from 90 % of its
+    // length to 97 % it comes on; the draw past taut is where your hand
+    // stops, held at the chain's reach. Against a draw alone (`arm` times
+    // how far past), a tug from a leash with slack in it was two or three
+    // centimetres past taut at best and landed as 20-40 N (MEASURED).
+    const Y = COLLAR.yank, Fmax = Y.F[0] + (Y.F[1] - Y.F[0]) * colYank.u;
+    const taut = clamp((span / reach - 0.92) / 0.07, 0, 1);
+    F = Fmax * collarDraw(colYank.t) * taut;
+    if (F > 20 && !colYank.landed) {
+      colYank.landed = true;
+      colLog.landed++;
+      jadrija.leashTug(colYank.u, colPull);
+      collarSay(colYank.u > 0.6 ? 'yank' : 'tug');
+    }
+  }
+  // AND ONLY A TUG. A steady lean on the leash as you walk ahead of her was
+  // tried (25-40 N from 94 % of its length) and it kept her ragdoll on for
+  // the whole of a walk, where every corner she crawled round swung her
+  // chest and head 40-75 degrees behind her hips (MEASURED, 100 ms samples
+  // round the kabina): a net built for a woman kneeling still, carried
+  // round a turn at a crawl. The chain comes taut on its own, and that is
+  // what walking ahead of her looks like.
+  colLog.Fmax = Math.max(colLog.Fmax, F);
+  colLog.F = F;
+  jadrija.leashPull(F, colPull, leashC.firstDir(colFirst));
+  // And now and then, following you about outside, a word.
+  const inKab = jadrija.kabina && jadrija.kabina.inside
+    && jadrija.kabina.inside(ground.you.x, ground.you.z) > 0.5;
+  if (s.mode === 'lead' && s.phase === 'leashCrawl' && !inKab) {
+    colLeadNext -= dt;
+    if (colLeadNext <= 0) {
+      colLeadNext = COLLAR.every[0] + Math.random() * (COLLAR.every[1] - COLLAR.every[0]);
+      collarSay('lead');
+    }
+  }
+}
+
+function collarStats() {
+  const s = collarState(), c = leashC ? leashC.stats : null;
+  const info = jadrija && jadrija.leashInfo ? jadrija.leashInfo() : null;
+  const rag = jadrija && jadrija.leashRag ? jadrija.leashRag() : null;
+  return { on: !!(s && s.on), phase: s ? s.phase : null, mode: s ? s.mode : null,
+    clipped: !!(s && s.clipped), collar: s ? +s.collar.toFixed(2) : 0,
+    k: +colK.toFixed(2), grip: +colGrip.toFixed(2), yank: colYank ? +colYank.t.toFixed(2) : null,
+    chain: c ? { ms: +c.ms.toFixed(3), msAvg: +(c.msSum / Math.max(1, c.frames)).toFixed(3), msMax: +c.msMax.toFixed(3),
+      steps: c.steps, hangs: c.hangs, rescues: c.rescues, contacts: c.contacts, span: +c.span.toFixed(3),
+      taut: +c.taut.toFixed(3), frames: c.frames } : null,
+    rag: rag ? { on: rag.on, layer: rag.layer, ms: +rag.ms.toFixed(3), msAvg: +(rag.msSum / Math.max(1, rag.frames)).toFixed(3),
+      msMax: +rag.msMax.toFixed(3), F: +rag.F.toFixed(1), Fmax: +rag.Fmax.toFixed(1), pitch: +rag.pitch.toFixed(1),
+      pitchMax: +rag.pitchMax.toFixed(1), chest: +rag.chest.toFixed(1), chestMax: +rag.chestMax.toFixed(1),
+      headD: +rag.headD.toFixed(3), headDMax: +rag.headDMax.toFixed(3), rescues: rag.rescues, why: rag.why, frames: rag.frames } : null,
+    her: info, tether: ground && ground.you && ground.you.tether ? { r: ground.you.tether.r } : null,
+    lock: +Math.max(0, colLock).toFixed(1), after: colAfter ? +colAfter.t.toFixed(1) : null,
+    frame: { avg: +(colMs.sum / Math.max(1, colMs.n)).toFixed(3), max: +colMs.max.toFixed(3),
+      last: +colMs.last.toFixed(3), n: colMs.n },
+    log: { ...colLog, said: colLog.said.slice(), F: colLog.F ? +colLog.F.toFixed(1) : 0, Fmax: +colLog.Fmax.toFixed(1) } };
+}
+
 const THUMB_WALK = 1.3;      // m/s you step in at
 let camMode = 0;
 const camPos = new THREE.Vector3();
@@ -2606,6 +3143,7 @@ const HELP = [
     [']', 'help.k.cell'],
     ['[', 'help.k.ball'],
     ['\\', 'help.k.belt'],
+    ['=', 'help.k.collar'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -5513,7 +6051,7 @@ function poseSwimBody(dt) {
       you.fig.aim('legLL', 0, 0, 1, -kn * L);
       you.fig.aim('legLR', 0, 0, 1, -kn * R);
       you.fig.aim('armUL', 0, 0, 1, aa);
-      you.fig.aim('armUR', 0, 0, 1, aa);
+      you.fig.aim('armUR', 0, 0, 1, aa + colArm);
     }
     jumpPosed = hp > 0 || kn > 0 || aa > 0;
     // Her root is between her feet, so `at` is simply where she stands —
@@ -8038,6 +8576,7 @@ function crossThreshold(dt, afoot) {
     inRoom = true;
     dipStart(() => {
       jadrija.kabinaMode(true);
+      if (jadrija.leashDoor) jadrija.leashDoor(true);
       const w = jadrija.toWorld(K.standIn[0], K.standIn[1]);
       dipPin = [w[0], w[2]];
       ground.stepTo(w[0], w[2]);
@@ -8048,6 +8587,7 @@ function crossThreshold(dt, afoot) {
     inRoom = false;
     dipStart(() => {
       jadrija.kabinaMode(false);
+      if (jadrija.leashDoor) jadrija.leashDoor(false);
       const w = jadrija.toWorld(K.standOut[0], K.standOut[1]);
       dipPin = [w[0], w[2]];
       ground.stepTo(w[0], w[2]);
@@ -8466,10 +9006,17 @@ function tick(wall, draw) {
       if (pressing && !reachWas) { reachKind = 'belt'; beltPress(true); }
       if (!pressing && reachWas && reachKind === 'belt') beltPress(false);
     }
+    // THE LEASH, with her on the end of it and following: the press is a tug
+    // and nothing else — not the hose, not the hammock, not a reach. Down
+    // winds it up, up lets it go. See `collarPress`.
+    if (collarLeading()) {
+      if (pressing && !reachWas) { reachKind = 'leash'; collarPress(true); }
+      if (!pressing && reachWas && reachKind === 'leash') collarPress(false);
+    } else if (reachKind === 'leash' && !pressing) { reachKind = null; collarPress(false); }
     // THE HAMMOCK, outside: a press with the cloth in front of you and within
     // an arm is a shove and not the branch, for the whole of the press — see
     // `hammockPush`. Decided on the frame the button goes down, like the reach.
-    if (pressing && !reachWas) pressHam = !inKab && !!hammockPush();
+    if (pressing && !reachWas) pressHam = !inKab && reachKind !== 'leash' && !!hammockPush();
     if (!pressing) pressHam = false;
     hammockHold(dt, pressHam && pressing);
     // A probe cannot aim a crosshair to the degree; it can say what it meant.
@@ -8721,7 +9268,7 @@ function tick(wall, draw) {
       const lg = jadrija.hairPullAt();
       if (lg) hairAt = lg;
     }
-    ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear && !pressHam);
+    ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear && !pressHam && reachKind !== 'leash');
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
     // integrated was the chute branch, so the moment the canopy touched down she
@@ -9106,6 +9653,7 @@ function tick(wall, draw) {
     ballThrowTick(dt);
     hammockPushTick(dt);
     beltHandTick(dt);
+    collarHandTick(dt);
     arms.update(dt, chaseCut || bodyCam ? null
       // The belt — see `beltHandTick`. A fist round the buckle, the strap
       // hanging out of the bottom of it; ahead of everything, because while
@@ -9115,6 +9663,15 @@ function tick(wall, draw) {
           hair: [_bf.x, 0, _bf.z] } }
       // And after a safeword, the flat of your hand on her where it stung —
       // the petting hand, palm down (see `beltHandTick`).
+      // The leash — see `collarHandTick`. A fist round the loop at your hip,
+      // the chain running out of it toward her; or your hands at her neck
+      // while the collar goes on or comes off.
+      : state.phase === 'ground' && colK > 0.01
+        ? { reach: { x: colAt.x, y: colAt.y, z: colAt.z, k: colK, kind: 'pull', grip: colGrip,
+          hair: [colDir.x, colDir.y, colDir.z] } }
+      // And after a safeword, your hand in her hair — see `colAfter`.
+      : state.phase === 'ground' && colAfterK > 0.01
+        ? { reach: { x: colAfterAt.x, y: colAfterAt.y, z: colAfterAt.z, k: colAfterK, kind: 'pet' } }
       : state.phase === 'ground' && beltRubK > 0.01
         ? { reach: { x: beltRubAt.x, y: beltRubAt.y, z: beltRubAt.z, k: beltRubK, kind: 'pet' } }
       // The throw — see `ballThrowTick`. The cupped hand, because it has a
@@ -9192,6 +9749,8 @@ function tick(wall, draw) {
       camera.getWorldDirection(_look));
     // The strap, against her as she has just been posed — see `beltSimTick`.
     beltSimTick(dt);
+    // The leash, against her as she has just been posed — see `collarSimTick`.
+    collarSimTick(dt);
   }
   rail.update(dt);
   sea.update(camera);
@@ -10275,6 +10834,7 @@ window.__fr = {
     ride: ride && ride.active ? { ...ride.stats(), point: ride.point() } : null,
     arms: arms ? arms.stats() : null,
     belt: beltStats(),
+    collar: collarStats(),
     mask: mask ? mask.stats() : null,
     shadow: shadow ? shadow.stats() : null,
     ao: ao ? ao.stats() : null,
@@ -12488,6 +13048,44 @@ window.__fr = {
     }
     camOverride = [x, groundAt(x, z) + 40, z - 30, x, groundAt(x, z), z];
     return { flew: [+x.toFixed(1), +z.toFixed(1)] };
+  },
+  /**
+   * Debug: the collar and the leash — see `collarCmd` and 43-leash.js.
+   * `cmd('collar.on' | 'collar.off' | 'collar.stop')` as the typed line does
+   * it; `tug(u)` a tug of that strength; `press(on)` the button; `walk(pts,
+   * pitch, limit)` walks you through (t, s) points holding W, which is how a
+   * probe leads her; `stats()`, `links()`, `fit()` (her neck in the strap).
+   */
+  collar: {
+    cmd: (what) => collarCmd(what),
+    key: () => collarCmd('collar.key'),
+    tug: (u = 0.6) => collarTug(u),
+    press: (on) => { collarPress(!!on); return colPressed; },
+    walk: (pts, pitch = null, limit = 60, back = false) => {
+      keys.delete('KeyW'); keys.delete('KeyS');
+      colWalk = pts && pts.length ? { pts, i: 0, pitch, t: 0, limit, back } : null;
+      return !!colWalk;
+    },
+    walking: () => (colWalk ? { i: colWalk.i, n: colWalk.pts.length, t: +colWalk.t.toFixed(1) } : null),
+    /** You turned to face her collar, and `pitch` (rad) if given — for a probe's shot. */
+    face: (pitch = null) => {
+      const s = collarState(), Y = ground && ground.you;
+      if (!s || !Y) return null;
+      Y.yaw = Math.atan2(Y.x - s.neck.x, Y.z - s.neck.z);
+      if (pitch != null) Y.pitch = pitch;
+      return +Y.yaw.toFixed(3);
+    },
+    stats: () => collarStats(),
+    links: () => (leashC ? leashC.links().map((q) => q.map((v) => +v.toFixed(3))) : null),
+    measure: () => (leashC ? leashC.measure() : null),
+    onFloor: () => (leashC ? leashC.onFloor() : null),
+    fit: (at, back, lim) => (jadrija && jadrija.collarFit ? jadrija.collarFit(at, back, lim) : null),
+    info: () => (jadrija && jadrija.leashInfo ? jadrija.leashInfo() : null),
+    hand: () => colHand.toArray().map((v) => +v.toFixed(3)),
+    tune: (o) => { for (const [k, v] of Object.entries(o || {})) { if (v && typeof v === 'object' && !Array.isArray(v)) Object.assign(COLLAR[k], v); else COLLAR[k] = v; } return COLLAR; },
+    reset: () => { colLog.Fmax = 0; colMs.n = 0; colMs.sum = 0; colMs.max = 0;
+      if (leashC) { leashC.stats.msMax = 0; leashC.stats.msSum = 0; leashC.stats.frames = 0; }
+      if (jadrija && jadrija.leashRagReset) jadrija.leashRagReset(); return true; },
   },
   look: (px, py, pz, tx, ty, tz) => { camOverride = [px, py, pz, tx, ty, tz]; },
   free: () => {

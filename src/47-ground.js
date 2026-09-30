@@ -1667,6 +1667,9 @@ async function buildGround(scene, field) {
         const [ct, cs] = field.local(you.x, you.z);
         if (field.tightTS(ct, cs)) top *= GROUND.indoorPace;
       }
+      // Leading her on the leash (1.553.0, COLLAR in 90-app.js): a lead's
+      // pace, which she can keep up with on all fours.
+      if (you.lead > 0) top = Math.min(top, you.lead);
       wx = (fx * iz + rx * ix) * top;
       wz = (fz * iz + rz * ix) * top;
       you.vx = damp(you.vx, wx, m > 0.01 ? GROUND.accel / top : GROUND.drag, dt);
@@ -1749,6 +1752,22 @@ async function buildGround(scene, field) {
         const into = you.vx * ux + you.vz * uz;
         if (into < 0) { you.vx -= ux * into; you.vz -= uz * into; }
       } else { you.vx = 0; you.vz = 0; }
+    }
+    // THE LEASH'S REACH (1.553.0). While it is clipped on, the far end of it
+    // is her collar, and you go no further from it than the chain lets you:
+    // held on the circle, and the part of your pace going outward taken off,
+    // so you slide round her rather than stopping dead. Walls still have the
+    // last word — the point on the circle goes through `confine` again.
+    if (you.tether) {
+      const Tt = you.tether, ox = nx - Tt.x, oz = nz - Tt.z, ol = Math.hypot(ox, oz);
+      if (ol > Tt.r && ol > 1e-6) {
+        const ux = ox / ol, uz = oz / ol;
+        const [cx2, cz2] = confine(Tt.x + ux * Tt.r, Tt.z + uz * Tt.r, you.y, false);
+        nx = cx2; nz = cz2;
+        const outV = you.vx * ux + you.vz * uz;
+        if (outV > 0) { you.vx -= ux * outV; you.vz -= uz * outV; }
+        you.tethered = (you.tethered || 0) + 1;
+      }
     }
     const moved = Math.hypot(nx - you.x, nz - you.z);
     you.x = nx; you.z = nz;

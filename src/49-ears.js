@@ -515,7 +515,18 @@ const ears = (() => {
     // said, and goes on as it always did.
     if (typed) {
       const bw = beltWords(blob);
-      if (bw && (bw !== 'belt.stop' || (typeof beltActive === 'function' && beltActive()))) {
+      // AND THE COLLAR (1.553.0): its words, and the same safeword while it
+      // is on her — see COLLAR in 90-app.js.
+      const on = (typeof beltActive === 'function' && beltActive())
+        || (typeof collarActive === 'function' && collarActive());
+      const cw = collarWords(blob);
+      if (cw) {
+        note('“' + blob + '”  typed · here  → ' + cw, 'heard');
+        act(cw);
+        draw();
+        return;
+      }
+      if (bw && (bw !== 'belt.stop' || on)) {
         note('“' + blob + '”  typed · here  → ' + bw, 'heard');
         act(bw);
         draw();
@@ -593,7 +604,8 @@ const ears = (() => {
         + (d.intents && d.intents.length ? '  → ' + d.intents.join(', ') : ''), 'heard');
       // "Stop" is the belt's safeword only while there is a belt out (see
       // `beltWords`); otherwise it is a sentence, and goes on to her.
-      if (d.intents && d.intents.length && !(typeof beltActive === 'function' && beltActive())) {
+      if (d.intents && d.intents.length && !(typeof beltActive === 'function' && beltActive())
+        && !(typeof collarActive === 'function' && collarActive())) {
         d.intents = d.intents.filter((n) => n !== 'belt.stop');
       }
       // A command, and that is the whole of it — commands outrank conversation.
@@ -876,6 +888,11 @@ const ears = (() => {
     kabinain: 'she is in the kabina — the hammock is out in the pines behind it',
     swimming: 'she is in the sea',
     noway: 'she cannot find a way through to it from here',
+    // The collar's (1.553.0). "leashed" is every other ask while she is on
+    // the end of it: the hammock is the one thing she comes off it for.
+    leashed: 'she is on the leash — take the collar off first, or ask for the hammock',
+    collared: 'she is already wearing it',
+    collaroff: 'it is coming off',
   };
 
   /**
@@ -894,8 +911,38 @@ const ears = (() => {
     return null;
   }
 
+  /**
+   * The collar's words, typed — see COLLAR in 90-app.js. English, Croatian
+   * and French, the whole line: "collar", "put the collar on her", "leash
+   * her", "ogrlica", "stavi joj ogrlicu"; "take off the collar", "collar
+   * off", "unclip her", "skini ogrlicu". The safeword is `beltWords`'.
+   */
+  function collarWords(text) {
+    const t = String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[.!?,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/^((take |get |pull )?(the |her |your )?collar off( her)?|(take |get )off (the |her )?collar|remove (the |her )?collar|unclip( her| the leash)?|unleash( her)?|(skini|makni|otkopcaj) (joj )?(ogrlicu|povodac)|ogrlica dolje|(enleve|retire) (le |son |ton )?collier)$/.test(t)) return 'collar.off';
+    if (/^((put )?(the |a |her |your )?collar( on)?( her)?|put (the |a |her )?collar on( her)?|put on (the |a |her )?collar|collar her|leash( her)?|(put |clip )(the |a |her )?leash on( her)?|(stavi |daj )?(joj )?(ogrlic[au]|povodac)|(mets? (lui )?)?(le |un |son )?collier|(la |en )?laisse)$/.test(t)) return 'collar.on';
+    return null;
+  }
+
   /** Do a command. Every one reports back to the panel, including "nobody". */
   async function act(name, lang = null) {
+    // The collar — `collarCmd` in 90-app.js. The safeword stops it too, and
+    // the belt as well if the belt is somehow out (it cannot be, with the
+    // leash in the same hand — but "red" must never do less than it says).
+    if (name === 'belt.stop' && typeof collarActive === 'function' && collarActive()) {
+      act('collar.stop');
+      if (!(typeof beltActive === 'function' && beltActive())) return;
+    }
+    if (name === 'collar.on' || name === 'collar.off' || name === 'collar.stop') {
+      const got = typeof collarCmd === 'function' ? collarCmd(name) : 'nothing';
+      const ok = got === 'asked' || got === 'off' || got === 'stopped';
+      note('collar: ' + (got === 'asked' ? 'she comes to you, and kneels for it'
+        : got === 'off' ? 'it comes off her'
+          : got === 'stopped' ? 'red — the collar comes straight off'
+            : typeof T === 'function' ? T('collar.' + got) : got), ok ? 'did' : 'meta');
+      return;
+    }
     // The belt — `beltCmd` in 90-app.js, and what it answered.
     if (name === 'belt.out' || name === 'belt.back' || name === 'belt.stop') {
       const got = typeof beltCmd === 'function' ? beltCmd(name) : 'nothing';
