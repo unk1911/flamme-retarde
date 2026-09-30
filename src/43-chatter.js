@@ -1570,6 +1570,20 @@ function makeChatter(dep) {
       fg.nod = 0;
       fg.nodN = chatJit(fg.idx + G.turn * 29, 733) < NOD.twice ? 2 : 1;
     }
+    // And their FACES (`bather2Face` in 42-bathers2.js): the one with the
+    // floor talks for most of the turn — the length of the scripted line when
+    // there is one — and now and then somebody smiles at it, and more rarely
+    // laughs. Off the seed and the turn, like everything else in here.
+    const len = G.conv != null && CHAT_LIB.conv[G.conv].lines[G.k]
+      ? CHAT_LIB.conv[G.conv].lines[G.k].d
+      : Math.min(2.6, 0.7 * (G.next - G.t));
+    faceCue(sp, 'talk', len);
+    for (let i = 0; i < n; i++) {
+      const fg = G.who[i];
+      const r = chatJit(fg.idx * 3 + G.turn * 41, 9173);
+      if (r < 0.07) faceCue(fg, 'laugh', 1.2 + 1.2 * chatJit(fg.idx + G.turn, 9181));
+      else if (r < 0.30) faceCue(fg, 'smile', 1.5 + 2.5 * chatJit(fg.idx + G.turn, 9187));
+    }
   }
 
   /**

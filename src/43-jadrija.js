@@ -46060,6 +46060,11 @@ async function buildJadrija(scene) {
     // On the mole's edge the water pushes as well as soaks — see `DUNK`.
     const eg = b.edge ? edgeFg(bi) : null;
     if (eg && litres) dunkWet(eg, litres, hit);
+    // Their face screwed up for as long as the water is on them and a moment
+    // after (`bather2Face` in 42-bathers2.js), and then a scowl.
+    const hf = personOf(bi);
+    faceCue(hf, 'hose', 1.2);
+    faceCue(hf, 'scowl', 6.0);
     if (b.soak > 0) { b.soak = 1.6; return; }
     b.soak = 1.6;
     const kind = CAST_KIND[castBlob[bi]] || null;
@@ -46265,6 +46270,9 @@ async function buildJadrija(scene) {
           bumpBalloon.say(line);
           bumpBalloon.said = line;
           bumpSaid = { fg, t: 0 };
+          // And the face that goes with it (`bather2Face`, 42-bathers2.js).
+          faceCue(fg, 'talk', 1.6);
+          faceCue(fg, 'scowl', 5.0);
           bumpCool = BUMP.cool;
           fg.saidAt = bumpClock;
         }
@@ -46594,6 +46602,8 @@ async function buildJadrija(scene) {
     dunkBalloon.say(text);
     dunkBalloon.said = text;
     dunkSaid = { fg, t: 0, dur };
+    faceCue(fg, 'talk', Math.min(dur, 2.2));
+    faceCue(fg, 'scowl', dur + 2);
     dunkLog.push({ idx: fg.idx, said: text, t: +crowdT.toFixed(2) });
     if (dunkLog.length > 60) dunkLog.shift();
   }
@@ -46614,6 +46624,17 @@ async function buildJadrija(scene) {
       for (const k in crowds) for (const fg of crowds[k].figures) if (fg.edge) edgeByIdx.set(fg.idx, fg);
     }
     return edgeByIdx.get(bi) || null;
+  }
+  /** The person `bi` is in the casting order, in whichever crowd holds them. */
+  let personByIdx = null;
+  function personOf(bi) {
+    if (!personByIdx) {
+      personByIdx = new Map();
+      for (const k in crowds) {
+        for (const fg of crowds[k].figures) if (!personByIdx.has(fg.idx)) personByIdx.set(fg.idx, fg);
+      }
+    }
+    return personByIdx.get(bi) || null;
   }
   /** Whether this body can do any of it: the diver's clips, on their skeleton. */
   const dunkable = (f) => !!(DV && f && f.clips && f.clips.includes('tread')
@@ -62722,6 +62743,8 @@ async function buildJadrija(scene) {
     bumpBalloon.say(line);
     bumpBalloon.said = line;
     bumpSaid = { fg, t: 0 };
+    faceCue(fg, 'talk', 1.3);
+    faceCue(fg, 'scowl', 2.2);
     return true;
   }
 
@@ -62814,6 +62837,7 @@ async function buildJadrija(scene) {
     bumpBalloon.say('Pardon!');
     bumpBalloon.said = 'Pardon!';
     bumpSaid = { fg: w, t: 0, dur: PARDON.hold };
+    faceCue(w, 'talk', 0.8);
     pardonLog.push({ said: w.idx, at: f.idx, mode: f.mode,
       t: +w.t.toFixed(1), s: +(w.lane + w.off).toFixed(2),
       clock: +bumpClock.toFixed(1) });
@@ -67476,6 +67500,8 @@ async function buildJadrija(scene) {
     bumpBalloon.say(line);
     bumpBalloon.said = line;
     bumpSaid = { fg: pf, t: 0, dur: THEFT.say };
+    faceCue(pf, 'talk', 1.5);
+    faceCue(pf, 'scowl', 4.0);
     bumpCool = BUMP.cool;
     theftStats.said++;
     theftLog.push({ i: r.i, who: r.c.who, what: 'say', key, t: +crowdT.toFixed(2) });
@@ -68380,6 +68406,29 @@ async function buildJadrija(scene) {
        * impulse (N·s, world) at height h over their feet — live now;
        * `home(seat)` back in the chair; `of(seat)` their state.
        */
+      /**
+       * The faces (`bather2Face`, 42-bathers2.js): every drawn bather within
+       * `r` m of the camera, with what their face is showing — the nine
+       * weights by name, rounded — and which moods are running on them.
+       */
+      faces: (r = 20) => {
+        if (!crowds.skin) return null;
+        const c = lastCam;
+        return crowds.skin.pairs().filter(([fg, f]) => fg && f && f.morph && f.mesh.visible
+          && Math.hypot(fg.x - c.x, fg.z - c.z) < r)
+          .map(([fg, f]) => {
+            const w = {};
+            f.morph.names.forEach((n, i) => { if (f.morph.w[i] > 0.005) w[n] = +f.morph.w[i].toFixed(2); });
+            const fx = {};
+            for (const k in (fg.fx || {})) {
+              if (typeof fg.fx[k] === 'number' && k !== 'talkT' && k !== 'talkPk') fx[k] = +(fg.fx[k] - FACE2_T).toFixed(1);
+            }
+            return { idx: fg.idx, mode: fg.mode, seat: fg.seat, d: +Math.hypot(fg.x - c.x, fg.z - c.z).toFixed(1),
+              on: f.morph.on.value, w, fx, blinks: fg.fx && fg.fx.bk ? fg.fx.bk.n : 0,
+              wet: f.wet ? +f.wet.value.toFixed(2) : null,
+              topple: fg.topple ? fg.topple.phase : null };
+          });
+      },
       topple: {
         stats: () => (crowds.skin && crowds.skin.toppler ? crowds.skin.toppler.stats() : null),
         list: () => (crowds.skin && crowds.skin.toppler ? crowds.skin.toppler.list() : null),

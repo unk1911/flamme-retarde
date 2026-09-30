@@ -403,7 +403,13 @@ def one(name, height, obj):
     MH.pose(rig, {})
     baked = [MH._bake_clip(rest, c) for c in clips]
     out = OUT / ('bather2_%s.fr3d.gz' % name)
-    B2.write_blob(buf, rest, baked, out, 'bathers2')
+    # And the face: MakeHuman's face rig baked on to this body as nine
+    # expressions, written as v12 (tools/face_morphs.py). Off the PACKED blob,
+    # so a rebake lands on the bytes the conversion wrote.
+    sys.path.insert(0, str(ROOT / 'tools'))
+    import face_morphs as FM
+    B2.write_blob(buf, rest, baked, out, 'bathers2',
+                  morph=lambda pk: FM.with_morphs(name, pk))
     return out
 
 

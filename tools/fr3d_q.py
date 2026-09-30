@@ -105,6 +105,15 @@ about its pivot, so it does not bound them), positions as v7, normals
 octahedral as v8/v9, colours verbatim, index as v7. `pack_crowd` / `pack_rig`
 take the v6 / v2 blob whole, as `pack_skin` does, and are what those two
 exporters write with.
+
+── v12: a v9 with faces ────────────────────────────────────────────────────────
+
+The eight bathers' expressions (1.551.0): a morph block — nine displacement
+targets on the head, baked off MakeHuman's CC0 face rig — spliced into a v9
+after its index runs, every other byte where it was. The layout is over
+`MORPH_STEP` below and the why in tools/face_morphs.py. `save_skin(...,
+morph=)` writes one; `strip_morphs` gives back the exact v9; `unpack_skin`
+strips it on the way, so the tools that parse skins do not need to know.
 """
 
 import gzip, io, struct, sys
@@ -444,20 +453,81 @@ def unpack_rig(raw: bytes) -> bytes:
                      col, idx.astype("<u4").tobytes()])
 
 
-def save_skin(path, blob: bytes):
+def save_skin(path, blob: bytes, morph=None):
     """What every skin exporter writes with: the v4/v5 blob it built, packed,
     gzipped deterministically — so a rebake that builds the same blob lands
-    on the same bytes as `main` below converted."""
+    on the same bytes as `main` below converted.
+
+    `morph`, if given, is called on the PACKED v9 and returns the v12 — the
+    bathers' faces, `with_morphs` in tools/face_morphs.py. On the packed blob
+    and not the float one so that a rebake measures the same quantised
+    positions the conversion measured, and lands on the same bytes."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(gz(pack_skin(blob)))
+    packed = pack_skin(blob)
+    if morph is not None:
+        packed = morph(packed)
+    path.write_bytes(gz(packed))
+
+
+# ── v12: v9 and a morph block (the bathers' faces) ───────────────────────────
+#
+# tools/face_morphs.py has the why and the numbers. The block goes after v9's
+# index runs and before its part table, so the clips are still the last
+# section of the file and can still be spliced on to the end (dive.py, 1.530.1).
+# Nothing before or after it moves by a byte:
+#
+#     u32 nt, u32 nm             targets, and how many vertices any of them move
+#     nt x (u16 len, utf-8 name)
+#     nm zigzag u32 deltas       the vertices, ascending, as four byte runs
+#     nt x 3 axes x nm int16     zigzag deltas, low bytes then high, in units
+#                                of MORPH_STEP metres
+#
+# `readFR3DSkin` in src/41-skin.js reads it.
+
+MORPH_STEP = 1.0 / 65536.0
+
+
+def index_end(packed: bytes) -> int:
+    """The offset just past a v9 / v12's index runs: where a morph block goes."""
+    magic, ver, nv, ni = struct.unpack_from("<4sIII", packed, 0)
+    assert magic == b"FR3D" and ver in (9, 12), ver
+    # positions 3 x 2 bytes, octahedral normals 2 x 2, UVs 2 x 4, bones 8, index 4
+    return 44 + nv * (6 + 4 + 8 + 8) + ni * 4
+
+
+def morph_end(packed: bytes, o: int) -> int:
+    nt, nm = struct.unpack_from("<II", packed, o)
+    e = o + 8
+    for _ in range(nt):
+        ln, = struct.unpack_from("<H", packed, e)
+        e += 2 + ln
+    return e + nm * 4 + nt * 3 * nm * 2
+
+
+def add_morphs(packed: bytes, block: bytes) -> bytes:
+    """A v9 blob -> v12: the version word, and the block spliced in after the
+    index. Every other byte where it was."""
+    assert struct.unpack_from("<I", packed, 4)[0] == 9
+    o = index_end(packed)
+    return packed[:4] + struct.pack("<I", 12) + packed[8:o] + block + packed[o:]
+
+
+def strip_morphs(packed: bytes) -> bytes:
+    """v12 -> exactly the v9 it was made from; anything else passes through."""
+    if struct.unpack_from("<I", packed, 4)[0] != 12:
+        return packed
+    o = index_end(packed)
+    return packed[:4] + struct.pack("<I", 9) + packed[8:o] + packed[morph_end(packed, o):]
 
 
 def unpack_skin(raw: bytes) -> bytes:
     """A v8/v9 blob -> the v4/v5 blob it was packed from, with the positions,
     normals and UVs as `readFR3DSkin` decodes them. For the Python tools that
-    parse skins (crowd_far.py, pinch_solve.py); a v4/v5 blob passes through."""
+    parse skins (crowd_far.py, pinch_solve.py); a v4/v5 blob passes through,
+    and a v12's morph block is dropped (`strip_morphs`)."""
     import numpy as np
+    raw = strip_morphs(raw)
     magic, ver, nv, ni = struct.unpack_from("<4sIII", raw, 0)
     if ver in (4, 5):
         return raw
