@@ -45381,6 +45381,36 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * A TUG ON THE LEASH, WITH HER ON THE COT (1.554.0) — from `leashTug`.
+   * The leash's own partial ragdoll (`leashRag*`) is not for here: it holds
+   * her hips in mid-air, and on the cot she is already the cot's ragdoll, in
+   * a net with the mattress under her. So the pull goes into that net, the
+   * slap's way (`cotImpulse`): on her neck body toward your hand, lifted a
+   * little (`up`) — off the pillow, not along it — and `chest` of it on her
+   * chest, and the give drawn for the slap's `calm`. Her head and shoulders
+   * come up toward you, the mattress has the rest of her, and her muscles
+   * have her back in the pose. `dir` the pull's way, world; `u` how hard.
+   */
+  function cotTug(u, dir) {
+    const R = cotR;
+    if (!R || !R.on || !skinFig) return false;
+    const T = LEASH_POSE.cotTug, { rag } = R;
+    const J = T.J[0] + (T.J[1] - T.J[0]) * clamp(u, 0, 1);
+    let jx = dir.x, jy = dir.y + T.up, jz = dir.z;
+    const l = Math.hypot(jx, jy, jz) || 1;
+    jx /= l; jy /= l; jz /= l;
+    const nb = rag.body('neck'), cb = rag.body('chest');
+    if (nb >= 0) cotImpulse(nb, null, jx * J, jy * J, jz * J);
+    if (cb >= 0) cotImpulse(cb, null, jx * J * T.chest, jy * J * T.chest, jz * J * T.chest);
+    R.calm = COT_RAG.calm;
+    if (R.t < R.warmFor) R.t = R.warmFor;
+    cotStats.tugs = (cotStats.tugs || 0) + 1;
+    cotStats.lastTug = { J: +J.toFixed(2), dv: nb >= 0 ? +(J / R.net.mass[nb]).toFixed(2) : null,
+      dir: [+jx.toFixed(2), +jy.toFixed(2), +jz.toFixed(2)], phase: show.phase };
+    return true;
+  }
+
+  /**
    * WHERE ON HER BACK THE CROSSHAIR IS, while she lies on her front on the
    * cot (COT_RAG.phases). Misha, 28 Sep 2026, of 1.540.0: *"it seems like
    * only about 25% of the spanks land, the others result in nothing. can u
@@ -46367,8 +46397,83 @@ async function buildJadrija(scene) {
   // and knees, which lurch toward you and plant again (`lurch`, `stumble`).
   // She never falls over: her hips are held in the net, and the lurch is a
   // few quick steps of the crawl, not a push.
+  //
+  // AND IT IS NOT ONLY ALL FOURS (1.554.0). Misha, 30 Sep 2026: *"she is
+  // always on all fours, always only in that pose ... if i yank the collar up
+  // she goes from all fours and into 'kneeling' position, and then if near
+  // the cot/bed, that she goes on the cot ... even standing up, it should
+  // work"*. So she has a POSE on the end of it (`leash.pose`: 'fours',
+  // 'kneel', 'stand', or 'cot'), and a firm yank moves it a step (LEASH_POSE):
+  // flicked UP, up a step — all fours to her knees, her knees to her feet; and
+  // near the cot and toward it, on to it. Flicked DOWN, down a step. A light
+  // tug still only lurches her, in every one of them. The steps are her own
+  // clips, run on from where she is:
+  //
+  //   leashUp       all fours to her knees: `getup` to KNEEL (its 0.40 s),
+  //                 then `submit` from KNEEL on to her heels (`leashSit`);
+  //   leashSit      on to her heels: `submit`, whole from standing, or its end;
+  //   leashKnelt    kneeling up (`kept`), facing you — and walked away from,
+  //                 down on all fours to follow (`leashDown`);
+  //   leashStandUp  her knees to her feet: `submit` run backwards;
+  //   leashStand    standing, facing you, her head to you;
+  //   leashWalk     following on foot, on your trail, as the crawl does;
+  //   leashToCot    to the cot's side, in whichever of the three she is in,
+  //                 and then on to it by the room's own road (`lieDown`) with
+  //                 the leash still clipped: mode 'cot', in the cot's phases.
   const LEASH_PH = { leashCome: 1, leashKneel: 1, leashPut: 1, leashDown: 1, leashFours: 1,
-    leashCrawl: 1, leashRise: 1, leashOff: 1 };
+    leashCrawl: 1, leashRise: 1, leashOff: 1,
+    leashUp: 1, leashSit: 1, leashKnelt: 1, leashStandUp: 1, leashStand: 1, leashWalk: 1, leashToCot: 1 };
+  /**
+   * HER POSE ON THE LEASH, and what moves it (1.554.0) — see the note over
+   * LEASH_PH, and COLLAR.yank in 90-app.js for the gesture.
+   */
+  const LEASH_POSE = {
+    // How hard a yank has to be (u, 0..1 — a click is 0.25-0.3, held half a
+    // second is 1) to change her pose at all. Under it, a lurch.
+    firm: 0.55,
+    // `getup` has her up on her knees (KNEEL) at this many s; `submit` is on
+    // KNEEL at this many, and on her heels at its end.
+    upAt: 0.40, sitFrom: 1.0,
+    // STANDING, FOLLOWING: her ring this far from your feet, level, m — a
+    // little more than on all fours, because standing the chain goes up to
+    // her throat at 1.45 m and down to your hip — and her pace up to `max`.
+    follow: 1.05, max: 1.95,
+    // A tug's lurch, times the one on all fours: standing it is a step or
+    // two of the walk; kneeling it is her upper body alone (the ragdoll), a
+    // woman on her knees is not slid across a floor.
+    lurch: { stand: 0.6, kneel: 0 },
+    // THE COT: a yank takes her on to it with her within `near` m of its
+    // footprint and the pull toward it (`toward`, the cosine off the way to
+    // its nearest point) — or you standing within `you` m of it and her
+    // within `led` of it, which is her following you there: on the end of
+    // the leash she is a metre behind you, and led up to it by the obvious
+    // route she was 1.8-2.2 m off it when the yank came, and you 1.0-1.4 —
+    // the leash holds you 1.3 m from her collar (MEASURED). Her mark
+    // beside it, `mark` m out from its walkway edge, level with where she
+    // lies on it (`cotSpot`). Off it: a firm tug with you `off` m or more
+    // from its edge — stepped back to near the end of the leash (it reaches
+    // about 1.2 m past the edge from her collar on the pillow). At 0.80 a
+    // firm tug from where you naturally stand beside her pulled her off
+    // (MEASURED, 0.84 m), when it was meant to lurch her.
+    cot: { near: 1.2, toward: 0.25, you: 1.2, led: 2.4, mark: 0.36, off: 1.0 },
+    // A tug on her on the cot, N·s on the net's neck body, and `chest` of it
+    // on her chest — her head and shoulders lifted toward your hand off the
+    // pillow, and the mattress under the rest (`cotTug`). MEASURED face down,
+    // the firmest (u 0.95) from beside her: at 2.2-6.5 N·s and `up` 0.25 her
+    // neck gave 5.4 degrees, which does not read as a yank at all; at 6-18
+    // and 0.6-1.0, 21-24 degrees at 150 ms and her chest 5-6, back within
+    // half a second, no rescues; at 8-24 it sat on the neck's 25-degree stop.
+    cotTug: { J: [5, 16], chest: 0.65, up: 0.8 },
+    // And in the hammock: a push toward you, `k` of a hand's (the hammock's
+    // own push, from the far side of her), up to a firm one, which is her out.
+    ham: [0.25, 0.8],
+  };
+  /**
+   * The words (and the service's skills) that are a pose on the leash — see
+   * `askWhy`. Anything else asked of her there is `leashed`.
+   */
+  const LEASH_ASK = { rise: 'stand', submit: 'kneel', fours: 'fours', recline: 'cot', 'recline.bed': 'cot',
+    flat: 'cot', 'flat.edge': 'cot:edge', 'sit.knees': 'cot:knees' };
   const COLLAR_FIT = {
     // Where on her neck: this far from the head of `neck` to the head of
     // `head` (0.114 m of bone), and the middle of her neck that far behind
@@ -46424,7 +46529,11 @@ async function buildJadrija(scene) {
   // (0..1), `buckled` and `clipped` the other two things it takes; `mode`
   // 'lead' while she is on the leash and following, 'free' while it is on her
   // and she is doing something else (the hammock).
+  // (1.554.0) `pose` is where she is on the end of it and `want` where a
+  // yank or a word has asked her to go (`leashWants`); `cotHow` how she goes
+  // on to the cot; `careHere` the aftercare where she is, off the floor.
   const leash = { on: false, collar: 0, buckled: false, clipped: false, mode: null,
+    pose: 'fours', want: null, cotHow: 'flat', lastTug: null, careHere: false,
     putT: 0, offing: null, after: null, safe: null, trail: [], freeT: 0,
     pullF: 0, pullDir: new THREE.Vector3(0, 1, 0), lurchV: 0, lurchT: 0, lurchS: 0, stumble: 0,
     careT: 0, headW: new THREE.Vector3(), ragHold: 0,
@@ -46856,6 +46965,7 @@ async function buildJadrija(scene) {
     L.putT = 0; L.offing = null; L.after = null; L.safe = null; L.trail.length = 0;
     L.pullF = 0; L.lurchV = 0; L.stumble = 0; L.v = 0; L.said = null; L.swing = -1.35; L.careT = 0;
     L.come = null;
+    L.pose = 'fours'; L.want = null; L.cotHow = 'flat'; L.lastTug = null; L.careHere = false;
   }
 
   /** All of it off her, now — the end of `offing`, or a reset. */
@@ -46863,6 +46973,7 @@ async function buildJadrija(scene) {
     const L = leash;
     L.on = false; L.collar = 0; L.buckled = false; L.clipped = false; L.mode = null;
     L.offing = null; L.after = null; L.trail.length = 0; L.pullF = 0; L.lurchV = 0; L.stumble = 0;
+    L.want = null; L.pose = 'fours';
     if (collarKit) collarKit.K.group.visible = false;
     // The ask that started it is over — the room may have her again.
     if (show) show.byAsk = 0;
@@ -46880,26 +46991,36 @@ async function buildJadrija(scene) {
    * is to run for these phases but the placement).
    */
   function leashStep(dt, pt, ps, done, go) {
-    const L = leash, f = skinFig, S = f.state, O = LEASH_ON;
+    const L = leash, f = skinFig, S = f.state, O = LEASH_ON, P = LEASH_POSE;
     const t0 = performance.now();
     L.freeT = 0;
+    const d = Math.hypot(show.t - pt, show.s - ps);
     // WHAT SHE IS ASKED ON THE LEASH. The hammock is the one thing she is let
-    // off it for: up off her hands, and the ask handed on to the dispatch the
-    // moment she is standing (`leashRise`, `after`). Anything else waits for
-    // the collar to come off — and says so, rather than being eaten.
+    // off it for: up on her feet, and the ask handed on to the dispatch the
+    // moment she is standing (`leashRise`, `after`). A POSE on it (LEASH_ASK,
+    // 1.554.0: "kneel", "stand up", "on all fours", "on the cot") is a `want`,
+    // the same one a firm yank sets. Anything else waits for the collar to
+    // come off — and says so, rather than being eaten.
     if (show.ask && L.mode === 'lead' && show.phase !== 'leashRise') {
       const a = show.ask;
       show.ask = null;
       if (a === 'hammock') {
         const why = askWhy('hammock');
-        if (!why) { show.did = 'hammock'; L.after = 'hammock'; go('leashRise', 'getup', 0.32); }
+        if (!why) { show.did = 'hammock'; leashUprightFor('hammock', go); }
         else { show.why = why; show.did = null; }
+      } else if (LEASH_ASK[a]) {
+        const why = leashPoseWhy(LEASH_ASK[a]);
+        if (!why) { leashWant(LEASH_ASK[a]); show.did = a; } else { show.why = why; show.did = null; }
       } else { show.why = 'leashed'; show.did = null; }
     }
-    // The pull, out of her frame into the shore's, and the lurch it makes.
+    // The pull, out of her frame into the shore's, and the lurch it makes —
+    // on all fours, and a step or two standing (LEASH_POSE.lurch). Kneeling,
+    // and between two poses, it is her upper body alone (`leashRag*`).
     if (L.lurchV > 0.01) {
+      const k = show.phase === 'leashFours' || show.phase === 'leashCrawl' ? 1
+        : show.phase === 'leashStand' || show.phase === 'leashWalk' ? P.lurch.stand : 0;
       const dx = pt - L.ringTS[0], dz = ps - L.ringTS[1], gap = Math.hypot(dx, dz);
-      const v = gap > O.lurch.near ? L.lurchV : 0;
+      const v = gap > O.lurch.near ? L.lurchV * k : 0;
       show.t += L.lurchT * v * dt; show.s += L.lurchS * v * dt;
       L.lurchV *= Math.exp(-dt / O.lurch.tau);
     } else L.lurchV = 0;
@@ -46943,59 +47064,39 @@ async function buildJadrija(scene) {
         break;
       case 'leashPut': {
         face();
-        const P = O.put;
+        const Pp = O.put;
         L.putT += dt;
-        L.collar = sat((L.putT - P.wrap[0]) / (P.wrap[1] - P.wrap[0]));
-        if (L.putT >= P.buckle) L.buckled = true;
-        if (L.putT >= P.clip && !L.clipped) { L.clipped = true; L.said = 'on'; }
-        if (L.putT >= P.end) {
+        L.collar = sat((L.putT - Pp.wrap[0]) / (Pp.wrap[1] - Pp.wrap[0]));
+        if (L.putT >= Pp.buckle) L.buckled = true;
+        if (L.putT >= Pp.clip && !L.clipped) { L.clipped = true; L.said = 'on'; }
+        if (L.putT >= Pp.end) {
           L.mode = 'lead';
-          go('leashDown', null);
-          f.play('kneel', { fade: O.kneelFade, from: O.kneelFrom });
+          leashDownGo(go);
           L.trail.length = 0;
         }
         break;
       }
       case 'leashDown':
         face();
-        if (S.cur && S.curT >= S.cur.dur - 0.03) go('leashFours', null);
+        if (S.cur && S.curT >= S.cur.dur - 0.03) { L.pose = 'fours'; go('leashFours', null); }
         break;
       case 'leashFours':
       case 'leashCrawl': {
-        // THE TRAIL: where you walked, a point every quarter metre.
-        const T = L.trail, lastP = T[T.length - 1];
-        if (!lastP || Math.hypot(pt - lastP[0], ps - lastP[1]) > O.trail.step) {
-          T.push([pt, ps]);
-          if (T.length > O.trail.most) T.shift();
+        L.pose = 'fours';
+        const moving = show.phase === 'leashCrawl';
+        // Asked to be somewhere else: stopped first, and then the step.
+        if (L.want) {
+          if (moving) { go('leashFours', null); leashHoldFours(f, 0.28); break; }
+          if (leashWants(pt, ps, d, go)) break;
         }
-        // Drop what she has reached, and what is behind her on the way to
-        // you — a point further from you than her collar is already past.
-        const gap = Math.hypot(pt - L.ringTS[0], ps - L.ringTS[1]);
-        while (T.length > 1 && (Math.hypot(T[0][0] - show.t, T[0][1] - show.s) < O.trail.reach
-          || Math.hypot(T[0][0] - pt, T[0][1] - ps) > gap + 0.8)) T.shift();
-        L.stats.trail = T.length; L.stats.gap = gap;
-        const goal = T.length > 1 ? T[0] : [pt, ps];
-        const want = gap > O.follow + (show.phase === 'leashCrawl' ? O.stop : O.start)
-          ? Math.min(O.max, (gap - O.follow) * O.k) : 0;
-        L.v = damp(L.v, want, O.accel, dt);
-        if (show.phase === 'leashFours') {
+        const goal = leashTrail(dt, pt, ps, O.follow, moving, O.max);
+        if (!moving) {
           face();
-          if (L.v > 0.08 || L.stumble > 0) {
-            go('leashCrawl', 'crawl', 0.22);
-          }
+          if (L.v > 0.08 || L.stumble > 0) go('leashCrawl', 'crawl', 0.22);
           break;
         }
-        // Crawling: along the trail, turning as a body on its hands turns —
-        // slower while she is still pointed away from where she is going.
-        show.want = Math.atan2(goal[1] - show.s, goal[0] - show.t);
-        let err = show.want - show.ang;
-        while (err > Math.PI) err -= TAU;
-        while (err < -Math.PI) err += TAU;
-        const turnK = Math.max(0.15, Math.cos(Math.min(Math.abs(err), Math.PI / 2)));
-        const v = L.v * turnK;
-        show.t += Math.cos(show.ang) * v * dt;
-        show.s += Math.sin(show.ang) * v * dt;
-        showClear();
+        // Crawling: along the trail, turning as a body on its hands turns.
+        const v = leashMove(dt, goal);
         L.stats.crawlV = v;
         // The crawl's clock off her pace — and quick, while she is catching
         // herself after a tug.
@@ -47007,33 +47108,97 @@ async function buildJadrija(scene) {
         }
         break;
       }
+      // ── UP ON HER KNEES, AND ON TO HER FEET (1.554.0) ─────────────────
+      case 'leashUp':
+        // `getup` as far as KNEEL, and from there `submit`'s own last beat,
+        // KNEEL back on to her heels — two clips that share the key she is on
+        // at the handover, so there is nothing to cross.
+        face();
+        if (!S.cur || S.cur.name !== 'getup' || S.curT >= P.upAt) {
+          go('leashSit', null);
+          f.play('submit', { fade: 0.14, from: P.sitFrom });
+        }
+        break;
+      case 'leashSit':
+        face();
+        if (done || !S.cur || S.cur.name !== 'submit') {
+          L.pose = 'kneel'; L.holdAt = null;
+          go('leashKnelt', 'kept', 0.30);
+        }
+        break;
+      case 'leashKnelt': {
+        L.pose = 'kneel';
+        face();
+        // Asked to take it off, or for the hammock, from here (off the cot):
+        // up on her feet first — see `leashUprightFor`.
+        if (L.after) { leashUprightFor(L.after, go); break; }
+        if (L.want && leashWants(pt, ps, d, go)) break;
+        // AND WALKED AWAY FROM, she goes down on all fours to follow. From
+        // where you stood when she got there: her ring kneeling up is a third
+        // of a metre further from you than on her hands, so a gap alone would
+        // put her straight back down.
+        if (!L.holdAt) L.holdAt = [pt, ps];
+        if (Math.hypot(pt - L.holdAt[0], ps - L.holdAt[1]) > 0.45) {
+          L.holdAt = null; L.trail.length = 0;
+          leashDownGo(go);
+        }
+        break;
+      }
+      case 'leashStandUp':
+        // `submit` run backwards: off her heels, up through the lunge, on to
+        // her feet — the kneel she came down by, the other way (`unroll`'s
+        // arrangement: no fade, the clock turned round every frame).
+        face();
+        S.speed = -1;
+        if (!S.cur || S.cur.name !== 'submit' || S.curT <= 0) {
+          S.speed = 1; L.pose = 'stand';
+          go('leashStand', 'idle', 0.25);
+        }
+        break;
+      case 'leashStand':
+      case 'leashWalk': {
+        L.pose = 'stand';
+        // Her face to you, which is where the leash goes: the gaze's own
+        // clock (`gazeTick`), kept topped up while she is on her feet.
+        show.gaze = Math.max(show.gaze || 0, 0.35);
+        const moving = show.phase === 'leashWalk';
+        if (L.want) {
+          if (moving) { show.vel = 0; go('leashStand', 'idle', 0.25); break; }
+          if (leashWants(pt, ps, d, go)) break;
+        }
+        const goal = leashTrail(dt, pt, ps, P.follow, moving, P.max);
+        if (!moving) {
+          face();
+          show.vel = 0;
+          if (L.v > 0.08 || L.stumble > 0) go('leashWalk', 'walk', 0.25);
+          break;
+        }
+        const v = leashMove(dt, goal);
+        L.stats.walkV = v;
+        S.speed = L.stumble > 0 ? 1.5 : clamp(Math.max(v, L.lurchV * P.lurch.stand) / SHOW.walk, 0.55, 1.75);
+        if (L.v < 0.05 && L.stumble <= 0 && L.lurchV < 0.05) go('leashStand', 'idle', 0.28);
+        break;
+      }
+      // ── TO THE COT ────────────────────────────────────────────────────
+      case 'leashToCot': {
+        // To her mark beside it (`leashCotMark`), in whichever pose she is
+        // in: a crawl, a knee shuffle (`creep`'s clip), a walk. Then the
+        // pose she settles in reads the `want` again and goes on to it.
+        const mk = leashCotMark();
+        if (!mk || L.want !== 'cot') { leashSettle(go); break; }
+        const dist = Math.hypot(mk[0] - show.t, mk[1] - show.s);
+        const top = L.pose === 'stand' ? 0.9 : L.pose === 'kneel' ? SHOW.creep : 0.7;
+        L.v = damp(L.v, dist > 0.08 ? Math.min(top, Math.max(0.2, dist * 2)) : 0, O.accel, dt);
+        const v = leashMove(dt, mk);
+        S.speed = L.pose === 'stand' ? clamp(v / SHOW.walk, 0.55, 1.75)
+          : L.pose === 'fours' ? clamp(v / O.clipV, O.rate[0], O.rate[1]) : 1;
+        if (dist < 0.10 || (dist < 0.3 && show.tmr > 6)) { L.v = 0; leashSettle(go); }
+        else if (show.tmr > 12) { L.want = null; show.why = 'noway'; leashSettle(go); }
+        break;
+      }
       case 'leashRise':
         face();
-        if (done) {
-          if (L.after === 'hammock' && L.on) {
-            // Off the leash for it, and straight on to the hammock's own
-            // road — the dispatch's branch for 'hammock', as it is: the mark,
-            // the way there (`hamRoute`), `hamGo`. Not by handing the ask
-            // back to the dispatch, which only hears it from a phase it may
-            // be entered from — and the ones that are, out here, are `play`
-            // and `home`, which clamp her to her lane (see `leashRelease`).
-            L.mode = 'free'; L.freeT = 0; L.after = null;
-            const mk = hamMark();
-            const legs = mk ? hamRoute(mk) : null;
-            if (mk && legs) {
-              show.job = { name: 'hammock', t: mk.t, s: mk.s, since: 0, leg: 0, legs,
-                best: null, stall: 0, replan: 0 };
-              show.ham = { mark: mk, t: 0, enter: false, laugh: 0, pushedAt: -9, alone: 0 };
-              show.stuck = null;
-              show.queue.length = 0;
-              L.said = 'ham';
-              go('hamGo', 'walk', 0.32);
-            } else { show.why = 'noway'; L.mode = 'lead'; go('leashDown', 'kneel', 0.35); }
-          } else {
-            go('leashOff', 'idle', 0.30);
-            if (L.on && !L.offing) L.offing = { t: 0, fast: !!L.safe, ready: !!L.safe };
-          }
-        }
+        if (done) leashRisen(go);
         break;
       case 'leashOff': {
         // Up on her feet and a step to you, near enough for your hands at
@@ -47069,6 +47234,200 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * FOLLOWING IS YOUR TRAIL: where you walked, a point every quarter metre,
+   * and her pace off how far her ring is from your feet past `follow` —
+   * `moving` for the smaller margin a body already going keeps going by.
+   * Answers where she is headed (the trail's next point, or you).
+   */
+  function leashTrail(dt, pt, ps, follow, moving, max) {
+    const L = leash, O = LEASH_ON;
+    const T = L.trail, lastP = T[T.length - 1];
+    if (!lastP || Math.hypot(pt - lastP[0], ps - lastP[1]) > O.trail.step) {
+      T.push([pt, ps]);
+      if (T.length > O.trail.most) T.shift();
+    }
+    // Drop what she has reached, and what is behind her on the way to you —
+    // a point further from you than her collar is already past.
+    const gap = Math.hypot(pt - L.ringTS[0], ps - L.ringTS[1]);
+    while (T.length > 1 && (Math.hypot(T[0][0] - show.t, T[0][1] - show.s) < O.trail.reach
+      || Math.hypot(T[0][0] - pt, T[0][1] - ps) > gap + 0.8)) T.shift();
+    L.stats.trail = T.length; L.stats.gap = gap;
+    const want = gap > follow + (moving ? O.stop : O.start) ? Math.min(max, (gap - follow) * O.k) : 0;
+    L.v = damp(L.v, want, O.accel, dt);
+    return T.length > 1 ? T[0] : [pt, ps];
+  }
+
+  /**
+   * Her at `L.v` toward `goal`, turning as a body turns — slower while she is
+   * still pointed away from where she is going — out of the blockers.
+   * Answers her pace this frame.
+   */
+  function leashMove(dt, goal) {
+    const L = leash;
+    show.want = Math.atan2(goal[1] - show.s, goal[0] - show.t);
+    let err = show.want - show.ang;
+    while (err > Math.PI) err -= TAU;
+    while (err < -Math.PI) err += TAU;
+    const turnK = Math.max(0.15, Math.cos(Math.min(Math.abs(err), Math.PI / 2)));
+    const v = L.v * turnK;
+    show.t += Math.cos(show.ang) * v * dt;
+    show.s += Math.sin(show.ang) * v * dt;
+    showClear();
+    return v;
+  }
+
+  /** Down on to all fours from her knees: `kneel` from where it has her on them. */
+  function leashDownGo(go) {
+    go('leashDown', null);
+    skinFig.play('kneel', { fade: LEASH_ON.kneelFade, from: LEASH_ON.kneelFrom });
+  }
+  /** All fours to her knees — see `leashUp`. */
+  function leashUpGo(go) { go('leashUp', 'getup', 0.28); }
+  /** Her knees to her feet — see `leashStandUp`. */
+  function leashStandGo(go) {
+    const f = skinFig, S = f.state;
+    go('leashStandUp', null);
+    if (!S.cur || S.cur.name !== 'submit') f.play('submit', { fade: 0, from: 1e3 });
+    if (S.cur && S.cur.name === 'submit') S.curT = Math.min(S.curT, S.cur.dur);
+    S.prev = null;
+    S.speed = -1;
+  }
+  /** Still, in the pose she is in. */
+  function leashSettle(go) {
+    const L = leash;
+    if (L.pose === 'stand') go('leashStand', 'idle', 0.30);
+    else if (L.pose === 'kneel') { L.holdAt = null; go('leashKnelt', 'kept', 0.30); }
+    else { go('leashFours', null); leashHoldFours(skinFig, 0.28); }
+  }
+
+  /** A pose on the leash asked for: 'fours', 'kneel', 'stand', or 'cot[:how]'. */
+  function leashWant(p) {
+    const L = leash;
+    if (p.startsWith('cot')) { L.want = 'cot'; L.cotHow = p.split(':')[1] || 'flat'; } else L.want = p;
+  }
+  /** Why not, or null. The cot is the kabina's. */
+  function leashPoseWhy(p) {
+    if (p.startsWith('cot') && (!kit || !kit.cot || !kit.cotEdge || !sheIsIn())) return 'nocot';
+    return null;
+  }
+
+  /**
+   * THE COT, AS THE LEASH SEES IT. How far (t, s) is from its footprint, m,
+   * and the nearest point of it — the mattress's 0.70 by 1.90 about `cot`'s
+   * middle across and `cotEdge`'s along (see `kabinaKit`).
+   */
+  function leashCotGap(t, s) {
+    if (!kit || !kit.cot || !kit.cotEdge) return [Infinity, t, s];
+    const cm = kit.cot[0], cs = kit.cotEdge[1];
+    const nt = clamp(t, cm - 0.35, cm + 0.35), ns = clamp(s, cs - 0.95, cs + 0.95);
+    return [Math.hypot(t - nt, s - ns), nt, ns];
+  }
+  /**
+   * Her mark beside it: off its walkway edge (`cotEdge` is 7 cm in from
+   * that), level with where she lies on it (`cotSpot`) — so `lieDown`'s
+   * road on to it is a short one, and not a slide across the room.
+   */
+  function leashCotMark() {
+    if (!kit || !kit.cot || !kit.cotEdge || !special || !sheIsIn()) return null;
+    const K = special, sp = cotSpot();
+    return [Math.max(K.t0 + 0.40, kit.cotEdge[0] - 0.07 - LEASH_POSE.cot.mark), sp[1]];
+  }
+
+  /**
+   * The step toward the pose she is asked for (`leash.want`), from the one
+   * she is settled in — answers whether it took one. One step at a time: all
+   * fours to her knees to her feet, and down the same way; to the cot by her
+   * mark beside it and her knees.
+   */
+  function leashWants(pt, ps, d, go) {
+    const L = leash, w = L.want, p = L.pose;
+    if (!w) return false;
+    if (w === 'cot') {
+      const mk = leashCotMark();
+      if (!mk) { L.want = null; show.why = 'nocot'; return false; }
+      if (Math.hypot(show.t - mk[0], show.s - mk[1]) > 0.22) {
+        go('leashToCot', p === 'fours' ? 'crawl' : p === 'kneel' ? 'knees' : 'walk', 0.28);
+        L.v = 0;
+        return true;
+      }
+      if (p === 'fours') { leashUpGo(go); return true; }
+      if (p === 'stand') { go('leashSit', 'submit', 0.25); return true; }
+      // ON HER KNEES BESIDE IT, and on to it by the room's own road, with the
+      // leash still clipped: `lieDown` on to the cot (`recline`, and the
+      // mattress under her), and the cradle sends her on — on to her front
+      // (`flat`), over the edge (`flatEdge`), or up on her knees on it
+      // (`sit.knees`). From here she is in the cot's phases, mode 'cot' —
+      // the cot's ragdoll, the slap, the belt, "turn over" — and
+      // `leashCotTick` has her back on the leash when she is off it again.
+      L.want = null; L.mode = 'cot'; L.pose = 'cot';
+      L.trail.length = 0; L.v = 0; L.lurchV = 0; L.stumble = 0;
+      L.stats.cots = (L.stats.cots || 0) + 1;
+      show.lieWant = 'bed';
+      show.edgeWant = L.cotHow === 'edge' ? 1 : 0;
+      show.flatWant = L.cotHow === 'knees' ? 0 : L.cotHow === 'edge' ? 2 : 1;
+      show.poseWant = L.cotHow === 'knees' ? 'sit.knees' : null;
+      show.sideWant = null;
+      show.byAsk = 1;
+      lieDown(pt, ps, d, go);
+      return true;
+    }
+    const rank = { fours: 0, kneel: 1, stand: 2 };
+    if (rank[w] == null || rank[w] === rank[p]) { L.want = null; return false; }
+    if (rank[w] > rank[p]) {
+      if (p === 'fours') leashUpGo(go); else leashStandGo(go);
+    } else if (p === 'stand') go('leashSit', 'submit', 0.25);
+    else { L.trail.length = 0; leashDownGo(go); }
+    return true;
+  }
+
+  /**
+   * On her feet for `after` ('hammock', or 'off'), from whichever pose she
+   * is in: all fours by the whole of `getup`, her knees by its second half,
+   * and standing at once.
+   */
+  function leashUprightFor(after, go) {
+    const L = leash;
+    L.after = after; L.want = null;
+    if (L.pose === 'stand' || show.phase === 'leashStandUp') { leashRisen(go); return; }
+    if (show.phase === 'leashKnelt' || show.phase === 'leashSit') {
+      go('leashRise', null);
+      skinFig.play('getup', { fade: 0.30, from: LEASH_POSE.upAt });
+      return;
+    }
+    go('leashRise', 'getup', 0.32);
+  }
+
+  /** Standing, and what she got up for: the hammock, or the collar off. */
+  function leashRisen(go) {
+    const L = leash;
+    L.pose = 'stand';
+    if (L.after === 'hammock' && L.on) {
+      // Off the leash for it, and straight on to the hammock's own
+      // road — the dispatch's branch for 'hammock', as it is: the mark,
+      // the way there (`hamRoute`), `hamGo`. Not by handing the ask
+      // back to the dispatch, which only hears it from a phase it may
+      // be entered from — and the ones that are, out here, are `play`
+      // and `home`, which clamp her to her lane (see `leashRelease`).
+      L.mode = 'free'; L.freeT = 0; L.after = null;
+      const mk = hamMark();
+      const legs = mk ? hamRoute(mk) : null;
+      if (mk && legs) {
+        show.job = { name: 'hammock', t: mk.t, s: mk.s, since: 0, leg: 0, legs,
+          best: null, stall: 0, replan: 0 };
+        show.ham = { mark: mk, t: 0, enter: false, laugh: 0, pushedAt: -9, alone: 0 };
+        show.stuck = null;
+        show.queue.length = 0;
+        L.said = 'ham';
+        go('hamGo', 'walk', 0.32);
+      } else { show.why = 'noway'; L.mode = 'lead'; L.pose = 'fours'; go('leashDown', 'kneel', 0.35); }
+    } else {
+      L.after = null;
+      go('leashOff', 'idle', 0.30);
+      if (L.on && !L.offing) L.offing = { t: 0, fast: !!L.safe, ready: !!L.safe };
+    }
+  }
+
+  /**
    * Every frame, from `stepShow` ahead of the phases: the collar coming off
    * (`offing`), whatever she is doing; and her put back on the leash when
    * she is let off it for the hammock and is out of it again.
@@ -47076,7 +47435,13 @@ async function buildJadrija(scene) {
   function leashTick(dt, go) {
     const L = leash;
     L.stats.ms = 0;
-    if (!L.on) return;
+    // THE AFTERCARE WHERE SHE IS (1.554.0): a safeword on the cot or in the
+    // hammock takes the collar off where she lies, and your hand goes to her
+    // hair there (90-app.js) for `care` seconds — she is not got up for it.
+    if (!L.on) {
+      if (L.careHere && L.careT > 0) { L.careT -= dt; if (L.careT <= 0) L.careHere = false; }
+      return;
+    }
     if (L.offing) {
       const O = LEASH_ON.off, o = L.offing;
       // Standing for it, it waits until she has stepped to you — see `leashOff`.
@@ -47091,6 +47456,7 @@ async function buildJadrija(scene) {
         // goodbye, or after a safeword the aftercare (90-app.js) — before
         // she is her own again: see `leashOff`.
         L.careT = L.safe && L.safe !== 'away' ? LEASH_ON.care[1] : LEASH_ON.care[0];
+        L.careHere = !LEASH_PH[show.phase];
         leashClear(); L.stats.offs = (L.stats.offs || 0) + 1;
       }
       return;
@@ -47099,12 +47465,82 @@ async function buildJadrija(scene) {
       L.freeT += dt;
       const inHam = HAM[show.phase] && show.phase !== 'hamBack';
       if (!inHam && (show.phase === 'hamBack' || L.freeT > LEASH_ON.freeGrace) && !LEASH_PH[show.phase]) {
-        // Back on the leash: down on all fours where she stands.
+        // Back on the leash: down on all fours where she stands — or, pulled
+        // out of it with the leash flicked up (`leashTug`), on her feet.
         L.mode = 'lead'; L.trail.length = 0; L.stats.recapture++;
         show.job = null; show.ham = null;
-        go('leashDown', 'kneel', 0.35);
+        if (L.want === 'stand') { L.want = null; L.pose = 'stand'; go('leashStand', 'idle', 0.35); }
+        else { L.pose = 'fours'; go('leashDown', 'kneel', 0.35); }
       }
     }
+    if (L.mode === 'cot') leashCotTick(go);
+  }
+
+  /**
+   * ON THE COT, ON THE LEASH (1.554.0). She is in the cot's own phases —
+   * `recline` on to it, the cradle, her front, over the edge, up on her
+   * knees, and the roll back and the sit-up off it — and every one of them
+   * is the room's, as it always was: the cot's ragdoll, the slap, the belt,
+   * "turn over", the clock that gets her up after seven minutes. What is the
+   * leash's is two things. A POSE on the leash asked for there (LEASH_ASK,
+   * not the cot's own — "stand up", "kneel", "on all fours") is her off the
+   * cot and then that. And OFF IT — on the floor, in a phase that is not the
+   * cot's — she is back on the end of it, in the pose she is in.
+   */
+  const COT_ROAD = { recline: 1, situp: 1, unroll: 1 };
+  function leashCotTick(go) {
+    const L = leash;
+    if (show.ask && LEASH_ASK[show.ask] && !LEASH_ASK[show.ask].startsWith('cot')) {
+      const a = show.ask;
+      show.ask = null; show.did = a;
+      leashOffCot(LEASH_ASK[a], go);
+    }
+    if (COT_ROAD[show.phase] || LYING[show.phase] || POSED[show.phase]) return;
+    L.mode = 'lead'; L.trail.length = 0; L.v = 0; L.lurchV = 0; L.stumble = 0; L.holdAt = null;
+    L.stats.offCot = (L.stats.offCot || 0) + 1;
+    show.getUp = 0; show.flatWant = 0; show.poseWant = null; show.lieWant = null; show.sideWant = null;
+    show.onBed = 0; show.mat = 0; show.job = null;
+    // `situp` lands on her heels, `kept`: that is the kneel, and it is
+    // already playing.
+    if (show.phase === 'kept') { L.pose = 'kneel'; go('leashKnelt', null); }
+    else if (KNEES[show.phase] || show.phase === 'creep') { L.pose = 'kneel'; go('leashKnelt', 'kept', 0.30); }
+    else if (show.phase === 'fours' || HANDS[show.phase]) { L.pose = 'fours'; go('leashDown', 'kneel', 0.35); }
+    else { L.pose = 'stand'; go('leashStand', 'idle', 0.35); }
+  }
+
+  /**
+   * Off the cot, on the leash: the room's own road off it — the roll back
+   * off her front (`unroll`), the cradle, `situp` on to her heels beside it
+   * — with `getUp` latched, and `want` the pose she is to be in once she is
+   * on the floor (`leashCotTick` has her there). `go` is `stepShow`'s or
+   * `goNow`.
+   */
+  function leashOffCot(want, go) {
+    const L = leash, ph = show.phase;
+    L.want = want && !want.startsWith('cot') && want !== 'kneel' ? want : null;
+    show.flatWant = 0; show.poseWant = null; show.sideWant = null; show.lieWant = null;
+    show.getUp = 1;
+    L.stats.offAsk = (L.stats.offAsk || 0) + 1;
+    if (UNROLL[ph]) cotUnroll(go);
+    else if (ph === 'cradle') go('situp', 'situp', 0.34);
+    else if (POSED[ph]) go('cradle', 'cradle', 0.44);
+    // On her way down (`recline`) or already on her way up (`situp`,
+    // `unroll`): `getUp` is read where that lands.
+  }
+  /** Off her front or a side on to her back: the roll she came in by, backwards — see `turn`. */
+  function cotUnroll(go) {
+    const f = skinFig, S = f.state, ph = show.phase, clip = UNROLL[ph];
+    if (!clip) return false;
+    show.legsDown = 0;
+    show.edgeAt = clip === 'flatEdge' ? [show.t, show.s] : null;
+    go('unroll', null);
+    if (!S.cur || S.cur.name !== clip) f.play(clip, { fade: 0, from: 1e3 });
+    if (S.cur && S.cur.name === clip) S.curT = Math.min(S.curT, S.cur.dur);
+    S.prev = null;
+    S.speed = -1;
+    show.unroll = clip;
+    show.unSide = show.side;
+    return true;
   }
 
   /**
@@ -47117,12 +47553,30 @@ async function buildJadrija(scene) {
     if (L.offing) { if (safe) { L.offing.fast = true; L.safe = safe; } return 'off'; }
     L.safe = safe;
     const p = show ? show.phase : null;
-    // On her hands or knees: up first, then it comes off — see `leashRise`.
-    if (p === 'leashFours' || p === 'leashCrawl' || p === 'leashDown' || p === 'leashPut' || p === 'leashKneel') {
+    // ON THE COT (1.554.0). A safeword: off where she lies, fast, and your
+    // hand in her hair there (`careHere`). Taken off: she is got off it and
+    // up first, like anywhere else — see `leashOffCot`, `leashKnelt`.
+    if (L.mode === 'cot') {
+      if (safe) { L.offing = { t: 0, fast: true }; return 'off'; }
       L.after = 'off';
+      leashOffCot('kneel', goNow);
+      return 'off';
+    }
+    // On her feet already: it comes off where she stands.
+    if (p === 'leashStand' || p === 'leashWalk' || p === 'leashStandUp'
+      || (p === 'leashToCot' && L.pose === 'stand')) {
+      L.after = null; L.want = null;
+      goNow('leashOff', 'idle', 0.30);
+      L.offing = { t: 0, fast: !!safe, ready: !!safe };
+      return 'off';
+    }
+    // On her hands or knees: up first, then it comes off — see `leashRise`.
+    if (p === 'leashFours' || p === 'leashCrawl' || p === 'leashDown' || p === 'leashPut' || p === 'leashKneel'
+      || p === 'leashUp' || p === 'leashSit' || p === 'leashKnelt' || p === 'leashToCot') {
       // Not yet clipped, or a safeword: straight off while she gets up.
       if (safe || !L.clipped) L.offing = { t: 0, fast: !!safe };
-      goNow('leashRise', 'getup', 0.32);
+      if (p === 'leashPut' || p === 'leashKneel') { L.after = 'off'; goNow('leashRise', 'getup', 0.32); }
+      else leashUprightFor('off', goNow);
       return 'off';
     }
     if (p === 'leashCome' || p === 'leashRise') {
@@ -47200,6 +47654,13 @@ async function buildJadrija(scene) {
    */
   function leashSnap(x, z, yaw) {
     const L = leash;
+    // On the cot (1.554.0): off it and on all fours, wherever you are.
+    if (L.on && L.clipped && L.mode === 'cot' && show && !L.offing) {
+      show.onBed = 0; show.mat = 0; show.getUp = 0; show.flatWant = 0; show.poseWant = null;
+      L.mode = 'lead'; L.pose = 'fours'; L.want = null;
+      goNow('leashFours', null);
+      leashHoldFours(skinFig, 0.2);
+    }
     if (!L.on || !L.clipped || L.mode !== 'lead' || !show) return false;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
     const [t, s] = local(x - fx * 1.15, z - fz * 1.15);
@@ -47215,11 +47676,78 @@ async function buildJadrija(scene) {
     return true;
   }
 
-  /** A tug from 90-app.js: `u` 0..1 how hard, `dir` the pull's way, world. */
-  function leashTug(u, dir) {
+  /**
+   * A tug from 90-app.js: `u` 0..1 how hard, `dir` the pull's way, world;
+   * `gest` 'up' or 'down' if the mouse was flicked that way while it was
+   * held (COLLAR.yank.flickY), else null. Answers what it did: 'lurch', or
+   * the step it asked for — 'up', 'down', 'cot', 'cotKnees', 'cotFlat',
+   * 'offCot', 'hamOut', 'hamPull' — or false.
+   *
+   * IN EVERY POSE (1.554.0). Through 1.553.0 this answered only while she
+   * was following ('lead') and the press was only a tug then — so on the cot,
+   * in the hammock and anywhere she was not on all fours a click did nothing
+   * to her at all, which is what "not working on the cot or in other
+   * positions" was. Now: on the floor it lurches her as before (on her feet a
+   * step or two, on her knees her upper body alone) and a FIRM one
+   * (LEASH_POSE.firm) moves her pose a step; on the cot it goes into the
+   * cot's own ragdoll (`cotTug`), and a firm one is on to her knees on it,
+   * down on to her front, or off it; in the hammock it swings the hammock to
+   * you, and a firm one has her out of it.
+   */
+  function leashTug(u, dir, gest = null) {
     const L = leash;
-    if (!L.on || !L.clipped || L.mode !== 'lead') return false;
-    const O = LEASH_ON.lurch;
+    if (!L.on || !L.clipped || L.offing || !show) return false;
+    const O = LEASH_ON.lurch, P = LEASH_POSE, firm = u >= P.firm;
+    L.stats.tugs++;
+    let did = 'lurch';
+    // ── in the hammock ──
+    if (L.mode === 'free') {
+      if (show.phase !== 'hamHeld') did = false;
+      else if (firm) {
+        show.ask = 'hammock.out';
+        if (gest === 'up') L.want = 'stand';
+        did = 'hamOut';
+      } else if (hammock && hammock.api.push) {
+        // From the far side of her, so the swing comes to you.
+        const k = P.ham[0] + (P.ham[1] - P.ham[0]) * u;
+        const r = hammock.api.push(L.ringW.x - dir.x * 0.3, L.ringW.z - dir.z * 0.3, k, false);
+        if (r) hamPushed(r.dv);
+        did = r ? 'hamPull' : 'lurch';
+      }
+      L.lastTug = { u: +u.toFixed(2), gest, did, phase: show.phase };
+      return did;
+    }
+    // ── on the cot ──
+    if (L.mode === 'cot') {
+      const hit = cotTug(u, dir);
+      const ph = show.phase;
+      const front = ph === 'flat' || ph === 'flatheld' || ph === 'flatEdge' || ph === 'edgeHeld';
+      if (firm && !COT_ROAD[ph]) {
+        if (gest === 'up') {
+          // Off her front and up on her knees on it — the cradle's road to
+          // `sit.knees`, which is `bedKneel`; and from any other pose on it,
+          // off it and on her feet.
+          if (front) { show.poseWant = 'sit.knees'; show.flatWant = 0; show.sideWant = null; cotUnroll(goNow); did = 'cotKnees'; }
+          else { leashOffCot('stand', goNow); did = 'offCot'; }
+        } else if (gest === 'down') {
+          // Down on to her front.
+          if (!front) {
+            show.flatWant = 1; show.poseWant = null; show.sideWant = null; show.edgeWant = 0;
+            if (ph === 'cradle') { show.flatWant = 0; show.legsDown = 0; goNow('flat', 'flat', 0.34); }
+            else goNow('cradle', 'cradle', 0.44);
+            did = 'cotFlat';
+          }
+        } else if (show.pt != null && leashCotGap(show.pt, show.ps)[0] >= P.cot.off) {
+          // A firm pull with you stood back from it: off it, on her knees.
+          leashOffCot('kneel', goNow);
+          did = 'offCot';
+        }
+      }
+      if (did === 'lurch' && !hit) did = 'pull';
+      L.lastTug = { u: +u.toFixed(2), gest, did, phase: ph };
+      return did;
+    }
+    if (L.mode !== 'lead') return false;
     const a = local(L.ringW.x, L.ringW.z), b = local(L.ringW.x + dir.x, L.ringW.z + dir.z);
     let dt0 = b[0] - a[0], ds0 = b[1] - a[1];
     const l = Math.hypot(dt0, ds0);
@@ -47227,10 +47755,38 @@ async function buildJadrija(scene) {
     dt0 /= l; ds0 /= l;
     L.lurchT = dt0; L.lurchS = ds0;
     L.lurchV = Math.max(L.lurchV, O.v[0] + (O.v[1] - O.v[0]) * u);
-    if (u > O.stumbleAt) { L.stumble = O.stumble[0] + (O.stumble[1] - O.stumble[0]) * u; L.stats.stumbles++; }
-    L.stats.tugs++;
+    if (u > O.stumbleAt && L.pose !== 'kneel') { L.stumble = O.stumble[0] + (O.stumble[1] - O.stumble[0]) * u; L.stats.stumbles++; }
     L.stats.lurchMax = Math.max(L.stats.lurchMax, L.lurchV);
-    return true;
+    // ── A FIRM ONE MOVES HER POSE A STEP ──
+    // From where she is going if she is on her way somewhere already, so two
+    // quick yanks up from all fours are her on her feet.
+    if (firm && show.phase !== 'leashCome' && show.phase !== 'leashKneel' && show.phase !== 'leashPut'
+      && show.phase !== 'leashRise' && show.phase !== 'leashOff') {
+      const base = L.want && L.want !== 'cot' ? L.want : L.pose;
+      // The cot: her near it and the pull toward it, or you beside it.
+      let cot = false;
+      if (sheIsIn() && kit && kit.cot && kit.cotEdge) {
+        const [g, nt, ns] = leashCotGap(show.t, show.s);
+        const toward = g > 1e-3 ? (dt0 * (nt - show.t) + ds0 * (ns - show.s)) / g : 1;
+        const you = show.pt != null ? leashCotGap(show.pt, show.ps)[0] : Infinity;
+        cot = (g < P.cot.near && toward > P.cot.toward) || (you < P.cot.you && g < P.cot.led);
+      }
+      // UP is a step up — on all fours, always to her knees; from her knees
+      // (or her feet) near the cot, on to it, and otherwise to her feet. The
+      // order Misha put it in: *"yank the collar up she goes from all fours
+      // and into 'kneeling' ... and then if near the cot/bed, that she goes
+      // on the cot"*. DOWN is a step down. And a firm pull with neither, near
+      // the cot and toward it, is her on to it from wherever she is.
+      if (gest === 'up') {
+        if (base === 'fours') { L.want = 'kneel'; did = 'up'; }
+        else if (cot) { L.want = 'cot'; L.cotHow = 'flat'; did = 'cot'; }
+        else if (base === 'kneel') { L.want = 'stand'; did = 'up'; }
+      } else if (gest === 'down') {
+        if (base !== 'fours') { L.want = base === 'stand' ? 'kneel' : 'fours'; did = 'down'; }
+      } else if (cot) { L.want = 'cot'; L.cotHow = 'flat'; did = 'cot'; }
+    }
+    L.lastTug = { u: +u.toFixed(2), gest, did, phase: show.phase, pose: L.pose };
+    return did;
   }
 
   /**
@@ -47240,7 +47796,7 @@ async function buildJadrija(scene) {
    */
   let _lwCaps = null, _lwNear = 0;
   function leashWorld() {
-    const out = { caps: null, n: 0, near: 0 };
+    const out = { caps: null, n: 0, near: 0, boxes: null, nb: 0 };
     if (!skinFig || !show) return out;
     const caps = chainCapsules();
     if (!_lwCaps || _lwCaps.length !== 8 * caps.length) {
@@ -47265,8 +47821,25 @@ async function buildJadrija(scene) {
       _lwCaps[8 * k + 6] = cp.r0; _lwCaps[8 * k + 7] = cp.r1;
     }
     out.caps = _lwCaps; out.n = caps.length; out.near = _lwNear;
+    // And the cot's mattress and pillow (1.554.0), while she is in the room
+    // with it: the chain lies on them and over their edge, not through them
+    // to the floor — the solver's static boxes, (7) in 43-avbd.js.
+    // THE MATTRESS DOWN TO THE FLOOR, for the chain and not for her: her
+    // net's box is the 16 cm of mattress and frame, open underneath for her
+    // shins, and against that a link laid inside it was pushed out of its
+    // bottom face and the leash went UNDER the mattress and out below the
+    // frame (PHOTOGRAPHED, a link 0.20 m under the top inside the footprint).
+    // Solid to the floor, a link inside is put out through the top or a side.
+    if (kit && kit.cot && sheIsIn()) {
+      if (!_lwBox) _lwBox = new Float64Array(14);
+      _lwBox.set(cotBoxes());
+      const top = _lwBox[1] + _lwBox[4], floorY = kit.cot[2] - 0.44;
+      _lwBox[1] = (top + floorY) / 2; _lwBox[4] = (top - floorY) / 2;
+      out.boxes = _lwBox; out.nb = 2;
+    }
     return out;
   }
+  let _lwBox = null;
 
   /** What 90-app.js needs of it, a frame. */
   function leashState() {
@@ -47276,8 +47849,8 @@ async function buildJadrija(scene) {
       const hb = skinFig.boneIndex('head');
       if (hb >= 0) skinFig.boneAt(hb, L.headW).applyMatrix4(skinFig.mesh.matrixWorld);
     }
-    return { on: L.on, phase: show.phase, mode: L.mode, collar: L.collar, buckled: L.buckled,
-      care: L.careT > 0 && show.phase === 'leashOff', head: L.headW, safe: L.safe,
+    return { on: L.on, phase: show.phase, mode: L.mode, pose: L.pose, want: L.want, collar: L.collar, buckled: L.buckled,
+      care: L.careT > 0 && (show.phase === 'leashOff' || L.careHere), head: L.headW, safe: L.safe,
       clipped: L.clipped, putT: L.putT, offT: L.offing ? L.offing.t : null, fast: L.offing ? L.offing.fast : false,
       ring: L.ringW, neck: L.neckW, buckle: L.buckleW, left: L.leftW, right: L.rightW, fwd: L.fwdW,
       feetY: skinFig ? skinFig.mesh.position.y : 0, rehang: L.rehang, said: L.said };
@@ -55053,6 +55626,13 @@ async function buildJadrija(scene) {
    */
   function askWhy(name) {
     if (!show) return 'gone';
+    // ON THE LEASH (1.554.0) a pose is a pose on it — LEASH_ASK: "kneel" is
+    // not refused out of doors, and "on the cot" is the leash's road there.
+    // On the cot the cot's own poses are the room's, as always.
+    if (leash.on && leash.clipped && !leash.offing && LEASH_ASK[name]
+      && (leash.mode === 'lead' || (leash.mode === 'cot' && !LEASH_ASK[name].startsWith('cot')))) {
+      return leashPoseWhy(LEASH_ASK[name]);
+    }
     if (name === 'collar') {
       // THE COLLAR — once is enough, and not from the water or the hammock.
       if (leash.on) return leash.offing ? 'collaroff' : 'collared';
@@ -74327,7 +74907,32 @@ async function buildJadrija(scene) {
       if (dir) leash.pullDir.copy(dir);
       if (first) (leash.dirW || (leash.dirW = new THREE.Vector3())).copy(first);
     },
-    leashTug: (u, dir) => leashTug(u, dir),
+    leashTug: (u, dir, gest) => leashTug(u, dir, gest || null),
+    /**
+     * A pose on the leash, from a word (1.554.0): 'fours', 'kneel', 'stand',
+     * 'cot', 'cot:edge', 'cot:knees'. Answers 'ok', or why not ('not on',
+     * 'nocot', 'already').
+     */
+    /** Debug: LEASH_POSE itself, for a probe to tune. */
+    leashPoseTable: LEASH_POSE,
+    leashPose: (p) => {
+      const L = leash;
+      if (!L.on || !L.clipped || L.offing || !show) return 'not on';
+      const why = leashPoseWhy(p);
+      if (why) return why;
+      if (L.mode === 'lead') { leashWant(p); return 'ok'; }
+      if (L.mode === 'cot') {
+        if (p.startsWith('cot')) return 'already';
+        leashOffCot(p, goNow); return 'ok';
+      }
+      if (L.mode === 'free') {
+        if (!HAM[show.phase] || show.phase === 'hamGo') return 'busy';
+        show.ask = 'hammock.out';
+        if (p === 'stand') L.want = 'stand';
+        return 'ok';
+      }
+      return 'busy';
+    },
     leashDoor: (inside) => leashDoor(inside),
     leashSnap: (x, z, yaw) => leashSnap(x, z, yaw),
     leashWorld: () => leashWorld(),
@@ -74336,6 +74941,8 @@ async function buildJadrija(scene) {
     leashRag: () => ({ ...lrStats, on: !!(lrR && lrR.on), layer: lrL.on, w: +lrL.w.toFixed(2) }),
     leashRagReset: () => { lrStats.msMax = 0; lrStats.Fmax = 0; lrStats.pitchMax = 0; lrStats.chestMax = 0; lrStats.headDMax = 0; },
     leashInfo: () => ({ ...leash.stats, on: leash.on, mode: leash.mode, phase: show ? show.phase : null,
+      pose: leash.pose, want: leash.want, cotHow: leash.cotHow, lastTug: leash.lastTug,
+      careHere: leash.careHere, onBed: show ? show.onBed || 0 : 0,
       collar: leash.collar, buckled: leash.buckled, clipped: leash.clipped, trailN: leash.trail.length,
       v: +leash.v.toFixed(2), lurchV: +leash.lurchV.toFixed(2), stumble: +leash.stumble.toFixed(2),
       ringTS: leash.ringTS.map((x) => +x.toFixed(2)), her: show ? [+show.t.toFixed(2), +show.s.toFixed(2)] : null,
@@ -74378,6 +74985,7 @@ async function buildJadrija(scene) {
       msMax: +cotStats.msMax.toFixed(3), msAvg: +(cotStats.msSum / Math.max(1, cotStats.frames)).toFixed(3),
       frames: cotStats.frames, steps: cotStats.steps, rescues: cotStats.rescues, why: cotStats.why, whys: cotStats.whys,
       spanks: cotStats.spanks, enters: cotStats.enters, last: cotStats.last,
+      tugs: cotStats.tugs || 0, lastTug: cotStats.lastTug || null,
       // What each hand is kept on while a give is drawn (`cotHands`).
       held: cotR ? cotR.held.slice() : null, heldBy: cotR ? cotR.heldBy.slice() : null,
       give: +cotStats.sink.toFixed(4), giveMax: +cotStats.sinkMax.toFixed(4),

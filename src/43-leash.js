@@ -351,10 +351,20 @@ function leashChain(scene) {
    * A frame: `ring` and `hand` where they are now (THREE vectors, world);
    * `caps` her capsules (eight numbers each, `nc` of them), `near` the bit
    * mask of the ones round her neck that the first links leave alone;
-   * `floor` a height.
+   * `floor` a height; `boxes` (1.554.0) the static boxes it lies on besides —
+   * the cot's mattress, seven numbers each (`cotBoxes`) — `nb` of them.
    */
-  function step(dt, ring, hand, caps, nc, near, floor) {
+  function step(dt, ring, hand, caps, nc, near, floor, boxes = null, nb = 0) {
     const t0 = performance.now();
+    // THE MATTRESS UNDER IT (1.554.0), when she is on the cot or beside it:
+    // the solver's static boxes, (7) in 43-avbd.js — draped over the edge of
+    // it and not through it to the floor.
+    const sh0 = sim.shapes;
+    if (boxes && nb > 0) {
+      if (!sh0.box || sh0.box.length < 7 * nb) sh0.box = new Float64Array(7 * nb);
+      for (let k = 0; k < 7 * nb; k++) sh0.box[k] = boxes[k];
+      sh0.boxN = nb;
+    } else sh0.boxN = 0;
     ringNow[0] = ring.x; ringNow[1] = ring.y; ringNow[2] = ring.z;
     handNow[0] = hand.x; handNow[1] = hand.y; handNow[2] = hand.z;
     floorNow = floor;

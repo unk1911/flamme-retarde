@@ -114,6 +114,12 @@
 // (a ball socket, with the angle lock when it is asked for), plus a one-row
 // string that only pulls, plus two-body contacts with the lever arm on BOTH
 // sides — the reference's manifold rows. Written there, with what is new.
+//
+// (7) AND A BOX UNDER THE CHAIN (1.554.0) — static boxes turned about +y
+// among a chain's shapes (`boxN`, `box`), for the leash draped over the cot's
+// mattress. One more kind of contact row in `collide`, the capsules' rows
+// with a box's nearest point; empty unless asked for, so the cuff chains
+// step exactly as they did (a side-by-side hash, 1.554.0's CHANGELOG).
 // ---------------------------------------------------------------------------
 
 const AVBD = {
@@ -494,6 +500,41 @@ function avbdChain(o) {
         const mz = (sh.a1[a + 2] + (sh.b1[a + 2] - sh.a1[a + 2]) * t) - qz;
         cnt = addContact(i, cnt, s, nx, ny, nz, gap, mx, my, mz);
       }
+      // (7) STATIC BOXES, turned about +y — the cot's mattress under the
+      // leash (1.554.0). The net's world box convention, (i): local x =
+      // wx·c − wz·s, z = wx·s + wz·c. Nothing moves them, so the contact
+      // has no move of its own over the step; and a link found inside one
+      // is pushed out through the nearest face whether or not it was
+      // touching it — a box cannot sweep through a chain the way a limb can,
+      // so a link inside it was laid there. Ids from 32, past the floor's.
+      // None unless asked for (`boxN`), so the cuff chains collide exactly
+      // as they did.
+      for (let k = 0; k < sh.boxN; k++) {
+        const o7 = 7 * k, B = sh.box;
+        const wx = px - B[o7], wy = py - B[o7 + 1], wz = pz - B[o7 + 2];
+        const hx = B[o7 + 3], hy = B[o7 + 4], hz = B[o7 + 5];
+        const yc = Math.cos(B[o7 + 6]), ys = Math.sin(B[o7 + 6]);
+        const lx = wx * yc - wz * ys, lz = wx * ys + wz * yc;
+        const qx = lx < -hx ? -hx : lx > hx ? hx : lx;
+        const qy = wy < -hy ? -hy : wy > hy ? hy : wy;
+        const qz = lz < -hz ? -hz : lz > hz ? hz : lz;
+        let nx = lx - qx, ny = wy - qy, nz = lz - qz;
+        const dd = nx * nx + ny * ny + nz * nz;
+        let gap;
+        if (dd > 1e-12) {
+          const d = Math.sqrt(dd);
+          gap = d - R;
+          if (gap > margin) continue;
+          nx /= d; ny /= d; nz /= d;
+        } else {
+          const ex = hx - Math.abs(lx), ey = hy - Math.abs(wy), ez = hz - Math.abs(lz);
+          nx = 0; ny = 0; nz = 0;
+          if (ey <= ex && ey <= ez) { ny = wy < 0 ? -1 : 1; gap = -ey - R; } else if (ex <= ez) {
+            nx = lx < 0 ? -1 : 1; gap = -ex - R;
+          } else { nz = lz < 0 ? -1 : 1; gap = -ez - R; }
+        }
+        cnt = addContact(i, cnt, 32 + k, nx * yc + nz * ys, ny, -nx * ys + nz * yc, gap, 0, 0, 0);
+      }
       // The floor: a plane, up.
       const fg = py - R - sh.floor0;
       if (fg < margin) cnt = addContact(i, cnt, 31, 0, 1, 0, fg, 0, sh.floor1 - sh.floor0, 0);
@@ -750,10 +791,14 @@ function avbdChainOwn(o) {
     cN: s.cN, cC0: s.cC0, cId: s.cId, MAXC: s.MAXC, jointC: s.jointC };
 }
 
-/** A chain's world, and its numbers — see `avbdChainOwn` for why out here. */
+/**
+ * A chain's world, and its numbers — see `avbdChainOwn` for why out here.
+ * `boxN` static boxes in `box`, seven numbers each as the net's world boxes
+ * ((i) below: centre, half extents, yaw about +y) — none unless asked for.
+ */
 function avbdShapes(n) {
   return { count: 0, a0: null, b0: null, a1: null, b1: null, r: null,
-    ignore: new Uint32Array(n), floor0: -1e9, floor1: -1e9 };
+    ignore: new Uint32Array(n), floor0: -1e9, floor1: -1e9, boxN: 0, box: null };
 }
 function avbdStats() {
   return { maxStretch: 0, sumStretch: 0, maxPen: 0, penShape: -1, penLink: -1, contacts: 0, steps: 0 };

@@ -8,6 +8,167 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.554.0] — 2026-09-30
+
+### On the leash: up on her knees, on her feet, on to the cot — and a tug that works in every one
+
+Misha, of 1.553.0: *"i love the first pass of the collar functionality, the
+only issue tbh, is that she is always all all fours, always only in that
+pose, but i think it would be more immersive if some of the time if i yank
+the collar up she goes from all fours and into 'kneeling' position, and then
+if near the cot/bed, that she goes on the cot, right now the collar/yank is
+not working on the cot or in other positions it seems. even standing up, it
+should work"*.
+
+**Why the tug did nothing anywhere else.** In 1.553.0 the press was a tug
+only while she was following (`collarLeading`, mode 'lead'), and her side
+took a tug only in that mode (`leashTug`). She had no other pose on the
+leash: kneeling happened only while it was being put on, and asked for the
+cot she answered "she is on the leash". In the hammock (mode 'free') the
+click was the hammock's push. So on the cot, in the hammock and in any pose
+but all fours a click did nothing to her. The press is now a tug whenever the
+leash is clipped and not going on or coming off (`collarTuggable`), and her
+side answers it in every pose.
+
+**Her pose on the leash** (`leash.pose`: 'fours', 'kneel', 'stand', 'cot').
+Each step is her own clips, run on from where she is:
+- All fours to her knees (`leashUp`): `getup` as far as KNEEL (its 0.40 s),
+  then `submit` from KNEEL back on to her heels (`leashSit`), then `kept`
+  (`leashKnelt`). The two clips share the key she is on at the handover.
+- Her knees to her feet (`leashStandUp`): `submit` run backwards, `unroll`'s
+  arrangement. Standing still is `leashStand`, her face to you (the gaze's
+  clock, kept topped up).
+- Standing, she FOLLOWS ON FOOT (`leashWalk`): the crawl's trail, shared now
+  (`leashTrail`, `leashMove`), with the walk's clock off her pace, her ring
+  1.05 m from your feet.
+- Down: standing to her knees is `submit`; her knees to all fours is the
+  existing `leashDown`.
+- Kneeling and walked away from (you move 0.45 m from where you stood), she
+  goes down on all fours and crawls after you. A gap alone does not do it:
+  kneeling up, her ring is a third of a metre further from you than on her
+  hands, and that would put her straight back down.
+
+**The gesture.** A tug with the mouse moved UP while the button is held (30 px,
+`COLLAR.yank.flickY`) is a yank up, and DOWN is down. It is counted in pixels,
+not pitch, so it still reads when you are looking straight down at her and the
+pitch is at its stop. Only a FIRM one moves her (u ≥ 0.55, `LEASH_POSE.firm`:
+held a quarter second, or flicked); a click still only lurches her. The hand
+is drawn up (or down) with it, so the pull on her ring goes that way too. On
+the help sheet (`CLICK + ↑ / ↓`). The same steps are words, matched locally
+while the collar is on, before anything is sent, so they work signed out:
+"stand up" / "ustani" / "debout", "kneel" / "klekni" / "à genoux", "on all
+fours" / "na sve četiri" / "à quatre pattes", "on the cot" / "na krevet" /
+"sur le lit" (`collarWords`). Spoken, the service's own skills (`rise`,
+`submit`, `fours`, `recline.bed`, `flat`, `flat.edge`, `sit.knees`) are taken
+as the same poses on the leash (`LEASH_ASK`, `askWhy`). No change to
+`server/baye/baye.py`.
+
+**Up is one step at a time**, in the order Misha gave: from all fours, up is
+always her knees. From her knees (or feet) near the cot, up is on to the cot,
+and otherwise it is her feet. Down is a step down. A firm pull toward the cot,
+with neither gesture, takes her there from anywhere near it. "Near" means her
+within 1.2 m of it with the pull toward it, or you within 1.2 m of it and her
+within 2.4 m. The second rule is her following you there: the leash holds you
+1.3 m from her collar, so led up to it she was 1.8-2.2 m off it when the yank
+came, and you were 1.0-1.4 m off it (MEASURED).
+
+**The cot, on the leash.** She goes to her mark beside its walkway edge in
+whichever pose she is in (`leashToCot`): a crawl, a knee shuffle (`creep`'s
+clip), or a walk. She comes up on her knees, and then takes the room's own
+road on to it with the leash still clipped: `lieDown` on to the cot, the
+cradle, and `flat` to her front (or over the edge, or up on her knees on it,
+for the words). From there she is in the cot's phases, mode 'cot', and
+everything the cot has is hers: its ragdoll, the hand spank, the belt,
+"turn over", the seven-minute clock. `leashCotTick` puts her back on the leash
+the moment she is off it.
+- **A tug while she lies there** goes into the cot's own ragdoll (`cotTug`),
+  not the leash's partial one, which would hold her hips in mid-air. It is an
+  impulse on her neck body toward your hand, lifted off the pillow, with 0.65
+  of it on her chest, and the give is drawn for the slap's `calm`. MEASURED
+  face down, the firmest from beside her: at 2.2-6.5 N·s her neck gave 5.4
+  degrees, which does not read as a yank. At 6-18 N·s it gave 21-24 degrees
+  at 150 ms and her chest 5-6, back within half a second. At 8-24 it sat on
+  the neck's 25-degree stop. Shipped at 5-16: 12.7-13.6 degrees at a
+  half-strength tug. No rescues.
+- **Firm, on the cot:** up from her front is her knees on it (`bedKneel`, the
+  unroll and the cradle's `sit.knees`). Up from anything else is off it and on
+  her feet. Down is her front (`flat`). A pull with you stood back 1.0 m or
+  more from its edge is off it, on to her knees beside it: the unroll,
+  `situp`, and she is on the leash again, kneeling. At 0.80 m a firm tug from
+  where you naturally stand beside her pulled her off (MEASURED, 0.84 m).
+- **The spank and the belt.** On the cot, a press aimed at her back, bottom or
+  thigh (`cotAim`) is still the hand spank. The leash is in your right hand
+  and the slap is your other one. Every other press there is a tug.
+  MEASURED: a real press at her bottom, leashed, gave slaps 0→1 and tugs
+  unchanged. The belt still will not come out while the leash is in the hand
+  it would be in (`belt.collar`), and the collar will not go on while the
+  belt is out.
+
+**The hammock.** A tug swings it toward you: the hammock's own push, from the
+far side of her, 0.25-0.8 of a hand's. A firm one has her out of it and back
+on the leash, on her feet if it was flicked up. The press is still the push
+with the crosshair on the cloth (`hammockOnAim`); beside her in it, with the
+hammock always in front of you, the aim is the only thing that tells the two
+apart.
+
+**The chain on the cot** (`avbdChain` (7), `leashWorld`). The leash lies on the
+mattress and over its edge instead of through it to the floor. MEASURED lying
+face down: 13-17 links on the mattress (1.5 mm into its soft contact at the
+worst), 10-16 over the edge, 0.5-2 mm of stretch. For the chain the cot is
+solid to the floor. Against her net's 16 cm box (the mattress and frame, open
+underneath for her shins), a link laid inside it was pushed out of its bottom
+face and the leash went UNDER the mattress (PHOTOGRAPHED, a link 0.20 m under
+the top inside the footprint).
+
+**Solver: one opt-in, and the cuff chain is byte for byte as it was.**
+`avbdChain` has static yawed boxes among its shapes (`shapes.boxN`, `box`,
+seven numbers each as the net's world boxes). In `collide` it adds one more
+kind of contact row, a box's nearest point, with ids from 32. There is no
+"only from outside" rule for these, because a box cannot sweep through a
+chain. `boxN` is 0 unless asked for. A side-by-side run of HEAD's
+`43-avbd.js` and this tree's gives the same hashes for:
+- a 600-step wrist chain between moving ends, against a moving capsule and a
+  floor, with the ignore mask and the stiffness switch exercised:
+  `0d19fbc1994d5d25`, the same again with `boxN` 0 set explicitly;
+- a 900-step leash drawn back and forth: `0f8903d81d1d1936`.
+`avbdNet` (the belt, the cot, the ragdolls, the hammock) is untouched.
+
+**Kept:**
+- The safeword ends it from any pose. On the cot and in the hammock it comes
+  off where she lies, and your hand goes to her hair there (`careHere`,
+  photographed on the cot: "Mm... hvala ti.").
+- Taken off from any pose, she is got up to you first. From the cot that is
+  unroll → situp → up → `leashOff` → her `dwell`.
+- The door, on foot: `leashDoor` took her through standing, and she was still
+  following on her feet outside.
+- Key 8 while she is standing snaps her a stride behind you (0.97 m), and from
+  the cot it takes her off it.
+- The belt and the collar are still one hand.
+- No `rng()` in any of it.
+- `leashInfo`'s fields are all still there, with `pose`, `want`, `cotHow`,
+  `lastTug`, `careHere` and `onBed` added.
+
+**A tug, by pose** (the leash's ragdoll at 105 N, u 0.5, MEASURED):
+- all fours: her head 26-29 degrees, her chest 13-14, the head moved
+  12-13 cm, and she lurches 0.15 m;
+- kneeling: 11, 10-11 and 8-9 cm, with no slide (a woman on her knees is not
+  slid across a floor);
+- standing: 20-22, 13 and 11-12 cm, and a step of 0.1 m.
+No rescues.
+
+**Cost.** Following on foot is 0.45 ms a frame (1.3 at the worst); the chain is
+0.36 of it. On the cot it is 0.46 ms, and 0.41 more for the cot's ragdoll,
+which is its own and was already there. The worst frame is 5 ms, at a chain
+re-hang, the same kind of frame as 1.553.0's door.
+
+In the game: the wrist cuffs' chain as before; the hand spank and a belt swing
+land (0 rescues, against HEAD's build on the same plan); the kabina door and
+key 8; `__fr.stats()` people 100, blockers 785; no console errors.
+
+Debug: `__fr.collar.yankUp(u)`, `yankDown(u)`, `tug(u, gest)`, `pose(name)`,
+`__fr.jad.raw().leashPose(p)`, `leashPoseTable`; `__fr.jad.cotRag().tugs`,
+`lastTug`.
+
 ## [1.553.0] — 2026-09-30
 
 ### The collar and the leash: black leather, a diamond chain, and a safeword
