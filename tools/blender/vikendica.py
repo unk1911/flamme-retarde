@@ -4246,38 +4246,67 @@ def living(kit):
     ceiling_light(kit, -1.70, -2.50)
 
 
+def _burn_bed():
+    """The draws `bed` would have made — two pillow turns off the house
+    generator and four fold phases off FRNG — so that replacing a bed here
+    leaves every later draw where it was. The loft's two beds come after."""
+    for _ in range(2):
+        RNG.uniform(-0.12, 0.12)
+    for _ in range(4):
+        FRNG.uniform(0, TAU)
+
+
 def bedroom_east(kit):
-    """Soba 3, 8.01 m², the bigger one — the double bed against the north wall
-    and the wardrobe along the spine, exactly as drawn."""
+    """Soba 3, 8.01 m², the bigger one, as the two photographs of it have it:
+    the bed's head on the party wall to soba 4 and its long side on the north
+    wall, the night table beside the head, and the floor between the door and
+    the window clear.
+
+    The 182 wardrobe that stood along the spine east of the door is gone
+    (Misha: *"declutter the 1 room by removing that giant closet"*). It was
+    2.02 high in a 2.40 room and took the whole of the wall the door is in, and
+    with it there the bed had to stand head-out in the middle of the floor,
+    its headboard 67 cm in front of the doorway."""
     x0, x1, y0, y1 = ROOMS["soba3"]
-    bed(kit, (x0 + x1) / 2 - 0.16, y1 - 1.16, yaw=math.pi / 2, w=1.42, l=2.00)
-    bedside(kit, x0 + 0.26, y1 - 0.32, F2)
-    # The 182 wardrobe on the spine wall, dark and enormous, as it is.
-    wardrobe(kit, x1 - 1.86, x1 - 0.04, y0 + 0.04, y0 + 0.60, F2, 2.02, "+y")
+    _burn_bed()
+    l, w = 2.00, 1.40
+    # The posts stand 4.2 cm behind the mattress end and 9.8 outside its side.
+    cx, cy = x0 + 0.047 + l / 2, y1 - 0.005 - (w / 2 + 0.098)
+    bed_oak(kit, cx, cy, yaw=0.0, w=w, l=l)
+    bedside_oak(kit, x0 + 0.010 + 0.18, cy - (w / 2 + 0.098) - 0.04 - 0.21,
+                yaw=math.pi / 2)
+    socket(kit, 2.00, y1, F2 + 0.62, 0.0)
     fan(kit, x1 - 0.36, y1 - 0.42, F2)
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, sun=True)
 
 
 def bedroom_west(kit):
-    """Soba 4, 7.69 m², bed head to the north wall. No room in this flat has
-    two windows.
+    """Soba 4, 7.69 m², the divan along the west wall under the window, head
+    to the north wall — which is the photograph of it: the window over the
+    long side of the bed, grey cushions against the walls, the bed made up by
+    leaving the bedding folded on it. No room in this flat has two windows.
 
     It used to run east-west with its head under the west window, which put the
-    only opening in the room directly over the pillows: you lay with the
-    shutter at your ear and the light across your face. Turned a quarter clock-
-    wise it heads the north wall instead, the window falls beside the bed where
-    a window belongs, and the walk from the door up the west side is clear."""
+    only opening in the room directly over the pillows. Turned a quarter
+    clockwise it heads the north wall instead, and the walk from the door up
+    the east side is clear."""
     x0, x1, y0, y1 = ROOMS["soba4"]
-    bed(kit, x0 + 0.76, y1 - 1.05, yaw=-math.pi / 2, w=1.40, l=1.98)
-    bedside(kit, x1 - 0.26, y1 - 0.32, F2)
+    _burn_bed()
+    cx, cy = x0 + 0.76, y1 - 1.05
+    divan(kit, cx, cy, yaw=-math.pi / 2, w=1.40, l=1.98)
+    # The night table beside the head, on the room side; it stood in the
+    # north-east corner a metre from the bed.
+    bedside_oak(kit, cx + 0.706 + 0.05 + 0.21, y1 - 0.010 - 0.18, yaw=0.0)
     # The single wardrobe stands on the party wall to soba 3 and not on the
     # spine, which is where it was: the spine here is 95 cm long and the door
     # takes 85 of it, so anything against it is standing in the doorway. On the
     # east wall it is clear of the door, clear of the bed and clear of the
     # sliding leaf, which parks west along the spine face.
-    wardrobe(kit, x1 - 0.58, x1 - 0.02, y0 + 0.22, y0 + 0.80, F2, 1.90, "-x")
-    kit.span(LINEN, x0 + 0.30, x0 + 0.66, y0 + 0.30, y0 + 0.70, F2 + 0.44,
-             F2 + 0.58, bev=0.02)
+    wardrobe_oak(kit, x1 - 0.58, x1 - 0.02, y0 + 0.22, y0 + 0.80, F2, 1.90, "-x")
+    # The stool by the foot, with the spare sheets on it. It was a slab of
+    # linen at seat height with nothing under it.
+    stool_oak(kit, x0 + 0.48, y0 + 0.50)
+    socket(kit, x0, 1.85, F2 + 0.62, math.pi / 2)
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, dome=True)
 
 
@@ -4956,6 +4985,752 @@ def wardrobe(kit, x0, x1, y0, y1, z, h, face):
         hx = x + side * (dw / 2 - 0.045)
         _bar_handle(kit, W_(hx, yf - 0.018, h * 0.48), W_(hx, yf - 0.018,
                     h * 0.48 + 0.16), out, r=0.006, off=0.028, colour=BRASS)
+
+
+# ── the two bedrooms, third pass ────────────────────────────────────────────
+#
+# Misha, 1 Oct 2026, the evening after the second pass: *"yeah vikendica looks
+# much better, yeah i love the bookcase, maybe increase the poly count on
+# furniture inside the 2 rooms as well, maybe declutter the 1 room by removing
+# that giant closet"*.
+#
+# The two rooms are the bedrooms, and the photographs of both are in
+# /mnt/c/tmp/refs/vacay_house/1st/: the double in soba 3 (cat-print bedding,
+# a sonoma-oak frame with an anthracite headboard between two oak posts, the
+# night table with an oak drawer over a black one and the navy mushroom lamp),
+# and the divan in soba 4 (a white upholstered base, a striped cover, grey
+# cushions against the wall and a blue pillow, folded sheets and a rolled
+# towel waiting on it). The walnut set the second pass put in both rooms is
+# the set that is downstairs, and it stays down there.
+#
+# The prints are geometry, not texture, because this shader has none: each cat
+# is a flat body, a head and two ears laid onto the cloth's own surface and
+# lifted two and a half millimetres off it, and each stripe is a band that
+# follows the cover down its side. Both are laid by (s, x) — distance round the
+# section and distance along the bed — so they wrap the rounded edge the way
+# cloth does rather than sticking out of it.
+#
+# All of this draws from its own generator. The two beds it replaces burned
+# two draws of RNG and four of FRNG each, and those are still burned, so the
+# loft's two beds — which come after these in the bake — are byte-identical.
+
+BRNG = random.Random(20261002)
+
+OAK_S = (0.660, 0.560, 0.430)        # sonoma oak melamine, off both photographs
+OAK_S_D = (0.540, 0.450, 0.340)      # the same board's edge and the back of it
+ANTHRACITE = (0.120, 0.115, 0.115)   # the headboard panel, the lower drawer
+CAT_GROUND = (0.930, 0.890, 0.770)
+CAT_COLS = [(0.780, 0.440, 0.170), (0.570, 0.570, 0.580), (0.120, 0.120, 0.130),
+            (0.720, 0.630, 0.500), (0.360, 0.360, 0.380)]
+STRIPE_GROUND = (0.905, 0.915, 0.925)
+STRIPE_COLS = [(0.440, 0.520, 0.760), (0.230, 0.290, 0.500),
+               (0.690, 0.740, 0.860), (0.760, 0.790, 0.420),
+               (0.560, 0.580, 0.620)]
+VALANCE = (0.905, 0.900, 0.890)
+CUSHION_GREY = (0.560, 0.555, 0.550)
+PILLOW_BLUE = (0.470, 0.540, 0.820)
+SHEET_BLUE = (0.520, 0.580, 0.800)
+LAMP_NAVY = (0.085, 0.110, 0.300)
+TOWEL = (0.940, 0.935, 0.910)
+TOWEL_BAND = (0.430, 0.310, 0.210)
+SOCKET = (0.930, 0.925, 0.905)
+CASE_BLUE = (0.170, 0.270, 0.420)
+
+
+def _pick(rng, cols, weights):
+    """A weighted choice by cumulative weights, one draw."""
+    r = rng.random() * sum(weights)
+    for c, w in zip(cols, weights):
+        r -= w
+        if r <= 0:
+            return c
+    return cols[-1]
+
+
+def _rr_path(hw, zt, zb, rc, top=None, side=None, n_arc=6, n_top=14, n_side=5):
+    """A cover in section, outside: up the −y side from `zb`, round the edge,
+    across the top, round, and down +y to `zb`. `top(y)` lifts the top and
+    `side(k)` pushes a hang point out, for the folds."""
+    pts = []
+    for k in range(n_side):
+        z = zb + (zt - rc - zb) * k / n_side
+        pts.append((-hw - (side(-1, k) if side else 0.0), z))
+    for k in range(n_arc + 1):
+        a = math.pi - (math.pi / 2) * k / n_arc
+        pts.append((-hw + rc + rc * math.cos(a), zt - rc + rc * math.sin(a)))
+    for k in range(1, n_top):
+        y = -hw + rc + 2 * (hw - rc) * k / n_top
+        pts.append((y, zt + (top(y) if top else 0.0)))
+    for k in range(n_arc + 1):
+        a = math.pi / 2 - (math.pi / 2) * k / n_arc
+        pts.append((hw - rc + rc * math.cos(a), zt - rc + rc * math.sin(a)))
+    for k in range(n_side - 1, -1, -1):
+        z = zb + (zt - rc - zb) * k / n_side
+        pts.append((hw + (side(1, k) if side else 0.0), z))
+    return pts
+
+
+def _offset_in(pts, th):
+    """The same section pulled `th` inward — the inside face of the cloth."""
+    out = []
+    for i, (y, z) in enumerate(pts):
+        a, b = pts[max(i - 1, 0)], pts[min(i + 1, len(pts) - 1)]
+        ty, tz = b[0] - a[0], b[1] - a[1]
+        n = math.hypot(ty, tz) or 1.0
+        out.append((y + th * tz / n, z - th * ty / n))
+    return out
+
+
+def _path_len(pts):
+    return sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(pts, pts[1:]))
+
+
+def _path_pt(pts, s):
+    """The point `s` along a polyline, from its start, clamped to its ends."""
+    acc = 0.0
+    for a, b in zip(pts, pts[1:]):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        if acc + L >= s:
+            t = 0.0 if L < 1e-9 else max(0.0, (s - acc) / L)
+            return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+        acc += L
+    return pts[-1]
+
+
+class _Cover:
+    """A cover swept along X: a section that is `_rr_path`, closed on the
+    inside by the same path pulled in by `th`, and — if `taper` — a rounded
+    end at `xb` where the cover goes over the end of the bed and down.
+
+    `P(s, x)` is a point on the outside with `s` the distance round the section
+    measured from the middle of the top, which is what the prints are laid by.
+    """
+
+    def __init__(self, hw, zt, zb, rc, th, xa, xb, taper=0.0, amp=0.010,
+                 hang_amp=0.004, rng=None, n_x=40):
+        self.hw, self.zt, self.zb, self.rc, self.th = hw, zt, zb, rc, th
+        self.xa, self.xb, self.taper = xa, xb, taper
+        rng = rng or BRNG
+        self.ph = [rng.uniform(0, TAU) for _ in range(5)]
+        self.amp, self.hang_amp = amp, hang_amp
+        x1 = xb - taper
+        self.xs = [xa + (x1 - xa) * i / n_x for i in range(n_x + 1)]
+        if taper:
+            self.xs += [x1 + taper * math.sin((math.pi / 2) * k / 6)
+                        for k in range(1, 7)]
+
+    def path(self, x):
+        d = 0.0
+        if self.taper and x > self.xb - self.taper:
+            u = min(1.0, (x - (self.xb - self.taper)) / self.taper)
+            d = self.taper * (1 - math.sqrt(max(0.0, 1 - u * u)))
+        u = (x - self.xa) / (self.xb - self.xa)
+        ph, hw, rc = self.ph, self.hw - d, max(self.rc - d, 0.006)
+        edge = hw - rc
+
+        def top(y):
+            w = math.cos(min(1.0, abs(y) / max(edge, 1e-3)) * math.pi / 2)
+            return w * self.amp * (math.sin(u * 7.0 + ph[0])
+                                   + 0.6 * math.sin(u * 15.0 + ph[1])) \
+                * math.cos(y * 3.0 + ph[3])
+
+        def side(sgn, k):
+            return self.hang_amp * (1 - k / 5.0) * math.sin(
+                u * (11 if sgn < 0 else 13) + ph[2] + k + (ph[4] if sgn > 0 else 0))
+
+        return _rr_path(hw, self.zt - d, self.zb, rc, top, side)
+
+    def build(self, bm):
+        secs = []
+        for x in self.xs:
+            o = self.path(x)
+            i = _offset_in(o, self.th)
+            secs.append([(x, y, z) for y, z in o]
+                        + [(x, y, z) for y, z in reversed(i)])
+        return _sweep(bm, secs)
+
+    def P(self, s, x):
+        x = min(max(x, self.xa), self.xb)
+        pts = self.path(x)
+        y, z = _path_pt(pts, s + _path_len(pts) / 2)
+        return Vector((x, y, z))
+
+    def length(self, x):
+        return _path_len(self.path(x))
+
+    def inside(self, p):
+        return Vector((min(max(p.x, self.xa), self.xb - self.taper), 0.0,
+                       self.zt - 0.25))
+
+
+def _surf_n(P, inside, s, x, e=0.004):
+    p = P(s, x)
+    n = (P(s + e, x) - P(s - e, x)).cross(P(s, x + e) - P(s, x - e))
+    if n.length < 1e-12:
+        n = Vector((0.0, 0.0, 1.0))
+    n.normalize()
+    if n.dot(p - inside(p)) < 0:
+        n = -n
+    return p, n
+
+
+def _decal(bm, P, inside, s, x, polys, theta, off=0.0025):
+    """Flat shapes laid onto a surface P(s, x) — `polys` are lists of (a, b) in
+    metres, `a` round the section and `b` along X — each fanned from its own
+    centre and wound to face out. Every vertex is put on the surface by its
+    own (s, x), so a shape that crosses an edge folds over it."""
+    _, n = _surf_n(P, inside, s, x)
+    c, sn = math.cos(theta), math.sin(theta)
+    for poly in polys:
+        ca = sum(a for a, _ in poly) / len(poly)
+        cb = sum(b for _, b in poly) / len(poly)
+
+        def at(a, b):
+            aa, bb = a * c - b * sn, a * sn + b * c
+            return P(s + aa, x + bb) + n * off
+        vc = bm.verts.new(at(ca, cb))
+        vs = [bm.verts.new(at(a, b)) for a, b in poly]
+        for i in range(len(vs)):
+            j = (i + 1) % len(vs)
+            fn = (vs[i].co - vc.co).cross(vs[j].co - vc.co)
+            bm.faces.new((vc, vs[i], vs[j]) if fn.dot(n) >= 0
+                         else (vc, vs[j], vs[i]))
+
+
+def _ellipse(cx, cy, rx, ry, n=8, rot=0.0):
+    c, s = math.cos(rot), math.sin(rot)
+    return [(cx + rx * math.cos(TAU * i / n) * c - ry * math.sin(TAU * i / n) * s,
+             cy + rx * math.cos(TAU * i / n) * s + ry * math.sin(TAU * i / n) * c)
+            for i in range(n)]
+
+
+def _cat(rng):
+    """One cat off the bedding: a body, a head, two ears and sometimes a tail
+    — curled, sitting or stretched, about four centimetres long."""
+    k = rng.uniform(1.15, 1.60)
+    pose = rng.random()
+    if pose < 0.4:                       # curled up, a round loaf
+        body = _ellipse(0.0, 0.0, 0.017 * k, 0.014 * k, 9)
+        hx, hy = 0.012 * k, 0.010 * k
+    elif pose < 0.75:                    # sitting, taller than long
+        body = _ellipse(0.0, 0.0, 0.012 * k, 0.018 * k, 9)
+        hx, hy = 0.002 * k, 0.020 * k
+    else:                                # stretched out
+        body = _ellipse(0.0, 0.0, 0.024 * k, 0.010 * k, 9)
+        hx, hy = 0.024 * k, 0.006 * k
+    r = 0.0085 * k
+    head = _ellipse(hx, hy, r, r * 0.92, 7)
+    ears = [[(hx - r * 0.85, hy + r * 0.35), (hx - r * 0.55, hy + r * 1.45),
+             (hx - r * 0.05, hy + r * 0.80)],
+            [(hx + r * 0.05, hy + r * 0.80), (hx + r * 0.55, hy + r * 1.45),
+             (hx + r * 0.85, hy + r * 0.35)]]
+    polys = [body, head] + ears
+    if rng.random() < 0.5:
+        tx = -0.016 * k
+        polys.append([(tx, -0.004 * k), (tx - 0.014 * k, 0.004 * k),
+                      (tx - 0.016 * k, 0.008 * k), (tx + 0.002 * k, 0.002 * k)])
+    if rng.random() < 0.5:
+        polys = [[(-a, b) for a, b in p] for p in polys]
+    return polys
+
+
+def _cat_print(kit, P, inside, s0, s1, x0, x1, at, yaw, rng, step=0.095,
+               name="cats"):
+    """Cats over the patch s0..s1 × x0..x1 of a surface, on a jittered grid —
+    a print is a repeat, so it is even, and a printed repeat is never in rows."""
+    bms = [bmesh.new() for _ in CAT_COLS]
+    ns = max(1, int((s1 - s0) / step))
+    nx = max(1, int((x1 - x0) / step))
+    for i in range(nx):
+        for j in range(ns):
+            x = x0 + (i + rng.uniform(0.15, 0.85)) * (x1 - x0) / nx
+            s = s0 + (j + rng.uniform(0.15, 0.85)) * (s1 - s0) / ns
+            ci = CAT_COLS.index(_pick(rng, CAT_COLS, (0.30, 0.26, 0.20, 0.14, 0.10)))
+            polys = _cat(rng)
+            _decal(bms[ci], P, inside, s, x, polys, rng.uniform(0, TAU))
+    for bm, col in zip(bms, CAT_COLS):
+        if len(bm.faces):
+            ob = new_object(bm, name, smooth=False, recalc=False)
+            _place(ob, at[0], at[1], at[2], yaw)
+            kit.adopt(ob, col)
+        else:
+            bm.free()
+
+
+def _sb_top(a, b, c, p, q, x, y):
+    """The height of a `_superball`'s top over (x, y) — its implicit form,
+    (|x/a|^p + |y/b|^p)^(q/p) + |z/c|^q = 1."""
+    r = (abs(x / a) ** p + abs(y / b) ** p) ** (q / p)
+    return c * max(0.0, 1.0 - r) ** (1.0 / q)
+
+
+def _sb_surface(a, b, c, p, q, M):
+    """P(s, x) over the top of a superball turned by M: `s` along its Y."""
+    def P(s, x):
+        x = max(-a * 0.97, min(a * 0.97, x))
+        s = max(-b * 0.97, min(b * 0.97, s))
+        return M @ Vector((x, s, _sb_top(a, b, c, p, q, x, s)))
+    ctr = M @ Vector((0.0, 0.0, 0.0))
+    return P, (lambda pt: ctr)
+
+
+def _soft(kit, colour, name, a, b, c, p, q, M, at, yaw, rows=12, seg=32):
+    bm = bmesh.new()
+    vs = _superball(bm, a, b, c, p=p, q=q, rows=rows, seg=seg)
+    _xf(vs, M)
+    _emit(kit, bm, colour, name, at, yaw)
+
+
+def _towel_roll(kit, M, at, yaw, l=0.30, r=0.042, band=TOWEL_BAND):
+    """A rolled towel lying along its local X: the roll, two woven bands near
+    the ends, and the end of the roll showing as a spiral."""
+    bm = bmesh.new()
+    vs = _lathe(bm, [(0.0, 0.0008), (0.0, r * 0.92), (0.006, r), (l - 0.006, r),
+                     (l, r * 0.92), (l, 0.0008)], seg=20)
+    _xf(vs, M @ _M((-l / 2, 0.0, 0.0), ry=math.pi / 2))
+    _emit(kit, bm, TOWEL, "towel_roll", at, yaw)
+    bm = bmesh.new()
+    for z0 in (0.030, l - 0.050):
+        vs = _lathe(bm, [(z0, r + 0.0012), (z0 + 0.020, r + 0.0012)], seg=20)
+        _xf(vs, M @ _M((-l / 2, 0.0, 0.0), ry=math.pi / 2))
+    _emit(kit, bm, band, "towel_band", at, yaw)
+    # The spiral on each end, a darker line wound in from the edge.
+    bm = bmesh.new()
+    for end in (-1, 1):
+        pts = []
+        for k in range(40):
+            t = k / 39.0
+            ang = t * TAU * 2.6
+            rr = r * 0.88 * (1 - t * 0.85)
+            pts.append((end * (l / 2 + 0.0015), rr * math.cos(ang),
+                        rr * math.sin(ang)))
+        pts = [tuple(M @ Vector(p_)) for p_ in pts]
+        _tube(bm, pts, 0.0016, seg=5)
+    _emit(kit, bm, (0.780, 0.770, 0.740), "towel_spiral", at, yaw)
+
+
+def _folded(kit, colour, M, at, yaw, a=0.18, b=0.13, c=0.020, bands=None):
+    """A folded towel or sheet: a flat stuffed slab, and optional woven bands
+    across it."""
+    _soft(kit, colour, "folded", a, b, c, 8.0, 5.0, M, at, yaw, rows=8, seg=28)
+    if bands:
+        bm = bmesh.new()
+        for x in bands:
+            vs = []
+            vs += bm_box(bm, x, 0.0, 0.0, 0.016, 2 * b - 0.010, 2 * c + 0.003)
+            _xf(vs, M)
+        ob = new_object(bm, "folded_band")
+        bevel(ob, 0.004, segments=2)
+        _place(ob, at[0], at[1], at[2], yaw)
+        kit.adopt(ob, TOWEL_BAND)
+
+
+def bed_oak(kit, cx, cy, yaw, w=1.40, l=2.00, floor=F2):
+    """The double in soba 3, off the two photographs of it: a sonoma-oak
+    platform with deep rails and set-back block feet, a headboard of two oak
+    posts with an anthracite panel between them, a mattress sitting down in
+    the rails, a cat-print duvet over it that goes over the foot and down, two
+    cat-print pillows against the headboard, and two sets of towels — a folded
+    one with a roll on it — put out for whoever is coming.
+
+    Built along +X, head at −X, like `bed`."""
+    at = (cx, cy, floor)
+    rail_z0, rail_z1, t = 0.13, 0.35, 0.028
+    bm = bmesh.new()
+    for s in (-1, 1):
+        bm_box(bm, 0.0, s * (w / 2 + 0.008 + t / 2), (rail_z0 + rail_z1) / 2,
+               l + 0.012, t, rail_z1 - rail_z0)
+    bm_box(bm, l / 2 + 0.006 + t / 2, 0.0, (rail_z0 + rail_z1) / 2, t,
+           w + 0.016 + 2 * t, rail_z1 - rail_z0)
+    # The posts, either side of the panel, standing on the floor.
+    for s in (-1, 1):
+        bm_box(bm, -l / 2 - 0.022, s * (w / 2 + 0.008 + 0.045), 0.475, 0.040,
+               0.090, 0.95)
+    ob = new_object(bm, "bed_oak")
+    bevel(ob, 0.004, segments=2)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, OAK_S)
+    # Feet set back under the rails, a slatted deck the mattress sits on, and
+    # the low rail across the head under the panel — all in the board's
+    # darker edge colour, because none of it is ever in the light.
+    bm = bmesh.new()
+    for ex in (-1, 1):
+        for s in (-1, 1):
+            bm_box(bm, ex * (l / 2 - 0.16), s * (w / 2 - 0.10), 0.065, 0.07,
+                   0.07, 0.13)
+    bm_box(bm, 0.0, 0.0, 0.20, 0.05, w, 0.04)
+    for i in range(14):
+        x = -l / 2 + 0.07 + (l - 0.14) * i / 13
+        bm_box(bm, x, 0.0, 0.272, 0.065, w - 0.01, 0.012)
+    for s in (-1, 1):
+        bm_box(bm, 0.0, s * (w / 2 - 0.02), 0.25, l - 0.02, 0.025, 0.03)
+    bm_box(bm, -l / 2 - 0.006, 0.0, 0.24, 0.022, w + 0.016, 0.22)
+    ob = new_object(bm, "bed_deck")
+    bevel(ob, 0.003, segments=1)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, OAK_S_D)
+    # The panel, set back between the posts.
+    bm = bmesh.new()
+    bm_box(bm, -l / 2 - 0.020, 0.0, 0.615, 0.026, w + 0.016, 0.67)
+    ob = new_object(bm, "bed_panel")
+    bevel(ob, 0.004, segments=2)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, ANTHRACITE)
+
+    # The mattress, down in the rails.
+    bm = bmesh.new()
+    _superball(bm, l / 2 - 0.012, w / 2 - 0.010, 0.105, p=12, q=7, rows=12,
+               seg=40, at=(0.0, 0.0, 0.385))
+    _emit(kit, bm, CAT_GROUND, "mattress", at, yaw)
+    ma, mb, mc = l / 2 - 0.012, w / 2 - 0.010, 0.105
+
+    # The duvet: over the top, down both sides and over the foot.
+    zt = 0.505
+    x0 = -l / 2 + 0.60
+    cov = _Cover(w / 2, zt, 0.335, 0.055, 0.022, x0, l / 2 + 0.002,
+                 taper=0.060, amp=0.010, hang_amp=0.002, rng=BRNG)
+    bm = bmesh.new()
+    cov.build(bm)
+    _emit(kit, bm, CAT_GROUND, "duvet", at, yaw)
+    # The turned-down edge at the head end.
+    bm = bmesh.new()
+    _superball(bm, 0.060, w / 2 + 0.008, 0.032, p=2.2, q=2.0, rows=9, seg=40,
+               at=(x0 + 0.03, 0.0, zt + 0.004))
+    _emit(kit, bm, (0.940, 0.900, 0.785), "duvet_fold", at, yaw)
+    half = cov.length(0.0) / 2
+    # The wall side is never seen, so the print stops at the top of it.
+    _cat_print(kit, cov.P, cov.inside, -half + 0.01, w / 2 - 0.02,
+               x0 + 0.07, l / 2 - 0.010, at, yaw, BRNG)
+    # The strip of bottom sheet showing between the pillows and the turn-down.
+    Pm = lambda s, x: Vector((x, s, 0.385 + _sb_top(ma, mb, mc, 12, 7, x, s)))
+    _cat_print(kit, Pm, lambda p_: Vector((p_.x, 0.0, 0.0)),
+               -mb + 0.06, mb - 0.06, -l / 2 + 0.06, x0 - 0.05, at, yaw, BRNG)
+
+    # Two pillows, propped on the headboard, in the same print.
+    pa, pb, pc = 0.180, 0.320, 0.075
+    for s in (-1, 1):
+        M = _M((-l / 2 + 0.25, s * 0.345, 0.565),
+               yaw=BRNG.uniform(-0.06, 0.06), ry=0.34)
+        _soft(kit, CAT_GROUND, "pillow", pa, pb, pc, 3.6, 2.2, M, at, yaw,
+              rows=12, seg=36)
+        P, ins = _sb_surface(pa, pb, pc, 3.6, 2.2, M)
+        _cat_print(kit, P, ins, -pb * 0.88, pb * 0.88, -pa * 0.85, pa * 0.85,
+                   at, yaw, BRNG, step=0.090)
+
+    # Towels, laid out in a V towards the foot the way the photographs have
+    # them: a folded bath towel with a hand towel rolled on top of it.
+    for s, ang in ((-1, 0.55), (1, -0.55)):
+        M = _M((0.30, s * 0.20, zt + 0.022), yaw=ang)
+        _folded(kit, TOWEL, M, at, yaw, a=0.17, b=0.11, c=0.020,
+                bands=(-0.12, -0.095))
+        M2 = _M((0.30 - 0.01, s * 0.20, zt + 0.042 + 0.040),
+                yaw=ang + s * 0.25)
+        _towel_roll(kit, M2, at, yaw, l=0.27, r=0.040)
+
+
+def divan(kit, cx, cy, yaw, w=1.40, l=1.98, floor=F2):
+    """The divan in soba 4, off its photograph: an oak plinth, a white
+    upholstered base, a striped fitted cover rounded over the foot, grey
+    cushions against the walls it stands in the corner of, a blue pillow,
+    and two blue sheets folded on it with a rolled towel — the bed made up by
+    leaving the bedding on it.
+
+    Built along +X, head at −X; −Y is the wall it stands against."""
+    at = (cx, cy, floor)
+    bm = bmesh.new()
+    bm_box(bm, 0.0, 0.0, 0.025, l - 0.10, w - 0.10, 0.05)
+    ob = new_object(bm, "divan_plinth")
+    bevel(ob, 0.003, segments=1)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, OAK_S)
+    bm = bmesh.new()
+    _superball(bm, l / 2 - 0.008, w / 2 - 0.008, 0.085, p=14, q=9, rows=10,
+               seg=40, at=(0.0, 0.0, 0.135))
+    _emit(kit, bm, VALANCE, "divan_base", at, yaw)
+    # A welt round the top of the base, where the cover meets it.
+    bm = bmesh.new()
+    _superball(bm, l / 2 + 0.001, w / 2 + 0.001, 0.008, p=14, q=2, rows=4,
+               seg=48, at=(0.0, 0.0, 0.228))
+    _emit(kit, bm, (0.860, 0.855, 0.845), "divan_welt", at, yaw)
+
+    zt = 0.445
+    zb, hw, tp = 0.240, w / 2 + 0.006, 0.060
+    xa, xb = -l / 2 - 0.004, l / 2 + 0.006
+    cov = _Cover(hw, zt, zb, 0.060, 0.018, xa, xb, taper=tp, amp=0.004,
+                 hang_amp=0.002, rng=BRNG, n_x=48)
+    bm = bmesh.new()
+    cov.build(bm)
+    # The sweep is a band of cloth, open at its ends; a divan is solid, so
+    # both ends are closed with a board the band meets.
+    bm_box(bm, xb - 0.004, 0.0, (zb + zt - tp) / 2, 0.008, 2 * (hw - tp) + 0.004,
+           zt - tp - zb)
+    bm_box(bm, xa + 0.010, 0.0, (zb + zt) / 2 - 0.004, 0.012, 2 * hw - 0.020,
+           zt - zb - 0.010)
+    _emit(kit, bm, STRIPE_GROUND, "divan_cover", at, yaw)
+
+    # The stripes: bands across the bed at random widths and spacings, each
+    # following the cover from the top of the wall side down the room side.
+    bms = [bmesh.new() for _ in STRIPE_COLS]
+    x = -l / 2 + 0.01
+    xe = l / 2 + 0.006
+    while True:
+        x += BRNG.uniform(0.008, 0.034)
+        wd = BRNG.choice((0.004, 0.006, 0.009, 0.013, 0.018, 0.024))
+        if x + wd > xe - 0.002:
+            break
+        ci = STRIPE_COLS.index(_pick(BRNG, STRIPE_COLS, (0.34, 0.20, 0.20, 0.16, 0.10)))
+        bm = bms[ci]
+        La, Lb = cov.length(x), cov.length(x + wd)
+        n = 30
+        rows = []
+        for xx, L in ((x, La), (x + wd, Lb)):
+            row = []
+            for k in range(n + 1):
+                # From partway up the wall side, over, to the hem on the room
+                # side; s is measured from the middle of the top.
+                s = -0.35 * L + 0.85 * L * k / n
+                p, nn = _surf_n(cov.P, cov.inside, s, xx)
+                row.append(bm.verts.new(p + nn * 0.0022))
+            rows.append(row)
+        for k in range(n):
+            q = (rows[0][k], rows[0][k + 1], rows[1][k + 1], rows[1][k])
+            fn = (q[1].co - q[0].co).cross(q[3].co - q[0].co)
+            _, nk = _surf_n(cov.P, cov.inside,
+                            -0.35 * La + 0.85 * La * (k + 0.5) / n, x)
+            bm.faces.new(q if fn.dot(nk) >= 0 else tuple(reversed(q)))
+        x += wd
+    for bm, col in zip(bms, STRIPE_COLS):
+        ob = new_object(bm, "stripes", smooth=False, recalc=False)
+        _place(ob, cx, cy, floor, yaw)
+        kit.adopt(ob, col)
+    # And round the end, where the same stripes would run across the cover
+    # face at the foot: horizontal bands on its flat end.
+    bm_e = [bmesh.new() for _ in STRIPE_COLS]
+    z = zb
+    end_x = xb + 0.0022
+    while True:
+        z += BRNG.uniform(0.010, 0.030)
+        hz = BRNG.choice((0.004, 0.006, 0.010, 0.015))
+        if z + hz > zt - tp - 0.004:
+            break
+        ci = STRIPE_COLS.index(_pick(BRNG, STRIPE_COLS, (0.34, 0.20, 0.20, 0.16, 0.10)))
+        bm_box(bm_e[ci], end_x, 0.0, z + hz / 2, 0.001, 2 * (hw - tp), hz)
+        z += hz
+    for bm, col in zip(bm_e, STRIPE_COLS):
+        if len(bm.faces):
+            ob = new_object(bm, "stripes_end")
+            _place(ob, cx, cy, floor, yaw)
+            kit.adopt(ob, col)
+        else:
+            bm.free()
+
+    # Grey cushions: one standing against the wall at the head, two leaning
+    # on the long wall under the window.
+    _soft(kit, CUSHION_GREY, "cushion",
+          0.070, 0.25, 0.23, 9.0, 4.5,
+          _M((-l / 2 + 0.11, 0.06, zt + 0.20), yaw=0.08, ry=-0.20),
+          at, yaw, rows=12, seg=36)
+    for x_, tw in ((-0.38, 0.10), (0.22, -0.06)):
+        _soft(kit, CUSHION_GREY, "cushion",
+              0.25, 0.070, 0.22, 9.0, 4.5,
+              _M((x_, -w / 2 + 0.11, zt + 0.19), yaw=tw, rx=0.22),
+              at, yaw, rows=12, seg=36)
+    # The blue pillow, propped on the head cushion.
+    _soft(kit, PILLOW_BLUE, "pillow", 0.150, 0.200, 0.065, 3.4, 2.2,
+          _M((-l / 2 + 0.25, 0.22, zt + 0.16), yaw=0.30, ry=1.05),
+          at, yaw, rows=10, seg=28)
+    # A blue sheet folded under it, and another at the other end with the
+    # rolled towel on it.
+    _folded(kit, SHEET_BLUE, _M((-l / 2 + 0.52, 0.12, zt + 0.018), yaw=0.10),
+            at, yaw, a=0.21, b=0.16, c=0.016)
+    _folded(kit, SHEET_BLUE, _M((0.45, 0.10, zt + 0.018), yaw=-0.12),
+            at, yaw, a=0.20, b=0.15, c=0.016)
+    _towel_roll(kit, _M((0.45, 0.10, zt + 0.036 + 0.040), yaw=-0.12 + math.pi / 2),
+                at, yaw, l=0.30, r=0.040, band=(0.180, 0.200, 0.300))
+
+
+def bedside_oak(kit, cx, cy, yaw, floor=F2, w=0.42, d=0.36, h=0.46):
+    """The night table in the photograph of soba 3: sonoma oak, the top
+    drawer oak and the bottom one anthracite, a chrome bar pull on each, and
+    the navy lamp — a ceramic bulb under a cone of a shade.
+
+    Built facing −Y and turned by `yaw`."""
+    at = (cx, cy, floor)
+    bm = bmesh.new()
+    t = 0.016
+    bm_box(bm, 0.0, 0.0, h - t / 2, w, d, t)                  # top
+    for s in (-1, 1):
+        bm_box(bm, s * (w / 2 - t / 2), 0.004, (h - t) / 2, t, d - 0.008, h - t)
+    bm_box(bm, 0.0, d / 2 - 0.006, (h - t) / 2, w - 2 * t, 0.008, h - t)
+    bm_box(bm, 0.0, 0.004, 0.008, w - 2 * t, d - 0.012, t)    # the floor of it
+    ob = new_object(bm, "bedside_oak")
+    bevel(ob, 0.002, segments=1)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, OAK_S)
+    yf = -d / 2 + 0.002
+    fronts = ((h - t - 0.004 - 0.165, h - t - 0.004, OAK_S),
+              (0.020, h - t - 0.008 - 0.165, ANTHRACITE))
+    c, s_ = math.cos(yaw), math.sin(yaw)
+    W_ = lambda lx, ly, lz: (cx + lx * c - ly * s_, cy + lx * s_ + ly * c,
+                             floor + lz)
+    out = (s_, -c, 0.0)
+    for z0, z1, col in fronts:
+        bm = bmesh.new()
+        bm_box(bm, 0.0, yf - 0.009, (z0 + z1) / 2, w - 2 * t - 0.004, 0.018,
+               z1 - z0)
+        ob = new_object(bm, "bedside_front")
+        bevel(ob, 0.002, segments=1)
+        _place(ob, cx, cy, floor, yaw)
+        kit.adopt(ob, col)
+        zc = (z0 + z1) / 2 + (0.03 if col == OAK_S else 0.04)
+        _bar_handle(kit, W_(-0.075, yf - 0.018, zc), W_(0.075, yf - 0.018, zc),
+                    out, r=0.0045, off=0.022, colour=CHROME)
+    # The lamp.
+    bm = bmesh.new()
+    _lathe(bm, [(0.0, 0.040), (0.006, 0.048), (0.030, 0.062), (0.060, 0.064),
+                (0.090, 0.052), (0.115, 0.030), (0.130, 0.016), (0.140, 0.014)],
+           seg=28)
+    _emit(kit, bm, LAMP_NAVY, "lamp_foot", (cx, cy, floor + h))
+    bm = bmesh.new()
+    _lathe(bm, [(0.140, 0.006), (0.200, 0.006)], seg=10)
+    _emit(kit, bm, CHROME, "lamp_stem", (cx, cy, floor + h))
+    bm = bmesh.new()
+    _lathe(bm, [(0.150, 0.0004), (0.150, 0.130), (0.156, 0.134), (0.162, 0.130),
+                (0.250, 0.050), (0.262, 0.030), (0.266, 0.0004)], seg=36)
+    _emit(kit, bm, LAMP_NAVY, "lamp_shade", (cx, cy, floor + h))
+    # The flex, down the back and away.
+    c, s_ = math.cos(yaw), math.sin(yaw)
+    pts = [W_(0.01, 0.0, h + 0.004), W_(0.03, d / 2 - 0.02, h + 0.004),
+           W_(0.05, d / 2 + 0.012, h - 0.03), W_(0.06, d / 2 + 0.014, 0.10),
+           W_(0.10, d / 2 + 0.010, 0.006), W_(0.30, d / 2 + 0.010, 0.006)]
+    bm = bmesh.new()
+    _tube(bm, pts, 0.0025, seg=6)
+    _emit(kit, bm, (0.900, 0.895, 0.880), "flex")
+
+
+def wardrobe_oak(kit, x0, x1, y0, y1, z, h, face):
+    """The single wardrobe in soba 4, in the oak of the bed and the night
+    table: carcass on an anthracite plinth, a flush door hung on two hinges
+    with a long chrome bar, and a suitcase lying on top of it, which is where
+    a weekend house keeps the suitcase."""
+    yaw = {"+y": math.pi, "+x": math.pi / 2, "-x": -math.pi / 2}[face]
+    w = (x1 - x0) if face == "+y" else (y1 - y0)
+    d = (y1 - y0) if face == "+y" else (x1 - x0)
+    at = ((x0 + x1) / 2, (y0 + y1) / 2, z)
+    t = 0.018
+    bm = bmesh.new()
+    bm_box(bm, 0.0, 0.0, h - t / 2, w, d, t)
+    for s in (-1, 1):
+        bm_box(bm, s * (w / 2 - t / 2), 0.0, (h + 0.06) / 2, t, d, h - 0.06)
+    bm_box(bm, 0.0, d / 2 - 0.004, h / 2, w - 2 * t, 0.008, h)
+    ob = new_object(bm, "wardrobe_oak")
+    bevel(ob, 0.002, segments=1)
+    _place(ob, at[0], at[1], at[2], yaw)
+    kit.adopt(ob, OAK_S)
+    bm = bmesh.new()
+    bm_box(bm, 0.0, 0.015, 0.035, w - 0.03, d - 0.05, 0.07)
+    ob = new_object(bm, "wardrobe_plinth")
+    _place(ob, at[0], at[1], at[2], yaw)
+    kit.adopt(ob, ANTHRACITE)
+    yf = -d / 2
+    # The door over a drawer, the drawer anthracite like the night tables'.
+    zd = 0.075 + 0.200
+    bm = bmesh.new()
+    bm_box(bm, 0.0, yf - 0.009, (zd + 0.003 + h - t - 0.003) / 2, w - 0.006,
+           0.018, h - t - 0.006 - zd)
+    ob = new_object(bm, "wardrobe_door")
+    bevel(ob, 0.002, segments=1)
+    _place(ob, at[0], at[1], at[2], yaw)
+    kit.adopt(ob, OAK_S)
+    bm = bmesh.new()
+    bm_box(bm, 0.0, yf - 0.009, (0.075 + zd) / 2, w - 0.006, 0.018,
+           zd - 0.075 - 0.003)
+    ob = new_object(bm, "wardrobe_drawer")
+    bevel(ob, 0.002, segments=1)
+    _place(ob, at[0], at[1], at[2], yaw)
+    kit.adopt(ob, ANTHRACITE)
+    c, s_ = math.cos(yaw), math.sin(yaw)
+    W_ = lambda lx, ly, lz: (at[0] + lx * c - ly * s_, at[1] + lx * s_ + ly * c,
+                             at[2] + lz)
+    out = (s_, -c, 0.0)
+    hx = w / 2 - 0.05
+    _bar_handle(kit, W_(hx, yf - 0.018, h * 0.45), W_(hx, yf - 0.018, h * 0.45
+                + 0.32), out, r=0.0055, off=0.026, colour=CHROME)
+    zc = (0.075 + zd) / 2 + 0.03
+    _bar_handle(kit, W_(-0.09, yf - 0.018, zc), W_(0.09, yf - 0.018, zc), out,
+                r=0.0045, off=0.022, colour=CHROME)
+    bm = bmesh.new()
+    for zz in (zd + 0.15, h - 0.25):
+        bm_box(bm, -w / 2 + 0.004, yf - 0.006, zz, 0.008, 0.010, 0.07)
+    ob = new_object(bm, "hinges")
+    _place(ob, at[0], at[1], at[2], yaw)
+    kit.adopt(ob, CHROME)
+    # The suitcase: a ribbed hard shell lying flat, its handle towards the room.
+    cl, cw, ch = 0.54, min(0.38, d - 0.06), 0.21
+    sz = h + ch / 2
+    bm = bmesh.new()
+    _superball(bm, cl / 2, cw / 2, ch / 2, p=8, q=8, rows=10, seg=36)
+    ob = new_object(bm, "suitcase", smooth=True)
+    _place(ob, at[0], at[1], at[2] + sz, yaw + 0.07)
+    kit.adopt(ob, CASE_BLUE)
+    bm = bmesh.new()
+    for i in range(5):
+        x = -cl / 2 + 0.08 + (cl - 0.16) * i / 4
+        bm_box(bm, x, 0.0, ch / 2 + 0.001, 0.016, cw - 0.06, 0.006)
+    bm_box(bm, 0.0, 0.0, 0.0, cl + 0.004, cw + 0.004, 0.012)
+    ob = new_object(bm, "suitcase_ribs")
+    bevel(ob, 0.003, segments=1)
+    _place(ob, at[0], at[1], at[2] + sz, yaw + 0.07)
+    kit.adopt(ob, tuple(v * 0.80 for v in CASE_BLUE))
+    bm = bmesh.new()
+    _tube(bm, [(-0.07, -cw / 2 - 0.002, 0.0), (-0.06, -cw / 2 - 0.022, 0.0),
+               (0.06, -cw / 2 - 0.022, 0.0), (0.07, -cw / 2 - 0.002, 0.0)],
+          0.007, seg=8)
+    ob = new_object(bm, "suitcase_handle", smooth=True)
+    _place(ob, at[0], at[1], at[2] + sz, yaw + 0.07)
+    kit.adopt(ob, BLACK)
+
+
+def stool_oak(kit, cx, cy, floor=F2, w=0.36, d=0.36, h=0.44):
+    """A plain oak stool by the door, with a folded sheet on it."""
+    bm = bmesh.new()
+    bm_box(bm, cx, cy, floor + h - 0.012, w, d, 0.024)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            bm_box(bm, cx + sx * (w / 2 - 0.035), cy + sy * (d / 2 - 0.035),
+                   floor + (h - 0.024) / 2, 0.038, 0.038, h - 0.024)
+    for sy in (-1, 1):
+        bm_box(bm, cx, cy + sy * (d / 2 - 0.035), floor + 0.14, w - 0.07,
+               0.018, 0.022)
+    ob = new_object(bm, "stool")
+    bevel(ob, 0.003, segments=1)
+    kit.adopt(ob, OAK_S)
+    _folded(kit, LINEN, _M((0.0, 0.0, 0.0), yaw=0.12), (cx, cy, floor + h + 0.022),
+            0.0, a=0.15, b=0.14, c=0.022)
+    _folded(kit, (0.700, 0.760, 0.860), _M((0.0, 0.0, 0.0), yaw=0.05),
+            (cx, cy, floor + h + 0.062), 0.0, a=0.13, b=0.12, c=0.018)
+
+
+def socket(kit, x, y, z, yaw):
+    """A Schuko socket on a wall: a square plate, the round well and the two
+    pin holes. Built facing -Y at the wall face and turned by `yaw`."""
+    bm = bmesh.new()
+    bm_box(bm, 0.0, -0.006, 0.0, 0.080, 0.012, 0.080)
+    ob = new_object(bm, "socket")
+    bevel(ob, 0.006, segments=3)
+    _place(ob, x, y, z, yaw)
+    kit.adopt(ob, SOCKET)
+    bm = bmesh.new()
+    vs = bm_cylinder(bm, 0.0, 0.0, 0.0, 0.004, 0.021, 0.021, seg=24)
+    _xf(vs, _M((0.0, -0.0125, 0.0), rx=math.pi / 2))
+    _emit(kit, bm, (0.820, 0.815, 0.800), "socket_well", (x, y, z), yaw,
+          smooth=False)
+    bm = bmesh.new()
+    for dx in (-0.0095, 0.0095):
+        vs = bm_cylinder(bm, 0.0, 0.0, 0.0, 0.002, 0.0028, 0.0028, seg=8)
+        _xf(vs, _M((dx, -0.0145, 0.0), rx=math.pi / 2))
+    _emit(kit, bm, (0.200, 0.200, 0.200), "socket_pins", (x, y, z), yaw,
+          smooth=False)
 
 
 # ── the bookcase ────────────────────────────────────────────────────────────

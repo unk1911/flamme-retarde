@@ -8,6 +8,76 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.559.1] — 2026-10-01
+
+### The two bedrooms, furnished off their own photographs, and the giant closet gone
+
+Misha: *"yeah vikendica looks much better, yeah i love the bookcase, maybe
+increase the poly count on furniture inside the 2 rooms as well, maybe
+declutter the 1 room by removing that giant closet"*
+
+The two rooms are the bedrooms, soba 3 and soba 4. Both are in his
+photographs (`/mnt/c/tmp/refs/vacay_house/1st/`), and the furniture in them
+is sonoma oak with anthracite, not walnut. The walnut set from 1.559.0 stays
+downstairs and in the loft. The bookcase and everything else from 1.559.0 is
+untouched. All in `tools/blender/vikendica.py`.
+
+- **The closet is gone.** This was the 1.82 m, three-door walnut wardrobe in
+  soba 3, 2.02 m tall in a 2.40 m room. It filled the whole door wall. With it
+  there, the bed stood head-out in the middle of the floor, with its
+  headboard 67 cm in front of the doorway. The single wardrobe in soba 4 stays.
+  The closet had no blocker (no furniture does), so blockers are still 820.
+- **Soba 3, as photographed.** The bed's head is on the party wall and its
+  long side on the north wall. You come in at its side, which is the photo
+  from the door. The bed:
+  - a sonoma-oak platform with deep rails, set-back block feet and a slatted
+    deck;
+  - a headboard of two oak posts with an anthracite panel between them;
+  - the mattress sitting down in the rails;
+  - a duvet that goes over the foot and down;
+  - two pillows propped on the headboard;
+  - two sets of towels in a V, each a folded bath towel with a striped hand
+    towel rolled on it, spiral showing.
+
+  The bedding is the **cat print**: a few hundred cats in five colours on the
+  duvet, the bottom sheet and both pillows. Each cat (curled, sitting or
+  stretched) has a body, a head, two ears and sometimes a tail. They are laid
+  on the cloth by distance round the section and along the bed, so they fold
+  over the rounded edges the way a print does.
+
+  The night table is the one in the photograph: an oak drawer over an
+  anthracite one, each with a chrome bar pull, and the navy mushroom lamp with
+  its flex. There is also a socket over the bed.
+- **Soba 4, the divan.** It stays on the same footprint, under the window and
+  head to the north wall, as in the photograph. It has:
+  - an oak plinth and a white upholstered base with a welt;
+  - a **striped** fitted cover rounded over the foot. The stripes are bands
+    of random widths in five colours that follow the cover down its side, and
+    they run across the foot face too;
+  - three squarish grey cushions against the walls and a blue pillow;
+  - two blue sheets folded on it, one with a rolled towel.
+
+  Also in this room:
+  - The night table now stands beside the head, not in the far corner a
+    metre from the bed.
+  - The wardrobe is in oak on the same footprint: a flush door on two hinges,
+    an anthracite drawer under it, and a suitcase lying on top.
+  - A white slab of "linen" used to float at seat height with nothing under
+    it. It is now an oak stool with spare sheets on it.
+  - There is a socket under the window.
+- **Not added:** the photo prints over the bed in soba 3. A coloured
+  rectangle in this shader reads as a screen (see `pictures`). They could come
+  back as the runtime-drawn kind if he wants them.
+
+The prints need no texture. They are geometry 2.5 mm off the cloth.
+
+Shell 284,018 → 314,862 tris (+31k), 543.2 → 645.6 KB packed (+102 KB);
+page 38.95 → 39.09 MB (+140 KB). The rebake is byte-stable, and only the
+shell blob changes. The new randomness comes from its own generator (BRNG).
+The two replaced beds still burn their RNG/FRNG draws, so the loft, roof,
+plan and downstairs are byte-identical. Blockers 820, people 100, no console
+errors, day and night.
+
 ## [1.559.0] — 2026-10-01
 
 ### The vikendica's furniture, at the resolution of the room you stand in
