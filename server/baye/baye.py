@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.50.1"
+VERSION = "1.51.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -459,6 +459,28 @@ INTENTS = [
     ("collar.off", [r"\b(collar|ogrlic\w*|povod\w*|leash|collier|laisse)\b",
                     r"\b(off|remove|unclip\w*|unleash\w*|skini\w*|skin\w*|makni\w*|otkop\w*|enl[eè]ve\w*|retire\w*|d[eé]tache\w*)\b"]),
     ("collar.on", [r"\b(collar|ogrlic\w*|povod\w*|leash|collier|laisse)\b"]),
+    # ── AND HER AUTONOMOUS MODE (1.51.0) ────────────────────────────────
+    #
+    # Misha, 1 Oct 2026: *"a special reserved command like 'engage autonomous
+    # mode', where she executes a sequence of commands, on her own"* — see
+    # src/49-auto.js. The page matches the TYPED line itself (`autoWords`),
+    # and the transcript too when this service is older than it; these are
+    # for the spoken one. Reserved: the whole sentence, so "are you
+    # autonomous?" is still a question and goes on to her. Off wins over on
+    # (see `intents_of`). Its safeword is `belt.stop`, which the page keeps
+    # while the mode is on.
+    ("auto.off", [r"^\W*(disengage|disable|stop|end|exit|quit|cancel|turn off|switch off|deactivate|leave)"
+                  r"\s+(the\s+|your\s+)?(autonomous|autonomy|autopilot|auto)(\s+mode)?\W*$"]),
+    ("auto.off", [r"^\W*(autonomous|autonomy|autopilot|auto)(\s+mode)?\s+(off|disengaged|stop)\W*$"]),
+    ("auto.off", [r"^\W*(isklju[cč]i|ugasi|prekini|zaustavi)\s+(autonomni|samostalni|samostalno|auto)"
+                  r"(\s+(na[cč]in|re[zž]im))?(\s+rada)?\W*$"]),
+    ("auto.off", [r"^\W*(d[eé]sactive[rz]?|arr[eê]te[rz]?)\s+(le\s+)?(mode\s+)?autonome\W*$"]),
+    ("auto.on", [r"^\W*((engage|enable|start|activate|turn on|switch on|enter|go)\s+(the\s+|your\s+)?)?"
+                 r"(autonomous|autonomy|autopilot)(\s+mode)?(\s+(on|engaged))?\W*$"]),
+    ("auto.on", [r"^\W*auto(\s+mode)?\s+on\W*$"]),
+    ("auto.on", [r"^\W*((uklju[cč]i|pokreni|upali)\s+)?(autonomni|samostalni)\s+(na[cč]in|re[zž]im)(\s+rada)?\W*$"]),
+    ("auto.on", [r"^\W*(samostalno|budi samostalna)\W*$"]),
+    ("auto.on", [r"^\W*((active[rz]?|lance[rz]?)\s+)?(le\s+)?mode\s+autonome\W*$"]),
 ]
 
 
@@ -1842,6 +1864,9 @@ def intents_of(text: str) -> list:
     # And "take the collar off" is one command, the off.
     if "collar.off" in out and "collar.on" in out:
         out.remove("collar.on")
+    # And her own mode: "disengage autonomous mode" names it too.
+    if "auto.off" in out and "auto.on" in out:
+        out.remove("auto.on")
     # And "lick the ball" is about the ball: one thing for him at a time, and
     # the one with the noun in it.
     if "doodle.ball" in out and "doodle.lick" in out:
@@ -4408,7 +4433,31 @@ SCENE_HAND = {"breast": "their hand is on your breast",
               "thigh": "their hand is stroking up the inside of your thigh",
               "mouth": "their thumb is in your mouth"}
 SCENE_SAFE_BY = {"you", "her"}      # the player, or her own red
-SCENE_SAFE_OF = {"belt": "the belt", "collar": "the collar and leash"}
+SCENE_SAFE_OF = {"belt": "the belt", "collar": "the collar and leash",
+                 "auto": "the play"}
+# HER AUTONOMOUS MODE (1.51.0, src/49-auto.js): the move she chose herself a
+# moment ago, by its key off the page's table, and what it was in her words.
+AUTO_DOING = {
+    "spread": "let your legs fall apart", "close": "drew your legs together",
+    "armsOut": "stretched your arms out wide", "armsIn": "brought your arms back in",
+    "legsDown": "stretched your legs out", "legsUp": "drew your knees back up",
+    "heels": "kicked your heels up in the air behind you",
+    "wiggle": "wriggled your hips and legs on the cot", "arch": "arched your back",
+    "peek": "lifted your head and looked back over your shoulder at them",
+    "glance": "looked at them", "away": "turned your head away from them",
+    "eyesDown": "lowered your eyes", "eyesUp": "raised your eyes to them",
+    "mouth": "let your mouth fall open", "yawn": "yawned",
+    "settle": "settled and let your body go soft", "chest": "straightened up, chest out",
+    "rollSide": "rolled onto your side", "rollBack": "rolled onto your back",
+    "rollFront": "rolled onto your front", "turnAway": "turned your back to them",
+    "turnBack": "turned to face them again", "shimmy": "did your shimmy for them",
+    "twerk": "bent over and twerked for them", "heart": "made them a heart with your hands",
+    "note": "held up your card for them", "joy": "did a somersault", "wheel": "did cartwheels",
+    "hairDown": "took your hair down", "hairUp": "put your hair back up",
+    "kneel": "got down on your knees for them", "kneelUp": "came up onto your knees on the leash",
+    "down": "went back down on all fours on the leash", "standUp": "stood up on the leash",
+    "rock": "rocked the hammock yourself",
+}
 # How long after a safeword she is still in the aftercare, s. Past it the line
 # says it happened and nothing more.
 SCENE_CARE_S = 150
@@ -4464,6 +4513,12 @@ def clean_scene(raw) -> dict:
         "safeword_by": who_safe if who_safe in SCENE_SAFE_BY else None,
         "safeword_of": of_safe if of_safe in SCENE_SAFE_OF else None,
         "aftercare": bool(g("aftercare")) or None,
+        # Her autonomous mode (1.51.0): on, held still by them, the move she
+        # chose a moment ago, and how worked up she is, 0..1.
+        "auto": bool(g("auto")) or None,
+        "auto_still": bool(g("auto_still")) or None,
+        "auto_doing": (lambda d: d if d in AUTO_DOING else None)(clamp_str(g("auto_doing"), 10)),
+        "auto_heat": clamp_num(g("auto_heat"), 0, 1),
     }
     # A count with no count is nothing, and a lead with no leash is no lead.
     for k in ("spanks", "lashes", "tugs", "marks"):
@@ -4478,6 +4533,8 @@ def clean_scene(raw) -> dict:
         out["leashed"] = out["leading"] = None
     if not out["leashed"]:
         out["leading"] = None
+    if not out["auto"]:
+        out["auto_still"] = out["auto_doing"] = out["auto_heat"] = None
     return {k: v for k, v in out.items() if v not in (None, [], "")}
 
 
@@ -4535,6 +4592,20 @@ def scene_lines(s: dict):
     if s.get("tugs"):
         facts.append(f"they have tugged your leash {_times(s['tugs'])} in the "
                      f"last minute, the last one {_since(s.get('tug_ago_s', 0))}")
+    if s.get("auto"):
+        facts.append("they have put you in your autonomous mode: nobody is "
+                     "telling you each move, you are choosing your own moves "
+                     "yourself, to suit what they are doing to you")
+        if s.get("auto_doing"):
+            facts.append("a moment ago, on your own, you " + AUTO_DOING[s["auto_doing"]])
+        if s.get("auto_still"):
+            facts.append("they told you to be still, so you are holding "
+                         "perfectly still for them until they say otherwise")
+        h = s.get("auto_heat")
+        if h is not None and h >= 0.7:
+            facts.append("you are very worked up and want more")
+        elif h is not None and h <= 0.3:
+            facts.append("you are calm and easy")
     for k in s.get("worn") or []:
         facts.append(WORN_NOUN[k])
     if s.get("buzz"):

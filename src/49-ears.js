@@ -517,11 +517,23 @@ const ears = (() => {
     // is the belt's only while the belt is out — otherwise it is a thing you
     // said, and goes on as it always did.
     if (typed) {
+      // HER AUTONOMOUS MODE (1.560.0, src/49-auto.js): "engage autonomous
+      // mode", "autonomous off" — reserved, the whole line, matched here so it
+      // works signed out like the belt.
+      const aw = typeof autoWords === 'function' ? autoWords(blob) : null;
+      if (aw) {
+        note('“' + blob + '”  typed · here  → ' + aw, 'heard');
+        act(aw);
+        draw();
+        return;
+      }
       const bw = beltWords(blob);
       // AND THE COLLAR (1.553.0): its words, and the same safeword while it
-      // is on her — see COLLAR in 90-app.js.
+      // is on her — see COLLAR in 90-app.js. And while she is in her own
+      // mode, which the safeword ends too.
       const on = (typeof beltActive === 'function' && beltActive())
-        || (typeof collarActive === 'function' && collarActive());
+        || (typeof collarActive === 'function' && collarActive())
+        || (typeof autoActive === 'function' && autoActive());
       const cw = collarWords(blob);
       if (cw) {
         note('“' + blob + '”  typed · here  → ' + cw, 'heard');
@@ -534,6 +546,20 @@ const ears = (() => {
         act(bw);
         draw();
         return;
+      }
+      // AND THE CUES, while she is in her own mode: "good girl", "be still",
+      // "more", "spread", "together", "relax", "arch", "look at me", "come
+      // here" — see `autoCueWords`. Matched here so they work signed out;
+      // signed in the line goes on as well, so she answers it, and the
+      // request it armed is not asked a second time (`armedHere`).
+      const cue = typeof autoActive === 'function' && autoActive() ? autoCueWords(blob) : null;
+      if (cue) {
+        note('“' + blob + '”  typed · here  → cue: ' + cue.cue + (cue.sub ? ' (' + cue.sub + ')' : ''), 'heard');
+        const r = autoCue(cue.cue, cue.sub);
+        note('baye: ' + r.label, 'did');
+        armedHere = r.ask || null;
+        draw();
+        if (!AUTH.baye || !AUTH.user) return;
       }
       // AND THE PLAYGROUND (1.555.2): armed here, and — signed in — the line
       // goes on so she says yes to it; her `does` coming back for the same
@@ -615,14 +641,33 @@ const ears = (() => {
       // The language it was heard in, when it is not English — the service
       // names it (see `classify` in server/baye/baye.py) and she answers in it.
       const lang = d.lang && d.lang !== 'English' ? d.lang : null;
+      // HER OWN MODE, HEARD (1.560.0): a service from before 1.51.0 knows no
+      // `auto.*`, so the transcript is matched here too — and while she is
+      // in it, the safeword and the cues. A typed line was matched already.
+      if (!typed && said && typeof autoWords === 'function') {
+        d.intents = d.intents || [];
+        const aw = autoWords(said);
+        if (aw && !d.intents.includes(aw)) d.intents.push(aw);
+        if (!aw && autoActive() && autoSafeword(said) && !d.intents.includes('belt.stop')) d.intents.push('belt.stop');
+      }
       note('“' + (said || '…') + '”  ' + (typed ? 'typed' : secs.toFixed(1) + ' s')
         + ' · ' + d.ms + ' ms'
         + (lang ? ' · ' + lang : '')
         + (d.intents && d.intents.length ? '  → ' + d.intents.join(', ') : ''), 'heard');
+      if (!typed && said && typeof autoActive === 'function' && autoActive()
+        && !(d.intents && d.intents.length)) {
+        const cue = autoCueWords(said);
+        if (cue) {
+          const r = autoCue(cue.cue, cue.sub);
+          note('baye: ' + r.label, 'did');
+          if (r.ask) armedHere = r.ask;
+        }
+      }
       // "Stop" is the belt's safeword only while there is a belt out (see
       // `beltWords`); otherwise it is a sentence, and goes on to her.
       if (d.intents && d.intents.length && !(typeof beltActive === 'function' && beltActive())
-        && !(typeof collarActive === 'function' && collarActive())) {
+        && !(typeof collarActive === 'function' && collarActive())
+        && !(typeof autoActive === 'function' && autoActive())) {
         d.intents = d.intents.filter((n) => n !== 'belt.stop');
       }
       // A command, and that is the whole of it — commands outrank conversation.
@@ -987,6 +1032,28 @@ const ears = (() => {
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
   async function act(name, lang = null) {
+    // HER OWN MODE (1.560.0) — see src/49-auto.js.
+    if (name === 'auto.on' || name === 'auto.off') {
+      const got = name === 'auto.on' ? autoOn('typed') : autoOff('asked');
+      note('baye: ' + (got === 'on' ? 'on her own now — she chooses her moves (say “be still”, “more”, “relax”…; “autonomous off” ends it)'
+        : got === 'off' ? 'yours again — her own mode is off'
+          : got === 'already' ? 'she is already on her own'
+            : got === 'not on' ? 'she is not in her own mode'
+              : got === 'ground' ? 'only on foot at the beach' : got), got === 'on' || got === 'off' ? 'did' : 'meta');
+      return;
+    }
+    // The safeword ends her own mode first, whatever else it stops — and with
+    // nothing else on her, it is her own mode's aftercare (`autoSafe`).
+    if (name === 'belt.stop' && typeof autoActive === 'function' && autoActive()) {
+      const belt = typeof beltActive === 'function' && beltActive();
+      const collar = typeof collarActive === 'function' && collarActive();
+      autoSafe('you');
+      if (!belt && !collar) { note('red — she stops, and you go to her', 'did'); return; }
+    }
+    // Anything else you tell her outranks her own moves for a while.
+    // (Hers only: the fly's and the dog's commands are not to her.)
+    if (/^(belt|collar)\./.test(name) && name !== 'belt.stop' && name !== 'collar.stop'
+      && typeof autoDirect === 'function') autoDirect(name);
     // The collar — `collarCmd` in 90-app.js. The safeword stops it too, and
     // the belt as well if the belt is somehow out (it cannot be, with the
     // leash in the same hand — but "red" must never do less than it says).

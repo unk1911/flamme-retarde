@@ -45898,6 +45898,8 @@ async function buildJadrija(scene) {
       hW1: new Float64Array(nb * 4), hT1: new Float64Array(nb * 3),
       hQ: new Float32Array(nb * 4), hT: new Float32Array(3),
       legL: f.boneIndex('legLL'), legR: f.boneIndex('legLR'), neck: f.boneIndex('neck'),
+      // Her back, for an arch she does on her own (1.560.0, `cotMove`).
+      sp2: f.boneIndex('spine02'), chestB: f.boneIndex('chest'),
       // The knees' angles in the net, and the multiple of their tone they are at.
       knees: rag.angles.filter(([n]) => /^legL/.test(n)).map(([, m]) => m), kneeK: 1,
       most: new Float64Array(nb),
@@ -46058,8 +46060,12 @@ async function buildJadrija(scene) {
   }
 
   /** A knee's reflex this moment, rad: 0 to the peak and back — see COT_RAG.kick. */
-  function cotKickAt(k, t) {
-    const K = COT_RAG.kick;
+  function cotKickAt(k, t, Kn = null) {
+    // `Kn` may carry its own timing (1.560.0, her own moves — see `cotMove`):
+    // a reflex is a tenth of a second up, and a woman kicking her heels up
+    // because she feels like it takes the better part of one.
+    const K = Kn && Kn.up != null ? Kn : COT_RAG.kick;
+    if (!k) return 0;
     let u = t - K.lag;
     if (u <= 0) return 0;
     if (u < K.up) { u /= K.up; return k * u * u * (3 - 2 * u); }
@@ -46128,16 +46134,19 @@ async function buildJadrija(scene) {
     // kick held up and not three stacked past the knee's stop.
     R.drv.set(R.tgt.q);
     const K = COT_RAG.kick, kickEnd = K.lag + K.up + K.hold + K.down;
-    let aL = 0, aR = 0, aH = 0;
+    let aL = 0, aR = 0, aH = 0, aS = 0;
     for (let n = R.kicks.length - 1; n >= 0; n--) {
       const Kn = R.kicks[n];
       Kn.t += dt;
-      if (Kn.t > kickEnd) { R.kicks.splice(n, 1); continue; }
-      aL = Math.max(aL, cotKickAt(Kn.l, Kn.t));
-      aR = Math.max(aR, cotKickAt(Kn.r, Kn.t));
+      if (Kn.t > (Kn.up != null ? Kn.lag + Kn.up + Kn.hold + Kn.down : kickEnd)) { R.kicks.splice(n, 1); continue; }
+      aL = Math.max(aL, cotKickAt(Kn.l, Kn.t, Kn));
+      aR = Math.max(aR, cotKickAt(Kn.r, Kn.t, Kn));
       // The flinch is signed (see `poses`' `head`): the most of it either way.
-      const h = cotKickAt(Kn.h, Kn.t);
+      const h = cotKickAt(Kn.h, Kn.t, Kn);
       if (Math.abs(h) > Math.abs(aH)) aH = h;
+      // And her back (1.560.0, `cotMove`'s arch): extension, which is +x on
+      // the spine bones as it is on the neck (RAGDOLL: spine -x forward).
+      if (Kn.s) aS = Math.max(aS, cotKickAt(Kn.s, Kn.t, Kn));
     }
     // The knees at `stiff` times their tone while a kick is in flight.
     const kk = R.kicks.length ? K.stiff : 1;
@@ -46147,7 +46156,8 @@ async function buildJadrija(scene) {
       const D = RAGDOLL.bodies.find((b) => b.bone === 'legLL'), t = COT_RAG.tension * kk;
       for (const m of R.knees) net.setAngleK(m, D.k * t, D.kd * Math.max(0.35, Math.sqrt(t)));
     }
-    for (const [i, a] of [[R.legL, aL], [R.legR, aR], [R.neck, aH]]) {
+    for (const [i, a] of [[R.legL, aL], [R.legR, aR], [R.neck, aH],
+      [R.sp2, aS * 0.55], [R.chestB, aS * 0.45]]) {
       if (i < 0 || !a) continue;
       // `legL` +x is the knee, and the neck's +x is her head going back —
       // up, on her front: a turn about the bone's own x, on its angle.
@@ -46498,6 +46508,98 @@ async function buildJadrija(scene) {
     cotStats.tugs = (cotStats.tugs || 0) + 1;
     cotStats.lastTug = { J: +J.toFixed(2), dv: nb >= 0 ? +(J / R.net.mass[nb]).toFixed(2) : null,
       dir: [+jx.toFixed(2), +jy.toFixed(2), +jz.toFixed(2)], phase: show.phase };
+    return true;
+  }
+
+  /**
+   * ── HER OWN SMALL MOVES ON THE COT (1.560.0, the autonomous mode) ─────────
+   *
+   * Misha, 1 Oct 2026: *"while on the cot tummy down, after several spanks
+   * maybe she spreads legs of her own accord, or narrows them back ... she can
+   * do so many different movements"*. The legs and the arms are latches she
+   * already has (`legsSpread`, `armsWide`); what she did not have is the
+   * small stuff a body on a mattress does between them, and the cot already
+   * holds her as a ragdoll with muscles aimed at the pose (`cotRagTick`).
+   * So these are the slap's own reflex rows, driven slower and on purpose —
+   * no new clip, no typed pose: the muscles are asked for an angle and the
+   * mattress has its say.
+   *
+   *   heels   both knees bent up off the mattress, one then the other, held
+   *           a beat — the girl on her tummy kicking her heels up
+   *   wiggle  three small alternating kicks and a nudge of her hips across
+   *           the bed, side to side
+   *   arch    her back extended (spine02 and chest, +x): chest and head up
+   *           off the pillow, hips held where the clip has them; on her
+   *           knees or sitting it is her straightening up
+   *   lift    her head up off the pillow on its own, held (to look back)
+   *
+   * `k` 0..1 how much. Only while the cot holds her (`cotR.on`) and only in
+   * the poses each one means something in; answers whether it was laid on.
+   */
+  const COT_MOVE = {
+    heels: { lie: { front: 1 }, deg: [45, 75], gap: 0.45, up: 0.45, hold: 0.9, down: 0.7 },
+    // MEASURED (1.560.0, face down, k 0.8): heels lift her feet 34-35 cm; the
+    // wiggle at 12-22 degrees and 2.2 N·s moved her feet 3-5 cm and her hips
+    // 6 mm, which nobody sees — so it is more; the arch at 9-16 lifted her
+    // head 5 cm and her chest nothing, a nod rather than a back — so it is
+    // up to the give's own clamp (`most`: 20 degrees a joint).
+    wiggle: { lie: { front: 1, side: 1, back: 1 }, deg: [22, 36], gap: 0.3, up: 0.16, hold: 0.08, down: 0.32, J: 6 },
+    arch: { lie: { front: 1, knees: 1, seat: 1 }, deg: [22, 34], head: 0.6, up: 0.8, hold: 2.4, down: 1.0 },
+    lift: { lie: { front: 1 }, deg: [16, 26], up: 0.45, hold: 2.0, down: 0.7 },
+  };
+  function cotMove(kind, k = 0.6) {
+    const R = cotR, M = COT_MOVE[kind];
+    if (!R || !R.on || !skinFig || !M) return false;
+    const pose = COT_RAG.poses[show.phase];
+    if (!pose || !M.lie[pose.lie]) return false;
+    k = clamp(k, 0, 1);
+    const D = Math.PI / 180, deg = (M.deg[0] + (M.deg[1] - M.deg[0]) * k) * D;
+    const T = (lag) => ({ t: 0, lag, up: M.up, hold: M.hold, down: M.down, l: 0, r: 0, h: 0, s: 0 });
+    const first = Math.random() < 0.5;
+    let end = 0;
+    if (kind === 'heels') {
+      const a = T(0), b = T(M.gap);
+      a[first ? 'l' : 'r'] = deg; b[first ? 'r' : 'l'] = deg * 0.9;
+      R.kicks.push(a, b);
+      end = M.gap + M.up + M.hold + M.down;
+    } else if (kind === 'wiggle') {
+      const kn = deg * (pose.knee || 0.5);
+      for (let n = 0; n < 3; n++) {
+        const e = T(n * M.gap);
+        e[(n % 2 === 0) === first ? 'l' : 'r'] = kn;
+        R.kicks.push(e);
+      }
+      // And her hips across the bed and back: a nudge on the pelvis body
+      // along the line through the heads of her thighs.
+      const P = R.net.P, bl = R.rag.body('legUL'), br = R.rag.body('legUR');
+      if (bl >= 0 && br >= 0) {
+        let x = P[3 * br] - P[3 * bl], z = P[3 * br + 2] - P[3 * bl + 2];
+        const l = Math.hypot(x, z) || 1;
+        x /= l; z /= l;
+        const J = M.J * (0.6 + 0.4 * k) * (first ? 1 : -1);
+        cotImpulse(R.rag.pelvis, null, x * J, 0, z * J);
+      }
+      end = 2 * M.gap + M.up + M.hold + M.down;
+    } else if (kind === 'arch') {
+      const e = T(0);
+      e.s = deg;
+      // Her head goes with her chest on her front; sitting or kneeling up it
+      // stays where it is, which is a chin level with a back that straightened.
+      if (pose.lie === 'front') e.h = deg * M.head;
+      R.kicks.push(e);
+      end = M.up + M.hold + M.down;
+    } else if (kind === 'lift') {
+      const e = T(0);
+      e.h = deg * Math.sign(pose.head || 1);
+      R.kicks.push(e);
+      end = M.up + M.hold + M.down;
+    }
+    while (R.kicks.length > 6) R.kicks.shift();
+    // The give drawn for as long as it lasts — see `calm` and `actIn`.
+    R.calm = Math.max(R.calm, end);
+    if (R.t < R.warmFor) R.t = R.warmFor;
+    cotStats.moves = (cotStats.moves || 0) + 1;
+    cotStats.lastMove = { kind, k: +k.toFixed(2), deg: +(deg / D).toFixed(1), phase: show.phase, secs: +end.toFixed(2) };
     return true;
   }
 
@@ -48106,6 +48208,41 @@ async function buildJadrija(scene) {
    * function sees it. `go` is its own; answers true (always — nothing past it
    * is to run for these phases but the placement).
    */
+  /**
+   * THE OVERLAY LATCHES, ON THE LEASH (1.560.0). Misha: with the collar on,
+   * "open mouth" and "eyes down" were acknowledged — the panel said so and
+   * she answered — and nothing happened: `leashStep` took every ask that was
+   * not a pose on the leash and ate it as `leashed`, and `stepShow` skipped
+   * her face while she was on it (see `faceStep`). These are the ones that
+   * change no pose — her eyes, her mouth, a yawn, your hand on her head —
+   * set exactly as the dispatch sets them. The yawn takes her right arm off
+   * whatever it is doing, so not on all fours, where it is holding her up.
+   * Her legs and arms are not here: on all fours or kneeling a spread lifts
+   * the knees she is on (LEGSP), and `arms.wide` is a lying-down latch.
+   */
+  const LEASH_KEEP = { look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1,
+    'mouth.open': 1, 'mouth.close': 1, yawn: 1, pet: 1 };
+  function leashLatch(a) {
+    const f = skinFig;
+    if (a === 'look') { show.gaze = Infinity; show.gazeAway = 0; show.eyesDown = 0; return null; }
+    if (a === 'look.stop') { show.gaze = 0; show.gazeAway = 0; return null; }
+    if (a === 'look.down' || a === 'look.up') { show.eyesDown = a === 'look.down' ? 1 : 0; return null; }
+    if (a === 'mouth.open' || a === 'mouth.close') { show.mouthFor = a === 'mouth.open' ? SHOW.mouthHold : 0; return null; }
+    if (a === 'pet') { show.petFor = SHOW.petHold; return null; }
+    if (a === 'yawn') {
+      if (leash.pose === 'fours' || show.phase === 'leashFours' || show.phase === 'leashCrawl'
+        || show.phase === 'leashDown' || show.phase === 'leashUp') return 'hands';
+      if (show.yawn != null) return 'yawning';
+      if (show.spread != null) return 'handsbusy';
+      if (!f) return 'gone';
+      show.yawn = 0;
+      f.over('yawn', { bones: YAWN_OVER, from: 0 });
+      f.state.overW = 0;
+      return null;
+    }
+    return 'leashed';
+  }
+
   function leashStep(dt, pt, ps, done, go) {
     const L = leash, f = skinFig, S = f.state, O = LEASH_ON, P = LEASH_POSE;
     const t0 = performance.now();
@@ -48127,6 +48264,9 @@ async function buildJadrija(scene) {
       } else if (LEASH_ASK[a]) {
         const why = leashPoseWhy(LEASH_ASK[a]);
         if (!why) { leashWant(LEASH_ASK[a]); show.did = a; } else { show.why = why; show.did = null; }
+      } else if (LEASH_KEEP[a]) {
+        const why = leashLatch(a);
+        if (!why) show.did = a; else { show.why = why; show.did = null; }
       } else { show.why = 'leashed'; show.did = null; }
     }
     // The pull, out of her frame into the shore's, and the lurch it makes —
@@ -55188,6 +55328,39 @@ async function buildJadrija(scene) {
   const _lsAx = new THREE.Vector3(), _lsOut = new THREE.Vector3(), _lsQ = new THREE.Quaternion();
   const _lsG = { L: new THREE.Vector3(), R: new THREE.Vector3() };
   const _lsP = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  /**
+   * ── HER BACK STRAIGHTENED, UPRIGHT (1.560.0, the autonomous mode) ───────
+   *
+   * Kneeling or standing, "straighten up": the three spine joints the bend
+   * uses, the other way. The shimmy's note is the sign: -z brings the chest
+   * forward on this rig, so +z is the chest out and the shoulders back, and
+   * weighted up the spine like the bend so it is a curve and not a hinge.
+   * `show.autoChest` 0..1 is the amount asked; eased; only where she is
+   * upright and nothing else is bending her (the cot's own arch is the
+   * ragdoll's — see `cotMove`). Cleared once on the way out, the latch every
+   * aim here keeps.
+   */
+  const AUTO_CHEST = { rad: [0.075, 0.055, 0.035], rate: 2.2,
+    on: { dwell: 1, kept: 1, idle: 1, meet: 1, wait: 1, here: 1, grounds: 1, leashKnelt: 1, leashStand: 1 } };
+  let autoChestOn = 0;
+  function autoChest(f, dt) {
+    const want = AUTO_CHEST.on[show.phase] && !show.stance && !(show.crouch > 0.01) ? (show.autoChest || 0) : 0;
+    show.autoChestAt = damp(show.autoChestAt || 0, want, AUTO_CHEST.rate, dt);
+    if (show.autoChestAt < 0.003) {
+      if (autoChestOn) {
+        for (const n of ['spine01', 'spine02', 'spine03']) f.aim(n, 0, 0, 1, 0);
+        autoChestOn = 0;
+      }
+      show.autoChestAt = 0;
+      return;
+    }
+    autoChestOn = 1;
+    const k = show.autoChestAt, A = AUTO_CHEST.rad;
+    f.aim('spine01', 0, 0, 1, A[0] * k);
+    f.aim('spine02', 0, 0, 1, A[1] * k);
+    f.aim('spine03', 0, 0, 1, A[2] * k);
+  }
+
   function legsSpread(f, dt) {
     // Capped by the pose, so an amount asked for standing comes down to what
     // the cot allows when she lies on it, and goes back when she gets up.
@@ -56876,6 +57049,14 @@ async function buildJadrija(scene) {
       && (leash.mode === 'lead' || (leash.mode === 'cot' && !LEASH_ASK[name].startsWith('cot')))) {
       return leashPoseWhy(LEASH_ASK[name]);
     }
+    // AND EVERYTHING ELSE ON IT, SAID AT ONCE (1.560.0): `leashStep` takes
+    // the poses, the hammock and the latches that change no pose
+    // (LEASH_KEEP) and eats the rest as `leashed`. Said here, so the panel
+    // does not answer "her mouth wide open" to a request she will not do.
+    if (leash.on && leash.clipped && !leash.offing && leash.mode === 'lead' && !LEASH_ASK[name]
+      && !LEASH_KEEP[name] && name !== 'hammock' && name !== 'collar' && name !== 'grounds') return 'leashed';
+    if (name === 'yawn' && leash.on && (leash.pose === 'fours' || show.phase === 'leashFours'
+      || show.phase === 'leashCrawl' || show.phase === 'leashDown' || show.phase === 'leashUp')) return 'hands';
     if (name === 'collar') {
       // THE COLLAR — once is enough, and not from the water or the hammock.
       if (leash.on) return leash.offing ? 'collaroff' : 'collared';
@@ -57628,6 +57809,146 @@ async function buildJadrija(scene) {
    */
   let resetWant = 0;
 
+  /**
+   * HER FACE, A FRAME OF IT — the water in her mouth, her lips when she
+   * talks, "open wide", your thumb, the petting, your hand, the toy, and the
+   * chin the water lifts. Out of `stepShow` (1.560.0) so the leash's own step
+   * can run it too: see `leashSkip`, which used to skip it, and with it every
+   * one of these while she was on the end of it. `her` is `sheIsIn()`.
+   */
+  function faceStep(f, dt, her) {
+    const into = KNEES[show.phase] && show.hit > 0 ? 1 : 0;
+    // Up fast and down slowly. She is answering the water, and a chin that
+    // falls as quickly as it rose reads as a flinch.
+    show.gape = damp(show.gape, into, into ? 9 : 3.2, dt);
+    // And how long it has been going in, which is a different question from
+    // whether it is going in now — `gape` is the gesture and lets go with the
+    // jet; this is the tally and does not. Keeping them apart is what lets a
+    // mouth that opened once keep opening while you hold the branch on it.
+    show.fill = clamp(show.fill
+      + (into ? dt / SHOW.gulp : -dt / SHOW.spit), 0, 1);
+    if (f.face) {
+      // AND HER LIPS, WHEN SHE IS TALKING. Misha, 16 Sep 2026: *"when she
+      // talks, is it possible to have her lips move a little bit so it's
+      // obvious that she is talking/saying something?"*
+      //
+      // The jaw is already here — it is what she opens her mouth with for
+      // the water, four lines down — so this is not a new mechanism, it is
+      // a second thing driving the same one. It rides the ENVELOPE of the
+      // line actually coming out of the speaker (`voiceLevel` in
+      // 80-audio.js) rather than a timer, because nothing in the page knows
+      // where the syllables are in an mp3 that arrived a moment ago, and
+      // lips flapping on a clock through a pause between words read worse
+      // than lips that never moved. `saying` is whose line it is: the voice
+      // channel is shared with the cat and the bathers, and she should not
+      // mouth their words from across the beach.
+      //
+      // A QUARTER, and not a full jaw drop. The water gape is a mouth held
+      // open to drink out of a hose; talking is millimetres, and the whole
+      // ask was "a little bit". Whichever of the two is bigger wins, so a
+      // woman being hosed while she talks does the hose.
+      const mine = typeof voice !== 'undefined' && voice.saying
+        && voice.saying() === 'baye';
+      let talk = 0;
+      if (mine) {
+        const lvl = audio && audio.voiceLevel ? audio.voiceLevel() : 0;
+        show.lipT = (show.lipT || 0) + dt;
+        show.lipPeak = Math.max(show.lipPeak || 0, lvl);
+        // AND A MOUTH THAT MOVES EVEN WHERE THE METER READS NOTHING. The
+        // envelope comes off an `<audio>` element through a media-element
+        // source, and that is the one part of this chain that a browser is
+        // allowed to refuse: headless Chrome resolves her whole line as a
+        // playback error, and a page with no output device would do the
+        // same. So the meter gets a third of a second to show anything at
+        // all, and if it does not, the rest of the line is carried by a
+        // syllable envelope instead — two beats crossed, which is a jaw
+        // moving at speech rate rather than a flap on one sine.
+        //
+        // It is a FALLBACK and not the plan: whenever the meter works, it
+        // wins, because only it knows where the pauses are.
+        const dumb = show.lipPeak < 0.02 && show.lipT > 0.35
+          ? Math.max(0, 0.55 + 0.45 * Math.sin(show.lipT * 17.0)
+            * Math.sin(show.lipT * 6.3))
+          : 0;
+        talk = Math.max(lvl, dumb) * SHOW.talkOpen;
+      } else if (show.lipT) { show.lipT = 0; show.lipPeak = 0; }
+      // Asked to open wide: a full drop, eased in and out rather than
+      // stepped, and bigger than anything else wins as always.
+      // Your thumb on her lip opens her mouth, and keeps it open while it
+      // is there and for a moment after — see `thumbTouch`. Misha: *"when
+      // facing her and pressing hose or spacebar should be the thumb thing,
+      // which should cause her to open wider"*.
+      if ((show.thumbK || 0) > 0.6) show.mouthFor = Math.max(show.mouthFor || 0, 1.2);
+      show.mouthFor = Math.max(0, (show.mouthFor || 0) - dt);
+      // And held there a while, she closes her lips on it. Misha, 24 Sep:
+      // *"after it's held there a while she closes her lips on the
+      // thumb"*. The jaw comes up to where her lips meet a thumb — not shut,
+      // there is a thumb in the way — and her lips purse round it (`seal`,
+      // the pucker in v5Parts). Let go and it all undoes.
+      show.thumbHeld = (show.thumbK || 0) > 0.95 ? (show.thumbHeld || 0) + dt : 0;
+      show.seal = damp(show.seal || 0, show.thumbHeld > SHOW.sealAfter ? 1 : 0,
+        SHOW.sealRate, dt);
+      f.face.seal = show.seal;
+      // Petted: how long is left, where the stroke is, and how much she
+      // is feeling it — which waits for your hand to actually be there.
+      show.petFor = Math.max(0, (show.petFor || 0) - dt);
+      if (show.petFor > 0) show.petT = (show.petT || 0) + dt;
+      show.petK = damp(show.petK || 0, show.petFor > 0 && (show.petTouch || 0) > 0.9 ? 1 : 0,
+        3, dt);
+      // Your hand on her breast: her eyelids heavy and her lips a little
+      // apart, like the petting, a touch less.
+      show.cupK = damp(show.cupK || 0, (show.cupTouch || 0) > 0.9 ? 1 : 0, 3, dt);
+      // And her hair pulled from behind: the same heavy eyelids — see
+      // PULL_RAG.face.
+      f.face.pet = Math.max(show.petK, SHOW.cupFace * show.cupK,
+        PULL_RAG.face.pet * (show.pullFace || 0));
+      // And while your hand is on her she looks up at you, lips parted.
+      // Misha, 24 Sep: *"she should also look up while being petted and
+      // look at me (Chloe) and part lips, which she already knows how to
+      // do"* — the gaze is `look` (gazeTick) kept topped up, and the lips
+      // are the jaw she talks with, a little way open.
+      if (show.petK > 0.05) show.gaze = Math.max(show.gaze || 0, 0.6);
+      const openTo = 1 + (SHOW.sealGape - 1) * show.seal;
+      show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? openTo : 0, 6, dt);
+      // And the toy, worn: her lips part and her eyes close on its beat.
+      // Misha, 24 Sep 2026: *"when lovense is engaged/buzzing, she should
+      // part her lips and close her eyes, in sync with the rhythms"*.
+      // `buzzNod` IS the motor's envelope (`signalAmp`), set only while one
+      // is on her — on the tabouret it is furniture — so this follows every
+      // pattern the app can send, pulse for pulse.
+      show.buzzFace = damp(show.buzzFace || 0, show.buzzNod || 0, SHOW.buzzRate, dt);
+      f.face.buzz = show.buzzFace;
+      f.face.gape = Math.max(talk, show.mouthW, SHOW.petGape * (show.petK || 0),
+        SHOW.cupGape * (show.cupK || 0), PULL_RAG.face.gape * (show.pullFace || 0),
+        SHOW.buzzGape * show.buzzFace,
+        show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
+      // Both gated on `gape` rather than on `fill` alone, so everything in
+      // her mouth leaves with her mouth. A closed mouth with foam painted on
+      // the inside of it is a closed mouth with a white line across it.
+      f.face.foam = show.gape
+        * sat((show.fill - SHOW.froth) / (1 - SHOW.froth));
+      // And what is running down her, which is the third of these and the
+      // only one that is not about her mouth. `wet` is the meter that already
+      // exists — it goes most of the way up on the first squirt and comes
+      // down over a dozen seconds — and the heavy feeds in the shader are
+      // gated on `foam` anyway, so a woman who has been rained on gets a
+      // sheen and threads, and a woman who has been holding her mouth under
+      // the branch for ten seconds gets it coming out of the corners.
+      f.face.wet = show.wet;
+      // And whether any of it is drawn as water rather than only as shine.
+      // Indoors, yes: that is the scene, in a room lit through one doorway
+      // where a rivulet has to be lifted above its own albedo to be seen at
+      // all. Out on the deck the same lift clips against a noon sun and the
+      // threads come out as white splotches on her forehead — which is what
+      // was reported, and is fair. Out there being hosed leaves her wet, and
+      // wet is the sheen and the darkening, both of which are unconditional
+      // in the shader.
+      f.face.streak = her ? 1 : 0;
+    }
+    f.aim('head', 0, 0, 1, CHIN[show.phase]
+      ? show.gape * SHOW.chin * (0.86 + 0.20 * show.fill) : 0);
+  }
+
   function stepShow(dt, pt, ps, dir = null) {
     // Kept only so a probe can ask what she is steering by. The camera and the
     // person were the same point until B, and telling them apart from outside
@@ -57785,7 +58106,12 @@ async function buildJadrija(scene) {
     // leash when she is out of the hammock she was let off it for.
     leashTick(dt, go);
     leashSkip: {
-    if (LEASH_PH[show.phase] && leashStep(dt, pt, ps, done, go)) break leashSkip;
+    if (LEASH_PH[show.phase] && leashStep(dt, pt, ps, done, go)) {
+      // Her face goes on while she is on it (`faceStep`) — her lips, her
+      // mouth, your hand — which this skipped, all of it, until 1.560.0.
+      faceStep(f, dt, sheIsIn());
+      break leashSkip;
+    }
 
     // The two set pieces, each with the setting-up its entry needs, so that the
     // dice below and the routine above can both start one without either
@@ -58033,138 +58359,10 @@ async function buildJadrija(scene) {
     // different place is two clips that have to be kept in step forever. And it
     // is in figure space, so it is a chin coming up whichever way she has
     // turned to face you.
-    {
-      const into = KNEES[show.phase] && show.hit > 0 ? 1 : 0;
-      // Up fast and down slowly. She is answering the water, and a chin that
-      // falls as quickly as it rose reads as a flinch.
-      show.gape = damp(show.gape, into, into ? 9 : 3.2, dt);
-      // And how long it has been going in, which is a different question from
-      // whether it is going in now — `gape` is the gesture and lets go with the
-      // jet; this is the tally and does not. Keeping them apart is what lets a
-      // mouth that opened once keep opening while you hold the branch on it.
-      show.fill = clamp(show.fill
-        + (into ? dt / SHOW.gulp : -dt / SHOW.spit), 0, 1);
-      if (f.face) {
-        // AND HER LIPS, WHEN SHE IS TALKING. Misha, 16 Sep 2026: *"when she
-        // talks, is it possible to have her lips move a little bit so it's
-        // obvious that she is talking/saying something?"*
-        //
-        // The jaw is already here — it is what she opens her mouth with for
-        // the water, four lines down — so this is not a new mechanism, it is
-        // a second thing driving the same one. It rides the ENVELOPE of the
-        // line actually coming out of the speaker (`voiceLevel` in
-        // 80-audio.js) rather than a timer, because nothing in the page knows
-        // where the syllables are in an mp3 that arrived a moment ago, and
-        // lips flapping on a clock through a pause between words read worse
-        // than lips that never moved. `saying` is whose line it is: the voice
-        // channel is shared with the cat and the bathers, and she should not
-        // mouth their words from across the beach.
-        //
-        // A QUARTER, and not a full jaw drop. The water gape is a mouth held
-        // open to drink out of a hose; talking is millimetres, and the whole
-        // ask was "a little bit". Whichever of the two is bigger wins, so a
-        // woman being hosed while she talks does the hose.
-        const mine = typeof voice !== 'undefined' && voice.saying
-          && voice.saying() === 'baye';
-        let talk = 0;
-        if (mine) {
-          const lvl = audio && audio.voiceLevel ? audio.voiceLevel() : 0;
-          show.lipT = (show.lipT || 0) + dt;
-          show.lipPeak = Math.max(show.lipPeak || 0, lvl);
-          // AND A MOUTH THAT MOVES EVEN WHERE THE METER READS NOTHING. The
-          // envelope comes off an `<audio>` element through a media-element
-          // source, and that is the one part of this chain that a browser is
-          // allowed to refuse: headless Chrome resolves her whole line as a
-          // playback error, and a page with no output device would do the
-          // same. So the meter gets a third of a second to show anything at
-          // all, and if it does not, the rest of the line is carried by a
-          // syllable envelope instead — two beats crossed, which is a jaw
-          // moving at speech rate rather than a flap on one sine.
-          //
-          // It is a FALLBACK and not the plan: whenever the meter works, it
-          // wins, because only it knows where the pauses are.
-          const dumb = show.lipPeak < 0.02 && show.lipT > 0.35
-            ? Math.max(0, 0.55 + 0.45 * Math.sin(show.lipT * 17.0)
-              * Math.sin(show.lipT * 6.3))
-            : 0;
-          talk = Math.max(lvl, dumb) * SHOW.talkOpen;
-        } else if (show.lipT) { show.lipT = 0; show.lipPeak = 0; }
-        // Asked to open wide: a full drop, eased in and out rather than
-        // stepped, and bigger than anything else wins as always.
-        // Your thumb on her lip opens her mouth, and keeps it open while it
-        // is there and for a moment after — see `thumbTouch`. Misha: *"when
-        // facing her and pressing hose or spacebar should be the thumb thing,
-        // which should cause her to open wider"*.
-        if ((show.thumbK || 0) > 0.6) show.mouthFor = Math.max(show.mouthFor || 0, 1.2);
-        show.mouthFor = Math.max(0, (show.mouthFor || 0) - dt);
-        // And held there a while, she closes her lips on it. Misha, 24 Sep:
-        // *"after it's held there a while she closes her lips on the
-        // thumb"*. The jaw comes up to where her lips meet a thumb — not shut,
-        // there is a thumb in the way — and her lips purse round it (`seal`,
-        // the pucker in v5Parts). Let go and it all undoes.
-        show.thumbHeld = (show.thumbK || 0) > 0.95 ? (show.thumbHeld || 0) + dt : 0;
-        show.seal = damp(show.seal || 0, show.thumbHeld > SHOW.sealAfter ? 1 : 0,
-          SHOW.sealRate, dt);
-        f.face.seal = show.seal;
-        // Petted: how long is left, where the stroke is, and how much she
-        // is feeling it — which waits for your hand to actually be there.
-        show.petFor = Math.max(0, (show.petFor || 0) - dt);
-        if (show.petFor > 0) show.petT = (show.petT || 0) + dt;
-        show.petK = damp(show.petK || 0, show.petFor > 0 && (show.petTouch || 0) > 0.9 ? 1 : 0,
-          3, dt);
-        // Your hand on her breast: her eyelids heavy and her lips a little
-        // apart, like the petting, a touch less.
-        show.cupK = damp(show.cupK || 0, (show.cupTouch || 0) > 0.9 ? 1 : 0, 3, dt);
-        // And her hair pulled from behind: the same heavy eyelids — see
-        // PULL_RAG.face.
-        f.face.pet = Math.max(show.petK, SHOW.cupFace * show.cupK,
-          PULL_RAG.face.pet * (show.pullFace || 0));
-        // And while your hand is on her she looks up at you, lips parted.
-        // Misha, 24 Sep: *"she should also look up while being petted and
-        // look at me (Chloe) and part lips, which she already knows how to
-        // do"* — the gaze is `look` (gazeTick) kept topped up, and the lips
-        // are the jaw she talks with, a little way open.
-        if (show.petK > 0.05) show.gaze = Math.max(show.gaze || 0, 0.6);
-        const openTo = 1 + (SHOW.sealGape - 1) * show.seal;
-        show.mouthW = damp(show.mouthW || 0, show.mouthFor > 0 ? openTo : 0, 6, dt);
-        // And the toy, worn: her lips part and her eyes close on its beat.
-        // Misha, 24 Sep 2026: *"when lovense is engaged/buzzing, she should
-        // part her lips and close her eyes, in sync with the rhythms"*.
-        // `buzzNod` IS the motor's envelope (`signalAmp`), set only while one
-        // is on her — on the tabouret it is furniture — so this follows every
-        // pattern the app can send, pulse for pulse.
-        show.buzzFace = damp(show.buzzFace || 0, show.buzzNod || 0, SHOW.buzzRate, dt);
-        f.face.buzz = show.buzzFace;
-        f.face.gape = Math.max(talk, show.mouthW, SHOW.petGape * (show.petK || 0),
-          SHOW.cupGape * (show.cupK || 0), PULL_RAG.face.gape * (show.pullFace || 0),
-          SHOW.buzzGape * show.buzzFace,
-          show.gape * (SHOW.open[0] + SHOW.open[1] * show.fill));
-        // Both gated on `gape` rather than on `fill` alone, so everything in
-        // her mouth leaves with her mouth. A closed mouth with foam painted on
-        // the inside of it is a closed mouth with a white line across it.
-        f.face.foam = show.gape
-          * sat((show.fill - SHOW.froth) / (1 - SHOW.froth));
-        // And what is running down her, which is the third of these and the
-        // only one that is not about her mouth. `wet` is the meter that already
-        // exists — it goes most of the way up on the first squirt and comes
-        // down over a dozen seconds — and the heavy feeds in the shader are
-        // gated on `foam` anyway, so a woman who has been rained on gets a
-        // sheen and threads, and a woman who has been holding her mouth under
-        // the branch for ten seconds gets it coming out of the corners.
-        f.face.wet = show.wet;
-        // And whether any of it is drawn as water rather than only as shine.
-        // Indoors, yes: that is the scene, in a room lit through one doorway
-        // where a rivulet has to be lifted above its own albedo to be seen at
-        // all. Out on the deck the same lift clips against a noon sun and the
-        // threads come out as white splotches on her forehead — which is what
-        // was reported, and is fair. Out there being hosed leaves her wet, and
-        // wet is the sheen and the darkening, both of which are unconditional
-        // in the shader.
-        f.face.streak = her ? 1 : 0;
-      }
-      f.aim('head', 0, 0, 1, CHIN[show.phase]
-        ? show.gape * SHOW.chin * (0.86 + 0.20 * show.fill) : 0);
-    }
+    // (Its own function since 1.560.0, `faceStep`: on the leash the rest of
+    // this step is skipped, and her mouth, her lips and the petting went with
+    // it — asked to open her mouth on the collar, nothing moved.)
+    faceStep(f, dt, her);
 
     // And the wrap, which she never puts back on.
     //
@@ -58875,6 +59073,7 @@ async function buildJadrija(scene) {
         // unless told to 'stop looking at me'"*. So the clock is set to
         // for ever, and `look.stop` is what sets it back to nothing.
         show.gaze = Infinity;
+        show.gazeAway = 0;
         // And her eyes come up to yours: "look at me" said to a woman looking
         // at the floor is a request to stop.
         show.eyesDown = 0;
@@ -58882,6 +59081,7 @@ async function buildJadrija(scene) {
         showSay('trill', d);
       } else if (name === 'look.stop') {
         show.gaze = 0;
+        show.gazeAway = 0;
         show.did = name;
       } else if (name === 'look.down' || name === 'look.up') {
         // Her eyes lowered, or raised again — a latch like `look` and for
@@ -62015,6 +62215,8 @@ async function buildJadrija(scene) {
     else if (show.legsWasOn) legsFlat(f, dt);
     // And apart, last, so it is laid over whatever the legs above have done.
     legsSpread(f, dt);
+    // And her chest up, straightening, on her feet or her knees (1.560.0).
+    autoChest(f, dt);
     gripArm(f, dt);
     coverUp(f, dt);
     // And the reach, IF SOMETHING TOOK HER OUT OF IT. `tieHair` clears its own
@@ -65419,6 +65621,7 @@ async function buildJadrija(scene) {
     if (neckB === null) { neckB = f.boneIndex('neck'); headGz = f.boneIndex('head'); }
     if (neckB < 0 || headGz < 0) return;
     if (show.gaze > 0) show.gaze = Math.max(0, show.gaze - dt);
+    if (show.gaze <= 0 && (show.gazeAt || 0) < 0.004) show.gazeAway = 0;
     show.gazeAt = damp(show.gazeAt || 0, show.gaze > 0 ? 1 : 0, GAZE.rate, dt);
     // Her eyes lowered: eased in and out, and handed to whichever figure
     // draws the eyes as `face.down`, the way the petting is `face.pet`.
@@ -65447,6 +65650,10 @@ async function buildJadrija(scene) {
       _gzV.set(w[0], w[1] + 1.56, w[2]);
       f.boneAt(headGz, _gzH).applyMatrix4(f.mesh.matrixWorld);
       _gzV.sub(_gzH).applyQuaternion(_gzQ.copy(f.mesh.quaternion).invert());
+      // AND AWAY FROM YOU (1.560.0, the autonomous mode's `away`): the same
+      // turn at the point opposite you through her head, level — so lying on
+      // her front with you at her right she lays her other cheek down.
+      if (show.gazeAway) { _gzV.x = -_gzV.x; _gzV.z = -_gzV.z; }
       if (_gzV.lengthSq() > 1e-6) {
         _gzV.normalize();
         // Her nose, as the CLIP is holding it this frame: what the bones say
@@ -76859,6 +77066,8 @@ async function buildJadrija(scene) {
       frames: cotStats.frames, steps: cotStats.steps, rescues: cotStats.rescues, why: cotStats.why, whys: cotStats.whys,
       spanks: cotStats.spanks, enters: cotStats.enters, last: cotStats.last,
       tugs: cotStats.tugs || 0, lastTug: cotStats.lastTug || null,
+      // Her own moves (1.560.0, `cotMove`), and the last of them.
+      moves: cotStats.moves || 0, lastMove: cotStats.lastMove || null,
       // What each hand is kept on while a give is drawn (`cotHands`).
       held: cotR ? cotR.held.slice() : null, heldBy: cotR ? cotR.heldBy.slice() : null,
       give: +cotStats.sink.toFixed(4), giveMax: +cotStats.sinkMax.toFixed(4),
@@ -76882,7 +77091,7 @@ async function buildJadrija(scene) {
       phase: show.phase } : null),
     /** Where a name actually goes — `wear:` from the bag is a handover. */
     askRoad: (name) => askRoad(name),
-    askShow: (rawName) => {
+    askShow: (rawName, who = null) => {
       // WHICH ROAD, decided here and once — see `askRoad`. Everything below
       // and everything in the dispatch reads the normalised name, so neither
       // has to know that the two words are the same request.
@@ -76909,11 +77118,70 @@ async function buildJadrija(scene) {
       // already full" is not a failure, it is the room. 49-ears.js turns the
       // key into words; see `askWhy`, which is asked again on the frame she
       // is free to start, because by then it may answer differently.
+      // AND IT WAS YOU, NOT HER (1.560.0): anything asked of her that her
+      // own autonomous mode did not ask holds that mode off for a while —
+      // see `autoDirect` in 49-auto.js. Asked for what she is already doing
+      // too ("arms out" with her arms out): that is you wanting it kept.
+      const direct = who !== 'auto' && typeof autoDirect === 'function';
       const why = askWhy(name);
-      if (why) { show.why = why; show.did = null; return why; }
+      if (why) { show.why = why; show.did = null; if (direct) autoDirect(name); return why; }
       show.ask = name;
       show.why = null;
+      if (direct) autoDirect(name);
       return true;
+    },
+    /**
+     * WHAT THE AUTONOMOUS MODE READS (1.560.0, src/49-auto.js) — a few flags
+     * and numbers off `show`, cheap enough for every half second, where
+     * `show()` lays out a page of them and tests the lane ahead.
+     */
+    autoView: () => {
+      if (!show) return null;
+      const p = show.phase, cp = COT_RAG.poses[p];
+      return { phase: p, onBed: !!show.onBed, inKab: sheIsIn(), ask: show.ask || null, getUp: !!show.getUp,
+        askable: !!ASKABLE[p], lying: !!LYING[p], posed: !!POSED[p], knees: !!KNEES[p], hands: !!HANDS[p],
+        ham: !!HAM[p], meet: !!MEET_PH[p], hereFrom: !!HERE_FROM[p], offLane: offLane(),
+        swim: p === 'swim' || (show.dip || 0) > 0, at: toWorld(show.t, show.s),
+        lie: cp ? cp.lie : null, rag: !!(cotR && cotR.on && cotR.phase === p),
+        legsSp: Math.min(show.legsSp || 0, legsSpMax(p)), legsSpMax: legsSpMax(p), legsDown: show.legsDown || 0,
+        arms: show.armsWide || 0, gaze: show.gaze || 0, away: show.gazeAway || 0, eyesDown: show.eyesDown || 0,
+        mouth: (show.mouthFor || 0) > 0, yawn: show.yawn != null, turnBack: show.turnBack || 0,
+        mouthW: +(show.mouthW || 0).toFixed(3), downAt: +(show.downAt || 0).toFixed(3),
+        hair: hairFall ? 'down' : 'up', hit: show.hit || 0, chest: show.autoChest || 0,
+        leash: leash.on ? { clipped: !!leash.clipped, mode: leash.mode, pose: leash.pose, offing: !!leash.offing } : null,
+        hamSwing: hammock && hammock.api && HAM[p] ? hammock.api.swing() : null };
+    },
+    /** Whether she could be asked for `name` now — `askWhy`, null when she could. */
+    autoWhy: (name) => (show ? askWhy(name) : 'gone'),
+    /**
+     * HER OWN SMALL MOVES (1.560.0) — the autonomous mode's hands on the
+     * things below the asks: `cot` a ragdoll move (`cotMove`: 'heels',
+     * 'wiggle', 'arch', 'lift'), `glance` her eyes on you for that many
+     * seconds (`away` the other way), `chest` her back straightened upright
+     * 0..1, `rock` a little push of her own in the hammock. Each answers
+     * whether it was laid on.
+     */
+    autoMove: (o = {}) => {
+      if (!show) return false;
+      if (o.cot) return cotMove(o.cot, o.k == null ? 0.6 : o.k);
+      if (o.glance != null) {
+        if (show.gaze === Infinity && !o.force) return false;
+        show.gaze = Math.max(0, +o.glance || 0);
+        show.gazeAway = o.away ? 1 : 0;
+        if (!o.away) show.eyesDown = 0;
+        return true;
+      }
+      if (o.chest != null) { show.autoChest = clamp(+o.chest || 0, 0, 1); return true; }
+      if (o.rock) {
+        if (!hammock || !hammock.api || show.phase !== 'hamHeld') return false;
+        const H = hammock.api, sw = H.swing(), F = H.frame();
+        // Gently, and never to the rim: past `most` rad of swing she leaves it be.
+        if (Math.abs(sw.peak || 0) > (o.most || 0.22)) return false;
+        const dir = Math.abs(sw.w) > 0.02 ? Math.sign(sw.w) : (Math.random() < 0.5 ? -1 : 1);
+        const r = H.push(F.M[0] - dir * F.ez[0] * 0.3, F.M[2] - dir * F.ez[2] * 0.3, clamp(+o.rock, 0.05, 0.4), false);
+        return !!r;
+      }
+      return false;
     },
     /**
      * WHERE SHE IS DOING IT, for the panel's line (1.559.1) — asked right

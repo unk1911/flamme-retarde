@@ -8,6 +8,232 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.560.0] — 2026-10-01 (baye 1.51.0)
+
+### On her own: the autonomous mode
+
+Misha: *"we should support a special mode, maybe after receiving a special
+reserved command like 'engage autonomous mode', where she executes a sequence
+of commands, on her own, whatever make sense, like i am thinking while on the
+cot tummy down, after several spanks maybe she spreads legs of her own accord,
+or narrows them back, or spreads arms, or brings them together ... she can
+just sorta become reactive (like a roomba that adjusts to its environment),
+reactive to verbal cues and/or some of our gestures and/or just autonomously
+doing certain things that fit the mood"*.
+
+**On and off.** Typed or said, the whole line: "engage autonomous mode",
+"autonomous mode on", "autonomous", "samostalno", "uključi autonomni način",
+"mode autonome"; and "disengage autonomous mode", "autonomous off", "stop
+autonomous", "isključi autonomni način". Typed lines are matched in the page,
+like the belt (`autoWords`, src/49-auto.js), so they work signed out. Spoken
+lines are `auto.on` / `auto.off` in the service. The page also matches the
+transcript itself, so a service older than 1.51.0 still turns it on.
+"Are you autonomous?" is still a question to her. A tag, **BAYE ·
+AUTONOMOUS**, sits top right in the ground HUD (`#gh-auto`), with "· still"
+or "· yours" while she is held. It is a child of `#ground-hud`, so the
+recorder's overlays film it. When it comes on she says "Samo gledaj." (and
+two others), and going off "Dobro, opet si ti glavna.".
+
+**A roomba, not a routine** (`autoDecide`). Every 3-8 s, or 1.6 times that
+once she has settled, she scores every move she has where she is and picks
+one. The pick is weighted, not the best, so the same evening is never the
+same twice. A slap, a lash, a tug or the hose brings the next decision
+forward to 0.8-1.8 s after it, as her answer to it. The inputs:
+
+- **Where she is** (`autoCtx`): the cot on her front (`flatheld`,
+  `edgeHeld`), on her back, on her side, sitting or kneeling on it; kneeling
+  or on all fours on the floor; standing in the kabina; on the leash; in the
+  hammock; out of doors (the grounds, the promenade's idle and play). She
+  does nothing between poses or with an ask pending.
+- **What was done to her**: `sceneLog` (`sceneTalk`'s record), polled four
+  times a second for new hits (tool, hardness, region) and tugs. Also your
+  hand in her hair, petting her or on her, and the hose (`show.hit`).
+- **Her mood**: `heat` 0-1. A slap raises it by (0.045 + 0.03 × hardness),
+  scaled down the hotter she already is; a lash, a tug, a hair pull and the
+  hose raise it too, and "more" raises it most. It falls back to 0.22 over
+  75 s. `calm` is filled by petting, "good girl" and "relax".
+- **Your words** (`autoCueWords`, below).
+
+Every move carries mood tags: open, close, look, shy, heat, play, calm. A
+tag's worth rises with heat, with three or more hits in 30 s (open), with a
+hard slap in the last 3 s (close: a flinch), and with anything that just
+happened (look: she checks on you). A cue adds to it. Freshness counts as
+well: the same move again is ×0.15, and the move that undoes the last one is
+held off 6 s and wanted after that. Big moves (a roll, a dance, a change of
+pose) are a gate and not a weight: at most one in 40 s, and none within 12 s
+of anything happening to her. At ×0.05 a roll still came up, once 5 s after
+the last one, mid-spanking (MEASURED).
+
+**What she does, by place** (`AUTO_MOVES`). All of these are things she
+already did.
+- **Cot, face down:** legs apart / together, arms out / in (the latches),
+  and four new small moves from the cot's own ragdoll (`cotMove`, below):
+  heels up, a wriggle, an arch, and her head up with a look back over her
+  shoulder (`peek`). Also a glance at you, her head turned away, settling,
+  a yawn, and rarely a roll to her side or on to her back.
+- **Cot, on her back:** legs apart / together, legs flat / knees up, arms,
+  a wriggle, her eyes (to you, away, lowered, up), her mouth, a yawn, and
+  rarely a roll to her front or side.
+- **Cot, on her side:** arms, a wriggle, her eyes, a yawn, and a roll to
+  her front.
+- **Cot, sitting / kneeling up:** the arch (her back straightened), her
+  eyes, her mouth, a yawn; in the wall perch, her legs.
+- **Kneeling on the floor:** her back straightened (`autoChest`), her eyes,
+  a yawn, her mouth, turning her back to you and round again.
+- **Standing in the kabina:** the shimmy, the bend, the heart, her hair,
+  legs apart / together, turning round, her back straightened, a yawn, and
+  (worked up) down on her knees.
+- **On the leash:** up on her knees after a tug, down on all fours again,
+  up on her feet (calm), her eyes, her back straightened, her mouth, a yawn.
+- **In the hammock:** a little push of her own (`rock`, never past 0.2 rad
+  of swing), her eyes, her hair, a yawn.
+- **Out of doors:** her own numbers where she stands: the shimmy, the bend,
+  the heart, the card, a somersault, cartwheels, her hair.
+
+Lines come in the existing bark style, Croatian with a gloss (`AUTO_SAY`,
+`auto.g.*`): "Ovako?", "Hehe, ne još.", "Au! ...hehe.", "Mm, još jednom.",
+"Što radiš tamo?", "Ljuljaj me... ili ću sama.". One comes with every answer
+to a hit and with about a third of the other moves, at most one in 11 s.
+
+**Her own small moves on the cot** (`cotMove` in 43-jadrija.js). The cot
+already holds her as a ragdoll whose muscles aim at the pose. These moves
+are the slap's own reflex rows, driven slower and on purpose. `cotKickAt`
+takes a per-entry timing, and a spine row (+x on `spine02` and `chest`,
+extension) joins the knees and the neck. No new clip and no typed pose. The
+mattress has its say. MEASURED face down, k 0.8:
+
+| move | what moves | measured |
+|---|---|---|
+| heels | both knees bent, one then the other, held 0.9 s | feet up 33-35 cm |
+| wiggle | three small alternating kicks and a nudge across the bed | feet 16-17 cm |
+| arch | back extended 22-34 degrees (the give's own 20-degree clamp a joint) | head up 14.8 cm, chest 1.9 cm |
+| lift (`peek`) | her head up off the pillow, held 2 s | head 3.7 cm, plus the gaze |
+
+The first cut of the wiggle (12-22 degrees, 2.2 N·s) moved her feet 3-5 cm
+and her hips 6 mm, which nobody sees. The first arch (9-16 degrees) was a
+nod: head 5 cm, chest nothing.
+
+Also new: her **head turned away** (`show.gazeAway`, the gaze's target
+mirrored through her head), and her **back straightened upright**
+(`autoChest`, +z on the bend's three spine joints, kneeling or standing).
+
+**The cues** (typed in the page while the mode is on; spoken ones are
+matched on the transcript). These are the whole line, up to seven words:
+- "be still" / "ne miči se" / "mirno": no moves until you say anything
+  else ("good girl" does not count). MEASURED: 12 s of slaps every 4 s
+  while still, 0 moves.
+- "more" / "još" / "encore": heat +0.15, open and heat lean, a move in
+  0.6 s. "No more" is not "more".
+- "spread" / "raširi" (arms if you name them) and "together" / "skupi":
+  done now, and her choices lean that way for about 25 s.
+- "relax" / "opusti se": heat −0.2, calm, her eyes and back let go.
+- "arch" / "izvij se" / "straighten up": the arch on the cot, otherwise
+  her back straightened.
+- "look at me" / "pogledaj me": her eyes on you.
+- "come here" / "dođi": on her feet she comes for a hug. Anywhere else she
+  turns to you ("Dođi ti meni.") and stays where she is.
+- "good girl" / "dobra cura": praise, calm, a glance. She does not stop
+  being still for it.
+
+**The rules, which are not scored:**
+- **The safeword wins.** "red", "crvena", "stop" or "safeword", typed or
+  said, while the mode is on ends it and runs the aftercare. With the belt
+  out it is the belt's stop. With the collar on it is the collar's. With
+  neither, it is the belt's own aftercare (`sceneCare` in 90-app.js): your
+  hand to her, "Okay. Come here.", her thanks. `scene` then says
+  `safeword_of: 'auto'`. Her own red, and any safeword at all, ends the mode
+  too (`sceneSafe` calls `autoSafeHook`).
+- **You come first.** Anything you ask her yourself, through `askShow` or
+  the belt's and collar's commands, is done at once and holds her own moves
+  off for 10 s (`autoDirect`). This includes asking for what she is already
+  doing ("arms out" with her arms out): you want it kept. MEASURED: 9 s
+  after a direct ask, 0 of her own moves.
+- **Never** the belt or the collar, never off the cot or out of the room,
+  never an errand, never the water. Those are simply not moves.
+
+**A decision trace** (`__fr.auto.trace()`), face down on the cot with a slap
+every 4 s, then the cues and the safeword:
+
+```
+ 17.0 front flatheld h0.28 heels    | answers the hit (after spank)
+ 24.5 front flatheld h0.39 arch     | 3 hits/30s, answers the hit | "Au! ...hehe."
+ 28.5 front flatheld h0.44 spread   | 4 hits/30s, answers the hit
+ 32.3 front flatheld h0.49 wiggle   | answers the hit
+ 36.7 front flatheld h0.52 peek     | checks on you, answers the hit | "Au! ...hehe."
+ 43.3 front          h0.60 cue:still  (12 s of slaps: 0 moves)
+ 55.5 front          h0.84 cue:more
+ 59.6 front flatheld h0.85 spread   | 8 hits/30s, cue:open, answers the hit
+ 64.7 front          h0.84 cue:together
+ 68.1 front          h0.81 obeyed   | you asked: arms.wide — her own moves held 10 s
+ 78.2 front flatheld h0.74 arch     | 4 hits/30s, cue:open, cue:heat | "Mm... gledaš?"
+ 85.5                h0.77 DISENGAGED | safe   (aftercare, safeword_of 'auto')
+```
+
+On the leash, tugged every 5 s: eyes down, then up on her knees on the
+second tug ("Hehe, idem."), then glances, her back straightened, settling.
+In the hammock: a glance, a rock of her own, a yawn ("Lijepo mi je."), her
+head away. Standing in the kabina: the bend, a glance, her back to you,
+her back straightened. Then you asked her down on her knees: obeyed, 10 s
+held, and then her eyes lowered, a yawn, a glance, turning away.
+
+**No pose cycling.** The rolls are 1.559.3's direct roads, phase by phase:
+front to side `unroll → cradle → sideL`, side to front `unroll → flat →
+flatheld`, front to back `unroll → cradle`, back to side `sideR`. Nothing
+she chooses leaves the cot, and she never walked off in any run.
+
+**Her voice knows** (`server/baye/baye.py` 1.51.0, **needs deploying on
+mpcn0**): `clean_scene` takes `auto`, `auto_still`, `auto_doing` (a key
+off `AUTO_DOING`, the moves in her words) and `auto_heat`. `scene_lines`
+tells her she is choosing her own moves, what she did a moment ago ("you
+kicked your heels up in the air behind you"), that she is holding still
+for them, and whether she is very worked up or calm. `SCENE_SAFE_OF` gains
+`auto` ("the play"). `INTENTS` gains `auto.on` / `auto.off` (whole
+sentences; off wins). Without the deploy, the mode works by voice through
+the page's own transcript match. She just is not told she is in it.
+
+**And a bug on the leash, found on the way** (the coordinator's trace, from
+Misha: with the collar on, "open mouth" and "eyes down" were acknowledged
+and voiced and nothing happened). Two causes:
+- `leashStep` took every ask that was not a leash pose and ate it as
+  `leashed`.
+- `stepShow` skipped her whole face while she was on the leash: the mouth,
+  the lips when she talks, the petting.
+
+The fix:
+- The face is its own function now (`faceStep`) and runs on the leash too.
+- The overlay latches that change no pose (`LEASH_KEEP`: look, look.stop,
+  look.down, look.up, mouth.open, mouth.close, yawn, pet) are set on the
+  leash by `leashLatch`. The yawn is not allowed on all fours, where that
+  arm is holding her up.
+- `askWhy` now says `leashed` up front for anything else, so the panel no
+  longer says yes to what she will not do.
+
+MEASURED, collar on: `mouth.open`, mouthW 0 → 0.999, and `look.down`,
+downAt → 0.97, in `leashFours`, `leashKnelt`, `leashStand`, and on the cot
+leashed. The yawn plays kneeling and standing, and is refused on all fours
+('hands').
+
+**Cost:** a clock and a comparison a frame, a poll of `autoView` (a few
+flags) four times a second, and one decision every 3-8 s.
+
+Regression: the belt (4 lashes landed, the safeword, the rub), your hand
+(5/5 landed, mode off and on), the collar and leash (on, poses, red), the
+on-the-spot asks (hair down in the hammock "in the hammock", a shimmy
+beside it), key 8, the cot rolls. People 100, blockers 820, no console
+errors. RULE 4: no `rng()` draw added, removed or moved (her choices use
+`Math.random`, as her lines always have).
+
+Debug: `__fr.auto`: `on()`, `off()`, `hear(text)`, `cue(name, sub)`,
+`decide()`, `do(id)`, `event(kind, k)`, `state()`, `mood()`, `trace(n)`,
+`set({heat, calm, next, pause})`, `moves()`, `words(text)`;
+`__fr.jad.raw().autoView()`, `autoMove({cot | glance, away | chest | rock})`,
+`autoWhy(name)`, `cotRag().moves`.
+
+**Rough:** the safeword's aftercare from across the room. The rub's hand
+reaches toward her from where you stand, and from 2.5 m it does not get
+there. The belt's aftercare has the same limit, since you are always close
+for the belt.
+
 ## [1.559.3] — 2026-10-01 (baye 1.50.1)
 
 ### Done where she is: no walk home for her hair, and on to the cot like a person
