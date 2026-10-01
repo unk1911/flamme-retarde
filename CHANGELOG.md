@@ -8,6 +8,112 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.558.0] — 2026-10-01
+
+### The playground moves: AVBD swings, seesaw, trampolines — and a gate you can walk through
+
+Misha: *"now add the AVBD physics to the swings, seesaw and trampolines.
+also, right now i cannot seem to enter the playground, there's that open
+gate but it's too small and doesn't let me thru, i have to literally jump
+over the fence to get there, should be easier to get to it."*
+
+**The gate.** It was 1.1 m between the posts, and `confine` grows every
+collider by `GROUND.girth`, 0.55 m. The two jambs ate 1.10 m of it, so the
+way through was minus four centimetres. It is now a double gate, 2.1 m
+between the posts (t 517.95-520.05, centre **t 519.0, s 40.2**), and both
+leaves stand open, swung out onto the gravel strip. Each leaf has a thin
+collider turned to lie along it. That leaves 0.96 m clear for the walker.
+Walked in with W held: s 36.6, 37.9, 41.5, 45.0, 48.7, 49.1, straight
+through. `GROUNDS_WAYS.play` now ends at (519.0, 39.3), the gate's middle.
+
+- Playground A: the orange frame's one box the length of its bar is now
+  three, on what stands on the ground (the gooseneck's post and leg, the
+  ladder, the Λ). You can walk up under the bar to a seat, or through one.
+- The rubber is 8 cm over the hill that `walkY` knows (5 cm of gravel pad,
+  3 cm of rubber). Feet stood 8 cm into it. A made floor now knows the
+  rubber, the rims, the beds and the ping pong's grit beds (`addFloor` in
+  47-ground.js).
+
+**The physics.** All twelve moving parts are AVBD nets on the existing
+`avbdNet`. 43-avbd.js is unchanged: side by side with HEAD, `nethash` and
+`avbdhash` are IDENTICAL for the net, the ball, the wrist chain and the
+leash.
+
+- **The seats.** There are seven: two on B, two on A's orange frame, two on
+  the navy one, and the nest on B.
+  - Each flat seat is a rigid body on two chains. Each chain is three rigid
+    links on hard ball joints, from the shackle on the beam.
+  - It swings as a pendulum: 2.71 s, against 2.77 s on paper.
+  - It twists on its chains, and the chains go slack and fold when the seat
+    is thrown up.
+  - The nest is a 12 kg ring on four chains from two swivels. It swings, and
+    turns about 9 degrees when it is pushed by its rim.
+  - The chains are drawn as one shared tube, laid every frame through each
+    chain's joints, beaded like links.
+- **The rope** on A's yellow frame is five free links with its knots. Walk
+  into it and it swings aside.
+- **The seesaw** is a beam on two hard joints at the ends of its axle.
+  - Its centre of mass is 0.16 m over the axle, so it always comes to rest
+    on one end.
+  - Under each end, the tyre is a soft world box (25 kN/m, 450 N·s/m). Push
+    the up end down and it goes over, bumps 8 cm off the far tyre and
+    settles.
+  - It rests with its bumper on the tyre's crown (10 degrees). Before, the
+    bumper sat 9 cm inside the tyre.
+- **The spring rider** is one body on a ball joint at the spring's foot,
+  with a 400 N·m/rad angle spring for the coil. It rocks at a little over a
+  hertz, and the coil turns with it.
+- **The trampolines.**
+  - Each bed is a 5 kg body on eight pretensioned radial springs from the
+    rim, so it stiffens as it goes down.
+  - You are a second body on it, held by a stiff leg spring. This is the
+    springboard's pattern (61-plunge.js).
+  - Standing on it you sink 3.6 cm. Jump and it throws you 2.7 m. Press the
+    jump key (Enter, or Q + W + Space) as you land, and the legs absorb and
+    then drive, and each bounce builds to the 3.5 m cap. Late presses come
+    out erratic. Stop pressing and it dies away: 3.0, 1.8, 1.05, 0.6 m.
+  - Landing takes the bed 0.30-0.34 m down. You are pulled toward its
+    middle down the dent's slope.
+  - The eye drops with your knees.
+  - Takeoff is looked for after every substep. The leg is a two-way spring,
+    and a step late it pulled you back down onto the bed.
+  - The pits are real. The gravel pad and the rubber are cut under each bed.
+    The hillside's own mesh has an opt-in hole, `TERRAIN_HOLES` in
+    10-world.js: a discard in the terrain fragment shader, empty unless asked
+    for. The hill is 7 cm under the rubber here and would have hidden the
+    dip.
+  - The bed is laid through the shore frame like its rim. This far inland a
+    metre of `t` is 1.15 m of ground, and a round bed sat in an oval rim
+    with the pit showing past both its sides.
+
+**Pushing them.**
+
+- **The hose** pushes wherever the water lands, along its way from you.
+- **Walking into something** pushes it, because you are a soft capsule in
+  every net near you.
+- **Your hand** uses the hose's button (click or Space): with a seat, the
+  nest, the rope, an end of the seesaw, the rider or a bed within 1.6 m and
+  in front of you, a press is a shove instead of water. This is the
+  hammock's rule. Once a press, so you build a swing by pushing as it comes
+  back; held, it keeps pushing for 0.8 s. The seesaw's near end goes down if
+  it is up, and up if it is down.
+
+**A bug found on the way.** `ground.aimAt()`, where the hose lands, was
+shadowed in the same object by the debug `aimAt(kind)`, which stands you 8 m
+off the nearest fire. It answered false at Jadrija, so the crabs (44-crabs.js)
+and the playground had never been handed the hose. It is `landing()` now.
+The crabs get the jet again too; their reaction to it was not re-tested
+here.
+
+**Cost.** Each net steps only within 30 m of you and sleeps once it is
+still. With all seven of B's parts swinging at once it costs 0.77 ms a
+frame: nest 0.15, a seat 0.10, a bed 0.09, the seesaw 0.04, the rider 0.02.
+Asleep (46 s after a big push) it costs 0.02 ms. Joint stretch is 0.2-1.9 mm.
+
+Blockers 818 → 822 (the gate's two leaves, A's frame in three). People 100,
+census 446/333/86/27, no console errors. Probes: `__fr.play.aim()`,
+`.press()`, `.beds()`, `.jump()`, and `list()` with angles, yaw, dip and
+cost. Strips are in `refs/playground/pg558_*.png`.
 ## [1.557.3] — 2026-10-01
 
 ### L records what is on the screen, not just the picture

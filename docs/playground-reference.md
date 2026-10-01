@@ -360,9 +360,9 @@ and a ground height; `olive` gained an angle that skips its one `rng()` draw.
 
 | | t | s | notes |
 |---|---|---|---|
-| fence | 517.4-532.6 | 40.2-52.0 | round posts, 2D mesh, gate t 518.05-519.15 on the seaward run |
+| fence | 517.4-532.6 | 40.2-52.0 | round posts, 2D mesh, double gate t 517.95-520.05 on the seaward run (1.558.0; was 518.05-519.15) |
 | rubber | 517.7-532.3 | 40.5-51.7 | corners r 2.6, 3 cm over the gravel pad, rolled edge |
-| board | 520.3 | 39.9 | outside the fence, facing the sea side |
+| board | 521.2 | 39.9 | outside the fence, facing the sea side |
 | tower | 521.6 | 45.6 | deck 1.25, roof to 3.04, ladder west, slide east to ~524.8, 43.3 |
 | seesaw | 520.0 | 49.9 | 4 m beam along t, pivot 0.58, rests on its west end |
 | trampolines | 519.6 and 527.0 | 43.0 | bed r 0.60, rim to r 0.80 |
@@ -434,3 +434,70 @@ Composites (gitignored, main checkout `refs/playground/`): `comp_B_drone.png`,
 `comp_top.png`. From the sea side, the stand of pines between the back row and
 the back wall hides B from a drone's height. That stand is planted off `rng()`
 and was left alone.
+
+## The physics, and the way in (1.558.0)
+
+Misha: *"now add the AVBD physics to the swings, seesaw and trampolines.
+also, right now i cannot seem to enter the playground ... i have to
+literally jump over the fence"*. CHANGELOG 1.558.0 has the whole of it.
+
+**The gate.** A 1.1 m gap less two jambs inflated by `GROUND.girth` (0.55)
+was −0.04 m clear. It is now a 2.1 m double gate, centre **t 519.0, s 40.2**,
+leaves open outward, each a thin rotated collider. That is 0.96 m clear.
+`GROUND.girth` is the number to check any future opening against: clear =
+gap − 1.10 m. `GROUNDS_WAYS.play` ends at (519.0, 39.3). On A, the orange
+frame's bar-length box is now three (post and leg, ladder, Λ).
+
+**What each thing is**, all on `avbdNet`, with 43-avbd.js unchanged. The
+builders are over `buildPlayground`: `pgHang`, `pgSeesaw`, `pgRider`,
+`pgBed`, and `pgSim` (substeps, sleep, impulse, the walker as a capsule, a
+guard).
+
+| part | model | numbers |
+|---|---|---|
+| flat seat (B 2, A 4) | rigid seat on 2 chains × 3 links, hard ball joints | 3 kg seat, 0.55 kg/m chain, drag 0.1/s, 120 Hz × 6 it |
+| nest | ring on 4 chains × 2 links from 2 swivels | 12 kg, I 0.75/1.5/0.75 |
+| rope (A yellow) | 5 free links, capsules for the walker | 0.6 kg/m |
+| seesaw | beam on 2 axle joints, CoM 0.16 over, bumpers vs soft world-box tyres | 25 kg, I 52, tyre 25 kN/m + 450 N·s/m, rest 10° |
+| spring rider | ball joint + angle spring | 12 kg, CoM 0.62, 400 N·m/rad |
+| bed (2) | 5 kg on 8 radial springs + walker on a leg spring | k 12 kN/m each, 25 % pretension, 240 Hz × 10 it, gravity = `GROUND.hopG` |
+
+Bed play numbers:
+
+- standing sag 3.6 cm;
+- jump from standing 2.7 m;
+- timed pumping reaches the 3.5 m cap;
+- untimed, the bounces decay (3.0, 1.8, 1.05, 0.6 m);
+- landing dip 0.30-0.34 m.
+
+The leg's stroke is 0.64-1.04 m: absorb 0.08 s, then drive 0.12 s.
+
+**The pits.** The pad hole is `GROUNDS.play.holes` (43-jadrija.js). The
+rubber hole is `buildRubber`. The terrain hole is `terrainHole`
+(`TERRAIN_HOLES` in 10-world.js, a discard; up to 4, empty by default). The
+shore frame is 15 % stretched along t here, so anything round on the ground
+must be laid through `P(t, s)` to match what is already there. A world
+circle sits in an oval.
+
+**The walker.** In 47-ground.js:
+
+- `addFloor(fn)`: made floors over `walkY`.
+- `setBouncer(b)`: a bed owns your height while you are on it.
+- `landing()`: where the hose lands. It was `aimAt()`, shadowed by the
+  debug `aimAt(kind)`.
+- `knees`: the eye drops with them.
+
+The hand push is the hose button, by the hammock's rule (`playPush` and
+`playHold` in 90-app.js).
+
+**Cost.** Nets within 30 m only; each sleeps when still. 0.77 ms a frame with
+all of B awake, 0.02 ms asleep.
+
+**Open.**
+
+- Baye riding a swing or the seesaw (the seats' nets take world capsules,
+  so her capsules could be handed in, as the curtain's are).
+- The seat's own ride: you sitting on a swing.
+
+**Strips** (gitignored): `refs/playground/pg558_gate.png`, `_swing`,
+`_seesaw`, `_tramp`, `_hose_nest_rider`, `_rest`.

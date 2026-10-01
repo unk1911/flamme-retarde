@@ -49,14 +49,13 @@
 //
 // ── physics-ready ─────────────────────────────────────────────────────────────
 //
-// Everything that moves is its own mesh on its own pivot, so the AVBD pass
-// (src/43-avbd.js) can take each one over without touching the frames: every
-// swing seat and the nest and the rope hang from a hinge on the beam's axis;
-// the seesaw beam turns on its fulcrum; each trampoline bed is a dent profile
-// scaled in y; the spring rider rocks on its spring's foot. Until then each is
-// a damped pendulum or spring of its own here (`tick`), which settles, sways a
-// little in the breeze, and is pushed by the hose and by walking into it.
-// `__fr.play` reads and drives them.
+// Everything that moves is an AVBD net of its own since 1.558.0 (`avbdNet`,
+// src/43-avbd.js, unchanged): the seats and the nest on chains of rigid
+// links, the rope as free links, the seesaw on its axle landing on soft
+// tyres, the rider on its coil, each trampoline bed sprung from its rim with
+// you on it as a second body. Pushed by the hose, by walking into them, and
+// by hand (the hose's button with one in reach). Stepped only near you, and
+// asleep when still. `__fr.play` reads and drives them. See "the motion".
 //
 // ── rule 4 ────────────────────────────────────────────────────────────────────
 //
@@ -74,7 +73,15 @@ const PG = {
   // B's fence, a little inside `GROUNDS.play` so the posts are clear of the
   // edge the trees were cleared to. The gate is in the seaward run, at its
   // west end, which is the side anybody arrives from.
-  fence: { t0: 517.4, t1: 532.6, s0: 40.2, s1: 52.0, gate: [518.05, 519.15] },
+  //
+  // A DOUBLE GATE, 2.1 m between the posts (1.558.0). Misha: *"there's that
+  // open gate but it's too small and doesn't let me thru, i have to
+  // literally jump over the fence"*. It was 1.1 m, and `confine` grows every
+  // collider by `GROUND.girth`, 0.55 m: two jambs took 1.10 m of it, and the
+  // way through was minus four centimetres wide. At 2.1 m it is 0.96 m clear
+  // for the walker's middle, which is a gate you walk through without
+  // aiming. Both leaves stand open, swung out on to the gravel strip.
+  fence: { t0: 517.4, t1: 532.6, s0: 40.2, s1: 52.0, gate: [517.95, 520.05] },
   // The rubber, a rounded rectangle 0.3 m inside the fence.
   pad: { t0: 517.7, t1: 532.3, s0: 40.5, s1: 51.7, r: 2.6 },
   RUB: 0.03,                 // its thickness over the gravel pad
@@ -91,6 +98,518 @@ const PG = {
   RUBBER: [0.035, 0.035, 0.038],
   CONC: [0.540, 0.530, 0.505],
 };
+
+// ── THE PHYSICS (1.558.0) — pure, no THREE, so Node can run it ──────────────
+const PGP = {
+  // The swings', the rope's, the seesaw's and the rider's solve. 120 Hz and
+  // six iterations hold a 3-link chain's hard joints to about a millimetre
+  // (eight: 0.8 mm, for a fifth more time — measured in Node on this solve).
+  sub: 1 / 120, iterations: 6, alpha: 0.95, gamma: 0.999, beta: 1e5, betaAng: 1e9,
+  // Galvanised 6 mm swing chain is about 0.55 kg a metre.
+  chainKgM: 0.55, links: 3,
+  // Asleep after this long under `still` m/s everywhere, nobody near.
+  sleepAfter: 1.5, still: 0.06,
+  // The walker as a kinematic capsule (feet up to the chest), and how hard it
+  // is: a person walking into a seat gives a little — they are not a wall.
+  youR: 0.22, youK: 1500,
+};
+
+/** A quaternion turning +x on to unit d (shortest arc), [x, y, z, w]. */
+function pgQuatX(d) {
+  const c = d[0];
+  if (c < -0.999999) return [0, 0, 1, 0];
+  // axis = x × d = (0, -d2, d1)
+  const ax = 0, ay = -d[2], az = d[1];
+  const w = 1 + c, l = Math.hypot(ax, ay, az, w);
+  return [ax / l, ay / l, az / l, w / l];
+}
+/** Rotate v by q. */
+function pgRot(q, v, out = [0, 0, 0]) {
+  const qx = q[0], qy = q[1], qz = q[2], qw = q[3], x = v[0], y = v[1], z = v[2];
+  const tx = 2 * (qy * z - qz * y), ty = 2 * (qz * x - qx * z), tz = 2 * (qx * y - qy * x);
+  out[0] = x + qw * tx + (qy * tz - qz * ty);
+  out[1] = y + qw * ty + (qz * tx - qx * tz);
+  out[2] = z + qw * tz + (qx * ty - qy * tx);
+  return out;
+}
+
+/**
+ * The common part of every playground net: fixed substeps, a sleep, a wake,
+ * an impulse at a point, the walker as a capsule, and the hammock's guard.
+ * `o.net` is the avbdNet, `o.bodies` the ones that move, `o.reach` the radius
+ * round `o.c` inside which the walker can touch it.
+ */
+function pgSim(o) {
+  const net = o.net, P = net.P, Q = net.Q, V = net.V, W = net.W;
+  const sub = o.sub || PGP.sub;
+  const restP = new Float64Array(P), restQ = new Float64Array(Q);
+  let acc = 0, asleep = true, still = 0;
+  const stats = { steps: 0, ms: 0, msLast: 0, rescues: 0, wakes: 0 };
+  const caps = new Float64Array(8);
+  let youOn = false;
+  function wake() { if (asleep) stats.wakes++; asleep = false; still = 0; }
+  /** Velocity added at world point p by impulse J (N·s), on body i. */
+  function impulse(i, p, J) {
+    const m = net.mass[i];
+    net.kick(i, J[0] / m, J[1] / m, J[2] / m);
+    // Angular: I⁻¹ (r × J), the inertia taken in the body's frame (diagonal).
+    const q = [Q[4 * i], Q[4 * i + 1], Q[4 * i + 2], Q[4 * i + 3]];
+    const qi = [-q[0], -q[1], -q[2], q[3]];
+    const r = [p[0] - P[3 * i], p[1] - P[3 * i + 1], p[2] - P[3 * i + 2]];
+    const t = [r[1] * J[2] - r[2] * J[1], r[2] * J[0] - r[0] * J[2], r[0] * J[1] - r[1] * J[0]];
+    const tl = pgRot(qi, t);
+    const I = net.inert;
+    const wl = [tl[0] / Math.max(1e-4, I[6 * i]), tl[1] / Math.max(1e-4, I[6 * i + 1]),
+      tl[2] / Math.max(1e-4, I[6 * i + 2])];
+    const ww = pgRot(q, wl);
+    W[3 * i] += ww[0]; W[3 * i + 1] += ww[1]; W[3 * i + 2] += ww[2];
+    wake();
+  }
+  /** The walker: feet (x, y, z), or null when not near. */
+  function you(p) {
+    if (!o.caps) return;
+    if (!p) { if (youOn) { net.setWorldCaps(caps, 0); youOn = false; } return; }
+    const dx = p[0] - o.c[0], dz = p[2] - o.c[2];
+    const near = dx * dx + dz * dz < (o.reach + PGP.youR) ** 2 && p[1] < o.c[1] + 1.5;
+    if (!near) { if (youOn) { net.setWorldCaps(caps, 0); youOn = false; } return; }
+    caps[0] = p[0]; caps[1] = p[1] + 0.25; caps[2] = p[2];
+    caps[3] = p[0]; caps[4] = p[1] + 1.45; caps[5] = p[2];
+    caps[6] = PGP.youR; caps[7] = PGP.youR;
+    net.setWorldCaps(caps, 1);
+    youOn = true;
+    // Anything inside its reach wakes it; a walker standing beside a seat at
+    // rest costs a solve, which is the price of being able to bump it.
+    wake();
+  }
+  function sane() {
+    for (const i of o.bodies) {
+      for (let k = 0; k < 3; k++) {
+        const v = P[3 * i + k];
+        if (!Number.isFinite(v) || Math.abs(v - restP[3 * i + k]) > (o.far || 4)) return false;
+      }
+      if (Math.hypot(V[3 * i], V[3 * i + 1], V[3 * i + 2]) > 25) return false;
+    }
+    return true;
+  }
+  function reset() {
+    for (const i of o.bodies) {
+      net.place(i, restP[3 * i], restP[3 * i + 1], restP[3 * i + 2],
+        [restQ[4 * i], restQ[4 * i + 1], restQ[4 * i + 2], restQ[4 * i + 3]]);
+    }
+    net.resetDuals();
+  }
+  /** Advance by dt; returns the substeps taken. */
+  function step(dt, before, after) {
+    if (asleep) { acc = 0; return 0; }
+    // Up to the frame's own 0.05 s ceiling, so a slow frame is not slow motion.
+    acc = Math.min(acc + dt, 0.05 + sub * 0.5);
+    let n = 0;
+    const t0 = performance.now();
+    while (acc >= sub) {
+      acc -= sub;
+      if (before) before(sub);
+      net.step(sub);
+      if (after) after(sub);
+      n++;
+      stats.steps++;
+    }
+    if (n && !sane()) { stats.rescues++; reset(); }
+    // Asleep when nothing has moved for a while and nothing is pushing.
+    let vmax = 0;
+    for (const i of o.bodies) {
+      const v = Math.hypot(V[3 * i], V[3 * i + 1], V[3 * i + 2])
+        + Math.hypot(W[3 * i], W[3 * i + 1], W[3 * i + 2]) * (o.arm || 0.3);
+      if (v > vmax) vmax = v;
+    }
+    still = vmax < (o.still || PGP.still) && !youOn && !(o.busy && o.busy()) ? still + dt : 0;
+    if (still > (o.sleepAfter || PGP.sleepAfter)) {
+      asleep = true;
+      for (const i of o.bodies) {
+        net.place(i, P[3 * i], P[3 * i + 1], P[3 * i + 2], [Q[4 * i], Q[4 * i + 1], Q[4 * i + 2], Q[4 * i + 3]]);
+      }
+    }
+    stats.msLast = performance.now() - t0;
+    stats.ms += stats.msLast;
+    return n;
+  }
+  return { net, step, wake, impulse, you, reset, stats,
+    get asleep() { return asleep; }, set asleep(v) { asleep = v; } };
+}
+
+/**
+ * Something hung on chains: a seat on two, the nest on four, or (`body`
+ * null) a rope hanging free. Each chain is `PGP.links` rigid links on hard
+ * ball joints, from a world point on the beam to a point on the body — so it
+ * swings as a pendulum, twists on its two chains, goes slack when the seat is
+ * thrown up, and folds when it does.
+ *
+ * `o` — anchors [[x, y, z]...] (world); body { m, I: [xx, yy, zz], p, q } or
+ * null; chains [{ a: anchor index, at: body-local point (or null, free),
+ * len }]; caps [[ax, ay, az, bx, by, bz, r]] on the body (or on the links of a
+ * free rope); drag; kgM, rLink.
+ */
+function pgHang(o) {
+  const NL = o.links || PGP.links;
+  const nChains = o.chains.length;
+  const NB = (o.body ? 1 : 0) + nChains * NL;
+  const net = avbdNet({
+    maxBodies: NB, maxJoints: nChains * (NL + 1), maxStrings: 0, maxPoints: 0, maxBoxes: 0,
+    maxCaps: NB + 4, maxContacts: 64, maxWorldCaps: 1, worldCapK: PGP.youK,
+    iterations: PGP.iterations, alpha: PGP.alpha, alphaContact: 0.9, beta: PGP.beta,
+    betaAng: PGP.betaAng, gamma: PGP.gamma, gravity: [0, -9.81, 0], drag: o.drag || 0.1,
+    vMax: 20, wMax: 60, margin: 0.02, deep: 0.12, mu: 0.4, floorMu: 0.6, capK: 1e4,
+  });
+  let body = -1;
+  const toW = (lp) => {
+    const r = pgRot(o.body.q, lp);
+    return [o.body.p[0] + r[0], o.body.p[1] + r[1], o.body.p[2] + r[2]];
+  };
+  if (o.body) {
+    const B = o.body;
+    body = net.addBody(B.m, [B.I[0], B.I[1], B.I[2], 0, 0, 0], B.p[0], B.p[1], B.p[2], B.q);
+  }
+  // The links, laid straight from the anchor to where they hang.
+  const links = [];
+  for (const ch of o.chains) {
+    const A = o.anchors[ch.a];
+    const E = ch.at ? toW(ch.at) : [A[0], A[1] - ch.len, A[2]];
+    const d = [E[0] - A[0], E[1] - A[1], E[2] - A[2]];
+    const L = Math.hypot(d[0], d[1], d[2]);
+    const u = [d[0] / L, d[1] / L, d[2] / L];
+    const l = L / NL, m = (o.kgM || PGP.chainKgM) * l, r = o.rLink || 0.012;
+    const q = pgQuatX(u);
+    const ids = [];
+    for (let k = 0; k < NL; k++) {
+      const c = [A[0] + u[0] * l * (k + 0.5), A[1] + u[1] * l * (k + 0.5), A[2] + u[2] * l * (k + 0.5)];
+      ids.push(net.addBody(m, [m * r * r / 2, m * l * l / 12, m * l * l / 12, 0, 0, 0], c[0], c[1], c[2], q));
+    }
+    net.addJoint(-1, A, ids[0], [-l / 2, 0, 0]);
+    for (let k = 1; k < NL; k++) net.addJoint(ids[k - 1], [l / 2, 0, 0], ids[k], [-l / 2, 0, 0]);
+    if (ch.at && body >= 0) net.addJoint(ids[NL - 1], [l / 2, 0, 0], body, ch.at);
+    links.push({ ids, l });
+  }
+  let nc = 0;
+  for (const c of (o.caps || [])) {
+    const b = c[7] != null ? c[7] : body;
+    const k = net.addCap(b, nc++);
+    net.setCap(k, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[6]);
+  }
+  net.finish();
+  const bodies = [];
+  for (let i = 0; i < NB; i++) bodies.push(i);
+  const sim = pgSim({ net, bodies, c: o.c || (o.body ? o.body.p : o.anchors[0]),
+    reach: o.reach || 1.2, caps: nc > 0, arm: 0.3, far: 4 });
+  // Settle it where it hangs, so it is built at rest.
+  sim.asleep = false;
+  for (let k = 0; k < 120; k++) net.step(PGP.sub);
+  for (const i of bodies) { net.V.fill(0, 3 * i, 3 * i + 3); net.W.fill(0, 3 * i, 3 * i + 3); }
+  sim.asleep = true;
+  /** Chain k's points, anchor first, `NL + 1` of them, into out (flat). */
+  const _r = [0, 0, 0];
+  function chainPts(k, out, oo = 0) {
+    const ch = o.chains[k], A = o.anchors[ch.a], L = links[k];
+    out[oo] = A[0]; out[oo + 1] = A[1]; out[oo + 2] = A[2];
+    for (let j = 0; j < NL; j++) {
+      const i = L.ids[j];
+      const q = [net.Q[4 * i], net.Q[4 * i + 1], net.Q[4 * i + 2], net.Q[4 * i + 3]];
+      pgRot(q, [L.l / 2, 0, 0], _r);
+      out[oo + 3 * (j + 1)] = net.P[3 * i] + _r[0];
+      out[oo + 3 * (j + 1) + 1] = net.P[3 * i + 1] + _r[1];
+      out[oo + 3 * (j + 1) + 2] = net.P[3 * i + 2] + _r[2];
+    }
+    return out;
+  }
+  return Object.assign(sim, { body, links, NL, chainPts, nChains });
+}
+
+/**
+ * The seesaw: a rigid beam on two hard ball joints at the ends of its axle,
+ * so it turns about the axle and nothing else, with its centre of mass above
+ * the axle (the beam sits on top of it, the seats and handles higher still)
+ * so it always comes to rest on one end. Each end has a rubber bumper — a
+ * capsule across the beam — and under each is the tyre, a world box that
+ * gives (`setWorldBoxSoft`): the rubber bump.
+ *
+ * `o` — hinge [x,y,z], X (axle, unit), Z (along the beam, unit), HL, mass,
+ * com (m above the axle), I [xx, yy, zz] about the CoM, rest (rad), stopK,
+ * stopD.
+ */
+function pgSeesaw(o) {
+  const net = avbdNet({
+    maxBodies: 1, maxJoints: 2, maxStrings: 0, maxPoints: 0, maxBoxes: 0, maxCaps: 3,
+    maxContacts: 16, maxWorldBoxes: 2, maxWorldCaps: 1, worldCapK: PGP.youK,
+    iterations: PGP.iterations, alpha: PGP.alpha, alphaContact: 0.9, beta: PGP.beta,
+    betaAng: PGP.betaAng, gamma: PGP.gamma, gravity: [0, -9.81, 0], drag: o.drag || 0.3,
+    vMax: 20, wMax: 30, margin: 0.02, deep: 0.10, mu: 0.6, floorMu: 0.6, capK: 1e4,
+  });
+  const X = o.X, Y = [0, 1, 0], Z = o.Z;
+  const q = [0, 0, 0, 1];
+  avbdQuatFromBasis(X[0], X[1], X[2], Y[0], Y[1], Y[2], Z[0], Z[1], Z[2], q, 0);
+  const H = o.hinge;
+  const com = [H[0], H[1] + o.com, H[2]];
+  const b = net.addBody(o.mass, [o.I[0], o.I[1], o.I[2], 0, 0, 0], com[0], com[1], com[2], q);
+  for (const sg of [-1, 1]) {
+    net.addJoint(-1, [H[0] + X[0] * sg * 0.17, H[1], H[2] + X[2] * sg * 0.17], b,
+      [sg * 0.17, -o.com, 0]);
+  }
+  // The bumpers: across the beam under each end.
+  const zb = o.HL - 0.22, yb = -0.02 - o.com, rb = 0.03;
+  for (const sg of [-1, 1]) {
+    const c = net.addCap(b, sg > 0 ? 1 : 0);
+    net.setCap(c, -0.05, yb, sg * zb, 0.05, yb, sg * zb, rb, rb);
+  }
+  // And the beam itself, for the walker to bump.
+  const cb = net.addCap(b, 2);
+  net.setCap(cb, 0, 0.06 - o.com, -o.HL, 0, 0.06 - o.com, o.HL, 0.07, 0.07);
+  net.finish();
+  // The tyres: a box under each bumper, its top where the bumper is when the
+  // beam rests on that end at `rest` — so it lies at the angle drawn.
+  const boxes = new Float64Array(14);
+  const yaw = Math.atan2(-Z[2], Z[0]);   // box local x along the beam
+  for (const [k, sg] of [[0, -1], [1, 1]]) {
+    // The bumper's centre with the beam at rest on this end: the −z end down
+    // is a turn of −rest about X... worked out by turning the local point.
+    const th = sg * o.rest;     // +z end down for sg +1
+    const c = Math.cos(th), s = Math.sin(th);
+    // Turn about local x by th: y' = y c − z s, z' = y s + z c (z down for th>0 means z end y').
+    const ly = yb + o.com, lz = sg * zb;
+    const y2 = ly * c - lz * s, z2 = ly * s + lz * c;
+    const wx = H[0] + Z[0] * z2, wz = H[2] + Z[2] * z2, wy = H[1] + y2;
+    const top = wy - rb;
+    boxes.set([wx, top - 0.15, wz, 0.20, 0.15, 0.20, yaw], 7 * k);
+  }
+  net.setWorldBoxes(boxes, 2);
+  net.setWorldBoxSoft(0, o.stopK || 2.5e4, o.stopD || 450);
+  net.setWorldBoxSoft(1, o.stopK || 2.5e4, o.stopD || 450);
+  const sim = pgSim({ net, bodies: [b], c: com, reach: o.HL + 0.4, caps: true, arm: o.HL, far: 1.5,
+    still: 0.03 });
+  /** The angle about X: positive is the +z end down. */
+  const _z = [0, 0, 0];
+  function angle() {
+    pgRot([net.Q[4 * b], net.Q[4 * b + 1], net.Q[4 * b + 2], net.Q[4 * b + 3]], [0, 0, 1], _z);
+    return -Math.asin(Math.max(-1, Math.min(1, _z[1])));
+  }
+  // Built on its −z end... it settles to whichever end it starts toward.
+  function rotateTo(th) {
+    // q = base · rot_x(th)  — body-local turn
+    const h = th / 2, rx = [Math.sin(h), 0, 0, Math.cos(h)];
+    const qb = q;
+    const out = [
+      qb[3] * rx[0] + qb[0] * rx[3] + qb[1] * rx[2] - qb[2] * rx[1],
+      qb[3] * rx[1] - qb[0] * rx[2] + qb[1] * rx[3] + qb[2] * rx[0],
+      qb[3] * rx[2] + qb[0] * rx[1] - qb[1] * rx[0] + qb[2] * rx[3],
+      qb[3] * rx[3] - qb[0] * rx[0] - qb[1] * rx[1] - qb[2] * rx[2],
+    ];
+    const r = pgRot(out, [0, o.com, 0]);
+    net.place(b, H[0] + r[0], H[1] + r[1], H[2] + r[2], out);
+  }
+  rotateTo(o.start != null ? o.start : -o.rest * 0.98);
+  sim.asleep = false;
+  for (let k = 0; k < 240; k++) net.step(PGP.sub);
+  net.V.fill(0, 0, 3); net.W.fill(0, 0, 3);
+  sim.asleep = true;
+  /** The world point at the end of the beam, `sg` ±1 (the +z end is +1). */
+  function end(sg, out = [0, 0, 0]) {
+    pgRot([net.Q[4 * b], net.Q[4 * b + 1], net.Q[4 * b + 2], net.Q[4 * b + 3]],
+      [0, 0.14 - o.com, sg * (o.HL - 0.22)], out);
+    out[0] += net.P[3 * b]; out[1] += net.P[3 * b + 1]; out[2] += net.P[3 * b + 2];
+    return out;
+  }
+  return Object.assign(sim, { body: b, angle, end, q0: q });
+}
+
+/**
+ * A spring rider: one body on a ball joint at the spring's foot, held to
+ * upright by the joint's angle lock as a finite spring — the coil's bending
+ * stiffness — with its centre of mass above the foot, so it rocks.
+ */
+function pgRider(o) {
+  const net = avbdNet({
+    maxBodies: 1, maxJoints: 1, maxStrings: 0, maxPoints: 0, maxBoxes: 0, maxCaps: 1,
+    maxContacts: 8, maxWorldCaps: 1, worldCapK: PGP.youK,
+    iterations: PGP.iterations, alpha: PGP.alpha, alphaContact: 0.9, beta: PGP.beta,
+    betaAng: PGP.betaAng, gamma: PGP.gamma, gravity: [0, -9.81, 0], drag: o.drag || 1.2,
+    vMax: 20, wMax: 30, margin: 0.02, deep: 0.10, mu: 0.6, floorMu: 0.6, capK: 1e4,
+  });
+  const X = o.X, Y = [0, 1, 0], Z = o.Z;
+  const q = [0, 0, 0, 1];
+  avbdQuatFromBasis(X[0], X[1], X[2], Y[0], Y[1], Y[2], Z[0], Z[1], Z[2], q, 0);
+  const F = o.foot;
+  const b = net.addBody(o.mass, [o.I[0], o.I[1], o.I[2], 0, 0, 0], F[0], F[1] + o.com, F[2], q);
+  const j = net.addJoint(-1, F, b, [0, -o.com, 0], Infinity, o.k, 1);
+  net.setTarget(j, F[0], F[1], F[2], q);
+  const c = net.addCap(b, 0);
+  net.setCap(c, 0, 0.62 - o.com, 0.42, 0, 0.66 - o.com, -0.45, 0.15, 0.15);
+  net.finish();
+  const sim = pgSim({ net, bodies: [b], c: [F[0], F[1] + o.com, F[2]], reach: 0.9, caps: true, arm: 0.6,
+    far: 1.0, still: 0.02 });
+  sim.asleep = false;
+  for (let k = 0; k < 60; k++) net.step(PGP.sub);
+  net.V.fill(0, 0, 3); net.W.fill(0, 0, 3);
+  sim.asleep = true;
+  return Object.assign(sim, { body: b });
+}
+
+/**
+ * An in-ground trampoline: the bed is one body hung on `n` radial springs
+ * from the rim, pre-tensioned — which is what a sprung bed is, and what
+ * makes it stiffen as it goes down (the springs lengthen AND turn toward the
+ * pull). Under it, the pit's floor. The walker, when on it, is a second body
+ * held to the bed by one stiff spring, the leg, whose rest length is how
+ * straight the legs are — the springboard's (`plungeBoard`, 61-plunge.js)
+ * — so the leg is what pumps it: bent as you land, driven straight as the bed
+ * comes back up.
+ *
+ * Its own gravity is the walker's (`GROUND.hopG`), not the world's: the
+ * flight between bounces is the walker's own hop, and a bed that threw at
+ * 9.81 what the hop catches at 12 would gain height by itself.
+ */
+const PGT = {
+  RB: 0.60,             // m, the bed's radius
+  n: 8,                 // springs round the rim
+  // N/m a spring, and how much shorter than the radius it is unstretched.
+  // Vertical stiffness for a small dip is n·k·pre: 8 · 7500 · 0.20 = 12 kN/m,
+  // so a 60 kg walker on it at 12 m/s² sits 6 cm down; and it stiffens with
+  // depth: at 0.3 m it pushes 5.1 kN, not 3.6.
+  k: 12000, pre: 0.25,
+  bed: 5,               // kg, the moving part of the bed and its springs
+  drag: 2.0,            // 1/s, on the bed
+  pit: 0.42,            // m under the bed's rest, the pit's floor
+  sub: 1 / 240,         // the springboard's rate, for the springboard's reason
+  you: 60, legK: 1e5,   // kg, N/m
+  stand: 0.90, absorb: 0.64, reach: 1.04,
+  absorbT: 0.08, driveT: 0.12, buffer: 0.30,
+  // The highest a bounce goes, m over the bed: the takeoff is capped at the
+  // speed that reaches it. Without it a well-timed pump climbs to 5 m.
+  top: 3.5,
+};
+function pgBed(o) {
+  const T = PGT, g = o.g || 12;
+  const net = avbdNet({
+    maxBodies: 2, maxJoints: 0, maxStrings: T.n + 1, maxPoints: 1, maxBoxes: 0, maxCaps: 0,
+    maxContacts: 4, iterations: 10, alpha: 0.95, alphaContact: 0.9, beta: 1e5, betaAng: 1e9,
+    gamma: 0.999, gravity: [0, -g, 0], drag: 0, vMax: 25, wMax: 40, margin: 0.01, deep: 0.3,
+    mu: 0.5, floorMu: 0.5, capK: 1e4, pointsHitCaps: false,
+  });
+  const C = o.c;      // the bed's centre at rest, on its surface
+  const bed = net.addBody(T.bed, [0.4, 0.8, 0.4, 0, 0, 0], C[0], C[1], C[2], null);
+  net.drag[bed] = T.drag;
+  for (let i = 0; i < T.n; i++) {
+    const a = (i / T.n) * Math.PI * 2;
+    net.addString(-1, [C[0] + Math.cos(a) * T.RB, C[1], C[2] + Math.sin(a) * T.RB], bed, [0, 0, 0],
+      T.RB * (1 - T.pre), T.k);
+  }
+  const you = net.addBody(T.you, [5, 5, 5, 0, 0, 0], C[0], C[1] + T.stand, C[2], null);
+  const leg = net.addString(bed, [0, 0, 0], you, [0, 0, 0], T.stand, T.legK);
+  net.addPoint(bed, 0, 0, 0, 0);
+  net.finish();
+  net.setFloor(() => C[1] - T.pit);
+  net.setString(leg, null, null, false);
+  net.setLive(you, false);
+  const sim = pgSim({ net, bodies: [bed], c: C, reach: 0, caps: false, arm: 0, far: 1.2, sub: T.sub,
+    still: 0.01, sleepAfter: 0.6, busy: () => on });
+  // Settle the bed under its own weight; `rest` is where it hangs.
+  sim.asleep = false;
+  for (let k = 0; k < 480; k++) net.step(T.sub);
+  net.V.fill(0, 0, 3);
+  const rest = net.P[3 * bed + 1];
+  sim.asleep = true;
+
+  let on = false, legLen = T.stand, phase = 'stand', pT = 0, buffered = -1, flew = 0;
+  const st = { bounces: 0, pumps: 0, maxDip: 0 };
+  /** How far down the bed is from where it rests, m (positive down). */
+  const dip = () => rest - net.P[3 * bed + 1];
+  /** Walker on, feet at y going at vy (m/s, up positive). */
+  function mount(y, vy) {
+    on = true;
+    net.setLive(you, true);
+    const top = net.P[3 * bed + 1];
+    legLen = Math.max(T.absorb, Math.min(T.reach, y + T.stand - top > 0 ? T.stand : T.stand));
+    net.place(you, C[0], top + legLen, C[2], [0, 0, 0, 1]);
+    net.kick(you, 0, vy, 0);
+    net.setString(leg, null, legLen, true);
+    sim.wake();
+    if (buffered >= 0 && flew - buffered < T.buffer) { phase = 'absorb'; pT = 0; st.pumps++; }
+    else phase = 'stand';
+    buffered = -1;
+  }
+  function unmount() {
+    on = false;
+    net.setString(leg, null, null, false);
+    net.setLive(you, false);
+    phase = 'stand';
+  }
+  /** Enter: pump now, or as you land if you are in the air over it. */
+  function press() {
+    if (on) {
+      if (phase === 'stand') { phase = 'absorb'; pT = 0; st.pumps++; }
+      return true;
+    }
+    buffered = flew;
+    return true;
+  }
+  /**
+   * One frame. Returns null with nobody on it, or { y: feet, vy, off } —
+   * `off` true the step the leg let go going up (the takeoff).
+   */
+  function step(dt, airborne) {
+    flew += dt;
+    let off = false, offV = 0, offLeg = T.stand;
+    const wasOn = on;
+    sim.step(dt, (h) => {
+      if (!on) return;
+      // The leg's length: absorb, then drive, then stand.
+      if (phase !== 'stand') {
+        pT += h;
+        if (phase === 'absorb') {
+          const u = Math.min(1, pT / T.absorbT);
+          legLen = T.stand + (T.absorb - T.stand) * (u * u * (3 - 2 * u));
+          if (u >= 1) { phase = 'drive'; pT = 0; }
+        } else if (phase === 'drive') {
+          const u = Math.min(1, pT / T.driveT);
+          legLen = T.absorb + (T.reach - T.absorb) * (u * u);
+          if (u >= 1) { phase = 'settle'; pT = 0; }
+        } else if (phase === 'settle') {
+          const u = Math.min(1, pT / 0.25);
+          legLen = T.reach + (T.stand - T.reach) * u;
+          if (u >= 1) phase = 'stand';
+        }
+        net.setString(leg, null, legLen, true);
+      }
+      const P = net.P, V = net.V;
+      P[3 * you] = C[0]; P[3 * you + 2] = C[2]; V[3 * you] = 0; V[3 * you + 2] = 0;
+      net.W.fill(0, 3 * you, 3 * you + 3);
+      net.Q[4 * you] = 0; net.Q[4 * you + 1] = 0; net.Q[4 * you + 2] = 0; net.Q[4 * you + 3] = 1;
+    }, () => {
+      // The takeoff, looked for after every substep: the leg is a two-way
+      // spring, and a step late it pulls you back down on to the bed.
+      if (!on) return;
+      const P = net.P, V = net.V;
+      const stretch = P[3 * you + 1] - P[3 * bed + 1] - legLen;
+      if (stretch > 0.002 && V[3 * you + 1] > V[3 * bed + 1] + 0.05 && V[3 * you + 1] > 0.4) {
+        off = true; offV = V[3 * you + 1]; offLeg = legLen;
+        st.bounces++;
+        unmount();
+      }
+    });
+    if (!wasOn && !off) return null;
+    const P = net.P, V = net.V;
+    // Where your soles are: on the bed's middle. And how far your knees are
+    // bent, which the eye takes (`knees`, positive down).
+    const feet = off ? P[3 * you + 1] - offLeg : P[3 * bed + 1];
+    st.maxDip = Math.max(st.maxDip, dip());
+    const cap = Math.sqrt(2 * g * T.top);
+    return { y: feet, vy: off ? Math.min(offV, cap) : V[3 * you + 1], off, legLen,
+      knees: T.stand - (off ? offLeg : legLen), dip: dip() };
+  }
+  /** A push on the bed: dv m/s down. */
+  function poke(dv) { net.kick(bed, 0, -dv, 0); sim.wake(); }
+  Object.assign(sim, { bed, you, rest, dip, mount, unmount, press, step2: step, poke, st, C });
+  // Getters by definition: Object.assign would copy their values once.
+  Object.defineProperty(sim, 'on', { get: () => on });
+  Object.defineProperty(sim, 'phase', { get: () => phase });
+  return sim;
+}
 
 function buildPlayground(scene, jad) {
   if (!jad || !jad.toWorld || !jad.blockers || !jad.grounds) return null;
@@ -314,15 +833,6 @@ function buildPlayground(scene, jad) {
       prev = ring;
     }
   }
-  /** A chain: a round line with a link pattern in its colour, `n` sides. */
-  function chain(B, a, c, col) {
-    const L = Math.hypot(c[0] - a[0], c[1] - a[1], c[2] - a[2]);
-    const N = Math.max(2, Math.round(L / 0.05));
-    const pts = [];
-    for (let i = 0; i <= N; i++) pts.push(lerp3(a, c, i / N));
-    // The links read as a beading of the line: alternate rings fatter.
-    pipe(B, pts, (i) => (i % 2 ? 0.0085 : 0.0055), col, 5, false);
-  }
   /**
    * A rounded quadratic curve, `n` points, from `a` through the control `c`
    * to `d` — the gooseneck and the slide's plan.
@@ -339,48 +849,68 @@ function buildPlayground(scene, jad) {
 
   // ── the moving parts ───────────────────────────────────────────────────────
   //
-  // Each is an outer group at the hinge, turned so its local x is the hinge
-  // axis and y is up, and an inner pivot that turns about x. Their geometry is
-  // built in the pivot's own frame, so `pivot.rotation.x` is the whole of
-  // their motion and a solver can drive it from one number.
+  // Since 1.558.0 each is an AVBD body (PGP and the four builders above
+  // `buildPlayground`), drawn as a rigid mesh in that body's own frame — x
+  // along the hinge or the axle, y up, z = x × y — whose matrix is the
+  // body's position and turn, written every frame it is near. The chains and
+  // the rope are not rigid: they are one shared tube mesh laid through each
+  // chain's joints every frame (`chainTick`).
   const parts = [];
   const eqMat = solidMaterial(0xffffff, {
     spec: 0.10, specPower: 26, side: THREE.DoubleSide, emissive: 0.06,
     body: 'n = gl_FrontFacing ? n : -n; base *= vVCol;',
   });
-  function mover(kind, hinge, axis, build, extra = {}) {
+  const v3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+  /**
+   * A rigid moving part: `build(B)` in its own frame, `origin` and `X` where
+   * that frame is at rest in the world.
+   */
+  function rigid(kind, origin, X, build, extra = {}) {
     const B = propBuilder();
     build(B);
-    const X = nrm(axis), Y = [0, 1, 0];
-    const Z = crs(X, Y);
-    const outer = new THREE.Group();
-    outer.matrixAutoUpdate = false;
-    outer.matrix.makeBasis(new THREE.Vector3(...X), new THREE.Vector3(...Y),
-      new THREE.Vector3(...Z));
-    outer.matrix.setPosition(hinge[0], hinge[1], hinge[2]);
+    const Y = [0, 1, 0], Z = crs(X, Y);
     const mesh = new THREE.Mesh(B.geo(), eqMat);
     mesh.name = 'play:' + kind;
+    mesh.matrixAutoUpdate = false;
+    mesh.matrix.makeBasis(v3(X), v3(Y), v3(Z));
+    mesh.matrix.setPosition(origin[0], origin[1], origin[2]);
     mesh.geometry.computeBoundingSphere();
-    outer.add(mesh);
-    scene.add(outer);
-    outer.updateMatrixWorld(true);
-    const p = { kind, mesh, outer, hinge, axis: X, side: Z, th: 0, om: 0,
-      tris: B.count() / 3, ...extra };
+    scene.add(mesh);
+    mesh.updateMatrixWorld(true);
+    const p = { kind, mesh, origin, X, Z, tris: B.count() / 3, ...extra };
     parts.push(p);
     return p;
   }
+  /** A builder that draws into B moved `dy` up — made in a hinge frame, kept in a body's. */
+  const lift = (B, dy) => {
+    const sh = (q) => [q[0], q[1] + dy, q[2]];
+    return {
+      quad: (a, c, d, e, cl) => B.quad(sh(a), sh(c), sh(d), sh(e), cl),
+      tri: (a, c, d, cl) => B.tri(sh(a), sh(c), sh(d), cl),
+      smooth: (a, c, d, na, nc, nd, ca, cc, cd) => B.smooth(sh(a), sh(c), sh(d), na, nc, nd, ca, cc, cd),
+    };
+  };
+  /** A world point in a hinge frame: origin H, axes X, up, X × up. */
+  const inFrame = (H, X) => {
+    const Z = crs(X, [0, 1, 0]);
+    return (x, y, z) => [H[0] + X[0] * x + Z[0] * z, H[1] + y, H[2] + X[2] * x + Z[2] * z];
+  };
+  /** The quaternion of the frame X, up, X × up. */
+  const quatOf = (X) => {
+    const Z = crs(X, [0, 1, 0]), q = [0, 0, 0, 1];
+    avbdQuatFromBasis(X[0], X[1], X[2], 0, 1, 0, Z[0], Z[1], Z[2], q, 0);
+    return q;
+  };
+  // The chains and the rope: { sim, k (which chain), col, r(f) radius along
+  // it, knots }. The tube is laid out once they have all hung — `chainBuild`.
+  const chainList = [];
   /**
-   * A flat seat on two chains, in the pivot frame: the hinge axis is x, the
-   * chains hang to y = −L, the seat is `w` along x. Black rubber, sagging a
-   * little in the middle, with its steel hanger plates at the ends.
+   * A flat seat, in the pivot frame: the hinge axis is x, the seat hangs at
+   * y = −L, `w` along x. Black rubber, sagging a little in the middle, with
+   * its steel hanger plates at the ends. Its chains are the shared tube and
+   * its shackles are on the beam (`shackles`).
    */
-  function seatGeo(B, L, w = 0.44, chainCol = PG.GALV) {
-    const hw = w / 2 - 0.02;
-    for (const x of [-hw, hw]) {
-      chain(B, [x, -0.02, 0], [x, -L + 0.05, 0], chainCol);
-      // The shackle at the beam.
-      pipe(B, [[x, 0.04, -0.03], [x, 0.06, 0], [x, 0.04, 0.03]], 0.008, PG.GALV, 5);
-    }
+  function seatGeo(B, L, w = 0.44) {
     // The seat: a strip of rubber, 17 cm deep, 3.5 cm thick, sagging 3 cm.
     const N = 10, D = 0.085, TH = 0.035;
     for (let i = 0; i < N; i++) {
@@ -400,6 +930,31 @@ function buildPlayground(scene, jad) {
       boxO(B, [x * 0.92, y + 0.02, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], 0.006, 0.04, 0.03,
         PG.GALV);
     }
+  }
+  /** The shackles on a beam, at the hinge frame's x in `xs`. */
+  function shackles(H, X, xs) {
+    const F = inFrame(H, X);
+    for (const x of xs) pipe(up, [F(x, 0.04, -0.03), F(x, 0.06, 0), F(x, 0.04, 0.03)], 0.008, PG.GALV, 5);
+  }
+  /**
+   * A seat on two chains, as a part: drawn, hung, and its chains listed.
+   * `H` the hinge on the beam, `X` along the beam, `L` hinge to seat.
+   */
+  function swingSeat(kind, H, X, L, w, chainCol) {
+    const hw = w / 2 - 0.02;
+    const body = [H[0], H[1] - L, H[2]];
+    const p = rigid(kind, body, X, (B) => seatGeo(lift(B, L), L, w), { L, r: 0.45 });
+    const F = inFrame(H, X);
+    p.sim = pgHang({
+      anchors: [F(-hw, 0, 0), F(hw, 0, 0)],
+      body: { m: 3, I: [0.01, 0.06, 0.05], p: body, q: quatOf(X) },
+      chains: [{ a: 0, at: [-hw, 0.05, 0] }, { a: 1, at: [hw, 0.05, 0] }],
+      caps: [[-w / 2, -0.02, 0, w / 2, -0.02, 0, 0.06]], c: body, reach: 0.7,
+    });
+    p.c = body; p.H = H;
+    for (let k = 0; k < 2; k++) chainList.push({ sim: p.sim, k, col: chainCol });
+    shackles(H, X, [-hw, hw]);
+    return p;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -435,7 +990,9 @@ function buildPlayground(scene, jad) {
   };
   // Where feet land, (t, s, radius t, radius s, how much).
   const WEAR = [];
-  const TRAMPS = [[519.6, 43.0], [527.0, 43.0]];
+  // The two trampolines, from the holes 43-jadrija.js cut in the gravel pad
+  // for their pits (1.558.0).
+  const TRAMPS = (G.holes || [[519.6, 43.0], [527.0, 43.0]]).map((h) => [h[0], h[1]]);
   const wear = (t, s) => {
     let w = 0;
     for (const [wt, ws, rt, rs, k] of WEAR) {
@@ -484,17 +1041,34 @@ function buildPlayground(scene, jad) {
       return 0;
     };
     const V = (t, s) => P(t, s, padY(t, s) + PG.RUB - tuck(t, s));
+    // AND A HOLE UNDER EACH BED (1.558.0), the pit the bed goes down into:
+    // cells near one are cut to 6 cm squares and those whose middle is
+    // within 0.70 m of it left out, so the ragged edge is 0.66-0.74 m out,
+    // all of it under the rim (0.64-0.80).
+    const HOLE = 0.70;
+    const nearHole = (t, s, m) => TRAMPS.some(([tt, ts]) => (t - tt) ** 2 + (s - ts) ** 2 < (HOLE + m) ** 2);
+    const lay = (t, s, t1, s1) => {
+      const poly = clip([[t, s], [t1, s], [t1, s1], [t, s1]]);
+      if (poly.length < 3) return;
+      for (let k = 1; k < poly.length - 1; k++) {
+        const a = poly[0], c = poly[k], d = poly[k + 1];
+        // Colour per vertex, so the wear and the mottle are washes and
+        // not a chequerboard of cells.
+        ground3(rub, V(a[0], a[1]), V(d[0], d[1]), V(c[0], c[1]),
+          rubCol(a[0], a[1]), rubCol(d[0], d[1]), rubCol(c[0], c[1]));
+      }
+    };
     for (let t = D.t0; t < D.t1 - 1e-6; t += STEP) {
       for (let s = D.s0; s < D.s1 - 1e-6; s += STEP) {
         const t1 = Math.min(t + STEP, D.t1), s1 = Math.min(s + STEP, D.s1);
-        const poly = clip([[t, s], [t1, s], [t1, s1], [t, s1]]);
-        if (poly.length < 3) continue;
-        for (let k = 1; k < poly.length - 1; k++) {
-          const a = poly[0], c = poly[k], d = poly[k + 1];
-          // Colour per vertex, so the wear and the mottle are washes and
-          // not a chequerboard of cells.
-          ground3(rub, V(a[0], a[1]), V(d[0], d[1]), V(c[0], c[1]),
-            rubCol(a[0], a[1]), rubCol(d[0], d[1]), rubCol(c[0], c[1]));
+        if (!nearHole((t + t1) / 2, (s + s1) / 2, 0.25)) { lay(t, s, t1, s1); continue; }
+        const n = 4, dt = (t1 - t) / n, ds = (s1 - s) / n;
+        for (let i = 0; i < n; i++) {
+          for (let j = 0; j < n; j++) {
+            const ta = t + i * dt, sa = s + j * ds;
+            if (nearHole(ta + dt / 2, sa + ds / 2, 0)) continue;
+            lay(ta, sa, ta + dt, sa + ds);
+          }
         }
       }
     }
@@ -581,22 +1155,30 @@ function buildPlayground(scene, jad) {
     run([T1, S0], [T1, S1]);
     run([T1, S1], [T0, S1]);
     run([T0, S1], [T0, S0]);
-    // The gate: a frame of 40 mm tube with the same mesh in it, hung on the
-    // east jamb and standing open into the playground.
-    {
-      const ht = Fc.gate[1], hs = S0;
+    // The gate: two leaves of 40 mm tube with the same mesh in them, one on
+    // each jamb, both standing open — swung out past square on to the gravel
+    // strip, so neither narrows the way in. Each is a thin collider of its
+    // own: walk into a leaf and it stops you, as the fence does.
+    for (const side of [0, 1]) {
+      const ht = Fc.gate[side], hs = S0;
       const y = bY(ht, hs);
-      const W = Fc.gate[1] - Fc.gate[0] - 0.08;
-      const open = 1.25;
-      const dir = [-Math.cos(open), Math.sin(open)];        // in (t, s)
+      const W = (Fc.gate[1] - Fc.gate[0] - 0.08) / 2;
+      const open = 1.75;                                    // 100 degrees
+      // In (t, s): along the fence toward the middle when shut, then out.
+      const sg = side ? -1 : 1;
+      const dir = [sg * Math.cos(open), -Math.sin(open)];
       const at = (u, h) => P(ht + dir[0] * (u + 0.05), hs + dir[1] * (u + 0.05), y + h);
       pipe(up, [at(0, 0.06), at(0, 1.00), at(W, 1.00), at(W, 0.06), at(0, 0.06)], 0.02,
         PG.GREEN, 6, false);
       for (let u = 0.1; u < W - 0.05; u += 0.2) bar(up, at(u, 0.07), at(u, 0.99), 0.0055, 0.0055, PG.GREEN);
       for (const h of [0.40, 0.72]) bar(up, at(0, h), at(W, h), 0.0065, 0.0065, PG.GREEN);
-      // Hinges and the latch.
+      // Hinges, and the latch on the west leaf and its keeper on the east.
       for (const h of [0.2, 0.85]) ball(up, at(-0.03, h), 0.025, PG.GREEN, 6, 3);
-      bar(up, at(W - 0.02, 0.72), at(W + 0.06, 0.72), 0.02, 0.05, PG.GALV);
+      if (!side) bar(up, at(W - 0.02, 0.72), at(W + 0.06, 0.72), 0.02, 0.05, PG.GALV);
+      else bar(up, at(W - 0.01, 0.30), at(W + 0.02, 0.30), 0.03, 0.03, PG.GALV);
+      // Its collider, turned to lie along it.
+      const mt = ht + dir[0] * (W / 2 + 0.05), ms = hs + dir[1] * (W / 2 + 0.05);
+      runs.push({ t: mt, s: ms, a: W / 2, c: 0.02, h: 1.0, y, rot: Math.atan2(dir[1], dir[0]) });
     }
     // Colliders: the four runs, the gateway left open.
     const y = bY(T0, S0), h = H;
@@ -811,13 +1393,17 @@ function buildPlayground(scene, jad) {
       0.05, PG.GREYBLUE, 12);
     // Hinge axis: along t, at the beam's underside.
     const axis = nrm(sub(P(T[2], s, 0), P(T[0], s, 0)));
-    // The nest, in the west bay.
+    // The nest, in the west bay: a ring on four chains from two swivels
+    // 0.9 m apart on the beam. It swings, and with the chains splayed fore
+    // and aft it turns a little on them and comes back.
     {
       const t = (T[0] + T[1]) / 2;
       const hinge = P(t, s, yb(t) + H - 0.03);
       const L = H - 0.03 - 0.58;
-      mover('nest', hinge, axis, (B) => {
-        const RR = 0.50;
+      const RR = 0.50;
+      const body = [hinge[0], hinge[1] - L, hinge[2]];
+      const p = rigid('nest', body, axis, (B0) => {
+        const B = lift(B0, L);
         // The ring: a padded rope torus.
         const ring = [];
         for (let k = 0; k <= 32; k++) {
@@ -839,24 +1425,30 @@ function buildPlayground(scene, jad) {
           pipe(B, [[0, -L - 0.035, 0], [Math.cos(a) * RR, -L, Math.sin(a) * RR]], 0.011,
             [0.20, 0.20, 0.22], 6, false);
         }
-        // Four chains to two swivels 0.9 m apart on the beam.
-        for (const x of [-0.45, 0.45]) {
-          for (const z of [-1, 1]) {
-            const a = [x * 0.98, -0.12, 0];
-            const c = [x * 0.62, -L + 0.02, z * RR * 0.80];
-            chain(B, a, c, PG.GALV);
-          }
-          pipe(B, [[x, 0.03, 0], [x, -0.12, 0]], 0.014, PG.GALV, 6);
-        }
-      }, { L, mass: 6, r: 0.5 });
+      }, { L, r: 0.7 });
+      const F = inFrame(hinge, axis);
+      // The swivels stay on the beam.
+      for (const x of [-0.45, 0.45]) pipe(up, [F(x, 0.03, 0), F(x, -0.12, 0)], 0.014, PG.GALV, 6);
+      const ch = [];
+      for (const x of [-0.45, 0.45]) {
+        for (const z of [-1, 1]) ch.push({ a: x < 0 ? 0 : 1, at: [x * 0.62, 0.02, z * RR * 0.80] });
+      }
+      // 12 kg: the ring, its padding and the web. A disc's moments.
+      p.sim = pgHang({
+        anchors: [F(-0.45, -0.12, 0), F(0.45, -0.12, 0)], links: 2,
+        body: { m: 12, I: [0.75, 1.5, 0.75], p: body, q: quatOf(axis) },
+        chains: ch,
+        caps: [[-RR, 0, 0, RR, 0, 0, 0.06], [0, 0, -RR, 0, 0, RR, 0.06]], c: body, reach: 1.0,
+      });
+      p.c = body; p.H = hinge;
+      for (let k = 0; k < 4; k++) chainList.push({ sim: p.sim, k, col: PG.GALV });
       WEAR.push([t, s - 1.6, 1.2, 0.7, 0.6]);
       WEAR.push([t, s + 1.6, 1.2, 0.7, 0.6]);
     }
     // Two flat seats, in the east bay.
     for (const t of [T[1] + 1.0, T[2] - 1.0]) {
       const hinge = P(t, s, yb(t) + H - 0.03);
-      const L = H - 0.03 - 0.46;
-      mover('seat', hinge, axis, (B) => seatGeo(B, L), { L, mass: 2.5 });
+      swingSeat('seat', hinge, axis, H - 0.03 - 0.46, 0.44, PG.GALV);
       WEAR.push([t, s - 1.0, 0.45, 0.55, 0.75]);
       WEAR.push([t, s + 1.0, 0.45, 0.55, 0.75]);
     }
@@ -892,9 +1484,18 @@ function buildPlayground(scene, jad) {
       pipe(up, tor, 0.075, [0.05, 0.05, 0.055], 10, false);
     }
     // The beam, which moves: hinge axis across it (v), so it tilts along u.
+    // An AVBD body on the axle (`pgSeesaw`), its centre of mass 16 cm over
+    // it — the beam sits on top of the axle and the seats and handles stand
+    // higher still — so it always comes to rest on one end, on that end's
+    // tyre, which gives like rubber and bumps it back up a hand's breadth.
     const hinge = fr.F(0, 0, y + HP);
-    const rest = Math.asin((HP - 0.13) / HL);
-    const p = mover('seesaw', hinge, fr.V, (B) => {
+    // Resting with the bumper on the tyre's crown: 0.22 m over the rubber.
+    const rest = Math.asin((HP - 0.05 - 0.22) / (HL - 0.22));
+    const COM = 0.16;
+    const X = fr.V, Z = crs(X, [0, 1, 0]);
+    const body = [hinge[0], hinge[1] + COM, hinge[2]];
+    const p = rigid('seesaw', body, X, (B0) => {
+      const B = lift(B0, -COM);
       // Local: x = V (axis), y up, z = V × up = −U. The beam runs along z.
       boxO(B, [0, 0.06, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], 0.07, 0.06, HL, PG.YELLOW,
         shade(PG.YELLOW, 1.1));
@@ -914,11 +1515,12 @@ function buildPlayground(scene, jad) {
         // A rubber bumper under the end.
         boxO(B, [0, -0.02, z], [1, 0, 0], [0, 1, 0], [0, 0, 1], 0.05, 0.03, 0.06, PG.RUBBER);
       }
-    }, { HL, rest, mass: 25 });
-    // Which way is down: the beam's +z end is the −u end. Put the −u end down.
-    p.th = -rest;
-    p.thRest = -rest;
-    p.lim = rest;
+    }, { HL, rest, r: 0.6 });
+    // 25 kg of steel beam, seats and handles; its moments about the CoM, the
+    // seats a metre and three quarters out each side.
+    p.sim = pgSeesaw({ hinge, X, Z, HL, mass: 25, com: COM, I: [52, 52, 0.4], rest,
+      start: -rest * 0.98 });
+    p.c = body; p.H = hinge;
     WEAR.push([t - HL + 0.15, s, 0.5, 0.45, 0.6]);
     WEAR.push([t + HL - 0.15, s, 0.5, 0.45, 0.6]);
     block(t - HL - 0.05, t + HL + 0.05, s - 0.24, s + 0.24, y, 0.9);
@@ -950,13 +1552,23 @@ function buildPlayground(scene, jad) {
       up.quad(pt(a0, RI, 0.003), pt(a1, RI, 0.003), pt(a1, RB, -0.012), pt(a0, RB, -0.012),
         [0.02, 0.02, 0.025]);
     }
-    // The bed's rest is 1.2 cm under the rubber's top, on the tucked rubber.
+    // The bed's rest is 1.2 cm under the rubber's top. Under it is a pit
+    // (1.558.0): the gravel pad has a hole in it (`GROUNDS.play.holes` in
+    // 43-jadrija.js), the rubber has one (`buildRubber`), and so does the
+    // hillside's own mesh (`terrainHole`, 10-world.js) — the bed goes 0.3 m
+    // down under somebody landing on it, and the hill is 7 cm under the
+    // rubber here.
     const hinge = add(c, [0, -0.012, 0]);
-    const axis = nrm(sub(P(t + 1, s, y), P(t, s, y)));
-    const p = mover('tramp', hinge, axis, (B) => {
+    // Laid through the shore frame like its rim and not as a circle in the
+    // world: this far inland a metre of `t` is 1.15 m of ground, so a round
+    // bed sat in an oval rim with the pit showing past both its sides.
+    const p = rigid('tramp', hinge, [1, 0, 0], (B) => {
       // The bed: rings from rim to centre, y = −(1 − (r/R)²), a unit dent.
-      const R = 10, A = 32;
-      const pt = (r, a) => [Math.cos(a) * r, -(1 - (r / RB) * (r / RB)), Math.sin(a) * r];
+      const R = 10, A = N;     // the rim's own segments, so the edges meet
+      const pt = (r, a) => {
+        const w = P(t + Math.cos(a) * r, s + Math.sin(a) * r, 0);
+        return [w[0] - hinge[0], -(1 - (r / RB) * (r / RB)), w[2] - hinge[2]];
+      };
       for (let i = 0; i < R; i++) {
         const r0 = RB * (1 - i / R), r1 = RB * (1 - (i + 1) / R);
         for (let k = 0; k < A; k++) {
@@ -969,10 +1581,15 @@ function buildPlayground(scene, jad) {
           ground3(B, pt(r0, a0), pt(r1, a1), pt(r0, a1), col, col, col);
         }
       }
-    }, { R: RB, mass: 40 });
-    p.mesh.scale.y = 0.003;
-    p.z = 0;
-    p.vz = 0;
+    }, { r: 0.65, top: hinge[1], rim: y + 0.035 });
+    // The hillside's hole: round, so as wide as the bed is long, and still
+    // under the rim across it.
+    const ut = Math.hypot(...sub(P(t + 1, s, 0), P(t, s, 0)));
+    const us = Math.hypot(...sub(P(t, s + 1, 0), P(t, s, 0)));
+    terrainHole(c[0], c[2], Math.min(0.66 * Math.max(ut, us), 0.78 * Math.min(ut, us)));
+    // The bed itself: `pgBed`, centred on its rest surface.
+    p.sim = pgBed({ c: hinge, g: GROUND.hopG });
+    p.c = hinge; p.H = hinge;
     WEAR.push([t, s, 1.15, 1.15, 0.35]);
   }
 
@@ -987,17 +1604,25 @@ function buildPlayground(scene, jad) {
     const fr = frame(t, s, 0);
     // The base plate, flush, and the spring.
     disc(up, fr.F(0, 0, y + 0.004), [0, 1, 0], 0.22, PG.GALV, 18);
-    {
-      const pts = [];
-      const turns = 6, rr = 0.10, h = 0.38;
-      for (let i = 0; i <= turns * 16; i++) {
-        const a = (i / 16) * TAU;
-        pts.push(fr.F(Math.cos(a) * rr, Math.sin(a) * rr, y + 0.02 + (h * i) / (turns * 16)));
-      }
-      pipe(up, pts, 0.016, [0.10, 0.36, 0.18], 6, false);
-    }
+    // The rider and its spring are an AVBD body on a ball joint at the
+    // spring's foot (`pgRider`), held upright by the coil's bending
+    // stiffness and rocking about it: the coil turns with the horse, which
+    // from any distance is what a bending spring looks like.
     const hinge = fr.F(0, 0, y + 0.02);
-    const p = mover('rider', hinge, fr.V, (B) => {
+    const COM = 0.62;
+    const X = fr.V, Z = crs(X, [0, 1, 0]);
+    const body = [hinge[0], hinge[1] + COM, hinge[2]];
+    const p = rigid('rider', body, X, (B0) => {
+      const B = lift(B0, -COM);
+      {
+        const pts = [];
+        const turns = 6, rr = 0.10, h = 0.38;
+        for (let i = 0; i <= turns * 16; i++) {
+          const a = (i / 16) * TAU;
+          pts.push([Math.cos(a) * rr, (h * i) / (turns * 16), Math.sin(a) * rr]);
+        }
+        pipe(B, pts, 0.016, [0.10, 0.36, 0.18], 6, false);
+      }
       // Local: x across, y up, z along the body (z = V × up = −U).
       const body = new THREE.CatmullRomCurve3([[0, 0.60, 0.42], [0, 0.66, 0.15],
         [0, 0.64, -0.15], [0, 0.60, -0.40]].map((q) => new THREE.Vector3(...q)));
@@ -1037,7 +1662,11 @@ function buildPlayground(scene, jad) {
       // And the plate the spring bolts to.
       disc(B, [0, 0.40, 0], [0, -1, 0], 0.09, PG.GALV, 12);
       pipe(B, [[0, 0.40, 0], [0, 0.50, 0]], 0.05, PG.GALV, 10);
-    }, { mass: 12 });
+    }, { r: 0.5 });
+    // 12 kg of moulded horse; 400 N·m/rad of coil, which rocks it at a
+    // little over a hertz and puts it back upright in four seconds.
+    p.sim = pgRider({ foot: hinge, X, Z, mass: 12, com: COM, I: [0.81, 0.75, 0.18], k: 400 });
+    p.c = body; p.H = hinge;
     WEAR.push([t, s, 0.8, 0.7, 0.4]);
     block(t - 0.45, t + 0.45, s - 0.25, s + 0.25, y, 1.0);
     return p;
@@ -1199,10 +1828,19 @@ function buildPlayground(scene, jad) {
       for (const u of [-0.93, 1.38]) {
         const [tt, ss] = fr.TS(u, 0);
         const hinge = P(tt, ss, y + H - 0.03);
-        const L = H - 0.03 - 0.45;
-        mover('seatA', hinge, axis, (B) => seatGeo(B, L, 0.42, [0.50, 0.46, 0.38]), { L, mass: 2.5 });
+        swingSeat('seatA', hinge, axis, H - 0.03 - 0.45, 0.42, [0.50, 0.46, 0.38]);
       }
-      block(t - len / 2 - 0.7, t + len / 2 + 0.6, s - 0.12, s + 0.12, y, H);
+      // Colliders on what stands on the ground — the gooseneck's post and
+      // leg, the ladder, the Λ — and not one box the length of the bar
+      // (1.558.0): under the bar is where the seats hang, and walking up to
+      // one to push it, or into it, is what a swing is for.
+      const tb = (u0, u1) => {
+        const [ta] = fr.TS(u0, 0), [tc] = fr.TS(u1, 0);
+        block(Math.min(ta, tc), Math.max(ta, tc), s - 0.12, s + 0.12, y, H);
+      };
+      tb(-len / 2 - 0.66, -len / 2 + 0.05);       // the gooseneck's post and its leg
+      tb(0.45 - 0.25, 0.45 + 0.25);               // the ladder
+      tb(len / 2 - 0.53, len / 2 + 0.53);         // the Λ
     }
 
     // The navy A-frame: a grey box beam across the alley mouth (along s),
@@ -1251,8 +1889,7 @@ function buildPlayground(scene, jad) {
       for (const u of [-0.55, 0.55]) {
         const [tt, ss] = fr.TS(u, 0);
         const hinge = P(tt, ss, y + H - 0.05);
-        const L = H - 0.05 - 0.42;
-        mover('seatA', hinge, fr.U, (B) => seatGeo(B, L, 0.44), { L, mass: 2.5 });
+        swingSeat('seatA', hinge, fr.U, H - 0.05 - 0.42, 0.44, PG.GALV);
       }
       for (const u of [-HB, HB]) {
         const [tt, ss] = fr.TS(u, 0);
@@ -1271,20 +1908,21 @@ function buildPlayground(scene, jad) {
       const { tip } = welderFrame(fr, y, { len, H, col: PG.YELLOW, ladderAt: null,
         ladderEnd: true, gooseOut: 1.15, gooseUp: 0.90 });
       const L = tip[1] - (y + 0.25);
-      mover('rope', tip, fr.V, (B) => {
-        const pts = [];
-        for (let i = 0; i <= 40; i++) {
-          const f = i / 40;
-          pts.push([0.006 * Math.sin(f * 37), -L * f, 0.006 * Math.cos(f * 29)]);
-        }
-        const ROPE = [0.62, 0.56, 0.44];
-        pipe(B, pts, (i) => 0.014 + 0.002 * Math.sin(i * 2.1), ROPE, 7, true);
-        for (let k = 1; k <= 5; k++) {
-          ball(B, [0, -L * (k / 5.6) - 0.15, 0], 0.035, shade(ROPE, 0.9), 8, 5, 0.75);
-        }
-        // The frayed end.
-        pipe(B, [[0, -L, 0], [0.01, -L - 0.06, 0.005]], (i) => (i ? 0.004 : 0.02), ROPE, 7);
-      }, { L, mass: 2 });
+      // The rope: five links of an AVBD chain hanging free from the ring,
+      // drawn as a rope with its five knots in the shared tube (`chainList`).
+      // 0.6 kg a metre with the knots; a capsule on every link, so it swings
+      // aside when you walk through it.
+      const NL = 5, l = L / NL;
+      const caps = [];
+      for (let k = 0; k < NL; k++) caps.push([-l / 2, 0, 0, l / 2, 0, 0, 0.03, k]);
+      const sim = pgHang({ anchors: [tip], body: null, links: NL, chains: [{ a: 0, at: null, len: L }],
+        kgM: 0.6, rLink: 0.02, caps, c: [tip[0], tip[1] - L / 2, tip[2]], reach: 0.6 });
+      const knots = [];
+      for (let k = 1; k <= 5; k++) knots.push((L * (k / 5.6) + 0.15) / L);
+      const ROPE = [0.62, 0.56, 0.44];
+      parts.push({ kind: 'rope', mesh: null, sim, L, r: 0.3, c: [tip[0], tip[1] - L * 0.6, tip[2]], H: tip,
+        Z: crs(fr.V, [0, 1, 0]), tris: 0 });
+      chainList.push({ sim, k: 0, col: ROPE, rope: true, knots, sides: 7, rings: 64 });
       const [ta, sa] = fr.TS(-len / 2, 0), [tb, sb] = fr.TS(len / 2, 0);
       block(ta - 0.15, ta + 0.15, Math.min(sa, sb) - 0.7, sa + 0.1, y, H);
       block(tb - 0.25, tb + 0.25, sb - 0.08, sb + 0.08, y, H);
@@ -1302,7 +1940,9 @@ function buildPlayground(scene, jad) {
    * because a table that has been played at for twenty years has worn its
    * own floor.
    */
+  const tables = [];
   function buildTable(t, s) {
+    tables.push({ t, s });
     const y = walkAt(t, s);
     const fr = frame(t, s, 0);
     const HL = 1.37, HW = 0.7625, TOP = 0.76, TH = 0.08;
@@ -1503,140 +2143,457 @@ function buildPlayground(scene, jad) {
   // Into the locale's blockers, by reference — see 46-backlane.js.
   for (const r of runs) jad.blockers.push(r);
 
-  // ── the motion ─────────────────────────────────────────────────────────────
+  // ── the motion (1.558.0) ───────────────────────────────────────────────────
   //
-  // Until the AVBD pass: a damped pendulum per hanging thing, a hinged beam
-  // with a resting end for the seesaw, a spring per bed and for the rider.
-  // Pushed by the hose (`jet`, where the water lands, and `who`, where it
-  // comes from) and by walking into a seat. A breeze is a slow sum of two
-  // sines per part at its own phase — a few degrees at most on a seat and
-  // nearly nothing on the nest — so the place is not frozen and not busy.
-  const _v = new THREE.Vector3();
-  const centre = P(G.t0 + 8, G.s0 + 7, 0), centreA = P(383, 24, 0), centreP = P(552, pongS, 0);
-  let clock = 0, awake = 0;
-  // A part's working point in the world: where the hose would hit it.
-  const tipOf = (p) => {
-    if (p.kind === 'seesaw') return null;
-    if (p.kind === 'tramp' || p.kind === 'rider') return p.hinge;
-    const L = p.L * 0.95;
-    const c = Math.cos(p.th), sn = Math.sin(p.th);
-    // y' = −L cos θ, z' = −L sin θ in the hinge frame.
-    return [p.hinge[0] - p.side[0] * L * sn, p.hinge[1] - L * c, p.hinge[2] - p.side[2] * L * sn];
-  };
-  function tick(dt, cam, who, jet) {
-    // Asleep unless somebody is within 90 m of one of the three sites.
-    const near = (c) => Math.hypot(cam.x - c[0], cam.z - c[2]) < 90;
-    if (!near(centre) && !near(centreA) && !near(centreP)) { awake = 0; return; }
-    awake = 1;
-    dt = Math.min(dt, 0.05);
-    clock += dt;
-    const g = 9.81;
-    for (let i = 0; i < parts.length; i++) {
-      const p = parts[i];
-      let push = 0;
-      // The hose: where it lands, and which way it is going.
-      if (jet) {
-        const tp = p.kind === 'seesaw'
-          ? null : tipOf(p);
-        if (p.kind === 'seesaw') {
-          // Either end: the end nearer the jet goes down.
-          for (const sg of [-1, 1]) {
-            const e = [p.hinge[0] + p.side[0] * sg * p.HL * 0.85, p.hinge[1],
-              p.hinge[2] + p.side[2] * sg * p.HL * 0.85];
-            if (Math.hypot(jet.x - e[0], jet.z - e[2]) < 0.6) push += -sg * 4.0;
-          }
-        } else if (tp && Math.hypot(jet.x - tp[0], jet.z - tp[2]) < (p.r || 0.45) + 0.25
-          && jet.y > tp[1] - 0.6 && jet.y < tp[1] + 1.2) {
-          if (p.kind === 'tramp' || p.kind === 'rider') push = 1;
-          else if (who) {
-            const dx = jet.x - who.x, dz = jet.z - who.z, L = Math.hypot(dx, dz) || 1;
-            // Along the swing's own direction (−side for +θ).
-            push = -(dx * p.side[0] + dz * p.side[2]) / L;
-          }
-        }
-      }
-      // And a walker who steps into a hanging seat shoves it.
-      if (who && (p.kind === 'seat' || p.kind === 'seatA' || p.kind === 'nest' || p.kind === 'rope')) {
-        const tp = tipOf(p);
-        const dx = tp[0] - who.x, dz = tp[2] - who.z;
-        const d = Math.hypot(dx, dz);
-        const R = (p.r || 0.2) + 0.25;
-        if (d < R && who.y < tp[1] + 0.3 && who.y + 1.7 > tp[1]) {
-          const k = (R - d) / R;
-          const along = (dx * p.side[0] + dz * p.side[2]) / (d || 1);
-          p.om += -along * k * 6 * dt;
-        }
-      }
-      if (p.kind === 'tramp') {
-        // A stiff bed: about 3 Hz, a few bounces.
-        const k = 360, c = 3.2;
-        const a = -k * p.z - c * p.vz - push * 8.0;
-        p.vz += a * dt; p.z += p.vz * dt;
-        // 3.5 cm down at most: under that is the resort's gravel pad, which
-        // would cover a deeper dent. The AVBD pass wants a hole cut in it.
-        p.z = clamp(p.z, -0.035, 0.01);
-        p.mesh.scale.y = Math.max(0.003, -p.z + 0.003);
-        continue;
-      }
-      if (p.kind === 'rider') {
-        const k = 40, c = 2.0;
-        const a = -k * p.th - c * p.om + push * 6 * Math.sin(clock * 9) ;
-        p.om += a * dt; p.th += p.om * dt;
-        p.th = clamp(p.th, -0.35, 0.35);
-        p.mesh.rotation.x = p.th;
-        continue;
-      }
-      if (p.kind === 'seesaw') {
-        // It lies on its resting end; push lifts that end over and it falls
-        // the other way, and the stops bounce it a little.
-        const bias = p.thRest < 0 ? -1.2 : 1.2;
-        const a = bias + push - 1.5 * p.om;
-        p.om += a * dt; p.th += p.om * dt;
-        if (p.th < -p.lim) { p.th = -p.lim; p.om = -p.om * 0.25; }
-        if (p.th > p.lim) { p.th = p.lim; p.om = -p.om * 0.25; }
-        p.mesh.rotation.x = p.th;
-        continue;
-      }
-      // A pendulum.
-      const ph = i * 1.7;
-      const breeze = (p.kind === 'nest' ? 0.05 : 0.22)
-        * (Math.sin(clock * 0.37 + ph) * 0.6 + Math.sin(clock * 0.91 + ph * 2.3) * 0.4);
-      const a = -(g / p.L) * Math.sin(p.th) - 0.25 * p.om + breeze + push * 5.0;
-      p.om += a * dt; p.th += p.om * dt;
-      p.th = clamp(p.th, -1.25, 1.25);
-      p.mesh.rotation.x = p.th;
+  // Every moving part is an AVBD net of its own (the builders over
+  // `buildPlayground`): the seats, the nest and the rope hang on chains of
+  // rigid links; the seesaw turns on its axle and lands on its tyres; the
+  // rider rocks on its coil; each bed is sprung from its rim. Stepped only
+  // within NEAR of you (or of the camera, off foot), and each one sleeps once
+  // it has been still a moment and nobody is touching it — so a playground
+  // at rest costs nothing. Pushed by:
+  //
+  //   the hose — a force where the water lands, along its way from you;
+  //   you — the walker is a capsule each net meets (`pgSim.you`), so walking
+  //     into a seat or the rope shoves it, and the push (the hose's button
+  //     with one of them in reach and in front of you, `aim`/`press`/`hold`
+  //     below; held, it keeps pushing) is a shove with the hand;
+  //   the beds — you stand on them: the bed has your height while you are
+  //     on it, and the jump key pumps it (`bouncer`, and 47-ground.js).
+  const NEAR = 30;
+  const _q = new THREE.Quaternion(), _pv = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1);
+  const tramps = parts.filter((p) => p.kind === 'tramp');
+  for (const p of tramps) {
+    p.base = p.mesh.matrix.clone();
+    const [tt, ts] = jad.local(p.c[0], p.c[2]);
+    p.t = tt; p.s = ts;
+  }
+  /** The world point the hose or a hand finds on part p. */
+  const _hp = [0, 0, 0];
+  function hitPoint(p, out = _hp) {
+    const n = p.sim.net;
+    if (p.kind === 'tramp') { out[0] = p.c[0]; out[1] = p.c[1]; out[2] = p.c[2]; return out; }
+    if (p.kind === 'rope') {
+      const i = p.sim.links[0].ids[2];
+      out[0] = n.P[3 * i]; out[1] = n.P[3 * i + 1]; out[2] = n.P[3 * i + 2];
+      return out;
     }
+    const b = p.sim.body;
+    out[0] = n.P[3 * b]; out[1] = n.P[3 * b + 1]; out[2] = n.P[3 * b + 2];
+    return out;
+  }
+  // How hard the hose pushes, N, and a hand: a shove (N·s) and a held push (N).
+  const HOSE = { seat: 30, seatA: 30, nest: 70, rope: 12, rider: 70, seesaw: 160, tramp: 250 };
+  const SHOVE = { seat: 5, seatA: 5, nest: 14, rope: 1.2, rider: 14, seesaw: 22, tramp: 5 };
+  const HOLD = { seat: 30, seatA: 30, nest: 80, rope: 8, rider: 60, seesaw: 180, tramp: 300 };
+  /**
+   * Push part p at world point `at`, horizontally along (fx, fz), with `J`
+   * N·s — or, for the seesaw, down on the end at `at` if it is up and up if
+   * it is down; for a bed, down.
+   */
+  function shove(p, at, fx, fz, J) {
+    const sim = p.sim;
+    if (p.kind === 'tramp') { sim.poke(J / PGT.bed); return J / PGT.bed; }
+    if (p.kind === 'seesaw') {
+      const e0 = sim.end(-1, [0, 0, 0]), e1 = sim.end(1, [0, 0, 0]);
+      const sg = (at[0] - e1[0]) ** 2 + (at[2] - e1[2]) ** 2 < (at[0] - e0[0]) ** 2 + (at[2] - e0[2]) ** 2 ? 1 : -1;
+      const e = sg > 0 ? e1 : e0;
+      // angle > 0 is the +z end down.
+      const down = sim.angle() * sg > 0;
+      sim.impulse(sim.body, e, [0, down ? J : -J, 0]);
+      return J / 25;
+    }
+    const b = p.kind === 'rope' ? p.sim.links[0].ids[3] : sim.body;
+    // The nest is pushed by its rim, on your side of it and a little off the
+    // line through its middle — which is why a pushed nest also turns.
+    if (p.kind === 'nest') at = [at[0] - fx * 0.40 + fz * 0.30, at[1], at[2] - fz * 0.40 - fx * 0.30];
+    sim.impulse(b, at, [fx * J, 0, fz * J]);
+    return J / sim.net.mass[b];
+  }
+  /** The hose landing at `jet`, coming from `who`, on part p for dt. */
+  function hose(p, jet, who, dt) {
+    const F = HOSE[p.kind] || 40;
+    let hx = who ? jet.x - who.x : 0, hz = who ? jet.z - who.z : 0;
+    const hl = Math.hypot(hx, hz) || 1;
+    hx /= hl; hz /= hl;
+    if (p.kind === 'seesaw') {
+      for (const sg of [-1, 1]) {
+        const e = p.sim.end(sg, [0, 0, 0]);
+        if ((jet.x - e[0]) ** 2 + (jet.z - e[2]) ** 2 < 0.36 && jet.y < e[1] + 1.0) {
+          p.sim.impulse(p.sim.body, e, [0, -F * dt, 0]);
+          return true;
+        }
+      }
+      return false;
+    }
+    const at = hitPoint(p);
+    const R = (p.r || 0.45) + 0.25;
+    if ((jet.x - at[0]) ** 2 + (jet.z - at[2]) ** 2 > R * R) return false;
+    if (jet.y < at[1] - 0.8 || jet.y > at[1] + 1.2) return false;
+    if (p.kind === 'tramp') { p.sim.poke(F * dt / PGT.bed); return true; }
+    shove(p, [jet.x, Math.min(jet.y, at[1] + 0.1), jet.z], hx, hz, F * dt);
+    return true;
+  }
+
+  // ── the chains, one tube ───────────────────────────────────────────────────
+  // Through each chain's joints, a Catmull-Rom so a slack chain bends round
+  // its links rather than kinking at them; beaded like the links of a chain
+  // (alternate rings fatter, 5 cm apart), or for the rope a twisted line with
+  // its five knots.
+  let chainMesh = null;
+  const chainState = { verts: 0, tris: 0 };
+  {
+    let nv = 0, ni = 0;
+    for (const c of chainList) {
+      c.sides = c.sides || 5;
+      c.rings = c.rings || 40;
+      c.v0 = nv;
+      nv += c.sides * c.rings;
+      ni += (c.rings - 1) * c.sides * 6;
+      c.pts = new Float64Array(3 * (c.sim.NL + 1));
+    }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3);
+    const idx = new Uint32Array(ni);
+    let o = 0;
+    for (const c of chainList) {
+      for (let v = c.v0; v < c.v0 + c.sides * c.rings; v++) col.set(c.col, 3 * v);
+      for (let i = 0; i < c.rings - 1; i++) {
+        for (let k = 0; k < c.sides; k++) {
+          const a = c.v0 + i * c.sides + k, b = c.v0 + i * c.sides + ((k + 1) % c.sides);
+          idx[o++] = a; idx[o++] = a + c.sides; idx[o++] = b + c.sides;
+          idx[o++] = a; idx[o++] = b + c.sides; idx[o++] = b;
+        }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('normal', new THREE.BufferAttribute(nor, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aVCol', new THREE.BufferAttribute(col, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    chainMesh = new THREE.Mesh(g, eqMat);
+    chainMesh.name = 'play:chains';
+    scene.add(chainMesh);
+    chainState.verts = nv; chainState.tris = ni / 3;
+  }
+  const _cr = [0, 0, 0];
+  /** A point along chain c at u in [0, 1]: Catmull-Rom through its joints. */
+  function chainAt(c, u, out) {
+    const P0 = c.pts, n = c.sim.NL;
+    const x = Math.min(n - 1e-6, Math.max(0, u * n)), i = Math.floor(x), f = x - i;
+    const at = (k, a) => P0[3 * Math.max(0, Math.min(n, k)) + a];
+    for (let a = 0; a < 3; a++) {
+      const p0 = at(i - 1, a), p1 = at(i, a), p2 = at(i + 1, a), p3 = at(i + 2, a);
+      // The ends' outer neighbours are mirrored, so the tangent there is
+      // along the link and not toward nothing.
+      const q0 = i - 1 < 0 ? 2 * p1 - p2 : p0, q3 = i + 2 > n ? 2 * p2 - p1 : p3;
+      const f2 = f * f, f3 = f2 * f;
+      out[a] = 0.5 * ((2 * p1) + (-q0 + p2) * f + (2 * q0 - 5 * p1 + 4 * p2 - q3) * f2
+        + (-q0 + 3 * p1 - 3 * p2 + q3) * f3);
+    }
+    return out;
+  }
+  function chainLay(c) {
+    c.sim.chainPts(c.k, c.pts);
+    const pos = chainMesh.geometry.attributes.position.array, nor = chainMesh.geometry.attributes.normal.array;
+    const R = c.rings, S = c.sides;
+    const pts = c.ringPts || (c.ringPts = new Float64Array(3 * R));
+    for (let i = 0; i < R; i++) {
+      chainAt(c, i / (R - 1), _cr);
+      pts[3 * i] = _cr[0]; pts[3 * i + 1] = _cr[1]; pts[3 * i + 2] = _cr[2];
+    }
+    let e1 = null;
+    for (let i = 0; i < R; i++) {
+      const a = Math.max(0, i - 1), b = Math.min(R - 1, i + 1);
+      const T = nrm([pts[3 * b] - pts[3 * a], pts[3 * b + 1] - pts[3 * a + 1], pts[3 * b + 2] - pts[3 * a + 2]]);
+      if (!e1) e1 = perp(T)[0];
+      e1 = nrm(sub(e1, T.map((x) => x * dot(e1, T))));
+      const e2 = crs(T, e1);
+      const f = i / (R - 1);
+      let r;
+      if (c.rope) {
+        r = 0.014 + 0.002 * Math.sin(i * 2.1);
+        for (const kf of c.knots) {
+          const d = Math.abs(f - kf) * c.sim.links[0].l * c.sim.NL;
+          if (d < 0.035) r = Math.max(r, 0.035 * Math.sqrt(1 - (d / 0.035) ** 2) * 0.9 + 0.006);
+        }
+        if (i === R - 1) r = 0.006;
+      } else r = i % 2 ? 0.0085 : 0.0055;
+      for (let k = 0; k < S; k++) {
+        const an = (k / S) * TAU, ca = Math.cos(an), sa = Math.sin(an);
+        const nx = e1[0] * ca + e2[0] * sa, ny = e1[1] * ca + e2[1] * sa, nz = e1[2] * ca + e2[2] * sa;
+        const v = 3 * (c.v0 + i * S + k);
+        pos[v] = pts[3 * i] + nx * r; pos[v + 1] = pts[3 * i + 1] + ny * r; pos[v + 2] = pts[3 * i + 2] + nz * r;
+        nor[v] = nx; nor[v + 1] = ny; nor[v + 2] = nz;
+      }
+    }
+  }
+  for (const c of chainList) chainLay(c);
+  chainMesh.geometry.computeBoundingSphere();
+
+  /** Part p's mesh where its body is. */
+  function draw(p) {
+    if (!p.mesh) return;
+    const n = p.sim.net;
+    if (p.kind === 'tramp') {
+      p.mesh.matrix.copy(p.base).scale(_pv.set(1, Math.max(0.003, p.sim.dip() + 0.003), 1));
+    } else {
+      const b = p.sim.body;
+      _pv.set(n.P[3 * b], n.P[3 * b + 1], n.P[3 * b + 2]);
+      _q.set(n.Q[4 * b], n.Q[4 * b + 1], n.Q[4 * b + 2], n.Q[4 * b + 3]);
+      p.mesh.matrix.compose(_pv, _q, _one);
+    }
+    p.mesh.matrixWorldNeedsUpdate = true;
+  }
+
+  // ── the walker on a bed ────────────────────────────────────────────────────
+  let onBed = null, bedFeet = 0;
+  // In the shore frame, which is what the beds are laid in.
+  const bedD = (p, x, z) => {
+    const ts = jad.local(x, z);
+    return Math.hypot(ts[0] - p.t, ts[1] - p.s);
+  };
+  const bedUnder = (x, z) => {
+    for (const p of tramps) {
+      if ((x - p.c[0]) ** 2 + (z - p.c[2]) ** 2 > 1) continue;
+      const d = bedD(p, x, z);
+      if (d < PGT.RB - 0.05) return [p, d];
+    }
+    return null;
+  };
+  /** Feet over the bed at d from its middle: the dent is shallower out there. */
+  function ride(you, p, d, r) {
+    bedFeet = r.y + r.dip * Math.min(1, (d / PGT.RB) ** 2);
+    if (r.off) {
+      onBed = null;
+      you.gy = p.top;
+      you.hop = Math.max(0.001, bedFeet - p.top);
+      you.hopV = r.vy;
+      you.y = you.gy + you.hop;
+      return { land: 0, knees: r.knees };
+    }
+    you.gy = bedFeet; you.hop = 0; you.hopV = 0; you.y = bedFeet;
+    return { land: 0, knees: r.knees };
+  }
+  const bouncer = {
+    step(you, dt, air) {
+      if (onBed) {
+        const p = onBed;
+        const d = bedD(p, you.x, you.z);
+        if (d > PGT.RB - 0.02) {
+          // Walked off it: down on to the rim from where the bed had you,
+          // and the walk's own step easing takes you up the 4 cm.
+          p.sim.unmount();
+          onBed = null;
+          you.gy = bedFeet; you.hop = 0; you.hopV = 0; you.y = bedFeet;
+          return { land: 0 };
+        }
+        // The dent's slope runs you to its middle, as a real bed does.
+        const dip = p.sim.dip();
+        const dw = Math.hypot(you.x - p.c[0], you.z - p.c[2]);
+        if (dw > 0.02 && dip > 0.01) {
+          const a = 0.5 * GROUND.hopG * 2 * dip * d / (PGT.RB * PGT.RB);
+          you.vx -= ((you.x - p.c[0]) / dw) * a * dt;
+          you.vz -= ((you.z - p.c[2]) / dw) * a * dt;
+        }
+        const r = p.sim.step2(dt, false);
+        p.stepped = true;
+        return ride(you, p, d, r);
+      }
+      const u = bedUnder(you.x, you.z);
+      if (!u) return null;
+      const [p, d] = u;
+      let land = 0;
+      if (air) {
+        // Still on the way down to it: the walk's own arc.
+        if (!(you.hopV < 0) || you.gy + you.hop + you.hopV * dt > p.top) return null;
+        land = -you.hopV * 0.4;
+        p.sim.mount(p.top, you.hopV);
+      } else p.sim.mount(p.top, 0);
+      onBed = p;
+      const r = p.sim.step2(dt, false);
+      p.stepped = true;
+      const res = ride(you, p, d, r);
+      res.land = land;
+      return res;
+    },
+    press(you) {
+      if (onBed) return onBed.sim.press();
+      if (you.hopV < 0 && you.hop > 0) {
+        const u = bedUnder(you.x, you.z);
+        if (u) return u[0].sim.press();
+      }
+      return false;
+    },
+  };
+
+  // ── what you stand on ──────────────────────────────────────────────────────
+  // The rubber is 8 cm over the hill `walkY` knows (5 of gravel, 3 of
+  // rubber), the beds are on their springs, the rims stand 3.5 cm proud,
+  // and the tables stand in grit beds; this is the floor that knows them
+  // (`ground.addFloor`, 47-ground.js).
+  const box = { x0: Infinity, z0: Infinity, x1: -Infinity, z1: -Infinity };
+  const grow = (t, s) => {
+    const w = jad.toWorld(t, s);
+    box.x0 = Math.min(box.x0, w[0] - 1); box.x1 = Math.max(box.x1, w[0] + 1);
+    box.z0 = Math.min(box.z0, w[2] - 1); box.z1 = Math.max(box.z1, w[2] + 1);
+  };
+  for (const [t, s] of [[G.t0, G.s0], [G.t1, G.s0], [G.t1, G.s1], [G.t0, G.s1]]) grow(t, s);
+  for (const tb of tables) for (const [du, dv] of [[-3, -2], [3, -2], [3, 2], [-3, 2]]) grow(tb.t + du, tb.s + dv);
+  function floorY(x, z) {
+    if (x < box.x0 || x > box.x1 || z < box.z0 || z > box.z1) return null;
+    const [t, s] = jad.local(x, z);
+    if (t > G.t0 && t < G.t1 && s > G.s0 && s < G.s1) {
+      for (const p of tramps) {
+        const d = Math.hypot(t - p.t, s - p.s);
+        if (d < 0.64) return p.top;
+        if (d < 0.80) return p.rim;
+      }
+      return bY(t, s);
+    }
+    for (const tb of tables) {
+      if (Math.abs(t - tb.t) < 3.0 && Math.abs(s - tb.s) < 1.9) return walkAt(t, s) + 0.035;
+    }
+    return null;
+  }
+
+  // ── the frame ──────────────────────────────────────────────────────────────
+  const cost = { ms: 0, msMax: 0, frames: 0, awake: 0, steps: 0 };
+  let awake = 0;
+  function tick(dt, cam, who, jet) {
+    const t0 = performance.now();
+    dt = Math.min(dt, 0.05);
+    const fx = who ? who.x : cam.x, fz = who ? who.z : cam.z;
+    const feet = who ? [who.x, who.y, who.z] : null;
+    awake = 0;
+    let laid = false;
+    for (const p of parts) {
+      const near = (p.c[0] - fx) ** 2 + (p.c[2] - fz) ** 2 < NEAR * NEAR;
+      if (!near) { if (p.kind !== 'tramp') p.sim.you(null); continue; }
+      if (p.kind !== 'tramp') p.sim.you(feet);
+      if (jet) hose(p, jet, who, dt);
+      let n;
+      if (p.kind === 'tramp') {
+        // A bed with you on it is stepped by the walk (`bouncer`).
+        if (p.stepped || onBed === p) { p.stepped = false; n = 1; } else n = p.sim.step2(dt, true) ? 1 : (p.sim.asleep ? 0 : 1);
+      } else n = p.sim.step(dt);
+      if (!p.sim.asleep) awake++;
+      if (n || p.drawn !== false) draw(p);
+      p.drawn = n > 0;
+      cost.steps += n;
+      if (n && p.kind !== 'tramp') laid = true;
+    }
+    if (laid) {
+      for (const c of chainList) if (!c.sim.asleep || c.wasAwake) chainLay(c);
+      for (const c of chainList) c.wasAwake = !c.sim.asleep;
+      chainMesh.geometry.attributes.position.needsUpdate = true;
+      chainMesh.geometry.attributes.normal.needsUpdate = true;
+    }
+    const ms = performance.now() - t0;
+    cost.ms += ms; cost.frames++; cost.msMax = Math.max(cost.msMax, ms); cost.awake = awake;
+    cost.last = ms;
   }
 
   const stats = () => ({
     tris: Math.round((up.count() + rub.count() + floor.count()) / 3),
     sapTris: Math.round((sapMesh.geometry.index ? sapMesh.geometry.index.count : 0) / 3),
-    moverTris: Math.round(parts.reduce((a, p) => a + p.tris, 0)),
-    movers: parts.length, blockers: runs.length, awake,
+    moverTris: Math.round(parts.reduce((a, p) => a + p.tris, 0) + chainState.tris),
+    movers: parts.length, chains: chainList.length, blockers: runs.length, awake,
+    ms: cost.frames ? +(cost.ms / cost.frames).toFixed(4) : 0, msMax: +cost.msMax.toFixed(3),
+    msLast: cost.last != null ? +cost.last.toFixed(4) : 0,
   });
+  /** Which part is in reach in front of you: { i, at, d }, or null. */
+  function aim(x, z, fx, fz, any = false, reach = 1.6) {
+    const fl = Math.hypot(fx, fz) || 1;
+    fx /= fl; fz /= fl;
+    let best = null;
+    parts.forEach((p, i) => {
+      const cands = p.kind === 'seesaw' ? [p.sim.end(-1, [0, 0, 0]), p.sim.end(1, [0, 0, 0])]
+        : [hitPoint(p, [0, 0, 0])];
+      for (const at of cands) {
+        const dx = at[0] - x, dz = at[2] - z, d = Math.hypot(dx, dz);
+        if (d > reach + (p.kind === 'nest' ? 0.4 : 0)) continue;
+        if (!any && d > 0.05 && (dx * fx + dz * fz) / d < 0.3) continue;
+        if (!best || d < best.d) best = { i, at, d, kind: p.kind };
+      }
+    });
+    return best;
+  }
+  const swingAngle = (p) => {
+    const at = hitPoint(p, [0, 0, 0]), H = p.H;
+    const dx = at[0] - H[0], dy = at[1] - H[1], dz = at[2] - H[2];
+    return Math.atan2(dx * p.Z[0] + dz * p.Z[2], -dy);
+  };
 
   return {
-    meshes: [upMesh, rubMesh, floorMesh, sapMesh, ...parts.map((p) => p.mesh)],
+    meshes: [upMesh, rubMesh, floorMesh, sapMesh, chainMesh, ...parts.filter((p) => p.mesh).map((p) => p.mesh)],
     casters: [upMesh],
     trees: [sapMesh],
-    movers: parts.map((p) => p.mesh),
+    movers: [chainMesh, ...parts.filter((p) => p.mesh).map((p) => p.mesh)],
     parts,
     blockers: runs.length,
     tick,
     stats,
-    /** Kick part `i` (all if i < 0): ω += v for a hinge, vz += v for a bed. */
+    floor: floorY,
+    bouncer,
+    /** Which part a press from (x, z) facing (fx, fz) would push, or null. */
+    aim,
+    /** The press: shove part `a.i` (from `aim`) along (fx, fz). */
+    press: (a, fx, fz) => {
+      const p = parts[a.i];
+      const fl = Math.hypot(fx, fz) || 1;
+      return shove(p, a.at, fx / fl, fz / fl, SHOVE[p.kind] || 4);
+    },
+    /** And held: a steady push for dt. */
+    hold: (a, fx, fz, dt) => {
+      const p = parts[a.i];
+      const fl = Math.hypot(fx, fz) || 1;
+      const at = p.kind === 'seesaw' ? a.at : hitPoint(p, [0, 0, 0]);
+      return shove(p, at, fx / fl, fz / fl, (HOLD[p.kind] || 30) * dt);
+    },
+    /**
+     * Debug: kick part i (all if i < 0) — v m/s along its swing (z of its
+     * hinge frame) for a seat, the nest, the rope and the rider; the +z end
+     * down for the seesaw; down for a bed.
+     */
     push(i, v) {
-      for (let k = 0; k < parts.length; k++) {
-        if (i >= 0 && k !== i) continue;
-        const p = parts[k];
-        if (p.kind === 'tramp') p.vz += v; else p.om += v;
-      }
+      parts.forEach((p, k) => {
+        if (i >= 0 && k !== i) return;
+        if (p.kind === 'tramp') { p.sim.poke(v); return; }
+        if (p.kind === 'seesaw') { const e = p.sim.end(1, [0, 0, 0]); p.sim.impulse(p.sim.body, e, [0, -25 * v, 0]); return; }
+        const b = p.kind === 'rope' ? p.sim.links[0].ids[3] : p.sim.body;
+        const m = p.kind === 'rope' ? 1 : p.sim.net.mass[b] + 1;
+        p.sim.impulse(b, hitPoint(p, [0, 0, 0]), [p.Z ? p.Z[0] * v * m : v * m, 0, p.Z ? p.Z[2] * v * m : 0]);
+      });
       return parts.length;
     },
-    list: () => parts.map((p, k) => ({ i: k, kind: p.kind,
-      hinge: p.hinge.map((x) => +x.toFixed(2)), th: +p.th.toFixed(3),
-      z: p.z != null ? +p.z.toFixed(3) : undefined })),
-    /** For tests: the (t, s) of the three sites. */
-    sites: { B: [(G.t0 + G.t1) / 2, (G.s0 + G.s1) / 2], A: [383, 24], pong: [552.5, pongS] },
+    list: () => parts.map((p, k) => {
+      const at = p.kind === 'seesaw' ? p.c : hitPoint(p, [0, 0, 0]);
+      const ts = jad.local(at[0], at[2]);
+      const o = { i: k, kind: p.kind, t: +ts[0].toFixed(2), s: +ts[1].toFixed(2), y: +at[1].toFixed(3),
+        awake: !p.sim.asleep };
+      if (p.kind === 'tramp') { o.dip = +p.sim.dip().toFixed(3); o.on = p.sim.on; o.phase = p.sim.phase; }
+      else if (p.kind === 'seesaw') o.th = +p.sim.angle().toFixed(3);
+      else if (p.kind !== 'rider') o.th = +swingAngle(p).toFixed(3);
+      if (p.mesh && p.kind !== 'tramp' && p.kind !== 'seesaw') {
+        // How far it has turned about the vertical off how it was hung.
+        const n = p.sim.net, b = p.sim.body;
+        const xv = pgRot([n.Q[4 * b], n.Q[4 * b + 1], n.Q[4 * b + 2], n.Q[4 * b + 3]], [1, 0, 0]);
+        o.yaw = +(Math.atan2(xv[0] * p.Z[0] + xv[2] * p.Z[2], xv[0] * p.X[0] + xv[2] * p.X[2])).toFixed(3);
+      }
+      o.msLast = +p.sim.stats.msLast.toFixed(4);
+      if (p.kind === 'rider') {
+        const n = p.sim.net, b = p.sim.body;
+        const yv = pgRot([n.Q[4 * b], n.Q[4 * b + 1], n.Q[4 * b + 2], n.Q[4 * b + 3]], [0, 1, 0]);
+        o.tilt = +Math.acos(Math.min(1, yv[1])).toFixed(3);
+      }
+      if (p.sim.net.measure) o.stretch = +p.sim.net.measure().maxStretch.toFixed(5);
+      return o;
+    }),
+    /** The beds: who is on which, how far down, the last bounces. */
+    beds: () => tramps.map((p) => ({ on: p.sim.on, phase: p.sim.phase, dip: +p.sim.dip().toFixed(3),
+      top: +p.top.toFixed(3), ...p.sim.st, feet: onBed === p ? +bedFeet.toFixed(3) : null })),
+    /** For tests: the (t, s) of the three sites, and B's gate. */
+    sites: { B: [(G.t0 + G.t1) / 2, (G.s0 + G.s1) / 2], A: [383, 24], pong: [552.5, pongS],
+      gate: [(PG.fence.gate[0] + PG.fence.gate[1]) / 2, PG.fence.s0] },
   };
 }
