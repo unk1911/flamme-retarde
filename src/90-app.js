@@ -2726,8 +2726,28 @@ function sceneHit(tool, hard, reg) {
   sceneLog.hits.push([sceneNow(), tool, hard, reg || 'butt']);
   if (sceneLog.hits.length > SCENE.keep) sceneLog.hits.shift();
 }
-/** The safeword, said — `who` 'you' | 'her', `of` 'belt' | 'collar'. */
-function sceneSafe(who, of) { sceneLog.safe = { t: sceneNow(), who, of }; }
+/** The safeword, said — `who` 'you' | 'her', `of` 'belt' | 'collar' | 'auto'. */
+function sceneSafe(who, of) {
+  sceneLog.safe = { t: sceneNow(), who, of };
+  // And whatever it stopped, her own autonomous mode stops with it (1.560.0).
+  if (typeof autoSafeHook === 'function') autoSafeHook(who, of);
+}
+
+/**
+ * THE AFTERCARE WITH NOTHING TO PUT AWAY (1.560.0). The safeword said in her
+ * autonomous mode with neither the belt nor the collar on: the belt's own
+ * aftercare, as it runs once the belt is back in its loops — your hand to
+ * her (the rub, lying on her front; your hand in her hair otherwise), and
+ * her "Okay. Come here." then her thanks. See `beltHandTick`.
+ */
+function sceneCare(who = 'you') {
+  if (audio && audio.herHush) audio.herHush('safe');
+  sceneSafe(who, 'auto');
+  if (beltActive() || beltAfter) return false;
+  beltSay(who === 'her' ? 'red' : 'heard', true);
+  beltAfter = { t: 0, who, how: null, said: false };
+  return true;
+}
 
 /**
  * Everything happening between you and her this second, as the keys
@@ -2782,6 +2802,9 @@ function sceneTalk() {
     o.safeword_of = S.of;
   }
   if (beltAfter || colAfter) o.aftercare = true;
+  // And her own mode (1.560.0): on, held still, what she just chose to do.
+  const A = typeof autoScene === 'function' ? autoScene() : null;
+  if (A) Object.assign(o, A);
   return o;
 }
 
@@ -3954,6 +3977,8 @@ const HELP = [
     ['\\', 'help.k.belt'],
     ['=', 'help.k.collar'],
     ['CLICK + ↑ / ↓', 'help.k.yank'],
+    // Her autonomous mode (1.560.0, src/49-auto.js) — a typed or spoken line.
+    ['I · “autonomous”', 'help.k.selfmode'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -10512,6 +10537,9 @@ function tick(wall, draw) {
   // for the phase to disagree with it about.
   // One arm rig, two water modes. It works out which from what it is handed —
   // see the note on `update` in 60-arms.js.
+  // Her autonomous mode (src/49-auto.js): a clock, and a decision every few
+  // seconds while it is on.
+  if (typeof autoTick === 'function') autoTick(dt);
   if (arms) {
     // Not during the establishing shot: the camera is sixteen metres up and a
     // pair of arms drawn over the top of it is a pair of arms in the sky.
@@ -14097,6 +14125,14 @@ window.__fr = {
    * pitch, limit)` walks you through (t, s) points holding W, which is how a
    * probe leads her; `stats()`, `links()`, `fit()` (her neck in the strap).
    */
+  /**
+   * Her autonomous mode (1.560.0, src/49-auto.js): `on()`, `off()`,
+   * `hear(text)` a line through the ears' matchers, `cue(name, sub)`,
+   * `decide()` a move now, `event(kind, k)`, `state()`, `mood()`,
+   * `trace(n)` the decisions (time, context, mood, pick, why), `set({...})`,
+   * `moves()`, `words(text)`.
+   */
+  auto: autoApi,
   collar: {
     cmd: (what) => collarCmd(what),
     key: () => collarCmd('collar.key'),

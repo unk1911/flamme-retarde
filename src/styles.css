@@ -464,6 +464,14 @@ html.touch #swim-hud { bottom: calc(7.4rem + var(--wrap)); }
   color: #9fb2b9; text-align: center;
 }
 #gh-hint.urgent { color: var(--ember-hi); }
+/* Her autonomous mode (src/49-auto.js): a small tag, top right, out of the
+   way of the gauges and the reticle. */
+#gh-auto {
+  position: absolute; right: 1.4rem; top: 1.2rem;
+  font-size: .56rem; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--ember-hi); padding: .28rem .6rem; border-radius: 3px;
+  border: 1px solid rgba(255, 140, 90, .45); background: rgba(20, 12, 10, .45);
+}
 
 /* And `hidden` has to actually hide. The user-agent rule for [hidden] is
    display:none at zero specificity, so every layout rule in this block — the
