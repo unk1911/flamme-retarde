@@ -322,11 +322,21 @@ def gather(items, origin=(0.0, 0.0, 0.0), base=0):
         mw = ob.matrix_world
         nm = mw.to_3x3().inverted_safe().transposed()
         c8 = tuple(min(255, max(0, int(v * 255 + 0.5))) for v in colour)
+        # An optional per-corner tint, multiplied into the object's colour: a
+        # corner colour attribute named "frcol" (the vikendica's plaster and
+        # ceilings carry one, for a wall that is not one flat value). Nothing
+        # else writes it, so every other bake comes out byte for byte the same.
+        tint = me.color_attributes.get("frcol")
+        tint = tint if tint is not None and tint.domain == "CORNER" else None
 
         for tri in me.loop_triangles:
             for k in range(3):
                 li = tri.loops[k]
                 vi = tri.vertices[k]
+                if tint is not None:
+                    t4 = tint.data[li].color
+                    c8 = tuple(min(255, max(0, int(colour[q] * t4[q] * 255 + 0.5)))
+                               for q in range(3))
                 co = mw @ me.vertices[vi].co
                 cx, cy, cz = co.x - ox, co.y - oy, co.z - oz
                 n = (nm @ (me.loops[li].normal if split
