@@ -8,6 +8,52 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.555.1] — 2026-10-01
+
+### The playground behind the kabine: found, and its ground cleared
+
+Misha: *"at some point, I want to add a playground (there is a real
+playground) behind the kabines ... locate it in pics and clear off the "land"
+for it"*, with the mini golf and the ping pong tables next to it. Nothing is
+built yet. This release finds all three and clears the ground for them. The
+whole reference is `docs/playground-reference.md`.
+
+**Where it is.** Every still, the walks, the pan and the aerial reel were
+contact-sheeted. The playground is only in the aerial (0:08-0:10, 0:15,
+0:44-0:51) and in the background of `1000150353`. It is a fenced pad of blue
+rubber behind the coloured row, with the road and the 60-space car park
+beyond it. On it:
+
+- a tower with a red slide and a long beam (most likely the teeter-totter);
+- a round in-ground trampoline;
+- a two-bay swing frame, one bay likely a nest swing;
+- a spring rider and a dark climbing frame;
+- four benches facing in from the strip behind the kabine;
+- an olive tree.
+
+No frame shows the ping pong or the mini golf. OSM maps both, along with the
+playground: `leisure=playground`, `sport=table_tennis`, and
+`leisure=miniature_golf` as a single node.
+
+**Where it goes.** `GROUNDS` in 43-jadrija.js holds three footprints in the
+shore frame:
+
+- `play` is t 517-533, s 38.4-52.4. It is the OSM size, moved 14 m inland,
+  because the OSM spot is our back row, lane wall, car row and back wall,
+  which the real place does not have.
+- `pong` is the OSM polygon.
+- `golf` is a guess round the node, to be confirmed.
+
+**What was cleared.**
+
+- The headland's pines and bushes on those grounds are gone. They are dropped
+  after their draws (`grove.clear`), so no other tree in the tile moves.
+  46-backlane.js's wrap of `jadrija.grove` now passes `clear` through.
+- Agaves on them are ghosted: every draw is made, nothing is built.
+- The grove floor's tufts and stones, the floor litter and the verge keep off.
+- `play` has a pad of plain limestone gravel.
+
+Census unchanged; people 100; blockers 785; no console errors.
 ## [1.555.0] — 2026-10-01
 
 ### Crabs on the rocks
