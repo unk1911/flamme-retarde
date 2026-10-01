@@ -1356,6 +1356,9 @@ function buildBackLane(scene, jad, city) {
       jad.grove = {
         houses: g0.houses,
         tile: g0.tile,
+        // Passed through: the grounds cleared behind the kabine (`GROUNDS`).
+        // A wrap that lists what it keeps drops whatever it does not list.
+        clear: g0.clear,
         at: (x, z) => {
           if (x < x0 || x > x1 || z < z0 || z > z1) return g0.at(x, z);
           const [t, s] = jad.local(x, z);

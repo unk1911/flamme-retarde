@@ -1706,7 +1706,7 @@ function buildTrees(scene, fire) {
 
       const [lo, hi, wide] = VEG_SIZE[pick];
       const h = lo + rng() * (hi - lo);
-      out[pick].push({
+      const tree = {
         x, y, z,
         h,
         w: h * wide * (0.78 + rng() * 0.44) / ((lo + hi) * 0.5),
@@ -1715,7 +1715,12 @@ function buildTrees(scene, fire) {
         // identical trees reads as a texture rather than as trees.
         tint: 0.80 + rng() * 0.34,
         warm: rng() * 0.16,
-      });
+      };
+      // Ground the resort has cleared to build on (`GROUNDS` in
+      // 43-jadrija.js) — asked only now, with every draw made, so that
+      // dropping this tree leaves every other dart in the tile where it was.
+      if (grove && grove.clear && grove.clear(x, z)) continue;
+      out[pick].push(tree);
       out.n++;
     }
     return out;

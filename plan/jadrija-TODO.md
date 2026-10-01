@@ -1130,7 +1130,11 @@ built yet. Roughly 0:00-1:12 is Jadrija; the rest is Sv. Nikola.
       basin.
 - [ ] **The playground and the pool court behind the coloured row**
       (0:44-0:50): the blue surface, the swings, and how they sit against the
-      kabine and the parking lot.
+      kabine and the parking lot. READ, 1 Oct (1.554.4). The "pool court" is
+      the playground's blue rubber, not a pool. Its kit, its OSM position
+      (with the table tennis and the mini golf beside it) and the ground
+      cleared for it (`GROUNDS`) are in docs/playground-reference.md. It
+      stays open until it is built.
 - [ ] **The promenade apron and the planted squares** at 0:54-0:56: the
       paving layout, the benches, the terraces. These are the frontages that
       STATE OF THE QUEUE says want reading before the apron treatment.

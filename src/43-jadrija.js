@@ -5406,6 +5406,49 @@ async function buildJadrija(scene) {
   }
   const SAN = { t0: 347.4, t1: 357.2, s0: 32.0, s1: 36.6 };
   const TRAMP = { t0: 346.4, t1: 363.6, s0: 44.4, s1: 57.6 };
+  // ── THE GROUND CLEARED FOR THE PLAYGROUND, THE PING PONG AND THE MINI GOLF ──
+  //
+  // Misha, 1 Oct 2026: *"at some point, I want to add a playground (there is
+  // a real playground) behind the kabines ... with a mini golf course and ping
+  // pong tables next to it ... dont actually yet start building them just
+  // maybe locate it in pics and clear off the land for it"*. Nothing is built
+  // on these yet. They are three rectangles that the verge, the floor litter,
+  // the grove floor, the agaves and the headland's pines all keep out of, and
+  // `play` has a pad of the limestone gravel the real one stands in. The
+  // findings, the frames and the equipment lists are docs/playground-reference.md.
+  //
+  // WHERE, and what is a survey fact and what is a placement. OSM maps all
+  // three: `leisure=playground` (way 1188532382), `sport=table_tennis`
+  // (way 1380201148) and `leisure=miniature_golf` (node 12777960802, a point
+  // and not an outline). Run through `local`, the playground is t 500-516,
+  // s 24-38, straight behind the coloured run the aerial shows it behind at
+  // 0:44-0:50 — and in this model that ground is the BACK ROW, the lane wall,
+  // the nose-in car row and the back wall, none of which the real place has
+  // there (it has one row; the second is ours). So `play` keeps the OSM size
+  // and stands in the first clear ground behind all of that: off the back
+  // wall's coping and past the deepest tree the stand behind the rows can
+  // plant (s 38.1), and short of the OSM road it is bounded by in reality,
+  // whose seaward edge is at s 53.3 at t 517. That is t 517-533, s 38.4-52.4,
+  // 16.5 m east and 14 m inland of the OSM polygon. `pong` is the OSM
+  // polygon, padded half a metre: it lands in open wood as it is. `golf` is a
+  // guess round the node — no frame of the course exists — and is the one to
+  // confirm before anything is built on it.
+  //
+  // Rule 4: nothing here is a draw, and everything that keeps out of these
+  // keeps its draws — see the agaves, and `clear` on the grove.
+  const GROUNDS = {
+    play: { t0: 517.0, t1: 533.0, s0: 38.4, s1: 52.4, pad: true },
+    pong: { t0: 544.0, t1: 561.0, s0: 51.0, s1: 59.0 },
+    golf: { t0: 572.0, t1: 596.0, s0: 48.0, s1: 68.0 },
+  };
+  /** Is (t, s) on one of the cleared grounds, or within `m` metres of one? */
+  const inGrounds = (t, s, m = 0) => {
+    for (const k in GROUNDS) {
+      const G = GROUNDS[k];
+      if (t > G.t0 - m && t < G.t1 + m && s > G.s0 - m && s < G.s1 + m) return true;
+    }
+    return false;
+  };
   // The way in, in t, on the seaward side of the fence — the side you arrive
   // from, because everything else at Jadrija is between here and the water.
   // Five bays of the 1.1 m mesh module wide, so nothing has to be drawn in
@@ -29104,7 +29147,9 @@ async function buildJadrija(scene) {
   // A second, shorter ring inside the first is added off `jit`, because
   // eight blades round an empty centre is a starfish and a rosette is packed
   // to the middle.
-  function agave(t, s, y, r) {
+  // `ghost`: make every draw a real one would and build nothing — how an agave
+  // that falls on `GROUNDS` stays out of it without moving anything after it.
+  function agave(t, s, y, r, ghost = false) {
     const ang = rng() * TAU;
     const n = 8;
     const leaves = [];
@@ -29117,6 +29162,7 @@ async function buildJadrija(scene) {
       leaves.push({ a: ang + a, reach: r, rise, mid: rise * (0.80 + 0.35 * arch),
         w: r * 0.15 });
     }
+    if (ghost) return;
     const key = (t * 131 + s * 17) | 0;
     for (let i = 0; i < 5; i++) {
       const a = ang + (i / 5) * TAU + 0.4 + jit(key, 900 + i) * 0.4;
@@ -33787,6 +33833,40 @@ async function buildJadrija(scene) {
       // The turf it all stands on, which is not where `surfaceY` is out here.
       ballPads.push({ t0: PLAY.t0, t1: PLAY.t1, s0: PLAY.s0, s1: PLAY.s1, y: (t, s) => yg(t, s) + 0.04 });
     }
+
+    // ── and the ground cleared for the one behind the kabine (`GROUNDS`) ──
+    //
+    // Not a playground yet: the pad it will stand on, and nothing else. The
+    // aerial (0:44-0:50) has the real one's blue surfacing inside a fence on
+    // a pale apron of the same raked limestone gravel as everything round
+    // the rows, so that is what is laid — and only on `play`. The other two
+    // grounds are cleared and left as the floor they are, because no frame
+    // shows what the table tennis and the golf stand on.
+    //
+    // On `yg`, the higher of the concrete and the hill, for the turf's reason
+    // above, in 2 m cells so it follows the ground. ONE colour: the first cut
+    // gave each cell its own shade off `jit` and a lighter grey, and from
+    // standing height that was a pale chequerboard of paving slabs, which is
+    // a claim about the ground this pad is not making. Warm and a step darker
+    // than the promenade, which is the raked gravel in `_349` under the pines.
+    {
+      const GRAV = [0.470, 0.440, 0.378];
+      b = deck;
+      for (const k in GROUNDS) {
+        const Gd = GROUNDS[k];
+        if (!Gd.pad) continue;
+        const nT = Math.max(1, Math.round((Gd.t1 - Gd.t0) / 2));
+        const nS = Math.max(1, Math.round((Gd.s1 - Gd.s0) / 2));
+        for (let i = 0; i < nT; i++) {
+          const ta = Gd.t0 + (Gd.t1 - Gd.t0) * (i / nT), tb2 = Gd.t0 + (Gd.t1 - Gd.t0) * ((i + 1) / nT);
+          for (let j = 0; j < nS; j++) {
+            const sa = Gd.s0 + (Gd.s1 - Gd.s0) * (j / nS), sb = Gd.s0 + (Gd.s1 - Gd.s0) * ((j + 1) / nS);
+            b.quad(W(ta, sa, yg(ta, sa) + 0.05), W(tb2, sa, yg(tb2, sa) + 0.05),
+              W(tb2, sb, yg(tb2, sb) + 0.05), W(ta, sb, yg(ta, sb) + 0.05), GRAV);
+          }
+        }
+      }
+    }
     b = back8;
   }
 
@@ -35007,7 +35087,7 @@ async function buildJadrija(scene) {
         const a2 = jit(i, 311 + k) * TAU;
         const r = 1.4 + jit(i, 331 + k) * 2.0;
         const t = gt + Math.cos(a2) * r, ss = gs + Math.sin(a2) * r;
-        if (underHammock(t, ss)) continue;
+        if (underHammock(t, ss) || inGrounds(t, ss, 0.6)) continue;
         const w = jit(i, 351 + k);
         if (w < 0.34) {
           // Limestone. Wider than it is tall — this is bedrock showing, not a
@@ -35035,7 +35115,7 @@ async function buildJadrija(scene) {
         const a2 = jit(i, 431 + k) * TAU;
         const r = 0.9 + jit(i, 451 + k) * 3.6;
         const t = gt + Math.cos(a2) * r, ss = gs + Math.sin(a2) * r;
-        if (underHammock(t, ss)) continue;
+        if (underHammock(t, ss) || inGrounds(t, ss, 0.3)) continue;
         const q = jit(i, 471 + k);
         if (q < 0.22) {
           const rr = 0.07 + jit(i, 491 + k) * 0.10;
@@ -36910,7 +36990,9 @@ async function buildJadrija(scene) {
   for (let t = 4; t < LEN - 4; t += 3.2 + rng() * 6) {
     if (!clearOfShops(t)) continue;
     const s = JAD.back + 1.5 + rng() * 7;
-    agave(t, s, surfaceY(t, s), 0.55 + rng() * 0.55);
+    // Not on the playground's ground (`GROUNDS`): its leaves reach 1.1 m, so
+    // that far off it too. Ghosted rather than skipped, which is rule 4.
+    agave(t, s, surfaceY(t, s), 0.55 + rng() * 0.55, inGrounds(t, s, 1.1));
   }
 
   // ── what is in the kabina ──────────────────────────────────────────────────
@@ -40066,6 +40148,18 @@ async function buildJadrija(scene) {
       }
     }
 
+    // And the world box round `GROUNDS`, so `clear` rejects almost every tree
+    // on the headland with four compares before `local` runs.
+    let gx0 = Infinity, gx1 = -Infinity, gz0 = Infinity, gz1 = -Infinity;
+    for (const k in GROUNDS) {
+      const Gd = GROUNDS[k];
+      for (const [tt, ss] of [[Gd.t0, Gd.s0], [Gd.t1, Gd.s0], [Gd.t0, Gd.s1], [Gd.t1, Gd.s1]]) {
+        const w = toWorld(tt, ss);
+        gx0 = Math.min(gx0, w[0] - 3); gx1 = Math.max(gx1, w[0] + 3);
+        gz0 = Math.min(gz0, w[2] - 3); gz1 = Math.max(gz1, w[2] + 3);
+      }
+    }
+
     // The two mixes, and they are read off the footage rather than invented.
     // Near the water and through the village it is pine and almost nothing
     // else — bare orange floor, trunks you see the sea through, no undergrowth
@@ -40103,6 +40197,23 @@ async function buildJadrija(scene) {
         if (inField(x, z, 4)) return null;
         if (built(x, z)) return null;
         return sv > 180 ? NECK : WOOD;
+      },
+      /**
+       * Is (x, z) on ground cleared for the playground (`GROUNDS`)?
+       *
+       * Asked by 45-trees.js AFTER a tree has made all of its draws, and not
+       * folded into `at` the way the anchor's `NOTHING` is: a dart `at` turns
+       * away skips the five draws a planted tree makes, which moves every
+       * dart after it in the tile, and the grounds are big enough that this
+       * would re-deal the whole wood round them. A tree dropped here costs
+       * the tile exactly that tree. A trunk within 0.4 m of the edge goes
+       * too; one further out stays, and its crown can hang over — the real
+       * playground is shaded from its edges.
+       */
+      clear: (x, z) => {
+        if (x < gx0 || x > gx1 || z < gz0 || z > gz1) return false;
+        const [t, sv] = local(x, z);
+        return inGrounds(t, sv, 0.4);
       },
     };
   })();
@@ -40792,6 +40903,8 @@ async function buildJadrija(scene) {
         // The tarmac apron, and the back lane: made ground.
         if (t > 212 && t < LEN - 12 && s > WALL.s + 1.4 && s < WALL.s + 5.4) return null;
         if (t > 212 && t < 342 && s > 36.2 && s < 40.6) return null;
+        // And the ground cleared for the playground and its neighbours.
+        if (inGrounds(t, s, 0.2)) return null;
         if (blocked(t, s) || onRoad(x, z)) return null;
         return floorY(t, s);
       },
@@ -40997,6 +41110,14 @@ async function buildJadrija(scene) {
       // and its frame is the shore's shifted and with s turned round
       // (`toHouse` in 44-vikendica.js): x = t - VIK.t, z = VIK.s - s.
       if (vik) rectTS(VIK.t - 5.2, VIK.t + 6.2, VIK.s - 7.6, VIK.s + 5.6, MADE);
+      // The cleared grounds (`GROUNDS`). The playground's has its gravel pad
+      // and is made ground like the compounds; the other two are bare floor
+      // with nothing on it yet, which is what KEEP is: clear, and not an
+      // edge for the verge to crowd.
+      for (const k in GROUNDS) {
+        const Gd = GROUNDS[k];
+        rectTS(Gd.t0 - 0.2, Gd.t1 + 0.2, Gd.s0 - 0.2, Gd.s1 + 0.2, Gd.pad ? MADE : KEEP);
+      }
       // WALL: every walk blocker, turned by its own `rot` in the shore frame.
       for (const bk of blockers) {
         if (!(bk.a > 0) || !(bk.c > 0)) continue;
