@@ -12,7 +12,9 @@ Reference for the builds Misha asked for on 1 Oct 2026:
 > later implement games of ping pong and mini golf to compete against baye
 
 This file covers what the footage shows, where the three things are in the
-game, and what was cleared (1.554.4). Nothing has been built on them yet.
+game, and what was cleared (1.554.4). Both playgrounds and the ping pong were
+built on that ground in 1.556.0: see **What was built** at the end. The mini
+golf is held.
 
 ## What was looked at
 
@@ -288,3 +290,97 @@ main checkout's `refs/playground/` to keep them.
 3. Are the ping pong tables concrete or steel, and how many?
 4. Is moving the playground 14 m inland of where it really is fine? It sits
    behind our back row and car row, which the real place does not have.
+
+## What was built (1.556.0)
+
+Misha, after reading this: *"there are sort of 2 playgrounds, the option A (the
+older one) and option B (newer fenced one): can u do both? the mini-golf maybe
+hold onto it. ... the ping pong is sort of next to the playground somewhere,
+maybe can build that out too."* That answers open questions 1 and 4: both,
+and B stays where `play` put it.
+
+Code: `src/46-playground.js` (everything below except the benches and the
+olive), hooked from `src/90-app.js` after the back lane. The benches and the
+olive are the resort's own (`parkBench`, `olive`) and are drawn in
+`src/43-jadrija.js` next to the `play` gravel pad. `parkBench` gained an angle
+and a ground height; `olive` gained an angle that skips its one `rng()` draw.
+`jadrija.grounds` exposes `GROUNDS`.
+
+### B, the fenced one, on `play`
+
+| | t | s | notes |
+|---|---|---|---|
+| fence | 517.4-532.6 | 40.2-52.0 | round posts, 2D mesh, gate t 518.05-519.15 on the seaward run |
+| rubber | 517.7-532.3 | 40.5-51.7 | corners r 2.6, 3 cm over the gravel pad, rolled edge |
+| board | 520.3 | 39.9 | outside the fence, facing the sea side |
+| tower | 521.6 | 45.6 | deck 1.25, roof to 3.04, ladder west, slide east to ~524.8, 43.3 |
+| seesaw | 520.0 | 49.9 | 4 m beam along t, pivot 0.58, rests on its west end |
+| trampolines | 519.6 and 527.0 | 43.0 | bed r 0.60, rim to r 0.80 |
+| swing frame | A-frames 524.4, 527.6, 530.8 | 48.0 | beam 2.45; nest at 526.0, seats 528.6 and 529.8 |
+| spring rider | 523.0 | 50.6 | a red horse on a green coil |
+| climbing frame | 531.25 | 50.6 | 1.4 m cube, 2.1 high, black |
+| benches | 522.2, 525.6, 529.0, 531.95 | 39.35 | `parkBench`, facing in |
+| olive | 529.6 | 42.5 | `olive`, 4.4 m |
+| saplings | 518.5, 525.9, 528.7 / 523.5, 532.0 | 51.5 / 40.8-41.1 | staked |
+
+### A, the old open one, on `shore` (new in `GROUNDS`)
+
+`shore` is t 371.5-395, s 20.6-28: the open gravel at the alley's west mouth.
+The boat-mural wall (`brodWall`) is the back of the first front-row run,
+t 395.5-416, so this is "just past the end of the mural wall, with the sea
+beyond", which is `1000150350`. It is cleared like `pong` (verge, litter,
+agaves, tile trees), with no pad.
+
+| | t | s | notes |
+|---|---|---|---|
+| orange frame | 376.8-381.0 | 25.6 | bar along t, 2.4 high; gooseneck east to ~382.2; ladder at 378.45; seats 377.5 and 379.8 |
+| navy swing | 387.5 | 22.25-25.75 | beam along s, legs splayed in t, rocket crests, seats 23.45 and 24.55 |
+| yellow frame | 393.2 | 21.95-24.05 | ladder leg inland, gooseneck seaward to ~20.8, knotted rope |
+
+### The ping pong, on `pong`
+
+Two concrete tables, t 548.5 and 556.5, s 55.0, long axis along t: a
+2.74 x 1.525 top at 0.76 on two cast slabs, white lines, a perforated steel
+net, each on a grit bed in a precast kerb. **Assumption:** concrete, two
+tables. No frame shows them (open question 3).
+
+### What moves, for the AVBD pass
+
+Each is its own mesh in an outer group at the hinge (local x = hinge axis,
+y = up), turning about x by `mesh.rotation.x`:
+
+- seats: 2 on B, 2 orange, 2 navy (chains + seat, pivot on the beam);
+- the nest (four chains to two swivels, one pivot);
+- the yellow frame's rope (pivot at the gooseneck ring);
+- the seesaw beam (pivot on the fulcrum axle; rests at -asin(0.45 / 2.0));
+- two trampoline beds (a unit dent profile, depth in `mesh.scale.y`);
+- the spring rider (pivot at the spring's foot).
+
+Until AVBD: `tick` in the file. Pendulums g/L with light damping and a slow
+breeze; the hose (`ground.aimAt()`) pushes a seat along the line from you to
+where the water lands, and a bed or the rider wherever it lands; walking into a
+seat shoves it. `__fr.play.list()`, `.push(i, v)`, `.jet(x, y, z, secs)`,
+`.stats()`.
+
+Two limits for that pass:
+
+- A bed dents 3.5 cm at most, because the resort's gravel pad under it would
+  cover a deeper dent. Cut a hole in `play`'s pad under each trampoline first.
+- `walkY` does not know the beds or the rubber's 3 cm.
+
+### Measured
+
+- Blockers 785 -> 816: 27 from this file (fence runs, tower, slide, A-frames,
+  seesaw, rider, climber, saplings, the olive's trunk, board, the three shore
+  frames, two tables) and 4 benches. None overlaps an existing blocker.
+- Triangles: 26.9k static, 13.5k saplings, 12.5k in the twelve moving parts,
+  plus the olive (about 7.5k, per `olive`'s note) and the benches in the
+  resort's buffers. 16 draw calls.
+- Census 446/333/86/27 unchanged, people 100, nobody stands on any of the three
+  sites, no console errors.
+
+Composites (gitignored, main checkout `refs/playground/`): `comp_B_drone.png`,
+`comp_B_eye.png`, `comp_A_349.png`, `comp_A_350.png`, `comp_pong.png`,
+`comp_top.png`. From the sea side, the stand of pines between the back row and
+the back wall hides B from a drone's height. That stand is planted off `rng()`
+and was left alone.

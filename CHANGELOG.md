@@ -8,6 +8,63 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.556.0] — 2026-10-01
+
+### Both playgrounds and the ping pong, built
+
+Misha: *"there are sort of 2 playgrounds, the option A (the older one) and
+option B (newer fenced one): can u do both? the mini-golf maybe hold onto it.
+... the ping pong is sort of next to the playground somewhere, maybe can build
+that out too."* All three now stand on the ground 1.555.1 cleared. New file
+`src/46-playground.js`; the benches and the olive are the resort's own and are
+drawn in 43-jadrija.js. The mini golf is held, as asked.
+
+**B, the fenced one** (`GROUNDS.play`, t 517-533, s 38.4-52.4), off the
+aerial at 0:46/0:48/0:49:
+
+- a pad of blue poured rubber with 2.6 m rounded corners and a rolled edge,
+  laid on the resort's gravel pad, mottled and worn paler where feet land, with
+  the granule speckle in its shader up close (faded by 6 m, so it never
+  shimmers);
+- a green 2D welded-mesh fence on round posts, the gate at the west end of the
+  seaward run, standing open, and the green information board beside it;
+- a red tower: deck at 1.25 m, yellow panels with portholes, an eight-panel
+  red and yellow roof, a ladder up the west face, and a red slide lofted as a
+  U-channel that curves off the east face toward the sea side;
+- a 4 m teeter-totter on its fulcrum with seats, T-handles and a tyre under
+  each end, resting on one end;
+- two round in-ground trampolines with red padded rims;
+- a two-bay swing frame on three A-frames (the east one red): a nest swing on
+  four chains in one bay, two flat seats in the other;
+- a red spring rider and a black climbing frame by the inland fence;
+- four municipal benches facing in from the strip behind the kabine, the olive
+  in the seaward-east quarter, and five staked saplings along the fence.
+
+**A, the old open one** (`GROUNDS.shore`, new, t 371.5-395, s 20.6-28), on
+the alley's own gravel at its west mouth, just past the end of the boat-mural
+wall, which is where `1000150350` has it:
+
+- the orange welded frame from `1000150349`: two seats on chains, a vertical
+  ladder between them, a gooseneck with a ring;
+- the navy A-frame swing with its grey beam and a red rocket crest at each end;
+- the yellow frame from the pan at 0:43, with the ladder as one leg and a
+  knotted rope off its gooseneck.
+
+**The ping pong** (`GROUNDS.pong`): two concrete tables end to end with
+perforated steel nets and white lines, each on a bed of limestone grit in a
+precast kerb. No frame shows them; concrete and two tables is an assumption.
+
+**Physics-ready.** All twelve things that move are their own meshes on their
+own hinges: seven seats, the nest, the rope, the seesaw beam, two trampoline
+beds and the spring rider. Until the AVBD pass they are damped pendulums and
+springs: they sway a little in the breeze, the hose pushes them, and walking
+into a seat shoves it. Read and drive them with `__fr.play`.
+
+Blockers 785 -> 816 (27 here, 4 benches). This file: 26.9k triangles static,
+13.5k of saplings, 12.5k moving, plus the olive and the benches in the
+resort's buffers. Census unchanged at 446/333/86/27; people 100; no console
+errors.
+
 ## [1.555.1] — 2026-10-01
 
 ### The playground behind the kabine: found, and its ground cleared

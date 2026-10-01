@@ -5436,10 +5436,22 @@ async function buildJadrija(scene) {
   //
   // Rule 4: nothing here is a draw, and everything that keeps out of these
   // keeps its draws — see the agaves, and `clear` on the grove.
+  //
+  // `shore` (1.556.0) is the OTHER playground, the older unfenced one:
+  // `1000150349`/`_350` and the pan at 0:43 film an orange swing with a
+  // ladder, a navy swing and a yellow rope frame on bare gravel between the
+  // rows, and `_350` has the yellow frame standing just past the end of the
+  // boat-mural wall with the sea beyond it. In this model that wall is the
+  // back of the first front-row run (`brodWall`, t 395.5-416), so the set
+  // stands in the open gravel at the alley's west mouth, t 371-395 — short of
+  // the stand's deepest trunk at s 28.3. Cleared like the others, no pad:
+  // it is on the alley's own gravel, which is what the photographs show.
+  // What stands on `play`, `shore` and `pong` is src/46-playground.js.
   const GROUNDS = {
     play: { t0: 517.0, t1: 533.0, s0: 38.4, s1: 52.4, pad: true },
     pong: { t0: 544.0, t1: 561.0, s0: 51.0, s1: 59.0 },
     golf: { t0: 572.0, t1: 596.0, s0: 48.0, s1: 68.0 },
+    shore: { t0: 371.5, t1: 395.0, s0: 20.6, s1: 28.0 },
   };
   /** Is (t, s) on one of the cleared grounds, or within `m` metres of one? */
   const inGrounds = (t, s, m = 0) => {
@@ -22870,12 +22882,15 @@ async function buildJadrija(scene) {
    * bar low at the back. The same 1.40 m by 0.50, the seat still 0.47 at its
    * front and the back still 0.92, the same collider.
    */
-  function parkBench(bt2, bs2) {
-    const gy2 = surfaceY(bt2, bs2);
+  // `ang` turns it in the shore frame (0 faces the sea, PI faces inland) and
+  // `gy` stands it on something other than `surfaceY` — both for the four
+  // round the playground (1.556.0), which face in and stand on its pad.
+  function parkBench(bt2, bs2, ang = 0, gy = null) {
+    const gy2 = gy ?? surfaceY(bt2, bs2);
     const IRONG = [0.075, 0.185, 0.115];
     const SLAT2 = [0.235, 0.390, 0.230];
     const BOLT = shade(IRONG, 1.12);
-    const F = bkFrame(bt2, bs2);
+    const F = bkFrame(bt2, bs2, ang);
     const key = bt2 * 3.71 + bs2 * 1.93;
     const uE = 0.62, RB = [0.020, 0.027];
     // The seat: five 62 mm slats, 12 mm apart, falling 20 mm to the back.
@@ -28708,11 +28723,13 @@ async function buildJadrija(scene) {
    * the twigs, and per cluster a shell and two discs — all in one buffer,
    * `olives`: see the CHANGELOG for 1.537.1 for what that costs.
    */
-  function olive(t, s, y, h) {
+  function olive(t, s, y, h, ang = null) {
     // Into `olives`, and put back on the way out.
     const bWas = b;
     b = olives;
-    const P = facing(t, s, rng() * TAU);
+    // `ang` given means NO draw: the playground's olive (1.556.0) is planted
+    // after the stand and must not take a number from it. See rule 4.
+    const P = facing(t, s, ang ?? rng() * TAU);
     const key = pineKey(t, s);
     let nj = 0;
     const J = () => jit(key, 6000 + nj++);
@@ -33866,6 +33883,25 @@ async function buildJadrija(scene) {
           }
         }
       }
+    }
+    // ── and the two things on `play` that are the resort's own (1.556.0) ──
+    //
+    // The four benches and the olive in the aerial at 0:46. Built here and not
+    // in src/46-playground.js because they ARE the resort's: `parkBench` is
+    // the municipal pattern the strip behind the huts already has four of, and
+    // `olive` is the stand's own tree, and both bake into buffers that are
+    // closed by the time that file runs. The benches stand on the gravel
+    // strip between the back wall and the fence, turned to face in; the olive
+    // stands in the pad's seaward-east quarter, where the aerial has it. No
+    // draw is taken by either — `parkBench` never drew, and `olive` with an
+    // angle skips its one. The rest of the playground is src/46-playground.js.
+    {
+      const G = GROUNDS.play;
+      b = up;
+      for (const bt of [522.2, 525.6, 529.0, 531.95]) {
+        parkBench(bt, G.s0 + 0.95, Math.PI, yg(bt, G.s0 + 0.95) + 0.05);
+      }
+      olive(529.6, 42.5, yg(529.6, 42.5) + 0.07, 4.4, 1.1);
     }
     b = back8;
   }
@@ -73550,6 +73586,8 @@ async function buildJadrija(scene) {
     },
     /** What grows on this headland — see the note over GROVE. Read by 45-trees.js. */
     grove,
+    /** The cleared grounds, (t, s) boxes — read by src/46-playground.js. */
+    grounds: GROUNDS,
     /**
      * Where you are a person rather than a clearance. See `GROUND.tight` — this
      * is the only locale in the game with an inside to be inside of.
