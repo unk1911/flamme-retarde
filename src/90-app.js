@@ -11764,6 +11764,14 @@ window.__fr = {
     wrap: () => clipWrapCheck(),
     /** Paint the terminal into any 2-D context — for timing it. */
     mirror: (ctx, k) => crtMirror(ctx, k),
+    /** What painting the overlays has cost this take — see `clipOverlays`. */
+    cost: () => clipCost(),
+    /** The clean plate: `clean(true)` films no overlays but the terminal,
+     *  as `?cleanrec` does. With nothing, says which it is. */
+    clean: (v) => { if (v != null) { clipClean = !!v; clipSprites.clear(); } return clipClean; },
+    /** Something to film: a toast, and a subtitle with a gloss under it. */
+    toast: (msg, kind) => { toast(msg, kind); return true; },
+    sub: (text, secs = 3, gloss = '') => { voice.sub(text, secs, gloss); return true; },
   },
   skipIntro: () => beginFlight(),
   /**
