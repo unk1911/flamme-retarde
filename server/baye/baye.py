@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.50.0"
+VERSION = "1.50.1"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4241,6 +4241,15 @@ SHORE_DOING = {
     # 1.555.2: the playground behind the kabine — see MEET in 43-jadrija.js.
     "toGrounds": "walking round behind the kabine to the playground to meet them",
     "grounds": "at the playground behind the kabine with them",
+    # 1.559.1: standing with them off the promenade, where they asked you
+    # something — beside the hammock, at the playground, on the way back —
+    # rather than walking home to do it. See SPOT in 43-jadrija.js.
+    "here": "standing with them away from the promenade, right where you "
+            "were — beside the hammock in the pines, or on the way somewhere",
+    # And the way on to the cot (1.559.1): to its side, then sat on the edge
+    # and lying back — see COT_IN in 43-jadrija.js.
+    "cotGo": "going over to the cot in the beach hut to get on it",
+    "cotIn": "sitting down on the edge of the cot and lying back on to it",
 }
 # THE SAME BEAT, ON THE MATTRESS. `kept`, `cradle`, `situp` and `recline` are
 # the hose's floor poses in `SHORE_DOING` — soaked, on the boards — and the

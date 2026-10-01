@@ -8,6 +8,165 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.559.1] — 2026-10-01 (baye 1.50.1)
+
+### Done where she is: no walk home for her hair, and on to the cot like a person
+
+Misha: *"after i tell baye to go to the hammock, she arrives, then i say 'hair
+down', she says "yeah i'm letting it down now", and for some reason begins
+walking all the way back to the kabine.... but why can't she just let hair
+down right there on the spot ... i think there may be other instances like
+that too"*. And, about the kabina: *"say i tell her 'lie on the cot', instead
+of directly doing that, she first performs a 'kneel', then sorta does this
+"hover fly" into the bed and lies down ... or sometimes i say 'lotus', and
+she first will shuffle through like 2 or 3 different poses until finally
+folding into lotus"*.
+
+**Why she walked home, measured.** "Hair down" in the hammock was 25.6 m of
+walking, then the hair. Three rules all said "anything you ask out here is
+done on her lane":
+
+- `hamHeld` got her out for anything not in HAM_KEEP (her eyes, her mouth, a
+  yawn, petting). `hamHome` then walked her down the cut, and `hamBack` is not
+  ASKABLE, so the ask waited for the lane.
+- `grounds` and `toGrounds` sent everything outside GROUNDS_OK (six numbers)
+  home the same way. `hamGo` dropped the trip for `play`.
+- Underneath both: every number ends in `showNext` → `play`, and `play` moves
+  her with `showMove`, which CLAMPS to the lane. So a number finished off the
+  lane put her back on it in one frame. MEASURED before: a kiss asked in the
+  hammock walked her to you, then jumped her **14.43 m** to the promenade in
+  one sample.
+- `rise` out of doors went to `leave`, which walks to the kabina's door. So
+  "get up" on all fours on the promenade walked her to the kabina.
+
+**What is done where now.** Asks are split by what they need (SPOT):
+
+- **Where she stands (SPOT):** hair down/up, the shimmy, the bend, the heart,
+  the card, a kiss, a hug, a handover, a somersault, cartwheels.
+- **In the hammock (HAM_IN):** her hair and what she has on. In `hamLie` her
+  hands are already at her nape, so the band comes out where they are. The
+  swap lands 0.9 s in.
+- **Gone to straight from wherever she is (HERE_GO):** the hammock, the
+  playground, the collar. Each has a way there from anywhere (`hamPath`).
+- **Still her lane or the room:** the wine, the plate, the cot poses, the
+  kneel, the handstand, swimming, the trampolines, the ladder (ballet), the
+  counters, the recons. Each needs a prop or a place, and the lane is the way
+  to all of them.
+- **Off her lane she has a standing state, `here`.** `show.here` remembers
+  what she was doing when you asked. When the number ends she goes back to it:
+  into the hammock again, on to the grounds, or on home.
+- She stays with you, faces you, and follows you by a way through if you
+  wander more than 6 m. She goes home if you go 16 m off for 5 s, into the
+  kabina, or after 4 minutes.
+- Asked out of the hammock ("get out"), or after falling out of it, she
+  stands with you rather than walking home.
+- **Room for it** (`hereRoom`, off the lane only). A dance wants 0.45 m clear
+  where she stands. A somersault wants a 2.6 m run and the wheels 6.8 m, along
+  a heading she turns to first. The search is her spot, then rings out to
+  2.5 m. It counts the hammock's cloth at its real 1.30 m width, the back wall
+  and you. With no room it says "there is no room for that where she is".
+- Back into the hammock only once the cloth is still (it is hushed as she
+  steps out).
+- **`doff:` anywhere.** It said "in the kabina" because the Lovense goes back
+  on the tabouret. Out of doors it goes to you, as the cuffs and headphones
+  always did.
+- **The playground gate.** A kiss or a handover there walked straight at you
+  and stood pinned against a gate leaf for 15 s (0.00 m moved, before and
+  after the change above). Off the lane `toYou` now takes `hamPath`, passing
+  each corner at 0.4 m rather than the promenade's 2.4 m.
+- The ears panel says where: "taking her hair out of the tail, in the
+  hammock" / "…, right where she is" (`askWhere`).
+
+| ask | context | before (1.559.0) | after |
+|---|---|---|---|
+| hair down | hammock | out, walk 25 m to lane, hair there | in the hammock; travel 0.6 m (the swing) |
+| shimmy / heart / twerk | hammock | out, home, dance on the lane (25.6 m) | out, dance on the mark (or ≤0.6 m off), back in |
+| kiss | hammock | out, kiss, **14.4 m jump** to the lane | out, to you, kiss, back in (4.1 m) |
+| cartwheels | hammock | out, home, wheels on the lane | out, step to a clear run, 3 wheels, back in |
+| get out | hammock | home down the cut | stands with you; follows you if you go |
+| doff (headphones) | hammock | refused: "in the kabina" | off in the hammock |
+| hair down | playground | walked home (30.2 m), hair there | on the spot, 0 m |
+| somersault / heart | playground | home (31.4 m) / on the spot | step ≤1.2 m, done, stays |
+| kiss / handover | playground (gate) | pinned 15 s, nothing | round by the gate, done |
+| doff | playground | refused | on the spot |
+| twerk | on the way to the playground | home first (29.9 m) | stops, twerks, goes on |
+| hair down | walking home from the hammock | at the lane | where she is, then on home |
+| hair down | promenade, far from her spot | on the spot | unchanged |
+| hair / shimmy | kabina | on the spot | unchanged |
+| hair up | on the cot | sit-up, rise, hair | unchanged |
+| hair down | swimming | waits until she is out | unchanged |
+| hair down | on the leash | "on the leash" | unchanged |
+| collar | beside the hammock | walked to the lane then back (14.8 m) | from where she stands (3.2 m) |
+
+**The cot.** Every way on to the mattress was the hose's way on to the floor.
+From standing: `submit` (a kneel), then `recline`, a FLOOR clip from a kneel
+to her back. Meanwhile `lieDown` slid her up to 4.2 m across the room and
+lifted her 0.44 m on to the mattress: the hover. MEASURED before: she knelt
+where she stood, at (424.3, 18.6), and arrived lying on a cot 4.2 m away.
+Anything asked on the cot that was not the cradle went `situp` → `kept` →
+`recline` → `cradle` → the pose: off the bed and on again, through the same
+hover.
+
+- **On to it like a bed** (COT_IN). She walks to a mark 0.60 m off the cot's
+  middle on the room side and turns her back to it. Then `hamIn` plays: sit on
+  the edge, lean back, swing the legs up and round, lie back. It was baked for
+  the hammock against a seat 0.45 m up, and the mattress is 0.44 m up.
+- Where she is going decides where the clip is cut:
+  - lying down: at its end;
+  - `sit` / `lotus` / `perch`: half way round (2.45 s), into that clip's own
+    SIT key (2.30 s);
+  - her front over the edge: sat on the edge (1.55 s), lying back across it.
+- **The hand-over** (`cotHand`): the pose she is in is held exactly where it
+  is in the world while she is put on the mattress. The root is re-expressed
+  in the new frame through `fig.manual` and eased into the clip over 0.7 s.
+  Nothing jumps.
+- **Already on it:** another pose goes by the cradle where she lies. From her
+  front or a side that is the roll she came in by, backwards (`turn`'s road).
+  Between the sitting poses it goes through SIT. From her knees or the floor
+  she gets up first, then on.
+- A bare "lie down" picks bed or floor once, before any get-up, so the choice
+  survives one.
+- The floor's own way down (kneel, then back) is unchanged.
+
+| ask | from | before: phases, s to the pose | after: phases, s |
+|---|---|---|---|
+| lie on the cot | standing | submit → kept → recline (hover from 4.2 m) → cradle | cotGo → cotIn → cradle, 8.3 (4.8 of it the walk) |
+| lotus | standing | submit → kept → recline → cradle → lotus, 7.3 | cotGo → cotIn → lotus, 8.3 |
+| lotus | sitting (sitHeld) | situp → kept → recline → lotus, 8.0 | lotus, 1.0 |
+| lotus | on her front | situp → kept → recline → lotus, 8.0 | unroll → cradle → lotus, 5.3 |
+| sit up | lotus | situp → kept → recline → cradle → sit, 7.0 | sitHeld (0.9 s fade) |
+| on her front | standing | submit → kept → recline → cradle → flat, 5.9 | cotGo → cotIn → cradle → flat, 10.2 |
+| front, legs off the edge | standing | submit → kept → recline → cradle → flatEdge, 6.6 | cotGo → cotIn (sat on the edge) → cradle → flatEdge, 9.0 |
+| lie on the cot | kneeling | recline with the hover, 2.3 | rise → cotGo → cotIn → cradle, 7.8 |
+| left side | on her front | crossfade front to side through her body, 0.05 | unroll → sideL, 2.0 |
+| perch | cradle | perch, 3.4 | unchanged |
+
+From standing it is slower, because she walks the 4 m she used to hover.
+Everything already on the bed is faster and has fewer poses.
+
+- Frame strip of "lie on the cot" from standing, before over after:
+  `strip_cot_bed_before_after.png`.
+- Probes: `__fr.jad.raw().here(name, r)` returns `show.here`, off-lane,
+  `hereRoom(name)`, blockers within `r`, `toYou`'s legs, her game clock, and
+  the cot (`cot`, `edge`, `spot`, `mark`, `ease`).
+- The voice service is 1.50.1. `SHORE_DOING` has `here`, `cotGo` and
+  `cotIn`, so she knows where she is in them. **It needs deploying** for
+  those lines (nothing breaks without it; she is told nothing in those three
+  phases).
+
+**Found, not changed (ask):**
+
+- Swimming ends in `play` with her 7.7 m seaward of the lane, and the clamp
+  snaps her on to it in one frame. Same mechanism, not an ask. `offBar` is
+  the fix's shape.
+- Asked 'flat.edge' while already lying along the bed, she gets off and on
+  again across it (was: the hover).
+
+RULE 4: no `rng()` draw added, removed or moved. People 100, blockers 820.
+Regression: kabina (hair, shimmy, cot and up), collar from beside the hammock
+and leading, swim, hammock in/out and follow, playground meet, promenade
+routine. No console errors.
+
 ## [1.559.0] — 2026-10-01
 
 ### The vikendica's furniture, at the resolution of the room you stand in
