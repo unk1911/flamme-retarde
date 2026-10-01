@@ -152,6 +152,32 @@ FIGURES = {
         'delete': 'suit',
         'clips': ['idle', 'walk', 'ballet'],
     },
+    # Baye v2.0 dressed for the swim out to the skakaonica (the R race, src/
+    # 61-chase.js). Misha, 1 Oct 2026: *"she should wear a bikini and her hair
+    # should be neatly tied"*.
+    #
+    # GARMENTS ONLY — no body, no face, no clips. She IS `baye2`: the race
+    # loads `baye2.fr3d.gz` a second time for her body, face and all forty-nine
+    # clips, and hangs these two parts on it at runtime, skinned off that
+    # body's own bone palette (same `armature()`, same rest — checked at load).
+    # A whole figure for two garments was ~650 KB of a body the page already
+    # carries; this is the garments and nothing else.
+    #
+    #   the bun    `rehmanpolanski_hair_bun_brown` (CC0) — the Bucketeer's bun,
+    #              and at runtime the Bucketeer's map (`bucketeer2_hair`), dyed
+    #              Baye's own brown rather than blonde. No second copy.
+    #   the suit   `mindfront_bikini_01` (CC-BY 4.0, Mindfront): a modelled
+    #              two-piece, fitted through its `.mhclo` like everything else.
+    #              Its `delete_verts` cannot take the body out from under it
+    #              here — the body is a different blob — so tools/baye2_tex.py
+    #              rasterises them into a UV mask (`bayeswim_mask`) and the body
+    #              discards those fragments instead. Same cut, other side.
+    'bayeswim': {
+        'body': 'build/mh_base.obj',
+        'wear': {'hair': 'rehmanpolanski_hair_bun_brown',
+                 'suit': 'mindfront_bikini_01'},
+        'wearOnly': True,
+    },
 }
 # `tools/baye2_tex.py` carries the same table; if they ever disagree the
 # figure is wearing one asset's geometry under another's texture, which on a
@@ -639,7 +665,7 @@ def main():
         gone = read_delete(next(iter(sorted(dd.glob('*.mhclo')))))
         print('[%s] %d body verts under the %s' % (name, len(gone), spec['delete']))
     buf = Buf()
-    for part, groups in BASE_PARTS.items():
+    for part, groups in ({} if spec.get('wearOnly') else BASE_PARTS).items():
         fs = faces
         if gone and part == 'body':
             fs = {g: [f for f in faces.get(g, []) if not all(vi in gone for vi, _t in f)]
@@ -689,16 +715,18 @@ def main():
     # The floor passes solve the hip heights the clips below are authored
     # against, and several of the clip lists are EMPTY until they run. Baking
     # before them is baking nothing.
-    H.wheel_floor(rig)
-    H.dance_floor(rig)
-    H.skip_floor(rig)
-    H.walk_floor(rig)
-    H.fire_floor(rig)
-    H.ballet_floor(rig)
-    H.wine_floor(rig)
+    if not spec.get('wearOnly'):
+        H.wheel_floor(rig)
+        H.dance_floor(rig)
+        H.skip_floor(rig)
+        H.walk_floor(rig)
+        H.fire_floor(rig)
+        H.ballet_floor(rig)
+        H.wine_floor(rig)
     keep = spec.get('clips')
-    baked = [H._bake_clip(rest, c) for c in H.CLIPS
-             if not keep or c['name'] in keep]
+    # A garments-only blob rides another figure's palette and plays nothing.
+    baked = [] if spec.get('wearOnly') else [H._bake_clip(rest, c) for c in H.CLIPS
+                                             if not keep or c['name'] in keep]
 
     write_blob(buf, rest, baked, OUT / ('%s.fr3d.gz' % name), name)
     bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'build' / ('%s.blend' % name)))

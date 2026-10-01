@@ -8,6 +8,111 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.557.0] — 2026-10-01
+
+### The R race: Baye v2.0, all the way to the ladder, up it, and off the board
+
+Misha: *"for the 'R' swim sequence, can u replace the old v1.0 baye with the
+latest v2.0 baye? ... she still swims half way to the trampuline, erroneously
+thinking she is done, but really she should swim all the way to the real
+location of the trampouline, and once she reaches it ... she should go up the
+trampoline, just like our diver, and execute a beautiful jump ... pick from a
+repertoire of like 4-6 different jumps ... she should wear a bikini and her
+hair should be neatly tied.. maybe u can add cute goggles to her that she can
+wear and then take them off once she goes up climbing"*.
+
+**Her.** The race was the last place Baye v1.0 was drawn. She is v2.0 now:
+`baye2.fr3d` loaded a second time (her skin, face, lids, jaw and all 49
+clips), less the braid, the loose hair and the fishnet.
+
+- **The bikini and the bun** are a new garments-only blob, `bayeswim.fr3d.gz`
+  (78 KB). `tools/blender/baye2.py --figure bayeswim` fits
+  `mindfront_bikini_01` (CC-BY 4.0, Mindfront) and the Bucketeer's bun
+  (`rehmanpolanski_hair_bun_brown`, CC0) to her body through their `.mhclo`.
+  It has no body and no clips. At runtime the parts hang on her own bone
+  palette, the rig is checked bone for bone first, and nothing is copied per
+  frame.
+- **The suit** is dyed fuchsia and keeps its gold trim (`bayeswim_suit.png`,
+  36 KB). The bun reuses the Bucketeer's map, dyed Baye's brown, with the
+  velvet tie dyed to match the suit. The brown was matched by eye with both
+  women in one frame. The tie test is tighter than the Bucketeer's 0.10-0.22:
+  the map's own strands sit at 0.13, and at her threshold a fifth of every
+  strand went fuchsia.
+- **The body under the suit is cut.** MakeHuman removes it at bake time
+  (`delete_verts`). Here the body is another blob, so `tools/baye2_tex.py`
+  rasterises those 494 faces into a 512 px UV mask (`bayeswim_mask.png`,
+  1 KB), eroded by one texel. Her body fragment discards there in the colour
+  pass only, so her shadow keeps its middle.
+- **The goggles** are made in `bayeGoggles`, the one thing on her not taken
+  off the rack (the packs have no goggles). They are two toed-out cups, blue
+  lenses, pink rims, a bridge and a strap, all sized off her own bind mesh:
+  the eye centres `v5Eyes` measured, plus her skull's width and back at strap
+  height. They ride the head bone the way Chloe's beanie does. She wears them
+  for the race. At the foot of the ladder she pushes them up onto her
+  forehead by tipping them about the back of her skull, which is where the
+  strap sits. They come back down when she swims over to talk.
+- She casts a sun shadow now (body only), which matters on the plank.
+
+**The finish.** The race was aimed at `swimRun.board`. That is a point 5 m
+off the tower on the jetty side, and it was never moved when the tower turned
+to face the kabine. The ladder is on the far face. Also, a racer 55 m behind
+got `lost`: she stopped and was hidden. Measured with a slow swimmer, that
+happened at 95% of the way. The finish is now the foot of the real ladder, by
+a route round the end of the tower (`towerRoute`: under the plank, a body's
+length off the masses, in along the ladder's face). The route length is
+`through`, and the wander dies over its last 25 m. She surfaces for the
+corner, and nobody vanishes: `lost` is now 260 m and only means you have left.
+The race ends at the ladder either way. You catch her and it is yours
+(`caught`), or she gets there first (`arrived`, with a new `chase.lost` line).
+The HUD goes and she carries on.
+
+**The show.** At the foot she treads, pushes her goggles up and climbs. From
+there she is 61-plunge.js's own diver: a second `buildPlunge` on her figure,
+with the same solved climb on her bones, the same AVBD springboard bending
+under her, the same conserved angular momentum and the same splash.
+`autoDive` drives it from her repertoire. Picks are random from a shuffled
+bag, never the same dive twice running. Entries measured on the final build,
+two full runs of all six in parallel, in opposite orders:
+
+| dive | plan | entries |
+| --- | --- | --- |
+| swan | 2 bounces, laid out, arms spread, ½ turn solved | clean 8.5 (9.8°), rip 9 (6.5°) |
+| forward 1½ tucked | 3 bounces, `autoPump`'s own kick-out | clean 8.5 (8.3°), rip 9 (5.4°) |
+| forward 1½ piked | the same, piked | clean 8.5 (9.4°), clean 8 (10.9°) |
+| reverse | 2 bounces, leaning back, ½ turn solved | rip 9.5 (2.1°), clean 8.5 (10.1°) |
+| forward, full twist | ½ turn solved, twist counted to 2π | rip 10 (0.2°), rip 9.5 (3.0°) |
+| cannonball | tucked feet first, no spin | feet first, both times; the biggest splash |
+
+What 61-plunge.js gained, all opt-in, so Chloe's dives are untouched (her
+autoPump 1½ tuck still rips, 9.0):
+
+- **`turnTo`.** The takeoff spin solved for a given turn at the water, over
+  the flight time the takeoff itself gives. A fixed lean spin off a 6.8 m/s
+  pump is 300° by the water. The time uses the sea where she will go in, not
+  where she left, because the swell is a tenth of a second of fall.
+- **The swan's arms.** A slerp from the sagittal aim to a wing, out of the
+  plane, laid on as one turn. They sweep overhead for the last 15% of the
+  flight.
+- **The cannonball** (`shape: 'ball'`, +1.1 on the splash) and **a counted
+  twist** (`twistTurns`).
+- **`busy`.** One tower, one ladder. Chloe's E at its foot says *"Baye has the
+  tower — let her go first"* while she is up there. Baye treads at the foot
+  while Chloe is up there or while the diver is on the rungs. Tested both
+  ways.
+
+Between dives she rests where she came up and waves if you are within 30 m.
+Then she swims round to the ladder again. Swim up to her (5 m) between dives,
+or let her do all six, and she comes and finds you. She says her three lines
+(the jaw now moves with them) and swims home with you, as before.
+
+Cost on the tower, CPU, running averages: update 0.37-0.41 ms (her board's
+240 Hz solve), draw 0.06-0.09 ms. Page +180 KB (38.37 to 38.55 MB). v1.0's
+blob stays in the page: it is still the undrawn driver under the shore Baye
+and the Bucketeer's fallback. It is no longer drawn anywhere. Debug:
+`__fr.chase.skip(dive)`, `__fr.chase.next(dive)`, and `freezeAt` / `freeze` /
+`thaw` on `__fr.chase.raw()` for photographing a flight. People 100;
+blockers 785; no console errors.
+
 ## [1.556.0] — 2026-10-01
 
 ### Both playgrounds and the ping pong, built

@@ -67,6 +67,21 @@ not are both in the table above:
 | brows | mindfront_eyebrows_09 | CC0 | Mindfront |
 | lashes | mindfront_eyelashes_04 | CC0 | Mindfront |
 
+## Baye in the water (`bayeswim.fr3d.gz`, 1.556.0)
+
+The R race's Baye is Baye v2.0 (`baye2.fr3d.gz`) with two garments hung on her
+own bone palette, built by `tools/blender/baye2.py --figure bayeswim` (garments
+only) and `tools/baye2_tex.py --figure bayeswim`. The bun's map is the
+Bucketeer's (`bucketeer2_hair`), dyed Baye's brown at runtime; the suit's map
+is `bayeswim_suit.png`, its black cloth dyed fuchsia at runtime with the gold
+trim kept. `bayeswim_mask.png` is the suit's own `delete_verts` rasterised into
+the body's UV space. Her goggles are made in `src/61-chase.js` and are ours.
+
+| part | asset | licence | author |
+| --- | --- | --- | --- |
+| bun (dyed brown at runtime) | rehmanpolanski_hair_bun_brown | CC0 | RehmanPolanski |
+| bikini (dyed fuchsia at runtime) | mindfront_bikini_01 | CC-BY 4.0 | Mindfront |
+
 ## Faces: lids, teeth and tongue (1.551.1)
 
 Every bather's lids are MakeHuman's own base-mesh faces round the eye, and its
