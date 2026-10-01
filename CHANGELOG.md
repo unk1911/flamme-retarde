@@ -8,6 +8,42 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.559.2] — 2026-10-01
+
+### The last houses off the water
+
+Misha, from the vikendica balcony: *"when i look into the distance there's
+still a few houses visible far away, that's Prvić ... still like 2 or 3
+houses sticking out of the water... they really shouldn't be there"*.
+
+They were six OSM footprints on the harbour front of **Prvić Luka**, 3.5 km
+due west, standing on 4–5 m of water: the heightmap does not carry Prvić. The
+1.548.7 rule skipped a building on the sea only when it was more than 50 m
+from a shore, a margin kept so real waterfronts that the coarse cover grid
+calls sea would survive. These six were 38–47 m from what the baked
+shore-distance field calls a waterline, so they slipped through. A map-wide search found
+the same fault at **Krapanj**: 34 houses on 2–5.5 m of water off Brodarica.
+Krapanj is barely a metre high in life and is not in the heightmap either.
+From the balcony those 34 are hidden behind Jadrija's pines, but a flight
+past Brodarica shows them.
+
+`buildCity` now also tests the footprint: if neither the middle nor any
+corner is on land and the lowest ground is below the waterline, the building
+is in the sea, however near a shore. It is counted as
+`__fr.stats().city.skipped.afloat`. That rule matches exactly those 40, and
+under all 40 the *highest* ground anywhere is below −0.6 m. No other building
+on the map has even half its footprint over sea, so a looser "mostly sea"
+test would match the same 40. Riva, Zablaće, Jadrija and Srima were checked
+from above and are identical. A skipped building also burns its roof-guess
+draw, so every building after it keeps its colours and roof. The last 1,000
+wall and roof vertices hash the same before and after.
+
+City built 12 140 → 12 100. Skipped: out 159, sea 678, afloat 40. Jadrija
+blockers 820, people 100.
+
+Putting Prvić and Krapanj back as land is a rebake of the terrain
+(`tools/bake.py`'s sea mask classes both islands as sea), not done here.
+
 ## [1.559.1] — 2026-10-01
 
 ### The two bedrooms, furnished off their own photographs, and the giant closet gone
