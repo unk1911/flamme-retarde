@@ -44736,8 +44736,160 @@ async function buildJadrija(scene) {
   // openings behind the huts, the wood either side, the far side of the road.
   const MEET_ENTRIES = [[517.0, 30.6], [552.4, 30.6], [505.5, 46.0], [526.0, 64.0],
     [539.0, 41.5], [565.0, 47.0]];
-  const GROUNDS_OK = { kiss: 1, hug: 1, shimmy: 1, twerk: 1, heart: 1, note: 1 };
   const MEET_PH = { toGrounds: 1, grounds: 1 };
+
+  // ── AND ON THE SPOT, WHEREVER SHE IS (1.559.1) ─────────────────────────────
+  //
+  // Misha, 1 Oct 2026: *"after i tell baye to go to the hammock, she arrives,
+  // then i say 'hair down', she says "yeah i'm letting it down now", and for
+  // some reason begins walking all the way back to the kabine.... why can't
+  // she just let hair down right there on the spot ... i think there may be
+  // other instances like that too"*.
+  //
+  // There were, and they were three rules saying one thing — "anything you
+  // ask out here is done back on her lane":
+  //
+  //   1. `hamHeld` got her out for anything not in HAM_KEEP (eyes, mouth,
+  //      yawn, petting), and `hamHome` walked her down the cut to her lane;
+  //      `hamBack` is not ASKABLE, so the ask waited for the lane. MEASURED:
+  //      "hair down" in the hammock was 25.6 m of walking, then the hair.
+  //   2. `grounds` and `toGrounds` sent anything outside GROUNDS_OK (six
+  //      numbers) home the same way, and `hamGo` dropped the trip for `play`.
+  //   3. Underneath both: every number ends in `showNext` → `play`, and
+  //      `play` moves her with `showMove`, which CLAMPS to the lane — so a
+  //      number finished off it put her back on the promenade in one frame.
+  //      That is why the rules above existed; they were the backstop's
+  //      backstop. `rise` out of doors went to `leave` — the kabina's door.
+  //
+  // So the asks are split by what they need. SPOT is done where she stands
+  // (a dance, her hands, you); HAM_IN is done lying in the hammock; HERE_GO
+  // is a place with a way there from anywhere (`hamPath`), so it goes there
+  // straight; everything else needs her lane or the room (the bottle, the
+  // cot, the sea, a counter, the ladder) and walks there as before. Off her
+  // lane she now has a standing state of her own — `here` — and `show.here`
+  // remembers what she was doing when she was asked, so the number ends by
+  // going back to it: into the hammock again, on to the grounds, on home.
+  const SPOT = { 'hair.down': 1, 'hair.up': 1, shimmy: 1, twerk: 1, heart: 1, note: 1,
+    kiss: 1, hug: 1, give: 1, joy: 1, wheel: 1 };
+  // Lying in it: her hands are already at her nape in `hamLie` (`_NAPE_ARMS`
+  // in tools/blender/human_mh.py), so the band comes out where they are; and
+  // what she has on comes off without her getting up.
+  const HAM_IN = { 'hair.down': 1, 'hair.up': 1, doff: 1 };
+  const HERE_GO = { hammock: 1, grounds: 1, collar: 1 };
+  // The off-lane phases a SPOT ask is taken in, straight from the dispatch.
+  const HERE_FROM = { here: 1, grounds: 1, hamBack: 1 };
+  // The ones that need clear ground round her, off the lane — `hereRoom`.
+  const HERE_ROOM = { shimmy: 1, twerk: 1, heart: 1, note: 1, joy: 1, wheel: 1 };
+  const HERE = {
+    follow: 6.0,    // m you may wander before she comes after you
+    stand: 1.7,     // m from you she stops
+    leave: 16,      // m: you have gone (the kabina is 15-20 m from the hammock)
+    leaveFor: 5,    // s of that before she goes home
+    wait: 240,      // s she stands about with you before going home anyway
+    again: 0.8,     // s, beside the hammock after a number, before she gets back in
+    // Clear deck a number needs off her lane, m: a run along a heading for
+    // the travelling ones (a somersault carries her 1.6 m, the run-up and
+    // three wheels 5.9), a radius for the ones on the spot.
+    run: { joy: 2.6, wheel: 6.8 }, pad: 0.38, spot: 0.45, search: [0.6, 1.2, 1.8, 2.5],
+  };
+  /** Off her strip of promenade and not in the kabina: inland of the lane. */
+  function offLane() {
+    return !!show && !sheIsIn() && show.s > SHOW.lane[1] + 0.6;
+  }
+  /** Taken where she stands, off her lane — see SPOT. */
+  function hereTakes(ask) {
+    if (!ask) return false;
+    const base = ask.split(':')[0];
+    return !!(SPOT[base] || HERE_GO[ask] || TURN_KEEP[ask] || HAM_KEEP[ask] || base === 'doff');
+  }
+  /**
+   * Room for a number off her lane: [t, s, heading] — where to stand and which
+   * way to go — or null. Her own spot first; then rings out to 2.5 m, each
+   * spot reachable in a straight line. The blockers near her once, plus the
+   * two things `hamPath` adds that are not blockers: the hammock's cloth and
+   * the back wall.
+   */
+  function hereRoom(name) {
+    const run = HERE.run[name] || 0, pad = run ? HERE.pad : HERE.spot;
+    const R = run + 3.5;
+    const near = blockers.filter((b) => !b.off && b.a >= 0 && b.c >= 0
+      && Math.abs(b.t - show.t) < R + b.a + b.c && Math.abs(b.s - show.s) < R + b.a + b.c);
+    // The cloth as it hangs, and not `hamBlock`'s line between the ties: it
+    // is 1.30 m across, and a cartwheel run along the mark (0.60 m off the
+    // line) went through its edge.
+    if (hamBlock) near.push({ ...hamBlock, c: 0.70 });
+    // And you: a somersault or a run of wheels is not aimed through you.
+    if (show.pt != null) near.push({ t: show.pt, s: show.ps, a: 0.35, c: 0.35 });
+    for (const w of backWall) {
+      if (w[1] > BACK_WALL_TO) continue;
+      if (w[1] > show.t - R && w[0] < show.t + R && Math.abs(w[2] - show.s) < R) {
+        near.push({ t: (w[0] + w[1]) * 0.5, s: w[2], a: (w[1] - w[0]) * 0.5, c: 0.22 });
+      }
+    }
+    const hit = (t, s, p) => {
+      for (const b of near) {
+        const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+        const dt0 = t - b.t, ds0 = s - b.s;
+        if (Math.abs(dt0 * co + ds0 * sn) < b.a + p && Math.abs(-dt0 * sn + ds0 * co) < b.c + p) return true;
+      }
+      return false;
+    };
+    const line = (t0, s0, a, len, p, u0 = 0.25) => {
+      for (let u = u0; u <= len + 1e-6; u += 0.25) {
+        if (hit(t0 + Math.cos(a) * u, s0 + Math.sin(a) * u, p)) return false;
+      }
+      return true;
+    };
+    const tryAt = (t, s) => {
+      if (hit(t, s, pad)) return null;
+      if (!run) return [t, s, null];
+      // Her own heading first, then out to either side of it.
+      for (let k = 0; k < 16; k++) {
+        const a = show.ang + Math.PI / 8 * (k % 2 ? (k + 1) / 2 : -k / 2);
+        if (line(t, s, a, run, pad)) return [t, s, a];
+      }
+      return null;
+    };
+    const here = tryAt(show.t, show.s);
+    if (here) return here;
+    for (const r of HERE.search) {
+      for (let k = 0; k < 12; k++) {
+        const a = k * Math.PI / 6, t = show.t + Math.cos(a) * r, s = show.s + Math.sin(a) * r;
+        // And a way there: a straight step, bare-body clear — from the mark
+        // she is standing at the cloth's own edge, so the first half metre
+        // of any step away is allowed to start inside its pad.
+        const got = tryAt(t, s);
+        if (got && line(show.t, show.s, a, r, 0, 0.5)) return got;
+      }
+    }
+    return null;
+  }
+  /** Back into the hammock from where she is standing beside it. */
+  function hamAgain(go) {
+    const mk = hammock ? hamMark() : null;
+    let legs = mk ? hamRoute(mk) : null;
+    if (!mk || !legs) return false;
+    if (!legs.length) legs = [[mk.t, mk.s]];
+    show.job = { name: 'hammock', t: mk.t, s: mk.s, since: 0, leg: 0, legs,
+      best: null, stall: 0, replan: 0 };
+    show.ham = { mark: mk, t: 0, enter: false, laugh: 0, pushedAt: -9, alone: 0 };
+    show.stuck = null;
+    show.byAsk = 1;
+    go('hamGo', 'walk', 0.32);
+    return true;
+  }
+  /** Standing with you, off her lane — `case 'here'`. */
+  function hereStand(kind, go) {
+    show.here = { kind, t: 0, gone: 0 };
+    // She has stopped. `away` is the rate the gap to you opens, and she was
+    // the one opening it — left alone it would read as you leaving for the
+    // next half second and cut the number she was asked for (`leaving`).
+    show.away = 0;
+    show.job = null;
+    show.queue.length = 0;
+    show.byAsk = 1;
+    go('here', 'idle', 0.40);
+  }
   const _mfr = new THREE.Frustum(), _mmx = new THREE.Matrix4(), _msp = new THREE.Sphere();
 
   /**
@@ -46690,6 +46842,28 @@ async function buildJadrija(scene) {
     show.job = { name: 'hamBack', t: goal[0], s: goal[1], since: 0, leg: 0, legs,
       best: null, stall: 0 };
     go('hamBack', 'walk', 0.36);
+  }
+
+  /**
+   * OUT OF IT, AND THEN WHAT (1.559.1). Out for a number done beside it
+   * (`spot`), she stands on the mark and the number is taken there — and
+   * once it is over she gets back in (`here` of kind `ham`). Asked out, or
+   * fallen out, or off to somewhere she can walk to from here, she stands
+   * with you (`stay`) rather than walking home. Out for anything that needs
+   * her lane or the room — or on her own, or with you gone — home as before.
+   */
+  function hamDone(go, withYou) {
+    const H = show.ham, why = H && H.why;
+    if (withYou && (why === 'spot' || why === 'go' || why === 'out' || why === 'fell')) {
+      hamLeft();
+      // The cloth she has just stepped out of, hushed — she is getting back
+      // into it in a moment, and a hammock still swinging when she does is
+      // one she can be thrown out of.
+      if (hammock && hammock.api.calm) hammock.api.calm();
+      hereStand(why === 'spot' ? 'ham' : 'stay', go);
+      return;
+    }
+    hamHome(go);
   }
 
   /** A push has landed — from 90-app.js. Answers whether she was in it to feel it. */
@@ -53834,6 +54008,112 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * ── ON TO THE COT THE WAY A PERSON GETS ON A BED (1.559.1) ─────────────
+   *
+   * Misha, 1 Oct 2026: *"when inside the kabine, say i tell her 'lie on the
+   * cot', instead of directly doing that, she first performs a 'kneel', then
+   * sorta does this "hover fly" into the bed and lies down ... or sometimes i
+   * say 'lotus', and she first will shuffle through like 2 or 3 different
+   * poses until finally folding into lotus"*.
+   *
+   * Both were the road, not the request. Every way on to this mattress was
+   * the hose's way on to the floor — standing, `submit` (a kneel), `kept`,
+   * then `recline`, a FLOOR clip from a kneel to her back — with `lieDown`
+   * sliding her up to a metre across the room and lifting her 0.44 m on to the
+   * mattress under it: the hover. And anything asked on the cot that was not
+   * the cradle went `situp` → `kept` → `lieDown` → `recline` → `cradle` →
+   * the pose — off the bed, on to her knees, and back on again through the
+   * same hover. MEASURED "lotus" from `sitHeld`: six phases.
+   *
+   * The way on is `hamIn` — sit on the edge with her back to it, lean back on
+   * her hands, swing her legs up and round, lie back — which was baked for
+   * the hammock against a seat 0.45 m up (HAM_SEAT in human_mh.py), and the
+   * mattress is 0.44 m up. She walks to a mark `mark` m off the cot's middle
+   * on the room side (low t: the other long edge is the wall), turns her back
+   * to it, and the clip carries her on: sat on the edge at 0.20 m off the
+   * middle, and lying along it with her head to the pillow. Where she is
+   * going decides where the clip is cut: lying down, the end of it; sitting
+   * up (`sit`, `lotus`, `perch`), half way round (`sitAt`), straight into that
+   * clip's own SIT key (`sitFrom`); her front over the edge, sat on the edge
+   * (`edgeAt`), lying back ACROSS it.
+   *
+   * THE HAND-OVER (`cotHand`) is where the hover was. At the cut she is put
+   * where the next pose lies — on the mattress, along the bed — and the pose
+   * she is in is held exactly where it is in the world (root re-expressed in
+   * the new frame, `fig.manual`) and eased off over `ease` s into the clip.
+   * Nothing jumps: the body that sat down is the body that lies there.
+   */
+  const COT_IN = { mark: 0.60, edge: 0.46, edgeAt: 1.55, sitAt: 2.45, sitFrom: 2.30, ease: 0.70 };
+  // The three sitting poses whose clip passes through SIT at `sitFrom`.
+  const COT_SIT = { 'sit.bed': 1, lotus: 1, perch: 1 };
+  // And the held ones she can go between through SIT, without lying down.
+  const COT_SIT_HELD = { sit: 1, sitHeld: 1, lotus: 1, lotusHeld: 1, perch: 1, perchHeld: 1 };
+  const _cnQ = new THREE.Quaternion(), _cnQ2 = new THREE.Quaternion(), _cnV = new THREE.Vector3();
+  /** Where she stands to get on, [t, s, heading]: her back to the cot. */
+  function cotMark(kind) {
+    if (!kit || !kit.cot) return null;
+    if (kind === 'edge' && kit.cotEdge) {
+      return [kit.cotEdge[0] - COT_IN.edge, kit.cotEdge[1], Math.PI];
+    }
+    const sp = cotSpot();
+    return [kit.cot[0] - COT_IN.mark, sp[1], Math.PI];
+  }
+  /**
+   * The hand-over — see COT_IN. Her pose this frame, held where it is in the
+   * world while she is put at (nt, ns) facing `nang` on the mattress; eased
+   * off by `cotEaseTick`.
+   */
+  function cotHand(f, nt, ns, nang) {
+    f.mesh.updateMatrixWorld();
+    const L = f.local();
+    const ri = Math.max(0, f.bones.findIndex((b) => b.parent < 0));
+    _cnQ.set(L.q[ri * 4], L.q[ri * 4 + 1], L.q[ri * 4 + 2], L.q[ri * 4 + 3]);
+    _cnV.set(L.t[0], L.t[1], L.t[2]).applyMatrix4(f.mesh.matrixWorld);
+    _cnQ.premultiply(f.mesh.quaternion);
+    const nmat = Math.max(0, kit.cot[2] - toWorld(nt, ns)[1]);
+    const p = toWorld(nt, ns);
+    _cnQ2.setFromAxisAngle(_hmY, faceYaw(nt, nang)).invert();
+    _cnV.x -= p[0]; _cnV.y -= p[1] + nmat; _cnV.z -= p[2];
+    _cnV.applyQuaternion(_cnQ2);
+    _cnQ.premultiply(_cnQ2);
+    const q = L.q.slice();
+    q[ri * 4] = _cnQ.x; q[ri * 4 + 1] = _cnQ.y; q[ri * 4 + 2] = _cnQ.z; q[ri * 4 + 3] = _cnQ.w;
+    show.cotEase = { pose: { q, t: Float32Array.of(_cnV.x, _cnV.y, _cnV.z), w: 1 }, t: 0 };
+    f.manual(show.cotEase.pose);
+    show.t = nt; show.s = ns; show.ang = nang; show.want = nang; show.rate = 0;
+    show.side = 0; show.sideRate = 0; show.leanR = 0; show.leanP = 0;
+    show.mat = nmat; show.onBed = 1; show.lie = null; show.vel = 0;
+  }
+  /**
+   * Off she goes to get on it, from standing — `kind` is where the clip is
+   * cut (see COT_IN): 'lie', 'sit' (with `pose`, one of COT_SIT) or 'edge'.
+   * What she does once she is lying there is the latch the ask set
+   * (`poseWant`, `flatWant`, `sideWant`), read by `cradle` as always.
+   */
+  function cotStart(kind, go, d, pose = null) {
+    const mk = cotMark(kind);
+    if (!mk) return false;
+    show.cot = { kind, pose, t: mk[0], s: mk[1], ang: mk[2], at: 0 };
+    show.lieWant = null;
+    show.byAsk = 1;
+    show.queue.length = 0;
+    show.side = 0;
+    show.legsDown = 0;
+    showSay('squee', d);
+    dogShoo();
+    go('cotGo', 'walk', 0.34);
+    return true;
+  }
+  function cotEaseTick(f, dt) {
+    const E = show.cotEase;
+    if (!E) return;
+    E.t += dt;
+    const u = clamp(E.t / COT_IN.ease, 0, 1);
+    E.pose.w = 1 - u * u * (3 - 2 * u);
+    if (u >= 1) { f.manual(null); show.cotEase = null; }
+  }
+
+  /**
    * Up on the mattress, or back down off it, over a few tenths.
    *
    * `show.mat` is the trampoline's own term — what she is standing on that is
@@ -55201,6 +55481,17 @@ async function buildJadrija(scene) {
 
   /** Advance her along her heading, kept on the deck and inside the resort. */
   function showMove(v, dt) {
+    // OFF HER LANE FOR A NUMBER (1.559.1, see SPOT): the lane is not hers to
+    // be clamped back to from out here — that clamp was the teleport every
+    // "home first" rule existed to avoid. What keeps her out of things there
+    // is what keeps her out of them on any walk: `showClear`. The room for it
+    // was looked for before she started (`hereRoom`).
+    if (show.here && show.s > SHOW.lane[1] + 0.6) {
+      show.t += Math.cos(show.ang) * v * dt;
+      show.s += Math.sin(show.ang) * v * dt;
+      showClear();
+      return;
+    }
     show.t = clamp(show.t + Math.cos(show.ang) * v * dt, show.t0, show.t1);
     show.s = clamp(show.s + Math.sin(show.ang) * v * dt, SHOW.lane[0], SHOW.lane[1]);
   }
@@ -56721,15 +57012,16 @@ async function buildJadrija(scene) {
     if (name.startsWith('doff:')) {
       const key = name.slice(5);
       if (!key) return 'nothing';
-      // The mirror of `wear:` and it answers the same three ways: a thing
-      // with no bone was never on her, a thing she is not wearing cannot come
-      // off, and it goes back on the tabouret — which is indoors.
+      // The mirror of `wear:` and it answers the same ways: a thing with no
+      // bone was never on her, a thing she is not wearing cannot come off.
+      // AND ANYWHERE (1.559.1). This said "in the kabina" because the Lovense
+      // goes back on the tabouret; nothing about taking a thing OFF needs a
+      // room, and out of doors she hands it back to you — see `doffNow`.
       const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
       if (!row || !row.wear) return 'notwearable';
       if (!worn[key]) return 'notworn';
       if (giftHeld) return 'holding';
-      if (!sheIsIn()) return 'outside';
-      if (!kit || !kit.spot) return 'nokit';
+      if (sheIsIn() && (!kit || !kit.spot)) return 'nokit';
       return null;
     }
     if (name === 'side.left' || name === 'side.right') {
@@ -57134,7 +57426,10 @@ async function buildJadrija(scene) {
     // down the room — the push was cancelling her stride every frame,
     // because `kit.handSpot` is 0.38 m off the boards and `HOLD` plus
     // `SHOW.solid` is further than that.
-    handGo: 1 };
+    handGo: 1,
+    // AND THE WAY ON TO THE COT (1.559.1), for the same reason: her mark is
+    // 0.27 m off its edge, inside what `showClear` keeps her out of.
+    cotGo: 1, cotIn: 1 };
 
   /**
    * Everything that outranks the room, hoisted.
@@ -57339,6 +57634,8 @@ async function buildJadrija(scene) {
     // is otherwise guesswork — see `updateCrowd`.
     show.pt = pt; show.ps = ps;
     if (!show || !skinFig) return;
+    // Her own clock, for a probe timing a request in game seconds.
+    show.clock = (show.clock || 0) + dt;
     const f = skinFig, S = f.state;
     const d = Math.hypot(show.t - pt, show.s - ps);
     // Somebody is down here on the deck with her, near enough to be with. Both
@@ -57447,6 +57744,10 @@ async function buildJadrija(scene) {
       // version to fall back to.
       if (clip) show.gait = clip === 'walk' || clip === 'crawl' ? clip : null;
       show.stall = 0;
+      // The lane's own life, and the room's: off-her-lane is over (see SPOT).
+      if (phase === 'play' || phase === 'home' || KABIN[phase]) show.here = null;
+      // A heading to face at a mark is `stepTo`'s alone — see `hereRoom`.
+      if (phase !== 'stepTo') { show.goFace = null; show.atMark = 0; }
       show.phase = phase;
       show.tmr = 0;
       show.said = 0;
@@ -57463,7 +57764,10 @@ async function buildJadrija(scene) {
       show.ask = null; show.why = null; show.did = null; show.don = null;
       show.byAsk = 0; show.side = 0; show.sideWant = null;
       show.turnBack = 0;
-      show.goMark = null; show.goNext = null;
+      show.goMark = null; show.goNext = null; show.goFace = null; show.atMark = 0;
+      show.here = null;
+      show.cot = null;
+      if (show.cotEase) { show.cotEase = null; if (skinFig) skinFig.manual(null); }
       show.bumped = 0; show.buzzNod = 0; show.buzzBlink = 0;
       if (skinFig) hugArms(skinFig, 0);
       if (leash.on) { leashClear(); leashRagLeave(); }
@@ -57533,6 +57837,41 @@ async function buildJadrija(scene) {
      * directly, which is what lets the same three states serve both the fixed
      * routine and the dice without knowing which one started them.
      */
+    /**
+     * BACK TO WHAT SHE WAS DOING, off her lane (1.559.1) — see SPOT. The kind
+     * is what she was doing when she was asked: in the hammock (`ham`) or on
+     * her way to it (`hamGo`), she goes back in; on her way to the grounds,
+     * on to them; at them, she stays; on her way home, on home; standing
+     * with you (`stay`), she goes on standing with you. With you gone, or
+     * nothing to go back to, home by a way through. Answers whether it put
+     * her somewhere — false only on her lane or in the room, where the
+     * ordinary ending is right.
+     */
+    const hereBack = () => {
+      const H = show.here;
+      show.here = null;
+      if (!H || sheIsIn() || !offLane()) return false;
+      const away = !withYou || d > HERE.leave;
+      // Back into the hammock by way of `here`, which waits for the cloth to
+      // be still first.
+      if (!away && (H.kind === 'ham' || H.kind === 'hamGo')) {
+        hereStand(H.kind, go);
+        show.here.t = HERE.again;
+        return true;
+      }
+      if (H.kind === 'toGrounds' && meetGo(pt, ps, go)) return true;
+      if (H.kind === 'grounds' && show.meet && groundsDist(show.t, show.s) < MEET.near) {
+        go('grounds', 'idle', 0.40);
+        return true;
+      }
+      if (!away && (H.kind === 'stay' || H.kind === 'ham' || H.kind === 'hamGo')) {
+        hereStand('stay', go);
+        return true;
+      }
+      meetHome(go);
+      return true;
+    };
+
     const showNext = () => {
       // AND THE ASK IS OVER. `byAsk` says the phase she is leaving was asked
       // for rather than rolled for — the room reads it and stands off while
@@ -57545,6 +57884,9 @@ async function buildJadrija(scene) {
       if (nxt === 'heart') return enterHeart();
       if (nxt === 'note') return enterNote();
       if (nxt === 'wheel') return enterWheels();
+      // Off her lane, a number ends by going back to what she was doing when
+      // it was asked — see SPOT and `hereBack`.
+      if (show.here && hereBack()) return undefined;
       // Out at the grounds, a number done there ends there — `play` would
       // clamp her back to her lane in one frame. See MEET.
       if (show.meet && !sheIsIn() && groundsDist(show.t, show.s) < MEET.near) {
@@ -58012,19 +58354,47 @@ async function buildJadrija(scene) {
       && (show.ask !== 'turn' || LYING[show.phase] || TURN_HOLD[show.phase]
         || show.phase === 'creep')
       // In the hammock only the things her face and your hand do — see
-      // HAM_KEEP; anything else waits for `hamHeld` to get her out first.
+      // HAM_KEEP; her hair and what she has on are `hamHeld`'s (HAM_IN), and
+      // anything else waits for `hamHeld` to get her out first.
       && (!HAM[show.phase] || HAM_KEEP[show.ask])
-      // Out at the grounds only what she does where she stands — see MEET.
-      && (!MEET_PH[show.phase] || HAM_KEEP[show.ask]);
-    // AND OUT AT THE GROUNDS (1.555.2): the numbers she does where she
-    // stands are taken there, and asked to go there again from on the way
-    // back from the hammock or from the grounds themselves, she goes.
-    const meetOk = (show.phase === 'grounds' && GROUNDS_OK[show.ask])
-      || (show.ask === 'grounds' && (show.phase === 'hamBack' || MEET_PH[show.phase]));
-    if (show.ask && (ASKABLE[show.phase] || nowOk || meetOk)) {
-      const name = show.ask;
+      // Out at the grounds, and anywhere else off her lane, only what she
+      // does where she stands — `hereOk`, below.
+      && (!MEET_PH[show.phase] || HAM_KEEP[show.ask])
+      && !HERE_FROM[show.phase];
+    // AND OUT AT THE GROUNDS (1.555.2): asked to go there again from on the
+    // way back from the hammock or from the grounds themselves, she goes.
+    const meetOk = show.ask === 'grounds' && (show.phase === 'hamBack' || MEET_PH[show.phase]);
+    // AND OFF HER LANE (1.559.1): at the grounds, beside the hammock, on her
+    // way home — everything she does where she stands is taken where she
+    // stands (SPOT), with her latches (TURN_KEEP), and the places she can
+    // walk to from anywhere are walked to from here (HERE_GO). See SPOT.
+    const hereOk = !!show.ask && !!HERE_FROM[show.phase] && !busy && hereTakes(show.ask);
+    if (show.ask && (ASKABLE[show.phase] || nowOk || meetOk || hereOk)) {
+      let name = show.ask;
       show.ask = null;
+      // "Lie down" with no place named picks one, alternately (see
+      // `show.bedTurn` in the recline branch) — and picks it HERE, once,
+      // because which it is decides whether she has to be on her feet for it
+      // (`cotBound`, below) and a request re-armed across a get-up must not
+      // toss the coin a second time on the other side of it.
+      if (name === 'recline') {
+        show.bedTurn = show.bedTurn ? 0 : 1;
+        name = show.bedTurn && kit && kit.cot ? 'recline.bed' : 'recline.floor';
+      }
       show.did = name;
+      // WHAT SHE WAS DOING, for the end of it — see `hereBack`. A number
+      // taken off her lane keeps the kind she already had (`here`), or takes
+      // the one the phase means; a place gone to from here ends it.
+      const hereWas = show.here || null;
+      if (hereOk && HERE_GO[name]) show.here = null;
+      else if (hereOk && SPOT[name.split(':')[0]] && offLane()) {
+        show.queue.length = 0;
+        show.away = 0;          // she has stopped — see `hereStand`
+        if (!show.here) {
+          show.here = { kind: show.phase === 'grounds' ? 'grounds'
+            : show.phase === 'hamBack' ? 'home' : 'stay', t: 0, gone: 0 };
+        }
+      }
       // AND WHETHER THERE IS ANYTHING LEFT TO DO. See `askWhy`: the same
       // function `askShow` answered the panel with, asked again here because
       // the player has had a frame or more to walk out of the room since.
@@ -58053,9 +58423,37 @@ async function buildJadrija(scene) {
       // Anything new she is asked to DO, she does facing the way it faces —
       // see `TURN_KEEP` for the handful laid over her that leave her turned.
       if (!show.why && name !== 'turn' && !TURN_KEEP[name]) show.turnBack = 0;
+      // ON TO THE COT FROM WHERE SHE IS (1.559.1) — see COT_IN. Already on
+      // it, anything else on it goes by the cradle and the cradle reads the
+      // latch: rolled back over if she is on her front or a side (`unroll`,
+      // `turn`'s own road), crossfaded if she is sitting. Not off the bed and
+      // on again, which is what `situp` → `kept` → `lieDown` was.
+      const toCradle = () => {
+        const ph = show.phase;
+        if (ph === 'cradle' || ph === 'recline' || ph === 'unroll' || ph === 'cotGo' || ph === 'cotIn') return;
+        if (UNROLL[ph]) {
+          const clip = UNROLL[ph];
+          show.legsDown = 0;
+          go('unroll', null);
+          if (!S.cur || S.cur.name !== clip) f.play(clip, { fade: 0, from: 1e3 });
+          if (S.cur && S.cur.name === clip) S.curT = Math.min(S.curT, S.cur.dur);
+          S.prev = null;
+          S.speed = -1;
+          show.unroll = clip;
+          show.unSide = show.side;
+        } else go('cradle', 'cradle', 0.44);
+      };
+      // And getting ON it: from her feet, in the room. From her knees or the
+      // floor she gets up first (the gate below), because the way on to a bed
+      // is from standing — the kneel and the hover were the floor's way down.
+      const cotHere = () => sheIsIn() && !!(kit && kit.cot);
+      const cotBound = (n) => cotHere() && !show.onBed
+        && (n === 'recline.bed' || n === 'flat' || n === 'flat.edge'
+          || n === 'side.left' || n === 'side.right' || !!BED_POSE[n]);
       if (show.why) {
         show.did = null;
-      } else if (ON_FEET[name.split(':')[0]] && !onHerFeet()) {
+        show.here = hereWas;
+      } else if ((ON_FEET[name.split(':')[0]] || cotBound(name)) && !onHerFeet()) {
         // ── AND SHE GETS UP FIRST, WHATEVER IT WAS ─────────────────────────
         //
         // Misha, 19 Sep 2026: *"when I ask her to do stuff inside kabine,
@@ -58156,13 +58554,20 @@ async function buildJadrija(scene) {
         show.byAsk = 1;
         show.queue.length = 0;
         show.side = 0;
+        // ON THE BED ALREADY, sitting or on her front: back to the cradle
+        // where she is. ON HER FEET IN HERE: on to it the way a person gets
+        // on a bed (COT_IN). Everything else as it was — the floor's own
+        // way down is a kneel, and that is what a body does on a floor.
+        const toBed = show.lieWant === 'bed';
+        if (toBed && show.onBed && onCot(show.phase)) { show.lieWant = null; toCradle(); }
+        else if (toBed && !show.onBed && onHerFeet() && cotHere()) cotStart('lie', go, d);
         // Three ways in, and all three end in `lieDown` reading `lieWant`.
         // From her knees it is immediate; from standing the kneel is the route
         // — `recline` starts from a kneel that is already pointed the right
         // way and there is nothing in the bank between standing and her back.
         // From her back it is a MOVE, floor to cot or the other way, and the
         // only honest way to cross a room is to get up first.
-        if (onCot(show.phase)) go('situp', 'situp', 0.30);
+        else if (onCot(show.phase)) go('situp', 'situp', 0.30);
         else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
         else go('submit', 'submit', 0.30);
       } else if (name === 'kiss' || name === 'hug') {
@@ -58173,6 +58578,7 @@ async function buildJadrija(scene) {
         // re-arms itself: `show.ask` is read again on a later frame, and by
         // then she is in `dwell` with her feet under her.
         show.near = name;
+        show.nearPathed = 0;
         show.queue.length = 0;
         show.side = 0;
         showSay('trill', d);
@@ -58182,6 +58588,7 @@ async function buildJadrija(scene) {
         // be handed anything; the item is remembered until it is in her hand.
         show.gift = name.slice(5);
         show.near = 'give';
+        show.nearPathed = 0;
         show.queue.length = 0;
         show.side = 0;
         showSay('trill', d);
@@ -58232,17 +58639,20 @@ async function buildJadrija(scene) {
         show.byAsk = 1;
         show.queue.length = 0;
         showSay('squee', d);
-        // The roll starts from the cradle, like the one on to her front.
+        // The roll starts from the cradle, like the one on to her front —
+        // and from her front or the other side it is the roll she came in by,
+        // backwards (`toCradle`), not a crossfade through her own body.
         if (onCot(show.phase) && show.phase !== 'cradle') {
           show.sideWant = clip;
-          go('cradle', 'cradle', 0.40);
+          toCradle();
         } else if (show.phase === 'cradle') {
           show.legsDown = 0;
           go(clip, clip, 0.34);
         } else {
           show.sideWant = clip;
           show.lieWant = show.onBed || (kit && kit.cot) ? 'bed' : 'floor';
-          if (KNEES[show.phase]) lieDown(pt, ps, d, go);
+          if (show.lieWant === 'bed' && onHerFeet() && cotHere()) cotStart('lie', go, d);
+          else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
           else go('submit', 'submit', 0.30);
         }
       } else if (name === 'turn') {
@@ -58374,10 +58784,22 @@ async function buildJadrija(scene) {
         if (show.phase === 'cradle' && show.onBed) {
           show.legsDown = 0;
           go('flatEdge', 'flatEdge', 0.34);
+        } else if (onHerFeet() && cotHere()) {
+          // Sat on the edge and back ACROSS it — see COT_IN, `edge`.
+          show.flatWant = 2;
+          cotStart('edge', go, d);
         } else {
           show.flatWant = 2;
           show.lieWant = 'bed';
-          if (onCot(show.phase)) go('situp', 'situp', 0.30);
+          // On the bed already, in some other pose: lying across it is a
+          // different place on it, so off and on again — her feet first, and
+          // the request re-armed across the get-up like the gate's.
+          if (onCot(show.phase) && show.onBed && cotHere()) {
+            show.flatWant = 0; show.lieWant = null; show.edgeWant = 0;
+            show.ask = name; show.getUp = 1;
+            if (POSED[show.phase]) go('cradle', 'cradle', 0.44);
+            else go('situp', 'situp', 0.30);
+          } else if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
           else go('submit', 'submit', 0.30);
         }
@@ -58398,6 +58820,28 @@ async function buildJadrija(scene) {
         if (show.phase === 'cradle' && show.onBed) {
           show.legsDown = 0;
           go(p[0], p[1], 0.34);
+        } else if (show.onBed && COT_SIT[name] && COT_SIT_HELD[show.phase]) {
+          // SITTING ALREADY, AND ANOTHER SITTING POSE (1.559.1): through the
+          // SIT every one of those clips passes at `sitFrom`, not back down to
+          // the cradle and up again. Off the wall first if she was perched.
+          show.poseWant = null;
+          show.perchBack = show.phase === 'perch' || show.phase === 'perchHeld' ? 1 : 0;
+          // `sit` ends ON SIT, so for it there is no clip left to play: the
+          // hold, faded into slowly enough to be a body unfolding.
+          if (p[0] === 'sit' && !show.perchBack) go('sitHeld', 'sitHeld', 0.9);
+          else {
+            go(p[0], null);
+            f.play(p[1], { fade: 0.6, from: COT_IN.sitFrom });
+          }
+        } else if (show.onBed && onCot(show.phase)) {
+          // On it in some other pose: the cradle, and on from there.
+          show.poseWant = name;
+          toCradle();
+        } else if (onHerFeet() && cotHere()) {
+          // On to it from standing — sat on the edge and round into the
+          // sitting poses, or lying back for the rest (COT_IN).
+          show.poseWant = COT_SIT[name] ? null : name;
+          cotStart(COT_SIT[name] ? 'sit' : 'lie', go, d, name);
         } else {
           show.poseWant = name;
           show.lieWant = 'bed';
@@ -58470,7 +58914,10 @@ async function buildJadrija(scene) {
         } else {
           show.flatWant = 1;
           show.lieWant = show.onBed || (kit && kit.cot) ? 'bed' : 'floor';
-          if (onCot(show.phase)) go('situp', 'situp', 0.30);
+          // On the bed already: by the cradle, where she is (1.559.1).
+          if (show.onBed && onCot(show.phase)) { show.lieWant = null; toCradle(); }
+          else if (show.lieWant === 'bed' && onHerFeet() && cotHere()) cotStart('lie', go, d);
+          else if (onCot(show.phase)) go('situp', 'situp', 0.30);
           else if (KNEES[show.phase]) lieDown(pt, ps, d, go);
           else go('submit', 'submit', 0.30);
         }
@@ -58593,6 +59040,31 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('errand', 'walk', 0.32);
         } else show.did = null;
+      } else if (show.here && offLane() && HERE_ROOM[name]) {
+        // ── OFF HER LANE, WHERE THERE IS ROOM FOR IT (1.559.1) ───────────
+        //
+        // On the promenade the deck is clear by construction and the
+        // cartwheels run along it. Out here there are trunks, cars, a fence
+        // and a hammock, so the room is looked for (`hereRoom`): where she
+        // stands if it is clear, or a step or two to somewhere that is, and
+        // for the somersault and the wheels a clear run along a heading she
+        // turns to first. No room within 2.5 m, and she says so.
+        const r = hereRoom(name);
+        const enter = { shimmy: enterShimmy, twerk: enterTwerk, heart: enterHeart, note: enterNote }[name];
+        if (!r) {
+          show.why = 'noroomhere'; show.did = null;
+          show.here = hereWas;
+        } else if (enter && Math.hypot(r[0] - show.t, r[1] - show.s) < 0.05) {
+          // Room where she stands: straight into it.
+          show.byAsk = 1;
+          enter();
+        } else {
+          show.byAsk = 1;
+          show.goMark = [r[0], r[1]];
+          show.goNext = name;
+          show.goFace = r[2];
+          go('stepTo', 'walk', 0.34);
+        }
       } else if (name === 'joy') {
         show.byAsk = 1;
         showSay('hup', d);
@@ -58792,16 +59264,39 @@ async function buildJadrija(scene) {
       case 'stepTo': {
         const mk = show.goMark;
         if (!mk) { showNext(); break; }
-        const aim = showRound(mk);
-        showTo(aim[0], aim[1], dt, 0.74);
-        const gone = Math.hypot(mk[0] - show.t, mk[1] - show.s);
+        let gone = Math.hypot(mk[0] - show.t, mk[1] - show.s);
+        // On the mark and with a heading to face (`goFace`, off her lane —
+        // see `hereRoom`): turned on the spot to it first, as she does
+        // before any run.
+        if (show.goFace != null && (gone < 0.20 || show.atMark)) {
+          show.atMark = 1;
+          showHold(dt);
+          show.want = show.goFace;
+          const e = Math.atan2(Math.sin(show.goFace - show.ang), Math.cos(show.goFace - show.ang));
+          if (Math.abs(e) > 0.12 && show.tmr < 8) break;
+          gone = 0;
+        } else {
+          const aim = showRound(mk);
+          showTo(aim[0], aim[1], dt, 0.74);
+          gone = Math.hypot(mk[0] - show.t, mk[1] - show.s);
+        }
         if (gone < 0.20 || show.tmr > 6) {
           const nx = show.goNext;
+          const face = show.goFace;
           show.goMark = null;
           show.goNext = null;
+          show.goFace = null;
+          show.atMark = 0;
           if (nx === 'coke') { cokeSet(0); go('coke', 'idle', 0.40); }
           else if (nx === 'line') go('line', 'snort', 0.30);
           else if (nx === 'liftIt') go('liftIt', 'idle', 0.34);
+          // The numbers, from the spot `hereRoom` found them room on.
+          else if (nx === 'joy') { showSay('hup', d); go('joy', 'flip', 0.18); }
+          else if (nx === 'wheel') { show.wander = face ?? show.ang; go('aim', 'walk', 0.30); }
+          else if (nx === 'shimmy') enterShimmy();
+          else if (nx === 'twerk') enterTwerk();
+          else if (nx === 'heart') enterHeart();
+          else if (nx === 'note') enterNote();
           else showNext();
         }
         break;
@@ -59408,6 +59903,14 @@ async function buildJadrija(scene) {
       case 'lotus':
       case 'upside': {
         matTick(dt);
+        // From the perch through SIT (1.559.1): off the wall and round to
+        // along the bed while she sits up out of it — `perch`'s ease, back.
+        if (show.perchBack && show.onBed) {
+          show.want = -Math.PI / 2;
+          const sp = cotSpot();
+          if (sp) showSettle(sp, dt, 1.6);
+          if (done) show.perchBack = 0;
+        }
         if (done) { const n = BED_NEXT[show.phase]; go(n[0], n[1], 0.30); }
         break;
       }
@@ -59555,6 +60058,76 @@ async function buildJadrija(scene) {
         }
         break;
 
+      // ── ON TO THE COT (1.559.1) — see COT_IN ──────────────────────────
+      //
+      // To her mark beside it, her back turned to it, and `hamIn` from there:
+      // sat on the edge, legs up and round, lying back — cut where the pose
+      // asked for begins, and handed over in place (`cotHand`).
+      case 'cotGo': {
+        const C = show.cot;
+        if (!C || !kit || !kit.cot) { show.cot = null; go('dwell', 'idle', 0.40); break; }
+        if (show.mat) show.mat = damp(show.mat, 0, 3.4, dt);
+        // Its own clock and not `tmr`, and a hard one: arrival is a radius a
+        // heading controller can circle, and a request is not a lap.
+        C.time = (C.time || 0) + dt;
+        const gone = Math.hypot(C.t - show.t, C.s - show.s);
+        if (!C.at && gone > 0.25 && C.time < 8) {
+          const aim = showRound([C.t, C.s]);
+          showTo(aim[0], aim[1], dt, 1.0);
+          break;
+        }
+        C.at = 1;
+        showHold(dt);
+        showSettle([C.t, C.s], dt, 8);
+        show.want = C.ang;
+        const e = Math.atan2(Math.sin(C.ang - show.ang), Math.cos(C.ang - show.ang));
+        if ((Math.abs(e) < 0.06 && gone < 0.03) || C.time > 10) {
+          show.t = C.t; show.s = C.s; show.ang = C.ang; show.want = C.ang; show.rate = 0;
+          show.mat = 0;
+          go('cotIn', 'hamIn', 0.30);
+        }
+        break;
+      }
+
+      case 'cotIn': {
+        const C = show.cot;
+        if (!C || !kit || !kit.cot) { show.cot = null; go('dwell', 'idle', 0.40); break; }
+        // Held on the mark: the clip's own root carries her back on to the
+        // mattress and round, as it carries her into the hammock.
+        show.vel = 0;
+        show.t = C.t; show.s = C.s; show.ang = C.ang; show.want = C.ang; show.rate = 0;
+        const at = S.cur && S.cur.name === 'hamIn' ? S.curT : 0;
+        const cut = C.kind === 'edge' ? COT_IN.edgeAt : C.kind === 'sit' ? COT_IN.sitAt : 1e9;
+        if (!(at >= cut || done)) break;
+        show.cot = null;
+        S.speed = 1;
+        if (C.kind === 'sit' && BED_POSE[C.pose]) {
+          // Half way round, into the clip's own SIT and on to the pose.
+          const p = BED_POSE[C.pose];
+          const sp = cotSpot();
+          cotHand(f, sp[0], sp[1], -Math.PI / 2);
+          show.poseWant = null;
+          go(p[0], null);
+          f.play(p[1], { fade: 0, from: COT_IN.sitFrom });
+        } else if (C.kind === 'edge' && kit.cotEdge) {
+          // Sat on the edge, and back across it — `flat.edge`'s placement,
+          // which `cradle` hands on to `flatEdge` from (`flatWant` 2).
+          cotHand(f, kit.cotEdge[0], kit.cotEdge[1], Math.PI);
+          show.edgeWant = 1;
+          go('cradle', null);
+          f.play('cradle', { fade: 0 });
+        } else {
+          const sp = cotSpot();
+          cotHand(f, sp[0], sp[1], -Math.PI / 2);
+          go('cradle', null);
+          f.play('cradle', { fade: 0 });
+        }
+        // POSED NOW, not next frame — `handstand`'s reason: she was sampled
+        // before this ran.
+        f.update(0);
+        break;
+      }
+
       case 'cradle':
         // ASKED TO GET UP OUT OF ONE OF THE SITTING POSES. The cradle is the
         // landing on the way back as well as on the way there — see the
@@ -59699,7 +60272,13 @@ async function buildJadrija(scene) {
           // through `kept` had the same hole in it, `recline.bed` included,
           // for as long as `rise` has existed.
           show.getUp = 0;
-          go(inside ? 'dwell' : 'leave', inside ? 'idle' : 'walk', 0.40);
+          // AND OUT OF DOORS NOT TO THE KABINA'S DOOR (1.559.1). `leave` is
+          // the way out of the room — its two legs are the doorway and the
+          // deck in front of it — and it was where every get-up went with
+          // you outside, so "get up" on all fours on the promenade walked
+          // her to the kabina and home from there. Only out of the room now.
+          if (!inside && !sheIsIn()) showNext();
+          else go(inside ? 'dwell' : 'leave', inside ? 'idle' : 'walk', 0.40);
         }
         break;
 
@@ -60095,7 +60674,19 @@ async function buildJadrija(scene) {
           % (Math.PI * 2)) - Math.PI);
         // The long way round, if there is furniture between you.
         if (show.nearLegs === undefined) show.nearLegs = null;
-        if (!show.nearLegs && gap > 7) {
+        // Off her lane (1.559.1) the lane's column search is the wrong one —
+        // it walks out to the promenade and back up — so it is the hammock's
+        // way through, from where she stands.
+        // Once, and at any distance: out here a gate leaf or a fence a metre
+        // off is the usual thing between you, and walked at straight she
+        // stood pinned against it until the request ran out — MEASURED at
+        // the playground gate, before this and after, 0.00 m in 15 s.
+        if (!show.nearLegs && !show.nearPathed && show.here && offLane() && gap > 0.8) {
+          show.nearPathed = 1;
+          const legs = hamPath(show.t, show.s, mt, ms);
+          show.nearLegs = legs && legs.length > 1 ? legs : null;
+          show.nearLeg = 0;
+        } else if (!show.nearLegs && gap > 7) {
           show.nearLegs = errandLegs(mt, ms) || null;
           show.nearLeg = 0;
         }
@@ -60113,7 +60704,11 @@ async function buildJadrija(scene) {
         }
         if (show.nearLegs && show.nearLeg < show.nearLegs.length - 1) {
           const g = show.nearLegs[show.nearLeg];
-          if (showTo(g[0], g[1], dt, ERRAND.pace) < ERRAND.near * 2.2) {
+          // Off her lane the corners are a gate's width apart, not a
+          // promenade's: passed at 2.4 m, every one of them was passed
+          // before she had moved (1.559.1).
+          const pass = show.nearPathed ? 0.40 : ERRAND.near * 2.2;
+          if (showTo(g[0], g[1], dt, ERRAND.pace) < pass) {
             show.nearLeg += 1;
           }
           break;
@@ -60250,10 +60845,17 @@ async function buildJadrija(scene) {
       case 'hamGo': {
         const j = show.job, H = show.ham;
         if (!j || !H || !hammock) { show.job = null; show.ham = null; go('play', 'walk', 0.36); break; }
-        // Asked for anything else on the way, she lets the hammock go.
+        // Asked for anything else on the way, she lets the hammock go — and
+        // off her lane (1.559.1) not for `play`, which clamps her back to it
+        // in one frame: a number is done where she is and the walk goes on
+        // after it (`here`, kind `hamGo`); a place she can walk to from
+        // here is gone to from here; anything else is home first.
         if (show.ask && show.ask !== 'hammock') {
           show.job = null; show.ham = null; show.byAsk = 0;
-          go('play', 'walk', 0.36);
+          if (!offLane()) go('play', 'walk', 0.36);
+          else if (hereTakes(show.ask)) {
+            hereStand(SPOT[show.ask.split(':')[0]] ? 'hamGo' : 'stay', go);
+          } else meetHome(go);
           break;
         }
         j.since += dt;
@@ -60319,6 +60921,40 @@ async function buildJadrija(scene) {
         H.alone = withYou ? 0 : H.alone + dt;
         const out = show.ask === 'hammock.out';
         if (out) { show.ask = null; show.did = 'hammock.out'; }
+        // IN IT, AND NOT OUT OF IT FOR THIS (1.559.1) — see SPOT. Her hair:
+        // her hands are at her nape already, so the band comes out where they
+        // are and the swap lands a beat later. What she has on comes off.
+        if (show.ask && HAM_IN[show.ask.split(':')[0]] && !H.hair) {
+          const a = show.ask;
+          show.ask = null;
+          show.why = askWhy(a);
+          show.did = show.why ? null : a;
+          askLog.push({ name: a, from: show.phase, why: show.why || null, to: show.why ? null : 'hamHeld',
+            feet: false, getUp: false });
+          while (askLog.length > 12) askLog.shift();
+          if (!show.why) {
+            if (a.startsWith('doff:')) { doffNow(a.slice(5)); showSay('trill', d); }
+            else { H.hair = { t: 0, want: a === 'hair.down' ? 1 : 0, done: 0 }; showSay('squee', d); }
+          }
+        }
+        if (H.hair) {
+          H.hair.t += dt;
+          if (!H.hair.done && H.hair.t > HAIRDO.up * 0.75) {
+            H.hair.done = 1;
+            hairDown(!!H.hair.want);
+            showSay('trill', d);
+          }
+          if (H.hair.t > HAIRDO.up + HAIRDO.down) H.hair = null;
+        }
+        // And WHY she is getting out, read by `hamDone` once she is standing:
+        // for a number done beside it she gets back in after; asked out, or a
+        // place she can walk to from here, she stands with you first.
+        // A second one while the first is still in her hands waits for it.
+        const later = !!(H.hair && show.ask && HAM_IN[show.ask.split(':')[0]]);
+        if (!H.why && !later) {
+          H.why = out ? 'out' : !show.ask ? null
+            : SPOT[show.ask.split(':')[0]] ? 'spot' : HERE_GO[show.ask] ? 'go' : null;
+        }
         // OUT OVER THE RIM — see HAM_RAG. Her pelvis clear of the cloth for
         // `fellFor` s and she has gone: the ragdoll takes her to the ground.
         if (H.rag && hammock.api.ragOn) {
@@ -60333,7 +60969,7 @@ async function buildJadrija(scene) {
             break;
           }
         }
-        if (out || (show.ask && !HAM_KEEP[show.ask]) || H.t > HAM_T.stay || H.alone > HAM_T.alone) {
+        if (out || (show.ask && !HAM_KEEP[show.ask] && !later) || H.t > HAM_T.stay || H.alone > HAM_T.alone) {
           if (f.face) { f.face.gape = 0; f.face.laugh = 0; }
           if (H.laugh > 0 && audio && audio.lickLaughStop) audio.lickLaughStop('baye', 0.4);
           H.laugh = 0;
@@ -60416,7 +61052,10 @@ async function buildJadrija(scene) {
         const [t, s] = local(_hmV.x, _hmV.z);
         show.t = t; show.s = s;
         H.mark = null;
-        hamHome(go);
+        // And with you there she stays with you, laughing it off — not a
+        // walk home for having fallen out (1.559.1, see `hamDone`).
+        H.why = 'fell';
+        hamDone(go, withYou);
         break;
       }
 
@@ -60427,7 +61066,7 @@ async function buildJadrija(scene) {
         S.speed = -1;
         if (!S.cur || S.cur.name !== 'hamIn' || S.curT <= 0) {
           S.speed = 1;
-          hamHome(go);
+          hamDone(go, withYou);
         }
         break;
       }
@@ -60440,8 +61079,15 @@ async function buildJadrija(scene) {
       case 'toGrounds': {
         const j = show.job, M = show.meet;
         if (!j || !j.legs || !M) { show.job = null; show.meet = null; meetHome(go); break; }
-        // Asked for something else on the way: home first, where it is done.
-        if (show.ask && show.ask !== 'grounds' && !HAM_KEEP[show.ask]) { meetHome(go); break; }
+        // Asked for something else on the way: done where she is, and on to
+        // the grounds after it (1.559.1, `here` of kind `toGrounds`); a place
+        // she can walk to from here, from here; anything else, home first.
+        if (show.ask && show.ask !== 'grounds' && !HAM_KEEP[show.ask]) {
+          if (offLane() && hereTakes(show.ask)) {
+            hereStand(SPOT[show.ask.split(':')[0]] ? 'toGrounds' : 'stay', go);
+          } else meetHome(go);
+          break;
+        }
         j.since += dt; M.since += dt;
         // Five times a second is plenty: the sight lines are the cost.
         M.chk = (M.chk || 0) - dt;
@@ -60477,9 +61123,11 @@ async function buildJadrija(scene) {
         const M = show.meet;
         if (!M) { meetHome(go); break; }
         M.t += dt;
-        // Anything asked that is not one of the numbers she does where she
-        // stands: home to her lane, and done there (the ask stays armed).
-        if (show.ask && show.ask !== 'grounds' && !HAM_KEEP[show.ask] && !GROUNDS_OK[show.ask]) {
+        // Anything asked that is not done where she stands (SPOT — taken by
+        // the dispatch, before this) or gone to from here (HERE_GO): home to
+        // her lane, and done there (the ask stays armed). Which is now only
+        // the things that need her lane or the room.
+        if (show.ask && !hereTakes(show.ask)) {
           meetHome(go); break;
         }
         const gd = groundsDist(pt, ps);
@@ -60504,12 +61152,69 @@ async function buildJadrija(scene) {
         break;
       }
 
+      // ── WITH YOU, OFF HER LANE (1.559.1) ─────────────────────────────────
+      //
+      // See SPOT. Standing beside the hammock, on the way to the grounds or
+      // home, wherever she was asked: facing you, and every SPOT ask is taken
+      // here by the dispatch above. Out of it in five ways — the hammock
+      // again after a number done beside it; after you, if you wander off
+      // (`hamBack` with `then`); home, if you have gone or after four
+      // minutes; the promenade's own life, once she is on her lane; and home
+      // first for anything that needs her lane or the room.
+      case 'here': {
+        const H = show.here;
+        if (!H) { if (offLane()) meetHome(go); else showNext(); break; }
+        H.t += dt;
+        showHold(dt);
+        if (!offLane()) { show.here = null; showNext(); break; }
+        // Asked for something that needs her lane or the room: home by a way
+        // through, and done there (the ask stays armed for it).
+        if (show.ask && !hereTakes(show.ask)) { show.here = null; meetHome(go); break; }
+        // You went into the kabina: she comes in by its door, from her lane
+        // (the room rule), and not through its back wall.
+        H.gone = !withYou || inside || d > HERE.leave ? H.gone + dt : 0;
+        if (H.gone > HERE.leaveFor || H.t > HERE.wait || inside) { show.here = null; meetHome(go); break; }
+        if (!show.ask && H.t > HERE.again) {
+          // Back in once the cloth is still (or near enough, after a while).
+          const still = !hammock || Math.abs(hammock.api.swing().a) < 0.12 || H.t > 6;
+          if ((H.kind === 'ham' || H.kind === 'hamGo') && !still) {
+            if (hammock.api.calm) hammock.api.calm();
+          } else if (H.kind === 'ham' || H.kind === 'hamGo') {
+            if (hamAgain(go)) { show.here = null; break; }
+            H.kind = 'stay';
+          } else if (H.kind !== 'stay') { hereBack(); break; }
+        }
+        // After you, by a way through, to a stride or two short of you.
+        if (!show.ask && H.kind === 'stay' && d > HERE.follow) {
+          const dl = d || 1;
+          const goal = [pt + (show.t - pt) / dl * HERE.stand, ps + (show.s - ps) / dl * HERE.stand];
+          const legs = hamPath(show.t, show.s, goal[0], goal[1]) || [goal];
+          H.kind = 'stay';
+          show.job = { name: 'hamBack', t: goal[0], s: goal[1], since: 0, leg: 0, legs, best: null,
+            stall: 0, then: 'here', cruise: wayPace(legs, show.t, show.s, HAM_T.pace) };
+          go('hamBack', 'walk', 0.36);
+          break;
+        }
+        show.want = Math.atan2(ps - show.s, pt - show.t);
+        if (show.tmr - show.said > 6 + Math.random() * 6 && d < SHOW.near) {
+          show.said = show.tmr; showSay(say1(IDLE_CHAT), d);
+        }
+        break;
+      }
+
       case 'hamBack': {
         // See `hamHome`. Out along the legs; past a stall, straight on —
         // `showClear` keeps her off what is in the way, and the lane is
         // never more than a few huts off.
         const j = show.job;
-        if (!j || !j.legs) { show.job = null; go('play', 'walk', 0.36); break; }
+        // Walking after you from `here` (`then`), she stands with you again
+        // where the legs end — unless they ended on her lane.
+        const then = () => {
+          show.job = null;
+          if (j && j.then === 'here' && show.here && offLane()) go('here', 'idle', 0.40);
+          else { show.here = null; go('play', 'walk', 0.36); }
+        };
+        if (!j || !j.legs) { then(); break; }
         j.since += dt;
         const g = j.legs[Math.min(j.leg, j.legs.length - 1)];
         // At a jog when it was given one (`meetHome`); the hammock's own way
@@ -60519,11 +61224,9 @@ async function buildJadrija(scene) {
         if (dist < (j.best == null ? 1e9 : j.best) - 0.2) { j.best = dist; j.stall = 0; } else j.stall += dt;
         if (dist < (r && j.leg < j.legs.length - 1 ? r.adv : 0.55) || j.stall > HAM_T.stall) {
           if (j.leg < j.legs.length - 1) { j.leg++; j.best = null; j.stall = 0; break; }
-          show.job = null;
-          go('play', 'walk', 0.36);
+          then();
         } else if (j.since > 60) {
-          show.job = null;
-          go('play', 'walk', 0.36);
+          then();
         }
         break;
       }
@@ -60844,7 +61547,10 @@ async function buildJadrija(scene) {
         showMove(SHOW.hop * sat((S.curT - 0.34) / 0.10)
           * sat((1.10 - S.curT) / 0.12), dt);
         if (S.curT >= 0.98 && !show.said) { show.said = 1; showSay('whump', d); }
-        if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'walk', 0.36); }
+        // Off her lane, back to what she was doing (`hereBack`) and not to
+        // `play`, which is the lane's.
+        if (done && show.here) showNext();
+        else if (done) { showWander(SHOW.turn, SHOW.swing); go('play', 'walk', 0.36); }
         break;
 
       case 'shimmy':
@@ -61325,6 +62031,8 @@ async function buildJadrija(scene) {
     // And the hands to her cheeks after a slap, which is the same kind of
     // thing and shares the one overlay the yawn uses — see `spreadTick`.
     spreadTick(f, dt);
+    // The hand-over on to the cot, eased off — see COT_IN.
+    cotEaseTick(f, dt);
 
     // ── AND DOWN TO THE PLATE ─────────────────────────────────────────────
     //
@@ -66957,7 +67665,9 @@ async function buildJadrija(scene) {
     // on the tabouret and belongs there; the cuffs and the headphones came
     // out of your bag and belong in it. Putting the cuffs on the stool would
     // be tidy and wrong — you could not carry them out of the room.
-    if (key !== 'lovense') {
+    // And out of doors there is no tabouret within reach, so the Lovense
+    // goes where the others go — to you (1.559.1). Indoors it is furniture.
+    if (key !== 'lovense' || !sheIsIn()) {
       if (typeof satchelPut === 'function') satchelPut(key, 1);
       return true;
     }
@@ -76205,6 +76915,37 @@ async function buildJadrija(scene) {
       show.why = null;
       return true;
     },
+    /**
+     * WHERE SHE IS DOING IT, for the panel's line (1.559.1) — asked right
+     * after `askShow` armed it, so it reads the phase the ask will be taken
+     * from. Empty where the label already says it (the errands) or where
+     * "where" is the ordinary answer (her lane, the room).
+     */
+    askWhere: (rawName) => {
+      if (!show || !rawName) return '';
+      const name = askRoad(rawName), base = name.split(':')[0], p = show.phase;
+      if (HAM[p] && p !== 'hamGo' && p !== 'hamOut' && p !== 'hamFall' && p !== 'hamUp') {
+        if (HAM_IN[base] || HAM_KEEP[name]) return 'in the hammock';
+        if (SPOT[base]) return 'beside the hammock, then back in';
+        return '';
+      }
+      if ((HERE_FROM[p] || MEET_PH[p] || p === 'hamGo') && offLane() && SPOT[base]) return 'right where she is';
+      return '';
+    },
+    /**
+     * Debug (1.559.1): off-her-lane state — `show.here`, whether she is off
+     * her lane, the room `hereRoom` finds for a number, and the blockers
+     * within `r` m of her.
+     */
+    here: (name = 'wheel', r = 3) => (show ? {
+      here: show.here ? { ...show.here, t: +show.here.t.toFixed(1) } : null,
+      off: offLane(), room: hereRoom(name), nearLegs: show.nearLegs || null, nearLeg: show.nearLeg,
+      clock: +(show.clock || 0).toFixed(2), onBed: show.onBed || 0, mat: +(show.mat || 0).toFixed(3),
+      cot: kit && kit.cot ? { cot: kit.cot, edge: kit.cotEdge || null, spot: cotSpot(), mark: cotMark('lie'),
+        ease: show.cotEase ? +show.cotEase.pose.w.toFixed(2) : 0 } : null,
+      near: blockers.filter((b) => !b.off && Math.hypot(b.t - show.t, b.s - show.s) < r + Math.hypot(b.a, b.c))
+        .map((b) => [+b.t.toFixed(2), +b.s.toFixed(2), +b.a.toFixed(2), +b.c.toFixed(2), +(b.rot || 0).toFixed(2)]),
+    } : null),
     /** The last dozen requests: what, from where, why not, and where to. */
     asked: () => askLog.map((r) => [r.name, r.from, r.to, r.why || '-',
       r.feet ? 'feet' : 'down', r.getUp ? 'rising' : '-']),

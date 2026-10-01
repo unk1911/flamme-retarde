@@ -710,7 +710,10 @@ const ears = (() => {
           const cut = went.indexOf(':');
           const base = cut > 0 ? went.slice(0, cut) : went;
           const what = cut > 0 ? went.slice(cut + 1) : '';
-          const label = (DOES[base] || base) + (what ? ' — ' + what : '');
+          // And WHERE, when it is not the obvious place (1.559.1): "in the
+          // hammock", "right where she is" — see `askWhere` in 43-jadrija.js.
+          const where = ok && J.askWhere ? J.askWhere(name) : '';
+          const label = (DOES[base] || base) + (what ? ' — ' + what : '') + (where ? ', ' + where : '');
           note('baye: ' + (ok ? label
             : (WHY[got] || 'cannot do that here')), ok ? 'did' : 'meta');
         }
@@ -899,6 +902,9 @@ const ears = (() => {
     widest: 'she cannot go any wider',
     cotnarrow: 'the cot is too narrow for her legs to go any wider',
     noroom: 'there is no room to go any wider where she is standing',
+    // Off her lane, a number with no clear ground for it within a couple of
+    // metres of her (1.559.1) — see `hereRoom` in 43-jadrija.js.
+    noroomhere: 'there is no room for that where she is',
     // The hammock's. Short, and each a fact about where she is.
     nohammock: 'there is no hammock here',
     inhammock: 'she is already in the hammock',
