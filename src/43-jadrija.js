@@ -45541,7 +45541,10 @@ async function buildJadrija(scene) {
     return { reg, side: bp.z > 0 ? 1 : -1, leg: bp.z > 0 ? 'R' : 'L',
       bone: reg === 'butt' || reg === 'hip' ? 'pelvis' : reg === 'thigh' ? 'legU' + (bp.z > 0 ? 'R' : 'L')
         : s.nm === 'pelvis' ? 'spine02' : s.nm,
-      x: w.x, y: w.y, z: w.z, bind: [bp.x, bp.y, bp.z], snap: !hitIn, t: +best.t.toFixed(3) };
+      x: w.x, y: w.y, z: w.z, bind: [bp.x, bp.y, bp.z], snap: !hitIn, t: +best.t.toFixed(3),
+      // And the way out of her skin there, world, off the capsule it is on —
+      // for the flat of your hand (`spankSpot` in 90-app.js).
+      n: (() => { const q = _caA.set(w.x - r[2], w.y - r[3], w.z - r[4]).normalize(); return [q.x, q.y, q.z]; })() };
   }
 
   // ── THE BELT, ON HER ─────────────────────────────────────────────────────

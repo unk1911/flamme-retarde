@@ -8,6 +8,112 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.553.2] — 2026-09-30
+
+### Your hand does the spanking
+
+Misha: *"when we spank her without the belt, it would be nice to see my
+(Chloe's) right hand appearing doing the spanking"*.
+
+**Why there was no hand.** The press on her bottom was written on 25 Sep as
+"a sound, no reach, one per press". Everything added since then hung off that
+same frame: the mark, her hands going back, the weight on the cot, and where
+on her it lands. `buttSlap` fired the moment the button went down, and the
+arm chain in the frame loop had entries for the thumb, the cup, the pet, the
+pull, the belt and the leash, but none for this. Nothing was hiding the hand.
+It had never been wired up.
+
+**Now the press starts a gesture, and the slap waits for the hand**
+(`spankStart` / `spankHandTick` in 90-app.js, reach kind `slap` in
+60-arms.js):
+- **up**, 0.10 s. Your right hand comes up from under the picture to above
+  the spot the crosshair picked, with the wrist cocked back. That is
+  `cotAim` on the cot, or the cheek's own point when she is standing. It
+  rises 14 to 24 cm along the skin's normal, higher for a harder slap when a
+  probe passes `k`, randomly otherwise, plus 7 cm back toward you.
+- **down**, 0.075 s, accelerating. The palm lands flat (`HAND_POSE.slap`:
+  fingers straight and together, thumb tucked), with the fingers lying along
+  her and pointing away from your shoulder.
+- **Contact.** On the frame the hand arrives, `buttSlap` runs unchanged:
+  sound, mark, her hands and the ragdoll's weight. Click to sound is 0.175 s
+  of world time when she is within reach.
+- **hold**, 0.08 s. The hand presses 3 mm in and starts lifting off, because
+  her seat comes back up under it.
+- **away**, 0.30 s. The hand lifts off her, moves to the bottom right close
+  to you, and drops out of the picture from there. Dropping straight to rest
+  went through the cot's edge and, with her bent over it, through her legs.
+
+While the hand comes down it follows the spot by asking the same ray again,
+so a cot still rocking from the last slap is met where it is now. The
+palm's underside (12 points) is tested against her capsules, and the hand
+stands off by the deepest of them (`spankLift`). That keeps the heel out of
+the hollow of her back when she is bent over the edge (29 mm in before).
+`cotAim` now also returns the skin's normal from the capsule its ray hit.
+Taking the nearest capsule instead stood the palm on its edge against her
+own hand lying beside her thigh.
+
+**An arm has to reach, which a sound never did.** From further than 0.72 m
+you step in to her first. If the spot is more than 0.8 m below your eye
+(1.0 m when she lies flat) you kneel by the cot, Shift's crouch, as the
+belt's aftercare already does. You get up again 2.5 s after the last slap,
+unless you were kneeling before. Kneeling adds about 0.35 s, so the first
+slap from standing lands about 0.55 s after the click. Earlier attempts
+failed: from a standing eye, the shoulder leaned into the middle of the
+picture with the upper arm's cut end showing, and from the door the hand
+stopped 0.9 m short.
+
+**The arm itself** (`SLAP_AIM`). The elbow is out and up, which is where a
+spanking elbow goes. Hung down, the forearm came up through her near cheek
+to reach the far one (37 mm) and went 83 mm into a thigh. The lean also goes
+`dip` of the way down, so the shoulder stays under the picture. Before each
+slap the arm is posed out of turn at the contact pose and its joints are
+tested against her (`spankReach`). The deepest dip that clears her wins
+(0.7, then 0.5, 0.35, 0.2, 0). The hand is not shown, and the slap lands on
+its own as before, in three cases: no dip clears her, the skin does not face
+the eye that picked it, or the palm cannot fit. Remaining flaw: on her far
+cheek and her thighs the clear dips are the shallow ones, and the round end
+of the upper arm shows at the right of the picture.
+
+**Quick presses.** Up to two are queued while a hand is on its way down.
+Each starts from her skin when the one before has landed, arcing up 8 cm so
+it does not cut across her. A press after the landing starts at once from
+wherever the hand is. Any further press is dropped. Eight presses 80 ms
+apart gave five slaps, 180–230 ms each, with no glitch.
+
+**Busy hand.** With the belt out, the press is the belt's swing as before,
+and a hand spank asked for anyway is instant. While the leash is clipped
+to her, while the collar is going on, and during the aftercare, your right
+hand is holding her. The slap then fires on the press with no arm. Doing it
+with the left hand would need the arm rig to take two reaches at once, which
+belongs with the collar work.
+
+**Third person.** The figure's right arm swings forward and up, with the
+elbow bent, then down to the spot. MEASURED: her hand landed within 5 cm of
+it. In the kabina the third-person camera can rarely get behind you, and
+then, as with every reach, neither the body nor the first-person arm is
+drawn.
+
+**Measured** (headless, `?jadrija`, key 8, her flat and over the edge, every
+vertex of the hand and arm checked against her capsules each frame).
+Flat, from beside the cot: both cheeks, the small of the back, the thighs
+and the flurry had no vertex of hand or arm inside her at any phase; the
+nearest was 4.9 mm off her. Over the edge, from behind: the near cheek, the
+thighs and the flurry were clean, the worst at 0.4 mm, which is touching.
+The far cheek (with her own hand over it) and the small of her back were
+refused and got the slap alone. Over the edge, from her head: the cheeks
+were clean. The test runs varied from one to the next (her ragdoll), and
+the arm's margin is set from the worst of them: the round of the shoulder
+had grazed her flank by 15 mm at the bottom edge of the picture before
+`cap`. The sound fires at contact, and the slap count rises at contact,
+not at the press. Belt swing, cupping, the collar and key 8 were unchanged.
+People 100, blockers 785, no console errors.
+
+Debug: `__fr.jad.spankHand(side, k, aim)`, `spankStats()` (phases, log with
+press/contact times, dip, arm gap), `spankStop(phase, t)` for stills,
+`spankClear()` (hand and arm against her), `spankTune({...})` (`guard:
+false` turns the checks off), `cotAimNow()`, `cotAxisNow()`, `butt()`;
+`__fr.arms.slapAim({ pole, dip, pose })`, `__fr.arms.joints()`.
+
 ## [1.553.1] — 2026-09-30
 
 ### She knows what you are doing to her
