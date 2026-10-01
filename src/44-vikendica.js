@@ -1295,30 +1295,59 @@ async function buildVikendica(scene, field) {
    * in the middle, and every flat in Dalmatia has one in August.
    *
    * Built here and not in Blender for the reason the hands are: the payload is
-   * one welded mesh per roof state, and a welded mesh cannot spin. That also
-   * gets the cage for free — three torus rings and eight spokes is four lines
-   * here and a small ordeal in bmesh.
+   * one welded mesh per roof state, and a welded mesh cannot spin.
+   *
+   * The second version (1.559.2; Misha: *"that fan in the kitchen could use an
+   * upgrade"*), off the one in the photograph of the bedroom — a 40 cm stand
+   * fan, white, five blades behind a domed wire guard with a round badge in
+   * the middle. It was flat sector blades, a ring-and-spoke cage drawn as two
+   * flat discs, and a cylinder for a motor. Now:
+   *
+   *   - the blades are moulded: each one narrow at the root and broad and
+   *     rounded at the tip, swept back, with its pitch twisting from steep at
+   *     the hub to flat at the tip and a camber across its chord, round a hub
+   *     with a domed spinner;
+   *   - the guard is two domes of wire — the rear one shallow, the front one
+   *     deeper — each of radial wires bent over the dome and concentric rings
+   *     on it, clamped together at the rim by a band with a clip, with the
+   *     badge on the front;
+   *   - the motor is a turned can with a rounded front, a tapered back and a
+   *     ring of vent slots, on a yoke with a tilt knob, with a row of four
+   *     piano keys and the oscillation knob on its back;
+   *   - the column telescopes through a knurled collar, on a cross of tube legs
+   *     with rubber feet, and the flex runs off to the wall with its plug.
    *
    * Local house metres. The wall the fridge stands against is +z, so the fan
    * faces −z, which is into the room.
    */
-  const fan = { blades: null, head: null };
-  {
-    const FAN = { x: -1.52, z: 3.28, r: 0.195 };
+  const fans = [];
+  function makeFan(FAN) {
+    const fan = { blades: null, head: null, phase: FAN.phase || 0 };
+    const R = FAN.r;
+    const ds = THREE.DoubleSide;
     const white = solidMaterial(new THREE.Color(0.925, 0.920, 0.905), {
-      spec: 0.30, specPower: 44, emissive: VIK.glow, vcol: false,
+      spec: 0.30, specPower: 44, emissive: VIK.glow, vcol: false, side: ds,
     });
     const grey = solidMaterial(new THREE.Color(0.735, 0.735, 0.730), {
-      spec: 0.22, specPower: 30, emissive: VIK.glow, vcol: false,
+      spec: 0.22, specPower: 30, emissive: VIK.glow, vcol: false, side: ds,
     });
-    // The blades are single sheets and a blade seen from behind is the same
-    // blade, so this one is drawn both ways round.
-    const vane = solidMaterial(new THREE.Color(0.760, 0.758, 0.750), {
-      spec: 0.26, specPower: 34, emissive: VIK.glow, vcol: false,
-      side: THREE.DoubleSide,
+    const wire = solidMaterial(new THREE.Color(0.890, 0.890, 0.880), {
+      spec: 0.40, specPower: 60, emissive: VIK.glow, vcol: false,
+    });
+    const dark = solidMaterial(new THREE.Color(0.090, 0.095, 0.105), {
+      spec: 0.10, specPower: 20, emissive: VIK.glow * 0.3, vcol: false, side: ds,
+    });
+    const blue = solidMaterial(new THREE.Color(0.180, 0.330, 0.620), {
+      spec: 0.30, specPower: 40, emissive: VIK.glow, vcol: false, side: ds,
+    });
+    // The blades are a translucent-looking pale grey plastic and a blade seen
+    // from behind is the same blade, so it is drawn both ways round.
+    const vane = solidMaterial(new THREE.Color(0.800, 0.805, 0.800), {
+      spec: 0.34, specPower: 48, emissive: VIK.glow, vcol: false, side: ds,
     });
     const g = new THREE.Group();
     g.position.set(FAN.x, plan.floor, FAN.z);
+    g.rotation.y = FAN.yaw || 0;
     root.add(g);
 
     const put = (geo, mat, x, y, z) => {
@@ -1327,110 +1356,356 @@ async function buildVikendica(scene, field) {
       m.castShadow = false; m.receiveShadow = false;
       return m;
     };
-    // Four splayed tube legs and a hub, which is what the base of one of these
-    // is — not a disc. The disc version read as a floor lamp.
-    //
-    // Each leg is aimed from the hub at its own foot, and it has to be: a
-    // three.js cylinder stands on its own Y axis, so a leg 30 cm long tipped
-    // by a tenth of a radian is not a splayed foot, it is a post. That is what
-    // these were — four white pins standing upright on the tiles around the
-    // column, with four loose white feet on the floor beyond them and nothing
-    // joining the two. Built from its two endpoints instead, so the strut
-    // reaches wherever the foot is and lies at whatever angle that takes.
+    /** A lathe about Y, from [r, y] pairs. */
+    const lathe = (pts, seg = 28) =>
+      new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+    /** A strut between two points, which is what a cylinder must be aimed as. */
+    const strut = (a, b, r0, r1, mat, seg = 10) => {
+      const mid = a.clone().add(b).multiplyScalar(0.5);
+      const m = put(new THREE.CylinderGeometry(r1, r0, a.distanceTo(b), seg),
+        mat, mid.x, mid.y, mid.z);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0),
+        b.clone().sub(a).normalize());
+      return m;
+    };
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+    // The cross base: four tube legs from a moulded hub, each ending in a
+    // rubber foot. Each leg is aimed from the hub at its foot — see `strut` —
+    // because a three.js cylinder stands on its own Y axis, and four of them
+    // tipped by a tenth of a radian were once four pins standing on the floor.
     for (let i = 0; i < 4; i++) {
       const a = (i + 0.5) * Math.PI / 2;
       const ca = Math.cos(a), sa = Math.sin(a);
-      const hub = new THREE.Vector3(ca * 0.045, 0.046, sa * 0.045);
-      const toe = new THREE.Vector3(ca * 0.295, 0.016, sa * 0.295);
-      const mid = hub.clone().add(toe).multiplyScalar(0.5);
-      // Thin at the toe, thick at the hub, which is the way a pressed steel
-      // leg is drawn: the cylinder's +Y end is the one the aim points at.
-      const leg = put(new THREE.CylinderGeometry(0.009, 0.012,
-        hub.distanceTo(toe), 7), white, mid.x, mid.y, mid.z);
-      leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0),
-        toe.clone().sub(hub).normalize());
-      g.add(leg);
-      g.add(put(new THREE.SphereGeometry(0.013, 6, 4), white,
-        toe.x, toe.y, toe.z));
+      const hub = V(ca * 0.050, 0.050, sa * 0.050);
+      const knee = V(ca * 0.180, 0.030, sa * 0.180);
+      const toe = V(ca * 0.300, 0.018, sa * 0.300);
+      g.add(strut(hub, knee, 0.013, 0.011, white, 12));
+      g.add(strut(knee, toe, 0.011, 0.0095, white, 12));
+      g.add(put(new THREE.SphereGeometry(0.0115, 12, 8), white, knee.x, knee.y, knee.z));
+      const foot = put(new THREE.SphereGeometry(0.016, 14, 8), dark, toe.x, 0.010, toe.z);
+      foot.scale.set(1.25, 0.65, 1.25);
+      g.add(foot);
     }
-    g.add(put(new THREE.CylinderGeometry(0.052, 0.058, 0.055, 12), white,
-      0, 0.028, 0));
-    // The column, in two diameters, because it telescopes and the joint is the
-    // one detail that says which kind of fan this is.
-    g.add(put(new THREE.CylinderGeometry(0.026, 0.026, 0.56, 10), white,
-      0, 0.335, 0));
-    g.add(put(new THREE.CylinderGeometry(0.030, 0.030, 0.045, 10), grey,
-      0, 0.632, 0));
-    g.add(put(new THREE.CylinderGeometry(0.017, 0.017, 0.44, 8), grey,
-      0, 0.855, 0));
+    g.add(put(lathe([[0.0005, 0.000], [0.060, 0.012], [0.064, 0.030],
+      [0.058, 0.058], [0.036, 0.074], [0.030, 0.090], [0.0005, 0.090]], 32),
+    white, 0, 0, 0));
+    // The column: a fat lower tube, the knurled collar it telescopes through,
+    // the thin upper tube.
+    g.add(put(new THREE.CylinderGeometry(0.0225, 0.025, 0.55, 20), white, 0, 0.36, 0));
+    {
+      const c = put(lathe([[0.022, 0.0], [0.034, 0.004], [0.036, 0.040],
+        [0.032, 0.048], [0.019, 0.050]], 36), grey, 0, 0.632, 0);
+      g.add(c);
+      for (let k = 0; k < 18; k++) {
+        const a = k * Math.PI * 2 / 18;
+        const rib = put(new THREE.BoxGeometry(0.004, 0.032, 0.004), grey,
+          Math.cos(a) * 0.0365, 0.654, Math.sin(a) * 0.0365);
+        rib.rotation.y = -a;
+        g.add(rib);
+      }
+    }
+    g.add(put(new THREE.CylinderGeometry(0.0145, 0.0145, 0.42, 16), grey, 0, 0.88, 0));
 
-    // The head, which oscillates.
+    // The head, which oscillates about the top of the column.
     const head = new THREE.Group();
     head.position.set(0, 1.09, 0);
     g.add(head);
     fan.head = head;
-    // Motor housing, on the room side of the column.
-    const motor = put(new THREE.CylinderGeometry(0.048, 0.052, 0.145, 12),
-      white, 0, 0, -0.055);
-    motor.rotation.x = Math.PI / 2;
-    head.add(motor);
-    head.add(put(new THREE.BoxGeometry(0.036, 0.052, 0.030), grey,
-      0, 0.052, 0.006));   // the three speed buttons, as one block
+    // The yoke: a stem off the column, a block, and the tilt knob on its side.
+    head.add(put(new THREE.CylinderGeometry(0.017, 0.019, 0.05, 16), white, 0, -0.025, 0));
+    head.add(put(new THREE.BoxGeometry(0.044, 0.036, 0.052), white, 0, 0.004, -0.004));
+    {
+      const k = put(lathe([[0.0005, 0.0], [0.016, 0.0], [0.018, 0.004],
+        [0.017, 0.016], [0.010, 0.020], [0.0005, 0.021]], 20), grey, 0.022, 0.006, -0.004);
+      k.rotation.z = -Math.PI / 2;
+      head.add(k);
+    }
+    // The motor: a turned can, rounded at the front, tapering at the back to
+    // a vented cap. Lathed about Y and laid along Z: the front is −Z.
+    {
+      const can = lathe([[0.0005, -0.128], [0.028, -0.126], [0.046, -0.118],
+        [0.056, -0.104], [0.060, -0.085], [0.061, -0.040], [0.058, -0.010],
+        [0.050, 0.020], [0.040, 0.040], [0.032, 0.052], [0.0005, 0.056]], 36);
+      can.rotateX(Math.PI / 2);
+      head.add(put(can, white, 0, 0.060, 0));
+      // The vent slots round the back, dark, and the shaft collar at the
+      // front.
+      for (let k = 0; k < 16; k++) {
+        const a = k * Math.PI * 2 / 16;
+        const slot = put(new THREE.BoxGeometry(0.006, 0.0025, 0.030), dark,
+          Math.cos(a) * 0.0535, 0.060 + Math.sin(a) * 0.0535, 0.008);
+        slot.rotation.z = a;
+        head.add(slot);
+      }
+      const col = lathe([[0.0005, 0.0], [0.020, 0.0], [0.020, 0.012], [0.012, 0.016],
+        [0.0005, 0.016]], 24);
+      col.rotateX(-Math.PI / 2);
+      head.add(put(col, grey, 0, 0.060, -0.126));
+      // The controls on the back of the can: four piano keys in a grey
+      // housing, and the oscillation knob sticking up behind them.
+      head.add(put(new THREE.BoxGeometry(0.060, 0.016, 0.034), grey, 0, 0.122, 0.006));
+      for (let k = 0; k < 4; k++) {
+        const key = put(new THREE.BoxGeometry(0.0125, 0.010, 0.026),
+          k === 0 ? blue : white, -0.0215 + k * 0.0143, 0.134, 0.004 - (k === 1 ? 0.004 : 0));
+        key.rotation.x = k === 1 ? 0.18 : 0;
+        head.add(key);
+      }
+      head.add(put(new THREE.CylinderGeometry(0.009, 0.011, 0.030, 14), white,
+        0, 0.114, 0.050));
+      head.add(put(new THREE.CylinderGeometry(0.0055, 0.0055, 0.018, 10), grey,
+        0, 0.136, 0.050));
+    }
 
-    // The cage: a ring front and back, two more on the face, and eight spokes
-    // between them. Thin enough to see the blades through, which is the point.
-    for (const [rr, zz] of [[FAN.r, -0.058], [FAN.r, -0.185]]) {
-      const t = put(new THREE.TorusGeometry(rr, 0.0055, 5, 30), white, 0, 0, zz);
-      head.add(t);
+    // The guard: a shallow rear dome and a deeper front one, both radial wires
+    // bent over the dome with rings on them, clamped together at the rim.
+    const GZ = -0.150, GY = 0.060;          // the rim's plane, and the axis height
+    /** A point on a guard dome: `s` 0 at the centre to 1 at the rim, `a` round. */
+    const dome = (s, a, depth, z0) => {
+      const r = R * s;
+      const z = z0 + depth * (1 - s * s) * (1 - 0.15 * s);
+      return V(Math.cos(a) * r, GY + Math.sin(a) * r, z);
+    };
+    const wireUp = (pts, r, n = 4) => new THREE.TubeGeometry(
+      new THREE.CatmullRomCurve3(pts), pts.length * 3, r, n, false);
+    {
+      const geos = [];
+      // Rear: 24 wires from a ring round the motor out to the rim.
+      for (let k = 0; k < 24; k++) {
+        const a = k * Math.PI * 2 / 24;
+        const pts = [];
+        for (let j = 0; j <= 6; j++) pts.push(dome(0.32 + 0.68 * j / 6, a, 0.050, GZ));
+        geos.push(wireUp(pts, 0.0018));
+      }
+      // Front: 36 wires, from the badge to the rim, over a deeper dome.
+      for (let k = 0; k < 36; k++) {
+        const a = k * Math.PI * 2 / 36 + 0.05;
+        const pts = [];
+        for (let j = 0; j <= 7; j++) pts.push(dome(0.17 + 0.83 * j / 7, a, -0.058, GZ));
+        geos.push(wireUp(pts, 0.0016));
+      }
+      for (const m of geos) head.add(put(m, wire, 0, 0, 0));
+      // The rings, on both domes.
+      for (const [s, depth, r] of [[0.45, 0.050, 0.0020], [0.75, 0.050, 0.0020],
+        [0.30, -0.058, 0.0018], [0.52, -0.058, 0.0018], [0.74, -0.058, 0.0018],
+        [0.92, -0.058, 0.0018]]) {
+        const p = dome(s, 0, depth, GZ);
+        const t = put(new THREE.TorusGeometry(R * s, r, 6, 64), wire, 0, GY, p.z);
+        head.add(t);
+      }
+      // The clamp band round the rim, and its clip at the bottom.
+      head.add(put(new THREE.TorusGeometry(R + 0.002, 0.0055, 8, 72), white, 0, GY, GZ));
+      head.add(put(new THREE.BoxGeometry(0.030, 0.016, 0.022), white, 0, GY - R - 0.006, GZ));
+      // The badge: a white disc with a blue ring and a grey centre.
+      const bz = GZ - 0.058 - 0.004;
+      const badge = lathe([[0.0005, 0.0], [0.034, 0.0], [0.035, 0.004], [0.031, 0.008],
+        [0.0005, 0.010]], 32);
+      badge.rotateX(-Math.PI / 2);
+      head.add(put(badge, white, 0, GY, bz));
+      const ring = put(new THREE.TorusGeometry(0.024, 0.0022, 6, 40), blue, 0, GY, bz - 0.009);
+      head.add(ring);
+      head.add(put(new THREE.CircleGeometry(0.012, 24), grey, 0, GY, bz - 0.0102)
+        .rotateY(Math.PI));
     }
-    for (const rr of [FAN.r * 0.68, FAN.r * 0.36]) {
-      head.add(put(new THREE.TorusGeometry(rr, 0.0045, 5, 24), white, 0, 0, -0.183));
-    }
-    for (let i = 0; i < 12; i++) {
-      const a = i * Math.PI / 6;
-      const sp = put(new THREE.CylinderGeometry(0.0035, 0.0035, FAN.r * 2, 4),
-        white, 0, 0, -0.184);
-      sp.rotation.z = a;
-      head.add(sp);
-    }
-    head.add(put(new THREE.CylinderGeometry(0.030, 0.030, 0.016, 12), white,
-      0, 0, -0.190));
 
-    // And the blades. A sector of a disc with a twist on its own radius, which
-    // is what a moulded fan blade is; three of them, because three is what is
-    // in the photograph.
+    // And the blades. Five, each a moulded paddle: narrow at the root, broad
+    // and rounded at the tip, swept back by a few degrees, pitched steeply at
+    // the hub and flatter at the tip, and cambered across the chord. Built in
+    // the blade's own polar frame — `u` out along the span, `v` across the
+    // chord — and turned into place.
     const blades = new THREE.Group();
-    blades.position.set(0, 0, -0.128);
+    blades.position.set(0, GY, GZ - 0.002);
     head.add(blades);
     fan.blades = blades;
-    for (let i = 0; i < 3; i++) {
-      const bg = new THREE.CircleGeometry(FAN.r * 0.86, 10, -0.60, 1.20);
-      // Rotate about the blade's own radius: a flat sector is a paddle and a
-      // pitched one is a fan.
-      bg.rotateX(0.34);
-      const b = new THREE.Mesh(bg, vane);
-      b.rotation.z = i * (Math.PI * 2 / 3);
-      b.castShadow = false; b.receiveShadow = false;
-      blades.add(b);
+    {
+      const NU = 14, NV = 8, r0 = 0.034, r1 = R * 0.86;
+      const bladeGeo = () => {
+        const pos = [], idx = [];
+        for (let i = 0; i <= NU; i++) {
+          const u = i / NU;
+          const r = r0 + (r1 - r0) * u;
+          // Half the chord as an angle: narrow at the root, widest at 0.7 and
+          // rounded off at the tip.
+          const half = (0.16 + 0.36 * Math.sin(Math.min(1, u / 0.75) * Math.PI / 2))
+            * Math.sqrt(Math.max(0, 1 - Math.pow(Math.max(0, u - 0.82) / 0.18, 2)) * 0.85 + 0.15);
+          const sweep = 0.22 * u * u;
+          const pitch = 0.50 - 0.25 * u;
+          for (let j = 0; j <= NV; j++) {
+            const v = j / NV * 2 - 1;
+            const a = sweep + v * half;
+            const chord = v * half * r;
+            const z = -Math.sin(pitch) * chord + 0.010 * (1 - v * v) * (0.4 + 0.6 * u);
+            pos.push(Math.cos(a) * r * Math.cos(pitch * 0.25), Math.sin(a) * r, z);
+          }
+        }
+        for (let i = 0; i < NU; i++) {
+          for (let j = 0; j < NV; j++) {
+            const a = i * (NV + 1) + j, b = a + NV + 1;
+            idx.push(a, b, a + 1, b, b + 1, a + 1);
+          }
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setIndex(idx);
+        geo.computeVertexNormals();
+        return geo;
+      };
+      const proto = bladeGeo();
+      for (let i = 0; i < 5; i++) {
+        const b = new THREE.Mesh(proto, vane);
+        b.rotation.z = i * (Math.PI * 2 / 5);
+        b.castShadow = false; b.receiveShadow = false;
+        blades.add(b);
+      }
+      // The hub and its spinner.
+      const hub = lathe([[0.0005, 0.016], [0.034, 0.012], [0.038, 0.0], [0.036, -0.012],
+        [0.026, -0.022], [0.012, -0.028], [0.0005, -0.030]], 32);
+      hub.rotateX(Math.PI / 2);
+      blades.add(put(hub, white, 0, 0, 0));
     }
     for (const m of blades.children) m.frustumCulled = false;
-    // The flex, trailing off across the tiles toward the wall behind.
-    //
-    // The same trap the legs were in, in the same object and for the same
-    // reason: a three.js cylinder stands on its own Y axis, so a cable written
-    // as one and never aimed is not a cable, it is a 60 cm grey pin standing
-    // upright on the floor beside the fan. Aimed at where it is going, and
-    // resting its own radius above the tile rather than a centimetre over it.
+
+    // The flex, off the hub across the tiles to the wall, and its plug.
     {
-      const from = new THREE.Vector3(0.05, 0.0035, 0.07);
-      const to = new THREE.Vector3(-0.07, 0.0035, 0.44);
-      const mid = from.clone().add(to).multiplyScalar(0.5);
-      const flex = put(new THREE.CylinderGeometry(0.0035, 0.0035,
-        from.distanceTo(to), 6), grey, mid.x, mid.y, mid.z);
-      flex.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0),
-        to.clone().sub(from).normalize());
-      g.add(flex);
+      const pts = [V(0.040, 0.012, 0.050), V(0.06, 0.004, 0.12), V(0.02, 0.004, 0.24),
+        V(-0.05, 0.004, 0.31), V(-0.07, 0.010, 0.335), V(-0.07, 0.30, 0.338)];
+      const flex = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0035, 6, false);
+      g.add(put(flex, grey, 0, 0, 0));
+      g.add(put(new THREE.BoxGeometry(0.036, 0.046, 0.024), white, -0.07, 0.31, 0.330));
     }
+    fans.push(fan);
+  }
+  makeFan({ x: -1.52, z: 3.28, r: 0.195 });
+  // And its twin in soba 3, in the corner by the window, where the photograph
+  // of a bedroom has one: it was baked into the room as three discs on a
+  // stick. Facing into the room, a different phase so the two never agree.
+  makeFan({ x: 2.83, z: -3.245, r: 0.195, yaw: Math.PI, phase: 2.1 });
+
+  // ── the towel on the terrace railing ────────────────────────────────────────
+  /**
+   * One beach towel hung over the top rail, flapping (Misha, 1 Oct 2026:
+   * *"perhaps hang one towel on the railings there and have it flap in the
+   * wind like them flags"*).
+   *
+   * It IS the flags: `brodEnsign` (src/59-brod.js), the particle cloth the
+   * Brod's ensign and the flags on the Jadrija mole fly, handed a carrier
+   * turned so that its luff — the edge that does not move — lies along the
+   * rail instead of up a pole, and its fly hangs down off it. The carrier's
+   * +X is up, so the cloth starts hanging straight down; its +Y runs along
+   * the rail; its +Z is the side the long half hangs on. `plane` keeps the
+   * cloth on that side of the railing's rods.
+   *
+   * The long half hangs on the TERRACE side, and that is the wind's choice,
+   * not taste. Hung on the sea side first, it lay dead flat against the rods
+   * (sag 89.8°, not a ripple): the channel's breeze here is onshore, so it
+   * pressed the cloth into the railing it was hung on. On the inside the
+   * same breeze lifts it off the rail toward the house, which is the towel
+   * flapping that was asked for — and the side it is seen from.
+   *
+   * The short half, over the rail and down the sea side, is not cloth: it is
+   * the same towel's other end, bent over the rail and hanging still, which
+   * is what a towel over a rail does — one half moves, the other is held.
+   *
+   * Terry is heavy for a flag (0.30 kg/m² against the ensign's 0.24), so in
+   * the channel's usual 2.6 m/s it lifts and ripples rather than flying flat.
+   * 7 × 11 particles, stepped only within 60 m of you; frozen where it was
+   * beyond that.
+   */
+  const towel = {};
+  {
+    // House metres, three.js axes: x along the rail, y up, z out to sea. The
+    // rail's top tube is at Blender (y -6.005, z 3.94), radius 21 mm.
+    const T = plan.towel;
+    const W = T.x1 - T.x0, FLY = 0.95;
+    // The part inside: over the top of the rail from where the cloth is
+    // pinned (0.85 rad up from level on the sea side) and 40 cm down.
+    const RR = 0.024, PH0 = 0.85, ARC = RR * (Math.PI - PH0), IN = ARC + 0.40;
+    // S: the side the free half hangs on, along house z. −1 is the terrace.
+    const S = -1;
+    const carrier = new THREE.Object3D();
+    carrier.position.set(S < 0 ? T.x1 : T.x0, T.y + RR * Math.sin(PH0),
+      T.z + S * RR * Math.cos(PH0));
+    carrier.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0, 1, 0), new THREE.Vector3(-S, 0, 0), new THREE.Vector3(0, 0, S)));
+    root.add(carrier);
+    root.updateMatrixWorld(true);
+    // The stripes, off the cloth's own u — metres down the towel from the
+    // inner end, so the still half over the rail carries on the same bands.
+    const STRIPES = 'n = gl_FrontFacing ? n : -n;'
+      + 'float s = vUv.x * ' + FLY.toFixed(3) + ' + ' + IN.toFixed(3) + ';'
+      + 'float k = fract(s / 0.47);'
+      + 'vec3 c = vec3(0.060, 0.230, 0.560);'
+      + 'if (k < 0.16) c = vec3(0.930, 0.925, 0.900);'
+      + 'else if (k < 0.27) c = vec3(0.960, 0.760, 0.150);'
+      + 'else if (k < 0.32) c = vec3(0.930, 0.925, 0.900);'
+      + 'else if (k < 0.58) c = vec3(0.100, 0.640, 0.700);'
+      + 'else if (k < 0.63) c = vec3(0.930, 0.925, 0.900);'
+      + 'else if (k < 0.76) c = vec3(0.920, 0.380, 0.180);'
+      + 'float e = min(s, ' + (FLY + IN).toFixed(3) + ' - s);'
+      + 'c = mix(vec3(0.900, 0.890, 0.860), c, smoothstep(0.015, 0.035, e));'
+      + 'base = c;';
+    const cloth = brodEnsign({
+      name: 'vikendica:towel',
+      E: { nu: 11, nv: 7, fly: FLY, hoist: W, sigma: 0.30, near: 60, gust: 0.6,
+        iters: 10, maxSub: 3 },
+      head: new THREE.Vector3(0, 0, 0),
+      mastF: 0, mastR: 0,
+      // Out of the railing: nothing behind the plane of the rods' face.
+      plane: { n: [0, 0, S], d: 0.004, frame: root },
+      body: STRIPES,
+    });
+    cloth.mesh.castShadow = true;
+    scene.add(cloth.mesh);
+    // Hang it once now, so that from the promenade — further than it is ever
+    // stepped from — it is a towel and not nothing.
+    cloth.step(1 / 60, carrier, 0, null);
+    towel.cloth = cloth;
+    towel.carrier = carrier;
+
+    // The short half: over the top of the rail and down the far side, still.
+    {
+      const NA = 8, NS = 18;
+      const pos = [], uv = [], idx = [];
+      for (let i = 0; i <= NA; i++) {
+        const x = T.x0 + W * i / NA;
+        for (let j = 0; j <= NS; j++) {
+          // Arc length back from the pinned edge: round the top of the rail
+          // and then straight down the far side, with a slow wave across it.
+          const L = (j / NS) * IN;
+          let y, z;
+          if (L < ARC) {
+            const ph = PH0 + L / RR;
+            y = T.y + RR * Math.sin(ph); z = T.z + S * RR * Math.cos(ph);
+          } else {
+            const h = L - ARC;
+            y = T.y - h;
+            z = T.z - S * (RR + 0.008 * Math.sin((i / NA) * Math.PI * 2.5 + 0.6)
+              * Math.min(1, h / 0.15));
+          }
+          pos.push(x, y, z);
+          uv.push(-L / FLY, i / NA);
+        }
+      }
+      for (let i = 0; i < NA; i++) {
+        for (let j = 0; j < NS; j++) {
+          const a = i * (NS + 1) + j, b = a + NS + 1;
+          idx.push(a, a + 1, b, b, a + 1, b + 1);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, cloth.mesh.material);
+      m.name = 'vikendica:towel-in';
+      m.castShadow = true;
+      root.add(m);
+    }
+  }
+  /** A frame of the towel. `who` is the person, in world metres. */
+  function stepTowel(dt, who) {
+    if (towel.cloth) towel.cloth.step(Math.min(dt || 0, 0.1), towel.carrier, 0, who || null);
   }
 
   /**
@@ -1497,8 +1772,8 @@ async function buildVikendica(scene, field) {
     // means the blades are where they should be on the first frame rather than
     // wherever a frame counter had got to.
     tv.tick();
-    if (fan.blades) {
-      const t = now / 1000;
+    for (const fan of fans) {
+      const t = now / 1000 + fan.phase;
       fan.blades.rotation.z = -t * 14.5;
       // Oscillating, slowly, through about fifty degrees either side. This is
       // the part you notice from across the room without looking at it.
@@ -3119,16 +3394,19 @@ async function buildVikendica(scene, field) {
     audio.fly(F.buzz * far * inFlat, F.hz, pan, F.mode === 'spin');
   }
 
-  /** The clock, the fan, the set, and the fly. */
+  /** The clock, the fan, the set, the fly, and the towel on the terrace. */
   function tickHouse(dt, who) {
     tickClock();
     stepFly(dt || 0, who);
+    stepTowel(dt, who);
   }
 
   return {
     root, parts, plan, base, yaw,
     floorAt, blockers, tight, indoorsAt, ductAt, hull, headroom,
     tick: tickHouse,
+    /** The towel on the terrace rail: the cloth's own probe (`brodEnsign`). */
+    towel: () => (towel.cloth ? towel.cloth.stats() : null),
     /** The television: where it is in world metres, and the knock. */
     tv: {
       at: () => { const [wx, wz] = world(tv.at[0], tv.at[2]);

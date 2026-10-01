@@ -8,6 +8,138 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.559.2] — 2026-10-01
+
+### The vikendica's walls, ceilings, curtains and bathroom; a new fan; two chairs, the washing and a towel on the terrace
+
+Misha: *"keep enhancing stuff at the vikendica, higher poly count for not
+just furniture but for the interior walls, ceiling, shades, etc, that fan in
+the kitchen could use an upgrade, also those chairs on the balcony ... instead
+of 4 positioned weirdly, just keep 2 chairs kinda facing one another, maybe
+place a cloth dryer there we often dry our clothes, perhaps hang one towel on
+the railings there and have it flap in the wind like them flags"*, and then
+*"make the objects in the bathroom on the second floor high-poly also, the
+toilet, the basin, etc"*.
+
+All of it is off his photographs of the upper floor
+(`/mnt/c/tmp/refs/vacay_house/`, the 15 Aug set).
+
+**The shell** (`tools/blender/vikendica.py`):
+
+- **Plaster that is not one flat value.** The inside of every wall and
+  partition on the upper floor, and the ceiling over it, is a grid of
+  14–16 cm quads now. Each corner carries a tint: a skim coat's slow
+  unevenness, a shadow into each inside corner and along the ceiling line,
+  and a little grey above the floor. On the ceiling the shadow runs along
+  every wall. The corners come from a list of the actual wall faces, so the
+  open side of the kitchen makes no corner. It is vertex colour, not a
+  texture: `tools/blender/frmesh.py` multiplies in an optional `frcol`
+  corner attribute that nothing else writes, so every other bake comes out
+  byte for byte the same.
+- **Skirting** has a profile now: 13 × 75 mm with a pencil-round top. It
+  stands on the plaster face and stops at every opening, at the architrave
+  where there is one. The old strips sat 1.2 cm inside the outside walls'
+  4 cm plaster skin, so on every outside wall there was none to see. They
+  also ran straight across the terrace doorway, the front door and the open
+  side of the kitchen, standing on the tiles as a white kerb.
+- **Architraves** are a moulded pine profile, mitred at the head, where they
+  were three flat battens.
+- **Light fittings**, after the photographs:
+  - in the big room, alabaster plafonjere: a lathed bowl in a spun ring
+    with three clips and a brass knob;
+  - in the bathroom, soba 4 and downstairs, the plain opal half-dome;
+  - in soba 3, the navy sun with twelve wavy rays.
+- **Sheer curtains** hang from wooden rings on the pole: a pleat every
+  11–12 cm, gathered at the heading, every pleat a different depth, and a
+  hem that wanders. The pole has acorn finials and two wall brackets. Before,
+  each curtain was a corrugated sheet two vertices tall.
+- **Switches** beside each door, with the cream junction-box lids above
+  them that are in every photograph. There are also sockets behind the
+  television, over the worktop and by the desk, uPVC turn handles on every
+  window, and a hatch in the bathroom ceiling.
+
+**The bathroom**, as photographed from its door:
+
+- **The WC.** The pan has twice the rings and segments, smooth. The lid
+  stands up on its hinge against the cistern, and the cistern is smooth too.
+  The dual flush buttons are pressed into chrome rings, and an angle valve
+  feeds a braided flexi up into the cistern.
+- **The basin** is the round-fronted one hung on the wall: one loft over
+  the rim into the bowl, a tap ledge, a single-lever mixer, a plug, and the
+  trap down into a white two-door cabinet with bar handles.
+- **Over it**, a strip light, clips on the mirror, and a glass shelf on
+  chrome brackets with a gallery rail. On the shelf are a tumbler, two
+  toothbrushes, paste and three bottles. The mirror's plane has not moved,
+  so `bathMirror` still reflects in it.
+- **The shower.** The tray is a dished acrylic loft with a drain. The
+  L-shaped chrome rail has wall flanges, and the blue curtain hangs on chrome
+  rings. There is an exposed bar mixer on S-unions, a riser with the handset
+  parked in it, and a hose looped down between them.
+- **Also:** a towel rail with a blue bath towel and a green hand towel
+  hung over it as cloth, a toilet-roll holder, a terry mat, and turned
+  bottles on the window sill.
+
+The sanitary ware is still split out to `_ware` and drawn with `wareMat`.
+
+**The kitchen fan** (`src/44-vikendica.js`, `makeFan`) is the 40 cm stand fan
+in the bedroom photograph:
+
+- five moulded blades, narrow at the root and broad at the tip, swept,
+  twisted and cambered, round a domed spinner;
+- two domed wire guards (24 radial wires behind, 36 in front, with rings on
+  both) clamped at the rim, and the blue-ringed badge;
+- a lathed motor can with vent slots, a yoke with a tilt knob, four piano
+  keys and the oscillation knob;
+- a knurled telescoping collar, a cross of tube legs on rubber feet, and the
+  flex to the wall with its plug.
+
+It still turns and oscillates. Its twin replaces the three-disc fan that
+was baked into soba 3, on its own phase.
+
+**The terrace:**
+
+- **Chairs.** The round table, its four chairs and the stray fifth chair are
+  gone. Two monoblocs face each other on a diagonal across a little white
+  bistro table in front of the kitchen window. Square to the house, the near
+  one hid the far one from the terrace door.
+- **The airer.** A wing airer stands along the railing east of the door, out
+  of the way. It has a flat top of nine rails, two wings at 54° with four
+  rails each, X legs with grey feet, and a tie. On it are:
+  - a white T-shirt and a navy one (body and sleeves) and a coral vest;
+  - a teal swimsuit and a red bikini;
+  - six socks, each pegged.
+- **The towel.** One striped beach towel is hung over the top rail, and it
+  flaps. It is `brodEnsign`, the particle cloth of the Brod's ensign and the
+  mole flags, carried with its luff along the rail. It is 7 × 11 particles
+  in terry at 0.30 kg/m², stepped within 60 m of you and costing
+  0.2–0.3 ms. The other end, over the rail and down the sea side, is still
+  geometry with the same stripes.
+  - The long half hangs on the terrace side, and that was the wind's
+    choice. Hung on the sea side first, the onshore breeze pressed it flat
+    against the rods (sag 89.8°, no movement).
+  - Inside, it lifts off the rail toward the house: sag 35–65° over a
+    four-second strip.
+  - A new `cfg.plane` in `brodEnsign` (src/59-brod.js) keeps it on its own
+    side of the rods. It is optional and touches no other flag.
+  - The rail and the towel's ends come out of the plan sidecar
+    (`plan.towel`).
+
+Tris and payload:
+
+| blob | tris before | tris after | KB before | KB after |
+|---|---|---|---|---|
+| shell | 314,862 | 418,926 | 645.6 | 790.4 |
+| roof | 6,220 | 14,956 | 15.1 | 25.0 |
+| sheer | 596 | 34,728 | 2.0 | 51.4 |
+| ware | 2,594 | 9,848 | 20.8 | 28.5 |
+
+The loft is unchanged. The page grows from 39.09 to 39.38 MB (+304 KB). The
+rebake is byte-stable. The new randomness comes off hashes of position and a
+new generator (SRNG), so the floors, tiling and yard did not move.
+
+Blockers are 820 (no furniture has one, and none was added), people 100, no
+console errors, day and night.
+
 ## [1.559.1] — 2026-10-01
 
 ### The two bedrooms, furnished off their own photographs, and the giant closet gone

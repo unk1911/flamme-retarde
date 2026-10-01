@@ -2873,6 +2873,12 @@ function brodEnsign(cfg = null) {
     BROD_MAST.y1 * BROD_K - E.drop, 0);
   const mastF = cfg && cfg.mastF != null ? cfg.mastF : BROD_MAST.x * BROD_K - head.x;
   const mastR = cfg && cfg.mastR != null ? cfg.mastR : BROD_MAST.w * 0.5 * BROD_K + E.pad;
+  // `cfg.plane` keeps the cloth on one side of a plane through the head of
+  // the luff: `n` its normal in `frame`'s axes (an Object3D, or the world),
+  // `d` metres along it the cloth may not come back past. A towel over a
+  // railing (44-vikendica.js) is the one user: the rods are the plane.
+  const plane = cfg && cfg.plane ? cfg.plane : null;
+  const PN = [0, 0, 0];
   // The section is square, 0.245 m; the cloth is kept outside the circle
   // through the middle of its faces plus a centimetre. It only ever touches
   // it when the wind is from astern of her and the flag wraps.
@@ -3080,6 +3086,10 @@ function brodEnsign(cfg = null) {
         if (md < mastR && md > 1e-6) {
           x[i] = ax + mx * mastR / md; x[i + 2] = az + mz * mastR / md;
         }
+        if (plane) {
+          const s = x[i] * PN[0] + x[i + 1] * PN[1] + x[i + 2] * PN[2] - plane.d;
+          if (s < 0) { x[i] -= PN[0] * s; x[i + 1] -= PN[1] * s; x[i + 2] -= PN[2] * s; }
+        }
       }
     }
   }
@@ -3097,6 +3107,17 @@ function brodEnsign(cfg = null) {
     ez[0] = M[8]; ez[1] = M[9]; ez[2] = M[10];
     A.copy(head).applyMatrix4(boat.matrixWorld);
     mesh.position.copy(A);
+    if (plane) {
+      const F = plane.frame ? plane.frame.matrixWorld.elements : null;
+      const [a, b, c] = plane.n;
+      if (F) {
+        PN[0] = F[0] * a + F[4] * b + F[8] * c;
+        PN[1] = F[1] * a + F[5] * b + F[9] * c;
+        PN[2] = F[2] * a + F[6] * b + F[10] * c;
+      } else { PN[0] = a; PN[1] = b; PN[2] = c; }
+      const L = Math.hypot(PN[0], PN[1], PN[2]) || 1;
+      PN[0] /= L; PN[1] /= L; PN[2] /= L;
+    }
     live = !cam || Math.hypot(cam.x - A.x, cam.y - A.y, cam.z - A.z) < E.near;
     if (!live) { pend = 0; return; }
     const t0 = performance.now();
