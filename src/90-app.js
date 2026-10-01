@@ -12103,6 +12103,9 @@ window.__fr = {
      *   __fr.jad.hammock.push()           the push, from where you are standing
      *   __fr.jad.hammock.gps()            where it is, in degrees and in the world
      */
+    /** The playground errand — see MEET in 43-jadrija.js. */
+    meet: (...a) => (jadrija && jadrija.meet ? jadrija.meet(...a) : null),
+    meetApi: () => (jadrija && jadrija.meet) || null,
     hammock: {
       api: () => (jadrija && jadrija.hammock) || null,
       stats: () => (jadrija && jadrija.hammock ? jadrija.hammock.stats() : null),

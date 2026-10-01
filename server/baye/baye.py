@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.49.1"
+VERSION = "1.50.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -553,6 +553,22 @@ HAM_ASK = (r"\b(get|go|goes|climb|hop|jump|lie|lay|lying|laying|sit|chill|relax|
            r"|" + HAMMOCK_RE + r".{0,16}\b(now|please|pls|time)\b"
            r"|\b(lezi|legni|idi|u[đd]i)\b.{0,12}\bu\s+mrež\w*\b")
 
+# The playground behind the kabine, and its ping pong tables (1.555.2): the
+# noun in English, Croatian (igralište, typed with or without the diacritic,
+# in any case), French and German. With a verb of going or meeting in the
+# sentence it is a request — "come to the playground", "meet me at the
+# playground", "idemo na igralište", "vidimo se na igralištu", "allons à
+# l'aire de jeux" — and on its own it is too; a sentence that only talks
+# about it ("the playground looks new") is talk. See `grounds_of`, and the
+# typed twin `groundsWords` in src/49-ears.js.
+GROUNDS_RE = (r"\b(play ?ground\w*|play ?area|igrali(š|s)t\w*|aire de jeux|"
+              r"parc (de|pour|à|a) (jeux|enfants)|spielplatz\w*|ping ?pong\w*|"
+              r"table tennis|stoln\w* tenis\w*|tennis de table)\b")
+GROUNDS_GO = (r"\b(come|coming|go|going|let'?s|lets|meet|see you|join|head|walk|run|"
+              r"race|take me|follow|bring|over|idemo|hajdemo|ajmo|ajde|hajde|"
+              r"do(đ|d|dj)i|idi|na(đ|d|dj)imo|na(đ|d|dj)i|vidimo|pridru(ž|z)i\w*|"
+              r"allons|allez|viens|va|vas|rejoins|retrouve|on va|treffen|gehen|komm)\b")
+
 SKILLS = {
     "see.slast": ("walk up to the ice cream place and see what flavours are in "
                   "the case", [r"\b(ice ?cream|gelato|flavou?rs?|slast\w*)\b", SEE_RE]),
@@ -949,6 +965,14 @@ SKILLS = {
     # sentence is read by `hammock_of` BEFORE this table, because "lie in the
     # hammock" is also a lie-down and "get out" is also a get-up; these two
     # entries are here for the one-word ask ("hammock") and for the ticket.
+    # AND THE PLAYGROUND BEHIND THE KABINE (1.555.2). Misha, 1 Oct 2026:
+    # *"we need to think about how to rapidly get her to the playground"*.
+    # She walks there by the gaps through the rows, or — if they are there
+    # already and she is a long way off — comes round unseen and walks in.
+    # Read by `grounds_of` ahead of the table, like the hammock; this entry
+    # is the one-word ask and the ticket.
+    "grounds": ("come to the playground behind the kabine and meet them there",
+                [GROUNDS_RE]),
     "hammock.out": ("get out of the hammock and stand up", [HAMMOCK_RE, HAM_OUT_RE]),
     "hammock": ("go to the hammock in the pines behind the kabine and lie in it",
                 [HAMMOCK_RE]),
@@ -1680,9 +1704,28 @@ def hammock_of(t: str):
     return "hammock"
 
 
+def grounds_of(t: str):
+    """`grounds` if the sentence asks her to the playground, else None.
+
+    Ahead of the table for the hammock's reason: "come and play ping pong" has
+    nothing `ASK_RE` would stop and a noun the table might give to something
+    else, and "see you at the playground" has no ask in it at all. The noun
+    and a verb of going or meeting, or the noun as the whole sentence.
+    """
+    if not re.search(GROUNDS_RE, t):
+        return None
+    if re.search(GROUNDS_GO, t) or bare_skill(t) == "grounds":
+        return "grounds"
+    return None
+
+
 def skills_of(text: str) -> list:
     """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
     t = (text or "").lower()
+    # THE PLAYGROUND FIRST — see `grounds_of`.
+    gr = grounds_of(t)
+    if gr:
+        return [gr]
     # THE HAMMOCK FIRST — see `hammock_of`. A sentence with the noun in it and
     # none of the gate's shapes ("that hammock looks comfy") is still talk.
     ham = hammock_of(t)
@@ -4195,6 +4238,9 @@ SHORE_DOING = {
     "hamUp": "getting up after tumbling out of the hammock",
     "hamFall": "tumbling out of the hammock",
     "hamBack": "walking back down through the pines from the hammock",
+    # 1.555.2: the playground behind the kabine — see MEET in 43-jadrija.js.
+    "toGrounds": "walking round behind the kabine to the playground to meet them",
+    "grounds": "at the playground behind the kabine with them",
 }
 # THE SAME BEAT, ON THE MATTRESS. `kept`, `cradle`, `situp` and `recline` are
 # the hose's floor poses in `SHORE_DOING` — soaked, on the boards — and the

@@ -506,6 +506,9 @@ const ears = (() => {
    * here. What differs is two headers and what the panel calls it.
    */
   async function send(blob, secs, typed = false) {
+    // A skill this line already armed in the page, so the service's echo of
+    // it is not asked a second time — see `groundsWords`.
+    let armedHere = null;
     // THE BELT, AND ITS SAFEWORD, ARE MATCHED HERE — 1.552.0, BELT_HAND in
     // 90-app.js. Before the sign-in and before anything is sent anywhere,
     // because "red" has to work every time: signed out, offline, with the
@@ -531,6 +534,20 @@ const ears = (() => {
         act(bw);
         draw();
         return;
+      }
+      // AND THE PLAYGROUND (1.555.2): armed here, and — signed in — the line
+      // goes on so she says yes to it; her `does` coming back for the same
+      // name is then skipped rather than asked twice. See `groundsWords`.
+      const gw = groundsWords(blob);
+      if (gw) {
+        note('“' + blob + '”  typed · here  → ' + gw, 'heard');
+        const J0 = typeof jadrija !== 'undefined' && jadrija;
+        const got = J0 && J0.askShow ? J0.askShow(gw) : false;
+        note('baye: ' + (got === true ? DOES[gw] : (WHY[got] || 'cannot do that here')),
+          got === true ? 'did' : 'meta');
+        armedHere = gw;
+        draw();
+        if (!AUTH.baye || !AUTH.user) return;
       }
     }
     // AND IT SAYS WHY, rather than swallowing the line. On a keyboard this
@@ -671,6 +688,7 @@ const ears = (() => {
                       : got), got === 'on' || got === 'off' ? 'did' : 'meta');
             continue;
           }
+          if (name === armedHere) continue;
           const J = typeof jadrija !== 'undefined' && jadrija;
           // THREE ANSWERS AND NOT TWO — see `askShow` in 43-jadrija.js.
           // `false` is a name she does not know; `true` is armed; a STRING is
@@ -813,6 +831,8 @@ const ears = (() => {
     swim: 'off for a swim', tramp: 'off to the trampolines',
     // And the hammock in the pines behind the kabine, in and out.
     hammock: 'off to the hammock in the pines', 'hammock.out': 'getting out of the hammock',
+    // And the playground behind the kabine (1.555.2) — see MEET.
+    grounds: 'off to the playground behind the kabine',
     // And the recon missions. She walks off and there is nothing else to see
     // until she is back, so the panel says where she has gone.
     'see.slast': 'off to the ice cream place, back in a minute',
@@ -894,7 +914,30 @@ const ears = (() => {
     collared: 'she is already wearing it',
     collaroff: 'it is coming off',
     nocot: 'the cot is in the kabina — lead her in there first',
+    // The playground's (1.555.2). On the leash the way there is you.
+    leadher: 'she is on the leash — lead her there yourself',
+    cotleashed: 'she is collared to the cot — take the collar off first',
   };
+
+  /**
+   * THE PLAYGROUND, typed (1.555.2) — "come to the playground", "meet me at
+   * the playground", "let's go to the playground", "idemo na igralište",
+   * "dođi na igralište", "vidimo se na igralištu", "allons à l'aire de
+   * jeux", and the ping pong tables the same way. The noun and a verb of
+   * going or meeting, or the noun on its own as the whole line; a sentence
+   * ABOUT the playground ("the playground looks new") is still a sentence,
+   * and goes on to her. Matched here like the belt so it works signed out;
+   * signed in the line goes on as well, so she answers it in her own voice.
+   */
+  function groundsWords(text) {
+    const t = String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd').replace(/[.!?,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const noun = /\b(play ?ground|play ?area|igralist\w*|aire de jeux|parc (de|pour|a) (jeux|enfants)|spielplatz\w*|ping ?pong\w*|table tennis|stoln\w* tenis\w*|tennis de table)\b/;
+    if (!noun.test(t)) return null;
+    if (/^(the |to the |na |u |a l'|au )?(play ?ground|igraliste|ping ?pong|aire de jeux)$/.test(t)) return 'grounds';
+    const go = /\b(come|coming|go|going|let'?s|lets|meet|see you|join|head|walk|run|race|take me|follow|bring|over|idemo|hajdemo|ajmo|ajde|hajde|dodi|dodji|idi|nadimo|nadjimo|nadi|vidimo|pridruzi\w*|allons|allez|viens|va|vas|rejoins|retrouve|on va|treffen|gehen|komm)\b/;
+    return go.test(t) ? 'grounds' : null;
+  }
 
   /**
    * The belt's words, typed — see the note in `send`. English, Croatian and
