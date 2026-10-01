@@ -8,6 +8,139 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.558.1] — 2026-10-01
+
+### To the playground the short way, at a jog, and a body that knows it is moving
+
+Misha: *"when i tell baye 'to the playground', she does this super long trek,
+she walks into the kabine, then comes out and then walks for a long time,
+maybe she should i dunno, optimize her path, and like sometimes "sprint"
+around... can we make her less wooden and more "springy", u know, more
+human-like and less robotic?"*
+
+**Why the trek was long, measured.**
+
+- **The kabina was a hole in the front row.** Its walls are not blockers (the
+  room keeps you in with its own shell), so to `hamPath`'s grid the special
+  hut was 4.5 m of open floor from its door to its back wall. Any way between
+  the promenade and the alley near t 424-429 went in at the door and out
+  through the back wall: alley to lane was one straight 13.5 m leg through
+  it. It is a solid box to the search now, unless one end of the way is
+  inside it.
+- **Asked from inside the kabina,** she walked out of the door and then the
+  whole promenade to t 511 and up the gravel way: 119 m, 70 s.
+- **From her own spot it was 113.5 m for a gate 94 m off.** `groundsRoute`
+  sent anyone on the promenade side to the NEAREST point of a gravel way
+  first, which by a straight line through two rows of huts is the way's
+  front end. That was there because `hamPath` was breadth-first: every step
+  cost the same, diagonals included, so it was short in cells and not in
+  metres.
+
+**Shorter ways** (`hamPath`, `groundsRoute`).
+
+- A* in metres: a straight step costs 0.25 m and a diagonal 0.354, under an
+  octile estimate. The gravel ways cost 0.82 of the rest, so she takes the
+  path when it goes her way.
+- The chain is pulled tight with a galloping sight test: a long straight run
+  is two dozen tests, not hundreds.
+- `groundsRoute` asks the search once, from where she is. The old
+  join-the-way route is kept as the fallback.
+
+| start | straight line | before | after |
+|---|---|---|---|
+| her spot (t 429, lane) | 94.3 | 113.5 | 99.9 |
+| kabina door | 95.0 | 114.2 | 99.3 |
+| lane at t 380 | 141.7 | 162.6 | 146.3 |
+| lane at t 470 | 56.9 | 72.5 | 64.6 |
+| the hammock | 79.1 | 81.8 | 79.3 |
+| the alley at t 450 | 70.5 | 78.7 | 77.6 |
+
+Search time is 2-15 ms a request (it was 2-9).
+
+**Time to the gate,** in game seconds. Two runs each after, because her pace
+is drawn per request:
+
+- from her spot: 69.7 → 31.5 / 39.9
+- from inside the kabina: 70.0 → 39.1 / 40.3
+- from the hammock: 50.4 → 29.5 / 32.1
+
+**A jog** (`jog`, tools/blender/jog.py).
+
+- A new clip on her rig, spliced onto the end of `human_skin.fr3d.gz`. Every
+  other byte of the blob is unchanged.
+- 0.72 s a cycle, 167 steps a minute, 1.03 m a step, 2.862 m/s at a clock
+  of 1.
+- A third of the cycle on the ground, 6.6 cm of bounce, elbows bent at about
+  85°.
+- The stance hip is solved per frame, so the ball of the planted foot moves
+  back in a straight line at exactly that speed. Measured in game, the jog's
+  planted foot slides 37 mm a stance (6 % of the ground covered).
+
+**And her walk, re-solved** (`stroll`, tools/blender/stroll.py).
+
+- The shipped `walk` set each foot down still swinging forward. In figure
+  space the ball reaches the deck at 0.43 of the cycle and travels on 16 cm
+  before it starts back.
+- Measured on the way to the playground, the ball moved 26-30 cm over the
+  ground in every stance. That is 42-46 % of the ground she covered.
+- `stroll` keeps the walk's knees, arms, sway and narrow track, its 1.00 s
+  cycle and its 1.37 m/s.
+- It lands on the heel, rolls over the ball, and has the stance hip solved
+  per frame. There is a little double support, which the walk had none of.
+- In game the planted ball slides 9 mm a stance (2 %). The jog's is 3-28 mm
+  (0-4 %).
+- Hers only: `walk` stays in the blob, byte for byte, for the other figures
+  built off it.
+- The blob now has 55 clips. Against HEAD the decompressed bytes differ
+  only in the clip count and the two clips appended at the end.
+
+**Pace** (`routeStep`, STRIDE).
+
+- Over 25 m of way she jogs at 2.6-3.0 m/s, and one time in four she runs at
+  3.3-3.6.
+- She brakes into each corner by how sharp it is (a right angle costs 40 %
+  of her speed) and into the last 6 m, which she walks.
+- She sets off at 1.7 m/s² and pulls up at up to 3.5 m/s², instead of an
+  exponential ease.
+- A heading more than about a right angle off is turned on the spot first.
+- She steers at a point a stride or two down the way, not at the corner.
+  Aimed at the corner, the heading controller swung her past the new leg and
+  back: the peak sideways acceleration at a corner went from 14.3 m/s² to
+  6.3.
+- Going home from the grounds is a jog too.
+- While larking about, about one wander tick in thirty she breaks into a
+  2.5-5 s run. That is the "sometimes sprint around".
+
+**Gait.**
+
+- The clip follows the ground she actually covers: jog over 2.10 m/s, back
+  to the walk under 1.80.
+- She enters the other gait at the same fraction of the stride, so the fade
+  carries the feet on instead of swapping which one is in front.
+- The jog's clock is her speed over 2.862.
+- Never on the leash. Never on the way to a cartwheel or a ladder.
+
+**Body** (`strideTick`).
+
+- She leans into a turn about her feet, by half of atan(v·ω/g), up to 10°.
+  Measured: into the turn on 145 of 162 turning frames; the rest are the lag
+  at the entry and the exit.
+- She leans forward as she sets off and back as she pulls up, by up to 4°.
+- She shifts her weight once as she stops.
+- Her head turns into the corner before her body does.
+- Every 3.5-8 s while she is going somewhere, she glances about. On the way
+  to the grounds with you behind her, she looks back over her shoulder.
+- The lean rides on the mesh's attitude, which v2.0 already copies. The neck
+  is hers only in the getting-somewhere phases, and never over a kiss, a
+  hug, the crouch or `look at me`.
+
+Probes: `__fr.jad.raw().meet.route(t0, s0, pt, ps)` (legs, metres, ms) and
+`.walls()`; `show()` now reports `leanR`, `leanP`, `neck` and `jogging`.
+
+RULE 4: no `rng()` draw added, removed or moved. Census 446/333/86/27,
+people 100, blockers 818. Collar leading, the hammock trip, the kabina door
+and the promenade routine all checked. No console errors.
+
 ## [1.558.0] — 2026-10-01
 
 ### The playground moves: AVBD swings, seesaw, trampolines — and a gate you can walk through
