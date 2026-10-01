@@ -3280,6 +3280,8 @@ let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audi
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
   mirror, mirrorP, swim, under, seabed, arms, mask, kites, ride, chase, you,
   brod, ao, backlane, backlaneCars, plunge, crabs;
+/** The two playgrounds and the ping pong (src/46-playground.js), and a test's jet. */
+let playground = null, playJet = null;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -3416,6 +3418,9 @@ async function boot() {
   backlane = buildBackLane(scene, jadrija, city);
   backlaneCars = backlane && backlane.sites.length
     ? await buildJadrijaCars(scene, backlane.sites) : null;
+  // The two playgrounds and the ping pong, on the ground 43-jadrija.js cleared
+  // for them — src/46-playground.js. Its colliders go into the same list.
+  playground = jadrija ? buildPlayground(scene, jadrija) : null;
 
   await step(80, 'load.streets');
   airfield = buildAirfield(scene);
@@ -3490,6 +3495,12 @@ async function boot() {
     for (const m of jadrija.carMeshes || []) {
       shadow.cast(m, { instanced: true, near: true });
     }
+  }
+  if (playground) {
+    for (const m of playground.casters) shadow.cast(m);
+    for (const m of playground.trees) shadow.cast(m, { material: treeCaster(shadow, false) });
+    // The seats, the beam, the beds and the rider move: dynamic, near only.
+    for (const m of playground.movers) shadow.cast(m, { dynamic: true, near: true });
   }
   if (backlane) {
     for (const m of backlane.casters) shadow.cast(m);
@@ -10515,6 +10526,15 @@ function tick(wall, draw) {
           d > 1e-3 ? _crabV.dot(_crabR) / d : 0);
       });
     }
+    // The swings, the seesaw, the beds and the rider — pushed by the hose
+    // and by walking into them. See `tick` in src/46-playground.js.
+    if (playground) {
+      const who = state.phase === 'ground' && ground && ground.ok ? ground.you : null;
+      let jet = state.phase === 'ground' && ground && ground.hose() > 0.2 && ground.aimAt
+        ? ground.aimAt() : null;
+      if (playJet && playJet.t > 0) { playJet.t -= dt; jet = playJet.at; }
+      playground.tick(dt, camera.position, who, jet);
+    }
     // The strap, against her as she has just been posed — see `beltSimTick`.
     beltSimTick(dt);
     // The leash, against her as she has just been posed — see `collarSimTick`.
@@ -11568,6 +11588,7 @@ window.__fr = {
         pyramid: city.forms[3], skillion: city.forms[4], round: city.forms[5] },
     } : null,
     roads: roads ? { runs: roads.drawn, km: Math.round(roads.km), tris: roads.tris } : null,
+    play: playground ? playground.stats() : null,
     backlane: backlane ? {
       tris: Math.round(backlane.tris), blockers: backlane.blockers,
       dressed: backlane.dressed,
@@ -11799,6 +11820,22 @@ window.__fr = {
    *   __fr.crabs.stand(x, z)      put the walker there (they run from you, not the eye)
    *   __fr.crabs.jet(x, y, z, s)  pretend the hose is landing there for s seconds
    */
+  /**
+   * The playgrounds — src/46-playground.js.
+   *
+   *   __fr.play.stats()            tris, movers, blockers, awake
+   *   __fr.play.list()             every moving part: kind, hinge, angle
+   *   __fr.play.push(i, v)         kick part i (all if i < 0)
+   *   __fr.play.jet(x, y, z, s)    pretend the hose lands there for s seconds,
+   *                                from where the walker stands
+   */
+  play: {
+    raw: () => playground,
+    stats: () => (playground ? playground.stats() : null),
+    list: () => (playground ? playground.list() : null),
+    push: (i, v) => (playground ? playground.push(i, v) : null),
+    jet: (x, y, z, secs = 2) => { playJet = { at: { x, y, z }, t: secs }; return true; },
+  },
   crabs: {
     raw: () => crabs,
     stats: () => (crabs ? crabs.stats() : null),
