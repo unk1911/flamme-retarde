@@ -631,6 +631,13 @@ const PLUNGE_MASS = [
   ['legLL', 'footL', 0.0481], ['legLR', 'footR', 0.0481],
   ['footL', 'toeL', 0.0129], ['footR', 'toeR', 0.0129],
 ];
+/**
+ * The swan's arms: out to the side, and how much toward her head (`up`) and
+ * behind her shoulders (`back`) for each unit out — a shallow Y with the chest
+ * leading, which is what reads as wings. Unitless, normalised into a
+ * direction in `airPose`.
+ */
+const PLUNGE_SWAN = { up: 0.28, back: 0.18 };
 /** The views B steps through while she is on the tower. See `camFor` below. */
 const PLUNGE_CAMS = ['eyes', 'follow', 'judge', 'water', 'deck'];
 
@@ -1000,9 +1007,38 @@ function buildPlunge(jad, you, hooks = {}) {
         ang[bi[al]] = lerp(0, ang[bi[al]], 1 - open);
       }
     }
+    // THE SWAN. Arms out to the sides, a little arch in the back and the chin
+    // up, for most of the flight — and swept together over her head for the
+    // last of it, so she still goes in hands first. Out of the sagittal plane,
+    // so not an angle the planar FK above can carry: the arm's sagittal aim is
+    // slerped toward an abduction about her forward axis and laid on as one
+    // turn. The centre of mass this leaves out is two arms moving sideways,
+    // which moves it nowhere.
+    const swan = st.style === 'swan' && st.tFlight > 0
+      ? 1 - smoothstep(0.66, 0.88, (st.tAir || 0) / st.tFlight) : 0;
+    if (swan > 0) {
+      ang[bi.spine01] += 0.10 * swan; ang[bi.spine02] += 0.08 * swan;
+      ang[bi.neck] += 0.22 * swan;
+    }
     fk();
     applyAims(1);
+    if (swan > 0) {
+      for (const [n, sgn] of [['armUL', 1], ['armUR', -1]]) {
+        _sq1.setFromAxisAngle(AZ, ang[bi[n]]);
+        // From hanging at her side to the wing: out along her own left or
+        // right, a little toward her head and a little behind the line of
+        // her shoulders. Figure space: +x her front, +y her head, +z her left.
+        _sv.set(-PLUNGE_SWAN.back, PLUNGE_SWAN.up, sgn).normalize();
+        _sq2.setFromUnitVectors(_sDown, _sv);
+        _sq1.slerp(_sq2, swan);
+        const s = Math.sqrt(Math.max(0, 1 - _sq1.w * _sq1.w));
+        const a = 2 * Math.acos(Math.min(1, Math.max(-1, _sq1.w)));
+        if (s > 1e-6) fig.aim(n, _sq1.x / s, _sq1.y / s, _sq1.z / s, a);
+      }
+    }
   }
+  const _sq1 = new THREE.Quaternion(), _sq2 = new THREE.Quaternion();
+  const _sv = new THREE.Vector3(), _sDown = new THREE.Vector3(0, -1, 0);
 
   // ── the cameras ───────────────────────────────────────────────────────────
   const _look = new THREE.Vector3(), _up = new THREE.Vector3();
@@ -1140,6 +1176,31 @@ function buildPlunge(jad, you, hooks = {}) {
         worldOf(st.at, _c[0], _c[1], _c[2], st.B0);
         st.B = st.B0.slice();
         st.R0 = [rider.u, rider.y];
+        st.tAir = 0;
+        st.style = st.auto ? st.auto.style || null : null;
+        // How long until the water, off the takeoff: her centre falls from
+        // here to the surface on a parabola, and that is the whole of it.
+        // The sea where she will go in, not where she left: the swell is half
+        // a metre either way and that is a tenth of a second of fall, which
+        // laid out is 20 degrees at the water. Twice round is enough.
+        let sy0 = sea(st.B[0], st.B[2]);
+        for (let k = 0; k < 2; k++) {
+          const dh = Math.max(0.1, st.B0[1] - (sy0 + 0.12));
+          st.tFlight = (rider.vy + Math.sqrt(rider.vy * rider.vy + 2 * 9.81 * dh)) / 9.81;
+          const du = rider.vu * st.tFlight;
+          sy0 = sea(st.B0[0] + du * F.axis.ux, st.B0[2] + du * F.axis.uz);
+        }
+        // THE SPIN SOLVED FOR THE ENTRY, for a dive that holds one shape the
+        // whole way (`autoDive`, Baye's in 61-chase.js). A straight dive has
+        // nothing to kick out of, so the only thing that decides how she goes
+        // in is how much she turned on the board — and a fixed lean spin is
+        // right for one takeoff speed and a flop at every other: 3 rad/s off a
+        // 6.8 m/s pump is 300 degrees by the water. So it is the takeoff's
+        // own number, solved here the way dive.py solves the diver's: so
+        // much turn, over exactly the time she has. Laid out, I is 1.
+        if (st.auto && st.auto.turnTo != null && st.dir !== 0) {
+          st.L = st.auto.turnTo / st.tFlight;
+        }
         if (hooks.sound) hooks.sound('board', clamp(Math.abs(board.tip()[1]) / 3, 0.2, 1));
         ev = { type: 'takeoff', vy: rider.lastTakeoff.vy };
       } else if (e === 'land') {
@@ -1163,6 +1224,7 @@ function buildPlunge(jad, you, hooks = {}) {
         else if (st.pike > 0.5 && st.spinShape !== 'tuck') st.spinShape = 'pike';
         const I = 1 - (1 - H.iTuck) * st.tuck - (1 - H.iPike) * st.pike;
         const w = st.L / Math.max(0.25, I);
+        st.tAir = (st.tAir || 0) + dt;
         st.spinMax = Math.max(st.spinMax, Math.abs(w));
         st.phi += w * dt;
         st.psi += (ctl.twist || 0) * H.twist * dt;
@@ -1177,7 +1239,10 @@ function buildPlunge(jad, you, hooks = {}) {
           st.entries++;
           const dev = st.entry.dev * Math.PI / 180;
           const hard = 0.55 + 1.9 * Math.sin(dev) + (st.entry.shape === 'tuck' ? 0.5 : 0)
-            + Math.max(0, -rider.vy - 6) * 0.08;
+            + Math.max(0, -rider.vy - 6) * 0.08
+            // A cannonball is the one entry made FOR the splash.
+            + (st.style === 'ball' ? 1.1 : 0);
+          st.entry.style = st.style;
           if (hooks.splash) hooks.splash(st.B[0], sy, st.B[2], hard, rider.vu * 0.6, F.axis.ux, F.axis.uz);
           if (hooks.sound) hooks.sound('plunge', clamp(0.6 + 0.6 * Math.sin(dev), 0, 1.2));
           st.uv = [rider.vu * F.axis.ux, rider.vy, rider.vu * F.axis.uz];
@@ -1339,7 +1404,19 @@ function buildPlunge(jad, you, hooks = {}) {
     }
     if (rider.mode === 'stand') a.armed = false;
     if (a.n >= a.bounces && rider.mode === 'stand') out.lean = a.lean;
+    if (rider.mode === 'air' && st.dir !== 0 && a.shape === 'ball') {
+      // The cannonball: knees to the chest the moment she is clear of the
+      // board and held into the water. No spin to time — `turnTo` is 0.
+      if (st.tAir > 0.12 && !st.tuckArmed) pressed.jump = true;
+      out.tuck = st.tAir > 0.12;
+      return out;
+    }
     if (rider.mode === 'air' && st.dir !== 0) {
+      // A counted twist: held until she has turned `twistTurns` times about
+      // her long axis and not a frame after, so a full twist is a full twist.
+      if (a.twistTurns) {
+        out.twist = Math.abs(st.psi) < TAU * a.twistTurns - 0.05 ? Math.sign(a.twistTurns) : 0;
+      }
       if (a.shape) {
         const sy = sea(st.B[0], st.B[2]);
         const tLeft = (rider.vy + Math.sqrt(Math.max(0, rider.vy * rider.vy + 2 * 9.81 * (st.B[1] - sy)))) / 9.81;
@@ -1364,6 +1441,10 @@ function buildPlunge(jad, you, hooks = {}) {
   const toLadder = (x, z) => Math.hypot(x - FOOT[0], z - FOOT[2]);
   /** Why the ladder cannot be climbed now, as a string key, or ''. */
   function blocked() {
+    // Somebody else of ours on the tower — Baye, in the R race's show (see
+    // 61-chase.js). One tower, one board, one ladder: whoever is up there has
+    // it until she is back in the water.
+    if (hooks.busy && hooks.busy()) return hooks.busyKey || 'plunge.busy';
     return D.mode && D.mode() === 'ladder' ? 'plunge.busy' : '';
   }
   /**
@@ -1398,7 +1479,7 @@ function buildPlunge(jad, you, hooks = {}) {
   function end() {
     releaseAims();
     st.mode = 'off';
-    st.script = null; st.auto = null;
+    st.script = null; st.auto = null; st.style = null;
     holdNpc(false);
   }
   function abort() {
@@ -1453,6 +1534,26 @@ function buildPlunge(jad, you, hooks = {}) {
       st.auto = { bounces, lean, shape, turns, twist, late, n: 0, armed: false, started: false };
       return true;
     },
+    /**
+     * A whole dive by name of its parts, for somebody who is not at the keys
+     * — Baye's repertoire in 61-chase.js. `autoPump`'s plan plus three:
+     * `turnTo` (rad) solves the takeoff spin so a one-shape dive goes in at
+     * exactly that much turn (see the takeoff); `style` is 'swan' (arms out)
+     * or 'ball' (tucked feet first, with `shape: 'ball'`); `twistTurns` is a
+     * counted twist.
+     */
+    autoDive: (o) => {
+      st.auto = { bounces: 3, lean: 1, shape: null, turns: 0, twist: 0, late: false,
+        ...o, n: 0, armed: false, started: false };
+      return true;
+    },
+    /**
+     * Her root in the world, wherever she is on the tower — and the foot of
+     * the ladder before the first pose has put her anywhere (`st.at` starts
+     * at the world's origin, two kilometres off).
+     */
+    where: () => (st.at[0] || st.at[2] ? st.at : FOOT),
+    get entryNow() { return st.entry; },
     blowUp: (v) => { board.blowUp(v); return true; },
     stats: () => ({
       mode: st.mode, tau: +st.tau.toFixed(2), cam: PLUNGE_CAMS[st.cam],
@@ -1461,6 +1562,8 @@ function buildPlunge(jad, you, hooks = {}) {
       tip: board.tip().map((v) => +v.toFixed(3)),
       takeoffs: rider.takeoffs.map((t) => t.vy),
       phi: +st.phi.toFixed(2), psi: +st.psi.toFixed(2), L: +st.L.toFixed(2),
+      tAir: +(st.tAir || 0).toFixed(2), tFlight: +(st.tFlight || 0).toFixed(2),
+      style: st.style || null, dir: st.dir,
       spinMax: +st.spinMax.toFixed(2),
       tuck: +st.tuck.toFixed(2), pike: +st.pike.toFixed(2),
       B: st.B.map((v) => +v.toFixed(2)), at: st.at.map((v) => +v.toFixed(2)),

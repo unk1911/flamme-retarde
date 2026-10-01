@@ -103,7 +103,73 @@ FIGURES = {
     'bucketeer2': {'body': 'build/mh_base.obj', 'pubic': False,
                    'tex': {'hair': 'rehmanpolanski_hair_bun_brown',
                            'suit': 'mindfront_f_one-piece_swimsuit_01'}},
+    # Baye in her bikini for the swim — garments only, see `bayeswim` in
+    # tools/blender/baye2.py. The bun's map is NOT written: it is the
+    # Bucketeer's (`bucketeer2_hair`), the same asset, dyed at runtime. What
+    # is hers is the suit's map, and `mask` — the suit's own `delete_verts`
+    # rasterised into the body's UV space, because her body is `baye2.fr3d`
+    # and cannot have those faces taken out of it at bake time. See
+    # `delete_mask`.
+    'bayeswim': {'body': 'build/mh_base.obj', 'pubic': False,
+                 'tex': {'suit': 'mindfront_bikini_01'},
+                 'mask': 'mindfront_bikini_01'},
 }
+# The delete mask's size. A body face under the suit is 10-40 texels across at
+# this resolution, and the mask is eroded by one texel so that a face only
+# PARTLY on the list — the row the suit's hem lies over — is never cut.
+MASK_PX = 512
+
+
+def delete_mask(vs, vts, want):
+    """The body faces a garment's `.mhclo` deletes, as a UV-space mask.
+
+    MakeHuman dresses a figure by taking the body out from under the cloth:
+    `delete_verts` in the asset's `.mhclo`, and a face goes when every one of
+    its corners is on the list (`read_delete` in baye2.py, which this agrees
+    with). When the body is a different blob from the garment that cannot
+    happen at bake time, so it happens in the fragment shader instead: white
+    where the body is under the suit and may be discarded. MakeHuman's own
+    image convention (row 0 is v = 1), the same as the skin map it is read
+    beside.
+    """
+    from PIL import ImageDraw, ImageFilter
+    d = next((x for x in (ROOT / 'build' / 'mh_assets').rglob(want) if x.is_dir()), None)
+    clo = next(iter(sorted(d.glob('*.mhclo'))))
+    gone, on = set(), False
+    for ln in clo.read_text(errors='ignore').splitlines():
+        w = ln.split()
+        if not w:
+            continue
+        if w[0] == 'delete_verts':
+            on = True
+            continue
+        if not on:
+            continue
+        if not w[0].isdigit():
+            break
+        i = 0
+        while i < len(w):
+            if i + 2 < len(w) and w[i + 1] == '-':
+                gone.update(range(int(w[i]), int(w[i + 2]) + 1))
+                i += 3
+            else:
+                gone.add(int(w[i]))
+                i += 1
+    # Every group's faces, not only `body`'s: read_obj keeps body alone, which
+    # is what the mask wants — the suit never hides an eye.
+    _vs, _vts, faces = read_obj(ROOT / 'build' / 'mh_base.obj')
+    im = Image.new('L', (MASK_PX, MASK_PX), 0)
+    dr = ImageDraw.Draw(im)
+    n = 0
+    for f in faces:
+        if not all(vi in gone for vi, _t in f) or min(t for _v, t in f) < 0:
+            continue
+        dr.polygon([(vts[t][0] * MASK_PX, (1.0 - vts[t][1]) * MASK_PX) for _v, t in f], fill=255)
+        n += 1
+    im = im.filter(ImageFilter.MinFilter(3))
+    print('[baye2tex] mask: %d verts listed, %d body faces cut, %d texels'
+          % (len(gone), n, int((np.asarray(im) > 127).sum())))
+    return im.point(lambda v: 255 if v > 127 else 0).convert('1')
 # The suit's map, which ships at 2048 square. It is one flat colour with a
 # black binding round every edge and is dyed at runtime off its luminance, so
 # what the map has to carry is the binding's width — 18 px at 2048, 4.5 at
@@ -476,6 +542,11 @@ def main():
                 dst, quality=86, optimize=True)
         print('[baye2tex] %-4s %-24s -> %-18s %.0f KB'
               % (kind, want[:24], dst.name, dst.stat().st_size / 1024))
+    if spec.get('mask'):
+        dst = OUT / ('%s_mask.png' % name)
+        delete_mask(vs, vts, spec['mask']).save(dst, optimize=True)
+        print('[baye2tex] mask %-24s -> %-18s %.1f KB'
+              % (spec['mask'][:24], dst.name, dst.stat().st_size / 1024))
 
 
 if __name__ == '__main__':

@@ -3458,6 +3458,9 @@ async function boot() {
     // two meshes on one group. Near cascade, like everything under two metres.
     shadow.castTree(jadrija.bucketeer.pail, { dynamic: true, near: true });
   }
+  // Baye in the R race — on the plank and the deck a figure with no shadow is
+  // a figure pasted on; in the water it costs nothing anybody sees.
+  if (chase && chase.fig && chase.fig.cast) chase.fig.cast(shadow, { near: true });
   // And the two things on her that are not skinned. `syncMoving` reads the
   // source mesh's `visible` every frame, so before the turn — when they are
   // hidden — they cast nothing.
@@ -3615,7 +3618,32 @@ async function boot() {
       else if (kind === 'land' && audio.nudge) audio.nudge();
     },
     toast: (msg) => toast(msg),
+    // One tower: while Baye has it — the R race's show, 61-chase.js — the
+    // ladder is hers, and E at its foot says so.
+    busy: () => !!(chase && chase.onTower),
+    busyKey: 'plunge.busyHer',
   });
+  // And Baye's own way up it, the same machinery on her own figure: the
+  // R race ends at the ladder now and she climbs it. She waits while Chloe is
+  // up there; her splash is the same splash, and her sound is quieter the
+  // further off she is.
+  if (chase && chase.attach) {
+    const far = (x, z) => clamp(1 - Math.hypot(x - camera.position.x, z - camera.position.z) / 140, 0.12, 1);
+    let lastAt = [0, 0];
+    chase.attach(jadrija, {
+      chloeUp: () => !!(plunge && plunge.active),
+      splash: (x, y, z, hard, fwd, fx, fz) => {
+        lastAt = [x, z];
+        if (bodySplash) bodySplash.at(x, y, z, hard, fwd, fx, fz);
+      },
+      sound: (kind, amt) => {
+        if (!audio || !chase.her) return;
+        const k = far(chase.her.x, chase.her.z);
+        if (kind === 'plunge' && audio.plunge) audio.plunge(amt * k);
+        else if (kind === 'land' && audio.nudge && k > 0.8) audio.nudge();
+      },
+    });
+  }
   arms = buildArms();
   mask = buildMask(scene);
   // The occlusion pass. Built here rather than beside the renderer because it
@@ -7103,6 +7131,32 @@ function stepCutBeat(beat, u, dt) {
   if (beat === 'swim' && you) you.drive(null);
 }
 
+/**
+ * What the race said this frame, acted on — from the swim and from the tower.
+ *
+ * The race ends at the ladder now (1.556.0), one way or the other, and she
+ * does not: `keep` holds her while the HUD goes. 'caught' and 'arrived' are
+ * the race; 'dive' is one of hers going in; 'done' is her lines over and the
+ * swim home begun; 'home' and 'gone' are her leaving.
+ */
+function chaseOut(out) {
+  if (!out) return;
+  if (out === 'caught') {
+    toast(T('chase.caught')); if (audio) audio.gasp(0.8);
+    endChase(true, true);
+  } else if (out === 'arrived') endChase(false, true);
+  else if (out === 'dive') {
+    const e = chase.lastEntry;
+    // Said when you are near enough to have watched it.
+    if (e && chase.gap < 120) {
+      toast(e.id === 'ball' ? T('chase.ball')
+        : T('chase.dive').replace('{name}', T('chase.dv.' + e.id))
+          .replace('{q}', T('plunge.q.' + e.word)).replace('{s}', e.score.toFixed(1)));
+    }
+  } else if (out === 'done') $('chase-hud').hidden = true;
+  else if (out === 'home' || out === 'gone') endChase(true);
+}
+
 /** Put the race away. `won` only decides what gets said about it. */
 function endChase(won, keep = false) {
   if (chase && !keep) chase.stop();
@@ -7120,6 +7174,9 @@ function endChase(won, keep = false) {
 function paintChaseHud() {
   if (!chase || !chase.active) return;
   const talking = chase.phase === 'talk';
+  // The HUD is the race's and her three lines'; between the two — the show —
+  // the picture is hers.
+  if (!chaseCut) $('chase-hud').hidden = !(chase.racing || talking);
   $('ch-gap').textContent = talking ? '' : Math.round(chase.gap);
   $('ch-unit').textContent = talking ? '' : T('chase.behind');
   $('ch-fill').style.width = (chase.through * 100).toFixed(1) + '%';
@@ -7986,7 +8043,9 @@ function landing(from) {
 /** Is she treading water at the foot of the tower's ladder? */
 function plungeHere() {
   if (!plunge || state.phase !== 'swim' || !swim || !swim.active) return false;
-  if (chaseCut || (chase && chase.active)) return false;
+  // The race blocks it, and only the race: once it is over she is going up
+  // there herself, and you may too — after her (see `busy` on the plunge).
+  if (chaseCut || (chase && chase.racing)) return false;
   const y = swim.you;
   return y.depth < 1.2 && plunge.toLadder(y.x, y.z) < plunge.reach;
 }
@@ -10062,7 +10121,7 @@ function tick(wall, draw) {
     // other three modes do it: a touchscreen laptop with a keyboard plugged
     // into it is a real machine and neither half of it should win.
     // Whether the race is on, which two of the controls below care about.
-    const racing = !!(chase && chase.active) || !!chaseCut;
+    const racing = !!(chase && chase.racing) || !!chaseCut;
     swim.update(dt, chaseCut ? { held: true } : {
       fwd: (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0)
         - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) + TOUCH.sy,
@@ -10108,14 +10167,7 @@ function tick(wall, draw) {
     // through the establishing shot would hand her twenty-five.
     if (chase && chase.active && !chaseCut) {
       const out = chase.update(dt, swim.you, (x, z) => swim.surfaceAt(x, z));
-      if (out === 'caught') { toast(T('chase.caught')); if (audio) audio.gasp(0.8); }
-      else if (out === 'lost') { $('ch-say').textContent = ''; }
-      // She has finished talking and is swimming back in. The race is over —
-      // the HUD goes, the keys are yours — but she is not: `keep` is what stops
-      // `endChase` calling `chase.stop()` and hiding her in the same frame she
-      // turns round. She goes when she reaches the jetty, which is 'home'.
-      else if (out === 'done') { endChase(true, true); }
-      else if (out === 'home') { endChase(true); }
+      chaseOut(out);
       paintChaseHud();
     }
     paintSwimHud();
@@ -10161,6 +10213,13 @@ function tick(wall, draw) {
     });
     if (ev && ev.type === 'top') toast(T('plunge.top'));
     if (ev && ev.type === 'entry') plungeEntry(ev.rate);
+    // Baye goes on while you are up here: treading at the foot of the ladder
+    // for her turn, or still in the water from her last one.
+    if (chase && chase.active && !chaseCut && plunge.where) {
+      const w = plunge.where();
+      chaseOut(chase.update(dt, { x: w[0], z: w[2], inWater: false },
+        (x, z) => swim.surfaceAt(x, z)));
+    }
     // In her own eyes she is in the sea the moment she is; behind her, the
     // shot holds a second on the water closing over her first.
     if (ev && (ev.type === 'done' || (ev.type === 'entry' && !bodyCam))) plungeToSwim();
@@ -12585,6 +12644,10 @@ window.__fr = {
       paintChaseHud();
       return chase.stats();
     },
+    /** Skip the race: her at the foot of the ladder, about to go up. `dive` names her first. */
+    skip: (dive) => (chase ? chase.skip(dive) : false),
+    /** The next dive she does: swan, tuck, pike, back, twist or ball. */
+    next: (dive) => (chase ? chase.nextIs(dive) : false),
     /**
      * Run the shot forward by hand.
      *
