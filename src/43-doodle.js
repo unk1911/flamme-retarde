@@ -1757,6 +1757,68 @@ async function buildDoodle(scene, J) {
   }
 
   /**
+   * Him, as the bead curtain in the kabina's doorway meets him — the peek
+   * puts his head, his neck and the front of his mane through it, and the
+   * lick takes all of him through. Misha, 1 Oct 2026, over a frame of the
+   * peek: his head and mane straight through the strands and the curtain
+   * hanging dead still — *"this action doesn't cause the AVBD dynamics of
+   * the bead curtains, but it really should"*. The curtain had been given
+   * you, Baye and the pug, and never him.
+   *
+   * Ten capsules, in the curtain's ids 10-19 (`beadCurtain` in
+   * 43-jadrija.js): the barrel, the MANE, his neck, skull and snout as the
+   * ball has them, the four lower legs, and the tail with its tuft. The mane
+   * is the one the ball does without and the one the curtain cannot: alpha
+   * cards standing 0.92 m up off his back (90th percentile, 1.02 at the
+   * tips) and 0.22 m either side of it, so a strand that lay on his spine
+   * would hang a hand's depth inside the flames. Fitted off every vertex of
+   * him skinned on the CPU in the peek's own pose, from the 90th percentile
+   * and not the tips, which are sparse and alpha-cut: a strand that drapes on
+   * the dense part of a mane reads as lying on it.
+   *
+   * On his bones (`onBone`, bind-frame points), so they go where the pose
+   * puts them: down with the look round the room, up with the lick's rear.
+   */
+  for (const n of ['Tail1', 'Tail2', 'Tail8']) bi[n] = fig.boneIndex(n);
+  const BC = (i, dx, dy) => [bindT[i].x + dx, bindT[i].y + dy, bindT[i].z];
+  const BEAD_BODY = [
+    // [bone, bind point, bone, bind point, r0, r1]: the barrel, hip to withers,
+    // a little under the spine, which is where the middle of a dog is
+    [bi.Tail1, BC(bi.Tail1, -0.10, -0.05), bi.Neck1, BC(bi.Neck1, -0.05, -0.05), 0.15, 0.15],
+    // the mane: over the withers and up the neck, as thick as the flames
+    [bi.Tail1, BC(bi.Tail1, 0.12, 0.20), bi.Neck1, BC(bi.Neck1, 0.0, 0.20), 0.19, 0.14],
+    [bi.Neck1, BC(bi.Neck1, 0, 0), bi.Head, headBind, 0.10, 0.09],
+  ];
+  const BEAD_LEGS = [['FrontLowerLeg.L', 'FF.L'], ['FrontLowerLeg.R', 'FF.R'],
+    ['BackLowerLeg.L', 'FFB.L'], ['BackLowerLeg.R', 'FFB.R']].map(([a, b]) => [bi[a], bi[b]]);
+  function beadCaps(add) {
+    if (d.far || !mesh.visible) return 0;
+    mesh.updateMatrixWorld();
+    const M = mesh.matrixWorld;
+    let k = 10;
+    for (const [i0, p0, i1, p1, r0, r1] of BEAD_BODY) {
+      onBone(i0, p0, _c0).applyMatrix4(M);
+      onBone(i1, p1, _c1).applyMatrix4(M);
+      add(k++, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, r0, r1);
+    }
+    onBone(bi.Head, headBind, _c0).applyMatrix4(M);
+    onBone(bi.Head, [0.55, 0.79, 0], _c1).applyMatrix4(M);
+    add(k++, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.085, 0.07);
+    onBone(bi.Head, [0.52, 0.80, 0], _c0).applyMatrix4(M);
+    onBone(bi.Head, LK.tip, _c1).applyMatrix4(M);
+    add(k++, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.05, 0.045);
+    for (const [a, b] of BEAD_LEGS) {
+      fig.boneAt(a, _c0).applyMatrix4(M);
+      fig.boneAt(b, _c1).applyMatrix4(M);
+      add(k++, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.04, 0.035);
+    }
+    fig.boneAt(bi.Tail2, _c0).applyMatrix4(M);
+    fig.boneAt(bi.Tail8, _c1).applyMatrix4(M);
+    add(k++, _c0.x, _c0.y, _c0.z, _c1.x, _c1.y, _c1.z, 0.06, 0.07);
+    return k - 10;
+  }
+
+  /**
    * Send him after the ball. `o.who` 'you' or 'baye' for who he brings it
    * to, or left out for you (and sometimes her, if she is near you). Answers
    * who he is bringing it to, or a key of DOODLE_FETCH_WHY.
@@ -2413,13 +2475,15 @@ async function buildDoodle(scene, J) {
         shoulderAt1: sh, hindAt1: [hx, hy] };
     },
     nudge: () => { d.bumped = 1; },
+    /** His bead-curtain capsules, world frame: [id, x0, y0, z0, x1, y1, z1, r0, r1]. */
+    beadCaps: () => { const o = []; beadCaps((...a) => o.push(a.map((v) => +v.toFixed(3)))); return o; },
     /** How deep a camera's front clip plane may sit — see `lensNear`. */
     lensNear: (cam) => lensNear(cam),
     raw: () => d,
   };
 
   return {
-    fig, mesh, api, step, ballCaps,
+    fig, mesh, api, step, ballCaps, beadCaps, noseAt,
     /**
      * Him, as the person collider sees him, pushed through whatever
      * `push(x, z, r, y0, top)` the promenade hands in: a capsule along his

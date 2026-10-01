@@ -8,6 +8,51 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.555.2] — 2026-10-01
+
+### The Slow Doodle parts the bead curtain
+
+Misha, over a frame of the peek: *"the slowdoodle, when he peeks inside the
+kabine ... for some reason this action doesn't cause the AVBD dynamics of the
+bead curtains, but it really should"*. His head and mane went straight
+through strands that did not move.
+
+**Why.** The curtain's chains are pushed by the capsules `beadsTick` hands
+them each frame. Since 1.546.0 those were you, Baye (CHAIN_BODY, off her
+bones) and the pug, and nothing else. The Slow Doodle had capsules for the
+beach ball (`ballCaps`), but nobody ever gave them to the curtain. He wasn't
+on its crossing-sound list either. And the capsule table was full anyway:
+48 slots, 47 already in use.
+
+**What he is to it now.** Ten capsules, `beadCaps` in 43-doodle.js, carried
+on his bones with bind-frame points so they follow the look round the room
+and the lick's rear:
+
+- his barrel;
+- **the mane**, a capsule over the withers as thick as the flames;
+- his neck, skull and snout, as the ball has them;
+- the four lower legs;
+- the tail and its tuft.
+
+The ball manages without the mane and the curtain can't. The radii were fitted
+off every vertex of him skinned on the CPU in the peek's own pose. 79 % of the
+mane's vertices are inside the mane capsule and the 90th percentile is 2.8 cm
+outside it; for the body it is 5.1 cm. They are fed only while his root is
+within 1.6 m of the strands. The table goes to 64.
+
+**The clack** is asked of his nose, not his root. The peek stops his root
+0.19 m short of the strands, so a crossing measured where he stands never
+happens. Measured: one `beadShove` as his nose goes in, one as it comes out,
+and the rattle running as he turns and the strands swing back (9 in the
+first 3 s).
+
+Baye was already in it. Her capsules come off her bones wherever `show` has
+her, the leash included.
+
+**Cost.** 0.09 ms a frame with his head through the curtain (`bench`, his
+10 capsules alone). Nothing while he is away from the doorway. People 100,
+blockers 785, no console errors.
+
 ## [1.555.1] — 2026-10-01
 
 ### The playground behind the kabine: found, and its ground cleared
