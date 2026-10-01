@@ -8,6 +8,19 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.554.3] — 2026-10-01
+
+### The diver takes a breather
+
+Misha: *"the trampoline diver, the frequency of his dives is too fast. he needs
+to occasionally take a break and just stand on the trampoline... idling"*. He
+stood 3-7 s at the end of the board between dives, so with the swim and the
+climb he went off about every 40 s, all afternoon. `diveRest` now gives 8-15 s
+most times and, about one time in three, a proper break of 30-75 s standing at
+the end of the board (`DIVE_REST`). Measured over eight loops at warp:
+36.5, 62.6, 12.2, 57.3, 11.0, 50.5, 11.5, 13.0 s. `Math.random`, not `rng`:
+when, never where.
+
 ## [1.554.2] — 2026-09-30
 
 ### Hosed off a chair, they go down and lie still

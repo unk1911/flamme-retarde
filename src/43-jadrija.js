@@ -41705,6 +41705,19 @@ async function buildJadrija(scene) {
     onPos(c);
     return dv.seg >= P.length - 1;
   }
+  // HOW LONG HE STANDS THERE between dives. Misha, 1 Oct 2026: *"the
+  // frequency of his dives is too fast. he needs to occasionally take a break
+  // and just stand on the trampoline... idling"*. It was 3-7 s, so with the
+  // dive, the swim and the climb he went off the end about every 40 s, all
+  // afternoon, like a machine. Now a short gather of 8-15 s most times, and
+  // about one time in three a proper break: 30-75 s of standing at the end of
+  // the board, looking at the water, before he goes again. Math.random, not
+  // the resort's `rng`: this is when, never where (rule 4).
+  const DIVE_REST = { short: [8, 15], long: [30, 75], longP: 0.35 };
+  function diveRest() {
+    const [a, b] = Math.random() < DIVE_REST.longP ? DIVE_REST.long : DIVE_REST.short;
+    return a + Math.random() * (b - a);
+  }
   const DIVE_MODE_CODE = { wait: 0, dive: 1, tread: 2, swim: 3, ladder: 4, walk: 5, turn: 6, off: 7 };
   // HER TURN. Set by src/61-plunge.js while she is on the tower (1.534.0), so
   // the two of them are never on one plank or one ladder: waiting on the
@@ -41831,7 +41844,7 @@ async function buildJadrija(scene) {
       if (Math.abs(d) < 0.01 && dv.t > 0.5) {
         dv.loops++;
         diveSet('wait');
-        dv.next = 3.0 + Math.random() * 4.0;
+        dv.next = diveRest();
       }
     }
     f.update(h);
