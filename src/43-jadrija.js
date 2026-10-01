@@ -25318,7 +25318,9 @@ async function buildJadrija(scene) {
     // substeps and gives the friction a speed to drag against. A capsule that
     // has jumped more than 0.6 m since is a teleport (the door's own cut, or
     // a probe) and is taken to have always been where it is now.
-    const CAPS = 48, IDS = 64;
+    // 48 held you (10), her (31 and the 5 that fill her hollows) and the pug,
+    // which is 47 — there was no room left for the Slow Doodle's ten.
+    const CAPS = 64, IDS = 64;
     const C = new Float64Array(CAPS * 8);       // a0 b0 y0 a1 b1 y1 r0 r1
     const Cw = new Float64Array(CAPS * 6);      // where it was last frame
     const Cs = new Float64Array(CAPS * 6);      // where it is this substep
@@ -39272,8 +39274,9 @@ async function buildJadrija(scene) {
    * for the crossing's sound. Both of them walk the same three marks at
    * t = K.dc — `moveDog`'s legs and hers — so both cross the strands square
    * on, and both used to do it in silence with the curtain hanging dead still
-   * behind them. Built fresh each frame because it is at most two entries and
-   * never survives one.
+   * behind them — and the Slow Doodle, whose peek and whose lick both go
+   * through it. Built fresh each frame because it is at most three entries
+   * and never survives one.
    */
   let beadYou = null;
   const _bcP = new THREE.Vector3(), _bcV = new THREE.Vector3(), _bcQ = new THREE.Quaternion();
@@ -39290,6 +39293,22 @@ async function buildJadrija(scene) {
     if (herOn) with_.push(['her', show.t, show.s]);
     const dogOn = dog && dog.mesh.visible;
     if (dogOn) with_.push(['dog', dog.at[0], dog.at[1]]);
+    // And the Slow Doodle, who was never in this list: his peek puts his head
+    // and mane through the strands every few minutes, and the curtain hung
+    // dead still round him. Near the doorway only — he is 1.4 m nose to tail,
+    // so 1.6 m either side of the strands is all of him that can reach them.
+    const doodleOn = doodle && !doodle.far && doodle.mesh.visible
+      && Math.abs(doodle.t - K.dc) < K.dj + 1.0 && Math.abs(doodle.s - beads.sHang) < 1.6;
+    if (doodleOn) {
+      // His NOSE is what goes through, not his root: the peek stops his root
+      // 0.19 m short of the strands, so a crossing asked of where he stands
+      // never happens and he nosed in and out in silence. The tip of his
+      // nose, into the doorway's own frame (`toA`/`toB` in `beadCurtain`).
+      const n = doodle.noseAt(_bcP), st = beadSt;
+      const det = st.ux * st.nz - st.nx * st.uz;
+      with_.push(['doodle', K.dc + ((n.x - st.x) * st.nz - (n.z - st.z) * st.nx) / det,
+        (st.ux * (n.z - st.z) - st.uz * (n.x - st.x)) / det]);
+    }
     if (d <= 26) {
       if (beadYou) {
         const w = W(beadYou[0], beadYou[1], K.floor);
@@ -39358,6 +39377,9 @@ async function buildJadrija(scene) {
         const p = dog.mesh.position, nx = beadSt.nx * 0.18, nz = beadSt.nz * 0.18;
         beads.cap(60, p.x - nx, p.y + 0.26, p.z - nz, p.x + nx, p.y + 0.26, p.z + nz, 0.13, 0.13);
       }
+      // Him: barrel, mane, neck, skull, snout, four legs and the tail, off
+      // his own bones — `beadCaps` in 43-doodle.js, in ids 10-19.
+      if (doodleOn) doodle.beadCaps(beads.cap);
     }
     beads.step(pt, ps, d, dt, camY, with_);
   }
