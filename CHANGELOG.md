@@ -8,6 +8,36 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.557.2] — 2026-10-01
+
+### Two houses that Jadrija does not have, gone from the promenade
+
+Misha, standing in front of the coloured row: *"remove the house at this
+location ... it doesn't exist in real jadrija. also remove this one ... also
+doesn't exist in real jadrija."*
+
+- Both were rich village houses (`detailHouse`, 43-jadrija.js), rebuilt from
+  OSM footprints. They stood on the concrete seaward of the kabine.
+  - The first was at t 534.8, s 8.6, 8.3 x 6.6 m, 11 m in front of where he
+    stood.
+  - The second was at t 579.1, s 10.3, 21.5 x 4.3 m, at the east end of the
+    concrete, half on the beach.
+- The aerial agrees with him. The promenade in front of the row is open from
+  end to end.
+- `NOT_THERE` matches each by its centroid in the shore frame. Rule 4 is kept:
+  each one still makes all of its `hr()` draws, into a scratch builder that is
+  never drawn. It stays `taken`, so the town builder does not put a plain box
+  back. Its blocker goes with it.
+- What is there now is the promenade concrete and, at the east end, the
+  beach. Nothing else was tied to either house: no props, lights or people.
+- Measured either side:
+  - blockers 818 -> 816, and the other 816 are identical (hashed);
+  - people 100, with identical placements (hashed);
+  - census 446/333/86/27;
+  - the 25 other houses do not move;
+  - the city's numbers and the tree count do not change;
+  - no console errors.
+
 ## [1.557.1] — 2026-10-01
 
 ### Gravel behind the kabine, two ways through to the playground, and Baye meets you there

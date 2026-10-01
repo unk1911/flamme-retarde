@@ -39695,9 +39695,31 @@ async function buildJadrija(scene) {
   const GLASS = [0.070, 0.082, 0.092];
   const FASCIA = [0.640, 0.620, 0.575];
 
-  const vil = propBuilder();
+  // `let` only so NOT THERE below can point it at a throwaway for one house.
+  let vil = propBuilder();
   const taken = new Set();
   const houses = [];
+  /**
+   * NOT THERE: OSM footprints that Jadrija does not have.
+   *
+   * Misha, 1 Oct 2026, standing on the promenade in front of the coloured row:
+   * *"remove the house at this location ... it doesn't exist in real
+   * jadrija"*, and the same about a second one further east. Both are rich
+   * houses that stood on the concrete seaward of the kabine. One was at
+   * t 534.8, s 8.6, 8.3 x 6.6 m. The other was at t 579.1, s 10.3,
+   * 21.5 x 4.3 m. The aerial agrees with him: the promenade in front of the
+   * row is open from end to end.
+   *
+   * Each is matched by its centroid in the shore frame, within 2 m. It is
+   * still THINNED-or-KEPT by its `hr()` draw and still built, with every one
+   * of its `hr()` draws, into a builder nobody draws (rule 4). That way every
+   * house after it keeps its colours, its shutters and its terrace. It stays
+   * `taken`, so the town builder does not put a plain box back there. It
+   * stays in `standing` and in the census, which is the before/after check.
+   * It gets no blocker.
+   */
+  const NOT_THERE = [[534.8, 8.6], [579.1, 10.3]];
+  const notThere = (t, s) => NOT_THERE.some(([nt, ns]) => Math.hypot(t - nt, s - ns) < 2);
   const census = { seen: 0, thin: 0, plain: 0, rich: 0 };
   /** Footprints that survived the thinning, for the wood to keep out of. */
   const standing = [];
@@ -40118,6 +40140,16 @@ async function buildJadrija(scene) {
       if (s > HOUSE.reach) { census.plain++; continue; }
       taken.add(bl);
       census.rich++;
+      if (notThere(t, s)) {
+        // Built and thrown away: `boxIn` draws into `b` and the rest into
+        // `vil`, so both point at a scratch builder for this one house.
+        const keepB = b, keepV = vil, nH = houses.length;
+        b = vil = propBuilder();
+        detailHouse(poly, bl.h || 6, hr);
+        b = keepB; vil = keepV;
+        houses.length = nH;
+        continue;
+      }
       detailHouse(poly, bl.h || 6, hr);
     }
   }
