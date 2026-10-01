@@ -557,6 +557,11 @@ async function buildJadrija(scene) {
   // the aerodrome casts its hangars and its objects and never its apron.
   const deck = propBuilder();
   const up = propBuilder();
+  // 1.555.2: the made ground behind the rows that is GRAVEL — the lane behind
+  // the lane wall and the paths through to the playground — in its own buffer,
+  // because gravel is a surface and `deck`'s material is one vertex colour.
+  // See `gravelGLSL` in 36-roads.js and `gravMesh` below.
+  const grav = propBuilder();
   // And the trees, which were in `up` and are not any more: `pine` and `olive`
   // draw into this whatever buffer they are called with, and it is drawn with
   // the landscape's own tree material (`treeMaterial` in 45-trees.js) so the
@@ -5441,6 +5446,42 @@ async function buildJadrija(scene) {
     pong: { t0: 544.0, t1: 561.0, s0: 51.0, s1: 59.0 },
     golf: { t0: 572.0, t1: 596.0, s0: 48.0, s1: 68.0 },
   };
+  // ── AND THE WAYS IN (1.555.2) ──────────────────────────────────────────
+  //
+  // Misha, 1 Oct 2026: *"it seems there's so many walls that it would be
+  // hard for me + baye to reach the playground, we need to somehow clear off
+  // various paths"*. Walking from the kabina door to `play` was a hundred and
+  // ten metres: through the hammock's cut at t 434-449, east along the strip
+  // behind the lane wall between it and the noses of the parked cars, and
+  // through the back wall — which was never a collider, so you walked
+  // through a rendered wall to get there. The lane wall itself ran unbroken
+  // from t 475 to 559, behind every gap in the back row.
+  //
+  // The aerial (0:46, 0:49) has the rows open on to gravel and the
+  // playground straight behind them, so the ways are cut where THIS model's
+  // two rows already have gaps that line up — nothing in either row moves:
+  //
+  //   play  front-row gap t 509.9-513.4, the alley, back-row gap 514.9-518.9,
+  //         and on through the lane wall between the trunks at t 514.5 and the
+  //         car at 520 — to the playground's west end, where the real gate is.
+  //   pong  front-row gap 549.9-553.3 and back-row gap 550.4-554.0, which
+  //         are straight across from each other, then the lane wall between
+  //         the trunks at 551.2 and 556.9, and the open wood to the tables.
+  //
+  // `t0..t1` is the opening in the lane wall (it opens whole 2.4 m bays, so
+  // the hole is a little wider); `walk` is the gravel path's centre line in
+  // (t, s), laid by `gravPath` where the pad is, and the same points are the
+  // legs she walks (`groundsRoute`).
+  const GROUNDS_WAYS = {
+    play: { t0: 515.0, t1: 519.0,
+      walk: [[511.6, 15.2], [511.8, 22.8], [517.0, 24.4], [517.3, 37.0], [515.0, 39.4], [515.0, 45.5]] },
+    pong: { t0: 550.6, t1: 554.0,
+      walk: [[551.9, 15.2], [552.1, 23.0], [552.4, 29.0], [552.6, 44.0], [552.6, 50.6]] },
+  };
+  // And the back wall (s 36.3, the white render with planters on its cap)
+  // stops short of the playground's frontage: the real one has a gravel
+  // strip with benches between the huts and the fence, and no wall.
+  const BACK_WALL_TO = 513.3;
   /** Is (t, s) on one of the cleared grounds, or within `m` metres of one? */
   const inGrounds = (t, s, m = 0) => {
     for (const k in GROUNDS) {
@@ -31954,7 +31995,14 @@ async function buildJadrija(scene) {
       // Kept, for the one walk that has to know where the wall is — see
       // `hamPath`. It is not a blocker and never has been; nothing else is
       // routed past it.
+      //
+      // Kept EVEN WHERE IT IS NOT BUILT (1.555.2): the car row and the
+      // hammock's choice of trees both test against this list, and a bay
+      // taken out of it would park a car that was not there and re-deal
+      // which third of them go. `hamPath` is the reader that skips them.
       backWall.push([t, t + 2.34, ws]);
+      // Not in front of the playground — see BACK_WALL_TO. No draws here.
+      if (t + 2.34 > BACK_WALL_TO) continue;
       const y = surfaceY(t, ws);
       boxTS(t, t + 2.34, ws - 0.16, ws + 0.16, y, y + 0.78, REND,
         shade(REND, 1.04));
@@ -33851,7 +33899,9 @@ async function buildJadrija(scene) {
     // than the promenade, which is the raked gravel in `_349` under the pines.
     {
       const GRAV = [0.470, 0.440, 0.378];
-      b = deck;
+      // Into `grav` since 1.555.2, the surface the lanes and the paths to it
+      // are, rather than the deck's flat colour.
+      b = grav;
       for (const k in GROUNDS) {
         const Gd = GROUNDS[k];
         if (!Gd.pad) continue;
@@ -33866,6 +33916,56 @@ async function buildJadrija(scene) {
           }
         }
       }
+      // ── and the gravel ways to it (1.555.2) ───────────────────────────
+      //
+      // See GROUNDS_WAYS. Raked gravel on the same `yg` as the pad and two
+      // centimetres over it and over the made lane behind the lane wall, so
+      // where a path crosses either it is the path you see. A centre line in
+      // (t, s) and a half width, laid in 0.8 m steps with each edge pulled
+      // in or let out by up to a seventh off `jit` (slots 570-573, no draws):
+      // a raked path's edge is where the rake stopped, not a kerb.
+      const gravPath = (pts, hw, seed) => {
+        // Counted along the whole line, so a corner shares its offsets with
+        // both segments either side of it and the edge never opens a gap.
+        let c = 0;
+        const edge = (q, side) => hw * (0.86 + 0.28 * jit(seed * 997 + q, 570 + side));
+        for (let i = 0; i < pts.length - 1; i++) {
+          const [ta, sa] = pts[i], [tb2, sb] = pts[i + 1];
+          const L = Math.hypot(tb2 - ta, sb - sa);
+          if (!(L > 1e-6)) continue;
+          const n = Math.max(1, Math.ceil(L / 0.8));
+          const nt = -(sb - sa) / L, ns = (tb2 - ta) / L;
+          const Q = (p, e) => W(p[0] + nt * e, p[1] + ns * e, yg(p[0] + nt * e, p[1] + ns * e) + 0.065);
+          for (let k = 0; k < n; k++, c++) {
+            const u0 = k / n, u1 = (k + 1) / n;
+            const p0 = [ta + (tb2 - ta) * u0, sa + (sb - sa) * u0];
+            const p1 = [ta + (tb2 - ta) * u1, sa + (sb - sa) * u1];
+            const g = 0.96 + jit(seed * 53 + c, 572) * 0.07;
+            b.quad(Q(p0, -edge(c, 1)), Q(p1, -edge(c + 1, 1)), Q(p1, edge(c + 1, 0)), Q(p0, edge(c, 0)),
+              [GRAV[0] * g, GRAV[1] * g, GRAV[2] * g]);
+          }
+        }
+      };
+      for (const [k, w] of Object.entries(GROUNDS_WAYS)) {
+        // From the back of the front row on: the promenade and the gap
+        // through the front row are paved already. Across the alley it is
+        // the line that tells you, from the promenade, which gap in the
+        // back row is the way through — the two do not line up at `play`.
+        const S0 = JAD.rowA + JAD.cabD + 0.55;
+        const pts = w.walk.filter((p) => p[1] >= S0);
+        const first = w.walk.findIndex((p) => p[1] >= S0);
+        if (first > 0 && w.walk[first][1] > S0) {
+          const a = w.walk[first - 1], c = w.walk[first];
+          const u = (S0 - a[1]) / (c[1] - a[1]);
+          pts.unshift([a[0] + (c[0] - a[0]) * u, S0]);
+        }
+        gravPath(pts, k === 'play' ? 1.30 : 1.15, k === 'play' ? 1 : 2);
+      }
+      // The strip along the playground's seaward side, where the real one
+      // has its benches facing the fence, and the link along its east end
+      // to the tables.
+      gravPath([[514.2, 37.5], [533.6, 37.5]], 0.85, 3);
+      gravPath([[533.8, 44.5], [539.5, 47.0], [543.6, 52.2]], 1.0, 4);
     }
     b = back8;
   }
@@ -34020,7 +34120,11 @@ async function buildJadrija(scene) {
     // And the way to the hammock, which HAM_WALK cuts through both rows of
     // huts: a gap in the huts that ends at a wall is a yard, not a way. Kept
     // apart from `gap0` for the planters below, which spend `rng`.
-    const gap = (t) => gap0(t) || (t > HAM_YARD.t0 && t < HAM_YARD.t1);
+    const gap = (t) => gap0(t) || (t > HAM_YARD.t0 && t < HAM_YARD.t1)
+      // And the two ways through to the grounds behind the rows (1.555.2,
+      // GROUNDS_WAYS), on `gap` and not `gap0` for the planters' draws.
+      || (t > GROUNDS_WAYS.play.t0 && t < GROUNDS_WAYS.play.t1)
+      || (t > GROUNDS_WAYS.pong.t0 && t < GROUNDS_WAYS.pong.t1);
     const step = 2.4;
     let run0 = null;
     for (let t = 300; t < LEN - 14 + step; t += step) {
@@ -34105,24 +34209,27 @@ async function buildJadrija(scene) {
           { col: [g, g * 0.985, g * 0.930], sub: 1, pits: 0 });
       }
 
-      // ── and the tarmac apron the dust gives out from ──────────────────
+      // ── and the made lane the dust gives out from ─────────────────────
       //
-      // b_076 films this straight down: an apron of tarmac that stops in a
-      // ragged, crumbling edge and becomes coarse limestone gravel. The whole
-      // band here was drawn as dust, and the seam is the thing the frame is
-      // about.
+      // b_076 films this straight down: a made surface that stops in a
+      // ragged, crumbling edge and becomes loose limestone gravel, and it was
+      // drawn from 1.2xx as TARMAC — pale, crazed all over with a craquelure
+      // net of 2600 chains. Nobody has ever placed b_076 (it carries no GPS;
+      // see the WHERE list in plan/jadrija-TODO.md), and in the shade of the
+      // stand the net read as what Misha called it on 1 Oct 2026: *"these
+      // black roads in the back of the kabine, jadrija doesn't have black
+      // roads, everything is gravel road"*. So the band is GRAVEL now —
+      // compacted crushed limestone where the cars come and go, the same
+      // surface as the lanes (`gravelGLSL` in 36-roads.js) — and the ragged
+      // edge stays, because that is where the stone gives out into the dust.
       //
-      // The tarmac is NOT the dark asphalt the word suggests. Twenty summers
-      // of this sun have taken it to a pale grey barely darker than the dust
-      // beside it, and what separates the two in the photograph is not colour
-      // so much as SURFACE: the tarmac is smooth and crazed all over with a
-      // fine craquelure, and the gravel is loose and full of white stones. So
-      // the colour difference is kept small on purpose and the crazing is what
-      // does the work.
-      b = deck;
-      const ASPH = [0.348, 0.338, 0.318];
-      const PATCH = [0.404, 0.398, 0.386];
-      // Where the tarmac gives out, as a function of t rather than a line: an
+      // Into `grav` and not `deck`: the deck's material is one flat vertex
+      // colour and gravel is a surface. No draws, as before — `jit` only.
+      b = grav;
+      // The playground pad's raked gravel (see GROUNDS), so the lane, the
+      // paths and the pad are one ground.
+      const GRAV = [0.470, 0.440, 0.378];
+      // Where the stone gives out, as a function of t rather than a line: an
       // edge somebody laid would be straight, and this one is where the last
       // load happened to reach.
       const edgeAt = (t) => WALL.s + 4.35
@@ -34132,67 +34239,27 @@ async function buildJadrija(scene) {
       for (let t = 214; t < LEN - 14; t += aStep) {
         const t1 = Math.min(t + aStep, LEN - 14);
         const e0 = edgeAt(t), e1 = edgeAt(t1);
-        const k = (t * 0.5) | 0;
-        // A made-good patch in a different mix, which the frame has one of
-        // right in the middle of the apron.
-        const col = jit(k, 81) > 0.87 ? PATCH
-          : [ASPH[0] * (0.94 + jit(k, 82) * 0.13),
-            ASPH[1] * (0.94 + jit(k, 82) * 0.13),
-            ASPH[2] * (0.94 + jit(k, 82) * 0.13)];
+        const k = 0.95 + jit((t * 0.5) | 0, 82) * 0.09;
+        const col = [GRAV[0] * k, GRAV[1] * k, GRAV[2] * k];
         b.quad(W(t, s0, surfaceY(t, s0) + 0.045),
           W(t1, s0, surfaceY(t1, s0) + 0.045),
           W(t1, e1, surfaceY(t1, e1) + 0.045),
           W(t, e0, surfaceY(t, e0) + 0.045), col);
       }
-      // The craquelure, and it has to be a NET.
-      //
-      // Not the cracks the promenade got — those are single lines walking
-      // across a slab with branches off them. This is what a tarmac surface
-      // does when the binder has gone: it breaks into cells, and the cells in
-      // the photograph are 0.2 to 0.5 m across. The first cut scattered 460
-      // loose dashes over twelve hundred square metres — one every 2.7 m² —
-      // and at that spacing they do not read as cracking at all, they read as
-      // litter lying on a clean grey strip. You can count them.
-      //
-      // So: chains, not dashes. Each crack is three or four segments joined
-      // end to end with a turn at every joint, and they are started thickly
-      // enough that they run into each other, which is what closes the cells.
-      const CRK = [0.258, 0.252, 0.243];
-      for (let n = 0; n < 2600; n++) {
-        let t = 216 + jit(n, 84) * (LEN - 232);
-        const e = edgeAt(t);
-        let sv = s0 + 0.25 + jit(n, 85) * (e - s0 - 0.5);
-        if (sv >= e - 0.15) continue;
-        let a0 = jit(n, 86) * TAU;
-        const segs = 2 + ((jit(n, 93) * 3) | 0);
-        for (let k = 0; k < segs; k++) {
-          // A turn at each joint, and a big one: a craquelure cell is not a
-          // gentle curve, it is a polygon.
-          a0 += (jit(n * 7 + k, 94) - 0.5) * 1.9;
-          const len = 0.16 + jit(n * 7 + k, 87) * 0.30;
-          const w = 0.018 + jit(n * 7 + k, 88) * 0.018;
-          const t1 = t + Math.cos(a0) * len, s1c = sv + Math.sin(a0) * len;
-          if (s1c <= s0 + 0.1 || s1c >= edgeAt(t1) - 0.1) break;
-          const nt = -Math.sin(a0) * w, ns = Math.cos(a0) * w;
-          const y = surfaceY(t, sv) + 0.048;
-          b.quad(W(t + nt, sv + ns, y), W(t1 + nt, s1c + ns, y),
-            W(t1 - nt, s1c - ns, y), W(t - nt, sv - ns, y), CRK);
-          t = t1; sv = s1c;
-        }
-      }
-      // And the edge itself, crumbling: lumps of tarmac that have come away
-      // and are lying just off it. Without these the seam is a cut line, and
-      // in the photograph it is a broken one.
+      // And the edge itself: lumps of the made surface broken off and lying
+      // just off it, pale stone now rather than tarmac. Same places, same
+      // sizes, same `jit` slots.
       b = up;
       for (let t = 216; t < LEN - 16; t += 0.75) {
         if (jit(t * 4 | 0, 89) > 0.5) continue;
         const e = edgeAt(t) + (jit(t * 4 | 0, 90) - 0.5) * 0.5;
         const y = surfaceY(t, e);
         const r = 0.075 + jit(t * 4 | 0, 91) * 0.080;
+        const g = 0.92 + jit(t * 4 | 0, 92) * 0.14;
         frustumTS(y - 0.02, [t, e, r, r * 0.72],
           y + r * 0.35, [t + (jit(t * 4 | 0, 92) - 0.5) * 0.08, e,
             r * 0.78, r * 0.55],
-          [0.300, 0.295, 0.288], [0.345, 0.340, 0.330]);
+          [0.540 * g, 0.512 * g, 0.455 * g], [0.600 * g, 0.570 * g, 0.508 * g]);
       }
       // ── and what stands at the top of the lane ──────────────────────────
       //
@@ -40225,6 +40292,20 @@ async function buildJadrija(scene) {
   const upMesh = new THREE.Mesh(up.geo(), solidMaterial(0xffffff, {
     spec: 0.05, specPower: 14, side: THREE.DoubleSide, emissive: 0.22, body: FACE,
   }));
+  // The gravel: compacted in drifts where the cars turn (`track`), and loose
+  // nowhere in particular — a lane's margins are its own business, and these
+  // are paths and a parking strip. Ground: receives and does not cast.
+  const gravMesh = new THREE.Mesh(grav.geo(), solidMaterial(0xffffff, {
+    spec: 0.015, specPower: 16, side: THREE.DoubleSide,
+    body: FACE + 'base *= vec3(1.03, 1.0, 0.92);' + gravelGLSL('vWorld.xz',
+      '0.55 * smoothstep(0.42, 0.72, vnoise2(vWorld.xz * 0.31 + vec2(17.0, 5.0)))', '0.0'),
+  }));
+  gravMesh.name = 'jad:gravel';
+  // The same offset the roads carry, for the same reason: it lies 4.5 cm over
+  // the dust, two kilometres from the origin.
+  gravMesh.material.polygonOffset = true;
+  gravMesh.material.polygonOffsetFactor = -2;
+  gravMesh.material.polygonOffsetUnits = -4;
   // Which mesh a builder became, for a chair taken out of it (`chairGeo`).
   // And `knTex`, which is where a bistro chair's woven seat and back are.
   const bldMesh = new Map([[deck, deckMesh], [up, upMesh], [knTex, knTexMesh]]);
@@ -40490,11 +40571,11 @@ async function buildJadrija(scene) {
     return m;
   });
   const kabRendMesh = rendMeshes[rends.findIndex((r) => r.out)] || null;
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, oliveMesh,
+  for (const m of [deckMesh, gravMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, oliveMesh,
     stonesMesh, floraMesh, shrubMesh, hedgeMesh]) {
     m.frustumCulled = false;
   }
-  for (const m of [deckMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, oliveMesh,
+  for (const m of [deckMesh, gravMesh, upMesh, vilMesh, kabOutMesh, kabInMesh, arborMesh, oliveMesh,
     ...rendMeshes, ...featherMeshes, stonesMesh, floraMesh, shrubMesh, hedgeMesh, ...grassMeshes]) {
     scene.add(m);
   }
@@ -40949,7 +41030,7 @@ async function buildJadrija(scene) {
   // pushes into `blockers` by reference) and a grid taken now would have none
   // of them. None of it touches `rng` (rule 4): the grid is geometry that is
   // already built, and the plants are `floraHash` of their cell.
-  const vergeFloors = [deckMesh.geometry];
+  const vergeFloors = [deckMesh.geometry, gravMesh.geometry];
   /**
    * ── AND NOTHING GROWS IN A ROOM ────────────────────────────────────────
    *
@@ -44258,6 +44339,7 @@ async function buildJadrija(scene) {
     // And the back wall, which is not a blocker to anything else — see
     // `backWall` — and has to be walked round to reach the wood.
     for (const w of backWall) {
+      if (w[1] > BACK_WALL_TO) continue;          // not built — see BACK_WALL_TO
       if (w[1] + PADP > tMin && w[0] - PADP < tMax && w[2] + PADP > sMin && w[2] - PADP < sMax) {
         near.push({ t: (w[0] + w[1]) * 0.5, s: w[2], a: (w[1] - w[0]) * 0.5, c: 0.22 });
       }
@@ -44360,6 +44442,240 @@ async function buildJadrija(scene) {
     const legs = hamPath(show.t, show.s, mk.t, mk.s);
     hamRouteMemo = { at: now, t: show.t, s: show.s, mt: mk.t, ms: mk.s, legs };
     return legs;
+  }
+
+  // ── TO THE PLAYGROUND, AND MEETING YOU THERE (1.555.2) ──────────────────
+  //
+  // Misha, 1 Oct 2026: *"we need to somehow clear off various paths for me
+  // and baye to walk over to the playground, either that, or maybe when i
+  // walk to the playground somehow magically baye just appears there? ... we
+  // need to think about how to rapidly get her to the playground"*.
+  //
+  // BOTH. Asked — "come to the playground", "meet me at the playground",
+  // "idemo na igralište" — she walks there by a way through (`hamPath`, which
+  // finds the gaps GROUNDS_WAYS cut), and stays with you once she is there
+  // (`grounds`). And if you are already at the grounds and she is a long way
+  // off, she does not make you wait three minutes: the moment she is out of
+  // your sight she is brought round to a spot just outside the grounds that
+  // is ALSO out of your sight, and walks in from there (`meetHop`). Never on
+  // camera, either end — `meetSeen` is the camera's own frustum, so a figure
+  // that vanishes is one nobody was looking at and one that appears comes
+  // round a corner.
+  //
+  // Out there she is off her lane, where `play` would clamp her back to it in
+  // one frame (the note over `hamHome`), so every way off the grounds is the
+  // hammock's road home (`meetHome` → `hamBack`), and only the numbers that
+  // stand where she stands are taken out there (GROUNDS_OK); anything else
+  // asked walks her home first and is done there.
+  const MEET = {
+    far: 60,        // m to you, over which (and unseen) she is brought round
+    unseen: 150,    // m past which she is out of sight whatever the frustum says
+    near: 22,       // m from a ground's edge that counts as being at it
+    by: 8,          // m from one, inside which she comes to YOU, not the gate
+    stand: 1.7,     // m from you she stops
+    follow: 4.5,    // m you may wander off before she comes after you
+    pace: 1.2,      // her walk there, on SHOW.walk
+    leave: 34,      // m from the grounds: you have left them
+    leaveFor: 7,    // s of that, once you have met, before she goes home
+    wait: 240,      // s she waits for you there if you never come
+    hops: 2,        // at most, per request
+  };
+  // Where she may come in from: just outside the grounds, each behind
+  // something from the usual ways of looking at them — the lane-wall
+  // openings behind the huts, the wood either side, the far side of the road.
+  const MEET_ENTRIES = [[517.0, 30.6], [552.4, 30.6], [505.5, 46.0], [526.0, 64.0],
+    [539.0, 41.5], [565.0, 47.0]];
+  const GROUNDS_OK = { kiss: 1, hug: 1, shimmy: 1, twerk: 1, heart: 1, note: 1 };
+  const MEET_PH = { toGrounds: 1, grounds: 1 };
+  const _mfr = new THREE.Frustum(), _mmx = new THREE.Matrix4(), _msp = new THREE.Sphere();
+
+  /**
+   * Is (t, s), a figure's height of it, in the camera's view?
+   *
+   * The frustum, and then the one occluder that matters here: anything
+   * standing taller than she is between the lens and the top of her head —
+   * the huts, the shops, the houses, a trunk. MEASURED without it: you in
+   * the playground looking west, she 107 m off on her lane, and the frustum
+   * alone called her seen the whole way along the promenade behind two rows
+   * of huts, so she walked all of it. The blockers are walls of known height,
+   * sampled along the sight line every half metre off a coarse bin of the
+   * tall ones (built once). Low things — cars, benches, the lane wall — do
+   * not hide a standing woman and are not in it.
+   */
+  let meetBins = null;
+  function meetTall() {
+    const BIN = 4, m = new Map();
+    const key = (a, c) => (a + 4000) * 8192 + (c + 4000);
+    for (const b of blockers) {
+      if (!(b.a > 0) || !(b.c > 0) || !(b.h >= 1.9) || b.kab) continue;
+      const e = b.rot ? Math.hypot(b.a, b.c) : Math.max(b.a, b.c);
+      for (let a = Math.floor((b.t - e) / BIN); a <= Math.floor((b.t + e) / BIN); a++) {
+        for (let c = Math.floor((b.s - e) / BIN); c <= Math.floor((b.s + e) / BIN); c++) {
+          const k = key(a, c);
+          if (!m.has(k)) m.set(k, []);
+          m.get(k).push(b);
+        }
+      }
+    }
+    meetBins = { m, key, BIN };
+  }
+  function meetHidden(ct, cs, cy, t, s, y) {
+    if (!meetBins) meetTall();
+    const { m, key, BIN } = meetBins;
+    const L = Math.hypot(t - ct, s - cs), n = Math.ceil(L / 0.5);
+    // Not the last metre: she is not hidden by the hut she is standing beside.
+    for (let k = 1; k < n && (n - k) * 0.5 > 1.0; k++) {
+      const u = k / n, pt2 = ct + (t - ct) * u, ps2 = cs + (s - cs) * u, py = cy + (y - cy) * u;
+      const list = m.get(key(Math.floor(pt2 / BIN), Math.floor(ps2 / BIN)));
+      if (!list) continue;
+      for (const b of list) {
+        const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
+        const dt0 = pt2 - b.t, ds0 = ps2 - b.s;
+        if (Math.abs(dt0 * co + ds0 * sn) > b.a || Math.abs(-dt0 * sn + ds0 * co) > b.c) continue;
+        const top = (b.y || 0) + b.h;
+        if (py < top) return true;
+      }
+    }
+    return false;
+  }
+  function meetSeen(t, s, pad = 1.2) {
+    if (typeof camera === 'undefined' || !camera) return false;
+    const w = toWorld(t, s);
+    _msp.center.set(w[0], w[1] + 0.9, w[2]);
+    _msp.radius = pad;
+    if (camera.position.distanceTo(_msp.center) > MEET.unseen) return false;
+    camera.updateMatrixWorld();
+    _mmx.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    _mfr.setFromProjectionMatrix(_mmx);
+    if (!_mfr.intersectsSphere(_msp)) return false;
+    const c = camera.position, [ct, cs] = local(c.x, c.z);
+    return !meetHidden(ct, cs, c.y, t, s, w[1] + 1.75);
+  }
+  /** How far (t, s) is from the nearer of the two grounds, 0 inside one. */
+  function groundsDist(t, s) {
+    let best = Infinity;
+    for (const k of ['play', 'pong']) {
+      const G = GROUNDS[k];
+      const dt = Math.max(G.t0 - t, 0, t - G.t1), ds = Math.max(G.s0 - s, 0, s - G.s1);
+      best = Math.min(best, Math.hypot(dt, ds));
+    }
+    return best;
+  }
+  /**
+   * Where she is going: beside you, if you are at the grounds; otherwise the
+   * end of the way in to the nearer of them — `play`'s west end, by its gate.
+   */
+  function groundsGoal(pt, ps) {
+    if (groundsDist(pt, ps) < MEET.by) {
+      const dt = show.t - pt, ds = show.s - ps, dl = Math.hypot(dt, ds) || 1;
+      return [pt + dt / dl * MEET.stand, ps + ds / dl * MEET.stand];
+    }
+    const near = (k) => {
+      const G = GROUNDS[k];
+      return Math.hypot(clamp(pt, G.t0, G.t1) - pt, clamp(ps, G.s0, G.s1) - ps);
+    };
+    const w = GROUNDS_WAYS[near('pong') < near('play') ? 'pong' : 'play'].walk;
+    return w[w.length - 1].slice();
+  }
+  /**
+   * A way there, or the way-end if the spot by you is somewhere she cannot
+   * stand.
+   *
+   * FROM THE FRONT, BY THE WAY CUT FOR IT. `hamPath` alone finds a way, and
+   * it is a breadth-first search on a grid with every step costing the same,
+   * so the way it finds is short in steps and not in metres: MEASURED from
+   * the promenade at t 500, it went up through the gaps and then swung four
+   * metres west into the wood round one trunk to come back to the gate. So
+   * when she starts on the promenade side of the lane wall she walks to the
+   * nearest point of whichever of GROUNDS_WAYS is the shorter way round, and
+   * then the way itself, which is the gravel path you can see — the search
+   * only joins her on to it and off it.
+   */
+  function groundsRoute(t0, s0, goal) {
+    if (s0 < WALL.s && goal[1] > WALL.s + 6) {
+      let best = null;
+      for (const k in GROUNDS_WAYS) {
+        const w = GROUNDS_WAYS[k].walk, e = w[w.length - 1];
+        let j = 0, dj = Infinity;
+        for (let i = 0; i < w.length; i++) {
+          const dd = Math.hypot(w[i][0] - t0, w[i][1] - s0);
+          if (dd < dj) { dj = dd; j = i; }
+        }
+        const c = dj + Math.hypot(e[0] - goal[0], e[1] - goal[1]);
+        if (!best || c < best.c) best = { c, w, j, dj };
+      }
+      const { w, j, dj } = best, e = w[w.length - 1];
+      const head = dj < 0.8 ? [] : hamPath(t0, s0, w[j][0], w[j][1]);
+      const tail = Math.hypot(goal[0] - e[0], goal[1] - e[1]) < 0.5 ? []
+        : hamPath(e[0], e[1], goal[0], goal[1]);
+      if (head && tail) {
+        const legs = [...head, ...w.slice(j + 1).map((p) => p.slice()), ...tail];
+        if (legs.length) return legs;
+      }
+    }
+    let legs = hamPath(t0, s0, goal[0], goal[1]);
+    if (!legs) {
+      const w = GROUNDS_WAYS.play.walk, e = w[w.length - 1];
+      legs = hamPath(t0, s0, e[0], e[1]);
+      if (legs) goal[0] = e[0], goal[1] = e[1];
+    }
+    return legs;
+  }
+  /** Off she goes. `go` is `stepShow`'s; `pt, ps` is you. */
+  function meetGo(pt, ps, go) {
+    const goal = groundsGoal(pt, ps);
+    const legs = groundsRoute(show.t, show.s, goal);
+    if (!legs) { show.meet = null; show.did = null; show.why = 'noway'; return false; }
+    const M = show.meet || {};
+    show.meet = { since: 0, t: 0, hops: M.hops || 0, met: false, gone: 0, goal };
+    show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0 };
+    show.stuck = null;
+    show.byAsk = 1;
+    show.queue.length = 0;
+    go('toGrounds', 'walk', 0.32);
+    return true;
+  }
+  /** Back to her lane by a way through — the hammock's road home. */
+  function meetHome(go) {
+    show.meet = null;
+    const goal = [clamp(show.t, show.t0 + 1, show.t1 - 1), LANE_S()];
+    const legs = hamPath(show.t, show.s, goal[0], goal[1]) || [goal];
+    show.job = { name: 'hamBack', t: goal[0], s: goal[1], since: 0, leg: 0, legs,
+      best: null, stall: 0 };
+    go('hamBack', 'walk', 0.36);
+  }
+  /**
+   * BROUGHT ROUND. You are at the grounds, she is more than `far` off (or in
+   * the kabina), and nobody is looking at her: she is put at the entry that
+   * nobody is looking at either, at least twelve metres from you, with the
+   * shortest way to where she is going — and walks in. Answers whether it
+   * happened. The frustum, not a ray: the rows, the trunks and the cars all
+   * hide her better than this assumes, so it errs toward walking.
+   */
+  function meetHop(pt, ps, d) {
+    const M = show.meet;
+    if (!M || M.hops >= MEET.hops || state.phase !== 'ground') return false;
+    if (groundsDist(pt, ps) > MEET.near) return false;
+    if (d < MEET.far && !sheIsIn()) return false;
+    if (!sheIsIn() && meetSeen(show.t, show.s, 1.4)) return false;
+    const goal = groundsGoal(pt, ps);
+    let best = null;
+    for (const e of MEET_ENTRIES) {
+      if (Math.hypot(e[0] - pt, e[1] - ps) < 12) continue;
+      if (meetSeen(e[0], e[1], 3.0)) continue;
+      const dd = Math.hypot(e[0] - goal[0], e[1] - goal[1]);
+      if (!best || dd < best.d) best = { e, d: dd };
+    }
+    if (!best) return false;
+    const legs = hamPath(best.e[0], best.e[1], goal[0], goal[1]);
+    if (!legs) return false;
+    show.t = best.e[0]; show.s = best.e[1];
+    show.ang = show.want = Math.atan2(legs[0][1] - show.s, legs[0][0] - show.t);
+    show.rate = 0; show.vel = SHOW.walk * 0.6;
+    showClear();
+    M.hops++; M.goal = goal; M.from = best.e.slice();
+    show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0 };
+    return true;
   }
 
   /**
@@ -55330,7 +55646,7 @@ async function buildJadrija(scene) {
   const askLog = [];
   const ON_FEET = { wine: 1, coke: 1, give: 1, wear: 1, kiss: 1, hug: 1,
     fours: 1, handstand: 1, ballet: 1, twerk: 1, shimmy: 1, heart: 1,
-    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1, hammock: 1, collar: 1,
+    note: 1, wheel: 1, joy: 1, swim: 1, tramp: 1, hammock: 1, collar: 1, grounds: 1,
     'hair.down': 1, 'hair.up': 1, 'fetch.cream': 1,
     'see.slast': 1, 'see.kiosk': 1, 'see.mini': 1, 'see.h2o': 1, 'see.f2': 1,
     'see.konoba': 1, 'see.tramp': 1, 'see.vik': 1 };
@@ -55392,6 +55708,13 @@ async function buildJadrija(scene) {
      * itself holding her up in between: see HAM below and src/43-hammock.js.
      */
     hammock: 1, 'hammock.out': 1,
+    /**
+     * AND TO THE PLAYGROUND (1.555.2): "come to the playground", "meet me at
+     * the playground", "idemo na igralište". A walk there by the ways
+     * GROUNDS_WAYS cut, and brought round unseen if you are there first —
+     * see MEET.
+     */
+    grounds: 1,
     // AND THE POSE SHE ALREADY HAD AND NOTHING COULD ASK FOR.
     //
     // Misha, 17 Sep 2026: *"i tell her to get down on her knees, and eventho
@@ -55790,6 +56113,13 @@ async function buildJadrija(scene) {
       // And a way there from where she is — see `hamPath`.
       const mk = hamMark();
       if (!mk || !hamRoute(mk)) return 'noway';
+      return null;
+    }
+    if (name === 'grounds') {
+      // TO THE PLAYGROUND — see MEET. On the leash she goes where you lead
+      // her, which is the answer; tied to the cot she is going nowhere.
+      if (leash.on && !leash.offing) return leash.mode === 'cot' ? 'cotleashed' : 'leadher';
+      if (show.phase === 'swim' || (show.dip || 0) > 0) return 'swimming';
       return null;
     }
     if (name === 'hammock.out') {
@@ -56723,6 +57053,12 @@ async function buildJadrija(scene) {
       if (nxt === 'heart') return enterHeart();
       if (nxt === 'note') return enterNote();
       if (nxt === 'wheel') return enterWheels();
+      // Out at the grounds, a number done there ends there — `play` would
+      // clamp her back to her lane in one frame. See MEET.
+      if (show.meet && !sheIsIn() && groundsDist(show.t, show.s) < MEET.near) {
+        return go('grounds', 'idle', 0.40);
+      }
+      show.meet = null;
       show.wander = show.ang;
       showWander(SHOW.turn, SHOW.swing);
       return go('play', 'walk', 0.36);
@@ -57185,8 +57521,15 @@ async function buildJadrija(scene) {
         || show.phase === 'creep')
       // In the hammock only the things her face and your hand do — see
       // HAM_KEEP; anything else waits for `hamHeld` to get her out first.
-      && (!HAM[show.phase] || HAM_KEEP[show.ask]);
-    if (show.ask && (ASKABLE[show.phase] || nowOk)) {
+      && (!HAM[show.phase] || HAM_KEEP[show.ask])
+      // Out at the grounds only what she does where she stands — see MEET.
+      && (!MEET_PH[show.phase] || HAM_KEEP[show.ask]);
+    // AND OUT AT THE GROUNDS (1.555.2): the numbers she does where she
+    // stands are taken there, and asked to go there again from on the way
+    // back from the hammock or from the grounds themselves, she goes.
+    const meetOk = (show.phase === 'grounds' && GROUNDS_OK[show.ask])
+      || (show.ask === 'grounds' && (show.phase === 'hamBack' || MEET_PH[show.phase]));
+    if (show.ask && (ASKABLE[show.phase] || nowOk || meetOk)) {
       const name = show.ask;
       show.ask = null;
       show.did = name;
@@ -57726,6 +58069,15 @@ async function buildJadrija(scene) {
           showSay('trill', d);
           go('hamGo', 'walk', 0.32);
         } else { show.did = null; show.why = 'noway'; }
+      } else if (name === 'grounds') {
+        // TO THE PLAYGROUND — see MEET. Out of the kabina by its door first
+        // (`leave`, which hands on to `meetGo` when `show.meet` is set).
+        showSay('trill', d);
+        if (sheIsIn()) {
+          show.meet = { since: 0, t: 0, hops: 0, met: false, gone: 0, goal: null };
+          show.leg = 0; show.byAsk = 1; show.queue.length = 0;
+          go('leave', 'walk', 0.34);
+        } else if (!meetGo(pt, ps, go)) show.did = null;
       } else if (name === 'hammock.out') {
         // Answered in `hamHeld`, which is where she is when it means anything.
         show.did = null;
@@ -58865,8 +59217,11 @@ async function buildJadrija(scene) {
         const legs = [[K.dc, K.face + 0.55], [K.dc, K.face - 1.9]];
         const g = legs[Math.min(show.leg, 1)];
         if (showTo(g[0], g[1], dt, 1.05) < 0.35) {
-          if (show.leg >= 1) { show.leg = 0; go('home', 'walk', 0.30); }
-          else show.leg++;
+          if (show.leg >= 1) {
+            show.leg = 0;
+            // Out of the door on her way to the playground — see MEET.
+            if (!(show.meet && meetGo(pt, ps, go))) { show.meet = null; go('home', 'walk', 0.30); }
+          } else show.leg++;
         }
         break;
       }
@@ -59564,6 +59919,76 @@ async function buildJadrija(scene) {
         if (!S.cur || S.cur.name !== 'hamIn' || S.curT <= 0) {
           S.speed = 1;
           hamHome(go);
+        }
+        break;
+      }
+
+      // ── TO THE PLAYGROUND ───────────────────────────────────────────────
+      //
+      // See MEET, over `meetSeen`. Along the legs `hamPath` found; brought
+      // round if you are there already and she is far and unseen; the last
+      // leg re-aimed at you while you move about the grounds.
+      case 'toGrounds': {
+        const j = show.job, M = show.meet;
+        if (!j || !j.legs || !M) { show.job = null; show.meet = null; meetHome(go); break; }
+        // Asked for something else on the way: home first, where it is done.
+        if (show.ask && show.ask !== 'grounds' && !HAM_KEEP[show.ask]) { meetHome(go); break; }
+        j.since += dt; M.since += dt;
+        // Five times a second is plenty: the sight lines are the cost.
+        M.chk = (M.chk || 0) - dt;
+        if (M.chk <= 0) { M.chk = 0.2; if (meetHop(pt, ps, d)) break; }
+        const last = j.leg >= j.legs.length - 1;
+        if (last && groundsDist(pt, ps) < MEET.by) {
+          const g2 = groundsGoal(pt, ps);
+          j.legs[j.legs.length - 1] = g2;
+        }
+        const g = j.legs[Math.min(j.leg, j.legs.length - 1)];
+        const dist = showTo(g[0], g[1], dt, MEET.pace);
+        if (!last && dist < 0.55) { j.leg++; j.best = null; j.stall = 0; break; }
+        if (last && dist < 0.30) {
+          show.job = null; M.t = 0;
+          showSay('trill', d);
+          go('grounds', 'idle', 0.40);
+          break;
+        }
+        if (dist < (j.best == null ? 1e9 : j.best) - 0.2) { j.best = dist; j.stall = 0; } else j.stall += dt;
+        if (j.stall > HAM_T.stall) {
+          const end = j.legs[j.legs.length - 1];
+          const again = j.replan < 3 ? hamPath(show.t, show.s, end[0], end[1]) : null;
+          if (again) { j.legs = again; j.leg = 0; j.best = null; j.stall = 0; j.replan++; } else {
+            show.stuck = 'grounds'; show.byAsk = 0;
+            meetHome(go);
+          }
+        }
+        break;
+      }
+
+      case 'grounds': {
+        const M = show.meet;
+        if (!M) { meetHome(go); break; }
+        M.t += dt;
+        // Anything asked that is not one of the numbers she does where she
+        // stands: home to her lane, and done there (the ask stays armed).
+        if (show.ask && show.ask !== 'grounds' && !HAM_KEEP[show.ask] && !GROUNDS_OK[show.ask]) {
+          meetHome(go); break;
+        }
+        const gd = groundsDist(pt, ps);
+        if (gd < MEET.near) M.met = true;
+        M.gone = M.met && gd > MEET.leave ? M.gone + dt : 0;
+        if (M.gone > MEET.leaveFor || (!M.met && M.t > MEET.wait)) { meetHome(go); break; }
+        // With you: you wander off across the grounds and she comes after
+        // you, by a way through if there is anything in it.
+        if (d > MEET.follow && gd < MEET.by) {
+          const goal = groundsGoal(pt, ps);
+          const legs = hamPath(show.t, show.s, goal[0], goal[1]) || [goal];
+          show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0 };
+          go('toGrounds', 'walk', 0.32);
+          break;
+        }
+        show.want = M.met || d < SHOW.near ? Math.atan2(ps - show.s, pt - show.t) : show.want;
+        showHold(dt);
+        if (show.tmr - show.said > 6 + Math.random() * 6 && d < SHOW.near) {
+          show.said = show.tmr; showSay(say1(IDLE_CHAT), d);
         }
         break;
       }
@@ -74329,7 +74754,7 @@ async function buildJadrija(scene) {
     // until this pass and which is where a hundred metres of hut belongs: take
     // them out of the caster list and the rows stop throwing the long shadows
     // that are half of what the promenade looks like at seven in the evening.
-    meshes: [deckMesh, upMesh, vilMesh, arborMesh, oliveMesh, ...rendMeshes, stonesMesh,
+    meshes: [deckMesh, upMesh, gravMesh, vilMesh, arborMesh, oliveMesh, ...rendMeshes, stonesMesh,
       floraMesh],
     // The feather flags cast as they stand: the shadow pass does not run the
     // wave, and a ripple of a few centimetres in a shadow is nothing anybody
@@ -74410,6 +74835,26 @@ async function buildJadrija(scene) {
     hamPushed: (dv) => hamPushed(dv),
     /** Debug: the way from (t0, s0) to (t1, s1) — see `hamPath` — and her mark. */
     hamPath: (t0, s0, t1, s1) => hamPath(t0, s0, t1, s1),
+    /**
+     * The playground errand, for a probe — see MEET. `meet()` is where she
+     * is with it; `meet.ways` the two ways in and the lane-wall openings,
+     * `meet.seen(t, s)` the camera test she is brought round on. Not called
+     * `grounds`, which is the name the grounds themselves will want.
+     */
+    meet: Object.assign(() => (show ? {
+      phase: show.phase, t: +show.t.toFixed(2), s: +show.s.toFixed(2),
+      you: [+(show.pt || 0).toFixed(2), +(show.ps || 0).toFixed(2)],
+      d: +Math.hypot(show.t - (show.pt || 0), show.s - (show.ps || 0)).toFixed(1),
+      meet: show.meet ? { ...show.meet, since: +show.meet.since.toFixed(1), t: +show.meet.t.toFixed(1) } : null,
+      legs: show.job && show.job.legs ? show.job.legs.map((p) => p.map((v) => +v.toFixed(2))) : null,
+      leg: show.job ? show.job.leg : null, ask: show.ask, did: show.did, why: show.why,
+      seen: meetSeen(show.t, show.s, 1.4), toGrounds: +groundsDist(show.t, show.s).toFixed(1),
+    } : null), {
+      ways: () => JSON.parse(JSON.stringify(GROUNDS_WAYS)),
+      entries: () => MEET_ENTRIES.map((e) => e.slice()),
+      seen: (t, s, pad) => meetSeen(t, s, pad),
+      grounds: () => JSON.parse(JSON.stringify(GROUNDS)),
+    }),
     /**
      * Debug: skip the walk — her on the mark, turning to get in, as if she
      * had just arrived. For probes that cannot spend forty seconds on the

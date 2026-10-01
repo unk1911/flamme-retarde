@@ -8,6 +8,98 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.555.2] — 2026-10-01
+
+### Gravel behind the kabine, two ways through to the playground, and Baye meets you there
+
+Misha: *"there are these black roads in the back of the kabine, jadrija
+doesn't have black roads, everything is gravel road, and also it seems
+there's so many walls that it would be hard for me + baye to reach the
+playground ... we need to think about how to rapidly get her to the
+playground"*.
+
+**Gravel, not asphalt.**
+
+- Every OSM lane on the headland is named for it, "Jadrija I" to "IX", and
+  all were drawn in the coast's one asphalt at 0.09-0.14 albedo, which is
+  black. They are pale crushed limestone now (`JAD_GRAVEL` and `gravelGLSL`
+  in 36-roads.js, with a gravel buffer of their own).
+  - Two compacted wheel tracks, a loose crown, stone heaped at the margins,
+    and a ragged edge.
+  - The stones are cells about 3 cm across. A third of the cells are dust,
+    so they never read as a laid mosaic.
+  - Between the stones and the dust patches there is a grain at 6 and 15 per
+    metre.
+  - Every layer fades out on its own pixel footprint, toward its mean.
+    Nothing is periodic and nothing crawls.
+  - The per-way `rng()` draw is still made, so no other road's grey moves.
+- **One road stays tarmac**, because his photograph says so. "Jadrija IX",
+  the through road past the car park and the playground, is asphalt in
+  `survey/4/1000150353`, faded to a mid grey. So it keeps the tarmac and
+  takes that grey (0.318), not black. Taking its name out of
+  `JAD_GRAVEL.tarmac` makes it gravel too.
+- The crazed tarmac apron behind the lane wall is gravel now. It ran
+  t 214-558 and had a craquelure net of 2,600 chains that read as black
+  cracks in the shade of the stand. Its ragged edge stays; the broken lumps
+  off it are pale stone.
+- The playground pad is the same gravel surface, in a new `grav` buffer.
+- The back lane's concrete is measured off his walk (`a_024`) and is pale, so
+  it is not touched.
+
+**The ways through** (`GROUNDS_WAYS`). Both are cut where our two rows
+already have gaps, so no hut moves:
+
+- To the playground: the front-row gap at t 510-513, the alley, and the
+  back-row gap at 515-519. The lane wall is open at 513.6-520.8. The way then
+  passes between the trunks and the parked car to the playground's west end,
+  where the real gate is.
+- To the ping pong: the front-row and back-row gaps at t 550-554, which line
+  up, then the lane wall open at 549.6-554.4.
+- The back wall now stops at t 513.3. It was never a collider; you walked
+  through its render to reach the playground. The real place has a gravel
+  strip with benches there, and no wall.
+- Gravel paths run from the alley through each gap, along the playground's
+  seaward side and on to the tables.
+- **Blockers 785 → 787.** The one change is the lane-wall run t 475.2-559.2,
+  which is now three runs. The planters' and ivy's draws follow `gap0`, so
+  the census is unchanged.
+- The routes Baye's search finds: from the promenade at t 552 to the tables
+  is 38.6 m (58.8 before). The kabina door to the playground is still 98 m;
+  that walk is along the promenade.
+
+**Getting Baye there** (`MEET`, the `grounds` skill).
+
+- Say "come to the playground", "meet me at the playground" or "idemo na
+  igralište". Typed, the page matches it (`groundsWords` in 49-ears.js), so
+  it works signed out. Spoken, the service does (`grounds_of` in
+  server/baye/baye.py).
+- From the promenade side she walks the way cut for it. `hamPath` alone
+  wandered into the wood round one trunk.
+- **If you are already at the grounds** and she is more than 60 m off and
+  out of your sight, she is moved to a spot just outside the grounds that you
+  cannot see either, at least 12 m from you, and walks in from there.
+  - "Out of sight" is the camera frustum plus a sight-line test against
+    everything taller than her (huts, shops, houses, trunks).
+  - Without the sight-line test she walked the whole promenade, because the
+    frustum alone counted her as seen behind two rows of huts.
+- At the grounds she stays with you and follows you round them. A kiss, a
+  hug, the shimmy, the bend, the heart and the card are done there. Anything
+  else walks her back to her lane first and is done there.
+  - She goes home about seven seconds after you leave.
+  - If you never come, she waits four minutes.
+- From the kabina she walks out by the door. From the cot or her knees she
+  gets up first. From the hammock she gets out of it.
+- On the leash the answer is "lead her there yourself", and the leash follow
+  goes through the new gaps. Tied to the cot, she refuses.
+- Probes: `__fr.jad.meet()`, with `.ways()`, `.entries()` and
+  `.seen(t, s)`.
+
+The voice service is 1.50.0: the `grounds` skill and two `SHORE_DOING`
+lines. **It needs deploying** for the spoken command.
+
+Census unchanged at 446/333/86/27. People 100, walkers 27, cars 13.
+Blockers 787. No console errors.
+
 ## [1.555.1] — 2026-10-01
 
 ### The playground behind the kabine: found, and its ground cleared

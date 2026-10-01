@@ -236,6 +236,56 @@ Measured either side:
 Nobody is placed past s 36. The walkers' beats are all on the promenade, and
 nothing new blocks a path.
 
+## The ways in, the gravel, and Baye (1.555.2)
+
+Misha, 1 Oct 2026: the roads behind the kabine are black and Jadrija has
+none, and there are so many walls that it is hard for him and Baye to reach
+the playground.
+
+**The ways in** (`GROUNDS_WAYS` in 43-jadrija.js). Both are cut where our
+two rows already have gaps, so no hut moves:
+
+- `play`: through the front-row gap at t 509.9-513.4, across the alley, and
+  through the back-row gap at 514.9-518.9. The lane wall is open at
+  t 513.6-520.8. From there the way runs between the trunks at t 514.5 and
+  the car at 520, to the playground's west end, where the real gate is.
+- `pong`: through the front-row gap at 549.9-553.3 and the back-row gap at
+  550.4-554.0, which line up. The lane wall is open at 549.6-554.4. Then
+  through the open wood to the tables.
+- The back wall (s 36.3) now stops at t 513.3, so nothing stands between the
+  rows and the playground's frontage. It was never a collider; you used to
+  walk through rendered wall to get there.
+- Each way has a raked gravel path from the alley on. There is also a strip
+  along the playground's seaward side, where the real benches are, and a link
+  from its east end to the tables.
+
+The only blocker change is the lane-wall run t 475.2-559.2, which is now three
+runs: 475.2-513.6, 520.8-549.6 and 554.4-559.2. That takes the count from 785
+to 787. The planters' and the ivy's draws still follow `gap0` (rule 4), so the
+census does not move.
+
+**The gravel.**
+
+- The OSM lanes named "Jadrija ..." are crushed limestone now. They are drawn
+  in the road layer's own gravel buffer (`JAD_GRAVEL`, `gravelGLSL` in
+  36-roads.js).
+- "Jadrija IX", the through road past the car park, stays tarmac. Misha's own
+  `1000150353` shows it asphalt, but faded to a mid grey.
+- The crazed tarmac apron behind the lane wall is gravel.
+- The paths and the `play` pad are gravel, in the resort's `grav` buffer.
+- The back lane's concrete, measured off his walk, is left alone.
+
+**Baye.** Asked "come to the playground", "meet me at the playground" or
+"idemo na igralište" (the `grounds` skill), she walks there. From the
+promenade side she uses the way cut for it. If you are already at the grounds
+and she is more than 60 m off and out of your sight, she is moved, unseen, to
+a spot just outside the grounds that you also cannot see, and walks in from
+there. "Out of sight" means the camera frustum plus the huts and trunks
+between you. At the grounds she stays with you (`grounds`). Anything she does
+standing still is done there; anything else walks her home first. On the
+leash the answer is that you lead her. Tied to the cot, she refuses. See
+`MEET` in 43-jadrija.js.
+
 ## For whoever builds it
 
 - **AVBD** (`43-avbd.js`, see the memory note on it):

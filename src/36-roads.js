@@ -52,6 +52,127 @@ function nearJadrija(x, z, extra = 0) {
 }
 
 /**
+ * AND WHAT THE LANES AT JADRIJA ARE MADE OF, WHICH IS NOT ASPHALT.
+ *
+ * Misha, 1 Oct 2026: *"there are these black roads in the back of the
+ * kabine, jadrija doesn't have black roads, everything is gravel road"*.
+ * Every OSM way on this headland is named for it — "Jadrija I" to
+ * "Jadrija IX", nineteen of them inside a kilometre of the huts and nothing
+ * else in that box — and every one of them was drawn in the one asphalt the
+ * whole coast gets, at 0.09-0.14, which is black. They are drawn now as what
+ * the aerial (0:44-0:50) and his own stills have round the rows: pale warm
+ * crushed limestone, two wheel tracks pressed darker and smoother, loose
+ * stone heaped at the margins, dust over all of it. See `GRAVEL_GLSL`.
+ *
+ * ONE STAYS TARMAC, AND THE PHOTOGRAPH SAYS SO. `survey/4/1000150353` is
+ * stood on the verge of the car park looking along the road past the
+ * playground — that is "Jadrija IX", the through road from the village to the
+ * marina — and it is asphalt: a crumbling edge, a kerb line, a car on it.
+ * Not black, though: twenty summers have taken it to a mid grey, and the
+ * aerial at 0:46 shows the same pale band. So it keeps the tarmac body and
+ * takes that grey (`pale`). Take its name out of `tarmac` and it is gravel
+ * like the rest.
+ */
+const JAD_GRAVEL = {
+  name: /^Jadrija\b/,
+  tarmac: new Set(['Jadrija IX']),
+  // The stone, as albedo: the playground pad's raked gravel off `_349`
+  // (0.470/0.440/0.378, see GROUNDS in 43-jadrija.js), a step paler — a lane
+  // is swept by tyres and dried white where the pad is shaded by pines. The
+  // first cut at 0.585 read as snow under this sun.
+  col: [0.480, 0.442, 0.362],
+  // And the through road's weathered asphalt.
+  pale: [0.318, 0.310, 0.294],
+};
+
+/**
+ * GRAVEL, as a fragment body: `base` in, `base` out.
+ *
+ * Read by three meshes — the Jadrija lanes here, and the resort's own made
+ * ground and paths in 43-jadrija.js — so it is a string and not a material:
+ * each caller says where its position is (`gp`, world xz) and how worn the
+ * spot is (`track` 0..1: pressed by tyres, darker and finer; `loose` 0..1:
+ * thrown to the margin, paler and coarser).
+ *
+ * THREE SCALES AND NO GRATING. A sum of sines here would be the corduroy the
+ * sea ripples were for eight months (see `no-varying-coefficient`, and
+ * `nothing-beats-a-wrong-pattern` in the notes), so every layer is value
+ * noise or cells, at constant frequency on the absolute position:
+ *
+ *   patches, 4-12 m: where the dust lies thick and where it has been swept;
+ *   clumps, about a metre: stone gathered in the low spots;
+ *   the stones themselves, ~4 cm cells, each its own tone with a dark joint
+ *   between it and the next, and one in a dozen a white limestone chip.
+ *
+ * The stones fade out on their own pixel footprint (`fwidth`), toward their
+ * MEAN rather than toward nothing, so a lane does not brighten or darken as
+ * you walk away from it and nothing crawls at distance. Inline rather than a
+ * function because `decl` lands above GLSL_NOISE in `solidFragment`, and the
+ * noise is what it is built from. No backticks in here.
+ */
+function gravelGLSL(gp, track, loose) {
+  return /* glsl */ `
+  {
+    vec2 gp = ${gp};
+    float gTrack = clamp(${track}, 0.0, 1.0);
+    float gLoose = clamp(${loose}, 0.0, 1.0);
+    float pm = fbm2(gp * 0.17 + vec2(3.1, 7.7), 3);
+    float cl = vnoise2(gp * 1.25 + vec2(11.0, 2.0));
+    // The stones, about 34 to the metre, on cells — and not every cell is
+    // one: a third of them are the dust the stones sit in, which is what
+    // stops the cells reading as a laid mosaic. They live only as long as a
+    // pixel is smaller than about a third of one.
+    vec2 fw = fwidth(gp);
+    float foot = max(fw.x, fw.y) * 34.0;
+    float sd = 1.0 - smoothstep(0.22, 0.85, foot);
+    float st = 0.0, gap = 0.20;
+    if (sd > 0.0) {
+      vec2 q = gp * 34.0;
+      vec2 ci = floor(q), cf = fract(q);
+      float d1 = 9.0, d2 = 9.0, tone = 0.5;
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          vec2 o = vec2(float(x), float(y));
+          vec2 c = ci + o;
+          vec2 r = o + 0.10 + 0.80 * vec2(h21(c), h21(c + 37.13)) - cf;
+          float dd = dot(r, r);
+          if (dd < d1) { d2 = d1; d1 = dd; tone = h21(c + 71.31); }
+          else if (dd < d2) { d2 = dd; }
+        }
+      }
+      float e = sqrt(d2) - sqrt(d1);
+      float isStone = step(0.34, tone);
+      gap = isStone * (1.0 - smoothstep(0.02, 0.13, e));
+      st = isStone * ((tone - 0.67) * 1.6 + step(0.93, tone) * 0.55);
+    }
+    // Pressed stone is smaller, flatter and full of dust: less of every
+    // kind of contrast, and a little darker. Loose stone the other way.
+    float con = mix(1.0, 0.45, gTrack) * (1.0 + 0.55 * gLoose);
+    float stone = sd * con * ((st - 0.03) * 0.22 - (gap - 0.20) * 0.16);
+    vec3 g = base;
+    g *= 0.84 + 0.30 * pm;
+    g *= 0.92 + 0.16 * cl * (1.0 - 0.5 * gTrack);
+    // AND THE GRAIN BETWEEN THE TWO, which is what a gravel reads as from
+    // five to forty metres, where the stones are already under a pixel:
+    // the tone of a hand's breadth of it, two octaves of value noise at a
+    // sixth and a fifteenth of a metre, each out on its own footprint and
+    // each a mean-zero term so nothing brightens as it fades.
+    float k1 = 1.0 - smoothstep(0.30, 0.95, max(fw.x, fw.y) * 6.0);
+    float k2 = 1.0 - smoothstep(0.30, 0.95, max(fw.x, fw.y) * 15.0);
+    float gr = k1 * (vnoise2(gp * 6.0 + vec2(1.7, 5.3)) - 0.5) * 0.20
+      + k2 * (vnoise2(gp * 15.0 + vec2(9.1, 0.4)) - 0.5) * 0.22;
+    g *= 1.0 + gr * mix(1.0, 0.55, gTrack);
+    g *= 1.0 + stone;
+    g *= mix(1.0, 0.86, gTrack) * mix(1.0, 1.07, gLoose);
+    // And dust over the lot: a little of the colour taken out toward its
+    // own grey, more where it lies thick.
+    float lum = dot(g, vec3(0.30, 0.50, 0.20));
+    base = mix(g, vec3(lum) * vec3(1.08, 1.0, 0.86), 0.06 + 0.12 * smoothstep(0.45, 0.8, pm));
+  }
+  `;
+}
+
+/**
  * Resample a polyline so no step is longer than `step`, dropping any run that
  * crosses water.
  *
@@ -96,6 +217,8 @@ function buildRoads(scene) {
   const bufs = {
     minor: { pos: [], norm: [], col: [], uv: [] },
     major: { pos: [], norm: [], col: [], uv: [] },
+    // And the lanes of Jadrija, which are gravel — see JAD_GRAVEL.
+    gravel: { pos: [], norm: [], col: [], uv: [] },
   };
   const rng = mulberry32(CONFIG.seed ^ 0x00b0ad);
   let drawn = 0, metres = 0;
@@ -106,12 +229,17 @@ function buildRoads(scene) {
   for (const way of world.roads) {
     const rank = clamp(way.r | 0, 1, 4);
     const halfW = ROADS.width[rank] * 0.5;
-    const B = rank >= 2 ? bufs.major : bufs.minor;
+    const jad = !!(way.n && JAD_GRAVEL.name.test(way.n));
+    const gravel = jad && !JAD_GRAVEL.tarmac.has(way.n);
+    const B = gravel ? bufs.gravel : rank >= 2 ? bufs.major : bufs.minor;
 
     // Asphalt, but not one asphalt: resurfacing dates vary and a network in a
-    // single grey reads as printed on.
+    // single grey reads as printed on. The draw is made for every way, the
+    // gravel ones included, so no other way's grey moves.
     const g = 0.093 + rng() * 0.042;
-    const col = [g * 1.06, g, g * 0.95];
+    const col = gravel
+      ? JAD_GRAVEL.col.map((c) => c * (0.97 + (g - 0.093) / 0.042 * 0.06))
+      : jad ? JAD_GRAVEL.pale : [g * 1.06, g, g * 0.95];
 
     for (const run of drapeRuns(way.p, ROADS.step)) {
       // Mitred offsets: at each point the ribbon edge follows the average of
@@ -193,7 +321,26 @@ function buildRoads(scene) {
     base = mix(base, vec3(0.62, 0.60, 0.54), centre * dash * 0.85);` : ''}
   `;
 
-  const mk = (B, marked) => {
+  // The gravel lane. Two wheel tracks either side of a loose crown, the
+  // margins heaped with what the tyres threw there, and an edge that is
+  // where the stone gave out rather than a line somebody cut — see
+  // `gravelGLSL`. The tracks are a fixed fraction of the width: every lane
+  // here is rank 1, 5 m, and a car's track is 1.5 m.
+  const gravelBody = /* glsl */ `
+    base *= vVCol;
+    float across = abs(vUv.x * 2.0 - 1.0);
+    // The edge, ragged on a metre scale: past it, nothing is drawn and the
+    // ground underneath is the edge.
+    float rag = 0.90 + 0.10 * (vnoise2(vWorld.xz * 0.9 + vec2(4.0, 9.0)) - 0.5) * 2.0;
+    if (across > rag) discard;
+    float wob = 0.05 * (vnoise2(vec2(vUv.y * 0.11, 3.0)) - 0.5);
+    float trk = 1.0 - smoothstep(0.09, 0.17, abs(across - 0.31 - wob));
+    float lse = smoothstep(rag - 0.26, rag - 0.02, across)
+      + 0.45 * (1.0 - smoothstep(0.05, 0.16, across));
+    ${gravelGLSL('vWorld.xz', 'trk', 'lse')}
+  `;
+
+  const mk = (B, marked, gravel) => {
     if (!B.pos.length) return null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(B.pos, 3));
@@ -202,7 +349,7 @@ function buildRoads(scene) {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(B.uv, 2));
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
     const m = new THREE.Mesh(g, solidMaterial(0xffffff, {
-      spec: 0.03, specPower: 16, body: body(marked),
+      spec: gravel ? 0.015 : 0.03, specPower: 16, body: gravel ? gravelBody : body(marked),
     }));
     m.frustumCulled = false;
     // The ribbon and the terrain are two different tessellations of the same
@@ -217,9 +364,10 @@ function buildRoads(scene) {
 
   const minor = mk(bufs.minor, false);
   const major = mk(bufs.major, true);
+  const gravel = mk(bufs.gravel, false, true);
   return {
-    minor, major, drawn, lanes,
+    minor, major, gravel, drawn, lanes,
     km: metres / 1000,
-    tris: (bufs.minor.pos.length + bufs.major.pos.length) / 9,
+    tris: (bufs.minor.pos.length + bufs.major.pos.length + bufs.gravel.pos.length) / 9,
   };
 }
