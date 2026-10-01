@@ -2639,6 +2639,9 @@ async function buildGround(scene, field) {
     get stranded() { return stranded; },
     get crew() { return crew; },
     hose: () => you.jet,
+    /** Where the jet is landing, [x, y, z] — for anything that minds getting wet
+     *  without being a guest (the crabs, 44-crabs.js). */
+    aimAt: () => you.aim || null,
     /** Where you tried to walk into the sea this frame, or null. */
     wet: () => wet,
     /**

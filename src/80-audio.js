@@ -1908,6 +1908,22 @@ function buildAudio() {
   }
 
   /**
+   * A crab's foot on stone: two ticks a few milliseconds apart, high and
+   * narrow, and very quiet — a dactyl is a fingernail. Panned to where it is.
+   * See 44-crabs.js, which asks for one at most every few tens of ms.
+   */
+  function crabClack(gain = 1, pan = 0) {
+    if (!ctx || gain <= 0.001) return;
+    const p = ctx.createStereoPanner();
+    p.pan.value = clamp(pan, -1, 1);
+    p.connect(master);
+    const t = ctx.currentTime, v = 0.85 + Math.random() * 0.3;
+    burst({ freq: 4300 * v, q: 4.5, dur: 0.010, gain: 0.010 * gain, dest: p, at: t });
+    burst({ freq: 2700 * v, q: 3.5, dur: 0.014, gain: 0.006 * gain, dest: p, at: t + 0.006 + Math.random() * 0.01 });
+    setTimeout(() => { try { p.disconnect(); } catch (e) { /* gone */ } }, 200);
+  }
+
+  /**
    * The sound the intro is built around. A bomblet is a small steel canister on
    * a ribbon; a few hundred of them coming down together ring against each
    * other, and that is where the name came from. Struck metal is inharmonic, so
@@ -8026,7 +8042,7 @@ function buildAudio() {
     return dur;
   }
 
-  return { start, update, squelch, dropWhoosh, setGush, footstep, splash, plunge, gasp, beep, nudge, rattle, creak,
+  return { start, update, squelch, dropWhoosh, setGush, footstep, crabClack, splash, plunge, gasp, beep, nudge, rattle, creak,
     beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, beltCrack, beltSwish,
     beltBuckle, beltQuiet, beltWarm, herMoan, herGasp, herHush,
     /** Debug: what the belt and her voice played, context seconds — see `sfxNote`. */

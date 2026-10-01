@@ -3279,7 +3279,7 @@ function updateCamera(dt) {
 let terrain, sky, sea, fire, shadow, plane, flight, waterfx, city, wingmen, audio, intro,
   trees, landmarks, alerts, roads, rail, props, airfield, jadrija, ground, birds, eject,
   mirror, mirrorP, swim, under, seabed, arms, mask, kites, ride, chase, you,
-  brod, ao, backlane, backlaneCars, plunge;
+  brod, ao, backlane, backlaneCars, plunge, crabs;
 /** You plus the three wingmen, as the birds see them. Built once, in boot(). */
 let birdFlush = [];
 
@@ -3388,6 +3388,9 @@ async function boot() {
   // the mixer lives in this file and reaching down the concatenation for it
   // from up there is Rule 3 waiting to happen.
   if (jadrija && jadrija.setThud) jadrija.setThud(() => { if (audio) audio.nudge(); });
+  // The crabs on the rocks at the water — 44-crabs.js. Built on the shore's
+  // own surfaces, so after it; nothing is baked until you come near them.
+  crabs = jadrija ? buildCrabs(scene, jadrija) : null;
   // Where she lies is a pair of degrees now — the Brod, on the far side of the
   // spit — so this no longer waits on the shore having been traced. It stays
   // here because the quay is masonry in the same scene and the loading order
@@ -6292,6 +6295,10 @@ let jumpWas = 0, jumpPush = 0, jumpLand = 0, jumpPosed = false;
 
 /** Third person in the water: off, or on with the mask down. */
 const _look = new THREE.Vector3();
+/** A pretend jet landing at `at` for `t` more seconds, for testing the crabs. */
+let crabJet = null;
+/** Scratch for the crabs' clack, which is panned off the camera's right. */
+const _crabV = new THREE.Vector3(), _crabR = new THREE.Vector3();
 let bodyCam = false;
 
 /**
@@ -10489,6 +10496,25 @@ function tick(wall, draw) {
       state.phase === 'ground' && ground && ground.ok
         ? { x: ground.you.x, y: ground.you.y, z: ground.you.z } : null,
       camera.getWorldDirection(_look));
+    // The crabs, which run from YOU — the walker or the swimmer, not the
+    // camera, which in the third person is somewhere else — and from the
+    // jet when it lands near them.
+    if (crabs) {
+      const who = state.phase === 'ground' && ground && ground.ok ? ground.you
+        : state.phase === 'swim' && swim ? swim.you : null;
+      let jet = state.phase === 'ground' && ground && ground.hose() > 0.2 && ground.aimAt
+        ? ground.aimAt() : null;
+      // A test's stand-in for a jet, for `crabJet` seconds — see __fr.crabs.jet.
+      if (crabJet && crabJet.t > 0) { crabJet.t -= dt; jet = crabJet.at; }
+      crabs.update(dt, camera, who, jet, (c, sp) => {
+        if (!audio || !audio.crabClack) return;
+        _crabV.set(c.x, c.y, c.z).sub(camera.position);
+        const d = _crabV.length();
+        _crabR.setFromMatrixColumn(camera.matrixWorld, 0);
+        audio.crabClack(Math.pow(1 - d / 4.5, 2) * (0.4 + Math.min(1, sp / 0.4)),
+          d > 1e-3 ? _crabV.dot(_crabR) / d : 0);
+      });
+    }
     // The strap, against her as she has just been posed — see `beltSimTick`.
     beltSimTick(dt);
     // The leash, against her as she has just been posed — see `collarSimTick`.
@@ -10858,6 +10884,11 @@ function tick(wall, draw) {
   if (dogNear != null) {
     wantNear = Math.min(wantNear, clamp(dogNear - DOODLE.lens.pad, DOODLE.lens.floor, 1.2));
   }
+  // And the crabs, which are four centimetres across and live where you
+  // crouch at the water's edge: one a metre from the lens is inside the
+  // 1.2 m plane and is not drawn. Only while one is that close and in front.
+  const crabNear = crabs ? crabs.lensNear(camera) : null;
+  if (crabNear != null) wantNear = Math.min(wantNear, clamp(crabNear - 0.08, 0.06, 1.2));
   // And the beach ball in your hand, which is half a metre from your eye:
   // inside the promenade's 1.2 m front plane it is not drawn at all, and the
   // hand came up empty. For the half second the throw lasts.
@@ -11753,6 +11784,42 @@ window.__fr = {
         rows.push(Math.round(x) + ' | ' + row.join(' '));
       }
       return rows;
+    },
+  },
+  /**
+   * The crabs — src/44-crabs.js.
+   *
+   *   __fr.crabs.stats()          patches baked, crabs made and live, ms, draws
+   *   __fr.crabs.list()           every crab: where, which mode, how far
+   *   __fr.crabs.flee(i, x, z)    send crab i (or every live one, i < 0) off from (x, z)
+   *   __fr.crabs.mode(i, 'guard') claws up; 'hide', 'idle', 'walk'
+   *   __fr.crabs.look(i, d, az, el)  pin the eye on crab i from d metres
+   *   __fr.crabs.feet(i)          each foot, and how far it is off the surface
+   *   __fr.crabs.freeze(true)     stop them (they are still drawn)
+   *   __fr.crabs.stand(x, z)      put the walker there (they run from you, not the eye)
+   *   __fr.crabs.jet(x, y, z, s)  pretend the hose is landing there for s seconds
+   */
+  crabs: {
+    raw: () => crabs,
+    stats: () => (crabs ? crabs.stats() : null),
+    list: () => (crabs ? crabs.list() : null),
+    flee: (i = -1, x, z) => {
+      if (!crabs) return null;
+      const p = x != null ? [x, z] : [camera.position.x, camera.position.z];
+      return crabs.flee(i, p[0], p[1]);
+    },
+    mode: (i, m, secs) => (crabs ? crabs.mode(i, m, secs) : null),
+    feet: (i) => (crabs ? crabs.feet(i) : null),
+    surf: (x, z) => (crabs ? crabs.surf(x, z) : null),
+    freeze: (on = true) => (crabs ? crabs.freeze(on) : null),
+    /** Pretend the hose is landing at (x, y, z) for `secs`. */
+    jet: (x, y, z, secs = 1) => { crabJet = { at: [x, y, z], t: secs }; return true; },
+    /** Stand the walker at (x, z) — what the crabs run from is you, not the eye. */
+    stand: (x, z, yaw = 0) => { if (ground) ground.put(x, z, yaw, 0); return ground ? [ground.you.x, ground.you.y, ground.you.z] : null; },
+    look: (i, d, az, el) => {
+      const e = crabs ? crabs.raw().all[i] && crabs.eye(i, d, az, el) : null;
+      if (e) camOverride = e;
+      return e;
     },
   },
   /**

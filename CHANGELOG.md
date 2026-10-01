@@ -8,6 +8,62 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.555.0] — 2026-10-01
+
+### Crabs on the rocks
+
+Misha, after gkjohnson's closed-chain-ik-js and its hexapods: *"sure bring in
+the crabs :)"*. Thirty-odd marbled rock crabs, *Pachygrapsus marmoratus*,
+the dark, squarish, fast crab of every rocky Dalmatian shore. They live on the
+tipped limestone where the beach becomes the quay (t 189-219), the stone toe
+at the head of the bathing mole and the bed at the foot of its flanks, and the
+armour at the heads of the two moles off the kabine. Some are in the splash
+zone and some are on the bottom 1-4 m down, where you meet them swimming.
+New file `src/44-crabs.js`.
+
+- **The animal.** 3.0-4.8 cm of carapace: a superellipse shell narrowed
+  behind, front dipped between the orbits, one tooth behind each eye, eyes on
+  short stalks, mouthparts underneath. It is purple-brown to olive with pale
+  transverse marbling drawn in the shell's own coordinates and seeded per
+  crab. It has eight flattened mottled walking legs (coxa, merus, and the rest
+  of the leg as one) and two chelae with a moving finger and pale tips. It is
+  33 instances across five instanced meshes that share one program, so the
+  whole population is five draw calls, and none when nobody is near.
+- **Feet planted with IK.** The IK is hand-written: the coxa swings in yaw
+  toward the foot, then an analytic two-bone solve runs in the vertical plane,
+  knee up. There is no closed chain in a crab standing on a rock, so the
+  library was not needed and is not in the build. The legs step in the
+  alternating tetrapod gait (L1 R2 L3 R4 against R1 L2 R3 L4), each swing
+  aimed where the foot will be wanted. The body rides between the ground and
+  its feet and tilts with the rock, capped at 40°.
+- **What the feet land on.** Each habitat is a patch with its own height
+  field, baked at load (about 0.1 s for all four). The terrain under it is
+  computed as the vertex shader draws it. `groundAt` is half a texel off the
+  GPU lattice and bilinear where the mesh is two flat triangles. Every
+  triangle of the shore's concrete, standing work and loose stone below 2.4 m
+  is then rasterised in, highest wins. Measured: every planted foot sits
+  1.5 mm above the drawn surface.
+- **Behaviour.** When idle, a crab picks at the rock one claw after the
+  other, then wanders sideways, mostly back toward stone. When you come
+  within 3 m it stops, turns to face you and half raises its claws. Within
+  2 m it flees: sideways, re-aimed every frame, preferring downhill into the
+  water. It then hides pressed down in its crack and comes out once nothing
+  has been near for 5-15 s. A bold one in three holds its ground with both
+  claws up and open until 1.25 m. A cornered crab turns on you. Water from
+  the hose landing within 1.5 m sends it off whoever is holding the hose
+  (`ground.aimAt`). It runs from YOU, the walker or the swimmer, never the
+  camera.
+- **The clack**: two tiny band-passed ticks when a foot lands on stone within
+  4.5 m, panned, rate-limited, very quiet (`audio.crabClack`).
+- **The near plane** comes in to just short of a crab that is within 1.6 m
+  and in front of the lens, as it does for the Slow Doodle; otherwise the
+  1.2 m plane would hide a crab at your feet.
+- **Cost**: 0.10 ms a frame with eleven crabs live, 71k triangles, 5 draws;
+  0 ms and 0 draws away from them. Simulated and drawn within 24 m of the eye
+  only. Nothing draws from the resort `rng`. People 100, blockers 785.
+- `__fr.crabs`: `stats`, `list`, `flee`, `mode`, `feet`, `look`, `stand`,
+  `jet`, `freeze`, `surf`.
+
 ## [1.554.3] — 2026-10-01
 
 ### The diver takes a breather
