@@ -8,6 +8,56 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.557.3] — 2026-10-01
+
+### L records what is on the screen, not just the picture
+
+Misha: *"when recording with 'L', it doesn't record the various messages that
+appear on the screen, just the visuals, not sure why.. so when jumping off the
+diving board, it doesn't show my score in the recording."*
+
+- The cause: the recorder films a 2-D composite of the WebGL canvas. Until now
+  the only things painted over it were the ottakyo terminal, the subtitle, the
+  EARS panel and the fly cam's frame. A dive's score is a toast, and toasts
+  were left out on purpose. That choice dates from when a clean clip was the
+  point.
+- Now everything the player reads is in the take:
+  - toasts (the dive verdict among them)
+  - every mode's HUD: flying, on foot, swim, tower, chase, bike, boat, canopy
+  - the subtitle and its gloss
+  - the shop counter, the EARS panel, the fly cam's frame
+  - the phone and the satchel
+  - the cutscene's bars and caption, and the end card
+  - the screen washes: mask vignette, crash red, flash, threshold dip
+- Left out: the menus (settings, help, pause, sign-in), the title veil, the
+  touch controls, `#whoami`, the poser, the two SVG reticles, and the red
+  REC dot.
+- `clipOverlays` (src/92-clip.js) replaces `clipDom` and does no layout of its
+  own:
+  - A Range over each word returns the box the browser put it in, and the word
+    is drawn on its baseline there, in its own font, colour, letter-spacing,
+    case and text-shadow.
+  - Boxes, borders and radii, CSS gradients, outer box-shadows, gradient masks
+    (the compass), `mix-blend-mode` (the tank label) and positioned
+    `::before`/`::after` boxes are drawn from computed styles. Children are
+    clipped at the rounded padding box, and empty inputs show their
+    placeholder.
+  - Each overlay is laid out into its own sprite, and rebuilt at most every
+    other captured frame when its markup changes or something inside it is
+    animating. Its opacity and position are read every frame, so fades and
+    slides match the screen.
+- Checked against Page.captureScreenshot on the toast, the subtitle and gloss,
+  the flight HUD, the phone, the satchel and the EARS panel. They match to the
+  pixel or close to it.
+- Cost per captured frame on the 4090 at 720p: 0.65–0.74 ms on the tower and in
+  the water, 0.86 ms in the air with the full HUD. The first frame after L
+  costs 20–30 ms once. `__fr.clip.cost()` reports it live.
+- `?cleanrec` or `__fr.clip.clean(true)` films the old way, with nothing over
+  the picture but the terminal. Use it for VACE restyle plates. The audio path
+  is unchanged.
+- New debug hooks: `__fr.clip.cost()`, `clean()`, `toast(msg, kind)` and
+  `sub(text, secs, gloss)`.
+
 ## [1.557.2] — 2026-10-01
 
 ### Two houses that Jadrija does not have, gone from the promenade
