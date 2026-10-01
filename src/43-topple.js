@@ -129,6 +129,34 @@ const KNOCK = {
   // Muscle tone (RAGDOLL's tension): held when the water gets them, let go
   // over `brace` s — a brace, and then gone — and on the ground.
   hold: 0.9, limp: 0.14, brace: 0.5, ground: 0.12,
+  // ON THE GROUND AND STILL BEING HOSED (1.554.2). Misha, 30 Sep 2026: *"why
+  // they wrythe so much?"* MEASURED, the jet held on somebody lying down: a
+  // mean of 52 to 95 J in them, peaks of 400 to 565, the fastest body 8.5
+  // m/s, and once flung 4 m along the terrace — the whole 240 N (`force` ×
+  // `liveGain`) put on whichever two or three bodies were nearest the jet's
+  // line, which on a forearm alone is 170 m/s². Now, once they are down,
+  // the water pushes no harder than it would push `catchKg` of body (a
+  // forearm in it alone takes its own share of that, not the whole jet), at
+  // `downGain` of `force`, and they curl up against it (`wetTone`, toward the pose
+  // they were in when it got them — sitting, which on the ground is curled),
+  // and let go again when it stops. Not at all before they land: the fall
+  // off the chair is what it was.
+  catchKg: 20, downGain: 1.0, wetTone: 0.3,
+  // A beat on the ground, s, before they roll over or get up.
+  downMin: 0.7,
+  // THE CONTACTS THAT CANNOT LET GO — (l) in 43-avbd.js. The body against
+  // itself (`pairK`) and the chair against the body (`boxK`), N/m: springs,
+  // not hard rows. MEASURED hard, lying still: an upper arm 4.6 cm into the
+  // belly with the shoulder holding it there, 1,400 N on that contact
+  // climbing to 8,000 in two seconds; the chair's seat across the legs,
+  // 2,500 N to 16,600 in three. Every one of the writhes was that: the arms
+  // at the 40 rad/s ceiling, the get-up only ever reached through `restMax`,
+  // and the roll-over failing and trying again (three tries in four of
+  // twelve knocks, and five of the twelve got up off their backs). As springs that arm is a steady 230 N and the chair 270,
+  // nothing turns faster than 10 rad/s a second after they land, and one
+  // roll does it. 5000 is a forearm's weight on the chest in 3 mm; 20000 the
+  // chair's on a leg in 1.5.
+  pairK: 5000, boxK: 20000,
   // The bodies the push goes to: by distance from the jet's line, m.
   spread: 0.30,
   // Air, 1/s, and the solver's speed caps (m/s, rad/s).
@@ -146,7 +174,13 @@ const KNOCK = {
   // two tries, three of the four were still face up at the get-up; at 9 to
   // 12, one in four, whichever way it was sent — the arm it rolls toward is
   // what stops it. So a third try goes the other way.
-  roll: 10, rollLift: 0.6, rollTone: 0.45, rolls: 3, rollFor: 1.2,
+  // MEASURED again once the stuck contacts were springs (1.554.2, `pairK`),
+  // on the café's own knocks and the jet: at 10, 70 % over on the first try
+  // and two in eighteen still face up after three; at 12.5, 31 of 36 on the
+  // first; and with the second try the other way (`rollFlip`, the try from
+  // which they alternate), none of 24 left face up. A roll that fails and
+  // tries again IS the writhe, so the first one has to count.
+  roll: 12.5, rollLift: 0.6, rollTone: 0.45, rolls: 3, rollFor: 1.2, rollFlip: 1,
   // Easing into `getup`'s first frame, s, and back into the chair.
   upFade: 0.75, reseatFade: 0.7,
   // The chair: whether it goes over with them at all, the seat's and the
@@ -202,7 +236,7 @@ function makeToppler(o) {
       maxContacts: 400, maxAngles: 16, maxWorldBoxes: 8, maxCapPairs: 96, limK: RAGDOLL.limK,
       iterations: KNOCK.iterations, alpha: 0.9, alphaContact: 0.9, beta: 1e5, betaAng: 100, gamma: 0.999,
       gravity: [0, -9.81, 0], drag: KNOCK.drag, vMax: KNOCK.vMax, wMax: KNOCK.wMax, margin: 0.01, deep: 0.03,
-      mu: 0.7, floorMu: 0.8, capK: 30000, pointsHitCaps: false,
+      mu: 0.7, floorMu: 0.8, capK: 30000, pointsHitCaps: false, pairK: KNOCK.pairK, boxK: KNOCK.boxK,
     });
     // THE CHAIR, which goes over with them — see `KNOCK.chair`. Two bodies
     // welded, the seat and the backrest, each the settle's own box for it,
@@ -279,9 +313,10 @@ function makeToppler(o) {
       } else return X.phase;
     }
     if (X.phase !== 'live') return X.phase;
-    // Held on a body that has let go: more of it, along the jet's line.
+    // Held on a body that has let go: more of it, along the jet's line —
+    // and on one lying down, less (`downGain`).
     toFig(fg, F, _d, true);
-    const g = KNOCK.liveGain / (fg.hscale || 1);
+    const g = (X.landed ? KNOCK.downGain : KNOCK.liveGain) / (fg.hscale || 1);
     X.F[0] = _d[0] * g; X.F[1] = _d[1] * g; X.F[2] = _d[2] * g;
     toFig(fg, at, X.at);
     const l = Math.hypot(_d[0], _d[1], _d[2]) || 1;
@@ -308,8 +343,12 @@ function makeToppler(o) {
     return true;
   }
 
-  /** How the push is shared: each body by its distance from the jet's line. */
-  function weights(s, X) {
+  /**
+   * How the push is shared: each body by its distance from the jet's line,
+   * over at least `minKg` of body — what the water can push is what it
+   * catches, so two bodies near its line do not take all of it between them.
+   */
+  function weights(s, X, minKg = 0) {
     const { net, rag } = s, P = net.P;
     const w = s.w || (s.w = new Float64Array(rag.bodies.length));
     let sum = 0;
@@ -325,6 +364,7 @@ function makeToppler(o) {
       rag.bodies.forEach((b, k) => { w[k] = b === rag.body('chest') || b === rag.body('spine02') ? 1 : 0; });
       sum = 2;
     }
+    sum = Math.max(sum, minKg);
     for (let k = 0; k < w.length; k++) w[k] /= sum;
     return w;
   }
@@ -372,7 +412,7 @@ function makeToppler(o) {
     for (const b of f.bones) if (/^(arm|hand|finger|thumb|spine01|chest|head|neck)/.test(b.name)) f.aim(b.name, 0, 1, 0, 0);
     fg.aimed = false;
     f.manual(X.pose);
-    X.phase = 'live'; X.t = 0; X.dry = 0; X.rest = 0; X.still = 0; X.landed = false; X.rolls = 0; X.rollT = 0; X.acc = 0;
+    X.phase = 'live'; X.t = 0; X.dry = 0; X.rest = 0; X.still = 0; X.landed = false; X.landT = 0; X.rolls = 0; X.rollT = 0; X.acc = 0;
     s.snapT = 0; s.trips = []; for (const sn of s.snaps) sn.ok = false;
     rag.tension(KNOCK.hold);
     event(fg, 'live', null);
@@ -496,9 +536,10 @@ function makeToppler(o) {
     while (X.acc >= KNOCK.h - 1e-9 && n < KNOCK.maxSteps) {
       X.acc -= KNOCK.h; n++;
       X.t += KNOCK.h;
-      // The tone: braced, then gone; on the ground, a rag; rolling, held.
+      // The tone: braced, then gone; on the ground, a rag, or curled up while
+      // the water is still on them; rolling, held.
       let k;
-      if (X.rollT > 0) { k = KNOCK.rollTone; X.rollT -= KNOCK.h; } else if (X.landed) k = KNOCK.ground;
+      if (X.rollT > 0) { k = KNOCK.rollTone; X.rollT -= KNOCK.h; } else if (X.landed) k = X.fT > 0 ? KNOCK.wetTone : KNOCK.ground;
       else {
         const u = Math.min(1, X.t / KNOCK.brace);
         k = KNOCK.hold + (KNOCK.limp - KNOCK.hold) * u * u * (3 - 2 * u);
@@ -507,7 +548,7 @@ function makeToppler(o) {
       // The water, on the bodies along its line.
       if (X.fT > 0) {
         X.fT -= KNOCK.h;
-        const w = weights(s, X);
+        const w = weights(s, X, X.landed ? KNOCK.catchKg : 0);
         rag.bodies.forEach((b, j) => {
           if (!w[j]) return;
           const m = net.mass[b], q = w[j] * KNOCK.h / m;
@@ -521,13 +562,14 @@ function makeToppler(o) {
     const ms = performance.now() - t0;
     stats.ms += ms; stats.msMax = Math.max(stats.msMax, ms);
     if (bail) { event(fg, 'bail', null); upStart(fg, f, true); return; }
+    if (KNOCK.trace) trace(fg, s, X);
     rag.write(X.pose, O, I, X.pose.clip.q);
     X.pose.w = 1;
     if (X.chair && s.chair.on && o.chair) { chairPose(fg, s, _cp, _cq); o.chair(fg, _cp, _cq); }
     // Down, still, stuck.
     const pv = rag.headWorld(f.boneIndex('pelvis'));
     const hy = pv[1] - X.floor(pv[0], pv[2]);
-    if (!X.landed && hy < KNOCK.landed) { X.landed = true; stats.landed++; event(fg, 'down', null); }
+    if (!X.landed && hy < KNOCK.landed) { X.landed = true; X.landT = X.t; stats.landed++; event(fg, 'down', null); }
     const sp = rag.speed();
     const wet = X.fT > 0;
     X.rest = !wet && sp < KNOCK.rest ? X.rest + dt : 0;
@@ -537,11 +579,46 @@ function makeToppler(o) {
     // Still — or, a limb twitching on for ever against something, dry for
     // long enough that it is still for every purpose that matters.
     const still = X.rest > KNOCK.restFor || X.dry > KNOCK.restMax;
-    if (X.landed && still) {
+    if (X.landed && still && X.t - X.landT >= KNOCK.downMin) {
       // On their back: over on to their front, by themselves, first.
       if (rag.faceUp() > 0.15 && X.rolls < KNOCK.rolls) { rollOver(fg, f, s); return; }
       upStart(fg, f, false);
     } else if (!X.landed && (X.rest > KNOCK.stuck || X.dry > KNOCK.restMax)) reseat(fg, f);
+  }
+
+  /**
+   * A probe's record of one live person's frame, while `KNOCK.trace` is an
+   * array (`__fr.jad.raw().crowd.topple.cfg().KNOCK.trace = []`): what they
+   * are doing, their kinetic energy (J, moving and turning), the fastest
+   * body and the fastest-turning one, the chair's energy, and the deepest
+   * capsule pair and the hardest-pressed contact — which is how the stuck
+   * rows of (l) in 43-avbd.js were found. Nothing while it is not.
+   */
+  function trace(fg, s, X) {
+    const { net, rag } = s, V = net.V, Wv = net.W, Q = net.Q, M = net.inert;
+    const names = s.names || (s.names = rag.capsOf().map((c) => c.bone));
+    let ke = 0, kr = 0, vm = 0, wm = 0, wb = 0;
+    rag.bodies.forEach((b, j) => {
+      const m = net.mass[b], o3 = 3 * b;
+      const v2 = V[o3] ** 2 + V[o3 + 1] ** 2 + V[o3 + 2] ** 2;
+      ke += 0.5 * m * v2; vm = Math.max(vm, Math.sqrt(v2));
+      _q.set(-Q[4 * b], -Q[4 * b + 1], -Q[4 * b + 2], Q[4 * b + 3]);
+      _v.set(Wv[o3], Wv[o3 + 1], Wv[o3 + 2]).applyQuaternion(_q);
+      const I = 6 * b, x = _v.x, y = _v.y, z = _v.z;
+      kr += 0.5 * (M[I] * x * x + M[I + 1] * y * y + M[I + 2] * z * z
+        + 2 * (M[I + 3] * x * y + M[I + 4] * x * z + M[I + 5] * y * z));
+      const w = Math.hypot(x, y, z);
+      if (w > wm) { wm = w; wb = j; }
+    });
+    let kc = 0, pg = 0, pf = 0, ff = 0;
+    if (s.chair.on) for (const b of [s.chair.seat, s.chair.back]) kc += 0.5 * net.mass[b] * (V[3 * b] ** 2 + V[3 * b + 1] ** 2 + V[3 * b + 2] ** 2);
+    net.eachContact((a, b, gap, fn, pair) => {
+      if (pair) { pg = Math.min(pg, gap); pf = Math.max(pf, fn); } else ff = Math.max(ff, fn);
+    });
+    const T = KNOCK.trace;
+    if (T.length < 40000) T.push({ id: fg.idx, t: +X.t.toFixed(3), landed: X.landed ? 1 : 0, roll: X.rollT > 0 ? 1 : 0,
+      wet: X.fT > 0 ? 1 : 0, k: +rag.tens.toFixed(2), ke: +ke.toFixed(3), kr: +kr.toFixed(3), v: +vm.toFixed(3),
+      w: +wm.toFixed(2), wb: names[wb], at: [+net.P[3 * rag.pelvis].toFixed(2), +net.P[3 * rag.pelvis + 2].toFixed(2)], kc: +kc.toFixed(3), pg: +pg.toFixed(3), pf: Math.round(pf), ff: Math.round(ff) });
   }
 
   /** A spin about the spine, pelvis to chest, the way a body rolls itself over. */
@@ -562,7 +639,7 @@ function makeToppler(o) {
     // Which way: toward the side the body already leans to, so the arm on
     // that side is not rolled over. The chest's +z is the figure's right.
     _v.set(0, 0, 1).applyQuaternion(_q.set(net.Q[4 * c], net.Q[4 * c + 1], net.Q[4 * c + 2], net.Q[4 * c + 3]));
-    const sg = (_v.y > 0 ? 1 : -1) * (X.rolls === 2 ? -1 : 1);
+    const sg = (_v.y > 0 ? 1 : -1) * (X.rolls >= KNOCK.rollFlip && (X.rolls - KNOCK.rollFlip) % 2 === 0 ? -1 : 1);
     const om = KNOCK.roll * sg;
     const cx = (P[3 * a] + P[3 * c]) / 2, cy = (P[3 * a + 1] + P[3 * c + 1]) / 2, cz = (P[3 * a + 2] + P[3 * c + 2]) / 2;
     for (const b of rag.bodies) {

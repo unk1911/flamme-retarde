@@ -8,6 +8,103 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.554.2] — 2026-09-30
+
+### Hosed off a chair, they go down and lie still
+
+Misha: *"when the bathers get hosed down and fall, sometimes they "wrythe"
+and "wrythe", but why they wrythe so much? something is not quite 100%
+adjusted with the physics"*.
+
+**Why they writhed.** Measured with a per-frame trace of each body on the
+ground (`KNOCK.trace`, below). The water was not the cause and neither was
+the damping. The solver was feeding energy into them that nothing had put
+there.
+- **Contacts that could not let go.** A capsule pair (an upper arm against
+  the belly) and the chair's seat against a leg were hard contacts. A hard
+  contact's force grows every iteration until its gap closes. Lying down,
+  the upper arm sits 4.6 cm into the belly, and the shoulder joint holds it
+  there, so the gap can never close. The force on that contact climbed from
+  1,400 N to 8,000 N in two seconds while she lay still. The chair across
+  someone's legs did the same, 2,500 N to 16,600 N in three seconds. The
+  solver paid that force back out as motion. Arms spun at the 40 rad/s
+  speed cap with nothing touching them but the floor. On a single knock,
+  energy fell to 2 J and then climbed back to 30-40 J with no water on them.
+- **The get-up came from a timeout, not from rest.** Because they never
+  went still, the get-up only started from `restMax`, 2.5 s dry, while they
+  were still moving at up to 2.4 m/s.
+- **The roll-over kept failing.** It rolls them from back to front before
+  the get-up, and the thrashing made it fail. In four of twelve knocks it
+  took all three tries. Five of the twelve got up off their backs anyway.
+- **Under a held jet, two or three bodies took all of it.** The push was
+  always shared out to total 240 N among whichever bodies were nearest the
+  jet's line. On a forearm alone that is 170 m/s². Lying down they averaged
+  30-110 J, peaked at 260-565 J, moved at up to 9 m/s, and were once
+  washed 4 m along the terrace.
+
+**The fix.**
+- **The stuck contacts are springs now** ((l) in 43-avbd.js; `pairK` 5000
+  and `boxK` 20000 N/m in `KNOCK`). Both new options are opt-in in
+  `avbdNet`, and only the toppler (café sitters and riders) asks for them. The same arm against the
+  belly is now a steady 230 N, and the chair a steady 270 N.
+- **The jet on someone lying down** (43-topple.js):
+  - The push is shared over at least `catchKg` 20 kg of body, so a forearm
+    alone gets only its own share.
+  - The force is `downGain` × `force` (150 N) instead of the 240 N used
+    mid-fall.
+  - They tense up (`wetTone` 0.3) toward the pose they were in when the jet
+    hit them, which was sitting. On the ground that reads as curled up. They
+    relax again when the jet stops.
+  - None of this applies before they land, so the fall from the chair is
+    unchanged.
+- **`downMin` 0.7 s.** They stay down that long before rolling or getting
+  up.
+- **Roll spin 12.5 rad/s (was 10), and the second try goes the other way**
+  (`rollFlip`). Measured with the contacts fixed: 86 % roll over on the
+  first try, against about 70 % at the old spin, and none of 24 runs were
+  left face up.
+
+**Measured, before → after** (headless, the café's own sitters: twelve
+knocks from four directions, four runs with the jet held on them 6 s after
+they land, and four riders knocked off at 5 m/s):
+
+| | before | after |
+|---|---|---|
+| knock: back at rest after landing | never, in 5 of 12 (30-40 J at the timeout) | 0.4-2.7 s (the longer ones include the roll) |
+| frames with a body over 10 rad/s, from 1 s after landing | up to 100 % | 0-2 % (one run 20 %) |
+| roll tries per face-up knock | 1-3 (five got up face up) | 1; 2-3 in three of 24 runs (none face up) |
+| landing → standing | 0.8-7.1 s | 0.6-4.3 s, typically 2-3 |
+| jet held on them, lying down: mean / peak energy | 30-110 J / 260-565 J | 2-10 J / under 10 J after the first second |
+| fastest body under the jet | 6.6-9 m/s | 2.4-5.7 m/s (in the first half second) |
+| after the jet stops: still | never, up in 2.5-9.9 s (0-3 rolls) | at once; up in 0.6-2.9 s, or 5.4-6.7 when the roll took 2-3 tries |
+| riders: energy 1 s after landing | 1.5-6 J, arms at 40 rad/s in two of four | 0.1-6 J; one rider has a single 0.05 s jolt (191 J), then still by 2.1 s |
+
+The fall itself is unchanged. The peak energy of a knock is 140-180 J
+before and after, and a rider's crash peaks at 1,050-1,095 J both ways.
+
+**Unchanged.**
+- The mole's edge sitters go into the sea and swim as before. All three
+  reached the ladders.
+- The solver: with neither option set, a 900-step `avbdNet` scene using
+  every feature (hard, finite and angle joints, drives and limits, strings,
+  points, body boxes, capsules, hard and soft world boxes, pairs, floor)
+  hashes identically on HEAD's 43-avbd.js and this one (19c3ddbc61ca724d).
+  So do the wrist chain (0d19fbc1994d5d25), the leash (0f8903d81d1d1936)
+  and the ball. The cuffs, the belt, the leash, the cot, the hammock and the
+  café settle step exactly as they did.
+- No rescues and no bails in any run. People 100, blockers 785, no console
+  errors.
+
+**Cost.** One person down is 0.20-0.23 ms a step, against 0.17-0.22 before.
+That is within noise, measured one browser at a time. They are down for
+about half as long, so a knock costs about half the solver time it did:
+78-91 ms against 86-172 ms.
+
+Debug: `__fr.jad.raw().crowd.topple.cfg().KNOCK.trace = []` records every
+live person's frames: energy, the fastest body, chair energy, the deepest
+capsule pair and the hardest-pressed contact. `net.eachContact(cb)` in
+43-avbd.js lists contacts the same way.
+
 ## [1.554.1] — 2026-09-30
 
 ### Your hand does the spanking
