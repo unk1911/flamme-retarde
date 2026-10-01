@@ -1721,6 +1721,25 @@ function avbdBall(o) {
 // `moving`), so the hammock, the cot, the settle, the springboard, the
 // bucketeer's yoke and the chair step exactly as they did.
 //
+// (l) AND A BODY THAT CANNOT GET OUT OF ITSELF (1.554.2, the toppler). Misha,
+// 30 Sep 2026, of the bathers hosed off their chairs: *"sometimes they
+// "wrythe" and "wrythe", but why they wrythe so much? something is not quite
+// 100% adjusted with the physics"*. A capsule pair of (i) is hard: its
+// multiplier grows by the penalty times the gap every iteration until the
+// gap closes. Lying on the ground, an upper arm against the belly can be
+// 4.6 cm into it with the shoulder's own socket holding it there — a gap
+// no motion can close — and the multiplier never stops growing: MEASURED,
+// 1,400 N on that contact at rest climbing to 8,000 in two seconds, and the
+// arm turning at the 40 rad/s ceiling with nothing touching it but the
+// floor. The chair's seat across somebody's legs (a box of (e) on its own
+// body) did the same, 2,500 N to 16,600 N in three seconds. That is where
+// the writhing came from: the solver paying out what the stuck row had
+// stored. So both may be given a stiffness instead (`pairK`, `boxK`, N/m —
+// each contact a spring of at most that, with no multiplier, the way a
+// `softBody`'s are): a stuck pair is then a steady push of k·depth and
+// nothing more. Unset (the default) they are hard, and nothing that has not
+// asked steps differently.
+//
 // NOT TAKEN: the box-box manifold, the broadphase (the only pair that matters
 // is cloth against her, and her bounding sphere is the broadphase), fracture.
 // ---------------------------------------------------------------------------
@@ -1732,7 +1751,8 @@ function avbdBall(o) {
  * — one bad step is one bad frame), margin (m, how near a contact is made),
  * deep (m, how far inside a new one is refused), mu, floorMu, capK (N/m for
  * the contacts of a `softBody`); maxAngles and betaLim (the limits' penalty
- * ramp, default `beta`) and limK (their ceiling) for (h).
+ * ramp, default `beta`) and limK (their ceiling) for (h); pairK and boxK
+ * (N/m, soft capsule pairs and soft body boxes — (l); unset, hard).
  */
 function avbdNet(o) {
   const NB = o.maxBodies;
@@ -1837,6 +1857,9 @@ function avbdNet(o) {
   // Capsule pairs — see (i): two capsule indices a pair.
   const NCPR = o.maxCapPairs || 0;
   const cpr = new Int32Array(2 * NCPR);
+  // (l): a stiffness for the capsule pairs and for the bodies' own boxes —
+  // nought, the default, is hard.
+  const pairK = o.pairK || 0, boxK = o.boxK || 0;
   let ncpr = 0;
   // World capsules — see (k): two ends and a radius at each, eight a capsule,
   // in the world, kinematic.
@@ -2545,7 +2568,7 @@ function avbdNet(o) {
         const swx = sgB[0] + px, swy = sgB[1] + py, swz = sgB[2] + pz;
         addContact(id, a, b, -wnx, -wny, -wnz, gap, qwx, qwy, qwz,
           swx - wnx * rr, swy - wny * rr, swz - wnz * rr,
-          o.mu, softBody[b] || softBody[a] ? o.capK : Infinity);
+          o.mu, boxK > 0 ? boxK : softBody[b] || softBody[a] ? o.capK : Infinity);
       }
     }
     // Capsules against the floor, at each end's lowest point.
@@ -2657,7 +2680,7 @@ function avbdNet(o) {
       const id = (NPT + NCP + NBX + NWB + m) * 128 + 1;
       if (gap < -o.deep && prevSlot(id) < 0) { stats.refused++; continue; }
       addContact(id, a, b, nx, ny, nz, gap, px - nx * ra, py - ny * ra, pz - nz * ra,
-        qx + nx * rb, qy + ny * rb, qz + nz * rb, o.mu, softBody[a] || softBody[b] ? o.capK : Infinity);
+        qx + nx * rb, qy + ny * rb, qz + nz * rb, o.mu, pairK > 0 ? pairK : softBody[a] || softBody[b] ? o.capK : Infinity);
     }
     // Capsules against the world's kinematic capsules — see (k). The same
     // closest pair of two segments, body B the world; and the speed A was
@@ -3118,6 +3141,16 @@ function avbdNet(o) {
     },
     /** The capsule pairs — see (i): `a` two capsule indices a pair, `n` of them. */
     setCapPairs: (a, n) => { ncpr = Math.min(NCPR, n); for (let k = 0; k < 2 * ncpr; k++) cpr[k] = a[k]; },
+    /**
+     * Debug: every contact as it stands after the last step — `cb(a, b, gap,
+     * force, pair)`: the bodies (b −1 the world), the gap at the start of
+     * the step (m), the normal force it ended on (N), and whether it is a
+     * capsule pair of (i). How (l) was found.
+     */
+    eachContact: (cb) => {
+      const p0 = (o.maxPoints + o.maxCaps + (o.maxBoxes || 0) + NWB) * 128, p1 = WC_ID0 * 128;
+      for (let c = 0; c < nc; c++) cb(cA[c], cB[c], cC0[c], cFn[c], cId[c] >= p0 && cId[c] < p1);
+    },
     /** Debug: angle m's rotation vector now, rad, in its joint frame. */
     angleNow: (m) => { angleEval(m); return [anPhi[0], anPhi[1], anPhi[2]]; },
     get nb() { return nb; }, get nc() { return nc; }, get ns() { return ns; }, get nj() { return nj; },
