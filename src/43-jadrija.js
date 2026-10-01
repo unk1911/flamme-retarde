@@ -44408,6 +44408,22 @@ async function buildJadrija(scene) {
         near.push({ t: (w[0] + w[1]) * 0.5, s: w[2], a: (w[1] - w[0]) * 0.5, c: 0.22 });
       }
     }
+    // AND NOT THROUGH THE KABINA (1.558.0). Its walls are not blockers — the
+    // room keeps you in with its own `shell`, and the furniture inside is
+    // switched with the room — so to this grid the special hut was a 4.5 m
+    // hole in the front row, door to back wall, and the shortest way from
+    // the lane to anything behind the rows went in at the door and out
+    // through the back of it. Solid now, unless one end of the way is inside
+    // it: walking in or out is by the door, and `leave` does that.
+    if (!obs && special) {
+      const S = special.small, m = 0.35;
+      const inRoom = (t, s) => (t > S.t0 - m && t < S.t1 + m && s > special.face - m && s < S.s1 + m)
+        || (t > special.t0 - m && t < special.t1 + m && s > special.face - m && s < special.s1 + m);
+      if (!inRoom(t0, s0) && !inRoom(t1, s1)) {
+        near.push({ t: (S.t0 + S.t1) * 0.5, s: (special.face + S.s1) * 0.5,
+          a: (S.t1 - S.t0) * 0.5 + 0.15, c: (S.s1 - special.face) * 0.5 + 0.15 });
+      }
+    }
     const inB = (b, t, s) => {
       const co = b.rot ? Math.cos(b.rot) : 1, sn = b.rot ? Math.sin(b.rot) : 0;
       const dt0 = t - b.t, ds0 = s - b.s;
@@ -44445,34 +44461,119 @@ async function buildJadrija(scene) {
     };
     const st = nearestFree(t0, s0, 2.0), gl = nearestFree(t1, s1, 0.6);
     if (!st || !gl) return null;
-    // Breadth first from the goal, so the start follows its parents to it.
-    const par = new Int32Array(nt * ns).fill(-1);
-    const q = new Int32Array(nt * ns);
-    let qh = 0, qt = 0;
+    // ── SHORTEST IN METRES, NOT IN STEPS (1.558.0) ─────────────────────────
+    //
+    // Misha, 1 Oct 2026: *"she does this super long trek ... maybe she should
+    // i dunno, optimize her path"*. This was breadth first from the goal, and
+    // breadth first over eight neighbours makes a diagonal step cost what a
+    // straight one does — so of the many ways that are the same number of
+    // CELLS, it handed back whichever the queue reached first, and a way that
+    // is short in cells can be forty per cent longer on the ground (the note
+    // over `groundsRoute` measured it swinging four metres round a trunk).
+    //
+    // A* now, from her to the goal: a straight step costs its 0.25 m and a
+    // diagonal its 0.354, the estimate is the octile distance, and so the way
+    // it finds is the shortest the grid allows. The cells on the gravel ways
+    // (GROUNDS_WAYS) are a little cheaper — a person takes the path that is
+    // there when it goes her way, and steps off it when it does not. The
+    // estimate is NOT scaled by that discount: scaled, it is exact and
+    // searches twice the cells (MEASURED 15-27 ms against 5-14), and the way
+    // it gives up on the gravel is under a metre in a hundred.
+    const WAYK = 0.82;
+    const N = nt * ns;
+    const cost = new Float32Array(N).fill(1);
+    if (!obs) {
+      for (const k in GROUNDS_WAYS) {
+        const w = GROUNDS_WAYS[k].walk;
+        for (let a = 0; a + 1 < w.length; a++) {
+          const [ta, sa] = w[a], [tb, sb] = w[a + 1];
+          const dt = tb - ta, ds = sb - sa, L2 = dt * dt + ds * ds || 1;
+          const i0 = Math.max(0, Math.floor((Math.min(ta, tb) - 1.2 - tMin) / R));
+          const i1 = Math.min(nt - 1, Math.ceil((Math.max(ta, tb) + 1.2 - tMin) / R));
+          const k0 = Math.max(0, Math.floor((Math.min(sa, sb) - 1.2 - sMin) / R));
+          const k1 = Math.min(ns - 1, Math.ceil((Math.max(sa, sb) + 1.2 - sMin) / R));
+          for (let i = i0; i <= i1; i++) {
+            for (let q = k0; q <= k1; q++) {
+              const t = tMin + i * R, s = sMin + q * R;
+              const u = Math.max(0, Math.min(1, ((t - ta) * dt + (s - sa) * ds) / L2));
+              if (Math.hypot(t - ta - dt * u, s - sa - ds * u) < 1.1) cost[i * ns + q] = WAYK;
+            }
+          }
+        }
+      }
+    }
+    const g = new Float32Array(N).fill(Infinity);
+    const par = new Int32Array(N).fill(-1);
+    const shut = new Uint8Array(N);
+    // A binary heap of cells on their f, kept in two typed arrays.
+    // A cell can go in more than once (whenever a cheaper way to it turns
+    // up), so the heap grows if it has to rather than writing off its end.
+    let hf = new Float32Array(N + 64), hc = new Int32Array(N + 64);
+    let hn = 0;
+    const push = (f, c) => {
+      if (hn >= hf.length) {
+        const f2 = new Float32Array(hf.length * 2), c2 = new Int32Array(hf.length * 2);
+        f2.set(hf); c2.set(hc); hf = f2; hc = c2;
+      }
+      let i = hn++;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (hf[p] <= f) break;
+        hf[i] = hf[p]; hc[i] = hc[p]; i = p;
+      }
+      hf[i] = f; hc[i] = c;
+    };
+    const pop = () => {
+      const c = hc[0], lf = hf[--hn], lc = hc[hn];
+      let i = 0;
+      for (;;) {
+        let m = 2 * i + 1;
+        if (m >= hn) break;
+        if (m + 1 < hn && hf[m + 1] < hf[m]) m++;
+        if (hf[m] >= lf) break;
+        hf[i] = hf[m]; hc[i] = hc[m]; i = m;
+      }
+      hf[i] = lf; hc[i] = lc;
+      return c;
+    };
+    const D2 = Math.SQRT2 - 2;
+    const est = (i, k) => {
+      const a = Math.abs(i - gl[0]), b = Math.abs(k - gl[1]);
+      return R * (a + b + D2 * Math.min(a, b));
+    };
     const g0 = gl[0] * ns + gl[1], s0i = st[0] * ns + st[1];
-    par[g0] = g0; q[qt++] = g0;
-    while (qh < qt && par[s0i] < 0) {
-      const c = q[qh++], ci = (c / ns) | 0, ck = c - ci * ns;
+    g[s0i] = 0; par[s0i] = s0i;
+    push(est(st[0], st[1]), s0i);
+    while (hn > 0) {
+      const c = pop();
+      if (shut[c]) continue;
+      shut[c] = 1;
+      if (c === g0) break;
+      const ci = (c / ns) | 0, ck = c - ci * ns, gc = g[c];
       for (let di = -1; di <= 1; di++) {
         for (let dk = -1; dk <= 1; dk++) {
           if (!di && !dk) continue;
           const i = ci + di, k = ck + dk;
           if (i < 0 || k < 0 || i >= nt || k >= ns) continue;
           const n = i * ns + k;
-          if (par[n] >= 0 || !free[n]) continue;
+          if (shut[n] || !free[n]) continue;
           // No cutting a corner between two blocked cells.
           if (di && dk && (!free[ci * ns + k] || !free[i * ns + ck])) continue;
-          par[n] = c; q[qt++] = n;
+          const gn = gc + R * (di && dk ? Math.SQRT2 : 1) * 0.5 * (cost[c] + cost[n]);
+          if (gn >= g[n]) continue;
+          g[n] = gn; par[n] = c;
+          push(gn + est(i, k), n);
         }
       }
     }
-    if (par[s0i] < 0) return null;
+    if (par[g0] < 0) return null;
     const pts = [];
-    for (let c = s0i; ; c = par[c]) {
+    for (let c = g0; ; c = par[c]) {
       const ci = (c / ns) | 0;
       pts.push([tMin + ci * R, sMin + (c - ci * ns) * R]);
-      if (c === g0) break;
+      if (c === s0i) break;
     }
+    pts.reverse();
     pts[pts.length - 1] = [t1, s1];
     // Pulled tight: from each kept point, the furthest one it can see.
     // Line of sight off the grid itself, a sample every 0.1 m.
@@ -44485,13 +44586,21 @@ async function buildJadrija(scene) {
       }
       return true;
     };
+    // Galloping out until it cannot see, then halving back: a straight run
+    // of three hundred cells is two dozen sight tests, not three hundred.
+    // Only a point that was actually seen is ever kept.
     const legs = [];
     let i = 0;
     while (i < pts.length - 1) {
-      let j = Math.min(pts.length - 1, i + 80);
-      while (j > i + 1 && !sees(pts[i], pts[j])) j--;
-      legs.push(pts[j]);
-      i = j;
+      let ok = i + 1, step = 1;
+      while (ok + step <= pts.length - 1 && sees(pts[i], pts[ok + step])) { ok += step; step *= 2; }
+      let bad = Math.min(pts.length, ok + step);
+      while (bad - ok > 1) {
+        const m = (ok + bad) >> 1;
+        if (sees(pts[i], pts[m])) ok = m; else bad = m;
+      }
+      legs.push(pts[ok]);
+      i = ok;
     }
     return legs;
   }
@@ -44645,17 +44754,21 @@ async function buildJadrija(scene) {
    * A way there, or the way-end if the spot by you is somewhere she cannot
    * stand.
    *
-   * FROM THE FRONT, BY THE WAY CUT FOR IT. `hamPath` alone finds a way, and
-   * it is a breadth-first search on a grid with every step costing the same,
-   * so the way it finds is short in steps and not in metres: MEASURED from
-   * the promenade at t 500, it went up through the gaps and then swung four
-   * metres west into the wood round one trunk to come back to the gate. So
-   * when she starts on the promenade side of the lane wall she walks to the
-   * nearest point of whichever of GROUNDS_WAYS is the shorter way round, and
-   * then the way itself, which is the gravel path you can see — the search
-   * only joins her on to it and off it.
+   * THE SHORTEST WAY, AND THE GRAVEL WHERE IT GOES HER WAY (1.558.0). This
+   * used to send her, from anywhere on the promenade side of the lane wall,
+   * to the NEAREST POINT of one of GROUNDS_WAYS first and then along the
+   * whole of it — because `hamPath` was a breadth-first search that was short
+   * in steps and not in metres, and swung round a trunk in the wood. The
+   * nearest point by a straight line through two rows of huts is the way's
+   * front end, so from her own spot she walked the promenade to t 511 and
+   * up the way: 113.5 m for a gate 94 m off (99.9 now, through the rows and
+   * along behind them). `hamPath` is A* in metres now and already
+   * prefers the gravel, so it is asked once, from where she is; the old
+   * join-the-way route is kept only for when that finds nothing.
    */
   function groundsRoute(t0, s0, goal) {
+    let legs = hamPath(t0, s0, goal[0], goal[1]);
+    if (legs) return legs;
     if (s0 < WALL.s && goal[1] > WALL.s + 6) {
       let best = null;
       for (const k in GROUNDS_WAYS) {
@@ -44673,16 +44786,13 @@ async function buildJadrija(scene) {
       const tail = Math.hypot(goal[0] - e[0], goal[1] - e[1]) < 0.5 ? []
         : hamPath(e[0], e[1], goal[0], goal[1]);
       if (head && tail) {
-        const legs = [...head, ...w.slice(j + 1).map((p) => p.slice()), ...tail];
+        legs = [...head, ...w.slice(j + 1).map((p) => p.slice()), ...tail];
         if (legs.length) return legs;
       }
     }
-    let legs = hamPath(t0, s0, goal[0], goal[1]);
-    if (!legs) {
-      const w = GROUNDS_WAYS.play.walk, e = w[w.length - 1];
-      legs = hamPath(t0, s0, e[0], e[1]);
-      if (legs) goal[0] = e[0], goal[1] = e[1];
-    }
+    const w = GROUNDS_WAYS.play.walk, e = w[w.length - 1];
+    legs = hamPath(t0, s0, e[0], e[1]);
+    if (legs) goal[0] = e[0], goal[1] = e[1];
     return legs;
   }
   /** Off she goes. `go` is `stepShow`'s; `pt, ps` is you. */
@@ -44692,7 +44802,8 @@ async function buildJadrija(scene) {
     if (!legs) { show.meet = null; show.did = null; show.why = 'noway'; return false; }
     const M = show.meet || {};
     show.meet = { since: 0, t: 0, hops: M.hops || 0, met: false, gone: 0, goal };
-    show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0 };
+    show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0,
+      cruise: wayPace(legs, show.t, show.s, MEET.pace) };
     show.stuck = null;
     show.byAsk = 1;
     show.queue.length = 0;
@@ -44704,8 +44815,9 @@ async function buildJadrija(scene) {
     show.meet = null;
     const goal = [clamp(show.t, show.t0 + 1, show.t1 - 1), LANE_S()];
     const legs = hamPath(show.t, show.s, goal[0], goal[1]) || [goal];
+    // Home from the grounds is a hundred metres: at a jog, like the way there.
     show.job = { name: 'hamBack', t: goal[0], s: goal[1], since: 0, leg: 0, legs,
-      best: null, stall: 0 };
+      best: null, stall: 0, cruise: wayPace(legs, show.t, show.s, HAM_T.pace) };
     go('hamBack', 'walk', 0.36);
   }
   /**
@@ -44738,9 +44850,244 @@ async function buildJadrija(scene) {
     show.rate = 0; show.vel = SHOW.walk * 0.6;
     showClear();
     M.hops++; M.goal = goal; M.from = best.e.slice();
-    show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0 };
+    show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0,
+      cruise: wayPace(legs, show.t, show.s, MEET.pace) };
     return true;
   }
+
+  // ── A WOMAN GOING SOMEWHERE, AND NOT A CURSOR (1.558.0) ─────────────────
+  //
+  // Misha, 1 Oct 2026: *"like sometimes 'sprint' around... can we make her
+  // less wooden and more 'springy', u know, more human-like and less
+  // robotic?"*
+  //
+  // What was robotic, measured on the way to the playground: one speed, a
+  // walk at 1.64 m/s, for 114 m; at every corner of the way `showTo` braked
+  // her toward the waypoint (`dist * 1.8`) as if it were the end, so she
+  // dipped to 1.5 at each one and picked up again; the speed was eased
+  // exponentially, which asks the most acceleration in the first frame;
+  // and nothing about her body knew she was turning or stopping — the mesh
+  // stayed bolt upright and her head pointed down her own nose.
+  //
+  // So, three things:
+  //
+  //   pace     `routeStep`: the way ahead is a budget. Over `far` metres of it
+  //            she jogs (a clip of its own, `jog`, solved on her rig), now and
+  //            then flat out; she brakes into each corner by how sharp it is
+  //            and into the last `walkLast` metres, which she walks; speed
+  //            changes at a person's acceleration, not an exponential's; and a
+  //            heading more than about a right angle off is turned on the spot
+  //            first rather than walked round in an arc.
+  //   gait     the clip follows the ground she actually covers — walk under
+  //            `down`, jog over `up` — entered at the matching point of the
+  //            stride so the feet carry on, and played at that speed over the
+  //            clip's own, so they do not slide.
+  //   body     `strideTick`: she leans into a turn (about her feet, by
+  //            v·ω/g, halved), forward as she sets off and back as she pulls
+  //            up, and shifts her weight once when she stops; her head turns
+  //            into the corner before her body does; and now and then, going
+  //            somewhere, she glances about or looks back for you.
+  const STRIDE = {
+    // The jog clip, as baked and spliced on by tools/blender/jog.py: 0.72 s a
+    // cycle, 1.03 m a step, 167 steps a minute, the planted foot solved to
+    // move back at exactly this speed — so this is the number that keeps it
+    // still on the deck, and not a choice.
+    jogV: 2.862,        // m/s the clip covers at a clock of 1
+    strollV: 1.37,      // and the solved walk's, which was solved to SHOW.walk
+    // The gait against the ground, with a gap so she does not flicker.
+    up: 2.10, down: 1.80,
+    jogMin: 0.62, jogMax: 1.27,   // the jog clip's clock, either side of jogV
+    far: 25,            // m of way left, over which she jogs
+    walkLast: 6,        // m before the end that she walks
+    // Not faster than this, because the clip's stride is one length and only
+    // its clock speeds up: 3.6 m/s is 210 steps a minute, which is a run;
+    // past it is a film played fast.
+    cruise: [2.6, 3.0], // m/s, jogging
+    sprint: [3.3, 3.6], sprintP: 0.28,   // and now and then flat out
+    acc: 1.7, dec: 2.2, // m/s²: setting off and pulling up
+    corner: 0.40,       // of her speed given up to a right-angle corner
+    // The body.
+    lean: 0.55, leanMax: 0.17,    // of atan(v·ω/g); rad
+    pitchK: 0.030, pitchMax: 0.07, // rad per m/s² of speeding up; rad
+    settle: 0.035,      // rad of sway in the weight shift as she stops
+    lead: 0.55, leadMax: 0.55,    // of the turn still to come, on her neck
+    glance: [3.5, 8.0], // s between looks about, going somewhere
+    // A run in the middle of larking about: the odds on a wander tick (about
+    // one a second) and how long it lasts.
+    burstP: 0.035, burstFor: [2.5, 5.0],
+  };
+  /** Her speed for a way: a walk, or over `far` a jog — sometimes a run. */
+  function wayPace(legs, t0, s0, walkMul) {
+    let m = 0, p = [t0, s0];
+    for (const q of legs || []) { m += Math.hypot(q[0] - p[0], q[1] - p[1]); p = q; }
+    const walk = SHOW.walk * walkMul;
+    if (m < STRIDE.far || !jogOk()) return walk;
+    const R = Math.random() < STRIDE.sprintP ? STRIDE.sprint : STRIDE.cruise;
+    return R[0] + Math.random() * (R[1] - R[0]);
+  }
+  const wrapPi = (a) => {
+    while (a > Math.PI) a -= TAU;
+    while (a < -Math.PI) a += TAU;
+    return a;
+  };
+  /**
+   * One frame along `j.legs` at `j.cruise`, ending at a walk (`end` m/s).
+   * Answers how far the current leg's point is and whether it is the last,
+   * and how near a point has to be before she takes the next one — further
+   * at speed, which is what rounds the corner off.
+   */
+  function routeStep(j, dt, end) {
+    const L = j.legs, k = Math.min(j.leg, L.length - 1), g = L[k];
+    const d0 = g[0] - show.t, d1 = g[1] - show.s, dist = Math.hypot(d0, d1);
+    const last = k >= L.length - 1;
+    let rest = 0;
+    for (let i = k; i + 1 < L.length; i++) rest += Math.hypot(L[i + 1][0] - L[i][0], L[i + 1][1] - L[i][1]);
+    const left = dist + rest;
+    const cruise = Math.max(end, j.cruise || end);
+    const slow = cruise > end + 0.2 ? STRIDE.walkLast : 0;
+    // The brake: whatever she can pull up from at `dec` by the time she is
+    // there — into the walk at the end, into the corner at the point.
+    let v = left < slow ? end : cruise;
+    v = Math.min(v, Math.sqrt(end * end + 2 * STRIDE.dec * Math.max(0, left - slow)));
+    if (!last) {
+      const a0 = Math.atan2(d1, d0), a1 = Math.atan2(L[k + 1][1] - g[1], L[k + 1][0] - g[0]);
+      const th = Math.abs(wrapPi(a1 - a0));
+      const vc = Math.max(1.2, cruise * (1 - STRIDE.corner * Math.min(2, th / (Math.PI / 2))));
+      v = Math.min(v, Math.sqrt(vc * vc + 2 * STRIDE.dec * Math.max(0, dist - 0.6)));
+    } else if (dist <= 0.14) v = 0;
+    else v = Math.min(v, Math.max(0.45, dist * 1.8));
+    // STEERED AT A POINT A STRIDE OR TWO DOWN THE WAY, not at the corner. Aimed
+    // at the corner itself, a heading controller that is a touch under
+    // critically damped (`turnRate`) swings her past the new leg and back —
+    // an S at every corner at a jog, which is a cursor being steered. A point
+    // that runs on ahead of her along the way rounds the corner instead,
+    // inside it by a few tenths, which the 0.40 m the way keeps off
+    // everything has room for.
+    // Where this way began, for its first leg — taken again if the way is.
+    if (j.fromOf !== L) { j.fromOf = L; j.from = [show.t, show.s]; }
+    const A = k > 0 ? L[k - 1] : j.from;
+    const e0 = g[0] - A[0], e1 = g[1] - A[1], el2 = e0 * e0 + e1 * e1;
+    const u = el2 > 1e-6 ? clamp(((show.t - A[0]) * e0 + (show.s - A[1]) * e1) / el2, 0, 1) : 1;
+    let qt = A[0] + e0 * u, qs = A[1] + e1 * u, ahead = 0.6 + 0.25 * show.vel;
+    for (let i = k; ahead > 0; i++) {
+      const b = L[i], bl = Math.hypot(b[0] - qt, b[1] - qs);
+      if (bl >= ahead || i >= L.length - 1) {
+        const w = bl > 1e-6 ? Math.min(1, ahead / bl) : 0;
+        qt += (b[0] - qt) * w; qs += (b[1] - qs) * w;
+        break;
+      }
+      ahead -= bl; qt = b[0]; qs = b[1];
+    }
+    show.want = Math.hypot(qt - show.t, qs - show.s) > 0.05
+      ? Math.atan2(qs - show.s, qt - show.t) : Math.atan2(d1, d0);
+    // Round first, then off: a heading a right angle and more away is
+    // turned on the spot, and she sets off as it comes round.
+    const err = Math.abs(wrapPi(show.want - show.ang));
+    v *= clamp(1.3 - err / 1.5, 0.10, 1);
+    show.vel += clamp(v - show.vel, -STRIDE.dec * 1.6 * dt, STRIDE.acc * dt);
+    show.vel = Math.max(0, show.vel);
+    show.t += Math.cos(show.ang) * show.vel * dt;
+    show.s += Math.sin(show.ang) * show.vel * dt;
+    showClear();
+    return { dist, last, adv: clamp(0.26 * show.vel, 0.55, 1.0) };
+  }
+
+  /**
+   * Her body over the gait — see the note over STRIDE. After the clip and
+   * every phase has had its say, so it is the last word on her neck while she
+   * is going somewhere and has nobody else's look on it, and its lean is
+   * applied with her yaw on the next frame (`leanR`, `leanP`).
+   */
+  let strideNeck = 0;
+  function strideTick(f, dt, pt, ps) {
+    if (!(dt > 0)) return;
+    const cur = f.state.cur ? f.state.cur.name : null;
+    const upright = (GAITS[cur] || cur === 'idle')
+      && !leash.on && !KABIN[show.phase] && !HAM_SIM[show.phase] && !(show.air > 0)
+      && show.phase !== 'hamUp' && !show.onBed;
+    const moving = upright && cur !== 'idle';
+    // How fast she is actually turning, in the world, and speeding up.
+    const yaw = faceYaw(show.t, show.ang);
+    const w = show.stYaw == null ? 0 : wrapPi(yaw - show.stYaw) / dt;
+    show.stYaw = yaw;
+    show.stW = damp(show.stW || 0, clamp(w, -4, 4), 10, dt);
+    const v = show.made || 0;
+    const a = show.stV == null ? 0 : (v - show.stV) / dt;
+    show.stV = v;
+    show.stA = damp(show.stA || 0, clamp(a, -5, 5), 5, dt);
+    // The weight shift, once, as she comes to a stop from going somewhere.
+    if (v > 0.9) show.stGo = 1;
+    if (show.stGo && v < 0.25) { show.stGo = 0; show.stSet = 1.6; }
+    show.stSet = Math.max(0, (show.stSet || 0) - dt);
+    const sway = upright && show.stSet > 0
+      ? STRIDE.settle * Math.sin((1.6 - show.stSet) * 5.2) * (show.stSet / 1.6) : 0;
+    const roll = moving
+      ? clamp(-STRIDE.lean * Math.atan(v * show.stW / 9.81), -STRIDE.leanMax, STRIDE.leanMax) : 0;
+    const pitch = upright
+      ? clamp(-STRIDE.pitchK * show.stA, -STRIDE.pitchMax, STRIDE.pitchMax) : 0;
+    show.leanR = damp(show.leanR || 0, roll + sway, 7, dt);
+    show.leanP = damp(show.leanP || 0, pitch, 6, dt);
+    if (Math.abs(show.leanR) < 1e-4) show.leanR = 0;
+    if (Math.abs(show.leanP) < 1e-4) show.leanP = 0;
+    // Her head: into the turn still to come, and now and then a look about.
+    let neck = 0;
+    if (moving) {
+      neck = STRIDE.lead * wrapPi(faceYaw(show.t, show.want) - yaw);
+      show.glIn = (show.glIn == null ? STRIDE.glance[0] : show.glIn) - dt;
+      if (show.glIn <= 0 && v > 0.6) {
+        show.glIn = STRIDE.glance[0] + Math.random() * (STRIDE.glance[1] - STRIDE.glance[0]);
+        show.glFor = 0.7 + Math.random() * 0.6;
+        // Back over her shoulder for you, if you are behind her and she is
+        // on her way somewhere you asked her to go; otherwise anywhere.
+        const toYou = wrapPi(faceYaw(show.t, Math.atan2(ps - show.s, pt - show.t)) - yaw);
+        const dYou = Math.hypot(pt - show.t, ps - show.s);
+        show.glTo = MEET_PH[show.phase] && Math.abs(toYou) > 1.6 && dYou < 40
+          ? Math.sign(toYou) * 0.95
+          : (Math.random() < 0.5 ? -1 : 1) * (0.30 + Math.random() * 0.40);
+      }
+      show.glFor = Math.max(0, (show.glFor || 0) - dt);
+    } else show.glFor = 0;
+    show.glAt = damp(show.glAt || 0, show.glFor > 0 ? show.glTo || 0 : 0, 4.5, dt);
+    neck = clamp(neck, -STRIDE.leadMax, STRIDE.leadMax) + show.glAt;
+    show.stNeck = damp(show.stNeck || 0, moving ? neck : 0, 6, dt);
+    // Only in the phases that are about getting somewhere, and never over
+    // somebody else's look: `aim` keeps one turn a bone, and the kiss, the
+    // hug, the crouch and `look at me` all turn this one.
+    // Handed back once on the way out — a phase that turns it for itself
+    // writes it every frame and has it back on the next.
+    const gazing = gazeOn || show.gaze > 0;
+    const mine = STRIDE_PH[show.phase] && !gazing;
+    if (mine && Math.abs(show.stNeck) > 0.004) {
+      f.aim('neck', 0, 1, 0, clamp(show.stNeck, -1.0, 1.0));
+      strideNeck = 1;
+    } else if (strideNeck) {
+      if (!gazing) f.aim('neck', 0, 1, 0, 0);
+      show.stNeck = 0;
+      strideNeck = 0;
+    }
+  }
+  const STRIDE_PH = { toGrounds: 1, grounds: 1, hamBack: 1, hamGo: 1, home: 1, play: 1, idle: 1 };
+  const _stQ = new THREE.Quaternion(), _stE = new THREE.Euler();
+  // Asked of the blob once it is there, and remembered.
+  let jogHave = null;
+  const jogOk = () => (jogHave != null ? jogHave
+    : skinFig ? (jogHave = skinFig.clips.includes('jog')) : false);
+  // And her walk, solved the same way as the jog (`stroll`, tools/blender/
+  // stroll.py — the walk's own knees, arms and sway, with a heel strike, a
+  // roll over the ball and the stance hip solved). The shipped `walk` sets
+  // each foot down still swinging: in figure space the ball reaches the deck
+  // at 0.43 of the cycle and travels on 16 cm before it starts back, and
+  // MEASURED on the way to the playground the ball moved 26-30 cm over the
+  // ground in every stance (42-46 % of the ground she covered). `stroll`:
+  // 9 mm, 2 %. The other figures built off this blob keep `walk`; she is
+  // the one asked about.
+  let strollHave = null;
+  const walkClip = () => ((strollHave != null ? strollHave
+    : skinFig ? (strollHave = skinFig.clips.includes('stroll')) : false) ? 'stroll' : 'walk');
+  const GAITS = { walk: 1, stroll: 1, jog: 1 };
+  // Where she may break into it: larking about, and going to and from the
+  // grounds. Not the walk into a cartwheel, to a ladder, or on the leash.
+  const JOG_PH = { play: 1, toGrounds: 1, grounds: 1, hamBack: 1 };
 
   /**
    * Her capsules this frame, in her mesh's own frame: the nineteen the cuff
@@ -48524,7 +48871,7 @@ async function buildJadrija(scene) {
       const clip = skinFig.playing();
       lickOn = { k: 0, t: 0, c: 0, h: 0, stand: !!LICK_STAND[show.phase], clip,
         swapped: false, to: null, grip: null, up: 0, legs: null, seen: 0 };
-      if (clip === 'walk') { skinFig.play('idle', { fade: 0.35 }); lickOn.swapped = true; }
+      if (clip === 'walk' || clip === 'jog' || clip === 'stroll') { skinFig.play('idle', { fade: 0.35 }); lickOn.swapped = true; }
     }
     lickOn.k = o.k; lickOn.to = o.to || null; lickOn.grip = o.grip || null;
     lickOn.up = o.up || 0; lickOn.seen = 0;
@@ -52963,7 +53310,10 @@ async function buildJadrija(scene) {
    * her. Nothing about that read as a decision; it read as a dropped frame.
    */
   function showPace(v, dt) {
-    show.vel = damp(show.vel, v, SHOW.accel, dt);
+    // Eased, and no harder than a person can: the ease alone asks 4.5 m/s²
+    // of a stroll breaking into a run (1.558.0, STRIDE).
+    show.vel += clamp(damp(show.vel, v, SHOW.accel, dt) - show.vel,
+      -STRIDE.dec * 1.6 * dt, STRIDE.acc * 1.5 * dt);
     skinFig.state.speed = clamp(show.vel / SHOW.walk, 0.55, 1.75);
     showMove(show.vel, dt);
   }
@@ -54514,7 +54864,7 @@ async function buildJadrija(scene) {
     const moved = dt > 0 && legsWas.t != null
       ? Math.hypot(show.t - legsWas.t, show.s - legsWas.s) / dt : 0;
     legsWas.t = show.t; legsWas.s = show.s;
-    if (moved > 0.05 || f.playing() === 'walk') {
+    if (moved > 0.05 || f.playing() === 'walk' || f.playing() === 'jog' || f.playing() === 'stroll') {
       if (show.legsSpOn) { clear(); show.legsSpOn = 0; }
       legsRest = null; legsRestPhase = null;
       return;
@@ -57011,7 +57361,7 @@ async function buildJadrija(scene) {
       // her — inheriting a rate from whatever she was doing before would put a
       // slow-motion flip in the middle of a lazy wander.
       S.speed = 1;
-      if (clip) f.play(clip, { fade });
+      if (clip) f.play(clip === 'walk' ? walkClip() : clip, { fade });
       // Which of the clips under her is a gait, so the tail of this function
       // knows what to put back when she starts covering ground again. The
       // somersault and the cartwheel are not on the list on purpose: both are
@@ -59402,7 +59752,24 @@ async function buildJadrija(scene) {
         // itself. The tick stays expired and comes up again on the frame she
         // lands, which costs three quarters of a second once in a while.
         if (show.tick <= 0 && show.air <= 0) {
+          const was = show.wander;
           showWander(SHOW.turn, SHOW.swing);
+          // AND NOW AND THEN A RUN (1.558.0) — "sometimes 'sprint' around".
+          // A few seconds of it, on a heading she mostly keeps: a jog that
+          // changes its mind every second is a dog after a fly. The gait
+          // follows on its own — see STRIDE.
+          if (show.burst > 0) {
+            show.burst -= show.tick;
+            if (show.burst > 0) {
+              show.pace = show.burstV;
+              show.wander = was + (show.wander - was) * 0.3;
+            }
+          } else if (jogOk() && Math.random() < STRIDE.burstP) {
+            show.burst = STRIDE.burstFor[0] + Math.random() * (STRIDE.burstFor[1] - STRIDE.burstFor[0]);
+            show.burstV = STRIDE.cruise[0] + Math.random() * (STRIDE.sprint[1] - STRIDE.cruise[0]);
+            show.pace = show.burstV;
+            show.wander = was + (show.wander - was) * 0.3;
+          }
           // The barre, and it is rolled BEFORE the table rather than being a
           // line in it. Every other move can be started anywhere; this one
           // needs a ladder within a few paces, so a roll that lands on it with
@@ -60006,9 +60373,10 @@ async function buildJadrija(scene) {
           const g2 = groundsGoal(pt, ps);
           j.legs[j.legs.length - 1] = g2;
         }
-        const g = j.legs[Math.min(j.leg, j.legs.length - 1)];
-        const dist = showTo(g[0], g[1], dt, MEET.pace);
-        if (!last && dist < 0.55) { j.leg++; j.best = null; j.stall = 0; break; }
+        // Along the way at the way's own pace — see STRIDE and `routeStep`.
+        const r = routeStep(j, dt, SHOW.walk * MEET.pace);
+        const dist = r.dist;
+        if (!last && dist < r.adv) { j.leg++; j.best = null; j.stall = 0; break; }
         if (last && dist < 0.30) {
           show.job = null; M.t = 0;
           showSay('trill', d);
@@ -60045,7 +60413,8 @@ async function buildJadrija(scene) {
         if (d > MEET.follow && gd < MEET.by) {
           const goal = groundsGoal(pt, ps);
           const legs = hamPath(show.t, show.s, goal[0], goal[1]) || [goal];
-          show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0 };
+          show.job = { name: 'grounds', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0,
+            cruise: wayPace(legs, show.t, show.s, MEET.pace) };
           go('toGrounds', 'walk', 0.32);
           break;
         }
@@ -60065,9 +60434,12 @@ async function buildJadrija(scene) {
         if (!j || !j.legs) { show.job = null; go('play', 'walk', 0.36); break; }
         j.since += dt;
         const g = j.legs[Math.min(j.leg, j.legs.length - 1)];
-        const dist = showTo(g[0], g[1], dt, HAM_T.pace);
+        // At a jog when it was given one (`meetHome`); the hammock's own way
+        // home is a few metres and walks as it always did.
+        const r = j.cruise ? routeStep(j, dt, SHOW.walk * HAM_T.pace) : null;
+        const dist = r ? r.dist : showTo(g[0], g[1], dt, HAM_T.pace);
         if (dist < (j.best == null ? 1e9 : j.best) - 0.2) { j.best = dist; j.stall = 0; } else j.stall += dt;
-        if (dist < 0.55 || j.stall > HAM_T.stall) {
+        if (dist < (r && j.leg < j.legs.length - 1 ? r.adv : 0.55) || j.stall > HAM_T.stall) {
           if (j.leg < j.legs.length - 1) { j.leg++; j.best = null; j.stall = 0; break; }
           show.job = null;
           go('play', 'walk', 0.36);
@@ -60706,13 +61078,34 @@ async function buildJadrija(scene) {
     }
     if (show.gait) {
       const stuck = show.stall > SHOW.stallFor;
-      const want = stuck ? 'idle' : show.gait;
-      if (f.playing() !== want) f.play(want, { fade: 0.22 });
+      let want = stuck ? 'idle' : show.gait === 'walk' ? walkClip() : show.gait;
+      // AND A JOG, off the same ground covered (1.558.0) — see STRIDE. With a
+      // gap between the two speeds, so a pace on the line between them is one
+      // gait and not both in turn; never on the leash or in the room.
+      if (show.gait === 'walk' && !stuck && JOG_PH[show.phase] && jogOk() && !leash.on) {
+        show.jogging = show.jogging ? show.made > STRIDE.down : show.made > STRIDE.up;
+        if (show.jogging) want = 'jog';
+      } else show.jogging = false;
+      const was = f.playing();
+      if (was !== want) {
+        // From one gait into the other at the same point of the stride: both
+        // put her left foot down at 0 and her right at half, so the fade
+        // carries the feet on instead of swapping which one is in front.
+        // Not when the clip asked for is the one still fading out — `play`
+        // turns that fade round and keeps both clocks.
+        const swap = GAITS[was] && GAITS[want]
+          && !(S.prev && S.prev.name === want) && S.cur;
+        const u = swap ? (((S.curT / S.cur.dur) % 1) + 1) % 1 : 0;
+        f.play(want, { fade: swap ? 0.32 : 0.22 });
+        if (swap && S.cur && S.cur.name === want) S.curT = u * S.cur.dur;
+      }
       // And the clip's clock off the ground she covered rather than off the
       // speed she was asking for, which is the same argument one step smaller:
       // a walk half eaten by an obstacle is a walk whose feet are sliding.
-      S.speed = stuck || show.gait !== 'walk'
-        ? 1 : clamp(show.made / SHOW.walk, 0.55, 1.75);
+      S.speed = stuck ? 1
+        : want === 'jog' ? clamp(show.made / STRIDE.jogV, STRIDE.jogMin, STRIDE.jogMax)
+          : want === 'walk' ? clamp(show.made / SHOW.walk, 0.55, 1.75)
+            : want === 'stroll' ? clamp(show.made / STRIDE.strollV, 0.55, 1.75) : 1;
     }
 
     // ── the hop ───────────────────────────────────────────────────────────
@@ -61049,6 +61442,11 @@ async function buildJadrija(scene) {
     // other two: MEASURED, she stood up out of the hammock and was drawn
     // upside down under the ground on the next frame.
     f.mesh.rotation.set(0, faceYaw(show.t, show.ang + show.side), 0);
+    // Leant into the turn and with the speed, about her feet — see STRIDE.
+    // The hammock's own attitude is written over this below.
+    if (show.leanR || show.leanP) {
+      f.mesh.quaternion.multiply(_stQ.setFromEuler(_stE.set(show.leanR, 0, show.leanP)));
+    }
     f.mesh.updateMatrixWorld();
     // AND IN THE HAMMOCK SHE IS WHERE HER BODY IS — see `hamPlace`.
     if (hammock && HAM_SIM[show.phase]) hamPlace(f, dt);
@@ -61061,6 +61459,9 @@ async function buildJadrija(scene) {
     // Her head: at you if you asked for it, and on the motor's beat if she is
     // wearing something with one in it. See GAZE.
     gazeTick(f, dt, pt, ps);
+    // And her body over the gait — the lean, the head into the turn, the
+    // look about. See STRIDE.
+    strideTick(f, dt, pt, ps);
 
     // ── AND THE ARM THAT IS FETCHING SOMETHING OFF THE STOOL ─────────────
     //
@@ -74920,6 +75321,23 @@ async function buildJadrija(scene) {
       entries: () => MEET_ENTRIES.map((e) => e.slice()),
       seen: (t, s, pad) => meetSeen(t, s, pad),
       grounds: () => JSON.parse(JSON.stringify(GROUNDS)),
+      walls: () => backWall.filter((w) => w[1] <= BACK_WALL_TO).map((w) => w.slice()),
+      // The way she would take from (t0, s0) to the grounds with you at
+      // (pt, ps), with its length and how long the search took.
+      route: (t0, s0, pt, ps) => {
+        if (!show) return null;
+        const ot = show.t, os = show.s;
+        show.t = t0; show.s = s0;
+        const goal = groundsGoal(pt, ps), a = performance.now();
+        const legs = groundsRoute(t0, s0, goal);
+        const ms = performance.now() - a;
+        show.t = ot; show.s = os;
+        let m = 0, p = [t0, s0];
+        for (const q of legs || []) { m += Math.hypot(q[0] - p[0], q[1] - p[1]); p = q; }
+        return { goal: goal.map((v) => +v.toFixed(2)), m: +m.toFixed(1), ms: +ms.toFixed(1),
+          line: +Math.hypot(goal[0] - t0, goal[1] - s0).toFixed(1),
+          legs: legs ? legs.map((q) => q.map((v) => +v.toFixed(2))) : null };
+      },
     }),
     /**
      * Debug: skip the walk — her on the mark, turning to get in, as if she
@@ -75160,6 +75578,10 @@ async function buildJadrija(scene) {
       // clamp and every arrival taken out of it. `made` well under `vel` for
       // more than a moment is a figure walking on the spot.
       made: +show.made.toFixed(2), stall: +show.stall.toFixed(2),
+      // Her body over the gait — see STRIDE: the lean (roll into the turn,
+      // pitch with the speed), the neck's turn, and whether she is jogging.
+      leanR: +(show.leanR || 0).toFixed(3), leanP: +(show.leanP || 0).toFixed(3),
+      neck: +(show.stNeck || 0).toFixed(3), jogging: !!show.jogging,
       gait: show.gait, withYou: show.withYou, away: +show.away.toFixed(2),
       // The stage she is actually fenced to this frame, which slides with you.
       stage: [+show.t0.toFixed(1), +show.t1.toFixed(1)],
