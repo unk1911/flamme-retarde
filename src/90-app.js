@@ -1926,6 +1926,47 @@ function hammockPush(any = false) {
   if (jadrija.hamPushed) jadrija.hamPushed(r.dv);
   return r;
 }
+// ── THE PLAYGROUND PUSH (1.558.0) ─────────────────────────────────────────
+//
+// Misha, 1 Oct 2026: *"now add the AVBD physics to the swings, seesaw and
+// trampolines"*. The hammock's button and the hammock's rule: with a seat,
+// the nest, the rope, an end of the seesaw, the rider or a bed within an
+// arm and a half and in front of you, a press is a shove with the hand
+// instead of water — once per press, so a swing is built by pushing again
+// as it comes back — and held it goes on pushing for `PLAY_HOLD.max` s. The
+// seesaw's end goes down if it is up and up if it is down. Which way you
+// face is the walker's, not the camera's, which in the third person is
+// somewhere else. See `aim`, `press` and `hold` in src/46-playground.js.
+const PLAY_HOLD = { after: 0.12, max: 0.8 };
+let pressPlay = false, playAimed = null, playHoldT = -1, playPushes = 0;
+const playFacing = () => {
+  const Y = ground.you;
+  return [-Math.sin(Y.yaw), -Math.cos(Y.yaw)];
+};
+/** What a press would push now, or null. `any` skips the facing test. */
+function playAim(any = false) {
+  if (!playground || state.phase !== 'ground' || !ground || !ground.ok || !ground.you) return null;
+  const Y = ground.you, [fx, fz] = playFacing();
+  return playground.aim(Y.x, Y.z, fx, fz, any);
+}
+function playPush(any = false) {
+  const a = playAim(any);
+  if (!a) return null;
+  const [fx, fz] = playFacing();
+  playground.press(a, fx, fz);
+  playAimed = a;
+  playPushes++;
+  // The hammock's open palm, out to it and back.
+  if (pushT < 0) { pushT = 0; pushAt.set(a.at[0], a.at[1] + 0.05, a.at[2]); }
+  return a;
+}
+function playHold(dt, down) {
+  if (!down || !playAimed) { playHoldT = -1; if (!down) playAimed = null; return; }
+  playHoldT = playHoldT < 0 ? 0 : playHoldT + dt;
+  if (playHoldT < PLAY_HOLD.after || playHoldT > PLAY_HOLD.max) return;
+  const [fx, fz] = playFacing();
+  playground.hold(playAimed, fx, fz, dt);
+}
 function hammockPushTick(dt) {
   if (pushT < 0) { pushK = damp(pushK, 0, 8, dt); return; }
   // Held: the palm stays out on the cloth — see `hammockHold`.
@@ -3519,6 +3560,12 @@ async function boot() {
   // After the fire, because the ground mission is downstream of it in every
   // sense: it does not exist until the front is close enough to throw embers.
   ground = await buildGround(scene, airfield);
+  // The playground's rubber and beds under your feet, and the beds' bounce
+  // (1.558.0) — see `floors` and `bouncer` in 47-ground.js.
+  if (playground) {
+    ground.addFloor(playground.floor);
+    ground.setBouncer(playground.bouncer);
+  }
   // The ground crew, who had exactly the same problem as the bathers: eleven
   // parts each, all of them moving, none of them attached to the apron. Dynamic
   // because they walk, and near-only because a person is under four texels of
@@ -9830,6 +9877,12 @@ function tick(wall, draw) {
     if (pressing && !reachWas) pressHam = !inKab && reachKind !== 'leash' && !!hammockPush();
     if (!pressing) pressHam = false;
     hammockHold(dt, pressHam && pressing);
+    // And the playground's things, the same way — see `playPush`.
+    if (pressing && !reachWas) {
+      pressPlay = !inKab && !pressHam && reachKind !== 'leash' && !!playPush();
+    }
+    if (!pressing) pressPlay = false;
+    playHold(dt, pressPlay && pressing);
     // A probe cannot aim a crosshair to the degree; it can say what it meant.
     if (pressing && reachForce) { reachKind = reachForce[0]; cupSide = reachForce[1]; }
     if (pressing && !reachWas && reachKind === 'pet' && jadrija && jadrija.askShow) {
@@ -10080,7 +10133,7 @@ function tick(wall, draw) {
       const lg = jadrija.hairPullAt();
       if (lg) hairAt = lg;
     }
-    ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear && !pressHam && reachKind !== 'leash');
+    ground.setSpray(!swatCut && !pourCut && pressing && !inKab && !lipNear && !pressHam && !pressPlay && reachKind !== 'leash');
     // Unless she is not parked. Walking away from an aeroplane you jumped out of
     // does not stop her flying — and it used to: the only place she was being
     // integrated was the chute branch, so the moment the canopy touched down she
@@ -10572,8 +10625,8 @@ function tick(wall, draw) {
     if (crabs) {
       const who = state.phase === 'ground' && ground && ground.ok ? ground.you
         : state.phase === 'swim' && swim ? swim.you : null;
-      let jet = state.phase === 'ground' && ground && ground.hose() > 0.2 && ground.aimAt
-        ? ground.aimAt() : null;
+      let jet = state.phase === 'ground' && ground && ground.hose() > 0.2
+        ? ground.landing() : null;
       // A test's stand-in for a jet, for `crabJet` seconds — see __fr.crabs.jet.
       if (crabJet && crabJet.t > 0) { crabJet.t -= dt; jet = crabJet.at; }
       crabs.update(dt, camera, who, jet, (c, sp) => {
@@ -10589,8 +10642,8 @@ function tick(wall, draw) {
     // and by walking into them. See `tick` in src/46-playground.js.
     if (playground) {
       const who = state.phase === 'ground' && ground && ground.ok ? ground.you : null;
-      let jet = state.phase === 'ground' && ground && ground.hose() > 0.2 && ground.aimAt
-        ? ground.aimAt() : null;
+      const a = state.phase === 'ground' && ground && ground.hose() > 0.2 ? ground.landing() : null;
+      let jet = a ? { x: a[0], y: a[1], z: a[2] } : null;
       if (playJet && playJet.t > 0) { playJet.t -= dt; jet = playJet.at; }
       playground.tick(dt, camera.position, who, jet);
     }
@@ -11887,6 +11940,10 @@ window.__fr = {
    *   __fr.play.push(i, v)         kick part i (all if i < 0)
    *   __fr.play.jet(x, y, z, s)    pretend the hose lands there for s seconds,
    *                                from where the walker stands
+   *   __fr.play.aim(any)           what a press would push now (1.558.0)
+   *   __fr.play.press(any)         the press itself, as the button does it
+   *   __fr.play.beds()             the trampolines: on, dip, bounces, pumps
+   *   __fr.play.jump()             the jump key on foot (pumps a bed you are on)
    */
   play: {
     raw: () => playground,
@@ -11894,6 +11951,11 @@ window.__fr = {
     list: () => (playground ? playground.list() : null),
     push: (i, v) => (playground ? playground.push(i, v) : null),
     jet: (x, y, z, secs = 2) => { playJet = { at: { x, y, z }, t: secs }; return true; },
+    aim: (any = false) => playAim(any),
+    press: (any = false) => { const a = playPush(any); return a ? { i: a.i, kind: a.kind, d: +a.d.toFixed(2) } : null; },
+    pushes: () => playPushes,
+    beds: () => (playground ? playground.beds() : null),
+    jump: () => (ground && ground.ok ? jumpOut() : null),
   },
   crabs: {
     raw: () => crabs,

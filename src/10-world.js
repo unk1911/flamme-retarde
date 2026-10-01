@@ -18,6 +18,31 @@ const TERRAIN = {
 };
 
 /**
+ * Round holes in the terrain's surface (1.558.0): world x, z, radius squared
+ * a hole. The fragment shader discards inside them, so something set into
+ * the ground can go below it — the playground's in-ground trampolines, whose
+ * beds go 0.3 m down into pits the hillside's mesh would otherwise cover
+ * (`terrainHole`, src/46-playground.js). Empty unless asked for, and then a
+ * fragment pays one bounding test.
+ */
+const TERRAIN_HOLES = {
+  max: 4, n: 0,
+  v: [0, 0, 0, 0].map(() => new THREE.Vector4(0, 0, 0, 0)),
+  // A box round all of them, xz min and max, so the hillside at large skips
+  // the loop.
+  box: new THREE.Vector4(1, 1, -1, -1),
+};
+function terrainHole(x, z, r) {
+  const H = TERRAIN_HOLES;
+  if (H.n >= H.max) return false;
+  H.v[H.n++].set(x, z, r * r, 0);
+  const b = H.box;
+  if (H.n === 1) b.set(x - r, z - r, x + r, z + r);
+  else b.set(Math.min(b.x, x - r), Math.min(b.y, z - r), Math.max(b.z, x + r), Math.max(b.w, z + r));
+  return true;
+}
+
+/**
  * One tile geometry: an n x n grid in local metres, plus a skirt ring around
  * the edge that the shader pushes downward. Positions carry x and z; y is the
  * skirt flag, because a whole attribute for one bit is not worth the bandwidth.
@@ -125,8 +150,20 @@ uniform float uAmbI;
 uniform float uNight;
 uniform vec4 uLitter;
 uniform vec2 uLitterAx;
+uniform vec4 uHoles[4];
+uniform int uHoleN;
+uniform vec4 uHoleBox;
 
 void main(){
+  // Holes cut for things set into the ground (TERRAIN_HOLES).
+  if (uHoleN > 0 && vWorld.x > uHoleBox.x && vWorld.z > uHoleBox.y
+    && vWorld.x < uHoleBox.z && vWorld.z < uHoleBox.w) {
+    for (int i = 0; i < 4; i++) {
+      if (i >= uHoleN) break;
+      vec2 hd = vWorld.xz - uHoles[i].xy;
+      if (dot(hd, hd) < uHoles[i].z) discard;
+    }
+  }
   // ── normal, from the height field rather than from the mesh ─────────────
   // The mesh is four different resolutions; the normals must not be, or every
   // LOD boundary shows up as a shading seam.
@@ -563,6 +600,9 @@ function buildTerrain(scene) {
     uCoverColor: { value: COVER_COLOR.map((c) => new THREE.Color(c[0], c[1], c[2])) },
     uLitter: U.uLitter,
     uLitterAx: U.uLitterAx,
+    uHoles: { value: TERRAIN_HOLES.v },
+    uHoleN: { get value() { return TERRAIN_HOLES.n; } },
+    uHoleBox: { value: TERRAIN_HOLES.box },
   };
 
   const levels = TERRAIN.lods.map((n) => {

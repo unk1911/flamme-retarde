@@ -5453,7 +5453,11 @@ async function buildJadrija(scene) {
   // it is on the alley's own gravel, which is what the photographs show.
   // What stands on `play`, `shore` and `pong` is src/46-playground.js.
   const GROUNDS = {
-    play: { t0: 517.0, t1: 533.0, s0: 38.4, s1: 52.4, pad: true },
+    // `holes`: where the gravel pad is cut out under the two in-ground
+    // trampolines (1.558.0), t, s and radius — the beds go 0.3 m down into
+    // pits, and a pad over them would cover the dip. The rim covers the cut.
+    play: { t0: 517.0, t1: 533.0, s0: 38.4, s1: 52.4, pad: true,
+      holes: [[519.6, 43.0, 0.70], [527.0, 43.0, 0.70]] },
     pong: { t0: 544.0, t1: 561.0, s0: 51.0, s1: 59.0 },
     golf: { t0: 572.0, t1: 596.0, s0: 48.0, s1: 68.0 },
     shore: { t0: 371.5, t1: 395.0, s0: 20.6, s1: 28.0 },
@@ -5486,7 +5490,7 @@ async function buildJadrija(scene) {
   // legs she walks (`groundsRoute`).
   const GROUNDS_WAYS = {
     play: { t0: 515.0, t1: 519.0,
-      walk: [[511.6, 15.2], [511.8, 22.8], [517.0, 24.4], [517.3, 37.0], [518.6, 39.3]] },
+      walk: [[511.6, 15.2], [511.8, 22.8], [517.0, 24.4], [517.3, 37.0], [519.0, 39.3]] },
     pong: { t0: 550.6, t1: 554.0,
       walk: [[551.9, 15.2], [552.1, 23.0], [552.4, 29.0], [552.6, 44.0], [552.6, 50.6]] },
   };
@@ -33936,6 +33940,48 @@ async function buildJadrija(scene) {
           const ta = Gd.t0 + (Gd.t1 - Gd.t0) * (i / nT), tb2 = Gd.t0 + (Gd.t1 - Gd.t0) * ((i + 1) / nT);
           for (let j = 0; j < nS; j++) {
             const sa = Gd.s0 + (Gd.s1 - Gd.s0) * (j / nS), sb = Gd.s0 + (Gd.s1 - Gd.s0) * ((j + 1) / nS);
+            // A cell with a trampoline's pit in it (1.558.0, `holes`) is cut
+            // down to 6 cm squares round the circle and those inside it are
+            // left out. Each piece stays on the cell's own two triangles —
+            // the plane the rubber in src/46-playground.js is laid on — so
+            // nothing comes up through it.
+            const hs = (Gd.holes || []).filter(([ht, hsS, hr]) => ht + hr > ta && ht - hr < tb2
+              && hsS + hr > sa && hsS - hr < sb);
+            if (hs.length) {
+              const y00 = yg(ta, sa) + 0.05, y10 = yg(tb2, sa) + 0.05;
+              const y11 = yg(tb2, sb) + 0.05, y01 = yg(ta, sb) + 0.05;
+              const Y = (t, s2) => {
+                const u = (t - ta) / (tb2 - ta), v = (s2 - sa) / (sb - sa);
+                return u >= v ? y00 + u * (y10 - y00) + v * (y11 - y10)
+                  : y00 + v * (y01 - y00) + u * (y11 - y01);
+              };
+              const piece = (t0, t1, s0, s1) => {
+                // Wholly outside every hole: one quad. Wholly inside one: none.
+                let out = true, inside = false;
+                for (const [ht, hsS, hr] of hs) {
+                  const nt = Math.max(t0, Math.min(ht, t1)), ns = Math.max(s0, Math.min(hsS, s1));
+                  if ((nt - ht) ** 2 + (ns - hsS) ** 2 < hr * hr) out = false;
+                  const ft = Math.max(Math.abs(t0 - ht), Math.abs(t1 - ht));
+                  const fs = Math.max(Math.abs(s0 - hsS), Math.abs(s1 - hsS));
+                  if (ft * ft + fs * fs < hr * hr) inside = true;
+                }
+                if (inside) return;
+                if (!out && t1 - t0 > 0.07) {
+                  const tm = (t0 + t1) / 2, sm = (s0 + s1) / 2;
+                  piece(t0, tm, s0, sm); piece(tm, t1, s0, sm);
+                  piece(tm, t1, sm, s1); piece(t0, tm, sm, s1);
+                  return;
+                }
+                if (!out) {
+                  const tc = (t0 + t1) / 2, sc = (s0 + s1) / 2;
+                  if (hs.some(([ht, hsS, hr]) => (tc - ht) ** 2 + (sc - hsS) ** 2 < hr * hr)) return;
+                }
+                b.quad(W(t0, s0, Y(t0, s0)), W(t1, s0, Y(t1, s0)), W(t1, s1, Y(t1, s1)),
+                  W(t0, s1, Y(t0, s1)), GRAV);
+              };
+              piece(ta, tb2, sa, sb);
+              continue;
+            }
             b.quad(W(ta, sa, yg(ta, sa) + 0.05), W(tb2, sa, yg(tb2, sa) + 0.05),
               W(tb2, sb, yg(tb2, sb) + 0.05), W(ta, sb, yg(ta, sb) + 0.05), GRAV);
           }

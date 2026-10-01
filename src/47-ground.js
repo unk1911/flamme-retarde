@@ -315,7 +315,7 @@ async function buildGround(scene, field) {
       canEnter: () => false, canBoard: () => false,
       hud: () => null, stats: () => null, hose: () => 0,
       you: {}, crew: [], force() {}, setSpray() {}, put() {}, bail: () => false,
-      aimAt: () => false,
+      aimAt: () => false, landing: () => null, addFloor: () => 0, setBouncer() {},
     };
   }
 
@@ -412,6 +412,30 @@ async function buildGround(scene, field) {
   // Somebody's machine under you (1.550.0): `{ step(dt, you, inp), eye }`,
   // handed in by 90-app.js off `jadrija.steal.take`. See `walk`.
   let mount = null;
+  // ── made floors, and a floor that springs (1.558.0) ────────────────────────
+  //
+  // `floors`: functions `(x, z, y) => height | null` asked after the locale's
+  // own `walkY`, each answering only where it has something drawn — the
+  // playground's rubber, which is 8 cm over the hill `walkY` knows, and the
+  // trampoline beds in it. Empty, and nothing anybody stands on moves.
+  //
+  // `bouncer`: `{ step(you, dt, air), press(you) }`, the playground's beds
+  // (src/46-playground.js). While a bed has you, `step` owns your height —
+  // it sets `gy`, `hop`, `hopV` and `y` and answers with `{ land }` — and
+  // the hop below is not run; anywhere else it answers null. `press` is the
+  // jump key on a bed, which pumps it instead of hopping. Unset, the walk
+  // is exactly what it was.
+  const floors = [];
+  let bouncer = null;
+  /** `field.walkY`, then the made floors over it. */
+  function floorAt(x, z, yHint) {
+    let v = field.walkY(x, z, yHint);
+    for (let k = 0; k < floors.length; k++) {
+      const w = floors[k](x, z, v);
+      if (w != null) v = w;
+    }
+    return v;
+  }
   let stranded = false;              // walked in under a canopy, not out of a door
   let armed = false;                 // has the spot fire been called
   let seeded = false;                // have the first flames appeared
@@ -1775,8 +1799,12 @@ async function buildGround(scene, field) {
     // what gets handed back to `walkY` next tick; `you.y` is where your feet
     // actually are, which during a hop is above it.
     const air = you.hop > 0 || you.hopV !== 0;
-    const gWant = field.walkY(you.x, you.z, you.gy != null ? you.gy : you.y);
-    if (you.gy == null || air) {
+    // A trampoline bed under you has your height — see `bouncer`.
+    const ride = bouncer && !mount && you.gy != null ? bouncer.step(you, dt, air) : null;
+    const gWant = ride ? you.gy : floorAt(you.x, you.z, you.gy != null ? you.gy : you.y);
+    if (ride) {
+      // Nothing: the bed set gy, hop and hopV.
+    } else if (you.gy == null || air) {
       // Nothing to ease from on the first frame, and nothing to ease at all
       // while you are off the ground: in the air the floor under you is
       // whatever you happen to be over, and easing that would have you land on
@@ -1797,7 +1825,8 @@ async function buildGround(scene, field) {
     // off the vikendica's rail are the same event to everything else in here,
     // and they are not the same noise.
     let land = 0;
-    if (air) {
+    if (ride) land = ride.land || 0;
+    else if (air) {
       you.hopV -= GROUND.hopG * dt;
       you.hop += you.hopV * dt;
       if (you.hop <= 0) { land = -you.hopV; you.hop = 0; you.hopV = 0; }
@@ -1806,8 +1835,16 @@ async function buildGround(scene, field) {
     // Eased, so ducking under the eaves is a movement and not a cut. The hard
     // cap in pose() is what stops a teleport arriving on the deck at full
     // height with its head outside.
-    you.eye = damp(you.eye, you.crouch ? Math.min(GROUND.kneel, eyeAt(you.x, you.z, you.y))
+    // (`eyeBase` is the eye with straight knees — see below.)
+    const eyeWas = you.knees ? you.eyeBase : you.eye;
+    you.eye = damp(eyeWas, you.crouch ? Math.min(GROUND.kneel, eyeAt(you.x, you.z, you.y))
       : eyeAt(you.x, you.z, you.y) + (mount ? mount.eye : 0), you.crouch ? 6 : 9, dt);
+    // Knees bent on a trampoline bed, pumping it (`bouncer`, 1.558.0): the
+    // eye goes down with them, and comes back up as you leave the bed.
+    you.knees = ride ? ride.knees || 0 : (you.knees ? damp(you.knees, 0, 8, dt) : 0);
+    if (Math.abs(you.knees) < 1e-4) you.knees = 0;
+    you.eyeBase = you.eye;
+    if (you.knees) you.eye -= you.knees;
     you.low = damp(you.low, you.crouch ? 1 : 0, you.crouch ? 6 : 9, dt);
     // No footfalls on a machine, and no bob: the tyres take the ground.
     if (!mount) gait(moved, dt, air);
@@ -2629,10 +2666,21 @@ async function buildGround(scene, field) {
      * at all. See `GROUND.hopV` and the airborne test in `confine`.
      */
     hop: () => {
+      // On a trampoline bed (or coming down on to one) the key pumps it —
+      // see `bouncer`.
+      if (active && bouncer && !mount && bouncer.press(you)) return true;
       if (!active || you.hop > 0 || you.hopV !== 0) return false;
       you.hopV = GROUND.hopV;
       return true;
     },
+    /**
+     * A made floor over the locale's own — `fn(x, z, y)`, a height where it
+     * has one and null elsewhere — and the beds' bouncer. See `floors`.
+     */
+    addFloor: (fn) => { floors.push(fn); return floors.length; },
+    setBouncer: (b) => { bouncer = b; },
+    /** Debug: the floor under (x, z) with the made floors on it. */
+    floorAt: (x, z, y) => floorAt(x, z, y),
     airborne: () => you.hop > 0.05,
     /** Whichever locale currently owns you — for a test, and read-only. */
     get field() { return field; },
@@ -2640,8 +2688,14 @@ async function buildGround(scene, field) {
     get crew() { return crew; },
     hose: () => you.jet,
     /** Where the jet is landing, [x, y, z] — for anything that minds getting wet
-     *  without being a guest (the crabs, 44-crabs.js). */
-    aimAt: () => you.aim || null,
+     *  without being a guest (the crabs, 44-crabs.js; the playground).
+     *
+     *  `landing` and not `aimAt` (1.558.0): this object also has the debug
+     *  `aimAt(kind)` further down, which stands you eight metres off the
+     *  nearest fire, and a later key wins — so asking `aimAt()` for the jet
+     *  ran that instead, found no fire at Jadrija and answered false. The
+     *  crabs and the playground had never been handed the hose. */
+    landing: () => you.aim || null,
     /** Where you tried to walk into the sea this frame, or null. */
     wet: () => wet,
     /**
@@ -2694,7 +2748,7 @@ async function buildGround(scene, field) {
      */
     put(x, z, yaw, pitch = 0, yHint = null) {
       const [px2, pz2] = confine(x, z);
-      you.x = px2; you.z = pz2; you.y = field.walkY(px2, pz2, yHint);
+      you.x = px2; you.z = pz2; you.y = floorAt(px2, pz2, yHint);
       you.gy = you.y; you.hop = 0; you.hopV = 0;
       you.yaw = yaw; you.pitch = pitch;
     },
