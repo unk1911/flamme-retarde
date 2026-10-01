@@ -179,6 +179,15 @@ const HAND_POSE = {
     fan: [-0.25, 0.0, -0.25, -0.30],
     t: [-0.60, -0.60, -0.20, -0.10, 0.0],
   },
+  // The flat of the hand for a spank (1.553.2): the stroke's hand with the
+  // fingers straighter still and held together, the thumb tucked along the
+  // side — a hand that meets her with the whole of the palm at once. A cupped
+  // hand is a pat, and a spread one is a slap across the face.
+  slap: {
+    f: [[0.03, 0.04, 0.01], [0.03, 0.05, 0.01], [0.04, 0.05, 0.02], [0.05, 0.06, 0.02]],
+    fan: [-0.35, 0.0, -0.35, -0.45],
+    t: [-0.60, -0.60, -0.20, -0.10, 0.0],
+  },
   // The paddle and the let-go hand of a crawl.
   flat: {
     f: [[0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11], [0.05, 0.09, 0.11]],
@@ -1197,6 +1206,17 @@ function buildArms() {
     palm: [0.0, 0.0, -1.0], flex: 0.10 };
   const PET_AIM = { pole: [0.55, -0.80, 0.10], along: [-0.15, -0.30, -0.94],
     palm: [0.0, -1.0, 0.0], flex: 0.10 };
+  // And the spank (1.553.2): the elbow out and UP, which is where a spanking
+  // elbow is. Hung down and out like the hip's, kneeling by the cot, the
+  // forearm came up at her from under the line to your shoulder — through
+  // her near cheek to the far one (37 mm), and 83 into her for a thigh;
+  // raised, it comes down on to her and clears her (MEASURED beside the
+  // cot, three poles, on her cheeks, back and thighs and a flurry). The fingers
+  // and the palm are the caller's, in the world — the palm on to the skin
+  // where it lands, the fingers along her away from you — see
+  // `spankHandTick` in 90-app.js.
+  const SLAP_AIM = { pole: [0.50, 0.80, 0.20], dip: 0.7, along: [-0.15, -0.30, -0.94],
+    palm: [0.0, -1.0, 0.0], flex: 0.10 };
   // And the fist in her hair from behind: the elbow down and out. The rest
   // of the hand's lie is the hair's own — see the end of `updateReach`.
   const PULL_AIM = { pole: [0.55, -0.80, 0.10], flex: 0.10, thumb: 1 };
@@ -1230,9 +1250,11 @@ function buildArms() {
     // fist as it closes on her hair — `grip`, eased here so the fingers take a
     // tenth of a second to close and not a frame.
     const pull = reach.kind === 'pull';
+    const slap = reach.kind === 'slap';
     a.pullG = pull ? (a.pullG || 0) + ((reach.grip || 0) - (a.pullG || 0)) * (1 - Math.exp(-14 * dt)) : 0;
     if (pull) setHandPose(a.pose, HAND_POSE.pet, HAND_POSE.fist, a.pullG);
     else if (pet) setHandPose(a.pose, HAND_POSE.pet);
+    else if (slap) setHandPose(a.pose, HAND_POSE.slap);
     else if (thigh && reach.along) setHandPose(a.pose, HAND_POSE.stroke);
     else if (cup || hip) setHandPose(a.pose, HAND_POSE.cup);
     else thumbDigits(a);
@@ -1254,14 +1276,37 @@ function buildArms() {
     // And bending right down for her thigh, which is a metre below your eye.
     // And down to her hair when her head is low — on her knees, on all
     // fours, on the cot — as far as for her thigh.
-    const lean = thigh || pull ? 0.95 : pet || hip ? PET_LEAN : THUMB_LEAN;
+    // And down to her on the cot for a spank, the same.
+    const lean = thigh || pull || slap ? 0.95 : pet || hip ? PET_LEAN : THUMB_LEAN;
     if (need > 0) body.position.copy(_p1.normalize().multiplyScalar(Math.min(need, lean)));
     else body.position.set(0, 0, 0);
+    // THE SPANK LEANS DOWN AS WELL AS IN. Kneeling by the cot, the spot is
+    // level with your shoulder and 0.7 m out, and leant straight along the
+    // line to it the shoulder came forward into the bottom of the picture,
+    // the cut end of the upper arm with it — with the elbow up (SLAP_AIM) the
+    // whole of the upper arm stood in the right of the frame. So the lean
+    // goes `dip` of the way down (the world's down) as well, far enough along
+    // that way for the arm to reach: the shoulder stays under the picture and
+    // the upper arm comes up into it from below, to the elbow. 0.3 still
+    // showed the cut end; 1.0 put the shoulder under her hip and the arm up
+    // through her flank (15 mm, MEASURED); 0.7 is the forearm and a bent
+    // elbow. The caller may ask for less (`reach.dip`) where 0.7 would put
+    // the upper arm through her — see `spankReach` in 90-app.js.
+    if (slap && need > 0) {
+      const dn = _v3b.set(0, -1, 0).applyQuaternion(_qr.copy(root.quaternion).invert());
+      _p1.set(_tt.x - S[0], _tt.y - S[1], _tt.z - S[2]);
+      const dir = _v3a.copy(_p1).normalize().addScaledVector(dn, reach.dip != null ? reach.dip : SLAP_AIM.dip)
+        .normalize();
+      const b = _p1.dot(dir), c = _p1.lengthSq() - THUMB_REACH * THUMB_REACH, disc = b * b - c;
+      const l = disc > 0 ? b - Math.sqrt(disc) : b;
+      body.position.copy(dir).multiplyScalar(Math.max(0, Math.min(l, lean)));
+    }
 
     // Elbow down and out to the right; palm down, so the thumb pad comes to
     // the lip from in front with the fingers curled under her chin.
-    const AIM = pet ? PET_AIM : cup ? CUP_AIM : thigh ? THIGH_AIM : hip ? HIP_AIM : THUMB_AIM;
-    const OFF = pet || cup || hip ? PALM_OFF : THUMB_OFF;
+    const AIM = pet ? PET_AIM : cup ? CUP_AIM : thigh ? THIGH_AIM : hip ? HIP_AIM
+      : slap ? SLAP_AIM : THUMB_AIM;
+    const OFF = pet || cup || hip || slap ? PALM_OFF : THUMB_OFF;
     let P = AIM.pole, N = AIM.palm, G = AIM.along || null;
     // A hand laid ON her — breast, hip, thigh — is laid in the room's upright
     // frame, not in your view's: the rig hangs off your eye and pitches with
@@ -1301,6 +1346,14 @@ function buildArms() {
       const sh = s0.multiplyScalar(ARMS.upper * 0.97).add(E);
       body.position.set(sh.x - S[0], sh.y - S[1], sh.z - S[2]).multiplyScalar(k);
       P = [E.x - (sh.x + _tt.x) * 0.5, E.y - (sh.y + _tt.y) * 0.5, E.z - (sh.z + _tt.z) * 0.5];
+    }
+    // THE SPANK hands over the hand's lie in the world, like the stroke: the
+    // fingers (`along`) and the way out of the palm (`palm`), brought into
+    // the body's frame. The arm is left to come to it from your shoulder.
+    if (slap && reach.along && reach.palm) {
+      _qr.copy(root.quaternion).invert();
+      G = _v3a.fromArray(reach.along).applyQuaternion(_qr).toArray();
+      N = _v3a.fromArray(reach.palm).applyQuaternion(_qr).toArray();
     }
     // THE FIST IN HER HAIR. The hair runs THROUGH it — in at the thumb from
     // her head, out past the little finger as the tail that hangs — so it is
@@ -1595,9 +1648,11 @@ function buildArms() {
      * Debug: your right hand as drawn — every vertex the hand or a finger
      * carries, skinned on the CPU by this frame's palette, world metres — and
      * the middle finger's knuckle and tip. What the thigh stroke's clearance
-     * off her skin and its fingers' aim were measured with.
+     * off her skin and its fingers' aim were measured with. `all`: the
+     * forearm and the upper arm's too (bones 0-3), which the spank's
+     * clearance is measured with.
      */
-    hand: () => {
+    hand: (all = false) => {
       const a = sides[1], md = a.model;
       if (!md || !root.visible || !a.shoulder.visible) return null;
       const g = md.geo, P = g.getAttribute('position');
@@ -1615,7 +1670,7 @@ function buildArms() {
         for (let k = 0; k < 4; k++) {
           if (BW.getComponent(i, k) > tw) { tw = BW.getComponent(i, k); top = Math.round(BI.getComponent(i, k) * 255); }
         }
-        if (top < 4) continue;
+        if (top < 4 && !all) continue;
         let x = 0, y = 0, z = 0;
         for (let k = 0; k < 4; k++) {
           const w = BW.getComponent(i, k);
@@ -1635,6 +1690,20 @@ function buildArms() {
       Object.assign(THIGH_AIM, aim);
       if (pose) Object.assign(HAND_POSE.stroke, pose);
       return THIGH_AIM;
+    },
+    /** The right arm's shoulder, elbow and wrist, world metres — what `spankReach` (90-app.js) tries against her. */
+    joints: () => {
+      const a = sides[1];
+      if (!root.visible || !a.shoulder.visible) return null;
+      const f = (o) => o.getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(3));
+      return { shoulder: f(a.shoulder), elbow: f(a.elbow), wrist: f(a.wrist), body: body.position.toArray().map((v) => +v.toFixed(3)) };
+    },
+    /** Debug: try an elbow for the spank — see SLAP_AIM; `pose` the hand's. */
+    slapAim: (o) => {
+      const { pose, ...aim } = o || {};
+      Object.assign(SLAP_AIM, aim);
+      if (pose) Object.assign(HAND_POSE.slap, pose);
+      return SLAP_AIM;
     },
     /** Debug: try a hand attitude on her hip — see HIP_AIM. */
     hipAim: (o) => Object.assign(HIP_AIM, o || {}),

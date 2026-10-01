@@ -1170,6 +1170,548 @@ function buttSlap(side, k = null, hit = null) {
   sceneHit('hand', last && last.u >= 0.6 ? 2 : 1, hit ? hit.reg : 'butt');
   return on;
 }
+
+// ── THE SPANK, WITH YOUR HAND IN IT ──────────────────────────────────────────
+//
+// 1.553.2. Misha, 30 Sep 2026: *"when we spank her without the belt, it would
+// be nice to see my (Chloe's) right hand appearing doing the spanking"*. It
+// never had one. The press on her bottom was written (25 Sep) as "a sound,
+// no reach, one per press", and everything since — the mark, her hands going
+// back, the weight on the cot, where on her it lands — was hung off that
+// same instant: `buttSlap` on the frame the button went down, and nothing
+// sent to the arm rig, whose chain in the frame loop had a line for the
+// thumb, the cup, the pet, the pull, the belt and the leash and none for this.
+//
+// Now the press starts a gesture and the slap waits for the hand. Your right
+// hand comes up from under the picture to over the spot the crosshair picked
+// (`cotAim` on the cot, the cheek's own point standing), the wrist cocked
+// back; comes down on it accelerating, the palm flat and the fingers
+// together (`HAND_POSE.slap`) along her away from you; and on the frame it
+// arrives — not the frame you clicked — the sound, the mark, her hands and
+// the weight on the ragdoll all go, which is `buttSlap` unchanged. It rests
+// on her a moment, a few millimetres in and back, and goes down out of view.
+// The spot is followed while the hand comes down (the same ray, asked again),
+// so a cot still rocking from the last one is met where it is now.
+//
+// AN ARM HAS TO REACH, which a sound never did. The crosshair picks her out
+// from 3 m, and lying on the cot she is a metre under a standing eye: so
+// from further than an arm you step in to her first, and from standing you
+// kneel by the cot (SPANK_HAND `near`, `kneelIf` — the belt's aftercare
+// kneels you for the same reason), and you get up again a little after the
+// last one. Where even then no arm could get to the spot without going
+// through her — her far side, the small of her back past the rise of her
+// bottom bent over the edge — it is the slap on its own (`spankReach`).
+// Click to sound is 0.175 s when she is within reach, about 0.55 s when you
+// kneel first.
+//
+// Quick presses: up to two are kept while a hand is on its way down, each
+// starting straight from her skin once the one before has landed; one
+// arriving after it landed starts at once from wherever the hand is. So a
+// flurry is a hand going up and down on her, about four a second, and not a
+// stack of slaps nobody's hand made.
+//
+// No hand when your right hand is busy: the belt out (the press is the
+// belt's swing then anyway — see the gate), the leash clipped to her, the
+// collar going on, the aftercare. Then it is the slap on the press, as it
+// always was. In the third person the figure's own right arm does it, from
+// the shoulder (`spankArm`, `spankElbow` — see `poseSwimBody`), up in front
+// of her and down to the spot; in the kabina the third person's camera can
+// rarely get behind you, and then, as for every reach, there is neither the
+// body nor the first person's arm to see it with.
+const SPANK_HAND = {
+  // Seconds: up to over the spot; down on to her, accelerating all the way;
+  // on her; and away, out of the bottom of the picture. The first two are
+  // the time from the click to the sound, 0.175 s.
+  up: 0.10, down: 0.075, hold: 0.08, away: 0.30,
+  // How far over the spot the hand goes up (m, out along her skin), from the
+  // lightest to the hardest; and back toward you, level, as a hand winds.
+  lift: [0.14, 0.24], back: 0.07,
+  // The wrist cocked back at the top of it (rad), flat by the time it lands.
+  cock: 0.60,
+  // The palm's bone line off her skin (m) — the thigh stroke's THIGH_OFF and
+  // a little over, since her capsules are a hair inside her skin and her
+  // bottom rounds away under the fingers — and how far it goes in at
+  // the moment it lands and comes back (the flatten), m.
+  off: 0.038, press: 0.003,
+  // The palm's underside, for `spankLift`: points along the fingers from the
+  // palm's middle (heel −, tips +) and across it, m; how far under the bone
+  // line its skin is (the thigh stroke's 26 mm, less a little); and the gap
+  // it keeps off her capsules, which are a hair inside her skin.
+  palm: { along: [-0.05, 0, 0.06, 0.13], across: [-0.04, 0, 0.04], under: 0.024, gap: 0.004 },
+  // Where the hand goes on its way out, before it drops out of the picture:
+  // right, up, forward of your eye (m) — see the `away` phase.
+  exit: [0.30, -0.28, 0.28],
+  // Presses kept while a hand is on its way down.
+  queue: 2,
+  // Your shoulder off your eye (right, up, m) — ARMS.shoulder — for which
+  // way the fingers lie.
+  shoulder: [0.195, -0.245],
+  // AND YOU GO TO HER, when it is further than an arm: the crosshair picks
+  // her out from across the room (COT_RAG.aim's `reach` is 3 m), and an arm
+  // sent 2 m is an arm floating by the cot with nobody on the end of it —
+  // MEASURED from the door, the hand stopped 0.9 m short. So past `near` m
+  // (level, your eye to the spot) you step in first, briskly (`walk` m/s),
+  // to `stand` m off it, turned on to it, and the hand goes up once you are
+  // there — or once the cot will not let you closer (`stall` s).
+  near: 0.72, stand: 0.45, walk: 2.4, stall: 0.9,
+  // And if the cot will not let you nearer than `reachMax` (level) — her
+  // bottom over the far edge from where you are, or her length between you
+  // and it — there is no hand that could do it from there without going
+  // through her: MEASURED from her head, bent over the edge, an arm along
+  // her back 28 mm into it. Then it is the slap on its own, as it was.
+  reachMax: 0.80,
+  // Your arm against her, for `spankReach`: the forearm's radius (m), the
+  // palm's own `near` m of it left out, and how much of the upper arm from
+  // the elbow is tried (the rest runs out under the picture).
+  arm: { r: 0.045, near: 0.12, upper: 1.0, cap: 0.07 },
+  // And the spot: how square to the eye that picked it its skin must face
+  // (the cosine), and the most the hand may stand off it (`spankLift`)
+  // before it does not fit there at all — see `spankReach`.
+  facing: 0.1, liftMax: 0.079,
+  // How far down the shoulder goes as it leans in (see `dip` in 60-arms.js),
+  // tried in this order until the arm clears her.
+  dips: [0.7, 0.5, 0.35, 0.2, 0],
+  // AND DOWN TO HER. Lying on the cot her bottom is a metre under a standing
+  // eye (0.98 m MEASURED, lying flat), and an arm is 0.48 m and a hand: sent
+  // from a standing eye the upper arm stood up the middle of the picture at
+  // you, its cut end showing, however the elbow was hung. So when the spot
+  // is more than `kneelIf` m under your eye you kneel by the cot first — the
+  // crouch, Shift's, which the belt's aftercare already kneels you into for
+  // the same reason — and the hand goes up once you are most of the way
+  // down (`low`). You stay down while you keep spanking, and get up again
+  // `rise` s after the last one, unless you were kneeling before it.
+  kneelIf: 0.80, low: 0.85, rise: 2.5,
+};
+let spankKnelt = null;              // { was, idle } — you knelt for it; see `rise`
+// idle | step | up | down | hold | away
+let spankPh = 'idle', spankT = 0, spankK = 0;
+const spankQ = [];                  // presses waiting for the hand — at most SPANK_HAND.queue
+let spankArm = 0, spankElbow = 0;   // the third person's right arm, rad — see `spankHandTick`
+let spank = null;                   // { side, k, hit, o, d, lift, u, fromK, al }
+const spankAt = new THREE.Vector3(), spankFrom = new THREE.Vector3();
+const spankP = new THREE.Vector3(), spankN = new THREE.Vector3(0, 1, 0);
+const spankAlong = [0, 0, -1], spankPalm = [0, -1, 0];
+const _skA = new THREE.Vector3(), _skB = new THREE.Vector3(), _skW = new THREE.Vector3();
+const spankLog = { presses: 0, landed: 0, instant: 0, queued: 0, dropped: 0, far: 0, blocked: 0, last: [] };
+let spankClock = 0;
+let spankStop = null;               // debug: [phase, t] to hold the gesture at — see `__fr.jad.spankStop`
+
+/** Whether the right hand is free to show a spank, first person or third. */
+function spankShowable() {
+  if (state.phase !== 'ground' || !ground || !ground.ok || chaseCut) return false;
+  if (beltActive() || beltK > 0.01 || beltRubK > 0.01) return false;
+  if (colK > 0.01 || colAfterK > 0.01) return false;
+  const s = collarState();
+  if (s && s.on && s.clipped) return false;
+  return bodyCam || !!arms;
+}
+
+/**
+ * A press on her backside: the hand, and the slap when it lands — or the
+ * slap now, if the hand is busy. Same arguments as `buttSlap`.
+ */
+function spankStart(side, k = null, hit = null) {
+  spankLog.presses++;
+  if (!spankShowable()) {
+    spankLog.instant++;
+    spankPush({ side, reg: hit ? hit.reg : 'butt', press: +spankClock.toFixed(3), ms: 0, instant: true });
+    return buttSlap(side, k, hit);
+  }
+  const job = { side, k, hit, o: camera.position.clone(), d: camera.getWorldDirection(new THREE.Vector3()),
+    press: spankClock };
+  // One on its way down already: this one goes next — up to `queue` of
+  // them, and past that a press is a press nobody's hand could keep up with.
+  if (spankPh === 'step' || spankPh === 'up' || spankPh === 'down') {
+    if (spankQ.length >= SPANK_HAND.queue) { spankLog.dropped++; return false; }
+    spankQ.push(job); spankLog.queued++;
+    return true;
+  }
+  return spankBegin(job) || true;
+}
+/**
+ * The hand for `job`, from wherever the hand is now — or, when it is in
+ * reach and there is no way to it that does not go through her, the slap on
+ * its own (see `spankReach`), and whatever the hand was doing goes on.
+ */
+function spankBegin(job) {
+  // Harder the higher: `k` N·s when a probe says it (10 to 18 is the cot's
+  // range, COT_RAG.spank), otherwise a little different every time.
+  const u = job.k != null ? clamp((job.k - 10) / 8, 0, 1) : 0.25 + 0.5 * Math.random();
+  job.lift = SPANK_HAND.lift[0] + (SPANK_HAND.lift[1] - SPANK_HAND.lift[0]) * u;
+  job.u = u;
+  job.fromK = spankK;
+  spankSpot(job);
+  // Out of an arm's reach, or a long way under it: over to her, and down.
+  const Y = ground && ground.you;
+  let step = false;
+  if (Y) {
+    job.kneel = !Y.crouch && Y.y + (Y.eye || GROUND.eye) - spankP.y > SPANK_HAND.kneelIf;
+    // Straight on from her skin, the next of a flurry does not step: only if
+    // she is well out of reach of where the hand already is.
+    const far = SPANK_HAND.near + (job.fromK > 0.5 ? 0.35 : 0);
+    step = job.kneel || Math.hypot(spankP.x - Y.x, spankP.z - Y.z) > far;
+  }
+  const was = spank;
+  spank = job;
+  if (!step && !spankReach()) {
+    spankLog.blocked++;
+    job.blocked = true;
+    spankLand();
+    spank = was;
+    if (was) spankSpot(was);
+    return false;
+  }
+  spankFrom.copy(spankAt);
+  spankPh = step ? 'step' : 'up'; spankT = 0;
+  if (step) { job.fromK = 0; job.moved = true; }
+  return true;
+}
+/**
+ * Whether the hand can get to the spot from here without your arm going
+ * through her. Asked of the arm itself: posed once, out of turn, with the
+ * palm on the spot (the frame's own pose, later, replaces it), and its
+ * wrist, elbow and the elbow's end of the upper arm tried against her
+ * capsules (`beltWorld`) — all but the last `near` m round the palm, which
+ * is the hand's own business (`spankLift`). Two guesses at it came first and
+ * both were wrong: her skin facing your shoulder said no to her far cheek
+ * from beside the cot, which the arm reaches cleanly, and a straight line
+ * from your shoulder said no to both cheeks from behind her bent over the
+ * edge. What it is for: from behind her like that, the small of her back is
+ * past the rise of her bottom and the forearm went 19 mm into it
+ * (MEASURED); and from her head a flurry's crosshair slid on to the far
+ * side of her.
+ */
+function spankReach() {
+  const J = spank;
+  J.dip = SPANK_HAND.dips[0];
+  if (SPANK_HAND.guard === false) return true;
+  // The skin there faces the eye that picked it — a crosshair cannot pick
+  // what it cannot see, and a near miss (`cotAim`'s snap) on the far side of
+  // her can — and the flat of a hand fits on it (`spankLift` not at its
+  // limit): the whole hand went 117 mm into her, MEASURED, on a flurry's
+  // spot on the far side of her from her head.
+  if (_skA.subVectors(J.o, spankP).normalize().dot(spankN) < SPANK_HAND.facing) return false;
+  const lift = spankLift();
+  if (lift >= SPANK_HAND.liftMax) return false;
+  if (bodyCam || !arms || !arms.joints) return true;
+  const P = _skW.copy(spankP).addScaledVector(spankN, SPANK_HAND.off + lift);
+  spankLie(0);
+  const w = jadrija && jadrija.beltWorld ? jadrija.beltWorld() : null;
+  if (!w || !w.caps || !w.n) return true;
+  // The most the shoulder can go down first, since that is the arm that
+  // looks right (see `dip` in 60-arms.js), and less of it if that one would
+  // go through her — down through the edge of the cot, or through her legs
+  // kneeling in front of you with her bent over it.
+  for (const dip of SPANK_HAND.dips) {
+    arms.update(0, { reach: { x: P.x, y: P.y, z: P.z, k: 1, kind: 'slap', along: spankAlong, palm: spankPalm,
+      dip } }, camera);
+    const j = arms.joints();
+    if (!j) return true;
+    const g = spankArmGap(j, P, w);
+    spankLog.armGap = +g.toFixed(3);
+    if (g >= SPANK_HAND.arm.r) { J.dip = dip; return true; }
+  }
+  return false;
+}
+/** The least gap (m) between the posed arm `j` (joints) and her capsules `w`, the palm's own end left out. */
+function spankArmGap(j, P, w) {
+  const G = SPANK_HAND.arm, C = w.caps;
+  // Wrist to elbow, and the elbow's end of the upper arm.
+  const segs = [[j.wrist, j.elbow, 0, 1], [j.elbow, j.shoulder, 0, G.upper]];
+  let worst = Infinity;
+  for (const [a, b, f0, f1] of segs) {
+    for (let k = 0; k <= 8; k++) {
+      const f = f0 + (f1 - f0) * k / 8;
+      const x = a[0] + (b[0] - a[0]) * f, y = a[1] + (b[1] - a[1]) * f, z = a[2] + (b[2] - a[2]) * f;
+      if (Math.hypot(x - P.x, y - P.y, z - P.z) < G.near) continue;
+      // The round of the shoulder stands further off its joint than the arm
+      // does off its line (MEASURED: in her 16 mm with the joint 76 clear).
+      const cap = b === j.shoulder && f > 0.99 ? G.cap : 0;
+      for (let i = 0; i < w.n; i++) {
+        const o = 8 * i;
+        const ex = C[o + 3] - C[o], ey = C[o + 4] - C[o + 1], ez = C[o + 5] - C[o + 2];
+        const ee = ex * ex + ey * ey + ez * ez;
+        const t = ee > 0 ? clamp(((x - C[o]) * ex + (y - C[o + 1]) * ey + (z - C[o + 2]) * ez) / ee, 0, 1) : 0;
+        const g = Math.hypot(x - C[o] - ex * t, y - C[o + 1] - ey * t, z - C[o + 2] - ez * t)
+          - (C[o + 6] + (C[o + 7] - C[o + 6]) * t) - cap;
+        if (g < worst) worst = g;
+      }
+    }
+  }
+  return worst;
+}
+function spankPush(e) {
+  spankLog.last.push(e);
+  if (spankLog.last.length > 16) spankLog.last.shift();
+}
+
+/**
+ * Where the hand is going on her, now: the spot (`spankP`), the way out of
+ * her skin there (`spankN`, off the capsule she is drawn round), and the
+ * fingers' way along her (`al`), away from your shoulder.
+ */
+function spankSpot(J = spank) {
+  if (!J || !jadrija) return;
+  if (J.hit) {
+    // The same ray, asked again: she may have moved under it.
+    const h = jadrija.cotAim ? jadrija.cotAim(J.o, J.d) : null;
+    const g = h && !h.miss ? h : !J.had ? J.hit : null;
+    if (g) { spankP.set(g.x, g.y, g.z); if (g.n) J.n = g.n; }
+  } else {
+    const b = jadrija.butt ? jadrija.butt() : null;
+    const c = b ? b.find((q) => q.side === J.side) || b[0] : null;
+    if (c) spankP.set(c.x, c.y, c.z);
+    else if (!J.had) spankP.copy(J.o).addScaledVector(J.d, 0.9);
+  }
+  J.had = true;
+  // Out of her skin: off the capsule the crosshair's ray went into, which
+  // `cotAim` says; or, standing, off the nearest of her capsules — the ones
+  // the belt and the cuff chains lie on (`beltWorld`) — from its line to the
+  // spot. The nearest was the cot's first answer too, and lying flat her
+  // hand beside her thigh is nearer a thigh's spot than the thigh is: the
+  // palm stood up on its edge, square to the thigh's side.
+  const w = !J.n && jadrija.beltWorld ? jadrija.beltWorld() : null;
+  let best = Infinity;
+  if (J.n) { spankN.fromArray(J.n); best = 0; }
+  if (w && w.caps && w.n) {
+    const C = w.caps;
+    for (let i = 0; i < w.n; i++) {
+      const o = 8 * i;
+      const ex = C[o + 3] - C[o], ey = C[o + 4] - C[o + 1], ez = C[o + 5] - C[o + 2];
+      const ee = ex * ex + ey * ey + ez * ez;
+      const t = ee > 0 ? clamp(((spankP.x - C[o]) * ex + (spankP.y - C[o + 1]) * ey
+        + (spankP.z - C[o + 2]) * ez) / ee, 0, 1) : 0;
+      _skA.set(spankP.x - (C[o] + ex * t), spankP.y - (C[o + 1] + ey * t), spankP.z - (C[o + 2] + ez * t));
+      const d = _skA.length();
+      const g = Math.abs(d - (C[o + 6] + (C[o + 7] - C[o + 6]) * t));
+      if (g < best && d > 1e-4) { best = g; spankN.copy(_skA).multiplyScalar(1 / d); }
+    }
+  }
+  if (best > 0.06) spankN.subVectors(J.o, spankP).normalize();
+  // The fingers: from your shoulder to the spot, laid on her skin.
+  beltFrames();
+  const S = SPANK_HAND.shoulder;
+  _skB.set(_bO.x + _br.x * S[0], _bO.y + S[1], _bO.z + _br.z * S[0]);
+  _skA.subVectors(spankP, _skB);
+  _skA.addScaledVector(spankN, -_skA.dot(spankN));
+  if (_skA.lengthSq() < 1e-6) _skA.copy(_bf).addScaledVector(spankN, -_bf.dot(spankN));
+  _skA.normalize();
+  J.al = [_skA.x, _skA.y, _skA.z];
+}
+
+/**
+ * How much further off her the hand has to be (m) for the whole flat of it
+ * to lie on her and not in her: the palm is 19 cm from heel to fingertip and
+ * her skin is not flat under it. Bent over the edge of the cot the small of
+ * her back is a hollow under the rise of her bottom, and a palm laid on it
+ * by its middle went 29 mm into her with its heel (MEASURED). So the palm's
+ * underside, heel to tips and side to side (`palm`, m along the fingers and
+ * across, and how far under the bone line), is tried against her capsules,
+ * and the hand stands off by the deepest, and a little.
+ */
+function spankLift() {
+  const J = spank, w = jadrija && jadrija.beltWorld ? jadrija.beltWorld() : null;
+  if (!J || !J.al || !w || !w.caps || !w.n) return 0;
+  const C = w.caps, A = J.al, N = spankN, F = SPANK_HAND.palm;
+  // Across the hand: fingers × out of her.
+  const sx = A[1] * N.z - A[2] * N.y, sy = A[2] * N.x - A[0] * N.z, sz = A[0] * N.y - A[1] * N.x;
+  let need = 0;
+  for (const a of F.along) for (const c of F.across) {
+    const x = spankP.x + A[0] * a + sx * c + N.x * (SPANK_HAND.off - F.under);
+    const y = spankP.y + A[1] * a + sy * c + N.y * (SPANK_HAND.off - F.under);
+    const z = spankP.z + A[2] * a + sz * c + N.z * (SPANK_HAND.off - F.under);
+    for (let i = 0; i < w.n; i++) {
+      const o = 8 * i;
+      const ex = C[o + 3] - C[o], ey = C[o + 4] - C[o + 1], ez = C[o + 5] - C[o + 2];
+      const ee = ex * ex + ey * ey + ez * ez;
+      const t = ee > 0 ? clamp(((x - C[o]) * ex + (y - C[o + 1]) * ey + (z - C[o + 2]) * ez) / ee, 0, 1) : 0;
+      const g = Math.hypot(x - C[o] - ex * t, y - C[o + 1] - ey * t, z - C[o + 2] - ez * t)
+        - (C[o + 6] + (C[o + 7] - C[o + 6]) * t);
+      if (F.gap - g > need) need = F.gap - g;
+    }
+  }
+  return Math.min(need, 0.08);
+}
+
+/** The hand's lie with the wrist cocked back by `a` rad, into spankAlong / spankPalm. */
+function spankLie(a) {
+  const A = spank.al, N = spankN, c = Math.cos(a), sn = Math.sin(a);
+  const n = [N.x, N.y, N.z];
+  for (let i = 0; i < 3; i++) {
+    spankAlong[i] = A[i] * c + n[i] * sn;
+    spankPalm[i] = -n[i] * c + A[i] * sn;
+  }
+}
+
+/** Once a frame, before the arms are posed: where the hand is, and the slap when it lands. */
+function spankHandTick(dt) {
+  spankClock += dt;
+  if (spankPh === 'idle') {
+    spankK = damp(spankK, 0, 10, dt);
+    spankArm = spankArm < 0.01 ? 0 : damp(spankArm, 0, 10, dt);
+    spankElbow = spankElbow < 0.01 ? 0 : damp(spankElbow, 0, 10, dt);
+    // Up again, a while after the last one — unless you were down before it,
+    // or have stood up yourself since.
+    if (spankKnelt) {
+      spankKnelt.idle += dt;
+      const Y = ground && ground.you;
+      if (!Y || !Y.crouch || state.phase !== 'ground') spankKnelt = null;
+      else if (spankKnelt.idle > SPANK_HAND.rise) {
+        if (!spankKnelt.was) Y.crouch = false;
+        spankKnelt = null;
+      }
+    }
+    return;
+  }
+  if (spankKnelt) spankKnelt.idle = 0;
+  const H = SPANK_HAND, J = spank;
+  // Gone from where a hand could do it: whatever was coming lands now.
+  if (!J || state.phase !== 'ground') {
+    if (J && (spankPh === 'step' || spankPh === 'up' || spankPh === 'down')) spankLand();
+    while (spankQ.length) { const q = spankQ.shift(); spankLog.instant++; buttSlap(q.side, q.k, q.hit); }
+    spankPh = 'idle'; spank = null;
+    return;
+  }
+  spankT = spankStop && spankStop[0] === spankPh ? Math.min(spankT + dt, spankStop[1]) : spankT + dt;
+  spankSpot();
+  const P = _skW.copy(spankP).addScaledVector(spankN, H.off + spankLift());
+  // Over the spot, and back toward you.
+  const W = _skB.set(camera.position.x - spankP.x, 0, camera.position.z - spankP.z);
+  if (W.lengthSq() > 1e-8) W.normalize();
+  W.multiplyScalar(H.back).add(spankP).addScaledVector(spankN, J.lift);
+  // The third person's arm, about the shoulder's fore-and-aft swing (the
+  // jump's axis): up in front of her and bent at the elbow, then down to her.
+  const armUp = 1.9 + 0.3 * J.u, armAt = 0.62, elUp = 1.25;
+  // Your view kept on the spot while you step in, go down and swing — only
+  // when it was the spank that moved you, and not once the hand is on her:
+  // she moves under it then, and a view steered on to a thing that moves is
+  // THE SHAKE (see `settleTurn`).
+  if (J.moved && !bodyCam && !camOverride && (spankPh === 'step' || spankPh === 'up' || spankPh === 'down')) {
+    const Y = ground.you, O = camera.position, ch = Math.hypot(spankP.x - O.x, spankP.z - O.z);
+    let dy = Math.atan2(O.x - spankP.x, O.z - spankP.z) - Y.yaw;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    Y.yaw += dy * (1 - Math.exp(-12 * dt));
+    Y.pitch += (Math.atan2(spankP.y - O.y, Math.max(ch, 0.05)) - Y.pitch) * (1 - Math.exp(-12 * dt));
+  }
+  if (spankPh === 'step') {
+    // To `stand` off the spot, level, along the line from you to it; your
+    // view turned on to it as you go, so the crosshair stays where you put it.
+    const Y = ground.you;
+    if (J.kneel && !Y.crouch) {
+      Y.crouch = true;
+      if (!spankKnelt) spankKnelt = { was: false, idle: 0 };
+    }
+    const dx = spankP.x - Y.x, dz = spankP.z - Y.z, hd = Math.hypot(dx, dz) || 1;
+    const md = hd - H.stand;
+    let moved = 0;
+    if (md > 0.005 && ground.confine) {
+      const st = Math.min(md, H.walk * dt);
+      const [nx, nz] = ground.confine(Y.x + dx / hd * st, Y.z + dz / hd * st);
+      moved = Math.hypot(nx - Y.x, nz - Y.z);
+      Y.x = nx; Y.z = nz;
+    }
+    J.stuck = moved < 0.2 * H.walk * dt ? (J.stuck || 0) + dt : 0;
+    const there = md <= 0.02 || J.stuck > 0.12 || spankT >= H.stall;
+    const down = !J.kneel || (Y.low || 0) > H.low || spankT >= H.stall + 0.6;
+    if (there && down) {
+      J.stepped = +spankT.toFixed(3);
+      const far = Math.hypot(spankP.x - Y.x, spankP.z - Y.z) > H.reachMax;
+      if (far || !spankReach()) {
+        if (far) { J.far = true; spankLog.far++; } else { J.blocked = true; spankLog.blocked++; }
+        spankLand();
+        spankPh = 'idle'; spank = null;
+        while (spankQ.length) { const q = spankQ.shift(); spankLog.instant++; buttSlap(q.side, q.k, q.hit); }
+        return;
+      }
+      spankPh = 'up'; spankT = 0; spankFrom.copy(spankAt);
+    }
+    spankK = damp(spankK, 0, 10, dt);
+  } else if (spankPh === 'up') {
+    const u = smooth01(spankT / H.up);
+    if (J.fromK < 0.05) { spankAt.copy(W); spankK = u; } else {
+      // From her skin, up and over: straight across to the next spot went
+      // through whatever of her rose between the two.
+      spankAt.lerpVectors(spankFrom, W, u).addScaledVector(spankN, 0.08 * Math.sin(Math.PI * u));
+      spankK = J.fromK + (1 - J.fromK) * u;
+    }
+    spankLie(H.cock * u);
+    spankArm += (armUp - spankArm) * u; spankElbow += (elUp - spankElbow) * u;
+    if (spankT >= H.up) { spankPh = 'down'; spankT = 0; }
+  } else if (spankPh === 'down') {
+    const u = clamp(spankT / H.down, 0, 1), w = u * u;
+    spankAt.lerpVectors(W, P, w);
+    spankK = 1;
+    spankLie(H.cock * (1 - w));
+    spankArm = armUp + (armAt - armUp) * w; spankElbow = elUp + (0.15 - elUp) * w;
+    if (u >= 1) { spankAt.copy(P); spankLand(); spankPh = 'hold'; spankT = 0; }
+  } else if (spankPh === 'hold') {
+    // Flattened on her, a few millimetres, and back — and coming up off her
+    // already in the second half, since she comes up under it too (the seat
+    // goes into the foam and back past where it lay: COT_RAG.spank).
+    const v = clamp(spankT / H.hold, 0, 1);
+    spankAt.copy(P).addScaledVector(spankN, v < 0.5 ? -H.press * Math.sin(Math.PI * v * 2)
+      : 0.012 * smooth01((v - 0.5) * 2));
+    spankK = 1;
+    spankLie(0);
+    if (spankT >= H.hold) {
+      spankFrom.copy(spankAt);
+      while (spankQ.length) if (spankBegin(spankQ.shift())) return;
+      spankPh = 'away'; spankT = 0;
+    }
+  } else if (spankPh === 'away') {
+    const u = clamp(spankT / H.away, 0, 1);
+    // Up off her first, then in to the bottom right of the picture close to
+    // you (`exit`, the eye's frame), and only from there down out of it:
+    // straight from her skin to where the hand rests is through her and the
+    // edge of the cot, kneeling (MEASURED, 34 mm into her), and bent over
+    // the edge, through her legs in front of you (43).
+    const lifted = _skB.copy(P).addScaledVector(spankN, 0.012 + 0.15 * smooth01(u / 0.4));
+    if (u > 0.4) {
+      beltFrames();
+      const X = H.exit, v = smooth01((u - 0.4) / 0.6);
+      const ex = _bO.x + _bR.x * X[0] + _bU.x * X[1] + _bF.x * X[2];
+      const ey = _bO.y + _bR.y * X[0] + _bU.y * X[1] + _bF.y * X[2];
+      const ez = _bO.z + _bR.z * X[0] + _bU.z * X[1] + _bF.z * X[2];
+      lifted.set(lifted.x + (ex - lifted.x) * v, lifted.y + (ey - lifted.y) * v, lifted.z + (ez - lifted.z) * v);
+    }
+    spankAt.copy(lifted);
+    spankK = 1 - smooth01((u - 0.75) / 0.25);
+    spankLie(0.25 * u);
+    spankArm = armAt * (1 - u); spankElbow = 0.15 * (1 - u);
+    if (spankT >= H.away) { spankPh = 'idle'; spankK = 0; spank = null; }
+  }
+}
+/** The hand is on her: the slap — sound, mark, her hands, the weight. */
+function spankLand() {
+  const J = spank;
+  if (!J || J.landed) return;
+  J.landed = true;
+  // Where the hand actually is on her now, for the weight; the mark keeps
+  // the bind point it was aimed at.
+  const hit = J.hit ? { ...J.hit, x: spankP.x, y: spankP.y, z: spankP.z } : null;
+  const n0 = buttSlaps;
+  buttSlap(J.side, J.k, hit);
+  spankLog.landed++;
+  spankPush({ side: J.side, reg: hit ? hit.reg : 'butt', press: +J.press.toFixed(3),
+    contact: +spankClock.toFixed(3), ms: Math.round((spankClock - J.press) * 1000), step: J.stepped || 0,
+    aimed: !!J.hit,
+    far: !!J.far, blocked: !!J.blocked, dip: J.dip, gap: spankLog.armGap, sound: buttSlaps > n0, at: [+spankP.x.toFixed(3), +spankP.y.toFixed(3), +spankP.z.toFixed(3)],
+    n: [+spankN.x.toFixed(2), +spankN.y.toFixed(2), +spankN.z.toFixed(2)],
+    miss: arms && arms.probe && !bodyCam ? arms.probe()[1].missMm : null });
+}
+/** Debug: where the spank is — see `__fr.jad.spankHand`. */
+function spankStats() {
+  return { ph: spankPh, t: +spankT.toFixed(3), k: +spankK.toFixed(3), queued: spankQ.length,
+    eye: camera.position.toArray().map((v) => +v.toFixed(3)), knelt: !!spankKnelt,
+    // The third person's right hand, world, while B is on — see `spankArm`.
+    hand3: bodyCam && collarThirdHand(_skA) ? _skA.toArray().map((v) => +v.toFixed(3)) : null,
+    arm: +spankArm.toFixed(2), elbow: +spankElbow.toFixed(2),
+    at: [+spankAt.x.toFixed(3), +spankAt.y.toFixed(3), +spankAt.z.toFixed(3)],
+    spot: [+spankP.x.toFixed(3), +spankP.y.toFixed(3), +spankP.z.toFixed(3)],
+    n: [+spankN.x.toFixed(3), +spankN.y.toFixed(3), +spankN.z.toFixed(3)],
+    log: { ...spankLog, last: spankLog.last.slice() } };
+}
+
 let buttSide = 1;               // which cheek the crosshair picked, +1 her left
 let buttHit = null;             // and where on her, on the cot — see `cotAim`
 let reachForce = null;       // debug: [kind, side] instead of the crosshair
@@ -5815,7 +6357,7 @@ function clearJump() {
   if (!you || !jumpPosed) return;
   jumpPosed = false;
   jumpWas = 0; jumpPush = 0; jumpLand = 0;
-  for (const b of ['legUL', 'legUR', 'legLL', 'legLR', 'armUL', 'armUR']) {
+  for (const b of ['legUL', 'legUR', 'legLL', 'legLR', 'armUL', 'armUR', 'armLR']) {
     you.fig.aim(b, 0, 0, 1, 0);
   }
 }
@@ -6106,9 +6648,9 @@ function crouchAims(cr, hL, hR, kL, kR, aa) {
   f.aim('neck', 0, 0, 1, nz(cr.ch));
   const arm = cr.b + CROUCH_YOU.arm * w;
   f.aim('armUL', 0, 0, 1, nz(arm + aa - cr.swL));
-  f.aim('armUR', 0, 0, 1, nz(arm + aa - cr.swR));
+  f.aim('armUR', 0, 0, 1, nz(arm + aa - cr.swR + spankArm));
   f.aim('armLL', 0, 0, 1, nz(CROUCH_YOU.elbow * w));
-  f.aim('armLR', 0, 0, 1, nz(CROUCH_YOU.elbow * w));
+  f.aim('armLR', 0, 0, 1, nz(CROUCH_YOU.elbow * w + spankElbow));
   crouchPosed = true;
 }
 
@@ -6230,9 +6772,11 @@ function poseSwimBody(dt) {
       you.fig.aim('legLL', 0, 0, 1, -kn * L);
       you.fig.aim('legLR', 0, 0, 1, -kn * R);
       you.fig.aim('armUL', 0, 0, 1, aa);
-      you.fig.aim('armUR', 0, 0, 1, aa + colArm);
+      you.fig.aim('armUR', 0, 0, 1, aa + colArm + spankArm);
+      // And the spank's elbow — see `spankHandTick`. Zero is "forget it".
+      you.fig.aim('armLR', 0, 0, 1, spankElbow);
     }
-    jumpPosed = hp > 0 || kn > 0 || aa > 0;
+    jumpPosed = hp > 0 || kn > 0 || aa > 0 || spankArm > 0 || spankElbow > 0;
     // Her root is between her feet, so `at` is simply where she stands —
     // `g.y` is already the hopped height, which is why the eye is taken off it
     // directly in `ground.pose`.
@@ -9214,9 +9758,10 @@ function tick(wall, draw) {
     if (pressing && !reachWas && reachKind === 'pet' && jadrija && jadrija.askShow) {
       jadrija.askShow('pet');
     }
+    // The slap is the hand's now, and goes when it lands — see `spankStart`.
     if (pressing && !reachWas && reachKind === 'butt') {
-      if (reachForce) buttSlap(reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
-      else buttSlap(buttSide, null, buttHit);
+      if (reachForce) spankStart(reachForce[0] === 'butt' ? (reachForce[1] ? -1 : 1) : buttSide);
+      else spankStart(buttSide, null, buttHit);
     }
     reachWas = pressing;
     let cupNow0 = pressing && reachKind === 'cup' && brs ? brs[cupSide]
@@ -9844,6 +10389,7 @@ function tick(wall, draw) {
     hammockPushTick(dt);
     beltHandTick(dt);
     collarHandTick(dt);
+    spankHandTick(dt);
     arms.update(dt, chaseCut || bodyCam ? null
       // The belt — see `beltHandTick`. A fist round the buckle, the strap
       // hanging out of the bottom of it; ahead of everything, because while
@@ -9864,6 +10410,12 @@ function tick(wall, draw) {
         ? { reach: { x: colAfterAt.x, y: colAfterAt.y, z: colAfterAt.z, k: colAfterK, kind: 'pet' } }
       : state.phase === 'ground' && beltRubK > 0.01
         ? { reach: { x: beltRubAt.x, y: beltRubAt.y, z: beltRubAt.z, k: beltRubK, kind: 'pet' } }
+      // The spank — see `spankHandTick`. The flat of the hand, laid on her
+      // the way `spankLie` says; ahead of the rest, because it is over in
+      // under half a second and the press that started it ended them.
+      : state.phase === 'ground' && spankK > 0.01 && spank
+        ? { reach: { x: spankAt.x, y: spankAt.y, z: spankAt.z, k: spankK, kind: 'slap',
+          along: spankAlong, palm: spankPalm, dip: spank.dip } }
       // The throw — see `ballThrowTick`. The cupped hand, because it has a
       // ball in it; ahead of the others, because it is over in half a second.
       : state.phase === 'ground' && throwK > 0.01
@@ -11682,6 +12234,63 @@ window.__fr = {
      * null). Whether the ragdoll took it; `cotRag()` is what it did.
      */
     spank: (side = 1, k = null) => buttSlap(side, k),
+    /**
+     * Debug: the press's spank, WITH the hand (1.553.2) — aimed down the
+     * crosshair as the press aims it (`cotAim`), or at the cheek `side` when
+     * `aim` is false or it is not on her. The slap goes when the hand lands;
+     * `spankStats()` says when, and where the hand was.
+     */
+    spankHand: (side = 1, k = null, aim = true) => {
+      const h = aim && jadrija && jadrija.cotAim
+        ? jadrija.cotAim(camera.position, camera.getWorldDirection(new THREE.Vector3())) : null;
+      return h && !h.miss ? spankStart(h.side, k, h) : spankStart(side, k, null);
+    },
+    spankStats: () => spankStats(),
+    /** Debug: her two cheeks' points, and what the crosshair is on now (`cotAim`). */
+    butt: () => (jadrija && jadrija.butt ? jadrija.butt() : null),
+    cotAimNow: () => (jadrija && jadrija.cotAim
+      ? jadrija.cotAim(camera.position, camera.getWorldDirection(new THREE.Vector3())) : null),
+    /** Debug: the cot's long axis, world [x, z]. */
+    cotAxisNow: () => {
+      const w = jadrija && jadrija.beltWorld ? jadrija.beltWorld() : null;
+      return w && w.boxes ? [Math.sin(w.boxes[6]), Math.cos(w.boxes[6])] : null;
+    },
+    spankTune: (o) => Object.assign(SPANK_HAND, o || {}),
+    /** Debug: hold the gesture at `t` s into phase `ph` (null lets it go) — for stills. */
+    spankStop: (ph, t = 0) => { spankStop = ph ? [ph, +t] : null; return spankStop; },
+    /**
+     * Debug: your hand against her as drawn this frame — each of its vertices
+     * against her capsules (`beltWorld`, a hair inside her skin), the least
+     * gap (m, − inside) and how many are inside, and which bone of the hand
+     * the least is on (4 the palm, higher the fingers).
+     */
+    spankClear: () => {
+      const H = arms && arms.hand ? arms.hand(true) : null;
+      const w = jadrija && jadrija.beltWorld ? jadrija.beltWorld() : null;
+      if (!H || !w || !w.caps) return null;
+      const C = w.caps;
+      let min = Infinity, bone = -1, inside = 0, arm = Infinity, armIn = 0;
+      const per = {};
+      for (const v of H.verts) {
+        let g = Infinity;
+        for (let i = 0; i < w.n; i++) {
+          const o = 8 * i;
+          const ex = C[o + 3] - C[o], ey = C[o + 4] - C[o + 1], ez = C[o + 5] - C[o + 2];
+          const ee = ex * ex + ey * ey + ez * ez;
+          const t = ee > 0 ? clamp(((v[0] - C[o]) * ex + (v[1] - C[o + 1]) * ey + (v[2] - C[o + 2]) * ez) / ee, 0, 1) : 0;
+          const d = Math.hypot(v[0] - C[o] - ex * t, v[1] - C[o + 1] - ey * t, v[2] - C[o + 2] - ez * t)
+            - (C[o + 6] + (C[o + 7] - C[o + 6]) * t);
+          if (d < g) g = d;
+        }
+        if (per[v[3]] == null || g < per[v[3]]) per[v[3]] = g;
+        if (v[3] < 4) { if (g < arm) arm = g; if (g < 0) armIn++; continue; }
+        if (g < 0) inside++;
+        if (g < min) { min = g; bone = v[3]; }
+      }
+      for (const kk in per) per[kk] = +(per[kk] * 1000).toFixed(1);
+      return { n: H.verts.length, min: +(min * 1000).toFixed(1), inside, bone,
+        arm: +(arm * 1000).toFixed(1), armIn, per };
+    },
     /** What her voice is told the two of you are doing — see `sceneTalk`. */
     scene: () => sceneTalk(),
     cotRag: () => (jadrija && jadrija.cotRag ? jadrija.cotRag() : null),
@@ -13322,7 +13931,9 @@ window.__fr = {
     probe: () => (arms ? arms.probe() : null),
     thumbAim: (o) => (arms ? arms.thumbAim(o) : null),
     hand: () => (arms ? arms.hand() : null),
+    joints: () => (arms && arms.joints ? arms.joints() : null),
     thighAim: (o) => (arms ? arms.thighAim(o) : null),
+    slapAim: (o) => (arms && arms.slapAim ? arms.slapAim(o) : null),
   },
   kites: () => kites,
   fire: () => fire,
