@@ -8,6 +8,82 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.559.0] — 2026-10-01
+
+### The vikendica's furniture, at the resolution of the room you stand in
+
+Misha, from just inside the front door: *"can u spruce-up / increase poly
+count for the books on the bookshelf, the appliances, etc, make the furniture
+higher resolution, so it really feels like more realistic u know what i
+mean?"*
+
+Everything is where it was, on the footprint it had, at the heights the fly's
+perches and death floors were read off (desk +0.74, low table +0.44, TV
+cabinet +0.66). Shapes are off his own photographs of the flat
+(`/mnt/c/tmp/refs/vacay_house/`). All in `tools/blender/vikendica.py`.
+
+- **The bookcase** is the white one on castors from the photographs: two
+  drawers with wooden knobs over four cubbies. It used to be a beech frame
+  with two rows of identical slats. Now it holds about sixty books. Each one
+  is a U-section cover (boards and a rounded spine) around a cream page
+  block, banded up the spine with gilt rules, title panels or the two-tone of
+  a series. They come at three sizes (paperback, trade, cloth), pushed in to
+  different depths. Rows end with one book leaning on the last, there are two
+  piles lying flat spines-out, a bookend, a scallop shell and a pot of
+  pencils. On top sit two magazines with a straw hat put down on them, and a
+  succulent.
+- **The cooker** is the white one in the photographs. On the left, two gas
+  rings with aluminium crowns and black caps sit under a cast-iron grate. On
+  the right are two hotplates in chrome rings, each with the red dot. The
+  enamel lid stands up at the back. Along the fascia are five cream knobs,
+  pointing different ways. The oven door has a smoked window and a chrome bar
+  on posts, with the pan drawer below. A striped tea towel hangs through the
+  handle and a džezva sits on the front plate.
+- **The kitchen run.** The base fronts are separate boards (a three-drawer
+  stack and three doors) hung 3 mm apart on a darker carcass, each with a bar
+  pull. The wall cupboards get three doors and vertical pulls. The tap is now
+  a swan-neck mixer. On the worktop are a steel kettle and a little red
+  transistor radio.
+- **The fridge** gets a grey gasket round both doors. Its magnets are
+  souvenirs now, each a picture on a backing, some of them round: 26 down the
+  white flank that faces the room, where they are in the photographs, and 8
+  on the doors.
+- **Soft things** are stuffed shapes (superellipsoids, smooth-shaded)
+  instead of bevelled boxes:
+  - The sofa: rolled tapestry arms with wood facings, two red seat cushions,
+    a red back, and the throw coming down the front in folds. The three
+    cushions along the back are one of each colour.
+  - The armchair: a chrome tube sled frame with the arm on it, a floral base
+    and a red throw over the seat and the back.
+  - The beds: a mattress, pillows propped on the headboard, and a duvet
+    swept over the mattress that hangs down both sides in folds, with a
+    turned-down edge. The frames have legs, rails and a raised headboard
+    panel.
+- **Wood and plastic:**
+  - The kitchen chairs: turned, splayed legs, stretchers, three spindles and
+    a bent top rail.
+  - The pine table: a rounded edge, an apron and tapered legs.
+  - The low table: three splayed tapered legs, with a mug of coffee where
+    the little white box was.
+  - The monoblocs (indoors and on the terrace): a dished seat, splayed legs,
+    four curved slats and moulded arms.
+  - The desk: a garden table with a deep rim and four splayed legs.
+- **The bedrooms.** The wardrobes have a plinth, a cornice, panelled doors
+  and brass bar pulls. The bedside tables have a top that oversails, a drawer
+  with a knob, and a lamp with a blue ceramic foot and a linen shade.
+  Downstairs gets the same pieces.
+- **Life on the table:** a blue bowl of oranges, lemons and figs, and a white
+  jug of rosemary and smilje. The teal rug has a border and a knotted fringe.
+- **Gone:** a white chest of drawers at x −0.80…−0.12 that the fridge had
+  been moved onto. All but 14 cm of it stood inside the fridge case.
+
+Shell 219,854 → 284,018 tris (+64k), 424.8 → 543.2 KB packed (+118 KB); loft
+19,744 → 29,316 tris, 41.6 → 54.2 KB (the mezzanine's two beds). Page
++175 KB. The rebake is byte-stable. New randomness comes from its own
+generator. The house generator makes the same number of draws through the
+yard and the bedrooms, so nothing outside the furniture moves, apart from
+the loft deck's plank tones. Blockers 820, people 100, no console errors.
+
 ## [1.558.1] — 2026-10-01
 
 ### To the playground the short way, at a jog, and a body that knows it is moving

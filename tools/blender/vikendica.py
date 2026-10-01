@@ -42,11 +42,12 @@ from pathlib import Path
 
 import bmesh  # type: ignore
 import bpy  # type: ignore
+from mathutils import Matrix, Vector  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from frmesh import (  # noqa: E402
     TAU, _ring_pts, bevel, bm_ball, bm_box, bm_cylinder, bm_hip_roof, bm_loft,
-    bm_prism, export_p, new_object, reset_scene,
+    bm_prism, bm_ring, export_p, new_object, reset_scene,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1272,28 +1273,16 @@ def soba_dolje(kit):
     x0, x1, y0, y1 = P_ROOMS["soba3d"]
     bed(kit, x1 - 0.82, y1 - 1.06, yaw=-math.pi / 2, w=1.44, l=2.00,
         floor=P_FL)
-    kit.span(WALNUT, x1 - 1.99, x1 - 1.59, y1 - 0.46, y1 - 0.06, P_FL,
-             P_FL + 0.54, bev=0.006)
-    bm_cylinder(kit.bm((0.86, 0.84, 0.78), 0.006), x1 - 1.79, y1 - 0.26,
-                P_FL + 0.54, P_FL + 0.76, 0.09, 0.12, seg=14)
+    bedside(kit, x1 - 1.79, y1 - 0.26, P_FL, h=0.54)
     # The wardrobe stands on the spine *south* of the door, not across it.
-    kit.span(WALNUT, x0 + 0.04, x0 + 0.62, y0 + 0.10, y0 + 1.24, P_FL,
-             P_FL + 2.00, bev=0.008)
-    for c in (y0 + 0.44, y0 + 0.86):
-        kit.span(BEECH, x0 + 0.62, x0 + 0.66, c, c + 0.026, P_FL + 1.02,
-                 P_FL + 1.16, bev=0.004)
+    wardrobe(kit, x0 + 0.04, x0 + 0.62, y0 + 0.10, y0 + 1.24, P_FL, 2.00, "+x")
 
     x0, x1, y0, y1 = P_ROOMS["soba4d"]
     bed(kit, x1 - 1.20, y1 - 1.05, yaw=-math.pi / 2, w=1.40, l=1.98,
         floor=P_FL)
-    kit.span(WALNUT, x0 + 0.72, x0 + 1.12, y1 - 0.46, y1 - 0.06, P_FL,
-             P_FL + 0.54, bev=0.006)
+    bedside(kit, x0 + 0.92, y1 - 0.26, P_FL, h=0.54)
     # Clear of PD_S4, which takes the southern 85 cm of this wall.
-    kit.span(WALNUT, x0 + 0.04, x0 + 0.60, y0 + 0.98, y1 - 0.08, P_FL,
-             P_FL + 2.00, bev=0.008)
-    for c in (y0 + 1.36, y0 + 1.76):
-        kit.span(BEECH, x0 + 0.60, x0 + 0.64, c, c + 0.026, P_FL + 1.02,
-                 P_FL + 1.16, bev=0.004)
+    wardrobe(kit, x0 + 0.04, x0 + 0.60, y0 + 0.98, y1 - 0.08, P_FL, 2.00, "+x")
     kit.span(LINEN, x1 - 0.90, x1 - 0.50, y0 + 0.24, y0 + 0.62, P_FL + 0.44,
              P_FL + 0.58, bev=0.02)
 
@@ -2690,8 +2679,10 @@ def kitchen(kit):
     top = F2 + 0.90
     run0, run1 = x0 + 0.02, x0 + 2.30
 
-    kit.span(KITCH_LO, run0, run1, y1 - 0.60, y1 - 0.02, F2 + 0.10, top - 0.04,
-             bev=0.004)
+    # The carcass, a shade darker than the fronts hung on it, so the 3 mm
+    # between two doors is a line and not nothing.
+    kit.span(tuple(v * 0.62 for v in KITCH_LO), run0, run1, y1 - 0.60,
+             y1 - 0.02, F2 + 0.10, top - 0.04, bev=0.004)
     kit.span(PLINTH, run0, run1, y1 - 0.56, y1 - 0.06, F2, F2 + 0.10, bev=0.004)
     # The worktop, with the sink cut out of it.
     #
@@ -2710,12 +2701,7 @@ def kitchen(kit):
                            (bx0, bx1, y1 - 0.63, by0),
                            (bx0, bx1, by1, y1)):
         kit.span(WORKTOP, a0, a1, b0, b1, top - 0.04, top, bev=0.006)
-    for i in range(4):
-        d = run0 + 0.10 + i * ((run1 - run0 - 0.20) / 4)
-        kit.span(tuple(v * 0.92 for v in KITCH_LO), d, d + 0.006,
-                 y1 - 0.605, y1 - 0.03, F2 + 0.12, top - 0.06, bev=0.001)
-        kit.span(CHROME, d + 0.14, d + 0.30, y1 - 0.615, y1 - 0.60,
-                 top - 0.16, top - 0.14, bev=0.002)
+    _base_fronts(kit, run0, run1 - 0.66, y1, top)
     # The splashback, and its east end is set out off the wall and not off the
     # cabinets, which is the whole of the fix.
     #
@@ -2743,16 +2729,16 @@ def kitchen(kit):
                top, top + 0.62,
                face=-1, size=0.155, colour=TILE_WALL, accent=None, accent_p=0)
     cab0, cab1 = run0 + 0.62, run1 + 0.02
-    kit.span(KITCH_UP, cab0, cab1, y1 - 0.34, y1 - 0.02,
-             F2 + 1.52, F2 + 2.24, bev=0.005)
-    for i in range(1, 3):
-        d = cab0 + i * ((cab1 - cab0) / 3)
-        kit.span(tuple(v * 0.9 for v in KITCH_UP), d, d + 0.006,
-                 y1 - 0.345, y1 - 0.03, F2 + 1.54, F2 + 2.22, bev=0.001)
+    kit.span(tuple(v * 0.62 for v in KITCH_UP), cab0, cab1, y1 - 0.32,
+             y1 - 0.02, F2 + 1.52, F2 + 2.24, bev=0.005)
+    dw = (cab1 - cab0) / 3
     for i in range(3):
-        c = cab0 + 0.10 + i * ((cab1 - cab0) / 3)
-        kit.span(CHROME, c, c + 0.012, y1 - 0.36, y1 - 0.345,
-                 F2 + 1.62, F2 + 1.86, bev=0.002)
+        a0, a1 = cab0 + i * dw + 0.0015, cab0 + (i + 1) * dw - 0.0015
+        kit.span(KITCH_UP, a0, a1, y1 - 0.340, y1 - 0.320, F2 + 1.522,
+                 F2 + 2.238, bev=0.004)
+        hx = a1 - 0.04 if i == 0 else a0 + 0.04
+        _bar_handle(kit, (hx, y1 - 0.340, F2 + 1.57), (hx, y1 - 0.340, F2 + 1.71),
+                    (0.0, -1.0, 0.0), off=0.026)
     kit.span(WHITEGOODS, cab0, cab1, y1 - 0.36, y1 - 0.02,
              F2 + 2.24, F2 + 2.36, bev=0.006)
     for i in range(3):
@@ -2778,30 +2764,13 @@ def kitchen(kit):
     # worktop — a mixer standing on the lip with its spout pointing back at the
     # wall. Nothing plumbs that way and nothing looks like it: a tap comes out
     # of the splashback, because that is where the wall the pipes are in is.
-    kit.span(CHROME, sx + 0.22, sx + 0.28, y1 - 0.10, y1 - 0.06,
-             top, top + 0.26, bev=0.004)
-    kit.span(CHROME, sx + 0.22, sx + 0.28, y1 - 0.34, y1 - 0.08,
-             top + 0.22, top + 0.26, bev=0.004)
+    _mixer(kit, sx + 0.25, y1 - 0.075, top)
+    # What lives on the worktop: the kettle by the sink and the little radio
+    # at the window end.
+    electric_kettle(kit, bx0 - 0.12, y1 - 0.30, top)
+    radio(kit, run0 + 0.15, y1 - 0.20, top)
 
-    cx = run1 - 0.66
-    kit.span(WHITEGOODS, cx, cx + 0.60, y1 - 0.62, y1 - 0.02, F2, top, bev=0.006)
-    kit.span((0.80, 0.80, 0.79), cx + 0.01, cx + 0.59, y1 - 0.60, y1 - 0.04,
-             top, top + 0.012, bev=0.003)
-    for i in range(2):
-        for j in range(2):
-            bm_cylinder(kit.bm(DARKMETAL, 0.003),
-                        cx + 0.17 + i * 0.26, y1 - 0.46 + j * 0.26,
-                        top + 0.010, top + 0.022, 0.085, 0.085, seg=14)
-    kit.span(BLACK, cx + 0.05, cx + 0.55, y1 - 0.64, y1 - 0.625,
-             F2 + 0.30, F2 + 0.62, bev=0.004)
-    kit.span(CHROME, cx + 0.03, cx + 0.57, y1 - 0.70, y1 - 0.655,
-             F2 + 0.68, F2 + 0.72, bev=0.004)
-    kit.span(WHITEGOODS, cx, cx + 0.60, y1 - 0.70, y1 - 0.62,
-             F2 + 0.74, top, bev=0.006)
-    for i in range(4):
-        bm_cylinder(kit.bm((0.85, 0.85, 0.84), 0.002),
-                    cx + 0.10 + i * 0.13, y1 - 0.71, F2 + 0.80, F2 + 0.86,
-                    0.022, 0.022, seg=10)
+    _cooker(kit, run1 - 0.66, y1, top)
 
     # The fridge goes on the south wall on the far side of the terrace window
     # from the kitchen, with the television stand between it and the terrace
@@ -2812,6 +2781,178 @@ def kitchen(kit):
     _fridge(kit, -0.88, IY0 + 0.02, F2)
 
     ceiling_light(kit, (x0 + x1) / 2, y1 - 1.00)
+
+
+def _base_fronts(kit, x0, x1, y1, top):
+    """The fronts on the base run, from the window end to the cooker: a stack
+    of three drawers, the pair of doors under the sink, and one more door.
+
+    It was one slate slab with three 6 mm lines drawn on it. A kitchen front is
+    a board hung 3 mm off the next one on a darker carcass, with a pull on it,
+    and the dark line round every board is what the eye reads as "cupboards"."""
+    n = 4
+    w = (x1 - x0) / n
+    yf0, yf1 = y1 - 0.620, y1 - 0.600
+    zb, zt = F2 + 0.105, top - 0.045
+    out = (0.0, -1.0, 0.0)
+    for i in range(n):
+        a0, a1 = x0 + i * w + 0.0015, x0 + (i + 1) * w - 0.0015
+        cuts = [zb, zb + 0.255, zb + 0.500, zt] if i == 0 else [zb, zt]
+        for k in range(len(cuts) - 1):
+            z0 = cuts[k] + (0.0015 if k else 0.0)
+            z1 = cuts[k + 1] - (0.0015 if k < len(cuts) - 2 else 0.0)
+            kit.span(KITCH_LO, a0, a1, yf0, yf1, z0, z1, bev=0.004)
+            m, hz = (a0 + a1) / 2, z1 - 0.05
+            _bar_handle(kit, (m - 0.064, yf0, hz), (m + 0.064, yf0, hz), out,
+                        off=0.026)
+
+
+def _mixer(kit, x, y, z):
+    """A single-lever mixer: a turned body off the worktop at the back, a
+    swan neck over the bowl, and the lever."""
+    bm = bmesh.new()
+    _lathe(bm, [(0.0, 0.028), (0.008, 0.028), (0.014, 0.022), (0.120, 0.020),
+                (0.126, 0.017), (0.130, 0.0004)], seg=18, at=(x, y, z))
+    pts = [(x, y, z + 0.10)]
+    for i in range(9):
+        a = math.pi * i / 8
+        pts.append((x, y - 0.09 + 0.09 * math.cos(a), z + 0.24 + 0.09 * math.sin(a)))
+    pts.append((x, y - 0.18, z + 0.20))
+    pts[1] = (x, y, z + 0.24)
+    _tube(bm, pts, 0.011, seg=12)
+    _tube(bm, [(x, y, z + 0.128), (x, y + 0.012, z + 0.150),
+               (x, y + 0.075, z + 0.165)], 0.0065, seg=8)
+    _emit(kit, bm, CHROME, "mixer")
+
+
+def _cooker(kit, cx, y1, top):
+    """The free-standing white cooker, as photographed: two gas rings under a
+    cast-iron grate on the left, two electric plates on the right, five
+    cream knobs along the fascia, an oven door with a window and a chrome
+    bar, a pan drawer under it, the enamel lid standing up at the back — and
+    the striped tea towel through the handle.
+
+    Footprint and top as before: cx .. cx + 0.60, the back against the tiles
+    at y1, the top at +0.90. The front faces −Y."""
+    W = 0.60
+    yb, yf = y1 - 0.02, y1 - 0.60
+    kit.span(DARKMETAL, cx + 0.03, cx + W - 0.03, yf + 0.03, yb - 0.03, F2,
+             F2 + 0.022, bev=0.002)
+    kit.span(WHITEGOODS, cx, cx + W, yf, yb, F2 + 0.020, top - 0.030,
+             bev=0.008)
+    kit.span((0.935, 0.930, 0.915), cx - 0.002, cx + W + 0.002, yf - 0.010,
+             yb, top - 0.030, top, bev=0.006)
+    # The lid, up.
+    kit.span(WHITEGOODS, cx + 0.006, cx + W - 0.006, yb - 0.016, yb + 0.002,
+             top, top + 0.46, bev=0.006)
+    for hx in (cx + 0.08, cx + W - 0.08):
+        kit.span(CHROME, hx - 0.02, hx + 0.02, yb - 0.026, yb - 0.010, top,
+                 top + 0.020, bev=0.003)
+    zt = top
+    rings = [(cx + 0.155, yf + 0.150), (cx + 0.155, yb - 0.175)]
+    plates = [(cx + 0.445, yf + 0.150), (cx + 0.445, yb - 0.175)]
+    # Gas: an aluminium crown and a black enamel cap on each.
+    bm_al, bm_cap = bmesh.new(), bmesh.new()
+    for i, (x, y) in enumerate(rings):
+        r = 0.048 if i == 0 else 0.038
+        _lathe(bm_al, [(0.0, 0.0004), (0.0, r + 0.012), (0.004, r + 0.012),
+                       (0.010, r), (0.020, r - 0.004), (0.020, 0.0004)],
+               seg=20, at=(x, y, zt))
+        _lathe(bm_cap, [(0.020, 0.0004), (0.020, r - 0.006), (0.026, r - 0.008),
+                        (0.030, r - 0.020), (0.031, 0.0004)], seg=20,
+               at=(x, y, zt))
+    _emit(kit, bm_al, (0.640, 0.640, 0.650), "burner")
+    _emit(kit, bm_cap, BLACK, "burner_cap")
+    # One grate over both, on little feet.
+    IRON = (0.075, 0.075, 0.080)
+    gx0, gx1 = cx + 0.025, cx + 0.290
+    gy0, gy1 = yf + 0.015, yb - 0.035
+    gz = zt + 0.030
+    for a0, a1, b0, b1 in ((gx0, gx1, gy0, gy0 + 0.010),
+                           (gx0, gx1, gy1 - 0.010, gy1),
+                           (gx0, gx0 + 0.010, gy0, gy1),
+                           (gx1 - 0.010, gx1, gy0, gy1),
+                           (gx0, gx1, (gy0 + gy1) / 2 - 0.005,
+                            (gy0 + gy1) / 2 + 0.005)):
+        kit.span(IRON, a0, a1, b0, b1, gz, gz + 0.010, bev=0.002)
+    for x, y in rings:
+        for ang in (0.0, math.pi / 2, math.pi, 3 * math.pi / 2):
+            c, s = math.cos(ang), math.sin(ang)
+            vs = bm_box(kit.bm(IRON, 0.002), 0.0, 0.0, 0.0, 0.070, 0.008,
+                        0.012)
+            _xf(vs, _M((x + c * 0.085, y + s * 0.085, gz + 0.004), yaw=ang))
+    for x in (gx0 + 0.005, gx1 - 0.005):
+        for y in (gy0 + 0.005, gy1 - 0.005):
+            kit.span(IRON, x - 0.006, x + 0.006, y - 0.006, y + 0.006, zt,
+                     gz, bev=0.001)
+    # Electric: a black plate in a chrome ring, the red dot in the middle.
+    for i, (x, y) in enumerate(plates):
+        r = 0.090 if i == 0 else 0.075
+        bm = bmesh.new()
+        _lathe(bm, [(0.0, 0.0004), (0.0, r), (0.010, r), (0.014, r - 0.006),
+                    (0.015, 0.0004)], seg=28, at=(x, y, zt))
+        _emit(kit, bm, (0.090, 0.090, 0.095), "hotplate")
+        bm = bmesh.new()
+        bm_ring(bm, x, y, zt + 0.004, r - 0.001, r + 0.010, 0.008, seg=28,
+                plane="xy")
+        _emit(kit, bm, CHROME, "hotplate_ring", smooth=False)
+        bm_cylinder(kit.bm((0.70, 0.12, 0.10), 0.0), x, y, zt + 0.014,
+                    zt + 0.0165, 0.012, 0.012, seg=12)
+    # The fascia and five knobs on it.
+    kit.span((0.920, 0.915, 0.900), cx + 0.004, cx + W - 0.004, yf - 0.012,
+             yf, top - 0.118, top - 0.032, bev=0.004)
+    for i in range(5):
+        kx = cx + 0.075 + i * 0.105
+        M = _M((kx, yf - 0.012, top - 0.075), rx=math.pi / 2)
+        bm = bmesh.new()
+        vs = _lathe(bm, [(0.0, 0.022), (0.005, 0.022), (0.007, 0.017),
+                         (0.024, 0.016), (0.026, 0.0004)], seg=16)
+        _xf(vs, M)
+        _emit(kit, bm, KNOB_C, "cooker_knob")
+        ang = FRNG.choice([0.0, 0.0, 0.0, 0.8, -0.6])
+        vs = bm_box(kit.bm((0.20, 0.20, 0.22), 0.0), 0.0, 0.008, 0.0255,
+                    0.0035, 0.016, 0.002)
+        _xf(vs, M @ Matrix.Rotation(ang, 4, "Z"))
+    kit.span((0.95, 0.55, 0.12), cx + W - 0.030, cx + W - 0.020, yf - 0.0135,
+             yf - 0.011, top - 0.080, top - 0.070, bev=0.0)
+    # The oven door: a white frame, a smoked window with a darker border, and
+    # a chrome bar standing off it on two posts.
+    zd0, zd1 = F2 + 0.175, top - 0.126
+    kit.span(WHITEGOODS, cx + 0.012, cx + W - 0.012, yf - 0.026, yf, zd0, zd1,
+             bev=0.008)
+    kit.span((0.24, 0.24, 0.25), cx + 0.075, cx + W - 0.075, yf - 0.0285,
+             yf - 0.025, zd0 + 0.105, zd1 - 0.105, bev=0.003)
+    kit.span((0.075, 0.080, 0.090), cx + 0.090, cx + W - 0.090, yf - 0.0305,
+             yf - 0.0275, zd0 + 0.120, zd1 - 0.120, bev=0.003)
+    hz = zd1 - 0.045
+    _bar_handle(kit, (cx + 0.07, yf - 0.026, hz), (cx + W - 0.07, yf - 0.026, hz),
+                (0.0, -1.0, 0.0), r=0.0095, off=0.040)
+    # The pan drawer.
+    kit.span(WHITEGOODS, cx + 0.012, cx + W - 0.012, yf - 0.020, yf,
+             F2 + 0.028, F2 + 0.160, bev=0.006)
+    kit.span((0.30, 0.30, 0.32), cx + 0.21, cx + W - 0.21, yf - 0.0215,
+             yf - 0.019, F2 + 0.130, F2 + 0.142, bev=0.0)
+    # The tea towel over the bar: a fold round it and two hanging leaves, in
+    # stripes across, cream and red and blue.
+    tx0, tx1 = cx + 0.17, cx + 0.37
+    hy = yf - 0.066
+    bands = [(0.00, 0.30, (0.88, 0.85, 0.78)), (0.30, 0.42, (0.68, 0.14, 0.12)),
+             (0.42, 0.58, (0.88, 0.85, 0.78)), (0.58, 0.70, (0.20, 0.30, 0.56)),
+             (0.70, 1.00, (0.88, 0.85, 0.78))]
+    for f0, f1, col in bands:
+        a0, a1 = tx0 + (tx1 - tx0) * f0, tx0 + (tx1 - tx0) * f1
+        bm = bmesh.new()
+        vs = bm_cylinder(bm, 0, 0, a0, a1, 0.017, 0.017, seg=10)
+        for v in vs:
+            v.co = Vector((v.co.z, hy + v.co.y, hz + v.co.x * 0.9))
+        for yy, drop in ((hy - 0.0155, 0.27), (hy + 0.0155, 0.22)):
+            def hang(u, v, a0=a0, a1=a1, yy=yy, drop=drop):
+                x = a0 + (a1 - a0) * u
+                return (x, yy - 0.004 * math.sin(u * 9.0 + v * 2.0) * v,
+                        hz - drop * v)
+            _sheet(bm, hang, 3, 4, (0.0, 0.0035 if yy > hy else -0.0035, 0.0))
+        _emit(kit, bm, col, "towel")
+    dzezva(kit, plates[0][0], plates[0][1], zt + 0.016)
 
 
 # The two door heights, as fractions of the case: a top-freezer is roughly two
@@ -2929,6 +3070,15 @@ def _fridge(kit, fx, fy, floor):
         # half-width into height.
         _rot_x([v for row in grid for v in row], cx, 0.0, (z0 + z1) / 2)
 
+        # The gasket: the grey rubber lip that shows all round a fridge door
+        # where it meets the case, and the reason the door reads as a door and
+        # not as a red panel stuck on a white box.
+        grid = _rr_loft(kit.bm((0.30, 0.30, 0.31), 0.0), [
+            (back + 0.001, hw - 0.001, hh - 0.001, R - 0.001, 0, 0),
+            (back + 0.0075, hw - 0.001, hh - 0.001, R - 0.001, 0, 0),
+        ])
+        _rot_x([v for row in grid for v in row], cx, 0.0, (z0 + z1) / 2)
+
         # Hinge caps on the −x edge, top and bottom of each leaf.
         for zz in (z0 + 0.035, z1 - 0.035):
             kit.span((0.80, 0.80, 0.79), fx + 0.012, fx + 0.052,
@@ -2952,18 +3102,49 @@ def _fridge(kit, fx, fy, floor):
              floor + FR_DOORS[1][1] - 0.105, floor + FR_DOORS[1][1] - 0.079,
              bev=0.002)
 
-    # And the magnets, on the crowned face rather than floating off the old
-    # flat one. Kept inside the roll-over, because a magnet on a radius is a
-    # magnet lying in mid-air.
-    for _ in range(20):
-        mx = fx + RNG.uniform(0.075, 0.46)
-        mz = floor + RNG.uniform(0.58, 1.76)
-        if floor + FR_DOORS[0][1] - 0.06 < mz < floor + FR_DOORS[1][0] + 0.02:
-            mz += 0.10
-        c = RNG.choice([(0.9, 0.85, 0.3), (0.2, 0.4, 0.8), (0.9, 0.9, 0.88),
-                        (0.15, 0.55, 0.35), (0.85, 0.5, 0.2)])
-        kit.span(c, mx, mx + RNG.uniform(0.035, 0.062), front, front + 0.009,
-                 mz, mz + RNG.uniform(0.035, 0.058), bev=0.002)
+    # And the magnets. Most of them are down the side that faces the room —
+    # in the photographs the white flank is where the souvenirs went, Seoul
+    # and the coral and the lighthouse, and the red door has a few. Each is a
+    # picture on a backing: a border colour and a face set into it, some of
+    # them round, standing a few millimetres proud.
+    #
+    # The side is the +x flank, x = fx + W, flat between its two 26 mm radii.
+    MAG = [(0.92, 0.88, 0.80), (0.20, 0.42, 0.78), (0.86, 0.22, 0.18),
+           (0.95, 0.80, 0.25), (0.18, 0.55, 0.40), (0.30, 0.20, 0.45),
+           (0.10, 0.12, 0.14), (0.85, 0.50, 0.20), (0.55, 0.78, 0.90)]
+    xs = fx + W
+    placed = []
+    for _ in range(26):
+        for _try in range(20):
+            mw, mh = FRNG.uniform(0.045, 0.085), FRNG.uniform(0.040, 0.070)
+            my = FRNG.uniform(fy + 0.04, fy + D - 0.04 - mw)
+            mz = floor + FRNG.uniform(0.70, 1.72)
+            if all(my + mw < py or my > py + pw or mz + mh < pz or mz > pz + ph
+                   for py, pz, pw, ph in placed):
+                break
+        placed.append((my, mz, mw, mh))
+        rim, face = FRNG.sample(MAG, 2)
+        if FRNG.random() < 0.25:
+            r = min(mw, mh) / 2
+            vs = bm_cylinder(kit.bm(rim, 0.001), 0, 0, 0.0, 0.004, r, r, seg=16)
+            vs += bm_cylinder(kit.bm(face, 0.0), 0, 0, 0.004, 0.006, r * 0.78,
+                              r * 0.78, seg=16)
+            _xf(vs, _M((xs, my + r, mz + r), ry=math.pi / 2))
+        else:
+            kit.span(rim, xs, xs + 0.004, my, my + mw, mz, mz + mh, bev=0.001)
+            kit.span(face, xs + 0.004, xs + 0.0055, my + 0.005, my + mw - 0.005,
+                     mz + 0.005, mz + mh - 0.005, bev=0.0)
+    for _ in range(8):
+        mx = fx + FRNG.uniform(0.075, 0.44)
+        mz = floor + FRNG.uniform(0.60, 1.74)
+        if floor + FR_DOORS[0][1] - 0.07 < mz < floor + FR_DOORS[1][0] + 0.03:
+            mz += 0.12
+        mw, mh = FRNG.uniform(0.04, 0.07), FRNG.uniform(0.035, 0.06)
+        rim, face = FRNG.sample(MAG, 2)
+        kit.span(rim, mx, mx + mw, front - 0.001, front + 0.004, mz, mz + mh,
+                 bev=0.001)
+        kit.span(face, mx + 0.005, mx + mw - 0.005, front + 0.004,
+                 front + 0.0055, mz + 0.005, mz + mh - 0.005, bev=0.0)
 
 
 def _oval_band(bm, z0, z1, out, inn, seg=24, power=2.6):
@@ -4016,16 +4197,14 @@ def living(kit):
     # in front of them and not between them.
     low_chair(kit, 0.86, -1.05, yaw=-math.pi / 2)
     round_table(kit, 0.55, -2.00, F2, r=0.32, h=0.44)
-    kit.span((0.85, 0.85, 0.84), 0.50, 0.60, -2.04, -1.96, F2 + 0.44,
-             F2 + 0.52, bev=0.006)
+    # The mug on it, where the little white box was.
+    _mug(kit, 0.53, -2.00, F2 + 0.44)
 
     # The dining table in the south-west corner, under the terrace window.
     tx, ty = -2.70, -2.90
-    kit.span(BEECH, tx - 0.55, tx + 0.55, ty - 0.40, ty + 0.40,
-             F2 + 0.72, F2 + 0.76, bev=0.006)
-    for dx, dy in ((-0.48, -0.33), (-0.48, 0.28), (0.43, -0.33), (0.43, 0.28)):
-        kit.span(BEECH, tx + dx, tx + dx + 0.05, ty + dy, ty + dy + 0.05,
-                 F2, F2 + 0.72, bev=0.004)
+    dining_table(kit, tx, ty, F2)
+    fruit_bowl(kit, tx + 0.22, ty + 0.06, F2 + 0.76)
+    herb_jug(kit, tx - 0.36, ty + 0.20, F2 + 0.76)
     # On the room side of the table looking back at it, not tucked into
     # the kitchen aisle with the cooker at its elbow.
     wooden_chair(kit, tx + 0.98, ty, F2, yaw=math.pi)
@@ -4033,19 +4212,22 @@ def living(kit):
              F2 + 0.76, F2 + 0.79, bev=0.004)
 
     # The white plastic garden table that lives indoors and is the desk.
-    kit.span(PLASTIC_W, 0.90, 1.80, -3.30, -2.40, F2 + 0.70, F2 + 0.74,
-             bev=0.008)
-    for dx, dy in ((0.95, -3.25), (0.95, -2.51), (1.69, -3.25), (1.69, -2.51)):
-        kit.span(PLASTIC_W, dx, dx + 0.055, dy, dy + 0.055, F2, F2 + 0.70,
-                 bev=0.005)
+    garden_table(kit, 1.35, -2.85, F2)
     plastic_chair(kit, LAP_SEAT[0], LAP_SEAT[1], F2, yaw=-math.pi / 2 + 0.15)
     laptop(kit, LAP_X, LAP_Y, F2 + 0.74)
 
     # TV on a low cabinet against the south wall, in the gap between the
     # terrace window and the terrace doors. On the east wall — where it was —
     # it stood squarely across the front door.
-    kit.span(WHITEGOODS, -0.16, 0.50, y0 + 0.02, y0 + 0.44, F2, F2 + 0.66,
-             bev=0.006)
+    kit.span(WHITEGOODS, -0.16, 0.50, y0 + 0.02, y0 + 0.44, F2 + 0.05,
+             F2 + 0.66, bev=0.006)
+    kit.span(tuple(v * 0.55 for v in WHITEGOODS), -0.14, 0.48, y0 + 0.04,
+             y0 + 0.42, F2, F2 + 0.05, bev=0.002)
+    for a0, a1 in ((-0.155, 0.168), (0.172, 0.495)):
+        kit.span((0.93, 0.925, 0.91), a0, a1, y0 + 0.44, y0 + 0.456,
+                 F2 + 0.062, F2 + 0.645, bev=0.004)
+        _knob_out(kit, CHROME, a1 - 0.04 if a0 < 0 else a0 + 0.04,
+                  y0 + 0.456, F2 + 0.52, out_y=1, r=0.011, l=0.020)
     kit.span(BLACK, 0.10, 0.24, y0 + 0.16, y0 + 0.22, F2 + 0.66, F2 + 0.72,
              bev=0.004)
     kit.span(BLACK, -0.12, 0.46, y0 + 0.17, y0 + 0.21, F2 + 0.72, F2 + 1.19,
@@ -4054,12 +4236,11 @@ def living(kit):
              F2 + 0.74, F2 + 1.17, bev=0.002)
 
     bookshelf(kit, 2.10, BY0 - 0.16, F2)
-    kit.span(WHITEGOODS, -0.80, -0.12, y0 + 0.02, y0 + 0.44, F2, F2 + 0.84,
-             bev=0.006)
-    for j in range(3):
-        kit.span((0.86, 0.86, 0.85), -0.77, -0.15, y0 + 0.44, y0 + 0.455,
-                 F2 + 0.06 + j * 0.25, F2 + 0.26 + j * 0.25, bev=0.006)
-    kit.span(TEAL, 1.60, 2.60, -0.30, 0.50, F2 + 0.010, F2 + 0.022, bev=0.004)
+    # There was a white chest of drawers here at x −0.80 to −0.12, and the
+    # fridge was moved on to it: all but 14 cm of it stood inside the case,
+    # drawer fronts and all, and the 14 cm read as part of the television
+    # cabinet. It is gone; the gap between the two is wall.
+    rug(kit, 1.60, 2.60, -0.30, 0.50, F2)
     pictures(kit)
     ceiling_light(kit, 1.35, -0.55)
     ceiling_light(kit, -1.70, -2.50)
@@ -4070,19 +4251,9 @@ def bedroom_east(kit):
     and the wardrobe along the spine, exactly as drawn."""
     x0, x1, y0, y1 = ROOMS["soba3"]
     bed(kit, (x0 + x1) / 2 - 0.16, y1 - 1.16, yaw=math.pi / 2, w=1.42, l=2.00)
-    kit.span(WALNUT, x0 + 0.06, x0 + 0.46, y1 - 0.52, y1 - 0.12, F2, F2 + 0.52,
-             bev=0.006)
-    bm_cylinder(kit.bm((0.86, 0.84, 0.78), 0.006), x0 + 0.26, y1 - 0.32,
-                F2 + 0.52, F2 + 0.74, 0.09, 0.12, seg=14)
+    bedside(kit, x0 + 0.26, y1 - 0.32, F2)
     # The 182 wardrobe on the spine wall, dark and enormous, as it is.
-    kit.span(WALNUT, x1 - 1.86, x1 - 0.04, y0 + 0.04, y0 + 0.60, F2, F2 + 2.02,
-             bev=0.008)
-    for d in (x1 - 1.25, x1 - 0.64):
-        kit.span(tuple(v * 0.7 for v in WALNUT), d - 0.006, d + 0.006,
-                 y0 + 0.60, y0 + 0.62, F2 + 0.06, F2 + 1.98, bev=0.002)
-    for c in (x1 - 1.35, x1 - 1.16, x1 - 0.74, x1 - 0.55):
-        kit.span(BEECH, c, c + 0.026, y0 + 0.62, y0 + 0.66, F2 + 1.02,
-                 F2 + 1.16, bev=0.004)
+    wardrobe(kit, x1 - 1.86, x1 - 0.04, y0 + 0.04, y0 + 0.60, F2, 2.02, "+y")
     fan(kit, x1 - 0.36, y1 - 0.42, F2)
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, sun=True)
 
@@ -4098,18 +4269,13 @@ def bedroom_west(kit):
     a window belongs, and the walk from the door up the west side is clear."""
     x0, x1, y0, y1 = ROOMS["soba4"]
     bed(kit, x0 + 0.76, y1 - 1.05, yaw=-math.pi / 2, w=1.40, l=1.98)
-    kit.span(WALNUT, x1 - 0.46, x1 - 0.06, y1 - 0.52, y1 - 0.12, F2, F2 + 0.52,
-             bev=0.006)
+    bedside(kit, x1 - 0.26, y1 - 0.32, F2)
     # The single wardrobe stands on the party wall to soba 3 and not on the
     # spine, which is where it was: the spine here is 95 cm long and the door
     # takes 85 of it, so anything against it is standing in the doorway. On the
     # east wall it is clear of the door, clear of the bed and clear of the
     # sliding leaf, which parks west along the spine face.
-    kit.span(WALNUT, x1 - 0.58, x1 - 0.02, y0 + 0.22, y0 + 0.80, F2, F2 + 1.90,
-             bev=0.008)
-    for c in (y0 + 0.36, y0 + 0.66):
-        kit.span(BEECH, x1 - 0.60, x1 - 0.56, c, c + 0.024, F2 + 1.00,
-                 F2 + 1.14, bev=0.004)
+    wardrobe(kit, x1 - 0.58, x1 - 0.02, y0 + 0.22, y0 + 0.80, F2, 1.90, "-x")
     kit.span(LINEN, x0 + 0.30, x0 + 0.66, y0 + 0.30, y0 + 0.70, F2 + 0.44,
              F2 + 0.58, bev=0.02)
     ceiling_light(kit, (x0 + x1) / 2, (y0 + y1) / 2, dome=True)
@@ -4117,61 +4283,1119 @@ def bedroom_west(kit):
 
 # ------------------------------------------------------------------ furniture --
 
-def sofa(kit, cx, cy, yaw, length, colour, throw=None, depth=0.86, floor=F2):
-    """A two- or three-seater with a throw over it. Built along +X and rotated,
-    because every soft thing in this flat is at a different angle to the walls."""
+# The second pass on the furniture, 1 Oct 2026.
+#
+# Misha, standing just inside the front door: *"spruce-up / increase poly count
+# for the books on the bookshelf, the appliances, etc, make the furniture
+# higher resolution, so it really feels like more realistic"*. Everything below
+# was a box or two with a bevel on it, which is what a room reads as from the
+# terrace and nothing like what it reads as from the middle of it.
+#
+# Nothing here moves. Every piece stands where it stood, on the footprint it
+# had, at the heights the runtime's fly perches and death floors were read off
+# (the desk top at +0.74, the low table at +0.44, the television cabinet at
+# +0.66) — and the shapes are off the photographs in /mnt/c/tmp/refs/
+# vacay_house/: the white bookcase on castors with two drawers over the
+# cubbies, the white cooker with two gas rings and two plates and a striped
+# towel through the oven handle, the souvenir magnets down the side of the red
+# fridge, the monobloc with its four slats, the chrome-framed armchair under a
+# red throw, the little splay-legged table with a mug on it.
+#
+# The vocabulary is four shapes. A superellipsoid, for anything stuffed —
+# cushions, mattresses, pillows — because a cushion is a box whose edges have
+# been pushed out by what is inside it and a bevelled box is a box. A lathe,
+# for anything turned. A sheet, for anything that hangs. And a sweep, for the
+# duvet. Soft things are smooth-shaded in objects of their own; hard things
+# stay in the colour buckets with their catch-light bevels.
+#
+# All the new randomness comes off its own generator, so a piece of furniture
+# cannot reshuffle the flagstones in the yard.
+
+FRNG = random.Random(20261001)
+
+WOOD_D = (0.300, 0.180, 0.095)      # turned feet, the sofa's arm facings
+MELAMINE = (0.905, 0.893, 0.862)    # the bookcase on castors, warm white
+MELA_FRONT = (0.925, 0.905, 0.850)  # and its drawer fronts, a shade creamier
+PAGES = (0.905, 0.878, 0.800)
+GILT = (0.760, 0.620, 0.300)
+STRAW = (0.800, 0.680, 0.440)
+BRASS = (0.720, 0.600, 0.340)
+CERAMIC = (0.925, 0.920, 0.900)
+TERRACOTTA = (0.640, 0.330, 0.220)
+LEAF = (0.300, 0.420, 0.250)
+SMILJE = (0.880, 0.760, 0.260)      # immortelle, the yellow of every Dalmatian hill
+KNOB_C = (0.930, 0.915, 0.870)
+
+# Spines. Not a rainbow: cloth, card and the faded paperbacks of a house
+# nobody takes books home from.
+SPINES = [
+    (0.560, 0.120, 0.110), (0.150, 0.220, 0.400), (0.180, 0.320, 0.220),
+    (0.800, 0.720, 0.540), (0.880, 0.860, 0.800), (0.780, 0.420, 0.120),
+    (0.880, 0.740, 0.200), (0.100, 0.100, 0.110), (0.420, 0.300, 0.220),
+    (0.300, 0.480, 0.620), (0.620, 0.560, 0.480), (0.700, 0.240, 0.300),
+    (0.240, 0.420, 0.420), (0.900, 0.900, 0.880), (0.500, 0.520, 0.300),
+    (0.320, 0.180, 0.300),
+]
+
+
+def _M(at=(0.0, 0.0, 0.0), yaw=0.0, rx=0.0, ry=0.0):
+    """Translate, then turn about Z, Y and X, in that order of application
+    reversed — X first. Built at the origin and moved, every time."""
+    return (Matrix.Translation(Vector(at)) @ Matrix.Rotation(yaw, 4, "Z")
+            @ Matrix.Rotation(ry, 4, "Y") @ Matrix.Rotation(rx, 4, "X"))
+
+
+def _xf(verts, M):
+    for v in verts:
+        v.co = M @ v.co
+    return verts
+
+
+def _emit(kit, bm, colour, name, at=(0.0, 0.0, 0.0), yaw=0.0, smooth=True,
+          bev=0.0, seg=1):
+    """A piece in an object of its own, placed like `_place` places one."""
+    ob = new_object(bm, name, smooth=smooth)
+    if bev:
+        bevel(ob, bev, segments=seg)
+    _place(ob, at[0], at[1], at[2], yaw)
+    return kit.adopt(ob, colour)
+
+
+def _sgp(v, e):
+    return math.copysign(abs(v) ** e, v)
+
+
+def _superball(bm, a, b, c, p=4.0, q=2.6, rows=9, seg=24, at=(0.0, 0.0, 0.0)):
+    """A superellipsoid: half-sizes a, b, c; `p` squares it off in plan and `q`
+    in section. p = q = 2 is an ellipsoid; a cushion is about (5, 2.6), a
+    mattress (10, 6). Returns its verts, so it can be turned afterwards."""
+    ep, eq = 2.0 / p, 2.0 / q
+    ox, oy, oz = at
+    grid = []
+    for j in range(1, rows):
+        t = -math.pi / 2 + math.pi * j / rows
+        ct, st = _sgp(math.cos(t), eq), _sgp(math.sin(t), eq)
+        grid.append([bm.verts.new((ox + a * ct * _sgp(math.cos(TAU * i / seg), ep),
+                                   oy + b * ct * _sgp(math.sin(TAU * i / seg), ep),
+                                   oz + c * st)) for i in range(seg)])
+    bot = bm.verts.new((ox, oy, oz - c))
+    top = bm.verts.new((ox, oy, oz + c))
+    bm.verts.ensure_lookup_table()
+    for j in range(len(grid) - 1):
+        for i in range(seg):
+            k = (i + 1) % seg
+            bm.faces.new((grid[j][i], grid[j][k], grid[j + 1][k], grid[j + 1][i]))
+    for i in range(seg):
+        k = (i + 1) % seg
+        bm.faces.new((bot, grid[0][k], grid[0][i]))
+        bm.faces.new((top, grid[-1][i], grid[-1][k]))
+    return [v for r in grid for v in r] + [bot, top]
+
+
+def _lathe(bm, prof, seg=14, at=(0.0, 0.0, 0.0)):
+    """Turn a (z, r) profile about Z. The profile need not climb — a hat brim
+    goes out and comes back — because the exporter's normal pass sorts out
+    which side is outside on anything closed."""
+    ox, oy, oz = at
+    g = bm_loft(bm, [(oz + z, max(r, 0.0004), max(r, 0.0004), ox, oy)
+                     for z, r in prof], seg=seg)
+    return [v for row in g for v in row]
+
+
+def _sheet(bm, P, nu, nv, off):
+    """A thin closed solid off a parametric surface P(u, v) and a fixed
+    thickness vector — a throw's overhang, a towel, a hem."""
+    F = [[bm.verts.new(P(i / nu, j / nv)) for j in range(nv + 1)]
+         for i in range(nu + 1)]
+    B = [[bm.verts.new(tuple(F[i][j].co[k] + off[k] for k in range(3)))
+          for j in range(nv + 1)] for i in range(nu + 1)]
+    for i in range(nu):
+        for j in range(nv):
+            bm.faces.new((F[i][j], F[i + 1][j], F[i + 1][j + 1], F[i][j + 1]))
+            bm.faces.new((B[i][j], B[i][j + 1], B[i + 1][j + 1], B[i + 1][j]))
+    for i in range(nu):
+        for j in (0, nv):
+            bm.faces.new((F[i][j], B[i][j], B[i + 1][j], F[i + 1][j]))
+    for j in range(nv):
+        for i in (0, nu):
+            bm.faces.new((F[i][j], F[i][j + 1], B[i][j + 1], B[i][j]))
+    return [v for r in F + B for v in r]
+
+
+def _sweep(bm, secs):
+    """Skin a run of closed sections (lists of 3-D points, equal length)."""
+    rings = [[bm.verts.new(p) for p in s] for s in secs]
+    n = len(rings[0])
+    for a, b in zip(rings, rings[1:]):
+        for i in range(n):
+            k = (i + 1) % n
+            bm.faces.new((a[i], a[k], b[k], b[i]))
+    bm.faces.new(tuple(reversed(rings[0])))
+    bm.faces.new(tuple(rings[-1]))
+    return [v for r in rings for v in r]
+
+
+def _bar_handle(kit, p0, p1, out, r=0.0055, off=0.030, colour=CHROME):
+    """A bar pull: a round bar standing `off` proud of the face on two posts,
+    with daylight behind it — which is the whole of what makes a handle read
+    as a handle and not as a stripe painted on the door."""
+    q0 = tuple(p0[k] + out[k] * off for k in range(3))
+    q1 = tuple(p1[k] + out[k] * off for k in range(3))
     bm = bmesh.new()
-    d, h = depth, 0.42
-    bm_box(bm, 0, 0, h / 2 + 0.06, length, d, h)                    # seat
-    bm_box(bm, 0, -d / 2 + 0.10, 0.52, length, 0.20, 0.62)          # back
+    _tube(bm, [q0, q1], r, seg=10)
+    for p, q in ((p0, q0), (p1, q1)):
+        _tube(bm, [p, q], r * 0.8, seg=8)
+    _emit(kit, bm, colour, "pull")
+
+
+def _knob_out(kit, colour, x, y, z, out_y=-1, r=0.014, l=0.022):
+    """A round cabinet knob standing out of a face that looks along ±Y."""
+    bm = bmesh.new()
+    vs = _lathe(bm, [(0.0, r * 0.55), (l * 0.45, r * 0.45), (l * 0.70, r),
+                     (l * 0.95, r * 0.92), (l, r * 0.55)], seg=12)
+    _xf(vs, _M((x, y, z), rx=(math.pi / 2 if out_y < 0 else -math.pi / 2)))
+    _emit(kit, bm, colour, "knob")
+
+
+# ── soft things ─────────────────────────────────────────────────────────────
+
+def sofa(kit, cx, cy, yaw, length, colour, throw=None, depth=0.86, floor=F2):
+    """The two-seater: a tapestry body with rolled arms, a red throw over the
+    seat and the back, three patterned cushions along it.
+
+    Built along +X with the back at −Y and turned, as before. The old one was
+    three bevelled boxes and a fourth over them in red, which from the front
+    door read as a red crate — a sofa is not its bounding box, it is cushions
+    with a shadow line between them and an arm you could rest a hand on."""
+    L, d = length, depth
+    red = throw or colour
+    arm = 0.15
+    inner = L - 2 * arm
+    base = 0.215
+    at = (cx, cy, floor)
+
+    bm = bmesh.new()
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            _lathe(bm, [(0.0, 0.016), (0.03, 0.019), (0.055, 0.024),
+                        (0.065, 0.024)], seg=10,
+                   at=(sx * (L / 2 - 0.07), sy * (d / 2 - 0.07), 0.0))
+    _emit(kit, bm, WOOD_D, "sofa_feet", at, yaw)
+
+    # The body under it all, and the two arms with a roll on each.
+    bm = bmesh.new()
+    _superball(bm, L / 2, d / 2, 0.080, p=10, q=5, at=(0, 0, 0.14))
     for s in (-1, 1):
-        bm_box(bm, s * (length / 2 - 0.09), 0.03, 0.44, 0.18, d - 0.10, 0.46)
-    ob = new_object(bm, "sofa")
-    bevel(ob, 0.045, segments=2)
-    _place(ob, cx, cy, floor, yaw)
-    kit.adopt(ob, colour)
-    if throw:
-        bm = bmesh.new()
-        bm_box(bm, 0, 0.03, h + 0.075, length - 0.05, d - 0.06, 0.08)
-        bm_box(bm, 0, -d / 2 + 0.12, 0.62, length - 0.05, 0.13, 0.44)
-        ob = new_object(bm, "throw")
-        bevel(ob, 0.05, segments=2)
-        _place(ob, cx, cy, floor, yaw)
-        kit.adopt(ob, throw)
-    # Cushions along the back — the tapestry ones with the tiger on them.
+        ax = s * (L / 2 - arm / 2)
+        _superball(bm, arm / 2, d / 2 - 0.005, 0.180, p=10, q=6,
+                   at=(ax, 0.0, base + 0.15))
+        _superball(bm, arm / 2 + 0.018, d / 2 + 0.004, 0.062, p=10, q=2.2,
+                   rows=8, seg=28, at=(ax + s * 0.010, 0.0, base + 0.32))
+    _emit(kit, bm, colour, "sofa_body", at, yaw)
+    # The polished wood facing on the front of each arm.
+    bm = bmesh.new()
+    for s in (-1, 1):
+        vs = _superball(bm, arm / 2 - 0.012, 0.150, 0.010, p=3, q=2,
+                        rows=6, seg=20)
+        _xf(vs, _M((s * (L / 2 - arm / 2 + 0.008), d / 2 + 0.006, base + 0.20),
+                   rx=math.pi / 2))
+    _emit(kit, bm, WOOD_D, "sofa_facing", at, yaw)
+
+    # The back, under the throw.
+    bm = bmesh.new()
+    vs = _superball(bm, inner / 2 + 0.01, 0.105, 0.300, p=10, q=4)
+    _xf(vs, _M((0.0, -d / 2 + 0.115, base + 0.29), rx=0.08))
+    _emit(kit, bm, red, "sofa_back", at, yaw)
+
+    # Seat cushions, each its own stuffed shape with a crease between them.
+    n = 2 if inner < 1.5 else 3
+    cw = inner / n
+    sd = d - 0.215
+    bm = bmesh.new()
+    for i in range(n):
+        x = -inner / 2 + cw * (i + 0.5)
+        _superball(bm, cw / 2 - 0.004, sd / 2, 0.072, p=6, q=2.6, rows=8,
+                   seg=28, at=(x, d / 2 - 0.004 - sd / 2, base + 0.060))
+    _emit(kit, bm, red, "sofa_seat", at, yaw)
+
+    # Where the throw comes down over the front, in folds that open towards
+    # the hem — it is a blanket and not upholstery, and the hem says so.
+    y_f = d / 2 + 0.012
+    ph = FRNG.uniform(0, TAU)
+
+    def front(u, v):
+        x = -inner / 2 - 0.01 + (inner + 0.02) * u
+        z = base + 0.11 - v * 0.20 + 0.012 * math.sin(u * 9.0 + ph) * v
+        y = y_f + (0.004 + 0.014 * v) * (0.5 + 0.5 * math.sin(u * TAU * 3.2 + ph))
+        return (x, y, z)
+    bm = bmesh.new()
+    _sheet(bm, front, 36, 5, (0.0, -0.007, 0.0))
+    _emit(kit, bm, red, "sofa_drape", at, yaw)
+
+    # The cushions along the back — the tapestry ones with the tiger on them —
+    # fat, and leaning back into the throw.
     for i in range(3):
-        t = (i - 1) * (length / 3.2)
+        t = (i - 1) * (inner / 3.0)
         bm = bmesh.new()
-        bm_box(bm, t, -d / 2 + 0.26, 0.62, 0.38, 0.16, 0.36)
-        ob = new_object(bm, "cushion")
-        bevel(ob, 0.06, segments=2)
+        vs = _superball(bm, 0.165, 0.062, 0.150, p=4.0, q=2.6, rows=8, seg=22)
+        _xf(vs, _M((0.0, 0.0, 0.0), rx=0.30, ry=FRNG.uniform(-0.12, 0.12)))
+        _xf(vs, _M((t, -d / 2 + 0.25, base + 0.25)))
+        ob = new_object(bm, "cushion", smooth=True)
         _place(ob, cx, cy, floor, yaw + RNG.uniform(-0.1, 0.1))
-        kit.adopt(ob, RNG.choice([(0.62, 0.42, 0.24), (0.80, 0.74, 0.60),
-                                  (0.42, 0.22, 0.18)]))
+        # One of each, not three draws: three draws came up cream three
+        # times and the row read as eggs. The draw is still made, so the
+        # house generator stays in step for the bedrooms after this.
+        RNG.choice((0, 1, 2))
+        kit.adopt(ob, ((0.62, 0.42, 0.24), (0.80, 0.74, 0.60),
+                       (0.42, 0.22, 0.18))[i])
 
 
 def low_chair(kit, cx, cy, yaw):
+    """The armchair: a chrome tube sled each side with the armrest on top of
+    it, a floral base, and the same red throw over the seat and back as the
+    sofa. Back at −X, as before; 0.78 by 0.80, as before."""
+    at = (cx, cy, F2)
     bm = bmesh.new()
-    bm_box(bm, 0, 0, 0.20, 0.78, 0.80, 0.34)
-    bm_box(bm, -0.30, 0, 0.50, 0.16, 0.76, 0.58)
-    ob = new_object(bm, "chair")
-    bevel(ob, 0.05, segments=2)
-    _place(ob, cx, cy, F2, yaw)
-    kit.adopt(ob, DAYBED)
+    for s in (-1, 1):
+        y = s * 0.365
+        pts = [(-0.34, y, 0.016), (0.26, y, 0.016), (0.32, y, 0.030),
+               (0.350, y, 0.080), (0.355, y, 0.50), (0.335, y, 0.555),
+               (0.280, y, 0.575), (-0.200, y, 0.590), (-0.270, y, 0.575),
+               (-0.310, y, 0.520), (-0.330, y, 0.300), (-0.340, y, 0.016)]
+        _tube(bm, pts, 0.0135, seg=10)
+    # Two cross tubes under the seat that carry it.
+    for x in (-0.20, 0.22):
+        _tube(bm, [(x, -0.365, 0.12), (x, 0.365, 0.12)], 0.011, seg=8)
+    _emit(kit, bm, CHROME, "chair_frame", at, yaw)
+
     bm = bmesh.new()
-    bm_box(bm, 0.02, 0, 0.395, 0.74, 0.76, 0.09)
-    bm_box(bm, -0.26, 0, 0.56, 0.10, 0.72, 0.50)
-    ob = new_object(bm, "chair_throw")
-    bevel(ob, 0.055, segments=2)
-    _place(ob, cx, cy, F2, yaw)
-    kit.adopt(ob, RED_THROW)
+    _superball(bm, 0.335, 0.335, 0.090, p=8, q=4, at=(0.01, 0.0, 0.22))
+    vs = _superball(bm, 0.085, 0.330, 0.270, p=6, q=3)
+    _xf(vs, _M((-0.255, 0.0, 0.55), ry=-0.20))
+    _emit(kit, bm, DAYBED, "chair_body", at, yaw)
+
     bm = bmesh.new()
-    for sx in (-0.32, 0.32):
-        for sy in (-0.34, 0.34):
-            bm_box(bm, sx, sy, 0.02, 0.05, 0.05, 0.06)
-    ob = new_object(bm, "chair_feet")
-    _place(ob, cx, cy, F2, yaw)
-    kit.adopt(ob, DARKMETAL)
+    _superball(bm, 0.320, 0.315, 0.070, p=6, q=2.5, rows=8, seg=28,
+               at=(0.035, 0.0, 0.355))
+    vs = _superball(bm, 0.075, 0.335, 0.255, p=6, q=2.6)
+    _xf(vs, _M((-0.235, 0.0, 0.585), ry=-0.20))
+    _emit(kit, bm, RED_THROW, "chair_throw", at, yaw)
+
+    def over(u, v):
+        return (0.355 + 0.010 * v + 0.006 * math.sin(u * 17.0),
+                -0.30 + 0.60 * u, 0.36 - 0.17 * v)
+    bm = bmesh.new()
+    _sheet(bm, over, 20, 4, (-0.006, 0.0, 0.0))
+    _emit(kit, bm, RED_THROW, "chair_drape", at, yaw)
+
+
+def bed(kit, cx, cy, yaw, w=1.42, l=2.00, floor=F2):
+    """A bed: walnut frame on legs, a mattress, two pillows that are pillows,
+    and a duvet that lies over it and hangs down the sides in folds.
+
+    Built along +X with the head at −X. The two RNG draws for the pillows'
+    set are kept on the house generator, so nothing outside the bedroom moves.
+    """
+    at = (cx, cy, floor)
+    bm = bmesh.new()
+    # Rails, legs and the two boards.
+    for s in (-1, 1):
+        bm_box(bm, 0.0, s * (w / 2 + 0.010), 0.19, l, 0.040, 0.20)
+        for e in (-1, 1):
+            bm_box(bm, e * (l / 2 - 0.035), s * (w / 2 - 0.005), 0.05, 0.06,
+                   0.06, 0.10)
+    bm_box(bm, l / 2 - 0.020, 0.0, 0.19, 0.040, w + 0.06, 0.20)
+    ob = new_object(bm, "bedframe")
+    bevel(ob, 0.006, segments=2)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, WALNUT)
+    bm = bmesh.new()
+    bm_box(bm, -l / 2 + 0.035, 0.0, 0.47, 0.06, w + 0.06, 0.94)
+    bm_box(bm, l / 2 - 0.035, 0.0, 0.29, 0.05, w + 0.06, 0.58)
+    ob = new_object(bm, "bedboards")
+    bevel(ob, 0.018, segments=3)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, WALNUT)
+    # A raised panel on the inside of the headboard.
+    bm = bmesh.new()
+    bm_box(bm, -l / 2 + 0.072, 0.0, 0.64, 0.016, w - 0.12, 0.40)
+    ob = new_object(bm, "bedpanel")
+    bevel(ob, 0.008, segments=2)
+    _place(ob, cx, cy, floor, yaw)
+    kit.adopt(ob, tuple(v * 0.82 for v in WALNUT))
+
+    bm = bmesh.new()
+    _superball(bm, l / 2 - 0.065, w / 2 - 0.030, 0.110, p=12, q=7, rows=10,
+               seg=32, at=(0.0, 0.0, 0.40))
+    _emit(kit, bm, LINEN, "mattress", at, yaw)
+
+    for s in (-1, 1):
+        bm = bmesh.new()
+        vs = _superball(bm, 0.175, 0.255, 0.080, p=3.4, q=2.2, rows=8, seg=24)
+        _xf(vs, _M((-l / 2 + 0.30, s * 0.30, 0.575), ry=0.30))
+        ob = new_object(bm, "pillow", smooth=True)
+        _place(ob, cx, cy, floor, yaw + RNG.uniform(-0.12, 0.12))
+        kit.adopt(ob, LINEN)
+
+    # The duvet: a section across the bed — down one side, over, down the
+    # other — swept from the turn-down to the foot, with folds along it.
+    zt, hang, th = 0.535, 0.20, 0.030
+    hw = w / 2 - 0.010
+    rc = 0.06
+    x0, x1 = -l / 2 + 0.62, l / 2 - 0.035
+    ph = [FRNG.uniform(0, TAU) for _ in range(4)]
+
+    def section(x):
+        u = (x - x0) / (x1 - x0)
+        fold = (0.010 * math.sin(u * 7.0 + ph[0])
+                + 0.006 * math.sin(u * 15.0 + ph[1]))
+        outer, inner = [], []
+        side = []
+        # Down the −y side, round the corner, across, round, down +y.
+        for k in range(5):
+            side.append((-hw - 0.004 * math.sin(u * 11 + ph[2] + k), zt - hang
+                         + (hang - rc) * k / 4.0))
+        for k in range(1, 6):
+            a = math.pi - (math.pi / 2) * k / 5.0
+            side.append((-hw + rc + rc * math.cos(a), zt - rc + rc * math.sin(a)))
+        for k in range(1, 8):
+            yy = -hw + rc + (2 * (hw - rc)) * k / 8.0
+            side.append((yy, zt + fold * math.cos(yy * 3.0 + ph[3])))
+        for k in range(0, 5):
+            a = (math.pi / 2) - (math.pi / 2) * k / 5.0
+            side.append((hw - rc + rc * math.cos(a), zt - rc + rc * math.sin(a)))
+        for k in range(5):
+            side.append((hw + 0.004 * math.sin(u * 13 + ph[1] + k),
+                         zt - rc - (hang - rc) * k / 4.0))
+        # The inside face, the same path pulled in by the duvet's thickness.
+        for y, z in side:
+            outer.append((x, y, z))
+        for y, z in reversed(side):
+            yy = y - math.copysign(th, y) if abs(y) > hw - rc else y
+            zz = z - th if z > zt - rc else z
+            inner.append((x, yy, zz))
+        return outer + inner
+
+    bm = bmesh.new()
+    _sweep(bm, [section(x0 + (x1 - x0) * i / 24.0) for i in range(25)])
+    _emit(kit, bm, (0.86, 0.85, 0.80), "duvet", at, yaw)
+    # The turned-down edge at the head end.
+    bm = bmesh.new()
+    _superball(bm, 0.060, hw + 0.004, 0.034, p=2.2, q=2.0, rows=7, seg=28,
+               at=(x0 + 0.03, 0.0, zt + 0.006))
+    _emit(kit, bm, (0.90, 0.89, 0.85), "duvet_fold", at, yaw)
+
+    # And the purple cushion that is always on it.
+    bm = bmesh.new()
+    vs = _superball(bm, 0.165, 0.165, 0.060, p=3.4, q=2.3, rows=7, seg=20)
+    _xf(vs, _M((-0.30, 0.18, 0.62), yaw=0.4, rx=0.10))
+    _emit(kit, bm, (0.45, 0.32, 0.62), "cushion", at, yaw)
+
+
+# ── wood ────────────────────────────────────────────────────────────────────
+
+def _turned_leg(bm, x, y, z0, z1, r=0.017, splay=(0.0, 0.0)):
+    """A turned leg: foot, long taper, a bead, a block where the seat goes."""
+    h = z1 - z0
+    prof = [(0.00, r * 0.80), (0.02 * h / 0.43, r * 0.95), (0.05, r * 0.85),
+            (0.28 * h, r * 1.00), (0.33 * h, r * 1.30), (0.38 * h, r * 0.95),
+            (0.70 * h, r * 1.05), (0.76 * h, r * 1.35), (0.80 * h, r * 1.05),
+            (h, r * 1.10)]
+    vs = _lathe(bm, prof, seg=10, at=(x, y, z0))
+    for v in vs:
+        f = 1.0 - (v.co.z - z0) / h
+        v.co.x += splay[0] * f
+        v.co.y += splay[1] * f
+    return vs
+
+
+def wooden_chair(kit, cx, cy, z, yaw):
+    """The pine kitchen chair: a shaped seat, four turned legs splayed, two
+    stretchers, and a back of two posts, three spindles and a curved rail.
+    The back is at −X, as it always was."""
+    at = (cx, cy, z)
+    bm = bmesh.new()
+    _rr_loft(bm, [(0.425, 0.196, 0.200, 0.040, 0, 0),
+                  (0.430, 0.204, 0.208, 0.045, 0, 0),
+                  (0.452, 0.204, 0.208, 0.045, 0, 0),
+                  (0.460, 0.196, 0.200, 0.038, 0, 0)], per=4)
+    _emit(kit, bm, BEECH, "chair_seat", at, yaw)
+    bm = bmesh.new()
+    for sx in (-0.155, 0.155):
+        for sy in (-0.155, 0.155):
+            _turned_leg(bm, sx, sy, 0.0, 0.43,
+                        splay=(math.copysign(0.025, sx), math.copysign(0.025, sy)))
+    for sy in (-0.165, 0.165):
+        _tube(bm, [(-0.170, sy, 0.15), (0.170, sy, 0.15)], 0.009, seg=8)
+    _tube(bm, [(0.0, -0.170, 0.21), (0.0, 0.170, 0.21)], 0.009, seg=8)
+    # The back posts lean back, 6 cm over their height.
+    for sy in (-0.150, 0.150):
+        vs = _lathe(bm, [(0.0, 0.017), (0.10, 0.016), (0.38, 0.014),
+                         (0.42, 0.016), (0.44, 0.011)], seg=10,
+                    at=(-0.160, sy, 0.455))
+        for v in vs:
+            v.co.x -= 0.06 * (v.co.z - 0.455) / 0.44
+    for k in range(3):
+        sy = (k - 1) * 0.075
+        vs = _lathe(bm, [(0.0, 0.009), (0.12, 0.012), (0.26, 0.009),
+                         (0.30, 0.009)], seg=8, at=(-0.163, sy, 0.462))
+        for v in vs:
+            v.co.x -= 0.06 * (v.co.z - 0.455) / 0.44
+    _emit(kit, bm, BEECH, "chair_turned", at, yaw)
+    # The top rail, bent to the sitter's back.
+    def rail(u, v):
+        sy = -0.17 + 0.34 * u
+        return (-0.205 - 0.035 * (1 - (2 * u - 1) ** 2) + 0.0 * v,
+                sy, 0.775 + 0.075 * v)
+    bm = bmesh.new()
+    _sheet(bm, rail, 12, 2, (0.022, 0.0, 0.0))
+    _emit(kit, bm, BEECH, "chair_rail", at, yaw)
+
+
+def plastic_chair(kit, cx, cy, z, yaw):
+    """The white monobloc. There are four of them in this flat and they are on
+    the terrace, at the table and in front of the laptop: a dished seat,
+    four splayed legs, a curved back of four slats under a top rail, and the
+    arms that run from the back down into the front legs. Back at −X."""
+    at = (cx, cy, z)
+    bm = bmesh.new()
+    _rr_loft(bm, [(0.418, 0.205, 0.215, 0.07, 0.01, 0),
+                  (0.432, 0.222, 0.232, 0.08, 0.01, 0),
+                  (0.450, 0.224, 0.234, 0.08, 0.01, 0),
+                  (0.455, 0.214, 0.224, 0.07, 0.01, 0)], per=5)
+    for sx, sy in ((-0.18, -0.20), (-0.18, 0.20), (0.19, -0.20), (0.19, 0.20)):
+        _rr_loft(bm, [(0.0, 0.020, 0.026, 0.008, sx * 1.22, sy * 1.18),
+                      (0.43, 0.026, 0.034, 0.010, sx, sy)], per=3)
+    # The back: posts, four slats and a rail, all on the one curve.
+    tilt = lambda zz: -0.17 * (zz - 0.45)
+    for sy in (-0.212, 0.212):
+        _rr_loft(bm, [(0.440, 0.022, 0.016, 0.006, -0.150, sy),
+                      (0.900, 0.020, 0.014, 0.006, -0.150 + tilt(0.90), sy)],
+                 per=3)
+    for z0, z1 in ((0.53, 0.57), (0.61, 0.65), (0.69, 0.73), (0.77, 0.81),
+                   (0.845, 0.905)):
+        secs = []
+        for i in range(13):
+            a = math.pi - 0.78 + 1.56 * i / 12
+            sec = []
+            for rr, zz in ((0.300, z0), (0.316, z0), (0.316, z1), (0.300, z1)):
+                sec.append((0.08 + rr * math.cos(a) + tilt(zz),
+                            rr * math.sin(a), zz))
+            secs.append(sec)
+        _sweep(bm, secs)
+    _emit(kit, bm, PLASTIC_W, "monobloc", at, yaw)
+    # The arms, smooth, as they are moulded.
+    bm = bmesh.new()
+    for s in (-1, 1):
+        _tube(bm, [(-0.18, s * 0.222, 0.69), (-0.06, s * 0.240, 0.655),
+                   (0.10, s * 0.245, 0.640), (0.19, s * 0.236, 0.615),
+                   (0.205, s * 0.226, 0.52), (0.200, s * 0.212, 0.45)],
+              0.015, seg=10)
+    _emit(kit, bm, PLASTIC_W, "monobloc_arms", at, yaw)
+
+
+def plastic_table(kit, cx, cy, z, r=0.40):
+    bm = bmesh.new()
+    bm_cylinder(bm, 0, 0, 0.68, 0.72, r, r, seg=22)
+    for a in range(4):
+        ang = TAU * a / 4 + 0.78
+        bm_box(bm, math.cos(ang) * (r - 0.09), math.sin(ang) * (r - 0.09),
+               0.34, 0.05, 0.05, 0.68)
+    ob = new_object(bm, "gardentable")
+    bevel(ob, 0.008)
+    _place(ob, cx, cy, z, 0.0)
+    kit.adopt(ob, PLASTIC_W)
+
+
+def garden_table(kit, cx, cy, z, w=0.90, d=0.90, h=0.74):
+    """The white plastic garden table that lives indoors and is the desk: a
+    rounded top with a deep moulded rim, and four legs splayed out to the
+    corners. The top is at +0.74 exactly, which the laptop and the fly's
+    perch are both set on."""
+    bm = bmesh.new()
+    _rr_loft(bm, [(h - 0.040, w / 2 - 0.012, d / 2 - 0.012, 0.055, 0, 0),
+                  (h - 0.034, w / 2, d / 2, 0.065, 0, 0),
+                  (h - 0.004, w / 2, d / 2, 0.065, 0, 0),
+                  (h, w / 2 - 0.006, d / 2 - 0.006, 0.060, 0, 0)], per=6)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            _rr_loft(bm, [(0.0, 0.022, 0.030, 0.009, sx * (w / 2 - 0.035),
+                           sy * (d / 2 - 0.035)),
+                          (0.30, 0.025, 0.036, 0.010, sx * (w / 2 - 0.065),
+                           sy * (d / 2 - 0.065)),
+                          (h - 0.036, 0.034, 0.048, 0.012, sx * (w / 2 - 0.085),
+                           sy * (d / 2 - 0.085))], per=3)
+    for a in (0.785, -0.785):
+        vs = bm_box(bm, 0.0, 0.0, h - 0.060, (w - 0.20) * 1.36, 0.030, 0.040)
+        _xf(vs, _M((0, 0, 0), yaw=a))
+    _emit(kit, bm, PLASTIC_W, "gardentable", (cx, cy, z), 0.0)
+
+
+def round_table(kit, cx, cy, z, r=0.30, h=0.44):
+    """A round wooden table on three splayed, tapered legs. Upstairs it is the
+    little one by the armchair; downstairs the same thing at dining height."""
+    at = (cx, cy, z)
+    bm = bmesh.new()
+    _lathe(bm, [(h - 0.030, 0.0004), (h - 0.030, r - 0.010),
+                (h - 0.024, r), (h - 0.006, r), (h, r - 0.008), (h, 0.0004)],
+           seg=36)
+    _emit(kit, bm, BEECH, "tabletop", at, 0.0)
+    bm = bmesh.new()
+    for a in range(3):
+        ang = TAU * a / 3 + 0.5
+        c, s = math.cos(ang), math.sin(ang)
+        bm_loft(bm, [(0.0, 0.011, 0.011, c * (r - 0.02), s * (r - 0.02)),
+                     (h - 0.030, 0.020, 0.020, c * (r - 0.10), s * (r - 0.10))],
+                seg=10)
+    _emit(kit, bm, BEECH, "tablelegs", at, 0.0)
+
+
+def dining_table(kit, cx, cy, z, w=1.10, d=0.80, h=0.76):
+    """The pine table under the kitchen window: a top with a rounded edge, an
+    apron, and four legs tapering to the floor."""
+    at = (cx, cy, z)
+    bm = bmesh.new()
+    _rr_loft(bm, [(h - 0.040, w / 2 - 0.006, d / 2 - 0.006, 0.026, 0, 0),
+                  (h - 0.032, w / 2, d / 2, 0.032, 0, 0),
+                  (h - 0.008, w / 2, d / 2, 0.032, 0, 0),
+                  (h, w / 2 - 0.007, d / 2 - 0.007, 0.025, 0, 0)], per=4)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            lx, ly = sx * (w / 2 - 0.075), sy * (d / 2 - 0.075)
+            _rr_loft(bm, [(0.0, 0.017, 0.017, 0.004, lx, ly),
+                          (h - 0.15, 0.024, 0.024, 0.005, lx, ly),
+                          (h - 0.04, 0.025, 0.025, 0.005, lx, ly)], per=2)
+    _emit(kit, bm, BEECH, "table", at, 0.0)
+    for sx in (-1, 1):
+        kit.box(BEECH, cx + sx * (w / 2 - 0.085), cy, z + h - 0.085, 0.022,
+                d - 0.20, 0.09, bev=0.004)
+    for sy in (-1, 1):
+        kit.box(BEECH, cx, cy + sy * (d / 2 - 0.085), z + h - 0.085, w - 0.20,
+                0.022, 0.09, bev=0.004)
+
+
+def bedside(kit, cx, cy, floor, w=0.40, d=0.40, h=0.52):
+    """A walnut night table facing −Y — carcass, a top that oversails it, a
+    drawer with a knob — and a lamp on it with a ceramic foot and a shade."""
+    kit.span(WALNUT, cx - w / 2 + 0.01, cx + w / 2 - 0.01, cy - d / 2 + 0.02,
+             cy + d / 2, floor + 0.04, floor + h - 0.025, bev=0.006)
+    kit.span(tuple(v * 0.7 for v in WALNUT), cx - w / 2 + 0.03,
+             cx + w / 2 - 0.03, cy - d / 2 + 0.04, cy + d / 2 - 0.02,
+             floor, floor + 0.04, bev=0.003)
+    kit.span(WALNUT, cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2,
+             floor + h - 0.025, floor + h, bev=0.008)
+    kit.span(tuple(v * 1.12 for v in WALNUT), cx - w / 2 + 0.02,
+             cx + w / 2 - 0.02, cy - d / 2 + 0.002, cy - d / 2 + 0.020,
+             floor + h - 0.17, floor + h - 0.035, bev=0.004)
+    _knob_out(kit, BRASS, cx, cy - d / 2 + 0.002, floor + h - 0.10, r=0.012,
+              l=0.020)
+    bm = bmesh.new()
+    _lathe(bm, [(0.0, 0.055), (0.015, 0.058), (0.05, 0.068), (0.10, 0.060),
+                (0.14, 0.035), (0.16, 0.014), (0.17, 0.012)], seg=20)
+    _emit(kit, bm, (0.300, 0.440, 0.580), "lamp_foot", (cx, cy, floor + h))
+    bm = bmesh.new()
+    _lathe(bm, [(0.17, 0.006), (0.25, 0.006)], seg=8)
+    _emit(kit, bm, BRASS, "lamp_stem", (cx, cy, floor + h))
+    bm = bmesh.new()
+    _lathe(bm, [(0.21, 0.0004), (0.21, 0.128), (0.215, 0.130), (0.36, 0.085),
+                (0.365, 0.082), (0.365, 0.0004)], seg=28)
+    _emit(kit, bm, (0.930, 0.900, 0.810), "lamp_shade", (cx, cy, floor + h))
+
+
+def wardrobe(kit, x0, x1, y0, y1, z, h, face):
+    """A walnut wardrobe: carcass, plinth, a cornice, and panelled doors with
+    a bar pull each — `face` is the side the doors are on, '+y', '+x' or
+    '-x'. Built facing −Y at the origin and turned."""
+    yaw = {"+y": math.pi, "+x": math.pi / 2, "-x": -math.pi / 2}[face]
+    w = (x1 - x0) if face == "+y" else (y1 - y0)
+    d = (y1 - y0) if face == "+y" else (x1 - x0)
+    at = ((x0 + x1) / 2, (y0 + y1) / 2, z)
+    dark = tuple(v * 0.62 for v in WALNUT)
+    lite = tuple(v * 1.10 for v in WALNUT)
+    bm = bmesh.new()
+    bm_box(bm, 0, 0.01, h / 2, w, d - 0.02, h - 0.02)
+    bm_box(bm, 0, -0.005, h - 0.012, w + 0.024, d + 0.01, 0.026)
+    ob = new_object(bm, "wardrobe")
+    bevel(ob, 0.006, segments=2)
+    _place(ob, at[0], at[1], at[2], yaw)
+    kit.adopt(ob, WALNUT)
+    bm = bmesh.new()
+    bm_box(bm, 0, 0.02, 0.035, w - 0.04, d - 0.06, 0.07)
+    ob = new_object(bm, "plinth")
+    _place(ob, at[0], at[1], at[2], yaw)
+    kit.adopt(ob, dark)
+    n = max(1, int(round(w / 0.60)))
+    dw = w / n
+    yf = -d / 2
+    doors, mould = bmesh.new(), bmesh.new()
+    for i in range(n):
+        x = -w / 2 + dw * (i + 0.5)
+        bm_box(doors, x, yf - 0.009, h / 2 + 0.03, dw - 0.006, 0.018, h - 0.13)
+        ix, iz = dw / 2 - 0.075, (h - 0.13) / 2 - 0.08
+        zc = h / 2 + 0.03
+        for bx, bz, sx, sz in ((x - ix, zc, 0.018, 2 * iz + 0.018),
+                               (x + ix, zc, 0.018, 2 * iz + 0.018),
+                               (x, zc - iz, 2 * ix, 0.018),
+                               (x, zc + iz, 2 * ix, 0.018),
+                               (x, zc + 0.10, 2 * ix, 0.018)):
+            bm_box(mould, bx, yf - 0.021, bz, sx, 0.008, sz)
+    for bm, col, nm in ((doors, lite, "doors"), (mould, WALNUT, "moulding")):
+        ob = new_object(bm, nm)
+        bevel(ob, 0.003, segments=1)
+        _place(ob, at[0], at[1], at[2], yaw)
+        kit.adopt(ob, col)
+    # Pulls, beside the meeting stiles: a pair meets in the middle of two
+    # doors, and a single door takes its pull on the side away from the hinge.
+    c, s = math.cos(yaw), math.sin(yaw)
+    W_ = lambda lx, ly, lz: (at[0] + lx * c - ly * s, at[1] + lx * s + ly * c,
+                             at[2] + lz)
+    out = (s * 1.0, -c * 1.0, 0.0)
+    for i in range(n):
+        x = -w / 2 + dw * (i + 0.5)
+        side = 1 if (i % 2 == 0 and i + 1 < n) or (n == 1) else -1
+        hx = x + side * (dw / 2 - 0.045)
+        _bar_handle(kit, W_(hx, yf - 0.018, h * 0.48), W_(hx, yf - 0.018,
+                    h * 0.48 + 0.16), out, r=0.006, off=0.028, colour=BRASS)
+
+
+# ── the bookcase ────────────────────────────────────────────────────────────
+
+def _book(kit, M, t, d, h, colour, style, sag=None):
+    """One book in its own frame — x across the thickness, the spine at y = 0
+    bulging toward −y, the boards running back to +y, z up — then moved by M.
+
+    The cover is a U in plan, boards and a rounded spine, so the page block
+    shows cream between the boards at the top and the fore-edge; and it goes
+    up in bands, because the bands are what make a spine a spine: gilt rules
+    on cloth, a title panel on a paperback, the two-tone of an orange series.
+    """
+    hard = style in ("cloth", "panel")
+    b = 0.0024 if hard else 0.0011
+    sag = sag if sag is not None else (min(0.0045, t * 0.16) if hard else 0.0014)
+    arc = 4
+    poly = [(t / 2, d)]
+    for i in range(arc + 1):
+        a = math.pi * i / arc
+        poly.append((t / 2 * math.cos(a), sag * (1 - math.sin(a))))
+    poly.append((-t / 2, d))
+    poly.append((-t / 2 + b, d))
+    for i in range(arc, -1, -1):
+        a = math.pi * i / arc
+        poly.append(((t / 2 - b) * math.cos(a), b + sag * (1 - math.sin(a))))
+    poly.append((t / 2 - b, d))
+    if style == "cloth":
+        bands = [(0.0, 0.07, colour), (0.07, 0.085, GILT), (0.085, 0.62, colour),
+                 (0.62, 0.80, tuple(v * 0.55 for v in colour)),
+                 (0.80, 0.90, colour), (0.90, 0.915, GILT), (0.915, 1.0, colour)]
+    elif style == "panel":
+        bands = [(0.0, 0.66, colour), (0.66, 0.84, (0.88, 0.86, 0.80)),
+                 (0.84, 1.0, colour)]
+    elif style == "duo":
+        other = FRNG.choice([(0.90, 0.89, 0.86), (0.10, 0.10, 0.11)])
+        bands = [(0.0, 0.30, other), (0.30, 1.0, colour)]
+    else:
+        bands = [(0.0, 1.0, colour)]
+    for f0, f1, col in bands:
+        vs = bm_prism(kit.bm(col, 0.0), poly, f0 * h, f1 * h)
+        _xf(vs, M)
+    inset = 0.0030 if hard else 0.0006
+    vs = bm_box(kit.bm(PAGES, 0.0), 0.0, (b + sag + d - inset) / 2, h / 2,
+                t - 2 * b, d - inset - b - sag, h - 2 * inset)
+    _xf(vs, M)
+
+
+def _book_dims(rng, hmax, dmax, style=None):
+    k = rng.random()
+    if k < 0.45:                       # paperbacks
+        h, d = rng.uniform(0.176, 0.200), rng.uniform(0.108, 0.125)
+        t = rng.uniform(0.012, 0.032)
+        st = style or rng.choice(["plain", "plain", "panel", "duo"])
+    elif k < 0.75:                     # trade and guides
+        h, d = rng.uniform(0.205, 0.236), rng.uniform(0.135, 0.155)
+        t = rng.uniform(0.014, 0.030)
+        st = style or rng.choice(["plain", "panel", "duo"])
+    else:                              # cloth
+        h, d = rng.uniform(0.215, 0.262), rng.uniform(0.150, 0.172)
+        t = rng.uniform(0.024, 0.048)
+        st = style or "cloth"
+    if st == "cloth" and t < 0.020:
+        t = 0.022
+    return t, min(d, dmax), min(h, hmax), st
+
+
+def _book_row(kit, x0, x1, yf, z, hmax, dmax, rng, lean=True):
+    """Fill a shelf from x0 toward x1 with books standing, in short runs of a
+    series now and then, pushed in to different depths, and one leaning on
+    the last of them if there is room for it to lean."""
+    x = x0 + 0.002
+    last = None
+    series = 0
+    # A row that is going to end in a leaning book stops short to leave it
+    # the room; a row that is not goes all the way to the side.
+    xend = x1 - (rng.uniform(0.045, 0.075) if lean else 0.0)
+    while True:
+        if series <= 0:
+            t, d, h, st = _book_dims(rng, hmax, dmax)
+            col = rng.choice(SPINES)
+            series = 1 if rng.random() < 0.75 else rng.randint(2, 4)
+        else:
+            t = max(0.012, t + rng.uniform(-0.004, 0.004))
+        if x + t > xend - 0.002:
+            break
+        push = rng.uniform(0.0, 0.016)
+        M = _M((x + t / 2, yf + push, z), yaw=rng.uniform(-0.025, 0.025))
+        _book(kit, M, t, d, h, tuple(min(1.0, v * rng.uniform(0.92, 1.06))
+                                     for v in col), st)
+        x += t + rng.uniform(0.0, 0.0012)
+        last = (x, h)
+        series -= 1
+    if not (lean and last) or x1 - x < 0.035:
+        return x
+    # Lean one on the last: pivot on its bottom-left edge at P, rest its left
+    # face on the top corner of the book before it.
+    t, d, h, st = _book_dims(rng, hmax, dmax)
+    t = min(t, max(0.012, x1 - x - 0.032))
+    gap = min(0.75 * last[1] * math.tan(0.42), x1 - x - t - 0.004)
+    if gap < 0.012:
+        return x
+    th = math.atan2(gap, last[1] * 0.98)
+    P = x + gap
+    if P + t * math.cos(th) > x1 - 0.002:
+        return x
+    M = (_M((P, yf + rng.uniform(0.0, 0.01), z)) @ Matrix.Rotation(-th, 4, "Y")
+         @ Matrix.Translation(Vector((t / 2, 0.0, 0.0))))
+    _book(kit, M, t, d, h, rng.choice(SPINES), st)
+    return x1
+
+
+def _book_stack(kit, xr, yf, z, n, rng, wmax=0.30, dmax=0.25):
+    """Books lying flat, spines out, each a little off the one under it."""
+    zz = z
+    for _ in range(n):
+        t, d, h, st = _book_dims(rng, wmax, dmax)
+        M = (_M((xr - rng.uniform(0.0, 0.015), yf + rng.uniform(0.0, 0.012),
+                 zz + t / 2), yaw=rng.uniform(-0.04, 0.04))
+             @ Matrix.Rotation(-math.pi / 2, 4, "Y"))
+        _book(kit, M, t, d, h, rng.choice(SPINES), st)
+        zz += t
+    return zz
+
+
+def _bookend(kit, x, yf, z, side=1):
+    """A bent steel bookend: a foot under the books, a plate up against them."""
+    kit.span(DARKMETAL, x - side * 0.075, x, yf + 0.03, yf + 0.14, z, z + 0.002,
+             bev=0.0008)
+    kit.span(DARKMETAL, x - side * 0.002, x, yf + 0.03, yf + 0.14, z,
+             z + 0.150, bev=0.0008)
+
+
+def _shell(kit, x, y, z, yaw):
+    """A scallop off the beach: a fan, ribbed, lying cupped side up."""
+    bm = bmesh.new()
+    vs = _superball(bm, 0.045, 0.040, 0.012, p=2.4, q=2.0, rows=6, seg=18)
+    for v in vs:
+        a = math.atan2(v.co.y, v.co.x)
+        v.co.z += 0.0025 * math.cos(a * 12) * (abs(v.co.x) + abs(v.co.y)) / 0.04
+    _xf(vs, _M((x, y, z + 0.010), yaw=yaw))
+    _emit(kit, bm, (0.900, 0.780, 0.700), "shell")
+
+
+def _jar(kit, x, y, z, colour=TERRACOTTA, r=0.032, h=0.080):
+    """A small pot of pencils, open, with the pencils in it."""
+    _vessel(kit, x, y, z, z + h, r * 0.92, r, 0.004, colour,
+            tuple(v * 0.7 for v in colour), seg=16)
+    for i, c in enumerate([(0.85, 0.65, 0.15), (0.20, 0.35, 0.70),
+                           (0.75, 0.15, 0.12)]):
+        a = TAU * i / 3 + 0.4
+        bm2 = bmesh.new()
+        _tube(bm2, [(x + 0.010 * math.cos(a), y + 0.010 * math.sin(a), z + 0.01),
+                    (x + 0.022 * math.cos(a), y + 0.022 * math.sin(a),
+                     z + h + 0.060)], 0.0038, seg=6)
+        _emit(kit, bm2, c, "pencil")
+
+
+def bookshelf(kit, cx, cy, z):
+    """The white bookcase on castors from the photographs: two drawers along
+    the top, four cubbies under them, and it is full.
+
+    It used to be a beech frame with two rows of identical boxes in it, which
+    is what a bookcase is from the terrace. From the front door, which is
+    where Misha stands, a shelf of books is the most detailed thing in any
+    room — sixty different spines at different heights, some pushed in, one
+    leaning, a pile lying flat with something put down on top of it — and a
+    row of coloured slats is the opposite of that.
+
+    Same place, same 0.74 width against the spine wall. It faces −Y."""
+    W, D, H = 0.74, 0.29, 0.86
+    cy = cy - 0.005                     # 0.29 deep, the back still on the wall
+    yf = cy - D / 2
+    p = 0.018
+    rng = FRNG
+    # Castors.
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            wx, wy = cx + sx * (W / 2 - 0.05), cy + sy * (D / 2 - 0.05)
+            kit.span(DARKMETAL, wx - 0.012, wx + 0.012, wy - 0.014, wy + 0.014,
+                     z + 0.030, z + 0.048, bev=0.002)
+            vs = bm_cylinder(kit.bm(BLACK, 0.002), 0, 0, -0.008, 0.008, 0.021,
+                             0.021, seg=14)
+            _rot_y(vs, wx, wy, z + 0.022)
+    z0 = z + 0.048
+    kit.span(MELAMINE, cx - W / 2, cx + W / 2, yf, cy + D / 2, z0, z0 + p,
+             bev=0.003)
+    kit.span(MELAMINE, cx - W / 2, cx + W / 2, yf, cy + D / 2, z + H - p,
+             z + H, bev=0.003)
+    for s in (-1, 1):
+        kit.span(MELAMINE, cx + s * (W / 2 - p), cx + s * W / 2, yf,
+                 cy + D / 2, z0, z + H, bev=0.003)
+    kit.span(tuple(v * 0.90 for v in MELAMINE), cx - W / 2 + p,
+             cx + W / 2 - p, cy + D / 2 - 0.006, cy + D / 2, z0 + p, z + H - p,
+             bev=0.001)
+    zs1 = z0 + p + 0.300                # the shelf between the two rows
+    zs2 = z + H - p - 0.165             # and the one under the drawers
+    for zz in (zs1, zs2):
+        kit.span(MELAMINE, cx - W / 2 + p, cx + W / 2 - p, yf + 0.004,
+                 cy + D / 2 - 0.006, zz, zz + p, bev=0.002)
+    kit.span(MELAMINE, cx - 0.008, cx + 0.008, yf + 0.004, cy + D / 2 - 0.006,
+             z0 + p, zs2, bev=0.002)
+    # The drawers.
+    dz0, dz1 = zs2 + p + 0.003, z + H - p - 0.003
+    for s in (-1, 1):
+        a0 = cx + (0.0015 if s > 0 else -W / 2 + p + 0.002)
+        a1 = cx + (W / 2 - p - 0.002 if s > 0 else -0.0015)
+        kit.span(MELA_FRONT, a0, a1, yf - 0.016, yf + 0.002, dz0, dz1,
+                 bev=0.004)
+        _knob_out(kit, BEECH, (a0 + a1) / 2, yf - 0.016, (dz0 + dz1) / 2,
+                  r=0.013, l=0.022)
+    # The four cubbies.
+    L0, L1 = cx - W / 2 + p, cx - 0.008
+    R0, R1 = cx + 0.008, cx + W / 2 - p
+    rowz = (z0 + p, zs1 + p)
+    hmax = 0.290
+    dmax = D - 0.045
+    yb = yf + 0.012
+    # Bottom left: a pile of big books and atlases lying flat, then upright.
+    top = _book_stack(kit, L0 + 0.232, yb, rowz[0], 4, rng, wmax=0.215)
+    _book_row(kit, L0 + 0.238, L1, yb, rowz[0], hmax, dmax, rng, lean=False)
+    # Bottom right: a full row, the last one leaning.
+    _book_row(kit, R0, R1, yb, rowz[0], hmax, dmax, rng)
+    # Top left: books, a bookend, and the shell somebody put down there.
+    x = _book_row(kit, L0, L1 - 0.095, yb, rowz[1], hmax, dmax, rng, lean=False)
+    _bookend(kit, x + 0.003, yb - 0.01, rowz[1], side=1)
+    _shell(kit, (x + L1) / 2 + 0.01, yb + 0.07, rowz[1], 0.6)
+    # Top right: a short pile with the pencil pot on it, then the rest.
+    top = _book_stack(kit, R0 + 0.20, yb, rowz[1], 3, rng, wmax=0.20,
+                      dmax=0.15)
+    _jar(kit, R0 + 0.10, yb + 0.09, top)
+    _book_row(kit, R0 + 0.205, R1, yb, rowz[1], hmax, dmax, rng)
+
+    # On top: two magazines with the straw hat put down on them, and a pot
+    # with a succulent in it.
+    kit.span((0.82, 0.30, 0.22), cx - 0.30, cx - 0.08, yf + 0.03, yf + 0.27,
+             z + H, z + H + 0.004, bev=0.001)
+    vs = bm_box(kit.bm((0.25, 0.45, 0.60), 0.001), 0, 0, 0.002, 0.21, 0.27,
+                0.004)
+    _xf(vs, _M((cx - 0.18, yf + 0.15, z + H + 0.004), yaw=0.22))
+    straw_hat(kit, cx - 0.12, cy - 0.025, z + H + 0.008)
+    _vessel(kit, cx + 0.24, cy, z + H, z + H + 0.085, 0.040, 0.050, 0.005,
+            TERRACOTTA, tuple(v * 0.6 for v in TERRACOTTA), seg=18)
+    bm = bmesh.new()
+    for i in range(7):
+        a = TAU * i / 7
+        vs = _superball(bm, 0.022, 0.011, 0.009, p=2, q=2, rows=5, seg=10)
+        _xf(vs, _M((cx + 0.24 + 0.018 * math.cos(a), cy + 0.018 * math.sin(a),
+                    z + H + 0.082), yaw=a, ry=-0.5))
+    _superball(bm, 0.016, 0.016, 0.014, p=2, q=2, rows=5, seg=10,
+               at=(cx + 0.24, cy, z + H + 0.088))
+    _emit(kit, bm, (0.38, 0.55, 0.40), "succulent")
+
+
+# ── small things ────────────────────────────────────────────────────────────
+
+def _mug(kit, x, y, z, colour=CERAMIC):
+    """A mug with coffee left in the bottom of it, and a handle."""
+    _vessel(kit, x, y, z, z + 0.095, 0.038, 0.040, 0.004, colour,
+            tuple(v * 0.93 for v in colour), seg=20)
+    bm_cylinder(kit.bm((0.18, 0.10, 0.06), 0.0), x, y, z + 0.035, z + 0.038,
+                0.0355, 0.0355, seg=20)
+    bm = bmesh.new()
+    pts = [(x + 0.038, y, z + 0.075)]
+    for i in range(1, 8):
+        a = math.pi / 2 - math.pi * i / 8
+        pts.append((x + 0.040 + 0.026 * math.cos(a), y, z + 0.047 + 0.028 * math.sin(a)))
+    pts.append((x + 0.038, y, z + 0.020))
+    _tube(bm, pts, 0.0055, seg=8)
+    _emit(kit, bm, colour, "mug_handle")
+
+
+def fruit_bowl(kit, x, y, z):
+    """A shallow glazed bowl with what is on every Dalmatian table in August:
+    oranges, two lemons and the figs off the tree."""
+    _vessel(kit, x, y, z, z + 0.070, 0.055, 0.125, 0.006, (0.22, 0.40, 0.58),
+            (0.86, 0.84, 0.78), floor=0.010, seg=26)
+    bm_o, bm_l, bm_f = bmesh.new(), bmesh.new(), bmesh.new()
+    for a, rr in ((0.3, 0.055), (2.3, 0.050), (4.3, 0.052)):
+        bm_ball(bm_o, x + rr * math.cos(a), y + rr * math.sin(a), z + 0.050,
+                0.036, 0.036, 0.034, rows=7, seg=14)
+    for a in (1.3, 3.3):
+        vs = _superball(bm_l, 0.040, 0.028, 0.028, p=2, q=2, rows=7, seg=14)
+        _xf(vs, _M((x + 0.060 * math.cos(a), y + 0.060 * math.sin(a), z + 0.052),
+                   yaw=a + 1.2, ry=0.2))
+    for a in (0.0, 1.9, 3.8, 5.2):
+        vs = _superball(bm_f, 0.022, 0.022, 0.027, p=2, q=2, rows=6, seg=12)
+        _xf(vs, _M((x + 0.018 * math.cos(a), y + 0.018 * math.sin(a), z + 0.085),
+                   rx=0.4 * math.cos(a), ry=0.4 * math.sin(a)))
+    _emit(kit, bm_o, (0.900, 0.470, 0.090), "oranges")
+    _emit(kit, bm_l, (0.920, 0.820, 0.250), "lemons")
+    _emit(kit, bm_f, (0.330, 0.170, 0.270), "figs")
+
+
+def herb_jug(kit, x, y, z):
+    """A white jug of what grows on the hill behind the house: rosemary, and
+    immortelle — smilje — gone gold."""
+    _vessel(kit, x, y, z, z + 0.160, 0.050, 0.040, 0.005, CERAMIC,
+            (0.80, 0.80, 0.78), seg=18)
+    bm = bmesh.new()
+    _tube(bm, [(x - 0.040, y, z + 0.140), (x - 0.075, y, z + 0.128),
+               (x - 0.082, y, z + 0.090), (x - 0.072, y, z + 0.055),
+               (x - 0.048, y, z + 0.045)], 0.006, seg=8)
+    _emit(kit, bm, CERAMIC, "jug_handle")
+    stems, leaves, flowers = bmesh.new(), bmesh.new(), bmesh.new()
+    for i in range(11):
+        a = TAU * i / 11 + FRNG.uniform(-0.2, 0.2)
+        lean = FRNG.uniform(0.15, 0.55)
+        L = FRNG.uniform(0.20, 0.32)
+        base = (x + 0.010 * math.cos(a), y + 0.010 * math.sin(a), z + 0.03)
+        tip = (base[0] + math.cos(a) * math.sin(lean) * L,
+               base[1] + math.sin(a) * math.sin(lean) * L,
+               base[2] + math.cos(lean) * L)
+        mid = tuple((base[k] + tip[k]) / 2 for k in range(3))
+        _tube(stems, [base, mid, tip], 0.0018, seg=4)
+        if i % 3 == 0:
+            for k in range(3):
+                u = 0.85 + 0.07 * k
+                p = tuple(base[j] + (tip[j] - base[j]) * u for j in range(3))
+                bm_ball(flowers, p[0] + FRNG.uniform(-0.01, 0.01),
+                        p[1] + FRNG.uniform(-0.01, 0.01), p[2], 0.012, 0.012,
+                        0.007, rows=4, seg=8)
+        else:
+            for k in range(7):
+                u = 0.45 + 0.08 * k
+                p = tuple(base[j] + (tip[j] - base[j]) * u for j in range(3))
+                vs = _superball(leaves, 0.010, 0.0022, 0.0022, p=2, q=2,
+                                rows=3, seg=5)
+                _xf(vs, _M(p, yaw=a + (1.2 if k % 2 else -1.2), ry=-0.6))
+    _emit(kit, stems, (0.36, 0.40, 0.26), "stems")
+    _emit(kit, leaves, LEAF, "rosemary", smooth=False)
+    _emit(kit, flowers, SMILJE, "smilje", smooth=False)
+
+
+def straw_hat(kit, x, y, z, s=0.86):
+    """The straw hat every summer house has, put down crown-up where there
+    was room: a brim with its edge turned up, a crown, a navy band."""
+    bm = bmesh.new()
+    vs = _lathe(bm, [(0.004, 0.070), (0.000, 0.120), (0.006, 0.165),
+                     (0.020, 0.182), (0.026, 0.178), (0.014, 0.160),
+                     (0.010, 0.118), (0.014, 0.070)], seg=36)
+    vs += _lathe(bm, [(0.010, 0.076), (0.074, 0.072), (0.104, 0.060),
+                      (0.114, 0.030), (0.117, 0.0004)], seg=30)
+    M = _M((x, y, z), yaw=0.5, rx=0.035) @ Matrix.Scale(s, 4)
+    _xf(vs, M)
+    _emit(kit, bm, STRAW, "hat")
+    bm = bmesh.new()
+    vs = _lathe(bm, [(0.014, 0.0775), (0.038, 0.0755)], seg=30)
+    _xf(vs, M)
+    _emit(kit, bm, (0.12, 0.18, 0.36), "hatband")
+
+
+def rug(kit, x0, x1, y0, y1, z):
+    """The teal cotton rug: a woven border a shade darker, and a knotted
+    fringe along both short ends."""
+    kit.span(TEAL, x0, x1, y0, y1, z + 0.010, z + 0.020, bev=0.004)
+    dk = tuple(v * 0.72 for v in TEAL)
+    b, w = 0.045, 0.035
+    for a0, a1, b0, b1 in ((x0 + b, x1 - b, y0 + b, y0 + b + w),
+                           (x0 + b, x1 - b, y1 - b - w, y1 - b),
+                           (x0 + b, x0 + b + w, y0 + b, y1 - b),
+                           (x1 - b - w, x1 - b, y0 + b, y1 - b)):
+        kit.span(dk, a0, a1, b0, b1, z + 0.019, z + 0.0215, bev=0.0)
+    n = 28
+    for s_, xe in ((-1, x0), (1, x1)):
+        for i in range(n):
+            y = y0 + 0.02 + (y1 - y0 - 0.04) * (i + 0.5) / n
+            L = 0.045 + 0.010 * math.sin(i * 2.3)
+            vs = bm_box(kit.bm((0.90, 0.88, 0.80), 0.0), 0.0, 0.0, 0.0, L,
+                        0.008, 0.004)
+            _xf(vs, _M((xe + s_ * L / 2, y, z + 0.0145),
+                       yaw=0.10 * math.sin(i * 1.7)))
+
+
+def electric_kettle(kit, x, y, z):
+    """The kettle on the worktop: a base, a steel body narrowing to the lid,
+    a spout, and a black loop of a handle."""
+    bm = bmesh.new()
+    _lathe(bm, [(0.0, 0.088), (0.012, 0.090), (0.018, 0.084)], seg=24,
+           at=(x, y, z))
+    _emit(kit, bm, BLACK, "kettle_base")
+    bm = bmesh.new()
+    _lathe(bm, [(0.018, 0.0004), (0.018, 0.076), (0.030, 0.082),
+                (0.120, 0.078), (0.190, 0.064), (0.214, 0.052),
+                (0.216, 0.0004)], seg=24, at=(x, y, z))
+    vs = _lathe(bm, [(0.0, 0.016), (0.05, 0.010), (0.055, 0.008)], seg=10)
+    _xf(vs, _M((x - 0.066, y, z + 0.165), ry=-1.0))
+    _emit(kit, bm, CHROME, "kettle")
+    bm = bmesh.new()
+    _lathe(bm, [(0.214, 0.050), (0.222, 0.046), (0.234, 0.016),
+                (0.236, 0.0004)], seg=20, at=(x, y, z))
+    _tube(bm, [(x + 0.070, y, z + 0.190), (x + 0.110, y, z + 0.175),
+               (x + 0.120, y, z + 0.110), (x + 0.105, y, z + 0.050),
+               (x + 0.078, y, z + 0.040)], 0.010, seg=8)
+    _emit(kit, bm, BLACK, "kettle_lid")
+
+
+def radio(kit, x, y, z):
+    """A little transistor radio on the worktop, facing the room (−Y): a red
+    case, a cream grille with a speaker behind it, a dial, two knobs, a
+    handle and its aerial up."""
+    bm = bmesh.new()
+    _superball(bm, 0.110, 0.042, 0.068, p=8, q=8, rows=10, seg=32,
+               at=(x, y, z + 0.068))
+    _emit(kit, bm, (0.640, 0.150, 0.120), "radio")
+    bm = bmesh.new()
+    vs = _superball(bm, 0.060, 0.050, 0.004, p=6, q=2, rows=4, seg=20)
+    _xf(vs, _M((x - 0.040, y - 0.041, z + 0.068), rx=math.pi / 2))
+    _emit(kit, bm, (0.880, 0.840, 0.740), "radio_grille")
+    for k in range(5):
+        kit.span((0.30, 0.28, 0.26), x - 0.090, x + 0.010, y - 0.0465,
+                 y - 0.0455, z + 0.038 + k * 0.014, z + 0.042 + k * 0.014,
+                 bev=0.0)
+    kit.span((0.10, 0.10, 0.11), x + 0.035, x + 0.095, y - 0.046, y - 0.040,
+             z + 0.075, z + 0.105, bev=0.002)
+    kit.span((0.90, 0.45, 0.10), x + 0.060, x + 0.062, y - 0.0466, y - 0.045,
+             z + 0.078, z + 0.102, bev=0.0)
+    for kx in (x + 0.045, x + 0.085):
+        bm_cylinder(kit.bm(KNOB_C, 0.002), kx, y - 0.005, z + 0.134,
+                    z + 0.146, 0.010, 0.009, seg=12)
+    bm = bmesh.new()
+    _tube(bm, [(x - 0.085, y, z + 0.128), (x - 0.080, y, z + 0.168),
+               (x - 0.040, y, z + 0.178), (x + 0.000, y, z + 0.168),
+               (x + 0.005, y, z + 0.128)], 0.0050, seg=8)
+    _emit(kit, bm, BLACK, "radio_handle")
+    bm = bmesh.new()
+    _tube(bm, [(x + 0.098, y + 0.02, z + 0.128),
+               (x + 0.180, y + 0.05, z + 0.420)], 0.0018, seg=6)
+    _emit(kit, bm, CHROME, "aerial")
+
+
+def dzezva(kit, x, y, z):
+    """The džezva on the front plate: a waisted steel pot with a lip and a
+    long wooden handle."""
+    _vessel(kit, x, y, z, z + 0.090, 0.040, 0.034, 0.003, (0.70, 0.71, 0.72),
+            (0.30, 0.20, 0.14), floor=0.050, seg=18)
+    bm = bmesh.new()
+    _tube(bm, [(x + 0.032, y - 0.02, z + 0.070), (x + 0.10, y - 0.08, z + 0.095),
+               (x + 0.17, y - 0.14, z + 0.110)], 0.006, seg=8)
+    _emit(kit, bm, WOOD_D, "dzezva_handle")
 
 
 def daybed(kit, cx, cy, yaw, l=1.92):
@@ -4205,129 +5429,6 @@ def daybed(kit, cx, cy, yaw, l=1.92):
     bevel(ob, 0.07, segments=2)
     _place(ob, cx, cy, F2, yaw)
     kit.adopt(ob, LINEN)
-
-
-def bed(kit, cx, cy, yaw, w=1.42, l=2.00, floor=F2):
-    bm = bmesh.new()
-    bm_box(bm, 0, 0, 0.16, l, w, 0.24)
-    bm_box(bm, -l / 2 + 0.04, 0, 0.44, 0.08, w + 0.06, 0.80)     # headboard
-    bm_box(bm, l / 2 - 0.04, 0, 0.30, 0.08, w + 0.06, 0.52)      # footboard
-    ob = new_object(bm, "bedframe")
-    bevel(ob, 0.014, segments=2)
-    _place(ob, cx, cy, floor, yaw)
-    kit.adopt(ob, WALNUT)
-    bm = bmesh.new()
-    bm_box(bm, 0, 0, 0.40, l - 0.12, w - 0.06, 0.22)
-    ob = new_object(bm, "mattress")
-    bevel(ob, 0.05, segments=2)
-    _place(ob, cx, cy, floor, yaw)
-    kit.adopt(ob, LINEN)
-    for s in (-1, 1):
-        bm = bmesh.new()
-        bm_box(bm, -l / 2 + 0.34, s * 0.30, 0.56, 0.44, 0.52, 0.14)
-        ob = new_object(bm, "pillow")
-        bevel(ob, 0.06, segments=2)
-        _place(ob, cx, cy, floor, yaw + RNG.uniform(-0.12, 0.12))
-        kit.adopt(ob, LINEN)
-    # A duvet thrown back, and the purple cushion that is always on it.
-    bm = bmesh.new()
-    bm_box(bm, 0.22, -0.06, 0.53, l - 0.70, w - 0.14, 0.10)
-    ob = new_object(bm, "duvet")
-    bevel(ob, 0.05, segments=2)
-    _place(ob, cx, cy, floor, yaw)
-    kit.adopt(ob, (0.86, 0.85, 0.80))
-    bm = bmesh.new()
-    bm_box(bm, -0.30, 0.18, 0.60, 0.34, 0.34, 0.13)
-    ob = new_object(bm, "cushion")
-    bevel(ob, 0.055, segments=2)
-    _place(ob, cx, cy, floor, yaw + 0.4)
-    kit.adopt(ob, (0.45, 0.32, 0.62))
-
-
-def wooden_chair(kit, cx, cy, z, yaw):
-    bm = bmesh.new()
-    bm_box(bm, 0, 0, 0.44, 0.40, 0.40, 0.035)
-    for sx in (-0.16, 0.16):
-        for sy in (-0.16, 0.16):
-            bm_box(bm, sx, sy, 0.21, 0.036, 0.036, 0.42)
-    bm_box(bm, -0.18, 0, 0.66, 0.036, 0.38, 0.46)
-    for zz in (0.62, 0.78):
-        bm_box(bm, -0.18, 0, zz, 0.040, 0.36, 0.07)
-    ob = new_object(bm, "chair")
-    bevel(ob, 0.006)
-    _place(ob, cx, cy, z, yaw)
-    kit.adopt(ob, BEECH)
-
-
-def plastic_chair(kit, cx, cy, z, yaw):
-    """The white monobloc. There are four of them in this flat and they are on
-    the terrace, at the table and in front of the laptop."""
-    bm = bmesh.new()
-    bm_box(bm, 0, 0, 0.45, 0.44, 0.44, 0.035)
-    for sx in (-0.17, 0.17):
-        for sy in (-0.17, 0.17):
-            bm_box(bm, sx, sy, 0.22, 0.032, 0.032, 0.44)
-    bm_box(bm, -0.20, 0, 0.70, 0.030, 0.42, 0.50)
-    for s in (-1, 1):
-        bm_box(bm, -0.02, s * 0.21, 0.60, 0.34, 0.030, 0.030)
-    ob = new_object(bm, "monobloc")
-    bevel(ob, 0.010, segments=2)
-    _place(ob, cx, cy, z, yaw)
-    kit.adopt(ob, PLASTIC_W)
-
-
-def plastic_table(kit, cx, cy, z, r=0.40):
-    bm = bmesh.new()
-    bm_cylinder(bm, 0, 0, 0.68, 0.72, r, r, seg=22)
-    for a in range(4):
-        ang = TAU * a / 4 + 0.78
-        bm_box(bm, math.cos(ang) * (r - 0.09), math.sin(ang) * (r - 0.09),
-               0.34, 0.05, 0.05, 0.68)
-    ob = new_object(bm, "gardentable")
-    bevel(ob, 0.008)
-    _place(ob, cx, cy, z, 0.0)
-    kit.adopt(ob, PLASTIC_W)
-
-
-def round_table(kit, cx, cy, z, r=0.30, h=0.44):
-    bm = bmesh.new()
-    bm_cylinder(bm, 0, 0, h - 0.03, h, r, r, seg=22)
-    for a in range(3):
-        ang = TAU * a / 3
-        bm_box(bm, math.cos(ang) * (r - 0.07), math.sin(ang) * (r - 0.07),
-               (h - 0.03) / 2, 0.035, 0.035, h - 0.03)
-    ob = new_object(bm, "coffeetable")
-    bevel(ob, 0.006)
-    _place(ob, cx, cy, z, 0.0)
-    kit.adopt(ob, BEECH)
-
-
-def bookshelf(kit, cx, cy, z):
-    bm = bmesh.new()
-    w, d, h = 0.74, 0.28, 0.86
-    bm_box(bm, 0, 0, h / 2, w, d, 0.020)
-    for s in (-1, 1):
-        bm_box(bm, s * (w / 2 - 0.01), 0, h / 2, 0.020, d, h)
-    for zz in (0.02, h / 2, h - 0.02):
-        bm_box(bm, 0, 0, zz, w, d, 0.020)
-    ob = new_object(bm, "shelf")
-    bevel(ob, 0.004)
-    _place(ob, cx, cy, z, 0.0)
-    kit.adopt(ob, BEECH)
-    for row, zz in ((0, 0.03), (1, h / 2 + 0.01)):
-        x = -w / 2 + 0.04
-        while x < w / 2 - 0.06:
-            t = RNG.uniform(0.016, 0.042)
-            hh = RNG.uniform(0.16, 0.26)
-            bm = bmesh.new()
-            bm_box(bm, x + t / 2, 0, zz + hh / 2, t, d - 0.06, hh)
-            ob = new_object(bm, "book")
-            bevel(ob, 0.002)
-            _place(ob, cx, cy, z, 0.0)
-            kit.adopt(ob, RNG.choice([(0.62, 0.18, 0.16), (0.18, 0.28, 0.48),
-                                      (0.80, 0.74, 0.58), (0.22, 0.42, 0.28),
-                                      (0.52, 0.44, 0.36), (0.78, 0.56, 0.20)]))
-            x += t + 0.004
 
 
 def vacuum(kit, cx, cy, z):
@@ -4370,13 +5471,6 @@ def fan(kit, cx, cy, z):
     _lay_disc(kit, (0.86, 0.86, 0.85), cx, cy - 0.05, z + 0.88, 0.19, 0.03)
     _lay_disc(kit, (0.75, 0.75, 0.74), cx, cy - 0.10, z + 0.88, 0.19, 0.02)
     _lay_disc(kit, WHITEGOODS, cx, cy + 0.02, z + 0.88, 0.06, 0.10)
-
-
-def kettle(kit, cx, cy, z):
-    bm_cylinder(kit.bm(BLACK, 0.006), cx, cy, z, z + 0.24, 0.075, 0.070,
-                seg=14)
-    kit.span(BLACK, cx - 0.02, cx + 0.02, cy - 0.13, cy - 0.07, z + 0.04,
-             z + 0.22, bev=0.006)
 
 
 def _glyph(ch, t=0.20):
