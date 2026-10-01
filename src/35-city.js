@@ -21,7 +21,7 @@ const CITY = {
 
 /** Roof forms, as OSM codes them. `b.s` is absent when OSM does not say. */
 /** What `buildCity` left out, and why — see NOT ON NOTHING. */
-const CITY_SKIP = { out: 0, sea: 0 };
+const CITY_SKIP = { out: 0, sea: 0, afloat: 0 };
 const ROOF = { GABLE: 0, HIP: 1, FLAT: 2, PYRAMID: 3, SKILLION: 4, ROUND: 5 };
 
 /**
@@ -181,6 +181,25 @@ function buildCity(scene) {
     // in miniature: nothing is ever built on the water.)
     if (Math.abs(cx) > HALF - 30 || Math.abs(cz) > HALF - 30) { CITY_SKIP.out++; continue; }
     if (isSea(cx, cz) && gy < 0.3 && shoreAt(cx, cz) > 50) { CITY_SKIP.sea++; continue; }
+    // Misha, 1 Oct 2026, from the vikendica balcony looking west: *"still
+    // like 2 or 3 houses sticking out of the water"*. Prvić Luka, 3.5 km out:
+    // six footprints on the harbour front of an island this heightmap does
+    // not carry, but only 38–47 m from what the baked shore-distance field
+    // calls a waterline — inside the 50 m margin above, which is there for
+    // real waterfronts the coarse cover grid calls sea. The same fault left
+    // 34 houses of Krapanj, an island barely a metre high in life and absent
+    // from this heightmap, as roofs on the open water off Brodarica. A margin cannot tell those apart from
+    // a riva; the footprint can. A building with NOT ONE corner, nor its
+    // middle, on land stands in the sea, however near a shore. A waterfront
+    // house always has its back on the quay. This one also burns the roof
+    // guess's draw below, so every building after it is what it was.
+    let dry = !isSea(cx, cz);
+    for (let i = 0; !dry && i < pts.length; i++) dry = !isSea(pts[i][0], pts[i][1]);
+    if (!dry && gy < 0) {
+      if (b.s == null) rng();
+      CITY_SKIP.afloat++;
+      continue;
+    }
 
     const eave = Math.max(CITY.eaveMin, b.h);
     const top = base + eave;
