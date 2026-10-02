@@ -8,6 +8,95 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.571.0] — 2026-10-02
+
+### Thin film: an oil sheen in the harbours, and a girl at beach bar MINI blowing soap bubbles
+
+Misha, 06:05, after Ryan Sael's soap-bubble piece: *"schedule it for later for
+the Harbour oil sheen, and maybe one of the bather kids seated at one of the
+chairs near one of the businesses there can be blowing the bubbles"*. That page
+is all rights reserved and nothing of it is used: this is built from the
+textbook.
+
+**The colour is physics, baked at load** (new `src/24-thinfilm.js`, ~60 lines).
+The Airy reflectance of a film, `(r12² + r23² + 2 r12 r23 cos δ) / (1 + r12² r23²
++ 2 r12 r23 cos δ)` with `δ = 2π·OPD/λ`, summed from 380 to 780 nm against the
+CIE 1931 matching functions (the Wyman–Sloan–Shirley 2013 multi-lobe fit), into
+XYZ, into linear sRGB, white-balanced against a perfect reflector. Two rows of
+512 in a byte `DataTexture` with no colour space (so no canvas-style sRGB
+decode): soap in air (n 1.33, `r` ∓0.142, so the film goes **black** as it
+thins to nothing) and oil on water (n 1.45 over 1.333: at zero thickness it is
+bare water's own 0.020, and the fringes only swing it to 0.051, which is why a
+sheen is faint). The soap row reads the known sequence: black, grey-white,
+straw-gold at ~150 nm, magenta and blue at 200–250, then green-and-pink orders
+washing out toward white past a micron. `filmRGB(opd, row)` and `filmCosT` in
+`GLSL_THINFILM`.
+
+**The sheen is in the sea shader, gated twice** (`src/25-sea.js`). Three world
+capsules: the Brod's pier, where the Šibenik boat berths on one face and the
+sixteen small craft lie med-moored on the other (`1000150357`, `_376` — flat
+calm marina water), the inlet behind its root, and the line of dinghies off
+Strand Jadrija (t 45–215, s −38, set from 90-app.js through `sea.sheenAt` once
+the resort's frame exists). `uSheenR.w` is 0 unless the camera is within
+`SEA.sheen.on` (420 m) of one, so the open sea never enters the branch — an
+open-water before/after from 40 m is 0.67 mean pixel difference (wave phase).
+Patches are value noise in the harbour's own frame — positions relative to the
+nearest harbour's end, slid 5 cm/s downwind — domain-warped by two more noises
+at constant scales (no coefficient on an absolute position); about a fifth of
+the water carries film, 30–450 nm thick, thickest in a patch's core (first and
+second order) and grey-clear at its edge. It tints only the **reflection**:
+the film's reflectance over bare water's at the same angle, the optical path
+carrying the angle (`2 n d cos θt`), faded toward grazing, on calm facets only,
+under the foam, and gone past ~3 m of pixel footprint. Sky-lit, so it goes
+with the sky — gone at night. The hue is lifted 1.7× over the brightening (the
+physics is pastel and a frame does not adapt to it the way an eye does); a
+slick also damps the capillary ripple by up to 45%, which is how one reads on a
+grey day. Faint by day over the bright shelf, plainer at dusk. `__fr.sheen()`
+reads it and takes `{ k, on }` (`k` 0.8; `{ k: 0 }` for an A/B).
+
+**The bubble girl** (`stepBubbler`, `WAND` in 43-jadrija.js). The café sitters
+are the pinned skinned tier, dealt the eight bodies round-robin, so two of
+them are children; the bubbler is the child-bodied sitter (under 1.45 m as
+drawn) with both hands free whose terrace is nearest the mole — **the girl
+(`girl_child`, 1.25 m) at beach bar MINI, t 279.6, seat 5**. By rule, no draw
+of anything (rule 4). A pink 13.5 cm wand with a 21 mm ring in her right hand
+and an open blue squeeze bottle on her table, its cap lying beside it. The arm
+is `smokeArm`'s two-frame solve with a wand for a cigarette: at rest the ring
+is down in the bottle's neck (dipping), and every 1.6–4.2 s she brings it up
+in 0.8 s, upright 7 cm in front of her lips (measured ring-to-lips 0.0705 m
+against 0.070 asked), blows for 2 s and goes back down. `fg.bubbles` keeps the
+crowd's hand placer off that arm (42-crowd.js).
+
+**The bubbles** (new `src/43-bubbles.js`): one pool of 48, one
+`InstancedBufferGeometry`, one draw, additive and both faces in a single pass,
+so they need no sorting. Six to ten a second off the ring while she blows,
+0.35–0.85 m/s along her face, radius 8–36 mm (mostly small), a quick swell as
+they leave the ring and a moment's ringing; then drag toward the terrace's air
+(4.5% of the true wind, with its gusts), a warm-breath lift that fades into the
+slow sink a real bubble has, two slow eddies a bubble, and 3–12 s of life. The
+film shader: thickness **drained** (about 1100 nm at the foot to 60 at the
+crown) with **swirling bands** (value noise on the bubble's own unit sphere,
+domain-warped, turning at a per-bubble rate), a **black film** cap at the
+crown that widens with age, the soap row of the table, Fresnel toward a mirror
+at the rim, the sky (and below the horizon the ground) reflected, the sun's
+glint in the film's colour. **Popping**: a hole opens at a point and runs round
+the film in 75 ms, with a bright thread at its edge — at the crown when it
+simply runs out of time, underneath on the ground, on the side that touched a
+table or one of the people seated round her (70% of touches). Everything on its
+own seeded generator.
+
+**Cost.** Inside 60 m only (`WAND.near`); past it the arm is the clip's, the
+wand, bottle and pool are hidden and nothing but her clock runs. JS: the
+bubbler 0.04 ms a frame including the arm solve, the pool 0.02 ms at 20 live
+bubbles. GPU frame (EXT_disjoint_timer_query, RTX 4090 laptop, median of 239
+frames): at the pier sheen on 7.6 / off 8.3 / on again 5.6 ms, at the terrace
+bubbles on 5.9 / off 6.5 / on again 6.7 ms — both inside the run-to-run noise.
+Regression: people 100, blockers 820, no console errors.
+
+`__fr.jad.raw().bubbles()` (who, phase, ring-to-lips gap, pool counters),
+`bubbleNow()`, `bubblePop()` (bursts the biggest), `bubbleList()`,
+`bubbleCfg()` (`WAND`) and `bubblePool()` (`BUBBLE`).
+
 ## [1.569.0] — 2026-10-02 (baye 1.61.0)
 
 ### Roles reversed: Chloe is a Californian now, shows off beside the cot, and hugs and kisses you on your back

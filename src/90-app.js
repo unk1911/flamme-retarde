@@ -3484,6 +3484,11 @@ async function boot() {
   // Jadrija first: it claims the footprints it is going to rebuild in detail,
   // and the town builder has to know about that before it draws them.
   jadrija = await buildJadrija(scene);
+  // The moored dinghies off Strand Jadrija (t 52-200, s -22 to -56 in the
+  // resort's frame) as the sea's second harbour for the oil sheen.
+  if (jadrija && jadrija.toWorld && sea.sheenAt) {
+    sea.sheenAt(1, jadrija.toWorld(45, -38), jadrija.toWorld(215, -38), 24);
+  }
   // The collision blip. Hung on here rather than inside 43-jadrija.js because
   // the mixer lives in this file and reaching down the concatenation for it
   // from up there is Rule 3 waiting to happen.
@@ -13734,6 +13739,16 @@ window.__fr = {
       // ever wants this for.
       yaw: +headingToYaw(d.x, d.z).toFixed(3),
     };
+  },
+
+  /**
+   * The harbour oil sheen (1.571.0, 25-sea.js): where the capsules are, how
+   * near the nearest is, and the live knobs — `__fr.sheen({ k: 0 })` turns it
+   * off for an A/B, `{ on: 0 }` shuts the branch out entirely.
+   */
+  sheen: (o) => {
+    if (o) Object.assign(SEA.sheen, o);
+    return sea.sheen();
   },
 
   sea: (o) => {
