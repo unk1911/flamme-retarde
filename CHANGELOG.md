@@ -8,6 +8,266 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.567.0] — 2026-10-02 (baye 1.59.0)
+
+### The toys in Chloe's hands: drawn out a little, pushed back in, and her remote
+
+Misha: *"if while in role reversal, and anal toy was inside baye (me), if
+sometimes chloe would pull it out briefly and pull it back in, same with
+lovense"*. The night-loop plan, item 5.
+
+The same two adults and the same game as 1.561.0–1.566.0, with the
+safeword over all of it. The new file is `src/49-revtoys.js`, with the toy's
+half in 43-jadrija.js and hooks in 49-reverse.js, 49-revmoves.js and
+90-app.js.
+
+**What she does, and when.** While the roles are reversed and you, in
+Baye's body, are wearing the plug or the Lovense, her selector has two more
+moves (`move:toy`, `move:remote`). They are weighted by her heat and your
+streak, are less likely just after the same one, and are never picked while
+an order waits on you, mid-spank, or with her belt or the leash in her hand.
+
+- **Her hand on it** (`toy`). She goes where her right arm reaches the base
+  from (`rvmPlan`, kneeling by the cot for a low one), and her palm is solved
+  on to the base (`rvmSolve`, the 2c spank's solver). The palm faces the
+  base's outer face, turned 22° toward her shoulder, with the fingers along
+  its long axis, in a new `pinch` hand shape. She slowly draws it partway
+  out along its own axis, holds it a beat, and pushes it back in to its
+  seat. There are three variants:
+  - one slow draw: 24–34 mm out over 1.0–1.5 s, held 0.6–0.95 s, and back
+    in over 0.9–1.25 s;
+  - a few short teasing draws: 3–4 of about 12 mm;
+  - the plug only, a twist: drawn about 13 mm and turned ±20° to and fro
+    about its axis.
+
+  The Lovense comes out 15–22 mm.
+- **Her remote** (`remote`). The phone is in her left hand, palm up in front
+  of her, with the app lit on it, brighter and with a longer bar the higher
+  it is. It uses the same `signalSet` channels, plug and Lovense. She does
+  one of these:
+  - turns it on and up in steps (1/4 to 4/4, as high as her heat says);
+  - teasing bursts: on, off, on, off, then left low or off;
+  - turns it down;
+  - turns it off.
+
+  Your lips and eyes follow it as they always have. A new intensity
+  (`signalLevel`, 0.15–1) scales the motor's shake, its sound, its light,
+  the wine and your nod. Every road that existed before runs at 1, as
+  before. The HUD tag shows `REMOTE ▮▮▯▯` while it runs.
+
+**Where she can reach it, and where she leaves it alone** (`rvtReach`):
+- The plug she takes in these poses:
+  - face down on the cot or over its edge;
+  - on all fours;
+  - kneeling;
+  - standing (she kneels behind you);
+  - on your back with your knees held, or your legs raised.
+
+  On your back with your legs down it faces the mattress, and she does not
+  try.
+- The Lovense she takes standing, kneeling, or on your back.
+- 10 cm out along the toy's way out must be clear air over the mattress or
+  the floor.
+- **Found, not changed (ask):** the Lovense rides your pelvis rigidly while
+  your skin there follows your thighs. With your hips folded it stands off
+  you. MEASURED as signed distance to v2.0's skin, its exit is 2.7 mm off you
+  standing and 8.7 mm on your back with your legs apart. It is 24 mm off
+  with your legs straight up and 52 mm off in the cradle, where the pink
+  loop shows between your thighs (photographed, `p3_cradle_side`). This is
+  how it has shipped. Chloe leaves the Lovense alone
+  wherever its exit is more than 10 mm off you (`drawSeat`).
+
+**The toy's half** (`toyDraw`, `toyGrip`, `drawFit` in 43-jadrija.js).
+The worn mount does not move: `wearTick` still puts it on your skin (the
+plug) or your pelvis (the Lovense), and the motor still shakes it. The draw
+is the mesh inside the mount, slid out along the toy's own axis. So the
+entrance stays where your body has it, and the toy slides through it.
+- **What is drawn is what is outside you, at every point of the travel.**
+  Seated, only the base and 4 mm of neck are drawn (`wornGeo`). Drawn out by
+  `d`, the plug is lathed again up to 11.8 mm + `d` (`cutAt`), so the cut
+  stays at your skin (MEASURED 3.9–5.7 mm inside you at every draw, in every
+  pose). The geometry is cached by the half millimetre.
+- The plug's maximum is 34 mm, where the bulb is 14.8 mm in radius at the
+  entrance. Its widest is 17.1 mm at 56 mm, so it never comes out.
+- The Lovense is slid along the arm's own tangent where it leaves you
+  (`drawExit`, measured on v2.0's surface: the first point of the arc that
+  is inside you). Its arm as worn (`armGeo`) is slid with it. The egg stays
+  off.
+
+**Fit, MEASURED** (`drawFit`, this frame's pose, against v2.0's skin
+skinned on the CPU, by signed distance to the nearest triangle, 1.5 mm of
+tolerance). In the table:
+- `face` is the base's outer face off your skin, along the axis;
+- `shaft` is the points on the drawn neck and bulb past the entrance's last
+  4 mm that are inside a cheek;
+- `deep` is how far inside the deepest of those is;
+- `rim` is the base's two rings inside you seated, which is your cheeks
+  closing over it as 1.560.3 shipped.
+
+Plug, mm:
+
+    pose                  d    face   shaft     deep   cut (inside)   rim seated
+    face down             0     7.9    –         –      3.9          34/48
+                         17    24.9   22/120    4.6    3.9
+                         34    41.9   44/264    9.5    3.9
+    on all fours          0     6.1    –         –      5.7          32/48
+                         17    23.1   18/120    4.1    5.7
+                         34    40.1   42/264    8.7    5.7
+    on your back,         0     6.9    –         –      4.9          32/48
+     legs straight up    17    23.9   20/120    4.3    4.9
+                         34    40.9   42/264    9.0    4.9
+    legs up and apart     0     6.7    –         –      5.1          24/48
+                         17    23.7    4/120    1.7    5.1
+                         34    40.7   19/264    4.8    5.1
+    standing             24    31.8   46/192    8.6    4.0
+                         34    41.8   57/264   10.6    4.0
+
+As it comes out the base clears the cheeks (`rim` 0 from about 12 mm out).
+The shaft is covered at its sides by up to 9.5 mm lying and 10.6 standing.
+That is the cleft closing round it, and it is never deeper than the seated
+base's own rim goes into the cheeks (−17.3 mm, 1.560.3). Nothing goes
+through a thigh. Spread, the overlap halves.
+
+Lovense, mm (the tip's clearance, the exit's depth in you, + inside):
+
+    pose                     d    tip    exit    arm shown past the exit
+    standing                 0    30.0   −2.7     8/204
+                            11    40.1   −1.9     4/168
+                            22    42.8   −0.3     0/144
+    on your back, apart      0    30.3   −8.7    54/204
+                            20    26.8   +3.9     0/156
+
+No point of the drawn arm is inside you, standing (0 of 432).
+
+**Her hand follows the base every frame.** The toy is drawn first and her
+palm is solved to where the base is THIS frame, with the lag feedback
+(`fb`) from the start of the reach. MEASURED as palm (as drawn) against the
+grip point it was sent to, every frame, mm, mean / worst:
+
+    pose / phase            grip        out         hold         in
+    face down              1.3 / 3.0   1.2 / 3.3   2.7 / 10.2   1.9 / 6.9
+    all fours              2.4 / 7.7   1.7 / 5.2   0.3 / 2.1    1.3 / 5.3
+    back, legs up          1.5 / 3.2   1.5 / 5.1   2.4 / 9.2    1.9 / 6.1
+    standing (plug)        2.1 / 4.6   1.5 / 4.4   3.8 / 29     1.5 / 5.8
+    standing (Lovense)     1.2 / 2.5   1.4 / 4.8   1.4 / 3.9    1.1 / 3.1
+    back, apart (Lovense)  1.3 / 3.3   1.4 / 3.9   2.5 / 6.8    1.5 / 3.8
+    her own session        0.4 / 2.3   0.2 / 1.9   0.6 / 4.8    0.2 / 2.8
+
+The worst figures are single frames in the hold, as her kneeling clip
+breathes under the arm. The full per-frame timelines (draw and error) were
+kept with the test runs.
+
+**Getting there.** For a toy she plans a deeper bow (0.85 rad, against 0.62
+for a spank) and an arm 0.46 m out, so she can lean over the mattress to a
+plug on you with your legs up. Before this, that pose was "noplace". With
+you on your feet she plans from past the half metre `revSteer` keeps her
+off you, on her knees. A reach still more than 6 cm short replans once,
+kneeling nearer, and then she lets it be.
+
+**What you feel.** On each draw out and each push back in:
+- your view shivers (`rvtCamTilt`), with a small jolt;
+- a breath of yours: Baye's own soft gasps (`herGasp`), now and then a moan
+  on the push in;
+- your back eases on the flinch spring, gently.
+
+**Her lines** (Croatian, with the gloss):
+- draw: "Polako van..." (Slowly out...), "Osjećaš ovo?" (Feel that?),
+  "Samo malo... i natrag." (Just a little... and back.)
+- tease: "Van... unutra... van...", "Hehe. Ne miči se."
+- twist: "Malo ću ga okrenuti." (I'll turn it a little.)
+- pushin: "I natrag unutra. Tako.", "Dobra cura. Sve je na mjestu." (Good
+  girl. All back in place.)
+- remote: "Uključujem.", "Da vidimo ovo..."; remup: "Jače?", "Još malo
+  jače."; remdown: "Malo slabije."; remtease: "Pali... gasi... hehe.";
+  remoff: "Dosta. Gasim."
+- toyno: "Ne odavde, curo." (Not from here, girl.)
+
+The service (`server/baye/baye.py` 1.59.0, **needs deploying**) gains the
+`CHLOE_BEAT`s `draw`, `tease`, `twist`, `pushin`, `remote`, `remup`,
+`remdown`, `remtease`, `remoff` and `toyno`. The reversed scene gains
+`toy_drawn` (`plug` | `lovense`) and `remote_level` (1–4), both off tables or
+clamped and dropped without the swap. She says them from her side: *"your
+hand is on the plug they are wearing and you have drawn it partway out of
+them, holding it there"*, *"the remote on your phone is at 3 of 4"*.
+Undeployed, the page's captions show, as before.
+
+**Asking her.** The whole line, typed or heard, matched in the page
+(`rvtWords`, ahead of your pose words):
+- "pull it out a bit", "take the plug out a little", "izvuci malo", "tire-le
+  un peu";
+- "tease me", "in and out", "van-unutra";
+- "twist it", "okreni ga";
+- "push it back in", "gurni ga natrag", "remets-le";
+- "turn it on", "buzz me", "upali";
+- "turn it up", "stronger", "pojačaj", "plus fort";
+- "turn it down", "slabije";
+- "turn it off", "ugasi", "éteins-le".
+
+Her hand waits for a free moment: an order you owe her and a round of hers
+come first. The remote changes at once, and with the phone in her hand if
+she is free. "Push it back in" mid-draw ends that draw early. A turn down or
+off is never a turn on: a channel that ran out under her thumb stays off.
+Help sheet: `I · "pull it out a bit"`.
+
+**The safeword** (`rvtSafe`):
+- the draw stops where it is and the toy goes back to its seat in 0.3 s;
+- her hand comes off;
+- her remote switches off.
+
+MEASURED: plug 16 mm out with the remote at 3/4, "red", then 0.1 s later
+remote 0 and the reseat under way (d 16.7 mm, hand k 0.42). 0.9 s later the
+toy is seated (d 0), her hand is off (k 0), and the aftercare is on. Then the
+roles go back with the toy seated and the remote off. Normal mode's safeword
+does not touch the toys, as before (item 8 waits on Misha).
+
+**A session on her own** (heat 0.8, a test player who obeys about three
+orders in five, 5 minutes at ×2). Of her own accord she:
+- took the remote to the plug, 1/4 up to 4/4 in four steps;
+- later took it to the Lovense, 1/4 to 3/4;
+- drew the plug 34 mm and back;
+- twisted it at 12 mm.
+
+All of this was between her orders, spanks, belt rounds, a stroke and a sit
+by you. An earlier session had her draw it by her own choice twice and stop
+a third reach that was 36 cm short (before the kneeling replan).
+
+**Regression.**
+- Normal roles: the plug and the Lovense fetched and worn (`plugFit` posed
+  unchanged: face 7.8, rim −17.3/−9.5/2.8, neck 0, bulb 0, hid 18; Lovense
+  tip 36 / LED 7). The remote on and off at level 1. The autonomous mode on
+  and off. 9.
+- Reversed: keys 1–7, Shift+1..6, a standing spank (palm 1.5 mm off the
+  spot), her belt out and back, the collar on and the safeword taking it
+  off.
+- People 100, blockers 820, no console errors.
+- RULE 4: no `rng()` draw added, removed or moved (her choices use
+  `Math.random`, as before).
+
+Debug: `__fr.reverse.toys`:
+- `start(kind, key)`, `remote(act, key)`, `ask(what)`;
+- `reach()`, `plan(key)`;
+- `line(reset)`, the per-frame timeline, and `stats()` by pose and phase,
+  with her hand's turn;
+- `state()`.
+
+Also `__fr.jad.raw()`:
+- `draw(key, d, tw)`, `grip(key)`, `drawFit(key)`, `drawSeat(key)`;
+- `remote(key, on, secs, lvl)`, `remoteLevel(key, lvl)`;
+- `wearToy(key, on)`, a toy straight on with no walk to the shelf;
+- `drawSet`.
+
+**Rough, still:**
+- Her hand is turned 115–145° off her forearm on the base, more than the
+  spank's. It holds to a few millimetres, but the wrist is working hard,
+  standing most of all.
+- The plug's neck and bulb are covered at the sides by the cleft as they
+  come out (up to about 1 cm). It reads as the cheeks round it. Nothing
+  deforms.
+- The Lovense is a rigid loop, so drawing it is more of its arm showing, not
+  the egg.
+- The phone's screen is turned to her eyes off her hand's line (her solved
+  wrist only nearly has the roll).
+
 ## [1.566.0] — 2026-10-02 (baye 1.58.0)
 
 ### One leg up, both up, higher, and wider

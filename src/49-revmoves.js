@@ -489,7 +489,7 @@ function rvmPlan(reach, o = {}) {
     const a = i / 32 * Math.PI * 2;
     for (const rr of rings) {
       const x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr;
-      if (!clear(x, z, 0.30)) continue;
+      if (!clear(x, z, 0.30)) { if (o.why) o.why.clear = (o.why.clear || 0) + 1; continue; }
       // Turned so the spots sit `phi` to the reaching hand's side of her.
       const s0 = reach[0].s;
       const yD = Math.atan2(-(cx - x), -(cz - z));
@@ -499,22 +499,22 @@ function rvmPlan(reach, o = {}) {
         if (mode === 'kneel' && !clear(x - f.x * 0.38, z - f.z * 0.38, 0.22)) continue;
         // The least bow that brings every hand's shoulder within reach.
         let bow = -1;
-        for (let b = 0; b <= RVM.bowMax + 1e-6; b += 0.05) {
+        for (let b = 0; b <= (o.bowMax || RVM.bowMax) + 1e-6; b += 0.05) {
           let ok = true;
           for (const R of reach) {
             const sg = R.s === 'R' ? 1 : -1;
             const up = (shY - hipY) * Math.cos(b), fw = (shY - hipY) * Math.sin(b) + RVM.shX;
             const sx = x + f.x * fw + r.x * RVM.shZ * sg, sz = z + f.z * fw + r.z * RVM.shZ * sg, sy = fy + hipY + up;
-            if (Math.hypot(R.T.x - sx, R.T.y - sy, R.T.z - sz) > RVM.reach) { ok = false; break; }
+            if (Math.hypot(R.T.x - sx, R.T.y - sy, R.T.z - sz) > (o.reach || RVM.reach)) { ok = false; break; }
           }
           if (ok) { bow = b; break; }
         }
-        if (bow < 0) continue;
+        if (bow < 0) { if (o.why) o.why.reach = (o.why.reach || 0) + 1; continue; }
         // And her head, bowed that far, clear of you: kneeling close behind
         // you it went into your back (photographed).
         const hy = (shY - hipY) * 1.30, hx = x + f.x * (hy * Math.sin(bow) + 0.06), hz = z + f.z * (hy * Math.sin(bow) + 0.06);
         const hh = fy + hipY + hy * Math.cos(bow);
-        if (body.some((p) => Math.hypot(p.x - hx, p.y - hh, p.z - hz) < 0.27)) continue;
+        if (body.some((p) => Math.hypot(p.x - hx, p.y - hh, p.z - hz) < (o.headR || 0.27))) { if (o.why) o.why.head = (o.why.head || 0) + 1; continue; }
         let score = bow * 1.4 + Math.abs(rr - 0.5) * 0.4 + Math.abs(phi - 0.4) * 0.3
           + 0.10 * Math.hypot(x - rev.ch.x, z - rev.ch.z);
         for (const R of reach) {
@@ -1057,6 +1057,8 @@ function rvmCands(ctx, D) {
   if (ctx === 'front' || ctx === 'back' || ctx === 'side') add('sitby', 0.32);
   if (ctx === 'kneel' || ctx === 'cotKneel') add('chin', 0.70);
   if (ctx === 'kneel' || ctx === 'fours' || ctx === 'stand' || ctx === 'cotKneel' || ctx === 'front') add('grip', 0.25 + 0.45 * D.heat);
+  // The toys you are wearing, in her hands (1.567.0, src/49-revtoys.js).
+  if (typeof rvtCands === 'function') for (const c of rvtCands(ctx, D)) out.push(c);
   return out;
 }
 
@@ -1141,6 +1143,10 @@ function rvmStart(id, why = 'mood') {
     }
     if (best) { revGo(best.x, best.z); rev.ch.face = Fc.clone(); }
     M.ph = 'on';
+  } else if ((id === 'toy' || id === 'remote') && typeof rvtStart === 'function') {
+    // The toys in her hands (1.567.0, src/49-revtoys.js).
+    const r = rvtStart(M);
+    if (r !== true) return r;
   } else return 'no such move';
   if (M.plan) rvmGoPlan(M.plan);
   rvm.move = M;
@@ -1156,6 +1162,8 @@ function rvmEnd(why = 'done') {
   rvm.move = null;
   if (M.id === 'sitby') rvmWant('stand');
   else rvm.downFor = M.id === 'care' ? 0 : 1.2;
+  // A draw left out goes back to its seat; the phone goes away (1.567.0).
+  if ((M.id === 'toy' || M.id === 'remote') && typeof rvtEnd === 'function') rvtEnd(M, why);
   rvm.nape = 0; rvm.chin = 0;
   if (jadrija && jadrija.petTouch && (M.id === 'stroke' || M.id === 'care')) jadrija.petTouch(0);
   rvmTrace({ pick: 'move end:' + M.id, why });
@@ -1259,6 +1267,8 @@ function rvmMoveTick(dt) {
   // You moved out of it (a move is about where you are), except the care.
   if (M.id !== 'care' && M.id !== 'hips' && M.ctx && ctx !== M.ctx) { rvmEnd('you moved: ' + (v ? v.phase : '?')); return; }
   const { f, r } = rvmAxes(rev.ch.yaw);
+  // Her hand on a toy you are wearing, or her remote (1.567.0).
+  if ((M.id === 'toy' || M.id === 'remote') && typeof rvtMoveTick === 'function') { rvtMoveTick(M, dt); return; }
   if (M.id === 'circle') {
     if (M.ph === 'go') { rvmSay('circle'); M.ph = 'walk'; }
     if (revAt() || (rev.ch.stuck > 0.8)) {
@@ -1522,7 +1532,7 @@ function rvmTick(dt) {
   if (rev.arm.mode === 'spank' && rev.arm.at && rev.arm.ph !== 'go') T = rev.arm.at.T;
   else if (rvm.move && rvm.move.id === 'hold' && rvm.move.spot && rvm.move.ph !== 'go' && rev.clock % 5 < 2) T = rvm.move.spot.T;
   else if (typeof rvkBeltRound === 'function' && rvkBeltRound() && typeof rvkPlanP !== 'undefined' && rvkPlanP.aim && rvk.belt.ph !== 'go') T = rvkPlanP.aim;
-  else T = rvmYourFace(new THREE.Vector3());
+  else T = (typeof rvtLookAt === 'function' ? rvtLookAt() : null) || rvmYourFace(new THREE.Vector3());
   // Not over her shoulder while she walks away: ahead, then.
   if (T && rev.ch.goal && rev.ch.sp > 0.3) {
     const { f } = rvmAxes(rev.ch.yaw);

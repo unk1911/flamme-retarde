@@ -4021,6 +4021,8 @@ const HELP = [
     ['1 – 7', 'help.k.revkeys'],
     // And your legs on the cot, roles reversed (1.566.0).
     ['SHIFT + 1 – 6', 'help.k.revlegs'],
+    // And the toy you wear, in her hands (1.567.0).
+    ['I · “pull it out a bit”', 'help.k.revtoys'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
