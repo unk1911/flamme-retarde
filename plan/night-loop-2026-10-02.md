@@ -29,7 +29,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    player-Baye, Chloe sometimes slowly draws it partway out and pushes it back in (an
    animation of the worn toy along its axis + her hand on the base, the fit check keeping it
    believable), plus using the remote. Same for the Lovense. Reactions on your body/camera.
-6. [ ] **Autonomous mode, deeper.** Use the new leg poses, the toys (her own reactions to
+6. [x] **Autonomous mode, deeper.** Use the new leg poses, the toys (her own reactions to
    them), the playground kit, the collar/leash (kneel-up on tugs etc.); smarter mood model
    (anticipation, teasing back), more lines; respond to the player's hand positions.
 6b. [ ] **Chloe speaks American English** (Misha, 05:20: "is there any way for Chloe to speak
