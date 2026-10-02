@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.68.0"
+VERSION = "1.69.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4425,7 +4425,14 @@ TALK_PERSONA = {"baye": PERSONA_TALK, "bucketeer": PERSONA_TALK_BUCKETEER}
 # half again her pace, which is a woman teasing and giving orders rather than
 # whispering. Nothing else here uses her. One id here to change it. (Nina,
 # `FXlzTee7Zx2caYKIAwBF`, was her Croatian voice from 1.55.0 to 1.60.0.)
-CHLOE_VOICE = CFG.get("CHLOE_VOICE_ID", "FGY2WhTYpPnrIDTdsKH5")   # Laura, US
+# IVANNA, 2 Oct, 1.69.0. Misha: *"i don't like the sound of it, it needs to be
+# deeper/saltrier ... similar to Jessica, but maybe just a lil bit different"*.
+# Auditioned six of the shared library's sultry young American women against
+# Jessica on the same three lines (/mnt/c/tmp/chloe-voices); he picked Ivanna,
+# "luxuriously soft ... seductive, intimate": median 200 Hz, p10-p90 176-216,
+# against Jessica's 205 and 186-216 and Laura's 213 and 152-307. A library
+# voice, used by id without adding it to the account — that worked first time.
+CHLOE_VOICE = CFG.get("CHLOE_VOICE_ID", "tQ4MEZFJOzsahSEEZtHK")   # Ivanna, US
 
 PERSONA_CHLOE = """You are Chloe, a woman in her twenties from California, on
 holiday at Jadrija on the Croatian coast with your partner. You are inside a
