@@ -529,6 +529,8 @@ addEventListener('keydown', (e) => {
     // AND ON TO SOMEBODY'S MACHINE, or off it — see `rideKey`. First, because
     // on one E means nothing else, and next to one lying there it means that.
     if (rideKey()) return;
+    // The awning's crank, on the vikendica's terrace — see `awningKey`.
+    if (awningKey()) return;
     // AND A THIRD, which is a hatch. E is the interact key and a counter is
     // the one place on this shore where standing in front of something means
     // being served at it: you cannot be at the Tisak's window and at the
@@ -8938,6 +8940,7 @@ function updateGroundHUD(dt) {
     hint = TK('brod.board', 'brod.boardTouch');
   } else if (riding()) hint = T('steal.ride.' + riding().kind);
   else if (stealNear()) hint = T('steal.take.' + stealNear().kind);
+  else if (awningNear()) hint = T('vik.awning.' + awningNear().offer());
   else if (g.canBoard) hint = TK('ground.board', 'ground.boardTouch');
   $('gh-hint').textContent = hint;
   $('gh-hint').className = urgent ? 'urgent' : '';
@@ -9337,6 +9340,24 @@ let rideCam = null;
 function riding() {
   return jadrija && jadrija.steal ? jadrija.steal.riding() : null;
 }
+/**
+ * The vikendica's awning, if you are stood on the terrace with its crank to
+ * hand — `awning` in src/44-vikendica.js — or null. E there winds it the whole
+ * way in or out, and again while it moves sends it back.
+ */
+function awningNear() {
+  if (state.phase !== 'ground' || !ground || !ground.ok || camOverride || riding()
+    || !jadrija || !jadrija.vik || !jadrija.vik.awning) return null;
+  const A = jadrija.vik.awning;
+  return A.near(ground.you.x, ground.you.y, ground.you.z) ? A : null;
+}
+function awningKey() {
+  const A = awningNear();
+  if (!A) return false;
+  A.toggle();
+  return true;
+}
+
 /** A machine lying within reach of you, or null. */
 function stealNear() {
   if (state.phase !== 'ground' || !ground || !ground.ok || camOverride || !jadrija || !jadrija.steal) return null;

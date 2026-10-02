@@ -1762,6 +1762,286 @@ async function buildVikendica(scene, field) {
     if (towel.cloth) towel.cloth.step(Math.min(dt || 0, 0.1), towel.carrier, 0, who || null);
   }
 
+  // ── the awning, on its crank ────────────────────────────────────────────────
+  /**
+   * The folding-arm awning over the terrace doors, wound in and out by hand
+   * (Misha, 2 Oct 2026: *"those awnings, there are missing those horizontal
+   * sticks that one can use to roll them out or in.. maybe would be cool to
+   * roll/unroll them using the sticks, would be cool to retract or fold the
+   * awnings to create atmosphere"*).
+   *
+   * The cassette and the arms' shoulder brackets are screwed to the wall and
+   * stay baked (`awning` in tools/blender/vikendica.py). Everything that moves
+   * is here, off the same numbers: the cloth off its roller, the front bar
+   * with its valance, the two folding arms, and the crank — a gearbox under
+   * the east end of the cassette's nose, and hooked into its eye a rod with a
+   * cranked handle at the foot, which is the stick every one of these has
+   * hanging off it.
+   *
+   * E beside the handle winds it, the whole way in or the whole way out —
+   * seven seconds and eleven turns, which is a quarter of what the real one
+   * takes and the most a game can ask anybody to stand and watch. E again
+   * while it moves sends it back the other way. Winding, the rod swings out
+   * toward you off the eye and the handle goes round; let go, it drops back
+   * to hanging straight.
+   *
+   * The arms are solved, not keyframed: each is two equal halves hinged at
+   * the elbow, the shoulder fixed under the cassette and the hand on the bar,
+   * and the elbow sits on the circle that leaves both halves their length —
+   * pushed in toward the middle, the way a folding arm's spring holds it.
+   * Right out the elbows are bent 23 degrees, as photographed; right in they
+   * lie along the cassette, 28 cm apart in the middle.
+   *
+   * All in the house's Blender metres (x east, y north, z up) and turned into
+   * the root's frame by `A3`, so the numbers can be read against the .py.
+   */
+  const AWN = {
+    z: 5.20,              // the cassette's underside: F2 + 2.30
+    wall: -3.865,         // the south face, Y0
+    xa: 0.14, xb: 3.14,   // its ends: the terrace doors and 40 cm either side
+    roll: -3.985,         // where the cloth leaves the slot in the nose
+    out: 2.05,            // the bar off the wall, run right out
+    tuck: 0.225,          // and wound right in, closing the nose
+    drop: 0.34,           // the bar below the roller, run right out
+    arm: 1.07,            // each half of a folding arm
+    secs: 7.0, turns: 11, // all the way, in or out
+    eye: [3.02, -4.030, 5.205],
+    rod: 1.10,            // the eye to the handle
+    reach: 1.0,           // m: how near the handle E finds it
+  };
+  const A3 = (x, y, z) => new THREE.Vector3(x, z, -y);
+  const awning = { e: 1, to: 1, phase: 0, tilt: 0, want: 0, shape: null };
+
+  function makeAwning() {
+    const ds = THREE.DoubleSide;
+    const cream = solidMaterial(new THREE.Color(0.880, 0.830, 0.610), {
+      spec: 0.10, specPower: 18, emissive: VIK.glow, vcol: false, side: ds,
+    });
+    const white = solidMaterial(new THREE.Color(0.905, 0.900, 0.885), {
+      spec: 0.34, specPower: 50, emissive: VIK.glow, vcol: false,
+    });
+    const grey = solidMaterial(new THREE.Color(0.620, 0.630, 0.640), {
+      spec: 0.30, specPower: 40, emissive: VIK.glow, vcol: false,
+    });
+    const black = solidMaterial(new THREE.Color(0.075, 0.075, 0.080), {
+      spec: 0.18, specPower: 24, emissive: VIK.glow * 0.3, vcol: false,
+    });
+    const g = new THREE.Group();
+    g.name = 'vikendica:awning';
+    root.add(g);
+    const mesh = (geo, mat) => {
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = true; m.receiveShadow = true;
+      return m;
+    };
+
+    // A closed (dy, dz) section swept along x, flat-shaded: the bar.
+    const sweepX = (prof, x0, x1) => {
+      const pos = [];
+      const tri = (a, b, c) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      const n = prof.length;
+      const P = (x, i) => A3(x, prof[i][0], prof[i][1]);
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        tri(P(x0, i), P(x1, i), P(x1, j)); tri(P(x0, i), P(x1, j), P(x0, j));
+      }
+      for (let i = 1; i < n - 1; i++) {
+        tri(P(x0, 0), P(x0, i + 1), P(x0, i)); tri(P(x1, 0), P(x1, i), P(x1, i + 1));
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.computeVertexNormals();
+      return geo;
+    };
+    // A rod from a to b (Blender metres), as a unit cylinder stretched.
+    const UP = new THREE.Vector3(0, 1, 0);
+    const rodTo = (m, a, b) => {
+      const A = A3(...a), B = A3(...b), d = B.clone().sub(A);
+      const L = d.length() || 1e-6;
+      m.position.copy(A).addScaledVector(d, 0.5);
+      m.quaternion.setFromUnitVectors(UP, d.divideScalar(L));
+      m.scale.set(1, L, 1);
+    };
+
+    // The cloth: a sheet off the roller to the back of the bar.
+    const NX = 28, NY = 20;
+    const cloth = new THREE.BufferGeometry();
+    cloth.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array((NX + 1) * (NY + 1) * 3), 3));
+    {
+      const idx = [];
+      for (let j = 0; j < NY; j++) {
+        for (let i = 0; i < NX; i++) {
+          const a = j * (NX + 1) + i, b = a + NX + 1;
+          idx.push(a, b, a + 1, a + 1, b, b + 1);
+        }
+      }
+      cloth.setIndex(idx);
+    }
+    const clothM = mesh(cloth, cream);
+    g.add(clothM);
+
+    // The bar, its grey end caps and the valance, which ride together.
+    const bar = new THREE.Group();
+    g.add(bar);
+    bar.add(mesh(sweepX([[0.035, 0.030], [-0.020, 0.030], [-0.034, 0.024], [-0.040, 0.012],
+      [-0.042, -0.012], [-0.040, -0.026], [-0.030, -0.030], [0.035, -0.030]],
+    AWN.xa + 0.012, AWN.xb - 0.012), white));
+    for (const x of [AWN.xa, AWN.xb - 0.012]) {
+      bar.add(mesh(sweepX([[0.038, 0.034], [-0.046, 0.034], [-0.046, -0.034], [0.038, -0.034]],
+        x, x + 0.012), grey));
+    }
+    {
+      // Straight, 20 cm, kicked out a little at the hem by its weighted edge,
+      // and never quite flat across.
+      const NV = 4, pos = [], idx = [];
+      for (let j = 0; j <= NV; j++) {
+        const v = j / NV;
+        for (let i = 0; i <= NX; i++) {
+          const x = AWN.xa + 0.02 + (AWN.xb - AWN.xa - 0.04) * i / NX;
+          const p = A3(x, -0.046 - 0.012 * v * v + 0.003 * Math.sin(x * 7.3) * v,
+            -0.020 - 0.20 * v);
+          pos.push(p.x, p.y, p.z);
+        }
+      }
+      for (let j = 0; j < NV; j++) {
+        for (let i = 0; i < NX; i++) {
+          const a = j * (NX + 1) + i, b = a + NX + 1;
+          idx.push(a, b, a + 1, a + 1, b, b + 1);
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      bar.add(mesh(geo, cream));
+    }
+
+    // The arms: upper, fore, and a knuckle at the shoulder, the elbow and
+    // the hand.
+    const tube = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true);
+    const ball = new THREE.SphereGeometry(1, 16, 10);
+    const arms = [AWN.xa + 0.30, AWN.xb - 0.30].map((sx, k) => {
+      const c = k === 0 ? 1 : -1;
+      const up = mesh(tube, white), fore = mesh(tube, white);
+      const kn = [0.028, 0.032, 0.024].map((r) => {
+        const m = mesh(ball, grey); m.scale.setScalar(r); g.add(m); return m;
+      });
+      g.add(up, fore);
+      return { sx, c, up, fore, kn };
+    });
+
+    // The gearbox under the east end of the nose, and its eye.
+    const [ex, ey, ez] = AWN.eye;
+    {
+      const box = mesh(new THREE.BoxGeometry(0.07, 0.05, 0.07), white);
+      box.position.copy(A3(ex, ey + 0.02, AWN.z - 0.005));
+      g.add(box);
+      const eyeR = mesh(new THREE.TorusGeometry(0.014, 0.0035, 8, 20), grey);
+      eyeR.position.copy(A3(ex, ey, ez - 0.045));
+      eyeR.rotation.y = Math.PI / 2;
+      g.add(eyeR);
+    }
+    // The crank: hung from the eye, its hook, the rod, and at the foot the
+    // cranked handle — out sideways and back down, with a black grip that
+    // turns on it.
+    const crank = new THREE.Group();
+    crank.position.copy(A3(ex, ey, ez - 0.058));
+    g.add(crank);
+    const spin = new THREE.Group();
+    crank.add(spin);
+    {
+      const R = 0.0085, L = AWN.rod, OFF = 0.12;
+      const hook = mesh(new THREE.TorusGeometry(0.016, 0.0045, 8, 20, Math.PI * 1.4), grey);
+      hook.rotation.z = -Math.PI * 0.2;
+      hook.position.y = -0.004;
+      spin.add(hook);
+      const rod = mesh(new THREE.CylinderGeometry(R, R, L - 0.02, 16), white);
+      rod.position.y = -0.02 - (L - 0.02) / 2;
+      spin.add(rod);
+      // The bend out to the handle, horizontal — the stick you turn by.
+      const arm = mesh(new THREE.CylinderGeometry(R, R, OFF, 12), white);
+      arm.rotation.z = Math.PI / 2;
+      arm.position.set(OFF / 2, -L, 0);
+      spin.add(arm);
+      for (const x of [0, OFF]) {
+        const b = mesh(ball, white); b.scale.setScalar(R * 1.05); b.position.set(x, -L, 0); spin.add(b);
+      }
+      const grip = mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.11, 16), black);
+      grip.position.set(OFF, -L - 0.065, 0);
+      spin.add(grip);
+      const cap = mesh(ball, black); cap.scale.set(0.017, 0.010, 0.017);
+      cap.position.set(OFF, -L - 0.12, 0);
+      spin.add(cap);
+      awning.grip = grip;
+    }
+
+    // The shape for an extension `e`, 0 wound in to 1 run out.
+    awning.shape = (e) => {
+      const d = AWN.tuck + (AWN.out - AWN.tuck) * e;
+      const yb = AWN.wall - d;
+      const zf = AWN.z + 0.035 - (AWN.drop + 0.035) * e;
+      bar.position.copy(A3(0, yb, zf));
+      // The cloth, with the belly a tensioned cloth has in it and no more.
+      const P = cloth.attributes.position.array;
+      const y0 = AWN.roll, z0 = AWN.z + 0.012, y1 = yb + 0.035, z1 = zf + 0.030;
+      for (let j = 0; j <= NY; j++) {
+        const v = j / NY;
+        for (let i = 0; i <= NX; i++) {
+          const u = i / NX;
+          const x = AWN.xa + 0.03 + (AWN.xb - AWN.xa - 0.06) * u;
+          const sag = 0.035 * e * Math.sin(Math.PI * v) * (0.6 + 0.4 * Math.sin(Math.PI * u));
+          const p = A3(x, y0 + (y1 - y0) * v, z0 + (z1 - z0) * v - sag);
+          const o = 3 * (j * (NX + 1) + i);
+          P[o] = p.x; P[o + 1] = p.y; P[o + 2] = p.z;
+        }
+      }
+      cloth.attributes.position.needsUpdate = true;
+      cloth.computeVertexNormals();
+      cloth.computeBoundingSphere();
+      clothM.visible = e > 0.01;
+      // The arms. Shoulder S fixed, hand F on the bar; the elbow on the
+      // circle of points `arm` from both, toward the middle and a touch low.
+      for (const A of arms) {
+        const S = [A.sx, AWN.wall - 0.06, AWN.z - 0.10];
+        const F = [A.sx, yb + 0.045, zf - 0.005];
+        const dy = F[1] - S[1], dz = F[2] - S[2];
+        const D = Math.hypot(dy, dz);
+        const h = Math.sqrt(Math.max(0, AWN.arm * AWN.arm - D * D / 4));
+        const E = [A.sx + A.c * h, (S[1] + F[1]) / 2, (S[2] + F[2]) / 2 - 0.035 * e];
+        rodTo(A.up, S, E); A.up.scale.x = A.up.scale.z = 0.021;
+        rodTo(A.fore, E, F); A.fore.scale.x = A.fore.scale.z = 0.018;
+        A.kn[0].position.copy(A3(...S)); A.kn[1].position.copy(A3(...E));
+        A.kn[2].position.copy(A3(...F));
+      }
+    };
+    awning.crank = crank; awning.spin = spin;
+    awning.shape(awning.e);
+  }
+  makeAwning();
+
+  /** A frame of the awning: wind it, swing the rod out or let it hang. */
+  function stepAwning(dt) {
+    if (!awning.shape || !(dt > 0)) return;
+    dt = Math.min(dt, 0.1);
+    const moving = awning.e !== awning.to;
+    if (moving) {
+      const dir = Math.sign(awning.to - awning.e);
+      const de = Math.min(Math.abs(awning.to - awning.e), dt / AWN.secs);
+      awning.e += dir * de;
+      if (Math.abs(awning.e - awning.to) < 1e-6) awning.e = awning.to;
+      // Clockwise to wind it out, seen from the handle.
+      awning.phase += dir * de * AWN.turns * Math.PI * 2;
+      awning.spin.rotation.y = awning.phase;
+      awning.shape(awning.e);
+    }
+    // Swung out 19 degrees toward you while it turns; hanging when not.
+    const want = moving ? 0.33 : 0;
+    if (Math.abs(want - awning.tilt) > 1e-4) {
+      awning.tilt += (want - awning.tilt) * Math.min(1, dt * 5);
+      awning.crank.rotation.x = -awning.tilt;
+    }
+  }
+
   /**
    * How far Zagreb is ahead of UTC, in milliseconds.
    *
@@ -3453,12 +3733,39 @@ async function buildVikendica(scene, field) {
     tickClock();
     stepFly(dt || 0, who);
     stepTowel(dt, who);
+    stepAwning(dt);
   }
 
   return {
     root, parts, plan, base, yaw,
     floorAt, blockers, tight, indoorsAt, ductAt, hull, headroom,
     tick: tickHouse,
+    /**
+     * The awning on its crank. `near` is whether a person stood at (x, y, z)
+     * in world metres has the handle to hand; `toggle` winds it the other
+     * way; `offer` names what E would do, for the line on the screen.
+     */
+    awning: {
+      near(x, y, z) {
+        if (!awning.grip) return false;
+        const p = awning.grip.getWorldPosition(new THREE.Vector3());
+        // `y` is the person's eye (ground.you.y, 1.66 over the floor), and a
+        // foot is let through too: anywhere from just under the terrace to a
+        // head over it. Under the terrace, on the porch, it is not to hand.
+        const up = y - (base + VIK.floor);
+        return Math.hypot(p.x - x, p.z - z) < AWN.reach && up > -0.3 && up < 2.1;
+      },
+      toggle() {
+        awning.to = awning.e !== awning.to ? (awning.to ? 0 : 1) : (awning.e > 0.5 ? 0 : 1);
+        return awning.to;
+      },
+      offer: () => (awning.e !== awning.to ? 'back' : awning.e > 0.5 ? 'in' : 'out'),
+      /** Debug: put it anywhere, 0 in to 1 out, at once. */
+      set(e) { awning.e = awning.to = clamp(e, 0, 1); awning.shape(awning.e); return awning.e; },
+      state: () => ({ e: +awning.e.toFixed(3), to: awning.to, turns: +(awning.phase / (Math.PI * 2)).toFixed(2),
+        tilt: +awning.tilt.toFixed(3) }),
+      grip: () => (awning.grip ? awning.grip.getWorldPosition(new THREE.Vector3()).toArray() : null),
+    },
     /** The towel on the terrace rail: the cloth's own probe (`brodEnsign`). */
     towel: () => (towel.cloth ? towel.cloth.stats() : null),
     /** The television: where it is in world metres, and the knock. */
