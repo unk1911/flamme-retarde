@@ -284,6 +284,11 @@ function rmoodBeg(what) {
     const r = typeof rvhAsk === 'function' ? rvhAsk('pull') : { ok: false, label: 'no hair' };
     return { ok: r.ok, label: 'Chloe, excited: ' + String(r.label).replace(/^chloe: /i, '') };
   }
+  // Walked round the room by it (1.584.0, src/49-revwalk.js).
+  if (what === 'drag') {
+    const r = typeof rvdAsk === 'function' ? rvdAsk() : { ok: false, label: 'no drag' };
+    return { ok: r.ok, label: 'Chloe, excited: ' + String(r.label).replace(/^chloe: /i, '') };
+  }
   if (what === 'collar' && typeof rvkCollarOn === 'function') {
     if (rvkCollarOn()) {
       const v = revView();
@@ -471,6 +476,8 @@ function rmoodWeight(id) {
   else if (id.startsWith('order:')) k = (1 + 0.6 * s) * (1 - 0.35 * g) * (1 - 0.45 * e);
   else if (id === 'hair:pull' || id === 'hair:upcot') k = (1 + 1.2 * s) * (1 - 0.5 * g) * (1 + 1.4 * e);
   else if (id === 'hair:draw' || id === 'hair:kneel') k = (1 + g) * (1 + 0.6 * e);
+  // Walking you by your hair (1.584.0): discipline, and a game when she is wound up.
+  else if (/^drag/.test(id)) k = (1 + 1.4 * s) * (1 - 0.6 * g) * (1 + 1.4 * e);
   else if (m === 'hold') k = (1 + s) * (1 + 0.5 * e);
   else if (m === 'grip') k = (1 + 0.8 * s) * (1 + 0.4 * e);
   else if (m === 'stroke' || m === 'hug' || m === 'spoon' || m === 'sitby' || m === 'chin') k = (1 - 0.8 * s) * (1 + 2 * g) * (1 - 0.4 * e);
@@ -590,6 +597,12 @@ function rmoodWords(t) {
   const buzzing = typeof rvt !== 'undefined' && rvt.phoneOn;
   if (/^((please |oh )?(harder|do it harder|spank (me )?harder|again|do it again|more|one more|another( one)?|again please|more please|harder please|please more|please again|please harder))( chloe| mistress| babe)?( please)?$/.test(t)) return 'rev.beg:harder';
   if (!buzzing && /^(jace|jos( jednom| jednu| malo)?( molim( te)?)?|encore( une)?( fois)?|plus fort|encore plus fort)( s'?il te plait)?$/.test(t)) return 'rev.beg:harder';
+  // Walked round the room by your hair (1.584.0, src/49-revwalk.js): "drag
+  // me", "pull me by the hair", "vuci me za kosu", "traîne-moi par les
+  // cheveux" — before the plain pull, which "pull ... hair" also is. Not the
+  // collar's: "drag me by my collar" is a tug on it.
+  if (!/\b(collar|leash|ogrlic\w*|povod\w*|collier|laisse)\b/.test(t)
+    && /\bdrag me\b|\b(pull|lead|walk|take|drag) me (a?round |about |round the room )?by (the|my|your) hair\b|\bvuci me\b|\bvodaj me za kosu\b|\bvodi me za kosu\b|\btraine[- ]moi\b|\b(tire|promene)[- ]moi par les cheveux\b/.test(t)) return 'rev.beg:drag';
   // Her fist in your hair, begged for.
   if (/\b(pull|grab|yank|take|tug)\b.*\bhair\b|\bhair pull\b|\b(za|mi) kosu\b|\bles cheveux\b/.test(t) && !/\b(draw|bring) me\b/.test(t)) return 'rev.beg:hair';
   // A pull on the collar or the leash (to put it on is `rev.collar`).

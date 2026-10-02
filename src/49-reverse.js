@@ -259,6 +259,8 @@ function revScene() {
   if (typeof rvmScene === 'function') rvmScene(o);
   // Her fist in your hair, or you drawn in to her side (1.574.0).
   if (typeof rvhScene === 'function') rvhScene(o);
+  // Walking you round the room by it (1.584.0): `rev_hair` 'drag'.
+  if (typeof rvdScene === 'function') rvdScene(o);
   // Her mood, and what you last begged for (1.583.0).
   if (typeof rmoodScene === 'function') rmoodScene(o);
   return o;
@@ -444,7 +446,8 @@ function revOff(why = 'asked') {
   if (typeof rvmClear === 'function') rvmClear();
   // A toy she had drawn partway out, seated; her phone away (1.567.0).
   if (typeof rvtClear === 'function') rvtClear();
-  // Her fist out of your hair (1.574.0).
+  // Her fist out of your hair (1.574.0), and the drag (1.584.0).
+  if (typeof rvdClear === 'function') rvdClear();
   if (typeof rvhClear === 'function') rvhClear();
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
@@ -487,6 +490,8 @@ function revSafe(who = 'you') {
   if (typeof rvkSafe === 'function') rvkSafe();
   // And her fist in your hair (1.574.0): open, this instant.
   if (typeof rvhSafe === 'function') rvhSafe();
+  // And walking you by it (1.584.0): let go, and you stop where you are.
+  if (typeof rvdSafe === 'function') rvdSafe();
   // And her moves (1.565.0): a hold, a grip, a hand on your chin — all off.
   if (typeof rvmSafe === 'function') rvmSafe();
   // And the toys (1.567.0): a draw stops where it is and goes back to its
@@ -682,7 +687,14 @@ function revKey(e) {
     }
     return true;
   }
-  // Your hair in her fist (1.574.0): . the pull from behind, , the kneeling draw.
+  // Your hair in her fist (1.574.0): . the pull from behind, , the kneeling draw;
+  // Shift+. walked round the room by it (1.584.0).
+  if (e.code === 'Period' && e.shiftKey && typeof rmoodBeg === 'function') {
+    e.preventDefault();
+    const r = rmoodBeg('drag');
+    if (typeof toast === 'function') toast(r.label);
+    return true;
+  }
   if (e.code === 'Period' || e.code === 'Comma') {
     e.preventDefault();
     if (typeof rvhAsk === 'function') {
@@ -1025,6 +1037,8 @@ function revDecide() {
   if (typeof rvmCands === 'function') for (const c of rvmCands(ctx, D)) cands.push(c);
   // Her fist in your hair, when she is excited (1.574.0, src/49-revpull.js).
   if (typeof rvhCands === 'function') for (const c of rvhCands(ctx, D)) cands.push(c);
+  // And walking you round the room by it, stern or excited (1.584.0, src/49-revwalk.js).
+  if (typeof rvdCands === 'function') for (const c of rvdCands(ctx, D)) cands.push(c);
   // The remote: since 1.567.0 a move of hers with the phone in her hand
   // (`move:remote`, src/49-revtoys.js, among `rvmCands`); the bare buzz is
   // what is left without that file.
@@ -1065,6 +1079,10 @@ function revDecide() {
   } else if (pick.id.startsWith('move:')) {
     const r = rvmStart(pick.id.slice(5), 'mood | alt: ' + alt);
     if (r !== true) revTrace({ pick: pick.id + ':' + r });
+    D.next = rev.clock + 3;
+  } else if (/^drag/.test(pick.id) && typeof rvdChoose === 'function') {
+    const r = rvdChoose(pick.id, 'mood | alt: ' + alt);
+    if (r !== true) revTrace({ pick: 'drag:' + r });
     D.next = rev.clock + 3;
   } else if (pick.id.startsWith('hair:') && typeof rvhChoose === 'function') {
     const r = rvhChoose(pick.id, 'mood | alt: ' + alt);
@@ -1120,7 +1138,10 @@ function revTick(dt) {
     // stroll is solved for 1.37 (1.75 times that is the most its clock
     // stretches before her feet slide). Q is a quicker walk.
     const top = typeof keys !== 'undefined' && keys.has('KeyQ') ? 2.3 : 1.45;
-    if (rev.last && dt > 0) {
+    // Her fist in your hair, walking you round the room (1.584.0,
+    // src/49-revwalk.js): her pace is yours, and your keys only lean on it.
+    const tow = typeof rvdTow === 'function' && rev.last && dt > 0 ? rvdTow(dt, Y) : null;
+    if (rev.last && dt > 0 && !tow) {
       const mx = Y.x - rev.last[0], mz = Y.z - rev.last[1], md = Math.hypot(mx, mz);
       if (md > top * dt && md < 1) {
         const k = top * dt / md;
@@ -1133,8 +1154,9 @@ function revTick(dt) {
     const ox = Y.x - rev.ch.x, oz = Y.z - rev.ch.z, od = Math.hypot(ox, oz);
     if (od < 0.5 && od > 1e-4) { Y.x = rev.ch.x + ox / od * 0.5; Y.z = rev.ch.z + oz / od * 0.5; }
     let dy = Y.yaw - rev.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    rev.yaw += dy * (1 - Math.exp(-REV.yawRate * dt));
-    jadrija.ride({ x: Y.x, z: Y.z, yaw: rev.yaw, sp: Math.hypot(Y.vx, Y.vz) });
+    // (Towed, the turn is the tow's own, already rate-limited.)
+    if (tow) rev.yaw = tow.yaw; else rev.yaw += dy * (1 - Math.exp(-REV.yawRate * dt));
+    jadrija.ride({ x: Y.x, z: Y.z, yaw: rev.yaw, sp: tow ? tow.sp : Math.hypot(Y.vx, Y.vz) });
     rev.last = [Y.x, Y.z];
   } else {
     rev.last = null;
@@ -1196,6 +1218,8 @@ function revTick(dt) {
   if (typeof rvtTick === 'function') rvtTick(dt);
   // Her fist in your hair (1.574.0): its asks of her arms, before they are solved.
   if (typeof rvhTick === 'function') rvhTick(dt);
+  // Walking you round the room by it (1.584.0): before her arms are solved.
+  if (typeof rvdTick === 'function') rvdTick(dt);
   // Her moves, her hands, her look (1.565.0).
   if (typeof rvmTick === 'function') rvmTick(dt);
   revCamera(dt);
@@ -1274,6 +1298,9 @@ function revCamera(dt) {
   // Your head pulled back by your hair (1.574.0): your view with it.
   const hv = typeof rvhCamTilt === 'function' ? rvhCamTilt() : null;
   if (hv && (hv[0] > 0.002 || Math.abs(hv[1]) > 0.002)) { camera.rotateX(hv[0]); camera.rotateZ(hv[1]); }
+  // Walked by your hair (1.584.0): your head held down and over toward her hand.
+  const dv = typeof rvdCamTilt === 'function' ? rvdCamTilt() : null;
+  if (dv && (Math.abs(dv[0]) > 0.002 || Math.abs(dv[1]) > 0.002)) { camera.rotateX(dv[0]); camera.rotateZ(dv[1]); }
   camera.updateMatrixWorld();
 }
 

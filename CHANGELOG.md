@@ -8,6 +8,172 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.584.0] — 2026-10-02 (baye 1.71.0)
+
+### Roles reversed: Chloe walks you round the kabina by your hair
+
+Misha: *"can chloe ... pull her by the hair harder around the kabine?"* — and,
+of this and the pin on the cot, *"yes queue up both of them"*. The queue's
+item 1 (plan/queue-2026-10-02.md). The same two adults and the same
+consensual kabina play as 1.561.0–1.583.0, and the safeword over all of it.
+Hair, never sex: nothing here presses the two bodies together, and that is
+measured on the skin.
+
+The new file is `src/49-revwalk.js` (names `rvd…`, `__fr.reverse.drag`),
+with hooks in 49-reverse.js (the walker's tow, her selector, Shift+., the
+camera, the safeword, the scene), 49-revmood.js (the words, the beg, her
+mood's weight), 49-voice.js (a priority beat), 90-app.js (the help line) and
+two small additions to 43-jadrija.js that are off unless asked for.
+
+**What it is.** You on your feet. She comes to your side, takes a fistful of
+your hair at the back of your head (1.574.0's grab) with the hand on your
+side, and sets off round the room with you at arm's length off her hip, your
+head drawn over toward her hand. It is the collar's walk with her fist
+instead of the leash:
+- **Her path** (`rvdPlan`): three to six legs, planned so that she AND you,
+  a body's width off her side, stay clear of the walls, the cot, the
+  tabouret, the set's stand and the radio's table — checked every 15 cm along
+  both lines and round every turn. She turns away from you, so you swing
+  round the outside. Her right hand with you on her right by preference; her
+  left with you on her left where the room has no walk for the other (from
+  where the 8 key puts you, between the tabouret and the west wall, there was
+  none right-handed).
+- **Her pace is yours** (`rvdTow`, called from `revTick` while you stand):
+  your body is towed after your place off her hip — her speed, a spring on
+  the miss and a body's acceleration (1.8 m/s²), so a sharp start or a turn
+  leaves you behind. Your keys only lean on it: holding back (S) drags your
+  feet, which is a lag too. Her arm is only so long: past it, it takes you
+  with it. Never nearer her than 0.60 m root to root, never quicker than a
+  stumble (1.9 m/s), never through a wall, and your body turns at a walker's
+  rate (2.2 rad/s), not at hers.
+- **A yank when you lag**, or when her mood wants one: her fist jerks
+  (`hairYank`: more force and 12 cm more draw for half a second), you
+  stumble a step after it, your view jolts, and a gasp, most times.
+- **Your head** is 1.545.0's `PULL_RAG` net, the very body the hair pull
+  moves, with the pull aimed out past her shoulder and a little behind her,
+  at your own head's height (`hairPullTune`). Its weight is her mood's, and
+  harder the further you lag, easing off past a 32° bow.
+- **Her hand** is solved on to the fist every frame (the 1.574 pull's
+  `rvhHairHand`), and **yours** goes up to her wrist (`rvhBayeArm`), as
+  anybody led by the hair does. Without it your near hand swung with the
+  walk in front of you, between the two of you (photographed).
+- **Your view**: tipped down a little and rolled toward her hand, with a
+  jolt at each yank. As she sets off your look is eased to where you are
+  going and a little toward her.
+
+**Her mood sets all of it** (`rvdMood`, off 49-revmood.js):
+- **pace**: 0.66 + 0.36 stern + 0.24 excited − 0.26 warm, m/s (0.42..1.15),
+  and in spurts of +35 % when excited;
+- **hold**: × 0.85 + 0.5 stern + 0.3 excited − 0.35 warm (0.5..1.45) on the
+  net's 70 N, up to 1.5 × more as you lag;
+- **yank**: u 0.5 + 0.5 stern + 0.4 excited − 0.35 warm, more for a long
+  lag. She yanks past a lag of 0.32 − 0.14 stern − 0.06 excited + 0.22 warm
+  m, and of her own accord at 0.30·(stern − 0.35) + 0.45·(excited − 0.25)
+  a second;
+- **how far**: legs 3 + 2 stern + 1.8 excited − 1.2 warm (3..6);
+- **turns** at 1.3 + 1.6 stern + 1.0 excited − 0.4 warm rad/s, and she cuts
+  corners the gentler she is: warm, a curve you can follow; stern, square,
+  and a turn is a lag, which is a yank.
+
+**Asking.** "drag me", "drag me around (the room)", "drag me by my hair",
+"pull me by the hair", "pull me around by my hair", "vuci me (za kosu)",
+"traîne-moi par les cheveux", "tire-moi par les cheveux", or Shift+. It is a
+beg (`rev.beg:drag`, `rmoodBeg('drag')`): it excites her as the others do,
+she says yes ("By the hair? Say less."), and does it. "pull my hair" is still
+the 1.574 pull, "drag me by my collar" still a tug on it, and "don't drag me"
+and "did you drag me" are nothing. Asked again while she walks you, a yank
+for it. Asked on your knees, on all fours or sitting, she has you up first
+(1); with her belt or the leash in her hand, those go away first.
+
+**Her own pick.** When she is stern (over 0.42) or excited (over 0.3) and you
+are standing, `drag` joins her candidates (stern weights it × 2.3); on your
+knees or all fours, `drag:up`, her order up first. Not within 32 s of the
+last one, nor twice in five picks.
+
+**Her lines**, in her tone and never one of the last fourteen
+(`rmoodLine`): new beats `hair_drag` (taking hold and setting off),
+`drag_yank`, `drag_walk` (a corner, now and then) and `drag_done`, about
+forty lines in all ("Walk. Don't make me pull harder.", "Easy... come with
+me, babe.", "Ooh, walkies! Hehe.", "Did I say stop?", "Hehe! Gotcha!", "Now
+you know who leads."), and five for the beg.
+
+**The safeword** lets go on that frame (`rvdSafe`). MEASURED: in the same
+frame as "red" the drag was over, the net not holding and the fist gone, and
+her aftercare had begun; the roles went back as ever.
+
+**Her voice** (`server/baye/baye.py` 1.71.0, **needs deploying on mpcn0**):
+`CHLOE_BEAT`s `hair_drag`, `drag_yank`, `drag_walk`, `drag_done`; `rev_hair`
+gains `drag` ("your fist is in their hair and you are walking them round the
+room at your side by it"); `REV_BEG` gains `drag`. All are within the
+existing key limits (12, 8, 10). `clean_scene` checked: `rev_hair: "drag"`
+kept, `"dragged"` dropped. Undeployed, the page's captions show, as before.
+
+**43-jadrija.js**, off unless asked for: `hairPullTune(o)` (the pull's way
+and weight for one hold: `outOf`, `draw`, `k`, `yankF`, `yankDraw`) and
+`hairYank(u)`. Both are forgotten when the hand lets go. With neither set the
+pull is the 1.545 pull to the number.
+
+**MEASURED** (worktree build, headless, `?jadrija&nointro`, key 8, her
+selector off, the mood set; seven drags back to back in three pages):
+
+| mood | pace, m/s (top) | hold | yank past | yanks | peak hair force | legs, walked |
+|---|---|---|---|---|---|---|
+| stern 0.95 | 0.88–0.92 (0.98) | × 1.32 | 0.19 m | 2, 5 in 10 s | 140–154 N | 5, 8.0–9.0 m |
+| excited 0.85 | 0.88–0.89 (1.14–1.16) | × 1.12 | 0.29 m | 3, 3 (1–2 for fun) | 135–139 N | 5, 8.3–8.9 m |
+| neutral | 0.64 (0.67) | × 0.86 | 0.35 m | 0 | 189 N (once, a transient) | 3, 3.7 m |
+| warm 1.0 | 0.40–0.42 | × 0.50 | 0.54 m | 0, 0 | 44–62 N | 3, 5.8–5.9 m in 11–14 s |
+
+- **Her palm on the fist**: median 11–32 mm, p90 26–88 mm; through a yank
+  median 19–26 mm, p90 37–89 mm. **Your palm on her wrist**: median 7–17 mm,
+  p90 20–44 mm. Her fist 0.30–0.62 m off her shoulder.
+- **The two of you apart**, skin to skin (her holding arm left out): the
+  nearest pair was 114–177 mm apart in every drag (her collarbone and your
+  upper arm; head to head 142 mm at the closest). No skin point went through
+  a wall or inside a piece of furniture, the collider never had to push you,
+  and the net's guard never let go (in the first cuts it did, once or twice
+  a drag).
+- **Your head**: of 284 quarter-second samples, 4 were bowed past 40° or
+  turned past 50°, each for 0.03–0.3 s. At a yank it was typically bowed
+  5–9° and turned 5–21° (once, bowed 41°).
+- **The words**: 15 of 15 as expected (above). **Her own pick**: at stern
+  0.95 with the defy bot, a `drag` 65 s in; excited, `drag` at weight
+  2.0–3.8, the top of her list. **From your knees**: "vuci me za kosu" → her
+  order up → 1 → the drag 2.7 s later; Shift+. during it, a yank.
+- No console errors in any run.
+
+What it took to get there, MEASURED along the way:
+- the pull aimed at her hip bowed your head 40–74° and took her fist
+  0.68–0.76 m off her shoulder;
+- aimed at her shoulder, a yank brought your head against her jaw (2–7 mm);
+- swung round at her own 8 rad/s, the net's head was left behind (81°) and
+  its guard let go;
+- a yank's lurch on top of a catch-up made 3.4–4.1 m/s, more than the net
+  follows;
+- with your place 0.74 m off her, it pushed you out while her reach pulled
+  you in, and the hair snapped (270 N for a frame).
+
+Debug: `__fr.reverse.drag`: `ask()`, `beg()`, `start()`, `yank(extra)`,
+`end()`, `state()`, `last()` (every number above, per drag), `all()`,
+`plan(legs)`, `mood()`, `words(t)`, `grid(step)` (the room as she plans it),
+`follow([az, d, h])` (a camera walking beside you two), `tune(o)`,
+`measure(on)`.
+
+**Rough, still:**
+1. Now and then (4 samples in 284), mostly in the first second, your head
+   is turned 55–90° toward her or bowed past 40° for a moment.
+2. At a corner or a yank her palm can be 5–9 cm off the fist for a few
+   frames (p90 up to 89 mm).
+3. In a cramped spot she plans with slim clearances for the first 1.3 m, and
+   once in a while finds only a short walk (one leg of 1.4–1.6 m was seen in
+   the earlier cuts).
+4. The tabouret, the set's stand and the radio's table are not on the
+   room's collider; she plans round discs fitted to them from the kit's
+   numbers.
+5. In first person her face can be close as your head is drawn to her
+   (114 mm skin to skin at the closest).
+6. If she cannot reach your hair she tries once from a step nearer and then
+   gives it up ("out of reach"), rather than shut her fist on the air.
+
 ## [1.583.0] — 2026-10-02 (baye 1.70.0)
 
 ### Roles reversed: Chloe has a mood, and you can beg her
