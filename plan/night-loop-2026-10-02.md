@@ -1,4 +1,4 @@
-# Night loop, 1–2 Oct 2026 (until ~07:30): role reversal + autonomous mode
+# Night loop, 1–2 Oct 2026 (until ~08:30, extended by Misha at 06:25): role reversal + autonomous mode
 
 Misha: "role reversal i think is the hottest part of the game now ... keep improving the
 role reversal as well as 'autonomous' modes, to essentially take advantage of the work that
@@ -99,4 +99,4 @@ merged + released before the next starts. Consensual adult kabina play; safeword
   regression people 100 / blockers 820, CHANGELOG/TASKLOG one row, commit in worktree).
 - Merge per merging-agent-worktrees (mergefix traps), regression plans, deploy baye.py if it
   changed (bump VERSION), release, remove worktree, check orphans.
-- Stop launching new work after ~06:45 so the last one lands by ~07:30.
+- Stop launching new work after ~07:45 so the last one lands by ~08:30 (extended 06:25). After 6b: items 11 + 9 in parallel (separate worktrees), then 10 once 11 is merged.
