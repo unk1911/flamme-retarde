@@ -327,6 +327,9 @@ async function buildVikendica(scene, field) {
                 : key === 'loft' ? loftMat : mat);
       // The kupe cast nothing the slab under them does not: their own laps
       // are finer than a texel of the sun's map.
+      // Named for the report key (src/94-report.js): a blob is one mesh, so
+      // its key is the most a hit on it can say.
+      mesh.name = 'vikendica:' + key;
       mesh.castShadow = !soft(key) && !key.endsWith('_kupe');
       mesh.receiveShadow = true;
       if (soft(key)) mesh.renderOrder = 3;
@@ -1939,10 +1942,12 @@ async function buildVikendica(scene, field) {
       cloth.setIndex(idx);
     }
     const clothM = mesh(cloth, cream);
+    clothM.name = 'cloth';
     g.add(clothM);
 
     // The bar, its grey end caps and the valance, which ride together.
     const bar = new THREE.Group();
+    bar.name = 'bar';
     g.add(bar);
     bar.add(mesh(sweepX([[0.035, 0.030], [-0.020, 0.030], [-0.034, 0.024], [-0.040, 0.012],
       [-0.042, -0.012], [-0.040, -0.026], [-0.030, -0.030], [0.035, -0.030]],
@@ -1987,6 +1992,7 @@ async function buildVikendica(scene, field) {
       const kn = [0.028, 0.032, 0.024].map((r) => {
         const m = mesh(ball, grey); m.scale.setScalar(r); g.add(m); return m;
       });
+      up.name = 'arm-upper'; fore.name = 'arm-fore';
       g.add(up, fore);
       return { sx, c, up, fore, kn };
     });
@@ -1996,6 +2002,7 @@ async function buildVikendica(scene, field) {
     {
       const box = mesh(new THREE.BoxGeometry(0.07, 0.05, 0.07), white);
       box.position.copy(A3(ex, ey + 0.02, AWN.z - 0.005));
+      box.name = 'gearbox';
       g.add(box);
       const eyeR = mesh(new THREE.TorusGeometry(0.014, 0.0035, 8, 20), grey);
       eyeR.position.copy(A3(ex, ey, ez - 0.045));
@@ -2007,6 +2014,7 @@ async function buildVikendica(scene, field) {
     // turns on it.
     const crank = new THREE.Group();
     crank.position.copy(A3(ex, ey, ez - 0.058));
+    crank.name = 'crank';
     g.add(crank);
     const spin = new THREE.Group();
     crank.add(spin);

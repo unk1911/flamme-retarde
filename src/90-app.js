@@ -4070,6 +4070,7 @@ const HELP = [
     ['M', 'help.k.settings'],
     ['H', 'help.k.hud'],
     ['L', 'help.k.clip'],
+    ['`', 'help.k.report'],
     ['?  ·  F1', 'help.k.help'],
   ]],
 ];

@@ -374,6 +374,7 @@ async function buildLandmarks(scene) {
       continue;
     }
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = 'landmark:' + (site.name || site.key);  // for the report key
     // `atY` is an absolute height for anything that does not stand on the
     // ground it is over — which so far is the bridge.
     mesh.position.set(site.x,
