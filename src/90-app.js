@@ -2770,6 +2770,8 @@ function sceneTalk() {
   if (!o.buzz_wand) delete o.buzz_wand;
   if (!o.toys) delete o.toys;
   if (!o.on_cot) delete o.on_cot;
+  // Your hand on one of them, drawing it out (1.582.0, src/49-toyhand.js).
+  if (typeof toyHandScene === 'function') toyHandScene(o);
   // The hand and the belt, each: how many in the last minute, the last one's
   // seconds, the hardest, and where on her — most-hit first.
   for (const [tool, key, n] of [['hand', 'spank', 'spanks'], ['belt', 'lash', 'lashes']]) {
@@ -10633,6 +10635,8 @@ function tick(wall, draw) {
     beltHandTick(dt);
     collarHandTick(dt);
     spankHandTick(dt);
+    // Your hand on the toy she wears (1.582.0, src/49-toyhand.js).
+    if (typeof toyHandTick === 'function') toyHandTick(dt);
     arms.update(dt, chaseCut || bodyCam || (typeof revActive === 'function' && revActive()) ? null
       // The belt — see `beltHandTick`. A fist round the buckle, the strap
       // hanging out of the bottom of it; ahead of everything, because while
@@ -10653,6 +10657,10 @@ function tick(wall, draw) {
         ? { reach: { x: colAfterAt.x, y: colAfterAt.y, z: colAfterAt.z, k: colAfterK, kind: 'pet' } }
       : state.phase === 'ground' && beltRubK > 0.01
         ? { reach: { x: beltRubAt.x, y: beltRubAt.y, z: beltRubAt.z, k: beltRubK, kind: 'pet' } }
+      // Your fist round the toy she is wearing, drawing it out and back —
+      // see src/49-toyhand.js. `hair` is the handle's line, toward her.
+      : state.phase === 'ground' && typeof thK !== 'undefined' && thK > 0.01
+        ? { reach: { x: thAt.x, y: thAt.y, z: thAt.z, k: thK, kind: 'pull', grip: thG, hair: thHair } }
       // The spank — see `spankHandTick`. The flat of the hand, laid on her
       // the way `spankLie` says; ahead of the rest, because it is over in
       // under half a second and the press that started it ended them.
@@ -11953,6 +11961,13 @@ window.__fr = {
     sub: (text, secs = 3, gloss = '') => { voice.sub(text, secs, gloss); return true; },
   },
   skipIntro: () => beginFlight(),
+  /** Your hand on her worn toy (1.582.0, src/49-toyhand.js): ask, read, "red", words. */
+  toyHand: {
+    ask: (act = 'draw', text = '') => toyHandAsk(act, text),
+    state: () => toyHandState(),
+    safe: () => toyHandSafe(),
+    words: (t) => toyHandWords(t),
+  },
   /**
    * The seat, without a keyboard. Synthetic key events never reach the `keys`
    * set from a headless driver, so a parachute test drives the canopy the same

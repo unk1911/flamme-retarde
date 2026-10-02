@@ -8,6 +8,112 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.582.0] — 2026-10-02 (baye 1.68.0)
+
+### The wand the right way in, and your own hand on her toy with the roles as they are
+
+Misha: *"one glaring error, the wand (or the vibrator / dildo), gets put in
+the wrong way in, it needs to go in the other side. and also should be able
+to pull in/out not just in role-reverse mode but in any mode"*. Asked which
+end goes in: the round massager head. Asked who handles it in normal roles:
+Chloe, and with the roles normal Chloe is you.
+
+**The wand, flipped** (43-jadrija.js). Worn, the round head is in her, and
+the neck, the gold band, the handle and the curved end are out. It was the
+curved G-spot end in and the head and handle out. The mesh is unchanged.
+- `seatAt(s)` is the spine's frame turned half round about its own x, so +y
+  points toward the head.
+- `cutFrom(s)` draws a suffix of the index buffer, from her skin to the
+  curved end. It used to be a prefix from the head.
+- `se` is 58 mm in both holes: the head inside, her skin closing on its neck.
+  It was 140 and 148.
+- `bend` sets which way the curved end swings outside her: +1 toward her
+  front for the front hole, −1 toward her back for the back. Both are away
+  from her thighs. Behind her, on all fours and face down, it now curves up
+  and away.
+- Every place that assumed the old way round now uses the seated grip,
+  `U.grip` at 140 mm from the head (past the band and the button, on the
+  handle): the settle samples (`WAND_S`, now offsets past her skin), the
+  grip, the mount, the hand's target, `wandFit` and `wandView`.
+- Drawn out, more of the head shows. `DRAW.max.wand` is 34 mm (it was 45),
+  which leaves 24 mm of head in, short of its widest.
+- Chloe's depths for it in reversal are 20–32 mm, her teases 13, and her
+  swap pushes it home from 34 mm.
+
+**Fit, MEASURED** (`wandFit`, seated, the same poses and harness as 1.572.0).
+`out` counts points on the outside part (neck to curved end) that are inside
+her. Every deep one is in the first rings past her skin, 64–72 mm from the
+head: her cheeks or lips closing round the neck, as the old shaft's were.
+
+    pose               front: out   deep   (1.572.0)        back: out   deep   (1.572.0)
+    standing                5/624   2.3    1/528   2.1          30/624  5.3    18/560  5.5
+    on all fours           21/624   6.2   16/528   6.9          39/624  6.6    32/560  7.4
+    face down               0/624   –      1/528   2.0          14/624  4.3    12/560  4.5
+    on her back            62/624  10.1   45/528  10.8          37/624  6.1    24/560  6.1
+    legs apart             47/624  10.8   38/528  11.2          14/624  4.5    11/560  4.6
+    both legs up            1/624   1.5    0/528   –            11/624  4.1     0/560  –
+    kneeling, cot           0/624   –      0/528   –             0/624  –       0/560  –
+    curled up              29/624   6.5   18/528   7.3          40/624  8.9    36/560  8.8
+    over the edge           0/624   –      0/528   –             6/624  3.2     6/560  3.3
+
+The depths match 1.572.0. The counts are a little higher because the band
+and the handle (31–35 mm across) sit nearer her than the old head did. `in`
+counts head points outside her. It is 0–2 of 156 standing, face down,
+kneeling and over the edge in front, and up to 14 behind standing. Folded at
+the hips it is high again, and as 1.572.0 said it is not a reliable number
+there: v2.0's skin self-intersects between her thighs. The head is never
+drawn, so it cannot show. Drawn 18–19 mm, `deep` rises to 9.8–14.9 at 44–46
+mm: the head coming out between her cheeks.
+
+**Your hand on it, the roles as they are** (new `src/49-toyhand.js`). These
+are 1.567.0's words, read with "her" for "me": "pull it out a bit", "pull
+the wand out slowly", "tease her", "in and out", "twist it", "push it back
+in", "izvuci malo", "tire-le un peu". They work for the wand, the plug and
+the Lovense, on 1.567.0's clock (`rvtCycles`) and through the toy's own
+`jadrija.draw`.
+- **The hand** is the first-person arm's fist (`pull`, the belt's and the
+  hair's), round the wand's handle or on a base. It follows the grip every
+  frame.
+- **Getting there.** You step to the side the toy faces out of, 42 cm off
+  it, and kneel first when it is low on her (the spank's `kneelIf`). You get
+  up again 2.5 s after.
+- **Her back to you.** On her feet, her knees or all fours she keeps facing
+  you. For a toy in her back she turns round first, with her own "turn
+  around" (`show.turnBack`, which keeps her back to you as you move). For one
+  in front, turned away, she turns back.
+- **Hers.** She gasps in her own voice on each draw out and push in
+  (`herGasp`, harder on the wand, `RVT.wandX`). Her scene carries
+  `toy_drawn`. The server (baye 1.68.0) keeps that field with the roles
+  normal and tells her *their hand is on the wand you are wearing and they
+  have drawn it partway out of you*.
+- **"red"** while your hand is on it puts the toy back in its seat in 0.3 s
+  and takes your hand away.
+- **What it does not take.** Bare "take the wand out" is still hers
+  (`doff:wand`): a draw needs a little in it ("a bit", "slowly", "halfway",
+  "malo"). "Put the plug in" is still a fetch: push is only yours while your
+  hand is on one. It never runs with the roles reversed, where the toy is
+  Chloe's (49-revtoys.js). In the third person only the toy moves, since the
+  third person has no arm for it.
+- Debug: `__fr.toyHand.ask(act, line)`, `.state()`, `.safe()`, `.words(t)`.
+
+MEASURED, headless, the wand unless named:
+- behind, standing, you starting in front of her: she turned round, you
+  knelt behind her, drew it 29 mm and back, two gasps;
+- behind, on all fours: she turned round, 23 mm;
+- face down on the cot (no turn): 31 mm;
+- in front, standing: 23 mm;
+- the plug face down, a twist: 12 mm out, turned to and fro;
+- "red" mid-tease: seated (d 0) and your hand away; you stood up again after.
+
+Reversal, rerun on the flipped wand: "swap it for the wand" with the plug in,
+face down, took the plug out and pushed the wand home. Chloe's draw to 18.6
+mm held her palm to the grip at 0.6 / 1.7 / 0.8 / 0.6 mm mean (grip, out,
+hold, in), with a 20 mm single-frame worst in the out.
+
+Server: baye 1.68.0, **needs deploying**. The wand's lines say the head is in
+and the handle and curved end are out, and `toy_drawn` is kept with the roles
+normal.
+
 ## [1.581.0] — 2026-10-02
 
 ### The vikendica: a second awning, the Starlink as it really is, and the plans off the door frame

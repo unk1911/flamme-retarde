@@ -65565,13 +65565,17 @@ async function buildJadrija(scene) {
    * putting it in takes out whatever was there (`holeClear`), and the
    * Lovense or the plug going back in takes the wand out.
    *
-   * WORN, the curved end is in her and the head and handle are out — about
-   * 14 cm of it. Each hole is a point on her skin (her BIND frame, v2.0's
-   * body, carried by her own skin weights the way the plug is —
-   * `wandSkin`), the way into her there (`dir`, in her sagittal plane), and
-   * how much of the toy, from its tip, is inside (`se`, arc length from the
-   * head end at which her skin sits). The G-spot curve bends toward her
-   * front in both.
+   * WORN, THE ROUND HEAD IS IN HER and the neck, the gold band, the handle
+   * and the curved end are out (1.582.0 — Misha: *"the wand ... gets put in
+   * the wrong way in, it needs to go in the other side"*; asked which part,
+   * the head). It was the curved G-spot end in and 14 cm of head and handle
+   * out. Each hole is a point on her skin (her BIND frame, v2.0's body,
+   * carried by her own skin weights the way the plug is — `wandSkin`), the
+   * way into her there (`dir`, in her sagittal plane), and how much of the
+   * head is inside (`se`, arc length from the top of the head at which her
+   * skin sits: the head is 0..se, and her skin closes on its neck). `bend`
+   * is which way the curved end, outside her now, swings: +1 toward her
+   * front, −1 toward her back — away from her thighs in both.
    *
    *   front  on her midline under the crotch, between the front of the vulva
    *          at x 0.067 and the perineum: the canal runs up and back.
@@ -65585,8 +65589,8 @@ async function buildJadrija(scene) {
     /** Arc length, m, head end (0) to the G-spot tip. */
     len: 0.220,
     holes: {
-      front: { at: [0.030, 0.8150, 0], dir: [-0.500, 0.866], se: 0.140 },
-      back: { at: [-0.0446, 0.8448, 0], dir: [0.697, 0.717], se: 0.148 },
+      front: { at: [0.030, 0.8150, 0], dir: [-0.500, 0.866], se: 0.058, bend: 1 },
+      back: { at: [-0.0446, 0.8448, 0], dir: [0.697, 0.717], se: 0.058, bend: -1 },
     },
     /** Metres the motor moves the whole of it while it is in her. */
     buzz: 0.0010,
@@ -71116,12 +71120,11 @@ async function buildJadrija(scene) {
     if (key === 'plug' && appr) {
       return plugCarry(plugSkin(), out, null).applyMatrix4(f.mesh.matrixWorld);
     }
-    // The wand's (1.572.0): the middle of its handle as it will sit seated
+    // The wand's (1.572.0): its grip on the handle as it will sit seated
     // in the hole she is putting it in — her hand is round the handle.
     if (key === 'wand') {
-      const hole = wandWant, H = WAND.holes[hole] || WAND.holes.front;
-      const p = new THREE.Vector3();
-      if (wandSpine) p.setFromMatrixPosition(wandSpine.frameAt(H.se, new THREE.Matrix4()).invert());
+      const hole = wandWant;
+      const p = wandSeatedPoint(hole, wandSpine ? wandSpine.grip : 0.14);
       p.applyQuaternion(wandBasis(hole));
       const q = new THREE.Quaternion();
       wandCarry(hole, out, q);
@@ -71886,12 +71889,36 @@ async function buildJadrija(scene) {
         0, 0, -1, 0,
         0, 0, 0, 1);
     };
+    /**
+     * WORN, THE HEAD GOES IN (1.582.0). `seatAt(s)` is `frameAt(s)` turned
+     * half round about its own x: its +y is now the way toward the HEAD, so
+     * with her skin at `s` put at the origin and +y into her, the round head
+     * (0..s) is in her and the neck, the band, the handle and the curved end
+     * (s..len) are out. Its x is the same — the side the curve bends to.
+     */
+    U.seatAt = (s, out = new THREE.Matrix4()) => {
+      const i = Math.max(0, Math.min(N, Math.round(s / STEP)));
+      const th = spineT[i], c = Math.cos(th), n = Math.sin(th);
+      return out.set(
+        c, -n, 0, spineP[i][0],
+        n, c, 0, spineP[i][1],
+        0, 0, 1, 0,
+        0, 0, 0, 1);
+    };
+    /** Draw it only from `s` (m from the head) to the curved end; null is all of it. */
+    U.cutFrom = (s) => {
+      if (s == null) { geo.setDrawRange(0, Infinity); return; }
+      const ring = Math.max(0, Math.min(N - 1, Math.floor(s / STEP)));
+      geo.setDrawRange(ring * SIDES * 6, (N - ring) * SIDES * 6);
+    };
     /** Draw it only as far as `s` (m) from the head; null is all of it. */
     U.cutAt = (s) => {
       if (s == null) { geo.setDrawRange(0, Infinity); return; }
       const ring = Math.max(1, Math.min(N, Math.ceil(s / STEP)));
       geo.setDrawRange(0, ring * SIDES * 6);
     };
+    /** Where a hand takes it: the handle's waist side of the button, m from the head. */
+    U.grip = 0.140;
     U.lay = 0;
     if (!wandSpine) wandSpine = U;
     return m;
@@ -72120,18 +72147,29 @@ async function buildJadrija(scene) {
   }
 
   /**
-   * SEAT IT, `d` out of her along its own curve and turned `tw` about its
-   * way in: the spine's frame at `se + d` goes to the origin, and only the
-   * part outside her and 4 mm past her skin is drawn.
+   * SEAT IT, `d` out of her along its own line and turned `tw` about its
+   * way in: the spine's worn frame (`seatAt`, head toward her) at `se − d`
+   * goes to the origin, and only the part outside her, from 4 mm inside her
+   * skin, is drawn. Drawn out, more of the head shows.
    */
   const _wsM = new THREE.Matrix4(), _wsR = new THREE.Matrix4();
   function wandSeat(part, d = 0, tw = 0) {
     const mesh = part.shake.children[0], U = mesh.userData;
-    const se = (WAND.holes[part.wand.hole] || WAND.holes.front).se;
-    U.frameAt(se + d, _wsM).invert();
-    if (tw) _wsM.premultiply(_wsR.makeRotationY(tw));
+    const H = WAND.holes[part.wand.hole] || WAND.holes.front;
+    const sk = Math.max(0.004, H.se - d);
+    U.seatAt(sk, _wsM).invert();
+    const t = tw + (H.bend < 0 ? Math.PI : 0);
+    if (t) _wsM.premultiply(_wsR.makeRotationY(t));
     _wsM.decompose(mesh.position, mesh.quaternion, mesh.scale);
-    U.cutAt(se + d + 0.004);
+    U.cutFrom(sk - 0.004);
+  }
+  /** Where the mesh's own point `s` (m from the head) sits seated in `hole`, in the settle frame. */
+  function wandSeatedPoint(hole, s, out = new THREE.Vector3()) {
+    const H = WAND.holes[hole] || WAND.holes.front;
+    if (!wandSpine) return out.set(0, -0.08, 0);
+    const M = wandSpine.seatAt(H.se, new THREE.Matrix4()).invert();
+    if (H.bend < 0) M.premultiply(new THREE.Matrix4().makeRotationY(Math.PI));
+    return wandSpine.pointAt(s, out).applyMatrix4(M);
   }
 
   function wandWorn(m, hole) {
@@ -72168,7 +72206,8 @@ async function buildJadrija(scene) {
    * it. Eased, so it rolls over as she rolls over rather than snapping.
    * And the motor's rock rides on top of that — the head shows it.
    */
-  const WAND_S = [0.002, 0.020, 0.040, 0.062, 0.085, 0.105, 0.122];
+  /** Its sample points outside her, m past her skin toward the curved end. */
+  const WAND_S = [0.004, 0.022, 0.044, 0.068, 0.094, 0.120, 0.150];
   const _wnG = new THREE.Matrix4(), _wnQ = new THREE.Quaternion(), _wnR = new THREE.Quaternion();
   const _wnV = new THREE.Vector3(), _wnD = new THREE.Vector3(), _wnE = new THREE.Euler(0, 0, 0, 'ZYX');
   let wandBox = null;
@@ -72206,16 +72245,17 @@ async function buildJadrija(scene) {
   function wandTick(part, dt) {
     const W = part.wand, mesh = part.shake.children[0], U = mesh.userData;
     const st = drawSt.wand, d = st ? st.d : 0;
-    const se = (WAND.holes[W.hole] || WAND.holes.front).se;
+    const sk = Math.max(0.004, (WAND.holes[W.hole] || WAND.holes.front).se - d);
     mesh.updateMatrix();
     if (!W.pts) { W.pts = WAND_S.map(() => new THREE.Vector3()); W.rad = []; W.give = []; W.tgive = []; W.legs = []; }
-    WAND_S.forEach((s, i) => {
+    WAND_S.forEach((o, i) => {
+      const s = Math.min(U.len - 0.002, sk + o);
       U.pointAt(s, W.pts[i]).applyMatrix4(mesh.matrix);
       W.rad[i] = U.radiusAt(s);
       // A centimetre of give in the sheet beside her, none a hand away.
-      W.give[i] = 0.004 + 0.022 * Math.max(0, 1 - (se + d - s) / 0.07);
+      W.give[i] = 0.004 + 0.022 * Math.max(0, 1 - (s - sk) / 0.07);
       // And the soft tops of her thighs, which give round it near her.
-      W.tgive[i] = 0.003 + 0.016 * Math.max(0, 1 - (se + d - s) / 0.05);
+      W.tgive[i] = 0.003 + 0.016 * Math.max(0, 1 - (s - sk) / 0.05);
     });
     // Her thighs, as she is posed, world.
     const TL = wandThighs();
@@ -72480,7 +72520,7 @@ async function buildJadrija(scene) {
    * `drawFit` measures it, posed, against the body that is drawn.
    */
   const DRAW = {
-    max: { plug: 0.034, lovense: 0.022, wand: 0.045 },
+    max: { plug: 0.034, lovense: 0.022, wand: 0.034 },
     /** The cache's step, m. */
     q: 0.0005,
     /** Where the plug's drawn cut sits seated, up its axis (`wornGeo`'s). */
@@ -72596,15 +72636,18 @@ async function buildJadrija(scene) {
     const mesh = part.shake.children[0];
     part.group.updateWorldMatrix(true, true);
     const M = mesh.matrixWorld;
-    // The wand (1.572.0): the middle of its handle, which is its origin;
-    // `out` the way out of her where it leaves her, `long` down the handle
-    // toward her, and `r` the handle's radius there, for a hand round it.
+    // The wand (1.572.0): its grip on the handle (`U.grip`, past the band
+    // and the button since the head is the end in her — 1.582.0); `out`
+    // the way out of her where it leaves her, `long` down the handle toward
+    // her, and `r` the handle's radius there, for a hand round it.
     if (key === 'wand') {
-      const p = new THREE.Vector3(0, 0, 0).applyMatrix4(M);
+      const U = mesh.userData;
+      const p = U.pointAt(U.grip, new THREE.Vector3()).applyMatrix4(M);
       const out = new THREE.Vector3(0, -1, 0).transformDirection(part.shake.matrixWorld);
-      const long = new THREE.Vector3(0, -1, 0).transformDirection(M);
+      const ta = U.pointAt(U.grip - 0.01, new THREE.Vector3()).applyMatrix4(M);
+      const long = ta.sub(p).normalize();
       const st = drawSt.wand;
-      return { p, out, long, d: st ? st.d : 0, r: mesh.userData.radiusAt(0.100), wand: true };
+      return { p, out, long, d: st ? st.d : 0, r: U.radiusAt(U.grip), wand: true };
     }
     if (key === 'plug') {
       const p = new THREE.Vector3(0, 0, 0).applyMatrix4(M);
@@ -72851,13 +72894,14 @@ async function buildJadrija(scene) {
    * v2.0's skin through her own weights, as it is drawn (its settle and any
    * draw on it). Millimetres; counts of points on rings of 16 round it:
    *
-   *   out    [buried, of]: points on the part OUTSIDE her (head, neck, band,
-   *          handle — from the head to 6 mm short of her skin) that are
-   *          inside her body: a thigh or a cheek through it. 0 is right
+   *   out    [buried, of]: points on the part OUTSIDE her (since 1.582.0 the
+   *          neck, band, handle and curved end — from 6 mm out of her skin
+   *          to the tip) that are inside her body: a thigh or a cheek
+   *          through it. 0 is right
    *   deep   the deepest of those, mm, and `at` the arc length (mm from the
    *          head) where it is
-   *   in     [shown, of]: points on the curved end, from 6 mm past her skin
-   *          to the tip, that are OUTSIDE her — the part not drawn ending in
+   *   in     [shown, of]: points on the head, from its top to 6 mm short of
+   *          her skin, that are OUTSIDE her — the part not drawn ending in
    *          the air. 0 is right
    *   cut    how far inside her the drawn part's end is, on its axis (+ in)
    *   bed    the settle's leftover overlap with the mattress or floor (0)
@@ -72872,7 +72916,7 @@ async function buildJadrija(scene) {
     part.group.updateWorldMatrix(true, true);
     const Mi = skinFig.mesh.matrixWorld.clone().invert();
     const M = mesh.matrixWorld.clone().premultiply(Mi);
-    const sc = H.se + st.d;
+    const sc = Math.max(0.004, H.se - st.d);
     const ent = U.pointAt(sc, new THREE.Vector3()).applyMatrix4(M);
     const R = herRays(ent, 0.30, true);
     const TOL = 0.0015;
@@ -72888,14 +72932,14 @@ async function buildJadrija(scene) {
       }
     };
     let out = 0, outN = 0, deep = 0, deepAt = null, inn = 0, inN = 0;
-    for (let s = 0.006; s <= sc - 0.006 + 1e-6; s += 0.004) {
+    for (let s = sc + 0.006; s <= U.len - 0.004 + 1e-6; s += 0.004) {
       ring(s, 16, (q, ss) => {
         const v = R.sd(q);
         outN++;
         if (v != null && v < -TOL) { out++; if (-v > deep) { deep = -v; deepAt = ss; } }
       });
     }
-    for (let s = sc + 0.006; s <= U.len - 0.004 + 1e-6; s += 0.006) {
+    for (let s = 0.004; s <= sc - 0.006 + 1e-6; s += 0.004) {
       ring(s, 12, (q) => { const v = R.sd(q); inN++; if (v != null && v > TOL) inn++; });
     }
     const vc = R.sd(ent);
@@ -81849,10 +81893,9 @@ async function buildJadrija(scene) {
       const MW = skinFig.mesh.matrixWorld, mq = new THREE.Quaternion().setFromRotationMatrix(MW);
       const bq = wandBasis(hole);
       const out = new THREE.Vector3(0, -1, 0).applyQuaternion(bq).applyQuaternion(q).applyQuaternion(mq).normalize();
-      const grip = new THREE.Vector3();
-      if (wandSpine) grip.setFromMatrixPosition(wandSpine.frameAt(H.se, new THREE.Matrix4()).invert());
+      const grip = wandSeatedPoint(hole, wandSpine ? wandSpine.grip : 0.14);
       grip.applyQuaternion(bq).applyQuaternion(q).add(P).applyMatrix4(MW);
-      return { p: P.clone().applyMatrix4(MW), out, grip };
+      return { p: P.clone().applyMatrix4(MW), out, grip, r: wandSpine ? wandSpine.radiusAt(wandSpine.grip) : 0.012 };
     },
     /**
      * The wand (1.572.0), measured — the plug's `plug()` for it. `fit` is
@@ -81924,7 +81967,7 @@ async function buildJadrija(scene) {
       part.group.updateWorldMatrix(true, true);
       const M = skinFig.mesh.matrixWorld, mesh = part.shake.children[0];
       const P = new THREE.Vector3().setFromMatrixPosition(part.shake.matrixWorld);
-      const Hd = mesh.userData.pointAt(0.06, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld);
+      const Hd = mesh.userData.pointAt(0.15, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld);
       const A = P.clone().lerp(Hd, 0.45);
       const lat = new THREE.Vector3(0, 0, 1).transformDirection(M);
       const fw = new THREE.Vector3(1, 0, 0).transformDirection(M);

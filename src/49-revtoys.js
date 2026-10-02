@@ -42,8 +42,10 @@
 const RVT = {
   // How far out (m): a full draw is somewhere in [lo, hi]; a tease about
   // `tease`. `toyDraw` clamps to DRAW.max (34 / 22 mm) whatever is asked.
-  depth: { plug: [0.024, 0.034], lovense: [0.015, 0.022], wand: [0.028, 0.044] },
-  tease: { plug: 0.012, lovense: 0.009, wand: 0.016 },
+  // The wand since 1.582.0 is its round head in you: drawn, the head shows,
+  // and never past its widest (DRAW.max 34 mm leaves 24 mm of it in).
+  depth: { plug: [0.024, 0.034], lovense: [0.015, 0.022], wand: [0.020, 0.032] },
+  tease: { plug: 0.012, lovense: 0.009, wand: 0.013 },
   // Rad either way of a twist (the plug's oval base turned about its axis).
   twist: 0.35,
   // Her palm's skin off the grip point, out along the axis (m): just over
@@ -870,7 +872,7 @@ function rvtClear() {
  * The safeword over all of it (`rvtEnd`): a toy in her hand goes to its
  * place, and a wand partway in is seated, its remote off.
  */
-const RVT_SWAP = { pull: 0.9, put: 0.85, take: 0.85, push: 1.6, dmax: 0.045, carryUp: -0.30 };
+const RVT_SWAP = { pull: 0.9, put: 0.85, take: 0.85, push: 1.6, dmax: 0.034, carryUp: -0.30 };
 
 /** Which hole a worn toy is in. */
 function rvtHoleOf(key) {
@@ -1097,7 +1099,7 @@ function rvtSwapTick(M, dt) {
   if (M.ph === 'reach2') {
     const m = jadrija.toyMountAt('wand', M.hole);
     if (!m) { rvmEnd('no mount'); return; }
-    const C = rvtWandHold(m.grip.clone().addScaledVector(m.out, RVT_SWAP.dmax), m.out.clone().negate(), 0.0172, true);
+    const C = rvtWandHold(m.grip.clone().addScaledVector(m.out, RVT_SWAP.dmax), m.out.clone().negate(), m.r || 0.012, true);
     const sh = rvmShoulder('R', _tB);
     if (sh) {
       const need = sh.distanceTo(C) - RVM.reach;

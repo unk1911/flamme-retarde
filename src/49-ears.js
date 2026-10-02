@@ -537,13 +537,24 @@ const ears = (() => {
         draw();
         return;
       }
+      // YOUR HAND ON THE TOY SHE IS WEARING (1.582.0, src/49-toyhand.js):
+      // "pull it out a bit", "tease her", "twist it", "push it back in" —
+      // 1.567.0's words, with the roles as they are.
+      const tw = typeof toyHandWords === 'function' ? toyHandWords(blob) : null;
+      if (tw) {
+        note('“' + blob + '”  typed · here  → ' + tw, 'heard');
+        act(tw, null, blob);
+        draw();
+        return;
+      }
       const bw = beltWords(blob);
       // AND THE COLLAR (1.553.0): its words, and the same safeword while it
       // is on her — see COLLAR in 90-app.js. And while she is in her own
-      // mode, which the safeword ends too.
+      // mode, which the safeword ends too. And while your hand is on her toy.
       const on = (typeof beltActive === 'function' && beltActive())
         || (typeof collarActive === 'function' && collarActive())
-        || (typeof autoActive === 'function' && autoActive());
+        || (typeof autoActive === 'function' && autoActive())
+        || (typeof toyHandActive === 'function' && toyHandActive());
       const cw = collarWords(blob);
       if (cw) {
         note('“' + blob + '”  typed · here  → ' + cw, 'heard');
@@ -696,6 +707,11 @@ const ears = (() => {
         const rv = revWords(said);
         if (rv) d.intents = [rv];
       }
+      // And your hand on her toy, heard (1.582.0): the whole line.
+      if (!typed && said && typeof toyHandWords === 'function') {
+        const tw = toyHandWords(said);
+        if (tw) d.intents = [tw];
+      }
       note('“' + (said || '…') + '”  ' + (typed ? 'typed' : secs.toFixed(1) + ' s')
         + ' · ' + d.ms + ' ms'
         + (lang ? ' · ' + lang : '')
@@ -714,12 +730,13 @@ const ears = (() => {
       if (d.intents && d.intents.length && !(typeof beltActive === 'function' && beltActive())
         && !(typeof collarActive === 'function' && collarActive())
         && !(typeof autoActive === 'function' && autoActive())
+        && !(typeof toyHandActive === 'function' && toyHandActive())
         && !(typeof revActive === 'function' && revActive())) {
         d.intents = d.intents.filter((n) => n !== 'belt.stop');
       }
       // A command, and that is the whole of it — commands outrank conversation.
       if (d.intents && d.intents.length) {
-        for (const it of d.intents) act(it, d.lang);
+        for (const it of d.intents) act(it, d.lang, said || "");
         return;
       }
       // AN ORDER AT A COUNTER. Misha, 16 Sep 2026: *"so i just come up and use
@@ -1149,10 +1166,23 @@ const ears = (() => {
   }
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
-  async function act(name, lang = null) {
+  async function act(name, lang = null, line = '') {
     // THE ROLE SWAP (1.561.0) — see src/49-reverse.js. While it is on, the
     // safeword is its own: it ends the swap and Chloe comes to you.
     if (name === 'belt.stop' && typeof revActive === 'function' && revActive()) name = 'rev.safe';
+    // Your hand on her toy (1.582.0, src/49-toyhand.js).
+    if (/^toy\.hand:/.test(name) && typeof toyHandAsk === 'function') {
+      const r = toyHandAsk(name.slice(9), line);
+      note(r.label, r.ok ? 'did' : 'meta');
+      return;
+    }
+    // And the safeword, while it is on her toy: it goes back to its seat.
+    if (name === 'belt.stop' && typeof toyHandActive === 'function' && toyHandActive()) {
+      toyHandSafe();
+      const others = (typeof beltActive === 'function' && beltActive()) || (typeof collarActive === 'function' && collarActive())
+        || (typeof autoActive === 'function' && autoActive());
+      if (!others) { note('red — it goes back in, and your hand comes away', 'did'); return; }
+    }
     // And since 1.564.0 the belt and the collar are hers while it is on
     // (src/49-revkit.js): asked for them, she uses them on you; the leash's
     // pose words are your own body's on the end of it.

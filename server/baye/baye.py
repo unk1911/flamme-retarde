@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.67.0"
+VERSION = "1.68.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4609,8 +4609,8 @@ CHLOE_BEAT = {
     "swap": "you are taking the toy they are wearing out of them to put it "
             "away, and going to the shelf for the wand, the pink G-spot one, "
             "which is much stronger. A short, teasing, promising line",
-    "swapin": "you have just slid the wand all the way into them, slowly, its "
-              "curved end in and its big head out. A short, pleased line",
+    "swapin": "you have just slid the wand into them, slowly, its round "
+              "head in and its handle and curved end out. A short, pleased line",
     "wandon": "you have switched on the wand they are wearing with the remote "
               "on your phone — the big motor — and you are watching them take "
               "it. A short, wicked line",
@@ -4970,11 +4970,12 @@ WORN_NOUN = {
     "plug": "you have the plug in, the remote-controlled one from the shelf",
     # The wand (1.63.0), and where — off `toys` in the scene, see `worn_line`.
     "wand": "you have the wand in, the pink G-spot one from the shelf",
-    "wand@front": "you have the pink G-spot wand in your pussy, its curved end "
-                  "in you and the big head and handle sticking out between "
-                  "your thighs",
-    "wand@back": "you have the pink G-spot wand in your ass, its curved end in "
-                 "you and the big head and handle sticking out behind",
+    # 1.68.0 (page 1.582.0): the round head goes in, the curved end is out.
+    "wand@front": "you have the pink G-spot wand in your pussy, its round "
+                  "head in you and the handle and curved end sticking out "
+                  "between your thighs",
+    "wand@back": "you have the pink G-spot wand in your ass, its round head in "
+                 "you and the handle and curved end sticking out behind",
 }
 
 
@@ -5033,8 +5034,9 @@ HER_WORLD = (
     "the hut; it goes in behind, and it is radio too, on its own button in "
     "the same app",
     "the third, the strongest, is a pink G-spot wand lying on that shelf: "
-    "a big massager head on one end and a curved end that goes in, either "
-    "in front or behind, radio on its own button too",
+    "a big round massager head that goes in, either in front or behind, "
+    "and a handle with a curved end that stays out, radio on its own "
+    "button too",
     "another of that phone's apps is a live camera on you, so when they are "
     "nowhere in sight they may still be watching your face on a screen",
     "the konoba pours beer, a gemišt, wine, rakija and espresso, and they "
@@ -5263,8 +5265,10 @@ def clean_scene(raw) -> dict:
         "rev_hair": _enum(g("rev_hair"), REV_HAIR, 8),
         "remote_level": clamp_num(g("remote_level"), 0, 4),
     }
+    # The toy drawn partway out is Chloe's hand on HER since 1.68.0 (page
+    # 1.582.0) as well, with the roles as they are: kept either way.
     if not out["roles"]:
-        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "toy_drawn", "remote_level",
+        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "remote_level",
                   "rev_spoon", "rev_hair"):
             out[k] = None
     if out["remote_level"] is not None:
@@ -5375,6 +5379,11 @@ def scene_lines(s: dict):
             facts.append("you are calm and easy")
     for k in s.get("worn") or []:
         facts.append(worn_line(k, s.get("toys")))
+    # Their hand on it (1.68.0, page 1.582.0): drawn partway out of you.
+    td = s.get("toy_drawn")
+    if td in TOY_DRAWN:
+        facts.append(f"their hand is on {TOY_DRAWN[td]} you are wearing and they "
+                     "have drawn it partway out of you, holding it there")
     if s.get("buzz"):
         facts.append("the Lovense they put on you is going, this second")
     if s.get("buzz_plug"):
