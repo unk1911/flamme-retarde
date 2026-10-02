@@ -25,7 +25,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    one leg flat on the cot + the other raised (left/right), both legs raised, and raised
    HIGHER — solved poses (Blender solvers / ?pose harness, rig sign traps), with commands,
    keys in reverse mode, autonomous-mode moves, and Chloe orders for each.
-5. [ ] **Toys in Chloe's hands.** While reversed and the Lovense or the plug is worn by
+5. [x] **Toys in Chloe's hands.** While reversed and the Lovense or the plug is worn by
    player-Baye, Chloe sometimes slowly draws it partway out and pushes it back in (an
    animation of the worn toy along its axis + her hand on the base, the fit check keeping it
    believable), plus using the remote. Same for the Lovense. Reactions on your body/camera.
