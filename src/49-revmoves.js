@@ -1785,9 +1785,9 @@ function rvmSitTick(M, dt) {
 //
 // Misha, 2 Oct 2026, 06:40: *"if at certain intimate moments of show of
 // affection that Chloe could slide in lay on the cot next to baye (baye being
-// in fetal pose) and spoon ... ultimately we are in love"*. The cuddle:
-// two people who love each other lying close.
-// The safeword is over it like everything else, and turns it into the aftercare (she keeps holding you).
+// in fetal pose) and spoon ... ultimately we are in love"*. The safeword is
+// over it like everything else, and turns it into the aftercare (she keeps
+// holding you).
 //
 // THE COT IS 0.66 M ACROSS, and Baye's own `fetal` — knees to her chest — is
 // 0.58 of it, with her back at the room-side edge: there is nowhere behind her
