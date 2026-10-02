@@ -2380,6 +2380,137 @@ function skinnedFigure(data, opts = {}) {
   }
 
   /**
+   * JOINT LIMITS, LAID ON LAST — a forearm cannot be wrung and a wrist cannot
+   * fold back on itself, whatever the layers above it asked for.
+   *
+   * Misha, 1 Oct 2026, Baye on her back on the cot: *"sometimes her hands/arms
+   * do this weird twist, like a ventriloquist: normal human arms don't bend
+   * that way"*. The cause was one layer (`armsWide` in 43-jadrija.js, solving
+   * against an arm it had cached from another pose) and it is fixed there.
+   * This is the net under every layer, so the next one cannot do it either:
+   * every aim, the settle, the tug and the overlay are composed in different
+   * frames by different files, and nothing but the final pose knows what the
+   * forearm ended up doing relative to the arm it hangs from.
+   *
+   * Per bone, IN ITS OWN FRAME: the turn off its rest (`rest⁻¹ · parent⁻¹ ·
+   * world`), split into a TWIST about the bone's own length (head to `child`'s
+   * head, so no axis is typed) and the SWING that is left. The twist is held
+   * to `twist` degrees either way, and to `total` with its parent's twist
+   * added — the forearm's turn shared between the forearm bone and the hand,
+   * which is how this rig carries pronation. The swing is held to `side`
+   * degrees off the plane of `hinge` (an elbow bends in one plane), and to
+   * `cone` degrees in all. Every number is a bound the shipped clips do not
+   * reach — measured on all 55 of Baye's, every frame (see CHANGELOG 1.560.2)
+   * — so a clip is drawn exactly as baked and only a composition that has
+   * gone wrong is caught. Nothing is allocated; a clamp costs a handful of
+   * products on the four bones that have limits.
+   *
+   * `limits({ armLL: { child: 'handL', twist: 80, side: 78, hinge: [1,0,0] },
+   *   handL: { child: 'fingersL', twist: 80, total: 92, cone: 115 }, ... })`;
+   * `limits(null)` takes them off. `limitStats()` counts what was clamped.
+   * The poser (`manual` with `exact`) is never clamped: what is on screen
+   * while somebody poses her is the dict they export.
+   */
+  let lim = null;
+  const limStat = { frames: 0, hits: 0, bones: {}, worst: 0, last: null };
+  const _lmA = new Float32Array(4), _lmB = new Float32Array(4), _lmC = new Float32Array(4);
+  const _lmT = new Float32Array(4), _lmS = new Float32Array(4);
+  function limits(spec) {
+    if (!spec) { lim = null; return true; }
+    const at = new Int16Array(nb).fill(-1), ks = Object.keys(spec);
+    const L = { at, n: 0, idx: [], ax: new Float32Array(ks.length * 3), hn: new Float32Array(ks.length * 3),
+      sd: new Float32Array(ks.length * 3), lo: [], hi: [], tot: [], side: [], cone: [], par: [],
+      tw: new Float32Array(ks.length) };
+    const D = Math.PI / 180;
+    for (const name of ks) {
+      const o = spec[name], i = data.bones.findIndex((b) => b.name === name);
+      const c = data.bones.findIndex((b) => b.name === o.child);
+      if (i < 0 || c < 0 || data.bones[i].parent < 0) continue;
+      const k = L.n++;
+      at[i] = k; L.idx.push(i);
+      const l = Math.hypot(restT[c * 3], restT[c * 3 + 1], restT[c * 3 + 2]) || 1;
+      const a = [restT[c * 3] / l, restT[c * 3 + 1] / l, restT[c * 3 + 2] / l];
+      L.ax.set(a, k * 3);
+      // The hinge, square to the bone; and the axis a swing off its plane is about.
+      const h = o.hinge || [1, 0, 0], hd = h[0] * a[0] + h[1] * a[1] + h[2] * a[2];
+      let hx = h[0] - hd * a[0], hy = h[1] - hd * a[1], hz = h[2] - hd * a[2];
+      const hl = Math.hypot(hx, hy, hz) || 1;
+      hx /= hl; hy /= hl; hz /= hl;
+      L.hn.set([hx, hy, hz], k * 3);
+      L.sd.set([a[1] * hz - a[2] * hy, a[2] * hx - a[0] * hz, a[0] * hy - a[1] * hx], k * 3);
+      const tw = (o.twist == null ? 180 : o.twist) * D;
+      L.lo.push(-tw); L.hi.push(tw);
+      L.tot.push(o.total ? o.total * D : 0);
+      L.side.push(o.side == null ? Infinity : o.side * D);
+      L.cone.push(o.cone == null ? Infinity : o.cone * D);
+      L.par.push(at[data.bones[i].parent]);
+    }
+    lim = L.n ? L : null;
+    return !!lim;
+  }
+  /** Bone `i` (limit slot `k`, parent `p`) held inside its limits, in worldQ. */
+  function limitBone(i, p, k) {
+    const L = lim, o = i * 4, a = k * 3;
+    // basis = rest⁻¹ · parent⁻¹ · world: the turn off rest, in the bone's frame.
+    _lmA[0] = -worldQ[p * 4]; _lmA[1] = -worldQ[p * 4 + 1]; _lmA[2] = -worldQ[p * 4 + 2]; _lmA[3] = worldQ[p * 4 + 3];
+    qmul(_lmB, 0, _lmA, 0, worldQ, o);
+    _lmA[0] = -restQ[o]; _lmA[1] = -restQ[o + 1]; _lmA[2] = -restQ[o + 2]; _lmA[3] = restQ[o + 3];
+    qmul(_lmC, 0, _lmA, 0, _lmB, 0);
+    if (_lmC[3] < 0) for (let c = 0; c < 4; c++) _lmC[c] = -_lmC[c];
+    const ax = L.ax[a], ay = L.ax[a + 1], az = L.ax[a + 2];
+    // Twist about the bone, and the swing left: basis = swing · twist.
+    const pr = _lmC[0] * ax + _lmC[1] * ay + _lmC[2] * az;
+    const tl = Math.hypot(pr, _lmC[3]);
+    const tw = tl > 1e-9 ? 2 * Math.atan2(pr, _lmC[3]) : 0;
+    _lmT[0] = tl > 1e-9 ? ax * pr / tl : 0; _lmT[1] = tl > 1e-9 ? ay * pr / tl : 0;
+    _lmT[2] = tl > 1e-9 ? az * pr / tl : 0; _lmT[3] = tl > 1e-9 ? _lmC[3] / tl : 1;
+    _lmA[0] = -_lmT[0]; _lmA[1] = -_lmT[1]; _lmA[2] = -_lmT[2]; _lmA[3] = _lmT[3];
+    qmul(_lmS, 0, _lmC, 0, _lmA, 0);
+    // The swing as a rotation vector: its angle along its axis.
+    const sl = Math.hypot(_lmS[0], _lmS[1], _lmS[2]);
+    const sa = 2 * Math.atan2(sl, Math.abs(_lmS[3])), sg = _lmS[3] < 0 ? -1 : 1;
+    let vx = sl > 1e-9 ? sg * _lmS[0] / sl * sa : 0, vy = sl > 1e-9 ? sg * _lmS[1] / sl * sa : 0;
+    let vz = sl > 1e-9 ? sg * _lmS[2] / sl * sa : 0;
+    // The limits. The twist, and with its parent's (already held) under `total`.
+    let lo = L.lo[k], hi = L.hi[k];
+    const pk = L.par[k];
+    if (L.tot[k] > 0 && pk >= 0) { lo = Math.max(lo, -L.tot[k] - L.tw[pk]); hi = Math.min(hi, L.tot[k] - L.tw[pk]); }
+    const tw2 = lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, tw));
+    L.tw[k] = tw2;
+    let hit = Math.abs(tw2 - tw);
+    // Off the hinge's plane, then the cone.
+    const sdx = L.sd[a], sdy = L.sd[a + 1], sdz = L.sd[a + 2];
+    const off = vx * sdx + vy * sdy + vz * sdz, lim2 = L.side[k];
+    if (off > lim2 || off < -lim2) {
+      const d = (off > 0 ? lim2 : -lim2) - off;
+      vx += sdx * d; vy += sdy * d; vz += sdz * d;
+      hit = Math.max(hit, Math.abs(d));
+    }
+    let va = Math.hypot(vx, vy, vz);
+    if (va > L.cone[k]) {
+      const s = L.cone[k] / va;
+      vx *= s; vy *= s; vz *= s;
+      hit = Math.max(hit, va - L.cone[k]);
+      va = L.cone[k];
+    }
+    if (hit < 1e-4) return;
+    // Rebuild: swing · twist, then rest · that, then parent · that.
+    const sn = va > 1e-9 ? Math.sin(va / 2) / va : 0.5;
+    _lmS[0] = vx * sn; _lmS[1] = vy * sn; _lmS[2] = vz * sn; _lmS[3] = Math.cos(va / 2);
+    const ts = Math.sin(tw2 / 2);
+    _lmT[0] = ax * ts; _lmT[1] = ay * ts; _lmT[2] = az * ts; _lmT[3] = Math.cos(tw2 / 2);
+    qmul(_lmC, 0, _lmS, 0, _lmT, 0);
+    qmul(_lmB, 0, restQ, o, _lmC, 0);
+    qmul(worldQ, o, worldQ, p * 4, _lmB, 0);
+    limStat.hits++;
+    const nm = data.bones[i].name;
+    limStat.bones[nm] = (limStat.bones[nm] || 0) + 1;
+    const deg = hit * 180 / Math.PI;
+    if (deg > limStat.worst) limStat.worst = deg;
+    limStat.last = nm + ' ' + deg.toFixed(1) + '° · ' + (st.cur ? st.cur.name : '-');
+  }
+
+  /**
    * LEGS LAID ON THE FLOOR — the quay sitters' (1.538.2; the numbers are made
    * by `legRestOf` in 43-settle.js and handed in through `legs()`).
    *
@@ -2699,6 +2830,8 @@ function skinnedFigure(data, opts = {}) {
     }
 
     const P = palette;
+    const limOn = !!lim && !(man && man.exact);
+    if (limOn) limStat.frames++;
     for (let i = 0; i < nb; i++) {
       const p = data.bones[i].parent;
       // The root's translation is the clip's; everything below it hangs off the
@@ -2725,6 +2858,8 @@ function skinnedFigure(data, opts = {}) {
       }
       // Legs laid on the floor — see `legRest` below.
       if (legsOn && !man && st.legs.at[i]) legRest(st.legs, i);
+      // And the joint limits, over everything — see `limits`.
+      if (limOn && lim.at[i] >= 0) limitBone(i, p, lim.at[i]);
 
       // skin = world * bind^-1, written straight out as three rows of a 3x4.
       const sq = i * 4;
@@ -3028,6 +3163,15 @@ function skinnedFigure(data, opts = {}) {
      * child, side, heel, calf, spread, lean, splay }`, or null for the clip's.
      */
     legs: (L) => { st.legs = L || null; },
+    /** Joint limits over every layer — see `limits` above. */
+    limits,
+    /** What the limits have clamped: frames run, bone-frames clamped, by bone, the worst (deg). `reset` zeroes it. */
+    limitStats: (reset = false) => {
+      const r = { on: !!lim, frames: limStat.frames, hits: limStat.hits, bones: Object.assign({}, limStat.bones),
+        worst: +limStat.worst.toFixed(1), last: limStat.last };
+      if (reset) { limStat.frames = 0; limStat.hits = 0; limStat.bones = {}; limStat.worst = 0; limStat.last = null; }
+      return r;
+    },
     /** The parsed blob — its bind-pose vertices and their bones, for the settle's capsules. */
     data,
     /** One clip's local pose at `t` s into `outQ` (4 a bone) and `outT` — nothing moves. */
