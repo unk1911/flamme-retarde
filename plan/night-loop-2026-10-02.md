@@ -32,6 +32,14 @@ merged + released before the next starts. Consensual adult kabina play; safeword
 6. [ ] **Autonomous mode, deeper.** Use the new leg poses, the toys (her own reactions to
    them), the playground kit, the collar/leash (kneel-up on tugs etc.); smarter mood model
    (anticipation, teasing back), more lines; respond to the player's hand positions.
+6b. [ ] **Chloe speaks American English** (Misha, 05:20: "is there any way for Chloe to speak
+   English, American English, she is really from the west coast and all?"). PERSONA_CHLOE
+   rewritten: a young woman from the US West Coast (California) on holiday at Jadrija, casual
+   West Coast speech, playful dom, English only (no gloss, no Croatian except maybe a word she
+   picked up); a new American female voice from the account, distinct from Baye's Jessica
+   (audition 2–3 and say which); every client Chloe line table (49-reverse/revkit/revmoves/
+   revtoys) speaks and captions the English line, rewritten to sound natural rather than
+   translated; the player's commands stay multilingual; Baye stays as she is.
 7. [ ] **Reverse-roles polish from playtesting the above** (whatever is roughest).
 8. [ ] Safeword also stops the Lovense/plug in both modes (Misha hasn't answered — only if
    he says yes; otherwise skip).
