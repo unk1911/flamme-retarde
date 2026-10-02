@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.55.0"
+VERSION = "1.56.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4415,6 +4415,21 @@ CHLOE_BEAT = {
             "stopped everything at once, as you always will. You are at their "
             "head with your hand in their hair. Say something soft and warm: "
             "it is over, you are here, they did so well. No orders, no teasing",
+    # 1.56.0 (page 1.564.0, src/49-revkit.js): her belt and the collar.
+    "belt": "you are taking your own belt off this second, out of the loops of "
+            "your jeans, to use on them on the cot. Tell them so, playful",
+    "lash": "you are using your belt on them on the cot right now, the strap "
+            "coming down on their bottom. A line between two strokes",
+    "beltback": "you are putting your belt back on, finished with it for now. "
+                "One light line",
+    "collar": "you are about to put your black leather collar on them and clip "
+              "the chain leash to it. Tell them to come to you for it",
+    "lead": "they are on all fours on the end of your leash and you are "
+            "leading them round the room. A line to them as they follow you",
+    "tug": "you have just tugged their leash to move them, up or down. A "
+           "short line with it",
+    "uncollar": "you are taking the collar off them now, the game with it "
+                "done for now. One fond line",
 }
 # The orders (`REV_ORDERS` in src/49-reverse.js), in words, and the plain
 # Croatian of each the page has always captioned: the model may say it its own
@@ -5117,6 +5132,28 @@ def chloe_scene_lines(s: dict):
             h = SCENE_HARD[s["spank_hard"]]
             line += f", a {h} one" if n == 1 else f", the hardest of them {h}"
         facts.append(line)
+    # Her belt and the collar (1.56.0): the page's own keys, read from her side.
+    nl = s.get("lashes")
+    if nl:
+        line = f"you have used your belt on them {_times(nl)} in the last minute"
+        if s.get("lash_at"):
+            line += " on " + _and([pov_swap(SCENE_REG[r]) for r in s["lash_at"]])
+        if s.get("lash_ago_s") is not None:
+            line += f", the last one {_since(s['lash_ago_s'])}"
+        facts.append(line)
+    if s.get("belt_out"):
+        facts.append("you have taken your belt off and are holding it by the "
+                     "buckle, the strap hanging, ready to use on them")
+    if s.get("collar_on"):
+        line = "they are wearing your black leather collar"
+        if s.get("leashed"):
+            line += ", the diamond chain leash clipped to its ring"
+            line += (" and you are leading them round by it" if s.get("leading")
+                     else " and you are holding the other end")
+        facts.append(line)
+    if s.get("tugs"):
+        facts.append(f"you have tugged their leash {_times(s['tugs'])} in the "
+                     f"last minute, the last one {_since(s.get('tug_ago_s', 0))}")
     if s.get("marks"):
         k = s.get("mark_k") or 0
         look = ("faintly pink" if k < 0.25 else "pink and warm" if k < 0.6

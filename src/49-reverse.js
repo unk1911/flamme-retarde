@@ -53,8 +53,13 @@
 //     (`converseChloe`); and the safeword cuts her off mid-word;
 //   - "reverse roles" again swaps back; so does leaving the room, the ground,
 //     or any skip key;
-//   - never outside the kabina, never the belt or the collar (refused while
-//     the swap is on, and the swap refused while either is).
+//   - never outside the kabina; and the swap is refused while your belt is out
+//     or the collar is on her. Since 1.564.0 (phase 2b, src/49-revkit.js) the
+//     belt and the collar are CHLOE'S while the roles are reversed: she takes
+//     her belt off and uses it on you on the cot, or puts the collar on you
+//     and leads you, on her own as the scene warms up or when you ask ("use
+//     the belt", "collar me", the backslash and =) — one at a time, one right
+//     hand.
 // -----------------------------------------------------------------------------
 
 const REV = {
@@ -99,6 +104,20 @@ const REV_SAY = {
   prowl: [['Mm... gledam te.', "Mm... I'm watching you.", 'Mm... je te regarde.']],
   care: [['Hej, hej... gotovo je. Tu sam.', "Hey, hey... it's over. I'm here.", "Hé, hé... c'est fini. Je suis là."],
     ['Bila si super. Dođi.', 'You were amazing. Come here.', 'Tu as été géniale. Viens.']],
+  // Her belt and the collar (1.564.0, src/49-revkit.js).
+  belt: [['Sad remen.', 'Now the belt.', 'Maintenant, la ceinture.'],
+    ['Vidiš ovo? Moj remen. Hehe.', 'See this? My belt. Hehe.', 'Tu vois ça ? Ma ceinture. Hihi.']],
+  lash: [['Još jedan.', 'Another one.', 'Encore un.'], ['Mirno, curo.', 'Stay still, girl.', 'Bouge pas, ma belle.'],
+    ['Broji.', 'Count.', 'Compte.'], ['Hehe. Sva si ružičasta.', "Hehe. You're all pink.", 'Hihi. Tu es toute rose.']],
+  beltback: [['Dosta za sad.', 'Enough for now.', 'Assez pour le moment.'],
+    ['Dobro. Vraćam ga.', "Good. It's going back on.", 'Bon. Je la remets.']],
+  collar: [['Dođi. Ogrlica.', 'Come here. The collar.', 'Viens. Le collier.'],
+    ['Sad ćeš nositi moju ogrlicu.', "Now you'll wear my collar.", 'Maintenant tu vas porter mon collier.']],
+  lead: [['Hajde, za mnom.', 'Come on, follow me.', 'Allez, suis-moi.'],
+    ['Polako... tako. Dobra cura.', 'Slowly... like that. Good girl.', 'Doucement... comme ça. Gentille fille.']],
+  tug: [['Hop. Gore.', 'Hup. Up.', 'Hop. Debout.'], ['Dolje, curo.', 'Down, girl.', 'En bas, ma belle.'],
+    ['Ovamo.', 'Over here.', 'Par ici.']],
+  uncollar: [['Gotovo. Skidam je.', "That's it. I'm taking it off.", "C'est fini. Je l'enlève."]],
 };
 
 /**
@@ -140,17 +159,17 @@ const REV_ORDERS = {
 if (typeof STRINGS !== 'undefined') {
   Object.assign(STRINGS.en || {}, {
     'help.k.reverse': 'in the kabina, say or type "reverse roles" — you are in Baye\'s body and Chloe gives the orders (and spanks). Do what she says: the keys below, or type it ("lie on the cot", "spread my legs"). "red" or "crvena" ends it at once; "reverse roles" again swaps back',
-    'help.k.revkeys': 'roles reversed: 1 stand up · 2 lie on the cot · 3 on your front · 4 kneel · 5 legs apart / together · 6 arms out / in · 7 on your back. Look at her with the mouse; W gets you up; type the rest ("lotus", "on my side")',
+    'help.k.revkeys': 'roles reversed: 1 stand up · 2 lie on the cot · 3 on your front · 4 kneel · 5 legs apart / together · 6 arms out / in · 7 on your back · \\ her belt (off, or back on) · = her collar (on, or off). Look at her with the mouse; W gets you up; type the rest ("lotus", "on my side", "use the belt", "collar me")',
     'rev.hud': 'ROLES REVERSED', 'rev.order': 'she wants',
   });
   Object.assign(STRINGS.hr || {}, {
     'help.k.reverse': 'u kabini reci ili utipkaj "zamijenimo uloge" — ti si u Bayeinom tijelu, a Chloe zapovijeda (i udara). Radi što kaže: tipke ispod, ili utipkaj ("lezi na krevet", "raširi noge"). "crvena" odmah završava; "zamijenimo uloge" opet vraća',
-    'help.k.revkeys': 'zamijenjene uloge: 1 ustani · 2 lezi na krevet · 3 na trbuh · 4 klekni · 5 noge raširi / skupi · 6 ruke u stranu / uz tijelo · 7 na leđa. Pogledaj je mišem; W te diže; ostalo utipkaj ("lotos", "na bok")',
+    'help.k.revkeys': 'zamijenjene uloge: 1 ustani · 2 lezi na krevet · 3 na trbuh · 4 klekni · 5 noge raširi / skupi · 6 ruke u stranu / uz tijelo · 7 na leđa · \\ njezin remen · = njezina ogrlica. Pogledaj je mišem; W te diže; ostalo utipkaj ("lotos", "na bok", "remen", "ogrlica")',
     'rev.hud': 'ZAMIJENJENE ULOGE', 'rev.order': 'želi',
   });
   Object.assign(STRINGS.fr || {}, {
     'help.k.reverse': 'dans la cabine, dites ou tapez « inverser les rôles » — vous êtes dans le corps de Baye et Chloe donne les ordres (et la fessée). Faites ce qu’elle dit : les touches ci-dessous, ou tapez-le (« sur le lit », « écarte les jambes »). « rouge » arrête tout de suite ; « inverser les rôles » à nouveau rend les rôles',
-    'help.k.revkeys': 'rôles inversés : 1 debout · 2 sur le lit · 3 sur le ventre · 4 à genoux · 5 jambes écartées / serrées · 6 bras écartés / le long du corps · 7 sur le dos. Regardez-la à la souris ; W vous relève ; tapez le reste (« lotus », « sur le côté »)',
+    'help.k.revkeys': 'rôles inversés : 1 debout · 2 sur le lit · 3 sur le ventre · 4 à genoux · 5 jambes écartées / serrées · 6 bras écartés / le long du corps · 7 sur le dos · \\ sa ceinture · = son collier. Regardez-la à la souris ; W vous relève ; tapez le reste (« lotus », « sur le côté », « ceinture », « collier »)',
     'rev.hud': 'RÔLES INVERSÉS', 'rev.order': 'elle veut',
   });
 }
@@ -192,6 +211,8 @@ function revScene() {
   if (D.miss) o.rev_miss = D.miss;
   o.rev_heat = +D.heat.toFixed(2);
   if (rev.care) o.rev_care = true;
+  // Her belt in her hand (1.564.0) — the collar is the page's own `collar_on`.
+  if (typeof rvkScene === 'function') rvkScene(o);
   return o;
 }
 
@@ -356,6 +377,8 @@ function revOn(src = 'typed') {
 /** Swap back. `why` 'asked' | 'safe' | 'left'. */
 function revOff(why = 'asked') {
   if (!rev.on) return 'not on';
+  // Her belt back on her and the collar off you, now (1.564.0).
+  if (typeof rvkClear === 'function') rvkClear(why);
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
   revArmClear();
@@ -392,6 +415,9 @@ function revSafe(who = 'you') {
   rev.dom.order = null;
   rev.care = { t: 0, said: false };
   revArmStop();
+  // And her belt and the collar (1.564.0): a swing stops where it is and she
+  // lets go of the strap; the collar comes off at once.
+  if (typeof rvkSafe === 'function') rvkSafe();
   revTrace({ pick: 'SAFEWORD', why: who });
   revHud();
   return 'stopped';
@@ -416,6 +442,11 @@ function revWords(text) {
   if (!rev.on) return null;
   if (/^((swap|switch|change) (us )?back|(back to )?normal( roles)?|roles? back|end (the )?(role )?swap|vrati(mo)? (nas|uloge)|vratimo se|remets? (les )?roles)$/.test(t)) return 'rev.off';
   if (typeof autoSafeword === 'function' ? autoSafeword(text) : /^(red|crvena|stop)$/.test(t)) return 'rev.safe';
+  // Her belt and the collar (1.564.0), asked for — or asked to put away.
+  if (/^((put |take )?(your |the )?belt (back|away)( on)?|belt back|(vrati|stavi) (si )?remen|remen natrag|remets? (ta )?ceinture)$/.test(t)) return 'rev.beltback';
+  if (/^((please )?(use |get |take off |take out )?(your |the |a )?belt( on me| please)?|belt me|whip me( with (your|the) belt)?|(uzmi |daj )?(svoj )?remen|remenom|(prends |utilise )?(ta |la )?ceinture)$/.test(t)) return 'rev.belt';
+  if (/^((take |get )?(the |my )?collar off( me)?|(take |get )off (the |my )?collar|unclip( me)?|unleash me|(skini|makni) (mi )?(ogrlicu|povodac)|(enleve|retire)[- ]moi (le |ce )?collier)$/.test(t)) return 'rev.uncollar';
+  if (/^((please )?collar me|put (the |a |your )?collar on me|put (a |the )?leash on me|leash me|(the )?collar( please)?|(stavi mi |daj mi )?(ogrlic[au]|povodac)|mets[- ]moi (le |ton |un )?collier|(le |un )?collier)$/.test(t)) return 'rev.collar';
   t = t.replace(/^(ok(ay)?|yes|da|dobro|oui|d'accord)( |$)/, '').replace(/ (for you|mistress|ma'?am|madam|chloe)$/, '').trim();
   const arms = /\b(arms?|ruke|bras)\b/.test(t);
   const v = revView();
@@ -458,6 +489,10 @@ function revAct(name) {
     const r = revSafe('you');
     return { ok: r === 'stopped', label: 'red — Chloe stops, comes to you, and the roles go back' };
   }
+  if ((name === 'rev.belt' || name === 'rev.beltback' || name === 'rev.collar' || name === 'rev.uncollar')
+    && typeof rvkAsk === 'function') {
+    return rvkAsk(name.slice(4));
+  }
   if (name === 'rev.dom.off' || name === 'rev.dom.on') { rev.dom.on = name === 'rev.dom.on'; return { ok: true, label: 'chloe: ' + (rev.dom.on ? 'in charge' : 'waiting') }; }
   if (name.startsWith('rev.ask:')) {
     const a = name.slice(8);
@@ -473,6 +508,15 @@ function revAsk(name) {
   if (rev.care) return 'aftercare';
   // A pose asked while the order is "be still" is a move.
   rev.dom.moved += 1;
+  // On her leash (1.564.0): the leash's own poses, and nothing that would
+  // have you walk out of the collar.
+  const lr = typeof rvkLeashAsk === 'function' ? rvkLeashAsk(name) : null;
+  if (lr !== null) {
+    const O = rev.dom.order;
+    if (lr === true && O && !O.ext) { O.ext = 1; O.t0 = Math.min(rev.clock, O.t0 + 6); }
+    revTrace({ pick: 'you:' + name + ' (leash)', why: lr === true ? 'asked' : String(lr) });
+    return lr;
+  }
   const r = jadrija.askShow(name, 'rev');
   // And on your way to doing what she said, she waits for it: the cot is a
   // walk and a lie-down, the kneel eleven seconds of going down (MEASURED:
@@ -488,10 +532,16 @@ function revKey(e) {
   if (!rev.on) return false;
   // The keys that put you somewhere else end it first, and then do their own thing.
   if (/^(Digit[089]|Numpad[089]|KeyV|KeyR|KeyO)$/.test(e.code)) { revOff('left'); return false; }
-  // Your belt and the collar are Chloe's, and she is not using them yet.
+  // Your belt and the collar are Chloe's (1.564.0): the backslash asks for
+  // her belt (or for it back on her), = for the collar (or off you).
   if (e.code === 'Backslash' || e.code === 'Equal') {
     e.preventDefault();
-    if (typeof toast === 'function') toast('not while the roles are reversed');
+    if (typeof rvkAsk === 'function') {
+      const belt = e.code === 'Backslash';
+      const r = rvkAsk(belt ? (rvkBeltInHand() && !rvkBeltRound() ? 'beltback' : 'belt')
+        : (rvkCollarOn() ? 'uncollar' : 'collar'));
+      if (typeof toast === 'function') toast(r.label);
+    }
     return true;
   }
   const m = /^(?:Digit|Numpad)([1-7])$/.exec(e.code);
@@ -588,7 +638,7 @@ function revDriveChloe(dt) {
     A.posed = true;
   } else if (A.posed) revArmClear();
   const cd = cr ? cr.drop : 0, cb = cr ? cr.back : 0;
-  you.drive({
+  rev.lastDrive = you.drive({
     at: [C.x + Math.sin(C.yaw) * cb, C.y - cd, C.z + Math.cos(C.yaw) * cb],
     yaw: C.yaw + Math.PI / 2, pitch: 0, seen: true, wet: false,
     clip: C.sp > 0.2 ? 'walk' : 'idle',
@@ -726,9 +776,12 @@ function revArmTick(dt) {
   const ease = (a, b, k) => a + (b - a) * (1 - Math.exp(-k * dt));
   if (A.mode === 'care') {
     // Down to you, her hand on your hair, slowly round.
-    A.w = ease(A.w, rev.walk ? 0 : R.crouch * 0.7, 6);
-    A.lift = ease(A.lift, 1, 5);
+    // (Down only to a head that is down: off the collar at a safeword you
+    // are on your feet but not on your own walk yet — 1.564.0.)
     const H = revBone('head', new THREE.Vector3());
+    const low = !rev.walk && !(H && H.y - rev.ch.y > 1.25);
+    A.w = ease(A.w, low ? R.crouch * 0.7 : 0, 6);
+    A.lift = ease(A.lift, 1, 5);
     if (H) { A.tgt = H.add(new THREE.Vector3(0, 0.10, 0)); revArmFit(dt, 1.6); }
     A.A += Math.sin(rev.clock * 2.4) * 0.12 * dt;
     return;
@@ -918,6 +971,13 @@ function revToys() {
 function revDecide() {
   const D = rev.dom, v = revView();
   D.decisions++;
+  // Her belt and the collar first (1.564.0, `rvkDecide`): off, on, a round of
+  // the belt, and all she does with you on the leash.
+  const kit = typeof rvkDecide === 'function' ? rvkDecide(v) : null;
+  if (kit) {
+    if (kit !== 'busy') revTrace({ pick: 'kit:' + kit, ctx: v ? v.ctx : null, heat: +D.heat.toFixed(2) });
+    return kit;
+  }
   const ctx = v ? v.ctx : null;
   if (!ctx) { D.next = rev.clock + 1; revTrace({ pick: '-', why: 'you are between poses', phase: v ? v.phase : null }); return null; }
   const cands = [];
@@ -932,7 +992,9 @@ function revDecide() {
     cands.push({ id: 'order:' + id, s });
   }
   // On her front on the cot, or standing — Chloe comes round behind you.
-  const canSpank = ctx === 'front' || (REV.standSpank && ctx === 'stand' && revBehindFree());
+  // Not with her belt or the leash in that hand (1.564.0).
+  const full = typeof rvkHandFull === 'function' && rvkHandFull();
+  const canSpank = !full && (ctx === 'front' || (REV.standSpank && ctx === 'stand' && revBehindFree()));
   if (canSpank) {
     cands.push({ id: 'spank', s: (D.punish ? 4 : (ctx === 'front' ? 1.0 : 0.5) + 1.2 * D.heat + 0.25 * D.streak)
       * (recent('spank') > 1 ? 0.5 : 1) });
@@ -941,7 +1003,8 @@ function revDecide() {
   if (toys.length && D.obey >= 1) cands.push({ id: 'buzz', s: 0.25 + 0.6 * D.heat });
   if (rev.walk && revGap() > 2.2) cands.push({ id: 'prowl', s: 0.6 });
   else cands.push({ id: 'prowl', s: 0.25 });
-  if (D.punish && !canSpank) {
+  // (And with her belt in her hand, the cot is where she wants you.)
+  if ((D.punish || (full && typeof rvkBeltInHand === 'function' && rvkBeltInHand())) && !canSpank) {
     // The spanking you have earned wants you where she can give it.
     const want = ctx === 'stand' ? 'order:cot' : 'order:front';
     const c = cands.find((x) => x.id === want);
@@ -1033,7 +1096,7 @@ function revTick(dt) {
     // is "get up", once.
     Y.x = r.x; Y.z = r.z; Y.vx = 0; Y.vz = 0;
     if (typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS')) && rev.clock - rev.riseAt > 2.5
-      && !rev.care && v.ctx) {
+      && !rev.care && v.ctx && !(typeof rvkCollarOn === 'function' && rvkCollarOn())) {
       rev.riseAt = rev.clock;
       revAsk('rise');
     }
@@ -1068,9 +1131,14 @@ function revTick(dt) {
   if (!rev.care && rev.dom.on) {
     if (!rev.dom.order && rev.arm.mode !== 'spank' && rev.clock >= rev.dom.next) revDecide();
   }
-  // Idling: facing you.
-  if (!rev.care && !rev.ch.goal && rev.arm.mode == null) rev.ch.face = revBone('pelvis', new THREE.Vector3()) || rev.ch.face;
+  // Idling: facing you — not while she stands square to the cot with her
+  // belt, and not with you on her leash (she leads, or faces your neck).
+  const kitFace = typeof rvkBeltRound === 'function' && (rvkBeltRound() || rvkCollarOn());
+  if (!rev.care && !rev.ch.goal && rev.arm.mode == null && !kitFace) rev.ch.face = revBone('pelvis', new THREE.Vector3()) || rev.ch.face;
+  if (kitFace && !rev.ch.goal && !rev.ch.face) rev.ch.face = revBone('pelvis', new THREE.Vector3());
   revDriveChloe(dt);
+  // Her belt and the collar (1.564.0): her arms solved, the strap stepped.
+  if (typeof rvkTick === 'function') rvkTick(dt);
   revCamera(dt);
   revHud();
 }
@@ -1206,7 +1274,8 @@ function revHud() {
   const O = rev.dom.order ? REV_ORDERS[rev.dom.order.id] : null;
   const T0 = typeof T === 'function' ? T : (k) => k;
   const lang = revLang();
-  const txt = !rev.on ? '' : T0('rev.hud') + (rev.care ? ' · ♥' : '')
+  const kitTag = typeof rvkHudTag === 'function' && rev.on ? rvkHudTag() : '';
+  const txt = !rev.on ? '' : T0('rev.hud') + (rev.care ? ' · ♥' : '') + (kitTag ? ' · ' + kitTag : '')
     + (O ? '\n' + T0('rev.order') + ': ' + (lang === 'fr' ? O.say[2] : lang === 'hr' ? O.say[0] : O.say[1])
       + (O.key ? ' [' + O.key + ']' : '') : '');
   if (txt === rev.hudWas) return;

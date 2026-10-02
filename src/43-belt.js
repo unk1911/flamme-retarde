@@ -99,7 +99,7 @@ const BELT = {
  * file for what it is; the controls are `hang`, `lay`, `release`, `step`,
  * `hide`, and `onHit` is set by whoever wants to know where it landed.
  */
-function beltStrap(scene) {
+function beltStrap(scene, opts = null) {
   const B = BELT, n = B.links, pitch = B.len / n, half = pitch / 2, m = B.mass / n;
   const w = B.width, t = B.thick;
   const inert = [m * (w * w + t * t) / 12, m * (pitch * pitch + w * w) / 12, m * (pitch * pitch + t * t) / 12, 0, 0, 0];
@@ -125,10 +125,15 @@ function beltStrap(scene) {
     const c = net.addCap(i, i);
     net.setCap(c, -half, 0, 0, half, 0, 0, B.r, B.r);
   }
-  const guide = net.addString(-1, [0, 0, 0], n - 1, [half, 0, 0], 0, B.guide, true);
+  // (`opts.guide`: a firmer wrist for a strap swung by an arm that is not
+  // yours — Chloe's, src/49-revkit.js. Unset, it is BELT.guide as ever.)
+  const guide = net.addString(-1, [0, 0, 0], n - 1, [half, 0, 0], 0, opts && opts.guide != null ? opts.guide : B.guide, true);
   net.finish();
   net.setString(guide, null, null, false);
   let aiming = false;
+  // Let go of: the fist's joint switched off and the strap left to fall —
+  // Chloe's hand at a safeword (src/49-revkit.js). `release` takes it up again.
+  let dropped = false;
   for (let i = 0; i < n; i++) net.setLive(i, false);
 
   // ── state ─────────────────────────────────────────────────────────────
@@ -363,6 +368,8 @@ function beltStrap(scene) {
 
   /** From laid to solved, as it lies and moving as it was: the buckle in the hand at `hand`/`q`. */
   function release(hand, q) {
+    // Let go of (`drop`) and now picked up again: the fist back on the buckle.
+    if (dropped) { net.setJointK(grip, Infinity, B.grip); dropped = false; }
     const V = net.V.slice();
     for (let i = 0; i < n; i++) net.setLive(i, true);     // setLive zeroes the velocity: give it back
     net.V.set(V);
@@ -525,6 +532,22 @@ function beltStrap(scene) {
     /** Air on every link, 1/s — BELT.drag, or `windDrag` while it is wound up. */
     setDrag: (d) => { for (let i = 0; i < n; i++) net.drag[i] = d; },
     get aiming() { return aiming; },
+    /**
+     * Let go of it where it is (1.564.0, Chloe's safeword in 49-revkit.js):
+     * the buckle's joint off, the aim off, and it falls on the cot and the
+     * floor as the solver has it. A hit after this is not a lash.
+     */
+    drop: () => {
+      if (mode !== 'sim' || dropped) return false;
+      aim(null);
+      net.setJointK(grip, 0, 0);
+      // Let fall, not thrown: most of a swing's way taken out of it.
+      for (let i = 0; i < 3 * n; i++) { net.V[i] *= 0.15; net.W[i] *= 0.15; }
+      dropped = true;
+      lash = null;
+      return true;
+    },
+    get dropped() { return dropped; },
     /** The worst joint gap now, m — how much it stretches. */
     stretch: () => { net.measure(); return net.stats.maxStretch; },
     /** Where each link is, world — for a probe. */
