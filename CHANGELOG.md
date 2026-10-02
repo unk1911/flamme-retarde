@@ -8,6 +8,76 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.560.1] — 2026-10-01
+
+### Off the cot is off the mattress: the giant was standing on air
+
+Misha: *"sometimes when she gets up from bed (not every time), in the kabine,
+she turns into a giant, as shown in the image. not sure why it happens, would
+be nice to fix it..."*
+
+**She was not bigger.** Measured on every frame of her: mesh scale 1.0000,
+every bone its rest length, no scale anywhere up her parents. She was 0.42 m
+up. `show.mat`, the mattress's lift (the trampoline's term, which the cot
+borrows), was still on her after she had left the cot. Standing, her head was
+at 2.01 m instead of 1.59, so from your eye her head was in the beams and the
+doorway came to her hips. She stayed up there until she lay on the cot again
+and was got up from it the proper way.
+
+**Why only sometimes.** A plain "get up" was never broken: 12 of 12 poses
+were fine before and after the change, because `situp` and `rise` take the
+lift down a little each frame. It went wrong when something done on her feet
+was asked of her while she was on the cot. MEASURED on 1.560.0, 8 of 8:
+
+| asked | from | what happened | left on her |
+|---|---|---|---|
+| kiss | kneeling up on it, her front, perched | walked to you in the air | 0.42 / 0.38 / 0.42 m |
+| hug | curled up | the same | 0.42 m |
+| fours | cross-legged, on her side | on all fours, over the floor | 0.42 / 0.39 m |
+| kneel (`submit`) | kneeling up on it, her front | knelt in mid-air beside the cot | 0.42 m |
+
+The autonomous mode asks her for the same things, so a roomba evening found
+it on its own. Three random soaks of the kabina (asks, slaps, her own moves,
+the autonomous mode on and off) each hit it inside about a minute.
+
+**Three roads, each mended where it is:**
+
+- **`NOW`'s licence** (kiss, hug, fours, rise, flat). The get-up gate sends her
+  up by `situp`, with the request armed again for when she is standing. The
+  licence then fired that request from the first frame of `situp`, where she
+  counts as on her feet. This is the fault the note over `coke` already
+  describes, still live for the names left on the list. While she is coming
+  down off the cot (`onBed` outside a cot pose) the request now waits for the
+  `dwell` the road ends in.
+- **A stale `done`.** `done` was read once at the top of `stepShow`. A request
+  taken lower down changes her phase and clip, and the switch then ran the new
+  phase in the same frame against the old clip's end. Off `sideL`/`sideR`
+  (once-clips held on their last frame, so always done) the get-up's `situp`
+  lasted ONE frame. She went from lying on her side to the kneel in a 0.3 s
+  crossfade and kept 0.36 m of lift (12 of 12 such roads in a soak). `go` now
+  sets `done` false when it plays a clip. From her side she now sits up
+  properly.
+- **"Kneel" on the cot** played the floor's kneel where she lay. It now goes
+  by `situp`, which lands on `kept`, the kneel `submit` ends in.
+
+**And the rule they all broke, kept in one place** (`stepShow`, before she is
+placed). The lift belongs to the poses on the mattress (`onCot`) and to the
+road on and off it (`MAT_PH`: `cotIn`, `unroll`, `situp`, `rise`). In any
+other phase it is let down at the road's own rate and `onBed` goes with it.
+This is not a per-frame clamp: in those phases there is nothing holding it up.
+`__fr.jad.raw().here().matStray` counts each time it had to, and the phase it
+found her in. In the soaks after the three repairs it counted **0**.
+
+Before and after, from eye height in the big room once the kiss is over:
+`giant_before_after.png`.
+
+Verified: the 8 roads above, 8 of 8 at standing height (head 1.584-1.589 m,
+lift 0); 12 poses × "get up"; four 8-minute random soaks (×4 warp) with
+`matStray` 0 and no tall frame indoors; a regression of cot, slaps (the cot's
+ragdoll on), the autonomous mode on the cot, the collar on, led to the cot and
+taken off, and the hammock in and out. People 100, blockers 820. No console
+errors.
+
 ## [1.560.0] — 2026-10-01 (baye 1.51.0)
 
 ### On her own: the autonomous mode

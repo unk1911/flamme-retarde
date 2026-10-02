@@ -56429,6 +56429,14 @@ async function buildJadrija(scene) {
    * and stay on `LYING`.
    */
   const onCot = (p) => !!(LYING[p] || POSED[p]);
+  // And besides those, the phases that may carry the mattress's lift: the
+  // hand-over on to it (`cotIn`), the roll back (`unroll`), and the road off
+  // it, which lets the lift down itself (`situp`, `rise`). Anywhere else a
+  // lift left on her is let down in `stepShow` — see "OFF THE COT IS OFF THE
+  // MATTRESS" — and `matStray` counts it, for a probe: zero is every road
+  // off the cot taking her down off it.
+  const MAT_PH = { cotIn: 1, unroll: 1, situp: 1, rise: 1 };
+  const matStray = { n: 0, last: null, mat: 0, on: 0 };
 
   /**
    * ── WITH HER BACK TO YOU ───────────────────────────────────────────────
@@ -57982,7 +57990,17 @@ async function buildJadrija(scene) {
     const leaving = withYou && d > SHOW.drop && show.away > 1.2;
     // A one-shot that has run off its end. `update` leaves `curT` past `dur`
     // and `sample` clamps, so this stays true until something else is played.
-    const done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
+    //
+    // AND FALSE AGAIN THE MOMENT SOMETHING ELSE IS (1.560.1, in `go`). It is
+    // read once, up here, and a request taken further down this function
+    // changes her phase and her clip before the switch runs the new phase in
+    // the same frame — which then read the OLD clip's end as its own. Off
+    // `sideL` / `sideR` (once-clips held on their last frame, so always
+    // `done`) the get-up's `situp` lasted ONE frame: she went from lying on
+    // her side to the kneel in a 0.3 s crossfade, and the mattress's lift went
+    // with her, 0.36 m of it (MEASURED, 12 of 12 such roads in a soak) —
+    // the `coke` note's "the sit-up ran for ONE frame", from the other side.
+    let done = S.cur && !S.cur.loop && S.curT >= S.cur.dur;
     show.tmr += dt;
     if (show.hutCool > 0) show.hutCool -= dt;
     if (show.barCool > 0) show.barCool -= dt;
@@ -58057,7 +58075,7 @@ async function buildJadrija(scene) {
       // her — inheriting a rate from whatever she was doing before would put a
       // slow-motion flip in the middle of a lazy wander.
       S.speed = 1;
-      if (clip) f.play(clip === 'walk' ? walkClip() : clip, { fade });
+      if (clip) { f.play(clip === 'walk' ? walkClip() : clip, { fade }); done = false; }
       // Which of the clips under her is a gait, so the tail of this function
       // knows what to put back when she starts covering ground again. The
       // somersault and the cartwheel are not on the list on purpose: both are
@@ -58548,7 +58566,17 @@ async function buildJadrija(scene) {
       // `dwell` that every one of those ends in, like a dance does.
       turn: 1 };
     const busy = show.air > 0 || show.hopV > 0 || show.burn > 0 || show.turned;
-    const nowOk = NOW[show.ask] && !busy
+    // AND NOT ON THE WAY DOWN OFF THE COT (1.560.1): `coke`'s fault, above,
+    // in the three names still on this list. Asked from a pose on the cot,
+    // the gate sends her up by `situp` with the request re-armed — and this
+    // licence fired it again from the first frame of that, where she counts
+    // as on her feet, so she set off to you with the mattress still under
+    // her. MEASURED: "kiss" from `perchHeld`, `flatheld`, `bedKneel` and
+    // `fetalHeld`, all four walked to you 0.38-0.42 m in the air (the giant).
+    // So while she is still coming down off it (`onBed` out of a cot pose:
+    // `situp`, `kept`, `rise`) the request waits like any other, and is taken
+    // from the `dwell` the road ends in, which is what the gate meant.
+    const nowOk = NOW[show.ask] && !busy && !(show.onBed && !onCot(show.phase))
       && (show.ask !== 'turn' || LYING[show.phase] || TURN_HOLD[show.phase]
         || show.phase === 'creep')
       // In the hammock only the things her face and your hand do — see
@@ -58734,7 +58762,14 @@ async function buildJadrija(scene) {
         show.queue.length = 0;
         show.side = 0;
         show.byAsk = 1;
-        go('submit', 'submit', 0.30);
+        // ON THE COT, OFF IT FIRST (1.560.1). The kneel is a floor clip, and
+        // asked from a pose on the mattress it was played where she lay: she
+        // knelt in mid-air beside the cot, 0.42 m up, and stayed there. The
+        // road off it already ends on her knees — `situp` lands on `kept`,
+        // which is the kneel `submit` ends in — so that is the whole answer,
+        // the one the floor-bound asks below take from the cot.
+        if (show.onBed && onCot(show.phase)) go('situp', 'situp', 0.30);
+        else go('submit', 'submit', 0.30);
       } else if (name === 'recline' || name === 'recline.bed'
           || name === 'recline.floor') {
         // WHERE, decided once and here. Two of the three names are the player
@@ -62387,6 +62422,35 @@ async function buildJadrija(scene) {
         show.side += show.sideRate * dt;
       }
     }
+
+    // ── AND OFF THE COT IS OFF THE MATTRESS, whichever way she left it ──
+    //
+    // Misha, 1 Oct 2026: *"sometimes when she gets up from bed (not every
+    // time), in the kabine, she turns into a giant"*. She was not bigger. She
+    // was standing on air 0.42 m up — the mattress's lift, `show.mat`, still
+    // on her — and from your eye her head was in the beams and the doorway
+    // came to her hips.
+    //
+    // The lift was taken off only by the phases that are the road off the
+    // bed (`situp`, `rise`), a little each frame, so any way off that cut
+    // that road short left the rest of it on her for good. MEASURED, 8 of 8
+    // tries: "kiss" / "hug" from a sitting pose or her front fired from the
+    // first frame of `situp` (NOW's licence, the `coke` fault below) and she
+    // walked to you 0.42 m up; off her side `situp` lasted one frame (a stale
+    // `done`) and "fours" went on with 0.39 left; "kneel" on the cot knelt in
+    // mid-air beside it. Those roads are mended where they are (`nowOk`,
+    // `done` in `go`, `submit`), and this is the rule they
+    // all broke, kept in one place: the lift belongs to the poses on the
+    // mattress and the road off it (`MAT_PH`), and in any other phase it is
+    // let down at the road's own rate and `onBed` goes with it.
+    if (show.onBed && !onCot(show.phase) && !MAT_PH[show.phase]) {
+      if (!matStray.on) {
+        matStray.on = 1; matStray.n++;
+        matStray.last = show.phase; matStray.mat = +(show.mat || 0).toFixed(3);
+      }
+      show.mat = damp(show.mat || 0, 0, 3.4, dt);
+      if (show.mat < 0.004) { show.mat = 0; show.onBed = 0; }
+    } else matStray.on = 0;
 
     const p = toWorld(show.t, show.s);
     // `air` is the hop, and it is added here rather than inside `toWorld`
@@ -77209,6 +77273,7 @@ async function buildJadrija(scene) {
       here: show.here ? { ...show.here, t: +show.here.t.toFixed(1) } : null,
       off: offLane(), room: hereRoom(name), nearLegs: show.nearLegs || null, nearLeg: show.nearLeg,
       clock: +(show.clock || 0).toFixed(2), onBed: show.onBed || 0, mat: +(show.mat || 0).toFixed(3),
+      matStray: { ...matStray },
       cot: kit && kit.cot ? { cot: kit.cot, edge: kit.cotEdge || null, spot: cotSpot(), mark: cotMark('lie'),
         ease: show.cotEase ? +show.cotEase.pose.w.toFixed(2) : 0 } : null,
       near: blockers.filter((b) => !b.off && Math.hypot(b.t - show.t, b.s - show.s) < r + Math.hypot(b.a, b.c))
