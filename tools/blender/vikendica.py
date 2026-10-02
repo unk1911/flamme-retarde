@@ -2125,8 +2125,21 @@ def awning(kit):
     a single tilted sheet — the arms were two sticks along its edges, and there
     was nothing to fold.
     """
+    for xa, xb in AWNINGS:
+        _awning(kit, xa, xb)
+
+
+# The two awnings on the sea face, each 40 cm past its opening either side:
+# over the terrace doors, and over the 140 window west of them (Misha, 2 Oct:
+# *"in real jadrija vikendica balcony, there's 2 awnings not 1"*). The same
+# numbers are in src/44-vikendica.js, `AWNINGS`.
+AWNINGS = ((D_TERR[0] - 0.40, D_TERR[1] + 0.40),
+           (W_TERR[0] - 0.40, W_TERR[1] + 0.40))
+
+
+def _awning(kit, xa, xb):
+    """One awning's cassette and shoulder brackets, from `xa` to `xb`."""
     z = F2 + 2.30
-    xa, xb = D_TERR[0] - 0.40, D_TERR[1] + 0.40
     # The cassette: a rounded box standing 19 cm off the wall, the cloth
     # coming out of the slot along the underside of its nose.
     bm = bmesh.new()
@@ -2244,130 +2257,173 @@ def starlink(kit, head):
     sea, and the dish needs to be curved, needs to look like a real starlink
     dish, and curvature pointed at the sky, not at the viewer, and its wire
     needs to go into the house through a little hole on the side of the house
-    facing the sea"*. It was a flat rectangle on the east gable, leaning 36
-    degrees toward the water — the newer kit's panel, and turned to face
-    whoever stood on the promenade looking at it.
+    facing the sea"*. And later the same day, with a photograph of the one he
+    means: *"the starlink dish is not circular it looks like this"* — the
+    Standard kit, a rounded rectangle 594 x 383 mm, pale grey, its back a
+    shallow stepped pyramid with the mast going into a dark recess in the
+    middle. Stood portrait, its face tipped 20 degrees off level to the north,
+    which is where a dish at 43.7° N looks — up and away from the promenade.
 
-    So it is the round one: the first dish, 59 cm across, a shallow white dome
-    on top and a dark underside, on its own mast out of the middle of the
-    underside. The dome faces up; the motor in the mast leaves it 8 degrees
-    off level, toward the north, which is where a dish at 43.7° N points.
+    The mount: ONE stand-off arm (*"doesn't need that extra 2nd arm"*), a
+    square tube off a plate on the render, east of the awning's cassette and
+    west of the corner, to a tall collar clamped round a pole 68 cm out from
+    the wall — 14 cm clear of the gutter's lip. The pole rises past the eave,
+    so the dish sits over the roof edge with the sky all round it. The arm is
+    under the fascia's foot (5.22 on the roof as built), so it never crosses
+    it.
 
-    The mount is what one on a south wall under a 40 cm eave has to be: two
-    stand-off arms off plates on the render, east of the awning's cassette
-    and west of the corner, carrying a pole 68 cm out from the wall — 14 cm
-    clear of the gutter's lip — that rises past the eave so the dish sits
-    over the roof edge with the sky all round it. The arms are under the
-    fascia's foot (5.22 on the roof as built), so they never cross it.
+    The wire is the point of it (*"this is key element"*): down the mast and
+    the pole, along the arm, down the render into a drip loop and in through a
+    hole with a grommet — and THROUGH: out of the inside face of the wall in
+    the pier between the terrace doors and the east wall, down the plaster,
+    into the router standing on the floor in that corner. The hole is 3.18 and
+    not under the pole, because the pole is 9 cm in from the corner and 9 cm
+    in from the corner is inside the east wall.
 
     `head` is the wall head of whichever roof is on, so the same builder serves
     the house as it stands and the raised walls under the mezzanine, and the
-    dish goes up sixty centimetres with them.
+    dish goes up sixty centimetres with them. The hole and the router do not.
 
     Built as loose objects rather than into the colour buckets, because the
     dish is tilted and a bucket is shared — rotating one would take the whole
     house with it.
     """
     black = (0.09, 0.09, 0.10)
-    under = (0.17, 0.175, 0.18)
-    pale = (0.90, 0.905, 0.905)
+    recess = (0.16, 0.165, 0.17)
+    back = (0.70, 0.705, 0.71)
+    pale = (0.88, 0.885, 0.885)
     steel = (0.56, 0.57, 0.58)
-    R = 0.295                        # 59 cm across
+    RX, RY = 0.1915, 0.297           # 383 x 594, portrait, long side N-S
 
     px = X1 - 0.09                  # the pole, 9 cm in from the corner
     py = Y0 - 0.68                  # and 68 out from the wall
-    a_lo = head - 0.70              # the stand-off arms: the pole's foot is
-    a_hi = head - 0.40              # 1.79 over the terrace, at its railing
+    arm = head - 0.40               # the one stand-off arm
     top = head + 0.23               # the top of the pole
     hub = top + 0.22                # the foot of the dish, on the mast
 
-    # The plates on the render, four coach screws each, and the two arms: a
-    # square tube out to a collar clamped round the pole.
-    for z in (a_lo, a_hi):
-        kit.span(black, px - 0.07, px + 0.07, Y0 - 0.010, Y0,
-                 z - 0.10, z + 0.10, bev=0.004)
-        for dx in (-0.045, 0.045):
-            for dz in (-0.07, 0.07):
-                _knob(kit, steel, px + dx, Y0 - 0.012, z + dz, 0.008,
-                      rows=4, seg=8)
-        bm = bmesh.new()
-        bm_box(bm, px, (Y0 - 0.010 + py + 0.030) / 2, z,
-               0.040, abs(py + 0.030 - Y0 + 0.010), 0.040)
-        ob = new_object(bm, "starlink_arm")
-        bevel(ob, 0.004)
-        kit.adopt(ob, black)
-        _rtube(kit, black, [(px, py, z - 0.045), (px, py, z + 0.045)],
-               0.034, seg=16)
-        # The clamp bolts through the collar, either side.
-        for sx in (-1, 1):
-            _knob(kit, steel, px + sx * 0.036, py, z, 0.009, rows=4, seg=8)
+    # The plate on the render, four coach screws, and the arm: a square tube
+    # out to a tall collar clamped round the pole — one arm carries it, so
+    # the collar is twice the height the two of them had.
+    kit.span(black, px - 0.075, px + 0.075, Y0 - 0.010, Y0,
+             arm - 0.12, arm + 0.12, bev=0.004)
+    for dx in (-0.048, 0.048):
+        for dz in (-0.09, 0.09):
+            _knob(kit, steel, px + dx, Y0 - 0.012, arm + dz, 0.008,
+                  rows=4, seg=8)
+    bm = bmesh.new()
+    bm_box(bm, px, (Y0 - 0.010 + py + 0.030) / 2, arm,
+           0.045, abs(py + 0.030 - Y0 + 0.010), 0.055)
+    ob = new_object(bm, "starlink_arm")
+    bevel(ob, 0.004)
+    kit.adopt(ob, black)
+    _rtube(kit, black, [(px, py, arm - 0.075), (px, py, arm + 0.075)],
+           0.034, seg=16)
+    for sx in (-1, 1):
+        for dz in (-0.04, 0.04):
+            _knob(kit, steel, px + sx * 0.036, py, arm + dz, 0.009,
+                  rows=4, seg=8)
     # The pole, capped, and the sleeve at its head the mast drops into.
-    _rtube(kit, black, [(px, py, a_lo - 0.16), (px, py, top - 0.08)],
+    _rtube(kit, black, [(px, py, arm - 0.20), (px, py, top - 0.08)],
            0.024, seg=16)
     _rtube(kit, black, [(px, py, top - 0.09), (px, py, top)], 0.031, seg=16)
-    _knob(kit, black, px, py, a_lo - 0.16, 0.024, rows=5, seg=16)
-    # The mast, the dish's own: pale, slimmer, up out of the sleeve.
-    _rtube(kit, pale, [(px, py, top - 0.02), (px, py, hub - 0.04)],
+    _knob(kit, black, px, py, arm - 0.20, 0.024, rows=5, seg=16)
+    # The mast, the dish's own: pale, slimmer, up out of the sleeve and into
+    # the recess in the back.
+    _rtube(kit, pale, [(px, py, top - 0.02), (px, py, hub - 0.09)],
            0.019, seg=16)
 
-    # The dish, built level about its own hub and then tipped.
-    tilt = math.radians(8.0)
+    # The dish, built level about its own hub and then tipped: the face turns
+    # toward +y, the north, and away from anybody on the promenade.
+    tilt = math.radians(20.0)
     c, s = math.cos(tilt), math.sin(tilt)
 
-    def tip(bm, verts):
-        for v in verts:
-            x, y, z = v.co
-            v.co = (px + x, py + y * c - z * s, hub + y * s + z * c)
+    def tip(x, y, z):
+        return (px + x, py + y * c + z * s, hub - y * s + z * c)
 
-    # The top: a dome 4.2 cm high over a 5 cm rim, rolled over at the edge.
-    prof = [(0.036, R - 0.001), (0.044, R + 0.0005), (0.050, R)]
-    for k in range(1, 17):
-        r = R * (1.0 - k / 16.0) ** 1.0
-        prof.append((0.050 + 0.042 * (1.0 - (r / R) ** 2), r))
-    bm = bmesh.new()
-    tip(bm, _lathe(bm, prof, seg=72))
-    kit.adopt(new_object(bm, "starlink_dish", smooth=True), pale)
-    # The underside, dark, rising from the hub to the rim.
-    prof = [(0.000, 0.0006), (-0.004, 0.050), (-0.002, 0.110), (0.008, 0.180),
-            (0.022, 0.245), (0.033, R - 0.010), (0.037, R - 0.001)]
-    bm = bmesh.new()
-    tip(bm, _lathe(bm, prof, seg=72))
-    kit.adopt(new_object(bm, "starlink_under", smooth=True), under)
-    # The motor housing the mast goes into, under the middle.
-    prof = [(-0.075, 0.0006), (-0.075, 0.030), (-0.060, 0.042), (-0.010, 0.046),
-            (-0.002, 0.050)]
-    bm = bmesh.new()
-    tip(bm, _lathe(bm, prof, seg=32))
-    kit.adopt(new_object(bm, "starlink_boss", smooth=True), under)
+    def dish_part(rings, name, colour):
+        bm = bmesh.new()
+        bm_loft(bm, rings, seg=64, power=9.0)
+        for v in bm.verts:
+            v.co = tip(*v.co)
+        kit.adopt(new_object(bm, name, smooth=True), colour)
 
-    # And the wire: out of the housing, down the mast and the pole on the
-    # wall side, along the underside of the lower arm to the render, down the
-    # wall a hand, into a drip loop so the rain runs off the bottom of it
-    # rather than following the cable in, and back up into a hole through the
-    # wall with a grommet round it. Six millimetres, black.
-    hole = (px, Y0, a_lo - 0.24)
+    # The face: a slab 28 mm thick with its top edge eased.
+    dish_part([(0.000, RX, RY), (0.022, RX, RY), (0.030, RX - 0.006, RY - 0.006)],
+              "starlink_dish", pale)
+    # The back: a lip, then the stepped pyramid falling to the recess.
+    dish_part([(-0.062, 0.070, 0.098), (-0.040, 0.118, 0.172),
+               (-0.034, 0.150, 0.236), (-0.010, RX - 0.004, RY - 0.004),
+               (0.000, RX, RY)], "starlink_back", back)
+    # The recess the mast goes into, dark.
+    dish_part([(-0.100, 0.040, 0.052), (-0.061, 0.066, 0.094)],
+              "starlink_recess", recess)
+
+    # And the wire: out of the recess on the wall side, down the mast and the
+    # pole, along the underside of the arm to the render, down the wall and
+    # across into a drip loop so the rain runs off the bottom of it rather
+    # than following the cable in, and up into the hole. Six millimetres,
+    # black, and it does not stop at the render.
+    # The hole: beside the arm's plate, just east of the end of the awning's
+    # cassette (3.164) and inside the room's east wall face (3.19), and high —
+    # the shutter folded back on this pier stands to F2 + 2.10 and 10 cm off
+    # the render, so anything under about F2 + 2.20 is behind it from the
+    # terrace, and the cassette 19 cm deep hides anything under it.
+    hx = 3.176
+    hz = F2 + 2.26
+    rx = 3.05                        # the router, and the drop to it
+    yi = Y0 + EXT                    # the inside face
     r = 0.0035
     wy = py + 0.028
-    _tube(kit.bm(black, 0.0), [
-        (px, py + 0.040, hub - 0.065),
-        (px, wy - 0.006, hub - 0.10),
+    out = tip(0.0, 0.050, -0.098)
+    run = [
+        out,
+        (px, wy, out[2] - 0.05),
         (px, wy, top - 0.10),
-        (px, wy + 0.008, a_lo + 0.10),
-        (px, wy + 0.010, a_lo - 0.035),
-        (px, (Y0 + py) / 2, a_lo - 0.026),
-        (px, Y0 - 0.06, a_lo - 0.026),
-        (px - 0.012, Y0 - 0.010, a_lo - 0.06),
-        (px - 0.016, Y0 - 0.008, hole[2] - 0.02),
-        (px - 0.010, Y0 - 0.020, hole[2] - 0.12),
-        (px + 0.020, Y0 - 0.024, hole[2] - 0.15),
-        (px + 0.040, Y0 - 0.020, hole[2] - 0.11),
-        (px + 0.030, Y0 - 0.014, hole[2] - 0.035),
-        (px + 0.006, Y0 - 0.010, hole[2]),
-        (px, Y0 + 0.03, hole[2]),
-    ], r, seg=6)
-    # The grommet: a rubber collar proud of the render, round the hole.
-    _tube(kit.bm(black, 0.0), [(px, Y0 + 0.004, hole[2]),
-                               (px, Y0 - 0.009, hole[2])], 0.011, seg=12)
+        (px, wy + 0.008, arm + 0.10),
+        (px, wy + 0.010, arm - 0.040),
+        (px, (Y0 + py) / 2, arm - 0.033),
+        (px, Y0 - 0.06, arm - 0.033),
+        (px - 0.030, Y0 - 0.016, arm - 0.05),
+        (px - 0.050, Y0 - 0.014, arm - 0.10),
+    ]
+    if arm - 0.10 > hz + 0.06:       # the loft's arm is 60 cm higher
+        run.append((px - 0.070, Y0 - 0.008, hz + 0.02))
+    run += [
+        # The drip loop, sagging just clear of the shutter's top rail.
+        (hx + 0.034, Y0 - 0.010, hz - 0.095),
+        (hx + 0.008, Y0 - 0.010, hz - 0.075),
+        (hx, Y0 - 0.008, hz - 0.035),
+        (hx, Y0 - 0.008, hz - 0.010),
+        (hx, Y0 - 0.002, hz),
+        # Through the wall, and down the plaster inside to the router.
+        (hx, yi - 0.010, hz),
+        (hx, yi + 0.008, hz - 0.006),
+        # Out of the corner, where it would be lost in the shadow of the
+        # return, along under the ceiling and down the open plaster.
+        (hx - 0.030, yi + 0.007, hz - 0.035),
+        (rx + 0.010, yi + 0.007, hz - 0.045),
+        (rx, yi + 0.007, hz - 0.08),
+        (rx, yi + 0.007, F2 + 0.36),
+        (rx, yi + 0.016, F2 + 0.27),
+        (rx, yi + 0.040, F2 + 0.235),
+        (rx, yi + 0.048, F2 + 0.205),
+    ]
+    _tube(kit.bm(black, 0.0), run, r, seg=6)
+    # The grommets, a rubber collar proud of the render outside and a round
+    # white cover over the hole on the plaster inside.
+    _tube(kit.bm(black, 0.0), [(hx, Y0 + 0.004, hz),
+                               (hx, Y0 - 0.009, hz)], 0.011, seg=12)
+    _tube(kit.bm(pale, 0.0), [(hx, yi - 0.002, hz),
+                              (hx, yi + 0.005, hz)], 0.016, seg=16)
+    # The router: the Standard kit's, a white upright slab on the floor in the
+    # corner, the wire into its top, a pin of white light on its face.
+    bm = bmesh.new()
+    bm_box(bm, rx, yi + 0.048, F2 + 0.102, 0.135, 0.050, 0.200)
+    ob = new_object(bm, "starlink_router")
+    bevel(ob, 0.012, segments=2)
+    kit.adopt(ob, pale)
+    _knob(kit, (1.0, 1.0, 0.98), rx, yi + 0.0735, F2 + 0.16, 0.003,
+          rows=4, seg=8)
 
 
 # --------------------------------------------------------------------------- #

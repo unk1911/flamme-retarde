@@ -8,6 +8,38 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.581.0] — 2026-10-02
+
+### The vikendica: a second awning, the Starlink as it really is, and the plans off the door frame
+
+Misha, with a photograph of the dish: *"the drawing on the left ... it's
+overlapping with the doorframe ... the bracket for the starlink doesn't need
+that extra 2nd arm ... the starlink dish is not circular ... it needs to have
+that little wire going through the wall of the house into the interior ...
+this is key element ... in real jadrija vikendica balcony, there's 2 awnings
+not 1"*.
+
+- **Second awning.** Over the 140 window west of the terrace doors, 40 cm
+  past it either side (−2.74…−0.54), same cassette, cloth, folding arms and
+  crank as the first. `makeAwning` builds one from its ends and crank x;
+  `AWNINGS` in both the .py and the .js. E winds whichever handle is nearer.
+  `__fr.vik.raw().awning.set(e[, k])`, `state(k)`, `grip(k)`, `count`; k 0 is
+  the east one.
+- **Starlink.** The Standard dish: a rounded rectangle 594 × 383, portrait,
+  pale face, stepped pyramid back with the mast in a dark recess, tipped 20°
+  to the north (it had been tipped toward the sea). One stand-off arm with a
+  tall collar, not two.
+- **Its wire, through the wall.** Down the mast and pole, along the arm, a drip
+  loop into a grommeted hole beside the arm's plate at F2 + 2.26. It is placed
+  there because anything lower on that pier is behind the folded-back shutter,
+  and anything further west is under the cassette. Inside: a white cover over
+  the hole, the cable along under the ceiling and down the pier to the
+  Starlink router standing on the floor. The pier is behind the door's net
+  curtain from most of the room.
+- **Plan sheets.** The soba 3 door's architrave ends at 1.425 and TLOCRT
+  PRIZEMLJA's frame started at 1.385. Both sheets move 12 cm east, and the gap
+  between them is unchanged.
+
 ## [1.580.0] — 2026-10-02
 
 ### Simplified the kneeling draw, and a wording pass over the night-loop docs

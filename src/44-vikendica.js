@@ -1222,8 +1222,12 @@ async function buildVikendica(scene, field) {
       0, 0, o.open ? 0.020 : 0.006);
       return g;
     };
-    hang(priz, 1.40, 1.96, 4.40, 4.80);
-    hang(kat, 2.10, 2.50, 4.32, 4.88);
+    // The soba 3 door is 0.51…1.36 with a 65 mm architrave, so the plaster
+    // starts at 1.425; the first cut hung this frame from 1.385, 4 cm into the
+    // moulding (Misha, 2 Oct: *"it's overlapping with the doorframe"*). Both
+    // move east 12 cm, the gap between them kept.
+    hang(priz, 1.52, 2.08, 4.40, 4.80);
+    hang(kat, 2.22, 2.62, 4.32, 4.88);
 
     // ── BUCKETEERS OF AMERICA, on the east wall ──────────────────────────────
     /**
@@ -1812,7 +1816,9 @@ async function buildVikendica(scene, field) {
 
   // ── the awning, on its crank ────────────────────────────────────────────────
   /**
-   * The folding-arm awning over the terrace doors, wound in and out by hand
+   * The folding-arm awnings on the sea face — one over the terrace doors and,
+   * since Misha said the real balcony has two, one over the window west of
+   * them — each wound in and out by hand
    * (Misha, 2 Oct 2026: *"those awnings, there are missing those horizontal
    * sticks that one can use to roll them out or in.. maybe would be cool to
    * roll/unroll them using the sticks, would be cool to retract or fold the
@@ -1846,21 +1852,28 @@ async function buildVikendica(scene, field) {
   const AWN = {
     z: 5.20,              // the cassette's underside: F2 + 2.30
     wall: -3.865,         // the south face, Y0
-    xa: 0.14, xb: 3.14,   // its ends: the terrace doors and 40 cm either side
     roll: -3.985,         // where the cloth leaves the slot in the nose
     out: 2.05,            // the bar off the wall, run right out
     tuck: 0.225,          // and wound right in, closing the nose
     drop: 0.34,           // the bar below the roller, run right out
     arm: 1.07,            // each half of a folding arm
     secs: 7.0, turns: 11, // all the way, in or out
-    eye: [3.02, -4.030, 5.205],
+    eye: [-4.030, 5.205], // the crank's eye, y and z; x is each awning's own
     rod: 1.10,            // the eye to the handle
     reach: 1.0,           // m: how near the handle E finds it
   };
   const A3 = (x, y, z) => new THREE.Vector3(x, z, -y);
-  const awning = { e: 1, to: 1, phase: 0, tilt: 0, want: 0, shape: null };
+  // The two: over the terrace doors, and over the 140 window west of them,
+  // each with its crank at its outer end. The ends are `AWNINGS` in the .py.
+  const AWNINGS = [
+    { xa: 0.14, xb: 3.14, eye: 3.02 },
+    { xa: -2.74, xb: -0.54, eye: -2.62 },
+  ];
+  let handy = null;       // the awning whose handle `near` last found
+  const awnings = AWNINGS.map((o) => ({ ...o, e: 1, to: 1, phase: 0, tilt: 0, shape: null }));
 
-  function makeAwning() {
+  function makeAwning(awning) {
+    const { xa, xb } = awning;
     const ds = THREE.DoubleSide;
     const cream = solidMaterial(new THREE.Color(0.880, 0.830, 0.610), {
       spec: 0.10, specPower: 18, emissive: VIK.glow, vcol: false, side: ds,
@@ -1875,7 +1888,7 @@ async function buildVikendica(scene, field) {
       spec: 0.18, specPower: 24, emissive: VIK.glow * 0.3, vcol: false,
     });
     const g = new THREE.Group();
-    g.name = 'vikendica:awning';
+    g.name = 'vikendica:awning' + (xa < 0 ? ':west' : '');
     root.add(g);
     const mesh = (geo, mat) => {
       const m = new THREE.Mesh(geo, mat);
@@ -1933,8 +1946,8 @@ async function buildVikendica(scene, field) {
     g.add(bar);
     bar.add(mesh(sweepX([[0.035, 0.030], [-0.020, 0.030], [-0.034, 0.024], [-0.040, 0.012],
       [-0.042, -0.012], [-0.040, -0.026], [-0.030, -0.030], [0.035, -0.030]],
-    AWN.xa + 0.012, AWN.xb - 0.012), white));
-    for (const x of [AWN.xa, AWN.xb - 0.012]) {
+    xa + 0.012, xb - 0.012), white));
+    for (const x of [xa, xb - 0.012]) {
       bar.add(mesh(sweepX([[0.038, 0.034], [-0.046, 0.034], [-0.046, -0.034], [0.038, -0.034]],
         x, x + 0.012), grey));
     }
@@ -1945,7 +1958,7 @@ async function buildVikendica(scene, field) {
       for (let j = 0; j <= NV; j++) {
         const v = j / NV;
         for (let i = 0; i <= NX; i++) {
-          const x = AWN.xa + 0.02 + (AWN.xb - AWN.xa - 0.04) * i / NX;
+          const x = xa + 0.02 + (xb - xa - 0.04) * i / NX;
           const p = A3(x, -0.046 - 0.012 * v * v + 0.003 * Math.sin(x * 7.3) * v,
             -0.020 - 0.20 * v);
           pos.push(p.x, p.y, p.z);
@@ -1968,7 +1981,7 @@ async function buildVikendica(scene, field) {
     // the hand.
     const tube = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true);
     const ball = new THREE.SphereGeometry(1, 16, 10);
-    const arms = [AWN.xa + 0.30, AWN.xb - 0.30].map((sx, k) => {
+    const arms = [xa + 0.30, xb - 0.30].map((sx, k) => {
       const c = k === 0 ? 1 : -1;
       const up = mesh(tube, white), fore = mesh(tube, white);
       const kn = [0.028, 0.032, 0.024].map((r) => {
@@ -1979,7 +1992,7 @@ async function buildVikendica(scene, field) {
     });
 
     // The gearbox under the east end of the nose, and its eye.
-    const [ex, ey, ez] = AWN.eye;
+    const ex = awning.eye, [ey, ez] = AWN.eye;
     {
       const box = mesh(new THREE.BoxGeometry(0.07, 0.05, 0.07), white);
       box.position.copy(A3(ex, ey + 0.02, AWN.z - 0.005));
@@ -2036,7 +2049,7 @@ async function buildVikendica(scene, field) {
         const v = j / NY;
         for (let i = 0; i <= NX; i++) {
           const u = i / NX;
-          const x = AWN.xa + 0.03 + (AWN.xb - AWN.xa - 0.06) * u;
+          const x = xa + 0.03 + (xb - xa - 0.06) * u;
           const sag = 0.035 * e * Math.sin(Math.PI * v) * (0.6 + 0.4 * Math.sin(Math.PI * u));
           const p = A3(x, y0 + (y1 - y0) * v, z0 + (z1 - z0) * v - sag);
           const o = 3 * (j * (NX + 1) + i);
@@ -2065,10 +2078,10 @@ async function buildVikendica(scene, field) {
     awning.crank = crank; awning.spin = spin;
     awning.shape(awning.e);
   }
-  makeAwning();
+  awnings.forEach(makeAwning);
 
-  /** A frame of the awning: wind it, swing the rod out or let it hang. */
-  function stepAwning(dt) {
+  /** A frame of an awning: wind it, swing the rod out or let it hang. */
+  function stepAwning(awning, dt) {
     if (!awning.shape || !(dt > 0)) return;
     dt = Math.min(dt, 0.1);
     const moving = awning.e !== awning.to;
@@ -3781,7 +3794,7 @@ async function buildVikendica(scene, field) {
     tickClock();
     stepFly(dt || 0, who);
     stepTowel(dt, who);
-    stepAwning(dt);
+    for (const a of awnings) stepAwning(a, dt);
   }
 
   return {
@@ -3795,24 +3808,46 @@ async function buildVikendica(scene, field) {
      */
     awning: {
       near(x, y, z) {
-        if (!awning.grip) return false;
-        const p = awning.grip.getWorldPosition(new THREE.Vector3());
         // `y` is the person's eye (ground.you.y, 1.66 over the floor), and a
         // foot is let through too: anywhere from just under the terrace to a
         // head over it. Under the terrace, on the porch, it is not to hand.
+        // Of the two handles, the nearer one within reach, kept for `toggle`.
         const up = y - (base + VIK.floor);
-        return Math.hypot(p.x - x, p.z - z) < AWN.reach && up > -0.3 && up < 2.1;
+        handy = null;
+        if (!(up > -0.3 && up < 2.1)) return false;
+        let best = AWN.reach;
+        for (const a of awnings) {
+          if (!a.grip) continue;
+          const p = a.grip.getWorldPosition(new THREE.Vector3());
+          const d = Math.hypot(p.x - x, p.z - z);
+          if (d < best) { best = d; handy = a; }
+        }
+        return !!handy;
       },
       toggle() {
-        awning.to = awning.e !== awning.to ? (awning.to ? 0 : 1) : (awning.e > 0.5 ? 0 : 1);
-        return awning.to;
+        const a = handy;
+        if (!a) return null;
+        a.to = a.e !== a.to ? (a.to ? 0 : 1) : (a.e > 0.5 ? 0 : 1);
+        return a.to;
       },
-      offer: () => (awning.e !== awning.to ? 'back' : awning.e > 0.5 ? 'in' : 'out'),
-      /** Debug: put it anywhere, 0 in to 1 out, at once. */
-      set(e) { awning.e = awning.to = clamp(e, 0, 1); awning.shape(awning.e); return awning.e; },
-      state: () => ({ e: +awning.e.toFixed(3), to: awning.to, turns: +(awning.phase / (Math.PI * 2)).toFixed(2),
-        tilt: +awning.tilt.toFixed(3) }),
-      grip: () => (awning.grip ? awning.grip.getWorldPosition(new THREE.Vector3()).toArray() : null),
+      offer: () => {
+        const a = handy;
+        return !a ? 'out' : a.e !== a.to ? 'back' : a.e > 0.5 ? 'in' : 'out';
+      },
+      /** Debug: put one (0 east, 1 west; both if omitted) anywhere, 0 in to 1 out, at once. */
+      set(e, k) {
+        for (const a of k == null ? awnings : [awnings[k]]) {
+          a.e = a.to = clamp(e, 0, 1); a.shape(a.e);
+        }
+        return clamp(e, 0, 1);
+      },
+      state: (k = 0) => {
+        const a = awnings[k];
+        return { e: +a.e.toFixed(3), to: a.to, turns: +(a.phase / (Math.PI * 2)).toFixed(2),
+          tilt: +a.tilt.toFixed(3) };
+      },
+      grip: (k = 0) => (awnings[k].grip ? awnings[k].grip.getWorldPosition(new THREE.Vector3()).toArray() : null),
+      count: awnings.length,
     },
     /** The towel on the terrace rail: the cloth's own probe (`brodEnsign`). */
     towel: () => (towel.cloth ? towel.cloth.stats() : null),
