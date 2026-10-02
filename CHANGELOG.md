@@ -8,6 +8,254 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.568.0] — 2026-10-02 (baye 1.60.0)
+
+### Her own mode, deeper: anticipation, teasing back, recovery, your hands, her toys
+
+Misha: *"keep improving the role reversal as well as 'autonomous' modes, to
+essentially take advantage of the work that has already been done with all the
+different toys/tools/positions"*. The night-loop plan, item 6. Normal roles:
+you are Chloe, Baye chooses her own moves (src/49-auto.js). The same
+consensual play as 1.560.0, and the safeword over all of it.
+
+**The audit first.** Five sessions of five minutes each at ×4 on 1.567.0, with
+every decision logged: face down with slaps every 5 s and then every 3 s;
+on her back; standing in the kabina; on the leash with a tug every 12 s; and
+face down with the plug running. What was wrong:
+
+- **She never stopped.** Face down under the slaps she made 65 moves in
+  300 s, a median of 3.9 s apart, and the longest gap was 8 s. There was
+  never a beat of stillness, so the room read as a machine ticking.
+- **She flip-flopped.** Legs apart, together, apart, together. The move that
+  undoes the last was held off 6 s and then wanted ×1.3. On the leash it was
+  eyes down, up, down.
+- **Her legs jittered.** Both legs up was her very first move, at resting
+  heat. Then one leg down, one up, more or less at random.
+- **The same lines.** "Mm, još jednom." and "Au! ...hehe." were 10 of her
+  16 lines, the first even at heat 0.92 straight after a flinch. On the
+  leash, "Hehe, idem." or "Evo me, evo." came with 13 of 16 tugs, though she
+  was kneeling and going nowhere.
+- **The toy did nothing to her.** The plug ran at 30 % and then 100 % for
+  two minutes and nothing in her choices changed. She yawned twice and
+  rolled on to her back while it ran.
+- Five yawns in four minutes, standing.
+
+**What changed.**
+
+- **A beat of nothing** (`rest`). It is one of her choices, weighted by calm,
+  low heat and recovery, and never three in a row. The gap after a move is
+  longer while she recovers and a little shorter when she is hot.
+- **Memory.**
+  - Nothing repeats within her last three picks.
+  - The undoing move is held off for 20 s, not 6, unless her mood really
+    turned (a flinch, your cue, her recovery). There is no ×1.3 after.
+  - Slow things have their own cooldowns: a yawn 75 s, her hair 120 s, her
+    mouth 40 s, kneeling 60 s.
+  - **What you liked:** "good girl", or your hand in her hair, within 8 s
+    of a move rewards that move. She leans into it (×1 + 0.45 per reward,
+    fading over 4 minutes).
+- **Her legs' ladder is a direction** (`autoLadderNext`), not a dice roll.
+  - On her back going up: one knee up, its foot up, both, straight up, and
+    over when she is hot.
+  - From the cradle: one leg kept up and the other laid down, or both
+    straight up.
+  - On her front: one shin, both, then the knees lifted off the mattress.
+  - Coming down, a rung at a time.
+  - Each rung is at least 7 s after the last. Only the next rung in her
+    direction can come up at all.
+  - She turns down when she cools (heat < 0.33), when she recovers, or after
+    25 s at the top. She turns up again only above heat 0.5, 30 s after the
+    last rung and a minute after a recovery.
+- **Lines** never repeat one of the last four she said. A hit's line depends
+  on how hard it was (`hitHard`) and how hot she is (`hitHot`). A tug's line
+  depends on where she is on the leash. A reaction gets a line 60 % of the
+  time, not always.
+
+**Anticipation** (`autoRhythm`, `autoAntic`). Four slaps in a row whose gaps
+are within 45 % of their median, with that median between 3.5 and 12 s, are
+a rhythm she has learned.
+- A second before the next slap is due she braces, seven times in ten. Face
+  down, that is a new cot move (`brace`: both knees drawn 10-18° and held
+  for the wait). Upright, her back tightens a little. She holds still until
+  the slap lands or the wait is over.
+- If the slap is late (2.5 s or 0.8 of the rhythm past due), she looks back
+  for it: head up off the pillow, eyes on you, and "Pa? ...", "Čekam...",
+  "Hehe... gdje si stala?".
+
+**Teasing back** (`cheek`).
+- `cheek` builds while she is warm but not hot (heat 0.28-0.72), not
+  stinging, nobody has told her anything for 15 s, and no toy is running
+  high.
+- Past 0.55 she spends it, at most once in 50 s:
+  - face down: a wiggle and a look back;
+  - on her back: a wiggle and a glance;
+  - standing: she turns her back and looks over her shoulder.
+- With it comes a cheeky line: "Je li to sve?", "Hehe, jedva sam osjetila.",
+  "Uhvati me, ako možeš.", "Mm... a sad?".
+- On the leash she stays put for one tug instead ("Hehe... natjeraj me.",
+  "Neću još."). On the next tug she comes.
+- **Tell her anything** within 25 s (a cue, an ask, the next tug) and she
+  complies, and says so: "Dobro, dobro... hehe.", "Kako ti kažeš.", "Mm...
+  slušam.".
+
+**Recovery** (`ache`).
+- `ache` is the sting of the last half minute, separate from heat. A hand
+  slap adds 0.09 + 0.08 × hardness, a lash 0.14 + 0.08 × hardness, and it
+  falls with a time constant of 22 s.
+- She recovers when the run ended at 0.55 or more and it has stopped: 4.5 s
+  without a slap, or 1.6 times the rhythm she had learned.
+- Recovering, she settles. Her eyes and back let go, her legs close, a
+  raised leg comes down a rung and her arms come in. She takes soft breaths
+  (her own gasps, quiet) and says "Uff... daj mi sekundu.", "Diši...
+  diši..." or "Peče... ali dobro je.".
+- For 16-22 s after that she does only quiet things, at 1.7 times the gap.
+
+**The toys in her** (`autoToyView` in 43-jadrija.js reads the worn plug or
+Lovense, its level and where in its pulse it is).
+- **She answers it being turned** 0.4-1 s later:
+  - **on or up:** a breath, and face down an arch or her heels up at a high
+    level, or a look back at a low one; on her back or side a squirm; "Oh!
+    ...uključila si ga.", "Ah... jače je.";
+  - **down:** "Mm... nježnije.";
+  - **off:** a look back, "Hej... zašto si stala?".
+- **While it runs** she has new moves, worth what she is feeling of it:
+  `toySquirm`, `toyArch` (her back straight standing), `toyHeels`,
+  `toyClench` (legs together on a strong level) and `toyOpen` (legs falling
+  apart as she warms). `toyMouth` exists too but has not been seen in a
+  session yet. She does no rolls, dances or yawns while it runs. It warms
+  her (heat +0.012/s × what she feels).
+- **She asks:**
+  - for it stronger after 20 s at half or less while warm ("Jače... molim
+    te.");
+  - softer after 50 s at full while hot ("Previše je... slabije.");
+  - for it on when it is worn and has been off 40 s ("Upali ga... molim
+    te.").
+
+  When you answer within 20 s she thanks you ("Da... tako. Hvala.",
+  "Mmm... savršeno.").
+- **Your remote in words**, while she is in her own mode: "stronger" / "turn
+  it up" / "jače" / "pojačaj" / "plus fort" (one step of 25 %, or on at half),
+  "softer" / "turn it down" / "slabije" / "smanji" / "moins fort", "turn it
+  on" / "upali ga" / "allume-le", "turn it off" / "ugasi ga" / "éteins-le".
+  They use the same signal path as the phone's buttons, so you need your
+  phone on you. With no toy on her, "stronger" is "more" and "softer" is
+  "relax". Help sheet updated.
+
+**Your hands** (`autoHandNow` reads the hands' own state).
+- The hands it reads: your hand in her hair (the pet), your fist in it from
+  behind, your hand on her hip, thigh or breast, your thumb at her lip.
+- She stills for it: none of her own moves while it is on her. A slap's
+  answer still comes.
+- 0.6-1.2 s after your hand arrives she answers it, and again now and then
+  while it stays:
+  - **pet:** her head turns into it (face down, up off the pillow to it),
+    then her eyes lower ("Mmm... to.", "Hehe... kao mačka.");
+  - **hip or breast:** she pushes into it (her back straightens, or a small
+    arch on the cot), with her mouth opening for a breast when she is hot;
+  - **thumb:** her eyes come up to you;
+  - **fist in her hair:** she arches to it ("Ah! ...da.").
+- **Your hand on her thigh:**
+  - on her back, that knee comes up, the ladder's first rung on that side
+    ("Samo nastavi...");
+  - standing, her legs come apart, or wider if they already are;
+  - at a middling heat she sometimes closes them on you, teasing ("Hehe...
+    ne tako brzo."), and opens them again a few seconds later if your hand
+    is still there;
+  - on a raised leg, when she is calm, she lets it down a rung.
+- When a hand that stayed leaves, she looks after it, and sometimes says
+  "Hej... vrati ruku.".
+
+**On the leash:** a tug on all fours brings her up on her knees, as before.
+Kneeling, a tug gets her presenting herself (`present`): back straight, eyes
+up, held. "Tu sam. Vodi me." / "Tvoja sam.". Then there is the resisting
+above.
+
+**The readout (dev only):** `?autodbg` on the page, or `__fr.auto.dbg(true)`.
+It shows:
+- heat, calm, ache, cheek and the toy as bars;
+- the rhythm she has learned and when the next slap is due;
+- the ladder's direction;
+- what is holding her (still, yours, braced, your hand);
+- what she has learned you like;
+- her last nine picks and why, with her lines.
+
+**Before and after** (same plans, 1.567.0 against 1.568.0; "moves" counts
+everything she did, the new reactions included):
+
+| session | moves | rests | longest gap | same move within 3 | lines (distinct / said) |
+|---|---|---|---|---|---|
+| face down, slaps 5 s then 3 s | 65 → 66 | 0 → 7 | 8 → 20 s | 6 → 5 | 7/16 → 9/14 |
+| standing, nothing done | 29 → 24 | 0 → 5 | 12.7 → 19 s | 2 → 0 (yawns 5 → 3) | 2/4 → 3/3 |
+| on the leash, tug every 12 s | 44 → 34 | 0 → 15 | 17 → 12.4 s | 12 → 0 | 2/13 → 11/14 |
+| plug at 30 %, then 100 %, then off | 23 → 27 | 0 → 3 | 12.6 → 13.8 s | 1 → 0 | toy reactions 0 → 8 |
+
+- The face-down "after" run had 9 braces, 2 recoveries, 1 look back for a
+  late slap and 2 teases.
+- The leash run: 5 presentings, 4 resists, 3 complies, and no eyes
+  ping-pong.
+- The toy run: the on, the up and the off each answered, plus 5 toy moves,
+  with no yawn or roll while it ran.
+- With the remote driven by your words (on at 100 %, down twice to 50 %,
+  then waiting): she asked "Jače... molim te.", thanked you ("Mmm...
+  savršeno.") when you turned it up, and asked "Previše je... slabije."
+  after 50 s at full.
+
+**Safeword and disengage, MEASURED.**
+- "red" 0.2 s after a move (`wiggle`) was picked, mid-spanking: the mode was
+  off in the same call. The scene said `aftercare: true` and
+  `safeword_of: 'auto'`, and nothing of hers came after.
+- "autonomous off" in the middle of a recovery, with three steps still
+  queued: the queue went to 0 and her mood to none. There were no picks
+  after it for the rest of the run.
+- Collar: on the leash, the collar's safeword ended her mode too
+  (`safeword_of: 'collar'`, leash off).
+- Everything she is in the middle of is cleared on the way out
+  (`autoClearMoment`): the queue, the brace, the recovery and an owed
+  answer.
+
+**Her voice knows** (`server/baye/baye.py` 1.60.0, **needs deploying**).
+- `AUTO_DOING` has words for every new move and reaction: tease, present,
+  brace, peekBack, recover, resist, toyReact, toySquirm, toyArch, toyHeels,
+  toyClench, toyOpen, toyMouth, toyMore, toyLess, toyOn, handTurn, handLean,
+  handOpen, handClose, handEase and handOff.
+- A new `auto_mood` key off `AUTO_MOOD` (bracing, teasing, recovering, held,
+  buzzing, hot, easy) gives her a line such as *"you can feel the toy going
+  in you and it is hard to keep still"*.
+
+Undeployed, the page's captions work as before.
+
+**Her lines**, Croatian with a gloss in en/fr (`auto.g.*`): 57 new lines in
+24 new kinds.
+
+**Regression.**
+- Normal roles: flat, legs apart, left leg up, the hand's spank, legs down,
+  the belt out and back, the mode on with "more", "red" with aftercare, the
+  collar on, a tug in her mode, the collar's red.
+- Reversed: keys 1-7, Shift+1..6, her belt, the remote up, the safeword.
+  `toys.start('draw')` answered "unreachable" in the pose the key run left
+  you in. The 1.567.0 build answers the same there.
+- The playground: from the grounds she chose the seesaw and the nest and got
+  off each.
+- People 100, blockers 820, no console errors in 39 headless runs.
+- RULE 4: no `rng()` draw added, removed or moved. Her new choices use
+  `Math.random`, as before.
+
+Debug: `__fr.auto.dbg(on)`, `state()` (now mood, ache, cheek, reward, hand,
+toy, ladder, rhythm, recovering, braced, queue), `set({ ache, cheek,
+lastOrder })`, `specials()`; `__fr.jad.raw().autoMove({ cot: 'brace', hold })`.
+
+**Rough, for item 7:**
+- She has no follow of her own on the leash. The leash's physics lead her,
+  but she never crawls after you.
+- Anticipation needs four regular slaps; a player who varies the rhythm
+  never sees the brace, only the look back.
+- The brace face down is subtle with her shins already up.
+- Teasing on her back and on her side is the same wiggle and glance.
+- Out of doors with nothing happening she rests a lot (18 of 24 picks on the
+  grounds), because her only small moves there are glances and her back.
+- Signed in, a typed "turn it on" also goes to the service, which may switch
+  on the Lovense intent as well as the page's.
+
 ## [1.567.0] — 2026-10-02 (baye 1.59.0)
 
 ### The toys in Chloe's hands: drawn out a little, pushed back in, and her remote

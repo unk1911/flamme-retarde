@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.59.0"
+VERSION = "1.60.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4963,6 +4963,40 @@ AUTO_DOING = {
     "pgSeesaw": "sat on the seesaw", "pgTramp": "jumped on the trampoline",
     "pgSlide": "went up the tower to the slide", "pgRider": "got on the spring horse",
     "pgOff": "got off it",
+    # 1.60.0 (page 1.568.0): her deeper mood — what she did of her own
+    # accord, and what happened to her that she answered.
+    "tease": "teased them back: a wiggle, a look over your shoulder, a cheeky word",
+    "present": "knelt up straight on the leash and presented yourself to them, eyes up",
+    "brace": "braced for the next one, holding still",
+    "peekBack": "looked back for the next one, because it was late",
+    "recover": "settled after a run of hard ones, legs together, breathing",
+    "resist": "stayed put for their tug on the leash, teasing them",
+    "toyReact": "felt them change the toy in you",
+    "toySquirm": "squirmed on the cot with the toy going in you",
+    "toyArch": "arched your back with the toy going in you",
+    "toyHeels": "kicked your heels up with the toy going in you",
+    "toyClench": "pressed your legs together on a strong pulse of the toy",
+    "toyOpen": "let your legs fall apart with the toy going in you",
+    "toyMouth": "let your mouth fall open with the toy going in you",
+    "toyMore": "asked them to turn the toy up",
+    "toyLess": "asked them to turn the toy down, it was too much",
+    "toyOn": "asked them to turn the toy on",
+    "handTurn": "turned toward their hand on you",
+    "handLean": "pushed into their hand on you",
+    "handOpen": "opened your legs for their hand on your thigh",
+    "handClose": "closed your legs on their hand, teasing",
+    "handEase": "let your raised leg down under their hand",
+    "handOff": "looked after their hand when it left you",
+}
+# Her mood in a word (1.60.0, page 1.568.0 — `autoMood` in src/49-auto.js).
+AUTO_MOOD = {
+    "bracing": "you are braced for the next one, holding your breath",
+    "teasing": "you are in a teasing mood and have just teased them back",
+    "recovering": "you are catching your breath after a run of hard ones",
+    "held": "their hand is on you and you are holding still for it",
+    "buzzing": "you can feel the toy going in you and it is hard to keep still",
+    "hot": "you are very worked up",
+    "easy": "you are calm and easy",
 }
 # How long after a safeword she is still in the aftercare, s. Past it the line
 # says it happened and nothing more.
@@ -5030,6 +5064,7 @@ def clean_scene(raw) -> dict:
         "auto_still": bool(g("auto_still")) or None,
         "auto_doing": (lambda d: d if d in AUTO_DOING else None)(clamp_str(g("auto_doing"), 10)),
         "auto_heat": clamp_num(g("auto_heat"), 0, 1),
+        "auto_mood": _enum(g("auto_mood"), AUTO_MOOD, 10),
         # The role swap (1.52.0, src/49-reverse.js): one value or nothing.
         "roles": "reversed" if clamp_str(g("roles"), 10) == "reversed" else None,
         # And Chloe's side of it (1.55.0): the order she has out, by its key,
@@ -5067,7 +5102,7 @@ def clean_scene(raw) -> dict:
     if not out["leashed"]:
         out["leading"] = None
     if not out["auto"]:
-        out["auto_still"] = out["auto_doing"] = out["auto_heat"] = None
+        out["auto_still"] = out["auto_doing"] = out["auto_heat"] = out["auto_mood"] = None
     return {k: v for k, v in out.items() if v not in (None, [], "")}
 
 
@@ -5146,6 +5181,9 @@ def scene_lines(s: dict):
         if s.get("auto_still"):
             facts.append("they told you to be still, so you are holding "
                          "perfectly still for them until they say otherwise")
+        m = s.get("auto_mood")
+        if m and m not in ("hot", "easy"):
+            facts.append(AUTO_MOOD[m])
         h = s.get("auto_heat")
         if h is not None and h >= 0.7:
             facts.append("you are very worked up and want more")
