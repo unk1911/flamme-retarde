@@ -32,7 +32,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
 6. [x] **Autonomous mode, deeper.** Use the new leg poses, the toys (her own reactions to
    them), the playground kit, the collar/leash (kneel-up on tugs etc.); smarter mood model
    (anticipation, teasing back), more lines; respond to the player's hand positions.
-6b. [ ] **Chloe speaks American English** (Misha, 05:20: "is there any way for Chloe to speak
+6b. [x] **Chloe speaks American English** (Misha, 05:20: "is there any way for Chloe to speak
    English, American English, she is really from the west coast and all?"). PERSONA_CHLOE
    rewritten: a young woman from the US West Coast (California) on holiday at Jadrija, casual
    West Coast speech, playful dom, English only (no gloss, no Croatian except maybe a word she
