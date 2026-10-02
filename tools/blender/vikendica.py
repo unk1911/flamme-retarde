@@ -2539,7 +2539,7 @@ WICKER_STEEL = (0.205, 0.214, 0.226)  # the chairs' frames: anthracite, as filme
 GLIDE = (0.115, 0.115, 0.118)         # the plastic feet under everything
 
 
-def _frcol(bm):
+def _frcol_layer(bm):
     lay = bm.loops.layers.float_color.get("frcol")
     if lay is None:
         lay = bm.loops.layers.float_color.new("frcol")
@@ -2551,7 +2551,7 @@ def _paint_from(bm, n0, fn):
     `n0` — one flat colour per face, which is what a weave or a stripe is. The
     exporter splits a vertex wherever its faces disagree, so the cost is in
     vertices, and only where the colour actually changes."""
-    lay = _frcol(bm)
+    lay = _frcol_layer(bm)
     bm.faces.ensure_lookup_table()
     for k in range(n0, len(bm.faces)):
         c = fn(k - n0)
@@ -7973,30 +7973,28 @@ def roof_loft(kit):
     for a0, a1, b0, b1 in ((X0, X1, Y1 - EXT, Y1), (X0, X1, Y0, Y0 + EXT),
                            (X0, X0 + EXT, Y0, Y1), (X1 - EXT, X1, Y0, Y1)):
         kit.span(RENDER, a0, a1, b0, b1, HEAD, LOFT_HEAD, bev=0.02)
+    # Its plaster inside, gridded and tinted like every other wall in the
+    # house: darker up under the wall plate and into the corners.
     for a0, a1, b0, b1 in ((IX0, IX1, IY1 - 0.04, IY1),
                            (IX0, IX1, IY0, IY0 + 0.04),
                            (IX0, IX0 + 0.04, IY0, IY1),
                            (IX1 - 0.04, IX1, IY0, IY1)):
-        kit.span(WALL, a0, a1, b0, b1, HEAD - 0.01, LOFT_HEAD, bev=0.004)
+        kit.vbox(WALL, a0, a1, b0, b1, HEAD - 0.01, LOFT_HEAD, bev=0.004,
+                 cell=0.15, tint=_loft_plaster_tint)
 
     span = (Y1 - Y0) / 2
-    ov = 0.42
+    ov = LOFT_OV
     for sgn in (-1, 1):
-        _slope(kit, PLY, sgn, RIDGE, PITCH, 0.0, span + ov, 0.028,
-               X0 - ov, X1 + ov)
-        n = int((X1 - X0 + 2 * ov) / 0.62)
-        for i in range(n + 1):
-            x = X0 - ov + i * ((X1 - X0 + 2 * ov) / n)
-            _slope(kit, BEECH, sgn, RIDGE, PITCH, 0.06, span + ov - 0.04, 0.14,
-                   x - 0.035, x + 0.035, lift=-0.028)
-    kit.span(BEECH, X0 - ov, X1 + ov, -0.09, 0.09, RIDGE - 0.30, RIDGE - 0.02,
-             bev=0.008)
+        _loft_boards(kit, sgn)
+        _loft_rafters(kit, sgn)
+        _loft_plate(kit, sgn)
+    _loft_ridge_beam(kit)
     roof_trim(kit, RIDGE, PITCH, span, ov, LOFT_HEAD)
     for at in (X0 + EXT / 2, X1 - EXT / 2):
         _gable(kit, RENDER, at, EXT, LOFT_HEAD, RIDGE, span)
         sgn = -1 if at < 0 else 1
         _gable(kit, WALL, at - sgn * (EXT / 2 + 0.02), 0.04, LOFT_HEAD, RIDGE,
-               span - 0.02)
+               span - 0.02, tint=_loft_plaster_tint)
     # Two roof lights: one over the gallery, one over the double height.
     rooflight(kit, -1.60, 1.70)
     rooflight(kit, 1.40, -2.30)
@@ -8006,16 +8004,18 @@ def roof_loft(kit):
     # ── the deck ────────────────────────────────────────────────────────────
     # Everything north of the living room's south third, so the ridge runs down
     # the middle of it and the headroom is where the beds are.
-    kit.span(CEIL, IX0, IX1, LOFT_Y, IY1, DECK - DECK_T, DECK - DECK_T + 0.02,
-             bev=0.004)
-    n = int((IX1 - IX0) / 0.55)
-    for i in range(n + 1):
-        x = IX0 + i * ((IX1 - IX0) / n)
-        kit.span(DARKMETAL, x - 0.035, x + 0.035, LOFT_Y, IY1,
-                 DECK - DECK_T + 0.02, DECK - 0.035, bev=0.006)
+    #
+    # Its soffit is the ceiling of every room under it once this roof is on,
+    # so it takes the ceilings' own tint (`_ceiling_tint`: the shadow along
+    # every wall under it) and a little more along the edge beam. The steel
+    # joists are gone: they were only ever seen as a row of black ends along
+    # the open edge, and that edge is a trimmer now (`_loft_deck_edge`).
+    kit.vbox(CEIL, IX0, IX1, LOFT_Y + 0.05, IY1, DECK - DECK_T,
+             DECK - DECK_T + 0.02, bev=0.004, cell=0.16, tint=_deck_soffit_tint)
     planks(kit, IX0, IX1, LOFT_Y, IY1, DECK, along="x",
            tones=((0.480, 0.352, 0.212), (0.520, 0.386, 0.232),
                   (0.442, 0.318, 0.190), (0.500, 0.368, 0.222)))
+    _loft_deck_edge(kit)
 
     # The rail stops short of the stair. It used to run the whole open edge,
     # which put a length of balustrade straight across the head of the flight —
@@ -8026,8 +8026,378 @@ def roof_loft(kit):
 
     # A bed each side of the ridge, where the headroom actually is, because the
     # question this model exists to answer is whether they fit.
-    bed(kit, -1.72, 0.10, yaw=0.0, w=1.40, l=1.98, floor=DECK)
-    bed(kit, 1.90, 0.10, yaw=0.0, w=1.40, l=1.98, floor=DECK)
+    #
+    # The double from soba 3 (`bed_oak`), on the same 1.40 x 1.98 footprint the
+    # old walnut box beds stood on. Those were the house's first beds and the
+    # house has moved on; a renovation study furnished with them looked like a
+    # different, older model of the same building. `_burn_bed` makes the draws
+    # the old `bed` made, in the same order, so the generators leave the loft
+    # where they always did.
+    for cx in (-1.72, 1.90):
+        _burn_bed()
+        bed_oak(kit, cx, 0.10, yaw=0.0, w=1.40, l=1.98, floor=DECK)
+
+
+# ── the loft's timber, at the resolution of the house ───────────────────────
+#
+# Misha, 2 Oct 2026: *"when we press V 3 times … that stuff was done with an
+# old model and it looks super low-poly … those beds upstairs, the ladder, the
+# shadows"*. The roof was a 2.8 cm slab of PLY with thirteen 7 x 14 boxes
+# under it each side and a box for a ridge beam, all one flat value, and the
+# shell shader lit every one of their undersides as if it were in the sun (see
+# `loftMat` in src/44-vikendica.js). Now:
+#
+#   * the boarding is boards, 14 cm, V-jointed, each its own tone, with the
+#     felt showing dark in the joints;
+#   * the rafters are a chamfered section, plumb-cut at the ridge beam and at
+#     the tail, with the arrises off the tail;
+#   * the ridge beam is a chamfered section too, and there is a wall plate on
+#     the new wall head, which the rafters sit on — the wedge of nothing
+#     between the blockwork and the boarding was open to the room;
+#   * all of it carries its occlusion in vertex colour: into the angle each
+#     rafter makes with the boarding, into the ridge, down to the plate and
+#     into both gables. Outside the walls the eave soffit takes `_eave_tint`,
+#     as the roof as built does.
+
+LOFT_OV = 0.42                      # the overhang, both roofs alike
+LOFT_BOARD = 0.028                  # the boarding under the felt
+LOFT_BW = 0.145                     # one board, measured down the slope
+RAF_W, RAF_D = 0.070, 0.140         # a rafter, its depth square to the pitch
+RIDGE_BW, RIDGE_BD = 0.18, 0.28     # the ridge beam
+LOFT_PLATE_D = IY1 - 0.06           # the plate's face, 2 cm proud of the plaster
+LOFT_GABLE_IN = IX1 - 0.04          # each gable's plaster face, inside
+
+
+def _loft_zb(d):
+    """The underside of the boarding, `d` (horizontal) from the ridge."""
+    return RIDGE - d * math.tan(PITCH) - LOFT_BOARD
+
+
+def _loft_rafter_xs():
+    """Where the rafters are: as they always were, one every 0.62 or so from
+    verge to verge."""
+    w = X1 - X0 + 2 * LOFT_OV
+    n = int(w / 0.62)
+    return [X0 - LOFT_OV + i * (w / n) for i in range(n + 1)]
+
+
+_RAF_XS = _loft_rafter_xs()
+
+
+def _loft_xstops(x0, x1, offs=(0.035, 0.09, 0.18)):
+    """Stations along the ridge, close in at every rafter and every gable so
+    the occlusion has somewhere to change, and nowhere else."""
+    xs = {x0, x1}
+    for xr in _RAF_XS:
+        for o in offs:
+            xs.update((xr - o, xr + o))
+    for s in (-1, 1):
+        for o in (0.0, 0.08, 0.20, 0.40):
+            xs.add(s * (LOFT_GABLE_IN - o))
+        xs.add(s * X1)
+    xs = sorted(v for v in xs if x0 <= v <= x1)
+    out = [xs[0]]
+    for v in xs[1:]:
+        if v - out[-1] > 0.012:
+            out.append(v)
+    out[-1] = x1
+    return out
+
+
+def _loft_ao(x, d, between=True):
+    """How much of the room a point up under the loft roof can see, as a
+    multiplier: less into the ridge, down by the plate, into each gable, and
+    — on the boarding — in the angle at each side of every rafter."""
+    k = 1.0
+    k -= 0.24 * math.exp(-max(0.0, d - RIDGE_BW / 2) / 0.16)
+    k -= 0.20 * math.exp(-max(0.0, LOFT_PLATE_D - d) / 0.20)
+    k -= 0.16 * math.exp(-max(0.0, LOFT_GABLE_IN - abs(x)) / 0.22)
+    if between:
+        r = min(abs(x - xr) for xr in _RAF_XS) - RAF_W / 2
+        k -= 0.17 * math.exp(-max(0.0, r) / 0.08)
+    return k
+
+
+def _outside(x, d):
+    return d > Y1 - 0.01 or abs(x) > X1 - 0.01
+
+
+def _frcol(bm, jobs):
+    """Paint `frcol` face by face: `jobs` is [(faces, tint)], so pieces with
+    their own tone can share one bmesh. Normals must already be right."""
+    bm.normal_update()
+    lay = bm.loops.layers.float_color.get("frcol")
+    if lay is None:
+        lay = bm.loops.layers.float_color.new("frcol")
+    for faces, tint in jobs:
+        for f in faces:
+            nrm = tuple(f.normal)
+            for lp in f.loops:
+                c = tint(tuple(lp.vert.co), nrm)
+                lp[lay] = (c[0], c[1], c[2], 1.0)
+
+
+def _skin(bm, secs, closed=True, caps=True):
+    """Skin a run of sections (lists of 3-D points, equal length). Returns the
+    new faces. Open, it is a strip: the boarding, which is only ever seen
+    from below."""
+    rings = [[bm.verts.new(p) for p in s] for s in secs]
+    n = len(rings[0])
+    faces = []
+    for a, b in zip(rings, rings[1:]):
+        for i in range(n if closed else n - 1):
+            k = (i + 1) % n
+            faces.append(bm.faces.new((a[i], a[k], b[k], b[i])))
+    if closed and caps:
+        faces.append(bm.faces.new(tuple(reversed(rings[0]))))
+        faces.append(bm.faces.new(tuple(rings[-1])))
+    return faces
+
+
+def _loft_boards(kit, sgn):
+    """One slope's boarding: boards running with the ridge, nailed across
+    the rafters, V-jointed underneath. Only their undersides and the two
+    arrises are built — the tops are under the felt, and what shows in each
+    joint is the felt."""
+    run = (Y1 - Y0) / 2 + LOFT_OV
+    x0, x1 = X0 - LOFT_OV, X1 + LOFT_OV
+    xs = _loft_xstops(x0, x1)
+    n = int(math.ceil(run / LOFT_BW))
+    bw = run / n
+    g, c = 0.0015, 0.0045
+    bm = bmesh.new()
+    jobs = []
+    for j in range(n):
+        da, db = j * bw + (g if j else 0.0), (j + 1) * bw - g
+        prof = [(da, _loft_zb(da) + c), (da + c, _loft_zb(da + c)),
+                (db - c, _loft_zb(db - c)), (db, _loft_zb(db) + c)]
+        secs = [[(x, sgn * d, z) for d, z in prof] for x in xs]
+        if sgn < 0:
+            secs = [list(reversed(s)) for s in secs]
+        faces = _skin(bm, secs, closed=False)
+        jobs.append((faces, _loft_board_tint(sgn, j)))
+    _frcol(bm, jobs)
+    kit.adopt(new_object(bm, "loft_boards", recalc=False), PLY)
+
+
+def _loft_board_tint(sgn, j):
+    tone = 1.0 + 0.060 * _hash3(j, sgn, 5, 50.0)
+    warm = 0.022 * _hash3(j, sgn, 6, 52.0)
+
+    def tint(p, n):
+        x, y, z = p
+        d = abs(y)
+        g = tone + 0.030 * _vnoise(x * 1.7, j * 2.3, sgn, 51.0)
+        if _outside(x, d):
+            e = _eave_tint(p, n)
+            return (e[0] * g * (1 + warm), e[1] * g, e[2] * g * (1 - warm))
+        k = _loft_ao(x, d) * g
+        if n[2] > -0.85:
+            k *= 0.55                     # the two faces of a V-joint
+        # What lights this indoors is the bounce off an oak deck, and the
+        # shader's only stand-in for it is the sky: warm it back.
+        return (k * (1.04 + warm), k, k * (0.90 - warm))
+    return tint
+
+
+def _loft_rafters(kit, sgn):
+    """One slope's rafters: a 7 x 14 section, its two lower arrises taken
+    off, plumb-cut against the ridge beam at the head and at the tail, and
+    chamfered round the tail."""
+    d0 = RIDGE_BW / 2
+    d1 = (Y1 - Y0) / 2 + LOFT_OV - 0.04
+    cs = 1.0 / math.cos(PITCH)
+    w, h, c = RAF_W / 2, RAF_D, 0.010
+    prof = [(-w, 0.0), (w, 0.0), (w, h - c), (w - c, h), (-w + c, h),
+            (-w, h - c)]
+    ds = {d0, d0 + 0.03, d0 + 0.08, d0 + 0.16, d0 + 0.30, d1 - 0.012,
+          LOFT_PLATE_D - 0.15, LOFT_PLATE_D - 0.05, LOFT_PLATE_D,
+          Y1 - 0.20, Y1, Y1 + 0.15}
+    d = d0 + 0.30
+    while d < d1 - 0.1:
+        ds.add(d)
+        d += 0.24
+    ds = sorted(v for v in ds if d0 <= v <= d1 - 0.012)
+    bm = bmesh.new()
+    jobs = []
+    for i, x in enumerate(_RAF_XS):
+        secs = [[(x + u, sgn * dd, _loft_zb(dd) + 0.002 - v * cs)
+                 for u, v in prof] for dd in ds]
+        # The tail's arrises: the last section a centimetre on and drawn in.
+        e = 0.008
+        tail = [(-w + e, 0.0), (w - e, 0.0), (w - e, h - c - e),
+                (w - c - e * 0.4, h - e), (-w + c + e * 0.4, h - e),
+                (-w + e, h - c - e)]
+        dd = d1
+        secs.append([(x + u, sgn * dd, _loft_zb(dd) + 0.002 - v * cs)
+                     for u, v in tail])
+        faces = _skin(bm, secs)
+        jobs.append((faces, _loft_rafter_tint(sgn, i)))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    _frcol(bm, jobs)
+    kit.adopt(new_object(bm, "loft_rafters", recalc=False), BEECH)
+
+
+def _loft_rafter_tint(sgn, i):
+    tone = 1.0 + 0.050 * _hash3(i, sgn, 7, 53.0)
+    cp = math.cos(PITCH)
+
+    def tint(p, n):
+        x, y, z = p
+        d = abs(y)
+        g = tone + 0.035 * _vnoise(d * 2.2, i * 1.7, sgn * 3.0, 54.0)
+        if _outside(x, d):
+            e = _eave_tint(p, n)
+            return (e[0] * g * 1.01, e[1] * g, e[2] * g * 0.98)
+        k = _loft_ao(x, d, between=False)
+        if abs(n[0]) > 0.5:
+            # The sides, into the angle with the boarding.
+            v = (_loft_zb(d) - z) * cp
+            k -= 0.24 * math.exp(-max(0.0, v) / 0.035)
+        k *= g
+        return (k * 1.04, k, k * 0.92)
+    return tint
+
+
+def _loft_ridge_beam(kit):
+    """The ridge beam, 18 x 28, its lower arrises off, from verge to verge —
+    with the rafters' shadow on its sides where each one lands."""
+    x0, x1 = X0 - LOFT_OV, X1 + LOFT_OV
+    w, c = RIDGE_BW / 2, 0.016
+    top, bot = RIDGE - 0.02, RIDGE - 0.02 - RIDGE_BD
+    prof = [(-w, top), (w, top), (w, bot + c), (w - c, bot), (-w + c, bot),
+            (-w, bot + c)]
+    xs = _loft_xstops(x0, x1, offs=(0.035, 0.08, 0.16))
+    bm = bmesh.new()
+    faces = _skin(bm, [[(x, y, z) for y, z in prof] for x in xs])
+    zj = _loft_zb(w)
+    rd = RAF_D / math.cos(PITCH)
+
+    def tint(p, n):
+        x, y, z = p
+        g = 1.0 + 0.030 * _vnoise(x * 1.4, z * 3.0, 0.0, 55.0)
+        if abs(x) > X1 - 0.01:
+            return (0.86 * g, 0.86 * g, 0.86 * g)
+        k = 1.0 - 0.16 * math.exp(-max(0.0, LOFT_GABLE_IN - abs(x)) / 0.22)
+        if abs(n[1]) > 0.5:
+            k -= 0.24 * math.exp(-max(0.0, zj - z) / 0.04)
+            # Where a rafter lands on this face, the shade round its foot.
+            if z > zj - rd - 0.05:
+                r = min(abs(x - xr) for xr in _RAF_XS) - RAF_W / 2
+                k -= 0.18 * math.exp(-max(0.0, r) / 0.05)
+        k *= g
+        return (k * 1.01, k, k * 0.98)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    _frcol(bm, [(faces, tint)])
+    kit.adopt(new_object(bm, "loft_ridge_beam", recalc=False), BEECH)
+
+
+def _loft_plate(kit, sgn):
+    """The wall plate along one new wall head, which is what the rafters sit
+    on. It fills the wedge between the top of the blockwork and the boarding,
+    and that wedge was open: from the deck you looked along the eave into a
+    slot of dark between every pair of rafters."""
+    dF = LOFT_PLATE_D
+    z0 = LOFT_HEAD
+    # Out to where the boarding comes down to within a centimetre of the
+    # blockwork; past that the boards are bedded on the wall itself.
+    dO = (RIDGE - LOFT_BOARD - z0 - 0.012) / math.tan(PITCH)
+    c = 0.012
+    prof = [(dF, z0 + c), (dF + c, z0), (dO, z0), (dO, _loft_zb(dO) + 0.004),
+            (dF, _loft_zb(dF) + 0.004)]
+    xa, xb = -LOFT_GABLE_IN - 0.01, LOFT_GABLE_IN + 0.01
+    xs = _loft_xstops(xa, xb, offs=(0.035, 0.09))
+    bm = bmesh.new()
+    faces = _skin(bm, [[(x, sgn * d, z) for d, z in prof] for x in xs])
+
+    def tint(p, n):
+        x, y, z = p
+        g = 0.93 + 0.035 * _vnoise(x * 1.6, z * 4.0, sgn, 56.0)
+        k = 1.0 - 0.16 * math.exp(-max(0.0, LOFT_GABLE_IN - abs(x)) / 0.22)
+        k -= 0.20 * math.exp(-max(0.0, _loft_zb(abs(y)) - z) / 0.035)
+        r = min(abs(x - xr) for xr in _RAF_XS) - RAF_W / 2
+        k -= 0.18 * math.exp(-max(0.0, r) / 0.05)
+        k *= g
+        return (k * 1.01, k, k * 0.98)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    _frcol(bm, [(faces, tint)])
+    kit.adopt(new_object(bm, "loft_plate", recalc=False), BEECH)
+
+
+def _loft_plaster_tint(p, n):
+    """The loft's plaster: the skim of `_plaster_tint`, and the shade up under
+    the boarding, under the plate, into the corners and along the deck."""
+    x, y, z = p
+    v = (0.032 * _vnoise(x * 1.15, y * 1.15, z * 1.15, 61.0)
+         + 0.013 * _vnoise(x * 3.4 + 7.0, y * 3.4, z * 3.4, 62.0))
+    if abs(n[2]) < 0.5:
+        if abs(n[0]) > 0.5:
+            v -= 0.110 * math.exp(-max(0.0, _loft_zb(abs(y)) - z) / 0.22)
+        else:
+            v -= 0.110 * math.exp(-max(0.0, LOFT_HEAD - z) / 0.18)
+        e = min(abs(LOFT_GABLE_IN - abs(x)), abs(IY1 - 0.04 - abs(y)))
+        v -= 0.060 * math.exp(-e / 0.24)
+        if z > DECK:
+            v -= 0.045 * math.exp(-(z - DECK) / 0.14)
+    w = 0.006 * _vnoise(x * 0.7 + 3.0, y * 0.7, z * 0.7, 63.0)
+    return (1.0 + v + w, 1.0 + v, 1.0 + v - w)
+
+
+def _deck_soffit_tint(p, n):
+    """The deck's underside: a ceiling like the others, and darker along the
+    trimmer at its open edge."""
+    r, g, b = _ceiling_tint(p, n)
+    if n[2] < -0.5:
+        k = 1.0 - 0.070 * math.exp(-max(0.0, p[1] - LOFT_Y - 0.05) / 0.16)
+        r, g, b = r * k, g * k, b * k
+    return (r, g, b)
+
+
+def _loft_deck_edge(kit):
+    """The open edge of the deck: an oak trimmer across the ends of the
+    joists, 2 cm below the soffit, with a shadow groove along its face, and a
+    bullnosed nosing on top that the boards run into and that stands a
+    finger's width proud of the trimmer.
+
+    It was the joists' own ends, black, a row of boxes along the edge, and
+    the planks stopped dead over them."""
+    yF, yB = LOFT_Y - 0.004, LOFT_Y + 0.050
+    zb, zt = DECK - DECK_T - 0.020, DECK - 0.026
+    trim = [(yB, zt), (yF, zt), (yF, zt - 0.030), (yF + 0.005, zt - 0.035),
+            (yF + 0.005, zt - 0.041), (yF, zt - 0.046), (yF, zb + 0.010),
+            (yF + 0.010, zb), (yB, zb)]
+    yN, r = LOFT_Y - 0.020, 0.014
+    zN = DECK + 0.002
+    nose = [(LOFT_Y + 0.070, zt), (LOFT_Y + 0.070, zN)]
+    for k in range(9):
+        t = (math.pi / 2) * k / 8
+        nose.append((yN + r - r * math.sin(t), zN - r + r * math.cos(t)))
+    nose += [(yN, zt + 0.004), (yN + 0.004, zt)]
+    xs = [IX0, IX0 + 0.03, IX0 + 0.10, IX0 + 0.25, IX0 + 0.5]
+    while xs[-1] < IX1 - 0.6:
+        xs.append(xs[-1] + 0.40)
+    xs += [IX1 - 0.25, IX1 - 0.10, IX1 - 0.03, IX1]
+
+    def tint_for(shade):
+        def tint(p, n):
+            x, y, z = p
+            g = 1.0 + 0.035 * _vnoise(x * 1.3, z * 6.0, shade, 57.0)
+            e = min(x - IX0, IX1 - x)
+            k = (1.0 - 0.18 * math.exp(-e / 0.12)) * shade * g
+            if n[2] < -0.5 or (n[1] < -0.5 and z < zt - 0.03 and shade < 1):
+                k *= 0.94
+            return (k * 1.01, k, k * 0.98)
+        return tint
+    for prof, name, shade in ((trim, "loft_trimmer", 0.92),
+                              (nose, "loft_nosing", 1.0)):
+        bm = bmesh.new()
+        faces = _skin(bm, [[(x, y, z) for y, z in prof] for x in xs])
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        _frcol(bm, [(faces, tint_for(shade))])
+        ob = new_object(bm, name, smooth=True, recalc=False)
+        ob.data.use_auto_smooth = True
+        ob.data.auto_smooth_angle = math.radians(35.0)
+        kit.adopt(ob, BEECH)
 
 
 def rooflight(kit, cx, cy):
@@ -8063,28 +8433,120 @@ def rooflight(kit, cx, cy):
         kit.adopt(ob, colour)
 
 
+def _rail_section(w, h, n=20, p=3.2):
+    """A handrail's section: a rounded oblong, `w` across and `h` high, as
+    (across, up) pairs — the moulded oak rail every joiner sells."""
+    out = []
+    for k in range(n):
+        a = TAU * k / n
+        ca, sa = math.cos(a), math.sin(a)
+        out.append((w / 2 * math.copysign(abs(ca) ** (2 / p), ca),
+                    h / 2 * math.copysign(abs(sa) ** (2 / p), sa)))
+    return out
+
+
+def _rail_run(kit, colour, name, a, b, sec, ends=(True, True)):
+    """Sweep `sec` straight from `a` to `b` (centreline points), its first
+    axis level and square to the run, and round off whichever ends `ends`
+    asks for. Smooth, with the flats kept flat."""
+    dx, dy, dz = (b[k] - a[k] for k in range(3))
+    L = math.sqrt(dx * dx + dy * dy + dz * dz)
+    t = (dx / L, dy / L, dz / L)
+    hl = math.hypot(t[0], t[1]) or 1.0
+    side = (t[1] / hl, -t[0] / hl, 0.0)
+    up = (side[1] * t[2] - side[2] * t[1], side[2] * t[0] - side[0] * t[2],
+          side[0] * t[1] - side[1] * t[0])
+    if up[2] < 0:
+        up = tuple(-v for v in up)
+    r = min(max(abs(u) for u, _ in sec), max(abs(v) for _, v in sec))
+    cap = 5
+    stations = []
+    if ends[0]:
+        for k in range(cap, 0, -1):
+            ang = (math.pi / 2) * k / cap
+            stations.append((-r * math.sin(ang), max(0.10, math.cos(ang))))
+    stations += [(0.0, 1.0), (L, 1.0)]
+    if ends[1]:
+        for k in range(1, cap + 1):
+            ang = (math.pi / 2) * k / cap
+            stations.append((L + r * math.sin(ang), max(0.10, math.cos(ang))))
+    secs = []
+    for s, f in stations:
+        c = (a[0] + t[0] * s, a[1] + t[1] * s, a[2] + t[2] * s)
+        secs.append([tuple(c[q] + (u * side[q] + v * up[q]) * f
+                           for q in range(3)) for u, v in sec])
+    bm = bmesh.new()
+    _skin(bm, secs)
+    ob = new_object(bm, name, smooth=True)
+    ob.data.use_auto_smooth = True
+    ob.data.auto_smooth_angle = math.radians(50.0)
+    return kit.adopt(ob, colour)
+
+
+def _rosette(kit, colour, at, out, r=0.030, t=0.008, seg=28):
+    """A round plate — a wall rose, a post's floor flange — lathed, with its
+    edge rounded over, standing off a surface along `out` (a unit axis)."""
+    prof = [(0.0, 0.0004), (0.0, r), (t * 0.45, r - 0.0006),
+            (t * 0.85, r - t * 0.35), (t, r - t * 0.9), (t, 0.0004)]
+    bm = bmesh.new()
+    vs = _lathe(bm, prof, seg=seg)
+    e1 = (0.0, 0.0, 1.0) if abs(out[2]) < 0.5 else (1.0, 0.0, 0.0)
+    e2 = (out[1] * e1[2] - out[2] * e1[1], out[2] * e1[0] - out[0] * e1[2],
+          out[0] * e1[1] - out[1] * e1[0])
+    for v in vs:
+        px, py, pz = v.co
+        v.co = tuple(at[q] + pz * out[q] + px * e1[q] + py * e2[q]
+                     for q in range(3))
+    ob = new_object(bm, "rosette", smooth=True)
+    ob.data.use_auto_smooth = True
+    ob.data.auto_smooth_angle = math.radians(45.0)
+    kit.adopt(ob, colour)
+
+
 def gallery_rail(kit, pts):
-    r = 0.018
-    (x0, y0), (x1, y1) = pts
-    L = math.hypot(x1 - x0, y1 - y0)
-    n = max(2, int(round(L / 0.72)) + 1)
+    """The gallery's balustrade along the open edge of the deck: round steel
+    posts on floor flanges, standing on the nosing, four 15 mm rods threaded
+    through them out of a rose on the west wall, and a moulded oak handrail
+    over the top that dies into the same wall and is rounded off at the
+    stairwell.
+
+    It was 36 mm posts as ten-sided sticks, three square bars and a box of
+    beech for a rail, all flat-shaded."""
+    (x0, y0), (x1, _) = pts
+    y = y0 + 0.035                  # on the nosing, behind its bullnose
+    xa = x0 + 0.04                  # the plaster face of the west wall
+    hw, hh = 0.062, 0.044
+    zr = DECK + 1.02 - hh / 2
+    first = xa + 0.10
+    n = max(2, int(round((x1 - first) / 0.80)) + 1)
     for i in range(n):
-        t = i / (n - 1)
-        px, py = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
-        bm_cylinder(kit.bm(DARKMETAL, 0.002), px, py, DECK, DECK + 0.94,
-                    r, r, seg=10)
-    kit.span(BEECH, min(x0, x1) - 0.03, max(x0, x1) + 0.03,
-             min(y0, y1) - 0.04, max(y0, y1) + 0.04,
-             DECK + 0.94, DECK + 1.02, bev=0.008)
-    for j in range(3):
-        z = DECK + 0.22 + j * 0.24
-        kit.span(DARKMETAL, min(x0, x1) - 0.012, max(x0, x1) + 0.012,
-                 min(y0, y1) - 0.012, max(y0, y1) + 0.012,
-                 z - 0.008, z + 0.008, bev=0.003)
+        px = first + (x1 - first) * i / (n - 1)
+        _rosette(kit, DARKMETAL, (px, y, DECK + 0.002), (0.0, 0.0, 1.0),
+                 r=0.040, t=0.009)
+        _rtube(kit, DARKMETAL, [(px, y, DECK + 0.006),
+                                (px, y, zr - hh / 2 + 0.006)], 0.019, seg=24)
+    for j in range(4):
+        z = DECK + 0.17 + 0.19 * j
+        _rtube(kit, DARKMETAL, [(xa, y, z), (x1 + 0.030, y, z)], 0.0075,
+               seg=14)
+        _rosette(kit, DARKMETAL, (xa, y, z), (1.0, 0.0, 0.0), r=0.017,
+                 t=0.006, seg=20)
+        _knob(kit, DARKMETAL, x1 + 0.030, y, z, 0.0085, rows=6, seg=14)
+    _rail_run(kit, BEECH, "gallery_handrail", (xa, y, zr), (x1 + 0.05, y, zr),
+              _rail_section(hw, hh), ends=(False, True))
+    _rosette(kit, BEECH, (xa, y, zr), (1.0, 0.0, 0.0), r=0.048, t=0.010)
+
+
+def _rect_d(y, z, y0, y1, z0, z1):
+    """Distance from (y, z) to a rectangle; nought inside it."""
+    dy = max(y0 - y, 0.0, y - y1)
+    dz = max(z0 - z, 0.0, z - z1)
+    return math.hypot(dy, dz)
 
 
 def loft_stair(kit):
-    """Twelve treads on a folded steel stringer, up the east wall.
+    """Eleven treads housed in two oak stringers, up the east wall, and the
+    deck's own nosing for the twelfth.
 
     2.55 m of rise in 1.98 m of run is 50°, which is a ladder-stair and not a
     staircase — and it is what both reference pictures show, because in a room
@@ -8098,7 +8560,16 @@ def loft_stair(kit):
     not a thing anybody would build. Two treads out and 2 cm off the going buys
     52 cm of floor at the foot — a place to arrive — at the price of six degrees
     of pitch, and six degrees is the cheaper thing to spend on a mezzanine
-    ladder."""
+    ladder.
+
+    October 2026: it was two steel plates as a chain of boxes, twelve slabs of beech
+    and three sticks with a square rail. The twelfth slab lay on the deck,
+    coplanar with its boards. Now the stringers are 43 x 275 oak, level-cut on
+    the floor and plumb-cut against the deck's trimmer, the treads are let 7 mm
+    into them, bullnosed and arrised, and the open side has flat-bar
+    balusters bolted to the stringer under a moulded rail, with a round rail
+    on brackets up the wall. The flight's going, rise and footprint — what
+    `VIK.loftStair` walks — are the ones it always had."""
     n = 12
     rise = (DECK - F2) / n
     go = 0.18
@@ -8110,46 +8581,146 @@ def loft_stair(kit):
     # otherwise looks perfectly normal.
     y_top = LOFT_Y + 0.15
     x = IX1 - 0.52
-    for i in range(1, n + 1):
-        y = y_top - (n - i) * go
-        kit.span(BEECH, x - 0.44, x + 0.44, y - go / 2 - 0.02, y + go / 2 + 0.06,
-                 F2 + rise * i - 0.045, F2 + rise * i, bev=0.008)
-    for s in (-1, 1):
-        bm = bmesh.new()
-        pts = [(y_top - (n - i) * go, F2 + rise * i) for i in range(n + 1)]
-        for i in range(n):
-            (ya, za), (yb, zb) = pts[i], pts[i + 1]
-            ang = math.atan2(zb - za, yb - ya)
-            L = math.hypot(yb - ya, zb - za)
-            vs = bm_box(bm, 0, 0, 0, 0.020, L + 0.06, 0.16)
-            c, sn = math.cos(ang), math.sin(ang)
-            for v in vs:
-                px, py, pz = v.co
-                v.co = (x + s * 0.44 + px,
-                        (ya + yb) / 2 + py * c - pz * sn,
-                        (za + zb) / 2 - 0.14 + py * sn + pz * c)
-        ob = new_object(bm, "stringer")
-        bevel(ob, 0.004)
-        kit.adopt(ob, DARKMETAL)
+    m = rise / go
+    yn = y_top - 0.11                    # the nosing line reaches the deck here
+
+    def nose(y):
+        return DECK - m * (yn - y)
+
+    th = 0.042
+    treads = []
+    for i in range(1, n):
+        yi = y_top - (n - i) * go
+        treads.append((yi - 0.11, yi + 0.12, F2 + rise * i))
+
+    # ── the treads ──
+    xs = sorted({x} | {x + s * v for v in (0.432, 0.40, 0.34, 0.22, 0.10)
+                       for s in (-1, 1)})
+    r = 0.016
     bm = bmesh.new()
-    for i in range(n):
-        ya, za = y_top - (n - i) * go, F2 + rise * i + 0.94
-        yb, zb = y_top - (n - i - 1) * go, F2 + rise * (i + 1) + 0.94
-        ang = math.atan2(zb - za, yb - ya)
-        L = math.hypot(yb - ya, zb - za)
-        vs = bm_box(bm, 0, 0, 0, 0.040, L + 0.02, 0.040)
-        c, sn = math.cos(ang), math.sin(ang)
-        for v in vs:
-            px, py, pz = v.co
-            v.co = (x - 0.46 + px, (ya + yb) / 2 + py * c - pz * sn,
-                    (za + zb) / 2 + py * sn + pz * c)
-    ob = new_object(bm, "loft_handrail")
-    bevel(ob, 0.006)
+    jobs = []
+    for i, (yf, yb, zt) in enumerate(treads):
+        prof = [(yb, zt - 0.004), (yb - 0.004, zt)]
+        for k in range(7):
+            a = (math.pi / 2) * k / 6
+            prof.append((yf + r - r * math.sin(a), zt - r + r * math.cos(a)))
+        prof += [(yf, zt - th + 0.004), (yf + 0.004, zt - th),
+                 (yb - 0.004, zt - th), (yb, zt - th + 0.004)]
+        faces = _skin(bm, [[(xx, yy, zz) for yy, zz in prof] for xx in xs])
+        jobs.append((faces, _tread_tint(x, i)))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    _frcol(bm, jobs)
+    ob = new_object(bm, "loft_treads", smooth=True, recalc=False)
+    ob.data.use_auto_smooth = True
+    ob.data.auto_smooth_angle = math.radians(35.0)
     kit.adopt(ob, BEECH)
-    for i in (2, 7, 12):
-        y = y_top - (n - i) * go
-        bm_cylinder(kit.bm(DARKMETAL, 0.002), x - 0.46, y,
-                    F2 + rise * i, F2 + rise * i + 0.94, 0.016, 0.016, seg=8)
+
+    # ── the stringers ──
+    a_, b_ = 0.065, 0.360                # above and below the nosing line
+    t_in, t_out = 0.425, 0.468
+    y_end = LOFT_Y - 0.004               # the trimmer's face
+    y_s = yn - (DECK - F2 + a_ - 0.010) / m
+    y_k = yn - (DECK - F2 - b_) / m
+    ys = {y_s, y_s + 0.02, y_k, y_end}
+    for yf, yb, _ in treads:
+        ys.update((yf - 0.025, yf, yf + 0.03, yb - 0.03, yb, yb + 0.025))
+    yy = y_s
+    while yy < y_end:
+        ys.add(yy)
+        yy += 0.10
+    ys = sorted(v for v in ys if y_s <= v <= y_end)
+    R = 8
+    bm = bmesh.new()
+    jobs = []
+    for s in (-1, 1):
+        lo, hi = sorted((x + s * t_in, x + s * t_out))
+        secs = []
+        for yy in ys:
+            zt = nose(yy) + a_
+            zb = max(nose(yy) - b_, F2)
+            c = min(0.006, (zt - zb) / 4)
+            zs = [zb + c + (zt - zb - 2 * c) * q / R for q in range(R + 1)]
+            sec = [(lo + c, zb), (hi - c, zb)]
+            sec += [(hi, z) for z in zs]
+            sec += [(hi - c, zt), (lo + c, zt)]
+            sec += [(lo, z) for z in reversed(zs)]
+            secs.append([(px, yy, pz) for px, pz in sec])
+        faces = _skin(bm, secs)
+        jobs.append((faces, _stringer_tint(s, treads, th, y_end)))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    _frcol(bm, jobs)
+    kit.adopt(new_object(bm, "loft_stringers", recalc=False), BEECH)
+
+    # ── the balustrade up the open side ──
+    xo = x - t_out - 0.006
+    posts = [y_top - (n - i) * go for i in (1, 4, 7, 10)]
+    for yp in posts:
+        z0, z1 = nose(yp) - 0.22, nose(yp) + 0.90 - 0.018
+        kit.span(DARKMETAL, xo - 0.006, xo + 0.006, yp - 0.020, yp + 0.020,
+                 z0, z1, bev=0.003)
+        for zb_ in (nose(yp) - 0.07, nose(yp) - 0.17):
+            _knob(kit, DARKMETAL, xo - 0.007, yp, zb_, 0.0075, rows=5, seg=12)
+    # And one on the deck at the head, on a plate, for the rail to end on.
+    yp = LOFT_Y + 0.10
+    kit.span(DARKMETAL, xo - 0.006, xo + 0.006, yp - 0.020, yp + 0.020,
+             DECK, nose(yp) + 0.90 - 0.018, bev=0.003)
+    kit.span(DARKMETAL, xo - 0.040, xo + 0.040, yp - 0.050, yp + 0.050,
+             DECK, DECK + 0.008, bev=0.002)
+    ya, yb = posts[0] - 0.05, yp + 0.05
+    _rail_run(kit, BEECH, "loft_handrail", (xo, ya, nose(ya) + 0.90),
+              (xo, yb, nose(yb) + 0.90), _rail_section(0.055, 0.042))
+
+    # ── and a round rail up the wall ──
+    xw = IX1 - 0.04
+    xr = xw - 0.070
+    ya, yb = -3.00, -1.32
+    _rtube(kit, RAIL, [(xr, ya, nose(ya) + 0.90), (xr, yb, nose(yb) + 0.90)],
+           0.021, seg=20)
+    for yy in (ya, yb):
+        _knob(kit, RAIL, xr, yy, nose(yy) + 0.90, 0.0212, rows=7, seg=20)
+    for yy in (ya + 0.22, (ya + yb) / 2, yb - 0.22):
+        zr = nose(yy) + 0.90
+        _rtube(kit, RAIL, [(xw, yy, zr - 0.068), (xr + 0.004, yy, zr - 0.068),
+                           (xr, yy, zr - 0.018)], 0.0065, seg=10)
+        _rosette(kit, RAIL, (xw, yy, zr - 0.068), (-1.0, 0.0, 0.0), r=0.026,
+                 t=0.007, seg=24)
+
+
+def _tread_tint(x, i):
+    tone = 1.0 + 0.050 * _hash3(i, 3, 8, 58.0)
+
+    def tint(p, n):
+        px, py, pz = p
+        dx = abs(px - x)
+        g = tone + 0.030 * _vnoise(px * 2.5, i * 3.1, 0.0, 59.0)
+        k = 1.0 - 0.22 * math.exp(-max(0.0, 0.425 - dx) / 0.035)
+        if n[2] < -0.5:
+            k *= 0.90
+        elif n[2] > 0.5:
+            # Oiled oak goes paler where it is walked on.
+            k += 0.040 * math.exp(-(dx / 0.16) ** 2)
+        k *= g
+        return (k * 1.01, k, k * 0.98)
+    return tint
+
+
+def _stringer_tint(s, treads, th, y_end):
+    def tint(p, n):
+        px, py, pz = p
+        g = 0.93 + 0.035 * _vnoise(py * 1.8 + pz * 1.2, s * 2.0, 0.0, 60.0)
+        k = 1.0
+        if n[0] * s < -0.5:
+            # The inside face, where every tread is housed.
+            d = min(_rect_d(py, pz, yf, yb, zt - th, zt) for yf, yb, zt in treads)
+            k -= 0.30 * math.exp(-d / 0.025)
+        if s > 0 and n[0] > 0.5:
+            k -= 0.22                        # 1.5 cm off the wall
+        k -= 0.15 * math.exp(-max(0.0, pz - F2) / 0.10)
+        if pz > DECK - DECK_T - 0.15:
+            k -= 0.15 * math.exp(-max(0.0, y_end - py) / 0.08)
+        k *= g
+        return (k * 1.01, k, k * 0.98)
+    return tint
 
 
 # --------------------------------------------------------------------------- #

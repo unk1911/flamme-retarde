@@ -8,6 +8,113 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.579.0] — 2026-10-02
+
+### The loft at the resolution of the house: beds, ladder-stair, timbers, and a roof that is not lit by the sun from below
+
+Misha: *"when we press 'V' 3 times, 3rd time to see the proposed raised roof
+layout, that stuff was done with an old model and it looks super low-poly ...
+can u enhance this with high-poly, those beds upstairs the ladder, the
+shadows, to bring it in sync with our latest vikendica"*.
+
+The renovation study (`vik.roof('loft')`) was still built from the house's
+first pass: box beds, a box stair, a slab roof on boxes. Everything is in
+`roof_loft`, `loft_stair` and `gallery_rail` in `tools/blender/vikendica.py`.
+The one shader change is `loftMat` in `src/44-vikendica.js`. Nothing outside
+the loft blob moved: the shell and the 'now' roof payloads are byte-identical,
+and the 'now' roof still draws with `mat`.
+
+**The shadows.** The roof underside, the rafters and the ridge beam came out
+one flat glowing yellow, with no shade anywhere. The cause is the shell shader's
+ceiling roll. It turns a downward normal toward the sky so a ceiling samples
+the sky's ambient and not the karst's, and the sun term is then computed off
+the turned normal as well. A shadow map cannot cancel that. Casters are drawn
+back face first, so the map's depth over the roof is the roof's own underside,
+and an underside is always on the lit side of its own bias. On the 25° boarding
+every face took full sun, lifted a third.
+
+- `loftMat` keeps the roll and the lift for the ambient. It puts the sun (and
+  its highlight) back to what the face's own normal says, which for anything
+  facing down is none.
+- Flat white faces are the exception: that is the deck's soffit, the ceiling
+  of the rooms under it, and it has to match the house's other ceilings. They
+  are found by normal and albedo, because the ridge beam's underside is flat
+  too.
+- The shade itself is vertex colour: into the ridge, down to the wall plate,
+  into both gables, and into the angle each rafter makes with the boarding.
+- Measured looking up from the big room at 11:00, a board between two rafters
+  went from (255,255,208), clipped, to (142,125,83).
+
+**The roof timbers:**
+
+- **The boarding** is boards now, 14.3 cm down the slope, 30 a side, running
+  with the ridge across the rafters. They are V-jointed underneath with the
+  felt dark in the joints, and each board has its own tone. It was one 2.8 cm
+  slab of PLY.
+- **The rafters** are a 7 × 14 section with the lower arrises off. They are
+  plumb-cut against the ridge beam and at the tail, and the tail is chamfered
+  round. Their sides darken into the boarding.
+- **The ridge beam** is 18 × 28 with chamfered lower arrises, and carries the
+  rafters' shade where each one lands.
+- **A wall plate** sits on the new wall head and fills the wedge between the
+  blockwork and the boarding. That wedge was open: from the deck you looked
+  along the eave into a slot of dark between every pair of rafters.
+- **The plaster** of the new course and both gables is tinted like the rest of
+  the house: darker under the boarding and the plate, into the corners, and
+  along the deck.
+
+**The deck:**
+
+- **The open edge** is an oak trimmer, 2 cm below the soffit, with a shadow
+  groove along its face. On top is a bullnosed nosing that the boards run
+  into. It was the joists' own black ends, a row of boxes. The steel joists
+  are gone, since they were never seen anywhere else.
+- **The soffit** takes `_ceiling_tint` (the shadow along every wall of the
+  rooms below) and darkens along the trimmer.
+- **The gallery balustrade**: 38 mm round steel posts on lathed floor flanges,
+  standing on the nosing, and four 15 mm rods threaded through them out of
+  roses on the west wall, with domed ends at the stairwell. Over them is a
+  moulded oak handrail (a rounded 62 × 44 section) that dies into the wall on
+  a rose and is rounded off at the stairwell. It was ten-sided sticks, three
+  square bars and a box. Its line and its gap at the stair are unchanged, so
+  the blockers still match it.
+
+**The ladder-stair** (`loft_stair`):
+
+- **The stringers** are oak, 43 × 275, level-cut on the floor and plumb-cut
+  against the trimmer. They darken round every housing, at the foot, and on
+  the face 1.5 cm off the wall. They were two steel plates built as a chain of
+  boxes.
+- **Eleven treads** are let 7 mm into the stringers. Each has a 16 mm bullnose
+  and arrised edges, is darker underneath and near the housings, and is paler
+  where it is walked on. The deck's nosing is the twelfth step. The old twelfth
+  slab lay on the deck, coplanar with its boards.
+- **The open side** has flat-bar balusters bolted to the stringer with two
+  domed bolts each, plus a post on a plate on the deck at the head. They carry
+  a moulded oak rail with rounded ends.
+- **Up the wall** is a 42 mm round rail on three brackets with roses.
+- The going, rise and footprint are the ones `VIK.loftStair` walks: 2.20 to
+  3.15 by 0.90 to 3.14, rising from 2.90 to 5.45.
+
+**The beds** are the double from soba 3 (`bed_oak`) on the same 1.40 × 1.98
+footprints: an oak platform, an anthracite headboard, cat-print bedding, and
+towels laid out. They were the walnut box beds from the house's first pass.
+`_burn_bed` makes the old `bed`'s draws first, so the generators stay where
+they were.
+
+**Cost.** The loft blob went from 61 KB to 311 KB (+251 KB gz, about 135k
+triangles). About 50k of those are the two beds, at the same resolution as the
+one in soba 3, and 29k are the boarding. The page grew by 337 KB. On the RTX
+4090 laptop, in the three loft views, two passes each:
+
+| view | before (fps) | after (fps) |
+|---|---|---|
+| from the big room | 49 / 45 | 44 / 41 |
+| west bed | 31 / 30 | 30 / 30 |
+| east bed | 28 / 27 | 25 / 27 |
+
+The 'now' house does not draw the loft blob at all.
+
 ## [1.578.0] — 2026-10-02
 
 ### The yard's furniture at full resolution: rattan chairs, the moulded table, the lounger, the gate
