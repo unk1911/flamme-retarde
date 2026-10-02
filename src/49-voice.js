@@ -266,6 +266,48 @@ const TALK = {
   wait: 8,
 };
 
+/**
+ * CHLOE, OUT LOUD (page 1.563.0, baye 1.55.0) — while the roles are reversed
+ * (src/49-reverse.js) her orders, praise, teases, the lines between slaps and
+ * the aftercare are said in her own voice: `chloe` below, `/line` with
+ * `who: 'chloe'` and the beat as a key. The words are the service's
+ * (`PERSONA_CHLOE`), Croatian with a gloss under the caption.
+ *
+ * PAID CALLS, SO A BUDGET. Phase one's selector says something every two or
+ * three seconds at its busiest — measured here at fourteen lines a minute
+ * with a player who obeys two orders in three — and every voiced one is a
+ * model call and a synthesis. So:
+ *   `prio`   the beats that carry the scene: the swap and the swap back, an
+ *            order (it is the instruction), the aftercare. They wait only
+ *            `floor`, the service's own (`CHLOE_LIMIT`), and the swap and the
+ *            aftercare talk over whatever is in the air, the way the
+ *            player's own line does (`cutIn`).
+ *   `gap`    s between a voiced line and any other beat (the praise, the
+ *            tease, a line between slaps, the remote, the prowl). Sooner, and
+ *            it is the phase-one caption, as it always was.
+ *   `hour`   voiced lines in any sixty minutes; past it, captions until the
+ *            oldest falls out. The service caps the same hour at 150.
+ *   `wait`   s before the caption goes up without her, if the service is slow.
+ *   `late`   s after which the request is dropped: a "good girl" eight
+ *            seconds late is praise for something else.
+ * One in the air at a time. Signed out, switched off, or a service that does
+ * not know her (it answers as Baye; `who` tells), and every line is the
+ * phase-one caption with nothing sent. Measured at ×1, face down with nobody
+ * obeying: eight lines in a minute, six of them voiced, two captioned; the
+ * hour cap then holds a long scene to 140 (CHANGELOG 1.563.0).
+ */
+const CHLOE_SAY = {
+  gap: 7,
+  floor: 3.1,
+  hour: 140,
+  wait: 3.0,
+  late: 8,
+  hold: 3.2,
+  memory: 8,
+  prio: { on: 1, off: 1, order: 1, care: 1 },
+  cut: { on: 1, off: 1, care: 1 },
+};
+
 const voice = (() => {
   /** The player's switch. On by default — but nothing happens without a
    *  session, so "on" is only a statement of intent until you sign in. */
@@ -345,6 +387,10 @@ const voice = (() => {
     bather: { key: 'bather', cfg: BATHER_VOICE, said: [], nextAt: 0,
       inRange: false, onlyNews: true,
       gap: () => at(() => jadrija.batherGap()), lead: null },
+    // Chloe, only while the roles are reversed, and never on a clock of this
+    // file's: her beats are 49-reverse.js's (`chloe` below).
+    chloe: { key: 'chloe', cfg: CHLOE_SAY, said: [], nextAt: 0, inRange: false,
+      quiet: true, gap: () => null, lead: 'Chloe: ' },
   };
 
   /**
@@ -485,7 +531,9 @@ const voice = (() => {
     // in 90-app.js. Here and not in `talkState`, so a line she volunteers in
     // the middle of it knows as much as an answer does: asked "am i spanking
     // you?" on the cot she said "not yet", because nothing up here said so.
-    if (sp.key === 'baye' && !(gap && gap.bucket)) {
+    // Chloe's too (1.563.0): it is the scene she is running, read from her
+    // side on the service (`chloe_scene_lines`).
+    if ((sp.key === 'baye' && !(gap && gap.bucket)) || sp.key === 'chloe') {
       const sc = at(() => (typeof sceneTalk === 'function' ? sceneTalk() : null));
       if (sc) c.scene = sc;
     }
@@ -859,11 +907,15 @@ const voice = (() => {
   async function answer(askName, spoken = null) {
     if (!on) return 'off';
     if (!AUTH.user || !AUTH.baye) return 'signed out';
-    const gap = at(() => jadrija.bayeGap());
+    // While the roles are reversed you are IN Baye, and the one in the room
+    // to ask is Chloe (1.563.0): "what time is it?" is hers to answer.
+    const rv = !!at(() => revActive(), false);
+    if (rv && chloeOff) return 'the voice service does not know Chloe yet';
+    const gap = rv ? { m: +(at(() => chloeGapM(), 1)).toFixed(1) } : at(() => jadrija.bayeGap());
     if (!gap) return 'nobody';
     if (gap.m > EARS_REACH) return 'far';
-    const who = gap.bucket ? 'bucketeer' : 'baye';
-    const sp = gap.bucket
+    const who = rv ? 'chloe' : gap.bucket ? 'bucketeer' : 'baye';
+    const sp = rv ? CAST.chloe : gap.bucket
       ? (CAST.bucketeer || (CAST.bucketeer = { key: 'bucketeer', cfg: { memory: 4, hold: 4.0 },
         said: [], nextAt: 0, inRange: false, gap: () => null, lead: null }))
       : CAST.baye;
@@ -885,17 +937,213 @@ const voice = (() => {
       });
       const d = await r.json().catch(() => null);
       if (!d || !d.ok) return (d && d.error) || ('http ' + r.status);
+      // A service from before Chloe answers her as Baye, in Baye's voice,
+      // and that voice is the body you are in: not played.
+      if (rv && d.who !== 'chloe') { chloeOff = 'old service'; return 'the voice service does not know Chloe yet'; }
       // Something else was said while this was in the model. Her answer to
       // the question before last is not an answer.
       if (!mine(tok)) return 'cut off';
       sp.said.push(d.text);
       if (sp.said.length > sp.cfg.memory) sp.said.shift();
-      caption(d.text, null);
+      caption(d.text, rv ? sp.lead : null, rv ? d.gloss : null);
+      if (rv) chloeNote('ask', d);
       await play(sp.key, d);
       capT = sp.cfg.hold;
       return 'said: ' + d.text;
     } catch (e) {
       return e.name === 'AbortError' ? 'cut off' : e.message;
+    } finally {
+      if (live === ctl) live = null;
+      release(tok);
+    }
+  }
+
+  // ── Chloe's beats ──────────────────────────────────────────────────────
+  //
+  // `chloeOff` latches the first sign that the service does not know her —
+  // a reply that is not hers — for the rest of the page's life, so a stale
+  // service costs one call and not one a line. `chloeLive` is her request in
+  // the air; `chloeTok` says whether a reply is still the newest one asked.
+  let chloeOff = null, chloeLive = null, chloeTok = 0, chloeAt = -1e9;
+  const chloeHour = [];       // when each voiced line of the last hour went up
+  const chloeLog = [];
+  const chloeN = { voiced: 0, captioned: 0, dropped: 0, refused: 0 };
+  function chloeNote(beat, d, extra) {
+    chloeLog.push(Object.assign({ t: +(performance.now() / 1000).toFixed(1), beat,
+      text: d ? d.text : null, gloss: d ? d.gloss || null : null }, extra || null));
+    if (chloeLog.length > 40) chloeLog.shift();
+  }
+  /** Metres from your body (Baye's) to Chloe, level. */
+  function chloeGapM() {
+    const me = at(() => jadrija.rideFrom());
+    const ch = at(() => revWho());
+    return me && ch ? Math.hypot(me.x - ch.x, me.z - ch.z) : 1;
+  }
+
+  /**
+   * One of her beats, out loud. `beat` is a key off `CHLOE_BEAT` in baye.py;
+   * `o.order` the order it is about; `o.fallback()` the phase-one caption;
+   * `o.still()` whether the reply is still worth saying when it lands (the
+   * order still out, the safeword not said since).
+   *
+   * Answers what happened at once, so 49-reverse.js knows whether to caption:
+   * `'voice'` (taken: it captions itself, or falls back to `o.fallback` if
+   * the service is slow or says no), `'caption'` (not voiced: caption it
+   * now), or `'drop'` (she is in the middle of saying something else: say
+   * nothing over her).
+   */
+  function chloe(beat, o = {}) {
+    if (!on || !AUTH.user || !AUTH.baye || chloeOff) return 'caption';
+    const now = performance.now() / 1000;
+    const prio = !!CHLOE_SAY.prio[beat];
+    const cut = !!CHLOE_SAY.cut[beat];
+    while (chloeHour.length && now - chloeHour[0] > 3600) chloeHour.shift();
+    if (chloeHour.length >= CHLOE_SAY.hour && beat !== 'care') return 'caption';
+    if (now - chloeAt < CHLOE_SAY.floor && beat !== 'care') return 'caption';
+    if (!cut) {
+      if (chloeLive) return prio ? 'caption' : 'drop';
+      if (busy) return prio ? 'caption' : 'drop';
+      if (!prio && now - chloeAt < CHLOE_SAY.gap) return 'caption';
+    }
+    // THE SWAP AND THE SAFEWORD'S LINE TAKE THE LINE, whatever was in the
+    // air — for the safeword, `chloeHush` has already cut her off.
+    if (cut && chloeLive) { chloeTok++; try { chloeLive.abort(); } catch (e) { /* done */ } chloeLive = null; }
+    const tok = cut ? cutIn() : claim();
+    if (!tok) return 'caption';
+    // The aftercare is never refused for coming too soon after an order: it
+    // waits out the service's floor instead (at most three seconds, while
+    // she is still on her way to your head).
+    const delay = beat === 'care' ? Math.max(0, CHLOE_SAY.floor - (now - chloeAt)) : 0;
+    chloeAt = now + delay;
+    chloeHour.push(now);
+    const my = ++chloeTok;
+    const ctl = new AbortController();
+    chloeLive = ctl;
+    const sp = CAST.chloe;
+    let shown = false;
+    const fall = () => {
+      if (shown) return;
+      shown = true;
+      chloeN.captioned++;
+      if (o.fallback) o.fallback();
+    };
+    const slow = setTimeout(() => { if (my === chloeTok) fall(); }, (CHLOE_SAY.wait + delay) * 1000);
+    const late = setTimeout(() => { try { ctl.abort(); } catch (e) { /* done */ } }, (CHLOE_SAY.late + delay) * 1000);
+    (async () => {
+      try {
+        if (delay) await new Promise((r) => setTimeout(r, delay * 1000));
+        if (my !== chloeTok) return;
+        const body = Object.assign(context(sp, { m: +chloeGapM().toFixed(1) }),
+          { who: 'chloe', rev: beat }, o.order ? { rev_order: o.order } : null);
+        const r = await fetch(AUTH.baye + '/line', {
+          method: 'POST',
+          credentials: 'same-origin',
+          signal: ctl.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json().catch(() => null);
+        if (!d || !d.ok || d.who !== 'chloe') {
+          if (d && d.ok) chloeOff = 'old service';
+          if (r.status === 429) chloeAt = performance.now() / 1000 + 6;
+          chloeN.refused++;
+          chloeNote(beat, null, { refused: (d && d.error) || (d && d.ok ? 'not hers' : 'http ' + r.status) });
+          fall();
+          return;
+        }
+        // Too late to be about anything, or something has happened since.
+        if (my !== chloeTok || !mine(tok) || (o.still && !o.still())) {
+          chloeN.dropped++;
+          chloeNote(beat, d, { dropped: true });
+          return;
+        }
+        shown = true;
+        chloeN.voiced++;
+        sp.said.push(d.text);
+        if (sp.said.length > CHLOE_SAY.memory) sp.said.shift();
+        caption(d.text, sp.lead, d.gloss);
+        chloeNote(beat, d);
+        await play('chloe', d);
+        capT = CHLOE_SAY.hold;
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('chloe:', e.message);
+        chloeNote(beat, null, { refused: e.name === 'AbortError' ? 'late' : e.message });
+        if (my === chloeTok) fall();
+      } finally {
+        clearTimeout(slow);
+        clearTimeout(late);
+        if (chloeLive === ctl) chloeLive = null;
+        release(tok);
+      }
+    })();
+    return 'voice';
+  }
+
+  /** The safeword: whatever she was saying stops, and what she was about to. */
+  function chloeHush() {
+    chloeTok++;
+    if (chloeLive) { try { chloeLive.abort(); } catch (e) { /* done */ } chloeLive = null; }
+    if (sayingKey === 'chloe') {
+      at(() => audio.voiceStop());
+      sayingKey = null;
+      caption('');
+    }
+  }
+
+  /**
+   * Talking to Chloe, while the roles are reversed: `converse`'s other half.
+   * Same ticket, same rules, `who: 'chloe'` — and her answer is Croatian with
+   * a gloss, in her voice.
+   */
+  async function converseChloe(heard, tell) {
+    const out = (kind, line, extra) => Object.assign({ kind, line }, extra || null);
+    if (chloeOff) return out('meta', 'ignored: the voice service does not know Chloe yet');
+    const m = chloeGapM();
+    if (m > TALK.earshot) return out('meta', 'ignored: nobody near — Chloe is ' + Math.round(m) + ' m off');
+    const ctl = new AbortController();
+    const tok = cutIn();
+    live = ctl;
+    chloeTok++;
+    if (chloeLive) { try { chloeLive.abort(); } catch (e) { /* done */ } chloeLive = null; }
+    const sp = CAST.chloe;
+    const t0 = performance.now();
+    try {
+      const body = Object.assign(context(sp, { m: +m.toFixed(1) }), talkState(false),
+        { who: 'chloe', heard: heard.id, near: +m.toFixed(1) });
+      const r = await fetch(AUTH.baye + '/talk', {
+        method: 'POST',
+        credentials: 'same-origin',
+        signal: ctl.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d || !d.ok) {
+        if (d && d.ignored) return out('meta', 'ignored: not to her (the service agrees)');
+        return out('err', 'talk × ' + ((d && d.error) || 'http ' + r.status));
+      }
+      if (d.who !== 'chloe') {
+        chloeOff = 'old service';
+        return out('meta', 'ignored: the voice service does not know Chloe yet');
+      }
+      const wait = Math.round(performance.now() - t0);
+      if (!mine(tok)) return out('meta', 'cut off: you said something else');
+      sp.said.push(d.text);
+      if (sp.said.length > CHLOE_SAY.memory) sp.said.shift();
+      caption(d.text, sp.lead, d.gloss);
+      chloeNote('talk', d);
+      const played = play('chloe', d);
+      const res = out('reply', 'Chloe · ' + m.toFixed(1) + ' m: “' + d.text + '”'
+        + (d.gloss ? ' (' + d.gloss + ')' : '') + '  '
+        + wait + ' ms (model ' + d.model_ms + ', voice ' + d.tts_ms + ')',
+      { text: d.text, ms: wait, who: 'chloe' });
+      if (tell) { tell(res); res.told = true; }
+      await played;
+      capT = TALK.hold;
+      return res;
+    } catch (e) {
+      if (e.name === 'AbortError') return out('meta', 'cut off: you said something else');
+      return out('err', 'talk × ' + e.message);
     } finally {
       if (live === ctl) live = null;
       release(tok);
@@ -1024,6 +1272,9 @@ const voice = (() => {
     const out = (kind, line, extra) => Object.assign({ kind, line }, extra || null);
     if (!on) return out('meta', 'ignored: her voice is switched off');
     if (!AUTH.user || !AUTH.baye) return out('meta', 'ignored: signed out');
+    // Roles reversed (1.563.0): you are in Baye, so whatever you say is said
+    // to Chloe, who is the one in the room with you.
+    if (at(() => revActive(), false)) return converseChloe(heard, tell);
     if (!AFOOT[state.phase]) {
       return out('meta', 'ignored: nobody near — '
         + (ELSEWHERE[state.phase] || 'you are not on your feet'));
@@ -1132,6 +1383,23 @@ const voice = (() => {
      * a call to the service. `gloss` what it means, as a service line has.
      */
     sub: (text, secs = 3, gloss = '') => { caption(text, null, gloss || null); capT = text ? secs : 0; },
+    /** One of Chloe's beats, out loud — see `chloe`. */
+    chloe,
+    /** The safeword: her line stops where it is. */
+    chloeHush,
+    /** Whether a line of hers is in the air or on its way (the aftercare
+     *  waits for it to finish). */
+    chloeBusy: () => !!chloeLive || sayingKey === 'chloe',
+    /** For a probe: what she has said, what was voiced and what was not. */
+    chloeStats: () => ({ off: chloeOff, live: !!chloeLive, saying: sayingKey === 'chloe',
+      n: Object.assign({}, chloeN), said: CAST.chloe.said.slice(), log: chloeLog.slice(-20) }),
+    /**
+     * Debug, for a headless probe with no session: pretend to be signed in,
+     * so the voice paths run and their request bodies can be captured with a
+     * stubbed `fetch`. The service still checks the cookie on every route;
+     * this changes nothing but which branch the page takes.
+     */
+    fakeAuth: (user = 'probe', base = '/baye') => { AUTH.user = user; AUTH.baye = base; chloeOff = null; return { user: AUTH.user, baye: AUTH.baye }; },
     /** Whose line is in the air right now, or null — see `play`. */
     saying: () => sayingKey,
     /** Which bather (casting index) that line is, when it is a bather's. */

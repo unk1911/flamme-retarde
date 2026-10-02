@@ -1280,9 +1280,11 @@ const ears = (() => {
       return;
     }
     if (name === 'baye.time') {
-      note('baye: asking…', 'meta');
+      // Chloe's to answer while the roles are reversed (1.563.0).
+      const who = typeof revActive === 'function' && revActive() ? 'chloe: ' : 'baye: ';
+      note(who + 'asking…', 'meta');
       const res = await voice.answer('time', lang);
-      note('baye: ' + res, res.startsWith('said') ? 'did' : 'meta');
+      note(who + res, res.startsWith('said') ? 'did' : 'meta');
     }
   }
 

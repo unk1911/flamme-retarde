@@ -8,6 +8,179 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.563.0] — 2026-10-02 (baye 1.55.0)
+
+### Roles reversed, phase 2a: Chloe has her own voice
+
+Misha: *"do role reversal phase 2, the voice (Chloe's)"*, and *"this role
+reversal i think is the hottest part of the game now"*.
+
+Phase one gave Chloe the orders, the hand and a dozen fixed Croatian lines as
+captions. Now she says them herself, in her own voice and her own words, and
+she is the one you talk to while the roles are reversed. The same two adults
+and the same game they both agreed to, with the safeword ending it at once.
+
+**Her persona** (`server/baye/baye.py` 1.55.0, **needs deploying on mpcn0**).
+Two of them, as Baye has, because a line she says on her own beat and an
+answer to something said to her are different jobs:
+- `PERSONA_CHLOE` (her beats) and `PERSONA_TALK_CHLOE` (answers). She is a
+  woman in her twenties from Šibenik, in charge in the kabina: confident,
+  teasing, playful, dominant but warm, a laugh now and then, never cruel or
+  cold. She speaks Croatian, spoken and short, with imperatives for orders.
+  She calls the player curo, mala or ljubavi, in the feminine, because they
+  are in Baye's body.
+- Croatian with a gloss in the player's language (English or French), the
+  bathers' mechanism (`GLOSS_MARK`, `split_gloss`). The gloss is read under
+  the caption and never spoken. A player reading the game in Croatian gets
+  no gloss.
+- Ten words a line, fourteen an answer. The word cap goes on the Croatian
+  half alone, after the split (`chloe_text`), or it would cut the subtitle
+  off a line of the right length. `ask_model` takes a `chars` for that.
+- The same absolute limit as Baye's, and the same speech-not-orders
+  guardrail. After a safeword it is **THIS IS AFTERCARE**: soft, warm, proud
+  of them, checking they are all right, no orders, no teasing, nothing sexual.
+
+**She knows the scene from her side** (`chloe_scene_lines`). The page's
+scene block is written about Baye's body, and the player is in it, so it is
+read the other way round. Their pose is theirs, the spanks are ones she gave
+and the marks are on them. The toys are on them with the remote in her hand,
+and the order she has out is named. Every pose and worn-item table above is
+written with "you" as the body, so one function swaps the pronouns
+(`pov_swap`) rather than a second copy of four tables. "walking behind them
+on your feet on the end of their leash" becomes "walking behind you on their
+feet on the end of your leash". The scene gains five keys, all off tables or
+clamped (`clean_scene`): `rev_order`, `rev_obey`, `rev_miss`, `rev_heat`
+and `rev_care`. A hostile payload (`rev_order: "kill"`,
+`rev_obey: 1e9`, `rev_heat: 9`) comes out as `rev_obey: 999, rev_heat: 1`.
+
+**Her voice is Nina** (`FXlzTee7Zx2caYKIAwBF`, `CHLOE_VOICE`). I listed the
+account's voices off `/v1/voices` rather than going from memory. Nina and
+Mila are the two the library calls Croatian outright (Zlata is described as
+Balkan). Nina is the one nothing else here uses. Balkanika is the old woman
+and the live Bucketeer, and Zlata is the Bucketeer's baked mutter. Mila was
+the brightest of the three auditioned for that (210.6 Hz, where Baye's
+Jessica sits). Nina is the darkest at 181.8 Hz, described as "professional and
+confident, with a calm but steady intonation": a woman giving orders, and the
+furthest of the three from the soft American voice the same body has the
+rest of the time. She is on the fast path (`FAST_WHO`: turbo synthesis, low
+reasoning), because she is reacting. Turbo lists `hr` among Nina's verified
+languages. One synthesis measured 0.74 s.
+
+**Her lines, out loud** (`voice.chloe` in 49-voice.js, `revSay` in
+49-reverse.js). Each of her beats goes up as a key: `on`, `off`, `order`
+(with the order's id), `good`, `slow`, `spank`, `buzz`, `prowl`, `care`. The
+words come back from the service. `/line` refuses `who: 'chloe'` without a
+beat or a question (409), so she is not a second way to talk to anybody. The
+phase-one line is still picked, and it is the caption whenever the line is
+not voiced:
+- **Signed out, voice switched off, or the service slow** (3 s) **or saying
+  no**: the phase-one caption, nothing else.
+- **A service from before Chloe** answered her as Baye, in Baye's voice,
+  which is the body you are in. `/line` now returns `who`. A reply that is
+  not hers is never played, and it latches her off for the page's life: one
+  call, not one a line. Measured with a stub service: one refused, then
+  captions, nothing more sent.
+- **The budget**, because every voiced line is a model call and a synthesis
+  (`CHLOE_SAY`):
+  - The beats that carry the scene (the swap, the swap back, an order, the
+    aftercare) wait only the service's own floor, 3.1 s.
+  - Everything else waits 7 s after her last voiced line, or it is the
+    caption.
+  - 140 voiced lines in any hour, then captions.
+  - One in the air at a time. While she is saying something, a lesser beat is
+    dropped rather than captioned over her.
+  - Server side: `CHLOE_LIMIT` (3 s, 150 an hour, 400 a day per player, 1200
+    a day in all).
+  - Measured at ×1, face down with nobody obeying: eight lines in a minute,
+    six voiced and two captioned.
+- **A reply that lands late** is dropped (`o.still`). That means the order no
+  longer out, the safeword said since, or 8 s gone: a "good girl" eight
+  seconds late is praise for something else.
+- **The swap and the aftercare talk over** whatever is in the air (`cutIn`),
+  as the player's own line does.
+
+**Talking to her.** While the roles are reversed, what you type or say
+(`converse` → `converseChloe`) goes to `/talk` with `who: 'chloe'`. It
+carries the same ticket and the scene block, and her answer comes back
+Croatian with a gloss, in her voice. The ears panel shows both:
+`Chloe · 2.0 m: "Jesi, curo." (Yes, girl.)`. The service refuses Chloe when
+the scene has no swap in it (409, before the ticket is spent). It remembers
+her turns with their gloss, so the next answer is asked for in the same
+shape. "What time is it?" is hers to answer too (`answer`, `ask: 'time'`).
+Once the roles go back, talking goes to Baye again (measured: `/talk` who
+`chloe`, then `baye`).
+
+**The safeword wins over her voice too.** "red" cuts her off mid-word, and a
+line already on its way is never said (`chloeHush` in `revSafe`). Then she
+comes to your head and says the aftercare in her own voice. The roles go back
+after four and a half seconds of her hand and not in the middle of her
+sentence (up to 14 s in all). The aftercare is never refused for coming too
+soon after an order: it waits out the service's floor instead.
+
+**Her lips move** (49-you.js). Her figure carried the v5 jaw's mouth part
+(teeth, tongue) and not the body half, so only her teeth could have moved.
+Her body now has the jaw (`v5Jaw`, the same one Baye, the Bucketeer and the
+diver talk with), held shut unless `voice.saying()` is `'chloe'`, then opened
+by the envelope of her line. Where the meter reads nothing (headless, no
+output device) two crossed beats carry it, as Baye's lips do. Measured
+`gape` 0.6 while she spoke and 0.02 between lines. Photographed from 55 cm
+held at 0, 0.6 and 1: the lips part over her teeth, and at 0 the face is as
+it was. Debug: `__fr.jad.youRaw().gape(k)`.
+
+**Sample lines**, off the real model (`gpt-5.6-luna`, low reasoning), through
+`build_chloe_messages` / `build_chloe_talk_messages` with scene payloads like
+the page's:
+- on: "Moja si, slušaj me." (You're mine, obey me.)
+- order spread, face down: "Raširi noge. Još šire, curo." (Spread your legs.
+  Wider, girl.)
+- order cot, standing: "Na krevet, lezi odmah." (To the cot, lie down now.)
+- good: "Tako, dobra curo, baš si poslušna." (That's it, good girl, very
+  obedient.)
+- slow: "Sporija si nego što glumiš, zaslužila si po guzi." (You're slower
+  than you pretend, you've earned a spanking.)
+- spank, red and stinging: "Ne miči se, ljubavi, još jedna stiže." (Don't
+  move, love, another one's coming.)
+- aftercare: "Gotovo je, tu sam. Bila si hrabra i poslušna." (It's over, I'm
+  here. You were brave and obedient.)
+- off: "Evo te natrag, ljubavi. Baš si mi bila dobra." (There you are, love.
+  You were very good.)
+- the French player: "Raširi noge. Još šire." (Écarte les jambes. Encore
+  plus.); the Croatian player: "Na koljena, curo." (no gloss)
+- "am I in trouble?": "Jesi, curo, dvaput si bila prespora, pa sad pokaži
+  koliko možeš slušati." (Yes, girl, you were too slow twice, so now show me
+  how well you can listen.)
+- "are you spanking me?": "Jesam, ljubavi, tri puta, zadnja je bila najjača."
+  (Yes, love, three times, the last one was the hardest.)
+- "are you okay? that was a lot", in the aftercare: "Jesam, ljubavi, dobro
+  sam, najvažnije mi je jesi li ti dobro." (I am, love, I'm okay, what
+  matters most is whether you're okay.)
+
+Lines took 1.0–3.3 s from the model and answers 1.9–3.5 s.
+
+**Measured in the page** (a stubbed service with a real mp3 of hers, the
+session faked with `__fr.voice.fakeAuth()`; the bodies captured):
+- The swap sent `/line` `{who: "chloe", rev: "on", scene: {roles:
+  "reversed", her: "dwell", rev_heat: 0.2}}`.
+- The order sent `rev: "order", rev_order: "cot"` with `scene.rev_order`.
+- The safeword sent `rev: "care"` with `safeword_by: "you"`,
+  `safeword_of: "rev"` and `rev_care: true`, and nothing was sent after it.
+- `/talk` went out with `who: "chloe"`, the scene and the ticket.
+- Signed out: nothing sent, phase-one captions, the safeword and the swap
+  back as before.
+- Normal roles (the belt and red, the collar and red, flat and three hand
+  spanks 3 of 3, the autonomous mode, 9 and 8) are unchanged.
+- People 100, blockers 820. No console errors. RULE 4: no `rng()` draw
+  added, removed or moved.
+
+**Rough, still:** the 14 s cap on the aftercare means a very slow service
+can still end it under her line. Her face does not turn to you while she
+talks (her head tracking is phase 2c). The buzz line does not name the toy.
+
+Debug: `__fr.voice.chloe()` (what was voiced, captioned, dropped or refused,
+and her last lines), `__fr.voice.fakeAuth(user, base)`,
+`__fr.reverse.state().lines`, `__fr.reverse.said()` (each line with how it
+went out), and `__fr.jad.you().gape`.
+
 ## [1.562.0] — 2026-10-01 (baye 1.54.0)
 
 ### Baye on the playground's kit: the swings, the nest, the seesaw, a trampoline, the slide and the horse

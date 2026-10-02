@@ -11639,6 +11639,11 @@ window.__fr = {
     talk: (buck) => voice.talkState(buck),
     /** What the phase gate in `converse` makes of where you are. */
     where: () => voice.where(),
+    /** Chloe's voiced lines while the roles are reversed (1.563.0). */
+    chloe: () => voice.chloeStats(),
+    /** Debug: take the signed-in branches without a session, for a probe that
+     *  stubs `fetch` and reads the bodies. */
+    fakeAuth: (user, base) => voice.fakeAuth(user, base),
   }),
   /** Who the page thinks you are, asked fresh rather than remembered. */
   who: () => authWhoami(),

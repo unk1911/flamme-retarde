@@ -47,6 +47,9 @@ const YOU = {
   // Where the camera sits above the feet. `GROUND.eye`, and if that moves this
   // moves with it or she stands on the floor with her head through the ceiling.
   eye: 1.66,
+  // How far her jaw opens on the loudest syllable, of the jaw's full drop:
+  // Baye's `SHOW.talkOpen`. Talking is millimetres, not a gape.
+  talkOpen: 0.6,
   // Her colours. Albedos, not pixels — they go through the tone mapper on the
   // way out, so they want to sit below the colour you actually want to see.
   // The cap is aubergine rather than black: in every reference of her it is a
@@ -337,11 +340,18 @@ async function buildYou(scene) {
     // their blink from `v5Blink` on the part that owns the eyeball instead.
     face: !V2,
     ...(V2 ? { parts: look.parts } : {}),
-    uniforms: V2 ? { uSwim, uBelt, uSkin: { value: v5Tex('chloe2_skin') } } : { uSwim, uBelt },
+    // HER JAW, so her lips part when she talks (1.563.0: Chloe has a voice of
+    // her own while the roles are reversed). The same jaw every v5 figure
+    // talks with — `jaw` in v5Parts, `v5Jaw` below — which her mouth part
+    // already carried and her body did not, so only her teeth could have
+    // moved. Held shut (`uGape` 0) unless `voice.saying()` is hers.
+    ...(V2 ? { vdecl: look.jaw.vdecl, vert: look.jaw.bodyVert } : {}),
+    uniforms: V2 ? { uSwim, uBelt, uSkin: { value: v5Tex('chloe2_skin') }, ...look.jaw.uniforms }
+      : { uSwim, uBelt },
     // Declared out here because the body is spliced into main() and GLSL ES 1.0
     // will not take a function inside a function. Everything below is used by
     // the sleeve and the print and by nothing else on this figure.
-    decl: (V2 ? 'uniform sampler2D uSkin;\n' : '') + `
+    decl: (V2 ? 'uniform sampler2D uSkin;\n' + look.jaw.decl : '') + `
       uniform float uSwim;
       uniform float uBelt;
       float youHash(vec3 p) {
@@ -946,10 +956,30 @@ async function buildYou(scene) {
       // one: there base is white, so base * vcol is vcol and mixing vcol with
       // vcol is vcol, whatever cover happens to be.
       base = mix(base * vcol, vcol, cover);
-    `,
+    ` + (V2 ? look.jaw.frag : ''),
   });
   if (!fig) return null;
   if (V2) v5Eyes(fig, look.eye);
+  const jawOk = V2 ? v5Jaw(fig, look.jaw) : false;
+  // Her lips, off the line coming out of the speaker when it is hers — Baye's
+  // rule in `stepShow` (43-jadrija.js): the envelope when the meter reads,
+  // two crossed beats when it cannot (headless, no output device).
+  const lip = { t: 0, peak: 0, k: 0 };
+  function lipTick(dt) {
+    if (!jawOk || lip.hold != null) return;
+    const mine = typeof voice !== 'undefined' && voice.saying && voice.saying() === 'chloe';
+    let want = 0;
+    if (mine) {
+      const lvl = typeof audio !== 'undefined' && audio.voiceLevel ? audio.voiceLevel() : 0;
+      lip.t += dt;
+      lip.peak = Math.max(lip.peak, lvl);
+      const dumb = lip.peak < 0.02 && lip.t > 0.35
+        ? Math.max(0, 0.55 + 0.45 * Math.sin(lip.t * 17.0) * Math.sin(lip.t * 6.3)) : 0;
+      want = Math.max(lvl, dumb) * YOU.talkOpen;
+    } else if (lip.t) { lip.t = 0; lip.peak = 0; }
+    lip.k += (want - lip.k) * (1 - Math.exp(-14 * dt));
+    look.jaw.uniforms.uGape.value = lip.k < 0.002 ? 0 : lip.k;
+  }
 
   fig.play('idle', { fade: 0 });
   const mesh = fig.mesh;
@@ -1262,6 +1292,7 @@ async function buildYou(scene) {
     fig.update(dt);
     if (fig.faceTick) fig.faceTick(dt);
     if (look) v5Blink(look.eye, dt);
+    lipTick(dt);
     if (hi >= 0) {
       fig.boneAt(hi, at);
       head.position.copy(at);
@@ -1381,6 +1412,10 @@ async function buildYou(scene) {
     stats: () => ({ tris: fig.tris, head: hi,
       at: [+mesh.position.x.toFixed(1), +mesh.position.y.toFixed(2),
         +mesh.position.z.toFixed(1)],
-      yaw: +mesh.rotation.y.toFixed(2), visible: mesh.visible }),
+      yaw: +mesh.rotation.y.toFixed(2), visible: mesh.visible,
+      jaw: jawOk, gape: look ? +look.jaw.uniforms.uGape.value.toFixed(3) : null }),
+    /** Debug: hold her jaw open by `k` (0..1) for a photograph, or null to
+     *  let her voice drive it again. */
+    gape: (k) => { lip.hold = k == null ? null : +k; if (look && lip.hold != null) look.jaw.uniforms.uGape.value = lip.hold; return lip.hold; },
   };
 }
