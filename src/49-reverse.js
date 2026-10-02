@@ -47,6 +47,10 @@
 // THE RULES, which are not scored:
 //   - the safeword ("red", "crvena", "stop") ends it at once: she stops, comes
 //     to your head, her hand on your hair, a soft line, and the roles go back;
+//   - HER VOICE (1.563.0): her lines are said in her own voice through the
+//     service when it can (`voice.chloe`, `PERSONA_CHLOE`, Nina), the
+//     phase-one captions when it cannot; what you say goes to her, not Baye
+//     (`converseChloe`); and the safeword cuts her off mid-word;
 //   - "reverse roles" again swaps back; so does leaving the room, the ground,
 //     or any skip key;
 //   - never outside the kabina, never the belt or the collar (refused while
@@ -164,6 +168,8 @@ const rev = {
   dom: { on: true, next: 0, order: null, obey: 0, miss: 0, streak: 0, heat: REV.heatRest, punish: 0,
     lastLine: -1e9, last: [], moved: 0, stillFrom: null, decisions: 0 },
   care: null, jolt: 0, trace: [], hud: null, hudWas: '', slaps: 0, log: [],
+  // How her lines went out (1.563.0): 'voice' | 'caption' | 'drop', counted.
+  said: {},
 };
 const _rvA = new THREE.Vector3(), _rvB = new THREE.Vector3(), _rvQ = new THREE.Quaternion();
 const _rvF = new THREE.Vector3(), _rvU = new THREE.Vector3(), _rvH = new THREE.Vector3();
@@ -173,21 +179,57 @@ function revActive() { return !!rev.on; }
 function revOwnsYou() { return !!rev.on; }
 /** The person Baye is with while the roles are reversed: Chloe. */
 function revWho() { return rev.on ? { x: rev.ch.x, y: rev.ch.y, z: rev.ch.z } : null; }
-function revScene() { return rev.on ? { roles: 'reversed' } : null; }
+/**
+ * The scene block's part of this (`sceneTalk` in 90-app.js): the swap, and
+ * since 1.563.0 Chloe's side of it for her own voice on the service — the
+ * order out, kept and missed, her heat, the aftercare. Keys and numbers only.
+ */
+function revScene() {
+  if (!rev.on) return null;
+  const D = rev.dom, o = { roles: 'reversed' };
+  if (D.order) o.rev_order = D.order.id;
+  if (D.obey) o.rev_obey = D.obey;
+  if (D.miss) o.rev_miss = D.miss;
+  o.rev_heat = +D.heat.toFixed(2);
+  if (rev.care) o.rev_care = true;
+  return o;
+}
 
 function revLang() { return typeof LANG !== 'undefined' ? LANG : 'en'; }
-function revSay(kind, force = false, line = null) {
+/**
+ * A line of hers. Since 1.563.0 it is SAID, in her own voice, when the voice
+ * service can (`voice.chloe` in 49-voice.js: the beat goes up as a key and
+ * the words come back from `PERSONA_CHLOE`, Croatian with a gloss). The
+ * phase-one line is still picked here, and it is the caption whenever the
+ * line is not voiced: signed out, too soon after the last one, the service
+ * slow or saying no. `o.order` is the order a beat is about; `o.still()`
+ * whether a reply that lands late is still worth saying.
+ */
+function revSay(kind, force = false, line = null, o = {}) {
   const L = line ? [line] : REV_SAY[kind];
   if (!L || !L.length) return null;
   if (!force && rev.clock - rev.dom.lastLine < REV.lineGap) return null;
   const l = L[Math.floor(Math.random() * L.length)];
   rev.dom.lastLine = rev.clock;
   const g = revLang() === 'fr' ? l[2] : revLang() === 'hr' ? '' : l[1];
-  if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub('Chloe: ' + l[0], 3.2, g || '');
-  rev.log.push([+rev.clock.toFixed(1), l[0]]);
+  const cap = () => {
+    if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub('Chloe: ' + l[0], 3.2, g || '');
+  };
+  const V = typeof voice !== 'undefined' && voice && voice.chloe
+    ? voice.chloe(kind, Object.assign({ fallback: cap }, o)) : 'caption';
+  if (V === 'caption') cap();
+  rev.said[V] = (rev.said[V] || 0) + 1;
+  rev.log.push([+rev.clock.toFixed(1), l[0], V]);
   if (rev.log.length > 40) rev.log.shift();
   return l[0];
 }
+/** Whether a beat's reply is still worth saying when it lands. */
+const revStill = {
+  dom: () => rev.on && !rev.care,
+  order: (O) => () => rev.on && !rev.care && rev.dom.order === O,
+  care: () => true,
+  off: () => !rev.on,
+};
 function revTrace(e) {
   e.t = +rev.clock.toFixed(1);
   rev.trace.push(e);
@@ -306,7 +348,7 @@ function revOn(src = 'typed') {
   jadrija.ride({ x: Y.x, z: Y.z, yaw: r.yaw, sp: 0 });
   revDriveChloe(0);
   revTrace({ pick: 'SWAPPED', why: src, ctx: v.ctx, phase: v.phase });
-  revSay('on', true);
+  revSay('on', true, null, { still: revStill.dom });
   revHud();
   return 'on';
 }
@@ -331,7 +373,10 @@ function revOff(why = 'asked') {
   if (you) you.drive(null);
   rev.care = null;
   revTrace({ pick: 'SWAPPED BACK', why });
-  if (why === 'asked') revSay('off', true);
+  // Walked out, or a key that puts you somewhere else: her line stops with
+  // the game. Her aftercare line ('safe') is left to finish.
+  if (why === 'left' && typeof voice !== 'undefined' && voice && voice.chloeHush) voice.chloeHush();
+  if (why === 'asked') revSay('off', true, null, { still: revStill.off });
   revHud();
   return 'off';
 }
@@ -339,6 +384,9 @@ function revOff(why = 'asked') {
 /** The safeword: she stops, comes to you, her hand in your hair — then back. */
 function revSafe(who = 'you') {
   if (!rev.on) return 'not on';
+  // Whatever she was saying stops mid-word, and what she was about to say is
+  // never said: the safeword wins over her voice too (1.563.0).
+  if (typeof voice !== 'undefined' && voice && voice.chloeHush) voice.chloeHush();
   if (typeof audio !== 'undefined' && audio && audio.herHush) audio.herHush('safe');
   if (typeof sceneSafe === 'function') sceneSafe(who, 'rev');
   rev.dom.order = null;
@@ -719,7 +767,7 @@ function revArmTick(dt) {
   if (A.ph === 'wind') {
     const e = u(A.t / R.wind), s = e * e * (3 - 2 * e);
     A.A = A.base + R.windA * s; A.E = A.baseE + R.windE * s;
-    if (A.t >= R.wind) { A.ph = 'strike'; A.t = 0; if (Math.random() < 0.6) revSay('spank'); }
+    if (A.t >= R.wind) { A.ph = 'strike'; A.t = 0; if (Math.random() < 0.6) revSay('spank', false, null, { still: revStill.dom }); }
     return;
   }
   if (A.ph === 'strike') {
@@ -809,7 +857,7 @@ function revOrder(id, why = 'mood') {
   const r = jadrija.rideFrom();
   rev.dom.order = { id, t0: rev.clock, held: 0, start: r ? [r.x, r.z] : null, phase: v ? v.phase : null };
   rev.dom.moved = 0;
-  revSay(null, true, O.say);
+  revSay('order', true, O.say, { order: id, still: revStill.order(rev.dom.order) });
   revTrace({ pick: 'order:' + id, why, ctx: v ? v.ctx : null, heat: +rev.dom.heat.toFixed(2) });
   revHud();
   return true;
@@ -848,12 +896,12 @@ function revOrderEnd(kept, why) {
     D.obey++; D.streak++;
     D.heat = Math.min(1, D.heat + 0.08);
     D.punish = 0;
-    revSay('good', true);
+    revSay('good', true, null, { order: id, still: revStill.dom });
     D.next = rev.clock + 2.2 + Math.random() * 2;
   } else {
     D.miss++; D.streak = 0;
     D.punish = 1;
-    revSay('slow', true);
+    revSay('slow', true, null, { order: id, still: revStill.dom });
     D.next = rev.clock + 1.4;
   }
   revTrace({ pick: (kept ? 'kept:' : 'ignored:') + id, why, heat: +D.heat.toFixed(2), obey: D.obey, miss: D.miss });
@@ -919,7 +967,7 @@ function revDecide() {
     const k = toys[Math.floor(Math.random() * toys.length)];
     const secs = 5 + Math.round(6 * D.heat);
     const r = jadrija.signal ? jadrija.signal(k, true, secs) : 'none';
-    revSay('buzz', true);
+    revSay('buzz', true, null, { still: revStill.dom });
     revTrace({ pick: 'buzz:' + k, why: String(r) + ' ' + secs + ' s | alt: ' + alt });
   } else {
     // Round you, to a new place to watch you from.
@@ -932,7 +980,7 @@ function revDecide() {
       const P = revBone('pelvis', new THREE.Vector3());
       rev.ch.face = P || new THREE.Vector3(r.x, r.y, r.z);
     }
-    if (Math.random() < 0.4) revSay('prowl');
+    if (Math.random() < 0.4) revSay('prowl', false, null, { still: revStill.dom });
     revTrace({ pick: 'prowl', why: 'alt: ' + alt });
   }
   return pick.id;
@@ -1051,11 +1099,14 @@ function revCareTick(dt, v) {
       }
     }
   }
-  if (!K.said && K.t > 0.4) { K.said = true; revSay('care', true); }
+  if (!K.said && K.t > 0.4) { K.said = true; revSay('care', true, null, { still: revStill.care }); }
   if (K.go && revAt() && rev.arm.mode !== 'care') { rev.arm.mode = 'care'; rev.arm.lift = 0; K.handAt = K.t; }
   if (rev.arm.mode === 'care' && jadrija.petTouch) jadrija.petTouch(Math.min(1, (K.t - K.handAt) / 0.8));
-  // Four and a half seconds of her hand, then the roles go back.
-  if ((K.handAt != null && K.t - K.handAt > 4.5) || K.t > 12) {
+  // Four and a half seconds of her hand, then the roles go back — and not in
+  // the middle of her saying it's over (1.563.0: her line is a round trip
+  // now, a second or three), up to fourteen seconds in all.
+  const talking = typeof voice !== 'undefined' && voice && voice.chloeBusy && voice.chloeBusy();
+  if ((K.handAt != null && K.t - K.handAt > 4.5 && !talking) || K.t > 14) {
     rev.arm.mode = null;
     revOff('safe');
   }
@@ -1201,6 +1252,7 @@ const revApi = {
         hand: (() => { const h = revHand(new THREE.Vector3()); return h ? h.toArray().map((x) => +x.toFixed(3)) : null; })(),
         tgt: rev.arm.tgt ? rev.arm.tgt.toArray().map((x) => +x.toFixed(3)) : null },
       spot: rev.spotDbg || null, slaps: rev.slaps, gap: +revGap().toFixed(2), looking: rev.on ? revLooking() : null,
+      lines: Object.assign({}, rev.said),
       cam: camera.position.toArray().map((x) => +x.toFixed(3)),
       eye: H ? H.eye.toArray().map((x) => +x.toFixed(3)) : null,
       walker: ground && ground.you ? [+ground.you.x.toFixed(2), +ground.you.z.toFixed(2)] : null };
