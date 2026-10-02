@@ -79,6 +79,17 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    The player's commands stay multilingual (en/hr/fr). Bathers, the cat, the Bucketeer, TV news
    and overheard chatter stay Croatian. Runs right after 6b (Chloe's English) merges, BEFORE
    item 10 so the wand's lines are written in English; in parallel with item 9.
+12. [ ] **Spooning on the cot (reverse roles)** (Misha, 06:40: "at certain intimate moments of
+   show of affection ... Chloe could slide in lay on the cot next to baye (baye being in fetal
+   pose) and spoon ... ultimately we are in love"). Player-Baye curled on her side (fetal; find
+   or solve the pose); Chloe climbs onto the cot behind her and lies along her back: arm over
+   her waist, hand finding hers, face nuzzled at the neck, a kiss on the shoulder, breathing
+   that slowly syncs (chest rise), a soft English line; hold until the player moves/asks/time.
+   NO hip thrusts or grinding while pressed together (Misha asked for "very slight hip
+   thrusts" — declined; the cuddle only). Selector: after aftercare / a run of obeyed orders /
+   praise; asks "spoon me", "cuddle me", "hold me", "zagrli me u krevetu"; a key. Bodies must
+   not interpenetrate (measure gaps); the cot holds both (AVBD/mattress lift as relevant).
+   Starts when item 9 or 11 lands (not parallel with item 10 if both touch 49-revmoves).
 10. [ ] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
    which can be used in place of the lovense or plug ... it can go into either hole, for a more
    intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
