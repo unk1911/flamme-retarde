@@ -8,6 +8,135 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [Unreleased] — 2026-10-02
+
+### The yard's furniture at full resolution: rattan chairs, the moulded table, the lounger, the gate
+
+Misha, standing in the yard behind the vikendica: *"enhance the low-poly
+backyard area ... the chairs, the tables, etc, look way too low-poly, would be
+nice to make those higher poly too"*.
+
+These were the last boxes on the plot. The chairs were twelve prisms in a
+ring on four square sticks. The table was a slab on four sticks. The lounger
+was eleven planks laid in steps, with its blue bands on separate planks a
+centimetre over them. The gate was five flat bars. Everything is rebuilt off
+the loggia photograph of 18 Aug (`vacay_house/1st/… terrace - front.jpeg`),
+which shows the table and two of the chairs from the kitchen door. Geometry
+is in `tools/blender/vikendica.py` only. No runtime code changed.
+
+**The wicker chairs** (`wicker_chair`, three in the loggia):
+
+- **The tub** is woven cane. It is round at the back and near straight down
+  the sides, 13 cm over the seat at the arms and 33 cm at the back. It is
+  drawn in at the seat, flared at the top and raked back. It is one sheet
+  64 × 12 faces, 11 mm thick.
+- **The seat** is woven the same, 20 × 20, with a 1 cm dish. Its front
+  edge is rolled down over the front rail.
+- **The weave** is the 4 cm basket check from the photograph, made two
+  ways. Each 2 × 2 block of faces is a pillow, lifted 1.8 mm. Each face has
+  its own flat colour (`_basket`): blocks of strands running across
+  alternate with blocks running up, the up ones a shade darker, and each
+  block varies a little off `_hash3`.
+- **The binding**: cane wrapped round the hoop at the top, down both front
+  edges of the tub, and along the seat's roll. These are tubes re-cut into
+  square faces and painted on the diagonal, so the wrap reads as a helix
+  (`_bound`).
+- **The frame** is 22 mm anthracite tube (`WICKER_STEEL`, as filmed; it was
+  the lounger's aluminium grey).
+  - The front legs run up past the seat corners into the arms and turn back
+    into the hoop. That is the dark curl at the front of each arm in the
+    photograph.
+  - The back legs are one U bowed under the seat, splayed out behind.
+  - Two side rails and a bowed front rail.
+  - Four plastic glides.
+- Same seat height (44 cm), same places and yaws. They still clear the
+  table's legs and its X pushed in: 1.5–4.5 cm at the closest.
+
+**The patio table** (`patio_table`):
+
+- **The top** is a rounded rectangle (7.5 cm corners) with a 5 cm rolled
+  lip. The field is moulded 2.5 mm down inside a flat border, and the
+  parasol hole in the middle has a collar.
+- **Under it**: a shallow apron, then four tapered legs of rounded square
+  section with sockets under the top and glides on the feet. An X of ribs
+  runs from the legs to a hub under the hole, as in the photograph.
+- The top is still at 72 cm, on the same 112 × 70 footprint. The legs moved
+  out to 7.5 cm from the ends and 6 cm from the long edges, so the chairs'
+  frames clear them.
+- **The ashtray on it** is a 48-sided turned tin with three rests dipped
+  into the rim. It was a 12-sided drum.
+
+**The sun lounger** (`sun_lounger`):
+
+- **The sling** is one sheet over the bend at the hinge. It sags 1.6 cm
+  between the rails and is striped down its length: navy hems, white, blue
+  and pale blue. All of this is one object, the stripes being corner
+  colour.
+- **The frame**:
+  - a full-length loop of tube, rounded at the corners;
+  - the backrest's own U, with hinge bosses;
+  - a prop sitting in a notched rack;
+  - a U leg at each end;
+  - two wheels at the head end.
+- Same place, length, width and sling height (34.6 cm).
+
+**The gate** (`steel_gate`):
+
+- The frame is 40 box section with rolled corners. The top and bottom rails
+  were missing; it had only the stiles.
+- The five bars are round bar.
+- It hangs on two barrel hinges.
+- On the free stile: a lever latch on a boss, both faces, and a drop bolt
+  with its keepers.
+
+**The loggia's ceiling lamp** (`bulkhead`) is now the fitting `wall_lamp`
+draws by the two outside doors, turned to face the floor: a superelliptic
+plate, the opal and the cage. It was a bevelled box and a ball of four rows.
+
+No RNG or FRNG draw was added or removed. Every variation is off a hash, so
+nothing baked after the yard moves. The rebake is byte-stable (two bakes,
+identical md5). Only `vikendica_shell` changes; the loft variant is the same
+bytes.
+
+| piece | faces each, after |
+|---|---|
+| wicker chair (shell + seat + binding / frame / glides) | 4,220 / 1,720 / 200 |
+| patio table (+ hole and glides) | 904 + 226 |
+| ashtray | 338 |
+| lounger (sling / frame / wheels and glides) | 2,586 / 1,240 / 432 |
+| gate | 742 |
+| ceiling lamp | 910 |
+
+- **Payload**: `vikendica_shell` goes from 488,066 to 536,214 tris
+  (+48k) and from 887.1 to 1,008.4 KB (+121 KB). Most of that is the
+  chairs: a colour per face splits the vertices wherever a strand changes
+  tone. The page goes from 42,562,185 to 42,727,737 bytes (+162 KB).
+- **Frame rate**, headless on the 4090, A/B against the 1.576.0 build,
+  served side by side, two passes each, fps:
+
+  | view | before | after |
+  |---|---|---|
+  | his view | 40, 37 | 41, 40 |
+  | loggia | 40, 42 | 40, 39 |
+  | table | 45, 40 | 42, 41 |
+  | wide from the bank | 37, 35 | 32, 34 |
+
+  That is within run-to-run noise. The wide view is the only one that may
+  be 2–3 fps down.
+- No console errors.
+
+**Found, not changed (ask):**
+
+- **The yard's paving does not show at grade.** From the bank, the
+  flagstones laid by `yard()` between the two retaining walls are under the
+  Jadrija ground. The yard reads as orange earth and gravel, with only the
+  two loggia step treads in stone. It is the terrain, not the bake.
+- **The rubble walls are coursed boxes.** From his spot they read as
+  brickwork, not laid limestone. They draw from RNG, so reshaping the
+  stones has to keep the draw order (the `_burn_bed` pattern).
+- **Still no planting.** The same photograph shows bamboo behind the
+  loggia, as 1.576.0 noted with the fig.
+
 ## [1.576.0] — 2026-10-02
 
 ### The vikendica's bojler and WC at full resolution, and the outside weathered, shaded and tiled
