@@ -259,6 +259,8 @@ function revScene() {
   if (typeof rvmScene === 'function') rvmScene(o);
   // Her fist in your hair, or you drawn in to her side (1.574.0).
   if (typeof rvhScene === 'function') rvhScene(o);
+  // Her mood, and what you last begged for (1.583.0).
+  if (typeof rmoodScene === 'function') rmoodScene(o);
   return o;
 }
 
@@ -274,12 +276,19 @@ function revLang() { return typeof LANG !== 'undefined' ? LANG : 'en'; }
  */
 function revSay(kind, force = false, line = null, o = {}) {
   const L = line ? [line] : REV_SAY[kind];
-  if (!L || !L.length) return null;
+  const moodL = !line && typeof rmoodLine === 'function';
+  if (!moodL && (!L || !L.length)) return null;
   if (!force && rev.clock - rev.dom.lastLine < REV.lineGap) return null;
   // English since 1.569.0: a line is one string, and the caption is it. A
   // table entry still written the old way ([hr, en, fr]) speaks its English.
-  let l = L[Math.floor(Math.random() * L.length)];
+  // Since 1.583.0 the line is picked in her mood (`rmoodLine`: stern, warm,
+  // excited or neutral) and never one of the last dozen she said; an order
+  // keeps its words whole, with a word of her mood before or after it.
+  let l = moodL ? rmoodLine(kind) : L[Math.floor(Math.random() * L.length)];
+  if (l == null) return null;
   if (Array.isArray(l)) l = l[1] || l[0];
+  if (line && kind === 'order' && typeof rmoodOrderLine === 'function') l = rmoodOrderLine(l);
+  if (typeof rmoodSaid === 'function') rmoodSaid(l);
   rev.dom.lastLine = rev.clock;
   const cap = () => {
     if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub('Chloe: ' + l, 3.2, '');
@@ -412,6 +421,8 @@ function revOn(src = 'typed') {
   Object.assign(rev.arm, { mode: null, ph: 'idle', t: 0, w: 0, lift: 0, n: 0, posed: false });
   if (typeof rvmClear === 'function') rvmClear();
   if (typeof rvtClear === 'function') rvtClear();
+  // Her mood starts where it starts (1.583.0, src/49-revmood.js).
+  if (typeof rmoodReset === 'function') rmoodReset();
   Object.assign(rev.dom, { on: rev.dom.on, next: rev.clock + 3.0, order: null, obey: 0, miss: 0, streak: 0,
     heat: REV.heatRest, punish: 0, last: [], moved: 0, stillFrom: null });
   // You into her: the walker where she stands, looking where she looks.
@@ -481,6 +492,8 @@ function revSafe(who = 'you') {
   // And the toys (1.567.0): a draw stops where it is and goes back to its
   // seat, her hand comes off it, and her remote switches off.
   if (typeof rvtSafe === 'function') rvtSafe();
+  // And her mood (1.583.0): no sternness, no excitement, no beg owed — care.
+  if (typeof rmoodSafe === 'function') rmoodSafe();
   revTrace({ pick: 'SAFEWORD', why: who });
   revHud();
   return 'stopped';
@@ -505,6 +518,10 @@ function revWords(text) {
   if (!rev.on) return null;
   if (/^((swap|switch|change) (us )?back|(back to )?normal( roles)?|roles? back|end (the )?(role )?swap|vrati(mo)? (nas|uloge)|vratimo se|remets? (les )?roles)$/.test(t)) return 'rev.off';
   if (typeof autoSafeword === 'function' ? autoSafeword(text) : /^(red|crvena|stop)$/.test(t)) return 'rev.safe';
+  // Begging her (1.583.0, src/49-revmood.js): "spank me", "harder", "whip
+  // me", "punish me", "pull my hair", "pull my collar" — in a sentence.
+  const bw = typeof rmoodWords === 'function' ? rmoodWords(t) : null;
+  if (bw) return bw;
   // Her belt and the collar (1.564.0), asked for — or asked to put away.
   if (/^((put |take )?(your |the )?belt (back|away)( on)?|belt back|(vrati|stavi) (si )?remen|remen natrag|remets? (ta )?ceinture)$/.test(t)) return 'rev.beltback';
   if (/^((please )?(use |get |take off |take out )?(your |the |a )?belt( on me| please)?|belt me|whip me( with (your|the) belt)?|(uzmi |daj )?(svoj )?remen|remenom|(prends |utilise )?(ta |la )?ceinture)$/.test(t)) return 'rev.belt';
@@ -584,6 +601,11 @@ function revAct(name) {
     const r = revSafe('you');
     return { ok: r === 'stopped', label: 'red — Chloe stops, comes to you, and the roles go back' };
   }
+  if (name.startsWith('rev.beg:') && typeof rmoodBeg === 'function') return rmoodBeg(name.slice(8));
+  // Asked for her belt, the collar or her fist in your hair the plain way:
+  // it stirs her too, if less than begging (1.583.0).
+  if ((name === 'rev.belt' || name === 'rev.collar' || name === 'rev.hair:pull') && !rev.care
+    && typeof rmoodExcite === 'function') rmoodExcite(0.3, 'asked: ' + name.slice(4));
   if ((name === 'rev.belt' || name === 'rev.beltback' || name === 'rev.collar' || name === 'rev.uncollar')
     && typeof rvkAsk === 'function') {
     return rvkAsk(name.slice(4));
@@ -919,7 +941,8 @@ function revOrderTick(dt, v) {
   const ok = v && revKept(O, v, rev);
   Ord.held = ok ? Ord.held + dt : 0;
   if (Ord.held >= REV.hold) return revOrderEnd(true, 'kept');
-  const wait = O.wait || REV.orderWait;
+  // Sterner, less time (1.583.0): 12.5 s at her gentlest, 7.5 at her sternest.
+  const wait = +((O.wait || REV.orderWait) * (typeof rmoodWaitK === 'function' ? rmoodWaitK() : 1)).toFixed(1);
   if (age > wait) revOrderEnd(false, 'not done in ' + wait + ' s');
 }
 
@@ -934,6 +957,9 @@ function revOrderEnd(kept, why) {
     revHud();
     return;
   }
+  // Her mood (1.583.0): sterner for a miss, and more for a run of them;
+  // softer and warmer for each kept.
+  if (typeof rmoodKept === 'function') { if (kept) rmoodKept(id, D.streak + 1); else rmoodMissed(id); }
   if (kept) {
     D.obey++; D.streak++;
     D.heat = Math.min(1, D.heat + 0.08);
@@ -960,6 +986,9 @@ function revToys() {
 function revDecide() {
   const D = rev.dom, v = revView();
   D.decisions++;
+  // A beg of yours she owes you first (1.583.0, `rmoodBegDecide`).
+  const bg = typeof rmoodBegDecide === 'function' ? rmoodBegDecide(v) : null;
+  if (bg) { revTrace({ pick: bg, ctx: v ? v.ctx : null, heat: +D.heat.toFixed(2) }); return bg; }
   // Her belt and the collar first (1.564.0, `rvkDecide`): off, on, a round of
   // the belt, and all she does with you on the leash.
   const kit = typeof rvkDecide === 'function' ? rvkDecide(v) : null;
@@ -1010,22 +1039,29 @@ function revDecide() {
     const c = cands.find((x) => x.id === want);
     if (c) c.s *= 3;
   }
+  // Her mood on all of it (1.583.0, `rmoodWeight`): stern, more spanks,
+  // orders, the hair and holding you down; warm, her hand in your hair, the
+  // hug and the spoon; excited, more of everything with energy in it.
+  if (typeof rmoodWeight === 'function') for (const c of cands) c.s *= rmoodWeight(c.id);
   const tot = cands.reduce((a, c) => a + c.s, 0);
   let x = Math.random() * tot, pick = cands[cands.length - 1];
   for (const c of cands) { x -= c.s; if (x <= 0) { pick = c; break; } }
   const alt = cands.slice().sort((a, b) => b.s - a.s).slice(0, 4).map((c) => c.id + ' ' + c.s.toFixed(2)).join(', ');
   D.last.push(pick.id.replace(/^(order|move):/, ''));
   if (D.last.length > 8) D.last.shift();
-  D.next = rev.clock + REV.gap[0] + (REV.gap[1] - REV.gap[0]) * Math.random();
+  const gk = typeof rmoodGapK === 'function' ? rmoodGapK() : 1;
+  D.next = rev.clock + (REV.gap[0] + (REV.gap[1] - REV.gap[0]) * Math.random()) * gk;
   if (pick.id.startsWith('order:')) {
     revOrder(pick.id.slice(6), 'alt: ' + alt);
     D.next = rev.clock + REV.orderWait + 1;
   } else if (pick.id === 'spank') {
-    const n = D.punish ? 2 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * (1 + D.heat * 3));
-    const r = revSpankRound(Math.min(4, n), (D.punish ? 'punishment' : 'mood') + ' | alt: ' + alt);
+    const n0 = D.punish ? 2 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * (1 + D.heat * 3));
+    // More the sterner or more excited she is, fewer the gentler (1.583.0).
+    const n = typeof rmoodSpanks === 'function' ? rmoodSpanks(Math.min(4, n0), !!D.punish) : Math.min(4, n0);
+    const r = revSpankRound(n, (D.punish ? 'punishment' : 'mood') + ' | alt: ' + alt);
     D.punish = 0;
     if (r !== true) revTrace({ pick: 'spank:' + r });
-    D.next = rev.clock + 4 + n * 1.2;
+    D.next = rev.clock + (4 + n * 1.2) * Math.min(1, gk + 0.2);
   } else if (pick.id.startsWith('move:')) {
     const r = rvmStart(pick.id.slice(5), 'mood | alt: ' + alt);
     if (r !== true) revTrace({ pick: pick.id + ':' + r });
@@ -1135,6 +1171,8 @@ function revTick(dt) {
   // ── Chloe ──
   revSteer(dt);
   revArmTick(dt);
+  // Her mood a frame (1.583.0): the waves of her excitement, her sternness easing.
+  if (typeof rmoodTick === 'function') rmoodTick(dt);
   if (rev.care) { revCareTick(dt, v); if (!rev.on) return; }
   else {
     rev.dom.heat += (REV.heatRest - rev.dom.heat) * (1 - Math.exp(-dt / REV.heatTau));
@@ -1350,6 +1388,7 @@ const revApi = {
         err: +rev.arm.err.toFixed(3), n: rev.arm.n,
         hand: (() => { const h = revHand(new THREE.Vector3()); return h ? h.toArray().map((x) => +x.toFixed(3)) : null; })(),
         tgt: rev.arm.tgt ? rev.arm.tgt.toArray().map((x) => +x.toFixed(3)) : null },
+      mood: typeof rmoodApi !== 'undefined' ? rmoodApi.state() : null,
       spot: rev.spotDbg || null, slaps: rev.slaps, gap: +revGap().toFixed(2), looking: rev.on ? revLooking() : null,
       lines: Object.assign({}, rev.said),
       cam: camera.position.toArray().map((x) => +x.toFixed(3)),

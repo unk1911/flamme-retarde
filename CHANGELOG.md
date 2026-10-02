@@ -8,6 +8,190 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.583.0] — 2026-10-02 (baye 1.70.0)
+
+### Roles reversed: Chloe has a mood, and you can beg her
+
+Misha: *"the dialogue needs to be more interesting/kinda random/ chloe is
+disciplining baye, which is good, but if baye is not obeying, chloe has to
+progressively become more stern, and deliver more spanks/slaps, and collar
+pulls or what nots, and then if baye please her then chloe should
+progressively cool off and become gentler with baye, but baye should always be
+allowed to ask chloe to spank her or to do whatever, especially begging to be
+spanked, whipped, disciplined, and chloe then gets excited and does it and
+says some random shit and that excitement should go in waves."*
+
+It's the same consensual kabina play between the same two adults as
+1.561.0–1.582.0, and the safeword still ends all of it. No new act was added.
+What changed is how she chooses among the things she already does. The new
+file is `src/49-revmood.js`, with hooks in 49-reverse.js, 49-revkit.js,
+49-revmoves.js, 49-revpull.js and 49-voice.js.
+
+**Her mood is three values, all state.**
+- **Stern**, from 0 to 1, rises with every order you leave undone: +0.16, and
+  +0.05 more for each miss in a row before it. It holds for 25 s after the
+  last miss, so it only climbs while you keep defying her. After that it
+  eases back toward where she started (0.22, τ 70 s). Each order you keep
+  takes off 0.10, plus 0.03 for each one in a run.
+- **Warm**, from 0 to 1, rises as you please her and drops 0.22 for a miss.
+  The warmth she shows is `warm × (1 − stern)`.
+- **Excitement**, from 0 to 1, comes only from begging, and it comes in waves.
+  Each beg fills a reservoir (`drive`), and a wave starts at once:
+  - it **rises** in about a second;
+  - it **rides** for 7–14 s, with a wobble on top;
+  - it **ebbs** over a few seconds;
+  - after a **lull** of 6–16 s it **surges** again on its own, a little lower
+    each time, until the reservoir is spent.
+
+  Begging again mid-wave raises the wave and lengthens it. Excitement and
+  sternness are separate values, so begging excites her even when she is
+  gentle or stern. Her heat (`rev.dom.heat`) is now her base heat plus 0.55 of
+  her excitement. Everything that already read her heat therefore rides the
+  waves too: the hair, the hip tease, the toys, the force of a slap and the
+  belt's charge.
+
+**What reads her mood:**
+- **Her picks.** Each candidate's weight gets a multiplier (`rmoodWeight`):
+  - stern: more spanks, orders, hair pulls and holding you down, and less of
+    the stroke, hug and spoon;
+  - gentle: her hand in your hair, the hug, the spoon and sitting by you, with
+    spanks halved;
+  - excited: spanks, the hair, the toys and the hip tease.
+- **Slaps a round** (`rmoodSpanks`). Her heat sets the count as before. On
+  top of that, a punishment round adds up to +4 at full sternness and any
+  other round up to +2. Excitement adds up to +2. A gentle round loses one or
+  two. The cap is 8 by hand and 6 with the belt.
+- **How hard** (`rmoodForce`). Stern adds up to +4, gentle takes off up to 4,
+  and a "harder" beg adds 4. Force stays between 6 and 20. The belt's charge
+  follows the same rule.
+- **How long she waits** for an order to be kept: 12.5 s at her gentlest,
+  7.5 s at her sternest (`rmoodWaitK`). She also decides again sooner when
+  stern or excited and later when warm (`rmoodGapK`).
+- **The collar.** When she is stern she puts it on sooner and more often, and
+  her tugs come more often and harder (`rmoodCollarP`, `rmoodTugK`). Her
+  fist in your hair is now discipline too: sternness raises her want for it
+  (`rmoodHairEx`).
+
+**Begging.** You can beg at any time and at any mood. Begs are matched in a
+sentence of up to twelve words, not only as the whole line, so "please chloe
+spank me harder" counts. A question ("did you spank me") or a "don't" does
+not count. The words, in English, Croatian and French:
+- "spank me", "please spank me", "I need a spanking", "udari me", "daj mi po
+  guzi", "fesse-moi";
+- "harder", "more", "again", "još", "encore", plus "jače" and "plus fort"
+  unless her remote is on a toy of yours (then they are her remote's);
+- "whip me", "use your belt on me", "išibaj me", "fouette-moi";
+- "punish me", "discipline me", "I've been bad", "kazni me", "punis-moi";
+- "pull my hair", "povuci me za kosu", "tire-moi les cheveux";
+- "pull my collar", "tug my leash", "povuci mi ogrlicu", "tire sur mon
+  collier".
+
+When you beg she gets excited, says yes, and lets go of any order she had
+out. Then she does it, and more than you asked:
+- **A spanking**: 3–4 slaps, plus up to 2 for her excitement and up to 2 for
+  her sternness. "Harder" also adds force.
+- **The belt**: off her jeans first if it isn't in her hand.
+- **Your hair**: her fist in it.
+- **The collar**: a tug, then a second one 3.5 s later. If the collar isn't on
+  you, she puts it on.
+- If she can't reach you for it (on your back, on your side, sitting), she has
+  you roll onto your tummy for it first. If the leash is in her hand, she
+  takes the collar off to free her hand.
+
+The words `use the belt`, `collar me` and `pull my hair` still work as before,
+and now stir her a little as well.
+
+**Her lines.** There are about two hundred new lines, in pools by tone (stern,
+warm, excited, neutral) for these beats: good, slow, spank, belt, prowl, on,
+buzz, remote, hold, grip, stroke, wait, hair, tug, lead and circle. There are
+also new beats:
+- `beg`, with lines for each kind of beg;
+- `surge`, when a wave comes back on its own;
+- `sterner`, when she crosses into stern, at most once a minute;
+- `soften`, when she cools off after being stern.
+
+In a mood she picks from that tone's pool three times in four. She never
+repeats one of her last fourteen lines. An order keeps its own words, with a
+word of her mood before or after it: "I said... on your tummy, babe. Go." /
+"Both legs up. Higher. Good girl." The service line for each beat comes from
+the model. The page sends the mood with it in the scene: `rev_mood`,
+`rev_stern`, `rev_warm`, `rev_excite` and `rev_beg`. Nothing about mood is
+sent during the aftercare.
+
+**Her voice** (`server/baye/baye.py` 1.70.0, **needs deploying on mpcn0**):
+- `PERSONA_CHLOE` now describes her moods. It says stern is never cruel or
+  contemptuous, and that the aftercare wins over whatever her mood was.
+- New beats in `CHLOE_BEAT`: `beg` (it names what was begged for), `surge`,
+  `sterner` and `soften`.
+- `REV_BEG` and `REV_MOOD` give each mood key its words and its MOOD tone
+  line.
+- `clean_scene` checks the five new keys: the two names against their tables,
+  the three numbers clamped to 0..1. All five are dropped unless the roles
+  are reversed. A hostile payload (`rev_mood: "evil"`, `rev_beg: "kill"`,
+  `rev_stern: 5`) comes out as nothing, nothing and 1.
+- The mood and the beg are left out during the aftercare.
+- The 1.67.0 refusal swap (a short sound of hers) is untouched.
+
+Until baye.py is deployed, the page's own lines are the captions. An old
+service answers the new beats with a 409, which falls back to the caption and
+does not switch her voice off.
+
+**Measured** (worktree build, headless, `?jadrija&nointro`, face down on the
+cot, her selector on; a debug bot either left every order undone or kept it
+1.5 s in):
+- **Defying.** Stern by miss: 0.22 → 0.38 → 0.59 → 0.76. In the second run of
+  misses it went 0.89 → 1.00 and stayed there. Her wait went from 10.4 s to
+  7.5 s. Rounds while defied: 5, 5, 6, 6, 6, 7 slaps (punishment rounds, and
+  belt rounds), mean 5.7.
+- **Obeying.** Four orders kept took stern from 0.71 to 0.52, 0.29, 0.05, then
+  0. Warm went from 0.22 to 0.58, 0.76, then 1.0, and her tone turned warm.
+  Rounds while obeyed: 4, 1, 1, 1, 2, 2, 3, 3, 1, mean 2.0. One more round
+  came after the bot missed a "look at me", a punishment of 4. Her lines:
+  "See how nice I am when you listen?", "I'm so proud of you right now."
+- **One beg** ("please spank me"). A round of 5 slaps started 0.4 s later.
+  - wave 1: 0.53–0.60 for 10 s, then an ebb to 0.04 by 24 s;
+  - wave 2, on its own at 25 s ("Wait, wait... I want more."): 0.38–0.44 for
+    12 s;
+  - calm from 41 s.
+
+  That is two waves in about 40 s from one beg. A second beg ("spank me
+  harder chloe") gave a round of 5 harder slaps, and four waves in all.
+- **The words**: 9 of 9 phrases matched as expected, including "did you spank
+  me" and "don't spank me" (no beg) and "red" (the safeword).
+- **The safeword**, said at stern 0.9 in the middle of an excitement wave:
+  excitement went to 0, stern to 0, the order and the beg were cleared, and
+  her hand moved to your hair. A beg after that was refused ("aftercare
+  first"). The roles went back 7.9 s later.
+- **The collar, begged for with her belt in her hand.** The first cut
+  refused it ("the belt is in that hand"). Now her belt goes back on and the
+  collar follows: you were on the leash 2 s after the belt was back. On the
+  leash, "please pull my collar" gave a tug up at once and a second one
+  3.5 s later.
+- **Begged harder at stern 0.85**: 5 slaps. Held at the moment of contact,
+  her palm was 2 mm off the spot (photographed from the side).
+- No console errors in five runs.
+
+Debug: `__fr.reverse.mood`:
+- `state()`;
+- `set({ stern, warm, excite, drive })`;
+- `beg(what)` and `words(text)`;
+- `hist()`: one sample a second of [t, stern, warm, excitement, drive, phase,
+  tone, heat];
+- `rounds()`, `log()` and `line(kind)`;
+- `bot('defy' | 'obey' | null)`.
+
+`__fr.reverse.state().mood` is the same as `state()`.
+
+**Rough, still:**
+1. Her belt rounds dominate when you are face down, whatever her mood. When
+   she is gentle they are short and lighter, but they still come.
+2. The obey bot can't keep "look at me" face down. That's a limit of the bot,
+   not of her.
+3. Excitement only comes from begging (plus a ripple from orders kept). She
+   has no spontaneous waves of her own.
+4. Sternness tops out at 1.0 after about six misses. Past that only her lines
+   change.
+
 ## [1.582.0] — 2026-10-02 (baye 1.68.0)
 
 ### The wand the right way in, and your own hand on her toy with the roles as they are
