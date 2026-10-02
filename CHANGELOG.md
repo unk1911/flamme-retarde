@@ -8,6 +8,192 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.574.0] — 2026-10-02 (baye 1.65.0)
+
+### Roles reversed: Chloe's fist in your hair, and the kneeling draw
+
+Misha: *"during the role reversal, does Chloe ever pull me by the hair, when
+she is excited? if not I think it would be hot to add it. Just like I (Chloe)
+sometimes pull baye's hair, she should do it also to me when in role
+reversal"* — and the follow-up, *"can Chloe pull me by my hair and bring my
+head ... towards her ... resulting in me trying to keep my balance by holding
+her by her legs"*, in the version that was agreed: your CHEEK against her SIDE
+at the hip, your head turned to the side. Never your face to her front below
+the waist; that was declined and is not built. The night loop's item 13. The
+same two adults and the same consensual kabina play as 1.561.0–1.572.0, and
+the safeword over all of it.
+
+A new file, `src/49-revpull.js` (names `rvh…`), with small hooks in
+49-reverse.js (her selector, the words, the keys `.` and `,`, the camera,
+the safeword, the scene) and one line on the help sheet in 90-app.js. Her two
+moves run as `rvm.move`s, so 49-revmoves.js solves her arms, her body and her
+look as for every other move of hers, and nothing in that file changed.
+
+**THE PULL FROM BEHIND.** Face down on the cot, on all fours, kneeling or
+standing. She goes where her arm reaches the back of your head from, her hand
+closes on your hair where the player's own hand closes on Baye's
+(`hairGrab`, 1.545.0), and she pulls your head back.
+
+- **Your body is 1.545.0's `PULL_RAG`**, the same net the player pulls
+  Baye's hair with — the body you are in IS Baye's. Nothing in 43-jadrija.js
+  changed: `hairPull(true, eye)` with the puller's eye being hers. Her fist is
+  wherever the net draws it (`hairPullAt`), and her palm (the `grip` shape) is
+  solved on to it every frame.
+- **The way she pulls** is level from your head toward her and a little up
+  (face down, mostly up). Her own shoulder was the first cut: standing over
+  you kneeling it is 40 cm above your head, so the pull was UP and not back —
+  2.5° of head, MEASURED.
+- **She leans back with it**: the fist comes 26 cm toward her as your head
+  comes up, and she straightens until it is a forearm (27 cm) off her
+  shoulder. Before this it ended 12–14 cm off it, her arm shut like a wing.
+- **Where she goes**, by where you are, and checked to be that: standing or
+  kneeling, behind your BODY (the front of your chest — your head turns with
+  your look and kneeling hangs forward; by your head's own forward she stood
+  in front of you and pulled your head down, MEASURED); on all fours beside
+  your shoulders, never back by your hips (kneeling there her body went into
+  yours, photographed); face down, wherever her arm reaches your nape from,
+  which on this cot is its head end — your head comes up off the pillow
+  toward her. If her hand is not on your hair 2.5 s after she reaches, she
+  tries once from nearer and then gives it up: never a fist shut on the air.
+- **Not bent over the cot's edge**: your head lies on the far side of the cot
+  by the wall, 0.6–0.8 m out of her reach from every place the room has
+  (MEASURED). She says so, and the selector never picks it there.
+- **Your hands brace**: face down your palms go flat to the mattress beside
+  your shoulders; on all fours they stay where they were planted while your
+  chest comes up (riding the chest, they would lift off the floor). Kneeling
+  and standing they stay as the clip has them.
+- **Your view goes back with your head**: the first-person camera tipped up
+  0.50 rad held, 0.60 at the yank, eased in fast and out slower, and never
+  past 0.85 rad over level whatever the mouse had.
+- **Her other hand**, now and then (and more as she warms up): planned with
+  her left in your hair and her right on your bottom, 1.565.0's strike from
+  where she already is. If the strike would have to move her, it does not
+  happen.
+- 2.2–3.6 s held; a gasp from you on the grab (the net's own `startle`), a
+  line from her; then her fist opens and your head springs back on the net.
+
+MEASURED (her palm against the fist as drawn, every frame from 0.45 s into
+the hold; "yank" is the first 0.45 s, when the fist moves 26 cm in 0.18 s):
+
+| you | head back | chest | head up | her palm, med / p90 / max | at the yank, max |
+|---|---|---|---|---|---|
+| standing | 26.5° | 16.6° | — | 0.3 / 1.3 / 2.4 mm | 36 mm |
+| kneeling | 21.6° | 15.2° | 11 mm | 0.2 / 3.2 / 8.3 mm | 33 mm |
+| on all fours | 27–37° | 15.6–20.4° | 127–170 mm | 0.2 / 6.0 / 20 mm | 9 mm |
+| face down | — | 17.6° | 158 mm | 1.0 / 5.9 / 13 mm | 39 mm |
+
+Your palms bracing, after they arrive: face down 0.2 / 0.4 mm median, on all
+fours 0.0–1.9 mm median. Your view: 30.9° at the most.
+
+**THE KNEELING DRAW.** You on your knees, she standing beside you, her side
+to you (her left or her right, whichever the room has space for). Her hand
+goes to the back of your head, high; she draws you in; your trunk bows to
+her, your head turns along her, and your cheek comes to rest against her
+side at the hip; your arms go round her leg, both palms on her thigh, front
+and back, above the knee. Then she turns her shoulders to you and looks down
+while her fist tips your head back so you look up at her face, holds it with
+a line, and lets you go.
+
+- **Measured on the skin**, not the bones: her vertices and yours skinned on
+  the CPU the way the shader does it (`turn · (v − bind head) + head` over
+  four bones), off v2.0's mesh for you and hers for her. Your cheek (1,176
+  vertices of the side of your face), your face (nose to chin), her flank at
+  the hip and waist, the middle of her front below the waist, and a ring
+  round her thigh.
+- **Your bow sets your cheek's height** (her hip bone, under her waist: 0.97
+  m); **she closes the rest with her feet**, a step in to you. Closing it with
+  your lean instead (the first cut) bowed you to the limit and leaned you
+  sideways after a planned point 9–15 cm off where your turned head arrived,
+  and your cheek met her low on the hip with your face a handspan from her
+  front.
+- **Your face off her front, whatever else**: inside 19 cm of the middle of
+  her front below the waist she steps on past you, which takes your face
+  further round her side. The point of her flank your cheek is planned to is
+  8 cm behind the middle of her depth.
+- **Your body stays facing where it faces** while her hand is in your hair
+  (`rvhWho`, read by `revWho`): on your knees (`kept`) the body you are in
+  turns to whoever it is with and shuffles after them — she walked round to
+  your side and your head followed her every step, MEASURED.
+- **Your arms** are the two-bone hinge solve (`hingeArm`) on the plane the
+  clip's own arm is bent in. On the bind's elbow axis, kneeling with your
+  hands behind your back, the forearm is wrung far out of that plane, and
+  `hingeArm` keeps what is out of it: your palm 20 cm off its goal every
+  frame, MEASURED. Plus a frame's feedback (`fb`, as her arms have it) for
+  the rest — 8° of forearm off the plane face down is a constant 34 mm.
+- **Looking up**: her shoulders turn to you (on her spine a + turn is to her
+  left, MEASURED off her chest — the opposite reading of a photograph had
+  turned her away) and her fist goes up on to your crown, as far back as her
+  arm reaches.
+- **Your view**: where your head points while it rests on her (not straight
+  at the floor), then up to her face.
+
+MEASURED, three runs (rest = the cheek resting, 0.5 s on; look = the look up):
+
+| | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| cheek to her side at rest, median (p90) | 16.1 (32.8) mm | 21.8 (29.0) mm | 21.5 (26.4) mm |
+| cheek to her side, least over the whole move | 11.2 mm | 15.5 mm | 15.8 mm |
+| your face to the middle of her front below the waist, least | 174 mm | 167 mm | 168 mm |
+| ... to any of her front to her hips, least | 147 mm | 140 mm | 141 mm |
+| your palms on her thigh, median (p90) | 0.1 / 0.1 (3.8) mm | 0.1 / 0.2 (3.5) mm | 0.1 / 0.1 (1.4) mm |
+| her palm in your hair, rest / look, median | 0.3 / 0.1 mm | 0.3 / 0.2 mm | 0.3 / 0.2 mm |
+| her step in to you, and on past you | 0.35 + 0.11 m | 0.31 + 0.09 m | 0.16 + 0.09 m |
+
+Your cheek rests at 0.974 m, on her belt line at the hip. Never into her.
+
+**WHEN.** Her excitement: heat over the middle, a run of orders kept, a
+spanking in the last 15 s or her hands on a toy in her last three picks —
+weighted in her selector beside her other moves, and never inside 24 s of the
+last or twice in five picks; never with her belt or the leash in her hand,
+mid-swing, or while a toy draw of hers runs. In a 30 s run at heat 0.95 she
+picked both, among stroke, spanks, thrust, grip, chin and orders. Standing and
+warm, she orders you to your knees first and draws you in when you kneel.
+
+- Asks: "pull my hair", "grab me by the hair", "povuci me za kosu", "zgrabi
+  mi kosu", "tire-moi les cheveux"; "draw me in", "pull me in to you",
+  "privuci me", "attire-moi contre toi". Asked while standing, the draw is an
+  order to kneel first.
+- Keys, roles reversed: `.` the pull, `,` the draw (on the help sheet).
+- **The safeword**: her fist opens on the frame you say it (the net lets go,
+  `holding` false the same frame); your view comes back from 29° to 16° in
+  120 ms; your head is back in the pose by itself; your body's aims from the
+  draw ease out over half a second; then her aftercare as ever.
+
+**Her voice** (`server/baye/baye.py` 1.65.0, **needs deploying on mpcn0**):
+`CHLOE_BEAT`s `hair_pulled`, `kneel_draw`, `kneel_look`, and the scene key
+`rev_hair` (`pull` | `draw` | `look`) so her chat knows what her hand is
+doing. The beat key was clamped to 8 characters on the way in, so
+`hair_pulled` would have arrived as `hair_pul` and been dropped: it is 12 now.
+Undeployed, the page's captions show, as before.
+
+**Regression**: main's two plans (normal roles: flat, legs, slap, belt out and
+back, autonomous on and red, collar, tug, collar red; reversed: keys 1–7 and
+Shift+1–6, the plug draw, the remote, her belt, the safeword) — the same
+answers as main's run; and reversed `-` (her hip tease), Shift+`-` on your back
+(hug and kiss: trunk ≥ 7.6 cm, faces 6.3 cm, kissed), the wand swap, a pull
+after it, red. People 100, blockers 820, no console errors. RULE 4: no `rng()`
+draw anywhere in 43-jadrija.js (nothing in it changed); her choices use
+`Math.random`, as hers always have.
+
+**Rough, still:**
+- Bent over the cot's edge she cannot reach your hair; she tells you so.
+- With her other hand spanking you, the fist in your hair rides off it for a
+  few frames at each strike (on all fours, up to 10 cm, p90 5 cm): her bow
+  belongs to the strike then.
+- At the yank the fist moves 26 cm in 0.18 s and her palm is a frame or two
+  behind it (up to 39 mm).
+- Looking up at her in first person, her forearm reaching to your crown
+  crosses the top of your view; her face is above and behind it.
+- Her step in to you during the draw is a foot slid, up to 35 cm, plus up to
+  11 cm on past you to keep your face off her front.
+- In the kabina the room's small table and stool are where they are: on all
+  fours under the table she still reaches round it.
+
+Debug: `__fr.reverse.hair`: `pull()`, `draw()`, `start(kind)`, `end()`,
+`state()`, `last()` (every number above, per move), `cands()`, `words(t)`,
+`tune(o)`, `view(az, d, h)` (a probe camera round her the room has space
+for), `arms()`, `chain(s)`, `armTo(s, d)`, `drawDbg()`, `sets()`.
+
 ## [1.572.0] — 2026-10-02 (baye 1.63.0)
 
 ### The third toy: a G-spot wand, in either hole

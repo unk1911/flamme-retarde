@@ -4030,6 +4030,8 @@ const HELP = [
     ['I · “pull it out a bit”', 'help.k.revtoys'],
     // Her hip tease and her hug and kiss (1.569.0).
     ['– · SHIFT + –', 'help.k.revmoves'],
+    // Her fist in your hair (1.574.0).
+    ['. · ,', 'help.k.revhair'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
