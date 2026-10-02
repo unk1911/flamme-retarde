@@ -69,6 +69,21 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    expanding-hole shader; pooled, cheap (dozens, one shader). RULE 4 for any 43-jadrija.js
    bather change (own RNG). people 100 / blockers 820.
 
+10. [ ] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
+   which can be used in place of the lovense or plug ... it can go into either hole, for a more
+   intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
+   silicone, a round wand-massager head on a short neck at one end, a thin gold band, a handle
+   with an embossed infinity-sign button, tapering into a curved G-spot end. Build it on the
+   Lovense/plug code paths (1.560.2/1.560.3 worn mount + clearance fit, signal path with the
+   1.567.0 intensity levels, its own remote channel, rhythm sync on lips/eyes): a prop on the
+   kabina shelf/tabouret, `wear:wand front` / `wear:wand back` (one at a time per hole; it
+   replaces whatever toy is in that hole), the curved end worn, the head and handle outside,
+   fit check in every cot pose incl. the 1.566.0 leg poses; stronger reactions than the
+   Lovense at the same level ("more intense"). Normal mode: asks typed + spoken; autonomous
+   mode reactions (1.568.0). Reverse roles: Chloe holds it by the handle and works it with
+   the 1.567.0 draw/tease/twist + her remote steps, and can swap it in for the Lovense/plug.
+   Safeword stops it in reverse roles (normal mode = item 8, unanswered).
+
 ## Rules for each iteration
 - One worktree agent at a time; brief it fully (memory notes, fast pipeline, RULE 4,
   regression people 100 / blockers 820, CHANGELOG/TASKLOG one row, commit in worktree).
