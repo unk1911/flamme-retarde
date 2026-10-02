@@ -1394,6 +1394,8 @@ async function buildYou(scene) {
       drive = o;
       mesh.visible = o.seen !== false;
       if (o.mask != null) { mask.visible = !!o.mask; hat.visible = !o.mask; }
+      // Her beanie off, without the mask (1.575.0: lying down on the cot).
+      else if (o.hat != null) hat.visible = !!o.hat;
       // The cord comes off in the water. That was a fix when it was a child
       // of the figure rather than of a bone — on a swimmer it sailed out
       // sideways from the sternum like a length of wire — and it rides her

@@ -71,18 +71,18 @@ const RVT_SAY = {
   // English since 1.569.0, written for her (see `REV_SAY` in 49-reverse.js).
   draw: ['Slowly out...', 'Feel that?', 'Just a little... and back.'],
   tease: ['Out... in... out...', "Hehe. Don't move."],
-  twist: ["I'm gonna twist it a little."],
+  twist: ['A little twist for you...'],
   pushin: ['And back in. There.', 'Good girl. All snug again.'],
-  remote: ["Ooh, I'm turning it on.", "Let's see what this does..."],
+  remote: ["Ooh. Let's switch you on.", "Let's see what this does..."],
   remup: ['Stronger?', 'A little more.'],
   remdown: ['Okay, a bit softer.'],
   remtease: ['On... off... hehe.'],
-  remoff: ["Okay, enough. I'm turning it off."],
+  remoff: ["Okay. Off. Breathe, babe."],
   toyno: ["Can't reach it from here, babe."],
   // The wand (1.572.0): her swap, and her remote on it.
   swap: ["Let's trade this for something bigger.", "I've got a better toy for you, babe.", 'Okay. Time for the good one.'],
   swapin: ["There. Now we're talking.", 'Mmm. That one fits you.', 'All the way in. Good girl.'],
-  wandon: ["Oh, you're gonna feel this one.", 'This is the big motor, babe.'],
+  wandon: ["Oh, you're gonna feel this one.", "That's the big motor, babe. Hold on."],
   wandup: ['Too much? Hehe. No?', "Look at you shaking. More?"],
 };
 

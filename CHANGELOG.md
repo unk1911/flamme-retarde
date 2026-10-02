@@ -8,6 +8,136 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.575.0] — 2026-10-02 (baye 1.66.0)
+
+### Roles reversed, polished: what twelve long playtests found
+
+Misha: *"go ahead polish"*. The night loop's item 7. No new act, nothing
+added to what the two of them do; the same consensual kabina play as
+1.561.0–1.574.0, and the safeword over all of it. A pass over what reads
+worst, found by playing it rather than by guessing.
+
+**THE AUDIT.** Eight sessions of three to six minutes each, headless, before
+anything was changed: face down with the plug in, on your back with your legs
+up and the Lovense, standing with the collar, kneeling with the wand, bent
+over the cot's edge, on all fours; her selector on, heat 0.5 or 0.9, and a bot
+player keeping four orders in five a second or three after she gives them.
+Every pick and its reason logged (`__fr.reverse.trace`), every line she said,
+a first-person and a third-person frame at each new move. Ranked, from the
+player's side:
+
+1. **Bent over the edge, a spanking was 90 s of her walking up and down.**
+   After a move of hers at your head she was past the cot's end on the wall's
+   side, and the spot was aimed from there: 54–92 cm short of anywhere a floor
+   reaches, 15 replans in one session and not one slap.
+2. **She gave orders that could not be kept, and punished them.** "Left leg
+   up" bent over the edge (the ladder only exists on your back or your front
+   on the cot); "Left leg up" with both legs already up, which reads as done.
+3. **Picks refused for her full hand.** With her belt in it she still picked
+   the stroke, the hold, the remote, the hip tease: refused 'hand full' and
+   three seconds of standing there each, up to four in a row.
+4. **Her own spoon was two minutes of nothing else.** Two of four sessions
+   had her pick it, and she held the full 120 s.
+5. **The hair pull under a spank lost the hair.** With her other hand
+   striking, the fist was 37–104 mm off your hair in the strike's opening
+   frames (more than the 10 cm 1.574.0 knew of), and once the strike wanted
+   her elsewhere her knees were left wanting up: 245 mm for the whole hold.
+6. **Captions said the opposite of the tug.** "Down, girl." five times in
+   one session while her leash pulled you up.
+7. **"Wider" was kept two presses in** (1.65 of a 2.4 ceiling on your back),
+   and kept by bending over the edge, whose ceiling is 1.
+8. **Looking round at her as her fist closed**, the first-person view stayed
+   on her face behind you, a neck turned half round, tipped up on top.
+9. The kneeling draw's look up, her forearm over her face; her step in, a
+   foot slide; her beanie in bed; the hair pull refused bent over the edge.
+
+**What changed:**
+
+- **Spanks from the room's side of the cot**, whichever side of you she is
+  on, and a round tries up to four spots before it says 'noplace' (bent over
+  the edge one draw in five went high on your back or your far thigh). Two
+  spots given up in one round end the round. Audit after: no `spank:reach`,
+  no 'noplace' (was 15 and 3).
+- **Orders she can see you keep.** The leg ladder's orders only where the
+  ladder is (`liftMode`); "left/right leg up" not with both already up.
+  "Wider" is kept at the ceiling, and waits 16 s for the presses that takes
+  (Shift+5 is 0.35 a press), and a pose with no room to spread does not
+  count as wide.
+- **A full hand, a short list**: with her belt or the leash in it she only
+  picks what she can do (`rvmCands`). 'hand full' refusals in the audit: 0
+  (was 2–3 a session).
+- **Her own spoon is 45–70 s**; asked for, it is still up to 120.
+- **The pull, bent over the edge**: she has you up on your knees on the cot
+  ("Up. On your knees, on the cot. I want that hair.", `4`, a new order
+  `upcot`), then takes it from behind you. Measured: palm on the fist 0.7–1.1
+  mm median. On your tummy instead (the first cut) lays you along the cot with
+  your head at its wall end, 60 cm from her again; and from kneeling up on the
+  cot she now tries behind your back before beside your shoulders.
+- **Her other hand while she holds your hair** strikes from where she is or
+  not at all, decided before anything of hers moves; her bow is not chased
+  while it swings; she leans back with the pull only after the yank (0.6 s)
+  and keeps leaning while her other hand waits; the strike starts 1.3 s in,
+  when your head is up; and the hair hand's correction is softer (0.5), which
+  ended a three-frame ringing. MEASURED on all fours, palm to fist through the
+  strike (wind, strike, hold, lift): max 1.3–14 mm over five runs, was 55–104.
+- **Your eyes go with your head** while she pulls: the walker's look eased to
+  your head's own forward, the tip-up on top of that.
+- **Her tug says which way**: "Up. Up you get." / "Up, babe." with an up,
+  "Down, girl." with a down, "Over here." to the cot.
+- **The kneeling draw.** She stands where her step always ended up (6 cm
+  back along your forward, 13 cm on along her facing — the same way three
+  draws in three), and does not chase the last 1.5 cm of a breathing skin.
+  Her feet slide 21–23 cm in all, was 28–46. Before you look up you come
+  upright off her side: her face is clear and her arm below it in your view
+  (photographed, first person, three in three; it was across her face).
+  Your face to her front, least: 165–178 mm (was 127–150 measured today).
+- **Her beanie comes off** as she sits on the edge to lie down with you, her
+  hand to her crown, and back on sat on the edge getting up. **Her boots stay
+  on**: they are her body mesh (`boots()` in tools/blender/human_mh.py) with
+  no leg drawn inside, so taking them off is a rebake, not a toggle.
+- **Lines.** The weakest fifth rewritten, same voice: "Eyes up here...
+  kidding. Don't stop looking." is "Mm-hm. Don't you dare look away."; "Okay.
+  Now I'm you... and you're me. Hehe." is "Okay. I'm in charge now... and
+  you're all mine."; "There it is. See? You can totally do it." (her most
+  said) is "There it is. See? Easy."; and eleven more in 49-reverse.js,
+  49-revmoves.js, 49-revtoys.js.
+
+**Her voice** (`server/baye/baye.py` 1.66.0, **needs deploying on mpcn0**):
+`REV_ORDER_WORDS.upcot`. Undeployed, the caption shows.
+
+**Audit after**, four sessions on the same starts: refusals 0 (was 2, 0, 3,
+15 'reach' in the matching four), orders ignored only where the bot chose to.
+
+Debug: `__fr.reverse.hair.errs(reset)` (palm to fist a frame, with her other
+hand's swing phase), `__fr.reverse.moves.spotPlan()` (a spank spot and her
+plan for it, with why places were refused), `hair.tune({ draw: { upKeep,
+planFl, planF, dead } })`.
+
+**Regression**: main's plans (normal roles; reversed keys 1–7 and Shift+1–6,
+the plug draw, the remote, her belt, the safeword; the spoon; the wand swap;
+the bubble kid; your arms kneeling) — the same answers run to run as main's.
+People 100, blockers 820, no console errors. RULE 4: nothing in
+43-jadrija.js changed.
+
+**Rough, still** (ranked):
+1. The yank itself: her palm is up to 10 cm off the fist for a third of a
+   second as it shuts (the net moves 2–5 cm a frame; leading it or dropping
+   the correction both measured worse).
+2. The kneeling draw's step is still a slide, 15 cm of it; a real step needs
+   a sideways stepping clip she does not have.
+3. In the look up, her arm crosses the bottom of your view, a spike of her
+   skin at the near clip.
+4. A toy taken off the shelf or stool jumps to her hand at the end of the
+   reach, and the wand's insert aims her hand at the handle's middle — not
+   touched this pass.
+5. Her under hand by her cheek, her palm a frame off yours at a kiss, the
+   hug's arms (1.569.0) — not touched.
+6. Teasing on your back and your side are the same wiggle (Baye's own mode).
+7. First person face down, "look at me" can be kept by looking through the
+   back of your own head (no pitch limit lying face down).
+8. Dead time in the audit is mostly her belt rounds (rounds of 2–5, then
+   another, three or four in a row): left as it is, it may be what he likes.
+
 ## [1.574.0] — 2026-10-02 (baye 1.65.0)
 
 ### Roles reversed: Chloe's fist in your hair, and the kneeling draw

@@ -96,22 +96,22 @@ const REV = {
  * Short, in the room, a laugh in some of them.
  */
 const REV_SAY = {
-  on: ["Okay. Now I'm you... and you're me. Hehe.", "You're mine now, babe. Listen up."],
+  on: ["Okay. I'm in charge now... and you're all mine.", "You're mine now, babe. Listen up."],
   off: ['Okay, okay... back to us.'],
-  good: ['Good girl.', 'There it is. See? You can totally do it.', "Mm, someone's being obedient today."],
-  slow: ['Hm? Did you not hear me?', 'Too slow, babe.', "Okay. Now you're getting spanked."],
-  spank: ["That one's for you.", 'Count.', 'One more.', "Hehe. You're already pink."],
+  good: ['Good girl.', 'There it is. See? Easy.', "Look at you, listening so well."],
+  slow: ['Hm? Did you not hear me?', 'Too slow, babe.', "Mm-mm. That's a spanking."],
+  spank: ['You earned that one.', 'Count.', 'One more.', "Hehe. You're already pink."],
   buzz: ["Let's see what this does..."],
-  prowl: ["Mm... I'm watching you."],
+  prowl: ["Take your time. I'm enjoying the view."],
   care: ["Hey, hey... it's over. I've got you.", "You were amazing. C'mere."],
   // Her belt and the collar (1.564.0, src/49-revkit.js).
   belt: ['Okay. Belt time.', 'See this? My belt. Hehe.'],
   lash: ['Another one.', 'Stay still, baby girl.', 'Count.', "Hehe. You're all pink."],
-  beltback: ["That's enough for now.", "Okay. It's going back on."],
-  collar: ['Come here. Collar.', "You're gonna wear my collar now."],
+  beltback: ["That's enough for now.", "Okay. Belt's going back on."],
+  collar: ["C'mere. Collar time.", "You're gonna wear my collar now."],
   lead: ['Come on. Follow me.', 'Slowly... like that. Good girl.'],
   tug: ['Up. Up you get.', 'Down, girl.', 'Over here.'],
-  uncollar: ["Okay, that's it. Taking it off."],
+  uncollar: ["Okay, that's enough. Let me get this off you."],
 };
 
 /**
@@ -150,22 +150,25 @@ const REV_ORDERS = {
   // YOUR LEGS' LADDER (1.566.0): one up, both up, higher, wider, down — on
   // your back or your front on the cot (`LIFT` in 43-jadrija.js). `can` is
   // whether the order makes sense where you are at all.
-  legL: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+1',
+  legL: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+1', can: (v) => !!v.liftMode && !revBothUp(v),
     ok: (v) => !!v.liftL && !(v.liftR && revRank(v.liftR) >= revRank(v.liftL)),
     say: 'Left leg up.', hud: ['Lijevu nogu gore.', 'Left leg up.', 'La jambe gauche en l’air.'] },
-  legR: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+2',
+  legR: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+2', can: (v) => !!v.liftMode && !revBothUp(v),
     ok: (v) => !!v.liftR && !(v.liftL && revRank(v.liftL) >= revRank(v.liftR)),
     say: 'Right leg up.', hud: ['Desnu nogu gore.', 'Right leg up.', 'La jambe droite en l’air.'] },
-  bothUp: { ctx: { back: 1.1, front: 0.7 }, w: 0.9, key: 'Shift+3',
+  bothUp: { ctx: { back: 1.1, front: 0.7 }, w: 0.9, key: 'Shift+3', can: (v) => !!v.liftMode,
     ok: (v) => revBothUp(v), say: 'Both legs up.', hud: ['Obje noge gore.', 'Both legs up.', 'Les deux jambes en l’air.'] },
   higher: { ctx: { back: 0.9 }, w: 0.8, key: 'Shift+4',
-    can: (v) => v.onBed, ok: (v) => revRank(v.liftL) >= 3 && revRank(v.liftR) >= 3,
+    can: (v) => v.onBed && !!v.liftMode, ok: (v) => revRank(v.liftL) >= 3 && revRank(v.liftR) >= 3,
     say: 'Both legs up. Higher.', hud: ['Obje noge gore. Više.', 'Both legs up. Higher.', 'Les deux jambes en l’air. Plus haut.'] },
-  wider: { ctx: { back: 0.9, front: 0.5, stand: 0.4 }, w: 0.8, key: 'Shift+5',
-    can: (v) => v.legsSpMax > 1.01, ok: (v) => v.legsSp >= Math.min(v.legsSpMax - 0.05, 1.65),
+  // "Even wider" means as wide as you go (1.575.0): it was kept at 1.65 of
+  // a ceiling of 2.4 on your back, two presses in. Every step there is a
+  // press (Shift+5, 0.35 each), so she waits longer for it.
+  wider: { ctx: { back: 0.9, front: 0.5, stand: 0.4 }, w: 0.8, key: 'Shift+5', wait: 16,
+    can: (v) => v.legsSpMax > 1.01, ok: (v) => v.legsSpMax > 1.01 && v.legsSp >= v.legsSpMax - 0.05,
     say: 'Wider. Even wider.', hud: ['Šire. Još šire.', 'Wider. Even wider.', 'Plus écartées. Encore.'] },
   legsDown: { ctx: { back: 0.7, front: 0.7 }, w: 0.5, key: 'Shift+3',
-    can: (v) => !!(v.liftL || v.liftR || (v.phase === 'cradle' && !v.legsDown)),
+    can: (v) => !!v.liftMode && !!(v.liftL || v.liftR || (v.phase === 'cradle' && !v.legsDown)),
     ok: (v) => !v.liftL && !v.liftR && (v.phase !== 'cradle' || !!v.legsDown),
     say: 'Legs down.', hud: ['Spusti noge.', 'Legs down.', 'Baisse les jambes.'] },
 };
@@ -802,7 +805,7 @@ function revDriveChloe(dt) {
   const sp = typeof rvmSpoonDrive === 'function' ? rvmSpoonDrive() : null;
   if (sp) {
     rev.lastDrive = you.drive({ at: [sp.at.x, sp.at.y, sp.at.z], yaw: C.yaw + Math.PI / 2, quat: sp.quat, pitch: 0,
-      seen: true, wet: false, clip: Bd.clip, fade: Bd.fade, speed: Bd.speed });
+      seen: true, wet: false, clip: Bd.clip, fade: Bd.fade, speed: Bd.speed, hat: !(typeof rvmHatOff === 'function' && rvmHatOff()) });
     return;
   }
   const sit = typeof rvmSitAt === 'function' ? rvmSitAt() : null;
@@ -810,7 +813,7 @@ function revDriveChloe(dt) {
   rev.lastDrive = you.drive({
     at: sit ? [sit.x, sit.y, sit.z] : [C.x + Math.sin(C.yaw) * cbk, C.y - cd, C.z + Math.cos(C.yaw) * cbk],
     yaw: C.yaw + Math.PI / 2, pitch: 0, seen: true, wet: false,
-    clip: Bd.clip, fade: Bd.fade, speed: Bd.speed,
+    clip: Bd.clip, fade: Bd.fade, speed: Bd.speed, hat: !(typeof rvmHatOff === 'function' && rvmHatOff()),
   });
 }
 

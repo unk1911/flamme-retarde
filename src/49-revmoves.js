@@ -106,7 +106,7 @@ const RVM = {
 
 const RVM_SAY = {
   // English since 1.569.0, written for her (see `REV_SAY` in 49-reverse.js).
-  circle: ["Mm... let me see you from every angle.", 'Mm. You look so good like this.'],
+  circle: ["Let me see you from every side.", 'Mm. You look so good like this.'],
   stroke: ["There... you're so good.", "Shh. I'm right here."],
   hold: ['Stay down.', "Don't even try."],
   sitby: ['Let me get a good look at you.'],
@@ -114,7 +114,7 @@ const RVM_SAY = {
   grip: ['Mm. Stay just like that.', "You're mine."],
   wait: ["I'm waiting.", 'Hm? Well?'],
   // 1.569.0: showing off beside the cot, and holding you.
-  thrust: ['Hehe. Like what you see?', 'Mm, watch me, babe.', "Eyes up here... kidding. Don't stop looking."],
+  thrust: ['Hehe. Like what you see?', 'Mm, watch me, babe.', "Mm-hm. Don't you dare look away."],
   hug: ['C\'mere, you.', "Mm. I've got you."],
   kiss: ['Mm. You taste like the beach.', 'One more... okay, two.'],
   // 1.573.0: lying behind you on the cot, holding you.
@@ -421,7 +421,7 @@ function rvmArms(dt) {
       const C = q.C.clone();
       if (q.fb && rvm.k[s] >= 1 && fb.ok) C.sub(fb.e); else fb.e.set(0, 0, 0);
       rvmSolve(s, C, q.n, q.d, q.pole, q.cock || 0, rvm.k[s], q.out || null);
-      fb.sent.copy(C); fb.ok = !!q.fb && rvm.k[s] >= 1;
+      fb.sent.copy(C); fb.ok = !!q.fb && rvm.k[s] >= 1; fb.gain = q.fbK || 0.8;
       rvm.last = rvm.last || {};
       rvm.qs = rvm.qs || {}; rvm.qs[s] = q;
       const sh = RVM.hands[q.shape || 'rest'] || RVM.hands.rest;
@@ -809,7 +809,15 @@ function rvmSpankSpot(v) {
     const hf = jadrija.headFrame ? jadrija.headFrame() : null;
     const ax = hf ? hf.ax : 1, az = hf ? hf.az : 0;
     const across = new THREE.Vector3(-az, 0, ax);
-    const sideOf = (rev.ch.x - Pv.P.x) * across.x + (rev.ch.z - Pv.P.z) * across.z >= 0 ? 1 : -1;
+    // From the ROOM'S side of the cot, whichever side of you she is on now
+    // (1.575.0). The cot's other long side is the wall: after a move at
+    // your head she could be standing past its end on the wall's side, and
+    // a spot aimed from there was one no floor reaches — MEASURED in a
+    // playtest bent over the edge, 54-92 cm short, two rounds of replans and
+    // 90 s of her walking to and fro without a slap.
+    const G = rvmCotGeom();
+    const roomSide = G && G.out ? (G.out.x * across.x + G.out.z * across.z >= 0 ? 1 : -1) : 0;
+    const sideOf = roomSide || ((rev.ch.x - Pv.P.x) * across.x + (rev.ch.z - Pv.P.z) * across.z >= 0 ? 1 : -1);
     const o = Pv.P.clone().addScaledVector(across, 0.62 * (A.from || sideOf)).add(_mA.set(0, 0.62, 0));
     const r = Math.random();
     const along = r < 0.12 ? 0.20 : r < 0.25 ? -0.20 : (Math.random() - 0.4) * 0.12;
@@ -853,25 +861,40 @@ function rvmSpankStart(n, why, o = {}) {
   const ctx = v ? v.ctx : null;
   if (!(ctx === 'front' || ctx === 'stand' || ctx === 'kneel' || ctx === 'fours')) return 'notthere';
   const A = rev.arm;
-  Object.assign(A, { mode: 'spank', ph: 'go', t: 0, n, err: 0, side0: null, from: null, ctx, hits: 0, hold: !!o.hold });
+  Object.assign(A, { mode: 'spank', ph: 'go', t: 0, n, err: 0, side0: null, from: null, ctx, hits: 0, hold: !!o.hold, fails: 0, replans: 0 });
   A.k = 9 + 7 * rev.dom.heat + (Math.random() < rev.dom.heat * 0.4 ? 4 : 0);
   if (ctx !== 'front') A.side0 = Math.random() < 0.5 ? 1 : -1;
-  const S = rvmSpankSpot(v);
+  // A spot she has somewhere to stand for — up to four tries (1.575.0).
+  // The spot is a ray at you with play in it, and bent over the edge one in
+  // five went high on your back or to your far thigh, where no floor reaches:
+  // the whole round was refused for that one draw ('noplace', MEASURED).
+  let S = null, P = null, reach = null;
+  for (let tries = 0; tries < 4 && !P; tries++) {
+    S = rvmSpankSpot(v);
+    if (!S) continue;
+    reach = [{ s: 'R', T: S.T, n: S.n }];
+    // Holding you down with her left hand while her right does it.
+    if (o.hold && rvm.move && rvm.move.id === 'hold' && rvm.move.spot) reach.push({ s: 'L', T: rvm.move.spot.T, n: rvm.move.spot.n });
+    // Already where her hand reaches it from — on her knees by you holding you
+    // down, or still there from the last round: she stays where she is.
+    const lowT = Math.min(...reach.map((r) => r.T.y)) - rev.ch.y < RVM.kneelAt;
+    const here = !rev.ch.goal && rvm.body.mode === (lowT ? 'kneel' : 'stand') && reach.every((r) => {
+      const sh = rvmShoulder(r.s, new THREE.Vector3());
+      return sh && sh.distanceTo(r.T) < RVM.reach + 0.05;
+    });
+    // Only from where she is (1.575.0: her other fist in your hair). Asked
+    // before anything of hers is moved: the old way planned, walked and stood
+    // her up, and then took it back — her knees stayed wanting up, and her
+    // palm was 25 cm off your hair for the rest of the hold, MEASURED.
+    if (o.stay) { if (here) P = { x: rev.ch.x, z: rev.ch.z, yaw: rev.ch.yaw, mode: rvm.body.mode, bow: rvm.body.bow, w: rvm.body.w, here: true }; continue; }
+    P = here ? { x: rev.ch.x, z: rev.ch.z, yaw: rev.ch.yaw, mode: rvm.body.mode, bow: rvm.body.bow, w: rvm.body.w, here: true }
+      : rvmPlan(reach, { prefer: ctx === 'front' ? null : S.n });
+  }
   if (!S) { A.mode = null; return 'nospot'; }
-  A.at = S; A.tgt = S.T.clone();
-  const reach = [{ s: 'R', T: S.T, n: S.n }];
-  // Holding you down with her left hand while her right does it.
-  if (o.hold && rvm.move && rvm.move.id === 'hold' && rvm.move.spot) reach.push({ s: 'L', T: rvm.move.spot.T, n: rvm.move.spot.n });
-  // Already where her hand reaches it from — on her knees by you holding you
-  // down, or still there from the last round: she stays where she is.
-  const lowT = Math.min(...reach.map((r) => r.T.y)) - rev.ch.y < RVM.kneelAt;
-  const here = !rev.ch.goal && rvm.body.mode === (lowT ? 'kneel' : 'stand') && reach.every((r) => {
-    const sh = rvmShoulder(r.s, new THREE.Vector3());
-    return sh && sh.distanceTo(r.T) < RVM.reach + 0.05;
-  });
-  const P = here ? { x: rev.ch.x, z: rev.ch.z, yaw: rev.ch.yaw, mode: rvm.body.mode, bow: rvm.body.bow, w: rvm.body.w, here: true }
-    : rvmPlan(reach, { prefer: ctx === 'front' ? null : S.n });
+  if (o.stay && !P) { A.mode = null; return 'out of reach'; }
   if (!P) { A.mode = null; rvmTrace({ pick: 'spank:noplace', why: ctx }); return 'noplace'; }
+  A.stay = !!o.stay;
+  A.at = S; A.tgt = S.T.clone();
   // On the cot: her side of you, for the spots that follow.
   if (ctx === 'front') {
     const Pv = rvmYourPelvis();
@@ -898,7 +921,7 @@ function rvmSpankTick(dt) {
   const S = A.at;
   if (A.ph === 'go') {
     if (A.plan.mode === 'kneel' && revAt()) rvmWant('kneel');
-    if (rvmSettled() || A.t > 7) { A.ph = 'ready'; A.t = 0; rvm.body.bowTo = A.plan.bow; rvm.body.wTo = A.plan.w; }
+    if (rvmSettled() || A.t > 7) { A.ph = 'ready'; A.t = 0; if (!A.stay) { rvm.body.bowTo = A.plan.bow; rvm.body.wTo = A.plan.w; } }
     return;
   }
   rvmSpotNow(S);
@@ -918,11 +941,15 @@ function rvmSpankTick(dt) {
   const sm = (x) => { const e = u(x); return e * e * (3 - 2 * e); };
   // From the wind-up on, her back and knees stay where they are: a body
   // still settling under the arm is a palm drawn behind where it was sent.
-  if (A.ph !== 'ready') { rvm.body.bowTo = rvm.body.bow; rvm.body.wTo = rvm.body.w; }
+  if (A.ph !== 'ready' && !(A.stay && A.ph === 'go')) { rvm.body.bowTo = rvm.body.bow; rvm.body.wTo = rvm.body.w; }
   if (A.ph === 'ready') {
     at(RVM.readyOff, RVM.cock * 0.3, 'flat');
-    // Her bow closed on the spot by feedback on her real shoulder.
-    if (sh) {
+    // Her bow closed on the spot by feedback on her real shoulder — not
+    // while her other hand holds your hair (`stay`): the bow carries that
+    // shoulder too, and the fist rode 9-10 cm off your hair while it moved
+    // (MEASURED, 1.575.0). She is within reach of both already.
+    if (sh && A.stay) A.err = Math.max(0, sh.distanceTo(T) - RVM.reach - 0.05);
+    else if (sh) {
       const need = sh.distanceTo(T) - RVM.reach;
       rvm.body.bowTo = Math.max(0, Math.min(RVM.bowMax + 0.25, rvm.body.bowTo + need * Math.min(1, dt * 3)));
       if (A.plan.mode === 'stand' && rvm.body.bowTo > RVM.bowMax) rvm.body.wTo = Math.min(0.5, rvm.body.wTo + need * dt * 2);
@@ -936,7 +963,18 @@ function rvmSpankTick(dt) {
       A.replans = (A.replans || 0) + 1;
       const P = A.replans <= 2 ? rvmPlan([{ s: 'R', T: S.T, n: S.n }], { prefer: S.floor ? S.n : null }) : null;
       rvmTrace({ pick: 'spank:reach', why: (A.err * 100).toFixed(0) + ' cm short, ' + (P ? 'moving' : 'next spot') });
-      if (P) { A.plan = P; rvmGoPlan(P); A.ph = 'go'; A.t = 0; } else { A.ph = 'lift'; A.t = R.lift; A.replans = 0; }
+      if (P) { A.plan = P; rvmGoPlan(P); A.ph = 'go'; A.t = 0; }
+      else {
+        // A spot given up on. Twice in one round and the round is over: no
+        // more walking round the cot after a slap that is not there.
+        A.fails = (A.fails || 0) + 1;
+        if (A.fails >= 2) {
+          rvmTrace({ pick: 'spank:gave up', why: A.fails + ' spots out of reach' });
+          A.mode = null; A.ph = 'rise'; A.t = 0; A.fails = 0; rvm.downFor = 1.0;
+          return;
+        }
+        A.ph = 'lift'; A.t = R.lift; A.replans = 0;
+      }
       return;
     }
     if (A.t > R.ready && (A.err < 0.015 || A.t > R.ready + 1.2) && rvm.k.R > 0.97) {
@@ -994,6 +1032,7 @@ function rvmSpankTick(dt) {
           // Still in reach from where she is? Then on; else to a new place.
           const sh2 = rvmShoulder('R', _mE);
           if (sh2 && sh2.distanceTo(N.T) < RVM.reach + 0.10) { A.ph = 'ready'; A.t = R.ready * 0.55; }
+          else if (A.stay) { A.mode = null; A.ph = 'rise'; A.t = 0; return; }
           else {
             const P = rvmPlan([{ s: 'R', T: N.T, n: N.n }], { prefer: N.floor ? N.n : null });
             if (P) { A.plan = P; rvmGoPlan(P); A.ph = 'go'; A.t = 0; } else A.ph = 'ready';
@@ -1017,7 +1056,7 @@ function rvmMeasure() {
     if (!d) continue;
     // What was sent was the goal less the last estimate; what is left over is
     // added to it, so the estimate is the whole lag.
-    fb.e.lerp(d.sub(fb.sent), 0.8);
+    fb.e.lerp(d.sub(fb.sent), fb.gain || 0.8);
     if (fb.e.length() > 0.12) fb.e.setLength(0.12);
   }
   const P = rvm.pend;
@@ -1086,7 +1125,11 @@ function rvmCands(ctx, D) {
   if (!ctx || rvm.move) return out;
   const onCot = ctx === 'front' || ctx === 'back' || ctx === 'side' || ctx === 'sit' || ctx === 'cotKneel';
   const recent = (id) => D.last.slice(-4).filter((x) => x === id).length;
-  const add = (id, s) => out.push({ id: 'move:' + id, s: s * (recent(id) ? 0.3 : 1) });
+  // Her belt or the leash in her hand: only what `rvmStart` will do with it
+  // full (1.575.0 — the rest were picked, refused 'hand full', and cost her
+  // three seconds of standing there each; up to four in a row, MEASURED).
+  const full = typeof rvkHandFull === 'function' && rvkHandFull();
+  const add = (id, s) => { if (!full || id === 'circle') out.push({ id: 'move:' + id, s: s * (recent(id) ? 0.3 : 1) }); };
   if (onCot) add('circle', 0.35);
   if (onCot || ctx === 'kneel' || ctx === 'fours') add('stroke', 0.30 + 0.25 * Math.min(2, D.streak));
   if (ctx === 'front') add('hold', 0.35 + 0.5 * D.heat);
@@ -1106,7 +1149,7 @@ function rvmCands(ctx, D) {
     add('spoon', (ctx === 'side' ? 0.30 : 0.10) + 0.10 * Math.min(3, D.streak) + (D.heat < 0.35 ? 0.12 : 0));
   }
   // The toys you are wearing, in her hands (1.567.0, src/49-revtoys.js).
-  if (typeof rvtCands === 'function') for (const c of rvtCands(ctx, D)) out.push(c);
+  if (typeof rvtCands === 'function' && !full) for (const c of rvtCands(ctx, D)) out.push(c);
   return out;
 }
 
@@ -1841,7 +1884,11 @@ const RVM_SPOON = {
   // Seconds: Baye loosening, the sit, the swing down, the settle, the way up.
   loosen: 1.8, sitT: 0.8, swingT: 2.6, settleT: 2.2, upT: 2.3,
   // Seconds: held at most, unasked; held in the aftercare; waiting on you to curl up.
-  hold: 120, care: 9, curlWait: 26,
+  // Her own idea (1.575.0): 45-70 s. Two of four long playtests had her pick
+  // it and hold the full 120, two minutes of nothing else in a session.
+  hold: 120, holdOwn: [45, 70], care: 9, curlWait: 26,
+  // Seconds: her hand to her beanie and away, taking it off or putting it on.
+  hatT: 1.1,
   // Breath (Hz, s, rad/s, rad): hers, Chloe's on arriving, the ease, the pull.
   breath: { her: 0.20, mine: 0.30, tau: 7.0, lock: 0.85, chest: 0.034, spine: 0.012 },
   // Between kisses on her shoulder (s), and how long one is (s).
@@ -2711,6 +2758,9 @@ function rvmSpoonTick(M, dt) {
   if (M.ph === 'sit') {
     const tt = M.t - M.t0;
     if (Bd.sit) Bd.sit.k = Math.min(1, tt / P.sitT);
+    // Her beanie off as she sits (1.575.0): her right hand up to her crown,
+    // and it comes away with the hand. Nobody lies down in bed in a wool hat.
+    rvsHatHand(M, tt, false);
     const C = jadrija.curlShift ? jadrija.curlShift() : null;
     const settled = !C || !C.mark || Math.hypot(C.at[0] - C.mark[0], C.at[1] - C.mark[1]) < 0.02;
     if (tt > P.sitT + 0.35 && (settled || tt > 5) && Bd.mode === 'sit') {
@@ -2816,7 +2866,8 @@ function rvmSpoonTick(M, dt) {
       }
     }
     if (!M.care && M.t > M.nextLine) { M.nextLine = M.t + 30 + Math.random() * 20; rvmSay('spoon'); }
-    const longest = M.care ? P.care : P.hold;
+    if (M.holdFor == null) M.holdFor = M.asked ? P.hold : P.holdOwn[0] + Math.random() * (P.holdOwn[1] - P.holdOwn[0]);
+    const longest = M.care ? P.care : M.holdFor;
     if (M.t - M.t0 > longest) rvmSpoonUp(M, M.care ? 'aftercare held' : 'time');
     return;
   }
@@ -2840,6 +2891,8 @@ function rvmSpoonTick(M, dt) {
     return;
   }
   if (M.ph === 'stand') {
+    // And back on, sat on the edge again before she stands.
+    rvsHatHand(M, M.t - M.t0, true);
     if (M.t - M.t0 > 0.35 && Bd.want !== 'stand') rvmWant('stand');
     if (jadrija.curlShift && M.t - M.t0 > 0.6) jadrija.curlShift(0, P.shiftRate);
     if (Bd.mode === 'stand' && M.t - M.t0 > 0.6 && M.bk <= 0) rvmSpoonDone(M);
@@ -2861,6 +2914,34 @@ function rvsMoveGap(M, dt) {
   let g = 9, at = null;
   for (const k of ['trunk', 'legs', 'head', 'armL', 'handL']) if (by[k] && Math.min(by[k].d, by[k].s) < g) { g = Math.min(by[k].d, by[k].s); at = k + ' into ' + by[k].sher + ' ' + JSON.stringify(by[k].sat); }
   if (g < (M.wayGap == null ? 9 : M.wayGap)) { M.wayGap = g; M.wayAt = at + ' @' + M.ph + ' ' + (M.lie || 0).toFixed(2); }
+}
+
+/**
+ * HER BEANIE (1.575.0). Off as she sits on the edge to lie down with you, on
+ * again sat on the edge getting up: her right hand to her crown and away,
+ * over `hatT` s, the hat going (or coming) with the hand at the top of it.
+ * Her boots stay on — they are part of her body mesh (`boots()` in
+ * tools/blender/human_mh.py), and there is no leg drawn inside them to show.
+ */
+function rvsHatHand(M, tt, on) {
+  const T = RVM_SPOON.hatT;
+  if (tt > T) { if (!on) M.hatOff = true; else M.hatOff = false; return; }
+  const u = tt / T, k = Math.sin(Math.PI * Math.min(1, u));
+  if (u > 0.5) M.hatOff = !on;
+  const hi = you.fig.boneIndex('head');
+  if (hi < 0 || k < 0.02) return;
+  const H = you.fig.boneAt(hi, new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld);
+  const hq = you.fig.boneTurn(hi, new THREE.Quaternion()).premultiply(you.mesh.quaternion);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(hq), fw = new THREE.Vector3(1, 0, 0).applyQuaternion(hq);
+  // Over her crown, a little back, palm down on it — and up off it as it goes.
+  const C = H.clone().addScaledVector(up, 0.17 + (u > 0.5 ? 0.06 * (u - 0.5) * 2 : 0)).addScaledVector(fw, -0.02);
+  const { r } = rvmAxes(rev.ch.yaw);
+  rvmAsk('R', { C, n: up.clone(), d: fw.clone(), pole: r.clone().add(new THREE.Vector3(0, -0.2, 0)), cock: 0.1, shape: 'soft', rate: 6 + 10 * k });
+}
+/** Whether her beanie is off (the spoon has taken it off her). */
+function rvmHatOff() {
+  const M = rvm.move;
+  return !!(M && M.id === 'spoon' && M.hatOff && rev.on);
 }
 
 /** Up off the cot, the way she came. `why` for the trace; your ask after, if any. */
@@ -3171,6 +3252,15 @@ const rvmApi = {
   /** Debug: the spoon's numbers, merged. */
   spoonTune: (o) => Object.assign(RVM_SPOON, o || {}),
   spank: (n = 1, hold = false) => rvmSpankStart(n, 'probe', { hold }),
+  /** Debug: a spank spot now and her plan for it, with why places were refused. */
+  spotPlan: () => {
+    const v = revView(); const S = v ? rvmSpankSpot(v) : null;
+    if (!S) return null;
+    const why = {}; const P = rvmPlan([{ s: 'R', T: S.T, n: S.n }], { why });
+    const G = rvmCotGeom();
+    return { T: rvmV(S.T), n: rvmV(S.n), reg: S.hit ? S.hit.reg : null, o: rvmV(S.o), out: G && rvmV(G.out), mid: G && rvmV(G.mid),
+      plan: P ? { x: +P.x.toFixed(2), z: +P.z.toFixed(2), mode: P.mode, bow: +P.bow.toFixed(2) } : null, why, ch: [rev.ch.x, rev.ch.z] };
+  },
   /** The contacts measured: palm against the spot, m. `reset` clears. */
   acc: (reset = false) => { const a = rvm.acc.slice(); if (reset) rvm.acc.length = 0; return a; },
   stats: () => {

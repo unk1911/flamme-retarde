@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.65.0"
+VERSION = "1.66.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4691,6 +4691,10 @@ REV_ORDER_WORDS = {
     # 1.64.0: soft, before she lies down behind them; never punished.
     "curl": ("curl up on their side on the cot, so you can lie down behind "
              "them and hold them", "C'mere... curl up for me."),
+    # 1.66.0 (page 1.575.0): off the cot's edge and up on their knees on it,
+    # so your hand reaches their hair.
+    "upcot": ("get up off the edge and kneel up on the cot, so you can take a "
+              "fistful of their hair", "Up. On your knees, on the cot. I want that hair."),
 }
 # Lying behind them on the cot, holding them (1.64.0, page 1.573.0): the page
 # sends 'on', or 'care' when it is the aftercare.
