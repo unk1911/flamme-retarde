@@ -90,6 +90,18 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    praise; asks "spoon me", "cuddle me", "hold me", "zagrli me u krevetu"; a key. Bodies must
    not interpenetrate (measure gaps); the cot holds both (AVBD/mattress lift as relevant).
    Starts when item 9 or 11 lands (not parallel with item 10 if both touch 49-revmoves).
+13. [ ] **Chloe pulls your hair when she's excited (reverse roles)** (Misha, 06:55: "does Chloe
+   ever pull me by the hair, when she is excited? ... just like I (Chloe) sometimes pull baye's
+   hair, she should do it also to me"). Today she only has 1.565.0's light nape hold (rvm.nape:
+   ~7° camera pitch, upper back eased back). Build the real thing, mirroring the player's
+   1.544.0 hairPull (43-jadrija.js hairPull/hairPullAt, PULL_RAG in 41-skin.js): from behind
+   (you face down / on all fours / bent over / kneeling), her fist gathers your hair, pulls
+   your head back firmly but playfully; PULL_RAG-style body response on player-Baye (neck +
+   upper back arched, hands bracing), first-person camera pitched back hard toward the
+   ceiling/her, a gasp; her lines in English (Laura). Triggered by her excitement (heat high,
+   a run of obeyed orders, during/after spanks or toy play) and on ask ("pull my hair");
+   holds a few seconds, can combine with a spank from her other hand; release eases back.
+   Safeword lets go instantly. Starts after item 12 (spooning) lands — both edit 49-revmoves.js.
 10. [ ] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
    which can be used in place of the lovense or plug ... it can go into either hole, for a more
    intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
