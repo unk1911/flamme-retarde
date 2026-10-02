@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.66.0"
+VERSION = "1.67.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -170,7 +170,7 @@ class Config:
 
 CFG = Config()
 
-OPENAI_MODEL = CFG.get("BAYE_MODEL", "gpt-5.6-luna")
+OPENAI_MODEL = CFG.get("BAYE_MODEL", "gpt-6-luna")   # 2 Oct: was gpt-5.6-luna
 TTS_VOICE = CFG.get("BAYE_VOICE_ID", "LEnmbrrxYsUYS7vsRRwD")   # Jessica
 TTS_MODEL = CFG.get("BAYE_TTS_MODEL", "eleven_multilingual_v2")
 # ── the fast path, and who is on it ──────────────────────────────────────────
@@ -6642,6 +6642,31 @@ def one_line(text: str, n: int = 0) -> str:
     return (head[:cut] if cut >= n // 2 else head).strip()
 
 
+# ── a refusal is never said aloud ────────────────────────────────────────────
+# The model's own policy declines some of the kabina lines, and it declines out
+# of character: *"I can't roleplay explicit sexual acts, but I can keep the
+# teasing flirty and non-graphic."* — read out in Baye's voice, in the room,
+# 2 Oct (and since 1 Oct on "spread your legs", "open your mouth"). The action
+# on the page has already happened by then; only the line is wrong. Misha:
+# *"if getting refusal should do 'mm, one sec' or something similar"*. So a
+# line that reads as the model talking about itself is swapped for a short
+# sound of hers, and the log says so. Nothing is retried or reworded: the
+# model's answer stands, it is just not spoken as if she had said it.
+REFUSAL = re.compile(
+    r"\b(?:i\s*(?:can[’']?t|cannot|won[’']?t|am not able to|[’']m not able to|"
+    r"[’']m unable to|am unable to)|i can keep (?:it|things|this))\b"
+    r".{0,80}?\b(?:roleplay|role-play|role play|explicit|sexual|graphic|"
+    r"sex toys?|that kind of|this kind of|continue (?:this|that))"
+    r"|\bi can keep (?:it|things|this) (?:flirty|playful|pg|light|tasteful)",
+    re.I | re.S)
+FILLERS = ("Mm, one sec.", "Mm… hold on.", "Mmm.", "Ah… one second.",
+           "Mm, give me a sec.", "Hmm… wait.")
+
+
+def refusal(text: str) -> bool:
+    return bool(REFUSAL.search(text or "")) or "non-graphic" in (text or "").lower()
+
+
 def ask_model(messages, fast=False, words=0, chars=0):
     key = CFG.get("OPENAI_API_KEY")
     if not key:
@@ -6682,6 +6707,9 @@ def ask_model(messages, fast=False, words=0, chars=0):
     text = "".join(ch for ch in text
                    if unicodedata.category(ch) not in ("So", "Sk", "Cn", "Co", "Cs"))
     text = re.sub(r"\s{2,}", " ", text).strip()
+    if refusal(text):
+        print(f"[model] refusal swapped: {text[:120]!r}", flush=True)
+        text = random.choice(FILLERS)
     if words:
         text = cap_words(text, words)
     # `chars` for a line that carries its gloss after `GLOSS_MARK` (Chloe's):
