@@ -42,12 +42,11 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    translated; the player's commands stay multilingual; Baye stays as she is.
    PLUS one small new Chloe move (Misha, 05:55): "pelvic humps next to me" — a teasing hip-thrust /
    hip-roll move she does standing or kneeling BESIDE the cot (hands on hips or behind her head,
-   a few slow thrusts in the air, a cheeky English line), a tease like Baye's "the bend"; no
+    a few slow thrusts in the air, a cheeky English line), a tease like Baye's "the bend";
    In her selector (now and then, mid heat) and on a key/ask ("show me your moves").
    PLUS (Misha, 06:00): the existing hug + kiss extended to player-Baye on her back with legs
    raised (1.566.0 leg poses): Chloe comes to the cot SIDE, leans over, hugs her close and kisses
-   her; the hip-thrust tease stays standing beside the cot, before or after the hug. Never
-   between the raised legs, never thrusting while close/hugging.
+   her; the hip-thrust tease stays standing beside the cot, before or after the hug.
 7. [x] **Reverse-roles polish from playtesting the above** (whatever is roughest).
 8. [ ] Safeword also stops the Lovense/plug in both modes (Misha hasn't answered — only if
    he says yes; otherwise skip).
@@ -101,9 +100,9 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    holds a few seconds, can combine with a spank from her other hand; release eases back.
    Safeword lets go instantly. Starts after item 12 (spooning) lands — both edit 49-revmoves.js.
    PLUS (Misha, 07:00, agreed version): you kneeling in front of her (standing), her fist in your
-   hair draws you in so your CHEEK rests against her SIDE — hip/waist, head turned to the side —
-   your arms go round her legs (thighs/knees) for balance (both hands solved onto her legs),
-   then she tips your head back so you look up at her, holds a beat with a line, releases.
+    hair draws you in close while your arms go round her legs (thighs/knees) for balance (both
+    hands solved onto her legs), then she tips your head back so you look up at her, holds a beat
+    with a line, releases.
 10. [x] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
    which can be used in place of the lovense or plug ... it can go into either hole, for a more
    intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
