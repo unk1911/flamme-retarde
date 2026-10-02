@@ -150,59 +150,61 @@ const AUTO = {
 };
 
 /**
- * Her lines, in her Croatian, and what they mean (`auto.g.*` in 02-i18n.js).
- * The existing bark style: short, a laugh in them, and not one every move.
- * You are Chloe, so what she says to you is said to a woman ("glavna",
- * "uključila si").
+ * Her lines. English since 1.570.0 (Misha: "the speech for baye should be in
+ * English, not croatian"), written for her rather than translated from the
+ * Croatian she had, and the caption is the line itself: no gloss. The id is
+ * the line's name for `auto.said` (the no-repeat memory). The existing bark
+ * style: short, a laugh in them, and not one every move. You are Chloe, so
+ * what she says is said to a woman.
  */
 const AUTO_SAY = {
-  on: [['Mm... dobro. Sad ja vodim, hehe.', 'on0'], ['Samo gledaj.', 'on1'], ['Hehe, pusti mene.', 'on2']],
-  off: [['Dobro, opet si ti glavna.', 'off0'], ['Mm, vraćam ti uzde.', 'off1']],
-  open: [['Ovako?', 'open0'], ['Mm... gledaš?', 'open1'], ['Hehe, izvoli.', 'open2']],
-  close: [['Hehe, ne još.', 'close0'], ['Mm, polako.', 'close1']],
-  hit: [['Au! ...hehe.', 'hit0'], ['Mm, još jednom.', 'hit1'], ['Joj... peče.', 'hit2']],
-  look: [['Što radiš tamo?', 'look0'], ['Hej, ti.', 'look1']],
-  calm: [['Mmm...', 'calm0'], ['Lijepo mi je.', 'calm1']],
-  good: [['Hehe, tvoja dobra cura.', 'good0'], ['Mm, znam.', 'good1']],
-  still: [['Dobro... ne mičem se.', 'still0'], ['Mirna sam, mirna.', 'still1']],
-  more: [['Još? Hehe, dobro.', 'more0'], ['Mm, može.', 'more1']],
-  tug: [['Evo me, evo.', 'tug0'], ['Hehe, idem.', 'tug1']],
-  ham: [['Ljuljaj me... ili ću sama.', 'ham0']],
-  play: [['Gledaj ovo!', 'play0'], ['Hehe, za tebe.', 'play1']],
-  hose: [['Hej! Hehe, mokra sam!', 'hose0']],
-  come: [['Dođi ti meni.', 'come0']],
+  on: [["Mm... okay. My turn to lead, hehe.", 'on0'], ['Just watch me.', 'on1'], ['Hehe, leave it to me.', 'on2']],
+  off: [["Okay, you're the boss again.", 'off0'], ["Mm, the reins are all yours.", 'off1']],
+  open: [['Like this?', 'open0'], ['Mm... you watching?', 'open1'], ['Hehe, all yours.', 'open2']],
+  close: [['Hehe, not yet.', 'close0'], ['Mm, slow down.', 'close1']],
+  hit: [['Ow! ...hehe.', 'hit0'], ['Mm, do it again.', 'hit1'], ['Ooh... that stings.', 'hit2']],
+  look: [["What're you doing back there?", 'look0'], ['Hey, you.', 'look1']],
+  calm: [['Mmm...', 'calm0'], ['This is nice.', 'calm1']],
+  good: [['Hehe, your good girl.', 'good0'], ['Mm, I know.', 'good1']],
+  still: [["Okay... I'm not moving.", 'still0'], ["I'm still, I'm still.", 'still1']],
+  more: [['More? Hehe, okay.', 'more0'], ['Mm, sure.', 'more1']],
+  tug: [['Coming, coming.', 'tug0'], ["Hehe, I'm coming.", 'tug1']],
+  ham: [["Swing me... or I'll do it myself.", 'ham0']],
+  play: [['Watch this!', 'play0'], ["Hehe, this one's for you.", 'play1']],
+  hose: [["Hey! Hehe, I'm soaked!", 'hose0']],
+  come: [['You come to me.', 'come0']],
   // 1.568.0 — a hit that was hard, and a hit when she is hot for them.
-  hitHard: [['Au! To je bilo jako...', 'hitHard0'], ['Ah! ...joj, joj.', 'hitHard1'], ['Ssss... peče!', 'hitHard2']],
-  hitHot: [['Da... još.', 'hitHot0'], ['Mm... tako.', 'hitHot1'], ['Hehe... jače, ako smiješ.', 'hitHot2']],
+  hitHard: [['Ow! That one was hard...', 'hitHard0'], ['Ah! ...oh God.', 'hitHard1'], ['Ssss... that stings!', 'hitHard2']],
+  hitHot: [['Yes... more.', 'hitHot0'], ['Mm... just like that.', 'hitHot1'], ['Hehe... harder, if you dare.', 'hitHot2']],
   // The next one is late, and she looks back for it.
-  wait: [['Pa? ...', 'wait0'], ['Čekam...', 'wait1'], ['Hehe... gdje si stala?', 'wait2']],
+  wait: [['Well? ...', 'wait0'], ["I'm waiting...", 'wait1'], ["Hehe... where'd you go?", 'wait2']],
   // Teasing back, and giving in once told.
-  tease: [['Je li to sve?', 'tease0'], ['Hehe, jedva sam osjetila.', 'tease1'], ['Uhvati me, ako možeš.', 'tease2'],
-    ['Mm... a sad?', 'tease3']],
-  comply: [['Dobro, dobro... hehe.', 'comply0'], ['Kako ti kažeš.', 'comply1'], ['Mm... slušam.', 'comply2']],
+  tease: [["Is that all you got?", 'tease0'], ['Hehe, I barely felt that.', 'tease1'], ['Catch me if you can.', 'tease2'],
+    ['Mm... and now?', 'tease3']],
+  comply: [['Okay, okay... hehe.', 'comply0'], ['Whatever you say.', 'comply1'], ["Mm... I'm listening.", 'comply2']],
   // A run of hard ones, and her settling after it.
-  recover: [['Uff... daj mi sekundu.', 'recover0'], ['Diši... diši...', 'recover1'], ['Peče... ali dobro je.', 'recover2']],
+  recover: [['Phew... gimme a sec.', 'recover0'], ['Breathe... breathe...', 'recover1'], ["It stings... but it's good.", 'recover2']],
   // Your hands.
-  pet: [['Mmm... to.', 'pet0'], ['Još me tako mazi.', 'pet1'], ['Hehe... kao mačka.', 'pet2']],
-  hand: [['Mm... ruka ti je topla.', 'hand0'], ['Ostavi je tu.', 'hand1']],
-  thighOpen: [['Mm... izvoli.', 'thighOpen0'], ['Samo nastavi...', 'thighOpen1']],
-  thighClose: [['Hehe... ne tako brzo.', 'thighClose0'], ['Polako, polako...', 'thighClose1']],
-  handOff: [['Hej... vrati ruku.', 'handOff0'], ['Mm... već?', 'handOff1']],
-  pull: [['Ah! ...da.', 'pull0'], ['Mm... drži me.', 'pull1']],
+  pet: [['Mmm... that.', 'pet0'], ['Keep petting me like that.', 'pet1'], ['Hehe... like a cat.', 'pet2']],
+  hand: [["Mm... your hand's warm.", 'hand0'], ['Leave it there.', 'hand1']],
+  thighOpen: [['Mm... go on.', 'thighOpen0'], ["Don't stop...", 'thighOpen1']],
+  thighClose: [['Hehe... not so fast.', 'thighClose0'], ['Easy, easy...', 'thighClose1']],
+  handOff: [['Hey... put your hand back.', 'handOff0'], ['Mm... already?', 'handOff1']],
+  pull: [['Ah! ...yes.', 'pull0'], ['Mm... hold me.', 'pull1']],
   // The toy in her, as you turn it.
-  buzzOn: [['Oh! ...uključila si ga.', 'buzzOn0'], ['Mmm... evo ga.', 'buzzOn1']],
-  buzzUp: [['Ah... jače je.', 'buzzUp0'], ['Mm! ...da, tako.', 'buzzUp1']],
-  buzzDown: [['Mm... nježnije.', 'buzzDown0'], ['Hej... zašto slabije?', 'buzzDown1']],
-  buzzOff: [['Hej... zašto si stala?', 'buzzOff0'], ['Mm... već?', 'buzzOff1']],
-  toyMore: [['Jače... molim te.', 'toyMore0'], ['Pojačaj ga... malo.', 'toyMore1']],
-  toyLess: [['Previše je... slabije.', 'toyLess0'], ['Ah... uspori malo.', 'toyLess1']],
-  toyOn: [['Upali ga... molim te.', 'toyOn0'], ['A igračka? ...hehe.', 'toyOn1']],
-  toyThanks: [['Da... tako. Hvala.', 'toyThanks0'], ['Mmm... savršeno.', 'toyThanks1']],
+  buzzOn: [['Oh! ...you turned it on.', 'buzzOn0'], ['Mmm... there it is.', 'buzzOn1']],
+  buzzUp: [["Ah... it's stronger.", 'buzzUp0'], ['Mm! ...yes, like that.', 'buzzUp1']],
+  buzzDown: [['Mm... gentler.', 'buzzDown0'], ['Hey... why softer?', 'buzzDown1']],
+  buzzOff: [["Hey... why'd you stop?", 'buzzOff0'], ["Aw... that's it?", 'buzzOff1']],
+  toyMore: [['Stronger... please.', 'toyMore0'], ['Turn it up... just a little.', 'toyMore1']],
+  toyLess: [["It's too much... softer.", 'toyLess0'], ['Ah... slow it down a bit.', 'toyLess1']],
+  toyOn: [['Turn it on... please?', 'toyOn0'], ['And the toy? ...hehe.', 'toyOn1']],
+  toyThanks: [['Yes... like that. Thank you.', 'toyThanks0'], ['Mmm... perfect.', 'toyThanks1']],
   // On the leash: kneeling, standing, presenting, and resisting.
-  tugKneel: [['Tu sam, tu.', 'tugKneel0'], ['Mm... evo me.', 'tugKneel1'], ['Čujem te, čujem.', 'tugKneel2']],
-  tugStand: [['Idem, idem.', 'tugStand0'], ['Hehe, vodi.', 'tugStand1']],
-  present: [['Tu sam. Vodi me.', 'present0'], ['Tvoja sam.', 'present1']],
-  resist: [['Hehe... natjeraj me.', 'resist0'], ['Neću još.', 'resist1']],
+  tugKneel: [["I'm here, I'm here.", 'tugKneel0'], ['Mm... here I am.', 'tugKneel1'], ['I hear you, I hear you.', 'tugKneel2']],
+  tugStand: [['Going, going.', 'tugStand0'], ['Hehe, lead the way.', 'tugStand1']],
+  present: [["I'm here. Lead me.", 'present0'], ["I'm all yours.", 'present1']],
+  resist: [['Hehe... make me.', 'resist0'], ['Not yet.', 'resist1']],
 };
 
 // ── the words ────────────────────────────────────────────────────────────────
@@ -583,8 +585,8 @@ function autoSay(kind, force = false) {
   auto.lastLine = auto.clock;
   auto.said.push(id);
   if (auto.said.length > AUTO.lineMem) auto.said.shift();
-  const g = typeof T === 'function' ? T('auto.g.' + id) : '';
-  if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub(text, 2.6, g && g !== 'auto.g.' + id ? g : '');
+  // English since 1.570.0: the line is its own caption, no gloss.
+  if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub(text, 2.6, '');
   return text;
 }
 
@@ -1820,6 +1822,9 @@ const autoApi = {
   moves: () => Object.fromEntries(Object.entries(AUTO_MOVES).map(([k, M]) => [k, Object.keys(M.ctx).filter((c) => M.ctx[c])])),
   specials: () => AUTO_SPECIAL.slice(),
   words: (text) => ({ cmd: autoWords(text), cue: autoCueWords(text), safe: autoSafeword(text) }),
+  /** Her lines (1.570.0): `lines()` the table, `say(kind)` one of them now, captioned. */
+  lines: () => Object.fromEntries(Object.entries(AUTO_SAY).map(([k, L]) => [k, L.map((x) => x[0])])),
+  say: (kind) => autoSay(kind, true),
 };
 // The readout, asked for on the page's address.
 if (typeof location !== 'undefined' && /[?&]autodbg\b/.test(location.search || '')) auto.dbgOn = true;

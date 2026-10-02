@@ -45032,17 +45032,17 @@ async function buildJadrija(scene) {
     // The ladder: s a rung, and where she stands on it (behind the rung line).
     rungT: 0.62, back: 0.17,
   };
-  // Her lines, Croatian, with what they mean (`pg.g.*` in 02-i18n.js).
+  // Her lines: English since 1.570.0, and the caption is the line, no gloss.
   const PG_SAY = {
-    swing: [['Ljuljaj me!', 'swing0'], ['Ajde, gurni me!', 'swing1']],
-    high: [['Juhuuu!', 'high0'], ['Jače! Hehe!', 'high1'], ['Gledaj, letim!', 'high2']],
-    seesaw: [['Ajde, ti na drugu stranu!', 'saw0']],
-    up: [['Gore!', 'up0'], ['Hehe, spusti me!', 'up1']],
-    tramp: [['Hop!', 'tramp0'], ['Gledaj kako visoko!', 'tramp1']],
-    slide: [['Pazi sad!', 'slide0']],
-    whee: [['Juhuu!', 'whee0']],
-    rider: [['Đi-ha!', 'rider0'], ['Hehe, moj konjić.', 'rider1']],
-    off: [['Dosta mi je, hehe.', 'off0'], ['Vrti mi se!', 'off1']],
+    swing: [['Push me!', 'swing0'], ["C'mon, give me a push!", 'swing1']],
+    high: [['Wheee!', 'high0'], ['Higher! Hehe!', 'high1'], ["Look, I'm flying!", 'high2']],
+    seesaw: [["C'mon, you get on the other end!", 'saw0']],
+    up: [['Up!', 'up0'], ['Hehe, let me down!', 'up1']],
+    tramp: [['Hop!', 'tramp0'], ['Look how high!', 'tramp1']],
+    slide: [['Watch this!', 'slide0']],
+    whee: [['Wheee!', 'whee0']],
+    rider: [['Giddy-up!', 'rider0'], ['Hehe, my little pony.', 'rider1']],
+    off: [["Okay, I'm done, hehe.", 'off0'], ["I'm so dizzy!", 'off1']],
   };
   let pgSaidAt = -99;
   function pgSay(kind, force = false) {
@@ -45051,8 +45051,7 @@ async function buildJadrija(scene) {
     if (!force && show.clock - pgSaidAt < PGR.say) return null;
     const [text, id] = L[Math.floor(Math.random() * L.length)];
     pgSaidAt = show.clock;
-    const g = typeof T === 'function' ? T('pg.g.' + id) : '';
-    if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub(text, 2.4, g && g !== 'pg.g.' + id ? g : '');
+    if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub(text, 2.4, '');
     return text;
   }
   /** Near enough to the playground kit to mean it — her, or you. */

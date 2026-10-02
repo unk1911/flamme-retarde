@@ -2046,18 +2046,18 @@ const BELT_HAND = {
   // how far over her skin its target is (m — the pet's is her hair's crown).
   rub: { secs: 4.5, r: 0.03, period: 1.6, off: 0.035 },
 };
-// What she says, in her Croatian, and what it means (i18n `belt.g.*` — the
-// gloss, which is empty in Croatian). One line in two, never closer than
-// `sayGap` s, a pat or a crack; the rest are always said.
+// What she says: English since 1.570.0, written for her, and the caption is
+// the line, no gloss. One line in two, never closer than `sayGap` s, a pat or
+// a crack; the rest are always said.
 const BELT_SAY = {
-  pat: [['Hehe. To je sve?', 'pat0'], ['Mm, škakljivo.', 'pat1'], ['Jače, ne bojim se.', 'pat2']],
-  crack: [['Ah! ...Opet.', 'crack0'], ['Mmh. Još jednom.', 'crack1'], ['Uh! Hehe, zločesta.', 'crack2'],
-    ['Joj, to je dobro.', 'crack3'], ['Opet!', 'crack4'], ['Hehe. Svidjelo mi se.', 'crack5']],
-  off: [['Hej! Ne tamo, hehe.', 'off0']],
-  yellow: [['Žuta. Polako, ljubavi.', 'yellow0']],
-  red: [['Crvena.', 'red0']],
-  heard: [['Okej. Dođi ovamo.', 'heard0']],
-  after: [['Mm... hvala ti.', 'after0'], ['Hvala ti, ljubavi.', 'after1']],
+  pat: [["Hehe. That's it?", 'pat0'], ['Mm, that tickles.', 'pat1'], ["Harder. I'm not scared.", 'pat2']],
+  crack: [['Ah! ...Again.', 'crack0'], ['Mmh. One more.', 'crack1'], ["Ooh! Hehe, you're bad.", 'crack2'],
+    ["Oh, that's good.", 'crack3'], ['Again!', 'crack4'], ['Hehe. I liked that one.', 'crack5']],
+  off: [['Hey! Not there, hehe.', 'off0']],
+  yellow: [['Yellow. Easy, babe.', 'yellow0']],
+  red: [['Red.', 'red0']],
+  heard: [['Okay. Come here.', 'heard0']],
+  after: [['Mm... thank you.', 'after0'], ['Thank you, babe.', 'after1']],
   sayGap: 1.4,
 };
 let belt = null;                 // the strap, built the first time it comes out
@@ -2238,8 +2238,7 @@ function beltSay(kind, force = false) {
   if (!force && beltClock - beltSaidAt < BELT_SAY.sayGap) return null;
   const [text, id] = L[Math.floor(Math.random() * L.length)];
   beltSaidAt = beltClock;
-  const gloss = T('belt.g.' + id);
-  if (voice && voice.sub) voice.sub(text, 2.6, gloss && gloss !== 'belt.g.' + id ? gloss : '');
+  if (voice && voice.sub) voice.sub(text, 2.6, '');
   beltLog.said.push(text);
   if (beltLog.said.length > 12) beltLog.said.shift();
   return text;
@@ -2645,19 +2644,19 @@ const COLLAR = {
   // Her lines while she follows, outside, one in `every` s at the most.
   every: [14, 26],
 };
-// What she says, in her Croatian, and what it means (i18n `collar.g.*`).
+// What she says: English since 1.570.0, and the caption is the line, no gloss.
 const COLLAR_SAY = {
-  on: [['Mm. Lijepo mi stoji?', 'on0'], ['Hehe. Sad sam tvoja.', 'on1'], ['Vodi me, ljubavi.', 'on2']],
-  tug: [['Hej! Polako, hehe.', 'tug0'], ['Idem, idem!', 'tug1'], ['Mm, zločesta.', 'tug2']],
-  yank: [['Ah! Hehe, jaka si.', 'yank0'], ['Joj! Dobro, dobro.', 'yank1'], ['Uh! ...Još jednom.', 'yank2']],
-  lead: [['Kamo me vodiš?', 'lead0'], ['Hehe, svi nas gledaju.', 'lead1'], ['Mm, sporije, ljubavi.', 'lead2']],
-  ham: [['Mreža? Može.', 'ham0']],
+  on: [['Mm. Does it suit me?', 'on0'], ["Hehe. Now I'm yours.", 'on1'], ['Lead me, babe.', 'on2']],
+  tug: [['Hey! Easy, hehe.', 'tug0'], ['Coming, coming!', 'tug1'], ["Mm, you're bad.", 'tug2']],
+  yank: [["Ah! Hehe, you're strong.", 'yank0'], ['Oh! Okay, okay.', 'yank1'], ['Uh! ...Do that again.', 'yank2']],
+  lead: [['Where are you taking me?', 'lead0'], ["Hehe, everybody's watching.", 'lead1'], ['Mm, slower, babe.', 'lead2']],
+  ham: [['The hammock? Sure.', 'ham0']],
   // 1.554.0: a yank that moves her — up on her knees or her feet, down, on
   // to the cot.
-  up: [['Mm, dobro, dobro.', 'up0'], ['Evo me, hehe.', 'up1'], ['Gore? Kako želiš.', 'up2']],
-  down: [['Dolje? Hehe, dobro.', 'down0'], ['Mm... polako.', 'down1']],
-  cot: [['Na krevet? Mm.', 'cot0'], ['Hehe, znam kamo me vodiš.', 'cot1']],
-  off: [['Hvala ti. Opet sutra?', 'off0'], ['Mm... bilo je lijepo.', 'off1']],
+  up: [['Mm, okay, okay.', 'up0'], ['Here I am, hehe.', 'up1'], ['Up? Whatever you want.', 'up2']],
+  down: [['Down? Hehe, okay.', 'down0'], ['Mm... slowly.', 'down1']],
+  cot: [['The cot? Mm.', 'cot0'], ['Hehe, I know where this is going.', 'cot1']],
+  off: [['Thank you. Again tomorrow?', 'off0'], ['Mm... that was nice.', 'off1']],
   sayGap: 1.6,
 };
 let leashC = null;               // the chain, built the first time it is clipped on
@@ -2827,8 +2826,7 @@ function collarSay(kind, force = false) {
   if (!force && colClock - colSaidAt < COLLAR_SAY.sayGap) return null;
   const [text, id] = L[Math.floor(Math.random() * L.length)];
   colSaidAt = colClock;
-  const gloss = T('collar.g.' + id);
-  if (voice && voice.sub) voice.sub(text, 2.6, gloss && gloss !== 'collar.g.' + id ? gloss : '');
+  if (voice && voice.sub) voice.sub(text, 2.6, '');
   colLog.said.push(text);
   if (colLog.said.length > 12) colLog.said.shift();
   return text;

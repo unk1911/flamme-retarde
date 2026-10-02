@@ -8,6 +8,91 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.570.0] — 2026-10-02 (baye 1.62.0)
+
+### Baye speaks English, in the same voice
+
+Misha, 06:20: *"the speech for baye should be in English, not croatian.
+whatever choices she was using earlier u know, keep using that same eleven
+labs voice"*. Same Baye, same Jessica (`LEnmbrrxYsUYS7vsRRwD`, `TTS_VOICE`,
+untouched), same four dials and the same models: `eleven_multilingual_v2` for
+her lines, `eleven_turbo_v2_5` for her answers.
+
+**Her voice** (`server/baye/baye.py` 1.62.0, **needs deploying on mpcn0**).
+Her lines used to follow your language: `PERSONA` said "English unless the
+player's language is Croatian or French", `PERSONA_TALK` "answer in the
+language they spoke to you in", and a spoken ask or a recon report answered
+in the language it was asked in. Now:
+- `PERSONA` and `PERSONA_TALK` say English, always. The talk persona's "in
+  another language it is the same mouth" paragraph is gone; the rest of her
+  (the Brooklyn mouth, warm, easy, the one absolute line) is as it was.
+- `build_messages` no longer tells her your language (the cat still is told),
+  and a spoken ask in Croatian or French gets "answer in English all the
+  same"; a recon report is English whatever you asked in.
+- `/talk` with her says "Answer in English, though they spoke Croatian".
+- The Bucketeer keeps her own rule (the language she was asked in, Croatian
+  when she cannot tell), and so does everybody else on the beach.
+
+Rendered on mpcn0 with this file (not the deployed one), in Jessica, and sent
+back through the transcriber:
+
+| asked | her line | heard back |
+|---|---|---|
+| page in Croatian, on the cot, three slaps | Three already, and you've left me choosing what comes next. | verbatim |
+| page in French, on the beach | Eleven already, and you still look too tempting to behave. | verbatim |
+| "Baye, kako si danas? Je li ti vruće?" | I'm good, totally dry, and yeah, it's hot as hell. | verbatim |
+| "Baye, tu veux une glace ?" | Yeah, gimme vanilla before I melt first. | "give me" for "gimme" |
+| "Did that one sting, Baye?" | Yeah, that last one stung, asshole, and I liked it. | verbatim |
+| the Bucketeer, "Koliko si kanti danas nosila?" | Ne znam, nisam ih brojila. | (still Croatian) |
+
+Synthesis 1.1–1.4 s on multilingual, 0.3–0.5 s on turbo, as before.
+
+**Her lines on the page** are English, written for her and not translated
+from the gloss, and the caption is the line: no gloss under it in any
+language, which is 1.569.0's choice for Chloe. 140 lines in four tables,
+lengths and ids unchanged:
+- `AUTO_SAY` (49-auto.js, her own mode, 87 lines): "Mm... okay. My turn to
+  lead, hehe.", "Is that all you got?", "Phew... gimme a sec.", "Hehe...
+  make me.", "Turn it up... just a little.", "Aw... that's it?" (was a
+  second "Mm... već?").
+- `BELT_SAY` (90-app.js, 15): "Hehe. That's it?", "Ooh! Hehe, you're bad.",
+  "Yellow. Easy, babe.", "Red.", "Thank you, babe."
+- `COLLAR_SAY` (90-app.js, 22): "Lead me, babe.", "Hehe, everybody's
+  watching.", "Hehe, I know where this is going."
+- `PG_SAY` (43-jadrija.js, 16): "C'mon, give me a push!", "Look, I'm
+  flying!", "Giddy-up!", "I'm so dizzy!"
+- The R race (`chase.say1-3`): "Ugh… I thought you swam better than that.",
+  "See the smoke? It's burning up over Rokići.", "Let's head back.
+  Somebody's gonna need you." One English line in every language.
+
+The 420 gloss strings (`auto.g.*`, `belt.g.*`, `collar.g.*`, `pg.g.*` in
+en/hr/fr) are gone. Your commands stay en/hr/fr, the HUD and help stay in
+your language, and the locals stay Croatian: the bathers' balloons and
+voices, the cat's café, the Bucketeer's baked mutter, the TV, the chatter,
+the signs.
+
+**No baked Baye speech to redo.** Every word she says aloud is live; the
+payload's `show_wet*` / `show_bump*` are Misha's own wordless takes, the
+`mutter_*` are the Bucketeer's Croatian and the `bump_*` the Brooklyn
+strangers'. The page is 15 KB lighter (41,970,398 to 41,954,922 bytes).
+
+**Measured.** A static scan of all 140 lines through a Croatian detector:
+0 hits (115 on 1.569.0). In the page: every one of her own-mode kinds said
+three times through `__fr.auto.say` (new, with `__fr.auto.lines()`), plus a
+worked session (face down, six slaps, "good girl", the plug on and up and
+off, "be still", "red", the belt out): 121 captions, all English, no gloss
+element shown. Regression (the normal and reversed plans): flat, legs, the
+hand, the belt out and back, her mode with "more", "red" with aftercare,
+the collar and a tug in her mode, the collar's red; reversed keys 1-7,
+Shift+1..6, the toy, the remote, her belt, the safeword (Chloe still in
+English). People 100, blockers 820, no console errors, 6 headless runs.
+RULE 4: no `rng()` draw touched (the playground lines are `Math.random`, and
+only their text changed).
+
+**Rough, still:** her voiced lines were heard only through the transcriber
+here, not by ear; the page captions are still captions only (unvoiced) in her
+own mode, on the belt, the collar and the kit, as they were in Croatian.
+
 ## [1.569.0] — 2026-10-02 (baye 1.61.0)
 
 ### Roles reversed: Chloe is a Californian now, shows off beside the cot, and hugs and kisses you on your back
