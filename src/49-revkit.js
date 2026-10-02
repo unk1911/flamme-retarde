@@ -169,6 +169,8 @@ function rvkPlace() {
   if (!o || !you || !you.mesh) return false;
   you.mesh.position.set(o.at[0], o.at[1], o.at[2]);
   you.mesh.rotation.set(o.roll || 0, o.yaw + (typeof YOU !== 'undefined' ? YOU.face : 0), o.pitch || 0, 'YZX');
+  // A whole attitude (1.573.0: lying behind you on the cot), as `tick` does.
+  if (o.quat) you.mesh.quaternion.copy(o.quat);
   you.mesh.updateMatrixWorld();
   return true;
 }

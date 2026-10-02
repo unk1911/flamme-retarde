@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.63.0"
+VERSION = "1.64.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4625,6 +4625,21 @@ CHLOE_BEAT = {
            "round their shoulders, holding them close. A soft, warm line",
     "kiss": "you are leaning over them on the cot, holding them, and you have "
             "just kissed them on the lips. A short, fond, teasing line",
+    # 1.64.0 (page 1.573.0, src/49-revmoves.js): lying down behind them on the
+    # cot and holding them, spooning. Tender and loving, never sexual.
+    "spoon": "you have just lain down on the cot behind them, curled round "
+             "their back, your arm over their waist and your hand on theirs. "
+             "Whisper something tender and loving; you two are in love. No "
+             "orders, no teasing, nothing sexual",
+    "nuzzle": "you are lying behind them on the cot holding them, and you have "
+              "just kissed their shoulder. A soft, loving whisper",
+    "spoonup": "you are getting up off the cot from behind them, where you "
+               "were holding them. One soft, warm line",
+    "curlup": "they asked you to hold them, and you are asking them to curl "
+              "up on their side on the cot so you can lie behind them. Soft "
+              "and warm, not an order",
+    "later": "you wanted to lie down with them and hold them, and they did not "
+             "curl up. Let it go lightly, fondly; maybe later",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
 TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense", "wand": "the wand"}
@@ -4652,7 +4667,13 @@ REV_ORDER_WORDS = {
     "higher": ("put both legs up, and higher, straight up", "Both legs up. Higher."),
     "wider": ("spread their legs even wider", "Wider. Even wider."),
     "legsDown": ("put their legs back down", "Legs down."),
+    # 1.64.0: soft, before she lies down behind them; never punished.
+    "curl": ("curl up on their side on the cot, so you can lie down behind "
+             "them and hold them", "C'mere... curl up for me."),
 }
+# Lying behind them on the cot, holding them (1.64.0, page 1.573.0): the page
+# sends 'on', or 'care' when it is the aftercare.
+REV_SPOON = {"on": 1, "care": 1}
 
 # HER LEGS, SHAPE BY SHAPE (1.58.0, page 1.566.0): `legs_l` / `legs_r` off
 # `LIFT_SCENE` in src/43-jadrija.js — on her back, then on her front — and
@@ -5211,10 +5232,12 @@ def clean_scene(raw) -> dict:
         # And the toy in her hand (1.59.0, page 1.567.0): which one she has
         # drawn partway out, if any, and her remote's level, 1..4.
         "toy_drawn": _enum(g("toy_drawn"), TOY_DRAWN, 8),
+        # And lying behind them, holding them (1.64.0, page 1.573.0).
+        "rev_spoon": _enum(g("rev_spoon"), REV_SPOON, 6),
         "remote_level": clamp_num(g("remote_level"), 0, 4),
     }
     if not out["roles"]:
-        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "toy_drawn", "remote_level"):
+        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "toy_drawn", "remote_level", "rev_spoon"):
             out[k] = None
     if out["remote_level"] is not None:
         out["remote_level"] = int(round(out["remote_level"])) or None
@@ -5508,6 +5531,14 @@ def chloe_scene_lines(s: dict):
     if lv and (s.get("buzz") or s.get("buzz_plug") or s.get("buzz_wand")):
         facts.append(f"the remote on your phone is at {lv} of 4"
                      + (", as high as it goes" if lv >= 4 else ""))
+    sp = s.get("rev_spoon")
+    if sp in REV_SPOON:
+        facts.append("you are lying on the cot behind them, spooning them: your "
+                     "front along their back, your arm over their waist, your "
+                     "hand on theirs, your face in their hair, both of you "
+                     "breathing together")
+        tone.append("This is tender. You two are in love. Be soft, close and "
+                    "loving: no orders, no teasing, nothing sexual.")
     td = s.get("toy_drawn")
     if td in TOY_DRAWN:
         facts.append(f"your hand is on {TOY_DRAWN[td]} they are wearing and you "

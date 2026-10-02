@@ -8,6 +8,182 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.573.0] — 2026-10-02 (baye 1.64.0)
+
+### Roles reversed: Chloe lies down behind you and holds you
+
+Misha, 06:40: *"if at certain intimate moments of show of affection that
+Chloe could slide in lay on the cot next to baye (baye being in fetal pose)
+and spoon ... ultimately we are in love"*. The night-loop plan, item 12. He
+also asked for "very slight hip thrusts" while they lie together; that part
+is declined. What is built is the cuddle: two people in love lying close,
+her arm over you and her hand on yours. Nothing in it moves rhythmically
+against you; her pelvis is never driven. The safeword is over it like
+everything else.
+
+**Curled on your side, loosened for two** (`move:spoon`, src/49-revmoves.js).
+Your own `fetal` (knees to your chest) takes 0.58 m of the 0.66 m mattress,
+with your back at its room-side edge, so nobody fits behind you. While she is
+there your curl is looser and you are moved over. It is solved, not typed:
+- each thigh 38° off your own long axis, each knee 77°, in your own sagittal
+  plane;
+- every knee and ankle put at a height over the foam: the under leg resting
+  on it, the upper one on the under one;
+- segment lengths kept, and `hingeArm` lays the bones on those points.
+  MEASURED: knee joints 0.0–0.1 mm off their targets.
+
+Your mark slides across the cot (`jadrija.curlShift`, a small hook in
+43-jadrija.js) until the front of you (your face) is at the wall-side edge.
+That position is measured off your skinned mesh, not off a bone.
+
+**Her, behind you.** The same rig and the same solve, with her own knee a
+little straighter (66°), so the two shapes nest. She is placed along your
+back by one translation in your frame. That translation is then closed by
+feedback on the measured skin-to-skin gap.
+- **The gap** is measured on the CPU: both bodies skinned off the palettes
+  that draw them (yours is v2.0's), then every vertex of hers checked against
+  your nearest three, and their normals, for inside or out. MEASURED, held:
+  trunk 1.6 cm, legs 2.6, face 3.7, under arm 4.7. No vertex of hers is
+  inside you. The least over a 35 s hold was 1.1 cm. After her kisses she
+  stays in close; before this fix, three kisses had walked her 8 cm back.
+- **Her arm over your waist, her hand on yours.** Your upper hand comes off
+  your knee onto the top of your hip, palm solved onto the skin with the 2c
+  palm solve on your arm (0.1 mm). Her palm is solved onto the back of your
+  hand. How thick your hand is there (4.3 cm) is measured off your mesh. Her
+  elbow is the one of 24 ways round the arm that keeps it clearest of you,
+  your own arm included (`rvsArmPole`). MEASURED: palm on the back of your
+  hand at 4.0–4.2 mm; the forearm 2.9 cm clear of you. Her curled fingertips
+  are up to 1.0 cm into your fingers (14 vertices).
+- **Her under arm** goes up the pillow, with the palm under her own cheek.
+- **Her face** is turned into your nape. Now and then she reaches the last
+  centimetre or two and kisses the skin nearest her lips: the back of your
+  shoulder, or the top of your back. You hear the kiss sound, sometimes with
+  a whispered line. MEASURED: three kisses in 35 s, lips 0.8–1.7 mm off your
+  skin.
+- **Both chests rise** (an aim on each chest about its own across-axis). You
+  breathe at a sleeper's 0.20 Hz. She arrives at 0.30 Hz; her rate eases onto
+  yours (τ 7 s) while her phase is drawn onto yours. MEASURED: phase 2.2 rad
+  apart as she settles, under 0.25 within 4 s, under 0.1 by 15 s; her rate is
+  within 5 % of yours by 10 s and 0.200 by 35 s. The trace is in
+  `__fr.reverse.moves.spoonBreath()`.
+- **The cot holds both.** You are 2.1 cm over its wall-side edge (your face)
+  and she is 2.2 cm over the room side (her heels). Both lie 2.3 cm into the
+  foam, which is what your own `fetal` was built to.
+
+**The way in** is how a person gets in behind somebody:
+1. To the edge level with your waist, and sat on it.
+2. Turned on it to face the cot's foot, knees drawn up, feet off the floor
+   and onto the mattress, both hands on the edge behind her (`rvsKneesUp`).
+3. Down onto her side a little wide of you (the clip crossfaded from `sitHeld`
+   to `fetalHeld`), and she slides in.
+
+You make room while she gets in: your knees are straighter and you are 12 cm
+further over. Once she is down you shuffle back into her and you both draw
+your knees up together. Your hand goes to your hip only once she is down,
+because it was in her way coming down.
+
+Skin to skin was MEASURED ten times a second all the way down and all the way
+up. The first cuts had her shins 8 cm through yours, her knees through your
+hip and her head through your arm. Now the nearest is 3.0 cm on the way in
+and 2.0 cm on the way out. The way out is the same run backwards: back off
+you, up onto the edge, sat, stood.
+
+**Her clip was the older bake.** Chloe's `fetalHeld` predates FETAL's 24 Sep
+fix: her arms are 78–153° off, her neck 27°, and her root 4 cm lower. The
+4 cm is put back into her place. Her arms are solved, so the rest never shows.
+
+**Fixed on the way** (all three found measuring this):
+- `rvkPlace` (49-revkit.js) put her figure in place on her yaw and dropped a
+  whole-attitude `quat`, so every solve in a frame read her lying body turned
+  the wrong way.
+- The 2c two-bone arm solve keeps whatever the clip has off the elbow's bind
+  hinge. On a curled arm that put the wrist 7.9 cm from where it was solved
+  (Baye's) and saturated the lag correction (Chloe's lying). Both now use the
+  hinge the clip bends on; standing moves are unchanged.
+- A look at a point 6 cm away turned her head, which moved her eyes, which
+  turned the look. She rocked 4 cm every other frame through a kiss. The look
+  now aims at a point past the target.
+
+**When.**
+- **Her own pick**, on the cot, when she is not worked up (heat < 0.62),
+  likelier after a run of kept orders and at low heat, likeliest with you
+  already curled up. Never twice within a minute.
+- **Not curled?** She asks first, softly: *"C'mere... curl up for me."* This is
+  a new soft order on the HUD ("she wants: Curl up for me. [Shift+7]"). It
+  waits 16 s, is never punished and gets no heat. If you do not curl up she
+  lets it go: *"Okay... later, then."*
+- **Asked:** "spoon me", "be my big spoon", "zagrli me u krevetu", "câlin" /
+  "fais-moi un câlin" anywhere. "cuddle me", "hold me" and "zagrli me" mean
+  the spoon on the cot; on your back they are still 1.569.0's hug. Asked,
+  she curls you up herself ("C'mere... curl up for me.") and comes.
+- **Key Shift+7** (on the help sheet).
+
+**Her lines:** *"C'mere. I've got you."* / *"Stay. Just like this."* as she
+settles. Later *"Mm. Right where you belong."*, and after a kiss *"Mm. You
+smell like sunscreen."* / *"Love you, babe."*. Getting up: *"Okay. I'm right
+here."* / *"Mm. Okay, up we get."*.
+
+**How it ends:**
+- **Move or ask for anything** (W/S, a key, a pose, another move of hers):
+  she gets up first, the way she came, and then it is done. Nobody rolls over
+  through her.
+- **A long hold** ends it after 120 s.
+- **The safeword** keeps her holding you. It is the aftercare: no kisses, her
+  care line, 9 s. Then she gets up the way she came, and only then do the
+  roles swap back.
+
+**First person and B.**
+- Your camera's own breath: a few millimetres and a nod.
+- When she settles, your eyes go down to your two hands once. From your head
+  on the pillow you see her tattooed arm over your waist and her hand on
+  yours.
+- B is the room's third person, as before.
+
+**Her voice** (`server/baye/baye.py` 1.64.0, **needs deploying on mpcn0**):
+- `CHLOE_BEAT` `spoon`, `nuzzle`, `spoonup`, `curlup`, `later`: tender,
+  loving, never sexual.
+- `REV_ORDER_WORDS.curl`.
+- The scene key `rev_spoon` ('on' | 'care'), which her chat reads as *"you are
+  lying on the cot behind them, spooning them..."* plus a tone line: tender,
+  no orders, no teasing, nothing sexual.
+- Undeployed, the page's captions show.
+
+Debug (`__fr.reverse.moves`):
+- `start('spoon', why)`
+- `spoon()`: everything above: gap by region, hand error, way-in/out gap,
+  kisses, breath, solve errors.
+- `spoonGap(stride)`, `spoonBreath(n)`, `spoonArms()`.
+- `spoonView('hands' | 'heads')`, `spoonLook('hands', dyaw, dpitch)`.
+- `spoonTune({...})`.
+
+**Measured** in 69 headless runs on the worktree build, the last ones:
+- a full asked run (views, first person, B, 35 s hold, get-up);
+- her own pick with the order let go and kept;
+- words and keys;
+- a hug asked mid-spoon (she gets up first);
+- the safeword mid-spoon (held, up, swapped back).
+
+Regression:
+- main's normal-roles plan (flat, spread, a leg up, a hand spank, the belt
+  out and back, her own mode, red, the collar with a tug, collar red);
+- the reversed plan (keys 1–7, Shift+1..6, the toy, the remote, her belt, the
+  safeword), identical to 1.570.0;
+- 1.569.0's hip tease (gap 0.448 m, push 7.7 cm) and hug and kiss with your
+  legs up. Faces were 7.6 cm at the kiss; 1.570.0 measures 4.8 or 7.5 cm run
+  to run with the same plan.
+- People 100, blockers 820, no console errors.
+
+RULE 4: no `rng()` draw added, removed or moved (43-jadrija.js gains
+`curlMark` and `curlShift` only).
+
+**Rough, still:**
+- She lies in bed in her boots and beanie.
+- Her under hand sits by her cheek on the pillow, not quite under it, because
+  her older neck does not bring her head down onto it.
+- Over a kiss her palm can be off your hand by up to 4.3 cm for a frame.
+- Your face and her heels are each about 2 cm over the edges of the mattress.
+- Her lines are captions until baye.py 1.64.0 is deployed.
+
 ## [1.572.0] — 2026-10-02 (baye 1.63.0)
 
 ### The third toy: a G-spot wand, in either hole

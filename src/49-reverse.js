@@ -247,6 +247,8 @@ function revScene() {
   if (typeof rvkScene === 'function') rvkScene(o);
   // A toy she has drawn partway out, and her remote's level (1.567.0).
   if (typeof rvtScene === 'function') rvtScene(o);
+  // Lying behind you on the cot, holding you (1.573.0).
+  if (typeof rvmScene === 'function') rvmScene(o);
   return o;
 }
 
@@ -503,6 +505,18 @@ function revWords(text) {
   if (tw) return tw;
   // Her hip tease and her hug and kiss (1.569.0, src/49-revmoves.js).
   if (/^((come on |go on )?show me (your|what you('ve| have) got|some) ?(moves|got)?( then| babe| please)?|show me what you('ve| have) got|show off( for me)?|dance for me|(pokazi|pokazes) mi( sto znas| svoje pokrete| pokrete)?|montre[- ]moi( ce que tu sais faire| tes mouvements)?)$/.test(t)) return 'rev.move:thrust';
+  // Lying behind you and holding you (1.573.0, src/49-revmoves.js): "spoon
+  // me" anywhere; "cuddle me", "hold me", "zagrli me" and "câlin" mean it on
+  // the cot (on your back they are still her hug, 1.569.0).
+  if (/^((please |come |come and |let'?s )?spoon( me| with me)?( please)?|be my (big )?spoon|(please )?(cuddle|hold) me( close| tight)?( please)?|cuddle( with me)?|(zagrli|mazi) me u krevetu|lezi (iza|uz) mene|(fais|fait)[- ]moi un calin( au lit)?|un calin|calin|serre[- ]moi contre toi)$/.test(t)) {
+    const vv = revView();
+    const forced = /spoon|krevetu|lezi|calin|contre toi/.test(t);
+    if (forced || !(vv && vv.ctx === 'back')) return 'rev.move:spoon';
+  }
+  if (/^(zagrli me)$/.test(t)) {
+    const vv = revView();
+    if (vv && vv.onBed && vv.ctx !== 'back') return 'rev.move:spoon';
+  }
   if (/^((please )?(hug|kiss|cuddle|hold) me( please)?|(give me |i want )?a (hug|kiss)( please)?|come here and (hug|kiss) me|(zagrli|poljubi) me|zagrljaj|pusu|(fais|fait)[- ]moi un (calin|bisou)|embrasse[- ]moi|serre[- ]moi( dans tes bras)?)$/.test(t)) return 'rev.move:hug';
   const arms = /\b(arms?|ruke|bras)\b/.test(t);
   const v = revView();
@@ -574,6 +588,12 @@ function revAct(name) {
 function revAsk(name) {
   if (!rev.on || !jadrija || !jadrija.askShow) return 'off';
   if (rev.care) return 'aftercare';
+  // Chloe lying behind you (1.573.0): she gets up off the cot first, and then
+  // it is done — nobody rolls over through her.
+  if (typeof rvmSpoonAsk === 'function' && rvmSpoonAsk(name)) {
+    revTrace({ pick: 'you:' + name, why: 'after she is up' });
+    return true;
+  }
   // A pose asked while the order is "be still" is a move.
   rev.dom.moved += 1;
   // On her leash (1.564.0): the leash's own poses, and nothing that would
@@ -628,6 +648,12 @@ function revKey(e) {
   const v = revView();
   if (!v) return true;
   const n = +m[1];
+  // SHIFT AND 7 (1.573.0): Chloe lies down behind you and holds you.
+  if (e.shiftKey && n === 7 && typeof rvmAskMove === 'function') {
+    const r = rvmAskMove('spoon');
+    if (typeof toast === 'function') toast(r.label);
+    return true;
+  }
   // SHIFT AND A NUMBER (1.566.0): your legs' ladder. 1 the left leg up, or
   // down again; 2 the right; 3 both up, or down; 4 higher; 5 wider; 6 lower.
   if (e.shiftKey && n <= 6) {
@@ -747,6 +773,14 @@ function revDriveChloe(dt) {
     if (!cr) for (const n of REV_SPINE) you.fig.aim(n, 0, 0, 1, 0);
     A.bowed = false;
   }
+  // Lying behind you on the cot (1.573.0): her place and her whole turn are
+  // the spoon's (`rvmSpoonDrive`), on Baye's own frame.
+  const sp = typeof rvmSpoonDrive === 'function' ? rvmSpoonDrive() : null;
+  if (sp) {
+    rev.lastDrive = you.drive({ at: [sp.at.x, sp.at.y, sp.at.z], yaw: C.yaw + Math.PI / 2, quat: sp.quat, pitch: 0,
+      seen: true, wet: false, clip: Bd.clip, fade: Bd.fade, speed: Bd.speed });
+    return;
+  }
   const sit = typeof rvmSitAt === 'function' ? rvmSitAt() : null;
   const cd = cr ? cr.drop : 0, cbk = cr ? cr.back : 0;
   rev.lastDrive = you.drive({
@@ -858,12 +892,21 @@ function revOrderTick(dt, v) {
   const ok = v && revKept(O, v, rev);
   Ord.held = ok ? Ord.held + dt : 0;
   if (Ord.held >= REV.hold) return revOrderEnd(true, 'kept');
-  if (age > REV.orderWait) revOrderEnd(false, 'not done in ' + REV.orderWait + ' s');
+  const wait = O.wait || REV.orderWait;
+  if (age > wait) revOrderEnd(false, 'not done in ' + wait + ' s');
 }
 
 function revOrderEnd(kept, why) {
   const D = rev.dom, id = D.order ? D.order.id : '?';
   D.order = null;
+  // A soft one (1.573.0: "curl up for me", before she lies down with you):
+  // not a test. Kept, what comes next is her answer; not, it is let go.
+  if (REV_ORDERS[id] && REV_ORDERS[id].soft) {
+    if (kept) D.obey++;
+    revTrace({ pick: (kept ? 'kept:' : 'let go:') + id, why, heat: +D.heat.toFixed(2) });
+    revHud();
+    return;
+  }
   if (kept) {
     D.obey++; D.streak++;
     D.heat = Math.min(1, D.heat + 0.08);
@@ -1046,7 +1089,9 @@ function revTick(dt) {
   }
   if (rev.lookTo > 0) {
     rev.lookTo -= dt;
-    const Hc = revChloeHead(new THREE.Vector3()), O = camera.position;
+    // At her face; or once at a point a move of hers asks (1.573.0: your two hands).
+    const Hc = rev.lookAtP ? rev.lookAtP.clone() : revChloeHead(new THREE.Vector3()), O = camera.position;
+    if (rev.lookTo <= 0) rev.lookAtP = null;
     const yw = Math.atan2(-(Hc.x - O.x), -(Hc.z - O.z));
     const pt = Math.atan2(Hc.y - O.y, Math.hypot(Hc.x - O.x, Hc.z - O.z));
     let dy = yw - Y.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
@@ -1098,7 +1143,13 @@ function revCareTick(dt, v) {
   }
   if (!K.said && K.t > 0.4) { K.said = true; revSay('care', true, null, { still: revStill.care }); }
   const M = typeof rvm !== 'undefined' ? rvm.move : null;
-  if (K.handAt == null && ((M && M.id === 'care' && M.handOn) || (K.how !== true && K.t > 1.5))) K.handAt = K.t;
+  if (K.handAt == null && ((M && (M.id === 'care' || M.id === 'spoon') && M.handOn) || (K.how !== true && K.t > 1.5))) K.handAt = K.t;
+  // Lying with you when you said it (1.573.0): she holds you through it, gets
+  // up the way she came, and only then do the roles go back.
+  if (M && M.id === 'spoon') {
+    if (K.t > 45) { rev.arm.mode = null; revOff('safe'); }
+    return;
+  }
   if (K.how !== true && K.handAt != null && jadrija.petTouch) jadrija.petTouch(Math.min(1, (K.t - K.handAt) / 0.8));
   // Four and a half seconds of her hand, then the roles go back — and not in
   // the middle of her saying it's over (1.563.0: her line is a round trip
@@ -1139,6 +1190,9 @@ function revCamera(dt) {
   }
   // Her hand lifting your chin, or holding your hair at the nape (1.565.0):
   // your head tipped up toward her, a little rolled.
+  // Lying with her (1.573.0): your own breath, a few millimetres and a nod.
+  const cb = typeof rvmCamBreath === 'function' ? rvmCamBreath() : 0;
+  if (cb) { camera.position.y += 0.005 * cb; camera.rotateX(-0.008 * cb); }
   const tl = typeof rvmCamTilt === 'function' ? rvmCamTilt() : null;
   if (tl && (tl[0] > 0.002 || tl[1] > 0.002)) { camera.rotateX(tl[0]); camera.rotateZ(tl[1]); }
   // A toy drawn out or pushed back in (1.567.0): a shiver.

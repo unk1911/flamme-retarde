@@ -79,7 +79,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    The player's commands stay multilingual (en/hr/fr). Bathers, the cat, the Bucketeer, TV news
    and overheard chatter stay Croatian. Runs right after 6b (Chloe's English) merges, BEFORE
    item 10 so the wand's lines are written in English; in parallel with item 9.
-12. [ ] **Spooning on the cot (reverse roles)** (Misha, 06:40: "at certain intimate moments of
+12. [x] **Spooning on the cot (reverse roles)** (Misha, 06:40: "at certain intimate moments of
    show of affection ... Chloe could slide in lay on the cot next to baye (baye being in fetal
    pose) and spoon ... ultimately we are in love"). Player-Baye curled on her side (fetal; find
    or solve the pose); Chloe climbs onto the cot behind her and lies along her back: arm over

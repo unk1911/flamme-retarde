@@ -55861,6 +55861,18 @@ async function buildJadrija(scene) {
     }
   }
 
+  /**
+   * The curl's mark (`kit.cotCurl`), moved `show.curlShift` m across the cot
+   * toward the wall — 1.573.0, src/49-revmoves.js: Chloe spooning her. Curled
+   * on the plain mark she fills 0.58 m of a 0.66 m mattress with her back at
+   * its room-side edge, so there is nowhere behind her for anybody; with the
+   * curl loosened and this, there is a body's depth. Nought otherwise.
+   */
+  function curlMark() {
+    const d = show.curlShift || 0;
+    return d ? [kit.cotCurl[0] + d, kit.cotCurl[1]] : kit.cotCurl;
+  }
+
   function poseOut(dt, go) {
     // `getUp` is NOT cleared on the way through, so that `cradle` passes it on
     // to `situp` and `kept` finishes the request — see the note in `cradle`.
@@ -62454,7 +62466,7 @@ async function buildJadrija(scene) {
       // `kit.cotCurl`, which is where the 0.45 m is measured. Eased over the
       // roll rather than set at the recline, for the reason written there.
       case 'fetal':
-        if (kit && kit.cotCurl) showSettle(kit.cotCurl, dt, 1.4);
+        if (kit && kit.cotCurl) showSettle(curlMark(), dt, 1.4);
         matTick(dt);
         if (done) go('fetalHeld', 'fetalHeld', 0.30);
         break;
@@ -62494,7 +62506,8 @@ async function buildJadrija(scene) {
       case 'fetalHeld':
         // Held on the curl's own mark for `perchHeld`'s reason: she was eased
         // on to it rather than walked to it, and the hold is seven minutes.
-        if (kit && kit.cotCurl) showSettle(kit.cotCurl, dt, 0.8);
+        // Moved over by `curlShift` while Chloe lies behind her (1.573.0).
+        if (kit && kit.cotCurl) showSettle(curlMark(), dt, show.curlRate || 0.8);
         matTick(dt);
         poseOut(dt, go);
         break;
@@ -81402,6 +81415,16 @@ async function buildJadrija(scene) {
      * Figure space throughout; it lays two `aim`s on `f` and nothing else.
      */
     hingeArm: (f, nU, nL, S, E, W, hinge, goal, pole) => hingeArm(f, nU, nL, S, E, W, hinge, goal, pole),
+    /**
+     * Her curl moved `d` m across the cot toward the wall, eased at `rate`
+     * (1.573.0: Chloe lying behind her, src/49-revmoves.js), or back with 0.
+     * Answers the shift and where the mark is, [t, s].
+     */
+    curlShift: (d, rate) => {
+      if (!show) return null;
+      if (d != null) { show.curlShift = +d || 0; show.curlRate = rate || null; }
+      return { d: show.curlShift || 0, mark: kit && kit.cotCurl ? curlMark() : null, at: [show.t, show.s] };
+    },
     /**
      * Where on her back, her bottom or a thigh the crosshair is — the ray from
      * `o` along `d` — while she lies on her front on the cot; or null. See
