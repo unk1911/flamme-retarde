@@ -146,6 +146,47 @@ function autoCueWords(text) {
   return null;
 }
 
+/**
+ * HER LEGS' LADDER, in words (1.566.0) — "left leg up", "right leg down",
+ * "both legs up", "left leg up straight", "legs straight up", "higher",
+ * "lower", "legs down"; "lijevu nogu gore", "desnu nogu dolje", "obje noge
+ * gore", "više", "niže", "spusti noge"; "jambe gauche en l'air", "les deux
+ * jambes en l'air", "plus haut", "plus bas". The whole line, short (eight
+ * words at most), and answers an ask name off `LIFT_ASKS` in 43-jadrija.js
+ * (or `legs.down`), or null. `raised` says whether a leg is up, so the
+ * bare Croatian "više" — which is also "more" — is "higher" only then.
+ * Matched in the page (49-ears.js, and for your own body while the roles
+ * are reversed, 49-reverse.js) so it works signed out; the voice service
+ * has the same words (`legs.*` in server/baye/baye.py).
+ */
+function liftWords(text, raised = false) {
+  let t = autoNorm(text);
+  if (!t || t.split(' ').length > 8) return null;
+  t = t.replace(/^(ok(ay)?|now|please|baye|babe|and|then|da|sad|ajde|hajde|allez)\s+/, '')
+    .replace(/\s+(please|baye|babe|molim( te)?|sad|now|s'il te plait|stp)$/, '').trim();
+  if (/\b(arms?|ruk\w*|bras|mouth|usta|bouche|hair|kos\w*|cheveux)\b/.test(t)) return null;
+  const leg = /\b(legs?|nog\w*|jambes?|knees?|koljen\w*|genoux?)\b/.test(t);
+  const left = /\b(left|lijev\w*|gauche)\b/.test(t), right = /\b(right|desn\w*|droite?)\b/.test(t) && !/\btendue? droite\b/.test(t);
+  const both = /\b(both|two|obje|obadvije|dvije|les deux)\b/.test(t);
+  const upW = /\b(up|raise\w*|lift\w*|gore|digni|podigni|dizi|uzdigni|leve\w*|en l'?air|monte\w*)\b/.test(t);
+  const downW = /\b(down|lower|put down|flat|dolje|spusti\w*|baisse\w*|pose\w*|descend\w*)\b/.test(t);
+  const straight = /\b(straight|ravn\w*|ispruz\w*|ispruzen\w*|tendue?s?)\b/.test(t);
+  if (leg && (left || right) && !(left && right)) {
+    const s = left ? 'left' : 'right';
+    if (downW && !upW) return 'legs.' + s + 'down';
+    if (upW || straight) return 'legs.' + s + (straight ? 'straight' : 'up');
+    return null;
+  }
+  if (leg && both && upW && !downW) return straight ? 'legs.straight' : 'legs.bothup';
+  if (leg && straight && upW && !downW) return 'legs.straight';
+  // "spusti noge", "legs down": the ask it always was.
+  if (leg && downW && !upW && !/\b(lower|nize)\b/.test(t)) return 'legs.down';
+  if (/^((a )?(bit |little |tiny |touch |even )*(higher|more up|up more)|(legs? |noge |nogu )?(jos |malo )*(vise|gore) (gore|vise)|podigni (ih |ju |je )?(jos |vise)( malo)?|(encore )?plus haut)$/.test(t)) return 'legs.higher';
+  if (/^(higher|(jos )?(vise|visa))$/.test(t)) return /^higher$/.test(t) || raised ? 'legs.higher' : null;
+  if (/^((a )?(bit |little |tiny |touch |even )*lower|(legs? )?(a bit |little )?lower( them)?|(malo |jos )*nize|spusti (ih |ju |je )?(malo|nize)|(encore )?plus bas)$/.test(t)) return 'legs.lower';
+  return null;
+}
+
 // ── the moves ────────────────────────────────────────────────────────────────
 //
 // Each: where (`ctx`), a base weight, the moods it is (`tags`), whether it can
@@ -179,6 +220,26 @@ const AUTO_MOVES = {
     can: (v) => !v.legsDown, go: _autoAsk('legs.down') },
   legsUp: { ctx: { back: 1 }, w: 0.5, tags: ['open'], inv: 'legsDown',
     can: (v) => !!v.legsDown, go: _autoAsk('legs.up') },
+  // HER LEGS' LADDER (1.566.0) — on her back, and her shins up on her
+  // front: a leg up of her own accord (whichever, at random), both, higher
+  // as she warms up, lower and down again as she calms, and wider once they
+  // are up — see `LIFT` in 43-jadrija.js. Each one rung, one move.
+  legUp: { ctx: { back: 0.8, front: 0.6 }, w: 0.7, tags: ['open', 'play'], inv: 'legDown', say: 'open',
+    can: (v) => !v.liftL && !v.liftR && (!!v.legsDown || v.liftMode === 'front') && !jadrija.autoWhy('legs.leftup'),
+    go: () => _autoAsk(Math.random() < 0.5 ? 'legs.leftup' : 'legs.rightup')() },
+  bothUp: { ctx: { back: 0.8, front: 0.5 }, w: 0.6, tags: ['open', 'heat'], inv: 'legDown',
+    can: (v) => (!!v.legsDown || v.liftMode === 'front') && !jadrija.autoWhy('legs.bothup'), go: _autoAsk('legs.bothup') },
+  higher: { ctx: { back: 1 }, w: 0.6, tags: ['heat', 'open'], inv: 'lower',
+    can: (v) => !!(v.liftL || v.liftR) && v.heat > 0.35 && !jadrija.autoWhy('legs.higher'), go: _autoAsk('legs.higher') },
+  straight: { ctx: { back: 1 }, w: 0.35, tags: ['play', 'open'], inv: 'legDown', say: 'play',
+    can: (v) => !!v.legsDown && !jadrija.autoWhy('legs.straight'), go: _autoAsk('legs.straight') },
+  lower: { ctx: { back: 1, front: 1 }, w: 0.5, tags: ['calm'], inv: 'higher',
+    can: (v) => !!(v.liftL || v.liftR) && !jadrija.autoWhy('legs.lower'), go: _autoAsk('legs.lower') },
+  legDown: { ctx: { back: 1, front: 1 }, w: 0.45, tags: ['calm', 'close'], inv: 'legUp',
+    can: (v) => !!(v.liftL || v.liftR), go: _autoAsk('legs.down') },
+  // And further apart than "apart", once she has something to go wider with.
+  wider: { ctx: { back: 1, front: 1, stand: 1 }, w: 0.6, tags: ['open', 'heat'], inv: 'close', say: 'open',
+    can: (v) => v.legsSp >= 1 && v.heat > 0.4 && !jadrija.autoWhy('legs.wider'), go: _autoAsk('legs.wider') },
   // The cot's ragdoll, asked (`cotMove`).
   heels: { ctx: AUTO_FRONT, w: 0.8, tags: ['play'], say: 'look', can: (v) => v.rag, go: _autoCot('heels') },
   wiggle: { ctx: AUTO_LYING, w: 0.9, tags: ['heat', 'play'], can: (v) => v.rag, go: _autoCot('wiggle') },
@@ -401,6 +462,9 @@ function autoDirect(name) {
   auto.pausedTo = auto.clock + AUTO.pause;
   auto.still = false;
   const lean = { 'legs.spread': 'open', 'legs.wider': 'open', 'arms.wide': 'open', 'legs.close': 'close',
+    'legs.leftup': 'open', 'legs.rightup': 'open', 'legs.bothup': 'open', 'legs.higher': 'open',
+    'legs.straight': 'open', 'legs.leftstraight': 'open', 'legs.rightstraight': 'open',
+    'legs.lower': 'calm', 'legs.leftdown': 'calm', 'legs.rightdown': 'calm', 'legs.down': 'calm',
     'arms.down': 'close', look: 'look', 'look.down': 'shy', yawn: 'calm' }[name];
   if (lean) autoLean(lean, 0.8);
   autoLog({ ctx: auto.ctx, pick: 'obeyed', why: 'you asked: ' + name + ' — her own moves held ' + AUTO.pause + ' s',

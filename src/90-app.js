@@ -2731,6 +2731,9 @@ function sceneHit(tool, hard, reg) {
 /** The safeword, said — `who` 'you' | 'her', `of` 'belt' | 'collar' | 'auto'. */
 function sceneSafe(who, of) {
   sceneLog.safe = { t: sceneNow(), who, of };
+  // And a leg she holds up on the cot comes down (1.566.0): the safeword
+  // ends the scene, and nobody stays in a held pose through the aftercare.
+  if (jadrija && jadrija.liftRelax) jadrija.liftRelax();
   // And whatever it stopped, her own autonomous mode stops with it (1.560.0).
   if (typeof autoSafeHook === 'function') autoSafeHook(who, of);
 }
@@ -4016,6 +4019,8 @@ const HELP = [
     // The role swap (1.561.0, src/49-reverse.js).
     ['I · “reverse roles”', 'help.k.reverse'],
     ['1 – 7', 'help.k.revkeys'],
+    // And your legs on the cot, roles reversed (1.566.0).
+    ['SHIFT + 1 – 6', 'help.k.revlegs'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [

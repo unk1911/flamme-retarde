@@ -158,22 +158,57 @@ const REV_ORDERS = {
     ok: (v, R) => R.walk && revFacing() < -0.5, say: ['Okreni se. Leđima prema meni.', 'Turn around. Back to me.', 'Retourne-toi. Dos à moi.'] },
   stand: { ctx: { kneel: 1, fours: 1, sit: 0.3 }, w: 0.4, key: '1',
     ok: (v) => v.phase === 'dwell', say: ['Ustani.', 'Stand up.', 'Debout.'] },
+  // YOUR LEGS' LADDER (1.566.0): one up, both up, higher, wider, down — on
+  // your back or your front on the cot (`LIFT` in 43-jadrija.js). `can` is
+  // whether the order makes sense where you are at all.
+  legL: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+1',
+    ok: (v) => !!v.liftL && !(v.liftR && revRank(v.liftR) >= revRank(v.liftL)),
+    say: ['Lijevu nogu gore.', 'Left leg up.', 'La jambe gauche en l’air.'] },
+  legR: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+2',
+    ok: (v) => !!v.liftR && !(v.liftL && revRank(v.liftL) >= revRank(v.liftR)),
+    say: ['Desnu nogu gore.', 'Right leg up.', 'La jambe droite en l’air.'] },
+  bothUp: { ctx: { back: 1.1, front: 0.7 }, w: 0.9, key: 'Shift+3',
+    ok: (v) => revBothUp(v), say: ['Obje noge gore.', 'Both legs up.', 'Les deux jambes en l’air.'] },
+  higher: { ctx: { back: 0.9 }, w: 0.8, key: 'Shift+4',
+    can: (v) => v.onBed, ok: (v) => revRank(v.liftL) >= 3 && revRank(v.liftR) >= 3,
+    say: ['Obje noge gore. Više.', 'Both legs up. Higher.', 'Les deux jambes en l’air. Plus haut.'] },
+  wider: { ctx: { back: 0.9, front: 0.5, stand: 0.4 }, w: 0.8, key: 'Shift+5',
+    can: (v) => v.legsSpMax > 1.01, ok: (v) => v.legsSp >= Math.min(v.legsSpMax - 0.05, 1.65),
+    say: ['Šire. Još šire.', 'Wider. Even wider.', 'Plus écartées. Encore.'] },
+  legsDown: { ctx: { back: 0.7, front: 0.7 }, w: 0.5, key: 'Shift+3',
+    can: (v) => !!(v.liftL || v.liftR || (v.phase === 'cradle' && !v.legsDown)),
+    ok: (v) => !v.liftL && !v.liftR && (v.phase !== 'cradle' || !!v.legsDown),
+    say: ['Spusti noge.', 'Legs down.', 'Baisse les jambes.'] },
 };
+/** How high a leg is on the ladder (`LIFT_RANK` in 43-jadrija.js). */
+function revRank(k) { return { 0: 0, 1: 1, s: 1.5, 2: 2, 3: 3, 4: 4 }[k || 0] || 0; }
+/**
+ * Both legs up: on your back the knees held in the cradle, or both at the
+ * foot-up shape or past it; on your front both shins up.
+ */
+function revBothUp(v) {
+  if (v.phase === 'cradle' && !v.legsDown) return true;
+  const lo = v.liftMode === 'front' ? 1 : 2;
+  return revRank(v.liftL) >= lo && revRank(v.liftR) >= lo;
+}
 
 // The help sheet and the HUD, in the three languages — kept with the feature.
 if (typeof STRINGS !== 'undefined') {
   Object.assign(STRINGS.en || {}, {
     'help.k.reverse': 'in the kabina, say or type "reverse roles" — you are in Baye\'s body and Chloe gives the orders (and spanks). Do what she says: the keys below, or type it ("lie on the cot", "spread my legs"). "red" or "crvena" ends it at once; "reverse roles" again swaps back',
+    'help.k.revlegs': 'roles reversed, your legs on the cot (Shift and a number): Shift+1 left leg up / down · Shift+2 right leg up / down · Shift+3 both legs up / down · Shift+4 higher · Shift+5 wider · Shift+6 lower. Or type it: "left leg up", "both legs up", "higher", "wider", "legs down"',
     'help.k.revkeys': 'roles reversed: 1 stand up · 2 lie on the cot · 3 on your front · 4 kneel · 5 legs apart / together · 6 arms out / in · 7 on your back · \\ her belt (off, or back on) · = her collar (on, or off). Look at her with the mouse; W gets you up; type the rest ("lotus", "on my side", "bend over", "use the belt", "collar me")',
     'rev.hud': 'ROLES REVERSED', 'rev.order': 'she wants',
   });
   Object.assign(STRINGS.hr || {}, {
     'help.k.reverse': 'u kabini reci ili utipkaj "zamijenimo uloge" — ti si u Bayeinom tijelu, a Chloe zapovijeda (i udara). Radi što kaže: tipke ispod, ili utipkaj ("lezi na krevet", "raširi noge"). "crvena" odmah završava; "zamijenimo uloge" opet vraća',
+    'help.k.revlegs': 'zamijenjene uloge, tvoje noge na krevetu (Shift i broj): Shift+1 lijeva noga gore / dolje · Shift+2 desna noga gore / dolje · Shift+3 obje noge gore / dolje · Shift+4 više · Shift+5 šire · Shift+6 niže. Ili utipkaj: "lijevu nogu gore", "obje noge gore", "više", "šire", "spusti noge"',
     'help.k.revkeys': 'zamijenjene uloge: 1 ustani · 2 lezi na krevet · 3 na trbuh · 4 klekni · 5 noge raširi / skupi · 6 ruke u stranu / uz tijelo · 7 na leđa · \\ njezin remen · = njezina ogrlica. Pogledaj je mišem; W te diže; ostalo utipkaj ("lotos", "na bok", "sagni se", "remen", "ogrlica")',
     'rev.hud': 'ZAMIJENJENE ULOGE', 'rev.order': 'želi',
   });
   Object.assign(STRINGS.fr || {}, {
     'help.k.reverse': 'dans la cabine, dites ou tapez « inverser les rôles » — vous êtes dans le corps de Baye et Chloe donne les ordres (et la fessée). Faites ce qu’elle dit : les touches ci-dessous, ou tapez-le (« sur le lit », « écarte les jambes »). « rouge » arrête tout de suite ; « inverser les rôles » à nouveau rend les rôles',
+    'help.k.revlegs': 'rôles inversés, vos jambes sur le lit (Maj et un chiffre) : Maj+1 jambe gauche en l’air / baissée · Maj+2 jambe droite · Maj+3 les deux en l’air / baissées · Maj+4 plus haut · Maj+5 plus écartées · Maj+6 plus bas. Ou tapez-le : « jambe gauche en l’air », « les deux jambes en l’air », « plus haut »',
     'help.k.revkeys': 'rôles inversés : 1 debout · 2 sur le lit · 3 sur le ventre · 4 à genoux · 5 jambes écartées / serrées · 6 bras écartés / le long du corps · 7 sur le dos · \\ sa ceinture · = son collier. Regardez-la à la souris ; W vous relève ; tapez le reste (« lotus », « sur le côté », « penche-toi », « ceinture », « collier »)',
     'rev.hud': 'RÔLES INVERSÉS', 'rev.order': 'elle veut',
   });
@@ -471,6 +506,12 @@ function revWords(text) {
   if (/^((get )?(down )?on (all|my|your) fours|(all )?fours|na sve (cetiri|4)|a quatre pattes)$/.test(t)) return 'rev.ask:fours';
   if (/^(sit( up)?|sjedni|sjedim|assis(e)?)$/.test(t)) return 'rev.ask:sit.bed';
   if (/^(curl up|sklupcaj se|en boule)$/.test(t)) return 'rev.ask:fetal';
+  // Your legs' ladder (1.566.0): "left leg up", "both legs up", "higher",
+  // "legs down" — see `liftWords` in 49-auto.js; and "wider".
+  const lw = typeof liftWords === 'function'
+    ? liftWords(t, !!(v && (v.liftL || v.liftR || (v.phase === 'cradle' && !v.legsDown)))) : null;
+  if (lw) return 'rev.ask:' + lw;
+  if (/^((spread |open )?(my |your |the |them |legs )?(even |a bit |bit )?wider|(jos |malo )*sire|rasiri (ih |noge )?(jos|vise|sire)|plus ecartees?|ecarte encore)$/.test(t)) return 'rev.ask:legs.wider';
   if (/^((i'?ll )?(spread|open) (my |your |the )?(legs|arms)( wide| apart| wider)?|legs (apart|open|wide)|spread( them)?|rasiri( noge| ruke)?|razmakni noge|ecarte( les jambes| les bras)?)$/.test(t)) return arms ? 'rev.ask:arms.wide' : 'rev.ask:legs.spread';
   if (/^((put |bring |close )?(my |your |the )?(legs|arms) (together|in|down|closed)|(close|shut) (my |your )?legs|together|skupi( noge| ruke)?|spoji noge|serre( les jambes)?)$/.test(t)) return arms ? 'rev.ask:arms.down' : 'rev.ask:legs.close';
   if (/^(arms (out|wide)( to the sides?)?|ruke u stranu|bras ecartes)$/.test(t)) return 'rev.ask:arms.wide';
@@ -562,6 +603,18 @@ function revKey(e) {
   const v = revView();
   if (!v) return true;
   const n = +m[1];
+  // SHIFT AND A NUMBER (1.566.0): your legs' ladder. 1 the left leg up, or
+  // down again; 2 the right; 3 both up, or down; 4 higher; 5 wider; 6 lower.
+  if (e.shiftKey && n <= 6) {
+    const up = (k) => revRank(k) > 0;
+    const a = n === 1 ? (up(v.liftL) ? 'legs.leftdown' : 'legs.leftup')
+      : n === 2 ? (up(v.liftR) ? 'legs.rightdown' : 'legs.rightup')
+        : n === 3 ? (revBothUp(v) ? 'legs.down' : 'legs.bothup')
+          : n === 4 ? 'legs.higher' : n === 5 ? 'legs.wider' : 'legs.lower';
+    const r = revAsk(a);
+    if (r !== true && typeof toast === 'function') toast(a + ': ' + r);
+    return true;
+  }
   const front = REV_FRONT[v.phase];
   let a = null;
   if (n === 1) a = 'rise';
@@ -828,6 +881,7 @@ function revDecide() {
     const w = O.ctx[ctx];
     if (!w) continue;
     if (!O.still && revKept(O, v, rev)) continue;     // already so: no order in it
+    if (O.can && !O.can(v)) continue;                 // nothing in it here (1.566.0)
     let s = O.w * w * (0.6 + 0.5 * D.heat);
     s *= recent(id) ? 0.25 : 1;
     cands.push({ id: 'order:' + id, s });
@@ -1141,7 +1195,7 @@ const revApi = {
   safe: () => revSafe('you'),
   hear: (text) => { const w = revWords(text); return w ? revAct(w) : null; },
   words: (text) => revWords(text),
-  key: (n) => revKey({ code: 'Digit' + n, preventDefault() {} }),
+  key: (n, shift = false) => revKey({ code: 'Digit' + n, shiftKey: !!shift, preventDefault() {} }),
   ask: (name) => revAsk(name),
   order: (id) => revOrder(id, 'probe'),
   spank: (n = 1) => revSpankRound(n, 'probe'),

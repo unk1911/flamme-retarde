@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.57.0"
+VERSION = "1.58.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -580,6 +580,29 @@ WIDER_RE = (r"(?:^(?!.*\b(?:mouth|jaw|lips?|tongue|arms?|eyes?|hands?|door|windo
             r"|\bšire\b|\braširi\w*\b.{0,16}\b(?:više|jače)\b"
             r"|\bplus (?:é|e)cart\w*|\b(?:é|e)carte\w*\b.{0,16}\b(?:plus|encore|davantage)\b)))")
 
+# HER LEGS' LADDER (1.58.0) — see the `legs.*` entries in `SKILLS`. A leg
+# noun and a side, a direction, "both", "straight"; and "higher" / "lower"
+# said as the whole line or about her legs. NOT the bare Croatian "više",
+# which is "more" as often as "higher" and in that room more often a
+# spanking's "more": the page takes it as "higher" only while a leg is up
+# (`liftWords`), and here it needs "gore" with it.
+LEG_N = r"\b(legs?|nog\w*|jambes?)\b"
+LEG_L = r"\b(left|lijev\w*|gauche)\b"
+LEG_R = r"\b(right|desn\w*|droite)\b"
+LEG_BOTH = r"\b(both|obje|obadvije|dvije|les deux)\b"
+LEG_UP = r"\b(up|raise\w*|lift\w*|gore|digni|podigni|dizi|l[eè]ve\w*|en l'?air)\b"
+LEG_DOWN = r"\b(down|lower|dolje|spusti\w*|baisse\w*|pose\w*)\b"
+LEG_NOT_UP = r"^(?!.*\b(up|raise\w*|lift\w*|gore|digni|podigni|en l'?air)\b)"
+LEG_NOT_DOWN = r"^(?!.*\b(down|dolje|spusti\w*|baisse\w*)\b)"
+LEG_STRAIGHT = r"\b(straight|ravn\w*|ispru[žz]\w*|tendues?)\b"
+LEG_HIGHER = (r"^\W*(?:(?:even|a|bit|little|tiny|touch|go|now|ok|okay|yes|please|baye|babe|and|"
+              r"then|just|still|come on|legs?|them|raise|lift|put)\W+)*higher\b"
+              r"|\b(?:legs?|them|it)\b.{0,16}\bhigher\b|\b(?:jo[šs]\s+)?vi[šs]e\s+gore\b"
+              r"|\bnog\w*\s+(?:jo[šs]\s+)?vi[šs]e\b|\bplus haut\b")
+LEG_LOWER = (r"^\W*(?:(?:even|a|bit|little|tiny|touch|now|ok|okay|please|baye|babe|just)\W+)*"
+             r"lower(?:\s+(?:them|it|your legs?))?\W*$"
+             r"|^\W*(?:(?:malo|jo[šs])\W+)*ni[žz]e\W*$|\bplus bas\b")
+
 # The hammock's noun, in the four languages anybody here says it in: English,
 # French (hamac), German (Hängematte, which the transcriber writes without the
 # umlaut as often as with), and Croatian — viseća mreža, "hanging net", or
@@ -734,6 +757,34 @@ SKILLS = {
     # your legs' should spread legs"*. A latch over whatever she is in, like
     # the arms. Above `arms.wide`, whose "spread" would take it otherwise;
     # CLOSE FIRST so "close your legs" is never read as the spread.
+    # HER LEGS' LADDER (1.58.0, page 1.566.0). Misha, 2 Oct 2026: *"one leg
+    # laying flat on the cot while the other raised, or both raised, and then
+    # raised higher"*. A leg up or down, both up, straight, higher and lower,
+    # on her back or her front on the cot — `LIFT` in src/43-jadrija.js. All
+    # of them AHEAD of `legs.down` and `legs.up`, whose "leg up", "leg down"
+    # and "legs straight" would take every one of these; the sided ones ahead
+    # of both-legs, the straight ones ahead of the plain up, and the downs
+    # fenced off from the ups so "left leg down, right leg up" is not read
+    # twice. Croatian (lijeva / desna noga, gore / dolje, obje, ravno, više,
+    # niže) and French (gauche / droite, en l'air, plus haut / bas).
+    "legs.leftstraight": ("raise her left leg straight, knee straight, while she lies on the cot",
+                          [LEG_L, LEG_N, LEG_STRAIGHT, LEG_NOT_DOWN]),
+    "legs.rightstraight": ("raise her right leg straight, knee straight, while she lies on the cot",
+                           [LEG_R, LEG_N, LEG_STRAIGHT, LEG_NOT_DOWN]),
+    "legs.leftdown": ("put her left leg back down flat on the cot",
+                      [LEG_L, LEG_N, LEG_DOWN, LEG_NOT_UP]),
+    "legs.rightdown": ("put her right leg back down flat on the cot",
+                       [LEG_R, LEG_N, LEG_DOWN, LEG_NOT_UP]),
+    "legs.leftup": ("raise her left leg while the other stays down, lying on the cot",
+                    [LEG_L, LEG_N, LEG_UP]),
+    "legs.rightup": ("raise her right leg while the other stays down, lying on the cot",
+                     [LEG_R, LEG_N, LEG_UP]),
+    "legs.straight": ("raise both legs straight up toward the ceiling, lying on her back",
+                      [LEG_N, LEG_STRAIGHT, LEG_UP]),
+    "legs.bothup": ("raise both legs up in the air, knees bent, lying on the cot",
+                    [LEG_BOTH, LEG_N, LEG_UP]),
+    "legs.higher": ("raise her raised legs higher", [LEG_HIGHER]),
+    "legs.lower": ("bring her raised legs a little lower", [LEG_LOWER]),
     "legs.close": ("put her legs back together",
                    [r"\b(close|together)\b.{0,20}\blegs?\b|\blegs?\b.{0,12}\b(together|closed?)\b"]),
     # AND FURTHER APART, BETWEEN THE TWO: after the close, so "don't close
@@ -868,7 +919,8 @@ SKILLS = {
                    r"|\b(hang|dangle)\w*\b.{0,16}\blegs?\b"
                    r"|\b(off|over)\s*(the\s*)?(edge|side)\s*(of\s*)?(the\s*)?(bed|cot)\b"]),
     "legs.down": ("lower her legs while she lies on her back",
-                  [r"\blegs?\s*(down|flat|out|straight)\b|\bstraighten your legs\b"]),
+                  [r"\blegs?\s*(down|flat|out|straight)\b|\bstraighten your legs\b"
+                   r"|\bspusti\w*\s+noge\b|\bnoge\s+dolje\b|\bbaisse\w*\s+(les |tes )?jambes\b"]),
     "legs.up": ("raise her legs again while she lies on her back",
                 [r"\blegs?\s*(up|back up)\b|\bknees up\b"]),
     "flat": ("roll over and lie flat on her front",
@@ -1101,6 +1153,11 @@ ASK_RE = re.compile(
     r"|\b(kiss|hug|cuddle|hold)\s+me\b|\bcome here\b"
     r"|\ball fours\b|\bhands and knees\b"
     r"|\blegs? (up|down)\b|\bflat on your\b|\bface down\b|\broll over\b"
+    # Her legs' ladder (1.58.0): "left leg up", "raise your right leg",
+    # "both legs up", "higher", "lower", "lijevu nogu gore", "spusti noge".
+    r"|\b(legs?|nog\w*|jambes?)\b.{0,24}\b(up|down|gore|dolje|straight|higher|lower|en l'?air)\b"
+    r"|\b(raise|lift|lower|digni|podigni|spusti\w*|l[eè]ve)\b.{0,20}\b(legs?|nog\w*|jambes?)\b"
+    r"|" + LEG_HIGHER + r"|" + LEG_LOWER +
     r"|\b(lay|lie|roll)\s*(down\s*)?flat\b"
     r"|\blegs? (hang\w*|dangl\w*|off|over)\b"
     r"|\b(coke|cocaine)\b|\bcut (me )?(a |some )?lines?\b|\brack '?em\b"
@@ -4464,7 +4521,44 @@ REV_ORDER_WORDS = {
     "come": ("come over here to you", "Dođi ovamo."),
     "turn": ("turn around, their back to you", "Okreni se. Leđima prema meni."),
     "stand": ("stand up", "Ustani."),
+    # 1.58.0: their legs' ladder (page 1.566.0).
+    "legL": ("raise their left leg while the other stays down", "Lijevu nogu gore."),
+    "legR": ("raise their right leg while the other stays down", "Desnu nogu gore."),
+    "bothUp": ("put both legs up in the air", "Obje noge gore."),
+    "higher": ("put both legs up, and higher, straight up", "Obje noge gore. Više."),
+    "wider": ("spread their legs even wider", "Šire. Još šire."),
+    "legsDown": ("put their legs back down", "Spusti noge."),
 }
+
+# HER LEGS, SHAPE BY SHAPE (1.58.0, page 1.566.0): `legs_l` / `legs_r` off
+# `LIFT_SCENE` in src/43-jadrija.js — on her back, then on her front — and
+# `legs_apart` 1..3. Baye's side; Chloe's is `pov_swap` of it.
+LEGS_DOING = {
+    "flat": "lying flat on the cot",
+    "knee": "bent at the knee with the foot flat on the cot",
+    "bent": "raised, the knee bent and the foot up in the air",
+    "up": "raised straight up toward the ceiling",
+    "over": "raised straight up and over past upright, toward your chest",
+    "raise": "raised straight, partway up",
+    "shin": "bent at the knee, the shin up in the air behind you",
+    "shinhi": "bent at the knee and lifted off the mattress, the foot high in the air behind you",
+    "back": "lifted straight up off the mattress behind you",
+}
+LEGS_APART = {1: "apart", 2: "spread wide", 3: "spread very wide"}
+
+
+def legs_line(s: dict):
+    """Her legs this second, in words — or None when there is nothing to say."""
+    l, r, a = s.get("legs_l"), s.get("legs_r"), s.get("legs_apart")
+    out = []
+    if l in LEGS_DOING and r in LEGS_DOING:
+        if l == r:
+            out.append("both your legs are " + LEGS_DOING[l])
+        else:
+            out.append(f"your left leg is {LEGS_DOING[l]} and your right leg is {LEGS_DOING[r]}")
+    if a in LEGS_APART:
+        out.append(("and " if out else "") + "your legs are " + LEGS_APART[a])
+    return ", ".join(out) if out else None
 
 # ── what is true, in words ───────────────────────────────────────────────────
 #
@@ -4816,6 +4910,11 @@ AUTO_DOING = {
     "spread": "let your legs fall apart", "close": "drew your legs together",
     "armsOut": "stretched your arms out wide", "armsIn": "brought your arms back in",
     "legsDown": "stretched your legs out", "legsUp": "drew your knees back up",
+    # 1.58.0: her legs' ladder (page 1.566.0).
+    "legUp": "raised one leg", "bothUp": "raised both legs in the air",
+    "higher": "raised your legs higher", "straight": "put both legs straight up in the air",
+    "lower": "brought your legs a little lower", "legDown": "put your legs back down on the cot",
+    "wider": "let your legs fall even wider apart",
     "heels": "kicked your heels up in the air behind you",
     "wiggle": "wriggled your hips and legs on the cot", "arch": "arched your back",
     "peek": "lifted your head and looked back over your shoulder at them",
@@ -4870,6 +4969,10 @@ def clean_scene(raw) -> dict:
         "worn": [k for k in (clamp_str(x, 12) for x in worn[:6]) if k in WEAR_KEYS],
         "buzz": bool(g("buzz")) or None,
         "buzz_plug": bool(g("buzz_plug")) or None,
+        # Her legs (1.58.0): each one's shape, and how far apart.
+        "legs_l": _enum(g("legs_l"), LEGS_DOING, 8),
+        "legs_r": _enum(g("legs_r"), LEGS_DOING, 8),
+        "legs_apart": (lambda n: int(n) if n in (1, 2, 3) else None)(clamp_num(g("legs_apart"), 0, 3)),
         "spanks": clamp_num(g("spanks"), 0, 99),
         "spank_ago_s": clamp_num(g("spank_ago_s"), 0, 600),
         "spank_hard": clamp_num(g("spank_hard"), 0, 2),
@@ -5066,6 +5169,9 @@ def scene_lines(s: dict):
     # never slapped, asked "am I spanking you?", two answers in three were
     # "yeah, your hand's been smacking my ass". A list of true things read
     # under "never deny any of this" is taken as licence for its neighbours.
+    legs = legs_line(s)
+    if legs and not rv:
+        facts.append(legs)
     if facts and not (s.get("spanks") or s.get("lashes")):
         facts.append("nobody has spanked you in the last minute")
     return facts, tone
@@ -5125,6 +5231,9 @@ def chloe_scene_lines(s: dict):
     if ph in SHORE_DOING:
         facts.append("they are " + pov_swap((s.get("on_cot") and COT_DOING.get(ph))
                                             or SHORE_DOING[ph]))
+    legs = legs_line(s)
+    if legs:
+        facts.append(pov_swap(legs))
     o = s.get("rev_order")
     if o in REV_ORDER_WORDS:
         facts.append(f"you have told them to {REV_ORDER_WORDS[o][0]} and are "

@@ -42605,6 +42605,26 @@ async function buildJadrija(scene) {
     handL: { child: 'fingersL', twist: 80, total: 92, cone: 115 },
     handR: { child: 'fingersR', twist: 80, total: 92, cone: 115 },
   };
+  /**
+   * AND HER KNEES (1.566.0), for the same reason, now that a layer
+   * (`liftLeg` under `legsSpread`) solves her legs into shapes no clip has.
+   * MEASURED over all of her clips, every frame, each bone's turn off its
+   * rest in its own frame: the knee's twist about the shin at most 16
+   * (`stretch`), its whole bend 132 (`ballet`, `lotus`). So a knee wrung
+   * more than 45 about its own shin, or folded past 150, is a composition
+   * gone wrong and is held. Every raised shape stays under 6 of twist.
+   *
+   * Not the knee's plane: `lotus` is baked with the shin 132 off the knee's
+   * hinge, which is what a lotus is, and a bound under that would redraw it.
+   * And NOT THE HIPS, though the clips alone keep a thigh's twist under 63
+   * (`ballet`'s turnout): the spread's own "wider" on her back with her
+   * knees up (1.522.0) turns each thigh up to 124 about its length, MEASURED,
+   * and a bound would redraw a shipped pose nobody asked to change.
+   */
+  const LEG_LIMITS = {
+    legLL: { child: 'footL', twist: 45, cone: 150 },
+    legLR: { child: 'footR', twist: 45, cone: 150 },
+  };
   let show = null;
   let banner = null;
   // The two horns, as a group hung off her head bone. Null until she has a
@@ -43489,7 +43509,7 @@ async function buildJadrija(scene) {
       skinFig.play('idle', { fade: 0 });
       // Her forearms and wrists held inside what a human's do, over every
       // layer — see `limits` in 41-skin.js and ARM_LIMITS.
-      skinFig.limits(ARM_LIMITS);
+      skinFig.limits(Object.assign({}, ARM_LIMITS, LEG_LIMITS));
       // Beside the open kabina, not beside the jetty.
       //
       // She was at `gapAt + 22` — 22 m east of the mole — and that was right
@@ -56516,7 +56536,7 @@ async function buildJadrija(scene) {
    */
   const LEGSP = { out: 0.26, stand: 0.14, secs: 0.9, settle: 0.35,
     step: 0.35, swing: (8 * Math.PI / 180) / 0.35,
-    top: { stand: 2.4, cradle: 2.4, flatBed: 1, flatFloor: 2.05,
+    top: { stand: 2.62, cradle: 2.4, flatBed: 1, flatFloor: 2.05,
       upsideHeld: 2.05, perchHeld: 1.35, other: 1 },
     // How far out a step puts a standing foot, for the room test — see
     // `legsRoom`. The most any step moved one, measured: 0.117 m.
@@ -56526,6 +56546,13 @@ async function buildJadrija(scene) {
   const LEGS_FLAT = { flat: 1, flatheld: 1 };
   /** The ceiling on `show.legsSp` in the pose she is in. See LEGSP. */
   function legsSpMax(phase) {
+    // A leg raised (1.566.0) has a ceiling of its own, and the spread asks
+    // the higher of the two: the other leg is held to its own (`liftTop`).
+    const lt = liftTopOf(phase);
+    return lt != null ? lt : legsSpBase(phase);
+  }
+  /** The pose's own ceiling, as if no leg were raised. */
+  function legsSpBase(phase) {
     const T = LEGSP.top;
     if (STANDS[phase]) return T.stand;
     if (LEGS_FLAT[phase] || (phase === 'cradle' && show.legsDown)) {
@@ -56535,8 +56562,465 @@ async function buildJadrija(scene) {
   }
   /** And why, when she is at it: the cot, or her. */
   function legsSpWhy(phase) {
+    if (liftTopOf(phase) != null) return 'widest';
     const flat = LEGS_FLAT[phase] || (phase === 'cradle' && show.legsDown);
     return flat && show.onBed ? 'cotnarrow' : 'widest';
+  }
+
+  /**
+   * ── ONE LEG UP, BOTH UP, AND HIGHER (1.566.0) ───────────────────────────
+   *
+   * Misha, 2 Oct 2026: *"perhaps add support for spreading legs even wider,
+   * and perhaps support, while on the cot, one leg laying flat on the cot
+   * while the other raised, or both raised, and then raised higher"*.
+   *
+   * EACH LEG ITS OWN SHAPE, on a ladder: `show.lift.L` / `.R` is where it is
+   * asked to be, and "higher" and "lower" are a rung up or down it. On her
+   * back, over the legs-down pose (`supine`, whose arms go on doing what they
+   * do — hands on her belly, then behind her head):
+   *
+   *   0  flat, the clip's own leg
+   *   1  the knee up, the sole flat on the cot — the heel slides up the
+   *      mattress on the way, it does not lift off it
+   *   2  the thigh straight up over her hip and the shin level: the foot up
+   *      in the air (this is the cradle's legs without her hands on them)
+   *   3  the leg straight up at the ceiling
+   *   4  and over, past upright, toward her: the thigh 124 off her length
+   *   s  the straight-leg raise: knee straight, the leg at 52 degrees
+   *
+   * On her front: 1 the shin up off the mattress, 2 the knee lifted off it
+   * as well (15 degrees of hip extension), s the straight leg lifted behind
+   * her. On her side, sitting, kneeling and the rest there is no ladder: the
+   * pose already has her legs somewhere, and none of these is a small change
+   * to it.
+   *
+   * SOLVED, NOT TYPED, the way `legsSpread` is: a shape is two numbers in the
+   * plane of the leg — the thigh's elevation above her own length and the
+   * knee's flexion — turned into a KNEE POINT and an ANKLE POINT off her own
+   * hip and her own segment lengths (measured off the clip each frame), and
+   * `wheelLimb` solves the bones to them. So none of the rig's three sign
+   * traps is in reach: there is no Euler here, only two points, and the
+   * rig's own bones carry them. Where the sole is on the cot (`plant`) the
+   * thigh's angle is not given at all but SOLVED for the contact: the lowest
+   * elevation that keeps the heel on what is under it — mattress, folded
+   * blanket or rail, measured in her frame (`LIFT.cot`) — and the same floor
+   * is held under every shape on the way, so a leg coming up from flat slides
+   * its heel up the bed instead of driving it into the foam. The planted foot
+   * is turned flat: its ankle-to-ball line 29 degrees under level, as it is
+   * when she stands (`ball`), and the ankle `sole` above the surface.
+   *
+   * Laid under the spread and not beside it: the spread takes whatever the
+   * legs are, so a leg up at the ceiling spread is a V, two knees up spread
+   * is the frog, and a planted foot spread lets its knee fall open while the
+   * foot stays on the mattress. Each leg has its own ceiling for it
+   * (`top`), measured, and a leg lying flat keeps the cot's.
+   */
+  const LIFT = {
+    // How fast a leg goes to its shape, 1/s (`damp`): most of the way in about
+    // a second, the spread's own unhurried pace. `w` is the blend from the
+    // clip's leg into the solved one, twice as quick.
+    rate: 2.4, wRate: 5,
+    back: {
+      1: { kn: 100, plant: 1 },
+      2: { th: 90, kn: 90 },
+      3: { th: 88, kn: 6 },
+      4: { th: 124, kn: 8 },
+      s: { th: 52, kn: 4 },
+    },
+    front: {
+      1: { th: 0, kn: 90 },
+      2: { th: 15, kn: 82 },
+      s: { th: 16, kn: 4 },
+    },
+    // A rung up, and a rung down, each ladder.
+    up: { back: { 0: 1, 1: 2, 2: 3, 3: 4, s: 3 }, front: { 0: 1, 1: 2, s: 2 } },
+    down: { back: { 1: 0, 2: 1, 3: 2, 4: 3, s: 0 }, front: { 1: 0, 2: 1, s: 0 } },
+    // What a bare "left leg up" goes to, from each rung: the next one, and
+    // "straight" the straight leg (and from the knees-up shape, straight up).
+    straight: { back: { 0: 's', 1: 's', 2: 3, s: 3 }, front: { 0: 's', 1: 's' } },
+    // The ankle joint over the sole, and the ankle-to-ball line under level,
+    // standing — her own skeleton, `footL` 0.068 over the floor and `toeL`
+    // (the ball) 0.127 ahead and 0.070 down. `heel` is how far behind the
+    // ankle the heel's contact is, along the foot.
+    sole: 0.078, ball: 0.505, heel: 0.03,
+    // THE COT IN HER FRAME, lying on it: the mattress top is figure y 0
+    // (`show.mat` lifts her by exactly the mattress's height), the folded
+    // blanket is 0.06 over x 0.345-0.895, the foot rail 0.02 over x
+    // 0.92-0.97, and the mattress is 0.33 either side of her middle. MEASURED
+    // by rays at the room's own mesh, every 5 cm along her, and the same
+    // numbers the supine solve in tools/blender/human_mh.py was fitted to.
+    cot: { half: 0.33, blanket: [0.345, 0.895, 0.06], rail: [0.92, 0.97, 0.02], floor: -0.424, edge: 0.025 },
+    // The spread each shape takes — see `liftTop`. Measured: see CHANGELOG.
+    top: { back: { 1: 1, 2: 1.7, 3: 2.4, 4: 2.4, s: 2.05 }, front: { 1: 1, 2: 1, s: 1 } },
+    // A planted foot spread stays on the mattress: its ankle no further out
+    // than this from her middle.
+    plantOut: 0.255,
+  };
+  // Each leg, as it is being drawn: `on` overriding the clip, `w` how much,
+  // `th`/`kn` the shape it is at, rad, and `pl` how planted its foot is.
+  const liftSt = { L: { on: 0, w: 0, th: 0, kn: 0, pl: 0 }, R: { on: 0, w: 0, th: 0, kn: 0, pl: 0 } };
+  /** Which ladder the pose she is holding has: 'back', 'front', or null. */
+  function liftMode(phase) {
+    if (phase === 'cradle') return 'back';
+    if (phase === 'flatheld') return 'front';
+    return null;
+  }
+  /** Her asked shapes, as a pair — 0 for a leg not raised. */
+  function liftWant() {
+    if (!show.lift) show.lift = { L: 0, R: 0 };
+    return show.lift;
+  }
+  function liftAny() { const w = liftWant(); return !!(w.L || w.R); }
+  /** The spread a leg may take in the shape it is asked to be in, or null for the pose's. */
+  function liftTop(side, phase) {
+    const m = liftMode(phase), k = liftWant()[side];
+    if (!m || !k) return null;
+    const t = LIFT.top[m][k];
+    return t == null ? 1 : t;
+  }
+  /** The higher of the two, when either leg is raised; null otherwise. */
+  function liftTopOf(phase) {
+    if (!show || !liftMode(phase) || !liftAny()) return null;
+    const flat = legsSpBase(phase);
+    const a = liftTop('L', phase), b = liftTop('R', phase);
+    return Math.max(a == null ? flat : a, b == null ? flat : b);
+  }
+  /** What is under her heel at `x` (her frame, lying on the cot), y. */
+  function liftSurf(x) {
+    if (!show.onBed) return 0;
+    const C = LIFT.cot, e = C.edge;
+    const step = (x0, x1, h) => h * smoothstep(x0 - e, x0 + e, x) * (1 - smoothstep(x1 - e, x1 + e, x));
+    if (x > C.rail[1] + e) return C.floor;
+    return step(C.blanket[0], C.blanket[1], C.blanket[2]) + step(C.rail[0], C.rail[1], C.rail[2]);
+  }
+  const _lfH = new THREE.Vector3(), _lfE = new THREE.Vector3(), _lfW = new THREE.Vector3();
+  const _lfUp = new THREE.Vector3(0, 1, 0);
+  /**
+   * The thigh's lowest elevation, rad, that keeps the heel on what is under
+   * it, for a knee bent `kn`: the ankle `sole` over the surface `heel` behind
+   * it. Halves between a thigh pointing 20 degrees down and one straight up.
+   */
+  function liftFloor(S, h, a, b, kn) {
+    const g = (th) => {
+      const ph = th - kn;
+      const ay = S.y + a * Math.sin(th) + b * Math.sin(ph);
+      const ax = S.x + (a * Math.cos(th) + b * Math.cos(ph)) * h.x;
+      return ay - (liftSurf(ax - LIFT.heel * Math.sign(h.x || 1)) + LIFT.sole);
+    };
+    let lo = -0.35, hi = 1.6;
+    if (g(lo) >= 0) return lo;
+    for (let i = 0; i < 20; i++) {
+      const m = (lo + hi) / 2;
+      if (g(m) >= 0) hi = m; else lo = m;
+    }
+    return hi;
+  }
+  /**
+   * One leg to its shape: `S`/`E`/`W` the clip's hip, knee and ankle, which
+   * come back as the solved ones (blended by `w`). Answers how planted its
+   * foot is, 0..1, and leaves the leg's heading in `_lfH`.
+   */
+  function liftLeg(side, S, E, W, mode, dt, fwd) {
+    const st = liftSt[side], want = liftWant()[side];
+    const a = E.distanceTo(S), b = W.distanceTo(E);
+    // The plane of the leg: up, and along her toward the clip's own ankle —
+    // with her length behind it, so a thigh pointing at the ceiling still
+    // has a heading.
+    _lfH.set(W.x - S.x, 0, W.z - S.z).addScaledVector(fwd, 0.3);
+    _lfH.y = 0;
+    _lfH.normalize();
+    const h = _lfH;
+    // The clip's leg in that plane.
+    const tx = (E.x - S.x) * h.x + (E.z - S.z) * h.z, ty = E.y - S.y;
+    const sx = (W.x - E.x) * h.x + (W.z - E.z) * h.z, sy = W.y - E.y;
+    const thc = Math.atan2(ty, tx), phc = Math.atan2(sy, sx);
+    const knc = mode === 'front' ? phc - thc : thc - phc;
+    if (!want && !st.on) return 0;
+    if (want && !st.on) { st.on = 1; st.w = 0; st.th = thc; st.kn = knc; st.pl = 0; }
+    const D = Math.PI / 180;
+    let thT = thc, knT = knc, plT = 0;
+    if (want) {
+      const sh = LIFT[mode][want];
+      knT = sh.kn * D;
+      plT = sh.plant ? 1 : 0;
+      if (mode === 'front') thT = thc + sh.th * D;
+      else thT = sh.plant ? liftFloor(S, h, a, b, knT) : sh.th * D;
+    }
+    st.th = damp(st.th, thT, LIFT.rate, dt);
+    st.kn = damp(st.kn, knT, LIFT.rate, dt);
+    st.pl = damp(st.pl, plT, LIFT.rate, dt);
+    st.w = damp(st.w, want ? 1 : 0, want ? LIFT.wRate : LIFT.rate, dt);
+    // The floor under every shape on the way: on her back the heel never
+    // goes into what is under it, and on her front the knee stays down.
+    if (mode === 'back') st.th = Math.max(st.th, liftFloor(S, h, a, b, st.kn));
+    else st.th = Math.max(st.th, thc);
+    if (!want && st.w < 0.01) { st.on = 0; st.w = 0; st.pl = 0; return 0; }
+    const ph = mode === 'front' ? st.th + st.kn : st.th - st.kn;
+    _lfE.copy(S).addScaledVector(h, a * Math.cos(st.th)).addScaledVector(_lfUp, a * Math.sin(st.th));
+    _lfW.copy(_lfE).addScaledVector(h, b * Math.cos(ph)).addScaledVector(_lfUp, b * Math.sin(ph));
+    E.lerp(_lfE, st.w);
+    W.lerp(_lfW, st.w);
+    return st.pl * st.w;
+  }
+  /** Both legs back to the clip at once — a pose change, a walk. */
+  function liftClear() {
+    for (const s of ['L', 'R']) { const st = liftSt[s]; st.on = 0; st.w = 0; st.pl = 0; }
+  }
+  // How high each shape is, for "both up" and "straight": the straight-leg
+  // raise sits between the knee up and the foot up.
+  const LIFT_RANK = { 0: 0, 1: 1, s: 1.5, 2: 2, 3: 3, 4: 4 };
+  /** The asks of the ladder, and what each does to the legs (`liftPlan`). */
+  const LIFT_ASKS = { 'legs.leftup': 1, 'legs.rightup': 1, 'legs.bothup': 1, 'legs.higher': 1,
+    'legs.lower': 1, 'legs.leftdown': 1, 'legs.rightdown': 1, 'legs.leftstraight': 1,
+    'legs.rightstraight': 1, 'legs.straight': 1 };
+  /**
+   * Where an ask of the ladder takes her legs: `{ L, R }`, or a reason she
+   * cannot (a key `WHY` in 49-ears.js has words for).
+   *
+   * From the cradle — both knees up, her hands holding them — the legs are
+   * read as both at the foot-up shape (2), which is what they are, and the
+   * ask goes from there on to the legs-down pose: "left leg up" keeps the
+   * left where it is and puts the right down, "higher" sends both straight
+   * up. Her hands let go of them, which is the cross from `cradle` to
+   * `supine` the legs-down ask has always been.
+   */
+  function liftPlan(name) {
+    const p = show.phase, m = liftMode(p);
+    if (!m) return LYING[p] ? 'liftpose' : 'notlying';
+    const Wt = liftWant();
+    const held = m === 'back' && !show.legsDown;
+    const up = LIFT.up[m], dn = LIFT.down[m], st = LIFT.straight[m];
+    const R0 = LIFT_RANK;
+    let L = held ? 2 : Wt.L, R = held ? 2 : Wt.R;
+    const side = /left/.test(name) ? 'L' : /right/.test(name) ? 'R' : null;
+    const get = (s) => (s === 'L' ? L : R), set = (s, v) => { if (s === 'L') L = v; else R = v; };
+    const other = side === 'L' ? 'R' : 'L';
+    if (name === 'legs.leftup' || name === 'legs.rightup') {
+      if (held) { set(side, 2); set(other, 0); } else {
+        const n = up[get(side)];
+        if (n == null) return 'legtop';
+        set(side, n);
+      }
+    } else if (name === 'legs.leftstraight' || name === 'legs.rightstraight') {
+      if (held) { set(side, 3); set(other, 0); } else {
+        const n = st[get(side)];
+        if (n == null) return 'legtop';
+        set(side, n);
+      }
+    } else if (name === 'legs.leftdown' || name === 'legs.rightdown') {
+      if (held) { set(side, 0); set(other, 2); } else {
+        if (!get(side)) return 'legdown';
+        set(side, 0);
+      }
+    } else if (name === 'legs.bothup') {
+      const lo = m === 'back' ? 2 : 1;
+      if (held || (R0[L] >= lo && R0[R] >= lo)) return 'legsup';
+      if (R0[L] < lo) L = lo;
+      if (R0[R] < lo) R = lo;
+    } else if (name === 'legs.straight') {
+      const s = m === 'back' ? 3 : 's';
+      if (!held && L === s && R === s) return 'legtop';
+      if (m === 'back') { L = R0[L] < 3 || held ? 3 : L; R = R0[R] < 3 || held ? 3 : R; } else { L = s; R = s; }
+    } else if (name === 'legs.higher') {
+      if (held) { L = 3; R = 3; } else {
+        if (!L && !R) return 'notraised';
+        const nL = L ? up[L] : 0, nR = R ? up[R] : 0;
+        if (nL == null && nR == null) return 'highest';
+        if (nL != null) L = nL;
+        if (nR != null) R = nR;
+      }
+    } else if (name === 'legs.lower') {
+      if (held) { L = 1; R = 1; } else {
+        if (!L && !R) return 'notraised';
+        L = L ? dn[L] : 0;
+        R = R ? dn[R] : 0;
+      }
+    } else return 'nothing';
+    return { L, R };
+  }
+  /**
+   * HER LEGS, MEASURED (1.566.0). Debug only: the drawn body (v2.0's mesh,
+   * which wears this figure's palette) put through its weights on the CPU,
+   * in her figure frame, and what a render cannot say about a raised leg:
+   *
+   *   foot     per side, the lowest point of the foot and toes, and its
+   *            least gap to what is under it there (`liftSurf`: mattress,
+   *            blanket, rail) — − is into it; and how far out from her
+   *            middle the foot reaches against the mattress's 0.33
+   *   thigh    per side, the lowest point of the thigh, and the deepest any
+   *            thigh vertex goes behind her belly's skin (the nearest torso
+   *            vertex's own normal), m — − is through her
+   *   rom      per side, the hip's flexion and abduction off her own trunk,
+   *            and the knee's flexion, degrees — tools/rom.js's frame
+   *   mat      the lowest point of her back, against the mattress
+   *   toys     each toy she has in, the deepest any vertex of it goes under
+   *            her thighs' skin (− is inside a thigh), m — the one thing a
+   *            leg raised can do to a toy that is carried by her pelvis
+   */
+  function legsMeasure() {
+    if (!appr || !skinFig) return null;
+    const g = appr.mesh.geometry, pos = g.getAttribute('position'), nrm = g.getAttribute('normal');
+    const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+    const bsc = BI.normalized ? 255 : 1;
+    const P = skinFig.pose().palette, ix = g.getIndex(), { start, count } = g.drawRange;
+    const names = skinFig.bones.map((b) => b.name);
+    const kind = (n) => (/^(foot|toe)L/.test(n) ? 'fL' : /^(foot|toe)R/.test(n) ? 'fR'
+      : n === 'legUL' ? 'tL' : n === 'legUR' ? 'tR' : n === 'legLL' ? 'sL' : n === 'legLR' ? 'sR'
+        : /^(pelvis|spine0[123]|chest)$/.test(n) ? 'body' : null);
+    const seen = new Uint8Array(pos.count);
+    const out = { foot: {}, thigh: {}, shin: {}, rom: {}, mat: 9 };
+    const cells = new Map(), tcells = new Map(), C = 0.03;
+    const key = (x, y, z) => Math.floor(x / C) + ',' + Math.floor(y / C) + ',' + Math.floor(z / C);
+    const thighs = [];
+    const fd = { fL: { y: 9, gap: 9, z: 0 }, fR: { y: 9, gap: 9, z: 0 } };
+    const sh = { sL: 9, sR: 9 }, th = { tL: 9, tR: 9 };
+    for (let i = start; i < start + count; i++) {
+      const v = ix.getX(i);
+      if (seen[v]) continue;
+      seen[v] = 1;
+      let best = 0, bb = -1;
+      const p = [0, 0, 0], n = [0, 0, 0];
+      const x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+      const nx = nrm.getX(v), ny = nrm.getY(v), nz = nrm.getZ(v);
+      for (let w = 0; w < 4; w++) {
+        const wt = BW.getComponent(v, w);
+        if (wt <= 0) continue;
+        const b = Math.round(BI.getComponent(v, w) * bsc), m = b * 12;
+        if (wt > best) { best = wt; bb = b; }
+        p[0] += wt * (P[m] * x + P[m + 1] * y + P[m + 2] * z + P[m + 3]);
+        p[1] += wt * (P[m + 4] * x + P[m + 5] * y + P[m + 6] * z + P[m + 7]);
+        p[2] += wt * (P[m + 8] * x + P[m + 9] * y + P[m + 10] * z + P[m + 11]);
+        n[0] += wt * (P[m] * nx + P[m + 1] * ny + P[m + 2] * nz);
+        n[1] += wt * (P[m + 4] * nx + P[m + 5] * ny + P[m + 6] * nz);
+        n[2] += wt * (P[m + 8] * nx + P[m + 9] * ny + P[m + 10] * nz);
+      }
+      const k = bb >= 0 ? kind(names[bb]) : null;
+      if (!k) continue;
+      if (k === 'body') {
+        if (best > 0.6) {
+          const nl = Math.hypot(n[0], n[1], n[2]) || 1;
+          const c = key(p[0], p[1], p[2]);
+          if (!cells.has(c)) cells.set(c, []);
+          cells.get(c).push([p[0], p[1], p[2], n[0] / nl, n[1] / nl, n[2] / nl]);
+        }
+        out.mat = Math.min(out.mat, p[1]);
+      } else if (k[0] === 'f') {
+        const F = fd[k];
+        F.y = Math.min(F.y, p[1]);
+        F.z = Math.max(F.z, Math.abs(p[2]));
+        if (Math.abs(p[2]) < LIFT.cot.half) F.gap = Math.min(F.gap, p[1] - liftSurf(p[0]));
+      } else if (k[0] === 's') sh[k] = Math.min(sh[k], p[1]);
+      else {
+        th[k] = Math.min(th[k], p[1]);
+        if (best > 0.6) thighs.push([k, p[0], p[1], p[2]]);
+        const nl = Math.hypot(n[0], n[1], n[2]) || 1;
+        const c = key(p[0], p[1], p[2]);
+        if (!tcells.has(c)) tcells.set(c, []);
+        tcells.get(c).push([p[0], p[1], p[2], n[0] / nl, n[1] / nl, n[2] / nl]);
+      }
+    }
+    // A thigh vertex behind the nearest belly vertex's normal is inside her.
+    const thIn = { tL: 0, tR: 0 };
+    for (const [k, x, y, z] of thighs) {
+      const cx = Math.floor(x / C), cy = Math.floor(y / C), cz = Math.floor(z / C);
+      let bd = 0.05, be = null;
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+        const l = cells.get((cx + a) + ',' + (cy + b) + ',' + (cz + c));
+        if (!l) continue;
+        for (const e of l) {
+          const d = Math.hypot(x - e[0], y - e[1], z - e[2]);
+          if (d < bd) { bd = d; be = e; }
+        }
+      }
+      if (!be) continue;
+      const s = (x - be[0]) * be[3] + (y - be[1]) * be[4] + (z - be[2]) * be[5];
+      if (s < thIn[k]) thIn[k] = s;
+    }
+    const r3 = (x) => +x.toFixed(3);
+    for (const s of ['L', 'R']) {
+      out.foot[s] = { low: r3(fd['f' + s].y), gap: fd['f' + s].gap === 9 ? null : r3(fd['f' + s].gap), out: r3(fd['f' + s].z) };
+      out.thigh[s] = { low: r3(th['t' + s]), into: r3(thIn['t' + s]) };
+      out.shin[s] = r3(sh['s' + s]);
+    }
+    out.mat = r3(out.mat);
+    // The toys against her thighs: each vertex of each, into her frame.
+    out.toys = {};
+    const Mi = skinFig.mesh.matrixWorld.clone().invert(), tv = new THREE.Vector3();
+    for (const k of ['lovense', 'plug']) {
+      const part = worn[k] && worn[k][0];
+      if (!part || !part.shake) continue;
+      let worst = 9;
+      part.shake.updateWorldMatrix(true, true);
+      part.shake.traverse((m) => {
+        if (!m.isMesh || !m.geometry) return;
+        const tp = m.geometry.getAttribute('position');
+        for (let i = 0; i < tp.count; i++) {
+          tv.fromBufferAttribute(tp, i).applyMatrix4(m.matrixWorld).applyMatrix4(Mi);
+          const cx = Math.floor(tv.x / C), cy = Math.floor(tv.y / C), cz = Math.floor(tv.z / C);
+          let bd = 0.05, be = null;
+          for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+            const l = tcells.get((cx + a) + ',' + (cy + b) + ',' + (cz + c));
+            if (!l) continue;
+            for (const e of l) {
+              const d = Math.hypot(tv.x - e[0], tv.y - e[1], tv.z - e[2]);
+              if (d < bd) { bd = d; be = e; }
+            }
+          }
+          if (!be) continue;
+          const sd = (tv.x - be[0]) * be[3] + (tv.y - be[1]) * be[4] + (tv.z - be[2]) * be[5];
+          if (sd < worst) worst = sd;
+        }
+      });
+      out.toys[k] = worst === 9 ? null : r3(worst);
+    }
+    // The joints, tools/rom.js's way: her trunk's own axes off bone heads.
+    const B = (n) => skinFig.boneAt(skinFig.boneIndex(n), new THREE.Vector3());
+    const pel = B('pelvis'), ch = B('chest'), hl = B('legUL'), hr = B('legUR');
+    const down = pel.clone().sub(ch).normalize();
+    const lat = hl.clone().sub(hr);
+    lat.addScaledVector(down, -lat.dot(down)).normalize();
+    // Forward is the way her knees go when she sits: `lat × down` with the
+    // sign checked against her own toes in the bind (+x is her front).
+    const fwd = new THREE.Vector3().crossVectors(down, lat).normalize();
+    const D = 180 / Math.PI;
+    for (const s of ['L', 'R']) {
+      const S = B('legU' + s), E = B('legL' + s), W = B('foot' + s);
+      const u = E.clone().sub(S).normalize();
+      const outw = s === 'L' ? lat.clone() : lat.clone().negate();
+      // Flexion signed by which side of her trunk the knee is on.
+      const flex = Math.atan2(u.dot(fwd), u.dot(down)) * D;
+      const abd = Math.asin(clamp(u.dot(outw), -1, 1)) * D;
+      const knee = 180 - E.clone().sub(S).angleTo(W.clone().sub(E).negate()) * D;
+      out.rom[s] = { flex: Math.round(flex), abd: Math.round(abd), knee: Math.round(knee) };
+    }
+    return out;
+  }
+  /**
+   * Her legs for the scene block (`sceneTalk` in 90-app.js), as keys the
+   * voice service has words for (`LEGS_DOING` in server/baye/baye.py): each
+   * leg's shape when either is raised, and how far apart they are.
+   */
+  const LIFT_SCENE = { back: { 0: 'flat', 1: 'knee', 2: 'bent', 3: 'up', 4: 'over', s: 'raise' },
+    front: { 0: 'flat', 1: 'shin', 2: 'shinhi', s: 'back' } };
+  function legsScene() {
+    const o = {}, m = liftMode(show.phase);
+    if (m && liftAny()) {
+      const W = liftWant();
+      o.legs_l = LIFT_SCENE[m][W.L];
+      o.legs_r = LIFT_SCENE[m][W.R];
+    }
+    const sp = Math.min(show.legsSp || 0, legsSpMax(show.phase));
+    if (sp > 0.05 && !HANDS[show.phase]) o.legs_apart = sp > 2.3 ? 3 : sp > 1.4 ? 2 : 1;
+    return o;
+  }
+  /** The plan, done: the legs asked, and on her back the pose under them. */
+  function liftDo(name) {
+    const P = liftPlan(name);
+    if (typeof P === 'string') return P;
+    const W = liftWant();
+    W.L = P.L; W.R = P.R;
+    if (liftMode(show.phase) === 'back') show.legsDown = 1;
+    return true;
   }
   /**
    * Whether both feet, a step further out, are still in the room.
@@ -56573,12 +57057,22 @@ async function buildJadrija(scene) {
   const legsWas = { t: null, s: null };
   // The turns last frame's solve put on each thigh and shin, to be taken back
   // off what the palette reports. See `handTo`, which does this for an arm.
-  const legsLaid = { L: { u: new THREE.Quaternion(), l: new THREE.Quaternion() },
-    R: { u: new THREE.Quaternion(), l: new THREE.Quaternion() } };
+  // And the foot's (1.566.0), which a planted sole turns flat.
+  const legsLaid = { L: { u: new THREE.Quaternion(), l: new THREE.Quaternion(), f: new THREE.Quaternion() },
+    R: { u: new THREE.Quaternion(), l: new THREE.Quaternion(), f: new THREE.Quaternion() } };
   const _lsGoal = new THREE.Vector3(), _lsMid = new THREE.Vector3(), _lsV = new THREE.Vector3();
   const _lsAx = new THREE.Vector3(), _lsOut = new THREE.Vector3(), _lsQ = new THREE.Quaternion();
   const _lsG = { L: new THREE.Vector3(), R: new THREE.Vector3() };
   const _lsP = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  // The raised legs' knee and ankle to aim at, how planted each foot is, and
+  // each leg's heading; and her own length, level.
+  const _lsE = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _lsW = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _lsHd = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _lsPl = { L: 0, R: 0 };
+  const _lsCap = { L: null, R: null };
+  const _lsFwd = new THREE.Vector3(1, 0, 0);
+  const _lsQt = new THREE.Quaternion();
   /**
    * ── HER BACK STRAIGHTENED, UPRIGHT (1.560.0, the autonomous mode) ───────
    *
@@ -56619,7 +57113,10 @@ async function buildJadrija(scene) {
     show.legsSpAt = damp(show.legsSpAt || 0, want, 1 / LEGSP.secs, dt);
     const clear = () => {
       for (const n of ['legUL', 'legLL', 'legUR', 'legLR', 'footL', 'footR']) f.aim(n, 0, 1, 0, 0);
-      for (const s of ['L', 'R']) { legsLaid[s].u.identity(); legsLaid[s].l.identity(); }
+      for (const s of ['L', 'R']) {
+        legsLaid[s].u.identity(); legsLaid[s].l.identity(); legsLaid[s].f.identity();
+        _lsCap[s] = null;
+      }
     };
     // ONE FRAME LATE, because the legs are. The aims below go into the
     // palette at the NEXT `update`, and her height is set this frame — so the
@@ -56629,8 +57126,14 @@ async function buildJadrija(scene) {
     // came up, which is one frame of the ease.
     show.legsDrop = legsDropNext;
     legsDropNext = 0;
-    if (show.legsSpAt < 0.002) {
+    // A leg raised (1.566.0) is only ever on the pose it was asked on: any
+    // other pose, and the ladder is put away with it.
+    const mode = liftMode(show.phase);
+    if (!mode && liftAny()) { show.lift.L = 0; show.lift.R = 0; }
+    const lifting = !!mode && (liftAny() || liftSt.L.on || liftSt.R.on);
+    if (show.legsSpAt < 0.002 && !lifting) {
       if (show.legsSpOn) { clear(); show.legsSpOn = 0; }
+      liftClear();
       legsRest = null; legsRestPhase = null;
       return;
     }
@@ -56648,6 +57151,7 @@ async function buildJadrija(scene) {
     legsWas.t = show.t; legsWas.s = show.s;
     if (moved > 0.05 || f.playing() === 'walk' || f.playing() === 'jog' || f.playing() === 'stroll') {
       if (show.legsSpOn) { clear(); show.legsSpOn = 0; }
+      liftClear();
       legsRest = null; legsRestPhase = null;
       return;
     }
@@ -56659,6 +57163,7 @@ async function buildJadrija(scene) {
     // walking or her pose changes.
     if (show.phase !== legsRestPhase) {
       clear();
+      liftClear();
       legsRest = null; legsRestPhase = show.phase; legsSettle = LEGSP.settle;
       show.legsSpAt = Math.min(show.legsSpAt, 0.003);
       return;
@@ -56670,35 +57175,66 @@ async function buildJadrija(scene) {
     }
     if (!legsRest) {
       legsRest = {};
-      for (const n of ['legUL', 'legLL', 'footL', 'legUR', 'legLR', 'footR']) {
+      for (const n of ['legUL', 'legLL', 'footL', 'toeL', 'legUR', 'legLR', 'footR', 'toeR']) {
         if (f.boneIndex(n) < 0) { legsRest = null; return; }
         legsRest[n] = new THREE.Vector3();
       }
+      legsRest.body = { pelvis: f.boneIndex('pelvis'), chest: f.boneIndex('chest') };
     }
     // Her legs as the clip has them this frame: the palette is the clip with
     // last frame's aims on it, thigh then shin, so those come off in the
-    // other order.
+    // other order. And the foot's own (1.566.0), off the ball's line.
     for (const side of ['L', 'R']) {
       const S = f.boneAt(f.boneIndex('legU' + side), legsRest['legU' + side]);
       const E = f.boneAt(f.boneIndex('legL' + side), legsRest['legL' + side]);
       const W = f.boneAt(f.boneIndex('foot' + side), legsRest['foot' + side]);
+      const T = f.boneAt(f.boneIndex('toe' + side), legsRest['toe' + side]);
       const L = legsLaid[side];
+      T.sub(W).applyQuaternion(_lsQ.copy(L.f).invert()).applyQuaternion(_lsQ.copy(L.l).invert())
+        .applyQuaternion(_lsQ.copy(L.u).invert());
       _lsV.copy(W).sub(E).applyQuaternion(_lsQ.copy(L.l).invert())
         .applyQuaternion(_lsQ.copy(L.u).invert());
       E.sub(S).applyQuaternion(_lsQ).add(S);
       W.copy(E).add(_lsV);
+      // `toe` holds the ankle-to-ball DIRECTION from here on, not a point.
+      T.normalize();
     }
     show.legsSpOn = 1;
     const stand = !!STANDS[show.phase];
     const out = stand ? LEGSP.stand : LEGSP.out;
-    // The spread itself, and the swing past it.
-    const e = Math.min(1, show.legsSpAt);
-    const sw = Math.max(0, show.legsSpAt - 1) * LEGSP.swing;
+    // Her length, from her chest to her hips, level: the way her feet are.
+    if (mode) {
+      f.boneAt(legsRest.body.pelvis, _lsMid);
+      f.boneAt(legsRest.body.chest, _lsAx);
+      _lsFwd.copy(_lsMid).sub(_lsAx);
+      _lsFwd.y = 0;
+      if (_lsFwd.lengthSq() < 1e-6) _lsFwd.set(1, 0, 0);
+      _lsFwd.normalize();
+    }
     let drop = 0;
     for (const side of ['L', 'R']) {
-      const S = legsRest['legU' + side], E = legsRest['legL' + side], W = legsRest['foot' + side];
+      const S = legsRest['legU' + side], E0 = legsRest['legL' + side], W0 = legsRest['foot' + side];
       const sgn = Math.sign(S.z || (side === 'L' ? 1 : -1));
-      const G = _lsG[side].set(W.x, W.y, W.z + sgn * out * e);
+      // The leg raised, or as the clip has it: its knee and ankle to aim at.
+      const E = _lsE[side].copy(E0), W = _lsW[side].copy(W0);
+      const pl = mode ? liftLeg(side, S, E, W, mode, dt, _lsFwd) : 0;
+      _lsPl[side] = pl;
+      _lsHd[side].copy(_lfH);
+      // The spread itself, and the swing past it — each leg to its own
+      // ceiling, so a leg lying flat keeps the cot's while the other is up.
+      // The ceiling eased, so a leg coming down from a wide V closes with it
+      // rather than snapping to the cot's.
+      const top = mode ? liftTop(side, show.phase) : null;
+      const cap = top == null ? legsSpBase(show.phase) : top;
+      _lsCap[side] = _lsCap[side] == null ? cap : damp(_lsCap[side], cap, 1 / LEGSP.secs, dt);
+      const amt = Math.min(show.legsSpAt, _lsCap[side]);
+      const e = Math.min(1, amt);
+      const sw = Math.max(0, amt - 1) * LEGSP.swing;
+      // A planted foot stays on the mattress: it goes out no further than
+      // the mattress has room for, and the knee falls open over it instead.
+      let o = out * e;
+      if (pl > 0.5 && show.onBed) o = Math.min(o, Math.max(0, LIFT.plantOut - Math.abs(W.z)));
+      const G = _lsG[side].set(W.x, W.y, W.z + sgn * o);
       // The knee out of the line it already bends from, and further out.
       _lsMid.copy(S).add(W).multiplyScalar(0.5);
       const P = _lsP[side].copy(E).sub(_lsMid);
@@ -56709,7 +57245,7 @@ async function buildJadrija(scene) {
       // And wider: the leg turned about the hip toward her own side, the goal
       // and the pole together. `hip→ankle × side` is the axis that carries
       // the one toward the other.
-      if (sw > 0) {
+      if (sw > 0 && !(pl > 0.5)) {
         _lsGoal.copy(G).sub(S);
         _lsAx.crossVectors(_lsGoal, _lsOut.set(0, 0, sgn));
         if (_lsAx.lengthSq() > 1e-8) {
@@ -56728,8 +57264,34 @@ async function buildJadrija(scene) {
       const chain = wheelLimb(f, 'legU' + side, 'legL' + side, S, E, W, G, _lsP[side]);
       legsLaid[side].u.copy(_wkQ);
       legsLaid[side].l.copy(_wkR);
-      if (stand) armAimQ(f, 'foot' + side, _lsQ.copy(chain).invert());
-      else f.aim('foot' + side, 0, 1, 0, 0);
+      legsLaid[side].f.identity();
+      if (stand) {
+        legsLaid[side].f.copy(chain).invert();
+        armAimQ(f, 'foot' + side, legsLaid[side].f);
+      } else if (_lsPl[side] > 0.002) {
+        // THE PLANTED FOOT, FLAT (1.566.0): the ankle-to-ball line turned
+        // from where the chain has carried it to 29 degrees under level along
+        // the leg's heading — the line it has standing — by as much as the
+        // foot is planted.
+        // AND LEVEL ACROSS: a knee fallen open rolls the foot on to its
+        // outer edge with it (MEASURED, 15 mm of the sole into the blanket
+        // at the first spread), so the foot's own across — square to the
+        // shin and the ball line, as the clip has them — is turned about the
+        // ball line until it lies level.
+        const H = _lsHd[side];
+        const ball = legsRest['toe' + side];
+        _lsV.copy(ball).applyQuaternion(chain);
+        _lsAx.set(H.x * Math.cos(LIFT.ball), -Math.sin(LIFT.ball), H.z * Math.cos(LIFT.ball)).normalize();
+        _lsQ.setFromUnitVectors(_lsV, _lsAx);
+        _lfE.copy(W).sub(E).normalize().cross(ball).normalize().applyQuaternion(chain).applyQuaternion(_lsQ);
+        _lfW.crossVectors(_lsAx, _lfUp).normalize();
+        if (_lfW.dot(_lfE) < 0) _lfW.negate();
+        _lfE.addScaledVector(_lsAx, -_lfE.dot(_lsAx)).normalize();
+        const tw = Math.atan2(_lsAx.dot(_lfH.crossVectors(_lfE, _lfW)), _lfE.dot(_lfW));
+        _lsQ.premultiply(_lsQt.setFromAxisAngle(_lsAx, tw));
+        legsLaid[side].f.identity().slerp(_lsQ, _lsPl[side]);
+        armAimQ(f, 'foot' + side, legsLaid[side].f);
+      } else f.aim('foot' + side, 0, 1, 0, 0);
     }
     legsDropNext = drop;
   }
@@ -57733,7 +58295,11 @@ async function buildJadrija(scene) {
   const TURN_KEEP = { look: 1, 'look.stop': 1, 'look.down': 1, 'look.up': 1,
     yawn: 1, 'mouth.open': 1, 'mouth.close': 1, pet: 1,
     'legs.spread': 1, 'legs.close': 1, 'arms.wide': 1, 'arms.down': 1,
-    'legs.down': 1, 'legs.up': 1 };
+    'legs.down': 1, 'legs.up': 1, 'legs.wider': 1,
+    // The ladder (1.566.0): a leg up or down, both, higher, lower.
+    'legs.leftup': 1, 'legs.rightup': 1, 'legs.bothup': 1, 'legs.higher': 1, 'legs.lower': 1,
+    'legs.leftdown': 1, 'legs.rightdown': 1, 'legs.leftstraight': 1, 'legs.rightstraight': 1,
+    'legs.straight': 1 };
 
   /**
    * ── AND OVER, LYING DOWN: THE ROLL SHE CAME IN BY, BACKWARDS ─────────
@@ -58119,6 +58685,15 @@ async function buildJadrija(scene) {
      */
     'legs.wider': 1,
     /**
+     * And one leg up, or both, and higher. Misha, 2 Oct 2026: *"one leg
+     * laying flat on the cot while the other raised, or both raised, and
+     * then raised higher"*. A ladder per leg over the pose she is lying in —
+     * see `LIFT` and `liftPlan`.
+     */
+    'legs.leftup': 1, 'legs.rightup': 1, 'legs.bothup': 1, 'legs.higher': 1, 'legs.lower': 1,
+    'legs.leftdown': 1, 'legs.rightdown': 1, 'legs.leftstraight': 1, 'legs.rightstraight': 1,
+    'legs.straight': 1,
+    /**
      * And her mouth, wide. Misha, 23 Sep 2026: *"can you add a command 'open
      * your mouth' or 'open wide', that she really opens the mouth wide"*. A
      * latch over whatever she is doing, like the arms and the eyes: the jaw
@@ -58449,9 +59024,18 @@ async function buildJadrija(scene) {
       // Only from the pose they are about. Everywhere else her legs are
       // whatever the clip says and there is nothing to raise or lower.
       if (!LYING[show.phase]) return 'notlying';
+      // A leg raised on the ladder (1.566.0) is a leg to put down, and on her
+      // front "legs up" is the ladder's both-up.
+      if (name === 'legs.down' && liftMode(show.phase) && liftAny()) return null;
+      if (name === 'legs.up' && show.phase === 'flatheld') return liftPlan('legs.bothup') === 'legsup' ? 'legsup' : null;
       const want = name === 'legs.up' ? 0 : 1;
       if ((show.legsDown || 0) === want) return want ? 'legsalready' : 'legsup';
       return null;
+    }
+    if (LIFT_ASKS[name]) {
+      if (HANDS[show.phase]) return 'hands';
+      const P = liftPlan(name);
+      return typeof P === 'string' ? P : null;
     }
     if (name.startsWith('give:')) {
       const key = name.slice(5);
@@ -59834,6 +60418,10 @@ async function buildJadrija(scene) {
       // already is.
       'side.left': 1, 'side.right': 1, 'arms.wide': 1, 'arms.down': 1,
       'legs.spread': 1, 'legs.close': 1, 'legs.wider': 1,
+      // The ladder (1.566.0), a latch on the pose like the spread.
+      'legs.leftup': 1, 'legs.rightup': 1, 'legs.bothup': 1, 'legs.higher': 1, 'legs.lower': 1,
+      'legs.leftdown': 1, 'legs.rightdown': 1, 'legs.leftstraight': 1, 'legs.rightstraight': 1,
+      'legs.straight': 1,
       'mouth.open': 1, 'mouth.close': 1, 'pet': 1,
       // AND THE HAIR IS NOT ON THIS LIST, which it was for an afternoon.
       //
@@ -60486,11 +61074,26 @@ async function buildJadrija(scene) {
         const has = Math.min(show.legsSp || 0, top);
         show.legsSp = has < 1 ? 1 : Math.min(top, has + LEGSP.step);
         show.did = name;
+      } else if (LIFT_ASKS[name]) {
+        // THE LADDER (1.566.0): a latch on the pose, like the spread — see
+        // `LIFT` and `liftPlan`. On her back it is laid over the legs-down
+        // pose, so asked from the cradle her hands let go of her knees.
+        liftDo(name);
+        show.did = name;
+        showSay('squee', d);
+      } else if (name === 'legs.up' && show.phase === 'flatheld') {
+        // On her front, "legs up" is her shins up off the mattress.
+        liftDo('legs.bothup');
+        show.did = name;
+        showSay('squee', d);
       } else if (name === 'legs.down' || name === 'legs.up') {
         // A LATCH AND NOT A PHASE. She stays in `cradle` — it is the same
         // pose with her legs somewhere else — so the hold, the aim at you and
-        // the mattress all carry on untouched.
+        // the mattress all carry on untouched. And either way the ladder's
+        // legs come with it (1.566.0): down is flat, up is the cradle's.
         show.legsDown = name === 'legs.down' ? 1 : 0;
+        const LW = liftWant();
+        LW.L = 0; LW.R = 0;
         show.did = name;
         showSay('squee', d);
       } else if (name === 'fours') {
@@ -79171,8 +79774,8 @@ async function buildJadrija(scene) {
      * she is on the mattress in it, `worn` what is on her (`WEAR_KEYS`), and
      * `buzz` the toy going this second.
      */
-    sceneHer: () => (show ? { her: show.phase, on_cot: !!show.onBed, worn: Object.keys(worn),
-      buzz: !!signals.lovense, buzz_plug: !!signals.plug } : null),
+    sceneHer: () => (show ? Object.assign({ her: show.phase, on_cot: !!show.onBed, worn: Object.keys(worn),
+      buzz: !!signals.lovense, buzz_plug: !!signals.plug }, legsScene()) : null),
     /**
      * The collar and the leash (1.553.0) — see `── THE COLLAR AND THE LEASH ──`.
      * `leashState` a frame's worth for 90-app.js; `leashOff(safe)` takes it
@@ -79357,6 +79960,9 @@ async function buildJadrija(scene) {
         swim: p === 'swim' || (show.dip || 0) > 0, at: toWorld(show.t, show.s),
         lie: cp ? cp.lie : null, rag: !!(cotR && cotR.on && cotR.phase === p),
         legsSp: Math.min(show.legsSp || 0, legsSpMax(p)), legsSpMax: legsSpMax(p), legsDown: show.legsDown || 0,
+        // Each leg's rung on the ladder (1.566.0): 0 down, 1 knee up, 's'
+        // straight-leg raise, 2 foot up, 3 straight up, 4 over — see LIFT.
+        liftL: liftMode(p) ? liftWant().L : 0, liftR: liftMode(p) ? liftWant().R : 0, liftMode: liftMode(p),
         arms: show.armsWide || 0, gaze: show.gaze || 0, away: show.gazeAway || 0, eyesDown: show.eyesDown || 0,
         mouth: (show.mouthFor || 0) > 0, yawn: show.yawn != null, turnBack: show.turnBack || 0,
         mouthW: +(show.mouthW || 0).toFixed(3), downAt: +(show.downAt || 0).toFixed(3),
@@ -79722,6 +80328,51 @@ async function buildJadrija(scene) {
      * tilt: 0.6 })` re-places a worn one first, so PLUG's two numbers can be
      * swept in one run; `{ profile: true }` adds her back's own profile.
      */
+    /**
+     * Her legs' ladder (1.566.0) — `__fr.jad.raw().lift()`: what is asked of
+     * each leg, where each is (degrees), and `legsMeasure`'s numbers with
+     * `{ measure: true }`. `{ ask: 'legs.leftup' }` asks it first, the way the
+     * ears would, and answers what `askShow` said.
+     */
+    /** Both legs off the ladder, flat — the safeword's (`sceneSafe` in 90-app.js). */
+    liftRelax: () => { if (!show || !liftAny()) return false; const W = liftWant(); W.L = 0; W.R = 0; return true; },
+    lift: (o = {}) => {
+      if (!show) return null;
+      const r = o.ask ? jadrija.askShow(o.ask, o.who || null) : undefined;
+      const D = 180 / Math.PI, W = liftWant();
+      // Sweeps: the ceilings and the shapes re-set, the legs put straight
+      // into a pair of shapes, an amount of spread set past its ceiling.
+      if (o.top) for (const m of ['back', 'front']) if (o.top[m]) Object.assign(LIFT.top[m], o.top[m]);
+      if (o.legsTop) Object.assign(LEGSP.top, o.legsTop);
+      if (o.shape) for (const m of ['back', 'front']) if (o.shape[m]) for (const k of Object.keys(o.shape[m])) Object.assign(LIFT[m][k], o.shape[m][k]);
+      if (o.lift) Object.assign(LIFT, o.lift);
+      if (o.set) { W.L = o.set.L; W.R = o.set.R; if (liftMode(show.phase) === 'back') show.legsDown = 1; }
+      if (o.sp != null) show.legsSp = o.sp;
+      if (o.hold) show.tmr = 0;
+      const st = (s) => ({ on: liftSt[s].on, w: +liftSt[s].w.toFixed(2), th: Math.round(liftSt[s].th * D),
+        kn: Math.round(liftSt[s].kn * D), pl: +liftSt[s].pl.toFixed(2) });
+      // Each joint's worst turn this frame, degrees (a limit of nothing,
+      // read off `limitStats`, then the real ones put back).
+      let rom;
+      if (o.rom && skinFig) {
+        rom = {};
+        const one = (n, c, k) => ({ [n + 'L']: { child: c + 'L', [k]: 0 }, [n + 'R']: { child: c + 'R', [k]: 0 } });
+        for (const [k, sp] of Object.entries({ kneeTwist: one('legL', 'foot', 'twist'),
+          kneeBend: Object.assign(one('legL', 'foot', 'cone'), { legLL: { child: 'footL', twist: 180, cone: 0 }, legLR: { child: 'footR', twist: 180, cone: 0 } }),
+          hipTwist: one('legU', 'legL', 'twist') })) {
+          skinFig.limits(sp); skinFig.limitStats(true); skinFig.update(0);
+          rom[k] = skinFig.limitStats().worst;
+        }
+        skinFig.limits(Object.assign({}, ARM_LIMITS, LEG_LIMITS));
+        skinFig.update(0);
+      }
+      return { asked: r, phase: show.phase, mode: liftMode(show.phase), legsDown: show.legsDown || 0, rom,
+        limits: skinFig ? skinFig.limitStats() : null,
+        want: { L: W.L, R: W.R }, L: st('L'), R: st('R'), clip: skinFig ? skinFig.playing() : null,
+        sp: +(show.legsSp || 0).toFixed(2), spAt: +(show.legsSpAt || 0).toFixed(2), spMax: legsSpMax(show.phase),
+        cap: { L: _lsCap.L == null ? null : +_lsCap.L.toFixed(2), R: _lsCap.R == null ? null : +_lsCap.R.toFixed(2) },
+        measure: o.measure ? legsMeasure() : undefined };
+    },
     plug: (o) => {
       if (!skinFig) return null;
       const part = worn.plug && worn.plug[0];
