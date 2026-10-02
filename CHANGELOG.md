@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.577.0] — 2026-10-02
+
+The vikendica, put right where Misha walked through it: one light in the
+kitchen corner, the wardrobe out of the doorway, the sun lamp and the bed in
+the rooms and the way round they really are, the Starlink as the round dish
+it is on the wall it is on — and the awning winds in and out on its crank.
+
+**One light, not two.** The big room hung a plafonjera at (−1.70, −2.50) and
+the kitchen its own at (−2.02, −2.12): two of them half a metre apart over
+the sink (*"here there should only be 1 light fixture, not 2"*). The
+kitchen's stays.
+
+**Soba 4's wardrobe, out of the doorway.** It stood on the east wall at its
+near end, its front in line with the door's jamb, so 1.90 m of oak was the
+first thing inside the door (*"it's sorta blocking the doorway"*). It is at
+the far end of the same wall now, in the north-east corner beside the night
+table, 18 cm off it.
+
+**The sun lamp in soba 4, the dome in soba 3.** *"move the sun lightfixture
+from 2nd room ... to 1st room, it's actually in 1st room"*: the two rooms'
+fittings swapped.
+
+**Soba 3's bed, a quarter turn clockwise.** Head on the north wall, foot to
+the door, night table in the north-west corner beside the head, the socket
+over it; 75 cm clear between the foot rail and the doorway, 21 cm between the
+east rail and the stand fan. The posts stand 5 cm off the wall — on it, the
+anthracite panel between them was behind the plaster all but a few black
+flecks (the first bake). The cat print now runs down both sides of the duvet:
+the side that was against the wall shows.
+
+**The Starlink: the round dish, on the sea face.** *"it actually is mounted
+on the side of the house facing the sea, and the dish needs to be curved ...
+curvature pointed at the sky, not at the viewer, and its wire needs to go
+into the house through a little hole on the side of the house facing the
+sea"*. It was the newer kit's flat rectangle on the east gable, leaning 36°
+at the promenade. Now: the first dish, 59 cm, a white dome 4.2 cm high over a
+5 cm rim, lathed at 72 segments, a dark underside rising to a motor housing,
+on its own pale mast, 8° off level toward the north. The mount is the one a
+south wall under a 40 cm eave needs: two stand-off arms off plates with
+coach screws, 9 cm in from the corner and east of the awning's cassette,
+carrying a pole 68 cm out — 14 cm clear of the gutter's lip — up past the
+eave, so the dish sits over the roof edge with sky all round it; the arms
+pass under the fascia's foot. The cable runs down the mast and the pole,
+along the underside of the lower arm to the wall, into a drip loop, and up
+into a grommeted hole in the south wall at 1.71 m over the terrace. Same
+builder for the raised roof, sixty centimetres higher.
+
+**The awning, on its crank.** *"there are missing those horizontal sticks
+that one can use to roll them out or in.. maybe would be cool to roll/unroll
+them using the sticks"*. The cassette and the arms' shoulder brackets stay
+baked; everything that moves is built at runtime off the same numbers
+(`makeAwning` in src/44-vikendica.js): the cloth off its roller (28 × 20,
+with a belly that grows as it runs out), the front bar with its end caps and
+the valance, the two folding arms, and a gearbox under the east end of the
+cassette with a crank hooked into its eye — a 1.10 m rod ending in the
+cranked handle, out sideways 12 cm and back down to a black grip.
+
+- **E beside the handle** winds it the whole way in or out: 7 seconds,
+  11 turns (a quarter of a real one's). E again while it moves sends it back.
+  The line on the screen says which: *[E] crank the awning in / out / the
+  other way* (hr *namotaj / odmotaj tendu*, fr *enrouler / dérouler le
+  store*). Within a metre of the handle, on the terrace; not from the porch
+  under it.
+- **The arms are solved**, two 1.07 m halves hinged at the elbow, the elbow
+  on the circle that keeps both lengths, pushed toward the middle: bent 23°
+  right out, folded along the cassette right in (28 cm between the elbows).
+- **Winding**, the rod swings 19° out toward you off the eye and the handle
+  goes round; let go, it drops back to hanging straight. Everything casts, so
+  the terrace's shade comes and goes with it.
+- `__fr.vik.raw().awning` — `state()`, `set(e)`, `toggle()`, `near(x,y,z)`,
+  `grip()`.
+
+MEASURED: winding from in, e 0.59 at 6.5 turns, e 1.00 at 11.0, rod back to
+hanging (tilt < 0.01); end to end, the player stood at the handle, the hint
+read "[E] crank the awning in", a real E keydown wound it to 0 in 11 turns
+and the hint turned to "out". Shell blob +2.9 KB; frame time within noise.
+
+All in `tools/blender/vikendica.py` (`living`, `bedroom_east`,
+`bedroom_west`, `bed_oak`, `ceiling_light`'s note, `starlink`, `awning`),
+`src/44-vikendica.js`, `src/90-app.js` (E and the hint), `src/02-i18n.js`.
+
 ## [1.576.0] — 2026-10-02
 
 ### The vikendica's bojler and WC at full resolution, and the outside weathered, shaded and tiled
