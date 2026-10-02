@@ -69,6 +69,16 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    expanding-hole shader; pooled, cheap (dozens, one shader). RULE 4 for any 43-jadrija.js
    bather change (own RNG). people 100 / blockers 820.
 
+11. [ ] **Baye speaks English** (Misha, 06:20: "the speech for baye should be in English, not
+   croatian ... keep using that same eleven labs voice" = Jessica `LEnmbrrxYsUYS7vsRRwD`,
+   unchanged). Every Baye line she SPEAKS and captions becomes English, rewritten to sound
+   natural (not word-for-word from the gloss), no gloss line: baye.py PERSONA / PERSONA_TALK
+   (her character otherwise unchanged) and every Baye beat/scene table; client line tables
+   (43-jadrija asks/replies, 49-auto.js 1.568.0 lines, ears, collar/belt/leash, toys, playground,
+   R race, aftercare, safeword lines). Pre-baked Baye audio re-rendered with Jessica in English.
+   The player's commands stay multilingual (en/hr/fr). Bathers, the cat, the Bucketeer, TV news
+   and overheard chatter stay Croatian. Runs right after 6b (Chloe's English) merges, BEFORE
+   item 10 so the wand's lines are written in English; in parallel with item 9.
 10. [ ] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
    which can be used in place of the lovense or plug ... it can go into either hole, for a more
    intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
