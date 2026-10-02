@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.61.0"
+VERSION = "1.62.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -2914,6 +2914,15 @@ WORLD = World()
 # reply, so a lower ceiling does not buy a shorter sentence — it buys an empty
 # one. That was measured at 220 and the note over the constant is the receipt.
 # Brevity is bought in the prompt or it is not bought.
+# SHE SPEAKS ENGLISH, ALWAYS (1.62.0, page 1.570.0). Misha, 2 Oct 2026, 06:20:
+# *"the speech for baye should be in English, not croatian. whatever choices
+# she was using earlier u know, keep using that same eleven labs voice"*. Her
+# lines used to follow the player's language (and her page captions were
+# Croatian with a gloss); now every line she says, here and in `PERSONA_TALK`,
+# is English whatever the player reads the game in or speaks to her in. The
+# voice is unchanged: Jessica, `TTS_VOICE`. The locals stay Croatian: the
+# bathers and the Bucketeer, who is a different errand with her own persona
+# and her own baked Croatian.
 PERSONA = """You are Baye. You are on the beach at Jadrija, near Šibenik, on the
 Dalmatian coast, in the summer of 2026. You are barefoot on hot concrete, the
 cicadas are deafening, and there is a fire somewhere inland.
@@ -2978,8 +2987,9 @@ HOW YOU SAY IT:
 - Never repeat a line you have already said, and never open the same way twice.
   In particular do not open with "The sea", with "That", or with "Come closer".
 - Do not narrate what they are obviously doing. Notice something instead.
-- English unless the context says the player's language is Croatian or French,
-  in which case speak that.
+- ENGLISH, ALWAYS, whatever the player's language: casual, spoken English the
+  way a young woman actually talks, contractions and all. A Croatian place
+  name is fine; a Croatian sentence never is.
 """
 
 
@@ -4228,9 +4238,7 @@ confessions, no sunsets, no metaphors for anybody's body, no similes at all. If
 a line could go on a greetings card or be read at a poetry night, it is the
 wrong line, so say the actual thing in the roughest plainest words you have.
 Swear like it is punctuation, because for you it is. Raw beats clever, every
-time. In another language it is the same mouth: that language's own blunt
-street register, not English slang translated, and exactly as explicit as you
-are in English. You do not clean yourself up for a language.
+time.
 
 AND YOU ARE EASY. You are in the mood, you are up for whatever, and you go
 along with them. Say yes. When they ask you for something, suggest something,
@@ -4262,7 +4270,9 @@ HOW YOU SAY IT:
   answers the same way.
 - Pet names are rare: darling or anything like it once in a whole
   conversation at most, and never two answers running.
-- Answer in the language they spoke to you in.
+- ENGLISH, ALWAYS. Whatever language they speak to you in, Croatian, French or
+  anything else, you understand it and you answer in English. Never translate
+  your answer and never add a second language after it.
 """
 
 PERSONA_TALK_BUCKETEER = """You are Baye on your other errand. All day you
@@ -5771,7 +5781,9 @@ def build_messages(ctx: dict, world: dict) -> list:
         lines.append(f"- they are {near}")
     if ctx.get("seen"):
         lines.append("- places they have been: " + ", ".join(ctx["seen"]))
-    if ctx.get("lang"):
+    # Baye answers in English whatever the player reads (1.62.0); the cat
+    # still follows the player's language, so he alone is told it.
+    if ctx.get("lang") and who != "baye":
         lines.append(f"- the player's language is {ctx['lang']}")
 
     w = world.get("weather") or {}
@@ -5879,11 +5891,10 @@ def build_messages(ctx: dict, world: dict) -> list:
             # model answered the whole thing in Croatian. `/hear` already
             # settles this for every other path — `plainly_english`, then the
             # classifier — so the answer travels with the question.
-            lines.append("Answer in "
-                         + (ctx.get("asked_lang") or "the language of that "
-                            "sentence")
-                         + ". A name off the board or the case keeps its own "
-                           "spelling.")
+            # English since 1.62.0, whatever they asked in: she is Baye.
+            lines.append("Answer in English, whatever language they asked "
+                         "in. A name off the board or the case keeps its own "
+                         "spelling.")
         lines.append("Tell them what you found, as somebody who has just got "
                      "back from doing it. THIRTY WORDS AT THE MOST. Nothing "
                      "you were not told above, no guessing at what else might "
@@ -5893,8 +5904,14 @@ def build_messages(ctx: dict, world: dict) -> list:
                 {"role": "user", "content": "\n".join(lines)}]
 
     if ctx.get("ask") and ctx.get("spoken"):
-        lines.append(f"They asked you in {ctx['spoken']}: answer in "
-                     f"{ctx['spoken']}, whatever your own language is.")
+        if who == "baye":
+            lines.append(f"They asked you in {ctx['spoken']}: answer in "
+                         "English all the same.")
+        else:
+            lines.append(f"They asked you in {ctx['spoken']}: answer in "
+                         f"{ctx['spoken']}, whatever your own language is.")
+    if who == "baye":
+        lines.append("Say it in casual spoken English.")
     lines.append(f"Say one thing to them now. At most {WORD_CAP[who]} words, "
                  "and fewer is better.")
     return [{"role": "system", "content": SPEAKERS[who]},
@@ -6388,6 +6405,12 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
     say_in = (f"They spoke {lang}, so answer in {lang}, whatever your own "
               "language is." if lang
               else "Answer in exactly the language their words are in.")
+    # Baye answers in English whatever they spoke (1.62.0); the Bucketeer
+    # keeps her own rule, the language she was asked in.
+    if who == "baye":
+        say_in = ("Answer in English" + (f", though they spoke {lang}"
+                                         if lang and lang != "English" else "")
+                  + ".")
     # THE LAST LINE BEFORE THE REPLY, and the number in it is the one that
     # binds — see the long note over the same trick in `line_prompt`. Misha,
     # 19 Sep 2026: *"her replies should be in general shorter, keeping it
