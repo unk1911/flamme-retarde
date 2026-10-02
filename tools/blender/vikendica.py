@@ -125,6 +125,10 @@ PORCELAIN = (0.968, 0.972, 0.978)
 # corner cannot be allowed to read as, because the whole point of the corner is
 # that there are two objects stacked in it.
 ENAMEL_W = (0.880, 0.868, 0.840)
+# The plastic cover under its dish, over the heating flange: a newer, cooler
+# white than the enamel it is screwed to, which is the line that separates
+# them from the doorway.
+BOJ_COVER = (0.905, 0.905, 0.898)
 # And the lonac on top of the machine, which is enamel of the other kind:
 # oxblood outside, speckled blue-grey inside, rolled black rim. Every sample of
 # the pot in the photograph is in the machine's own shadow, so the hue is the
@@ -183,6 +187,16 @@ UNDERLAY = (0.170, 0.150, 0.138)    # battens and felt, under the kupe
 LEAD = (0.420, 0.430, 0.440)        # the chimney's apron
 DRIP = (0.640, 0.650, 0.660)        # the aluminium edge on the terrace tiling
 SOFFIT_J = (0.560, 0.420, 0.250)    # the joint between two eave boards
+
+# How the outside render is laid since 1.576.0: a grid of 16 x 10 cm quads with
+# the weathering of `_render_tint` in its corners, rather than one box a face.
+# And no bevel: `wall` builds a face with windows in it out of strips, aprons
+# and lintels, and every one of them was bevelled 18 mm on all four sides, so
+# each was outlined by a groove — a grid of ruled lines through the render at
+# the jamb, sill and head line of every window, which was the most regular
+# thing on the house. At 4 mm they were still there in sun.
+RENDER_V = dict(vcol=True, tint=lambda p, n: _render_tint(p, n),
+                cell=(0.16, 0.16, 0.10), bev=0.0)
 
 
 # --------------------------------------------------------------------------- #
@@ -505,7 +519,7 @@ def solidify(ob, thickness, offset=0.0):
 # ------------------------------------------------------------------ surfaces --
 
 def wall(kit, colour, axis, at, a0, a1, thick, z0, z1, holes=(), bev=0.018,
-         vcol=False):
+         vcol=False, tint=None, cell=0.14):
     """A wall panel with rectangular holes in it, decomposed into boxes.
 
     No booleans anywhere in this file. A wall with three windows is a strip
@@ -514,7 +528,8 @@ def wall(kit, colour, axis, at, a0, a1, thick, z0, z1, holes=(), bev=0.018,
     because the exporter deduplicates on position and normal anyway.
 
     `vcol` lays every panel as a tinted grid instead (`Kit.vbox`): the inside
-    of the upper floor, whose plaster is not one flat value.
+    of the upper floor, whose plaster is not one flat value. `tint` and `cell`
+    go through to it — the outside render uses `_render_tint` on a finer grid.
     """
     hs = sorted(holes, key=lambda h: h[0])
     cuts = [a0]
@@ -524,20 +539,26 @@ def wall(kit, colour, axis, at, a0, a1, thick, z0, z1, holes=(), bev=0.018,
     for i in range(0, len(cuts) - 1, 2):
         p, q = cuts[i], cuts[i + 1]
         if q - p > 1e-4:
-            _panel(kit, colour, axis, at, p, q, thick, z0, z1, bev, vcol)
+            _panel(kit, colour, axis, at, p, q, thick, z0, z1, bev, vcol,
+                   tint, cell)
     for (ha0, ha1, hz0, hz1) in hs:
         if hz0 - z0 > 1e-4:
-            _panel(kit, colour, axis, at, ha0, ha1, thick, z0, hz0, bev, vcol)
+            _panel(kit, colour, axis, at, ha0, ha1, thick, z0, hz0, bev, vcol,
+                   tint, cell)
         if z1 - hz1 > 1e-4:
-            _panel(kit, colour, axis, at, ha0, ha1, thick, hz1, z1, bev, vcol)
+            _panel(kit, colour, axis, at, ha0, ha1, thick, hz1, z1, bev, vcol,
+                   tint, cell)
 
 
-def _panel(kit, colour, axis, at, a0, a1, thick, z0, z1, bev, vcol=False):
+def _panel(kit, colour, axis, at, a0, a1, thick, z0, z1, bev, vcol=False,
+           tint=None, cell=0.14):
     if vcol:
         if axis == "x":
-            kit.vbox(colour, a0, a1, at - thick / 2, at + thick / 2, z0, z1, bev)
+            kit.vbox(colour, a0, a1, at - thick / 2, at + thick / 2, z0, z1, bev,
+                     cell=cell, tint=tint)
         else:
-            kit.vbox(colour, at - thick / 2, at + thick / 2, a0, a1, z0, z1, bev)
+            kit.vbox(colour, at - thick / 2, at + thick / 2, a0, a1, z0, z1, bev,
+                     cell=cell, tint=tint)
         return
     if axis == "x":
         kit.box(colour, (a0 + a1) / 2, at, (z0 + z1) / 2,
@@ -1190,9 +1211,10 @@ def shell(kit):
     }
     for key, (axis, at, a0, a1, holes) in ext.items():
         hs = [(h[0], h[1], F2 + h[2], F2 + h[3]) for h in holes]
-        wall(kit, RENDER, axis, at, a0, a1, EXT, F2, HEAD, holes=hs)
+        wall(kit, RENDER, axis, at, a0, a1, EXT, F2, HEAD, holes=hs, **RENDER_V)
     # The return face of the set-back, and the little roof over the notch.
-    wall(kit, RENDER, "x", BY1 - EXT / 2, X0, NX0 + EXT, EXT, F2, HEAD)
+    wall(kit, RENDER, "x", BY1 - EXT / 2, X0, NX0 + EXT, EXT, F2, HEAD,
+         **RENDER_V)
 
     # Inside face of the same walls, so a room is painted where the outside is
     # rendered. Two skins 4 cm apart rather than one wall in one colour: every
@@ -1291,6 +1313,13 @@ def shell(kit):
     window(kit, "y", NX0 + EXT / 2, W_S4_W, F2, curtain_c=SHEER)
     window(kit, "y", X1 - EXT / 2, W_S3_E, F2, curtain_c=SHEER)
 
+    # The two outside doors that had no light at them: the front door at the
+    # head of the stair, on the render beside it, and the terrace door below,
+    # under the slab. Same fitting as the loggia's.
+    wall_lamp(kit, (X1 + 0.004, D_ENTRY[1] + 0.26, F2 + 1.95),
+              (0.0, math.pi / 2))
+    wall_lamp(kit, (PD_TERR[1] + 0.86, Y0 - 0.004, P_FL + 1.95),
+              (math.pi / 2, 0.0))
     terrace(kit)
     outside_stair(kit)
     yard(kit)
@@ -1722,9 +1751,10 @@ def prizemlje(kit):
     }
     for axis, at, a0, a1, holes in ext.values():
         hs = [(h[0], h[1], P_FL + h[2], P_FL + h[3]) for h in holes]
-        wall(kit, RENDER, axis, at, a0, a1, EXT, P_FL - 0.02, P_CEIL, holes=hs)
+        wall(kit, RENDER, axis, at, a0, a1, EXT, P_FL - 0.02, P_CEIL, holes=hs,
+             **RENDER_V)
     wall(kit, RENDER, "x", BY1 - EXT / 2, X0, NX0 + EXT, EXT, P_FL - 0.02,
-         P_CEIL)
+         P_CEIL, **RENDER_V)
 
     inner = {
         "south": ("x", IY0 + 0.02, IX0 - 0.10, IX1 + 0.10, [PD_TERR, PW_S3_S]),
@@ -1757,7 +1787,7 @@ def prizemlje(kit):
              holes=[(h[0], h[1], P_FL + h[2], P_FL + h[3]) for h in holes])
     wall(kit, RENDER, "y", P_SPINE_N, P_TER_S, IY1, EXT, P_FL, P_CEIL,
          holes=[(PD_TER7[0], PD_TER7[1], P_FL + PD_TER7[2],
-                 P_FL + PD_TER7[3])])
+                 P_FL + PD_TER7[3])], **RENDER_V)
     wall(kit, WALL, "y", P_BATH_E, P_CROSS, P_KIT_S, INT, P_FL, P_CEIL,
          holes=[(PD_BATH[0], PD_BATH[1], P_FL + PD_BATH[2],
                  P_FL + PD_BATH[3])])
@@ -1767,7 +1797,7 @@ def prizemlje(kit):
          P_FL, P_CEIL,
          holes=[(PD_KIT[0], PD_KIT[1], P_FL + PD_KIT[2], P_FL + PD_KIT[3])])
     wall(kit, RENDER, "x", P_TER_S, P_SPINE_N - EXT / 2, IX1, EXT,
-         P_FL, P_CEIL)
+         P_FL, P_CEIL, **RENDER_V)
 
     # ── floors, and the ceiling ─────────────────────────────────────────────
     # The slab, its top 2 cm below the finish for the same reason the one above
@@ -1932,10 +1962,12 @@ def chimney(kit, top=CHIMNEY):
     """It is on all four elevations and it goes to +7.82, which is the highest
     thing on the house — worth the twelve boxes it costs."""
     cx, cy = CHIM_XY
-    kit.span(RENDER, cx - 0.24, cx + 0.24, cy - 0.24, cy + 0.24,
-             CEILZ - 0.20, top - 0.18, bev=0.02)
-    kit.span(RENDER, cx - 0.30, cx + 0.30, cy - 0.30, cy + 0.30,
-             top - 0.18, top - 0.08, bev=0.02)
+    kit.vbox(RENDER, cx - 0.24, cx + 0.24, cy - 0.24, cy + 0.24,
+             CEILZ - 0.20, top - 0.18, bev=0.02, cell=(0.16, 0.16, 0.10),
+             tint=lambda p, n: _chimney_tint(p, n, top))
+    kit.vbox(RENDER, cx - 0.30, cx + 0.30, cy - 0.30, cy + 0.30,
+             top - 0.18, top - 0.08, bev=0.02, cell=(0.15, 0.15, 0.05),
+             tint=lambda p, n: _chimney_tint(p, n, top))
     kit.span(DARKMETAL, cx - 0.13, cx + 0.13, cy - 0.13, cy + 0.13,
              top - 0.08, top, bev=0.01)
 
@@ -1956,14 +1988,19 @@ def terrace(kit):
     # mostly this edge, and a box edge is what made it read as a shelf.
     zs0, zs1 = TER_Z - 0.22, TER_Z - 0.03
     g = 0.015
-    kit.span(RENDER, X0, X1, TER_Y0, TER_Y1 + 0.10, zs0 + g, zs1, bev=0.012)
-    kit.span(RENDER, X0 + 0.05, X1 - 0.05, TER_Y0 + 0.05, TER_Y1 + 0.10,
-             zs0, zs0 + g + 0.002, bev=0.004)
+    # 1.576.0: all of it gridded and tinted (`_soffit_tint`) — the soffit was
+    # the brightest thing on the house. See the note there.
+    kit.vbox(RENDER, X0, X1, TER_Y0, TER_Y1 + 0.10, zs0 + g, zs1, bev=0.012,
+             cell=(0.20, 0.16, 0.10), tint=_soffit_tint)
+    kit.vbox(RENDER, X0 + 0.05, X1 - 0.05, TER_Y0 + 0.05, TER_Y1 + 0.10,
+             zs0, zs0 + g + 0.002, bev=0.004, cell=(0.20, 0.16, 0.10),
+             tint=_soffit_tint)
     lip = 0.032
     for a0, a1, b0, b1 in ((X0, X1, TER_Y0, TER_Y0 + lip),
                            (X0, X0 + lip, TER_Y0, TER_Y1 + 0.10),
                            (X1 - lip, X1, TER_Y0, TER_Y1 + 0.10)):
-        kit.span(RENDER, a0, a1, b0, b1, zs0, zs0 + g + 0.002, bev=0.004)
+        kit.vbox(RENDER, a0, a1, b0, b1, zs0, zs0 + g + 0.002, bev=0.004,
+                 cell=(0.20, 0.16, 0.10), tint=_soffit_tint)
     floor_tiles(kit, X0 + 0.02, X1 - 0.02, TER_Y0 + 0.02, TER_Y1,
                 TER_Z, size=0.33, colour=TERRAZZO, accent=None,
                 grout=tuple(v * 0.85 for v in TERRAZZO))
@@ -2651,6 +2688,33 @@ def bulkhead(kit, cx, cy, z):
             0.105, 0.072, 0.058, rows=4, seg=14, squash_bottom=0.22)
 
 
+def wall_lamp(kit, at, rot):
+    """An oval opal bulkhead on a wall, beside an outside door: the same lamp
+    as the one in the loggia ceiling, turned on its side, on a white plate.
+    `at` is the point on the render it is fixed to and `rot` the (rx, ry)
+    that turns +Z out of that wall."""
+    M = _M(at, rx=rot[0], ry=rot[1])
+    bm = bmesh.new()
+    _xf(_superball(bm, 0.070, 0.105, 0.014, p=3.2, q=3.0, rows=7, seg=32,
+                   at=(0.0, 0.0, 0.010)), M)
+    _emit(kit, bm, WHITEGOODS, "lamp_plate", smooth=True)
+    bm = bmesh.new()
+    vs = _superball(bm, 0.056, 0.088, 0.050, p=2.3, q=2.2, rows=11, seg=40,
+                    at=(0.0, 0.0, 0.020))
+    for v in vs:
+        v.co.z = max(v.co.z, 0.020)
+    _xf(vs, M)
+    _emit(kit, bm, (0.945, 0.930, 0.880), "lamp_opal", smooth=True)
+    # The cage over it: three thin white bars across the glass.
+    bm = bmesh.new()
+    for k in (-0.045, 0.0, 0.045):
+        pts = [(0.060 * math.cos(math.pi * j / 10), k,
+                0.020 + 0.052 * math.sin(math.pi * j / 10) * math.sqrt(
+                    max(0.0, 1.0 - (k / 0.088) ** 2))) for j in range(11)]
+        _tube(bm, [tuple(M @ Vector(p_)) for p_ in pts], 0.0028, seg=8)
+    _emit(kit, bm, WHITEGOODS, "lamp_cage", smooth=True)
+
+
 def loggia(kit):
     """Terrace 7 fitted out. Four square metres, and it is the room this house
     is photographed in.
@@ -2772,8 +2836,9 @@ def front_yard(kit):
 
     # ── the wall at the end, and the gate in it ─────────────────────────────
     for a0, a1 in ((FY_X0 - 0.34, FY_GATE[0]), (FY_GATE[1], FY_X1 + 0.34)):
-        kit.span(RENDER, a0, a1, FY_Y0 - 0.20, FY_Y0,
-                 GRADE - 0.45, FY_Z + 1.12, bev=0.02)
+        kit.vbox(RENDER, a0, a1, FY_Y0 - 0.20, FY_Y0,
+                 GRADE - 0.45, FY_Z + 1.12, bev=0.02, cell=(0.16, 0.10, 0.10),
+                 tint=_render_tint)
         kit.span(CONCRETE, a0 - 0.02, a1 + 0.02, FY_Y0 - 0.22, FY_Y0 + 0.02,
                  FY_Z + 1.12, FY_Z + 1.17, bev=0.01)
     # Hung on the west jamb and standing open into the forecourt, at 100
@@ -3291,6 +3356,44 @@ def _oval_band(bm, z0, z1, out, inn, seg=24, power=2.6):
     return rows
 
 
+def _wc_seat(kit, P, zc, outer, inner, seg=96, sec=16, thick=0.032,
+             power=2.6):
+    """A moulded lavatory seat: a rounded section swept round an oval.
+
+    `outer` and `inner` are (r_fwd, r_lat, centre_fwd) for the two edges —
+    not concentric, because a seat is wider at the hinge than at the front.
+    At every station the section spans from the inner edge to the outer edge
+    at the same angle, so its width varies round the ring the way a real
+    seat's does. `P(f, l)` maps forward/lateral to plan, as in `_wc`.
+    """
+    bm = bmesh.new()
+    po = _ring_pts(outer[0], outer[1], seg, power)
+    pi = _ring_pts(inner[0], inner[1], seg, power)
+    rows = []
+    for i in range(seg):
+        of, ol = outer[2] + po[i][0], po[i][1]
+        if_, il = inner[2] + pi[i][0], pi[i][1]
+        mf, ml = (of + if_) / 2, (ol + il) / 2
+        df, dl = (of - if_) / 2, (ol - il) / 2
+        ring = []
+        for k in range(sec):
+            s = TAU * k / sec
+            a = _sgp(math.cos(s), 2.0 / 3.2)
+            b = _sgp(math.sin(s), 2.0 / 2.6)
+            # Crowned on top, nearly flat underneath where it bears on the rim.
+            h = thick / 2 * b * (1.0 if b > 0 else 0.55)
+            h += 0.003 * max(0.0, b) * (1.0 - a * a)
+            x, y = P(mf + df * a, ml + dl * a)
+            ring.append(bm.verts.new((x, y, zc + h)))
+        rows.append(ring)
+    for i in range(seg):
+        j = (i + 1) % seg
+        for k in range(sec):
+            m = (k + 1) % sec
+            bm.faces.new((rows[i][k], rows[j][k], rows[j][m], rows[i][m]))
+    _emit(kit, bm, PORCELAIN, "wc_seat", smooth=True)
+
+
 def _wc(kit, bx, ty, floor=F2, cistern="close", face="+x"):
     """A lavatory backed on to the wall at `bx`, centred on `ty`.
 
@@ -3338,9 +3441,19 @@ def _wc(kit, bx, ty, floor=F2, cistern="close", face="+x"):
     # waist at 9 cm, the shoulder at 27, the rim at 41 — then two rings that
     # roll over the lip, and four that descend into the bowl. The last is the
     # water.
+    #
+    # 1.576.0: Misha, "upstairs bathroom boiler and toilet need more
+    # polygons". The pan is three times the rings through the same eleven and
+    # 72 round, and it stands on the floor now — the first ring used to be 2 cm
+    # up with a flat cap under it, so from the doorway there was a line of
+    # cobalt under the foot of a floor-standing pan. Two rings put the foot down
+    # and splay it a few millimetres, the way a fired foot does where it was
+    # set in its bed of silicone.
     rings = [(floor + z, *R(rf * DEEP, rl), *P(f * DEEP, 0))
              for z, rf, rl, f in
-             ((0.020, 0.114, 0.102, 0.150),
+             ((0.000, 0.120, 0.108, 0.150),
+              (0.008, 0.117, 0.105, 0.150),
+              (0.020, 0.114, 0.102, 0.150),
               (0.090, 0.100, 0.089, 0.160),
               (0.180, 0.110, 0.096, 0.176),
               (0.270, 0.136, 0.122, 0.196),
@@ -3355,8 +3468,18 @@ def _wc(kit, bx, ty, floor=F2, cistern="close", face="+x"):
     # object of its own and smooth: glazed ceramic is one continuous highlight,
     # and twenty flat facets round a rim is twenty highlights.
     bm = bmesh.new()
-    bm_loft(bm, _densify(rings, 2), seg=40, power=2.5)
+    bm_loft(bm, _densify(rings, 3), seg=72, power=2.5)
     _emit(kit, bm, PORCELAIN, "pan", smooth=True)
+    # The two bolt caps either side of the foot, where the pan is screwed to
+    # the floor: little domed porcelain-white covers, and the only thing that
+    # says the pan is fixed rather than set down.
+    bm = bmesh.new()
+    for dl in (-1.0, 1.0):
+        x, y = P(0.150 * DEEP, dl * 0.112)
+        _lathe(bm, ((0.0, 0.0155), (0.004, 0.0150), (0.010, 0.0125),
+                    (0.015, 0.0085), (0.018, 0.0040), (0.019, 0.0005)),
+               seg=24, at=(x, y, floor))
+    _emit(kit, bm, PORCELAIN, "bolt_caps", smooth=True)
 
     # The spigot into the wall behind it. The pan's foot stands 5 cm clear of
     # the tiling, as a floor-standing pan does, and the soil pipe crosses that
@@ -3377,26 +3500,56 @@ def _wc(kit, bx, ty, floor=F2, cistern="close", face="+x"):
     bm_cylinder(kit.bm((0.760, 0.830, 0.870), 0.002), *P(0.192 * DEEP, 0),
                 floor + 0.222, floor + 0.228, 0.056, 0.056, seg=18)
 
-    # The seat, down, and the two hinge lugs at the back of it.
-    _oval_band(kit.bm(PORCELAIN, 0.004), floor + 0.414, floor + 0.446,
-               (*R(0.188 * DEEP, 0.164), *P(0.216 * DEEP, 0)),
-               (*R(0.126 * DEEP, 0.104), *P(0.238 * DEEP, 0)),
-               seg=48, power=2.6)
+    # The seat, down. It was a flat band — a ring with a square section and
+    # hard edges — which is a seat cut out of sheet. A moulded seat is a
+    # rounded section swept round an oval that is wider at the hinge than at
+    # the front, so it is that now: 96 stations round, each a 16-point
+    # superelliptic section spanning from the inner edge to the outer edge at
+    # the same angle, crowned on top and flatter underneath where it sits on
+    # the rim.
+    _wc_seat(kit, P, floor + 0.430,
+             (0.188 * DEEP, 0.164, 0.216 * DEEP),
+             (0.126 * DEEP, 0.104, 0.238 * DEEP))
     # And the lid, up — as it is in the photograph — standing on its hinge in
-    # front of the cistern and leaning back on it. A solid oval plate with a
-    # rounded edge, built lying flat out from the hinge line and turned up
-    # about it.
-    fh = 0.215 if cistern == "close" else 0.075
+    # front of the cistern and leaning back on it. An oval plate with a rolled
+    # edge, built lying flat out from the hinge line and turned up about it,
+    # and with the shallow dome every moulded lid has on its top face: flat,
+    # it caught one value of light over its whole area and read as a white
+    # board stood against the tank.
+    # The hinge line is 6 cm in front of the cistern and the lid stands 5
+    # degrees past upright, so it leans back ON the cistern's cover rather
+    # than through it: at 0.215 and 97 degrees its top half was inside the
+    # tank, and the cover's rolled edge drew a white belt across it.
+    fh = 0.262 if cistern == "close" else 0.075
     Lr = 0.188 * DEEP * 0.98
     bm = bmesh.new()
-    vs = _superball(bm, 0.162, Lr, 0.009, p=2.6, q=5.0, rows=9, seg=40,
+    vs = _superball(bm, 0.162, Lr, 0.009, p=2.6, q=5.0, rows=17, seg=96,
                     at=(0.0, Lr + 0.006, 0.010))
+    for v in vs:
+        x, y, z = v.co
+        if z > 0.010:
+            u = (x / 0.162) ** 2 + ((y - Lr - 0.006) / Lr) ** 2
+            v.co.z = z + 0.007 * max(0.0, 1.0 - u)
     yaw = -math.pi / 2 if face == "+x" else math.pi
-    _xf(vs, _M((*P(fh, 0), floor + 0.452), yaw=yaw, rx=math.radians(97.0)))
+    _xf(vs, _M((*P(fh, 0), floor + 0.452), yaw=yaw,
+               rx=math.radians(95.0 if cistern == "close" else 97.0)))
     _emit(kit, bm, PORCELAIN, "wc_lid", smooth=True)
+    # The hinges: on each side a chromed post down into the pan's back shelf,
+    # a knuckle on it, and the pin through the knuckle that the seat and the
+    # lid both turn on. They were two chrome boxes.
+    bm = bmesh.new()
     for dl in (-0.058, 0.058):
-        SP(CHROME, 0.030 * DEEP, 0.070 * DEEP, dl - 0.016, dl + 0.016,
-           floor + 0.412, floor + 0.452, bev=0.006)
+        x, y = P(fh - 0.006, dl)
+        _lathe(bm, ((0.0, 0.0145), (0.003, 0.0150), (0.006, 0.0125),
+                    (0.028, 0.0110), (0.034, 0.0120), (0.040, 0.0005)),
+               seg=24, at=(x, y, floor + 0.404))
+        a, b = P(fh, dl - 0.022), P(fh, dl + 0.022)
+        _tube(bm, [(a[0], a[1], floor + 0.452), (b[0], b[1], floor + 0.452)],
+              0.0105, seg=20)
+        a, b = P(fh, dl - 0.027), P(fh, dl + 0.027)
+        _tube(bm, [(a[0], a[1], floor + 0.452), (b[0], b[1], floor + 0.452)],
+              0.0045, seg=12)
+    _emit(kit, bm, CHROME, "wc_hinges", smooth=True)
 
     # The cistern. Two of them, because the two floors of this house are two
     # different decades: the flat upstairs has a close-coupled suite, and the
@@ -3457,51 +3610,85 @@ def _wc(kit, bx, ty, floor=F2, cistern="close", face="+x"):
     #
     # There is no separate lid. The rolled top ends in a flat 12 by 27 panel,
     # which is the lid, and the buttons go in it.
+    #
+    # 1.576.0: and it has a lid, as the one in the photograph does — the body
+    # stops in a flat top at 77 cm and a separate cover sits on it, a little
+    # proud all round, with the shadow line of the joint under its edge. That
+    # line is most of what makes a cistern read as a cistern from the door.
     rings = []
     for z, rf, rl in ((0.400, 0.100, 0.181), (0.445, 0.102, 0.183),
                       (0.570, 0.099, 0.181), (0.690, 0.094, 0.177),
-                      (0.748, 0.088, 0.171), (0.782, 0.076, 0.158),
-                      (0.800, 0.058, 0.136)):
+                      (0.740, 0.091, 0.174), (0.760, 0.088, 0.170),
+                      (0.770, 0.082, 0.163), (0.772, 0.070, 0.150)):
         # The back stays on the wall line as the section narrows, so everything
         # the taper takes off comes off the front.
         rings.append((floor + z, *R(rf, rl), *P(rf, 0)))
     bm = bmesh.new()
-    bm_loft(bm, _densify(rings, 2), seg=40, power=2.6)
+    bm_loft(bm, _densify(rings, 3), seg=72, power=2.6)
     _emit(kit, bm, PORCELAIN, "cistern", smooth=True)
-    # Dual flush, in the flat of the top. The big one is the far one: each a
+    # The cover: a rounded slab 2.6 cm thick, 1 cm proud of the body at the
+    # front and the sides, crowned a few millimetres.
+    bm = bmesh.new()
+    lid_c = (*P(0.100, 0.0), floor + 0.786)
+    vs = _superball(bm, *R(0.104, 0.186), 0.013, p=5.0, q=3.4, rows=13,
+                    seg=96, at=lid_c)
+    for v in vs:
+        if v.co.z > lid_c[2]:
+            dx, dy = v.co.x - lid_c[0], v.co.y - lid_c[1]
+            ra, rb = R(0.104, 0.186)
+            v.co.z += 0.004 * max(0.0, 1.0 - (dx / ra) ** 2 - (dy / rb) ** 2)
+    _emit(kit, bm, PORCELAIN, "cistern_lid", smooth=True)
+    # Dual flush, in the top of the cover. The big one is the far one: each a
     # chrome ring and a pressed button sitting a millimetre down in it.
     bm = bmesh.new()
     for dl, r in ((-0.046, 0.029), (0.044, 0.021)):
-        x, y = P(0.058, dl)
+        x, y = P(0.090, dl)
         _lathe(bm, ((0.0, r), (0.012, r), (0.016, r * 0.96), (0.017, r * 0.86),
-                    (0.0145, r * 0.84), (0.0145, 0.0005)), seg=24,
-               at=(x, y, floor + 0.798))
+                    (0.0145, r * 0.84), (0.0145, 0.0005)), seg=36,
+               at=(x, y, floor + 0.787))
     _emit(kit, bm, CHROME, "flush", smooth=True)
-    # The water in: an angle valve out of the wall beside the cistern, a
-    # braided flexi from it up into the cistern's underside.
-    vx_, vy_ = P(0.0, -0.245)
+    # The water in, as it is in the photograph: a stop valve out of the
+    # tiling on the shower side at the height of the cover, and a chromed
+    # 10 mm pipe that leaves it, swings forward round the corner of the tank
+    # in one easy bend and goes into the side of it just under the lid. It
+    # was an angle valve at the skirting and a braided flexi up into the
+    # underside, which is a newer suite than this one.
     bm = bmesh.new()
-    vs = _lathe(bm, ((0.0, 0.024), (0.006, 0.022), (0.010, 0.012), (0.050, 0.012),
-                     (0.052, 0.0005)), seg=16)
-    _xf(vs, _M((vx_, vy_, floor + 0.22),
-               ry=math.pi / 2 if face == "+x" else 0.0,
+    vz = floor + 0.805
+    vx_, vy_ = P(0.0, -0.255)
+    vs = _lathe(bm, ((0.0, 0.026), (0.004, 0.025), (0.008, 0.016),
+                     (0.012, 0.0125), (0.044, 0.0125), (0.050, 0.0135),
+                     (0.058, 0.0135), (0.060, 0.0005)), seg=28)
+    _xf(vs, _M((vx_, vy_, vz), ry=math.pi / 2 if face == "+x" else 0.0,
                rx=0.0 if face == "+x" else math.pi / 2))
-    sx_, sy_ = P(0.045, -0.245)
-    _tube(bm, [(sx_, sy_, floor + 0.22), (sx_, sy_, floor + 0.27)], 0.009, seg=10)
-    hx_, hy_ = P(0.045, -0.255)
-    _superball(bm, 0.008, 0.008, 0.020, p=4.0, q=3.0, rows=5, seg=10,
-               at=(hx_, hy_, floor + 0.205))
-    _emit(kit, bm, CHROME, "angle_valve", smooth=True)
-    pts = []
-    for k in range(9):
-        u = k / 8
-        f_ = 0.045 + 0.035 * math.sin(math.pi * u * 0.5)
-        l_ = -0.245 + 0.085 * u
-        x, y = P(f_, l_)
-        pts.append((x, y, floor + 0.27 + 0.14 * u))
-    bm = bmesh.new()
-    _tube(bm, pts, 0.0065, seg=10)
-    _emit(kit, bm, (0.700, 0.710, 0.720), "flexi", smooth=True)
+    # The handle on top of the valve body: a short spindle and a cross-head.
+    hx_, hy_ = P(0.032, -0.255)
+    _tube(bm, [(hx_, hy_, vz + 0.010), (hx_, hy_, vz + 0.030)], 0.0055, seg=14)
+    for a in (0.0, math.pi / 2):
+        ca, sa = math.cos(a) * 0.020, math.sin(a) * 0.020
+        _superball(bm, abs(ca) + 0.005, abs(sa) + 0.005, 0.005, p=3.0, q=2.6,
+                   rows=7, seg=20, at=(hx_, hy_, vz + 0.034))
+    pts = [(f_, l_, z_) for f_, l_, z_ in (
+        (0.058, -0.255, 0.805), (0.070, -0.254, 0.803), (0.084, -0.247, 0.795),
+        (0.094, -0.233, 0.778), (0.099, -0.214, 0.758), (0.100, -0.196, 0.742),
+        (0.100, -0.178, 0.736))]
+    dense = []
+    for i in range(len(pts) - 1):
+        a, b = pts[max(0, i - 1)], pts[i]
+        c, d = pts[i + 1], pts[min(len(pts) - 1, i + 2)]
+        for s in range(4):
+            dense.append(_cr(a, b, c, d, s / 4))
+    dense.append(pts[-1])
+    _tube(bm, [(*P(f_, l_), floor + z_) for f_, l_, z_ in dense],
+          0.0055, seg=16)
+    # A compression nut where it goes into the tank.
+    nx_, ny_ = P(0.100, -0.184)
+    vs = _lathe(bm, ((0.0, 0.0105), (0.012, 0.0105), (0.014, 0.0070),
+                     (0.016, 0.0005)), seg=6)
+    _xf(vs, _M((nx_, ny_, floor + 0.736),
+               rx=math.pi / 2 if face == "+x" else 0.0,
+               ry=0.0 if face == "+x" else -math.pi / 2))
+    _emit(kit, bm, CHROME, "inlet", smooth=True)
 
 
 def _bojler(kit, cx, cy, zb, d=0.450, h=0.900):
@@ -3535,99 +3722,335 @@ def _bojler(kit, cx, cy, zb, d=0.450, h=0.900):
     with the fittings and the flexi hanging down into it. That gap is the one
     vertical the photograph does state, and it states about 23.
 
-    Cheap on purpose. The jacket is one loft of ten rings, because a bojler is a
-    cylinder with a dished bottom and a torispherical top and nothing else, and
-    everything that makes it read as a bojler rather than as a white drum is in
-    the last 3 per cent: the thermometer, the fittings hanging under the dish,
-    and the flexi dropping into the corner.
+    It was cheap on purpose — one loft of ten rings at 28 sides, flat-shaded,
+    and boxes and 8-sided sticks for everything under it. 1.576.0, Misha:
+    *"upstairs bathroom boiler and toilet need more polygons"*. So it is built
+    the way the thing is made now:
+
+    * the jacket is one lathe of 96 sides, smooth: a dished bottom and a
+      torispherical crown, each a superelliptic quarter of fourteen rings,
+      the rolled seam where each one is welded to the shell, and the shell;
+    * under the dish, the round plastic cover over the heating flange, with
+      the thermostat knob on its room side and the pilot lamp beside it;
+    * the thermometer as a chromed bezel, a dial with its scale, a needle and
+      a domed glass, instead of four stacked discs;
+    * the two welded hanging straps round the back, and the tabs and bolts
+      that carry it on the wall, which are what you see of them at the sides;
+    * the two half-inch tails out of the cover, each with its colour ring and
+      union, the cold through the safety valve and a ball valve and the hot
+      straight back to the wall, both into chrome rosettes on the tiling;
+    * the safety valve's drain hose, which is the hose in the photograph
+      dropping into the corner by the machine;
+    * the flex to a junction box on the side wall.
+
+    The jacket stays ENAMEL_W, and goes out in a blob of its own (see `main`)
+    so the runtime can give it an enamel's highlight without giving one to
+    the plaster.
     """
     r = d / 2
     # z is written as a height above the jacket's own underside, so the whole
     # tank moves by moving `zb` and nothing has to be re-added.
-    rings = [(0.000, 0.086), (0.026, 0.148), (0.058, 0.202),
-             # The rolled rim under the jacket is the widest point on the tank
-             # and it is what the dish hangs off.
-             (0.084, r + 0.005), (0.112, r),
-             (0.886, r), (0.942, r - 0.007), (0.980, r - 0.035),
-             (0.996, r - 0.113), (1.000, r - 0.170)]
-    # 28 sides and not the 20 the rest of this file uses on a pipe: 20 puts a
-    # 7 cm flat on a Ø 45 cylinder, and the tank is looked at from a metre in a
-    # flat-shaded room, so at 20 the shading bands read as facets and the thing
-    # is a drum after all. 28 is 5 cm and the bands close up.
-    bm_loft(kit.bm(ENAMEL_W, 0.004),
-            [(zb + h * z, rr, rr, cx, cy) for z, rr in rings], seg=28)
+    def quarter(z0, hd, flip, n=14, p=2.4):
+        """A superelliptic quarter from the axis (r 0) out to the shell."""
+        out = []
+        for i in range(n + 1):
+            t = (math.pi / 2) * i / n
+            rr = (r - 0.001) * max(1e-4, math.sin(t)) ** (2.0 / p)
+            zz = hd * (1.0 - math.cos(t) ** (2.0 / p))
+            out.append((z0 + (hd - zz if flip else zz), max(rr, 0.0006)))
+        return out
+
+    hd, ht = 0.092, 0.104
+    prof = quarter(0.0, hd, False)
+    # The welded seam: a rolled bead, the widest point of the tank.
+    prof += [(hd + 0.004, r + 0.0035), (hd + 0.011, r + 0.0060),
+             (hd + 0.018, r + 0.0040), (hd + 0.024, r + 0.0004)]
+    prof += [(0.30, r), (0.60, r), (h - ht - 0.024, r + 0.0004)]
+    prof += [(h - ht - 0.018, r + 0.0040), (h - ht - 0.011, r + 0.0060),
+             (h - ht - 0.004, r + 0.0035)]
+    prof += list(reversed(quarter(h - ht, ht, True)))
+    bm = bmesh.new()
+    _lathe(bm, prof, seg=96, at=(cx, cy, zb))
+    _emit(kit, bm, ENAMEL_W, "bojler", smooth=True)
 
     # The rating plate low on the body, and the maker's badge beside it. Both
     # are white stickers with printing on them and the printing is four pixels
     # at any distance a player can stand: what goes in is the blue mark, which
     # is the only part of either that carries at this size, and no lettering —
     # inventing a legible brand is inventing a fact the footage cannot support.
-    zp = zb + 0.138
-    kit.span((0.935, 0.935, 0.925), cx - 0.040, cx + 0.040,
-             cy + r - 0.020, cy + r + 0.0025, zp - 0.015, zp + 0.015, bev=0.002)
-    kit.span((0.160, 0.380, 0.620), cx - 0.023, cx + 0.023,
-             cy + r + 0.0025, cy + r + 0.0060, zp - 0.006, zp + 0.006, bev=0.002)
+    # Bent round the jacket now, as a sticker is, rather than a flat card
+    # standing off a curve.
+    bm = bmesh.new()
+    zp = zb + 0.150
+    for (w, t, hh, zc_, c) in ((0.080, 0.0008, 0.030, zp, (0.935, 0.935, 0.925)),
+                               (0.046, 0.0016, 0.012, zp, (0.160, 0.380, 0.620))):
+        b2 = bmesh.new()
+        n = 12
+        g = []
+        for zz in (zc_ - hh / 2, zc_ + hh / 2):
+            for rr in (r - 0.001, r + t):
+                g.append([b2.verts.new((cx + rr * math.sin((-w / 2 + w * i / n) / r),
+                                        cy + rr * math.cos((-w / 2 + w * i / n) / r),
+                                        zz)) for i in range(n + 1)])
+        b2.verts.ensure_lookup_table()
+        (bi, bo, ti, to) = g
+        for i in range(n):
+            b2.faces.new((bo[i], bo[i + 1], to[i + 1], to[i]))
+            b2.faces.new((ti[i], ti[i + 1], bi[i + 1], bi[i]))
+            b2.faces.new((to[i], to[i + 1], ti[i + 1], ti[i]))
+            b2.faces.new((bi[i], bi[i + 1], bo[i + 1], bo[i]))
+        for e in (0, n):
+            b2.faces.new((bi[e], bo[e], to[e], ti[e]))
+        _emit(kit, b2, c, "bojler_plate", smooth=False)
 
-    # The thermometer, and it is the whole difference between a bojler and a
-    # white drum. Ø 9.5, which is large for a gauge and is what the photograph
-    # measures — these tanks carry a dial you are meant to read from the
-    # doorway — and it sits 72 per cent of the way up the jacket, which is
-    # where the photograph has it above the rolled rim. The needle is radial
-    # and its angle is not a reading: at this size it is three pixels of red,
-    # and a temperature is a number the picture cannot be made to say.
+    # ── the thermometer ─────────────────────────────────────────────────────
+    # The whole difference between a bojler and a white drum. Ø 9.5 over the
+    # bezel, which is large for a gauge and is what the photograph measures —
+    # these tanks carry a dial you are meant to read from the doorway — and
+    # 72 per cent of the way up the jacket. The needle is radial and its angle
+    # is not a reading: a temperature is a number the picture cannot be made
+    # to say.
     #
-    # Four discs, and the order they stand in is the whole of it. The chrome
-    # bezel is a solid disc rather than a ring, so it has to be the *back* one:
-    # built the other way round — chrome in front, face and needle behind —
-    # every part of the gauge that says what it is ends up inside the chrome,
-    # and Ø 9.5 of the one detail this object needs renders as a blank puck.
-    # Each shell is set clear of the one behind it, never flush with it.
+    # Built along +Z and turned to face the room (+Y), seated 7 mm into the
+    # jacket so its back edge meets the curve all the way round.
     zd = zb + h - 0.250
-    _lay_disc(kit, CHROME, cx, cy + r - 0.0080, zd, 0.048, 0.020, seg=24)
-    _lay_disc(kit, (0.920, 0.920, 0.905), cx, cy + r - 0.0005, zd, 0.039, 0.013,
-              seg=24)
-    kit.span((0.640, 0.100, 0.090), cx + 0.004, cx + 0.032,
-             cy + r + 0.0040, cy + r + 0.0095, zd - 0.003, zd + 0.003, bev=0.001)
-    _lay_disc(kit, DARKMETAL, cx, cy + r + 0.0110, zd, 0.008, 0.012, seg=10)
+    gy = cy + r - 0.007
+    Mg = _M((cx, gy, zd), rx=-math.pi / 2)
+    bm = bmesh.new()
+    _xf(_lathe(bm, ((0.000, 0.0475), (0.008, 0.0485), (0.014, 0.0470),
+                    (0.018, 0.0440), (0.0195, 0.0405), (0.0180, 0.0385),
+                    (0.0150, 0.0380), (0.0150, 0.0005)), seg=64), Mg)
+    _emit(kit, bm, CHROME, "gauge_bezel", smooth=True)
+    bm = bmesh.new()
+    _xf(_lathe(bm, ((0.0150, 0.0379), (0.0158, 0.0379), (0.0160, 0.0005)),
+               seg=64), Mg)
+    _emit(kit, bm, (0.930, 0.928, 0.915), "gauge_dial", smooth=False)
+    # The scale: eleven ticks over 270 degrees, and a red sector at the hot
+    # end. Then the needle and its boss.
+    bm = bmesh.new()
+    for k in range(11):
+        a = math.radians(-135.0 + 27.0 * k)
+        long_ = 0.009 if k % 5 == 0 else 0.0055
+        vs = []
+        b = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+        for v in b:
+            v.co = (v.co.x * 0.0016, v.co.y * long_, v.co.z * 0.0008)
+        _xf(b, _M((0.0, 0.0, 0.0162), yaw=math.pi - a)
+            @ Matrix.Translation((0.0, 0.0310 - long_ / 2, 0.0)))
+        _xf(b, Mg)
+    _emit(kit, bm, (0.120, 0.120, 0.130), "gauge_ticks", smooth=False)
+    bm = bmesh.new()
+    b = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+    for v in b:
+        v.co = (v.co.x * 0.0022, v.co.y * 0.034, v.co.z * 0.0012)
+    _xf(b, _M((0.0, 0.0, 0.0170), yaw=math.pi + math.radians(62.0))
+        @ Matrix.Translation((0.0, 0.010, 0.0)))
+    _xf(b, Mg)
+    _emit(kit, bm, (0.700, 0.100, 0.085), "gauge_needle", smooth=False)
+    bm = bmesh.new()
+    _xf(_lathe(bm, ((0.016, 0.0045), (0.019, 0.0040), (0.0205, 0.0005)),
+               seg=20), Mg)
+    _emit(kit, bm, DARKMETAL, "gauge_boss", smooth=True)
+    bm = bmesh.new()
+    _xf(_lathe(bm, ((0.0165, 0.0386), (0.0195, 0.0340), (0.0215, 0.0240),
+                    (0.0225, 0.0005)), seg=48), Mg)
+    _emit(kit, bm, GLASS, "gauge_glass", smooth=True)
 
-    # Under the dish: the red label on the flange cover, the outlet tee, the
-    # safety valve's discharge into the wall, and the flexi.
-    kit.span((0.620, 0.090, 0.080), cx - 0.020, cx + 0.020,
-             cy + 0.170, cy + 0.186, zb + 0.038, zb + 0.052, bev=0.002)
-    bm_cylinder(kit.bm(CHROME, 0.003), cx + 0.070, cy + 0.005,
-                zb - 0.080, zb + 0.010, 0.014, 0.014, seg=8)
-    arm = bm_cylinder(kit.bm(CHROME, 0.003), 0, 0, -0.038, 0.038,
-                      0.011, 0.011, seg=8)
-    _rot_y(arm, cx + 0.108, cy + 0.005, zb - 0.045)
-    # The valve pipe goes into the wall through a plastic collar, because a pipe
-    # that stops in mid-air two centimetres off the tiling is worse than no pipe.
-    # Halfway down the 22 cm gap, which is where the photograph has the collar
-    # and is also the only height it can take: run lower and the discharge
-    # crosses the rim of the pot instead of clearing it.
-    bm_cylinder(kit.bm(STEEL, 0.003), cx + 0.090, cy - 0.040,
-                zb - 0.135, zb + 0.020, 0.012, 0.012, seg=8)
-    leg = bm_cylinder(kit.bm(STEEL, 0.003), 0, 0, -0.095, 0.095,
-                      0.012, 0.012, seg=8)
-    _rot_x(leg, cx + 0.090, cy - 0.135, zb - 0.130)
-    _lay_disc(kit, (0.900, 0.900, 0.890), cx + 0.090, cy - 0.235, zb - 0.130,
-              0.042, 0.030, seg=14)
+    # ── the cover under the dish, the thermostat and the lamp ───────────────
+    # Ø 30 white plastic over the heating flange, bulging a little below the
+    # dish; the thermostat knob comes out of its side facing the room, with a
+    # red pilot lamp beside it. The knob is fluted, sixteen ribs, and has a
+    # pointer moulded into its face.
+    bm = bmesh.new()
+    _lathe(bm, ((-0.054, 0.0006), (-0.054, 0.104), (-0.0525, 0.124),
+                (-0.048, 0.138), (-0.040, 0.147), (-0.028, 0.151),
+                (0.000, 0.152), (0.012, 0.152), (0.014, 0.0006)),
+           seg=72, at=(cx, cy, zb))
+    _emit(kit, bm, BOJ_COVER, "bojler_cover", smooth=True)
+    kz = zb - 0.026
+    Mk = _M((cx, cy + 0.148, kz), rx=-math.pi / 2)
+    bm = bmesh.new()
+    vs = _lathe(bm, ((0.000, 0.0215), (0.004, 0.0215), (0.006, 0.0185),
+                     (0.022, 0.0175), (0.026, 0.0160), (0.0285, 0.0120),
+                     (0.0295, 0.0005)), seg=64)
+    for v in vs:
+        x, y, z = v.co
+        rr = math.hypot(x, y)
+        if 0.006 < z < 0.027 and rr > 0.010:
+            k = 1.0 + 0.055 * math.cos(16 * math.atan2(y, x))
+            v.co.x, v.co.y = x * k, y * k
+    _xf(vs, Mk)
+    _emit(kit, bm, (0.880, 0.880, 0.875), "thermostat_knob", smooth=True)
+    bm = bmesh.new()
+    b = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+    for v in b:
+        v.co = (v.co.x * 0.0025, v.co.y * 0.012, v.co.z * 0.0016)
+    _xf(b, _M((0.0, 0.0, 0.0298), yaw=math.radians(30.0))
+        @ Matrix.Translation((0.0, 0.006, 0.0)))
+    _xf(b, Mk)
+    _emit(kit, bm, (0.640, 0.100, 0.090), "thermostat_mark", smooth=False)
+    bm = bmesh.new()
+    for dx, c in ((0.055, (0.860, 0.140, 0.090)),):
+        a = math.asin(dx / 0.151)
+        _xf(_lathe(bm, ((0.000, 0.0080), (0.003, 0.0080), (0.004, 0.0065),
+                        (0.0075, 0.0052), (0.0095, 0.0030), (0.0102, 0.0005)),
+                   seg=32),
+            _M((cx + dx, cy + 0.151 * math.cos(a) - 0.002, kz), yaw=-a,
+               rx=-math.pi / 2))
+    _emit(kit, bm, (0.860, 0.140, 0.090), "pilot_lamp", smooth=True)
 
-    # And the flexi, which leaves the tee, swings clear of the pot on the
-    # machine and drops down the 13 cm gap between the machine's end and the
-    # tiling, into the wall near the floor. In the photograph it loops the other
-    # way, across the front of the pot and down the far side; it cannot here,
-    # because this machine is 42 deep against that one's 60 and the loop would
-    # have to pass through the pot to do it. Same hose, same job, the side of
-    # the machine the room actually leaves room for.
-    _tube(kit.bm(STEEL, 0.003),
-          [(cx + dx, cy + dy, zb + dz) for dx, dy, dz in (
-              (0.070, -0.005, -0.060), (0.080, 0.015, -0.140),
-              (0.100, 0.050, -0.220), (0.130, 0.070, -0.310),
-              (0.160, 0.050, -0.380), (0.180, -0.010, -0.430),
-              (0.190, -0.090, -0.500), (0.190, -0.150, -0.740),
-              (0.185, -0.210, -1.040), (0.180, -0.270, -1.110),
-              (0.178, -0.300, -1.250))],
-          0.013, seg=8)
+    # ── the hanging straps ──────────────────────────────────────────────────
+    # Two galvanised straps welded round the back of the shell, one under the
+    # crown seam and one over the bottom one, each ending in a tab bent back
+    # to the wall and bolted. From the room they are the two grey bars at
+    # either side of the tank, which is the thing that hangs it on the wall
+    # rather than standing it in the air.
+    wall_y = cy - r - 0.025
+    bm = bmesh.new()
+    for zs in (zb + 0.150, zb + h - 0.165):
+        n = 40
+        a0, a1 = math.radians(196.0), math.radians(344.0)
+        rows = []
+        for zz in (zs - 0.018, zs + 0.018):
+            for rr in (r - 0.0005, r + 0.0035):
+                rows.append([bm.verts.new((cx + rr * math.cos(a0 + (a1 - a0) * i / n),
+                                           cy + rr * math.sin(a0 + (a1 - a0) * i / n),
+                                           zz)) for i in range(n + 1)])
+        bm.verts.ensure_lookup_table()
+        bi, bo, ti, to = rows
+        for i in range(n):
+            bm.faces.new((bo[i], bo[i + 1], to[i + 1], to[i]))
+            bm.faces.new((ti[i], ti[i + 1], bi[i + 1], bi[i]))
+            bm.faces.new((to[i], to[i + 1], ti[i + 1], ti[i]))
+            bm.faces.new((bi[i], bi[i + 1], bo[i + 1], bo[i]))
+        for e in (0, n):
+            bm.faces.new((bi[e], bo[e], to[e], ti[e]))
+        for a in (a0, a1):
+            px, py = cx + (r + 0.002) * math.cos(a), cy + (r + 0.002) * math.sin(a)
+            bm_box(bm, px, (py + wall_y) / 2, zs, 0.004, abs(py - wall_y) + 0.004,
+                   0.036)
+            bm_box(bm, px, wall_y + 0.002, zs, 0.040, 0.004, 0.036)
+    _emit(kit, bm, STEEL, "bojler_straps", smooth=False)
+    bm = bmesh.new()
+    for zs in (zb + 0.150, zb + h - 0.165):
+        for a in (math.radians(196.0), math.radians(344.0)):
+            px = cx + (r + 0.002) * math.cos(a)
+            for s in (-1, 1):
+                _xf(_lathe(bm, ((0.0, 0.0065), (0.004, 0.0065), (0.0055, 0.0045),
+                                (0.0060, 0.0005)), seg=6),
+                    _M((px + s * 0.013, wall_y + 0.004, zs), rx=-math.pi / 2))
+    _emit(kit, bm, DARKMETAL, "bojler_bolts", smooth=False)
+
+    # ── the tails, the valves and the rosettes ──────────────────────────────
+    # Two half-inch tails out of the cover 10 cm apart, a little toward the
+    # wall: hot on the left as you face it, cold on the right, each with its
+    # red or blue ring where it leaves the plastic and a hex union under that.
+    # Then down, a bend, and straight back to the wall. On the cold side the
+    # safety valve stands in the vertical run with its drain spout toward the
+    # room, and a ball valve with a blue butterfly sits in the horizontal one.
+    # The 22 cm between the dish and the pot is all they have, and the bends
+    # are at 16 cm so the horizontals clear the pot's rim by 3.
+    ty_ = cy - 0.040
+    zt = zb - 0.054
+    zh = zb - 0.160
+    bm = bmesh.new()
+    for sx in (-1, 1):
+        x = cx + sx * 0.050
+        path = _fillet([(x, ty_, zt + 0.004), (x, ty_, zh),
+                        (x, wall_y + 0.002, zh)], 0.030, 8)
+        _tube(bm, path, 0.0105, seg=20)
+        # Rosette on the tiling.
+        _xf(_lathe(bm, ((0.0, 0.031), (0.003, 0.031), (0.006, 0.026),
+                        (0.009, 0.014), (0.012, 0.0115), (0.013, 0.0005)),
+                   seg=40), _M((x, wall_y, zh), rx=-math.pi / 2))
+    # The cold side's safety valve: a body on the vertical, a spout off it,
+    # and the little test lever on top of the spout.
+    vx = cx + 0.050
+    _lathe(bm, ((0.0, 0.0005), (0.0, 0.0150), (0.004, 0.0175), (0.046, 0.0175),
+                (0.050, 0.0150), (0.050, 0.0005)), seg=32,
+           at=(vx, ty_, zb - 0.128))
+    _tube(bm, [(vx, ty_, zb - 0.100), (vx, ty_ + 0.026, zb - 0.100),
+               (vx, ty_ + 0.034, zb - 0.106), (vx, ty_ + 0.036, zb - 0.118)],
+          0.0085, seg=16)
+    _xf(_lathe(bm, ((0.0, 0.016), (0.012, 0.016), (0.014, 0.0005)), seg=28),
+        _M((vx, wall_y + 0.075, zh), rx=-math.pi / 2))
+    _emit(kit, bm, CHROME, "bojler_tails", smooth=True)
+    bm = bmesh.new()
+    for sx in (-1, 1):
+        x = cx + sx * 0.050
+        _lathe(bm, ((0.0, 0.0145), (0.006, 0.0145), (0.007, 0.0005)), seg=6,
+               at=(x, ty_, zb - 0.072))
+    _emit(kit, bm, CHROME, "bojler_unions", smooth=False)
+    for sx, c in ((-1, (0.760, 0.120, 0.100)), (1, (0.130, 0.330, 0.700))):
+        bm = bmesh.new()
+        _lathe(bm, ((0.0, 0.0140), (0.010, 0.0140), (0.011, 0.0005)), seg=24,
+               at=(cx + sx * 0.050, ty_, zt - 0.010))
+        _emit(kit, bm, c, "bojler_ring", smooth=True)
+    # The ball valve's butterfly, blue, on top of its body.
+    bm = bmesh.new()
+    _tube(bm, [(vx, wall_y + 0.081, zh + 0.014), (vx, wall_y + 0.081, zh + 0.026)],
+          0.0040, seg=12)
+    vs = _superball(bm, 0.030, 0.011, 0.0035, p=3.0, q=2.4, rows=7, seg=24,
+                    at=(vx, wall_y + 0.081, zh + 0.029))
+    _emit(kit, bm, (0.130, 0.300, 0.680), "ball_valve_handle", smooth=True)
+    bm = bmesh.new()
+    _superball(bm, 0.0045, 0.020, 0.003, p=3.0, q=2.4, rows=5, seg=16,
+               at=(vx, ty_ + 0.012, zb - 0.088))
+    _emit(kit, bm, (0.850, 0.150, 0.110), "safety_lever", smooth=True)
+
+    # And the safety valve's drain hose, which is the hose in the photograph:
+    # off the spout, clear of the pot on the machine and down the 13 cm gap
+    # between the machine's end and the tiling, into the wall near the floor.
+    # In the photograph it loops the other way, across the front of the pot
+    # and down the far side; it cannot here, because this machine is 42 deep
+    # against that one's 60 and the loop would have to pass through the pot.
+    hose = [(cx + dx, cy + dy, zb + dz) for dx, dy, dz in (
+        (0.050, -0.004, -0.118), (0.056, 0.006, -0.155), (0.085, 0.022, -0.205),
+        (0.130, 0.030, -0.265), (0.165, 0.010, -0.330), (0.182, -0.035, -0.410),
+        (0.190, -0.090, -0.500), (0.190, -0.150, -0.740),
+        (0.185, -0.210, -1.040), (0.180, -0.262, -1.110),
+        (0.178, -0.290, -1.250))]
+    dense = []
+    for i in range(len(hose) - 1):
+        a, b = hose[max(0, i - 1)], hose[i]
+        c, e = hose[i + 1], hose[min(len(hose) - 1, i + 2)]
+        for s in range(4):
+            dense.append(_cr(a, b, c, e, s / 4))
+    dense.append(hose[-1])
+    bm = bmesh.new()
+    _tube(bm, dense, 0.0090, seg=16)
+    _emit(kit, bm, (0.700, 0.715, 0.730), "drain_hose", smooth=True)
+
+    # The flex: out of the side of the cover, along to a junction box on the
+    # east wall.
+    jx = cx + r + 0.035
+    bm = bmesh.new()
+    _tube(bm, _fillet([(cx + 0.140, cy - 0.060, zb - 0.030),
+                       (jx - 0.020, cy - 0.060, zb - 0.030),
+                       (jx - 0.020, cy - 0.060, zb - 0.020)], 0.012, 6),
+          0.0040, seg=12)
+    _emit(kit, bm, WHITEGOODS, "bojler_flex", smooth=True)
+    kit.span(WHITEGOODS, jx - 0.024, jx + 0.002, cy - 0.105, cy - 0.015,
+             zb - 0.020, zb + 0.060, bev=0.006)
+
+
+def _fillet(pts, rad, n=6):
+    """A polyline with every inside corner rounded off by `n` points of a
+    quadratic arc `rad` back from it — a bent pipe, not a mitred one."""
+    out = [pts[0]]
+    for i in range(1, len(pts) - 1):
+        a, b, c = pts[i - 1], pts[i], pts[i + 1]
+        la = math.dist(a, b)
+        lc = math.dist(b, c)
+        r0 = min(rad, la * 0.5, lc * 0.5)
+        p0 = tuple(b[k] + (a[k] - b[k]) * r0 / la for k in range(3))
+        p2 = tuple(b[k] + (c[k] - b[k]) * r0 / lc for k in range(3))
+        for s in range(n + 1):
+            u = s / n
+            out.append(tuple((1 - u) ** 2 * p0[k] + 2 * (1 - u) * u * b[k]
+                             + u * u * p2[k] for k in range(3)))
+    out.append(pts[-1])
+    return out
 
 
 def bathroom(kit):
@@ -3735,11 +4158,11 @@ def bathroom(kit):
     # photograph: the bojler over the machine, the enamel lonac on it, and the
     # bucket on the floor beside it.
     #
-    # The tank hangs on the south wall hard into the east corner, 3 cm off the
-    # tiling behind it and 4 cm off the tiling beside it — a cylinder is tangent
-    # to a wall rather than parallel with one, so rule 5 has nothing to bite on
-    # here, and there are no brackets because there are none to see: the plate
-    # it hangs on is behind the tank.
+    # The tank hangs on the south wall hard into the east corner, 2.5 cm off
+    # the tiling behind it and 4 cm off the tiling beside it — a cylinder is
+    # tangent to a wall rather than parallel with one, so rule 5 has nothing to
+    # bite on here. It hangs on two welded straps whose tabs are bolted to the
+    # tiling; see `_bojler`.
     _bojler(kit, x1 - 0.28, y0 + 0.27, F2 + 1.45)
 
     # The pot is the third object in the photograph and the most characterful
@@ -3763,7 +4186,7 @@ def bathroom(kit):
     # is why this is built as a vessel and not as a drum.
     px, py = wx + 0.29, y0 + 0.22
     _vessel(kit, px, py, F2 + 0.90, F2 + 1.25, 0.185, 0.200, 0.010,
-            ENAMEL_POT, POT_IN, rim_c=DARKMETAL, seg=18)
+            ENAMEL_POT, POT_IN, rim_c=DARKMETAL, seg=64, smooth=True)
     for s in (1, -1):
         ox = px + s * 0.186
         for z0h, z1h in ((F2 + 1.196, F2 + 1.212), (F2 + 1.086, F2 + 1.102)):
@@ -3781,7 +4204,7 @@ def bathroom(kit):
     # tall, which is the standard size and is not measured, because the one in
     # the photograph is tipped over a mop head and cannot be.
     _vessel(kit, x0 + 1.45, y0 + 0.19, F2 + 0.02, F2 + 0.30, 0.120, 0.145,
-            0.012, BUCKET_B, BUCKET_IN, seg=16)
+            0.012, BUCKET_B, BUCKET_IN, seg=48, smooth=True)
     for s in (1, -1):
         kit.span(BUCKET_B, x0 + 1.45 + s * 0.128, x0 + 1.45 + s * 0.156,
                  y0 + 0.165, y0 + 0.215, F2 + 0.235, F2 + 0.290, bev=0.003)
@@ -3806,7 +4229,7 @@ def _lay_disc(kit, colour, cx, cy, cz, r, t, seg=18, bev=0.003):
 
 
 def _vessel(kit, cx, cy, z0, z1, r0, r1, wall, out_c, in_c,
-            rim_c=None, floor=None, seg=16, bev=0.003):
+            rim_c=None, floor=None, seg=16, bev=0.003, smooth=False):
     """An open vessel — a bucket, a cooking pot — with an inside you can see.
 
     Rule 8, and the reason this needs a builder of its own: a truncated cone
@@ -3837,9 +4260,14 @@ def _vessel(kit, cx, cy, z0, z1, r0, r1, wall, out_c, in_c,
                               cy + math.sin(TAU * i / seg) * r, z))
                 for i in range(seg)]
 
+    # `smooth` (1.576.0, the pot and the bucket under the new bojler): the
+    # walls shade round, and each cap is its own ring of vertices so its flat
+    # normal is not averaged into the wall's. No bevel then — nothing is
+    # welded for it to bevel.
     def adopt(bm, colour, name):
-        ob = new_object(bm, "%s_%s" % (kit.name, name), recalc=False)
-        if bev > 0:
+        ob = new_object(bm, "%s_%s" % (kit.name, name), smooth=smooth,
+                        recalc=False)
+        if bev > 0 and not smooth:
             bevel(ob, bev, segments=1, angle=35.0)
         kit.adopt(ob, colour)
 
@@ -3852,7 +4280,7 @@ def _vessel(kit, cx, cy, z0, z1, r0, r1, wall, out_c, in_c,
     for i in range(seg):
         j = (i + 1) % seg
         bo.faces.new((ob[i], ob[j], ot[j], ot[i]))
-    bo.faces.new(tuple(reversed(ob)))
+    bo.faces.new(tuple(reversed(ring(bo, z0, r0) if smooth else ob)))
     adopt(bo, out_c, "vessel_out")
 
     # The rim, which is its own colour on the pot: an enamel lonac has a rolled
@@ -3870,7 +4298,7 @@ def _vessel(kit, cx, cy, z0, z1, r0, r1, wall, out_c, in_c,
     for i in range(seg):
         j = (i + 1) % seg
         bi.faces.new((it[i], it[j], ib[j], ib[i]))
-    bi.faces.new(tuple(ib))
+    bi.faces.new(tuple(ring(bi, fz, at(fz) - wall) if smooth else ib))
     adopt(bi, in_c, "vessel_in")
 
 
@@ -6747,15 +7175,20 @@ def roof_now(kit):
     # shadow into every room's edges and the faint unevenness of a skim coat.
     kit.vbox(CEIL, IX0 - 0.05, IX1 + 0.05, IY0 - 0.05, IY1 + 0.05,
              CEILZ, CEILZ + 0.14, bev=0.01, cell=0.16, tint=_ceiling_tint)
-    kit.span(RENDER, X0, X1, Y0, Y1, CEILZ + 0.14, HEAD, bev=0.02)
+    # Held 2 cm inside the wall faces: it was flush with them, which was a
+    # coplanar pair nobody could see while both were one flat colour and is a
+    # flickering band now that the walls carry their weathering.
+    kit.span(RENDER, X0 + 0.02, X1 - 0.02, Y0 + 0.02, Y1 - 0.02, CEILZ + 0.14,
+             HEAD, bev=0.02)
     ov = 0.40
     for sgn in (-1, 1):
         _slope(kit, PLY, sgn, RIDGE_NOW, PITCH_NOW, 0.0, (Y1 - Y0) / 2 + ov,
-               0.030, X0 - ov, X1 + ov)
+               0.030, X0 - ov, X1 + ov, tint=_eave_tint, cells=(36, 12))
     roof_trim(kit, RIDGE_NOW, PITCH_NOW, (Y1 - Y0) / 2, ov, HEAD,
               rafters=True)
     for at in (X0 + EXT / 2, X1 - EXT / 2):
-        _gable(kit, RENDER, at, EXT, HEAD, RIDGE_NOW, (Y1 - Y0) / 2)
+        _gable(kit, RENDER, at, EXT, HEAD, RIDGE_NOW, (Y1 - Y0) / 2,
+               tint=_render_tint)
     # The dish, on the south-east corner under the eave.
     starlink(kit, HEAD)
 
@@ -6791,8 +7224,12 @@ def roof_trim(kit, ridge, pitch, span, ov, head, rafters=False):
     for sgn in (-1, 1):
         _slope(kit, UNDERLAY, sgn, ridge, pitch, 0.0, run - 0.02, TILE_BASE,
                x0 + 0.03, x1 - 0.03, lift=TILE_BASE)
+        # The flat slab is the FAR roof now, 3.5 cm under where it was so the
+        # kupe laid over it never show it; see `_kupe`.
         _slope(kit, ROOFTILE, sgn, ridge, pitch, 0.0, run + 0.05, 0.075,
-               x0 + 0.03, x1 - 0.03, lift=TILE_BASE + 0.075)
+               x0 + 0.03, x1 - 0.03, lift=TILE_BASE + 0.040)
+        _kupe(kit, sgn, ridge, pitch, run + 0.05, x0 + 0.03, x1 - 0.03,
+              TILE_BASE + 0.075)
         yf = sgn * run
         kit.span(FASCIA, x0, x1, *sorted((yf, yf - sgn * 0.024)),
                  zp(run) - 0.17, zp(run) + 0.012, bev=0.004)
@@ -6804,7 +7241,8 @@ def roof_trim(kit, ridge, pitch, span, ov, head, rafters=False):
             for i in range(n + 1):
                 x = X0 + 0.04 + i * ((X1 - X0 - 0.08) / n)
                 _slope(kit, BEECH, sgn, ridge, pitch, span - 0.10, run - 0.026,
-                       0.12, x - 0.035, x + 0.035, lift=-0.029)
+                       0.12, x - 0.035, x + 0.035, lift=-0.029,
+                       tint=_eave_tint, cells=(1, 4))
         _gutter(kit, sgn, run, zp(run) - 0.028, x0, x1)
         for xe0, xe1 in ((x0, x0 + 0.024), (x1 - 0.024, x1)):
             _slope(kit, FASCIA, sgn, ridge, pitch, 0.0, run, 0.20, xe0, xe1,
@@ -6813,8 +7251,10 @@ def roof_trim(kit, ridge, pitch, span, ov, head, rafters=False):
             _slope(kit, RENDER, sgn, ridge, pitch, 0.0, run + 0.04, 0.12,
                    xe0, xe1, lift=0.152)
 
-    kit.span(ROOFTILE, x0 - 0.02, x1 + 0.02, -0.14, 0.14,
-             ridge + 0.08, ridge + 0.20, bev=0.03)
+    # The ridge: a plain roll for far, inside the cappings that are near.
+    kit.span(ROOFTILE, x0 - 0.02, x1 + 0.02, -0.10, 0.10,
+             ridge + 0.08, ridge + 0.22, bev=0.03)
+    _ridge_tiles(kit, ridge, TILE_BASE + 0.075, x0 - 0.02, x1 + 0.02)
 
     # Downpipes. Both gutters fall to one end, and each pipe comes off the
     # outlet, swan-necks back under the soffit to the wall, and goes down it
@@ -6854,6 +7294,184 @@ def roof_trim(kit, ridge, pitch, span, ov, head, rafters=False):
     d = abs(cy)
     kit.span(LEAD, cx - 0.27, cx + 0.27, cy - 0.27, cy + 0.27,
              zp(d + 0.27) + 0.03, zp(d - 0.27) + 0.17, bev=0.01)
+
+
+# ── kupe ─────────────────────────────────────────────────────────────────────
+# The roof as laid, near to: kupa kanalica, the Dalmatian barrel tile, in
+# courses. 1.576.0 — until then each slope was one flat terracotta slab, which
+# from the road is a sheet of orange card with a fascia under it.
+#
+# Each slope is a run of courses 36 cm deep down the pitch. In a course, the
+# section across the roof is a cover tile (convex, 12 cm across, 6 high) and a
+# channel tile (shallow, concave) alternating on a 21 cm pitch, and every
+# course's lower edge stands 2 cm proud of the next, which is the lap: the
+# horizontal stepping that is most of what a tiled roof looks like from below.
+# At the eave the mouths of the covers are stopped with white mortar, as they
+# are on every roof on this coast.
+#
+# Every tile carries its own colour off a hash of where it is — fired clay is
+# never two the same, a few have been replaced, the channels hold the dirt and
+# the lichen and the tops are bleached — and the top of each course is in the
+# shadow of the one over it. No generator is touched.
+#
+# This is the NEAR roof. It goes out in its own blob (`kupe`, split by
+# `KUPE_C` in `main`) and the runtime draws it within `VIK.kupeNear` of the
+# house and the flat slab beyond: a 21 cm ripple seen from a kilometre is a
+# moiré and nothing else, and a plain roof makes no claim. The slab under it is
+# held 2.5 cm below the troughs, so near to it is never seen.
+
+KUPE_C = (0.662, 0.311, 0.191)      # ROOFTILE, by a thousandth: the split key
+KUPE_MORTAR = (0.835, 0.815, 0.770)
+KUPE_PITCH = 0.215                  # cover to cover
+KUPE_COURSE = 0.36                  # exposed length of a course
+KUPE_LAP = 0.020                    # how far a course's foot stands proud
+
+
+def _kupe_h(u):
+    """Height of the tile surface across one pitch, `u` in [0, 1)."""
+    fc = 0.56
+    if u < fc:
+        t = abs(2.0 * u / fc - 1.0)
+        return 0.060 * max(0.0, 1.0 - t ** 2.3) ** (1.0 / 2.3)
+    return -0.011 * math.sin(math.pi * (u - fc) / (1.0 - fc))
+
+
+def _kupe_tile_col(i, k, cover, rowpos):
+    """The colour multiplier of one tile, off a hash of (column, course)."""
+    h1 = _hash3(i, k, 1, 41.0)
+    h2 = _hash3(i, k, 2, 42.0)
+    v = 1.0 + 0.085 * h1
+    r, g, b = v * (1.0 + 0.035 * h2), v, v * (1.0 - 0.045 * h2)
+    if _hash3(i, k, 3, 43.0) > 0.86:            # a replacement, browner
+        r, g, b = r * 0.86, g * 0.80, b * 0.80
+    if cover:
+        r, g, b = r * 1.06, g * 1.08, b * 1.10  # bleached tops
+    else:
+        r, g, b = r * 0.80, g * 0.84, b * 0.88  # the channels: dirt, lichen
+    # In the shadow of the course above, at the head of every tile.
+    s = 0.72 if rowpos == 0 else (0.97 if rowpos == 1 else 1.0)
+    return (r * s, g * s, b * s)
+
+
+def _kupe(kit, sgn, ridge, pitch, run, x0, x1, lift):
+    """The courses of one slope, from the ridge to `run` (past the eave)."""
+    tn = math.tan(pitch)
+    nper = max(1, int(round((x1 - x0) / KUPE_PITCH)))
+    w = (x1 - x0) / nper
+    us = [0.56 * i / 6 for i in range(7)] + [0.56 + 0.44 * j / 3 for j in (1, 2)]
+    cols = []                                   # (x, h, column index, cover?)
+    for i in range(nper):
+        for u in us:
+            cols.append((x0 + w * (i + u), _kupe_h(u), i, u < 0.56))
+    cols.append((x1, _kupe_h(0.0), nper, True))
+    ncourse = max(1, int(math.ceil(run / KUPE_COURSE)))
+
+    def Z(d, h, step):
+        return ridge - d * tn + lift + h + step
+
+    bm = bmesh.new()
+    lay = bm.loops.layers.float_color.new("frcol")
+    bmm = bmesh.new()
+
+    for k in range(ncourse):
+        db = run - (ncourse - 1 - k) * KUPE_COURSE   # foot of this course
+        da = max(0.0, db - KUPE_COURSE)
+        rows = (da, min(db, da + 0.05), db)
+        steps = [KUPE_LAP * (d - da) / max(1e-6, db - da) for d in rows]
+        G = [[bm.verts.new((x, sgn * d, Z(d, h, st))) for (x, h, _, _) in cols]
+             for d, st in zip(rows, steps)]
+        for r in range(2):
+            for c in range(len(cols) - 1):
+                q = [(G[r][c], r), (G[r][c + 1], r), (G[r + 1][c + 1], r + 1),
+                     (G[r + 1][c], r + 1)]
+                if sgn < 0:
+                    q.reverse()
+                f = bm.faces.new([v for v, _ in q])
+                for lp, (_, rp) in zip(f.loops, q):
+                    cc = _kupe_tile_col(cols[c][2], k, cols[c][3], rp)
+                    lp[lay] = (cc[0], cc[1], cc[2], 1.0)
+        # The lap: the foot of this course, down to the head of the next (or,
+        # at the eave, to the underside of the tile, mortared in the covers).
+        last = k == ncourse - 1
+        drop = KUPE_LAP + (0.022 if last else 0.0)
+        for c in range(len(cols) - 1):
+            (xa, ha, ia, ca), (xb, hb, _, _) = cols[c], cols[c + 1]
+            top_a, top_b = Z(db, ha, KUPE_LAP), Z(db, hb, KUPE_LAP)
+            if last and ca and ha > 0.004:
+                # The mortar in the mouth of a cover, set back a centimetre.
+                q = [bmm.verts.new((xa, sgn * (db - 0.012), top_a - 0.006)),
+                     bmm.verts.new((xb, sgn * (db - 0.012), top_b - 0.006)),
+                     bmm.verts.new((xb, sgn * (db - 0.012), top_b - drop)),
+                     bmm.verts.new((xa, sgn * (db - 0.012), top_a - drop))]
+                bmm.faces.new(q if sgn > 0 else list(reversed(q)))
+                # And the tile's own thickness round the mouth, over it.
+                ta, tb = top_a - 0.012, top_b - 0.012
+            else:
+                ta, tb = top_a - drop, top_b - drop
+            q = [bm.verts.new((xa, sgn * db, top_a)),
+                 bm.verts.new((xb, sgn * db, top_b)),
+                 bm.verts.new((xb, sgn * db, tb)),
+                 bm.verts.new((xa, sgn * db, ta))]
+            f = bm.faces.new(q if sgn > 0 else list(reversed(q)))
+            cc = _kupe_tile_col(ia, k, ca, 2)
+            for lp in f.loops:
+                lp[lay] = (cc[0] * 0.80, cc[1] * 0.80, cc[2] * 0.80, 1.0)
+    # Smooth across each course's curve; the laps are their own islands of
+    # vertices, so they stay hard.
+    ob = new_object(bm, "kupe", smooth=True, recalc=False)
+    kit.adopt(ob, KUPE_C)
+    if len(bmm.faces):
+        kit.adopt(new_object(bmm, "kupe_mortar", smooth=False, recalc=False),
+                  KUPE_MORTAR)
+
+
+def _ridge_tiles(kit, ridge, lift, x0, x1):
+    """The ridge: half-round cappings, 40 cm each, each overlapping the next by
+    6, bedded in mortar on both slopes."""
+    zc = ridge + lift + 0.035
+    n = max(1, int(math.ceil((x1 - x0) / 0.34)))
+    L = (x1 - x0) / n
+    bm = bmesh.new()
+    lay = bm.loops.layers.float_color.new("frcol")
+    seg = 14
+    for i in range(n):
+        xa, xb = x0 + i * L - 0.03, x0 + (i + 1) * L + 0.03
+        ring = []
+        for xx, rr in ((xa, 0.128), (xa + 0.02, 0.126), (xb, 0.118)):
+            ring.append([bm.verts.new((xx, rr * math.cos(math.pi * j / seg),
+                                       zc + rr * math.sin(math.pi * j / seg)
+                                       - (0.04 if j in (0, seg) else 0.0)))
+                         for j in range(seg + 1)])
+        h = _hash3(i, 7, 0, 44.0)
+        c = (1.0 + 0.08 * h, 1.0 + 0.06 * h, 1.0 + 0.05 * h)
+        for a, b in zip(ring, ring[1:]):
+            for j in range(seg):
+                f = bm.faces.new((a[j], a[j + 1], b[j + 1], b[j]))
+                for lp in f.loops:
+                    lp[lay] = (*c, 1.0)
+        # The open end of the capping, facing along the ridge: its thickness.
+        inner = [bm.verts.new((xa, 0.110 * math.cos(math.pi * j / seg),
+                               zc + 0.110 * math.sin(math.pi * j / seg)
+                               - (0.04 if j in (0, seg) else 0.0)))
+                 for j in range(seg + 1)]
+        for j in range(seg):
+            f = bm.faces.new((ring[0][j + 1], ring[0][j], inner[j], inner[j + 1]))
+            for lp in f.loops:
+                lp[lay] = (0.80, 0.80, 0.80, 1.0)
+    kit.adopt(new_object(bm, "ridge_tiles", smooth=True, recalc=False), KUPE_C)
+    # Both ends stopped with mortar, as a verge capping is.
+    bm = bmesh.new()
+    for xe, r_, sg in ((x0 - 0.03, 0.128, -1), (x1 + 0.03, 0.118, 1)):
+        pts = [bm.verts.new((xe, r_ * math.cos(math.pi * j / seg),
+                             zc + r_ * math.sin(math.pi * j / seg)
+                             - (0.04 if j in (0, seg) else 0.0)))
+               for j in range(seg + 1)]
+        bm.faces.new(pts if sg > 0 else list(reversed(pts)))
+    kit.adopt(new_object(bm, "ridge_ends", smooth=False, recalc=False),
+              KUPE_MORTAR)
+    for s in (-1, 1):
+        kit.span(KUPE_MORTAR, x0, x1, *sorted((s * 0.105, s * 0.150)),
+                 zc - 0.075, zc - 0.035, bev=0.006)
 
 
 def _gutter(kit, sgn, run, zr, x0, x1):
@@ -6907,26 +7525,56 @@ def _gutter(kit, sgn, run, zr, x0, x1):
                  zr - 0.010, zr + 0.004, bev=0.002)
 
 
-def _slope(kit, colour, sgn, ridge, pitch, d0, d1, thick, x0, x1, lift=0.0):
-    """One layer of one plane of a roof, between two distances from the ridge."""
+def _slope(kit, colour, sgn, ridge, pitch, d0, d1, thick, x0, x1, lift=0.0,
+           tint=None, cells=None):
+    """One layer of one plane of a roof, between two distances from the ridge.
+
+    `tint` (with `cells`, the (along x, down the slope) subdivision of its
+    two broad faces) shades it in vertex colour: the eave soffit and the
+    rafter tails, in the roof's own shadow. See `_eave_tint`."""
     za = ridge - d0 * math.tan(pitch) + lift
     zb = ridge - d1 * math.tan(pitch) + lift
     poly = [(d0, za), (d1, zb), (d1, zb - thick), (d0, za - thick)]
     bm = bmesh.new()
-    vs = [bm.verts.new((x0, sgn * yy, zz)) for yy, zz in poly]
-    vs += [bm.verts.new((x1, sgn * yy, zz)) for yy, zz in poly]
-    bm.verts.ensure_lookup_table()
-    bm.faces.new(tuple(vs[:4]))
-    bm.faces.new(tuple(reversed(vs[4:])))
-    for i in range(4):
-        j = (i + 1) % 4
-        bm.faces.new((vs[i], vs[j], vs[4 + j], vs[4 + i]))
+    if tint is not None and cells:
+        nx, nd = cells
+        # A box whose two broad faces (top, underside) are an nx x nd grid,
+        # skinned round by its four thin sides, all welded.
+        def P(i, j, top):
+            x = x0 + (x1 - x0) * i / nx
+            d = d0 + (d1 - d0) * j / nd
+            z = ridge - d * math.tan(pitch) + lift - (0.0 if top else thick)
+            return (x, sgn * d, z)
+        T = [[bm.verts.new(P(i, j, True)) for j in range(nd + 1)]
+             for i in range(nx + 1)]
+        B = [[bm.verts.new(P(i, j, False)) for j in range(nd + 1)]
+             for i in range(nx + 1)]
+        for i in range(nx):
+            for j in range(nd):
+                bm.faces.new((T[i][j], T[i + 1][j], T[i + 1][j + 1], T[i][j + 1]))
+                bm.faces.new((B[i][j], B[i][j + 1], B[i + 1][j + 1], B[i + 1][j]))
+        for i in range(nx):
+            for j in (0, nd):
+                bm.faces.new((T[i][j], B[i][j], B[i + 1][j], T[i + 1][j]))
+        for j in range(nd):
+            for i in (0, nx):
+                bm.faces.new((T[i][j], T[i][j + 1], B[i][j + 1], B[i][j]))
+        _tint_bm(bm, tint)
+    else:
+        vs = [bm.verts.new((x0, sgn * yy, zz)) for yy, zz in poly]
+        vs += [bm.verts.new((x1, sgn * yy, zz)) for yy, zz in poly]
+        bm.verts.ensure_lookup_table()
+        bm.faces.new(tuple(vs[:4]))
+        bm.faces.new(tuple(reversed(vs[4:])))
+        for i in range(4):
+            j = (i + 1) % 4
+            bm.faces.new((vs[i], vs[j], vs[4 + j], vs[4 + i]))
     ob = new_object(bm, "roofplane")
     bevel(ob, 0.008)
     kit.adopt(ob, colour)
 
 
-def _gable(kit, colour, at, thick, z_eave, z_ridge, span):
+def _gable(kit, colour, at, thick, z_eave, z_ridge, span, tint=None):
     bm = bmesh.new()
     poly = [(-span, z_eave), (span, z_eave), (0.0, z_ridge)]
     vs0 = [bm.verts.new((at - thick / 2, y, z)) for y, z in poly]
@@ -6937,6 +7585,16 @@ def _gable(kit, colour, at, thick, z_eave, z_ridge, span):
     for i in range(3):
         j = (i + 1) % 3
         bm.faces.new((vs0[i], vs0[j], vs1[j], vs1[i]))
+    if tint is not None:
+        # The two triangles as a triangular grid, about 26 cm along the eave
+        # line (and 6 up), so the gable carries the same weathering as the
+        # wall it stands on.
+        tri = [f for f in bm.faces if len(f.verts) == 3]
+        edges = list({e for f in tri for e in f.edges})
+        bmesh.ops.subdivide_edges(bm, edges=edges,
+                                  cuts=max(1, int(2 * span / 0.26)),
+                                  use_grid_fill=True)
+        _tint_bm(bm, tint)
     ob = new_object(bm, "gable")
     bevel(ob, 0.012)
     kit.adopt(ob, colour)
@@ -7861,12 +8519,218 @@ def _ceiling_tint(p, n):
     return (1.0 + v, 1.0 + v, 1.0 + v * 1.1)
 
 
+# ── the outside, weathered ───────────────────────────────────────────────────
+# Misha, 2 Oct 2026: *"the exterior of vikendica need more detail and shade"*.
+# Every outside wall was one flat value of RENDER from the plinth to the eave,
+# so in sun the house was a cut-out and out of it a grey card. The photographs
+# of the loggia and of the terrace say what a twenty-year-old roughcast on this
+# coast does instead, and it is all here as a multiplier on the render, laid
+# into the corners of a 16 x 10 cm grid (`_render_tint`):
+#
+#   * the render is never one value — a slow mottle of patching and repaint,
+#     and a little warm/cool drift in it;
+#   * rain has run down it in long vertical streaks, heaviest under each sill
+#     (a dark run off each end of the stone, a fainter wash under the middle)
+#     and down beside the two downpipes;
+#   * the foot of every wall carries a band of splash and dust, warmer and
+#     darker, fading over the first half metre;
+#   * light does not get into corners: the shadow under the eaves and the
+#     verges, under the terrace slab (the whole south face below it is a
+#     porch), into the inside corner of the set-back on the west, along the
+#     line where the terrace floor meets the wall, and on the east wall over
+#     the line of the stair.
+#
+# It is vertex colour, not a texture — the same `frcol` route the plaster
+# indoors takes — and the shader's sky term still does the lighting; this is
+# only the part of it that geometry and time do. A few per cent per effect, and
+# irregular, because a regular one reads as a pattern before it reads as dirt.
+# The soffits have their own (`_soffit_tint`, `_eave_tint`).
+
+def _ext_windows():
+    """(axis, face, a0, a1, z_sill, out) for every window in an outside wall:
+    the face plane, the opening's extent along it, its sill, and which way is
+    out. Off the same constants `shell` and `prizemlje` punch them with."""
+    out = []
+    for axis, face, w, base, o in (
+            ("x", Y0, W_TERR, F2, -1), ("y", X0, W_KIT_W, F2, -1),
+            ("y", X0, W_BATH_W, F2, -1), ("y", NX0, W_S4_W, F2, -1),
+            ("y", X1, W_S3_E, F2, 1),
+            ("x", Y0, PW_S3_S, P_FL, -1), ("x", Y1, PW_KIT_N, P_FL, 1),
+            ("y", X0, PW_BATH_W, P_FL, -1), ("y", X1, PW_S4_E, P_FL, 1)):
+        out.append((axis, face, w[0], w[1], base + w[2] - 0.05, o))
+    return out
+
+
+_EXT_WIN = None
+
+
+def _render_tint(p, n):
+    """The outside render, as a multiplier (see the block above)."""
+    global _EXT_WIN
+    if _EXT_WIN is None:
+        _EXT_WIN = _ext_windows()
+    x, y, z = p
+    # Patching and repaint: three octaves, slow.
+    v = (0.050 * _vnoise(x * 0.55, y * 0.55, z * 0.55, 21.0)
+         + 0.028 * _vnoise(x * 1.9 + 4.0, y * 1.9, z * 1.9, 22.0)
+         + 0.012 * _vnoise(x * 6.0, y * 6.0, z * 6.0, 23.0))
+    warm = 0.014 * _vnoise(x * 0.35 + 9.0, y * 0.35, z * 0.35, 24.0)
+    vertical = abs(n[2]) < 0.5
+    if vertical:
+        along = x if abs(n[1]) > abs(n[0]) else y
+        # Rain runs: a noise stretched eleven to one down the wall, only its
+        # dark half kept, and stronger toward the top where the water starts.
+        r_ = _vnoise(along * 5.5, z * 0.5, 0.0, 25.0)
+        v -= 0.080 * max(0.0, r_) * (0.5 + 0.5 * min(1.0, max(0.0, (z - 0.3) / 5.0)))
+
+        # The foot: splash and dust, warm.
+        ground = GRADE + 0.06
+        if z < 1.2:
+            k = math.exp(-max(0.0, z - ground - 0.22) / 0.30)
+            k *= 0.85 + 0.15 * _vnoise(along * 2.3, z * 3.0, 0.0, 27.0)
+            v -= 0.120 * k
+            warm += 0.030 * k
+
+        # Under the eaves on the long faces, and under the verges on the gables.
+        if abs(n[1]) > 0.5 and F2 < z < HEAD + 0.01:
+            v -= 0.150 * math.exp(-max(0.0, HEAD - z) / 0.35)
+        if abs(n[0]) > 0.5 and abs(abs(x) - X1) < 0.3 and z > F2:
+            zv = RIDGE_NOW - abs(y) * math.tan(PITCH_NOW)
+            v -= 0.120 * math.exp(-max(0.0, zv - z) / 0.32)
+
+        # The south face under the terrace slab is a porch: in shade, and
+        # darker again into the angle under the soffit.
+        if n[1] < -0.5 and y < Y0 + 0.30 and z < TER_Z - 0.20:
+            v -= 0.040 + 0.110 * math.exp(-max(0.0, TER_Z - 0.22 - z) / 0.40)
+        # And the upper south face where the terrace floor meets it.
+        if n[1] < -0.5 and y < Y0 + 0.30 and z > TER_Z - 0.05:
+            v -= 0.090 * math.exp(-max(0.0, z - TER_Z) / 0.14)
+
+        # The inside corner of the set-back on the west, both faces of it.
+        if x < NX0 + 0.30 and abs(y - BY1) < 1.2:
+            d = math.hypot(x - NX0, y - BY1)
+            v -= 0.110 * math.exp(-d / 0.30)
+
+        # The east wall along the stair: contact over the nosings, and the
+        # shade of the flight on the wall under its waist.
+        if n[0] > 0.5 and x > X1 - 0.05 and Y0 - 0.1 < y < ST_TOP + 1.2:
+            yA = ST_BOT - ST_GO
+            zn = (GRADE + (y - yA) / ST_GO * ST_RISE) if y < ST_TOP else F2
+            if z > zn - 0.05:
+                v -= 0.100 * math.exp(-max(0.0, z - zn) / 0.24)
+            elif z > zn - 0.45:
+                v -= 0.070
+            else:
+                v -= 0.045
+
+        # The loggia at the back (terrace 7), under its own ceiling.
+        if x > P_SPINE_N - 0.2 and y > P_TER_S - 0.2 and z < P_CEIL + 0.02:
+            v -= 0.035 + 0.060 * math.exp(-max(0.0, P_CEIL - z) / 0.35)
+
+        # Under every sill: a dark run off each end, a fainter wash between,
+        # and the sill's own shadow line directly under its nose.
+        for axis, face, a0, a1, zs, o in _EXT_WIN:
+            if axis == "x":
+                if abs(y - face) > 0.06 or n[1] * o < 0.5:
+                    continue
+                a = x
+            else:
+                if abs(x - face) > 0.06 or n[0] * o < 0.5:
+                    continue
+                a = y
+            dz = zs - z
+            if dz < -0.02 or dz > 1.6 or a < a0 - 0.35 or a > a1 + 0.35:
+                continue
+            fade = math.exp(-max(0.0, dz) / 0.55)
+            ends = (math.exp(-((a - a0 + 0.02) / 0.045) ** 2)
+                    + math.exp(-((a - a1 - 0.02) / 0.045) ** 2))
+            mid = 1.0 / (1.0 + math.exp(-(a - a0) / 0.03)) \
+                * 1.0 / (1.0 + math.exp((a - a1) / 0.03))
+            wob = 0.75 + 0.25 * _vnoise(a * 9.0, z * 1.2, 0.0, 26.0)
+            v -= (0.200 * ends + 0.070 * mid) * fade * wob
+            v -= 0.070 * mid * math.exp(-max(0.0, dz) / 0.06)
+
+        # Beside the two downpipes.
+        for xp, face, z0_ in ((X0 + 0.20, Y0, TER_Z), (X1 - 0.12, Y1, GRADE)):
+            if abs(abs(y) - abs(face)) < 0.06 and z > z0_:
+                v -= 0.070 * math.exp(-((x - xp) / 0.08) ** 2)
+    return (1.0 + v + warm, 1.0 + v, 1.0 + v - warm * 1.4)
+
+
+def _soffit_tint(p, n):
+    """The underside of the terrace slab, which is the porch ceiling of the
+    flat below, and its nose.
+
+    The shader used to roll every downward face's normal up toward the sky
+    and lift it a third, which is right for a ceiling indoors with the sea
+    outside it — and out here it made the porch ceiling the brightest
+    surface on the house, a white panel glowing over a shaded wall. That roll
+    now stops at the walls (`mat` in src/44-vikendica.js). What is left is
+    the occlusion: in the loggia photograph the render overhead is darkest
+    into the corner over the wall and lifts toward the open edge, where it
+    sees the lit ground.
+    """
+    x, y, z = p
+    v = (0.030 * _vnoise(x * 0.8, y * 0.8, 0.0, 31.0)
+         + 0.012 * _vnoise(x * 3.0, y * 3.0, 0.0, 32.0))
+    if n[2] < -0.5:
+        d = max(0.0, Y0 - y)                         # out from the wall
+        k = 0.97 + 0.16 * (1.0 - math.exp(-d / 0.9))
+        # And into the two end corners, where the side piers stop the light.
+        e = min(abs(x - X0), abs(x - X1))
+        k -= 0.08 * math.exp(-e / 0.35)
+        # And a little cooler than the render: what lights it is mostly the
+        # pale terrazzo under it and some sky, and the shader's only bounce
+        # is the ochre of open karst.
+        return (k * (0.955 + v), k * (1.0 + v), k * (1.09 + v))
+    if abs(n[2]) < 0.5:
+        # The nose: water off the tiles runs over it and down the face.
+        r_ = _vnoise((x + y) * 6.0, z * 0.8, 0.0, 33.0)
+        v -= 0.050 * max(0.0, r_) + 0.040
+    return (1.0 + v, 1.0 + v, 1.0 + v - 0.006)
+
+
+def _eave_tint(p, n):
+    """The eave and verge soffits and the rafter tails: in the shade of the
+    roof, and darker still where they meet the wall."""
+    x, y, z = p
+    d = min(abs(abs(y) - Y1), abs(x - X0), abs(x - X1))
+    k = 0.76 + 0.20 * (1.0 - math.exp(-d / 0.22)) if n[2] < 0.3 else 0.95
+    w = 0.025 * _vnoise(x * 1.3, y * 1.3, z, 34.0)
+    return (k * (1.0 + w), k * (1.0 + w), k * (1.0 + w))
+
+
+def _chimney_tint(p, n, top):
+    """The stack: the render's own weathering, and soot down from the crown."""
+    r, g, b = _render_tint(p, n)
+    k = 1.0 - 0.16 * math.exp(-max(0.0, top - 0.08 - p[2]) / 0.35)
+    k -= 0.04 * max(0.0, _vnoise(p[0] * 7.0 + p[1] * 7.0, p[2] * 0.7, 0.0, 35.0))
+    return (r * k, g * k, b * k * 0.98)
+
+
+def _tint_bm(bm, tint):
+    """Write `tint(position, face normal)` into every corner of `bm` as the
+    `frcol` attribute the exporter multiplies in — for anything that is not
+    a `Kit.vbox` box."""
+    lay = bm.loops.layers.float_color.get("frcol")
+    if lay is None:
+        lay = bm.loops.layers.float_color.new("frcol")
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.normal_update()
+    for f in bm.faces:
+        nrm = tuple(f.normal)
+        for lp in f.loops:
+            c = tint(tuple(lp.vert.co), nrm)
+            lp[lay] = (c[0], c[1], c[2], 1.0)
+
+
 def _grid_box(bm, lay, x0, x1, y0, y1, z0, z1, cell, tint):
     """A closed box whose six faces are quads of about `cell`, sharing their
     lattice so the edges weld, with the tint written into every corner."""
-    nx = max(1, int(math.ceil((x1 - x0) / cell - 1e-6)))
-    ny = max(1, int(math.ceil((y1 - y0) / cell - 1e-6)))
-    nz = max(1, int(math.ceil((z1 - z0) / cell - 1e-6)))
+    cx_, cy_, cz_ = cell if isinstance(cell, tuple) else (cell, cell, cell)
+    nx = max(1, int(math.ceil((x1 - x0) / cx_ - 1e-6)))
+    ny = max(1, int(math.ceil((y1 - y0) / cy_ - 1e-6)))
+    nz = max(1, int(math.ceil((z1 - z0) / cz_ - 1e-6)))
     xs = [x0 + (x1 - x0) * i / nx for i in range(nx + 1)]
     ys = [y0 + (y1 - y0) * j / ny for j in range(ny + 1)]
     zs = [z0 + (z1 - z0) * k / nz for k in range(nz + 1)]
@@ -8451,6 +9315,8 @@ def main():
         # window and the terrace opening both read as shuttered from inside,
         # with the brightest thing in the flat behind a flat grey sheet.
         for tag, col, why in (
+            # The near roof, drawn only near — see `_kupe`.
+            ("kupe", (KUPE_C, KUPE_MORTAR), "the tiles as laid, drawn near"),
             ("glass", GLASS, "the glazing, drawn transparent"),
             ("sheer", SHEER, "the net curtains, drawn through"),
             # And the sanitary ware, for the same kind of reason: it is the one
@@ -8459,9 +9325,13 @@ def main():
             # can give it the bounce this shader does not have. See the note on
             # `wareMat` in src/44-vikendica.js.
             ("ware", PORCELAIN, "the sanitary ware, drawn brighter"),
+            # And the bojler's jacket, which is enamel: a gloss the plaster
+            # must not have. See `enamelMat` in src/44-vikendica.js.
+            ("enamel", ENAMEL_W, "the bojler's enamel, drawn glossy"),
         ):
-            sub = [p for p in parts if p[1] == col]
-            parts = [p for p in parts if p[1] != col]
+            cs = col if isinstance(col[0], tuple) else (col,)
+            sub = [p for p in parts if p[1] in cs]
+            parts = [p for p in parts if p[1] not in cs]
             if sub:
                 export_p(sub, OUT / ("vikendica_%s_%s.fr3d.gz" % (name, tag)), why)
         coll = bpy.data.collections.new(name)
