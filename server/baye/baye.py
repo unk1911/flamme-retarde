@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.53.0"
+VERSION = "1.54.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -602,6 +602,29 @@ GROUNDS_GO = (r"\b(come|coming|go|going|let'?s|lets|meet|see you|join|head|walk|
               r"do(đ|d|dj)i|idi|na(đ|d|dj)imo|na(đ|d|dj)i|vidimo|pridru(ž|z)i\w*|"
               r"allons|allez|viens|va|vas|rejoins|retrouve|on va|treffen|gehen|komm)\b")
 
+# AND ON THE PLAYGROUND'S KIT (1.54.0, page 1.562.0). Misha, 1 Oct 2026:
+# "Baye on the playground equipment" — the swings, the nest swing, the
+# seesaw, the slide and the spring rider, and getting off. The noun decides
+# which; read by `pg_of` ahead of the playground itself, so "go to the
+# playground and get on the swing" is the swing and not only the walk there.
+# The trampoline stays `tramp`: the page knows whether she is at the
+# playground (its trampoline) or on the beach (the beach's), and maps it.
+PG_NOUNS = [
+    ("pg:nest", r"\b(nest(\s+swing)?|basket\s+swing|gnijezd\w*|nid)\b"),
+    ("pg:seesaw", r"\b(see-?saws?|teeter[- ]?totter|klackalic\w*|tape-?cul|bascule|wippe)\b"),
+    ("pg:slide", r"\b(slides?|tobogan\w*|toboggan|rutsche)\b"),
+    ("pg:rider", r"\b(spring\s+rider|rocking\s+horse|horsey|horse|pony|konji(ć|c)\w*|cheval\w*)\b"),
+    ("pg:swing", r"\b(swings?|ljulja(č|c)k\w*|balan(ç|c)oire\w*|schaukel\w*)\b"),
+]
+PG_VERB = (r"\b(get|hop|jump|go|goes|going|climb|sit|ride|riding|try|use|play|on|onto|"
+           r"down|come|let'?s|lets|wanna|want|can you|could you|will you|idi|idemo|ajde|"
+           r"hajde|sjedni|sjedi|popni|penji|sko(č|c)i|spusti|ja(š|s)i|jahati|zaja(š|s)i|"
+           r"ljuljaj|zaljuljaj|klackaj|monte|va|vas|allez|allons|essaie|fais|glisse|descends)\b")
+PG_OFF_RE = (r"^\s*((get|hop|jump|climb|come)\s+(off|down)(\s+of)?(\s+(it|that|the\s+(swing|nest|"
+             r"seesaw|slide|horse|rider|spring\s+rider|trampoline)))?|si(đ|d|dj)i(\s+(s|sa)\s+"
+             r"(toga|nje|njega|ljulja(č|c)ke|klackalice|trampolina|konji(ć|c)a))?|silazi)"
+             r"(\s+(please|baye|now))?\s*[.!]*\s*$")
+
 SKILLS = {
     "see.slast": ("walk up to the ice cream place and see what flavours are in "
                   "the case", [r"\b(ice ?cream|gelato|flavou?rs?|slast\w*)\b", SEE_RE]),
@@ -1004,6 +1027,13 @@ SKILLS = {
     # already and she is a long way off — comes round unseen and walks in.
     # Read by `grounds_of` ahead of the table, like the hammock; this entry
     # is the one-word ask and the ticket.
+    "pg:swing": ("get on a swing at the playground and swing on it", [PG_NOUNS[4][1], PG_VERB]),
+    "pg:nest": ("get in the nest swing at the playground", [PG_NOUNS[0][1], PG_VERB]),
+    "pg:seesaw": ("sit on the seesaw at the playground and ride it up and down", [PG_NOUNS[1][1], PG_VERB]),
+    "pg:slide": ("climb the playground tower and go down the slide", [PG_NOUNS[2][1], PG_VERB]),
+    "pg:rider": ("ride the spring rider, the little spring horse, at the playground",
+                 [PG_NOUNS[3][1], PG_VERB]),
+    "pg.off": ("get off the swing, the seesaw or whatever she is on at the playground", [PG_OFF_RE]),
     "grounds": ("come to the playground behind the kabine and meet them there",
                 [GROUNDS_RE]),
     "hammock.out": ("get out of the hammock and stand up", [HAMMOCK_RE, HAM_OUT_RE]),
@@ -1783,6 +1813,32 @@ def hammock_of(t: str):
     return "hammock"
 
 
+def pg_of(t: str):
+    """A piece of the playground's kit the sentence asks her on to, or off, or None.
+
+    Ahead of `grounds_of`: "go to the playground and get on the swing" names
+    the playground AND the swing, and the swing is the request (the page walks
+    her there on the way). The noun with a verb of getting on or going to it,
+    or the noun as the whole sentence; "get off" as the whole sentence.
+    """
+    if re.search(PG_OFF_RE, t):
+        return "pg.off"
+    # The noun as the whole sentence, articles and a please aside.
+    rest = re.sub(r"[^\w' -]+", " ", t)
+    rest = re.sub(r"\b(the|a|an|on|onto|to|na|u|please|pls|baye|now|ok|okay|hey|le|la|babe)\b", " ", rest).split()
+    # And the trampoline, as the beach's `tramp`: the page knows which one she
+    # is near and makes it the playground's there.
+    for name, noun in PG_NOUNS + [("tramp", r"\btrampolin\w*\b")]:
+        if re.search(noun, t):
+            if name == "pg:swing" and re.search(r"\bswing\s+(me|her|it|you|us)\b", t):
+                return None
+            if re.search(PG_VERB, t) or (len(rest) <= 2 and all(re.search(noun, w) or w in
+                                                                 ("swing", "rider", "horse", "spring", "rocking", "basket") for w in rest)):
+                return name
+            return None
+    return None
+
+
 def grounds_of(t: str):
     """`grounds` if the sentence asks her to the playground, else None.
 
@@ -1801,6 +1857,10 @@ def grounds_of(t: str):
 def skills_of(text: str) -> list:
     """Which of her numbers a sentence asks for. English patterns, like `INTENTS`."""
     t = (text or "").lower()
+    # THE PLAYGROUND'S KIT FIRST, then the playground — see `pg_of`.
+    pg = pg_of(t)
+    if pg:
+        return [pg]
     # THE PLAYGROUND FIRST — see `grounds_of`.
     gr = grounds_of(t)
     if gr:
@@ -4345,6 +4405,18 @@ SHORE_DOING = {
     # and lying back — see COT_IN in 43-jadrija.js.
     "cotGo": "going over to the cot in the beach hut to get on it",
     "cotIn": "sitting down on the edge of the cot and lying back on to it",
+    # 1.54.0: on the playground's kit (page 1.562.0). `pgRide` is sent with
+    # the piece she is on (`pgswing` …), within the ten characters `her` has.
+    "pgGo": "going over to a piece of the playground to get on it",
+    "pgTurn": "stepping up to it to get on",
+    "pgOn": "getting on it",
+    "pgOff": "getting off it",
+    "pgswing": "on a swing at the playground, swinging",
+    "pgnest": "in the big round nest swing at the playground, swinging",
+    "pgseesaw": "on one end of the seesaw at the playground, going up and down",
+    "pgtramp": "bouncing on the round trampoline at the playground",
+    "pgslide": "climbing the playground tower and going down the red slide",
+    "pgrider": "riding the little spring horse at the playground, rocking on it",
 }
 # THE SAME BEAT, ON THE MATTRESS. `kept`, `cradle`, `situp` and `recline` are
 # the hose's floor poses in `SHORE_DOING` — soaked, on the boards — and the
@@ -4532,6 +4604,11 @@ AUTO_DOING = {
     "kneel": "got down on your knees for them", "kneelUp": "came up onto your knees on the leash",
     "down": "went back down on all fours on the leash", "standUp": "stood up on the leash",
     "rock": "rocked the hammock yourself",
+    # 1.54.0: on to the playground's kit of your own accord (page 1.562.0).
+    "pgSwing": "got on a swing", "pgNest": "climbed into the nest swing",
+    "pgSeesaw": "sat on the seesaw", "pgTramp": "jumped on the trampoline",
+    "pgSlide": "went up the tower to the slide", "pgRider": "got on the spring horse",
+    "pgOff": "got off it",
 }
 # How long after a safeword she is still in the aftercare, s. Past it the line
 # says it happened and nothing more.

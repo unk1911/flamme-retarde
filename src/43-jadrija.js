@@ -44832,6 +44832,8 @@ async function buildJadrija(scene) {
   // what she has on comes off without her getting up.
   const HAM_IN = { 'hair.down': 1, 'hair.up': 1, doff: 1 };
   const HERE_GO = { hammock: 1, grounds: 1, collar: 1 };
+  // ...and the kit at the playground, any piece of it (1.562.0, `pg:swing`).
+  const hereGo = (ask) => !!ask && (!!HERE_GO[ask] || ask.startsWith('pg:'));
   // The off-lane phases a SPOT ask is taken in, straight from the dispatch.
   const HERE_FROM = { here: 1, grounds: 1, hamBack: 1 };
   // The ones that need clear ground round her, off the lane — `hereRoom`.
@@ -44856,7 +44858,9 @@ async function buildJadrija(scene) {
   function hereTakes(ask) {
     if (!ask) return false;
     const base = ask.split(':')[0];
-    return !!(SPOT[base] || HERE_GO[ask] || TURN_KEEP[ask] || HAM_KEEP[ask] || base === 'doff');
+    return !!(SPOT[base] || HERE_GO[ask] || TURN_KEEP[ask] || HAM_KEEP[ask] || base === 'doff'
+      // And the playground's kit (1.562.0): a place with a way there.
+      || base === 'pg');
   }
   /**
    * Room for a number off her lane: [t, s, heading] — where to stand and which
@@ -44946,6 +44950,1058 @@ async function buildJadrija(scene) {
     show.byAsk = 1;
     go('here', 'idle', 0.40);
   }
+
+  // ── THE PLAYGROUND KIT, RIDDEN (1.562.0) ─────────────────────────────────
+  //
+  // Misha, 1 Oct 2026: *"Baye on the playground equipment"* — once she is at
+  // the playground she can use it: sit on a swing and be pushed or pump it
+  // herself, ride an end of the seesaw while you push the other, bounce on a
+  // trampoline, climb the tower and go down the slide, rock on the spring
+  // rider, and get off when she is asked or has had enough.
+  //
+  // THE PHYSICS IS THE KIT'S. Each thing is the AVBD net 1.558.0 built
+  // (src/46-playground.js); she goes INTO it: her 55 kg on the body she sits
+  // on, her hands on a swing's chains as joints, her capsules on it for you to
+  // walk into, her weight at her own height on the seesaw and the rider, and
+  // on a bed she is the bed's second body exactly as you are — see `HER ON
+  // IT` there. What she does is a drive on that net: a pump with the swing,
+  // a kick off the ground at the bottom of the seesaw, a rock with the rider,
+  // her legs on the bed. Where she is drawn is read off the body every frame
+  // (`pgPlace`), and again after the kit has stepped (`pgAfter`, from
+  // 90-app.js), so she and the seat are one frame and never a frame apart.
+  //
+  // THE POSES ARE HER OWN CLIPS WITH THE CONTACTS SOLVED. Sat on anything,
+  // she is `hamIn` held on its HAM_SIT key — sat on an edge 0.45 m up, which
+  // is a swing seat to a centimetre — and everything that touches the kit is
+  // solved to it each frame by the elbow's and the knee's own hinges
+  // (`hingeArm`, so the joint limits of 41-skin.js hold): her hands to the
+  // chains where her grip joints are, to the seesaw's T-bar, to the horse's
+  // handles; her feet to the footrests, to the ground under the low end of
+  // the seesaw, out and tucked with the swing. Her back leans only as far as
+  // her hands need to reach (`pgLean`, solved). On the slide it is `sitHeld`,
+  // laid along the trough; on the ladder and the bed, `idle` with all four
+  // limbs solved to rungs, rails and the bed. No angle here is typed.
+  //
+  // THE WAY THERE is `groundsRoute` (A* through the gaps), at a jog when it
+  // is far; from the kabina by its door first; and if you are at the grounds
+  // and she is a long way off, she is brought round unseen by MEET's own
+  // `meetGo` and goes on to the kit from there (`show.pgWant`).
+  let pgKit = null;
+  const PG_PH = { pgGo: 1, pgTurn: 1, pgOn: 1, pgRide: 1, pgOff: 1 };
+  // The ones where her mesh is the kit's and not the deck's.
+  const PG_ON = { pgOn: 1, pgRide: 1, pgOff: 1 };
+  const PG_KINDS = { swing: 1, nest: 1, seesaw: 1, tramp: 1, slide: 1, rider: 1 };
+  const PGR = {
+    sitT: 0.95,           // hamIn's HAM_SIT key: sat on an edge, feet down
+    hipUp: { hamIn: 0.084, sitHeld: 0.109 },   // her hip joints over the seat in each, MEASURED
+    stay: [70, 130],      // s she stays on before getting off of her own accord
+    reach: 0.93,          // of her arm's full length a hand is held to (`pgLean`)
+    leanMax: 0.95,        // rad, the most her back bends to reach
+    gripUp: 0.22,         // m up a swing's chain from the seat where she holds it
+    nestGrip: 0.40,       // and up the nest's front chains
+    laughAt: 0.62,        // rad of swing that makes her laugh
+    pushedFor: 4.0,       // s after your push that she lets you swing her
+    turnFor: 2.5,         // s at most to step on to her mark and turn
+    bedTop: [0.95, 1.45], // m over the bed she bounces to, picked per run
+    trickP: 0.38,         // of the high bounces with a trick at the top
+    slideMu: 0.24, slideV0: 0.55, slideEnd: 0.985,
+    say: 7,               // s at least between two of her lines
+    // HAM_SIT's hips over the seat, figure space, MEASURED (legU heads at
+    // −0.385, 0.534, less `hipUp`) — until the clip is there to measure.
+    cfSit: [-0.385, 0.450, 0],
+    // The ladder: s a rung, and where she stands on it (behind the rung line).
+    rungT: 0.62, back: 0.17,
+  };
+  // Her lines, Croatian, with what they mean (`pg.g.*` in 02-i18n.js).
+  const PG_SAY = {
+    swing: [['Ljuljaj me!', 'swing0'], ['Ajde, gurni me!', 'swing1']],
+    high: [['Juhuuu!', 'high0'], ['Jače! Hehe!', 'high1'], ['Gledaj, letim!', 'high2']],
+    seesaw: [['Ajde, ti na drugu stranu!', 'saw0']],
+    up: [['Gore!', 'up0'], ['Hehe, spusti me!', 'up1']],
+    tramp: [['Hop!', 'tramp0'], ['Gledaj kako visoko!', 'tramp1']],
+    slide: [['Pazi sad!', 'slide0']],
+    whee: [['Juhuu!', 'whee0']],
+    rider: [['Đi-ha!', 'rider0'], ['Hehe, moj konjić.', 'rider1']],
+    off: [['Dosta mi je, hehe.', 'off0'], ['Vrti mi se!', 'off1']],
+  };
+  let pgSaidAt = -99;
+  function pgSay(kind, force = false) {
+    const L = PG_SAY[kind];
+    if (!L || !show) return null;
+    if (!force && show.clock - pgSaidAt < PGR.say) return null;
+    const [text, id] = L[Math.floor(Math.random() * L.length)];
+    pgSaidAt = show.clock;
+    const g = typeof T === 'function' ? T('pg.g.' + id) : '';
+    if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub(text, 2.4, g && g !== 'pg.g.' + id ? g : '');
+    return text;
+  }
+  /** Near enough to the playground kit to mean it — her, or you. */
+  function pgNear(t, s) {
+    if (!pgKit || !pgKit.her) return false;
+    if (groundsDist(t, s) < 12) return true;
+    const A = GROUNDS.shore;
+    return !!A && Math.hypot(Math.max(A.t0 - t, 0, t - A.t1), Math.max(A.s0 - s, 0, s - A.s1)) < 10;
+  }
+  /** The heading she has at t walking along world (dx, dz). */
+  function angOf(t, dx, dz) {
+    const st = at(t);
+    return Math.atan2(dx * st.nx + dz * st.nz, dx * st.ux + dz * st.uz);
+  }
+  const _pgA = new THREE.Vector3(), _pgB = new THREE.Vector3(), _pgC = new THREE.Vector3();
+  const _pgD = new THREE.Vector3(), _pgE = new THREE.Vector3(), _pgP = new THREE.Vector3();
+  const _pgQ = new THREE.Quaternion(), _pgQ2 = new THREE.Quaternion(), _pgQF = new THREE.Quaternion();
+  const _pgM = new THREE.Matrix4(), _pgX = new THREE.Vector3(), _pgY = new THREE.Vector3(), _pgZ = new THREE.Vector3();
+  const v3c = (a, out) => out.set(a[0], a[1], a[2]);
+  const crs3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const nrm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+  const qrot3 = (q, v) => {
+    _pgQ2.set(q[0], q[1], q[2], q[3]);
+    const r = _pgA.set(v[0], v[1], v[2]).applyQuaternion(_pgQ2);
+    return [r.x, r.y, r.z];
+  };
+
+  /**
+   * Where she goes for part i: `at` the mark she stands on to get on, `ap`
+   * one step out from it that a way can reach (the seesaw and the rider
+   * stand in their own colliders), `ang` the way she faces on the mark, and
+   * how she sits — `Cb` her seat in the body's frame, `Fb` the way she faces
+   * in it, `sg` her end of the seesaw.
+   */
+  function pgMark(kind, i, pt, ps) {
+    const H = pgKit.her, info = H.info(i), fr = H.frame(i);
+    const yw = toWorld(pt, ps);
+    const flat = (v) => { const l = Math.hypot(v[0], v[2]) || 1; return [v[0] / l, 0, v[2] / l]; };
+    const tsOf = (w) => local(w[0], w[2]);
+    const mk = { kind, i };
+    if (kind === 'tramp') {
+      const c = info.c, [tc, sc] = tsOf(c);
+      // In from her side of it, a pace outside the rim, and on to the middle.
+      let dt = show.t - tc, ds = show.s - sc;
+      const dl = Math.hypot(dt, ds) || 1;
+      dt /= dl; ds /= dl;
+      mk.ap = [tc + dt * 1.25, sc + ds * 1.25];
+      mk.at = [tc, sc];
+      mk.ang = Math.atan2(ps - sc, pt - tc);
+      return mk;
+    }
+    if (kind === 'slide') {
+      const T = H.slide(), L = T.ladder;
+      const w = T.fr.F(L.foot - 0.45, 0, T.y), w2 = T.fr.F(L.foot - 0.22, 0, T.y);
+      mk.ap = tsOf(w);
+      mk.at = tsOf(w2);
+      mk.ang = angOf(mk.at[0], T.fr.U[0], T.fr.U[2]);
+      return mk;
+    }
+    const Zw = flat(qrot3(fr.Q, [0, 0, 1])), Xw = flat(qrot3(fr.Q, [1, 0, 0]));
+    let fwd, side = 1;
+    if (kind === 'seesaw') {
+      // The end that is down: the one she can sit on.
+      const th = pgKit.parts[i].sim.angle();
+      mk.sg = th >= 0 ? 1 : -1;
+      // Her seat on the saddle's top (0.015 over the body's origin) and
+      // 17 mm over it: astride, the inside of her thighs is that deep into
+      // the saddle on the seat key (MEASURED, `pgClip`), which a moulded
+      // seat does not give.
+      mk.Cb = [0, 0.015 + 0.017, mk.sg * (info.HL - 0.22)];
+      mk.Fb = [0, 0, -mk.sg];
+    } else if (kind === 'rider') {
+      // The saddle's top, and 33 mm over it for the same reason as the
+      // seesaw's (MEASURED, `pgClip`: 30 vertices 33 mm into it before).
+      mk.Cb = [0, 0.81 - info.COM + 0.033, 0.06];
+      mk.Fb = [0, 0, -1];
+    } else {
+      // Facing you, so you see her — the push lands from in front or behind.
+      const c = fr.P;
+      const face = (Zw[0] * (yw[0] - c[0]) + Zw[2] * (yw[2] - c[2])) >= 0 ? 1 : -1;
+      mk.face = face;
+      mk.Fb = [0, 0, face];
+      mk.Cb = kind === 'nest' ? [0, 0.0, 0.10 * face] : [0, info.seatY + 0.012, 0];
+    }
+    const Cw = H.toWorld(i, mk.Cb);
+    const Fw = flat(qrot3(fr.Q, mk.Fb));
+    fwd = Fw;
+    if (kind === 'seesaw' || kind === 'rider') {
+      // Beside it, on whichever side she is coming from, a stride off its
+      // line — and the mark: for the seesaw astride the beam in front of
+      // her seat, for the rider beside the horse.
+      const wHer = toWorld(show.t, show.s);
+      side = (Xw[0] * (wHer[0] - Cw[0]) + Xw[2] * (wHer[2] - Cw[2])) >= 0 ? 1 : -1;
+      if (kind === 'seesaw') {
+        const m = [Cw[0] + fwd[0] * 0.385, 0, Cw[2] + fwd[2] * 0.385];
+        mk.at = tsOf(m);
+        mk.ap = tsOf([m[0] + Xw[0] * side * 0.62, 0, m[2] + Xw[2] * side * 0.62]);
+      } else {
+        const m = [Cw[0] + Xw[0] * side * 0.42, 0, Cw[2] + Xw[2] * side * 0.42];
+        mk.at = tsOf(m);
+        mk.ap = tsOf([m[0] + Xw[0] * side * 0.45, 0, m[2] + Xw[2] * side * 0.45]);
+        mk.side = side;
+      }
+    } else {
+      // In front of the seat with her back to it, as far out as the sit
+      // carries her hips back (HAM_SIT's own −0.385), and a pace further for
+      // the way in.
+      const m = [Cw[0] + fwd[0] * 0.385, 0, Cw[2] + fwd[2] * 0.385];
+      mk.at = tsOf(m);
+      mk.ap = tsOf([m[0] + fwd[0] * 0.55, 0, m[2] + fwd[2] * 0.55]);
+    }
+    mk.ang = angOf(mk.at[0], fwd[0], fwd[2]);
+    return mk;
+  }
+
+  /** Off to part `name` (`pg:swing` …): the part, the mark and the way. */
+  function pgStart(name, go, pt, ps) {
+    if (!pgKit || !pgKit.her) return false;
+    const kind = name.slice(3);
+    if (!PG_KINDS[kind]) return false;
+    // Nearest to you if you are at either playground, else to her.
+    const youNear = pgNear(pt, ps);
+    const w = youNear ? toWorld(pt, ps) : toWorld(show.t, show.s);
+    let i = kind === 'slide' ? -2 : pgKit.her.find(kind, w[0], w[2]);
+    if (i === -1) { show.why = 'pgbusy'; show.did = null; return false; }
+    const mk = pgMark(kind, i, pt, ps);
+    const legs = groundsRoute(show.t, show.s, mk.ap.slice());
+    if (!legs) { show.why = 'noway'; show.did = null; return false; }
+    show.pg = { name, kind, i, mk, t: 0, stage: 'go', said: 0, laughs: 0, pushedAt: -99,
+      stay: PGR.stay[0] + Math.random() * (PGR.stay[1] - PGR.stay[0]), aims: false };
+    show.pgWant = null;
+    show.job = { name: 'pg', legs, leg: 0, best: null, stall: 0, replan: 0, since: 0,
+      cruise: wayPace(legs, show.t, show.s, MEET.pace) };
+    show.stuck = null;
+    show.byAsk = 1;
+    show.queue.length = 0;
+    show.here = null;
+    // If she came to the grounds for this, she stays at them after.
+    if (!show.meet && groundsDist(show.t, show.s) < 40) {
+      show.meet = { since: 0, t: 0, hops: 9, met: true, gone: 0, goal: null };
+    }
+    go('pgGo', 'walk', 0.32);
+    return true;
+  }
+
+  /** The ask, from the dispatch: there now, or by the door, or brought round. */
+  function pgAsk(name, go, pt, ps) {
+    const kind = name.slice(3);
+    if (sheIsIn()) {
+      show.pgWant = name;
+      show.meet = { since: 0, t: 0, hops: 0, met: false, gone: 0, goal: null };
+      show.leg = 0; show.byAsk = 1; show.queue.length = 0;
+      go('leave', 'walk', 0.34);
+      return true;
+    }
+    // You at the grounds and she a long way off: MEET's way, which brings her
+    // round unseen, and on to the kit from the grounds.
+    const dYou = Math.hypot(show.t - pt, show.s - ps);
+    if (kind !== 'swing' && groundsDist(pt, ps) < MEET.near && dYou > MEET.far && groundsDist(show.t, show.s) > 30) {
+      show.pgWant = name;
+      return meetGo(pt, ps, go);
+    }
+    return pgStart(name, go, pt, ps);
+  }
+
+  // ── her limbs on the kit ─────────────────────────────────────────────────
+  //
+  // Everything in her figure's own space (+x the way she faces, +y up), off
+  // the clip's own chain this frame (`armsNow`, which runs the local pose
+  // forward), so a solve never works from an arm that is not there.
+  let pgBones = null;
+  function pgBoneIdx(f) {
+    if (pgBones) return pgBones;
+    pgBones = {};
+    for (const n of ['pelvis', 'spine01', 'spine03', 'legUL', 'legLL', 'footL', 'legUR', 'legLR', 'footR',
+      'armUL', 'armLL', 'handL', 'armUR', 'armLR', 'handR']) pgBones[n] = f.boneIndex(n);
+    return pgBones;
+  }
+  const PG_AIMED = ['spine01', 'spine03', 'legUL', 'legLL', 'legUR', 'legLR', 'armUL', 'armLL', 'armUR', 'armLR'];
+  function pgAimsOff(f) {
+    for (const n of PG_AIMED) f.aim(n, 0, 1, 0, 0);
+    if (show && show.pg) show.pg.aims = false;
+  }
+  const _lmS = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _lmE = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _lmW = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _lmH = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  const _aS = new THREE.Vector3(), _aE = new THREE.Vector3(), _aW = new THREE.Vector3(), _aH = new THREE.Vector3();
+  const _pgPole = new THREE.Vector3(), _pgGoal = new THREE.Vector3(), _pgPiv = new THREE.Vector3();
+  /** Her hips' middle in her figure, now, and the leg chains with their knee hinges. */
+  function pgLegs(f) {
+    const B = pgBoneIdx(f);
+    for (const sd of ['L', 'R']) {
+      const iu = B['legU' + sd], il = B['legL' + sd], ie = B['foot' + sd];
+      _lmS[sd].set(_awT[3 * iu], _awT[3 * iu + 1], _awT[3 * iu + 2]);
+      _lmE[sd].set(_awT[3 * il], _awT[3 * il + 1], _awT[3 * il + 2]);
+      _lmW[sd].set(_awT[3 * ie], _awT[3 * ie + 1], _awT[3 * ie + 2]);
+      // The knee's hinge as the clip bends it; a leg nearly straight bends
+      // about her own left-right, the shin going back (the sign `hingeArm`'s
+      // solved plane takes, upper × lower).
+      _aE.copy(_lmE[sd]).sub(_lmS[sd]);
+      _aW.copy(_lmW[sd]).sub(_lmE[sd]);
+      _lmH[sd].crossVectors(_aE, _aW);
+      if (_lmH[sd].lengthSq() < 1e-4 * _aE.lengthSq() * _aW.lengthSq()) _lmH[sd].set(0, 0, -1);
+      _lmH[sd].normalize();
+    }
+  }
+  /**
+   * The lean her back needs for her hands to reach: the least turn of
+   * `spine01` about her left-right that puts both hands within `PGR.reach`
+   * of her arms' length, in 0.05 rad steps up to `leanMax`; plus `extra`, the
+   * lean the drive asks for. Answers the angle (forward positive).
+   */
+  function pgLean(handL, handR, extra) {
+    const B = pgBones;
+    const piv = _pgPiv.set(_awT[3 * B.spine01], _awT[3 * B.spine01 + 1], _awT[3 * B.spine01 + 2]);
+    let best = extra;
+    const fits = (a) => {
+      _pgQ.setFromAxisAngle(_pgZ.set(0, 0, -1), a);
+      for (const [sd, h] of [['L', handL], ['R', handR]]) {
+        if (!h) continue;
+        const A = armNow[sd];
+        _aS.copy(A.S).sub(piv).applyQuaternion(_pgQ).add(piv);
+        const len = (A.E.distanceTo(A.S) + A.W.distanceTo(A.E)) * PGR.reach;
+        if (_aS.distanceTo(h) > len) return false;
+      }
+      return true;
+    };
+    if (!fits(extra)) {
+      for (let a = extra + 0.05; a <= PGR.leanMax + 1e-6; a += 0.05) { best = a; if (fits(a)) break; }
+    }
+    return best;
+  }
+  /**
+   * Her limbs to targets (figure space, each null to leave the clip's), with
+   * weights; `lean` forward about her left-right at `spine01`; poles for the
+   * elbows and knees. Every frame on the kit.
+   */
+  function pgLimbs(f, o) {
+    if (!armsNow(f)) return;
+    pgLegs(f);
+    const B = pgBones;
+    let lean = o.lean || 0;
+    if (o.solveLean) lean = pgLean(o.handL, o.handR, lean);
+    lean *= o.wLean == null ? 1 : o.wLean;
+    const piv = _pgPiv.set(_awT[3 * B.spine01], _awT[3 * B.spine01 + 1], _awT[3 * B.spine01 + 2]);
+    _pgQ.setFromAxisAngle(_pgZ.set(0, 0, -1), lean);
+    if (Math.abs(lean) > 1e-4) f.aim('spine01', 0, 0, -1, lean); else f.aim('spine01', 0, 1, 0, 0);
+    f.aim('spine03', 0, 1, 0, 0);
+    // The arms ride the lean: their chain turned about the pivot first.
+    for (const sd of ['L', 'R']) {
+      const h = sd === 'L' ? o.handL : o.handR;
+      const w = o.wHand == null ? 1 : o.wHand;
+      const A = armNow[sd];
+      if (!h || w <= 0) { f.aim('armU' + sd, 0, 1, 0, 0); f.aim('armL' + sd, 0, 1, 0, 0); continue; }
+      _aS.copy(A.S).sub(piv).applyQuaternion(_pgQ).add(piv);
+      _aE.copy(A.E).sub(piv).applyQuaternion(_pgQ).add(piv);
+      _aW.copy(A.W).sub(piv).applyQuaternion(_pgQ).add(piv);
+      _aH.copy(A.hinge).applyQuaternion(_pgQ);
+      _pgGoal.lerpVectors(_aW, h, w);
+      const sg = sd === 'L' ? -1 : 1;
+      const P0 = o.poleArm || [-0.55, -1, 0.18];
+      _pgPole.set(P0[0], P0[1], P0[2] * sg).normalize();
+      hingeArm(f, 'armU' + sd, 'armL' + sd, _aS, _aE, _aW, _aH, _pgGoal, _pgPole);
+    }
+    for (const sd of ['L', 'R']) {
+      const ft = sd === 'L' ? o.footL : o.footR;
+      const w = o.wFoot == null ? 1 : o.wFoot;
+      if (!ft || w <= 0) { f.aim('legU' + sd, 0, 1, 0, 0); f.aim('legL' + sd, 0, 1, 0, 0); continue; }
+      _pgGoal.lerpVectors(_lmW[sd], ft, w);
+      const sg = sd === 'L' ? -1 : 1;
+      const P0 = o.poleLeg || [1, 0.2, 0.25];
+      _pgPole.set(P0[0], P0[1], P0[2] * sg).normalize();
+      hingeArm(f, 'legU' + sd, 'legL' + sd, _lmS[sd], _lmE[sd], _lmW[sd], _lmH[sd], _pgGoal, _pgPole);
+    }
+    if (show.pg) show.pg.aims = true;
+  }
+
+  // ── where she is drawn ───────────────────────────────────────────────────
+  /** Sat on part i: her figure's place and turn in the world, into p and q. */
+  function pgAttach(G, p, q) {
+    const fr = pgKit.her.frame(G.i);
+    _pgQ2.set(fr.Q[0], fr.Q[1], fr.Q[2], fr.Q[3]);
+    const ex = G.mk.Fb, ey = [0, 1, 0], ez = crs3(ex, ey);
+    _pgM.makeBasis(v3c(ex, _pgX), v3c(ey, _pgY), v3c(ez, _pgZ));
+    _pgQF.setFromRotationMatrix(_pgM);
+    q.copy(_pgQ2).multiply(_pgQF);
+    p.set(G.mk.Cb[0], G.mk.Cb[1], G.mk.Cb[2]).applyQuaternion(_pgQ2).add(_pgB.set(fr.P[0], fr.P[1], fr.P[2]));
+    p.sub(_pgC.copy(G.cf).applyQuaternion(q));
+  }
+  /** A body-local point of part i, in her figure's frame while she sits on it. */
+  function pgFig(G, l, out) {
+    const ex = G.mk.Fb, ez = crs3(ex, [0, 1, 0]);
+    const d0 = l[0] - G.mk.Cb[0], d1 = l[1] - G.mk.Cb[1], d2 = l[2] - G.mk.Cb[2];
+    return out.set(G.cf.x + d0 * ex[0] + d1 * 0 + d2 * ex[2], G.cf.y + d1, G.cf.z + d0 * ez[0] + d2 * ez[2]);
+  }
+  /** Standing on the deck at (t, s) facing `ang`: her place and turn. */
+  function pgStand(t, s, ang, p, q, y = null) {
+    const w = toWorld(t, s);
+    p.set(w[0], y == null ? pgFloorAt(w[0], w[2], w[1]) : y, w[2]);
+    q.setFromAxisAngle(_pgY.set(0, 1, 0), faceYaw(t, ang));
+  }
+  /** What she stands on at (x, z): the rubber and the beds where they are. */
+  function pgFloorAt(x, z, dflt) {
+    const y = pgKit && pgKit.floor ? pgKit.floor(x, z) : null;
+    return y == null ? dflt : y;
+  }
+  const _pgFromP = new THREE.Vector3(), _pgFromQ = new THREE.Quaternion();
+  const _pgToP = new THREE.Vector3(), _pgToQ = new THREE.Quaternion();
+  /** Begin a blend of where she is drawn, from where she is drawn now, over `dur` s. */
+  function pgBlendFrom(G, f, dur) {
+    G.from = { p: f.mesh.position.clone(), q: f.mesh.quaternion.clone() };
+    G.blendT = 0; G.blendDur = dur;
+  }
+  /**
+   * Her mesh, while the kit has her: off the body she is on, or on the bed,
+   * the ladder, the slide. Called at the end of `stepShow` over the ordinary
+   * placement, and again from 90-app.js once the kit has stepped.
+   */
+  function pgPlace(f, dt) {
+    const G = show.pg;
+    if (!G || !pgKit) return;
+    if (!pgTarget(G, _pgToP, _pgToQ)) return;
+    if (G.from && G.blendDur > 0) {
+      G.blendT = Math.min(G.blendDur, G.blendT + dt);
+      const u = G.blendT / G.blendDur, e = u * u * (3 - 2 * u);
+      _pgToP.lerpVectors(G.from.p, _pgToP, e);
+      _pgToQ.slerpQuaternions(G.from.q, _pgToQ, e);
+      if (G.arc) _pgToP.y += G.arc * Math.sin(Math.PI * u);
+      if (u >= 1) { G.from = null; G.arc = 0; }
+    }
+    f.mesh.position.copy(_pgToP);
+    f.mesh.quaternion.copy(_pgToQ);
+    f.mesh.updateMatrixWorld();
+    // Where she is, for everything else in this file that asks.
+    const [t, s] = local(_pgToP.x, _pgToP.z);
+    show.t = t; show.s = s;
+    _pgX.set(1, 0, 0).applyQuaternion(_pgToQ);
+    if (Math.hypot(_pgX.x, _pgX.z) > 0.2) { show.ang = angOf(t, _pgX.x, _pgX.z); show.want = show.ang; }
+  }
+  /** Where she is drawn for the stage she is at, into p, q. False: leave her be. */
+  function pgTarget(G, p, q) {
+    const st = G.stage;
+    if (G.kind === 'tramp') {
+      const fr = pgKit.her.frame(G.i), B = fr.bed;
+      if (!B) return false;
+      p.set(fr.P[0], B.y - (B.on ? B.knees : 0), fr.P[2]);
+      q.setFromAxisAngle(_pgY.set(0, 1, 0), faceYaw(show.t, G.mk.ang));
+      return true;
+    }
+    if (G.kind === 'slide') return pgSlideAt(G, p, q);
+    if (st === 'sit' || st === 'ride' || st === 'brake') { pgAttach(G, p, q); return true; }
+    if (st === 'stand' || st === 'hop') {
+      // Stood up off it: level, on the floor, where her feet are.
+      pgStand(G.standAt[0], G.standAt[1], G.standAng, p, q);
+      return true;
+    }
+    return false;
+  }
+  /** After the kit has stepped (90-app.js): drawn where the seat now is. */
+  function pgAfter() {
+    if (!show || !show.pg || !skinFig || !PG_ON[show.phase]) return;
+    pgPlace(skinFig, 0);
+    // And the figure that is drawn, which took its place from this one
+    // earlier in the frame (`apprenticeStep`, 46-apprentice.js).
+    if (typeof appr !== 'undefined' && appr && APPR.primary && appr.mesh) {
+      appr.mesh.position.copy(skinFig.mesh.position);
+      appr.mesh.quaternion.copy(skinFig.mesh.quaternion);
+      appr.mesh.updateMatrixWorld();
+    }
+  }
+  /**
+   * Debug: how far into the seat her skin goes, MEASURED on the drawn figure
+   * (v2.0's mesh skinned on the CPU with this frame's palette) in the seat's
+   * own frame: the deepest vertex under the seat's top surface inside its
+   * footprint (m, negative is inside), how many are, and her lowest point.
+   */
+  function pgClip() {
+    const G = show && show.pg;
+    if (!G || !pgKit || G.i < 0 || !skinFig) return null;
+    const part = pgKit.parts[G.i], kind = part.kind;
+    const useAppr = typeof appr !== 'undefined' && appr && APPR.primary && appr.mesh && appr.mesh.visible;
+    const mesh = useAppr ? appr.mesh : skinFig.mesh;
+    const geo = mesh.geometry, pos = geo.getAttribute('position');
+    const BI = geo.getAttribute('aBoneIdx'), BW = geo.getAttribute('aBoneWt');
+    if (!pos || !BI || !BW) return { err: 'no skin attributes' };
+    const P = skinFig.pose().palette;
+    mesh.updateMatrixWorld();
+    const M = mesh.matrixWorld;
+    const fr = pgKit.her.frame(G.i);
+    const qi = new THREE.Quaternion(fr.Q[0], fr.Q[1], fr.Q[2], fr.Q[3]).invert();
+    const bp = new THREE.Vector3(fr.P[0], fr.P[1], fr.P[2]);
+    const info = pgKit.her.info(G.i);
+    const v = new THREE.Vector3(), o = new THREE.Vector3();
+    let deep = Infinity, n = 0, low = Infinity, seen = 0;
+    const idx = new Set();
+    const ix = geo.getIndex(), { start, count } = geo.drawRange;
+    const end = Math.min(ix ? ix.count : pos.count, start + (count === Infinity ? 1e9 : count));
+    for (let k = start; k < end; k++) idx.add(ix ? ix.getX(k) : k);
+    for (const vi of idx) {
+      v.set(pos.getX(vi), pos.getY(vi), pos.getZ(vi));
+      o.set(0, 0, 0);
+      let wsum = 0;
+      for (let j = 0; j < 4; j++) {
+        const w = BW.getComponent(vi, j);
+        if (w <= 0) continue;
+        const b = Math.round(BI.getComponent(vi, j) * (BI.normalized ? 255 : 1));
+        const q = b * 12;
+        o.x += w * (P[q] * v.x + P[q + 1] * v.y + P[q + 2] * v.z + P[q + 3]);
+        o.y += w * (P[q + 4] * v.x + P[q + 5] * v.y + P[q + 6] * v.z + P[q + 7]);
+        o.z += w * (P[q + 8] * v.x + P[q + 9] * v.y + P[q + 10] * v.z + P[q + 11]);
+        wsum += w;
+      }
+      if (wsum <= 0) continue;
+      o.applyMatrix4(M);
+      low = Math.min(low, o.y);
+      o.sub(bp).applyQuaternion(qi);
+      let top = null;
+      if (kind === 'seat' || kind === 'seatA') {
+        if (Math.abs(o.x) < info.w / 2 && Math.abs(o.z) < 0.085) top = -0.03 * (1 - Math.pow(2 * o.x / info.w, 2));
+      } else if (kind === 'nest') {
+        const r = Math.hypot(o.x, o.z);
+        if (r < info.RR - 0.05) top = -0.035 * (1 - r / info.RR);
+      } else if (kind === 'seesaw') {
+        const z = o.z - G.mk.sg * (info.HL - 0.22);
+        if (Math.abs(o.x) < 0.17 && Math.abs(z) < 0.16) top = 0.175 - info.COM;
+      } else if (kind === 'rider') {
+        if (Math.abs(o.x) < 0.11 && Math.abs(o.z - 0.06) < 0.15) top = 0.81 - info.COM;
+      }
+      if (top == null) continue;
+      seen++;
+      const dpt = o.y - top;
+      if (dpt < deep) deep = dpt;
+      if (dpt < -0.005) n++;
+    }
+    return { kind, mesh: useAppr ? 'v2' : 'v1', verts: idx.size, overSeat: seen,
+      deepest: seen ? +deep.toFixed(4) : null, under5mm: n, lowest: +low.toFixed(3) };
+  }
+
+  // ── on, riding, off ──────────────────────────────────────────────────────
+  /** Measured once she is in the seat clip: her hips over the seat, figure space. */
+  function pgContact(f, clip) {
+    if (!armsNow(f)) return new THREE.Vector3(-0.385, 0.45, 0);
+    pgLegs(f);
+    return new THREE.Vector3((_lmS.L.x + _lmS.R.x) / 2, (_lmS.L.y + _lmS.R.y) / 2 - PGR.hipUp[clip],
+      (_lmS.L.z + _lmS.R.z) / 2);
+  }
+  /** Her capsules on the seat's body, from her figure: thighs, back, shins. */
+  function pgCaps(G) {
+    const ex = G.mk.Fb, ez = crs3(ex, [0, 1, 0]);
+    const toB = (x, y, z) => {
+      const dx = x - G.cf.x, dy = y - G.cf.y, dz = z - G.cf.z;
+      return [G.mk.Cb[0] + ex[0] * dx + ez[0] * dz, G.mk.Cb[1] + dy, G.mk.Cb[2] + ex[2] * dx + ez[2] * dz];
+    };
+    const c = G.cf;
+    const cap = (a, b, r) => [...a, ...b, r];
+    return [
+      cap(toB(c.x + 0.05, c.y + 0.10, -0.10), toB(c.x + 0.42, c.y + 0.09, -0.11), 0.075),
+      cap(toB(c.x + 0.05, c.y + 0.10, 0.10), toB(c.x + 0.42, c.y + 0.09, 0.11), 0.075),
+      cap(toB(c.x - 0.05, c.y + 0.22, 0), toB(c.x - 0.08, c.y + 0.62, 0), 0.15),
+      cap(toB(c.x + 0.46, c.y + 0.02, 0), toB(c.x + 0.50, c.y - 0.30, 0), 0.09),
+    ];
+  }
+  /** Sat on it: into the net, and riding. */
+  function pgSeated(G, f, keepCf = false) {
+    if (!keepCf) G.cf = pgContact(f, 'hamIn');
+    const H = pgKit.her;
+    const o = { at: G.mk.Cb, sg: G.mk.sg || 1, caps: pgCaps(G) };
+    if (G.kind === 'seat' || G.kind === 'seatA' || G.kind === 'swing') {
+      o.gripUp = PGR.gripUp; o.grips = [0, 1];
+    } else if (G.kind === 'nest') {
+      o.gripUp = PGR.nestGrip;
+      o.grips = G.mk.face > 0 ? [1, 3] : [0, 2];
+    }
+    H.on(G.i, o);
+    G.grips = pgKit.parts[G.i].her ? pgKit.parts[G.i].her.grips : [];
+  }
+  /** Leave the kit: out of its net, aims off, her mesh the deck's again. */
+  function pgRelease() {
+    const G = show && show.pg;
+    if (!G) return;
+    if (pgKit && pgKit.her && G.i >= 0 && pgKit.parts[G.i] && pgKit.parts[G.i].her) pgKit.her.off(G.i);
+    if (skinFig) { pgAimsOff(skinFig); skinFig.state.speed = 1; }
+    show.pg = null;
+  }
+  /** Off it and done: with you at the grounds, or standing with you. */
+  function pgDone(go) {
+    const G = show.pg;
+    const next = G && G.next;
+    pgRelease();
+    show.job = null;
+    if (next && next !== 'pg.off') { show.ask = next; }
+    if (show.meet && groundsDist(show.t, show.s) < MEET.near) { go('grounds', 'idle', 0.40); return; }
+    hereStand('stay', go);
+  }
+
+  /** The limbs for a seated stage: what touches the kit, and the drive's pose. */
+  function pgSeatPose(f, G, dt, wIK, legsOnly = false) {
+    const H = pgKit.her, kind = G.kind === 'swing' ? 'seat' : G.kind;
+    const st = H.state(G.i) || { th: 0 };
+    const o = { handL: null, handR: null, footL: null, footR: null, wHand: wIK, wFoot: wIK, lean: 0,
+      solveLean: true };
+    const hand = (l, out) => pgFig(G, l, out);
+    // The hands.
+    if (kind === 'seat' || kind === 'seatA' || kind === 'nest') {
+      const gr = G.grips || [];
+      const pts = gr.filter((g) => g[1]).map((g) => hand(g[1], new THREE.Vector3()));
+      for (const v of pts) { if (v.z < 0) o.handL = v; else o.handR = v; }
+    } else if (kind === 'seesaw') {
+      const sg = G.mk.sg, info = H.info(G.i), z = sg * (info.HL - 0.22 - 0.32);
+      o.handL = hand([0, 0.26, z], new THREE.Vector3());
+      o.handR = hand([0, 0.26, z], new THREE.Vector3());
+      // The bar is across the beam: each hand to its own end of it.
+      o.handL.z = -0.15; o.handR.z = 0.15;
+    } else if (kind === 'rider') {
+      const yH = 0.80 - (H.info(G.i).COM);
+      o.handL = hand([-0.14, yH, -0.36], new THREE.Vector3());
+      o.handR = hand([0.14, yH, -0.36], new THREE.Vector3());
+      if (o.handL.z > 0) { const t = o.handL; o.handL = o.handR; o.handR = t; }
+    }
+    // The legs.
+    const hip = _pgP.set((_lmS.L.x + _lmS.R.x) / 2, (_lmS.L.y + _lmS.R.y) / 2, 0);
+    if (kind === 'seat' || kind === 'seatA' || kind === 'nest') {
+      const P = G.pumpPose || 0;            // −1 tucked … +1 out
+      if (Math.abs(P) > 0.02 && kind !== 'nest') {
+        const e = (P + 1) / 2;
+        const x = hip.x + 0.24 + 0.52 * e, y = hip.y - 0.44 + 0.30 * e;
+        o.footL = new THREE.Vector3(x, y, -0.10);
+        o.footR = new THREE.Vector3(x, y, 0.10);
+        o.lean = -0.22 * P;                 // back with her legs out, over them tucked
+        o.poleLeg = [1, 0.5, 0.1];
+      }
+    } else if (kind === 'seesaw') {
+      // Astride: knees out round the beam, feet forward — on the ground when
+      // her end is down, hanging when it is up.
+      const fx = hip.x + 0.30, fy = hip.y - 0.46;
+      o.footL = new THREE.Vector3(fx, fy, -0.25);
+      o.footR = new THREE.Vector3(fx, fy, 0.25);
+      o.poleLeg = [1, 0.15, 0.9];
+      o.lean = 0.10;
+    } else if (kind === 'rider') {
+      const fyL = 0.42 - H.info(G.i).COM;
+      o.footL = hand([-0.20, fyL, -0.02], new THREE.Vector3());
+      o.footR = hand([0.20, fyL, -0.02], new THREE.Vector3());
+      if (o.footL.z > 0) { const t = o.footL; o.footL = o.footR; o.footR = t; }
+      // Ankles over the rests, not the soles: the foot bone's head is 7 cm up.
+      o.footL.y += 0.07; o.footR.y += 0.07;
+      o.footL.x -= 0.08; o.footR.x -= 0.08;
+      o.poleLeg = [1, 0.3, 0.9];
+      o.lean = 0.25;
+    }
+    if (legsOnly) { o.handL = null; o.handR = null; o.solveLean = false; o.lean *= wIK; }
+    // Feet never into the ground: each target lifted to its ankle's height
+    // over the floor under it, as her figure stands now.
+    if (o.footL || o.footR) {
+      f.mesh.updateMatrixWorld();
+      for (const ft of [o.footL, o.footR]) {
+        if (!ft) continue;
+        _pgD.copy(ft).applyMatrix4(f.mesh.matrixWorld);
+        const yf = pgFloorAt(_pgD.x, _pgD.z, toWorld(...local(_pgD.x, _pgD.z))[1]) + 0.075;
+        if (_pgD.y < yf) {
+          _pgD.y = yf;
+          _pgM.copy(f.mesh.matrixWorld).invert();
+          ft.copy(_pgD.applyMatrix4(_pgM));
+        }
+      }
+    }
+    pgLimbs(f, o);
+    return st;
+  }
+
+  /** One frame of a seated thing: the drive, her face, her lines, the way off. */
+  function pgSeatRide(f, G, dt, d, pt, ps) {
+    const H = pgKit.her, kind = G.kind === 'swing' ? 'seat' : G.kind, st = H.state(G.i);
+    if (!st) return;
+    G.t += dt;
+    if (kind === 'seat' || kind === 'seatA' || kind === 'nest') {
+      // Pushed, she rides it; left alone, she pumps.
+      const pushed = st.pushedAgo < PGR.pushedFor;
+      const pump = G.stage === 'brake' ? 0 : pushed ? 0.25 : 1;
+      H.drive(G.i, { pump, brake: G.stage === 'brake' ? 1 : 0, top: G.top || 0.78 });
+      // Her legs with the swing: out on the way forward, tucked on the way
+      // back — the pump, which is a lean and a tuck before it is a force.
+      const p = pgKit.parts[G.i];
+      const n = p.sim.net, b = p.sim.body;
+      const Fw = qrot3(H.frame(G.i).Q, G.mk.Fb);
+      const v = n.V[3 * b] * Fw[0] + n.V[3 * b + 2] * Fw[2];
+      const want = G.stage === 'brake' ? -0.3 : pump > 0.5 ? clamp(v * 1.6, -1, 1) : 0.15;
+      G.pumpPose = damp(G.pumpPose || 0, want, 6, dt);
+      // A laugh and a line at a big swing.
+      if (st.peak > PGR.laughAt && (G.laughT || 0) <= 0 && show.clock - (G.laughAt || -99) > 5) {
+        G.laughAt = show.clock;
+        G.laughT = HAM_T.laughFor;
+        G.laughs++;
+        if (audio && audio.lickLaugh) audio.lickLaugh('baye', d);
+        if (G.laughs === 1 || Math.random() < 0.4) pgSay('high');
+      }
+    } else if (kind === 'seesaw') {
+      H.drive(G.i, { kick: G.stage === 'brake' ? 0 : 1 });
+      const sg = G.mk.sg, up = st.th * sg < -0.08;
+      if (up && !G.wasUp && Math.random() < 0.3) pgSay('up');
+      if (up && !G.wasUp && (G.ups = (G.ups || 0) + 1) && G.ups % 4 === 2 && audio && audio.lickLaugh
+        && (G.laughT || 0) <= 0) { G.laughT = HAM_T.laughFor; audio.lickLaugh('baye', d); }
+      G.wasUp = up;
+    } else if (kind === 'rider') {
+      H.drive(G.i, { rock: G.stage === 'brake' ? 0 : 1, brake: G.stage === 'brake' ? 1 : 0 });
+    }
+    // Her face: a smile with the motion, and the laugh.
+    if (f.face) {
+      f.face.smile = clamp(0.55 + Math.abs(st.peak || st.th || 0) * 0.8, 0, 1);
+      if (G.laughT > 0) {
+        const L = { laugh: G.laughT, t: G.t };
+        hamLaughFace(f, L, dt);
+        G.laughT = L.laugh;
+      }
+    }
+  }
+
+  // ── the bed ───────────────────────────────────────────────────────────
+  function pgBedPose(f, G, dt) {
+    const H = pgKit.her, st = H.state(G.i);
+    if (!st) return;
+    if (!armsNow(f)) return;
+    pgLegs(f);
+    const k = st.on ? st.knees : 0;
+    const o = { handL: null, handR: null, footL: null, footR: null, solveLean: false, lean: 0 };
+    // On the bed her feet stay on it while her hips come down by `knees`.
+    const T = G.trick, e = T ? Math.sin(Math.PI * clamp(T.t / T.dur, 0, 1)) : 0;
+    for (const sd of ['L', 'R']) {
+      const W = _lmW[sd], sg = sd === 'L' ? -1 : 1;
+      const ft = new THREE.Vector3(W.x, W.y + k, W.z);
+      if (T && T.kind === 'tuck') { ft.x += 0.16 * e; ft.y += 0.46 * e; }
+      if (T && T.kind === 'star') { ft.z += sg * 0.26 * e; ft.y += 0.06 * e; }
+      if (sd === 'L') o.footL = ft; else o.footR = ft;
+    }
+    o.poleLeg = [1, 0.1, 0.12];
+    o.lean = (k * 0.6) + (T && T.kind === 'tuck' ? 0.30 * e : 0);
+    // Her arms: up as she goes up, down as she lands; out for a star; round
+    // her shins for a tuck.
+    const A = armNow;
+    const up = clamp((st.air ? st.vy : 0) / 4, -0.2, 1) + (st.on ? -0.3 * k / 0.26 : 0);
+    for (const sd of ['L', 'R']) {
+      const S = A[sd].S, sg = sd === 'L' ? -1 : 1;
+      let h;
+      if (T && T.kind === 'star') h = new THREE.Vector3(S.x + 0.05, S.y + 0.33 * e - 0.25 * (1 - e), S.z + sg * (0.18 + 0.30 * e));
+      else if (T && T.kind === 'tuck') {
+        const ft = sd === 'L' ? o.footL : o.footR;
+        h = new THREE.Vector3(ft.x + 0.10, ft.y + 0.22, ft.z * 0.9);
+        h.lerpVectors(A[sd].W, h, e);
+      } else h = new THREE.Vector3(S.x + 0.12 + 0.10 * up, S.y - 0.42 + 0.30 * up, S.z + sg * 0.10);
+      if (sd === 'L') o.handL = h; else o.handR = h;
+    }
+    o.wHand = T ? 1 : 0.55;
+    o.poleArm = [-0.4, -0.8, 0.6];
+    pgLimbs(f, o);
+  }
+  function pgBedRide(f, G, dt, d) {
+    const H = pgKit.her, st = H.state(G.i);
+    if (!st) return;
+    G.t += dt;
+    if (!G.want) G.want = PGR.bedTop[0] + Math.random() * (PGR.bedTop[1] - PGR.bedTop[0]);
+    const want = G.stage === 'brake' ? 0 : G.want;
+    H.bed(G.i, want, G.stage !== 'brake' && st.on && st.phase === 'stand' && st.bounces === 0 && G.t > 0.4);
+    // Now and then a new height to go for.
+    if (G.stage !== 'brake' && Math.random() < dt / 9) G.want = PGR.bedTop[0] + Math.random() * (PGR.bedTop[1] - PGR.bedTop[0]);
+    // A trick at the top of a high one.
+    if (G.trick) {
+      G.trick.t += dt;
+      if (G.trick.t >= G.trick.dur || st.on) G.trick = null;
+    } else if (st.air && st.vy > 0 && st.vy < 2.4 && !G.trickDone && G.stage !== 'brake') {
+      G.trickDone = true;
+      if (st.apex > 0.25 && Math.random() < PGR.trickP) {
+        const kind = Math.random() < 0.5 ? 'tuck' : 'star';
+        G.trick = { kind, t: 0, dur: Math.min(0.62, 2 * st.vy / 12 + 0.25) };
+        G.tricks = (G.tricks || 0) + 1;
+      }
+    }
+    if (st.on) G.trickDone = false;
+    if (f.face) f.face.smile = clamp(0.6 + st.apex * 0.3, 0, 1);
+    if (st.air && st.apex > 1.1 && !G.highSaid) { G.highSaid = true; pgSay('tramp'); }
+    if (st.on) G.highSaid = false;
+  }
+
+  // ── the ladder and the slide ──────────────────────────────────────────
+  //
+  // Up the ladder a rung at a time (both feet to each, the way a grown woman
+  // goes up a child's ladder), across the deck, sat down at the mouth of
+  // the slide, and down it with the plastic's friction against the slope —
+  // `PGR.slideMu` under her, and gravity along the line — then off the end on
+  // to her feet. The line is the slide's own (`tower.curve`), the trough's
+  // bottom under it, so she sits IN it.
+  function pgLadder(G) {
+    const T = pgKit.her.slide(), L = T.ladder;
+    const rung = (k) => {
+      // k 0 the ground, 1-4 the rungs, 5 the deck.
+      if (k <= 0) return { u: L.foot - 0.05, h: 0 };
+      if (k >= 5) return { u: -T.R + 0.30, h: T.DECK + 0.03 };
+      const fk = L.rungs[k - 1];
+      return { u: L.foot + (L.top - L.foot) * fk, h: (L.rise) * fk + 0.018 };
+    };
+    return { T, L, rung };
+  }
+  function pgSlideAt(G, p, q) {
+    const { T, rung } = pgLadder(G);
+    const st = G.stage;
+    if (st === 'climb') {
+      const n = G.rung, u = clamp(G.ct / PGR.rungT, 0, 1);
+      // Up on the second half of each step: the foot goes first.
+      const e = clamp((u - 0.35) / 0.65, 0, 1), ee = e * e * (3 - 2 * e);
+      const a = rung(n), b = rung(n + 1);
+      const h = a.h + (b.h - a.h) * ee, uu = a.u + (b.u - a.u) * ee - (n + 1 >= 5 && ee > 0.5 ? 0 : PGR.back);
+      const w = T.fr.F(uu, 0, T.y + h);
+      p.set(w[0], w[1], w[2]);
+      q.setFromAxisAngle(_pgY.set(0, 1, 0), Math.atan2(-T.fr.U[2], T.fr.U[0]));
+      return true;
+    }
+    if (st === 'deck') {
+      const u = clamp(G.ct / 1.1, 0, 1), e = u * u * (3 - 2 * u);
+      const a = rung(5);
+      const w = T.fr.F(a.u + (0.18 - a.u) * e, -0.15 * e, T.y + T.DECK + 0.03);
+      p.set(w[0], w[1], w[2]);
+      q.setFromAxisAngle(_pgY.set(0, 1, 0), Math.atan2(-T.fr.U[2], T.fr.U[0]));
+      return true;
+    }
+    if (st === 'sitdown' || st === 'slide') {
+      const uc = st === 'slide' ? G.uc : 0.015;
+      const c = T.curve.getPointAt(uc), tg = T.curve.getTangentAt(uc);
+      _pgX.set(tg.x, tg.y, tg.z).normalize();
+      _pgZ.crossVectors(_pgX, _pgY.set(0, 1, 0)).normalize();
+      _pgY.crossVectors(_pgZ, _pgX).normalize();
+      _pgM.makeBasis(_pgX, _pgY, _pgZ);
+      q.setFromRotationMatrix(_pgM);
+      p.set(c.x, c.y, c.z).addScaledVector(_pgY, -T.trough);
+      p.sub(_pgC.copy(G.cf).applyQuaternion(q));
+      return true;
+    }
+    if (st === 'stand') {
+      pgStand(G.standAt[0], G.standAt[1], G.standAng, p, q);
+      return true;
+    }
+    return false;
+  }
+  function pgSlidePose(f, G, dt) {
+    const st = G.stage;
+    if (st === 'climb') {
+      if (!armsNow(f)) return;
+      pgLegs(f);
+      const { T, L, rung } = pgLadder(G);
+      const n = G.rung, u = clamp(G.ct / PGR.rungT, 0, 1);
+      const e = clamp((u - 0.35) / 0.65, 0, 1), ee = e * e * (3 - 2 * e);
+      const a = rung(n), b = rung(n + 1);
+      // Her place this frame (as `pgSlideAt` has it) to put world rungs in her figure.
+      f.mesh.updateMatrixWorld();
+      _pgM.copy(f.mesh.matrixWorld).invert();
+      const lead = n % 2 ? 'R' : 'L';
+      const fig = (uu, v, y) => { const w = T.fr.F(uu, v, y); return new THREE.Vector3(w[0], w[1], w[2]).applyMatrix4(_pgM); };
+      const o = { solveLean: false, lean: 0.08, poleLeg: [1, 0.1, 0.15], poleArm: [-0.3, -1, 0.5] };
+      for (const sd of ['L', 'R']) {
+        const v = sd === 'L' ? -0.11 : 0.11;
+        // The leading foot lifts to the next rung over the first part of the
+        // step; the other follows it up as her weight goes on.
+        let r;
+        if (sd === lead) {
+          const up = clamp(u / 0.4, 0, 1), eu = up * up * (3 - 2 * up);
+          r = { u: a.u + (b.u - a.u) * eu, h: a.h + (b.h - a.h) * eu + 0.08 * Math.sin(Math.PI * eu) };
+        } else {
+          r = ee < 0.8 ? a : { u: a.u + (b.u - a.u) * ((ee - 0.8) / 0.2), h: a.h + (b.h - a.h) * ((ee - 0.8) / 0.2) };
+        }
+        const ft = n + 1 >= 5 && sd !== lead && ee >= 1 ? fig(b.u, v, T.y + b.h + 0.075) : fig(r.u - 0.06, v, T.y + r.h + 0.075);
+        if (sd === 'L') o.footL = ft; else o.footR = ft;
+      }
+      // Her hands on the rails, a metre over her feet.
+      const hy = (a.h + (b.h - a.h) * ee) + 1.02;
+      const railU = (y) => {
+        const yr = y;
+        if (yr <= T.DECK + 0.02) return L.foot + (L.top - L.foot) * clamp(yr / (T.DECK + 0.12), 0, 1);
+        return L.top + 0.02 * clamp((yr - T.DECK) / 0.76, 0, 1);
+      };
+      for (const sd of ['L', 'R']) {
+        const v = sd === 'L' ? L.rails[0] : L.rails[1];
+        const hh = n + 1 >= 5 ? Math.min(hy, T.DECK + 0.78) : hy;
+        const h = fig(railU(hh) + 0.01, v * 0.92, T.y + hh);
+        if (sd === 'L') o.handL = h; else o.handR = h;
+      }
+      o.wHand = n + 1 >= 5 ? 1 - ee : 1;
+      o.wFoot = 1;
+      pgLimbs(f, o);
+      return;
+    }
+    if (st === 'slide' || st === 'sitdown') {
+      if (!armsNow(f)) return;
+      pgLegs(f);
+      // Hands up for the fast part — "wheee".
+      const up = st === 'slide' ? clamp((G.v - 1.6) / 1.2, 0, 1) : 0;
+      G.handsUp = damp(G.handsUp || 0, up, 5, dt);
+      const o = { solveLean: false, lean: -0.05, wHand: G.handsUp, wFoot: 0 };
+      if (G.handsUp > 0.02) {
+        const A = armNow;
+        o.handL = new THREE.Vector3(A.L.S.x + 0.10, A.L.S.y + 0.38, A.L.S.z - 0.16);
+        o.handR = new THREE.Vector3(A.R.S.x + 0.10, A.R.S.y + 0.38, A.R.S.z + 0.16);
+        o.poleArm = [-0.2, 0.1, 1];
+      }
+      pgLimbs(f, o);
+      return;
+    }
+    if (G.aims) pgAimsOff(f);
+  }
+  function pgSlideRide(f, G, dt, d, go) {
+    const S = f.state;
+    const { T } = pgLadder(G);
+    G.ct = (G.ct || 0) + dt;
+    if (G.stage === 'climb') {
+      if (G.ct >= PGR.rungT) {
+        G.ct = 0; G.rung++;
+        if (G.rung >= 5) {
+          G.stage = 'deck';
+          go('pgRide', 'walk', 0.30);
+          S.speed = 0.75;
+        }
+      }
+      return;
+    }
+    if (G.stage === 'deck') {
+      if (G.ct >= 1.1) {
+        // Sat down at the mouth: from standing into `sitHeld`, blended into
+        // the slide's own frame.
+        G.stage = 'sitdown'; G.ct = 0;
+        pgBlendFrom(G, f, 0.75);
+        f.play('sitHeld', { fade: 0.70 });
+        S.speed = 1;
+        // SIT's own hips over the floor until the clip is there to measure.
+        G.cf = new THREE.Vector3(0.015, 0.0, 0);
+        G.cfMeasured = false;
+        pgSay('slide');
+      }
+      return;
+    }
+    if (G.stage === 'sitdown') {
+      // Measured on the clip itself, once it is the one drawn.
+      if (S.cur && S.cur.name === 'sitHeld' && !S.prev && !G.cfMeasured && armsNow(f)) {
+        G.cf = pgContact(f, 'sitHeld'); G.cfMeasured = true;
+      }
+      if (G.ct >= 0.8) { G.stage = 'slide'; G.ct = 0; G.uc = 0.015; G.v = PGR.slideV0; G.vMax = 0; }
+      return;
+    }
+    if (G.stage === 'slide') {
+      // Along the line: gravity's share down the slope, less the plastic's.
+      const L = G.len || (G.len = T.curve.getLength());
+      const tg = T.curve.getTangentAt(G.uc);
+      const sn = -tg.y, cs = Math.sqrt(Math.max(0, 1 - sn * sn));
+      const a = 9.81 * (sn - PGR.slideMu * cs) - 0.08 * G.v * G.v;
+      G.v = Math.max(0.35, G.v + a * dt);
+      G.vMax = Math.max(G.vMax, G.v);
+      G.uc = Math.min(1, G.uc + G.v * dt / L);
+      if (G.v > 2.0 && !G.wheeSaid) {
+        G.wheeSaid = true;
+        if (audio && audio.lickLaugh) audio.lickLaugh('baye', d);
+        G.laughT = HAM_T.laughFor;
+        pgSay('whee', true);
+      }
+      if (G.laughT > 0 && f.face) { const Lf = { laugh: G.laughT, t: G.ct }; hamLaughFace(f, Lf, dt); G.laughT = Lf.laugh; }
+      if (G.uc >= PGR.slideEnd) {
+        // Off the end and on to her feet: the seat clip's stand reversed,
+        // from where she has come to rest over the run-out.
+        const c = T.curve.getPointAt(PGR.slideEnd), tg2 = T.curve.getTangentAt(PGR.slideEnd);
+        const fl = Math.hypot(tg2.x, tg2.z) || 1;
+        const fx = tg2.x / fl, fz = tg2.z / fl;
+        const at = local(c.x + fx * 0.62, c.z + fz * 0.62);
+        G.standAt = at; G.standAng = angOf(at[0], fx, fz);
+        G.stage = 'stand'; G.ct = 0;
+        pgBlendFrom(G, f, 0.85);
+        f.play('hamIn', { fade: 0.30, from: PGR.sitT - 0.30 });
+        S.speed = 1;
+        G.rise = 0;
+      }
+      return;
+    }
+    if (G.stage === 'stand') {
+      // The legs come down for 0.3 s (the fade on to the seat key), then up
+      // off the seat: hamIn backwards.
+      if (G.ct > 0.32 && !S.prev) S.speed = -1;
+      else if (S.cur && S.cur.name === 'hamIn' && S.curT >= PGR.sitT) { S.curT = PGR.sitT; S.speed = S.prev ? 1 : 0; }
+      if (G.aims) pgAimsOff(f);
+      if (S.cur && S.cur.name === 'hamIn' && S.curT <= 0.02 && G.ct > 0.5) {
+        S.speed = 1;
+        show.t = G.standAt[0]; show.s = G.standAt[1]; show.ang = show.want = G.standAng;
+        pgDone(go);
+      }
+    }
+  }
+
+  /**
+   * The seat key held: `hamIn` pinned on HAM_SIT. While a fade into it is
+   * still going its clock runs (a held clock holds the fade with it) and is
+   * pinned only once it has arrived.
+   */
+  function pgHold(S) {
+    if (!S.cur || S.cur.name !== 'hamIn') return;
+    if (S.curT >= PGR.sitT - 1e-4) {
+      S.curT = PGR.sitT;
+      S.speed = S.prev ? 1 : 0;
+    } else S.speed = 1;
+  }
+  /** On to it from her mark: the sit, the hop, the step, the first rung. */
+  function pgOnStart(f, G, go) {
+    const S = f.state;
+    G.t = 0;
+    if (G.kind === 'tramp') { G.stage = 'step'; go('pgOn', 'idle', 0.25); return; }
+    if (G.kind === 'slide') {
+      G.stage = 'climb'; G.rung = 0; G.ct = 0;
+      pgBlendFrom(G, f, 0.30);
+      go('pgOn', 'idle', 0.25);
+      return;
+    }
+    // Sat on the edge she has her back to: HAM_SIT's own contact until the
+    // clip is there to measure (`pgSeated` measures it).
+    G.cf = new THREE.Vector3(PGR.cfSit[0], PGR.cfSit[1], PGR.cfSit[2]);
+    if (G.kind === 'rider') {
+      // Up on to a horse 0.8 m high is a hop astride, not a sit: straight
+      // into the held seat key, carried over on to the saddle.
+      go('pgRide', null);
+      // The clock runs through the fade (a held clock holds the fade too)
+      // and arrives on the seat key as the fade does.
+      f.play('hamIn', { fade: 0.55, from: PGR.sitT - 0.55 });
+      S.speed = 1;
+      pgSeated(G, f, true);
+      G.stage = 'sit';
+      pgBlendFrom(G, f, 0.60);
+      G.arc = 0.12;
+      pgSay('rider');
+      return;
+    }
+    G.stage = 'sitdown';
+    go('pgOn', 'hamIn', 0.25);
+  }
+  /** Off: feet down and still first (`brake`), then up. */
+  function pgOffStart(f, G, go) {
+    G.t = 0;
+    if (G.kind === 'slide') { go('pgOff', null); return; }
+    G.stage = 'brake';
+    go('pgOff', null);
+    if (G.kind !== 'tramp') pgHold(f.state);
+  }
+  /** Her limbs for the stage she is at — every frame on the kit, after the placement. */
+  function pgPose(f, dt) {
+    const G = show.pg;
+    if (!G || !pgKit) return;
+    const ph = show.phase, st = G.stage, S = f.state;
+    if (G.kind === 'tramp') {
+      if ((ph === 'pgRide' || ph === 'pgOff') && pgKit.her.state(G.i)) pgBedPose(f, G, dt);
+      return;
+    }
+    if (G.kind === 'slide') { if (PG_ON[ph]) pgSlidePose(f, G, dt); return; }
+    if (ph === 'pgOn' && st === 'sitdown') {
+      // Sitting down astride the beam: her feet out round it as she goes down.
+      const u = S.cur && S.cur.name === 'hamIn' ? clamp(S.curT / PGR.sitT, 0, 1) : 0;
+      if (G.kind === 'seesaw') pgSeatPose(f, G, dt, u * u * (3 - 2 * u), true);
+      else if (G.aims) pgAimsOff(f);
+      return;
+    }
+    if (st === 'sit' || st === 'ride' || st === 'brake') {
+      pgHold(S);
+      const w = clamp((G.ridT || 0) / 0.5, 0, 1);
+      pgSeatPose(f, G, dt, ph === 'pgOff' ? 1 : w * w * (3 - 2 * w));
+      return;
+    }
+    if (G.aims) pgAimsOff(f);
+  }
+
   const _mfr = new THREE.Frustum(), _mmx = new THREE.Matrix4(), _msp = new THREE.Sphere();
 
   /**
@@ -56883,6 +57939,12 @@ async function buildJadrija(scene) {
      * see MEET.
      */
     grounds: 1,
+    /**
+     * AND ON THE KIT THERE (1.562.0): "get on the swing", "seesaw",
+     * "jump on the trampoline", "go down the slide", "ride the horse", and
+     * "get off". See `── THE PLAYGROUND KIT, RIDDEN ──`.
+     */
+    pg: 1, 'pg.off': 1,
     // AND THE POSE SHE ALREADY HAD AND NOTHING COULD ASK FOR.
     //
     // Misha, 17 Sep 2026: *"i tell her to get down on her knees, and eventho
@@ -57296,6 +58358,24 @@ async function buildJadrija(scene) {
       // her, which is the answer; tied to the cot she is going nowhere.
       if (leash.on && !leash.offing) return leash.mode === 'cot' ? 'cotleashed' : 'leadher';
       if (show.phase === 'swim' || (show.dip || 0) > 0) return 'swimming';
+      return null;
+    }
+    if (name.startsWith('pg:')) {
+      // THE PLAYGROUND'S KIT (1.562.0). On the leash the way there is you;
+      // tied to the cot she is going nowhere; not from the sea.
+      if (!pgKit || !pgKit.her) return 'nopg';
+      const kind = name.slice(3);
+      if (!PG_KINDS[kind]) return 'nopg';
+      if (leash.on && !leash.offing) return leash.mode === 'cot' ? 'cotleashed' : 'leadher';
+      if (show.phase === 'swim' || (show.dip || 0) > 0) return 'swimming';
+      if (show.pg && show.pg.kind === kind && PG_PH[show.phase] && show.phase !== 'pgOff') return 'pgon';
+      if (kind !== 'slide' && pgKit.her.find(kind, ...toWorld(show.t, show.s).filter((_, k) => k !== 1)) < 0
+        && !(show.pg && PG_PH[show.phase])) return 'pgbusy';
+      return null;
+    }
+    if (name === 'pg.off') {
+      if (!show.pg || !PG_PH[show.phase]) return 'notpg';
+      if (show.phase === 'pgOff') return 'pgoff';
       return null;
     }
     if (name === 'hammock.out') {
@@ -58312,9 +59392,14 @@ async function buildJadrija(scene) {
       // authored to carry her a fixed distance and neither has a standing
       // version to fall back to.
       if (clip) show.gait = clip === 'walk' || clip === 'crawl' ? clip : null;
+      // On the playground's kit her clip is the kit's, never the gait's —
+      // the gait's tail would play a walk under a woman on a swing (1.562.0).
+      if (PG_ON[phase]) show.gait = null;
       show.stall = 0;
       // The lane's own life, and the room's: off-her-lane is over (see SPOT).
       if (phase === 'play' || phase === 'home' || KABIN[phase]) show.here = null;
+      // Off the playground's kit by any road at all: out of its net (1.562.0).
+      if (show.pg && !PG_PH[phase]) pgRelease();
       // A heading to face at a mark is `stepTo`'s alone — see `hereRoom`.
       if (phase !== 'stepTo') { show.goFace = null; show.atMark = 0; }
       show.phase = phase;
@@ -58513,7 +59598,7 @@ async function buildJadrija(scene) {
     const full = her ? SHOW.soakIn : SHOW.soakFor;
     if (show.soak < full) {
       show.soak = clamp(show.soak + (show.hit > 0 ? dt : -dt * 0.12), 0, full);
-    } else if (!HELD[show.phase]) {
+    } else if (!HELD[show.phase] && !PG_PH[show.phase]) {
       show.soak = 0;
       show.queue.length = 0;
       show.side = 0;
@@ -58816,6 +59901,9 @@ async function buildJadrija(scene) {
       // Out at the grounds, and anywhere else off her lane, only what she
       // does where she stands — `hereOk`, below.
       && (!MEET_PH[show.phase] || HAM_KEEP[show.ask])
+      // On the playground's kit, likewise: her face and your hand, and
+      // anything else is `pgRide`'s to get her off for (1.562.0).
+      && (!PG_PH[show.phase] || HAM_KEEP[show.ask])
       && !HERE_FROM[show.phase];
     // AND OUT AT THE GROUNDS (1.555.2): asked to go there again from on the
     // way back from the hammock or from the grounds themselves, she goes.
@@ -58842,7 +59930,7 @@ async function buildJadrija(scene) {
       // taken off her lane keeps the kind she already had (`here`), or takes
       // the one the phase means; a place gone to from here ends it.
       const hereWas = show.here || null;
-      if (hereOk && HERE_GO[name]) show.here = null;
+      if (hereOk && hereGo(name)) show.here = null;
       else if (hereOk && SPOT[name.split(':')[0]] && offLane()) {
         show.queue.length = 0;
         show.away = 0;          // she has stopped — see `hereStand`
@@ -59484,6 +60572,15 @@ async function buildJadrija(scene) {
           show.leg = 0; show.byAsk = 1; show.queue.length = 0;
           go('leave', 'walk', 0.34);
         } else if (!meetGo(pt, ps, go)) show.did = null;
+      } else if (name.startsWith('pg:')) {
+        // ON THE PLAYGROUND'S KIT (1.562.0) — see `── THE PLAYGROUND KIT,
+        // RIDDEN ──`. There now; out of the kabina by its door first; or, you
+        // at the grounds and she far off, brought round by MEET and on to it.
+        showSay('trill', d);
+        if (!pgAsk(name, go, pt, ps)) show.did = null;
+      } else if (name === 'pg.off') {
+        // Answered in `pgRide`, which is where she is when it means anything.
+        show.did = null;
       } else if (name === 'hammock.out') {
         // Answered in `hamHeld`, which is where she is when it means anything.
         show.did = null;
@@ -60770,7 +61867,8 @@ async function buildJadrija(scene) {
           if (show.leg >= 1) {
             show.leg = 0;
             // Out of the door on her way to the playground — see MEET.
-            if (!(show.meet && meetGo(pt, ps, go))) { show.meet = null; go('home', 'walk', 0.30); }
+            // ...or straight on to the playground's kit (1.562.0, `pgWant`).
+            if (show.pgWant && pgStart(show.pgWant, go, pt, ps)) { /* on its way */ } else if (!(show.meet && meetGo(pt, ps, go))) { show.meet = null; go('home', 'walk', 0.30); }
           } else show.leg++;
         }
         break;
@@ -61432,7 +62530,7 @@ async function buildJadrija(scene) {
         const later = !!(H.hair && show.ask && HAM_IN[show.ask.split(':')[0]]);
         if (!H.why && !later) {
           H.why = out ? 'out' : !show.ask ? null
-            : SPOT[show.ask.split(':')[0]] ? 'spot' : HERE_GO[show.ask] ? 'go' : null;
+            : SPOT[show.ask.split(':')[0]] ? 'spot' : hereGo(show.ask) ? 'go' : null;
         }
         // OUT OVER THE RIM — see HAM_RAG. Her pelvis clear of the cloth for
         // `fellFor` s and she has gone: the ragdoll takes her to the ground.
@@ -61550,6 +62648,203 @@ async function buildJadrija(scene) {
         break;
       }
 
+      // ── THE PLAYGROUND KIT (1.562.0) ────────────────────────────────────
+      //
+      // See `── THE PLAYGROUND KIT, RIDDEN ──`. There along the way the
+      // search found (`pgGo`); the last steps straight on to her mark, into
+      // the kit's own collider if that is where it is, and round (`pgTurn`);
+      // on (`pgOn`); riding it (`pgRide`); and off (`pgOff`).
+      case 'pgGo': {
+        const j = show.job, G = show.pg;
+        if (!j || !j.legs || !G || !pgKit) { pgRelease(); show.job = null; hereStand('stay', go); break; }
+        if (show.ask && !HAM_KEEP[show.ask]) {
+          const a = show.ask;
+          if (a === 'pg.off') { show.ask = null; show.did = a; pgDone(go); break; }
+          if (a.startsWith('pg:')) {
+            show.ask = null; show.did = a;
+            pgRelease();
+            if (!pgStart(a, go, pt, ps)) hereStand('stay', go);
+            break;
+          }
+          // Anything else on the way: the kit is let go and it is done where
+          // she stands, or home first for what needs her lane.
+          pgRelease(); show.job = null;
+          if (offLane() && hereTakes(a)) hereStand('stay', go); else meetHome(go);
+          break;
+        }
+        j.since += dt;
+        const r = routeStep(j, dt, SHOW.walk * MEET.pace);
+        const last = j.leg >= j.legs.length - 1;
+        if (!last && r.dist < r.adv) { j.leg++; j.best = null; j.stall = 0; break; }
+        if (last && r.dist < 0.30) { show.job = null; G.t = 0; go('pgTurn', 'walk', 0.30); break; }
+        if (r.dist < (j.best == null ? 1e9 : j.best) - 0.2) { j.best = r.dist; j.stall = 0; } else j.stall += dt;
+        if (j.stall > HAM_T.stall) {
+          const end = j.legs[j.legs.length - 1];
+          const again = j.replan < 3 ? hamPath(show.t, show.s, end[0], end[1]) : null;
+          if (again) { j.legs = again; j.leg = 0; j.best = null; j.stall = 0; j.replan++; } else {
+            show.stuck = 'pg'; pgRelease(); show.job = null; hereStand('stay', go);
+          }
+        }
+        break;
+      }
+
+      case 'pgTurn': {
+        const G = show.pg;
+        if (!G || !pgKit) { pgRelease(); hereStand('stay', go); break; }
+        G.t += dt;
+        const mk = G.mk;
+        // Where she gets on may have moved under her — a seesaw that went over,
+        // a seat somebody pushed — so the mark is asked again as she arrives.
+        if (G.t < dt * 1.5 && G.kind !== 'slide') {
+          const m2 = pgMark(G.kind, G.i, pt, ps);
+          G.mk = m2;
+        }
+        const gap = Math.hypot(show.t - G.mk.at[0], show.s - G.mk.at[1]);
+        if (gap > 0.30 && G.t < PGR.turnFor) {
+          // The last pace, walked, straight: not `showTo`, whose `showClear`
+          // keeps her out of colliders — the seesaw's mark is inside its own.
+          show.want = Math.atan2(G.mk.at[1] - show.s, G.mk.at[0] - show.t);
+          const v = Math.min(SHOW.walk * 0.7, Math.max(0.45, gap * 1.8));
+          const e = wrapPi(show.want - show.ang);
+          if (Math.abs(e) < 0.9) {
+            show.t += Math.cos(show.want) * v * dt;
+            show.s += Math.sin(show.want) * v * dt;
+          }
+          S.speed = clamp(v / SHOW.walk, 0.55, 1.2);
+          break;
+        }
+        if (S.cur && S.cur.name !== 'idle' && !G.idled) { G.idled = 1; f.play('idle', { fade: 0.30 }); }
+        show.vel = 0;
+        showSettle(G.mk.at, dt, 6);
+        show.want = G.mk.ang;
+        const e = wrapPi(G.mk.ang - show.ang);
+        if ((Math.abs(e) < 0.06 && gap < 0.04) || G.t > PGR.turnFor + 1.2) {
+          show.t = G.mk.at[0]; show.s = G.mk.at[1];
+          show.ang += e; show.want = show.ang; show.rate = 0;
+          G.t = 0;
+          pgOnStart(f, G, go);
+        }
+        break;
+      }
+
+      case 'pgOn': {
+        const G = show.pg;
+        if (!G || !pgKit) { pgRelease(); hereStand('stay', go); break; }
+        G.t += dt;
+        show.vel = 0;
+        if (G.kind === 'tramp') {
+          // Stepped on to the middle of the bed, and she is the bed's.
+          pgKit.her.on(G.i, {});
+          G.stage = 'ride';
+          go('pgRide', null);
+          pgSay('tramp');
+          break;
+        }
+        if (G.kind === 'slide') { go('pgRide', 'idle', 0.25); break; }
+        if (G.stage === 'sitdown') {
+          // Sitting down: `hamIn` to its HAM_SIT key and held there.
+          pgHold(S);
+          if (G.t >= PGR.sitT + 0.05 && S.cur && S.cur.name === 'hamIn') {
+            pgHold(S);
+            pgSeated(G, f);
+            G.stage = 'sit';
+            pgBlendFrom(G, f, 0.35);
+            G.t = 0;
+            go('pgRide', null);
+            pgHold(S);
+            pgSay(G.kind === 'seesaw' ? 'seesaw' : G.kind === 'rider' ? 'rider' : 'swing');
+          }
+        }
+        break;
+      }
+
+      case 'pgRide': {
+        const G = show.pg;
+        if (!G || !pgKit) { pgRelease(); hereStand('stay', go); break; }
+        show.vel = 0;
+        // ASKED SOMETHING: getting off is the way to anything that is not
+        // her face or your hand; another piece of the kit is off this one
+        // and on to it. Getting off itself is `pgOff`.
+        if (show.ask && !HAM_KEEP[show.ask]) {
+          const a = show.ask;
+          if (a === 'pg.off') { show.ask = null; show.did = a; }
+          else if (a.startsWith('pg:')) { show.ask = null; show.did = a; G.next = a; }
+          // Anything else stays asked, and is taken once she is off.
+          pgOffStart(f, G, go);
+          break;
+        }
+        // Had enough, of her own accord — or you have gone.
+        G.alone = withYou ? 0 : (G.alone || 0) + dt;
+        G.ridT = (G.ridT || 0) + dt;
+        if (G.kind !== 'slide' && (G.ridT > G.stay || G.alone > 25)) {
+          if (Math.random() < 0.5) pgSay('off');
+          pgOffStart(f, G, go);
+          break;
+        }
+        if (G.kind === 'tramp') { pgBedRide(f, G, dt, d); break; }
+        if (G.kind === 'slide') { pgSlideRide(f, G, dt, d, go); break; }
+        pgHold(S);
+        pgSeatRide(f, G, dt, d, pt, ps);
+        break;
+      }
+
+      case 'pgOff': {
+        const G = show.pg;
+        if (!G || !pgKit) { pgRelease(); hereStand('stay', go); break; }
+        G.t += dt;
+        show.vel = 0;
+        if (G.kind === 'tramp') {
+          pgBedRide(f, G, dt, d);
+          const st = pgKit.her.state(G.i);
+          // Let it die away, and step off once the bed is still under her.
+          if (!st || st.still || G.t > 6) {
+            const fr = pgKit.her.frame(G.i);
+            pgKit.her.off(G.i);
+            const [t2, s2] = local(fr.P[0], fr.P[2]);
+            show.t = t2; show.s = s2;
+            pgDone(go);
+          }
+          break;
+        }
+        if (G.kind === 'slide') { pgSlideRide(f, G, dt, d, go); break; }
+        const st = pgKit.her.state(G.i);
+        if (G.stage === 'brake') {
+          // Feet down and it stops: a swing scuffed still, the seesaw left
+          // to come down on her end, the rider let go of.
+          pgSeatRide(f, G, dt, d, pt, ps);
+          const sg = G.mk.sg || 1;
+          const still = !st || (G.kind === 'seesaw' ? st.th * sg > 0.10 : Math.abs(st.th) < 0.10 && st.peak < 0.16);
+          if (still || G.t > 5) {
+            // Up off it: out of the net, level on the floor where her figure
+            // stands, and the sit played backwards.
+            f.mesh.updateMatrixWorld();
+            _pgA.set(G.cf.x, 0, 0).applyMatrix4(f.mesh.matrixWorld);
+            _pgB.set(0, 0, 0).applyMatrix4(f.mesh.matrixWorld);
+            _pgX.set(1, 0, 0).applyQuaternion(f.mesh.quaternion);
+            const at2 = G.kind === 'rider' ? G.mk.at : local(_pgB.x, _pgB.z);
+            G.standAt = at2;
+            G.standAng = G.kind === 'rider' ? G.mk.ang : angOf(at2[0], _pgX.x, _pgX.z);
+            pgKit.her.off(G.i);
+            G.stage = G.kind === 'rider' ? 'hop' : 'stand';
+            G.t = 0;
+            pgBlendFrom(G, f, G.kind === 'rider' ? 0.6 : 0.4);
+            if (G.kind === 'rider') { G.arc = 0.12; f.play('idle', { fade: 0.55 }); S.speed = 1; }
+            else S.speed = -1;
+          }
+          break;
+        }
+        if (G.stage === 'stand' || G.stage === 'hop') {
+          if (G.aims) pgAimsOff(f);
+          const up = G.stage === 'hop' ? G.t > 0.65 : (S.cur && S.cur.name === 'hamIn' && S.curT <= 0.02);
+          if (up || G.t > 2.5) {
+            S.speed = 1;
+            show.t = G.standAt[0]; show.s = G.standAt[1]; show.ang = show.want = G.standAng;
+            pgDone(go);
+          }
+        }
+        break;
+      }
+
       // ── TO THE PLAYGROUND ───────────────────────────────────────────────
       //
       // See MEET, over `meetSeen`. Along the legs `hamPath` found; brought
@@ -61602,6 +62897,12 @@ async function buildJadrija(scene) {
         const M = show.meet;
         if (!M) { meetHome(go); break; }
         M.t += dt;
+        // Brought to the grounds for the kit (1.562.0): on to it now.
+        if (show.pgWant && !show.ask) {
+          const n = show.pgWant;
+          show.pgWant = null;
+          if (pgStart(n, go, pt, ps)) break;
+        }
         // Anything asked that is not done where she stands (SPOT — taken by
         // the dispatch, before this) or gone to from here (HERE_GO): home to
         // her lane, and done there (the ask stays armed). Which is now only
@@ -62746,6 +64047,9 @@ async function buildJadrija(scene) {
     f.mesh.updateMatrixWorld();
     // AND IN THE HAMMOCK SHE IS WHERE HER BODY IS — see `hamPlace`.
     if (hammock && HAM_SIM[show.phase]) hamPlace(f, dt);
+    // AND ON THE PLAYGROUND'S KIT SHE IS WHERE IT HAS HER — see `pgPlace`.
+    if (show.pg && PG_ON[show.phase]) pgPlace(f, dt);
+    if (show.pg && PG_PH[show.phase]) pgPose(f, dt);
     // And up off the ground where she fell — see `hamUpStart`.
     if (show.phase === 'hamUp' && show.ham && show.ham.up) hamUpPlace(f);
 
@@ -77763,7 +79067,10 @@ async function buildJadrija(scene) {
       }
       const w = toWorld(show.t, show.s);
       return {
-        her: show.phase, soak_s: +show.soak.toFixed(1), wet: +show.wet.toFixed(2),
+        // On the playground's kit, the piece she is on (1.562.0): `pgswing`,
+        // `pgseesaw` … — SHORE_DOING in server/baye/baye.py, ten characters.
+        her: show.pg && show.phase === 'pgRide' ? 'pg' + show.pg.kind : show.phase,
+        soak_s: +show.soak.toFixed(1), wet: +show.wet.toFixed(2),
         hosed_now: show.hit > 0, burning: show.burn > 0, turned: !!show.turned,
         with_you: !!show.withYou, crowd, company,
         dog: !!(dog && Math.hypot(dog.at[0] - show.t, dog.at[1] - show.s) < 12),
@@ -77973,8 +79280,15 @@ async function buildJadrija(scene) {
       // her back; so there it is the way out, and not a get-up asked again
       // once she is already standing.
       const road = askRoad(rawName);
-      const name = road === 'rise' && show && HAM[show.phase] && show.phase !== 'hamGo'
+      let name = road === 'rise' && show && HAM[show.phase] && show.phase !== 'hamGo'
         ? 'hammock.out' : road;
+      // AND ON THE KIT, "get up" and "get out" are "get off"; and at the
+      // playground "the trampoline" is the one in front of her, not the
+      // beach's (1.562.0).
+      if (show && show.pg && PG_PH[show.phase] && (name === 'rise' || name === 'hammock.out')) name = 'pg.off';
+      if (name === 'tramp' && show && (pgNear(show.t, show.s) || (show.pt != null && pgNear(show.pt, show.ps)))) {
+        name = 'pg:tramp';
+      }
       // THE FLAVOUR RIDES ON THE NAME — see `fetch.cream` in SHE_CAN. The
       // table is checked against the base, so one entry covers every tray in
       // the case and nothing downstream has to learn a second argument.
@@ -78021,10 +79335,38 @@ async function buildJadrija(scene) {
         mouthW: +(show.mouthW || 0).toFixed(3), downAt: +(show.downAt || 0).toFixed(3),
         hair: hairFall ? 'down' : 'up', hit: show.hit || 0, chest: show.autoChest || 0,
         leash: leash.on ? { clipped: !!leash.clipped, mode: leash.mode, pose: leash.pose, offing: !!leash.offing } : null,
-        hamSwing: hammock && hammock.api && HAM[p] ? hammock.api.swing() : null };
+        hamSwing: hammock && hammock.api && HAM[p] ? hammock.api.swing() : null,
+        // The playground's kit (1.562.0): on it, and near enough to get on.
+        pg: show.pg && PG_PH[p] ? { kind: show.pg.kind, stage: show.pg.stage, t: show.pg.ridT || 0 } : null,
+        atPlay: pgNear(show.t, show.s) };
     },
     /** Whether she could be asked for `name` now — `askWhy`, null when she could. */
     autoWhy: (name) => (show ? askWhy(name) : 'gone'),
+    /** The playground's kit (src/46-playground.js), handed in by 90-app.js (1.562.0). */
+    setPlayground: (pg) => { pgKit = pg || null; return !!pgKit; },
+    /** After the kit has stepped: her drawn where the seat now is — see `pgAfter`. */
+    pgAfter: () => pgAfter(),
+    /** Debug (1.562.0): her skin against the seat she is on — see `pgClip`. */
+    pgClip: () => pgClip(),
+    /** Near enough to the kit for "the trampoline" to mean the playground's. */
+    pgNear: (t, s) => (!show ? false : t != null ? pgNear(t, s)
+      : pgNear(show.t, show.s) || (show.pt != null && pgNear(show.pt, show.ps))),
+    /**
+     * Debug (1.562.0): her on the kit — the piece, the stage, the drive, and
+     * what the kit's net says (`her.state`); `put(kind)` sends her there.
+     */
+    pg: () => {
+      if (!show) return null;
+      const G = show.pg;
+      return { phase: show.phase, pgWant: show.pgWant || null,
+        pg: G ? { kind: G.kind, i: G.i, stage: G.stage, t: +(G.t || 0).toFixed(2), ridT: +(G.ridT || 0).toFixed(2),
+          laughs: G.laughs || 0, tricks: G.tricks || 0, rung: G.rung, uc: G.uc != null ? +G.uc.toFixed(3) : null,
+          v: G.v != null ? +G.v.toFixed(2) : null, vMax: G.vMax != null ? +G.vMax.toFixed(2) : null,
+          mk: G.mk ? { at: G.mk.at.map((v) => +v.toFixed(2)), ang: +G.mk.ang.toFixed(3), sg: G.mk.sg, face: G.mk.face } : null,
+          cf: G.cf ? [+G.cf.x.toFixed(3), +G.cf.y.toFixed(3), +G.cf.z.toFixed(3)] : null,
+          kit: pgKit && G.i >= 0 ? pgKit.her.state(G.i) : null } : null,
+        at: [+show.t.toFixed(2), +show.s.toFixed(2)] };
+    },
     /**
      * THE ROLE SWAP's hold on her `dwell` (1.561.0, src/49-reverse.js):
      * `{ x, z, yaw, sp }` each frame while the player walks her, null to give
