@@ -4038,6 +4038,8 @@ const HELP = [
     ['SHIFT + 7 · “spoon me”', 'help.k.revspoon'],
     // Her fist in your hair (1.574.0).
     ['. · ,', 'help.k.revhair'],
+    // Walked round the room by it (1.584.0).
+    ['SHIFT + . · “drag me”', 'help.k.revdrag'],
     // Begging her, and her mood (1.583.0).
     ['“spank me” · “harder”', 'help.k.revbeg'],
     ['O', 'help.k.pc'],

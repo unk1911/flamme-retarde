@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.70.0"
+VERSION = "1.71.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4679,6 +4679,20 @@ CHLOE_BEAT = {
     "soften": "they have started doing everything you say, so well, and you "
               "are cooling off and getting gentler with them. A short, warm, "
               "pleased line",
+    # 1.71.0 (page 1.584.0, src/49-revwalk.js): the hair drag. Your fist in
+    # their hair, walking them round the kabina at your side. Consensual
+    # play between the two of them; the safeword ends it at once. Nothing
+    # sexual: no touching beyond your hand in their hair.
+    "hair_drag": "you have just taken a fistful of their hair and are setting "
+                 "off round the room with them at your side, leading them by "
+                 "it. A short, in-charge line that tells them to walk with you",
+    "drag_yank": "you are walking them round the room by their hair and they "
+                 "lagged behind, so you just gave it a yank to keep them up "
+                 "with you. A short line about keeping up",
+    "drag_walk": "you are walking them round the room by their hair, turning "
+                 "a corner with them. A short, teasing line on the way",
+    "drag_done": "you have just let go of their hair after walking them round "
+                 "the room by it. One short line as you let them go",
 }
 # What they begged for (1.70.0, page 1.583.0): the page's `rev_beg`.
 REV_BEG = {
@@ -4688,6 +4702,7 @@ REV_BEG = {
     "discipline": "discipline them, punish them",
     "hair": "pull their hair",
     "collar": "pull them by their collar",
+    "drag": "drag them round the room by their hair",
 }
 # Her mood (1.70.0, page 1.583.0): the page's `rev_mood`, and the tone it is.
 REV_MOOD = {
@@ -4711,6 +4726,9 @@ REV_HAIR = {
             "side, holding on to your leg, your hand in their hair",
     "look": "they are kneeling at your side and you are holding their head "
             "tipped back by the hair so they look up at you",
+    # 1.71.0 (page 1.584.0): walking them round the room by it.
+    "drag": "your fist is in their hair and you are walking them round the "
+            "room at your side by it, their head held down toward your hand",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
 TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense", "wand": "the wand"}

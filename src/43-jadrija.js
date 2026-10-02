@@ -48260,7 +48260,13 @@ async function buildJadrija(scene) {
     eye: new THREE.Vector3(), T: new THREE.Vector3(), S: new THREE.Vector3(), G: new THREE.Vector3(),
     // The fist as drawn: the hair's length from her scalp toward the spring's end.
     P: new THREE.Vector3(),
-    F: 0, grip: 0 };
+    F: 0, grip: 0,
+    // 1.584.0, the hair drag (src/49-revwalk.js): `tune` the pull's way and
+    // weight for one hold (`outOf`, `draw` m, `k` times the arm's force, and
+    // a yank's `yankF` N and `yankDraw` m), null for PULL_RAG's own; `yk` a
+    // yank on top of the hold, { t, u }. Both off when the hand lets go, so a
+    // pull that never set them is the pull it always was.
+    tune: null, yk: null };
   const pullStats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, grabs: 0, rescues: 0, why: null,
     pitch: 0, pitchMax: 0, chest: 0, chestMax: 0, hip: 0, hipMax: 0, F: 0, Fmax: 0, back: null, relAt: null,
     hair: null };
@@ -48481,6 +48487,7 @@ async function buildJadrija(scene) {
     if (!on) {
       if (!pull.on) return false;
       pull.on = false; pull.rel = 0; pull.still = 0;
+      pull.tune = null; pull.yk = null;
       if (pullR && pullR.on) pullR.net.setString(pullR.hair, null, null, false);
       pullStats.relAt = 0; pullStats.back = null;
       return true;
@@ -48517,6 +48524,17 @@ async function buildJadrija(scene) {
       audio.startle('woman_young_slim', Math.hypot(eye.x - f.mesh.position.x, eye.z - f.mesh.position.z));
     }
     return true;
+  }
+
+  /**
+   * A yank on top of the hold (1.584.0, the hair drag): its share now, 0..1,
+   * `t` s in — up over 0.08 s, held 0.10, down over 0.35. See `pull.yk`.
+   */
+  function pullYankU(t) {
+    if (t < 0.08) { const u = t / 0.08; return u * u * (3 - 2 * u); }
+    if (t < 0.18) return 1;
+    if (t < 0.53) { const u = 1 - (t - 0.18) / 0.35; return u * u * (3 - 2 * u); }
+    return 0;
   }
 
   /** The arm's force this moment, N — see PULL_RAG.F. */
@@ -48609,9 +48627,16 @@ async function buildJadrija(scene) {
       // on her front, from beside the cot, your shoulder alone is as much
       // sideways as up and drags her head across the pillow — the hand of
       // someone pulling hair lifts it.
+      const TU = pull.tune;
+      let yU = 0;
+      if (pull.yk) {
+        pull.yk.t += dt;
+        yU = pullYankU(pull.yk.t) * pull.yk.u;
+        if (pull.yk.t > 0.6) pull.yk = null;
+      }
       _plV.set(pull.eye.x, pull.eye.y - PULL_RAG.down, pull.eye.z).sub(pull.G).normalize();
       pullFwd(f, R.fkW, R.cb, _plB).applyQuaternion(f.mesh.quaternion);
-      _plV.addScaledVector(_plB, -PULL_RAG.outOf).normalize();
+      _plV.addScaledVector(_plB, -(TU && TU.outOf != null ? TU.outOf : PULL_RAG.outOf)).normalize();
       // From where it closed to the hair's length out of her scalp along that
       // way, and `draw` on: the hair taken up, then her head drawn. Measured
       // from the grab alone, the draw was spent on the slack wherever the
@@ -48620,7 +48645,8 @@ async function buildJadrija(scene) {
       // hand's whole draw brought it level with her scalp: 22 N, and her head
       // 4 cm off the pillow (MEASURED).
       pullAt(f, R.fkW, R.fkT, R.hb, pull.sB, _plA);
-      _plA.addScaledVector(_plV, pull.len + PULL_RAG.draw);
+      _plA.addScaledVector(_plV, pull.len + (TU && TU.draw != null ? TU.draw : PULL_RAG.draw)
+        + (TU && TU.yankDraw != null ? TU.yankDraw : 0.12) * yU);
       _plA.lerp(pull.G, 1 - smoothstep(0, 1, pull.t / PULL_RAG.drawT));
       // Her scalp, on the net's head.
       _plE[0] = R.rb[0]; _plE[1] = R.rb[1]; _plE[2] = R.rb[2];
@@ -48633,7 +48659,8 @@ async function buildJadrija(scene) {
       const L = _plB.length();
       if (L <= pull.len) pull.T.copy(_plA);
       else {
-        const F = Math.min(k * (L - pull.len), pullForce(pull.t));
+        const F = Math.min(k * (L - pull.len), pullForce(pull.t) * (TU && TU.k != null ? TU.k : 1)
+          + (TU && TU.yankF != null ? TU.yankF : 80) * yU);
         pull.T.copy(pull.S).addScaledVector(_plB, (pull.len + F / k) / L);
       }
       net.setString(R.hair, [pull.T.x, pull.T.y, pull.T.z]);
@@ -80220,6 +80247,14 @@ async function buildJadrija(scene) {
         nx: n.x, ny: n.y, nz: n.z };
     },
     hairPull: (on, eye) => hairPull(!!on, eye || null),
+    /**
+     * The hair drag's two (1.584.0, src/49-revwalk.js): `hairPullTune(o)` the
+     * way and weight of this hold — { outOf, draw, k, yankF, yankDraw }, null
+     * for PULL_RAG's own; `hairYank(u)` a yank on top of it, 0..1. Both are
+     * forgotten when the hand lets go.
+     */
+    hairPullTune: (o) => { pull.tune = o ? Object.assign({}, o) : null; return !!pull.tune; },
+    hairYank: (u = 1) => { if (!pull.on) return false; pull.yk = { t: 0, u: Math.max(0, Math.min(1.5, +u || 0)) }; return true; },
     hairPullAt: () => {
       if (!(pull.grip > 0)) return null;
       const d = _plV.copy(pull.S).sub(pull.P);
