@@ -13,7 +13,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    Baye), her own ElevenLabs voice (pick a distinct female voice already on the account; ask
    nothing — choose one and say which), her orders/praise/teases spoken, chat with her
    while reversed (`/talk` routes to Chloe when roles are reversed), scene block awareness.
-2. [ ] **Phase 2b — Chloe uses the belt and the collar on player-Baye.** Belt: she takes it
+2. [x] **Phase 2b — Chloe uses the belt and the collar on player-Baye.** Belt: she takes it
    off, the AVBD strap in HER hand (third-person arm), swings at the cot targets, same hit
    path/marks/sounds; collar: she buckles it on you, leads you (camera follows), tugs move
    your pose (reuse the leash pose steps). Safeword ends both.
