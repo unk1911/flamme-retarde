@@ -159,7 +159,8 @@ const poser = (() => {
     const q = new Float32Array(nb * 4);
     L.forEach((v, i) => q.set(v, i * 4));
     const r = pose.root;
-    fig.manual({ q, t: new Float32Array([restT0[0] + r[0], restT0[1] + r[2], restT0[2] - r[1]]) });
+    // `exact`: the joint limits (41-skin.js) leave it alone — what is drawn is what exports.
+    fig.manual({ q, t: new Float32Array([restT0[0] + r[0], restT0[1] + r[2], restT0[2] - r[1]]), exact: true });
   }
 
   function capture() {

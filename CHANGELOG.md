@@ -8,6 +8,72 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.561.1] — 2026-10-01
+
+### The ventriloquist's arms: "arms out" solved against an arm from another pose
+
+Misha: *"when she is lying on the cot, sometimes her hands/arms do this weird
+twist, like a ventriloquist: normal human arms don't bend that way.. this
+looks like a bug"*. His screenshot had her on her back, forearms up beside
+her head, hands wrung palm-out and bent back at the wrist.
+
+**No clip does that.** All 55 of her clips, every frame, measured as each
+bone's turn off its rest in its own frame: the forearm twists at most 60
+degrees (`perch`), the hand 73 (`stretch`), the two together 78
+(`handstand`). The cot clips stay under 52.
+
+**`armsWide` did.** "Arms out" is two aims solved by `wheelLimb` from where
+the arm is, and the arm it solved from was sampled ONCE (`armsRest`) and kept
+for the rest of the session. But `cradle` and `supine` are not one pose each:
+ten seconds of hands on her thighs (or her belly), ten behind her head, in
+turn. Ask for arms out in one half and the turn worked out from that arm was
+laid, as a figure-space aim, on the other half's arm. MEASURED on 1.560.1:
+
+| arms out asked | then drawn | forearm twist | with the hand | elbow off its plane |
+|---|---|---|---|---|
+| hands behind her head | hands on her thighs | 151 | 182 | 90 |
+| hands on her thighs | hands behind her head | 3 | 4 | 74: forearms up by her face, hands palm-out (his picture) |
+
+And the first pose anybody said "arms out" in, on her front or her side, was
+the arm every later one was solved from. Her autonomous mode (1.560.0) says
+"arms out" on its own, which is the "sometimes".
+
+**The fix is in the cause.** The chain is the clip's own, every frame: last
+frame's local pose (clips, the cot's settle, the tug, before any aim) run
+forward (`armsNow`). And the solve now has an elbow: `hingeArm` turns the
+upper arm so the bind's elbow axis, carried by the clip, lies square to the
+solved arm's plane, and then closes the forearm about that hinge and nothing
+else. `wheelLimb` takes each bone the shortest way, which says nothing about
+how the humerus is rolled, so the forearm had to swing out of the elbow's
+plane to reach. Arms out across the whole `cradle`/`supine` loop now: forearm
+twist 68 at most, elbow 10 off its plane, no clamp.
+
+**Her hair tie was the same fault standing up.** `hairHands` (hair down /
+hair up) used the same shortest turns for a reach behind her head: 165-177
+degrees of forearm twist and the elbow 138 off its plane at the top of the
+gesture, both arms, every time, and her hand passed in front of her face
+palm-out on the way down. On `hingeArm` with the hinge it samples with the
+arm: 21 and 11.
+
+**And a net under all of it** (`limits` in 41-skin.js, `ARM_LIMITS` in
+43-jadrija.js): after every layer (clip, crossfade, overlay, settle, tug,
+aims), each forearm and hand is split into the twist about its own length and
+the swing left, in its own frame, and held to a human's: forearm twist 80
+either way, the hand's 80 and the two together 92, the elbow 78 off its
+plane, the wrist 115 in all. All of it sits outside every shipped clip, so a
+clip is drawn as baked and only a composition gone wrong is caught.
+`skinFig.limitStats()` counts what was clamped. The poser (`?pose`) is
+exempt: what is drawn while he poses her is what exports.
+
+**Soak, 1.560.1 against this** (warp 4, each about 16 min of world time: 80
+random cot asks and slaps across every cot pose, then 48 more with her
+autonomous mode on, her own moves among them): frames over the human bounds
+32 → 0, clamp hits 0. A
+sweep of the rest of her (shimmy, twerk, heart, note, cartwheel, flip, hair
+down and up, hug, kiss, ballet, the hammock, fours, kneel, the leash standing
+and on the cot): the only frames over the bounds were the hair tie, 209 → 0,
+and the clamp never fired. People 100, blockers 820, no console errors.
+
 ## [1.561.0] — 2026-10-01 (baye 1.53.0)
 
 ### Roles reversed: you in Baye's body, Chloe giving the orders

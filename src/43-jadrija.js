@@ -42582,6 +42582,29 @@ async function buildJadrija(scene) {
    */
   let testFigure = null;
   let skinFig = null;
+  /**
+   * HER FOREARMS AND WRISTS, HELD — the net under every layer that turns her
+   * arms (`limits` in 41-skin.js). Degrees, bone-local, off her rest.
+   *
+   * Misha, 1 Oct 2026: *"when she is lying on the cot, sometimes her
+   * hands/arms do this weird twist, like a ventriloquist"*. That one was
+   * `armsWide` solving against an arm cached from another pose (see there),
+   * 151 degrees of twist in the forearm and the elbow bent 90 off its hinge.
+   *
+   * The bounds are a human's and sit just outside every shipped clip —
+   * MEASURED over all 55, every frame: forearm twist 60 at most (`perch`),
+   * the hand's own 73 (`stretch`), the two together 78 (`handstand`), the
+   * elbow off its hinge plane 69 (`perch`, written that way in human_mh.py),
+   * and the wrist 109 in all (`handstand`, flat on the floor). So no clip is
+   * ever clamped, and a pronation-plus-supination arc of 184 is about what a
+   * forearm has.
+   */
+  const ARM_LIMITS = {
+    armLL: { child: 'handL', twist: 80, side: 78, hinge: [1, 0, 0] },
+    armLR: { child: 'handR', twist: 80, side: 78, hinge: [1, 0, 0] },
+    handL: { child: 'fingersL', twist: 80, total: 92, cone: 115 },
+    handR: { child: 'fingersR', twist: 80, total: 92, cone: 115 },
+  };
   let show = null;
   let banner = null;
   // The two horns, as a group hung off her head bone. Null until she has a
@@ -43464,6 +43487,9 @@ async function buildJadrija(scene) {
       if (!skinFig) throw new Error('no skinned figure');
       const mesh = skinFig.mesh;
       skinFig.play('idle', { fade: 0 });
+      // Her forearms and wrists held inside what a human's do, over every
+      // layer — see `limits` in 41-skin.js and ARM_LIMITS.
+      skinFig.limits(ARM_LIMITS);
       // Beside the open kabina, not beside the jetty.
       //
       // She was at `gapAt + 22` — 22 m east of the mole — and that was right
@@ -54666,7 +54692,6 @@ async function buildJadrija(scene) {
    * the surface she is lying on.
    */
   const ARMS = { out: 0.52, drop: 0.02, secs: 1.0 };
-  let armsRest = null;
   /**
    * The arm chain as the clip has it, sampled once into a caller's own cache.
    *
@@ -54679,10 +54704,11 @@ async function buildJadrija(scene) {
    * is simply skipped and she holds the thing at her side.
    *
    * A cache per caller rather than one shared one, which is what the hair and
-   * the blade already do. The shared `armsRest` is filled once and kept
+   * the blade already do. The shared `armsRest` was filled once and kept
    * forever, from whatever pose happened to be current the first time
    * anything wanted it, and two callers reaching for two different things
-   * from two different clips cannot both be right about that.
+   * from two different clips cannot both be right about that — and in the
+   * end it was not right for its own caller either (see `armsNow`).
    */
   function armChain(f) {
     const v = new THREE.Vector3();
@@ -54696,6 +54722,141 @@ async function buildJadrija(scene) {
     return out;
   }
 
+  /**
+   * THE ARM AS THE CLIP HAS IT THIS FRAME, and the elbow's hinge with it.
+   *
+   * Misha, 1 Oct 2026, her on her back on the cot: *"sometimes her hands/arms
+   * do this weird twist, like a ventriloquist: normal human arms don't bend
+   * that way"*. This was it. `armsWide` solved every frame against a chain
+   * sampled ONCE (`armsRest`, kept forever) — and `cradle` is not one pose:
+   * it is ten seconds of her hands holding her thighs and ten of them behind
+   * her head, turn and turn about, and `supine` the same. Asked for arms out
+   * in one half, the turn worked out from that half's arm was laid, as a
+   * figure-space aim, on the other half's — an arm that was somewhere else
+   * entirely. MEASURED: asked in the nape half, then into the hold, the
+   * forearm twisted 151 degrees off its rest (the hand's own 31 on top, 182
+   * in all, where her clips never pass 78), the elbow bent 90 degrees off its
+   * hinge, and the hand that should have been out at her shoulder was across
+   * her belly. And whichever pose she was in the FIRST time anybody said
+   * "arms out" — on her front, on her side — was the arm every later "arms
+   * out" was solved from, for the rest of the session. Her autonomous mode
+   * (1.560.0) says it on its own every minute or so, which is why "sometimes".
+   *
+   * So the chain is the clip's own, every frame: last frame's local pose (the
+   * clips, the cot's settle and the tug — everything before an aim) run
+   * forward, so the solve never works from an arm that is not there and never
+   * from its own previous answer. And the hinge, which the old solve did not
+   * have: the bind's elbow axis, carried by the clip's upper arm.
+   */
+  let _awQ = null, _awT = null, _awE = null;
+  const _awH = new THREE.Vector3(), _awW = new THREE.Vector3(), _awQU = new THREE.Quaternion();
+  const armNow = { L: null, R: null };
+  function armsNow(f) {
+    if (!armsInit(f)) return false;
+    const L = f.local();
+    ragdollFK(f, L.q, L.t, _awQ, _awT);
+    for (const s of ['L', 'R']) {
+      const A = _awE[s], N = armNow[s];
+      N.S.set(_awT[3 * A.iu], _awT[3 * A.iu + 1], _awT[3 * A.iu + 2]);
+      N.E.set(_awT[3 * A.il], _awT[3 * A.il + 1], _awT[3 * A.il + 2]);
+      N.W.set(_awT[3 * A.ih], _awT[3 * A.ih + 1], _awT[3 * A.ih + 2]);
+      _awQU.set(_awQ[4 * A.iu], _awQ[4 * A.iu + 1], _awQ[4 * A.iu + 2], _awQ[4 * A.iu + 3]).multiply(A.bq);
+      N.hinge.copy(A.e).applyQuaternion(_awQU);
+    }
+    return true;
+  }
+  /** The buffers, and each elbow's hinge in the bind, the first time. */
+  function armsInit(f) {
+    const nb = f.bones.length;
+    if (!_awQ || _awQ.length !== nb * 4) {
+      _awQ = new Float32Array(nb * 4); _awT = new Float32Array(nb * 3);
+      // The elbow's axis in the bind, each side: upper arm × forearm, which is
+      // the way it flexes (her bind elbow is 47 degrees bent).
+      const B = f.bindRest(), T = B.bindT;
+      _awE = {};
+      for (const s of ['L', 'R']) {
+        const iu = f.boneIndex('armU' + s), il = f.boneIndex('armL' + s), ih = f.boneIndex('hand' + s);
+        if (iu < 0 || il < 0 || ih < 0) { _awE = null; return false; }
+        const u = new THREE.Vector3(T[3 * il] - T[3 * iu], T[3 * il + 1] - T[3 * iu + 1], T[3 * il + 2] - T[3 * iu + 2]);
+        const a = new THREE.Vector3(T[3 * ih] - T[3 * il], T[3 * ih + 1] - T[3 * il + 1], T[3 * ih + 2] - T[3 * il + 2]);
+        _awE[s] = { iu, il, ih, e: u.cross(a).normalize(),
+          bq: new THREE.Quaternion(B.bindQ[4 * iu], B.bindQ[4 * iu + 1], B.bindQ[4 * iu + 2], B.bindQ[4 * iu + 3]).invert() };
+        armNow[s] = { S: new THREE.Vector3(), E: new THREE.Vector3(), W: new THREE.Vector3(), hinge: new THREE.Vector3() };
+      }
+    }
+    return !!_awE;
+  }
+  /** Side `s`'s elbow hinge as the figure is drawn now (its last update), into `out`. */
+  function armHingeDrawn(f, s, out) {
+    if (!armsInit(f)) return null;
+    const A = _awE[s];
+    return out.copy(A.e).applyQuaternion(f.boneTurn(A.iu, _awQU));
+  }
+
+  /**
+   * Two bones to `goal`, the elbow toward `pole` — and BENDING ON ITS HINGE.
+   *
+   * `wheelLimb` takes each bone the shortest way round to its new direction,
+   * which is right for a bicycle's knees and wrong for an elbow taken a long
+   * way: the shortest turn of the upper arm says nothing about how the humerus
+   * is rolled, so the forearm then has to swing to the wrist out of the plane
+   * the elbow bends in — the ventriloquist's elbow. Here the upper arm is
+   * turned so its carried hinge lies square to the plane of the solved arm,
+   * and the forearm then closes about that hinge and nothing else. The same
+   * two `aim`s out and the same elbow point, on a real joint.
+   */
+  const _hlA = new THREE.Vector3(), _hlV = new THREE.Vector3(), _hlU = new THREE.Vector3();
+  const _hlL = new THREE.Vector3(), _hlR0 = new THREE.Vector3(), _hlRL = new THREE.Vector3();
+  const _hlH0 = new THREE.Vector3(), _hlH1 = new THREE.Vector3(), _hlK = new THREE.Vector3();
+  const _hlM0 = new THREE.Matrix4(), _hlM1 = new THREE.Matrix4(), _hlX = new THREE.Vector3();
+  const _hlQU = new THREE.Quaternion(), _hlQL = new THREE.Quaternion();
+  function hingeArm(f, nU, nL, S, E, W, hinge, goal, pole) {
+    const l1 = E.distanceTo(S), l2 = W.distanceTo(E);
+    const D = _hlA.copy(goal).sub(S);
+    const dl = D.length() || 1e-3;
+    const u = D.multiplyScalar(1 / dl);
+    const d = clamp(dl, Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999);
+    const ca = clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
+    const sa = Math.sqrt(1 - ca * ca);
+    const v = _hlV.copy(pole).addScaledVector(u, -pole.dot(u));
+    if (v.lengthSq() < 1e-8) v.set(1, 0, 0).addScaledVector(u, -u.x);
+    v.normalize();
+    const dirU = _hlU.copy(u).multiplyScalar(ca).addScaledVector(v, sa);
+    const elbow = _hlK.copy(S).addScaledVector(dirU, l1);
+    const dirL = _hlL.copy(S).addScaledVector(u, d).sub(elbow).normalize();
+    // The upper arm: (its line, its hinge) as the clip has them → (where it
+    // goes, the solved arm's hinge). The hinge squared to the bone first.
+    const r0 = _hlR0.copy(E).sub(S).normalize();
+    const h0 = _hlH0.copy(hinge).addScaledVector(r0, -hinge.dot(r0));
+    const h1 = _hlH1.crossVectors(dirU, dirL);
+    if (h0.lengthSq() < 1e-8 || h1.lengthSq() < 1e-10) {
+      _hlQU.setFromUnitVectors(r0, dirU);
+    } else {
+      h0.normalize(); h1.normalize();
+      _hlM0.makeBasis(r0, h0, _hlX.crossVectors(r0, h0));
+      _hlM1.makeBasis(dirU, h1, _hlX.crossVectors(dirU, h1));
+      _hlQU.setFromRotationMatrix(_hlM1.multiply(_hlM0.transpose()));
+    }
+    // The forearm, carried by that, closed on to its line ABOUT THE HINGE and
+    // nothing else: the turn in the hinge's plane from where it is to where
+    // it goes. Not the shortest turn between the two — when the clip's
+    // forearm is folded back past the line it has to go to, that turn is
+    // near 180 degrees and its axis is anybody's, which is a forearm spun
+    // on itself (MEASURED, 99 degrees past the limit going from her side to
+    // sitting up, before this). Whatever the clip has off the plane, it keeps.
+    const rl = _hlRL.copy(W).sub(E).normalize().applyQuaternion(_hlQU);
+    if (h1.lengthSq() > 0.5) {
+      const ry = rl.dot(h1);
+      rl.addScaledVector(h1, -ry);
+      const phi = Math.atan2(_hlX.crossVectors(rl, dirL).dot(h1), rl.dot(dirL));
+      _hlQL.setFromAxisAngle(h1, phi);
+    } else {
+      _hlQL.setFromUnitVectors(rl, dirL);
+    }
+    armAimQ(f, nU, _hlQU);
+    armAimQ(f, nL, _hlQL);
+  }
+
   function armsWide(f, dt) {
     const want = show.armsWide ? 1 : 0;
     show.armsAt = damp(show.armsAt || 0, want, 1 / ARMS.secs, dt);
@@ -54706,21 +54867,25 @@ async function buildJadrija(scene) {
       }
       return;
     }
-    if (!armsRest) {
-      armsRest = armChain(f);
-      if (!armsRest) return;
-    }
+    if (!armsNow(f)) return;
     show.armsWasOn = 1;
+    const e = show.armsAt;
     for (const side of ['L', 'R']) {
-      const S = armsRest['armU' + side];
-      const E = armsRest['armL' + side];
-      const W = armsRest['hand' + side];
+      const { S, E, W, hinge } = armNow[side];
       const sgn = Math.sign(S.z || 1);
       _hugGoal.set(S.x, S.y - ARMS.drop, S.z + sgn * ARMS.out);
-      _hugGoal.lerpVectors(W, _hugGoal, show.armsAt);
-      // Elbow away from her body, which is the only bend an arm held out has.
-      _hugPole.set(0, -0.3, sgn).normalize();
-      wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _hugGoal, _hugPole);
+      _hugGoal.lerpVectors(W, _hugGoal, e);
+      // Elbow away from her body, which is the only bend an arm held out has
+      // — eased in from where the clip's own elbow is, so the first frame of
+      // the reach is the clip's arm and not an elbow that jumps to the pole.
+      _awW.copy(W).sub(S).normalize();
+      _awH.copy(E).sub(S);
+      _awH.addScaledVector(_awW, -_awH.dot(_awW));
+      if (_awH.lengthSq() > 1e-10) _awH.normalize();
+      _hugPole.set(0, -0.3, sgn).normalize().multiplyScalar(e).addScaledVector(_awH, 1 - e);
+      if (_hugPole.lengthSq() < 1e-8) _hugPole.set(0, -0.3, sgn);
+      _hugPole.normalize();
+      hingeArm(f, 'armU' + side, 'armL' + side, S, E, W, hinge, _hugGoal, _hugPole);
     }
   }
 
@@ -55585,6 +55750,9 @@ async function buildJadrija(scene) {
         f.boneAt(i, v);
         out[n] = v.clone();
       }
+      // And each elbow's hinge, as drawn at the same moment — see `hingeArm`.
+      out.hingeL = armHingeDrawn(f, 'L', new THREE.Vector3());
+      out.hingeR = armHingeDrawn(f, 'R', new THREE.Vector3());
       hairRest = out;
     }
     const H = hairRest.head;
@@ -55598,7 +55766,13 @@ async function buildJadrija(scene) {
       _hugGoal.lerpVectors(W, _hugGoal, e);
       _hugPole.set(HAIRDO.pole[0], HAIRDO.pole[1], sgn * HAIRDO.pole[2])
         .normalize();
-      wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _hugGoal, _hugPole);
+      // On the elbow's hinge (1.560.2). The shortest turns `wheelLimb` takes
+      // put this reach through 175 degrees of forearm twist and the elbow 140
+      // off its plane at the top of it — MEASURED, both arms, every time she
+      // tied her hair — the same wrung forearm as `armsWide`'s, standing up.
+      const hg = hairRest['hinge' + side];
+      if (hg) hingeArm(f, 'armU' + side, 'armL' + side, S, E, W, hg, _hugGoal, _hugPole);
+      else wheelLimb(f, 'armU' + side, 'armL' + side, S, E, W, _hugGoal, _hugPole);
       // Readable from a probe, because "her hands went to her head" is a
       // sentence a render cannot settle and a distance can.
       if (side === 'L') {
