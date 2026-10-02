@@ -21,7 +21,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    misses (solve the arm to the target with the same two-bone hinge solver as 1.561.1),
    kneel-by-the-cot instead of squat, head tracking you, hand poses (open palm, grip),
    circling, hair stroke, hand on your back holding you down, sitting on the cot edge.
-4. [ ] **New leg poses (both modes).** Legs spread WIDER (a further step past `legs.wider`),
+4. [x] **New leg poses (both modes).** Legs spread WIDER (a further step past `legs.wider`),
    one leg flat on the cot + the other raised (left/right), both legs raised, and raised
    HIGHER — solved poses (Blender solvers / ?pose harness, rig sign traps), with commands,
    keys in reverse mode, autonomous-mode moves, and Chloe orders for each.
